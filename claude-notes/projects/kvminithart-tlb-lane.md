@@ -56,6 +56,7 @@ written, built green, and REVERTED for this reason. Do not re-introduce it.
 | `11eb3a09` | `Global Opaque s_tlb_at` |
 | `ba32b71e` | revert of the funnel wiring (see §3) |
 | `9466bad8` | **`swp_run_hart_active_instr_S_res_b`** and the `iApply` diagnosis (see §3) |
+| (this session) | **`WpSmodeIntr.wp_instr_s_sconf_off_clock` is off `sie_cap_to_cells`** — two concrete branches on the arm; 14 s, statement unchanged |
 
 The nine data sites (`WpSconfLock` 1, `WpSconfMem` 2, `WpPlic` 2,
 `WpVirtioDev` 2, `ProofUart` 2) now keep the translation slot FOLDED exactly
@@ -104,25 +105,74 @@ Related, same session: one `set_solver` in a tower-carrying context cost 417 of
 
 ## 4. WHAT IS LEFT, IN ORDER
 
-### 4a. Finish the SIE=0 funnel (unblocked; est. small now)
+### 4a. The SIE=0 funnel — **DONE**
 
-`WpSmodeIntr.wp_instr_s_sconf_off_clock` is at its ORIGINAL committed form.
-To convert it:
+`WpSmodeIntr.wp_instr_s_sconf_off_clock` no longer calls `sie_cap_to_cells`
+or `sie_cap_of_cells`.  It opens with `sie_cap_frame_acc`, splits the arm
+ONCE with `destruct Harm as [[-> Hbsok] | [-> Hksok]]` (destructing `s_arm_ok`
+itself, not `s_arm_cells`: the Bare disjunct already carries the
+`bare_satp_ok` that `_res_b` wants, and the KPT set-inequality never has to be
+proved), and runs two branches that are CONCRETE in the write set —
+`swp_run_hart_active_instr_S_res` / `s_Drw` / `s_disj …` and
+`swp_run_hart_active_instr_S_res_b` / `s_Drwb` / `s_disj_b …` — over
+`s_frames_cells_D` at that set.  14 s, no statement changed.
 
-1. open with `sie_cap_frame_acc` → `(SD satp0 tlbv pcfg paddr)` plus
-   `%Harm`, `#Hwitk`, and the closer;
-2. `destruct (s_arm_cells _ _ Harm) as [-> | ->]` immediately, so both
-   branches are CONCRETE (this is what §3 requires);
-3. in each branch use the concrete engine —
-   `swp_run_hart_active_instr_S_res` at `s_Drw`,
-   `swp_run_hart_active_instr_S_res_b` at `s_Drwb` — plus
-   `s_frames_cells_D … SD Hcellsok` and the `sf_*` memberships;
-4. hand the leaf its capability through the closer, and re-open with
-   `sie_cap_cells_at SD` (which absorbs a leaf that flipped the arm);
-5. `WpSmodeWfi` has one more `sie_cap_to_cells` site, same treatment.
+Three things the recipe did not foresee, all of which the next lane will meet
+again:
 
-The two-branch text was written once and is recoverable from the reflog /
-`ba32b71e^`; only the engine calls need to become the concrete pair.
+* **THE CLOSER CANNOT BE RE-DERIVED, SO IT HAS TO RIDE — TWICE.**  The slot is
+  opened once at the top and again INSIDE the leaf's own postcondition (the
+  landing frames want its satp / PMP cells at the landing file) and re-sealed
+  OUTSIDE, after the tick.  At the Bare arm the closer is where the tlb cell
+  is PARKED, so nothing at the far end can rebuild it.  Both crossings are the
+  funnel's own choice of a rider, so both are payable without touching a
+  statement: the first goes in the engine's `W` parameter (the leaf is handed
+  a FOLDED capability, so the closer must reach it), the second in a local
+  `off_ret SD b' R rs2 := intr_ret … ∗ off_close SD rs2`, keyed on the landing
+  file so the continuation can name the values it pins.
+* **`WpSFrames.s_tick_agree` HAS NO BARE TWIN, AND CANNOT.**  `swp_tick_wrap_ex`
+  hands its agreement back over `(Drw ∪ Dro) ∖ tk_clock3`, and at `s_Drwb` that
+  set has no tlb in it — so the landing tower cannot name the tlb value the
+  cycle started with.  It names the LANDING FILE's instead
+  (`register_lookup tlb rs3`), which is sound exactly because a frame at
+  `s_Drwb` does not contain the cell.  `s_tick_agree_b` is local to
+  `WpSmodeIntr.v` and is `s_tick_agree`'s proof with the tlb case closed by
+  `reflexivity`.  If a third consumer wants it, move it to `WpSFrames`.
+* **THE TWO BRANCHES ARE 250 LINES EACH.**  There is no factoring: any helper
+  with the write set in a parameter position re-triggers §3 (measured — even
+  at a fully CONCRETE argument, `_D s_Drw s_frame_ok_Drw` diverges).
+
+### 4a′. `WpSmodeWfi` — NOT "the same treatment", and it is its own lane
+
+`WpSmodeWfi.v:1037`'s `sie_cap_to_cells` cannot be converted the same way, and
+this is a design item rather than a proof edit.  The wfi does not run on
+`s_Drw`: it has its OWN hart-parking footprint `wfi_Drw` (= `s_Drw` with
+`hart_state` moved into the writable half), defined in that file, containing
+`tlb`, and hard-wired concretely through roughly 900 lines —
+
+* `wfi_Drw`/`wfi_Dro` plus ~20 membership lemmas, `wfi_union`,
+  `wfi_rw_split` / `wfi_ro_split` / `wfi_rw_ext` / `wfi_ro_ext`,
+  `wfi_frames_s` (the bridge to `s_Drw`/`s_Dro`);
+* the whole WAIT phase — `wfi_stay` / `wfi_wake` / `wfi_moved` and their ten
+  set lemmas, `wfi_wait_cases`, `wfi_wait_loop`, `wfi_land_cell` /
+  `wfi_land_PC` — all stated at `wfi_Drw ∪ wfi_Dro`;
+* `wfi_run_enter` (257 lines), the enter step's run layer, stated at
+  `s_Drw`/`s_Dro`.
+
+The *dependencies* are all already set-generic (`swp_exec_step_full`,
+`swp_exec_step_waiting`, `swp_span`, `SmodeCorePt`'s `spt_tr_obl_D` /
+`spt_disp_obl_D` / `spt_dispatch_none_D` / `spt_fetch_S_P` /
+`swp_run_hart_active_gen_exf_res`, and `spt_tr_obl_of_regime_D` for the Bare
+side condition), so nothing outside `WpSmodeWfi.v` has to change.  What is
+missing is the abstraction `HartSFrame` already has and this file does not: a
+`wfi_frame_ok`-style record plus the `_D` forms, so the family can be stated
+once and instantiated twice.  Writing `_b` twins by hand instead means ~900
+duplicated lines, which is the wrong answer.
+
+**So: `wp_wfi_s_sconf` still calls `sie_cap_to_cells` / `_of_cells`, and 4b's
+restriction of those two to `b = true` will break it** (the wfi's `b` is
+generic, and its `intr_count 0 false` premise pins SIE=0 rather than the arm).
+Decide the `wfi_frame_ok` question before starting 4b.
 
 ### 4b. Then, and only then, flip `bare_inv`
 

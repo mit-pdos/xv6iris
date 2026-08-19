@@ -214,6 +214,69 @@ Section WpSmodeIntr.
               cy1 ti1 ip1 ms1 pcfg1 paddr1 mc micfg misa0 mseccfg0
               (mword_of_int 0) pmar0 elp0 satp1 MIE_S mdv1 MENVCFG_S tlb1.
 
+  (* THE SLOT'S CLOSER, KEYED ON THE LANDING FILE.  The translation slot is
+     re-opened INSIDE the leaf's own postcondition -- the landing frames want
+     its satp / PMP cells at the file the instruction landed on -- and
+     re-sealed OUTSIDE, after the tick.  So the closer has to RIDE, and it
+     rides beside [WpIntrInv.intr_ret] in the cycle's own rider: at the Bare
+     arm it is where the tlb cell is PARKED, so there is nothing at the far
+     end to rebuild it from.  Every value it pins is read off the landing
+     file, which is what lets the continuation name it. *)
+  Definition off_close (SD : gset register) (rs2 : regstate) : iProp Σ :=
+    (∀ (m' : regfile) (av' : nat) (b'' : bool) (tv' : type_of_register tlb),
+       ⌜ SD = s_Drwb -> tv' = register_lookup tlb rs2 ⌝ -∗
+       satp ↦ᵣ register_lookup satp rs2 -∗ s_tlb_at SD tv' -∗
+       pmpcfg_n ↦ᵣ register_lookup pmpcfg_n rs2 -∗
+       pmpaddr_n ↦ᵣ register_lookup pmpaddr_n rs2 -∗
+       strans_res_at (register_lookup satp rs2) tv' -∗
+       sie_cap_rest kt m' av' b'' p -∗
+       sie_cap kt m' av' b'' p)%I.
+
+  Definition off_ret (SD : gset register) (b' : bool)
+      (R : CpuId -> mword 64 -> mword 64 -> regfile -> nat -> iProp Σ)
+      (rs2 : regstate) : iProp Σ :=
+    (intr_ret kt p b' R rs2 ∗ off_close SD rs2)%I.
+
+  (* [WpSFrames.s_tick_agree] AT THE BARE FRAME.  The tick hands its
+     agreement back over [(Drw ∪ Dro) ∖ tk_clock3], and at [s_Drwb] that set
+     has NO tlb in it -- so the landing tower cannot name the value the cycle
+     started with and names the landing file's instead.  That is sound
+     exactly because a frame at [s_Drwb] does not contain the cell; the proof
+     is [s_tick_agree]'s with the tlb case closed by [reflexivity]. *)
+  Local Lemma s_tick_agree_b (pc npc ms : mword 64) (bmi : bool)
+      (cy ti ip mst0 : mword 64) (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n)
+      (mc : mword 32) (micfg misa0 mseccfg0 senv0 : mword 64)
+      (pmar0 : list PMA_Region) (elp0 : type_of_register elp)
+      (satp0 mie0 mdv0 menv0 : mword 64) (tlbv : type_of_register tlb)
+      (mi : mword 64) (rs : regstate) :
+    reg_agree_on ((s_Drwb ∪ s_Dro) ∖ tk_clock3) rs
+      (wrap_post (s_rs pc npc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                    mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv)
+         mi) ->
+    reg_agree_on (s_Drw ∪ s_Dro) rs
+      (s_rs npc npc mi bmi
+         (register_lookup (R_bitvector_64 mcycle) rs)
+         (register_lookup (R_bitvector_64 mtime) rs)
+         (register_lookup (R_bitvector_64 mip) rs)
+         mst0 pcfg paddr mc micfg misa0 mseccfg0 senv0 pmar0 elp0
+         satp0 mie0 mdv0 menv0 (register_lookup tlb rs)).
+  Proof.
+    intros Hag. apply s_rs_agree.
+    all: try reflexivity.
+    all: (etransitivity;
+          [ apply Hag; rewrite /s_Drwb /s_Dro /tk_clock3; set_solver | ]).
+    all: try (by rewrite wrap_post_PC s_rs_nPC).
+    all: try (by rewrite wrap_post_ms).
+    all: rewrite wrap_post_other;
+      [| vm_compute; reflexivity | vm_compute; reflexivity ].
+    all: by rewrite ?s_rs_PC ?s_rs_nPC ?s_rs_ms ?s_rs_mi ?s_rs_cy ?s_rs_ti
+              ?s_rs_ip ?s_rs_tlb ?s_rs_priv ?s_rs_mst ?s_rs_hart ?s_rs_pcfg
+              ?s_rs_paddr ?s_rs_mc ?s_rs_micfg ?s_rs_misa ?s_rs_sec
+              ?s_rs_pma ?s_rs_htif ?s_rs_elp ?s_rs_senv ?s_rs_satp
+              ?s_rs_mie ?s_rs_mdl ?s_rs_menv.
+  Qed.
+
   (* THE SIE=0 ARM, PROVED HERE RATHER THAN ON [SmodeCorePt]'s WRAPPER.
      The wrapper ([wp_instr_s_config_regime]) now has everything this arm
      needs on the leaf side -- the borrowed [clock_res] and an existential
@@ -231,17 +294,20 @@ Section WpSmodeIntr.
      So this arm INLINES [HartMCycle.wp_loop_cycle_ex]'s own two lines
      ([swp_loop] then [swp_tick_wrap_ex]) and takes that later HERE.  The
      rest is the SIE=1 engine's plumbing with the trap arm deleted:
-       - the bundle opens into the 25 cells ([WpIntrInv.sconf_to_cells] and
-         [WpIntrInv.sie_cap_to_cells], the latter arm-GENERIC through the
-         regime's own bundle face, so the Bare slot before kvminithart is
-         covered as well as the kernel table);
+       - the bundle opens into the cells ([WpIntrInv.sconf_to_cells] and
+         [WpIntrInv.sie_cap_frame_acc]).  The SLOT is where the two
+         translation arms are told apart, and this is the only funnel that
+         has to: the accessor hands out [s_tlb_at SD] rather than the tlb
+         cell, so the Bare slot before kvminithart need not fund one;
        - SIE=0 is read off the capability's ghost quarter, which is what
          the index [b = false] MEANS, and it makes [s_dispatch] [None] --
          so the run rule's trap payload is instantiated at [False];
-       - the body is [WpIntrInv.swp_run_hart_active_instr_S_res] at the
-         regime residue, and the rider is [WpIntrInv.intr_ret], the same
-         one the SIE=1 engine uses: the frames go back at the landing
-         tower and the non-cell residue rides beside them. *)
+       - the body is [WpIntrInv.swp_run_hart_active_instr_S_res] at the KPT
+         arm and [_res_b] at the Bare one -- two CONCRETE branches, because
+         a write set in a parameter position makes the [iApply] diverge --
+         and the rider is [WpIntrInv.intr_ret] with the slot's closer
+         beside it ([off_ret]): the frames go back at the landing tower and
+         the non-cell residue rides beside them. *)
   Lemma wp_instr_s_sconf_off_clock (m : regfile) (n : nat)
       (pc : mword 64) (is_rvc : bool) (i : instruction) (b' : bool)
       (R : CpuId -> mword 64 -> mword 64 -> regfile -> nat -> iProp Σ) :
@@ -257,8 +323,16 @@ Section WpSmodeIntr.
     iDestruct (sconf_to_cells with "Hsc") as (mst0 mdv0)
       "(%Hmsf & %Hmm & #Hhw & #Hminv & Hpriv & Hms & Hhalf & Htie & Hmie &
         Hmdl & Hmenv)".
-    iDestruct (sie_cap_to_cells with "Hcap") as (satp0 tlbv pcfg paddr)
-      "(%Hsok & %Hpok & Hsatp & Htlb & Hpcfg & Hpaddr & Hres & Hrest)".
+    (* THE SLOT, THROUGH THE ARM-AWARE ACCESSOR.  [sie_cap_to_cells] hands
+       out the tlb CELL unconditionally, and that is exactly what forces the
+       Bare arm to fund one; [WpIntrInv.sie_cap_frame_acc] hands out
+       [s_tlb_at SD] instead -- the cell at the kernel table, [emp] under
+       Bare -- with the arm as a PURE fact and the re-seal as a closer.  See
+       claude-notes/projects/kvminithart-tlb-lane.md. *)
+    iDestruct (sie_cap_frame_acc with "Hcap") as (SD satp0 tlbv pcfg paddr)
+      "(%Harm & %Hpok & #Hwitk & Hsatp & Htlb & Hpcfg & Hpaddr & Hres &
+        Hrest & Hclose)".
+    pose proof (s_arm_satp_ok _ _ Harm) as Hsok.
     (* SIE = 0 IS READ OFF THE CAPABILITY'S OWN GHOST QUARTER, which is what
        the arm index [b = false] MEANS.  It is what makes the dispatch's
        [Some] arm refutable below, so the whole trap payload is [False]. *)
@@ -279,230 +353,523 @@ Section WpSmodeIntr.
         %Hmisaval & %Hsecval & #Hkmapb)".
     iDestruct (hw_config_cert with "Hhw") as "#Hcert".
     pose proof Hmsf as Hmsf'. destruct Hmsf' as (HMPRV & HSXL & _).
-    (* ---- the cycle's frame, at the tower the cells make ---- *)
-    iAssert (hreg_frame (s_rs pc pc msr bmi cy ti ip mst0 pcfg paddr mc micfg
-                 misa0 mseccfg0 (mword_of_int 0) pmar0 elp0 satp0 MIE_S mdv0
-                 MENVCFG_S tlbv) s_Drw ∗
-             hreg_frame_ro (s_Df (DfracOwn 1))
-               (s_rs pc pc msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
-                  mseccfg0 (mword_of_int 0) pmar0 elp0 satp0 MIE_S mdv0
-                  MENVCFG_S tlbv) s_Dro)%I
-      with "[HPC HnPC Hmsr Hmi Hcy Hti Hip Htlb Hpriv Hms Hhs Hpcfg Hpaddr
-             Hsatp Hmie Hmdl Hmenv]" as "[Hsrw Hsro]".
-    { rewrite (s_frames_cells pc pc msr bmi cy ti ip mst0 pcfg paddr mc micfg
-                 misa0 mseccfg0 (mword_of_int 0) pmar0 elp0 satp0 MIE_S mdv0
-                 MENVCFG_S tlbv).
-      rewrite /s_cells. srs.
-      iFrame "HPC HnPC Hmsr Hmi Hcy Hti Hip Htlb Hpriv Hms Hhs Hpcfg Hpaddr
-              Hsatp Hmie Hmdl Hmenv".
-      iFrame "Hmc Hmicfg Hmisa Hmseccfg Hpma Hhtif Help Hsenv". }
-    (* ---- THE CYCLE, WITH THE LATER STRIPPED BY HAND.
-       [HartMCycle.wp_loop_cycle_ex] is inlined ([swp_loop] + [swp_tick_wrap_ex],
-       its own two lines) for ONE reason: this funnel's callback sits under an
-       outermost [▷], and [swp_loop]'s later is the only one in the whole
-       chain -- taking it here is what puts the leaf's obligation in hand
-       BEFORE the body has to be supplied. ---- *)
-    iDestruct "Hresv" as (rr) "Hfrag".
-    iApply (swp_loop rr with "Hcert Hfrag").
-    iNext. iIntros (tick) "Hfrag".
-    iApply (swp_mono _ _ (fun _ => WP (Loop : expr riscv_lang))%I
-              with "[] [-]").
-    2:{ iApply (swp_tick_wrap_ex s_Drw s_Dro (s_Df (DfracOwn 1))
-                  (fun rsx => exists (rs2 : regstate) (mi : mword 64),
-                     off_Q pc msr mc micfg misa0 mseccfg0 pmar0 elp0 rs2 /\
-                     rsx = wrap_post rs2 mi)
-                  (fun rsx => ∃ (rs2 : regstate) (mi : mword 64),
-                     ⌜off_Q pc msr mc micfg misa0 mseccfg0 pmar0 elp0 rs2 /\
-                      rsx = wrap_post rs2 mi⌝ ∗ intr_ret kt p b' R rs2)%I
-                  tick s_disj s_w_cy s_w_ti s_w_ip with "Hcert [-]").
-        (* [swp_try_step_any_ex] lands at [wrap_post rs2 mi] with the two
-           existentials OUTSIDE; the tick wants them inside its [rs1]. *)
-        iApply (swp_mono with "[] [-]").
-        2:{ iApply (swp_try_step_any_ex s_Drw s_Dro (s_Df (DfracOwn 1))
-                  (s_rs pc pc msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
-                     mseccfg0 (mword_of_int 0) pmar0 elp0 satp0 MIE_S mdv0
-                     MENVCFG_S tlbv)
-                  (off_Q pc msr mc micfg misa0 mseccfg0 pmar0 elp0)
-                  (intr_ret kt p b' R)
-                  s_disj s_in_priv s_in_hart s_in_mc s_in_micfg s_w_mi
-                  s_in_mi s_w_ms s_in_ms s_w_PC s_in_PC s_in_nPC
-                  ltac:(by srs)
-                  ltac:(intros rs2 HQ; destruct HQ as (npc & ms1 & mdv1 & cy1
-                          & ti1 & ip1 & satp1 & pcfg1 & paddr1 & tlb1 & _ & _
-                          & _ & _ & ->); by srs)
-                  ltac:(intros rs2 HQ; destruct HQ as (npc & ms1 & mdv1 & cy1
-                          & ti1 & ip1 & satp1 & pcfg1 & paddr1 & tlb1 & _ & _
-                          & _ & _ & ->);
-                        rewrite s_rs_mc s_rs_micfg s_rs_priv; by srs)
-                  with "Hcert Hsrw Hsro [-]").
-        iIntros "Hrw Hro".
-        (* the prelude's file, re-anchored on the tower *)
-        pose proof (s_pre_agree pc msr bmi cy ti ip mst0 pcfg paddr mc micfg
-                      misa0 mseccfg0 (mword_of_int 0) pmar0 elp0 satp0 MIE_S
-                      mdv0 MENVCFG_S tlbv) as Hpre.
-        iDestruct (s_rw_ext _ _ Hpre with "Hrw") as "Hrw".
-        iDestruct (s_ro_ext (DfracOwn 1) _ _ Hpre with "Hro") as "Hro".
-        iApply (swp_mono with "[] [-]").
-        2:{ iApply (swp_run_hart_active_instr_S_res pc msr
-                      (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0
-                      pcfg paddr mc micfg misa0 mseccfg0 (mword_of_int 0)
-                      pmar0 elp0 satp0 mdv0 tlbv is_rvc i
-                      (off_Q pc msr mc micfg misa0 mseccfg0 pmar0 elp0)
-                      (intr_ret kt p b' R)
-                      (wp_next false p
-                         (sconf_step_obl_clock m n false b' pc is_rvc i R)
-                       ∗ ghost_var sie_gname (1/2) (_get_Mstatus_SIE mst0)
-                       ∗ sret_tie mst0 ∗ sie_cap_rest kt m n false p
-                       ∗ gpr_file (tp_pin m))%I
-                      (fun _ _ => False)%I
-                      Hmisaval HSXL HMPRV Hmm Helpnp (pma_all_ram Hpmaall)
-                      Hsok Hpok
-                      with "Hcert Hinstr Hres Hfrag
-                            [$Hbody $Hhalf $Htie $Hrest $Hfile] Hrw Hro
-                            [] []").
-            (* ---------- NO TRAP: SIE = 0 makes [s_dispatch] [None] ------- *)
-            { iIntros (ii pr) "%Hd _ _ _ _ _".
-              iPureIntro. destruct Hd as (meip & seip & Hd).
-              rewrite /s_dispatch HSIE in Hd. cbn [andb] in Hd. discriminate. }
-            (* ---------- THE INSTRUCTION ---------- *)
-            iIntros (tv') "HW HRes Hany Hrw Hro".
-            iDestruct "HW" as "(Hwn & Hhalf & Htie & Hrest & Hfile)".
-            pose proof (s_rs_set_nPC pc pc
-                       (add_vec_int pc (if is_rvc then 2 else 4)) msr
-                       (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0
-                       pcfg paddr mc micfg misa0 mseccfg0 (mword_of_int 0)
-                       pmar0 elp0 satp0 MIE_S mdv0 MENVCFG_S tv') as Hagf.
-            iDestruct (s_rw_ext _ _ Hagf with "Hrw") as "Hrw".
-            iDestruct (s_ro_ext (DfracOwn 1) _ _ Hagf with "Hro") as "Hro".
-            iAssert (s_cells pc (add_vec_int pc (if is_rvc then 2 else 4)) msr
-                       (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0
-                       pcfg paddr mc micfg misa0 mseccfg0 (mword_of_int 0)
-                       pmar0 elp0 satp0 MIE_S mdv0 MENVCFG_S tv')
-              with "[Hrw Hro]" as "Hcells".
-            { rewrite -s_frames_cells. iFrame. }
-            iEval (rewrite /s_cells) in "Hcells".
-            iDestruct "Hcells" as
-              "(HPC & HnPC & Hmsr & Hmi & Hcy & Hti & Hip & Htlb & Hpriv &
-                Hms & Hhs & Hpcfg & Hpaddr & ? & ? & ? & ? & ? & ? & ? & ? &
-                Hsatp & Hmie & Hmdl & Hmenv)".
-            iAssert (sconf) with "[Hpriv Hms Hhalf Htie Hmie Hmdl Hmenv]"
-              as "Hsc".
-            { iApply (sconf_of_cells mst0 mdv0 Hmsf Hmm
-                        with "Hhw Hminv Hpriv Hms Hhalf Htie Hmie Hmdl
-                              Hmenv"). }
-            iAssert (sie_cap kt m n false p)
-              with "[Hsatp Htlb Hpcfg Hpaddr HRes Hrest]" as "Hcap".
-            { iApply (sie_cap_of_cells kt m n false p satp0 tv' pcfg paddr
+    (* ---- THE ARM, SPLIT HERE AND NOWHERE ELSE.  Both branches are
+       CONCRETE in the write set, and they have to be: an [iApply] of a cycle
+       engine whose write set sits in a PARAMETER position does not terminate
+       against this goal, however concrete the argument (kvminithart-tlb-lane
+       .md §3).  Nothing under the split mentions [SD], and the two branches
+       differ only in the set, its memberships, and the engine's name. ---- *)
+    destruct Harm as [[-> Hbsok] | [-> Hksok]].
+    { (* ===================== THE BARE ARM, at [s_Drwb] ==================
+         [translateAddr]'s [Bare] arm is a bare [returnR] -- it neither reads
+         nor writes the TLB -- so the fetch's frame does not contain the cell
+         and nothing has to fund one.  It stays in the slot, parked in the
+         accessor's closer. ============================================== *)
+      (* ---- the cycle's frame, at the tower the cells make ---- *)
+      iAssert (hreg_frame (s_rs pc pc msr bmi cy ti ip mst0 pcfg paddr mc micfg
+                   misa0 mseccfg0 (mword_of_int 0) pmar0 elp0 satp0 MIE_S mdv0
+                   MENVCFG_S tlbv) s_Drwb ∗
+               hreg_frame_ro (s_Df (DfracOwn 1))
+                 (s_rs pc pc msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                    mseccfg0 (mword_of_int 0) pmar0 elp0 satp0 MIE_S mdv0
+                    MENVCFG_S tlbv) s_Dro)%I
+        with "[HPC HnPC Hmsr Hmi Hcy Hti Hip Htlb Hpriv Hms Hhs Hpcfg Hpaddr
+               Hsatp Hmie Hmdl Hmenv]" as "[Hsrw Hsro]".
+      { rewrite (s_frames_cells_D pc pc msr bmi cy ti ip mst0 pcfg paddr mc
+                   micfg misa0 mseccfg0 (mword_of_int 0) pmar0 elp0 satp0
+                   MIE_S mdv0 MENVCFG_S tlbv s_Drwb (or_intror eq_refl)).
+        rewrite /s_cells_D. srs.
+        iFrame "HPC HnPC Hmsr Hmi Hcy Hti Hip Htlb Hpriv Hms Hhs Hpcfg Hpaddr
+                Hsatp Hmie Hmdl Hmenv".
+        iFrame "Hmc Hmicfg Hmisa Hmseccfg Hpma Hhtif Help Hsenv". }
+      (* ---- THE CYCLE, WITH THE LATER STRIPPED BY HAND.
+         [HartMCycle.wp_loop_cycle_ex] is inlined ([swp_loop] + [swp_tick_wrap_ex],
+         its own two lines) for ONE reason: this funnel's callback sits under an
+         outermost [▷], and [swp_loop]'s later is the only one in the whole
+         chain -- taking it here is what puts the leaf's obligation in hand
+         BEFORE the body has to be supplied. ---- *)
+      iDestruct "Hresv" as (rr) "Hfrag".
+      iApply (swp_loop rr with "Hcert Hfrag").
+      iNext. iIntros (tick) "Hfrag".
+      iApply (swp_mono _ _ (fun _ => WP (Loop : expr riscv_lang))%I
+                with "[] [-]").
+      2:{ iApply (swp_tick_wrap_ex s_Drwb s_Dro (s_Df (DfracOwn 1))
+                    (fun rsx => exists (rs2 : regstate) (mi : mword 64),
+                       off_Q pc msr mc micfg misa0 mseccfg0 pmar0 elp0 rs2 /\
+                       rsx = wrap_post rs2 mi)
+                    (fun rsx => ∃ (rs2 : regstate) (mi : mword 64),
+                       ⌜off_Q pc msr mc micfg misa0 mseccfg0 pmar0 elp0 rs2 /\
+                        rsx = wrap_post rs2 mi⌝ ∗ off_ret s_Drwb b' R rs2)%I
+                    tick s_disj_b s_w_cy_b s_w_ti_b s_w_ip_b
+                    with "Hcert [-]").
+          (* [swp_try_step_any_ex] lands at [wrap_post rs2 mi] with the two
+             existentials OUTSIDE; the tick wants them inside its [rs1]. *)
+          iApply (swp_mono with "[] [-]").
+          2:{ iApply (swp_try_step_any_ex s_Drwb s_Dro (s_Df (DfracOwn 1))
+                    (s_rs pc pc msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                       mseccfg0 (mword_of_int 0) pmar0 elp0 satp0 MIE_S mdv0
+                       MENVCFG_S tlbv)
+                    (off_Q pc msr mc micfg misa0 mseccfg0 pmar0 elp0)
+                    (off_ret s_Drwb b' R)
+                    s_disj_b s_in_priv_b s_in_hart_b s_in_mc_b
+                    s_in_micfg_b s_w_mi_b s_in_mi_b s_w_ms_b s_in_ms_b
+                    s_w_PC_b s_in_PC_b s_in_nPC_b
+                    ltac:(by srs)
+                    ltac:(intros rs2 HQ; destruct HQ as (npc & ms1 & mdv1 & cy1
+                            & ti1 & ip1 & satp1 & pcfg1 & paddr1 & tlb1 & _ & _
+                            & _ & _ & ->); by srs)
+                    ltac:(intros rs2 HQ; destruct HQ as (npc & ms1 & mdv1 & cy1
+                            & ti1 & ip1 & satp1 & pcfg1 & paddr1 & tlb1 & _ & _
+                            & _ & _ & ->);
+                          rewrite s_rs_mc s_rs_micfg s_rs_priv; by srs)
+                    with "Hcert Hsrw Hsro [-]").
+          iIntros "Hrw Hro".
+          (* the prelude's file, re-anchored on the tower *)
+          pose proof (s_pre_agree pc msr bmi cy ti ip mst0 pcfg paddr mc micfg
+                        misa0 mseccfg0 (mword_of_int 0) pmar0 elp0 satp0 MIE_S
+                        mdv0 MENVCFG_S tlbv) as Hpre.
+          iDestruct (s_rw_ext_D s_Drwb s_frame_ok_Drwb _ _ Hpre
+                       with "Hrw") as "Hrw".
+          iDestruct (s_ro_ext (DfracOwn 1) _ _ Hpre with "Hro") as "Hro".
+          iApply (swp_mono with "[] [-]").
+          2:{ iApply (swp_run_hart_active_instr_S_res_b pc msr
+                        (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0
+                        pcfg paddr mc micfg misa0 mseccfg0 (mword_of_int 0)
+                        pmar0 elp0 satp0 mdv0 tlbv is_rvc i
+                        (off_Q pc msr mc micfg misa0 mseccfg0 pmar0 elp0)
+                        (off_ret s_Drwb b' R)
+                        (* THE SLOT'S CLOSER TRAVELS IN [W]: the leaf is
+                           handed a FOLDED capability, and the closer is
+                           the only thing that can build one -- at the Bare
+                           arm it is holding the tlb cell. *)
+                        (wp_next false p
+                           (sconf_step_obl_clock m n false b' pc is_rvc i R)
+                         ∗ ghost_var sie_gname (1/2) (_get_Mstatus_SIE mst0)
+                         ∗ sret_tie mst0 ∗ sie_cap_rest kt m n false p
+                         ∗ gpr_file (tp_pin m)
+                         ∗ (∀ (m1 : regfile) (av1 : nat) (b1 : bool)
+                              (tv1 : type_of_register tlb),
+                              satp ↦ᵣ satp0 -∗ s_tlb_at s_Drwb tv1 -∗
+                              pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+                              strans_res_at satp0 tv1 -∗
+                              sie_cap_rest kt m1 av1 b1 p -∗
+                              sie_cap kt m1 av1 b1 p))%I
+                        (fun _ _ => False)%I
+                        Hmisaval HSXL HMPRV Hmm Helpnp (pma_all_ram Hpmaall)
+                        Hbsok Hpok
+                        with "Hcert Hinstr Hres Hfrag
+                              [$Hbody $Hhalf $Htie $Hrest $Hfile $Hclose]
+                              Hrw Hro
+                              [] []").
+              (* ---------- NO TRAP: SIE = 0 makes [s_dispatch] [None] ------- *)
+              { iIntros (ii pr) "%Hd _ _ _ _ _".
+                iPureIntro. destruct Hd as (meip & seip & Hd).
+                rewrite /s_dispatch HSIE in Hd. cbn [andb] in Hd. discriminate. }
+              (* ---------- THE INSTRUCTION ---------- *)
+              iIntros (tv') "HW HRes Hany Hrw Hro".
+              iDestruct "HW" as "(Hwn & Hhalf & Htie & Hrest & Hfile & Hclose)".
+              pose proof (s_rs_set_nPC pc pc
+                         (add_vec_int pc (if is_rvc then 2 else 4)) msr
+                         (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0
+                         pcfg paddr mc micfg misa0 mseccfg0 (mword_of_int 0)
+                         pmar0 elp0 satp0 MIE_S mdv0 MENVCFG_S tv') as Hagf.
+              iDestruct (s_rw_ext_D s_Drwb s_frame_ok_Drwb _ _ Hagf
+                           with "Hrw") as "Hrw".
+              iDestruct (s_ro_ext (DfracOwn 1) _ _ Hagf with "Hro") as "Hro".
+              iAssert (s_cells_D pc (add_vec_int pc (if is_rvc then 2 else 4))
+                         msr (minstret_inc_flag mc micfg Supervisor) cy ti ip
+                         mst0 pcfg paddr mc micfg misa0 mseccfg0
+                         (mword_of_int 0) pmar0 elp0 satp0 MIE_S mdv0
+                         MENVCFG_S tv' s_Drwb)
+                with "[Hrw Hro]" as "Hcells".
+              { rewrite -(s_frames_cells_D _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+                            _ _ _ _ _ s_Drwb (or_intror eq_refl)). iFrame. }
+              iEval (rewrite /s_cells_D) in "Hcells".
+              iDestruct "Hcells" as
+                "(HPC & HnPC & Hmsr & Hmi & Hcy & Hti & Hip & Htlb & Hpriv &
+                  Hms & Hhs & Hpcfg & Hpaddr & ? & ? & ? & ? & ? & ? & ? & ? &
+                  Hsatp & Hmie & Hmdl & Hmenv)".
+              iAssert (sconf) with "[Hpriv Hms Hhalf Htie Hmie Hmdl Hmenv]"
+                as "Hsc".
+              { iApply (sconf_of_cells mst0 mdv0 Hmsf Hmm
+                          with "Hhw Hminv Hpriv Hms Hhalf Htie Hmie Hmdl
+                                Hmenv"). }
+              iAssert (sie_cap kt m n false p)
+                with "[Hsatp Htlb Hpcfg Hpaddr HRes Hrest Hclose]" as "Hcap".
+              { iApply ("Hclose" $! m n false tv'
+                          with "Hsatp Htlb Hpcfg Hpaddr HRes Hrest"). }
+              iAssert (clock_res) with "[Hcy Hti Hip]" as "Hclk".
+              { iExists cy, ti, ip. iFrame. }
+              iDestruct (wp_next_at false p _ CID (fun _ => eq_refl) with "Hwn")
+                as "[Hobl Hcont]".
+              iApply (swp_mono with "[Hmsr Hmi Hhs Hcont] [-]").
+              2:{ iApply ("Hobl" with "Hsc Hcap Hfile HPC HnPC Hany Hclk"). }
+              iIntros (e) "(-> & Hr)".
+              iDestruct "Hr" as (npc ms' m' av')
+                "(HPC & HnPC & Hresv2 & Hclk & Hsc' & Hcap' & Hfile' & HRv)".
+              iDestruct "Hclk" as (cy' ti' ip') "(Hcy & Hti & Hip)".
+              iDestruct "Hsc'" as (mdv') "(%Hmsf' & %Hmm' & _ & _ & Hpriv' &
+                                           Hms' & Hhalf' & Htie' & Hmie' &
+                                           Hmdl' & Hmenv')".
+              iDestruct (sie_cap_cells_at s_Drwb kt m' av' b' p (or_intror eq_refl)
+                           with "Hwitk Hcap'")
+                as (satp1 tlb1 pcfg1 paddr1)
+                   "(%Hsok1 & %Hpok1 & Hsatp1 & Htlb1 & Hpcfg1 & Hpaddr1 &
+                     Hres1 & Hrest1 & Hclose1)".
+              iSplitR; [done|].
+              iExists (s_rs pc npc msr (minstret_inc_flag mc micfg Supervisor)
+                     cy' ti' ip' ms' pcfg1 paddr1 mc micfg misa0 mseccfg0
+                     (mword_of_int 0) pmar0 elp0 satp1 MIE_S mdv' MENVCFG_S
+                     tlb1).
+              iSplitR.
+              { iPureIntro.
+                exists npc, ms', mdv', cy', ti', ip', satp1, pcfg1, paddr1, tlb1.
+                split_and!; try assumption; reflexivity. }
+              iAssert (hreg_frame (s_rs pc npc msr
+                         (minstret_inc_flag mc micfg Supervisor) cy' ti' ip' ms'
+                         pcfg1 paddr1 mc micfg misa0 mseccfg0 (mword_of_int 0)
+                         pmar0 elp0 satp1 MIE_S mdv' MENVCFG_S tlb1) s_Drwb ∗
+                       hreg_frame_ro (s_Df (DfracOwn 1)) (s_rs pc npc msr
+                         (minstret_inc_flag mc micfg Supervisor) cy' ti' ip' ms'
+                         pcfg1 paddr1 mc micfg misa0 mseccfg0 (mword_of_int 0)
+                         pmar0 elp0 satp1 MIE_S mdv' MENVCFG_S tlb1) s_Dro)%I
+                with "[HPC HnPC Hmsr Hmi Hcy Hti Hip Htlb1 Hpriv' Hms' Hhs
+                       Hpcfg1 Hpaddr1 Hsatp1 Hmie' Hmdl' Hmenv']"
+                as "[Hrw2 Hro2]".
+              { rewrite (s_frames_cells_D pc npc msr
+                           (minstret_inc_flag mc micfg Supervisor) cy' ti' ip'
+                           ms' pcfg1 paddr1 mc micfg misa0 mseccfg0
+                           (mword_of_int 0) pmar0 elp0 satp1 MIE_S mdv'
+                           MENVCFG_S tlb1 s_Drwb (or_intror eq_refl)).
+                rewrite /s_cells_D. srs.
+                iFrame "HPC HnPC Hmsr Hmi Hcy Hti Hip Htlb1 Hpriv' Hms' Hhs
+                        Hpcfg1 Hpaddr1 Hsatp1 Hmie' Hmdl' Hmenv'".
+                iFrame "Hmc Hmicfg Hmisa Hmseccfg Hpma Hhtif Help Hsenv". }
+              iFrame "Hrw2 Hro2".
+              rewrite /off_ret. iSplitR "Hclose1".
+              { rewrite /intr_ret. srs. iExists m', av'.
+                iFrame "Hhalf' Htie' Hres1 Hrest1 Hfile' Hresv2 HRv Hcont". }
+              rewrite /off_close. srs. iExact "Hclose1". }
+          iIntros (st) "[Hi | Hr]".
+          - iDestruct "Hi" as (ii pr) "(-> & %Hf)". destruct Hf.
+          - iDestruct "Hr" as (w) "(-> & Hr)".
+            iDestruct "Hr" as (rs2) "(%HQ & Hrw & Hro & HRet)".
+            iExists rs2. iSplitR; [done|]. iFrame. }
+          iIntros (u). iDestruct 1 as (rs2 mi) "(%HQ & Hrw & Hro & HRet)".
+          iExists (wrap_post rs2 mi).
+          iSplitR; [iPureIntro; by exists rs2, mi |].
+          iFrame "Hrw Hro". iExists rs2, mi. iFrame "HRet".
+          iPureIntro. by split. }
+      (* ---- THE CYCLE'S CONTINUATION ---- *)
+      iIntros (u). iDestruct 1 as (rs3 rs1) "((%HP & %Hag) & Hrw & Hro & HRet)".
+      iDestruct "HRet" as (rs2 mi) "((%HQ & %Heq) & HRet)".
+      subst rs1.
+      destruct HQ as (npc & ms1 & mdv1 & cy1 & ti1 & ip1 & satp1 & pcfg1 &
+                      paddr1 & tlb1 & Hmsf1 & Hmm1 & Hsok1 & Hpok1 & ->).
+      iEval (rewrite /off_ret) in "HRet".
+      iDestruct "HRet" as "(HRet & Hclose1)".
+      iEval (rewrite /intr_ret) in "HRet".
+      iEval (srs) in "HRet".
+      iEval (rewrite /off_close) in "Hclose1".
+      iEval (srs) in "Hclose1".
+      iDestruct "HRet" as (m' av')
+        "(Hhalf1 & Htie1 & Hres1 & Hrest1 & Hfile1 & Hresv1 & HRv & Hcont)".
+      pose proof (s_tick_agree_b pc npc msr
+                    (minstret_inc_flag mc micfg Supervisor) cy1 ti1 ip1 ms1
+                    pcfg1 paddr1 mc micfg misa0 mseccfg0 (mword_of_int 0) pmar0
+                    elp0 satp1 MIE_S mdv1 MENVCFG_S tlb1 mi rs3 Hag) as Hag'.
+      iDestruct (s_rw_ext_D s_Drwb s_frame_ok_Drwb _ _ Hag'
+                   with "Hrw") as "Hrw".
+      iDestruct (s_ro_ext (DfracOwn 1) _ _ Hag' with "Hro") as "Hro".
+      iAssert (s_cells_D npc npc mi (minstret_inc_flag mc micfg Supervisor)
+                 (register_lookup (R_bitvector_64 mcycle) rs3)
+                 (register_lookup (R_bitvector_64 mtime) rs3)
+                 (register_lookup (R_bitvector_64 mip) rs3)
+                 ms1 pcfg1 paddr1 mc micfg misa0 mseccfg0 (mword_of_int 0)
+                 pmar0 elp0 satp1 MIE_S mdv1 MENVCFG_S
+                 (register_lookup tlb rs3) s_Drwb)
+        with "[Hrw Hro]" as "Hcells".
+      { rewrite -(s_frames_cells_D _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+                    _ _ s_Drwb (or_intror eq_refl)). iFrame. }
+      iEval (rewrite /s_cells_D) in "Hcells".
+      iDestruct "Hcells" as
+        "(HPC & HnPC & Hmsr3 & Hmi3 & Hcy3 & Hti3 & Hip3 & Htlb3 & Hpriv3 &
+          Hms3 & Hhs3 & Hpcfg3 & Hpaddr3 & ? & ? & ? & ? & ? & ? & ? & ? &
+          Hsatp3 & Hmie3 & Hmdl3 & Hmenv3)".
+      iEval (rewrite s_tlb_at_bare) in "Htlb3".
+      iAssert (s_tlb_at s_Drwb tlb1) with "[Htlb3]" as "Htlb3".
+      { rewrite s_tlb_at_bare. iExact "Htlb3". }
+      iApply ("Hcont" $! npc ms1 m' av' with
+                "[Hhs3 Hpriv3 Hms3 Hhalf1 Htie1 Hmie3 Hmdl3 Hmenv3 Hsatp3
+                  Htlb3 Hpcfg3 Hpaddr3 Hres1 Hrest1 Hfile1 Hclose1]
+                 [HPC HnPC Hmsr3 Hmi3 Hcy3 Hti3 Hip3 Hresv1] HRv").
+      - rewrite /sie_cap_gpr_at. iFrame "Hhs3 Hfile1".
+        iSplitL "Hpriv3 Hms3 Hhalf1 Htie1 Hmie3 Hmdl3 Hmenv3".
+        { iApply (sconf_at_of_cells ms1 mdv1 Hmsf1 Hmm1
+                    with "Hhw Hminv Hpriv3 Hms3 Hhalf1 Htie1 Hmie3 Hmdl3
+                          Hmenv3"). }
+        iApply ("Hclose1" $! m' av' b' tlb1 with "[%] Hsatp3 Htlb3 Hpcfg3
+                  Hpaddr3 Hres1 Hrest1").
+        intros _. reflexivity.
+      - rewrite /pc_is. iFrame "HPC HnPC Hresv1".
+        iSplitL "Hmsr3 Hmi3".
+        { iExists mi, (minstret_inc_flag mc micfg Supervisor), mc, micfg.
+          by iFrame "Hmsr3 Hmi3 Hmc Hmicfg". }
+        iExists (register_lookup (R_bitvector_64 mcycle) rs3),
+                (register_lookup (R_bitvector_64 mtime) rs3),
+                (register_lookup (R_bitvector_64 mip) rs3).
+        by iFrame "Hcy3 Hti3 Hip3".
+    }
+    { (* ===================== THE KPT ARM, at [s_Drw] ====================
+         a Sv39 fetch's walk FILLS the TLB ([CommonWalk]'s [vec_update_dec]),
+         so [tlb ∈ s_Drw] is genuinely needed and [tlb_res_pt] funds the
+         cell. ========================================================= *)
+      (* ---- the cycle's frame, at the tower the cells make ---- *)
+      iAssert (hreg_frame (s_rs pc pc msr bmi cy ti ip mst0 pcfg paddr mc micfg
+                   misa0 mseccfg0 (mword_of_int 0) pmar0 elp0 satp0 MIE_S mdv0
+                   MENVCFG_S tlbv) s_Drw ∗
+               hreg_frame_ro (s_Df (DfracOwn 1))
+                 (s_rs pc pc msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                    mseccfg0 (mword_of_int 0) pmar0 elp0 satp0 MIE_S mdv0
+                    MENVCFG_S tlbv) s_Dro)%I
+        with "[HPC HnPC Hmsr Hmi Hcy Hti Hip Htlb Hpriv Hms Hhs Hpcfg Hpaddr
+               Hsatp Hmie Hmdl Hmenv]" as "[Hsrw Hsro]".
+      { rewrite (s_frames_cells_D pc pc msr bmi cy ti ip mst0 pcfg paddr mc
+                   micfg misa0 mseccfg0 (mword_of_int 0) pmar0 elp0 satp0
+                   MIE_S mdv0 MENVCFG_S tlbv s_Drw (or_introl eq_refl)).
+        rewrite /s_cells_D. srs.
+        iFrame "HPC HnPC Hmsr Hmi Hcy Hti Hip Htlb Hpriv Hms Hhs Hpcfg Hpaddr
+                Hsatp Hmie Hmdl Hmenv".
+        iFrame "Hmc Hmicfg Hmisa Hmseccfg Hpma Hhtif Help Hsenv". }
+      (* ---- THE CYCLE, WITH THE LATER STRIPPED BY HAND.
+         [HartMCycle.wp_loop_cycle_ex] is inlined ([swp_loop] + [swp_tick_wrap_ex],
+         its own two lines) for ONE reason: this funnel's callback sits under an
+         outermost [▷], and [swp_loop]'s later is the only one in the whole
+         chain -- taking it here is what puts the leaf's obligation in hand
+         BEFORE the body has to be supplied. ---- *)
+      iDestruct "Hresv" as (rr) "Hfrag".
+      iApply (swp_loop rr with "Hcert Hfrag").
+      iNext. iIntros (tick) "Hfrag".
+      iApply (swp_mono _ _ (fun _ => WP (Loop : expr riscv_lang))%I
+                with "[] [-]").
+      2:{ iApply (swp_tick_wrap_ex s_Drw s_Dro (s_Df (DfracOwn 1))
+                    (fun rsx => exists (rs2 : regstate) (mi : mword 64),
+                       off_Q pc msr mc micfg misa0 mseccfg0 pmar0 elp0 rs2 /\
+                       rsx = wrap_post rs2 mi)
+                    (fun rsx => ∃ (rs2 : regstate) (mi : mword 64),
+                       ⌜off_Q pc msr mc micfg misa0 mseccfg0 pmar0 elp0 rs2 /\
+                        rsx = wrap_post rs2 mi⌝ ∗ off_ret s_Drw b' R rs2)%I
+                    tick s_disj s_w_cy s_w_ti s_w_ip with "Hcert [-]").
+          (* [swp_try_step_any_ex] lands at [wrap_post rs2 mi] with the two
+             existentials OUTSIDE; the tick wants them inside its [rs1]. *)
+          iApply (swp_mono with "[] [-]").
+          2:{ iApply (swp_try_step_any_ex s_Drw s_Dro (s_Df (DfracOwn 1))
+                    (s_rs pc pc msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                       mseccfg0 (mword_of_int 0) pmar0 elp0 satp0 MIE_S mdv0
+                       MENVCFG_S tlbv)
+                    (off_Q pc msr mc micfg misa0 mseccfg0 pmar0 elp0)
+                    (off_ret s_Drw b' R)
+                    s_disj s_in_priv s_in_hart s_in_mc s_in_micfg s_w_mi
+                    s_in_mi s_w_ms s_in_ms s_w_PC s_in_PC s_in_nPC
+                    ltac:(by srs)
+                    ltac:(intros rs2 HQ; destruct HQ as (npc & ms1 & mdv1 & cy1
+                            & ti1 & ip1 & satp1 & pcfg1 & paddr1 & tlb1 & _ & _
+                            & _ & _ & ->); by srs)
+                    ltac:(intros rs2 HQ; destruct HQ as (npc & ms1 & mdv1 & cy1
+                            & ti1 & ip1 & satp1 & pcfg1 & paddr1 & tlb1 & _ & _
+                            & _ & _ & ->);
+                          rewrite s_rs_mc s_rs_micfg s_rs_priv; by srs)
+                    with "Hcert Hsrw Hsro [-]").
+          iIntros "Hrw Hro".
+          (* the prelude's file, re-anchored on the tower *)
+          pose proof (s_pre_agree pc msr bmi cy ti ip mst0 pcfg paddr mc micfg
+                        misa0 mseccfg0 (mword_of_int 0) pmar0 elp0 satp0 MIE_S
+                        mdv0 MENVCFG_S tlbv) as Hpre.
+          iDestruct (s_rw_ext _ _ Hpre with "Hrw") as "Hrw".
+          iDestruct (s_ro_ext (DfracOwn 1) _ _ Hpre with "Hro") as "Hro".
+          iApply (swp_mono with "[] [-]").
+          2:{ iApply (swp_run_hart_active_instr_S_res pc msr
+                        (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0
+                        pcfg paddr mc micfg misa0 mseccfg0 (mword_of_int 0)
+                        pmar0 elp0 satp0 mdv0 tlbv is_rvc i
+                        (off_Q pc msr mc micfg misa0 mseccfg0 pmar0 elp0)
+                        (off_ret s_Drw b' R)
+                        (* THE SLOT'S CLOSER TRAVELS IN [W]: the leaf is
+                           handed a FOLDED capability, and the closer is
+                           the only thing that can build one -- at the Bare
+                           arm it is holding the tlb cell. *)
+                        (wp_next false p
+                           (sconf_step_obl_clock m n false b' pc is_rvc i R)
+                         ∗ ghost_var sie_gname (1/2) (_get_Mstatus_SIE mst0)
+                         ∗ sret_tie mst0 ∗ sie_cap_rest kt m n false p
+                         ∗ gpr_file (tp_pin m)
+                         ∗ (∀ (m1 : regfile) (av1 : nat) (b1 : bool)
+                              (tv1 : type_of_register tlb),
+                              satp ↦ᵣ satp0 -∗ s_tlb_at s_Drw tv1 -∗
+                              pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+                              strans_res_at satp0 tv1 -∗
+                              sie_cap_rest kt m1 av1 b1 p -∗
+                              sie_cap kt m1 av1 b1 p))%I
+                        (fun _ _ => False)%I
+                        Hmisaval HSXL HMPRV Hmm Helpnp (pma_all_ram Hpmaall)
                         Hsok Hpok
-                        with "Hsatp Htlb Hpcfg Hpaddr HRes Hrest"). }
-            iAssert (clock_res) with "[Hcy Hti Hip]" as "Hclk".
-            { iExists cy, ti, ip. iFrame. }
-            iDestruct (wp_next_at false p _ CID (fun _ => eq_refl) with "Hwn")
-              as "[Hobl Hcont]".
-            iApply (swp_mono with "[Hmsr Hmi Hhs Hcont] [-]").
-            2:{ iApply ("Hobl" with "Hsc Hcap Hfile HPC HnPC Hany Hclk"). }
-            iIntros (e) "(-> & Hr)".
-            iDestruct "Hr" as (npc ms' m' av')
-              "(HPC & HnPC & Hresv2 & Hclk & Hsc' & Hcap' & Hfile' & HRv)".
-            iDestruct "Hclk" as (cy' ti' ip') "(Hcy & Hti & Hip)".
-            iDestruct "Hsc'" as (mdv') "(%Hmsf' & %Hmm' & _ & _ & Hpriv' &
-                                         Hms' & Hhalf' & Htie' & Hmie' &
-                                         Hmdl' & Hmenv')".
-            iDestruct (sie_cap_to_cells with "Hcap'")
-              as (satp1 tlb1 pcfg1 paddr1)
-                 "(%Hsok1 & %Hpok1 & Hsatp1 & Htlb1 & Hpcfg1 & Hpaddr1 &
-                   Hres1 & Hrest1)".
-            iSplitR; [done|].
-            iExists (s_rs pc npc msr (minstret_inc_flag mc micfg Supervisor)
-                   cy' ti' ip' ms' pcfg1 paddr1 mc micfg misa0 mseccfg0
-                   (mword_of_int 0) pmar0 elp0 satp1 MIE_S mdv' MENVCFG_S
-                   tlb1).
-            iSplitR.
-            { iPureIntro.
-              exists npc, ms', mdv', cy', ti', ip', satp1, pcfg1, paddr1, tlb1.
-              split_and!; try assumption; reflexivity. }
-            iAssert (hreg_frame (s_rs pc npc msr
-                       (minstret_inc_flag mc micfg Supervisor) cy' ti' ip' ms'
-                       pcfg1 paddr1 mc micfg misa0 mseccfg0 (mword_of_int 0)
-                       pmar0 elp0 satp1 MIE_S mdv' MENVCFG_S tlb1) s_Drw ∗
-                     hreg_frame_ro (s_Df (DfracOwn 1)) (s_rs pc npc msr
-                       (minstret_inc_flag mc micfg Supervisor) cy' ti' ip' ms'
-                       pcfg1 paddr1 mc micfg misa0 mseccfg0 (mword_of_int 0)
-                       pmar0 elp0 satp1 MIE_S mdv' MENVCFG_S tlb1) s_Dro)%I
-              with "[HPC HnPC Hmsr Hmi Hcy Hti Hip Htlb1 Hpriv' Hms' Hhs
-                     Hpcfg1 Hpaddr1 Hsatp1 Hmie' Hmdl' Hmenv']"
-              as "[Hrw2 Hro2]".
-            { rewrite (s_frames_cells pc npc msr
-                         (minstret_inc_flag mc micfg Supervisor) cy' ti' ip'
-                         ms' pcfg1 paddr1 mc micfg misa0 mseccfg0
-                         (mword_of_int 0) pmar0 elp0 satp1 MIE_S mdv'
-                         MENVCFG_S tlb1).
-              rewrite /s_cells. srs.
-              iFrame "HPC HnPC Hmsr Hmi Hcy Hti Hip Htlb1 Hpriv' Hms' Hhs
-                      Hpcfg1 Hpaddr1 Hsatp1 Hmie' Hmdl' Hmenv'".
-              iFrame "Hmc Hmicfg Hmisa Hmseccfg Hpma Hhtif Help Hsenv". }
-            iFrame "Hrw2 Hro2".
-            rewrite /intr_ret. srs. iExists m', av'.
-            iFrame "Hhalf' Htie' Hres1 Hrest1 Hfile' Hresv2 HRv Hcont". }
-        iIntros (st) "[Hi | Hr]".
-        - iDestruct "Hi" as (ii pr) "(-> & %Hf)". destruct Hf.
-        - iDestruct "Hr" as (w) "(-> & Hr)".
-          iDestruct "Hr" as (rs2) "(%HQ & Hrw & Hro & HRet)".
-          iExists rs2. iSplitR; [done|]. iFrame. }
-        iIntros (u). iDestruct 1 as (rs2 mi) "(%HQ & Hrw & Hro & HRet)".
-        iExists (wrap_post rs2 mi).
-        iSplitR; [iPureIntro; by exists rs2, mi |].
-        iFrame "Hrw Hro". iExists rs2, mi. iFrame "HRet".
-        iPureIntro. by split. }
-    (* ---- THE CYCLE'S CONTINUATION ---- *)
-    iIntros (u). iDestruct 1 as (rs3 rs1) "((%HP & %Hag) & Hrw & Hro & HRet)".
-    iDestruct "HRet" as (rs2 mi) "((%HQ & %Heq) & HRet)".
-    subst rs1.
-    destruct HQ as (npc & ms1 & mdv1 & cy1 & ti1 & ip1 & satp1 & pcfg1 &
-                    paddr1 & tlb1 & Hmsf1 & Hmm1 & Hsok1 & Hpok1 & ->).
-    iEval (rewrite /intr_ret) in "HRet".
-    iEval (srs) in "HRet".
-    iDestruct "HRet" as (m' av')
-      "(Hhalf1 & Htie1 & Hres1 & Hrest1 & Hfile1 & Hresv1 & HRv & Hcont)".
-    pose proof (s_tick_agree pc npc msr
-                  (minstret_inc_flag mc micfg Supervisor) cy1 ti1 ip1 ms1
-                  pcfg1 paddr1 mc micfg misa0 mseccfg0 (mword_of_int 0) pmar0
-                  elp0 satp1 MIE_S mdv1 MENVCFG_S tlb1 mi rs3 Hag) as Hag'.
-    iDestruct (s_rw_ext _ _ Hag' with "Hrw") as "Hrw".
-    iDestruct (s_ro_ext (DfracOwn 1) _ _ Hag' with "Hro") as "Hro".
-    iAssert (s_cells npc npc mi (minstret_inc_flag mc micfg Supervisor)
-               (register_lookup (R_bitvector_64 mcycle) rs3)
-               (register_lookup (R_bitvector_64 mtime) rs3)
-               (register_lookup (R_bitvector_64 mip) rs3)
-               ms1 pcfg1 paddr1 mc micfg misa0 mseccfg0 (mword_of_int 0)
-               pmar0 elp0 satp1 MIE_S mdv1 MENVCFG_S tlb1)
-      with "[Hrw Hro]" as "Hcells".
-    { rewrite -s_frames_cells. iFrame. }
-    iEval (rewrite /s_cells) in "Hcells".
-    iDestruct "Hcells" as
-      "(HPC & HnPC & Hmsr3 & Hmi3 & Hcy3 & Hti3 & Hip3 & Htlb3 & Hpriv3 &
-        Hms3 & Hhs3 & Hpcfg3 & Hpaddr3 & ? & ? & ? & ? & ? & ? & ? & ? &
-        Hsatp3 & Hmie3 & Hmdl3 & Hmenv3)".
-    iApply ("Hcont" $! npc ms1 m' av' with
-              "[Hhs3 Hpriv3 Hms3 Hhalf1 Htie1 Hmie3 Hmdl3 Hmenv3 Hsatp3
-                Htlb3 Hpcfg3 Hpaddr3 Hres1 Hrest1 Hfile1]
-               [HPC HnPC Hmsr3 Hmi3 Hcy3 Hti3 Hip3 Hresv1] HRv").
-    - rewrite /sie_cap_gpr_at. iFrame "Hhs3 Hfile1".
-      iSplitL "Hpriv3 Hms3 Hhalf1 Htie1 Hmie3 Hmdl3 Hmenv3".
-      { iApply (sconf_at_of_cells ms1 mdv1 Hmsf1 Hmm1
-                  with "Hhw Hminv Hpriv3 Hms3 Hhalf1 Htie1 Hmie3 Hmdl3
-                        Hmenv3"). }
-      iApply (sie_cap_of_cells kt m' av' b' p satp1 tlb1 pcfg1 paddr1
-                Hsok1 Hpok1
-                with "Hsatp3 Htlb3 Hpcfg3 Hpaddr3 Hres1 Hrest1").
-    - rewrite /pc_is. iFrame "HPC HnPC Hresv1".
-      iSplitL "Hmsr3 Hmi3".
-      { iExists mi, (minstret_inc_flag mc micfg Supervisor), mc, micfg.
-        by iFrame "Hmsr3 Hmi3 Hmc Hmicfg". }
-      iExists (register_lookup (R_bitvector_64 mcycle) rs3),
-              (register_lookup (R_bitvector_64 mtime) rs3),
-              (register_lookup (R_bitvector_64 mip) rs3).
-      by iFrame "Hcy3 Hti3 Hip3".
+                        with "Hcert Hinstr Hres Hfrag
+                              [$Hbody $Hhalf $Htie $Hrest $Hfile $Hclose]
+                              Hrw Hro
+                              [] []").
+              (* ---------- NO TRAP: SIE = 0 makes [s_dispatch] [None] ------- *)
+              { iIntros (ii pr) "%Hd _ _ _ _ _".
+                iPureIntro. destruct Hd as (meip & seip & Hd).
+                rewrite /s_dispatch HSIE in Hd. cbn [andb] in Hd. discriminate. }
+              (* ---------- THE INSTRUCTION ---------- *)
+              iIntros (tv') "HW HRes Hany Hrw Hro".
+              iDestruct "HW" as "(Hwn & Hhalf & Htie & Hrest & Hfile & Hclose)".
+              pose proof (s_rs_set_nPC pc pc
+                         (add_vec_int pc (if is_rvc then 2 else 4)) msr
+                         (minstret_inc_flag mc micfg Supervisor) cy ti ip mst0
+                         pcfg paddr mc micfg misa0 mseccfg0 (mword_of_int 0)
+                         pmar0 elp0 satp0 MIE_S mdv0 MENVCFG_S tv') as Hagf.
+              iDestruct (s_rw_ext _ _ Hagf with "Hrw") as "Hrw".
+              iDestruct (s_ro_ext (DfracOwn 1) _ _ Hagf with "Hro") as "Hro".
+              iAssert (s_cells_D pc (add_vec_int pc (if is_rvc then 2 else 4))
+                         msr (minstret_inc_flag mc micfg Supervisor) cy ti ip
+                         mst0 pcfg paddr mc micfg misa0 mseccfg0
+                         (mword_of_int 0) pmar0 elp0 satp0 MIE_S mdv0
+                         MENVCFG_S tv' s_Drw)
+                with "[Hrw Hro]" as "Hcells".
+              { rewrite -(s_frames_cells_D _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+                            _ _ _ _ _ s_Drw (or_introl eq_refl)). iFrame. }
+              iEval (rewrite /s_cells_D) in "Hcells".
+              iDestruct "Hcells" as
+                "(HPC & HnPC & Hmsr & Hmi & Hcy & Hti & Hip & Htlb & Hpriv &
+                  Hms & Hhs & Hpcfg & Hpaddr & ? & ? & ? & ? & ? & ? & ? & ? &
+                  Hsatp & Hmie & Hmdl & Hmenv)".
+              iAssert (sconf) with "[Hpriv Hms Hhalf Htie Hmie Hmdl Hmenv]"
+                as "Hsc".
+              { iApply (sconf_of_cells mst0 mdv0 Hmsf Hmm
+                          with "Hhw Hminv Hpriv Hms Hhalf Htie Hmie Hmdl
+                                Hmenv"). }
+              iAssert (sie_cap kt m n false p)
+                with "[Hsatp Htlb Hpcfg Hpaddr HRes Hrest Hclose]" as "Hcap".
+              { iApply ("Hclose" $! m n false tv'
+                          with "Hsatp Htlb Hpcfg Hpaddr HRes Hrest"). }
+              iAssert (clock_res) with "[Hcy Hti Hip]" as "Hclk".
+              { iExists cy, ti, ip. iFrame. }
+              iDestruct (wp_next_at false p _ CID (fun _ => eq_refl) with "Hwn")
+                as "[Hobl Hcont]".
+              iApply (swp_mono with "[Hmsr Hmi Hhs Hcont] [-]").
+              2:{ iApply ("Hobl" with "Hsc Hcap Hfile HPC HnPC Hany Hclk"). }
+              iIntros (e) "(-> & Hr)".
+              iDestruct "Hr" as (npc ms' m' av')
+                "(HPC & HnPC & Hresv2 & Hclk & Hsc' & Hcap' & Hfile' & HRv)".
+              iDestruct "Hclk" as (cy' ti' ip') "(Hcy & Hti & Hip)".
+              iDestruct "Hsc'" as (mdv') "(%Hmsf' & %Hmm' & _ & _ & Hpriv' &
+                                           Hms' & Hhalf' & Htie' & Hmie' &
+                                           Hmdl' & Hmenv')".
+              iDestruct (sie_cap_cells_at s_Drw kt m' av' b' p (or_introl eq_refl)
+                           with "Hwitk Hcap'")
+                as (satp1 tlb1 pcfg1 paddr1)
+                   "(%Hsok1 & %Hpok1 & Hsatp1 & Htlb1 & Hpcfg1 & Hpaddr1 &
+                     Hres1 & Hrest1 & Hclose1)".
+              iSplitR; [done|].
+              iExists (s_rs pc npc msr (minstret_inc_flag mc micfg Supervisor)
+                     cy' ti' ip' ms' pcfg1 paddr1 mc micfg misa0 mseccfg0
+                     (mword_of_int 0) pmar0 elp0 satp1 MIE_S mdv' MENVCFG_S
+                     tlb1).
+              iSplitR.
+              { iPureIntro.
+                exists npc, ms', mdv', cy', ti', ip', satp1, pcfg1, paddr1, tlb1.
+                split_and!; try assumption; reflexivity. }
+              iAssert (hreg_frame (s_rs pc npc msr
+                         (minstret_inc_flag mc micfg Supervisor) cy' ti' ip' ms'
+                         pcfg1 paddr1 mc micfg misa0 mseccfg0 (mword_of_int 0)
+                         pmar0 elp0 satp1 MIE_S mdv' MENVCFG_S tlb1) s_Drw ∗
+                       hreg_frame_ro (s_Df (DfracOwn 1)) (s_rs pc npc msr
+                         (minstret_inc_flag mc micfg Supervisor) cy' ti' ip' ms'
+                         pcfg1 paddr1 mc micfg misa0 mseccfg0 (mword_of_int 0)
+                         pmar0 elp0 satp1 MIE_S mdv' MENVCFG_S tlb1) s_Dro)%I
+                with "[HPC HnPC Hmsr Hmi Hcy Hti Hip Htlb1 Hpriv' Hms' Hhs
+                       Hpcfg1 Hpaddr1 Hsatp1 Hmie' Hmdl' Hmenv']"
+                as "[Hrw2 Hro2]".
+              { rewrite (s_frames_cells_D pc npc msr
+                           (minstret_inc_flag mc micfg Supervisor) cy' ti' ip'
+                           ms' pcfg1 paddr1 mc micfg misa0 mseccfg0
+                           (mword_of_int 0) pmar0 elp0 satp1 MIE_S mdv'
+                           MENVCFG_S tlb1 s_Drw (or_introl eq_refl)).
+                rewrite /s_cells_D. srs.
+                iFrame "HPC HnPC Hmsr Hmi Hcy Hti Hip Htlb1 Hpriv' Hms' Hhs
+                        Hpcfg1 Hpaddr1 Hsatp1 Hmie' Hmdl' Hmenv'".
+                iFrame "Hmc Hmicfg Hmisa Hmseccfg Hpma Hhtif Help Hsenv". }
+              iFrame "Hrw2 Hro2".
+              rewrite /off_ret. iSplitR "Hclose1".
+              { rewrite /intr_ret. srs. iExists m', av'.
+                iFrame "Hhalf' Htie' Hres1 Hrest1 Hfile' Hresv2 HRv Hcont". }
+              rewrite /off_close. srs. iExact "Hclose1". }
+          iIntros (st) "[Hi | Hr]".
+          - iDestruct "Hi" as (ii pr) "(-> & %Hf)". destruct Hf.
+          - iDestruct "Hr" as (w) "(-> & Hr)".
+            iDestruct "Hr" as (rs2) "(%HQ & Hrw & Hro & HRet)".
+            iExists rs2. iSplitR; [done|]. iFrame. }
+          iIntros (u). iDestruct 1 as (rs2 mi) "(%HQ & Hrw & Hro & HRet)".
+          iExists (wrap_post rs2 mi).
+          iSplitR; [iPureIntro; by exists rs2, mi |].
+          iFrame "Hrw Hro". iExists rs2, mi. iFrame "HRet".
+          iPureIntro. by split. }
+      (* ---- THE CYCLE'S CONTINUATION ---- *)
+      iIntros (u). iDestruct 1 as (rs3 rs1) "((%HP & %Hag) & Hrw & Hro & HRet)".
+      iDestruct "HRet" as (rs2 mi) "((%HQ & %Heq) & HRet)".
+      subst rs1.
+      destruct HQ as (npc & ms1 & mdv1 & cy1 & ti1 & ip1 & satp1 & pcfg1 &
+                      paddr1 & tlb1 & Hmsf1 & Hmm1 & Hsok1 & Hpok1 & ->).
+      iEval (rewrite /off_ret) in "HRet".
+      iDestruct "HRet" as "(HRet & Hclose1)".
+      iEval (rewrite /intr_ret) in "HRet".
+      iEval (srs) in "HRet".
+      iEval (rewrite /off_close) in "Hclose1".
+      iEval (srs) in "Hclose1".
+      iDestruct "HRet" as (m' av')
+        "(Hhalf1 & Htie1 & Hres1 & Hrest1 & Hfile1 & Hresv1 & HRv & Hcont)".
+      pose proof (s_tick_agree pc npc msr
+                    (minstret_inc_flag mc micfg Supervisor) cy1 ti1 ip1 ms1
+                    pcfg1 paddr1 mc micfg misa0 mseccfg0 (mword_of_int 0) pmar0
+                    elp0 satp1 MIE_S mdv1 MENVCFG_S tlb1 mi rs3 Hag) as Hag'.
+      iDestruct (s_rw_ext _ _ Hag' with "Hrw") as "Hrw".
+      iDestruct (s_ro_ext (DfracOwn 1) _ _ Hag' with "Hro") as "Hro".
+      iAssert (s_cells_D npc npc mi (minstret_inc_flag mc micfg Supervisor)
+                 (register_lookup (R_bitvector_64 mcycle) rs3)
+                 (register_lookup (R_bitvector_64 mtime) rs3)
+                 (register_lookup (R_bitvector_64 mip) rs3)
+                 ms1 pcfg1 paddr1 mc micfg misa0 mseccfg0 (mword_of_int 0)
+                 pmar0 elp0 satp1 MIE_S mdv1 MENVCFG_S tlb1 s_Drw)
+        with "[Hrw Hro]" as "Hcells".
+      { rewrite -(s_frames_cells_D _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+                    _ _ s_Drw (or_introl eq_refl)). iFrame. }
+      iEval (rewrite /s_cells_D) in "Hcells".
+      iDestruct "Hcells" as
+        "(HPC & HnPC & Hmsr3 & Hmi3 & Hcy3 & Hti3 & Hip3 & Htlb3 & Hpriv3 &
+          Hms3 & Hhs3 & Hpcfg3 & Hpaddr3 & ? & ? & ? & ? & ? & ? & ? & ? &
+          Hsatp3 & Hmie3 & Hmdl3 & Hmenv3)".
+      iApply ("Hcont" $! npc ms1 m' av' with
+                "[Hhs3 Hpriv3 Hms3 Hhalf1 Htie1 Hmie3 Hmdl3 Hmenv3 Hsatp3
+                  Htlb3 Hpcfg3 Hpaddr3 Hres1 Hrest1 Hfile1 Hclose1]
+                 [HPC HnPC Hmsr3 Hmi3 Hcy3 Hti3 Hip3 Hresv1] HRv").
+      - rewrite /sie_cap_gpr_at. iFrame "Hhs3 Hfile1".
+        iSplitL "Hpriv3 Hms3 Hhalf1 Htie1 Hmie3 Hmdl3 Hmenv3".
+        { iApply (sconf_at_of_cells ms1 mdv1 Hmsf1 Hmm1
+                    with "Hhw Hminv Hpriv3 Hms3 Hhalf1 Htie1 Hmie3 Hmdl3
+                          Hmenv3"). }
+        iApply ("Hclose1" $! m' av' b' tlb1 with "[%] Hsatp3 Htlb3 Hpcfg3
+                  Hpaddr3 Hres1 Hrest1").
+        intros _. reflexivity.
+      - rewrite /pc_is. iFrame "HPC HnPC Hresv1".
+        iSplitL "Hmsr3 Hmi3".
+        { iExists mi, (minstret_inc_flag mc micfg Supervisor), mc, micfg.
+          by iFrame "Hmsr3 Hmi3 Hmc Hmicfg". }
+        iExists (register_lookup (R_bitvector_64 mcycle) rs3),
+                (register_lookup (R_bitvector_64 mtime) rs3),
+                (register_lookup (R_bitvector_64 mip) rs3).
+        by iFrame "Hcy3 Hti3 Hip3".
+    }
   Qed.
 
   Lemma wp_instr_s_sconf_clock
