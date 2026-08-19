@@ -2012,7 +2012,11 @@ platform ones + `functional_extensionality_dep` where inherited)
   on `instr`'s text-byte claim.
 - >5 min per file is a bug; no pkill of coqc; commit by explicit path only.
 
-### RULINGS ON THE TAIL-1 ITEMS (all decided 2026-08-18; each is TO DO)
+### RULINGS ON THE TAIL-1 ITEMS (decided 2026-08-18)
+
+> **ITEM 1 (tlb into `bare_inv`) IS CANCELLED.**  See "THE KVMINITHART LANE:
+> THE SETTLED ANSWER" below.  Items 2 and 3 stand and are landed.
+
 1. **RULED (user, 2026-08-18): the tlb cell lives in `bare_inv`;
    `SpecKvminithart.wp_kvminithart_sconf_body` drops its `tlb ↦ᵣ tlbvec0`
    premise and requires the `bare_inv` (via the Bare arm) instead** --
@@ -2230,6 +2234,10 @@ all now in the tree:
    `escrow_swap_checkout` one fupd BEFORE the load, closes the escrow, and
    the load's update is then over a cell the thread holds. Sound because
    nothing stays open across the step.
+
+**BLOCKED (1) IS CANCELLED** — it was ruling 1's own doing; kvminithart's
+`tlb ↦ᵣ tlbvec0` premise is CORRECT and stays.  See "THE KVMINITHART LANE:
+THE SETTLED ANSWER".  Original text follows for the record.
 
 **BLOCKED (1): `SpecKvminithart` still takes `tlb ↦ᵣ tlbvec0`.** 52f89133
 moved that cell INTO `SRegime.bare_inv`, which sits in `IntrDefs.strans_inv`'s
@@ -2612,66 +2620,92 @@ Each line is a ROOT: every file that merely depends on one is skipped by
    Htlb & Htcsr)"` over-destructs into `trap_csrs_raw`; and `mn_grp_kvm`
    drops its own `tlb ↦ᵣ tlbvec0` premise with the spec.
 
-### THE ROOT CAUSE UNDER THE KVMINITHART LANE (found 2026-08-18, session 2)
+### THE KVMINITHART LANE: THE SETTLED ANSWER (2026-08-19)
 
-**The `tlb` cell had two owners, and the reason is a premise in the wrong
-place.**  `SRegime.sr_swp_translate` / `_wit` demanded `(tlb : register) ∈
-Drw` in the FIELD TYPE — a blanket requirement on every regime.  At Bare that
-premise is DEAD: the model's `translateAddr` returns before the TLB is
-consulted at all when `mode = Bare` (rv64d.v — the `Bare` arm is a bare
-`returnR`; **neither read nor write**), and `HWtlb` occurred exactly once in
-`bare_swp_translate`, in its `intros` line, never used.
+**READ THIS BEFORE TOUCHING ANYTHING ABOUT THE `tlb` CELL.**  Three sessions
+went in circles here.  Two earlier write-ups in this file are WRONG and are
+superseded by what follows: "RULINGS ON THE TAIL-1 ITEMS" item 1 (ruling 1:
+move tlb ownership into `bare_inv`, drop it from kvminithart's precondition)
+and the session-2 "root cause" that made ruling 1 a symptom of a
+`sr_swp_translate` premise.  **Ruling 1 must NOT be adopted.**
 
-That blanket premise is what made `6b5d1eb2` put `∃ tlbv, tlb ↦ᵣ tlbv` into
-`bare_inv` ("every S-mode translation slot must fund it … this is the Bare arm
-catching up"), which made kvminithart's `tlb ↦ᵣ tlbvec0` precondition a SECOND
-owner — the unsatisfiability recorded above under "BLOCKED (1)".  **Ruling 1
-and "BLOCKED (1)" are symptoms of this, not the disease.**
+#### The rule that settles it
 
-**HOW THE PRE-PORT PROOF WORKED, and it is the shape to keep.**  The cell is
-NEVER in the slot: `ProofKvminithart` takes `tlb ↦ᵣ tlbvec0` (an ARBITRARY
-value — the precondition says nothing about contents) and holds it in hand
-from entry to exit.  The +0x08 sfence produces `tlbz1` **and** `Hnone1`; six
-instructions later +0x1c consumes them as
-`tlb_res_pt_intro root … tlbz1 t0 … (tlb_ok_pt_empty … Hnone1)`, dissolving
-`bare_inv` for **satp and pmp only**.  The flush survives because the cell it
-names is the caller's.  `SpecKvminithart`'s header says this in one line:
-"both sfence.vma's leave the TLB empty, so `tlb_ok_pt_empty` holds at any
-tree".  **Do not re-seal the flushed cell into `bare_inv`** — that arm is
-existential in the value and forgets it.  (Two arm-specific sfence leaves that
-did exactly that were written and reverted; see `WpSconfSfence.v`'s comment.)
+`bare_inv` must NOT own the `tlb` cell.  Commit `6b5d1eb2` put it there; that
+is the disease.  kvminithart KEEPS its `tlb ↦ᵣ tlbvec0` precondition.
 
-**STEP (1) IS LANDED** (commit "SRegime: the TLB frame requirement is the
-WALKING regime's"): the premise moved off `sr_swp_translate`/`_wit` into
-`kpt_swp_side`, entering through `sr_swp_side_ok` — the introduction a LEAF
-calls, and a leaf knows its own `Drw`.  `bare_swp_side` ignores it, and
-`strans_swp_side` needs nothing special because it is literally
-`bare_swp_side ∨ kpt_swp_side`.  Regression-free (failing set unchanged at the
-eight roots).
+#### Why the pre-port proof worked for an ARBITRARY `tlbvec0`, which is the
+#### fact that kills every "we need to remember the flush" design
 
-**STEP (2) IS SCOPED BUT NOT STARTED**, and its cost is the frame set:
-* `sr_swp_open` / `sr_swp_close` hand out `tlb ↦ᵣ tlbv` in a signature SHARED
-  by all three regimes, and `HartSFrame.s_Drw` contains `tlb` unconditionally.
-* The tlb cannot simply move into the regime's residue: `kpt_swp_res` is
-  `tlb_snap_ok (register_lookup tlb rs) ∗ kpt_inv root_ppn` — it is INDEXED by
-  the frame's tlb value and does not own the cell, and the KPT walk WRITES the
-  cell (`CommonWalk`: `vec_update_dec (register_lookup tlb rs) …`, the fill).
-  So the walking regime genuinely needs it in `Drw`.
-* Therefore the frame set has to become regime-dependent — `sr_Drw R` rather
-  than the global `s_Drw` — so that Bare's frame simply has no tlb and
-  `bare_inv` need not fund it.  **Measured footprint: `s_Drw` is mentioned 319
-  times across 10 files** (WpSFrames 98, HartSFrame 75, SmodeCorePt 53,
-  TrampStepPt 32, WpSmodeWfi 28, WpIntrInv 21, WpSmodeIntr 4, UptWalkPt 4,
-  WpSmodePtFetch 2, SRegime 2).
+The precondition quantifies `tlbvec0` and says nothing about its contents, and
+the whole function was proved.  `ProofKvminithart.v` at +0x08 does
+`iMod (reg_update _ tlb _ tlbz1 with "Hreg Htlb")` and keeps
+`Htlb : tlb ↦ᵣ tlbz1` **together with `Hnone1`, in hand**.  The instructions at
++0x0c..+0x1a (`auipc`, `ld`, `srli`, `li`, `slli`, `or`) then run on `Hcg`
+(`sie_cap_gpr`) ALONE — `Htlb` sits beside the bundle, owned by nobody else and
+touched by nobody.  At +0x1c it is still there with `Hnone1` attached, and
+`tlb_res_pt_intro root … tlbz1 t0 … (tlb_ok_pt_empty … Hnone1)` consumes both,
+dissolving `bare_inv` for **satp and pmp only**.
 
-**AFTER (2)**, the lane is straight: revert `6b5d1eb2`'s `bare_inv` conjunct
-and `52f89133`'s BootBridge/SpecMain routing, keep kvminithart's precondition
-(ruling 1 becomes unnecessary), and port the three raw blocks onto the
-cell-premise leaves that already exist — `WpSconfSfence.wp_sfence_vma_s_sconf`
-plus a `csrw satp` switch leaf whose composer half is already landed
-(`WpSconfCsr.swp_write_CSR_satp_S` and the write-side satp legality check).
-The switch leaf must take the `tlb` cell as a caller argument and take only
-satp/pmp from `strans_inv_acc_bare`.
+So the flush is never remembered THROUGH anything: the cell never enters a
+bundle.  Any design that reseals it into an existential (`bare_inv`,
+`strans_inv`'s Bare arm) forgets the value and then has to buy the fact back —
+with a ghost tie, or with an assumption.  **An assumption is out of the
+question: a port must not need a hypothesis the original did not.**  (An
+attempt to add a 17th `RiscvLang.reset_regs` conjunct, "the TLB is empty at
+power-on", was written, built green, and REVERTED for exactly this reason.)
+
+#### Why the port LOOKED like it forced the cell into `bare_inv`
+
+The swp-layer S-mode frame `HartSFrame.s_Drw` contains `tlb`, because a Sv39
+fetch's walk FILLS the TLB (`CommonWalk`: `vec_update_dec (register_lookup tlb
+rs) …`) and `HartSpan.hspan_stops` on `RegWrite r` is `bool_decide (r ∉ Drw)`
+— so the walking regime genuinely needs `tlb ∈ Drw`.  The frame is assembled
+out of `sie_cap`'s FOLDED `strans_inv`, so at the KPT arm `tlb_res_pt` funds
+the cell and at the Bare arm nothing did.  `6b5d1eb2` made `bare_inv` fund it.
+
+#### The fix, and the trap that hid it
+
+**THE TRAP:** "the funnel is arm-blind at `strans_regime`, so there is one
+frame set, so the Bare arm must fund the cell."  This is WRONG.  It confuses
+the funnel's STATEMENT with its PROOF.  `strans_inv` is a DISJUNCTION, and
+`WpSmodeIntr.wp_instr_s_sconf_off_clock` opens it — so it can **case-split on
+the arm inside the proof**, with no change to its statement and no change to
+any leaf:
+
+* **KPT arm**  — frame at `s_Drw` (contains `tlb`; `tlb_res_pt` funds it),
+  because that fetch's walk fills the TLB.
+* **Bare arm** — frame at `s_Drw ∖ {[tlb]}`.  At Bare the model's
+  `translateAddr` returns before the TLB is consulted at all (rv64d.v: the
+  `Bare` arm is a bare `returnR`, **neither read nor write**), so `hfrun` does
+  not need the cell in the write set and nothing has to fund it.  The caller's
+  `Htlb` stays outside the bundle — the exec-world shape, exactly.
+
+**Only the SIE=0 funnel needs the split.**  `IntrDefs.sie_cap_on_kpt` already
+refutes the Bare arm under interrupts-enabled (the enabled arm owns `stvec`,
+and so does the Bare slot), so the SIE=1 engine is KPT-only and untouched.
+
+#### Consequences
+
+* `6b5d1eb2` reverts (`bare_inv` loses its `tlb ↦ᵣ tlbv` conjunct);
+  `52f89133`'s BootBridge / SpecMain routing reverts with it.
+* kvminithart's, `ProofMain`'s and `ProofMainSecondary`'s `tlb ↦ᵣ tlbvec0`
+  premises STAY.  Ruling 1 is cancelled; so is the "BLOCKED (1)"
+  unsatisfiability, which was ruling 1's own doing.
+* `WpSconfSfence.wp_sfence_vma_s_sconf` keeps its CELL-PREMISE shape (the
+  caller owns the cell and gets it back flushed).  That was already the right
+  call and it stays right.
+* Step (1) (commit `9c14c1d5`, the `tlb ∈ Drw` premise moved off
+  `sr_swp_translate`/`_wit` into `kpt_swp_side` via `sr_swp_side_ok`) STAYS —
+  it is independently correct and is what lets the Bare branch below exist.
+* The work is confined to the frames layer: `WpSFrames.v`'s wrapper family
+  (and `HartSFrame`'s tower lemmas) must take the write set as a PARAMETER so
+  the funnel can instantiate it twice.  `s_Drw` is mentioned 319 times across
+  10 files (WpSFrames 98, HartSFrame 75, SmodeCorePt 53, TrampStepPt 32,
+  WpSmodeWfi 28, WpIntrInv 21, WpSmodeIntr 4, UptWalkPt 4, WpSmodePtFetch 2,
+  SRegime 2), but a `Local Notation` per file keeps the bodies textually
+  unchanged — only the exported statements gain the parameter.
+* NOTHING on a spec, leaf, or whole-function surface changes.
 
 ### WHY `ProofKvminithart` WAS RED, AND WHY IT IS NOT RULING 1 ALONE
 
