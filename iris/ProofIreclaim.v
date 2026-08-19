@@ -1018,7 +1018,8 @@ Section IreclaimOrphan.
     iPoseProof (printk_env_panic with "Hpenv") as "#Hpanenv".
     iPoseProof (kernel_data_string irc_msg_addr irc_msg
                   (mword_of_int irc_msg_addr) eq_refl
-                  ltac:(unfold text_end, irc_msg_addr; lia) irc_msg_bytes
+                  ltac:(unfold text_end, irc_msg_addr; lia)
+                  ltac:(vm_compute; discriminate) irc_msg_bytes
                   with "Hkdata") as "#Hstr".
     iPoseProof (irci_38 with "Htext") as "Hi38".
     iPoseProof (irci_3a with "Htext") as "Hi3a".

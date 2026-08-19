@@ -30,6 +30,22 @@ Definition sync_segments : list (Z * Z * Z * Z) := [
     ((0x1000)%Z, (0x0)%Z, (0x20)%Z, (6)%Z)   (* RW- *)
   ].
 
+(* THE ALLOCATED SECTIONS, in address order.  The program headers above
+   are a SINGLE RWX PT_LOAD, so the read-only/writable split of the
+   loaded image is visible only here:
+     .text             0x0 .. 0x8c0  r-x
+     .rodata           0x8c0 .. 0x8d9  r--
+     .eh_frame         0x8e0 .. 0xd44  r--
+     .data             0x1000 .. 0x1000  rw-
+     .bss              0x1000 .. 0x1020  rw-  (no file contents)
+   [syncRodataEnd] is the LOWEST WRITABLE one's address: every
+   loadable byte below it is read-only image material and is immutable
+   for the life of the image, while a byte at or above it may be stored
+   to at run time -- so no proof may reside one permanently read-only.
+   (An image with no writable allocated section gets
+   [syncMemEnd], i.e. the whole image is read-only.) *)
+Definition syncRodataEnd : Z := 0x1000%Z.
+
 Definition sync_data : gmap Z (bv 8) := list_to_map [
   ((0x8c2)%Z, Z_to_bv 8 (0x75)%Z)
 ; ((0x8c3)%Z, Z_to_bv 8 (0x6c)%Z)

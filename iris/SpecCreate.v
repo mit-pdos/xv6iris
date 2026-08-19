@@ -611,7 +611,7 @@ Definition wp_create_sconf_body
   is_itable2 gtl cn γfs γi cov logstart nib dev -∗
   itable_inv -∗
   ic_escrows cn γfs γi cov logstart -∗
-  SpecDirlink.ic_sleeplocks cn -∗
+  ic_sleeplocks cn -∗
   ireg_inv γi γfs inodestart nib -∗
   (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B).  Persistent,
      borrowed, never spent.  create is the only function in the tree that

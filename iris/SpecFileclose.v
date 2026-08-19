@@ -246,14 +246,13 @@ Section SpecFileclose.
      as [IcacheEscrow.ic_escrows] is the family of escrows for the same
      reason.  The two lock gnames are existential because nothing above the
      cache names them and [is_sleeplock] is persistent, so the ∃ is free. *)
-  Definition ic_sleeplocks (cn : ic_names) : iProp Σ :=
-    ([∗ list] k ∈ seq 0 NINODE,
-       ∃ γil γisl : gname,
-         is_sleeplock_gen γil γisl (i_lock (ientry k)) "inode"%string
-                          (ic_tok cn k) (slh_tok (icfg_isl k)))%I.
-
-  Global Instance ic_sleeplocks_persistent cn : Persistent (ic_sleeplocks cn).
-  Proof. apply _. Qed.
+  (* [ic_sleeplocks] -- EVERY ENTRY'S INODE SLEEPLOCK, as one persistent
+     family -- was defined HERE, and identically in [SpecDirlink.v].  It is
+     now [IcacheEscrow.ic_sleeplocks]: nothing in it is file- or
+     directory-shaped, and a *function spec* owning a definition the
+     invariant layer needs is what put [ProcInv] into [FsReady]'s dependency
+     cone.  The accessor below is kept under its old name for its two
+     callers and is now [IcacheEscrow.ic_sleeplocks_lookup]'s statement. *)
 
   Lemma ic_sleeplocks_acc (cn : ic_names) (k : nat) :
     (k < NINODE)%nat ->

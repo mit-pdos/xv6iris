@@ -302,7 +302,8 @@ Section KexitMsg.
   Proof.
     iIntros "#Hd".
     iApply (kernel_data_string kx_msg_a kx_msg _ eq_refl
-              ltac:(unfold text_end, kx_msg_a; lia) kx_msg_bytes with "Hd").
+              ltac:(unfold text_end, kx_msg_a; lia)
+              ltac:(vm_compute; discriminate) kx_msg_bytes with "Hd").
   Qed.
 End KexitMsg.
 

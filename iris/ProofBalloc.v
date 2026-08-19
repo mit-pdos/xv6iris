@@ -636,7 +636,8 @@ Section BallocOut.
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm. cbn in Hbm.
     iPoseProof (kernel_data_string ba_msg_addr ba_msg
                   (mword_of_int ba_msg_addr) eq_refl
-                  ltac:(unfold text_end, ba_msg_addr; lia) ba_msg_bytes
+                  ltac:(unfold text_end, ba_msg_addr; lia)
+                  ltac:(vm_compute; discriminate) ba_msg_bytes
                   with "Hkdata") as "#Hstr".
     iPoseProof (bai_0e8 with "Htext") as "Hie8".
     iPoseProof (bai_0ea with "Htext") as "Hiea".

@@ -201,25 +201,6 @@ Section CreateParts.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  (* [KernelDataInv.kernel_data_window] extracts the bytes of a machine
-     WORD; a name literal is a byte STRING that is not NUL-terminated
-     within its window, so neither that lemma nor [kernel_data_string]
-     applies.  This is the same proof at a byte function. *)
-  Lemma cr_kd_bytes (A : Z) (W : nat) (f : nat -> bv 8) (a : mword 64) :
-    a = mword_of_int A ->
-    text_end <= A ->
-    (forall j, (j < W)%nat ->
-       KernelData.kernel_data !! (A + Z.of_nat j)%Z = Some (f j)) ->
-    kernel_data -∗
-    ([∗ list] j ∈ seq 0 W, (pa_add a j) ↦ₘ□ f j).
-  Proof.
-    iIntros (-> HA Hbytes) "#Hd". iApply big_sepL_intro. iIntros "!>" (i j Hi).
-    apply lookup_seq in Hi. destruct Hi as [-> Hlt]. simpl.
-    rewrite pa_add_mword.
-    iApply (big_sepM_lookup _ _ (A + Z.of_nat i)%Z (f i) with "Hd").
-    apply map_lookup_filter_Some_2; [apply Hbytes; exact Hlt | cbn; lia].
-  Qed.
-
   (* the two instances, at the two rodata addresses the auipc/addi pairs
      at +0xfc..+0x100 and +0x110..+0x114 compute.  Both re-checked against
      CodeCreate.v after the bump: create + 0xe4 + 0x3000 - 1622
@@ -231,8 +212,9 @@ Section CreateParts.
     a = mword_of_int cr_dot_addr ->
     kernel_data -∗ ([∗ list] j ∈ seq 0 14, (pa_add a j) ↦ₘ□ cr_dot_f j).
   Proof.
-    intros ->. iApply (cr_kd_bytes cr_dot_addr 14 cr_dot_f _ eq_refl
-                         ltac:(unfold text_end, cr_dot_addr; lia)).
+    intros ->. iApply (kernel_data_bytes cr_dot_addr 14 cr_dot_f _ eq_refl
+                         ltac:(unfold text_end, cr_dot_addr; lia)
+                         ltac:(vm_compute; discriminate)).
     intros j Hj.
     do 14 (destruct j as [|j]; [vm_compute; reflexivity |]).
     exfalso. lia.
@@ -242,8 +224,9 @@ Section CreateParts.
     a = mword_of_int cr_dotdot_addr ->
     kernel_data -∗ ([∗ list] j ∈ seq 0 14, (pa_add a j) ↦ₘ□ cr_dotdot_f j).
   Proof.
-    intros ->. iApply (cr_kd_bytes cr_dotdot_addr 14 cr_dotdot_f _ eq_refl
-                         ltac:(unfold text_end, cr_dotdot_addr; lia)).
+    intros ->. iApply (kernel_data_bytes cr_dotdot_addr 14 cr_dotdot_f _ eq_refl
+                         ltac:(unfold text_end, cr_dotdot_addr; lia)
+                         ltac:(vm_compute; discriminate)).
     intros j Hj.
     do 14 (destruct j as [|j]; [vm_compute; reflexivity |]).
     exfalso. lia.

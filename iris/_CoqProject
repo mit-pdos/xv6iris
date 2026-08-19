@@ -1037,6 +1037,15 @@ IregLinkNz.v
 IgetLic.v
 IregDirBit.v
 IcacheEscrow.v
+# --- BEGIN descoped: the option-A escrow de-risk ---
+# EscrowRegionA.v is the stage-1a de-risk twin of EscrowDefs/EscrowInode: it
+# proved the pending-free + imark hand-off in the real region Sigma before the
+# shipping escrow was written against it.  Nothing Requires it, so compiling it
+# buys the build no checked claim -- SIMP-1 retired the row.  The file stays on
+# disk as the worked de-risk the three Escrow* headers cite by name; reviving it
+# means uncommenting the row and re-porting it onto today's InodeRegion.
+# EscrowRegionA.v
+# --- END descoped ---
 IregBox.v
 IcacheBoot.v
 CodeIget.v
@@ -1236,6 +1245,7 @@ LinkSysMkdir.v
 # SIMP-2: the runtime file system as ONE persistent assertion, with the seal
 # that produces it.  A leaf BELOW the syscall layer, so anything can import
 # the predicate without importing the syscall bodies.
+FsCfg.v
 FsReady.v
 FsSyscalls.v
 LinkFsSyscalls.v

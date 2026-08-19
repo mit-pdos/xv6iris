@@ -375,7 +375,8 @@ Section IgetMsg.
   Proof.
     iIntros "#Hd".
     iApply (kernel_data_string ig_msg_a ig_msg _ eq_refl
-              ltac:(unfold text_end, ig_msg_a; lia) ig_msg_bytes with "Hd").
+              ltac:(unfold text_end, ig_msg_a; lia)
+              ltac:(vm_compute; discriminate) ig_msg_bytes with "Hd").
   Qed.
 End IgetMsg.
 

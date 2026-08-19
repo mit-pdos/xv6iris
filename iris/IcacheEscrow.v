@@ -165,6 +165,7 @@ Require Import DirLinks.
 Require Import FsTree.        (* [dir_uniq] -- the name-uniqueness payload clause *)
 Require Import InodeInv.
 Require Import InodeLock.
+Require Import SleepLock.  (* [is_sleeplock_gen] / [slh_tok] -- see [ic_sleeplocks] below *)
 Require Import InodeRegion.
 Require Import EscrowDefs.
 Require Import EscrowInode.   (* OPTION A: pool_pending, reg_full *)
@@ -3253,6 +3254,52 @@ Section IcacheEscrow.
     assert (Hxk : x <> k) by lia.
     iEval (rewrite /islot2) in "H".
     rewrite /islot2 (HagM x Hxk) (Hagc x Hxk). iExact "H".
+  Qed.
+
+  (* ================================================================== *)
+  (*  6b.  EVERY ENTRY'S INODE SLEEPLOCK                                 *)
+  (* ================================================================== *)
+
+  (* The per-slot inode sleeplock family, in the shape
+     [IcacheBoot.icache_alloc] hands it out.  iput names ONE slot's lock;
+     a caller that cannot know which entry an [iget] will return -- dirlink,
+     create, fileclose, and the whole namei walk -- takes the family, exactly
+     as it takes [ic_escrows] rather than [ic_escrow].  Persistent, so it
+     costs a caller nothing.
+
+     IT LIVES HERE, and that placement is load-bearing rather than tidy.  It
+     was defined TWICE, identically, in [SpecDirlink.v] and
+     [SpecFileclose.v] -- two *function* specs -- and [FsReady.v] reached it
+     by requiring the first.  That import is what put [ProcInv] in
+     [fs_ready]'s dependency cone (SpecDirlink -> SpecWritei -> ProcInv,
+     writei taking the process block for its user-memory copy), and hence
+     what made the file system look as though it depended on process
+     abstractions.  It does not: nothing below is process-shaped, and every
+     ingredient -- [is_sleeplock_gen], [ic_tok], [ientry], [icfg_isl] -- is
+     in scope one layer down from any spec.  A spec file must not own a
+     definition the invariant layer needs; this is that rule applied. *)
+  Definition ic_sleeplocks (cn : ic_names) : iProp Σ :=
+    ([∗ list] k ∈ seq 0 NINODE,
+       ∃ γil γisl : gname,
+         is_sleeplock_gen γil γisl (i_lock (ientry k)) "inode"%string
+                          (ic_tok cn k) (slh_tok (icfg_isl k)))%I.
+
+  Global Instance ic_sleeplocks_persistent cn : Persistent (ic_sleeplocks cn).
+  Proof. apply _. Qed.
+
+  (* ...AND ITS ACCESSOR, which was copied out four times ([ProofDirlink]'s
+     [dl_slk_acc], [LinkCreateFreshTy]'s [cft_slk_acc], [ProofSysLink]'s and
+     [ProofCreate]'s) because the definition sat above them.  One copy. *)
+  Lemma ic_sleeplocks_lookup (cn : ic_names) (k : nat) :
+    (k < NINODE)%nat ->
+    ic_sleeplocks cn -∗
+    ∃ γil γisl : gname,
+      is_sleeplock_gen γil γisl (i_lock (ientry k)) "inode"%string
+                       (ic_tok cn k) (slh_tok (icfg_isl k)).
+  Proof.
+    iIntros (Hk) "H". rewrite /ic_sleeplocks.
+    assert (Hl : seq 0 NINODE !! k = Some k) by (rewrite lookup_seq; lia).
+    iDestruct (big_sepL_lookup _ _ k k Hl with "H") as "$".
   Qed.
 
 End IcacheEscrow.

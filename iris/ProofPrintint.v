@@ -1350,10 +1350,12 @@ Section ProofPrintint.
   Proof.
     assert (Hle : text_end <= KernelSyms.digits)
       by (unfold text_end, KernelSyms.digits; lia).
+    assert (Hhi : KernelSyms.digits + Z.of_nat 16%nat <= rodata_end)
+      by (vm_compute; discriminate).
     pose proof digits_bytes as Hb.
     iIntros "#Hkd".
     iPoseProof (kernel_data_window KernelSyms.digits digits_word 16
-                  (mword_of_int KernelSyms.digits) eq_refl Hle Hb
+                  (mword_of_int KernelSyms.digits) eq_refl Hle Hhi Hb
                   with "Hkd") as "Hw".
     rewrite /digits_tbl. iApply (big_sepL_impl with "Hw").
     iIntros "!>" (k j Hk) "Hb". by iExists (nth_byte digits_word j).

@@ -214,8 +214,12 @@ jobs:
       # longer exists, or _CoqProject drift (a .v in the tree that the project
       # file does not list, so the build never compiles it — or one it lists
       # that is gone).  Those all mean the coverage numbers are lying, and each
-      # fix is a one-line edit.  A mere coverage change never fails CI.  Runs only on a successful build, so the report describes a green
-      # tree.
+      # fix is a one-line edit.  A file that is out of the build ON PURPOSE is
+      # not drift and does not fail here, but it has to say so: comment its row
+      # out to a bare `# Foo.v` (see coqproject_files' docstring), which is what
+      # distinguishes a descope from the forgotten row this check is here to
+      # catch.  A mere coverage change never fails CI.  Runs only on a
+      # successful build, so the report describes a green tree.
       - name: Proof coverage report (iris/)
         run: |
           # The report is written (and lands in the summary) even when --check

@@ -167,7 +167,8 @@ Section DirlinkMsg.
   Proof.
     iIntros "#Hd".
     iApply (kernel_data_string dl_msg_a dl_msg _ eq_refl
-              ltac:(unfold text_end, dl_msg_a; lia) dl_msg_bytes with "Hd").
+              ltac:(unfold text_end, dl_msg_a; lia)
+              ltac:(vm_compute; discriminate) dl_msg_bytes with "Hd").
   Qed.
 End DirlinkMsg.
 
@@ -671,13 +672,13 @@ Section DlBuf.
      it needs its own accessor rather than that file's. *)
   Lemma dl_slk_acc (cn : ic_names) (k : nat) :
     (k < NINODE)%nat ->
-    (SpecDirlink.ic_sleeplocks cn -∗
+    (ic_sleeplocks cn -∗
      ∃ γil γisl : gname,
        is_sleeplock_gen γil γisl (i_lock (ientry k)) "inode"%string
                         (ic_tok cn k) (slh_tok (icfg_isl k))
      : iProp Σ).
   Proof.
-    iIntros (Hk) "H". rewrite /SpecDirlink.ic_sleeplocks.
+    iIntros (Hk) "H". rewrite /ic_sleeplocks.
     assert (Hl : seq 0 NINODE !! k = Some k) by (rewrite lookup_seq; lia).
     iDestruct (big_sepL_lookup _ _ k k Hl with "H") as "$".
   Qed.

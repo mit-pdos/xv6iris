@@ -945,7 +945,8 @@ Section ProofProcinit.
       do 8 (destruct j as [|j];
             [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
       vm_compute in Hj; discriminate. }
-    iPoseProof (kernel_data_string nextpid_str "nextpid"%string name_nextpid eq_refl ltac:(unfold text_end, nextpid_str; lia) Hnextpid
+    iPoseProof (kernel_data_string nextpid_str "nextpid"%string name_nextpid eq_refl ltac:(unfold text_end, nextpid_str; lia)
+                                                                                     ltac:(vm_compute; discriminate) Hnextpid
                   with "Hkdata") as "#Hstr_nextpid".
     assert (Hwaitlock : forall j bt, cstring_bytes "wait_lock"%string !! j = Some bt ->
                          KernelData.kernel_data !! (waitlock_str + Z.of_nat j)%Z = Some bt).
@@ -953,7 +954,8 @@ Section ProofProcinit.
       do 10 (destruct j as [|j];
              [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
       vm_compute in Hj; discriminate. }
-    iPoseProof (kernel_data_string waitlock_str "wait_lock"%string name_waitlock eq_refl ltac:(unfold text_end, waitlock_str; lia) Hwaitlock
+    iPoseProof (kernel_data_string waitlock_str "wait_lock"%string name_waitlock eq_refl ltac:(unfold text_end, waitlock_str; lia)
+                                                                                         ltac:(vm_compute; discriminate) Hwaitlock
                   with "Hkdata") as "#Hstr_waitlock".
     assert (Hprocstr : forall j bt, cstring_bytes "proc"%string !! j = Some bt ->
                         KernelData.kernel_data !! (proc_str + Z.of_nat j)%Z = Some bt).
@@ -961,7 +963,8 @@ Section ProofProcinit.
       do 5 (destruct j as [|j];
             [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
       vm_compute in Hj; discriminate. }
-    iPoseProof (kernel_data_string proc_str "proc"%string name_proc eq_refl ltac:(unfold text_end, proc_str; lia) Hprocstr
+    iPoseProof (kernel_data_string proc_str "proc"%string name_proc eq_refl ltac:(unfold text_end, proc_str; lia)
+                                                                            ltac:(vm_compute; discriminate) Hprocstr
                   with "Hkdata") as "#Hstr_proc".
     (* ---- route both supplies, once ---- *)
     iDestruct (proc_seal_list (seq 0 NPROC) with "Hraws [Hslots] [Hirslots]") as "Hseals".

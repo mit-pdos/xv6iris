@@ -30,6 +30,22 @@ Definition sh_segments : list (Z * Z * Z * Z) := [
     ((0x2000)%Z, (0x10)%Z, (0x98)%Z, (6)%Z)   (* RW- *)
   ].
 
+(* THE ALLOCATED SECTIONS, in address order.  The program headers above
+   are a SINGLE RWX PT_LOAD, so the read-only/writable split of the
+   loaded image is visible only here:
+     .text             0x0 .. 0x127e  r-x
+     .rodata           0x1280 .. 0x13d9  r--
+     .eh_frame         0x13e0 .. 0x1c54  r--
+     .data             0x2000 .. 0x2010  rw-
+     .bss              0x2010 .. 0x2098  rw-  (no file contents)
+   [shRodataEnd] is the LOWEST WRITABLE one's address: every
+   loadable byte below it is read-only image material and is immutable
+   for the life of the image, while a byte at or above it may be stored
+   to at run time -- so no proof may reside one permanently read-only.
+   (An image with no writable allocated section gets
+   [shMemEnd], i.e. the whole image is read-only.) *)
+Definition shRodataEnd : Z := 0x2000%Z.
+
 Definition sh_data : gmap Z (bv 8) := list_to_map [
   ((0x1280)%Z, Z_to_bv 8 (0x24)%Z)
 ; ((0x1281)%Z, Z_to_bv 8 (0x20)%Z)

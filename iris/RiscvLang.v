@@ -746,6 +746,27 @@ Definition img_end : Z :=
            | [] => 0%Z
            end) in exact x).
 
+(* THE READ-ONLY/WRITABLE BOUNDARY inside the loaded image -- one past the
+   last byte the kernel can never store to.  The PT_LOAD [img_end] is built
+   from is a SINGLE RWX segment, so it says nothing about this; only the
+   ELF's SECTION flags do, and [KernelData.kernelRodataEnd] is the dumper's
+   reading of them (the lowest writable allocated section's address).  So the
+   image splits THREE ways, not two:
+
+     [ram_lo, rodata_end)   .text / .rodata / .eh_frame -- read-only image
+                            material, immutable for the life of the image;
+     [rodata_end, img_end)  .data / .got / .got.plt -- INITIALIZED but
+                            WRITABLE (xv6's `first` and `nextpid` live here);
+     [img_end, kernelMemEnd)  .bss -- zero-filled and writable.
+
+   Only the first range may be resided at [DfracDiscarded]: a persistent
+   points-to at an address the kernel stores to is an INCONSISTENT premise,
+   not a failed proof, and it makes every contract that carries it vacuous.
+   Computed from the dump by the same [ltac:(eval vm_compute)] idiom as
+   [img_end], so [unfold rodata_end; lia] sees a plain [Z] literal. *)
+Definition rodata_end : Z :=
+  ltac:(let x := eval vm_compute in KernelData.kernelRodataEnd in exact x).
+
 Definition boot_image : gmap Z (bv 8) :=
   base.filter (fun ab : Z * bv 8 => (ab.1 < img_end)%Z)
     (KernelInstrs.kernel_bytes ∪ KernelData.kernel_data).

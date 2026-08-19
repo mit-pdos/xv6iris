@@ -148,6 +148,7 @@ Require Import SpecSysChdir.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
+Require Import FsCfg.     (* the ambient fs names [fs_ready] is stated at *)
 Require Import FsReady.   (* SIMP-2: [fs_world] is now the derived form *)
 Import Defs.
 
@@ -204,6 +205,10 @@ Section FsBundles.
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
             !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId}.
+  (* the ambient fs names [FsReady.fs_ready] is stated at.  Not a
+     superclass of anything, so unlike [icfg] (which rides in on [fileG])
+     it has to be bound by hand. *)
+  Context `{FSC : fscfg}.
 
   (* THE AMBIENT, AND IT IS PERSISTENT.  Every invariant, lock handle and
      certificate the fs cone runs on, plus the printk credential PAIR (the
@@ -227,14 +232,34 @@ Section FsBundles.
      the class-used-as-index trap, see that file's header).  "A friendly
      client pays for the file system's world once, at boot" is, since
      SIMP-2, a lemma rather than an assumption. *)
+  (* [fs_world] AT A CALLER'S OWN NAMES.  [FsReady.fs_ready] is now
+     PARAMETER-FREE -- every ghost name it used to take is ambient, in
+     [FsCfg.fscfg] and [IcacheRef.icfg] (see FsCfg.v's header for why a
+     carried predicate must not be an existential).  The contracts below
+     still THREAD their names, as every fs contract in the tree does, so
+     what they want is the ambient predicate plus the equations saying the
+     two agree -- [SpecKexec]'s [g = icfg_log] idiom, at the full width.
+     True at boot by construction; the boot chain builds the [fscfg]
+     instance out of exactly these names.
+
+     [procs_inv] IS NO LONGER IN IT.  It is persistent, it is a PROCESS
+     resource rather than a file-system one, and it was the only conjunct
+     that reached back into the process layer.  The two bodies below take
+     it as their own premise. *)
   Definition fs_world (γpr γa : gname) (γs : list gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64) (bn : bio_names) (glog : log_names)
       (γfs : fs_names) (γi : gname) (cn : ic_names) (gtl : gname)
       (cov : gset Z) (logstart inodestart : Z) (nib : nat) (dev : mword 32)
       : iProp Σ :=
-    FsReady.fs_ready γpr γa γs γu γd γk pd pav pu bn glog γfs γi cn gtl
-                     cov logstart inodestart nib dev.
+    (⌜γpr = fsc_printk⌝ ∗ ⌜γa = fsc_kalloc⌝ ∗
+     ⌜γu = fsc_uart⌝ ∗ ⌜γd = fsc_disk⌝ ∗ ⌜γk = fsc_dlock⌝ ∗
+     ⌜pd = fsc_desc⌝ ∗ ⌜pav = fsc_avail⌝ ∗ ⌜pu = fsc_used⌝ ∗
+     ⌜bn = fsc_bio⌝ ∗ ⌜glog = icfg_log⌝ ∗ ⌜γfs = fsc_fs⌝ ∗
+     ⌜γi = fsc_ireg⌝ ∗ ⌜cn = fsc_ic⌝ ∗ ⌜gtl = fsc_itlock⌝ ∗
+     ⌜cov = fsc_cov⌝ ∗ ⌜logstart = fsc_logst⌝ ∗ ⌜inodestart = icfg_ist⌝ ∗
+     ⌜nib = icfg_nib⌝ ∗ ⌜dev = icfg_dev⌝ ∗
+     FsReady.fs_ready)%I.
 
   Global Instance fs_world_persistent γpr γa γs γu γd γk pd pav pu bn glog
       γfs γi cn gtl cov logstart inodestart nib dev :
@@ -242,15 +267,46 @@ Section FsBundles.
                          cov logstart inodestart nib dev).
   Proof. rewrite /fs_world. apply _. Qed.
 
-  (* the alias, as a lemma, so a reader need not take the [Definition]'s
-     word for it *)
-  Lemma fs_world_ready γpr γa γs γu γd γk pd pav pu bn glog
+  (* THE UNPACK, at the caller's names.  This is what the [γs] parameter's
+     departure and the ties buy: a body that threads its own names still
+     destructs ONE row and gets the eighteen constituents spelled the way
+     its callee spells them.  The substitution happens here, once, instead
+     of in every consumer. *)
+  Lemma fs_world_all γpr γa γs γu γd γk pd pav pu bn glog
       γfs γi cn gtl cov logstart inodestart nib dev :
     fs_world γpr γa γs γu γd γk pd pav pu bn glog γfs γi cn gtl
-             cov logstart inodestart nib dev
-    ⊣⊢ FsReady.fs_ready γpr γa γs γu γd γk pd pav pu bn glog γfs γi cn gtl
-                        cov logstart inodestart nib dev.
-  Proof. reflexivity. Qed.
+             cov logstart inodestart nib dev -∗
+    kernel_text ∗ kernel_data ∗
+    printk_env γpr γu γd ∗ ⌜printk_gen_contract (kt := KT1) γpr γu γd⌝ ∗
+    bio_ctx bn (fs_view γfs γd dev cov) ∗
+    log_ctx glog bn γfs cov logstart dev ∗
+    fs_crash_seam cov logstart ∗ gen_cert ∗
+    dev_inv γu γd ∗ disk_geom γd pd pav pu ∗
+    is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) ∗
+    is_itable2 gtl cn γfs γi cov logstart nib dev ∗ itable_inv ∗
+    ic_escrows cn γfs γi cov logstart ∗ ic_sleeplocks cn ∗
+    ireg_inv γi γfs inodestart nib ∗ ireg_open ∗
+    kalloc_env γa None.
+  Proof.
+    rewrite /fs_world.
+    iIntros "(-> & -> & -> & -> & -> & -> & -> & -> & -> & -> & -> & -> & ->
+              & -> & -> & -> & -> & -> & -> & Hw)".
+    by iApply FsReady.fs_ready_all.
+  Qed.
+
+  (* the alias, as a lemma, so a reader need not take the [Definition]'s
+     word for it: at the ambient names, [fs_world] IS [fs_ready]. *)
+  Lemma fs_world_ready γs :
+    fs_world fsc_printk fsc_kalloc γs fsc_uart fsc_disk fsc_dlock
+             fsc_desc fsc_avail fsc_used fsc_bio icfg_log fsc_fs fsc_ireg
+             fsc_ic fsc_itlock fsc_cov fsc_logst icfg_ist icfg_nib icfg_dev
+    ⊣⊢ FsReady.fs_ready.
+  Proof.
+    rewrite /fs_world. iSplit.
+    - by iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _
+                   & _ & _ & _ & _ & $)".
+    - iIntros "$". by repeat iSplit.
+  Qed.
 
   (* THE CONSUMABLES.  What actually crosses the call and comes back: the
      three block slots, the four superblock cells, the free-block ledger at
@@ -300,7 +356,7 @@ Definition wp_sys_mkdir_friendly_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
       !irefslotG Σ, !pavG Σ, !iregG Σ}
-    `{GEN : GenId} `{CID : CpuId}
+    `{GEN : GenId} `{CID : CpuId} `{FSC : fscfg}
 
     (γf γa γpr : gname)                                 (* ftable, kalloc, printk *)
     (γs : list gname) (j : nat) (γl : gname)             (* the running process *)
@@ -330,6 +386,9 @@ Definition wp_sys_mkdir_friendly_body
   pc_is pcE -∗
   fs_world γpr γa γs γu γd γk pd pav pu bn glog γfs γi cn gtl
            cov logstart inodestart nib dev -∗
+  (* [procs_inv] left [fs_ready] (FsCfg.v's header): a PROCESS resource,
+     persistent, and every caller already holds it. *)
+  procs_inv γs -∗
   fs_res bn γfs cov logstart bmapstart inodestart ninodes size used ns
          dqb dqs dqbs dqn -∗
   proc_priv γf pj pid V -∗
@@ -357,7 +416,7 @@ Module FsSysMkdir (M : SYSMKDIR).
       `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
         !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
         !irefslotG Σ, !pavG Σ, !iregG Σ}
-      `{GEN : GenId} `{CID : CpuId}
+      `{GEN : GenId} `{CID : CpuId} `{FSC : fscfg}
       (γf γa γpr : gname)
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
@@ -381,16 +440,23 @@ Module FsSysMkdir (M : SYSMKDIR).
     intros HK Hg Hns Hj Hgs Htf.
     destruct Hg as [Hdev Hnib Hlog Hist Hroot Hnibp Hlg Hsz Hbnn Hbcov Hbout
                     Histnn Hcb Hbg Hib Hn1 Hn2 Hn3 Hus].
-    iIntros "Hcg Hown Hpc Hw Hres Hpriv Hcont".
+    iIntros "Hcg Hown Hpc Hw Hprocs Hres Hpriv Hcont".
     (* SIMP-2: the unpack is [FsReady]'s own projection rather than a raw
        [iDestruct].  It has to be: [fs_ready] is [Typeclasses Opaque] (see
        that file's two seals and the measurement behind them), so the
        nineteen conjuncts come out through the family, which is exactly what
        the family is for. *)
-    iDestruct (FsReady.fs_ready_all with "Hw") as
+    (* SIMP-2: the unpack is [fs_world]'s own projection rather than a raw
+       [iDestruct].  It has to be: [fs_ready] is [Typeclasses Opaque] (see
+       FsReady.v's two seals and the measurement behind them), and it is now
+       parameter-free, so the eighteen constituents come out through the
+       family AT THIS BODY'S OWN NAMES -- which is what [fs_world_all]'s
+       ties are for.  [procs_inv] is no longer among them; it arrives as its
+       own premise. *)
+    iDestruct (fs_world_all with "Hw") as
       "(Htext & Hdata & Hpr & %Hprg & Hbio & Hlogc &
         Hseam & Hgc & Hdev & Hdgeom & Hdlk & Hitb2 & Hitbl &
-        Hesc & Hisl & Hireg & Hiopen & Hkenv & Hprocs)".
+        Hesc & Hisl & Hireg & Hiopen & Hkenv)".
     iDestruct "Hres" as "(Hbsl & Hsbn & Hsbi & Hsbs & Hsbb & Hbm & Hir)".
     iApply (M.wp_sys_mkdir_sconf γf γa γpr γs j γl γu γd γk pd pav pu bn
               glog γfs γi cn gtl cov logstart bmapstart inodestart nib
@@ -466,7 +532,7 @@ Definition wp_sys_chdir_friendly_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
       !irefslotG Σ, !pavG Σ, !iregG Σ}
-    `{GEN : GenId} `{CID : CpuId}
+    `{GEN : GenId} `{CID : CpuId} `{FSC : fscfg}
 
     (γf γa γpr : gname)
     (γs : list gname) (j : nat) (γl : gname)
@@ -495,6 +561,9 @@ Definition wp_sys_chdir_friendly_body
   pc_is pcE -∗
   fs_world γpr γa γs γu γd γk pd pav pu bn glog γfs γi cn gtl
            cov logstart inodestart nib dev -∗
+  (* [procs_inv] left [fs_ready] (FsCfg.v's header): a PROCESS resource,
+     persistent, and every caller already holds it. *)
+  procs_inv γs -∗
   fs_res bn γfs cov logstart bmapstart inodestart ninodes size used 2
          dqb dqs dqbs dqn -∗
   proc_priv γf pj pid V -∗
@@ -520,7 +589,7 @@ Module FsSysChdir (M : SYSCHDIR).
       `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
         !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
         !irefslotG Σ, !pavG Σ, !iregG Σ}
-      `{GEN : GenId} `{CID : CpuId}
+      `{GEN : GenId} `{CID : CpuId} `{FSC : fscfg}
       (γf γa γpr : gname)
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
@@ -544,16 +613,23 @@ Module FsSysChdir (M : SYSCHDIR).
     intros HK Hg Hj Hgs Htf.
     destruct Hg as [Hdev Hnib Hlog Hist Hroot Hnibp Hlg Hsz Hbnn Hbcov Hbout
                     Histnn Hcb Hbg Hib Hn1 Hn2 Hn3 Hus].
-    iIntros "Hcg Hown Hpc Hw Hres Hpriv Hcont".
+    iIntros "Hcg Hown Hpc Hw Hprocs Hres Hpriv Hcont".
     (* SIMP-2: the unpack is [FsReady]'s own projection rather than a raw
        [iDestruct].  It has to be: [fs_ready] is [Typeclasses Opaque] (see
        that file's two seals and the measurement behind them), so the
        nineteen conjuncts come out through the family, which is exactly what
        the family is for. *)
-    iDestruct (FsReady.fs_ready_all with "Hw") as
+    (* SIMP-2: the unpack is [fs_world]'s own projection rather than a raw
+       [iDestruct].  It has to be: [fs_ready] is [Typeclasses Opaque] (see
+       FsReady.v's two seals and the measurement behind them), and it is now
+       parameter-free, so the eighteen constituents come out through the
+       family AT THIS BODY'S OWN NAMES -- which is what [fs_world_all]'s
+       ties are for.  [procs_inv] is no longer among them; it arrives as its
+       own premise. *)
+    iDestruct (fs_world_all with "Hw") as
       "(Htext & Hdata & Hpr & %Hprg & Hbio & Hlogc &
         Hseam & Hgc & Hdev & Hdgeom & Hdlk & Hitb2 & Hitbl &
-        Hesc & Hisl & Hireg & Hiopen & Hkenv & Hprocs)".
+        Hesc & Hisl & Hireg & Hiopen & Hkenv)".
     iDestruct "Hres" as "(Hbsl & Hsbn & Hsbi & Hsbs & Hsbb & Hbm & Hir)".
     iPoseProof (printk_env_panic with "Hpr") as "#Hpe".
     iApply (M.wp_sys_chdir_sconf γf γa γs j γl γu γd γk pd pav pu bn

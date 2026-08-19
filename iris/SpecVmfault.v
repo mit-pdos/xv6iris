@@ -118,7 +118,75 @@ Definition wp_vmfault_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
+(* ===================================================================== *)
+(* THE MEMORY-INDEXED CONTRACT.                                          *)
+(*                                                                       *)
+(* Same function, same three arms; what it adds is what happens to the   *)
+(* PROCESS'S MEMORY -- and the answer is NOTHING.                        *)
+(*                                                                       *)
+(* [ProcPtOwn.proc_ptm P sz M] is the process's own view of its memory:  *)
+(* a [gmap] from user virtual address to byte covering EVERYTHING below  *)
+(* [p->sz] rounded up, with a 0 at every va the table does not map --    *)
+(* because that is what the process will read there once vmfault has run *)
+(* ([UserPtTree.umem_lazy]).  vmfault maps a page that was already in    *)
+(* that view, as a lazy page reading 0, and it memsets the page it maps  *)
+(* to 0.  So the view does not move: [M] is the SAME on the way in and   *)
+(* on the way out, on BOTH arms.  What changes is only which half of it  *)
+(* is backed by ownership.                                               *)
+(*                                                                       *)
+(* That is the property copyin and copyout need.  They fault pages in    *)
+(* MID-COPY, and a contract that only said "M grows" would leave the     *)
+(* prefix they have already copied saying nothing after the first fault. *)
+(*                                                                       *)
+(* [wp_vmfault_sconf] (above) is the [proc_pt]-altitude COROLLARY, kept  *)
+(* so that vmfault's other callers -- usertrap, copyinstr -- do not have *)
+(* to name a memory they say nothing about.                              *)
+(* ===================================================================== *)
+Definition wp_vmfault_sconf_mem_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
+    (γa : gname) (mm : regfile)
+    (P : uptd) (M : gmap Z (bv 8)) (szv : mword 64) (K lvl : nat) (eb : bool)
+    (p : mword 64) (b : bool) (lks : gset string) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.vmfault in
+  let va := mm !!! Regidx (mword_of_int 12) in
+  let va0 : mword 64 := and_vec va (mword_of_int (-4096)) in
+  let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
+  (38 <= K)%nat ->
+  mm !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
+  mm !!! Regidx (mword_of_int 10) = page_base P.(ud_root) ->
+  mm !!! Regidx (mword_of_int 11) = szv ->
+  (uint szv <= 2 ^ 38)%Z ->
+  (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
+  locks_below lks "kmem" ->
+  sie_cap_gpr KT1 mm K b p -∗
+  cpu_own lvl eb p b lks -∗
+  kernel_text -∗
+  pc_is pcE -∗
+  proc_ptm P (uint szv) M -∗
+  kalloc_env γa None -∗
+  wp_next b p (fun (CID : CpuId) =>
+    ∀ (mr : regfile),
+    sie_cap_gpr KT1 mr K b p -∗
+    cpu_own lvl eb p b lks -∗
+    pc_is ret_tgt -∗
+    ⌜callee_saved mm mr⌝ -∗
+    ( (⌜mr !!! Regidx (mword_of_int 10) = mword_of_int 0⌝ ∗
+         proc_ptm P (uint szv) M)
+      ∨ (∃ r : mword 64,
+           ⌜mr !!! Regidx (mword_of_int 10) = r⌝ ∗
+           ⌜page_valid r⌝ ∗
+           ⌜(uint va < uint szv)%Z⌝ ∗
+           ⌜P.(ud_um) !! svpn_of va0 = None⌝ ∗
+           proc_ptm (uptd_insert P (svpn_of va0) r) (uint szv) M) ) -∗
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
+
 Module Type VMFAULT.
+  Parameter wp_vmfault_sconf_mem :
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
+      (γa : gname) (mm : regfile)
+      (P : uptd) (M : gmap Z (bv 8)) (szv : mword 64) (K lvl : nat) (eb : bool)
+      (p : mword 64) (b : bool) (lks : gset string),
+      wp_vmfault_sconf_mem_body γa mm P M szv K lvl eb p b lks.
   Parameter wp_vmfault_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (mm : regfile)

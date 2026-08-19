@@ -1213,7 +1213,7 @@ Proof.
   destruct Hhw as (Hmisa & Hmseccfg & Hsenv & Hhtif & Hall & Help).
   destruct Hpt as ((usatp & Hsatpok & Hsatp) & HA & Hord & HXp & HWp & HRp & Hcovp).
   destruct Hsatpok as (Hmode & Hasid & Hppn & Hpmaw_of).
-  pose proof Hwf as (md & Hdisj & Hdj & Hmm & Hdm & Hram & Hcov & Hacc0 & Hwfm & Hspec).
+  pose proof Hwf as (md & Hdisj & Hdj & Hmm & Hdm & Hram & Hacc0 & Hwfm & Hspec).
   pose proof Hspec as (Hbase & _).
   destruct (upt_spec_maps (ud_root P) (ud_tfp P) (ud_um P) t (svpn_of va) w
               Hspec (or_intror (or_intror Hl)))
@@ -1942,7 +1942,7 @@ Section ZicbopArm.
     { apply u_gm_pmlen; try assumption;
         rewrite u_state_sregs; first [ rewrite Lms; exact Lmxr0 | assumption ]. }
     (* the runtime block address, classified *)
-    pose proof Hwf as (md0 & _ & _ & _ & _ & _ & _ & Haccwf & _ & _).
+    pose proof Hwf as (md0 & _ & _ & _ & _ & _ & Haccwf & _ & _).
     destruct (ca_classify cbop (ud_tfp pt) (ud_um pt)
                 (ca_blk rs1 offset
                    (u_state (register_set nextPC (add_vec_int va 4) rsf) mm)) Haccwf)

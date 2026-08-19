@@ -15,7 +15,7 @@
        and the live user table [utlb_inv_pt];
      - the bridge additionally needs the cells userret never touches --
        scause/stval (stale), stvec/medeleg/mip and the state-enable pins
-       (kernel-owned config), and the user data pages [udata_own] -- which
+       (kernel-owned config), and the process's memory [umem_any] -- which
        the CALLER holds across userret and supplies here;
      - the mstatus pins [user_mstatus_ok (sret_ms5 mstatus0)] follow from
        the S-mode pins on the pre-sret mstatus0 (SXL/MXR from userret's own
@@ -94,7 +94,7 @@ Section UserretUser.
     (* ---- the config record's data fields, pinned to the cells ---- *)
     uc_dqc C = DfracOwn 1 ->
     (* ---- the user data pages' pure facts ---- *)
-    udata_cov (ud_um pt) (ud_data pt) ->
+    uva_pa_inj pt ->
     upt_acc_wf (ud_um pt) ->
     kernel_text -∗
     hw_config -∗
@@ -154,7 +154,7 @@ Section UserretUser.
     (R_bitvector_32 mcounteren) ↦ᵣ□ mcounteren_v -∗
     (R_bitvector_32 scounteren) ↦ᵣ□ scounteren_v -∗
     mhpmcounter ↦ᵣ□ mhpmcounter_v -∗
-    udata_own (ud_data pt) -∗
+    umem_any pt -∗
     (* ---- THE RESIDUE, COMPLETED BY THE WORDS userret READS ----------------
        The 31 save slots are OWNED BY the kernel-side bundle that parks
        across user execution ([UsertrapRes.ut_res_bare]'s [tf_page], via
@@ -205,7 +205,7 @@ Section UserretUser.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HSIE HMPRV HSXL HTVM HMXR Hmm Hwf HTSR Hsup Ha0 HuMode Huasid Huppn
-      HFS HVS Hdqc Hcov Hacc.
+      HFS HVS Hdqc Hinj Hacc.
     iIntros "#Hkt #Hhw #Hmi #Hwi Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenv Hsepc
              #Hclaim Hktlb Hufr Hpc Hfile
              Htf40 Htf48 Htf56 Htf64 Htf72 Htf80 Htf88 Htf96 Htf104 Htf120
@@ -252,7 +252,7 @@ Section UserretUser.
                  eq_refl eq_refl eq_refl eq_refl
                  eq_refl eq_refl eq_refl
                  eq_refl eq_refl eq_refl eq_refl
-                 Hcov Hacc
+                 Hinj Hacc
                  with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenv Hsepc Hutlb Hpc
                        Hfile Hsc Hstval Hstvec Hmedl Hmse Hsse
                        Hmcen Hscen Hhpm Hdata Hrut")

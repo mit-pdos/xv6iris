@@ -495,21 +495,41 @@ Section BootCarve.
       | cbn; unfold img_end; lia ].
   Qed.
 
+  (* [KernelData] lookups above [text_end], in the form the PINNED-run lemmas
+     ([boot_ran_run_at], [boot_ran_phys_word]) want them: what the dump says
+     is at an address IS what the loader left there. *)
+  Lemma boot_byte_data_run (A : Z) (w : bv 64) (W : nat) :
+    text_end <= A ->
+    (forall j, (j < W)%nat ->
+       KernelData.kernel_data !! (A + Z.of_nat j) = Some (nth_byte w j)) ->
+    forall j, (j < W)%nat -> nth_byte w j = boot_byte (A + Z.of_nat j).
+  Proof.
+    intros HA Hb j Hj. symmetry.
+    apply (boot_byte_data (A + Z.of_nat j) (nth_byte w j));
+      [unfold text_end in *; lia | by apply Hb].
+  Qed.
+
   (* [KernelDataInv.kernel_data] is the PERSISTED ([↦ₘ□]) initialized-globals
-     image, filtered at [text_end] (its sub-etext bytes belong to the [↦ₓ□]
-     half).  Its keys stop at [img_end], which is why the SECOND cut of the
-     data half goes there: below [img_end] the bytes persist into this
-     bundle, at or above it they stay OWNED for the typed .bss cells and the
-     page run.  Nothing is left over that anything wants -- the range's
-     non-[KernelData] bytes are padding. *)
+     image, filtered at [text_end] below (its sub-etext bytes belong to the
+     [↦ₓ□] half) and at [rodata_end] ABOVE.  The upper bound is why the
+     SECOND cut of the data half goes to [rodata_end] and not to [img_end]:
+     [rodata_end, img_end) is the image's WRITABLE initialized data
+     (`.data` -- xv6's `first` and `nextpid` -- plus `.got`/`.got.plt`), and
+     persisting a byte the kernel stores to would make every contract that
+     carries [kernel_data] vacuous rather than break a proof.  So only
+     [text_end, rodata_end) persists here; [rodata_end, ram_hi) stays OWNED
+     for the writable globals, the typed .bss cells and the page run.
+     Nothing is left over that anything wants -- the range's non-[KernelData]
+     bytes are padding. *)
   Lemma kernel_data_intro (g : gstate) :
     (forall x : Z, ram_lo <= x < ram_hi ->
        g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
-    ([∗ map] a ↦ b ∈ ran_bytes g text_end img_end, a ↦ₘ□ b) -∗ kernel_data.
+    ([∗ map] a ↦ b ∈ ran_bytes g text_end rodata_end, a ↦ₘ□ b) -∗ kernel_data.
   Proof.
-    iIntros (Hmem) "#Hd". rewrite /kernel_data.
+    iIntros (Hmem) "#Hd". rewrite /kernel_data /kdata_ro.
     iApply big_sepM_intro. iIntros "!>" (a b Hlk).
-    apply map_lookup_filter_Some in Hlk. destruct Hlk as [Hlk Hge]. cbn in Hge.
+    apply map_lookup_filter_Some in Hlk. destruct Hlk as [Hlk [Hge Hlt]].
+    cbn in Hge, Hlt.
     pose proof (KernelData.kernel_data_range a b Hlk) as Hr.
     unfold KernelData.kernel_data_lo, KernelData.kernel_data_hi in Hr.
     assert (Hram : ram_lo <= a < ram_hi)
@@ -517,7 +537,7 @@ Section BootCarve.
     iApply (big_sepM_lookup _ _ (pa_of_z a) b with "Hd").
     rewrite /ran_bytes. apply map_lookup_filter_Some_2.
     - rewrite <- (boot_byte_data a b Hge Hlk). exact (Hmem a Hram).
-    - cbn. rewrite (boot_uint_pa a Hram). unfold img_end. lia.
+    - cbn. rewrite (boot_uint_pa a Hram). lia.
   Qed.
 
   (* ================================================================== *)
@@ -581,41 +601,6 @@ Section BootCarve.
     rewrite Hnb /phys_pointsto. iFrame "Hb". iPureIntro.
     unfold addr_is_ram, ram_base, ram_size.
     rewrite (boot_uint_pa _ Hin). unfold ram_lo, ram_hi in Hin. lia.
-  Qed.
-
-  (* the PHYSICAL-tier doubleword of the INITIALIZED image, at a pinned value:
-     what M-mode boot code reads (it has no translation).  [kernel_data]'s
-     [↦ₘ□] bytes sit at STATIC (identity) kernel-data addresses, so
-     [KMap.mem_ident_phys] disassembles each one.  This is the shape the
-     [mb_ld_ea] word ([_entry]'s GOT slot, holding &stack0) comes out at;
-     the instantiation lives with the client, which is the only place that
-     knows [mb_ld_ea]'s literal value (this file stays below the M-mode
-     tower on purpose). *)
-  Lemma kernel_data_phys_word (A : Z) (w : bv 64) (a : mword 64) :
-    a = pa_of_z A -> text_end <= A -> A + 8 <= img_end ->
-    A mod 8 = 0 ->
-    (forall j, (j < 8)%nat ->
-       KernelData.kernel_data !! (A + Z.of_nat j) = Some (nth_byte w j)) ->
-    kmap_static_claims -∗ kernel_data -∗ a ↦ₚ₈□ w.
-  Proof.
-    iIntros (-> HA Hhi Hal Hbytes) "#Hkbundle #Hd".
-    unfold text_end in HA. unfold img_end in Hhi.
-    assert (Hram : ram_lo <= A < ram_hi) by (unfold ram_lo, ram_hi; lia).
-    assert (Halb : uint (pa_of_z A) mod 8 = 0)
-      by (rewrite (boot_uint_pa A Hram); exact Hal).
-    iApply (phys_word_pointsto_intro _ _ _ (aligned8_of_mod _ Halb)).
-    iDestruct (kernel_data_window (wd := 64) A w 8%nat (pa_of_z A) eq_refl HA Hbytes
-                 with "Hd") as "Hbs".
-    iApply (big_sepL_impl with "Hbs"). iIntros "!>" (kk j Hk) "Hb".
-    apply lookup_seq in Hk. destruct Hk as [-> Hlt].
-    change (0 + kk)%nat with kk.
-    assert (Hin : ram_lo <= A + Z.of_nat kk < ram_hi).
-    { unfold ram_lo, ram_hi. lia. }
-    assert (Hkd : addr_is_kdata (pa_add (pa_of_z A) kk)).
-    { rewrite pa_add_mword. unfold addr_is_kdata, ram_base, ram_size, text_end.
-      rewrite (boot_uint_pa _ Hin). lia. }
-    iApply (mem_ident_phys _ DfracDiscarded _ (kdata_svpn_class _ Hkd)
-              with "Hkbundle Hb").
   Qed.
 
   (* ================================================================== *)
@@ -683,6 +668,57 @@ Section BootCarve.
     iApply (big_sepL_mono with "Hbs"). iIntros (kk j Hk) "Hb".
     apply lookup_seq in Hk. destruct Hk as [-> Hlt].
     rewrite (Hbytes (0 + kk)%nat Hlt). iExact "Hb".
+  Qed.
+
+  (* THE PHYSICAL-TIER DOUBLEWORD of the initialized image, at a pinned value
+     and at [DfracDiscarded]: what M-mode boot code reads (it has no
+     translation), and persistent so all eight harts share it.
+
+     It is cut out of the OWNED range rather than out of [kernel_data],
+     because the one word this serves -- [_entry]'s GOT slot, holding
+     &stack0 -- lives in `.got`, i.e. ABOVE [rodata_end], where
+     [kernel_data] deliberately stops.  Persisting it here is a claim about
+     ONE cell (xv6 is statically linked and non-PIE, so nothing ever writes
+     the GOT) instead of about a whole writable section, which is exactly
+     the distinction [rodata_end] exists to keep.  The instantiation lives
+     with the client, which is the only place that knows [mb_ld_ea]'s
+     literal value (this file stays below the M-mode tower on purpose). *)
+  Lemma boot_ran_phys_word (g : gstate) (A : Z) (w : bv 64) (a : mword 64) :
+    a = pa_of_z A ->
+    (forall x : Z, ram_lo <= x < ram_hi ->
+       g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
+    text_end <= A -> A + 8 <= ram_hi -> A mod 8 = 0 ->
+    (forall j, (j < 8)%nat -> nth_byte w j = boot_byte (A + Z.of_nat j)) ->
+    kmap_static_claims -∗ boot_raw_ran g A (A + 8) ==∗ a ↦ₚ₈□ w.
+  Proof.
+    intros -> Hmem Hlo Hhi Hal Hbytes. iIntros "#Hcl H".
+    assert (Hram : ram_lo <= A < ram_hi) by (unfold ram_lo, text_end in *; lia).
+    assert (E : A + 8 = A + Z.of_nat 8%nat) by (cbn; lia).
+    assert (Hhi' : A + Z.of_nat 8%nat <= ram_hi) by (cbn; lia).
+    iDestruct (boot_ran_eq g A (A + 8) A (A + Z.of_nat 8%nat) eq_refl E with "H")
+      as "H".
+    iDestruct (boot_ran_run_at (m := 64%N) g A 8%nat w Hmem Hlo Hhi' Hbytes
+                 with "Hcl H") as "Hbs".
+    iAssert (|==> [∗ list] j ∈ seq 0 8,
+                    (pa_add (pa_of_z A) j) ↦ₘ□ nth_byte w j)%I
+      with "[Hbs]" as "Hp".
+    { iApply big_sepL_bupd. iApply (big_sepL_mono with "Hbs").
+      iIntros (kk j Hk) "Hb". by iApply mem_pointsto_persist. }
+    iMod "Hp" as "#Hp". iModIntro.
+    assert (Halb : uint (pa_of_z A) mod 8 = 0)
+      by (rewrite (boot_uint_pa A Hram); exact Hal).
+    iApply (phys_word_pointsto_intro _ _ _ (aligned8_of_mod _ Halb)).
+    iApply (big_sepL_impl with "Hp"). iIntros "!>" (kk j Hk) "Hb".
+    apply lookup_seq in Hk. destruct Hk as [-> Hlt].
+    change (0 + kk)%nat with kk.
+    assert (Hin : ram_lo <= A + Z.of_nat kk < ram_hi).
+    { unfold ram_lo, ram_hi in *. lia. }
+    assert (Hkd : addr_is_kdata (pa_add (pa_of_z A) kk)).
+    { rewrite pa_add_of_z. unfold addr_is_kdata, ram_base, ram_size, text_end.
+      unfold text_end in Hlo.
+      rewrite (boot_uint_pa _ Hin). unfold ram_lo, ram_hi in Hin. lia. }
+    iApply (mem_ident_phys _ DfracDiscarded _ (kdata_svpn_class _ Hkd)
+              with "Hcl Hb").
   Qed.
 
   (* ...and the .bss corollary: above [img_end] the obligation is discharged

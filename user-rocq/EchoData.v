@@ -30,6 +30,22 @@ Definition echo_segments : list (Z * Z * Z * Z) := [
     ((0x1000)%Z, (0x0)%Z, (0x20)%Z, (6)%Z)   (* RW- *)
   ].
 
+(* THE ALLOCATED SECTIONS, in address order.  The program headers above
+   are a SINGLE RWX PT_LOAD, so the read-only/writable split of the
+   loaded image is visible only here:
+     .text             0x0 .. 0x92a  r-x
+     .rodata           0x930 .. 0x959  r--
+     .eh_frame         0x960 .. 0xdcc  r--
+     .data             0x1000 .. 0x1000  rw-
+     .bss              0x1000 .. 0x1020  rw-  (no file contents)
+   [echoRodataEnd] is the LOWEST WRITABLE one's address: every
+   loadable byte below it is read-only image material and is immutable
+   for the life of the image, while a byte at or above it may be stored
+   to at run time -- so no proof may reside one permanently read-only.
+   (An image with no writable allocated section gets
+   [echoMemEnd], i.e. the whole image is read-only.) *)
+Definition echoRodataEnd : Z := 0x1000%Z.
+
 Definition echo_data : gmap Z (bv 8) := list_to_map [
   ((0x92c)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x92d)%Z, Z_to_bv 8 (0x0)%Z)

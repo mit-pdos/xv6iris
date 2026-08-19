@@ -1538,14 +1538,17 @@ Section UservecAllPt.
        installed [utlb_inv_pt] into the parked [Hufr : pt_frame ...] and
        produced [Hkres : tlb_res_pt kroot] for the kernel one.  The user
        PAGES did not move at all -- [Hdata] is the same resource the kernel
-       tier calls [proc_pt_own], page-indexed rather than byte-indexed
-       ([ProcPtOwn.proc_pt_own_udata]), which is why this costs a rewrite
-       and not a conversion.
+       tier calls [proc_pt_own], page-indexed rather than keyed by user
+       virtual address ([ProcPtOwn.proc_pt_own_umem]), which is why this
+       costs a rewrite and not a conversion.
          So the whole user address space is now in the kernel's hands in the
        kernel's shape, and [proc_pt] is exactly the two of them: that is
        what the BARE residue is missing, and what makes it the residue that
        could park across user execution in the first place. *)
-    iEval (rewrite Hnorm -proc_pt_own_udata) in "Hdata".
+    assert (Hmwf0 : upt_map_wf (ud_um pt)) by (destruct Hptwf as (H1 & _); exact H1).
+    assert (Hinj0 : um_inj (ud_um pt))
+      by (destruct Hptwf as (_ & _ & _ & H4 & _); exact H4).
+    iEval (rewrite -(proc_pt_own_umem pt Hmwf0 Hinj0)) in "Hdata".
     iAssert (proc_pt pt) with "[Hufr Hdata]" as "Hpt".
     { rewrite proc_pt_split. iFrame "Hdata". iSplitR; [iPureIntro; exact Hptwf|].
       iExact "Hufr". }

@@ -306,7 +306,8 @@ Section IlockMsg.
   Proof.
     iIntros "#Hd".
     iApply (kernel_data_string il_msg_a il_msg _ eq_refl
-              ltac:(unfold text_end, il_msg_a; lia) il_msg_bytes with "Hd").
+              ltac:(unfold text_end, il_msg_a; lia)
+              ltac:(vm_compute; discriminate) il_msg_bytes with "Hd").
   Qed.
 End IlockMsg.
 

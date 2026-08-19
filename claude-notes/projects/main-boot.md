@@ -387,7 +387,9 @@ release(&p->lock)`, and three of the five are ready:
 So what userinit's contract must take, and main must therefore pay, is: the
 `nextpid` lock (`is_lock γp alp_pid_lock "nextpid" nextpid_res` — procinit
 returns the `lk_fresh`, and the `nextpid` cell has to join
-`main_globals_raw`), `procs_avail (Some (S k))`, and the icache bundle
+`main_globals_raw`; the CELL is already carved and handed out, as
+`BootShared.main_data_raw`'s second conjunct, so that step is a move rather
+than a new carve), `procs_avail (Some (S k))`, and the icache bundle
 (`is_itable2` / `itable_inv` / `ic_escrows` / one `iref_slot`).
 **THE ICACHE IS THE ONE THAT IS NOT READY**: `IcacheBoot.icache_boot` needs
 the stocked inode pool, which needs the fs BLOCK layer wired into main

@@ -138,7 +138,8 @@ Section FilewriteMsg.
   Proof.
     iIntros "#Hd".
     iApply (kernel_data_string fw_msg_a fw_msg _ eq_refl
-              ltac:(unfold text_end, fw_msg_a; lia) fw_msg_bytes with "Hd").
+              ltac:(unfold text_end, fw_msg_a; lia)
+              ltac:(vm_compute; discriminate) fw_msg_bytes with "Hd").
   Qed.
 End FilewriteMsg.
 

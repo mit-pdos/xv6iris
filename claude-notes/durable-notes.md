@@ -346,6 +346,70 @@ equation makes every instantiation a claim that can quietly go false — so
 prefer a contract that COMPUTES the arm to one that takes the arm's
 identity as a hypothesis.
 
+## A PERSISTENT POINTS-TO AT A **WRITABLE** IMAGE BYTE IS AN INCONSISTENT PREMISE
+
+The loaded image is not two ranges but THREE, and the middle one is invisible
+in the program headers. xv6 links a SINGLE RWX `PT_LOAD`, so
+`KernelData.kernel_segments` — and `RiscvLang.img_end`, derived from it — can
+only say where the file image ends. The read-only/writable split lives in the
+ELF's SECTION table:
+
+| | |
+|---|---|
+| `[ram_lo, rodata_end)` | `.text` / `.rodata` / `.eh_frame` — read-only forever |
+| `[rodata_end, img_end)` | `.data` / `.got` / `.got.plt` — initialized and WRITABLE |
+| `[img_end, kernelMemEnd)` | `.bss` — zero-filled and writable |
+
+`RiscvLang.rodata_end` is that boundary. It is GENERATED, like every other
+image constant: `tools/dump_elf.py` parses the section headers and emits
+`KernelData.kernelRodataEnd` (the lowest writable *allocated* section's
+address) with the whole allocated-section table beside it as a comment, so the
+reading is auditable in the file rather than in a tool.
+
+**Anything that resides image bytes at `DfracDiscarded` must stop at
+`rodata_end`, not at `img_end`.** `KernelDataInv.kernel_data` used to stop at
+`img_end`, so it claimed permanent read-only status for `first` and `nextpid`
+— two `.data` globals xv6 *stores* to (`first = 0` in forkret,
+`nextpid = nextpid + 1` in allocpid). Nothing failed to compile, and the
+consequence is the section above's, exactly: any contract holding
+`kernel_data` *and* ownership of one of those cells is VACUOUS, so
+`SpecForkret.wp_forkret_body`'s proven contract said nothing to a caller that
+also held `kernel_data`.
+
+**The tier index does not save you.** `mem_pointsto` bottoms out in a
+`pointsto` keyed on the PHYSICAL address, with `ktier_pin` only a pure side
+condition, and a kernel global is identity-mapped — so `↦ₘ□` and `↦₄` at the
+same `.data` address really do collide, at every tier.
+
+**State the tripwire POSITIVELY.** `kernel_data ∗ first ↦₄{dq} w ⊢ False` is
+the wrong shape: after the fix that conjunction is precisely what must be
+SATISFIABLE. `KernelDataInv`'s §T instead pins the DOMAIN — `kdata_ro_bounds`
+(everything resident is in `[text_end, rodata_end)`) plus `kdata_ro_first` /
+`kdata_ro_nextpid`, two `vm_compute`d instances saying the globals xv6 writes
+are not in it. Re-widen the filter, or move the image so a written global
+falls below the boundary, and those two fail.
+
+**Writable-by-flags is not the same as written.** `.got`/`.got.plt` are
+writable sections xv6 never writes (statically linked, non-PIE), and `_entry`'s
+GOT slot must persist so all eight harts share the `&stack0` word. That ONE
+word is persisted by name out of the boot carve
+(`BootCarve.boot_ran_phys_word`, off the owned range) rather than by widening
+`kernel_data` back over a whole writable section — a claim about one cell,
+which is checkable, in place of a claim about a section, which is not.
+
+### The tactic trap this dragged in: `by apply map_lookup_filter_Some_2`
+
+Adding the second bound turns the filter's side condition into a two-conjunct
+BETA-REDEX, `(fun p => text_end <= p.1 < rodata_end) (a, b)`, and stdpp's
+`done` on that over `KernelData.kernel_data`'s 17932 entries takes **minutes**
+— 1.3 s with an explicit proof, over 14 minutes with `by`, with no error and
+no output, so it reads as a hung build rather than a slow tactic. The
+one-condition form is fine, which is why the regression arrives exactly when
+you tighten the filter. **Reduce the side condition before closing it**
+(`apply map_lookup_filter_Some_2; [exact Hlk | cbn; split; assumption]`), and
+treat any `by`/`done` over a `map_lookup_filter_Some*` goal on an image map as
+a bug.
+
 ## A HEDGED CONJUNCT IS A FALSE STATEMENT THAT COMPILES
 
 **Never write `⌜P \/ True⌝` (or `(H : True)`) into a contract as a
@@ -556,6 +620,43 @@ expected type is still an evar at splice time.
   Hiok0`) and rebuild with `exact Hiok0`. The rule generalizes: a `Prop`
   you only ever pass along should be destructured for READING and
   reconstructed from the SAVED original, never from its pieces.
+
+## A PREDICATE'S DEPENDENCY CONE IS EVIDENCE; ITS PROSE IS NOT
+
+If some predicate's cone contains a layer it has no business containing,
+the conclusion is almost never "these layers are entangled" — it is that
+ONE definition is in the wrong file, and the cone is how you find it.
+
+Worked example (`design/fs-ghost-state.md` §7e): `FsReady.fs_ready`'s cone
+contained `ProcInv`, i.e. the whole process layer, which reads as "the file
+system depends on process abstractions".  It does not.  Two edges, one
+real: a vestigial `Require Import ProcInv` (checked: zero of the 132 names
+`ProcInv`/`ProcDefs` define were used), and `FsReady` → `SpecDirlink` →
+`SpecWritei` → `ProcInv`, where only the last hop is legitimate (writei
+takes the process block to copy user memory).  `SpecDirlink` was in the
+chain solely because it owned `ic_sleeplocks`, five lines of pure icache
+invariant, in a *function spec*.  Moving it beside `ic_tok` in
+`IcacheEscrow.v` took the process layer out of the file system's cone.
+
+Three practical points:
+
+- **Compute the cone; do not read imports.**  `iris/.CoqMakefile.d` already
+  IS the graph (`X.vo: … Y.vo …`).  A dozen lines of Python over it answers
+  "why does A depend on B" and "what breaks if I move this" exactly, and
+  the shortest path it prints is usually the whole diagnosis.
+- **The rule this sharpens** is the one `SpecFsinit.v` and `SpecDirlink.v`
+  already state — *a Spec file must not require another function's Spec*.
+  The sharper form: **a spec file must not OWN a definition the invariant
+  layer needs.**  A spec is allowed to depend downward; a definition it
+  owns forces everything that wants it to depend UPWARD, through the whole
+  function-spec cone, and nothing in the build reports that as wrong.
+- **"Leave the old name as an alias" is not always available.**  It works
+  for a `Prop` (`SpecDirlink.ireg_blocks_ok` is the tree's precedent) and
+  fails for anything a caller unfolds: five sites did
+  `rewrite /SpecDirlink.ic_sleeplocks` followed by `big_sepL_lookup`, which
+  needs the BODY one unfold away, and a transparent alias leaves them one
+  unfold short.  Check for `rewrite /<name>` at the call sites before
+  promising a zero-churn move.
 
 ## A CLASS USED AS AN INDEX NEEDS ITS INSTANCES DECLARED TWICE
 
@@ -1402,6 +1503,20 @@ and axioms each proven function rests on. `--format text|md|html|json`.
   a `--check` error that fails CI, not a silent adjustment. So **adding a file
   to `iris/` means adding it to `_CoqProject`**; without the check, forgetting
   is invisible in both directions at once (never built, still counted).
+- **A FILE DELIBERATELY OUT OF THE BUILD IS DESCOPED BY A COMMENTED ROW, and a
+  bare `# Foo.v` is the syntax the check recognizes.** Leaving a `.v` on disk
+  while dropping it from the build is legitimate — a descoped tier kept for a
+  later revival, a retired de-risk kept as the worked provenance its neighbours
+  cite — but *silently* dropping it is the accident the check exists to catch,
+  and the two look identical from outside the project file. So the intent is
+  recorded in the project file, beside the rows it sits among, where the
+  reviver looks: comment the row out to a bare filename (prose above it
+  explaining why is ignored by the parser, and is the point of the block).
+  Then reviving the file is uncommenting one row. Two new drift errors keep
+  that honest: a `# Foo.v` naming a file that no longer exists (it promises the
+  reviver a row that cannot come back), and a name both listed and commented
+  out. In the tree today: the descoped Umode tier (~41 rows) and
+  `EscrowRegionA.v`.
 - **THE PROOF FUNCTOR NEEDS ITS `: <MODTYPE>` ASCRIPTION, and without it the
   function reads `assumed` with the build green.** `module_status` matches a
   `Link` instance to a spec through `Module <F>Proof (…) : <MODTYPE>.`; a
@@ -1649,10 +1764,12 @@ table, which names the symbol, the offset and the field kind (`word32` /
 `auipc`/`addi` pair computes). If you find yourself about to write a hex
 literal that came out of `kernel.asm`, add a row instead.
 
-Two constants are NOT routed through the generator, because the dumper
+Three constants are NOT routed through the generator, because the dumper
 already emits exactly them and a generator would be a second copy:
 `RiscvLang.img_end` (the single PT_LOAD's `vaddr + filesz`, from
-`KernelData.kernel_segments`) and `PageGeom.kmem_lo` (the `end` symbol, from
+`KernelData.kernel_segments`), `RiscvLang.rodata_end` (the read-only/writable
+boundary, from `KernelData.kernelRodataEnd` — see "A PERSISTENT POINTS-TO AT A
+WRITABLE IMAGE BYTE") and `PageGeom.kmem_lo` (the `end` symbol, from
 `KernelSyms.end_`).
 
 **Both use `Definition c : Z := ltac:(let x := eval vm_compute in <e> in exact x).`

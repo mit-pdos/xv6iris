@@ -219,7 +219,7 @@ Definition usertrap_post `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG
        §1), so [proc_pt] says nothing about [ud_data]; and on the syscall arm
        the descriptor is whatever the table entry left, of which
        [SpecSyscall]'s post pins only [ud_tfp].  Nor is it usertrap's fact to
-       state: the trampoline needs it beside [udata_own (ud_data pt')], and
+       state: the trampoline needs it beside the process's memory, and
        the conversion that BUILDS that resource -- the page-footprint side of
        the dovetail, conversion 2 -- derives the footprint from [ud_um] and so
        establishes the coverage by construction ([ProcPtOwn.ud_pas_cov]).

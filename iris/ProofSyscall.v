@@ -748,12 +748,16 @@ Section SyscallVocab.
     intro Hk.
     assert (Hle : text_end <= KernelSyms.syscalls + 8 * Z.of_nat k)
       by (unfold text_end, KernelSyms.syscalls; lia).
+    assert (Hhi : KernelSyms.syscalls + 8 * Z.of_nat k + Z.of_nat 8%nat
+                  <= rodata_end)
+      by (unfold rodata_end, KernelSyms.syscalls; lia).
     pose proof (sysc_tbl_bytes k Hk) as Hb.
     iIntros "#Hd". rewrite /word_pointsto. iSplit.
     { iPureIntro. destruct k as [|[|[|[|[|[|[|[|[|[|[|[|[|[|[|[|[|[|[|[|[|[|[|k']]]]]]]]]]]]]]]]]]]]]]];
         try lia; vm_compute; reflexivity. }
     iApply (kernel_data_window (KernelSyms.syscalls + 8 * Z.of_nat k)
-              (mword_of_int (sysc_target k) : mword 64) 8%nat _ eq_refl Hle Hb with "Hd").
+              (mword_of_int (sysc_target k) : mword 64) 8%nat _ eq_refl
+              Hle Hhi Hb with "Hd").
   Qed.
 
   (* every table entry is nonzero *)
@@ -1466,7 +1470,8 @@ Section SyscallVocab.
   Proof.
     iIntros "#Hd".
     iApply (kernel_data_string sysc_fmt_a sysc_fmt _ eq_refl
-              ltac:(unfold text_end, sysc_fmt_a; lia) sysc_fmt_bytes with "Hd").
+              ltac:(unfold text_end, sysc_fmt_a; lia)
+              ltac:(vm_compute; discriminate) sysc_fmt_bytes with "Hd").
   Qed.
 
   (* [p->name]'s sixteen bytes as a byte CURSOR from its own base -- the

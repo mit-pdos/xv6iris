@@ -323,7 +323,8 @@ Section ProofInitlog.
       vm_compute in Hjj; discriminate. }
     iPoseProof (kernel_data_string log_name_str "log"%string
                   (mword_of_int log_name_str : mword 64) eq_refl
-                  ltac:(unfold text_end, log_name_str; lia) Hlogs
+                  ltac:(unfold text_end, log_name_str; lia)
+                  ltac:(vm_compute; discriminate) Hlogs
                   with "Hkdata") as "#Hstr".
     (* ---- the frame geometry (6 slots; ra@40 s0@32 s1@24 s2@16 s3@8) ---- *)
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).

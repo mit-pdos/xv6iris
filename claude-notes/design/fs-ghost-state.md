@@ -238,35 +238,57 @@ step rather than a sentence:
 | piece | statement | why |
 |---|---|---|
 | `FsReady.fs_ready_seal` | `ireg_boot ==∗ ireg_open` | one `ity_shoot`, no invariant, no mask.  **The boot-freedom witness**: `ireg_boot` is exclusive, so after this step no second seal is possible and nothing boot-shaped survives — `ireg_open` is an existential over the one-shot's value and mentions nothing else. |
-| `FsReady.fs_ready_pre` | the eighteen non-regime constituents, as one persistent assertion | what a seal SITE must hold.  Every one of them is either persistent boot material the chain already carries or a bundle `SpecFsinit`'s post hands back, so the site can be checked constituent by constituent. |
+| `FsReady.fs_ready_pre` | the seventeen non-regime constituents, as one persistent assertion | what a seal SITE must hold.  Every one of them is either persistent boot material the chain already carries or a bundle `SpecFsinit`'s post hands back, so the site can be checked constituent by constituent. |
 | `FsReady.fs_ready_establish` | `fs_ready_pre -∗ ireg_boot ==∗ fs_ready` | **the producer `fs_world` never had.**  Booting is over the instant the predicate exists. |
 
 ### 7b. `fs_ready` — the runtime file system as ONE persistent assertion
 
-`FsReady.fs_ready` is `FsSyscalls.fs_world` rehomed, conjunct for conjunct
-(19 of them: the two text/data certificates, the printk credential pair, the
-block/log/crash fabric, `gen_cert`, the disk fabric and its lock, the
-icache's four, `ireg_inv` + `ireg_open`, `kalloc_env`, `procs_inv`).
-`fs_world` is now the one-line derived alias, and `fs_world_ready` is that
-alias as a `reflexivity` lemma.  Three things changed around the assertion:
+`FsReady.fs_ready` is **PARAMETER-FREE**: 18 conjuncts (the two text/data
+certificates, the printk credential pair, the block/log/crash fabric,
+`gen_cert`, the disk fabric and its lock, the icache's four, `ireg_inv` +
+`ireg_open`, `kalloc_env`) and not one argument.  Every ghost name it used
+to take is ambient — the four the inode cache already owned (`icfg_log`,
+`icfg_ist`, `icfg_nib`, `icfg_dev`) and the fifteen `FsCfg.fscfg` adds.
+
+**WHY PARAMETER-FREE, and it is not cosmetic.**  `fs_ready` is meant to be
+CARRIED — produced by forkret's not-forked arm, held by a running process,
+handed to the trap loop, read back by every later syscall.  A
+twenty-parameter version can be carried only by existentially quantifying
+the twenty, and a bare existential is useless downstream: a consumer handed
+`∃ γ…, fs_ready γ…` cannot feed it to `SpecKexec.fs_fabric` or to
+`UsertrapRes.ut_res_bare`, whose own resources are keyed to the *caller's*
+concrete names, because nothing relates the two.  Ambient names remove the
+existential instead of hiding it.  The argument is `IcacheRef.icfg`'s,
+verbatim, one layer out: there is exactly one file system per boot.
+`FsCfg.fscfg` is per-era for the same reason `icfg` is (the disk image
+ghost is re-minted at PowerOn — `design/crash.md`), i.e. a Class ASSUMPTION
+each era's boot instantiates, not a global constant.
+
+**`procs_inv` IS NO LONGER A CONJUNCT.**  It is persistent, every consumer
+holds it beside the fs environment anyway (`SpecKexec.fs_fabric` lists it
+separately), and it was the one conjunct that reached back into the process
+layer — which is what made `fs_ready` *look* as though the file system
+depended on process abstractions.  A spec that wants it takes `procs_inv γs`
+as its own premise; the two friendly bodies in `FsSyscalls.v` do.
+
+`fs_world` is no longer a one-line alias: it is the predicate AT A CALLER'S
+OWN NAMES — the nineteen tie equations (`bn = fsc_bio`, `glog = icfg_log`,
+…) beside the ambient `fs_ready`.  `fs_world_all` does the substitution once
+so that a body which threads its own names still destructs ONE row and gets
+the eighteen constituents spelled the way its callee spells them.  This is
+`SpecKexec`'s existing `g = icfg_log` idiom at full width.  Three things
+changed around the assertion:
 
 1. **Its own file**, below the syscall layer, so any file can import the
-   predicate without importing the syscall bodies that used to own it.
-   NOT yet below the whole Spec layer, and the reason is one line:
-   `ic_sleeplocks` — one of the nineteen — is defined in `SpecDirlink.v`
-   (and duplicated in `SpecFileclose.v`), and `SpecDirlink` requires
-   `SpecIput`/`SpecDirlookup`.  So `FsReady` sits ABOVE those two and they
-   cannot adopt it without a cycle.  The fix, when wanted, is small and
-   local: move the five-line `ic_sleeplocks` definition down to
-   `IcacheEscrow.v` (which both spec files already import and whose section
-   already carries `lockG`/`icacheG`/`ICFG`) and leave the two existing
-   names as aliases.
+   predicate without importing the syscall bodies that used to own it —
+   and, since the `ic_sleeplocks` move, below the whole Spec layer as well.
+   That move is DONE and it is worth reading as a case study; see §7e.
 2. **A producer** — §7a.  `fs_world`'s own header called it an assertion "a
    friendly client pays for once, at boot", satisfiability unchecked
    (upstream's `syscall_env` is in the same position); it is a lemma now.
 3. **A projection family** — `fs_ready_text`/`_data`/`_printk`/`_panic`/
-   `_bio`/`_log`/`_seam`/`_gen`/`_disk`/`_icache`/`_region`/`_kalloc`/
-   `_procs`, plus `fs_ready_all`.  Each is one `iDestruct`.  `_panic` is the
+   `_bio`/`_log`/`_seam`/`_gen`/`_disk`/`_icache`/`_region`/`_kalloc`,
+   plus `fs_ready_all`.  Each is one `iDestruct`.  `_panic` is the
    standing weakening `printk_env -∗ panic_env`; `_region` is the pair the
    whole half exists for (`ireg_inv` beside the SEALED `ireg_open`, with no
    arm to case on and no boot token to thread).
@@ -312,7 +334,7 @@ Recorded here so the question is not re-opened blind.
 | Spec | verdict | why |
 |---|---|---|
 | `SpecIget`, `SpecIlock`, `SpecIunlock` | **MUST NOT** | reachable PRE-SEAL.  `ProofFsinit` calls `ireclaim`; `ProofIreclaim` calls `iget`/`ilock`/`iunlock`.  A boot caller holds `ireg_inv` WITHOUT `ireg_open`, so it cannot form `fs_ready` — which is §7b's boot-freedom, enforced by the type. |
-| `SpecIput`, `SpecDirlookup` | **CANNOT** (today) | dependency cycle: `FsReady` → `SpecDirlink` (`ic_sleeplocks`) → `SpecIput`/`SpecDirlookup`.  Unblocked by the `ic_sleeplocks` move above. |
+| `SpecIput`, `SpecDirlookup` | **UNBLOCKED**, not yet done | the cycle (`FsReady` → `SpecDirlink` → `SpecIput`/`SpecDirlookup`) is gone with the `ic_sleeplocks` move (§7e).  Whether they SHOULD adopt is now the same weighing as the row below — iput uses ~7 of the eighteen. |
 | `SpecIdup`, `SpecIunlockput`, `SpecIalloc`, `SpecNamex`, `SpecCreate` | **SHOULD NOT** | no cycle and no boot caller, but adoption is a contract-content GAIN, not a collapse: `fs_ready` carries `kalloc_env`, `procs_inv`, `gen_cert`, `fs_crash_seam` and `ic_sleeplocks`, and none of these five needs all of them.  Trading 7 rows the callee uses for 19 rows every caller must supply is the "any Spec gaining a row" tripwire in substance. |
 | the syscall layer | **ALREADY DONE** | `ProofSyscall.sysc_fs_env` is bundle-fed and mentions `fs_world` by field ties; nothing to collapse. |
 | `SpecFsinit`, `SpecIreclaim` | **MUST NOT**, by design | they run pre-seal and keep constituent forms. |
@@ -331,6 +353,48 @@ that arm is `LinkForkretNF.wp_forkret_nf_ax`.  SIMP-2 makes the seal
 STATABLE and CHECKED (`fs_ready_establish` is `Qed`); it cannot wire it,
 because there is no landed caller to wire it into.  No new axiom either
 way.
+
+### 7e. `ic_sleeplocks`, and how a misplaced definition faked a dependency
+
+Worth reading even if you never touch the icache, because the *symptom* is
+general and it was mis-diagnosed once.
+
+`fs_ready`'s dependency cone contained `ProcInv` — the whole process layer —
+which reads as "the file system depends on process abstractions".  It does
+not.  There were exactly two edges, and only one was real:
+
+* `FsReady.v`'s own `Require Import ProcInv` — **vestigial**.  Checked all
+  132 names `ProcInv.v` and `ProcDefs.v` define against the text of
+  `FsReady.v`: zero were used.
+* `FsReady` → `SpecDirlink` (for `ic_sleeplocks`) → `SpecWritei` → `ProcInv`
+  — real, and `SpecWritei → ProcInv` is legitimate: `writei` copies user
+  memory, so it takes the process block.
+
+So one five-line definition, sitting in a *function spec*, dragged the
+process layer into the file system's cone.  `ic_sleeplocks` now lives in
+`IcacheEscrow.v` beside `ic_tok`, which it is built from; nothing in it is
+file- or directory-shaped, and every ingredient (`is_sleeplock_gen`,
+`ic_tok`, `ientry`, `icfg_isl`) is in scope one layer down from any spec.
+Measured: `FsReady`'s cone 161 → 154 files, and `ProcInv` is out of it.
+
+Two things the earlier plan for this move did not know:
+
+* it was defined **twice, byte-identically**, in `SpecDirlink.v` AND
+  `SpecFileclose.v`, and its four-line accessor was copied out **seven**
+  times (`ProofDirlink`, `LinkCreateFreshTy`, `ProofKexecTail`,
+  `ProofCreate`, `ProofSysLink`, `ProofSysUnlink`, `ProofNamex`).
+  `IcacheBoot.v` had already flagged the duplication as debt.
+* the plan said "leave the two existing names as aliases".  That does not
+  work: five sites do `rewrite /SpecDirlink.ic_sleeplocks` and then
+  `big_sepL_lookup`, i.e. they need the BODY one unfold away, and a
+  transparent alias leaves them one unfold short.  Both copies are retired
+  and the ten qualified spellings requalified instead —
+  `IcacheEscrow.ic_sleeplocks_lookup` is the one accessor.
+
+**The general rule:** a spec file must not own a definition the invariant
+layer needs, and the way you find out that it does is that some predicate's
+dependency cone contains a layer it has no business containing.  Read the
+cone, not the prose.
 
 ## 8. The tree layer (fs-friendly fragments)
 

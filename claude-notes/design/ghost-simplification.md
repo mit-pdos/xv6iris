@@ -132,6 +132,16 @@ refers to one accessor, not the piece.)
   `EscrowInode`; VERIFIED: in `_CoqProject` (`:970`) but imported by
   nothing — it compiles on every build for zero consumers.  Retire the
   row (keep the file as provenance, or move it beside the probes).
+  **DONE, and the row is COMMENTED OUT rather than deleted.**  SIMP-1
+  (`9e51d849`) dropped the row and left the file, which
+  `proof_coverage --check` reads as the accident it exists to catch —
+  main went red on it.  The row is now a descoped `# EscrowRegionA.v`
+  under a comment block saying why, the syntax the check accepts for a
+  file that is out of the build on purpose (see the coverage bullet in
+  `durable-notes.md`).  So the file stays as the worked de-risk the three
+  `Escrow*` headers cite by name, reviving it is uncommenting one row, and
+  a later `rm` of the file fails the check instead of leaving a row that
+  promises a revival it cannot deliver.
 - The three `ZZProbe*` scratch files are untracked and do not travel; the
   `proof_coverage --check` drift rows they cause vanish on any fresh clone.
 
@@ -290,6 +300,36 @@ remained baked-instance-mismatched even then.  This fragility is itself
 an argument FOR the rehoming: `FsReady.v` states `fs_ready` over an
 EXPLICIT `Context`, and every projection/pack lemma lives inside that
 section.  Executor step 1 carries a tripwire for it.
+
+### 5.3a LANDED (2026-08-19): the parameter-free `fs_ready`
+
+§5.3's delta was "one row, `fs_ready … -∗`".  Making that row CARRIABLE
+took two further steps, both landed; `design/fs-ghost-state.md` §7b/§7e is
+the design of record and this is the ledger entry.
+
+1. **`ic_sleeplocks` hoisted** out of `SpecDirlink.v` (and its byte-identical
+   twin in `SpecFileclose.v`) into `IcacheEscrow.v`, with its accessor —
+   which had been copied out SEVEN times — as `ic_sleeplocks_lookup`.  This
+   is the move §7b item 1 predicted; what it did not predict is the second
+   copy, the seven accessors, and that the promised "leave the old names as
+   aliases" does not work (five sites unfold the name and need the body).
+   Both copies retired, ten qualified spellings requalified.  Measured:
+   `FsReady`'s cone 161 → 154 files, and `ProcInv` is out of it.
+2. **`fs_ready` is parameter-free**, over the new `FsCfg.fscfg` (fifteen
+   fields) plus the four names `icfg` already owned.  The reason is not
+   brevity: a carried predicate cannot be an existential, because an
+   existential cannot be fed to a consumer whose own resources are keyed to
+   concrete names (`SpecKexec.fs_fabric`, `UsertrapRes.ut_res_bare`).
+   `procs_inv` left the predicate — it is a PROCESS resource and was the
+   only conjunct reaching back into that layer; the specs that want it take
+   it explicitly.  `fs_world` survives as the predicate AT A CALLER'S OWN
+   NAMES (the tie equations ∗ `fs_ready`), with `fs_world_all` doing the
+   substitution once.
+
+Not done, and deliberately: the §7d adoption sweep.  `SpecIput`/
+`SpecDirlookup` are now UNBLOCKED (the cycle is gone) but the weighing in
+§7d is unchanged — iput uses about seven of the eighteen constituents, so
+adoption is still a contract-content gain rather than a collapse.
 
 ### 5.4 The SIMP-2 executable brief (dependency order)
 

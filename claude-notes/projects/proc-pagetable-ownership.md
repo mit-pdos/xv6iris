@@ -32,10 +32,13 @@ duplicating another:
   **parked**, which is the form `wp_userret_pt` (UserretAllPt.v) consumes.
 - **`UserPtTree.v` — the user-execution bundle.** The descriptor record
   `uptd` and `upt_acc_wf` (each leaf is User-ok or User-denied on every A/D
-  variant — decided once when the map is built), plus `user_pt_inv P` =
-  `utlb_inv_pt` ∗ `udata_own ud_data` ∗ ⌜`udata_cov`⌝ ∗ ⌜`upt_acc_wf`⌝.
-  `UserExec.user_inv` wraps it; `UserKernelBridge.userret_to_user_inv`
-  repackages userret's post into it.
+  variant — decided once when the map is built), plus **`user_pt_inv P M` =
+  `utlb_inv_pt` ∗ `umem_own P M` ∗ ⌜`uva_pa_inj P`⌝ ∗ ⌜`upt_acc_wf`⌝**,
+  where `M : gmap Z (bv 8)` is THE ABSTRACT STATE OF THE USER-MODE PROCESS —
+  its memory, keyed by user virtual address. `user_pt_any P := ∃ M,
+  user_pt_inv P M` is what the user-execution engines take (see
+  "The address-space view" below). `UserExec.user_inv` wraps `user_pt_any`;
+  `UserKernelBridge.userret_to_user_inv` repackages userret's post into it.
 
 So `user_pt_inv` was the closest thing to a "process page table", and three
 things were missing from it:
@@ -53,6 +56,192 @@ things were missing from it:
 Plus one shape defect: `ud_data` + `udata_cov` is a derived quantity carried
 as a second field of the same record and re-coupled by a side condition —
 exactly the "ad-hoc argument coupling" the durable notes warn off.
+
+## The address-space view: `user_pt_inv` exposes the process's memory
+
+**The user-visible memory used to be existentially quantified inside the
+bundle** (`udata_own`, a flat `gset Arch.pa` of pages with existential
+contents). That is enough for SAFETY — user execution never depends on what
+the bytes are — but it says nothing a kernel-side proof can thread:
+copyin/copyout, a syscall argument, an exec image are all statements ABOUT
+THE BYTES, at USER VIRTUAL addresses. So the bundle now exposes that state.
+
+- `uva_pa P va` — the pa a user va translates to through `P`'s map (total;
+  zeros off the mapped vpns). Moved down from the descoped `UmodeMem.v`,
+  which had the same definition for the verified tier.
+- `uva_mapped P va` / `uva_dom P : gset Z` — the user address space, spelled
+  `PAGE * 4096 + OFFSET` so the finite set is a function of `ud_um` and its
+  membership needs no well-formedness hypothesis.
+- `umem_own P M` — `⌜dom M = uva_dom P⌝ ∗ [∗ map] va ↦ b ∈ M, uva_pa P va ↦ₚ b`.
+  The domain is PINNED, so it says "this is ALL of the user's memory".
+  `umem_any P := ∃ M, umem_own P M`.
+- `u_data_pa P a : Prop` — the pas the address space covers; the successor of
+  `udata_cov`'s `data` set, DERIVED and stated as a predicate so that no
+  `gset Arch.pa` (and so no `Countable Arch.pa` instance) appears in the
+  interface. `u_data_pa_cov` is `udata_cov`, now a theorem.
+
+**A va-keyed map forces NO ALIASING**, because two vpns mapping one physical
+page would make `umem_own` own that page's bytes twice. That is not a new
+restriction: `ProcPtOwn.um_inj` ("distinct vpns, distinct pages") was already
+a conjunct of `proc_pt_wf`, re-established at every insert from the OWNERSHIP
+of the page being added. The user tier states the same fact at byte
+granularity as `uva_pa_inj P`, and `ProcPtOwn.uva_pa_inj_of_wf` derives it.
+
+The satp-switch dovetail is unchanged in substance — the SAME `↦ₚ` cells,
+indexed two ways: `ProcPtOwn.proc_pt_own_umem` (`proc_pt_own P ⊣⊢ umem_any P`,
+under `upt_map_wf` + `um_inj`) replaces the old `proc_pt_own_udata` at the
+`user_pt_inv_open` / `user_pt_inv_close` boundary and at ProofUservec's exit
+switch. The reindexing itself is three generic Iris lemmas in `UserPtTree.v`
+(`bigset_gather`, `bigset_reindex`, `bigset_gather_reindex`), kept
+POLYMORPHIC in the key type — which is also what lets them be used at BOTH
+`Countable Arch.pa` instances the tree carries, retiring UserBytes.v's old
+`list_to_map (map_to_list _)` transport.
+
+**What the user-execution engines see.** `UserExec.user_inv` /
+`user_trap_frame` carry `user_pt_any pt`, and `UserBytes.user_pt_inv_bytes`
+opens and re-seals at `user_pt_any`. That loses nothing: arbitrary user code
+may write arbitrary bytes into its own pages, which is exactly what
+`u_mem_step`'s data half already said, and the DOMAIN is pinned by `pt`
+anyway — only the kernel can change which vas are mapped. `u_mem_wf` /
+`u_mem_step` keep their arity; their data-half clause now reads
+`∀ a, u_data_pa P a ↔ is_Some (md !! a)` and the `udata_cov` conjunct is
+gone (it is derivable from the `upt_map_wf` conjunct).
+
+## The KERNEL side: `proc_ptm P sz M`, and the copy loops
+
+`proc_pt P` with the process's memory NAMED — and named at the view the
+PROCESS has, which is **not** the set of mapped pages.
+
+**THE LAZY PAGES ARE PART OF THE VIEW.** A va below `p->sz` that the table
+does not map is not an error: it is a page the kernel will allocate,
+ZERO-FILLED, the first time the process touches it (vmfault). The process
+cannot tell that page from one already mapped, so neither does its abstract
+state: `UserPtTree.umem_lazy P sz M` says `M` covers everything below
+`pgroundup sz`, with the real byte wherever the table has a leaf and a **0**
+wherever it does not. The ownership of a lazy page is nothing at all —
+there is no page to own — and that is the whole point: **vmfault PRESERVES
+this view instead of extending it.**
+
+`umem_lazy` keeps the mapped half `Mp` existential (`Mp ⊆ M`, `umem_own P Mp`),
+because `Mp` is a function of `M` and the table; every user of the predicate
+wants `M`.
+
+**WHY `sz` IS A PARAMETER AND NOT A FIELD OF `uptd`.** A page table does not
+have a size; a PROCESS does, and `p->sz` is a `struct proc` cell. Nothing in
+the OWNERSHIP depends on it either, so `proc_pt P` — the 260-site predicate —
+stays exactly as it is, and `proc_pt_ptm : proc_pt P ⊣⊢ ∃ M, proc_ptm P sz M`
+holds **at every `sz`** (`umem_lazy_intro` builds the lazy half out of
+`gset_to_gmap` and nothing changes hands). The three functions that care —
+vmfault, copyin, copyout — already carry the size as an argument, and it is
+exactly the size their view is relative to.
+
+`proc_pt_own_umem` (`proc_pt_own P ⊣⊢ umem_any P`, under `upt_map_wf` +
+`um_inj`) is still the bridge underneath. What sits on top of it:
+
+- **`UserPtTree`'s BYTE WINDOW.** The copy loops work a chunk at a time
+  inside one page, and what they need of the abstract state is ONE accessor:
+  take the `n` bytes at `a`, give them back — possibly at new values — and
+  move `M` by exactly that write. `umem_write` / `umem_del` are the pure
+  vocabulary (`umem_write_lookup_in/_out`, `umem_del_write`,
+  `umem_write_dom`); `bigM_window` is the split, and it is an INDUCTION ON
+  `n` over `big_sepM_delete` — which is why the window form and not a page
+  form: a 4096-key submap needs `map_filter` surgery, a window needs none.
+  `umem_own_window` is the accessor.
+- **`ProcPtOwn.proc_ptm_window`** is that accessor at the copy loop's
+  altitude: `n` bytes at offset `off` inside a mapped page, at the values
+  `M` records and at the kernel's `↦ₘ` tier (which is what memmove speaks),
+  plus the wand.
+- **`proc_ptm_acc_rep0` / `proc_ptm_rebuild`** are vmfault's open/close
+  bracket, memory-indexed; **`proc_ptm_grow`** is its insert:
+  `umem_own_grow` says the new page's bytes JOIN and the bytes the process
+  already had are UNTOUCHED (`M ⊆ M'`).
+- **`SpecVmfault.wp_vmfault_sconf_mem`** is the memory-indexed contract, and
+  what it says about the memory is **nothing changes**: `M` is the same on
+  the way in and on the way out, on BOTH arms. vmfault maps a page that was
+  already in the view (as a lazy page reading 0) and memsets the page it maps
+  to 0; only which half of the view is backed by ownership moves.
+  `proc_ptm_fault` is the step, `umem_lazy_fault` its memory half, and
+  `uva_live_page` the arithmetic that says the whole PAGE of a va below
+  `p->sz` is below `pgroundup sz`.
+  `wp_vmfault_sconf` survives as the `proc_pt`-altitude COROLLARY, derived
+  in ten lines, so vmfault's other callers (usertrap, copyinstr) are
+  untouched. **Do this for copyin/copyout too**: a strengthened contract of
+  record plus a derived weak one keeps the ~15 call sites off the diff.
+- **`SpecMemsetPage.wp_memset_page_val_sconf`** — the value-preserving form
+  of the page memset. The old one weakens the written page back to
+  `page_own`, contents existential, which is right for kalloc/kfree (whose
+  memsets only poison) and wrong for vmfault, whose whole contribution to the
+  process's memory is that the page reads as ZERO. The existential form is
+  now derived from it, so kalloc/kfree/uvmalloc are untouched.
+
+### The copyin / copyout contracts — DESIGNED, NOT YET PROVEN
+
+The shape is settled; what is missing is the two loop proofs. Contracts:
+
+```coq
+(* copyin *)
+Definition copyin_got (M' : gmap Z (bv 8)) (srcva : mword 64) (len : nat)
+    (dst_new : nat -> bv 8) : Prop :=
+  forall j, (j < len)%nat ->
+    M' !! uint (add_vec_int srcva (Z.of_nat j)) = Some (dst_new j).
+(* postcondition: proc_ptm P' M' ∗ ⌜M ⊆ M'⌝ ∗
+   ⌜(a0 = 0 ∧ copyin_got M' srcva len dst_new) ∨ a0 = -1⌝ *)
+```
+
+Stated against the FINAL `M'`, not the initial `M`, because copyin may FAULT
+PAGES IN as it goes — a va it reads need not have been mapped when it was
+called. `M ⊆ M'` is the half a caller uses. The `-1` arm promises nothing:
+a run that gives up part-way has copied a prefix, and which prefix is not
+observable from the return value. copyout is the mirror: `M'` has the source
+bytes at `dstva + j`, and every byte of `M` at an untouched va survives.
+
+**Why the loop proofs are the whole cost.** `ProofCopyin`'s header records
+that "THE USER-SIDE CURSOR HAS NO INVARIANT" and "the DESTINATION BUFFER is
+carried WHOLE at existential contents". Both have to change:
+
+1. `ci_loop` gains `srcva0` and `M` as outer parameters and `Mc` as an
+   iterated one; premises `m !!! Rs2 = add_vec_int srcva0 done` (the cursor,
+   which today is an arbitrary `mword 64`), `M ⊆ Mc`, and the prefix
+   invariant `∀ j < done, Mc !! uint (add_vec_int srcva0 j) = Some (fd j)`.
+2. `ci_chunk_body` carries the page as a NAMED buffer plus a closer
+   (`proc_ptm_window` at `off = 0, n = 4096`) instead of `page_own pa0` and
+   `(page_own pa0 -∗ proc_pt Pd)`, together with `Md`, `fpg`, `Mc ⊆ Md`,
+   `uint va0 < 2^38` (both arms give it: walkaddr's hit says so directly,
+   vmfault's success gives `uint va0 < uint szv ≤ 2^38`) and the page link
+   `∀ j < 4096, Md !! (uint va0 + j) = Some (fpg j)`.
+3. `ci_copy_body` gains `⌜n = 4096 - off ∨ n = rem⌝` — WITHOUT it the cursor
+   invariant cannot be re-established at the back edge, because the code
+   sets `s2 = va0 + 4096` and that is `cur + n` only in the first case.
+   Both `BODY` arms supply it.
+4. The join must keep the naming: `ByteBuf.bb_join3`'s existential loses it,
+   so a `bb_join3_fn` that takes the merged function and three pointwise
+   equations is needed.
+5. The arithmetic, all of it standard: `pgd_unsigned` for
+   `uint va0 + off = uint cur`, `uint_add_vec_int_small` for
+   `uint (add_vec_int cur i) = uint cur + i` (no wrap, since
+   `uint cur < 2^38`), `avi_assoc` for the cursor.
+6. copyout is the same plus the write side: the closer is instantiated at
+   the bytes memmove wrote, so `Md` moves by `umem_write`, and the loop
+   carries "every byte of `M` at a va outside the copied range survives".
+
+`umem_write_id` (writing back the bytes that were already there is the
+identity) is the copyin-side lemma that makes step 2's closer free.
+
+### Still to do
+
+1. **The two copy loops**, per the design above.
+2. **Pin `M` across the USER-mode memory arms.** Today a user store re-seals
+   at a fresh `M`; making the arms say *which* bytes changed means
+   `u_mem_step` gains `M M'` and the width-generic store certificate
+   (`UserMemCert.u_mem_step_store`) states `M' = M` with `k` bytes written at
+   `va`. Everything else that mentions `u_mem_wf`/`u_mem_step` (~370 sites)
+   is a mechanical extra argument.
+3. **The rest of the kernel side**: uvmcopy / uvmalloc / uvmunmap / kexec.
+4. **Retire `ud_data`.** `user_pt_inv` no longer reads it, so the
+   `ud_data pt = ud_pas pt` premise threaded through
+   `SpecUserretClosed.loop_ok`, `SpecUservec.uservec_post`, `SpecForkret` and
+   `ProcInv` is now DEAD, as is `ud_norm`. Dropping the field is a
+   mechanical sweep and was already slated (step 3 below).
 
 ## The design (in `iris/ProcPtOwn.v`)
 

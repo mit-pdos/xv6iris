@@ -151,7 +151,7 @@ Definition wp_userret_closed_body `{!riscvGS Σ, !sieG Σ}
   upt_map_wf (ud_um pt) ->
   m !!! Regidx (mword_of_int 10) = usatp ->
   satp_rooted usatp (ud_root pt) ->
-  udata_cov (ud_um pt) (ud_data pt) ->
+  uva_pa_inj pt ->
   upt_acc_wf (ud_um pt) ->
   kernel_text -∗
   hw_config -∗
@@ -175,7 +175,7 @@ Definition wp_userret_closed_body `{!riscvGS Σ, !sieG Σ}
   sstateen0 ↦ᵣ□ (mword_of_int 0 : mword 32) -∗
   tlb_res_pt kroot -∗
   pt_frame (upt_tree_spec (ud_root pt) (ud_tfp pt) (ud_um pt)) -∗
-  udata_own (ud_data pt) -∗
+  umem_any pt -∗
   pc_is (uva 0x9c) -∗
   gpr_file m -∗
   (* ---- the kernel-side bundle, at THIS hart ---- *)

@@ -14,7 +14,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
-Require Import RegFile.
+Require Import RegFile WpNext.
 Require Import SmodeCore.
 Require Import WpMemsetPage.
 Require Import KallocInv.
@@ -34,12 +34,12 @@ Section ProofMemsetPage.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Context {kt : ktier}.
-  Lemma wp_memset_page_sconf
+  Lemma wp_memset_page_val_sconf
       (m0 : regfile) (n : nat) (cval : mword 64) (b : bool) (pcur : mword 64)
-    : wp_memset_page_sconf_body kt m0 n cval b pcur.
+    : wp_memset_page_val_sconf_body kt m0 n cval b pcur.
   Proof.
-    cbv beta delta [wp_memset_page_sconf_body].
-    intros a0_idx a1_idx a2_idx pcE ra0 p ret_tgt Hn Hpv Hcval Ha2.
+    cbv beta delta [wp_memset_page_val_sconf_body].
+    intros a0_idx a1_idx a2_idx pcE ra0 p ret_tgt cbyte Hn Hpv Hcval Ha2.
     iIntros "Hcg #Htext Hpc Hpage Hcont".
     (* --- bridge [page_own p] to memset's per-byte buffer --- *)
     iEval (rewrite /page_own /byte_any) in "Hpage".
@@ -55,11 +55,29 @@ Section ProofMemsetPage.
     { iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H". iExact "H". }
     iIntros (CID1 Hs1 mfin) "Hcg Hpc Hbuf %Hcs".
     iSpecialize ("Hcont" $! CID1 with "[]"); [iPureIntro; exact Hs1|].
-    (* rebuild page_own from the all-cbyte buffer *)
+    (* the bytes come back NAMED -- that is the whole of this form *)
     iApply ("Hcont" $! mfin with "Hcg Hpc [Hbuf] [%]").
-    - iEval (rewrite /page_own /byte_any).
-      iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H". iExists _. iExact "H".
+    - iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H". iExact "H".
     - exact Hcs.
+  Qed.
+
+  (* ...and the contents-existential form, by forgetting them *)
+  Lemma wp_memset_page_sconf
+      (m0 : regfile) (n : nat) (cval : mword 64) (b : bool) (pcur : mword 64)
+    : wp_memset_page_sconf_body kt m0 n cval b pcur.
+  Proof.
+    cbv beta delta [wp_memset_page_sconf_body].
+    intros a0_idx a1_idx a2_idx pcE ra0 p ret_tgt Hn Hpv Hcval Ha2.
+    iIntros "Hcg #Htext Hpc Hpage Hcont".
+    iApply (wp_memset_page_val_sconf m0 n cval b pcur Hn Hpv Hcval Ha2
+              with "Hcg Htext Hpc Hpage").
+    rewrite /wp_next. iIntros (CID1) "%Hs1".
+    iSpecialize ("Hcont" $! CID1 with "[]"); [iPureIntro; exact Hs1|].
+    iIntros (mfin) "Hcg Hpc Hbuf %Hcs".
+    iApply ("Hcont" $! mfin with "Hcg Hpc [Hbuf] [%]"); [| exact Hcs].
+    iEval (rewrite /page_own /byte_any).
+    iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H".
+    iExists _. iExact "H".
   Qed.
 
 End ProofMemsetPage.

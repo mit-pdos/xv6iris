@@ -232,7 +232,7 @@ Proof.
   destruct Hhw as (Hmisa & Hmseccfg & Hsenv & Hhtif & Hall & Help).
   destruct Hpt as ((usatp & Hsatpok & Hsatp) & HA & Hord & HXp & HWp & HRp & Hcovp).
   destruct Hsatpok as (Hmode & Hasid & Hppn & Hpmaw_of).
-  pose proof Hwf as (md & Hdisj & Hdj & Hmm & Hdm & Hram & Hcov & Hacc0 & Hwfm & Hspec).
+  pose proof Hwf as (md & Hdisj & Hdj & Hmm & Hdm & Hram & Hacc0 & Hwfm & Hspec).
   pose proof Hspec as (Hbase & _).
   destruct (upt_spec_maps (ud_root P) (ud_tfp P) (ud_um P) t (svpn_of va) w
               Hspec (or_intror (or_intror Hl)))
@@ -482,7 +482,7 @@ Lemma u_mem_step_store (P : uptd) (t t' : ptree) (mm mm' : pamap)
   u_mem_step P t t' mm (write_bytes mm' (u_walk_pa w va) (Z.to_N k) v).
 Proof.
   intros Hk Hp Hl Hwf Hstep.
-  pose proof Hwf as (mdd & _ & _ & _ & _ & _ & Hcov & _).
+  pose proof Hwf as (mdd & _ & _ & _ & _ & _ & _ & Hwfm & _).
   destruct Hstep as (Hshape & Hspec' & md' & Hdj' & Hmm' & Hdm').
   (* the whole window is a DATA address, hence in [md'] and not in the tree *)
   assert (Hin : forall j : nat, (N.of_nat j < Z.to_N k)%N ->
@@ -490,7 +490,7 @@ Proof.
   { intros j Hj.
     rewrite (u_walk_pa_window_page w va k j Hk Hp ltac:(lia)).
     apply (proj1 (Hdm' _)).
-    exact (Hcov (svpn_of va) w (add_vec_int va (Z.of_nat j)) Hl). }
+    exact (u_data_pa_cov P (svpn_of va) w (add_vec_int va (Z.of_nat j)) Hwfm Hl). }
   assert (Hnt : forall j : nat, (N.of_nat j < Z.to_N k)%N ->
             ptree_bytes 2 t' !! pa_add (u_walk_pa w va) j = None).
   { intros j Hj.
@@ -694,13 +694,13 @@ Lemma u_page_window (P : uptd) (t : ptree) (mm : pamap) (k : Z) (w va : mword 64
   forall j : nat, (j < Z.to_nat k)%nat ->
     is_Some (mm !! pa_add (u_walk_pa w va) j) /\
     addr_is_ram (pa_add (u_walk_pa w va) j) /\
-    pa_add (u_walk_pa w va) j ∈ ud_data P.
+    u_data_pa P (pa_add (u_walk_pa w va) j).
 Proof.
   intros Hk Hp Hwf Hl j Hj.
-  pose proof Hwf as (md & _ & _ & Hmm & Hdm & Hram & Hcov & _).
-  assert (Hd : pa_add (u_walk_pa w va) j ∈ ud_data P).
+  pose proof Hwf as (md & _ & _ & Hmm & Hdm & Hram & _ & Hwfm & _).
+  assert (Hd : u_data_pa P (pa_add (u_walk_pa w va) j)).
   { rewrite (u_walk_pa_window_page w va k j Hk Hp Hj).
-    exact (Hcov (svpn_of va) w (add_vec_int va (Z.of_nat j)) Hl). }
+    exact (u_data_pa_cov P (svpn_of va) w (add_vec_int va (Z.of_nat j)) Hwfm Hl). }
   assert (Hs : is_Some (mm !! pa_add (u_walk_pa w va) j)).
   { rewrite Hmm. apply lookup_union_is_Some. right.
     exact (proj1 (Hdm _) Hd). }
@@ -816,13 +816,13 @@ Qed.
 (*                                                                       *)
 (* A misaligned in-page store writes N chunk windows, so the post state is *)
 (* [UserMemMis.wchain] rather than one [write_bytes].  Section 5's         *)
-(* absorption generalises to ANY window that lies in [ud_data P], and the  *)
+(* absorption generalises to ANY window inside the user address space     *)
 (* chain is then N applications of it.                                     *)
 (* --------------------------------------------------------------------- *)
 
 Lemma u_mem_step_write_in (P : uptd) (t t' : ptree) (mm mm2 : pamap)
     (a : Arch.pa) (n : N) {wd : N} (v : bv wd) :
-  (forall j : nat, (N.of_nat j < n)%N -> pa_add a j ∈ ud_data P) ->
+  (forall j : nat, (N.of_nat j < n)%N -> u_data_pa P (pa_add a j)) ->
   u_mem_step P t t' mm mm2 ->
   u_mem_step P t t' mm (write_bytes mm2 a n v).
 Proof.
@@ -849,7 +849,7 @@ Qed.
 Lemma u_mem_step_wchain (P : uptd) (t t' : ptree) (mm : pamap)
     (pa : mword 64) (W bytes : Z) (N : nat) (sg : mstate) (dat : mword (8 * W)) :
   0 < bytes -> Z.of_nat N * bytes = W ->
-  (forall j : nat, (j < Z.to_nat W)%nat -> pa_add pa j ∈ ud_data P) ->
+  (forall j : nat, (j < Z.to_nat W)%nat -> u_data_pa P (pa_add pa j)) ->
   (forall j : nat, (j < Z.to_nat W)%nat -> addr_is_ram (pa_add pa j)) ->
   u_mem_step P t t' mm sg.(mem) ->
   forall k : nat, (k <= N)%nat ->

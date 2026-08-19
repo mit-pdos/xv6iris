@@ -112,7 +112,8 @@ Section PanicData.
   Proof.
     iIntros "#Hd".
     iApply (kernel_data_string pn_hdr_a pn_hdr _ eq_refl
-              ltac:(unfold text_end, pn_hdr_a; lia) pn_hdr_bytes with "Hd").
+              ltac:(unfold text_end, pn_hdr_a; lia)
+              ltac:(vm_compute; discriminate) pn_hdr_bytes with "Hd").
   Qed.
 
   Lemma pn_fmt_str :
@@ -120,7 +121,8 @@ Section PanicData.
   Proof.
     iIntros "#Hd".
     iApply (kernel_data_string pn_fmt_a pn_fmt _ eq_refl
-              ltac:(unfold text_end, pn_fmt_a; lia) pn_fmt_bytes with "Hd").
+              ltac:(unfold text_end, pn_fmt_a; lia)
+              ltac:(vm_compute; discriminate) pn_fmt_bytes with "Hd").
   Qed.
 
 End PanicData.

@@ -261,7 +261,8 @@ Section BreadMsg.
   Proof.
     iIntros "#Hd".
     iApply (kernel_data_string bd_msg_a bd_msg _ eq_refl
-              ltac:(unfold text_end, bd_msg_a; lia) bd_msg_bytes with "Hd").
+              ltac:(unfold text_end, bd_msg_a; lia)
+              ltac:(vm_compute; discriminate) bd_msg_bytes with "Hd").
   Qed.
 End BreadMsg.
 

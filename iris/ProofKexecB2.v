@@ -200,7 +200,8 @@ Section KexecMsg.
   Proof.
     iIntros "#Hd".
     iApply (kernel_data_string kxc_msg_a kxc_msg _ eq_refl
-              ltac:(unfold text_end, kxc_msg_a; lia) kxc_msg_bytes with "Hd").
+              ltac:(unfold text_end, kxc_msg_a; lia)
+              ltac:(vm_compute; discriminate) kxc_msg_bytes with "Hd").
   Qed.
 End KexecMsg.
 

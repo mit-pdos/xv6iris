@@ -514,7 +514,7 @@ Section UserWaitClose.
     (∀ (t' : ptree) (mm' : PtBytes.pamap) (tlbvec' : type_of_register tlb),
        ⌜u_mem_step pt t t' mm mm'⌝ -∗
        ⌜tlb_ok_pt (mword_of_int 0) t' tlbvec'⌝ -∗
-       upt_regs pt usatp tlbvec' -∗ bytes_own mm' -∗ user_pt_inv pt) -∗
+       upt_regs pt usatp tlbvec' -∗ bytes_own mm' -∗ user_pt_any pt) -∗
     Rut pt -∗
     user_inv C pt Rut.
   Proof.
@@ -608,7 +608,7 @@ Section UserStepWaitArm.
     user_mstatus_ok ms_v ->
     hw_config -∗
     user_regs (HART_WAITING (wr, ib)) ms_v sc_v stval_v sepc_v va va' g -∗
-    user_pt_inv pt -∗ user_cfg C -∗ Rut pt -∗
+    user_pt_any pt -∗ user_cfg C -∗ Rut pt -∗
     ▷ (user_inv C pt Rut -∗ WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.

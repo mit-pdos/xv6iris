@@ -742,6 +742,23 @@ Proof.
   rewrite /fin_to_set big_sepS_list_to_set; [done | apply NoDup_enum].
 Qed.
 
+(* THE WRITABLE INITIALIZED GLOBALS -- the part of the image in
+   [rodata_end, img_end) that anything will want to name.  These two cells
+   are the reason [KernelDataInv.kernel_data] stops at [rodata_end]: xv6
+   STORES to both (`first = 0` in forkret, `nextpid = nextpid + 1` in
+   allocpid), so neither can ever be part of a persistent image bundle --
+   see that file's header and durable-notes.md.
+
+   Contents-EXISTENTIAL, like every other cell the boot carve hands out (the
+   loader leaves 1 in each, but no client has read one yet).  Nothing
+   consumes this bundle today; it is here so that narrowing [kernel_data]
+   does not drop the bytes on the floor, and it is what [SpecForkret]'s
+   `first` premise and [SpecAllocpid.nextpid_res] get threaded from when
+   those land ([main_globals_raw] is where they will end up). *)
+Definition main_data_raw `{!riscvGS Σ} : iProp Σ :=
+  ((∃ w : bv 32, (pa_of_z KernelSyms.first_1) ↦₄ w) ∗
+   (∃ w : bv 32, (pa_of_z KernelSyms.nextpid)  ↦₄ w))%I.
+
 Section BootAlloc.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ}.
   (* NO [icacheG] BINDER: [fileG] already carries it, and [IcacheRef.icfg]
@@ -940,6 +957,9 @@ Section BootAlloc.
            boot_hart_res (CID := c) (g.(gregs) c) iv DfracDiscarded) ∗
       (* --- the BOOT hart's supply --- *)
       main_locks_raw ∗ main_globals_raw ∗
+      (* the image's WRITABLE initialized globals, which [kernel_data] no
+         longer claims -- see [main_data_raw] *)
+      main_data_raw ∗
       ([∗ list] i ∈ seq 0 NPROC, hart_full i (0%fin : CPU)) ∗
       ([∗ list] i ∈ seq 0 NPROC, pstate_full i UNUSED) ∗
       (* NO RESERVATION MIRRORS COME OUT: every hart's is threaded into that
@@ -978,23 +998,55 @@ Section BootAlloc.
         Hlkauth & Hpark & Hpst & Hresv & Huf & Hpf & Hvf & Hdimg & Hmir & #Hcinv & #Hcert)".
     (* ---- the claims bundle FIRST: both image halves need it ---- *)
     iMod (kmap_static_claims_intro with "Hkfrags") as "#Hcl".
-    (* ---- the image: text persisted, data persisted up to [img_end] ---- *)
+    (* ---- the image: text persisted, data persisted up to [rodata_end] ---- *)
     iDestruct (boot_bytes_split g with "Hbytes") as "[Htext Hdata]".
     iMod (boot_text_persist g Hram with "Hcl Htext") as "Htext".
     iDestruct (kernel_text_intro g Hmemf with "Htext") as "#Hktext".
     iDestruct (boot_data_ran g Hram with "Hdata") as "Hdata".
-    iDestruct (bss_cut g text_end text_end img_end ram_hi
+    (* THE SECOND CUT IS AT [rodata_end], NOT AT [img_end].  [rodata_end,
+       img_end) is the image's WRITABLE initialized data (`.data`, `.got`,
+       `.got.plt`), and the kernel stores into `.data`; persisting it would
+       make [kernel_data] contradict any ownership of `first`/`nextpid` and
+       so make every contract carrying it vacuous.  Only the read-only
+       material [text_end, rodata_end) becomes [kernel_data]. *)
+    iDestruct (bss_cut g text_end text_end rodata_end ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "Hdata")
-      as "[Himg Hbss]".
-    iDestruct (boot_ran_own g text_end img_end Hram ltac:(zlit)
-                 with "Hcl Himg") as "Himg".
-    iMod (boot_ran_persist g text_end img_end with "Himg") as "#Himg".
-    iDestruct (kernel_data_intro g Hmem with "Himg") as "#Hkdata".
+      as "[Hro Hrw]".
+    iDestruct (boot_ran_own g text_end rodata_end Hram ltac:(zlit)
+                 with "Hcl Hro") as "Hro".
+    iMod (boot_ran_persist g text_end rodata_end with "Hro") as "#Hro".
+    iDestruct (kernel_data_intro g Hmem with "Hro") as "#Hkdata".
+    (* ---- [rodata_end, ram_hi), walked in ADDRESS order exactly like the
+           .bss walk below: `first`, `nextpid`, [_entry]'s GOT slot, and the
+           .bss tail.  The gaps (`.data`'s leading and trailing padding, the
+           rest of `.got`/`.got.plt`) are claimed by nobody and dropped, as
+           everywhere else in this walk. ---- *)
+    iDestruct (bss_cut g rodata_end KernelSyms.first_1
+                 (KernelSyms.first_1 + 4) ram_hi
+                 ltac:(zlit) ltac:(zlit) ltac:(zlit) with "Hrw")
+      as "[Hfirst Hrw]".
+    iDestruct (bss_cut g (KernelSyms.first_1 + 4) KernelSyms.nextpid
+                 (KernelSyms.nextpid + 4) ram_hi
+                 ltac:(zlit) ltac:(zlit) ltac:(zlit) with "Hrw")
+      as "[Hnext Hrw]".
+    iDestruct (bss_cut g (KernelSyms.nextpid + 4) entry_got (entry_got + 8)
+                 ram_hi ltac:(zlit) ltac:(zlit) ltac:(zlit) with "Hrw")
+      as "[Hgot Hrw]".
+    iDestruct (bss_cut g (entry_got + 8) img_end ram_hi ram_hi
+                 ltac:(zlit) ltac:(zlit) ltac:(zlit) with "Hrw") as "[Hbss _]".
+    iDestruct (boot_ran_cell4 g KernelSyms.first_1 Hmem ltac:(zlit)
+                 ltac:(zlit) ltac:(zeq) with "Hcl Hfirst") as "Hfirst".
+    iDestruct (boot_ran_cell4 g KernelSyms.nextpid Hmem ltac:(zlit)
+                 ltac:(zlit) ltac:(zeq) with "Hcl Hnext") as "Hnext".
     (* ---- [_entry]'s GOT slot: the &stack0 word, at [DfracDiscarded] so all
-           eight harts share it ---- *)
-    iDestruct (kernel_data_phys_word entry_got v_stack0 mb_ld_ea
-                 entry_ld_ea_addr ltac:(zlit) ltac:(zlit) ltac:(zeq)
-                 entry_got_bytes with "Hcl Hkdata") as "#Hword".
+           eight harts share it.  It is in `.got`, i.e. ABOVE [rodata_end],
+           so it is persisted here as ONE cell rather than claimed wholesale
+           by [kernel_data] -- nothing ever writes the GOT (xv6 is statically
+           linked and non-PIE), but the section flags cannot say so. ---- *)
+    iMod (boot_ran_phys_word g entry_got v_stack0 mb_ld_ea entry_ld_ea_addr
+            Hmem ltac:(zlit) ltac:(zlit) ltac:(zeq)
+            (boot_byte_data_run entry_got v_stack0 8%nat ltac:(zlit)
+               entry_got_bytes) with "Hcl Hgot") as "#Hword".
     (* ---- the fd-slot supply (no memory footprint: a pure ghost) ---- *)
     (* the proc table's COUNTED regime, at the whole table: every slot is
        UNUSED at boot, so [userinit]'s allocproc cannot come back empty
@@ -1096,6 +1148,7 @@ Section BootAlloc.
     iSplitL "Hres"; [iExact "Hres" |].
     iSplitL "Hlocks"; [iExact "Hlocks" |].
     iSplitL "Hglobals"; [iExact "Hglobals" |].
+    iSplitL "Hfirst Hnext"; [rewrite /main_data_raw; iFrame "Hfirst Hnext" |].
     iSplitL "Hpark"; [iExact "Hpark" |].
     iSplitL "Hpst"; [iExact "Hpst" |].
     iSplitL "Htx Hsent".

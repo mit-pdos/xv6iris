@@ -243,11 +243,13 @@ Section ProofArgraw.
   Proof.
     intro Hi.
     assert (Hle : text_end <= ar_tbl + 4 * Z.of_nat i) by (unfold text_end, ar_tbl, KernelSyms.states_0; lia).
+    assert (Hhi : ar_tbl + 4 * Z.of_nat i + Z.of_nat 4%nat <= rodata_end)
+      by (unfold rodata_end, ar_tbl, KernelSyms.states_0, NARG in *; lia).
     pose proof (ar_tbl_bytes i Hi) as Hb.
     unfold NARG in Hi. iIntros "#Hd". rewrite /word4_pointsto. iSplit.
     { iPureIntro. destruct i as [|[|[|[|[|[|i']]]]]]; try lia; vm_compute; reflexivity. }
     iApply (kernel_data_window (ar_tbl + 4 * Z.of_nat i) (ar_entry i) 4%nat _ eq_refl
-              Hle Hb with "Hd").
+              Hle Hhi Hb with "Hd").
   Qed.
 
   (* ================================================================== *)

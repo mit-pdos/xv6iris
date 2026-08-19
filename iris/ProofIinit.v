@@ -539,7 +539,8 @@ Section ProofIinit.
       do 7 (destruct j as [|j];
             [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
       vm_compute in Hj; discriminate. }
-    iPoseProof (kernel_data_string itable_name_str "itable"%string name_itable eq_refl ltac:(unfold text_end, itable_name_str; lia) Hitable
+    iPoseProof (kernel_data_string itable_name_str "itable"%string name_itable eq_refl ltac:(unfold text_end, itable_name_str; lia)
+                                                                                       ltac:(vm_compute; discriminate) Hitable
                   with "Hkdata") as "#Hstr_itable".
     assert (Hinode : forall j bt, cstring_bytes "inode"%string !! j = Some bt ->
                       KernelData.kernel_data !! (inode_name_str + Z.of_nat j)%Z = Some bt).
@@ -547,7 +548,8 @@ Section ProofIinit.
       do 6 (destruct j as [|j];
             [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
       vm_compute in Hj; discriminate. }
-    iPoseProof (kernel_data_string inode_name_str "inode"%string name_inode eq_refl ltac:(unfold text_end, inode_name_str; lia) Hinode
+    iPoseProof (kernel_data_string inode_name_str "inode"%string name_inode eq_refl ltac:(unfold text_end, inode_name_str; lia)
+                                                                                    ltac:(vm_compute; discriminate) Hinode
                   with "Hkdata") as "#Hstr_inode".
     assert (Hslstr : forall j bt, cstring_bytes "sleep lock"%string !! j = Some bt ->
                       KernelData.kernel_data !! (0x80007568 + Z.of_nat j)%Z = Some bt).
@@ -555,7 +557,8 @@ Section ProofIinit.
       do 11 (destruct j as [|j];
              [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
       vm_compute in Hj; discriminate. }
-    iPoseProof (kernel_data_string 0x80007568 "sleep lock"%string sl_str_addr eq_refl ltac:(unfold text_end; lia) Hslstr
+    iPoseProof (kernel_data_string 0x80007568 "sleep lock"%string sl_str_addr eq_refl ltac:(unfold text_end; lia)
+                                                                                      ltac:(vm_compute; discriminate) Hslstr
                   with "Hkdata") as "#Hstr_sl".
     (* ---- the frame geometry ---- *)
     assert (Hspr6 : spr = pa_stk sp0 6).

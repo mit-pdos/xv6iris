@@ -63,7 +63,8 @@ Section ProofKinit.
       do 5 (destruct j as [|j];
             [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
       vm_compute in Hj; discriminate. }
-    iPoseProof (kernel_data_string 0x80007040 "kmem"%string _ eq_refl ltac:(unfold text_end; lia) Hkmem
+    iPoseProof (kernel_data_string 0x80007040 "kmem"%string _ eq_refl ltac:(unfold text_end; lia)
+                                                                      ltac:(vm_compute; discriminate) Hkmem
                   with "Hkdata") as "#Hstr".
     assert (Hspr2 : spr = pa_stk sp0 2).
     { unfold spr, pa_stk, add_vec_int. f_equal; try (apply bv_eq; vm_compute; reflexivity). }

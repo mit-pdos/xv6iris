@@ -12,7 +12,7 @@
        is_itable2   (IcacheEscrow)  -- the itable spinlock's resource
 
    ...plus the fifty inode sleeplocks sealed over [ic_tok cn k], which is
-   [SpecFileclose.ic_sleeplocks] verbatim (that name lives up in the file-
+   [ic_sleeplocks] verbatim (that name lives up in the file-
    close spec, which this file must not depend on, so the family is spelled
    out here and unifies with it by unfolding).
 
@@ -1081,11 +1081,11 @@ Section IcacheBootTable.
      THIS IS THE LOWEST FILE THAT CAN STATE IT (it needs [SleepLock] and
      [IcacheEscrow.ic_tok], and it is where the family is produced), and
      it is stated here so that no further contract has to write a fifth
-     copy.  [SpecFileclose.ic_sleeplocks] and [SpecDirlink.ic_sleeplocks]
+     copy.  [ic_sleeplocks] and [ic_sleeplocks]
      are two earlier, character-identical copies, each with its own
      consumers that [rewrite /] the QUALIFIED name
      ([ProofDirlink.dl_slk_acc], [ProofNamex.nx_slk_acc],
-     [SpecFileclose.ic_sleeplocks_acc]); retiring them is a four-line
+     [ic_sleeplocks_acc]); retiring them is a four-line
      alias change that costs a recompile of ProofDirlink / ProofNamex /
      ProofFileclose / ProofKexit, and is deliberately NOT bundled with
      this stage.  New contracts (fs-namei N5's ireclaim and fsinit) name
@@ -1123,7 +1123,7 @@ Section IcacheBootTable.
      state (§13.7-§13.9): [M = ∅], [ci = ∅], fifty [ic_empty_arm]s, fifty
      [islot_empty]s, the pool covering the whole region.
 
-     The last conjunct IS [SpecFileclose.ic_sleeplocks cn], spelled out
+     The last conjunct IS [ic_sleeplocks cn], spelled out
      because this file sits below the fileclose spec. *)
   Lemma icache_boot (E : coPset) (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (nib : nat) (dv : mword 32) :

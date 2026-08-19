@@ -1369,7 +1369,7 @@ Qed.
 (* what lets the instruction read be justified at the POST-translate state. *)
 Lemma u_writeback_data (P : uptd) (t : ptree) (mm : pamap) (vpn : mword 27)
     (p2 p1 p0 q : mword 64) (x : Arch.pa) :
-  u_mem_wf P t mm -> ptree_maps t vpn p2 p1 p0 -> x ∈ ud_data P ->
+  u_mem_wf P t mm -> ptree_maps t vpn p2 p1 p0 -> u_data_pa P x ->
   write_bytes mm (pt_addr0 p1 vpn) 8 q !! x = mm !! x.
 Proof.
   intros Hwf Hmaps Hx.
@@ -1404,10 +1404,10 @@ Lemma u_fetch_win_in (P : uptd) (t : ptree) (mm : pamap) (k : Z)
     is_Some (mm !! pa_add (u_walk_pa w va) j).
 Proof.
   intros Hk Hdvd Hwf Hl Hal j Hj.
-  pose proof Hwf as (md & Hdisj & Hdj & Hmm & Hdm & Hram & Hcov & _).
-  assert (Hd : pa_add (u_walk_pa w va) j ∈ ud_data P).
+  pose proof Hwf as (md & Hdisj & Hdj & Hmm & Hdm & Hram & _ & Hwfm & _).
+  assert (Hd : u_data_pa P (pa_add (u_walk_pa w va) j)).
   { rewrite (u_walk_pa_window_wf k w va j Hk Hdvd Hal Hj).
-    exact (Hcov (svpn_of va) w (add_vec_int va (Z.of_nat j)) Hl). }
+    exact (u_data_pa_cov P (svpn_of va) w (add_vec_int va (Z.of_nat j)) Hwfm Hl). }
   destruct (proj1 (Hdm _) Hd) as [bd Hbd].
   exists bd. rewrite Hmm.
   destruct (ptree_bytes 2 t !! pa_add (u_walk_pa w va) j) as [c|] eqn:Ht.

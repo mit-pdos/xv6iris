@@ -19,7 +19,7 @@
    it has no loop-constant value, and the hart owns it inside
    [user_regs]'s [clock_res] rider, which arrives here as part of the
    [pc_is] userret hands back, see [UserExec.ucfg]), and the user data
-   pages' bytes [udata_own] with their coverage / access-classification
+   memory [umem_any] with its no-aliasing / access-classification
    facts.
 
    THE ONE PURE OBLIGATION is [user_mstatus_ok (sret_ms5 mstatus0)] -- the
@@ -121,8 +121,8 @@ Section UserKernelBridge.
     (* the state-enable pins user_cfg fixes at zero *)
     mstateen0v = (mword_of_int 0 : mword 64) ->
     sstateen0v = (mword_of_int 0 : mword 32) ->
-    (* the user pages' coverage / access classification *)
-    udata_cov pt.(ud_um) pt.(ud_data) ->
+    (* the user address space's no-aliasing / access classification *)
+    uva_pa_inj pt ->
     upt_acc_wf pt.(ud_um) ->
     (* ---- the cells [wp_userret_pt] hands back ---- *)
     hart_state ↦ᵣ HART_ACTIVE tt -∗
@@ -155,14 +155,15 @@ Section UserKernelBridge.
     (R_bitvector_32 mcounteren) ↦ᵣ□ mcounteren_v -∗
     (R_bitvector_32 scounteren) ↦ᵣ□ scounteren_v -∗
     mhpmcounter ↦ᵣ□ mhpmcounter_v -∗
-    (* ---- the user data pages ---- *)
-    udata_own pt.(ud_data) -∗
+    (* ---- the process's memory (contents quantified: the bridge says
+           nothing about the bytes, only that the process owns them) ---- *)
+    umem_any pt -∗
     (* ---- the exclusive usertrap-residue conjunct [user_inv] now carries ---- *)
     Rut pt -∗
     user_inv C pt Rut.
   Proof.
     intros HSXL HMXR HFS HVS HTVM HTSR Hdqc Hstvec Hmie Hmdl Hmedl
-      Hroot Htfp Hum Hmenv Hsenv Hmse Hsse Hcov Hacc.
+      Hroot Htfp Hum Hmenv Hsenv Hmse Hsse Hinj Hacc.
     subst menvcfg0 senvcfg0 mstateen0v sstateen0v.
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenv Hsepc Hutlb Hpc Hgpr
              Hsc Hstval Hstvec Hmedl Hmse Hsse Hmcen Hscen Hhpm Hdata Hrut".
@@ -184,12 +185,12 @@ Section UserKernelBridge.
       unfold user_regs. rewrite u_regs_pc_is.
       iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hgpr". }
     iSplitL "Hutlb Hdata".
-    { (* user_pt_inv *)
-      unfold user_pt_inv.
+    { (* user_pt_any *)
+      rewrite user_pt_any_unfold.
       rewrite Hroot Htfp Hum.
       iFrame "Hutlb Hdata".
-      rewrite Hum in Hcov Hacc.
-      iPureIntro. split; [exact Hcov | exact Hacc]. }
+      rewrite Hum in Hacc.
+      iPureIntro. split; [exact Hinj | exact Hacc]. }
     iSplitL "Hstvec Hmie Hmdl Hmedl Hmenv Hsenv Hmse Hsse Hmcen Hscen Hhpm".
     { (* user_cfg *)
       unfold user_cfg.
@@ -232,10 +233,10 @@ Section UserKernelBridge.
          needs all five. *)
       pc_is (stvec_base (uc_stvec C)) ∗
       gpr_file g ∗
-      (* user_pt_inv pt, fully unpacked *)
+      (* user_pt_any pt, fully unpacked *)
       utlb_inv_pt pt.(ud_root) pt.(ud_tfp) pt.(ud_um) ∗
-      udata_own pt.(ud_data) ∗
-      ⌜udata_cov pt.(ud_um) pt.(ud_data)⌝ ∗
+      umem_any pt ∗
+      ⌜uva_pa_inj pt⌝ ∗
       ⌜upt_acc_wf pt.(ud_um)⌝ ∗
       (* user_cfg C, fully unpacked *)
       stvec ↦ᵣ{ uc_dqc C } uc_stvec C ∗
@@ -259,8 +260,8 @@ Section UserKernelBridge.
     unfold user_trap_frame.
     iDestruct "H" as (ms_v sc_v stval_v sepc_v g)
       "(%Hok & Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc & Hpc & Hgpr & Hupt & Hcfg & Hrut)".
-    unfold user_pt_inv.
-    iDestruct "Hupt" as "(Hutlb & Hdata & %Hcov & %Hacc)".
+    rewrite user_pt_any_unfold.
+    iDestruct "Hupt" as "(Hutlb & Hdata & %Hinj & %Hacc)".
     unfold user_cfg.
     iDestruct "Hcfg" as
       "(Hstvec & Hmie & Hmdl & Hmedl & Hmenv & Hsenv & Hmse & Hsse & #Hctr & #Hhpm)".
@@ -268,7 +269,7 @@ Section UserKernelBridge.
     iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hgpr
             Hutlb Hdata Hstvec Hmie Hmdl Hmedl Hmenv Hsenv Hmse Hsse
             Hrut".
-    iPureIntro. split; [exact Hok | split; [exact Hcov | exact Hacc]].
+    iPureIntro. split; [exact Hok | split; [exact Hinj | exact Hacc]].
   Qed.
 
 End UserKernelBridge.

@@ -117,6 +117,8 @@ class Names:
     def entry(self) -> str:   return f"{self.prefix}Entry"
     @property
     def segs(self) -> str:    return f"{self.prefix}_segments"
+    @property
+    def rodata_end(self) -> str: return f"{self.prefix}RodataEnd"
     # The decode-index RECORD keeps one fixed name across all images.  It holds
     # no image-specific data (addr/width/enc), and naming it per-prefix would
     # rewrite every one of the ~8500 entries of a kernel re-dump — burying a
@@ -331,6 +333,26 @@ class Segment:
 
 
 @dataclass
+class Sect:
+    """One ALLOCATED section header.  The program headers say only "one RWX
+    PT_LOAD" (the linker merges everything into a single segment), so the
+    read-only/writable split of the loaded image is visible ONLY here."""
+    name: str
+    addr: int
+    size: int
+    flags: int          # SHF_WRITE=1, SHF_ALLOC=2, SHF_EXECINSTR=4
+    has_bits: bool      # SHT_NOBITS (.bss) has no file contents
+
+    @property
+    def writable(self) -> bool: return bool(self.flags & 1)
+
+    def flag_str(self) -> str:
+        return ("r" if self.flags & 2 else "-") + \
+               ("w" if self.flags & 1 else "-") + \
+               ("x" if self.flags & 4 else "-")
+
+
+@dataclass
 class Elf:
     """The bits of a 64-bit little-endian ELF this dumper needs: the entry pc
     and the PT_LOAD segments.  A user program (`user/_sync`) has a low, often
@@ -339,6 +361,7 @@ class Elf:
     path: str
     entry: int
     segments: list[Segment]     # PT_LOAD only, in program-header order
+    sections: list[Sect]        # SHF_ALLOC only, in address order
 
 
 def read_elf(path: str) -> Elf:
@@ -366,7 +389,43 @@ def read_elf(path: str) -> Elf:
                             data=f[p_offset:p_offset + p_filesz]))
     if not segs:
         sys.exit(f"{path}: no PT_LOAD segments")
-    return Elf(path=path, entry=e_entry, segments=segs)
+    # --- the section headers, ALLOC only (what the loader actually maps) ---
+    e_shoff = struct.unpack_from("<Q", f, 0x28)[0]
+    e_shentsize = struct.unpack_from("<H", f, 0x3A)[0]
+    e_shnum = struct.unpack_from("<H", f, 0x3C)[0]
+    e_shstrndx = struct.unpack_from("<H", f, 0x3E)[0]
+    raw = []
+    for i in range(e_shnum):
+        off = e_shoff + i * e_shentsize
+        raw.append((struct.unpack_from("<I", f, off)[0],       # sh_name
+                    struct.unpack_from("<I", f, off + 4)[0],   # sh_type
+                    struct.unpack_from("<Q", f, off + 8)[0],   # sh_flags
+                    struct.unpack_from("<Q", f, off + 16)[0],  # sh_addr
+                    struct.unpack_from("<Q", f, off + 24)[0],  # sh_offset
+                    struct.unpack_from("<Q", f, off + 32)[0])) # sh_size
+    strtab_off = raw[e_shstrndx][4] if e_shnum else 0
+
+    def shname(n: int) -> str:
+        end = f.index(b"\0", strtab_off + n)
+        return f[strtab_off + n:end].decode()
+
+    sects = [Sect(name=shname(nm), addr=addr, size=size, flags=flags,
+                  has_bits=(typ != 8))                          # 8 = SHT_NOBITS
+             for (nm, typ, flags, addr, _o, size) in raw if flags & 2]
+    sects.sort(key=lambda s: (s.addr, s.size))
+    return Elf(path=path, entry=e_entry, segments=segs, sections=sects)
+
+
+def rodata_end(elf_info: Elf) -> int:
+    """The lowest address of a WRITABLE allocated section -- i.e. one past the
+    last byte of read-only image material (.text/.rodata/.eh_frame).  Every
+    loadable byte BELOW it is immutable for the life of the image; a byte at
+    or above it may be stored to at run time, so a proof may never reside one
+    at a discarded (permanently read-only) fraction.  An image with no
+    writable allocated section has nothing above the read-only material, so
+    the answer is the end of the image."""
+    w = [s.addr for s in elf_info.sections if s.writable]
+    return min(w) if w else image_extent(elf_info.path)[1]
 
 
 def load_segments(elf_path: str) -> list[tuple[int, bytes]]:
@@ -846,6 +905,26 @@ def emit_rocq_data(items: list[object], out_path: str, elf: str,
     w(f"Definition {names.segs} : list (Z * Z * Z * Z) := [")
     w(segs)
     w("  ].")
+    w("")
+    # --- the read-only/writable boundary, off the SECTION table ---------
+    # The program headers above are ONE RWX PT_LOAD, so they cannot say which
+    # loaded bytes are read-only; only the section flags can.  A proof that
+    # resides image bytes as permanently read-only (Iris `DfracDiscarded`)
+    # must stop here, or it claims read-only status for cells the kernel
+    # writes -- an inconsistent premise, not a failed proof.
+    w("(* THE ALLOCATED SECTIONS, in address order.  The program headers above")
+    w("   are a SINGLE RWX PT_LOAD, so the read-only/writable split of the")
+    w("   loaded image is visible only here:")
+    for s in elf_info.sections:
+        w(f"     {s.name:<18}0x{s.addr:x} .. 0x{s.addr + s.size:x}  {s.flag_str()}"
+          + ("" if s.has_bits else "  (no file contents)"))
+    w(f"   [{names.rodata_end}] is the LOWEST WRITABLE one's address: every")
+    w("   loadable byte below it is read-only image material and is immutable")
+    w("   for the life of the image, while a byte at or above it may be stored")
+    w("   to at run time -- so no proof may reside one permanently read-only.")
+    w("   (An image with no writable allocated section gets")
+    w(f"   [{names.end}], i.e. the whole image is read-only.) *)")
+    w(f"Definition {names.rodata_end} : Z := 0x{rodata_end(elf_info):x}%Z.")
     w("")
     w(f"Definition {name} : gmap Z (bv 8) := list_to_map [")
     for i, a in enumerate(data_addrs):

@@ -285,7 +285,8 @@ Section FilereadMsg.
   Proof.
     iIntros "#Hd".
     iApply (kernel_data_string fr_msg_a fr_msg _ eq_refl
-              ltac:(unfold text_end, fr_msg_a; lia) fr_msg_bytes with "Hd").
+              ltac:(unfold text_end, fr_msg_a; lia)
+              ltac:(vm_compute; discriminate) fr_msg_bytes with "Hd").
   Qed.
 End FilereadMsg.
 

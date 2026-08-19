@@ -29,6 +29,24 @@ Definition kernel_segments : list (Z * Z * Z * Z) := [
     ((0x80000000)%Z, (0xa2b0)%Z, (0x235d8)%Z, (7)%Z)   (* RWX *)
   ].
 
+(* THE ALLOCATED SECTIONS, in address order.  The program headers above
+   are a SINGLE RWX PT_LOAD, so the read-only/writable split of the
+   loaded image is visible only here:
+     .text             0x80000000 .. 0x80007000  r-x
+     .rodata           0x80007000 .. 0x80007848  r--
+     .eh_frame         0x80007848 .. 0x8000a274  r--
+     .data             0x8000a274 .. 0x8000a290  rw-
+     .got              0x8000a290 .. 0x8000a2a0  rw-
+     .got.plt          0x8000a2a0 .. 0x8000a2b0  rw-
+     .bss              0x8000a2b0 .. 0x800235d8  rw-  (no file contents)
+   [kernelRodataEnd] is the LOWEST WRITABLE one's address: every
+   loadable byte below it is read-only image material and is immutable
+   for the life of the image, while a byte at or above it may be stored
+   to at run time -- so no proof may reside one permanently read-only.
+   (An image with no writable allocated section gets
+   [kernelMemEnd], i.e. the whole image is read-only.) *)
+Definition kernelRodataEnd : Z := 0x8000a274%Z.
+
 Definition kernel_data : gmap Z (bv 8) := list_to_map [
   ((0x80005b80)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x80005b81)%Z, Z_to_bv 8 (0x0)%Z)
