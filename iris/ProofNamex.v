@@ -1142,7 +1142,7 @@ Section ProofNamexMain.
        [proc_addr j] into every resource ONCE, and never write [pjv] again. *)
     assert (Hpjd : proc_addr j = pjv) by reflexivity.
     iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv #Hbio #Hlogc #Hkenv #Hitb2 #Hitbl
-              #Hesc #Hslks #Hireg #Hprocs #Hdev #Hgeom #Hdlk Hbmap Hinos
+              #Hesc #Hslks #Hireg #Hropen #Hprocs #Hdev #Hgeom #Hdlk Hbmap Hinos
               Hbits Hppid Hcwdc Hcwdr Hpath Hname Hbslot Hislot Hlog Hcont".
     (* PIN THE INDEX.  This contract still carries [eb = true ->], and at
        level 0 [cpu_own_eb_agree] gives [eb = b], so [b] IS the literal
@@ -2672,15 +2672,17 @@ Section ProofNamexMain.
                          Hibc Hibl Hpb' Hcovb HbD
                          Hj Hgs HT2a0 Hbelow
                          with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
-                               Hescp Hireg Hslkp Href Hru Hbmap Hinos Hbits Hppid
+                               Hescp Hireg [] Hslkp Href Hru Hbmap Hinos Hbits Hppid
                                Hprocs Hdev Hgeom Hdlk Hbslot [] Hlog").
                all: try lkbelow.
                { rewrite Heb /trap_csrs_ext. done. }
                { rewrite Heb /cpu_claim_ext. done. }
+               (* RULING G: a runtime caller lends the SEALED arm. *)
+               { iLeft. iExact "Hropen". }
                { iEval (cbn beta iota). iEmpIntro. }
                iIntros (CIDip Hqip mip nip usedip Sip wip)
                  "%Hcsip Hcg Hcnt _ _ Hpc Hppid Hbmap Hinos %Husdip Hbits Hbslot
-                  %Hsip %Hwip %Hwipc %Hbdip Hlog Hisl2".
+                  %Hsip %Hwip %Hwipc %Hbdip Hlog Hisl2 _".
                  (* THE CREDITED BOUND IS STRONGER THAN THE COUNTED ONE, and
                     namex is stated at the counted one.  [ip_spend_w w false
                     false = 2] where [iput_units = 3] -- iput's own third unit
@@ -3329,17 +3331,19 @@ Section ProofNamexMain.
                                Hinos0 Hibc Hibl Hib' Hcovb Hiu Hj Hgs
                                HND2a0 Hbelow
                                with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc
-                                     Hitb2 Hitbl Hesck Hireg Hslkk Hslkd
+                                     Hitb2 Hitbl Hesck Hireg [] Hslkk Hslkd
                                      Hslpid Hdep Hidev Hiinum Hivalid Hload
                                      Hshot Hfrz Hkeep2 Hru Hbmap Hinos Hbits Hppid Hprocs
                                      Hdev Hgeom Hdlk Hbslot [] Hlog").
                      all: try lkbelow.
                      { rewrite Heb /trap_csrs_ext. done. }
                      { rewrite Heb /cpu_claim_ext. done. }
+                     (* RULING G: a runtime caller lends the SEALED arm. *)
+                     { iLeft. iExact "Hropen". }
                      { iEval (cbn beta iota). iEmpIntro. }
                      iIntros (CIDup Hqup mup nup usedup Sup wup)
                        "%Hcsup Hcg Hcnt _ _ Hpc Hppid Hbmap Hinos %Husdup Hbits
-                        Hbslot %Hsup %Hwup %Hwupc %Hbdup Hlog Hisl2".
+                        Hbslot %Hsup %Hwup %Hwupc %Hbdup Hlog Hisl2 _".
                      assert (Hpc5a : ret_pc (ND2 !!! Regidx Rra)
                               = mword_of_int (NX + 0x80)).
                      { rewrite HND2ra. pcw. }
@@ -4118,7 +4122,7 @@ Section ProofNamexMain.
                                      Hbmaplog Hinos0 Hibc Hibl Hib' Hcovb
                                      Hiu Hj Hgs HGB3a0 Hbelow
                                      with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio
-                                           Hlogc Hitb2 Hitbl Hesck Hireg
+                                           Hlogc Hitb2 Hitbl Hesck Hireg []
                                            Hslkk Hslkd Hslpid Hdep Hidev
                                            Hiinum Hivalid Hload Hshot Hfrz Hkeep2 Hru Hbmap
                                            Hinos Hbits Hppid Hprocs Hdev
@@ -4126,9 +4130,13 @@ Section ProofNamexMain.
                            all: try lkbelow.
                            { rewrite Heb /trap_csrs_ext. done. }
                            { rewrite Heb /cpu_claim_ext. done. }
+                           (* RULING G: a runtime caller lends the SEALED arm of
+                              the borrowed regime and discards what comes back --
+                              its own copy is persistent. *)
+                           { iLeft. iExact "Hropen". }
                            iIntros (CIDup Hqup mup nup usedup Sup wup)
                              "%Hcsup Hcg Hcnt _ _ Hpc Hppid Hbmap Hinos %Husdup
-                              Hbits Hbslot %Hsup %Hwup %Hwupc %Hbdup Hlog Hisl".
+                              Hbits Hbslot %Hsup %Hwup %Hwupc %Hbdup Hlog Hisl _".
                            assert (Hpce2 : ret_pc (GB3 !!! Regidx Rra)
                                     = mword_of_int (NX + 0xf2)).
                            { rewrite HGB3ra. pcw. }
@@ -4336,7 +4344,7 @@ Section ProofNamexMain.
                                      Hbmaplog Hinos0 Hibc Hibl Hib' Hcovb
                                      Hiu Hj Hgs HGC3a0 Hbelow
                                      with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio
-                                           Hlogc Hitb2 Hitbl Hesck Hireg
+                                           Hlogc Hitb2 Hitbl Hesck Hireg []
                                            Hslkk Hslkd Hslpid Hdep Hidev
                                            Hiinum Hivalid Hload Hshot Hfrz Hkeep2 Hru Hbmap
                                            Hinos Hbits Hppid Hprocs Hdev
@@ -4344,9 +4352,13 @@ Section ProofNamexMain.
                            all: try lkbelow.
                            { rewrite Heb /trap_csrs_ext. done. }
                            { rewrite Heb /cpu_claim_ext. done. }
+                           (* RULING G: a runtime caller lends the SEALED arm of
+                              the borrowed regime and discards what comes back --
+                              its own copy is persistent. *)
+                           { iLeft. iExact "Hropen". }
                            iIntros (CIDup Hqup mup nup usedup Sup wup)
                              "%Hcsup Hcg Hcnt _ _ Hpc Hppid Hbmap Hinos %Husdup
-                              Hbits Hbslot %Hsup %Hwup %Hwupc %Hbdup Hlog Hisl3".
+                              Hbits Hbslot %Hsup %Hwup %Hwupc %Hbdup Hlog Hisl3 _".
                            assert (Hpc88 : ret_pc (GC3 !!! Regidx Rra)
                                     = mword_of_int (NX + 0x92)).
                            { rewrite HGC3ra. pcw. }
@@ -4625,17 +4637,19 @@ Section ProofNamexMain.
                                Hinos0 Hibc Hibl Hib' Hcovb Hiu Hj Hgs
                                HND2a0 Hbelow
                                with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc
-                                     Hitb2 Hitbl Hesck Hireg Hslkk Hslkd
+                                     Hitb2 Hitbl Hesck Hireg [] Hslkk Hslkd
                                      Hslpid Hdep Hidev Hiinum Hivalid Hload
                                      Hshot Hfrz Hkeep2 Hru Hbmap Hinos Hbits Hppid Hprocs
                                      Hdev Hgeom Hdlk Hbslot [] Hlog").
                      all: try lkbelow.
                      { rewrite Heb /trap_csrs_ext. done. }
                      { rewrite Heb /cpu_claim_ext. done. }
+                     (* RULING G: a runtime caller lends the SEALED arm. *)
+                     { iLeft. iExact "Hropen". }
                      { iEval (cbn beta iota). iEmpIntro. }
                      iIntros (CIDup Hqup mup nup usedup Sup wup)
                        "%Hcsup Hcg Hcnt _ _ Hpc Hppid Hbmap Hinos %Husdup Hbits
-                        Hbslot %Hsup %Hwup %Hwupc %Hbdup Hlog Hisl2".
+                        Hbslot %Hsup %Hwup %Hwupc %Hbdup Hlog Hisl2 _".
                      assert (Hpc5a : ret_pc (ND2 !!! Regidx Rra)
                               = mword_of_int (NX + 0x5a)).
                      { rewrite HND2ra. pcw. }
@@ -5883,7 +5897,7 @@ Section ProofNamexMain.
            HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov
            Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen Hbud Hj Hgs Ha1 Heb Hbelow.
     iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv #Hbio #Hlogc #Hkenv #Hitb2 #Hitbl
-              #Hesc #Hslks #Hireg #Hprocs #Hdev #Hgeom #Hdlk Hbmap Hinos
+              #Hesc #Hslks #Hireg #Hropen #Hprocs #Hdev #Hgeom #Hdlk Hbmap Hinos
               Hbits Hppid Hcwdc Hcwdr Hpath Hname Hbslot Hislot Hlog Hcont".
     (* THE WITNESS: the set the counted reservation was hiding *)
     iDestruct "Hlog" as (Sb0) "Hlog".
@@ -5894,7 +5908,7 @@ Section ProofNamexMain.
               Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen
               (walk_need_counted L n Hbud) Hj Hgs Ha1 Heb Hbelow
               with "Hcg Hcnt Htext Hkd Hpc Hpenv Hbio Hlogc Hkenv Hitb2 Hitbl
-                    Hesc Hslks Hireg Hprocs Hdev Hgeom Hdlk Hbmap Hinos
+                    Hesc Hslks Hireg Hropen Hprocs Hdev Hgeom Hdlk Hbmap Hinos
                     Hbits Hppid Hcwdc Hcwdr Hpath Hname Hbslot Hislot Hlog
                     [Hcont]").
     all: try lkbelow.

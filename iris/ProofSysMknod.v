@@ -1754,15 +1754,17 @@ Section ProofSysMknodBody.
                   ltac:(exact (proj2 (proj2 Hun1) eq_refl)) Hj Hgl HP0a0
                   (Hlb "log"%string)
                   with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hitab Hitinv
-                        Hesc Hireg Hslk Hslkd Hslpid Hdep Hidev Hiinum Hivalid
+                        Hesc Hireg [] Hslk Hslkd Hslpid Hdep Hidev Hiinum Hivalid
                         Hload Hshot Hfrz Href Hru Hsbb Hsbi Hbmres Hpidq Hprocs Hdev
                         Hgeo Hdlk Hbsl [HopS]").
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
+        (* RULING G: a runtime caller lends the SEALED arm. *)
+        { iLeft. iExact "Hiopen". }
         { iApply (log_opS_op with "HopS"). }
         iIntros (CID29 Hq29 miu n2 used2)
           "%Hcsiu Hcg Hown _ _ Hpc Hpidq Hsbb Hsbi %Hused2 Hbmres Hbsl %Hn2
-           Hop Hislot".
+           Hop Hislot _".
         assert (Hpc4a : ret_pc (P0 !!! Regidx Rra : mword 64)
                         = mword_of_int (MN + 0x4a)) by (rewrite HP0ra; pcw).
         iEval (rewrite Hpc4a) in "Hpc".

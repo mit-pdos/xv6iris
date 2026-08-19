@@ -1357,7 +1357,7 @@ Section ProofDirlinkMain.
       by exact (Z.le_trans _ _ _ Hk0le Hszb').
     iIntros "Hcg Hcnt #Htext Hpc #Hkd #Hpk #Hbio #Hlog #Hkenv
               Hidev Hiinum Hmeta Hmap Hblocks Hnm Hsbi Hsbs Hsbb Hbmr
-              #Hiregi Hdat Hppid #Hprocs #Hdev #Hgeom #Hdlk Hbsl
+              #Hiregi #Hropen Hdat Hppid #Hprocs #Hdev #Hgeom #Hdlk Hbsl
               #Hitb2 #Hitbl #Hesc #Hslks Hislot Hlinks Hop Hcont".
     iPoseProof (printk_env_panic with "Hpk") as "#Hpenv".
     (* PIN THE INDEX.  This contract still carries [eb = true ->], and at
@@ -1899,15 +1899,19 @@ Section ProofDirlinkMain.
                 HE1a0
                 Hbelow
                 with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlog Hitb2 Hitbl Hesck
-                      Hiregi Hslk Href Hru Hsbb Hsbi Hbmr Hppid Hprocs Hdev Hgeom
+                      Hiregi [] Hslk Href Hru Hsbb Hsbi Hbmr Hppid Hprocs Hdev Hgeom
                       Hdlk Hbsl [] Hop").
       all: try lkbelow.
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
+      (* RULING G: dirlink runs at RUNTIME, so it lends iput the SEALED arm
+         of the borrowed regime and discards what comes back -- its own copy
+         is persistent. *)
+      { iLeft. iExact "Hropen". }
       { iEval (cbn beta iota). iEmpIntro. }
       iIntros (CIDip Hsip mip nn uu Sbp wdl)
         "%Hcsip Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi %Huu Hbmr Hbsl %Hsbp %Hwdl %Hwdc %Hnn Hop
-         Hislot".
+         Hislot _".
       (* GR-2c FINDING 5, verbatim: the credited bound is STRONGER
          ([ip_spend_w w false false <= 2] against [iput_units = 3]), and
          dirlink's own clause is stated at the coarse figure.  One weakening
@@ -3537,7 +3541,7 @@ Section ProofDirlinkMain.
            Hsize Hbms0 Hbmsc Hbmsl Hcovb Hiregb Hnc Hj Hgs Ha0 Ha2 Heb Hbelow.
     iIntros "Hcg Hcnt #Htext Hpc #Hkd #Hpk #Hbio #Hlog #Hkenv
               Hidev Hiinum Hmeta Hmap Hblocks Hnm Hsbi Hsbs Hsbb Hbmr
-              #Hiregi Hdat Hppid #Hprocs #Hdev #Hgeom #Hdlk Hbsl
+              #Hiregi #Hropen Hdat Hppid #Hprocs #Hdev #Hgeom #Hdlk Hbsl
               #Hitb2 #Hitbl #Hesc #Hslks Hislot Hlinks Hop Hcont".
     iDestruct "Hop" as (Sb0) "Hop".
     (* THE COUNTED SEAL'S ONE NEW STEP (D0 pre-stage 1): the gen form asks
@@ -3555,7 +3559,7 @@ Section ProofDirlinkMain.
               Hsize Hbms0 Hbmsc Hbmsl Hcovb Hiregb (Hncg _ _) Hj Hgs Ha0 Ha2 Heb Hbelow
               with "Hcg Hcnt Htext Hpc Hkd Hpk Hbio Hlog Hkenv
                     Hidev Hiinum Hmeta Hmap Hblocks Hnm Hsbi Hsbs Hsbb Hbmr
-                    Hiregi Hdat Hppid Hprocs Hdev Hgeom Hdlk Hbsl
+                    Hiregi Hropen Hdat Hppid Hprocs Hdev Hgeom Hdlk Hbsl
                     Hitb2 Hitbl Hesc Hslks Hislot Hlinks Hop [Hcont]").
     all: try lkbelow.
     iEval (rewrite /wp_next).
