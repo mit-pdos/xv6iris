@@ -556,6 +556,18 @@ would hand a client a `cn` with nothing to use it on. Do not split it.
   belong in the `started_inv P` deposit wand, beside `printk_env` and
   `procs_inv`). Blocked on (ii) and (c); nothing of it is publishable
   early.
+  **(iii) IS NOW THE TREE'S ONE BOOT-CONE AXIOM (2026-08-19).** `userinit`
+  is proven and linked (`SpecUserinit` / `ProofUserinit` / `LinkUserinit`),
+  and what stands in its place is `LinkNameiRootBoot.v`'s `Axiom` — namei's
+  root corner minus exactly four of these five rows (`is_itable2` /
+  `itable_inv` / `ic_escrows` / `ireg_inv`). Discharging it is not a proof:
+  it is a functor application over `LinkNameiRoot.NameiRoot`, which already
+  proves that corner AT those rows. So this item is the last thing between
+  the tree and an axiom-free boot cone modulo `forkret_park`. See
+  `projects/main-boot.md` §G3, and note its warning that the cache's
+  CONFIGURATION (`icfg_dev = ROOTDEV`, `0 < icfg_nib`) cannot be pinned by
+  threading a premise either — that is (c) again, and `vm_compute` does not
+  fail on it, it grinds.
 - (iv) the image-wf layer that discharges `ipool_alloc`'s allocated half
   for the real mkfs image (bitmap/`ialloc` effort).
 - (c) **THE AMBIENT-`icfg` TIE — EXAMINED 2026-08-10 AND DELIBERATELY

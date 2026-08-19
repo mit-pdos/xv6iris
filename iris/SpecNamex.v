@@ -796,6 +796,18 @@ End NAMEX.
 (*  contract -- the currency ([IcacheRef.inode_held]), the frame          *)
 (*  geometry, the epilogue -- it shares verbatim.                         *)
 (*                                                                        *)
+(*  WHAT THE CORNER DOES *NOT* TAKE, and why the list matters.  This        *)
+(*  contract's premises are exactly what [iget] needs and nothing else:     *)
+(*  the itable lock, the [ref] words, the per-entry escrows, the inode      *)
+(*  region, one [iref_slot], [panic_env] for iget's "iget: no inodes" arm,  *)
+(*  and the two path bytes.  In particular it does NOT take [ireg_open],    *)
+(*  the SEALED regime -- see the note at that row below.  [ireg_open] is    *)
+(*  minted by [FsReady.fs_ready_seal] out of fsinit's exclusive             *)
+(*  [ireg_boot], so it does not exist at all before fsinit has run, and     *)
+(*  userinit -- the caller this corner exists for -- runs before fsinit.    *)
+(*  A premise that cannot be satisfied by the one caller is not a premise,  *)
+(*  it is a hole; the corner never reaches [iput] and never needed it.      *)
+(*                                                                        *)
 (*  THE PATH IS TWO BYTES AT AN ARBITRARY [dfrac].  namex reads index 0   *)
 (*  twice (at +0x22 and +0xf4) and index 1 once (at +0xfe) and never      *)
 (*  writes either, and the [name] buffer is untouched because no memmove  *)
@@ -841,15 +853,21 @@ Definition wp_namex_root_body
      GHOST-ONLY there (the recycle arm's peel and its 0 -> 1 count move).
      Persistent, relayed unchanged. *)
   ireg_inv gi gfs inodestart nib -∗
-  (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B; §6′ RULING G).
-     Persistent, borrowed and never spent; it rides the SAME channel
-     [ireg_inv] does.  It is here because this contract reaches iput, whose
-     free path FREEZES the inode, and §2.3's boot-shelter clause makes a
-     freezer exhibit the regime it freezes under.  A runtime caller hands
-     [SpecIput] the LEFT arm of its borrowed disjunction and discards what
-     comes back; only ireclaim, which freezes before the seal is fired,
-     lends [ireg_boot] instead. *)
-  ireg_open -∗
+  (* ...AND NOT [ireg_open].  THE CORNER'S REGIME PREMISE IS GONE, and its
+     absence is the whole point of this contract for the boot caller.
+     [ireg_open] is the SEALED regime -- [FsReady.fs_ready_seal] mints it by
+     SHOOTING fsinit's exclusive [ireg_boot], so it does not exist until
+     fsinit has run.  [userinit] runs BEFORE fsinit, so a premise naming it
+     is not merely unwanted here, it is UNAVAILABLE.
+
+     It was here because the general walk reaches [iput], whose free path
+     freezes an inode and must therefore exhibit the regime it freezes
+     under (iclaim-ledger.md §3.2, RULING B).  THE ROOT CORNER NEVER REACHES
+     [iput]: [nameiparent = 0] sends +0x140 straight to the epilogue, so the
+     only callee in the cone is [iget], which does not take it.  Verified by
+     the proof: [ProofNamexRoot] introduced it and never used it.  Dropping
+     it is a pure weakening -- every existing caller has one and simply
+     stops passing it. *)
   iref_slot -∗
   (* the path: [pv] holds '/' and [pv+1] holds the terminator *)
   pa_add pv 0 ↦ₘ{dqp} SLASH -∗

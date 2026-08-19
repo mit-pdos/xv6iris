@@ -137,7 +137,7 @@ Section ProofNamexRoot.
     cbv beta delta [wp_namex_root_body].
     intros pcE pv ret_tgt HK Hn Hdev Hnib Hroot Hnib0 Ha1 Hbelow.
     destruct (nxr_kb K HK) as (Kig & K12 & Kpop).
-    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv #Hitb2 #Hitbl #Hesc #Hireg #Hropen Hisl Hp0 Hp1 Hcont".
+    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv #Hitb2 #Hitbl #Hesc #Hireg Hisl Hp0 Hp1 Hcont".
     iPoseProof (nxi_000 with "Htext") as "Hi000".
     iPoseProof (nxi_002 with "Htext") as "Hi002".
     iPoseProof (nxi_004 with "Htext") as "Hi004".

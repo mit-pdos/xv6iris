@@ -37,14 +37,17 @@
       scheduler's swtch chain is a Löb argument about forkret, which
       belongs to the caller that parks the process, not here"
 
-   -- and [SpecUserinit.v], the ONE other place a process is parked at
-   RUNNABLE from scratch, sidesteps the question entirely by being a
-   wholesale [Axiom] (no [ProofUserinit.v] exists).  kfork cannot dodge it
-   the same way -- unlike userinit, kfork's own body (allocproc, uvmcopy,
-   the trapframe copy, the filedup scan, idup, safestrcpy, the two lock
-   crossings) is ordinary, provable code, and boxing all of THAT into one
-   Axiom just to avoid this one step would throw away everything real about
-   the proof.  So this file isolates exactly the missing step, in the same
+   -- and [ProofUserinit.v], the ONE other place a process is parked at
+   RUNNABLE from scratch, is now a REAL PROOF over this contract (2026-08-19;
+   it used to sidestep the question by being a wholesale [Axiom], which is
+   what an earlier revision of this paragraph described).  So both parkers
+   are ordinary provable code and both take this one step assumed: kfork's
+   body (allocproc, uvmcopy, the trapframe copy, the filedup scan, idup,
+   safestrcpy, the two lock crossings) and userinit's (allocproc, the
+   [initproc] store, namei, the state write, the release) are proved around
+   it.  Boxing either of THOSE into one Axiom to avoid this step would throw
+   away everything real about the proof.  So this file isolates exactly the
+   missing step, in the same
    [Module Type] + [Axiom]-in-the-Link shape [SpecIput.v] already uses,
    which is what lets [ProofKfork.v] be a functor over it: when kfork can
    pay [forkret_park_pkg], its [Axiom] is replaced by an application of

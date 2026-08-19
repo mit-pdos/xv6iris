@@ -439,15 +439,11 @@ Definition wp_namei_root_body
      GHOST-ONLY there (the recycle arm's peel and its 0 -> 1 count move).
      Persistent, relayed unchanged. *)
   ireg_inv gi gfs inodestart nib -∗
-  (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B; §6′ RULING G).
-     Persistent, borrowed and never spent; it rides the SAME channel
-     [ireg_inv] does.  It is here because this contract reaches iput, whose
-     free path FREEZES the inode, and §2.3's boot-shelter clause makes a
-     freezer exhibit the regime it freezes under.  A runtime caller hands
-     [SpecIput] the LEFT arm of its borrowed disjunction and discards what
-     comes back; only ireclaim, which freezes before the seal is fired,
-     lends [ireg_boot] instead. *)
-  ireg_open -∗
+  (* ...AND NOT [ireg_open]: the corner's regime premise is gone, forwarded
+     from [SpecNamex.wp_namex_root_body], whose header says why.  The short
+     version: [ireg_open] does not exist until fsinit's [ireg_boot] is shot,
+     and userinit -- this corner's whole reason for existing -- runs before
+     fsinit. *)
   iref_slot -∗
   pa_add pv 0 ↦ₘ{dqp} SLASH -∗
   pa_add pv 1 ↦ₘ{dqp} NUL -∗

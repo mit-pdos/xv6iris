@@ -1,43 +1,70 @@
-(* SpecUserinit.v -- the public interface of userinit() (kernel/proc.c), stated
-   as an ASSUMED contract.  There is no [ProofUserinit.v]: this is the
-   [Module Type] + [Axiom]-in-the-Link shape
-   (claude-notes/design/spec-modules.md, "An ASSUMED callee"), and
-   [LinkUserinit.v] supplies the only instance.
+(* SpecUserinit.v -- the public interface of userinit() (kernel/proc.c).
+   PROVEN: [ProofUserinit.v] discharges it, [LinkUserinit.v] links it.
 
      void userinit(void) {
        struct proc *p = allocproc();
        initproc = p;
-       uvmfirst(p->pagetable, initcode, sizeof(initcode));
-       p->sz = PGSIZE;
-       p->trapframe->epc = 0;
-       p->trapframe->sp = PGSIZE;
-       safestrcpy(p->name, "initcode", sizeof(p->name));
        p->cwd = namei("/");
        p->state = RUNNABLE;
        release(&p->lock);
      }
 
-   WHY ASSUMED, DELIBERATELY.  userinit's callee [namei] drags in the whole
-   file-system cone (iget / ilock / readi / dirlookup / the log), which is far
-   from anything proven.  main() is the only caller and needs SOME contract to
-   be a functor over; assuming this one keeps [ProofMain.v] axiom-free and
-   makes proving userinit later a change to exactly two files -- this one and
-   its [Axiom].
+   (THIS KERNEL'S userinit, read off [CodeUserinit.v]: twenty-two
+   instructions, three calls and two stores.  Upstream's uvmfirst /
+   trapframe / safestrcpy lines are not in this image and the decode is what
+   says so.)
 
-   THE INTERFACE IS THE WEAKEST THING main() CAN PAY.  Nothing about the first
-   process crosses back out: main does not use [initproc], and the process
-   userinit made is reached by the scheduler through [procs_inv], which is
-   persistent and rides in unchanged.  So the post is the frame plus the
-   resources that went in, and the only cell that genuinely moves is the
-   [initproc] global -- in at an arbitrary value, out at an unspecified one.
+   ---- THIS FILE USED TO BE AN ASSUMED CONTRACT.  IT IS NOT ANY MORE. ----
 
-   THE TWO NUMERIC CONSTANTS ARE PROVISIONAL.  [K_userinit] and
-   [userinit_pages] are budgets nobody has measured: [namei]'s real stack
-   depth is unknown and allocproc's page appetite is only bounded by reading
-   the source.  They are set to what main() has available and to a
-   comfortable over-estimate respectively.  Adjusting them when the real proof
-   is attempted replaces this file plus the [Axiom] in [LinkUserinit.v] and
-   nothing else. *)
+   The axiom that stood here assumed userinit's WHOLE BODY, on the grounds
+   that namei "drags in the whole file-system cone".  It does not:
+   [namei("/")] is a path of one separator, so [skipelem] returns 0 on its
+   first call, the walk's body never runs, and the only callee reached is
+   [iget(ROOTDEV, ROOTINO)].  What is assumed now is exactly that one call,
+   at the premises the boot client can produce
+   ([SpecNameiRootBoot.NAMEI_ROOT_BOOT], whose header is the inventory) --
+   four persistent inode-cache rows short of a contract the tree already
+   proves.  Everything else about userinit is a theorem.
+
+   ---- WHAT IT TAKES ------------------------------------------------------
+
+   THE COUNTED PROC REGIME is the headline.  userinit does NOT test
+   allocproc's result -- it stores through the returned pointer at +0x24 --
+   so the proof has to REFUTE allocproc's empty-table arm, and
+   [ProcAvail.procs_avail (Some (S k))] is the only thing that can
+   (claude-notes/kernel-defects.md, "UNREACHABLE, BY THE CALLER'S
+   POSITION").  It is threaded exactly as [kalloc_env] is and comes back one
+   slot lighter.  The page budget is the same story for allocproc's two
+   freeproc failure tails: [K_allocproc < nb] refutes both.
+
+   THE [nextpid] LOCK is allocproc's own premise, and main builds it out of
+   procinit's [lk_fresh] and the .data cell (durable-notes.md, "A WRITABLE
+   GLOBAL INSIDE THE LOADED IMAGE...").
+
+   THE ONE [iref_slot] namei's [iget] spends is NOT a premise: allocproc
+   hands back [iref_slots (1 + IREFSPARE)] and the [1] is exactly it.  In
+   kfork that unit pays for [idup]; here it pays for the root's [iget], and
+   in both cases it is the working directory's.
+
+   ---- WHAT COMES BACK ----------------------------------------------------
+
+   NOTHING ABOUT THE FIRST PROCESS CROSSES BACK OUT: main does not use
+   [initproc], and the process userinit made is reached by the scheduler
+   through [procs_inv], which is persistent and rides in unchanged.  The
+   RUNNABLE park swallows the private block, the fd allowance and the saved
+   context; the [initproc] cell comes back at an unspecified value and the
+   two counted regimes come back one unit down.
+
+   THE PAGE COUNT COMES BACK EXISTENTIALLY ([nc <= K_allocproc]) rather than
+   at a fixed subtraction: allocproc's own post reports what it spent, and
+   inventing a round number here would be [claude-notes/durable-notes.md]'s
+   "a numeral that silently encodes another constant's value".
+
+   THE FTABLE'S GNAME DOES NOT APPEAR.  allocproc's post mentions it (in
+   [ProcInv.proc_priv_nocwd]) and so does [FORKRET_PARK], but the block
+   userinit hands over has every descriptor null, so nothing about the open
+   file table is observable in this contract; the proof instantiates both
+   callees at one arbitrary name. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -54,65 +81,90 @@ Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
 Require Import CpuOwn.
+Require Import LockRank.
+(* the classes the binder list generalizes over -- [fileG] (which carries
+   the cache's [icfg] and [icacheG] as superclass fields) and the two device
+   ghosts [panic_env] needs.  A bare [Require Import SpecPanic] does not put
+   them in scope and backtick generalization then invents fresh binders. *)
+Require Import FileInvDefs.
+Require Import WpUart DiskPtsto.
+Require Import SpecPanic.
 Require Import FdSlots.
 Require Import SchedCtx.
 Require Import KallocInv KvmSpec.
+Require Import InodeInv.
+Require Import IcacheRef.
+Require Import ProcAvail.
+Require Import SpecAllocpid.
+(* the two callee contracts whose budgets this one is the sum of.  Neither
+   pulls the file-system cone: [SpecNameiRootBoot] is a leaf by design (its
+   header says why) and [SpecAllocproc] is the proc/kalloc layer. *)
+Require Import SpecAllocproc.
+Require Import SpecNameiRootBoot.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
-Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Local Open Scope Z_scope.
 
 
-(* PROVISIONAL stack budget: 50 is what main() has available below its own
-   two-slot frame ([SpecMain.K_main] = 52).  namei's real depth is unknown. *)
-Notation K_userinit := (120%nat) (only parsing).
-(* PROVISIONAL kalloc budget: allocproc takes one page for the trapframe and
-   one for the process's page-table root, uvmfirst one more for the first user
-   page plus up to two interior nodes, and namei's cone allocates nothing.
-   Eight leaves slack. *)
-Definition userinit_pages : nat := 8%nat.
+(* userinit's own frame is 32 bytes (4 slots); its deepest callee is [namei]
+   at its root corner (74), over allocproc's 48 and release's 10.  Written
+   as the sum rather than as 78 (durable-notes.md, "A STACK-BUDGET PREMISE
+   IS ARITHMETIC"). *)
+Notation K_userinit := ((4 + K_namei_root_boot)%nat) (only parsing).
 
 Definition wp_userinit_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname)  (γs : list gname)
-    (m0 : regfile) (K : nat)
-    (eb : bool) (pj : mword 64)
-    (on : option nat) (v0 : mword 64) (b : bool) (lks : gset string) :=
+    `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
+    `{GEN : GenId} `{CID : CpuId}
+    (γa γp : gname) (γs : list gname)
+    (m : regfile) (K : nat) (eb : bool) (pj : mword 64)
+    (on : option nat) (np : nat) (v0 : mword 64)
+    (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.userinit in
-  let ra_idx : mword 5 := mword_of_int 1 in
-  let ra0 := m0 !!! Regidx ra_idx in
-  let ret_tgt := ret_pc ra0 in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_userinit <= K)%nat ->
-  (* enough pages for allocproc's trapframe + page table and uvmfirst's first
-     user page; stated exactly as virtio_disk_init states its three *)
-  (exists nb, on = Some nb /\ (userinit_pages <= nb)%nat) ->
-  sie_cap_gpr KT1 m0 K b pj -∗
-  (* [kernel_data] supplies the "initcode" / "/" string literals *)
-  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
+  (* allocproc's four pages, at its own STRICT convention *)
+  (exists nb, on = Some nb /\ (K_allocproc < nb)%nat) ->
+  (* allocproc's own [acquire] is on "proc" (9); the only lock taken while
+     it is held is namei's "itable" (14), which follows by
+     [LockRank.locks_below_mono]. *)
+  locks_below lks "proc" ->
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0%nat eb pj b lks -∗
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
+  (* iget's "iget: no inodes" arm is live code *)
+  panic_env -∗
   (* the proc array's lock invariant: allocproc scans it, and release gives
      back the slot userinit found.  Persistent, so threading it is free. *)
   procs_inv γs -∗
+  is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
+  (* ---- the two counted regimes ---- *)
   kalloc_env γa on -∗
+  procs_avail (Some (S np)) -∗
   (* the one global cell userinit writes *)
   (mword_of_int KernelSyms.initproc : mword 64) ↦₈ v0 -∗
   wp_next b pj (fun (CID : CpuId) =>
-  ∀ mf : regfile,
-    sie_cap_gpr KT1 mf K b pj -∗
-    pc_is ret_tgt -∗
-    ⌜ callee_saved m0 mf /\ mf !!! Regidx ra_idx = ra0 ⌝ -∗
-    cpu_own 0%nat eb pj b lks -∗
-    kalloc_env γa (avail_sub on userinit_pages) -∗
-    (∃ v : mword 64, (mword_of_int KernelSyms.initproc : mword 64) ↦₈ v) -∗
-    WP (Loop : expr riscv_lang)) -∗
+    ∀ mf : regfile,
+      sie_cap_gpr KT1 mf K b pj -∗
+      pc_is ret_tgt -∗
+      ⌜ callee_saved m mf
+        /\ mf !!! Regidx (mword_of_int 1 : mword 5)
+           = (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) ⌝ -∗
+      cpu_own 0%nat eb pj b lks -∗
+      (∃ nc : nat, ⌜(nc <= K_allocproc)%nat⌝ ∗
+                   kalloc_env γa (avail_sub on nc)) -∗
+      procs_avail (Some np) -∗
+      (∃ v : mword 64, (mword_of_int KernelSyms.initproc : mword 64) ↦₈ v) -∗
+      WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type USERINIT.
   Parameter wp_userinit_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (γs : list gname)
-      (m0 : regfile) (K : nat)
-      (eb : bool) (pj : mword 64)
-      (on : option nat) (v0 : mword 64) (b : bool) (lks : gset string),
-      wp_userinit_sconf_body γa γs m0 K eb pj on v0 b lks.
+    forall `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
+      `{GEN : GenId} `{CID : CpuId}
+      (γa γp : gname) (γs : list gname)
+      (m : regfile) (K : nat) (eb : bool) (pj : mword 64)
+      (on : option nat) (np : nat) (v0 : mword 64)
+      (b : bool) (lks : gset string),
+      wp_userinit_sconf_body γa γp γs m K eb pj on np v0 b lks.
 End USERINIT.

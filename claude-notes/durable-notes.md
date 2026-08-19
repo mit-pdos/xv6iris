@@ -211,6 +211,29 @@ sentence. **Rule: `vm_compute` only closed immediates.** Pull the immediate
 out as its own `Hc : sign_extend' 64 … = mword_of_int k` (closed, so
 `vm_compute` is instant), then `rewrite Hc moi_add; f_equal; lia`.
 
+**AND THE SAME TRAP AT AN OPAQUE INSTANCE, which is the shape that bites at
+the top of the tree (2026-08-19).** `vm_compute` ignores `Qed`-opacity: point
+it at a goal whose head sits behind an opaque instance and it will unfold
+that instance's proof term. `FileInv.subG_fileΣ` is `solve_inG. Qed.`, so at
+`xv6Σ` the ambient `IcacheRef.icfg` — a superclass FIELD of `fileG` — is
+behind it, and a goal as small as `icfg_dev = ROOTDEV` behaves like this:
+
+- `reflexivity` FAILS, with *"Unable to unify `ROOTDEV` with `icfg_dev`"*,
+  even though the instance visibly says `mword_of_int 1`;
+- `apply bv_eq; vm_compute; reflexivity` does NOT fail — it grinds through
+  the `solve_inG` term for **fifteen minutes** and reports nothing, and
+  `make` looks stalled rather than wrong.
+
+**The rule: a fact about the ambient `icfg` is not provable by conversion
+anywhere below the boot fupd, and reaching for `vm_compute` to force it is
+the failure above.** It is `fs-icache.md` C7 (c)'s ambient-`icfg` tie seen
+from below — only `IcacheRef.icfg_alloc` can establish anything about the
+cache's configuration. Where the configuration matters (it does: at
+`icfg_nib = 0` an `IcacheRef.inode_held` cannot exist), make it a property
+of the concrete INSTANCE and say so at its definition, as
+`SystemAdequacy.adequacy_icfg` now does — do not make it a premise and
+thread it, because nothing at the far end can discharge it.
+
 Three smaller ones from the same effort:
 
 - **`exact (f … _ _ H ltac:(lia) …)` fails with "Cannot find witness"** — the
@@ -1910,18 +1933,41 @@ The number goes up; that is the real one.
 ## The adequacy-print baseline (GR-36, 2026-08-16)
 
 `Print Assumptions xv6_power_adequacy_xv6Σ` (SystemAdequacy.v, printed by
-every CI build since 85c21e9f) must show EXACTLY these seven, and merge
+every CI build since 85c21e9f) must show EXACTLY these eight, and merge
 rounds diff against this list textually, not by count:
 
-1. `LinkUserinit.Userinit.wp_userinit_sconf`   (assumed-Link — the ONLY one)
-2. `FunctionalExtensionality.functional_extensionality_dep`
-3. `valid_reservation`    (rv64d extern)
-4. `plat_term_write`      (rv64d extern)
-5. `match_reservation`    (rv64d extern)
-6. `load_reservation`     (rv64d extern)
-7. `cancel_reservation`   (rv64d extern)
+1. `LinkNameiRootBoot.NameiRootBoot.wp_namei_root_boot`  (assumed-Link)
+2. `LinkForkretPark.ForkretPark.forkret_park`            (assumed-Link)
+3. `FunctionalExtensionality.functional_extensionality_dep`
+4. `valid_reservation`    (rv64d extern)
+5. `plat_term_write`      (rv64d extern)
+6. `match_reservation`    (rv64d extern)
+7. `load_reservation`     (rv64d extern)
+8. `cancel_reservation`   (rv64d extern)
 
-`LinkPanicStub.PanicAssumed.panic_wp_holds` was the second assumed Link and
+**IT WAS SEVEN UNTIL 2026-08-19, AND THE SWAP IS THE POINT.** What stood at
+(1) was `LinkUserinit.Userinit.wp_userinit_sconf` — userinit's WHOLE BODY,
+assumed. userinit is now PROVEN (`ProofUserinit.v`, linked in
+`LinkUserinit.v`), and the two entries above are what its proof rests on:
+
+- (1) is `namei("/")` at the boot client's premises — the same corner
+  `ProofNameiRoot.v` already PROVES, minus the four persistent inode-cache
+  rows main cannot produce (`SpecNameiRootBoot.v`'s header is the
+  inventory). Retiring it is boot wiring, not proof work.
+- (2) is the RUNNABLE park, and it is **not new to the tree** — `kfork` and
+  `sys_fork` have carried it all along. It is new to the BOOT cone only
+  because the old axiom hid it: `SpecForkretPark.v`'s header said userinit
+  "sidesteps the question entirely by being a wholesale Axiom", and it no
+  longer does. The paid form (`SpecForkretParkPaid`, PROVED) is not
+  available to userinit either: its `forkret_park_pkg` wants the trap
+  loop's kernel-side bundle for the new process, which is the same
+  "where does a new process's half of the kernel environment come from"
+  question kfork owes.
+
+So the count went up by one while the assumed SURFACE went down by a whole
+function: prefer that trade, and do not read the count alone.
+
+`LinkPanicStub.PanicAssumed.panic_wp_holds` was an earlier assumed Link and
 is gone: `panic()` is proven and every arm links against `SpecPanic`, so the
 placeholder was deleted outright (`claude-notes/projects/panic.md`).
 

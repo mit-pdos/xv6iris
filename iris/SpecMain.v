@@ -141,6 +141,8 @@ Require Import SpecProcinit.
    not transitive), but keeping the order makes the [NINODE] below
    unambiguously [SpecIinit]'s if that ever changes. *)
 Require Import IcacheBoot.
+(* [ROOTDEV] / [icfg_dev] / [icfg_nib], for the two config ties above *)
+Require Import InodeInv IcacheRef.
 Require Import SpecIinit SpecVirtioDiskInit.
 Require Import SpecFreerange SpecPrintk.
 Require Import ProcGeom FdSlots CpuOwn SchedCtx.
@@ -391,6 +393,20 @@ Section SpecMain.
     (* the boot supply *)
     main_locks_raw -∗
     main_globals_raw -∗
+    (* THE IMAGE'S WRITABLE INITIALIZED GLOBALS, which [kernel_data] stopped
+       claiming when it was narrowed to [rodata_end].  This is
+       [BootShared.main_data_raw], spelled out rather than named because
+       [BootShared] sits ABOVE this file and naming it would be a cycle; the
+       two are convertible and [BootChain] frames one against the other.
+
+       main spends the [nextpid] half immediately: it is the whole of
+       [SpecAllocpid.nextpid_res], so the [newlock] on procinit's
+       [lk_fresh pid_lock_addr "nextpid"] turns the pair into the
+       [is_lock γp alp_pid_lock "nextpid" nextpid_res] that allocproc -- and
+       hence kfork, sys_fork and userinit -- takes.  `first` is forkret's;
+       main carries it and drops it. *)
+    (∃ w : mword 32, (mword_of_int KernelSyms.first_1 : mword 64) ↦₄ w) -∗
+    (∃ w : mword 32, (mword_of_int KernelSyms.nextpid : mword 64) ↦₄ w) -∗
     (* every proc slot's HART TAG, minted at adequacy
        ([RiscvAdequacy.riscv_system_adequacy]) at hart 0: main spends them in
        [SpecProcinit.procs_inv_alloc], one per proc lock.  The tag names the
@@ -399,6 +415,12 @@ Section SpecMain.
        boot can mint them all at the same arbitrary hart. *)
     ([∗ list] i ∈ seq 0 NPROC, hart_full i (0%fin : CPU)) -∗
     ([∗ list] i ∈ seq 0 NPROC, pstate_full i UNUSED) -∗
+    (* THE PROC TABLE'S COUNTED REGIME ([ProcAvail.v]), minted whole at
+       [BootShared.boot_shared_alloc] and SPENT at the userinit call:
+       [SpecUserinit.wp_userinit_sconf_body] takes [procs_avail (Some (S k))]
+       and it is what refutes allocproc's empty-table arm, which userinit
+       does not test (claude-notes/kernel-defects.md). *)
+    procs_avail (Some NPROC) -∗
     (* the device fabric, which exists from time 0 (allocated in adequacy), and
        the boot hart's tokens over it *)
     dev_inv γd γv -∗

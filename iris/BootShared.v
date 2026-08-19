@@ -960,6 +960,14 @@ Section BootAlloc.
       main_data_raw ∗
       ([∗ list] i ∈ seq 0 NPROC, hart_full i (0%fin : CPU)) ∗
       ([∗ list] i ∈ seq 0 NPROC, pstate_full i UNUSED) ∗
+      (* THE PROC TABLE'S COUNTED REGIME, at the whole table: every slot is
+         UNUSED at boot, so allocproc cannot come back empty and a caller
+         that does not test its result -- userinit -- can be proved
+         ([ProcAvail.v], and [SpecUserinit.v]'s contract, which takes
+         [procs_avail (Some (S k))] and hands back [Some k]).  Threaded to
+         [main] through [BootChain.boot_hart_primary]; main carries it to
+         the userinit call site. *)
+      procs_avail (Some NPROC) ∗
       (* NO RESERVATION MIRRORS COME OUT: every hart's is threaded into that
          hart's [InstrBytes.pc_is] here, inside [boot_hart_pre] (design
          §3a), so the boot client never names one. *)
@@ -1130,10 +1138,9 @@ Section BootAlloc.
     iMod (started_inv_alloc ⊤ (main_deposit γd γv) with "Hstartcell")
       as "#Hstarted".
     (* ================================================================ *)
-    (* [Hprocsavail] -- [procs_avail (Some NPROC)] -- is deliberately NOT in
-       the postcondition yet: nothing consumes it until userinit is proved,
-       and Iris is affine so it is simply dropped here.  It is what the
-       counted regime will be threaded from ([ProcAvail.v]). *)
+    (* [Hprocsavail] -- [procs_avail (Some NPROC)] -- now leaves in the
+       postcondition: userinit is proven and its contract
+       ([SpecUserinit.v]) takes exactly this. *)
     iModIntro. iExists Hfd, Hir, Hpav, γd, γv.
     iSplitR; [iPureIntro; exact Himg |].
     iSplitR; [iExact "Hktext" |].
@@ -1149,6 +1156,7 @@ Section BootAlloc.
     iSplitL "Hfirst Hnext"; [rewrite /main_data_raw; iFrame "Hfirst Hnext" |].
     iSplitL "Hpark"; [iExact "Hpark" |].
     iSplitL "Hpst"; [iExact "Hpst" |].
+    iSplitL "Hprocsavail"; [iExact "Hprocsavail" |].
     iSplitL "Htx Hsent".
     { iExists (uart_acc (g.(gdev).(duart))). iFrame "Htx Hsent Hlb". }
     iSplitL "Hdlab"; [iExists (uart_dlab (g.(gdev).(duart))); iExact "Hdlab" |].

@@ -658,8 +658,17 @@ Section BootPrimary.
     (* --- the boot supply --- *)
     main_locks_raw -∗
     main_globals_raw -∗
+    (* the image's writable initialized globals -- main spends [nextpid] on
+       the pid lock, see [SpecMain]'s own row.  Spelled out rather than named
+       as [BootShared.main_data_raw]: that file sits ABOVE this one, so the
+       name is not in scope here either; [SystemAdequacy] splits the pair. *)
+    (∃ w : mword 32, (mword_of_int KernelSyms.first_1 : mword 64) ↦₄ w) -∗
+    (∃ w : mword 32, (mword_of_int KernelSyms.nextpid : mword 64) ↦₄ w) -∗
     ([∗ list] i ∈ seq 0 NPROC, hart_full i (0%fin : CPU)) -∗
     ([∗ list] i ∈ seq 0 NPROC, pstate_full i UNUSED) -∗
+    (* the proc table's counted regime, straight through from
+       [BootShared.boot_shared_alloc] to main -- see [SpecMain]'s own row *)
+    procs_avail (Some NPROC) -∗
     dev_inv γd γv -∗
     uart_tx_own γd l0 -∗ uart_sent γd l0 -∗ uart_out_lb γd l0 -∗
     uart_dlab_is γd (DfracOwn (1/2)) b0 -∗
@@ -672,7 +681,7 @@ Section BootPrimary.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hreset Hz Hprun Hlen Hlive.
-    iIntros "#Htext #Hdata Hres #Hstarted Hlk Hgl Hpark Hpst
+    iIntros "#Htext #Hdata Hres #Hstarted Hlk Hgl Hfirst Hnext Hpark Hpst Hpav
              #Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim #Hdone Hkpt Hkmap Hpages".
     iApply (boot_entry_bridge rs iv dq Hreset with "Htext Hres").
     iIntros (mf) "Hcap Hctx Hcpu Hg Hraw #Htimc Hpc".
@@ -684,8 +693,8 @@ Section BootPrimary.
               (cid_word_of_zero _ Hz) K_main_boot_le eq_refl eq_refl Hprun Hlen
               Hlive eq_refl
               with "Hcap Hctx Hcpu Hg Htext Hdata Hpc Hstarted [] Hlk Hgl
-                    Hpark Hpst Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim Hdone
-                    Htimc Hraw Hkpt Hkmap Hpages").
+                    Hfirst Hnext Hpark Hpst Hpav Hdev Htx Hsent Hlb Hdlab
+                    Hcfg Hclaim Hdone Htimc Hraw Hkpt Hkmap Hpages").
     (* THE DEPOSIT WAND: main's boot arm hands over exactly [main_deposit]'s
        nine conjuncts at exactly its eight existential witnesses, so the wand
        is intro + exists + frame and nothing else. *)

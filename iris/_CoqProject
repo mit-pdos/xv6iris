@@ -971,8 +971,6 @@ CodeSysSbrk.v
 ProofSysSbrk.v
 LinkSysSbrk.v
 CodeUserinit.v
-SpecUserinit.v
-LinkUserinit.v
 StartedInv.v
 CodeMain.v
 SpecMain.v
@@ -1147,6 +1145,15 @@ ProofNamei.v
 LinkNamei.v
 ProofNameiRoot.v
 LinkNameiRoot.v
+# namei's root corner at the BOOT client's premises (the tree's one assumed
+# contract in the boot cone), and userinit -- specified, PROVEN and linked
+# against it.  Here rather than beside CodeUserinit.v only because
+# SpecAllocproc.v, whose budget userinit's premise is stated in, is above.
+SpecNameiRootBoot.v
+LinkNameiRootBoot.v
+SpecUserinit.v
+ProofUserinit.v
+LinkUserinit.v
 ProofNameiparent.v
 LinkNameiparent.v
 WpIntrOff.v
