@@ -10,23 +10,22 @@
 
     THIS FILE'S RESULTS:
 
-    (1) THE COMPLETENESS THEOREM.  Every candidate that is
-        PUBLICATION-CLEAN ([cand_pub_clean] below) and satisfies
-        [cand_axiomatic_ok] is machine-reachable — every stale read allowed,
-        which is where all the weak-memory content of completeness lives, and
-        a strict generalisation of slice 2's [sc_cand_reachable] (that
-        fragment has no stale reads at all).  The proof is the view-domination
-        induction §9(1) asked for, one conjunct per view component.
+    (1) THE COMPLETENESS THEOREM, WITH NO SIDE CONDITION.  Every candidate
+        satisfying [cand_axiomatic_ok] is machine-reachable — every stale read
+        allowed, which is where all the weak-memory content of completeness
+        lives, and a strict generalisation of slice 2's [sc_cand_reachable]
+        (that fragment has no stale reads at all).  The proof is the
+        view-domination induction §9(1) asked for, one conjunct per view
+        component.
 
     (2) THE NAMED TOP LEVEL (§14): [srvwmo_consistent] and
         [srvwmo_realizable], with the ppo residue table of the settled
         axiomatization next to them.
 
-    ONE PREMISE, AND WHY IT IS THE ONLY ONE.  A premise here marks a place
-    where THE MACHINE IS STRONGER THAN THE MODELLED [ppo] — free for
-    SOUNDNESS, fatal for COMPLETENESS.  Slice 1 §7(3) and slice 2 §6(b)
-    recorded two such seams; both are now closed at the source, and only the
-    proof-side residue of the second remains as a hypothesis:
+    NO PREMISE, AND WHY.  A premise here would mark a place where THE MACHINE
+    IS STRONGER THAN THE MODELLED [ppo] — free for SOUNDNESS, fatal for
+    COMPLETENESS.  Slice 1 §7(3) and slice 2 §6(b) recorded two such seams;
+    both are closed at the source, and neither leaves a proof-side residue:
 
     (a) THE RELEASE/ACQUIRE SEAM — CLOSED BY STRENGTHENING THE MODEL.
         [store_post] raises [w_vRel] on a [.rl] store and [load_vpre] joins
@@ -49,15 +48,22 @@
         no single [ord] edge covers ([ord_pw]/[ord_pr] both require [sr],
         the bank's source needs [sw]).  It now banks PARM's dependency-free
         [FwdItem] view [0], so a forwarded plain read contributes
-        [max vpre 0 = vpre] and the witness of §15(1) no longer blocks.
+        [max vpre 0 = vpre]: nothing the pre-state's views did not already
+        carry, and hence no floor to justify by an [ord] edge.
 
-        [cand_pub_clean] SURVIVES AS A PROOF-SIDE PREMISE ONLY: the induction
-        below uses it at every read (via [cand_pub_clean_pub_r]) to obtain
-        [pub_r], and dropping it needs §8's [w_vrOld]/[w_vrNew] conjuncts
-        re-proved for a forwarded read, whose contribution is now the
-        pre-view rather than its timestamp.  That re-proof is not attempted
-        here, so the theorem below is weaker than it now needs to be — not
-        wrong.
+        §8 is what turns that into a theorem.  [cand_read_split] says every
+        byte a read takes is EITHER forwarded — contributing the banked [0],
+        which every conjunct absorbs by [maxcl_0] — OR contributes its own
+        timestamp, and in the second case that timestamp is a [pub_r]
+        PUBLICATION.  The internal, non-acquire read that used to need the
+        [cand_pub_clean] premise falls in the FIRST case, because the bank at
+        a byte holds the agent's LATEST own write to it: an internally-sourced
+        read is therefore necessarily forwarded ([cand_bankdom], plus the
+        [ax_coherence] cycle that rules out a bank entry strictly above the
+        timestamp read).  THE ACQUIRE CORNER needs none of that machinery:
+        [fwd_view_aq] says an acquire never forwards, and [pub_r]'s side
+        condition is met by [lb_aq] alone, so an acquire read of the agent's
+        own po-earlier store publishes just like any other.
 
     Slice 2's definitions are used verbatim; nothing here weakens any of them.
     DEPENDENCY-FREE like its parents: stdpp + [WeakMem] + [WeakAxiomatic] +
@@ -697,11 +703,28 @@ Qed.
     lift batch, exactly as this file's §15(3) asked.  Nothing is restated
     here; the uses below are against [WeakMem]'s copies.
 
-    ONE addition owes the same lift: the release channel's upper bound.
-    [store_fold_vRel_norl] (in [WeakMem]) says a non-release store leaves
-    [w_vRel] alone; this is its [.rl] companion, in [store_fold_vwOld]'s
-    conditional shape.  It belongs next to that one and is proved here only
-    because this slice may not edit [WeakMem.v]. *)
+    THREE additions owe the same lift, all proved here only because this slice
+    may not edit [WeakMem.v]:
+
+    (i) the release channel's upper bound.  [store_fold_vRel_norl] (in
+        [WeakMem]) says a non-release store leaves [w_vRel] alone; this is its
+        [.rl] companion, in [store_fold_vwOld]'s conditional shape.
+
+    (ii) the load fold's bounds WITH FORWARDING.  [WeakMem]'s
+        [load_fold_coh] / [load_fold_vrOld] / [load_fold_vrNew] each assume
+        "no byte of this load is forwarded" ([fwd_view ws aq p.1 p.2 = p.2]),
+        which no longer holds at every read.  The primed copies below drop
+        that assumption and state the bound on the byte's actual
+        CONTRIBUTION, [P (fwd_view ws aq p.1 p.2)] — which a
+        FORWARDED byte satisfies for free, because post-D-7 the bank holds
+        PARM's dependency-free view [0] and [maxcl P] gives [P 0].  Each is a
+        strict generalisation of [WeakMem]'s copy (rewrite the old hypothesis
+        into the new one).  Only [coh] still needs the raw timestamp, because
+        [load_post_at]'s coherence floor deliberately takes [t] rather than
+        the forwarded view.
+
+    (iii) the forward bank's own fold facts: a store fold sets the bank at
+        every byte it writes to [(t, 0)] and leaves every other byte alone. *)
 
 Lemma store_fold_vRel P rl t as_ ws :
   maxcl P → P (w_vRel ws) → (rl = true → P t) →
@@ -712,33 +735,123 @@ Proof.
   destruct rl; [|exact Hc]. apply maxcl_max; [done|exact Hc|by apply Ht].
 Qed.
 
-(* ================================================================== *)
-(** * 6. The one remaining premise, and the state calculus
-
-    [cand_pub_clean] is the last side condition of the completeness theorem.
-    It is stated over the candidate's own data and relations — no machine
-    notion — so it is a checkable hypothesis of the same kind as
-    [cand_axiomatic_ok].  (Its predecessor [cand_rl_free] is GONE: the model
-    now carries RVWMO ppo rule 7 as [WeakAxiomatic2.rel_acq_po] /
-    [ax_rel_ord], so a release store is an ordering source rather than an
-    excluded shape — see §13.) *)
-
-(** Every byte read is ACQUIRE or EXTERNALLY sourced — i.e. exactly the side
-    condition of [pub_r], per byte.  Equivalently: no read is forwarded from
-    the reader's own store, which is what keeps the banked [w_vwNew] out of
-    every view component. *)
-Definition cand_pub_clean (c : cand) : Prop :=
-  ∀ k s a t v, cd_tr c !! k = Some s → reads_at (cand_exec c) k a t v →
-    lb_aq (es_lb s) = true ∨
-    ∃ w, rf_b (cand_exec c) a w (ev_at k) ∧ ext_w (cand_exec c) w (es_ag s).
-
-Lemma cand_pub_clean_pub_r c k s a t v :
-  cand_pub_clean c → cd_tr c !! k = Some s → reads_at (cand_exec c) k a t v →
-  pub_r (cand_exec c) (ev_at k) t.
+Lemma load_fold_coh' P aq vpre ats ws a :
+  maxcl P →
+  (∀ p, p ∈ ats → p.1 = a → P p.2) →
+  (∀ p, p ∈ ats → p.1 = a → P (fwd_view ws aq p.1 p.2)) →
+  P (coh ws a) → P vpre →
+  P (coh (foldl (λ w at_, load_post_at w aq vpre at_.1 at_.2) ws ats) a).
 Proof.
-  intros Hpc Hs Hr. exists k, s, a, v. split_and!; [done|done|done|].
-  by eapply Hpc.
+  intros Hcl. revert ws. induction ats as [|p l IH]; intros ws Hts Hfv Hc Hv;
+    [exact Hc|].
+  simpl. apply IH.
+  - intros q Hq Hqa. apply (Hts q); [apply elem_of_cons; by right|exact Hqa].
+  - intros q Hq Hqa. rewrite /fwd_view load_post_at_fwd -/(fwd_view ws aq q.1 q.2).
+    apply (Hfv q); [apply elem_of_cons; by right|exact Hqa].
+  - destruct (decide (a = p.1)) as [Heq|Hne]; last first.
+    { rewrite (coh_load_post_at_ne _ _ _ _ _ _ Hne). exact Hc. }
+    assert (Hpa : P p.2).
+    { apply (Hts p); [apply elem_of_cons; by left|by rewrite -Heq]. }
+    assert (Hpf : P (fwd_view ws aq p.1 p.2)).
+    { apply (Hfv p); [apply elem_of_cons; by left|by rewrite -Heq]. }
+    rewrite Heq coh_load_post_at_eq.
+    apply maxcl_max; [done|rewrite -Heq; exact Hc|].
+    apply maxcl_max; [done| |exact Hpa].
+    apply maxcl_max; [done|exact Hv|exact Hpf].
+  - exact Hv.
 Qed.
+
+Lemma load_fold_vrOld' P aq vpre ats ws :
+  maxcl P → (∀ p, p ∈ ats → P (fwd_view ws aq p.1 p.2)) →
+  P (w_vrOld ws) → P vpre →
+  P (w_vrOld (foldl (λ w at_, load_post_at w aq vpre at_.1 at_.2) ws ats)).
+Proof.
+  intros Hcl. revert ws. induction ats as [|p l IH]; intros ws Hfv Hc Hv;
+    [exact Hc|].
+  simpl. apply IH.
+  - intros q Hq. rewrite /fwd_view load_post_at_fwd -/(fwd_view ws aq q.1 q.2).
+    apply Hfv, elem_of_cons; by right.
+  - rewrite /load_post_at /=.
+    apply maxcl_max; [done|exact Hc|].
+    apply maxcl_max; [done|exact Hv|apply Hfv, elem_of_cons; by left].
+  - exact Hv.
+Qed.
+
+Lemma load_fold_vrNew' P aq vpre ats ws :
+  maxcl P → (∀ p, p ∈ ats → P (fwd_view ws aq p.1 p.2)) →
+  P (w_vrNew ws) → P vpre →
+  P (w_vrNew (foldl (λ w at_, load_post_at w aq vpre at_.1 at_.2) ws ats)).
+Proof.
+  intros Hcl. revert ws. induction ats as [|p l IH]; intros ws Hfv Hc Hv;
+    [exact Hc|].
+  simpl. apply IH.
+  - intros q Hq. rewrite /fwd_view load_post_at_fwd -/(fwd_view ws aq q.1 q.2).
+    apply Hfv, elem_of_cons; by right.
+  - rewrite /load_post_at /=. destruct aq; [|exact Hc].
+    apply maxcl_max; [done|exact Hc|].
+    apply maxcl_max; [done|exact Hv|apply Hfv, elem_of_cons; by left].
+  - exact Hv.
+Qed.
+
+(** The bank after a store fold: [(t, 0)] on every byte written, untouched
+    elsewhere.  [WeakMem]'s [store_post_run_fwd_inv] is the weaker inversion
+    (it names the timestamp but not the view, and not the byte set). *)
+
+Lemma store_fold_fwd_out rl t as_ ws a :
+  a ∉ as_ →
+  w_fwd (foldl (λ w b, store_post w rl b t) ws as_) !! a = w_fwd ws !! a.
+Proof.
+  revert ws. induction as_ as [|b l IH]; intros ws Hnin; [done|].
+  apply not_elem_of_cons in Hnin as [Hne Hnin].
+  rewrite /= (IH _ Hnin) /store_post /= lookup_insert_ne //.
+Qed.
+
+Lemma store_fold_fwd_in rl t as_ ws a :
+  a ∈ as_ →
+  w_fwd (foldl (λ w b, store_post w rl b t) ws as_) !! a = Some (t, 0%nat).
+Proof.
+  revert ws. induction as_ as [|b l IH]; intros ws Hin;
+    [by apply elem_of_nil in Hin|].
+  destruct (decide (a ∈ l)) as [Hl|Hl]; [by apply IH|].
+  apply elem_of_cons in Hin as [->|Hin]; [|done].
+  rewrite /= (store_fold_fwd_out rl t l _ _ Hl) /store_post /= lookup_insert //.
+Qed.
+
+Lemma store_run_fwd_in ws rl base n t a :
+  a ∈ store_run_as base n →
+  w_fwd (store_post_run ws rl base n t) !! a = Some (t, 0%nat).
+Proof.
+  rewrite /store_post_run /store_post_bytes. apply store_fold_fwd_in.
+Qed.
+
+Lemma store_run_fwd_out ws rl base n t a :
+  a ∉ store_run_as base n →
+  w_fwd (store_post_run ws rl base n t) !! a = w_fwd ws !! a.
+Proof.
+  rewrite /store_post_run /store_post_bytes. apply store_fold_fwd_out.
+Qed.
+
+(** [fwd_view] post-D-7: with a bank whose views are all [0], a byte's
+    contribution is EITHER its own timestamp (no forwarding) or nothing at
+    all (forwarded).  There is no third case, and in particular no banked
+    FENCE FLOOR — that was the M1 bank the premise had to exclude. *)
+Lemma fwd_view_cases ws aq a t :
+  (∀ a' tf vf, w_fwd ws !! a' = Some (tf, vf) → vf = 0%nat) →
+  fwd_view ws aq a t = t ∨ fwd_view ws aq a t = 0%nat.
+Proof.
+  intros Hz. rewrite /fwd_view. destruct aq; [by left|].
+  destruct (w_fwd ws !! a) as [[tf vf]|] eqn:Hf; [|by left].
+  case_bool_decide as Ht; [|by left]. right. by eapply Hz.
+Qed.
+
+(* ================================================================== *)
+(** * 6. The state calculus
+
+    The completeness theorem has NO side condition: its hypothesis is
+    [cand_shape], [cand_values] and the axioms, all checkable candidate data.
+    What this section holds is the dictionary between a candidate's steps and
+    the per-agent machine state its replay produces — one equation per label
+    arm, plus the byte/timestamp list a multi-byte access folds over. *)
 
 (** *** How one step moves the per-agent state *)
 
@@ -934,15 +1047,253 @@ Proof.
 Qed.
 
 (* ================================================================== *)
-(** * 8. THE VIEW-DOMINATION INVARIANT
+(** * 8. THE FORWARD BANK'S CONTENT — what makes a forwarded read harmless
+
+    This section is what replaced the old [cand_pub_clean] premise.  Its
+    conclusion, [cand_read_split], is the one fact §9's load arm needs at a
+    read: every byte a read takes either contributes NOTHING to any view or
+    contributes its own timestamp, and in the second case that timestamp is
+    a PUBLICATION.  Everything before it is replay bookkeeping about the
+    forward bank. *)
+
+Lemma msg_byte_in_range base vs tid k (j : nat) :
+  (j < length vs)%nat →
+  is_Some (msg_byte (WMsg base vs tid k) (acc_addr base j)).
+Proof.
+  intros Hj. rewrite /msg_byte /= bool_decide_eq_true_2; [rewrite /acc_addr; lia|].
+  replace (Z.to_nat (acc_addr base j - base)) with j by (rewrite /acc_addr; lia).
+  by apply lookup_lt_is_Some_2.
+Qed.
+
+Lemma msg_byte_elem base vs tid kc a :
+  is_Some (msg_byte (WMsg base vs tid kc) a) → a ∈ store_run_as base (length vs).
+Proof.
+  rewrite /msg_byte /=. case_bool_decide as Hle; [|by intros []].
+  intros Hj. apply lookup_lt_is_Some in Hj.
+  apply elem_of_list_fmap. exists (Z.to_nat (a - base)).
+  split; [lia|]. apply elem_of_seq. lia.
+Qed.
+
+(** *** THE FORWARD BANK'S CONTENT — what makes a forwarded read harmless
+
+    The bank at byte [a] holds the agent's LATEST OWN WRITE to [a], with
+    PARM's dependency-free view [0] (deviation D-7).  Both halves are needed,
+    and both are pure replay bookkeeping — no axiom is used:
+
+    - the VIEW half says a forwarded byte contributes [Nat.max vpre 0], i.e.
+      exactly the pre-view, so it can raise no floor the pre-state did not
+      already carry;
+    - the TIMESTAMP half says an INTERNALLY-sourced read is necessarily
+      forwarded: its source is an own write to [a], the bank dominates every
+      such write, and a bank entry strictly above the timestamp read would
+      close a coherence cycle ([touch_frdom]).
+
+    Together they are what replaced the [cand_pub_clean] premise: every byte
+    a read takes either publishes ([pub_r]) or contributes nothing. *)
+
+Lemma cand_wr_run k s base vs a :
+  cd_tr c !! k = Some s → lb_wr (es_lb s) = Some (base, vs) →
+  wr_b E a (ev_at k) → a ∈ store_run_as base (length vs).
+Proof.
+  intros Hs Hwr Hw.
+  assert (Hm : es_wmsg s = Some (WMsg base vs (Some (es_ag s)) (lb_cls (es_lb s))))
+    by (rewrite /es_wmsg Hwr //).
+  destruct (cand_wr_b_inv c a (ev_at k) Hw)
+    as [[Habs _]|(k0 & s0 & m0 & Heq & Hs0 & Hm0 & Hb)]; [done|].
+  assert (k0 = k) as -> by (by simplify_eq).
+  assert (s0 = s) as -> by (rewrite Hs in Hs0; by simplify_eq).
+  rewrite Hm in Hm0. simplify_eq.
+  by eapply msg_byte_elem.
+Qed.
+
+Lemma cand_run_wr k s base vs a :
+  cd_tr c !! k = Some s → lb_wr (es_lb s) = Some (base, vs) →
+  a ∈ store_run_as base (length vs) → wr_b E a (ev_at k).
+Proof.
+  intros Hs Hwr Hin.
+  destruct (elem_of_map_seq base (length vs) a Hin) as (j & Hj & ->).
+  apply (cand_wr_b c k s (WMsg base vs (Some (es_ag s)) (lb_cls (es_lb s))) _ Hs);
+    [rewrite /es_wmsg Hwr //|by apply msg_byte_in_range].
+Qed.
+
+(** One step's effect on the bank, for both writing labels at once. *)
+Lemma cand_ws_fwd_w k s base vs a :
+  cd_tr c !! k = Some s → lb_wr (es_lb s) = Some (base, vs) →
+  (a ∈ store_run_as base (length vs) →
+     w_fwd (ews E (S k) (es_ag s)) !! a = Some (ev_ts E (ev_at k), 0%nat)) ∧
+  (a ∉ store_run_as base (length vs) →
+     w_fwd (ews E (S k) (es_ag s)) !! a = w_fwd (ews E k (es_ag s)) !! a).
+Proof.
+  intros Hs Hwr.
+  destruct (es_lb s) as [aq b0 ts0 vs0|rl b0 vs0 kc|p1 p2 p3 p4|
+                         aq rl b0 ts0 rvs0 wvs0 kc] eqn:Hl;
+    simpl in Hwr; [done| |done|]; simplify_eq.
+  - rewrite (cand_ws_store c k s rl base vs kc Hs Hl). split.
+    + intros Hin. by apply store_run_fwd_in.
+    + intros Hout. by apply store_run_fwd_out.
+  - rewrite (cand_ws_rmw c k s aq rl base ts0 rvs0 vs kc Hs Hl). split.
+    + intros Hin. by apply store_run_fwd_in.
+    + intros Hout. rewrite (store_run_fwd_out _ _ _ _ _ _ Hout).
+      by rewrite load_post_run_fwd.
+Qed.
+
+(** A non-writing step moves neither the bank nor the write set. *)
+Lemma cand_ws_fwd_nw k s :
+  cd_tr c !! k = Some s → es_wmsg s = None →
+  w_fwd (ews E (S k) (es_ag s)) = w_fwd (ews E k (es_ag s)).
+Proof.
+  intros Hs Hm.
+  destruct (es_lb s) as [aq b0 ts0 vs0|rl b0 vs0 kc|p1 p2 p3 p4|
+                         aq rl b0 ts0 rvs0 wvs0 kc] eqn:Hl;
+    rewrite /es_wmsg Hl /= in Hm; [| done | |done].
+  - rewrite (cand_ws_load c k s aq b0 ts0 vs0 Hs Hl). apply load_post_run_fwd.
+  - rewrite (cand_ws_fence c k s p1 p2 p3 p4 Hs Hl). apply fence_post_fwd.
+Qed.
+
+Definition bankdom (k : nat) (i : agent) : Prop :=
+  (∀ a tf vf, w_fwd (ews E k i) !! a = Some (tf, vf) → vf = 0%nat) ∧
+  (∀ k' s' a, (k' < k)%nat → cd_tr c !! k' = Some s' → es_ag s' = i →
+     wr_b E a (ev_at k') →
+     ∃ k'' s'', (k'' < k)%nat ∧ cd_tr c !! k'' = Some s'' ∧ es_ag s'' = i ∧
+                wr_b E a (ev_at k'') ∧
+                (ev_ts E (ev_at k') ≤ ev_ts E (ev_at k''))%nat ∧
+                w_fwd (ews E k i) !! a = Some (ev_ts E (ev_at k''), 0%nat)).
+
+Lemma cand_bankdom k i : (k ≤ length (cd_tr c))%nat → bankdom k i.
+Proof.
+  induction k as [|k IH]; intros Hk.
+  { split.
+    - intros a tf vf. rewrite (cand_ws_init c i) /ws_init /= lookup_empty //.
+    - intros k' s' a Hlt. lia. }
+  destruct (lookup_lt_is_Some_2 (cd_tr c) k ltac:(lia)) as [s Hs].
+  destruct (IH ltac:(lia)) as [IHa IHb].
+  destruct (decide (i = es_ag s)) as [->|Hne]; last first.
+  { assert (Hws : ews E (S k) i = ews E k i) by (by apply (cand_ws_ne c k s i Hs)).
+    rewrite /bankdom Hws. split; [exact IHa|].
+    intros k' s' a Hk' Hs' Hag Hw.
+    assert (Hlt : (k' < k)%nat).
+    { destruct (decide (k' = k)) as [->|?]; [|lia].
+      rewrite Hs in Hs'. by simplify_eq. }
+    destruct (IHb k' s' a Hlt Hs' Hag Hw)
+      as (k'' & s'' & ? & ? & ? & ? & ? & ?).
+    exists k'', s''. split_and!; [lia|done|done|done|done|done]. }
+  destruct (es_wmsg s) as [m|] eqn:Hm; last first.
+  { (* not a write step *)
+    pose proof (cand_ws_fwd_nw k s Hs Hm) as Hws.
+    assert (Hnw : ∀ a, ¬ wr_b E a (ev_at k)).
+    { intros a [(s0 & Hs0 & Hw0) _]. rewrite cand_ex_tr Hs in Hs0.
+      assert (s0 = s) as -> by congruence.
+      by rewrite (es_wmsg_none s Hm) in Hw0. }
+    rewrite /bankdom Hws. split; [exact IHa|].
+    intros k' s' a Hk' Hs' Hag Hw.
+    assert (Hlt : (k' < k)%nat).
+    { destruct (decide (k' = k)) as [->|?]; [|lia]. by destruct (Hnw a Hw). }
+    destruct (IHb k' s' a Hlt Hs' Hag Hw)
+      as (k'' & s'' & ? & ? & ? & ? & ? & Hbk).
+    exists k'', s''. split_and!; [lia|done|done|done|done|exact Hbk]. }
+  (* a write step of this very agent *)
+  destruct (lb_wr (es_lb s)) as [[base vs]|] eqn:Hwr;
+    [|by rewrite /es_wmsg Hwr in Hm].
+  split.
+  - intros a tf vf Hlk.
+    destruct (cand_ws_fwd_w k s base vs a Hs Hwr) as [Hin Hout].
+    destruct (decide (a ∈ store_run_as base (length vs))) as [H|H].
+    + rewrite (Hin H) in Hlk. by simplify_eq.
+    + rewrite (Hout H) in Hlk. by eapply IHa.
+  - intros k' s' a Hk' Hs' Hag Hw.
+    destruct (cand_ws_fwd_w k s base vs a Hs Hwr) as [Hin Hout].
+    destruct (decide (a ∈ store_run_as base (length vs))) as [H|H]; last first.
+    { assert (Hlt : (k' < k)%nat).
+      { destruct (decide (k' = k)) as [->|?]; [|lia].
+        by destruct (H (cand_wr_run k s base vs a Hs Hwr Hw)). }
+      destruct (IHb k' s' a Hlt Hs' Hag Hw)
+        as (k'' & s'' & ? & ? & ? & ? & ? & Hbk).
+      exists k'', s''. split_and!; [lia|done|done|done|done|by rewrite (Hout H)]. }
+    exists k, s. split_and!; [lia|done|done| |  |by apply Hin].
+    + by eapply cand_run_wr.
+    + destruct (decide (k' = k)) as [->|Hne']; [done|].
+      destruct Hw as [(s0 & Hs0 & Hw0) _]. rewrite cand_ex_tr Hs' in Hs0.
+      assert (s0 = s') as -> by congruence.
+      destruct (lb_is_w_wr (es_lb s') Hw0) as (b1 & v1 & Hwr1).
+      pose proof (cand_ts_mono c k' k s'
+                    (WMsg b1 v1 (Some (es_ag s')) (lb_cls (es_lb s')))
+                    Hs' ltac:(rewrite /es_wmsg Hwr1 //) ltac:(lia) ltac:(lia)).
+      lia.
+Qed.
+
+(** THE READ CLASSIFICATION.  Every byte a read takes either contributes
+    NOTHING (it was forwarded — the internal, non-acquire case that
+    [cand_pub_clean] used to exclude) or contributes its own timestamp, which
+    is then a PUBLICATION.  This is the single lemma the premise's deletion
+    turns on.
+
+    THE ACQUIRE CORNER resolves before the bank is ever consulted:
+    [fwd_view_aq] says an acquire load never forwards, but [pub_r]'s side
+    condition is satisfied by [lb_aq] ALONE — an acquire read publishes
+    whatever it read, own po-earlier store or not — so the acquire arm needs
+    no [ext_w] witness and no rf-totality appeal at all. *)
+Lemma cand_read_split k s a t v :
+  (k < length (cd_tr c))%nat →
+  cd_tr c !! k = Some s → reads_at E k a t v →
+  fwd_view (ews E k (es_ag s)) (lb_aq (es_lb s)) a t = 0%nat ∨
+  (fwd_view (ews E k (es_ag s)) (lb_aq (es_lb s)) a t = t ∧
+   pub_r E (ev_at k) t).
+Proof.
+  intros Hk Hs Hr.
+  destruct (cand_bankdom k (es_ag s) ltac:(lia)) as [Hz Hb].
+  destruct (fwd_view_cases (ews E k (es_ag s)) (lb_aq (es_lb s)) a t Hz)
+    as [Hfv|Hfv]; [|by left].
+  right. split; [exact Hfv|].
+  (* an ACQUIRE read publishes unconditionally *)
+  destruct (lb_aq (es_lb s)) eqn:Haq.
+  { exists k, s, a, v. split_and!; [done|by rewrite cand_ex_tr|done|by left]. }
+  destruct (Hrft k a t v Hr) as [w Hrf].
+  assert (Hts : ev_ts E w = t).
+  { destruct Hrf as (_ & k0 & t0 & v0 & Hkeq & Hr0 & Hts0).
+    assert (k0 = k) as -> by (by simplify_eq).
+    destruct (reads_at_det E k a t0 v0 t v Hr0 Hr) as [-> _]. exact Hts0. }
+  destruct w as [|k'].
+  { (* the era-initial image is external to every agent *)
+    exists k, s, a, v. split_and!; [done|by rewrite cand_ex_tr|done|].
+    right. exists ev_init. split; [exact Hrf|exact I]. }
+  assert (Htlen : (t ≤ length (cd_log c k))%nat) by (by eapply cand_read_ts_le).
+  assert (Hk' : (k' < k)%nat)
+    by (apply (cand_wr_lt k a k'); [exact (proj1 Hrf)|lia]).
+  destruct (lookup_lt_is_Some_2 (cd_tr c) k' ltac:(lia)) as [s' Hs'].
+  destruct (decide (es_ag s' = es_ag s)) as [Hag|Hag]; last first.
+  { exists k, s, a, v. split_and!; [done|by rewrite cand_ex_tr|done|].
+    right. exists (ev_at k'). split; [exact Hrf|].
+    exists s'. split; [by rewrite cand_ex_tr|exact Hag]. }
+  (* INTERNAL SOURCE: impossible in this branch — the bank must be holding
+     [t] at [a], and then the read WOULD have been forwarded. *)
+  exfalso.
+  destruct (Hb k' s' a Hk' Hs' Hag (proj1 Hrf))
+    as (k'' & s'' & Hk'' & Hs'' & Hag'' & Hw'' & Hle & Hbk).
+  rewrite Hts in Hle.
+  destruct (decide (ev_ts E (ev_at k'') = t)) as [Heq|Hne].
+  - (* the bank holds [t]: [fwd_view] is the banked [0], not [t] *)
+    rewrite Heq in Hbk.
+    rewrite (fwd_view_hit (ews E k (es_ag s)) a t t 0%nat Hbk eq_refl) in Hfv.
+    rewrite -Hts in Hfv. rewrite /ev_ts in Hfv. lia.
+  - (* the bank holds a STRICTLY LATER own write to [a]: a coherence cycle *)
+    pose proof (touch_frdom k'' s'' a (ev_ts E (ev_at k'')) Hs''
+                  (or_intror (conj Hw'' eq_refl))) as Hfrd.
+    rewrite Hag'' in Hfrd.
+    assert (Hfr : fr_b E a (ev_at k) (ev_at k'')).
+    { split; [|intros Habs; simplify_eq; lia].
+      exists (ev_at k'). split; [exact Hrf|].
+      split_and!; [exact (proj1 Hrf)|exact Hw''|lia]. }
+    pose proof (Hfrd k s (ev_at k'') ltac:(lia)
+                  ltac:(by rewrite cand_ex_tr) eq_refl Hfr). lia.
+Qed.
+
+(* ================================================================== *)
+(** * 9. THE VIEW-DOMINATION INVARIANT
 
     One conjunct per view component, in the shape §4 fixed.  [w_vwNew] and the
-    forward bank carry NO conjunct: under [cand_pub_clean] the bank is never
-    consulted ([fwd_view] is the identity on every timestamp actually read),
-    so no banked view ever reaches a floor — which is precisely the leak the
-    premise closes.  (Post-D-7 the bank holds [0], so a consulted bank would
-    contribute nothing either; the premise is belt-and-braces here — see the
-    header's (b').) *)
+    forward bank carry NO conjunct, and post-D-7 they need none: a CONSULTED
+    bank contributes [0] (§8's [cand_bankdom]), so no banked view can reach a
+    floor, and [w_vwNew] is read by no rule this induction has to justify. *)
 
 Definition invw (k : nat) (i : agent) (ws : wstate) : Prop :=
   (∀ a, frdom_b E i k a (coh ws a)) ∧
@@ -987,27 +1338,27 @@ Proof.
   by rewrite cand_ex_tr.
 Qed.
 
-Lemma msg_byte_in_range base vs tid k (j : nat) :
-  (j < length vs)%nat →
-  is_Some (msg_byte (WMsg base vs tid k) (acc_addr base j)).
-Proof.
-  intros Hj. rewrite /msg_byte /= bool_decide_eq_true_2; [rewrite /acc_addr; lia|].
-  replace (Z.to_nat (acc_addr base j - base)) with j by (rewrite /acc_addr; lia).
-  by apply lookup_lt_is_Some_2.
-Qed.
-
 (** *** The load arm *)
 
+(** THE LOAD ARM, WITH FORWARDING.  The hypothesis [Hnf] is [cand_read_split]
+    at this step: each byte the load takes either was FORWARDED — its
+    contribution is the banked [0], which every conjunct absorbs by [maxcl_0]
+    — or contributes its own timestamp, and then that timestamp is a
+    PUBLICATION.  The [coh] conjunct is the one that also needs the RAW
+    timestamp of a forwarded byte ([load_post_at]'s coherence floor takes [t],
+    not the forwarded view); that is [touch_frdom]'s, and needs no
+    publication. *)
 Lemma inv_load_fold k s base ts vs aq i :
-  cand_pub_clean c →
   cd_tr c !! k = Some s → es_ag s = i →
   lb_rd (es_lb s) = Some (base, ts, vs) → length vs = length ts →
   lb_aq (es_lb s) = aq →
-  (∀ a t v, reads_at E k a t v → fwd_view (ews E k i) aq a t = t) →
+  (∀ a t v, reads_at E k a t v →
+     fwd_view (ews E k i) aq a t = 0%nat ∨
+     (fwd_view (ews E k i) aq a t = t ∧ pub_r E (ev_at k) t)) →
   inv k i →
   invw (S k) i (load_post_run (ews E k i) aq base ts).
 Proof.
-  intros Hpc Hs Hag Hrd Hlen Haq Hnf Hinv.
+  intros Hs Hag Hrd Hlen Haq Hnf Hinv.
   pose proof Hinv as (Hc & Hrn & Hro & Hwo & Hrel).
   set (ws := ews E k i).
   (* AN EMPTY READ MOVES NOTHING — and builds no [rel_ord] edge either, which
@@ -1034,44 +1385,50 @@ Proof.
   assert (Hread : ∀ p, p ∈ ats → ∃ v, reads_at E k p.1 p.2 v).
   { intros p Hp. destruct (elem_of_zip_seq base ts p Hp) as (j & Hj & ->).
     by eapply cand_read_of. }
-  assert (Hfv : ∀ p, p ∈ ats → fwd_view ws aq p.1 p.2 = p.2).
+  assert (Hsplit : ∀ p, p ∈ ats →
+            fwd_view ws aq p.1 p.2 = 0%nat ∨
+            (fwd_view ws aq p.1 p.2 = p.2 ∧ pub_r E (ev_at k) p.2)).
   { intros p Hp. destruct (Hread p Hp) as [v Hr]. by eapply Hnf. }
-  assert (Hpub : ∀ p, p ∈ ats → pub_r E (ev_at k) p.2).
-  { intros p Hp. destruct (Hread p Hp) as [v Hr].
-    by eapply cand_pub_clean_pub_r. }
   assert (Hfrd : ∀ p, p ∈ ats → frdom_b E i (S k) p.1 p.2).
   { intros p Hp. destruct (Hread p Hp) as [v Hr].
     rewrite -Hag. apply (touch_frdom k s p.1 p.2 Hs). left. by exists v. }
-  assert (Hrs : ∀ p, p ∈ ats → rsrc E i (S k) p.2).
-  { intros p Hp. right. exists k, s, p.2.
-    split_and!; [lia|by rewrite cand_ex_tr|done|by apply Hpub|lia]. }
+  assert (Hrs : ∀ p, p ∈ ats → pub_r E (ev_at k) p.2 → rsrc E i (S k) p.2).
+  { intros p Hp Hpub. right. exists k, s, p.2.
+    split_and!; [lia|by rewrite cand_ex_tr|done|exact Hpub|lia]. }
   (* the five conjuncts *)
   rewrite /load_post_run /load_post_bytes -/ws -/ats.
   split_and!.
-  - intros a. apply load_fold_coh; [apply maxcl_frdom_b|exact Hfv| | |].
+  - intros a. apply load_fold_coh'; [apply maxcl_frdom_b| | | |].
+    + intros p Hp Heq. rewrite -Heq. by apply Hfrd.
+    + intros p Hp Heq. destruct (Hsplit p Hp) as [H0|[Ht _]].
+      * rewrite H0. apply maxcl_0, maxcl_frdom_b.
+      * rewrite Ht -Heq. by apply Hfrd.
     + eapply frdom_b_wk; [|apply Hc]. lia.
     + rewrite /load_vpre. apply maxcl_max; [apply maxcl_frdom_b| |].
       * eapply ord_dom_frdom; [exact Hordax|exact Hrelax|].
         eapply ord_dom_wk; [|exact Hrn]. lia.
       * eapply ord_dom_frdom; [exact Hordax|exact Hrelax|exact Hreldel].
-    + intros p Hp Heq. rewrite -Heq. by apply Hfrd.
   - destruct aq; last first.
     { rewrite load_fold_vrNew_plain. eapply ord_dom_wk; [|exact Hrn]. lia. }
-    apply load_fold_vrNew; [apply maxcl_ord_dom|exact Hfv| | |].
+    apply load_fold_vrNew'; [apply maxcl_ord_dom| | |].
+    + intros p Hp. destruct (Hsplit p Hp) as [H0|[Ht Hpub]].
+      * rewrite H0. apply maxcl_0, maxcl_ord_dom.
+      * rewrite Ht -Hag.
+        apply (acq_ord_dom E (es_ag s) k s p.2);
+          [by rewrite cand_ex_tr|done|by eapply lb_rd_is_r|by rewrite Haq|].
+        exact Hpub.
     + eapply ord_dom_wk; [|exact Hrn]. lia.
     + rewrite /load_vpre. apply maxcl_max; [apply maxcl_ord_dom| |].
       * eapply ord_dom_wk; [|exact Hrn]. lia.
       * exact Hreldel.
-    + intros p Hp. rewrite -Hag.
-      apply (acq_ord_dom E (es_ag s) k s p.2);
-        [by rewrite cand_ex_tr|done|by eapply lb_rd_is_r|by rewrite Haq|].
-      by apply Hpub.
-  - apply load_fold_vrOld; [apply maxcl_rdom|exact Hfv| | |].
+  - apply load_fold_vrOld'; [apply maxcl_rdom| | |].
+    + intros p Hp. destruct (Hsplit p Hp) as [H0|[Ht Hpub]].
+      * rewrite H0. apply maxcl_0, maxcl_rdom.
+      * rewrite Ht. right. by apply Hrs.
     + eapply rdom_wk; [|exact Hro]. lia.
     + rewrite /load_vpre. apply maxcl_max; [apply maxcl_rdom| |].
       * left. eapply ord_dom_wk; [|exact Hrn]. lia.
       * left. exact Hreldel.
-    + intros p Hp. right. by apply Hrs.
   - rewrite load_fold_vwOld. eapply wsrc_wk; [|exact Hwo]. lia.
   - rewrite load_fold_vRel. eapply relsrc_wk; [|exact Hrel]. lia.
 Qed.
@@ -1147,13 +1504,14 @@ Qed.
 (** *** One step of the invariant, all four label arms *)
 
 Lemma inv_step k s i :
-  cand_pub_clean c →
   cd_tr c !! k = Some s →
   (∀ a t v, reads_at E k a t v →
-     fwd_view (ews E k (es_ag s)) (lb_aq (es_lb s)) a t = t) →
+     fwd_view (ews E k (es_ag s)) (lb_aq (es_lb s)) a t = 0%nat ∨
+     (fwd_view (ews E k (es_ag s)) (lb_aq (es_lb s)) a t = t ∧
+      pub_r E (ev_at k) t)) →
   inv k i → inv (S k) i.
 Proof.
-  intros Hpc Hs Hnf Hinv.
+  intros Hs Hnf Hinv.
   destruct (decide (i = es_ag s)) as [->|Hne]; last first.
   { rewrite /inv (cand_ws_ne c k s i Hs Hne). eapply invw_wk; [|exact Hinv]. lia. }
   pose proof (Hshape k s Hs) as Hsh.
@@ -1162,7 +1520,7 @@ Proof.
                          aq rl base ts rvs wvs kc] eqn:Hl; simpl in Hsh.
   - (* load *)
     rewrite (cand_ws_load c k s aq base ts vs Hs Hl).
-    apply (inv_load_fold k s base ts vs aq (es_ag s) Hpc Hs eq_refl);
+    apply (inv_load_fold k s base ts vs aq (es_ag s) Hs eq_refl);
       [by rewrite Hl|exact Hsh|by rewrite Hl| |exact Hinv].
     intros a t v Hr. exact (Hnf a t v Hr).
   - (* store *)
@@ -1178,73 +1536,11 @@ Proof.
     destruct Hsh as (Hne0 & Hlenw & Hlenr).
     apply (inv_store_fold k s base wvs rl (es_ag s));
       [done|done|by rewrite Hl|by rewrite Hl|].
-    apply (inv_load_fold k s base ts rvs aq (es_ag s) Hpc Hs eq_refl);
+    apply (inv_load_fold k s base ts rvs aq (es_ag s) Hs eq_refl);
       [by rewrite Hl|exact Hlenr|by rewrite Hl| |exact Hinv].
     intros a t v Hr. exact (Hnf a t v Hr).
 Qed.
 
-(* ================================================================== *)
-(** * 9. No read is forwarded — the one place the truncation is needed
-
-    [pub_r_fwd_view] (slice 1) says an acquire or externally-sourced read
-    takes its own timestamp rather than a banked view; it is proved from the
-    forward-bank invariant [exec_fwd_ok], which needs [exec_wf].  At stage [n]
-    of the completeness induction that is available for the TRUNCATED
-    candidate, and the states of the two executions agree below [n]. *)
-
-Lemma ctake_wf n :
-  (n ≤ length (cd_tr c))%nat →
-  (∀ k s, (k < n)%nat → cd_tr c !! k = Some s →
-     mstep_ok (stt E k) (es_ag s) (es_lb s)) →
-  exec_wf (cand_exec (ctake c n)).
-Proof.
-  intros Hn Hok. apply (cand_reachable (ctake c n)).
-  intros k s Hs.
-  assert (Hk : (k < n)%nat).
-  { pose proof (lookup_lt_Some _ _ _ Hs) as Hlt.
-    rewrite /ctake /= length_take in Hlt. lia. }
-  rewrite (ctake_stt c n k ltac:(lia)).
-  rewrite /ctake /= (lookup_take (cd_tr c) n k Hk) in Hs.
-  by apply Hok.
-Qed.
-
-Lemma cand_nofwd n k s a t v :
-  (n ≤ length (cd_tr c))%nat →
-  (∀ k' s', (k' < n)%nat → cd_tr c !! k' = Some s' →
-     mstep_ok (stt E k') (es_ag s') (es_lb s')) →
-  cand_pub_clean c →
-  (k < n)%nat → cd_tr c !! k = Some s → reads_at E k a t v →
-  fwd_view (ews E k (es_ag s)) (lb_aq (es_lb s)) a t = t.
-Proof.
-  intros Hn Hok Hpc Hk Hs Hr.
-  pose proof (ctake_wf n Hn Hok) as Hwf.
-  rewrite -(ctake_ews c n k (es_ag s) ltac:(lia)).
-  apply (pub_r_fwd_view (cand_exec (ctake c n)) k s a t v Hwf).
-  - rewrite (ctake_tr c n k Hk) //.
-  - by apply ctake_reads_at.
-  - destruct (Hpc k s a t v Hs Hr) as [Haq|(w & Hrf & Hext)]; [by left|].
-    right. exists w.
-    (* the source's timestamp IS the timestamp read *)
-    assert (Hts : ev_ts E w = t).
-    { destruct Hrf as (_ & k0 & t0 & v0 & Hkeq & Hr0 & Hts0).
-      assert (k0 = k) as -> by (by simplify_eq).
-      destruct (reads_at_det E k a t0 v0 t v Hr0 Hr) as [-> _]. exact Hts0. }
-    assert (Htlen : (t ≤ length (cd_log c k))%nat) by (by eapply cand_read_ts_le).
-    destruct w as [|k'].
-    + split.
-      * split; [by apply ctake_wr_b_init, (proj1 Hrf)|].
-        exists k, t, v. split_and!; [done|by apply ctake_reads_at|].
-        rewrite /ev_ts. rewrite /ev_ts in Hts. lia.
-      * done.
-    + assert (Hk' : (k' < k)%nat).
-      { apply (cand_wr_lt k a k'); [exact (proj1 Hrf)|lia]. }
-      split.
-      * split; [by apply ctake_wr_b, (proj1 Hrf); lia|].
-        exists k, t, v. split_and!; [done|by apply ctake_reads_at|].
-        rewrite (ctake_ev_ts c n k' ltac:(lia)) //.
-      * destruct Hext as (s'' & Hs'' & Hne). exists s''. split; [|exact Hne].
-        rewrite cand_ex_tr in Hs''. rewrite (ctake_tr c n k' ltac:(lia)) //.
-Qed.
 
 (* ================================================================== *)
 (** * 10. THE VIEW-DOMINATION LEMMA, and the discharge of [readable]
@@ -1256,12 +1552,9 @@ Qed.
 
 Lemma inv_upto n :
   (n ≤ length (cd_tr c))%nat →
-  cand_pub_clean c →
-  (∀ k s, (k < n)%nat → cd_tr c !! k = Some s →
-     mstep_ok (stt E k) (es_ag s) (es_lb s)) →
   ∀ k i, (k ≤ n)%nat → inv k i.
 Proof.
-  intros Hn Hpc Hok k. induction k as [|k IH]; intros i Hk.
+  intros Hn k. induction k as [|k IH]; intros i Hk.
   - rewrite /inv /invw (cand_ws_init c i). split_and!.
     + intros a. rewrite coh_init. apply frdom_b_0.
     + by left.
@@ -1269,8 +1562,8 @@ Proof.
     + by left.
     + by left.
   - destruct (lookup_lt_is_Some_2 (cd_tr c) k ltac:(lia)) as [s Hs].
-    eapply (inv_step k s i Hpc Hs); [|apply IH; lia].
-    intros a t v Hr. eapply (cand_nofwd n k s a t v Hn Hok Hpc); [lia|done|done].
+    eapply (inv_step k s i Hs); [|apply IH; lia].
+    intros a t v Hr. exact (cand_read_split k s a t v ltac:(lia) Hs Hr).
 Qed.
 
 (** The read at step [n] is admissible: a write inside [readable]'s forbidden
@@ -1278,7 +1571,6 @@ Qed.
     the floor — which is exactly what the invariant forbids. *)
 Lemma cand_rd_ok n s base ts vs :
   (n ≤ length (cd_tr c))%nat →
-  cand_pub_clean c →
   (∀ k s', (k < n)%nat → cd_tr c !! k = Some s' →
      mstep_ok (stt E k) (es_ag s') (es_lb s')) →
   cd_tr c !! n = Some s → lb_rd (es_lb s) = Some (base, ts, vs) →
@@ -1286,13 +1578,13 @@ Lemma cand_rd_ok n s base ts vs :
   rd_ok (ms_img (stt E n)) (ms_log (stt E n)) (ms_ws (stt E n) (es_ag s))
         (lb_aq (es_lb s)) base ts vs.
 Proof.
-  intros Hn Hpc Hok Hs Hrd Hlen.
+  intros Hn Hok Hs Hrd Hlen.
   pose proof (lookup_lt_Some _ _ _ Hs) as Hnlt.
   assert (Himg : ms_img (stt E n) = cd_img c) by (by apply (cand_eimg c n)).
   assert (Hlog : ms_log (stt E n) = cd_log c n) by (by apply (cand_elog c n)).
   pose proof (cand_bounded_upto c n ltac:(lia) Hok) as Hb.
   pose proof (Hb (es_ag s)) as Hbnd. rewrite Hlog in Hbnd.
-  pose proof (inv_upto n ltac:(lia) Hpc Hok n (es_ag s) ltac:(lia)) as Hinv.
+  pose proof (inv_upto n ltac:(lia) n (es_ag s) ltac:(lia)) as Hinv.
   rewrite /inv /invw /ews in Hinv.
   destruct Hinv as (Hc & Hrn & _ & _ & Hrel).
   split; [exact Hlen|]. intros j t v Hj Hv.
@@ -1380,15 +1672,14 @@ Qed.
 
 Lemma cand_mstep_ok_at n s :
   (n ≤ length (cd_tr c))%nat →
-  cand_pub_clean c →
   (∀ k s', (k < n)%nat → cd_tr c !! k = Some s' →
      mstep_ok (stt E k) (es_ag s') (es_lb s')) →
   cd_tr c !! n = Some s → mstep_ok (stt E n) (es_ag s) (es_lb s).
 Proof.
-  intros Hn Hpc Hok Hs. pose proof (Hshape n s Hs) as Hsh.
+  intros Hn Hok Hs. pose proof (Hshape n s Hs) as Hsh.
   destruct (es_lb s) as [aq base ts vs|rl base vs kc|pr pw sr sw|
                          aq rl base ts rvs wvs kc] eqn:Hl; simpl in Hsh |- *.
-  - pose proof (cand_rd_ok n s base ts vs Hn Hpc Hok Hs
+  - pose proof (cand_rd_ok n s base ts vs Hn Hok Hs
                   ltac:(by rewrite Hl) Hsh) as HH.
     rewrite Hl /= in HH. exact HH.
   - exact Hsh.
@@ -1396,7 +1687,7 @@ Proof.
   - destruct Hsh as (Hne0 & Hlenw & Hlenr). split_and!.
     + exact Hne0.
     + exact Hlenw.
-    + pose proof (cand_rd_ok n s base ts rvs Hn Hpc Hok Hs
+    + pose proof (cand_rd_ok n s base ts rvs Hn Hok Hs
                     ltac:(by rewrite Hl) Hlenr) as HH.
       rewrite Hl /= in HH. exact HH.
     + eapply (cand_rmw_latest n s base ts rvs Hn Hok Hs);
@@ -1404,15 +1695,14 @@ Proof.
 Qed.
 
 Lemma cand_mstep_ok :
-  cand_pub_clean c →
   ∀ n k s, (k < n)%nat → cd_tr c !! k = Some s →
     mstep_ok (stt E k) (es_ag s) (es_lb s).
 Proof.
-  intros Hpc n. induction n as [|n IH]; intros k s Hk Hs; [lia|].
+  intros n. induction n as [|n IH]; intros k s Hk Hs; [lia|].
   destruct (decide (k < n)%nat) as [Hlt|Hge]; [by eapply IH|].
   assert (k = n) as -> by lia.
   pose proof (lookup_lt_Some _ _ _ Hs) as Hnlt.
-  eapply (cand_mstep_ok_at n s ltac:(lia) Hpc); [|exact Hs].
+  eapply (cand_mstep_ok_at n s ltac:(lia)); [|exact Hs].
   intros k' s' Hk' Hs'. by eapply IH.
 Qed.
 
@@ -1420,11 +1710,10 @@ Qed.
 (** ** THE THEOREM (for this section's hypotheses) *)
 
 Theorem complete_clean :
-  cand_pub_clean c →
   exec_wf E ∧ ex_tr E = cd_tr c ∧ ex_img E = cd_img c.
 Proof.
-  intros Hpc. apply cand_reachable. intros k s Hs.
-  eapply (cand_mstep_ok Hpc (S k) k s ltac:(lia) Hs).
+  apply cand_reachable. intros k s Hs.
+  eapply (cand_mstep_ok (S k) k s ltac:(lia) Hs).
 Qed.
 
 End candidate.
@@ -1440,18 +1729,20 @@ Definition cand_axiomatic_ok (c : cand) : Prop :=
   axiomatic_ok (cand_exec c) ∧ ax_rel_ord (cand_exec c) ∧
   (∀ o, ¬ tc (ob_op (cand_exec c)) o o).
 
-(** THE COMPLETENESS THEOREM OF THIS SLICE.  §9(1)'s
-    [promise_free_complete] with the ONE premise §15(1) still forces. *)
+(** THE COMPLETENESS THEOREM OF THIS SLICE — §9(1)'s
+    [promise_free_complete], PREMISE-FREE: every candidate whose steps have
+    the right shape, whose read values agree with its own log, and which
+    satisfies the axioms is machine-reachable.  (The name still says "clean";
+    the publication-cleanliness side condition it used to carry is gone.) *)
 Theorem promise_free_complete_clean c :
   cand_shape c → cand_values c →
-  cand_pub_clean c →
   cand_axiomatic_ok c →
   exec_wf (cand_exec c) ∧
   ex_tr (cand_exec c) = cd_tr c ∧ ex_img (cand_exec c) = cd_img c.
 Proof.
-  intros Hsh Hval Hpc
+  intros Hsh Hval
     ((Hrft & _ & _ & Hcohax & Hatom & Hordax & _ & _) & Hrelax & _).
-  exact (complete_clean c Hval Hrft Hcohax Hordax Hrelax Hsh Hatom Hpc).
+  exact (complete_clean c Hval Hrft Hcohax Hordax Hrelax Hsh Hatom).
 Qed.
 
 (** ... and the same theorem with the hypothesis pared down to what the proof
@@ -1466,14 +1757,13 @@ Qed.
     [ord] edge from the original publication, which is all [ax_ord] needs. *)
 Theorem promise_free_complete_local c :
   cand_shape c → cand_values c →
-  cand_pub_clean c →
   ax_rf_total (cand_exec c) → ax_coherence (cand_exec c) →
   ax_ord (cand_exec c) → ax_rel_ord (cand_exec c) → ax_atomicity (cand_exec c) →
   exec_wf (cand_exec c) ∧
   ex_tr (cand_exec c) = cd_tr c ∧ ex_img (cand_exec c) = cd_img c.
 Proof.
-  intros Hsh Hval Hpc Hrft Hcohax Hordax Hrelax Hatom.
-  exact (complete_clean c Hval Hrft Hcohax Hordax Hrelax Hsh Hatom Hpc).
+  intros Hsh Hval Hrft Hcohax Hordax Hrelax Hatom.
+  exact (complete_clean c Hval Hrft Hcohax Hordax Hrelax Hsh Hatom).
 Qed.
 
 (* ================================================================== *)
@@ -1565,21 +1855,32 @@ Proof.
 Qed.
 
 (** Two acyclicity lemmas for the SIMPLE shape the counterexamples have: no
-    same-byte program order, no event that both reads and writes a byte, and
-    (for [ob]) no [ppo_op] edge at all.  Then the naive "a read sits at the
-    timestamp it read" placement already embeds every edge, so both
-    acyclicity obligations reduce to arithmetic. *)
+    event that both reads and writes a byte, same-byte program order that does
+    not LOWER the byte's timestamp, and (for [ob]) no [ppo_op] edge at all.
+    Then the naive "a read sits at the timestamp it read" placement already
+    embeds every edge, so both acyclicity obligations reduce to arithmetic.
+
+    The [po_loc] hypothesis is the [ets]-monotonicity that [coh_rel_lexlt]
+    gets from [exec_wf]; a candidate with no same-byte program order at all
+    discharges it by absurdity, and one whose only same-byte pair is
+    [ets]-FLAT (a store forwarding to its own po-later load, §13b) discharges
+    it by [reflexivity]. *)
 
 Lemma coh_rel_acyc_simple c a :
   cand_values c →
-  (∀ e1 e2, ¬ po_loc_b (cand_exec c) a e1 e2) →
+  (∀ e1 e2, po_loc_b (cand_exec c) a e1 e2 →
+     (ets (cand_exec c) a e1 ≤ ets (cand_exec c) a e2)%nat) →
   (∀ e, wr_b (cand_exec c) a e → ¬ rd_b (cand_exec c) a e) →
   ∀ e, ¬ tc (coh_rel (cand_exec c) a) e e.
 Proof.
   intros Hval Hnpl Hnrw.
   apply (tc_lexlt _ (λ e, (ets (cand_exec c) a e, ev_ix e))).
   intros x y [Hpl|[Hrf|[Hco|Hfr]]].
-  - by destruct (Hnpl x y Hpl).
+  - pose proof (Hnpl x y Hpl) as Hle.
+    pose proof (po_ix (cand_exec c) x y (proj1 Hpl)).
+    rewrite /lexlt /=.
+    destruct (decide (ets (cand_exec c) a x = ets (cand_exec c) a y));
+      [right; split; [done|lia]|left; lia].
   - pose proof Hrf as (Hw & k & t & v & Hkeq & Hr & Hts).
     assert (Hnw : ¬ wr_b (cand_exec c) a y).
     { rewrite Hkeq. intros Hwx. apply (Hnrw _ Hwx). by exists k, t, v. }
@@ -1685,14 +1986,6 @@ Proof.
   rewrite /ce_rl /ce_rl_tr /= in Hs.
   destruct k as [|[|[|k]]]; simplify_eq/=; try done.
   by destruct j as [|j]; simplify_eq/=.
-Qed.
-
-Lemma ce_rl_pub_clean : cand_pub_clean ce_rl.
-Proof.
-  intros k s a t v' Hs Hr.
-  destruct Hr as (s' & base & ts & vs & j & Hs' & Hrd & Hj & Hv & Ha).
-  rewrite /ce_rl /ce_rl_tr /= in Hs, Hs'.
-  destruct k as [|[|[|k]]]; simplify_eq/=; try done. by left.
 Qed.
 
 End ce_rl.
@@ -1862,7 +2155,8 @@ Qed.
 Lemma ce_rl_ax_coherence : ax_coherence (cand_exec (ce_rl rl v)).
 Proof.
   intros a e. apply (coh_rel_acyc_simple (ce_rl rl v) a (ce_rl_values rl v));
-    [apply ce_rl_no_poloc|apply ce_rl_no_rw].
+    [intros e1 e2 Hpl; by destruct (ce_rl_no_poloc rl v a e1 e2 Hpl)
+    |apply ce_rl_no_rw].
 Qed.
 
 Lemma ce_rl_ax_atomicity : ax_atomicity (cand_exec (ce_rl rl v)).
@@ -1993,7 +2287,6 @@ Proof.
   - eapply promise_free_complete_clean.
     + apply ce_rl_shape.
     + apply ce_rl_values.
-    + apply ce_rl_pub_clean.
     + by apply ce_rl_axiomatic_ok.
   - intros Hlat.
     destruct (Hlat 2%nat (EStep 0 (LLoad true 0 [0]%nat [v])) 0 [0]%nat [v]
@@ -2002,6 +2295,227 @@ Proof.
     exists 1%nat. split_and!; [lia|lia|]. eexists. split; [done|].
     rewrite /msg_byte /=. by eexists.
 Qed.
+
+(* ================================================================== *)
+(** * 13b. THE FORWARDED-READ WITNESS: the deleted premise's case, inhabited
+
+    Two steps, one byte, one agent:
+
+      ts 1 : agent 0 stores byte 0
+      then : agent 0 PLAIN-loads byte 0 and reads timestamp 1
+
+    The load's rf source is the agent's OWN po-earlier store, and the load is
+    not [.aq] — exactly the shape the old [cand_pub_clean] premise excluded
+    ([ce_fwd_not_pub_clean]).  It is machine-reachable by §11's theorem
+    ([ce_fwd_reachable]), so deleting the premise really did widen the
+    theorem rather than merely restate it.
+
+    WHY IT IS REACHABLE, on the machine: [store_post] banks [(1, 0)] at byte
+    0, so the load forwards and contributes [Nat.max vpre 0 = vpre] — no view
+    moves, nothing to justify.  (This trace has no fence, so it was reachable
+    before D-7 too; what D-7 bought is that the SAME contribution is [0] even
+    when the agent's fence floor is high, which is what makes §8's argument
+    work for every forwarded read rather than for fence-free ones —
+    §15(1)'s witness is the trace that separates the two.)
+
+    The axiomatic side needs only the five LOCAL axioms
+    ([promise_free_complete_local]): there are no fences, no acquires and no
+    releases, so [ord_pw] / [ord_pr] / [rel_ord] are all empty; the one
+    same-byte program-order pair is [ets]-FLAT (store and load both sit at
+    timestamp 1), which is what [coh_rel_acyc_simple]'s [po_loc] hypothesis
+    asks for. *)
+
+Section ce_fwd.
+Context (v : bv 8).
+
+Definition ce_fwd_tr : list estep :=
+  [EStep 0 (LStore false 0 [v] WCplain);
+   EStep 0 (LLoad false 0 [1]%nat [v])].
+
+Definition ce_fwd : cand := Cand (λ _, Some v) ce_fwd_tr.
+
+Local Notation Ef := (cand_exec ce_fwd).
+
+Lemma ce_fwd_tr_inv k s :
+  cd_tr ce_fwd !! k = Some s →
+  (k = 0%nat ∧ s = EStep 0 (LStore false 0 [v] WCplain)) ∨
+  (k = 1%nat ∧ s = EStep 0 (LLoad false 0 [1]%nat [v])).
+Proof.
+  intros Hs. rewrite /ce_fwd /ce_fwd_tr /= in Hs.
+  destruct k as [|[|k]]; simplify_eq/=; auto.
+Qed.
+
+Lemma ce_fwd_shape : cand_shape ce_fwd.
+Proof.
+  intros k s Hs. by destruct (ce_fwd_tr_inv k s Hs) as [[-> ->]|[-> ->]].
+Qed.
+
+Lemma ce_fwd_values : cand_values ce_fwd.
+Proof.
+  intros k s base ts vs Hs Hrd j t v' Hj Hv'.
+  destruct (ce_fwd_tr_inv k s Hs) as [[-> ->]|[-> ->]]; [done|].
+  rewrite /= in Hrd. simplify_eq.
+  destruct j as [|j]; simplify_eq/=.
+  by rewrite /cd_log /ce_fwd /ce_fwd_tr /acc_addr /msg_byte /=.
+Qed.
+
+Lemma ce_fwd_ts0 : ev_ts Ef (ev_at 0%nat) = 1%nat.
+Proof.
+  rewrite (cand_ev_ts ce_fwd 0%nat ltac:(simpl; lia))
+          /cd_log /ce_fwd /ce_fwd_tr //.
+Qed.
+
+Lemma ce_fwd_wr0 : wr_b Ef 0 (ev_at 0%nat).
+Proof.
+  apply (cand_wr_b ce_fwd 0%nat (EStep 0 (LStore false 0 [v] WCplain))
+           (WMsg 0 [v] (Some 0%nat) WCplain) 0 eq_refl eq_refl).
+  rewrite /msg_byte /=. by eexists.
+Qed.
+
+Lemma ce_fwd_rd1 : reads_at Ef 1%nat 0 1%nat v.
+Proof.
+  exists (EStep 0 (LLoad false 0 [1]%nat [v])), 0, [1]%nat, [v], 0%nat.
+  split_and!; [done|done|done|done|rewrite /acc_addr; lia].
+Qed.
+
+(** Only the store (and the era-initial image) writes, only the load reads. *)
+Lemma ce_fwd_wr_inv a e :
+  wr_b Ef a e → e = ev_init ∨ (e = ev_at 0%nat ∧ a = 0).
+Proof.
+  intros Hw. destruct (cand_wr_b_inv ce_fwd a e Hw)
+    as [[-> _]|(k & s & m & -> & Hs & Hm & Hb)]; [by left|].
+  destruct (ce_fwd_tr_inv k s Hs) as [[-> ->]|[-> ->]]; [|done].
+  right. rewrite /es_wmsg /= in Hm. simplify_eq. split; [done|].
+  rewrite /msg_byte /= in Hb. case_bool_decide as Hle; [|by destruct Hb].
+  destruct Hb as [w Hw']. destruct (Z.to_nat (a - 0)) as [|n] eqn:Hn;
+    [lia|by simplify_eq/=].
+Qed.
+
+Lemma ce_fwd_not_wr1 a : ¬ wr_b Ef a (ev_at 1%nat).
+Proof.
+  intros Hw. by destruct (ce_fwd_wr_inv a (ev_at 1%nat) Hw) as [Habs|[Habs _]].
+Qed.
+
+Lemma ce_fwd_rd_inv a e : rd_b Ef a e → e = ev_at 1%nat ∧ a = 0.
+Proof.
+  intros (k & t & v' & -> & (s & base & ts & vs & j & Hs & Hrd & Hj & Hv & Ha)).
+  rewrite cand_ex_tr in Hs.
+  destruct (ce_fwd_tr_inv k s Hs) as [[-> ->]|[-> ->]]; rewrite /= in Hrd;
+    simplify_eq.
+  destruct j as [|j]; simplify_eq/=.
+  split; [done|rewrite /acc_addr; lia].
+Qed.
+
+Lemma ce_fwd_no_rw a e : wr_b Ef a e → ¬ rd_b Ef a e.
+Proof.
+  intros Hw Hr. destruct (ce_fwd_rd_inv a e Hr) as [-> _].
+  by apply (ce_fwd_not_wr1 a).
+Qed.
+
+(** The one same-byte program-order pair is [ets]-flat: the store sits at its
+    own timestamp 1, and the load READ timestamp 1. *)
+Lemma ce_fwd_poloc_ets a e1 e2 :
+  po_loc_b Ef a e1 e2 → (ets Ef a e1 ≤ ets Ef a e2)%nat.
+Proof.
+  intros (Hpo & Hacc1 & Hacc2).
+  destruct Hpo as (k1 & k2 & s1 & s2 & -> & -> & Hlt & Hs1 & Hs2 & Hag).
+  rewrite cand_ex_tr in Hs1. rewrite cand_ex_tr in Hs2.
+  destruct (ce_fwd_tr_inv k1 s1 Hs1) as [[-> ->]|[-> ->]];
+    destruct (ce_fwd_tr_inv k2 s2 Hs2) as [[-> ->]|[-> ->]]; try lia.
+  assert (a = 0) as ->.
+  { destruct Hacc1 as [Hw|Hr];
+      [by destruct (ce_fwd_wr_inv a (ev_at 0%nat) Hw) as [Habs|[_ ->]]
+      |by destruct (ce_fwd_rd_inv a (ev_at 0%nat) Hr) as [Habs _]]. }
+  rewrite (ets_wr Ef 0 (ev_at 0%nat) ce_fwd_wr0) ce_fwd_ts0.
+  rewrite (ets_rd Ef 0 1%nat 1%nat v (ce_fwd_not_wr1 0) ce_fwd_rd1).
+  lia.
+Qed.
+
+(** No fence, no acquire, no release: the three ordering relations are empty. *)
+Lemma ce_fwd_no_ord e1 e2 :
+  ¬ ord_pw Ef e1 e2 ∧ ¬ ord_pr Ef e1 e2 ∧ ¬ rel_ord Ef e1 e2.
+Proof.
+  assert (Hnf : ∀ k1 k2 pr pw sr sw, ¬ fence_between Ef k1 k2 pr pw sr sw).
+  { intros k1 k2 pr pw sr sw (kf & sf & ? & ? & ? & ? & ? & Hsf & ? & ? & ? & Hlf).
+    rewrite cand_ex_tr in Hsf.
+    destruct (ce_fwd_tr_inv kf sf Hsf) as [[_ ->]|[_ ->]]; by rewrite /= in Hlf. }
+  assert (Hnaq : ∀ e e', ¬ acq_po Ef e e').
+  { intros e e' (k1 & k2 & s1 & s2 & -> & -> & Hlt & Hs1 & Hs2 & Hag & Hisr & Haq).
+    rewrite cand_ex_tr in Hs1.
+    destruct (ce_fwd_tr_inv k1 s1 Hs1) as [[-> ->]|[-> ->]];
+      by rewrite /= in Haq. }
+  assert (Hnra : ∀ e e', ¬ rel_acq_po Ef e e').
+  { intros e e' (k1 & k2 & s1 & s2 & -> & -> & Hlt & Hs1 & Hs2 & Hag & _ & Hrl & _).
+    rewrite cand_ex_tr in Hs1.
+    destruct (ce_fwd_tr_inv k1 s1 Hs1) as [[-> ->]|[-> ->]];
+      by rewrite /= in Hrl. }
+  split_and!.
+  - intros (k1 & k2 & pr & sw & _ & _ & Hfb). by eapply Hnf.
+  - intros [(k1 & k2 & pw & sw & _ & _ & Hfb)|Hacq]; [by eapply Hnf|].
+    by eapply Hnaq.
+  - intros [H|(em & H & _ & _)]; by eapply Hnra.
+Qed.
+
+Lemma ce_fwd_ax_ord : ax_ord Ef.
+Proof.
+  intros e1 k2 s2 a w t Hs2 Hcase Hfr.
+  destruct (ce_fwd_no_ord e1 (ev_at k2)) as (Hpw & Hpr & _).
+  by destruct Hcase as [[Hord _]|[Hord _]].
+Qed.
+
+Lemma ce_fwd_ax_rel_ord : ax_rel_ord Ef.
+Proof.
+  intros e1 k2 s2 a w t Hs2 Hro _ _.
+  by destruct (ce_fwd_no_ord e1 (ev_at k2)) as (_ & _ & Hnr).
+Qed.
+
+Lemma ce_fwd_ax_atomicity : ax_atomicity Ef.
+Proof.
+  intros kr a w0 w HW Hrf0 _ _.
+  destruct Hrf0 as (_ & k & t & v' & Hkeq & Hr & _).
+  assert (k = kr) as -> by (by simplify_eq).
+  destruct (ce_fwd_rd_inv a (ev_at kr) ltac:(by exists kr, t, v')) as [Heq _].
+  assert (kr = 1%nat) as -> by (by simplify_eq).
+  destruct HW as (s & Hs & Hisw). rewrite cand_ex_tr in Hs.
+  by destruct (ce_fwd_tr_inv 1%nat s Hs) as [[Habs _]|[_ ->]].
+Qed.
+
+(** THE TWO HALVES.  The candidate fails the old premise ... *)
+Theorem ce_fwd_not_pub_clean :
+  ¬ (∀ k s a t v', cd_tr ce_fwd !! k = Some s → reads_at Ef k a t v' →
+       lb_aq (es_lb s) = true ∨
+       ∃ w, rf_b Ef a w (ev_at k) ∧ ext_w Ef w (es_ag s)).
+Proof.
+  intros Hpc.
+  destruct (Hpc 1%nat (EStep 0 (LLoad false 0 [1]%nat [v])) 0 1%nat v
+              eq_refl ce_fwd_rd1) as [Habs|(w & Hrf & Hext)]; [done|].
+  (* the only write at timestamp 1 is agent 0's own store *)
+  assert (Hts : ev_ts Ef w = 1%nat).
+  { destruct Hrf as (_ & k & t & v' & Hkeq & Hr & Hts).
+    assert (k = 1%nat) as -> by (by simplify_eq).
+    destruct (reads_at_det Ef 1%nat 0 t v' 1%nat v Hr ce_fwd_rd1) as [-> _].
+    exact Hts. }
+  assert (w = ev_at 0%nat) as ->.
+  { apply (cand_ts_inj ce_fwd (0, w) (0, ev_at 0%nat) (proj1 Hrf) ce_fwd_wr0).
+    change (ev_ts Ef w = ev_ts Ef (ev_at 0%nat)).
+    by rewrite Hts ce_fwd_ts0. }
+  destruct Hext as (s'' & Hs'' & Hne). rewrite cand_ex_tr in Hs''.
+  by destruct (ce_fwd_tr_inv 0%nat s'' Hs'') as [[_ ->]|[Habs _]].
+Qed.
+
+(** ... and is machine-reachable all the same. *)
+Theorem ce_fwd_reachable : exec_wf Ef ∧ ex_tr Ef = cd_tr ce_fwd.
+Proof.
+  destruct (promise_free_complete_local ce_fwd ce_fwd_shape ce_fwd_values
+              (cand_rf_total ce_fwd ce_fwd_values)
+              ltac:(intros a e; apply (coh_rel_acyc_simple ce_fwd a ce_fwd_values);
+                      [apply ce_fwd_poloc_ets|apply ce_fwd_no_rw])
+              ce_fwd_ax_ord ce_fwd_ax_rel_ord ce_fwd_ax_atomicity)
+    as (Hwf & Htr & _).
+  by split.
+Qed.
+
+End ce_fwd.
 
 (* ================================================================== *)
 (** * 14. THE NAMED TOP LEVEL: sRVWMO
@@ -2042,11 +2556,19 @@ Qed.
                                        the site is unreachable.  IF D-8 IS
                                        EVER DROPPED, RULE 9's LOAD HALF COMES
                                        STRAIGHT BACK INTO THE DEFINITION.
-      12   forwarding pipeline         OMITTED via the [dep_dom] domination
-                                       argument (every dependency view is
-                                       dominated by [w_vrOld] at every
-                                       pf-reachable state), which must LAND
-                                       separately
+      12   forwarding pipeline         OMITTED, and CONSUMED INSIDE THE
+                                       THEOREM: the forwarded read is a case
+                                       of the completeness induction
+                                       ([cand_read_split]), not a deferred
+                                       obligation.  Post-D-7 the bank holds
+                                       PARM's dependency-free view [0], so a
+                                       forwarded byte contributes NOTHING and
+                                       needs no ppo edge to justify; the
+                                       [dep_dom] domination argument is what
+                                       the D2 dependency track will need for
+                                       the register views rule 12 will then
+                                       bank, not something this theorem waits
+                                       on
 >>
 
     Exclusive pairs stay FUSED in this presentation: the projection re-fuses a
@@ -2056,19 +2578,16 @@ Qed.
 Definition srvwmo_consistent (c : cand) : Prop :=
   cand_shape c ∧ cand_values c ∧ cand_axiomatic_ok c.
 
-(** T1 FOR THIS FRAGMENT: an sRVWMO-consistent candidate is realized by the
-    promise-free machine, with the same trace and the same image.  The single
-    remaining premise is [cand_pub_clean]; deleting it is task A3(ii) (re-prove
-    §8's [w_vrOld]/[w_vrNew] conjuncts for a FORWARDED read, whose
-    contribution post-D-7 is the pre-view rather than its timestamp, plus the
-    ~150-line generalisation §15(1) prices). *)
+(** T1 FOR THIS FRAGMENT, IN FINAL FORM: an sRVWMO-consistent candidate is
+    realized by the promise-free machine, with the same trace and the same
+    image.  NO SIDE CONDITION — [srvwmo_consistent] is the whole hypothesis,
+    and it is checkable candidate data. *)
 Theorem srvwmo_realizable c :
   srvwmo_consistent c →
-  cand_pub_clean c →            (* A3(ii) deletes this *)
   exec_wf (cand_exec c) ∧
   ex_tr (cand_exec c) = cd_tr c ∧ ex_img (cand_exec c) = cd_img c.
 Proof.
-  intros (Hsh & Hval & Hax) Hpc. by apply promise_free_complete_clean.
+  intros (Hsh & Hval & Hax). by apply promise_free_complete_clean.
 Qed.
 
 (* ================================================================== *)
@@ -2077,14 +2596,19 @@ Qed.
     As in slices 1 and 2, everything that does not close is a comment, not an
     [Axiom]: [Print Assumptions] on [srvwmo_realizable],
     [promise_free_complete_clean], [promise_free_complete_local],
-    [ce_rl_true_inconsistent] and [ce_rl_stale_reachable] all report "Closed
-    under the global context".
+    [ce_rl_true_inconsistent], [ce_rl_stale_reachable], [ce_fwd_reachable] and
+    [ce_fwd_not_pub_clean] all report "Closed under the global context".
 
     ------------------------------------------------------------------
-    (1) COUNTEREXAMPLE (b) — THE FORWARD-BANK LEAK — is ARGUED HERE AND NOT
-    MACHINE-CHECKED.  It is what forces the one surviving premise,
-    [cand_pub_clean], and it is a genuinely different leak from §13's: it
-    survives a release-free trace.  The witness, in this file's vocabulary:
+    (1) THE PRE-D-7 FORWARD-BANK LEAK IS ARGUED HERE AND NOT MACHINE-CHECKED.
+    What IS machine-checked is that the leak is gone: §13b's two-step
+    [ce_fwd] — a plain load of the agent's own po-earlier store — fails the
+    old [cand_pub_clean] side condition ([ce_fwd_not_pub_clean]) and is
+    reachable anyway ([ce_fwd_reachable]).  The seven-step witness below is
+    the SMALLEST trace that separated the two sides BEFORE D-7, and it is
+    kept because it is what fixes the bank's contents as a design decision
+    rather than a convenience; nothing in the file depends on it.  In this
+    file's vocabulary:
 
 <<
       Definition ce_fwd_tr : list estep :=
@@ -2106,13 +2630,12 @@ Qed.
     the [pr,sr] fence lifts that to [w_vrNew = 2]; step 6's floor is therefore
     2 and timestamp 1 writes byte 0 inside (0,2] — [readable] fails.
 
-    THIS WITNESS IS DEAD AS OF D-7 (2026-08-17).  [store_post] banks [(3, 0)],
+    THE WITNESS IS DEAD AS OF D-7 (2026-08-17).  [store_post] banks [(3, 0)],
     not [(3, 2)]: step 4's [fwd_view] returns 0, [w_vrOld] stays 0, the
     [pr,sr] fence lifts nothing, and step 6's floor is 0 — the machine ALLOWS
-    the trace, matching the axiomatic side computed just below.  So there is
-    no known counterexample forcing [cand_pub_clean] any more; it survives as
-    a premise the PROOF uses, not one the STATEMENT needs.  See the header's
-    (b') for what removing it would cost.
+    the trace, matching the axiomatic side computed just below.  That is
+    exactly the machine fact §8 turns into a theorem, and with it there is no
+    forwarding side condition left to state.
 
     AXIOMATIC SIDE (why no axiom catches it):
     - [ord_pw] needs a fence with [pw ∧ sr]: step 2 has [sr = false], step 5
@@ -2130,20 +2653,23 @@ Qed.
     - [ax_atomicity] is vacuous (no RMW); the [rf] axioms, [ax_no_thin_air]
       and [ax_po_ww_gmo] are free by §12.
 
-    WHAT A MECHANISATION WOULD COST, and why it was not done here: §13's
-    acyclicity shortcuts do NOT apply — [ppo_op] is non-empty for this witness
-    (the po-into-a-write arm fires, and there is a [po_loc] pair), so
-    [ob_op_acyc_simple] and [coh_rel_acyc_simple] must be generalised to
-    "every [ppo_op] edge is [po] into a write, or [po_loc] with equal [ets]"
-    before they can discharge it.  That generalisation is the honest ~150-line
-    residue of this file; the machine side and the [ord]-emptiness side are
-    each a ten-line computation of the shape already landed in §13.
+    WHAT MECHANISING THIS PARTICULAR TRACE WOULD COST, and why §13b's
+    two-step candidate is used for non-vacuity instead: [ppo_op] is non-empty
+    for the seven-step witness (the po-into-a-write arm fires), so
+    [ob_op_acyc_simple] would have to be generalised to "every [ppo_op] edge
+    is [po] into a write, or [po_loc] with equal [ets]" before it could
+    discharge [cand_axiomatic_ok]'s [ob] conjunct — the ~150 lines this note
+    has always priced.  §13b avoids all of it: [promise_free_complete_local]
+    needs only the five LOCAL axioms, and the only generalisation it wanted
+    was [coh_rel_acyc_simple]'s [po_loc] hypothesis, weakened from "no
+    same-byte program order" to "same-byte program order does not lower
+    [ets]" (five lines).
 
     ------------------------------------------------------------------
-    (2) WHY ONE PREMISE REMAINS, AND WHERE THE OTHER WENT.  A premise here
-    marks a place where THE MACHINE IS STRONGER THAN THE MODELLED [ppo] — the
-    polarity that is free for soundness and fatal for completeness.  Both
-    original leaks are now closed AT THE SOURCE rather than by a premise:
+    (2) WHY NO PREMISE REMAINS.  A premise here would mark a place where THE
+    MACHINE IS STRONGER THAN THE MODELLED [ppo] — the polarity that is free
+    for soundness and fatal for completeness.  Both original leaks are closed
+    AT THE SOURCE:
 
     - the RELEASE/ACQUIRE leak, by STRENGTHENING THE MODEL: [ppo_op] carries
       RVWMO ppo rule 7 ([rel_acq_po]) and [cand_axiomatic_ok] carries the
@@ -2153,14 +2679,9 @@ Qed.
     - the FORWARD-BANK leak, by WEAKENING THE MACHINE: D-7 (2026-08-17) makes
       [store_post] bank [0] instead of [w_vwNew], for the independent reason
       that the old fence floor was a behaviour-REDUCING deviation from RVWMO
-      ppo 12.  The witness in (1) no longer blocks.
-
-    [cand_pub_clean] therefore survives as a PROOF-side premise only: §8's
-    [w_vrOld]/[w_vrNew] conjuncts are still stated for a read whose
-    contribution IS its timestamp, and a forwarded read now contributes the
-    pre-view instead.  Re-proving those two conjuncts is the whole cost of
-    deleting it (task A3(ii)), together with (1)'s generalisation if the
-    witness is to be mechanised rather than argued.
+      ppo 12.  §8 cashes that in — [cand_bankdom] plus [ax_coherence] make an
+      internally-sourced read necessarily forwarded, hence contributing [0] —
+      and [cand_pub_clean] is gone with it.
 
     ------------------------------------------------------------------
     (3) OWED LIFTS (for W4's batch), all proved here against [.vo]s this slice
@@ -2170,8 +2691,14 @@ Qed.
     five "this step does not touch that component" equalities) belong in
     [WeakMem.v] next to [ws_bounded]'s preservation lemmas — they are the
     missing THIRD kind of step-function fact (monotone / bounded / DOMINATED).
-    §5's own [store_fold_vRel] — the release channel's bound, proved here for
-    the same reason — belongs there too, next to [store_fold_vRel_norl].
+    §5's own [store_fold_vRel] — the release channel's bound — belongs there
+    too, next to [store_fold_vRel_norl], and so do §5's other four locals:
+    the FORWARDING-TOLERANT [load_fold_coh'] / [load_fold_vrOld'] /
+    [load_fold_vrNew'] (which SUBSUME [WeakMem]'s three unprimed copies — the
+    lift should replace them, not add to them), the bank facts
+    [store_fold_fwd_in] / [store_fold_fwd_out] / [store_run_fwd_in] /
+    [store_run_fwd_out] (next to [store_post_run_fwd_inv], which they
+    strengthen), and [fwd_view_cases].
     §1–§3's candidate-level log calculus ([tr_msgs_app], [cd_log_S],
     [cd_log_split], [cand_ev_ts], [cand_ts_writer], [cand_ts_inj],
     [cand_wr_b] / [cand_wr_b_inv]) belongs in [WeakAxiomatic2.v] next to
