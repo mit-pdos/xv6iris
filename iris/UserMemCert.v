@@ -579,7 +579,7 @@ Proof.
   assert (Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
             (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n rs') 0)) 4)
             (uint pa) (uint (to_bits 64 k)) = PMP_Match)
-    by exact (ram_fetch_pmp pa _ k (Z.to_nat k - 1) Hk Hk8 Huintk
+    by exact (ram_fetch_pmp pa _ k (Z.to_nat k - 1) Hk ltac:(lia) Huintk
                 ltac:(clear -Hk; lia) Hram0 Hramk Hcovp).
   assert (Halign : is_aligned_paddr (Physaddr pa) k = true)
     by exact (pa_aligned_div _ va k Hk Hkdvd Hal).
@@ -1902,7 +1902,7 @@ Proof.
   assert (Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
             (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n rs') 0)) 4)
             (uint pa) (uint (to_bits 64 k)) = PMP_Match)
-    by exact (ram_fetch_pmp pa _ k (Z.to_nat k - 1) Hk Hk8 Huintk
+    by exact (ram_fetch_pmp pa _ k (Z.to_nat k - 1) Hk ltac:(lia) Huintk
                 ltac:(clear -Hk; lia) Hram0 Hramk Hcovp).
   assert (Hpmpe : exec (pmpCheck (Physaddr pa) k (LoadReserved (aq, rl, Data)) User) s'
                   = Some (None, s'))
@@ -2439,7 +2439,7 @@ Proof.
   assert (Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
             (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n rs') 0)) 4)
             (uint pa) (uint (to_bits 64 k)) = PMP_Match)
-    by exact (ram_fetch_pmp pa _ k (Z.to_nat k - 1) Hk Hk8 Huintk
+    by exact (ram_fetch_pmp pa _ k (Z.to_nat k - 1) Hk ltac:(lia) Huintk
                 ltac:(clear -Hk; lia) Hram0 Hramk Hcovp).
   assert (Hpmpe : exec (pmpCheck (Physaddr pa) k (StoreConditional (aq, rl, Data)) User) s'
                   = Some (None, s'))
@@ -2824,7 +2824,7 @@ Proof.
   assert (Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
             (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n rs') 0)) 4)
             (uint pa) (uint (to_bits 64 k)) = PMP_Match)
-    by exact (ram_fetch_pmp pa _ k (Z.to_nat k - 1) Hk Hk8 Huintk
+    by exact (ram_fetch_pmp pa _ k (Z.to_nat k - 1) Hk ltac:(lia) Huintk
                 ltac:(clear -Hk; lia) Hram0 Hramk Hcovp).
   assert (Hpmpe : exec (pmpCheck (Physaddr pa) k ac User) s' = Some (None, s'))
     by exact (exec_pmpCheck_user_grant_amo op aq rl pa k s' HA Hord Hrange HR HW).

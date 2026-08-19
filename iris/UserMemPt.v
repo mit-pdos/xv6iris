@@ -856,7 +856,7 @@ Section UserMemPtGeneric.
                   (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n σ'.(sregs)) 0)) 4)
                   (uint pa) (uint (to_bits 64 k)) = PMP_Match).
         { rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)).
-          exact (ram_fetch_pmp pa _ k (Z.to_nat k - 1) Hk Hk8
+          exact (ram_fetch_pmp pa _ k (Z.to_nat k - 1) Hk ltac:(lia)
                    Huintk ltac:(lia)
                    Hram0 Hram7 Hcovp). }
         exact (exec_mem_read_data_U PBMT_PMA pa region dv σ'
@@ -953,7 +953,7 @@ Section UserMemPtGeneric.
                   (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n σ'.(sregs)) 0)) 4)
                   (uint pa) (uint (to_bits 64 k)) = PMP_Match).
         { rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)).
-          exact (ram_fetch_pmp pa _ k (Z.to_nat k - 1) Hk Hk8
+          exact (ram_fetch_pmp pa _ k (Z.to_nat k - 1) Hk ltac:(lia)
                    Huintk ltac:(lia)
                    Hram0 Hram7 Hcovp). }
         exact (exec_mem_write_value_U PBMT_PMA pa region v σ'
@@ -982,7 +982,7 @@ Section UserMemPtGeneric.
                   (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n σ'.(sregs)) 0)) 4)
                   (uint pa) (uint (to_bits 64 k)) = PMP_Match).
         { rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)).
-          exact (ram_fetch_pmp pa _ k (Z.to_nat k - 1) Hk Hk8
+          exact (ram_fetch_pmp pa _ k (Z.to_nat k - 1) Hk ltac:(lia)
                    Huintk ltac:(lia)
                    Hram0 Hram7 Hcovp). }
         apply (exec_mem_write_ea_g k pa (Store Data) PBMT_PMA User σ').
