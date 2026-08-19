@@ -742,9 +742,12 @@ Write I1–I6 as **statements with `Admitted` bodies in one commit**, then fan o
   dispatch tables at `UserTotalU.v:1514,1760`) survive verbatim provided
   `base_exec_total_u` / `rvc_exec_total_u` keep their NAMES and their
   `⌜exec …⌝` conjuncts.
-* **P8 (after green).**  The verified Umode tier (`WpUmodeStep.v` and friends) —
-  the same bricks; and the standalone premise-removal commit
-  (`minstret_inv`, `wire_inv`).
+* **P8 — CANCELLED by user ruling (2026-08-19):** the verified Umode tier is
+  descoped from the hart-node-port build; the tier's rows (`WpUmodeStep.v`
+  and friends, 25 files) are commented out of `iris/_CoqProject`, with the
+  `.v` files left on disk. Reviving it is still "the same bricks" — the port
+  this section described — plus the standalone premise-removal commit
+  (`minstret_inv`, `wire_inv`) it was scheduled alongside.
 
 ### 5.3 THE ONE DESIGN DECISION THAT COULD STILL GO EITHER WAY
 
