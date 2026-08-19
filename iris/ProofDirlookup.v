@@ -2117,7 +2117,7 @@ Section ProofDirlookupMain.
                       with "Hcg Hcnt Htext Hkd Hpc Hitb2 Hitbl Hesc Hireg Hpenv Hislot
                             Hlic").
             all: try lkbelow.
-            iIntros (CIDig Hsig mig kslot q) "Hcg Hcnt Hpc %Higp Href Hru Hlic".
+            iIntros (CIDig Hsig mig kslot q) "Hcg Hcnt Hpc %Higp [Href Hru] Hlic".
             iDestruct ("Hlicback" with "Hlic") as "[Hlinks Hdi]".
             destruct Higp as (Hcsig & Hkslot & Higa0).
             assert (Higregs : dlk_regs m sp0 ip nb pf (16 * i) mig)

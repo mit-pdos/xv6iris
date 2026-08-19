@@ -2949,7 +2949,7 @@ Section ProofSysLinkBody.
                                       with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog
                                             Hitab Hitinv Hescd Hireg Hropen Hslkd0 Hslkdd
                                             Hslpidd Hdepd Hidevd Hiinumd Hivalidd
-                                            Hloadd Hshotd3 Hfrzd Hkeepd Hrud Hsbb Hsbi
+                                            Hloadd Hshotd3 Hfrzd [$Hkeepd $Hrud] Hsbb Hsbi
                                             Hbmres
                                             Hpidq Hprocs Hdev Hgeo Hdlk Hbsl [] HopE").
                             { rewrite Heb /trap_csrs_ext. done. }
@@ -3032,7 +3032,7 @@ Section ProofSysLinkBody.
                                       Hgl HW3a0
                                       ltac:(rewrite Hlkempty; apply locks_below_empty)
                                       with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog
-                                            Hitab Hitinv Hesck Hireg Hropen Hslkk Hrefip Hru
+                                            Hitab Hitinv Hesck Hireg Hropen Hslkk [$Hrefip $Hru]
                                             Hsbb Hsbi Hbmres Hpidq Hprocs Hdev Hgeo
                                             Hdlk Hbsl [HopS]").
                             { rewrite Heb /trap_csrs_ext. done. }

@@ -1826,7 +1826,7 @@ Section ProofSysChdirBody.
                     Hiblkc Hiblogc Hinbc Hcovb Hiu Hj Hgl
                     ltac:(rewrite HP6a0; exact Hcwde) (Hlb "log"%string)
                     with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hitab Hitinv
-                          Hescc Hireg Hropen Hslkc Hrefc Hruc Hsbb Hsbi Hbmres Hpidq Hprocs
+                          Hescc Hireg Hropen Hslkc [$Hrefc $Hruc] Hsbb Hsbi Hbmres Hpidq Hprocs
                           Hdev Hgeo Hdlk Hbsl [HopS]").
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }
@@ -2080,7 +2080,7 @@ Section ProofSysChdirBody.
                     Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl HQ1a0 (Hlb "log"%string)
                     with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hitab Hitinv
                           Hesck Hireg Hropen Hslkk Hslkd Hslpid Hdep Hidev Hiinum
-                          Hivalid Hload Hshot Hfrz Hkeep Hruip Hsbb Hsbi Hbmres Hpidq
+                          Hivalid Hload Hshot Hfrz [$Hkeep $Hruip] Hsbb Hsbi Hbmres Hpidq
                           Hprocs Hdev Hgeo Hdlk Hbsl [HopS]").
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }

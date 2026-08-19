@@ -229,15 +229,18 @@ Definition wp_iput_sconf_body
      on it (claude-notes/projects/iput-acquiresleep.md). *)
   is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k)
                    (slh_tok (icfg_isl k)) -∗
-  (* ---- THE REFERENCE BEING DESTROYED ---- *)
-  inode_ref k q dev inum -∗
-  (* THE CLOSING REFERENCE's PROVENANCE UNIT (item 7a-wire, iclaim-ledger.md
-     §5''.3).  Minted at the iget that created this reference, copied at any
-     idup of it, and SPENT here: iput's close -- last or not -- surrenders it
+  (* ---- THE REFERENCE BEING DESTROYED, WITH ITS PROVENANCE UNIT ----
+     ONE ROW (SIMP-2): [inode_refp] IS this pair -- the reference and the
+     unit minted at the iget that created it, copied at any idup of it,
+     and SPENT here.  iput's close -- last or not -- surrenders the unit
      in the same ghost step that moves the in-core count, which is what
-     [InodeRegion.ireg_ref_ok]'s (R1) demands.  The flavour is the one the
-     minting licence chose and iput does not care which. *)
-  runit_any (bv_unsigned inum) -∗
+     [InodeRegion.ireg_ref_ok]'s (R1) demands.  There is no flavour to
+     bind: under RULING C' the claim flavour is CONVERTED at ilock's
+     ClaimK arm, so the only unit that ever reaches an iput is the plain
+     one -- which is why the package's plain form suffices and the
+     restatement is a rename ([IcacheRef.inode_refp_spend], by
+     [reflexivity]). *)
+  inode_refp k q dev inum -∗
   (* ---- itrunc / iupdate's own resources ---- *)
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -427,14 +430,9 @@ Definition wp_iput_gen_body
      on it (claude-notes/projects/iput-acquiresleep.md). *)
   is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k)
                    (slh_tok (icfg_isl k)) -∗
-  inode_ref k q dev inum -∗
-  (* THE CLOSING REFERENCE's PROVENANCE UNIT (item 7a-wire, iclaim-ledger.md
-     §5''.3).  Minted at the iget that created this reference, copied at any
-     idup of it, and SPENT here: iput's close -- last or not -- surrenders it
-     in the same ghost step that moves the in-core count, which is what
-     [InodeRegion.ireg_ref_ok]'s (R1) demands.  The flavour is the one the
-     minting licence chose and iput does not care which. *)
-  runit_any (bv_unsigned inum) -∗
+  (* the reference being destroyed, WITH its provenance unit: ONE ROW
+     (SIMP-2), exactly as in the [_sconf] body above. *)
+  inode_refp k q dev inum -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   bitmap_res gfs bmapstart cov logstart size used -∗

@@ -1729,7 +1729,7 @@ Section KexitRest.
               ltac:(rewrite HQ2a0; exact Hipe)
               Hfresh
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpanenv Hbio Hlog Hitab Hitinv Hescrow
-                    Hireg Hropen Hslk Href Hru Hsbb Hsbi Hbmres Hpidq Hprocs
+                    Hireg Hropen Hslk [$Href $Hru] Hsbb Hsbi Hbmres Hpidq Hprocs
                     Hdev Hgeo Hdlk Hbsl Hop").
     all: try lkbelow.
     iIntros (CID5 Hs5 mip n' us') "%Hcsip Hcg Hown Htce Hcce Hpc Hpidq Hsbb Hsbi

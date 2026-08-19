@@ -1418,7 +1418,7 @@ Section KexecABad.
               Hbml Hins0 Hibc Hibl Hib Hcovb Hn2 Hjp Hgs HB2a0
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitab Hitinv Hesck
                     Hireg Hropen Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid Hload
-                    Hity Hfrz Hkeep Hru Hbm Hins Hbits Hppid Hprocs Hdevi Hdgeom Hdlock Hbs
+                    Hity Hfrz [$Hkeep $Hru] Hbm Hins Hbits Hppid Hprocs Hdevi Hdgeom Hdlock Hbs
                     Hlog").
     all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }

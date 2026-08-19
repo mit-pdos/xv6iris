@@ -1899,7 +1899,7 @@ Section ProofDirlinkMain.
                 HE1a0
                 Hbelow
                 with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlog Hitb2 Hitbl Hesck
-                      Hiregi [] Hslk Href Hru Hsbb Hsbi Hbmr Hppid Hprocs Hdev Hgeom
+                      Hiregi [] Hslk [$Href $Hru] Hsbb Hsbi Hbmr Hppid Hprocs Hdev Hgeom
                       Hdlk Hbsl [] Hop").
       all: try lkbelow.
       { rewrite Heb /trap_csrs_ext. done. }

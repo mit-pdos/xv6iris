@@ -1484,7 +1484,7 @@ Section ProofFileclose.
                     ltac:(rewrite HB3a0; exact Hipe)
                     ltac:(lkbelow)
                     with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlog Hitab Hitinv
-                          Hescrow Hireg Hropen Hslk Href Hru Hsbb Hsbi Hbmres Hpid Hprocs
+                          Hescrow Hireg Hropen Hslk [$Href $Hru] Hsbb Hsbi Hbmres Hpid Hprocs
                           Hdev Hgeo Hdlk Hbsl Hop").
           all: try lkbelow.
           iIntros (CIDf6 Hsf6 mi ni us') "%Hics Hcg Hcnt Hextc Hextm Hpc Hpid Hsbb Hsbi

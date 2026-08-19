@@ -1163,6 +1163,10 @@ ProofSysChdir.v
 SpecSysMkdir.v
 ProofSysMkdir.v
 LinkSysMkdir.v
+# SIMP-2: the runtime file system as ONE persistent assertion, with the seal
+# that produces it.  A leaf BELOW the syscall layer, so anything can import
+# the predicate without importing the syscall bodies.
+FsReady.v
 FsSyscalls.v
 LinkFsSyscalls.v
 SpecSysMknod.v

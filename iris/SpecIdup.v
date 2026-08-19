@@ -191,17 +191,22 @@ Definition wp_idup_sconf_body
     `{GEN : GenId} `{CID : CpuId}
     (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)
     (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
-    (k : nat) (s : Qp) (dev inum : mword 32)
+    (k : nat) (dev : mword 32)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64)
     (K : nat) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.idup in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   (K_idup <= K)%nat ->
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
-  (* the share does not name its own slot -- see the header. *)
   (k < NINODE)%nat ->
   (* a0 = ip, and a [struct inode *] IS its slot: [ientry_inj]. *)
   m !!! Regidx (mword_of_int 10 : mword 5) = ientry k ->
+  (* THE PURE TIE, and it rides exactly as [FsSyscalls.sysc_fs_env]'s do:
+     the package below is POINTER-keyed, so its device is the cache's own
+     ([IcacheRef.icfg_dev], design §13.11's single-device pin), while the
+     itable handle above is stated at whatever [dev] the caller names.
+     Every caller has this equation already. *)
+  dev = icfg_dev ->
   (* THE FRESHNESS PREMISE: idup acquires and releases [itable.lock]
      internally (balanced -- [lks] is unchanged across the whole call), so
      the caller must already hold only locks BELOW "itable"'s rank. *)
@@ -219,16 +224,35 @@ Definition wp_idup_sconf_body
   ireg_inv γi γfs inodestart nib -∗
   (* THE precondition that makes [ip->ref++] safe -- see the header. *)
   iref_slot -∗
-  (* A SHARE, not a reference -- see the header. *)
-  inode_shr k s dev inum -∗
-  (* THE PARENT REFERENCE's PROVENANCE UNIT (item 7a-wire, §5''.3's step 3).
-     idup's mint is SELF-PAYING: this unit is what buys the two side
-     conditions [InodeRegion.ireg_ref_ok_mint] owes (allocatedness at either
-     flavour, and [c = None] at the plain one), so idup needs no licence --
-     which is what §3.11's wall said it could never have.  And the COPY is
-     minted at the PARENT's flavour: a dup of a claim reference is
-     claim-flavoured, which is what keeps (R3) true. *)
-  runit_any (bv_unsigned inum) -∗
+  (* ---- ONE ROW IN, TWO ROWS OUT (SIMP-2) ---------------------------
+     STATED OVER [IcacheRef.inode_held] -- the POINTER-keyed package --
+     because that is what idup's two callers already hold: kfork's parent
+     block and namex's cwd both carry [inode_held] and, before SIMP-2,
+     had to open it, shed a share by [inode_ref_shed], hand the share and
+     the unit across, and then re-assemble TWO packages out of six
+     returned rows.  All of that was bookkeeping the contract could do
+     once: the carve ([IcacheRef.inode_refp_carve]) and the gather are
+     equivalences, so moving them inside costs nothing and deletes the
+     [s] / [dev] / [inum] binders along with four rows.
+
+     Why the mover still only needs a share: [ip->ref++] does not need a
+     reference to start from, only a claim that the entry cannot be freed
+     underneath it, and a count-0 slice of the liveness unit is already
+     that (see the header).  The share is carved out of THIS package, the
+     count fragment stays with the short parent, and the two rejoin before
+     the return -- so the caller's fraction is the fraction it came in
+     with, exactly as before.
+
+     Why the second package is a package and not a bare reference: the
+     mint is SELF-PAYING (item 7a-wire, §5''.3's step 3).  The unit inside
+     the argument buys the two side conditions
+     [InodeRegion.ireg_ref_ok_mint] owes -- allocatedness at either
+     flavour, and [c = None] at the plain one -- so idup needs no licence,
+     which is what §3.11's wall said it could never have; and the COPY is
+     minted at the PARENT's flavour, which is what keeps (R3) true.  Under
+     RULING C' that flavour is the plain one at every rest home, so both
+     packages that leave are [inode_refp]-shaped and iput-ready. *)
+  inode_held (ientry k) -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr,
     sie_cap_gpr KT1 mr K b p -∗
@@ -236,16 +260,11 @@ Definition wp_idup_sconf_body
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr
       /\ mr !!! Regidx (mword_of_int 10 : mword 5) = ientry k ⌝ -∗
-    (* THE SAME SHARE BACK -- the increment moved the count and nothing
-       else, so the caller's slice is neither split nor spent... *)
-    inode_shr k s dev inum -∗
-    (* ...beside a NEW reference, minted from the table's retained share at
-       a fraction only the table knows. *)
-    (∃ qn : Qp, inode_ref k qn dev inum) -∗
-    (* TWO units out: the parent's back, unspent, and the copy the new
-       reference carries -- both at the parent's flavour. *)
-    runit_any (bv_unsigned inum) -∗
-    runit_any (bv_unsigned inum) -∗
+    (* the caller's own package, whole and at its own fraction *)
+    inode_held (ientry k) -∗
+    (* ...and the new one, minted from the table's retained share at a
+       fraction only the table knows -- which [inode_held] hides anyway. *)
+    inode_held (ientry k) -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -256,9 +275,9 @@ Module Type IDUP.
       `{GEN : GenId} `{CID : CpuId}
       (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
-      (k : nat) (s : Qp) (dev inum : mword 32)
+      (k : nat) (dev : mword 32)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string),
-      wp_idup_sconf_body γl cn γfs γi cov logstart inodestart nib k s dev inum
+      wp_idup_sconf_body γl cn γfs γi cov logstart inodestart nib k dev
                          m n eb p K b lks.
 End IDUP.

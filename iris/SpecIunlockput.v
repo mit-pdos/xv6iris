@@ -205,16 +205,15 @@ Definition wp_iunlockput_sconf_body
      [ilock] handed over, unspent. *)
   ifreeze_off (bv_unsigned inum) -∗
   (* ---- THE RETAINED PARENT: what makes the seam close ---- *)
-  (* the share [s] above was carved off THIS reference ([inode_ref_carve]);
-     iunlock hands the share back and [inode_ref_gather] re-forms the
-     canonical [inode_ref k (qi + s)] that iput then spends. *)
-  inode_ref_short k (qi + s)%Qp qi dev inum -∗
-  (* THE REFERENCE's PROVENANCE UNIT (item 7a-wire, iclaim-ledger.md §5''.3).
-     iunlockput is "iunlock; iput", and iput's close SPENDS the unit that
-     rode with this reference since the iget that minted it -- so the wrapper
-     relays it exactly as it relays the reference itself.  Every caller has
-     it: it is what [IcacheRef.inode_held_shed] left on the short parent. *)
-  runit_any (bv_unsigned inum) -∗
+  (* ONE ROW (SIMP-2): the short parent AND its provenance unit.  The
+     share [s] above was carved off THIS reference ([inode_refp_carve]);
+     iunlock hands the share back and [inode_refp_gather] re-forms the
+     canonical [inode_refp k (qi + s)] that iput then spends -- unit still
+     attached, because the unit rode with the short parent and never with
+     the travelling share (item 7a-wire).  Every caller already holds the
+     pair in this shape: it is exactly what [IcacheRef.inode_held_shed]
+     leaves behind, and [inode_held_short] is now stated over it. *)
+  inode_refp_short k (qi + s)%Qp qi dev inum -∗
   (* ---- iput's own resources ---- *)
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -355,16 +354,15 @@ Definition wp_iunlockput_gen_body
      [ilock] handed over, unspent. *)
   ifreeze_off (bv_unsigned inum) -∗
   (* ---- THE RETAINED PARENT: what makes the seam close ---- *)
-  (* the share [s] above was carved off THIS reference ([inode_ref_carve]);
-     iunlock hands the share back and [inode_ref_gather] re-forms the
-     canonical [inode_ref k (qi + s)] that iput then spends. *)
-  inode_ref_short k (qi + s)%Qp qi dev inum -∗
-  (* THE REFERENCE's PROVENANCE UNIT (item 7a-wire, iclaim-ledger.md §5''.3).
-     iunlockput is "iunlock; iput", and iput's close SPENDS the unit that
-     rode with this reference since the iget that minted it -- so the wrapper
-     relays it exactly as it relays the reference itself.  Every caller has
-     it: it is what [IcacheRef.inode_held_shed] left on the short parent. *)
-  runit_any (bv_unsigned inum) -∗
+  (* ONE ROW (SIMP-2): the short parent AND its provenance unit.  The
+     share [s] above was carved off THIS reference ([inode_refp_carve]);
+     iunlock hands the share back and [inode_refp_gather] re-forms the
+     canonical [inode_refp k (qi + s)] that iput then spends -- unit still
+     attached, because the unit rode with the short parent and never with
+     the travelling share (item 7a-wire).  Every caller already holds the
+     pair in this shape: it is exactly what [IcacheRef.inode_held_shed]
+     leaves behind, and [inode_held_short] is now stated over it. *)
+  inode_refp_short k (qi + s)%Qp qi dev inum -∗
   (* ---- iput's own resources ---- *)
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗

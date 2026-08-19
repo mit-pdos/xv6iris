@@ -148,6 +148,7 @@ Require Import SpecSysChdir.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
+Require Import FsReady.   (* SIMP-2: [fs_world] is now the derived form *)
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -213,39 +214,43 @@ Section FsBundles.
      the seals CONSUME all nineteen and return NONE of them, and that is
      sound precisely because not one of them is spent.  A friendly client
      pays for the file system's world once, at boot. *)
+  (* REHOMED BY SIMP-2 (ghost-simplification.md §5.2).  The nineteen
+     conjuncts are now [FsReady.fs_ready], a LEAF below this layer, and
+     this is the derived form: the definition below is an alias, so the two
+     friendly seals read exactly as before and every consumer of the name
+     is unaffected.
+
+     What moved with the predicate is what this file never had: a PRODUCER
+     ([FsReady.fs_ready_establish] -- the boot chain's eighteen plus
+     fsinit's returned [ireg_boot], in one [bupd]) and a PROJECTION FAMILY
+     (each an [iDestruct], statable only inside [FsReady]'s own section --
+     the class-used-as-index trap, see that file's header).  "A friendly
+     client pays for the file system's world once, at boot" is, since
+     SIMP-2, a lemma rather than an assumption. *)
   Definition fs_world (γpr γa : gname) (γs : list gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64) (bn : bio_names) (glog : log_names)
       (γfs : fs_names) (γi : gname) (cn : ic_names) (gtl : gname)
       (cov : gset Z) (logstart inodestart : Z) (nib : nat) (dev : mword 32)
       : iProp Σ :=
-    (kernel_text ∗ kernel_data ∗
-     printk_env γpr γu γd ∗ ⌜printk_gen_contract (kt := KT1) γpr γu γd⌝ ∗
-     bio_ctx bn (fs_view γfs γd dev cov) ∗
-     log_ctx glog bn γfs cov logstart dev ∗
-     fs_crash_seam cov logstart ∗
-     gen_cert ∗
-     dev_inv γu γd ∗
-     disk_geom γd pd pav pu ∗
-     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) ∗
-     is_itable2 gtl cn γfs γi cov logstart nib dev ∗
-     itable_inv ∗
-     ic_escrows cn γfs γi cov logstart ∗
-     ic_sleeplocks cn ∗
-     ireg_inv γi γfs inodestart nib ∗
-     (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B).
-        Persistent, and it rides beside [ireg_inv] because that is the
-        channel [SpecCreate] -> [SpecIalloc] -> [ireg_claim_au] uses.  Like
-        every other conjunct here, F2 pays for it once at boot. *)
-     ireg_open ∗
-     kalloc_env γa None ∗
-     procs_inv γs)%I.
+    FsReady.fs_ready γpr γa γs γu γd γk pd pav pu bn glog γfs γi cn gtl
+                     cov logstart inodestart nib dev.
 
   Global Instance fs_world_persistent γpr γa γs γu γd γk pd pav pu bn glog
       γfs γi cn gtl cov logstart inodestart nib dev :
     Persistent (fs_world γpr γa γs γu γd γk pd pav pu bn glog γfs γi cn gtl
                          cov logstart inodestart nib dev).
   Proof. rewrite /fs_world. apply _. Qed.
+
+  (* the alias, as a lemma, so a reader need not take the [Definition]'s
+     word for it *)
+  Lemma fs_world_ready γpr γa γs γu γd γk pd pav pu bn glog
+      γfs γi cn gtl cov logstart inodestart nib dev :
+    fs_world γpr γa γs γu γd γk pd pav pu bn glog γfs γi cn gtl
+             cov logstart inodestart nib dev
+    ⊣⊢ FsReady.fs_ready γpr γa γs γu γd γk pd pav pu bn glog γfs γi cn gtl
+                        cov logstart inodestart nib dev.
+  Proof. reflexivity. Qed.
 
   (* THE CONSUMABLES.  What actually crosses the call and comes back: the
      three block slots, the four superblock cells, the free-block ledger at
@@ -377,9 +382,15 @@ Module FsSysMkdir (M : SYSMKDIR).
     destruct Hg as [Hdev Hnib Hlog Hist Hroot Hnibp Hlg Hsz Hbnn Hbcov Hbout
                     Histnn Hcb Hbg Hib Hn1 Hn2 Hn3 Hus].
     iIntros "Hcg Hown Hpc Hw Hres Hpriv Hcont".
-    iDestruct "Hw" as "(Htext & Hdata & Hpr & %Hprg & Hbio & Hlogc &
-                        Hseam & Hgc & Hdev & Hdgeom & Hdlk & Hitb2 & Hitbl &
-                        Hesc & Hisl & Hireg & Hiopen & Hkenv & Hprocs)".
+    (* SIMP-2: the unpack is [FsReady]'s own projection rather than a raw
+       [iDestruct].  It has to be: [fs_ready] is [Typeclasses Opaque] (see
+       that file's two seals and the measurement behind them), so the
+       nineteen conjuncts come out through the family, which is exactly what
+       the family is for. *)
+    iDestruct (FsReady.fs_ready_all with "Hw") as
+      "(Htext & Hdata & Hpr & %Hprg & Hbio & Hlogc &
+        Hseam & Hgc & Hdev & Hdgeom & Hdlk & Hitb2 & Hitbl &
+        Hesc & Hisl & Hireg & Hiopen & Hkenv & Hprocs)".
     iDestruct "Hres" as "(Hbsl & Hsbn & Hsbi & Hsbs & Hsbb & Hbm & Hir)".
     iApply (M.wp_sys_mkdir_sconf γf γa γpr γs j γl γu γd γk pd pav pu bn
               glog γfs γi cn gtl cov logstart bmapstart inodestart nib
@@ -534,9 +545,15 @@ Module FsSysChdir (M : SYSCHDIR).
     destruct Hg as [Hdev Hnib Hlog Hist Hroot Hnibp Hlg Hsz Hbnn Hbcov Hbout
                     Histnn Hcb Hbg Hib Hn1 Hn2 Hn3 Hus].
     iIntros "Hcg Hown Hpc Hw Hres Hpriv Hcont".
-    iDestruct "Hw" as "(Htext & Hdata & Hpr & %Hprg & Hbio & Hlogc &
-                        Hseam & Hgc & Hdev & Hdgeom & Hdlk & Hitb2 & Hitbl &
-                        Hesc & Hisl & Hireg & Hiopen & Hkenv & Hprocs)".
+    (* SIMP-2: the unpack is [FsReady]'s own projection rather than a raw
+       [iDestruct].  It has to be: [fs_ready] is [Typeclasses Opaque] (see
+       that file's two seals and the measurement behind them), so the
+       nineteen conjuncts come out through the family, which is exactly what
+       the family is for. *)
+    iDestruct (FsReady.fs_ready_all with "Hw") as
+      "(Htext & Hdata & Hpr & %Hprg & Hbio & Hlogc &
+        Hseam & Hgc & Hdev & Hdgeom & Hdlk & Hitb2 & Hitbl &
+        Hesc & Hisl & Hireg & Hiopen & Hkenv & Hprocs)".
     iDestruct "Hres" as "(Hbsl & Hsbn & Hsbi & Hsbs & Hsbb & Hbm & Hir)".
     iPoseProof (printk_env_panic with "Hpr") as "#Hpe".
     iApply (M.wp_sys_chdir_sconf γf γa γs j γl γu γd γk pd pav pu bn

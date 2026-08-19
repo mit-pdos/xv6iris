@@ -958,7 +958,9 @@ Section ProofIget.
       iDestruct (cpu_own_transport CIDt CIDt9 n eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iSpecialize ("Hcont" $! CIDt9 with "[]"); [ iPureIntro; wp_next_chain | ].
-      iApply ("Hcont" $! P8 kk q with "Hcg Hcnt Hpc [%] Href Hru Hlic").
+      (* SIMP-2: the post is ONE row -- the reference and its minted unit,
+         packaged by [IcacheRef.inode_refb] (its intro is [iFrame]). *)
+      iApply ("Hcont" $! P8 kk q with "Hcg Hcnt Hpc [%] [$Href $Hru] Hlic").
       (* [callee_saved m P8], the slot bound, and [a0 = ientry kk] *)
       split; [| split; [exact Hkk | exact HP8a0]].
       assert (Hthread : forall c : mword 5, is_cs_idx c = true ->

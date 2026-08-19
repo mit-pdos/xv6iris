@@ -4556,7 +4556,11 @@ Section ProofIput.
     unfold iput_units in Hn.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hlogc #Hitab #Hinv #Hesc #Hireg
-             Hropen #Hslk Href Hru Hbms Hins Hbm Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hbslots Hnlz Hop Hcont".
+             Hropen #Hslk Hrefp Hbms Hins Hbm Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hbslots Hnlz Hop Hcont".
+    (* SIMP-2: the reference being destroyed arrives PACKAGED with its
+       provenance unit; the two halves are what the walk below moves, so
+       split once here and nothing else changes. *)
+    iDestruct "Hrefp" as "[Href Hru]".
     (* iput enters at level 0, so the live index and the saved base agree;
        keep BOTH names alive as [Hbm], then [subst b] -- unlike the
        [dirlookup]/[namex]-style scaffolding, [b] is not spelled by name
@@ -5047,7 +5051,7 @@ Section ProofIput.
     intros pcE ip pj ret_tgt HK Hk Hgeom Hsz Hbm0 Hbmcov Hbmlog Hist Hicov Hilog
            Hnib Hcovb Hn Hj Hgsj Ha0 Hfresh.
     iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hlogc #Hitab #Hinv #Hesc #Hireg
-             Hropen #Hslk Href Hru Hbms Hins Hbm Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hbslots Hop Hcont".
+             Hropen #Hslk Hrefp Hbms Hins Hbm Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hbslots Hop Hcont".
     (* THE WITNESS: the set the counted reservation was hiding, and the birth
        epoch it was hiding under it ([log_opS_named]).  Both are the gen
        contract's own existentials, so the seal derives with no new fact. *)
@@ -5064,7 +5068,7 @@ Section ProofIput.
               Hgeom Hsz Hbm0 Hbmcov Hbmlog Hist Hicov Hilog
               Hnib Hcovb Hn Hj Hgsj Ha0 Hfresh
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlogc Hitab Hinv Hesc Hireg
-                    Hropen Hslk Href Hru Hbms Hins Hbm Hppid Hprocs Hdevi Hdgeom Hdlock Hbslots [] Hop
+                    Hropen Hslk Hrefp Hbms Hins Hbm Hppid Hprocs Hdevi Hdgeom Hdlock Hbslots [] Hop
                     [Hcont]").
     all: try lkbelow.
     { iEval (cbn beta iota). iEmpIntro. }
