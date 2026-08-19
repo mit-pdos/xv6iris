@@ -1402,6 +1402,20 @@ and axioms each proven function rests on. `--format text|md|html|json`.
   a `--check` error that fails CI, not a silent adjustment. So **adding a file
   to `iris/` means adding it to `_CoqProject`**; without the check, forgetting
   is invisible in both directions at once (never built, still counted).
+- **A FILE DELIBERATELY OUT OF THE BUILD IS DESCOPED BY A COMMENTED ROW, and a
+  bare `# Foo.v` is the syntax the check recognizes.** Leaving a `.v` on disk
+  while dropping it from the build is legitimate — a descoped tier kept for a
+  later revival, a retired de-risk kept as the worked provenance its neighbours
+  cite — but *silently* dropping it is the accident the check exists to catch,
+  and the two look identical from outside the project file. So the intent is
+  recorded in the project file, beside the rows it sits among, where the
+  reviver looks: comment the row out to a bare filename (prose above it
+  explaining why is ignored by the parser, and is the point of the block).
+  Then reviving the file is uncommenting one row. Two new drift errors keep
+  that honest: a `# Foo.v` naming a file that no longer exists (it promises the
+  reviver a row that cannot come back), and a name both listed and commented
+  out. In the tree today: the descoped Umode tier (~41 rows) and
+  `EscrowRegionA.v`.
 - **THE PROOF FUNCTOR NEEDS ITS `: <MODTYPE>` ASCRIPTION, and without it the
   function reads `assumed` with the build green.** `module_status` matches a
   `Link` instance to a spec through `Module <F>Proof (…) : <MODTYPE>.`; a

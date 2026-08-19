@@ -132,6 +132,16 @@ refers to one accessor, not the piece.)
   `EscrowInode`; VERIFIED: in `_CoqProject` (`:970`) but imported by
   nothing — it compiles on every build for zero consumers.  Retire the
   row (keep the file as provenance, or move it beside the probes).
+  **DONE, and the row is COMMENTED OUT rather than deleted.**  SIMP-1
+  (`9e51d849`) dropped the row and left the file, which
+  `proof_coverage --check` reads as the accident it exists to catch —
+  main went red on it.  The row is now a descoped `# EscrowRegionA.v`
+  under a comment block saying why, the syntax the check accepts for a
+  file that is out of the build on purpose (see the coverage bullet in
+  `durable-notes.md`).  So the file stays as the worked de-risk the three
+  `Escrow*` headers cite by name, reviving it is uncommenting one row, and
+  a later `rm` of the file fails the check instead of leaving a row that
+  promises a revival it cannot deliver.
 - The three `ZZProbe*` scratch files are untracked and do not travel; the
   `proof_coverage --check` drift rows they cause vanish on any fresh clone.
 
