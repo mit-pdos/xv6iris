@@ -2737,48 +2737,24 @@ it here.  What is left is the rest:
 ## CHECKPOINT 2026-08-18 (session 2) -- SUPERSEDED by the red-root table
 ## immediately below; the LANE write-ups after it are still current.
 
-### THE THREE RED ROOTS (2026-08-19, after the trampoline lane closed)
+### THE PORT IS COMPLETE — NO RED ROOTS
 
-Branch `hart-node-port`, LOCAL ONLY (still nothing pushed).  Last whole-tree
-run: `./gcp-rocq/run-on-gcp make -k -j36 proofs`, **3 red roots**.  Each
-line is a ROOT: every file that merely depends on one is skipped by `-k`,
-not broken.
+Branch `hart-node-port`, LOCAL ONLY (still nothing pushed).  Whole-tree run:
+`./gcp-rocq/run-on-gcp make -k -j36 proofs`, **exit 0**, every
+`iris/_CoqProject` row with a `.vo`.
 
-| root | error | lane |
-|---|---|---|
-| `ProofKvminithart` | `iIntro: cannot turn … sconf_step_obl …` | kvminithart: the `csrw satp` leaf — see below |
-| `ProofUser` | `arm_LOAD_u C pt` — pre-port arity | P7 §5 assembly + the last 2 arms |
-| `WpUmodeStep` | `minstret_inv_body` not found | "Not started" (verified U-mode tier) |
-
-**CURRENT COUNT (2026-08-19, after the USER-EXEC AXIOM landed): ONE red
-root** — `WpUmodeStep`. `ProofUser` is no longer a root because it is no
-longer in the build: the project owner ruled it temporarily descoped and its
-one dependency axiomatised in `iris/UserExecAxiom.v` — the register, the
-reverse-dep closure that decides which rows leave `_CoqProject`, and the
-revival procedure are in
-[`user-tier-port.md`](user-tier-port.md), "THE USER-EXEC AXIOM".
-
-The line the ruling superseded, for the record: **TWO red roots** —
-`ProofUser` and `WpUmodeStep`.
-Green now: `ProofKvminithart`, `ProofMain`, `ProofMainSecondary`,
-`BootChain`, `UserretPt`, `UservecPt`, `UserretEntryPt`, `UservecExitPt`,
-`ProofUserret`, `ProofUservec`.  `BootChain` was never a lane of its own —
-it only became reachable when `ProofKvminithart` fell, and nothing above it
-(`BootShared`, `SystemAdequacy`) needed more than the same three port-shape
-fixes.  Recount rather than trusting this line.
-
-GONE since the eight-root table: `ProofMain` / `ProofMainSecondary` (the
-kvminithart tlb ruling, `5cea2c9e`), `UserretPt` / `UservecExitPt` /
-`UserretEntryPt` (the trampoline lane, `732cc4db` + `4d672abc`), and with
-them `ProofUserret` / `ProofUservec`, which surfaced red the moment the
-trampoline blocks went green and were fixed in `3932c12d`.
-
-**A ROOT THAT FALLS CAN UNCOVER NEW ONES, AND THAT IS NOT A REGRESSION.**
-`ProofUserret` / `ProofUservec` had never been compiled since the port
-started; `-k` had been SKIPPING them, not passing them.  When counting
-roots after a lane closes, expect the number to fall by less than the
-number of files you fixed, and read the newly-visible ones as the lane's
-own tail rather than as breakage you introduced.
+The last three roots are all closed.  `ProofKvminithart` fell to the
+kvminithart tlb ruling (`5cea2c9e`) and the satp-switch leaf (`545026c7`).
+`ProofUser` — the general-case user-mode WP — is PORTED, so the temporary
+axiom that stood in for it while that lane ran is discharged and
+`iris/UserExecAxiom.v` is deleted; the record is in
+[`user-tier-port.md`](user-tier-port.md), "THE TIER IS PORTED".
+`WpUmodeStep` is not a root because the specific-binary Umode tier
+(`sync`/`echo`/`sh`/`init`) is DESCOPED by the 2026-08-19 owner ruling — its
+`_CoqProject` rows are commented, the files are on disk, and reviving it is
+"the same bricks" (`user-tier-port.md` §P8).  That descope is the only thing
+between this branch and a whole-tree port; it is a scope decision, not a red
+root.
 
 ### (DONE) THE KVMINITHART LANE'S REMAINING PIECE HAD A TEMPLATE
 

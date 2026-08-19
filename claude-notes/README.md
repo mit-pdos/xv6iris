@@ -120,13 +120,13 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   monad port (design in [`design/main-cycle-port.md`](design/main-cycle-port.md)).
 - **[`user-tier-port.md`](projects/user-tier-port.md)** — the user tier's port onto
   per-node semantics (sub-plan of the above: `swp_hmrun_of_exec` + `goodmb` twins).
-  **Live, on branch `hart-node-port`, and the tree is RED from `MinstretInv.v`
-  up by design** — open its CHECKPOINT before any work under `iris/`, and its
-  trap list before writing a proof over the new language. Its first section,
-  "THE USER-EXEC AXIOM", registers the tree's one TEMPORARY tracked
-  assumption (`iris/UserExecAxiom.v`, a 2026-08-19 owner ruling): the proven
-  but not-yet-ported general-case user-mode safety theorem, assumed so the
-  port can land, with the revival procedure beside it.
+  **Done on branch `hart-node-port`**: `ProofUser.wp_user_exec_closed` is proven
+  per-node, so the temporary user-exec axiom is discharged and
+  `iris/UserExecAxiom.v` is gone. Read it for the §14.4 fetch-geometry package
+  (width-generic read certificates, the six va geometries, the split-fetch
+  shells) and the `goodmb` discipline. The one scope decision it still records
+  is §P8: the specific-binary Umode tier (`sync`/`echo`/`sh`/`init`) is
+  descoped from the build.
 - **[`fs-sysfile.md`](projects/fs-sysfile.md)** — the syscall-layer campaign
   (file.c's last 2 + sysfile.c's 11). **Live and actively appended to.**
 - **[`fs-fragments-campaign.md`](projects/fs-fragments-campaign.md)** — the

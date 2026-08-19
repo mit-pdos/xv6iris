@@ -7,67 +7,32 @@ worklist: `claude-notes/projects/main-cycle-port.md`, "THE USER TIER".
 
 ---
 
-## THE USER-EXEC AXIOM — THE TREE'S ONE TRACKED ASSUMPTION FROM THIS LANE
+## THE TIER IS PORTED, AND THE USER-EXEC AXIOM IS DISCHARGED
 
-**RULING (project owner, 2026-08-19).** To land the hart-node port on main
-sooner rather than later, the general-case user-mode safety proof — the
-**ProofUser stack** — is TEMPORARILY OUT OF THE BUILD, and its one dependency
-is stated as an AXIOM. This lane continues and will discharge it; §5.5 below
-is exactly the discharge criterion.
+`ProofUser.UserProof.wp_user_exec_closed` — the general-case user-mode safety
+theorem, `SpecUser.USER`'s single `Parameter` — is PROVEN on the per-node
+semantics. `ProofUser.v` and `UserActiveClass.v` are rows in
+`iris/_CoqProject` again, `LinkUserretClosed.v` / `LinkUserretUser.v` take
+`UserProof` directly, and `iris/UserExecAxiom.v` — the user-ruled temporary
+axiom that stood in for this theorem while the lane was in flight — is
+deleted. Nothing else in the tree moved to discharge it: the axiom's
+statement was that theorem character for character, so the revival was the
+three mechanical steps that file's header prescribed.
 
-**THE ASSUMPTION IS ABOUT THE PORT, NOT ABOUT THE MACHINE.**
-`ProofUser.UserProof.wp_user_exec_closed` is PROVEN in the pre-port tree (see
-`completed/user-mode-exec-v2.md`); what is missing is its port onto per-node
-semantics. The axiom's statement is that theorem character for character —
-both are `SpecUser.USER`'s single `Parameter` over
-`SpecUser.wp_user_exec_closed_body`, so nothing was weakened, generalised or
-re-shaped to make it assumable.
+`Print Assumptions UserretClosedD.wp_userret_closed` is now the platform
+baseline — the 5 `rv64d` axioms (`load_reservation`, `cancel_reservation`,
+`match_reservation`, `valid_reservation`, `plat_term_write`) and
+`functional_extensionality_dep` — plus the pre-existing assumed callee
+`LinkSyscall.Syscall.wp_syscall_sconf` and the **two `ResvAxioms` term
+axioms** the port introduced, which REPLACE the two `exec_*` reservation
+axioms the pre-port proof carried (§5.5: net axiom count unchanged).
+`SystemAdequacy.xv6_power_adequacy_xv6Σ` never depended on the closed trap
+loop and is unchanged.
 
-### The register
-
-| | |
-|---|---|
-| **file** | `iris/UserExecAxiom.v` (screaming header: ruling, discharge, revival) |
-| **axiom** | `UserExecAxiom.UserProof_USER_RULED_TEMPORARY_AXIOM.wp_user_exec_closed_USER_RULED_TEMPORARY_AXIOM` |
-| **shape** | an `Axiom` INSIDE `Module UserProof_USER_RULED_TEMPORARY_AXIOM : USER`, per `design/spec-modules.md` "An ASSUMED callee" — never `Declare Module`, which `tools/proof_coverage.py` cannot see |
-| **consumers** | `LinkUserretClosed.v`, `LinkUserretUser.v` — the only two files that ever required `ProofUser` |
-| **reach** | five theorems: `UserretClosedD.wp_userret_closed`, `UserretUserD.wp_userret_user`, and `LinkForkret` / `LinkForkretNF` / `LinkForkretParkPaid` above them. It does NOT reach `LinkMain` / `BootChain` / `SystemAdequacy`, which do not depend on the closed trap loop |
-| **out of the build** | `iris/_CoqProject`: `ProofUser.v` and `UserActiveClass.v`, commented under a header block. **The files stay on disk, untouched.** |
-
-`Print Assumptions UserretClosedD.wp_userret_closed` is the baseline plus this
-one axiom and nothing else: the 5 rv64d platform axioms (`load_reservation`,
-`cancel_reservation`, `match_reservation`, `valid_reservation`,
-`plat_term_write`), `functional_extensionality_dep`, and the pre-existing
-assumed callee `LinkSyscall.Syscall.wp_syscall_sconf`.
-
-### Why exactly two rows leave the build
-
-The descope closure is decided by REVERSE DEPENDENCIES over every `Require`
-line in `iris/*.v`, not by the `User*` name prefix. `ProofUser.v` has exactly
-two consumers (the two Link files, now repointed at the axiom) and
-`UserActiveClass.v` has exactly one (`ProofUser.v`); the fixpoint stops there.
-**Every other `User*` tier file has a consumer that stays in the build** —
-`UserExec` / `UserPtTree` / `UserFrame` / `UserKernelBridge` feed
-`ProofUserretClosed`, `UserretUser`, `ProofUservec` and `SpecUser` itself;
-`UserTotalU` / `UserMemClassify*` / `UserMemTotal` / `UserClassifyAsm` feed the
-`UserMemArms*` roots; `UserStep` / `UserStepFull` / `UserTrap` / `UserExecFacts`
-/ `HartRunFull` / `HartStepFull` feed `WpUmodeStep` and `WpSmodeWfi`;
-`ResvAxioms` feeds `UserMemAccess` / `UserMemArms`. `SpecUser.v` stays — it is
-the interface the axiom implements. When the specific-binary Umode tier is
-descoped, more of these lose their last consumer; recompute the fixpoint then
-rather than reading a list off this table.
-
-### REVIVAL (three steps, no proof work elsewhere)
-
-1. Uncomment the `USER-RULED TEMPORARY DESCOPE (2026-08-19)` block's two rows
-   in `iris/_CoqProject` and delete the `UserExecAxiom.v` row.
-2. In `iris/LinkUserretClosed.v` and `iris/LinkUserretUser.v`, put `ProofUser`
-   back in the `Require` line and rename the functor argument
-   `UserProof_USER_RULED_TEMPORARY_AXIOM` back to `UserProof`.
-3. `rm iris/UserExecAxiom.v`.
-
-The check that it really happened is `Print Assumptions` on
-`UserretClosedD.wp_userret_closed`: the axiom must be gone.
+**A DIFFERENT DESCOPE REMAINS, and this discharge does not touch it**: §P8's
+Umode tier — the proofs of the specific binaries `sync` / `echo` / `sh` /
+`init` — is still out of the build under the same 2026-08-19 ruling. Its
+block in `iris/_CoqProject` is untouched here.
 
 ---
 
