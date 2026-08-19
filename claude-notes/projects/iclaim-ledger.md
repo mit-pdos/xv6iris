@@ -2528,3 +2528,118 @@ which is the whole content those two tops would inherit from this item.
     THIRD un-landed item at ProofIlock that no red-set line in this file has
     ever named, and RULING C′ removed the licence content its recorded
     discharge depends on.
+
+### 5⁗‴ RULING R-c (2026-08-19, Fable design fork): the frozen mass moves to
+### the ESCROW TAIL — ProofIlock:2422 closes licence-free, PROBED GREEN
+
+PROBE: `iris/ZZProbeFrzArm.v` (untracked, COMPILE-EXIT=0, all five lemmas
+**Closed under the global context**; pinned at `7d102ff3f6`).
+
+**THE RULING.**  §5⁗″'s R-a and R-b are both rejected; R-c lands with two
+amendments over its sketch:
+
+1. **The mass already sits parked for the whole span — only its HOME is
+   wrong.**  Since A⁗/IVc, `IcacheInv.frz_park`'s ON arm holds the
+   freezer's slice (`live_frac k s`, `½ ≤ s`) plus the escrow's `½` from
+   the mint (`IputFreeLockedDev:844` `frz_park_intro_on`, consuming the
+   walk's `Hlvr`/`Hlvh` at generation g1) to the `+0x82` reclaim
+   (`:1344 frz_park_pre_reclaim`).  The walk is GREEN without touching it
+   mid-span — so relocation is free of custody risk.  It moves from
+   `islot2`'s live arm (itable-lock side, unreachable at ilock) to the
+   ESCROW TAIL:
+
+       ic_frz_park z k := ifreeze_off z
+                        ∨ (frzown z ∗ (∃ s, ⌜½ ≤ s⌝ ∗ live_frac k s)
+                                   ∗ live_frac k ½)
+
+   which `ic_swap_checkout` hands out — i.e. the mass arrives exactly at
+   the :2422 obligation.
+
+2. **Both arms decide at both readers, with NO two-half receipt and NO
+   licence content** (the §5⁗″ worry about an undecidable slot is closed):
+   - ON arm: ANY caller's share carries a positive `live_frac`
+     (`probe_share_live`), and parked `½ + ½ + s' > 1` is
+     `IcacheInv.frz_mass_absurd` — **pure own_valid, no invariant, no
+     lock** (`probe_arm_refute`).  Uniform for ClaimK/PlainK/ShotK: ilock's
+     :2422 needs nothing from its index.
+   - OFF arm: the tail's token IS the f-fragment; against a region auth at
+     `FrzPre`, `link_freeze_agree` + `discriminate` (`probe_arm_off_absurd`).
+     This is idup's decider (it holds the region open at `FrzPre`); ilock's
+     OFF arm is simply the normal case (the `ifreeze_off` its post wants).
+   - The mint deposit and the `+0x8a` reclaim are plain re-bundlings of the
+     resources the walk provably holds at those lock-held endpoints
+     (`probe_mint_deposit`, `probe_close_reclaim`).
+
+3. **Reachability note (why the OUT window needs only the freezer's own
+   choreography):** the freezer takes the sleeplock at `+0x5a` BEFORE
+   releasing the itable lock at `+0x66`, so no foreign ilock can check out
+   during the OUT window (`0x5a–0x76`); the mass transits through the
+   freezer's own hand there (its checkout receives the frozen tail, the
+   `+0x5e` `DepFrz` deposit and the `+0x70/76` re-park carry it).  Foreign
+   checkouts see only the PARKED tail — where the mass sits.
+
+**THE 7c BRIEF (dependency order):**
+  1. `IcacheEscrow`: `ic_frz_park` gains the slot index + the mass conjunct
+     (shape above); `ic_out_frz` (`DepFrz`) gains the two live slices; the
+     frozen-case lemmas (`ic_swap_park_arm`, the checkout hand-out,
+     `ic_mk_parked_arm`, `ic_close_to_empty_frz`) carry them through.
+  2. `IcacheInv`: `frz_park` slims to the mirror bit (`frzm_h` only — keep
+     the region tie); `frz_park_intro_on` / `frz_park_pre_reclaim` /
+     `frz_park_shr_off` retire or move to escrow-side twins per the probe's
+     P3 shapes; `frz_park_ref1_off` (the mint decider, pre-park, in-hand
+     mass) survives against the slimmed park.
+  3. The walk (both files Qed — surgical): the `:844` mint deposit
+     re-targets the escrow tail (the mint's token swap and the mass deposit
+     are ONE escrow open); `+0x5e`/`+0x70` frozen transitions carry the
+     slices; the `:1344` reclaim comes back through the eviction's
+     `ic_close_to_empty_frz`.
+  4. `ProofIdup`: the kill re-routes to the escrow tail two-case (OFF →
+     `probe_arm_off_absurd` against its region open at FrzPre; ON →
+     `probe_arm_refute` with its own share).  `SpecIdup` untouched.
+  5. `ProofIlock:2422`: destructure the handed tail — OFF arm proceeds (the
+     post's `ifreeze_off`), ON arm dies by `probe_arm_refute` with the
+     caller's share.  GREEN.
+  6. **Re-run 7b″'s blocked gate in full**: whole-tree to fixpoint
+     (target red = {`ProofIput`} + its Link* cone alone); `Print
+     Assumptions` on the create top (`LinkCreate.v`'s export) AND the
+     sys_unlink top (`LinkSysUnlink.v`'s) = THE STANDING SIX + funext
+     ALONE; audit greps (`create_fresh_ty` → lemma + tombstones; SpanL /
+     GreyL → tombstones); `tools/proof_coverage.py --check` (the four
+     `assumes Axiom` lines gone) and `tools/lemma_diff.py` — outputs
+     verbatim.
+
+**TRIPWIRES:** (t1) the mint's one-open claim fails (token swap and mass
+deposit can't share the escrow open) — stop with the mask/arm mismatch;
+(t2) a `DepFrz` consumer (IVd named six) rejects the widened shape; (t3)
+anything forces a `SpecIdup`/`SpecIlock` text change beyond what 7b″
+landed; (t4) red-set growth; (t5) the freezer's own checkout cannot SELECT
+the frozen arm (the disjunction must arrive raw, as :2422 shows it does).
+
+### 5⁗⁗ RULING R-e ACCEPTED (2026-08-19, coordinator, from the 7c executor's
+### probed report — W1/W2/W3 in ZZProbeFrzArm.v are the evidence)
+
+R-c is DEAD: its frozen-arm shape is globally unsatisfiable (W1 — the arm's
+whole-unit park is inconsistent with live_slot at any live slot; W2 — the
+mint's q is strictly below ½, so the tail can hold at most q + ½). The R-c
+probe was green vacuously; LESSON, binding on all future probes: a probe of
+an invariant-arm design MUST include a SATISFIABILITY witness for the arm
+(an intro lemma from the real mint-site resources), not only the use-side
+kill lemmas.
+
+ADOPTED: R-e — the mass lives in the INVARIANT. live_slot's live arm gains a
+FROZEN alternative holding the WHOLE unit (the freezer's q + the escrow's ½
++ the table's own ½ − q, joined at the mint inside the one itable_inv
+opening live_slot_regen already takes, under the itable lock), tied to the
+escrow's frozen tail by half of a new per-slot exclusive ghost. Any reader
+with a positive live_frac k s' kills the frozen alternative by
+live_frac_full_excl — no lock, no licence, no region open, index-independent
+— discharging ProofIlock:2422 AND ProofIdup's decider (whose frzm_h … false
+comes off the same ghost). Mint deposit and +0x82/+0x8a reclaim stay at the
+same two endpoints, re-homed. R-f (count-one pin) is REJECTED — circular.
+
+Cost accepted as priced: IcacheInv (live_slot shape + the ghost + the five
+count movers' re-establishment), IcacheEscrow (the tail's ghost half), both
+walk files, ProofIdup, ProofIlock. 7d executes: PROBE FIRST (the
+satisfiability witness from IputFreeLockedDev:844's real resources + the
+kill + the movers' re-establishment skeleton), then the increment, then
+7b″'s full payout gate.

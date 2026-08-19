@@ -1141,7 +1141,11 @@ Section IcacheBootTable.
        [IcacheRef.icfg_live] of the AMBIENT cache, so this lemma may not
        mint it.  [IcacheRef.icfg_alloc] + [IcacheRef.live_boot_split] is
        what discharges it. *)
-    ([∗ list] k ∈ seq 0 NINODE, live_frac k 1%Qp) -∗
+    (* RULING R-e: [live_boot_map] mints the RESERVED half of the keyspace
+       ([NINODE + k], the per-slot freeze selector) in the same [own_alloc],
+       so this premise simply runs to [NINODE + NINODE] and
+       [live_pool_empty] retags the upper half to [false] on the way in. *)
+    ([∗ list] k ∈ seq 0 (NINODE + NINODE), live_frac k 1%Qp) -∗
     (* THE PER-SLOT SLEEPLOCK GHOSTS, as [IcacheRef.icfg_alloc] hands them
        over: an unbuilt lock's free arm, and the AUTHORITATIVE ZERO of its
        outstanding-share count.  A PREMISE for the same reason the count
@@ -1189,11 +1193,12 @@ Section IcacheBootTable.
     iDestruct (itable_half_split with "Hauth") as "[HhalfI HhalfL]".
     iMod (ic_names_alloc dvs) as (cn) "(Htok & Hmid & Hgid)".
     (* ---- the [ref]-word invariant ---- *)
+    iMod (live_pool_empty with "Hlive") as "Hpool0".
     iMod (inv_alloc icacheN E itable_body
-            with "[HhalfI Href Hlive]") as "#Hitinv".
+            with "[HhalfI Href Hpool0]") as "#Hitinv".
     { iNext. iExists ∅. iFrame "HhalfI". iSplitR; [iPureIntro; exact icM_wf_empty |].
       iSplitL "Href"; [iApply iref_cells_boot; iExact "Href" |].
-      iApply live_pool_empty. iExact "Hlive". }
+      iExact "Hpool0". }
     (* ---- the fifty escrows, at the EMPTY arm, and the table's shares ---- *)
     iDestruct (big_sepL_sep_2 with "Hid Hvalid") as "H1".
     iDestruct (big_sepL_sep_2 with "H1 Hmirror") as "H2".

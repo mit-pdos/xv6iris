@@ -562,9 +562,9 @@ Section FreeEntryDev.
     (* ---- THE REF-1 PARK DECISION (A⁗, §3.16) ---- *)
     iDestruct "Hrtok" as "(Hrfrg0 & Hrlv0 & Hrslh0)".
     iApply fupd_wp.
-    iMod (frz_park_ref1_off ⊤ Mt k (bv_unsigned inum) q
-            ltac:(solve_ndisj) HMk1 with "Hitinv Hhalf Hrlv0 Hpark")
-      as "(Hhalf & Hrlv0 & Hmirf)".
+    iMod (frz_park_ref1_off ⊤ k (bv_unsigned inum) q
+            ltac:(solve_ndisj) Hk with "Hitinv Hrlv0 Hpark")
+      as "(Hrlv0 & Hmirf & Hself)".
     iModIntro.
     iAssert (iref_tok k q) with "[Hrfrg0 Hrlv0 Hrslh0]" as "Hrtok";
       [ rewrite /iref_tok; iFrame |].
@@ -611,7 +611,7 @@ Section FreeEntryDev.
       destruct vld.
       - (* LOADED: the payload leaves with us; the FULL inum cell stays *)
         rewrite /ic_payload_arm.
-        iDestruct "Hpayl" as "[(Hpayl & Hoff & Hlvh) | Hrc]"; last first.
+        iDestruct "Hpayl" as "[(Hpayl & Hoff & Hlvh) | [Hrc _]]"; last first.
         { iMod (ireg_frzown_off_absurd (⊤ ∖ ↑minstretN ∖ ↑icEscN)
                   γi γfs inodestart nib inum ltac:(solve_ndisj) Hnib
                   with "Hireg Hmirf Hrc") as "[]". }
@@ -671,11 +671,11 @@ Section FreeEntryDev.
                        = mword_of_int (KernelSyms.iput + 0x20)) by pcw.
       iEval (rewrite Hpp20b) in "Hpc".
       iDestruct "Hrem" as "[Hrident Hrest]".
-      iDestruct ("Hback" $! Mt ci with "[%] [%] [Hrest Hiu Hgid Hcnt1 Hmirf]") as "Hslots";
+      iDestruct ("Hback" $! Mt ci with "[%] [%] [Hrest Hiu Hgid Hcnt1 Hmirf Hself]") as "Hslots";
         [ intros i Hi; reflexivity | intros i Hi; reflexivity | | ].
       { rewrite /islot2 HMk1 Hcik. iFrame "Hiu Hgid Hcnt1".
         iSplitL "Hrest"; [iExact "Hrest" |].
-        iApply (frz_park_intro_off with "Hmirf"). }
+        iApply (frz_park_intro_off with "Hmirf Hself"). }
       iApply ("HcA" $! F1 vg4 vg5 vg6
                 with "[%] [%] Hcg Hcnt Hpay Hextc Hclm Hpc Htok Hhalf Hiauth Hipool
                       Hslots Hpool [Hrtok Hrident] Hbms Hins Hbm Hppid Hbslots Hvlb
@@ -968,10 +968,10 @@ Section FreeEntryDev.
                   with "Hidv Hinh Hvld [Hpayl Hoff Hlvh] Hmt Hgida").
         rewrite /ic_payload_arm. iLeft. iFrame "Hpayl Hoff Hlvh". }
       iModIntro.
-      iDestruct ("Hback" $! Mt ci with "[%] [%] [Htd Htn Hiu Hgid Hcnt1 Hmirf]") as "Hslots";
+      iDestruct ("Hback" $! Mt ci with "[%] [%] [Htd Htn Hiu Hgid Hcnt1 Hmirf Hself]") as "Hslots";
         [ intros i Hi; reflexivity | intros i Hi; reflexivity | | ].
       { rewrite /islot2 HMk1 Hcik. iFrame "Hiu Hgid Hcnt1".
-        iSplitR "Hmirf"; [| iApply (frz_park_intro_off with "Hmirf")].
+        iSplitR "Hmirf Hself"; [| iApply (frz_park_intro_off with "Hmirf Hself")].
         rewrite /islot_rest_at Ert /IcacheRef.inode_ident. iFrame. }
       (* ===== +0xcc c.ldsp s2,16(sp) ; +0xce c.ldsp s4,0(sp) ===== *)
       iPoseProof (ipi_cc with "Htext") as "Hicc".

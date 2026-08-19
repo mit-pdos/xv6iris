@@ -850,8 +850,17 @@ Class icfg := MkIcfg {
    nothing needs to -- every slot is FREE, no arm carries a per-generation
    one-shot, and the first [iget] recycle bumps the slot it takes to a fresh
    generation of its own. *)
+(* ---- THE RESERVED HALF OF THE KEYSPACE (RULING R-e) ----
+   Slot [k]'s FREEZE SELECTOR (see [frzsel] below) is filed in THIS ghost at
+   the key [NINODE + k].  No slot ever names such a key -- every consumer of
+   the pool is stated at [k < NINODE] ([IcacheInv.live_pool_live],
+   [live_pool_acc_upd], the five count movers) -- so the two halves of the
+   keyspace cannot meet, and the selector costs no [inG], no [icfg] field and
+   no new boot premise anywhere: the SAME [own_alloc] mints both.
+   [live_seq_valid] is already stated at an arbitrary [n],[m], so
+   [live_boot_map_valid] does not move. *)
 Definition live_boot_map (g : gname) : iliveUR :=
-  ([^op list] k ∈ seq 0 NINODE,
+  ([^op list] k ∈ seq 0 (NINODE + NINODE),
      ({[ k := (1%Qp, to_agree (g : leibnizO gname)) ]} : iliveUR)).
 
 Local Lemma live_seq_lookup_lt (g : gname) (n m i : nat) :
@@ -2361,13 +2370,107 @@ Section IcacheRefGhost.
   (* the boot map fans out into the fifty units the invariant starts with *)
   Lemma live_boot_split (g : gname) :
     own icfg_live (live_boot_map g)
-      ⊢ [∗ list] k ∈ seq 0 NINODE, live_frac k 1%Qp.
+      ⊢ [∗ list] k ∈ seq 0 (NINODE + NINODE), live_frac k 1%Qp.
   Proof.
     rewrite /live_boot_map.
     iIntros "H".
     iDestruct (big_opL_own_1 with "H") as "H".
     iApply (big_sepL_mono with "H").
     intros idx j _. iIntros "H". by iExists g.
+  Qed.
+
+  (* ================================================================== *)
+  (*  THE PER-SLOT FREEZE SELECTOR (iclaim-ledger.md §5⁗⁗, RULING R-e)     *)
+  (* ================================================================== *)
+
+  (* R-e homes the freezer's parked liveness mass in the INVARIANT --
+     [IcacheInv.live_slot]'s live arm gains a FROZEN alternative holding the
+     WHOLE unit -- and ties that alternative to the escrow's frozen tail by
+     the two halves of THIS per-slot agreement.  Everything decides off it:
+
+       * a reader with the tail's half and ANY positive [live_frac k s']
+         kills the frozen alternative with no lock, no licence, no region
+         open and no index ([IcacheInv.frz_slot_kill] -- ProofIlock:2422 and
+         ProofIdup's decider, both);
+       * the licensed up-count, which holds no live slice of its own, kills
+         it with the OFF half [IcacheInv.frz_park] hands it.
+
+     IT LIVES IN THE LIVENESS GHOST at the reserved key [NINODE + k] (see
+     [live_boot_map]).  The BOOLEAN rides in the generation's [to_agree]
+     cell as one of two RESERVED LITERAL names: that cell holds an arbitrary
+     [gname] VALUE -- never a name that has to have been allocated -- so two
+     distinct literals give exactly the two-half agreement R-e asks for.  Cf.
+     [icnt]/[frzm], which pay a whole [inG] and an [icfg] field for the same
+     thing because THEIR keyspace (the inum's [Z]) is not ours to reserve. *)
+  Definition frzname (b : bool) : gname := if b then 2%positive else 1%positive.
+
+  Definition frzsel (k : nat) (q : Qp) (b : bool) : iProp Σ :=
+    live_gen (NINODE + k)%nat q (frzname b).
+
+  Global Instance frzsel_timeless k q b : Timeless (frzsel k q b).
+  Proof. rewrite /frzsel /live_gen. apply _. Qed.
+
+  Lemma frzsel_agree k q1 b1 q2 b2 :
+    frzsel k q1 b1 -∗ frzsel k q2 b2 -∗ ⌜b1 = b2⌝.
+  Proof.
+    iIntros "H1 H2". rewrite /frzsel.
+    iDestruct (live_gen_agree with "H1 H2") as %Heq.
+    iPureIntro. rewrite /frzname in Heq.
+    destruct b1, b2; [reflexivity | discriminate | discriminate | reflexivity].
+  Qed.
+
+  Lemma frzsel_split k q1 q2 b :
+    frzsel k (q1 + q2)%Qp b ⊣⊢ frzsel k q1 b ∗ frzsel k q2 b.
+  Proof. rewrite /frzsel. apply live_gen_split. Qed.
+
+  Lemma frzsel_join k q1 q2 b :
+    frzsel k q1 b -∗ frzsel k q2 b -∗ frzsel k (q1 + q2)%Qp b.
+  Proof. iIntros "H1 H2". rewrite frzsel_split. iFrame. Qed.
+
+  Lemma frzsel_halve k q b :
+    frzsel k q b -∗ frzsel k (q/2)%Qp b ∗ frzsel k (q/2)%Qp b.
+  Proof. iIntros "H". rewrite -frzsel_split Qp.div_2. iFrame. Qed.
+
+  (* the two quarters the frozen span keeps apart -- one in [frz_park]'s ON
+     arm (the itable-lock side), one in the escrow's frozen tail -- rejoined
+     at the retirement.  Written [(1/2)/2] throughout so that every split is
+     [Qp.div_2] and no [Qp] numeral arithmetic is ever needed. *)
+  Lemma frzsel_quarters k b :
+    frzsel k ((1/2)/2)%Qp b -∗ frzsel k ((1/2)/2)%Qp b -∗ frzsel k (1/2)%Qp b.
+  Proof.
+    iIntros "H1 H2". iDestruct (frzsel_join with "H1 H2") as "H".
+    by iEval (rewrite Qp.div_2) in "H".
+  Qed.
+
+  (* THE FLIP, and it is available ONLY at the whole element -- which IS the
+     two-endpoint discipline: the mint must gather the arm's ½ and the
+     park's ½, and the retirement the arm's ½ and the two quarters. *)
+  Lemma frzsel_flip k b b' : frzsel k 1%Qp b ==∗ frzsel k 1%Qp b'.
+  Proof.
+    rewrite /frzsel /live_gen. iIntros "H".
+    iMod (own_update _ _
+            ({[ (NINODE + k)%nat
+                := (1%Qp, to_agree (frzname b' : leibnizO gname)) ]} : iliveUR)
+           with "H") as "H".
+    { apply singleton_update, cmra_update_exclusive.
+      split; [by apply frac_valid | done]. }
+    by iModIntro.
+  Qed.
+
+  (* boot: the reserved key's unit arrives at the generation [icfg_alloc]
+     minted, and is retagged to the [false] literal before it enters the
+     arm ([IcacheInv.live_pool_empty]). *)
+  Lemma frzsel_boot (k : nat) :
+    live_frac (NINODE + k)%nat 1%Qp ==∗ frzsel k 1%Qp false.
+  Proof.
+    rewrite /frzsel /live_frac /live_gen. iIntros "[%g H]".
+    iMod (own_update _ _
+            ({[ (NINODE + k)%nat
+                := (1%Qp, to_agree (frzname false : leibnizO gname)) ]} : iliveUR)
+           with "H") as "H".
+    { apply singleton_update, cmra_update_exclusive.
+      split; [by apply frac_valid | done]. }
+    by iModIntro.
   Qed.
 
   (* ---- a reference's count fragment, and the reference token ---- *)

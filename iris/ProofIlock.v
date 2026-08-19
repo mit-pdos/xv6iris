@@ -2420,8 +2420,28 @@ Section ProofIlockMain.
     iApply fupd_wp.
     iInv "Hesc" as ">Hbody" "Hclose".
     iMod (ic_swap_checkout cn gfs gi cov logstart k (DepShr s dev inum g) g
-            dev inum eq_refl with "Hbody Htok [Href]") as "(Hbody & Hdep & Hout)".
+            dev inum eq_refl with "Hbody Htok [Href]") as "[Hok | Hfrz]".
     { rewrite /ic_dep_own. iSplitR; [iPureIntro; done |]. iExact "Href". }
+    2:{ (* ============ DEVIATION 1's OWED OBLIGATION, PAID BY RULING R-e
+           (iclaim-ledger.md §5⁗⁗).  The checkout may find the free path's
+           FROZEN PARK, and ilock holds no licence that decides it -- RULING
+           C' took that content away (§5⁗″.2), and neither PlainK nor ShotK
+           can get it back.
+
+           R-e pays it from the INVARIANT.  The frozen tail carries a quarter
+           of the slot's freeze SELECTOR, whose other half sits in
+           [IcacheInv.live_slot]'s frozen alternative BESIDE THE SLOT'S WHOLE
+           LIVENESS UNIT; and the deposit the checkout hands straight back
+           carries this caller's own positive slice.  A whole unit and a
+           positive slice cannot coexist, so the branch is dead -- with NO
+           lock, NO licence, NO region open, and NOTHING read off the index,
+           which is why the same line serves ClaimK, PlainK and ShotK. ==== *)
+        iDestruct "Hfrz" as "(Htok & Hown & Hrcpt & Hsel & Hwand)".
+        iDestruct (ic_dep_own_live with "Hown") as (s0 g0) "(%Hg0 & Hlv & _)".
+        iMod (frz_slot_kill (⊤ ∖ ↑icEscN) k ((1/2)/2)%Qp s0
+                ltac:(solve_ndisj) Hk with "Hitbl Hsel [Hlv]") as "[]".
+        iExists g0. iExact "Hlv". }
+    iDestruct "Hok" as "(Hbody & Hdep & Hout)".
     iMod ("Hclose" with "[Hbody]") as "_"; [iNext; iExact "Hbody" |].
     iModIntro.
     iDestruct "Hout" as (vv) "(Hidev & Hinumc & Hvalid & Hpay)".

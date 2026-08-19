@@ -981,7 +981,13 @@ Section IcacheEscrow.
     ((ic_payload_np γfs γi cov logstart k inum g v
       ∗ ifreeze_off (bv_unsigned inum)
       ∗ live_gen k (1/2) g)
-     ∨ frzown (bv_unsigned inum))%I.
+     (* RULING R-e (iclaim-ledger.md §5⁗⁗): the frozen alternative carries the
+        SELECTOR's quarter beside the receipt.  That quarter is what turns
+        ProofIlock:2422 from an unpayable obligation into one line: with it
+        and the live slice inside the deposit [ic_swap_checkout] hands back,
+        [IcacheInv.frz_slot_kill] closes -- no lock, no licence, no region
+        open, no index. *)
+     ∨ (frzown (bv_unsigned inum) ∗ frzsel k ((1/2)/2)%Qp true))%I.
 
   Global Instance ic_payload_arm_timeless γfs γi cov logstart k inum g v :
     Timeless (ic_payload_arm γfs γi cov logstart k inum g v).
@@ -1000,9 +1006,9 @@ Section IcacheEscrow.
 
   (* ...and the FROZEN alternative, which is the receipt alone *)
   Lemma ic_payload_arm_frz γfs γi cov logstart k inum g v :
-    frzown (bv_unsigned inum) -∗
+    frzown (bv_unsigned inum) -∗ frzsel k ((1/2)/2)%Qp true -∗
     ic_payload_arm γfs γi cov logstart k inum g v.
-  Proof. rewrite /ic_payload_arm. iIntros "H". iRight. iExact "H". Qed.
+  Proof. rewrite /ic_payload_arm. iIntros "H Hs". iRight. iFrame. Qed.
 
   (* THE DECIDER at the free path's two readers (+0x70, +0x8a): the
      [ifreeze_pre] the walk has kept in hand since the mint kills the LEFT
@@ -1011,7 +1017,8 @@ Section IcacheEscrow.
   Lemma ic_payload_arm_decide_frz γfs γi cov logstart k inum g v :
     ifreeze_pre (bv_unsigned inum) -∗
     ic_payload_arm γfs γi cov logstart k inum g v -∗
-    ifreeze_pre (bv_unsigned inum) ∗ frzown (bv_unsigned inum).
+    ifreeze_pre (bv_unsigned inum) ∗ frzown (bv_unsigned inum) ∗
+    frzsel k ((1/2)/2)%Qp true.
   Proof.
     rewrite /ic_payload_arm. iIntros "Hpre [(_ & Hoff & _) | Hrc]".
     - iExFalso. rewrite /ifreeze_pre /ifreeze_off.
@@ -1320,7 +1327,11 @@ Section IcacheEscrow.
         (⌜dv = dev /\ nu = inum⌝ ∗
          iref_frag k qf ∗
          inode_ident k (DfracOwn qf) dev inum ∗
-         frzown (bv_unsigned inum))%I
+         frzown (bv_unsigned inum) ∗
+         (* RULING R-e: the selector's quarter rides the DepFrz window too --
+            it is the same quarter, moving from the mint through the OUT arm
+            to [ic_parked]'s frozen tail at the +0x70 park. *)
+         frzsel k ((1/2)/2)%Qp true)%I
     | _ => False%I
     end.
 
@@ -1633,8 +1644,8 @@ Section IcacheEscrow.
            i_valid (ientry k) ↦₄ valid_word v ∗
            ic_payload γfs γi cov logstart k inum g v))
        ∨ (ic_tok cn k ∗ ic_dep_own k d dev inum ∗
-          frzown (bv_unsigned inum) ∗
-          (frzown (bv_unsigned inum) -∗
+          frzown (bv_unsigned inum) ∗ frzsel k ((1/2)/2)%Qp true ∗
+          (frzown (bv_unsigned inum) -∗ frzsel k ((1/2)/2)%Qp true -∗
              ic_escrow_body cn γfs γi cov logstart k))).
   Proof.
     iIntros (Hdg) "Hbody Htok Hown".
@@ -1652,14 +1663,16 @@ Section IcacheEscrow.
            [False] against the region's own copy) with the wand that puts it
            back -- the arm cannot simply give it away, being the only home
            it has while the column reads [FrzPre]. *)
+        iDestruct "Hrcpt" as "[Hrcpt Hsel]".
         iModIntro. iRight.
         iSplitL "Htok"; [iExact "Htok" |].
         iSplitL "Hown"; [iExact "Hown" |].
         iSplitL "Hrcpt"; [iExact "Hrcpt" |].
-        iIntros "Hrcpt".
+        iSplitL "Hsel"; [iExact "Hsel" |].
+        iIntros "Hrcpt Hsel".
         iLeft. rewrite /ic_parked. iExists dev, inum, v, ga.
         iFrame "Hid Hin Hvld Hmid Hgid".
-        rewrite /ic_payload_arm. iRight. iExact "Hrcpt". }
+        rewrite /ic_payload_arm. iRight. iFrame. }
       (* THE GENERATION AGREEMENT (§17.3 (A)): the arm's 1/2 and the
          depositor's own slice are two slices of ONE slot's unit, so they
          name one generation -- which is what lets the payload come out at
@@ -1830,14 +1843,14 @@ Section IcacheEscrow.
       { rewrite /ic_dep_res /ic_dep_own /ic_dep_half /=.
         iDestruct "Hres" as "[[] _]". }
       rewrite /ic_out_frz.
-      iDestruct "Hfrz" as "([%Hdv %Hnu] & Hfr & [Hrd Hrn] & Hrc)".
+      iDestruct "Hfrz" as "([%Hdv %Hnu] & Hfr & [Hrd Hrn] & Hrc & Hsel)".
       subst dev' inum'.
       iModIntro.
       iSplitR "Htok Hfr Hrd Hrn";
         [| iFrame "Htok Hfr"; iFrame "Hrd Hrn"].
       iLeft. rewrite /ic_parked. iExists dev, inum, v, inhabitant.
       iFrame "Hid Hin Hvld Hmid Hgid".
-      iApply (ic_payload_arm_frz with "Hrc").
+      iApply (ic_payload_arm_frz with "Hrc Hsel").
     - iDestruct "Hmid" as (dev' inum' w) "(_ & _ & Hvld' & _ & _)".
       iExFalso. iApply (ic_word4_excl with "Hvld Hvld'").
     - iDestruct "Hvg" as (dev' inum' w) "(_ & _ & Hvld' & _ & _ & _)".
@@ -1957,6 +1970,101 @@ Section IcacheEscrow.
           [iExists gd; iExact "Hlvs" |].
         iMod (live_whole_share_absurd Eo M k q s 1%positive HE HMk
                 with "Hinv Hhalf Hlv Hfh Hfs") as "[]".
+    - iDestruct "Hmid" as (dev' inum' w) "(_ & Hin & _ & _ & _)".
+      iDestruct "Hid" as "[_ Hqi]".
+      iExFalso. iApply (ic_word4_excl with "Hin Hqi").
+    - (* EMPTY: the opener's own dev fraction against the arm's full cell *)
+      iDestruct "Hvg" as (dev' inum' w) "(Hidv & _ & _ & _ & _ & _)".
+      iDestruct "Hid" as "[Hqd _]".
+      iExFalso. iApply (ic_word4_excl with "Hidv Hqd").
+    - (* HELD (§13.13): the opener's inum fraction against the FULL cell.
+         This is what keeps iput's own LAST CLOSE (which is this lemma) from
+         ever meeting its own window arm. *)
+      iDestruct "Hhd" as (dev' inum' w) "(_ & Hin & _ & _ & _)".
+      iDestruct "Hid" as "[_ Hqi]".
+      iExFalso. iApply (ic_word4_excl with "Hin Hqi").
+  Qed.
+
+  Lemma ic_open_auth_frz cn γfs γi cov logstart k (Eo : coPset)
+      (M : gmap nat (Qp * positive)) (q qi : Qp) (dev inum : mword 32) :
+    ↑icacheN ⊆ Eo -> (k < NINODE)%nat ->
+    M !! k = Some (q, 1%positive) ->
+    itable_inv -∗
+    ic_escrow_body cn γfs γi cov logstart k -∗
+    itable_half M -∗
+    (* RULING R-e: at iput+0x82 the freezer's live slice is NOT in its hand --
+       it has been in [IcacheInv.live_slot]'s frozen alternative since the mint
+       -- so this opener arrives with the bare COUNT FRAGMENT and the freeze
+       SELECTOR's quarter, and the [DepShr] arm's REF-1 refutation runs off
+       [IcacheInv.frz_slot_kill] instead of [live_whole_share_absurd]. *)
+    iref_frag k q -∗ frzsel k ((1/2)/2)%Qp true -∗
+    inode_ident k (DfracOwn qi) dev inum -∗
+    |={Eo}=>
+    itable_half M ∗
+    iref_frag k q ∗ frzsel k ((1/2)/2)%Qp true ∗
+    inode_ident k (DfracOwn qi) dev inum ∗
+    (∃ (v : bool) (g : gname),
+       i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev ∗
+       i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum ∗
+       i_valid (ientry k) ↦₄ valid_word v ∗
+       (* THE ARM's TAIL (A⁗, §3.16): the ordinary payload + token + the
+          arm's liveness half, or the free path's FROZEN PARK -- the receipt
+          alone.  iput's last close decides it with the [ifreeze_pre] it has
+          kept in hand since the mint
+          ([ic_payload_arm_decide_frz]); every other opener is on the
+          ordinary alternative and says so with its own token. *)
+       ic_payload_arm γfs γi cov logstart k inum g v ∗
+       ic_mid cn k ∗
+       ic_id cn k (1/2) true dev inum) ∗
+    (ic_parked cn γfs γi cov logstart k -∗
+     ic_escrow_body cn γfs γi cov logstart k).
+  Proof.
+    iIntros (HE Hk HMk) "#Hinv Hbody Hhalf Hfrq Hsel Hid".
+    iDestruct "Hbody" as "[Hpk | [Hout | [Hmid | [Hvg | Hhd]]]]".
+    - iDestruct "Hpk" as (dev' inum' v ga)
+        "(Hidv & Hin & Hvld & Hpay & Hmidt & Hgid)".
+      iDestruct "Hid" as "[Hidd Hidn]".
+      iDestruct (word4_pointsto_agree with "Hidd Hidv") as %<-.
+      iDestruct (word4_pointsto_agree with "Hidn Hin") as %<-.
+      iModIntro. iFrame "Hhalf Hfrq Hsel Hidd Hidn".
+      iSplitR "".
+      { iExists v, ga. iFrame. }
+      iIntros "Hp". by iLeft.
+    - iDestruct "Hout" as (d dev' inum') "(_ & Hres & _ & _)".
+      iDestruct "Hres" as "[Hres | Hfrz]".
+      2:{ (* THE FROZEN ALTERNATIVE (IVd): no live mass to argue with -- the
+             freer parked it -- and no live-mass complement to appeal to.
+             The COUNT FRAGMENT is what it left behind, and REF-1 kills it
+             with the opener's own, exactly as on the reference deposit. *)
+          rewrite /ic_out_frz. destruct d; try (iDestruct "Hfrz" as "[]").
+          iDestruct "Hfrz" as "(_ & Hfr' & _ & _ & _)".
+          iDestruct (iref_frag_two_lookup with "Hhalf Hfrq Hfr'")
+            as %(qt' & n & HMk' & Hn).
+          rewrite HMk in HMk'. injection HMk' as _ Hn1. subst n.
+          iExFalso. iPureIntro. cbn in Hn. lia. }
+      rewrite /ic_dep_res /ic_dep_own /ic_dep_half.
+      destruct d as [| q' dv nu gd | s dv nu gd | qf dv nu];
+        [| | | iDestruct "Hres" as "[[] _]"].
+      + iDestruct "Hres" as "[[] _]".
+      + iDestruct "Hres" as "[[_ (Hfr' & Hlv' & _)] _]".
+        (* the arm's reference has no sleeplock slice of its own (the lock
+           holds it), so the refutation's [iref_tok] borrows the OPENER's --
+           which is sound because the two are refuted together. *)
+        (* the arm's reference has no sleeplock slice of its own -- the
+           entry's LOCK holds it -- so the refutation reads the bare count
+           fragments, which is all it ever used. *)
+        iDestruct (iref_frag_two_lookup with "Hhalf Hfrq Hfr'")
+          as %(qt' & n & HMk' & Hn).
+        rewrite HMk in HMk'. injection HMk' as _ Hn1. subst n.
+        iExFalso. iPureIntro. cbn in Hn. lia.
+      + (* THE REF-1 REFUTATION OF A SHARE DEPOSIT, under the restated
+           ledger (§17.3 (A)): the opener's [q = qt], the invariant's
+           [1/2 - qt], the ARM's own 1/2 and the share's [s] sum past one.
+           The 1/2 is what §17.2's placement lost and what puts this back. *)
+        iDestruct "Hres" as "[[_ [_ Hlvs]] Hhf]".
+        iAssert (live_frac k s) with "[Hlvs]" as "Hfs";
+          [iExists gd; iExact "Hlvs" |].
+        iMod (frz_slot_kill Eo k ((1/2)/2)%Qp s HE Hk with "Hinv Hsel Hfs") as "[]".
     - iDestruct "Hmid" as (dev' inum' w) "(_ & Hin & _ & _ & _)".
       iDestruct "Hid" as "[_ Hqi]".
       iExFalso. iApply (ic_word4_excl with "Hin Hqi").
@@ -2349,15 +2457,15 @@ Section IcacheEscrow.
     i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum -∗
     i_valid (ientry k) ↦₄ valid_word v -∗
-    frzown (bv_unsigned inum) -∗
+    frzown (bv_unsigned inum) -∗ frzsel k ((1/2)/2)%Qp true -∗
     ic_mid cn k -∗
     ic_id cn k (1/2) true dev inum -∗
     ic_escrow_body cn γfs γi cov logstart k.
   Proof.
-    iIntros "Hd Hn Hv Hrc Hm Hg". iLeft.
+    iIntros "Hd Hn Hv Hrc Hsel Hm Hg". iLeft.
     rewrite /ic_parked. iExists dev, inum, v, inhabitant.
     iFrame "Hd Hn Hv Hm Hg".
-    iApply (ic_payload_arm_frz with "Hrc").
+    iApply (ic_payload_arm_frz with "Hrc Hsel").
   Qed.
 
   (* ...and its opener.  The freer identifies the arm by the identity slice it
@@ -2371,7 +2479,7 @@ Section IcacheEscrow.
     inode_ident k (DfracOwn q) dev inum -∗
     ic_tok cn k -∗
     ifreeze_pre (bv_unsigned inum) ∗ inode_ident k (DfracOwn q) dev inum ∗
-    ic_tok cn k ∗ frzown (bv_unsigned inum) ∗
+    ic_tok cn k ∗ frzown (bv_unsigned inum) ∗ frzsel k ((1/2)/2)%Qp true ∗
     (∃ v : bool,
        i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev ∗
        i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum ∗
@@ -2385,8 +2493,8 @@ Section IcacheEscrow.
     - iDestruct "Hpk" as (dev' inum' v ga) "(Hidv & Hin & Hvld & Hpay & Hmid & Hgid)".
       iDestruct (word4_pointsto_agree with "Hrd Hidv") as %<-.
       iDestruct (word4_pointsto_agree with "Hrn Hin") as %<-.
-      iDestruct (ic_payload_arm_decide_frz with "Hpre Hpay") as "[Hpre Hrc]".
-      iFrame "Hpre Hrd Hrn Htok Hrc".
+      iDestruct (ic_payload_arm_decide_frz with "Hpre Hpay") as "(Hpre & Hrc & Hsel)".
+      iFrame "Hpre Hrd Hrn Htok Hrc Hsel".
       iExists v. iFrame.
     - iDestruct "Hout" as (d' dev' inum') "(Hdep' & _ & _ & _)".
       iExFalso. iApply (ic_tok_deposit_excl with "Htok Hdep'").
@@ -2578,16 +2686,16 @@ Section IcacheEscrow.
     ic_deposit cn k (DepFrz qf dev inum) -∗
     iref_frag k qf -∗
     inode_ident k (DfracOwn qf) dev inum -∗
-    frzown (bv_unsigned inum) -∗
+    frzown (bv_unsigned inum) -∗ frzsel k ((1/2)/2)%Qp true -∗
     ic_mid cn k -∗
     ic_id cn k (1/2) true dev inum -∗
     ic_escrow_body cn γfs γi cov logstart k.
   Proof.
-    iIntros "Hdep Hfr Hid Hrc Hmt Hgid".
+    iIntros "Hdep Hfr Hid Hrc Hsel Hmt Hgid".
     iRight; iLeft. rewrite /ic_out. iExists (DepFrz qf dev inum), dev, inum.
     iFrame "Hdep Hmt Hgid". iRight.
     rewrite /ic_out_frz. iSplitR; [iPureIntro; split; reflexivity |].
-    iFrame "Hfr Hid Hrc".
+    iFrame "Hfr Hid Hrc Hsel".
   Qed.
 
   (* full ownership of a word is EXCLUSIVE -- [FileOff.word4_pointsto_excl]

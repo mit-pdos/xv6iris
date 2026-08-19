@@ -392,9 +392,9 @@ Section ProofIdup.
        ON arm is refuted and what comes out is the [false] mirror half that
        [iref_upgrade_mir_store_au] takes in place of an [iname]. *)
     iApply fupd_wp.
-    iMod (frz_park_shr_off ⊤ M k (bv_unsigned inum) qt s cnt
-            ltac:(solve_ndisj) HMk with "Hinv Hhalf Hrlive Hpark")
-      as "(Hhalf & Hrlive & Hmir)".
+    iMod (frz_park_shr_off ⊤ k (bv_unsigned inum) s
+            ltac:(solve_ndisj) Hk with "Hinv Hrlive Hpark")
+      as "(Hrlive & Hmir & Hsel)".
     iModIntro.
     assert (Hhalfsum : (1/2)%Qp = (qt + qr)%Qp) by (by apply Qp.sub_Some).
     assert (Hqv : (qt + qr/2 < 1/2)%Qp) by (by apply id_frac_lt1).
@@ -517,14 +517,14 @@ Section ProofIdup.
     iEval (rewrite Qp.div_2) in "Hsplit".
     iDestruct ("Hsplit" with "Hrest") as "[Hid1 Hid2]".
     iDestruct ("Hback" $! (<[k := ((qt + qr/2)%Qp, Pos.succ cnt)]> M) ci
-                 with "[%] [%] [Hid1 Hiu Hgid Hicnt Hmir]") as "Hslots".
+                 with "[%] [%] [Hid1 Hiu Hgid Hicnt Hmir Hsel]") as "Hslots".
     { intros j Hj. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
     { intros j Hj. reflexivity. }
     (* the ledger's [icnt] half goes back at the GROWN count, and the mirror
        half goes back into [frz_park]'s OFF arm -- which is where this proof
        found it, since the ON arm was refuted before the store. *)
     { rewrite /islot2 lookup_insert Hcik. iFrame "Hiu Hgid Hicnt".
-      iSplitR "Hmir"; [| rewrite /frz_park; by iLeft ].
+      iSplitR "Hmir Hsel"; [| iApply (frz_park_intro_off with "Hmir Hsel") ].
       rewrite /islot_rest_at (id_frac_rest qt qr Hhalfsum). iFrame. }
     iAssert (itable_res2 cn γfs γi cov logstart nib dev) with "[Hhalf Hiauth Hipool Hslots Hpool]" as "HRres".
     { iExists (<[k := ((qt + qr/2)%Qp, Pos.succ cnt)]> M), ci.

@@ -1385,6 +1385,7 @@ Section ProofIget.
                        isl_slot (<[e := ((1/2/2)%Qp, 1%positive)]> M) e ∗
                        iref_tok e (1/2/2)%Qp ∗
                        (∃ g : gname, live_gen e (1/2) g ∗ ity_pending g) ∗
+                       IcacheRef.frzsel e (1/2)%Qp false ∗
                        iname γi γfs inum l ∗
                        ifreeze_off (bv_unsigned inum) ∗
                        icnt_half (bv_unsigned inum) 1%nat ∗
@@ -1411,10 +1412,10 @@ Section ProofIget.
                 as "[Hcell Hback2]".
               iModIntro. iExists (iref_word M e). iFrame "Hcell". iIntros "Hcell".
               iMod ("Hback2" with "Hcell")
-                as "(Hhalf & Hisl & Htok2 & Hgen & Hlic & Hfoff & Hicnt1 & Hru)".
+                as "(Hhalf & Hisl & Htok2 & Hgen & Hsel & Hlic & Hfoff & Hicnt1 & Hru)".
               iModIntro. iFrame. }
             iApply wp_next_off_intro.
-            iIntros "Hcg Hpc (Hhalf & Hisl & Htok2 & (%gnew & Hlvh & Hpend) & Hlic & Hfoff & Hicnt1 & Hru)".
+            iIntros "Hcg Hpc (Hhalf & Hisl & Htok2 & (%gnew & Hlvh & Hpend) & Hsel & Hlic & Hfoff & Hicnt1 & Hru)".
             (* the slot's share authority goes back into the lock's resource *)
             iDestruct ("Hislback" $! (<[e := ((1/2/2)%Qp, 1%positive)]> M)
                          with "[%] Hisl") as "Hipool".
@@ -1466,7 +1467,7 @@ Section ProofIget.
             assert (Hp1 : Pos.to_nat 1 = 1%nat) by reflexivity.
             iDestruct ("Hback" $! (<[e := ((1/2/2)%Qp, 1%positive)]> M)
                          (<[e := (dev, inum)]> ci)
-                         with "[%] [%] [Hid1 Hislot Hgid2 Hicnt1 Hmir0]") as "Hslots".
+                         with "[%] [%] [Hid1 Hislot Hgid2 Hicnt1 Hmir0 Hsel]") as "Hslots".
             { intros i Hi. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
             { intros i Hi. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
             { rewrite /islot2 !lookup_insert Hp1.
@@ -1476,8 +1477,8 @@ Section ProofIget.
                  [icnt] column moves from the POOL's custody to this slot's
                  live arm (§2.2's "pool + live = every region inum"). *)
               iFrame "Hidd Hidn Hgid2 Hicnt1".
-              iSplitR "Hmir0";
-                [iExact "Hislot" | iApply (frz_park_intro_off with "Hmir0")]. }
+              iSplitR "Hmir0 Hsel";
+                [iExact "Hislot" | iApply (frz_park_intro_off with "Hmir0 Hsel")]. }
             iAssert (itable_res2 cn γfs γi cov logstart nib dev)
               with "[Hhalf Hiauth Hipool Hslots Hpool]" as "HRres".
             { iExists (<[e := ((1/2/2)%Qp, 1%positive)]> M), (<[e := (dev, inum)]> ci).
@@ -1865,7 +1866,8 @@ Section ProofIget.
            [frzm_agree].  The three MISS exits above re-park it untouched. *)
         iApply fupd_wp.
         iMod (frz_park_lic_off ⊤ γi γfs inodestart nib inum l j qj
-                ltac:(solve_ndisj) Hnib with "Hrinv Hlic Hpark") as "[Hlic Hmirj]".
+                ltac:(solve_ndisj) Hnib with "Hrinv Hlic Hpark")
+          as "(Hlic & Hmirj & Hselj)".
         iModIntro.
         iPoseProof (igi_56 with "Htext") as "Hi56".
         iPoseProof (igi_58 with "Htext") as "Hi58".
@@ -1922,11 +1924,12 @@ Section ProofIget.
                   (itable_half (<[j := ((qj + qj'/2)%Qp, Pos.succ nj)]> M) ∗
                    isl_slot (<[j := ((qj + qj'/2)%Qp, Pos.succ nj)]> M) j ∗
                    iref_tok j (qj'/2)%Qp ∗
+                   IcacheRef.frzsel j (1/2)%Qp false ∗
                    iname γi γfs inum l ∗
                    icnt_half (bv_unsigned inum) (Pos.to_nat (Pos.succ nj)) ∗
                    runit (is_claim l) (bv_unsigned inum))%I
                   (⊤ ∖ ↑minstretN ∖ ↑icacheN ∖ ↑iregN) false ltac:(solve_ndisj)
-                  with "Hcg Hpc Hi58 [Hhalf Hisl Hlic Hicnt]").
+                  with "Hcg Hpc Hi58 [Hhalf Hisl Hselj Hlic Hicnt]").
         { rewrite Hpa58 Hstv.
           (* THE BORROWED LICENCE (iclaim-ledger.md §3.1, RULING A): the
              incrementer holds no freeze token -- A-custody put it on the
@@ -1937,12 +1940,13 @@ Section ProofIget.
           iMod (iref_incr_store_au (⊤ ∖ ↑minstretN) γi γfs inodestart nib M j inum l
                   qj (qj'/2)%Qp nj
                   ltac:(solve_ndisj) ltac:(solve_ndisj) Hnib HMj Hqv Hno1 Hbno
-                  with "Hinv Hrinv Hhalf Hisl Hlic Hicnt") as "[Hcell Hback2]".
+                  with "Hinv Hrinv Hhalf Hisl Hselj Hlic Hicnt") as "[Hcell Hback2]".
           iModIntro. iExists (iref_word M j). iFrame "Hcell". iIntros "Hcell".
-          iMod ("Hback2" with "Hcell") as "(Hhalf & Hisl & Htok2 & Hlic & Hicnt & Hru)".
+          iMod ("Hback2" with "Hcell")
+            as "(Hhalf & Hisl & Htok2 & Hselj & Hlic & Hicnt & Hru)".
           iModIntro. iFrame. }
         iApply wp_next_off_intro.
-        iIntros "Hcg Hpc (Hhalf & Hisl & Htok2 & Hlic & Hicnt & Hru)".
+        iIntros "Hcg Hpc (Hhalf & Hisl & Htok2 & Hselj & Hlic & Hicnt & Hru)".
         iDestruct ("Hislback" $! (<[j := ((qj + qj'/2)%Qp, Pos.succ nj)]> M)
                      with "[%] Hisl") as "Hipool".
         { intros i Hi. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
@@ -1952,12 +1956,12 @@ Section ProofIget.
         iDestruct ("Hsplit" with "[Hdcell Hncell]") as "[Hid1 Hid2]";
           [ rewrite /inode_ident; iFrame | ].
         iDestruct ("Hback" $! (<[j := ((qj + qj'/2)%Qp, Pos.succ nj)]> M) ci
-                     with "[%] [%] [Hid1 Hiu Hgid Hicnt Hmirj]") as "Hslots".
+                     with "[%] [%] [Hid1 Hiu Hgid Hicnt Hmirj Hselj]") as "Hslots".
         { intros i Hi. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
         { intros i Hi. reflexivity. }
         { rewrite /islot2 lookup_insert Hcij. iFrame "Hiu Hgid Hicnt".
-          iSplitR "Hmirj";
-            [| iApply (frz_park_intro_off with "Hmirj")].
+          iSplitR "Hmirj Hselj";
+            [| iApply (frz_park_intro_off with "Hmirj Hselj")].
           rewrite /islot_rest_at (ig_frac_rest qj qj' ltac:(by apply Qp.sub_Some)).
           rewrite /inode_ident. iFrame. }
         iAssert (itable_res2 cn γfs γi cov logstart nib dev)
