@@ -752,6 +752,127 @@ Section UptTramp.
       [ exact Hcanon | exact Hvpn | exact Hident ].
   Qed.
 
+  (* ==================================================================== *)
+  (* THE USER-TABLE STEP ENGINE.                                           *)
+  (*                                                                      *)
+  (* [TrampStepPt.wp_instr_tramp_pt] at [Res := upt_res_pt uroot tfp um],   *)
+  (* on the bundle [UptTree.utlb_inv_pt] -- i.e. the shape                 *)
+  (* [SmodeCorePt.wp_instr_s_config_tlbinv_pt] has on [tlb_res_pt], with   *)
+  (* [upt_swp_open]/[upt_swp_close] as the bundle face and the trampoline   *)
+  (* fetch underneath.  The user table is NOT an [s_regime] and cannot be   *)
+  (* one ([sr_swp_translate] is keyed on a [kmap_at] claim, and the user    *)
+  (* table's mapping facts come from [um]), so this is the bespoke twin of  *)
+  (* [TrampStepPt.wp_instr_ktramp_pt_share] rather than an instance.        *)
+  (*                                                                      *)
+  (* The fetch obligation costs the caller NOTHING beyond [hw_config]: the  *)
+  (* trampoline claim is the trampoline CLAUSE of [upt_tree_spec], i.e. it  *)
+  (* is already inside the bundle.                                          *)
+  (* ==================================================================== *)
+  Lemma wp_instr_u_pt (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64))
+      (pc pa : mword 64) (is_rvc : bool) (i : instruction)
+      (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
+      (mie1 menvcfg1 : mword 64)
+      (Rl : mword 64 -> mword 64 -> mword 64 -> iProp Σ) {dq : dfrac} :
+    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
+    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
+    _get_Mstatus_SXL mstatus0 = 'b"10" ->
+    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
+    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    menvcfg0 = MENVCFG_S ->
+    neq_vec (bits_of_virtaddr (Virtaddr pc))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr pc)) (Z.sub 39 1) 0)) = false ->
+    svpn_of pc = tramp_vpn ->
+    zero_extend' 64 (concat_vec tramp_ppn
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr pc)) (Z.sub pagesize_bits 1) 0)) = pa ->
+    neq_vec (bits_of_virtaddr (Virtaddr (add_vec_int pc 2)))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int pc 2))) (Z.sub 39 1) 0)) = false ->
+    svpn_of (add_vec_int pc 2) = tramp_vpn ->
+    zero_extend' 64 (concat_vec tramp_ppn
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int pc 2))) (Z.sub pagesize_bits 1) 0)) = add_vec_int pa 2 ->
+    is_aligned_vaddr (Virtaddr pc) 2 = true ->
+    is_aligned_vaddr (Virtaddr pa) 4 = is_aligned_vaddr (Virtaddr pc) 4 ->
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ{ dq } Supervisor -∗
+    mstatus ↦ᵣ{ dq } mstatus0 -∗
+    mie ↦ᵣ{ dq } mie_v -∗
+    mideleg ↦ᵣ{ dq } mdv0 -∗
+    menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+    utlb_inv_pt uroot tfp um -∗
+    pc_is pc -∗
+    instr pa is_rvc i -∗
+    (∀ (satp0 : mword 64) (pcfg : type_of_register pmpcfg_n)
+       (paddr : type_of_register pmpaddr_n) (tv' : type_of_register tlb),
+       ⌜ upt_satp_ok_pt uroot satp0 ⌝ -∗ ⌜ pmp_ent0_ok pcfg paddr ⌝ -∗
+       cur_privilege ↦ᵣ{ dq } Supervisor -∗
+       mstatus ↦ᵣ{ dq } mstatus0 -∗
+       mie ↦ᵣ{ dq } mie_v -∗
+       mideleg ↦ᵣ{ dq } mdv0 -∗
+       menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+       satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+       tlb ↦ᵣ tv' -∗ upt_res_pt uroot tfp um tv' -∗
+       clock_res -∗
+       (R_bitvector_64 PC) ↦ᵣ pc -∗
+       (R_bitvector_64 nextPC) ↦ᵣ (add_vec_int pc (if is_rvc then 2 else 4)) -∗
+       resv_any cpu_id -∗
+       swp (execute i)
+         (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
+                   cur_privilege ↦ᵣ{ dq } Supervisor ∗
+                   mie ↦ᵣ{ dq } mie1 ∗
+                   menvcfg ↦ᵣ{ dq } menvcfg1 ∗
+                   satp ↦ᵣ satp0 ∗ pmpcfg_n ↦ᵣ pcfg ∗
+                   pmpaddr_n ↦ᵣ paddr ∗
+                   (∃ tv2 : type_of_register tlb,
+                      tlb ↦ᵣ tv2 ∗ upt_res_pt uroot tfp um tv2) ∗
+                   clock_res ∗
+                   (∃ ms1 mdv1 npc : mword 64,
+                      mstatus ↦ᵣ{ dq } ms1 ∗ mideleg ↦ᵣ{ dq } mdv1 ∗
+                      (R_bitvector_64 PC) ↦ᵣ pc ∗
+                      (R_bitvector_64 nextPC) ↦ᵣ npc ∗ Rl npc ms1 mdv1) ∗
+                   resv_any cpu_id)) -∗
+    ▷ (∀ npc ms1 mdv1 : mword 64,
+         hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+         cur_privilege ↦ᵣ{ dq } Supervisor -∗
+         mstatus ↦ᵣ{ dq } ms1 -∗
+         mie ↦ᵣ{ dq } mie1 -∗
+         mideleg ↦ᵣ{ dq } mdv1 -∗
+         menvcfg ↦ᵣ{ dq } menvcfg1 -∗
+         utlb_inv_pt uroot tfp um -∗
+         pc_is npc -∗ Rl npc ms1 mdv1 -∗
+         WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros HSIE HMPRV HSXL Hmm HPBMTE Hmenvval
+           Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4.
+    iIntros "#Hhw #Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hinv Hpc
+             Hinstr Hex Hcont".
+    iDestruct (upt_swp_open uroot tfp um with "Hinv")
+      as (satp0 tlbv pcfg paddr)
+      "(%Hsatpok & %Hpmpok & Hsatp & Htlbc & Hpcfg & Hpaddr & HRes)".
+    iApply (wp_instr_tramp_pt (upt_res_pt uroot tfp um) pc pa is_rvc i
+              mstatus0 mie_v mdv0 menvcfg0 satp0 pcfg paddr tlbv
+              mie1 menvcfg1 satp0 pcfg paddr Rl (dq := dq)
+              HSIE HMPRV HSXL Hmm HPBMTE Hmenvval Hpmpok
+              Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4
+              with "Hhw Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp
+                    Hpcfg Hpaddr Htlbc HRes Hpc Hinstr [] [Hex] [Hcont]").
+    - iApply (utramp_fetch_tr uroot tfp um dq pc mstatus0 satp0 mie_v mdv0
+                menvcfg0 pcfg paddr Hmenvval HSXL HMPRV Hsatpok Hpmpok
+                with "Hhw").
+    - iIntros (tv') "_".
+      iApply ("Hex" $! satp0 pcfg paddr tv' with "[%] [%]");
+        [ exact Hsatpok | exact Hpmpok ].
+    - iNext. iIntros (npc ms1 mdv1 tv1)
+        "Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp Hpcfg Hpaddr Htlbc
+         HRes Hpc HRl".
+      iApply ("Hcont" $! npc ms1 mdv1 with
+                "Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc
+                 [Hsatp Htlbc Hpcfg Hpaddr HRes] Hpc HRl").
+      iApply (upt_swp_close uroot tfp um satp0 tv1 pcfg paddr Hsatpok Hpmpok
+                with "Hsatp Htlbc Hpcfg Hpaddr HRes").
+  Qed.
+
 End UptTramp.
 
 (* ===================================================================== *)

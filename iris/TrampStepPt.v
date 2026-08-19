@@ -24,22 +24,22 @@
    witness [sr_kwit], which is [emp] at [kpt_share_regime] and [False] at
    Bare (which is what keeps the route sound).
 
-   WHAT IS NOT HERE, and what it needs.  The engine is regime-generic and
-   the SHARED KERNEL TABLE instance is proved ([ktramp_fetch_tr_share], off
-   [SRegime.kpt_share_regime] / [HartSKpt.swp_translate_kpt]).  The other
-   two tables the trampoline tower steps on have NO per-node walk yet, so
-   they have no [tramp_fetch_tr] producer:
-     - the USER table [UptTree.utlb_inv_pt] (7 sites, [UservecPt] /
-       [UserretPt] / [UservecExitPt]);
+   THE THREE TABLES.  The engine is regime-generic in [Res] and each table
+   supplies its own [tramp_fetch_tr] producer plus a wrapper that opens its
+   bundle into the engine's cells:
+     - the SHARED KERNEL table: [ktramp_fetch_tr_share] and
+       [wp_instr_ktramp_pt_share] below, off [SRegime.kpt_share_regime] /
+       [HartSKpt.swp_translate_kpt];
+     - the USER table [UptTree.utlb_inv_pt]: [UptWalkPt.utramp_fetch_tr] and
+       [UptWalkPt.wp_instr_u_pt], off [UptWalkPt.swp_translate_upt];
      - the switch-window two-table invariants [TransPt.tlb_inv_pt2_kcur] /
-       [_kprev] (2 sites).
-   Both are exec-level today ([utlb_inv_pt_translateAddr_tramp_fetch],
-   [tlb_inv_pt2_translateAddr]); each needs the swp assembly
-   [HartSKpt.swp_translate_kpt] is for the kernel table -- the front end
-   ([PtTreeAdue.swp_translateAddr_pt_front]), the hit/miss split
-   ([HartSTrans.swp_translate_hit] / [CommonWalk.swp_translate_TLB_miss_user])
-   and the three [read_pte] nodes over the table's own bytes.  Until they
-   exist, TransPt.v and the four Pt consumers stay red. *)
+       [_kprev] have NO per-node walk yet.  They are exec-level today
+       ([tlb_inv_pt2_translateAddr]) and differ from [utlb_inv_pt] in the
+       TLB agreement ([tlb_ok_pt2] over two trees) and in taking an abstract
+       tree spec, so [swp_translate_upt] does not instantiate: the exec side
+       is [TransPt.ptree2_translateAddr_cases] and the certificate has to be
+       its [goodmb] twin.  Until that exists, TransPt.v, [UserretEntryPt]
+       and [UservecExitPt] stay red. *)
 From Stdlib Require Import ZArith Bool Lia.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -1045,6 +1045,124 @@ Section TrampFetchPt.
               satp0 mie0 mdv0 menv0 pcfg paddr Hmenv HSXL HMPRV Hsatpok Hpmpok
               with "[] Hclaim Hhw").
     iApply (sr_ktier_wit_kpt_share root_ppn KT1).
+  Qed.
+
+  (* ==================================================================== *)
+  (* THE SHARED-KERNEL-TABLE STEP ENGINE.                                  *)
+  (*                                                                      *)
+  (* [wp_instr_tramp_pt] at [Res := kpt_res_at root_ppn satp0], on the     *)
+  (* per-hart bundle [KptShare.tlb_res_pt] -- i.e.                         *)
+  (* [SmodeCorePt.wp_instr_s_config_sr]'s open/call/close over             *)
+  (* [kpt_share_regime root_ppn] (whose [sr_inv] IS [tlb_res_pt] and whose *)
+  (* [sr_swp_open]/[sr_swp_close] ARE [kpt_swp_open]/[kpt_swp_close]),     *)
+  (* with the trampoline fetch underneath.  The statement is CONCRETE in   *)
+  (* [root_ppn] on purpose: an [s_regime] in a parameter position makes    *)
+  (* the call site's [iApply] diverge (claude-notes/projects/              *)
+  (* kvminithart-tlb-lane.md §3), so the regime lives only in the PROOF.   *)
+  (* ==================================================================== *)
+  Lemma wp_instr_ktramp_pt_share (root_ppn : mword 44)
+      (pc pa : mword 64) (is_rvc : bool) (i : instruction)
+      (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
+      (mie1 menvcfg1 : mword 64)
+      (Rl : mword 64 -> mword 64 -> mword 64 -> iProp Σ) {dq : dfrac} :
+    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
+    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
+    _get_Mstatus_SXL mstatus0 = 'b"10" ->
+    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
+    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    menvcfg0 = MENVCFG_S ->
+    neq_vec (bits_of_virtaddr (Virtaddr pc))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr pc)) (Z.sub 39 1) 0)) = false ->
+    svpn_of pc = tramp_vpn ->
+    zero_extend' 64 (concat_vec tramp_ppn
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr pc)) (Z.sub pagesize_bits 1) 0)) = pa ->
+    neq_vec (bits_of_virtaddr (Virtaddr (add_vec_int pc 2)))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int pc 2))) (Z.sub 39 1) 0)) = false ->
+    svpn_of (add_vec_int pc 2) = tramp_vpn ->
+    zero_extend' 64 (concat_vec tramp_ppn
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr (add_vec_int pc 2))) (Z.sub pagesize_bits 1) 0)) = add_vec_int pa 2 ->
+    is_aligned_vaddr (Virtaddr pc) 2 = true ->
+    is_aligned_vaddr (Virtaddr pa) 4 = is_aligned_vaddr (Virtaddr pc) 4 ->
+    kmap_at tramp_vpn tramp_ppn KP_rx -∗
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ{ dq } Supervisor -∗
+    mstatus ↦ᵣ{ dq } mstatus0 -∗
+    mie ↦ᵣ{ dq } mie_v -∗
+    mideleg ↦ᵣ{ dq } mdv0 -∗
+    menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+    tlb_res_pt root_ppn -∗
+    pc_is pc -∗
+    instr pa is_rvc i -∗
+    (∀ (satp0 : mword 64) (pcfg : type_of_register pmpcfg_n)
+       (paddr : type_of_register pmpaddr_n) (tv' : type_of_register tlb),
+       ⌜ kpt_satp_ok root_ppn satp0 ⌝ -∗ ⌜ pmp_ent0_ok pcfg paddr ⌝ -∗
+       cur_privilege ↦ᵣ{ dq } Supervisor -∗
+       mstatus ↦ᵣ{ dq } mstatus0 -∗
+       mie ↦ᵣ{ dq } mie_v -∗
+       mideleg ↦ᵣ{ dq } mdv0 -∗
+       menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+       satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+       tlb ↦ᵣ tv' -∗ kpt_res_at root_ppn satp0 tv' -∗
+       clock_res -∗
+       (R_bitvector_64 PC) ↦ᵣ pc -∗
+       (R_bitvector_64 nextPC) ↦ᵣ (add_vec_int pc (if is_rvc then 2 else 4)) -∗
+       resv_any cpu_id -∗
+       swp (execute i)
+         (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
+                   cur_privilege ↦ᵣ{ dq } Supervisor ∗
+                   mie ↦ᵣ{ dq } mie1 ∗
+                   menvcfg ↦ᵣ{ dq } menvcfg1 ∗
+                   satp ↦ᵣ satp0 ∗ pmpcfg_n ↦ᵣ pcfg ∗
+                   pmpaddr_n ↦ᵣ paddr ∗
+                   (∃ tv2 : type_of_register tlb,
+                      tlb ↦ᵣ tv2 ∗ kpt_res_at root_ppn satp0 tv2) ∗
+                   clock_res ∗
+                   (∃ ms1 mdv1 npc : mword 64,
+                      mstatus ↦ᵣ{ dq } ms1 ∗ mideleg ↦ᵣ{ dq } mdv1 ∗
+                      (R_bitvector_64 PC) ↦ᵣ pc ∗
+                      (R_bitvector_64 nextPC) ↦ᵣ npc ∗ Rl npc ms1 mdv1) ∗
+                   resv_any cpu_id)) -∗
+    ▷ (∀ npc ms1 mdv1 : mword 64,
+         hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+         cur_privilege ↦ᵣ{ dq } Supervisor -∗
+         mstatus ↦ᵣ{ dq } ms1 -∗
+         mie ↦ᵣ{ dq } mie1 -∗
+         mideleg ↦ᵣ{ dq } mdv1 -∗
+         menvcfg ↦ᵣ{ dq } menvcfg1 -∗
+         tlb_res_pt root_ppn -∗
+         pc_is npc -∗ Rl npc ms1 mdv1 -∗
+         WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros HSIE HMPRV HSXL Hmm HPBMTE Hmenvval
+           Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4.
+    iIntros "#Hclaim #Hhw #Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hinv Hpc
+             Hinstr Hex Hcont".
+    iDestruct (kpt_swp_open root_ppn with "Hinv") as (satp0 tlbv pcfg paddr)
+      "(%Hsatpok & %Hpmpok & Hsatp & Htlbc & Hpcfg & Hpaddr & HRes)".
+    iApply (wp_instr_tramp_pt (kpt_res_at root_ppn satp0) pc pa is_rvc i
+              mstatus0 mie_v mdv0 menvcfg0 satp0 pcfg paddr tlbv
+              mie1 menvcfg1 satp0 pcfg paddr Rl (dq := dq)
+              HSIE HMPRV HSXL Hmm HPBMTE Hmenvval Hpmpok
+              Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4
+              with "Hhw Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp
+                    Hpcfg Hpaddr Htlbc HRes Hpc Hinstr [] [Hex] [Hcont]").
+    - iApply (ktramp_fetch_tr_share root_ppn dq pc mstatus0 satp0 mie_v mdv0
+                menvcfg0 pcfg paddr Hmenvval HSXL HMPRV Hsatpok Hpmpok
+                with "Hclaim Hhw").
+    - iIntros (tv') "_".
+      iApply ("Hex" $! satp0 pcfg paddr tv' with "[%] [%]");
+        [ exact Hsatpok | exact Hpmpok ].
+    - iNext. iIntros (npc ms1 mdv1 tv1)
+        "Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp Hpcfg Hpaddr Htlbc
+         HRes Hpc HRl".
+      iApply ("Hcont" $! npc ms1 mdv1 with
+                "Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc
+                 [Hsatp Htlbc Hpcfg Hpaddr HRes] Hpc HRl").
+      iApply (kpt_swp_close root_ppn satp0 tv1 pcfg paddr Hsatpok Hpmpok
+                with "Hsatp Htlbc Hpcfg Hpaddr HRes").
   Qed.
 
 End TrampFetchPt.
