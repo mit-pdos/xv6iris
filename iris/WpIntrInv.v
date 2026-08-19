@@ -1494,6 +1494,14 @@ Section IntrEngine.
     rewrite /s_tlb_at bool_decide_eq_true_2; [reflexivity | exact s_w_tlb].
   Qed.
 
+  (* SEALED.  Consumers use the two lemmas above and NOTHING else about it.
+     Left transparent, the unreduced [if bool_decide (tlb ∈ SD)] is a term
+     [iFrame] tries to unify structurally at every cell of every frame in the
+     instruction funnel, and that funnel then takes over forty minutes to
+     compile instead of seconds.  (durable-notes: a per-file build over five
+     minutes is a bug.) *)
+  Global Opaque s_tlb_at.
+
   (* WHICH ARM, as a pure fact about the pair (write set, satp value).  The
      slot accessor exports this and the funnel turns it into the regime's
      fetch side condition with [strans_side_of_arm]; nothing else needs to
@@ -1668,11 +1676,8 @@ Section IntrEngine.
        : iProp Σ) ⊣⊢ s_cells_D SD.
     Proof.
       intros [-> | ->].
-      - rewrite s_frames_cells /s_cells /s_cells_D /s_tlb_at.
-        rewrite bool_decide_eq_true_2; [| exact s_w_tlb]. reflexivity.
-      - rewrite s_frames_cells_b /s_cells_b /s_cells_D /s_tlb_at.
-        rewrite bool_decide_eq_false_2;
-          [| rewrite /s_Drwb; set_solver].
+      - rewrite s_frames_cells /s_cells /s_cells_D s_tlb_at_kpt. reflexivity.
+      - rewrite s_frames_cells_b /s_cells_b /s_cells_D s_tlb_at_bare.
         iSplit.
         + iIntros "(?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?)".
           iFrame.
