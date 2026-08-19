@@ -1103,6 +1103,19 @@ Section IntrEngine.
       [exact s_in_misa | exact s_in_mst | exact s_in_satp].
   Qed.
 
+  (* the same at ANY write set satisfying [HartSFrame.s_frame_ok] -- the
+     write-set-generic cycle body below needs it. *)
+  Lemma i_Db_in_gen (D : gset register) (HD : s_frame_ok D) (r : register) :
+    i_Db r = true -> r ∈ D ∪ s_Dro.
+  Proof.
+    unfold i_Db. intros Hr.
+    apply orb_true_elim in Hr as [Hr | Hr];
+      [ apply orb_true_elim in Hr as [Hr | Hr] | ];
+      apply register_beq_eq in Hr; subst r;
+      [exact (sf_in_misa D HD) | exact (sf_in_mst D HD) | exact (sf_in_satp D HD)].
+  Qed.
+
+
   (* ==================================================================== *)
   (* §3 THE S-MODE CYCLE BODY: [run_hart_active] FROM THE [instr] BUNDLE.  *)
   (*                                                                      *)
@@ -1135,6 +1148,145 @@ Section IntrEngine.
     (s_rs pc0 pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0
        senv0 pmar0 elp0 satp0 MIE_S mdv0 MENVCFG_S tv).
 
+  Lemma swp_run_hart_active_instr_S_res_D
+      (SD : gset register) (HSD : s_frame_ok SD) (R : s_regime)
+      (pc0 msr : mword 64) (bmi : bool) (cy ti ip mst0 : mword 64)
+      (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
+      (mc : mword 32) (micfg misa0 mseccfg0 senv0 : mword 64)
+      (pmar0 : list PMA_Region) (elp0 : type_of_register elp)
+      (satp0 mdv0 : mword 64) (tlbv : type_of_register tlb)
+      (is_rvc : bool) (i : instruction)
+      (Q : regstate -> Prop) (Rr : regstate -> iProp Σ) (W : iProp Σ)
+      (Qi : InterruptType -> Privilege -> iProp Σ) :
+    misa0 = MISA_C ->
+    _get_Mstatus_SXL mst0 = 'b"10" ->
+    eq_vec (_get_Mstatus_MPRV mst0) ('b"1") = false ->
+    and_vec MIE_S (not_vec mdv0) = zeros' 64 ->
+    eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
+    pma_allows_ram pmar0 ->
+    sr_swp_satp_ok R satp0 ->
+    pmp_ent0_ok pcfg paddr ->
+    (* the regime's own side condition for the FETCH -- a premise, not derived
+       from [sr_swp_side_ok], because that introduction demands [tlb ∈ Drw] and
+       the Bare instantiation ([SD := s_Drwb]) has no tlb in its write set.
+       [swp_run_hart_active_instr_S_res] below is this at [s_Drw] /
+       [strans_regime], with the generic introduction paying it. *)
+    (forall (va : mword 64) (ppn : mword 44) (tv : type_of_register tlb),
+       sr_swp_side R (InstructionFetch tt) va ppn KP_rx i_Db SD s_Dro
+         (STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0
+            senv0 pmar0 elp0 satp0 mdv0 tv)
+         (MState (STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+            mseccfg0 senv0 pmar0 elp0 satp0 mdv0 tv) ∅ dev0_state)) ->
+    gen_cert -∗
+    instr pc0 is_rvc i -∗
+    sr_swp_res_at R satp0 tlbv -∗
+    resv_frag cpu_id None -∗
+    W -∗
+    hreg_frame (STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                  mseccfg0 senv0 pmar0 elp0 satp0 mdv0 tlbv) SD -∗
+    hreg_frame_ro (s_Df (DfracOwn 1))
+      (STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+         mseccfg0 senv0 pmar0 elp0 satp0 mdv0 tlbv) s_Dro -∗
+    (* the trap payload: the dispatch answered [Some], nothing has run *)
+    (∀ (ii : InterruptType) (pr : Privilege),
+       ⌜ ∃ meip seip : mword 1,
+           s_dispatch ip meip seip MIE_S mdv0 mst0 = Some (ii, pr) ⌝ -∗
+       W -∗ sr_swp_res_at R satp0 tlbv -∗ resv_frag cpu_id None -∗
+       hreg_frame (STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                     mseccfg0 senv0 pmar0 elp0 satp0 mdv0 tlbv) SD -∗
+       hreg_frame_ro (s_Df (DfracOwn 1))
+         (STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+            mseccfg0 senv0 pmar0 elp0 satp0 mdv0 tlbv) s_Dro -∗
+       Qi ii pr) -∗
+    (* the instruction: at the fetch's landing file, nextPC committed, and
+       it hands the frames back at the file it lands on *)
+    (∀ tv' : type_of_register tlb,
+       W -∗ sr_swp_res_at R satp0 tv' -∗ resv_any cpu_id -∗
+       hreg_frame (register_set (R_bitvector_64 nextPC)
+           (add_vec_int pc0 (if is_rvc then 2 else 4))
+           (STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+              mseccfg0 senv0 pmar0 elp0 satp0 mdv0 tv')) SD -∗
+       hreg_frame_ro (s_Df (DfracOwn 1))
+         (register_set (R_bitvector_64 nextPC)
+           (add_vec_int pc0 (if is_rvc then 2 else 4))
+           (STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+              mseccfg0 senv0 pmar0 elp0 satp0 mdv0 tv')) s_Dro -∗
+       swp (execute i)
+         (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
+                   ∃ rs2 : regstate, ⌜ Q rs2 ⌝ ∗
+                     hreg_frame rs2 SD ∗
+                     hreg_frame_ro (s_Df (DfracOwn 1)) rs2 s_Dro ∗ Rr rs2)) -∗
+    swp (run_hart_active 0)
+      (fun st => (∃ ii pr, ⌜st = Step_Pending_Interrupt (ii, pr)⌝ ∗ Qi ii pr)
+                 ∨ (∃ w : mword 32,
+                      ⌜st = Step_Execute (RETIRE_SUCCESS, w)⌝ ∗
+                      ∃ rs2 : regstate, ⌜ Q rs2 ⌝ ∗
+                        hreg_frame rs2 SD ∗
+                        hreg_frame_ro (s_Df (DfracOwn 1)) rs2 s_Dro ∗
+                        Rr rs2)).
+  Proof.
+    intros Hmisa HSXL HMPRV Hmm Help Hpma Hsok Hpok Hsidepre.
+    pose proof Hpok as Hpf'. destruct Hpf' as (HA & Hord & HX & HW & HR & Hcov).
+    iIntros "#Hcert Hinstr Hres Hfrag HW Hrw Hro Hqi Hex".
+    iApply (spt_run_hart_active_instr_S_D SD HSD (s_Df (DfracOwn 1))
+              pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0
+              senv0 pmar0 elp0 satp0 MIE_S mdv0 MENVCFG_S
+              (sr_swp_res_at R satp0) tlbv is_rvc i Q Rr W Qi
+              Hmisa eq_refl Help Hpma HA Hord HX Hcov
+              with "Hcert Hinstr HW Hfrag Hres Hrw Hro [Hqi] [] [Hex]").
+    - (* ---- THE DISPATCH.  SIE is SYMBOLIC here, so both arms are live:
+           [Some] is the caller's trap payload, [None] gives everything
+           back.  The reference state is this hart's own file, which is
+           what makes every agreement premise [eq_refl]. ---- *)
+      rewrite /spt_disp_obl. iIntros "HW HRes Hfrag Hrw Hro".
+      assert (Lmisa : register_lookup misa
+                (MState (STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg
+                   misa0 mseccfg0 senv0 pmar0 elp0 satp0 mdv0 tlbv)
+                   ∅ dev0_state).(sregs) = MISA_C).
+      { cbn [sregs]. srs. exact Hmisa. }
+      iApply (swp_mono with "[HW HRes Hfrag Hqi] [-]");
+        [| iApply (swp_dispatchInterrupt_S SD s_Dro (s_Df (DfracOwn 1))
+                     (STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                        mseccfg0 senv0 pmar0 elp0 satp0 mdv0 tlbv)
+                     (MState (STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc
+                        micfg misa0 mseccfg0 senv0 pmar0 elp0 satp0 mdv0 tlbv)
+                        ∅ dev0_state)
+                     spt_Db ip MIE_S mdv0 mst0
+                     (sf_disj SD HSD) (sf_in_ip SD HSD) (sf_in_mie SD HSD) (sf_in_mdl SD HSD)
+                     ltac:(vm_compute; reflexivity)
+                     ltac:(by srs) ltac:(by srs) ltac:(by srs)
+                     ltac:(by srs) Hmm
+                     (spt_Db_in_gen SD HSD) (fun r _ => eq_refl)
+                     (spt_exec_cE_S _ Lmisa)
+                     (spt_goodb_cE_S _ Lmisa)
+                     with "Hcert Hrw Hro") ].
+      iIntros (o). iDestruct 1 as (meip seip) "(-> & Hrw & Hro)".
+      destruct (s_dispatch ip meip seip MIE_S mdv0 mst0)
+        as [[ii pr] |] eqn:Ed.
+      + iApply ("Hqi" $! ii pr with "[%] HW HRes Hfrag Hrw Hro").
+        exists meip, seip. exact Ed.
+      + iFrame "HW HRes Hfrag Hrw Hro".
+    - (* ---- THE FETCH TRANSLATION, from the regime's own swp face ---- *)
+      iApply (spt_tr_obl_of_regime_D SD HSD R (s_Df (DfracOwn 1)) i_Db
+                pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0
+                senv0 pmar0 elp0 satp0 MIE_S mdv0 MENVCFG_S
+                Hmisa eq_refl HSXL HMPRV (i_Db_in_gen SD HSD)
+                ltac:(intros r Hr; unfold D_leafchk in Hr;
+                      apply orb_true_elim in Hr as [Hr | Hr];
+                      apply register_beq_eq in Hr; subst r;
+                      [exact (sf_in_misa SD HSD) | exact (sf_in_menv SD HSD)])
+                ltac:(vm_compute; reflexivity)
+                ltac:(vm_compute; reflexivity)
+                Hsok Hpok Hpma Hsidepre with "Hcert").
+    - (* ---- THE INSTRUCTION, with the residue unpacked ---- *)
+      rewrite /spt_ex_obl. iIntros (tv') "HW HRes Hany Hrw Hro".
+      iApply ("Hex" $! tv' with "HW HRes Hany Hrw Hro").
+  Qed.
+
+  (* THE KPT/BLIND PINNING of the above, at the folded translation slot and
+     the full write set.  Every existing caller means this one; only the Bare
+     branch of [WpSmodeIntr.wp_instr_s_sconf_off_clock] spells out
+     [_D s_Drwb s_frame_ok_Drwb bare_regime]. *)
   Lemma swp_run_hart_active_instr_S_res
       (pc0 msr : mword 64) (bmi : bool) (cy ti ip mst0 : mword 64)
       (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
@@ -1162,7 +1314,6 @@ Section IntrEngine.
     hreg_frame_ro (s_Df (DfracOwn 1))
       (STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
          mseccfg0 senv0 pmar0 elp0 satp0 mdv0 tlbv) s_Dro -∗
-    (* the trap payload: the dispatch answered [Some], nothing has run *)
     (∀ (ii : InterruptType) (pr : Privilege),
        ⌜ ∃ meip seip : mword 1,
            s_dispatch ip meip seip MIE_S mdv0 mst0 = Some (ii, pr) ⌝ -∗
@@ -1173,8 +1324,6 @@ Section IntrEngine.
          (STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
             mseccfg0 senv0 pmar0 elp0 satp0 mdv0 tlbv) s_Dro -∗
        Qi ii pr) -∗
-    (* the instruction: at the fetch's landing file, nextPC committed, and
-       it hands the frames back at the file it lands on *)
     (∀ tv' : type_of_register tlb,
        W -∗ strans_res_at satp0 tv' -∗ resv_any cpu_id -∗
        hreg_frame (register_set (R_bitvector_64 nextPC)
@@ -1201,62 +1350,25 @@ Section IntrEngine.
                         Rr rs2)).
   Proof.
     intros Hmisa HSXL HMPRV Hmm Help Hpma Hsok Hpok.
-    pose proof Hpok as Hpf'. destruct Hpf' as (HA & Hord & HX & HW & HR & Hcov).
-    iIntros "#Hcert Hinstr Hres Hfrag HW Hrw Hro Hqi Hex".
-    iApply (spt_run_hart_active_instr_S (s_Df (DfracOwn 1))
-              pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0
-              senv0 pmar0 elp0 satp0 MIE_S mdv0 MENVCFG_S
-              (strans_res_at satp0) tlbv is_rvc i Q Rr W Qi
-              Hmisa eq_refl Help Hpma HA Hord HX Hcov
-              with "Hcert Hinstr HW Hfrag Hres Hrw Hro [Hqi] [] [Hex]").
-    - (* ---- THE DISPATCH.  SIE is SYMBOLIC here, so both arms are live:
-           [Some] is the caller's trap payload, [None] gives everything
-           back.  The reference state is this hart's own file, which is
-           what makes every agreement premise [eq_refl]. ---- *)
-      rewrite /spt_disp_obl. iIntros "HW HRes Hfrag Hrw Hro".
-      assert (Lmisa : register_lookup misa
-                (MState (STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg
-                   misa0 mseccfg0 senv0 pmar0 elp0 satp0 mdv0 tlbv)
-                   ∅ dev0_state).(sregs) = MISA_C).
-      { cbn [sregs]. srs. exact Hmisa. }
-      iApply (swp_mono with "[HW HRes Hfrag Hqi] [-]");
-        [| iApply (swp_dispatchInterrupt_S s_Drw s_Dro (s_Df (DfracOwn 1))
-                     (STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
-                        mseccfg0 senv0 pmar0 elp0 satp0 mdv0 tlbv)
-                     (MState (STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc
-                        micfg misa0 mseccfg0 senv0 pmar0 elp0 satp0 mdv0 tlbv)
-                        ∅ dev0_state)
-                     spt_Db ip MIE_S mdv0 mst0
-                     s_disj s_in_ip s_in_mie s_in_mdl
-                     ltac:(vm_compute; reflexivity)
-                     ltac:(by srs) ltac:(by srs) ltac:(by srs)
-                     ltac:(by srs) Hmm
-                     spt_Db_in (fun r _ => eq_refl)
-                     (spt_exec_cE_S _ Lmisa)
-                     (spt_goodb_cE_S _ Lmisa)
-                     with "Hcert Hrw Hro") ].
-      iIntros (o). iDestruct 1 as (meip seip) "(-> & Hrw & Hro)".
-      destruct (s_dispatch ip meip seip MIE_S mdv0 mst0)
-        as [[ii pr] |] eqn:Ed.
-      + iApply ("Hqi" $! ii pr with "[%] HW HRes Hfrag Hrw Hro").
-        exists meip, seip. exact Ed.
-      + iFrame "HW HRes Hfrag Hrw Hro".
-    - (* ---- THE FETCH TRANSLATION, from the regime's own swp face ---- *)
-      iApply (spt_tr_obl_of_regime strans_regime (s_Df (DfracOwn 1)) i_Db
-                pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0
-                senv0 pmar0 elp0 satp0 MIE_S mdv0 MENVCFG_S
-                Hmisa eq_refl HSXL HMPRV i_Db_in
-                ltac:(intros r Hr; unfold D_leafchk in Hr;
-                      apply orb_true_elim in Hr as [Hr | Hr];
-                      apply register_beq_eq in Hr; subst r;
-                      [exact s_in_misa | exact s_in_menv])
-                ltac:(vm_compute; reflexivity)
-                ltac:(vm_compute; reflexivity)
-                Hsok Hpok Hpma with "Hcert").
-    - (* ---- THE INSTRUCTION, with the residue unpacked ---- *)
-      rewrite /spt_ex_obl. iIntros (tv') "HW HRes Hany Hrw Hro".
-      iApply ("Hex" $! tv' with "HW HRes Hany Hrw Hro").
+    iApply (swp_run_hart_active_instr_S_res_D s_Drw s_frame_ok_Drw
+              strans_regime pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg
+              misa0 mseccfg0 senv0 pmar0 elp0 satp0 mdv0 tlbv is_rvc i
+              Q Rr W Qi Hmisa HSXL HMPRV Hmm Help Hpma Hsok Hpok).
+    intros va ppn tv.
+    apply (sr_swp_side_ok strans_regime (InstructionFetch tt) va ppn KP_rx
+             i_Db s_Drw s_Dro).
+    - left. reflexivity.
+    - srs. exact Hsok.
+    - srs. exact Hpok.
+    - srs. exact Hpma.
+    - srs. exact HMPRV.
+    - reflexivity.
+    - reflexivity.
+    - cbn [sregs]. srs. exact HSXL.
+    - reflexivity.
+    - rewrite /s_Drw. set_solver.
   Qed.
+
 
   (* ...and the KPT reading, which is what the SIE=1 engine below holds: the
      residue is built from the bundle's own three pieces and taken apart
@@ -1402,6 +1514,43 @@ Section IntrEngine.
         iDestruct "H2" as "(?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?)".
         iFrame.
       - iIntros "(?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?)".
+        iFrame.
+    Qed.
+
+    (* ---- THE BARE TWIN: the same, minus the tlb cell, at [s_Drwb]. -----
+       The tower [SRS] still carries a tlb value and it is simply IGNORED
+       here -- the Bare frame does not contain that register, which is the
+       whole point of [HartSFrame.s_Drwb] (see there).  Keeping the tower's
+       arity means the two branches of the funnel share every other lemma
+       about it. *)
+    Definition s_cells_b : iProp Σ :=
+      ((R_bitvector_64 PC) ↦ᵣ pc ∗ (R_bitvector_64 nextPC) ↦ᵣ npc ∗
+       (R_bitvector_64 minstret) ↦ᵣ ms ∗ (R_bool minstret_increment) ↦ᵣ bmi ∗
+       (R_bitvector_64 mcycle) ↦ᵣ cy ∗ (R_bitvector_64 mtime) ↦ᵣ ti ∗
+       (R_bitvector_64 mip) ↦ᵣ ip ∗
+       cur_privilege ↦ᵣ Supervisor ∗ mstatus ↦ᵣ mst0 ∗
+       hart_state ↦ᵣ HART_ACTIVE tt ∗ pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr ∗
+       reg_pointsto (R_bitvector_32 mcountinhibit) DfracDiscarded mc ∗
+       reg_pointsto (R_bitvector_64 minstretcfg) DfracDiscarded micfg ∗
+       reg_pointsto misa DfracDiscarded misa0 ∗
+       reg_pointsto mseccfg DfracDiscarded mseccfg0 ∗
+       reg_pointsto pma_regions DfracDiscarded pmar0 ∗
+       reg_pointsto htif_tohost_base DfracDiscarded None ∗
+       reg_pointsto elp DfracDiscarded elp0 ∗
+       reg_pointsto senvcfg DfracDiscarded senv0 ∗
+       satp ↦ᵣ satp0 ∗ mie ↦ᵣ mie0 ∗ mideleg ↦ᵣ mdv0 ∗ menvcfg ↦ᵣ menv0)%I.
+
+    Lemma s_frames_cells_b :
+      (hreg_frame SRS s_Drwb ∗ hreg_frame_ro (s_Df (DfracOwn 1)) SRS s_Dro
+       : iProp Σ) ⊣⊢ s_cells_b.
+    Proof.
+      rewrite s_rw_split_b s_ro_split /s_cells_b. srs.
+      iSplit.
+      - iIntros "(H1 & H2)".
+        iDestruct "H1" as "(?&?&?&?&?&?&?)".
+        iDestruct "H2" as "(?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?)".
+        iFrame.
+      - iIntros "(?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?)".
         iFrame.
     Qed.
   End SCells.
