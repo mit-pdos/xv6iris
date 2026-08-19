@@ -389,6 +389,109 @@ is the entire fix.  **Profile, don't guess**: `coqc -time` streams, the last
 line is the stalling sentence, and `head -c B <f>.v | wc -l` maps it to a
 line.
 
+### THE LEAF CONVERSION RECIPE (for a fresh agent, no context assumed)
+
+**It is THIRTEEN sites, not 44.**  The 44 figure counted every regime-generic
+statement that would have needed the rejected `SrWalks` binder.  Under the
+folded design *no statement changes at all*, so only the proofs that actually
+call the engine move.  The other 29 are pass-throughs and are untouched.
+
+| file | lemmas to convert |
+|---|---|
+| `SmodeCorePt.v` | `wp_instr_s_sr` |
+| `WpSmodePtMem.v` | `wp_clw_s_r_t`, `wp_ld_s_r_t`, `wp_csw_s_r_t`, `wp_sd_s_r_t` |
+| `WpSmodePtLeaves.v` | `wp_gpr_write_s_config_regime`, `wp_cld_s_r_t`, `wp_csd_s_r_t` |
+| `WpSmodePtBtype.v` | `wp_btype_fall_s_r`, `wp_btype_taken_s_r` |
+| `WpSmodePtCtl.v` | `wp_jal_gpr_s_zca_r`, `wp_cret_s_zca_r_later`, `wp_sret_gpr_r` |
+
+`WpSmodePtAlu.v`, `WpSmodePtMemWrap.v` and `VcGenS.v` have **no** site — they
+reach the engine only through the leaves above.
+
+**THE NEW OBLIGATION.**  `wp_instr_s_config_sr`'s leaf premise loses the four
+slot cells and the residue and takes the slot FOLDED, exactly as pre-port
+(`git show main:iris/SmodeCorePt.v`):
+
+```coq
+    (cur_privilege ↦ᵣ{ dq } Supervisor -∗ mstatus ↦ᵣ{ dq } mstatus0 -∗
+     mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗
+     menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+     sr_inv R -∗ clock_res -∗
+     (R_bitvector_64 PC) ↦ᵣ pc -∗
+     (R_bitvector_64 nextPC) ↦ᵣ (add_vec_int pc (if is_rvc then 2 else 4)) -∗
+     resv_any cpu_id -∗
+     swp (execute i)
+       (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
+                 cur_privilege ↦ᵣ{ dq } Supervisor ∗ mie ↦ᵣ{ dq } mie1 ∗
+                 menvcfg ↦ᵣ{ dq } menvcfg1 ∗ sr_inv R ∗ clock_res ∗
+                 (∃ ms1 mdv1 npc : mword 64,
+                    mstatus ↦ᵣ{ dq } ms1 ∗ mideleg ↦ᵣ{ dq } mdv1 ∗
+                    (R_bitvector_64 PC) ↦ᵣ pc ∗
+                    (R_bitvector_64 nextPC) ↦ᵣ npc ∗ Rl npc ms1 mdv1) ∗
+                 resv_any cpu_id)) -∗
+```
+
+Gone from it: `⌜sr_swp_satp_ok R satp0⌝`, `⌜pmp_ent0_ok pcfg paddr⌝`, the
+`satp`/`pmpcfg_n`/`pmpaddr_n`/`tlb` cells, `sr_swp_res_at R satp0 tv'`, and
+the `∀ satp0 pcfg paddr tv'` binder.  **The whole `spt_fetch_tr` premise is
+gone too** — the engine now produces the fetch translation from the arm, so
+every site drops that argument (today it is the `[]` bucket discharged with
+`spt_tr_obl_of_regime`).
+
+**THE SUBSTITUTION, per site.**
+
+1. Delete the `spt_tr_obl_of_regime …` bullet and its `[]` from the
+   `with "…"` string.
+2. Where the proof did `iDestruct (sda_frames_in dq … with "Htlbc Hms Hpriv
+   Hmenv Hsatp Hpma Hpcfg Hpaddr Hhtif Hmisa")`, call instead
+
+   ```coq
+   iDestruct (sda_slot_acc_R R dq mstatus0 menvcfg0 pmar0
+                Hmenvval0 HSXL HMPRV (pma_all_ram Hpma_all)
+                with "Hms Hpriv Hmenv Hpma Hhtif Hmisa Hinv")
+     as (SD satp0 pcfg paddr tv') "(%Hdisj & %Hsok & %Hpok & %Hside &
+                                    Hrw & Hro & HRes & Hclose)".
+   ```
+
+   It hands out the abstract write set, both frames, the residue, and
+   `sda_side_at R SD …` — the arm's translation side condition, ALREADY
+   DISCHARGED.  That last one is the thing a leaf cannot produce for itself.
+3. `iApply (sda_translate R kt kt' dq acc kp … )` becomes
+   `iApply (sda_translate_D R SD kt kt' dq acc kp … Hdisj (Hside acc kp va ppn tv' Hacc))`
+   — same arguments otherwise.
+4. Every `sda_in_mst` / `sda_in_priv` / `sda_in_satp` / `sda_in_pma` /
+   `sda_in_pcfg` / `sda_in_paddr` / `sda_in_htif` / `sda_in_misa` becomes
+   `sda_in_*_D SD`; `sda_disj` becomes `Hdisj`; and
+   `hval_translationMode_S_mode (sda_Drw ∪ sda_Dro) sda_Drw …` becomes
+   `… (SD ∪ sda_Dro) SD …`.
+5. `iDestruct (sda_frames_out dq … )` becomes `iApply ("Hclose" $! tvf with
+   "Hrw Hro HRes")`, which returns the six config cells and `sr_inv R`.
+   `tvf` is **the landing file's own tlb slot**, not the one you opened at.
+
+**THE TRAPS.**
+
+* **NEVER name a stale tlb value at a frame lemma.**  This is the one that
+  cost this lane two eight-minute hangs: applying a frame lemma at `tv` when
+  the file in hand is at some other slot makes the unifier compare two OPAQUE
+  22-deep `s_rs`/`sda_rs` towers — durable-notes' 3^N bomb, which never
+  returns.  Always pass the slot the file you are holding actually carries.
+* **A hang is localized by `coqc -time`, not by guessing.**  It streams, so
+  the LAST line of the log is the stalling sentence; map it with
+  `head -c <B> <file>.v | wc -l`.  Do this FIRST, every time.
+* **No `set_solver` on a union with a set VARIABLE.**  `SD` is abstract here,
+  so `SD ∪ sda_Dro` memberships must come from the `sda_in_*_D` family by
+  name (a sibling lane measured 24 s per call for exactly that idiom).
+* **Do not `iApply` anything write-set-parameterized against a cycle WP
+  goal** (§3).  It does not arise in a leaf conversion — `sda_translate_D` is
+  applied at a `swp (translateAddr …)` goal, which is fine and is what the
+  nine sconf-tier sites already do — but do not "simplify" toward it.
+
+**ACCEPTANCE, per leaf.**  `git diff` shows the lemma's STATEMENT
+byte-identical (only proof lines move), and `make -C iris -f CoqMakefile
+<file>.vo` is green.  Each of the thirteen is independently checkable.
+Precedent worth reading first: the nine sconf-tier sites converted onto
+`sda_slot_acc` in commits `553d1630`, `c694f217`, `25812c05` — every one came
+out SHORTER than before, and these should too.
+
 **STILL TO DO (steps 2 and 3).**  Step 2: build the R-generic data-side
 absorber (the `sda_slot_acc` twin at generic `R`) on top of `sr_slot_acc` —
 the layering is already right, `WpSmodePtEngine.v` is `_CoqProject` 110 vs
