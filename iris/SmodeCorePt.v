@@ -2993,6 +2993,270 @@ Section SmodeCorePt.
     iFrame.
   Qed.
 
+
+  (* ==================================================================== *)
+  (* THE BARE-ARM TWINS.  Everything below is the [s_Drw] material above   *)
+  (* at [HartSFrame.s_Drwb] -- the same set minus [tlb] -- and it exists   *)
+  (* for one reason: at the Bare arm nothing owns that cell, because       *)
+  (* [translateAddr]'s [Bare] case is a bare [returnR] that never consults *)
+  (* the TLB.  The engine's fetch case-splits on [SRegime.sr_slot_acc] and *)
+  (* runs THIS side concretely; the run layer itself needs no twin         *)
+  (* ([spt_run_hart_active_instr_S_D] is already write-set generic).       *)
+  (* ==================================================================== *)
+  Lemma s_agree_narrow_b (rs rs' : regstate) :
+    reg_agree_on (s_Drw ∪ s_Dro) rs rs' ->
+    reg_agree_on (s_Drwb ∪ s_Dro) rs rs'.
+  Proof.
+    intros Hag r Hr. apply Hag.
+    apply elem_of_union in Hr as [Hr | Hr].
+    - apply elem_of_union_l. rewrite s_Drw_split. by apply elem_of_union_l.
+    - by apply elem_of_union_r.
+  Qed.
+
+  Lemma spt_frames_intro_b (dq : dfrac) (pc : mword 64)
+      (mstatus0 mie_v mdv0 menvcfg0 satp0 : mword 64)
+      (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
+      (tlbv : type_of_register tlb) :
+    hw_config -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ{ dq } Supervisor -∗
+    mstatus ↦ᵣ{ dq } mstatus0 -∗
+    mie ↦ᵣ{ dq } mie_v -∗
+    mideleg ↦ᵣ{ dq } mdv0 -∗
+    menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+    satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+    pc_is pc -∗
+    resv_any cpu_id ∗
+    ∃ (ms : mword 64) (bmi : bool) (cy ti ip : mword 64) (mc : mword 32)
+      (micfg misa0 mseccfg0 senv0 : mword 64) (pmar0 : list PMA_Region)
+      (elp0 : type_of_register elp),
+      ⌜ misa0 = MISA_C ⌝ ∗
+      ⌜ pma_allows_all pmar0 ⌝ ∗
+      ⌜ eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ⌝ ∗
+      hreg_frame (s_rs pc pc ms bmi cy ti ip mstatus0 pcfg paddr mc micfg
+                    misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie_v mdv0
+                    menvcfg0 tlbv) s_Drwb ∗
+      hreg_frame_ro (s_Df_mix dq)
+        (s_rs pc pc ms bmi cy ti ip mstatus0 pcfg paddr mc micfg misa0
+           mseccfg0 senv0 pmar0 elp0 satp0 mie_v mdv0 menvcfg0 tlbv) s_Dro.
+  Proof.
+    iIntros "#Hhw Hhs Hpriv Hmst Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr Hpc".
+    iDestruct "Hpc" as "(HPC & HnPC & Hmr & Hcr & Hresv)". iFrame "Hresv".
+    iDestruct "Hmr" as (ms bmi mc micfg) "(Hms & Hmi & #Hmc & #Hmicfg)".
+    iDestruct "Hcr" as (cy ti ip) "(Hcy & Hti & Hip)".
+    iPoseProof "Hhw" as "#Hhwc".
+    iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmS & %HmC &
+        %HmU & %HmM & %Hpmaall & %Hsec1 & %Hsec2 & %Helpnp & %HmA &
+        %Hmisaval & %Hsecval & _)".
+    iExists ms, bmi, cy, ti, ip, mc, micfg, misa0, mseccfg0,
+            (mword_of_int 0 : mword 64), pmar0, elp0.
+    iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
+    iSplitL "HPC HnPC Hms Hmi Hcy Hti Hip".
+    - rewrite s_rw_split_b.
+      rewrite s_rs_PC s_rs_nPC s_rs_ms s_rs_mi s_rs_cy s_rs_ti s_rs_ip. iFrame.
+    - rewrite s_ro_split_mix.
+      rewrite s_rs_priv s_rs_mst s_rs_hart s_rs_pcfg s_rs_paddr s_rs_mc
+        s_rs_micfg s_rs_misa s_rs_sec s_rs_pma s_rs_htif s_rs_elp
+        s_rs_senv s_rs_satp s_rs_mie s_rs_mdl s_rs_menv.
+      iFrame "Hpriv Hmst Hhs Hpcfg Hpaddr Hsatp Hmie Hmdl Hmenv".
+      by iFrame "Hmc Hmicfg Hmisa Hmseccfg Hpma Hhtif Help Hsenv".
+  Qed.
+
+  Lemma spt_frames_open_b
+      (dq : dfrac) (pc npc ms : mword 64) (bmi : bool)
+      (cy ti ip mst0 : mword 64) (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n) (mc : mword 32)
+      (micfg misa0 mseccfg0 senv0 : mword 64) (pmar0 : list PMA_Region)
+      (elp0 : type_of_register elp) (satp0 mie0 mdv0 menv0 : mword 64)
+      (tlbv : type_of_register tlb) :
+    hreg_frame (s_rs pc npc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0
+         senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Drwb -∗
+    hreg_frame_ro (s_Df_mix dq)
+      (s_rs pc npc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0
+         senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Dro -∗
+    ((R_bitvector_64 PC) ↦ᵣ pc ∗ (R_bitvector_64 nextPC) ↦ᵣ npc ∗
+     (R_bitvector_64 minstret) ↦ᵣ ms ∗ (R_bool minstret_increment) ↦ᵣ bmi ∗
+     (R_bitvector_64 mcycle) ↦ᵣ cy ∗ (R_bitvector_64 mtime) ↦ᵣ ti ∗
+     (R_bitvector_64 mip) ↦ᵣ ip ∗
+     cur_privilege ↦ᵣ{ dq } Supervisor ∗ mstatus ↦ᵣ{ dq } mst0 ∗
+     hart_state ↦ᵣ{ dq } HART_ACTIVE tt ∗
+     pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr ∗
+     reg_pointsto (R_bitvector_32 mcountinhibit) DfracDiscarded mc ∗
+     reg_pointsto (R_bitvector_64 minstretcfg) DfracDiscarded micfg ∗
+     reg_pointsto misa DfracDiscarded misa0 ∗
+     reg_pointsto mseccfg DfracDiscarded mseccfg0 ∗
+     reg_pointsto pma_regions DfracDiscarded pmar0 ∗
+     reg_pointsto htif_tohost_base DfracDiscarded None ∗
+     reg_pointsto elp DfracDiscarded elp0 ∗
+     reg_pointsto senvcfg DfracDiscarded senv0 ∗
+     satp ↦ᵣ satp0 ∗ mie ↦ᵣ{ dq } mie0 ∗ mideleg ↦ᵣ{ dq } mdv0 ∗
+     menvcfg ↦ᵣ{ dq } menv0).
+  Proof.
+    iIntros "Hrw Hro".
+    rewrite s_rw_split_b s_ro_split_mix.
+    rewrite s_rs_PC s_rs_nPC s_rs_ms s_rs_mi s_rs_cy s_rs_ti s_rs_ip s_rs_priv s_rs_mst s_rs_hart s_rs_pcfg s_rs_paddr s_rs_mc
+      s_rs_micfg s_rs_misa s_rs_sec s_rs_pma s_rs_htif s_rs_elp s_rs_senv
+      s_rs_satp s_rs_mie s_rs_mdl s_rs_menv.
+    iDestruct "Hrw" as "(HPC & HnPC & Hms & Hmi & Hcy & Hti & Hip)".
+    iDestruct "Hro" as "(Hpriv & Hmst & Hhs & Hpcfg & Hpaddr & Hmc & Hmicfg &
+                         Hmisa & Hsec & Hpma & Hhtif & Help & Hsenv &
+                         Hsatp & Hmie & Hmdl & Hmenv)".
+    iFrame.
+  Qed.
+
+  Lemma spt_frames_close_b
+      (dq : dfrac) (pc npc ms : mword 64) (bmi : bool)
+      (cy ti ip mst0 : mword 64) (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n) (mc : mword 32)
+      (micfg misa0 mseccfg0 senv0 : mword 64) (pmar0 : list PMA_Region)
+      (elp0 : type_of_register elp) (satp0 mie0 mdv0 menv0 : mword 64)
+      (tlbv : type_of_register tlb) :
+    ((R_bitvector_64 PC) ↦ᵣ pc ∗ (R_bitvector_64 nextPC) ↦ᵣ npc ∗
+     (R_bitvector_64 minstret) ↦ᵣ ms ∗ (R_bool minstret_increment) ↦ᵣ bmi ∗
+     (R_bitvector_64 mcycle) ↦ᵣ cy ∗ (R_bitvector_64 mtime) ↦ᵣ ti ∗
+     (R_bitvector_64 mip) ↦ᵣ ip ∗
+     cur_privilege ↦ᵣ{ dq } Supervisor ∗ mstatus ↦ᵣ{ dq } mst0 ∗
+     hart_state ↦ᵣ{ dq } HART_ACTIVE tt ∗
+     pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr ∗
+     reg_pointsto (R_bitvector_32 mcountinhibit) DfracDiscarded mc ∗
+     reg_pointsto (R_bitvector_64 minstretcfg) DfracDiscarded micfg ∗
+     reg_pointsto misa DfracDiscarded misa0 ∗
+     reg_pointsto mseccfg DfracDiscarded mseccfg0 ∗
+     reg_pointsto pma_regions DfracDiscarded pmar0 ∗
+     reg_pointsto htif_tohost_base DfracDiscarded None ∗
+     reg_pointsto elp DfracDiscarded elp0 ∗
+     reg_pointsto senvcfg DfracDiscarded senv0 ∗
+     satp ↦ᵣ satp0 ∗ mie ↦ᵣ{ dq } mie0 ∗ mideleg ↦ᵣ{ dq } mdv0 ∗
+     menvcfg ↦ᵣ{ dq } menv0) -∗
+    hreg_frame (s_rs pc npc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0
+         senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Drwb ∗
+    hreg_frame_ro (s_Df_mix dq)
+      (s_rs pc npc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0
+         senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Dro.
+  Proof.
+    iIntros "(HPC & HnPC & Hms & Hmi & Hcy & Hti & Hip & Hpriv & Hmst
+              & Hhs & Hpcfg & Hpaddr & Hmc & Hmicfg & Hmisa & Hsec & Hpma
+              & Hhtif & Help & Hsenv & Hsatp & Hmie & Hmdl & Hmenv)".
+    rewrite s_rw_split_b s_ro_split_mix.
+    rewrite s_rs_PC s_rs_nPC s_rs_ms s_rs_mi s_rs_cy s_rs_ti s_rs_ip s_rs_priv s_rs_mst s_rs_hart s_rs_pcfg s_rs_paddr s_rs_mc
+      s_rs_micfg s_rs_misa s_rs_sec s_rs_pma s_rs_htif s_rs_elp s_rs_senv
+      s_rs_satp s_rs_mie s_rs_mdl s_rs_menv.
+    iFrame.
+  Qed.
+
+  Lemma spt_frames_elim_b (dq : dfrac) (npc ms : mword 64) (bmi : bool)
+      (cy ti ip : mword 64) (mc : mword 32)
+      (micfg misa0 mseccfg0 senv0 : mword 64) (pmar0 : list PMA_Region)
+      (elp0 : type_of_register elp)
+      (mstatus1 satp1 mie1 mdv1 menvcfg1 : mword 64)
+      (pcfg1 : type_of_register pmpcfg_n)
+      (paddr1 : type_of_register pmpaddr_n) (tv : type_of_register tlb) :
+    resv_any cpu_id -∗
+    hreg_frame (s_rs npc npc ms bmi cy ti ip mstatus1 pcfg1 paddr1 mc micfg
+                  misa0 mseccfg0 senv0 pmar0 elp0 satp1 mie1 mdv1 menvcfg1 tv)
+      s_Drwb -∗
+    hreg_frame_ro (s_Df_mix dq)
+      (s_rs npc npc ms bmi cy ti ip mstatus1 pcfg1 paddr1 mc micfg misa0
+         mseccfg0 senv0 pmar0 elp0 satp1 mie1 mdv1 menvcfg1 tv) s_Dro -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt ∗ cur_privilege ↦ᵣ{ dq } Supervisor ∗
+    mstatus ↦ᵣ{ dq } mstatus1 ∗ mie ↦ᵣ{ dq } mie1 ∗
+    mideleg ↦ᵣ{ dq } mdv1 ∗ menvcfg ↦ᵣ{ dq } menvcfg1 ∗
+    satp ↦ᵣ satp1 ∗ pmpcfg_n ↦ᵣ pcfg1 ∗ pmpaddr_n ↦ᵣ paddr1 ∗ pc_is npc.
+  Proof.
+    iIntros "Hresv Hrw Hro".
+    rewrite s_rw_split_b s_ro_split_mix.
+    rewrite s_rs_PC s_rs_nPC s_rs_ms s_rs_mi s_rs_cy s_rs_ti s_rs_ip.
+    rewrite s_rs_priv s_rs_mst s_rs_hart s_rs_pcfg s_rs_paddr s_rs_mc
+      s_rs_micfg s_rs_misa s_rs_sec s_rs_pma s_rs_htif s_rs_elp s_rs_senv
+      s_rs_satp s_rs_mie s_rs_mdl s_rs_menv.
+    iDestruct "Hrw" as "(HPC & HnPC & Hms & Hmi & Hcy & Hti & Hip)".
+    iDestruct "Hro" as "(Hpriv & Hmst & Hhs & Hpcfg & Hpaddr & #Hmc & #Hmicfg &
+                         #Hmisa & #Hsec & #Hpma & #Hhtif & #Help & #Hsenv &
+                         Hsatp & Hmie & Hmdl & Hmenv)".
+    iFrame "Hhs Hpriv Hmst Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr".
+    rewrite /pc_is /minstret_res /clock_res.
+    iFrame "HPC HnPC Hresv".
+    iSplitL "Hms Hmi".
+    - iExists ms, bmi, mc, micfg. by iFrame "Hms Hmi Hmc Hmicfg".
+    - iExists cy, ti, ip. by iFrame.
+  Qed.
+
+  Lemma spt_cycle_b (Df : register -> dfrac) (pc : mword 64)
+      (Psi : regstate -> iProp Σ) (Q : regstate -> Prop)
+      (ms : mword 64) (bmi : bool) (cy ti ip mst0 : mword 64)
+      (mc : mword 32) (micfg misa0 mseccfg0 senv0 : mword 64)
+      (pmar0 : list PMA_Region) (elp0 : type_of_register elp)
+      (satp0 mie0 mdv0 menv0 : mword 64)
+      (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
+      (tlbv : type_of_register tlb) :
+    (forall rs2, Q rs2 -> register_lookup hart_state rs2 = HART_ACTIVE tt) ->
+    (forall rs2, Q rs2 ->
+       register_lookup (R_bool minstret_increment) rs2
+       = minstret_inc_flag mc micfg Supervisor) ->
+    gen_cert -∗
+    resv_any cpu_id -∗
+    hreg_frame (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                  mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv)
+      s_Drwb -∗
+    hreg_frame_ro Df
+      (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+         mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Dro -∗
+    (resv_frag cpu_id None -∗
+     hreg_frame (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor)
+                   cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0 senv0
+                   pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Drwb -∗
+     hreg_frame_ro Df
+       (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor)
+          cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0 senv0
+          pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Dro -∗
+       swp (run_hart_active 0)
+         (fun st => ∃ rs2 : regstate, ⌜Q rs2⌝ ∗
+            match st with
+            | Step_Execute (Retire_Success tt, _) =>
+                hreg_frame rs2 s_Drwb ∗
+                hreg_frame_ro Df rs2 s_Dro ∗ Psi rs2
+            | Step_Pending_Interrupt (i, p) =>
+                swp (handle_interrupt i p)
+                  (fun _ => hreg_frame rs2 s_Drwb ∗
+                            hreg_frame_ro Df rs2 s_Dro ∗ Psi rs2)
+            | _ => False
+            end)) -∗
+    ▷ (∀ (rs3 rs2 : regstate) (mi : mword 64),
+         ⌜Q rs2 /\
+           reg_agree_on ((s_Drwb ∪ s_Dro) ∖ tk_clock3) rs3
+             (wrap_post rs2 mi)⌝ -∗
+         hreg_frame rs3 s_Drwb -∗
+         hreg_frame_ro Df rs3 s_Dro -∗ Psi rs2 -∗
+         WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros HQhart HQmi.
+    iIntros "#Hcert Hfrag Hrw Hro Hbody Hcont".
+    iApply (swp_exec_step_any_ex s_Drwb s_Dro Df
+              (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv)
+              (s_rs pc pc ms (minstret_inc_flag mc micfg Supervisor)
+                 cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0 senv0
+                 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) Q Psi
+              s_disj_b s_w_cy_b s_w_ti_b s_w_ip_b s_in_priv_b s_in_hart_b
+              s_in_mc_b s_in_micfg_b s_w_mi_b s_in_mi_b s_w_ms_b s_in_ms_b
+              s_w_PC_b s_in_PC_b s_in_nPC_b ltac:(spt_srs) HQhart
+              ltac:(intros rs2 HQ; rewrite (HQmi rs2 HQ);
+                    by rewrite s_rs_mc s_rs_micfg s_rs_priv)
+              (s_agree_narrow_b _ _
+                 (s_pre_agree pc ms bmi cy ti ip mst0 pcfg paddr mc micfg
+                    misa0 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0
+                    tlbv))
+              with "Hcert Hfrag Hrw Hro [Hbody] Hcont").
+    (* [swp_exec_step_any_ex]'s body premise is UNDER A LATER (the body runs
+       at the next language step, so a caller may build it from a resource a
+       step produces).  Absorbed here rather than threaded: no consumer of
+       [spt_cycle] or of the wrappers needs it, and threading it would put an
+       [iNext] in every leaf's obligation for nothing. *)
+    iNext. iExact "Hbody".
+  Qed.
+
   (* the tower transport the execute obligation needs: the fetch committed
      nextPC by a [register_set], and the cells are read off a tower.
      [HartMFrame.mm_npc_agree]'s S twin. *)
