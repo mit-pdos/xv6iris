@@ -104,6 +104,161 @@ Proof. rewrite /s_Drw. set_solver. Qed.
 Lemma s_w_tlb : (tlb : register) ∈ s_Drw.
 Proof. rewrite /s_Drw. set_solver. Qed.
 
+(* ===================================================================== *)
+(* THE BARE WRITE SET: [s_Drw] WITHOUT THE tlb CELL.                      *)
+(*                                                                       *)
+(* WHY THERE ARE TWO.  [tlb] is in [s_Drw] because a Sv39 fetch's walk    *)
+(* FILLS the TLB, and [HartSpan.hspan_stops] on a [RegWrite r] is         *)
+(* [bool_decide (r ∉ Drw)] -- so the walking arm genuinely needs the      *)
+(* cell in its write set.  A BARE hart does not: the model's              *)
+(* [translateAddr] returns before the TLB is consulted at all when        *)
+(* [mode = Bare] (rv64d.v -- the [Bare] arm is a bare [returnR], neither  *)
+(* read nor write).  Making the Bare arm carry the cell anyway is what    *)
+(* forced [SRegime.bare_inv] to fund it, and THAT is what buried          *)
+(* kvminithart's flushed-TLB fact under an existential.  With this set    *)
+(* the Bare arm funds nothing and the cell stays where the pre-port proof *)
+(* kept it: in kvminithart's own hand, beside the bundle.  See            *)
+(* claude-notes/projects/main-cycle-port.md, "THE KVMINITHART LANE: THE   *)
+(* SETTLED ANSWER".                                                       *)
+(*                                                                       *)
+(* The two sets are used by the TWO BRANCHES of one funnel                *)
+(* ([WpSmodeIntr.wp_instr_s_sconf_off_clock] case-splits on               *)
+(* [IntrDefs.strans_inv]'s arm), which is why this is a second CONSTANT   *)
+(* rather than a parameter: nothing above the funnel ever chooses.        *)
+(* ===================================================================== *)
+Definition s_Drwb : gset register :=
+  {[ (R_bitvector_64 PC : register); (R_bitvector_64 nextPC : register);
+     (R_bitvector_64 minstret : register);
+     (R_bool minstret_increment : register);
+     (R_bitvector_64 mcycle : register);
+     (R_bitvector_64 mtime : register);
+     (R_bitvector_64 mip : register) ]}.
+
+Lemma s_Drw_split : s_Drw = s_Drwb ∪ {[ (tlb : register) ]}.
+Proof. rewrite /s_Drw /s_Drwb. set_solver. Qed.
+
+Lemma s_disj_b : s_Drwb ## s_Dro.
+Proof. rewrite /s_Drwb /s_Dro. set_solver. Qed.
+
+Lemma s_w_PC_b : (R_bitvector_64 PC : register) ∈ s_Drwb.
+Proof. rewrite /s_Drwb. set_solver. Qed.
+Lemma s_w_nPC_b : (R_bitvector_64 nextPC : register) ∈ s_Drwb.
+Proof. rewrite /s_Drwb. set_solver. Qed.
+Lemma s_w_ms_b : (R_bitvector_64 minstret : register) ∈ s_Drwb.
+Proof. rewrite /s_Drwb. set_solver. Qed.
+Lemma s_w_mi_b : (R_bool minstret_increment : register) ∈ s_Drwb.
+Proof. rewrite /s_Drwb. set_solver. Qed.
+Lemma s_w_cy_b : (R_bitvector_64 mcycle : register) ∈ s_Drwb.
+Proof. rewrite /s_Drwb. set_solver. Qed.
+Lemma s_w_ti_b : (R_bitvector_64 mtime : register) ∈ s_Drwb.
+Proof. rewrite /s_Drwb. set_solver. Qed.
+Lemma s_w_ip_b : (R_bitvector_64 mip : register) ∈ s_Drwb.
+Proof. rewrite /s_Drwb. set_solver. Qed.
+
+(* the [∈ Drw ∪ Dro] family, EVERY member of [s_in_*] except [s_in_tlb] --
+   which has no twin on purpose: at Bare the cell is off-frame entirely. *)
+Lemma s_in_PC_b : (R_bitvector_64 PC : register) ∈ s_Drwb ∪ s_Dro.
+Proof. rewrite /s_Drwb /s_Dro. set_solver. Qed.
+Lemma s_in_nPC_b : (R_bitvector_64 nextPC : register) ∈ s_Drwb ∪ s_Dro.
+Proof. rewrite /s_Drwb /s_Dro. set_solver. Qed.
+Lemma s_in_ms_b : (R_bitvector_64 minstret : register) ∈ s_Drwb ∪ s_Dro.
+Proof. rewrite /s_Drwb /s_Dro. set_solver. Qed.
+Lemma s_in_mi_b : (R_bool minstret_increment : register) ∈ s_Drwb ∪ s_Dro.
+Proof. rewrite /s_Drwb /s_Dro. set_solver. Qed.
+Lemma s_in_ip_b : (R_bitvector_64 mip : register) ∈ s_Drwb ∪ s_Dro.
+Proof. rewrite /s_Drwb /s_Dro. set_solver. Qed.
+Lemma s_in_priv_b : (cur_privilege : register) ∈ s_Drwb ∪ s_Dro.
+Proof. rewrite /s_Drwb /s_Dro. set_solver. Qed.
+Lemma s_in_mst_b : (mstatus : register) ∈ s_Drwb ∪ s_Dro.
+Proof. rewrite /s_Drwb /s_Dro. set_solver. Qed.
+Lemma s_in_hart_b : (hart_state : register) ∈ s_Drwb ∪ s_Dro.
+Proof. rewrite /s_Drwb /s_Dro. set_solver. Qed.
+Lemma s_in_pcfg_b : (pmpcfg_n : register) ∈ s_Drwb ∪ s_Dro.
+Proof. rewrite /s_Drwb /s_Dro. set_solver. Qed.
+Lemma s_in_paddr_b : (pmpaddr_n : register) ∈ s_Drwb ∪ s_Dro.
+Proof. rewrite /s_Drwb /s_Dro. set_solver. Qed.
+Lemma s_in_mc_b : (R_bitvector_32 mcountinhibit : register) ∈ s_Drwb ∪ s_Dro.
+Proof. rewrite /s_Drwb /s_Dro. set_solver. Qed.
+Lemma s_in_micfg_b : (R_bitvector_64 minstretcfg : register) ∈ s_Drwb ∪ s_Dro.
+Proof. rewrite /s_Drwb /s_Dro. set_solver. Qed.
+Lemma s_in_misa_b : (misa : register) ∈ s_Drwb ∪ s_Dro.
+Proof. rewrite /s_Drwb /s_Dro. set_solver. Qed.
+Lemma s_in_sec_b : (mseccfg : register) ∈ s_Drwb ∪ s_Dro.
+Proof. rewrite /s_Drwb /s_Dro. set_solver. Qed.
+Lemma s_in_pma_b : (pma_regions : register) ∈ s_Drwb ∪ s_Dro.
+Proof. rewrite /s_Drwb /s_Dro. set_solver. Qed.
+Lemma s_in_htif_b : (htif_tohost_base : register) ∈ s_Drwb ∪ s_Dro.
+Proof. rewrite /s_Drwb /s_Dro. set_solver. Qed.
+Lemma s_in_elp_b : (elp : register) ∈ s_Drwb ∪ s_Dro.
+Proof. rewrite /s_Drwb /s_Dro. set_solver. Qed.
+Lemma s_in_senv_b : (senvcfg : register) ∈ s_Drwb ∪ s_Dro.
+Proof. rewrite /s_Drwb /s_Dro. set_solver. Qed.
+Lemma s_in_satp_b : (satp : register) ∈ s_Drwb ∪ s_Dro.
+Proof. rewrite /s_Drwb /s_Dro. set_solver. Qed.
+Lemma s_in_mie_b : (mie : register) ∈ s_Drwb ∪ s_Dro.
+Proof. rewrite /s_Drwb /s_Dro. set_solver. Qed.
+Lemma s_in_mdl_b : (mideleg : register) ∈ s_Drwb ∪ s_Dro.
+Proof. rewrite /s_Drwb /s_Dro. set_solver. Qed.
+Lemma s_in_menv_b : (menvcfg : register) ∈ s_Drwb ∪ s_Dro.
+Proof. rewrite /s_Drwb /s_Dro. set_solver. Qed.
+
+(* ===================================================================== *)
+(* THE FRAME-SET CONTRACT, as a record.                                   *)
+(*                                                                       *)
+(* Everything above this file that is generic in the S-mode write set     *)
+(* ([SmodeCorePt]'s dispatch section, [SmodeCorePt.spt_tr_obl_of_regime_D], *)
+(* [WpIntrInv]'s cycle body) needs exactly these memberships and NOTHING  *)
+(* else about the set.  Bundling them into one record is what keeps the   *)
+(* parameterization to a single extra argument per lemma instead of       *)
+(* thirty, and what makes the section discharge UNIFORM (every lemma in   *)
+(* the section then generalizes over the same two variables).             *)
+(*                                                                       *)
+(* THE tlb IS DELIBERATELY ABSENT.  It is the one cell the two instances  *)
+(* disagree about, and the disagreement is the whole point: see [s_Drwb]. *)
+(* A consumer that genuinely walks asks for [s_w_tlb] separately.         *)
+(* ===================================================================== *)
+Record s_frame_ok (D : gset register) : Prop := SFrameOk {
+  (* the set is BETWEEN the two instances, which is what lets a consumer
+     re-use [s_rs_agree] (stated at [s_Drw ∪ s_Dro]) by monotonicity *)
+  sf_sub : D ⊆ s_Drw;
+  sf_disj : D ## s_Dro;
+  sf_w_PC : (R_bitvector_64 PC : register) ∈ D;
+  sf_w_nPC : (R_bitvector_64 nextPC : register) ∈ D;
+  sf_w_ms : (R_bitvector_64 minstret : register) ∈ D;
+  sf_w_mi : (R_bool minstret_increment : register) ∈ D;
+  sf_w_cy : (R_bitvector_64 mcycle : register) ∈ D;
+  sf_w_ti : (R_bitvector_64 mtime : register) ∈ D;
+  sf_w_ip : (R_bitvector_64 mip : register) ∈ D;
+  sf_in_PC : (R_bitvector_64 PC : register) ∈ D ∪ s_Dro;
+  sf_in_nPC : (R_bitvector_64 nextPC : register) ∈ D ∪ s_Dro;
+  sf_in_ms : (R_bitvector_64 minstret : register) ∈ D ∪ s_Dro;
+  sf_in_mi : (R_bool minstret_increment : register) ∈ D ∪ s_Dro;
+  sf_in_ip : (R_bitvector_64 mip : register) ∈ D ∪ s_Dro;
+  sf_in_priv : (cur_privilege : register) ∈ D ∪ s_Dro;
+  sf_in_mst : (mstatus : register) ∈ D ∪ s_Dro;
+  sf_in_hart : (hart_state : register) ∈ D ∪ s_Dro;
+  sf_in_pcfg : (pmpcfg_n : register) ∈ D ∪ s_Dro;
+  sf_in_paddr : (pmpaddr_n : register) ∈ D ∪ s_Dro;
+  sf_in_mc : (R_bitvector_32 mcountinhibit : register) ∈ D ∪ s_Dro;
+  sf_in_micfg : (R_bitvector_64 minstretcfg : register) ∈ D ∪ s_Dro;
+  sf_in_misa : (misa : register) ∈ D ∪ s_Dro;
+  sf_in_sec : (mseccfg : register) ∈ D ∪ s_Dro;
+  sf_in_pma : (pma_regions : register) ∈ D ∪ s_Dro;
+  sf_in_htif : (htif_tohost_base : register) ∈ D ∪ s_Dro;
+  sf_in_elp : (elp : register) ∈ D ∪ s_Dro;
+  sf_in_senv : (senvcfg : register) ∈ D ∪ s_Dro;
+  sf_in_satp : (satp : register) ∈ D ∪ s_Dro;
+  sf_in_mie : (mie : register) ∈ D ∪ s_Dro;
+  sf_in_mdl : (mideleg : register) ∈ D ∪ s_Dro;
+  sf_in_menv : (menvcfg : register) ∈ D ∪ s_Dro;
+}.
+
+Lemma s_frame_ok_Drw : s_frame_ok s_Drw.
+Proof. constructor; rewrite /s_Drw /s_Dro; set_solver. Qed.
+
+Lemma s_frame_ok_Drwb : s_frame_ok s_Drwb.
+Proof. constructor; rewrite /s_Drwb /s_Dro; set_solver. Qed.
+
 Lemma s_in_PC : (R_bitvector_64 PC : register) ∈ s_Drw ∪ s_Dro.
 Proof. rewrite /s_Drw /s_Dro. set_solver. Qed.
 Lemma s_in_nPC : (R_bitvector_64 nextPC : register) ∈ s_Drw ∪ s_Dro.
@@ -435,6 +590,50 @@ Section SFrames.
     (hreg_frame_ro (s_Df dq) rs' s_Dro : iProp Σ).
   Proof.
     intros Hag. rewrite (hreg_frame_ro_ext _ _ _ s_Dro (s_agree_ro _ _ Hag)).
+    iIntros "H". iExact "H".
+  Qed.
+
+  (* ---- the BARE twins of the three [s_Drw]-dependent lemmas above ---- *)
+  Lemma s_rw_split_b (rs : regstate) :
+    (hreg_frame rs s_Drwb : iProp Σ) ⊣⊢
+    ((R_bitvector_64 PC) ↦ᵣ register_lookup (R_bitvector_64 PC) rs ∗
+     (R_bitvector_64 nextPC) ↦ᵣ register_lookup (R_bitvector_64 nextPC) rs ∗
+     (R_bitvector_64 minstret) ↦ᵣ
+       register_lookup (R_bitvector_64 minstret) rs ∗
+     (R_bool minstret_increment) ↦ᵣ
+       register_lookup (R_bool minstret_increment) rs ∗
+     (R_bitvector_64 mcycle) ↦ᵣ register_lookup (R_bitvector_64 mcycle) rs ∗
+     (R_bitvector_64 mtime) ↦ᵣ register_lookup (R_bitvector_64 mtime) rs ∗
+     (R_bitvector_64 mip) ↦ᵣ register_lookup (R_bitvector_64 mip) rs)%I.
+  Proof.
+    rewrite /hreg_frame /s_Drwb.
+    repeat (rewrite big_sepS_union; last set_solver).
+    rewrite !big_sepS_singleton.
+    by rewrite !bi.sep_assoc.
+  Qed.
+
+  Lemma s_agree_rw_b (rs rs' : regstate) :
+    reg_agree_on (s_Drwb ∪ s_Dro) rs rs' -> reg_agree_on s_Drwb rs rs'.
+  Proof. intros Hag r Hr. apply Hag. set_solver. Qed.
+
+  Lemma s_agree_ro_b (rs rs' : regstate) :
+    reg_agree_on (s_Drwb ∪ s_Dro) rs rs' -> reg_agree_on s_Dro rs rs'.
+  Proof. intros Hag r Hr. apply Hag. set_solver. Qed.
+
+  Lemma s_rw_ext_b (rs rs' : regstate) :
+    reg_agree_on (s_Drwb ∪ s_Dro) rs rs' ->
+    hreg_frame rs s_Drwb -∗ (hreg_frame rs' s_Drwb : iProp Σ).
+  Proof.
+    intros Hag. rewrite (hreg_frame_ext _ _ s_Drwb (s_agree_rw_b _ _ Hag)).
+    iIntros "H". iExact "H".
+  Qed.
+
+  Lemma s_ro_ext_b (dq : dfrac) (rs rs' : regstate) :
+    reg_agree_on (s_Drwb ∪ s_Dro) rs rs' ->
+    hreg_frame_ro (s_Df dq) rs s_Dro -∗
+    (hreg_frame_ro (s_Df dq) rs' s_Dro : iProp Σ).
+  Proof.
+    intros Hag. rewrite (hreg_frame_ro_ext _ _ _ s_Dro (s_agree_ro_b _ _ Hag)).
     iIntros "H". iExact "H".
   Qed.
 

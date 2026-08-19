@@ -163,6 +163,43 @@ state it as `gset_disjUR (mword 64) (EqDecision0 := @…Decidable_eq_mword 64)
 unpinned functor field takes stdpp's instances and then fails to unify at
 every use site, with an error naming neither.
 
+### AND `FastSetSolver` DOES NOT CURE THE CONTEXT BLOW-UP EITHER — measured
+
+`iris/FastSetSolver.v` is `Require Export`ed from `RiscvLang.v`, so it is in
+scope everywhere, and the note above says it cures the context-size blow-up.
+It does not cure it in a proof carrying the S-mode towers.
+
+Measured 2026-08-19. One `set_solver`, proving `r ∈ SD ∪ s_Dro -> r ∈ s_Drw ∪
+s_Dro` from `SD ⊆ s_Drw` inside `SmodeCorePt.spt_tr_obl_of_regime_D`, cost
+**417 of that file's 438 seconds**; every other command in the file was under
+0.7 s. The context at that point holds the 25-cell towers and a
+tower-to-tower `reg_agree_on`, and `set_unfold` goes through all of it.
+Written by name instead —
+
+```coq
+apply elem_of_union in Hr as [Hr | Hr].
+- apply elem_of_union_l. exact (proj1 (elem_of_subseteq A B) Hsub r Hr).
+- apply elem_of_union_r. exact Hr.
+```
+
+— the file builds in **20.3 s**. So: inside any proof that holds a tower,
+discharge set side conditions by named lemma, exactly as the `gset (mword n)`
+rule above already requires for a different reason. `HartSFrame.v`'s
+precomputed `s_w_*` / `s_in_*` family exists for this, and its header says so;
+`ltac:(set_solver)` written inside a TERM is the same trap and is easy to miss.
+
+TO PROFILE (the rule is that a per-file build over five minutes is a bug):
+
+```
+./gcp-rocq/run-on-gcp opam exec --switch=/shared/xv6rocq -- \
+  make -C iris -f CoqMakefile TIMING=1 X.vo
+./gcp-rocq/run-on-gcp --no-sync sh -c \
+  "sed 's/.*\] \([0-9.]*\) secs.*/\1 &/' iris/X.v.timing | sort -rn | head"
+```
+
+Artifacts are not synced back from the VM, so read `X.v.timing` there with
+`--no-sync`.
+
 ## A HEDGED CONJUNCT IS A FALSE STATEMENT THAT COMPILES
 
 **Never write `⌜P \/ True⌝` (or `(H : True)`) into a contract as a
