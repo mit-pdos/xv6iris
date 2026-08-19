@@ -773,7 +773,7 @@ fallback is to keep them `iProp` with `bytes_own`/frames threaded through; the
 | R6 | Do the GPRs fit in a footprint at symbolic operands? | **[V] YES via `goodmb`** (§1.3) — the trap in the durable notes is about *computing* `hfrun`, which this route never does |
 | R7 | Can a user store corrupt a PTE? | **[A→V by construction**: the tree bytes and the data bytes are separately owned today, so they are disjoint; the port must EXTRACT that disjointness once into `u_mem_wf` (§4.2).  If it is ever violated, `u_mem_step`'s A/D-only clause fails and the port fails loudly rather than silently |
 
-### 5.5 SUCCESS CRITERION
+### 5.5 SUCCESS CRITERION — MET (see §14.8)
 
 `UserExec.v` … `UserActiveClass.v` compile; `ProofUser.wp_user_exec_closed`
 closes at the 5 rv64d platform axioms **plus the two reservation term axioms**
@@ -1783,7 +1783,55 @@ two EXPLICIT lists; do the same.
   `UserBytes.v` beside `u_mem_step_refl`), or put `u_fetch_pure_2` in a new
   file after `UserMemCert`.
 
-### 14.5 §14.3's LIST IS INCOMPLETE, AND §14.4 IS THE MISSING ITEM — §5 IS BLOCKED ON IT
+### 14.8 THE TIER IS CLOSED — and two corrections to §14.5's ledger
+
+`ProofUser.wp_user_exec_closed` compiles, at exactly the §5.5 axiom set: the
+five rv64d platform axioms (`valid_reservation`, `plat_term_write`,
+`match_reservation`, `load_reservation`, `cancel_reservation`) plus
+`ResvAxioms.load_reservation_term` / `cancel_reservation_term`.  `ProofUser`
+drops off the red-root list, leaving the four that were always there
+(`WpUmodeStep`, `UservecExitPt`, `UserretEntryPt`, `ProofKvminithart`).
+The dispatch tables and `UserActiveClass` §1–§2 are byte-identical to `main`.
+
+**CORRECTION 1: THERE ARE SIX `va` GEOMETRIES, NOT FIVE.**  §14.5 enumerated
+two 4-aligned producers and three 2-aligned ones and MISSED THE ODD PC,
+which the pre-port case tree handles first
+(`main:UserClassifyAsm.user_fetch_fault_active_align`).  Its exec side
+existed (`UserFetch.exec_fetch_align_fault`); the certificate did not.
+`goodmb_fetch_align_fault` is the cheapest shell in the file — three `PC`
+reads and the misalignment test, no translation and no read — and
+`u_fetch_align_fault_pure`'s premise is `register_lookup PC rsf = va`, NOT
+`post_fetch_cfg`, whose fifth conjunct asserts a 2-alignment that is false
+on an odd pc.  **The lesson: enumerate a case tree from the PRE-PORT
+`iApply`s, not from the producers that happen to exist.**
+
+**CORRECTION 2: `HartRunFull.swp_run_hart_active_U` CANNOT SERVE THIS TIER,
+so §14.3 item 5 as written does not close.**  It returns only the FRAMES on
+the pending-interrupt arm, while the tier needs `resv_frag`, `bytes_own` and
+`u_open` on BOTH arms — the fetch needs the bytes and the reservation
+*before* the branch is decided, `u_arm_pending_interrupt` needs all three
+*after*.  Putting them in the `swp_mono` wand starves the fetch; putting
+them in the fetch obligation starves the interrupt arm.
+`swp_run_hart_active_full` does not help either: its dispatch obligation's
+`None` branch is likewise fixed to the frames.  **This is the same hole
+`SmodeCorePt.swp_run_hart_active_gen_exf_res` already fills for the S tier**
+— a resource `Wd` threaded from the dispatch's `None` branch into the fetch
+— and `UserActiveClass.swp_run_hart_active_res` fills it the same way, in
+the CONSUMING file so `HartRunFull`'s cone is not paid.  **Fold both into
+`HartRunFull` at the milestone; a third tier will want it.**
+
+Two smaller shape notes from the assembly:
+
+* **`u_exec_pins_only` wants a whole-file `u_tlb_only`, which no landing
+  gives.**  What the three transports (`rs1→rsA`, `rsA→rsF`, `rsF→rsX`)
+  actually have is agreement on the FOOTPRINT with a `minstret_increment`
+  exclusion, so `u_pins_move` is stated over `u_Dfix` instead.
+* the three POST-fetch trap arms take `resv_any`, not `resv_frag _ None`:
+  the fetch consumes the fragment and `swp_hmrun_of_exec` hands back only
+  `resv_any`, so they can never see a `None` again.  Only
+  `u_arm_pending_interrupt` keeps the fragment — it fires before the fetch.
+
+### 14.5 §14.3's LIST IS INCOMPLETE, AND §14.4 IS THE MISSING ITEM (RESOLVED — see §14.8)
 
 **§5 is NOT assembly-only.**  §14.3 lists five items and none of them is
 the 2-aligned geometry, so §14 reads as though §14.4 were optional polish.
