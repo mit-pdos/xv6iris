@@ -107,19 +107,102 @@ anyway — only the kernel can change which vas are mapped. `u_mem_wf` /
 `∀ a, u_data_pa P a ↔ is_Some (md !! a)` and the `udata_cov` conjunct is
 gone (it is derivable from the `upt_map_wf` conjunct).
 
-### Still to do (the "thread it into other proofs" half)
+## The KERNEL side: `proc_ptm P M`, and the copy loops
 
-1. **Pin `M` across the memory arms.** Today a user store re-seals at a fresh
-   `M`; making the arms say *which* bytes changed means `u_mem_step` gains
-   `M M'` and the width-generic store certificate (`UserMemCert.u_mem_step_store`)
-   states `M' = M` with `k` bytes written at `va`. Everything else that
-   mentions `u_mem_wf`/`u_mem_step` (~370 sites) is a mechanical extra
-   argument.
-2. **Expose `M` on the KERNEL side**, i.e. `proc_pt P M`, and thread it
-   through copyin / copyout / uvmcopy / uvmalloc / uvmunmap / kexec. This is
-   where the abstract state actually pays: `proc_pt_own_umem` is already the
-   bridge, so the work is restating those specs.
-3. **Retire `ud_data`.** `user_pt_inv` no longer reads it, so the
+`proc_pt P` with the process's memory NAMED. It is the SAME resource —
+`proc_pt_own_umem` (`proc_pt_own P ⊣⊢ umem_any P`, under `upt_map_wf` +
+`um_inj`) is the whole of the difference — so a caller with nothing to say
+about the bytes keeps using `proc_pt` and opens/closes with `proc_pt_ptm`
+(`proc_pt P ⊣⊢ ∃ M, proc_ptm P M`) at the one call that does. What sits on
+top of it:
+
+- **`UserPtTree`'s BYTE WINDOW.** The copy loops work a chunk at a time
+  inside one page, and what they need of the abstract state is ONE accessor:
+  take the `n` bytes at `a`, give them back — possibly at new values — and
+  move `M` by exactly that write. `umem_write` / `umem_del` are the pure
+  vocabulary (`umem_write_lookup_in/_out`, `umem_del_write`,
+  `umem_write_dom`); `bigM_window` is the split, and it is an INDUCTION ON
+  `n` over `big_sepM_delete` — which is why the window form and not a page
+  form: a 4096-key submap needs `map_filter` surgery, a window needs none.
+  `umem_own_window` is the accessor.
+- **`ProcPtOwn.proc_ptm_window`** is that accessor at the copy loop's
+  altitude: `n` bytes at offset `off` inside a mapped page, at the values
+  `M` records and at the kernel's `↦ₘ` tier (which is what memmove speaks),
+  plus the wand.
+- **`proc_ptm_acc_rep0` / `proc_ptm_rebuild`** are vmfault's open/close
+  bracket, memory-indexed; **`proc_ptm_grow`** is its insert:
+  `umem_own_grow` says the new page's bytes JOIN and the bytes the process
+  already had are UNTOUCHED (`M ⊆ M'`).
+- **`SpecVmfault.wp_vmfault_sconf_mem`** is the memory-indexed contract.
+  `wp_vmfault_sconf` survives as the `proc_pt`-altitude COROLLARY, derived
+  in ten lines, so vmfault's other callers (usertrap, copyinstr) are
+  untouched. **Do this for copyin/copyout too**: a strengthened contract of
+  record plus a derived weak one keeps the ~15 call sites off the diff.
+
+### The copyin / copyout contracts — DESIGNED, NOT YET PROVEN
+
+The shape is settled; what is missing is the two loop proofs. Contracts:
+
+```coq
+(* copyin *)
+Definition copyin_got (M' : gmap Z (bv 8)) (srcva : mword 64) (len : nat)
+    (dst_new : nat -> bv 8) : Prop :=
+  forall j, (j < len)%nat ->
+    M' !! uint (add_vec_int srcva (Z.of_nat j)) = Some (dst_new j).
+(* postcondition: proc_ptm P' M' ∗ ⌜M ⊆ M'⌝ ∗
+   ⌜(a0 = 0 ∧ copyin_got M' srcva len dst_new) ∨ a0 = -1⌝ *)
+```
+
+Stated against the FINAL `M'`, not the initial `M`, because copyin may FAULT
+PAGES IN as it goes — a va it reads need not have been mapped when it was
+called. `M ⊆ M'` is the half a caller uses. The `-1` arm promises nothing:
+a run that gives up part-way has copied a prefix, and which prefix is not
+observable from the return value. copyout is the mirror: `M'` has the source
+bytes at `dstva + j`, and every byte of `M` at an untouched va survives.
+
+**Why the loop proofs are the whole cost.** `ProofCopyin`'s header records
+that "THE USER-SIDE CURSOR HAS NO INVARIANT" and "the DESTINATION BUFFER is
+carried WHOLE at existential contents". Both have to change:
+
+1. `ci_loop` gains `srcva0` and `M` as outer parameters and `Mc` as an
+   iterated one; premises `m !!! Rs2 = add_vec_int srcva0 done` (the cursor,
+   which today is an arbitrary `mword 64`), `M ⊆ Mc`, and the prefix
+   invariant `∀ j < done, Mc !! uint (add_vec_int srcva0 j) = Some (fd j)`.
+2. `ci_chunk_body` carries the page as a NAMED buffer plus a closer
+   (`proc_ptm_window` at `off = 0, n = 4096`) instead of `page_own pa0` and
+   `(page_own pa0 -∗ proc_pt Pd)`, together with `Md`, `fpg`, `Mc ⊆ Md`,
+   `uint va0 < 2^38` (both arms give it: walkaddr's hit says so directly,
+   vmfault's success gives `uint va0 < uint szv ≤ 2^38`) and the page link
+   `∀ j < 4096, Md !! (uint va0 + j) = Some (fpg j)`.
+3. `ci_copy_body` gains `⌜n = 4096 - off ∨ n = rem⌝` — WITHOUT it the cursor
+   invariant cannot be re-established at the back edge, because the code
+   sets `s2 = va0 + 4096` and that is `cur + n` only in the first case.
+   Both `BODY` arms supply it.
+4. The join must keep the naming: `ByteBuf.bb_join3`'s existential loses it,
+   so a `bb_join3_fn` that takes the merged function and three pointwise
+   equations is needed.
+5. The arithmetic, all of it standard: `pgd_unsigned` for
+   `uint va0 + off = uint cur`, `uint_add_vec_int_small` for
+   `uint (add_vec_int cur i) = uint cur + i` (no wrap, since
+   `uint cur < 2^38`), `avi_assoc` for the cursor.
+6. copyout is the same plus the write side: the closer is instantiated at
+   the bytes memmove wrote, so `Md` moves by `umem_write`, and the loop
+   carries "every byte of `M` at a va outside the copied range survives".
+
+`umem_write_id` (writing back the bytes that were already there is the
+identity) is the copyin-side lemma that makes step 2's closer free.
+
+### Still to do
+
+1. **The two copy loops**, per the design above.
+2. **Pin `M` across the USER-mode memory arms.** Today a user store re-seals
+   at a fresh `M`; making the arms say *which* bytes changed means
+   `u_mem_step` gains `M M'` and the width-generic store certificate
+   (`UserMemCert.u_mem_step_store`) states `M' = M` with `k` bytes written at
+   `va`. Everything else that mentions `u_mem_wf`/`u_mem_step` (~370 sites)
+   is a mechanical extra argument.
+3. **The rest of the kernel side**: uvmcopy / uvmalloc / uvmunmap / kexec.
+4. **Retire `ud_data`.** `user_pt_inv` no longer reads it, so the
    `ud_data pt = ud_pas pt` premise threaded through
    `SpecUserretClosed.loop_ok`, `SpecUservec.uservec_post`, `SpecForkret` and
    `ProcInv` is now DEAD, as is `ud_norm`. Dropping the field is a
