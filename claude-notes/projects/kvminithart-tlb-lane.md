@@ -296,10 +296,22 @@ arm-honest accessor — one field, disjunctive, no guard, no class:
 
 * the WALKING disjunct hands the tlb cell over plus a closer that takes it
   back at the walk's landing value;
-* the BARE disjunct hands over `⌜bare_satp_ok satp0⌝` **instead of a cell**,
-  plus a closer — and `bare_satp_ok` (moved above the record) is exactly what
-  `strans_swp_side_bare` and `WpIntrInv.swp_run_hart_active_instr_S_res_b`
-  consume, so the Bare branch of any consumer has what it needs.
+* the BARE disjunct hands over, **instead of a cell**, everything the Bare
+  path actually needs and nothing it cannot fund: `⌜bare_satp_ok satp0⌝`
+  (moved above the record — exactly what `strans_swp_side_bare` and
+  `WpIntrInv.swp_run_hart_active_instr_S_res_b` consume), the regime's own
+  **side-condition introduction** (`s_acc_ok` + the file's satp Bare + MPRV=0
+  ⟹ `sr_swp_side`), and a closer.
+
+  The side condition has to ride IN THE DISJUNCT and cannot be its own field:
+  `kpt_share_regime` could not inhabit one, since at Sv39 the antecedent is
+  about a satp it never has.  In the disjunct it costs nothing — the walking
+  arm never produces it, and both regimes that do already had it
+  (`SRegime.bare_swp_side_intro`, `IntrDefs.strans_swp_side_bare`, which IS
+  this statement).  The Bare closer is ∀ over the landing tlb value: a frame
+  at the Bare write set cannot have moved the cell, so the residue's index is
+  irrelevant, and pinning it would force the data-side absorber to convert a
+  residue between two indices, which is not generically possible.
 
 It is an ACCESSOR because while `bare_inv` still owns a cell the Bare arm has
 to PARK it rather than hand it over; when the cell leaves `bare_inv` those
