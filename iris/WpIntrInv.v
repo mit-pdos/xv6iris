@@ -1150,7 +1150,7 @@ Section IntrEngine.
        senv0 pmar0 elp0 satp0 MIE_S mdv0 MENVCFG_S tv).
 
   Lemma swp_run_hart_active_instr_S_res_D
-      (SD : gset register) (HSD : s_frame_ok SD) (R : s_regime)
+      (SD : gset register) (HSD : s_frame_ok SD)
       (pc0 msr : mword 64) (bmi : bool) (cy ti ip mst0 : mword 64)
       (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
       (mc : mword 32) (micfg misa0 mseccfg0 senv0 : mword 64)
@@ -1165,7 +1165,7 @@ Section IntrEngine.
     and_vec MIE_S (not_vec mdv0) = zeros' 64 ->
     eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
     pma_allows_ram pmar0 ->
-    sr_swp_satp_ok R satp0 ->
+    strans_satp_ok satp0 ->
     pmp_ent0_ok pcfg paddr ->
     (* the regime's own side condition for the FETCH -- a premise, not derived
        from [sr_swp_side_ok], because that introduction demands [tlb ∈ Drw] and
@@ -1173,14 +1173,14 @@ Section IntrEngine.
        [swp_run_hart_active_instr_S_res] below is this at [s_Drw] /
        [strans_regime], with the generic introduction paying it. *)
     (forall (va : mword 64) (ppn : mword 44) (tv : type_of_register tlb),
-       sr_swp_side R (InstructionFetch tt) va ppn KP_rx i_Db SD s_Dro
+       strans_swp_side (InstructionFetch tt) va ppn KP_rx i_Db SD s_Dro
          (STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0
             senv0 pmar0 elp0 satp0 mdv0 tv)
          (MState (STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
             mseccfg0 senv0 pmar0 elp0 satp0 mdv0 tv) ∅ dev0_state)) ->
     gen_cert -∗
     instr pc0 is_rvc i -∗
-    sr_swp_res_at R satp0 tlbv -∗
+    strans_res_at satp0 tlbv -∗
     resv_frag cpu_id None -∗
     W -∗
     hreg_frame (STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
@@ -1192,7 +1192,7 @@ Section IntrEngine.
     (∀ (ii : InterruptType) (pr : Privilege),
        ⌜ ∃ meip seip : mword 1,
            s_dispatch ip meip seip MIE_S mdv0 mst0 = Some (ii, pr) ⌝ -∗
-       W -∗ sr_swp_res_at R satp0 tlbv -∗ resv_frag cpu_id None -∗
+       W -∗ strans_res_at satp0 tlbv -∗ resv_frag cpu_id None -∗
        hreg_frame (STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
                      mseccfg0 senv0 pmar0 elp0 satp0 mdv0 tlbv) SD -∗
        hreg_frame_ro (s_Df (DfracOwn 1))
@@ -1202,7 +1202,7 @@ Section IntrEngine.
     (* the instruction: at the fetch's landing file, nextPC committed, and
        it hands the frames back at the file it lands on *)
     (∀ tv' : type_of_register tlb,
-       W -∗ sr_swp_res_at R satp0 tv' -∗ resv_any cpu_id -∗
+       W -∗ strans_res_at satp0 tv' -∗ resv_any cpu_id -∗
        hreg_frame (register_set (R_bitvector_64 nextPC)
            (add_vec_int pc0 (if is_rvc then 2 else 4))
            (STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
@@ -1232,7 +1232,7 @@ Section IntrEngine.
     iApply (spt_run_hart_active_instr_S_D SD HSD (s_Df (DfracOwn 1))
               pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0
               senv0 pmar0 elp0 satp0 MIE_S mdv0 MENVCFG_S
-              (sr_swp_res_at R satp0) tlbv is_rvc i Q Rr W Qi
+              (strans_res_at satp0) tlbv is_rvc i Q Rr W Qi
               Hmisa eq_refl Help Hpma HA Hord HX Hcov
               with "Hcert Hinstr HW Hfrag Hres Hrw Hro [Hqi] [] [Hex]").
     - (* ---- THE DISPATCH.  SIE is SYMBOLIC here, so both arms are live:
@@ -1268,7 +1268,7 @@ Section IntrEngine.
         exists meip, seip. exact Ed.
       + iFrame "HW HRes Hfrag Hrw Hro".
     - (* ---- THE FETCH TRANSLATION, from the regime's own swp face ---- *)
-      iApply (spt_tr_obl_of_regime_D SD HSD R (s_Df (DfracOwn 1)) i_Db
+      iApply (spt_tr_obl_of_regime_D SD HSD strans_regime (s_Df (DfracOwn 1)) i_Db
                 pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0 mseccfg0
                 senv0 pmar0 elp0 satp0 MIE_S mdv0 MENVCFG_S
                 Hmisa eq_refl HSXL HMPRV (i_Db_in_gen SD HSD)
@@ -1352,7 +1352,7 @@ Section IntrEngine.
   Proof.
     intros Hmisa HSXL HMPRV Hmm Help Hpma Hsok Hpok.
     iApply (swp_run_hart_active_instr_S_res_D s_Drw s_frame_ok_Drw
-              strans_regime pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg
+              pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg
               misa0 mseccfg0 senv0 pmar0 elp0 satp0 mdv0 tlbv is_rvc i
               Q Rr W Qi Hmisa HSXL HMPRV Hmm Help Hpma Hsok Hpok).
     intros va ppn tv.
@@ -1368,6 +1368,91 @@ Section IntrEngine.
     - cbn [sregs]. srs. exact HSXL.
     - reflexivity.
     - rewrite /s_Drw. set_solver.
+  Qed.
+
+  (* THE BARE INSTANCE, stated CONCRETELY.  [swp_run_hart_active_instr_S_res_D]
+     is the single proof, but a call site must not [iApply] it directly: with
+     the write set in a PARAMETER position, [iApply]'s unification against the
+     cycle's WP goal does not terminate (measured: the same call diverges past
+     four minutes, while this concrete statement takes 13 s).  So the two
+     instances are stated concretely and the generic lemma is applied at the
+     TERM level, where there is nothing to unify. *)
+  Lemma swp_run_hart_active_instr_S_res_b
+      (pc0 msr : mword 64) (bmi : bool) (cy ti ip mst0 : mword 64)
+      (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
+      (mc : mword 32) (micfg misa0 mseccfg0 senv0 : mword 64)
+      (pmar0 : list PMA_Region) (elp0 : type_of_register elp)
+      (satp0 mdv0 : mword 64) (tlbv : type_of_register tlb)
+      (is_rvc : bool) (i : instruction)
+      (Q : regstate -> Prop) (Rr : regstate -> iProp Σ) (W : iProp Σ)
+      (Qi : InterruptType -> Privilege -> iProp Σ) :
+    misa0 = MISA_C ->
+    _get_Mstatus_SXL mst0 = 'b"10" ->
+    eq_vec (_get_Mstatus_MPRV mst0) ('b"1") = false ->
+    and_vec MIE_S (not_vec mdv0) = zeros' 64 ->
+    eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
+    pma_allows_ram pmar0 ->
+    (* the BARE arm's own satp fact, not the disjunction: this instance IS
+       the Bare arm, and it is what [strans_swp_side_bare] needs. *)
+    bare_satp_ok satp0 ->
+    pmp_ent0_ok pcfg paddr ->
+    gen_cert -∗
+    instr pc0 is_rvc i -∗
+    strans_res_at satp0 tlbv -∗
+    resv_frag cpu_id None -∗
+    W -∗
+    hreg_frame (STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                  mseccfg0 senv0 pmar0 elp0 satp0 mdv0 tlbv) s_Drwb -∗
+    hreg_frame_ro (s_Df (DfracOwn 1))
+      (STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+         mseccfg0 senv0 pmar0 elp0 satp0 mdv0 tlbv) s_Dro -∗
+    (∀ (ii : InterruptType) (pr : Privilege),
+       ⌜ ∃ meip seip : mword 1,
+           s_dispatch ip meip seip MIE_S mdv0 mst0 = Some (ii, pr) ⌝ -∗
+       W -∗ strans_res_at satp0 tlbv -∗ resv_frag cpu_id None -∗
+       hreg_frame (STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                     mseccfg0 senv0 pmar0 elp0 satp0 mdv0 tlbv) s_Drwb -∗
+       hreg_frame_ro (s_Df (DfracOwn 1))
+         (STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+            mseccfg0 senv0 pmar0 elp0 satp0 mdv0 tlbv) s_Dro -∗
+       Qi ii pr) -∗
+    (∀ tv' : type_of_register tlb,
+       W -∗ strans_res_at satp0 tv' -∗ resv_any cpu_id -∗
+       hreg_frame (register_set (R_bitvector_64 nextPC)
+           (add_vec_int pc0 (if is_rvc then 2 else 4))
+           (STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+              mseccfg0 senv0 pmar0 elp0 satp0 mdv0 tv')) s_Drwb -∗
+       hreg_frame_ro (s_Df (DfracOwn 1))
+         (register_set (R_bitvector_64 nextPC)
+           (add_vec_int pc0 (if is_rvc then 2 else 4))
+           (STOW pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+              mseccfg0 senv0 pmar0 elp0 satp0 mdv0 tv')) s_Dro -∗
+       swp (execute i)
+         (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
+                   ∃ rs2 : regstate, ⌜ Q rs2 ⌝ ∗
+                     hreg_frame rs2 s_Drwb ∗
+                     hreg_frame_ro (s_Df (DfracOwn 1)) rs2 s_Dro ∗ Rr rs2)) -∗
+    swp (run_hart_active 0)
+      (fun st => (∃ ii pr, ⌜st = Step_Pending_Interrupt (ii, pr)⌝ ∗ Qi ii pr)
+                 ∨ (∃ w : mword 32,
+                      ⌜st = Step_Execute (RETIRE_SUCCESS, w)⌝ ∗
+                      ∃ rs2 : regstate, ⌜ Q rs2 ⌝ ∗
+                        hreg_frame rs2 s_Drwb ∗
+                        hreg_frame_ro (s_Df (DfracOwn 1)) rs2 s_Dro ∗
+                        Rr rs2)).
+  Proof.
+    intros Hmisa HSXL HMPRV Hmm Help Hpma Hsok Hpok.
+    iApply (swp_run_hart_active_instr_S_res_D s_Drwb s_frame_ok_Drwb
+              pc0 msr bmi cy ti ip mst0 pcfg paddr mc micfg
+              misa0 mseccfg0 senv0 pmar0 elp0 satp0 mdv0 tlbv is_rvc i
+              Q Rr W Qi Hmisa HSXL HMPRV Hmm Help Hpma
+              (or_introl Hsok) Hpok).
+    intros va ppn tv.
+    apply (strans_swp_side_bare (InstructionFetch tt) va ppn KP_rx
+             i_Db s_Drwb s_Dro _ _).
+    - left. reflexivity.
+    - srs. exact Hsok.
+    - srs. exact HMPRV.
   Qed.
 
 
