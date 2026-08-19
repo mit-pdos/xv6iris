@@ -145,7 +145,7 @@ Require Import KernelDataInv.
 Require Import RiscvModelBytes.
 Require Import SchedCtx.
 Require Import SleepLock.
-Require Import WpSconfSrliw.
+(* [wp_srliw_s_sconf] lives in WpSconfAlu.v since the per-node fold-in. *)
 Require Import EscrowDefs.
 Require Import EscrowInode.
 Require Import EscrowDeposit.

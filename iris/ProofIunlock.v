@@ -437,8 +437,9 @@ Section ProofIunlockMain.
        is persistent, so it survives the close. *)
     iApply fupd_wp.
     iInv "Hesc" as ">Hbodyp" "Hclosep".
-    iDestruct (ic_open_out cn gfs gi cov logstart k true with "Hbodyp Hvalid")
-      as "[Hvalid Hborp]".
+    iDestruct (ic_open_out cn gfs gi cov logstart k (DepShr s dev inum g) g true
+                 eq_refl with "Hbodyp Hvalid Hdep")
+      as "(Hvalid & Hdep & Hborp)".
     iDestruct "Hborp" as (sbp) "[Hlvp Hbbackp]".
     iMod (iref_live_load_au (⊤ ∖ ↑icEscN) k sbp
             ltac:(solve_ndisj) Hk with "Hitbl Hlvp") as (vp) "[Hcellp Hclp]".

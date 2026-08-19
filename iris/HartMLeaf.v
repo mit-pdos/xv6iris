@@ -510,7 +510,11 @@ Qed.
 Lemma t_ram_flag : addr_is_ram hp_flag.
 Proof.
   unfold addr_is_ram.
-  assert (H : uint hp_flag = 2147525284) by (vm_cast_no_check (eq_refl 2147525284)).
+  (* 0x8000a2b4 = [KernelSyms.started], which [HartPilot.hp_flag] IS.  A
+     transcribed address, so it moves on any bump that moves the symbol
+     (xv6-bump-playbook.md §4c-bis); this file does not import [KernelSyms],
+     so the provenance is recorded here instead. *)
+  assert (H : uint hp_flag = 2147525300) by (vm_cast_no_check (eq_refl 2147525300)).
   assert (Hb : ram_base = 2147483648) by (vm_cast_no_check (eq_refl 2147483648)).
   assert (Hs : ram_size = 134217728) by (vm_cast_no_check (eq_refl 134217728)).
   rewrite H Hb Hs. lia.
