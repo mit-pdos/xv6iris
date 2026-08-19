@@ -567,9 +567,11 @@ a conditional write is a plain store, as before.
    `resv_frag c None` per hart (`power_boot_res`, `boot_shared_alloc`, the
    single-generation bundle with its new `Hresv0` hypothesis).  Leaves'
    obligations are UNCHANGED (the wrapper holds the frag aside); a store
-   leaf that needs it will get a `_w` wrapper variant.  `BootChain`/
-   `SystemAdequacy` (above the red line) do not thread it into the boot
-   harts yet.**
+   leaf that needs it will get a `_w` wrapper variant.  The boot chain
+   threads it: `BootChain.boot_entry_pre` takes `resv_frag cpu_id None` and
+   puts it into that hart's `pc_is`, `BootShared` carries it as the per-hart
+   family `hart_resv` through `boot_hart_pre_combine`/`boot_hart_pre`, and
+   `boot_shared_alloc` therefore hands NO mirror out.**
 
    **Also landed: the CONDITIONAL-WRITE RULE**
    (`HartEvents.wp/swp_hart_ram_write_cond`: caller holds `resv_frag cpu_id
@@ -784,6 +786,16 @@ So the next unit is **`wp_instr_s` + `s_cycle`**, built the way `WpInstr` is:
    | misa, mseccfg, pma_regions, htif, elp, senvcfg | `hw_config` (pinned, persistent) |
    | **satp, tlb** | `KptShare.tlb_res_pt` — owns both, with the Sv39/asid/root facts and `tlb_snap_ok` |
    | pmpcfg_n, pmpaddr_n | `pmp_config`, inside the same `tlb_res_pt` |
+
+   **EVERY CELL IN THAT TABLE MUST BE IN `BootConfig.boot_D`, and a
+   missing one is invisible until the boot chain is reached.**  Adequacy
+   allocates the era's register ghost map at domain exactly `boot_D`, so a
+   register outside it has no cell in the era and the bundle that owns it
+   simply cannot be formed — but nothing between the leaf and the boot
+   notices, because every file in between takes the bundle as a premise.
+   `mcountinhibit` / `minstretcfg` were missing this way for the whole
+   sweep and surfaced only at `boot_entry_pre`'s `pc_is`.  When a resource
+   grows a cell, check `boot_D_named` in the same change.
 
    `tlb_snap_ok` is the piece that makes a TLB HIT usable: it says the entry
    the lookup finds is a legitimate one for the installed tree — the S-mode
@@ -2678,6 +2690,14 @@ Each line is a ROOT: every file that merely depends on one is skipped by
 | `UserretEntryPt` | `wp_instr_ktramp_pt_share` not found | trampoline lane (a) |
 | `WpUmodeStep` | `minstret_inv_body` not found | "Not started" (verified U-mode tier) |
 
+**CURRENT COUNT (2026-08-19, after the kvminithart lane and the boot
+chain): FOUR red roots** — `ProofUser`, `UserretEntryPt`, `UservecExitPt`,
+`WpUmodeStep`.  `ProofKvminithart`, `ProofMain`, `ProofMainSecondary`,
+`UserretPt` and `BootChain` are green; `BootChain` was never a lane of its
+own — it only became reachable when `ProofKvminithart` fell, and nothing
+above it (`BootShared`, `SystemAdequacy`) needed more than the same three
+port-shape fixes.  Recount rather than trusting this line.
+
 ### THE KVMINITHART LANE: THE SFENCE HALF IS BUILT (session 2), THE SATP HALF IS NOT
 
 `WpSconfSfence.v` is the converted `sfence.vma` leaf, in three pieces:
@@ -2903,6 +2923,13 @@ Doing this lane turns THREE roots green and is the largest single win left.
 - **P4b 16 → 17 of 19 arms**: `UserMemArmsC.v` (the thirteen compressed) and
   `UserMemArmsA.v` (`arm_LOADRES_u`).  Design notes in
   `user-tier-port.md` §16.
+- **The boot chain** (`BootChain` / `BootShared` / `SystemAdequacy`, exposed
+  when `ProofKvminithart` fell): `boot_entry_pre` forms `pc_is`'s
+  `minstret_res` / `clock_res` out of the reset cells instead of allocating
+  `minstret_inv`; `mcountinhibit` / `minstretcfg` joined `boot_D_named` (see
+  the rule under the cell-ownership table above); the reservation mirror is
+  threaded per hart.  Only `boot_shared_alloc`'s statement moved, and it
+  LOST a conjunct.
 - Assorted port-shape corrections: `hw_config`'s trailing conjunct in three
   ipatterns, `user_trap_frame_open`'s `pc_is`, `minstret_inv`'s lost hart
   index.
@@ -2921,10 +2948,13 @@ Doing this lane turns THREE roots green and is the largest single win left.
    answer).  Beware: `make -C iris -f CoqMakefile <one>.vo` through
    `run-on-gcp` runs WITHOUT the opam switch (`rocq: not found`) — prefix it
    with `opam exec --switch=/shared/xv6rocq --` if you want a single file.
-3. Pick a lane.  In descending order of roots-per-effort: the kvminithart
-   sfence leaf (3 roots), the trampoline leaves (3, but they need
-   `wp_instr_u_pt` first), `WpUmodeStep` (1, not started), the last two
-   memory arms + P7 §5 (1, and it is the biggest).
+3. Pick a lane.  Four roots are left, in descending order of
+   roots-per-effort: the trampoline leaves (`UserretEntryPt` /
+   `UservecExitPt`, which need `wp_instr_u_pt` and
+   `wp_instr_ktramp_pt_share`), `WpUmodeStep` (1, not started — its error is
+   `minstret_inv_body`, i.e. the same post-port MinstretInv interface the
+   boot chain was ported onto), the last two memory arms + P7 §5
+   (`ProofUser`, and it is the biggest).
 4. Standing rules, unchanged: no caller-visible leaf/spec statement change
    without the user; every address claim from
    `mem_pointsto_claim`/`wordw_claim_of`; per-file <5 min; commit by
