@@ -2939,7 +2939,7 @@ Section ProofSysLinkBody.
                                       dinum dnd' bmd' n3 Sb3
                                       (bool_decide (bmapstart ∈ Sb3)) true false e0
                                       pid (DfracOwn (1/4)) dqb dqs
-                                      W1 (K - 38)%nat eb b lks true
+                                      W1 (K - 38)%nat eb b lks
                                       ltac:(exact Kiup) Hkd
                                       ltac:(exact (proj1 (bool_decide_eq_true _)))
                                       ltac:(intros _; exact Hmiblk)
@@ -2957,7 +2957,7 @@ Section ProofSysLinkBody.
                             { done. }
                             iIntros (CID64 Hq64 mupd n4 used4 Sb4 wd)
                               "%Hcsupd Hcg Hown _ _ Hpc Hpidq Hsbb Hsbi %Hused4
-                               Hbmres Hbsl %HSb4 %Hwd %Hcrbwd %Hn4 HopS Hislotd _".
+                               Hbmres Hbsl %HSb4 %Hwd %Hcrbwd %Hn4 HopS Hislotd".
                             assert (Hpcaa : ret_pc (W1 !!! Regidx Rra : mword 64)
                                       = mword_of_int (SL + 0xaa))
                               by (rewrite HW1ra; pcw).
@@ -3026,7 +3026,7 @@ Section ProofSysLinkBody.
                                       logstart bmapstart inodestart nib size dev
                                       used4 kk (qq/2 + qq/2)%Qp inum n4
                                       pid (DfracOwn (1/4)) dqb dqs
-                                      W3 (K - 38)%nat eb b lks true
+                                      W3 (K - 38)%nat eb b lks
                                       ltac:(exact Kip) Hkk Hgeom Hsize Hbm0 Hbmcov
                                       Hbmlog Hist0 Hiblk Hiblog Hinb Hcovb Hiu4 Hj
                                       Hgl HW3a0
@@ -3040,7 +3040,7 @@ Section ProofSysLinkBody.
                             { rewrite /log_op. iExists Sb4. iExact "HopS". }
                             iIntros (CID67 Hq67 mip n5 used5)
                               "%Hcsip Hcg Hown _ _ Hpc Hpidq Hsbb Hsbi %Hused5
-                               Hbmres Hbsl %Hn5 Hop Hisloti _".
+                               Hbmres Hbsl %Hn5 Hop Hisloti".
                             assert (Hpcb0 : ret_pc (W3 !!! Regidx Rra : mword 64)
                                       = mword_of_int (SL + 0xb0))
                               by (rewrite HW3ra; pcw).

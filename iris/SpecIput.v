@@ -146,7 +146,7 @@ Definition wp_iput_sconf_body
     (n : nat)
     (pidv : mword 32) (dq dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) (rg : bool) :=
+    (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iput in
   let ip : mword 64 := ientry k in
   let pj := proc_addr j in
@@ -208,20 +208,20 @@ Definition wp_iput_sconf_body
   ic_escrow cn gfs gi cov logstart k -∗
   (* the inode region *)
   ireg_inv gi gfs inodestart nib -∗
-  (* THE SEALED REGIME, BORROWED AND RETURNED (iclaim-ledger.md §6′, RULING G).
-     iput's free path FREEZES the inode ([InodeRegion.ireg_freeze_au] at
-     +0x50), and §2.3's boot-shelter clause makes a freezer exhibit the regime
-     it is freezing under: the sealed [IcacheRef.ireg_open] a RUNTIME thread
-     carries (persistent, fired once by RULING B between fsinit and
-     kexec("/init")), or the exclusive [ireg_boot] the pre-userspace thread
-     carries instead.  It is BORROWED, not consumed: the off-lock deposit at
-     +0xba retires the freeze and lifts the disjunction back out of the slot's
-     own clause ([EscrowDeposit.ireg_free_deposit_au]), and the two close arms
-     never spend it at all -- so it comes back on EVERY arm, below.  A runtime
-     caller passes [iLeft] on its persistent copy and may discard what comes
-     back; ireclaim, the one boot caller, lends [ireg_boot] and needs it
-     returned to run its next loop iteration. *)
-  ireg_regime rg -∗
+  (* THE SEALED REGIME, AT THE RUNTIME ARM (iclaim-ledger.md §6′, RULING G;
+     SPECIALIZED BY SIMP-1).  iput's free path FREEZES the inode
+     ([InodeRegion.ireg_freeze_au] at +0x50), and §2.3's boot-shelter clause
+     makes a freezer exhibit the regime it is freezing under.  A RUNTIME
+     thread's regime is the sealed [IcacheRef.ireg_open] -- persistent, fired
+     once by RULING B between fsinit and kexec("/init") -- so the indexed
+     form's "lend a copy, get a copy back" round-trip carried no information
+     at all here, and both the [(rg : bool)] binder and the return clause are
+     gone: this premise IS [ireg_regime true], and being persistent the
+     caller keeps its own copy across the call.  The ONE caller that freezes
+     under the other regime is ireclaim, whose [ireg_boot] is exclusive and
+     must come back; it reads [wp_iput_gen], which keeps the full indexed
+     round-trip. *)
+  ireg_open -∗
   (* the entry's sleeplock, over the CHECKOUT TOKEN alone *)
   (* TRACKED: what a holder deposits is a share of somebody's REFERENCE to
      the slot, keyed by the slot rather than by the lock -- which is what
@@ -287,10 +287,10 @@ Definition wp_iput_sconf_body
          n = 1 arm held.  iget spends exactly one on both ITS arms, so
          iget/iput are a matched pair against the fixed IREFSLOTS supply. *)
       iref_slot -∗
-      (* RULING G: the regime comes back, on every arm (see the premise). *)
-      ireg_regime rg -∗
-      (* ...AND NOTHING ELSE.  The reference is consumed; xv6's iput
-         returns void and the caller's pointer is dead. *)
+      (* ...AND NOTHING ELSE.  The regime does NOT come back: the runtime
+         arm's is persistent, so the caller never gave it up (SIMP-1).  The
+         reference is consumed; xv6's iput returns void and the caller's
+         pointer is dead. *)
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -512,10 +512,10 @@ Module Type IPUT.
       (n : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (rg : bool),
+      (b : bool) (lks : gset string),
       wp_iput_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
                           cov logstart bmapstart inodestart nib size dev used
-                          k q inum n pidv dq dqb dqs m K eb b lks rg.
+                          k q inum n pidv dq dqb dqs m K eb b lks.
   (* the credited set-form contract; [wp_iput_sconf] is this at
      [crb := cru := crz := false], derived at the [log_op] existential's own
      witness ([ip_spend_w w false false <= 2], and iput's own flush is the

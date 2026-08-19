@@ -1306,18 +1306,17 @@ Section IreclaimOrphan.
        presents (e) and it is a boot-thread proof, so the token is simply
        [Hboot], threaded here and taken straight back below -- BORROWED,
        exactly like the block half beside it. *)
-    iAssert (iname γi γfs inum (BufL (uint bno) ds)) with "[HpL Hboot]" as "Hlic".
+    iAssert (iname γi γfs inodestart inum (BufL (uint bno) ds))
+      with "[HpL Hboot]" as "Hlic".
     { rewrite /iname /fsblock -Hbseq. iFrame "HpL Hboot". iPureIntro.
-      split; [exact Hdswf | exact Htnz]. }
+      (* THE BLOCK TIE, discharged HERE and only here (SIMP-1): this walk is
+         the one site in the tree that presents licence (e), and the real
+         equation is its own [Hbnoeq]. *)
+      split; [exact Hbnoeq | split; [exact Hdswf | exact Htnz]]. }
     iApply (IG.wp_iget_sconf gtl cn γfs γi cov logstart inodestart nib dev inum
               (BufL (uint bno) ds)
               O6 0%nat true (proc_addr j) (K - 8)%nat b lks
               ltac:(lia) ltac:(cbn [Z.of_nat]; lia) Hnibin
-              (* THE MINT's [BufL] BLOCK TIE (item 7a-wire): this walk is the
-                 ONE site in the tree that presents licence (e), and the real
-                 equation is its own [Hbnoeq]. *)
-              ltac:(intros bno0 ds0 Heq; injection Heq as Hb1 Hb2;
-                    subst bno0; exact Hbnoeq)
               HO6a0 HO6a1
               ltac:(lkbelow)
               with "Hcg Hcnt Htext Hkdata Hpc Hitb2 Hitbl Hesc Hireg Hpanenv Hiref Hlic").
@@ -1332,7 +1331,7 @@ Section IreclaimOrphan.
        not in scope in this file, and writing the target proposition out
        would import it for one line. *)
     iEval (rewrite /iname /fsblock -Hbseq) in "Hlic".
-    iDestruct "Hlic" as "(HpL & _ & _ & Hboot)".
+    iDestruct "Hlic" as "(HpL & _ & _ & _ & Hboot)".
     iDestruct ("Hlkback" with "HpL") as "Hlk".
     iAssert (bio_locked bn (fs_view γfs γd dev cov) kk pidv dev bno bs bsd0 d0)
       with "[Hlk]" as "Hlk"; [rewrite /bio_locked; iExact "Hlk" |].
@@ -1869,26 +1868,40 @@ Section IreclaimOrphan.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID20) (CIDb := CID23) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    iApply (IP.wp_iput_sconf γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
+    (* SIMP-1: the RUNTIME iput contracts are specialized to the sealed
+       regime and no longer carry the [(rg : bool)] index; ireclaim is the
+       one caller that freezes under the OTHER arm, so it reads the indexed
+       [wp_iput_gen] instead.  The set-form reservation is the only
+       difference at this site -- its witness and birth epoch are the
+       [log_op] existential's own, exactly as [ProofIput]'s own counted seal
+       derives them. *)
+    iDestruct "Hop" as (Sb0) "Hop".
+    iDestruct (log_opS_named with "Hop") as (e00) "Hop".
+    iApply (IP.wp_iput_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
               gil gisl cov logstart bmapstart inodestart nib size dev usedn
-              kslot q inum MAXOPBLOCKS pidv dq dqb dqs OG (K - 8)%nat true b lks false
-              ltac:(lia) Hkslot Hgeom Hsize Hbm0 Hbmcov Hbmlog
+              kslot q inum MAXOPBLOCKS Sb0 false false false e00
+              pidv dq dqb dqs OG (K - 8)%nat true b lks false
+              ltac:(lia) Hkslot ltac:(discriminate) ltac:(discriminate)
+              Hgeom Hsize Hbm0 Hbmcov Hbmlog
               Hst Hibcov Hiblog Hnibin Hcovb
               ltac:(unfold iput_units, MAXOPBLOCKS; lia) Hj Hgl HOGa0
               Hbelow
               with "Hcg Hcnt [] [] Htext Hkdata Hpc Hpanenv Hbio Hlctx Hitb2 Hitbl Hescrow
                     Hireg Hboot Hslk Href Hru Hsbb Hsbi Hbm Hppid Hprocs Hdevi Hdgeom
-                    Hdlock Hsl Hop").
+                    Hdlock Hsl [] Hop").
     all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
+    { iEval (cbn beta iota). iEmpIntro. }
     (* RULING G' (iclaim-ledger.md §6''): ireclaim lends its EXCLUSIVE
        [ireg_boot] at [rg := false] and the indexed post gives it back as
        [ireg_regime false = ireg_boot] -- re-bound here under its own name, so
        the next loop iteration has it.  This is the round-trip §2.3 asked for
        and integration-2's un-indexed disjunction could not close. *)
-    iIntros (CID24 Hq24 mQ n' usedp) "%Hcsip Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi
-                                      %Hsubp Hbm Hsl %Hn' Hop Hiref Hboot".
+    iIntros (CID24 Hq24 mQ n' usedp Sb' wf) "%Hcsip Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi
+                                      %Hsubp Hbm Hsl %Hssub %Hwbm %Hwc %Hbnd
+                                      Hop Hiref Hboot".
+    iDestruct (log_opS_op with "Hop") as "Hop".
     assert (Hpc6a : ret_pc (OG !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ireclaim + 0x6a))
       by (rewrite HOGra; pcw).

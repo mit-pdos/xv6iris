@@ -132,7 +132,7 @@ Definition wp_iunlockput_sconf_body
     (n : nat)
     (pidv : mword 32) (dq dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) (rg : bool) :=
+    (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iunlockput in
   let ip : mword 64 := ientry k in
   let pj := proc_addr j in
@@ -178,11 +178,13 @@ Definition wp_iunlockput_sconf_body
   itable_inv -∗
   ic_escrow cn gfs gi cov logstart k -∗
   ireg_inv gi gfs inodestart nib -∗
-  (* THE SEALED REGIME, BORROWED AND RETURNED (iclaim-ledger.md §6′, RULING
-     G) -- [SpecIput]'s premise verbatim, because iunlockput's whole
-     obligation here is iput's.  A runtime caller passes [iLeft] on its
-     persistent copy and may discard what comes back. *)
-  ireg_regime rg -∗
+  (* THE SEALED REGIME (iclaim-ledger.md §6′, RULING G) -- [SpecIput]'s
+     runtime premise verbatim, because iunlockput's whole obligation here is
+     iput's.  SPECIALIZED BY SIMP-1, and here the specialization is total:
+     no boot thread calls iunlockput at all, so the indexed form had no
+     [rg := false] consumer on either of this file's two contracts.  The
+     premise is persistent, so nothing comes back. *)
+  ireg_open -∗
   is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k)) -∗
   (* ---- THE HOLDER'S BUNDLE (SpecIunlock's precondition) ---- *)
   sleeplocked_q gisl s -∗
@@ -244,8 +246,6 @@ Definition wp_iunlockput_sconf_body
       ⌜((n - iput_units)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
       log_op g n' -∗
       iref_slot -∗
-      (* RULING G: the regime comes back, on every arm. *)
-      ireg_regime rg -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -279,7 +279,7 @@ Definition wp_iunlockput_gen_body
     (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
     (pidv : mword 32) (dq dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) (rg : bool) :=
+    (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iunlockput in
   let ip : mword 64 := ientry k in
   let pj := proc_addr j in
@@ -328,11 +328,13 @@ Definition wp_iunlockput_gen_body
   itable_inv -∗
   ic_escrow cn gfs gi cov logstart k -∗
   ireg_inv gi gfs inodestart nib -∗
-  (* THE SEALED REGIME, BORROWED AND RETURNED (iclaim-ledger.md §6′, RULING
-     G) -- [SpecIput]'s premise verbatim, because iunlockput's whole
-     obligation here is iput's.  A runtime caller passes [iLeft] on its
-     persistent copy and may discard what comes back. *)
-  ireg_regime rg -∗
+  (* THE SEALED REGIME (iclaim-ledger.md §6′, RULING G) -- [SpecIput]'s
+     runtime premise verbatim, because iunlockput's whole obligation here is
+     iput's.  SPECIALIZED BY SIMP-1, and here the specialization is total:
+     no boot thread calls iunlockput at all, so the indexed form had no
+     [rg := false] consumer on either of this file's two contracts.  The
+     premise is persistent, so nothing comes back. *)
+  ireg_open -∗
   is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k)) -∗
   (* ---- THE HOLDER'S BUNDLE (SpecIunlock's precondition) ---- *)
   sleeplocked_q gisl s -∗
@@ -410,8 +412,6 @@ Definition wp_iunlockput_gen_body
       ⌜((n - ip_spend_w w cru crz)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
       log_opS g n' Sb' -∗
       iref_slot -∗
-      (* RULING G: the regime comes back, on every arm. *)
-      ireg_regime rg -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -434,11 +434,11 @@ Module Type IUNLOCKPUT.
       (n : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (rg : bool),
+      (b : bool) (lks : gset string),
       wp_iunlockput_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                                gil gisl cov logstart bmapstart inodestart nib
                                size dev used k qi s gy inum dn' bm' n
-                               pidv dq dqb dqs m K eb b lks rg.
+                               pidv dq dqb dqs m K eb b lks.
   (* the credited set-form contract; [wp_iunlockput_sconf] is this at
      [crb := cru := crz := false], derived at the [log_op] existential's own
      witness and at the birth epoch [LogInv.log_opS_named] opens. *)
@@ -460,9 +460,9 @@ Module Type IUNLOCKPUT.
       (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (rg : bool),
+      (b : bool) (lks : gset string),
       wp_iunlockput_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                              gil gisl cov logstart bmapstart inodestart nib
                              size dev used k qi s gy inum dn' bm' n Sb crb cru
-                             crz e0 pidv dq dqb dqs m K eb b lks rg.
+                             crz e0 pidv dq dqb dqs m K eb b lks.
 End IUNLOCKPUT.

@@ -2060,33 +2060,24 @@ Section ProofDirlookupMain.
                       = bv_unsigned (dir_inum data i))
               by exact (dlk_zext32_unsigned (dir_inum data i)).
             iAssert (∃ lic : ilic,
-                       (* the mint's [BufL] block tie: neither arm below is
-                          [BufL], so the premise is vacuous -- but the
-                          licence is chosen HERE, so the fact travels with
-                          it (item 7a-wire) *)
-                       ⌜forall bno ds0,
-                          lic = BufL bno ds0 ->
-                          bno = IBLOCK
-                                  (zero_extend' 32
-                                     (dir_inum data i : mword 16) : mword 32)
-                                  inodestart⌝
-                       (* ...AND THE FLAVOUR, for the same reason (RULING
-                          C', iclaim-ledger.md §5''''').  Neither arm below
-                          is [ClaimL] -- dirlookup never claims -- so the
-                          unit its iget mints is the PLAIN one, which is
-                          what [runit_any] now IS and what this contract's
-                          rest home promises.  Chosen here, so the fact has
-                          to travel with the licence. *)
-                       ∗ ⌜is_claim lic = false⌝
-                       ∗ iname gi gfs
+                       (* THE FLAVOUR (RULING C', iclaim-ledger.md §5''''').
+                          Neither arm below is [ClaimL] -- dirlookup never
+                          claims -- so the unit its iget mints is the PLAIN
+                          one, which is what [runit_any] now IS and what this
+                          contract's rest home promises.  Chosen here, so the
+                          fact has to travel with the licence.  (The [BufL]
+                          block tie that used to ride beside it is gone: the
+                          licence carries its own, SIMP-1.) *)
+                       ⌜is_claim lic = false⌝
+                       ∗ iname gi gfs inodestart
                          (zero_extend' 32 (dir_inum data i : mword 16) : mword 32)
                          lic
-                       ∗ (iname gi gfs
+                       ∗ (iname gi gfs inodestart
                             (zero_extend' 32 (dir_inum data i : mword 16)
                              : mword 32) lic
                           -∗ dir_links (bv_unsigned dinum) dn data
                              ∗ dinode_at gi dinum dr))%I
-              with "[Hlinks Hdi]" as (lic) "(%Hbno & %Hlicfl & Hlic & Hlicback)".
+              with "[Hlinks Hdi]" as (lic) "(%Hlicfl & Hlic & Hlicback)".
             { destruct (decide (bv_unsigned (dir_inum data i)
                                 = bv_unsigned dinum)) as [Hself | Hnself].
               - (* the SELF record: licence (c) *)
@@ -2094,7 +2085,6 @@ Section ProofDirlookupMain.
                                : mword 32) = dinum)
                   by (apply bv_eq; rewrite Hzu; exact Hself).
                 iExists (HeldL dr). rewrite Hii.
-                iSplitR; [iPureIntro; discriminate |].
                 iSplitR; [iPureIntro; reflexivity |].
                 iSplitL "Hdi".
                 (* §3.3 (RULING D): licence (c) now costs BOTH pure halves of
@@ -2102,7 +2092,7 @@ Section ProofDirlookupMain.
                    count comes from the IN-CORE one ([Hnl0], already in hand
                    on this arm out of [dl_lic_live]) transported across
                    premise (6')'s equation [Hdrnl]. *)
-                { iApply (iname_held_intro gi gfs dinum dr Hdrnz
+                { iApply (iname_held_intro gi gfs inodestart dinum dr Hdrnz
                             ltac:(rewrite Hdrnl; exact Hnl0) with "Hdi"). }
                 iIntros "Hl".
                 iDestruct (iname_held_alloc with "Hl") as "(_ & _ & Hdi)".
@@ -2112,7 +2102,6 @@ Section ProofDirlookupMain.
                              Htyz Hnl0 Hilt Hlive Hnself with "Hlinks")
                   as (fl) "[Hp Hback]".
                 iExists (LinkedL fl).
-                iSplitR; [iPureIntro; discriminate |].
                 iSplitR; [iPureIntro; reflexivity |].
                 rewrite /iname Hzu.
                 iSplitL "Hp"; [iExact "Hp" |].
@@ -2122,7 +2111,7 @@ Section ProofDirlookupMain.
                       lic
                       N7 0%nat eb pj (K - 12)%nat b lks
                       ltac:(lia)
-                      ltac:(vm_compute; reflexivity) Hinumb Hbno HN7a0
+                      ltac:(vm_compute; reflexivity) Hinumb HN7a0
                       ltac:(rewrite dlk_sext_zext_16_32_64; exact HN7a1)
                       ltac:(lkbelow)
                       with "Hcg Hcnt Htext Hkd Hpc Hitb2 Hitbl Hesc Hireg Hpenv Hislot

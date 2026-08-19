@@ -1,11 +1,14 @@
 # The file system's abstract/ghost state — a reference inventory
 
-STATUS: verified against `main` @ `bc96776a` (2026-08-19, the pushed tree of
-the iclaim-ledger campaign's FINAL GATE).  The campaign is COMPLETE: the
-reordered `iput` (kernel pin 4398009) is proven end-to-end, and
-`create_fresh_ty` is a THEOREM (`LinkCreateFreshTy.v:443`;
-`SpecCreateFreshTy.v` is deleted).  Nothing here is in flight; the three
-syscall tops rest on the five Sail platform axioms + funext alone.
+STATUS: verified at the `simp-1` tip, `iris/` tree `6cd93011142170caed6651098b9862f3547ecc74` — the
+post-campaign simplification increment SIMP-1 (regime specialization, the
+BufL block-tie fold, the dead-weight sweep) on top of the pushed FINAL-GATE
+tree `bc96776a`.  Whole tree green at fixpoint, staleness 0.  The
+iclaim-ledger campaign is COMPLETE: the reordered `iput` (kernel pin 4398009)
+is proven end-to-end, and `create_fresh_ty` is a THEOREM
+(`LinkCreateFreshTy.v:443`; `SpecCreateFreshTy.v` is deleted).  Nothing here
+is in flight; the three syscall tops rest on the five Sail platform axioms +
+funext alone.
 
 Layout: one section per layer, bottom-up.  For each piece: the RA/type, its
 HOME (which invariant or lock-held bundle owns the authority), what a
@@ -151,8 +154,8 @@ redeems (escrow→`imark`, pool arm→normal, `reg_join`→`reg_full`).
 |---|---|
 | `itable_half M` | ½ of the authoritative slot map `M : slot k ↦ (q_out, count)` — the other half lives in the itable spinlock's invariant. |
 | `ci : k ↦ (dev, inum)` | the pure identity map; `ic_ci_wf` ties `dom ci = dom M`; the pool's domain is its complement. |
-| `islot2 cn M ci k` | per-slot arm: EMPTY (`islot_empty`) or LIVE = `islot_rest_at k q dev inum ∗ iref_slots count ∗ ic_id ½ ∗ icnt_half inum count ∗ frz_park k inum q`. |
-| `frz_park k z q` (`IcacheInv.v:1807`) | the lock-side halves of the freeze bookkeeping: OFF = `frzm_h z false ∗ frzsel k ½ false`; ON = `frzm_h z true ∗ frzsel k ¼ true` (the ON quarter is what the +0x82 reclaim brings home).  `q` is vestigial. |
+| `islot2 cn M ci k` | per-slot arm: EMPTY (`islot_empty`) or LIVE = `islot_rest_at k q dev inum ∗ iref_slots count ∗ ic_id ½ ∗ icnt_half inum count ∗ frz_park k inum`. |
+| `frz_park k z` (`IcacheInv.v`) | the lock-side halves of the freeze bookkeeping: OFF = `frzm_h z false ∗ frzsel k ½ false`; ON = `frzm_h z true ∗ frzsel k ¼ true` (the ON quarter is what the +0x82 reclaim brings home).  It carries NO MASS — R-e moved that into `live_slot`'s frozen alternative — so it is indexed by the slot and the inum alone and every count mover re-parks it unchanged. |
 | `live_slot M k := live_norm ∨ live_frzn` (`IcacheInv.v:434`, RULING R-e) | the invariant-side live-mass account, per slot, inside `itable_inv`'s `live_pool`: NORM holds the table's complement slice at `frzsel ½ false`; **FRZN holds the WHOLE live unit** (`live_frac k 1`) at `frzsel ½ true` — so ANY reader with a positive `live_frac` share kills the frozen alternative (`frz_slot_kill`) with no lock, no licence, no region open.  This is the index-independent decider ProofIlock and ProofIdup use. |
 | `frzsel k q b` (`IcacheRef.v:2466`) | the per-slot freeze SELECTOR — a `dfrac_agree bool` filed at the RESERVED key `NINODE + k` **inside the existing liveness ghost** (`icfg_live`; no new `inG`, no boot premise). |
 | `isl_pool M` / `iref_slots_auth` / `iref_slot` | as before: the slots' share authorities (lock-held) and the fungible reference-slot budget a caller brings to iget. |
@@ -185,10 +188,10 @@ everywhere as a typeclass.
 |---|---|
 | `inode_ref k q dev inum` | ONE counted reference to slot k at that identity — what iget returns and iput spends.  `inode_shr`/`inode_shr_gen` are shares; the `inode_held`/`inode_held_ty`/`inode_held_short` PACKAGES (`IcacheRef.v:2950–3022`: reference + its `runit` + the generation shot) are what `FileInvDefs.inode_pay`'s cinv holds per fd and what `p->cwd` owns (`ProcInv.v:59`) — no separate rest-home conjunct was ever needed. |
 | `runit b z` — the reference-provenance unit (item 7a) | minted by iget FLAVOURED by the licence presented (`is_claim l`: ialloc's ClaimL iget mints `runit_claim` into its own claim box, every other iget mints `runit_plain`), copied by idup, surrendered at the iput that closes the reference.  `runit_any := runit_plain`.  The mint's side conditions are the five-row table `iname_mint_ok` (`IgetLic.v:725`). |
-| `iname γi γfs inum l` — the iget **licence** (`IgetLic.v`) | `l : ilic`, five constructors: `LinkedL fl` (a paid dirent unit), `HeldL d` (caller holds `dinode_at`, type≠0 ∧ nlink≠0), `ClaimL ty` (the typed `iclaim`), `BufL bno ds` (the inode block's `fsblock` half at type≠0 bytes ∗ `ireg_boot` — boot-only), `RootL`.  `SpecIget` additionally takes the pure BufL block-equation (`l = BufL bno ds → bno = IBLOCK inum inodestart`) and posts the flavoured `runit` beside the reference. |
+| `iname γi γfs inodestart inum l` — the iget **licence** (`IgetLic.v`) | `l : ilic`, five constructors: `LinkedL fl` (a paid dirent unit), `HeldL d` (caller holds `dinode_at`, type≠0 ∧ nlink≠0), `ClaimL ty` (the typed `iclaim`), `BufL bno ds` (the inode block's `fsblock` half at type≠0 bytes ∗ `⌜bno = IBLOCK inum inodestart⌝` ∗ `ireg_boot` — boot-only), `RootL`.  The BufL **block tie is a conjunct of the arm**, which is why the licence is indexed by the region's start: `SpecIget` states no block equation of its own, so no non-BufL caller pays a `discriminate` for it and the one presenter (`ProofIreclaim`'s boot scan) discharges it where it builds the licence.  `SpecIget` posts the flavoured `runit` beside the reference. |
 | `ilkc` — SpecIlock's fill index (`InodeRegion.v:441`) | `ClaimK ty` (create's child fill: spends the typed claim + `runit_claim`, receives `runit_plain` + `⌜filled ∧ di_type = ty⌝` — the `create_fresh_ty` payout) \| `PlainK` (the twelve dirent/kernel sites: borrow `runit_plain`, the pin derives `c = None`) \| `ShotK ty` (the three fd sites: the persistent generation one-shot `ity_shot g ty` they already hold kills the uncached arm — `⌜filled = false⌝`). |
 | `ifreeze_off z` | §3b's f-column at rest — surfaces through `SpecIlock`'s post and returns at `iunlock`/`iunlockput`; how create/sys_link prove a fresh box is not mid-free (`ireg_link_pin`). |
-| `ireg_regime rg` | the borrowed regime witness on `SpecIput`/`SpecIunlockput` (G/G′): runtime callers lend a copy of the persistent `ireg_open` (rg = true); ireclaim lends its exclusive `ireg_boot` (rg = false) and gets IT back from the post. |
+| `ireg_regime rg` (= `if rg then ireg_open else ireg_boot`) | the borrowed regime witness, now on **`wp_iput_gen` alone** (G/G′).  ireclaim — the tree's only `rg := false` caller, and the only caller of any iput contract that is not a runtime thread — lends its exclusive `ireg_boot` and gets IT back from the post.  Every RUNTIME contract is specialized: `wp_iput_sconf` and both `wp_iunlockput_*` take the persistent `ireg_open` as an ordinary premise and return nothing, because a persistent lend/return round-trip carries no information.  `ireg_regime` still indexes the LEDGER (the f column's phases, `ireg_fsh`, the escrow) — only the contract surface lost it. |
 | contract facts | `SpecIdup` carries `!logG` + `ireg_inv` (the region handle its count move needs — `ireg_inv`'s type really does mention `logG`, via the epoch coupling) + the `runit` copies; `K_iput = 74`, `K_iunlockput = 78`. |
 
 ## 7. Boot phase
@@ -198,7 +201,10 @@ ity_shot icfg_boot ty` (persistent) — a one-shot (`ity_shoot`).
 Boot/ireclaim runs holding `ireg_boot`, which refutes every claim it meets
 (the c-shelter), backs its `BufL` scan-igets, and — as `ireg_regime false`
 — is LENT into each of its boot freezes and returned by the deposit (the
-G′ round-trip; `ireg_fsh` parks it, the phase payload remembers it).  The
+G′ round-trip; `ireg_fsh` parks it, the phase payload remembers it).  That
+round-trip is why `wp_iput_gen` keeps the `rg` index at all: ireclaim is its
+one consumer, and the runtime contracts, whose regime is the persistent
+`ireg_open`, dropped the index.  The
 **seal** fires once after `fsinit` returns, converting to the persistent
 `ireg_open` that rides the syscall dispatch env (`sysc_fs_env`/`fs_world`)
 down to `ireg_claim_au` and every runtime iput.  The seal's site terminates
@@ -243,9 +249,11 @@ the +0x8a re-read gives `cnt2 = 1` outright (B1); the last close steps
 `FrzPre→FrzPost` (receipt home, selector quarter reclaimed), the eviction
 parks `pool_await` while the freer keeps `dinode_at` in hand (B2); the
 deposit writes type 0, fills the rg-indexed escrow, retires the phase to
-`FrzOff`, and hands back `ireg_regime rg` — ireclaim's `ireg_boot`
-round-trips, a runtime caller's `ireg_open` copy is absorbed — closing
-the window and re-arming the inum for its next life.
+`FrzOff`, and hands back `ireg_regime rg` — closing the window and re-arming
+the inum for its next life.  That hand-back reaches a CALLER only through
+`wp_iput_gen`, where ireclaim's exclusive `ireg_boot` round-trips; on the
+runtime contracts it is absorbed inside iput, since a persistent `ireg_open`
+the caller never gave up cannot be given back.
 
 The two windows are duals: the claim protects a box being BORN from a
 foreign free; the freeze protects a box DYING from a foreign rebirth.  Both

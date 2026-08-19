@@ -934,7 +934,7 @@ Section ProofSysUnlinkTails.
     iApply (Iunlockput.wp_iunlockput_sconf (CID := CID2) gs jx gl gu gd gk
               pd pav pu bn g gfs gi cn gtl gil gisl cov logstart bmapstart
               inodestart nib size dev used kk qi s gy inum dn bm u pidv dq
-              dqb dqs M2 (K - 30)%nat eb b lks true
+              dqb dqs M2 (K - 30)%nat eb b lks
               HKup Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog
               Hinb Hcovb Hiu Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
@@ -944,7 +944,7 @@ Section ProofSysUnlinkTails.
                     Hdlk Hbsl Hop").
     iIntros (CID3 Hq3 mup n2 used2)
       "%Hcsup Hcg Hown Htce Hcce Hpc Hpid Hsbb Hsbi %Hused2 Hbmres Hbsl %Hn2
-       Hop Hislot _".
+       Hop Hislot".
     assert (Hpc160 : ret_pc (M2 !!! Regidx Rra : mword 64)
                      = mword_of_int (SU + 0x160)) by (rewrite HM2ra; pcw).
     iEval (rewrite Hpc160) in "Hpc".
@@ -1477,7 +1477,7 @@ Section ProofSysUnlinkTails.
     iApply (Iunlockput.wp_iunlockput_sconf (CID := CID2) gs jx gl gu gd gk
               pd pav pu bn g gfs gi cn gtl gili gisli cov logstart bmapstart
               inodestart nib size dev used ki qip si gyi inumi dni bmi u pidv
-              dq dqb dqs M2 (K - 30)%nat eb b lks true
+              dq dqb dqs M2 (K - 30)%nat eb b lks
               HKup Hki Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblki Hiblogi
               Hinbi Hcovb ltac:(unfold iput_units in *; lia) Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
@@ -1487,7 +1487,7 @@ Section ProofSysUnlinkTails.
                     Hdev Hgeo Hdlk Hbsl Hop").
     iIntros (CID3 Hq3 mup n2 used2)
       "%Hcsup Hcg Hown Htce Hcce Hpc Hpid Hsbb Hsbi %Hused2 Hbmres Hbsl %Hn2
-       Hop Hislot _".
+       Hop Hislot".
     assert (Hpc17a : ret_pc (M2 !!! Regidx Rra : mword 64)
                      = mword_of_int (SU + 0x17a)) by (rewrite HM2ra; pcw).
     iEval (rewrite Hpc17a) in "Hpc".

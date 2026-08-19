@@ -1801,14 +1801,14 @@ Section IcacheRefInv.
      and the ON arm's quarter is exactly what the +0x82 reclaim brings home,
      to be joined with the escrow tail's at the +0x8a retirement.
 
-     [q] IS NOW VESTIGIAL.  It is kept so that [IcacheEscrow.islot2]'s live
-     arm and the three walk statements that name [frz_park k z q] do not move
-     one byte; [frz_park_mono] is correspondingly free. *)
-  Definition frz_park (k : nat) (z : Z) (q : Qp) : iProp Σ :=
+     THE PARK CARRIES NO MASS, so it is indexed by the slot and the inum
+     alone -- [islot2]'s live arm re-parks it across every count move with no
+     accompanying fraction. *)
+  Definition frz_park (k : nat) (z : Z) : iProp Σ :=
     ((frzm_h z false ∗ frzsel k (1/2)%Qp false)
      ∨ (frzm_h z true ∗ frzsel k ((1/2)/2)%Qp true))%I.
 
-  Global Instance frz_park_timeless k z q : Timeless (frz_park k z q).
+  Global Instance frz_park_timeless k z : Timeless (frz_park k z).
   Proof. rewrite /frz_park. apply _. Qed.
 
   (* a slice at [s] contains one at any [q <= s] *)
@@ -1822,10 +1822,6 @@ Section IcacheRefInv.
     rewrite live_gen_split.
     iDestruct "H" as "[H _]". iExists g. iExact "H".
   Qed.
-
-  Lemma frz_park_mono (k : nat) (z : Z) (q q' : Qp) :
-    (q' ≤ q)%Qp -> frz_park k z q -∗ frz_park k z q'.
-  Proof. intros _. rewrite /frz_park. iIntros "H". iExact "H". Qed.
 
   (* the mass overflow, kept because the escrow's own openers still name it *)
   Lemma frz_mass_absurd (k : nat) (q : Qp) :
@@ -1932,8 +1928,8 @@ Section IcacheRefInv.
   (* THE +0x82 RECLAIM (S1b): with the mirror's own [true] half in hand the
      OFF alternative dies on [frzm_agree], and what comes home is the ON arm's
      quarter of the selector -- the mass itself never left the invariant. *)
-  Lemma frz_park_reclaim (k : nat) (z : Z) (q : Qp) :
-    frzm_h z true -∗ frz_park k z q -∗
+  Lemma frz_park_reclaim (k : nat) (z : Z) :
+    frzm_h z true -∗ frz_park k z -∗
     frzm_h z true ∗ frzsel k ((1/2)/2)%Qp true.
   Proof.
     rewrite /frz_park. iIntros "Hb [[Hoff _] | [_ Hs]]".
@@ -1941,12 +1937,12 @@ Section IcacheRefInv.
     - iFrame.
   Qed.
 
-  Lemma frz_park_intro_on (k : nat) (z : Z) (q : Qp) :
-    frzm_h z true -∗ frzsel k ((1/2)/2)%Qp true -∗ frz_park k z q.
+  Lemma frz_park_intro_on (k : nat) (z : Z) :
+    frzm_h z true -∗ frzsel k ((1/2)/2)%Qp true -∗ frz_park k z.
   Proof. rewrite /frz_park. iIntros "Hb Hs". iRight. iFrame. Qed.
 
-  Lemma frz_park_intro_off (k : nat) (z : Z) (q : Qp) :
-    frzm_h z false -∗ frzsel k (1/2)%Qp false -∗ frz_park k z q.
+  Lemma frz_park_intro_off (k : nat) (z : Z) :
+    frzm_h z false -∗ frzsel k (1/2)%Qp false -∗ frz_park k z.
   Proof. rewrite /frz_park. iIntros "Hb Hs". iLeft. iFrame. Qed.
 
   (* THE WINDOW-ENTERING DECIDER AT REF-1 (iput+0x3a) and THE FOREIGN SHARE
@@ -1961,7 +1957,7 @@ Section IcacheRefInv.
   Lemma frz_park_shr_off (Eo : coPset)
       (k : nat) (z : Z) (s : Qp) :
     ↑icacheN ⊆ Eo -> (k < NINODE)%nat ->
-    itable_inv -∗ live_frac k s -∗ frz_park k z s ={Eo}=∗
+    itable_inv -∗ live_frac k s -∗ frz_park k z ={Eo}=∗
       live_frac k s ∗ frzm_h z false ∗ frzsel k (1/2)%Qp false.
   Proof.
     iIntros (HE Hk) "#Hinv Hs Hpark".
@@ -1974,7 +1970,7 @@ Section IcacheRefInv.
   Lemma frz_park_ref1_off (Eo : coPset)
       (k : nat) (z : Z) (qt : Qp) :
     ↑icacheN ⊆ Eo -> (k < NINODE)%nat ->
-    itable_inv -∗ live_frac k qt -∗ frz_park k z qt ={Eo}=∗
+    itable_inv -∗ live_frac k qt -∗ frz_park k z ={Eo}=∗
       live_frac k qt ∗ frzm_h z false ∗ frzsel k (1/2)%Qp false.
   Proof.
     iIntros (HE Hk) "#Hinv Hq Hpark".
@@ -2466,17 +2462,11 @@ Section IcacheRefInvReg.
       (inodestart : Z) (nib : nat) (inum : bv 32) (l : ilic) (n : nat) :
     ↑iregN ⊆ E ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
-    (* RULING R, WIRED (§5''.3's step 4): [IgetLic.iname_mint_ok]'s [BufL]
-       row transports the licence's own decoded type fact to the REGION's
-       record through the two block halves, and that needs the constructor's
-       block to BE this inum's.  [discriminate] at every non-[BufL] site;
-       the real equation only at [ProofIreclaim]'s boot walk. *)
-    (forall bno ds0, l = BufL bno ds0 -> bno = IBLOCK inum inodestart) ->
     ireg_inv γi γfs inodestart nib -∗
-    iname γi γfs inum l -∗
+    iname γi γfs inodestart inum l -∗
     icnt_half (bv_unsigned inum) n
     ={E, E ∖ ↑iregN}=∗
-      iname γi γfs inum l ∗
+      iname γi γfs inodestart inum l ∗
       (* THE MINT.  Both callers of this accessor are UP-counts by exactly
          one, and the unit they mint is FLAVOURED by the licence presented:
          ialloc's own [ClaimL] iget mints [runit_claim] into its own claim
@@ -2487,7 +2477,7 @@ Section IcacheRefInvReg.
            icnt_half (bv_unsigned inum) m ∗
            runit (is_claim l) (bv_unsigned inum)).
   Proof.
-    iIntros (HE Hin Hbno) "#Hinv Hl Hhalf".
+    iIntros (HE Hin) "#Hinv Hl Hhalf".
     pose proof (islot_lt inum) as Hsl.
     assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
                    = bv_unsigned inum) by (symmetry; apply ireg_key_split).
@@ -2508,7 +2498,7 @@ Section IcacheRefInvReg.
     pose proof (Hcp (islot inum) Hsl) as Hmd.
     rewrite -ireg_key_split in Hmd.
     (* §2.6's TABLE, at whichever licence the caller presented *)
-    iDestruct (iname_not_frozen γi γfs inum l (ds !!! islot inum) mrg
+    iDestruct (iname_not_frozen γi γfs inodestart inum l (ds !!! islot inum) mrg
                  wl wdu wdt gl rl cl pl fz n Hlok Hrt Hclm Hfrz Hmd
                  with "Ha Hla Hfdisj Hl") as %Hfz0.
     (* THE MINT's TABLE (§5', RULING R): the same five rows, read for the
@@ -2518,7 +2508,7 @@ Section IcacheRefInvReg.
        fact and this accessor already holds [↑iregN] open. *)
     iEval (rewrite -(ireg_bi_iblock inum inodestart)) in "Hfsb".
     iDestruct (iname_mint_ok γi γfs inodestart inum l ds mrg
-                 wl wdu wdt gl rl cl pl fz n Hbno Hwf Hlok Hrt Hclm Hmd
+                 wl wdu wdt gl rl cl pl fz n Hwf Hlok Hrt Hclm Hmd
                  with "Ha Hla Hfsb Hdisj Hl") as %[Hty0 Hcl0].
     iEval (rewrite (ireg_bi_iblock inum inodestart)) in "Hfsb".
     assert (Hins : <[islot inum := ds !!! islot inum]> ds = ds).
@@ -2584,13 +2574,13 @@ Section IcacheRefInvReg.
      arm's [1/2].  Together with the invariant's retained [1/2 - q] they are
      the WHOLE unit the last close surrenders ([frz_evict_mass]). *)
   Lemma frz_park_pre_reclaim (E : coPset) (γi : gname) (γfs : fs_names)
-      (inodestart : Z) (nib : nat) (inum : bv 32) (k : nat) (q : Qp)
+      (inodestart : Z) (nib : nat) (inum : bv 32) (k : nat)
       (rg : bool) :
     ↑iregN ⊆ E ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
     ireg_inv γi γfs inodestart nib -∗
     ifreeze_pre rg (bv_unsigned inum) -∗
-    frz_park k (bv_unsigned inum) q ={E}=∗
+    frz_park k (bv_unsigned inum) ={E}=∗
       ifreeze_pre rg (bv_unsigned inum) ∗ frzm_h (bv_unsigned inum) true ∗
       (* RULING R-e: the MASS never left [live_slot]'s frozen alternative, so
          what comes home here is the park's QUARTER of the selector -- to be
@@ -2607,22 +2597,22 @@ Section IcacheRefInvReg.
   Qed.
 
   (* THE PARK, DECIDED FROM A LICENCE (iclaim-ledger.md §3.16).  Two of the
-     five count movers re-park [islot2]'s live arm at a MOVED [q]: the close
-     shrinks it and rides through by [frz_park_mono], and the UP-COUNT grows
-     it and cannot.  What pays there is the licence the up-count already
+     five count movers re-park [islot2]'s live arm across a count move, and
+     the UP-COUNT cannot re-establish the arm on its own.  What pays there is
+     the licence the up-count already
      carries: §2.6's table puts the column at [FrzOff] ([iname_not_frozen]),
      the region's mirror bit is therefore DOWN, and the arm's FROZEN
      alternative dies on [frzm_agree].  A standalone read -- nothing moves,
      no count is touched -- so not one mover's signature changes for it. *)
   Lemma frz_park_lic_off (E : coPset) (γi : gname) (γfs : fs_names)
       (inodestart : Z) (nib : nat) (inum : bv 32) (l : ilic)
-      (k : nat) (q : Qp) :
+      (k : nat) :
     ↑iregN ⊆ E ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
     ireg_inv γi γfs inodestart nib -∗
-    iname γi γfs inum l -∗
-    frz_park k (bv_unsigned inum) q ={E}=∗
-      iname γi γfs inum l ∗ frzm_h (bv_unsigned inum) false ∗
+    iname γi γfs inodestart inum l -∗
+    frz_park k (bv_unsigned inum) ={E}=∗
+      iname γi γfs inodestart inum l ∗ frzm_h (bv_unsigned inum) false ∗
       (* RULING R-e: the OFF arm's SELECTOR half comes out beside the mirror
          bit, and it is what [iref_incr_store_au] spends to refute
          [live_slot]'s frozen alternative. *)
@@ -2645,7 +2635,7 @@ Section IcacheRefInvReg.
     iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) Hep]".
     pose proof (Hcp (islot inum) Hsl) as Hmd.
     rewrite -ireg_key_split in Hmd.
-    iDestruct (iname_not_frozen γi γfs inum l (ds !!! islot inum) mrg
+    iDestruct (iname_not_frozen γi γfs inodestart inum l (ds !!! islot inum) mrg
                  wl wdu wdt gl rl cl pl fz cn Hlok Hrt Hclm Hfrz Hmd
                  with "Ha Hla Hfdisj Hl") as %Hfz0.
     iDestruct "Hfrcp" as "[Hrc Hmr]".
@@ -2807,8 +2797,6 @@ Section IcacheRefInvReg.
     bv_unsigned inum < 16 * Z.of_nat nib ->
     M !! k = Some (qt, n) ->
     (Z.pos (Pos.succ n) < 2 ^ 31)%Z ->
-    (* RULING R, WIRED: [ireg_icnt_lic_acc]'s [BufL] tie, riding up. *)
-    (forall bno ds0, l = BufL bno ds0 -> bno = IBLOCK inum inodestart) ->
     (* THE SLOT'S SHARE AUTHORITY comes from the CALLER, not from the
        invariant: it lives in the itable LOCK's resource, and every step that
        moves it runs under that lock.  iput is why -- it has to hold the
@@ -2817,7 +2805,7 @@ Section IcacheRefInvReg.
        The [icnt] half rides there for the same reason. *)
     itable_inv -∗ ireg_inv γi γfs inodestart nib -∗
     itable_half M -∗ iref_tok k q -∗ isl_slot M k -∗
-    iname γi γfs inum l -∗
+    iname γi γfs inodestart inum l -∗
     icnt_half (bv_unsigned inum) (Pos.to_nat n) -∗
     |={Eo, Eo ∖ ↑icacheN ∖ ↑iregN}=>
       i_ref (ientry k) ↦₄ iref_word M k ∗
@@ -2826,12 +2814,12 @@ Section IcacheRefInvReg.
          itable_half (<[k := (qt, Pos.succ n)]> M) ∗
          isl_slot (<[k := (qt, Pos.succ n)]> M) k ∗
          iref_tok k (q/2)%Qp ∗ iref_tok k (q/2)%Qp ∗
-         iname γi γfs inum l ∗
+         iname γi γfs inodestart inum l ∗
          icnt_half (bv_unsigned inum) (Pos.to_nat (Pos.succ n)) ∗
          (* THE MINTED UNIT, flavoured by the licence presented *)
          runit (is_claim l) (bv_unsigned inum)).
   Proof.
-    iIntros (HE HER Hin HMk Hno Hbno) "#Hinv #Hrinv Hhalf Htok Hislot Hoff Hcnt".
+    iIntros (HE HER Hin HMk Hno) "#Hinv #Hrinv Hhalf Htok Hislot Hoff Hcnt".
     iMod (inv_acc Eo icacheN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
     iDestruct "Hbody" as (M') "(>Ha & >%Hwf & >Hcells & >Hpool)".
     iDestruct (itable_half_agree with "Ha Hhalf") as %->.
@@ -2840,7 +2828,7 @@ Section IcacheRefInvReg.
     iDestruct (live_pool_acc_upd M k Hk with "Hpool") as "[Hslot Hpback]".
     (* ---- region: the SECOND open, nested inside the icache's hole ---- *)
     iMod (ireg_icnt_lic_acc (Eo ∖ ↑icacheN) γi γfs inodestart nib inum
-            l (Pos.to_nat n) ltac:(solve_ndisj) Hin Hbno
+            l (Pos.to_nat n) ltac:(solve_ndisj) Hin
             with "Hrinv Hoff Hcnt") as "[Hoff Hrback]".
     iModIntro. iFrame "Hcell". iIntros "Hcell".
     iDestruct (itable_half_join with "Ha Hhalf") as "Hauth".
@@ -2899,8 +2887,6 @@ Section IcacheRefInvReg.
     M !! k = Some (qt, n) ->
     (qt + qn < 1/2)%Qp ->
     (Z.pos (Pos.succ n) < 2 ^ 31)%Z ->
-    (* RULING R, WIRED: [ireg_icnt_lic_acc]'s [BufL] tie, riding up. *)
-    (forall bno ds0, l = BufL bno ds0 -> bno = IBLOCK inum inodestart) ->
     itable_inv -∗ ireg_inv γi γfs inodestart nib -∗
     itable_half M -∗ isl_slot M k -∗
     (* RULING R-e: the ONE mover that holds no live slice of its own, so the
@@ -2909,7 +2895,7 @@ Section IcacheRefInvReg.
        caller has just decided with the very [iname] it presents here
        ([frz_park_lic_off]), and it goes straight back out. *)
     frzsel k (1/2)%Qp false -∗
-    iname γi γfs inum l -∗
+    iname γi γfs inodestart inum l -∗
     icnt_half (bv_unsigned inum) (Pos.to_nat n) -∗
     |={Eo, Eo ∖ ↑icacheN ∖ ↑iregN}=>
       i_ref (ientry k) ↦₄ iref_word M k ∗
@@ -2918,11 +2904,11 @@ Section IcacheRefInvReg.
          itable_half (<[k := ((qt + qn)%Qp, Pos.succ n)]> M) ∗
          isl_slot (<[k := ((qt + qn)%Qp, Pos.succ n)]> M) k ∗
          iref_tok k qn ∗ frzsel k (1/2)%Qp false ∗
-         iname γi γfs inum l ∗
+         iname γi γfs inodestart inum l ∗
          icnt_half (bv_unsigned inum) (Pos.to_nat (Pos.succ n)) ∗
          runit (is_claim l) (bv_unsigned inum)).
   Proof.
-    iIntros (HE HER Hin HMk Hq Hno Hbno) "#Hinv #Hrinv Hhalf Hislot Hsel Hoff Hcnt".
+    iIntros (HE HER Hin HMk Hq Hno) "#Hinv #Hrinv Hhalf Hislot Hsel Hoff Hcnt".
     iMod (inv_acc Eo icacheN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
     iDestruct "Hbody" as (M') "(>Ha & >%Hwf & >Hcells & >Hpool)".
     iDestruct (itable_half_agree with "Ha Hhalf") as %->.
@@ -2930,7 +2916,7 @@ Section IcacheRefInvReg.
     iDestruct (iref_cells_acc_upd M k Hk with "Hcells") as "[Hcell Hback]".
     iDestruct (live_pool_acc_upd M k Hk with "Hpool") as "[Hslot Hpback]".
     iMod (ireg_icnt_lic_acc (Eo ∖ ↑icacheN) γi γfs inodestart nib inum
-            l (Pos.to_nat n) ltac:(solve_ndisj) Hin Hbno
+            l (Pos.to_nat n) ltac:(solve_ndisj) Hin
             with "Hrinv Hoff Hcnt") as "[Hoff Hrback]".
     iModIntro. iFrame "Hcell". iIntros "Hcell".
     iDestruct (itable_half_join with "Ha Hhalf") as "Hauth".
@@ -3368,12 +3354,10 @@ Section IcacheRefInvReg.
     M !! k = Some (qt, n) ->
     (qt + qn < 1/2)%Qp ->
     (Z.pos (Pos.succ n) < 2 ^ 31)%Z ->
-    (* RULING R, WIRED: [ireg_icnt_lic_acc]'s [BufL] tie, riding up. *)
-    (forall bno ds0, l = BufL bno ds0 -> bno = IBLOCK inum inodestart) ->
     itable_inv -∗ ireg_inv γi γfs inodestart nib -∗
     itable_half M -∗ live_frac k s -∗ isl_slot M k -∗
     frzsel k (1/2)%Qp false -∗
-    iname γi γfs inum l -∗
+    iname γi γfs inodestart inum l -∗
     icnt_half (bv_unsigned inum) (Pos.to_nat n) -∗
     |={Eo, Eo ∖ ↑icacheN ∖ ↑iregN}=>
       i_ref (ientry k) ↦₄ iref_word M k ∗
@@ -3382,13 +3366,13 @@ Section IcacheRefInvReg.
          itable_half (<[k := ((qt + qn)%Qp, Pos.succ n)]> M) ∗
          isl_slot (<[k := ((qt + qn)%Qp, Pos.succ n)]> M) k ∗
          iref_tok k qn ∗ live_frac k s ∗ frzsel k (1/2)%Qp false ∗
-         iname γi γfs inum l ∗
+         iname γi γfs inodestart inum l ∗
          icnt_half (bv_unsigned inum) (Pos.to_nat (Pos.succ n)) ∗
          runit (is_claim l) (bv_unsigned inum)).
   Proof.
-    iIntros (HE HER Hin HMk Hq Hno Hbno) "#Hinv #Hrinv Hhalf Hlv Hislot Hsel Hoff Hcnt".
+    iIntros (HE HER Hin HMk Hq Hno) "#Hinv #Hrinv Hhalf Hlv Hislot Hsel Hoff Hcnt".
     iMod (iref_incr_store_au Eo γi γfs inodestart nib M k inum l qt qn n
-            HE HER Hin HMk Hq Hno Hbno
+            HE HER Hin HMk Hq Hno
             with "Hinv Hrinv Hhalf Hislot Hsel Hoff Hcnt")
       as "[Hcell Hback]".
     iModIntro. iFrame "Hcell". iIntros "Hcell".
@@ -3426,8 +3410,6 @@ Section IcacheRefInvReg.
       (q : Qp) :
     ↑icacheN ⊆ Eo -> ↑iregN ⊆ Eo ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
-    (* RULING R, WIRED: [ireg_icnt_lic_acc]'s [BufL] tie, riding up. *)
-    (forall bno ds0, l = BufL bno ds0 -> bno = IBLOCK inum inodestart) ->
     (* the index bound is the CALLER's here and nowhere else in the family:
        a FREE slot is not in [M], so [icM_wf]'s domain clause cannot supply
        it (iget's scan has it, from [IcacheEscrow]'s pool geometry). *)
@@ -3441,7 +3423,7 @@ Section IcacheRefInvReg.
        this mover borrows it -- exactly as the other three up-counts do --
        and the [ifreeze_off] it also carries is now only threaded, not
        stepped (the phase does not move at a recycle). *)
-    iname γi γfs inum l -∗
+    iname γi γfs inodestart inum l -∗
     ifreeze_off (bv_unsigned inum) -∗
     icnt_half (bv_unsigned inum) 0%nat -∗
     |={Eo, Eo ∖ ↑icacheN ∖ ↑iregN}=>
@@ -3456,12 +3438,12 @@ Section IcacheRefInvReg.
             what [IcacheEscrow.islot2]'s live arm parks in [frz_park]'s OFF
             alternative -- the up-count's future weapon. *)
          frzsel k (1/2)%Qp false ∗
-         iname γi γfs inum l ∗
+         iname γi γfs inodestart inum l ∗
          ifreeze_off (bv_unsigned inum) ∗
          icnt_half (bv_unsigned inum) 1%nat ∗
          runit (is_claim l) (bv_unsigned inum)).
   Proof.
-    iIntros (HE HER Hin Hbno Hk HMk Hq) "#Hinv #Hrinv Hhalf Hislot Hl Hoff Hcnt".
+    iIntros (HE HER Hin Hk HMk Hq) "#Hinv #Hrinv Hhalf Hislot Hl Hoff Hcnt".
     iMod (inv_acc Eo icacheN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
     iDestruct "Hbody" as (M') "(>Ha & >%Hwf & >Hcells & >Hpool)".
     iDestruct (itable_half_agree with "Ha Hhalf") as %->.
@@ -3469,7 +3451,7 @@ Section IcacheRefInvReg.
     iDestruct (live_pool_acc_upd M k Hk with "Hpool") as "[Hslot Hpback]".
     (* ---- region: the nested open, the token pinning the column ---- *)
     iMod (ireg_icnt_lic_acc (Eo ∖ ↑icacheN) γi γfs inodestart nib inum
-            l 0%nat ltac:(solve_ndisj) Hin Hbno
+            l 0%nat ltac:(solve_ndisj) Hin
             with "Hrinv Hl Hcnt") as "[Hl Hrback]".
     iModIntro. iFrame "Hcell". iIntros "Hcell".
     iDestruct (itable_half_join with "Ha Hhalf") as "Hauth".

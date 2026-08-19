@@ -1283,7 +1283,7 @@ Section ProofSysMkdirBody.
         iApply (Iunlockput.wp_iunlockput_sconf (CID := CID20) gs j gl gu gd gk
                   pd pav pu bn g gfs gi cn gtl gil gisl cov logstart bmapstart
                   inodestart nib size dev used1 kk qi ss gy inum dn bm un1
-                  pid (DfracOwn (1/4)) dqb dqs P0 (K - 18)%nat eb b lks true
+                  pid (DfracOwn (1/4)) dqb dqs P0 (K - 18)%nat eb b lks
                   ltac:(lia) ltac:(lia) Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
                   Hibcov Hiblog ltac:(lia) Hcovb
                   ltac:(exact (proj2 (proj2 Hun1) eq_refl)) Hj Hgl HP0a0
@@ -1301,7 +1301,7 @@ Section ProofSysMkdirBody.
         { iApply (log_opS_op with "HopS"). }
         iIntros (CID21 Hq21 miu n2 used2)
           "%Hcsiu Hcg Hown _ _ Hpc Hpidq Hsbb Hsbi %Hused2 Hbmres Hbsl %Hn2
-           Hop Hislot _".
+           Hop Hislot".
         assert (Hpc32 : ret_pc (P0 !!! Regidx Rra : mword 64)
                         = mword_of_int (MD + 0x32)) by (rewrite HP0ra; pcw).
         iEval (rewrite Hpc32) in "Hpc".

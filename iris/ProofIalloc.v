@@ -1710,9 +1710,7 @@ Section IallocClaim.
               (ClaimL ty)
               WA 0%nat true (proc_addr j) (K - 8)%nat b lks
               ltac:(lia) ltac:(vm_compute; reflexivity)
-              Hnib
-              (* the mint's [BufL] block tie: [ClaimL] is not [BufL] *)
-              ltac:(discriminate) HWAa0 HWAa1
+              Hnib HWAa0 HWAa1
               ltac:(lkbelow)
               with "Hcg Hcnt Htext Hkdata Hpc Hitb2 Hitbl Hesc Hireg Hpanenv Hiref
                     Hclaim").

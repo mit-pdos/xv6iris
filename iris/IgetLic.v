@@ -322,7 +322,8 @@ Section IgetLic.
   (*  THE LICENCE ITSELF                                                  *)
   (* ------------------------------------------------------------------ *)
 
-  Definition iname (γi : gname) (γfs : fs_names) (inum : bv 32) (l : ilic)
+  Definition iname (γi : gname) (γfs : fs_names) (inodestart : Z)
+                   (inum : bv 32) (l : ilic)
     : iProp Σ :=
     match l with
     | LinkedL fl => ipaid fl (bv_unsigned inum)                      (* a *)
@@ -347,8 +348,17 @@ Section IgetLic.
        lends, and [ProofIreclaim.v:1302] (the only site in the tree) is a
        boot-thread proof that holds one; it re-proves in a later
        increment. *)
+    (* THE BLOCK TIE IS THE LICENCE'S OWN (SIMP-1).  It used to be a
+       standalone premise on [SpecIget] -- and hence a [discriminate] at
+       every one of the tree's non-[BufL] iget sites -- but it is a fact
+       ABOUT THIS CONSTRUCTOR and nothing else: the half a [BufL] presenter
+       holds must be the block that CONTAINS the inum it is licensing, or
+       [iname_mint_ok] cannot meet it against the region's own half.  Stated
+       here it is discharged once, by the one presenter in the tree
+       ([ProofIreclaim]'s boot walk), and no other caller ever sees it. *)
     | BufL bno ds =>
                  (fsblock γfs bno (diblk_bytes ds) ∗                  (* e *)
+                  ⌜bno = IBLOCK inum inodestart⌝ ∗
                   ⌜diblk_wf ds⌝ ∗
                   ⌜bv_unsigned (di_type (ds !!! islot inum)) <> 0⌝ ∗
                   ireg_boot)
@@ -357,7 +367,8 @@ Section IgetLic.
 
   (* Timeless throughout -- which is what lets [SpecIget]'s premise sit
      beside the itable spinlock's resource without a later. *)
-  Global Instance iname_timeless γi γfs inum l : Timeless (iname γi γfs inum l).
+  Global Instance iname_timeless γi γfs ist inum l :
+    Timeless (iname γi γfs ist inum l).
   Proof. destruct l; rewrite /iname; apply _. Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -370,7 +381,7 @@ Section IgetLic.
       ledger's own clauses at the slot the caller's [dinode_at] names, and
       hands everything back.  A free-standing entailment
 
-          iname γi γfs inum l -∗ ⌜bv_unsigned (di_type dn) <> 0⌝
+          iname γi γfs inodestart inum l -∗ ⌜bv_unsigned (di_type dn) <> 0⌝
 
       with [dn] FREE is the inconsistent form the axiom's own header warns
       about, verbatim -- it says something about a record nobody has tied to
@@ -394,9 +405,9 @@ Section IgetLic.
     bv_unsigned inum < 16 * Z.of_nat nib ->
     ireg_inv γi γfs inodestart nib -∗
     dinode_at γi inum dn -∗
-    iname γi γfs inum (LinkedL fl) ={E}=∗
+    iname γi γfs inodestart inum (LinkedL fl) ={E}=∗
     ⌜bv_unsigned (di_type dn) <> 0⌝ ∗
-    dinode_at γi inum dn ∗ iname γi γfs inum (LinkedL fl).
+    dinode_at γi inum dn ∗ iname γi γfs inodestart inum (LinkedL fl).
   Proof.
     iIntros (HE Hin) "#Hinv Hdn Hfrag". rewrite /iname.
     pose proof (islot_lt inum) as Hsl.
@@ -449,7 +460,7 @@ Section IgetLic.
       FULL-fraction ghost_map element ([InodeRegion.dinode_at_excl]), so a
       lemma of the accessor family's shape --
 
-          ireg_inv -∗ dinode_at γi inum dn -∗ iname γi γfs inum HeldL
+          ireg_inv -∗ dinode_at γi inum dn -∗ iname γi γfs inodestart inum HeldL
             ={E}=∗ ⌜bv_unsigned (di_type dn) <> 0⌝ ∗ …
 
       -- has an UNSATISFIABLE premise set: the licence carries a second
@@ -458,9 +469,9 @@ Section IgetLic.
       twice-instantiate failure of §4.1, one tier up, and writing it would
       have been green.  The honest statement is the unpack: the licence IS
       the record, so it hands the record out and takes it back. *)
-  Lemma iname_held_alloc (γi : gname) (γfs : fs_names) (inum : bv 32)
-      (d : dinode) :
-    iname γi γfs inum (HeldL d) -∗
+  Lemma iname_held_alloc (γi : gname) (γfs : fs_names) (inodestart : Z)
+      (inum : bv 32) (d : dinode) :
+    iname γi γfs inodestart inum (HeldL d) -∗
     ⌜bv_unsigned (di_type d) <> 0⌝ ∗ ⌜bv_unsigned (di_nlink d) <> 0⌝
     ∗ dinode_at γi inum d.
   Proof.
@@ -470,11 +481,11 @@ Section IgetLic.
   (* ...and back in, which is all the round trip costs at the ["."] site.
      The [nlink] premise is §2.6's strengthening: the ["."] site holds a
      LIVE directory, so it is discharged where the licence is built. *)
-  Lemma iname_held_intro (γi : gname) (γfs : fs_names) (inum : bv 32)
-      (d : dinode) :
+  Lemma iname_held_intro (γi : gname) (γfs : fs_names) (inodestart : Z)
+      (inum : bv 32) (d : dinode) :
     bv_unsigned (di_type d) <> 0 ->
     bv_unsigned (di_nlink d) <> 0 ->
-    dinode_at γi inum d -∗ iname γi γfs inum (HeldL d).
+    dinode_at γi inum d -∗ iname γi γfs inodestart inum (HeldL d).
   Proof. intros Hnz Hnl. rewrite /iname. iIntros "Hd". by iFrame "Hd". Qed.
 
   (* ---- (f) [RootL] ⇒ allocated --------------------------------------- *)
@@ -492,9 +503,9 @@ Section IgetLic.
     bv_unsigned inum < 16 * Z.of_nat nib ->
     ireg_inv γi γfs inodestart nib -∗
     dinode_at γi inum dn -∗
-    iname γi γfs inum RootL ={E}=∗
+    iname γi γfs inodestart inum RootL ={E}=∗
     ⌜bv_unsigned (di_type dn) <> 0⌝ ∗
-    dinode_at γi inum dn ∗ iname γi γfs inum RootL.
+    dinode_at γi inum dn ∗ iname γi γfs inodestart inum RootL.
   Proof.
     iIntros (HE Hin) "#Hinv Hdn %Hroot". rewrite /iname.
     pose proof (islot_lt inum) as Hsl.
@@ -546,27 +557,22 @@ Section IgetLic.
       names the caller's slot in it, and injectivity of the encoding turns
       the two decodings into one.
 
-      THE BLOCK NUMBER IS CARRIED BY THE CONSTRUCTOR, and the tie to the
-      inum is this reading's own premise -- [ireg_read]'s [Hb], verbatim.
-      Spelling it as [iblk_of] instead would pin the licence to the
-      region's AMBIENT start [icfg_ist] (a receipt key, §G.17) while every
-      holder of a buffer half has it at the THREADED [inodestart]; the two
-      are equal at every real caller and the equation is exactly what this
-      lemma should be asking for rather than assuming. *)
+      THE BLOCK NUMBER IS CARRIED BY THE CONSTRUCTOR, and so is its tie to
+      the inum -- [ireg_read]'s [Hb] comes straight out of the licence
+      (SIMP-1), so this reading takes no block premise at all. *)
   Lemma iname_buf_alloc (E : coPset) (γi : gname) (γfs : fs_names)
       (inodestart : Z) (nib : nat) (inum : bv 32) (dn : dinode)
       (bno : Z) (ds : list dinode) :
     ↑iregN ⊆ E ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
-    bno = IBLOCK inum inodestart ->
     ireg_inv γi γfs inodestart nib -∗
     dinode_at γi inum dn -∗
-    iname γi γfs inum (BufL bno ds) ={E}=∗
+    iname γi γfs inodestart inum (BufL bno ds) ={E}=∗
     ⌜bv_unsigned (di_type dn) <> 0⌝ ∗
-    dinode_at γi inum dn ∗ iname γi γfs inum (BufL bno ds).
+    dinode_at γi inum dn ∗ iname γi γfs inodestart inum (BufL bno ds).
   Proof.
-    iIntros (HE Hin Hb) "#Hinv Hdn Hbuf". rewrite /iname.
-    iDestruct "Hbuf" as "(Hhalf & %Hwf & %Hnz & Hboot)".
+    iIntros (HE Hin) "#Hinv Hdn Hbuf". rewrite /iname.
+    iDestruct "Hbuf" as "(Hhalf & %Hb & %Hwf & %Hnz & Hboot)".
     rewrite /fsblock.
     iMod (ireg_read E γi γfs inodestart nib inum dn
             bno (diblk_bytes ds) HE Hin Hb
@@ -578,7 +584,7 @@ Section IgetLic.
     iModIntro. iSplitR.
     { iPureIntro. rewrite -Hslot. exact Hnz. }
     iFrame "Hdn Hhalf Hboot".
-    iPureIntro. split; [exact Hwf | exact Hnz].
+    iPureIntro. split; [exact Hb | split; [exact Hwf | exact Hnz]].
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -637,8 +643,8 @@ Section IgetLic.
         [RootL]       the root clause is (L1) MADE STRICT, so it delivers
                       [1 <= di_nlink d] outright and the collision is the
                       first row's.                                        *)
-  Lemma iname_not_frozen (γi : gname) (γfs : fs_names) (inum : bv 32)
-      (l : ilic) (d : dinode) (mm : gmap Z dinode)
+  Lemma iname_not_frozen (γi : gname) (γfs : fs_names) (inodestart : Z)
+      (inum : bv 32) (l : ilic) (d : dinode) (mm : gmap Z dinode)
       (wl wdu wdt g r : nat) (c : ctyUR)
       (p : option (dfrac_agreeR (leibnizO Z))) (f : frzUR) (n : nat) :
     ireg_link_ok d (wl + wdu + wdt) ->
@@ -649,7 +655,7 @@ Section IgetLic.
     ghost_map_auth γi 1 mm -∗
     ireg_rcol (bv_unsigned inum) wl wdu wdt g c r p f n d -∗
     ireg_fsh f -∗
-    iname γi γfs inum l -∗
+    iname γi γfs inodestart inum l -∗
     ⌜f = Some (Excl FrzOff)⌝.
   Proof.
     intros Hlok Hrt Hclm Hfrz Hmd.
@@ -678,7 +684,7 @@ Section IgetLic.
       iPureIntro.
       exact (ireg_claim_ok_off c f d ltac:(rewrite Hc; discriminate) Hclm).
     - (* (e) BufL -- the boot one-shot against the freeze's own shelter *)
-      iDestruct "Hl" as "(_ & _ & _ & Hboot)".
+      iDestruct "Hl" as "(_ & _ & _ & _ & Hboot)".
       iApply (ireg_fsh_boot_off f with "Hsh Hboot").
     - (* (f) RootL *)
       iDestruct "Hl" as %Hroot.
@@ -719,14 +725,12 @@ Section IgetLic.
       halves to meet -- which is [iname_buf_alloc]'s [ireg_read] step, except
       that this lemma's consumers ([IcacheInv]'s up-count movers) already hold
       [^iregN] open and cannot re-open it.  So the region's half comes IN as
-      an argument, and the constructor's [bno] tie comes in as the same pure
-      premise [iname_buf_alloc] takes.  Everything is borrowed: the conclusion
-      is pure. *)
+      an argument, and the constructor's [bno] tie comes out of the LICENCE
+      itself (SIMP-1).  Everything is borrowed: the conclusion is pure. *)
   Lemma iname_mint_ok (γi : gname) (γfs : fs_names) (inodestart : Z)
       (inum : bv 32) (l : ilic) (ds : list dinode) (mm : gmap Z dinode)
       (wl wdu wdt g r : nat) (c : ctyUR)
       (p : option (dfrac_agreeR (leibnizO Z))) (f : frzUR) (n : nat) :
-    (forall bno ds0, l = BufL bno ds0 -> bno = IBLOCK inum inodestart) ->
     diblk_wf ds ->
     ireg_link_ok (ds !!! islot inum) (wl + wdu + wdt) ->
     ireg_root_ok (bv_unsigned inum) (ds !!! islot inum) (wl + wdu + wdt) ->
@@ -736,11 +740,11 @@ Section IgetLic.
     ireg_rcol (bv_unsigned inum) wl wdu wdt g c r p f n (ds !!! islot inum) -∗
     fsblock γfs (IBLOCK inum inodestart) (diblk_bytes ds) -∗
     (⌜c = None⌝ ∨ ireg_open) -∗
-    iname γi γfs inum l -∗
+    iname γi γfs inodestart inum l -∗
     ⌜bv_unsigned (di_type (ds !!! islot inum)) <> 0
      /\ (is_claim l = false -> c = None)⌝.
   Proof.
-    intros Hbno Hwf Hlok Hrt Hclm Hmd.
+    intros Hwf Hlok Hrt Hclm Hmd.
     (* bridge (a): a named record is neither free nor a claim box *)
     assert (Hnzb : bv_unsigned (di_nlink (ds !!! islot inum)) <> 0 ->
                    bv_unsigned (di_type (ds !!! islot inum)) <> 0 /\ c = None).
@@ -777,8 +781,8 @@ Section IgetLic.
                       ltac:(rewrite Hc; discriminate) Hclm)).
     - (* (e) BufL -- the buffer's type fact, transported; the boot one-shot
          against the c column's shelter *)
-      iDestruct "Hl" as "(Hhalf & %Hwf0 & %Hnz0 & Hboot)".
-      rewrite (Hbno bno ds0 eq_refl) /fsblock.
+      iDestruct "Hl" as "(Hhalf & %Hbno & %Hwf0 & %Hnz0 & Hboot)".
+      rewrite Hbno /fsblock.
       iDestruct (ghost_map_elem_agree with "Hhalf Hfsb") as %Hbytes.
       assert (Hdseq : ds0 = ds)
         by exact (diblk_bytes_inj ds0 ds Hwf0 Hwf Hbytes).
@@ -818,9 +822,9 @@ Section IgetLic.
     ↑iregN ⊆ E ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
     ireg_inv γi γfs inodestart nib -∗
-    iname γi γfs inum l -∗
+    iname γi γfs inodestart inum l -∗
     ifreeze ph (bv_unsigned inum) ={E}=∗
-    ⌜ph = FrzOff⌝ ∗ iname γi γfs inum l ∗ ifreeze ph (bv_unsigned inum).
+    ⌜ph = FrzOff⌝ ∗ iname γi γfs inodestart inum l ∗ ifreeze ph (bv_unsigned inum).
   Proof.
     iIntros (HE Hin) "#Hinv Hl Hfz".
     pose proof (islot_lt inum) as Hsl.
@@ -841,7 +845,7 @@ Section IgetLic.
     iDestruct (ireg_rcol_freeze_agree with "Hla Hfz") as %Hfeq.
     pose proof (Hcp (islot inum) Hsl) as Hmd.
     rewrite -ireg_key_split in Hmd.
-    iDestruct (iname_not_frozen γi γfs inum l (ds !!! islot inum) m
+    iDestruct (iname_not_frozen γi γfs inodestart inum l (ds !!! islot inum) m
                  wl wdu wdt gl rl cl pl fz cn Hlok Hrt Hclm Hfrz Hmd
                  with "Ha Hla Hfdisj Hl") as %Hfz0.
     assert (Hph : ph = FrzOff).

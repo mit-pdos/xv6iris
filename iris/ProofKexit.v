@@ -1722,7 +1722,7 @@ Section KexitRest.
     iApply (Iput.wp_iput_sconf (CID := CID4) γs j γl γu γd γk pd pav pu bn γ γfs
               γi cn γtl gil gisl cov logstart bmapstart inodestart nib size
               dev us kk qq inum MAXOPBLOCKS pid (DfracOwn (1/4)) dqb dqs
-              Q2 av eb b lks true
+              Q2 av eb b lks
               ltac:(lia) Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog
               Hist0 Hiblk Hiblog Hinb Hcovb
               ltac:(unfold iput_units, MAXOPBLOCKS; lia) Hj Hgl
@@ -1733,7 +1733,7 @@ Section KexitRest.
                     Hdev Hgeo Hdlk Hbsl Hop").
     all: try lkbelow.
     iIntros (CID5 Hs5 mip n' us') "%Hcsip Hcg Hown Htce Hcce Hpc Hpidq Hsbb Hsbi
-                                   %Hussub Hbmres Hbsl %Hn' Hop Hislot _".
+                                   %Hussub Hbmres Hbsl %Hn' Hop Hislot".
     assert (Hpc58 : ret_pc (Q2 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KX + 0x58))
       by (rewrite HQ2ra; apply bv_eq; vm_compute; reflexivity).

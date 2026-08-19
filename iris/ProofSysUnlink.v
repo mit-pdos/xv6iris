@@ -5052,7 +5052,7 @@ Section ProofSysUnlinkBody.
               pu bn g gfs gi cn gtl gild gisld cov logstart bmapstart
               inodestart nib size dev usedw kd qdi sd gyd dinum dnW bm'
               nw Sbw false true false e0 pid (DfracOwn (1/4)) dqb dqs
-              C5 (K - 30)%nat eb b lks true
+              C5 (K - 30)%nat eb b lks
               ltac:(exact Kiup) Hkd ltac:(discriminate)
               ltac:(intros _; exact Hibd16)
               Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hdiblk Hdiblog Hdinb Hcovb
@@ -5066,7 +5066,7 @@ Section ProofSysUnlinkBody.
     { iEval (cbn beta iota). iEmpIntro. }
     iIntros (D21 Hd21 mup n2 used2 Sb2 wg)
       "%Hcsup Hcg Hown _ _ Hpc Hpidq Hsbb Hsbi %Husd2 Hbmres Hbsl %Hsb2 %Hwg
-       %Hwgc %Hn2 HopS Hisl _".
+       %Hwgc %Hn2 HopS Hisl".
     assert (Hpcbe : ret_pc (C5 !!! Regidx Rra : mword 64)
                     = mword_of_int (SU + 0xbe)) by (rewrite HC5ra; pcw).
     iEval (rewrite Hpcbe) in "Hpc".
@@ -5346,7 +5346,7 @@ Section ProofSysUnlinkBody.
               bmi c2 (Sb2 ∪ {[IBLOCK (zero_extend' 32
                 (dir_inum datd kk : mword 16) : mword 32) inodestart]})
               false true false e1 pid (DfracOwn (1/4)) dqb dqs
-              E2 (K - 30)%nat eb b lks true
+              E2 (K - 30)%nat eb b lks
               Kiup Hks Hcrb2 Hcru2
               Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblki Hiblogi Hinb Hcovb
               Hnu2 Hj Hgl HE2a0 (Hlb "log"%string)
@@ -5360,7 +5360,7 @@ Section ProofSysUnlinkBody.
     { iEval (cbn beta iota). iEmpIntro. }
     iIntros (D30 Hd30 mip n3 used3 Sb3 wh)
       "%Hcsip Hcg Hown Htce Hcce Hpc Hpidq Hsbb Hsbi %Husd3 Hbmres Hbsl %Hsb3
-       %Hwh %Hwhc %Hn3 HopS Hisl2 _".
+       %Hwh %Hwhc %Hn3 HopS Hisl2".
     clear Hcrb2 Hcru2 Hnu2 dni2.
     assert (Hpcd4 : ret_pc (E2 !!! Regidx Rra : mword 64)
                     = mword_of_int (SU + 0xd4)) by (rewrite HE2ra; pcw).
@@ -6881,7 +6881,7 @@ Section ProofSysUnlinkBody.
               pu bn g gfs gi cn gtl gild gisld cov logstart bmapstart
               inodestart nib size dev usedw kd qdi sd gyd dinum dnW2 bm'
               (S c1) (Sbw ∪ {[IBLOCK dinum inodestart]}) false true false e0 pid (DfracOwn (1/4)) dqb dqs
-              C5 (K - 30)%nat eb b lks true
+              C5 (K - 30)%nat eb b lks
               Kiup Hkd Hcrbd2 Hcrud2
               Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hdiblk Hdiblog Hdinb Hcovb
               Hnud2 Hj Hgl HC5a0 (Hlb "log"%string)
@@ -6895,7 +6895,7 @@ Section ProofSysUnlinkBody.
     { iEval (cbn beta iota). iEmpIntro. }
     iIntros (D21 Hd21 mup n2 used2 Sb2 wg)
       "%Hcsup Hcg Hown _ _ Hpc Hpidq Hsbb Hsbi %Husd2 Hbmres Hbsl %Hsb2 %Hwg
-       %Hwgc %Hn2 HopS Hisl _".
+       %Hwgc %Hn2 HopS Hisl".
     clear Hcrbd2 Hcrud2 Hnud2 dnW2.
     assert (Hpcbe : ret_pc (C5 !!! Regidx Rra : mword 64)
                     = mword_of_int (SU + 0xbe)) by (rewrite HC5ra; pcw).
@@ -7242,7 +7242,7 @@ Section ProofSysUnlinkBody.
               bmi c2 (Sb2 ∪ {[IBLOCK (zero_extend' 32
                 (dir_inum datd kk : mword 16) : mword 32) inodestart]})
               false true false e1 pid (DfracOwn (1/4)) dqb dqs
-              E2 (K - 30)%nat eb b lks true
+              E2 (K - 30)%nat eb b lks
               Kiup Hks Hcrb2 Hcru2
               Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblki Hiblogi Hinb Hcovb
               Hnu2 Hj Hgl HE2a0 (Hlb "log"%string)
@@ -7256,7 +7256,7 @@ Section ProofSysUnlinkBody.
     { iEval (cbn beta iota). iEmpIntro. }
     iIntros (D30 Hd30 mip n3 used3 Sb3 wh)
       "%Hcsip Hcg Hown Htce Hcce Hpc Hpidq Hsbb Hsbi %Husd3 Hbmres Hbsl %Hsb3
-       %Hwh %Hwhc %Hn3 HopS Hisl2 _".
+       %Hwh %Hwhc %Hn3 HopS Hisl2".
     clear Hcrb2 Hcru2 Hnu2 dni2.
     assert (Hpcd4 : ret_pc (E2 !!! Regidx Rra : mword 64)
                     = mword_of_int (SU + 0xd4)) by (rewrite HE2ra; pcw).

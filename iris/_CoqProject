@@ -967,7 +967,6 @@ IregLinkNz.v
 IgetLic.v
 IregDirBit.v
 IcacheEscrow.v
-EscrowRegionA.v
 IregBox.v
 IcacheBoot.v
 CodeIget.v

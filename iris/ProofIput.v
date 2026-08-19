@@ -1261,12 +1261,8 @@ Section IputTail.
       { rewrite /npred. rewrite <- Hsucc at 1. rewrite Pos2Nat.inj_succ. lia. }
       iEval (rewrite Hiun) in "Hiu".
       iDestruct (iref_slots_split 1 (Pos.to_nat npred) with "Hiu") as "[Hislot Hiu]".
-      (* the park rides through: under R-e its [q] is vestigial, so the moved
-         share needs no more than [frz_park_mono]'s free weakening *)
-      assert (Hqrle : (qrest ≤ qt)%Qp).
-      { rewrite Hqt'. first [apply Qp.le_add_l | apply Qp.le_add_r]. }
-      iDestruct (frz_park_mono k (bv_unsigned inum) qt qrest Hqrle
-                   with "Hpark") as "Hpark".
+      (* the park rides through untouched: under R-e it carries no mass, so
+         a moved share is nothing it has to be re-established against *)
       iDestruct ("Hback" $! (<[k := (qrest, npred)]> Mt) ci
                    with "[%] [%] [Hrest Hiu Hgid Hcnt1 Hpark]") as "Hslots".
       { intros i Hi. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
@@ -2192,7 +2188,7 @@ Section IputFreePath.
         about to stop needing.  It cannot be built inside the wand: the mint
         at +0x50 has already flipped the bit, so from that instant nothing
         but the park itself satisfies [islot2]'s live arm. *)
-     frz_park k (bv_unsigned inum) q -∗
+     frz_park k (bv_unsigned inum) -∗
        ([∗ list] i0 ∈ seq 0 NINODE, islot2 cn Mt ci i0) ∗
        IcacheRef.inode_ident k (DfracOwn q) dev inum) -∗
     (* the sleeplock for the acquiresleep at 0x5a *)
@@ -2463,7 +2459,7 @@ Section IputFreePath.
             ltac:(solve_ndisj) HMk1 with "Hitinv Hhalf [Hlvr] [Hlvh] Hselo")
       as "(Hhalf & Hselp & Hsele)";
       [iExists ga'; iExact "Hlvr" | iExists ga'; iExact "Hlvh" |].
-    iAssert (frz_park k (bv_unsigned inum) q) with "[Hmirt Hselp]" as "Hpark".
+    iAssert (frz_park k (bv_unsigned inum)) with "[Hmirt Hselp]" as "Hpark".
     { iApply (frz_park_intro_on with "Hmirt Hselp"). }
     iDestruct ("Hwand" with "Hnsurp Hgid Hpark") as "[Hslots Hrident]".
     (* ================================================================
@@ -2991,7 +2987,7 @@ Section IputFreePath.
     (* ---- and the FROZEN PARK comes home: the mint's mirror half and the two
        live slices, which together with the invariant's retained (1/2 - q) are
        the whole unit the last close surrenders (ZZProbeFrz P5) ---- *)
-    iMod (frz_park_pre_reclaim ⊤ γi γfs inodestart nib inum k qt2 rg
+    iMod (frz_park_pre_reclaim ⊤ γi γfs inodestart nib inum k rg
             ltac:(solve_ndisj) Hnib with "Hireg Hpre Hpark")
       as "(Hpre & Hmirt & Hselp)".
     iModIntro.
@@ -3742,7 +3738,7 @@ Section IputFreePath.
            live slices it is about to stop needing.  It cannot be built here:
            the mint has already flipped the bit, so nothing but the park
            itself satisfies [islot2]'s live arm from +0x50 on. *)
-        frz_park k (bv_unsigned inum) q -∗
+        frz_park k (bv_unsigned inum) -∗
           ([∗ list] i0 ∈ seq 0 NINODE, islot2 cn Mt ci i0) ∗
           IcacheRef.inode_ident k (DfracOwn q) dev inum) -∗
        ic_payload_at γfs γi cov logstart k inum g1 dn bm -∗
@@ -4453,7 +4449,7 @@ Section IputFreePath.
     { rewrite /iref_tok. iFrame. }
     iAssert (i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum -∗
              ic_id cn k (1/2) true dev inum -∗
-             frz_park k (bv_unsigned inum) q -∗
+             frz_park k (bv_unsigned inum) -∗
                ([∗ list] i0 ∈ seq 0 NINODE, islot2 cn Mt ci i0) ∗
                IcacheRef.inode_ident k (DfracOwn q) dev inum)%I
       with "[Htd Hiu Hback Hrd Hcnt1]" as "Hwand".
@@ -5042,10 +5038,10 @@ Section ProofIput.
       (n : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (rg : bool)
+      (b : bool) (lks : gset string)
     : wp_iput_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
                           cov logstart bmapstart inodestart nib size dev used
-                          k q inum n pidv dq dqb dqs m K eb b lks rg.
+                          k q inum n pidv dq dqb dqs m K eb b lks.
   Proof.
     cbv beta delta [wp_iput_sconf_body].
     intros pcE ip pj ret_tgt HK Hk Hgeom Hsz Hbm0 Hbmcov Hbmlog Hist Hicov Hilog
@@ -5057,9 +5053,13 @@ Section ProofIput.
        contract's own existentials, so the seal derives with no new fact. *)
     iDestruct "Hop" as (Sb0) "Hop".
     iDestruct (log_opS_named with "Hop") as (e00) "Hop".
+    (* SIMP-1: the runtime contract states the regime at the persistent
+       [ireg_open] itself; the indexed form the gen contract keeps is that
+       proposition at [rg := true], and it is not given back. *)
+    iEval (rewrite -ireg_regime_true) in "Hropen".
     iApply (wp_iput_gen gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
               cov logstart bmapstart inodestart nib size dev used
-              k q inum n Sb0 false false false e00 pidv dq dqb dqs m K eb b lks rg
+              k q inum n Sb0 false false false e00 pidv dq dqb dqs m K eb b lks true
               HK Hk ltac:(discriminate) ltac:(discriminate)
               Hgeom Hsz Hbm0 Hbmcov Hbmlog Hist Hicov Hilog
               Hnib Hcovb Hn Hj Hgsj Ha0 Hfresh
@@ -5071,10 +5071,10 @@ Section ProofIput.
     iEval (rewrite /wp_next).
     iIntros (CIDf) "%Hchain".
     iIntros (mf n' used' Sb' wf) "%Hcs Hcg Hcnt Hextc Hextm Hpc Hppid Hbms Hins
-                               %Husub Hbm Hbslots %Hssub %Hwbm %Hwc %Hbnd Hop Hislot Hgreg".
+                               %Husub Hbm Hbslots %Hssub %Hwbm %Hwc %Hbnd Hop Hislot _".
     iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
     iApply ("Hcont" $! mf n' used' with "[%] Hcg Hcnt Hextc Hextm Hpc Hppid Hbms Hins
-                     [%] Hbm Hbslots [%] [Hop] Hislot Hgreg").
+                     [%] Hbm Hbslots [%] [Hop] Hislot").
     { exact Hcs. }
     { exact Husub. }
     { unfold ip_spend_w, ip_bm in Hbnd. unfold iput_units.

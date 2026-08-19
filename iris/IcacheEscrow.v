@@ -669,9 +669,9 @@ Section IcacheEscrow.
     ↑iregN ⊆ E ∖ ↑escAN (bv_unsigned inum) ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
     ireg_inv γi γfs inodestart nib -∗
-    iname γi γfs inum l -∗
+    iname γi γfs inodestart inum l -∗
     ipool_shape γfs γi cov logstart inum ={E}=∗
-    iname γi γfs inum l ∗
+    iname γi γfs inodestart inum l ∗
     ipool_shape_np γfs γi cov logstart inum ∗
     icnt_half (bv_unsigned inum) 0%nat ∗
     (* the MIRROR's uncached half rides out with the count half (§3.16): the
@@ -697,7 +697,7 @@ Section IcacheEscrow.
          [ifreeze_off], which is exactly the ordinary arm's token. *)
       iDestruct "Haw" as (ge gr gd rg) "(#Hesc & Htk)".
       iMod (escA_await_peel E ge gr gd γi (bv_unsigned inum) rg
-              (iname γi γfs inum l) HE with "Hesc Htk Hl []")
+              (iname γi γfs inodestart inum l) HE with "Hesc Htk Hl []")
         as "(Hl & Hmk & Hoff)".
       { iIntros "Hl Hpost". rewrite /ifreeze_post.
         iMod (iname_freeze_off (E ∖ ↑escAN (bv_unsigned inum))
@@ -3193,7 +3193,7 @@ Section IcacheEscrow.
             +0x82.  A foreign [idup] that takes this lock in between finds
             them and dies on [IcacheInv.live_whole_share_absurd] --
             [ProofIdup]'s OPEN(2.6b), closed. *)
-         frz_park k (bv_unsigned inum) q)%I
+         frz_park k (bv_unsigned inum))%I
     | _, _ => False%I
     end.
 
