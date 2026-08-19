@@ -445,7 +445,7 @@ Section SpecFilewrite.
                      (fwn_size fn)⌝ ∗
      (* balloc's out-of-blocks arm calls the GENERAL printk path; carried as
         a hypothesis, never a functor (SpecBalloc.v's header) *)
-     ⌜printk_gen_contract (fwn_pr fn) (fwn_uart fn) (fwn_disk fn)⌝ ∗
+     ⌜printk_gen_contract (kt := KT1) (fwn_pr fn) (fwn_uart fn) (fwn_disk fn)⌝ ∗
      bio_ctx (fwn_bio fn)
        (fs_view (fwn_fs fn) (fwn_disk fn) icfg_dev (fwn_cov fn)) ∗
      (* THE LOG: begin_op mints the reservation, end_op spends it, and the
@@ -608,7 +608,7 @@ Definition wp_filewrite_sconf_body
      ilock ("bcache", 4), iunlock ("sleep lock", 6) -- "log" is the lowest,
      so one premise there covers the whole cone via [locks_below_mono]. *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   (* noff = 0: everything below reaches sleep *)
   cpu_own 0%nat eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
@@ -639,7 +639,7 @@ Definition wp_filewrite_sconf_body
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
       ⌜filewrite_ret n r⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = r⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       file_ref γf k q Cf -∗

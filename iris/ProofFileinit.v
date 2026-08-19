@@ -84,7 +84,7 @@ Section ProofFileinit.
       vm_compute in Hj; discriminate. }
     iPoseProof (kernel_data_string ftable_name_str "ftable"%string name eq_refl ltac:(unfold text_end, ftable_name_str; lia) Hftable
                   with "Hkdata") as "#Hstr".
-    iApply (ILW.wp_initlock_wrapper_sconf m K KernelSyms.fileinit
+    iApply (ILW.wp_initlock_wrapper_sconf KT1 m K KernelSyms.fileinit
               (mword_of_int 3) (mword_of_int 30) (mword_of_int 1382) (mword_of_int 1206)
               (mword_of_int 2083608) lk name "ftable"%string vlock vname vcpu b p HK
               ltac:(vm_compute; reflexivity)

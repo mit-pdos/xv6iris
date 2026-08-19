@@ -20,10 +20,10 @@
 
    - THE BOUNCE BUFFER IS THE FRAME'S FOUR LOWEST SLOTS.  [buf] is [s0-128],
      which is the pushed sp itself, so it is slots 16..13 of a sixteen-slot
-     frame.  [StackBytes.slotsn_bytes_own] carves them into 32 bytes at the
-     prologue and [bytes_own_slotsn] puts them back before the pop; in
+     frame.  [StackBytes.slotsn_bytes_own (KTR := KT1)] carves them into 32 bytes at the
+     prologue and [bytes_own_slotsn (KTR := KT1)] puts them back before the pop; in
      between the loop owns [bytes_own], contents unspecified, and each
-     iteration NAMES the first [nn] of them ([StackBytes.bytes_own_name])
+     iteration NAMES the first [nn] of them ([StackBytes.bytes_own_name (KTR := KT1)])
      because both callees are parametric in the contents.  The naming has to
      happen per iteration rather than once, since [nn] varies.
    - THE LOOP IS ROTATED.  The head is the TEST at +0x5e ([n - i], then the
@@ -151,36 +151,36 @@ Section CwBodies.
 
   (* ra / s0 / s1, saved unconditionally by the prologue *)
   Definition cw_saved (sp0 : mword 64) (m0 : regfile) : iProp Σ :=
-    (pa_stk sp0 1 ↦₈ (m0 !!! Regidx Rra) ∗
-     pa_stk sp0 2 ↦₈ (m0 !!! Regidx Rs0) ∗
-     pa_stk sp0 3 ↦₈ (m0 !!! Regidx Rs1))%I.
+    (pa_stk sp0 1 ↦₈[KT1] (m0 !!! Regidx Rra) ∗
+     pa_stk sp0 2 ↦₈[KT1] (m0 !!! Regidx Rs0) ∗
+     pa_stk sp0 3 ↦₈[KT1] (m0 !!! Regidx Rs1))%I.
 
   (* s2..s10, saved only on the [n > 0] path (slots 4..12) *)
   Definition cw_spill (sp0 : mword 64) (m0 : regfile) : iProp Σ :=
-    (pa_stk sp0 4  ↦₈ (m0 !!! Regidx Rs2) ∗
-     pa_stk sp0 5  ↦₈ (m0 !!! Regidx Rs3) ∗
-     pa_stk sp0 6  ↦₈ (m0 !!! Regidx Rs4) ∗
-     pa_stk sp0 7  ↦₈ (m0 !!! Regidx Rs5) ∗
-     pa_stk sp0 8  ↦₈ (m0 !!! Regidx Rs6) ∗
-     pa_stk sp0 9  ↦₈ (m0 !!! Regidx Rs7) ∗
-     pa_stk sp0 10 ↦₈ (m0 !!! Regidx Rs8) ∗
-     pa_stk sp0 11 ↦₈ (m0 !!! Regidx Rs9) ∗
-     pa_stk sp0 12 ↦₈ (m0 !!! Regidx Rs10))%I.
+    (pa_stk sp0 4  ↦₈[KT1] (m0 !!! Regidx Rs2) ∗
+     pa_stk sp0 5  ↦₈[KT1] (m0 !!! Regidx Rs3) ∗
+     pa_stk sp0 6  ↦₈[KT1] (m0 !!! Regidx Rs4) ∗
+     pa_stk sp0 7  ↦₈[KT1] (m0 !!! Regidx Rs5) ∗
+     pa_stk sp0 8  ↦₈[KT1] (m0 !!! Regidx Rs6) ∗
+     pa_stk sp0 9  ↦₈[KT1] (m0 !!! Regidx Rs7) ∗
+     pa_stk sp0 10 ↦₈[KT1] (m0 !!! Regidx Rs8) ∗
+     pa_stk sp0 11 ↦₈[KT1] (m0 !!! Regidx Rs9) ∗
+     pa_stk sp0 12 ↦₈[KT1] (m0 !!! Regidx Rs10))%I.
 
   (* everything below the three unconditional saves, as WORDS -- what the
      pop needs.  Slots 4..16. *)
   Definition cw_rest (sp0 : mword 64) : iProp Σ :=
-    ([∗ list] k ∈ seq 4 13, ∃ w : mword 64, pa_stk sp0 k ↦₈ w)%I.
+    ([∗ list] k ∈ seq 4 13, ∃ w : mword 64, pa_stk sp0 k ↦₈[KT1] w)%I.
 
   (* ...and the same region with its four lowest slots carved into bytes *)
   Definition cw_buf (sp0 : mword 64) : iProp Σ :=
-    bytes_own (DfracOwn 1) (pa_stk sp0 16) 32.
+    bytes_own (KTR := KT1) (DfracOwn 1) (pa_stk sp0 16) 32.
 
   Lemma cw_frame_back (sp0 : mword 64) (m0 : regfile) :
-    cw_saved sp0 m0 -∗ cw_rest sp0 -∗ stack_own sp0 16.
+    cw_saved sp0 m0 -∗ cw_rest sp0 -∗ stack_own (KTR := KT1) sp0 16.
   Proof.
     iIntros "(H1 & H2 & H3) Hr".
-    rewrite stack_own_slots /cw_rest.
+    rewrite (stack_own_slots (KTR := KT1)) /cw_rest.
     change (seq 1 16) with ((seq 1 3 ++ seq 4 13)%list).
     rewrite big_sepL_app. iSplitR "Hr"; [| iExact "Hr"].
     cbn [seq]. iSplitL "H1"; [by iExists _|].
@@ -191,11 +191,11 @@ Section CwBodies.
      alignment facts are the ones the prologue's carve handed out. *)
   Lemma cw_buf_slots (sp0 : mword 64) :
     (forall i, (i < 4)%nat -> is_aligned_paddr (Physaddr (pa_stk sp0 (16 - i))) 8 = true) ->
-    cw_buf sp0 ⊢ [∗ list] i ∈ seq 0 4, ∃ w : mword 64, pa_stk sp0 (16 - i) ↦₈ w.
+    cw_buf sp0 ⊢ [∗ list] i ∈ seq 0 4, ∃ w : mword 64, pa_stk sp0 (16 - i) ↦₈[KT1] w.
   Proof.
     intro Hal. rewrite /cw_buf.
     change 32%nat with (8 * 4)%nat.
-    iApply (bytes_own_slotsn sp0 16 4 ltac:(lia) Hal).
+    iApply (bytes_own_slotsn (KTR := KT1) sp0 16 4 ltac:(lia) Hal).
   Qed.
 
   (* ---- the register shape the loop maintains ----------------------- *)
@@ -278,7 +278,7 @@ Section CwBodies.
          ⌜uptd_ext (pv_upt V) P'⌝ -∗
          ⌜(0 <= r <= Z.max 0 n)%Z⌝ -∗
          ⌜mf !!! Regidx Ra0 = (mword_of_int r : mword 64)⌝ -∗
-         sie_cap_gpr mf av true (proc_addr jp) -∗
+         sie_cap_gpr KT1 mf av true (proc_addr jp) -∗
          cpu_own 0%nat eb (proc_addr jp) true lks -∗
          pc_is (ret_pc (m0 !!! Regidx Rra)) -∗
          proc_priv_core (proc_addr jp) pid (upd_upt V P') -∗
@@ -319,7 +319,7 @@ Section CwBodies.
     eb = true ->
     (true = false \/ pj = zero_reg -> (CID : CPU) = CID0) ->
     kernel_text -∗
-    sie_cap_gpr M (av - 16)%nat true pj -∗
+    sie_cap_gpr KT1 M (av - 16)%nat true pj -∗
     cpu_own 0%nat eb pj true lks -∗
     pc_is (mword_of_int (CW + 0x96)) -∗
     proc_priv_core pj pid V -∗
@@ -515,7 +515,7 @@ Section CwBodies.
        is_aligned_paddr (Physaddr (pa_stk sp0 (16 - i))) 8 = true) ->
     (true = false \/ pj = zero_reg -> (CID : CPU) = CID0) ->
     kernel_text -∗
-    sie_cap_gpr M (av - 16)%nat true pj -∗
+    sie_cap_gpr KT1 M (av - 16)%nat true pj -∗
     cpu_own 0%nat eb pj true lks -∗
     pc_is (mword_of_int (CW + 0x6c)) -∗
     proc_priv_core pj pid V -∗
@@ -738,7 +738,7 @@ Section CwBodies.
        is_aligned_paddr (Physaddr (pa_stk sp0 (16 - i))) 8 = true) ->
     (true = false \/ pj = zero_reg -> (CID : CPU) = CID0) ->
     kernel_text -∗
-    sie_cap_gpr M (av - 16)%nat true pj -∗
+    sie_cap_gpr KT1 M (av - 16)%nat true pj -∗
     cpu_own 0%nat eb pj true lks -∗
     pc_is (mword_of_int (CW + 0x84)) -∗
     proc_priv_core pj pid V -∗
@@ -968,7 +968,7 @@ Section CwBodies.
          cone, current and anticipated. *)
       locks_below lks "proc" ->
       kernel_text -∗
-      sie_cap_gpr M (av - 16)%nat true (proc_addr jp) -∗
+      sie_cap_gpr KT1 M (av - 16)%nat true (proc_addr jp) -∗
       cpu_own 0%nat eb (proc_addr jp) true lks -∗
       pc_is (mword_of_int (CW + 0x5e)) -∗
       proc_priv_core (proc_addr jp) pid V -∗
@@ -1017,7 +1017,7 @@ Section CwBodies.
                ⌜Mb !!! Regidx Rs2 = (mword_of_int nn : mword 64)⌝ -∗
                ⌜Mb !!! Regidx Rs11 = m0 !!! Regidx Rs11⌝ -∗
                ⌜(true = false \/ pj = zero_reg -> (CIDb : CPU) = CID0)⌝ -∗
-               sie_cap_gpr Mb (av - 16)%nat true pj -∗
+               sie_cap_gpr KT1 Mb (av - 16)%nat true pj -∗
                pc_is (mword_of_int (CW + 0x38)) -∗
                WP (Loop : expr riscv_lang))%I
       with "[Hcnt Hpriv Hsaved Hspill Hbuf Hcont]" as "BODY".
@@ -1129,10 +1129,10 @@ Section CwBodies.
       (* the first [nn] bytes of the frame buffer, NAMED *)
       rewrite /cw_buf H32 bytes_own_app.
       iDestruct "Hbuf" as "[Hb1 Hb2]".
-      iDestruct (bytes_own_name nnN buf with "Hb1") as (fb) "Hb1".
+      iDestruct (bytes_own_name (KTR := KT1) nnN buf with "Hb1") as (fb) "Hb1".
      iDestruct (cpu_own_transport CIDb CIDc6 0%nat eb pj true 
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iApply (EitherCopyin.wp_either_copyin_sconf γa γf B6 (av - 16)%nat 0%nat
+      iApply (EitherCopyin.wp_either_copyin_sconf KT1 KT1 γa γf B6 (av - 16)%nat 0%nat
                 eb pj pid V true nnN (fun _ => bv_0 8) fb true lks
                 ltac:(lia)
                 ltac:(rewrite HB6a1; vm_compute; reflexivity)
@@ -1273,9 +1273,9 @@ Section CwBodies.
         iEval (rewrite HD3a0) in "Hb1".
         iDestruct ("Hpback" with "Hpid") as "Hpriv".
         (* the buffer is whole again *)
-        iDestruct (bytes_own_of_name nnN buf fb' with "Hb1") as "Hb1".
+        iDestruct (bytes_own_of_name (KTR := KT1) nnN buf fb' with "Hb1") as "Hb1".
         iAssert (cw_buf sp0) with "[Hb1 Hb2]" as "Hbuf".
-        { rewrite /cw_buf H32 bytes_own_app.
+        { rewrite /cw_buf H32 (bytes_own_app (KTR := KT1)).
           iSplitL "Hb1"; [iExact "Hb1" | iExact "Hb2"]. }
         assert (Hregd : cw_regs mf2 (pa_stk sp0 16%nat) sp0 src n i).
         { apply (cw_regs_cs D3); [exact Hcs2|].
@@ -1380,8 +1380,8 @@ Section CwBodies.
         iApply bi.later_intro. iIntros (CIDc8 Hsc8) "Hcg Hpc".
         iEval (rewrite Htgtb) in "Hpc".
         iAssert (cw_buf sp0) with "[Hb1 Hb2]" as "Hbuf".
-        { rewrite /cw_buf H32 bytes_own_app.
-          iDestruct (bytes_own_of_name nnN buf fb' with "Hb1") as "Hb1".
+        { rewrite /cw_buf H32 (bytes_own_app (KTR := KT1)).
+          iDestruct (bytes_own_of_name (KTR := KT1) nnN buf fb' with "Hb1") as "Hb1".
           iSplitL "Hb1"; [iExact "Hb1" | iExact "Hb2"]. }
         iDestruct (cw_ret_weaken (CID0 := CID0) jp m0 av eb pid V P1 n lks Hext1
                      with "Hcont") as "Hcont".
@@ -1557,7 +1557,7 @@ Section CwBodies.
       by (rewrite /A0 upd_eq Hpush; reflexivity).
     assert (P02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (CW + 0x2)) by pcw.
     iEval (rewrite P02) in "Hpc".
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(F1 & F2 & F3 & F4 & F5 & F6 & F7 & F8 &
                             F9 & F10 & F11 & F12 & F13 & F14 & F15 & F16 & _)".
     iDestruct "F1" as (v1) "H1". iDestruct "F2" as (v2) "H2".
@@ -1973,10 +1973,10 @@ Section CwBodies.
         rewrite /G2 upd_ne; [| reg_neq]. rewrite /G1 upd_ne; [| reg_neq].
         apply HA1cs; reg_neq. }
       (* the four lowest slots become the 32-byte bounce buffer *)
-      iAssert ([∗ list] k ∈ seq 0 4, ∃ w : mword 64, pa_stk sp0 (16 - k) ↦₈ w)%I
+      iAssert ([∗ list] k ∈ seq 0 4, ∃ w : mword 64, pa_stk sp0 (16 - k) ↦₈[KT1] w)%I
         with "[F13 F14 F15 F16]" as "Hbs".
       { cbn [seq]. iFrame "F16 F15 F14 F13". all: try done. }
-      iDestruct (slotsn_bytes_own sp0 16 4 ltac:(lia) with "Hbs") as "[%Hal Hbuf]".
+      iDestruct (slotsn_bytes_own (KTR := KT1) sp0 16 4 ltac:(lia) with "Hbs") as "[%Hal Hbuf]".
       iApply (cw_loop (Z.to_nat n) CID γa γf γs jp γlp γl γu γv m av eb pid n sp0
                 (m !!! Regidx Ra1) lks
                 Hj Hjlp Hlens ltac:(exact (proj2 Hnr))

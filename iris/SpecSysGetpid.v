@@ -71,7 +71,7 @@ Definition wp_sys_getpid_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (* 2 for this frame, 10 for myproc's *)
   (12 <= av)%nat ->
-  sie_cap_gpr m av b p -∗
+  sie_cap_gpr KT1 m av b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   proc_priv γf p pid V -∗
@@ -79,7 +79,7 @@ Definition wp_sys_getpid_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG
     ∀ mf : regfile,
       ⌜ callee_saved m mf /\
         mf !!! Regidx (mword_of_int 10 : mword 5) = sign_extend' 64 pid ⌝ -∗
-      sie_cap_gpr mf av b p -∗
+      sie_cap_gpr KT1 mf av b p -∗
       cpu_own n eb p b lks -∗
       pc_is ret_tgt -∗
       proc_priv γf p pid V -∗

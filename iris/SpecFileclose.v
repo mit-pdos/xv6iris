@@ -132,7 +132,6 @@ Require Import IcacheRef.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import SleepLock.
-Require Import SpecIput.
 Require Import SpecEndOp.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
@@ -630,7 +629,7 @@ Definition wp_fileclose_sconf_body
   (* a0 is the file being closed *)
   m !!! Regidx (mword_of_int 10 : mword 5) = fnode k ->
   locks_below lks "log" ->
-  sie_cap_gpr m K b p -∗
+  sie_cap_gpr KT1 m K b p -∗
   cpu_own n eb p b lks -∗
   (* THE TRAP-CSR COMPLEMENT, ON EVERY ARM.  [emp] at [eb = true], where
      fileclose's own acquire mints what the FS arm's interior sleeps need;
@@ -639,7 +638,7 @@ Definition wp_fileclose_sconf_body
      [fileclose_fs_env] -- see that bundle's banner for why the FS arm is
      the wrong home for it.  See
      claude-notes/completed/eb-generic-sweep.md. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb p -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   is_ftable γfl γf -∗
@@ -658,9 +657,9 @@ Definition wp_fileclose_sconf_body
      continuation hart-generically.) *)
   wp_next true p (fun (CID : CpuId) =>
     ∀ mr,
-    sie_cap_gpr mr K b p -∗
+    sie_cap_gpr KT1 mr K b p -∗
     cpu_own n eb p b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗

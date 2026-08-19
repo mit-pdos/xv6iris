@@ -137,7 +137,7 @@ Definition wp_namei_sconf_body
   (j < NPROC)%nat ->
   gs !! j = Some gl ->
   eb = true ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
@@ -159,7 +159,7 @@ Definition wp_namei_sconf_body
   p_pid pj ↦₄{dq} pidv -∗
   p_cwd pj ↦₈{dqc} cwdv -∗
   inode_held cwdv -∗
-  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
   bslots bn 3 -∗
   iref_slots 2 -∗
   log_op g n -∗
@@ -172,7 +172,7 @@ Definition wp_namei_sconf_body
   ∀ (mf : regfile) (n' : nat) (used' : gset Z)
     (ok : bool) (ipv : mword 64),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -182,7 +182,7 @@ Definition wp_namei_sconf_body
       p_pid pj ↦₄{dq} pidv -∗
       p_cwd pj ↦₈{dqc} cwdv -∗
       inode_held cwdv -∗
-      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
       bslots bn 3 -∗
       ⌜((n - (L + 1) * iput_units)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
       log_op g n' -∗
@@ -259,7 +259,7 @@ Definition wp_namei_gen_body
   (j < NPROC)%nat ->
   gs !! j = Some gl ->
   eb = true ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
@@ -281,7 +281,7 @@ Definition wp_namei_gen_body
   p_pid pj ↦₄{dq} pidv -∗
   p_cwd pj ↦₈{dqc} cwdv -∗
   inode_held cwdv -∗
-  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
   bslots bn 3 -∗
   iref_slots 2 -∗
   log_opS g n Sb -∗
@@ -294,7 +294,7 @@ Definition wp_namei_gen_body
   ∀ (mf : regfile) (n' : nat) (used' Sb' : gset Z)
     (ok : bool) (ipv : mword 64) (w : bool),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -304,7 +304,7 @@ Definition wp_namei_gen_body
       p_pid pj ↦₄{dq} pidv -∗
       p_cwd pj ↦₈{dqc} cwdv -∗
       inode_held cwdv -∗
-      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
       bslots bn 3 -∗
       (* the set only GROWS; namex takes no credit and neither does
          this wrapper, so the counter clause is untouched *)
@@ -418,7 +418,7 @@ Definition wp_namei_root_body
   dev = ROOTDEV ->
   (0 < nib)%nat ->
   locks_below lks "itable" ->
-  sie_cap_gpr m K b p -∗
+  sie_cap_gpr KT1 m K b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
@@ -432,7 +432,7 @@ Definition wp_namei_root_body
     ∀ (mr : regfile) (ipv : mword 64),
       ⌜ callee_saved m mr
         /\ mr !!! Regidx (mword_of_int 10 : mword 5) = ipv ⌝ -∗
-      sie_cap_gpr mr K b p -∗
+      sie_cap_gpr KT1 mr K b p -∗
       cpu_own n eb p b lks -∗
       pc_is ret_tgt -∗
       pa_add pv 0 ↦ₘ{dqp} SLASH -∗

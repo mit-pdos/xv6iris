@@ -86,6 +86,21 @@ Proof. vm_compute. reflexivity. Qed.
 Lemma sex_arg0 : (0 < NARG)%nat.
 Proof. unfold NARG. lia. Qed.
 
+(* the four frame slots, back as free stack.  sys_exit does not return --
+   its [jal kexit] is the last thing it does -- so at that call the frame is
+   dead and belongs to the page the dying thread donates
+   ([ProcDefs.kstack_closer_frame]). *)
+Lemma sex_frame_stack `{!riscvGS Σ} (sp0 w1 w2 w3 w4 : mword 64) :
+  word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) w1 -∗
+  word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) w2 -∗
+  word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) w3 -∗
+  word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) w4 -∗
+  stack_own (KTR := KT1) sp0 4.
+Proof.
+  iIntros "H1 H2 H3 H4". rewrite /stack_own.
+  iExists [w1; w2; w3; w4]. iSplitR; [done|]. simpl. iFrame "H1 H2 H3 H4".
+Qed.
+
 Module SysExitProof (Argint : ARGINT) (Kexit : KEXIT) : SYSEXIT.
 
 Section ProofSysExit.
@@ -125,7 +140,7 @@ Section ProofSysExit.
     cbv beta delta [wp_sys_exit_sconf_body].
     intros pcE pj Hfn Hj Hgl Hv0 Hav Hgeo Heb Hbelow.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hprocs #Hpenv
+    iIntros "Hcg Hcl Hcpu #Htext #Hdata Hpc #Hprocs #Hpenv
              #Hlk #Hft #Hkl Hkav #Hbio #Hlog #Hcrash #Hcert #Hdev #Hgeom
              #Hdlk Hbs #Hicenv Hbm Hip Hfds Hirs Hpriv".
     iPoseProof (se_00 with "Htext") as "Hi00".
@@ -150,7 +165,7 @@ Section ProofSysExit.
     iEval (rewrite Hpp02) in "Hpc".
     assert (HM1sp : M1 !!! Regidx csp_rs1 = pa_stk sp0 4)
       by (rewrite /M1 upd_eq; apply stk_push_32).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & _)".
     iDestruct "S1" as (u1) "Hb1". iDestruct "S2" as (u2) "Hb2".
     iDestruct "S3" as (w3) "Hb3". iDestruct "S4" as (u4) "Hb4".
@@ -298,6 +313,21 @@ Section ProofSysExit.
     iIntros (CID10 Hk10) "Hcg Hpc".
     set (B2 := <[Regidx Rra := regval_into_reg (add_vec_int (mword_of_int (SE + 0x16) : mword 64) 4)]> B1).
     change (<[Regidx Rra := regval_into_reg (add_vec_int (mword_of_int (SE + 0x16) : mword 64) 4)]> B1) with B2.
+    (* ---- THE CLOSER, RE-ANCHORED PAST sys_exit'S OWN FRAME.  Nothing
+       reloads those four slots: this [jal] does not return, so they are part
+       of the page and the closer swallows them. ---- *)
+    assert (HB2sp : B2 !!! Regidx csp_rs1 = pa_stk sp0 4).
+    { rewrite /B2 upd_ne; [| vm_compute; discriminate].
+      rewrite /B1 upd_ne; [| vm_compute; discriminate].
+      rewrite (proj1 HcsAi). exact HA4sp. }
+    iEval (rewrite Haddrn) in "Hb3hi".
+    iDestruct (word_pointsto_join4 (pa_stk sp0 3) (DfracOwn 1) _ _ Hal3
+                 with "Hb3lo Hb3hi") as "Hb3".
+    iDestruct (sex_frame_stack sp0 _ _ _ _ with "Hb1 Hb2 Hb3 Hb4") as "Hfr".
+    iDestruct (kstack_closer_frame pj sp0 (trap_res b + av)%nat 4 ltac:(lia)
+                 with "Hcl Hfr") as "Hcl4".
+    assert (Hix : (trap_res b + av - 4)%nat = (trap_res b + (av - 4))%nat) by lia.
+    iEval (rewrite Hix -HB2sp) in "Hcl4".
     assert (Hjke : add_vec (mword_of_int (SE + 0x16) : mword 64)
                      (sign_extend' 64 (mword_of_int 2094870 : mword 21)) = mword_of_int KernelSyms.kexit)
       by pcstep.
@@ -313,7 +343,7 @@ Section ProofSysExit.
               γi cn γtl bmapstart inodestart nib size dqb dqs us
               on fn B2 (av - 4)%nat eb b lks pid V
               Hfn Hj Hgl (sex_Kke av Hav) Hgeo Hbelow
-              with "Hcg Hcpu [] [] Htext Hdata Hpc Hprocs Hpenv Hlk
+              with "Hcg Hcl4 Hcpu [] [] Htext Hdata Hpc Hprocs Hpenv Hlk
                     Hft Hkl Hkav Hbio Hlog Hcrash Hcert Hdev Hgeom Hdlk Hbs
                     Hicenv Hbm Hip Hfds Hirs Hpriv").
     all: try lkbelow.

@@ -187,7 +187,7 @@ Definition wp_iupdate_sconf_body
      ("bcache", 4) -- "log" is the lowest, so one premise there covers the
      whole cone via [locks_below_mono]. *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  iupdate itself never
      acquires or releases anything -- it just calls bread, whose OWN acquire
@@ -199,7 +199,7 @@ Definition wp_iupdate_sconf_body
      straight through to bread and back, unused, all the way to its own
      exit.  See claude-notes/completed/sched-hart-generic.md and
      claude-notes/completed/eb-generic-sweep.md. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
@@ -243,9 +243,9 @@ Definition wp_iupdate_sconf_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
@@ -353,14 +353,14 @@ Definition wp_iupdate_gen_body
      ("bcache", 4) -- "log" is the lowest, so one premise there covers the
      whole cone via [locks_below_mono]. *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT.  Same pure-pass-through shape as
      [wp_iupdate_sconf_body] above -- required so that a caller reaching
      iupdate through the SET form (writei's own loop, deriving its counted
      [wp_writei_sconf] from [wp_writei_gen]) can reach this contract at
      [eb = false] too.  See claude-notes/completed/eb-generic-sweep.md. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
@@ -403,9 +403,9 @@ Definition wp_iupdate_gen_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
@@ -523,7 +523,7 @@ Definition wp_iupdate_cred_body
      ("bcache", 4) -- "log" is the lowest, so one premise there covers the
      whole cone via [locks_below_mono]. *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
@@ -568,7 +568,7 @@ Definition wp_iupdate_cred_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
@@ -673,9 +673,9 @@ Definition wp_iupdate_credgen_body
      ("bcache", 4) -- "log" is the lowest, so one premise there covers the
      whole cone via [locks_below_mono]. *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
@@ -706,9 +706,9 @@ Definition wp_iupdate_credgen_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
@@ -873,7 +873,7 @@ Definition wp_iupdate_link_body
      ("bcache", 4) -- "log" is the lowest, so one premise there covers the
      whole cone via [locks_below_mono]. *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
@@ -896,7 +896,7 @@ Definition wp_iupdate_link_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
@@ -1035,7 +1035,7 @@ Definition wp_iupdate_unlink_body
      ("bcache", 4) -- "log" is the lowest, so one premise there covers the
      whole cone via [locks_below_mono]. *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
@@ -1066,7 +1066,7 @@ Definition wp_iupdate_unlink_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗

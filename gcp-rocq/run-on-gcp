@@ -348,7 +348,10 @@ fi
 for p in "${PULL_PATHS[@]:-}"; do
   [[ -n "$p" ]] || continue
   say "pulling $p"
-  rsync -a -e "$(ssh_e_string)" \
+  # --no-owner --no-group for the same reason pull_artifacts uses them: -a
+  # would try to reproduce the VM's uid/gid here and every file draws a
+  # chown failure ("Value too large for defined data type").
+  rsync -a --no-owner --no-group -e "$(ssh_e_string)" \
     "$SSH_USER@$IP:$REMOTE_DIR/${p%/}" "$LOCAL_DIR/$(dirname "${p%/}")/" \
     || warn "pull of $p failed"
 done

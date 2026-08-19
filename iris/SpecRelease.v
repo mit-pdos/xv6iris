@@ -52,7 +52,7 @@ Import Defs.
    The finisher's mask is the step engine's [⊤ ∖ ↑minstretN]: the choice is
    made INSIDE the atomic store, so no other hart can see the window in which
    the lock is free but its storage already spoken for. *)
-Definition wp_release_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (lka : mword 64) (s : string) (R Dc Out : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (lks : gset string) :=
+Definition wp_release_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (γl : gname) (lka : mword 64) (s : string) (R Dc Out : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.release in
   let lk0 := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -84,25 +84,25 @@ Definition wp_release_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN :
      [trap_res false + av], DEFINITIONALLY [av], so those callers are untouched.
      [10 <= av] does not move: release's own 10-slot frame comes out of the
      entry count [trap_res outb + av >= av]. *)
-  sie_cap_gpr m (trap_res outb + av)%nat false p -∗
+  sie_cap_gpr kt m (trap_res outb + av)%nat false p -∗
   kernel_text -∗ pc_is pcE -∗
   lock_openable γl lka s R Dc -∗
   locked γl cpu_id -∗
   R -∗
   lock_finisher γl lka s R Dc Out (⊤ ∖ ↑minstretN) -∗
   cpu_own (S n) eb p false lks -∗
-  arm_pay n eb p -∗
+  arm_pay kt n eb p -∗
   wp_next outb p (fun (CID : CpuId) =>
     ∀ mr,
     Out -∗
-    sie_cap_gpr mr av outb p -∗
+    sie_cap_gpr kt mr av outb p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     cpu_own n eb p outb (lks ∖ {[s]}) -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
-Definition wp_release_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (lka : mword 64) (s : string) (R : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (lks : gset string) :=
+Definition wp_release_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (γl : gname) (lka : mword 64) (s : string) (R : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.release in
   let lk0 := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -125,16 +125,16 @@ Definition wp_release_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : Gen
      [trap_res false + av], DEFINITIONALLY [av], so those callers are untouched.
      [10 <= av] does not move: release's own 10-slot frame comes out of the
      entry count [trap_res outb + av >= av]. *)
-  sie_cap_gpr m (trap_res outb + av)%nat false p -∗
+  sie_cap_gpr kt m (trap_res outb + av)%nat false p -∗
   kernel_text -∗ pc_is pcE -∗
   is_lock γl lka s R -∗
   locked γl cpu_id -∗
   R -∗
   cpu_own (S n) eb p false lks -∗
-  arm_pay n eb p -∗
+  arm_pay kt n eb p -∗
   wp_next outb p (fun (CID : CpuId) =>
     ∀ mr,
-    sie_cap_gpr mr av outb p -∗
+    sie_cap_gpr kt mr av outb p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     cpu_own n eb p outb (lks ∖ {[s]}) -∗
@@ -153,7 +153,7 @@ Definition wp_release_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : Gen
    because release's word clear reassembles the invariant on the branch it
    does not take.  So the certificate can only be completed inside the
    finisher, with [R] in hand.  See PipeInv.pipe_res_dead. *)
-Definition wp_release_cancel_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (lka : mword 64) (s : string) (R D Out : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (lks : gset string) :=
+Definition wp_release_cancel_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (γl : gname) (lka : mword 64) (s : string) (R D Out : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.release in
   let lk0 := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -178,7 +178,7 @@ Definition wp_release_cancel_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GE
      [trap_res false + av], DEFINITIONALLY [av], so those callers are untouched.
      [10 <= av] does not move: release's own 10-slot frame comes out of the
      entry count [trap_res outb + av >= av]. *)
-  sie_cap_gpr m (trap_res outb + av)%nat false p -∗
+  sie_cap_gpr kt m (trap_res outb + av)%nat false p -∗
   kernel_text -∗ pc_is pcE -∗
   lock_openable γl lka s R D -∗
   locked γl cpu_id -∗
@@ -186,13 +186,13 @@ Definition wp_release_cancel_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GE
   (* the licence to destroy, cashed inside the store *)
   (lock_frag γl None -∗ R ==∗ D ∗ Out) -∗
   cpu_own (S n) eb p false lks -∗
-  arm_pay n eb p -∗
+  arm_pay kt n eb p -∗
   wp_next outb p (fun (CID : CpuId) =>
     ∀ mr,
     lka ↦₄ (mword_of_int 0 : mword 32) -∗
     lock_cpu lka ↦₈ (zero_reg : mword 64) -∗
     Out -∗
-    sie_cap_gpr mr av outb p -∗
+    sie_cap_gpr kt mr av outb p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     cpu_own n eb p outb (lks ∖ {[s]}) -∗
@@ -201,18 +201,18 @@ Definition wp_release_cancel_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GE
 
 Module Type RELEASE_GEN.
   Parameter wp_release_gen_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (lka : mword 64) (s : string) (R Dc Out : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (lks : gset string),
-      wp_release_gen_sconf_body γl lka s R Dc Out m n eb p av lks.
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (γl : gname) (lka : mword 64) (s : string) (R Dc Out : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (lks : gset string),
+      wp_release_gen_sconf_body kt γl lka s R Dc Out m n eb p av lks.
 End RELEASE_GEN.
 
 Module Type RELEASE.
   Parameter wp_release_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (lka : mword 64) (s : string) (R : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (lks : gset string),
-      wp_release_sconf_body γl lka s R m n eb p av lks.
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (γl : gname) (lka : mword 64) (s : string) (R : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (lks : gset string),
+      wp_release_sconf_body kt γl lka s R m n eb p av lks.
 End RELEASE.
 
 Module Type RELEASE_CANCEL.
   Parameter wp_release_cancel_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (lka : mword 64) (s : string) (R D Out : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (lks : gset string),
-      wp_release_cancel_sconf_body γl lka s R D Out m n eb p av lks.
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (γl : gname) (lka : mword 64) (s : string) (R D Out : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (lks : gset string),
+      wp_release_cancel_sconf_body kt γl lka s R D Out m n eb p av lks.
 End RELEASE_CANCEL.

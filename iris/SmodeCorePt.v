@@ -115,7 +115,11 @@ Section SmodeCorePt.
   (* The physical read then lands at [pa_add (pa_of ppn b) j] throughout    *)
   (* ([pa_of_pa_add]) -- an ARBITRARY translated pa, no identity premise.   *)
   (* =================================================================== *)
-  Lemma s_fetch_chunk (σ' : mstate) (pc b : mword 64)
+  (* TIER-GENERIC (sp-migration K5), exactly as [s_mem_chunk] below: the
+     collapse is about the CLAIM each byte carries, never about its tier
+     pin, so one lemma serves a KT0 (identity image) and a KT1
+     (TRAMPOLINE-va) window with the statement unchanged. *)
+  Lemma s_fetch_chunk `{KTR : !CurKtier} (σ' : mstate) (pc b : mword 64)
       (lo len N : nat) (g : nat -> bv 8) (ppn : mword 44) :
     (lo + len <= N)%nat ->
     (0 < len)%nat ->
@@ -321,7 +325,21 @@ Section SmodeCorePt.
   (* from [smode_config]/[hw_config]'s cells); everything the walk needs  *)
   (* rides inside [tlb_inv_pt].                                           *)
   (* =================================================================== *)
-  Lemma s_regime_fetch (R : s_regime) (σ : mstate)
+  (* TIER-INDEXED (sp-migration K5).  The window's tier is the ambient
+     [CurKtier]; the reconciliation with the hardware goes through the ONE
+     generic dispatcher [SRegime.sr_absorb_ktier] instead of the KT0-only
+     [sr_absorb]+[sr_adm_id] pair, so BOTH arms are this one proof:
+
+       KT0 -- the window byte's pin IS the identity, fed to [sr_adm];
+       KT1 -- there is no pin, and admissibility comes from the regime's
+              all-claims witness, which the caller supplies as
+              [sr_ktier_wit R cur_ktier].
+
+     The witness is PERSISTENT and free at KT0 ([sr_ktier_wit_KT0]) and at
+     the shared-kernel-table regime at every tier
+     ([sr_ktier_wit_kpt_share]), so every caller in the tree discharges it
+     in one line and no function contract grows anything. *)
+  Lemma s_regime_fetch `{KTR : !CurKtier} (R : s_regime) (σ : mstate)
       (pc : mword 64) (r : FetchResult) (E : coPset) :
     ↑kptN ⊆ E ->
     register_lookup PC σ.(sregs) = pc ->
@@ -331,6 +349,7 @@ Section SmodeCorePt.
     register_lookup htif_tohost_base σ.(sregs) = None ->
     _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
     pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+    sr_ktier_wit R cur_ktier -∗
     mstate_interp σ -∗
     sr_inv R -∗
     instr_bytes pc r ={E}=∗
@@ -343,7 +362,7 @@ Section SmodeCorePt.
       sr_inv R.
   Proof.
     intros HE Lpc Lpriv Lmisa Lmenv Lhtif LSXL Lpma.
-    iIntros "[Hreg [Hmem Hdev]] Hinv Hbytes".
+    iIntros "#Hwit [Hreg [Hmem Hdev]] Hinv Hbytes".
     assert (HmisaC : eq_vec (_get_Misa_C (register_lookup misa σ.(sregs))) ('b"1") = true)
       by (rewrite Lmisa; vm_compute; reflexivity).
     iEval (rewrite /instr_bytes) in "Hbytes".
@@ -362,11 +381,11 @@ Section SmodeCorePt.
         iDestruct (text_canonical with "Hb0") as %Hcan.
         pose proof (off4_bound pc Hal) as Hoff. rewrite (uint_unsigned_n _) in Hoff.
         (* present the claim to the claim-keyed absorb: translate pc = pa_of ppn pc *)
-        unshelve iMod (sr_absorb R (InstructionFetch tt) pc (pa_of ppn pc) ppn KP_rx σ _
+        unshelve iMod (sr_absorb_ktier R cur_ktier cur_ktier (InstructionFetch tt) pc (pa_of ppn pc) ppn KP_rx σ _
                 (or_introl eq_refl) eq_refl (lo_canonical pc Hcan) ltac:(reflexivity)
                 Lmisa Lmenv Lhtif Lpriv LSXL
                 (exec_effectivePrivilege_fetch _ _ σ) (exec_is_shadow_stack_fetch σ)
-                Lpma (sr_adm_id R pc ppn Hid) _ with "Hk Hreg Hmem Hinv")
+                Lpma Hid _ with "Hwit Hk Hreg Hmem Hinv")
           as (s1) "(%Htr1 & %Hmdev1 & %Hsh1 & %Hgr1 & Hreg & Hmem & Hinv)"; [solve_ndisj |].
         pose proof (pt_regs_preserved _ _ Hsh1) as Hpres1.
         iDestruct (s_fetch_chunk s1 pc pc 0 4 4 (nth_byte w) ppn
@@ -422,11 +441,11 @@ Section SmodeCorePt.
         iDestruct (text_canonical with "Hb2") as %Hcanh.
         pose proof (off_bound_div (add_vec_int pc 2) 2 ltac:(lia) ltac:(exists 2048; lia) Hvah2) as Hoffh. rewrite (uint_unsigned_n _) in Hoffh.
         (* absorb the LOW translation: pc -> pa_of ppnl pc, at [σ -> s1] *)
-        unshelve iMod (sr_absorb R (InstructionFetch tt) pc (pa_of ppnl pc) ppnl KP_rx σ _
+        unshelve iMod (sr_absorb_ktier R cur_ktier cur_ktier (InstructionFetch tt) pc (pa_of ppnl pc) ppnl KP_rx σ _
                 (or_introl eq_refl) eq_refl (lo_canonical pc Hcanl) ltac:(reflexivity)
                 Lmisa Lmenv Lhtif Lpriv LSXL
                 (exec_effectivePrivilege_fetch _ _ σ) (exec_is_shadow_stack_fetch σ)
-                Lpma (sr_adm_id R pc ppnl Hidl) _ with "Hkl Hreg Hmem Hinv")
+                Lpma Hidl _ with "Hwit Hkl Hreg Hmem Hinv")
           as (s1) "(%Htr1 & %Hmdev1 & %Hsh1 & %Hgr1 & Hreg & Hmem & Hinv)"; [solve_ndisj |].
         pose proof (pt_regs_preserved _ _ Hsh1) as Hpres1.
         assert (L1pc : register_lookup PC s1.(sregs) = pc)
@@ -448,11 +467,11 @@ Section SmodeCorePt.
                      ltac:(lia) ltac:(lia) (fun k => eq_refl) Hoffl Hcanl
                      with "Hmem Hkl Hbytes") as %(HbfL & Hraml0 & Hraml1).
         (* absorb the HIGH translation: pc+2 -> pa_of ppnh (pc+2), at [s1 -> s2] *)
-        unshelve iMod (sr_absorb R (InstructionFetch tt) (add_vec_int pc 2) (pa_of ppnh (add_vec_int pc 2)) ppnh KP_rx s1 _
+        unshelve iMod (sr_absorb_ktier R cur_ktier cur_ktier (InstructionFetch tt) (add_vec_int pc 2) (pa_of ppnh (add_vec_int pc 2)) ppnh KP_rx s1 _
                 (or_introl eq_refl) eq_refl (lo_canonical (add_vec_int pc 2) Hcanh) ltac:(reflexivity)
                 L1misa L1menv L1htif L1priv L1SXL
                 (exec_effectivePrivilege_fetch _ _ s1) (exec_is_shadow_stack_fetch s1)
-                L1pma (sr_adm_id R (add_vec_int pc 2) ppnh Hidh) _ with "Hkh Hreg Hmem Hinv")
+                L1pma Hidh _ with "Hwit Hkh Hreg Hmem Hinv")
           as (s2) "(%Htr2 & %Hmdev2 & %Hsh2 & %Hgr2 & Hreg & Hmem & Hinv)"; [solve_ndisj |].
         pose proof (pt_regs_preserved _ _ Hsh2) as Hpres2.
         assert (Hpres12 : forall rr, register_beq rr tlb = false ->
@@ -536,11 +555,11 @@ Section SmodeCorePt.
         iDestruct (code_text with "Hb0") as (ppn) "(#Hk & %Htext0 & %Hid)".
         iDestruct (text_canonical with "Hb0") as %Hcan.
         pose proof (off4_bound pc Hal) as Hoff. rewrite (uint_unsigned_n _) in Hoff.
-        unshelve iMod (sr_absorb R (InstructionFetch tt) pc (pa_of ppn pc) ppn KP_rx σ _
+        unshelve iMod (sr_absorb_ktier R cur_ktier cur_ktier (InstructionFetch tt) pc (pa_of ppn pc) ppn KP_rx σ _
                 (or_introl eq_refl) eq_refl (lo_canonical pc Hcan) ltac:(reflexivity)
                 Lmisa Lmenv Lhtif Lpriv LSXL
                 (exec_effectivePrivilege_fetch _ _ σ) (exec_is_shadow_stack_fetch σ)
-                Lpma (sr_adm_id R pc ppn Hid) _ with "Hk Hreg Hmem Hinv")
+                Lpma Hid _ with "Hwit Hk Hreg Hmem Hinv")
           as (s1) "(%Htr1 & %Hmdev1 & %Hsh1 & %Hgr1 & Hreg & Hmem & Hinv)"; [solve_ndisj |].
         pose proof (pt_regs_preserved _ _ Hsh1) as Hpres1.
         iDestruct (s_fetch_chunk s1 pc pc 0 4 4 (nth_byte w) ppn
@@ -587,11 +606,11 @@ Section SmodeCorePt.
         iDestruct (code_text with "Hb0") as (ppn) "(#Hk & %Htext0 & %Hid)".
         iDestruct (text_canonical with "Hb0") as %Hcan.
         pose proof (off_bound_div pc 2 ltac:(lia) ltac:(exists 2048; lia) H2al) as Hoff. rewrite (uint_unsigned_n _) in Hoff.
-        unshelve iMod (sr_absorb R (InstructionFetch tt) pc (pa_of ppn pc) ppn KP_rx σ _
+        unshelve iMod (sr_absorb_ktier R cur_ktier cur_ktier (InstructionFetch tt) pc (pa_of ppn pc) ppn KP_rx σ _
                 (or_introl eq_refl) eq_refl (lo_canonical pc Hcan) ltac:(reflexivity)
                 Lmisa Lmenv Lhtif Lpriv LSXL
                 (exec_effectivePrivilege_fetch _ _ σ) (exec_is_shadow_stack_fetch σ)
-                Lpma (sr_adm_id R pc ppn Hid) _ with "Hk Hreg Hmem Hinv")
+                Lpma Hid _ with "Hwit Hk Hreg Hmem Hinv")
           as (s1) "(%Htr1 & %Hmdev1 & %Hsh1 & %Hgr1 & Hreg & Hmem & Hinv)"; [solve_ndisj |].
         pose proof (pt_regs_preserved _ _ Hsh1) as Hpres1.
         iDestruct (s_fetch_chunk s1 pc pc 0 2 2 (nth_byte h) ppn
@@ -695,9 +714,12 @@ Section SmodeCorePt.
     assert (Lpma : pma_allows_all (register_lookup pma_regions σ.(sregs)))
       by (rewrite Lpma0; exact Hpma_all).
     (* the unified fetch through the tree invariant (may write A/D back) *)
+    (* the KT0 witness is [emp] -- this is the whole cost of the fetch
+       engine's tier index at an ambient (identity-image) caller. *)
+    iPoseProof (sr_ktier_wit_KT0 R) as "#Hwit".
     unshelve iMod (s_regime_fetch R σ pc r _ _
             Lpc Lpriv Lmisa Lmenv Lhtif LSXL Lpma
-            with "[$Hreg $Hmem] Htlbinv Hbytes")
+            with "Hwit [$Hreg $Hmem] Htlbinv Hbytes")
       as (σf) "(%Hfetcheq & %Hmdevf & %Hpresf & Hsi & Htlbinv)"; [solve_ndisj |].
     (* decode agreement + its side conditions, at σf *)
     iDestruct ("Hdec" $! σf with "Hsi") as %Hdec0.
@@ -835,9 +857,12 @@ Section SmodeCorePt.
       by (rewrite Lms; exact HSXL).
     assert (Lpma : pma_allows_all (register_lookup pma_regions σ.(sregs)))
       by (rewrite Lpma0; exact Hpma_all).
+    (* the KT0 witness is [emp] -- this is the whole cost of the fetch
+       engine's tier index at an ambient (identity-image) caller. *)
+    iPoseProof (sr_ktier_wit_KT0 R) as "#Hwit".
     unshelve iMod (s_regime_fetch R σ pc r _ _
             Lpc Lpriv Lmisa Lmenv Lhtif LSXL Lpma
-            with "[$Hreg $Hmem] Htlbinv Hbytes")
+            with "Hwit [$Hreg $Hmem] Htlbinv Hbytes")
       as (σf) "(%Hfetcheq & %Hmdevf & %Hpresf & Hsi & Htlbinv)"; [solve_ndisj |].
     iDestruct ("Hdec" $! σf with "Hsi") as %Hdec0.
     iDestruct "Hsi" as "[Hreg Hmem]".
@@ -893,7 +918,7 @@ Section SmodeCorePt.
   (* [tlb_res_pt root_ppn] definitionally, so [exact] closes each          *)
   (* restatement.                                                         *)
   (* =================================================================== *)
-  Lemma tlb_inv_pt_fetch (root_ppn : mword 44) (σ : mstate)
+  Lemma tlb_inv_pt_fetch `{KTR : !CurKtier} (root_ppn : mword 44) (σ : mstate)
       (pc : mword 64) (r : FetchResult) (E : coPset) :
     ↑kptN ⊆ E ->
     register_lookup PC σ.(sregs) = pc ->
@@ -913,7 +938,17 @@ Section SmodeCorePt.
           register_lookup rr σf.(sregs) = register_lookup rr σ.(sregs) ⌝ ∗
       mstate_interp σf ∗
       tlb_res_pt root_ppn.
-  Proof. exact (s_regime_fetch (kpt_share_regime root_ppn) σ pc r E). Qed.
+  Proof.
+    (* the shared-kernel-table regime's witness is [emp] at EVERY tier
+       ([sr_ktier_wit_kpt_share]), so this restatement stays a one-liner and
+       is itself tier-generic. *)
+    intros HE Lpc Lpriv Lmisa Lmenv Lhtif LSXL Lpma.
+    iIntros "Hsi Hinv Hb".
+    iApply (s_regime_fetch (kpt_share_regime root_ppn) σ pc r E
+              HE Lpc Lpriv Lmisa Lmenv Lhtif LSXL Lpma
+              with "[] Hsi Hinv Hb").
+    iApply sr_ktier_wit_kpt_share.
+  Qed.
 
   Lemma wp_instr_s_config_tlbinv_pt (root_ppn : mword 44)
       (pc : mword 64) (is_rvc : bool) (i : instruction)

@@ -97,7 +97,7 @@ Definition wp_proc_freepagetable_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, 
   um_below sz P.(ud_um) ->
   (* proc_freepagetable -> uvmunmap/uvmfree -> kfree *)
   locks_below lks "kmem" ->
-  sie_cap_gpr mm K b p -∗
+  sie_cap_gpr KT1 mm K b p -∗
   cpu_own ilvl eb p b lks -∗
   kernel_text -∗
   pc_is pcE -∗
@@ -105,7 +105,7 @@ Definition wp_proc_freepagetable_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, 
   kalloc_env γa None -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),
-    sie_cap_gpr mr K b p -∗
+    sie_cap_gpr KT1 mr K b p -∗
     cpu_own ilvl eb p b lks -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗

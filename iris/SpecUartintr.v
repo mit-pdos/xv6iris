@@ -81,7 +81,7 @@ Definition wp_uartintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
      THRE arm's wakeup call needs only the higher "proc" (11), which
      [locks_below_mono] recovers from this one bound. *)
   locks_below lks "cons" ->
-  sie_cap_gpr m av b pme -∗
+  sie_cap_gpr KT1 m av b pme -∗
   cpu_own lvl eb pme b lks -∗
   kernel_text -∗ pc_is pcE -∗
   (* THE DEVICE, AND NOTHING ELSE.  The transmit lock is gone from this
@@ -105,7 +105,7 @@ Definition wp_uartintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
   wp_next b pme (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜ callee_saved m mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap mf)) ⌝ -∗
-      sie_cap_gpr mf av b pme -∗
+      sie_cap_gpr KT1 mf av b pme -∗
       cpu_own lvl eb pme b lks -∗
       pc_is ret_tgt -∗
       WP (Loop : expr riscv_lang)) -∗

@@ -113,9 +113,9 @@ Definition wp_write_head_sconf_body
      recycle acquires) and brelse (its unlink/splice acquire); nothing in
      its cone touches a lower rank, so one premise covers both callees. *)
   locks_below lks "bcache" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
@@ -162,9 +162,9 @@ Definition wp_write_head_sconf_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (bs' : list (bv 8)),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗

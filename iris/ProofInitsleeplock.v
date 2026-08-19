@@ -108,7 +108,7 @@ Section ProofInitsleeplock.
         (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m) with A0.
     assert (Hpc02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (KernelSyms.initsleeplock + 0x02)) by (unfold pcE; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc02) in "Hpc".
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1c & S2c & S3c & S4c & _)".
     iDestruct "S1c" as (vr24) "Hr24".
     iDestruct "S2c" as (vr16) "Hr16".
@@ -291,7 +291,7 @@ Section ProofInitsleeplock.
     (* the cpu-word cell in initlock's [add_vec lk (sext 0x10)] form *)
     iEval (rewrite /sl_lkcpu) in "Hcpu".
     (* ===== jal initlock: initlock(&lk->lk, "sleep lock") ===== *)
-    iApply (Initlock.wp_initlock_sconf A7 vlk vlkname vcpu "sleep lock"%string (av - 4) b p
+    iApply (Initlock.wp_initlock_sconf KT1 A7 vlk vlkname vcpu "sleep lock"%string (av - 4) b p
               ltac:(lia)
               with "Hcg Htext Hpc [] [Hlk] [Hlkname] [Hcpu]").
     { iEval (rewrite HA7a1). iExact "Hstr". }
@@ -315,7 +315,7 @@ Section ProofInitsleeplock.
       by (rewrite Hils2 HA7s2; apply add_vec_zero_l).
     (* ===== the three struct stores ===== *)
     (* +0x1e sd s2,32(s1)  (lk->name := name) *)
-    iApply (wp_sd_s_sconf (mword_of_int (KernelSyms.initsleeplock + 0x1e)) (mword_of_int 18 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 0x20 : mword 12)
+    iApply (wp_sd_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.initsleeplock + 0x1e)) (mword_of_int 18 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 0x20 : mword 12)
               mil (av - 4)%nat vname b with "Hcg Hpc Hi1e [Hnamefield]").
     { iEval (rgne; rewrite Hmils1). unfold sl_name_field. iExact "Hnamefield". }
     iIntros (CID14 Hs14) "Hcg Hpc Hnamefield".
@@ -323,7 +323,7 @@ Section ProofInitsleeplock.
     assert (Hpc22 : add_vec_int (mword_of_int (KernelSyms.initsleeplock + 0x1e) : mword 64) 4 = mword_of_int (KernelSyms.initsleeplock + 0x22)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc22) in "Hpc".
     (* +0x22 sw zero,0(s1)  (lk->locked := 0) *)
-    iApply (wp_sw_zero_s_sconf (mword_of_int (KernelSyms.initsleeplock + 0x22)) (mword_of_int 9 : mword 5) (mword_of_int 0x0 : mword 12)
+    iApply (wp_sw_zero_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.initsleeplock + 0x22)) (mword_of_int 9 : mword 5) (mword_of_int 0x0 : mword 12)
               mil (av - 4)%nat vlocked b with "Hcg Hpc Hi22 [Hlocked]").
     { iEval (rgne; rewrite Hmils1 addv_sext0). iExact "Hlocked". }
     iIntros (CID15 Hs15) "Hcg Hpc Hlocked".
@@ -331,7 +331,7 @@ Section ProofInitsleeplock.
     assert (Hpc26 : add_vec_int (mword_of_int (KernelSyms.initsleeplock + 0x22) : mword 64) 4 = mword_of_int (KernelSyms.initsleeplock + 0x26)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc26) in "Hpc".
     (* +0x26 sw zero,40(s1)  (lk->pid := 0) *)
-    iApply (wp_sw_zero_s_sconf (mword_of_int (KernelSyms.initsleeplock + 0x26)) (mword_of_int 9 : mword 5) (mword_of_int 0x28 : mword 12)
+    iApply (wp_sw_zero_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.initsleeplock + 0x26)) (mword_of_int 9 : mword 5) (mword_of_int 0x28 : mword 12)
               mil (av - 4)%nat vpid b with "Hcg Hpc Hi26 [Hpid]").
     { iEval (rgne; rewrite Hmils1). unfold sl_pid. iExact "Hpid". }
     iIntros (CID16 Hs16) "Hcg Hpc Hpid".
@@ -340,7 +340,7 @@ Section ProofInitsleeplock.
     iEval (rewrite Hpc2a) in "Hpc".
     (* persist the name field, pairing with the caller's [name ↦ₛ□ s] -> sl_name *)
     iApply fupd_wp.
-    iMod (word_pointsto_persist with "Hnamefield") as "#Hnamefield".
+    iMod (word_pointsto_persist (KTR := KT0) with "Hnamefield") as "#Hnamefield".
     iModIntro.
     iAssert (sl_name slk s) as "#Hslname".
     { iExists name. iFrame "Hnamefield". iExact "Hnames". }
@@ -419,8 +419,8 @@ Section ProofInitsleeplock.
     assert (Hpop : E4 !!! Regidx csp_rs1
                    = pa_stk (add_vec (E4 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
     { rewrite Hwv HcspE4. symmetry. exact Hspd4. }
-    iAssert (stack_own sp0 4) with "[Hr24 Hr16 Hr8 Hr0]" as "Hframe4".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := KT1) sp0 4) with "[Hr24 Hr16 Hr8 Hr0]" as "Hframe4".
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hr24". { iExists _. iEval (rewrite Hb1). iExact "Hr24". }
       iSplitL "Hr16". { iExists _. iEval (rewrite Hb2). iExact "Hr16". }
       iSplitL "Hr8".  { iExists _. iEval (rewrite Hb3). iExact "Hr8". }

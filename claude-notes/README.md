@@ -144,11 +144,12 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   from `um`, the physical-tier decision, the `page_own ⇄ udata_own` bridges.
   The CONSTRUCTION side is [`completed/proc-pagetable.md`](completed/proc-pagetable.md).
 - **[`kexec.md`](projects/kexec.md)** — `kexec()`, the largest function in the
-  tree, where the FS, the page-table builder and `struct proc` meet: PROVEN
-  and linked, with `sys_exec` the only thing left. Read it for how a
-  four-phase function's seams compose (every seam hands the caller's exit
-  BACK), and for **the copyout story**, the most transferable thing this
-  project produced.
+  tree, where the FS, the page-table builder and `struct proc` meet: PROVEN,
+  linked, and reaching `syscall()` through `sys_exec` at dispatch index 7.
+  Read it for how a four-phase function's seams compose (every seam hands the
+  caller's exit BACK), for **the copyout story**, the most transferable thing
+  this project produced, and — before wiring any other `ProofSyscall.v` GAP
+  entry — for why the fs fabric was a NAMING problem, not a missing resource.
 - **[`main-boot.md`](projects/main-boot.md)** — `main()`, both arms proven: the
   `started` one-shot escrow, the deposit as a □-wand, the hart-generic init
   chain. Remaining: the whole-system adequacy composition, and (§G2) retiring
@@ -171,6 +172,26 @@ in `durable-notes.md` for what belongs where and what gets deleted.
 - **[`user-verified.md`](projects/user-verified.md)** — VERIFIED user-mode
   execution (the Umode tier): the `uv_cap` capability, the concrete-image memory
   layer, the interrupt-absorbing step engine, and the sync program's proofs.
+- **[`user-sh.md`](projects/user-sh.md)** — the Umode tier's THIRD program,
+  `sh`, on ONE input (`echo Hello world!`): the syscall protocol at I/O
+  depth, which is what lets a theorem say what a process DOES rather than
+  only that it steps. Read it for the observing `exec` arm, the ghost stdin
+  stream, and why fixing the input removes the two things the tier cannot
+  express.
+- **[`user-echo.md`](projects/user-echo.md)** — the Umode tier's SECOND
+  program, `echo`: the first with loops, memory reads, an argv area and a
+  syscall with a real precondition. Read it for the pieces that grew to carry
+  it — the stack as a splittable BUDGET, `uM_only` as the image
+  postcondition of a call, the `mword_of_int` calculus, and the one generic
+  branch leaf that replaces an op cross-product.
+- **[`user-sh.md`](projects/user-sh.md)** — the Umode tier's THIRD program,
+  `sh` on one fixed input: the design of record for scoping a program by its
+  input, the `xv6_io_protocol` at I/O depth, and the code-catalog generator.
+- **[`user-init.md`](projects/user-init.md)** — the Umode tier's FOURTH
+  program, `init`: the first that NEVER TERMINATES (two nested `iLöb` loops
+  and the `▷`-exposing branch leaves that close them), the first whose
+  theorem assumes nothing about what the kernel returns (every branch of
+  every syscall test is proved), and the first verified xv6 `printf`.
 
 ## `completed/` — finished projects, archived for reference
 

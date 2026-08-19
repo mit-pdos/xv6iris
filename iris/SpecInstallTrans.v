@@ -174,7 +174,7 @@ Definition wp_install_trans_sconf_body
      "bcache" (4); it takes no lock of its own and calls no other function
      with a lower bound, so this is the one premise its whole cone needs. *)
   locks_below lks "bcache" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  install_trans has NO
      acquire/release of its own -- it delegates entirely to bread/bwrite, so
@@ -183,7 +183,7 @@ Definition wp_install_trans_sconf_body
      callee's own acquire mints what it needs) and at [eb = false] it is the
      honest pair, held because the TRAP handed it over.  See
      claude-notes/completed/eb-generic-sweep.md. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
@@ -245,9 +245,9 @@ Definition wp_install_trans_sconf_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗

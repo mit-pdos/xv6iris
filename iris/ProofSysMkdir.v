@@ -276,18 +276,18 @@ Section ProofSysMkdirFrame.
   Context `{!riscvGS Σ}.
 
   Lemma md_frame_carve (sp0 : mword 64) :
-    stack_own sp0 18 -∗
+    stack_own (KTR := KT1) sp0 18 -∗
     ⌜forall i, (i < 16)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (18 - i)%nat)) 8 = true⌝ ∗
-    (∃ w : mword 64, (pa_stk sp0 1) ↦₈ w) ∗
-    (∃ w : mword 64, (pa_stk sp0 2) ↦₈ w) ∗
-    bytes_own (DfracOwn 1) (pa_stk sp0 18) 128.
+    (∃ w : mword 64, (pa_stk sp0 1) ↦₈[KT1] w) ∗
+    (∃ w : mword 64, (pa_stk sp0 2) ↦₈[KT1] w) ∗
+    bytes_own (KTR := KT1) (DfracOwn 1) (pa_stk sp0 18) 128.
   Proof.
-    iIntros "H". rewrite stack_own_slots. cbn [seq].
+    iIntros "H". rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
     iDestruct "H" as "(H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & H9 & H10 &
                        H11 & H12 & H13 & H14 & H15 & H16 & H17 & H18 & _)".
     change 128%nat with (8 * 16)%nat.
-    iDestruct (slotsn_bytes_own sp0 18 16 ltac:(lia)
+    iDestruct (slotsn_bytes_own (KTR := KT1) sp0 18 16 ltac:(lia)
                  with "[H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16
                         H17 H18]") as "[%Hal Hb]".
     { cbn [seq].
@@ -306,17 +306,17 @@ Section ProofSysMkdirFrame.
   Lemma md_frame_join (sp0 : mword 64) (w1 w2 : mword 64) :
     (forall i, (i < 16)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (18 - i)%nat)) 8 = true) ->
-    (pa_stk sp0 1) ↦₈ w1 -∗ (pa_stk sp0 2) ↦₈ w2 -∗
-    bytes_own (DfracOwn 1) (pa_stk sp0 18) 128 -∗
-    stack_own sp0 18.
+    (pa_stk sp0 1) ↦₈[KT1] w1 -∗ (pa_stk sp0 2) ↦₈[KT1] w2 -∗
+    bytes_own (KTR := KT1) (DfracOwn 1) (pa_stk sp0 18) 128 -∗
+    stack_own (KTR := KT1) sp0 18.
   Proof.
     intro Hal. iIntros "H1 H2 Hb".
     change 128%nat with (8 * 16)%nat.
-    iDestruct (bytes_own_slotsn sp0 18 16 ltac:(lia) Hal with "Hb") as "Hs".
+    iDestruct (bytes_own_slotsn (KTR := KT1) sp0 18 16 ltac:(lia) Hal with "Hb") as "Hs".
     cbn [seq].
     iDestruct "Hs" as "(K18 & K17 & K16 & K15 & K14 & K13 & K12 & K11 & K10 &
                         K9 & K8 & K7 & K6 & K5 & K4 & K3 & _)".
-    rewrite stack_own_slots. cbn [seq].
+    rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
     iSplitL "H1"; [iExists w1; iExact "H1" |].
     iSplitL "H2"; [iExists w2; iExact "H2" |].
     iSplitL "K3"; [iExact "K3" |]. iSplitL "K4"; [iExact "K4" |].
@@ -333,22 +333,22 @@ Section ProofSysMkdirFrame.
   (* the buffer, as bytes and back: argstr / create both speak the
      [seq]-indexed byte window, not [bytes_own] *)
   Lemma md_bytes_name (a : mword 64) (N : nat) :
-    bytes_own (DfracOwn 1) a N ⊢
-    ∃ f : nat -> bv 8, [∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ f j.
-  Proof. rewrite /bytes_own. exact (bb_any_named a N). Qed.
+    bytes_own (KTR := KT1) (DfracOwn 1) a N ⊢
+    ∃ f : nat -> bv 8, [∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ[KT1] f j.
+  Proof. rewrite /bytes_own. exact (bb_any_named (KTR := KT1) a N). Qed.
 
   Lemma md_name_bytes (a : mword 64) (N : nat) (f : nat -> bv 8) :
-    ([∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ f j) ⊢ bytes_own (DfracOwn 1) a N.
-  Proof. rewrite /bytes_own. exact (bb_named_any a N f). Qed.
+    ([∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ[KT1] f j) ⊢ bytes_own (KTR := KT1) (DfracOwn 1) a N.
+  Proof. rewrite /bytes_own. exact (bb_named_any (KTR := KT1) a N f). Qed.
 
   (* 128 = (k+1) + (127-k): create reads the NUL-terminated prefix, the rest
      rides through untouched *)
   Lemma md_buf_split (a : mword 64) (f : nat -> bv 8) (k : nat) :
     (k < 128)%nat ->
-    ([∗ list] j ∈ seq 0 128, pa_add a j ↦ₘ f j) -∗
-    ([∗ list] j ∈ seq 0 (S k), pa_add a j ↦ₘ f j)
+    ([∗ list] j ∈ seq 0 128, pa_add a j ↦ₘ[KT1] f j) -∗
+    ([∗ list] j ∈ seq 0 (S k), pa_add a j ↦ₘ[KT1] f j)
     ∗ ([∗ list] j ∈ seq 0 (127 - k)%nat,
-         pa_add (pa_add a (S k)) j ↦ₘ f (S k + j)%nat).
+         pa_add (pa_add a (S k)) j ↦ₘ[KT1] f (S k + j)%nat).
   Proof.
     intro Hk.
     replace 128%nat with (S k + (127 - k))%nat by lia.
@@ -357,10 +357,10 @@ Section ProofSysMkdirFrame.
 
   Lemma md_buf_join (a : mword 64) (f : nat -> bv 8) (k : nat) :
     (k < 128)%nat ->
-    ([∗ list] j ∈ seq 0 (S k), pa_add a j ↦ₘ f j) -∗
+    ([∗ list] j ∈ seq 0 (S k), pa_add a j ↦ₘ[KT1] f j) -∗
     ([∗ list] j ∈ seq 0 (127 - k)%nat,
-       pa_add (pa_add a (S k)) j ↦ₘ f (S k + j)%nat) -∗
-    bytes_own (DfracOwn 1) a 128.
+       pa_add (pa_add a (S k)) j ↦ₘ[KT1] f (S k + j)%nat) -∗
+    bytes_own (KTR := KT1) (DfracOwn 1) a 128.
   Proof.
     intro Hk. iIntros "H1 H2".
     iDestruct (md_name_bytes a (S k) f with "H1") as "B1".
@@ -406,11 +406,11 @@ Section ProofSysMkdirEpilogue.
     md_sp sp0 M -> md_thr m M ->
     (forall i, (i < 16)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (18 - i)%nat)) 8 = true) ->
-    sie_cap_gpr M (K - 18) b pj -∗
+    sie_cap_gpr KT1 M (K - 18) b pj -∗
     kernel_text -∗ pc_is (mword_of_int (MD + 0x38)) -∗
-    (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-    (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 18) jj ↦ₘ bf jj) -∗
+    (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
+    (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
+    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 18) jj ↦ₘ[KT1] bf jj) -∗
     (* THE INDEX IS [b], NOT [true], and it has to be: the epilogue is four
        PLAIN instructions, so every crossing it makes is a [b]-link and the
        [b]-form chain is what it can hand back (ProofSysChdir's [sc_epilogue]
@@ -420,7 +420,7 @@ Section ProofSysMkdirEpilogue.
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
         ⌜(mf !!! Regidx Ra0 : mword 64) = (M !!! Regidx Ra0 : mword 64)⌝ -∗
-        sie_cap_gpr mf K b pj -∗
+        sie_cap_gpr KT1 mf K b pj -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -585,9 +585,9 @@ Section ProofSysMkdirM1Tail.
     md_sp sp0 M -> md_thr m M ->
     (forall i, (i < 16)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp0 (18 - i)%nat)) 8 = true) ->
-    sie_cap_gpr M (K - 18) b (proc_addr jx) -∗
+    sie_cap_gpr KT1 M (K - 18) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr jx) -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (MD + 0x40)) -∗
     panic_env -∗
@@ -601,16 +601,16 @@ Section ProofSysMkdirM1Tail.
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
     log_op g u -∗
-    (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-    (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 18) jj ↦ₘ bf jj) -∗
+    (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
+    (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
+    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 18) jj ↦ₘ[KT1] bf jj) -∗
     wp_next true (proc_addr jx) (fun (CIDx : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
         ⌜(mf !!! Regidx Ra0 : mword 64) = (mword_of_int (-1) : mword 64)⌝ -∗
-        sie_cap_gpr mf K b (proc_addr jx) -∗
+        sie_cap_gpr KT1 mf K b (proc_addr jx) -∗
         cpu_own 0 eb (proc_addr jx) b lks -∗
-        trap_csrs_ext eb -∗
+        trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr jx) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         p_pid (proc_addr jx) ↦₄{dq} pidv -∗

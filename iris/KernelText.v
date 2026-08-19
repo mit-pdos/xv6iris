@@ -100,8 +100,13 @@ Section KernelText.
     apply Hbytes. exact Hlt.
   Qed.
 
-  (* ---- generic [instr_bytes] introduction (base / 4-aligned RVC / RVC) ---- *)
-  Lemma instr_bytes_base (pc : mword 64) (w : mword 32) :
+  (* ---- generic [instr_bytes] introduction (base / 4-aligned RVC / RVC) ----
+     TIER-GENERIC (sp-migration K5): these are pure repackagings of a code
+     window into the fetch footprint and never look at a byte's tier pin, so
+     the [CurKtier] binder makes one lemma serve the identity image (KT0,
+     what [kernel_window_pc] hands over) and a TRAMPOLINE-va window (KT1).
+     Ambient callers keep resolving them at the KT0 default. *)
+  Lemma instr_bytes_base `{KTR : !CurKtier} (pc : mword 64) (w : mword 32) :
     is_aligned_vaddr (Virtaddr pc) 2 = true ->
     isRVC (subrange_vec_dec w 15 0) = false ->
     ([∗ list] j ∈ seq 0 4, (pa_add pc j) ↦ₓ□ nth_byte w j) -∗
@@ -127,7 +132,7 @@ Section KernelText.
      by [nth_byte_subrange_lo].  Owning 4 bytes where the fetch reads 2 is
      free: the window comes from the persistent [kernel_text], and a
      mid-function instruction always has a successor in the image. *)
-  Lemma instr_bytes_rvc_any (pc : mword 64) (h : mword 16) (w : mword 32) :
+  Lemma instr_bytes_rvc_any `{KTR : !CurKtier} (pc : mword 64) (h : mword 16) (w : mword 32) :
     is_aligned_vaddr (Virtaddr pc) 2 = true ->
     isRVC h = true ->
     subrange_vec_dec w 15 0 = h ->

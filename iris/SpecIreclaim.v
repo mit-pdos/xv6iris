@@ -232,7 +232,7 @@ Definition wp_ireclaim_sconf_body
   ninodes <= 16 * Z.of_nat nib ->
   ninodes < 2 ^ 31 ->
   (* THE ORPHAN ARM'S FIRST CALLEE, as a hypothesis and not a functor *)
-  printk_gen_contract γpr γu γd ->
+  printk_gen_contract (kt := KT1) γpr γu γd ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (* a0 = dev: the RV64 ABI's sign extension of an [int] *)
@@ -246,7 +246,7 @@ Definition wp_ireclaim_sconf_body
      "itable" is the lowest, so one premise there covers the whole cone
      via [locks_below_mono]. *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
   (* the general printk path's two PERSISTENT credentials *)
@@ -308,7 +308,7 @@ Definition wp_ireclaim_sconf_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (used' : gset Z),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗

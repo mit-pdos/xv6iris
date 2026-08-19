@@ -59,7 +59,7 @@ Import Defs.
 
    [6 <= av] does NOT move: [av] is still the ENTRY usable count, which is what
    push_off's own 4-slot frame and the mycpu() call come out of. *)
-Definition wp_push_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (av : nat)
+Definition wp_push_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (m : regfile) (av : nat)
     (n : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string) :=
   (* push_off's mstatus0-dependent register chain N2..N8 + storeval32 (which
      read [sstatus_read mstatus0]) are reconstructed inside the proof over the
@@ -71,7 +71,7 @@ Definition wp_push_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID 
   (* the noff increment stays in int range *)
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (6 <= av)%nat ->
-  sie_cap_gpr m av b p -∗
+  sie_cap_gpr kt m av b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is (mword_of_int (KernelSyms.push_off + 0x00) : mword 64) -∗
   wp_next b p (fun (CID : CpuId) =>
@@ -79,9 +79,9 @@ Definition wp_push_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID 
     ⌜ sconf_ms_facts ms ⌝ -∗
     (* [trap_res b + av], not [av]: see the header -- the flip conserves the
        carve, so the reserve the entry arm was holding is usable stack now. *)
-    sie_cap_gpr mfin (trap_res b + av)%nat false p -∗
+    sie_cap_gpr kt mfin (trap_res b + av)%nat false p -∗
     cpu_own (S n) eb p false lks -∗
-    arm_pay n eb p -∗
+    arm_pay kt n eb p -∗
     pc_is caller_ret -∗
     ⌜ callee_saved m mfin ⌝ -∗
     WP (Loop : expr riscv_lang)) -∗
@@ -127,7 +127,7 @@ Definition wp_push_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID 
 
    [4 <= av] does NOT move even though [av] changed meaning: pop_off's own
    4-slot frame comes out of the ENTRY count [trap_res bexit + av >= av]. *)
-Definition wp_pop_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (av : nat)
+Definition wp_pop_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (m : regfile) (av : nat)
     (n : nat) (eb : bool) (p : mword 64) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.pop_off in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -146,13 +146,13 @@ Definition wp_pop_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID :
      At [n = 0] it reads [lks = ∅] -- exactly what the re-enabling exit's
      [b = true] arm demands, so that arm is DERIVED here, not imposed. *)
   (size lks <= n)%nat ->
-  sie_cap_gpr m (trap_res bexit + av)%nat false p -∗
+  sie_cap_gpr kt m (trap_res bexit + av)%nat false p -∗
   cpu_own (S n) eb p false lks -∗
-  arm_pay n eb p -∗
+  arm_pay kt n eb p -∗
   kernel_text -∗ pc_is pcE -∗
   wp_next bexit p (fun (CID : CpuId) =>
     ∀ mf,
-    sie_cap_gpr mf av bexit p -∗
+    sie_cap_gpr kt mf av bexit p -∗
     cpu_own n eb p bexit lks -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mf ⌝ -∗
@@ -161,11 +161,11 @@ Definition wp_pop_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID :
 
 Module Type PUSHOFF.
   Parameter wp_push_off_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (av : nat)
+    forall `{!riscvGS Σ, !sieG Σ} (kt : ktier) `{GEN : GenId} `{CID : CpuId} (m : regfile) (av : nat)
       (n : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string),
-      wp_push_off_sconf_body m av n eb p b lks.
+      wp_push_off_sconf_body kt m av n eb p b lks.
   Parameter wp_pop_off_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (av : nat)
+    forall `{!riscvGS Σ, !sieG Σ} (kt : ktier) `{GEN : GenId} `{CID : CpuId} (m : regfile) (av : nat)
       (n : nat) (eb : bool) (p : mword 64) (lks : gset string),
-      wp_pop_off_sconf_body m av n eb p lks.
+      wp_pop_off_sconf_body kt m av n eb p lks.
 End PUSHOFF.

@@ -20,6 +20,16 @@
                     other register / the image / pc+4 intact, on an
                     arbitrary hart.  (The xv6 trap path restores all GPRs
                     from the trapframe except a0, and bumps epc by 4.)
+     [UsysReadsBuf] the syscall READS a caller-supplied buffer -- the
+                    (a1, a2) pointer/length pair of the xv6 read/write
+                    calling convention -- and then returns as [UsysPureRet]
+                    does.  The process must SUPPLY the proof that the
+                    buffer is a readable window of its own image
+                    ([uv_rd], UmodeAbi.v): that is the caller's half of
+                    the copyin the kernel will perform, and it is the one
+                    thing a verified process genuinely has to establish
+                    about the pointers it hands the kernel.  Nothing is
+                    said yet about WHAT the syscall does with the bytes.
      [UsysNoRet]    the syscall never returns to this process (exit).
      [UsysUnused]   no semantics stated: the arm is [False], so a verified
                     process simply cannot be proven to invoke it (and the
@@ -71,6 +81,7 @@ Definition SYS_sync   : Z := 22.
 
 Inductive usys_sem : Type :=
   | UsysPureRet
+  | UsysReadsBuf
   | UsysNoRet
   | UsysUnused.
 
@@ -79,16 +90,26 @@ Section UmodeSyscall.
   Context `{GEN : GenId}.
   Context (C : ucfg) (pt : uptd).
 
+  (* the RESUME continuation shared by every returning shape: the hart is
+     re-bound, a0 is an arbitrary return value, everything else -- the
+     other registers, the image, pc+4 -- comes back intact. *)
+  Definition usys_ret (g : regfile) (va : mword 64)
+      (M : gmap Z (bv 8)) : iProp Σ :=
+    (∀ (CID : CpuId) (ret : mword 64),
+       uv_run C pt M (<[Regidx a0_idx := ret]> g) (add_vec_int va 4) -∗
+       WP (Loop : expr riscv_lang))%I.
+
   (* what the process supplies at an [ecall] whose number has shape [s] --
-     for a returning syscall, the resume continuation (hart re-bound, a0
-     arbitrary, pc+4); for a non-returning one, nothing. *)
+     for a returning syscall, the resume continuation (and, for one that
+     reads a buffer, the buffer's readability); for a non-returning one,
+     nothing. *)
   Definition usys_arm (s : usys_sem) (g : regfile) (va : mword 64)
       (M : gmap Z (bv 8)) : iProp Σ :=
     match s with
-    | UsysPureRet =>
-        (∀ (CID : CpuId) (ret : mword 64),
-           uv_run C pt M (<[Regidx a0_idx := ret]> g) (add_vec_int va 4) -∗
-           WP (Loop : expr riscv_lang))%I
+    | UsysPureRet => usys_ret g va M
+    | UsysReadsBuf =>
+        (⌜uv_rd pt M (uint (g !!! Regidx a1_idx)) (uint (g !!! Regidx a2_idx))⌝ ∗
+         usys_ret g va M)%I
     | UsysNoRet => emp%I
     | UsysUnused => False%I
     end.
@@ -107,6 +128,7 @@ End UmodeSyscall.
 
 Definition xv6_sys_sem (n : Z) : usys_sem :=
   if bool_decide (n = SYS_sync) then UsysPureRet
+  else if bool_decide (n = SYS_write) then UsysReadsBuf
   else if bool_decide (n = SYS_exit) then UsysNoRet
   else UsysUnused.
 
@@ -118,4 +140,6 @@ Definition xv6_sys_protocol `{!riscvGS Σ} `{GEN : GenId}
 Lemma xv6_sys_sem_sync : xv6_sys_sem SYS_sync = UsysPureRet.
 Proof. reflexivity. Qed.
 Lemma xv6_sys_sem_exit : xv6_sys_sem SYS_exit = UsysNoRet.
+Proof. reflexivity. Qed.
+Lemma xv6_sys_sem_write : xv6_sys_sem SYS_write = UsysReadsBuf.
 Proof. reflexivity. Qed.

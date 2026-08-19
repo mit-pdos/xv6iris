@@ -207,9 +207,9 @@ Definition wp_forkret_gen_body
   (* THE [first] PREMISE -- see the header, and the two readings above *)
   Pfirst -∗
   (* ---- the running kernel thread, as swtch left it ---- *)
-  sie_cap_gpr m av false p -∗
+  sie_cap_gpr KT1 m av false p -∗
   cpu_own 1%nat eb p false {[s]} -∗
-  trap_csrs -∗
+  trap_csrs KT1 -∗
   cpu_claim p -∗
   (* ---- p->lock, still held from scheduler() ---- *)
   is_lock γl p s Rlk -∗

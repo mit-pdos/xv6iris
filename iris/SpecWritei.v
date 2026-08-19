@@ -502,12 +502,15 @@ Definition wi_dinode (dn : dinode) (bm' : blkmap) (off tot : nat) : dinode :=
      else di_size dn)
     (bm_cells bm').
 
+(* THE BUFFER CARRIES ITS OWN TIER [ktb] -- the kernel arm's destination is
+   a FRAME local for one caller (dirlookup's [de]) and a KT0 page for the
+   next (kexec's segment).  Same shape as SpecMemmove.v's note. *)
 Definition wp_writei_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
     `{GEN : GenId} `{CID : CpuId}
     
-    (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
+    (ktb : ktier) `{!KtierLe ktb KT1} (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
@@ -592,7 +595,7 @@ Definition wp_writei_sconf_body
   bitmap_geom_ok cov logstart bmapstart size ->
   (* balloc's out-of-blocks arm calls the GENERAL printk path; carried as a
      hypothesis, never a functor.  See SpecBalloc.v's header. *)
-  printk_gen_contract γpr γu γd ->
+  printk_gen_contract (kt := KT1) γpr γu γd ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (* a0 = ip *)
@@ -616,7 +619,7 @@ Definition wp_writei_sconf_body
      (3); nothing writei's cone touches ranks lower.  One premise covers the
      whole cone (mirrors SpecBfree.v's). *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  writei holds no lock of
      its own -- every push_off/pop_off pair that can mint or spend an
@@ -629,7 +632,7 @@ Definition wp_writei_sconf_body
      by the caller because the TRAP handed it over.  See
      claude-notes/completed/sched-hart-generic.md and
      claude-notes/completed/eb-generic-sweep.md. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   (* the two PERSISTENT printk credentials, forwarded through bmap to balloc *)
@@ -681,7 +684,7 @@ Definition wp_writei_sconf_body
      the same fix, made one stage earlier by fileread.) *)
   (if user
    then proc_priv_core pj pidv V
-   else ([∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ src_bytes i) ∗
+   else ([∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ[ktb] src_bytes i) ∗
         p_pid pj ↦₄{dq} pidv) -∗
   (* the running-thread bundle *)
   procs_inv γs -∗
@@ -754,9 +757,9 @@ Definition wp_writei_sconf_body
       (* at most [wi_cost_bmonly off n] units gone, and none gained *)
       ⌜((ncount - wi_cost_bmonly off n)%nat <= n')%nat /\ (n' <= ncount)%nat⌝ -∗
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       i_dev ip ↦₄{dqd} dev -∗
@@ -773,7 +776,7 @@ Definition wp_writei_sconf_body
          buffer, or inside the user arm's block *)
       (if user
        then proc_priv_core pj pidv (upd_upt V P')
-       else ([∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ src_bytes i) ∗
+       else ([∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ[ktb] src_bytes i) ∗
             p_pid pj ↦₄{dq} pidv) -∗
       bslots bn 3 -∗
       log_op γ n' -∗
@@ -788,12 +791,15 @@ Definition wp_writei_sconf_body
 (*  [wp_writei_sconf] is this contract with the set forgotten, derived    *)
 (*  at the [log_op] existential's own witness -- so no caller moves.      *)
 (* ===================================================================== *)
+(* THE BUFFER CARRIES ITS OWN TIER [ktb] -- the kernel arm's destination is
+   a FRAME local for one caller (dirlookup's [de]) and a KT0 page for the
+   next (kexec's segment).  Same shape as SpecMemmove.v's note. *)
 Definition wp_writei_gen_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
     `{GEN : GenId} `{CID : CpuId}
     
-    (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
+    (ktb : ktier) `{!KtierLe ktb KT1} (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
@@ -878,7 +884,7 @@ Definition wp_writei_gen_body
   bitmap_geom_ok cov logstart bmapstart size ->
   (* balloc's out-of-blocks arm calls the GENERAL printk path; carried as a
      hypothesis, never a functor.  See SpecBalloc.v's header. *)
-  printk_gen_contract γpr γu γd ->
+  printk_gen_contract (kt := KT1) γpr γu γd ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (* a0 = ip *)
@@ -895,7 +901,7 @@ Definition wp_writei_gen_body
      (3); nothing writei's cone touches ranks lower.  One premise covers the
      whole cone (mirrors SpecBfree.v's). *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  Same pure-pass-through
      shape as [wp_writei_sconf_body] above -- required so that
@@ -905,7 +911,7 @@ Definition wp_writei_gen_body
      SET form ([bmap]'s [cr]/[Sb]) can express, so the derivation has to
      reach through here at whatever [eb] the counted caller was given.  See
      claude-notes/completed/eb-generic-sweep.md. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   (* the two PERSISTENT printk credentials, forwarded through bmap to balloc *)
@@ -957,7 +963,7 @@ Definition wp_writei_gen_body
      the same fix, made one stage earlier by fileread.) *)
   (if user
    then proc_priv_core pj pidv V
-   else ([∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ src_bytes i) ∗
+   else ([∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ[ktb] src_bytes i) ∗
         p_pid pj ↦₄{dq} pidv) -∗
   (* the running-thread bundle *)
   procs_inv γs -∗
@@ -1039,9 +1045,9 @@ Definition wp_writei_gen_body
       ⌜wi16_spend_any bmapstart inum inodestart ncount n' off n bm bm' Sb⌝ -∗
       ⌜wi16_atomic off n tot⌝ -∗
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       i_dev ip ↦₄{dqd} dev -∗
@@ -1058,7 +1064,7 @@ Definition wp_writei_gen_body
          buffer, or inside the user arm's block *)
       (if user
        then proc_priv_core pj pidv (upd_upt V P')
-       else ([∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ src_bytes i) ∗
+       else ([∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ[ktb] src_bytes i) ∗
             p_pid pj ↦₄{dq} pidv) -∗
       bslots bn 3 -∗
       log_opS γ n' Sb' -∗
@@ -1071,7 +1077,7 @@ Module Type WRITEI.
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
       `{GEN : GenId} `{CID : CpuId}
 
-      (γs : list gname) (j : nat) (γl : gname)
+      (ktb : ktier) `{!KtierLe ktb KT1} (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
@@ -1088,7 +1094,7 @@ Module Type WRITEI.
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_writei_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi γa γf
+      wp_writei_sconf_body ktb γs j γl γu γd γk pd pav pu bn γ γfs γi γa γf
                            cov logstart inodestart nib bmapstart size dev used γpr
                            ip inum bm data dn dn0
                            user off n src_bytes V ncount
@@ -1102,7 +1108,7 @@ Module Type WRITEI.
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
       `{GEN : GenId} `{CID : CpuId}
 
-      (γs : list gname) (j : nat) (γl : gname)
+      (ktb : ktier) `{!KtierLe ktb KT1} (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
@@ -1119,7 +1125,7 @@ Module Type WRITEI.
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_writei_gen_body γs j γl γu γd γk pd pav pu bn γ γfs γi γa γf
+      wp_writei_gen_body ktb γs j γl γu γd γk pd pav pu bn γ γfs γi γa γf
                          cov logstart inodestart nib bmapstart size dev used γpr
                          ip inum bm data dn dn0
                          user off n src_bytes V ncount Sb

@@ -105,7 +105,7 @@ Definition wp_consoleinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ
      callee is uartinit, which needs 4 (its own 2-slot frame plus initlock's
      2).  So the budget is 2 + 4. *)
   (6 <= K)%nat ->
-  sie_cap_gpr m K false p -∗
+  sie_cap_gpr KT0 m K false p -∗
   (* [kernel_data] supplies the "cons" string literal consoleinit's [auipc a1 /
      addi a1] points at -- the name it hands to initlock -- and, through
      uartinit's own spec, the "uart" one. *)
@@ -128,7 +128,7 @@ Definition wp_consoleinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ
   devsw_console_read ↦₈ dread0 -∗
   devsw_console_write ↦₈ dwrite0 -∗
   ( ∀ mr,
-    sie_cap_gpr mr K false p -∗
+    sie_cap_gpr KT0 mr K false p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     (* uartinit writes no THR, so the accepted trace is unchanged; its final

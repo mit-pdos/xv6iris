@@ -172,7 +172,7 @@ Section BmapKit.
   Definition bm_prk (ak : option bm_alloc) (γu : uart_names)
       (γd : disk_names) : iProp Σ :=
     match ak with
-    | Some a => (⌜printk_gen_contract (ba_pr a) γu γd⌝ ∗
+    | Some a => (⌜printk_gen_contract (kt := KT1) (ba_pr a) γu γd⌝ ∗
                  kernel_data ∗ printk_env (ba_pr a) γu γd)%I
     | None => emp%I
     end.
@@ -184,7 +184,7 @@ Section BmapKit.
       (γu : uart_names) (γd : disk_names) :
     ak = Some a ->
     bm_prk ak γu γd -∗
-      ⌜printk_gen_contract (ba_pr a) γu γd⌝ ∗
+      ⌜printk_gen_contract (kt := KT1) (ba_pr a) γu γd⌝ ∗
       kernel_data ∗ printk_env (ba_pr a) γu γd.
   Proof. intros ->. rewrite /bm_prk. iIntros "H". iExact "H". Qed.
 
@@ -458,9 +458,9 @@ Definition bm_gen_stmt
   γs !! j = Some γl ->
   m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
   m !!! Regidx (mword_of_int 11 : mword 5) = sign_extend' 64 bnw ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
@@ -494,9 +494,9 @@ Definition bm_gen_stmt
        \/ (mf !!! Regidx (mword_of_int 10 : mword 5)
              = sign_extend' 64 (blkmap_get bm' fbn : mword 32)
            /\ bv_unsigned (blkmap_get bm' fbn) <> 0)⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
@@ -545,22 +545,22 @@ Section BmapDefs.
      and the indirect arms have read it back by the time the epilogue
      runs. *)
   Definition bm_frame (m : regfile) : iProp Σ :=
-    (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈ (m !!! Regidx Rra : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈ (m !!! Regidx Rs0 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈ (m !!! Regidx Rs1 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈ (m !!! Regidx Rs2 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 5 ↦₈ (m !!! Regidx Rs3 : mword 64) ∗
-     (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈ v))%I.
+    (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈[KT1] (m !!! Regidx Rra : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈[KT1] (m !!! Regidx Rs2 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 5 ↦₈[KT1] (m !!! Regidx Rs3 : mword 64) ∗
+     (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈[KT1] v))%I.
 
   (* the frame with slot 0 pinned to s4's entry value: what the indirect
      arms hold between the [c.sdsp s4] and the [c.ldsp s4] *)
   Definition bm_frame4 (m : regfile) : iProp Σ :=
-    (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈ (m !!! Regidx Rra : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈ (m !!! Regidx Rs0 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈ (m !!! Regidx Rs1 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈ (m !!! Regidx Rs2 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 5 ↦₈ (m !!! Regidx Rs3 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈ (m !!! Regidx Rs4 : mword 64))%I.
+    (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈[KT1] (m !!! Regidx Rra : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈[KT1] (m !!! Regidx Rs2 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 5 ↦₈[KT1] (m !!! Regidx Rs3 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈[KT1] (m !!! Regidx Rs4 : mword 64))%I.
 
   Lemma bm_frame_of4 (m : regfile) : bm_frame4 m -∗ bm_frame m.
   Proof.
@@ -594,9 +594,9 @@ Section BmapDefs.
           /\ bv_unsigned (blkmap_get bm' fbn) = 0)
          \/ (mf !!! Regidx Ra0 = sign_extend' 64 (blkmap_get bm' fbn : mword 32)
              /\ bv_unsigned (blkmap_get bm' fbn) <> 0)⌝ -∗
-        sie_cap_gpr mf K b (proc_addr j) -∗
+        sie_cap_gpr KT1 mf K b (proc_addr j) -∗
         cpu_own 0 eb (proc_addr j) b lks -∗
-        trap_csrs_ext eb -∗
+        trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr j) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
@@ -661,9 +661,9 @@ Section BmapEpilogue.
      \/ (bv_unsigned (blkmap_get bm fbn) = 0
          /\ data' = <[fbn := replicate BSIZE (bv_0 8)]> data)) ->
     bm_ledger_ok ak cr bm bm' fbn n n' Sb Sb' ->
-    sie_cap_gpr M (K - 6)%nat b (proc_addr j) -∗
+    sie_cap_gpr KT1 M (K - 6)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.bmap + 0x8a) : mword 64) -∗
@@ -863,9 +863,9 @@ Section BmapEpilogue.
                        (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6)))) 6).
     { rewrite Hwv HP5sp. unfold pa_stk, add_vec_int.
       apply f_equal. pcw. }
-    iAssert (stack_own (m !!! Regidx csp_rs1 : mword 64) 6)
+    iAssert (stack_own (KTR := KT1) (m !!! Regidx csp_rs1 : mword 64) 6)
       with "[Hf1 Hf2 Hf3 Hf4 Hf5 Hf6]" as "Hstk".
-    { rewrite stack_own_slots. cbn [seq].
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hf1"; [iExists _; iExact "Hf1"|].
       iSplitL "Hf2"; [iExists _; iExact "Hf2"|].
       iSplitL "Hf3"; [iExists _; iExact "Hf3"|].
@@ -1006,9 +1006,9 @@ Section BmapRelease.
        (the alloc-capable one by [locks_below_mono] down from "log", the
        no-alloc one directly) -- is what it takes. *)
     locks_below lks "bcache" ->
-    sie_cap_gpr M (K - 6)%nat b (proc_addr j) -∗
+    sie_cap_gpr KT1 M (K - 6)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.bmap + 0x82) : mword 64) -∗
@@ -1231,9 +1231,9 @@ Section BmapTail.
        the caller that cannot allocate (BmapNoallocProof, ak = None) never
        has to supply "log" -- only the unconditional "bcache" above. *)
     (ak <> None -> locks_below lks "log") ->
-    sie_cap_gpr M (K - 6)%nat b (proc_addr j) -∗
+    sie_cap_gpr KT1 M (K - 6)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.bmap + 0x62) : mword 64) -∗
@@ -1314,7 +1314,7 @@ Section BmapTail.
                     = i_dev ip).
     { rgne. rewrite HI0s2. reflexivity. }
     iEval (rewrite -Hdadr) in "Hidev".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.bmap + 0x64)) Ra0 Rs2
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.bmap + 0x64)) Ra0 Rs2
               (mword_of_int 0 : mword 12) I0 (K - 6)%nat dev b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi64 Hidev").
     iIntros (CID2 Hq2) "Hcg Hpc Hidev".
@@ -1577,7 +1577,7 @@ Section BmapTail.
                     = pa_add (b_data (bnode kk)) (4 * q)%nat).
     { rgne. rewrite HB6a5. apply bm_off0. }
     iEval (rewrite -Hcadr) in "Hcell".
-    iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.bmap + 0x7e)) Rs1 Ra5
+    iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.bmap + 0x7e)) Rs1 Ra5
               (mword_of_int 0 : mword 12) B6 (K - 6)%nat
               (bb_mk (fun jj => ind_bytes (bm_ent bmI) !!! jj) (4 * q)%nat) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi7e Hcell").
@@ -1642,7 +1642,7 @@ Section BmapTail.
                          (sign_extend' 64 (mword_of_int 0 : mword 12)) = i_dev ip).
       { rgne. rewrite HB7s2. reflexivity. }
       iEval (rewrite -Hdadr2) in "Hidev".
-      iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.bmap + 0x9a)) Ra0 Rs2
+      iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.bmap + 0x9a)) Ra0 Rs2
                 (mword_of_int 0 : mword 12) B7 (K - 6)%nat dev b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi9a Hidev").
       iIntros (CID13 Hq13) "Hcg Hpc Hidev".
@@ -2229,7 +2229,7 @@ Section ProofBmapMain.
                   (add_vec (m !!! Regidx csp_rs1 : mword 64)
                      (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))))]> m).
     assert (HR1sp : bm_sp m R1) by (rewrite /bm_sp /R1 upd_eq; reflexivity).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & S5 & S6 & _)".
     iDestruct "S1" as (v1) "Hf1". iDestruct "S2" as (v2) "Hf2".
     iDestruct "S3" as (v3) "Hf3". iDestruct "S4" as (v4) "Hf4".
@@ -2487,7 +2487,7 @@ Section ProofBmapMain.
                         (sign_extend' 64 (mword_of_int 80 : mword 12)) = i_addr ip fbn).
       { rgne. rewrite HD2s3. symmetry. apply i_addr_indexed. }
       iEval (rewrite -Hcadr) in "Hcell".
-      iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.bmap + 0x22)) Rs1 Rs3
+      iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.bmap + 0x22)) Rs1 Rs3
                 (mword_of_int 80 : mword 12) D2 (K - 6)%nat (blkmap_get bm fbn) b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi22 Hcell").
       iIntros (CID14 Hq14) "Hcg Hpc Hcell".
@@ -2547,7 +2547,7 @@ Section ProofBmapMain.
                           (sign_extend' 64 (mword_of_int 0 : mword 12)) = i_dev ip).
         { rgne. rewrite HD3a0. reflexivity. }
         iEval (rewrite -Hdadr) in "Hidev".
-        iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.bmap + 0x28)) Ra0 Ra0
+        iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.bmap + 0x28)) Ra0 Ra0
                   (mword_of_int 0 : mword 12) D3 (K - 6)%nat dev b
                   ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi28 Hidev").
         iIntros (CID16 Hq16) "Hcg Hpc Hidev".
@@ -3051,7 +3051,7 @@ Section ProofBmapMain.
                       = i_addr ip NDIRECT).
       { rgne. rewrite HJ3a0. symmetry. apply i_addr_ndirect. }
       iEval (rewrite -Hiadr) in "Hcell".
-      iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.bmap + 0x48)) Rs1 Ra0
+      iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.bmap + 0x48)) Rs1 Ra0
                 (mword_of_int 128 : mword 12) J3 (K - 6)%nat (bm_ind bm) b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi48 Hcell").
       iIntros (CID16 Hq16) "Hcg Hpc Hcell".
@@ -3119,7 +3119,7 @@ Section ProofBmapMain.
                           (sign_extend' 64 (mword_of_int 0 : mword 12)) = i_dev ip).
         { rgne. rewrite HJ4a0. reflexivity. }
         iEval (rewrite -Hdadr) in "Hidev".
-        iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.bmap + 0x4e)) Ra0 Ra0
+        iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.bmap + 0x4e)) Ra0 Ra0
                   (mword_of_int 0 : mword 12) J4 (K - 6)%nat dev b
                   ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi4e Hidev").
         iIntros (CID18 Hq18) "Hcg Hpc Hidev".

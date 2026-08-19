@@ -24,7 +24,7 @@ From Kernel Require KernelSyms.
 
 
 Definition wp_mappages_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string) :=
+    (kt : ktier) (γa : gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string) :=
   let va := mm !!! Regidx (mword_of_int 11) in
   let pa := mm !!! Regidx (mword_of_int 13) in
   let vpn0 := svpn_of va in
@@ -49,14 +49,14 @@ Definition wp_mappages_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
   (forall i, (i < npages)%nat -> m !! vpn_at vpn0 i = None) ->
   (* order premise at the lowest rank this cone reaches. *)
   locks_below lks "kmem" ->
-  sie_cap_gpr mm K b p -∗
+  sie_cap_gpr kt mm K b p -∗
   cpu_own lvl eb p b lks -∗ kernel_text -∗
   pc_is (mword_of_int KernelSyms.mappages) -∗
   ptree_own 2 (DfracOwn 1) t -∗
   kalloc_env γa on -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t' : ptree) (k : nat) (g : nat),
-    sie_cap_gpr mr K b p -∗
+    sie_cap_gpr kt mr K b p -∗
     cpu_own lvl eb p b lks -∗
     pc_is ret_tgt -∗
     ptree_own 2 (DfracOwn 1) t' -∗
@@ -77,6 +77,6 @@ Definition wp_mappages_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
 Module Type MAPPAGES.
   Parameter wp_mappages_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string),
-      wp_mappages_sconf_body γa mm t m npages perm lvl K eb p on b lks.
+      (kt : ktier) (γa : gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string),
+      wp_mappages_sconf_body kt γa mm t m npages perm lvl K eb p on b lks.
 End MAPPAGES.

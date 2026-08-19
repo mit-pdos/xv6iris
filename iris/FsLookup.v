@@ -579,7 +579,7 @@ Definition wp_dirlookup_tree_body
   eq_vec (m !!! Regidx (mword_of_int 12 : mword 5)) zero_reg = negb hasp ->
   eb = true ->
   locks_below lks "bcache" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
@@ -591,9 +591,9 @@ Definition wp_dirlookup_tree_body
   inode_map γfs ip bm -∗
   fdir γi γfs dpi ents dn bm data -∗
   (* ---- THE CALLER'S 14-BYTE NAME BUFFER (namecmp's [f]) ---- *)
-  ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ{dqn} fn i) -∗
+  ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1]{dqn} fn i) -∗
   (* ---- poff: a 4-byte cell, or nothing ---- *)
-  (if hasp then pf ↦₄ pofv else emp) -∗
+  (if hasp then pf ↦₄[KT1] pofv else emp) -∗
   (* ---- the caller's own pid cell ---- *)
   p_pid pj ↦₄{dq} pidv -∗
   (* ---- the running-thread bundle and the disk fabric ---- *)
@@ -613,7 +613,7 @@ Definition wp_dirlookup_tree_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (found : bool) (k : nat) (kslot : nat) (q : Qp),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       (* THE DIRECTORY COMES BACK UNTOUCHED, NODE FRAGMENT INCLUDED --
@@ -624,7 +624,7 @@ Definition wp_dirlookup_tree_body
       inode_meta ip dn -∗
       inode_map γfs ip bm -∗
       fdir γi γfs dpi ents dn bm data -∗
-      ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ{dqn} fn i) -∗
+      ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1]{dqn} fn i) -∗
       p_pid pj ↦₄{dq} pidv -∗
       bslot bn -∗
       fedges dpi dn data -∗
@@ -639,14 +639,14 @@ Definition wp_dirlookup_tree_body
             inode_ref kslot q dev
               (zero_extend' 32 (dir_inum data k : mword 16) : mword 32) ∗
             (if hasp
-             then pf ↦₄ (mword_of_int (Z.of_nat (16 * k)) : mword 32)
+             then pf ↦₄[KT1] (mword_of_int (Z.of_nat (16 * k)) : mword 32)
              else emp)
        else ⌜ents !! s = None⌝ ∗
             ⌜dir_first data nrec s = None
              /\ mf !!! Regidx (mword_of_int 10 : mword 5)
                 = (mword_of_int 0 : mword 64)⌝ ∗
             iref_slot ∗
-            (if hasp then pf ↦₄ pofv else emp)) -∗
+            (if hasp then pf ↦₄[KT1] pofv else emp)) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

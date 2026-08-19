@@ -99,7 +99,7 @@ Definition wp_sys_wait_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG �
   (sys_wait_stack <= av)%nat ->
   (* the PARKING premise, inherited from kwait: everything that sleeps has it *)
   eb = true ->
-  sie_cap_gpr m av b pj -∗
+  sie_cap_gpr KT1 m av b pj -∗
   cpu_own 0%nat eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   procs_inv γs -∗
@@ -111,7 +111,7 @@ Definition wp_sys_wait_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG �
       ⌜ callee_saved m mf /\
         mf !!! Regidx (mword_of_int 10 : mword 5) = sign_extend' 64 rv ⌝ -∗
       ⌜ uptd_ext_sz (pv_sz V) (pv_upt V) P' ⌝ -∗
-      sie_cap_gpr mf av b pj -∗
+      sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       proc_priv γf pj pid (upd_upt V P') -∗

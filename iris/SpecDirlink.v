@@ -536,7 +536,7 @@ Definition wp_dirlink_sconf_body
      record dirlink stores.  See the header. *)
   bv_unsigned inum < 16 * Z.of_nat nib ->
   bitmap_geom_ok cov logstart bmapstart size ->
-  printk_gen_contract γpr γu γd ->
+  printk_gen_contract (kt := KT1) γpr γu γd ->
   (* ---- iput's premises (itrunc's geometry) ---- *)
   0 < size <= BPB ->
   0 <= bmapstart ->
@@ -560,7 +560,7 @@ Definition wp_dirlink_sconf_body
   (* the order premise, at the LOWEST rank this cone touches; every
      higher one follows by [locks_below_mono]. *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
   kernel_data -∗
@@ -575,7 +575,7 @@ Definition wp_dirlink_sconf_body
   inode_map γfs ip bm -∗
   inode_blocks γfs bm data -∗
   (* ---- THE CALLER'S 14-BYTE NAME BUFFER (namecmp's f, strncpy's src) ---- *)
-  ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ{dqn} fn i) -∗
+  ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1]{dqn} fn i) -∗
   (* ---- the superblock cells and the bitmap ---- *)
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
@@ -614,7 +614,7 @@ Definition wp_dirlink_sconf_body
     (n' : nat) (used' : gset Z)
     (tot : nat),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       (* ---- everything comes back, at the possibly-updated indices ---- *)
@@ -623,7 +623,7 @@ Definition wp_dirlink_sconf_body
       inode_meta ip dn' -∗
       inode_map γfs ip bm' -∗
       inode_blocks γfs bm' data' -∗
-      ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ{dqn} fn i) -∗
+      ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1]{dqn} fn i) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -803,7 +803,7 @@ Definition wp_dirlink_gen_body
      record dirlink stores.  See the header. *)
   bv_unsigned inum < 16 * Z.of_nat nib ->
   bitmap_geom_ok cov logstart bmapstart size ->
-  printk_gen_contract γpr γu γd ->
+  printk_gen_contract (kt := KT1) γpr γu γd ->
   (* ---- iput's premises (itrunc's geometry) ---- *)
   0 < size <= BPB ->
   0 <= bmapstart ->
@@ -834,7 +834,7 @@ Definition wp_dirlink_gen_body
   (* the order premise, at the LOWEST rank this cone touches; every
      higher one follows by [locks_below_mono]. *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
   kernel_data -∗
@@ -849,7 +849,7 @@ Definition wp_dirlink_gen_body
   inode_map γfs ip bm -∗
   inode_blocks γfs bm data -∗
   (* ---- THE CALLER'S 14-BYTE NAME BUFFER (namecmp's f, strncpy's src) ---- *)
-  ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ{dqn} fn i) -∗
+  ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1]{dqn} fn i) -∗
   (* ---- the superblock cells and the bitmap ---- *)
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
@@ -888,7 +888,7 @@ Definition wp_dirlink_gen_body
     (n' : nat) (used' : gset Z) (Sb' : gset Z)
     (tot : nat),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       (* ---- everything comes back, at the possibly-updated indices ---- *)
@@ -897,7 +897,7 @@ Definition wp_dirlink_gen_body
       inode_meta ip dn' -∗
       inode_map γfs ip bm' -∗
       inode_blocks γfs bm' data' -∗
-      ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ{dqn} fn i) -∗
+      ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1]{dqn} fn i) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗

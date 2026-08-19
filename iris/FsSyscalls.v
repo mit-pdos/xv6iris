@@ -141,12 +141,9 @@ Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import ProcInv.
 Require Import SpecPrintk.
-Require Import SpecIput.
 Require Import SpecDirlink.
-Require Import SpecNamex.
 Require Import SpecCreate.
 Require Import SpecSysMkdir.
-Require Import SpecPanic.
 Require Import SpecSysChdir.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -223,7 +220,7 @@ Section FsBundles.
       (cov : gset Z) (logstart inodestart : Z) (nib : nat) (dev : mword 32)
       : iProp Σ :=
     (kernel_text ∗ kernel_data ∗
-     printk_env γpr γu γd ∗ ⌜printk_gen_contract γpr γu γd⌝ ∗
+     printk_env γpr γu γd ∗ ⌜printk_gen_contract (kt := KT1) γpr γu γd⌝ ∗
      bio_ctx bn (fs_view γfs γd dev cov) ∗
      log_ctx glog bn γfs cov logstart dev ∗
      fs_crash_seam cov logstart ∗
@@ -318,7 +315,7 @@ Definition wp_sys_mkdir_friendly_body
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   pv_tf V !! tf_arg_idx 0 = Some v ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 true pj b lks -∗
   pc_is pcE -∗
   fs_world γpr γa γs γu γd γk pd pav pu bn glog γfs γi cn gtl
@@ -332,7 +329,7 @@ Definition wp_sys_mkdir_friendly_body
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
       ⌜((ns - create_slots)%nat <= ns')%nat /\ (ns' <= ns)%nat⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 true pj b lks -∗
       pc_is ret_tgt -∗
       fs_res bn γfs cov logstart bmapstart inodestart ninodes size used' ns'
@@ -476,7 +473,7 @@ Definition wp_sys_chdir_friendly_body
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   pv_tf V !! tf_arg_idx 0 = Some v ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 true pj b lks -∗
   pc_is pcE -∗
   fs_world γpr γa γs γu γd γk pd pav pu bn glog γfs γi cn gtl
@@ -489,7 +486,7 @@ Definition wp_sys_chdir_friendly_body
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
       ⌜used' ⊆ used⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 true pj b lks -∗
       pc_is ret_tgt -∗
       (* THE LEDGER IS RESTORED AT THE LITERAL 2 -- the composability half *)

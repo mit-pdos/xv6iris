@@ -74,6 +74,38 @@ Proof. destruct t; reflexivity. Qed.
 Global Instance ktier_le_refl t : KtierLe t t.
 Proof. destruct t; reflexivity. Qed.
 
+(* WHICH INSTANCE FIRES WHEN THE DATUM TIER IS STILL AN EVAR, AND WHY THE
+   ANSWER IS [ktier_le_refl].  A memory leaf is applied as
+   [iApply (leaf ... with "Hcg [Hd]")]: the datum premise becomes a SUBGOAL,
+   so at the moment the application elaborates, the goal is
+   [KtierLe ?ktd kt] with the datum's tier undetermined.  Search fires
+   EAGERLY and takes [ktier_le_refl], i.e. [?ktd := kt] -- the datum is
+   assumed to sit at the ACCESSING HART's own regime.  That is the right
+   default (a frame slot peeled off the capability, anything the function
+   owns), and it is why the leaves need no annotation at their ~1800
+   stack-slot call sites.  A datum at a DIFFERENT tier -- static image data
+   under a tier-generic hart -- must say so, and the annotation is TWO
+   named arguments, [(kt := kt) (ktd := KT0)], not one: at a call site the
+   HART's tier is an implicit argument too, so [ktier_le_refl] ties the two
+   together and pinning only [ktd] drags the capability's tier along with
+   it (the symptom is [iSpecialize: cannot instantiate (sie_cap_gpr KT0 ...)]).
+   [KT0] and not [cur_ktier]: [cur_ktier] is [Typeclasses Opaque], so
+   instance search cannot see through it to [ktier_le_bot] and the whole
+   application fails to elaborate.
+
+   DO NOT "FIX" THIS WITH [Hint Mode KtierLe ! -].  It was measured: the
+   mode does defer resolution so a bracket's [iExact] can pin the tier, but
+   an [ltac:(...)] splice in argument position forces the application to
+   elaborate strictly, and a mode-blocked goal is then reported as
+   "Could not find an instance for KtierLe ?ktd kt" rather than shelved.
+   1444 of the tree's 2640 leaf call sites pass a pure premise that way, so
+   the mode turns a silent over-constraint into a hard error at more than
+   half of them.  Moving the [KtierLe] binder to the end of the leaf's
+   telescope changes nothing either (the whole application elaborates before
+   any subgoal is touched), and stating the order as a PURE premise is worse
+   still: the resulting goal is emitted BEFORE the datum's, where its tier
+   is not yet known. *)
+
 (* the eliminator the datum's monotonicity lemma runs on *)
 Lemma ktier_le_cases (t1 t2 : ktier) :
   KtierLe t1 t2 -> t1 = t2 \/ (t1 = KT0 /\ t2 = KT1).
@@ -92,3 +124,19 @@ Global Typeclasses Opaque cur_ktier.
    whole mechanism: a [Local Instance : CurKtier := KT1] in a post-boot file
    resolves first, whether it is declared before or after this one. *)
 Global Instance curktier_default : CurKtier | 100 := KT0.
+
+(* THE THREE [KtierLe] INSTANCES AGAIN, AT THE CLASS TYPE.  [CurKtier] is a
+   definitional class, so a section variable [KTR : CurKtier] IS a tier --
+   but Coq's INSTANCE unification does not unfold the class, so a goal
+   [KtierLe KTR KTR] matches none of the three above and reports "Unable to
+   unify CurKtier with ktier".  These cover exactly that case and cannot
+   perturb the literal ones (their conclusions unify only when the tier
+   argument is already typed at [CurKtier]).  Same root cause as the
+   pointsto family's [Persistent]/[Timeless] instances, which must bind
+   their tier as a plain [(ktr : CurKtier)] for the mirror-image reason:
+   a BACKTICK CLASS binder is resolved by instance SEARCH (so it only ever
+   produces the KT0 default) and a [(ktr : ktier)] binder cannot take a
+   [CurKtier] argument. *)
+Global Instance ktier_le_bot_c (t : CurKtier) : KtierLe KT0 t := ktier_le_bot t.
+Global Instance ktier_le_top_c (t : CurKtier) : KtierLe t KT1 := ktier_le_top t.
+Global Instance ktier_le_refl_c (t : CurKtier) : KtierLe t t := ktier_le_refl t.

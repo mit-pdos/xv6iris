@@ -1,0 +1,22 @@
+# ucode_echo.txt -- the pc set of iris/UCodeEcho.v, for tools/gen_ucode.py.
+#
+#   tools/gen_ucode.py --module Echo --out iris/UCodeEcho.v \
+#       --spec tools/ucode_echo.txt
+#
+# iris/UCodeEcho.v is HAND-WRITTEN and stays that way; this file exists so
+# the generator can be checked against it (every [udec_*] and [ui_echo_*]
+# STATEMENT the two produce is character-for-character the same).
+
+note echo's five reachable functions.  main and start diverge; strlen and
+note the two syscall stubs return.
+
+func main
+func start
+func strlen
+func exit
+func write
+
+# one level down from main's diverging [jal ra,<exit>] at 0x78
+omit 0x338 exit's [c.jr ra] -- the ecall at 0x334 never returns
+
+skipdefault library or syscall stub that echo never calls

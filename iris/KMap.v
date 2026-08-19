@@ -235,7 +235,11 @@ Section KMap.
     iEval (rewrite /phys_pointsto) in "H". iDestruct "H" as "[Hp _]".
     rewrite /text_pointsto. iExists (kpt_leaf_ppn (svpn_of pa)).
     rewrite (pa_of_id pa Hc). iFrame "Hk0 Hp". iPureIntro.
-    split; [exact Hc | split; [exact Htx | reflexivity]].
+    (* TIER-GENERIC: an identity-mapped va satisfies the pin at EVERY tier,
+       so this keeps its exact signature and serves whatever tier the
+       caller's ambient instance selects (as [phys_to_mem_claim] does). *)
+    split; [exact Hc | split; [exact Htx |
+      exact (ktier_pin_of_id cur_ktier (kpt_leaf_ppn (svpn_of pa)) pa (pa_of_id pa Hc))]].
   Qed.
 
 End KMap.

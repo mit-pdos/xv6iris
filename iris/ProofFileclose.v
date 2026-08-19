@@ -68,8 +68,6 @@ Require Import IrefSlots.
 Require Import WpUart DiskPtsto FsBlocks LogInv FsCrash.
 Require Import BioDefs.
 Require Import WpLock.
-Require Import KernelDataInv.
-Require Import SpecPanic.
 Require Import SpecAcquire SpecRelease.
 Require Import SpecPipeclose SpecBeginOp SpecIput SpecEndOp.
 Require Import IrefSlots InodeRegion.
@@ -131,14 +129,14 @@ Section ProofFileclose.
      lock layer into every function proof that has one.) *)
   Local Lemma sie_b_agree (m : regfile) (n K0 : nat) (eb b : bool)
       (p : mword 64) (lks : gset string) :
-    sie_cap_gpr m K0 b p -∗ cpu_own n eb p b lks -∗
+    sie_cap_gpr KT1 m K0 b p -∗ cpu_own n eb p b lks -∗
     ⌜ b = match n with O => eb | S _ => false end ⌝.
   Proof.
     iIntros "Hcg Hcnt". destruct b.
     - iDestruct "Hcnt" as "%Hb". destruct Hb as (-> & -> & _). done.
     - destruct n as [|n']; [ | done ].
       iDestruct "Hcnt" as "[_ Hint]".
-      iDestruct "Hcg" as "(_ & _ & (_ & _ & Harm) & _)".
+      iDestruct "Hcg" as "(_ & _ & (_ & _ & Harm & _) & _)".
       iDestruct (ghost_var_agree with "Harm Hint") as %Heq.
       destruct eb; [ exfalso | done ].
       apply (f_equal (@bv_unsigned _)) in Heq. vm_compute in Heq. discriminate.
@@ -194,7 +192,7 @@ Section ProofFileclose.
            (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))))]> m) with R1.
     assert (HspR1 : R1 !!! Regidx csp_rs1 = spr) by (rewrite /R1 upd_eq; reflexivity).
     assert (HsprS : spr = pa_stk sp0 8) by exact Hpush.
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 & _)".
     iDestruct "S1" as (u1) "Hb1". iDestruct "S2" as (u2) "Hb2".
     iDestruct "S3" as (u3) "Hb3". iDestruct "S4" as (u4) "Hb4".
@@ -324,7 +322,7 @@ Section ProofFileclose.
       rewrite /R1 upd_ne; [reflexivity | regne]. }
     iDestruct (cpu_own_transport CID CID9 n eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf γfl "ftable"%string (ftable_res γf) mA
+    iApply (Acquire.wp_acquire_sconf KT1 γfl "ftable"%string (ftable_res γf) mA
               n eb p (K - 8)%nat b lks
               HnZ ltac:(lia) ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc [Hlock]").
@@ -367,7 +365,7 @@ Section ProofFileclose.
                   = a_fref k).
     { rewrite (rget_ne macq Rs1 ltac:(vm_compute; discriminate)) Hms1. reflexivity. }
     iEval (rewrite -Hpa) in "Hcell".
-    iApply (wp_clw_s_sconf (mword_of_int (FC + 0x18)) Ra5 Rs1 (mword_of_int 4 : mword 12)
+    iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (FC + 0x18)) Ra5 Rs1 (mword_of_int 4 : mword 12)
               macq (trap_res b + (K - 8))%nat (mword_of_int (Z.pos cnt) : mword 32) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi18 Hcell").
@@ -551,7 +549,7 @@ Section ProofFileclose.
          it -- so this is a pure re-spelling, and it is what makes the
          acquire/release pair compose back to [N]. *)
       iEval (rewrite Houtb) in "Hcg".
-      iApply (Release.wp_release_sconf γfl ftable_addr "ftable"%string
+      iApply (Release.wp_release_sconf KT1 γfl ftable_addr "ftable"%string
                 (ftable_res γf) E3 n eb p (K - 8)%nat
                 ({["ftable"]} ∪ lks)
                 ltac:(rewrite HE3a0; apply bv_eq; vm_compute; reflexivity)
@@ -721,7 +719,7 @@ Section ProofFileclose.
       { rewrite (rget_ne D2 Rs1 ltac:(vm_compute; discriminate)) HD2s1.
         rewrite /a_ftype. apply addv_sext0. }
       iEval (rewrite -Hat) in "Hcty".
-      iApply (wp_lw_s_sconf (mword_of_int (FC + 0x2e)) Rs2 Rs1
+      iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (FC + 0x2e)) Rs2 Rs1
                 (mword_of_int 0 : mword 12) D2 (trap_res b + (K - 8))%nat (fc_type Cf) false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi2e Hcty").
@@ -739,7 +737,7 @@ Section ProofFileclose.
                     = a_fwritable k).
       { rewrite (rget_ne F1 Rs1 ltac:(vm_compute; discriminate)) HF1s1. reflexivity. }
       iEval (rewrite -Haw) in "Hcwr".
-      iApply (wp_lbu_s_sconf (mword_of_int (FC + 0x32)) Ra5 Rs1
+      iApply (wp_lbu_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (FC + 0x32)) Ra5 Rs1
                 (mword_of_int 9 : mword 12) F1 (trap_res b + (K - 8))%nat (fc_writable Cf : mword 8) false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi32 Hcwr").
@@ -769,7 +767,7 @@ Section ProofFileclose.
                     = a_fpipe k).
       { rewrite (rget_ne F3 Rs1 ltac:(vm_compute; discriminate)) HF3s1. reflexivity. }
       iEval (rewrite -Hap) in "Hcpp".
-      iApply (wp_cld_s_sconf (mword_of_int (FC + 0x38)) Ra5 Rs1
+      iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (FC + 0x38)) Ra5 Rs1
                 (mword_of_int 16 : mword 12) F3 (trap_res b + (K - 8))%nat (fc_pipe Cf) false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi38 Hcpp").
@@ -796,7 +794,7 @@ Section ProofFileclose.
                     = a_fip k).
       { rewrite (rget_ne F5 Rs1 ltac:(vm_compute; discriminate)) HF5s1. reflexivity. }
       iEval (rewrite -Hai) in "Hcip".
-      iApply (wp_cld_s_sconf (mword_of_int (FC + 0x3c)) Ra5 Rs1
+      iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (FC + 0x3c)) Ra5 Rs1
                 (mword_of_int 24 : mword 12) F5 (trap_res b + (K - 8))%nat (fc_ip Cf) false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi3c Hcip").
@@ -963,7 +961,7 @@ Section ProofFileclose.
          it -- so this is a pure re-spelling, and it is what makes the
          acquire/release pair compose back to [N]. *)
       iEval (rewrite Houtb) in "Hcg".
-      iApply (Release.wp_release_sconf γfl ftable_addr "ftable"%string
+      iApply (Release.wp_release_sconf KT1 γfl ftable_addr "ftable"%string
                 (ftable_res γf) G3 n eb p (K - 8)%nat
                 ({["ftable"]} ∪ lks)
                 ltac:(rewrite HG3a0; apply bv_eq; vm_compute; reflexivity)

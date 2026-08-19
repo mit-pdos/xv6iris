@@ -148,11 +148,11 @@ Section ProofSysDup.
   Lemma sd_sp_bounds `{CID0 : CpuId} (mm : regfile) (k : nat)
       (bb : bool) (pp : mword 64) :
     (0 < k)%nat ->
-    sie_cap_gpr mm k bb pp -∗
+    sie_cap_gpr KT1 mm k bb pp -∗
     ⌜(8 <= uint (mm !!! Regidx csp_rs1) < 274877906944 + 8)%Z⌝.
   Proof.
     iIntros (Hk) "(_ & _ & (Hstk & _ & _) & _)".
-    iApply (stack_own_sp_bounds _ (trap_res bb + k)%nat with "Hstk").
+    iApply (stack_own_sp_bounds (KTR := KT1) _ (trap_res bb + k)%nat with "Hstk").
     destruct bb; unfold trap_res; lia.
   Qed.
 
@@ -174,19 +174,19 @@ Section ProofSysDup.
     Mt !!! Regidx Ra5 = rv ->
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 -> r <> Rs0 ->
         Mt !!! Regidx r = m !!! Regidx r) ->
-    sie_cap_gpr Mt (av - 6)%nat b p -∗
+    sie_cap_gpr KT1 Mt (av - 6)%nat b p -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.sys_dup + 0x3c) : mword 64) -∗
-    word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (pa_stk sp0 3) (DfracOwn 1) w3 -∗
-    word_pointsto (pa_stk sp0 4) (DfracOwn 1) w4 -∗
-    word_pointsto (pa_stk sp0 5) (DfracOwn 1) w5 -∗
-    word_pointsto (pa_stk sp0 6) (DfracOwn 1) w6 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) w3 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) w4 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) w5 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) w6 -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
-        sie_cap_gpr mf av b p -∗
+        sie_cap_gpr KT1 mf av b p -∗
         pc_is (ret_pc ra0) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -264,8 +264,8 @@ Section ProofSysDup.
     iEval (rewrite -E6) in "Hb6".
     iDestruct (stack_own_4_intro sp0 ra0 s00 w3 w4 with "Hb1 Hb2 Hb3 Hb4") as "Hf14".
     iDestruct (stack_own_2_intro (pa_stk sp0 4) w5 w6 with "Hb5 Hb6") as "Hf56".
-    iAssert (stack_own sp0 6) with "[Hf14 Hf56]" as "Hframe".
-    { rewrite (stack_own_split sp0 4 6 ltac:(lia)). change (6 - 4)%nat with 2%nat. iFrame. }
+    iAssert (stack_own (KTR := KT1) sp0 6) with "[Hf14 Hf56]" as "Hframe".
+    { rewrite (stack_own_split (KTR := KT1) sp0 4 6 ltac:(lia)). change (6 - 4)%nat with 2%nat. iFrame. }
     iEval (rewrite -Hwv) in "Hframe".
     iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (KernelSyms.sys_dup + 0x42))
               (mword_of_int 3 : mword 6) T2 (av - 6)%nat 6 b Hpop
@@ -390,7 +390,7 @@ Section ProofSysDup.
       by (rewrite /M1 upd_eq; apply stk_push_48).
     assert (E5 : pa_stk (pa_stk sp0 4) 1 = pa_stk sp0 5) by (rewrite pa_stk_assoc; reflexivity).
     assert (E6 : pa_stk (pa_stk sp0 4) 2 = pa_stk sp0 6) by (rewrite pa_stk_assoc; reflexivity).
-    rewrite (stack_own_split sp0 4 6 ltac:(lia)). change (6 - 4)%nat with 2%nat.
+    rewrite (stack_own_split (KTR := KT1) sp0 4 6 ltac:(lia)). change (6 - 4)%nat with 2%nat.
     iDestruct "Hframe" as "[Hf14 Hf56]".
     iDestruct (stack_own_4_elim with "Hf14") as (u1 u2 u3 u4) "(Hs1 & Hs2 & Hs3 & Hs4)".
     iDestruct (stack_own_2_elim with "Hf56") as (w5 w6) "[Hs5 Hs6]".

@@ -106,19 +106,19 @@ Definition wp_yield_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (20 <= av)%nat ->
-  sie_cap_gpr m av eb pj -∗
+  sie_cap_gpr KT1 m av eb pj -∗
   cpu_own 0 eb pj eb ∅ -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv γs -∗
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   wp_next true pj (fun (CID : CpuId) =>
     ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf av eb pj -∗
+      sie_cap_gpr KT1 mf av eb pj -∗
       cpu_own 0 eb pj eb ∅ -∗
       pc_is ret_tgt -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).

@@ -76,7 +76,7 @@ Definition wp_pipeclose_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
      the page), so entry and exit [cpu_own] carry the same [lks].  The kmem
      lock kfree takes is entirely inside kfree, after the release. *)
   locks_below lks "pipe" ->
-  sie_cap_gpr m av b pme -∗
+  sie_cap_gpr KT1 m av b pme -∗
   cpu_own n eb pme b lks -∗
   kernel_text -∗ pc_is pcE -∗
   is_pipe γl γp pi -∗
@@ -88,7 +88,7 @@ Definition wp_pipeclose_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   procs_inv γs -∗
   wp_next b pme (fun (CID : CpuId) =>
   ∀ mr,
-    sie_cap_gpr mr av b pme -∗
+    sie_cap_gpr KT1 mr av b pme -∗
     cpu_own n eb pme b lks -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗

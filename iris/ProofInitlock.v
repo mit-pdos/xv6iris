@@ -53,6 +53,7 @@ Section ProofInitlock.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 
+  Context {kt : ktier}.
   (* ============================================================= *)
   (* initlock: whole-function WP over the sconf world.  Owns the     *)
   (* spinlock's three struct fields as raw memory and returns them   *)
@@ -63,7 +64,7 @@ Section ProofInitlock.
       (m : regfile)
       (vlock : bv 32) (vname vcpu : bv 64) (s : string)
       (K : nat) (b : bool) (p : mword 64)
-    : wp_initlock_sconf_body m vlock vname vcpu s K b p.
+    : wp_initlock_sconf_body kt m vlock vname vcpu s K b p.
   Proof.
     cbv beta delta [wp_initlock_sconf_body].
     intros pcE lk name ret_tgt c_name c_cpu HK.
@@ -94,7 +95,7 @@ Section ProofInitlock.
     change (<[Regidx csp_rs1 := regval_into_reg (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))]> m) with R1.
     assert (HspR1 : R1 !!! Regidx csp_rs1 = spr) by (rewrite /R1 upd_eq; reflexivity).
     (* frame cells at [pa_stk sp0 1..2] *)
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & _)".
     iDestruct "S1" as (vra0) "Hras". iDestruct "S2" as (vs00) "Hs0s".
     assert (Hb1 : add_vec spr (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) = pa_stk sp0 1).
@@ -157,7 +158,7 @@ Section ProofInitlock.
     assert (Hea_name : forall (CID' : CpuId),
               add_vec (rget (CID := CID') R2 (mword_of_int 10 : mword 5)) (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")))) = c_name).
     { intros CID'. rgne. rewrite HR2a0. unfold c_name, lock_name_field. f_equal; apply bv_eq; vm_compute; reflexivity. }
-    iApply (wp_csd_s_sconf (mword_of_int (KernelSyms.initlock + 0x08)) (mword_of_int 11 : mword 5) (mword_of_int 10 : mword 5)
+    iApply (wp_csd_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.initlock + 0x08)) (mword_of_int 11 : mword 5) (mword_of_int 10 : mword 5)
               (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) R2 (K - 2)%nat vname b
               with "Hcg Hpc Hi08 [Hname]").
     { iEval (rewrite Hea_name). iExact "Hname". }
@@ -177,7 +178,7 @@ Section ProofInitlock.
     assert (Hea_lock : forall (CID' : CpuId),
               add_vec (rget (CID := CID') R2 (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 0 : mword 12)) = lk).
     { intros CID'. rgne. rewrite HR2a0. replace (sign_extend' 64 (mword_of_int 0 : mword 12)) with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity). apply kv_addv_zero. }
-    iApply (wp_sw_zero_s_sconf (mword_of_int (KernelSyms.initlock + 0x0a)) (mword_of_int 10 : mword 5)
+    iApply (wp_sw_zero_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.initlock + 0x0a)) (mword_of_int 10 : mword 5)
               (mword_of_int 0 : mword 12) R2 (K - 2)%nat vlock b
               with "Hcg Hpc Hi0a [Hlock]").
     { iEval (rewrite Hea_lock). iExact "Hlock". }
@@ -189,7 +190,7 @@ Section ProofInitlock.
     assert (Hea_cpu : forall (CID' : CpuId),
               add_vec (rget (CID := CID') R2 (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 0x10 : mword 12)) = c_cpu).
     { intros CID'. rgne. rewrite HR2a0. reflexivity. }
-    iApply (wp_sd_zero_s_sconf (mword_of_int (KernelSyms.initlock + 0x0e)) (mword_of_int 10 : mword 5)
+    iApply (wp_sd_zero_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.initlock + 0x0e)) (mword_of_int 10 : mword 5)
               (mword_of_int 0x10 : mword 12) R2 (K - 2)%nat vcpu b
               with "Hcg Hpc Hi0e [Hcpu]").
     { iEval (rewrite Hea_cpu). iExact "Hcpu". }
@@ -235,8 +236,8 @@ Section ProofInitlock.
     assert (Hpop : R4 !!! Regidx csp_rs1
                    = pa_stk (add_vec (R4 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)))) 2).
     { rewrite Hwv HspR4. unfold spr, sp0, pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
-    iAssert (stack_own sp0 2) with "[Hras Hs0s]" as "Hframe".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := kt) sp0 2) with "[Hras Hs0s]" as "Hframe".
+    { rewrite (stack_own_slots (KTR := kt)). cbn [seq].
       iSplitL "Hras"; [iExists _; iExact "Hras"|].
       iSplitL "Hs0s"; [iExists _; iExact "Hs0s"|].
       done. }

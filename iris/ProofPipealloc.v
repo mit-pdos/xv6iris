@@ -60,8 +60,7 @@ Require Import DiskPtsto.
 Require Import BioDefs.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
-Require Import SpecPanic.
-Require Import SpecFilealloc SpecKalloc SpecInitlock SpecIput SpecFileclose.
+Require Import SpecFilealloc SpecKalloc SpecInitlock SpecFileclose.
 Require Import IrefSlots InodeRegion.
 Require Import SpecPipealloc.
 From Kernel Require KernelSyms.
@@ -187,7 +186,7 @@ Section ProofPipealloc.
         (add_vec (m !!! Regidx csp_rs1)
            (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))))]> m) with R1.
     assert (HspR1 : R1 !!! Regidx csp_rs1 = spr) by (rewrite /R1 upd_eq; reflexivity).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & S5 & S6 & _)".
     iDestruct "S1" as (u40) "Hr40". iDestruct "S2" as (u32) "Hr32".
     iDestruct "S3" as (u24) "Hr24". iDestruct "S4" as (u16) "Hr16".
@@ -349,12 +348,12 @@ Section ProofPipealloc.
           /\ (forall c : mword 5, is_cs_idx c = true ->
                 c <> csp_rs1 -> c <> Rs0 -> c <> Rs1 -> c <> Rs4 ->
                 mj !!! Regidx c = m !!! Regidx c) ⌝ -∗
-        sie_cap_gpr mj (K - 6)%nat b p -∗
+        sie_cap_gpr KT1 mj (K - 6)%nat b p -∗
         pc_is (mword_of_int (KernelSyms.pipealloc + 0xb8)) -∗
         cpu_own n eb p b lks -∗
-        trap_csrs_ext eb -∗
+        trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb p -∗
-        (∃ w4 w5 : mword 64, pa_stk sp0 4 ↦₈ w4 ∗ pa_stk sp0 5 ↦₈ w5) -∗
+        (∃ w4 w5 : mword 64, pa_stk sp0 4 ↦₈[KT1] w4 ∗ pa_stk sp0 5 ↦₈[KT1] w5) -∗
         pipealloc_post γf γk on pf0 pf1 res -∗
         WP (Loop : expr riscv_lang)))%I).
     iAssert EPI with "[Hcont Hr40 Hr32 Hr24 Hr0]" as "Hepi".
@@ -427,8 +426,8 @@ Section ProofPipealloc.
                                  (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6)))) 6).
       { rewrite Hwv HP4sp. unfold spr, sp0, pa_stk, add_vec_int.
         apply f_equal. apply bv_eq; vm_compute; reflexivity. }
-      iAssert (stack_own sp0 6) with "[Hr40 Hr32 Hr24 Hs4c Hs5c Hr0]" as "Hframe6".
-      { rewrite stack_own_slots. cbn [seq].
+      iAssert (stack_own (KTR := KT1) sp0 6) with "[Hr40 Hr32 Hr24 Hs4c Hs5c Hr0]" as "Hframe6".
+      { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
         iSplitL "Hr40"; [iEval (rewrite -Hb1 HspR1); iExists _; iExact "Hr40"|].
         iSplitL "Hr32"; [iEval (rewrite -Hb2 HspR1); iExists _; iExact "Hr32"|].
         iSplitL "Hr24"; [iEval (rewrite -Hb3 HspR1); iExists _; iExact "Hr24"|].
@@ -529,10 +528,10 @@ Section ProofPipealloc.
        ([SpecFileclose.fileclose_env_none]) and this error path owes no file
        system.  It comes straight out of [filealloc_post] and would simply be
        dropped here without this clause. *)
-    set (PF1 := ((pf1 ↦₈ (zero_reg : mword 64) ∗ fd_slot)
+    set (PF1 := ((pf1 ↦₈[KT1] (zero_reg : mword 64) ∗ fd_slot)
                  ∨ (∃ (k1 : nat) (Cf1 : fcontent),
                       ⌜(k1 < NFILE)%nat /\ fc_type Cf1 = FD_NONE⌝ ∗
-                      pf1 ↦₈ fnode k1 ∗ file_ref γf k1 1 Cf1))%I).
+                      pf1 ↦₈[KT1] fnode k1 ∗ file_ref γf k1 1 Cf1))%I).
     set (T8 := (wp_next (CID0 := CID) true p (fun (CIDt : CpuId) =>
         ∀ (Mt : regfile),
         ⌜ Mt !!! Regidx csp_rs1 = spr
@@ -540,13 +539,13 @@ Section ProofPipealloc.
           /\ (forall c : mword 5, is_cs_idx c = true ->
                 c <> csp_rs1 -> c <> Rs0 -> c <> Rs1 -> c <> Rs4 ->
                 Mt !!! Regidx c = m !!! Regidx c) ⌝ -∗
-        sie_cap_gpr Mt (K - 6)%nat b p -∗
+        sie_cap_gpr KT1 Mt (K - 6)%nat b p -∗
         pc_is (mword_of_int (KernelSyms.pipealloc + 0xa8)) -∗
         cpu_own n eb p b lks -∗
-        trap_csrs_ext eb -∗
+        trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb p -∗
-        (∃ w4 w5 : mword 64, pa_stk sp0 4 ↦₈ w4 ∗ pa_stk sp0 5 ↦₈ w5) -∗
-        (∃ w : mword 64, pf0 ↦₈ w) -∗
+        (∃ w4 w5 : mword 64, pa_stk sp0 4 ↦₈[KT1] w4 ∗ pa_stk sp0 5 ↦₈[KT1] w5) -∗
+        (∃ w : mword 64, pf0 ↦₈[KT1] w) -∗
         (* the READ end's unit: banked by the time control reaches +0xa8,
            either because filealloc gave it straight back or because the
            fileclose at +0xa4 did *)
@@ -565,14 +564,14 @@ Section ProofPipealloc.
           /\ (forall c : mword 5, is_cs_idx c = true ->
                 c <> csp_rs1 -> c <> Rs0 -> c <> Rs1 -> c <> Rs4 ->
                 Mt !!! Regidx c = m !!! Regidx c) ⌝ -∗
-        sie_cap_gpr Mt (K - 6)%nat b p -∗
+        sie_cap_gpr KT1 Mt (K - 6)%nat b p -∗
         pc_is (mword_of_int (KernelSyms.pipealloc + 0xa4)) -∗
         cpu_own n eb p b lks -∗
-        trap_csrs_ext eb -∗
+        trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb p -∗
         file_ref γf k0 1 Cf0 -∗
-        (∃ w4 w5 : mword 64, pa_stk sp0 4 ↦₈ w4 ∗ pa_stk sp0 5 ↦₈ w5) -∗
-        (∃ w : mword 64, pf0 ↦₈ w) -∗
+        (∃ w4 w5 : mword 64, pa_stk sp0 4 ↦₈[KT1] w4 ∗ pa_stk sp0 5 ↦₈[KT1] w5) -∗
+        (∃ w : mword 64, pf0 ↦₈[KT1] w) -∗
         PF1 -∗
         kalloc_avail γk on -∗
         WP (Loop : expr riscv_lang)))%I).
@@ -587,7 +586,7 @@ Section ProofPipealloc.
     { iSplit; [iExact "Hepi"|]. rewrite /T8.
       iIntros (CIDt Hbt Mt) "(%Htsp & %Hts4 & %Htthr) Hcg Hpc Hcnt Hextc Hextm Hslots Hcell0 Hunit0 Hcell1 Hav".
       (* the value sitting in *f1 is what the last branch tests *)
-      iAssert (∃ x : mword 64, pf1 ↦₈ x ∗
+      iAssert (∃ x : mword 64, pf1 ↦₈[KT1] x ∗
                  (⌜x = (zero_reg : mword 64)⌝ ∗ fd_slot
                   ∨ ∃ (k1 : nat) (Cf1 : fcontent),
                       ⌜(k1 < NFILE)%nat /\ x = fnode k1 /\ fc_type Cf1 = FD_NONE⌝ ∗
@@ -1138,7 +1137,7 @@ Section ProofPipealloc.
       by (rewrite /mE; apply upd_eq).
     iDestruct (cpu_own_transport CID16 CID20 n eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Kalloc.wp_kalloc_sconf γkl γk fl mE on n eb p (K - 6)%nat b lks
+    iApply (Kalloc.wp_kalloc_sconf KT1 γkl γk fl mE on n eb p (K - 6)%nat b lks
               ltac:(lia) Hfl Hnoffpos
               (* "kmem" (13) outranks "ftable" (1): weaken [Hbelow] up to it --
                  kalloc's own acquire needs no more than that, since
@@ -1499,7 +1498,7 @@ Section ProofPipealloc.
       by (rewrite /G5 upd_ne; [exact HG4a1 | vm_compute; discriminate]).
     assert (HG5ra : G5 !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.pipealloc + 0x50) : mword 64) 4)
       by (rewrite /G5; apply upd_eq).
-    iApply (Initlock.wp_initlock_sconf G5 vlock vname vcpu "pipe"%string (K - 6)%nat b p
+    iApply (Initlock.wp_initlock_sconf KT1 G5 vlock vname vcpu "pipe"%string (K - 6)%nat b p
               ltac:(lia) with "Hcg Htext Hpc [] [Hlkw] [Hlkn] [Hlkc]").
     { iEval (rewrite HG5a1). iExact "Hstr". }
     { iEval (rewrite HG5a0). iExact "Hlkw". }

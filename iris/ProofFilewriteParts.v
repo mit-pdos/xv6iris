@@ -465,7 +465,7 @@ Section ProofFilewriteParts.
       (m : regfile) (K : nat) (sp0 : mword 64) (p : mword 64) (b : bool) :
     (12 <= K)%nat ->
     m !!! Regidx csp_rs1 = sp0 ->
-    sie_cap_gpr m K b p -∗
+    sie_cap_gpr KT1 m K b p -∗
     kernel_text -∗
     pc_is (mword_of_int (FW + 0x08) : mword 64) -∗
     wp_next b p (fun (CID : CpuId) =>
@@ -474,20 +474,20 @@ Section ProofFilewriteParts.
           /\ Mr !!! Regidx Rs0 = sp0
           /\ (forall r : mword 5, r <> csp_rs1 -> r <> Rs0 ->
                 Mr !!! Regidx r = m !!! Regidx r) ⌝ -∗
-        sie_cap_gpr Mr (K - 12)%nat b p -∗
+        sie_cap_gpr KT1 Mr (K - 12)%nat b p -∗
         pc_is (mword_of_int (FW + 0x16) : mword 64) -∗
-        word_pointsto (pa_stk sp0 1) (DfracOwn 1) (m !!! Regidx Rra) -∗
-        word_pointsto (pa_stk sp0 2) (DfracOwn 1) (m !!! Regidx Rs0) -∗
-        word_pointsto (pa_stk sp0 3) (DfracOwn 1) w3 -∗
-        word_pointsto (pa_stk sp0 4) (DfracOwn 1) (m !!! Regidx Rs2) -∗
-        word_pointsto (pa_stk sp0 5) (DfracOwn 1) w5 -∗
-        word_pointsto (pa_stk sp0 6) (DfracOwn 1) w6 -∗
-        word_pointsto (pa_stk sp0 7) (DfracOwn 1) (m !!! Regidx Rs5) -∗
-        word_pointsto (pa_stk sp0 8) (DfracOwn 1) (m !!! Regidx Rs6) -∗
-        word_pointsto (pa_stk sp0 9) (DfracOwn 1) w9 -∗
-        word_pointsto (pa_stk sp0 10) (DfracOwn 1) w10 -∗
-        word_pointsto (pa_stk sp0 11) (DfracOwn 1) w11 -∗
-        word_pointsto (pa_stk sp0 12) (DfracOwn 1) w12 -∗
+        word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) (m !!! Regidx Rra) -∗
+        word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) (m !!! Regidx Rs0) -∗
+        word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) w3 -∗
+        word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) (m !!! Regidx Rs2) -∗
+        word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) w5 -∗
+        word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) w6 -∗
+        word_pointsto (KTR := KT1) (pa_stk sp0 7) (DfracOwn 1) (m !!! Regidx Rs5) -∗
+        word_pointsto (KTR := KT1) (pa_stk sp0 8) (DfracOwn 1) (m !!! Regidx Rs6) -∗
+        word_pointsto (KTR := KT1) (pa_stk sp0 9) (DfracOwn 1) w9 -∗
+        word_pointsto (KTR := KT1) (pa_stk sp0 10) (DfracOwn 1) w10 -∗
+        word_pointsto (KTR := KT1) (pa_stk sp0 11) (DfracOwn 1) w11 -∗
+        word_pointsto (KTR := KT1) (pa_stk sp0 12) (DfracOwn 1) w12 -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -517,7 +517,7 @@ Section ProofFilewriteParts.
     assert (HR1thr : forall r : mword 5, r <> csp_rs1 ->
                        R1 !!! Regidx r = m !!! Regidx r).
     { intros r Nsp. rewrite /R1 upd_ne; [reflexivity | regne]. }
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 & S9 & S10 &
                             S11 & S12 & _)".
     iDestruct "S1" as (u1) "Hb1". iDestruct "S2" as (u2) "Hb2".
@@ -638,25 +638,25 @@ Section ProofFilewriteParts.
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
         r <> Rs0 -> r <> Rs2 -> r <> Rs5 -> r <> Rs6 ->
         Mt !!! Regidx r = m !!! Regidx r) ->
-    sie_cap_gpr Mt (K - 12)%nat b p -∗
+    sie_cap_gpr KT1 Mt (K - 12)%nat b p -∗
     kernel_text -∗
     pc_is (mword_of_int (FW + 0xfc) : mword 64) -∗
-    word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (pa_stk sp0 3) (DfracOwn 1) w3 -∗
-    word_pointsto (pa_stk sp0 4) (DfracOwn 1) s20 -∗
-    word_pointsto (pa_stk sp0 5) (DfracOwn 1) w5 -∗
-    word_pointsto (pa_stk sp0 6) (DfracOwn 1) w6 -∗
-    word_pointsto (pa_stk sp0 7) (DfracOwn 1) s50 -∗
-    word_pointsto (pa_stk sp0 8) (DfracOwn 1) s60 -∗
-    word_pointsto (pa_stk sp0 9) (DfracOwn 1) w9 -∗
-    word_pointsto (pa_stk sp0 10) (DfracOwn 1) w10 -∗
-    word_pointsto (pa_stk sp0 11) (DfracOwn 1) w11 -∗
-    word_pointsto (pa_stk sp0 12) (DfracOwn 1) w12 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) w3 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) s20 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) w5 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) w6 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 7) (DfracOwn 1) s50 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 8) (DfracOwn 1) s60 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 9) (DfracOwn 1) w9 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 10) (DfracOwn 1) w10 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 11) (DfracOwn 1) w11 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 12) (DfracOwn 1) w12 -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
-        sie_cap_gpr mf K b p -∗
+        sie_cap_gpr KT1 mf K b p -∗
         pc_is (ret_pc ra0) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -758,9 +758,9 @@ Section ProofFilewriteParts.
                    = pa_stk (add_vec (T5 !!! Regidx csp_rs1)
                        (sign_extend' 64 (caddi16sp_imm (mword_of_int 6 : mword 6)))) 12)
       by (rewrite Hwv; exact HT5sp).
-    iAssert (stack_own sp0 12)
+    iAssert (stack_own (KTR := KT1) sp0 12)
       with "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12]" as "Hframe".
-    { rewrite stack_own_slots. cbn [seq].
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hb1"; [iExists _; iExact "Hb1"|].
       iSplitL "Hb2"; [iExists _; iExact "Hb2"|].
       iSplitL "Hb3"; [iExists _; iExact "Hb3"|].
@@ -861,7 +861,7 @@ Section ProofFilewriteParts.
     add_vec_int (mword_of_int zc : mword 64) 2 = mword_of_int zd ->
     add_vec_int (mword_of_int zd : mword 64) 2 = mword_of_int ze ->
     add_vec_int (mword_of_int ze : mword 64) 2 = mword_of_int zf ->
-    sie_cap_gpr Mt K b p -∗
+    sie_cap_gpr KT1 Mt K b p -∗
     pc_is (mword_of_int za : mword 64) -∗
     instr (mword_of_int za : mword 64) true
       (LOAD (zero_extend' 12 (concat_vec (mword_of_int 9 : mword 6) ('b"000")),
@@ -878,11 +878,11 @@ Section ProofFilewriteParts.
     instr (mword_of_int ze : mword 64) true
       (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")),
              sp, Regidx Rs9, false, 8)) -∗
-    word_pointsto (pa_stk sp0 3) (DfracOwn 1) v1 -∗
-    word_pointsto (pa_stk sp0 5) (DfracOwn 1) v3 -∗
-    word_pointsto (pa_stk sp0 9) (DfracOwn 1) v7 -∗
-    word_pointsto (pa_stk sp0 10) (DfracOwn 1) v8 -∗
-    word_pointsto (pa_stk sp0 11) (DfracOwn 1) v9 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) v1 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) v3 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 9) (DfracOwn 1) v7 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 10) (DfracOwn 1) v8 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 11) (DfracOwn 1) v9 -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ Mr : regfile,
         ⌜ Mr !!! Regidx csp_rs1 = pa_stk sp0 12
@@ -892,13 +892,13 @@ Section ProofFilewriteParts.
           /\ (forall r : mword 5, is_cs_idx r = true ->
                 r <> Rs1 -> r <> Rs3 -> r <> Rs7 -> r <> Rs8 -> r <> Rs9 ->
                 Mr !!! Regidx r = Mt !!! Regidx r) ⌝ -∗
-        sie_cap_gpr Mr K b p -∗
+        sie_cap_gpr KT1 Mr K b p -∗
         pc_is (mword_of_int zf : mword 64) -∗
-        word_pointsto (pa_stk sp0 3) (DfracOwn 1) v1 -∗
-        word_pointsto (pa_stk sp0 5) (DfracOwn 1) v3 -∗
-        word_pointsto (pa_stk sp0 9) (DfracOwn 1) v7 -∗
-        word_pointsto (pa_stk sp0 10) (DfracOwn 1) v8 -∗
-        word_pointsto (pa_stk sp0 11) (DfracOwn 1) v9 -∗
+        word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) v1 -∗
+        word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) v3 -∗
+        word_pointsto (KTR := KT1) (pa_stk sp0 9) (DfracOwn 1) v7 -∗
+        word_pointsto (KTR := KT1) (pa_stk sp0 10) (DfracOwn 1) v8 -∗
+        word_pointsto (KTR := KT1) (pa_stk sp0 11) (DfracOwn 1) v9 -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1011,7 +1011,7 @@ Section ProofFilewriteParts.
     add_vec_int (mword_of_int za : mword 64) 2 = mword_of_int zb ->
     add_vec (mword_of_int zb : mword 64) (sign_extend' 64 jimm)
       = mword_of_int (FW + 0xfc) ->
-    sie_cap_gpr Mt K b p -∗
+    sie_cap_gpr KT1 Mt K b p -∗
     pc_is (mword_of_int za : mword 64) -∗
     instr (mword_of_int za : mword 64) true
       (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), zreg, Regidx Ra0, ADDI)) -∗
@@ -1021,7 +1021,7 @@ Section ProofFilewriteParts.
         ⌜ Mr !!! Regidx Ra0 = (mword_of_int (-1) : mword 64)
           /\ (forall r : mword 5, is_cs_idx r = true ->
                 Mr !!! Regidx r = Mt !!! Regidx r) ⌝ -∗
-        sie_cap_gpr Mr K b p -∗
+        sie_cap_gpr KT1 Mr K b p -∗
         pc_is (mword_of_int (FW + 0xfc) : mword 64) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1060,7 +1060,7 @@ Section ProofFilewriteParts.
     add_vec_int (mword_of_int zb : mword 64) 2 = mword_of_int zc ->
     add_vec (mword_of_int zc : mword 64) (sign_extend' 64 jimm)
       = mword_of_int (FW + 0xfc) ->
-    sie_cap_gpr Mt K b p -∗
+    sie_cap_gpr KT1 Mt K b p -∗
     pc_is (mword_of_int za : mword 64) -∗
     instr (mword_of_int za : mword 64) true
       (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), zreg, Regidx Ra0, ADDI)) -∗
@@ -1068,16 +1068,16 @@ Section ProofFilewriteParts.
       (LOAD (zero_extend' 12 (concat_vec (mword_of_int 6 : mword 6) ('b"000")),
              sp, Regidx Rs4, false, 8)) -∗
     instr (mword_of_int zc : mword 64) true (JAL (jimm, zreg)) -∗
-    word_pointsto (pa_stk sp0 6) (DfracOwn 1) v4 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) v4 -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ Mr : regfile,
         ⌜ Mr !!! Regidx Ra0 = (mword_of_int (-1) : mword 64)
           /\ Mr !!! Regidx Rs4 = v4
           /\ (forall r : mword 5, is_cs_idx r = true -> r <> Rs4 ->
                 Mr !!! Regidx r = Mt !!! Regidx r) ⌝ -∗
-        sie_cap_gpr Mr K b p -∗
+        sie_cap_gpr KT1 Mr K b p -∗
         pc_is (mword_of_int (FW + 0xfc) : mword 64) -∗
-        word_pointsto (pa_stk sp0 6) (DfracOwn 1) v4 -∗
+        word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) v4 -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1132,7 +1132,7 @@ Section ProofFilewriteParts.
       (p : mword 64) (b : bool) :
     (0 <= mj < 16)%Z ->
     Mt !!! Regidx Ra5 = (mword_of_int mj : mword 64) ->
-    sie_cap_gpr Mt K b p -∗
+    sie_cap_gpr KT1 Mt K b p -∗
     kernel_text -∗
     pc_is (mword_of_int (FW + 0x6c) : mword 64) -∗
     word_pointsto (mword_of_int (KernelSyms.devsw + 16 * mj + 8)) dq slot -∗
@@ -1141,7 +1141,7 @@ Section ProofFilewriteParts.
         ⌜ Mr !!! Regidx Ra5 = slot
           /\ (forall r : mword 5, r <> Ra4 -> r <> Ra5 ->
                 Mr !!! Regidx r = Mt !!! Regidx r) ⌝ -∗
-        sie_cap_gpr Mr K b p -∗
+        sie_cap_gpr KT1 Mr K b p -∗
         pc_is (mword_of_int (FW + 0x7a) : mword 64) -∗
         word_pointsto (mword_of_int (KernelSyms.devsw + 16 * mj + 8)) dq slot -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -1221,7 +1221,7 @@ Section ProofFilewriteParts.
         [| apply bv_eq; vm_compute; reflexivity].
       by rewrite fr_addv64_moi. }
     iEval (rewrite -Hpsl) in "Hslot".
-    iApply (wp_cld_s_sconf (mword_of_int (FW + 0x78)) Ra5 Ra5
+    iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (FW + 0x78)) Ra5 Ra5
               (mword_of_int 8 : mword 12) D4 K slot b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi78 Hslot").
@@ -1268,7 +1268,7 @@ Section ProofFilewriteParts.
       forall (CID : CpuId) (m : regfile) (K : nat)
         (n : nat) (eb : bool) (b : bool) (p : mword 64)
         (dm : pk_arg_desc) (lks : gset string),
-        wp_panic_sconf_body (CID := CID) m K n eb b p dm lks.
+        wp_panic_sconf_body KT1 (CID := CID) m K n eb b p dm lks.
 
   Lemma fw_panic `{CID0 : CpuId}
       (Mt : regfile) (K : nat) (sp0 : mword 64)
@@ -1277,17 +1277,17 @@ Section ProofFilewriteParts.
     Mt !!! Regidx csp_rs1 = pa_stk sp0 12 ->
     (panic_stack <= K)%nat ->
     locks_below lks "log" ->
-    sie_cap_gpr Mt K b p -∗
+    sie_cap_gpr KT1 Mt K b p -∗
     cpu_own 0%nat eb p b lks -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (FW + 0x10a) : mword 64) -∗
     panic_env -∗
-    word_pointsto (pa_stk sp0 3) (DfracOwn 1) u3 -∗
-    word_pointsto (pa_stk sp0 5) (DfracOwn 1) u5 -∗
-    word_pointsto (pa_stk sp0 6) (DfracOwn 1) u6 -∗
-    word_pointsto (pa_stk sp0 9) (DfracOwn 1) u9 -∗
-    word_pointsto (pa_stk sp0 10) (DfracOwn 1) u10 -∗
-    word_pointsto (pa_stk sp0 11) (DfracOwn 1) u11 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) u3 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) u5 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) u6 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 9) (DfracOwn 1) u9 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 10) (DfracOwn 1) u10 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 11) (DfracOwn 1) u11 -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hmtsp HK Hbelow.
@@ -1469,27 +1469,27 @@ Section ProofFilewriteParts.
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
         r <> Rs0 -> r <> Rs2 -> r <> Rs4 -> r <> Rs5 -> r <> Rs6 ->
         Mt !!! Regidx r = m !!! Regidx r) ->
-    sie_cap_gpr Mt (K - 12)%nat b p -∗
+    sie_cap_gpr KT1 Mt (K - 12)%nat b p -∗
     kernel_text -∗
     pc_is (mword_of_int (FW + 0xf4) : mword 64) -∗
-    word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (pa_stk sp0 3) (DfracOwn 1) w3 -∗
-    word_pointsto (pa_stk sp0 4) (DfracOwn 1) s20 -∗
-    word_pointsto (pa_stk sp0 5) (DfracOwn 1) w5 -∗
-    word_pointsto (pa_stk sp0 6) (DfracOwn 1) s40 -∗
-    word_pointsto (pa_stk sp0 7) (DfracOwn 1) s50 -∗
-    word_pointsto (pa_stk sp0 8) (DfracOwn 1) s60 -∗
-    word_pointsto (pa_stk sp0 9) (DfracOwn 1) w9 -∗
-    word_pointsto (pa_stk sp0 10) (DfracOwn 1) w10 -∗
-    word_pointsto (pa_stk sp0 11) (DfracOwn 1) w11 -∗
-    word_pointsto (pa_stk sp0 12) (DfracOwn 1) w12 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) w3 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) s20 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) w5 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) s40 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 7) (DfracOwn 1) s50 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 8) (DfracOwn 1) s60 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 9) (DfracOwn 1) w9 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 10) (DfracOwn 1) w10 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 11) (DfracOwn 1) w11 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 12) (DfracOwn 1) w12 -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ (mf : regfile) (rv : mword 64),
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv
           /\ (rv = (mword_of_int (-1) : mword 64)
               \/ (iz = nz /\ rv = (mword_of_int nz : mword 64)))⌝ -∗
-        sie_cap_gpr mf K b p -∗
+        sie_cap_gpr KT1 mf K b p -∗
         pc_is (ret_pc ra0) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).

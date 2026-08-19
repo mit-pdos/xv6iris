@@ -71,7 +71,7 @@ Definition wp_sys_kill_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
   locks_below lks "proc" ->
   (* what argint's own load needs -- see SpecArgraw's matching premise. *)
   page_valid (page_base tfp) ->
-  sie_cap_gpr m av b p -∗
+  sie_cap_gpr KT1 m av b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* argint's trapframe resources *)
@@ -84,7 +84,7 @@ Definition wp_sys_kill_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
       ⌜ callee_saved m mf /\
         mf !!! Regidx (mword_of_int 10 : mword 5) = rv /\
         (rv = (zero_reg : mword 64) \/ rv = mword_of_int (-1)) ⌝ -∗
-      sie_cap_gpr mf av b p -∗
+      sie_cap_gpr KT1 mf av b p -∗
       cpu_own n eb p b lks -∗
       pc_is ret_tgt -∗
       p_trapframe p ↦₈{dqt} page_base tfp -∗

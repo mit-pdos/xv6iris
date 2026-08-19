@@ -69,6 +69,8 @@ Require Import KallocInv KvmSpec PageGeom.
    [KptShare.kpt_inv_alloc], [KvmMap.kvm_bridge]) and the deposit wand
    carries the resulting [kpt_inv] / 65 claims / persistent root cell *)
 Require Import KptGhost KptShare KptExecMap KvmMap.
+(* K1 of the KSTACK campaign: the boot-arm mint of the 64 kernel stacks *)
+Require Import KstackOwn.
 Require Import PtreeType.
 Require Import WpKvminithart.
 Require Import ProcGeom CpuOwn SchedCtx FdSlots.
@@ -165,8 +167,8 @@ Section ProofMain.
 
   (* [hw_config] + [minstret_inv], both persistent, out of the ambient
      bundle -- what [Kernelvec.kernelvec_handler_spec] consumes. *)
-  Local Lemma mn_dup_hw m avail b p :
-    sie_cap_gpr m avail b p -∗ hw_config ∗ minstret_inv ∗ sie_cap_gpr m avail b p.
+  Local Lemma mn_dup_hw {kt : ktier} m avail b p :
+    sie_cap_gpr kt m avail b p -∗ hw_config ∗ minstret_inv ∗ sie_cap_gpr kt m avail b p.
   Proof.
     iIntros "Hcg".
     iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hsie & Hgpr)".
@@ -188,9 +190,9 @@ Section ProofMain.
   (* idempotent and never touches sp.  Same move ProofCopyin /            *)
   (* ProofCopyout make for vmfault's identical leftover premise.          *)
   (* ------------------------------------------------------------------ *)
-  Local Lemma mn_pin_sie_cap_gpr (M : regfile) (avail : nat) (bb : bool)
+  Local Lemma mn_pin_sie_cap_gpr {kt : ktier} (M : regfile) (avail : nat) (bb : bool)
       (pp : mword 64) :
-    sie_cap_gpr M avail bb pp -∗ sie_cap_gpr (tp_pin M) avail bb pp.
+    sie_cap_gpr kt M avail bb pp -∗ sie_cap_gpr kt (tp_pin M) avail bb pp.
   Proof.
     rewrite /sie_cap_gpr /sie_cap (tp_pin_sp M).
     assert (Htp2 : tp_pin (tp_pin M) = tp_pin M)
@@ -210,10 +212,10 @@ Section ProofMain.
       (m : regfile) (K : nat) (p0 : mword 64) :
     cid_word = (zero_reg : mword 64) ->
     (K_main <= K)%nat ->
-    sie_cap_gpr m K false p0 -∗ kernel_text -∗
+    sie_cap_gpr KT0 m K false p0 -∗ kernel_text -∗
     pc_is (mword_of_int KernelSyms.main : mword 64) -∗
     ( ∀ m1 : regfile,
-        sie_cap_gpr m1 (K - 2)%nat false p0 -∗
+        sie_cap_gpr KT0 m1 (K - 2)%nat false p0 -∗
         pc_is (mword_of_int (KernelSyms.main + 0x42) : mword 64) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -254,7 +256,7 @@ Section ProofMain.
     pose (W1 := <[Regidx csp_rs1 := regval_into_reg
         (add_vec (m !!! Regidx csp_rs1)
            (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))]> m).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT0)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & _)".
     iDestruct "S1" as (v1) "Hc1". iDestruct "S2" as (v2) "Hc2".
     assert (HspW1 : W1 !!! Regidx csp_rs1 = add_vec (m !!! Regidx csp_rs1)
@@ -311,7 +313,7 @@ Section ProofMain.
               = (mword_of_int KernelSyms.cpuid : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtcp) in "Hpc".
-    iApply (Cpuid.wp_cpuid_sconf W3 (K - 2)%nat p0 ltac:(lia) with "Hcg Htext Hpc").
+    iApply (Cpuid.wp_cpuid_sconf KT0 W3 (K - 2)%nat p0 ltac:(lia) with "Hcg Htext Hpc").
     iIntros (m4) "Hcg Hpc %Hcp".
     destruct Hcp as (Hcpcs & Hcpa0).
     assert (Hretcp : ret_pc (W3 !!! Regidx (mword_of_int 1 : mword 5))
@@ -379,7 +381,7 @@ Section ProofMain.
       (γd : uart_names) (γv : disk_names)
       (m : regfile) (n : nat) (p0 : mword 64) (l0 : list (bv 8)) (b0 : bool) :
     (K_userinit <= n)%nat ->
-    sie_cap_gpr m n false p0 -∗
+    sie_cap_gpr KT0 m n false p0 -∗
     kernel_text -∗ kernel_data -∗ dev_inv γd γv -∗
     pc_is (mword_of_int (KernelSyms.main + 0x42) : mword 64) -∗
     cpu_ctx_free -∗
@@ -394,7 +396,7 @@ Section ProofMain.
     uart_tx_own γd l0 -∗ uart_sent γd l0 -∗ uart_out_lb γd l0 -∗
     uart_dlab_is γd (DfracOwn (1/2)) b0 -∗
     ( ∀ (γpr : gname) (m' : regfile),
-        sie_cap_gpr m' n false p0 -∗
+        sie_cap_gpr KT0 m' n false p0 -∗
         pc_is (mword_of_int (KernelSyms.main + 0x6e) : mword 64) -∗
         cpu_ctx_free -∗
         cpu_own 0 false p0 false ∅ -∗
@@ -579,7 +581,7 @@ Section ProofMain.
     assert (HA3a0 : A3 !!! Regidx (mword_of_int 10 : mword 5)
                     = (mword_of_int mn_nl_addr : mword 64))
       by (rewrite /A3 upd_ne; [exact HA2a0 | reg_neq]).
-    iApply (PrintkGen.wp_printk_gen_sconf γpr γd γv A3 n false p0
+    iApply (PrintkGen.wp_printk_gen_sconf KT0 γpr γd γv A3 n false p0
               mn_nl [] false ∅ ltac:(lia) Hlnl Hnnl ltac:(rewrite Hknl; reflexivity)
               ltac:(cbn [length]; lia) (locks_below_empty "pr")
               with "Hcg Htext Hkdata Hpc Hcpu Hpenv [] [//]").
@@ -637,7 +639,7 @@ Section ProofMain.
     assert (HB3a0 : B3 !!! Regidx (mword_of_int 10 : mword 5)
                     = (mword_of_int mn_boot_addr : mword 64))
       by (rewrite /B3 upd_ne; [exact HB2a0 | reg_neq]).
-    iApply (PrintkGen.wp_printk_gen_sconf γpr γd γv B3 n false p0
+    iApply (PrintkGen.wp_printk_gen_sconf KT0 γpr γd γv B3 n false p0
               mn_boot [] false ∅ ltac:(lia) Hlbt Hnbt ltac:(rewrite Hkbt; reflexivity)
               ltac:(cbn [length]; lia) (locks_below_empty "pr")
               with "Hcg Htext Hkdata Hpc Hcpu Hpenv [] [//]").
@@ -695,7 +697,7 @@ Section ProofMain.
     assert (HD3a0 : D3 !!! Regidx (mword_of_int 10 : mword 5)
                     = (mword_of_int mn_nl_addr : mword 64))
       by (rewrite /D3 upd_ne; [exact HD2a0 | reg_neq]).
-    iApply (PrintkGen.wp_printk_gen_sconf γpr γd γv D3 n false p0
+    iApply (PrintkGen.wp_printk_gen_sconf KT0 γpr γd γv D3 n false p0
               mn_nl [] false ∅ ltac:(lia) Hlnl Hnnl ltac:(rewrite Hknl; reflexivity)
               ltac:(cbn [length]; lia) (locks_below_empty "pr")
               with "Hcg Htext Hkdata Hpc Hcpu Hpenv [] [//]").
@@ -732,7 +734,7 @@ Section ProofMain.
                         (mword_of_int 4095 : mword 64)) negPGSIZEv) PGSIZEv ->
     prun phystop s1entry ps ->
     (K_kvmmake + 64 + 3 < length ps)%nat ->
-    sie_cap_gpr m n false p0 -∗
+    sie_cap_gpr KT0 m n false p0 -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.main + 0x6e) : mword 64) -∗
     cpu_ctx_free -∗
@@ -754,7 +756,7 @@ Section ProofMain.
     ([∗ list] i ∈ seq 0 NPROC, pstate_full i UNUSED) -∗
     ( ∀ (γa : gname) (γs : list gname) (m' : regfile)
         (root : mword 44) (pas : nat -> mword 44),
-        sie_cap_gpr m' n false p0 -∗
+        sie_cap_gpr KT1 m' n false p0 -∗
         pc_is (mword_of_int (KernelSyms.main + 0x7e) : mword 64) -∗
         cpu_ctx_free -∗
         cpu_own 0 false p0 false ∅ -∗
@@ -844,6 +846,16 @@ Section ProofMain.
     iApply fupd_wp.
     iMod (word_pointsto_persist with "Hkpt") as "#Hkptp".
     iMod (kvm_M_mint pas with "Hkauth") as "(Hauth & #Htramp & #Hkstx)".
+    (* ---- K1 -- THE MINT (claude-notes/projects/sp-migration.md).  The 64
+       claims just minted, against the 64 identity-mapped pages kvminit
+       handed out, ARE the 64 process kernel stacks owned at their KSTACK
+       virtual addresses -- at KT1, the tree's first real KT1 facts.  This
+       is the one point in the tree where both halves are in hand.
+       The bank travels to the [procs_inv] assembly below, where each slot's
+       page is carved to [KSTACK_AV] and deposited in its dormant block
+       ([SpecProcinit.procs_inv_alloc]) -- so a process's kernel stack comes
+       from HERE for the rest of the system's life. ---- *)
+    iDestruct (kstack_bank_intro pas Hpasok with "Hkstx Hkstacks") as "Hbank".
     iMod (kpt_inv_alloc (pt_base t) t (kvm_M pas) ⊤
             (kvm_bridge pas t (pt_base t) Hpasok eq_refl Hrep)
             with "Htree Hauth Hunset") as "[#Hkinv #Hlbt]".
@@ -870,7 +882,13 @@ Section ProofMain.
        table is installed), so the boot chain must carry it to the fold in
        [wp_main_boot_sconf].  Named [Hkptr] -- [Hkpt] in this lemma is the
        [kernel_pagetable] CELL, a different thing. *)
-    iIntros (mkh) "Hcg Hpc %Hcskh Hkptr Hstvec".
+    iIntros (mkh) "Hcg Hpc %Hcskh #Hkptr Hstvec".
+    (* ---- THE BOOT SEAM: kvminithart has installed the kernel table, so
+       this hart's regime moves KT0 -> KT1.  [sie_cap_gpr_ktier_up] carries
+       the capability across, weakening its (static, boot-stack) frame
+       through [StackOwn.stack_ktier_mono] and re-minting the tier witness
+       from the receipt.  Everything below this line is post-boot. ---- *)
+    iDestruct (sie_cap_gpr_ktier_up KT0 KT1 with "Hcg Hkptr") as "Hcg".
     assert (Hretkh : ret_pc (V3 !!! Regidx (mword_of_int 1))
                      = (mword_of_int (KernelSyms.main + 0x7a) : mword 64)).
     { rewrite /V3 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
@@ -916,7 +934,7 @@ Section ProofMain.
                                 proc_pub (proc_addr i))) ∗ hart_full i (0%fin : CPU))%I)
                  (fun _ i => pstate_full i UNUSED)
                  (seq 0 NPROC) with "Hin Hpst") as "Hin".
-    iMod (procs_inv_alloc ⊤ with "Hin") as (γs) "#Hpinv".
+    iMod (procs_inv_alloc ⊤ with "Hin Hbank") as (γs) "#Hpinv".
     iModIntro.
     iApply ("Hcont" $! γl γs mpr (pt_base t) pas
               with "Hcg Hpc Hfree Hcpu Hkenv Hpinv Hkptr Hstvec Hkinv Hkptp Htramp Hkstx").
@@ -931,7 +949,7 @@ Section ProofMain.
       (p0 : mword 64) :
     (K_userinit <= n)%nat ->
     cid_word = (zero_reg : mword 64) ->
-    sie_cap_gpr m n false p0 -∗
+    sie_cap_gpr KT1 m n false p0 -∗
     kernel_text -∗ kernel_data -∗ dev_inv γd γv -∗
     pc_is (mword_of_int (KernelSyms.main + 0x7e) : mword 64) -∗
     lk_raw (mword_of_int KernelSyms.tickslock) -∗
@@ -948,7 +966,7 @@ Section ProofMain.
        [intr_res] is folded and where [trap_csrs_raw] was already waiting to
        be completed. *)
     ( ∀ (m' : regfile) (γtl : gname),
-        sie_cap_gpr m' n false p0 -∗
+        sie_cap_gpr KT1 m' n false p0 -∗
         pc_is (mword_of_int (KernelSyms.main + 0x8e) : mword 64) -∗
         is_tickslock γtl -∗
         stvec ↦ᵣ (mword_of_int KernelSyms.kernelvec : mword 64) -∗
@@ -1090,7 +1108,7 @@ Section ProofMain.
     (K_userinit <= n)%nat ->
     (K_kvmmake + 64 + 3 < length ps)%nat ->
     virtio_live c0 = false ->
-    sie_cap_gpr m n false p0 -∗
+    sie_cap_gpr KT1 m n false p0 -∗
     kernel_text -∗ kernel_data -∗ dev_inv γd γv -∗
     pc_is (mword_of_int (KernelSyms.main + 0x8e) : mword 64) -∗
     cpu_ctx_free -∗
@@ -1115,7 +1133,7 @@ Section ProofMain.
     disk_cfg_is γv (DfracOwn (1/2)) c0 -∗
     (∃ v0 : mword 64, (mword_of_int KernelSyms.initproc : mword 64) ↦₈ v0) -∗
     ( ∀ (γk : gname) (pd pav pu : mword 64) (m' : regfile),
-        sie_cap_gpr m' n false p0 -∗
+        sie_cap_gpr KT1 m' n false p0 -∗
         pc_is (mword_of_int (KernelSyms.main + 0xa2) : mword 64) -∗
         cpu_ctx_free -∗
         cpu_own 0 false p0 false ∅ -∗
@@ -1327,12 +1345,12 @@ Section ProofMain.
        and must fund [kv_frame_slots] there; see [SpecScheduler]. *)
     (kv_frame_slots + 20 <= n)%nat ->
     p0 = zero_reg ->
-    sie_cap_gpr m n false p0 -∗
+    sie_cap_gpr KT1 m n false p0 -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.main + 0xa2) : mword 64) -∗
     cpu_ctx_free -∗
     cpu_own 0 false p0 false ∅ -∗
-    trap_csrs -∗
+    trap_csrs KT1 -∗
     started_inv P -∗
     □ (∀ (γpr' : gname) (γs' : list gname) (γk' : gname) (pd' pav' pu' : mword 64)
          (root' : mword 44) (pas' : nat -> mword 44),
@@ -1435,7 +1453,7 @@ Section ProofMain.
     assert (Hsvst : trunc32 (rget S3 (mword_of_int 14 : mword 5)) = started_set).
     { rewrite HS3a4 /trunc32 /started_set. apply bv_eq; vm_compute; reflexivity. }
     (* ---- +0xb0 sw a4,0(a5) : started = 1, paying [P] into the escrow ---- *)
-    iApply (wp_store_s_sconf_au 4 true (mword_of_int (KernelSyms.main + 0xb0))
+    iApply (wp_store_s_sconf_au (kt := KT1) (ktd := KT0) 4 true (mword_of_int (KernelSyms.main + 0xb0))
               (mword_of_int 14 : mword 5) (mword_of_int 15 : mword 5)
               (mword_of_int 0 : mword 12) S3 n
               (trunc32 (rget S3 (mword_of_int 14 : mword 5))) True%I

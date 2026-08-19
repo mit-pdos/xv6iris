@@ -334,7 +334,7 @@ Section UvmcopyDefs.
       ⌜ mj !!! Regidx csp_rs1 = spr
         /\ mj !!! Regidx URa0 = res
         /\ uc_thr mm mj ⌝ -∗
-      sie_cap_gpr mj (K - 10)%nat b p -∗
+      sie_cap_gpr KT1 mj (K - 10)%nat b p -∗
       cpu_own ilvl eb p b lks -∗
       pc_is (mword_of_int (KernelSyms.uvmcopy + 0x80) : mword 64) -∗
       proc_pt Pold -∗
@@ -463,7 +463,7 @@ Section ProofUvmcopy.
     (* uc_err's one callee is uvmunmap, whose do_free-!=0 call bottoms out
        at kfree's "kmem" (13) bound; nothing else here touches a lock. *)
     locks_below lks "kmem" ->
-    sie_cap_gpr M (K - 10)%nat b p -∗
+    sie_cap_gpr KT1 M (K - 10)%nat b p -∗
     cpu_own ilvl eb p b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.uvmcopy + 0x6c) : mword 64) -∗
@@ -670,7 +670,7 @@ Section ProofUvmcopy.
        also in the cone but carries no order premise of its own to pass
        (SpecMappages.v/SpecWalk.v -- outside this pass's file list). *)
     locks_below lks "kmem" ->
-    sie_cap_gpr M (K - 10)%nat b p -∗
+    sie_cap_gpr KT1 M (K - 10)%nat b p -∗
     cpu_own ilvl eb p b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.uvmcopy + 0x2a) : mword 64) -∗
@@ -767,7 +767,7 @@ Section ProofUvmcopy.
           /\ (forall v, v ∉ vpn_run vpn0 (S j) ->
                 Pk.(ud_um) !! v = Pnew.(ud_um) !! v)
           /\ (forall i, (i < S j)%nat -> uc_at Pold Pnew Pk vpn0 i) ⌝ -∗
-        sie_cap_gpr mt (K - 10)%nat b p -∗
+        sie_cap_gpr KT1 mt (K - 10)%nat b p -∗
         cpu_own ilvl eb p b lks -∗
         pc_is (mword_of_int (KernelSyms.uvmcopy + 0x24) : mword 64) -∗
         proc_pt Pold -∗
@@ -937,7 +937,7 @@ Section ProofUvmcopy.
       change (2 ^ 38)%Z with 274877906944%Z. clear -Hjb; lia. }
     assert (Hret34 : ret_pc (L4 !!! Regidx Rra) = mword_of_int (KernelSyms.uvmcopy + 0x34)).
     { rewrite /L4 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
-    iApply (WalkNoalloc.wp_walk_noalloc_sconf L4 to m_o (K - 10)%nat (DfracOwn 1) b p
+    iApply (WalkNoalloc.wp_walk_noalloc_sconf KT1 L4 to m_o (K - 10)%nat (DfracOwn 1) b p
               HKwk HL4a0 HL4a2 Hwkva Hrepo with "Hcg Htext Hpc Hptreeo").
     iIntros (CIDl5 Hsl5 mw) "Hcg Hpc Hptreeo %Hwcs %Hpay".
     iEval (rewrite Hret34) in "Hpc".
@@ -1016,7 +1016,7 @@ Section ProofUvmcopy.
       replace (sign_extend' 64 (mword_of_int 0 : mword 12) : mword 64)
         with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity).
       apply kv_addv_zero. }
-    iApply (wp_ld_s_sconf (mword_of_int (KernelSyms.uvmcopy + 0x36)) Rs3 Ra0
+    iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.uvmcopy + 0x36)) Rs3 Ra0
               (mword_of_int 0 : mword 12) mw (K - 10)%nat w0 b (dqm:=DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi36 [Hcell]").
@@ -1152,7 +1152,7 @@ Section ProofUvmcopy.
       rewrite /B3. rewrite upd_ne; [| uc_thr_ne]. apply HB2thr; assumption. }
     iDestruct (cpu_own_transport CID0 CIDl11 ilvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Kalloc.wp_kalloc_sconf γa γk (mword_of_int (KernelSyms.kmem + 24))
+    iApply (Kalloc.wp_kalloc_sconf KT1 γa γk (mword_of_int (KernelSyms.kmem + 24))
               B3 None ilvl eb p (K - 10)%nat b
               _ HKka ltac:(reflexivity) Hilvl Hbelow
               with "Hcg Hcnt Htext Hpc Hlock Havail").
@@ -1338,7 +1338,7 @@ Section ProofUvmcopy.
       as "[Hsrc Hsrcback]".
     iDestruct (bb_page_named (page_base (pte_ppn wu)) with "Hsrc") as (fsrc) "Hsrc".
     iDestruct (bb_page_named r with "Hpage") as (fdst) "Hdst".
-    iApply (Memmove.wp_memmove_sconf C5 (K - 10)%nat 4096%nat fsrc fdst b p
+    iApply (Memmove.wp_memmove_sconf KT1 KT0 KT0 C5 (K - 10)%nat 4096%nat fsrc fdst b p
               HKmm ltac:(vm_compute; reflexivity) Hmmlen
               with "Hcg Htext Hpc [Hsrc] [Hdst]").
     { iEval (rewrite HC5a1). iExact "Hsrc". }
@@ -1509,7 +1509,7 @@ Section ProofUvmcopy.
       rewrite vpn_at_0 HD6a1 Hvj. exact Hmcnone. }
     iDestruct (cpu_own_transport CIDl12 CIDl25 ilvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Mappages.wp_mappages_sconf γa D6 tc m_c 1%nat (pte_flags10 w0) ilvl
+    iApply (Mappages.wp_mappages_sconf KT1 γa D6 tc m_c 1%nat (pte_flags10 w0) ilvl
               (K - 10)%nat eb p None b
               _ Hilvl HKmp HD6root Hmpva Hmppa Hmpsz ltac:(clear; lia)
               HD6a4 (proj1 Hperm) Hmpvab Hmppab Hrepc Hmpfresh
@@ -1646,7 +1646,7 @@ Section ProofUvmcopy.
       uc_thr_peel. apply Hmgthr; assumption. }
     iDestruct (cpu_own_transport CIDl26 CIDl29 ilvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Kfree.wp_kfree_sconf γa γk (mword_of_int KernelSyms.kmem)
+    iApply (Kfree.wp_kfree_sconf KT1 γa γk (mword_of_int KernelSyms.kmem)
               (mword_of_int (KernelSyms.kmem + 24)) F2 None ilvl eb p (K - 10)%nat b
               _ HKka ltac:(reflexivity) ltac:(reflexivity)
               Hilvl Hbelow
@@ -1810,7 +1810,7 @@ Section ProofUvmcopy.
         (add_vec (mm !!! Regidx csp_rs1)
            (sign_extend' 64 (caddi16sp_imm (mword_of_int 59 : mword 6))))]> mm) with R1.
     assert (HspR1 : R1 !!! Regidx csp_rs1 = spr) by (rewrite /R1 upd_eq; reflexivity).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 & S9 & S10 & _)".
     iDestruct "S1" as (u72) "Hk1". iDestruct "S2" as (u64) "Hk2".
     iDestruct "S3" as (u56) "Hk3". iDestruct "S4" as (u48) "Hk4".
@@ -2182,9 +2182,9 @@ Section ProofUvmcopy.
                      = pa_stk (add_vec (E9 !!! Regidx csp_rs1)
                         (sign_extend' 64 (caddi16sp_imm (mword_of_int 5 : mword 6)))) 10).
       { rewrite Hwv HE9sp. symmetry. exact Hsprstk. }
-      iAssert (stack_own sp0 10) with "[Hk1 Hk2 Hk3 Hk4 Hk5 Hk6 Hk7 Hk8 Hk9 Hk10]"
+      iAssert (stack_own (KTR := KT1) sp0 10) with "[Hk1 Hk2 Hk3 Hk4 Hk5 Hk6 Hk7 Hk8 Hk9 Hk10]"
         as "Hframe10".
-      { rewrite stack_own_slots. cbn [seq].
+      { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
         iSplitL "Hk1"; [iExists _; iExact "Hk1" |].
         iSplitL "Hk2"; [iExists _; iExact "Hk2" |].
         iSplitL "Hk3"; [iExists _; iExact "Hk3" |].

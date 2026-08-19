@@ -152,7 +152,7 @@ Section ProofUvmclear.
     iIntros (CID1 Hs1) "Hcg Hframe Hpc".
     change (<[Regidx csp_rs1 := regval_into_reg
         (add_vec (mm !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))]> mm) with W1.
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & _)".
     iDestruct "S1" as (v8) "Hc1". iDestruct "S2" as (v0) "Hc2".
     assert (HspW1 : W1 !!! Regidx csp_rs1 = spr)
@@ -231,7 +231,7 @@ Section ProofUvmclear.
     assert (Hret0e : ret_pc (W4 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.uvmclear + 0x0e)).
     { rewrite HW4ra. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     (* ---- the call ---- *)
-    iApply (WalkNoalloc.wp_walk_noalloc_sconf W4 t m_ad (K - 2)%nat (DfracOwn 1) b p
+    iApply (WalkNoalloc.wp_walk_noalloc_sconf KT1 W4 t m_ad (K - 2)%nat (DfracOwn 1) b p
               ltac:(lia) HW4a0 HW4a2
               ltac:(rewrite HW4a1; exact Hvab)
               Hrep
@@ -293,7 +293,7 @@ Section ProofUvmclear.
       apply kv_addv_zero. }
     iDestruct (pt_slot_phys_to_mem (u_next_base p1) (vpn_idx 0 vpn) (DfracOwn 1) wr
                  with "Hcl0 Hcell") as "Hcell".
-    iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.uvmclear + 0x10)) (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
+    iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.uvmclear + 0x10)) (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
               (mword_of_int 0 : mword 12)
               mw (K - 2)%nat wr b (dqm:=DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -322,7 +322,7 @@ Section ProofUvmclear.
     assert (Hpp14 : add_vec_int (mword_of_int (KernelSyms.uvmclear + 0x12) : mword 64) 2 = mword_of_int (KernelSyms.uvmclear + 0x14)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp14) in "Hpc".
     (* ---- +0x14 c.sd a5,0(a0) : *pte = a5 ---- *)
-    iApply (wp_csd_s_sconf (mword_of_int (KernelSyms.uvmclear + 0x14)) (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
+    iApply (wp_csd_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.uvmclear + 0x14)) (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
               (mword_of_int 0 : mword 12) B2 (K - 2)%nat wr b
               with "Hcg Hpc Hi14 [Hcell]").
     { iEval (rewrite Hea0; rgne; rewrite HB2a0). iExact "Hcell". }
@@ -425,8 +425,8 @@ Section ProofUvmclear.
     assert (Hpop : E2 !!! Regidx csp_rs1
                    = pa_stk (add_vec (E2 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)))) 2).
     { rewrite Hwvsp HspE2. symmetry. exact Hsprstk. }
-    iAssert (stack_own sp0 2) with "[Hc1 Hc2]" as "Hfr".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := KT1) sp0 2) with "[Hc1 Hc2]" as "Hfr".
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hc1". { iExists (mm !!! Regidx (mword_of_int 1)). iExact "Hc1". }
       iSplitL "Hc2". { iExists (mm !!! Regidx (mword_of_int 8)). iExact "Hc2". }
       done. }

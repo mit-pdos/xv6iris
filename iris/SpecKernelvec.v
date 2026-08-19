@@ -81,7 +81,7 @@ Definition kernelvec_handler_spec_body
   minstret_inv -∗
   kernel_text -∗
   devintr_caps γu γv γdk γtl γs pd pav pu -∗
-  intr_handler_spec (mword_of_int KernelSyms.kernelvec : mword 64).
+  intr_handler_spec KT1 (mword_of_int KernelSyms.kernelvec : mword 64).
 
 Module Type KERNELVEC.
   Parameter kernelvec_handler_spec :

@@ -465,11 +465,11 @@ Section WpBfreeSllw.
       (shift_bits_left (subrange_vec_dec (rget m rs1) 31 0 : mword 32)
          (subrange_vec_dec
             (subrange_vec_dec (rget m rs2) 31 0 : mword 32) 4 0)) = wval ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr KT1 m n b p -∗
     pc_is pc -∗
     instr pc false (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, SLLW)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr KT1 (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -517,10 +517,10 @@ Section BfreeDefs.
 
   (* bfree's 32-byte frame: ra@24 s0@16 s1@8 s2@0 *)
   Definition bf_frame (m : regfile) : iProp Σ :=
-    (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈ (m !!! Regidx Rra : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈ (m !!! Regidx Rs0 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈ (m !!! Regidx Rs1 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈ (m !!! Regidx Rs2 : mword 64))%I.
+    (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈[KT1] (m !!! Regidx Rra : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈[KT1] (m !!! Regidx Rs2 : mword 64))%I.
 
   (* ONE BYTE of a buffer's data area, borrowed and given back at a new
      byte list -- [ByteBuf.bb_byte_acc] over [buf_own]'s list form. *)
@@ -564,13 +564,13 @@ Section BfreeDefs.
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
-        sie_cap_gpr mf K b (proc_addr j) -∗
+        sie_cap_gpr KT1 mf K b (proc_addr j) -∗
         cpu_own 0 b (proc_addr j) b lks -∗
         (* bfree's own crossing established [eb = b] once at entry
            (cpu_own_eb_agree, n = 0); the whole function is a PURE
            PASS-THROUGH of the trap-CSR complement (it does no acquire of
            its own), so it stays [b] rather than a fresh [eb]. *)
-        trap_csrs_ext b -∗
+        trap_csrs_ext KT1 b -∗
         cpu_claim_ext b (proc_addr j) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
@@ -619,9 +619,9 @@ Section BfreeTail.
     bmapstart ∈ cov ->
     ~ (bmapstart ∈ log_region_set logstart) ->
     bitmap_ok cov logstart size (used ∖ {[ bi ]}) ->
-    sie_cap_gpr M (K - 4)%nat b (proc_addr j) -∗
+    sie_cap_gpr KT1 M (K - 4)%nat b (proc_addr j) -∗
     cpu_own 0 b (proc_addr j) b lks -∗
-    trap_csrs_ext b -∗
+    trap_csrs_ext KT1 b -∗
     cpu_claim_ext b (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.bfree + 0x4a) : mword 64) -∗
@@ -919,9 +919,9 @@ Section BfreeTail.
                    = pa_stk (add_vec (P4 !!! Regidx csp_rs1 : mword 64)
                        (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
     { rewrite Hwv HP4sp. unfold pa_stk, add_vec_int. apply f_equal. pcw. }
-    iAssert (stack_own (m !!! Regidx csp_rs1 : mword 64) 4)
+    iAssert (stack_own (KTR := KT1) (m !!! Regidx csp_rs1 : mword 64) 4)
       with "[Hf1 Hf2 Hf3 Hf4]" as "Hstk".
-    { rewrite stack_own_slots. cbn [seq].
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hf1"; [iExists _; iExact "Hf1" |].
       iSplitL "Hf2"; [iExists _; iExact "Hf2" |].
       iSplitL "Hf3"; [iExists _; iExact "Hf3" |].
@@ -1113,7 +1113,7 @@ Section ProofBfreeMain.
                   (add_vec (m !!! Regidx csp_rs1 : mword 64)
                      (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m).
     assert (HR1sp : bf_sp m R1) by (rewrite /bf_sp /R1 upd_eq; reflexivity).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & _)".
     iDestruct "S1" as (v1) "Hf1". iDestruct "S2" as (v2) "Hf2".
     iDestruct "S3" as (v3) "Hf3". iDestruct "S4" as (v4) "Hf4".
@@ -1290,7 +1290,7 @@ Section ProofBfreeMain.
                      = sb_bmapstart).
     { rgne. rewrite HR5a1. rewrite /sb_bmapstart /pa_add /add_vec_int. pcw. }
     iEval (rewrite -Hsbadr) in "Hsb".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.bfree + 0x16)) Ra1 Ra1
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.bfree + 0x16)) Ra1 Ra1
               (mword_of_int 2504 : mword 12) R5 (K - 4)%nat
               (mword_of_int bmapstart : mword 32) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi16 Hsb").
@@ -1597,7 +1597,7 @@ Section ProofBfreeMain.
                      = pa_add (b_data (bpa kk)) d).
     { rgne. rewrite HB5a4. apply bf_data_off. }
     iEval (rewrite -Hbyadr) in "Hbyte".
-    iApply (wp_lbu_s_sconf (mword_of_int (KernelSyms.bfree + 0x32)) Ra4 Ra4
+    iApply (wp_lbu_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.bfree + 0x32)) Ra4 Ra4
               (mword_of_int 88 : mword 12) B5 (K - 4)%nat
               (bm_byte used q) b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hi32 Hbyte").

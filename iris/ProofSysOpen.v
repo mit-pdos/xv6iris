@@ -71,7 +71,6 @@ Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
-Require Import FsTree.
 Require Import IcacheEscrow.
 Require Import IcacheBoot.
 Require Import KallocInv.
@@ -201,9 +200,9 @@ Section ProofSysOpenBody.
          ⌜callee_saved m mf⌝ -∗
          ⌜used' ⊆ used⌝ -∗
          ⌜(nsj <= ns')%nat /\ (ns' <= S nsj)%nat⌝ -∗
-         sie_cap_gpr mf K b pj -∗
+         sie_cap_gpr KT1 mf K b pj -∗
          cpu_own 0 eb pj b lks -∗
-         trap_csrs_ext eb -∗
+         trap_csrs_ext KT1 eb -∗
          cpu_claim_ext eb pj -∗
          pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
          sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -265,9 +264,9 @@ Section ProofSysOpenBody.
     (M !!! Regidx Rs1 : mword 64) = ientry kk ->
     (M !!! Regidx Rs3 : mword 64) = (mword_of_int (Z.of_nat fd) : mword 64) ->
     so_al sp0 ->
-    sie_cap_gpr M (K - 24) b (proc_addr jx) -∗
+    sie_cap_gpr KT1 M (K - 24) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr jx) -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SO + 0xb8)) -∗
     panic_env -∗
@@ -309,15 +308,15 @@ Section ProofSysOpenBody.
     bslots bn 3 -∗
     iref_slots nsj -∗
     fd_slot -∗
-    (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-    (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-    (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
-    (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
-    (pa_stk sp0 5) ↦₈ (m !!! Regidx Rs3 : mword 64) -∗
-    (pa_stk sp0 6) ↦₈ w6 -∗
-    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ bp jj) -∗
-    (pa_stk sp0 23) ↦₈ w23 -∗
-    (pa_stk sp0 24) ↦₈ w24 -∗
+    (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
+    (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
+    (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
+    (pa_stk sp0 4) ↦₈[KT1] (m !!! Regidx Rs2 : mword 64) -∗
+    (pa_stk sp0 5) ↦₈[KT1] (m !!! Regidx Rs3 : mword 64) -∗
+    (pa_stk sp0 6) ↦₈[KT1] w6 -∗
+    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ[KT1] bp jj) -∗
+    (pa_stk sp0 23) ↦₈[KT1] w23 -∗
+    (pa_stk sp0 24) ↦₈[KT1] w24 -∗
     wp_next true (proc_addr jx)
       (so_cont gf bn gfs cov logstart bmapstart inodestart size used nsj
                dqb dqs (proc_addr jx) pidv V m K eb b lks) -∗
@@ -476,9 +475,9 @@ Section ProofSysOpenBody.
     (N !!! Regidx Rs2 : mword 64) = fnode kf ->
     (N !!! Regidx Rs3 : mword 64) = (mword_of_int (Z.of_nat fd) : mword 64) ->
     so_al sp0 ->
-    sie_cap_gpr N (K - 24) b (proc_addr jx) -∗
+    sie_cap_gpr KT1 N (K - 24) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr jx) -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SO + 0x88)) -∗
     panic_env -∗
@@ -524,16 +523,16 @@ Section ProofSysOpenBody.
     bslots bn 3 -∗
     iref_slots nsj -∗
     fd_slot -∗
-    (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-    (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-    (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
-    (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
-    (pa_stk sp0 5) ↦₈ (m !!! Regidx Rs3 : mword 64) -∗
-    (pa_stk sp0 6) ↦₈ w6 -∗
-    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ bp jj) -∗
-    (pa_stk sp0 23) ↦₄ lo -∗
-    (pa_add (pa_stk sp0 23) 4) ↦₄ om -∗
-    (pa_stk sp0 24) ↦₈ w24 -∗
+    (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
+    (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
+    (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
+    (pa_stk sp0 4) ↦₈[KT1] (m !!! Regidx Rs2 : mword 64) -∗
+    (pa_stk sp0 5) ↦₈[KT1] (m !!! Regidx Rs3 : mword 64) -∗
+    (pa_stk sp0 6) ↦₈[KT1] w6 -∗
+    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ[KT1] bp jj) -∗
+    (pa_stk sp0 23) ↦₄[KT1] lo -∗
+    (pa_add (pa_stk sp0 23) 4) ↦₄[KT1] om -∗
+    (pa_stk sp0 24) ↦₈[KT1] w24 -∗
     wp_next true (proc_addr jx)
       (so_cont gf bn gfs cov logstart bmapstart inodestart size used nsj
                dqb dqs (proc_addr jx) pidv V m K eb b lks) -∗
@@ -570,7 +569,7 @@ Section ProofSysOpenBody.
     iPoseProof (soi_0b4 with "Htext") as "Hib4".
     (* ===== +0x88 sd s1,24(s2) -- f->ip = ip ===== *)
     iEval (rewrite /a_fip /foff_of) in "Hfip".
-    iApply (wp_sd_s_sconf (CID := CID0) (mword_of_int (SO + 0x88)) Rs1 Rs2
+    iApply (wp_sd_s_sconf (kt := KT1) (ktd := KT0) (CID := CID0) (mword_of_int (SO + 0x88)) Rs1 Rs2
               (mword_of_int 24 : mword 12) N (K - 24)%nat ipold b
               with "Hcg Hpc Hi88 [Hfip]").
     { iEval (rgne; rewrite HNs2). iExact "Hfip". }
@@ -643,7 +642,7 @@ Section ProofSysOpenBody.
     iEval (rewrite Hpp94) in "Hpc".
     (* ===== +0x98 sb a4,8(s2) -- f->readable ===== *)
     iEval (rewrite /a_freadable /foff_of) in "Hfrd".
-    iApply (wp_sb_s_sconf (CID := CID4) (mword_of_int (SO + 0x98)) Ra4 Rs2
+    iApply (wp_sb_s_sconf (kt := KT1) (ktd := KT0) (CID := CID4) (mword_of_int (SO + 0x98)) Ra4 Rs2
               (mword_of_int 8 : mword 12) N3 (K - 24)%nat rd0 b
               with "Hcg Hpc Hi98 [Hfrd]").
     { iEval (rgne; rewrite HN3s2). iExact "Hfrd". }
@@ -689,7 +688,7 @@ Section ProofSysOpenBody.
     iEval (rewrite Hppa0) in "Hpc".
     (* ===== +0xa4 sb a4,9(s2) -- f->writable ===== *)
     iEval (rewrite /a_fwritable /foff_of) in "Hfwr".
-    iApply (wp_sb_s_sconf (CID := CID7) (mword_of_int (SO + 0xa4)) Ra4 Rs2
+    iApply (wp_sb_s_sconf (kt := KT1) (ktd := KT0) (CID := CID7) (mword_of_int (SO + 0xa4)) Ra4 Rs2
               (mword_of_int 9 : mword 12) N5 (K - 24)%nat wr0 b
               with "Hcg Hpc Hia4 [Hfwr]").
     { iEval (rgne; rewrite HN5s2). iExact "Hfwr". }
@@ -792,7 +791,7 @@ Section ProofSysOpenBody.
     iDestruct (so_meta_acc with "Hload") as "[Hmeta Hlback]".
     iDestruct (so_type_acc with "Hmeta") as "[Hity Hmback]".
     iEval (rewrite /i_type) in "Hity".
-    iApply (wp_lh_s_sconf (CID := CID10) (mword_of_int (SO + 0xae)) Ra4 Rs1
+    iApply (wp_lh_s_sconf (CID := CID10) (kt := KT1) (ktd := KT0) (mword_of_int (SO + 0xae)) Ra4 Rs1
               (mword_of_int 68 : mword 12) N6 (K - 24)%nat
               (di_type dn : mword 16) b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hiae [Hity]").
@@ -1084,9 +1083,9 @@ Section ProofSysOpenBody.
     (N !!! Regidx Rs2 : mword 64) = (m !!! Regidx Rs2 : mword 64) ->
     (N !!! Regidx Rs3 : mword 64) = (m !!! Regidx Rs3 : mword 64) ->
     so_al sp0 ->
-    sie_cap_gpr N (K - 24) b (proc_addr jx) -∗
+    sie_cap_gpr KT1 N (K - 24) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr jx) -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SO + 0x5e)) -∗
     panic_env -∗
@@ -1121,16 +1120,16 @@ Section ProofSysOpenBody.
     bslots bn 3 -∗
     iref_slots nsj -∗
     fd_slot -∗
-    (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-    (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-    (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
-    (pa_stk sp0 4) ↦₈ w4 -∗
-    (pa_stk sp0 5) ↦₈ w5 -∗
-    (pa_stk sp0 6) ↦₈ w6 -∗
-    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ bp jj) -∗
-    (pa_stk sp0 23) ↦₄ lo -∗
-    (pa_add (pa_stk sp0 23) 4) ↦₄ om -∗
-    (pa_stk sp0 24) ↦₈ w24 -∗
+    (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
+    (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
+    (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
+    (pa_stk sp0 4) ↦₈[KT1] w4 -∗
+    (pa_stk sp0 5) ↦₈[KT1] w5 -∗
+    (pa_stk sp0 6) ↦₈[KT1] w6 -∗
+    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ[KT1] bp jj) -∗
+    (pa_stk sp0 23) ↦₄[KT1] lo -∗
+    (pa_add (pa_stk sp0 23) 4) ↦₄[KT1] om -∗
+    (pa_stk sp0 24) ↦₈[KT1] w24 -∗
     wp_next true (proc_addr jx)
       (so_cont gf bn gfs cov logstart bmapstart inodestart size used nsj
                dqb dqs (proc_addr jx) pidv V m K eb b lks) -∗
@@ -1512,7 +1511,7 @@ Section ProofSysOpenBody.
     iDestruct (so_meta_acc with "Hload") as "[Hmeta Hlback]".
     iDestruct (so_type_acc with "Hmeta") as "[Hity Hmback]".
     iEval (rewrite /i_type) in "Hity".
-    iApply (wp_lh_s_sconf (CID := CID10) (mword_of_int (SO + 0x74)) Ra4 Rs1
+    iApply (wp_lh_s_sconf (CID := CID10) (kt := KT1) (ktd := KT0) (mword_of_int (SO + 0x74)) Ra4 Rs1
               (mword_of_int 68 : mword 12) M4 (K - 24)%nat
               (di_type dn : mword 16) b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hi74 [Hity]").
@@ -1606,7 +1605,7 @@ Section ProofSysOpenBody.
       iDestruct (so_meta_acc with "Hload") as "[Hmeta Hlback]".
       iDestruct (so_maj_acc with "Hmeta") as "[Himaj Hmback]".
       iEval (rewrite /i_major) in "Himaj".
-      iApply (wp_lh_s_sconf (CID := CID14) (mword_of_int (SO + 0x144)) Ra5 Rs1
+      iApply (wp_lh_s_sconf (CID := CID14) (kt := KT1) (ktd := KT0) (mword_of_int (SO + 0x144)) Ra5 Rs1
                 (mword_of_int 70 : mword 12) M6 (K - 24)%nat
                 (di_major dn : mword 16) b ltac:(nz) ltac:(rdok)
                 with "Hcg Hpc Hi144 [Himaj]").
@@ -1640,7 +1639,7 @@ Section ProofSysOpenBody.
       iEval (rewrite Hpp144) in "Hpc".
       (* ===== +0x148 sh a5,36(s2) -- f->major = ip->major ===== *)
       iEval (rewrite /a_fmajor /foff_of) in "Hfmaj".
-      iApply (wp_sh_s_sconf (CID := CID15) (mword_of_int (SO + 0x148)) Ra5 Rs2
+      iApply (wp_sh_s_sconf (CID := CID15) (kt := KT1) (ktd := KT0) (mword_of_int (SO + 0x148)) Ra5 Rs2
                 (mword_of_int 36 : mword 12) M7 (K - 24)%nat (fc_major Cf) b
                 with "Hcg Hpc Hi148 [Hfmaj]").
       { iEval (rgne; rewrite HM7s2). iExact "Hfmaj". }
@@ -1745,7 +1744,7 @@ Section ProofSysOpenBody.
     iEval (rewrite Hpp80) in "Hpc".
     (* ===== +0x84 sw zero,32(s2) -- f->off = 0 ===== *)
     iEval (rewrite /a_foff /foff_of) in "Hfoff".
-    iApply (wp_sw_zero_s_sconf (CID := CID15) (mword_of_int (SO + 0x84)) Rs2
+    iApply (wp_sw_zero_s_sconf (kt := KT1) (ktd := KT0) (CID := CID15) (mword_of_int (SO + 0x84)) Rs2
               (mword_of_int 32 : mword 12) M8 (K - 24)%nat voff b
               with "Hcg Hpc Hi84 [Hfoff]").
     { iEval (rgne; rewrite HM8s2). iExact "Hfoff". }
@@ -1838,9 +1837,9 @@ Section ProofSysOpenBody.
     (M !!! Regidx Rs2 : mword 64) = (m !!! Regidx Rs2 : mword 64) ->
     (M !!! Regidx Rs3 : mword 64) = (m !!! Regidx Rs3 : mword 64) ->
     so_al sp0 ->
-    sie_cap_gpr M (K - 24) b (proc_addr jx) -∗
+    sie_cap_gpr KT1 M (K - 24) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr jx) -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SO + 0x4a)) -∗
     panic_env -∗
@@ -1875,16 +1874,16 @@ Section ProofSysOpenBody.
     bslots bn 3 -∗
     iref_slots nsj -∗
     fd_slot -∗
-    (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-    (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-    (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
-    (pa_stk sp0 4) ↦₈ w4 -∗
-    (pa_stk sp0 5) ↦₈ w5 -∗
-    (pa_stk sp0 6) ↦₈ w6 -∗
-    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ bp jj) -∗
-    (pa_stk sp0 23) ↦₄ lo -∗
-    (pa_add (pa_stk sp0 23) 4) ↦₄ om -∗
-    (pa_stk sp0 24) ↦₈ w24 -∗
+    (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
+    (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
+    (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
+    (pa_stk sp0 4) ↦₈[KT1] w4 -∗
+    (pa_stk sp0 5) ↦₈[KT1] w5 -∗
+    (pa_stk sp0 6) ↦₈[KT1] w6 -∗
+    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ[KT1] bp jj) -∗
+    (pa_stk sp0 23) ↦₄[KT1] lo -∗
+    (pa_add (pa_stk sp0 23) 4) ↦₄[KT1] om -∗
+    (pa_stk sp0 24) ↦₈[KT1] w24 -∗
     wp_next true (proc_addr jx)
       (so_cont gf bn gfs cov logstart bmapstart inodestart size used nsj
                dqb dqs (proc_addr jx) pidv V m K eb b lks) -∗
@@ -1914,7 +1913,7 @@ Section ProofSysOpenBody.
     iDestruct (so_meta_acc with "Hload") as "[Hmeta Hlback]".
     iDestruct (so_type_acc with "Hmeta") as "[Hity Hmback]".
     iEval (rewrite /i_type) in "Hity".
-    iApply (wp_lh_s_sconf (CID := CID0) (mword_of_int (SO + 0x4a)) Ra4 Rs1
+    iApply (wp_lh_s_sconf (CID := CID0) (kt := KT1) (ktd := KT0) (mword_of_int (SO + 0x4a)) Ra4 Rs1
               (mword_of_int 68 : mword 12) M (K - 24)%nat
               (di_type dn : mword 16) b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hi4a [Hity]").
@@ -2014,7 +2013,7 @@ Section ProofSysOpenBody.
     iDestruct (so_meta_acc with "Hload") as "[Hmeta Hlback]".
     iDestruct (so_maj_acc with "Hmeta") as "[Himaj Hmback]".
     iEval (rewrite /i_major) in "Himaj".
-    iApply (wp_lhu_s_sconf (CID := CID3) (mword_of_int (SO + 0x54)) Ra4 Rs1
+    iApply (wp_lhu_s_sconf (CID := CID3) (kt := KT1) (ktd := KT0) (mword_of_int (SO + 0x54)) Ra4 Rs1
               (mword_of_int 70 : mword 12) M2 (K - 24)%nat
               (di_major dn : mword 16) b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hi54 [Himaj]").
@@ -2204,9 +2203,9 @@ Section ProofSysOpenBody.
       (∀ (mf : regfile) (used' : gset Z) (ns' : nat),
          ⌜callee_saved m mf⌝ -∗
          ⌜((ns - sys_open_slots)%nat <= ns')%nat /\ (ns' <= ns)%nat⌝ -∗
-         sie_cap_gpr mf K b pj -∗
+         sie_cap_gpr KT1 mf K b pj -∗
          cpu_own 0 eb pj b lks -∗
-         trap_csrs_ext eb -∗
+         trap_csrs_ext KT1 eb -∗
          cpu_claim_ext eb pj -∗
          pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
          sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
@@ -2269,7 +2268,7 @@ Section ProofSysOpenBody.
     (plen < 128)%nat ->
     1 < ninodes -> ninodes <= 16 * Z.of_nat nib -> ninodes < 2 ^ 31 ->
     16 * Z.of_nat nib <= 2 ^ 16 ->
-    printk_gen_contract gpr gu gd ->
+    printk_gen_contract (kt := KT1) gpr gu gd ->
     (sys_open_slots <= ns)%nat ->
     (jx < NPROC)%nat -> gs !! jx = Some gl ->
     eb = true ->
@@ -2281,9 +2280,9 @@ Section ProofSysOpenBody.
     (N !!! Regidx Rs2 : mword 64) = (m !!! Regidx Rs2 : mword 64) ->
     (N !!! Regidx Rs3 : mword 64) = (m !!! Regidx Rs3 : mword 64) ->
     so_al sp0 ->
-    sie_cap_gpr N (K - 24) b (proc_addr jx) -∗
+    sie_cap_gpr KT1 N (K - 24) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr jx) -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SO + 0x38)) -∗
     printk_env gpr gu gd -∗
@@ -2312,16 +2311,16 @@ Section ProofSysOpenBody.
     bslots bn 3 -∗
     iref_slots ns -∗
     fd_slot -∗
-    (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-    (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-    (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
-    (pa_stk sp0 4) ↦₈ w4 -∗
-    (pa_stk sp0 5) ↦₈ w5 -∗
-    (pa_stk sp0 6) ↦₈ w6 -∗
-    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ bp jj) -∗
-    (pa_stk sp0 23) ↦₄ lo -∗
-    (pa_add (pa_stk sp0 23) 4) ↦₄ om -∗
-    (pa_stk sp0 24) ↦₈ w24 -∗
+    (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
+    (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
+    (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
+    (pa_stk sp0 4) ↦₈[KT1] w4 -∗
+    (pa_stk sp0 5) ↦₈[KT1] w5 -∗
+    (pa_stk sp0 6) ↦₈[KT1] w6 -∗
+    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ[KT1] bp jj) -∗
+    (pa_stk sp0 23) ↦₄[KT1] lo -∗
+    (pa_add (pa_stk sp0 23) 4) ↦₄[KT1] om -∗
+    (pa_stk sp0 24) ↦₈[KT1] w24 -∗
     wp_next true (proc_addr jx)
       (so_cont0 gf bn gfs cov logstart bmapstart inodestart size ninodes ns
                 dqb dqs dqbs dqn (proc_addr jx) pidv V m K eb b lks) -∗
@@ -2724,7 +2723,7 @@ Section ProofSysOpenBody.
     (plen < 128)%nat ->
     1 < ninodes -> ninodes <= 16 * Z.of_nat nib -> ninodes < 2 ^ 31 ->
     16 * Z.of_nat nib <= 2 ^ 16 ->
-    printk_gen_contract gpr gu gd ->
+    printk_gen_contract (kt := KT1) gpr gu gd ->
     (sys_open_slots <= ns)%nat ->
     (jx < NPROC)%nat -> gs !! jx = Some gl ->
     eb = true ->
@@ -2736,9 +2735,9 @@ Section ProofSysOpenBody.
     (N !!! Regidx Rs2 : mword 64) = (m !!! Regidx Rs2 : mword 64) ->
     (N !!! Regidx Rs3 : mword 64) = (m !!! Regidx Rs3 : mword 64) ->
     so_al sp0 ->
-    sie_cap_gpr N (K - 24) b (proc_addr jx) -∗
+    sie_cap_gpr KT1 N (K - 24) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr jx) -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SO + 0xdc)) -∗
     printk_env gpr gu gd -∗
@@ -2767,16 +2766,16 @@ Section ProofSysOpenBody.
     bslots bn 3 -∗
     iref_slots ns -∗
     fd_slot -∗
-    (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-    (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-    (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
-    (pa_stk sp0 4) ↦₈ w4 -∗
-    (pa_stk sp0 5) ↦₈ w5 -∗
-    (pa_stk sp0 6) ↦₈ w6 -∗
-    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ bp jj) -∗
-    (pa_stk sp0 23) ↦₄ lo -∗
-    (pa_add (pa_stk sp0 23) 4) ↦₄ om -∗
-    (pa_stk sp0 24) ↦₈ w24 -∗
+    (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
+    (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
+    (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
+    (pa_stk sp0 4) ↦₈[KT1] w4 -∗
+    (pa_stk sp0 5) ↦₈[KT1] w5 -∗
+    (pa_stk sp0 6) ↦₈[KT1] w6 -∗
+    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ[KT1] bp jj) -∗
+    (pa_stk sp0 23) ↦₄[KT1] lo -∗
+    (pa_add (pa_stk sp0 23) 4) ↦₄[KT1] om -∗
+    (pa_stk sp0 24) ↦₈[KT1] w24 -∗
     wp_next true (proc_addr jx)
       (so_cont0 gf bn gfs cov logstart bmapstart inodestart size ninodes ns
                 dqb dqs dqbs dqn (proc_addr jx) pidv V m K eb b lks) -∗
@@ -3108,7 +3107,7 @@ Section ProofSysOpenBody.
     iDestruct (so_meta_acc with "Hload") as "[Hmeta Hlback]".
     iDestruct (so_type_acc with "Hmeta") as "[Hity Hmback]".
     iEval (rewrite /i_type) in "Hity".
-    iApply (wp_lh_s_sconf (CID := CID7) (mword_of_int (SO + 0xec)) Ra4 Rs1
+    iApply (wp_lh_s_sconf (CID := CID7) (kt := KT1) (ktd := KT0) (mword_of_int (SO + 0xec)) Ra4 Rs1
               (mword_of_int 68 : mword 12) mil (K - 24)%nat
               (di_type dn : mword 16) b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hiec [Hity]").

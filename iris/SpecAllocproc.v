@@ -156,7 +156,7 @@ Definition allocproc_post
         arm.  See [ProcAvail.v]'s header. --- *)
     (⌜ rv = (zero_reg : mword 64) ⌝ ∗
      ⌜ avail_zero op ⌝ ∗
-     sie_cap_gpr mr K b pme ∗
+     sie_cap_gpr KT1 mr K b pme ∗
      cpu_own lvl eb pme b lks ∗
      kalloc_env γa on ∗
      procs_avail op)
@@ -196,6 +196,14 @@ Definition allocproc_post
           [procs_inv], so it is where the unit has to come from. *)
        iref_slots (1 + IREFSPARE) ∗
        is_kstack (proc_addr j) ks ∗
+       (* THE SLOT'S KERNEL STACK, out of the dormant block with everything
+          else the slot owned.  SEALED ([ProcDefs.kstack_free]) rather than
+          carved: the caller that wants the words spells [kstack_free_at]
+          against the [is_kstack] one line up.  It is what a failure tail
+          hands freeproc ([SpecFreeproc.fp_rest]) and, once kfork builds a
+          paid park, what [SpecForkretParkPaid.forkret_park_pkg] is anchored
+          on. *)
+       kstack_free (proc_addr j) ∗
        ctx_cells (p_context (proc_addr j))
          (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest) ∗
        (* [trap_res b + K], NOT [K]: allocproc RETURNS HOLDING p->lock, so
@@ -205,12 +213,12 @@ Definition allocproc_post
           there until the caller's own [release] gives it back.  The null arms
           below released everything, so they exit at [K] with arm [b] and the
           reserve back inside [sie_cap]'s [trap_res b] summand. *)
-       sie_cap_gpr mr (trap_res b + K)%nat false pme ∗
+       sie_cap_gpr KT1 mr (trap_res b + K)%nat false pme ∗
        (* the found slot's OWN lock is now held, on top of whatever the
           caller already held: this is the one arm allocproc returns
           without releasing everything it took. *)
        cpu_own (S lvl) eb pme false ({["proc"]} ∪ lks) ∗
-       arm_pay lvl eb pme ∗
+       arm_pay KT1 lvl eb pme ∗
        kalloc_env γa (avail_sub on nc) ∗
        (* one slot fewer, by the same [avail_dec] the page count uses *)
        procs_avail (avail_dec op))
@@ -229,7 +237,7 @@ Definition allocproc_post
         it.  Carrying the witness is what lets ONE proof serve both. --- *)
     (⌜ rv = (zero_reg : mword 64) ⌝ ∗
      ⌜ exists n : nat, (n <= K_allocproc)%nat /\ avail_zero (avail_sub on n) ⌝ ∗
-     sie_cap_gpr mr K b pme ∗
+     sie_cap_gpr KT1 mr K b pme ∗
      cpu_own lvl eb pme b lks ∗
      kalloc_env γa None ∗
      procs_avail op))%I.
@@ -256,7 +264,7 @@ Definition wp_allocproc_sconf_body
      [locks_below_mono] plus [locks_below_union_singleton] derive their
      order premises from this single bound; see ProofAllocproc.v. *)
   locks_below lks "proc" ->
-  sie_cap_gpr m K b pme -∗
+  sie_cap_gpr KT1 m K b pme -∗
   cpu_own lvl eb pme b lks -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv γs -∗
@@ -291,7 +299,7 @@ Definition wp_allocproc_core_body
   (* same order premise as the counted contract above -- "proc" is the
      lowest (only) rank this function itself acquires. *)
   locks_below lks "proc" ->
-  sie_cap_gpr m K b pme -∗
+  sie_cap_gpr KT1 m K b pme -∗
   cpu_own lvl eb pme b lks -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv γs -∗

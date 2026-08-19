@@ -987,6 +987,48 @@ Section IcacheLink.
     split; [exact Hv | exact Hz].
   Qed.
 
+  (* Lift the seven component updates through [linkElemUR] once.  Applying
+     [prod_local_update'] directly at every move makes elaboration rediscover
+     the deeply nested product CMRA at the outermost pair; keep that generic
+     inference out of all of the callers below. *)
+  Lemma lelem_local_update
+      (awl awdu awdt ag : nat) (ac : option (excl unit)) (ar : nat)
+      (ap : option (dfrac_agreeR (leibnizO Z)))
+      (bwl bwdu bwdt bg : nat) (bc : option (excl unit)) (br : nat)
+      (bp : option (dfrac_agreeR (leibnizO Z)))
+      (awl' awdu' awdt' ag' : nat) (ac' : option (excl unit)) (ar' : nat)
+      (ap' : option (dfrac_agreeR (leibnizO Z)))
+      (bwl' bwdu' bwdt' bg' : nat) (bc' : option (excl unit)) (br' : nat)
+      (bp' : option (dfrac_agreeR (leibnizO Z))) :
+    (awl, bwl) ~l~> (awl', bwl') ->
+    (awdu, bwdu) ~l~> (awdu', bwdu') ->
+    (awdt, bwdt) ~l~> (awdt', bwdt') ->
+    (ag, bg) ~l~> (ag', bg') ->
+    (ac, bc) ~l~> (ac', bc') ->
+    (ar, br) ~l~> (ar', br') ->
+    (ap, bp) ~l~> (ap', bp') ->
+    (lelem awl awdu awdt ag ac ar ap, lelem bwl bwdu bwdt bg bc br bp)
+      ~l~>
+    (lelem awl' awdu' awdt' ag' ac' ar' ap',
+     lelem bwl' bwdu' bwdt' bg' bc' br' bp').
+  Proof.
+    rewrite /lelem. intros Hwl Hwdu Hwdt Hg Hc Hr Hp.
+    apply (prod_local_update'
+      (A := prodUR
+        (prodUR
+          (prodUR
+            (prodUR natUR (prodUR natUR natUR))
+            natUR)
+          (optionUR (exclR unitO)))
+        natUR)
+      (B := optionUR (dfrac_agreeR (leibnizO Z)))); [| exact Hp].
+    apply prod_local_update'; [| exact Hr].
+    apply prod_local_update'; [| exact Hc].
+    apply prod_local_update'; [| exact Hg].
+    apply prod_local_update'; [exact Hwl |].
+    apply prod_local_update'; [exact Hwdu | exact Hwdt].
+  Qed.
+
   (* THE UNIT, SPELLED.  [ε] at [linkElemUR] is convertible to the
      all-zero element, but a goal that still MENTIONS [ε] defeats [lia]
      ("Cannot find witness"), so the allocating form takes the spelled
@@ -1023,12 +1065,7 @@ Section IcacheLink.
   Proof.
     rewrite /link_auth /ilink. iIntros "Ha".
     iApply (link_update_alloc with "Ha").
-    rewrite /lelem.
-    apply prod_local_update'; [| apply link_lu_id].
-    apply prod_local_update'; [| apply link_lu_id].
-    apply prod_local_update'; [| apply link_lu_id].
-    apply prod_local_update'; [| apply link_lu_id].
-    apply prod_local_update'; [| apply link_lu_id].
+    apply lelem_local_update; try apply link_lu_id.
     apply nat_local_update. lia.
   Qed.
 
@@ -1043,13 +1080,7 @@ Section IcacheLink.
   Proof.
     rewrite /link_auth /ilinkd. iIntros "Ha".
     iApply (link_update_alloc with "Ha").
-    rewrite /lelem.
-    apply prod_local_update'; [| apply link_lu_id].
-    apply prod_local_update'; [| apply link_lu_id].
-    apply prod_local_update'; [| apply link_lu_id].
-    apply prod_local_update'; [| apply link_lu_id].
-    apply prod_local_update'; [apply link_lu_id |].
-    apply prod_local_update'; [| apply link_lu_id].
+    apply lelem_local_update; try apply link_lu_id.
     apply nat_local_update. lia.
   Qed.
 
@@ -1078,14 +1109,8 @@ Section IcacheLink.
       with "[Ha]" as ">[Hauth Hfr]".
     { iApply (link_update_alloc with "Ha").
       rewrite -Hsp.
-      rewrite /lelem.
-      apply prod_local_update'.
-      - apply prod_local_update'; [| apply link_lu_id].
-        apply prod_local_update'; [| apply link_lu_id].
-        apply prod_local_update'; [| apply link_lu_id].
-        apply prod_local_update'; [apply link_lu_id |].
-        apply prod_local_update'; [apply link_lu_id |].
-        apply nat_local_update. lia.
+      apply lelem_local_update; try apply link_lu_id.
+      - apply nat_local_update. lia.
       - apply alloc_option_local_update.
         rewrite /lreg /to_frac_agree.
         apply pair_valid. split; done. }
@@ -1107,12 +1132,7 @@ Section IcacheLink.
     iMod (link_update _ _ _ (lelem wl wdu wdt g c r p)
             (lelem 0 0 0 0 None 0 None)
             with "Ha Hb") as "[$ _]"; [| done].
-    rewrite /lelem.
-    apply prod_local_update'; [| apply link_lu_id].
-    apply prod_local_update'; [| apply link_lu_id].
-    apply prod_local_update'; [| apply link_lu_id].
-    apply prod_local_update'; [| apply link_lu_id].
-    apply prod_local_update'; [| apply link_lu_id].
+    apply lelem_local_update; try apply link_lu_id.
     apply nat_local_update. lia.
   Qed.
 
@@ -1126,13 +1146,7 @@ Section IcacheLink.
     iMod (link_update _ _ _ (lelem wl wdu wdt g c r p)
             (lelem 0 0 0 0 None 0 None)
             with "Ha Hb") as "[$ _]"; [| done].
-    rewrite /lelem.
-    apply prod_local_update'; [| apply link_lu_id].
-    apply prod_local_update'; [| apply link_lu_id].
-    apply prod_local_update'; [| apply link_lu_id].
-    apply prod_local_update'; [| apply link_lu_id].
-    apply prod_local_update'; [apply link_lu_id |].
-    apply prod_local_update'; [| apply link_lu_id].
+    apply lelem_local_update; try apply link_lu_id.
     apply nat_local_update. lia.
   Qed.
 
@@ -1162,14 +1176,8 @@ Section IcacheLink.
     iApply (link_update with "Ha [Hb]").
     2:{ rewrite /link_frag_e. iExact "Hb". }
     rewrite -Hsp.
-    rewrite /lelem.
-    apply prod_local_update'.
-    - apply prod_local_update'; [| apply link_lu_id].
-      apply prod_local_update'; [| apply link_lu_id].
-      apply prod_local_update'; [| apply link_lu_id].
-      apply prod_local_update'; [apply link_lu_id |].
-      apply prod_local_update'; [apply link_lu_id |].
-      apply nat_local_update. lia.
+    apply lelem_local_update; try apply link_lu_id.
+    - apply nat_local_update. lia.
     - apply delete_option_local_update.
       rewrite /lreg /to_frac_agree. apply _.
   Qed.
@@ -1184,14 +1192,8 @@ Section IcacheLink.
   Proof.
     rewrite /link_auth /ilink /igrey. iIntros "Ha Hb".
     iApply (link_update with "Ha Hb").
-    rewrite /lelem.
-    apply prod_local_update'; [| apply link_lu_id].
-    apply prod_local_update'; [| apply link_lu_id].
-    apply prod_local_update'; [| apply link_lu_id].
-    apply prod_local_update';
-      [ apply prod_local_update';
-          [ apply nat_local_update; lia | apply link_lu_id ]
-      | apply nat_local_update; lia ].
+    apply lelem_local_update; try apply link_lu_id;
+      apply nat_local_update; lia.
   Qed.
 
   (* MINT ONE [igrey] FROM NOTHING -- the [g]-component twin of
@@ -1225,11 +1227,7 @@ Section IcacheLink.
   Proof.
     rewrite /link_auth /igrey. iIntros "Ha".
     iApply (link_update_alloc with "Ha").
-    rewrite /lelem.
-    apply prod_local_update'; [| apply link_lu_id].
-    apply prod_local_update'; [| apply link_lu_id].
-    apply prod_local_update'; [| apply link_lu_id].
-    apply prod_local_update'; [apply link_lu_id |].
+    apply lelem_local_update; try apply link_lu_id.
     apply nat_local_update. lia.
   Qed.
 
@@ -1243,11 +1241,8 @@ Section IcacheLink.
   Proof.
     rewrite /link_auth /iclaim. iIntros "Ha".
     iApply (link_update_alloc with "Ha").
-    rewrite /lelem.
-    apply prod_local_update'; [| apply link_lu_id].
-    apply prod_local_update'; [| apply link_lu_id].
-    apply prod_local_update'; [| apply alloc_option_local_update; done].
-    apply link_lu_id.
+    apply lelem_local_update; try apply link_lu_id.
+    apply alloc_option_local_update. done.
   Qed.
 
   Lemma link_spend_claim (z : Z) (wl wdu wdt g : nat)
@@ -1261,11 +1256,8 @@ Section IcacheLink.
     iMod (link_update _ _ _ (lelem wl wdu wdt g None r p)
             (lelem 0 0 0 0 None 0 None)
             with "Ha Hb") as "[$ _]"; [| done].
-    rewrite /lelem.
-    apply prod_local_update'; [| apply link_lu_id].
-    apply prod_local_update'; [| apply link_lu_id].
-    apply prod_local_update'; [| apply delete_option_local_update, _].
-    apply link_lu_id.
+    apply lelem_local_update; try apply link_lu_id.
+    apply delete_option_local_update, _.
   Qed.
 
   (* THE REFERENCE LICENCE (§20.7's (M1)). *)
@@ -1276,9 +1268,7 @@ Section IcacheLink.
   Proof.
     rewrite /link_auth /iref_lic. iIntros "Ha".
     iApply (link_update_alloc with "Ha").
-    rewrite /lelem.
-    apply prod_local_update'; [| apply link_lu_id].
-    apply prod_local_update'; [apply link_lu_id |].
+    apply lelem_local_update; try apply link_lu_id.
     apply nat_local_update. lia.
   Qed.
 
@@ -1291,9 +1281,7 @@ Section IcacheLink.
     iMod (link_update _ _ _ (lelem wl wdu wdt g c r p)
             (lelem 0 0 0 0 None 0 None)
             with "Ha Hb") as "[$ _]"; [| done].
-    rewrite /lelem.
-    apply prod_local_update'; [| apply link_lu_id].
-    apply prod_local_update'; [apply link_lu_id |].
+    apply lelem_local_update; try apply link_lu_id.
     apply nat_local_update. lia.
   Qed.
 

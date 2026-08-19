@@ -43,7 +43,7 @@ Definition wp_initsleeplock_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))
                    in
   (6 <= av)%nat ->
-  sie_cap_gpr m av b p -∗
+  sie_cap_gpr KT1 m av b p -∗
   kernel_text -∗ pc_is pcE -∗
   (* the two strings: the fixed "sleep lock" literal for the inner spinlock,
      and the caller's own name for the sleeplock (both duplicable). *)
@@ -58,7 +58,7 @@ Definition wp_initsleeplock_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN
   sl_pid slk ↦₄ vpid -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr,
-    sie_cap_gpr mr av b p -∗
+    sie_cap_gpr KT1 mr av b p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     slk ↦₄ (mword_of_int 0 : mword 32) -∗

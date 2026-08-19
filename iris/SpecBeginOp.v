@@ -103,7 +103,7 @@ Definition wp_begin_op_sconf_body
      function needs -- [locks_below_mono] weakens it to "proc" for the
      interior sleep calls. *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   (* enters at noff 0; the acquire raises it to what sleep demands *)
   cpu_own 0 eb pj b lks -∗
   (* WHAT THE PARK NEEDS, AND WHERE IT COMES FROM.  begin_op's own acquire
@@ -111,7 +111,7 @@ Definition wp_begin_op_sconf_body
      [emp] and the caller brings nothing); at [eb = false] the push_off frees
      nothing and the caller brings the pair, holding it because the TRAP
      handed it over -- see SpecSleep.v / SpecAcquiresleep.v. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   log_ctx γ bn γfs cov logstart dev -∗
@@ -126,9 +126,9 @@ Definition wp_begin_op_sconf_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗

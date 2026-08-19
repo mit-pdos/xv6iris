@@ -123,10 +123,10 @@ Section BallocLeaves.
     sign_extend' 64
       (shift_bits_right_arith (subrange_vec_dec (rget m rs1) 31 0 : mword 32) shamt)
       = wval ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr KT1 m n b p -∗
     pc_is pc -∗ instr pc false (SHIFTIWOP (shamt, Regidx rs1, Regidx rd, SRAIW)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr KT1 (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -153,10 +153,10 @@ Section BallocLeaves.
         (shift_bits_left (subrange_vec_dec (rget m rs1) 31 0 : mword 32)
            (subrange_vec_dec (subrange_vec_dec (rget m rs2) 31 0 : mword 32) 4 0)) in
     uint rd <> 0 -> ops_ok b rd rs1 rs2 ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr KT1 m n b p -∗
     pc_is pc -∗ instr pc false (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, SLLW)) -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      sie_cap_gpr KT1 (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).

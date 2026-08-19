@@ -55,7 +55,7 @@ Definition wp_freerange_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG 
      [kmem.lock] once per page (balanced -- [lks] is unchanged), so the
      caller must already hold only locks BELOW "kmem"'s rank. *)
   locks_below lks "kmem" ->
-  sie_cap_gpr m K b pcur -∗
+  sie_cap_gpr KT0 m K b pcur -∗
   cpu_own ncnt eb pcur b lks -∗
   kernel_text -∗ pc_is pcE -∗
   is_lock γl lk "kmem"%string (kmem_res γk fl) -∗
@@ -63,7 +63,7 @@ Definition wp_freerange_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG 
   kalloc_avail γk (Some 0%nat) -∗
   wp_next b pcur (fun (CID : CpuId) =>
     ∀ mr,
-    sie_cap_gpr mr K b pcur -∗
+    sie_cap_gpr KT0 mr K b pcur -∗
     cpu_own ncnt eb pcur b lks -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗

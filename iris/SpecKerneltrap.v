@@ -258,7 +258,7 @@ Definition wp_kerneltrap_sconf_body
      tickslock (8) and virtio's (9), and a bound has to be stated at the
      minimum, since [locks_below_mono] raises but never lowers. *)
   locks_below lks "cons" ->
-  sie_cap_gpr m av false p -∗
+  sie_cap_gpr KT1 m av false p -∗
   (* THE TRAP CAME FROM S-MODE WITH INTERRUPTS ENABLED: SPP = 1 and
      SPIE = 1.  This is the [sret_bits] travelling half, which is what
      carries the fact past the four instructions before the check. *)
@@ -282,7 +282,7 @@ Definition wp_kerneltrap_sconf_body
      bought nothing across the one boundary (the park) that mattered.  The
      trap CSRs beside it are threaded piecewise at PINNED values here, which
      is why this is its own conjunct rather than folded into [trap_csrs]. *)
-  intr_res -∗
+  intr_res KT1 -∗
   (* THE KPT RECEIPT, [trap_csrs]' sixth member (IntrDefs §6b), threaded for
      EXACTLY [intr_res]'s reasons and by the same route.  kernelvec's sret
      re-enables interrupts, and the arm it rebuilds carries the receipt, so a
@@ -309,10 +309,10 @@ Definition wp_kerneltrap_sconf_body
       ⌜ _get_Mstatus_SPP  ms_f = ('b"1" : mword 1) ⌝ -∗
       ⌜ _get_Mstatus_SPIE ms_f = ('b"1" : mword 1) ⌝ -∗
       ⌜ _get_Mstatus_SIE  ms_f = ('b"0" : mword 1) ⌝ -∗
-      sie_cap_gpr_at ms_f mf av false p -∗
+      sie_cap_gpr_at KT1 ms_f mf av false p -∗
       sret_bits ('b"1" : mword 1) ('b"1" : mword 1) -∗
       (* at the RESUMING hart -- see the premise *)
-      intr_res -∗
+      intr_res KT1 -∗
       kpt_on cpu_id -∗
       cpu_own 0 false p false lks -∗
       (* sepc is RESTORED to the trapped pc; scause and stval belong to the

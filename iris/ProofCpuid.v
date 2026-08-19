@@ -94,6 +94,7 @@ Section ProofCpuid.
 
 
 
+  Context {kt : ktier}.
   (* =================================================================== *)
   (*  THE CAPSTONE: a WP for the entire cpuid(), entry through return.    *)
   (*  Registers: ra=x1 sp=x2 tp=x4 s0=x8 a0=x10.  On exit                 *)
@@ -101,7 +102,7 @@ Section ProofCpuid.
   (* =================================================================== *)
   Lemma wp_cpuid_sconf
       (m0 : regfile) (n : nat) (p : mword 64)
-    : wp_cpuid_sconf_body m0 n p.
+    : wp_cpuid_sconf_body kt m0 n p.
   Proof.
     cbv beta delta [wp_cpuid_sconf_body].
     intros ra_idx tp_idx a0_idx pcE ra0 ret_tgt cret Hn.
@@ -310,7 +311,7 @@ Section ProofCpuid.
   Lemma wp_call_cpuid_sconf_cs
       (P : mword 64) (jimm : mword 21)
       (m : regfile) (n : nat) (p : mword 64)
-    : wp_call_cpuid_sconf_cs_body P jimm m n p.
+    : wp_call_cpuid_sconf_cs_body kt P jimm m n p.
   Proof.
     cbv beta delta [wp_call_cpuid_sconf_cs_body].
     intros ra_idx tp_idx a0_idx m0 pcE ra0 ret_tgt cret Htarget Halpce Hn.

@@ -357,7 +357,7 @@ Section SpecMain.
     (* main has no current proc, and neither does the scheduler() it tail-
        calls. *)
     p0 = zero_reg ->
-    sie_cap_gpr m K false p0 -∗
+    sie_cap_gpr KT0 m K false p0 -∗
     cpu_ctx_free -∗
     cpu_own 0 false p0 false ∅ -∗
     (* the SIE live-bit ghost's INVARIANT quarter, still raw: main is the only

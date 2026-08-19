@@ -16,7 +16,6 @@ From iris.base_logic.lib Require Import ghost_var invariants gen_heap.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
-Require Import RegFile.
 Require Import SmodeCore.
 Require Import KernelText WireInv.
 Require Import KptExecMap.
@@ -111,7 +110,7 @@ Definition forkret_park_pkg
    procs_inv γs ∗
    pslot_used_at pa ∗
    (* ---- the child's kernel stack, free below its top ---- *)
-   stack_own (add_vec ks (mword_of_int 4096)) av ∗
+   stack_own (KTR := KT1) (add_vec ks (mword_of_int 4096)) av ∗
    (* ---- the residue closer, at every hart the record may resume on.
           It takes the two ALLOWANCES the park's own arguments carry
           ([fd_slots FDSPARE] / [iref_slots IREFSPARE]): those are the

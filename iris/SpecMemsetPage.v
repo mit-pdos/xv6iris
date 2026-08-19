@@ -20,7 +20,7 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 
 
-Definition wp_memset_page_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (m0 : regfile) (n : nat) (cval : mword 64) (b : bool) (pcur : mword 64) :=
+Definition wp_memset_page_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (m0 : regfile) (n : nat) (cval : mword 64) (b : bool) (pcur : mword 64) :=
   let a0_idx : mword 5 := mword_of_int 10 in
   let a1_idx : mword 5 := mword_of_int 11 in
   let a2_idx : mword 5 := mword_of_int 12 in
@@ -32,12 +32,12 @@ Definition wp_memset_page_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{C
   page_valid p ->
   m0 !!! Regidx a1_idx = cval ->
   m0 !!! Regidx a2_idx = (mword_of_int 4096 : mword 64) ->
-  sie_cap_gpr m0 n b pcur -∗
+  sie_cap_gpr kt m0 n b pcur -∗
   kernel_text -∗ pc_is pcE -∗
   page_own p -∗
   wp_next b pcur (fun (CID : CpuId) =>
     ∀ mfin,
-    sie_cap_gpr mfin n b pcur -∗
+    sie_cap_gpr kt mfin n b pcur -∗
     pc_is ret_tgt -∗
     page_own p -∗
     ⌜ callee_saved m0 mfin ⌝ -∗
@@ -46,6 +46,6 @@ Definition wp_memset_page_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{C
 
 Module Type MEMSETPAGE.
   Parameter wp_memset_page_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (m0 : regfile) (n : nat) (cval : mword 64) (b : bool) (pcur : mword 64),
-      wp_memset_page_sconf_body m0 n cval b pcur.
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (m0 : regfile) (n : nat) (cval : mword 64) (b : bool) (pcur : mword 64),
+      wp_memset_page_sconf_body kt m0 n cval b pcur.
 End MEMSETPAGE.

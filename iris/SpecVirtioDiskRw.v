@@ -98,7 +98,7 @@ Definition wp_virtio_disk_rw_sconf_body
   γs !! j = Some γl ->
   (* order premise at the lowest rank this cone reaches. *)
   locks_below lks "virtio_disk" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   (* enters at noff 0; acquire raises to the level sleep requires *)
   cpu_own 0 eb pj b lks -∗
   (* WHAT THE PARK NEEDS, AND WHERE IT COMES FROM.  Everything below sleeps,
@@ -108,7 +108,7 @@ Definition wp_virtio_disk_rw_sconf_body
      caller brings nothing -- which is why this used to be an [eb = true]
      premise instead.  At [eb = false] the push_off frees nothing and the
      caller brings the pair, holding it because the TRAP handed it over. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv γs -∗
@@ -150,9 +150,9 @@ Definition wp_virtio_disk_rw_sconf_body
   wp_next true pj (fun (CID : CpuId) =>
     ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       (* the exchange: a read fills the buffer from the block, a write

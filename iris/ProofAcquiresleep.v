@@ -245,10 +245,10 @@ Section AslProps.
     (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (M : regfile),
       ⌜ asl_regs m M slk spd ⌝ -∗
-      pa_stk sp0 1 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
-      pa_stk sp0 2 ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
-      pa_stk sp0 3 ↦₈ (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
-      pa_stk sp0 4 ↦₈ (m !!! Regidx (mword_of_int 18 : mword 5)) -∗
+      pa_stk sp0 1 ↦₈[KT1] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
+      pa_stk sp0 2 ↦₈[KT1] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
+      pa_stk sp0 3 ↦₈[KT1] (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
+      pa_stk sp0 4 ↦₈[KT1] (m !!! Regidx (mword_of_int 18 : mword 5)) -∗
       locked γl cpu_id -∗ sl_free_tok γsl -∗ H q -∗
       sl_pid slk ↦₄ (mword_of_int 0 : mword 32) -∗ R -∗
       slk ↦₄ (mword_of_int 0 : mword 32) -∗
@@ -259,9 +259,9 @@ Section AslProps.
          what this stretch's own continuation ([Hcont], threaded straight
          through from the caller) hands back once that release fires. *)
       cpu_own 1 eb (proc_addr j) false ({["sleep lock"]} ∪ lks) -∗
-      trap_csrs -∗
+      trap_csrs KT1 -∗
       cpu_claim (proc_addr j) -∗
-      sie_cap_gpr M (trap_res eb + (av - 4))%nat false (proc_addr j) -∗
+      sie_cap_gpr KT1 M (trap_res eb + (av - 4))%nat false (proc_addr j) -∗
       pc_is (mword_of_int (KernelSyms.acquiresleep + 0x36)) -∗
       WP (Loop : expr riscv_lang)))%I.
 
@@ -274,10 +274,10 @@ Section AslProps.
     (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (M : regfile),
       ⌜ asl_regs m M slk spd ⌝ -∗
-      pa_stk sp0 1 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
-      pa_stk sp0 2 ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
-      pa_stk sp0 3 ↦₈ (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
-      pa_stk sp0 4 ↦₈ (m !!! Regidx (mword_of_int 18 : mword 5)) -∗
+      pa_stk sp0 1 ↦₈[KT1] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
+      pa_stk sp0 2 ↦₈[KT1] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
+      pa_stk sp0 3 ↦₈[KT1] (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
+      pa_stk sp0 4 ↦₈[KT1] (m !!! Regidx (mword_of_int 18 : mword 5)) -∗
       locked γl cpu_id -∗
       (∃ v : mword 32, slk ↦₄ v ∗ ⌜neq_vec (sign_extend' 64 v) zero_reg = true⌝) -∗
       sl_dep γsl H -∗ H q -∗
@@ -285,9 +285,9 @@ Section AslProps.
       (* same convention as [asl_exit]: [lks] is the OUTER set, this loop
          iteration is entered still HOLDING "sleep lock". *)
       cpu_own 1 eb (proc_addr j) false ({["sleep lock"]} ∪ lks) -∗
-      trap_csrs -∗
+      trap_csrs KT1 -∗
       cpu_claim (proc_addr j) -∗
-      sie_cap_gpr M (trap_res eb + (av - 4))%nat false (proc_addr j) -∗
+      sie_cap_gpr KT1 M (trap_res eb + (av - 4))%nat false (proc_addr j) -∗
       pc_is (mword_of_int (KernelSyms.acquiresleep + 0x1c)) -∗
       asl_exit CID0 γs j γl γsl R H q m pidv av dq slk spd sp0 eb lks -∗
       WP (Loop : expr riscv_lang)))%I.
@@ -318,10 +318,10 @@ Section AslProps.
       (eb : bool) (n : nat) (lks : gset string) : iProp Σ :=
     (∀ (M : regfile),
       ⌜ asl_regs m M slk spd ⌝ -∗
-      pa_stk sp0 1 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
-      pa_stk sp0 2 ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
-      pa_stk sp0 3 ↦₈ (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
-      pa_stk sp0 4 ↦₈ (m !!! Regidx (mword_of_int 18 : mword 5)) -∗
+      pa_stk sp0 1 ↦₈[KT1] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
+      pa_stk sp0 2 ↦₈[KT1] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
+      pa_stk sp0 3 ↦₈[KT1] (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
+      pa_stk sp0 4 ↦₈[KT1] (m !!! Regidx (mword_of_int 18 : mword 5)) -∗
       locked γl cpu_id -∗ sl_free_tok γsl -∗ H q -∗ X -∗
       sl_pid slk ↦₄ (mword_of_int 0 : mword 32) -∗ R -∗
       slk ↦₄ (mword_of_int 0 : mword 32) -∗
@@ -330,8 +330,8 @@ Section AslProps.
          stretch is entered still holding "sleep lock" (released by the
          [+0x44 jal release] it covers). *)
       cpu_own (S (S n)) eb (proc_addr j) false ({["sleep lock"]} ∪ lks) -∗
-      arm_pay (S n) eb (proc_addr j) -∗
-      sie_cap_gpr M (av - 4)%nat false (proc_addr j) -∗
+      arm_pay KT1 (S n) eb (proc_addr j) -∗
+      sie_cap_gpr KT1 M (av - 4)%nat false (proc_addr j) -∗
       pc_is (mword_of_int (KernelSyms.acquiresleep + 0x36)) -∗
       WP (Loop : expr riscv_lang))%I.
 
@@ -342,10 +342,10 @@ Section AslProps.
       (eb : bool) (n : nat) (lks : gset string) : iProp Σ :=
     (∀ (M : regfile),
       ⌜ asl_regs m M slk spd ⌝ -∗
-      pa_stk sp0 1 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
-      pa_stk sp0 2 ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
-      pa_stk sp0 3 ↦₈ (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
-      pa_stk sp0 4 ↦₈ (m !!! Regidx (mword_of_int 18 : mword 5)) -∗
+      pa_stk sp0 1 ↦₈[KT1] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
+      pa_stk sp0 2 ↦₈[KT1] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
+      pa_stk sp0 3 ↦₈[KT1] (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
+      pa_stk sp0 4 ↦₈[KT1] (m !!! Regidx (mword_of_int 18 : mword 5)) -∗
       locked γl cpu_id -∗
       (∃ v : mword 32, slk ↦₄ v ∗ ⌜neq_vec (sign_extend' 64 v) zero_reg = true⌝) -∗
       sl_dep γsl H -∗ H q -∗ X -∗
@@ -353,8 +353,8 @@ Section AslProps.
       (* HELD, same convention as [asl_loop]: [lks] is the OUTER set, this
          loop iteration is entered still holding "sleep lock". *)
       cpu_own (S (S n)) eb (proc_addr j) false ({["sleep lock"]} ∪ lks) -∗
-      arm_pay (S n) eb (proc_addr j) -∗
-      sie_cap_gpr M (av - 4)%nat false (proc_addr j) -∗
+      arm_pay KT1 (S n) eb (proc_addr j) -∗
+      sie_cap_gpr KT1 M (av - 4)%nat false (proc_addr j) -∗
       pc_is (mword_of_int (KernelSyms.acquiresleep + 0x1c)) -∗
       asl_nexit γl γsl R H q X m j pidv av dq slk spd sp0 eb n lks -∗
       WP (Loop : expr riscv_lang))%I.
@@ -398,25 +398,25 @@ Section AslBodies.
     locks_below lks "sleep lock" ->
     kernel_text -∗
     is_sleeplock_gen γl γsl slk s R H -∗
-    pa_stk sp0 1 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
-    pa_stk sp0 2 ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
-    pa_stk sp0 3 ↦₈ (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
-    pa_stk sp0 4 ↦₈ (m !!! Regidx (mword_of_int 18 : mword 5)) -∗
+    pa_stk sp0 1 ↦₈[KT1] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
+    pa_stk sp0 2 ↦₈[KT1] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
+    pa_stk sp0 3 ↦₈[KT1] (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
+    pa_stk sp0 4 ↦₈[KT1] (m !!! Regidx (mword_of_int 18 : mword 5)) -∗
     locked γl cpu_id -∗ sl_free_tok γsl -∗ H q -∗
     sl_pid slk ↦₄ (mword_of_int 0 : mword 32) -∗ R -∗
     slk ↦₄ (mword_of_int 0 : mword 32) -∗
     p_pid pj ↦₄{dq} pidv -∗
     cpu_own 1 eb pj false ({["sleep lock"]} ∪ lks) -∗
-    trap_csrs -∗
+    trap_csrs KT1 -∗
     cpu_claim pj -∗
-    sie_cap_gpr M (trap_res eb + (av - 4))%nat false pj -∗
+    sie_cap_gpr KT1 M (trap_res eb + (av - 4))%nat false pj -∗
     pc_is (mword_of_int (KernelSyms.acquiresleep + 0x36)) -∗
     wp_next (CID0 := CID0) true pj (fun (CID : CpuId) =>
       ∀ (mf : regfile),
         ⌜ callee_saved m mf ⌝ -∗
-        sie_cap_gpr mf av eb pj -∗
+        sie_cap_gpr KT1 mf av eb pj -∗
         cpu_own 0 eb pj eb lks -∗
-        trap_csrs_ext eb -∗
+        trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb pj -∗
         pc_is (ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))) -∗
         sleeplocked_q γsl q -∗
@@ -469,7 +469,7 @@ Section AslBodies.
     (* +0x38 c.sw a5,0(s1) : slk->locked := 1 *)
     assert (Hlw0 : add_vec (rget E1 (mword_of_int 9 : mword 5)) (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00")))) = slk).
     { rgne. rewrite HE1s1. replace (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00"))) : mword 64) with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity). apply kv_addv_zero. }
-    iApply (wp_csw_s_sconf (mword_of_int (KernelSyms.acquiresleep + 0x38)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5)
+    iApply (wp_csw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.acquiresleep + 0x38)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5)
               (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00"))) E1 (trap_res eb + (av - 4))%nat (mword_of_int 0 : mword 32) false
               with "Hcg Hpc Hi2a [Hw]").
     { iEval (rewrite Hlw0). iExact "Hw". }
@@ -510,7 +510,7 @@ Section AslBodies.
       replace (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 12 : mword 5) ('b"00"))) : mword 64)
         with (sign_extend' 64 (mword_of_int 48 : mword 12) : mword 64) by (apply bv_eq; vm_compute; reflexivity).
       reflexivity. }
-    iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.acquiresleep + 0x3e)) (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
+    iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.acquiresleep + 0x3e)) (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
               (zero_extend' 12 (concat_vec (mword_of_int 12 : mword 5) ('b"00"))) mfm (trap_res eb + (av - 4))%nat pidv false (dqm := dq)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi30 [Hpid]").
@@ -531,7 +531,7 @@ Section AslBodies.
       replace (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 5) ('b"00"))) : mword 64)
         with (sign_extend' 64 (mword_of_int 40 : mword 12) : mword 64) by (apply bv_eq; vm_compute; reflexivity).
       reflexivity. }
-    iApply (wp_csw_s_sconf (mword_of_int (KernelSyms.acquiresleep + 0x40)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5)
+    iApply (wp_csw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.acquiresleep + 0x40)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5)
               (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 5) ('b"00"))) E3 (trap_res eb + (av - 4))%nat (mword_of_int 0 : mword 32) false
               with "Hcg Hpc Hi32 [Hspid]").
     { iEval (rewrite Hspidaddr). iExact "Hspid". }
@@ -580,7 +580,7 @@ Section AslBodies.
        [eb = true], [emp] at [eb = false] -- and the complement rides out to
        the caller, which is what makes this contract index-generic. *)
     iDestruct (arm_pay_ext_split eb _ with "Htc Hclm") as "[Hpay Hext]".
-    iApply (Release.wp_release_sconf γl (sl_lk slk) "sleep lock"%string (sl_res_gen γsl slk R H) E5
+    iApply (Release.wp_release_sconf KT1 γl (sl_lk slk) "sleep lock"%string (sl_res_gen γsl slk R H) E5
               0%nat eb pj (av - 4)%nat
               ({["sleep lock"]} ∪ lks)
               Hrel_lka ltac:(lia)
@@ -671,8 +671,8 @@ Section AslBodies.
                    = pa_stk (add_vec (Q40 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
     { rewrite Hwv HQ40sp -Hspd. unfold pa_stk, add_vec_int.
       apply f_equal. apply bv_eq; vm_compute; reflexivity. }
-    iAssert (stack_own sp0 4) with "[Hr24 Hr16 Hr8 Hr0]" as "Hframe4".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := KT1) sp0 4) with "[Hr24 Hr16 Hr8 Hr0]" as "Hframe4".
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hr24"; [iExists _; iExact "Hr24"|].
       iSplitL "Hr16"; [iExists _; iExact "Hr16"|].
       iSplitL "Hr8";  [iExists _; iExact "Hr8"|].
@@ -757,10 +757,10 @@ Section AslBodies.
     kernel_text -∗
     ▷ asl_loop CID0 γs j γl γsl R H q m pidv av dq slk spd sp0 eb lks -∗
     asl_exit CID0 γs j γl γsl R H q m pidv av dq slk spd sp0 eb lks -∗
-    pa_stk sp0 1 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
-    pa_stk sp0 2 ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
-    pa_stk sp0 3 ↦₈ (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
-    pa_stk sp0 4 ↦₈ (m !!! Regidx (mword_of_int 18 : mword 5)) -∗
+    pa_stk sp0 1 ↦₈[KT1] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
+    pa_stk sp0 2 ↦₈[KT1] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
+    pa_stk sp0 3 ↦₈[KT1] (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
+    pa_stk sp0 4 ↦₈[KT1] (m !!! Regidx (mword_of_int 18 : mword 5)) -∗
     locked γl cpu_id -∗
     sl_res_gen γsl slk R H -∗ H q -∗
     p_pid pj ↦₄{dq} pidv -∗
@@ -768,9 +768,9 @@ Section AslBodies.
        "sleep lock" here (the reload+branch at +0x32..+0x34 happens before
        either arm touches the lock). *)
     cpu_own 1 eb pj false ({["sleep lock"]} ∪ lks) -∗
-    trap_csrs -∗
+    trap_csrs KT1 -∗
     cpu_claim pj -∗
-    sie_cap_gpr M (trap_res eb + (av - 4))%nat false pj -∗
+    sie_cap_gpr KT1 M (trap_res eb + (av - 4))%nat false pj -∗
     pc_is (mword_of_int (KernelSyms.acquiresleep + 0x32)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -788,7 +788,7 @@ Section AslBodies.
     iDestruct "HRc" as (vp) "[Hwp Harm]".
     assert (Hlw24 : add_vec (rget M (mword_of_int 9 : mword 5)) (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00")))) = slk).
     { rgne. rewrite Hs1. replace (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00"))) : mword 64) with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity). apply kv_addv_zero. }
-    iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.acquiresleep + 0x32)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5)
+    iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.acquiresleep + 0x32)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5)
               (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00"))) M (trap_res eb + (av - 4))%nat vp false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi24 [Hwp]").
@@ -861,18 +861,18 @@ Section AslBodies.
     is_sleeplock_gen γl γsl slk s R H -∗
     procs_inv γs -∗
     ▷ asl_loop CID0 γs j γl γsl R H q m pidv av dq slk spd sp0 eb lks -∗
-    pa_stk sp0 1 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
-    pa_stk sp0 2 ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
-    pa_stk sp0 3 ↦₈ (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
-    pa_stk sp0 4 ↦₈ (m !!! Regidx (mword_of_int 18 : mword 5)) -∗
+    pa_stk sp0 1 ↦₈[KT1] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
+    pa_stk sp0 2 ↦₈[KT1] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
+    pa_stk sp0 3 ↦₈[KT1] (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
+    pa_stk sp0 4 ↦₈[KT1] (m !!! Regidx (mword_of_int 18 : mword 5)) -∗
     locked γl cpu_id -∗
     (∃ v : mword 32, slk ↦₄ v ∗ ⌜neq_vec (sign_extend' 64 v) zero_reg = true⌝) -∗
     sl_dep γsl H -∗ H q -∗
     p_pid pj ↦₄{dq} pidv -∗
     cpu_own 1 eb pj false ({["sleep lock"]} ∪ lks) -∗
-    trap_csrs -∗
+    trap_csrs KT1 -∗
     cpu_claim pj -∗
-    sie_cap_gpr M (trap_res eb + (av - 4))%nat false pj -∗
+    sie_cap_gpr KT1 M (trap_res eb + (av - 4))%nat false pj -∗
     pc_is (mword_of_int (KernelSyms.acquiresleep + 0x1c)) -∗
     asl_exit CID0 γs j γl γsl R H q m pidv av dq slk spd sp0 eb lks -∗
     WP (Loop : expr riscv_lang).
@@ -982,7 +982,7 @@ Section AslBodies.
     assert (Hrel_lka : add_vec (L4 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 0 : mword 12)) = sl_lk slk).
     { rewrite HL4a0. replace (sign_extend' 64 (mword_of_int 0 : mword 12) : mword 64) with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity). apply kv_addv_zero. }
     iDestruct (arm_pay_ext_split eb _ with "Htc Hclm") as "[Hpay Hext]".
-    iApply (Release.wp_release_sconf γl (sl_lk slk) "sleep lock"%string (sl_res_gen γsl slk R H) L4
+    iApply (Release.wp_release_sconf KT1 γl (sl_lk slk) "sleep lock"%string (sl_res_gen γsl slk R H) L4
               0%nat eb pj (av - 4)%nat
               ({["sleep lock"]} ∪ lks)
               Hrel_lka ltac:(lia)
@@ -1077,7 +1077,7 @@ Section AslBodies.
     iDestruct (cpu_own_transport CIDs CIDa 0 eb pj eb ltac:(wp_next_chain)
                  with "Hown") as "Hown".
     (* ===== acquire(&slk->lk) again: back to level 1, index [false] ===== *)
-    iApply (Acquire.wp_acquire_sconf γl "sleep lock"%string (sl_res_gen γsl slk R H) L7
+    iApply (Acquire.wp_acquire_sconf KT1 γl "sleep lock"%string (sl_res_gen γsl slk R H) L7
               0%nat eb pj (av - 4)%nat eb lks
               ltac:(lia)
               ltac:(lia)
@@ -1158,7 +1158,7 @@ Section ProofAcquiresleep.
     change (<[Regidx csp_rs1 := regval_into_reg
         (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m) with R1.
     assert (HspR1 : R1 !!! Regidx csp_rs1 = spd) by (rewrite /R1 upd_eq; reflexivity).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & _)".
     iDestruct "S1" as (vr24) "Hr24". iDestruct "S2" as (vr16) "Hr16".
     iDestruct "S3" as (vr8)  "Hr8".  iDestruct "S4" as (vr0)  "Hr0".
@@ -1291,7 +1291,7 @@ Section ProofAcquiresleep.
     (* ===== acquire(&slk->lk): cpu_own 0 -> 1, returns locked + sl_res + pay ===== *)
     iDestruct (cpu_own_transport CID CID10 0 eb pj eb ltac:(wp_next_chain)
                  with "Hown") as "Hown".
-    iApply (Acquire.wp_acquire_sconf γl "sleep lock"%string (sl_res_gen γsl slk R H) Maq
+    iApply (Acquire.wp_acquire_sconf KT1 γl "sleep lock"%string (sl_res_gen γsl slk R H) Maq
               0%nat eb pj (av - 4)%nat eb lks
               ltac:(lia)
               ltac:(lia)
@@ -1355,7 +1355,7 @@ Section ProofAcquiresleep.
     assert (Hlw18 : add_vec (rget Macq (mword_of_int 9 : mword 5)) (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00")))) = slk).
     { rgne. rewrite Hacq_s1. replace (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00"))) : mword 64) with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity). apply kv_addv_zero. }
     (* +0x18 lw a5,0(s1) *)
-    iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.acquiresleep + 0x18)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5)
+    iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.acquiresleep + 0x18)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5)
               (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00"))) Macq (trap_res eb + (av - 4))%nat v0 false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi18 [Hw0]").
@@ -1457,7 +1457,7 @@ Section ProofAcquiresleep.
     (26 <= av)%nat ->
     (Z.of_nat n + 4 < 2 ^ 31)%Z ->
     "sleep lock" ∉ lks ->
-    sie_cap_gpr m av false pj -∗
+    sie_cap_gpr KT1 m av false pj -∗
     cpu_own (S n) eb pj false lks -∗
     kernel_text -∗ pc_is pcE -∗
     is_sleeplock_gen γl γsl slk s R H -∗
@@ -1471,7 +1471,7 @@ Section ProofAcquiresleep.
     wp_next false pj (fun (CID : CpuId) =>
       ∀ (mf : regfile),
         ⌜ callee_saved m mf ⌝ -∗
-        sie_cap_gpr mf av false pj -∗
+        sie_cap_gpr KT1 mf av false pj -∗
         cpu_own (S n) eb pj false lks -∗
         pc_is ret_tgt -∗
         sleeplocked_q γsl q -∗
@@ -1516,7 +1516,7 @@ Section ProofAcquiresleep.
     change (<[Regidx csp_rs1 := regval_into_reg
         (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m) with R1.
     assert (HspR1 : R1 !!! Regidx csp_rs1 = spd) by (rewrite /R1 upd_eq; reflexivity).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & _)".
     iDestruct "S1" as (vr24) "Hr24". iDestruct "S2" as (vr16) "Hr16".
     iDestruct "S3" as (vr8)  "Hr8".  iDestruct "S4" as (vr0)  "Hr0".
@@ -1656,7 +1656,7 @@ Section ProofAcquiresleep.
       rewrite /C1 upd_ne; [| congruence]. rewrite /C0 upd_ne; [| congruence].
       rewrite /R2 upd_ne; [| congruence]. rewrite /R1 upd_ne; [reflexivity | congruence]. }
     (* ===== acquire(&slk->lk): cpu_own 0 -> 1, returns locked + sl_res + pay ===== *)
-    iApply (Acquire.wp_acquire_fresh_sconf γl "sleep lock"%string (sl_res_gen γsl slk R H) Maq
+    iApply (Acquire.wp_acquire_fresh_sconf KT1 γl "sleep lock"%string (sl_res_gen γsl slk R H) Maq
               (S n) eb pj (av - 4)%nat false lks
               ltac:(lia)
               ltac:(lia)
@@ -1693,7 +1693,7 @@ Section ProofAcquiresleep.
     assert (Hlw18 : add_vec (rget Macq (mword_of_int 9 : mword 5)) (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00")))) = slk).
     { rgne. rewrite Hacq_s1. replace (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00"))) : mword 64) with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity). apply kv_addv_zero. }
     (* +0x18 lw a5,0(s1) *)
-    iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.acquiresleep + 0x18)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5)
+    iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.acquiresleep + 0x18)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5)
               (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00"))) Macq (av - 4)%nat v0 false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi18 [Hw0]").
@@ -1750,7 +1750,7 @@ Section ProofAcquiresleep.
       (* +0x38 c.sw a5,0(s1) : slk->locked := 1 *)
       assert (Hlw0 : add_vec (rget E1 (mword_of_int 9 : mword 5)) (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00")))) = slk).
       { rgne. rewrite HE1s1. replace (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00"))) : mword 64) with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity). apply kv_addv_zero. }
-      iApply (wp_csw_s_sconf (mword_of_int (KernelSyms.acquiresleep + 0x38)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5)
+      iApply (wp_csw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.acquiresleep + 0x38)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5)
                 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00"))) E1 (av - 4)%nat (mword_of_int 0 : mword 32) false
                 with "Hcg Hpc Hi2a [Hw]").
       { iEval (rewrite Hlw0). iExact "Hw". }
@@ -1791,7 +1791,7 @@ Section ProofAcquiresleep.
         replace (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 12 : mword 5) ('b"00"))) : mword 64)
           with (sign_extend' 64 (mword_of_int 48 : mword 12) : mword 64) by (apply bv_eq; vm_compute; reflexivity).
         reflexivity. }
-      iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.acquiresleep + 0x3e)) (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
+      iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.acquiresleep + 0x3e)) (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
                 (zero_extend' 12 (concat_vec (mword_of_int 12 : mword 5) ('b"00"))) mfm (av - 4)%nat pidv false (dqm := dq)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi30 [Hpid]").
@@ -1812,7 +1812,7 @@ Section ProofAcquiresleep.
         replace (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 5) ('b"00"))) : mword 64)
           with (sign_extend' 64 (mword_of_int 40 : mword 12) : mword 64) by (apply bv_eq; vm_compute; reflexivity).
         reflexivity. }
-      iApply (wp_csw_s_sconf (mword_of_int (KernelSyms.acquiresleep + 0x40)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5)
+      iApply (wp_csw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.acquiresleep + 0x40)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5)
                 (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 5) ('b"00"))) E3 (av - 4)%nat (mword_of_int 0 : mword 32) false
                 with "Hcg Hpc Hi32 [Hspid]").
       { iEval (rewrite Hspidaddr). iExact "Hspid". }
@@ -1857,7 +1857,7 @@ Section ProofAcquiresleep.
       iDestruct (sl_res_close_held_q γsl slk R H (mword_of_int 1 : mword 32) q ltac:(vm_compute; reflexivity) with "Hw Hha HHq") as "HRc".
       assert (Hrel_lka : add_vec (E5 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 0 : mword 12)) = sl_lk slk).
       { rewrite HE5a0. replace (sign_extend' 64 (mword_of_int 0 : mword 12) : mword 64) with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity). apply kv_addv_zero. }
-      iApply (Release.wp_release_sconf γl (sl_lk slk) "sleep lock"%string (sl_res_gen γsl slk R H) E5
+      iApply (Release.wp_release_sconf KT1 γl (sl_lk slk) "sleep lock"%string (sl_res_gen γsl slk R H) E5
                 (S n) eb pj (av - 4)%nat
                 ({["sleep lock"]} ∪ lks)
                 Hrel_lka ltac:(lia)
@@ -1954,8 +1954,8 @@ Section ProofAcquiresleep.
                      = pa_stk (add_vec (Q40 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
       { rewrite Hwv HQ40sp -Hspd. unfold pa_stk, add_vec_int.
         apply f_equal. apply bv_eq; vm_compute; reflexivity. }
-      iAssert (stack_own sp0 4) with "[Hr24 Hr16 Hr8 Hr0]" as "Hframe4".
-      { rewrite stack_own_slots. cbn [seq].
+      iAssert (stack_own (KTR := KT1) sp0 4) with "[Hr24 Hr16 Hr8 Hr0]" as "Hframe4".
+      { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
         iSplitL "Hr24"; [iExists _; iExact "Hr24"|].
         iSplitL "Hr16"; [iExists _; iExact "Hr16"|].
         iSplitL "Hr8";  [iExists _; iExact "Hr8"|].

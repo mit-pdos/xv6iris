@@ -154,6 +154,12 @@ Section ReadiDefs.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
 
+  (* the CALLER's buffer tier -- see this function's spec for why it is not
+     [KT1].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at
+     instance search, so every OTHER leaf in this file has to name its own
+     datum tier out loud (the blanket [(ktd := KT1)] below). *)
+  Context {ktb : ktier}.
+  Context `{!KtierLe ktb KT1}.
   (* readi's 112-byte frame.  Slot k sits at [sp0 - 8k], i.e. at
      [sp_new + (112 - 8k)]:
        1 ra@104   2 s0@96   3 s1@88   4 s2@80   5 s3@72   6 s4@64
@@ -163,54 +169,54 @@ Section ReadiDefs.
   (* the SEVEN unconditional saves (+0x008..+0x014), which is all the
      return block may assume. *)
   Definition rd_fr7 (m : regfile) : iProp Σ :=
-    (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈ (m !!! Regidx Rra : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈ (m !!! Regidx Rs0 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈ (m !!! Regidx Rs1 : mword 64) ∗
-     (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈ v) ∗
-     (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 5 ↦₈ v) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈ (m !!! Regidx Rs4 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 7 ↦₈ (m !!! Regidx Rs5 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 8 ↦₈ (m !!! Regidx Rs6 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 9 ↦₈ (m !!! Regidx Rs7 : mword 64) ∗
-     (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 10 ↦₈ v) ∗
-     (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 11 ↦₈ v) ∗
-     (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 12 ↦₈ v) ∗
-     (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 13 ↦₈ v) ∗
-     (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 14 ↦₈ v))%I.
+    (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈[KT1] (m !!! Regidx Rra : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) ∗
+     (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈[KT1] v) ∗
+     (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 5 ↦₈[KT1] v) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈[KT1] (m !!! Regidx Rs4 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 7 ↦₈[KT1] (m !!! Regidx Rs5 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 8 ↦₈[KT1] (m !!! Regidx Rs6 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 9 ↦₈[KT1] (m !!! Regidx Rs7 : mword 64) ∗
+     (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 10 ↦₈[KT1] v) ∗
+     (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 11 ↦₈[KT1] v) ∗
+     (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 12 ↦₈[KT1] v) ∗
+     (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 13 ↦₈[KT1] v) ∗
+     (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 14 ↦₈[KT1] v))%I.
 
   (* ...plus s3's slot, pinned from +0x02a to the [c.ldsp s3] at +0xda *)
   Definition rd_fr8 (m : regfile) : iProp Σ :=
-    (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈ (m !!! Regidx Rra : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈ (m !!! Regidx Rs0 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈ (m !!! Regidx Rs1 : mword 64) ∗
-     (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈ v) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 5 ↦₈ (m !!! Regidx Rs3 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈ (m !!! Regidx Rs4 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 7 ↦₈ (m !!! Regidx Rs5 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 8 ↦₈ (m !!! Regidx Rs6 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 9 ↦₈ (m !!! Regidx Rs7 : mword 64) ∗
-     (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 10 ↦₈ v) ∗
-     (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 11 ↦₈ v) ∗
-     (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 12 ↦₈ v) ∗
-     (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 13 ↦₈ v) ∗
-     (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 14 ↦₈ v))%I.
+    (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈[KT1] (m !!! Regidx Rra : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) ∗
+     (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈[KT1] v) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 5 ↦₈[KT1] (m !!! Regidx Rs3 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈[KT1] (m !!! Regidx Rs4 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 7 ↦₈[KT1] (m !!! Regidx Rs5 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 8 ↦₈[KT1] (m !!! Regidx Rs6 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 9 ↦₈[KT1] (m !!! Regidx Rs7 : mword 64) ∗
+     (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 10 ↦₈[KT1] v) ∗
+     (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 11 ↦₈[KT1] v) ∗
+     (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 12 ↦₈[KT1] v) ∗
+     (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 13 ↦₈[KT1] v) ∗
+     (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 14 ↦₈[KT1] v))%I.
 
   (* ...and all thirteen, which is what the loop holds (+0x038..+0x040) *)
   Definition rd_fr13 (m : regfile) : iProp Σ :=
-    (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈ (m !!! Regidx Rra : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈ (m !!! Regidx Rs0 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈ (m !!! Regidx Rs1 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈ (m !!! Regidx Rs2 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 5 ↦₈ (m !!! Regidx Rs3 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈ (m !!! Regidx Rs4 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 7 ↦₈ (m !!! Regidx Rs5 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 8 ↦₈ (m !!! Regidx Rs6 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 9 ↦₈ (m !!! Regidx Rs7 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 10 ↦₈ (m !!! Regidx Rs8 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 11 ↦₈ (m !!! Regidx Rs9 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 12 ↦₈ (m !!! Regidx Rs10 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 13 ↦₈ (m !!! Regidx Rs11 : mword 64) ∗
-     (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 14 ↦₈ v))%I.
+    (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈[KT1] (m !!! Regidx Rra : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈[KT1] (m !!! Regidx Rs2 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 5 ↦₈[KT1] (m !!! Regidx Rs3 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈[KT1] (m !!! Regidx Rs4 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 7 ↦₈[KT1] (m !!! Regidx Rs5 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 8 ↦₈[KT1] (m !!! Regidx Rs6 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 9 ↦₈[KT1] (m !!! Regidx Rs7 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 10 ↦₈[KT1] (m !!! Regidx Rs8 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 11 ↦₈[KT1] (m !!! Regidx Rs9 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 12 ↦₈[KT1] (m !!! Regidx Rs10 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 13 ↦₈[KT1] (m !!! Regidx Rs11 : mword 64) ∗
+     (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 14 ↦₈[KT1] v))%I.
 
   (* THE DESTINATION AND THE PID SHARE THAT RIDES WITH IT -- SpecReadi's
      [if user then … else …] premise, named once.
@@ -229,7 +235,7 @@ Section ReadiDefs.
       (bytes : nat -> bv 8) : iProp Σ :=
     (if user
      then proc_priv_core (proc_addr j) pidv Vc
-     else ([∗ list] i ∈ seq 0 n, pa_add dstb i ↦ₘ bytes i) ∗
+     else ([∗ list] i ∈ seq 0 n, pa_add dstb i ↦ₘ[ktb] bytes i) ∗
           p_pid (proc_addr j) ↦₄{dq} pidv)%I.
 
   (* the dfrac the borrowed share carries: [proc_priv]'s own quarter on the
@@ -269,9 +275,9 @@ Section ReadiDefs.
         ⌜(mf !!! Regidx Ra0 = (mword_of_int (-1) : mword 64) /\ user = true)
          \/ (mf !!! Regidx Ra0 = (mword_of_int (Z.of_nat tot) : mword 64)
              /\ tot = rd_clamp (di_size dn) off n)⌝ -∗
-        sie_cap_gpr mf K b (proc_addr j) -∗
+        sie_cap_gpr KT1 mf K b (proc_addr j) -∗
         cpu_own 0 eb (proc_addr j) b lks -∗
-        trap_csrs_ext eb -∗
+        trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr j) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         i_dev ip ↦₄{dqd} dev -∗
@@ -299,6 +305,12 @@ Section ReadiRet.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
 
+  (* the CALLER's buffer tier -- see this function's spec for why it is not
+     [KT1].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at
+     instance search, so every OTHER leaf in this file has to name its own
+     datum tier out loud (the blanket [(ktd := KT1)] below). *)
+  Context {ktb : ktier}.
+  Context `{!KtierLe ktb KT1}.
   Local Lemma rd_ret `{GEN : GenId} `{CID0 : CpuId} 
       (γfs : fs_names) (bn : bio_names) (γf : gname) (dev : mword 32)
       (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8)) (dn : dinode)
@@ -320,9 +332,9 @@ Section ReadiRet.
     ((M !!! Regidx Ra0 = (mword_of_int (-1) : mword 64) /\ user = true)
      \/ (M !!! Regidx Ra0 = (mword_of_int (Z.of_nat tot) : mword 64)
          /\ tot = rd_clamp (di_size dn) off n)) ->
-    sie_cap_gpr M (K - 14)%nat b (proc_addr j) -∗
+    sie_cap_gpr KT1 M (K - 14)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (RI + 0xdc) : mword 64) -∗
@@ -331,11 +343,11 @@ Section ReadiRet.
     inode_meta ip dn -∗
     inode_map γfs ip bm -∗
     inode_blocks γfs bm data -∗
-    rd_dst γf j pidv dq user (upd_upt V P')
+    rd_dst (ktb := ktb) γf j pidv dq user (upd_upt V P')
            (m !!! Regidx Ra2 : mword 64) n
            (rd_delivered data dst_olds off tot) -∗
     bslot bn -∗
-    rd_cont (CID0 := CID0) γfs bn γf dev ip bm data dn user off n dst_olds V
+    rd_cont (ktb := ktb) (CID0 := CID0) γfs bn γf dev ip bm data dn user off n dst_olds V
             pidv dq dqd j m K eb b lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -385,7 +397,7 @@ Section ReadiRet.
                   = pa_stk (m !!! Regidx csp_rs1 : mword 64) 9).
     { rewrite Hsp. unfold pa_stk, add_vec_int. rewrite add_vec_off2. f_equal; try pcw. }
     (* ===== +0xdc c.ldsp ra,104(sp) ===== *)
-    iApply (wp_cldsp_s_sconf (mword_of_int (RI + 0xdc)) (mword_of_int 13 : mword 6) Rra
+    iApply (wp_cldsp_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (RI + 0xdc)) (mword_of_int 13 : mword 6) Rra
               M (K - 14)%nat (m !!! Regidx Rra : mword 64) b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hidc [Hf1]").
     { iEval (rewrite Hc1). iExact "Hf1". }
@@ -398,7 +410,7 @@ Section ReadiRet.
                   = mword_of_int (RI + 0xde)) by pcw.
     iEval (rewrite Hpp) in "Hpc". clear Hpp.
     (* ===== +0xde c.ldsp s0,96(sp) ===== *)
-    iApply (wp_cldsp_s_sconf (mword_of_int (RI + 0xde)) (mword_of_int 12 : mword 6) Rs0
+    iApply (wp_cldsp_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (RI + 0xde)) (mword_of_int 12 : mword 6) Rs0
               P1 (K - 14)%nat (m !!! Regidx Rs0 : mword 64) b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hide [Hf2]").
     { iEval (rewrite HP1sp -Hsp Hc2). iExact "Hf2". }
@@ -411,7 +423,7 @@ Section ReadiRet.
                   = mword_of_int (RI + 0xe0)) by pcw.
     iEval (rewrite Hpp) in "Hpc". clear Hpp.
     (* ===== +0xe0 c.ldsp s1,88(sp) ===== *)
-    iApply (wp_cldsp_s_sconf (mword_of_int (RI + 0xe0)) (mword_of_int 11 : mword 6) Rs1
+    iApply (wp_cldsp_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (RI + 0xe0)) (mword_of_int 11 : mword 6) Rs1
               P2 (K - 14)%nat (m !!! Regidx Rs1 : mword 64) b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hie0 [Hf3]").
     { iEval (rewrite HP2sp -Hsp Hc3). iExact "Hf3". }
@@ -424,7 +436,7 @@ Section ReadiRet.
                   = mword_of_int (RI + 0xe2)) by pcw.
     iEval (rewrite Hpp) in "Hpc". clear Hpp.
     (* ===== +0xe2 c.ldsp s4,64(sp) ===== *)
-    iApply (wp_cldsp_s_sconf (mword_of_int (RI + 0xe2)) (mword_of_int 8 : mword 6) Rs4
+    iApply (wp_cldsp_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (RI + 0xe2)) (mword_of_int 8 : mword 6) Rs4
               P3 (K - 14)%nat (m !!! Regidx Rs4 : mword 64) b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hie2 [Hf6]").
     { iEval (rewrite HP3sp -Hsp Hc6). iExact "Hf6". }
@@ -437,7 +449,7 @@ Section ReadiRet.
                   = mword_of_int (RI + 0xe4)) by pcw.
     iEval (rewrite Hpp) in "Hpc". clear Hpp.
     (* ===== +0xe4 c.ldsp s5,56(sp) ===== *)
-    iApply (wp_cldsp_s_sconf (mword_of_int (RI + 0xe4)) (mword_of_int 7 : mword 6) Rs5
+    iApply (wp_cldsp_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (RI + 0xe4)) (mword_of_int 7 : mword 6) Rs5
               P4 (K - 14)%nat (m !!! Regidx Rs5 : mword 64) b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hie4 [Hf7]").
     { iEval (rewrite HP4sp -Hsp Hc7). iExact "Hf7". }
@@ -450,7 +462,7 @@ Section ReadiRet.
                   = mword_of_int (RI + 0xe6)) by pcw.
     iEval (rewrite Hpp) in "Hpc". clear Hpp.
     (* ===== +0xe6 c.ldsp s6,48(sp) ===== *)
-    iApply (wp_cldsp_s_sconf (mword_of_int (RI + 0xe6)) (mword_of_int 6 : mword 6) Rs6
+    iApply (wp_cldsp_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (RI + 0xe6)) (mword_of_int 6 : mword 6) Rs6
               P5 (K - 14)%nat (m !!! Regidx Rs6 : mword 64) b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hie6 [Hf8]").
     { iEval (rewrite HP5sp -Hsp Hc8). iExact "Hf8". }
@@ -463,7 +475,7 @@ Section ReadiRet.
                   = mword_of_int (RI + 0xe8)) by pcw.
     iEval (rewrite Hpp) in "Hpc". clear Hpp.
     (* ===== +0xe8 c.ldsp s7,40(sp) ===== *)
-    iApply (wp_cldsp_s_sconf (mword_of_int (RI + 0xe8)) (mword_of_int 5 : mword 6) Rs7
+    iApply (wp_cldsp_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (RI + 0xe8)) (mword_of_int 5 : mword 6) Rs7
               P6 (K - 14)%nat (m !!! Regidx Rs7 : mword 64) b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hie8 [Hf9]").
     { iEval (rewrite HP6sp -Hsp Hc9). iExact "Hf9". }
@@ -496,9 +508,9 @@ Section ReadiRet.
                    = pa_stk (add_vec (P7 !!! Regidx csp_rs1 : mword 64)
                        (sign_extend' 64 (caddi16sp_imm (mword_of_int 7 : mword 6)))) 14).
     { rewrite Hwv HP7sp. unfold pa_stk, add_vec_int. apply f_equal. pcw. }
-    iAssert (stack_own (m !!! Regidx csp_rs1 : mword 64) 14)
+    iAssert (stack_own (KTR := KT1) (m !!! Regidx csp_rs1 : mword 64) 14)
       with "[Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hf8 Hf9 HfA HfB HfC HfD HfE]" as "Hstk".
-    { rewrite stack_own_slots. cbn [seq].
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hf1"; [iExists _; iExact "Hf1"|].
       iSplitL "Hf2"; [iExists _; iExact "Hf2"|].
       iSplitL "Hf3"; [iExists _; iExact "Hf3"|].
@@ -614,6 +626,12 @@ Section ReadiJoin.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
 
+  (* the CALLER's buffer tier -- see this function's spec for why it is not
+     [KT1].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at
+     instance search, so every OTHER leaf in this file has to name its own
+     datum tier out loud (the blanket [(ktd := KT1)] below). *)
+  Context {ktb : ktier}.
+  Context `{!KtierLe ktb KT1}.
   Local Lemma rd_join `{GEN : GenId} `{CID0 : CpuId} 
       (γfs : fs_names) (bn : bio_names) (γf : gname) (dev : mword 32)
       (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8)) (dn : dinode)
@@ -634,9 +652,9 @@ Section ReadiJoin.
     ((ans = (mword_of_int (-1) : mword 64) /\ user = true)
      \/ (ans = (mword_of_int (Z.of_nat tot) : mword 64)
          /\ tot = rd_clamp (di_size dn) off n)) ->
-    sie_cap_gpr M (K - 14)%nat b (proc_addr j) -∗
+    sie_cap_gpr KT1 M (K - 14)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (RI + 0xd8) : mword 64) -∗
@@ -645,11 +663,11 @@ Section ReadiJoin.
     inode_meta ip dn -∗
     inode_map γfs ip bm -∗
     inode_blocks γfs bm data -∗
-    rd_dst γf j pidv dq user (upd_upt V P')
+    rd_dst (ktb := ktb) γf j pidv dq user (upd_upt V P')
            (m !!! Regidx Ra2 : mword 64) n
            (rd_delivered data dst_olds off tot) -∗
     bslot bn -∗
-    rd_cont (CID0 := CID0) γfs bn γf dev ip bm data dn user off n dst_olds V
+    rd_cont (ktb := ktb) (CID0 := CID0) γfs bn γf dev ip bm data dn user off n dst_olds V
             pidv dq dqd j m K eb b lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -690,7 +708,7 @@ Section ReadiJoin.
                     (zero_extend' 64 (concat_vec (mword_of_int 9 : mword 6) ('b"000")))
                   = pa_stk (m !!! Regidx csp_rs1 : mword 64) 5).
     { rewrite HT0sp. unfold pa_stk, add_vec_int. rewrite add_vec_off2. f_equal; try pcw. }
-    iApply (wp_cldsp_s_sconf (mword_of_int (RI + 0xda)) (mword_of_int 9 : mword 6) Rs3
+    iApply (wp_cldsp_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (RI + 0xda)) (mword_of_int 9 : mword 6) Rs3
               T0 (K - 14)%nat (m !!! Regidx Rs3 : mword 64) b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hida [Hf5]").
     { iEval (rewrite Hc5). iExact "Hf5". }
@@ -753,6 +771,12 @@ Section ReadiExit.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
 
+  (* the CALLER's buffer tier -- see this function's spec for why it is not
+     [KT1].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at
+     instance search, so every OTHER leaf in this file has to name its own
+     datum tier out loud (the blanket [(ktd := KT1)] below). *)
+  Context {ktb : ktier}.
+  Context `{!KtierLe ktb KT1}.
   Local Lemma rd_exit `{GEN : GenId} `{CID0 : CpuId} 
       (γfs : fs_names) (bn : bio_names) (γf : gname) (dev : mword 32)
       (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8)) (dn : dinode)
@@ -780,9 +804,9 @@ Section ReadiExit.
     eq_vec (access_vec_dec
               (add_vec (mword_of_int zf : mword 64) (sign_extend' 64 jimm)) 0)
       ('b"0") = true ->
-    sie_cap_gpr M (K - 14)%nat b (proc_addr j) -∗
+    sie_cap_gpr KT1 M (K - 14)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int za : mword 64) -∗
@@ -807,11 +831,11 @@ Section ReadiExit.
     inode_meta ip dn -∗
     inode_map γfs ip bm -∗
     inode_blocks γfs bm data -∗
-    rd_dst γf j pidv dq user (upd_upt V P')
+    rd_dst (ktb := ktb) γf j pidv dq user (upd_upt V P')
            (m !!! Regidx Ra2 : mword 64) n
            (rd_delivered data dst_olds off tot) -∗
     bslot bn -∗
-    rd_cont (CID0 := CID0) γfs bn γf dev ip bm data dn user off n dst_olds V
+    rd_cont (ktb := ktb) (CID0 := CID0) γfs bn γf dev ip bm data dn user off n dst_olds V
             pidv dq dqd j m K eb b lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -828,7 +852,7 @@ Section ReadiExit.
                   = pa_stk (m !!! Regidx csp_rs1 : mword 64) 4).
     { rewrite Hsp. unfold pa_stk, add_vec_int. rewrite add_vec_off2. f_equal; try pcw. }
     (* ===== c.ldsp s2,80(sp) ===== *)
-    iApply (wp_cldsp_s_sconf (mword_of_int za) (mword_of_int 10 : mword 6) Rs2
+    iApply (wp_cldsp_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int za) (mword_of_int 10 : mword 6) Rs2
               M (K - 14)%nat (m !!! Regidx Rs2 : mword 64) b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hia [Hf4]").
     { iEval (rewrite Hc4). iExact "Hf4". }
@@ -846,7 +870,7 @@ Section ReadiExit.
                      (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000")))
                    = pa_stk (m !!! Regidx csp_rs1 : mword 64) 10).
     { rewrite HQ1sp. unfold pa_stk, add_vec_int. rewrite add_vec_off2. f_equal; try pcw. }
-    iApply (wp_cldsp_s_sconf (mword_of_int zb) (mword_of_int 4 : mword 6) Rs8
+    iApply (wp_cldsp_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int zb) (mword_of_int 4 : mword 6) Rs8
               Q1 (K - 14)%nat (m !!! Regidx Rs8 : mword 64) b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hib [HfA]").
     { iEval (rewrite Hc10). iExact "HfA". }
@@ -866,7 +890,7 @@ Section ReadiExit.
                      (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000")))
                    = pa_stk (m !!! Regidx csp_rs1 : mword 64) 11).
     { rewrite HQ2sp. unfold pa_stk, add_vec_int. rewrite add_vec_off2. f_equal; try pcw. }
-    iApply (wp_cldsp_s_sconf (mword_of_int zc) (mword_of_int 3 : mword 6) Rs9
+    iApply (wp_cldsp_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int zc) (mword_of_int 3 : mword 6) Rs9
               Q2 (K - 14)%nat (m !!! Regidx Rs9 : mword 64) b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hic [HfB]").
     { iEval (rewrite Hc11). iExact "HfB". }
@@ -888,7 +912,7 @@ Section ReadiExit.
                      (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000")))
                    = pa_stk (m !!! Regidx csp_rs1 : mword 64) 12).
     { rewrite HQ3sp. unfold pa_stk, add_vec_int. rewrite add_vec_off2. f_equal; try pcw. }
-    iApply (wp_cldsp_s_sconf (mword_of_int zd) (mword_of_int 2 : mword 6) Rs10
+    iApply (wp_cldsp_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int zd) (mword_of_int 2 : mword 6) Rs10
               Q3 (K - 14)%nat (m !!! Regidx Rs10 : mword 64) b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hid [HfC]").
     { iEval (rewrite Hc12). iExact "HfC". }
@@ -912,7 +936,7 @@ Section ReadiExit.
                      (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000")))
                    = pa_stk (m !!! Regidx csp_rs1 : mword 64) 13).
     { rewrite HQ4sp. unfold pa_stk, add_vec_int. rewrite add_vec_off2. f_equal; try pcw. }
-    iApply (wp_cldsp_s_sconf (mword_of_int ze) (mword_of_int 1 : mword 6) Rs11
+    iApply (wp_cldsp_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int ze) (mword_of_int 1 : mword 6) Rs11
               Q4 (K - 14)%nat (m !!! Regidx Rs11 : mword 64) b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hie [HfD]").
     { iEval (rewrite Hc13). iExact "HfD". }
@@ -991,6 +1015,12 @@ Section ReadiLoop.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
 
+  (* the CALLER's buffer tier -- see this function's spec for why it is not
+     [KT1].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at
+     instance search, so every OTHER leaf in this file has to name its own
+     datum tier out loud (the blanket [(ktd := KT1)] below). *)
+  Context {ktb : ktier}.
+  Context `{!KtierLe ktb KT1}.
   Local Ltac reg_neq := vm_compute; discriminate.
 
   (* peel a chain of [<[Regidx k := v]>]s down to the fact that names the
@@ -1028,7 +1058,7 @@ Section ReadiLoop.
      ⌜Mb !!! Regidx Rs3 = (mword_of_int (Z.of_nat tot) : mword 64)⌝ -∗
      ⌜Mb !!! Regidx Rs9 = (mword_of_int 1024 : mword 64)⌝ -∗
      ⌜Mb !!! Regidx Rs8 = (mword_of_int (-1) : mword 64)⌝ -∗
-     sie_cap_gpr Mb (K - 14)%nat b (proc_addr j) -∗
+     sie_cap_gpr KT1 Mb (K - 14)%nat b (proc_addr j) -∗
      pc_is (mword_of_int (RI + 0x4c) : mword 64) -∗
      WP (Loop : expr riscv_lang))%I.
 
@@ -1071,9 +1101,9 @@ Section ReadiLoop.
     M !!! Regidx Rs3 = (mword_of_int (Z.of_nat tot) : mword 64) ->
     M !!! Regidx Rs9 = (mword_of_int 1024 : mword 64) ->
     M !!! Regidx Rs8 = (mword_of_int (-1) : mword 64) ->
-    sie_cap_gpr M (K - 14)%nat b (proc_addr j) -∗
+    sie_cap_gpr KT1 M (K - 14)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (RI + 0x7c) : mword 64) -∗
@@ -1089,11 +1119,11 @@ Section ReadiLoop.
     inode_meta ip dn -∗
     inode_map γfs ip bm -∗
     inode_blocks γfs bm data -∗
-    rd_dst γf j pidv dq user (upd_upt V PI)
+    rd_dst (ktb := ktb) γf j pidv dq user (upd_upt V PI)
            (m !!! Regidx Ra2 : mword 64) n
            (rd_delivered data dst_olds off tot) -∗
     bslot bn -∗
-    rd_cont (CID0 := CID0) γfs bn γf dev ip bm data dn user off n dst_olds V
+    rd_cont (ktb := ktb) (CID0 := CID0) γfs bn γf dev ip bm data dn user off n dst_olds V
             pidv dq dqd j m K eb b lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1310,7 +1340,7 @@ Section ReadiLoop.
     assert (Hdadr : add_vec (rget B1 Rs6) (sign_extend' 64 (mword_of_int 0 : mword 12))
                     = i_dev ip) by (rgne; rewrite HB1s6; reflexivity).
     iEval (rewrite -Hdadr) in "Hidev".
-    iApply (wp_lw_s_sconf (mword_of_int (RI + 0x8a)) Ra0 Rs6
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (RI + 0x8a)) Ra0 Rs6
               (mword_of_int 0 : mword 12) B1 (K - 14)%nat dev b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi8a Hidev").
     iIntros (CIDa7 Hqa7) "Hcg Hpc Hidev".
@@ -1678,22 +1708,22 @@ Section ReadiLoop.
                 then proc_priv_core (proc_addr j) pidv (upd_upt V PI)
                 else [∗ list] jj ∈ seq 0 mm,
                        pa_add (pa_add (m !!! Regidx Ra2 : mword 64) tot) jj
-                         ↦ₘ rd_delivered data dst_olds off tot (tot + jj)%nat)
+                         ↦ₘ[ktb] rd_delivered data dst_olds off tot (tot + jj)%nat)
                ∗ (if user then True
                   else p_pid (proc_addr j) ↦₄{dq} pidv
                        ∗ ([∗ list] jj ∈ seq 0 tot,
                             pa_add (m !!! Regidx Ra2 : mword 64) jj
-                              ↦ₘ rd_delivered data dst_olds off tot jj)
+                              ↦ₘ[ktb] rd_delivered data dst_olds off tot jj)
                        ∗ ([∗ list] jj ∈ seq 0 (n - tot - mm),
                             pa_add (pa_add (pa_add (m !!! Regidx Ra2 : mword 64) tot)
                                       mm) jj
-                              ↦ₘ rd_delivered data dst_olds off tot
+                              ↦ₘ[ktb] rd_delivered data dst_olds off tot
                                    (tot + (mm + jj))%nat)))%I
         with "[Hdst]" as "[Hdstw Hdstrest]".
       { rewrite /rd_dst. destruct user.
         - iSplitL "Hdst"; [iExact "Hdst" | done].
         - iDestruct "Hdst" as "[Hdst Hppid]".
-          iDestruct (rd_split3 (m !!! Regidx Ra2 : mword 64)
+          iDestruct (rd_split3 (KTR := ktb) (m !!! Regidx Ra2 : mword 64)
                        tot mm (n - tot - mm)%nat n
                        (fun i => rd_delivered data dst_olds off tot i)
                        ltac:(lia) with "Hdst") as "(Hp & Hq & Hr)".
@@ -1725,7 +1755,7 @@ Section ReadiLoop.
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iEval (rewrite -HD8a2) in "Hwin".
       iEval (rewrite -HD8a1) in "Hdstw".
-      iApply (EC.wp_either_copyout_sconf γa γf D8 (K - 14)%nat 0%nat eb
+      iApply (EC.wp_either_copyout_sconf ktb KT0 γa γf D8 (K - 14)%nat 0%nat eb
                 (proc_addr j) pidv (upd_upt V PI) user mm
                 (fun i => (data fbn) !!! (o + i)%nat)
                 (fun jj => rd_delivered data dst_olds off tot (tot + jj)%nat) b lks
@@ -1750,7 +1780,7 @@ Section ReadiLoop.
                  ⌜(mE !!! Regidx Ra0 : mword 64) = (mword_of_int 0 : mword 64)
                   \/ ((mE !!! Regidx Ra0 : mword 64)
                         = (mword_of_int (-1) : mword 64) /\ user = true)⌝ ∗
-                 rd_dst γf j pidv dq user (upd_upt V P2)
+                 rd_dst (ktb := ktb) γf j pidv dq user (upd_upt V P2)
                         (m !!! Regidx Ra2 : mword 64) n
                         (rd_delivered data dst_olds off (tot + mm)%nat))%I
         with "[Hpost Hdstrest]" as "Hnorm".
@@ -1768,7 +1798,7 @@ Section ReadiLoop.
           iSplitR; [iPureIntro; exact HextI|].
           iSplitR; [iPureIntro; left; exact Hr|].
           iSplitR "Hppid"; [| iExact "Hppid"].
-          iApply (rd_join3 (m !!! Regidx Ra2 : mword 64)
+          iApply (rd_join3 (KTR := ktb) (m !!! Regidx Ra2 : mword 64)
                     tot mm (n - tot - mm)%nat n
                     (fun i => rd_delivered data dst_olds off (tot + mm)%nat i)
                     ltac:(lia) with "[Hp] [Hmid] [Hq]").
@@ -2202,7 +2232,7 @@ Section ReadiLoop.
         iEval (rewrite Hpp) in "Hpc". clear Hpp.
         (* the destination claim reverts to [tot]: on this arm [user] is
            [true], so both readings are the same [proc_priv]. *)
-        iAssert (rd_dst γf j pidv dq user (upd_upt V P2)
+        iAssert (rd_dst (ktb := ktb) γf j pidv dq user (upd_upt V P2)
                         (m !!! Regidx Ra2 : mword 64) n
                         (rd_delivered data dst_olds off tot))%I
           with "[Hdst2]" as "Hdst3".
@@ -2346,6 +2376,12 @@ Section ReadiMain.
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  (* the CALLER's buffer tier -- see this function's spec for why it is not
+     [KT1].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at
+     instance search, so every OTHER leaf in this file has to name its own
+     datum tier out loud (the blanket [(ktd := KT1)] below). *)
+  Context {ktb : ktier}.
+  Context `{!KtierLe ktb KT1}.
   Local Ltac reg_neq := vm_compute; discriminate.
   Local Ltac lkp :=
     repeat first
@@ -2380,7 +2416,7 @@ Section ReadiMain.
      ⌜Mt !!! Regidx Rs9 = (m !!! Regidx Rs9 : mword 64)⌝ -∗
      ⌜Mt !!! Regidx Rs10 = (m !!! Regidx Rs10 : mword 64)⌝ -∗
      ⌜Mt !!! Regidx Rs11 = (m !!! Regidx Rs11 : mword 64)⌝ -∗
-     sie_cap_gpr Mt (K - 14)%nat b (proc_addr j) -∗
+     sie_cap_gpr KT1 Mt (K - 14)%nat b (proc_addr j) -∗
      pc_is (mword_of_int (RI + 0x34) : mword 64) -∗
      WP (Loop : expr riscv_lang))%I.
 
@@ -2400,7 +2436,7 @@ Section ReadiMain.
       (pidv : mword 32) (dq dqd : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
-    : wp_readi_sconf_body γs j γl γu γd γk pd pav pu bn γfs γa γf
+    : wp_readi_sconf_body ktb γs j γl γu γd γk pd pav pu bn γfs γa γf
                           cov logstart dev ip bm data dn
                           user off n dst_olds V pidv dq dqd m K eb b lks.
   Proof.
@@ -2442,7 +2478,7 @@ Section ReadiMain.
        a3 is read before the test. *)
     iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hkenv Hidev
               Hmeta Hmap Hblocks Hdst #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hcont".
-    iAssert (rd_cont (CID0 := CID) γfs bn γf dev ip bm data dn user off n
+    iAssert (rd_cont (ktb := ktb) (CID0 := CID) γfs bn γf dev ip bm data dn user off n
                dst_olds V pidv dq dqd j m K eb b lks)%I with "[Hcont]" as "Hcont";
       [rewrite /rd_cont /rd_dst; iExact "Hcont"|].
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Heb2b. cbn in Heb2b.
@@ -2489,7 +2525,7 @@ Section ReadiMain.
                        (sign_extend' 64 (mword_of_int 76 : mword 12))
                      = i_size ip) by (rgne; rewrite Ha0; reflexivity).
     iEval (rewrite -Hszadr) in "Hmz".
-    iApply (wp_clw_s_sconf pcE Ra5 Ra0 (mword_of_int 76 : mword 12)
+    iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) pcE Ra5 Ra0 (mword_of_int 76 : mword 12)
               m K (di_size dn : mword 32) b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hi00 Hmz").
     iIntros (CIDp0 Hqp0) "Hcg Hpc Hmz".
@@ -2552,7 +2588,7 @@ Section ReadiMain.
         iSplitL "Hmt"; [iExact "Hmt"|]. iSplitL "Hmj"; [iExact "Hmj"|].
         iSplitL "Hmn"; [iExact "Hmn"|]. iSplitL "Hml"; [iExact "Hml"|].
         iExact "Hmz". }
-      iAssert (rd_dst γf j pidv dq user (upd_upt V (pv_upt V))
+      iAssert (rd_dst (ktb := ktb) γf j pidv dq user (upd_upt V (pv_upt V))
                       (m !!! Regidx Ra2 : mword 64) n
                       (rd_delivered data dst_olds off 0%nat))%I
         with "[Hdst]" as "Hdst".
@@ -2602,7 +2638,7 @@ Section ReadiMain.
     (* ---- everything past this point holds the destination at [tot = 0]
        and the descriptor at [pv_upt V] ---- *)
     assert (HVid : upd_upt V (pv_upt V) = V) by apply rd_upd_upt_id.
-    iAssert (rd_dst γf j pidv dq user (upd_upt V (pv_upt V))
+    iAssert (rd_dst (ktb := ktb) γf j pidv dq user (upd_upt V (pv_upt V))
                     (m !!! Regidx Ra2 : mword 64) n
                     (rd_delivered data dst_olds off 0%nat))%I
       with "[Hdst]" as "Hdst".
@@ -2645,7 +2681,7 @@ Section ReadiMain.
     assert (HR1sp : rd_sp m R1).
     { rewrite /rd_sp /R1 upd_eq HQ0sp. reflexivity. }
     iEval (rewrite HQ0sp) in "Hstk".
-    iEval (rewrite stack_own_slots) in "Hstk".
+    iEval (rewrite (stack_own_slots (KTR := KT1))) in "Hstk".
     iEval (cbn [seq]) in "Hstk".
     iDestruct "Hstk" as "(Hf1 & Hf2 & Hf3 & Hf4 & Hf5 & Hf6 & Hf7 & Hf8 & Hf9
                           & HfA & HfB & HfC & HfD & HfE & _)".
@@ -2660,7 +2696,7 @@ Section ReadiMain.
     { rewrite HR1sp. unfold pa_stk, add_vec_int. rewrite add_vec_off2.
       f_equal; try pcw. }
     iEval (rewrite -Hc1) in "Hf1".
-    iApply (wp_csdsp_s_sconf (mword_of_int (RI + 0x08)) (mword_of_int 13 : mword 6) Rra
+    iApply (wp_csdsp_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (RI + 0x08)) (mword_of_int 13 : mword 6) Rra
               R1 (K - 14)%nat w1 b with "Hcg Hpc Hi08 Hf1").
     iIntros (CIDs1 Hqs1) "Hcg Hpc Hf1".
     iEval (rewrite Hc1) in "Hf1".
@@ -2677,7 +2713,7 @@ Section ReadiMain.
     { rewrite HR1sp. unfold pa_stk, add_vec_int. rewrite add_vec_off2.
       f_equal; try pcw. }
     iEval (rewrite -Hc2) in "Hf2".
-    iApply (wp_csdsp_s_sconf (mword_of_int (RI + 0x0a)) (mword_of_int 12 : mword 6) Rs0
+    iApply (wp_csdsp_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (RI + 0x0a)) (mword_of_int 12 : mword 6) Rs0
               R1 (K - 14)%nat w2 b with "Hcg Hpc Hi0a Hf2").
     iIntros (CIDs2 Hqs2) "Hcg Hpc Hf2".
     iEval (rewrite Hc2) in "Hf2".
@@ -2694,7 +2730,7 @@ Section ReadiMain.
     { rewrite HR1sp. unfold pa_stk, add_vec_int. rewrite add_vec_off2.
       f_equal; try pcw. }
     iEval (rewrite -Hc3) in "Hf3".
-    iApply (wp_csdsp_s_sconf (mword_of_int (RI + 0x0c)) (mword_of_int 11 : mword 6) Rs1
+    iApply (wp_csdsp_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (RI + 0x0c)) (mword_of_int 11 : mword 6) Rs1
               R1 (K - 14)%nat w3 b with "Hcg Hpc Hi0c Hf3").
     iIntros (CIDs3 Hqs3) "Hcg Hpc Hf3".
     iEval (rewrite Hc3) in "Hf3".
@@ -2711,7 +2747,7 @@ Section ReadiMain.
     { rewrite HR1sp. unfold pa_stk, add_vec_int. rewrite add_vec_off2.
       f_equal; try pcw. }
     iEval (rewrite -Hc6) in "Hf6".
-    iApply (wp_csdsp_s_sconf (mword_of_int (RI + 0x0e)) (mword_of_int 8 : mword 6) Rs4
+    iApply (wp_csdsp_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (RI + 0x0e)) (mword_of_int 8 : mword 6) Rs4
               R1 (K - 14)%nat w6 b with "Hcg Hpc Hi0e Hf6").
     iIntros (CIDs6 Hqs6) "Hcg Hpc Hf6".
     iEval (rewrite Hc6) in "Hf6".
@@ -2728,7 +2764,7 @@ Section ReadiMain.
     { rewrite HR1sp. unfold pa_stk, add_vec_int. rewrite add_vec_off2.
       f_equal; try pcw. }
     iEval (rewrite -Hc7) in "Hf7".
-    iApply (wp_csdsp_s_sconf (mword_of_int (RI + 0x10)) (mword_of_int 7 : mword 6) Rs5
+    iApply (wp_csdsp_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (RI + 0x10)) (mword_of_int 7 : mword 6) Rs5
               R1 (K - 14)%nat w7 b with "Hcg Hpc Hi10 Hf7").
     iIntros (CIDs7 Hqs7) "Hcg Hpc Hf7".
     iEval (rewrite Hc7) in "Hf7".
@@ -2745,7 +2781,7 @@ Section ReadiMain.
     { rewrite HR1sp. unfold pa_stk, add_vec_int. rewrite add_vec_off2.
       f_equal; try pcw. }
     iEval (rewrite -Hc8) in "Hf8".
-    iApply (wp_csdsp_s_sconf (mword_of_int (RI + 0x12)) (mword_of_int 6 : mword 6) Rs6
+    iApply (wp_csdsp_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (RI + 0x12)) (mword_of_int 6 : mword 6) Rs6
               R1 (K - 14)%nat w8 b with "Hcg Hpc Hi12 Hf8").
     iIntros (CIDs8 Hqs8) "Hcg Hpc Hf8".
     iEval (rewrite Hc8) in "Hf8".
@@ -2762,7 +2798,7 @@ Section ReadiMain.
     { rewrite HR1sp. unfold pa_stk, add_vec_int. rewrite add_vec_off2.
       f_equal; try pcw. }
     iEval (rewrite -Hc9) in "Hf9".
-    iApply (wp_csdsp_s_sconf (mword_of_int (RI + 0x14)) (mword_of_int 5 : mword 6) Rs7
+    iApply (wp_csdsp_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (RI + 0x14)) (mword_of_int 5 : mword 6) Rs7
               R1 (K - 14)%nat w9 b with "Hcg Hpc Hi14 Hf9").
     iIntros (CIDs9 Hqs9) "Hcg Hpc Hf9".
     iEval (rewrite Hc9) in "Hf9".
@@ -2933,7 +2969,7 @@ Section ReadiMain.
     { rewrite HT2sp. unfold pa_stk, add_vec_int. rewrite add_vec_off2.
       f_equal; try pcw. }
     iEval (rewrite -Hc5) in "Hf5".
-    iApply (wp_csdsp_s_sconf (mword_of_int (RI + 0x2a)) (mword_of_int 9 : mword 6) Rs3
+    iApply (wp_csdsp_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (RI + 0x2a)) (mword_of_int 9 : mword 6) Rs3
               T2 (K - 14)%nat w5 b with "Hcg Hpc Hi2a Hf5").
     iIntros (CIDs5 Hqs5) "Hcg Hpc Hf5".
     iEval (rewrite Hc5) in "Hf5".
@@ -3068,7 +3104,7 @@ Section ReadiMain.
       { rewrite Htsp. unfold pa_stk, add_vec_int. rewrite add_vec_off2.
         f_equal; try pcw. }
       iEval (rewrite -Hd4) in "Hf4".
-      iApply (wp_csdsp_s_sconf (mword_of_int (RI + 0x38)) (mword_of_int 10 : mword 6) Rs2
+      iApply (wp_csdsp_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (RI + 0x38)) (mword_of_int 10 : mword 6) Rs2
                 Mt (K - 14)%nat v4 b with "Hcg Hpc Hi38 Hf4").
       iIntros (CIDu1 Hqu1) "Hcg Hpc Hf4".
       iEval (rewrite Hd4) in "Hf4".
@@ -3084,7 +3120,7 @@ Section ReadiMain.
       { rewrite Htsp. unfold pa_stk, add_vec_int. rewrite add_vec_off2.
         f_equal; try pcw. }
       iEval (rewrite -Hd10) in "HfA".
-      iApply (wp_csdsp_s_sconf (mword_of_int (RI + 0x3a)) (mword_of_int 4 : mword 6) Rs8
+      iApply (wp_csdsp_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (RI + 0x3a)) (mword_of_int 4 : mword 6) Rs8
                 Mt (K - 14)%nat v10 b with "Hcg Hpc Hi3a HfA").
       iIntros (CIDu2 Hqu2) "Hcg Hpc HfA".
       iEval (rewrite Hd10) in "HfA".
@@ -3100,7 +3136,7 @@ Section ReadiMain.
       { rewrite Htsp. unfold pa_stk, add_vec_int. rewrite add_vec_off2.
         f_equal; try pcw. }
       iEval (rewrite -Hd11) in "HfB".
-      iApply (wp_csdsp_s_sconf (mword_of_int (RI + 0x3c)) (mword_of_int 3 : mword 6) Rs9
+      iApply (wp_csdsp_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (RI + 0x3c)) (mword_of_int 3 : mword 6) Rs9
                 Mt (K - 14)%nat v11 b with "Hcg Hpc Hi3c HfB").
       iIntros (CIDu3 Hqu3) "Hcg Hpc HfB".
       iEval (rewrite Hd11) in "HfB".
@@ -3116,7 +3152,7 @@ Section ReadiMain.
       { rewrite Htsp. unfold pa_stk, add_vec_int. rewrite add_vec_off2.
         f_equal; try pcw. }
       iEval (rewrite -Hd12) in "HfC".
-      iApply (wp_csdsp_s_sconf (mword_of_int (RI + 0x3e)) (mword_of_int 2 : mword 6) Rs10
+      iApply (wp_csdsp_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (RI + 0x3e)) (mword_of_int 2 : mword 6) Rs10
                 Mt (K - 14)%nat v12 b with "Hcg Hpc Hi3e HfC").
       iIntros (CIDu4 Hqu4) "Hcg Hpc HfC".
       iEval (rewrite Hd12) in "HfC".
@@ -3132,7 +3168,7 @@ Section ReadiMain.
       { rewrite Htsp. unfold pa_stk, add_vec_int. rewrite add_vec_off2.
         f_equal; try pcw. }
       iEval (rewrite -Hd13) in "HfD".
-      iApply (wp_csdsp_s_sconf (mword_of_int (RI + 0x40)) (mword_of_int 1 : mword 6) Rs11
+      iApply (wp_csdsp_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (RI + 0x40)) (mword_of_int 1 : mword 6) Rs11
                 Mt (K - 14)%nat v13 b with "Hcg Hpc Hi40 HfD").
       iIntros (CIDu5 Hqu5) "Hcg Hpc HfD".
       iEval (rewrite Hd13) in "HfD".

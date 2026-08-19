@@ -301,7 +301,7 @@ Definition wp_fsinit_sconf_body
          pass are both dead.  Real recovery is stage 4. *)
   hdr_n bs_hdr = 0 ->
   (* ---- ireclaim's printk, as a hypothesis and not a functor ---- *)
-  printk_gen_contract γpr γu γd ->
+  printk_gen_contract (kt := KT1) γpr γu γd ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (* a0 = dev *)
@@ -313,7 +313,7 @@ Definition wp_fsinit_sconf_body
      ("bcache", 4) and ireclaim ("itable", 2) -- "itable" is the lowest,
      so one premise there covers the whole cone via [locks_below_mono]. *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   printk_env γpr γu γd -∗
@@ -388,7 +388,7 @@ Definition wp_fsinit_sconf_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (used' : gset Z),
       ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗

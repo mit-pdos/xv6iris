@@ -113,7 +113,7 @@ Section ProofReleasesleep.
         (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m) with R1.
     assert (HspR1 : R1 !!! Regidx csp_rs1 = spr)
       by (rewrite /R1 upd_eq; reflexivity).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & _)".
     iDestruct "S1" as (vr24) "Hr24". iDestruct "S2" as (vr16) "Hr16".
     iDestruct "S3" as (vr8)  "Hr8".  iDestruct "S4" as (vr0)  "Hr0".
@@ -235,7 +235,7 @@ Section ProofReleasesleep.
        moved to a fresh one, so acquire wants it at CID10. *)
     iDestruct (cpu_own_transport CID CID10 0%nat b pme b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
-    iApply (Acquire.wp_acquire_sconf γl "sleep lock"%string (sl_res_gen γsl slk R H) Kacq
+    iApply (Acquire.wp_acquire_sconf KT1 γl "sleep lock"%string (sl_res_gen γsl slk R H) Kacq
               0%nat b pme (av - 4)%nat b lks
               ltac:(lia)
               ltac:(lia)
@@ -265,7 +265,7 @@ Section ProofReleasesleep.
     iDestruct "Hcell" as (v) "[Hslkw %Hnz]".
     (* ===== sw zero,0(s1) : slk->locked := 0 ===== *)
     iPoseProof (rsl_18 with "Htext") as "Hi18".
-    iApply (wp_sw_zero_s_sconf (mword_of_int (KernelSyms.releasesleep + 0x18)) (mword_of_int 9 : mword 5) (mword_of_int 0 : mword 12) Macq (trap_res b + (av - 4))%nat v false
+    iApply (wp_sw_zero_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.releasesleep + 0x18)) (mword_of_int 9 : mword 5) (mword_of_int 0 : mword 12) Macq (trap_res b + (av - 4))%nat v false
               with "Hcg Hpc Hi18 [Hslkw]").
     { iEval (rewrite Hslkaddr). iExact "Hslkw". }
     iApply wp_next_off_intro.
@@ -275,7 +275,7 @@ Section ProofReleasesleep.
     iEval (rewrite Hpp1c) in "Hpc".
     (* ===== sw zero,40(s1) : slk->pid := 0 ===== *)
     iPoseProof (rsl_1c with "Htext") as "Hi1c".
-    iApply (wp_sw_zero_s_sconf (mword_of_int (KernelSyms.releasesleep + 0x1c)) (mword_of_int 9 : mword 5) (mword_of_int 0x28 : mword 12) Macq (trap_res b + (av - 4))%nat pd false
+    iApply (wp_sw_zero_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.releasesleep + 0x1c)) (mword_of_int 9 : mword 5) (mword_of_int 0x28 : mword 12) Macq (trap_res b + (av - 4))%nat pd false
               with "Hcg Hpc Hi1c [Hpid]").
     { iEval (rewrite Hpidaddr). iExact "Hpid". }
     iApply wp_next_off_intro.
@@ -375,7 +375,7 @@ Section ProofReleasesleep.
     (* rebuild the FREE sl_res: zeroed word + token + zeroed pid + R. *)
     iDestruct (sl_res_close_free γsl slk R H q with "Hslkw Hslk Hha Hpid HRcaller") as "HRsl".
     (* release(&slk->lk): intr_count 1 -> 0. *)
-    iApply (Release.wp_release_sconf γl (sl_lk slk) "sleep lock"%string (sl_res_gen γsl slk R H) Krel
+    iApply (Release.wp_release_sconf KT1 γl (sl_lk slk) "sleep lock"%string (sl_res_gen γsl slk R H) Krel
               0%nat b pme (av - 4)%nat
               ({["sleep lock"%string]} ∪ lks)
               ltac:(rewrite HKrela0; apply addv_sext0)
@@ -463,8 +463,8 @@ Section ProofReleasesleep.
                    = pa_stk (add_vec (Q32 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
     { rewrite Hwv HspQ32. unfold spr, sp0, pa_stk, add_vec_int. apply f_equal.
       apply bv_eq; vm_compute; reflexivity. }
-    iAssert (stack_own sp0 4) with "[Hr24 Hr16 Hr8 Hr0]" as "Hframe4".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := KT1) sp0 4) with "[Hr24 Hr16 Hr8 Hr0]" as "Hframe4".
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hr24"; [iEval (rewrite -Hb1 HspR1); iExists _; iExact "Hr24"|].
       iSplitL "Hr16"; [iEval (rewrite -Hb2 HspR1); iExists _; iExact "Hr16"|].
       iSplitL "Hr8";  [iEval (rewrite -Hb3 HspR1); iExists _; iExact "Hr8"|].

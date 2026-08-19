@@ -114,14 +114,14 @@ Definition wp_clockintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   (Z.of_nat n + 2 < 2 ^ 31)%Z ->
   (20 <= av)%nat ->
   locks_below lks "time" ->
-  sie_cap_gpr m av false p -∗
+  sie_cap_gpr KT1 m av false p -∗
   cpu_own n eb p false lks -∗
   kernel_text -∗ pc_is pcE -∗
   timer_cap -∗
   tick_keeper γl γs -∗
   ( ∀ mf : regfile,
       ⌜ callee_saved m mf ⌝ -∗
-      sie_cap_gpr mf av false p -∗
+      sie_cap_gpr KT1 mf av false p -∗
       cpu_own n eb p false lks -∗
       pc_is ret_tgt -∗
       tick_keeper γl γs -∗

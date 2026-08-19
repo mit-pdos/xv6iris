@@ -112,6 +112,7 @@ file, and delete the line when the file goes.
 - **A `nat` EQUALITY WHOSE RHS IS A LARGE LITERAL NEEDS `Z`, NOT A BIGGER STACK.** Any route to closing such a goal — `reflexivity`, `vm_compute`, even `vm_cast_no_check` — eventually materializes a literal-deep unary successor chain and overflows a normal 8 MB stack outright, deterministically, in under 4 s and under 1 GB RSS. So it does NOT look like memory pressure or a `-j` artifact; it looks like a broken proof in a file you did not touch. `Z` literals are binary `Z.pos` trees (~log2 depth), so state the fact at `Z.of_nat (…) = <literal>` (`rewrite Nat2Z.inj_mul` first if the LHS is a product) and close with `vm_compute; reflexivity`.
   - **If a CALLER genuinely needs the fact AT `nat`**, do not restate it over `nat` — that regresses straight back to the overflow, and it hides: `reflexivity`/`vm_compute` on the small unfolded factors (`268 * 1024`) succeed FINE in isolation and only overflow inside the real file's Iris/stdpp-heavy import context, so a standalone test says it is safe. `lia`/`nia` cannot bridge it either — past Rocq's abstraction threshold (~5000) a `nat` literal elaborates to an opaque `Nat.of_num_uint`, which `lia` cannot relate to a *computed* product (`(268 * 1024 <= 274432)%nat` fails with "Cannot find witness" though both sides are closed numerals). **Derive the `nat` fact from the `Z` one via `Z.to_nat`**: state `… = Z.to_nat <literal>`, prove `rewrite <- <the Z lemma>, Nat2Z.id; reflexivity`. Both rewrites are symbolic, so it is O(1) regardless of context, and `lia` resolves `Z.to_nat` of a literal symbolically downstream — a transparent drop-in.
 - **Fork/parallel discipline:** `make clean-proofs` nukes the shared `.vo` tree and breaks concurrent siblings — a fork must `coqc` only its OWN file, one compile at a time. Never `pkill -f coqc` (the pattern matches the killer's own shell → kills Bash, exit 144; and kills sibling compiles) — use `pkill -x coqc` or kill the `rocqworker` by PID. The same self-match trap breaks WAIT loops: `until ! pgrep -f "CoqMakefile -j16"; do …` never terminates (the waiter's own command line contains the pattern) and then makes `pgrep -f CoqMakefile` report a phantom in-progress build to everyone else. Don't poll processes at all — have the build write its own sentinel (`…; echo "EXIT=$?" >> log`) and wait on `grep EXIT` of the log. **And never `git stash` in a shared working tree** — the stash captures every concurrent agent's uncommitted edits along with yours, and the pop conflicts with (or silently wipes) work you never saw. For an "untouched baseline" compile, `git show HEAD:iris/<f>.v > /tmp/copy.v` and compile the copy; leave the live tree alone. **The same rule kills `git commit -a` and `git add -A`**: a sweep-everything commit lands every OTHER agent's in-flight files under YOUR message, and the loser finds their increment already committed, unattributed, with its own record gone missing — one increment's five files were absorbed into a sibling's commit exactly that way. Commit by explicit path (`git commit <paths> -m …`), and before you do, `git status --porcelain` and account for every line that is not yours. Corollary for the reader of a shared tree: `git status` is not a private view, so a file you did not touch appearing modified means a sibling is live — re-check the MIRROR's md5s before trusting any build you started.
+- **A SINGLE-FILE `coqc` LOOP SILENTLY ACCEPTS A STALE BASE, AND IN A TREE THAT BUILDS ON THE VM THE LOCAL BASE IS ROUTINELY A WHOLE COMMIT BEHIND.** `coqc <one file>.v` loads sibling `.vo` without ever comparing them to their `.v`, so a checkout whose `.vo` were pulled back (or last built) before a mid-tree commit compiles new work happily against the OLD interfaces — for hours, with `git status` clean and every proof green. The tell is one `ls`: `ls -la iris/*.v iris/*.vo` and look for a `.v` NEWER than its own `.vo` (here `UserExec.v` was, by a commit that changed `user_cfg`'s conjuncts and two step engines' invariant masks). The damage is a file written to the old interface that no local check can fail. **Before starting a session of single-file work, run one `make -f CoqMakefile -j<N> -k` (or the VM equivalent) to establish that the base is current**, and validate anything that reaches into an engine's internals — a new leaf file, anything mirroring `WpUmodeStore.v` — with a real build, not a `coqc`. The GCP tree keeps its own `.vo` and rebuilds from synced sources, so `run-on-gcp make` is the cheap authoritative answer.
 - **`make` SAYING "Nothing to be done" WITH ZERO COMPILE LINES IS NOT A GREEN CONE — ON A SHARED BUILD BOX IT IS USUALLY A MTIME ARTEFACT.** A whole-tree sync (`rsync -a`, a `tar` restore, a bulk `touch` of `*.vo` to force "staleness 0") leaves every `.vo` newer than every `.v` — check with `ls --time-style=full-iso`: **identical timestamps to the NANOSECOND across unrelated files is the tell**, and no compile ever produces that. `make` then skips the cone you meant to validate and reports success, which is indistinguishable at a glance from a real green. Force the cone instead of trusting it: take the reverse transitive closure of the file you edited out of `iris/.CoqMakefile.d` (the `X.vo: … Y.vo …` lines are already the dependency graph), `rm` those `.vo/.vos/.vok/.glob`, then `make -f CoqMakefile -jN -k`. The closure is small for a leaf-ish file (`DirLinks.v` → 142) and it is the only way to know the consumers actually recompiled. Do NOT reach for `-B`: that rebuilds the whole tree.
 - **A PARTIALLY-BUILT LANE HOLDS TWO GENERATIONS OF `.vo`, AND "STALENESS 0" FOR ONE TARGET PROVES NOTHING ABOUT A NEW ONE.** A lane built by `make <one>.vo` is green and `make -n` emits 0 compile lines — for that chain. The first file you add that Requires something OUTSIDE it dies with **"Compiled library X makes inconsistent assumptions over library Y"**, which reads like a corrupt checkout and is not one: X was compiled against an older Y, and `make` will never notice because every stale `.vo` is still newer than its own `.v`. **The mtime test that finds them is not "older than the file that was rebuilt"** — that flags every base file the rebuilt one sits on top of (27 false positives out of a 208-file chain) — **it is "older than a `.vo` it DEPENDS on", iterated to a fixpoint** over `iris/.CoqMakefile.d`. `rm` the few that names and re-make. And after adding a `_CoqProject` row, regenerate with `coq_makefile -f _CoqProject -o CoqMakefile` **chained into the same command as the `eval $(opam env …)`** — a regeneration under the wrong switch stamps the wrong Rocq version into `CoqMakefile` and every later build inherits it.
 - **DO NOT `set (pj := proc_addr j)` IN A BLOCK LEMMA.** A callee's contract carries its own `let pj := proc_addr j`, so its postcondition hands resources back spelled `proc_addr j`; a walk that folded its goal with `set` then meets them unfolded, and the hart-mismatch error it is really looking at (`iSpecialize: cannot instantiate (cpu_own 0 eb … -∗ …)`) loses its usual tell — the two propositions printing IDENTICALLY — and looks like a `pj`-vs-`proc_addr j` problem instead. Spell the address out and read the error as what it is: a missing `cpu_own_transport`. Plain instructions between a callee's return and a block's seam move the hart just as a call does, and a seam stated over a `∀`-bound `CpuId` demands the transport that the seam's own binder makes invisible. (`ProofSysUnlink.su_w1`'s seam at +0x30, two instructions past nameiparent.)
@@ -160,6 +161,234 @@ state it as `gset_disjUR (mword 64) (EqDecision0 := @…Decidable_eq_mword 64)
 (H := @…Countable_mword 64)`, exactly as `RiscvPtsto.lockSetR` does — an
 unpinned functor field takes stdpp's instances and then fails to unify at
 every use site, with an error naming neither.
+
+## `vm_compute` ON A GOAL CONTAINING A SECTION VARIABLE DOES NOT FAIL — IT HANGS
+
+`apply bv_eq; vm_compute; reflexivity` is the tier's idiom for a CLOSED
+bitvector identity. Point it at a goal mentioning a section variable
+(`moi hbase = add_vec (moi hbase) (sign_extend' …)`) and it does not report
+anything: it runs for 12+ minutes with no output, and `coqc -time`'s last
+streamed line is the sentence BEFORE it, so the log blames the wrong
+sentence. **Rule: `vm_compute` only closed immediates.** Pull the immediate
+out as its own `Hc : sign_extend' 64 … = mword_of_int k` (closed, so
+`vm_compute` is instant), then `rewrite Hc moi_add; f_equal; lia`.
+
+Three smaller ones from the same effort:
+
+- **`exact (f … _ _ H ltac:(lia) …)` fails with "Cannot find witness"** — the
+  inline `ltac:` is elaborated BEFORE the conclusion is unified with the
+  goal, so `lia` sees a goal full of evars. Use
+  `refine (f … _ _ H _ _ _); lia`. (Same family as the other inline-`ltac:`
+  traps above; this is the one that bites in `exact`.)
+- **`change C with <lit> in *` does not reach hypotheses a callee's contract
+  delivers LATER**, and the failure surfaces as a `lia` "Cannot find witness"
+  comparing `C` to the literal. Re-`change` on each hypothesis as it arrives.
+- **A Coq comment containing `(void *)` closes early**: `(* … free((void
+  *)(hp+1)) … *)` ends at the `*)` inside the cast, and the syntax error is
+  reported ~60 characters later with an unrelated `[ltac_use_default]`
+  message. Quoting C in a comment needs the `*` broken up.
+
+## `rewrite` CAN FAIL ON A SUBTERM THAT PRINTS CHARACTER-FOR-CHARACTER
+
+**"Found no subterm matching `X`" where `X` visibly IS a subterm of the goal
+is not a printing illusion and not a scope problem** — it is ssreflect's
+keyed matching declining a term that is only CONVERTIBLE, not syntactically
+equal, to the pattern. Printing both with `idtac` confirms they are
+identical and gets you no further. (Seen rewriting `m !!! Regidx ra_idx`
+inside `uM_bytes … 8 (m !!! Regidx ra_idx)` against a hypothesis
+`mA !!! Regidx ra_idx = m !!! Regidx ra_idx`.)
+
+The fix is not to rewrite at all: state a one-line CONGRUENCE lemma for the
+predicate (`uM_bytes_val : w1 = w2 -> uM_bytes M a 8 w1 -> uM_bytes M a 8 w2`)
+and `apply` it, so the equation is discharged by unification and conversion
+instead of by syntactic matching. Same family as the `regval_into_reg`
+`f_equal` paper cut above.
+
+Two smaller ones from the same proof:
+
+- **`unfold c in H1, H2` unfolds only in `H1`.** The failure surfaces as a
+  `lia` two lines later that has every fact it needs — except that the second
+  hypothesis was never unfolded. Write two `unfold`s.
+- **An inline `ltac:(lia)` inside `rewrite (lem _ _ _ ltac:(lia))` fails when
+  an earlier `_` is still an evar at splice time.** Spell out the argument the
+  side condition mentions. (Same root cause as the `Qp.div_2` and
+  `co_license` traps: a hole whose expected type is still an evar.)
+
+## INCONSISTENT PREMISES ARE THE WORST DEFECT, AND NOTHING IN THE BUILD SEES THEM
+
+A hedged conjunct makes a postcondition say nothing. **Contradictory
+PREMISES make the whole contract say nothing** — it is vacuously true, its
+proof goes through, its callers apply it, and every check in this tree stays
+green. `Print Assumptions` does not see it. There is no compile error to
+find.
+
+The instance: adding `Hbss : sh_zeroed M (SH_DATA_PG + 0x10) 0 0x88` to
+`wp_sh_free_first_body`, which already carried
+`Hfreep : uM_bytes M SH_FREEP 8 (mword_of_int SH_BASE)`. `SH_DATA_PG + 0x10`
+IS `SH_FREEP`, so one premise says that byte is 0 and the other says it is
+0x88. It was caught only because a proof agent noticed the two addresses
+coincide and wrote the four-line refutation.
+
+Two rules follow:
+
+- **Adding a premise to a contract is not a safe operation.** When a premise
+  is added because some OTHER function needed it, check it against every
+  premise already there — especially any that names an address, since a
+  contract's addresses are usually literals that no type discipline relates.
+  Here the premise belonged to `malloc`'s contract (where `freep` really is
+  0, before `malloc` writes it) and was over-applied to `free`'s (where
+  `malloc` has already set `freep = &base`, which is the entire point of the
+  scan).
+- **When two premises mention overlapping ADDRESS RANGES, prove they are
+  jointly satisfiable, or delete one.** A four-line `Lemma … -> … -> False`
+  attempt is cheap and is the only thing that finds this.
+
+### The commoner variant: SATISFIABLE IN ISOLATION, REFUTABLE AT THE CALL SITE
+
+Contradictory premises are the extreme case and the rare one. The variant
+that keeps recurring is milder and just as invisible: a premise that is
+perfectly satisfiable on its own, so the callee's proof compiles and
+`Print Assumptions` is clean, but that is **false in the state the only
+caller is actually in**. The lemma is correct and unusable, and nothing
+discovers it until someone writes the caller.
+
+Three instances in `sh` alone, all the same shape — a premise about the
+program's `.bss` stated over too WIDE an address range:
+
+| where | the range | why it is false there |
+|---|---|---|
+| `wp_sh_free_first_body` | `sh_zeroed M (SH_DATA_PG+0x10) 0 0x88` | `free` runs from `morecore`, i.e. after `malloc`'s head has already written `freep` and `base.s.ptr` |
+| `wp_sh_malloc_first_body` | same | the range covers `buf.0` at 0x2020, so it says the command buffer is all zeros — but `parseexec` reaches `malloc` after `gets` filled it |
+| `wp_sh_execcmd_body` | same | ditto, one frame up |
+
+The fix each time was the same: **state the windows the proof actually
+reads, and nothing between them.** `malloc` consumes exactly offsets
+`[0,8)` (`freep == 0`) and `[128,136)` (`base.s.size`, plus the four bytes
+of union padding above it that no instruction writes and that only the
+zeroing establishes). So the premises became
+
+    (Hfreep0  : sh_zeroed M SH_FREEP 0 8)
+    (Hbasesz0 : sh_zeroed M (SH_BASE + 8) 0 8)
+
+and the whole-`.bss` claim survives only in `main`/`start`, which is where
+it is true.
+
+The habit that catches it: when a premise covers a RANGE, list what else
+lives in that range and ask whether the caller has written any of it yet.
+A range premise is a claim about every byte in it, including the ones you
+were not thinking about. Grepping the layout constants for addresses inside
+the range takes a minute and is the whole check.
+
+### FIXING A DEFINITION CAN TURN A DOWNSTREAM LEMMA VACUOUS INSTEAD OF BREAKING IT
+
+The reassuring assumption about a definition change is that everything
+depending on it either still compiles or fails loudly. That is true when
+the definition appears in a lemma's CONCLUSION. When it appears in a
+PREMISE, the third outcome is available and it is silent: the lemma still
+compiles, and is now unusable.
+
+`UmodeIo.xv6_io_sem SYS_wait` was `IoPureRet`, which was wrong — `wait(p)`
+for `p ≠ 0` writes through `p`, so the arm cannot claim the image is
+untouched. It was corrected to `IoWaitNull`. But `UProofShLib.wp_sh_wait`
+proves `wp_sh_pureret_body ShSyms.wait SYS_wait`, whose premise list
+contains
+
+    Hsem : xv6_io_sem SYS_wait = IoPureRet
+
+and that equation is now FALSE. Nothing broke. The lemma is still there,
+still proved, still axiom-clean — and no caller can ever supply `Hsem`, so
+`main`, its only caller, had no usable `wait` contract at all. The gap was
+found months of proof-work later, by the first person to actually call it.
+
+**After changing a definition, grep for it in PREMISE position, not just
+for compile failures.** A premise mentioning a changed definition is a
+place where the build's silence means nothing. The `_body`-with-`Hsem`
+idiom is especially exposed — parameterising a contract by a semantic
+equation makes every instantiation a claim that can quietly go false — so
+prefer a contract that COMPUTES the arm to one that takes the arm's
+identity as a hypothesis.
+
+## A HEDGED CONJUNCT IS A FALSE STATEMENT THAT COMPILES
+
+**Never write `⌜P \/ True⌝` (or `(H : True)`) into a contract as a
+placeholder for a fact you have not pinned down yet.** `right; exact I`
+discharges it, so the postcondition says NOTHING where it appears, and it
+reads at a glance exactly like a postcondition that says something. Three
+of `USpecSh.v`'s image postconditions shipped that way and were caught only
+because a proof agent was asked to report contract drift rather than work
+around it. If the fact is not yet known, leave the conjunct OUT — a missing
+conjunct fails loudly at the first call site that needs it; a vacuous one
+never fails at all.
+
+The same rule covers the mirror case: **a textual reorder of a contract can
+silently EAT a conjunct.** Reordering `wp_sh_sbrk_body`'s two image effects
+by `str.replace` dropped its return-value conjunct, so the contract stopped
+saying what `sbrk` returns — which is the one thing its only caller needs.
+After any edit to a `_body` definition, diff the conjunct COUNT, not just
+the compile result.
+
+## A STACK-BUDGET PREMISE IS ARITHMETIC — SPELL IT AS THE SUM, NOT A ROUND NUMBER
+
+`uv_stack pt M sp0 n` looks like a formality and is not: `n` is a claim
+about the deepest call chain below this function, and if it is too small
+the contract is simply **unprovable**, which is a defect that surfaces only
+when someone sits down to prove the body — potentially thousands of lines
+of work later.
+
+`wp_sh_main_body` asked for 512. `main`'s own frame is 64 (`addi sp,sp,-64`
+@0x8e2) and the deepest chain below it is `parsecmd`'s 480, so the honest
+number is 544. It was short by 32, and nothing could have revealed that
+except attempting the proof: the premise is *weaker* than needed, so no
+caller complains either — `wp_sh_start_body` happily supplies 576.
+
+**Write the budget as the sum of its parts**, exactly as the contract below
+it spells its own:
+
+    (Hst : uv_stack pt M sp0 (64 + (64 + 48 + 48 + 128 + 112 + 64 + 16)))
+
+not `544`, and certainly not a number rounded up "for safety". A rounded
+constant loses the correspondence with the chain, so the next person to add
+a frame cannot tell whether it still fits, and the two numbers drift apart
+with nothing to notice. If a comment records the arithmetic (as
+`wp_sh_start_body`'s does), the sum in the premise and the sum in the
+comment must be the same expression — otherwise the comment is the thing
+that gets updated and the premise is the thing that is wrong.
+
+## A FUNCTION THAT WRITES A CALLER'S BUFFER DISTURBS *TWO* WINDOWS
+
+`uM_only M M' a n` says "only `[a, a+n)` moved", which is right for a
+function whose only writes are its own frames. It is WRONG — not weak — for
+one that also writes a caller-supplied buffer: the gcc prologue spills `ra`
+and `s0` into the frame and the epilogue only RELOADS them, so those bytes
+differ in `M'` and any "only the buffer moved" claim is false. `memset`'s
+first contract asserted exactly that and was unprovable.
+
+The fix is `UmodeAbi.uM_only_in M M' ws` over a LIST of windows, with
+`uM_only` recovered as the one-window case (`uM_only_in_one`) and the usual
+`_trans` / `_weaken` / transports. State a callee's image effect as its own
+frame window PLUS whatever it was asked to write.
+
+## THREE `f_equal`/`rewrite` PAPER CUTS THAT REPORT SOMETHING ELSE
+
+All three cost real time in the verified-user proofs and none of the messages
+names the cause.
+
+- **`f_equal` cannot see through a leaf's `regval_into_reg` wrapper.** A leaf
+  stores `regval_into_reg wval`, so a goal reached by `upd_eq` is
+  `regval_into_reg (mword_of_int z) = mword_of_int z'`; `f_equal` there fails,
+  and the failure surfaces from the following `lia` as **"Cannot find
+  witness"**, which reads like an arithmetic gap and is not one. Fix the `Z`
+  argument first (`replace z with z'`), then `exact (upd_eq …)`.
+- **`f_equal. lia.` as two sentences dies with "No such goal"** whenever the
+  two arguments turn out convertible (`x - 16` vs `x + -16`) and `f_equal`
+  closes the goal outright. Write `f_equal; lia`.
+- **An equation over a whole `if b then … else …` rewrites only on the
+  arm where `b` is still symbolic.** A branch leaf hands its continuation
+  `pc_is (if taken then tgt else pc+k)`; with `taken := false` the `if` is
+  still a redex when it reaches the context and an `iEval (rewrite E)` stating
+  the whole term's value applies, but with `taken := true` it has already
+  iota-reduced and the same rewrite fails with **"all matches … are equal to
+  the RHS"**. Rewrite on the fall-through arms only.
 
 ## A `[-]` SPEC PATTERN EATS THE HYPOTHESES NAMED *AFTER* IT
 
@@ -289,6 +518,51 @@ expected type is still an evar at splice time.
   Hiok0`) and rebuild with `exact Hiok0`. The rule generalizes: a `Prop`
   you only ever pass along should be destructured for READING and
   reconstructed from the SAVED original, never from its pieces.
+
+## A CLASS USED AS AN INDEX NEEDS ITS INSTANCES DECLARED TWICE
+
+When a class is a *definitional* one used as an INDEX rather than as a
+capability — `Class CurKtier := cur_ktier : ktier`, whose inhabitants are
+just values — a term of that index type reaches a goal by one of two
+routes, and `simple apply` (hence `typeclasses eauto`) will NOT unfold the
+class to reconcile them:
+
+- through the AMBIENT INSTANCE, so the argument has the CLASS type
+  (`curktier_default : CurKtier`);
+- written out at a LITERAL, so it has the UNDERLYING type (`KT1 : ktier`).
+
+An instance whose index binder is the backtick class form
+(`` `{KTR : !CurKtier} ``, which is what a section `Context` gives you)
+is worse than either: the binder becomes an instance-SEARCH argument, so
+the only index it can ever produce is the default — it silently refuses
+every goal at a literal, reported as **`no match for (Persistent …), N
+possibilities`**, naming nothing about the index. A plain
+`(k : TheClass)` binder covers the ambient route and reports **"Unable to
+unify ktier with CurKtier"** on the literals; a plain `(k : Underlying)`
+binder covers the literals and reports the mirror image.
+
+**So declare each such instance TWICE** — once at the class type, once at
+the underlying type, the second `exact`ing the first — and do the same for
+any auxiliary class indexed by it (an order class `KtierLe` needs `_c`
+twins for exactly the same reason: a goal `KtierLe KTR KTR` over a section
+variable matches none of the underlying-typed instances). The symptom that
+identifies the trap: a `Persistent` / `Timeless` / order goal that fails
+ONLY in the files that name a literal, or ONLY in the ones that do not.
+
+Two neighbours of the same shape:
+
+- **A SECTION VARIABLE CANNOT BE INSTANTIATED FROM INSIDE ITS OWN
+  SECTION.** `Context `{KTR : !CurKtier}` makes the section's lemmas
+  index-generic *for callers*; inside the section the index is fixed, so a
+  lemma that must be at one index cannot sit beside one that must be
+  generic. Split the section. The tell is **`Wrong argument name KTR`** at
+  a `(KTR := …)` written in the defining file.
+- **A CLASS HYPOTHESIS IN A SECTION BEATS A GLOBAL INSTANCE.** Adding
+  `Context `{!KtierLe ktb kt}` for one two-index callee makes every OTHER
+  application in the file resolve its index to `ktb` instead of the
+  default the global `refl` instance would have given — so a whole file's
+  worth of unrelated goals break at once, and each has to name its index
+  out loud. Put the note at the `Context`, not at the failures.
 
 ## Typeclass sweeps: the three traps that do not look like typeclass problems
 
@@ -1134,8 +1408,15 @@ and axioms each proven function rests on. `--format text|md|html|json`.
 - **AN `own`-GHOST-STEP WHOSE FRAGMENT IS AN OP-TERM MUST BE STATED AS A GOAL AND `iApply`ed, NEVER `iMod`ed WITH EXPLICIT ARGUMENTS — the failure is a silent divergence, not an error.** Minting two fragments in one step (`link_update_alloc z a a' (b1 ⋅ b2)`) via `iMod` with every argument explicit spins forever at the `iMod` sentence (>14 min at 100 % CPU, stable RSS, no message); the IDENTICAL proof stated as `iAssert (|==> auth' ∗ frag (b1 ⋅ b2))%I … as ">[Hauth Hfr]"` with `iApply (link_update_alloc with "Ha")` inside — unification against the stated goal instead of elaborated arguments — completes in seconds. `iCombine "H1 H2" as "H"` on two `own`s of singleton auth-maps over a wide product CMRA diverges the same way (its `IsOp`/`CombineSepAs` search); combine with `iDestruct (own_op with "[$H1 $H2]") as "H"` + `iEval (rewrite singleton_op -auth_frag_op) in "H"` (all `=`-rewrites, no setoid search). And a `≡`-split of a fragment (`full ≡ half ⋅ half`) must NOT be setoid-rewritten under `own` inside `iEval` (fails fast with *"setoid rewrite failed: UNDEFINED EVARS"*) — do the `rewrite -Hsp` in the PURE local-update subgoal, where `local_update_proper` carries it. (All three found landing V5''s fractional parent register in `IcacheRef.link_mint_linkdp`/`link_spend_linkdp`.)
 - **A `prod_local_update'` CHAIN OVER A WIDE NESTED `prodUR` COSTS SECONDS PER `apply` — ~8 s each at a 7-component element, and in a long Section EVERY apply pays it** (in a small scratch file only the first does). A file with a dozen movers over such an element takes minutes for the algebra section alone. When widening a ledger element, budget for it — or fold the per-component chain into ONE composed helper lemma so each mover pays the elaboration once. (`IcacheRef.v` after the V4+V5' widening.)
 - **A STALE `iDestruct` PATTERN CAN SPLIT A NESTED CONJUNCTION AND BIND THE WRONG RESOURCE — silently, and it surfaces far away.** When a bundled predicate loses a conjunct, an intro pattern with the OLD arity does not necessarily fail: if one of the remaining conjuncts is itself a separating conjunction, the extra slots happily split IT instead. A four-slot `"(_ & _ & #Hdev & _)"` against a now-three-conjunct bundle bound `#Hdev` to the FIRST COMPONENT of the third conjunct (itself a 4-way `∗`) with no arity error, and failed eight lines later at an application wanting the whole thing — reported as "cannot instantiate … with (uart_inv γd)". **When you change the shape of a bundled predicate, grep for every `iDestruct` of it and re-count**; the error, when it comes, names the consumer and not the pattern.
+- **TWO `bv` BYTES WITH THE SAME VALUE NEED NOT BE THE SAME TERM, AND THE ERROR PRINTS THEM IDENTICALLY.** Reading an IMAGE byte into a `uM_bytes` window fails with *"Unable to unify \"Some 54%bv\" with \"Some 54%bv\""* — the two really are equal as bitvectors, but one is `Z_to_bv 8 0x36` (what the dump holds) and the other is `nth_byte w 0` (what the window wants), and they carry DIFFERENT `bv_is_wf` proofs. `vm_compute; reflexivity` cannot bridge it, and the message gives you nothing to work with because both sides print as their common value. The route: get `M !! k = Some (Z_to_bv 8 …)` from `sh_data_sub` first, `rewrite` it, then close with `f_equal; apply bv_eq; vm_compute; reflexivity` — `bv_eq` is what discards the proof component. (Hit reading `runcmd`'s jump table out of `ShData.sh_data`; a byte introduced EXISTENTIALLY never hits it, which is why most image reads in this tree do not.)
+- **`vm_compute` INSIDE AN `ltac:(…)` WHOSE ARGUMENT POSITION IS STILL AN EVAR HANGS; `lia` THERE FAILS WITH A MISLEADING MESSAGE.** `exact (some_lemma _ ltac:(vm_compute; reflexivity))` — where the `_` is inferred from the goal only AFTER the `ltac:` runs — spins forever rather than erroring, and costs you the "is this a slow proof or a hang?" question. `coqc -time` localises it in one run; reach for that before bisecting. In the same position `lia` does fail, but it reports **"Cannot find witness"**, which reads like an arithmetic gap and is not one — it means the goal still had an evar in it. In both cases the fix is to name the value: `assert (H : …) by (vm_compute; reflexivity)` and pass `H`, or supply the `_` explicitly. (Cost 22 minutes once and recurred three more times, once per `_`-inferred address, while proving `nulterminate`.)
+- **A `*)` INSIDE A COMMENT SILENTLY CLOSES IT, AND THE ERROR APPEARS SOMEWHERE ELSE ENTIRELY.** Quoting C in a comment is enough to do it: `a5 := *(int*)(0x13b0 …)` ends the comment at `t*)`, and the rest of the intended comment becomes code. The symptom is `Nested proofs are discouraged` reported many lines later, at a `Lemma` that is perfectly fine — and every `Proof.`/`Qed.` pair still balances, so bisecting on `Qed.` lines finds nothing. The mirror case, a stray `(*` inside a comment (`(*eargv[i] = 0)`), gives `Unterminated comment` at EOF. **Write a comment-nesting checker and run it first**; a dozen lines of Python finds both in seconds. This tree has now been bitten by the pair three times (once mangling a comment via a careless regex substitution).
+- **`split_and!` on `0 <= x < N` produces TWO goals, not one.** The conjunction is `0 <= x /\ x < N`. Any following bullet list is then off by one, and the error surfaces as a *rewrite* failure inside the next bullet ("The LHS of Hend (S i) does not match any subterm") rather than as a goal-count complaint. Count the goals after `split_and!` on any range hypothesis.
+- **A CALLER'S `uM_only_in` WINDOW MUST COVER THE LOCALS IT PASSES DOWN, NOT JUST THE CALLEE'S FRAME.** The instinct "everything below my sp" is wrong for any function that hands a callee the address of one of its OWN locals. `parseexec` passes `&q`/`&eq` to `gettoken`; those cells live at `sp0-120`/`sp0-128`, inside parseexec's frame but ABOVE the region the callee carves — so the arg loop's window is `(uint sp0 - 320, 208)`, not 192. It must reach 16 bytes further up than the callee's frame, and still stop short of the caller's own spill slots, or the epilogue loses `ra`/`s0`. Get this wrong in either direction and the failure is a `uM_only_in` that cannot be established, reported at the caller.
+- **A `rewrite` BETWEEN A `bv ?n` AND AN `mword 64` FAILS SAYING IT CANNOT FIND A TERM THAT IS PLAINLY THERE.** `rewrite <- H` with `H : m1 !!! Regidx r = m !!! Regidx r` fails with *"Found no subterm matching `m !!! Regidx ra_idx`"* inside a `uM_bytes M a 8 (m !!! Regidx ra_idx)` goal — because `uM_bytes`' value argument is a `bv ?n` with the width still an evar, while the equation is at `mword 64`, and **the two width indices print identically**. No stronger rewrite helps. State the whole spill/reload tower at the SOURCE file's spelling (`m1 !!! r`, `f1 !!! r`) and convert once at the end, in the final `ucallee_saved`, where both sides are honestly `mword 64`. Same family as the `Some 54%bv` / `Some 54%bv` unification failure above: when a message shows you two identical-looking terms, suspect an index or a proof component, not the values.
 - **Some files are deliberately ssreflect-FREE, and that decides where a definition may live.** `Pt4kWalk.v` has 27 vanilla `rewrite … by …` rewrites, so it cannot `Require` anything that pulls in the iris proofmode — which `PageGeom.v` does (it needs ssreflect's `rewrite … in H |- *` for the two `uint`/`bv_unsigned` bridges it inherited from `KallocInv.v`). So a `page_base`-spelled restatement of a `Pt4kWalk` fact has to live in `PtBuild.v`, not in `Pt4kWalk.v`, even though there is no dependency CYCLE. Before planning a relocation into a low file, check whether that file uses `rewrite … by …`; the failure mode is a parse error at the first such rewrite, far from the import you added.
-- In iris proofmode: `rewrite a b c` uses SPACES not commas (`rewrite H1, H2.` fails); `rewrite lem by tac` does NOT parse (ssreflect clash) — use `rewrite lem; [|tac]` / `rewrite (lem args ltac:(tac))` / `assert … by tac`. iris-FREE files can use `rewrite … by`. Rewrite a proofmode HYP with `iEval (rewrite H) in "Hpc"` — bare `rewrite H` rewrites the WHOLE `envs_entails Δ P` (hyps AND goal) and desyncs them.
+- **BUILD A CALLEE'S PRECONDITION BUNDLE WITH A NAMED `assert`, NEVER AN INLINE `ltac:`.** A conjunctive premise like `init_layout pt /\ init_text_sub M /\ is_aligned_vaddr (Virtaddr (mreg !!! Regidx ra_idx)) 2 = true` supplied as `(conj Hlay (conj Htext ltac:(rewrite Hmra; vm_compute; reflexivity)))` fails with *"The LHS of Hmra (mreg !!! Regidx ra_idx) does not match any subterm of the goal"* — by the time the `ltac:` runs, elaboration has zeta-expanded the `set`-bound register file, so the goal names the raw insert tower and the rewrite has nothing to hit. `assert (Hpre : <the whole conjunction>). { split_and!; [ … | … | rewrite Hmra; vm_compute; reflexivity ]. }` and pass `Hpre` works every time. Hit four times across UProofInitLib.v / UProofInit.v; the same shape is why `wp_init_write`'s three pure premises are named asserts too.
+- In iris proofmode: `rewrite a b c` uses SPACES not commas (`rewrite H1, H2.` fails) — and a comma list is not rescued by the modifiers either: `rewrite H1, !H2` and `rewrite H1, <- H2` die with *"Syntax error: [ltac_use_default] expected after [tactic]"*, pointing at the `!`/`<-` rather than at the comma. Split them. `rewrite lem by tac` does NOT parse (ssreflect clash) — use `rewrite lem; [|tac]` / `rewrite (lem args ltac:(tac))` / `assert … by tac`. iris-FREE files can use `rewrite … by`. Rewrite a proofmode HYP with `iEval (rewrite H) in "Hpc"` — bare `rewrite H` rewrites the WHOLE `envs_entails Δ P` (hyps AND goal) and desyncs them.
 - `iDestruct (lem with "…") as %pure` keeps the spatial inputs when the conclusion is pure (relied on by fetch/config lemmas) — a plain `iDestruct` of a pure-conclusion wand CONSUMES its premises. `big_sepM`/`big_sepL` byte extraction needs an EXPLICIT Φ (underscores leave TC evars unresolved).
 - Value/frame binders must be `mword 64` (annotate; `add_vec` demands `mword n` and won't unify a `bv 64` binder even though `mword 64 ≡ bv 64`). Same trap for a value introduced from an EXISTENTIAL resource (`iDestruct "HR" as (t) "Hcell"` on a `∃ t : mword 32, a ↦₄ t` invariant body): `t` arrives as `bv 32`, so `sign_extend' 64 t` fails with "has type bv 32 while it is expected to have type mword ?n" — ascribe `(t : mword 32)` at every use (the ascription leaves no mark, so `change`/`set` terms still match the leaf's output). Decode-fact immediates must be the decoder's POSITIVE RESIDUE (−2016 → 2080; the signed literal fails `bv_is_wf`). Model names need `Defs.` qualification (`Defs.bind`/`Defs.read_reg`/`Defs.assert_exp'`; `rv64d_types.Read_plain`) or they resolve to raw Prompt_monad versions that won't unify with `M = Defs.monad`. A `.` immediately before `(*` parses as `.(` projection — leave a space.
 - **A `nat`-ASCRIBED `Definition` WHOSE BODY IS AN `if`/`match` DOES NOT PUSH THE SCOPE INTO ITS BRANCHES.** Under the tree's usual `Local Open Scope Z_scope`, `Definition c (b : bool) : nat := if b then 0 else 1` fails with *"The term `0` has type `Z` while it is expected to have type `nat`"* — the return ascription constrains the `if` as a whole, but each branch is elaborated in the ambient scope first. Write the literals `0%nat` / `1%nat` per branch, and `(… + …)%nat` on any arithmetic. The same definition written with a bare literal body (`:= 3`) is fine, which is what makes this look arbitrary.
@@ -1165,6 +1446,7 @@ and axioms each proven function rests on. `--format text|md|html|json`.
 - **`++` IN A LEMMA *STATEMENT* PARSES IN `string_scope`** in the usual import set (proofmode's string scope under `Local Open Scope Z_scope`): `disk_read dk o n ++ …` fails with *"has type list (bv 8) while it is expected to have type string"*. Annotate `(… ++ …)%list`. This is the statement-position twin of the recorded local-hypothesis `++` trap.
 - **A DOUBLE-QUOTED PHRASE IN A HEADER COMMENT MUST NOT SPAN LINES.** The `*)` ending an intervening line lands inside the string, Coq warns *"Not interpreting `*)` as the end of current non-terminated comment"*, and swallows the rest of the file. (Live example: `FsCrash.v`'s line-260 warning.)
 - **`cbn` with NO delta list next to a definition that expands into a 1024-element list is seconds per use.** `fs_blocks` unfolds into a `disk_read` of 1024 bytes and a following `injection` then walks it — measured ~7 s per `cbn` in `FsBoot.v`. Give `cbn` its delta list (`cbn [mbind option_bind]`); `coqc -time` pins it instantly.
+- **A `bv 8` VALUE DOES NOT UNIFY WITH AN `mword 8` PARAMETER, though the two are convertible.** `mword` is a `match` on its `Z` index, so `mword ?n =?= bv 8` is not solvable by unification and a `b : bv 8` handed to a lemma expecting `mword ?n` fails with *"has type `bv 8` while it is expected to have type `mword ?n`"*. Image bytes come out of a `gmap Z (bv 8)` and go into width-generic model operations (`zero_extend'`, `nth_byte`), so this hits any proof that reads a byte: write the binder as **`(b : mword 8)`** and the map lookup's result coerces by conversion. (Found proving `strlen`'s `lbu`.)
 - **A `gmap Arch.pa _` written as an explicit BINDER TYPE in a proof file is a Countable-instance trap.** `VirtioProto.v`/`DiskInv.v` (and the other `gmap Arch.pa (bv 8)` homes) deliberately do NOT `Require SailStdpp.Base`/`SailStdpp.Values` — their headers say so. A WP proof file *does* import them, and then a `Lemma` binder `(pin : gmap Arch.pa (bv 8))` elaborates against `@Countable_mword (if 64 =? 32 then 34 else 64)` instead of the instance those files used: the binder is silently a DIFFERENT type and every application fails with an unreadable "has type … while it is expected to have type …" naming two maps that print identically. Fix: write the binder as **`(pin : _)`** and let its first use (`disk_receipt γ p sl pin`) fix the type. Same for any `gmap Arch.pa _`/`gset Arch.pa` binder in an importing file. (This is the binder-position twin of the `SailStdpp.Values` instance leak noted above.)
 - **At an accessor↔leaf seam, rewrite the address equation into the PURE side conditions, never into the Iris hypothesis.** An invariant accessor hands out its window at ITS address (`phys_word4 (used_elem_pa (v_cfg v) p) …`) while the memory leaf's bridge (`DiskInv.phys_to_word4`) wants the address the CODE computes. `iEval (rewrite Haddr) in "Hw4"` fails with *"The LHS of Haddr … does not match any subterm"* on a hypothesis that visibly contains it — an `Arch.pa`-vs-`mword 64` ascription mismatch under the accessor's definition defeats ssreflect's matching — while the SAME equation rewrites fine into the pure `is_aligned_paddr`/`kmap_static`/canonicality hypotheses. So: state the equation toward the accessor's form (`pa_add pu off = used_elem_pa (v_cfg v) p`), `rewrite Haddr in Halign Hstatic Hcanon`, and apply the bridge AT THE ACCESSOR'S ADDRESS; only the GOAL ever gets `rewrite Hea Haddr`.
 - The Sail model (`Import Defs` / `Riscv.rv64d`) SHADOWS `filter` (a bool list filter) and `not` (bool negation): in model-importing files write `base.filter` for the stdpp map filter and `¬` (never `not`) for Logic negation, or the elaborator demands `bool`. Similarly, do NOT `Require Import SailStdpp.Values` just to name `mword` in a type annotation — it leaks typeclass instances that break unrelated Iris proofs ("Unable to find an instance"); reference it qualified (`SailStdpp.Values.mword`) instead.

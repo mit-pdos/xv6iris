@@ -214,7 +214,7 @@ Definition wp_sys_chdir_sconf_body
   (* argstr reads syscall argument 0 out of the trapframe page [proc_priv]
      carries *)
   pv_tf V !! tf_arg_idx 0 = Some v ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   (* ENTERED WITH NO LOCK HELD, and that is why there is no [locks_below]
      premise here where sys_close has one: the depth is pinned at ZERO, so
      [CpuOwn.cpu_own_zero_empty] DERIVES [lks = ∅] and every order goal the
@@ -228,7 +228,7 @@ Definition wp_sys_chdir_sconf_body
      is threaded rather than framed because begin_op / ilock / iput /
      iunlockput / end_op each take it and each crosses at the literal
      [true].  See claude-notes/completed/eb-generic-sweep.md. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
@@ -267,9 +267,9 @@ Definition wp_sys_chdir_sconf_body
       (* the page table may have GROWN: argstr's fetchstr faults user pages
          in.  [uptd_ext] is argstr's own report, relayed. *)
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       bslots bn 3 -∗

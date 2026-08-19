@@ -97,7 +97,6 @@ Require Import CodeFsinit.
 Require Import SpecBread SpecBrelse SpecMemmove.
 Require Import SpecInitlog SpecIreclaim.
 Require Import SpecPrintk.
-Require Import SpecPanic.
 Require Import SpecFsinit.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
@@ -189,10 +188,10 @@ Section FsinitDefs.
 
   (* ra@24 s0@16 s1@8 s2@0 off the pushed sp, i.e. slots 1..4 off the entry *)
   Definition fsi_frame (m : regfile) : iProp Σ :=
-    (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈ (m !!! Regidx Rra : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈ (m !!! Regidx Rs0 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈ (m !!! Regidx Rs1 : mword 64) ∗
-     pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈ (m !!! Regidx Rs2 : mword 64))%I.
+    (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈[KT1] (m !!! Regidx Rra : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈[KT1] (m !!! Regidx Rs2 : mword 64))%I.
 
   (* THE CONTINUATION, named so the proofmode does not re-traverse it at
      every split (claude-notes/optimization.md).  It is the contract's post,
@@ -208,7 +207,7 @@ Section FsinitDefs.
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (mf : regfile) (used' : gset Z),
         ⌜callee_saved m mf⌝ -∗
-        sie_cap_gpr mf K b (proc_addr j) -∗
+        sie_cap_gpr KT1 mf K b (proc_addr j) -∗
         cpu_own 0 true (proc_addr j) b lks -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
@@ -292,7 +291,7 @@ Section FsinitEpilogue.
     used' ⊆ used ->
     fsi_sp m M ->
     fsi_thr4 m M ->
-    sie_cap_gpr M (K - 4)%nat b (proc_addr j) -∗
+    sie_cap_gpr KT1 M (K - 4)%nat b (proc_addr j) -∗
     cpu_own 0 true (proc_addr j) b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.fsinit + 0x58) : mword 64) -∗
@@ -637,7 +636,7 @@ Section FsinitMain.
       by (rewrite /M1 upd_ne; [reflexivity | nz]).
     assert (HM1s2 : (M1 !!! Regidx Rs2 : mword 64) = (m !!! Regidx Rs2 : mword 64))
       by (rewrite /M1 upd_ne; [reflexivity | nz]).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(T1 & T2 & T3 & T4 & _)".
     iDestruct "T1" as (w1) "Hf1".   iDestruct "T2" as (w2) "Hf2".
     iDestruct "T3" as (w3) "Hf3".   iDestruct "T4" as (w4) "Hf4".
@@ -999,7 +998,7 @@ Section FsinitMain.
       rewrite /N6 upd_ne; [| regne]. exact (HN5thr c Hcs N2' N8 N9 N18). }
     iEval (rewrite -HN6a1) in "Hsrc".
     iEval (rewrite -HN6a0) in "Hsbold".
-    iApply (MM.wp_memmove_sconf N6 (K - 4)%nat 32%nat
+    iApply (MM.wp_memmove_sconf KT1 KT0 KT0 N6 (K - 4)%nat 32%nat
               (fun jj => bs_sb !!! jj) sb_old b (proc_addr j)
               ltac:(lia) ltac:(vm_compute; reflexivity) HN6a2
               with "Hcg Htext Hpc Hsrc Hsbold").
@@ -1218,7 +1217,7 @@ Section FsinitMain.
                      = sb_magic).
     { rgne. rewrite HQ2a4. rewrite /sb_magic /sb_base /pa_add /add_vec_int. pcw. }
     iEval (rewrite -Hmgadr) in "Hmg".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.fsinit + 0x34)) Ra4 Ra4
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.fsinit + 0x34)) Ra4 Ra4
               (mword_of_int 934 : mword 12) Q2 (K - 4)%nat v_magic b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi34 Hmg").
     iIntros (CID22 Hq22) "Hcg Hpc Hmg".

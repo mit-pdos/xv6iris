@@ -113,9 +113,9 @@ Section ProofVirtioDiskRwDSeam.
                     (vdrwd_bufwin b wr bs_buf))⌝ -∗
        ⌜is_aligned_paddr (Physaddr (pa_stk sp0 11)) 8 = true
         /\ is_aligned_paddr (Physaddr (pa_stk sp0 12)) 8 = true⌝ -∗
-       sie_cap_gpr M (trap_res eb + (K - 12))%nat false (proc_addr j) -∗
+       sie_cap_gpr KT1 M (trap_res eb + (K - 12))%nat false (proc_addr j) -∗
        cpu_own 1 eb (proc_addr j) false lks -∗
-       trap_csrs -∗
+       trap_csrs KT1 -∗
        cpu_claim (proc_addr j) -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x19a) : mword 64) -∗
        locked γk cpu_id -∗
@@ -124,7 +124,7 @@ Section ProofVirtioDiskRwDSeam.
                                     (vdrwd_sldata wr bs_buf bs_disk))
                                 (h, m2, t) pin) -∗
        vdrw_slot_rest m2 -∗ vdrw_slot_rest t -∗
-       vdrw_idx sp0 (mword_of_int (Z.of_nat h)) (mword_of_int (Z.of_nat m2))
+       vdrw_idx (KTR := KT1) sp0 (mword_of_int (Z.of_nat h)) (mword_of_int (Z.of_nat m2))
                     (mword_of_int (Z.of_nat t)) -∗
        WP (Loop : expr riscv_lang)))%I.
 
@@ -145,16 +145,16 @@ Section ProofVirtioDiskRwDSeam.
        ⌜forall p T, tr !! p = Some T -> tri_set T ## tri_set (h, m2, t)⌝ -∗
        ⌜is_aligned_paddr (Physaddr (pa_stk sp0 11)) 8 = true
         /\ is_aligned_paddr (Physaddr (pa_stk sp0 12)) 8 = true⌝ -∗
-       sie_cap_gpr M (trap_res eb + (K - 12))%nat false (proc_addr j) -∗
+       sie_cap_gpr KT1 M (trap_res eb + (K - 12))%nat false (proc_addr j) -∗
        cpu_own 1 eb (proc_addr j) false lks -∗
-       trap_csrs -∗
+       trap_csrs KT1 -∗
        cpu_claim (proc_addr j) -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x176) : mword 64) -∗
        locked γk cpu_id -∗
        vdrw_body γd pd pav np nr fl pk tr
          (fr_upd (fr_upd (fr_upd fr h false) m2 false) t false) -∗
        vdrw_chain pd b h m2 t wr sector -∗
-       vdrw_idx sp0 (mword_of_int (Z.of_nat h)) (mword_of_int (Z.of_nat m2))
+       vdrw_idx (KTR := KT1) sp0 (mword_of_int (Z.of_nat h)) (mword_of_int (Z.of_nat m2))
                     (mword_of_int (Z.of_nat t)) -∗
        WP (Loop : expr riscv_lang)))%I.
 

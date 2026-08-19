@@ -220,7 +220,7 @@ Definition wp_sys_mkdir_sconf_body
   ninodes < 2 ^ 31 ->
   16 * Z.of_nat nib <= 2 ^ 16 ->
   (* ---- ialloc's no-inodes arm calls printk, not panic ---- *)
-  printk_gen_contract γpr gu gd ->
+  printk_gen_contract (kt := KT1) γpr gu gd ->
   (* ---- the reference allowance create's walk needs ---- *)
   (create_slots <= ns)%nat ->
   (j < NPROC)%nat ->
@@ -230,14 +230,14 @@ Definition wp_sys_mkdir_sconf_body
   (* argstr reads syscall argument 0 out of the trapframe page [proc_priv]
      carries *)
   pv_tf V !! tf_arg_idx 0 = Some v ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   (* ENTERED WITH NO LOCK HELD, exactly as sys_chdir: the depth is pinned at
      ZERO, so [CpuOwn.cpu_own_zero_empty] DERIVES [lks = ∅] and every order
      goal the four callees raise is [locks_below ∅ _]. *)
   cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, THREADED.  [emp] at [eb = true] -- which this
      contract's own premise forces -- so no caller gains an obligation. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* ---- the two persistent credentials ialloc's printk arm needs ---- *)
@@ -279,9 +279,9 @@ Definition wp_sys_mkdir_sconf_body
       (* the page table may have GROWN: argstr's fetchstr faults user pages
          in.  [uptd_ext] is argstr's own report, relayed. *)
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       bslots bn 3 -∗

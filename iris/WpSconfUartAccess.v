@@ -63,6 +63,7 @@ Section WpSconfUartAccess.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
+  Context {kt : ktier}.
   (* ==================================================================== *)
   (* THE READ-SIDE SIDE CONDITION [SrcOk] ON EVERY LEAF IN THIS SECTION.   *)
   (* Read once; each leaf below carries a three-line pointer back here.    *)
@@ -126,12 +127,12 @@ Section WpSconfUartAccess.
     uint rd <> 0 ->
     rd_ok rd ->
     add_vec (rget m rs1) (sign_extend' 64 imm) = uart_pa 5 ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 1)) -∗
     dev_inv γd γv -∗ uart_tx_own γd l -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ bt : bv 8,
-      sie_cap_gpr (<[Regidx rd := regval_into_reg (lsr_ldval_of bt)]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg (lsr_ldval_of bt)]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗
       uart_tx_own γd l -∗
       (⌜ lsr_thre_clear bt = false ⌝ -∗ uart_out_lb γd l) -∗
@@ -145,7 +146,7 @@ Section WpSconfUartAccess.
     assert (Haddr_all : forall hh : CpuId,
               add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = uart_pa 5)
       by (intros hh; rewrite (src_ok_rget_indep m rs1 hh CID); exact Haddr).
-    iApply (Uart.wp_lb_uart_s_sconf (CID:=CID) γd γv 5 pc false true rd rs1 imm
+    iApply (Uart.wp_lb_uart_s_sconf kt (CID:=CID) γd γv 5 pc false true rd rs1 imm
               m n (uart_tx_own γd l)
               (fun bt => uart_tx_own γd l ∗ (⌜ lsr_thre_clear bt = false ⌝ -∗ uart_out_lb γd l))%I b p
               ltac:(unfold uart_size; lia) Hrd Hrdok
@@ -177,12 +178,12 @@ Section WpSconfUartAccess.
     uint rd <> 0 ->
     rd_ok rd ->
     rget m rs1 = uart_pa 5 ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc false (LOAD (mword_of_int 0 : mword 12, Regidx rs1, Regidx rd, true, 1)) -∗
     dev_inv γd γv -∗ uart_tx_own γd l -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ bt : bv 8,
-      sie_cap_gpr (<[Regidx rd := regval_into_reg (lsr_ldval_of bt)]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg (lsr_ldval_of bt)]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗
       uart_tx_own γd l -∗
       (⌜ lsr_thre_clear bt = false ⌝ -∗ uart_out_lb γd l) -∗
@@ -238,12 +239,12 @@ Section WpSconfUartAccess.
     uint rd <> 0 ->
     rd_ok rd ->
     add_vec (rget m rs1) (sign_extend' 64 imm) = uart_pa off ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 1)) -∗
     dev_inv γd γv -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ bt : bv 8,
-      sie_cap_gpr (<[Regidx rd := regval_into_reg (lsr_ldval_of bt)]> m) n b p -∗
+      sie_cap_gpr kt (<[Regidx rd := regval_into_reg (lsr_ldval_of bt)]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -256,7 +257,7 @@ Section WpSconfUartAccess.
               add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = uart_pa off)
       by (intros hh; rewrite (src_ok_rget_indep m rs1 hh CID); exact Haddr).
     destruct (uart_geom_ok off Hoff) as (Hg1 & Hg2 & Hg3).
-    iApply (Uart.wp_lb_uart_s_sconf (CID:=CID) γd γv off pc false true rd rs1 imm
+    iApply (Uart.wp_lb_uart_s_sconf kt (CID:=CID) γd γv off pc false true rd rs1 imm
               m n emp%I (fun _ => emp%I) b p
               Hoff Hrd Hrdok
               ltac:(rewrite Haddr; exact Hg1)
@@ -285,11 +286,11 @@ Section WpSconfUartAccess.
        silently re-read [rs2] -- i.e. [tp] -- at the RESUMING hart). *)
     let sb : mword 8 := autocast (T := mword) (subrange_vec_dec (rget m rs2) (Z.sub (Z.mul 1 8) 1) 0) in
     rget m rs1 = uart_pa 0 ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr kt m n b p -∗
     pc_is pc -∗ instr pc false (STORE (mword_of_int 0 : mword 12, Regidx rs2, Regidx rs1, 1)) -∗
     dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_out_lb γd l -∗ uart_dlab_off γd -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr m n b p -∗
+      sie_cap_gpr kt m n b p -∗
       pc_is (add_vec_int pc 4) -∗
       uart_tx_own γd (l ++ [sb]) -∗
       uart_sent γd (l ++ [sb]) -∗
@@ -305,7 +306,7 @@ Section WpSconfUartAccess.
       by (intros hh; rewrite (src_ok_rget_indep m rs1 hh CID); exact Haddr).
     assert (Hsb_all : forall hh : CpuId, rget (CID := hh) m rs2 = rget (CID := CID) m rs2)
       by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
-    iApply (Uart.wp_sb_uart_s_sconf (CID:=CID) γd γv 0 pc false rs2 rs1 (mword_of_int 0 : mword 12)
+    iApply (Uart.wp_sb_uart_s_sconf kt (CID:=CID) γd γv 0 pc false rs2 rs1 (mword_of_int 0 : mword 12)
               m n (uart_tx_own γd l)
               (uart_tx_own γd (l ++ [sb]) ∗ uart_sent γd (l ++ [sb]))%I b p
               ltac:(unfold uart_size; lia)

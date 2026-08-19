@@ -142,7 +142,7 @@ Definition vdi_post
     (eb : bool) (pp : mword 64) (on : option nat)
     (ret_tgt c_cpu : mword 64) (lks : gset string) : iProp Σ :=
   ( ∀ (mr : regfile) (pd pav pu : mword 64),
-    sie_cap_gpr mr K false pp -∗
+    sie_cap_gpr KT1 mr K false pp -∗
     cpu_own 0%nat eb pp false lks -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
@@ -208,7 +208,7 @@ Definition wp_virtio_disk_init_sconf_body
      "kmem" (13) -- and initlock/memset, which need no premise; "kmem" is
      the whole cone.  Mirrors SpecBfree.v's. *)
   locks_below lks "kmem" ->
-  sie_cap_gpr m K false pp -∗
+  sie_cap_gpr KT1 m K false pp -∗
   cpu_own 0%nat eb pp false lks -∗
   (* [kernel_data] supplies the "virtio_disk" string literal the auipc/addi
      pair points at -- the name handed to initlock. *)

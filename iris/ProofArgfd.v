@@ -161,12 +161,12 @@ Section ProofArgfd.
       (p : mword 64) (b : bool) :
     Mt !!! Regidx (mword_of_int 18 : mword 5) = pfd ->
     Mt !!! Regidx (mword_of_int 14 : mword 5) = sign_extend' 64 wfd ->
-    sie_cap_gpr Mt nav b p -∗
+    sie_cap_gpr KT1 Mt nav b p -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.argfd + 0x38) : mword 64) -∗
     ofd_out pfd oldfd -∗
     wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr Mt nav b p -∗
+      sie_cap_gpr KT1 Mt nav b p -∗
       pc_is (mword_of_int (KernelSyms.argfd + 0x40) : mword 64) -∗
       ofd_out pfd wfd -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -243,19 +243,19 @@ Section ProofArgfd.
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
         r <> (mword_of_int 8 : mword 5) -> r <> (mword_of_int 9 : mword 5) ->
         r <> (mword_of_int 18 : mword 5) -> Mt !!! Regidx r = m !!! Regidx r) ->
-    sie_cap_gpr Mt (av - 6)%nat b p -∗
+    sie_cap_gpr KT1 Mt (av - 6)%nat b p -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.argfd + 0x46) : mword 64) -∗
-    word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (pa_stk sp0 3) (DfracOwn 1) s10 -∗
-    word_pointsto (pa_stk sp0 4) (DfracOwn 1) s20 -∗
-    word_pointsto (pa_stk sp0 5) (DfracOwn 1) w5 -∗
-    word_pointsto (pa_stk sp0 6) (DfracOwn 1) w6 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) s20 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) w5 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) w6 -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx (mword_of_int 10 : mword 5) = rv⌝ -∗
-        sie_cap_gpr mf av b p -∗
+        sie_cap_gpr KT1 mf av b p -∗
         pc_is (ret_pc ra0) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -359,8 +359,8 @@ Section ProofArgfd.
     iEval (rewrite -E6) in "Hb6".
     iDestruct (stack_own_4_intro sp0 ra0 s00 s10 s20 with "Hb1 Hb2 Hb3 Hb4") as "Hf14".
     iDestruct (stack_own_2_intro (pa_stk sp0 4) w5 w6 with "Hb5 Hb6") as "Hf56".
-    iAssert (stack_own sp0 6) with "[Hf14 Hf56]" as "Hframe".
-    { rewrite (stack_own_split sp0 4 6 ltac:(lia)). change (6 - 4)%nat with 2%nat. iFrame. }
+    iAssert (stack_own (KTR := KT1) sp0 6) with "[Hf14 Hf56]" as "Hframe".
+    { rewrite (stack_own_split (KTR := KT1) sp0 4 6 ltac:(lia)). change (6 - 4)%nat with 2%nat. iFrame. }
     iEval (rewrite -Hwv) in "Hframe".
     iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (KernelSyms.argfd + 0x4e))
               (mword_of_int 3 : mword 6) T4 (av - 6)%nat 6 b Hpop
@@ -506,7 +506,7 @@ Section ProofArgfd.
     (* the six frame slots *)
     assert (E5 : pa_stk (pa_stk sp0 4) 1 = pa_stk sp0 5) by (rewrite pa_stk_assoc; reflexivity).
     assert (E6 : pa_stk (pa_stk sp0 4) 2 = pa_stk sp0 6) by (rewrite pa_stk_assoc; reflexivity).
-    rewrite (stack_own_split sp0 4 6 ltac:(lia)). change (6 - 4)%nat with 2%nat.
+    rewrite (stack_own_split (KTR := KT1) sp0 4 6 ltac:(lia)). change (6 - 4)%nat with 2%nat.
     iDestruct "Hframe" as "[Hf14 Hf56]".
     iDestruct (stack_own_4_elim with "Hf14") as (u1 u2 u3 u4) "(Hs1 & Hs2 & Hs3 & Hs4)".
     iDestruct (stack_own_2_elim with "Hf56") as (w5 w6) "[Hs5 Hs6]".
@@ -956,7 +956,7 @@ Section ProofArgfd.
                           (sign_extend' 64 (mword_of_int 0 : mword 12)) = p_ofile p fd)
         by (rewrite HC4a0; apply addv_sext0).
       iEval (rewrite -Haddrof) in "Hcell".
-      iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.argfd + 0x34))
+      iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.argfd + 0x34))
                 (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 0 : mword 12)
                 C4 (av - 6)%nat fv b
                 ltac:(vm_compute; discriminate) ltac:(rdok)

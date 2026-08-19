@@ -73,11 +73,11 @@ Definition wp_plic_complete_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ
   (* plic_complete's own max depth: its 32-byte frame (4 slots) plus the two
      slots cpuid's frame needs below it. *)
   (6 <= n)%nat ->
-  sie_cap_gpr m0 n false p -∗
+  sie_cap_gpr KT1 m0 n false p -∗
   kernel_text -∗ pc_is pcE -∗
   dev_inv γd γv -∗
   ( ∀ m' : regfile,
-    sie_cap_gpr m' n false p -∗
+    sie_cap_gpr KT1 m' n false p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 m' /\ m' !!! Regidx ra_idx = ra0 ⌝ -∗
     WP (Loop : expr riscv_lang)) -∗

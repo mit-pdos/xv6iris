@@ -118,7 +118,7 @@ Section UsertrapRes.
      own premise.  [trap_res false = 0], so no reserve is owed: the disabled
      index is not holding an enabled arm's window. *)
   Definition ut_stack (ksp : mword 64) (av : nat) : iProp Σ :=
-    stack_own ksp (trap_res false + av)%nat.
+    stack_own (KTR := KT1) ksp (trap_res false + av)%nat.
 
   (* [sconf] MINUS the mstatus cell AND the privilege cell is
      [IntrDefs.sconf_priv_closer], which lives beside [sconf_at] because it
@@ -144,7 +144,7 @@ Section UsertrapRes.
         SHARED tier ([KptShare.tlb_res_pt] inside), which is the whole point
         of SpecUsertrap.v's restatement *)
      strans_inv ∗
-     sie_arm false pj ∗
+     sie_arm KT1 false pj ∗
      kpt_on cpu_id ∗
      (* NOT [IntrDefs.sconf_priv_closer]: [mie]/[mideleg]/[menvcfg] are
         [user_cfg]'s cells too (uservec/userret/user-mode hold them the
@@ -182,7 +182,7 @@ Section UsertrapRes.
   Definition ut_trap_parked (pj : mword 64) (ksp : mword 64) (av : nat)
       (lks : gset string) : iProp Σ :=
     (ut_stack ksp av ∗
-     sie_arm false pj ∗
+     sie_arm KT1 false pj ∗
      strans_kpt ∗ kpt_on cpu_id ∗
      ut_ghosts ∗
      cpu_own 0%nat false pj false lks ∗
@@ -258,7 +258,7 @@ Section UsertrapRes.
     menvcfg ↦ᵣ menvcfg0 -∗
     gpr_file m -∗
     ut_trap pj ksp av lks -∗
-      sie_cap_gpr m av false pj ∗
+      sie_cap_gpr KT1 m av false pj ∗
       cpu_own 0%nat false pj false lks ∗
       cpu_claim pj ∗
       ghost_var sie_gname (1/4) ('b"0" : mword 1) ∗
@@ -270,7 +270,12 @@ Section UsertrapRes.
     apply mword1_zero_of_ne_one in Hsie.
     apply mword1_zero_of_ne_one in Hspp.
     iIntros "#Hhw #Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Hgpr Ht".
-    iDestruct "Ht" as "(Hstk & Hstr & Harm & Hkpt & Hgh & Hcpu & Hclm)".
+    (* THE RECEIPT IS PERSISTENT, and taking it intuitionistically is what
+       lets this assembly supply the capability's tier witness for real
+       ([strans_ktier_wit_intro] below) instead of re-conjuring a KT0 one:
+       [ut_trap] carries [kpt_on cpu_id] at every tier, so the bundle it
+       builds attests the access right whatever the hart's regime is. *)
+    iDestruct "Ht" as "(Hstk & Hstr & Harm & #Hkpt & Hgh & Hcpu & Hclm)".
     iDestruct "Hgh" as "(Hhalf & Hq & Htie & Htrav)".
     (* A named [iFrame] here still makes the tactic hunt these five atoms
        through the WHOLE goal, including the [sie_cap_gpr] conjunct that is
@@ -283,7 +288,7 @@ Section UsertrapRes.
        The first branch is left open (empty in the bracket) so the rest of
        this proof, which is entirely about the [sie_cap_gpr] side, is
        unchanged. *)
-    iSplitR "Hcpu Hclm Hq Hkpt Htrav"; [ | iFrame "Hcpu Hclm Hq Hkpt Htrav" ].
+    iSplitR "Hcpu Hclm Hq Htrav"; [ | iFrame "Hcpu Hclm Hq Hkpt Htrav" ].
     rewrite /sie_cap_gpr. iFrame "Hhs".
     iSplitL "Hhw Hminv Hpriv Hms Hhalf Htie Hmie Hmdl Hmenv".
     { rewrite /sconf. iFrame "Hhw Hminv Hpriv".
@@ -296,6 +301,7 @@ Section UsertrapRes.
       iPureIntro. split; [| split; [| split; [| split]]]; vm_compute; reflexivity. }
     rewrite /sie_cap /ut_stack Hsp.
     iFrame "Hstk Hstr Harm".
+    iSplitR; [ iApply (strans_ktier_wit_intro with "Hkpt") |].
     rewrite (tp_pin_id m Htp). iExact "Hgpr".
   Qed.
 
@@ -367,8 +373,8 @@ Section UsertrapRes.
     stvec ↦ᵣ (mword_of_int KernelSyms.kernelvec : mword 64) -∗
     ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
     kpt_on cpu_id -∗
-    intr_handler_spec (mword_of_int KernelSyms.kernelvec : mword 64) -∗
-    trap_csrs.
+    intr_handler_spec KT1 (mword_of_int KernelSyms.kernelvec : mword 64) -∗
+    trap_csrs KT1.
   Proof.
     iIntros "Hep Hsc Hst Hsret Hstv Hq Hkpt #Hih".
     iApply (trap_csrs_of_raw with "[Hep Hsc Hst Hsret] [Hq Hstv] Hkpt").
@@ -1044,8 +1050,21 @@ Section UsertrapRes.
      the epilogue's [c.ldsp ra,24(sp)] is what makes the [ret] land on the
      boundary's [ret_pc (m !!! ra)]. *)
   Definition ut_frame (sp0 : mword 64) (vra vs0 vs1 vs2 : mword 64) : iProp Σ :=
-    (pa_stk sp0 1 ↦₈ vra ∗ pa_stk sp0 2 ↦₈ vs0 ∗
-     pa_stk sp0 3 ↦₈ vs1 ∗ pa_stk sp0 4 ↦₈ vs2)%I.
+    (pa_stk sp0 1 ↦₈[KT1] vra ∗ pa_stk sp0 2 ↦₈[KT1] vs0 ∗
+     pa_stk sp0 3 ↦₈[KT1] vs1 ∗ pa_stk sp0 4 ↦₈[KT1] vs2)%I.
+
+  (* ...and the same four cells as FREE STACK, which is what they are on a
+     path that never returns: usertrap's frame is dead the moment the walk
+     reaches [kexit], and it is part of the page the dying thread donates
+     ([ProcDefs.kstack_closer_frame]). *)
+  Lemma ut_frame_stack (sp0 vra vs0 vs1 vs2 : mword 64) :
+    ut_frame sp0 vra vs0 vs1 vs2 ⊢ stack_own (KTR := KT1) sp0 4.
+  Proof.
+    rewrite /ut_frame /stack_own.
+    iIntros "(H1 & H2 & H3 & H4)".
+    iExists [vra; vs0; vs1; vs2]. iSplitR; [done|].
+    simpl. iFrame "H1 H2 H3 H4".
+  Qed.
 
   (* CALLEE-SAVED MINUS THE FOUR THE FRAME HOLDS.  [CalleeSaved.callee_saved
      m0 m] is FALSE at every point inside usertrap -- s1 holds [p] and s2
@@ -1149,8 +1168,8 @@ Section UsertrapRes.
 
   Lemma ut_csrs_raw_fold (ep sc st : mword 64) :
     ut_csrs_raw ep sc st -∗
-    intr_handler_spec (mword_of_int KernelSyms.kernelvec : mword 64) -∗
-    trap_csrs.
+    intr_handler_spec KT1 (mword_of_int KernelSyms.kernelvec : mword 64) -∗
+    trap_csrs KT1.
   Proof.
     iIntros "(Hep & Hsc & Hst & Hstv & Hq & Hsret & Hkpt) #Hih".
     iApply (ut_trap_csrs_fold ep sc st with "Hep Hsc Hst Hsret Hstv Hq Hkpt Hih").
@@ -1166,7 +1185,7 @@ Section UsertrapRes.
   Definition ut_hold (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
       (N : ut_names) (V : pprivate) (b : bool) (lks : gset string) : iProp Σ :=
     (cpu_own 0%nat b (un_pj N) b lks ∗
-     trap_csrs_ext b ∗
+     trap_csrs_ext KT1 b ∗
      cpu_claim_ext b (un_pj N) ∗
      ut_env Rsys N V)%I.
 
@@ -1295,14 +1314,14 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES.
         !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
         !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId} : uptd -> mword 64 -> iProp Σ :=
-    ut_res SY.syscall_env.
+    ut_res (SY.syscall_env).
 
   Definition usertrap_res_parked
       `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
         !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
         !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId} : uptd -> mword 64 -> iProp Σ :=
-    ut_res_parked SY.syscall_env.
+    ut_res_parked (SY.syscall_env).
 
   Lemma usertrap_res_tlb_close
       `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
@@ -1310,7 +1329,7 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES.
         !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) (kroot : mword 44) :
     usertrap_res_parked pt ksp -∗ tlb_res_pt kroot -∗ usertrap_res pt ksp.
-  Proof. exact (ut_res_tlb_close SY.syscall_env pt ksp kroot). Qed.
+  Proof. exact (ut_res_tlb_close (SY.syscall_env) pt ksp kroot). Qed.
 
   Lemma usertrap_res_tlb_open
       `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
@@ -1319,14 +1338,14 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES.
       `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
     usertrap_res pt ksp -∗
     ∃ kroot : mword 44, tlb_res_pt kroot ∗ usertrap_res_parked pt ksp.
-  Proof. exact (ut_res_tlb_open SY.syscall_env pt ksp). Qed.
+  Proof. exact (ut_res_tlb_open (SY.syscall_env) pt ksp). Qed.
 
   Definition usertrap_res_bare
       `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
         !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
         !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId} : uptd -> mword 64 -> iProp Σ :=
-    ut_res_bare SY.syscall_env.
+    ut_res_bare (SY.syscall_env).
 
   Lemma usertrap_res_pt_close
       `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
@@ -1334,7 +1353,7 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES.
         !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
     usertrap_res_bare pt ksp -∗ proc_pt pt -∗ usertrap_res_parked pt ksp.
-  Proof. exact (ut_res_pt_close SY.syscall_env pt ksp). Qed.
+  Proof. exact (ut_res_pt_close (SY.syscall_env) pt ksp). Qed.
 
   Lemma usertrap_res_pt_open
       `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
@@ -1342,7 +1361,7 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES.
         !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
     usertrap_res_parked pt ksp -∗ proc_pt pt ∗ usertrap_res_bare pt ksp.
-  Proof. exact (ut_res_pt_open SY.syscall_env pt ksp). Qed.
+  Proof. exact (ut_res_pt_open (SY.syscall_env) pt ksp). Qed.
 
   Lemma usertrap_res_bare_norm
       `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
@@ -1350,7 +1369,7 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES.
         !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
     usertrap_res_bare pt ksp -∗ usertrap_res_bare (ud_norm pt) ksp.
-  Proof. exact (ut_res_bare_norm SY.syscall_env pt ksp). Qed.
+  Proof. exact (ut_res_bare_norm (SY.syscall_env) pt ksp). Qed.
 
   Lemma usertrap_res_tf_open
       `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
@@ -1361,7 +1380,7 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES.
     usertrap_res_bare pt ksp -∗
     ∃ ws : list (mword 64), ⌜tf_kernel_words_ok kroot ksp ws⌝ ∗ tf_page (ud_tfp pt) ws ∗
       (∀ ws' : list (mword 64), tf_page (ud_tfp pt) ws' -∗ usertrap_res_bare pt ksp).
-  Proof. exact (ut_res_bare_tf_open SY.syscall_env pt ksp kroot). Qed.
+  Proof. exact (ut_res_bare_tf_open (SY.syscall_env) pt ksp kroot). Qed.
 
   Lemma usertrap_res_csrs_open
       `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
@@ -1370,7 +1389,7 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES.
       `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
     usertrap_res_bare pt ksp -∗
     hart_csrs ∗ (hart_csrs -∗ usertrap_res_bare pt ksp).
-  Proof. exact (ut_res_bare_csrs_open SY.syscall_env pt ksp). Qed.
+  Proof. exact (ut_res_bare_csrs_open (SY.syscall_env) pt ksp). Qed.
 
   Lemma usertrap_res_tf_csrs_open
       `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
@@ -1383,6 +1402,6 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES.
         tf_page (ud_tfp pt) ws ∗ hart_csrs ∗
         (∀ ws' : list (mword 64),
            tf_page (ud_tfp pt) ws' -∗ hart_csrs -∗ usertrap_res_bare pt ksp).
-  Proof. exact (ut_res_bare_tf_csrs_open SY.syscall_env pt ksp kroot). Qed.
+  Proof. exact (ut_res_bare_tf_csrs_open (SY.syscall_env) pt ksp kroot). Qed.
 
 End UtResFits.

@@ -82,14 +82,14 @@ Definition wp_sleep_prepare_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdsl
   (* the caller's held set must bound below "proc"'s rank (LockRank.v);
      [locks_below_not_elem] gives the non-membership the ghost step needs. *)
   locks_below lks "proc" ->
-  sie_cap_gpr m av b pj -∗
+  sie_cap_gpr KT1 m av b pj -∗
   cpu_own n eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv γs -∗
   wp_next b pj (fun (CID : CpuId) =>
     ∀ (mf : regfile),
       ⌜ callee_saved m mf ⌝ -∗
-      sie_cap_gpr mf av b pj -∗
+      sie_cap_gpr KT1 mf av b pj -∗
       cpu_own n eb pj b lks -∗
       pc_is ret_tgt -∗
       WP (Loop : expr riscv_lang)) -∗

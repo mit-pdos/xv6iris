@@ -18,13 +18,13 @@
      ...    epilogue
 
    So this contract is argint's with the narrowing removed: argaddr stores
-   the WHOLE 64-bit trapframe slot, and its postcondition is [ip ↦₈ v] where
+   the WHOLE 64-bit trapframe slot, and its postcondition is [ip ↦₈[KT1] v] where
    [v] is argraw's result.  There is no [trunc32] and no range clause -- a
    [uint64] argument is whatever the user put in the register, which is
    precisely why the C comment says argaddr "doesn't check for legality,
    since copyin/copyout will do that".
 
-   Resources are argraw's, plus the caller's destination cell [ip ↦₈ old].
+   Resources are argraw's, plus the caller's destination cell [ip ↦₈[KT1] old].
    Nothing about [proc_priv] appears: see SpecArgraw.v for why the trapframe
    pointer travels as a bare fraction (a caller holding the block splits it
    out with [ProcInv.proc_priv_tf]). *)
@@ -71,21 +71,21 @@ Definition wp_argaddr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ
   (argaddr_stack <= av)%nat ->
   (* what argraw's own load needs -- see SpecArgraw's matching premise. *)
   page_valid (page_base tfp) ->
-  sie_cap_gpr m av b p -∗
+  sie_cap_gpr KT1 m av b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   p_trapframe p ↦₈{dqt} page_base tfp -∗
   tf_page tfp ws -∗
-  ip ↦₈ old -∗
+  ip ↦₈[KT1] old -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜ callee_saved m mf ⌝ -∗
-      sie_cap_gpr mf av b p -∗
+      sie_cap_gpr KT1 mf av b p -∗
       cpu_own n eb p b lks -∗
       pc_is ret_tgt -∗
       p_trapframe p ↦₈{dqt} page_base tfp -∗
       tf_page tfp ws -∗
-      ip ↦₈ v -∗
+      ip ↦₈[KT1] v -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

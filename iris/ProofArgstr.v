@@ -390,7 +390,7 @@ Section ProofArgstr.
     iEval (rewrite -HA3a1) in "Hbuf".
     (* ---- fetchstr(addr, buf, max) ---- *)
     iDestruct (cpu_own_transport CID10 CID13 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Fetchstr.wp_fetchstr_sconf γa γf A3 (av - 4)%nat n eb p pid V maxn buf_olds b
+    iApply (Fetchstr.wp_fetchstr_sconf KT1 γa γf A3 (av - 4)%nat n eb p pid V maxn buf_olds b
               _ Hn HKfs HA3a2 Hmax31
               with "Hcg Hcpu Htext Hpc Hpriv Henv Hbuf").
     all: try lkbelow.

@@ -41,14 +41,14 @@ Definition wp_fileinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CI
   let c_name := lock_name_field lk in
   let c_cpu := add_vec lk (sign_extend' 64 (mword_of_int 16 : mword 12)) in
   (4 <= K)%nat ->
-  sie_cap_gpr m K b p -∗
+  sie_cap_gpr KT1 m K b p -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   lk ↦₄ vlock -∗
   c_name ↦₈ vname -∗
   c_cpu ↦₈ vcpu -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr,
-    sie_cap_gpr mr K b p -∗
+    sie_cap_gpr KT1 mr K b p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     lk ↦₄ (mword_of_int 0 : mword 32) -∗

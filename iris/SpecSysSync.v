@@ -110,12 +110,12 @@ Definition wp_sys_sync_sconf_body
      (possibly many times, around each wait iteration's [sleep]) but is
      BALANCED overall, so [lks] is unchanged end to end. *)
   locks_below lks "log" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   (* enters at noff 0; the acquire raises it to what sleep demands *)
   cpu_own 0 eb pj b lks -∗
   (* WHAT THE PARK NEEDS, AND WHERE IT COMES FROM: see the header note, and
      SpecBeginOp.v, whose wait loop this one is a transcription of. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   log_ctx γ bn γfs cov logstart dev -∗
@@ -130,9 +130,9 @@ Definition wp_sys_sync_sconf_body
       ⌜callee_saved m mf⌝ -∗
       (* the syscall's return value: [return 0] *)
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int 0 : mword 64)⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       WP (Loop : expr riscv_lang)) -∗

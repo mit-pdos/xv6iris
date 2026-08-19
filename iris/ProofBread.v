@@ -311,9 +311,9 @@ Section BreadDefs.
       ∀ (mf : regfile) (k : nat) (bs bsd : list (bv 8)) (d : bool),
         ⌜callee_saved m mf
          /\ mf !!! Regidx Ra0 = bnode k⌝ -∗
-        sie_cap_gpr mf K eb pj -∗
+        sie_cap_gpr KT1 mf K eb pj -∗
         cpu_own 0 eb pj eb lks -∗
-        trap_csrs_ext eb -∗
+        trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb pj -∗
         pc_is (ret_pc (m !!! Regidx Rra)) -∗
         p_pid pj ↦₄{dq} pidv -∗
@@ -341,12 +341,12 @@ Section BreadDefs.
   (* the six frame slots, as one bundle (slot 6 -- offset 0 -- is pushed but
      never written) *)
   Definition bd_frame (m : regfile) : iProp Σ :=
-    (pa_stk (m !!! Regidx csp_rs1) 1 ↦₈ (m !!! Regidx Rra) ∗
-     pa_stk (m !!! Regidx csp_rs1) 2 ↦₈ (m !!! Regidx Rs0) ∗
-     pa_stk (m !!! Regidx csp_rs1) 3 ↦₈ (m !!! Regidx Rs1) ∗
-     pa_stk (m !!! Regidx csp_rs1) 4 ↦₈ (m !!! Regidx Rs2) ∗
-     pa_stk (m !!! Regidx csp_rs1) 5 ↦₈ (m !!! Regidx Rs3) ∗
-     ∃ w : mword 64, pa_stk (m !!! Regidx csp_rs1) 6 ↦₈ w)%I.
+    (pa_stk (m !!! Regidx csp_rs1) 1 ↦₈[KT1] (m !!! Regidx Rra) ∗
+     pa_stk (m !!! Regidx csp_rs1) 2 ↦₈[KT1] (m !!! Regidx Rs0) ∗
+     pa_stk (m !!! Regidx csp_rs1) 3 ↦₈[KT1] (m !!! Regidx Rs1) ∗
+     pa_stk (m !!! Regidx csp_rs1) 4 ↦₈[KT1] (m !!! Regidx Rs2) ∗
+     pa_stk (m !!! Regidx csp_rs1) 5 ↦₈[KT1] (m !!! Regidx Rs3) ∗
+     ∃ w : mword 64, pa_stk (m !!! Regidx csp_rs1) 6 ↦₈[KT1] w)%I.
 
   (* the register facts every block lemma carries about its arrival map:
      the frame pointer, the two saved arguments, and agreement with the entry
@@ -383,12 +383,12 @@ Section BreadBlocks.
     (K_bread <= K)%nat ->
     bd_regs m M ->
     M !!! Regidx Rs1 = bnode k ->
-    sie_cap_gpr M (K - 6)%nat eb (proc_addr j) -∗
+    sie_cap_gpr KT1 M (K - 6)%nat eb (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.bread + 0xb8) : mword 64) -∗
     bd_frame m -∗
     cpu_own 0 eb (proc_addr j) eb lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     bio_locked bn V k pidv dev bno bs_out bsd d -∗
@@ -528,8 +528,8 @@ Section BreadBlocks.
                                (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6)))) 6).
     { rewrite Hwv HE6sp. unfold spr, sp0, pa_stk, add_vec_int.
       apply f_equal. apply bv_eq; vm_compute; reflexivity. }
-    iAssert (stack_own sp0 6) with "[Hr40 Hr32 Hr24 Hr16 Hr8 Hg0]" as "Hframe6".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := KT1) sp0 6) with "[Hr40 Hr32 Hr24 Hr16 Hr8 Hg0]" as "Hframe6".
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hr40"; [iExists _; iExact "Hr40"|].
       iSplitL "Hr32"; [iExists _; iExact "Hr32"|].
       iSplitL "Hr24"; [iExists _; iExact "Hr24"|].
@@ -642,13 +642,13 @@ Section BreadBlocks.
     γs !! j = Some γl ->
     bd_regs m M ->
     M !!! Regidx Rs1 = bnode k ->
-    sie_cap_gpr M (K - 6)%nat eb (proc_addr j) -∗
+    sie_cap_gpr KT1 M (K - 6)%nat eb (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.bread + 0xb4) : mword 64) -∗
     inv bioN (buf_escrow_body bn V k) -∗
     bd_frame m -∗
     cpu_own 0 eb (proc_addr j) eb lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
     procs_inv γs -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
@@ -1003,14 +1003,14 @@ Section BreadBlocks.
        the ensuing acquiresleep call needs the bound lifted to "sleep lock"
        (rank 6) via [locks_below_mono]. *)
     locks_below lks "bcache" ->
-    sie_cap_gpr M (trap_res eb + (K - 6))%nat false (proc_addr j) -∗
+    sie_cap_gpr KT1 M (trap_res eb + (K - 6))%nat false (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.bread + 0x48) : mword 64) -∗
     bio_ctx bn V -∗
     bd_frame m -∗
     cpu_own 1 eb (proc_addr j) false ({["bcache"]} ∪ lks) -∗
-    arm_pay 0 eb (proc_addr j) -∗
-    trap_csrs_ext eb -∗
+    arm_pay KT1 0 eb (proc_addr j) -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
     locked (bn_lk bn) cpu_id -∗
     bcache_scan bn V Mg ord devs bnos -∗
@@ -1046,7 +1046,7 @@ Section BreadBlocks.
                   = brefcnt k).
     { rgne. rewrite HMs1 bd_s64. rewrite /brefcnt /bpa /pa_add /add_vec_int. reflexivity. }
     iEval (rewrite -Hpa) in "Hcell".
-    iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.bread + 0x48)) Ra5 Rs1 (mword_of_int 64 : mword 12)
+    iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.bread + 0x48)) Ra5 Rs1 (mword_of_int 64 : mword 12)
               M (trap_res eb + (K - 6))%nat (cw : mword 32) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi48 Hcell").
@@ -1147,7 +1147,7 @@ Section BreadBlocks.
       by (rewrite /H5 upd_ne; [exact HH4a0 | vm_compute; discriminate]).
     assert (HH5ra : H5 !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.bread + 0x56) : mword 64) 4)
       by (rewrite /H5; apply upd_eq).
-    iApply (R.wp_release_sconf (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn V) H5
+    iApply (R.wp_release_sconf KT1 (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn V) H5
               0%nat eb (proc_addr j) (K - 6)%nat ({["bcache"]} ∪ lks)
               ltac:(rewrite HH5a0; apply bv_eq; vm_compute; reflexivity)
               ltac:(lia)
@@ -1297,14 +1297,14 @@ Section BreadBlocks.
     (* the block owns "bcache" on entry (0x90..0xa8); see bread_hit's
        [Hbelow] for what this covers. *)
     locks_below lks "bcache" ->
-    sie_cap_gpr M (trap_res eb + (K - 6))%nat false (proc_addr j) -∗
+    sie_cap_gpr KT1 M (trap_res eb + (K - 6))%nat false (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.bread + 0x90) : mword 64) -∗
     bio_ctx bn V -∗
     bd_frame m -∗
     cpu_own 1 eb (proc_addr j) false ({["bcache"]} ∪ lks) -∗
-    arm_pay 0 eb (proc_addr j) -∗
-    trap_csrs_ext eb -∗
+    arm_pay KT1 0 eb (proc_addr j) -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
     locked (bn_lk bn) cpu_id -∗
     bcache_scan bn V Mg ord devs bnos -∗
@@ -1520,7 +1520,7 @@ Section BreadBlocks.
       by (rewrite /C4 upd_ne; [exact HC3a0 | vm_compute; discriminate]).
     assert (HC4ra : C4 !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.bread + 0xa8) : mword 64) 4)
       by (rewrite /C4; apply upd_eq).
-    iApply (R.wp_release_sconf (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn V) C4
+    iApply (R.wp_release_sconf KT1 (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn V) C4
               0%nat eb (proc_addr j) (K - 6)%nat ({["bcache"]} ∪ lks)
               ltac:(rewrite HC4a0; apply bv_eq; vm_compute; reflexivity)
               ltac:(lia)
@@ -1660,15 +1660,15 @@ Section BreadBlocks.
     bd_regs m M ->
     M !!! Regidx Rs1 = List.last (map bnode pre) bhead ->
     M !!! Regidx Ra4 = bhead ->
-    sie_cap_gpr M (trap_res eb + (K - 6))%nat false (proc_addr j) -∗
+    sie_cap_gpr KT1 M (trap_res eb + (K - 6))%nat false (proc_addr j) -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.bread + 0x7a) : mword 64) -∗
     panic_env -∗
     bio_ctx bn V -∗
     bd_frame m -∗
     cpu_own 1 eb (proc_addr j) false ({["bcache"]} ∪ lks) -∗
-    arm_pay 0 eb (proc_addr j) -∗
-    trap_csrs_ext eb -∗
+    arm_pay KT1 0 eb (proc_addr j) -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
     locked (bn_lk bn) cpu_id -∗
     bcache_scan bn V Mg ord devs bnos -∗
@@ -1709,7 +1709,7 @@ Section BreadBlocks.
                   = brefcnt kk).
     { rgne. rewrite Hcur bd_s64. rewrite /brefcnt /bpa /pa_add /add_vec_int. reflexivity. }
     iEval (rewrite -Hpa) in "Hcell".
-    iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.bread + 0x7a)) Ra5 Rs1 (mword_of_int 64 : mword 12)
+    iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.bread + 0x7a)) Ra5 Rs1 (mword_of_int 64 : mword 12)
               M (trap_res eb + (K - 6))%nat (cw : mword 32) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi7a Hcell").
@@ -1785,7 +1785,7 @@ Section BreadBlocks.
       iEval (rewrite Hord2 (bcur_fwd_split d kk post)) in "Hlru".
       iDestruct (bcache_lru_prev_acc bhead (bnode kk) (map bnode d) (map bnode post)
                    with "Hlru") as "[Hprev Hrelink]".
-      iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.bread + 0x7e)) Rs1 Rs1 (mword_of_int 72 : mword 12)
+      iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.bread + 0x7e)) Rs1 Rs1 (mword_of_int 72 : mword 12)
                 B1 (trap_res eb + (K - 6))%nat (List.last (map bnode d) bhead) false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi7e [Hprev]").
@@ -1892,7 +1892,7 @@ Section BreadBlocks.
                            (mword_of_int (KernelSyms.bread + 0x8c) : mword 64) 4)]> Q2).
         assert (Ha0msg : Q3 !!! Regidx Ra0 = (mword_of_int bd_msg_a : mword 64))
           by (apply bv_eq; vm_compute; reflexivity).
-        iApply (PN.wp_panic_sconf Q3 (trap_res eb + (K - 6))%nat
+        iApply (PN.wp_panic_sconf KT1 Q3 (trap_res eb + (K - 6))%nat
                   1%nat eb false (proc_addr j) (PkAStr DfracDiscarded bd_msg)
                   ({["bcache"]} ∪ lks)
                   (bd_panic_K K eb HK) eq_refl bd_panic_noff
@@ -1958,7 +1958,7 @@ Section BreadBlocks.
     (* still inside the critical section (0x64..0x78 is the backward scan's
        preamble); see bread_floop's [Hbelow] for what this is for. *)
     locks_below lks "bcache" ->
-    sie_cap_gpr M (trap_res eb + (K - 6))%nat false (proc_addr j) -∗
+    sie_cap_gpr KT1 M (trap_res eb + (K - 6))%nat false (proc_addr j) -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.bread + 0x64) : mword 64) -∗
     (* (the arrival map's s1 is irrelevant: 0x64 overwrites it) *)
@@ -1966,8 +1966,8 @@ Section BreadBlocks.
     bio_ctx bn V -∗
     bd_frame m -∗
     cpu_own 1 eb (proc_addr j) false ({["bcache"]} ∪ lks) -∗
-    arm_pay 0 eb (proc_addr j) -∗
-    trap_csrs_ext eb -∗
+    arm_pay KT1 0 eb (proc_addr j) -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
     locked (bn_lk bn) cpu_id -∗
     bcache_scan bn V Mg ord devs bnos -∗
@@ -2014,7 +2014,7 @@ Section BreadBlocks.
     { rgne. rewrite /Q1 upd_eq. unfold regval_into_reg.
       rewrite /bprev /bhead /bnode /acur. apply bv_eq; vm_compute; reflexivity. }
     iDestruct (bcache_lru_head_prev_acc bhead (map bnode ord) with "Hlru") as "[Hhpc Hrelink]".
-    iApply (wp_ld_s_sconf (mword_of_int (KernelSyms.bread + 0x68)) Rs1 Rs1 (mword_of_int 2286 : mword 12)
+    iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.bread + 0x68)) Rs1 Rs1 (mword_of_int 2286 : mword 12)
               Q1 (trap_res eb + (K - 6))%nat (List.last (map bnode ord) bhead) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi68 [Hhpc]").
@@ -2179,15 +2179,15 @@ Section BreadBlocks.
     bd_regs m M ->
     M !!! Regidx Rs1 = List.hd bhead (map bnode rest) ->
     M !!! Regidx Ra4 = bhead ->
-    sie_cap_gpr M (trap_res eb + (K - 6))%nat false (proc_addr j) -∗
+    sie_cap_gpr KT1 M (trap_res eb + (K - 6))%nat false (proc_addr j) -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.bread + 0x3c) : mword 64) -∗
     panic_env -∗
     bio_ctx bn V -∗
     bd_frame m -∗
     cpu_own 1 eb (proc_addr j) false ({["bcache"]} ∪ lks) -∗
-    arm_pay 0 eb (proc_addr j) -∗
-    trap_csrs_ext eb -∗
+    arm_pay KT1 0 eb (proc_addr j) -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
     locked (bn_lk bn) cpu_id -∗
     bcache_scan bn V Mg ord devs bnos -∗
@@ -2221,12 +2221,12 @@ Section BreadBlocks.
                ⌜bd_regs m Mx
                 /\ Mx !!! Regidx Rs1 = bnode kk /\ Mx !!! Regidx Ra4 = bhead
                 /\ ¬ (devs kk = dev /\ bnos kk = bno)⌝ -∗
-               sie_cap_gpr Mx (trap_res eb + (K - 6))%nat false (proc_addr j) -∗
+               sie_cap_gpr KT1 Mx (trap_res eb + (K - 6))%nat false (proc_addr j) -∗
                pc_is (mword_of_int (KernelSyms.bread + 0x36) : mword 64) -∗
                bd_frame m -∗
                cpu_own 1 eb (proc_addr j) false ({["bcache"]} ∪ lks) -∗
-               arm_pay 0 eb (proc_addr j) -∗
-               trap_csrs_ext eb -∗
+               arm_pay KT1 0 eb (proc_addr j) -∗
+               trap_csrs_ext KT1 eb -∗
                cpu_claim_ext eb (proc_addr j) -∗
                locked (bn_lk bn) cpu_id -∗
                bcache_scan bn V Mg ord devs bnos -∗
@@ -2251,7 +2251,7 @@ Section BreadBlocks.
       iDestruct (bcache_lru_next_acc bhead (bnode kk) (map bnode done) (map bnode r)
                    with "Hlru") as "[Hnextc Hrelink]".
       assert (Hxs1g : rget Mx Rs1 = bnode kk) by (rgne; exact Hxs1).
-      iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.bread + 0x36)) Rs1 Rs1 (mword_of_int 80 : mword 12)
+      iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.bread + 0x36)) Rs1 Rs1 (mword_of_int 80 : mword 12)
                 Mx (trap_res eb + (K - 6))%nat (List.hd bhead (map bnode r)) false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi36 [Hnextc]").
@@ -2351,7 +2351,7 @@ Section BreadBlocks.
     { rgne. rewrite Hcur bd_s8. rewrite /b_dev /bpa /pa_add /add_vec_int. reflexivity. }
     (* ---- +0x3c c.lw a5,8(s1) : b->dev ---- *)
     iEval (rewrite -Hadev) in "Hdevc".
-    iApply (wp_clw_s_sconf (dqm := DfracOwn qc) (mword_of_int (KernelSyms.bread + 0x3c)) Ra5 Rs1
+    iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (dqm := DfracOwn qc) (mword_of_int (KernelSyms.bread + 0x3c)) Ra5 Rs1
               (mword_of_int 8 : mword 12) M (trap_res eb + (K - 6))%nat (devs kk) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi3c Hdevc").
@@ -2400,7 +2400,7 @@ Section BreadBlocks.
                       = b_blockno (bpa kk)).
       { rgne. rewrite HF1s1 bd_s12. rewrite /b_blockno /bpa /pa_add /add_vec_int. reflexivity. }
       iEval (rewrite -Habno) in "Hbnoc".
-      iApply (wp_clw_s_sconf (dqm := DfracOwn qc) (mword_of_int (KernelSyms.bread + 0x42)) Ra5 Rs1
+      iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (dqm := DfracOwn qc) (mword_of_int (KernelSyms.bread + 0x42)) Ra5 Rs1
                 (mword_of_int 12 : mword 12) F1 (trap_res eb + (K - 6))%nat (bnos kk) false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi42 Hbnoc").
@@ -2595,7 +2595,7 @@ Section ProofBread.
       by (rewrite /R1 upd_ne; [reflexivity | vm_compute; discriminate]).
     assert (HR1s3 : R1 !!! Regidx Rs3 = m !!! Regidx Rs3)
       by (rewrite /R1 upd_ne; [reflexivity | vm_compute; discriminate]).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & S5 & S6 & _)".
     iDestruct "S1" as (v40) "Hr40". iDestruct "S2" as (v32) "Hr32".
     iDestruct "S3" as (v24) "Hr24". iDestruct "S4" as (v16) "Hr16".
@@ -2782,7 +2782,7 @@ Section ProofBread.
       by (rewrite /R7; apply upd_eq).
     iDestruct (cpu_own_transport CID CID12 0%nat eb pj eb ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (A.wp_acquire_sconf (bn_lk bn) "bcache"%string (bcache_res bn V) R7
+    iApply (A.wp_acquire_sconf KT1 (bn_lk bn) "bcache"%string (bcache_res bn V) R7
               0%nat eb pj (K - 6)%nat eb lks
               ltac:(vm_compute; reflexivity) ltac:(lia)
               Hbelow
@@ -2839,7 +2839,7 @@ Section ProofBread.
     { rgne. rewrite /W1 upd_eq. unfold regval_into_reg.
       rewrite /bnext /bhead /bnode /acur. apply bv_eq; vm_compute; reflexivity. }
     iDestruct (bcache_lru_head_next_acc bhead (map bnode ord) with "Hlru") as "[Hhnc Hrelink]".
-    iApply (wp_ld_s_sconf (mword_of_int (KernelSyms.bread + 0x22)) Rs1 Rs1 (mword_of_int 2364 : mword 12)
+    iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.bread + 0x22)) Rs1 Rs1 (mword_of_int 2364 : mword 12)
               W1 (trap_res eb + (K - 6))%nat (List.hd bhead (map bnode ord)) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi22 [Hhnc]").

@@ -148,11 +148,11 @@ Section ProofSysFstat.
   Lemma sfs_sp_bounds `{CID0 : CpuId} (mm : regfile) (kk : nat)
       (b : bool) (pp : mword 64) :
     (0 < kk)%nat ->
-    sie_cap_gpr mm kk b pp -∗
+    sie_cap_gpr KT1 mm kk b pp -∗
     ⌜(8 <= uint (mm !!! Regidx csp_rs1) < 274877906944 + 8)%Z⌝.
   Proof.
     iIntros (Hk) "(_ & _ & (Hstk & _ & _) & _)".
-    iApply (stack_own_sp_bounds _ (trap_res b + kk)%nat with "Hstk").
+    iApply (stack_own_sp_bounds (KTR := KT1) _ (trap_res b + kk)%nat with "Hstk").
     destruct b; unfold trap_res; lia.
   Qed.
 
@@ -193,17 +193,17 @@ Section ProofSysFstat.
     Mt !!! Regidx Ra0 = rv ->
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
         r <> Rs0 -> Mt !!! Regidx r = m !!! Regidx r) ->
-    sie_cap_gpr Mt (av - 4)%nat b pp -∗
+    sie_cap_gpr KT1 Mt (av - 4)%nat b pp -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.sys_fstat + 0x32) : mword 64) -∗
-    word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (pa_stk sp0 3) (DfracOwn 1) w3 -∗
-    word_pointsto (pa_stk sp0 4) (DfracOwn 1) w4 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) w3 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) w4 -∗
     wp_next (CID0 := CID0) b pp (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
-        sie_cap_gpr mf av b pp -∗
+        sie_cap_gpr KT1 mf av b pp -∗
         pc_is (ret_pc ra0) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).

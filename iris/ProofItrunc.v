@@ -95,9 +95,9 @@ Section ItruncCont.
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
-        sie_cap_gpr mf K b (proc_addr j) -∗
+        sie_cap_gpr KT1 mf K b (proc_addr j) -∗
         cpu_own 0 eb (proc_addr j) b lks -∗
-        trap_csrs_ext eb -∗
+        trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr j) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
@@ -220,9 +220,9 @@ Section ItruncTail.
     (* it_tail's only lock-touching callee is the closing iupdate, at "log"
        (3). *)
     locks_below lks "log" ->
-    sie_cap_gpr M (K - 6)%nat b (proc_addr j) -∗
+    sie_cap_gpr KT1 M (K - 6)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (IT + 0x38) : mword 64) -∗
@@ -559,9 +559,9 @@ Section ItruncTail.
                    = pa_stk (add_vec (P5 !!! Regidx csp_rs1 : mword 64)
                        (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6)))) 6).
     { rewrite Hwv HP5sp. unfold pa_stk, add_vec_int. apply f_equal. pcw. }
-    iAssert (stack_own (m !!! Regidx csp_rs1 : mword 64) 6)
+    iAssert (stack_own (KTR := KT1) (m !!! Regidx csp_rs1 : mword 64) 6)
       with "[Hf1 Hf2 Hf3 Hf4 Hf5 Hf6]" as "Hstk".
-    { rewrite stack_own_slots. cbn [seq].
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hf1"; [iExists _; iExact "Hf1" |].
       iSplitL "Hf2"; [iExists _; iExact "Hf2" |].
       iSplitL "Hf3"; [iExists _; iExact "Hf3" |].
@@ -682,9 +682,9 @@ Section ItruncDLoop.
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ Mx : regfile,
         ⌜it_sp m Mx⌝ -∗ ⌜it_thr m Mx⌝ -∗ ⌜Mx !!! Regidx Rs3 = ip⌝ -∗
-        sie_cap_gpr Mx (K - 6)%nat b (proc_addr j) -∗
+        sie_cap_gpr KT1 Mx (K - 6)%nat b (proc_addr j) -∗
         cpu_own 0 eb (proc_addr j) b lks -∗
-        trap_csrs_ext eb -∗
+        trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr j) -∗
         pc_is (mword_of_int (IT + 0x32) : mword 64) -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
@@ -729,9 +729,9 @@ Section ItruncDLoop.
     (* it_dloop's only lock-touching callee is bfree, at "log" (3), on its
        own binder list so the recursive back-edge re-proves it. *)
     locks_below lks "log" ->
-    sie_cap_gpr M (K - 6)%nat b (proc_addr jx) -∗
+    sie_cap_gpr KT1 M (K - 6)%nat b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr jx) -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (IT + 0x20) : mword 64) -∗
@@ -786,7 +786,7 @@ Section ItruncDLoop.
                                 : mword 64) = 0) by (vm_compute; reflexivity).
       rewrite Hz Z.add_0_r. apply bvw64_small, bv_unsigned_in_range. }
     iEval (rewrite -Hca) in "Hcell".
-    iApply (wp_clw_s_sconf (mword_of_int (IT + 0x20)) Ra1 Rs1
+    iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (IT + 0x20)) Ra1 Rs1
               (mword_of_int 0 : mword 12) M (K - 6)%nat (bm_dir bm !!! k) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi20 Hcell").
     iIntros (CID1 Hq1) "Hcg Hpc Hcell".
@@ -994,7 +994,7 @@ Section ItruncDLoop.
                      = i_dev ip).
       { rgne. rewrite HL0s3. reflexivity. }
       iEval (rewrite -Hdva) in "Hidev".
-      iApply (wp_lw_s_sconf (mword_of_int (IT + 0x24)) Ra0 Rs3
+      iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (IT + 0x24)) Ra0 Rs3
                 (mword_of_int 0 : mword 12) L0 (K - 6)%nat dev b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi24 Hidev").
       iIntros (CID2 Hq2) "Hcg Hpc Hidev".
@@ -1263,9 +1263,9 @@ Section ItruncELoop.
       ∀ Mx : regfile,
         ⌜it_sp m Mx⌝ -∗ ⌜it_thr4 m Mx⌝ -∗ ⌜Mx !!! Regidx Rs3 = ip⌝ -∗
         ⌜Mx !!! Regidx Rs4 = bnode kk⌝ -∗
-        sie_cap_gpr Mx (K - 6)%nat b (proc_addr j) -∗
+        sie_cap_gpr KT1 Mx (K - 6)%nat b (proc_addr j) -∗
         cpu_own 0 eb (proc_addr j) b lks -∗
-        trap_csrs_ext eb -∗
+        trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr j) -∗
         pc_is (mword_of_int (IT + 0x7a) : mword 64) -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
@@ -1313,9 +1313,9 @@ Section ItruncELoop.
     (* it_eloop's only lock-touching callee is bfree, at "log" (3), on its
        own binder list so the recursive back-edge re-proves it. *)
     locks_below lks "log" ->
-    sie_cap_gpr M (K - 6)%nat b (proc_addr jx) -∗
+    sie_cap_gpr KT1 M (K - 6)%nat b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr jx) -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (IT + 0x6c) : mword 64) -∗
@@ -1370,7 +1370,7 @@ Section ItruncELoop.
                                 : mword 64) = 0) by (vm_compute; reflexivity).
       rewrite Hz Z.add_0_r. apply bvw64_small, bv_unsigned_in_range. }
     iEval (rewrite -Hca) in "Hcell".
-    iApply (wp_clw_s_sconf (mword_of_int (IT + 0x6c)) Ra1 Rs1
+    iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (IT + 0x6c)) Ra1 Rs1
               (mword_of_int 0 : mword 12) M (K - 6)%nat (bm_ent bm !!! q) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi6c Hcell").
     iIntros (CID1 Hq1) "Hcg Hpc Hcell".
@@ -1554,7 +1554,7 @@ Section ItruncELoop.
                        (sign_extend' 64 (mword_of_int 0 : mword 12)) = i_dev ip).
       { rgne. rewrite HE0s3. reflexivity. }
       iEval (rewrite -Hdva) in "Hidev".
-      iApply (wp_lw_s_sconf (mword_of_int (IT + 0x70)) Ra0 Rs3
+      iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (IT + 0x70)) Ra0 Rs3
                 (mword_of_int 0 : mword 12) E0 (K - 6)%nat dev b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi70 Hidev").
       iIntros (CIDy Hqy) "Hcg Hpc Hidev".
@@ -1801,15 +1801,15 @@ Section ItruncIArm.
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ Mx : regfile,
         ⌜it_sp m Mx⌝ -∗ ⌜it_thr m Mx⌝ -∗ ⌜Mx !!! Regidx Rs3 = ip⌝ -∗
-        sie_cap_gpr Mx (K - 6)%nat b (proc_addr j) -∗
+        sie_cap_gpr KT1 Mx (K - 6)%nat b (proc_addr j) -∗
         cpu_own 0 eb (proc_addr j) b lks -∗
-        trap_csrs_ext eb -∗
+        trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr j) -∗
         pc_is (mword_of_int (IT + 0x38) : mword 64) -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
         i_dev ip ↦₄{dqd} dev -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-        (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈ v) -∗
+        (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈[KT1] v) -∗
         inode_map γfs ip bm_empty -∗
         inode_blocks γfs bm_empty (fun _ => replicate BSIZE (bv_0 8)) -∗
         bitmap_res γfs bmapstart cov logstart size (used ∖ bm_blocks bm) -∗
@@ -1850,9 +1850,9 @@ Section ItruncIArm.
     (* it_iarm's cone: bread/brelse ("bcache", 4) for the indirect block,
        it_eloop and the block's own bfree ("log", 3) -- "log" is lowest. *)
     locks_below lks "log" ->
-    sie_cap_gpr M (K - 6)%nat b (proc_addr jx) -∗
+    sie_cap_gpr KT1 M (K - 6)%nat b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr jx) -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (IT + 0x50) : mword 64) -∗
@@ -1867,7 +1867,7 @@ Section ItruncIArm.
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     (* the sixth frame slot -- this arm is the only writer *)
-    (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈ v) -∗
+    (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈[KT1] v) -∗
     bslots bn 3 -∗
     inode_map γfs ip (bm_dir_zeroed bm NDIRECT) -∗
     it_ent_res γfs bm data 0 -∗
@@ -1934,7 +1934,7 @@ Section ItruncIArm.
                      (sign_extend' 64 (mword_of_int 0 : mword 12)) = i_dev ip).
     { rgne. rewrite Hs3. reflexivity. }
     iEval (rewrite -Hdva) in "Hidev".
-    iApply (wp_lw_s_sconf (mword_of_int (IT + 0x52)) Ra0 Rs3
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (IT + 0x52)) Ra0 Rs3
               (mword_of_int 0 : mword 12) M (K - 6)%nat dev b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi52 Hidev").
     iIntros (CID2 Hq2) "Hcg Hpc Hidev".
@@ -2280,7 +2280,7 @@ Section ItruncIArm.
                    = i_addr ip NDIRECT).
     { rgne. rewrite HmRs3 it_dir_limit /pa_add /add_vec_int. f_equal. }
     iEval (rewrite -Hica) in "Hindcell".
-    iApply (wp_lw_s_sconf (mword_of_int (IT + 0x80)) Ra1 Rs3
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (IT + 0x80)) Ra1 Rs3
               (mword_of_int 128 : mword 12) mR (K - 6)%nat
               (bm_ind bm : mword 32) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi80 Hindcell").
@@ -2306,7 +2306,7 @@ Section ItruncIArm.
                       (sign_extend' 64 (mword_of_int 0 : mword 12)) = i_dev ip).
     { rgne. rewrite HC0s3. reflexivity. }
     iEval (rewrite -Hdva2) in "Hidev".
-    iApply (wp_lw_s_sconf (mword_of_int (IT + 0x84)) Ra0 Rs3
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (IT + 0x84)) Ra0 Rs3
               (mword_of_int 0 : mword 12) C0 (K - 6)%nat dev b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi84 Hidev").
     iIntros (CID14 Hq14) "Hcg Hpc Hidev".
@@ -2599,7 +2599,7 @@ Section ItruncMain.
         [reflexivity | intros Hq; injection Hq as Hq'; exact (N2 Hq')]. }
     assert (HP0a0 : P0 !!! Regidx Ra0 = ip)
       by (rewrite /P0 upd_ne; [exact Ha0 | nz]).
-    rewrite stack_own_slots. cbn [seq].
+    rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
     iDestruct "Hstk" as "(Hf1 & Hf2 & Hf3 & Hf4 & Hf5 & Hf6 & _)".
     iDestruct "Hf1" as (v1) "Hf1". iDestruct "Hf2" as (v2) "Hf2".
     iDestruct "Hf3" as (v3) "Hf3". iDestruct "Hf4" as (v4) "Hf4".
@@ -2846,7 +2846,7 @@ Section ItruncMain.
                     = i_addr ip NDIRECT).
     { rgne. rewrite HMs3 it_dir_limit /pa_add /add_vec_int. f_equal. }
     iEval (rewrite -Hica0) in "Hindcell".
-    iApply (wp_lw_s_sconf (mword_of_int (IT + 0x32)) Ra1 Rs3
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (IT + 0x32)) Ra1 Rs3
               (mword_of_int 128 : mword 12) Mx (K - 6)%nat
               (bm_ind bm : mword 32) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi32 Hindcell").

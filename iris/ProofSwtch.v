@@ -63,7 +63,7 @@ Section ProofSwtch.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Instance stack_own_timeless_local (sp : mword 64) (n : nat) :
-    Timeless (stack_own sp n).
+    Timeless (stack_own (KTR := KT1) sp n).
   Proof.
     rewrite /stack_own. apply bi.exist_timeless. intros ws.
     apply bi.sep_timeless; [ apply _ | ].
@@ -101,7 +101,7 @@ Section ProofSwtch.
        sie_cap into stack + strans_inv + arm ---- *)
     iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
     iEval (rewrite /sie_cap) in "Hcap".
-    iDestruct "Hcap" as "(Hstk & Htr & Hsiearm)".
+    iDestruct "Hcap" as "(Hstk & Htr & Hsiearm & #Hwit)".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
     iDestruct "Hmsx" as (ms) "(Hms & Hhalf & Hspp & %Hmsf)".
     pose proof Hmsf as Hmsf'.
@@ -179,7 +179,8 @@ Section ProofSwtch.
               (VSt KernelSyms.swtch vregs_init swtch_heap0 [])
               (VSt (KernelSyms.swtch + 0x68) swtch_regs1 swtch_heap1 [])
               rho ms MIE_S mdv0 menvcfg0 (dq:=DfracOwn 1)
-              HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 swtch_run
+              HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
+              (SRegime.sr_ktier_wit_KT0 strans_regime) swtch_run
               with "Hhw Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Htr
                     Hpc Hfile Hcode [Holdcells Hnewcells] []").
     { rewrite /vheap_own /swtch_heap0 big_sepL_app.
@@ -287,8 +288,8 @@ Section ProofSwtch.
        our own [eb] (eb' := eb) -- no retune, no equation.  [sie_arm false p]
        is [intr_off_tok] by conversion now (an INDEX, not a disjunction), so
        building [sie_cap] at [false] needs no [iLeft]. ---- *)
-    iAssert (sie_cap (vregs_den rho swtch_regs1) av_t false p) with "[Hstk_t Htr Hq0]" as "Hcap_t".
-    { rewrite /sie_cap Hcsp_t. iFrame "Hstk_t Htr". iExact "Hq0". }
+    iAssert (sie_cap KT1 (vregs_den rho swtch_regs1) av_t false p) with "[Hstk_t Htr Hq0]" as "Hcap_t".
+    { rewrite /sie_cap Hcsp_t. iFrame "Hstk_t Htr Hwit". iExact "Hq0". }
     (* [Hfile] comes back from the block as the bare [gpr_file (vregs_den
        rho swtch_regs1)] (it went in the same way, via [Hden]); re-fold it
        under [tp_pin] -- a no-op, since that map's own tp slot is ALREADY

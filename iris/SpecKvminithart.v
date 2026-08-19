@@ -78,7 +78,7 @@ Definition wp_kvminithart_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{C
   let root_b := zero_extend' 64 (concat_vec root (zeros' 12 : mword 12)) in
   lvl = 0%nat ->
   (2 <= K)%nat ->
-  sie_cap_gpr mm K false p -∗
+  sie_cap_gpr KT0 mm K false p -∗
   strans_pending -∗
   kernel_text -∗
   pc_is pcE -∗
@@ -90,7 +90,7 @@ Definition wp_kvminithart_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{C
   (* the shared table, likewise persistent *)
   kpt_inv root -∗
   ( ∀ (mr : regfile),
-    sie_cap_gpr mr K false p -∗
+    sie_cap_gpr KT0 mr K false p -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     kpt_on cpu_id -∗

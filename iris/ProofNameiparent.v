@@ -219,7 +219,7 @@ Section ProofNameiparentMain.
                   (add_vec (m !!! Regidx csp_rs1 : mword 64)
                      (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))]> m).
     assert (HR1sp : npi_sp m R1) by (rewrite /npi_sp /R1 upd_eq; exact Hpush).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & _)".
     iDestruct "S1" as (v1) "Hf1". iDestruct "S2" as (v2) "Hf2".
     assert (Hb1 : add_vec (R1 !!! Regidx csp_rs1 : mword 64)
@@ -441,8 +441,8 @@ Section ProofNameiparentMain.
                    = pa_stk (add_vec (P2 !!! Regidx csp_rs1 : mword 64)
                        (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)))) 2)
       by (rewrite Hwv HP2sp; reflexivity).
-    iAssert (stack_own sp0 2) with "[Hf1 Hf2]" as "Hstk".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := KT1) sp0 2) with "[Hf1 Hf2]" as "Hstk".
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hf1"; [iExists _; iExact "Hf1" |].
       iSplitL "Hf2"; [iExists _; iExact "Hf2" |].
       done. }

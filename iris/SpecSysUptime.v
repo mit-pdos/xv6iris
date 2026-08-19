@@ -62,7 +62,7 @@ Definition wp_sys_uptime_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : 
      "time"'s -- sys_uptime acquires and releases [tickslock] in the same
      call, so this contract is BALANCED and [lks] is unchanged end to end. *)
   locks_below lks "time" ->
-  sie_cap_gpr m av b p -∗
+  sie_cap_gpr KT1 m av b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   is_tickslock γl -∗
@@ -70,7 +70,7 @@ Definition wp_sys_uptime_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : 
     ∀ (mf : regfile) (t : mword 32),
       ⌜ callee_saved m mf /\
         mf !!! Regidx (mword_of_int 10 : mword 5) = zero_extend' 64 t ⌝ -∗
-      sie_cap_gpr mf av b p -∗
+      sie_cap_gpr KT1 mf av b p -∗
       cpu_own n eb p b lks -∗
       pc_is ret_tgt -∗
       WP (Loop : expr riscv_lang)) -∗

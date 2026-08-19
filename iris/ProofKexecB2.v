@@ -107,7 +107,6 @@ Require Export SwtchCtx.
 Require Import WpUart.
 Require Import FsCrash.
 Require Import InodeRegion.
-Require Import FsTree.
 Require Import IcacheEscrow.
 Require Import W32Arith.
 Require Import PageGeom.
@@ -1037,7 +1036,7 @@ Section KexecB2Loops.
                        (add_vec_int (mword_of_int (KXB + 0xd6) : mword 64) 4)]> Np2).
       assert (Ha0msg : Np3 !!! Regidx Ra0 = (mword_of_int kxc_msg_a : mword 64))
         by lpcw.
-      iApply (PN.wp_panic_sconf (CID := CIDp3) Np3 (K - 68)%nat
+      iApply (PN.wp_panic_sconf KT1 (CID := CIDp3) Np3 (K - 68)%nat
                 0%nat true true (proc_addr jp) (PkAStr DfracDiscarded kxc_msg) lks
                 (kxc_panic_K K HK) eq_refl kxc_panic_noff
                 (kxc_panic_below lks Hlkempty)
@@ -1149,7 +1148,7 @@ Section KexecB2Loops.
                  Md !!! Regidx Ra2 = page_base (pte_ppn w0) /\
                  (forall r : mword 5, is_cs_idx r = true -> r <> Rs2 ->
                     Md !!! Regidx r = Ml !!! Regidx r)⌝ -∗
-               sie_cap_gpr Md (K - 68)%nat true (proc_addr jp) -∗
+               sie_cap_gpr KT1 Md (K - 68)%nat true (proc_addr jp) -∗
                cpu_own (CID := CIDd) 0 true (proc_addr jp) true lks -∗
                pc_is (mword_of_int (KXB + 0xda) : mword 64) -∗
                WP (Loop : expr riscv_lang))%I
@@ -1343,7 +1342,7 @@ Section KexecB2Loops.
       iEval (rewrite -HD6a2) in "Hdst".
       iDestruct (cpu_own_transport CIDd CIDd6 0%nat true (proc_addr jp) true
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iApply (Readi.wp_readi_sconf gs jp gl gu gd gk pd pav pu bn gfs ga gf
+      iApply (Readi.wp_readi_sconf KT0 gs jp gl gu gd gk pd pav pu bn gfs ga gf
                 cov logstart dev (ientry kf) bmf datl dnf false offn nn fpg V
                 pidv (DfracOwn (1/4)) (DfracOwn (1/2)) D6 (K - 68)%nat true
                 true lks ltac:(lia) Hlg Hbmwf Hbmcov Hszb

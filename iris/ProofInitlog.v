@@ -86,7 +86,6 @@ Require Import BufOwn BcacheInv BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import CodeInitlog.
-Require Import SpecPanic.
 Require Import SpecInitlock.
 Require Import SpecBread SpecBrelse.
 Require Import SpecInstallTrans SpecWriteHead.
@@ -375,7 +374,7 @@ Section ProofInitlog.
         (add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))))]> m) with R1.
     assert (HspR1 : R1 !!! Regidx csp_rs1 = spr)
       by (rewrite /R1 upd_eq; reflexivity).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & S5 & S6 & _)".
     iDestruct "S1" as (vra0) "Hc1". iDestruct "S2" as (vs00) "Hc2".
     iDestruct "S3" as (vs10) "Hc3". iDestruct "S4" as (vs20) "Hc4".
@@ -624,7 +623,7 @@ Section ProofInitlog.
       rewrite /R7 upd_ne; [| vm_compute; discriminate].
       rewrite /R6 upd_ne; [| vm_compute; discriminate].
       rewrite /R5 upd_ne; [exact HR4s3 | vm_compute; discriminate]. }
-    iApply (Initlock.wp_initlock_sconf RA vlock vname vcpu "log"%string
+    iApply (Initlock.wp_initlock_sconf KT1 RA vlock vname vcpu "log"%string
               (K - 6)%nat b pj ltac:(lia)
               with "Hcg Htext Hpc [] [Hlock] [Hname] [Hcpu]").
     { iEval (rewrite HRAa1). iExact "Hstr". }
@@ -682,7 +681,7 @@ Section ProofInitlog.
                     = pa_add sb 20%nat).
     { rgne. rewrite Hmils3 il_s20. reflexivity. }
     iEval (rewrite -Hsbad) in "Hsbf".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.initlog + 0x28)) Ra1 Rs3
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.initlog + 0x28)) Ra1 Rs3
               (mword_of_int 20 : mword 12) mil (K - 6)%nat
               (mword_of_int logstart : mword 32) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -870,7 +869,7 @@ Section ProofInitlog.
     { rgne. rewrite HmBa0 il_s88. apply il_hdr_addr. }
     iEval (rewrite (il_hdrw_zero bs_hdr Hhdr0)) in "Hword".
     iEval (rewrite -Hhaddr) in "Hword".
-    iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.initlog + 0x3a)) Ra2 Ra0
+    iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.initlog + 0x3a)) Ra2 Ra0
               (mword_of_int 88 : mword 12) mB (K - 6)%nat
               (mword_of_int 0 : mword 32) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -1323,8 +1322,8 @@ Section ProofInitlog.
                    = pa_stk (add_vec (P5 !!! Regidx csp_rs1 : mword 64)
                                (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6)))) 6).
     { rewrite Hwv HP5sp. exact Hspr6. }
-    iAssert (stack_own sp0 6) with "[Hc1 Hc2 Hc3 Hc4 Hc5 Hc6]" as "Hframe6".
-    { rewrite stack_own_slots. cbn [seq].
+    iAssert (stack_own (KTR := KT1) sp0 6) with "[Hc1 Hc2 Hc3 Hc4 Hc5 Hc6]" as "Hframe6".
+    { rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
       iSplitL "Hc1"; [iExists _; iExact "Hc1"|].
       iSplitL "Hc2"; [iExists _; iExact "Hc2"|].
       iSplitL "Hc3"; [iExists _; iExact "Hc3"|].

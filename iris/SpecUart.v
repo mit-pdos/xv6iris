@@ -20,7 +20,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Import Defs.
 
 Definition wp_lb_uart_s_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γd : uart_names) (γv : disk_names) (off : Z) (pc : mword 64) (is_rvc is_unsigned : bool) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12) (m : regfile) (n : nat) (R : iProp Σ) (S : bv 8 -> iProp Σ) (b : bool) (p : mword 64) :=
+    (kt : ktier) (γd : uart_names) (γv : disk_names) (off : Z) (pc : mword 64) (is_rvc is_unsigned : bool) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12) (m : regfile) (n : nat) (R : iProp Σ) (S : bv 8 -> iProp Σ) (b : bool) (p : mword 64) :=
 let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
 let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
 (* the vmem level hands back the value itself now, not the split accumulator *)
@@ -34,7 +34,7 @@ rd_ok rd ->
 neq_vec (bits_of_virtaddr (Virtaddr a8)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false ->
 autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = uart_vpn ->
 zero_extend' 64 (add_vec_int a8 (0 * 1)) = uart_pa off ->
-sie_cap_gpr m n b p -∗
+sie_cap_gpr kt m n b p -∗
 pc_is pc -∗ instr pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 1)) -∗
 dev_inv γd γv -∗
 R -∗
@@ -42,14 +42,14 @@ R -∗
    uart_ghosts γd u -∗ R ==∗ uart_ghosts γd u' ∗ S bt) -∗
 wp_next b p (fun (CID : CpuId) =>
   ∀ bt : bv 8,
-  sie_cap_gpr (<[Regidx rd := regval_into_reg (ldval bt)]> m) n b p -∗
+  sie_cap_gpr kt (<[Regidx rd := regval_into_reg (ldval bt)]> m) n b p -∗
   pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
   S bt -∗
   WP (Loop : expr riscv_lang)) -∗
 WP (Loop : expr riscv_lang).
 
 Definition wp_sb_uart_s_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γd : uart_names) (γv : disk_names) (off : Z) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12) (m : regfile) (n : nat) (R S : iProp Σ) (b : bool) (p : mword 64) :=
+    (kt : ktier) (γd : uart_names) (γv : disk_names) (off : Z) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12) (m : regfile) (n : nat) (R S : iProp Σ) (b : bool) (p : mword 64) :=
 let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
 let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
 let storebyte : mword 8 := autocast (T := mword) (subrange_vec_dec (rget m rs2) (Z.sub (Z.mul 1 8) 1) 0) in
@@ -60,14 +60,14 @@ let lppn := kpt_leaf_ppn uart_vpn in
 neq_vec (bits_of_virtaddr (Virtaddr a8)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false ->
 autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = uart_vpn ->
 zero_extend' 64 (add_vec_int a8 (0 * 1)) = uart_pa off ->
-sie_cap_gpr m n b p -∗
+sie_cap_gpr kt m n b p -∗
 pc_is pc -∗ instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 1)) -∗
 dev_inv γd γv -∗
 R -∗
 (∀ u u', ⌜ uart_write u off storebyte = Some u' ⌝ -∗
    uart_ghosts γd u -∗ R ==∗ uart_ghosts γd u' ∗ S) -∗
 wp_next b p (fun (CID : CpuId) =>
-  sie_cap_gpr m n b p -∗
+  sie_cap_gpr kt m n b p -∗
   pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
   S -∗
   WP (Loop : expr riscv_lang)) -∗
@@ -81,7 +81,7 @@ WP (Loop : expr riscv_lang).
    handed a disk ghost bundle it has no use for.  [wp_sb_uart_s_sconf] above is
    its bundle-taking restatement, kept verbatim for the existing consumers. *)
 Definition wp_sb_uart_uinv_s_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γd : uart_names) (off : Z) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12) (m : regfile) (n : nat) (R S : iProp Σ) (b : bool) (p : mword 64) :=
+    (kt : ktier) (γd : uart_names) (off : Z) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12) (m : regfile) (n : nat) (R S : iProp Σ) (b : bool) (p : mword 64) :=
 let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
 let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
 let storebyte : mword 8 := autocast (T := mword) (subrange_vec_dec (rget m rs2) (Z.sub (Z.mul 1 8) 1) 0) in
@@ -92,14 +92,14 @@ let lppn := kpt_leaf_ppn uart_vpn in
 neq_vec (bits_of_virtaddr (Virtaddr a8)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false ->
 autocast (T := mword) (subrange_vec_dec (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0) (Z.sub 39 1) pagesize_bits) = uart_vpn ->
 zero_extend' 64 (add_vec_int a8 (0 * 1)) = uart_pa off ->
-sie_cap_gpr m n b p -∗
+sie_cap_gpr kt m n b p -∗
 pc_is pc -∗ instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 1)) -∗
 uart_inv γd -∗
 R -∗
 (∀ u u', ⌜ uart_write u off storebyte = Some u' ⌝ -∗
    uart_ghosts γd u -∗ R ==∗ uart_ghosts γd u' ∗ S) -∗
 wp_next b p (fun (CID : CpuId) =>
-  sie_cap_gpr m n b p -∗
+  sie_cap_gpr kt m n b p -∗
   pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
   S -∗
   WP (Loop : expr riscv_lang)) -∗
@@ -108,14 +108,14 @@ WP (Loop : expr riscv_lang).
 Module Type UART.
   Parameter wp_lb_uart_s_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γd : uart_names) (γv : disk_names) (off : Z) (pc : mword 64) (is_rvc is_unsigned : bool) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12) (m : regfile) (n : nat) (R : iProp Σ) (S : bv 8 -> iProp Σ) (b : bool) (p : mword 64),
-      wp_lb_uart_s_sconf_body γd γv off pc is_rvc is_unsigned rd rs1 imm m n R S b p.
+      (kt : ktier) (γd : uart_names) (γv : disk_names) (off : Z) (pc : mword 64) (is_rvc is_unsigned : bool) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12) (m : regfile) (n : nat) (R : iProp Σ) (S : bv 8 -> iProp Σ) (b : bool) (p : mword 64),
+      wp_lb_uart_s_sconf_body kt γd γv off pc is_rvc is_unsigned rd rs1 imm m n R S b p.
   Parameter wp_sb_uart_s_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γd : uart_names) (γv : disk_names) (off : Z) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12) (m : regfile) (n : nat) (R S : iProp Σ) (b : bool) (p : mword 64),
-      wp_sb_uart_s_sconf_body γd γv off pc is_rvc rs2 rs1 imm m n R S b p.
+      (kt : ktier) (γd : uart_names) (γv : disk_names) (off : Z) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12) (m : regfile) (n : nat) (R S : iProp Σ) (b : bool) (p : mword 64),
+      wp_sb_uart_s_sconf_body kt γd γv off pc is_rvc rs2 rs1 imm m n R S b p.
   Parameter wp_sb_uart_uinv_s_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γd : uart_names) (off : Z) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12) (m : regfile) (n : nat) (R S : iProp Σ) (b : bool) (p : mword 64),
-      wp_sb_uart_uinv_s_sconf_body γd off pc is_rvc rs2 rs1 imm m n R S b p.
+      (kt : ktier) (γd : uart_names) (off : Z) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12) (m : regfile) (n : nat) (R S : iProp Σ) (b : bool) (p : mword 64),
+      wp_sb_uart_uinv_s_sconf_body kt γd off pc is_rvc rs2 rs1 imm m n R S b p.
 End UART.

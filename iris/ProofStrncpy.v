@@ -204,15 +204,15 @@ Section MachineProof.
     Mt !!! Regidx Ra0 = rv ->
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 -> r <> Rs0 ->
         Mt !!! Regidx r = mm !!! Regidx r) ->
-    sie_cap_gpr (CID := CID0) Mt (K - 2)%nat b p -∗
+    sie_cap_gpr KT1 (CID := CID0) Mt (K - 2)%nat b p -∗
     kernel_text -∗
     pc_is (CID := CID0) (mword_of_int (KernelSyms.strncpy + 0x3e) : mword 64) -∗
-    word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
     wp_next (CID0 := CID0) b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved mm mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
-        sie_cap_gpr mf K b p -∗ pc_is (ret_pc ra0) -∗
+        sie_cap_gpr KT1 mf K b p -∗ pc_is (ret_pc ra0) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -228,7 +228,7 @@ Section MachineProof.
     { rewrite Hmtsp. unfold pa_stk, add_vec_int. rewrite !pa_stk_off2.
       f_equal; try (apply bv_eq; vm_compute; reflexivity). }
     iEval (rewrite -Hpa1) in "Hb1".
-    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.strncpy + 0x3e))
+    iApply (wp_cldsp_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (KernelSyms.strncpy + 0x3e))
               (mword_of_int 1 : mword 6) Rra Mt (K - 2)%nat ra0 b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi3e Hb1").
@@ -245,7 +245,7 @@ Section MachineProof.
     { rewrite HT1sp. unfold pa_stk, add_vec_int. rewrite !pa_stk_off2.
       f_equal; try (apply bv_eq; vm_compute; reflexivity). }
     iEval (rewrite -Hpa2) in "Hb2".
-    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.strncpy + 0x40))
+    iApply (wp_cldsp_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (KernelSyms.strncpy + 0x40))
               (mword_of_int 0 : mword 6) Rs0 T1 (K - 2)%nat s00 b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi40 Hb2").
@@ -391,10 +391,10 @@ Qed.
     M !!! Regidx Ra0 = s -> M !!! Regidx Ra4 = pa_add s k -> M !!! Regidx Ra5 = endw ->
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 -> r <> Rs0 ->
         M !!! Regidx r = mm !!! Regidx r) ->
-    sie_cap_gpr (CID := CID0) M (K - 2)%nat b p -∗ kernel_text -∗
+    sie_cap_gpr KT1 (CID := CID0) M (K - 2)%nat b p -∗ kernel_text -∗
     pc_is (CID := CID0) (mword_of_int (KernelSyms.strncpy + 0x30) : mword 64) -∗
-    ([∗ list] j ∈ seq 0 n, (pa_add t j) ↦ₘ{dq} f j) -∗
-    ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ h j) -∗
+    ([∗ list] j ∈ seq 0 n, (pa_add t j) ↦ₘ[KT1]{dq} f j) -∗
+    ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ[KT1] h j) -∗
     wp_next (CID0 := CIDh) b p (fun (CID : CpuId) =>
       ∀ (Mt : regfile) (hf : nat -> bv 8),
         ⌜snc_post f hf n⌝ -∗
@@ -402,10 +402,10 @@ Qed.
         ⌜Mt !!! Regidx Ra0 = s⌝ -∗
         ⌜forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 -> r <> Rs0 ->
             Mt !!! Regidx r = mm !!! Regidx r⌝ -∗
-        sie_cap_gpr Mt (K - 2)%nat b p -∗
+        sie_cap_gpr KT1 Mt (K - 2)%nat b p -∗
         pc_is (mword_of_int (KernelSyms.strncpy + 0x3e) : mword 64) -∗
-        ([∗ list] j ∈ seq 0 n, (pa_add t j) ↦ₘ{dq} f j) -∗
-        ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ hf j) -∗
+        ([∗ list] j ∈ seq 0 n, (pa_add t j) ↦ₘ[KT1]{dq} f j) -∗
+        ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ[KT1] hf j) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -444,7 +444,7 @@ Qed.
     iDestruct (bb_byte_acc s n k h (DfracOwn 1) Hklt with "Hdst") as "[Hdb Hdback]".
     iDestruct (sie_cap_gpr_x0 P1 (K - 2)%nat b p Rz
                  ltac:(vm_compute; reflexivity) with "Hcg") as "[%Hx0 Hcg]".
-    iApply (wp_sb_s_sconf (mword_of_int (KernelSyms.strncpy + 0x32)) Rz Ra4
+    iApply (wp_sb_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (KernelSyms.strncpy + 0x32)) Rz Ra4
               (mword_of_int 4095 : mword 12) P1 (K - 2)%nat (h k) b
               with "Hcg Hpc Hi32 [Hdb]").
     { iEval (rewrite (HP1a4' _) (snc_back1 s k)). iExact "Hdb". }
@@ -565,10 +565,10 @@ Qed.
     M !!! Regidx Ra5 = pa_add s d ->
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 -> r <> Rs0 ->
         M !!! Regidx r = mm !!! Regidx r) ->
-    sie_cap_gpr (CID := CID0) M (K - 2)%nat b p -∗ kernel_text -∗
+    sie_cap_gpr KT1 (CID := CID0) M (K - 2)%nat b p -∗ kernel_text -∗
     pc_is (CID := CID0) (mword_of_int (KernelSyms.strncpy + 0x0e) : mword 64) -∗
-    ([∗ list] j ∈ seq 0 n, (pa_add t j) ↦ₘ{dq} f j) -∗
-    ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ h j) -∗
+    ([∗ list] j ∈ seq 0 n, (pa_add t j) ↦ₘ[KT1]{dq} f j) -∗
+    ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ[KT1] h j) -∗
     wp_next (CID0 := CIDh) b p (fun (CID : CpuId) =>
       ∀ (Mt : regfile) (hf : nat -> bv 8),
         ⌜snc_post f hf n⌝ -∗
@@ -576,10 +576,10 @@ Qed.
         ⌜Mt !!! Regidx Ra0 = s⌝ -∗
         ⌜forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 -> r <> Rs0 ->
             Mt !!! Regidx r = mm !!! Regidx r⌝ -∗
-        sie_cap_gpr Mt (K - 2)%nat b p -∗
+        sie_cap_gpr KT1 Mt (K - 2)%nat b p -∗
         pc_is (mword_of_int (KernelSyms.strncpy + 0x3e) : mword 64) -∗
-        ([∗ list] j ∈ seq 0 n, (pa_add t j) ↦ₘ{dq} f j) -∗
-        ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ hf j) -∗
+        ([∗ list] j ∈ seq 0 n, (pa_add t j) ↦ₘ[KT1]{dq} f j) -∗
+        ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ[KT1] hf j) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -696,7 +696,7 @@ Qed.
                      = mword_of_int (KernelSyms.strncpy + 0x1e)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp1e) in "Hpc". iPoseProof (sncp_1e with "Htext") as "Hi1e".
       iDestruct (bb_byte_acc s n d h (DfracOwn 1) Hdlt with "Hdst") as "[Hdb Hdback]".
-      iApply (wp_sb_s_sconf (mword_of_int (KernelSyms.strncpy + 0x1e)) Ra4 Ra5
+      iApply (wp_sb_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (KernelSyms.strncpy + 0x1e)) Ra4 Ra5
                 (mword_of_int 4095 : mword 12) C4 (K - 2)%nat (h d) b
                 with "Hcg Hpc Hi1e [Hdb]").
       { iEval (rewrite (HC4a5' _) (snc_back1 s d)). iExact "Hdb". }
@@ -1007,7 +1007,7 @@ Qed.
     { rewrite HR1sp. unfold pa_stk, add_vec_int. rewrite !pa_stk_off2.
       f_equal; try (apply bv_eq; vm_compute; reflexivity). }
     (* +0x02,+0x04: save ra and s0. *)
-    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.strncpy + 0x02))
+    iApply (wp_csdsp_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (KernelSyms.strncpy + 0x02))
               (mword_of_int 1 : mword 6) Rra R1 (K - 2)%nat u1 b
               with "Hcg Hpc Hi02 [Hb1]").
     { iEval (rewrite Hpa1). iExact "Hb1". }
@@ -1021,7 +1021,7 @@ Qed.
                    = mword_of_int (KernelSyms.strncpy + 0x04))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp04) in "Hpc".
-    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.strncpy + 0x04))
+    iApply (wp_csdsp_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (KernelSyms.strncpy + 0x04))
               (mword_of_int 0 : mword 6) Rs0 R1 (K - 2)%nat u2 b
               with "Hcg Hpc Hi04 [Hb2]").
     { iEval (rewrite Hpa2). iExact "Hb2". }

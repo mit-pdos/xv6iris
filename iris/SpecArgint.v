@@ -18,11 +18,11 @@
 
    argint is a thin wrapper: it holds [ip] in the callee-saved s1 across the
    argraw call and narrows the 64-bit result to the [int] cell with a
-   [c.sw].  So its postcondition is [ip ↦₄ trunc32 v] where [v] is argraw's
+   [c.sw].  So its postcondition is [ip ↦₄[KT1] trunc32 v] where [v] is argraw's
    result -- the low 32 bits of the trapframe slot, which is exactly C's
    [int] conversion.
 
-   Resources are argraw's, plus the caller's destination cell [ip ↦₄ old].
+   Resources are argraw's, plus the caller's destination cell [ip ↦₄[KT1] old].
    Nothing about [proc_priv] appears: see SpecArgraw.v for why the trapframe
    pointer travels as a bare fraction. *)
 From Stdlib Require Import ZArith Lia List.
@@ -72,21 +72,21 @@ Definition wp_argint_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ,
   (18 <= av)%nat ->
   (* what argraw's own load needs -- see SpecArgraw's matching premise. *)
   page_valid (page_base tfp) ->
-  sie_cap_gpr m av b p -∗
+  sie_cap_gpr KT1 m av b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   p_trapframe p ↦₈{dqt} page_base tfp -∗
   tf_page tfp ws -∗
-  ip ↦₄ old -∗
+  ip ↦₄[KT1] old -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜ callee_saved m mf ⌝ -∗
-      sie_cap_gpr mf av b p -∗
+      sie_cap_gpr KT1 mf av b p -∗
       cpu_own n eb p b lks -∗
       pc_is ret_tgt -∗
       p_trapframe p ↦₈{dqt} page_base tfp -∗
       tf_page tfp ws -∗
-      ip ↦₄ arg_int32 v -∗
+      ip ↦₄[KT1] arg_int32 v -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

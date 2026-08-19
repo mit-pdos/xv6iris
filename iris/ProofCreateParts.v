@@ -249,6 +249,30 @@ Section CreateParts.
     exfalso. lia.
   Qed.
 
+  (* ...and the same two windows WEAKENED to KT1, which is the tier
+     [SpecDirlink]'s name-buffer premise is stated at (its other caller,
+     sys_link, passes a frame local).  The [.]/[..] strings are .rodata, so
+     the KT0 window is the real fact and this is [mem_ktier_mono]. *)
+  Lemma cr_dot_window_kt1 (a : mword 64) :
+    a = mword_of_int cr_dot_addr ->
+    kernel_data -∗ ([∗ list] j ∈ seq 0 14, (pa_add a j) ↦ₘ[KT1]□ cr_dot_f j).
+  Proof.
+    intros ->. iIntros "Hkd".
+    iDestruct (cr_dot_window _ eq_refl with "Hkd") as "H".
+    iApply (big_sepL_mono with "H"). iIntros (k j _) "H".
+    iApply (mem_ktier_mono _ KT1 with "H").
+  Qed.
+
+  Lemma cr_dotdot_window_kt1 (a : mword 64) :
+    a = mword_of_int cr_dotdot_addr ->
+    kernel_data -∗ ([∗ list] j ∈ seq 0 14, (pa_add a j) ↦ₘ[KT1]□ cr_dotdot_f j).
+  Proof.
+    intros ->. iIntros "Hkd".
+    iDestruct (cr_dotdot_window _ eq_refl with "Hkd") as "H".
+    iApply (big_sepL_mono with "H"). iIntros (k j _) "H".
+    iApply (mem_ktier_mono _ KT1 with "H").
+  Qed.
+
 End CreateParts.
 
 (* ===================================================================== *)
@@ -308,7 +332,7 @@ Proof.
 Qed.
 
 (* THE WORD THE THREE ALU LEAVES LEAVE IN a5, at their own output shapes:
-   [wp_lhu_s_sconf] gives [zero_extend' 64 t], [wp_caddiw_s_sconf] gives
+   [wp_lhu_s_sconf (kt := KT1) (ktd := KT0)] gives [zero_extend' 64 t], [wp_caddiw_s_sconf] gives
    [sign_extend' 64 (subrange_vec_dec (add_vec _ (sign_extend' 64
    (sign_extend' 12 imm))) 31 0)], and [wp_cslli_s_sconf] /
    [wp_csrli_s_sconf] give [shift_bits_left] / [shift_bits_right] at

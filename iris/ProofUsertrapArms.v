@@ -98,7 +98,6 @@ Require Import CodeUsertrap.
 Require Import SpecKilled SpecSetkilled SpecKexit SpecYield SpecPrepareReturn.
 Require Import SpecVmfault.
 Require Import SpecPrintk.
-Require Import SpecSyscall SpecSysExit.
 Require Import SpecUsertrap UsertrapRes.
 Require Import ProofUsertrapParts.
 Require Import UsertrapAux.
@@ -158,12 +157,12 @@ Section UtArmsCommon.
      directly is a coin flip on whether resolution unfolds the definition. *)
   Lemma ua_hold_off (N : ut_names) (V : pprivate) (lks : gset string) :
     ut_hold Rsys N V false lks -∗
-      cpu_own 0%nat false (un_pj N) false lks ∗ trap_csrs ∗
+      cpu_own 0%nat false (un_pj N) false lks ∗ trap_csrs KT1 ∗
       cpu_claim (un_pj N) ∗ ut_env Rsys N V.
   Proof. iIntros "H". iExact "H". Qed.
 
   Lemma ua_hold_on (N : ut_names) (V : pprivate) (lks : gset string) :
-    cpu_own 0%nat false (un_pj N) false lks -∗ trap_csrs -∗
+    cpu_own 0%nat false (un_pj N) false lks -∗ trap_csrs KT1 -∗
     cpu_claim (un_pj N) -∗ ut_env Rsys N V -∗
     ut_hold Rsys N V false lks.
   Proof.
@@ -180,7 +179,7 @@ Section UtArmsCommon.
   (* ==================================================================== *)
   Lemma ua_pin_sie_cap_gpr (M : regfile) (avail : nat) (bb : bool)
       (pp : mword 64) :
-    sie_cap_gpr (tp_pin M) avail bb pp = sie_cap_gpr M avail bb pp.
+    sie_cap_gpr KT1 (tp_pin M) avail bb pp = sie_cap_gpr KT1 M avail bb pp.
   Proof.
     unfold sie_cap_gpr, sie_cap.
     rewrite (tp_pin_id (tp_pin M) (rget_tp M)).
@@ -223,7 +222,7 @@ Section Ut56.
   Lemma ut_56 (N : ut_names) (V : pprivate) (pt : uptd) (ksp : mword 64)
       (m0 m : regfile) (av nx : nat)
       (mie_v menvcfg0 : mword 64) (lks : gset string) :
-    printk_gen_contract (un_pr N) (un_u N) (un_v N) ->
+    printk_gen_contract (kt := KT1) (un_pr N) (un_u N) (un_v N) ->
     ut_wf N ->
     (K_usertrap <= av)%nat ->
     (trap_res false + nx)%nat = (av - 4)%nat ->
@@ -237,7 +236,7 @@ Section Ut56.
     menvcfg0 = MENVCFG_S ->
     kernel_text -∗
     pc_is (mword_of_int (UT + 0x56)) -∗
-    sie_cap_gpr m nx false (un_pj N) -∗
+    sie_cap_gpr KT1 m nx false (un_pj N) -∗
     ut_hold Rsys N V false lks -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
@@ -310,7 +309,7 @@ Section Ut56.
                        = p_pid (un_pj N))
       by (rgne; rewrite HM1s1; reflexivity).
     iEval (rewrite -Haddrpid) in "Hpid".
-    iApply (wp_clw_s_sconf (mword_of_int (UT + 0x5a)) Ra2 Rs1
+    iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (UT + 0x5a)) Ra2 Rs1
               (mword_of_int 48 : mword 12) M1 nx (un_pid N) false
               (dqm := DfracOwn (1/4))
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -650,7 +649,7 @@ Section UtD0.
   Lemma ut_d0 (N : ut_names) (V : pprivate) (pt : uptd) (ksp : mword 64)
       (m0 m : regfile) (av nx : nat)
       (mie_v menvcfg0 : mword 64) (lks : gset string) :
-    printk_gen_contract (un_pr N) (un_u N) (un_v N) ->
+    printk_gen_contract (kt := KT1) (un_pr N) (un_u N) (un_v N) ->
     ut_wf N ->
     (K_usertrap <= av)%nat ->
     (trap_res false + nx)%nat = (av - 4)%nat ->
@@ -664,7 +663,7 @@ Section UtD0.
     menvcfg0 = MENVCFG_S ->
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xd0)) -∗
-    sie_cap_gpr m nx false (un_pj N) -∗
+    sie_cap_gpr KT1 m nx false (un_pj N) -∗
     ut_hold Rsys N V false lks -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
@@ -786,7 +785,7 @@ Section UtD0.
                       = p_sz (un_pj N))
       by (rgne; rewrite HM4s1; reflexivity).
     iEval (rewrite -Haddrsz) in "Hsz".
-    iApply (wp_cld_s_sconf (mword_of_int (UT + 0xde)) Ra1 Rs1
+    iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (UT + 0xde)) Ra1 Rs1
               (mword_of_int 72 : mword 12) M4 nx (pv_sz V) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hide Hsz [-]").
@@ -812,7 +811,7 @@ Section UtD0.
                       = p_pagetable (un_pj N))
       by (rgne; rewrite HM5s1; reflexivity).
     iEval (rewrite -Haddrpg) in "Hpgt".
-    iApply (wp_cld_s_sconf (mword_of_int (UT + 0xe0)) Ra0 Rs1
+    iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (UT + 0xe0)) Ra0 Rs1
               (mword_of_int 80 : mword 12) M5 nx
               (page_base (ud_root (pv_upt V))) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -900,7 +899,7 @@ Section UtD0.
       by exact (ut_cs_trans m0 (tp_pin M7) mr HcsP7
                   (ut_cs_of_callee_saved _ _ Hvfcs)).
     (* the trap CSR bundle, closed: nothing below reads a cell. *)
-    iAssert (trap_csrs) with "[Hsepc Hscause Hstval Hsret Hres Hkpt]"
+    iAssert (trap_csrs KT1) with "[Hsepc Hscause Hstval Hsret Hres Hkpt]"
       as "Hcsrs".
     { rewrite /trap_csrs.
       iSplitL "Hsepc"; [iExact "Hsepc"|].
@@ -1031,7 +1030,7 @@ Section UtE8.
     menvcfg0 = MENVCFG_S ->
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xea)) -∗
-    sie_cap_gpr m nx false (un_pj N) -∗
+    sie_cap_gpr KT1 m nx false (un_pj N) -∗
     ut_hold Rsys N V false lks -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
@@ -1193,11 +1192,32 @@ Section UtE8.
                        (sign_extend' 64 (mword_of_int 2095486 : mword 21))
                      = mword_of_int KernelSyms.kexit) by pcw.
       iEval (rewrite Hkex) in "Hpc".
+      (* ---- THE DYING THREAD'S STACK CLOSER, BUILT HERE.  usertrap was
+         entered with sp AT THE PAGE TOP ([Hksp]), which is the one point in
+         a trap round where the closer is free ([ProcDefs.kstack_closer_top]:
+         nothing is owed above the top).  Wrapping usertrap's own frame
+         around it re-anchors it at the sp the walk is running on -- and that
+         frame is dead, because kexit does not return.  From here it rides
+         the diverging chain to the ZOMBIE park. ---- *)
+      assert (HKsp : (<[Regidx Rra := regval_into_reg
+                          (add_vec_int (mword_of_int (UT + 0xf8) : mword 64) 4)]> K1)
+                       !!! Regidx csp_rs1 = pa_stk ksp 4).
+      { rewrite upd_ne; [| vm_compute; discriminate].
+        rewrite /K1 upd_ne; [exact Hmfsp | vm_compute; discriminate]. }
+      iAssert (is_kstack (un_pj N) (un_ks N)) as "#Hkstk".
+      { iDestruct "Hcaps" as "(_ & _ & $ & _)". }
+      iDestruct (ut_frame_stack with "Hframe") as "Hfr".
+      iDestruct (kstack_closer_top (un_pj N) (un_ks N) av
+                   ltac:(unfold KSTACK_AV; lia) with "Hkstk") as "Hkcl".
+      iEval (rewrite Hksp) in "Hkcl".
+      iDestruct (kstack_closer_frame (un_pj N) ksp av 4 ltac:(lia)
+                   with "Hkcl Hfr") as "Hkcl4".
+      iEval (rewrite -Hnx -HKsp) in "Hkcl4".
       iApply (T.ut_kexit Rsys N V
                 (<[Regidx Rra := regval_into_reg
                      (add_vec_int (mword_of_int (UT + 0xf8) : mword 64) 4)]> K1)
                 nx false lks Hwf' ltac:(lia) ltac:(lkbelow)
-                with "Htext Hpc Hcg [-]").
+                with "Htext Hpc Hcg Hkcl4 [-]").
       iApply (ua_hold_on Rsys N V with "Hcpu Hcsrs Hclm [-]").
       rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"].
   Qed.

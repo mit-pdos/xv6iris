@@ -107,7 +107,7 @@ From Kernel Require KernelSyms.
    printint's 24. *)
 Notation printk_stack := (48%nat) (only parsing).
 Definition wp_printk_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γpr : gname) (γl : gname) (γd : uart_names) (γv : disk_names)
+    (kt : ktier) (γpr : gname) (γl : gname) (γd : uart_names) (γv : disk_names)
     (m0 : regfile) (K : nat) (bs : list (bv 8))
     (n : nat) (eb : bool) (dqf : dfrac)
     (f : string) (descs : list pk_arg_desc) (b : bool) (p : mword 64) (lks : gset string) :=
@@ -134,7 +134,7 @@ Definition wp_printk_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGhost
      acquire (rank 15 > 14) follows from this by
      [LockRank.locks_below_union_singleton]. *)
   locks_below lks "pr" ->
-  sie_cap_gpr m0 K b p -∗
+  sie_cap_gpr kt m0 K b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   fmt ↦ₛ{ dqf } f -∗
@@ -150,7 +150,7 @@ Definition wp_printk_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGhost
   uart_sent_sub γd bs -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf cs,
-    sie_cap_gpr mf K b p -∗
+    sie_cap_gpr kt mf K b p -∗
     cpu_own n eb p b lks -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 mf /\ mf !!! Regidx ra_idx = ra0
@@ -164,11 +164,11 @@ Definition wp_printk_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGhost
 Module Type PRINTK.
   Parameter wp_printk_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γpr : gname) (γl : gname) (γd : uart_names) (γv : disk_names)
+      (kt : ktier) (γpr : gname) (γl : gname) (γd : uart_names) (γv : disk_names)
       (m0 : regfile) (K : nat) (bs : list (bv 8))
       (n : nat) (eb : bool) {dqf : dfrac}
       (f : string) (descs : list pk_arg_desc) (b : bool) (p : mword 64) (lks : gset string),
-      wp_printk_sconf_body γpr γl γd γv m0 K bs n eb dqf f descs b p lks.
+      wp_printk_sconf_body kt γpr γl γd γv m0 K bs n eb dqf f descs b p lks.
 End PRINTK.
 
 (* ========================================================================
@@ -246,7 +246,7 @@ End PrintkGen.
 
 Definition wp_printk_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γpr : gname) (γd : uart_names) (γv : disk_names)
+    (kt : ktier) (γpr : gname) (γd : uart_names) (γv : disk_names)
     (m0 : regfile) (K : nat) (eb : bool) (pj : mword 64)
     (dqf : dfrac) (f : string) (descs : list pk_arg_desc) (b : bool) (lks : gset string) :=
   let ra_idx : mword 5 := mword_of_int 1 in
@@ -268,7 +268,7 @@ Definition wp_printk_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
   (* acquire's order premise, at the LOWEST rank this function (or a callee)
      acquires: "pr" (rank 14), see [wp_printk_sconf_body]. *)
   locks_below lks "pr" ->
-  sie_cap_gpr m0 K b pj -∗
+  sie_cap_gpr kt m0 K b pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* the interrupt level is left exactly as found: acquire/release pair *)
   cpu_own 0%nat eb pj b lks -∗
@@ -278,7 +278,7 @@ Definition wp_printk_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
   ([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m0 j) d) -∗
   wp_next b pj (fun (CID : CpuId) =>
     ∀ mf : regfile,
-    sie_cap_gpr mf K b pj -∗
+    sie_cap_gpr kt mf K b pj -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 mf /\ mf !!! Regidx ra_idx = ra0 ⌝ -∗
     cpu_own 0%nat eb pj b lks -∗
@@ -294,17 +294,17 @@ Definition wp_printk_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
    a holder pays nothing beyond the standing platform/stdlib axioms. *)
 Definition printk_gen_contract `{!riscvGS Σ, !sieG Σ, !lockG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId}
-    (γpr : gname) (γd : uart_names) (γv : disk_names) : Prop :=
+    {kt : ktier} (γpr : gname) (γd : uart_names) (γv : disk_names) : Prop :=
   forall (CIDp : CpuId)
     (m0 : regfile) (K : nat) (eb : bool) (pj : mword 64)
     (dqf : dfrac) (f : string) (descs : list pk_arg_desc) (b : bool) (lks : gset string),
-    wp_printk_gen_sconf_body (CID := CIDp) γpr γd γv m0 K eb pj dqf f descs b lks.
+    wp_printk_gen_sconf_body kt (CID := CIDp) γpr γd γv m0 K eb pj dqf f descs b lks.
 
 Module Type PRINTK_GEN.
   Parameter wp_printk_gen_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γpr : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat) (eb : bool) (pj : mword 64)
+      (kt : ktier) (γpr : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat) (eb : bool) (pj : mword 64)
       {dqf : dfrac} (f : string) (descs : list pk_arg_desc) (b : bool) (lks : gset string),
-      wp_printk_gen_sconf_body γpr γd γv m0 K eb pj dqf f descs b lks.
+      wp_printk_gen_sconf_body kt γpr γd γv m0 K eb pj dqf f descs b lks.
 End PRINTK_GEN.

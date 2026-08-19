@@ -203,7 +203,7 @@ Section SchedCtx.
                        mword 64 -d> mword 64 -d> bool -d> iPropO Σ :=
     fun h A' c cret tpv p back =>
     (⌜tpv = cid_word_of h⌝ ∗
-     trap_csrs (CID := h) ∗
+     trap_csrs KT1 (CID := h) ∗
      ( (* c = the CPU/scheduler context, resumed by a PARKING PROC [cret]
           (sched's swtch): the proc hands over its held lock and the cpu
           cells; its state is one of the two parked states.  [A'] -- the
@@ -251,7 +251,7 @@ Section SchedCtx.
   Lemma p_sched_to_cpu (i : CPU) (j : nat) (γl : gname)
       (st : mword 32) (ch : mword 64) :
     (j < NPROC)%nat -> γs !! j = Some γl -> park_ok st = true ->
-    trap_csrs (CID := i) -∗
+    trap_csrs KT1 (CID := i) -∗
     proc_held i j γl st ch -∗
     hart_full j i -∗
     park_pay (proc_addr j) st -∗
@@ -270,7 +270,7 @@ Section SchedCtx.
      hart's ghost. *)
   Lemma p_sched_to_proc (i : CPU) (j : nat) (γl : gname) (ch : mword 64) :
     (j < NPROC)%nat -> γs !! j = Some γl ->
-    trap_csrs (CID := i) -∗
+    trap_csrs KT1 (CID := i) -∗
     proc_held i j γl RUNNING ch -∗
     hart_full j i -∗
     p_sched i (Some i) (p_context (proc_addr j))
@@ -290,7 +290,7 @@ Section SchedCtx.
     p_sched i A' (p_context (proc_addr j)) cret tpv p back -∗
     ⌜tpv = cid_word_of i⌝ ∗ ⌜cret = a_cpu_ctx (cid_word_of i)⌝ ∗
     ⌜p = proc_addr j⌝ ∗ ⌜A' = Some i⌝ ∗ ⌜back = true⌝ ∗
-    trap_csrs (CID := i) ∗
+    trap_csrs KT1 (CID := i) ∗
     ∃ (γl : gname) (ch : mword 64),
       ⌜γs !! j = Some γl⌝ ∗ proc_held i j γl RUNNING ch ∗ hart_full j i.
   Proof.
@@ -324,7 +324,7 @@ Section SchedCtx.
     (j < NPROC)%nat ->
     p_sched i A' (a_cpu_ctx (cid_word_of i)) cret tpv (proc_addr j) back -∗
     ⌜tpv = cid_word_of i⌝ ∗ ⌜cret = p_context (proc_addr j)⌝ ∗
-    ⌜A' = None⌝ ∗ trap_csrs (CID := i) ∗
+    ⌜A' = None⌝ ∗ trap_csrs KT1 (CID := i) ∗
     ∃ (γl : gname) (st : mword 32) (ch : mword 64),
       ⌜γs !! j = Some γl /\ park_ok st = true /\ back = needs_ctx st⌝ ∗
       proc_held i j γl st ch ∗ hart_full j i ∗ park_pay (proc_addr j) st.

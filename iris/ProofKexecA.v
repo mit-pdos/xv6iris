@@ -183,7 +183,6 @@ Require Export SwtchCtx.
 Require Import WpUart.
 Require Import FsCrash.
 Require Import InodeRegion.
-Require Import FsTree.
 Require Import IcacheEscrow.
 Require Import ByteBuf.
 Require Import ElfEnc.
@@ -337,7 +336,7 @@ Section KexecABody.
     m !!! Regidx Rs2 = s20 ->
     m !!! Regidx Ra0 = pv ->
     m !!! Regidx Ra1 = av ->
-    sie_cap_gpr m K b (proc_addr jp) -∗
+    sie_cap_gpr KT1 m K b (proc_addr jp) -∗
     cpu_own 0 eb (proc_addr jp) b lks -∗
     kernel_text -∗ pc_is (mword_of_int KXA : mword 64) -∗
     fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
@@ -347,8 +346,8 @@ Section KexecABody.
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bitmap_res gfs bmapstart cov logstart size used -∗
     proc_priv gf (proc_addr jp) pidv V -∗
-    ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
-    ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
+    ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
+    ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
     ([∗ list] i ∈ seq 0 na,
        [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
     bslots bn 3 -∗
@@ -359,7 +358,7 @@ Section KexecABody.
         (entry spv szv' : mword 64),
           ⌜callee_saved m mf⌝ -∗
           ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
-          sie_cap_gpr mf K b (proc_addr jp) -∗
+          sie_cap_gpr KT1 mf K b (proc_addr jp) -∗
           cpu_own 0 eb (proc_addr jp) b lks -∗
           pc_is (ret_pc ra0) -∗
           sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -368,8 +367,8 @@ Section KexecABody.
           bitmap_res gfs bmapstart cov logstart size used' -∗
           kalloc_env ga None -∗
           proc_priv gf (proc_addr jp) pidv V' -∗
-          ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
-          ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
+          ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
+          ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
           ([∗ list] i ∈ seq 0 na,
              [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
           bslots bn 3 -∗
@@ -395,7 +394,7 @@ Section KexecABody.
             (entry spv szv' : mword 64),
               ⌜callee_saved m mf⌝ -∗
               ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
-              sie_cap_gpr mf K b (proc_addr jp) -∗
+              sie_cap_gpr KT1 mf K b (proc_addr jp) -∗
               cpu_own 0 eb (proc_addr jp) b lks -∗
               pc_is (ret_pc ra0) -∗
               sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -404,8 +403,8 @@ Section KexecABody.
               bitmap_res gfs bmapstart cov logstart size used' -∗
               kalloc_env ga None -∗
               proc_priv gf (proc_addr jp) pidv V' -∗
-              ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
-              ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
+              ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
+              ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
               ([∗ list] i ∈ seq 0 na,
                  [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
               bslots bn 3 -∗
@@ -865,7 +864,7 @@ Section KexecABody.
         (entry spv szv' : mword 64),
           ⌜callee_saved m mf⌝ -∗
           ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
-          sie_cap_gpr mf K b (proc_addr jp) -∗
+          sie_cap_gpr KT1 mf K b (proc_addr jp) -∗
           cpu_own 0 eb (proc_addr jp) b lks -∗
           pc_is (ret_pc ra0) -∗
           sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -874,8 +873,8 @@ Section KexecABody.
           bitmap_res gfs bmapstart cov logstart size used' -∗
           kalloc_env ga None -∗
           proc_priv gf (proc_addr jp) pidv V' -∗
-          ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
-          ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
+          ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
+          ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
           ([∗ list] i ∈ seq 0 na,
              [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
           bslots bn 3 -∗
@@ -898,7 +897,7 @@ Section KexecABody.
              M90 !!! Regidx r = m !!! Regidx r) ⌝ -∗
         ⌜ (iput_units <= n2)%nat /\ used2 ⊆ used ⌝ -∗
         pc_is (mword_of_int (KXA + 0x90) : mword 64) -∗
-        sie_cap_gpr M90 (K - 68)%nat b (proc_addr jp) -∗
+        sie_cap_gpr KT1 M90 (K - 68)%nat b (proc_addr jp) -∗
         cpu_own 0 eb (proc_addr jp) b lks -∗
         is_sleeplock_gen gilf gislf (i_lock (ientry kf)) "inode"%string
                      (ic_tok cn kf) (slh_tok (icfg_isl kf)) -∗
@@ -921,8 +920,8 @@ Section KexecABody.
         bslots bn 3 -∗
         kalloc_env ga None -∗
         proc_priv gf (proc_addr jp) pidv V -∗
-        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
-        ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
+        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
+        ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
         ([∗ list] i ∈ seq 0 na,
            [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
         kxc_frameA6 sp0 ra0 s00 s10 s20 pv av (m !!! Regidx Rs4) -∗
@@ -932,7 +931,7 @@ Section KexecABody.
             (entry spv szv' : mword 64),
               ⌜callee_saved m mf⌝ -∗
               ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
-              sie_cap_gpr mf K b (proc_addr jp) -∗
+              sie_cap_gpr KT1 mf K b (proc_addr jp) -∗
               cpu_own 0 eb (proc_addr jp) b lks -∗
               pc_is (ret_pc ra0) -∗
               sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -941,8 +940,8 @@ Section KexecABody.
               bitmap_res gfs bmapstart cov logstart size used' -∗
               kalloc_env ga None -∗
               proc_priv gf (proc_addr jp) pidv V' -∗
-              ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
-              ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
+              ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
+              ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
               ([∗ list] i ∈ seq 0 na,
                  [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
               bslots bn 3 -∗
@@ -1259,7 +1258,7 @@ Section KexecABody.
     iEval (rewrite -HQ8a2) in "Helfb".
     iDestruct (cpu_own_transport CIDil CID9 0%nat true (proc_addr jp) true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Readi.wp_readi_sconf gs jp gl gu gd gk pd pav pu bn gfs ga gf
+    iApply (Readi.wp_readi_sconf KT1 gs jp gl gu gd gk pd pav pu bn gfs ga gf
               cov logstart dev (ientry k) bml datl dnl false 0%nat 64%nat fb V
               pidv (DfracOwn (1/4)) (DfracOwn (1/2)) Q8 (K - 68)%nat true true lks
               ltac:(lia) Hlg Hbmwf Hbmcov Hszb
@@ -1411,11 +1410,11 @@ Section KexecABody.
         rewrite /Q10 upd_ne; [| regne]. exact (HQ9thr r Hr Nsp Ns0 Ns1 Ns2 Ns4). }
       (* ---- give the magic word back and re-form the elf buffer ---- *)
       iDestruct (kxc_named_of_word4 (pa_stk sp0 54) gb with "Hw4") as "Helf4".
-      iAssert ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ gb j)%I
+      iAssert ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ[KT1] gb j)%I
         with "[Helf4 Helfr]" as "Helfb".
       { iApply (kxc_named_join4 (pa_stk sp0 54) gb 64 ltac:(lia)
                   with "Helf4 Helfr"). }
-      iAssert (stack_own (pa_stk sp0 46) 8) with "[Helfb]" as "Helf".
+      iAssert (stack_own (KTR := KT1) (pa_stk sp0 46) 8) with "[Helfb]" as "Helf".
       { iApply kxc_stack_of_elf_slots. iApply (kxc_bytes_elf sp0 Hal).
         rewrite /bytes_own. iApply (bb_named_any with "Helfb"). }
       (* ---- +0x060: beq a4,a5 -- the second BLIND split ---- *)
@@ -1587,7 +1586,7 @@ Section KexecABody.
         iSplitL "Haddrs"; [iExact "Haddrs" |].
         iSplitL "Hindres"; [iExact "Hindres" | iExact "Hblocks"]. }
       iDestruct (T.kxa_bs3_join bn with "Hbs1 Hbs2") as "Hbs".
-      iAssert (stack_own (pa_stk sp0 46) 8) with "[Helfb]" as "Helf".
+      iAssert (stack_own (KTR := KT1) (pa_stk sp0 46) 8) with "[Helfb]" as "Helf".
       { iApply kxc_stack_of_elf_slots. iApply (kxc_bytes_elf sp0 Hal).
         rewrite /bytes_own. iApply (bb_named_any with "Helfb"). }
       (* same re-anchoring as the bad-magic tail: [T.kxc_bad64] runs at [CID11] *)
@@ -1717,7 +1716,7 @@ Section KexecAMain.
     m !!! Regidx Rs2 = s20 ->
     m !!! Regidx Ra0 = pv ->
     m !!! Regidx Ra1 = av ->
-    sie_cap_gpr m K b (proc_addr jp) -∗
+    sie_cap_gpr KT1 m K b (proc_addr jp) -∗
     cpu_own 0 eb (proc_addr jp) b lks -∗
     kernel_text -∗ pc_is (mword_of_int KXA : mword 64) -∗
     fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
@@ -1727,8 +1726,8 @@ Section KexecAMain.
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bitmap_res gfs bmapstart cov logstart size used -∗
     proc_priv gf (proc_addr jp) pidv V -∗
-    ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
-    ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
+    ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
+    ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
     ([∗ list] i ∈ seq 0 na,
        [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
     bslots bn 3 -∗
@@ -1739,7 +1738,7 @@ Section KexecAMain.
         (entry spv szv' : mword 64),
           ⌜callee_saved m mf⌝ -∗
           ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
-          sie_cap_gpr mf K b (proc_addr jp) -∗
+          sie_cap_gpr KT1 mf K b (proc_addr jp) -∗
           cpu_own 0 eb (proc_addr jp) b lks -∗
           pc_is (ret_pc ra0) -∗
           sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -1748,8 +1747,8 @@ Section KexecAMain.
           bitmap_res gfs bmapstart cov logstart size used' -∗
           kalloc_env ga None -∗
           proc_priv gf (proc_addr jp) pidv V' -∗
-          ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
-          ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
+          ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
+          ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
           ([∗ list] i ∈ seq 0 na,
              [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
           bslots bn 3 -∗
@@ -1772,7 +1771,7 @@ Section KexecAMain.
              M90 !!! Regidx r = m !!! Regidx r) ⌝ -∗
         ⌜ (iput_units <= n2)%nat /\ used2 ⊆ used ⌝ -∗
         pc_is (mword_of_int (KXA + 0x90) : mword 64) -∗
-        sie_cap_gpr M90 (K - 68)%nat b (proc_addr jp) -∗
+        sie_cap_gpr KT1 M90 (K - 68)%nat b (proc_addr jp) -∗
         cpu_own 0 eb (proc_addr jp) b lks -∗
         is_sleeplock_gen gilf gislf (i_lock (ientry kf)) "inode"%string
                      (ic_tok cn kf) (slh_tok (icfg_isl kf)) -∗
@@ -1795,8 +1794,8 @@ Section KexecAMain.
         bslots bn 3 -∗
         kalloc_env ga None -∗
         proc_priv gf (proc_addr jp) pidv V -∗
-        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
-        ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
+        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
+        ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
         ([∗ list] i ∈ seq 0 na,
            [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
         kxc_frameA6 sp0 ra0 s00 s10 s20 pv av (m !!! Regidx Rs4) -∗
@@ -1810,7 +1809,7 @@ Section KexecAMain.
             (entry spv szv' : mword 64),
               ⌜callee_saved m mf⌝ -∗
               ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
-              sie_cap_gpr mf K b (proc_addr jp) -∗
+              sie_cap_gpr KT1 mf K b (proc_addr jp) -∗
               cpu_own 0 eb (proc_addr jp) b lks -∗
               pc_is (ret_pc ra0) -∗
               sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -1819,8 +1818,8 @@ Section KexecAMain.
               bitmap_res gfs bmapstart cov logstart size used' -∗
               kalloc_env ga None -∗
               proc_priv gf (proc_addr jp) pidv V' -∗
-              ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
-              ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
+              ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
+              ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
               ([∗ list] i ∈ seq 0 na,
                  [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
               bslots bn 3 -∗

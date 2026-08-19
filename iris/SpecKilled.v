@@ -70,7 +70,7 @@ Definition wp_killed_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ,
      internally (balanced -- [lks] is unchanged across the whole call), so
      the caller must already hold only locks BELOW "proc"'s rank. *)
   locks_below lks "proc" ->
-  sie_cap_gpr m av b p -∗
+  sie_cap_gpr KT1 m av b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv γs -∗
@@ -78,7 +78,7 @@ Definition wp_killed_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ,
     ∀ (mf : regfile) (kl : mword 32),
       ⌜ callee_saved m mf /\
         mf !!! Regidx (mword_of_int 10 : mword 5) = sign_extend' 64 kl ⌝ -∗
-      sie_cap_gpr mf av b p -∗
+      sie_cap_gpr KT1 mf av b p -∗
       cpu_own n eb p b lks -∗
       pc_is ret_tgt -∗
       WP (Loop : expr riscv_lang)) -∗

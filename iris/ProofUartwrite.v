@@ -342,25 +342,25 @@ Section UwProps.
      n = 0 path never builds a frame at all and there is no shrink-wrapping
      to account for). *)
   Definition uw_saved (sp0 : mword 64) (m0 : regfile) : iProp Σ :=
-    (pa_stk sp0 1 ↦₈ (m0 !!! Regidx Rra) ∗
-     pa_stk sp0 2 ↦₈ (m0 !!! Regidx Rs0) ∗
-     pa_stk sp0 3 ↦₈ (m0 !!! Regidx Rs1) ∗
-     pa_stk sp0 4 ↦₈ (m0 !!! Regidx Rs2) ∗
-     pa_stk sp0 5 ↦₈ (m0 !!! Regidx Rs3) ∗
-     pa_stk sp0 6 ↦₈ (m0 !!! Regidx Rs4) ∗
-     pa_stk sp0 7 ↦₈ (m0 !!! Regidx Rs5) ∗
-     pa_stk sp0 8 ↦₈ (m0 !!! Regidx Rs6) ∗
-     pa_stk sp0 9 ↦₈ (m0 !!! Regidx Rs7))%I.
+    (pa_stk sp0 1 ↦₈[KT1] (m0 !!! Regidx Rra) ∗
+     pa_stk sp0 2 ↦₈[KT1] (m0 !!! Regidx Rs0) ∗
+     pa_stk sp0 3 ↦₈[KT1] (m0 !!! Regidx Rs1) ∗
+     pa_stk sp0 4 ↦₈[KT1] (m0 !!! Regidx Rs2) ∗
+     pa_stk sp0 5 ↦₈[KT1] (m0 !!! Regidx Rs3) ∗
+     pa_stk sp0 6 ↦₈[KT1] (m0 !!! Regidx Rs4) ∗
+     pa_stk sp0 7 ↦₈[KT1] (m0 !!! Regidx Rs5) ∗
+     pa_stk sp0 8 ↦₈[KT1] (m0 !!! Regidx Rs6) ∗
+     pa_stk sp0 9 ↦₈[KT1] (m0 !!! Regidx Rs7))%I.
 
   (* the tenth slot is alignment padding: never written, carried existentially *)
   Definition uw_slot10 (sp0 : mword 64) : iProp Σ :=
-    (∃ w : mword 64, pa_stk sp0 10 ↦₈ w)%I.
+    (∃ w : mword 64, pa_stk sp0 10 ↦₈[KT1] w)%I.
 
   Lemma uw_frame_stack_own sp0 m0 :
-    uw_saved sp0 m0 -∗ uw_slot10 sp0 -∗ stack_own sp0 10.
+    uw_saved sp0 m0 -∗ uw_slot10 sp0 -∗ stack_own (KTR := KT1) sp0 10.
   Proof.
     iIntros "(H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & H9) H10".
-    rewrite stack_own_slots. cbn [seq].
+    rewrite (stack_own_slots (KTR := KT1)). cbn [seq].
     iSplitL "H1"; [by iExists _|]. iSplitL "H2"; [by iExists _|].
     iSplitL "H3"; [by iExists _|]. iSplitL "H4"; [by iExists _|].
     iSplitL "H5"; [by iExists _|]. iSplitL "H6"; [by iExists _|].
@@ -369,7 +369,7 @@ Section UwProps.
   Qed.
 
   Definition uw_buf (buf : mword 64) (dq : dfrac) (f : nat -> bv 8) (n : nat) : iProp Σ :=
-    ([∗ list] k0 ∈ seq 0 n, (pa_add buf k0) ↦ₘ{dq} f k0)%I.
+    ([∗ list] k0 ∈ seq 0 n, (pa_add buf k0) ↦ₘ[KT1]{dq} f k0)%I.
 
   Definition uw_full (sp0 : mword 64) (m0 : regfile) : iProp Σ :=
     (uw_saved sp0 m0 ∗ uw_slot10 sp0)%I.
@@ -395,7 +395,7 @@ Section UwProps.
        ∀ M' : regfile,
        ⌜ (S i < n)%nat ⌝ -∗
        ⌜ uw_loop_regs m0 M' (pa_stk sp0 10) buf n (S i) ⌝ -∗
-       sie_cap_gpr M' (av - 10)%nat true (proc_addr j) -∗
+       sie_cap_gpr KT1 M' (av - 10)%nat true (proc_addr j) -∗
        cpu_own 0%nat eb (proc_addr j) true lks -∗
        pc_is (mword_of_int (KernelSyms.uartwrite + 0x4a)) -∗
        p_pid (proc_addr j) ↦₄{dqp} pidv -∗
@@ -411,7 +411,7 @@ Section UwProps.
     (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
        ∀ M' : regfile,
        ⌜ uw_loop_regs m0 M' (pa_stk sp0 10) buf n n ⌝ -∗
-       sie_cap_gpr M' (av - 10)%nat true (proc_addr j) -∗
+       sie_cap_gpr KT1 M' (av - 10)%nat true (proc_addr j) -∗
        cpu_own 0%nat eb (proc_addr j) true lks -∗
        pc_is (mword_of_int (KernelSyms.uartwrite + 0x76)) -∗
        p_pid (proc_addr j) ↦₄{dqp} pidv -∗
@@ -427,7 +427,7 @@ Section UwProps.
     (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
        ∀ M : regfile,
        ⌜ uw_loop_regs m0 M (pa_stk sp0 10) buf n i ⌝ -∗
-       sie_cap_gpr M (av - 10)%nat true (proc_addr j) -∗
+       sie_cap_gpr KT1 M (av - 10)%nat true (proc_addr j) -∗
        cpu_own 0%nat eb (proc_addr j) true lks -∗
        pc_is (mword_of_int (KernelSyms.uartwrite + 0x4a)) -∗
        p_pid (proc_addr j) ↦₄{dqp} pidv -∗
@@ -443,7 +443,7 @@ Section UwProps.
     (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
        ∀ mf : regfile,
          ⌜ callee_saved m0 mf ⌝ -∗
-         sie_cap_gpr mf av true (proc_addr j) -∗
+         sie_cap_gpr KT1 mf av true (proc_addr j) -∗
          cpu_own 0%nat eb (proc_addr j) true lks -∗
          pc_is (ret_pc (m0 !!! Regidx Rra)) -∗
          Rbuf -∗
@@ -491,7 +491,7 @@ Section UwBodies.
     eb = true ->
     (true = false \/ pj = zero_reg -> (CID : CPU) = CID0) ->
     kernel_text -∗
-    sie_cap_gpr M (av - 10)%nat true pj -∗
+    sie_cap_gpr KT1 M (av - 10)%nat true pj -∗
     cpu_own 0%nat eb pj true lks -∗
     pc_is (mword_of_int (KernelSyms.uartwrite + 0x76)) -∗
     p_pid pj ↦₄{dqp} pidv -∗
@@ -633,7 +633,7 @@ Section UwBodies.
     (* +0x88  c.addi16sp sp,80 -- the frame pop *)
     iAssert (uw_saved sp0 m0) with "[H1 H2 H3 H4 H5 H6 H7 H8 H9]" as "Hsv".
     { rewrite /uw_saved. iFrame "H1 H2 H3 H4 H5 H6 H7 H8 H9". }
-    iAssert (stack_own sp0 10) with "[Hsv Hs10]" as "Hframe".
+    iAssert (stack_own (KTR := KT1) sp0 10) with "[Hsv Hs10]" as "Hframe".
     { iApply (uw_frame_stack_own sp0 m0 with "Hsv Hs10"). }
     assert (Hpopv : add_vec (E9 !!! Regidx csp_rs1)
                       (sign_extend' 64 (caddi16sp_imm (mword_of_int 5 : mword 6))) = sp0).
@@ -767,7 +767,7 @@ Section UwBodies.
     locks_below lks "proc" ->
     kernel_text -∗ dev_inv γu γv -∗ is_txlock γl γu -∗
     procs_inv γs -∗
-    sie_cap_gpr M (av - 10)%nat true pj -∗
+    sie_cap_gpr KT1 M (av - 10)%nat true pj -∗
     cpu_own 0%nat eb pj true lks -∗
     pc_is (mword_of_int (KernelSyms.uartwrite + 0x4a)) -∗
     p_pid pj ↦₄{dqp} pidv -∗
@@ -845,7 +845,7 @@ Section UwBodies.
     iAssert (wp_next (CID0 := CID) true pj (fun (CIDh : CpuId) =>
       ∀ M1 : regfile,
       ⌜ uw_loop_regs m0 M1 (pa_stk sp0 10) buf n i ⌝ -∗
-      sie_cap_gpr M1 (av - 10)%nat true pj -∗
+      sie_cap_gpr KT1 M1 (av - 10)%nat true pj -∗
       cpu_own 0%nat true pj true lks -∗
       pc_is (mword_of_int (KernelSyms.uartwrite + 0x4a)) -∗
       p_pid pj ↦₄{dqp} pidv -∗
@@ -929,7 +929,7 @@ Section UwBodies.
       { rewrite /Q4. apply callee_saved_insert_r; [vm_compute; reflexivity | exact HcsQ3]. }
       iDestruct (cpu_own_transport CIDp CIDa4 0 true pj true ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iApply (Acquire.wp_acquire_sconf γl "uart"%string (tx_res γu) Q4
+      iApply (Acquire.wp_acquire_sconf KT1 γl "uart"%string (tx_res γu) Q4
                 0%nat true pj (av - 10)%nat true lks ltac:(lia)
                 ltac:(lia)
                 ltac:(lkbelow)
@@ -1014,7 +1014,7 @@ Section UwBodies.
           by (rewrite /K2 upd_eq; reflexivity).
         assert (HcsK2 : callee_saved D2 K2).
         { rewrite /K2. apply callee_saved_insert_r; [vm_compute; reflexivity | exact HcsK1]. }
-        iApply (Release.wp_release_sconf γl a_tx_lock "uart"%string (tx_res γu) K2
+        iApply (Release.wp_release_sconf KT1 γl a_tx_lock "uart"%string (tx_res γu) K2
                   0%nat true pj (av - 10)%nat ({["uart"]} ∪ lks)
                   ltac:(rewrite HK2a0; apply uw_addv_0)
                   ltac:(lia)
@@ -1101,12 +1101,12 @@ Section UwBodies.
         assert (HG1a5 : G1 !!! Regidx Ra5 = pa_add buf i) by (rewrite /G1 upd_eq; reflexivity).
         (* --- +0x64  lbu a5,0(a5) --- *)
         assert (Hlk0 : seq 0 n !! i = Some i) by (apply lookup_seq; split; [lia | exact Hin]).
-        iDestruct (big_sepL_lookup_acc (fun _ x => ((pa_add buf x) ↦ₘ{dq} f x)%I) (seq 0 n) i i Hlk0
+        iDestruct (big_sepL_lookup_acc (fun _ x => ((pa_add buf x) ↦ₘ[KT1]{dq} f x)%I) (seq 0 n) i i Hlk0
                      with "Hbuf") as "[Hbyte Hback]".
         assert (Haddrb : add_vec (rget G1 Ra5) (sign_extend' 64 (mword_of_int 0 : mword 12))
                          = pa_add buf i).
         { rgne. rewrite HG1a5. apply uw_addv_0. }
-        iApply (wp_lbu_s_sconf (mword_of_int (KernelSyms.uartwrite + 0x64)) Ra5 Ra5
+        iApply (wp_lbu_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (KernelSyms.uartwrite + 0x64)) Ra5 Ra5
                   (mword_of_int 0 : mword 12) G1 (trap_res true + (av - 10))%nat (f i : mword 8) false
                   (dqm := dq) ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi64 [Hbyte]").
         { iEval (rewrite Haddrb). iExact "Hbyte". }
@@ -1173,7 +1173,7 @@ Section UwBodies.
           by (rewrite /G4 upd_eq; reflexivity).
         assert (HcsG4 : callee_saved D2 G4).
         { rewrite /G4. apply callee_saved_insert_r; [vm_compute; reflexivity | exact HcsG3]. }
-        iApply (Release.wp_release_sconf γl a_tx_lock "uart"%string (tx_res γu) G4
+        iApply (Release.wp_release_sconf KT1 γl a_tx_lock "uart"%string (tx_res γu) G4
                   0%nat true pj (av - 10)%nat ({["uart"]} ∪ lks)
                   ltac:(rewrite HG4a0; apply uw_addv_0)
                   ltac:(lia)
@@ -1442,7 +1442,7 @@ Section ProofUartwrite.
       assert (HcspA0 : A0 !!! Regidx csp_rs1 = spd)
         by (rewrite /A0 upd_eq Hpush Hspm; reflexivity).
       iEval (rewrite P06) in "Hpc".
-      iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+      iEval (rewrite (stack_own_slots (KTR := KT1)); cbn [seq]) in "Hframe".
       iDestruct "Hframe" as "(F1 & F2 & F3 & F4 & F5 & F6 & F7 & F8 & F9 & F10 & _)".
       iDestruct "F1" as (v1) "H1". iDestruct "F2" as (v2) "H2".
       iDestruct "F3" as (v3) "H3". iDestruct "F4" as (v4) "H4".

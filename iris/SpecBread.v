@@ -97,7 +97,7 @@ Definition wp_bread_sconf_body
      is stated at the LOWER rank -- [locks_below_mono] (4 <= 6) lifts it to
      cover the acquiresleep call too, so one premise suffices for both. *)
   locks_below lks "bcache" ->
-  sie_cap_gpr m K b pj -∗
+  sie_cap_gpr KT1 m K b pj -∗
   (* enters at noff 0; the acquires raise it to what sleep demands *)
   cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  This function acquires at
@@ -117,7 +117,7 @@ Definition wp_bread_sconf_body
      sleepers need can only come from here, and the caller holds it because
      the TRAP handed it over.  See claude-notes/completed/sched-hart-generic.md
      and claude-notes/completed/eb-generic-sweep.md. *)
-  trap_csrs_ext eb -∗
+  trap_csrs_ext KT1 eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
@@ -143,9 +143,9 @@ Definition wp_bread_sconf_body
   ∀ (mf : regfile) (k : nat) (bs bsd : list (bv 8)) (d : bool),
       ⌜callee_saved m mf
        /\ mf !!! Regidx (mword_of_int 10 : mword 5) = bnode k⌝ -∗
-      sie_cap_gpr mf K b pj -∗
+      sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
-      trap_csrs_ext eb -∗
+      trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗

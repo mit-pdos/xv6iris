@@ -145,7 +145,7 @@ Section SpecMainSecondary.
        it is scheduler() at the far end that first enables them.  So the hart
        provably cannot move under this contract, and (as on the boot arm) it
        needs no [wp_next] wrapper: it diverges, there is no continuation. *)
-    sie_cap_gpr m K false p0 -∗
+    sie_cap_gpr KT0 m K false p0 -∗
     cpu_ctx_free -∗
     cpu_own 0 false p0 false ∅ -∗
     (* the SIE live-bit ghost's INVARIANT quarter: this hart allocates its

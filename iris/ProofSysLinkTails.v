@@ -146,9 +146,9 @@ Section ProofSysLinkTails.
     sl_sp sp0 M -> sl_thr m M ->
     (M !!! Regidx Rs2 : mword 64) = (m !!! Regidx Rs2 : mword 64) ->
     sl_al sp0 ->
-    sie_cap_gpr M (K - 38) b (proc_addr jx) -∗
+    sie_cap_gpr KT1 M (K - 38) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr jx) -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SL + 0xbc)) -∗
     panic_env -∗
@@ -162,20 +162,20 @@ Section ProofSysLinkTails.
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
     log_op g u -∗
-    (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-    (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-    (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
-    (pa_stk sp0 4) ↦₈ w4 -∗
-    ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 6) jj ↦ₘ bnm jj) -∗
-    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ bw jj) -∗
-    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 38) jj ↦ₘ bo jj) -∗
+    (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
+    (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
+    (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
+    (pa_stk sp0 4) ↦₈[KT1] w4 -∗
+    ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 6) jj ↦ₘ[KT1] bnm jj) -∗
+    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ[KT1] bw jj) -∗
+    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 38) jj ↦ₘ[KT1] bo jj) -∗
     wp_next true (proc_addr jx) (fun (CIDx : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
         ⌜(mf !!! Regidx Ra0 : mword 64) = (mword_of_int (-1) : mword 64)⌝ -∗
-        sie_cap_gpr mf K b (proc_addr jx) -∗
+        sie_cap_gpr KT1 mf K b (proc_addr jx) -∗
         cpu_own 0 eb (proc_addr jx) b lks -∗
-        trap_csrs_ext eb -∗
+        trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr jx) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         p_pid (proc_addr jx) ↦₄{dq} pidv -∗
@@ -371,9 +371,9 @@ Section ProofSysLinkTails.
     (M !!! Regidx Rs1 : mword 64) = ientry kk ->
     (M !!! Regidx Rs2 : mword 64) = (m !!! Regidx Rs2 : mword 64) ->
     sl_al sp0 ->
-    sie_cap_gpr M (K - 38) b (proc_addr jx) -∗
+    sie_cap_gpr KT1 M (K - 38) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr jx) -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SL + 0xc6)) -∗
     panic_env -∗
@@ -405,21 +405,21 @@ Section ProofSysLinkTails.
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
     bslots bn 3 -∗
     log_op g u -∗
-    (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-    (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-    (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
-    (pa_stk sp0 4) ↦₈ w4 -∗
-    ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 6) jj ↦ₘ bnm jj) -∗
-    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ bw jj) -∗
-    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 38) jj ↦ₘ bo jj) -∗
+    (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
+    (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
+    (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
+    (pa_stk sp0 4) ↦₈[KT1] w4 -∗
+    ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 6) jj ↦ₘ[KT1] bnm jj) -∗
+    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ[KT1] bw jj) -∗
+    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 38) jj ↦ₘ[KT1] bo jj) -∗
     wp_next true (proc_addr jx) (fun (CIDx : CpuId) =>
       ∀ (mf : regfile) (used' : gset Z),
         ⌜callee_saved m mf⌝ -∗
         ⌜(mf !!! Regidx Ra0 : mword 64) = (mword_of_int (-1) : mword 64)⌝ -∗
         ⌜used' ⊆ used⌝ -∗
-        sie_cap_gpr mf K b (proc_addr jx) -∗
+        sie_cap_gpr KT1 mf K b (proc_addr jx) -∗
         cpu_own 0 eb (proc_addr jx) b lks -∗
-        trap_csrs_ext eb -∗
+        trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr jx) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         p_pid (proc_addr jx) ↦₄{dq} pidv -∗
@@ -690,9 +690,9 @@ Section ProofSysLinkTails.
     (M !!! Regidx Rs1 : mword 64) = ientry kk ->
     (M !!! Regidx Rs2 : mword 64) = (m !!! Regidx Rs2 : mword 64) ->
     sl_al sp0 ->
-    sie_cap_gpr M (K - 38) b (proc_addr jx) -∗
+    sie_cap_gpr KT1 M (K - 38) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
-    trap_csrs_ext eb -∗
+    trap_csrs_ext KT1 eb -∗
     cpu_claim_ext eb (proc_addr jx) -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SL + 0xd6)) -∗
     panic_env -∗
@@ -724,21 +724,21 @@ Section ProofSysLinkTails.
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
     bslots bn 3 -∗
     log_op g u -∗
-    (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-    (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-    (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
-    (pa_stk sp0 4) ↦₈ w4 -∗
-    ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 6) jj ↦ₘ bnm jj) -∗
-    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ bw jj) -∗
-    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 38) jj ↦ₘ bo jj) -∗
+    (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
+    (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
+    (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
+    (pa_stk sp0 4) ↦₈[KT1] w4 -∗
+    ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 6) jj ↦ₘ[KT1] bnm jj) -∗
+    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ[KT1] bw jj) -∗
+    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 38) jj ↦ₘ[KT1] bo jj) -∗
     wp_next true (proc_addr jx) (fun (CIDx : CpuId) =>
       ∀ (mf : regfile) (used' : gset Z),
         ⌜callee_saved m mf⌝ -∗
         ⌜(mf !!! Regidx Ra0 : mword 64) = (mword_of_int (-1) : mword 64)⌝ -∗
         ⌜used' ⊆ used⌝ -∗
-        sie_cap_gpr mf K b (proc_addr jx) -∗
+        sie_cap_gpr KT1 mf K b (proc_addr jx) -∗
         cpu_own 0 eb (proc_addr jx) b lks -∗
-        trap_csrs_ext eb -∗
+        trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr jx) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         p_pid (proc_addr jx) ↦₄{dq} pidv -∗
@@ -1050,7 +1050,7 @@ Section ProofSysLinkTails.
        CALLER minted before its [iunlock] pins the type, and the generation
        is carriable because [SpecIunlock] returns the share gen-named. *)
     bv_unsigned ty <> T_DIR_z ->
-    sie_cap_gpr M (K - 38) b (proc_addr jx) -∗
+    sie_cap_gpr KT1 M (K - 38) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SL + 0xf4)) -∗
     panic_env -∗
@@ -1080,21 +1080,21 @@ Section ProofSysLinkTails.
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
     bslots bn 3 -∗
     log_opS g (S u) Sb -∗
-    (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-    (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-    (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
-    (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
-    ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 6) jj ↦ₘ bnm jj) -∗
-    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ bw jj) -∗
-    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 38) jj ↦ₘ bo jj) -∗
+    (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
+    (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
+    (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
+    (pa_stk sp0 4) ↦₈[KT1] (m !!! Regidx Rs2 : mword 64) -∗
+    ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 6) jj ↦ₘ[KT1] bnm jj) -∗
+    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ[KT1] bw jj) -∗
+    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 38) jj ↦ₘ[KT1] bo jj) -∗
     wp_next true (proc_addr jx) (fun (CIDx : CpuId) =>
       ∀ (mf : regfile) (used' : gset Z),
         ⌜callee_saved m mf⌝ -∗
         ⌜(mf !!! Regidx Ra0 : mword 64) = (mword_of_int (-1) : mword 64)⌝ -∗
         ⌜used' ⊆ used⌝ -∗
-        sie_cap_gpr mf K b (proc_addr jx) -∗
+        sie_cap_gpr KT1 mf K b (proc_addr jx) -∗
         cpu_own 0 eb (proc_addr jx) b lks -∗
-        trap_csrs_ext eb -∗
+        trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr jx) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         p_pid (proc_addr jx) ↦₄{dq} pidv -∗
@@ -1219,7 +1219,7 @@ Section ProofSysLinkTails.
             with "Hireg Hdiat Hilink") as "(%Hnz & Hdiat & Hilink)".
     iModIntro.
     (* ===== +0xfa lhu a5,74(s1) ===== *)
-    iApply (wp_lhu_s_sconf (CID := CID3) (mword_of_int (SL + 0xfa)) Ra5 Rs1
+    iApply (wp_lhu_s_sconf (CID := CID3) (kt := KT1) (ktd := KT0) (mword_of_int (SL + 0xfa)) Ra5 Rs1
               (mword_of_int 74 : mword 12) mil (K - 38)%nat
               (di_nlink dn : mword 16) b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hi2 [Hinl]").
@@ -1271,7 +1271,7 @@ Section ProofSysLinkTails.
                     = mword_of_int (SL + 0x100)) by pcw.
     iEval (rewrite Hpp100) in "Hpc".
     (* ===== +0x100 sh a5,74(s1) ===== *)
-    iApply (wp_sh_s_sconf (CID := CID5) (mword_of_int (SL + 0x100)) Ra5 Rs1
+    iApply (wp_sh_s_sconf (CID := CID5) (kt := KT1) (ktd := KT0) (mword_of_int (SL + 0x100)) Ra5 Rs1
               (mword_of_int 74 : mword 12) P2 (K - 38)%nat
               (di_nlink dn : mword 16) b with "Hcg Hpc Hi4 [Hinl]").
     { iEval (rgne; rewrite HP2s1). iExact "Hinl". }
@@ -1675,7 +1675,7 @@ Section ProofSysLinkTails.
        CALLER minted before its [iunlock] pins the type, and the generation
        is carriable because [SpecIunlock] returns the share gen-named. *)
     bv_unsigned ty <> T_DIR_z ->
-    sie_cap_gpr M (K - 38) b (proc_addr jx) -∗
+    sie_cap_gpr KT1 M (K - 38) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SL + 0xee)) -∗
     panic_env -∗
@@ -1715,21 +1715,21 @@ Section ProofSysLinkTails.
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
     bslots bn 3 -∗
     log_opSe g n Sb e0 -∗
-    (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-    (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-    (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
-    (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
-    ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 6) jj ↦ₘ bnm jj) -∗
-    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ bw jj) -∗
-    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 38) jj ↦ₘ bo jj) -∗
+    (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
+    (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
+    (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
+    (pa_stk sp0 4) ↦₈[KT1] (m !!! Regidx Rs2 : mword 64) -∗
+    ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 6) jj ↦ₘ[KT1] bnm jj) -∗
+    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ[KT1] bw jj) -∗
+    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 38) jj ↦ₘ[KT1] bo jj) -∗
     wp_next true (proc_addr jx) (fun (CIDx : CpuId) =>
       ∀ (mf : regfile) (used' : gset Z),
         ⌜callee_saved m mf⌝ -∗
         ⌜(mf !!! Regidx Ra0 : mword 64) = (mword_of_int (-1) : mword 64)⌝ -∗
         ⌜used' ⊆ used⌝ -∗
-        sie_cap_gpr mf K b (proc_addr jx) -∗
+        sie_cap_gpr KT1 mf K b (proc_addr jx) -∗
         cpu_own 0 eb (proc_addr jx) b lks -∗
-        trap_csrs_ext eb -∗
+        trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr jx) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         p_pid (proc_addr jx) ↦₄{dq} pidv -∗
@@ -1943,7 +1943,7 @@ Section ProofSysLinkTails.
        CALLER minted before its [iunlock] pins the type, and the generation
        is carriable because [SpecIunlock] returns the share gen-named. *)
     bv_unsigned ty <> T_DIR_z ->
-    sie_cap_gpr M (K - 38) b (proc_addr jx) -∗
+    sie_cap_gpr KT1 M (K - 38) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SL + 0xe6)) -∗
     panic_env -∗
@@ -1983,21 +1983,21 @@ Section ProofSysLinkTails.
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
     bslots bn 3 -∗
     log_opSe g n Sb e0 -∗
-    (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
-    (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
-    (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
-    (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
-    ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 6) jj ↦ₘ bnm jj) -∗
-    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ bw jj) -∗
-    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 38) jj ↦ₘ bo jj) -∗
+    (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
+    (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
+    (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
+    (pa_stk sp0 4) ↦₈[KT1] (m !!! Regidx Rs2 : mword 64) -∗
+    ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 6) jj ↦ₘ[KT1] bnm jj) -∗
+    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ[KT1] bw jj) -∗
+    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 38) jj ↦ₘ[KT1] bo jj) -∗
     wp_next true (proc_addr jx) (fun (CIDx : CpuId) =>
       ∀ (mf : regfile) (used' : gset Z),
         ⌜callee_saved m mf⌝ -∗
         ⌜(mf !!! Regidx Ra0 : mword 64) = (mword_of_int (-1) : mword 64)⌝ -∗
         ⌜used' ⊆ used⌝ -∗
-        sie_cap_gpr mf K b (proc_addr jx) -∗
+        sie_cap_gpr KT1 mf K b (proc_addr jx) -∗
         cpu_own 0 eb (proc_addr jx) b lks -∗
-        trap_csrs_ext eb -∗
+        trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr jx) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         p_pid (proc_addr jx) ↦₄{dq} pidv -∗

@@ -133,7 +133,7 @@ Definition wp_sys_sbrk_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG �
   pv_tf V !! tf_arg_idx 0 = Some v0 ->
   pv_tf V !! tf_arg_idx 1 = Some v1 ->
   (sys_sbrk_stack <= av)%nat ->
-  sie_cap_gpr m av b p -∗
+  sie_cap_gpr KT1 m av b p -∗
   (* [n = 0]: growproc's uvmalloc reaches kalloc with interrupts un-pushed *)
   cpu_own 0%nat eb p b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
@@ -144,7 +144,7 @@ Definition wp_sys_sbrk_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG �
       ⌜callee_saved m mf⌝ -∗
       ⌜sys_sbrk_ok V v0 v1 P' szv'
          (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
-      sie_cap_gpr mf av b p -∗
+      sie_cap_gpr KT1 mf av b p -∗
       cpu_own 0%nat eb p b lks -∗
       pc_is ret_tgt -∗
       proc_priv γf p pid (upd_sz (upd_upt V P') szv') -∗

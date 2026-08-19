@@ -63,7 +63,7 @@ From Kernel Require KernelSyms.
    and its only callees are acquire and release, which want 10 below it. *)
 Notation uartputc_stack := (14%nat) (only parsing).
 Definition wp_uartputc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
+    (kt : ktier) (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
     (bs : list (bv 8)) (n : nat) (eb : bool) (b : bool) (p : mword 64) (lks : gset string) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let a0_idx : mword 5 := mword_of_int 10 in
@@ -81,7 +81,7 @@ Definition wp_uartputc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGho
      "uart"'s -- uartputc_sync acquires and releases [tx_lock] in the same
      call, so this contract is BALANCED: [lks] is unchanged end to end. *)
   locks_below lks "uart" ->
-  sie_cap_gpr m0 K b p -∗
+  sie_cap_gpr kt m0 K b p -∗
   (* the interrupt level is left exactly as found: an acquire/release pair *)
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -90,7 +90,7 @@ Definition wp_uartputc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGho
   uart_sent_sub γd bs -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf,
-    sie_cap_gpr mf K b p -∗
+    sie_cap_gpr kt mf K b p -∗
     cpu_own n eb p b lks -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 mf /\ mf !!! Regidx ra_idx = ra0 ⌝ -∗
@@ -101,7 +101,7 @@ Definition wp_uartputc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGho
 Module Type UARTPUTC.
   Parameter wp_uartputc_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
+      (kt : ktier) (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
       (bs : list (bv 8)) (n : nat) (eb : bool) (b : bool) (p : mword 64) (lks : gset string),
-      wp_uartputc_sconf_body γl γd γv m0 K bs n eb b p lks.
+      wp_uartputc_sconf_body kt γl γd γv m0 K bs n eb b p lks.
 End UARTPUTC.

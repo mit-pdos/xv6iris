@@ -171,6 +171,7 @@ Section ProofUartPutc.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 
+  Context {kt : ktier}.
   (* [rget m k] at a NON-tp index is the plain map lookup ([rget_ne]) -- the
      one-line bridge from a leaf's [rget] to the register-map facts a
      whole-function proof already has.  Written name-free (durable-notes: an
@@ -185,12 +186,12 @@ Section ProofUartPutc.
   (* =================================================================== *)
   Lemma wp_uartputc_poll_sconf `{CID0 : CpuId} (γd : uart_names) (γv : disk_names) (mentry : regfile) (n : nat) (l : list (bv 8)) (b : bool) (p : mword 64) :
     mentry !!! Regidx (mword_of_int 14) = uart_pa 5 ->
-    sie_cap_gpr mentry n b p -∗ kernel_text -∗
+    sie_cap_gpr kt mentry n b p -∗ kernel_text -∗
     pc_is (mword_of_int (KernelSyms.uartputc_sync + 0x1e)) -∗
     dev_inv γd γv -∗ uart_tx_own γd l -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ bt : bv 8,
-      sie_cap_gpr (<[Regidx (mword_of_int 15) := regval_into_reg (lsr_masked bt)]> mentry) n b p -∗
+      sie_cap_gpr kt (<[Regidx (mword_of_int 15) := regval_into_reg (lsr_masked bt)]> mentry) n b p -∗
       pc_is (mword_of_int (KernelSyms.uartputc_sync + 0x28)) -∗
       uart_tx_own γd l -∗ uart_out_lb γd l -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -211,9 +212,9 @@ Section ProofUartPutc.
       ⌜ m !!! Regidx (mword_of_int 14) = uart_pa 5 ⌝ -∗
       ⌜ forall Y, <[Regidx (mword_of_int 15) := Y]> m
                 = <[Regidx (mword_of_int 15) := Y]> mentry ⌝ -∗
-      sie_cap_gpr m n b p -∗ pc_is (mword_of_int (KernelSyms.uartputc_sync + 0x1e)) -∗ uart_tx_own γd l -∗
+      sie_cap_gpr kt m n b p -∗ pc_is (mword_of_int (KernelSyms.uartputc_sync + 0x1e)) -∗ uart_tx_own γd l -∗
       wp_next (CID0:=CID1) b p (fun (CID : CpuId) =>
-        ∀ bt : bv 8, sie_cap_gpr (<[Regidx (mword_of_int 15) := regval_into_reg (lsr_masked bt)]> mentry) n b p -∗
+        ∀ bt : bv 8, sie_cap_gpr kt (<[Regidx (mword_of_int 15) := regval_into_reg (lsr_masked bt)]> mentry) n b p -∗
             pc_is (mword_of_int (KernelSyms.uartputc_sync + 0x28)) -∗
             uart_tx_own γd l -∗ uart_out_lb γd l -∗ WP (Loop : expr riscv_lang)) -∗
       WP (Loop : expr riscv_lang))%I with "[]" as "Loop".
@@ -281,12 +282,12 @@ Section ProofUartPutc.
     let sb : mword 8 := autocast (T := mword)
        (subrange_vec_dec (and_vec (m !!! Regidx (mword_of_int 9))
           (sign_extend' 64 (mword_of_int 255 : mword 12))) 7 0) in
-    sie_cap_gpr m n b p -∗ kernel_text -∗
+    sie_cap_gpr kt m n b p -∗ kernel_text -∗
     pc_is (mword_of_int (KernelSyms.uartputc_sync + 0x18)) -∗
     dev_inv γd γv -∗ uart_tx_own γd l -∗ uart_dlab_off γd -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ bt : bv 8,
-      sie_cap_gpr (ppc_f6' m bt) n b p -∗ pc_is (mword_of_int (KernelSyms.uartputc_sync + 0x34)) -∗
+      sie_cap_gpr kt (ppc_f6' m bt) n b p -∗ pc_is (mword_of_int (KernelSyms.uartputc_sync + 0x34)) -∗
       uart_tx_own γd (l ++ [sb]) -∗ uart_sent γd (l ++ [sb]) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -368,7 +369,7 @@ Section ProofUartPutc.
   Lemma wp_uartputc_sconf (γl : gname) (γd : uart_names) (γv : disk_names)
       (m0 : regfile) (K : nat) (bs : list (bv 8)) (n : nat) (eb : bool)
       (b : bool) (p : mword 64) (lks : gset string)
-    : wp_uartputc_sconf_body γl γd γv m0 K bs n eb b p lks.
+    : wp_uartputc_sconf_body kt γl γd γv m0 K bs n eb b p lks.
   Proof.
     cbv beta delta [wp_uartputc_sconf_body].
     intros ra_idx a0_idx pcE ra0 a00 ret_tgt sb HK Hn Hfresh.
@@ -409,7 +410,7 @@ Section ProofUartPutc.
     iIntros (CIDp1 Hsp1) "Hcg Hframe Hpc".
     assert (HspR1 : R1 !!! Regidx csp_rs1 = spr)
       by (rewrite /R1 upd_eq; reflexivity).
-    iEval (rewrite stack_own_slots; cbn [seq]) in "Hframe".
+    iEval (rewrite (stack_own_slots (KTR := kt)); cbn [seq]) in "Hframe".
     iDestruct "Hframe" as "(S1 & S2 & S3 & S4 & _)".
     iDestruct "S1" as (vr24) "Hr24". iDestruct "S2" as (vr16) "Hr16".
     iDestruct "S3" as (vr8)  "Hr8".  iDestruct "S4" as (vg4)  "Hg4".
@@ -508,7 +509,7 @@ Section ProofUartPutc.
     (* ===== acquire(&tx_lock) ===== *)
     iDestruct (cpu_own_transport CID CIDp9 n eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (Acquire.wp_acquire_sconf γl "uart"%string (tx_res γd) G14 n eb p (K - 4)%nat b lks
+    iApply (Acquire.wp_acquire_sconf kt γl "uart"%string (tx_res γd) G14 n eb p (K - 4)%nat b lks
               Hn Hav Hfresh with "Hcg Hcpu Ht Hpc [Hlk]").
     all: try lkbelow.
     { iEval (rewrite HG14a0). iExact "Hlk". }
@@ -588,7 +589,7 @@ Section ProofUartPutc.
       apply kv_addv_zero. }
     (* ===== release(&tx_lock) ===== *)
     iEval (rewrite -Hbeq) in "Hcg".
-    iApply (Release.wp_release_sconf γl a_tx_lock "uart"%string (tx_res γd) H3c n eb p (K - 4)%nat
+    iApply (Release.wp_release_sconf kt γl a_tx_lock "uart"%string (tx_res γd) H3c n eb p (K - 4)%nat
               ({["uart"]} ∪ lks)
               Hlka Hav with "Hcg Ht Hpc Hlk Hlocked [Hown] Hcpu Hpay").
     { iApply (tx_res_intro γd (l ++ [sb]) with "Hown"). }
@@ -666,9 +667,9 @@ Section ProofUartPutc.
     assert (Hpop : Q44 !!! Regidx csp_rs1
                    = pa_stk (add_vec (Q44 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4).
     { rewrite Hwval HspQ44. unfold spr, sp0, pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
-    iAssert (stack_own (add_vec (Q44 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4)
+    iAssert (stack_own (KTR := kt) (add_vec (Q44 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))) 4)
       with "[Hr24 Hr16 Hr8 Hg4]" as "Hframe".
-    { rewrite Hwval. rewrite stack_own_slots. cbn [seq].
+    { rewrite Hwval. rewrite (stack_own_slots (KTR := kt)). cbn [seq].
       iSplitL "Hr24"; [iEval (rewrite -Hb1 HspR1); iExists _; iExact "Hr24"|].
       iSplitL "Hr16"; [iEval (rewrite -Hb2 HspR1); iExists _; iExact "Hr16"|].
       iSplitL "Hr8";  [iEval (rewrite -Hb3 HspR1); iExists _; iExact "Hr8"|].

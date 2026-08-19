@@ -54,9 +54,7 @@ Require Import DiskPtsto.
 Require Import BioDefs.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
-Require Import KernelDataInv.
-Require Import SpecPanic.
-Require Import SpecMyproc SpecArgfd SpecIput SpecFileclose.
+Require Import SpecMyproc SpecArgfd SpecFileclose.
 Require Import IrefSlots InodeRegion.
 Require Import SpecSysClose.
 Require Import CodeSysClose.
@@ -138,11 +136,11 @@ Section ProofSysClose.
   Lemma sc_sp_bounds `{CID0 : CpuId} (m : regfile) (k : nat)
       (b : bool) (pp : mword 64) :
     (0 < k)%nat ->
-    sie_cap_gpr m k b pp -∗
+    sie_cap_gpr KT1 m k b pp -∗
     ⌜(8 <= uint (m !!! Regidx csp_rs1) < 274877906944 + 8)%Z⌝.
   Proof.
     iIntros (Hk) "(_ & _ & (Hstk & _ & _) & _)".
-    iApply (stack_own_sp_bounds _ (trap_res b + k)%nat with "Hstk").
+    iApply (stack_own_sp_bounds (KTR := KT1) _ (trap_res b + k)%nat with "Hstk").
     destruct b; unfold trap_res; lia.
   Qed.
 
@@ -168,17 +166,17 @@ Section ProofSysClose.
     Mt !!! Regidx (mword_of_int 15 : mword 5) = rv ->
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
         r <> (mword_of_int 8 : mword 5) -> Mt !!! Regidx r = m !!! Regidx r) ->
-    sie_cap_gpr Mt (av - 4)%nat b pp -∗
+    sie_cap_gpr KT1 Mt (av - 4)%nat b pp -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.sys_close + 0x3a) : mword 64) -∗
-    word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (pa_stk sp0 3) (DfracOwn 1) w3 -∗
-    word_pointsto (pa_stk sp0 4) (DfracOwn 1) w4 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) w3 -∗
+    word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) w4 -∗
     wp_next (CID0 := CID0) b pp (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx (mword_of_int 10 : mword 5) = rv⌝ -∗
-        sie_cap_gpr mf av b pp -∗
+        sie_cap_gpr KT1 mf av b pp -∗
         pc_is (ret_pc ra0) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).

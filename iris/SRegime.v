@@ -669,6 +669,17 @@ Section SRegimeKtier.
   Lemma sr_ktier_wit_KT0 (R : s_regime) : ⊢ sr_ktier_wit R KT0.
   Proof. done. Qed.
 
+  (* ...and the SHARED-KPT regime's witness is free at BOTH tiers, because
+     [kpt_share_regime]'s [sr_kwit] is [emp]: a hart that reaches those
+     leaves has the kernel table installed by construction ([tlb_res_pt] IS
+     the regime's invariant), so there is nothing left to attest.  This is
+     what lets the whole symbolic-block executor ([VcGenS]) be tier-generic
+     without growing a resource premise -- kernelvec's frame slots are
+     KSTACK words at KT1 and it drives them through exactly these rules. *)
+  Lemma sr_ktier_wit_kpt_share (root_ppn : mword 44) (kt : ktier) :
+    ⊢ sr_ktier_wit (kpt_share_regime root_ppn) kt.
+  Proof. destruct kt; done. Qed.
+
   (* THE ONE ABSORPTION A TIER-INDEXED LEAF CALLS.  Its premise list is
      [sr_absorb]'s with the [sr_adm va ppn] conjunct replaced by the
      DATUM's pin [ktier_pin kt' ppn va] and the witness [sr_ktier_wit R
