@@ -269,8 +269,61 @@ the `kpt_on` premise discharged at its one call site — so **the wfi leaf keeps
 its `kpt_on` premise as landed in `1cd04ce5`**, conditional only on that
 scheduler proof staying closed.)
 
-### THE DISJUNCTIVE RECORD (user design, 2026-08-19): BLOCKED, and not by an
-### encoding — the tlb cell is in the LEAF's obligation, not just the engine's
+### THE DISJUNCTIVE RECORD (user design, 2026-08-19) — **THE SETTLED 4b
+### ANSWER.**  Step 1 (the record) is LANDED; the engine and the leaves follow.
+
+**The analysis two entries below this one was WRONG, and it is worth knowing
+why: it measured the PORT'S OWN ARTIFACT and mistook it for a constraint.**
+`git show main:iris/SmodeCorePt.v` settles it — pre-port,
+`wp_instr_s_config_regime` took `sr_inv R` **folded**, handed the leaf
+`sr_inv R` **folded** together with the state interpretation, and got it back
+folded.  There was no tlb cell anywhere on that boundary; the walk's TLB write
+was absorbed BELOW the leaves, by `sr_absorb`, and at Bare `translateAddr` is
+a bare `returnR` that touches nothing.  `git show main:iris/WpSmodePtMem.v`
+confirms the leaf side: `wp_clw_s_r_t`'s exported statement is byte-identical
+to today's and passes `sr_inv R` folded both ways.
+
+The post-port `SmodeCorePt.v:3926` (`… -∗ tlb ↦ᵣ tv' -∗ sr_swp_res_at R satp0
+tv' -∗ …`) unfolds the slot ACROSS the leaf boundary.  That is the same
+disease "THE FIFTEEN DATA-LEAF SITES" diagnosed on the sconf tier and cured
+with `sda_slot_acc`; the pt tier's engine↔leaf interface never got the
+treatment, and it typechecked only because `6b5d1eb2` had put the cell in
+`bare_inv`.  So the fix is to restore the pre-port boundary here too, and the
+leaf PROOFS get shorter, not longer.
+
+**LANDED (step 1 of 3).**  `SRegime.s_regime` gains `sr_slot_acc`, the
+arm-honest accessor — one field, disjunctive, no guard, no class:
+
+* the WALKING disjunct hands the tlb cell over plus a closer that takes it
+  back at the walk's landing value;
+* the BARE disjunct hands over `⌜bare_satp_ok satp0⌝` **instead of a cell**,
+  plus a closer — and `bare_satp_ok` (moved above the record) is exactly what
+  `strans_swp_side_bare` and `WpIntrInv.swp_run_hart_active_instr_S_res_b`
+  consume, so the Bare branch of any consumer has what it needs.
+
+It is an ACCESSOR because while `bare_inv` still owns a cell the Bare arm has
+to PARK it rather than hand it over; when the cell leaves `bare_inv` those
+closers simply stop mentioning one.  **All three instances inhabit it**, which
+is what two rejected designs could not achieve: `bare_slot_acc` always right,
+`kpt_slot_acc` always left, `strans_slot_acc` **cases on its own slot
+disjunction**.  Whole tree green at the 8 roots.
+
+**STILL TO DO (steps 2 and 3).**  Step 2: build the R-generic data-side
+absorber (the `sda_slot_acc` twin at generic `R`) on top of `sr_slot_acc` —
+the layering is already right, `WpSmodePtEngine.v` is `_CoqProject` 110 vs
+`SRegime.v` 150, and `sda_Drwb = ∅`, `sda_frames_b`, `sda_frames_in_b`,
+`sda_rw_ext_D`, the `sda_in_*_D` family and `WpSmodePtFetch.sda_translate_D`
+(already generic in `R` AND in the write set) all exist from the sconf-tier
+lane.  Then re-shape the engine's leaf obligation to pass the slot folded and
+convert the 44 leaf proofs onto it (statements untouched — verified
+byte-identical against `main`), fetch side case-split into two concrete arms.
+Step 3: the flip proper.  Land each green; a strangler (new folded engine
+beside the old one, leaves moved in batches, old engine deleted last) keeps
+every commit green because the old cell-handout fields stay inhabitable until
+the flip.
+
+### (superseded analysis, kept for the record) why the naive reading said
+### "the tlb cell is in the LEAF's obligation, not just the engine's" 
 
 The design was: `sr_swp_open` returns EITHER the satp/tlb/pmp cells OR the
 satp/pmp cells plus `⌜bare_satp_ok satp0⌝`; `sr_swp_close` takes the tlb back

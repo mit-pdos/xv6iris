@@ -1775,6 +1775,75 @@ Section IntrDefsBase.
       iPureIntro. exact Hmk.
   Qed.
 
+  (* THE COMBINED SLOT's accessor: it CASES ON ITS OWN ARM, which is the
+     whole point -- [strans_inv] is a disjunction, so the regime can tell
+     the engine which arm is live instead of pretending both fund a tlb
+     cell.  Bare returns the right disjunct with the cell parked in the
+     closer; KPT returns the left one and hands it over. *)
+  Lemma strans_slot_acc :
+    strans_inv -∗
+    ∃ (satp0 : mword 64) (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n) (tlbv : type_of_register tlb),
+      ⌜ strans_satp_ok satp0 ⌝ ∗ ⌜ pmp_ent0_ok pcfg paddr ⌝ ∗
+      satp ↦ᵣ satp0 ∗ pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr ∗
+      strans_res_at satp0 tlbv ∗
+      ( (tlb ↦ᵣ tlbv ∗
+         (∀ tv' : type_of_register tlb,
+            satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+            tlb ↦ᵣ tv' -∗ strans_res_at satp0 tv' -∗ strans_inv))
+      ∨ (⌜ bare_satp_ok satp0 ⌝ ∗
+         (satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+          strans_res_at satp0 tlbv -∗ strans_inv)) ).
+  Proof.
+    iIntros "[(Hpend & Hb & Hstv) | (Hkpt & Hk)]".
+    - (* ---- BARE: no cell to the frame; it stays parked here ---- *)
+      iDestruct "Hb" as (satp0 tlbv) "(Hsatp & %Hmode & Htlb & Hpmp)".
+      iDestruct "Hpmp" as (pcfg paddr)
+        "(Hpcfg & Hpaddr & %HA & %Hord & %HX & %HW & %HR & %Hcov)".
+      assert (Hpok : pmp_ent0_ok pcfg paddr)
+        by (unfold pmp_ent0_ok; split_and!; assumption).
+      iExists satp0, pcfg, paddr, tlbv.
+      iSplitR; [iPureIntro; left; exact Hmode |].
+      iSplitR; [iPureIntro; exact Hpok |].
+      iFrame "Hsatp Hpcfg Hpaddr".
+      iSplitL "Hpend Hstv".
+      { rewrite /strans_res_at. iLeft. iFrame "Hpend Hstv".
+        iPureIntro. exact Hmode. }
+      iRight. iSplitR; [iPureIntro; exact Hmode |].
+      iIntros "Hsatp Hpcfg Hpaddr Hres".
+      rewrite /strans_res_at.
+      iDestruct "Hres" as "[(Hpend & Hstv & _) | (Hkpt & %Hbad & _)]".
+      2:{ rewrite /bare_satp_ok in Hmode. rewrite Hbad in Hmode.
+          vm_compute in Hmode. discriminate. }
+      iLeft. iFrame "Hpend Hstv".
+      rewrite /bare_inv. iExists satp0, tlbv. iFrame "Hsatp Htlb".
+      iSplitR; [iPureIntro; exact Hmode |].
+      iApply (pmp_config_intro (mword_of_int 0) pcfg paddr HA Hord HX HW HR
+                Hcov with "Hpcfg Hpaddr").
+    - (* ---- KPT: the walk fills the TLB, so the cell IS the frame's ---- *)
+      iDestruct "Hk" as (root_ppn) "Hres".
+      iDestruct (kpt_swp_open root_ppn with "Hres") as (satp0 tlbv pcfg paddr)
+        "(%Hsok & %Hpok & Hsatp & Htlb & Hpcfg & Hpaddr & Hres)".
+      pose proof Hsok as Hsok'. destruct Hsok' as (Hmode & Hasid & Hppn).
+      subst root_ppn.
+      iExists satp0, pcfg, paddr, tlbv.
+      iSplitR; [iPureIntro; right; exact Hsok |].
+      iSplitR; [iPureIntro; exact Hpok |].
+      iFrame "Hsatp Hpcfg Hpaddr".
+      iSplitL "Hkpt Hres".
+      { rewrite /strans_res_at. iRight. iFrame "Hkpt Hres".
+        iPureIntro. exact Hmode. }
+      iLeft. iFrame "Htlb".
+      iIntros (tv') "Hsatp Hpcfg Hpaddr Htlb Hres".
+      rewrite /strans_res_at.
+      iDestruct "Hres" as "[(Hpend & _ & %Hbad) | (Hkpt & _ & Hres)]".
+      { rewrite /bare_satp_ok in Hbad. rewrite Hmode in Hbad.
+        vm_compute in Hbad. discriminate. }
+      iRight. iFrame "Hkpt". iExists (strans_root_of satp0).
+      iApply (kpt_swp_close (strans_root_of satp0) satp0 tv' pcfg paddr
+                Hsok Hpok with "Hsatp Htlb Hpcfg Hpaddr Hres").
+  Qed.
+
   Definition strans_regime : s_regime :=
     SRegime strans_inv kadm_ident (fun _ _ H => H)
             strans_absorb strans_transform strans_tmode
@@ -1782,7 +1851,7 @@ Section IntrDefsBase.
             strans_swp_res strans_swp_side strans_swp_translate
             strans_swp_translate_wit
             strans_res_at strans_satp_ok strans_swp_res_agree
-            strans_swp_open strans_swp_close
+            strans_swp_open strans_swp_close strans_slot_acc
             (fun _ _ H => H) strans_swp_side_ok
             strans_mode strans_swp_mode_ok.
 

@@ -336,6 +336,13 @@ Section SRegimeDef.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  (* THE BARE ARM'S SATP FACT, stated before the record because
+     [sr_slot_acc]'s Bare disjunct hands it out: it is what
+     [strans_swp_side_bare] and [WpIntrInv.swp_run_hart_active_instr_S_res_b]
+     consume in place of a tlb cell. *)
+  Definition bare_satp_ok (satp0 : mword 64) : Prop :=
+    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"0000" : mword 4).
+
   Record s_regime := SRegime {
     sr_inv : iProp Σ;
     (* ADMISSIBILITY of a claim under this regime (claude-notes/projects/
@@ -638,6 +645,40 @@ Section SRegimeDef.
         pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
         sr_swp_res_at satp0 tlbv -∗ sr_inv;
 
+    (* ---- THE SLOT, AS AN ARM-HONEST ACCESSOR ---------------------------
+       [sr_swp_open] above hands the tlb CELL out unconditionally, and that
+       is the port's own artifact: pre-port the slot went to the leaves
+       FOLDED and the walk's TLB write was absorbed BELOW them.  Handing the
+       cell up forced the Bare arm to fund one, which is what put it in
+       [bare_inv] (6b5d1eb2) and buried kvminithart's flush.
+
+       This field restores the pre-port boundary at the record.  It is an
+       ACCESSOR because at Bare the cell (while there still is one) has to
+       be HELD ASIDE across the body rather than handed over, and it is
+       DISJUNCTIVE because that is the honest shape:
+
+         - the WALKING arm hands the cell over, because a Sv39 walk fills
+           the TLB and the frame must own it;
+         - the BARE arm hands over [bare_satp_ok satp0] INSTEAD -- which is
+           exactly what the Bare translation consumes, [translateAddr]'s
+           [Bare] case being a bare [returnR] that touches no TLB.
+
+       No guard, no boolean, no class: all three instances inhabit this. *)
+    sr_slot_acc :
+      sr_inv -∗
+      ∃ (satp0 : mword 64) (pcfg : type_of_register pmpcfg_n)
+        (paddr : type_of_register pmpaddr_n) (tlbv : type_of_register tlb),
+        ⌜ sr_swp_satp_ok satp0 ⌝ ∗ ⌜ pmp_ent0_ok pcfg paddr ⌝ ∗
+        satp ↦ᵣ satp0 ∗ pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr ∗
+        sr_swp_res_at satp0 tlbv ∗
+        ( (tlb ↦ᵣ tlbv ∗
+           (∀ tv' : type_of_register tlb,
+              satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+              tlb ↦ᵣ tv' -∗ sr_swp_res_at satp0 tv' -∗ sr_inv))
+        ∨ (⌜ bare_satp_ok satp0 ⌝ ∗
+           (satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+            sr_swp_res_at satp0 tlbv -∗ sr_inv)) );
+
     (* ---- THE TWO INTRODUCTIONS THE REGIME-GENERIC LEAVES NEED ---------
        A leaf quantified over [R] can produce the CONFIG facts (the arm's
        satp constraint, the PMP TOR grant, pma, MPRV, the [Db] read set,
@@ -937,9 +978,9 @@ Section SRegimeDef.
   Qed.
 
   (* the BARE bundle face.  The residue is nothing, so open/close are just
-     [bare_inv]'s own destructor/constructor plus [pmp_config]'s. *)
-  Definition bare_satp_ok (satp0 : mword 64) : Prop :=
-    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"0000" : mword 4).
+     [bare_inv]'s own destructor/constructor plus [pmp_config]'s.
+     ([bare_satp_ok] is stated ABOVE the record -- [sr_slot_acc]'s Bare
+     disjunct names it.) *)
 
   Lemma bare_swp_res_agree (rs : regstate) :
     (True : iProp Σ) ⊣⊢ (True : iProp Σ).
@@ -1092,13 +1133,50 @@ Section SRegimeDef.
     iIntros "H". iDestruct "H" as %[].
   Qed.
 
+  (* THE BARE ARM's accessor: always the right disjunct.  While [bare_inv]
+     still owns a tlb cell the closer PARKS it -- a frame at Bare cannot
+     touch it, so pinning its value there is sound -- and when the cell
+     leaves [bare_inv] this proof simply stops mentioning one. *)
+  Lemma bare_slot_acc :
+    bare_inv -∗
+    ∃ (satp0 : mword 64) (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n) (tlbv : type_of_register tlb),
+      ⌜ bare_satp_ok satp0 ⌝ ∗ ⌜ pmp_ent0_ok pcfg paddr ⌝ ∗
+      satp ↦ᵣ satp0 ∗ pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr ∗
+      (True : iProp Σ) ∗
+      ( (tlb ↦ᵣ tlbv ∗
+         (∀ tv' : type_of_register tlb,
+            satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+            tlb ↦ᵣ tv' -∗ (True : iProp Σ) -∗ bare_inv))
+      ∨ (⌜ bare_satp_ok satp0 ⌝ ∗
+         (satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+          (True : iProp Σ) -∗ bare_inv)) ).
+  Proof.
+    iIntros "H". iDestruct "H" as (satp0 tlbv) "(Hsatp & %Hmode & Htlb & Hpmp)".
+    iDestruct "Hpmp" as (pcfg paddr)
+      "(Hpcfg & Hpaddr & %HA & %Hord & %HX & %HW & %HR & %Hcov)".
+    assert (Hpok : pmp_ent0_ok pcfg paddr)
+      by (unfold pmp_ent0_ok; split_and!; assumption).
+    iExists satp0, pcfg, paddr, tlbv.
+    iSplitR; [iPureIntro; exact Hmode |].
+    iSplitR; [iPureIntro; exact Hpok |].
+    iFrame "Hsatp Hpcfg Hpaddr".
+    iSplitR; [done |].
+    iRight. iSplitR; [iPureIntro; exact Hmode |].
+    iIntros "Hsatp Hpcfg Hpaddr _".
+    rewrite /bare_inv. iExists satp0, tlbv. iFrame "Hsatp Htlb".
+    iSplitR; [iPureIntro; exact Hmode |].
+    iApply (pmp_config_intro (mword_of_int 0) pcfg paddr HA Hord HX HW HR Hcov
+              with "Hpcfg Hpaddr").
+  Qed.
+
   Definition bare_regime : s_regime :=
     SRegime bare_inv kadm_ident (fun _ _ H => H) bare_absorb bare_transform
             bare_tmode (False%I) _ bare_absorb_wit
             (fun _ => True%I) bare_swp_side bare_swp_translate
             bare_swp_translate_wit
             (fun _ _ => True%I) bare_satp_ok bare_swp_res_agree
-            bare_swp_open bare_swp_close
+            bare_swp_open bare_swp_close bare_slot_acc
             (fun _ _ H => H) bare_swp_side_ok
             (fun _ => Bare) bare_swp_mode_ok.
 
@@ -1541,6 +1619,38 @@ Section SRegimeShared.
               Heffg Hss Hssg Hcanon Hconcat I Hside).
   Qed.
 
+  (* THE WALKING ARM's accessor: always the left disjunct, since a Sv39
+     fetch fills the TLB and [tlb_res_pt] funds the cell.  Open and close
+     are the existing pair; the closer is just [kpt_swp_close] curried. *)
+  Lemma kpt_slot_acc (root_ppn : mword 44) :
+    tlb_res_pt root_ppn -∗
+    ∃ (satp0 : mword 64) (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n) (tlbv : type_of_register tlb),
+      ⌜ kpt_satp_ok root_ppn satp0 ⌝ ∗ ⌜ pmp_ent0_ok pcfg paddr ⌝ ∗
+      satp ↦ᵣ satp0 ∗ pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr ∗
+      kpt_res_at root_ppn satp0 tlbv ∗
+      ( (tlb ↦ᵣ tlbv ∗
+         (∀ tv' : type_of_register tlb,
+            satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+            tlb ↦ᵣ tv' -∗ kpt_res_at root_ppn satp0 tv' -∗
+            tlb_res_pt root_ppn))
+      ∨ (⌜ bare_satp_ok satp0 ⌝ ∗
+         (satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+          kpt_res_at root_ppn satp0 tlbv -∗ tlb_res_pt root_ppn)) ).
+  Proof.
+    iIntros "H".
+    iDestruct (kpt_swp_open root_ppn with "H") as (satp0 tlbv pcfg paddr)
+      "(%Hsok & %Hpok & Hsatp & Htlb & Hpcfg & Hpaddr & Hres)".
+    iExists satp0, pcfg, paddr, tlbv.
+    iSplitR; [iPureIntro; exact Hsok |].
+    iSplitR; [iPureIntro; exact Hpok |].
+    iFrame "Hsatp Hpcfg Hpaddr Hres".
+    iLeft. iFrame "Htlb".
+    iIntros (tv') "Hsatp Hpcfg Hpaddr Htlb Hres".
+    iApply (kpt_swp_close root_ppn satp0 tv' pcfg paddr Hsok Hpok
+              with "Hsatp Htlb Hpcfg Hpaddr Hres").
+  Qed.
+
   Definition kpt_share_regime (root_ppn : mword 44) : s_regime :=
     SRegime (tlb_res_pt root_ppn) (fun _ _ => True) (fun _ _ _ => I)
             (res_absorb root_ppn) (res_transform root_ppn) (res_tmode root_ppn)
@@ -1549,7 +1659,7 @@ Section SRegimeShared.
             (kpt_swp_translate root_ppn) (kpt_swp_translate_wit root_ppn)
             (kpt_res_at root_ppn) (kpt_satp_ok root_ppn)
             (kpt_swp_res_agree root_ppn) (kpt_swp_open root_ppn)
-            (kpt_swp_close root_ppn)
+            (kpt_swp_close root_ppn) (kpt_slot_acc root_ppn)
             (fun _ _ _ => I) (kpt_swp_side_ok root_ppn)
             (fun _ => Sv39) (kpt_swp_mode_ok root_ppn).
 
