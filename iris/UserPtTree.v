@@ -376,6 +376,103 @@ Proof.
     rewrite Hjz Z.add_comm Z_mod_plus_full Zmod_mod. reflexivity.
 Qed.
 
+(* --------------------------------------------------------------------- *)
+(* §3d' THE PURE WRITE / DELETE VOCABULARY of the byte window (§3e).      *)
+(* --------------------------------------------------------------------- *)
+
+(* [M] with the [n] bytes at [a] set to [bs] -- what a copyout does to the *)
+(* process's memory, and the identity a copyin does to it. *)
+Fixpoint umem_write (M : gmap Z (bv 8)) (a : Z) (n : nat) (bs : nat -> bv 8)
+    : gmap Z (bv 8) :=
+  match n with
+  | O => M
+  | S k => <[(a + Z.of_nat k)%Z := bs k]> (umem_write M a k bs)
+  end.
+
+(* ...and [M] with those [n] bytes REMOVED -- the frame the accessor keeps *)
+Fixpoint umem_del (M : gmap Z (bv 8)) (a : Z) (n : nat) : gmap Z (bv 8) :=
+  match n with
+  | O => M
+  | S k => delete (a + Z.of_nat k)%Z (umem_del M a k)
+  end.
+
+Lemma umem_del_lookup_out (M : gmap Z (bv 8)) (a : Z) (n : nat) (va : Z) :
+  (forall j, (j < n)%nat -> va <> (a + Z.of_nat j)%Z) ->
+  umem_del M a n !! va = M !! va.
+Proof.
+  induction n as [| k IH]; intros Hne; [reflexivity |].
+  cbn [umem_del].
+  rewrite lookup_delete_ne; [| intros Heq; exact (Hne k ltac:(lia) (eq_sym Heq))].
+  apply IH. intros j Hj. apply Hne. lia.
+Qed.
+
+Lemma umem_write_lookup_out (M : gmap Z (bv 8)) (a : Z) (n : nat)
+    (bs : nat -> bv 8) (va : Z) :
+  (forall j, (j < n)%nat -> va <> (a + Z.of_nat j)%Z) ->
+  umem_write M a n bs !! va = M !! va.
+Proof.
+  induction n as [| k IH]; intros Hne; [reflexivity |].
+  cbn [umem_write].
+  rewrite lookup_insert_ne; [| intros Heq; exact (Hne k ltac:(lia) (eq_sym Heq))].
+  apply IH. intros j Hj. apply Hne. lia.
+Qed.
+
+Lemma umem_write_lookup_in (M : gmap Z (bv 8)) (a : Z) (n : nat)
+    (bs : nat -> bv 8) (j : nat) :
+  (j < n)%nat -> umem_write M a n bs !! (a + Z.of_nat j)%Z = Some (bs j).
+Proof.
+  revert j. induction n as [| k IH]; intros j Hj; [exfalso; lia |].
+  cbn [umem_write].
+  destruct (decide (j = k)) as [-> | Hne].
+  - apply lookup_insert.
+  - rewrite lookup_insert_ne; [| lia]. apply IH. lia.
+Qed.
+
+(* membership of the run, in a DECIDABLE form *)
+Local Lemma in_run_iff (a : Z) (n : nat) (va : Z) :
+  (a <= va < a + Z.of_nat n)%Z <-> exists j, (j < n)%nat /\ va = (a + Z.of_nat j)%Z.
+Proof.
+  split.
+  - intros [Hlo Hhi]. exists (Z.to_nat (va - a)). split; lia.
+  - intros (j & Hj & ->). lia.
+Qed.
+
+Lemma umem_del_write (M : gmap Z (bv 8)) (a : Z) (n : nat) (bs : nat -> bv 8) :
+  umem_del (umem_write M a n bs) a n = umem_del M a n.
+Proof.
+  (* both sides delete the same [n] keys, and outside them the two maps
+     agree, so the equality is pointwise *)
+  apply map_eq. intros va.
+  destruct (decide (a <= va < a + Z.of_nat n)%Z) as [Hin | Hout];
+    [ apply in_run_iff in Hin as (j & Hj & ->) |].
+  - assert (Hdel : forall N : gmap Z (bv 8),
+              umem_del N a n !! (a + Z.of_nat j)%Z = None).
+    { intros N. clear -Hj. induction n as [| k IH]; [exfalso; lia |].
+      cbn [umem_del].
+      destruct (decide (j = k)) as [-> | Hne];
+        [ apply lookup_delete |].
+      rewrite lookup_delete_ne; [| lia]. apply IH. lia. }
+    rewrite !Hdel. reflexivity.
+  - assert (Hne : forall j, (j < n)%nat -> va <> (a + Z.of_nat j)%Z)
+      by (intros j Hj Heq; apply Hout; apply in_run_iff; eauto).
+    rewrite !(umem_del_lookup_out _ a n va Hne).
+    apply (umem_write_lookup_out M a n bs va Hne).
+Qed.
+
+Lemma umem_write_dom (M : gmap Z (bv 8)) (a : Z) (n : nat) (bs : nat -> bv 8) :
+  (forall j, (j < n)%nat -> is_Some (M !! (a + Z.of_nat j)%Z)) ->
+  dom (umem_write M a n bs) = dom M.
+Proof.
+  intros Hsome. apply set_eq. intros va. rewrite !elem_of_dom.
+  destruct (decide (a <= va < a + Z.of_nat n)%Z) as [Hin | Hout];
+    [ apply in_run_iff in Hin as (j & Hj & ->) |].
+  - rewrite (umem_write_lookup_in M a n bs j Hj).
+    split; [intros _; exact (Hsome j Hj) | intros _; eauto].
+  - assert (Hne : forall j, (j < n)%nat -> va <> (a + Z.of_nat j)%Z)
+      by (intros j Hj Heq; apply Hout; apply in_run_iff; eauto).
+    rewrite (umem_write_lookup_out M a n bs va Hne). reflexivity.
+Qed.
+
 Section UserPtInv.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
@@ -602,6 +699,77 @@ Section UserPtInv.
   Lemma user_pt_any_intro (P : uptd) (M : gmap Z (bv 8)) :
     user_pt_inv P M -∗ user_pt_any P.
   Proof. iIntros "H". iExists M. iExact "H". Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* §3e THE BYTE WINDOW: reading and writing a RUN of user vas.         *)
+  (*                                                                    *)
+  (* The kernel's copy loops (copyin / copyout) work one chunk at a time *)
+  (* inside one page, and what they need of the abstract state is ONE    *)
+  (* accessor: take the [n] bytes at [a], give them back -- possibly at  *)
+  (* new values -- and move [M] by exactly that write.  The window form  *)
+  (* rather than a page form is deliberate: it is what the loops hold,   *)
+  (* and it makes the whole thing an induction on [n] over              *)
+  (* [big_sepM_delete] instead of surgery on a 4096-key submap.         *)
+  (* ------------------------------------------------------------------ *)
+
+  Lemma bigM_window (Phi : Z -> bv 8 -> iProp Σ) (M : gmap Z (bv 8))
+      (a : Z) (n : nat) :
+    (forall j, (j < n)%nat -> is_Some (M !! (a + Z.of_nat j)%Z)) ->
+    ([∗ map] va ↦ b ∈ M, Phi va b) ⊣⊢
+    ([∗ list] j ∈ seq 0 n, Phi (a + Z.of_nat j)%Z (M !!! (a + Z.of_nat j)%Z)) ∗
+    ([∗ map] va ↦ b ∈ umem_del M a n, Phi va b).
+  Proof.
+    induction n as [| k IH]; intros Hsome.
+    - cbn [umem_del]. rewrite big_sepL_nil bi.emp_sep. reflexivity.
+    - assert (Hk : forall j, (j < k)%nat -> is_Some (M !! (a + Z.of_nat j)%Z))
+        by (intros j Hj; apply Hsome; lia).
+      assert (Hdk : umem_del M a k !! (a + Z.of_nat k)%Z = M !! (a + Z.of_nat k)%Z)
+        by (apply umem_del_lookup_out; intros j Hj Heq; lia).
+      destruct (Hsome k ltac:(lia)) as [bk Hbk].
+      rewrite (IH Hk).
+      rewrite seq_S big_sepL_app big_sepL_singleton Nat.add_0_l.
+      cbn [umem_del].
+      rewrite (big_sepM_delete Phi (umem_del M a k) (a + Z.of_nat k)%Z bk
+                 ltac:(rewrite Hdk; exact Hbk)).
+      assert (Hkt : M !!! (a + Z.of_nat k)%Z = bk)
+        by (rewrite lookup_total_alt Hbk; reflexivity).
+      rewrite Hkt.
+      iSplit.
+      + iIntros "[Hw [Hb Hr]]". iFrame "Hw Hb Hr".
+      + iIntros "[[Hw Hb] Hr]". iFrame "Hw Hb Hr".
+  Qed.
+
+  (* THE ACCESSOR.  [n] bytes at [a], at the values [M] records, and a
+     wand that takes them back at ANY values and moves [M] by exactly
+     that write.  [copyin] instantiates the wand at the bytes it got
+     (nothing moves); [copyout] instantiates it at what it wrote. *)
+  Lemma umem_own_window (P : uptd) (M : gmap Z (bv 8)) (a : Z) (n : nat) :
+    (forall j, (j < n)%nat -> is_Some (M !! (a + Z.of_nat j)%Z)) ->
+    umem_own P M -∗
+      ([∗ list] j ∈ seq 0 n,
+         (uva_pa P (a + Z.of_nat j)%Z : Arch.pa) ↦ₚ (M !!! (a + Z.of_nat j)%Z)) ∗
+      (∀ bs : nat -> bv 8,
+         ([∗ list] j ∈ seq 0 n,
+            (uva_pa P (a + Z.of_nat j)%Z : Arch.pa) ↦ₚ bs j) -∗
+         umem_own P (umem_write M a n bs)).
+  Proof.
+    intros Hsome. iIntros "[%Hdom HM]".
+    rewrite (bigM_window (fun va b => ((uva_pa P va : Arch.pa) ↦ₚ b)%I) M a n Hsome).
+    iDestruct "HM" as "[Hwin Hrest]".
+    iFrame "Hwin".
+    iIntros (bs) "Hwin'".
+    assert (Hsome' : forall j, (j < n)%nat ->
+              is_Some (umem_write M a n bs !! (a + Z.of_nat j)%Z))
+      by (intros j Hj; rewrite (umem_write_lookup_in M a n bs j Hj); eauto).
+    iSplitR.
+    { iPureIntro. rewrite <- Hdom. exact (umem_write_dom M a n bs Hsome). }
+    rewrite (bigM_window (fun va b => ((uva_pa P va : Arch.pa) ↦ₚ b)%I)
+               (umem_write M a n bs) a n Hsome').
+    rewrite (umem_del_write M a n bs). iFrame "Hrest".
+    iApply (big_sepL_mono with "Hwin'"). intros i j Hj.
+    apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
+    rewrite lookup_total_alt (umem_write_lookup_in M a n bs _ Hlt). reflexivity.
+  Qed.
 
 End UserPtInv.
 

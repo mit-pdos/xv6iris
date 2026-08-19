@@ -174,13 +174,13 @@ Section ProofVmfault.
       | rewrite upd_ne; [| reg_neq]
       | lazymatch goal with |- ?M !!! _ = _ => is_var M; progress unfold M end ].
 
-  Lemma wp_vmfault_sconf
+  Lemma wp_vmfault_sconf_mem
       (γa : gname) (mm : regfile)
-      (P : uptd) (szv : mword 64) (K lvl : nat) (eb : bool) (p : mword 64)
-      (b : bool) (lks : gset string)
-    : wp_vmfault_sconf_body γa mm P szv K lvl eb p b lks.
+      (P : uptd) (M : gmap Z (bv 8)) (szv : mword 64) (K lvl : nat) (eb : bool)
+      (p : mword 64) (b : bool) (lks : gset string)
+    : wp_vmfault_sconf_mem_body γa mm P M szv K lvl eb p b lks.
   Proof.
-    cbv beta delta [wp_vmfault_sconf_body].
+    cbv beta delta [wp_vmfault_sconf_mem_body].
     intros pcE va va0 ret_tgt HK Htp Hroot Hsza1 Hszb Hlvl Hbelow.
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc Hpt Henv Hcont".
@@ -355,11 +355,11 @@ Section ProofVmfault.
     iPoseProof (vfi_18 with "Htext") as "Hi18".
     iPoseProof (vfi_1a with "Htext") as "Hi1a".
     set (PAY := (fun res : mword 64 =>
-      ((⌜res = mword_of_int 0⌝ ∗ proc_pt P)
-       ∨ (∃ r : mword 64,
+      ((⌜res = mword_of_int 0⌝ ∗ proc_ptm P M)
+       ∨ (∃ (r : mword 64) (M' : gmap Z (bv 8)),
             ⌜res = r⌝ ∗ ⌜page_valid r⌝ ∗ ⌜(uint va < uint szv)%Z⌝ ∗
-            ⌜P.(ud_um) !! svpn_of va0 = None⌝ ∗
-            proc_pt (uptd_insert P (svpn_of va0) r)))%I)).
+            ⌜P.(ud_um) !! svpn_of va0 = None⌝ ∗ ⌜M ⊆ M'⌝ ∗
+            proc_ptm (uptd_insert P (svpn_of va0) r) M'))%I)).
     set (EPI := (wp_next (CID0 := CID) b p (fun (CIDe : CpuId) =>
         ∀ (mj : regfile) (res : mword 64),
         ⌜ mj !!! Regidx csp_rs1 = spr
@@ -715,7 +715,7 @@ Section ProofVmfault.
         [| intros Hx; injection Hx as Hx2; subst c; apply H9; reflexivity].
       apply HR3thr; assumption. }
     (* ---- open the table into the exact represented view ---- *)
-    iDestruct (proc_pt_acc_rep0 P with "Hpt") as
+    iDestruct (proc_ptm_acc_rep0 P M with "Hpt") as
       (t m_ad) "(%Hrep & %Hview & %Hbase & %Hwf & Hptree & Hown)".
     assert (HL5root : L5 !!! Regidx Ra0
                       = zero_extend' 64 (concat_vec (pt_base t) (zeros' 12 : mword 12))).
@@ -959,7 +959,7 @@ Section ProofVmfault.
                   (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 1995 : mword 11) ('b"0"))))
                 = mword_of_int (KernelSyms.vmfault + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hjt7a) in "Hpc".
-        iDestruct (proc_pt_rebuild P t m_ad Hwf Hview Hrep Hbase with "Hptree Hown") as "Hpt".
+        iDestruct (proc_ptm_rebuild P M t m_ad Hwf Hview Hrep Hbase with "Hptree Hown") as "Hpt".
         iDestruct (cpu_own_transport Ckr C10A lvl eb p b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
         iSpecialize ("Hepi" $! C10A with "[%]"); [wp_next_chain|].
@@ -1385,9 +1385,9 @@ Section ProofVmfault.
           "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hkmapb & _)".
         assert (Hvpnb : (bv_unsigned (svpn_of va0) < 67108864)%Z)
           by exact (svpn_of_lt_maxva va0 Hva0b).
-        iDestruct (proc_pt_grow P (svpn_of va0) r t'
+        iDestruct (proc_ptm_grow P M (svpn_of va0) r t'
                      m_ad Hwf Hview Hnone Hvpnb Hrep' Hbase'' Hpv
-                     with "Hkmapb Hptree Hpage Hown") as "Hpt".
+                     with "Hkmapb Hptree Hpage Hown") as (M') "[%Hsub Hpt]".
         assert (Humnone : P.(ud_um) !! svpn_of va0 = None)
           by (exact (proj2 (proj2 (proj1 (proj1 Hview (svpn_of va0)) Hnone)))).
         iDestruct (cpu_own_transport Cgr C10B lvl eb p b ltac:(wp_next_chain)
@@ -1415,11 +1415,12 @@ Section ProofVmfault.
               [| intros Hx; injection Hx as Hx2; subst c; apply H9; reflexivity].
             apply Hmgthr; assumption. }
         { iExists _, _, _. iFrame "Hk3 Hk4 Hk5". }
-        { rewrite /PAY. iRight. iExists r.
+        { rewrite /PAY. iRight. iExists r, M'.
           iSplitR; [iPureIntro; reflexivity |].
           iSplitR; [iPureIntro; exact Hpv |].
           iSplitR; [iPureIntro; exact Hvalt |].
           iSplitR; [iPureIntro; exact Humnone |].
+          iSplitR; [iPureIntro; exact Hsub |].
           iExact "Hpt". } }
       (* ============ mappages FAILED: kfree and return 0 ============= *)
       assert (Hk0 : k = 0%nat) by lia. subst k.
@@ -1571,7 +1572,7 @@ Section ProofVmfault.
                 (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 1999 : mword 11) ('b"0"))))
               = mword_of_int (KernelSyms.vmfault + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hjt72) in "Hpc".
-      iDestruct (proc_pt_rebuild P t' m_ad Hwf Hview Hrep' Hbase'' with "Hptree Hown") as "Hpt".
+      iDestruct (proc_ptm_rebuild P M t' m_ad Hwf Hview Hrep' Hbase'' with "Hptree Hown") as "Hpt".
       iDestruct (cpu_own_transport Cfr C10C lvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iSpecialize ("Hepi" $! C10C with "[%]"); [wp_next_chain|].
@@ -1653,7 +1654,7 @@ Section ProofVmfault.
               (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2029 : mword 11) ('b"0"))))
             = mword_of_int (KernelSyms.vmfault + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjt36) in "Hpc".
-    iDestruct (proc_pt_rebuild P t m_ad Hwf Hview Hrep Hbase with "Hptree Hown") as "Hpt".
+    iDestruct (proc_ptm_rebuild P M t m_ad Hwf Hview Hrep Hbase with "Hptree Hown") as "Hpt".
     iDestruct (cpu_own_transport CID C10D lvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iSpecialize ("Hepi" $! C10D with "[%]"); [wp_next_chain|].
@@ -1674,6 +1675,40 @@ Section ProofVmfault.
         apply HN1thr; assumption. }
     { iExists _, _, _. iFrame "Hk3 Hk4 Hk5". }
     { rewrite /PAY. iLeft. iSplitR; [iPureIntro; reflexivity | iExact "Hpt"]. }
+  Qed.
+
+  (* THE [proc_pt]-ALTITUDE COROLLARY.  vmfault's other callers -- usertrap,
+     copyinstr -- say nothing about the process's memory, so they keep the
+     contract that does not name it.  Opening and re-sealing is the whole
+     of the derivation: [ProcPtOwn.proc_pt_ptm] IS the equivalence. *)
+  Lemma wp_vmfault_sconf
+      (γa : gname) (mm : regfile)
+      (P : uptd) (szv : mword 64) (K lvl : nat) (eb : bool) (p : mword 64)
+      (b : bool) (lks : gset string)
+    : wp_vmfault_sconf_body γa mm P szv K lvl eb p b lks.
+  Proof.
+    cbv beta delta [wp_vmfault_sconf_body].
+    intros pcE va va0 ret_tgt HK Htp Hroot Hsza1 Hszb Hlvl Hbelow.
+    iIntros "Hcg Hcnt #Htext Hpc Hpt Henv Hcont".
+    iEval (rewrite proc_pt_ptm) in "Hpt". iDestruct "Hpt" as (M) "Hpt".
+    iApply (wp_vmfault_sconf_mem γa mm P M szv K lvl eb p b lks
+              HK Htp Hroot Hsza1 Hszb Hlvl Hbelow
+              with "Hcg Hcnt Htext Hpc Hpt Henv").
+    rewrite /wp_next.
+    iIntros (CIDr) "%Hch".
+    iSpecialize ("Hcont" $! CIDr with "[%]"); [exact Hch |].
+    iIntros (mr) "Hcg2 Hcnt2 Hpc2 %Hcs Hpost".
+    iApply ("Hcont" $! mr with "Hcg2 Hcnt2 Hpc2 [%] [Hpost]"); [exact Hcs |].
+    iDestruct "Hpost" as "[(%Hz & Hp) | Hs]".
+    - iLeft. iSplitR; [iPureIntro; exact Hz |].
+      iApply (proc_ptm_pt with "Hp").
+    - iDestruct "Hs" as (r M') "(%Hr & %Hv & %Hlt & %Hn & _ & Hp)".
+      iRight. iExists r.
+      iSplitR; [iPureIntro; exact Hr |].
+      iSplitR; [iPureIntro; exact Hv |].
+      iSplitR; [iPureIntro; exact Hlt |].
+      iSplitR; [iPureIntro; exact Hn |].
+      iApply (proc_ptm_pt with "Hp").
   Qed.
 
 End ProofVmfault.
