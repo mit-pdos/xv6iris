@@ -875,6 +875,16 @@ Section IntrDefsBase.
     iPureIntro. lia.
   Qed.
 
+  (* the KPT auth's own persistent lower bound.  The flip is ONE-WAY
+     ([strans_flip] is a [mono_nat] update), and this is how a holder of the
+     KPT arm records that fact in a form it can keep: [kpt_on] is persistent,
+     and [kpt_on_pending_False] then refutes any later Bare arm. *)
+  Lemma strans_kpt_on : strans_kpt -∗ strans_kpt ∗ kpt_on cpu_id.
+  Proof.
+    iIntros "H". rewrite /strans_kpt /strans_kpt_at /kpt_on /kpt_on_at.
+    iDestruct (mono_nat_lb_own_get with "H") as "#Hlb". iFrame "H Hlb".
+  Qed.
+
   Lemma strans_pending_kpt_False : strans_pending -∗ strans_kpt -∗ ⌜ False ⌝.
   Proof.
     rewrite /strans_pending /strans_pending_at /strans_kpt /strans_kpt_at.

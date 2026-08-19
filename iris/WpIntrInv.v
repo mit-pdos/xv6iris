@@ -1874,6 +1874,16 @@ Section IntrEngine.
     iFrame "Hsatp Htlb Hpcfg Hpaddr Hres Hstk Harm Hwit".
   Qed.
 
+  (* WHAT A HOLDER OF THE WRITE SET KNOWS ABOUT THE ARM.  Persistent, and it
+     is what lets the funnel re-open the slot AT THE SAME SET after a leaf
+     that may have flipped the arm: the flip is one-way (Bare -> KPT), so a
+     set of [s_Drw] can only have come from KPT and can only still be KPT. *)
+  Definition s_kpt_wit (SD : gset register) : iProp Σ :=
+    (⌜ SD = s_Drwb ⌝ ∨ kpt_on cpu_id)%I.
+
+  Global Instance s_kpt_wit_persistent SD : Persistent (s_kpt_wit SD).
+  Proof. rewrite /s_kpt_wit. apply _. Qed.
+
   (* ==================================================================== *)
   (* THE INSTRUCTION-SIDE SLOT ACCESSOR -- [sda_slot_acc]'s twin, and the   *)
   (* second and last place the two translation arms are told apart.        *)
@@ -1894,7 +1904,7 @@ Section IntrEngine.
     sie_cap kt m av b p -∗
     ∃ (SD : gset register) (satp0 : mword 64) (tlbv : type_of_register tlb)
       (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n),
-      ⌜ s_arm_ok SD satp0 ⌝ ∗ ⌜ pmp_ent0_ok pcfg paddr ⌝ ∗
+      ⌜ s_arm_ok SD satp0 ⌝ ∗ ⌜ pmp_ent0_ok pcfg paddr ⌝ ∗ s_kpt_wit SD ∗
       satp ↦ᵣ satp0 ∗ s_tlb_at SD tlbv ∗
       pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr ∗
       strans_res_at satp0 tlbv ∗ sie_cap_rest kt m av b p ∗
@@ -1916,6 +1926,7 @@ Section IntrEngine.
       iExists s_Drwb, satp0, tlbv, pcfg, paddr.
       iSplitR; [iPureIntro; left; split; [reflexivity | exact Hmode] |].
       iSplitR; [iPureIntro; exact Hpok |].
+      iSplitR; [rewrite /s_kpt_wit; iLeft; iPureIntro; reflexivity |].
       rewrite s_tlb_at_bare.
       iFrame "Hsatp Hpcfg Hpaddr".
       iSplitL "Hpend Hstv".
@@ -1949,6 +1960,8 @@ Section IntrEngine.
       iExists s_Drw, satp0, tlbvec, pcfg, paddr.
       iSplitR; [iPureIntro; right; split; [reflexivity | exact Hsokk] |].
       iSplitR; [iPureIntro; exact Hpok |].
+      iDestruct (strans_kpt_on with "Hkpt") as "[Hkpt #Hon]".
+      iSplitR; [rewrite /s_kpt_wit; iRight; iExact "Hon" |].
       rewrite s_tlb_at_kpt.
       iFrame "Hsatp Htlb Hpcfg Hpaddr".
       iSplitL "Hkpt Hsnap".
@@ -1976,6 +1989,148 @@ Section IntrEngine.
                 with "Hpcfg Hpaddr").
   Qed.
 
+
+
+  (* THE RE-OPEN, AT A REQUESTED SET.  The funnel opens the slot, hands the
+     leaf a folded capability, and must re-open it AT THE SET IT STARTED WITH
+     -- the cycle engine fixed that set before the leaf ran.  But a leaf may
+     FLIP THE ARM: kvminithart's [csrw satp] switches Bare -> KPT inside its
+     own [execute].  So:
+
+       - started at [s_Drw] (KPT): the flip is one-way, so the arm is still
+         KPT.  [s_kpt_wit] is what rules the Bare arm out -- [kpt_on] against
+         the Bare arm's [strans_pending].
+       - started at [s_Drwb] (Bare): the arm may now be either.  If it flipped,
+         the tlb cell is [tlb_res_pt]'s and the requested set does not want it,
+         so it is PARKED IN THE CLOSER and never enters the frame.  That is
+         sound because a frame at [s_Drwb] cannot touch it, which is also why
+         the closer may pin the landing value.
+
+     No fetch happens after this point, so no side condition is produced. *)
+  Lemma sie_cap_cells_at (SD : gset register) (kt : ktier) (m : regfile)
+      (av : nat) (b : bool) (p : mword 64) :
+    SD = s_Drw \/ SD = s_Drwb ->
+    s_kpt_wit SD -∗ sie_cap kt m av b p -∗
+    ∃ (satp0 : mword 64) (tlbv : type_of_register tlb)
+      (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n),
+      ⌜ strans_satp_ok satp0 ⌝ ∗ ⌜ pmp_ent0_ok pcfg paddr ⌝ ∗
+      satp ↦ᵣ satp0 ∗ s_tlb_at SD tlbv ∗
+      pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr ∗
+      strans_res_at satp0 tlbv ∗ sie_cap_rest kt m av b p ∗
+      (∀ (m' : regfile) (av' : nat) (b' : bool)
+         (tv' : type_of_register tlb),
+         ⌜ SD = s_Drwb -> tv' = tlbv ⌝ -∗
+         satp ↦ᵣ satp0 -∗ s_tlb_at SD tv' -∗
+         pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+         strans_res_at satp0 tv' -∗ sie_cap_rest kt m' av' b' p -∗
+         sie_cap kt m' av' b' p).
+  Proof.
+    intros HSD.
+    iIntros "#Hwitk (Hstk & Htr & Harm & #Hwit)".
+    iDestruct "Htr" as "[(Hpend & Hb & Hstv) | (Hkpt & Hk)]".
+    - (* ---- Bare.  [SD] must be [s_Drwb]: at [s_Drw] the witness is
+           [kpt_on], which this arm's [strans_pending] refutes. ---- *)
+      iAssert (⌜ SD = s_Drwb ⌝)%I as %Hbb.
+      { destruct HSD as [-> | ->]; [| by iPureIntro].
+        rewrite /s_kpt_wit.
+        iDestruct "Hwitk" as "[%Hbad | Hon]".
+        { exfalso. rewrite /s_Drw /s_Drwb in Hbad. set_solver. }
+        iDestruct (kpt_on_pending_False with "Hon Hpend") as %[]. }
+      subst SD.
+      iDestruct "Hb" as (satp0 tlbv) "(Hsatp & %Hmode & Htlb & Hpmp)".
+      iDestruct "Hpmp" as (pcfg paddr)
+        "(Hpcfg & Hpaddr & %HA & %Hord & %HX & %HW & %HR & %Hcov)".
+      assert (Hpok : pmp_ent0_ok pcfg paddr)
+        by (unfold pmp_ent0_ok; split_and!; assumption).
+      iExists satp0, tlbv, pcfg, paddr.
+      iSplitR; [iPureIntro; left; exact Hmode |].
+      iSplitR; [iPureIntro; exact Hpok |].
+      rewrite s_tlb_at_bare.
+      iFrame "Hsatp Hpcfg Hpaddr".
+      iSplitL "Hpend Hstv".
+      { rewrite /strans_res_at. iLeft. iFrame "Hpend Hstv".
+        iPureIntro. exact Hmode. }
+      iSplitL "Hstk Harm"; [ rewrite /sie_cap_rest; iFrame "Hstk Harm Hwit" |].
+      iIntros (m' av' b' tv') "_ Hsatp _ Hpcfg Hpaddr Hres Hrest".
+      rewrite /sie_cap. iDestruct "Hrest" as "(Hstk & Harm & _)".
+      iFrame "Hstk Harm Hwit".
+      rewrite /strans_res_at.
+      iDestruct "Hres" as "[(Hpend & Hstv & _) | (Hkpt & %Hbad & _)]".
+      2:{ rewrite /bare_satp_ok in Hmode. rewrite Hbad in Hmode.
+          vm_compute in Hmode. discriminate. }
+      iLeft. iFrame "Hpend Hstv".
+      rewrite /bare_inv. iExists satp0, tlbv. iFrame "Hsatp Htlb".
+      iSplitR; [iPureIntro; exact Hmode |].
+      iApply (pmp_config_intro (mword_of_int 0) pcfg paddr HA Hord HX HW HR
+                Hcov with "Hpcfg Hpaddr").
+    - (* ---- KPT.  At [s_Drw] the cell goes into the frame; at [s_Drwb] the
+           leaf flipped the arm under us and the cell is PARKED. ---- *)
+      iDestruct "Hk" as (root_ppn) "Hres".
+      iDestruct "Hres" as (satp0 tlbvec)
+        "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & Hsnap & Hpmp & #Hkinv)".
+      iDestruct "Hpmp" as (pcfg paddr)
+        "(Hpcfg & Hpaddr & %HA & %Hord & %HX & %HW & %HR & %Hcov)".
+      assert (Hpok : pmp_ent0_ok pcfg paddr)
+        by (unfold pmp_ent0_ok; split_and!; assumption).
+      assert (Hsokk : kpt_satp_ok (strans_root_of satp0) satp0)
+        by (unfold strans_root_of; rewrite Hppn; split_and!; assumption).
+      iExists satp0, tlbvec, pcfg, paddr.
+      iSplitR; [iPureIntro; right; exact Hsokk |].
+      iSplitR; [iPureIntro; exact Hpok |].
+      destruct HSD as [-> | ->].
+      + rewrite s_tlb_at_kpt.
+        iFrame "Hsatp Htlb Hpcfg Hpaddr".
+        iSplitL "Hkpt Hsnap".
+        { rewrite /strans_res_at. iRight. iFrame "Hkpt".
+          iSplitR; [iPureIntro; exact Hmode |].
+          rewrite /kpt_res_at. unfold strans_root_of. rewrite Hppn.
+          iFrame "Hsnap Hkinv". }
+        iSplitL "Hstk Harm"; [ rewrite /sie_cap_rest; iFrame "Hstk Harm Hwit" |].
+        iIntros (m' av' b' tv') "_ Hsatp Htlb Hpcfg Hpaddr Hres Hrest".
+        rewrite s_tlb_at_kpt.
+        rewrite /sie_cap. iDestruct "Hrest" as "(Hstk & Harm & _)".
+        iFrame "Hstk Harm Hwit".
+        rewrite /strans_res_at.
+        iDestruct "Hres" as "[(Hpend & _ & %Hbad) | (Hkpt & _ & Hres)]".
+        { rewrite /bare_satp_ok in Hbad. rewrite Hmode in Hbad.
+          vm_compute in Hbad. discriminate. }
+        iRight. iFrame "Hkpt". iExists (strans_root_of satp0).
+        rewrite /kpt_res_at. iDestruct "Hres" as "[Hsnap #Hkinv2]".
+        rewrite /tlb_res_pt. iExists satp0, tv'.
+        iFrame "Hsatp Htlb Hsnap Hkinv2".
+        iSplitR; [iPureIntro; exact Hmode |].
+        iSplitR; [iPureIntro; exact Hasid |].
+        iSplitR; [iPureIntro; reflexivity |].
+        unfold strans_root_of. rewrite Hppn.
+        iApply (pmp_config_intro root_ppn pcfg paddr HA Hord HX HW HR Hcov
+                  with "Hpcfg Hpaddr").
+      + rewrite s_tlb_at_bare.
+        iFrame "Hsatp Hpcfg Hpaddr".
+        iSplitL "Hkpt Hsnap".
+        { rewrite /strans_res_at. iRight. iFrame "Hkpt".
+          iSplitR; [iPureIntro; exact Hmode |].
+          rewrite /kpt_res_at. unfold strans_root_of. rewrite Hppn.
+          iFrame "Hsnap Hkinv". }
+        iSplitL "Hstk Harm"; [ rewrite /sie_cap_rest; iFrame "Hstk Harm Hwit" |].
+        iIntros (m' av' b' tv') "%Hpin Hsatp _ Hpcfg Hpaddr Hres Hrest".
+        rewrite (Hpin eq_refl).
+        rewrite /sie_cap. iDestruct "Hrest" as "(Hstk & Harm & _)".
+        iFrame "Hstk Harm Hwit".
+        rewrite /strans_res_at.
+        iDestruct "Hres" as "[(Hpend & _ & %Hbad) | (Hkpt & _ & Hres)]".
+        { rewrite /bare_satp_ok in Hbad. rewrite Hmode in Hbad.
+          vm_compute in Hbad. discriminate. }
+        iRight. iFrame "Hkpt". iExists (strans_root_of satp0).
+        rewrite /kpt_res_at. iDestruct "Hres" as "[Hsnap #Hkinv2]".
+        rewrite /tlb_res_pt. iExists satp0, tlbvec.
+        iFrame "Hsatp Htlb Hsnap Hkinv2".
+        iSplitR; [iPureIntro; exact Hmode |].
+        iSplitR; [iPureIntro; exact Hasid |].
+        iSplitR; [iPureIntro; reflexivity |].
+        unfold strans_root_of. rewrite Hppn.
+        iApply (pmp_config_intro root_ppn pcfg paddr HA Hord HX HW HR Hcov
+                  with "Hpcfg Hpaddr").
+  Qed.
 
 
   Lemma sie_cap_of_cells (kt : ktier) (m : regfile) (av : nat) (b : bool)

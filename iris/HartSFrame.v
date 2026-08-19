@@ -593,6 +593,21 @@ Section SFrames.
     iIntros "H". iExact "H".
   Qed.
 
+  (* the write-frame extension at ANY conforming set: [s_rs_agree] and the
+     tower's other agreements are stated at the widest set, and [sf_sub] is
+     what makes the narrowing legal.  [s_ro_ext] needs no twin -- it is at
+     [s_Dro] and takes the same agreement. *)
+  Lemma s_rw_ext_D (D : gset register) (HD : s_frame_ok D)
+      (rs rs' : regstate) :
+    reg_agree_on (s_Drw ∪ s_Dro) rs rs' ->
+    hreg_frame rs D -∗ (hreg_frame rs' D : iProp Σ).
+  Proof.
+    intros Hag.
+    rewrite (hreg_frame_ext _ _ D
+      (fun r Hr => Hag r (elem_of_union_l r s_Drw s_Dro (sf_sub D HD r Hr)))).
+    iIntros "H". iExact "H".
+  Qed.
+
   (* ---- the BARE twins of the three [s_Drw]-dependent lemmas above ---- *)
   Lemma s_rw_split_b (rs : regstate) :
     (hreg_frame rs s_Drwb : iProp Σ) ⊣⊢
