@@ -320,6 +320,31 @@ is what two rejected designs could not achieve: `bare_slot_acc` always right,
 `kpt_slot_acc` always left, `strans_slot_acc` **cases on its own slot
 disjunction**.  Whole tree green at the 8 roots.
 
+**THE §3 DIVERGENCE REPRODUCES ON THE PT TIER, AND IT IS THE NEXT THING TO
+FIX.**  Measured 2026-08-19: the Bare cell-handout engine
+(`wp_instr_s_config_regime_b`, the mechanical `s_Drwb` twin) applies the run
+layer as
+
+```coq
+iApply (spt_run_hart_active_instr_S_D s_Drwb s_frame_ok_Drwb (s_Df_mix dq) …)
+```
+
+against the cycle's `swp (run_hart_active 0)` goal, and that **does not
+terminate** — killed at 10 minutes, against ~35 s for the whole file
+otherwise.  Same shape as §3's `swp_run_hart_active_instr_S_res_D`, same cure
+required: state the Bare instance CONCRETELY and discharge it by applying the
+generic at the TERM level (`Proof. apply (spt_run_hart_active_instr_S_D
+s_Drwb s_frame_ok_Drwb). Qed.` — every remaining argument is then fixed by the
+goal, so there is nothing to search).  `spt_dispatch_none_D s_Drwb …` in the
+same proof is applied at a `swp (dispatchInterrupt …)` goal, NOT the cycle
+goal, so it is expected to be fine — the funnel's experience is that only the
+cycle-WP application diverges — but bisect with `Timeout 120` rather than
+assume.
+
+Note the comment already in `SmodeCorePt.v` at the KPT pinning ("The Bare
+branch spells `_D s_Drwb s_frame_ok_Drwb` out") — that instruction is what
+diverges; the concrete instance is what is actually needed.
+
 **STILL TO DO (steps 2 and 3).**  Step 2: build the R-generic data-side
 absorber (the `sda_slot_acc` twin at generic `R`) on top of `sr_slot_acc` —
 the layering is already right, `WpSmodePtEngine.v` is `_CoqProject` 110 vs
