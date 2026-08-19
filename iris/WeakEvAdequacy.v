@@ -109,10 +109,21 @@ Theorem weak_ev_adequacy_phi Σ `{!riscvGpreS Σ, !weakGpreS Σ}
        ={⊤}=∗ ([∗ list] e ∈ epower_fork gen, EWP e @ ⊤)) ->
   forall t2 σ2,
     rtc (@erased_step weak_ev_lang) (epower_fork gen, σ) (t2, σ2) ->
-    no_violation (wglog σ2) (wgws σ2).
+    no_violation (wglog σ2) (wgws σ2) /\
+    (forall e2, e2 ∈ t2 -> reducible (Λ := weak_ev_lang) e2 σ2).
 Proof.
   intros Hwp t2 σ2 Hrtc.
   apply erased_steps_nsteps in Hrtc as (n & κs & Hsteps).
+  (* THE SAFETY FORM ([WeakAdequacy.weak_system_adequacy_phi]'s two lines,
+     verbatim).  [wp_strong_adequacy] at [NotStuck] hands out [not_stuck],
+     which is "reducible OR a value"; [WeakEvLang.eto_val] is constantly
+     [None] (the event language has NO values — [eval := Empty_set]), so the
+     value disjunct is refuted outright and [not_stuck] IS reducibility. *)
+  cut (no_violation (wglog σ2) (wgws σ2) /\
+       (forall e : expr weak_ev_lang, e ∈ t2 -> not_stuck e σ2)).
+  { intros [Hnv Hns]. split; [exact Hnv|].
+    intros e2 He2. destruct (Hns e2 He2) as [[v Hv]|Hred];
+      [discriminate Hv|exact Hred]. }
   eapply (wp_strong_adequacy Σ weak_ev_lang NotStuck (epower_fork gen) σ n κs
             t2 σ2 _ (fun _ => 0%nat)); last exact Hsteps.
   intros Hinv.
@@ -209,7 +220,42 @@ Proof.
   iIntros (es' t2') "%Heq %Hlen %Hns Hsi Hes Hts".
   iDestruct (weak_state_interp_export σ2 with "Hsi") as %Hnv.
   iApply fupd_mask_intro; [set_solver|]. iIntros "_".
-  iPureIntro. exact Hnv.
+  iPureIntro. split; [exact Hnv|].
+  intros e He. exact (Hns e eq_refl He).
+Qed.
+
+(** THE SAFETY FORM, projected — the event-language twin of
+    [WeakAdequacy.weak_system_adequacy].  EVERY thread of EVERY reachable
+    configuration can take a step: the WP package is a total correctness
+    obligation on each node, and the RMW split's RETRY ARM (design §5) is
+    what keeps the conditional-write node reducible even when its
+    exclusivity window has gone dirty, so no liveness reasoning enters
+    here. *)
+Corollary weak_ev_adequacy_reducible Σ `{!riscvGpreS Σ, !weakGpreS Σ}
+    (gen : nat) (σ : wgstate) (D : CPU -> gset register)
+    (Hgen : gen = 0%nat)
+    (Hpow : wgpow σ = true) (Hgen0 : wggen σ = 0%nat)
+    (Hlog : wglog σ = [])
+    (Hws : forall c : CPU, wgws σ c = ws_init) :
+  (forall (HR : riscvGS Σ) (HW : weakGS Σ),
+     ⊢ ([∗ set] c ∈ (fin_to_set CPU : gset CPU),
+          [∗ set] r ∈ D c,
+            reg_pointsto_at c r (DfracOwn 1)
+              (register_lookup r (wgregs σ c))) ∗
+       ([∗ map] a ↦ b ∈ wgimg σ, wlat_pointsto (pa_z a) (DfracOwn 1) 0%nat b) ∗
+       ([∗ set] c ∈ (fin_to_set CPU : gset CPU), hart_view c) ∗
+       wlog_lb [] ∗
+       uart_frag (wgdev σ).(duart) ∗ plic_frag (wgdev σ).(dplic) ∗
+       virtio_frag (wgdev σ).(dvirtio)
+       ={⊤}=∗ ([∗ list] e ∈ epower_fork gen, EWP e @ ⊤)) ->
+  forall t2 σ2 e2,
+    rtc (@erased_step weak_ev_lang) (epower_fork gen, σ) (t2, σ2) ->
+    e2 ∈ t2 ->
+    reducible (Λ := weak_ev_lang) e2 σ2.
+Proof.
+  intros Hwp t2 σ2 e2 Hrtc He2.
+  exact (proj2 (weak_ev_adequacy_phi Σ gen σ D Hgen Hpow Hgen0 Hlog Hws Hwp
+                  t2 σ2 Hrtc) e2 He2).
 Qed.
 
 (* ====================================================================== *)
@@ -269,8 +315,8 @@ Proof.
   rewrite /= epool_list_init in Herased.
   (* S3, the φ export *)
   have Hnv : no_violation (wglog ρ2.2) (wgws ρ2.2).
-  { eapply (weak_ev_adequacy_phi Σ gen σ D Hgen Hpow Hgen0 Hlog Hws Hwp
-              (epool_list ρ2.1) ρ2.2 Herased). }
+  { exact (proj1 (weak_ev_adequacy_phi Σ gen σ D Hgen Hpow Hgen0 Hlog Hws Hwp
+                    (epool_list ρ2.1) ρ2.2 Herased)). }
   (* the layout transport *)
   exact (no_violation_violation_hart ρ2.1 ρ2.2 Hnv).
 Qed.

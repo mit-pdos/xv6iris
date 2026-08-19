@@ -875,6 +875,7 @@ WeakPromise.v
 WeakPromiseLitmus.v
 WeakPromiseFact.v
 WeakPromiseBridge.v
+WeakErase.v
 WeakRobust.v
 WeakRobustTrace.v
 WeakRetag.v

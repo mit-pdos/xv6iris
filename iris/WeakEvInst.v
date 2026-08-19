@@ -123,6 +123,7 @@ Require Import WeakMem.
 Require Import WeakDeps.
 Require Import WeakPromise.
 Require Import WeakPromiseFact.
+Require Import WeakErase.
 Require Import WeakInterp.
 Require Import WeakInterpProj.
 Require Import RiscvLang.
@@ -202,6 +203,31 @@ Proof. reflexivity. Qed.
 
 Lemma pcls_ev_fence p ws pr pw sr sw : pcls_ev p (LFence pr pw sr sw) ws = WCplain.
 Proof. reflexivity. Qed.
+
+(** THE ERASURE'S CLASS PREMISE (A2 stage 1,
+    [WeakErase.pcls_erasable]).  The erased run must append the SAME
+    messages as the instance run, so the class this function computes must
+    survive both moves the erasure makes: BLANKING THE OPERAND LISTS (and
+    collapsing [LRegW]/[LCtrl]/[LInstr] onto [LSilent] — all four answer
+    [WCplain]) and DROPPING TO A LOWER [wstate].  It survives both because
+    [WeakInterp.wm_class_of] reads exactly the ACCESS KIND — program data,
+    off the residual monad node — and [w_relp], which the erasure simulation
+    keeps EQUAL.  Layer 1 cannot see either fact, which is why it takes the
+    equation as a hypothesis and this is where it is discharged. *)
+Lemma pnode_wclass_relp m we wi :
+  w_relp we = w_relp wi -> pnode_wclass m we = pnode_wclass m wi.
+Proof.
+  intros H. unfold pnode_wclass. destruct m; [done|].
+  destruct o; try done. unfold wm_class_of. rewrite H. reflexivity.
+Qed.
+
+Theorem pcls_ev_erasable : WeakErase.pcls_erasable pcls_ev.
+Proof.
+  intros p l we wi Hrelp. destruct l; unfold pcls_ev; try reflexivity;
+    destruct p as [cpu m rs fn ib|dp];
+    solve [ apply (pnode_wclass_relp m we wi Hrelp)
+          | unfold ddev_class, wm_class_of; rewrite Hrelp; reflexivity ].
+Qed.
 
 (* ====================================================================== *)
 (** ** 2. The program half
