@@ -755,6 +755,48 @@ Proof. rewrite /sda_Dro. set_solver. Qed.
 Lemma sda_in_misa : (misa : register) ∈ sda_Drw ∪ sda_Dro.
 Proof. rewrite /sda_Dro. set_solver. Qed.
 
+(* ===================================================================== *)
+(* THE BARE DATA WRITE SET.                                               *)
+(*                                                                       *)
+(* [sda_Drw] is the tlb cell AND NOTHING ELSE -- a data access writes no  *)
+(* other register -- and it is there because a Sv39 walk FILLS the TLB on *)
+(* a miss.  At Bare the model's [translateAddr] returns before the TLB is *)
+(* consulted at all (rv64d.v: the [Bare] arm is a bare [returnR]), so the *)
+(* Bare data frame is EMPTY.                                             *)
+(*                                                                       *)
+(* This is what lets the Bare arm of [IntrDefs.strans_inv] hold no tlb    *)
+(* cell, which is what lets kvminithart keep the flushed-TLB fact its     *)
+(* pre-port proof kept -- see claude-notes/projects/main-cycle-port.md,   *)
+(* "THE KVMINITHART LANE".  ONE lemma absorbs the difference              *)
+(* ([WpIntrInv.sda_translate_slot]); no leaf ever sees which set it is on. *)
+(* ===================================================================== *)
+Definition sda_Drwb : gset register := ∅.
+
+Lemma sda_disj_b : sda_Drwb ## sda_Dro.
+Proof. rewrite /sda_Drwb. set_solver. Qed.
+
+(* the [∈ D ∪ sda_Dro] family at an ARBITRARY write set.  Every member but
+   the tlb is proved from [sda_Dro] alone above, so the generalization is
+   free -- and the tlb has no twin, on purpose. *)
+Lemma sda_in_mst_D (D : gset register) : (mstatus : register) ∈ D ∪ sda_Dro.
+Proof. rewrite /sda_Dro. set_solver. Qed.
+Lemma sda_in_priv_D (D : gset register) : (cur_privilege : register) ∈ D ∪ sda_Dro.
+Proof. rewrite /sda_Dro. set_solver. Qed.
+Lemma sda_in_menv_D (D : gset register) : (menvcfg : register) ∈ D ∪ sda_Dro.
+Proof. rewrite /sda_Dro. set_solver. Qed.
+Lemma sda_in_satp_D (D : gset register) : (satp : register) ∈ D ∪ sda_Dro.
+Proof. rewrite /sda_Dro. set_solver. Qed.
+Lemma sda_in_pma_D (D : gset register) : (pma_regions : register) ∈ D ∪ sda_Dro.
+Proof. rewrite /sda_Dro. set_solver. Qed.
+Lemma sda_in_pcfg_D (D : gset register) : (pmpcfg_n : register) ∈ D ∪ sda_Dro.
+Proof. rewrite /sda_Dro. set_solver. Qed.
+Lemma sda_in_paddr_D (D : gset register) : (pmpaddr_n : register) ∈ D ∪ sda_Dro.
+Proof. rewrite /sda_Dro. set_solver. Qed.
+Lemma sda_in_htif_D (D : gset register) : (htif_tohost_base : register) ∈ D ∪ sda_Dro.
+Proof. rewrite /sda_Dro. set_solver. Qed.
+Lemma sda_in_misa_D (D : gset register) : (misa : register) ∈ D ∪ sda_Dro.
+Proof. rewrite /sda_Dro. set_solver. Qed.
+
 Local Ltac sdadf :=
   unfold sda_Df;
   repeat first [ rewrite decide_True; [reflexivity|reflexivity]
