@@ -1817,6 +1817,75 @@ A last tell that this was a real hole and not a reading error: **neither
 `u_fetch_pure` nor `u_fetch_fault_pure` has a single consumer anywhere in
 the tree.**  The fetch-dependent half of §5 has never been started.
 
+### 14.6 THE §14.4 PACKAGE, AS BUILT — the shared machinery is in
+
+The fetch path is no longer 4-hardcoded, and `u_fetch_pure` is now three
+lemmas instead of one 250-line script.  What a `u_fetch_pure_2` author
+stands on:
+
+| brick | where | note |
+|---|---|---|
+| `goodmb_checked_mem_read_ram_g_U` / `goodmb_mem_read_fetch_g_U` | `UserFetchCert` §1 | ONE generic section over `k`; the width-2 and width-4 pairs are its instances and the 4 pair kept its old argument list |
+| `u_walk_fetch_pure` | `UserFetchCert` §7a | the fetch walk, once — run it at `va` and again at `va+2` |
+| `u_fetch_read_ok` | `UserFetchCert` §7b | the whole physical grant, width-generic |
+| `u_fetch_win_in` / `u_fetch_bytes_2` / `nth_byte_assemble2` | `UserFetchCert` §5 | the halfword bytes |
+| `u_mem_step_trans` / `pt_same_shape_trans` | `UserBytes` | composes the two walks |
+| `u_tlb_only` + `_land`/`_refl`/`_trans`, `u_exec_pins_only` | `UserClassifyAsm` | composes the two landings |
+| `read_bytes_ne_of_exec_read_ram` / `goodmb_read_ram_of_exec` | `HartMemAsm` | keyed on the exec fact, so the symbolic width never surfaces |
+
+**THE TWO STATEMENT RULES THE EXTRACTION SETTLED**, and both are the same
+rule the page-straddling DATA accesses already found:
+
+* **a walk-level lemma concludes `u_tlb_only`, never the one-walk
+  disjunction.**  `rs' = rs \/ ∃ tv, rs' = register_set tlb tv rs` does not
+  compose — collapsing two nested `register_set tlb` is a pointwise equality
+  of the record's field FUNCTION, i.e. functional extensionality.  The
+  one-walk caller re-derives the disjunction locally, so no landed statement
+  moved.
+* **the cfg pins are taken one by one, not as `post_fetch_cfg`.**  At the
+  second halfword the pc is still `va`, so `post_fetch_cfg _ (va+2) _` does
+  not exist while the three registers it would supply are unchanged.
+
+**AND ONE ARITHMETIC TRAP, which is `durable-notes.md`'s `nat`-literal rule
+in a new place.**  A width-generic access's last byte offset is
+`Z.of_nat (Z.to_nat k - 1)`; nat subtraction is TRUNCATED, so an inline
+`ltac:(lia)` for `Z.of_nat (Z.to_nat k - 1) = k - 1` fails with "Cannot find
+witness" — which reads as an arithmetic gap and is a missing side condition.
+Assert `(1 <= Z.to_nat k)%nat` first, then `Nat2Z.inj_sub` + `Z2Nat.id`.
+
+**A SECTION DISCHARGES ONLY THE VARIABLES A LEMMA USES**, so a positional
+argument list copied from the `Context`/`Hypothesis` block is wrong whenever
+one lemma in the section uses fewer of them than another — here the checked
+read needs neither `Dr mstatus` nor `Dr cur_privilege`, and the error names
+an unrelated hypothesis (`The term "HDms" has type "Dr mstatus = true" while
+it is expected to have type "pmpAddrMatchType_encdec_backwards … = TOR"`).
+Instantiate such a lemma with `apply …; assumption`, not positionally.
+
+The remaining §14.4 items are the four `goodmb` fetch SHELLS (twins of
+`UserFetch`'s `exec_fetch_rvc_2` / `_base_2` / `_fault_2_second` /
+`_fault_2_first`), then `u_fetch_pure_2` and the two fault composers.  The
+shape for those three, decided against what `HartRunFull.run_fetch_post`
+actually consumes:
+
+```coq
+  exists (rsf' : regstate) (mm' : pamap) (t' : ptree) (fr : FetchResult),
+    exec (fetch tt) (u_state rsf mm) = Some (fr, u_state rsf' mm') /\
+    goodmb Du_r Du_w (fetch tt) (u_state rsf mm) mm = true /\
+    <which constructor fr is> /\
+    u_tlb_only rsf rsf' /\
+    tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rsf') /\
+    u_mem_step P t t' mm mm'.
+```
+
+Exposing `fr` existentially with a constructor disjunct is simpler than
+`u_fetch_pure`'s `if isRVC … then F_RVC … else F_Base …`, and it is all the
+caller needs: `run_fetch_base` / `run_fetch_rvc` do not constrain the WORD,
+only the landing frame, and the decode fact is re-derived at the landing
+file by `UserTotalU.u_hval_base` / `u_hval_rvc`.  The "low half fetches,
+high half faults" case is a DISJUNCTION inside one lemma, not a third
+lemma — the model reads the second halfword only when the first is not
+compressed, so the compressed outcome is always live.
+
 ## 15. P4b IN PROGRESS — the memory arms, and the 5 700 lines that had to go
 
 ### `UserMemClassify` / `UserMemClassifyAmo` ARE PURE NOW, AND GREEN
