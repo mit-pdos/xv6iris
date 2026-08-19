@@ -2703,3 +2703,110 @@ and receipt lemmas gain rg threading), InodeRegion clauses, the walk
 binders, the deposit, then the remaining ~25 RULING-G threading edits in
 their final shape (persistent ireg_open premise for runtime files;
 ireclaim's indexed round-trip). Then THE FINAL GATE, unchanged.
+
+### §6‴ INTEGRATION-3 AS-BUILT (2026-08-19): RULING G′ LANDED END TO END --
+### the whole tree is GREEN and the three tops stand at the STANDING SIX
+
+#### 6‴.1 What landed (all `Qed`, admit-free)
+
+The phase payload, at `IcacheRef.v`:
+
+  * `Inductive frz := FrzOff | FrzPre (rg : bool) | FrzPost (rg : bool)`, with
+    `frz_ispre`/`frz_preb`/`frz_reg` beside it -- the three decidable readers
+    that keep every clause which used to be the equation
+    `f = Some (Excl FrzPre)` at a one-`reflexivity` shape.  `ifreeze_pre` and
+    `ifreeze_post` gain the index; `link_mint_freeze`/`link_spend_freeze` too.
+  * `ireg_regime rg := if rg then ireg_open else ireg_boot`, with
+    `ireg_regime_boot_excl` (ireclaim's exclusive token refutes EITHER arm --
+    the old un-indexed disjunction's whole content, recovered at the index).
+
+The region, at `InodeRegion.v`:
+
+  * `ireg_fsh f` REPLACES §2.3's last conjunct
+    `⌜f = FrzOff⌝ ∨ ireg_open ∨ ireg_boot`: `True` at `FrzOff`,
+    `ireg_regime rg` at `FrzPre rg` / `FrzPost rg`, the old disjunction at the
+    two degenerate columns.  Four one-line lemmas serve it -- `ireg_fsh_off`,
+    `ireg_fsh_pre`, `ireg_fsh_post_acc` (RULING G's RETURN LEG), `ireg_fsh_step`
+    (the ride-through) -- plus `ireg_fsh_boot_off`, which is
+    `IgetLic.iname_not_frozen`'s (e)/BufL row unchanged in content.
+  * `ireg_freeze_au` takes `ireg_regime rg`, parks it, mints `ifreeze_pre rg`.
+    `ireg_free_au` and `EscrowDeposit.ireg_free_deposit_au` take `rg` and the
+    deposit RETURNS `ireg_regime rg`: with the walk's own `ifreeze_post rg`
+    pinning the column at `FrzPost rg` (`ireg_rcol_freeze_agree`, one line
+    above), agreement selects the parked arm.  ONE `iApply`.
+  * `ireg_frzm_ok b f` is now `b = frz_preb f`; `ireg_frz_ok`'s two window rows
+    take `(FrzPre _)` / `(FrzPost _)`; `ireg_frz_ok_phase`'s two count premises
+    become `∀ rg, ...`.
+
+The escrow, at `EscrowInode.v`: `escA_body`/`escA_inv` are INDEXED by `rg`.
+They had to be -- the standing `ifreeze_post` lives there from iput+0x8a to
+the off-lock deposit, and it is that token's agreement with the f column that
+tells the deposit which arm to hand back.  The index rides with
+`redeem_ticketA gd` in the walk's own hand, so the tie is structural.
+`pool_await`/`pool_pending` existentially quantify it (both peels are
+rg-indifferent).
+
+The phase step, at `IcacheInv.v`: `frz_close`/`frz_rcpt`/`frz_bit`/`frz_mir`
+thread the payload; `frz_close_reg` says the close never moves the index.
+`ireg_icnt_frz_acc`'s shelter premise is STRENGTHENED from
+`ph' = FrzOff ∨ ph <> FrzOff` to `ph' = FrzOff ∨ frz_reg ph' = frz_reg ph` --
+at `ph = FrzOff` it still forces `ph' = FrzOff`, so the old reading is
+recovered verbatim, and every caller in the tree discharges it with
+`right; exact (frz_close_reg ph)`.
+
+The walk: `ip_free_entry`/`ip_free_locked`/`ip_free_offlock`/`ip_tail`/
+`ip_tail_exit` and `SpecIput`/`SpecIunlockput`'s four bodies + four Parameters
+carry `(rg : bool)` as the LAST binder (so partial positional application at
+the ~45 call sites keeps working).  Premise `ireg_regime rg`, post returns it.
+
+#### 6‴.2 The callers
+
+Runtime (`rg := true`): `ireg_regime true` reduces to `ireg_open`, so the
+side goal closes with a bare `iExact "Hropen"` -- integration-2's
+`iLeft. iExact "Hropen"` loses its `iLeft` and nothing else moves.  The
+persistent copy travels the RULING B channel; two bundles were widened to
+carry it the last hop: `SpecKexec.fs_fabric` (the kexec cone, one conjunct
+between `ireg_inv` and `procs_inv`) and, already at integration-2,
+`SpecFileclose.fileclose_ic_env` / `FsSyscalls.fs_world`.
+
+Boot (`rg := false`): `ProofIreclaim` lends its exclusive `ireg_boot` at
+iput+0x00 and RE-BINDS it from the indexed post -- `ireg_regime false` IS
+`ireg_boot` -- so the next loop iteration has it.  That is §2.3's round-trip,
+ghost-complete, and it is precisely what integration-2's un-indexed
+disjunction could not close.
+
+#### 6‴.3 Gate arithmetic (task 18's FINAL GATE, as run)
+
+  * whole-tree `make -k -j32` to FIXPOINT: pass 1 = 0 compiles / 0 errors,
+    pass 2 = 0 compiles / 0 errors; the two preceding passes did the real work
+    (35 and 2 real `ROCQ compile` lines -- the durable-notes trap checked).
+  * staleness 0 over all 1198 `_CoqProject` rows (no `NOVO`, no `STALE`).
+  * `Print Assumptions` on `Iput.wp_iput_sconf`, `Create.wp_create_sconf` and
+    `SysUnlink.wp_sys_unlink_sconf`: three BYTE-IDENTICAL blocks, each the
+    STANDING SIX and nothing else -- `rv64d.valid_reservation`,
+    `rv64d.plat_term_write`, `rv64d.match_reservation`,
+    `rv64d.load_reservation`, `FunctionalExtensionality.
+    functional_extensionality_dep`, `rv64d.cancel_reservation`.
+  * admits tree-wide: exactly ONE, the pre-existing upstream
+    `ProofSyscall.sysc_arm_placeholder` (ProofSyscall.v:1700).
+  * `proof_coverage.py --check`: exit 1 on six `_CoqProject`-drift rows, all
+    KNOWN and squash-time -- `IputFreeEntryDev.v`, `IputFreeLockedDev.v`,
+    `IputOfflockDev.v` (superseded by §6.1's fold-in; restored byte-identical
+    to `e2cddc247e` here so they add nothing to the diff) and the three
+    untracked `ZZProbe*.v`.  Coverage itself unchanged: fs.c 24/24, sysfile.c
+    16/16, vm.c 20/20, all at 100% bytes.
+  * `lemma_diff.py --ref e2cddc247e --dir .`: 36 files checked, ONE thing to
+    justify -- the same pre-existing `Admitted.` at ProofSyscall.v:1700.
+
+#### 6‴.4 Tripwires, as fired
+
+  * (the rg agreement not closing at the deposit) -- DID NOT FIRE.  One
+    `iApply (ireg_fsh_post_acc rg with "Hfdisj")`.
+  * (a runtime file where `ireg_open` is genuinely unavailable) -- DID NOT
+    FIRE.  Every runtime iput/iunlockput reaches one of the three persistent
+    bundles; `fs_fabric` was the only one still missing the conjunct.
+  * (red-set growth beyond the named set) -- FIRED, transiently and by
+    construction: threading the persistent premise through the local helper
+    chains touched `ProofKexecA/B2/B3/Tail`, `ProofSysLink`, `ProofSysOpen`,
+    `ProofSysUnlink`, `ProofNamei*`, `SpecKexec` beyond the named eleven.
+    All re-greened; the tree is at fixpoint.
