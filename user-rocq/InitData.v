@@ -30,6 +30,22 @@ Definition init_segments : list (Z * Z * Z * Z) := [
     ((0x1000)%Z, (0x10)%Z, (0x30)%Z, (6)%Z)   (* RW- *)
   ].
 
+(* THE ALLOCATED SECTIONS, in address order.  The program headers above
+   are a SINGLE RWX PT_LOAD, so the read-only/writable split of the
+   loaded image is visible only here:
+     .text             0x0 .. 0x96a  r-x
+     .rodata           0x970 .. 0xa01  r--
+     .eh_frame         0xa08 .. 0xe6c  r--
+     .data             0x1000 .. 0x1010  rw-
+     .bss              0x1010 .. 0x1030  rw-  (no file contents)
+   [initRodataEnd] is the LOWEST WRITABLE one's address: every
+   loadable byte below it is read-only image material and is immutable
+   for the life of the image, while a byte at or above it may be stored
+   to at run time -- so no proof may reside one permanently read-only.
+   (An image with no writable allocated section gets
+   [initMemEnd], i.e. the whole image is read-only.) *)
+Definition initRodataEnd : Z := 0x1000%Z.
+
 Definition init_data : gmap Z (bv 8) := list_to_map [
   ((0x96c)%Z, Z_to_bv 8 (0x0)%Z)
 ; ((0x96d)%Z, Z_to_bv 8 (0x0)%Z)
