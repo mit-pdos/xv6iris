@@ -2247,17 +2247,66 @@ through `HartSCsr`'s privilege-parametric CSR engines at Supervisor.
   Every other leaf statement is byte-identical, including the three
   `is_aligned_paddr` fetch premises the per-node engine no longer reads.
 
-**WHAT IS LEFT.**  The SWITCH-WINDOW two-table invariants
-`TransPt.tlb_inv_pt2_kcur` / `_kprev` still have no per-node walk: they
-differ from `utlb_inv_pt` in the TLB agreement (`tlb_ok_pt2` over two trees)
-and in taking an ABSTRACT tree spec `Sp` rather than `upt_tree_spec`, so
-`swp_translate_upt` does not instantiate -- the exec side is
-`TransPt.ptree2_translateAddr_cases` and the certificate would have to be
-its `goodmb` twin.  `UserretEntryPt` and `UservecExitPt` (and behind them
-`ProofUserret` / `ProofUservec`) wait on it; their own leaves and the two
-block lemmas are then the same conversion as UserretPt's.  Their call sites
-of `wp_instr_ktramp_pt_share` / `wp_instr_u_pt` take the post-port argument
-lists (no `is_aligned_paddr` premises, `mie1`/`menvcfg1`/`Rl` riders).
+**THE SWITCH WINDOW'S PER-NODE WALK IS BUILT (`Pt2Walk.v` + `Pt2WalkPt.v`),
+AND IT IS THE ONE PLACE THE TWO ROUTES MEET.**  `TransPt.tlb_inv_pt2_kcur` /
+`_kprev` hold TWO live tables, one EXCLUSIVELY OWNED (`ptree_own`, abstract
+spec) and one SHARED (`KptShare.kpt_inv`), so neither existing route serves
+the whole walk:
+
+- `UptWalkPt.swp_translate_upt`'s route (`HartMemRun.swp_hmrun_of_exec`
+  under a `goodmb` certificate) answers every memory access out of an OWNED
+  byte map, and the shared table's bytes are not owned;
+- `HartSKpt.swp_translate_kpt`'s route (a per-node open of `kptN`, read and
+  write seams as iProps) needs those seams PERSISTENT-backed, and a linear
+  `ptree_own` cannot back five independently-consumed ones.
+
+**THEY DO NOT HAVE TO MIX**, because each arm of
+`TransPt.ptree2_translateAddr_cases` touches exactly ONE tree and which one
+is decided by a PURE case split on the TLB slot the va hashes to -- off
+`tlb_ok_pt2`'s own per-entry disjunction, before any `swp` reasoning.  A
+slot that misses (empty or foreign tag) walks the CURRENT tree; a hit on
+this vpn's entry touches only its PROVENANCE tree's leaf slot.  So each
+window walk dispatches once and then runs one route.  Three things this
+needed:
+
+- **`tlb_ok_pt` IS TOO STRONG FOR A WINDOW, AND NEITHER WALK LEMMA EVER
+  NEEDED IT.**  `KptTree.ptree_translateAddr_cases` and
+  `PtWalkCert.goodmb_ptree_translateAddr` consume the whole premise in a
+  single `Htlbok vpn ent Hslot`.  `Pt2Walk.tlb_slot_pt` is that one slot's
+  worth -- "the slot fails the tag test, or holds THIS vpn's entry off `t`"
+  -- and both are restated over it (`_slot` suffix).  `KptTree`'s cone is
+  773 files, so the restatement lives in the new leaf, not in place.
+- **A HIT DOES NOT WALK, so the tree it touches need not be `satp`'s root.**
+  That is exactly the window's PREVIOUS table.  Hence the `_hit_slot`
+  twins, without the `pt_base t = root_ppn` premise and without the two
+  upper slots -- and, on the shared side, with the invariant's root split
+  off from satp's (`swp_translate_kpt_hit_slot` takes both).
+- **`assert (HDtlb : (tlb : register) ∈ Drw ∪ Dro) by set_solver` COSTS
+  24 SECONDS** (`coqc -time`), and it is one `elem_of_union_l` away from
+  free.  `Pt2WalkPt` compiles in 13 s with the named lemma and 62 s with
+  `set_solver`; `HartSKpt.swp_translate_kpt` still carries the `set_solver`
+  form.
+
+The engines `Pt2WalkPt.wp_instr_pt2_tramp_kcur` / `_kprev` are
+`TrampStepPt.wp_instr_tramp_pt` at that residue, opening the window on the
+way in and resealing it on the way out.  Both were checked to APPLY at the
+two real call sites' geometry (`uva 0x96`/`upa 0x96` and `uva 0xa8`/`upa
+0xa8`, `ai_sfence`), all eight geometry premises by `vm_compute`.
+
+**WHAT IS LEFT: `UserretEntryPt` AND `UservecExitPt`.**  `UservecPt` and
+`UserretPt` are converted (above) and `UserretPt` is GREEN; the other two
+need the same treatment for their own leaves and two block lemmas -- their
+obligations are still the old
+`∀ σ, mstate_interp σ ={…}=∗ ∃ s_exec, ⌜exec (execute i) … ⌝ ∗ …` shape and
+the per-node engine hands them `swp (execute i)` instead.  They also STEP
+THE SWITCH WINDOW, and that is no longer a blocker: `Pt2WalkPt`'s
+`wp_instr_pt2_tramp_kcur` / `_kprev` are built and were checked to apply at
+both real call sites' geometry.  (The paragraph this replaces said the
+window had no per-node walk and that these two files waited on it -- true
+when it was written, and `Pt2Walk.v`/`Pt2WalkPt.v` are the answer.)  Their
+call sites of `wp_instr_ktramp_pt_share` / `wp_instr_u_pt` take the
+post-port argument lists (no `is_aligned_paddr` premises, `mie1` /
+`menvcfg1` / `Rl` riders).
 
 ## THE DOWNSTREAM COMPILE TAIL (2026-08-18) -- what it took, and the two
 ## things it is BLOCKED on

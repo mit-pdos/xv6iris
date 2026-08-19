@@ -24,22 +24,21 @@
    witness [sr_kwit], which is [emp] at [kpt_share_regime] and [False] at
    Bare (which is what keeps the route sound).
 
-   THE THREE TABLES.  The engine is regime-generic in [Res] and each table
-   supplies its own [tramp_fetch_tr] producer plus a wrapper that opens its
-   bundle into the engine's cells:
+   THE THREE TABLES.  The engine is regime-generic in [Res]; each table the
+   trampoline tower steps on brings its own [tramp_fetch_tr] producer, and
+   two of them also have a wrapper that opens their bundle into the engine's
+   cells:
      - the SHARED KERNEL table: [ktramp_fetch_tr_share] and
        [wp_instr_ktramp_pt_share] below, off [SRegime.kpt_share_regime] /
        [HartSKpt.swp_translate_kpt];
      - the USER table [UptTree.utlb_inv_pt]: [UptWalkPt.utramp_fetch_tr] and
        [UptWalkPt.wp_instr_u_pt], off [UptWalkPt.swp_translate_upt];
      - the switch-window two-table invariants [TransPt.tlb_inv_pt2_kcur] /
-       [_kprev] have NO per-node walk yet.  They are exec-level today
-       ([tlb_inv_pt2_translateAddr]) and differ from [utlb_inv_pt] in the
-       TLB agreement ([tlb_ok_pt2] over two trees) and in taking an abstract
-       tree spec, so [swp_translate_upt] does not instantiate: the exec side
-       is [TransPt.ptree2_translateAddr_cases] and the certificate has to be
-       its [goodmb] twin.  Until that exists, TransPt.v, [UserretEntryPt]
-       and [UservecExitPt] stay red. *)
+       [_kprev]: [Pt2WalkPt.pt2_tramp_fetch_tr_kcur] / [_kprev].
+   The last two are BESPOKE, not [tramp_tr_obl_of_regime] instances: an
+   [SRegime.s_regime]'s [sr_inv] is keyed on ONE table's [kmap_at] claim,
+   and neither the user table (its mapping facts come from [um]) nor the
+   window (two asymmetric tables) fits that shape. *)
 From Stdlib Require Import ZArith Bool Lia.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
