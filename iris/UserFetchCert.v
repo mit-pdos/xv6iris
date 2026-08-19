@@ -738,19 +738,19 @@ Qed.
    the slot geometry's), is a [pt_slot_mem] of the reference state *)
 Lemma u_slot_mem_at (P : uptd) (t : ptree) (mm : pamap) (rs : regstate)
     (b : mword 44) (i : mword 9) (q : mword 64) :
-  u_mem_wf P t mm ->
+  u_mem_ok P t mm ->
   word_bytes (u_pte_addr b i) q ∈ pt_maps 2 t ->
   pt_slot_mem (MState rs mm dev0_state) (u_pte_addr b i) q.
 Proof.
   intros Hwf Hin.
-  pose proof (u_mem_wf_sub P t mm _ q Hwf Hin) as Hsub.
+  pose proof (u_mem_ok_sub P t mm _ q Hwf Hin) as Hsub.
   assert (Hlk : forall j : nat, (N.of_nat j < 8)%N ->
             mm !! pa_add (u_pte_addr b i) j = Some (nth_byte q j)).
   { intros j Hj. apply (lookup_weaken (word_bytes (u_pte_addr b i) q) mm);
       [ apply word_bytes_lookup; lia | exact Hsub ]. }
   assert (Hram : forall j : nat, (N.of_nat j < 8)%N ->
             addr_is_ram (pa_add (u_pte_addr b i) j)).
-  { intros j Hj. destruct Hwf as (md & _ & _ & _ & _ & Hr & _).
+  { intros j Hj. destruct Hwf as (md & _ & _ & Hmmeq & Hr & _).
     apply Hr. apply elem_of_dom. exists (nth_byte q j). exact (Hlk j Hj). }
   split_and!.
   - exact Hlk.
@@ -760,8 +760,8 @@ Proof.
 Qed.
 
 Lemma u_slot_owned (P : uptd) (t : ptree) (mm : pamap) (a : Arch.pa) (q : mword 64) :
-  u_mem_wf P t mm -> word_bytes a q ∈ pt_maps 2 t -> bytes_owned mm a 8 = true.
-Proof. intros Hwf Hin. exact (u_mem_wf_owned P t mm a q Hwf Hin). Qed.
+  u_mem_ok P t mm -> word_bytes a q ∈ pt_maps 2 t -> bytes_owned mm a 8 = true.
+Proof. intros Hwf Hin. exact (u_mem_ok_owned P t mm a q Hwf Hin). Qed.
 
 (* ===================================================================== *)
 (* 4. THE ADUE ABSORPTION AT THE BYTE LEVEL.                              *)
@@ -1264,6 +1264,102 @@ Proof.
   - exact Hdm.
 Qed.
 
+(* THE SAME WRITE-BACK AT THE WEAKER PREDICATE.  [u_mem_step_writeback]
+   concludes the STRONG [u_mem_step], whose data clause is exactly what
+   [u_mem_wf] supplies and [u_mem_ok] does not -- so the composer chain,
+   which holds only [u_mem_ok], cannot go through it and cannot repair it
+   with [u_mem_step_ok_of] either (that lemma wants the [u_mem_wf] the
+   chain no longer has).  The domain equality [u_mem_step_ok] asks for
+   instead comes from the SHAPE alone, which is why this twin is the same
+   proof minus one conjunct rather than a weaker theorem. *)
+(* THIS FILE'S [dom] DOES NOT REWRITE, and the failure is the keyed-matching
+   one: [rewrite !dom_union_L] reports "found no subterm matching
+   dom (?m1 ∪ ?m2)" on a goal that visibly contains one, and giving the
+   union's arguments explicitly only moves the failure to the RHS's
+   [dom A].  (The identical script in [UserBytes.union_list_dom_shape]
+   works; this file's ambient instances are not the ones the lemma is
+   keyed on.)  So every step below goes through UNIFICATION -- an [apply]
+   or an [exact] against a statement whose set type is ascribed here --
+   and nothing is rewritten. *)
+Lemma dom_union_shape (A B M : pamap) :
+  (dom A : gset Arch.pa) = dom B ->
+  (dom (A ∪ M) : gset Arch.pa) = dom (B ∪ M).
+Proof.
+  intros H.
+  assert (Hmem : forall a : Arch.pa,
+            a ∈ (dom A : gset Arch.pa) <-> a ∈ (dom B : gset Arch.pa))
+    by (apply set_eq; exact H).
+  assert (Hab : forall a : Arch.pa, is_Some (A !! a) <-> is_Some (B !! a)).
+  { intros a. split; intros Hx.
+    - assert (H1 : a ∈ (dom A : gset Arch.pa)) by (apply elem_of_dom; exact Hx).
+      assert (H2 : a ∈ (dom B : gset Arch.pa)) by (apply (proj1 (Hmem a)); exact H1).
+      apply elem_of_dom in H2. exact H2.
+    - assert (H1 : a ∈ (dom B : gset Arch.pa)) by (apply elem_of_dom; exact Hx).
+      assert (H2 : a ∈ (dom A : gset Arch.pa)) by (apply (proj2 (Hmem a)); exact H1).
+      apply elem_of_dom in H2. exact H2. }
+  assert (Hu : forall (X : pamap) (a : Arch.pa),
+            is_Some ((X ∪ M) !! a) <-> is_Some (X !! a) \/ is_Some (M !! a)).
+  { intros X a. split.
+    - intros [c Hc]. destruct (X !! a) as [b|] eqn:Hb.
+      + left. exists b. reflexivity.
+      + right. exists c. exact (eq_trans (eq_sym (lookup_union_r X M a Hb)) Hc).
+    - intros [[b Hb] | [c Hc]].
+      + exists b. exact (lookup_union_Some_l X M a b Hb).
+      + destruct (X !! a) as [b|] eqn:Hb.
+        * exists b. exact (lookup_union_Some_l X M a b Hb).
+        * exists c. exact (eq_trans (lookup_union_r X M a Hb) Hc). }
+  apply set_eq. intros a. split; intros Ha;
+    apply elem_of_dom; apply elem_of_dom in Ha;
+    apply Hu; apply Hu in Ha;
+    (destruct Ha as [Hx | Hx];
+     [ left; first [ apply (proj1 (Hab a)); exact Hx
+                   | apply (proj2 (Hab a)); exact Hx ]
+     | right; exact Hx ]).
+Qed.
+
+Lemma u_mem_step_ok_writeback (P : uptd) (t : ptree) (mm : pamap)
+    (vpn : mword 27) (p2 p1 p0 q : mword 64) :
+  u_mem_ok P t mm ->
+  ptree_maps t vpn p2 p1 p0 ->
+  upt_tree_spec (ud_root P) (ud_tfp P) (ud_um P) (ptree_set_leaf t vpn q) ->
+  u_mem_step_ok P t (ptree_set_leaf t vpn q) mm
+    (write_bytes mm (pt_addr0 p1 vpn) 8 q).
+Proof.
+  intros Hok Hmaps Hspec'.
+  pose proof (pt_same_shape_set_leaf t vpn p2 p1 p0 q Hmaps) as Hshape.
+  destruct Hok as (md & Hdisj & Hdj & Hmm & Hram & Hwfm & Hspec).
+  assert (Hwdj : word_bytes (pt_addr0 p1 vpn) q ##ₘ md).
+  { apply map_disjoint_spec. intros x b1 b2 H1 H2.
+    destruct (word_bytes_is_Some (pt_addr0 p1 vpn) q p0 x (mk_is_Some _ _ H1))
+      as [b0 Hb0].
+    pose proof (maps_disj_subseteq (pt_maps 2 t)
+                  (word_bytes (pt_addr0 p1 vpn) p0) Hdisj
+                  (ptree_maps_slot0 t vpn p2 p1 p0 Hmaps)) as Hsubt.
+    pose proof (lookup_weaken _ _ x b0 Hb0 Hsubt) as Hbt.
+    exact (proj1 (map_disjoint_spec (ptree_bytes 2 t) md) Hdj x b0 b2 Hbt H2). }
+  assert (Heq : ptree_bytes 2 (ptree_set_leaf t vpn q)
+                = word_bytes (pt_addr0 p1 vpn) q ∪ ptree_bytes 2 t).
+  { rewrite (ptree_bytes_set_leaf t vpn p2 p1 p0 q Hdisj Hmaps).
+    apply write_bytes_word. }
+  assert (Hdj2 : ptree_bytes 2 (ptree_set_leaf t vpn q) ##ₘ md).
+  { rewrite Heq. apply map_disjoint_union_l. by split. }
+  assert (Hmm2 : write_bytes mm (pt_addr0 p1 vpn) 8 q
+                 = ptree_bytes 2 (ptree_set_leaf t vpn q) ∪ md).
+  { rewrite Hmm. rewrite write_bytes_union_l. rewrite write_bytes_word.
+    rewrite Heq. reflexivity. }
+  split_and!.
+  - exact Hshape.
+  - exact Hspec'.
+  (* the domain equality by UNIFICATION against [dom_union_shape], not by
+     [rewrite !dom_union_L] on the goal: after the two map rewrites the
+     goal's [dom] is only convertible to the one [dom_union_L] is keyed on
+     and the rewrite reports "found no subterm". *)
+  - rewrite Hmm2. rewrite Hmm.
+    exact (dom_union_shape _ _ md
+             (eq_sym (ptree_bytes_dom_shape 2 t (ptree_set_leaf t vpn q) Hshape))).
+  - exists md. split; [ exact Hdj2 | exact Hmm2 ].
+Qed.
+
 (* ===================================================================== *)
 (* 5. WHAT THE WRITE-BACK DOES *NOT* TOUCH, and the fetched word.         *)
 (* ===================================================================== *)
@@ -1320,26 +1416,45 @@ Proof.
   - by rewrite (lookup_union_r _ md _ Ht).
 Qed.
 
+(* A WINDOW TRAVELS ALONG A DOMAIN EQUALITY.  [u_mem_step_ok] carries
+   [dom mm' = dom mm], so a caller that pays the window premise at the PRE
+   map has it at every map the walk can land on -- which is what lets the
+   composers take their window premise at [mm] alone even though the read
+   happens at the post-walk map. *)
+Lemma u_win_dom (mm mm' : pamap) (pa : Arch.pa) (n : nat) :
+  (dom mm' : gset Arch.pa) = dom mm ->
+  (forall j : nat, (j < n)%nat -> is_Some (mm !! pa_add pa j)) ->
+  forall j : nat, (j < n)%nat -> is_Some (mm' !! pa_add pa j).
+Proof.
+  intros Hdom Hin j Hj.
+  assert (Hmem : forall a : Arch.pa,
+            a ∈ (dom mm' : gset Arch.pa) <-> a ∈ (dom mm : gset Arch.pa))
+    by (apply set_eq; exact Hdom).
+  assert (H1 : pa_add pa j ∈ (dom mm : gset Arch.pa))
+    by (apply elem_of_dom; exact (Hin j Hj)).
+  assert (H2 : pa_add pa j ∈ (dom mm' : gset Arch.pa))
+    by (apply (proj2 (Hmem _)); exact H1).
+  apply elem_of_dom in H2. exact H2.
+Qed.
+
 (* the TWO instruction bytes of a halfword fetch are in the owned map *)
 Lemma nth_byte_assemble2 (bs : list (bv 8)) (j : nat) :
   length bs = 2%nat -> (j < 2)%nat ->
   nth_byte (Z_to_bv 16 (assemble_bytes bs) : mword 16) j = bs !!! j.
 Proof. intros Hlen Hj. apply nth_byte_assemble_len; lia. Qed.
 
-Lemma u_fetch_bytes_2 (P : uptd) (t : ptree) (mm : pamap) (w va : mword 64) :
-  u_mem_wf P t mm ->
-  ud_um P !! svpn_of va = Some w ->
-  is_aligned_vaddr (Virtaddr va) 2 = true ->
+(* THE BYTE ASSEMBLY TAKES THE WINDOW, NOT THE MAP PREDICATE.  Coverage is
+   the one thing [u_mem_ok] does not say, so it becomes the caller's
+   premise -- produced by [u_fetch_win_in] in the safety tier, and by its
+   own image in a tier that owns only part of its address space. *)
+Lemma u_fetch_bytes_2 (mm : pamap) (w va : mword 64) :
+  (forall j : nat, (j < 2)%nat ->
+     is_Some (mm !! pa_add (u_walk_pa w va) j)) ->
   exists ih : mword 16,
     forall j : nat, (N.of_nat j < 2)%N ->
       mm !! pa_add (u_walk_pa w va) j = Some (nth_byte ih j).
 Proof.
-  intros Hwf Hl Hal.
-  assert (Hin : forall j : nat, (j < 2)%nat ->
-            is_Some (mm !! pa_add (u_walk_pa w va) j))
-    by (intros j Hj;
-        exact (u_fetch_win_in P t mm 2 w va ltac:(lia) (Z.divide_factor_l 2 2048)
-                 Hwf Hl Hal j ltac:(lia))).
+  intros Hin.
   destruct (Hin 0%nat ltac:(lia)) as [b0 Hb0].
   destruct (Hin 1%nat ltac:(lia)) as [b1 Hb1].
   exists (Z_to_bv 16 (assemble_bytes [b0; b1]) : mword 16).
@@ -1352,20 +1467,14 @@ Proof.
 Qed.
 
 (* the four instruction bytes are in the owned map, with SOME value *)
-Lemma u_fetch_bytes (P : uptd) (t : ptree) (mm : pamap) (w va : mword 64) :
-  u_mem_wf P t mm ->
-  ud_um P !! svpn_of va = Some w ->
-  is_aligned_vaddr (Virtaddr va) 4 = true ->
+Lemma u_fetch_bytes (mm : pamap) (w va : mword 64) :
+  (forall j : nat, (j < 4)%nat ->
+     is_Some (mm !! pa_add (u_walk_pa w va) j)) ->
   exists iw : mword 32,
     forall j : nat, (N.of_nat j < 4)%N ->
       mm !! pa_add (u_walk_pa w va) j = Some (nth_byte iw j).
 Proof.
-  intros Hwf Hl Hal.
-  set (pa := u_walk_pa w va).
-  assert (Hin : forall j : nat, (j < 4)%nat -> is_Some (mm !! pa_add pa j))
-    by (intros j Hj;
-        exact (u_fetch_win_in P t mm 4 w va ltac:(lia) (Z.divide_factor_l 4 1024)
-                 Hwf Hl Hal j ltac:(lia))).
+  intros Hin.
   destruct (Hin 0%nat ltac:(lia)) as [b0 Hb0].
   destruct (Hin 1%nat ltac:(lia)) as [b1 Hb1].
   destruct (Hin 2%nat ltac:(lia)) as [b2 Hb2].
@@ -1550,7 +1659,7 @@ Lemma u_walk_fetch_pure (P : uptd) (t : ptree) (mm : pamap) (rsf : regstate)
   _get_Mstatus_SXL (register_lookup mstatus rsf) = 'b"10" ->
   register_lookup menvcfg rsf = MENVCFG_S ->
   u_exec_pins P t rsf ->
-  u_mem_wf P t mm ->
+  u_mem_ok P t mm ->
   exists (rsf' : regstate) (mm' : pamap) (t' : ptree),
     exec (translateAddr (Virtaddr va) (InstructionFetch tt)) (u_state rsf mm)
       = Some (Ok (Physaddr (u_walk_pa w va), PBMT_PMA, init_ext_ptw),
@@ -1559,14 +1668,14 @@ Lemma u_walk_fetch_pure (P : uptd) (t : ptree) (mm : pamap) (rsf : regstate)
       (u_state rsf mm) mm = true /\
     (rsf' = rsf \/ exists tv, rsf' = register_set tlb tv rsf) /\
     tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rsf') /\
-    u_mem_step P t t' mm mm'.
+    u_mem_step_ok P t t' mm mm'.
 Proof.
   intros Hl Hleaf Hcanon Lcp Lsxl Lmenv Hpins Hwf.
   destruct Hpins as (Hhw & Hcfgp & Hpt & Htlbok).
   destruct Hhw as (Hmisa & Hmseccfg & Hsenv & Hhtif & Hall & Help).
   destruct Hpt as ((usatp & Hsatpok & Hsatp) & HA & Hord & HXp & HWp & HRp & Hcovp).
   destruct Hsatpok as (Hmode & Hasid & Hppn & Hpmaw_of).
-  pose proof Hwf as (md & Hdisj & Hdj & Hmm & Hdm & Hram & Hcov & Hacc & Hwfm & Hspec).
+  pose proof Hwf as (md & Hdisj & Hdj & Hmm & Hram & Hwfm & Hspec).
   pose proof Hspec as (Hbase & _).
   destruct (upt_spec_maps (ud_root P) (ud_tfp P) (ud_um P) t (svpn_of va) w
               Hspec (or_intror (or_intror Hl)))
@@ -1676,18 +1785,18 @@ Proof.
             sf = u_state rsf' mm' /\
             (rsf' = rsf \/ exists tv, rsf' = register_set tlb tv rsf) /\
             tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rsf') /\
-            u_mem_step P t t' mm mm').
+            u_mem_step_ok P t t' mm mm').
   { destruct Harms as [-> | [-> | (a1 & d1 & ->)]].
     - exists rsf, mm, t. split_and!;
         [ reflexivity | left; reflexivity | exact Htlbok
-        | exact (u_mem_step_refl P t mm Hwf) ].
+        | exact (u_mem_step_ok_refl P t mm Hwf) ].
     - eexists _, mm, t. split_and!.
       + reflexivity.
       + right. eexists. reflexivity.
       + rewrite register_lookup_set.
         exact (tlb_ok_pt_fill_self (mword_of_int 0) t (register_lookup tlb rsf)
                  (svpn_of va) p2 p1 _ Hmaps Htlbok).
-      + exact (u_mem_step_refl P t mm Hwf).
+      + exact (u_mem_step_ok_refl P t mm Hwf).
     - assert (Habs : pte_set_ad (pte_set_ad w a0 d0) a1 d1 = pte_set_ad w a1 d1)
         by exact (pte_set_ad_absorb w a0 d0 a1 d1).
       assert (Hv' : pte_valid (pte_set_ad (pte_set_ad w a0 d0) a1 d1))
@@ -1720,7 +1829,7 @@ Proof.
                  (tlb_ok_pt_set_leaf (mword_of_int 0) t (register_lookup tlb rsf)
                     (svpn_of va) p2 p1 (pte_set_ad w a0 d0) a1 d1
                     Hmaps Hv' Hl' Hn' Hp' Htlbok)).
-      + exact (u_mem_step_writeback P t mm (svpn_of va) p2 p1
+      + exact (u_mem_step_ok_writeback P t mm (svpn_of va) p2 p1
                  (pte_set_ad w a0 d0) _ Hwf Hmaps Hspec'). }
   destruct Hland as (rsf' & mm' & t' & Hsf & Hfile & Htlbok' & Hstep).
   exists rsf', mm', t'. split_and!;
@@ -1750,8 +1859,12 @@ Lemma u_fetch_read_ok (P : uptd) (t t' : ptree) (mm mm' : pamap)
   ud_um P !! svpn_of va = Some w ->
   register_lookup cur_privilege rsf = User ->
   u_exec_pins P t rsf ->
-  u_mem_wf P t mm ->
-  u_mem_wf P t' mm' ->
+  u_mem_ok P t mm ->
+  u_mem_ok P t' mm' ->
+  (forall j : nat, (j < Z.to_nat k)%nat ->
+     is_Some (mm !! pa_add (u_walk_pa w va) j)) ->
+  (forall j : nat, (j < Z.to_nat k)%nat ->
+     is_Some (mm' !! pa_add (u_walk_pa w va) j)) ->
   u_tlb_only rsf rsf' ->
   exists region : PMA_Region,
     pmpAddrMatchType_encdec_backwards
@@ -1776,19 +1889,18 @@ Lemma u_fetch_read_ok (P : uptd) (t t' : ptree) (mm mm' : pamap)
     bytes_owned mm (u_walk_pa w va) (Z.to_N k) = true /\
     register_lookup cur_privilege rsf' = User.
 Proof.
-  intros Hk Hdvd Hk16 Huintk Hal Hl Lcp Hpins Hwf Hwf' Tr.
+  intros Hk Hdvd Hk16 Huintk Hal Hl Lcp Hpins Hwf Hwf' Hwin Hwin' Tr.
   pose proof Hpins as (Hhw & _ & Hpt & _).
   pose proof Hhw as (Hmisa & Hmseccfg & Hsenv & Hhtif & Hall & Help).
   pose proof Hpt as ((usatp & Hsatpok & Hsatp) & HA & Hord & HXp & HWp & HRp & Hcovp).
   (* the window is owned at the PRE map, and is RAM at the POST map *)
   assert (Hown : bytes_owned mm (u_walk_pa w va) (Z.to_N k) = true).
   { apply bytes_owned_of_dom. intros j Hj. apply elem_of_dom.
-    exact (u_fetch_win_in P t mm k w va Hk Hdvd Hwf Hl Hal j ltac:(lia)). }
+    exact (Hwin j ltac:(lia)). }
   assert (Hramj : forall j : nat, (j < Z.to_nat k)%nat ->
             addr_is_ram (pa_add (u_walk_pa w va) j)).
-  { intros j Hj. pose proof Hwf' as (mdx & _ & _ & _ & _ & Hr & _).
-    apply Hr. apply elem_of_dom.
-    exact (u_fetch_win_in P t' mm' k w va Hk Hdvd Hwf' Hl Hal j Hj). }
+  { intros j Hj. pose proof Hwf' as (mdx & _ & _ & Hmmx & Hr & _).
+    apply Hr. apply elem_of_dom. exact (Hwin' j Hj). }
   assert (Hram0 : addr_is_ram (u_walk_pa w va))
     by (rewrite <- (pa_add_0 (u_walk_pa w va)); apply Hramj; lia).
   assert (Hramk : addr_is_ram (pa_add (u_walk_pa w va) (Z.to_nat k - 1)))
@@ -1851,7 +1963,9 @@ Lemma u_fetch_pure (P : uptd) (t : ptree) (mm : pamap) (rsf : regstate)
                         (Z.sub 39 1) 0)) = false ->
   post_fetch_cfg (u_state rsf mm) va mi ->
   u_exec_pins P t rsf ->
-  u_mem_wf P t mm ->
+  u_mem_ok P t mm ->
+  (forall j : nat, (j < 4)%nat ->
+     is_Some (mm !! pa_add (u_walk_pa w va) j)) ->
   exists (iw : mword 32) (rsf' : regstate) (mm' : pamap) (t' : ptree),
     exec (fetch tt) (u_state rsf mm)
       = Some ((if isRVC (subrange_vec_dec (autocast (T := mword) iw : mword 32) 15 0)
@@ -1860,9 +1974,9 @@ Lemma u_fetch_pure (P : uptd) (t : ptree) (mm : pamap) (rsf : regstate)
     goodmb Du_r Du_w (fetch tt) (u_state rsf mm) mm = true /\
     (rsf' = rsf \/ exists tv, rsf' = register_set tlb tv rsf) /\
     tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rsf') /\
-    u_mem_step P t t' mm mm'.
+    u_mem_step_ok P t t' mm mm'.
 Proof.
-  intros Hl Hleaf Hal Hcanon Hcfg Hpins Hwf.
+  intros Hl Hleaf Hal Hcanon Hcfg Hpins Hwf Hwin.
   pose proof Hcfg as (Lpc & Lcp & Lms & Lmenv & _ & _).
   pose proof Lms as (Lsxl & _).
   pose proof Hpins as (Hhw & Hcfgp & Hpt & Htlbok).
@@ -1877,14 +1991,26 @@ Proof.
      bytes are in the OWNED map at BOTH ends: at [mm'] with the values the
      machine reads, and at [mm] -- the map the certificate is stated over
      -- as ownership.  [u_mem_step] is what carries the first. *)
-  assert (Hwf' : u_mem_wf P t' mm')
-    by exact (u_mem_step_wf P t t' mm mm' Hwf Hstep).
-  destruct (u_fetch_bytes P t' mm' w va Hwf' Hl Hal) as (iw & Hbytes).
+  assert (Hwf' : u_mem_ok P t' mm')
+    by exact (u_mem_step_ok_wf P t t' mm mm' Hwf Hstep).
+  (* the window travels to the post-walk map along [u_mem_step_ok]'s own
+     domain equality -- which is why ONE window premise, at [mm], serves *)
+  assert (Hwin' : forall j : nat, (j < 4)%nat ->
+            is_Some (mm' !! pa_add (u_walk_pa w va) j))
+    by exact (u_win_dom mm mm' (u_walk_pa w va) 4
+                (proj1 (proj2 (proj2 Hstep))) Hwin).
+  assert (HwinK : forall j : nat, (j < Z.to_nat 4)%nat ->
+            is_Some (mm !! pa_add (u_walk_pa w va) j))
+    by (intros j Hj; apply Hwin; lia).
+  assert (HwinK' : forall j : nat, (j < Z.to_nat 4)%nat ->
+            is_Some (mm' !! pa_add (u_walk_pa w va) j))
+    by (intros j Hj; apply Hwin'; lia).
+  destruct (u_fetch_bytes mm' w va Hwin') as (iw & Hbytes).
   (* THE PHYSICAL GRANT -- section 7b, at width 4. *)
   destruct (u_fetch_read_ok P t t' mm mm' rsf rsf' 4 w va
               ltac:(lia) (Z.divide_factor_l 4 1024) ltac:(lia)
               ltac:(vm_compute; reflexivity) Hal Hl Lcp Hpins Hwf Hwf'
-              (u_tlb_only_land rsf rsf' Hfile))
+              HwinK HwinK' (u_tlb_only_land rsf rsf' Hfile))
     as (region & HA' & Hord' & Hrange & HX' & Hpmam & Halp & Hexecp &
         Hclint & Hsigw & Hhtif' & Hdevp & Hown4 & Lcp').
   assert (Hmr : exec (mem_read (InstructionFetch tt) PBMT_PMA

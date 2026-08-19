@@ -1,53 +1,32 @@
 (* WpUmodeStep.v -- THE STEP ENGINE of the VERIFIED user-execution tier
-   (claude-notes/projects/user-verified.md).
+   (claude-notes/projects/user-verified.md), REBASED ON PER-NODE SEMANTICS.
 
-   The safety tier's wrapper (UserStepFull.v) proves that an ARBITRARY user
-   machine steps safely; this file is its VALUE-PRECISE twin.  Everything
-   here threads the concrete bundle [uv_cap_gpr] (UmodeCap.v): a known
-   image [M], a known register file [m], a known pc -- and hands the
-   kernel the CONCRETE trapped frame [uv_trap_frame] rather than the
-   existential [user_trap_frame].
+   The safety tier's wrapper (UserStepFull.v + UserActiveClass.v) proves that
+   an ARBITRARY user machine steps safely; this file is its VALUE-PRECISE
+   twin.  Everything here threads the concrete bundle [uv_cap_gpr]
+   (UmodeCap.v): a known image [M], a known register file [m], a known pc --
+   and hands the kernel the CONCRETE trapped frame [uv_trap_frame] rather
+   than the existential [user_trap_frame].
 
-   Four layers, bottom up:
+   WHAT THE PORT CHANGED.  There is no [wp_exec_step_minstret], no
+   [mstate_interp], no [minstret_inv_body] and NO WIRE/MIP BORROW: the hart
+   OWNS mcycle/mtime/mip (they ride inside [pc_is] via
+   [MinstretInv.clock_res]), so [dispatchInterrupt]'s wire reads are answered
+   from the hart's own read-only frame.  The cycle is
+   [HartStepFull.swp_exec_step_full] driven exactly as
+   [UserStepFull.wp_user_step_active] drives it, with
+   [HartRunFull.swp_run_hart_active_res] in its body slot so that the tier's
+   linear residue crosses the dispatch's branch.
 
-   §1 [uv_interrupt_branch] -- the concrete-frame twin of
-      [UserStepFull.interrupt_branch]: same minstret prelude, same
-      [exec_riscv_step_interrupt] reduction, same [utrap_ghost] tower, but
-      the pt/image/config payload it threads is the verified tier's
-      ([utlb_inv_pt] + [umem] + [user_cfg]) and the continuation receives
-      the frame at the EXACT cause / stval / registers / image.
-
-   §2 [uv_step_obl] + [wp_uv_step] -- the interrupt-ABSORBING engine, the
-      verified analog of [WpIntrInv.wp_exec_step_intr].  A Löb loop over
-      [wp_exec_step_minstret]; each round borrows the wires ([wire_inv]),
-      decides [u_dispatch] and branches: a pending delegated interrupt goes
-      through §1 into the capability's [uv_intr_wp] and comes back -- same
-      (M, m, pc), ARBITRARY hart -- at the Löb hypothesis, so arbitrarily
-      many back-to-back interrupts (and migrations) are absorbed; no pending
-      interrupt hands the caller's σ-callback [uv_step_obl] the real step.
-
-   §3 [wp_uv_retire] -- the RETIRE funnel: from one [uinstr] fact and one
-      value-precise [execute] obligation, drive the fetch (UmodeFetch.v's
-      four geometry composers), transport the decode fact, assemble the
-      [run_hart_active] witness (SmodeCore's progress composers at User),
-      do the PC / gpr / nextPC ghost bookkeeping and re-establish
-      [uv_cap_gpr] at the new register file.  Memory is UNCHANGED (the one
-      store leaf comes later; the seam for it is the opaque frame [P] that
-      [uv_retire_post_fetch] threads -- an [umem pt M'] instead of
-      [umem pt M] is all that changes there).
-
-      The post-execute machine state is described by TWO optional layers,
-      applied in the order the model writes them: [jt] (a nextPC redirect,
-      for a jump) then [wr] (one gpr write).  Both [None] is a plain
-      arithmetic instruction; [Some]/[Some] is [jal]; [Some]/[None] is a
-      [ret].  A leaf therefore never mentions fetch geometry, and the
-      geometry dispatch (compressed x 4-aligned) is folded inside.
-
-   §4 [wp_uv_ecall] -- the ECALL driver: execute raises E_U_EnvCall,
-      delegated to S by [uc_del], delivered through the [utrap_state] /
-      [utrap_ghost] tower, and the concrete frame is handed to the
-      capability's [uv_sys_wp] with the caller's protocol payload. *)
-From Stdlib Require Import ZArith Bool Lia.
+   THE ONE THING THE VERIFIED TIER CANNOT TAKE FROM THE SAFETY TIER is the
+   fetch.  [UserFetchCert.u_fetch_pure] answers with an EXISTENTIAL word and
+   an EXISTENTIAL post byte-map, which is exactly what a value-precise tier
+   may not accept; and its post-map existential also loses the fact that the
+   walk's A/D write-back leaves the process IMAGE alone.  So section 2 below
+   re-derives the walk with both named: the map is always
+   [ptree_bytes 2 t ∪ md] with the image half [md] LITERALLY unchanged, and
+   the fetched word is the one [uinstr] names. *)
+From Stdlib Require Import ZArith Bool Lia FunctionalExtensionality.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import invariants gen_heap.
@@ -55,12 +34,23 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
+Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
 Require Import MinstretInv WireInv WpGpr RegFile InstrBytes.
 Require Import SmodeCore WpIntrCore ExecCommon.
 Require Import WpDecodeBridge DecodeTotalU.
-Require Import UptTree UserPtTree UserExec UserStep UserTrap UserExecFacts.
-Require Import UserStepFull.
+Require Import CommonWalk.
+Require Import PtreeType PtAdBits PtTree SmodePte KptPt KptTree.
+Require Import SRegime UptTree UptWalkPt.
+Require Import UserBits UserMem UserFetch UserPtTree UserTranslate.
+Require Import HartSwp HartLift HartSpan HartGoodb HartMemRun HartMCycle
+        HartStepFull HartRunFull HartRunGen.
+Require Import PtBytes UserBytes UserFrame UserClassifyAsm.
+Require Import UserFetchCert UserFaultCert.
+Require Import UserExec UserStep UserTrap UserExecFacts.
+(* NOT [Import]ed: [UserTotalU.u_pins_tick] shadows [UserFrame.u_pins_tick],
+   which is the one the frames bridge is stated over. *)
+Require UserTotalU.
+Require Import UserStepFull UserActiveClass.
 Require Import UmodeMem UmodeCap UmodeFetch.
 Require Import WpDecode.
 Local Open Scope Z_scope.
@@ -68,286 +58,1708 @@ Import Defs.
 Set Printing Depth 40.
 
 (* ===================================================================== *)
-(* §1 The interrupt branch, with the CONCRETE frame.                      *)
+(* §1 THE TIER'S BYTE MAP.                                                *)
+(*                                                                        *)
+(* [uv_mm t md] is what the hart owns: the page table's bytes, plus the    *)
+(* process image [md] (which is [UmodeMem.upa_map pt M], the image re-keyed *)
+(* by physical address).  The two halves are DISJOINT -- derived from the  *)
+(* ownership, never assumed -- and the image half is what every step of    *)
+(* this file carries through unchanged.                                   *)
 (* ===================================================================== *)
-Section UvInterruptBranch.
+
+Definition uv_mm (t : ptree) (md : PtBytes.pamap) : PtBytes.pamap :=
+  ptree_bytes 2 t ∪ md.
+
+(* the tree half's well-formedness, at a fixed image half *)
+Definition uv_tree_ok (pt : uptd) (md : PtBytes.pamap) (t : ptree) : Prop :=
+  maps_disj (pt_maps 2 t) /\
+  ptree_bytes 2 t ##ₘ md /\
+  (forall a : Arch.pa, a ∈ (dom (uv_mm t md) : gset Arch.pa) -> addr_is_ram a) /\
+  upt_map_wf (ud_um pt) /\
+  upt_tree_spec (ud_root pt) (ud_tfp pt) (ud_um pt) t.
+
+Lemma uv_tree_mem_ok (pt : uptd) (md : PtBytes.pamap) (t : ptree) :
+  uv_tree_ok pt md t -> u_mem_ok pt t (uv_mm t md).
+Proof.
+  intros (Hdisj & Hdj & Hram & Hwfm & Hspec).
+  exists md. split_and!;
+    [ exact Hdisj | exact Hdj | reflexivity | exact Hram | exact Hwfm
+    | exact Hspec ].
+Qed.
+
+(* a same-shaped tree change keeps the domain, hence the RAM clause *)
+Lemma uv_tree_ok_shape (pt : uptd) (md : PtBytes.pamap) (t t' : ptree) :
+  uv_tree_ok pt md t ->
+  pt_same_shape 2 t t' ->
+  upt_tree_spec (ud_root pt) (ud_tfp pt) (ud_um pt) t' ->
+  ptree_bytes 2 t' ##ₘ md ->
+  uv_tree_ok pt md t'.
+Proof.
+  intros (Hdisj & Hdj & Hram & Hwfm & Hspec) Hshape Hspec' Hdj'.
+  split_and!;
+    [ exact (pt_maps_disj_shape 2 t t' Hshape Hdisj) | exact Hdj' | | exact Hwfm
+    | exact Hspec' ].
+  intros a Ha. apply Hram.
+  assert (Hd : (dom (uv_mm t' md) : gset Arch.pa) = dom (uv_mm t md))
+    by exact (dom_union_shape (ptree_bytes 2 t') (ptree_bytes 2 t) md
+                (eq_sym (ptree_bytes_dom_shape 2 t t' Hshape))).
+  rewrite <- Hd. exact Ha.
+Qed.
+
+(* ===================================================================== *)
+(* §2 THE WALK, WITH THE LANDING MAP NAMED.                               *)
+(*                                                                        *)
+(* [UserFetchCert.u_walk_fetch_pure] answers with [exists mm', ... /\      *)
+(* u_mem_step_ok P t t' mm mm'], which pins [mm']'s DOMAIN and nothing     *)
+(* else: for the safety tier that is enough (its data bytes are            *)
+(* existential), for a tier that owns a NAMED image it is not.  The three  *)
+(* arms of [KptTree.ptree_translateAddr_cases] do say it -- the TLB hit    *)
+(* and the fill leave memory alone, and the A/D write-back writes the LEAF *)
+(* SLOT, which is inside the tree half -- so the walk is re-derived here   *)
+(* with the map spelled [uv_mm t' md] at the same [md].                    *)
+(*                                                                        *)
+(* Only the [goodmb] certificate is taken from the safety tier's producer: *)
+(* it is stated at the PRE map alone and so is untouched by all this.      *)
+(* ===================================================================== *)
+
+Lemma uv_walk_fetch (pt : uptd) (t : ptree) (md : PtBytes.pamap)
+    (rsf : regstate) (w va : mword 64) :
+  ud_um pt !! svpn_of va = Some w ->
+  uleaf_ok (InstructionFetch tt) w ->
+  uva_canon va ->
+  register_lookup cur_privilege rsf = User ->
+  _get_Mstatus_SXL (register_lookup mstatus rsf) = 'b"10" ->
+  register_lookup menvcfg rsf = MENVCFG_S ->
+  u_exec_pins pt t rsf ->
+  uv_tree_ok pt md t ->
+  exists (rsf' : regstate) (t' : ptree),
+    exec (translateAddr (Virtaddr va) (InstructionFetch tt))
+      (u_state rsf (uv_mm t md))
+      = Some (Values.Ok (Physaddr (u_walk_pa w va), PBMT_PMA, init_ext_ptw),
+              u_state rsf' (uv_mm t' md)) /\
+    goodmb Du_r Du_w (translateAddr (Virtaddr va) (InstructionFetch tt))
+      (u_state rsf (uv_mm t md)) (uv_mm t md) = true /\
+    u_tlb_only rsf rsf' /\
+    tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rsf') /\
+    uv_tree_ok pt md t' /\
+    pt_same_shape 2 t t'.
+Proof.
+  intros Hl Hleaf Hcanon Lcp Lsxl Lmenv Hpins Htok.
+  pose proof (uv_tree_mem_ok pt md t Htok) as Hwf.
+  pose proof Htok as (Hdisj & Hdj & Hram & Hwfm & Hspec).
+  pose proof Hpins as (Hhw & Hcfgp & Hpt & Htlbok).
+  pose proof Hhw as (Hmisa & Hmseccfg & Hsenv & Hhtif & Hall & Help).
+  pose proof Hpt as ((usatp & Hsatpok & Hsatp) & HA & Hord & HXp & HWp & HRp & Hcovp).
+  pose proof Hsatpok as (Hmode & Hasid & Hppn & Hpmaw_of).
+  pose proof Hspec as (Hbase & _).
+  (* the certificate, from the safety tier's producer *)
+  destruct (u_walk_fetch_pure pt t (uv_mm t md) rsf w va Hl Hleaf Hcanon Lcp
+              Lsxl Lmenv Hpins Hwf)
+    as (rsfX & mmX & tX & HtrX & Htrg & HfileX & HtlbokX & HstepX).
+  clear HtrX HfileX HtlbokX HstepX.
+  (* the walk's own data *)
+  destruct (upt_spec_maps (ud_root pt) (ud_tfp pt) (ud_um pt) t (svpn_of va) w
+              Hspec (or_intror (or_intror Hl)))
+    as (p2 & p1 & a0 & d0 & Hmaps).
+  pose proof (upt_variant (ud_tfp pt) (ud_um pt) (svpn_of va) w Hwfm
+                (or_intror (or_intror Hl))) as Hvar.
+  assert (Hsm2 : pt_slot_mem (u_state rsf (uv_mm t md)) (pt_addr2 t (svpn_of va)) p2)
+    by exact (u_slot_mem_at pt t (uv_mm t md) rsf (pt_base t)
+                (vpn_idx 2 (svpn_of va)) p2 Hwf
+                (ptree_maps_slot2 t (svpn_of va) p2 p1 _ Hmaps)).
+  assert (Hsm1 : pt_slot_mem (u_state rsf (uv_mm t md)) (pt_addr1 p2 (svpn_of va)) p1)
+    by exact (u_slot_mem_at pt t (uv_mm t md) rsf (u_next_base p2)
+                (vpn_idx 1 (svpn_of va)) p1 Hwf
+                (ptree_maps_slot1 t (svpn_of va) p2 p1 _ Hmaps)).
+  assert (Hsm0 : pt_slot_mem (u_state rsf (uv_mm t md)) (pt_addr0 p1 (svpn_of va))
+                   (pte_set_ad w a0 d0))
+    by exact (u_slot_mem_at pt t (uv_mm t md) rsf (u_next_base p1)
+                (vpn_idx 0 (svpn_of va)) _ Hwf
+                (ptree_maps_slot0 t (svpn_of va) p2 p1 _ Hmaps)).
+  assert (Htm : exec (translationMode User) (u_state rsf (uv_mm t md))
+                = Some (Sv39, u_state rsf (uv_mm t md)))
+    by exact (exec_translationMode_U_sv39 usatp (u_state rsf (uv_mm t md))
+                Lsxl Hsatp Hmode).
+  assert (Heff : exec (effectivePrivilege (InstructionFetch tt)
+                        (register_lookup mstatus (u_state rsf (uv_mm t md)).(sregs))
+                        User) (u_state rsf (uv_mm t md))
+                 = Some (User, u_state rsf (uv_mm t md)))
+    by exact (exec_effectivePrivilege_fetch _ User (u_state rsf (uv_mm t md))).
+  assert (Hss : exec (is_shadow_stack_access (InstructionFetch tt))
+                  (u_state rsf (uv_mm t md))
+                = Some (false, u_state rsf (uv_mm t md)))
+    by exact (exec_is_shadow_stack_fetch (u_state rsf (uv_mm t md))).
+  destruct (ptree_translateAddr_cases (InstructionFetch tt) User
+              (ud_root pt) va w (u_walk_pa w va) usatp t
+              (register_lookup tlb rsf) p2 p1 a0 d0 (u_state rsf (uv_mm t md))
+              Hleaf Hcanon eq_refl (fun a d => proj2 (proj2 (proj2 (Hvar a d))))
+              Hbase Hmaps Htlbok Hsm2 Hsm1 Hsm0
+              Hmisa Lmenv Hhtif Lcp Htm Heff Hss
+              Hsatp Hppn Hasid eq_refl HA Hord HRp HWp Hcovp
+              (pma_allows_all_pte_read _ Hall) (Hpmaw_of _ Hall))
+    as (sf & Htr & Harms).
+  (* WHERE THE WALK LANDED, with the image half NAMED *)
+  assert (Hland : exists (rsf' : regstate) (t' : ptree),
+            sf = u_state rsf' (uv_mm t' md) /\
+            (rsf' = rsf \/ exists tv, rsf' = register_set tlb tv rsf) /\
+            tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rsf') /\
+            pt_same_shape 2 t t' /\
+            upt_tree_spec (ud_root pt) (ud_tfp pt) (ud_um pt) t' /\
+            ptree_bytes 2 t' ##ₘ md).
+  { destruct Harms as [-> | [-> | (a1 & d1 & ->)]].
+    - exists rsf, t. split_and!;
+        [ reflexivity | left; reflexivity | exact Htlbok
+        | apply pt_same_shape_refl | exact Hspec | exact Hdj ].
+    - eexists _, t. split_and!.
+      + reflexivity.
+      + right. eexists. reflexivity.
+      + rewrite register_lookup_set.
+        exact (tlb_ok_pt_fill_self (mword_of_int 0) t (register_lookup tlb rsf)
+                 (svpn_of va) p2 p1 _ Hmaps Htlbok).
+      + apply pt_same_shape_refl.
+      + exact Hspec.
+      + exact Hdj.
+    - assert (Habs : pte_set_ad (pte_set_ad w a0 d0) a1 d1 = pte_set_ad w a1 d1)
+        by exact (pte_set_ad_absorb w a0 d0 a1 d1).
+      assert (Hv' : pte_valid (pte_set_ad (pte_set_ad w a0 d0) a1 d1))
+        by (rewrite Habs; exact (proj1 (Hvar a1 d1))).
+      assert (Hl' : pte_leaf (pte_set_ad (pte_set_ad w a0 d0) a1 d1))
+        by (rewrite Habs; exact (proj1 (proj2 (Hvar a1 d1)))).
+      assert (Hn' : pte_no_napot (pte_set_ad (pte_set_ad w a0 d0) a1 d1))
+        by (rewrite Habs; exact (proj1 (proj2 (proj2 (Hvar a1 d1))))).
+      assert (Hp' : pte_pbmt0 (pte_set_ad (pte_set_ad w a0 d0) a1 d1))
+        by (rewrite Habs; exact (proj2 (proj2 (proj2 (Hvar a1 d1))))).
+      assert (Hspec' : upt_tree_spec (ud_root pt) (ud_tfp pt) (ud_um pt)
+                (ptree_set_leaf t (svpn_of va)
+                   (pte_set_ad (pte_set_ad w a0 d0) a1 d1))).
+      { rewrite Habs.
+        exact (upt_tree_spec_set_leaf (ud_root pt) (ud_tfp pt) (ud_um pt) t
+                 (svpn_of va) w p2 p1 a0 d0 a1 d1 Hwfm Hspec
+                 (or_intror (or_intror Hl)) Hmaps). }
+      (* the tree half absorbs the write; the image half is untouched *)
+      assert (Heqt : ptree_bytes 2 (ptree_set_leaf t (svpn_of va)
+                       (pte_set_ad (pte_set_ad w a0 d0) a1 d1))
+                     = write_bytes (ptree_bytes 2 t) (pt_addr0 p1 (svpn_of va)) 8
+                         (pte_set_ad (pte_set_ad w a0 d0) a1 d1))
+        by exact (ptree_bytes_set_leaf t (svpn_of va) p2 p1 _ _ Hdisj Hmaps).
+      assert (Hwdj : word_bytes (pt_addr0 p1 (svpn_of va))
+                       (pte_set_ad (pte_set_ad w a0 d0) a1 d1) ##ₘ md).
+      { apply map_disjoint_spec. intros x b1 b2 H1 H2.
+        destruct (word_bytes_is_Some (pt_addr0 p1 (svpn_of va))
+                    (pte_set_ad (pte_set_ad w a0 d0) a1 d1) (pte_set_ad w a0 d0)
+                    x (mk_is_Some _ _ H1)) as [b0 Hb0].
+        pose proof (maps_disj_subseteq (pt_maps 2 t)
+                      (word_bytes (pt_addr0 p1 (svpn_of va)) (pte_set_ad w a0 d0))
+                      Hdisj (ptree_maps_slot0 t (svpn_of va) p2 p1 _ Hmaps))
+          as Hsubt.
+        pose proof (lookup_weaken _ _ x b0 Hb0 Hsubt) as Hbt.
+        exact (proj1 (map_disjoint_spec (ptree_bytes 2 t) md) Hdj x b0 b2 Hbt H2). }
+      assert (Hdj' : ptree_bytes 2 (ptree_set_leaf t (svpn_of va)
+                       (pte_set_ad (pte_set_ad w a0 d0) a1 d1)) ##ₘ md).
+      { rewrite Heqt write_bytes_word. apply map_disjoint_union_l.
+        split; [ exact Hwdj | exact Hdj ]. }
+      eexists _,
+        (ptree_set_leaf t (svpn_of va) (pte_set_ad (pte_set_ad w a0 d0) a1 d1)).
+      split_and!.
+      + rewrite /set_reg. cbn [sregs mem mdev]. rewrite /uv_mm.
+        rewrite Heqt. rewrite <- write_bytes_union_l. reflexivity.
+      + right. eexists. reflexivity.
+      + rewrite register_lookup_set.
+        exact (tlb_ok_pt_fill_self (mword_of_int 0)
+                 (ptree_set_leaf t (svpn_of va)
+                    (pte_set_ad (pte_set_ad w a0 d0) a1 d1))
+                 (register_lookup tlb rsf) (svpn_of va) p2 p1 _
+                 (ptree_set_leaf_maps_self t (svpn_of va) p2 p1
+                    (pte_set_ad w a0 d0) _ Hmaps Hv' Hl' Hn' Hp')
+                 (tlb_ok_pt_set_leaf (mword_of_int 0) t (register_lookup tlb rsf)
+                    (svpn_of va) p2 p1 (pte_set_ad w a0 d0) a1 d1
+                    Hmaps Hv' Hl' Hn' Hp' Htlbok)).
+      + exact (pt_same_shape_set_leaf t (svpn_of va) p2 p1 _ _ Hmaps).
+      + exact Hspec'.
+      + exact Hdj'. }
+  destruct Hland as (rsf' & t' & -> & Hfile & Htlbok' & Hshape & Hspec' & Hdj').
+  exists rsf', t'. split_and!.
+  - exact Htr.
+  - exact Htrg.
+  - exact (u_tlb_only_land rsf rsf' Hfile).
+  - exact Htlbok'.
+  - exact (uv_tree_ok_shape pt md t t' Htok Hshape Hspec' Hdj').
+  - exact Hshape.
+Qed.
+
+(* ===================================================================== *)
+(* §3 THE VALUE-PRECISE FETCH.                                            *)
+(*                                                                        *)
+(* Four geometries, exactly as the pre-port file had them (all four occur  *)
+(* in the binaries this tier verifies): compressed / base x 4-aligned /    *)
+(* 2-mod-4.  Each takes the [uinstr] data and produces the CONCRETE        *)
+(* [FetchResult] together with its [goodmb] certificate, the landing file  *)
+(* and the landing tree -- the image half of the map never moves.          *)
+(* ===================================================================== *)
+
+(* the image half of the map is read through the union's right slot *)
+Lemma uv_mm_lookup (t : ptree) (md : PtBytes.pamap) (x : Arch.pa) (b : bv 8) :
+  ptree_bytes 2 t ##ₘ md -> md !! x = Some b -> uv_mm t md !! x = Some b.
+Proof.
+  intros Hdj Hx. rewrite /uv_mm.
+  destruct (ptree_bytes 2 t !! x) as [c|] eqn:Ht.
+  - exfalso. exact (proj1 (map_disjoint_spec _ _) Hdj x c b Ht Hx).
+  - rewrite (lookup_union_r _ md x Ht). exact Hx.
+Qed.
+
+(* [uinstr]'s "these bytes are in [M]" AT THE PHYSICAL WINDOW *)
+Lemma uv_win_bytes (pt : uptd) (M : gmap Z (bv 8)) (t : ptree)
+    (w_leaf pc : mword 64) (k : nat) (n : N) (iw : bv n) :
+  uva_inj pt M ->
+  ptree_bytes 2 t ##ₘ upa_map pt M ->
+  ud_um pt !! svpn_of pc = Some w_leaf ->
+  (forall j : nat, (j < k)%nat -> bv_unsigned pc mod 4096 + Z.of_nat j < 4096) ->
+  uM_bytes M (uint pc) k iw ->
+  forall j : nat, (j < k)%nat ->
+    uv_mm t (upa_map pt M) !! pa_add (u_walk_pa w_leaf pc) j
+    = Some (nth_byte iw j).
+Proof.
+  intros Hinj Hdj Hl Hnc Hb j Hj.
+  rewrite <- (uva_pa_window pt w_leaf pc j Hl (Hnc j Hj)).
+  apply (uv_mm_lookup t (upa_map pt M) _ (nth_byte iw j) Hdj).
+  exact (upa_map_lookup pt M (uint pc + Z.of_nat j) (nth_byte iw j) Hinj
+           (Hb j Hj)).
+Qed.
+
+Lemma uv_win_some (pt : uptd) (M : gmap Z (bv 8)) (t : ptree)
+    (w_leaf pc : mword 64) (k : nat) (n : N) (iw : bv n) :
+  uva_inj pt M ->
+  ptree_bytes 2 t ##ₘ upa_map pt M ->
+  ud_um pt !! svpn_of pc = Some w_leaf ->
+  (forall j : nat, (j < k)%nat -> bv_unsigned pc mod 4096 + Z.of_nat j < 4096) ->
+  uM_bytes M (uint pc) k iw ->
+  forall j : nat, (j < k)%nat ->
+    is_Some (uv_mm t (upa_map pt M) !! pa_add (u_walk_pa w_leaf pc) j).
+Proof.
+  intros Hinj Hdj Hl Hnc Hb j Hj. exists (nth_byte iw j).
+  exact (uv_win_bytes pt M t w_leaf pc k n iw Hinj Hdj Hl Hnc Hb j Hj).
+Qed.
+
+(* ---- the two instruction READS, at the state the walk landed on ------- *)
+
+Lemma uv_read_4 (pt : uptd) (M : gmap Z (bv 8)) (t t' : ptree)
+    (rsf rsf' : regstate) (w_leaf pc : mword 64) (iw : mword 32) :
+  uva_inj pt M ->
+  ud_um pt !! svpn_of pc = Some w_leaf ->
+  (forall j : nat, (j < 4)%nat ->
+     bv_unsigned pc mod 4096 + Z.of_nat j < 4096) ->
+  is_aligned_vaddr (Virtaddr pc) 4 = true ->
+  uM_bytes M (uint pc) 4 iw ->
+  register_lookup cur_privilege rsf = User ->
+  u_exec_pins pt t rsf ->
+  uv_tree_ok pt (upa_map pt M) t ->
+  uv_tree_ok pt (upa_map pt M) t' ->
+  u_tlb_only rsf rsf' ->
+  exec (mem_read (InstructionFetch tt) PBMT_PMA
+          (Physaddr (u_walk_pa w_leaf pc)) 4 false false false)
+    (u_state rsf' (uv_mm t' (upa_map pt M)))
+    = Some (Ok iw, u_state rsf' (uv_mm t' (upa_map pt M))) /\
+  goodmb Du_r Du_w (mem_read (InstructionFetch tt) PBMT_PMA
+           (Physaddr (u_walk_pa w_leaf pc)) 4 false false false)
+    (u_state rsf' (uv_mm t' (upa_map pt M))) (uv_mm t (upa_map pt M)) = true.
+Proof.
+  intros Hinj Hl Hnc Hal Hb Lcp Hpins Htok Htok' Tr.
+  pose proof (uv_win_bytes pt M t' w_leaf pc 4 32 iw Hinj
+                (proj1 (proj2 Htok')) Hl Hnc Hb) as Hbytes'.
+  destruct (u_fetch_read_ok pt t t' (uv_mm t (upa_map pt M))
+              (uv_mm t' (upa_map pt M)) rsf rsf' 4 w_leaf pc
+              ltac:(lia) (Z.divide_factor_l 4 1024) ltac:(lia)
+              ltac:(vm_compute; reflexivity) Hal Hl Lcp Hpins
+              (uv_tree_mem_ok pt (upa_map pt M) t Htok)
+              (uv_tree_mem_ok pt (upa_map pt M) t' Htok')
+              ltac:(intros j Hj;
+                    exact (uv_win_some pt M t w_leaf pc 4 32 iw Hinj
+                             (proj1 (proj2 Htok)) Hl Hnc Hb j ltac:(lia)))
+              ltac:(intros j Hj;
+                    exact (uv_win_some pt M t' w_leaf pc 4 32 iw Hinj
+                             (proj1 (proj2 Htok')) Hl Hnc Hb j ltac:(lia)))
+              Tr)
+    as (region & HA & Hord & Hrange & HX & Hpmam & Halp & Hexecp &
+        Hclint & Hsig & Hhtif & Hdev & Hown & Lcp').
+  split.
+  - exact (exec_mem_read_fetch_4_U PBMT_PMA (u_walk_pa w_leaf pc) region iw
+             (u_state rsf' (uv_mm t' (upa_map pt M)))
+             HA Hord Hrange HX Hpmam Halp Hexecp Hclint Hsig
+             (within_htif_false (u_walk_pa w_leaf pc) 4
+                (u_state rsf' (uv_mm t' (upa_map pt M))) Hhtif)
+             Hdev ltac:(intros j Hj; apply Hbytes'; lia) Lcp').
+  - exact (goodmb_mem_read_fetch_4_U Du_r Du_w PBMT_PMA (u_walk_pa w_leaf pc)
+             region iw (u_state rsf' (uv_mm t' (upa_map pt M)))
+             (uv_mm t (upa_map pt M))
+             ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+             ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+             ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+             HA Hord Hrange HX Hpmam Halp Hexecp Hclint Hsig Hhtif Hdev Hown
+             ltac:(intros j Hj; apply Hbytes'; lia) Lcp').
+Qed.
+
+Lemma uv_read_2 (pt : uptd) (M : gmap Z (bv 8)) (t t' : ptree)
+    (rsf rsf' : regstate) (w_leaf pc : mword 64) (ih : mword 16) :
+  uva_inj pt M ->
+  ud_um pt !! svpn_of pc = Some w_leaf ->
+  (forall j : nat, (j < 2)%nat ->
+     bv_unsigned pc mod 4096 + Z.of_nat j < 4096) ->
+  is_aligned_vaddr (Virtaddr pc) 2 = true ->
+  uM_bytes M (uint pc) 2 ih ->
+  register_lookup cur_privilege rsf = User ->
+  u_exec_pins pt t rsf ->
+  uv_tree_ok pt (upa_map pt M) t ->
+  uv_tree_ok pt (upa_map pt M) t' ->
+  u_tlb_only rsf rsf' ->
+  exec (mem_read (InstructionFetch tt) PBMT_PMA
+          (Physaddr (u_walk_pa w_leaf pc)) 2 false false false)
+    (u_state rsf' (uv_mm t' (upa_map pt M)))
+    = Some (Ok ih, u_state rsf' (uv_mm t' (upa_map pt M))) /\
+  goodmb Du_r Du_w (mem_read (InstructionFetch tt) PBMT_PMA
+           (Physaddr (u_walk_pa w_leaf pc)) 2 false false false)
+    (u_state rsf' (uv_mm t' (upa_map pt M))) (uv_mm t (upa_map pt M)) = true.
+Proof.
+  intros Hinj Hl Hnc Hal Hb Lcp Hpins Htok Htok' Tr.
+  pose proof (uv_win_bytes pt M t' w_leaf pc 2 16 ih Hinj
+                (proj1 (proj2 Htok')) Hl Hnc Hb) as Hbytes'.
+  destruct (u_fetch_read_ok pt t t' (uv_mm t (upa_map pt M))
+              (uv_mm t' (upa_map pt M)) rsf rsf' 2 w_leaf pc
+              ltac:(lia) (Z.divide_factor_l 2 2048) ltac:(lia)
+              ltac:(vm_compute; reflexivity) Hal Hl Lcp Hpins
+              (uv_tree_mem_ok pt (upa_map pt M) t Htok)
+              (uv_tree_mem_ok pt (upa_map pt M) t' Htok')
+              ltac:(intros j Hj;
+                    exact (uv_win_some pt M t w_leaf pc 2 16 ih Hinj
+                             (proj1 (proj2 Htok)) Hl Hnc Hb j ltac:(lia)))
+              ltac:(intros j Hj;
+                    exact (uv_win_some pt M t' w_leaf pc 2 16 ih Hinj
+                             (proj1 (proj2 Htok')) Hl Hnc Hb j ltac:(lia)))
+              Tr)
+    as (region & HA & Hord & Hrange & HX & Hpmam & Halp & Hexecp &
+        Hclint & Hsig & Hhtif & Hdev & Hown & Lcp').
+  split.
+  - exact (exec_mem_read_fetch_2_U PBMT_PMA (u_walk_pa w_leaf pc) region ih
+             (u_state rsf' (uv_mm t' (upa_map pt M)))
+             HA Hord Hrange HX Hpmam Halp Hexecp Hclint Hsig
+             (within_htif_false (u_walk_pa w_leaf pc) 2
+                (u_state rsf' (uv_mm t' (upa_map pt M))) Hhtif)
+             Hdev ltac:(intros j Hj; apply Hbytes'; lia) Lcp').
+  - exact (goodmb_mem_read_fetch_2_U Du_r Du_w PBMT_PMA (u_walk_pa w_leaf pc)
+             region ih (u_state rsf' (uv_mm t' (upa_map pt M)))
+             (uv_mm t (upa_map pt M))
+             ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+             ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+             ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+             HA Hord Hrange HX Hpmam Halp Hexecp Hclint Hsig Hhtif Hdev Hown
+             ltac:(intros j Hj; apply Hbytes'; lia) Lcp').
+Qed.
+
+(* the domain does not move along a same-shaped tree change -- which is what
+   transports the SECOND walk's certificate back to the entry map *)
+Lemma uv_mm_dom (t t' : ptree) (md : PtBytes.pamap) :
+  pt_same_shape 2 t t' ->
+  (dom (uv_mm t md) : gset Arch.pa) = dom (uv_mm t' md).
+Proof.
+  intros Hs.
+  exact (dom_union_shape (ptree_bytes 2 t) (ptree_bytes 2 t') md
+           (ptree_bytes_dom_shape 2 t t' Hs)).
+Qed.
+
+(* ---- (a) a 4-ALIGNED pc: ONE 4-byte read ----------------------------- *)
+Lemma uv_fetch_4 (pt : uptd) (M : gmap Z (bv 8)) (t : ptree) (rsf : regstate)
+    (w_leaf pc : mword 64) (iw : mword 32) :
+  uva_inj pt M ->
+  ud_um pt !! svpn_of pc = Some w_leaf ->
+  uleaf_ok (InstructionFetch tt) w_leaf ->
+  uva_canon pc ->
+  Z.rem (uint pc) 4096 <= 4092 ->
+  is_aligned_vaddr (Virtaddr pc) 4 = true ->
+  uM_bytes M (uint pc) 4 iw ->
+  register_lookup PC rsf = pc ->
+  register_lookup cur_privilege rsf = User ->
+  _get_Mstatus_SXL (register_lookup mstatus rsf) = 'b"10" ->
+  register_lookup menvcfg rsf = MENVCFG_S ->
+  u_exec_pins pt t rsf ->
+  uv_tree_ok pt (upa_map pt M) t ->
+  exists (rsf' : regstate) (t' : ptree),
+    exec (fetch tt) (u_state rsf (uv_mm t (upa_map pt M)))
+      = Some ((if isRVC (subrange_vec_dec iw 15 0)
+               then F_RVC (subrange_vec_dec iw 15 0) else F_Base iw),
+              u_state rsf' (uv_mm t' (upa_map pt M))) /\
+    goodmb Du_r Du_w (fetch tt) (u_state rsf (uv_mm t (upa_map pt M)))
+      (uv_mm t (upa_map pt M)) = true /\
+    u_tlb_only rsf rsf' /\
+    tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rsf') /\
+    uv_tree_ok pt (upa_map pt M) t' /\
+    pt_same_shape 2 t t'.
+Proof.
+  intros Hinj Hl Hleaf Hcanon Hpg Hal Hb Lpc Lcp Lsxl Lmenv Hpins Htok.
+  assert (Hnc : forall j : nat, (j < 4)%nat ->
+            bv_unsigned pc mod 4096 + Z.of_nat j < 4096)
+    by (intros j Hj; exact (uinpage_nc pc (Z.of_nat j) Hpg ltac:(lia))).
+  destruct (uv_walk_fetch pt t (upa_map pt M) rsf w_leaf pc
+              Hl Hleaf Hcanon Lcp Lsxl Lmenv Hpins Htok)
+    as (rsf1 & t1 & Htr & Htrg & Tr1 & Htlbok1 & Htok1 & Hshape1).
+  destruct (uv_read_4 pt M t t1 rsf rsf1 w_leaf pc iw
+              Hinj Hl Hnc Hal Hb Lcp Hpins Htok Htok1 Tr1) as [Hmr Hmrg].
+  exists rsf1, t1. split_and!.
+  - pose proof (exec_fetch_ok_4 (u_state rsf (uv_mm t (upa_map pt M)))
+                  (u_state rsf1 (uv_mm t1 (upa_map pt M))) pc
+                  (u_walk_pa w_leaf pc) iw Lpc Hal Htr Hmr) as Hf.
+    rewrite autocast_mword_id in Hf. exact Hf.
+  - exact (goodmb_fetch_ok_4 Du_r Du_w (u_state rsf (uv_mm t (upa_map pt M)))
+             (u_state rsf1 (uv_mm t1 (upa_map pt M))) (uv_mm t (upa_map pt M))
+             pc (u_walk_pa w_leaf pc) iw ltac:(vm_compute; reflexivity)
+             Lpc Hal Htr Htrg Hmr Hmrg).
+  - exact Tr1.
+  - exact Htlbok1.
+  - exact Htok1.
+  - exact Hshape1.
+Qed.
+
+(* ---- (b) a 2-mod-4 pc holding a COMPRESSED instruction: ONE 2-byte read *)
+Lemma uv_fetch_rvc_2 (pt : uptd) (M : gmap Z (bv 8)) (t : ptree)
+    (rsf : regstate) (w_leaf pc : mword 64) (h : mword 16) :
+  uva_inj pt M ->
+  ud_um pt !! svpn_of pc = Some w_leaf ->
+  uleaf_ok (InstructionFetch tt) w_leaf ->
+  uva_canon pc ->
+  Z.rem (uint pc) 4096 <= 4092 ->
+  is_aligned_vaddr (Virtaddr pc) 2 = true ->
+  is_aligned_vaddr (Virtaddr pc) 4 = false ->
+  uM_bytes M (uint pc) 2 h ->
+  isRVC h = true ->
+  register_lookup PC rsf = pc ->
+  register_lookup cur_privilege rsf = User ->
+  _get_Mstatus_SXL (register_lookup mstatus rsf) = 'b"10" ->
+  register_lookup menvcfg rsf = MENVCFG_S ->
+  u_exec_pins pt t rsf ->
+  uv_tree_ok pt (upa_map pt M) t ->
+  exists (rsf' : regstate) (t' : ptree),
+    exec (fetch tt) (u_state rsf (uv_mm t (upa_map pt M)))
+      = Some (F_RVC h, u_state rsf' (uv_mm t' (upa_map pt M))) /\
+    goodmb Du_r Du_w (fetch tt) (u_state rsf (uv_mm t (upa_map pt M)))
+      (uv_mm t (upa_map pt M)) = true /\
+    u_tlb_only rsf rsf' /\
+    tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rsf') /\
+    uv_tree_ok pt (upa_map pt M) t' /\
+    pt_same_shape 2 t t'.
+Proof.
+  intros Hinj Hl Hleaf Hcanon Hpg Hal2 Hnal4 Hb Hrvc Lpc Lcp Lsxl Lmenv
+    Hpins Htok.
+  pose proof Hpins as ((Hmisa & _ & _ & _ & _ & _) & _).
+  assert (HmisaC : eq_vec (_get_Misa_C (register_lookup misa rsf)) ('b"1") = true)
+    by (rewrite Hmisa; vm_compute; reflexivity).
+  destruct (align2_not4_facts pc Hal2 Hnal4) as (_ & Hbit0 & Hbit1).
+  assert (Hnc : forall j : nat, (j < 2)%nat ->
+            bv_unsigned pc mod 4096 + Z.of_nat j < 4096)
+    by (intros j Hj; exact (uinpage_nc pc (Z.of_nat j) Hpg ltac:(lia))).
+  destruct (uv_walk_fetch pt t (upa_map pt M) rsf w_leaf pc
+              Hl Hleaf Hcanon Lcp Lsxl Lmenv Hpins Htok)
+    as (rsf1 & t1 & Htr & Htrg & Tr1 & Htlbok1 & Htok1 & Hshape1).
+  destruct (uv_read_2 pt M t t1 rsf rsf1 w_leaf pc h
+              Hinj Hl Hnc Hal2 Hb Lcp Hpins Htok Htok1 Tr1) as [Hmr Hmrg].
+  exists rsf1, t1. split_and!.
+  - exact (exec_fetch_rvc_2 (u_state rsf (uv_mm t (upa_map pt M)))
+             (u_state rsf1 (uv_mm t1 (upa_map pt M))) pc (u_walk_pa w_leaf pc)
+             Lpc HmisaC Hbit0 Hbit1 Hnal4 h Htr Hmr Hrvc).
+  - exact (goodmb_fetch_rvc_2 Du_r Du_w (u_state rsf (uv_mm t (upa_map pt M)))
+             (u_state rsf1 (uv_mm t1 (upa_map pt M))) (uv_mm t (upa_map pt M))
+             pc (u_walk_pa w_leaf pc)
+             ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+             Lpc HmisaC Hbit0 Hbit1 Hnal4 h Htr Htrg Hmr Hmrg Hrvc).
+  - exact Tr1.
+  - exact Htlbok1.
+  - exact Htok1.
+  - exact Hshape1.
+Qed.
+
+(* ---- (c) a 2-mod-4 pc holding a BASE instruction: TWO 2-byte reads ---- *)
+Lemma uv_fetch_base_2 (pt : uptd) (M : gmap Z (bv 8)) (t : ptree)
+    (rsf : regstate) (w_leaf pc : mword 64) (iw : mword 32) :
+  uva_inj pt M ->
+  ud_um pt !! svpn_of pc = Some w_leaf ->
+  uleaf_ok (InstructionFetch tt) w_leaf ->
+  uva_canon pc ->
+  Z.rem (uint pc) 4096 <= 4092 ->
+  is_aligned_vaddr (Virtaddr pc) 2 = true ->
+  is_aligned_vaddr (Virtaddr pc) 4 = false ->
+  uM_bytes M (uint pc) 4 iw ->
+  isRVC (subrange_vec_dec iw 15 0) = false ->
+  register_lookup PC rsf = pc ->
+  register_lookup cur_privilege rsf = User ->
+  _get_Mstatus_SXL (register_lookup mstatus rsf) = 'b"10" ->
+  register_lookup menvcfg rsf = MENVCFG_S ->
+  u_exec_pins pt t rsf ->
+  uv_tree_ok pt (upa_map pt M) t ->
+  exists (rsf' : regstate) (t' : ptree),
+    exec (fetch tt) (u_state rsf (uv_mm t (upa_map pt M)))
+      = Some (F_Base iw, u_state rsf' (uv_mm t' (upa_map pt M))) /\
+    goodmb Du_r Du_w (fetch tt) (u_state rsf (uv_mm t (upa_map pt M)))
+      (uv_mm t (upa_map pt M)) = true /\
+    u_tlb_only rsf rsf' /\
+    tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rsf') /\
+    uv_tree_ok pt (upa_map pt M) t' /\
+    pt_same_shape 2 t t'.
+Proof.
+  intros Hinj Hl Hleaf Hcanon Hpg Hal2 Hnal4 Hb HnRVC Lpc Lcp Lsxl Lmenv
+    Hpins Htok.
+  pose proof Hpins as ((Hmisa & _ & _ & _ & _ & _) & _).
+  assert (HmisaC : eq_vec (_get_Misa_C (register_lookup misa rsf)) ('b"1") = true)
+    by (rewrite Hmisa; vm_compute; reflexivity).
+  destruct (align2_not4_facts pc Hal2 Hnal4) as (_ & Hbit0 & Hbit1).
+  pose proof (uinpage_nc pc 2 Hpg ltac:(lia)) as Hnc2.
+  pose proof (uinpage_nc pc 3 Hpg ltac:(lia)) as Hnc3.
+  (* the SECOND halfword's va is on the SAME page, hence the same leaf *)
+  assert (Hl2 : ud_um pt !! svpn_of (add_vec_int pc 2) = Some w_leaf).
+  { rewrite (usvpn_window pc 2 ltac:(lia) Hnc2). exact Hl. }
+  pose proof (uva_canon_add pc 2 Hcanon ltac:(lia) Hnc2) as Hcanon2.
+  destruct (uwin_shift pc 2 Hpg ltac:(lia)) as [Hu2 Hmod2].
+  assert (Hnch : forall j : nat, (j < 2)%nat ->
+            bv_unsigned (add_vec_int pc 2) mod 4096 + Z.of_nat j < 4096).
+  { intros j Hj. rewrite Hmod2. lia. }
+  assert (Hncl : forall j : nat, (j < 2)%nat ->
+            bv_unsigned pc mod 4096 + Z.of_nat j < 4096)
+    by (intros j Hj; lia).
+  assert (Hb2 : uM_bytes M (uint (add_vec_int pc 2)) 2
+                  (subrange_vec_dec iw 31 16 : mword 16)).
+  { intros j Hj.
+    rewrite (nth_byte_subrange_hi iw j ltac:(lia)).
+    pose proof (Hb (2 + j)%nat ltac:(lia)) as Hbj.
+    rewrite Nat2Z.inj_add in Hbj. change (Z.of_nat 2) with 2 in Hbj.
+    rewrite Hu2. rewrite <- Z.add_assoc. exact Hbj. }
+  assert (Hb1 : uM_bytes M (uint pc) 2 (subrange_vec_dec iw 15 0 : mword 16)).
+  { intros j Hj. rewrite (nth_byte_subrange_lo iw j ltac:(lia)).
+    exact (Hb j ltac:(lia)). }
+  assert (Hal2h : is_aligned_vaddr (Virtaddr (add_vec_int pc 2)) 2 = true)
+    by exact (ualign2_plus2 pc Hal2).
+  (* ---- the low halfword ---- *)
+  destruct (uv_walk_fetch pt t (upa_map pt M) rsf w_leaf pc
+              Hl Hleaf Hcanon Lcp Lsxl Lmenv Hpins Htok)
+    as (rsf1 & t1 & Htr1 & Htr1g & Tr1 & Htlbok1 & Htok1 & Hshape1).
+  destruct (uv_read_2 pt M t t1 rsf rsf1 w_leaf pc
+              (subrange_vec_dec iw 15 0 : mword 16)
+              Hinj Hl Hncl Hal2 Hb1 Lcp Hpins Htok Htok1 Tr1) as [Hmr1 Hmr1g].
+  (* ---- the high halfword, at the state the first walk landed on ---- *)
+  assert (Hpins1 : u_exec_pins pt t1 rsf1)
+    by exact (u_exec_pins_only pt t t1 rsf rsf1 Tr1 Htlbok1 Hpins).
+  assert (Lcp1 : register_lookup cur_privilege rsf1 = User)
+    by (rewrite (Tr1 cur_privilege ltac:(vm_compute; reflexivity)); exact Lcp).
+  assert (Lsxl1 : _get_Mstatus_SXL (register_lookup mstatus rsf1) = 'b"10")
+    by (rewrite (Tr1 mstatus ltac:(vm_compute; reflexivity)); exact Lsxl).
+  assert (Lmenv1 : register_lookup menvcfg rsf1 = MENVCFG_S)
+    by (rewrite (Tr1 menvcfg ltac:(vm_compute; reflexivity)); exact Lmenv).
+  assert (Lpc1 : register_lookup PC rsf1 = pc)
+    by (rewrite (Tr1 PC ltac:(vm_compute; reflexivity)); exact Lpc).
+  destruct (uv_walk_fetch pt t1 (upa_map pt M) rsf1 w_leaf (add_vec_int pc 2)
+              Hl2 Hleaf Hcanon2 Lcp1 Lsxl1 Lmenv1 Hpins1 Htok1)
+    as (rsf2 & t2 & Htr2 & Htr2g & Tr2 & Htlbok2 & Htok2 & Hshape2).
+  destruct (uv_read_2 pt M t1 t2 rsf1 rsf2 w_leaf (add_vec_int pc 2)
+              (subrange_vec_dec iw 31 16 : mword 16)
+              Hinj Hl2 Hnch Hal2h Hb2 Lcp1 Hpins1 Htok1 Htok2 Tr2)
+    as [Hmr2 Hmr2g].
+  (* the second walk's and read's certificates are at [uv_mm t1 md]; the
+     shell wants every certificate at the ENTRY map, and the domain has not
+     moved *)
+  pose proof (uv_mm_dom t t1 (upa_map pt M) Hshape1) as Hdom1.
+  exists rsf2, t2. split_and!.
+  - rewrite <- (concat_subranges_id iw).
+    exact (exec_fetch_base_2 (u_state rsf (uv_mm t (upa_map pt M)))
+             (u_state rsf1 (uv_mm t1 (upa_map pt M))) pc (u_walk_pa w_leaf pc)
+             Lpc HmisaC Hbit0 Hbit1 Hnal4 (subrange_vec_dec iw 15 0)
+             Htr1 Hmr1 (u_state rsf2 (uv_mm t2 (upa_map pt M)))
+             (u_walk_pa w_leaf (add_vec_int pc 2)) Lpc1 HnRVC
+             (subrange_vec_dec iw 31 16) Htr2 Hmr2).
+  - exact (goodmb_fetch_base_2 Du_r Du_w
+             (u_state rsf (uv_mm t (upa_map pt M)))
+             (u_state rsf1 (uv_mm t1 (upa_map pt M))) (uv_mm t (upa_map pt M))
+             pc (u_walk_pa w_leaf pc)
+             ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+             Lpc HmisaC Hbit0 Hbit1 Hnal4 (subrange_vec_dec iw 15 0)
+             Htr1 Htr1g Hmr1 Hmr1g (u_state rsf2 (uv_mm t2 (upa_map pt M)))
+             (u_walk_pa w_leaf (add_vec_int pc 2)) Lpc1 HnRVC
+             (subrange_vec_dec iw 31 16) Htr2
+             ltac:(rewrite (goodmb_dom Du_r Du_w
+                     (translateAddr (Virtaddr (add_vec_int pc 2))
+                        (InstructionFetch tt))
+                     (u_state rsf1 (uv_mm t1 (upa_map pt M)))
+                     (uv_mm t (upa_map pt M)) (uv_mm t1 (upa_map pt M)) Hdom1);
+                   exact Htr2g)
+             Hmr2 ltac:(rewrite (goodmb_dom Du_r Du_w
+                     (mem_read (InstructionFetch tt) PBMT_PMA
+                        (Physaddr (u_walk_pa w_leaf (add_vec_int pc 2))) 2
+                        false false false)
+                     (u_state rsf2 (uv_mm t2 (upa_map pt M)))
+                     (uv_mm t (upa_map pt M)) (uv_mm t1 (upa_map pt M)) Hdom1);
+                   exact Hmr2g)).
+  - exact (u_tlb_only_trans rsf rsf1 rsf2 Tr1 Tr2).
+  - exact Htlbok2.
+  - exact Htok2.
+  - exact (pt_same_shape_trans 2 t t1 t2 Hshape1 Hshape2).
+Qed.
+
+(* ===================================================================== *)
+(* §4 THE RESOURCE BRIDGES.                                               *)
+(*                                                                        *)
+(* [utlb_inv_pt] + [umem] in, ONE byte map out -- plus the four register   *)
+(* cells the walk reads and writes and a closer that takes a same-shaped   *)
+(* tree back.  This is [UserBytes.user_pt_inv_bytes] for a tier that owns  *)
+(* its NAMED image instead of the whole data half, so the memory predicate *)
+(* is [uv_tree_ok] (i.e. [u_mem_ok], not [u_mem_wf]) and the image half of *)
+(* the map is literally [UmodeMem.upa_map pt M].                           *)
+(* ===================================================================== *)
+
+Section UvOpen.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  Lemma uv_pt_open (pt : uptd) (M : gmap Z (bv 8)) :
+    utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) -∗ umem pt M -∗
+    ∃ (t : ptree) (usatp : mword 64) (tlbvec : type_of_register tlb)
+      (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n),
+      ⌜uva_inj pt M⌝ ∗ ⌜uv_tree_ok pt (upa_map pt M) t⌝ ∗
+      ⌜upt_satp_ok_pt (ud_root pt) usatp⌝ ∗ ⌜pmp_ent0_ok pcfg paddr⌝ ∗
+      ⌜tlb_ok_pt (mword_of_int 0) t tlbvec⌝ ∗
+      satp ↦ᵣ usatp ∗ tlb ↦ᵣ tlbvec ∗
+      pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr ∗
+      pt_claims 2 t ∗ bytes_own (uv_mm t (upa_map pt M)) ∗
+      (∀ (t' : ptree) (tlbvec' : type_of_register tlb),
+         ⌜pt_same_shape 2 t t'⌝ -∗
+         ⌜uv_tree_ok pt (upa_map pt M) t'⌝ -∗
+         ⌜tlb_ok_pt (mword_of_int 0) t' tlbvec'⌝ -∗
+         satp ↦ᵣ usatp -∗ tlb ↦ᵣ tlbvec' -∗
+         pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+         bytes_own (uv_mm t' (upa_map pt M)) -∗
+         utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) ∗ umem pt M).
+  Proof.
+    iIntros "Hinv HM".
+    iDestruct (umem_uva_inj pt M with "HM") as %Hinj.
+    iDestruct (umem_to_bytes pt M with "HM") as "HMb".
+    iDestruct (upt_swp_open (ud_root pt) (ud_tfp pt) (ud_um pt) with "Hinv")
+      as (usatp tlbvec pcfg paddr) "(%Hsatpok & %Hpmpok & Hsatp & Htlb &
+                                     Hpcfg & Hpaddr & Hres)".
+    iDestruct "Hres" as (t) "(%Htlbok & %Hspec & %Hwfm & Htree)".
+    iDestruct (ptree_own_bytes 2 t with "Htree") as "(#Hclaims & %Hdisj & Hmt)".
+    iDestruct (bytes_own_disj with "Hmt HMb") as %Hdj.
+    iAssert (bytes_own (uv_mm t (upa_map pt M))) with "[Hmt HMb]" as "Hmm".
+    { rewrite /uv_mm (bytes_own_union _ _ Hdj). iFrame. }
+    iDestruct (bytes_own_ram with "Hmm") as %Hram.
+    iExists t, usatp, tlbvec, pcfg, paddr.
+    iSplitR; [ by iPureIntro |].
+    iSplitR.
+    { iPureIntro. split_and!;
+        [ exact Hdisj | exact Hdj | exact Hram | exact Hwfm | exact Hspec ]. }
+    iSplitR; [ by iPureIntro |]. iSplitR; [ by iPureIntro |].
+    iSplitR; [ by iPureIntro |].
+    iFrame "Hsatp Htlb Hpcfg Hpaddr Hclaims Hmm".
+    iIntros (t' tlbvec') "%Hshape %Htok' %Htlbok' Hsatp Htlb Hpcfg Hpaddr Hmm".
+    pose proof Htok' as (Hdisj' & Hdj' & _ & _ & Hspec').
+    rewrite /uv_mm (bytes_own_union _ _ Hdj').
+    iDestruct "Hmm" as "[Hmt' HMb']".
+    iSplitR "HMb'".
+    - iApply (upt_swp_close (ud_root pt) (ud_tfp pt) (ud_um pt) usatp tlbvec'
+                pcfg paddr Hsatpok Hpmpok with "Hsatp Htlb Hpcfg Hpaddr").
+      iExists t'. iSplitR; [ by iPureIntro |]. iSplitR; [ by iPureIntro |].
+      iSplitR; [ by iPureIntro |].
+      iApply (ptree_own_of_bytes 2 t' Hdisj' with "[] Hmt'").
+      by iApply (pt_claims_shape 2 t t' Hshape).
+    - iApply (bytes_to_umem pt M Hinj with "HMb'").
+  Qed.
+
+  (* ---- the [swp] bridge over a PURE fetch fact -------------------------
+     [UserActiveClass.swp_fetch_of_pure] at the tier's map: the landing map
+     is pinned by [UserClassifyAsm.u_map_eq] (a submap with the full domain
+     IS the map) rather than by [u_landing_map], because the tier's step
+     relation is [uv_tree_ok] plus the shape, not [u_mem_step_ok]. *)
+  Lemma uv_swp_fetch (pt : uptd) (M : gmap Z (bv 8)) (t t' : ptree)
+      (dq : dfrac) (rsf rsf' : regstate) (fr : FetchResult)
+      (Pe : ExecutionResult -> mword 32 -> iProp Σ)
+      (Pf : mword 64 -> ExceptionType -> iProp Σ)
+      (Px : ext_fetch_addr_error -> iProp Σ) :
+    exec (fetch tt) (u_state rsf (uv_mm t (upa_map pt M)))
+      = Some (fr, u_state rsf' (uv_mm t' (upa_map pt M))) ->
+    goodmb Du_r Du_w (fetch tt) (u_state rsf (uv_mm t (upa_map pt M)))
+      (uv_mm t (upa_map pt M)) = true ->
+    pt_same_shape 2 t t' ->
+    gen_cert -∗ resv_any cpu_id -∗
+    hreg_frame rsf u_Drw -∗ hreg_frame_ro (u_Df dq) rsf u_Dro -∗
+    bytes_own (uv_mm t (upa_map pt M)) -∗
+    (∀ rs2 : regstate,
+       ⌜reg_agree_on (u_Drw ∪ u_Dro) rs2 rsf'⌝ -∗
+       hreg_frame rs2 u_Drw -∗ hreg_frame_ro (u_Df dq) rs2 u_Dro -∗
+       bytes_own (uv_mm t' (upa_map pt M)) -∗ resv_any cpu_id -∗
+       run_fetch_post u_Drw u_Dro (u_Df dq) Pe Pf Px fr) -∗
+    swp (fetch tt) (run_fetch_post u_Drw u_Dro (u_Df dq) Pe Pf Px).
+  Proof.
+    intros He Hg Hshape.
+    iIntros "#Hcert Hany Hrw Hro Hown Hk".
+    iApply (swp_mono with "[Hk] [Hany Hrw Hro Hown]").
+    2:{ iApply (swp_hmrun_of_exec Du_r Du_w u_Drw u_Dro (u_Df dq) (fetch tt)
+                  (u_state rsf (uv_mm t (upa_map pt M)))
+                  (u_state rsf' (uv_mm t' (upa_map pt M))) fr rsf
+                  (uv_mm t (upa_map pt M))
+                  u_disj Du_r_sub Du_w_sub
+                  ltac:(intros r _; reflexivity) ltac:(reflexivity) Hg He
+                  with "Hcert Hany Hrw Hro Hown"). }
+    iIntros (v) "(-> & Hpost)".
+    iDestruct "Hpost"
+      as (rs2 mm2) "(%Hag & %Hsub & %Hdom & Hrw & Hro & Hown & Hany)".
+    assert (Hmm2 : mm2 = uv_mm t' (upa_map pt M)).
+    { apply (u_map_eq mm2 (uv_mm t' (upa_map pt M)) Hsub).
+      rewrite Hdom. exact (uv_mm_dom t t' (upa_map pt M) Hshape). }
+    subst mm2.
+    iApply ("Hk" $! rs2 with "[%] Hrw Hro Hown Hany"). exact Hag.
+  Qed.
+
+  (* ---- and over a PURE execute fact, for the register-only instructions
+     this file's funnel serves.  The map does not move at all, so the
+     landing map is pinned by the SAME argument at [t' := t]. *)
+  Lemma uv_swp_execute (pt : uptd) (M : gmap Z (bv 8)) (t : ptree)
+      (dq : dfrac) (rsx : regstate) (instr : instruction)
+      (r : ExecutionResult) (rs_x : regstate) (ib : mword 32)
+      (Pe : ExecutionResult -> mword 32 -> iProp Σ) :
+    exec (execute instr) (u_state rsx (uv_mm t (upa_map pt M)))
+      = Some (r, u_state rs_x (uv_mm t (upa_map pt M))) ->
+    goodmb Du_r Du_w (execute instr) (u_state rsx (uv_mm t (upa_map pt M)))
+      (uv_mm t (upa_map pt M)) = true ->
+    (match r with ExecuteAs _ => False | _ => True end) ->
+    gen_cert -∗ resv_any cpu_id -∗
+    hreg_frame rsx u_Drw -∗ hreg_frame_ro (u_Df dq) rsx u_Dro -∗
+    bytes_own (uv_mm t (upa_map pt M)) -∗
+    (∀ rs2 : regstate,
+       ⌜reg_agree_on (u_Drw ∪ u_Dro) rs2 rs_x⌝ -∗
+       hreg_frame rs2 u_Drw -∗ hreg_frame_ro (u_Df dq) rs2 u_Dro -∗
+       bytes_own (uv_mm t (upa_map pt M)) -∗ resv_any cpu_id -∗
+       Pe r ib) -∗
+    swp (execute instr) (run_exec_post Pe ib).
+  Proof.
+    intros He Hg Hnr.
+    iIntros "#Hcert Hany Hrw Hro Hown Hk".
+    iApply (swp_mono with "[Hk] [Hany Hrw Hro Hown]").
+    2:{ iApply (swp_hmrun_of_exec Du_r Du_w u_Drw u_Dro (u_Df dq)
+                  (execute instr) (u_state rsx (uv_mm t (upa_map pt M)))
+                  (u_state rs_x (uv_mm t (upa_map pt M))) r rsx
+                  (uv_mm t (upa_map pt M))
+                  u_disj Du_r_sub Du_w_sub
+                  ltac:(intros q _; reflexivity) ltac:(reflexivity) Hg He
+                  with "Hcert Hany Hrw Hro Hown"). }
+    iIntros (v) "(-> & Hpost)".
+    iDestruct "Hpost"
+      as (rs2 mm2) "(%Hag & %Hsub & %Hdom & Hrw & Hro & Hown & Hany)".
+    assert (Hmm2 : mm2 = uv_mm t (upa_map pt M))
+      by (apply (u_map_eq mm2 (uv_mm t (upa_map pt M)) Hsub); exact Hdom).
+    subst mm2.
+    iApply (run_exec_post_direct Pe ib r Hnr).
+    iApply ("Hk" $! rs2 with "[%] Hrw Hro Hown Hany"). exact Hag.
+  Qed.
+
+End UvOpen.
+
+(* ===================================================================== *)
+(* §5 THE CYCLE.                                                          *)
+(*                                                                        *)
+(* [UserStepFull.wp_user_step_active]'s shape, at the verified tier's      *)
+(* concrete frames: [Q] is [UserStepFull.u_land] verbatim (it mentions     *)
+(* neither the config nor the page table), [Psi] is a CLOSER, and          *)
+(* [HartRunFull.swp_run_hart_active_res] threads the tier's linear residue *)
+(* -- the byte map, the page-table re-former, the reservation fragment and *)
+(* the caller's OBLIGATION -- from the dispatch's [None] branch into the   *)
+(* fetch, while the INTERRUPT arm is owned here.                           *)
+(* ===================================================================== *)
+
+Local Ltac uv_notin_clock := apply (bool_decide_unpack _); vm_compute; reflexivity.
+
+(* ---- THE LANDING PREDICATE.  [UserStepFull.u_land] admits the ENTER-WAIT
+   shape, which a verified program never reaches and whose landing file the
+   verified frames cannot describe (the wait step skips the tick, so PC and
+   nextPC come apart and [pc_is] is unprovable).  Ruling it out in [Q] is
+   free -- the body slot answers [False] on that arm anyway -- and it is
+   what makes the cycle's tail a SINGLE shape. *)
+Definition uv_land (rs1 : regstate) (st : Step) (rs2 : regstate) : Prop :=
+  register_lookup hart_state rs2 = HART_ACTIVE tt /\
+  register_lookup (R_bool minstret_increment) rs2
+    = minstret_inc_flag (register_lookup (R_bitvector_32 mcountinhibit) rs1)
+        (register_lookup (R_bitvector_64 minstretcfg) rs1)
+        (register_lookup cur_privilege rs1) /\
+  match st with
+  | Step_Execute (Enter_Wait _, _) => False
+  | _ => True
+  end.
+
+(* ...so the cycle's tail is exactly [wrap_post]: the PC tick and the
+   minstret bump, up to agreement off the three clock cells. *)
+Definition uv_tail (rs2 rs3 : regstate) : Prop :=
+  exists mi : mword 64,
+    forall r : register, r ∈ u_Drw ∪ u_Dro -> r ∉ tk_clock3 ->
+      register_lookup r rs3 = register_lookup r (wrap_post rs2 mi).
+
+Lemma uv_tail_of (rs1 rs2 rs3 : regstate) :
+  (exists rsP : regstate, tsf_post (uv_land rs1) rs2 rsP /\
+     reg_agree_on ((u_Drw ∪ u_Dro) ∖ tk_clock3) rs3 rsP) ->
+  uv_tail rs2 rs3.
+Proof.
+  intros (rsP & (st & Hq & Hsh) & Hag).
+  assert (T : forall r : register, r ∈ u_Drw ∪ u_Dro -> r ∉ tk_clock3 ->
+            register_lookup r rs3 = register_lookup r rsP).
+  { intros r H1 H2. apply Hag, elem_of_difference. split; assumption. }
+  destruct st as [ [ii pr] | x | [xv e] | [r ib] | wq ];
+    try (destruct Hsh as (mi & ->); exists mi; exact T).
+  destruct r as [u | i0 | wr0 | u | u | trp | u | ec | ed | u];
+    try (destruct Hsh as (mi & ->); exists mi; exact T).
+  destruct Hq as (_ & _ & []).
+Qed.
+
+Lemma uv_tail_reg (rs2 rs3 : regstate) (r : register) :
+  uv_tail rs2 rs3 ->
+  r ∈ u_Drw ∪ u_Dro -> r ∉ tk_clock3 ->
+  register_beq r (R_bitvector_64 minstret) = false ->
+  register_beq r (R_bitvector_64 PC) = false ->
+  register_lookup r rs3 = register_lookup r rs2.
+Proof.
+  intros (mi & T) Hin Hnc Hms Hpc.
+  rewrite (T r Hin Hnc). exact (wrap_post_other r rs2 mi Hms Hpc).
+Qed.
+
+Lemma uv_tail_pc (rs2 rs3 : regstate) :
+  uv_tail rs2 rs3 ->
+  register_lookup (R_bitvector_64 PC) rs3
+  = register_lookup (R_bitvector_64 nextPC) rs2.
+Proof.
+  intros (mi & T). rewrite (T _ u_in_PC ltac:(uv_notin_clock)).
+  apply wrap_post_PC.
+Qed.
+
+(* a GPR is none of the three clock cells -- the symbolic-index side
+   condition, discharged once (WpGpr's [regbeq_gpr_*] recipe) *)
+Lemma uv_gpr_notin_clock3 (n : Z) :
+  (R_bitvector_64 (gpr_of_Z n) : register) ∉ tk_clock3.
+Proof.
+  unfold gpr_of_Z; repeat case_match; uv_notin_clock.
+Qed.
+
+(* the register file a landing file determines IS the caller's, once x0 is
+   known to read [zero_reg] there.  [UserFrame.u_gpr_file_eq] proves the
+   same equality from the RESOURCE; a closer that has already handed the
+   file back needs it from the PURE side. *)
+Lemma uv_regfile_eq (g : regfile) (rs : regstate) :
+  u_gpr_agree g rs ->
+  g (Regidx (mword_of_int 0)) = zero_reg ->
+  g = u_regfile rs.
+Proof.
+  intros Hag H0. apply functional_extensionality. intros [i].
+  destruct (decide (uint i = 0)) as [Hz | Hnz].
+  - rewrite /u_regfile (proj2 (Z.eqb_eq (uint i) 0) Hz).
+    rewrite (u_mword5_eq i 0 ltac:(lia) Hz). exact H0.
+  - by rewrite (Hag i Hnz) /u_regfile (proj2 (Z.eqb_neq (uint i) 0) Hnz).
+Qed.
+
+Section UvResume.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId}.
+  Context (C : ucfg) (pt : uptd).
+
+  (* the kernel's resume wand, in EXACTLY the shape [UmodeCap.uv_intr_wp]
+     takes it: hart-free, because the scheduler may migrate the process
+     while it is parked. *)
+  Definition uv_resume (Ψ : usys_protocol Σ) (M : gmap Z (bv 8))
+      (m : regfile) (pc : mword 64) : iProp Σ :=
+    (∀ CID : CpuId, uv_run C pt M m pc -∗ WP (Loop : expr riscv_lang))%I.
+
+End UvResume.
+
+Section UvEngine.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context (C : ucfg) (pt : uptd).
 
-  (* The verified twin of [UserStepFull.interrupt_branch]: identical
-     premises and identical internal reduction, but (i) the pt/image/config
-     payload is the verified tier's, and (ii) the continuation receives the
-     CONCRETE [uv_trap_frame] -- the delivered scause is
-     [utrap_scause (Interrupt i) sc_v], the delivered stval is [tval None]
-     (an interrupt carries no tval), sepc is the interrupted pc, and the
-     register file and image come back verbatim.
+  (* ---- the page-table re-former, keyed on the tree it was opened at ---- *)
+  Definition uv_close (M : gmap Z (bv 8)) (t : ptree) (usatp : mword 64)
+      (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
+      : iProp Σ :=
+    (∀ (t' : ptree) (tlbv' : type_of_register tlb),
+       ⌜pt_same_shape 2 t t'⌝ -∗ ⌜uv_tree_ok pt (upa_map pt M) t'⌝ -∗
+       ⌜tlb_ok_pt (mword_of_int 0) t' tlbv'⌝ -∗
+       satp ↦ᵣ usatp -∗ tlb ↦ᵣ tlbv' -∗
+       pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+       bytes_own (uv_mm t' (upa_map pt M)) -∗
+       utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) ∗ umem pt M)%I.
 
-     The two lemmas should eventually be UNIFIED by the wrapper recipe (a
-     payload-generic core over an opaque [P : iProp Σ] plus two
-     restatements); they are kept apart here so that landing this file
-     touches no already-built file. *)
-  Lemma uv_interrupt_branch (Ei : coPset)
-      (σ : mstate) (i : InterruptType)
-      (ms_v sc_v stval_v sepc_v va : mword 64) (g : regfile)
-      (M : gmap Z (bv 8))
-      (mst : mword 64) (mi : bool) (misa0 : type_of_register misa) (elpv : mword 1)
-      (mip_v : mword 64) (meip seip : mword 1) :
-    user_mstatus_ok ms_v ->
-    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
-    eq_vec elpv (landing_pad_bits_backwards LP_EXPECTED) = false ->
-    register_lookup cur_privilege σ.(sregs) = User ->
-    register_lookup mstatus σ.(sregs) = ms_v ->
-    register_lookup scause σ.(sregs) = sc_v ->
-    register_lookup stvec σ.(sregs) = uc_stvec C ->
-    register_lookup elp σ.(sregs) = elpv ->
-    register_lookup misa σ.(sregs) = misa0 ->
-    register_lookup PC σ.(sregs) = va ->
-    register_lookup mip σ.(sregs) = mip_v ->
-    register_lookup sig_meip σ.(sregs) = meip ->
-    register_lookup sig_seip σ.(sregs) = seip ->
-    register_lookup mie σ.(sregs) = uc_mie C ->
-    register_lookup mideleg σ.(sregs) = uc_mideleg C ->
-    u_dispatch mip_v meip seip (uc_mie C) (uc_mideleg C) = Some (i, Supervisor) ->
-    mstate_interp σ -∗
-    (minstret ↦ᵣ mst) -∗ (R_bool minstret_increment ↦ᵣ mi) -∗
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    cur_privilege ↦ᵣ User -∗ mstatus ↦ᵣ ms_v -∗ scause ↦ᵣ sc_v -∗
-    stval ↦ᵣ stval_v -∗ sepc ↦ᵣ sepc_v -∗ PC ↦ᵣ va -∗ nextPC ↦ᵣ va -∗
-    gpr_file g -∗
-    utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) -∗
-    umem pt M -∗ user_cfg C -∗
-    ▷ (uv_trap_frame C pt (utrap_scause (Interrupt i) sc_v) (tval None) va g M -∗
-       WP (Loop : expr riscv_lang)) -∗
-    |={Ei}=> ∃ s' : mstate,
-      ⌜exec (riscv_step false) σ = Some (tt, s')⌝ ∗
-      ▷ (mstate_interp s' ∗ minstret_inv_body ∗
-         WP (Loop : expr riscv_lang)).
+  Definition uv_res (M : gmap Z (bv 8)) (t : ptree) (usatp : mword 64)
+      (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
+      : iProp Σ :=
+    (pt_claims 2 t ∗ uv_close M t usatp pcfg paddr)%I.
+
+  (* the residue travels with the tree the walk landed on *)
+  Lemma uv_res_move (M : gmap Z (bv 8)) (t t' : ptree) (usatp : mword 64)
+      (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n) :
+    pt_same_shape 2 t t' ->
+    uv_res M t usatp pcfg paddr -∗ uv_res M t' usatp pcfg paddr.
   Proof.
-    iIntros (Hmsok HmisaS Help_ne Lpriv Lms Lsc Lstvec Lelp Lmisa Lpc
-             Lmip Lmeip Lseip Lmie Lmdl Hd)
-      "[Hreg Hmd] Hmst Hmi Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr
-       Hutlb Humem Hcfg Hcont".
-    iDestruct (reg_valid_dq with "Hreg Hhs") as %Lhs0.
-    destruct (exec_should_inc_minstret_Some
-                (register_lookup cur_privilege σ.(sregs)) σ) as [b Hsi].
-    iMod (reg_update _ (R_bool minstret_increment) _ b with "Hreg Hmi") as "[Hreg Hmi]".
-    assert (T : forall (r : register) (v : type_of_register r),
-              register_lookup r σ.(sregs) = v ->
-              register_beq r (R_bool minstret_increment) = false ->
-              register_lookup r (set_reg σ (R_bool minstret_increment) b).(sregs) = v).
-    { intros r v Hv Hne. rewrite ?sregs_set_reg.
-      rewrite irrelevant_register_set; [exact Hv | exact Hne]. }
-    iDestruct (reg_valid_dq with "Hreg Hhs") as %Lhs.
-    assert (Hdisp_a : exec (dispatchInterrupt User) (set_reg σ (R_bool minstret_increment) b)
-                      = Some (Some (i, Supervisor), set_reg σ (R_bool minstret_increment) b)).
-    { rewrite (exec_dispatchInterrupt_U_reduce (set_reg σ (R_bool minstret_increment) b)
-                 mip_v (uc_mie C) (uc_mideleg C) meip seip
-                 ltac:(rewrite exec_currentlyEnabled_S; rewrite (T misa _ Lmisa eq_refl);
-                       rewrite HmisaS; reflexivity)
-                 (T mip _ Lmip eq_refl) (T sig_meip _ Lmeip eq_refl)
-                 (T sig_seip _ Lseip eq_refl) (T mie _ Lmie eq_refl)
-                 (T mideleg _ Lmdl eq_refl) (uc_mm C)).
-      rewrite Hd. reflexivity. }
-    pose proof (exec_run_hart_active_pending_U (set_reg σ (R_bool minstret_increment) b)
-                  i Supervisor (T cur_privilege _ Lpriv eq_refl) Hdisp_a) as Hha.
-    pose proof (exec_handle_interrupt_U (set_reg σ (R_bool minstret_increment) b)
-                  (Interrupt i) None va ms_v sc_v (uc_stvec C) elpv
-                  (T cur_privilege _ Lpriv eq_refl) (T mstatus _ Lms eq_refl)
-                  (T scause _ Lsc eq_refl) (T stvec _ Lstvec eq_refl)
-                  (T elp _ Lelp eq_refl)
-                  ltac:(rewrite (T misa _ Lmisa eq_refl); exact HmisaS)
-                  (uc_tvd C) (T PC _ Lpc eq_refl) i eq_refl eq_refl) as Hhi.
-    set (s_trap := set_reg _ nextPC (stvec_base (uc_stvec C))) in Hhi.
-    assert (Lhs_trap : register_lookup hart_state s_trap.(sregs) = HART_ACTIVE tt).
-    { unfold s_trap; rewrite ?sregs_set_reg.
-      repeat (rewrite irrelevant_register_set; [ | vm_compute; reflexivity ]).
-      exact Lhs0. }
-    assert (Hstep : exec (riscv_step false) σ
-              = Some (tt, set_reg s_trap PC (register_lookup nextPC s_trap.(sregs)))).
-    { eapply exec_riscv_step_interrupt;
-        [ exact Hsi | exact Lhs | exact Hha | exact Hhi | exact Lhs_trap ]. }
-    assert (Lnpc_trap : register_lookup nextPC s_trap.(sregs) = stvec_base (uc_stvec C)).
-    { unfold s_trap; rewrite ?sregs_set_reg. apply register_lookup_set. }
-    rewrite Lnpc_trap in Hstep.
-    assert (Hs' : set_reg s_trap PC (stvec_base (uc_stvec C))
-                = utrap_state (set_reg σ (R_bool minstret_increment) b)
-                    (Interrupt i) None va ms_v sc_v elpv (uc_stvec C))
-      by (unfold s_trap; reflexivity).
-    rewrite Hs' in Hstep.
-    iMod (utrap_ghost (set_reg σ (R_bool minstret_increment) b) (Interrupt i) None
-            va ms_v sc_v stval_v sepc_v va va elpv (uc_stvec C)
-            (T elp _ Lelp eq_refl) Help_ne
-            with "[Hreg Hmd] Hms Hsc Hstval Hsepc Hpriv Hnpc Hpc")
-      as "(Hint & Hms & Hsc & Hstval & Hsepc & Hpriv & Hnpc & Hpc)".
-    { iFrame "Hreg Hmd". }
-    iModIntro. iExists _.
-    iSplitR. { iPureIntro. exact Hstep. }
-    iNext.
-    iFrame "Hint".
-    iSplitL "Hmst Hmi". { iExists mst, b. iFrame. }
-    iApply ("Hcont" with "[-]").
-    iExists (utrap_ms elpv ms_v).
-    iSplitR. { iPureIntro. exact (utrap_ms_ok elpv ms_v Hmsok). }
-    iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hutlb Humem Hcfg".
+    intros Hshape. iIntros "[#Hc Hcl]". iSplitR.
+    { by iApply (pt_claims_shape 2 t t' Hshape). }
+    iIntros (t'' tlbv'') "%Hs'' %Htok'' %Hok'' Hsatp Htlb Hpcfg Hpaddr Hmm".
+    iApply ("Hcl" $! t'' tlbv'' with "[%] [%] [%] Hsatp Htlb Hpcfg Hpaddr Hmm");
+      [ exact (pt_same_shape_trans 2 t t' t'' Hshape Hs'')
+      | exact Htok'' | exact Hok'' ].
   Qed.
 
-End UvInterruptBranch.
+  (* ---- the payload: a CLOSER over the file the CYCLE (not the arm)
+     landed on.  It takes the interrupt-resume wand from the wrapper -- the
+     one thing an arm cannot build for itself, since it is the Loeb
+     hypothesis and only the wrapper's continuation is under the later. *)
+  (* [R] is what the WRAPPER supplies to the closer and an arm cannot build
+     for itself: the Loeb hypothesis, which is [|>]-guarded and only becomes
+     usable inside the cycle rule's continuation.  Keeping it ABSTRACT here
+     is what breaks the definitional cycle (the hypothesis mentions the
+     obligation, the obligation mentions the payload). *)
+  Definition uv_psi (R : iProp Σ) (rs2 : regstate) : iProp Σ :=
+    (resv_any cpu_id ∗
+     (∀ rs3 : regstate,
+        ⌜uv_tail rs2 rs3⌝ -∗
+        hreg_frame rs3 u_Drw -∗ hreg_frame_ro (u_Df (uc_dqc C)) rs3 u_Dro -∗
+        resv_any cpu_id -∗ R -∗
+        WP (Loop : expr riscv_lang)))%I.
+
+  Definition uv_arm_res (R : iProp Σ) (rs2 : regstate) : iProp Σ :=
+    (hreg_frame rs2 u_Drw ∗ hreg_frame_ro (u_Df (uc_dqc C)) rs2 u_Dro ∗
+     uv_psi R rs2)%I.
+
+  (* the three arms this tier can reach.  A verified program never executes
+     an illegal word, never enters a wait and never fetches from an unmapped
+     page (its [uinstr] says so), so those three shapes are [False]. *)
+  Definition uv_step_post (R : iProp Σ) (rs1 : regstate) (st : Step) : iProp Σ :=
+    (∃ rs2 : regstate, ⌜uv_land rs1 st rs2⌝ ∗
+       match st with
+       | Step_Execute (Retire_Success tt, _) => uv_arm_res R rs2
+       | Step_Pending_Interrupt (i, p) =>
+           swp (handle_interrupt i p) (fun _ => uv_arm_res R rs2)
+       | Step_Execute (rv64d_types.Trap (p, exc, pcx), _) =>
+           swp (Defs.bind (exception_handler p exc pcx) set_next_pc)
+             (fun _ => uv_arm_res R rs2)
+       | _ => False
+       end)%I.
+
+  (* ---- the pure pin bundle the obligation and the arms share ---------- *)
+  Definition uv_pre (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64)
+      (t : ptree) (rs1 rsA : regstate) (usatp : mword 64)
+      (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n) : Prop :=
+    uva_inj pt M /\
+    uv_tree_ok pt (upa_map pt M) t /\
+    u_exec_pins pt t rsA /\
+    register_lookup hart_state rsA = HART_ACTIVE tt /\
+    register_lookup cur_privilege rsA = User /\
+    user_mstatus_ok (register_lookup (R_bitvector_64 mstatus) rsA) /\
+    register_lookup (R_bitvector_64 PC) rsA = pc /\
+    u_gpr_agree m rsA /\
+    register_lookup (R_bitvector_64 stvec) rsA = uc_stvec C /\
+    register_lookup (R_bitvector_64 mie) rsA = uc_mie C /\
+    register_lookup (R_bitvector_64 mideleg) rsA = uc_mideleg C /\
+    register_lookup (R_bitvector_64 medeleg) rsA = uc_medeleg C /\
+    register_lookup (R_bitvector_64 menvcfg) rsA = MENVCFG_S /\
+    register_lookup (R_bitvector_64 satp) rsA = usatp /\
+    register_lookup pmpcfg_n rsA = pcfg /\
+    register_lookup pmpaddr_n rsA = paddr /\
+    register_lookup (R_bool minstret_increment) rsA
+      = minstret_inc_flag (register_lookup (R_bitvector_32 mcountinhibit) rs1)
+          (register_lookup (R_bitvector_64 minstretcfg) rs1)
+          (register_lookup cur_privilege rs1) /\
+    m (Regidx (mword_of_int 0)) = zero_reg.
+
+End UvEngine.
+
+(* THE OBLIGATION lives in a CpuId-FREE section, with the hart as an
+   ordinary leading binder: the engine consumes it at whatever hart the
+   process is running on after any number of absorbed interrupts, and a
+   SECTION CpuId variable is auto-applied and cannot be named at
+   application (claude-notes/projects/user-verified.md section 5). *)
+Section UvObl.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId}.
+  Context (C : ucfg) (pt : uptd).
+
+  (* ---- THE OBLIGATION: fetch-onward.  The engine has already taken the
+     dispatch's [None] branch, so what is left to say is what the machine
+     does from the FETCH on -- which is exactly where the caller's [uinstr]
+     and execute facts live. *)
+  (* [Kc] is the CALLER's continuation.  It arrives [|>]-guarded (that is
+     what [wp_uv_retire_later] is FOR: an [iLoeb] back edge can only close
+     under a later), and the only later-stripping point in the whole chain
+     is the cycle rule's own continuation -- which runs AFTER the body slot
+     where this obligation lives.  So the obligation does not hold [Kc]: it
+     holds a WAND [R -∗ Kc] out of the abstract payload argument, and the
+     wrapper -- which does stand past the later -- puts [Kc] into [R]. *)
+  Definition uv_step_obl (Kc : iProp Σ) (Ψ : usys_protocol Σ)
+      (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) : iProp Σ :=
+    (∀ (R : iProp Σ) (CIDo : CpuId) (t : ptree) (rs1 rsA : regstate)
+       (usatp : mword 64) (pcfg : type_of_register pmpcfg_n)
+       (paddr : type_of_register pmpaddr_n),
+       ⌜uv_pre C pt M m pc t rs1 rsA usatp pcfg paddr⌝ -∗
+       uv_amb (CID := CIDo) -∗
+       uv_cap C pt Ψ -∗
+       (R -∗ Kc) -∗
+       resv_any cpu_id -∗
+       hreg_frame rsA u_Drw -∗
+       hreg_frame_ro (u_Df (uc_dqc C)) rsA u_Dro -∗
+       bytes_own (uv_mm t (upa_map pt M)) -∗
+       uv_res (CID := CIDo) pt M t usatp pcfg paddr -∗
+       swp (fetch tt)
+         (run_fetch_post u_Drw u_Dro (u_Df (uc_dqc C))
+            (fun (r : ExecutionResult) (ib : mword 32) =>
+               uv_step_post (CID := CIDo) C R rs1 (Step_Execute (r, ib)))
+            (fun (xv : mword 64) (e : ExceptionType) =>
+               uv_step_post (CID := CIDo) C R rs1
+                 (Step_Fetch_Failure (Virtaddr xv, e)))
+            (fun _ : ext_fetch_addr_error => False)))%I.
+
+  (* the Loeb hypothesis, named: what the wrapper hands the payload closer *)
+  Definition uv_ih (Kc : iProp Σ) (Ψ : usys_protocol Σ) (M : gmap Z (bv 8))
+      (m : regfile) (pc : mword 64) : iProp Σ :=
+    (∀ CID : CpuId, uv_cap_gpr C pt Ψ M m -∗ pc_is pc -∗
+       uv_step_obl Kc Ψ M m pc -∗ ▷ Kc -∗ WP (Loop : expr riscv_lang))%I.
+
+End UvObl.
 
 (* ===================================================================== *)
-(* §2 The interrupt-absorbing engine.                                     *)
+(* §5b THE CYCLE'S TAIL, ONCE FOR BOTH LANDING SHAPES.                    *)
+(*                                                                        *)
+(* A retiring cycle and a trapping one land on files that differ only in   *)
+(* the privilege and in what the trap tower wrote; in BOTH the tail is     *)
+(* [wrap_post], so PC = nextPC = [rs2]'s nextPC and every other cell of    *)
+(* the footprint reads through.  One lemma therefore takes the frames      *)
+(* apart and rebuilds the tier's bundles for both.                        *)
 (* ===================================================================== *)
+
+Section UvLandClose.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+  Context (C : ucfg) (pt : uptd).
+
+  Lemma uv_land_close (M : gmap Z (bv 8)) (g : regfile) (npc : mword 64)
+      (t : ptree) (usatp : mword 64) (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n) (p : Privilege)
+      (rs2 rs3 : regstate) :
+    uv_tail rs2 rs3 ->
+    register_lookup hart_state rs2 = HART_ACTIVE tt ->
+    register_lookup cur_privilege rs2 = p ->
+    register_lookup (R_bitvector_64 nextPC) rs2 = npc ->
+    u_gpr_agree g rs2 ->
+    g (Regidx (mword_of_int 0)) = zero_reg ->
+    register_lookup (R_bitvector_64 stvec) rs2 = uc_stvec C ->
+    register_lookup (R_bitvector_64 mie) rs2 = uc_mie C ->
+    register_lookup (R_bitvector_64 mideleg) rs2 = uc_mideleg C ->
+    register_lookup (R_bitvector_64 medeleg) rs2 = uc_medeleg C ->
+    register_lookup (R_bitvector_64 menvcfg) rs2 = MENVCFG_S ->
+    register_lookup (R_bitvector_64 mstateen0) rs2 = (mword_of_int 0 : mword 64) ->
+    register_lookup (R_bitvector_32 sstateen0) rs2 = (mword_of_int 0 : mword 32) ->
+    register_lookup (R_bitvector_64 senvcfg) rs2 = (mword_of_int 0 : mword 64) ->
+    register_lookup (R_bitvector_64 satp) rs2 = usatp ->
+    register_lookup pmpcfg_n rs2 = pcfg ->
+    register_lookup pmpaddr_n rs2 = paddr ->
+    uv_tree_ok pt (upa_map pt M) t ->
+    tlb_ok_pt (mword_of_int 0) t (register_lookup tlb rs2) ->
+    hreg_frame rs3 u_Drw -∗ hreg_frame_ro (u_Df (uc_dqc C)) rs3 u_Dro -∗
+    resv_any cpu_id -∗
+    bytes_own (uv_mm t (upa_map pt M)) -∗
+    uv_res pt M t usatp pcfg paddr -∗
+    (hart_state ↦ᵣ HART_ACTIVE tt ∗ cur_privilege ↦ᵣ p ∗
+     mstatus ↦ᵣ (register_lookup (R_bitvector_64 mstatus) rs2) ∗
+     scause ↦ᵣ (register_lookup (R_bitvector_64 scause) rs2) ∗
+     stval ↦ᵣ (register_lookup (R_bitvector_64 stval) rs2) ∗
+     sepc ↦ᵣ (register_lookup (R_bitvector_64 sepc) rs2) ∗
+     pc_is npc ∗ gpr_file g ∗ user_cfg C ∗
+     utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) ∗ umem pt M).
+  Proof.
+    intros Htail Lhs Lpriv Lnpc Hgag Hx0 Lstvec Lmie Lmdl Lmedl Lmenv Lmste
+      Lsste Lsenv Lsatp Lpcfg Lpaddr Htok Htlbok.
+    (* every cell of the footprint but PC and minstret reads through *)
+    assert (T : forall r : register, r ∈ u_Drw ∪ u_Dro -> r ∉ tk_clock3 ->
+              register_beq r (R_bitvector_64 minstret) = false ->
+              register_beq r (R_bitvector_64 PC) = false ->
+              register_lookup r rs3 = register_lookup r rs2)
+      by (intros r H1 H2 H3 H4; exact (uv_tail_reg rs2 rs3 r Htail H1 H2 H3 H4)).
+    assert (Lhs3 : register_lookup hart_state rs3 = HART_ACTIVE tt)
+      by (rewrite (T _ u_in_hart ltac:(uv_notin_clock) eq_refl eq_refl); exact Lhs).
+    assert (Lpriv3 : register_lookup cur_privilege rs3 = p)
+      by (rewrite (T _ u_in_priv ltac:(uv_notin_clock) eq_refl eq_refl); exact Lpriv).
+    assert (Lpc3 : register_lookup (R_bitvector_64 PC) rs3 = npc)
+      by (rewrite (uv_tail_pc rs2 rs3 Htail); exact Lnpc).
+    assert (Lnpc3 : register_lookup (R_bitvector_64 nextPC) rs3 = npc)
+      by (rewrite (T _ u_in_nPC ltac:(uv_notin_clock) eq_refl eq_refl); exact Lnpc).
+    assert (Lstvec3 : register_lookup (R_bitvector_64 stvec) rs3 = uc_stvec C)
+      by (rewrite (T _ u_in_stvec ltac:(uv_notin_clock) eq_refl eq_refl); exact Lstvec).
+    assert (Lmie3 : register_lookup (R_bitvector_64 mie) rs3 = uc_mie C)
+      by (rewrite (T _ u_in_mie ltac:(uv_notin_clock) eq_refl eq_refl); exact Lmie).
+    assert (Lmdl3 : register_lookup (R_bitvector_64 mideleg) rs3 = uc_mideleg C)
+      by (rewrite (T _ u_in_mdl ltac:(uv_notin_clock) eq_refl eq_refl); exact Lmdl).
+    assert (Lmedl3 : register_lookup (R_bitvector_64 medeleg) rs3 = uc_medeleg C)
+      by (rewrite (T _ u_in_medl ltac:(uv_notin_clock) eq_refl eq_refl); exact Lmedl).
+    assert (Lmenv3 : register_lookup (R_bitvector_64 menvcfg) rs3 = MENVCFG_S)
+      by (rewrite (T _ u_in_menv ltac:(uv_notin_clock) eq_refl eq_refl); exact Lmenv).
+    assert (Lmste3 : register_lookup (R_bitvector_64 mstateen0) rs3
+                     = (mword_of_int 0 : mword 64))
+      by (rewrite (T _ u_in_mste ltac:(uv_notin_clock) eq_refl eq_refl); exact Lmste).
+    assert (Lsste3 : register_lookup (R_bitvector_32 sstateen0) rs3
+                     = (mword_of_int 0 : mword 32))
+      by (rewrite (T _ u_in_sste ltac:(uv_notin_clock) eq_refl eq_refl); exact Lsste).
+    assert (Lsenv3 : register_lookup (R_bitvector_64 senvcfg) rs3
+                     = (mword_of_int 0 : mword 64))
+      by (rewrite (T _ u_in_senv ltac:(uv_notin_clock) eq_refl eq_refl); exact Lsenv).
+    assert (Lsatp3 : register_lookup (R_bitvector_64 satp) rs3 = usatp)
+      by (rewrite (T _ u_in_satp ltac:(uv_notin_clock) eq_refl eq_refl); exact Lsatp).
+    assert (Lpcfg3 : register_lookup pmpcfg_n rs3 = pcfg)
+      by (rewrite (T _ u_in_pcfg ltac:(uv_notin_clock) eq_refl eq_refl); exact Lpcfg).
+    assert (Lpaddr3 : register_lookup pmpaddr_n rs3 = paddr)
+      by (rewrite (T _ u_in_paddr ltac:(uv_notin_clock) eq_refl eq_refl); exact Lpaddr).
+    assert (Ltlb3 : register_lookup tlb rs3 = register_lookup tlb rs2)
+      by (exact (T _ u_in_tlb ltac:(uv_notin_clock) eq_refl eq_refl)).
+    (* ...including every GPR, at a SYMBOLIC index *)
+    assert (Hgag3 : u_gpr_agree g rs3).
+    { intros i Hnz.
+      rewrite (T _ (u_gpr_in_D i Hnz) (uv_gpr_notin_clock3 (uint i))
+                 (regbeq_gpr_minstret (uint i)) (regbeq_gpr_PC (uint i))).
+      exact (Hgag i Hnz). }
+    assert (Hgeq : g = u_regfile rs3) by exact (uv_regfile_eq g rs3 Hgag3 Hx0).
+    (* ---- the five pin bundles at [rs3] ---- *)
+    assert (Hregs : u_pins_regs_at p rs3 (HART_ACTIVE tt)
+              (register_lookup (R_bitvector_64 mstatus) rs2)
+              (register_lookup (R_bitvector_64 scause) rs2)
+              (register_lookup (R_bitvector_64 stval) rs2)
+              (register_lookup (R_bitvector_64 sepc) rs2)
+              npc npc (u_regfile rs3)).
+    { rewrite /u_pins_regs_at. split_and!;
+        [ exact Lhs3 | exact Lpriv3
+        | exact (T _ u_in_mst ltac:(uv_notin_clock) eq_refl eq_refl)
+        | exact (T _ u_in_scause ltac:(uv_notin_clock) eq_refl eq_refl)
+        | exact (T _ u_in_stval ltac:(uv_notin_clock) eq_refl eq_refl)
+        | exact (T _ u_in_sepc ltac:(uv_notin_clock) eq_refl eq_refl)
+        | exact Lpc3 | exact Lnpc3 | exact (u_regfile_agree rs3) ]. }
+    assert (Htick : u_pins_tick rs3
+              (register_lookup (R_bitvector_64 minstret) rs3)
+              (register_lookup (R_bool minstret_increment) rs3)
+              (register_lookup (R_bitvector_32 mcountinhibit) rs3)
+              (register_lookup (R_bitvector_64 minstretcfg) rs3)
+              (register_lookup (R_bitvector_64 mcycle) rs3)
+              (register_lookup (R_bitvector_64 mtime) rs3)
+              (register_lookup (R_bitvector_64 mip) rs3))
+      by (rewrite /u_pins_tick; split_and!; reflexivity).
+    assert (Hcfg : u_pins_cfg rs3 (uc_stvec C) (uc_mie C) (uc_mideleg C)
+              (uc_medeleg C) MENVCFG_S (mword_of_int 0 : mword 64)
+              (mword_of_int 0 : mword 32)
+              (register_lookup (R_bitvector_32 mcounteren) rs3)
+              (register_lookup (R_bitvector_32 scounteren) rs3)
+              (register_lookup mhpmcounter rs3)).
+    { rewrite /u_pins_cfg. split_and!;
+        [ exact Lstvec3 | exact Lmie3 | exact Lmdl3 | exact Lmedl3
+        | exact Lmenv3 | exact Lmste3 | exact Lsste3
+        | reflexivity | reflexivity | reflexivity ]. }
+    assert (Hhw : u_pins_hw rs3
+              (register_lookup (R_bitvector_64 misa) rs3)
+              (register_lookup (R_bitvector_64 mseccfg) rs3)
+              (mword_of_int 0 : mword 64)
+              (register_lookup pma_regions rs3)
+              (register_lookup htif_tohost_base rs3)
+              (register_lookup (R_bitvector_1 elp) rs3)).
+    { rewrite /u_pins_hw. split_and!;
+        [ reflexivity | reflexivity | exact Lsenv3
+        | reflexivity | reflexivity | reflexivity ]. }
+    assert (Hpt : u_pins_pt rs3 usatp pcfg paddr (register_lookup tlb rs3))
+      by (rewrite /u_pins_pt; split_and!;
+          [ exact Lsatp3 | exact Lpcfg3 | exact Lpaddr3 | reflexivity ]).
+    iIntros "Hrw Hro Hresv Hmm [#Hclaims Hcl]".
+    iDestruct (u_frames_elim_at p rs3 (uc_dqc C) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+                 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+                 Hregs Htick Hcfg Hhw Hpt with "Hrw Hro")
+      as "(Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc & HPC & HnPC & Hgpr &
+           Hminstret & Hmincr & #Hmcnt & #Hmicfg & Hmcycle & Hmtime & Hmip &
+           Hstvec & Hmie & Hmdl & #Hmedl & Hmenv & #Hmste & #Hsste & #Hmcen &
+           #Hscen & #Hhpm & #Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help &
+           #Hsenv & Hsatp & Htlb & Hpcfg & Hpaddr)".
+    iDestruct ("Hcl" $! t (register_lookup tlb rs3)
+                 with "[%] [%] [%] Hsatp Htlb Hpcfg Hpaddr Hmm")
+      as "[Hutlb Humem]".
+    { apply pt_same_shape_refl. }
+    { exact Htok. }
+    { rewrite Ltlb3. exact Htlbok. }
+    rewrite <- Hgeq.
+    iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hgpr Hutlb Humem".
+    iSplitL "HPC HnPC Hminstret Hmincr Hmcycle Hmtime Hmip Hresv".
+    { rewrite /pc_is /minstret_res /clock_res. iFrame "HPC HnPC Hresv".
+      iSplitL "Hminstret Hmincr".
+      - iExists _, _, _, _. iFrame "Hminstret Hmincr Hmcnt Hmicfg".
+      - iExists _, _, _. iFrame "Hmcycle Hmtime Hmip". }
+    rewrite /user_cfg. iFrame "Hstvec Hmie Hmdl Hmedl Hmenv Hsenv Hmste Hsste".
+    iSplitR; [ iExists _, _; iFrame "Hmcen Hscen" | iExists _; iFrame "Hhpm" ].
+  Qed.
+
+End UvLandClose.
+
+(* peel the trap tower's landing file down to the file it started from --
+   [UserActiveClass]'s [u_trap_peel], plus the SYMBOLIC-GPR variant its
+   concrete [vm_compute] side condition cannot serve *)
+Local Ltac uv_trap_peel :=
+  unfold u_trap_rs; cbv zeta;
+  repeat (rewrite irrelevant_register_set; [ | vm_compute; reflexivity ]).
+
+Local Ltac uv_gpr_ne := unfold gpr_of_Z; repeat case_match; vm_compute; reflexivity.
+
+Lemma uv_gpr_agree_trap (g : regfile) (rsf : regstate) (c : TrapCause)
+    (info : option (mword 64)) (pcx sv : mword 64) :
+  u_gpr_agree g rsf -> u_gpr_agree g (u_trap_rs rsf c info pcx sv).
+Proof.
+  intros Hag i Hnz. rewrite (Hag i Hnz).
+  unfold u_trap_rs; cbv zeta.
+  repeat (rewrite irrelevant_register_set; [ | uv_gpr_ne ]).
+  reflexivity.
+Qed.
+
+(* ===================================================================== *)
+(* §5c THE TWO PAYLOAD BUILDERS AND THE INTERRUPT ARM.                    *)
+(* ===================================================================== *)
+
+Section UvArms.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+  Context (C : ucfg) (pt : uptd).
+
+  (* the RETIRING payload: the process runs on, at the new file and pc *)
+  Lemma uv_psi_active (R : iProp Σ) (Ψ : usys_protocol Σ) (M : gmap Z (bv 8))
+      (m' : regfile) (npc : mword 64) (t : ptree) (usatp : mword 64)
+      (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
+      (rs2 : regstate) :
+    register_lookup hart_state rs2 = HART_ACTIVE tt ->
+    register_lookup cur_privilege rs2 = User ->
+    user_mstatus_ok (register_lookup (R_bitvector_64 mstatus) rs2) ->
+    register_lookup (R_bitvector_64 nextPC) rs2 = npc ->
+    u_gpr_agree m' rs2 ->
+    m' (Regidx (mword_of_int 0)) = zero_reg ->
+    register_lookup (R_bitvector_64 stvec) rs2 = uc_stvec C ->
+    register_lookup (R_bitvector_64 mie) rs2 = uc_mie C ->
+    register_lookup (R_bitvector_64 mideleg) rs2 = uc_mideleg C ->
+    register_lookup (R_bitvector_64 medeleg) rs2 = uc_medeleg C ->
+    register_lookup (R_bitvector_64 menvcfg) rs2 = MENVCFG_S ->
+    register_lookup (R_bitvector_64 mstateen0) rs2 = (mword_of_int 0 : mword 64) ->
+    register_lookup (R_bitvector_32 sstateen0) rs2 = (mword_of_int 0 : mword 32) ->
+    register_lookup (R_bitvector_64 senvcfg) rs2 = (mword_of_int 0 : mword 64) ->
+    register_lookup (R_bitvector_64 satp) rs2 = usatp ->
+    register_lookup pmpcfg_n rs2 = pcfg ->
+    register_lookup pmpaddr_n rs2 = paddr ->
+    uv_tree_ok pt (upa_map pt M) t ->
+    tlb_ok_pt (mword_of_int 0) t (register_lookup tlb rs2) ->
+    uv_amb -∗ uv_cap C pt Ψ -∗
+    resv_any cpu_id -∗
+    bytes_own (uv_mm t (upa_map pt M)) -∗
+    uv_res pt M t usatp pcfg paddr -∗
+    (R -∗ ∀ CID0 : CpuId, uv_cap_gpr (CID := CID0) C pt Ψ M m' -∗
+       pc_is (CID := CID0) npc -∗ WP (Loop : expr riscv_lang)) -∗
+    uv_psi C R rs2.
+  Proof.
+    intros Lhs Lpriv Hmsok Lnpc Hgag Hx0 Lstvec Lmie Lmdl Lmedl Lmenv Lmste
+      Lsste Lsenv Lsatp Lpcfg Lpaddr Htok Htlbok.
+    iIntros "#Hamb #Hcap Hresv Hmm Hres Hk".
+    rewrite /uv_psi. iFrame "Hresv".
+    iIntros (rs3) "%Htail Hrw Hro Hresv HR".
+    iDestruct ("Hk" with "HR") as "Hcont".
+    iDestruct (uv_land_close C pt M m' npc t usatp pcfg paddr User rs2 rs3
+                 Htail Lhs Lpriv Lnpc Hgag Hx0 Lstvec Lmie Lmdl Lmedl Lmenv
+                 Lmste Lsste Lsenv Lsatp Lpcfg Lpaddr Htok Htlbok
+                 with "Hrw Hro Hresv Hmm Hres")
+      as "(Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc & Hpc & Hgpr & Hcfg &
+           Hutlb & Humem)".
+    iApply ("Hcont" $! CID with "[-Hpc] Hpc").
+    rewrite /uv_cap_gpr /uv_lin /uv_regs.
+    iFrame "Hcap Hamb Hutlb Humem Hcfg Hgpr".
+    iExists _, _, _, _. iSplitR; [ iPureIntro; exact Hmsok |].
+    iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc".
+  Qed.
+
+  (* the TRAPPING payload: the kernel takes over at [stvec_base] *)
+  Lemma uv_psi_trap (R : iProp Σ) (M : gmap Z (bv 8))
+      (g : regfile) (t : ptree) (usatp : mword 64)
+      (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
+      (rs2 : regstate) (sc_v stv_v sep_v : mword 64) :
+    register_lookup (R_bitvector_64 scause) rs2 = sc_v ->
+    register_lookup (R_bitvector_64 stval) rs2 = stv_v ->
+    register_lookup (R_bitvector_64 sepc) rs2 = sep_v ->
+    register_lookup hart_state rs2 = HART_ACTIVE tt ->
+    register_lookup cur_privilege rs2 = Supervisor ->
+    trap_mstatus_ok (register_lookup (R_bitvector_64 mstatus) rs2) ->
+    register_lookup (R_bitvector_64 nextPC) rs2 = stvec_base (uc_stvec C) ->
+    u_gpr_agree g rs2 ->
+    g (Regidx (mword_of_int 0)) = zero_reg ->
+    register_lookup (R_bitvector_64 stvec) rs2 = uc_stvec C ->
+    register_lookup (R_bitvector_64 mie) rs2 = uc_mie C ->
+    register_lookup (R_bitvector_64 mideleg) rs2 = uc_mideleg C ->
+    register_lookup (R_bitvector_64 medeleg) rs2 = uc_medeleg C ->
+    register_lookup (R_bitvector_64 menvcfg) rs2 = MENVCFG_S ->
+    register_lookup (R_bitvector_64 mstateen0) rs2 = (mword_of_int 0 : mword 64) ->
+    register_lookup (R_bitvector_32 sstateen0) rs2 = (mword_of_int 0 : mword 32) ->
+    register_lookup (R_bitvector_64 senvcfg) rs2 = (mword_of_int 0 : mword 64) ->
+    register_lookup (R_bitvector_64 satp) rs2 = usatp ->
+    register_lookup pmpcfg_n rs2 = pcfg ->
+    register_lookup pmpaddr_n rs2 = paddr ->
+    uv_tree_ok pt (upa_map pt M) t ->
+    tlb_ok_pt (mword_of_int 0) t (register_lookup tlb rs2) ->
+    resv_any cpu_id -∗
+    bytes_own (uv_mm t (upa_map pt M)) -∗
+    uv_res pt M t usatp pcfg paddr -∗
+    (uv_trap_frame C pt sc_v stv_v sep_v g M -∗ R -∗
+     WP (Loop : expr riscv_lang)) -∗
+    uv_psi C R rs2.
+  Proof.
+    intros Lsc Lstv Lsep.
+    subst sc_v stv_v sep_v.
+    intros Lhs Lpriv Hmsok Lnpc Hgag Hx0 Lstvec Lmie Lmdl Lmedl Lmenv Lmste
+      Lsste Lsenv Lsatp Lpcfg Lpaddr Htok Htlbok.
+    iIntros "Hresv Hmm Hres Hcont".
+    rewrite /uv_psi. iFrame "Hresv".
+    iIntros (rs3) "%Htail Hrw Hro Hresv Hresume".
+    iDestruct (uv_land_close C pt M g (stvec_base (uc_stvec C)) t usatp pcfg
+                 (* the trapped landing shape *)
+                 paddr Supervisor rs2 rs3
+                 Htail Lhs Lpriv Lnpc Hgag Hx0 Lstvec Lmie Lmdl Lmedl Lmenv
+                 Lmste Lsste Lsenv Lsatp Lpcfg Lpaddr Htok Htlbok
+                 with "Hrw Hro Hresv Hmm Hres")
+      as "(Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc & Hpc & Hgpr & Hcfg &
+           Hutlb & Humem)".
+    iApply ("Hcont" with "[-Hresume] Hresume"). rewrite /uv_trap_frame.
+    iExists _. iSplitR; [ iPureIntro; exact Hmsok |].
+    iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hgpr Hutlb Humem Hcfg".
+  Qed.
+
+  (* ---- ARM 1: a pending delegated interrupt.  The frame goes to the
+     capability's [uv_intr_wp] and comes back -- same (M, m, pc), ARBITRARY
+     hart -- at the wrapper's resume wand. *)
+  Lemma uv_arm_intr (Ψ : usys_protocol Σ) (M : gmap Z (bv 8)) (m : regfile)
+      (pc : mword 64) (t : ptree) (usatp : mword 64)
+      (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
+      (rs1 rsA : regstate) (i : InterruptType) (Kc : iProp Σ) :
+    uv_pre C pt M m pc t rs1 rsA usatp pcfg paddr ->
+    gen_cert -∗ uv_cap C pt Ψ -∗
+    resv_any cpu_id -∗
+    hreg_frame rsA u_Drw -∗ hreg_frame_ro (u_Df (uc_dqc C)) rsA u_Dro -∗
+    bytes_own (uv_mm t (upa_map pt M)) -∗
+    uv_res pt M t usatp pcfg paddr -∗
+    uv_step_obl C pt Kc Ψ M m pc -∗
+    uv_step_post C (uv_ih C pt Kc Ψ M m pc ∗ Kc)%I rs1
+      (Step_Pending_Interrupt (i, Supervisor)).
+  Proof.
+    intros (Hinj & Htok & Hpins & Lhs & Lpriv & Hmsok & Lpc & Hgag & Lstvec &
+            Lmie & Lmdl & Lmedl & Lmenv & Lsatp & Lpcfg & Lpaddr & Lmi & Hx0).
+    pose proof Hpins as ((Hmisa & Hsec & Hsenv & Hhtif & Hall & Helpne) &
+                         (Hmste & Hsste) & _ & Htlbok).
+    pose proof (elp_no_lp _ Helpne) as Lelp.
+    assert (HmisaS : eq_vec (_get_Misa_S (register_lookup (R_bitvector_64 misa) rsA))
+                       ('b"1") = true)
+      by (rewrite Hmisa; vm_compute; reflexivity).
+    iIntros "#Hcert #Hcap Hany Hrw Hro Hmm Hres Hobl".
+    iDestruct "Hcap" as "[#Hintr #Hsys]".
+    iDestruct (u_ro_elp_acc with "Hro") as "[#Help Hro]".
+    rewrite Lelp.
+    rewrite /uv_step_post.
+    iExists (u_trap_rs rsA (Interrupt i) None pc (uc_stvec C)).
+    iSplitR "Hany Hrw Hro Hmm Hres Hobl".
+    { iPureIntro. rewrite /uv_land. split_and!;
+        [ uv_trap_peel; exact Lhs | uv_trap_peel; exact Lmi | exact I ]. }
+    iApply (swp_mono with "[Hmm Hres Hobl] [Hany Hrw Hro]").
+    2:{ iApply (swp_handle_interrupt_u
+                  (u_state rsA (uv_mm t (upa_map pt M)))
+                  (Interrupt i) None pc
+                  (register_lookup (R_bitvector_64 mstatus) rsA)
+                  (register_lookup (R_bitvector_64 scause) rsA)
+                  (uc_stvec C) (landing_pad_bits_backwards NO_LP_EXPECTED)
+                  Lpriv eq_refl eq_refl Lstvec Lelp HmisaS (uc_tvd C) Lpc
+                  Du_r Du_w u_Drw u_Dro (u_Df (uc_dqc C)) rsA i eq_refl eq_refl
+                  u_disj Du_r_sub Du_w_sub
+                  ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                  ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                  ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                  ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                  ltac:(vm_compute; reflexivity)
+                  ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                  ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                  ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                  ltac:(intros r _; reflexivity) eq_refl
+                  with "Hcert Hany Help Hrw Hro"). }
+    iIntros (v) "Hpost".
+    iDestruct "Hpost" as (rs') "(%Hag & Hrw & Hro & Hany)".
+    rewrite /uv_arm_res.
+    rewrite <- (hreg_frame_ext rs'
+                 (u_trap_rs rsA (Interrupt i) None pc (uc_stvec C)) u_Drw
+                 ltac:(intros r Hr; apply Hag, elem_of_union_l, Hr)).
+    rewrite <- (hreg_frame_ro_ext (u_Df (uc_dqc C)) rs'
+                 (u_trap_rs rsA (Interrupt i) None pc (uc_stvec C)) u_Dro
+                 ltac:(intros r Hr; apply Hag, elem_of_union_r, Hr)).
+    iFrame "Hrw Hro".
+    iApply (uv_psi_trap (uv_ih C pt Kc Ψ M m pc ∗ Kc)%I M m t usatp pcfg paddr
+              (u_trap_rs rsA (Interrupt i) None pc (uc_stvec C))
+              (utrap_scause (Interrupt i) (register_lookup (R_bitvector_64 scause) rsA))
+              (tval None) pc
+              ltac:(uv_trap_peel; apply register_lookup_set)
+              ltac:(uv_trap_peel; apply register_lookup_set)
+              ltac:(uv_trap_peel; apply register_lookup_set)
+              ltac:(uv_trap_peel; exact Lhs)
+              ltac:(uv_trap_peel; apply register_lookup_set)
+              ltac:(uv_trap_peel; rewrite register_lookup_set;
+                    exact (utrap_ms_ok _ _ Hmsok))
+              ltac:(uv_trap_peel; apply register_lookup_set)
+              (uv_gpr_agree_trap m rsA _ _ _ _ Hgag) Hx0
+              ltac:(uv_trap_peel; exact Lstvec)
+              ltac:(uv_trap_peel; exact Lmie)
+              ltac:(uv_trap_peel; exact Lmdl)
+              ltac:(uv_trap_peel; exact Lmedl)
+              ltac:(uv_trap_peel; exact Lmenv)
+              ltac:(uv_trap_peel; exact Hmste)
+              ltac:(uv_trap_peel; exact Hsste)
+              ltac:(uv_trap_peel; exact Hsenv)
+              ltac:(uv_trap_peel; exact Lsatp)
+              ltac:(uv_trap_peel; exact Lpcfg)
+              ltac:(uv_trap_peel; exact Lpaddr)
+              Htok ltac:(uv_trap_peel; exact Htlbok)
+              with "Hany Hmm Hres [Hintr Hobl]").
+    iIntros "Hframe [Hih Hkc]".
+    iApply ("Hintr" $! CID m M pc i
+              (register_lookup (R_bitvector_64 scause) rsA) (tval None)
+              with "Hframe").
+    iIntros (CID') "Hrun".
+    iDestruct (uv_run_cap_gpr (CID := CID') C pt Ψ M m pc
+                 with "[$Hintr $Hsys] Hrun") as "[Hcg Hpc']".
+    iApply ("Hih" $! CID' with "Hcg Hpc' Hobl [Hkc]"). iNext. iExact "Hkc".
+  Qed.
+
+End UvArms.
+
+(* ---- the two transports across the cycle's minstret PRELUDE ---------- *)
+Lemma uv_pins_wpre (P : uptd) (t : ptree) (rs : regstate) :
+  u_exec_pins P t rs -> u_exec_pins P t (wrap_pre rs).
+Proof.
+  intros H. unfold u_exec_pins, u_hw_pins, u_cfg_pins, u_pt_pins in H |- *.
+  repeat (rewrite wrap_pre_other; [ | vm_compute; reflexivity ]).
+  exact H.
+Qed.
+
+Lemma uv_gpr_agree_wpre (g : regfile) (rs : regstate) :
+  u_gpr_agree g rs -> u_gpr_agree g (wrap_pre rs).
+Proof.
+  intros Hag i Hnz. rewrite (Hag i Hnz). symmetry.
+  exact (wrap_pre_other (R_bitvector_64 (gpr_of_Z (uint i))) rs
+           (regbeq_gpr_minc (uint i))).
+Qed.
+
+(* ===================================================================== *)
+(* §5d THE ENGINE.                                                        *)
+(* ===================================================================== *)
+
 Section UvStepEngine.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId}.
   Context (C : ucfg) (pt : uptd).
 
-  (* The per-leaf REAL-STEP obligation.  LINEAR (it captures the leaf's
-     continuation) and consumed EXACTLY ONCE, by the round that takes the
-     real step -- possibly after any number of absorbed interrupts and
-     migrations, which is why the hart is quantified INSIDE. *)
-  Definition uv_step_obl (Ψ : usys_protocol Σ) (M : gmap Z (bv 8))
-      (m : regfile) (pc : mword 64) : iProp Σ :=
-    (∀ (CID : CpuId) (σ : mstate) (ms_v sc_v stval_v sepc_v : mword 64),
-       ⌜user_mstatus_ok ms_v⌝ -∗
-       ⌜register_lookup cur_privilege σ.(sregs) = User⌝ -∗
-       ⌜register_lookup mstatus σ.(sregs) = ms_v⌝ -∗
-       ⌜register_lookup PC σ.(sregs) = pc⌝ -∗
-       ⌜forall b : bool,
-          exec (dispatchInterrupt User) (set_reg σ (R_bool minstret_increment) b)
-            = Some (None, set_reg σ (R_bool minstret_increment) b)⌝ -∗
-       (* the ambient per-hart persistent bundle, re-delivered AT THIS hart
-          (hw_config / minstret_inv / wire_inv own THIS hart's cells, so the
-          caller's ambient copy is useless after a migration) *)
-       uv_amb -∗
-       hart_state ↦ᵣ HART_ACTIVE tt -∗
-       cur_privilege ↦ᵣ User -∗ mstatus ↦ᵣ ms_v -∗ scause ↦ᵣ sc_v -∗
-       stval ↦ᵣ stval_v -∗ sepc ↦ᵣ sepc_v -∗ PC ↦ᵣ pc -∗ nextPC ↦ᵣ pc -∗
-       gpr_file m -∗
-       utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) -∗
-       umem pt M -∗ user_cfg C -∗
-       mstate_interp σ -∗ minstret_inv_body -∗
-       |={⊤ ∖ ↑minstretN ∖ ↑wireN ∖ ↑clockN}=> ∃ s' : mstate,
-          ⌜exec (riscv_step false) σ = Some (tt, s')⌝ ∗
-          ▷ (mstate_interp s' ∗ minstret_inv_body ∗
-             WP (Loop : expr riscv_lang)))%I.
-
-  (* THE ENGINE, in the hart-quantified form the Löb induction needs: only
+  (* THE ENGINE, in the hart-quantified form the Loeb induction needs: only
      [CID] is bound inside the entailment, everything else is a lemma
      binder, so the induction hypothesis can be re-applied at the RESUMING
      hart after a migration. *)
-  Lemma wp_uv_step_gen (Ψ : usys_protocol Σ) (M : gmap Z (bv 8))
-      (m : regfile) (pc : mword 64) :
-    ⊢ ∀ CID : CpuId,
-        uv_cap_gpr (CID := CID) C pt Ψ M m -∗
-        pc_is pc -∗
-        uv_step_obl Ψ M m pc -∗
-        WP (Loop : expr riscv_lang).
+  Lemma wp_uv_step_gen (Kc : iProp Σ) (Ψ : usys_protocol Σ)
+      (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) :
+    ⊢ uv_ih C pt Kc Ψ M m pc.
   Proof.
+    rewrite /uv_ih.
     iLöb as "IH".
-    iIntros (CID) "(#Hcap & Hlin & Hgpr) [Hpc Hnpc] Hobl".
-    iDestruct "Hcap" as "[#Hintr #Hsys]".
+    iIntros (CID) "(#Hcap & Hlin & Hgpr) Hpc Hobl Hkc".
     iDestruct "Hlin" as "(#Hamb & Hregs & Hutlb & Humem & Hcfg)".
-    iAssert uv_amb with "[]" as "#Hamb2". { iExact "Hamb". }
-    iDestruct "Hamb" as "(#Hhw & #Hmin & #Hwinv)".
+    iPoseProof "Hamb" as "(#Hhw & _ & _)".
     iDestruct "Hregs" as (ms_v sc_v stval_v sepc_v)
       "(%Hmsok & Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc)".
-    iApply (wp_exec_step_minstret (⊤ ∖ ↑minstretN ∖ ↑wireN ∖ ↑clockN) with "Hmin").
-    iIntros (σ) "Hint Hbody".
-    (* borrow the wires for this step *)
-    iInv "Hwinv" as ">Hwbody" "Hclosew".
-    iDestruct "Hwbody" as (seipf meipf) "Hwires".
-    iDestruct (big_sepS_delete _ _ cpu_id with "Hwires") as "[[Hseip Hmeip] Hwrest]";
-      [ apply elem_of_fin_to_set |].
-    set (meip := meipf cpu_id). set (seip := seipf cpu_id).
-    (* ... and borrow [mip] from [clock_inv] the same way: the clock tick
-       writes it, so no frame may own it across a step (UserExec.ucfg) *)
-    iPoseProof "Hmin" as "#Hmin'".
-    iDestruct "Hmin'" as "#(_ & Hclock & _)".
-    iMod (clock_mip_acc (⊤ ∖ ↑minstretN ∖ ↑wireN) ltac:(solve_ndisj) with "Hclock")
-      as (mip_v) "[Hmip Hclosec]".
-    iDestruct "Hint" as "[Hreg [Hmem Hdev]]".
-    iDestruct "Hcfg" as "(Hstvec & Hmie & Hmdl & Hmedl & Hcfgrest)".
+    iDestruct "Hpc" as "(HPC & HnPC & Hmr & Hcr & Hresv)".
+    iDestruct "Hmr" as (mst mi mc micfg) "(Hminstret & Hmincr & #Hmcnt & #Hmicfg)".
+    iDestruct "Hcr" as (cy ti ip) "(Hmcycle & Hmtime & Hmip)".
+    iDestruct "Hcfg" as "(Hstvec & Hmie & Hmdl & #Hmedl & Hmenv & #Hsenv &
+                          #Hmste & #Hsste & Hctr & Hhpmb)".
+    iDestruct "Hctr" as (mcenv scenv) "[#Hmcen #Hscen]".
+    iDestruct "Hhpmb" as (hpm) "#Hhpm".
     iPoseProof "Hhw" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & _ & _ & _ & #Help & #Hsenv & %HmisaS & _ & _ & _ & _ & _ & _ & %Help_ne & _)".
-    iDestruct (reg_valid_dq with "Hreg Hmeip") as %Lmeip.
-    iDestruct (reg_valid_dq with "Hreg Hseip") as %Lseip.
-    iDestruct (reg_valid_dq with "Hreg Hmip") as %Lmip.
-    iDestruct (reg_valid_dq with "Hreg Hmie") as %Lmie.
-    iDestruct (reg_valid_dq with "Hreg Hmdl") as %Lmdl.
-    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv.
-    iDestruct (reg_valid_dq with "Hreg Hms") as %Lms.
-    iDestruct (reg_valid_dq with "Hreg Hsc") as %Lsc.
-    iDestruct (reg_valid_dq with "Hreg Hstvec") as %Lstvec.
-    iDestruct (reg_valid_dq with "Hreg Help") as %Lelp.
-    iDestruct (reg_valid_dq with "Hreg Hpc") as %Lpc.
-    iAssert (mstate_interp σ) with "[Hreg Hmem Hdev]" as "Hint".
-    { iFrame "Hreg Hmem Hdev". }
-    iAssert (user_cfg C) with "[Hstvec Hmie Hmdl Hmedl Hcfgrest]" as "Hcfg".
-    { iFrame "Hstvec Hmie Hmdl Hmedl Hcfgrest". }
-    destruct (u_dispatch mip_v meip seip (uc_mie C) (uc_mideleg C)) as [[i p]|] eqn:Hd.
-    - (* ---- a pending delegated interrupt: absorb it ---- *)
-      pose proof (u_dispatch_Supervisor _ _ _ _ _ _ _ Hd) as ->.
-      iDestruct "Hbody" as (mst mi) "[Hmst Hmi]".
-      iMod (uv_interrupt_branch C pt (⊤ ∖ ↑minstretN ∖ ↑wireN ∖ ↑clockN) σ i
-              ms_v sc_v stval_v sepc_v pc m M mst mi misa0 elp0 mip_v meip seip
-              Hmsok HmisaS Help_ne Lpriv Lms Lsc Lstvec Lelp Lmisa Lpc
-              Lmip Lmeip Lseip Lmie Lmdl Hd
-              with "Hint Hmst Hmi Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr
-                    Hutlb Humem Hcfg [Hobl]")
-        as (s') "[%Hexec Hrest]".
-      { iNext. iIntros "Hframe".
-        iApply ("Hintr" $! CID m M pc i sc_v (tval None) with "Hframe").
-        iIntros (CID') "Hrun".
-        iDestruct (uv_run_cap_gpr (CID := CID') C pt Ψ M m pc
-                     with "[$Hintr $Hsys] Hrun") as "[Hcg Hpc']".
-        iApply ("IH" $! CID' with "Hcg Hpc' Hobl"). }
-      iModIntro. iExists s'. iSplitR. { iPureIntro. exact Hexec. }
-      iNext. iDestruct "Hrest" as "(Hint & Hbody & HWP)".
-      iMod ("Hclosec" with "Hmip") as "_".
-      iMod ("Hclosew" with "[Hseip Hmeip Hwrest]") as "_".
-      { iNext. iExists seipf, meipf.
-        iApply (big_sepS_delete _ _ cpu_id); [ apply elem_of_fin_to_set |].
-        iFrame "Hseip Hmeip Hwrest". }
-      iModIntro. iFrame "Hint Hbody HWP".
-    - (* ---- nothing pending: hand the caller its real step ---- *)
-      assert (Hdisp_ab : forall b : bool,
-                exec (dispatchInterrupt User) (set_reg σ (R_bool minstret_increment) b)
-                  = Some (None, set_reg σ (R_bool minstret_increment) b)).
-      { intro b.
-        assert (Tb : forall (r : register) (v : type_of_register r),
-                  register_lookup r σ.(sregs) = v ->
-                  register_beq r (R_bool minstret_increment) = false ->
-                  register_lookup r (set_reg σ (R_bool minstret_increment) b).(sregs) = v).
-        { intros r v Hv Hne. rewrite ?sregs_set_reg.
-          rewrite irrelevant_register_set; [exact Hv | exact Hne]. }
-        rewrite (exec_dispatchInterrupt_U_reduce (set_reg σ (R_bool minstret_increment) b)
-                   mip_v (uc_mie C) (uc_mideleg C) meip seip
-                   ltac:(rewrite exec_currentlyEnabled_S; rewrite (Tb misa _ Lmisa eq_refl);
-                         rewrite HmisaS; reflexivity)
-                   (Tb mip _ Lmip eq_refl) (Tb sig_meip _ Lmeip eq_refl)
-                   (Tb sig_seip _ Lseip eq_refl) (Tb mie _ Lmie eq_refl)
-                   (Tb mideleg _ Lmdl eq_refl) (uc_mm C)).
-        rewrite Hd. reflexivity. }
-      iMod ("Hobl" $! CID σ ms_v sc_v stval_v sepc_v Hmsok Lpriv Lms Lpc Hdisp_ab
-              with "Hamb2 Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr
-                    Hutlb Humem Hcfg Hint Hbody")
-        as (s') "[%Hexec Hrest]".
-      iModIntro. iExists s'. iSplitR. { iPureIntro. exact Hexec. }
-      iNext. iDestruct "Hrest" as "(Hint & Hbody & HWP)".
-      iMod ("Hclosec" with "Hmip") as "_".
-      iMod ("Hclosew" with "[Hseip Hmeip Hwrest]") as "_".
-      { iNext. iExists seipf, meipf.
-        iApply (big_sepS_delete _ _ cpu_id); [ apply elem_of_fin_to_set |].
-        iFrame "Hseip Hmeip Hwrest". }
-      iModIntro. iFrame "Hint Hbody HWP".
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenvhw &
+        _ & _ & _ & _ & %Hpmaall & _ & _ & %Helpne & _ &
+        %Hmisaeq & %Hseceq & _ & #Hcert & _)".
+    iDestruct (gpr_file_x0 m (mword_of_int 0)
+                 ltac:(apply (u_uint_mword5 0); lia) with "Hgpr")
+      as "[%Hx0 Hgpr]".
+    iDestruct (uv_pt_open pt M with "Hutlb Humem")
+      as (t usatp tlbvec pcfg paddr)
+         "(%Hinj & %Htok & %Hsatpok & %Hpmpok & %Htlbok &
+           Hsatp & Htlb & Hpcfg & Hpaddr & #Hclaims & Hmm & Hcl)".
+    pose proof Hpmpok as (HpA & Hpord & HpX & HpW & HpR & Hpcov).
+    (* ---- the entry file ---- *)
+    set (RS := u_rs m (HART_ACTIVE tt) mi mc (mword_of_int 0 : mword 32)
+                 mcenv scenv hpm elp0 pmar0 None pcfg paddr tlbvec
+                 pc pc ms_v sc_v stval_v sepc_v mst cy ti ip micfg
+                 misa0 mseccfg0 (mword_of_int 0 : mword 64)
+                 (uc_stvec C) (uc_mie C) (uc_mideleg C) (uc_medeleg C)
+                 MENVCFG_S (mword_of_int 0 : mword 64) usatp).
+    iDestruct (u_frames_intro RS (uc_dqc C) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+                 (u_rs_pins_regs _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)
+                 (u_rs_pins_tick _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)
+                 (u_rs_pins_cfg _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)
+                 (u_rs_pins_hw _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)
+                 (u_rs_pins_pt _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)
+                 with "Hhs Hpriv Hms Hsc Hstval Hsepc HPC HnPC Hgpr
+                       Hminstret Hmincr Hmcnt Hmicfg Hmcycle Hmtime Hmip
+                       Hstvec Hmie Hmdl Hmedl Hmenv Hmste Hsste
+                       Hmcen Hscen Hhpm
+                       Hmisa Hmseccfg Hpma Hhtif Help Hsenv
+                       Hsatp Htlb Hpcfg Hpaddr")
+      as "[Hrw Hro]".
+    (* ---- the ambient pins, at the entry file and after the prelude ---- *)
+    assert (HpinsR : u_exec_pins pt t RS).
+    { rewrite /u_exec_pins /u_hw_pins /u_cfg_pins /u_pt_pins.
+      split_and!;
+        [ exact Hmisaeq | exact Hseceq | reflexivity | reflexivity
+        | exact Hpmaall | exact Helpne
+        | reflexivity | reflexivity
+        | exists usatp; split; [ exact Hsatpok | reflexivity ]
+        | exact HpA | exact Hpord | exact HpX | exact HpW | exact HpR
+        | exact Hpcov
+        | exact Htlbok ]. }
+    assert (Hpre : uv_pre C pt M m pc t RS (wrap_pre RS) usatp pcfg paddr).
+    { rewrite /uv_pre. split_and!.
+      - exact Hinj.
+      - exact Htok.
+      - exact (uv_pins_wpre pt t RS HpinsR).
+      - rewrite (wrap_pre_other hart_state RS ltac:(vm_compute; reflexivity)).
+        reflexivity.
+      - rewrite (wrap_pre_other cur_privilege RS ltac:(vm_compute; reflexivity)).
+        reflexivity.
+      - rewrite (wrap_pre_other (R_bitvector_64 mstatus) RS
+                   ltac:(vm_compute; reflexivity)). exact Hmsok.
+      - rewrite (wrap_pre_other (R_bitvector_64 PC) RS
+                   ltac:(vm_compute; reflexivity)). reflexivity.
+      - apply uv_gpr_agree_wpre.
+        exact (u_rs_gpr_agree m (HART_ACTIVE tt) mi mc _ mcenv scenv hpm elp0
+                 pmar0 None pcfg paddr tlbvec pc pc ms_v sc_v stval_v sepc_v
+                 mst cy ti ip micfg misa0 mseccfg0 _ (uc_stvec C) (uc_mie C)
+                 (uc_mideleg C) (uc_medeleg C) MENVCFG_S _ usatp).
+      - rewrite (wrap_pre_other (R_bitvector_64 stvec) RS
+                   ltac:(vm_compute; reflexivity)). reflexivity.
+      - rewrite (wrap_pre_other (R_bitvector_64 mie) RS
+                   ltac:(vm_compute; reflexivity)). reflexivity.
+      - rewrite (wrap_pre_other (R_bitvector_64 mideleg) RS
+                   ltac:(vm_compute; reflexivity)). reflexivity.
+      - rewrite (wrap_pre_other (R_bitvector_64 medeleg) RS
+                   ltac:(vm_compute; reflexivity)). reflexivity.
+      - rewrite (wrap_pre_other (R_bitvector_64 menvcfg) RS
+                   ltac:(vm_compute; reflexivity)). reflexivity.
+      - rewrite (wrap_pre_other (R_bitvector_64 satp) RS
+                   ltac:(vm_compute; reflexivity)). reflexivity.
+      - rewrite (wrap_pre_other pmpcfg_n RS ltac:(vm_compute; reflexivity)).
+        reflexivity.
+      - rewrite (wrap_pre_other pmpaddr_n RS ltac:(vm_compute; reflexivity)).
+        reflexivity.
+      - exact (wrap_pre_mi RS).
+      - exact Hx0. }
+    pose proof Hpre as (_ & _ & HpinsA & LhsA & LcpA & HmsokA & LpcA & _ &
+                        LstvecA & LmieA & LmdlA & LmedlA & LmenvA & LsatpA &
+                        LpcfgA & LpaddrA & LmiA & _).
+    pose proof HpinsA as (HhwA & HcfgpA & _ & _).
+    assert (HagdA : agree_on D_u
+              (u_state (wrap_pre RS) (uv_mm t (upa_map pt M))) dstateU)
+      by exact (UserTotalU.u_agree_decode (wrap_pre RS) (uv_mm t (upa_map pt M))
+                  LcpA LmenvA HhwA HcfgpA).
+    (* ---- the one cycle ---- *)
+    iApply (swp_exec_step_full u_Drw u_Dro (u_Df (uc_dqc C)) RS (wrap_pre RS)
+              (uv_land RS) (uv_psi C (uv_ih C pt Kc Ψ M m pc ∗ Kc)%I)
+              u_disj u_w_cy u_w_ti u_w_ip u_in_priv u_w_hart u_in_hart
+              u_in_mc u_in_micfg u_w_mi u_in_mi u_w_ms u_in_ms
+              u_w_PC u_in_PC u_in_nPC
+              (eq_refl : register_lookup hart_state RS = HART_ACTIVE tt)
+              ltac:(intros st rs2 H; exact (proj1 H))
+              ltac:(intros st rs2 H; exact (proj1 (proj2 H)))
+              ltac:(intros r _; reflexivity)
+              with "Hcert Hresv Hrw Hro [Hmm Hcl Hobl] [Hkc]").
+    - (* ================= THE BODY SLOT ================= *)
+      iIntros "Hfrag Hrw Hro".
+      iApply (swp_mono with "[] [-]").
+      2: iApply (swp_run_hart_active_res u_Drw u_Dro (u_Df (uc_dqc C))
+                   (wrap_pre RS) User
+                   (resv_frag cpu_id None ∗
+                    bytes_own (uv_mm t (upa_map pt M)) ∗
+                    uv_res pt M t usatp pcfg paddr ∗
+                    uv_step_obl C pt Kc Ψ M m pc)%I
+                   (fun (ii : InterruptType) (pr : Privilege) =>
+                      uv_step_post C (uv_ih C pt Kc Ψ M m pc ∗ Kc)%I RS
+                        (Step_Pending_Interrupt (ii, pr)))
+                   (fun (r : ExecutionResult) (ib : mword 32) =>
+                      uv_step_post C (uv_ih C pt Kc Ψ M m pc ∗ Kc)%I RS
+                        (Step_Execute (r, ib)))
+                   (fun (xv : mword 64) (e : ExceptionType) =>
+                      uv_step_post C (uv_ih C pt Kc Ψ M m pc ∗ Kc)%I RS
+                        (Step_Fetch_Failure (Virtaddr xv, e)))
+                   (fun _ : ext_fetch_addr_error => False%I)
+                   u_disj u_in_priv u_in_PC u_w_nPC LcpA
+                   with "Hcert Hrw Hro [Hfrag Hmm Hcl Hobl] [] []").
+      + (* the outcome map: the three shapes this tier rules out are
+           [False] on our side and anything at all on the rule's *)
+        iIntros (st) "H". rewrite /uv_step_post.
+        destruct st as [ [ii pr] | x | [[xv] e] | [r ib] | wq ].
+        * iDestruct "H" as (rs2) "[%Hq H]".
+          iExists rs2. iSplitR; [ by iPureIntro |]. iApply "H".
+        * iExFalso. iExact "H".
+        * iDestruct "H" as (rs2) "[%Hq H]". iExFalso. iExact "H".
+        * destruct r as [u | i0 | wr0 | u1 | u2 | trp | u3 | ec | ed | u4];
+            [ destruct u | | | | | destruct trp as [[p exc] pcx] | | | | ];
+            iDestruct "H" as (rs2) "[%Hq H]";
+            try (iExFalso; iExact "H");
+            iExists rs2; (iSplitR; [ by iPureIntro |]); iApply "H".
+        * iExFalso. iExact "H".
+      + (* the threaded residue *)
+        rewrite /uv_res. iFrame "Hfrag Hmm Hclaims Hcl Hobl".
+      + (* ---- THE DISPATCH ---- *)
+        iIntros "HWd Hrw Hro".
+        iApply (swp_mono with "[HWd] [Hrw Hro]").
+        2:{ iApply (swp_dispatchInterrupt_U u_Drw u_Dro (u_Df (uc_dqc C))
+                      (wrap_pre RS) dstateU D_u
+                      (register_lookup mip (wrap_pre RS)) (uc_mie C)
+                      (uc_mideleg C) u_disj u_in_ip u_in_mie u_in_mdl
+                      eq_refl LmieA LmdlA (uc_mm C) UserTotalU.u_D_u_sub HagdA
+                      (UserTotalU.s0_ext_S dstateU ltac:(vm_compute; reflexivity))
+                      ltac:(reflexivity)
+                      with "Hcert Hrw Hro"). }
+        iIntros (o). iDestruct 1 as (meip seip) "(%Hd & Hrw & Hro)".
+        destruct o as [[ii pr] |].
+        * assert (Hsup : pr = Supervisor).
+          { rewrite <- u_dispatch_of_pending in Hd. unfold u_dispatch in Hd.
+            destruct (neq_vec (s_pending (register_lookup mip (wrap_pre RS))
+                                 meip seip (uc_mie C) (uc_mideleg C))
+                        (zeros' 64)); [| discriminate Hd].
+            destruct (findPendingInterrupt
+                        (s_pending (register_lookup mip (wrap_pre RS)) meip seip
+                           (uc_mie C) (uc_mideleg C))); [| discriminate Hd].
+            congruence. }
+          subst pr.
+          iDestruct "HWd" as "(Hfrag & Hmm & Hres & Hobl)".
+          iDestruct (resv_any_intro cpu_id None with "Hfrag") as "Hany".
+          iApply (uv_arm_intr C pt Ψ M m pc t usatp pcfg paddr RS
+                    (wrap_pre RS) ii Kc Hpre
+                    with "Hcert Hcap Hany Hrw Hro Hmm Hres Hobl").
+        * iFrame.
+      + (* ---- THE FETCH: the caller's obligation ---- *)
+        iIntros "HWd Hrw Hro".
+        iDestruct "HWd" as "(Hfrag & Hmm & Hres & Hobl)".
+        iDestruct (resv_any_intro cpu_id None with "Hfrag") as "Hany".
+        iApply ("Hobl" $! (uv_ih C pt Kc Ψ M m pc ∗ Kc)%I CID t RS (wrap_pre RS)
+                  usatp pcfg paddr
+                  with "[%] Hamb Hcap [] Hany Hrw Hro Hmm Hres").
+        { exact Hpre. }
+        iIntros "[_ $]".
+    - (* ================= THE CYCLE'S TAIL ================= *)
+      iNext. iIntros (rs3 rs2) "%Hag Hrw Hro [Hresv Hcl]".
+      iApply ("Hcl" $! rs3 with "[%] Hrw Hro Hresv [$IH $Hkc]").
+      exact (uv_tail_of RS rs2 rs3 Hag).
   Qed.
 
 End UvStepEngine.
 
 (* ===================================================================== *)
-(* §3 The RETIRE funnel.                                                  *)
+(* §6 THE RETIRE FUNNEL AND THE ECALL DRIVER.                             *)
 (*                                                                        *)
 (* The state a retiring, non-CSR, memory-preserving instruction leaves is  *)
 (* always the same two-layer tower over the post-fetch state: an OPTIONAL  *)
@@ -415,58 +1827,223 @@ Proof.
   exact Hj.
 Qed.
 
-(* ---- the two geometry-specific [run_hart_active] assemblers ---------- *)
+(* the REGISTER-level twin of the tower, which is what the frames speak *)
+Definition uv_jmp_rs (rs : regstate) (jt : option (mword 64)) : regstate :=
+  match jt with Some t => register_set nextPC t rs | None => rs end.
 
-Lemma uv_prog_rvc (sa sf : mstate) (h : mword 16) (i : instruction)
-    (o : option instruction) (pc : mword 64) :
-  register_lookup cur_privilege sa.(sregs) = User ->
-  exec (dispatchInterrupt User) sa = Some (None, sa) ->
-  exec (fetch tt) sa = Some (F_RVC h, sf) ->
-  exec (ext_decode_compressed h) sf = Some (i, sf) ->
-  eq_vec (register_lookup elp sf.(sregs))
-         (landing_pad_bits_backwards LP_EXPECTED) = false ->
-  register_lookup PC sf.(sregs) = pc ->
-  exec (currentlyEnabled Ext_Zca) sf = Some (true, sf) ->
-  uv_redirect i o ->
-  forall s_x : mstate,
-    exec (execute (uv_exp i o)) (set_reg sf nextPC (add_vec_int pc 2))
-      = Some (RETIRE_SUCCESS, s_x) ->
-    exec (run_hart_active 0) sa
-      = Some (Step_Execute (RETIRE_SUCCESS, zero_extend' 32 h), s_x).
+Definition uv_wr_rs (rs : regstate) (wr : option (mword 5 * mword 64))
+    : regstate :=
+  match wr with
+  | Some (rd, v) =>
+      register_set (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg v) rs
+  | None => rs
+  end.
+
+Definition uv_post_rs (rs : regstate) (jt : option (mword 64))
+    (wr : option (mword 5 * mword 64)) : regstate :=
+  uv_wr_rs (uv_jmp_rs rs jt) wr.
+
+Lemma uv_post_sregs (s : mstate) (jt : option (mword 64))
+    (wr : option (mword 5 * mword 64)) :
+  (uv_post s jt wr).(sregs) = uv_post_rs s.(sregs) jt wr.
 Proof.
-  intros Hpriv Hdisp Hfetch Hdec Help Lpc Hzca Hred s_x Hex.
-  destruct o as [other | ]; cbn [uv_exp] in Hex.
-  - exact (exec_hart_active_progress_RVC_gen User sa sf s_x h i other pc
-             RETIRE_SUCCESS Hpriv Hdisp Hfetch Hdec Help Lpc Hzca
-             (Hred (set_reg sf nextPC (add_vec_int pc 2))) Hex).
-  - exact (exec_hart_active_progress_RVC_direct_gen User sa sf s_x h i pc
-             RETIRE_SUCCESS Hpriv Hdisp Hfetch Hdec Help Lpc Hzca Hex I).
+  unfold uv_post, uv_post_rs, uv_jmp, uv_jmp_rs, uv_wr, uv_wr_rs.
+  destruct jt as [tv | ]; destruct wr as [[rd v] | ];
+    rewrite ?sregs_set_reg; reflexivity.
 Qed.
 
-Lemma uv_prog_base (sa sf : mstate) (w : mword 32) (i : instruction)
-    (o : option instruction) (pc : mword 64) :
-  register_lookup cur_privilege sa.(sregs) = User ->
-  exec (dispatchInterrupt User) sa = Some (None, sa) ->
-  exec (fetch tt) sa = Some (F_Base w, sf) ->
-  exec (ext_decode w) sf = Some (i, sf) ->
-  eq_vec (register_lookup elp sf.(sregs))
-         (landing_pad_bits_backwards LP_EXPECTED) = false ->
-  is_lpad_instruction i = false ->
-  register_lookup PC sf.(sregs) = pc ->
-  uv_redirect i o ->
-  forall s_x : mstate,
-    exec (execute (uv_exp i o)) (set_reg sf nextPC (add_vec_int pc 4))
-      = Some (RETIRE_SUCCESS, s_x) ->
-    exec (run_hart_active 0) sa
-      = Some (Step_Execute (RETIRE_SUCCESS, zero_extend' 32 w), s_x).
+(* every cell the tower does NOT write reads through *)
+Lemma uv_post_rs_other (rs : regstate) (jt : option (mword 64))
+    (wr : option (mword 5 * mword 64)) (r : register) :
+  register_beq r (R_bitvector_64 nextPC) = false ->
+  (forall n : Z, register_beq r (R_bitvector_64 (gpr_of_Z n)) = false) ->
+  register_lookup r (uv_post_rs rs jt wr) = register_lookup r rs.
 Proof.
-  intros Hpriv Hdisp Hfetch Hdec Help Hlpad Lpc Hred s_x Hex.
-  destruct o as [other | ]; cbn [uv_exp] in Hex.
-  - exact (exec_hart_active_progress_base_redirect_gen User sa sf s_x w i other pc
-             RETIRE_SUCCESS Hpriv Hdisp Hfetch Hdec Help Hlpad Lpc
-             (Hred (set_reg sf nextPC (add_vec_int pc 4))) Hex).
-  - exact (exec_hart_active_progress_base_gen User sa sf s_x w i pc
-             RETIRE_SUCCESS Hpriv Hdisp Hfetch Hdec Help Hlpad Lpc Hex I).
+  intros Hnpc Hgpr. unfold uv_post_rs, uv_jmp_rs, uv_wr_rs.
+  destruct jt as [tv | ]; destruct wr as [[rd v] | ];
+    repeat (rewrite irrelevant_register_set; [ | first [ exact Hnpc | apply Hgpr ] ]);
+    reflexivity.
+Qed.
+
+(* [gpr_of_Z] is INJECTIVE on x1..x31 -- the one pure fact a gpr write at a
+   SYMBOLIC index needs, and the only 31x31 split in this file.  Each leaf is
+   a [register_beq] of two distinct constructors, i.e. milliseconds. *)
+Lemma uv_idx_cases (x : Z) : 0 < x < 32 -> x = 1 \/ x = 2 \/ x = 3 \/ x = 4 \/ x = 5 \/ x = 6 \/ x = 7 \/ x = 8 \/ x = 9 \/ x = 10 \/ x = 11 \/ x = 12 \/ x = 13 \/ x = 14 \/ x = 15 \/ x = 16 \/ x = 17 \/ x = 18 \/ x = 19 \/ x = 20 \/ x = 21 \/ x = 22 \/ x = 23 \/ x = 24 \/ x = 25 \/ x = 26 \/ x = 27 \/ x = 28 \/ x = 29 \/ x = 30 \/ x = 31.
+Proof. lia. Qed.
+
+Lemma uv_gpr_of_Z_ne (a b : Z) :
+  0 < a < 32 -> 0 < b < 32 -> a <> b ->
+  register_beq (R_bitvector_64 (gpr_of_Z a)) (R_bitvector_64 (gpr_of_Z b))
+  = false.
+Proof.
+  intros Ha Hb Hne.
+  pose proof (uv_idx_cases a Ha) as Hca.
+  pose proof (uv_idx_cases b Hb) as Hcb.
+  repeat (destruct Hca as [Hca | Hca]);
+    repeat (destruct Hcb as [Hcb | Hcb]);
+    subst; try (exfalso; exact (Hne eq_refl)); vm_compute; reflexivity.
+Qed.
+
+Lemma uv_gpr_agree_post (g : regfile) (rs : regstate) (jt : option (mword 64))
+    (wr : option (mword 5 * mword 64)) :
+  uv_wrok wr -> u_gpr_agree g rs ->
+  u_gpr_agree (uv_upd g wr) (uv_post_rs rs jt wr).
+Proof.
+  intros Hok Hag i Hnz.
+  unfold uv_post_rs, uv_jmp_rs, uv_wr_rs, uv_upd.
+  destruct wr as [[rd v] | ].
+  - cbn [uv_wrok] in Hok.
+    destruct (decide (i = rd)) as [-> | Hne].
+    + rewrite <- (rf_lookup (<[Regidx rd := regval_into_reg v]> g) (Regidx rd)).
+      rewrite upd_eq. rewrite register_lookup_set. reflexivity.
+    + assert (Hnr : Regidx i <> Regidx rd)
+        by (intros Hc; injection Hc as Hc; exact (Hne Hc)).
+      assert (Hni : uint i <> uint rd).
+      { intros Heq. apply Hne. apply bv_eq.
+        rewrite <- (u_uint5_bv i), <- (u_uint5_bv rd). exact Heq. }
+      rewrite <- (rf_lookup (<[Regidx rd := regval_into_reg v]> g) (Regidx i)).
+      rewrite (upd_ne g (Regidx rd) (Regidx i) (regval_into_reg v) Hnr).
+      rewrite rf_lookup.
+      rewrite (irrelevant_register_set _ _ _ _
+                 (uv_gpr_of_Z_ne (uint i) (uint rd)
+                    ltac:(pose proof (uint5_lt i); lia)
+                    ltac:(pose proof (uint5_lt rd); lia) Hni)).
+      destruct jt as [tv | ];
+        [ rewrite (irrelevant_register_set _ _ _ _ (regbeq_gpr_nextPC (uint i))) | ];
+        exact (Hag i Hnz).
+  - destruct jt as [tv | ];
+      [ rewrite (irrelevant_register_set _ _ _ _ (regbeq_gpr_nextPC (uint i))) | ];
+      exact (Hag i Hnz).
+Qed.
+
+Lemma uv_upd_x0 (g : regfile) (wr : option (mword 5 * mword 64)) :
+  uv_wrok wr -> g (Regidx (mword_of_int 0)) = zero_reg ->
+  uv_upd g wr (Regidx (mword_of_int 0)) = zero_reg.
+Proof.
+  intros Hok Hx0. unfold uv_upd. destruct wr as [[rd v] | ]; [ | exact Hx0 ].
+  cbn [uv_wrok] in Hok.
+  assert (Hne : Regidx (mword_of_int 0) <> Regidx rd).
+  { intros Heq. injection Heq as Heq. apply Hok. rewrite <- Heq.
+    exact (u_uint_mword5 0 ltac:(lia)). }
+  rewrite <- (rf_lookup (<[Regidx rd := regval_into_reg v]> g)
+                (Regidx (mword_of_int 0))).
+  rewrite (upd_ne g (Regidx rd) (Regidx (mword_of_int 0)) (regval_into_reg v) Hne).
+  rewrite rf_lookup. exact Hx0.
+Qed.
+
+(* the gpr READS an execute obligation is stated over *)
+Lemma uv_gpr_vals (g : regfile) (rs : regstate) :
+  u_gpr_agree g rs -> g (Regidx (mword_of_int 0)) = zero_reg ->
+  forall r : mword 5,
+    (if Z.eqb (uint r) 0 then zero_reg
+     else register_lookup (R_bitvector_64 (gpr_of_Z (uint r))) rs)
+    = g !!! Regidx r.
+Proof.
+  intros Hag Hx0 r.
+  destruct (decide (uint r = 0)) as [Hz | Hnz].
+  - rewrite (proj2 (Z.eqb_eq (uint r) 0) Hz).
+    change (g !!! Regidx r) with (g (Regidx r)).
+    rewrite (u_mword5_eq r 0 ltac:(lia) Hz). exact (eq_sym Hx0).
+  - rewrite (proj2 (Z.eqb_neq (uint r) 0) Hnz).
+    change (g !!! Regidx r) with (g (Regidx r)).
+    exact (eq_sym (Hag r Hnz)).
+Qed.
+
+
+(* a NAMED register is never a GPR -- the symbolic-index side condition of
+   every peel through the retire tower, proved once per name (WpGpr's
+   [regbeq_gpr_*] recipe: 31 [vm_compute]s each, in an empty context). *)
+Definition uv_nogpr (r : register) : Prop :=
+  forall n : Z, register_beq r (R_bitvector_64 (gpr_of_Z n)) = false.
+
+Local Ltac uv_nogpr_tac :=
+  intro n; unfold gpr_of_Z; repeat case_match; vm_compute; reflexivity.
+
+Lemma uv_nogpr_minc : uv_nogpr (R_bool minstret_increment).
+Proof. uv_nogpr_tac. Qed.
+
+Lemma uv_nogpr_hart : uv_nogpr hart_state.
+Proof. uv_nogpr_tac. Qed.
+
+Lemma uv_nogpr_priv : uv_nogpr cur_privilege.
+Proof. uv_nogpr_tac. Qed.
+
+Lemma uv_nogpr_mst : uv_nogpr (R_bitvector_64 mstatus).
+Proof. uv_nogpr_tac. Qed.
+
+Lemma uv_nogpr_sc : uv_nogpr (R_bitvector_64 scause).
+Proof. uv_nogpr_tac. Qed.
+
+Lemma uv_nogpr_stv : uv_nogpr (R_bitvector_64 stval).
+Proof. uv_nogpr_tac. Qed.
+
+Lemma uv_nogpr_sep : uv_nogpr (R_bitvector_64 sepc).
+Proof. uv_nogpr_tac. Qed.
+
+Lemma uv_nogpr_stvec : uv_nogpr (R_bitvector_64 stvec).
+Proof. uv_nogpr_tac. Qed.
+
+Lemma uv_nogpr_mie : uv_nogpr (R_bitvector_64 mie).
+Proof. uv_nogpr_tac. Qed.
+
+Lemma uv_nogpr_mdl : uv_nogpr (R_bitvector_64 mideleg).
+Proof. uv_nogpr_tac. Qed.
+
+Lemma uv_nogpr_medl : uv_nogpr (R_bitvector_64 medeleg).
+Proof. uv_nogpr_tac. Qed.
+
+Lemma uv_nogpr_menv : uv_nogpr (R_bitvector_64 menvcfg).
+Proof. uv_nogpr_tac. Qed.
+
+Lemma uv_nogpr_mste : uv_nogpr (R_bitvector_64 mstateen0).
+Proof. uv_nogpr_tac. Qed.
+
+Lemma uv_nogpr_sste : uv_nogpr (R_bitvector_32 sstateen0).
+Proof. uv_nogpr_tac. Qed.
+
+Lemma uv_nogpr_senv : uv_nogpr (R_bitvector_64 senvcfg).
+Proof. uv_nogpr_tac. Qed.
+
+Lemma uv_nogpr_satp : uv_nogpr (R_bitvector_64 satp).
+Proof. uv_nogpr_tac. Qed.
+
+Lemma uv_nogpr_pcfg : uv_nogpr pmpcfg_n.
+Proof. uv_nogpr_tac. Qed.
+
+Lemma uv_nogpr_paddr : uv_nogpr pmpaddr_n.
+Proof. uv_nogpr_tac. Qed.
+
+Lemma uv_nogpr_tlb : uv_nogpr tlb.
+Proof. uv_nogpr_tac. Qed.
+
+Lemma uv_nogpr_misa : uv_nogpr (R_bitvector_64 misa).
+Proof. uv_nogpr_tac. Qed.
+
+Lemma uv_nogpr_elp : uv_nogpr (R_bitvector_1 elp).
+Proof. uv_nogpr_tac. Qed.
+
+(* peel a named cell through the retire tower and the [nextPC := pc+k] write *)
+Lemma uv_land_reg (rs : regstate) (v : mword 64) (jt : option (mword 64))
+    (wr : option (mword 5 * mword 64)) (r : register) (val : type_of_register r) :
+  register_beq r (R_bitvector_64 nextPC) = false ->
+  uv_nogpr r ->
+  register_lookup r rs = val ->
+  register_lookup r (uv_post_rs (register_set nextPC v rs) jt wr) = val.
+Proof.
+  intros H1 H2 Hv.
+  rewrite (uv_post_rs_other _ jt wr r H1 H2).
+  rewrite (irrelevant_register_set r (R_bitvector_64 nextPC) rs v H1). exact Hv.
+Qed.
+
+Lemma uv_land_nextPC (rs : regstate) (v : mword 64) (jt : option (mword 64))
+    (wr : option (mword 5 * mword 64)) :
+  register_lookup (R_bitvector_64 nextPC)
+    (uv_post_rs (register_set nextPC v rs) jt wr) = uv_next jt v.
+Proof.
+  unfold uv_post_rs, uv_jmp_rs, uv_wr_rs, uv_next.
+  destruct jt as [tv | ]; destruct wr as [[rd vv] | ];
+    repeat (rewrite irrelevant_register_set; [ | apply regbeq_nextPC_gpr ]);
+    apply register_lookup_set.
 Qed.
 
 (* ---- the U-mode CONFIG agreement, transported to the leaf's state -----
@@ -578,95 +2155,95 @@ Proof.
   apply exec_returnm.
 Qed.
 
-Section UvStepAt.
+(* ===================================================================== *)
+(* §6b THE FUNNEL'S POST-FETCH HALF, geometry-agnostic.                   *)
+(* ===================================================================== *)
+
+Section UvFunnel.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context (C : ucfg) (pt : uptd).
 
   (* the engine at the ambient hart *)
-  Lemma wp_uv_step (Ψ : usys_protocol Σ) (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) :
-    uv_cap_gpr C pt Ψ M m -∗ pc_is pc -∗ uv_step_obl C pt Ψ M m pc -∗
-    WP (Loop : expr riscv_lang).
+  Lemma wp_uv_step (Kc : iProp Σ) (Ψ : usys_protocol Σ) (M : gmap Z (bv 8))
+      (m : regfile) (pc : mword 64) :
+    uv_cap_gpr C pt Ψ M m -∗ pc_is pc -∗ uv_step_obl C pt Kc Ψ M m pc -∗
+    ▷ Kc -∗ WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "Hcg Hpc Hobl".
-    iPoseProof (wp_uv_step_gen C pt Ψ M m pc) as "H".
-    iApply ("H" $! CID with "Hcg Hpc Hobl").
+    iIntros "Hcg Hpc Hobl Hkc".
+    iPoseProof (wp_uv_step_gen C pt Kc Ψ M m pc) as "H". rewrite /uv_ih.
+    iApply ("H" $! CID with "Hcg Hpc Hobl Hkc").
   Qed.
 
-  (* every gpr value, read off the file at one state (pure conclusion, so
-     the file is retained) *)
-  Lemma gpr_file_values (f : regfile) (s : mstate) :
-    reg_interp s.(sregs) -∗ gpr_file f -∗
-    ⌜forall r : mword 5,
-       (if Z.eqb (uint r) 0 then zero_reg
-        else register_lookup (R_bitvector_64 (gpr_of_Z (uint r))) s.(sregs))
-       = f !!! Regidx r⌝.
+  (* the execute, at the EMPTY byte map: a register-only instruction never
+     reaches a memory node, so [goodmb] at the empty map is exactly what the
+     catalogue proves and the tier's own bytes stay framed. *)
+  Lemma uv_swp_exec (dq : dfrac) (rsx : regstate) (i : instruction)
+      (o : option instruction) (s_x : mstate) (ib : mword 32)
+      (Pe : ExecutionResult -> mword 32 -> iProp Σ) :
+    uv_redirect i o ->
+    (forall s : mstate, goodmb Du_r Du_w (execute i) s ∅ = true) ->
+    (forall s : mstate, goodmb Du_r Du_w (execute (uv_exp i o)) s ∅ = true) ->
+    exec (execute (uv_exp i o)) (u_state rsx ∅) = Some (RETIRE_SUCCESS, s_x) ->
+    gen_cert -∗ resv_any cpu_id -∗
+    hreg_frame rsx u_Drw -∗ hreg_frame_ro (u_Df dq) rsx u_Dro -∗
+    (∀ rs2 : regstate,
+       ⌜reg_agree_on (u_Drw ∪ u_Dro) rs2 s_x.(sregs)⌝ -∗
+       hreg_frame rs2 u_Drw -∗ hreg_frame_ro (u_Df dq) rs2 u_Dro -∗
+       resv_any cpu_id -∗ Pe RETIRE_SUCCESS ib) -∗
+    swp (execute i) (run_exec_post Pe ib).
   Proof.
-    iIntros "Hreg Hf". rewrite bi.pure_forall. iIntros (r).
-    iDestruct (gpr_file_lookup_acc f (Regidx r) with "Hf") as "[Hpt _]".
-    iApply (gpr_pt_value r (f (Regidx r)) s with "Hreg Hpt").
+    intros Hred Hg1 Hg2 He.
+    iIntros "#Hcert Hany Hrw Hro Hk".
+    iAssert (bytes_own (∅ : gmap Arch.pa (bv 8))) as "#Hemp";
+      [ by rewrite /bytes_own big_sepM_empty |].
+    destruct o as [j | ].
+    - iApply (swp_mono with "[Hk] [Hany Hrw Hro]").
+      2:{ iApply (swp_hmrun_of_exec Du_r Du_w u_Drw u_Dro (u_Df dq)
+                    (execute i) (u_state rsx ∅) (u_state rsx ∅) (ExecuteAs j)
+                    rsx ∅ u_disj Du_r_sub Du_w_sub
+                    ltac:(intros q _; reflexivity) (map_empty_subseteq _)
+                    (Hg1 (u_state rsx ∅)) (Hred (u_state rsx ∅))
+                    with "Hcert Hany Hrw Hro Hemp"). }
+      iIntros (v) "(-> & Hpost)".
+      iDestruct "Hpost" as (rs1 mm1) "(%Hag1 & _ & _ & Hrw & Hro & _ & Hany)".
+      iApply run_exec_post_redirect.
+      iApply (swp_mono with "[Hk] [Hany Hrw Hro]").
+      2:{ iApply (swp_hmrun_of_exec Du_r Du_w u_Drw u_Dro (u_Df dq)
+                    (execute j) (u_state rsx ∅) s_x RETIRE_SUCCESS rs1 ∅
+                    u_disj Du_r_sub Du_w_sub Hag1 (map_empty_subseteq _)
+                    (Hg2 (u_state rsx ∅)) He
+                    with "Hcert Hany Hrw Hro Hemp"). }
+      iIntros (v) "(-> & Hpost)".
+      iDestruct "Hpost" as (rs2 mm2) "(%Hag & _ & _ & Hrw & Hro & _ & Hany)".
+      iApply ("Hk" $! rs2 with "[%] Hrw Hro Hany"). exact Hag.
+    - iApply (swp_mono with "[Hk] [Hany Hrw Hro]").
+      2:{ iApply (swp_hmrun_of_exec Du_r Du_w u_Drw u_Dro (u_Df dq)
+                    (execute i) (u_state rsx ∅) s_x RETIRE_SUCCESS rsx ∅
+                    u_disj Du_r_sub Du_w_sub
+                    ltac:(intros q _; reflexivity) (map_empty_subseteq _)
+                    (Hg2 (u_state rsx ∅)) He
+                    with "Hcert Hany Hrw Hro Hemp"). }
+      iIntros (v) "(-> & Hpost)".
+      iDestruct "Hpost" as (rs2 mm2) "(%Hag & _ & _ & Hrw & Hro & _ & Hany)".
+      iApply (run_exec_post_direct Pe ib RETIRE_SUCCESS I).
+      iApply ("Hk" $! rs2 with "[%] Hrw Hro Hany"). exact Hag.
   Qed.
-
-  Lemma uv_jmp_ghost (s : mstate) (jt : option (mword 64)) (v0 : mword 64) :
-    mstate_interp s -∗ nextPC ↦ᵣ v0 ==∗
-    mstate_interp (uv_jmp s jt) ∗ nextPC ↦ᵣ uv_next jt v0.
-  Proof.
-    iIntros "Hint Hnpc". destruct jt as [t | ]; cbn [uv_jmp uv_next];
-      [ | iModIntro; iFrame ].
-    iDestruct "Hint" as "(Hreg & Hmem & Hdev)".
-    iMod (reg_update _ nextPC _ t with "Hreg Hnpc") as "[Hreg Hnpc]".
-    iModIntro. rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame.
-  Qed.
-
-  Lemma uv_wr_ghost (s : mstate) (wr : option (mword 5 * mword 64)) (m : regfile) :
-    uv_wrok wr ->
-    mstate_interp s -∗ gpr_file m ==∗
-    mstate_interp (uv_wr s wr) ∗ gpr_file (uv_upd m wr).
-  Proof.
-    iIntros (Hok) "Hint Hgpr". destruct wr as [[rd v] | ]; cbn [uv_wr uv_upd];
-      [ | iModIntro; iFrame ].
-    cbn [uv_wrok] in Hok.
-    iDestruct "Hint" as "(Hreg & Hmem & Hdev)".
-    iDestruct (gpr_file_insert_acc m (Regidx rd) (regval_into_reg v) with "Hgpr")
-      as "[Hpt Hins]".
-    rewrite (gpr_pt_nz rd _ Hok).
-    iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _ (regval_into_reg v)
-            with "Hreg Hpt") as "[Hreg Hpt]".
-    iDestruct ("Hins" with "[Hpt]") as "Hgpr".
-    { rewrite (gpr_pt_nz rd _ Hok). iExact "Hpt". }
-    iModIntro. rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame.
-  Qed.
-
-End UvStepAt.
-
-Section UvRetirePost.
-  Context `{!riscvGS Σ}.
-  Context `{GEN : GenId}.
 
   (* ------------------------------------------------------------------- *)
-  (* Everything from the FETCHED state on: the nextPC := pc+k write, the   *)
-  (* leaf's value-precise execute, the PC tick and the minstret bump.      *)
-  (* Geometry-agnostic: the [run_hart_active] witness enters as the pure   *)
-  (* implication [Hprog] that [uv_prog_rvc] / [uv_prog_base] produce.      *)
+  (* Everything from the FETCHED file on: the leaf's value-precise         *)
+  (* execute, and the payload that rebuilds [uv_cap_gpr] at the new file.  *)
   (* ------------------------------------------------------------------- *)
-  Lemma uv_retire_post_fetch (CIDp : CpuId) (P : iProp Σ)
-      (sg sf : mstate) (b : bool) (mst pc : mword 64) (k : Z) (ib : mword 32)
-      (m : regfile) (i : instruction) (o : option instruction)
-      (jt : option (mword 64)) (wr : option (mword 5 * mword 64)) :
-    exec (should_inc_minstret (register_lookup cur_privilege sg.(sregs))) sg
-      = Some (b, sg) ->
-    register_lookup hart_state
-      (set_reg sg (R_bool minstret_increment) b).(sregs) = HART_ACTIVE tt ->
-    register_lookup PC sf.(sregs) = pc ->
-    register_lookup cur_privilege sf.(sregs) = User ->
-    agree_on D_u sf dstateU ->
+  Lemma uv_retire_post_fetch (R : iProp Σ) (Ψ : usys_protocol Σ)
+      (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) (k : Z)
+      (i : instruction) (o : option instruction) (jt : option (mword 64))
+      (wr : option (mword 5 * mword 64)) (ib : mword 32) (t' : ptree)
+      (usatp : mword 64) (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n) (rs1 rs2 : regstate) :
     uv_wrok wr ->
-    (forall s_x : mstate,
-       exec (execute (uv_exp i o)) (set_reg sf nextPC (add_vec_int pc k))
-         = Some (RETIRE_SUCCESS, s_x) ->
-       exec (run_hart_active 0) (set_reg sg (R_bool minstret_increment) b)
-         = Some (Step_Execute (RETIRE_SUCCESS, ib), s_x)) ->
+    uv_redirect i o ->
+    (forall s : mstate, goodmb Du_r Du_w (execute i) s ∅ = true) ->
+    (forall s : mstate, goodmb Du_r Du_w (execute (uv_exp i o)) s ∅ = true) ->
     (forall s_pc : mstate,
        register_lookup PC s_pc.(sregs) = pc ->
        register_lookup nextPC s_pc.(sregs) = add_vec_int pc k ->
@@ -676,130 +2253,430 @@ Section UvRetirePost.
           (if Z.eqb (uint r) 0 then zero_reg
            else register_lookup (R_bitvector_64 (gpr_of_Z (uint r))) s_pc.(sregs))
           = m !!! Regidx r) ->
-       exec (execute (uv_exp i o)) s_pc = Some (RETIRE_SUCCESS, uv_post s_pc jt wr)) ->
-    mstate_interp sf -∗
-    P -∗
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    PC ↦ᵣ pc -∗ nextPC ↦ᵣ pc -∗ gpr_file m -∗
-    minstret ↦ᵣ mst -∗ (R_bool minstret_increment) ↦ᵣ b -∗
-    ▷ (P -∗
-       hart_state ↦ᵣ HART_ACTIVE tt -∗
-       PC ↦ᵣ uv_next jt (add_vec_int pc k) -∗
-       nextPC ↦ᵣ uv_next jt (add_vec_int pc k) -∗
-       gpr_file (uv_upd m wr) -∗
+       exec (execute (uv_exp i o)) s_pc
+         = Some (RETIRE_SUCCESS, uv_post s_pc jt wr)) ->
+    register_lookup (R_bitvector_64 PC) rs2 = pc ->
+    register_lookup hart_state rs2 = HART_ACTIVE tt ->
+    register_lookup cur_privilege rs2 = User ->
+    user_mstatus_ok (register_lookup (R_bitvector_64 mstatus) rs2) ->
+    u_gpr_agree m rs2 ->
+    m (Regidx (mword_of_int 0)) = zero_reg ->
+    register_lookup (R_bitvector_64 stvec) rs2 = uc_stvec C ->
+    register_lookup (R_bitvector_64 mie) rs2 = uc_mie C ->
+    register_lookup (R_bitvector_64 mideleg) rs2 = uc_mideleg C ->
+    register_lookup (R_bitvector_64 medeleg) rs2 = uc_medeleg C ->
+    register_lookup (R_bitvector_64 menvcfg) rs2 = MENVCFG_S ->
+    register_lookup (R_bitvector_64 mstateen0) rs2 = (mword_of_int 0 : mword 64) ->
+    register_lookup (R_bitvector_32 sstateen0) rs2 = (mword_of_int 0 : mword 32) ->
+    register_lookup (R_bitvector_64 senvcfg) rs2 = (mword_of_int 0 : mword 64) ->
+    register_lookup (R_bitvector_64 satp) rs2 = usatp ->
+    register_lookup pmpcfg_n rs2 = pcfg ->
+    register_lookup pmpaddr_n rs2 = paddr ->
+    register_lookup (R_bool minstret_increment) rs2
+      = minstret_inc_flag (register_lookup (R_bitvector_32 mcountinhibit) rs1)
+          (register_lookup (R_bitvector_64 minstretcfg) rs1)
+          (register_lookup cur_privilege rs1) ->
+    tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rs2) ->
+    agree_on D_u (u_state rs2 ∅) dstateU ->
+    uv_tree_ok pt (upa_map pt M) t' ->
+    gen_cert -∗ uv_amb -∗ uv_cap C pt Ψ -∗
+    (R -∗ ∀ CID0 : CpuId, uv_cap_gpr (CID := CID0) C pt Ψ M (uv_upd m wr) -∗
+       pc_is (CID := CID0) (uv_next jt (add_vec_int pc k)) -∗
        WP (Loop : expr riscv_lang)) -∗
-    |={⊤ ∖ ↑minstretN ∖ ↑wireN ∖ ↑clockN}=> ∃ s' : mstate,
-      ⌜exec (riscv_step false) sg = Some (tt, s')⌝ ∗
-      ▷ (mstate_interp s' ∗ minstret_inv_body ∗
-         WP (Loop : expr riscv_lang)).
+    resv_any cpu_id -∗
+    bytes_own (uv_mm t' (upa_map pt M)) -∗
+    uv_res pt M t' usatp pcfg paddr -∗
+    hreg_frame (register_set nextPC (add_vec_int pc k) rs2) u_Drw -∗
+    hreg_frame_ro (u_Df (uc_dqc C))
+      (register_set nextPC (add_vec_int pc k) rs2) u_Dro -∗
+    swp (execute i)
+      (run_exec_post (fun (r : ExecutionResult) (ib' : mword 32) =>
+                        uv_step_post C R rs1 (Step_Execute (r, ib'))) ib).
   Proof.
-    intros Hsi Hhart_a Lpcf Lprivf Hagreef Hwrok Hprog Hexec.
-    iIntros "Hint HP Hhs Hpc Hnpc Hgpr Hmst Hmi Hcont".
-    (* the model's nextPC := pc + k write *)
-    iDestruct "Hint" as "(Hreg & Hmem & Hdev)".
-    iMod (reg_update _ nextPC _ (add_vec_int pc k) with "Hreg Hnpc")
-      as "[Hreg Hnpc]".
-    iDestruct (gpr_file_values m (set_reg sf nextPC (add_vec_int pc k))
-                 with "[Hreg] Hgpr") as %Hvals.
-    { rewrite ?sregs_set_reg. iExact "Hreg". }
-    assert (Lnpc0 : register_lookup nextPC
-              (set_reg sf nextPC (add_vec_int pc k)).(sregs) = add_vec_int pc k)
-      by (rewrite ?sregs_set_reg; apply register_lookup_set).
-    assert (Lpc0 : register_lookup PC
-              (set_reg sf nextPC (add_vec_int pc k)).(sregs) = pc).
-    { rewrite ?sregs_set_reg.
-      rewrite irrelevant_register_set; [ exact Lpcf | vm_compute; reflexivity ]. }
-    assert (Lpriv0 : register_lookup cur_privilege
-              (set_reg sf nextPC (add_vec_int pc k)).(sregs) = User).
-    { rewrite ?sregs_set_reg.
-      rewrite irrelevant_register_set; [ exact Lprivf | vm_compute; reflexivity ]. }
-    pose proof (Hexec _ Lpc0 Lnpc0 Lpriv0
-                  (agree_u_set_nextPC sf (add_vec_int pc k) Hagreef) Hvals) as Hex.
-    pose proof (Hprog _ Hex) as Hha.
-    (* the execute's own writes, in the model's order *)
-    iAssert (mstate_interp (set_reg sf nextPC (add_vec_int pc k)))
-      with "[Hreg Hmem Hdev]" as "Hint".
-    { rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hmem Hdev". }
-    iMod (uv_jmp_ghost (set_reg sf nextPC (add_vec_int pc k)) jt (add_vec_int pc k)
-            with "Hint Hnpc") as "[Hint Hnpc]".
-    iMod (uv_wr_ghost (uv_jmp (set_reg sf nextPC (add_vec_int pc k)) jt) wr m Hwrok
-            with "Hint Hgpr") as "[Hint Hgpr]".
-    assert (Lnpcx : register_lookup nextPC
-              (uv_post (set_reg sf nextPC (add_vec_int pc k)) jt wr).(sregs)
-              = uv_next jt (add_vec_int pc k))
-      by (apply uv_post_nextPC; exact Lnpc0).
-    iDestruct "Hint" as "(Hreg & Hmem & Hdev)".
-    iDestruct (reg_valid_dq with "Hreg Hhs") as %Hhart_x.
-    iDestruct (reg_valid_dq with "Hreg Hmi") as %Hmi_x.
-    iDestruct (reg_valid_dq with "Hreg Hmst") as %Lmst_x.
-    pose proof (exec_riscv_step_hart_active sg
-                  (uv_post (set_reg sf nextPC (add_vec_int pc k)) jt wr) ib b
-                  Hsi Hhart_a Hha Hhart_x Hmi_x) as Hstep.
-    rewrite Lnpcx in Hstep.
-    set (s_tick := set_reg (uv_post (set_reg sf nextPC (add_vec_int pc k)) jt wr)
-                     PC (uv_next jt (add_vec_int pc k))) in *.
-    assert (Lmst_t : register_lookup minstret s_tick.(sregs) = mst).
-    { unfold s_tick; rewrite ?sregs_set_reg.
-      rewrite irrelevant_register_set; [ exact Lmst_x | reflexivity ]. }
-    rewrite Lmst_t in Hstep.
-    iMod (reg_update _ PC _ (uv_next jt (add_vec_int pc k)) with "Hreg Hpc")
-      as "[Hreg Hpc]".
-    destruct b.
-    - iMod (reg_update _ minstret _ (add_vec_int mst 1) with "Hreg Hmst")
-        as "[Hreg Hmst]".
-      iModIntro. iExists (set_reg s_tick minstret (add_vec_int mst 1)).
-      iSplitR. { iPureIntro. exact Hstep. }
-      iNext. unfold s_tick; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hmem Hdev".
-      iSplitL "Hmst Hmi". { iExists (add_vec_int mst 1), true. iFrame. }
-      iApply ("Hcont" with "HP Hhs Hpc Hnpc Hgpr").
-    - iModIntro. iExists s_tick.
-      iSplitR. { iPureIntro. exact Hstep. }
-      iNext. unfold s_tick; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hmem Hdev".
-      iSplitL "Hmst Hmi". { iExists mst, false. iFrame. }
-      iApply ("Hcont" with "HP Hhs Hpc Hnpc Hgpr").
+    intros Hwrok Hred Hg1 Hg2 Hexec Lpc2 Lhs2 Lcp2 Hms2 Hgag2 Hx0 Lstvec2
+      Lmie2 Lmdl2 Lmedl2 Lmenv2 Lmste2 Lsste2 Lsenv2 Lsatp2 Lpcfg2 Lpaddr2
+      Lmi2 Htlbok2 Hagd2 Htok'.
+    set (rsx := register_set nextPC (add_vec_int pc k) rs2).
+    assert (Lpcx : register_lookup (R_bitvector_64 PC) rsx = pc).
+    { unfold rsx.
+      rewrite (irrelevant_register_set (R_bitvector_64 PC)
+                 (R_bitvector_64 nextPC) rs2 _ ltac:(vm_compute; reflexivity)).
+      exact Lpc2. }
+    assert (Lnpcx : register_lookup (R_bitvector_64 nextPC) rsx
+                    = add_vec_int pc k)
+      by (unfold rsx; apply register_lookup_set).
+    assert (Lcpx : register_lookup cur_privilege rsx = User).
+    { unfold rsx.
+      rewrite (irrelevant_register_set cur_privilege
+                 (R_bitvector_64 nextPC) rs2 _ ltac:(vm_compute; reflexivity)).
+      exact Lcp2. }
+    assert (Hagdx : agree_on D_u (u_state rsx ∅) dstateU)
+      by exact (agree_u_set_nextPC (u_state rs2 ∅) (add_vec_int pc k) Hagd2).
+    assert (Hgagx : u_gpr_agree m rsx).
+    { intros q Hnz. unfold rsx.
+      rewrite (irrelevant_register_set _ (R_bitvector_64 nextPC) rs2 _
+                 (regbeq_gpr_nextPC (uint q))).
+      exact (Hgag2 q Hnz). }
+    pose proof (Hexec (u_state rsx ∅) Lpcx Lnpcx Lcpx Hagdx
+                  (uv_gpr_vals m rsx Hgagx Hx0)) as Hex.
+    iIntros "#Hcert #Hamb #Hcap Hk Hany Hmm Hres Hrw Hro".
+    iApply (uv_swp_exec (uc_dqc C) rsx i o
+              (uv_post (u_state rsx ∅) jt wr) ib _
+              Hred Hg1 Hg2 Hex with "Hcert Hany Hrw Hro [Hk Hmm Hres]").
+    iIntros (rs3) "%Hag3 Hrw Hro Hany".
+    rewrite uv_post_sregs in Hag3.
+    rewrite /uv_step_post.
+    iExists (uv_post_rs rsx jt wr).
+    iSplitR.
+    { iPureIntro. rewrite /uv_land. split_and!;
+        [ exact (uv_land_reg rs2 _ jt wr hart_state _
+                   ltac:(vm_compute; reflexivity) uv_nogpr_hart Lhs2)
+        | exact (uv_land_reg rs2 _ jt wr (R_bool minstret_increment) _
+                   ltac:(vm_compute; reflexivity) uv_nogpr_minc Lmi2)
+        | exact I ]. }
+    change RETIRE_SUCCESS with (Retire_Success tt). cbn match.
+    rewrite /uv_arm_res.
+    rewrite <- (hreg_frame_ext rs3 (uv_post_rs rsx jt wr) u_Drw
+                 ltac:(intros q Hq; apply Hag3, elem_of_union_l, Hq)).
+    rewrite <- (hreg_frame_ro_ext (u_Df (uc_dqc C)) rs3
+                 (uv_post_rs rsx jt wr) u_Dro
+                 ltac:(intros q Hq; apply Hag3, elem_of_union_r, Hq)).
+    iFrame "Hrw Hro".
+    iApply (uv_psi_active C pt R Ψ M (uv_upd m wr)
+              (uv_next jt (add_vec_int pc k)) t' usatp pcfg paddr
+              (uv_post_rs rsx jt wr)
+              (uv_land_reg rs2 _ jt wr hart_state _
+                 ltac:(vm_compute; reflexivity) uv_nogpr_hart Lhs2)
+              (uv_land_reg rs2 _ jt wr cur_privilege _
+                 ltac:(vm_compute; reflexivity) uv_nogpr_priv Lcp2)
+              ltac:(rewrite (uv_land_reg rs2 _ jt wr (R_bitvector_64 mstatus) _
+                               ltac:(vm_compute; reflexivity) uv_nogpr_mst eq_refl);
+                    exact Hms2)
+              (uv_land_nextPC rs2 (add_vec_int pc k) jt wr)
+              (uv_gpr_agree_post m rsx jt wr Hwrok Hgagx)
+              (uv_upd_x0 m wr Hwrok Hx0)
+              (uv_land_reg rs2 _ jt wr (R_bitvector_64 stvec) _
+                 ltac:(vm_compute; reflexivity) uv_nogpr_stvec Lstvec2)
+              (uv_land_reg rs2 _ jt wr (R_bitvector_64 mie) _
+                 ltac:(vm_compute; reflexivity) uv_nogpr_mie Lmie2)
+              (uv_land_reg rs2 _ jt wr (R_bitvector_64 mideleg) _
+                 ltac:(vm_compute; reflexivity) uv_nogpr_mdl Lmdl2)
+              (uv_land_reg rs2 _ jt wr (R_bitvector_64 medeleg) _
+                 ltac:(vm_compute; reflexivity) uv_nogpr_medl Lmedl2)
+              (uv_land_reg rs2 _ jt wr (R_bitvector_64 menvcfg) _
+                 ltac:(vm_compute; reflexivity) uv_nogpr_menv Lmenv2)
+              (uv_land_reg rs2 _ jt wr (R_bitvector_64 mstateen0) _
+                 ltac:(vm_compute; reflexivity) uv_nogpr_mste Lmste2)
+              (uv_land_reg rs2 _ jt wr (R_bitvector_32 sstateen0) _
+                 ltac:(vm_compute; reflexivity) uv_nogpr_sste Lsste2)
+              (uv_land_reg rs2 _ jt wr (R_bitvector_64 senvcfg) _
+                 ltac:(vm_compute; reflexivity) uv_nogpr_senv Lsenv2)
+              (uv_land_reg rs2 _ jt wr (R_bitvector_64 satp) _
+                 ltac:(vm_compute; reflexivity) uv_nogpr_satp Lsatp2)
+              (uv_land_reg rs2 _ jt wr pmpcfg_n _
+                 ltac:(vm_compute; reflexivity) uv_nogpr_pcfg Lpcfg2)
+              (uv_land_reg rs2 _ jt wr pmpaddr_n _
+                 ltac:(vm_compute; reflexivity) uv_nogpr_paddr Lpaddr2)
+              Htok'
+              ltac:(rewrite (uv_land_reg rs2 _ jt wr tlb _
+                               ltac:(vm_compute; reflexivity) uv_nogpr_tlb eq_refl);
+                    exact Htlbok2)
+              with "Hamb Hcap Hany Hmm Hres Hk").
   Qed.
 
-End UvRetirePost.
+End UvFunnel.
 
-Section UvRetireFunnel.
+Lemma uv_gpr_ne_tlb (n : Z) :
+  register_beq (R_bitvector_64 (gpr_of_Z n)) tlb = false.
+Proof. unfold gpr_of_Z; repeat case_match; vm_compute; reflexivity. Qed.
+
+(* ===================================================================== *)
+(* §6c THE OBLIGATION, once per FETCH SHAPE.                              *)
+(* ===================================================================== *)
+
+Section UvObligation.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context (C : ucfg) (pt : uptd).
 
-  (* ------------------------------------------------------------------- *)
-  (* THE RETIRE FUNNEL.                                                    *)
-  (*                                                                       *)
-  (* One [uinstr] fact + one value-precise execute obligation = one         *)
-  (* verified instruction.  The funnel picks the fetch geometry off the     *)
-  (* [uinstr] (compressed x 4-aligned), transports the decode fact to the   *)
-  (* fetched state, assembles the [run_hart_active] witness at User, and    *)
-  (* re-establishes [uv_cap_gpr] at the updated register file.  The image   *)
-  (* [M] is UNCHANGED -- this is the memory-preserving funnel; a store leaf *)
-  (* will need the [umem] update threaded through [uv_retire_post_fetch].   *)
-  (*                                                                       *)
-  (* The continuation quantifies the hart: the step may be preceded by an   *)
-  (* arbitrary number of absorbed interrupts, each of which may migrate the *)
-  (* process, so nothing after the step runs at the entry hart.             *)
-  (*                                                                       *)
-  (* [wp_uv_retire_later] IS THE GENERAL FORM and hands the step's own      *)
-  (* [|>] OUT: at the point the funnel applies the continuation the goal    *)
-  (* already IS [|> WP] (that is what [uv_retire_post_fetch] asks for), so  *)
-  (* exposing the later costs nothing here and is the only thing that lets  *)
-  (* a caller close an UNBOUNDED loop -- an [iLoeb] IH is [|>]-guarded and  *)
-  (* a later-free leaf can never strip it (design/kernel-proofs.md, and the *)
-  (* kernel tier's [wp_cbnez_taken_s]).  [wp_uv_retire] is the later-free   *)
-  (* restatement every existing leaf uses: it absorbs the later with its    *)
-  (* own [iNext], so nothing downstream changed shape.  init's two          *)
-  (* unbounded loops (claude-notes/projects/user-init.md) are what made the *)
-  (* general form necessary; echo's and sh's loops are all bounded.         *)
-  (* ------------------------------------------------------------------- *)
-  Lemma wp_uv_retire_later (Ψ : usys_protocol Σ) (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (is_rvc : bool) (i : instruction) (o : option instruction)
-      (jt : option (mword 64)) (wr : option (mword 5 * mword 64)) :
+  Lemma uv_obl_base (R : iProp Σ) (Ψ : usys_protocol Σ) (M : gmap Z (bv 8))
+      (m : regfile) (pc : mword 64) (w : mword 32) (i : instruction)
+      (o : option instruction) (jt : option (mword 64))
+      (wr : option (mword 5 * mword 64)) (t t' : ptree) (usatp : mword 64)
+      (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
+      (rs1 rsA rsf : regstate) :
+    uv_pre C pt M m pc t rs1 rsA usatp pcfg paddr ->
+    exec (fetch tt) (u_state rsA (uv_mm t (upa_map pt M)))
+      = Some (F_Base w, u_state rsf (uv_mm t' (upa_map pt M))) ->
+    goodmb Du_r Du_w (fetch tt) (u_state rsA (uv_mm t (upa_map pt M)))
+      (uv_mm t (upa_map pt M)) = true ->
+    u_tlb_only rsA rsf ->
+    tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rsf) ->
+    uv_tree_ok pt (upa_map pt M) t' ->
+    pt_same_shape 2 t t' ->
+    udecode_base w i ->
+    uv_wrok wr -> uv_redirect i o ->
+    (forall s : mstate, goodmb Du_r Du_w (execute i) s ∅ = true) ->
+    (forall s : mstate, goodmb Du_r Du_w (execute (uv_exp i o)) s ∅ = true) ->
+    (forall s_pc : mstate,
+       register_lookup PC s_pc.(sregs) = pc ->
+       register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4 ->
+       register_lookup cur_privilege s_pc.(sregs) = User ->
+       agree_on D_u s_pc dstateU ->
+       (forall r : mword 5,
+          (if Z.eqb (uint r) 0 then zero_reg
+           else register_lookup (R_bitvector_64 (gpr_of_Z (uint r))) s_pc.(sregs))
+          = m !!! Regidx r) ->
+       exec (execute (uv_exp i o)) s_pc
+         = Some (RETIRE_SUCCESS, uv_post s_pc jt wr)) ->
+    gen_cert -∗ uv_amb -∗ uv_cap C pt Ψ -∗
+    (R -∗ ∀ CID0 : CpuId, uv_cap_gpr (CID := CID0) C pt Ψ M (uv_upd m wr) -∗
+       pc_is (CID := CID0) (uv_next jt (add_vec_int pc 4)) -∗
+       WP (Loop : expr riscv_lang)) -∗
+    resv_any cpu_id -∗
+    hreg_frame rsA u_Drw -∗ hreg_frame_ro (u_Df (uc_dqc C)) rsA u_Dro -∗
+    bytes_own (uv_mm t (upa_map pt M)) -∗
+    uv_res pt M t usatp pcfg paddr -∗
+    swp (fetch tt)
+      (run_fetch_post u_Drw u_Dro (u_Df (uc_dqc C))
+         (fun (r : ExecutionResult) (ib : mword 32) =>
+            uv_step_post C R rs1 (Step_Execute (r, ib)))
+         (fun (xv : mword 64) (e : ExceptionType) =>
+            uv_step_post C R rs1 (Step_Fetch_Failure (Virtaddr xv, e)))
+         (fun _ : ext_fetch_addr_error => False)).
+  Proof.
+    intros Hpre Hfe Hfg Tr Htlbok' Htok' Hshape Hdec Hwrok Hred Hg1 Hg2 Hexec.
+    pose proof Hpre as (Hinj & Htok & HpinsA & LhsA & LcpA & HmsokA & LpcA &
+                        HgagA & LstvecA & LmieA & LmdlA & LmedlA & LmenvA &
+                        LsatpA & LpcfgA & LpaddrA & LmiA & Hx0).
+    iIntros "#Hcert #Hamb #Hcap Hk Hany Hrw Hro Hmm Hres".
+    iApply (uv_swp_fetch pt M t t' (uc_dqc C) rsA rsf (F_Base w) _ _ _
+              Hfe Hfg Hshape with "Hcert Hany Hrw Hro Hmm [Hk Hres]").
+    iIntros (rs2) "%Hag Hrw Hro Hmm Hany".
+    iDestruct (uv_res_move pt M t t' usatp pcfg paddr Hshape with "Hres")
+      as "Hres".
+    assert (T2 : forall (r : register) (val : type_of_register r),
+              r ∈ u_Drw ∪ u_Dro -> register_beq r tlb = false ->
+              register_lookup r rsA = val -> register_lookup r rs2 = val).
+    { intros r val Hin Hne Hv. rewrite (Hag r Hin) (Tr r Hne). exact Hv. }
+    assert (Ltlb2 : register_lookup tlb rs2 = register_lookup tlb rsf)
+      by exact (Hag _ u_in_tlb).
+    assert (Hpins2 : u_exec_pins pt t' rs2).
+    { apply (u_pins_move pt t t' rsA rs2);
+        [ intros q Hq _;
+          exact (T2 q _ (u_Dfix_sub q Hq) (u_fix_ne_tlb q Hq) eq_refl)
+        | rewrite Ltlb2; exact Htlbok'
+        | exact HpinsA ]. }
+    pose proof Hpins2 as ((Hmisa2 & _ & Hsenv2 & _ & _ & Helpne2) &
+                          (Hmste2 & Hsste2) & _ & Htlbok2).
+    assert (Lcp2 : register_lookup cur_privilege rs2 = User)
+      by exact (T2 _ _ u_in_priv ltac:(vm_compute; reflexivity) LcpA).
+    assert (Lmenv2 : register_lookup (R_bitvector_64 menvcfg) rs2 = MENVCFG_S)
+      by exact (T2 _ _ u_in_menv ltac:(vm_compute; reflexivity) LmenvA).
+    assert (Hagd2 : agree_on D_u (u_state rs2 ∅) dstateU)
+      by exact (UserTotalU.u_agree_decode rs2 ∅ Lcp2 Lmenv2
+                  (proj1 Hpins2) (proj1 (proj2 Hpins2))).
+    assert (Hgag2 : u_gpr_agree m rs2).
+    { intros q Hnz. rewrite (HgagA q Hnz).
+      exact (eq_sym (T2 _ _ (u_gpr_in_D q Hnz) (uv_gpr_ne_tlb (uint q)) eq_refl)). }
+    rewrite /run_fetch_post /run_fetch_base.
+    iExists rs2, i, pc, 8%nat.
+    iSplitR.
+    { iPureIntro.
+      exact (T2 _ _ u_in_PC ltac:(vm_compute; reflexivity) LpcA). }
+    iSplitR.
+    { iPureIntro.
+      exact (UserTotalU.u_hval_base rs2 ∅ w i Hagd2
+               (Hdec dstateU ltac:(intros r _; reflexivity))). }
+    iSplitR.
+    { iPureIntro. exact (hfrun_lpad (u_Drw ∪ u_Dro) u_Drw rs2 u_in_elp Helpne2). }
+    iFrame "Hrw Hro".
+    iIntros "Hrw Hro".
+    iApply (uv_retire_post_fetch C pt R Ψ M m pc 4 i o jt wr
+              (zero_extend' 32 w) t' usatp pcfg paddr rs1 rs2
+              Hwrok Hred Hg1 Hg2 Hexec
+              (T2 _ _ u_in_PC ltac:(vm_compute; reflexivity) LpcA)
+              (T2 _ _ u_in_hart ltac:(vm_compute; reflexivity) LhsA)
+              Lcp2
+              ltac:(rewrite (T2 _ _ u_in_mst ltac:(vm_compute; reflexivity)
+                               (eq_refl : register_lookup (R_bitvector_64 mstatus) rsA
+                                          = register_lookup (R_bitvector_64 mstatus) rsA));
+                    exact HmsokA)
+              Hgag2 Hx0
+              (T2 _ _ u_in_stvec ltac:(vm_compute; reflexivity) LstvecA)
+              (T2 _ _ u_in_mie ltac:(vm_compute; reflexivity) LmieA)
+              (T2 _ _ u_in_mdl ltac:(vm_compute; reflexivity) LmdlA)
+              (T2 _ _ u_in_medl ltac:(vm_compute; reflexivity) LmedlA)
+              Lmenv2 Hmste2 Hsste2 Hsenv2
+              (T2 _ _ u_in_satp ltac:(vm_compute; reflexivity) LsatpA)
+              (T2 _ _ u_in_pcfg ltac:(vm_compute; reflexivity) LpcfgA)
+              (T2 _ _ u_in_paddr ltac:(vm_compute; reflexivity) LpaddrA)
+              (T2 _ _ u_in_mi ltac:(vm_compute; reflexivity) LmiA)
+              Htlbok2 Hagd2 Htok'
+              with "Hcert Hamb Hcap Hk Hany Hmm Hres Hrw Hro").
+  Qed.
+
+  Lemma uv_obl_rvc (R : iProp Σ) (Ψ : usys_protocol Σ) (M : gmap Z (bv 8))
+      (m : regfile) (pc : mword 64) (h : mword 16) (i : instruction)
+      (o : option instruction) (jt : option (mword 64))
+      (wr : option (mword 5 * mword 64)) (t t' : ptree) (usatp : mword 64)
+      (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
+      (rs1 rsA rsf : regstate) :
+    uv_pre C pt M m pc t rs1 rsA usatp pcfg paddr ->
+    exec (fetch tt) (u_state rsA (uv_mm t (upa_map pt M)))
+      = Some (F_RVC h, u_state rsf (uv_mm t' (upa_map pt M))) ->
+    goodmb Du_r Du_w (fetch tt) (u_state rsA (uv_mm t (upa_map pt M)))
+      (uv_mm t (upa_map pt M)) = true ->
+    u_tlb_only rsA rsf ->
+    tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rsf) ->
+    uv_tree_ok pt (upa_map pt M) t' ->
+    pt_same_shape 2 t t' ->
+    udecode_rvc h i ->
+    uv_wrok wr -> uv_redirect i o ->
+    (forall s : mstate, goodmb Du_r Du_w (execute i) s ∅ = true) ->
+    (forall s : mstate, goodmb Du_r Du_w (execute (uv_exp i o)) s ∅ = true) ->
+    (forall s_pc : mstate,
+       register_lookup PC s_pc.(sregs) = pc ->
+       register_lookup nextPC s_pc.(sregs) = add_vec_int pc 2 ->
+       register_lookup cur_privilege s_pc.(sregs) = User ->
+       agree_on D_u s_pc dstateU ->
+       (forall r : mword 5,
+          (if Z.eqb (uint r) 0 then zero_reg
+           else register_lookup (R_bitvector_64 (gpr_of_Z (uint r))) s_pc.(sregs))
+          = m !!! Regidx r) ->
+       exec (execute (uv_exp i o)) s_pc
+         = Some (RETIRE_SUCCESS, uv_post s_pc jt wr)) ->
+    gen_cert -∗ uv_amb -∗ uv_cap C pt Ψ -∗
+    (R -∗ ∀ CID0 : CpuId, uv_cap_gpr (CID := CID0) C pt Ψ M (uv_upd m wr) -∗
+       pc_is (CID := CID0) (uv_next jt (add_vec_int pc 2)) -∗
+       WP (Loop : expr riscv_lang)) -∗
+    resv_any cpu_id -∗
+    hreg_frame rsA u_Drw -∗ hreg_frame_ro (u_Df (uc_dqc C)) rsA u_Dro -∗
+    bytes_own (uv_mm t (upa_map pt M)) -∗
+    uv_res pt M t usatp pcfg paddr -∗
+    swp (fetch tt)
+      (run_fetch_post u_Drw u_Dro (u_Df (uc_dqc C))
+         (fun (r : ExecutionResult) (ib : mword 32) =>
+            uv_step_post C R rs1 (Step_Execute (r, ib)))
+         (fun (xv : mword 64) (e : ExceptionType) =>
+            uv_step_post C R rs1 (Step_Fetch_Failure (Virtaddr xv, e)))
+         (fun _ : ext_fetch_addr_error => False)).
+  Proof.
+    intros Hpre Hfe Hfg Tr Htlbok' Htok' Hshape Hdec Hwrok Hred Hg1 Hg2 Hexec.
+    pose proof Hpre as (Hinj & Htok & HpinsA & LhsA & LcpA & HmsokA & LpcA &
+                        HgagA & LstvecA & LmieA & LmdlA & LmedlA & LmenvA &
+                        LsatpA & LpcfgA & LpaddrA & LmiA & Hx0).
+    iIntros "#Hcert #Hamb #Hcap Hk Hany Hrw Hro Hmm Hres".
+    iApply (uv_swp_fetch pt M t t' (uc_dqc C) rsA rsf (F_RVC h) _ _ _
+              Hfe Hfg Hshape with "Hcert Hany Hrw Hro Hmm [Hk Hres]").
+    iIntros (rs2) "%Hag Hrw Hro Hmm Hany".
+    iDestruct (uv_res_move pt M t t' usatp pcfg paddr Hshape with "Hres")
+      as "Hres".
+    assert (T2 : forall (r : register) (val : type_of_register r),
+              r ∈ u_Drw ∪ u_Dro -> register_beq r tlb = false ->
+              register_lookup r rsA = val -> register_lookup r rs2 = val).
+    { intros r val Hin Hne Hv. rewrite (Hag r Hin) (Tr r Hne). exact Hv. }
+    assert (Ltlb2 : register_lookup tlb rs2 = register_lookup tlb rsf)
+      by exact (Hag _ u_in_tlb).
+    assert (Hpins2 : u_exec_pins pt t' rs2).
+    { apply (u_pins_move pt t t' rsA rs2);
+        [ intros q Hq _;
+          exact (T2 q _ (u_Dfix_sub q Hq) (u_fix_ne_tlb q Hq) eq_refl)
+        | rewrite Ltlb2; exact Htlbok'
+        | exact HpinsA ]. }
+    pose proof Hpins2 as ((Hmisa2 & _ & Hsenv2 & _ & _ & Helpne2) &
+                          (Hmste2 & Hsste2) & _ & Htlbok2).
+    assert (Lcp2 : register_lookup cur_privilege rs2 = User)
+      by exact (T2 _ _ u_in_priv ltac:(vm_compute; reflexivity) LcpA).
+    assert (Lmenv2 : register_lookup (R_bitvector_64 menvcfg) rs2 = MENVCFG_S)
+      by exact (T2 _ _ u_in_menv ltac:(vm_compute; reflexivity) LmenvA).
+    assert (HmisaC2 : eq_vec (_get_Misa_C (register_lookup misa rs2)) ('b"1") = true)
+      by (rewrite Hmisa2; vm_compute; reflexivity).
+    assert (Hagd2 : agree_on D_u (u_state rs2 ∅) dstateU)
+      by exact (UserTotalU.u_agree_decode rs2 ∅ Lcp2 Lmenv2
+                  (proj1 Hpins2) (proj1 (proj2 Hpins2))).
+    assert (Hgag2 : u_gpr_agree m rs2).
+    { intros q Hnz. rewrite (HgagA q Hnz).
+      exact (eq_sym (T2 _ _ (u_gpr_in_D q Hnz) (uv_gpr_ne_tlb (uint q)) eq_refl)). }
+    rewrite /run_fetch_post /run_fetch_rvc.
+    iExists rs2, i, pc, 8%nat, 4%nat.
+    iSplitR.
+    { iPureIntro.
+      exact (T2 _ _ u_in_PC ltac:(vm_compute; reflexivity) LpcA). }
+    iSplitR.
+    { iPureIntro.
+      exact (UserTotalU.u_hval_rvc rs2 ∅ h i Hagd2
+               (Hdec dstateU ltac:(vm_compute; reflexivity))). }
+    iSplitR.
+    { iPureIntro. exact (hfrun_lpad (u_Drw ∪ u_Dro) u_Drw rs2 u_in_elp Helpne2). }
+    iSplitR.
+    { iPureIntro. apply (hfrun_cE_Zca (u_Drw ∪ u_Dro) u_Drw rs2 u_in_misa).
+      exact HmisaC2. }
+    iFrame "Hrw Hro".
+    iIntros "Hrw Hro".
+    iApply (uv_retire_post_fetch C pt R Ψ M m pc 2 i o jt wr
+              (zero_extend' 32 h) t' usatp pcfg paddr rs1 rs2
+              Hwrok Hred Hg1 Hg2 Hexec
+              (T2 _ _ u_in_PC ltac:(vm_compute; reflexivity) LpcA)
+              (T2 _ _ u_in_hart ltac:(vm_compute; reflexivity) LhsA)
+              Lcp2
+              ltac:(rewrite (T2 _ _ u_in_mst ltac:(vm_compute; reflexivity)
+                               (eq_refl : register_lookup (R_bitvector_64 mstatus) rsA
+                                          = register_lookup (R_bitvector_64 mstatus) rsA));
+                    exact HmsokA)
+              Hgag2 Hx0
+              (T2 _ _ u_in_stvec ltac:(vm_compute; reflexivity) LstvecA)
+              (T2 _ _ u_in_mie ltac:(vm_compute; reflexivity) LmieA)
+              (T2 _ _ u_in_mdl ltac:(vm_compute; reflexivity) LmdlA)
+              (T2 _ _ u_in_medl ltac:(vm_compute; reflexivity) LmedlA)
+              Lmenv2 Hmste2 Hsste2 Hsenv2
+              (T2 _ _ u_in_satp ltac:(vm_compute; reflexivity) LsatpA)
+              (T2 _ _ u_in_pcfg ltac:(vm_compute; reflexivity) LpcfgA)
+              (T2 _ _ u_in_paddr ltac:(vm_compute; reflexivity) LpaddrA)
+              (T2 _ _ u_in_mi ltac:(vm_compute; reflexivity) LmiA)
+              Htlbok2 Hagd2 Htok'
+              with "Hcert Hamb Hcap Hk Hany Hmm Hres Hrw Hro").
+  Qed.
+
+End UvObligation.
+
+(* ===================================================================== *)
+(* §7 THE RETIRE FUNNEL.                                                  *)
+(*                                                                        *)
+(* One [uinstr] fact + one value-precise execute obligation = one          *)
+(* verified instruction.  The funnel picks the fetch geometry off the      *)
+(* [uinstr] (compressed x 4-aligned), transports the decode fact to the    *)
+(* fetched state, and re-establishes [uv_cap_gpr] at the updated register  *)
+(* file.  The image [M] is UNCHANGED -- this is the memory-preserving      *)
+(* funnel.                                                                *)
+(*                                                                        *)
+(* [wp_uv_retire_later] IS THE GENERAL FORM and hands the step's own       *)
+(* [|>] OUT: it is the only way an [iLoeb] back edge can strip its IH, and *)
+(* what every UNBOUNDED loop in this tier needs.  [wp_uv_retire] is the    *)
+(* later-free restatement every existing leaf uses.                        *)
+(*                                                                        *)
+(* THE PORT'S ONE ADDITION is the [goodmb] certificate: the per-node       *)
+(* cycle rule wants it beside the pure [exec] fact, at the EMPTY byte map  *)
+(* (a register-only execute never reaches a memory node) -- which is       *)
+(* exactly the shape the catalogue [UserTotalU.goodmb_execute_C_*] /       *)
+(* [UserExecFacts.*_total] already proves.                                 *)
+(* ===================================================================== *)
+
+Section UvRetire.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+  Context (C : ucfg) (pt : uptd).
+
+  Lemma wp_uv_retire_later (Ψ : usys_protocol Σ) (M : gmap Z (bv 8))
+      (m : regfile) (pc : mword 64) (is_rvc : bool) (i : instruction)
+      (o : option instruction) (jt : option (mword 64))
+      (wr : option (mword 5 * mword 64)) :
     uinstr pt M pc is_rvc i ->
     uv_redirect i o ->
     is_lpad_instruction i = false ->
     uv_wrok wr ->
+    (forall s : mstate, goodmb Du_r Du_w (execute i) s ∅ = true) ->
+    (forall s : mstate, goodmb Du_r Du_w (execute (uv_exp i o)) s ∅ = true) ->
     (forall s_pc : mstate,
        register_lookup PC s_pc.(sregs) = pc ->
        register_lookup nextPC s_pc.(sregs)
@@ -816,222 +2693,89 @@ Section UvRetireFunnel.
     pc_is pc -∗
     ▷ (∀ CID0 : CpuId,
          uv_cap_gpr (CID := CID0) C pt Ψ M (uv_upd m wr) -∗
-         pc_is (CID := CID0) (uv_next jt (add_vec_int pc (if is_rvc then 2 else 4))) -∗
+         pc_is (CID := CID0)
+           (uv_next jt (add_vec_int pc (if is_rvc then 2 else 4))) -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hui Hred Hlpad Hwrok Hexec.
+    intros Hui Hred Hlpad Hwrok Hg1 Hg2 Hexec.
     destruct Hui as [Hal2 Hcanon Hleaf Hinpage Hcode].
     destruct Hleaf as (w_leaf & Hum & Hlok).
     iIntros "Hcg Hpc Hcont".
-    iDestruct "Hcg" as "(#Hcap & Hlin & Hgprc)".
-    iAssert (uv_cap_gpr C pt Ψ M m) with "[Hlin Hgprc]" as "Hcg".
-    { rewrite /uv_cap_gpr. iFrame "Hcap Hlin Hgprc". }
-    iApply (wp_uv_step C pt Ψ M m pc with "Hcg Hpc [Hcont]").
+    iApply (wp_uv_step C pt _ Ψ M m pc with "Hcg Hpc [] Hcont").
     rewrite /uv_step_obl.
-    iIntros (CID0 sg ms_v sc_v stval_v sepc_v)
-      "%Hmsok %Lpriv %Lms %Lpc %Hdisp #Hamb Hhs Hpriv Hms Hsc Hstval Hsepc
-       Hpc Hnpc Hgpr Hutlb Humem Hcfg Hint Hbody".
-    iAssert uv_amb with "[]" as "#Hamb2". { iExact "Hamb". }
-    iDestruct "Hamb" as "(#Hhw & #Hmin & #Hwinv)".
-    iDestruct "Hbody" as (mst mi) "[Hmst Hmi]".
-    iDestruct "Hint" as "(Hreg & Hmem & Hdev)".
-    iDestruct (reg_valid_dq with "Hreg Hhs") as %Lhs.
-    iDestruct "Hcfg" as "(Hstvec & Hmie & Hmdl & Hmedl & Hmenv & Hsenv & Hmse & Hsse)".
-    iDestruct (reg_valid_dq with "Hreg Hmenv") as %Lmenv.
-    iDestruct (reg_valid_dq with "Hreg Hsenv") as %Lsenv.
-    iDestruct (reg_valid_dq with "Hreg Hmse") as %Lmse.
-    iDestruct (reg_valid_dq with "Hreg Hsse") as %Lsse.
+    iIntros (R CIDo t rs1 rsA usatp pcfg paddr)
+      "%Hpre #Hamb #Hcap Hk Hany Hrw Hro Hmm Hres".
+    iPoseProof "Hamb" as "(#Hhw & _ & _)".
     iPoseProof "Hhw" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & _ & #Hpma & #Hhtif & #Help & _ & _ & _ & _ & _ & %Hpma_all
-        & _ & _ & %Help_ne & _ & %Hmisaval & _)".
-    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    iDestruct (reg_valid_dq with "Hreg Hpma") as %Lpma.
-    iDestruct (reg_valid_dq with "Hreg Hhtif") as %Lhtif.
-    iDestruct (reg_valid_dq with "Hreg Help") as %Lelp.
-    subst misa0.
-    iAssert (user_cfg C)
-      with "[Hstvec Hmie Hmdl Hmedl Hmenv Hsenv Hmse Hsse]" as "Hcfg".
-    { iFrame "Hstvec Hmie Hmdl Hmedl Hmenv Hsenv Hmse Hsse". }
-    (* ---- the minstret prelude: minstret_increment := should_inc ---- *)
-    destruct (exec_should_inc_minstret_Some
-                (register_lookup cur_privilege sg.(sregs)) sg) as [b Hsi].
-    iMod (reg_update _ (R_bool minstret_increment) _ b with "Hreg Hmi") as "[Hreg Hmi]".
-    assert (T : forall (r : register) (v : type_of_register r),
-              register_lookup r sg.(sregs) = v ->
-              register_beq r (R_bool minstret_increment) = false ->
-              register_lookup r (set_reg sg (R_bool minstret_increment) b).(sregs) = v).
-    { intros r v Hv Hne. rewrite ?sregs_set_reg.
-      rewrite irrelevant_register_set; [exact Hv | exact Hne]. }
-    pose proof (T hart_state _ Lhs eq_refl) as Hhart_a.
-    pose proof (T PC _ Lpc eq_refl) as LpcA.
-    pose proof (T cur_privilege _ Lpriv eq_refl) as LprivA.
-    pose proof (T misa _ Lmisa eq_refl) as LmisaA.
-    pose proof (T menvcfg _ Lmenv eq_refl) as LmenvA.
-    pose proof (T senvcfg _ Lsenv eq_refl) as LsenvA.
-    pose proof (T mstateen0 _ Lmse eq_refl) as LmseA.
-    pose proof (T sstateen0 _ Lsse eq_refl) as LsseA.
-    pose proof (T elp _ Lelp eq_refl) as LelpA.
-    assert (HSXL : _get_Mstatus_SXL
-              (register_lookup mstatus (set_reg sg (R_bool minstret_increment) b).(sregs))
-              = 'b"10")
-      by (rewrite (T mstatus _ Lms eq_refl); exact (proj1 Hmsok)).
-    assert (HpmaA : pma_allows_all
-              (register_lookup pma_regions
-                 (set_reg sg (R_bool minstret_increment) b).(sregs)))
-      by (rewrite (T pma_regions _ Lpma eq_refl); exact Hpma_all).
-    pose proof (Hdisp b) as HdispA.
-    (* every post-fetch pin, in one place: the fetch only ever writes tlb *)
-    assert (Hsf : forall sf : mstate,
-              (forall r : register, register_beq r tlb = false ->
-                 register_lookup r sf.(sregs)
-                   = register_lookup r (set_reg sg (R_bool minstret_increment) b).(sregs)) ->
-              register_lookup PC sf.(sregs) = pc /\
-              register_lookup cur_privilege sf.(sregs) = User /\
-              register_lookup misa sf.(sregs) = MISA_C /\
-              eq_vec (register_lookup elp sf.(sregs))
-                     (landing_pad_bits_backwards LP_EXPECTED) = false /\
-              agree_on D_u sf dstateU).
-    { intros sf Tr. split_and!.
-      - rewrite (Tr PC ltac:(vm_compute; reflexivity)). exact LpcA.
-      - rewrite (Tr cur_privilege ltac:(vm_compute; reflexivity)). exact LprivA.
-      - rewrite (Tr misa ltac:(vm_compute; reflexivity)). exact LmisaA.
-      - rewrite (Tr elp ltac:(vm_compute; reflexivity)). rewrite LelpA. exact Help_ne.
-      - apply agree_u.
-        + rewrite (Tr cur_privilege ltac:(vm_compute; reflexivity)). exact LprivA.
-        + rewrite (Tr menvcfg ltac:(vm_compute; reflexivity)). exact LmenvA.
-        + rewrite (Tr senvcfg ltac:(vm_compute; reflexivity)). exact LsenvA.
-        + rewrite (Tr mstateen0 ltac:(vm_compute; reflexivity)). exact LmseA.
-        + rewrite (Tr sstateen0 ltac:(vm_compute; reflexivity)). exact LsseA.
-        + rewrite (Tr misa ltac:(vm_compute; reflexivity)). exact LmisaA. }
-    (* the closure every geometry hands to [uv_retire_post_fetch] *)
-    iAssert (▷ ((utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) ∗
-                 umem pt M ∗ user_cfg C) -∗
-                hart_state ↦ᵣ HART_ACTIVE tt -∗
-                PC ↦ᵣ uv_next jt (add_vec_int pc (if is_rvc then 2 else 4)) -∗
-                nextPC ↦ᵣ uv_next jt (add_vec_int pc (if is_rvc then 2 else 4)) -∗
-                gpr_file (uv_upd m wr) -∗
-                WP (Loop : expr riscv_lang)))%I
-      with "[Hcont Hpriv Hms Hsc Hstval Hsepc]" as "Hk".
-    { iNext. iIntros "(Hutlb & Humem & Hcfg) Hhs Hpc Hnpc Hgpr".
-      iApply ("Hcont" $! CID0 with "[-Hpc Hnpc] [$Hpc $Hnpc]").
-      rewrite /uv_cap_gpr /uv_lin.
-      iFrame "Hcap Hamb2 Hutlb Humem Hcfg Hgpr".
-      rewrite /uv_regs.
-      iExists ms_v, sc_v, stval_v, sepc_v.
-      iSplitR; [ iPureIntro; exact Hmsok | ].
-      iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc". }
+      "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
+        #Hcert & _)".
+    pose proof Hpre as (Hinj & Htok & HpinsA & LhsA & LcpA & HmsokA & LpcA &
+                        HgagA & LstvecA & LmieA & LmdlA & LmedlA & LmenvA &
+                        LsatpA & LpcfgA & LpaddrA & LmiA & Hx0).
     destruct is_rvc.
     - (* ================= COMPRESSED ================= *)
       destruct Hcode as (h & HisRVC & Hbytes & Hdecrvc & Hnext2).
       destruct (is_aligned_vaddr (Virtaddr pc) 4) eqn:Hal4.
-      + (* 4-aligned: one 4-byte read *)
-        destruct (Hnext2 ltac:(first [exact Hal4 | reflexivity]))
-          as (b2 & b3 & Hb2 & Hb3).
-        iMod (umode_fetch_rvc_4 pt M w_leaf pc h b2 b3
-                (set_reg sg (R_bool minstret_increment) b)
-                Hum Hlok Hcanon Hinpage Hal4 Hbytes Hb2 Hb3 HisRVC
-                LpcA LmisaA LmenvA (T htif_tohost_base _ Lhtif eq_refl) LprivA
-                HSXL HpmaA
-                with "[Hreg] [Hmem] Hutlb Humem")
-          as (sf) "(%Hfetch & %Hmdev & _ & %Tr & Hreg & Hmem & Hutlb & Humem)".
-        { rewrite ?sregs_set_reg. iExact "Hreg". }
-        { rewrite ?mem_set_reg. iExact "Hmem". }
-        destruct (Hsf sf Tr) as (Lpcf & Lprivf & Lmisaf & Helpf & Hagree).
-        iApply (uv_retire_post_fetch CID0
-                  (utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) ∗
-                   umem pt M ∗ user_cfg C)%I sg sf b mst pc 2 (zero_extend' 32 h) m i o jt wr
-                  Hsi Hhart_a Lpcf Lprivf Hagree Hwrok
-                  (uv_prog_rvc _ _ h i o pc LprivA HdispA Hfetch
-                     (Hdecrvc sf ltac:(rewrite Lmisaf; vm_compute; reflexivity))
-                     Helpf Lpcf
-                     (exec_currentlyEnabled_Zca sf
-                        ltac:(rewrite Lmisaf; vm_compute; reflexivity)) Hred)
-                  Hexec
-                  with "[Hreg Hmem Hdev] [$Hutlb $Humem $Hcfg] Hhs Hpc Hnpc Hgpr Hmst Hmi Hk").
-        unfold mstate_interp. rewrite Hmdev. rewrite ?mdev_set_reg.
-        iFrame "Hreg Hmem Hdev".
+      + (* 4-aligned: one 4-byte read, low half is the instruction *)
+        destruct (Hnext2 ltac:(first [ exact Hal4 | reflexivity ])) as (b2 & b3 & Hb2 & Hb3).
+        assert (Hbytes4 : uM_bytes M (uint pc) 4 (urvc4_word h b2 b3)).
+        { intros j Hj. rewrite (urvc4_byte h b2 b3 j Hj).
+          destruct j as [ | [ | [ | [ | j ] ] ] ]; try lia;
+            cbn [lookup_total list_lookup_total];
+            [ exact (Hbytes 0%nat ltac:(lia)) | exact (Hbytes 1%nat ltac:(lia))
+            | exact Hb2 | exact Hb3 ]. }
+        destruct (uv_fetch_4 pt M t rsA w_leaf pc (urvc4_word h b2 b3)
+                    Hinj Hum Hlok Hcanon Hinpage Hal4 Hbytes4 LpcA LcpA
+                    (proj1 HmsokA) LmenvA HpinsA Htok)
+          as (rsf & t' & Hfe & Hfg & Tr & Htlbok' & Htok' & Hshape).
+        rewrite urvc4_low HisRVC in Hfe.
+        iApply (uv_obl_rvc C pt R Ψ M m pc h i o jt wr t t' usatp pcfg paddr
+                  rs1 rsA rsf Hpre Hfe Hfg Tr Htlbok' Htok' Hshape Hdecrvc
+                  Hwrok Hred Hg1 Hg2 Hexec
+                  with "Hcert Hamb Hcap Hk Hany Hrw Hro Hmm Hres").
       + (* 2 mod 4: one 2-byte read *)
-        iMod (umode_fetch_rvc_2 pt M w_leaf pc h
-                (set_reg sg (R_bool minstret_increment) b)
-                Hum Hlok Hcanon Hinpage Hal2 Hal4 Hbytes HisRVC
-                LpcA LmisaA LmenvA (T htif_tohost_base _ Lhtif eq_refl) LprivA
-                HSXL HpmaA
-                with "[Hreg] [Hmem] Hutlb Humem")
-          as (sf) "(%Hfetch & %Hmdev & _ & %Tr & Hreg & Hmem & Hutlb & Humem)".
-        { rewrite ?sregs_set_reg. iExact "Hreg". }
-        { rewrite ?mem_set_reg. iExact "Hmem". }
-        destruct (Hsf sf Tr) as (Lpcf & Lprivf & Lmisaf & Helpf & Hagree).
-        iApply (uv_retire_post_fetch CID0
-                  (utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) ∗
-                   umem pt M ∗ user_cfg C)%I sg sf b mst pc 2 (zero_extend' 32 h) m i o jt wr
-                  Hsi Hhart_a Lpcf Lprivf Hagree Hwrok
-                  (uv_prog_rvc _ _ h i o pc LprivA HdispA Hfetch
-                     (Hdecrvc sf ltac:(rewrite Lmisaf; vm_compute; reflexivity))
-                     Helpf Lpcf
-                     (exec_currentlyEnabled_Zca sf
-                        ltac:(rewrite Lmisaf; vm_compute; reflexivity)) Hred)
-                  Hexec
-                  with "[Hreg Hmem Hdev] [$Hutlb $Humem $Hcfg] Hhs Hpc Hnpc Hgpr Hmst Hmi Hk").
-        unfold mstate_interp. rewrite Hmdev. rewrite ?mdev_set_reg.
-        iFrame "Hreg Hmem Hdev".
+        destruct (uv_fetch_rvc_2 pt M t rsA w_leaf pc h
+                    Hinj Hum Hlok Hcanon Hinpage Hal2 Hal4 Hbytes HisRVC
+                    LpcA LcpA (proj1 HmsokA) LmenvA HpinsA Htok)
+          as (rsf & t' & Hfe & Hfg & Tr & Htlbok' & Htok' & Hshape).
+        iApply (uv_obl_rvc C pt R Ψ M m pc h i o jt wr t t' usatp pcfg paddr
+                  rs1 rsA rsf Hpre Hfe Hfg Tr Htlbok' Htok' Hshape Hdecrvc
+                  Hwrok Hred Hg1 Hg2 Hexec
+                  with "Hcert Hamb Hcap Hk Hany Hrw Hro Hmm Hres").
     - (* ================= BASE (4-byte) ================= *)
       destruct Hcode as (w & HnRVC & Hbytes & Hdecbase).
       destruct (is_aligned_vaddr (Virtaddr pc) 4) eqn:Hal4.
-      + iMod (umode_fetch_base_4 pt M w_leaf pc w
-                (set_reg sg (R_bool minstret_increment) b)
-                Hum Hlok Hcanon Hinpage Hal4 Hbytes HnRVC
-                LpcA LmisaA LmenvA (T htif_tohost_base _ Lhtif eq_refl) LprivA
-                HSXL HpmaA
-                with "[Hreg] [Hmem] Hutlb Humem")
-          as (sf) "(%Hfetch & %Hmdev & _ & %Tr & Hreg & Hmem & Hutlb & Humem)".
-        { rewrite ?sregs_set_reg. iExact "Hreg". }
-        { rewrite ?mem_set_reg. iExact "Hmem". }
-        destruct (Hsf sf Tr) as (Lpcf & Lprivf & Lmisaf & Helpf & Hagree).
-        iApply (uv_retire_post_fetch CID0
-                  (utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) ∗
-                   umem pt M ∗ user_cfg C)%I sg sf b mst pc 4 (zero_extend' 32 w) m i o jt wr
-                  Hsi Hhart_a Lpcf Lprivf Hagree Hwrok
-                  (uv_prog_base _ _ w i o pc LprivA HdispA Hfetch
-                     (Hdecbase sf Hagree) Helpf Hlpad Lpcf Hred)
-                  Hexec
-                  with "[Hreg Hmem Hdev] [$Hutlb $Humem $Hcfg] Hhs Hpc Hnpc Hgpr Hmst Hmi Hk").
-        unfold mstate_interp. rewrite Hmdev. rewrite ?mdev_set_reg.
-        iFrame "Hreg Hmem Hdev".
-      + iMod (umode_fetch_base_2 pt M w_leaf pc w
-                (set_reg sg (R_bool minstret_increment) b)
-                Hum Hlok Hcanon Hinpage Hal2 Hal4 Hbytes HnRVC
-                LpcA LmisaA LmenvA (T htif_tohost_base _ Lhtif eq_refl) LprivA
-                HSXL HpmaA
-                with "[Hreg] [Hmem] Hutlb Humem")
-          as (sf) "(%Hfetch & %Hmdev & %Tr & Hreg & Hmem & Hutlb & Humem)".
-        { rewrite ?sregs_set_reg. iExact "Hreg". }
-        { rewrite ?mem_set_reg. iExact "Hmem". }
-        destruct (Hsf sf Tr) as (Lpcf & Lprivf & Lmisaf & Helpf & Hagree).
-        iApply (uv_retire_post_fetch CID0
-                  (utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) ∗
-                   umem pt M ∗ user_cfg C)%I sg sf b mst pc 4 (zero_extend' 32 w) m i o jt wr
-                  Hsi Hhart_a Lpcf Lprivf Hagree Hwrok
-                  (uv_prog_base _ _ w i o pc LprivA HdispA Hfetch
-                     (Hdecbase sf Hagree) Helpf Hlpad Lpcf Hred)
-                  Hexec
-                  with "[Hreg Hmem Hdev] [$Hutlb $Humem $Hcfg] Hhs Hpc Hnpc Hgpr Hmst Hmi Hk").
-        unfold mstate_interp. rewrite Hmdev. rewrite ?mdev_set_reg.
-        iFrame "Hreg Hmem Hdev".
+      + destruct (uv_fetch_4 pt M t rsA w_leaf pc w
+                    Hinj Hum Hlok Hcanon Hinpage Hal4 Hbytes LpcA LcpA
+                    (proj1 HmsokA) LmenvA HpinsA Htok)
+          as (rsf & t' & Hfe & Hfg & Tr & Htlbok' & Htok' & Hshape).
+        rewrite HnRVC in Hfe.
+        iApply (uv_obl_base C pt R Ψ M m pc w i o jt wr t t' usatp pcfg paddr
+                  rs1 rsA rsf Hpre Hfe Hfg Tr Htlbok' Htok' Hshape Hdecbase
+                  Hwrok Hred Hg1 Hg2 Hexec
+                  with "Hcert Hamb Hcap Hk Hany Hrw Hro Hmm Hres").
+      + destruct (uv_fetch_base_2 pt M t rsA w_leaf pc w
+                    Hinj Hum Hlok Hcanon Hinpage Hal2 Hal4 Hbytes HnRVC
+                    LpcA LcpA (proj1 HmsokA) LmenvA HpinsA Htok)
+          as (rsf & t' & Hfe & Hfg & Tr & Htlbok' & Htok' & Hshape).
+        iApply (uv_obl_base C pt R Ψ M m pc w i o jt wr t t' usatp pcfg paddr
+                  rs1 rsA rsf Hpre Hfe Hfg Tr Htlbok' Htok' Hshape Hdecbase
+                  Hwrok Hred Hg1 Hg2 Hexec
+                  with "Hcert Hamb Hcap Hk Hany Hrw Hro Hmm Hres").
   Qed.
 
-  (* ------------------------------------------------------------------- *)
-  (* The later-free restatement: the shape every leaf in WpUmodeLeaf.v /   *)
-  (* WpUmodeBranch.v / WpUmodeStore.v / WpUmodeLoad.v takes.  A caller     *)
-  (* that does not want the step's later absorbs it here, once.            *)
-  (* ------------------------------------------------------------------- *)
+  (* the later-free restatement: the shape every leaf takes *)
   Lemma wp_uv_retire (Ψ : usys_protocol Σ) (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (is_rvc : bool) (i : instruction) (o : option instruction)
-      (jt : option (mword 64)) (wr : option (mword 5 * mword 64)) :
+      (pc : mword 64) (is_rvc : bool) (i : instruction)
+      (o : option instruction) (jt : option (mword 64))
+      (wr : option (mword 5 * mword 64)) :
     uinstr pt M pc is_rvc i ->
     uv_redirect i o ->
     is_lpad_instruction i = false ->
     uv_wrok wr ->
+    (forall s : mstate, goodmb Du_r Du_w (execute i) s ∅ = true) ->
+    (forall s : mstate, goodmb Du_r Du_w (execute (uv_exp i o)) s ∅ = true) ->
     (forall s_pc : mstate,
        register_lookup PC s_pc.(sregs) = pc ->
        register_lookup nextPC s_pc.(sregs)
@@ -1048,183 +2792,259 @@ Section UvRetireFunnel.
     pc_is pc -∗
     (∀ CID0 : CpuId,
        uv_cap_gpr (CID := CID0) C pt Ψ M (uv_upd m wr) -∗
-       pc_is (CID := CID0) (uv_next jt (add_vec_int pc (if is_rvc then 2 else 4))) -∗
+       pc_is (CID := CID0)
+         (uv_next jt (add_vec_int pc (if is_rvc then 2 else 4))) -∗
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hui Hred Hlpad Hwrok Hexec.
+    intros Hui Hred Hlpad Hwrok Hg1 Hg2 Hexec.
     iIntros "Hcg Hpc Hcont".
     iApply (wp_uv_retire_later Ψ M m pc is_rvc i o jt wr
-              Hui Hred Hlpad Hwrok Hexec with "Hcg Hpc [Hcont]").
+              Hui Hred Hlpad Hwrok Hg1 Hg2 Hexec with "Hcg Hpc [Hcont]").
     iNext. iExact "Hcont".
   Qed.
 
-End UvRetireFunnel.
+End UvRetire.
 
 (* ===================================================================== *)
-(* §4 The ECALL driver.                                                   *)
+(* §8 THE ECALL DRIVER.                                                   *)
 (*                                                                        *)
 (* [ecall] at User raises E_U_EnvCall with the state UNCHANGED             *)
-(* ([exec_execute_ECALL_U]); [uc_del] delegates it to Supervisor, the      *)
-(* shared trap tower delivers it, and the CONCRETE frame goes to the       *)
-(* capability's [uv_sys_wp] together with the caller's protocol payload    *)
-(* at the number in a7.  Nothing comes back: what the syscall does is      *)
-(* entirely the protocol's business.                                      *)
+(* ([UserExecFacts.exec_execute_ECALL_U]); [uc_del] delegates it to        *)
+(* Supervisor, the shared trap tower ([UserTrap.swp_exec_trap_u])          *)
+(* delivers it, and the CONCRETE frame goes to the capability's            *)
+(* [uv_sys_wp] together with the caller's protocol payload at the number   *)
+(* in a7.  Nothing comes back: what the syscall does is entirely the       *)
+(* protocol's business.                                                    *)
 (* ===================================================================== *)
 
-Lemma uv_prog_ecall (sa sf : mstate) (w : mword 32) (pc : mword 64) :
-  register_lookup cur_privilege sa.(sregs) = User ->
-  exec (dispatchInterrupt User) sa = Some (None, sa) ->
-  exec (fetch tt) sa = Some (F_Base w, sf) ->
-  exec (ext_decode w) sf = Some (ECALL tt, sf) ->
-  eq_vec (register_lookup elp sf.(sregs))
-         (landing_pad_bits_backwards LP_EXPECTED) = false ->
-  register_lookup PC sf.(sregs) = pc ->
-  register_lookup cur_privilege sf.(sregs) = User ->
-  exec (run_hart_active 0) sa
-    = Some (Step_Execute
-              (rv64d_types.Trap
-                 (User, make_sync_exception (E_U_EnvCall tt) (zeros' 64), pc),
-               zero_extend' 32 w),
-            set_reg sf nextPC (add_vec_int pc 4)).
-Proof.
-  intros Hpriv Hdisp Hfetch Hdec Help Lpc Lpriv.
-  apply (exec_hart_active_progress_base_gen User sa sf _ w (ECALL tt) pc _
-           Hpriv Hdisp Hfetch Hdec Help eq_refl Lpc); [ | exact I ].
-  apply exec_execute_ECALL_U.
-  - rewrite ?sregs_set_reg.
-    rewrite irrelevant_register_set; [ exact Lpriv | vm_compute; reflexivity ].
-  - rewrite ?sregs_set_reg.
-    rewrite irrelevant_register_set; [ exact Lpc | vm_compute; reflexivity ].
-Qed.
-
+(* the trap half lives in a section of its OWN: [wp_uv_ecall] applies it at
+   the hart the OBLIGATION runs on, which is a [forall]-bound one, and a
+   section CpuId variable is auto-applied and cannot be named at
+   application (claude-notes/projects/user-verified.md section 5). *)
 Section UvEcallPost.
   Context `{!riscvGS Σ}.
-  Context `{GEN : GenId}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+  Context (C : ucfg) (pt : uptd).
 
-  (* everything from the FETCHED state on, for the ecall trap *)
-  Lemma uv_ecall_post_fetch (CIDp : CpuId) (C : ucfg) (pt : uptd)
-      (Ψ : usys_protocol Σ)
-      (sg sf : mstate) (b : bool) (mst pc : mword 64) (ib : mword 32)
-      (ms_v sc_v stval_v sepc_v : mword 64)
-      (m : regfile) (M : gmap Z (bv 8))
-      (elp0 : mword 1) (misa0 : type_of_register misa) :
-    user_mstatus_ok ms_v ->
-    eq_vec (_get_Misa_S misa0) ('b"1") = true ->
-    eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
-    exec (should_inc_minstret (register_lookup cur_privilege sg.(sregs))) sg
-      = Some (b, sg) ->
-    register_lookup hart_state
-      (set_reg sg (R_bool minstret_increment) b).(sregs) = HART_ACTIVE tt ->
-    register_lookup cur_privilege sf.(sregs) = User ->
-    register_lookup mstatus sf.(sregs) = ms_v ->
-    register_lookup scause sf.(sregs) = sc_v ->
-    register_lookup stvec sf.(sregs) = uc_stvec C ->
-    register_lookup elp sf.(sregs) = elp0 ->
-    register_lookup misa sf.(sregs) = misa0 ->
-    register_lookup medeleg sf.(sregs) = uc_medeleg C ->
-    exec (run_hart_active 0) (set_reg sg (R_bool minstret_increment) b)
-      = Some (Step_Execute
-                (rv64d_types.Trap
-                   (User, make_sync_exception (E_U_EnvCall tt) (zeros' 64), pc), ib),
-              set_reg sf nextPC (add_vec_int pc 4)) ->
-    mstate_interp sf -∗
-    uv_sys_wp C pt Ψ -∗
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    cur_privilege ↦ᵣ User -∗ mstatus ↦ᵣ ms_v -∗ scause ↦ᵣ sc_v -∗
-    stval ↦ᵣ stval_v -∗ sepc ↦ᵣ sepc_v -∗ PC ↦ᵣ pc -∗ nextPC ↦ᵣ pc -∗
-    gpr_file m -∗
-    utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) -∗
-    umem pt M -∗ user_cfg C -∗
-    minstret ↦ᵣ mst -∗ (R_bool minstret_increment) ↦ᵣ b -∗
-    Ψ (uint (m !!! Regidx a7_idx)) m pc M -∗
-    |={⊤ ∖ ↑minstretN ∖ ↑wireN ∖ ↑clockN}=> ∃ s' : mstate,
-      ⌜exec (riscv_step false) sg = Some (tt, s')⌝ ∗
-      ▷ (mstate_interp s' ∗ minstret_inv_body ∗
-         WP (Loop : expr riscv_lang)).
+  Lemma uv_ecall_post_fetch (R : iProp Σ) (Ψ : usys_protocol Σ)
+      (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) (ib : mword 32)
+      (t' : ptree) (usatp : mword 64) (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n) (rs1 rs2 : regstate) :
+    (forall s : mstate, goodmb Du_r Du_w (execute (ECALL tt)) s ∅ = true) ->
+    register_lookup (R_bitvector_64 PC) rs2 = pc ->
+    register_lookup hart_state rs2 = HART_ACTIVE tt ->
+    register_lookup cur_privilege rs2 = User ->
+    user_mstatus_ok (register_lookup (R_bitvector_64 mstatus) rs2) ->
+    u_gpr_agree m rs2 ->
+    m (Regidx (mword_of_int 0)) = zero_reg ->
+    register_lookup (R_bitvector_64 stvec) rs2 = uc_stvec C ->
+    register_lookup (R_bitvector_64 mie) rs2 = uc_mie C ->
+    register_lookup (R_bitvector_64 mideleg) rs2 = uc_mideleg C ->
+    register_lookup (R_bitvector_64 medeleg) rs2 = uc_medeleg C ->
+    register_lookup (R_bitvector_64 menvcfg) rs2 = MENVCFG_S ->
+    register_lookup (R_bitvector_64 mstateen0) rs2 = (mword_of_int 0 : mword 64) ->
+    register_lookup (R_bitvector_32 sstateen0) rs2 = (mword_of_int 0 : mword 32) ->
+    register_lookup (R_bitvector_64 senvcfg) rs2 = (mword_of_int 0 : mword 64) ->
+    register_lookup (R_bitvector_64 satp) rs2 = usatp ->
+    register_lookup pmpcfg_n rs2 = pcfg ->
+    register_lookup pmpaddr_n rs2 = paddr ->
+    register_lookup (R_bitvector_64 misa) rs2 = MISA_C ->
+    eq_vec (register_lookup (R_bitvector_1 elp) rs2)
+      (landing_pad_bits_backwards LP_EXPECTED) = false ->
+    register_lookup (R_bool minstret_increment) rs2
+      = minstret_inc_flag (register_lookup (R_bitvector_32 mcountinhibit) rs1)
+          (register_lookup (R_bitvector_64 minstretcfg) rs1)
+          (register_lookup cur_privilege rs1) ->
+    tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rs2) ->
+    uv_tree_ok pt (upa_map pt M) t' ->
+    gen_cert -∗ uv_cap C pt Ψ -∗
+    (R -∗ Ψ (uint (m !!! Regidx a7_idx)) m pc M) -∗
+    resv_any cpu_id -∗
+    bytes_own (uv_mm t' (upa_map pt M)) -∗
+    uv_res pt M t' usatp pcfg paddr -∗
+    hreg_frame (register_set nextPC (add_vec_int pc 4) rs2) u_Drw -∗
+    hreg_frame_ro (u_Df (uc_dqc C))
+      (register_set nextPC (add_vec_int pc 4) rs2) u_Dro -∗
+    swp (execute (ECALL tt))
+      (run_exec_post (fun (r : ExecutionResult) (ib' : mword 32) =>
+                        uv_step_post C R rs1 (Step_Execute (r, ib'))) ib).
   Proof.
-    intros Hmsok HmisaS Help_ne Hsi Hhart_a Lprivf Lmsf Lscf Lstvecf Lelpf
-           Lmisaf Lmedlf Hha.
-    iIntros "Hint #Hsys Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr
-             Hutlb Humem Hcfg Hmst Hmi HPsi".
-    iDestruct "Hint" as "(Hreg & Hmem & Hdev)".
-    iDestruct (reg_valid_dq with "Hreg Hhs") as %Lhs_f.
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc")
-      as "[Hreg Hnpc]".
-    assert (Tn : forall (r : register) (v : type_of_register r),
-              register_lookup r sf.(sregs) = v ->
-              register_beq r nextPC = false ->
-              register_lookup r (set_reg sf nextPC (add_vec_int pc 4)).(sregs) = v).
-    { intros r v Hv Hne. rewrite ?sregs_set_reg.
-      rewrite irrelevant_register_set; [ exact Hv | exact Hne ]. }
-    iAssert (mstate_interp (set_reg sf nextPC (add_vec_int pc 4)))
-      with "[Hreg Hmem Hdev]" as "Hint".
-    { rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hmem Hdev". }
-    iDestruct "Hint" as "(Hreg & Hmem & Hdev)".
-    assert (Hdel_x : bit_to_bool (access_vec_dec
-              (register_lookup medeleg (set_reg sf nextPC (add_vec_int pc 4)).(sregs))
-              (uint (exceptionType_bits_forwards (E_U_EnvCall tt)))) = true).
-    { rewrite (Tn medeleg _ Lmedlf ltac:(vm_compute; reflexivity)).
-      exact (uc_del C (E_U_EnvCall tt) eq_refl). }
-    pose proof (exec_exception_handler_U
-                  (set_reg sf nextPC (add_vec_int pc 4))
+    intros Hg Lpc2 Lhs2 Lcp2 Hms2 Hgag2 Hx0 Lstvec2 Lmie2 Lmdl2 Lmedl2 Lmenv2
+      Lmste2 Lsste2 Lsenv2 Lsatp2 Lpcfg2 Lpaddr2 Lmisa2 Helpne2 Lmi2
+      Htlbok2 Htok'.
+    set (rsx := register_set nextPC (add_vec_int pc 4) rs2).
+    (* every named pin survives the [nextPC := pc+4] write *)
+    assert (Tx : forall (r : register) (val : type_of_register r),
+              register_beq r (R_bitvector_64 nextPC) = false ->
+              register_lookup r rs2 = val -> register_lookup r rsx = val).
+    { intros r val Hne Hv. unfold rsx.
+      rewrite (irrelevant_register_set r (R_bitvector_64 nextPC) rs2 _ Hne).
+      exact Hv. }
+    assert (Lpcx : register_lookup (R_bitvector_64 PC) rsx = pc)
+      by exact (Tx (R_bitvector_64 PC) _ ltac:(vm_compute; reflexivity) Lpc2).
+    assert (Lcpx : register_lookup cur_privilege rsx = User)
+      by exact (Tx cur_privilege _ ltac:(vm_compute; reflexivity) Lcp2).
+    assert (Lhsx : register_lookup hart_state rsx = HART_ACTIVE tt)
+      by exact (Tx hart_state _ ltac:(vm_compute; reflexivity) Lhs2).
+    assert (Hmsx : user_mstatus_ok (register_lookup (R_bitvector_64 mstatus) rsx))
+      by (rewrite (Tx (R_bitvector_64 mstatus) _
+                     ltac:(vm_compute; reflexivity) eq_refl); exact Hms2).
+    assert (Lstvecx : register_lookup (R_bitvector_64 stvec) rsx = uc_stvec C)
+      by exact (Tx (R_bitvector_64 stvec) _ ltac:(vm_compute; reflexivity) Lstvec2).
+    assert (Lmiex : register_lookup (R_bitvector_64 mie) rsx = uc_mie C)
+      by exact (Tx (R_bitvector_64 mie) _ ltac:(vm_compute; reflexivity) Lmie2).
+    assert (Lmdlx : register_lookup (R_bitvector_64 mideleg) rsx = uc_mideleg C)
+      by exact (Tx (R_bitvector_64 mideleg) _ ltac:(vm_compute; reflexivity) Lmdl2).
+    assert (Lmedlx : register_lookup (R_bitvector_64 medeleg) rsx = uc_medeleg C)
+      by exact (Tx (R_bitvector_64 medeleg) _ ltac:(vm_compute; reflexivity) Lmedl2).
+    assert (Lmenvx : register_lookup (R_bitvector_64 menvcfg) rsx = MENVCFG_S)
+      by exact (Tx (R_bitvector_64 menvcfg) _ ltac:(vm_compute; reflexivity) Lmenv2).
+    assert (Lmstex : register_lookup (R_bitvector_64 mstateen0) rsx
+                     = (mword_of_int 0 : mword 64))
+      by exact (Tx (R_bitvector_64 mstateen0) _ ltac:(vm_compute; reflexivity) Lmste2).
+    assert (Lsstex : register_lookup (R_bitvector_32 sstateen0) rsx
+                     = (mword_of_int 0 : mword 32))
+      by exact (Tx (R_bitvector_32 sstateen0) _ ltac:(vm_compute; reflexivity) Lsste2).
+    assert (Lsenvx : register_lookup (R_bitvector_64 senvcfg) rsx
+                     = (mword_of_int 0 : mword 64))
+      by exact (Tx (R_bitvector_64 senvcfg) _ ltac:(vm_compute; reflexivity) Lsenv2).
+    assert (Lsatpx : register_lookup (R_bitvector_64 satp) rsx = usatp)
+      by exact (Tx (R_bitvector_64 satp) _ ltac:(vm_compute; reflexivity) Lsatp2).
+    assert (Lpcfgx : register_lookup pmpcfg_n rsx = pcfg)
+      by exact (Tx pmpcfg_n _ ltac:(vm_compute; reflexivity) Lpcfg2).
+    assert (Lpaddrx : register_lookup pmpaddr_n rsx = paddr)
+      by exact (Tx pmpaddr_n _ ltac:(vm_compute; reflexivity) Lpaddr2).
+    assert (Lmisax : register_lookup (R_bitvector_64 misa) rsx = MISA_C)
+      by exact (Tx (R_bitvector_64 misa) _ ltac:(vm_compute; reflexivity) Lmisa2).
+    assert (Helpnex : eq_vec (register_lookup (R_bitvector_1 elp) rsx)
+                        (landing_pad_bits_backwards LP_EXPECTED) = false)
+      by (rewrite (Tx (R_bitvector_1 elp) _
+                     ltac:(vm_compute; reflexivity) eq_refl); exact Helpne2).
+    assert (Lmix : register_lookup (R_bool minstret_increment) rsx
+              = minstret_inc_flag (register_lookup (R_bitvector_32 mcountinhibit) rs1)
+                  (register_lookup (R_bitvector_64 minstretcfg) rs1)
+                  (register_lookup cur_privilege rs1))
+      by exact (Tx (R_bool minstret_increment) _ ltac:(vm_compute; reflexivity) Lmi2).
+    assert (Ltlbx : register_lookup tlb rsx = register_lookup tlb rs2)
+      by exact (Tx tlb _ ltac:(vm_compute; reflexivity) eq_refl).
+    assert (Hgagx : u_gpr_agree m rsx).
+    { intros q Hnz. rewrite (Hgag2 q Hnz). symmetry.
+      exact (Tx (R_bitvector_64 (gpr_of_Z (uint q))) _ (regbeq_gpr_nextPC (uint q)) eq_refl). }
+    pose proof (elp_no_lp _ Helpnex) as Lelpx.
+    assert (HmisaS : eq_vec (_get_Misa_S (register_lookup (R_bitvector_64 misa) rsx))
+                       ('b"1") = true)
+      by (rewrite Lmisax; vm_compute; reflexivity).
+    assert (Hdel : bit_to_bool (access_vec_dec
+              (register_lookup (R_bitvector_64 medeleg) rsx)
+              (uint (exceptionType_bits_forwards (E_U_EnvCall tt)))) = true)
+      by (rewrite Lmedlx; exact (uc_del C (E_U_EnvCall tt) eq_refl)).
+    pose proof (exec_execute_ECALL_U (u_state rsx ∅) pc Lcpx Lpcx) as Hex.
+    iIntros "#Hcert #Hcap Hk Hany Hmm Hres Hrw Hro".
+    iDestruct "Hcap" as "[#Hintr #Hsys]".
+    iAssert (bytes_own (∅ : gmap Arch.pa (bv 8))) as "#Hemp";
+      [ by rewrite /bytes_own big_sepM_empty |].
+    (* ---- the execute: one node, no memory ---- *)
+    iApply (swp_mono with "[Hk Hmm Hres] [Hany Hrw Hro]").
+    2:{ iApply (swp_hmrun_of_exec Du_r Du_w u_Drw u_Dro (u_Df (uc_dqc C))
+                  (execute (ECALL tt)) (u_state rsx ∅) (u_state rsx ∅)
+                  (rv64d_types.Trap
+                     (User, make_sync_exception (E_U_EnvCall tt) (zeros' 64), pc))
+                  rsx ∅ u_disj Du_r_sub Du_w_sub
+                  ltac:(intros q _; reflexivity) (map_empty_subseteq _)
+                  (Hg (u_state rsx ∅)) Hex
+                  with "Hcert Hany Hrw Hro Hemp"). }
+    iIntros (v) "(-> & Hpost)".
+    iDestruct "Hpost" as (rs3 mm3) "(%Hag3 & _ & _ & Hrw & Hro & _ & Hany)".
+    iApply (run_exec_post_direct
+              (fun (r : ExecutionResult) (ib' : mword 32) =>
+                 uv_step_post C R rs1 (Step_Execute (r, ib'))) ib
+              (rv64d_types.Trap
+                 (User, make_sync_exception (E_U_EnvCall tt) (zeros' 64), pc)) I).
+    (* ---- the trap tower ---- *)
+    iDestruct (u_ro_elp_acc with "Hro") as "[#Help Hro]".
+    assert (Lelp3 : register_lookup (R_bitvector_1 elp) rs3
+                    = landing_pad_bits_backwards NO_LP_EXPECTED)
+      by (rewrite (Hag3 _ u_in_elp); exact Lelpx).
+    rewrite Lelp3.
+    rewrite /uv_step_post.
+    iExists (u_trap_rs rsx (rv64d_types.Exception (E_U_EnvCall tt))
+               (xtval_exception_value (E_U_EnvCall tt) (zeros' 64)) pc
+               (uc_stvec C)).
+    iSplitR "Hany Hrw Hro Hmm Hres Hk".
+    { iPureIntro. rewrite /uv_land. split_and!;
+        [ uv_trap_peel; exact Lhs2 | uv_trap_peel; exact Lmi2 | exact I ]. }
+    iApply (swp_mono with "[Hk Hmm Hres] [Hany Hrw Hro]").
+    2:{ iApply (swp_exec_trap_u (u_state rsx ∅)
                   (rv64d_types.Exception (E_U_EnvCall tt))
-                  (xtval_exception_value (E_U_EnvCall tt) (zeros' 64))
-                  pc ms_v sc_v (uc_stvec C) elp0
-                  (Tn cur_privilege _ Lprivf ltac:(vm_compute; reflexivity))
-                  (Tn mstatus _ Lmsf ltac:(vm_compute; reflexivity))
-                  (Tn scause _ Lscf ltac:(vm_compute; reflexivity))
-                  (Tn stvec _ Lstvecf ltac:(vm_compute; reflexivity))
-                  (Tn elp _ Lelpf ltac:(vm_compute; reflexivity))
-                  ltac:(rewrite (Tn misa _ Lmisaf ltac:(vm_compute; reflexivity));
-                        exact HmisaS)
-                  (uc_tvd C)
-                  (E_U_EnvCall tt) (zeros' 64) eq_refl eq_refl Hdel_x) as Heh.
-    set (s9x := set_reg _ cur_privilege Supervisor) in Heh.
-    set (s_trap := set_reg s9x nextPC (stvec_base (uc_stvec C))).
-    assert (Hxh : exec (Defs.bind
-                    (exception_handler User
-                       (make_sync_exception (E_U_EnvCall tt) (zeros' 64)) pc)
-                    set_next_pc) (set_reg sf nextPC (add_vec_int pc 4))
-                  = Some (tt, s_trap)).
-    { rewrite (exec_bind_Some _ _ _ _ _ Heh). unfold s_trap. apply exec_set_next_pc. }
-    assert (Lhs_trap : register_lookup hart_state s_trap.(sregs) = HART_ACTIVE tt).
-    { unfold s_trap, s9x; rewrite ?sregs_set_reg.
-      repeat (rewrite irrelevant_register_set; [ | vm_compute; reflexivity ]).
-      exact Lhs_f. }
-    assert (Hstep : exec (riscv_step false) sg
-              = Some (tt, set_reg s_trap PC (register_lookup nextPC s_trap.(sregs)))).
-    { eapply exec_riscv_step_execute_trap;
-        [ exact Hsi | exact Hhart_a | exact Hha | exact Hxh | exact Lhs_trap ]. }
-    assert (Lnpc_trap : register_lookup nextPC s_trap.(sregs)
-                        = stvec_base (uc_stvec C)).
-    { unfold s_trap; rewrite ?sregs_set_reg. apply register_lookup_set. }
-    rewrite Lnpc_trap in Hstep.
-    assert (Hs' : set_reg s_trap PC (stvec_base (uc_stvec C))
-                = utrap_state (set_reg sf nextPC (add_vec_int pc 4))
-                    (rv64d_types.Exception (E_U_EnvCall tt))
-                    (xtval_exception_value (E_U_EnvCall tt) (zeros' 64))
-                    pc ms_v sc_v elp0 (uc_stvec C))
-      by (unfold s_trap, s9x; reflexivity).
-    rewrite Hs' in Hstep.
-    iMod (utrap_ghost (set_reg sf nextPC (add_vec_int pc 4))
-            (rv64d_types.Exception (E_U_EnvCall tt))
-            (xtval_exception_value (E_U_EnvCall tt) (zeros' 64))
-            pc ms_v sc_v stval_v sepc_v pc (add_vec_int pc 4) elp0 (uc_stvec C)
-            (Tn elp _ Lelpf ltac:(vm_compute; reflexivity)) Help_ne
-            with "[Hreg Hmem Hdev] Hms Hsc Hstval Hsepc Hpriv Hnpc Hpc")
-      as "(Hint & Hms & Hsc & Hstval & Hsepc & Hpriv & Hnpc & Hpc)".
-    { iFrame "Hreg Hmem Hdev". }
-    iModIntro. iExists _.
-    iSplitR. { iPureIntro. exact Hstep. }
-    iNext. iFrame "Hint".
-    iSplitL "Hmst Hmi". { iExists mst, b. iFrame. }
-    iApply ("Hsys" $! CIDp m M pc sc_v
+                  (xtval_exception_value (E_U_EnvCall tt) (zeros' 64)) pc
+                  (register_lookup (R_bitvector_64 mstatus) rsx)
+                  (register_lookup (R_bitvector_64 scause) rsx)
+                  (uc_stvec C) (landing_pad_bits_backwards NO_LP_EXPECTED)
+                  Lcpx eq_refl eq_refl Lstvecx Lelpx HmisaS (uc_tvd C)
+                  Du_r Du_w u_Drw u_Dro (u_Df (uc_dqc C)) rs3
+                  (E_U_EnvCall tt) (zeros' 64) eq_refl eq_refl Hdel
+                  u_disj Du_r_sub Du_w_sub
+                  ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                  ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                  ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                  ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                  ltac:(vm_compute; reflexivity)
+                  ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                  ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                  ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                  Hag3 eq_refl
+                  with "Hcert Hany Help Hrw Hro"). }
+    iIntros (v) "Hpost".
+    iDestruct "Hpost" as (rs') "(%Hag & Hrw & Hro & Hany)".
+    rewrite /uv_arm_res.
+    rewrite <- (hreg_frame_ext rs'
+                 (u_trap_rs rsx (rv64d_types.Exception (E_U_EnvCall tt))
+                    (xtval_exception_value (E_U_EnvCall tt) (zeros' 64)) pc
+                    (uc_stvec C)) u_Drw
+                 ltac:(intros q Hq; apply Hag, elem_of_union_l, Hq)).
+    rewrite <- (hreg_frame_ro_ext (u_Df (uc_dqc C)) rs'
+                 (u_trap_rs rsx (rv64d_types.Exception (E_U_EnvCall tt))
+                    (xtval_exception_value (E_U_EnvCall tt) (zeros' 64)) pc
+                    (uc_stvec C)) u_Dro
+                 ltac:(intros q Hq; apply Hag, elem_of_union_r, Hq)).
+    iFrame "Hrw Hro".
+    iApply (uv_psi_trap C pt R M m t' usatp pcfg paddr
+              (u_trap_rs rsx (rv64d_types.Exception (E_U_EnvCall tt))
+                 (xtval_exception_value (E_U_EnvCall tt) (zeros' 64)) pc
+                 (uc_stvec C))
+              (utrap_scause (rv64d_types.Exception (E_U_EnvCall tt))
+                 (register_lookup (R_bitvector_64 scause) rsx))
+              (tval (xtval_exception_value (E_U_EnvCall tt) (zeros' 64))) pc
+              ltac:(uv_trap_peel; apply register_lookup_set)
+              ltac:(uv_trap_peel; apply register_lookup_set)
+              ltac:(uv_trap_peel; apply register_lookup_set)
+              ltac:(uv_trap_peel; exact Lhs2)
+              ltac:(uv_trap_peel; apply register_lookup_set)
+              ltac:(uv_trap_peel; rewrite register_lookup_set;
+                    exact (utrap_ms_ok _ _ Hmsx))
+              ltac:(uv_trap_peel; apply register_lookup_set)
+              (uv_gpr_agree_trap m rsx _ _ _ _ Hgagx) Hx0
+              ltac:(uv_trap_peel; exact Lstvec2)
+              ltac:(uv_trap_peel; exact Lmie2)
+              ltac:(uv_trap_peel; exact Lmdl2)
+              ltac:(uv_trap_peel; exact Lmedl2)
+              ltac:(uv_trap_peel; exact Lmenv2)
+              ltac:(uv_trap_peel; exact Lmste2)
+              ltac:(uv_trap_peel; exact Lsste2)
+              ltac:(uv_trap_peel; exact Lsenv2)
+              ltac:(uv_trap_peel; exact Lsatp2)
+              ltac:(uv_trap_peel; exact Lpcfg2)
+              ltac:(uv_trap_peel; exact Lpaddr2)
+              Htok'
+              ltac:(uv_trap_peel; exact Htlbok2)
+              with "Hany Hmm Hres [Hsys Hk]").
+    iIntros "Hframe HR".
+    iApply ("Hsys" $! CID m M pc
+              (register_lookup (R_bitvector_64 scause) rsx)
               (tval (xtval_exception_value (E_U_EnvCall tt) (zeros' 64)))
-              with "[-HPsi] HPsi").
-    iExists (utrap_ms elp0 ms_v).
-    iSplitR. { iPureIntro. exact (utrap_ms_ok elp0 ms_v Hmsok). }
-    iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hutlb Humem Hcfg".
+              with "Hframe [HR Hk]").
+    iApply ("Hk" with "HR").
   Qed.
 
 End UvEcallPost.
@@ -1234,160 +3054,121 @@ Section UvEcall.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context (C : ucfg) (pt : uptd).
 
-  (* THE ECALL DRIVER.  The process supplies (and relies on) its protocol's
-     arm at the number in a7; the kernel's syscall service takes it from
-     there, so this WP has no continuation of its own. *)
   Lemma wp_uv_ecall (Ψ : usys_protocol Σ) (M : gmap Z (bv 8)) (m : regfile)
       (pc : mword 64) :
     uinstr pt M pc false (ECALL tt) ->
+    (forall s : mstate, goodmb Du_r Du_w (execute (ECALL tt)) s ∅ = true) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
     Ψ (uint (m !!! Regidx a7_idx)) m pc M -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hui.
+    intros Hui Hg.
     destruct Hui as [Hal2 Hcanon Hleaf Hinpage Hcode].
     destruct Hleaf as (w_leaf & Hum & Hlok).
     destruct Hcode as (w & HnRVC & Hbytes & Hdecbase).
     iIntros "Hcg Hpc HPsi".
-    iDestruct "Hcg" as "(#Hcap & Hlin & Hgprc)".
-    iDestruct "Hcap" as "[#Hintr #Hsys]".
-    iAssert (uv_cap_gpr C pt Ψ M m) with "[Hlin Hgprc]" as "Hcg".
-    { rewrite /uv_cap_gpr /uv_cap. iFrame "Hintr Hsys Hlin Hgprc". }
-    iApply (wp_uv_step C pt Ψ M m pc with "Hcg Hpc [HPsi]").
+    iApply (wp_uv_step C pt _ Ψ M m pc with "Hcg Hpc [] [HPsi]").
+    2:{ iNext. iExact "HPsi". }
     rewrite /uv_step_obl.
-    iIntros (CID0 sg ms_v sc_v stval_v sepc_v)
-      "%Hmsok %Lpriv %Lms %Lpc %Hdisp #Hamb Hhs Hpriv Hms Hsc Hstval Hsepc
-       Hpc Hnpc Hgpr Hutlb Humem Hcfg Hint Hbody".
-    iDestruct "Hamb" as "(#Hhw & #Hmin & #Hwinv)".
-    iDestruct "Hbody" as (mst mi) "[Hmst Hmi]".
-    iDestruct "Hint" as "(Hreg & Hmem & Hdev)".
-    iDestruct (reg_valid_dq with "Hreg Hhs") as %Lhs.
-    iDestruct (reg_valid_dq with "Hreg Hsc") as %Lsc.
-    iDestruct "Hcfg" as "(Hstvec & Hmie & Hmdl & Hmedl & Hmenv & Hsenv & Hmse & Hsse)".
-    iDestruct (reg_valid_dq with "Hreg Hstvec") as %Lstvec.
-    iDestruct (reg_valid_dq with "Hreg Hmedl") as %Lmedl.
-    iDestruct (reg_valid_dq with "Hreg Hmenv") as %Lmenv.
-    iDestruct (reg_valid_dq with "Hreg Hsenv") as %Lsenv.
-    iDestruct (reg_valid_dq with "Hreg Hmse") as %Lmse.
-    iDestruct (reg_valid_dq with "Hreg Hsse") as %Lsse.
+    iIntros (R CIDo t rs1 rsA usatp pcfg paddr)
+      "%Hpre #Hamb #Hcap Hk Hany Hrw Hro Hmm Hres".
+    iPoseProof "Hamb" as "(#Hhw & _ & _)".
     iPoseProof "Hhw" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & _ & #Hpma & #Hhtif & #Help & _ & %HmisaS & _ & _ & _ & %Hpma_all
-        & _ & _ & %Help_ne & _ & %Hmisaval & _)".
-    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    iDestruct (reg_valid_dq with "Hreg Hpma") as %Lpma.
-    iDestruct (reg_valid_dq with "Hreg Hhtif") as %Lhtif.
-    iDestruct (reg_valid_dq with "Hreg Help") as %Lelp.
-    subst misa0.
-    iAssert (user_cfg C)
-      with "[Hstvec Hmie Hmdl Hmedl Hmenv Hsenv Hmse Hsse]" as "Hcfg".
-    { iFrame "Hstvec Hmie Hmdl Hmedl Hmenv Hsenv Hmse Hsse". }
-    destruct (exec_should_inc_minstret_Some
-                (register_lookup cur_privilege sg.(sregs)) sg) as [b Hsi].
-    iMod (reg_update _ (R_bool minstret_increment) _ b with "Hreg Hmi") as "[Hreg Hmi]".
-    assert (T : forall (r : register) (v : type_of_register r),
-              register_lookup r sg.(sregs) = v ->
-              register_beq r (R_bool minstret_increment) = false ->
-              register_lookup r (set_reg sg (R_bool minstret_increment) b).(sregs) = v).
-    { intros r v Hv Hne. rewrite ?sregs_set_reg.
-      rewrite irrelevant_register_set; [exact Hv | exact Hne]. }
-    pose proof (T hart_state _ Lhs eq_refl) as Hhart_a.
-    pose proof (T PC _ Lpc eq_refl) as LpcA.
-    pose proof (T cur_privilege _ Lpriv eq_refl) as LprivA.
-    pose proof (T misa _ Lmisa eq_refl) as LmisaA.
-    pose proof (T menvcfg _ Lmenv eq_refl) as LmenvA.
-    pose proof (T senvcfg _ Lsenv eq_refl) as LsenvA.
-    pose proof (T mstateen0 _ Lmse eq_refl) as LmseA.
-    pose proof (T sstateen0 _ Lsse eq_refl) as LsseA.
-    pose proof (T elp _ Lelp eq_refl) as LelpA.
-    pose proof (T mstatus _ Lms eq_refl) as LmsA.
-    pose proof (T scause _ Lsc eq_refl) as LscA.
-    pose proof (T stvec _ Lstvec eq_refl) as LstvecA.
-    pose proof (T medeleg _ Lmedl eq_refl) as LmedlA.
-    assert (HSXL : _get_Mstatus_SXL
-              (register_lookup mstatus (set_reg sg (R_bool minstret_increment) b).(sregs))
-              = 'b"10")
-      by (rewrite LmsA; exact (proj1 Hmsok)).
-    assert (HpmaA : pma_allows_all
-              (register_lookup pma_regions
-                 (set_reg sg (R_bool minstret_increment) b).(sregs)))
-      by (rewrite (T pma_regions _ Lpma eq_refl); exact Hpma_all).
-    pose proof (Hdisp b) as HdispA.
-    assert (Hsf : forall sf : mstate,
-              (forall r : register, register_beq r tlb = false ->
-                 register_lookup r sf.(sregs)
-                   = register_lookup r (set_reg sg (R_bool minstret_increment) b).(sregs)) ->
-              register_lookup PC sf.(sregs) = pc /\
-              register_lookup cur_privilege sf.(sregs) = User /\
-              register_lookup misa sf.(sregs) = MISA_C /\
-              eq_vec (register_lookup elp sf.(sregs))
-                     (landing_pad_bits_backwards LP_EXPECTED) = false /\
-              agree_on D_u sf dstateU /\
-              register_lookup mstatus sf.(sregs) = ms_v /\
-              register_lookup scause sf.(sregs) = sc_v /\
-              register_lookup stvec sf.(sregs) = uc_stvec C /\
-              register_lookup elp sf.(sregs) = elp0 /\
-              register_lookup medeleg sf.(sregs) = uc_medeleg C).
-    { intros sf Tr. split_and!.
-      - rewrite (Tr PC ltac:(vm_compute; reflexivity)). exact LpcA.
-      - rewrite (Tr cur_privilege ltac:(vm_compute; reflexivity)). exact LprivA.
-      - rewrite (Tr misa ltac:(vm_compute; reflexivity)). exact LmisaA.
-      - rewrite (Tr elp ltac:(vm_compute; reflexivity)). rewrite LelpA. exact Help_ne.
-      - apply agree_u.
-        + rewrite (Tr cur_privilege ltac:(vm_compute; reflexivity)). exact LprivA.
-        + rewrite (Tr menvcfg ltac:(vm_compute; reflexivity)). exact LmenvA.
-        + rewrite (Tr senvcfg ltac:(vm_compute; reflexivity)). exact LsenvA.
-        + rewrite (Tr mstateen0 ltac:(vm_compute; reflexivity)). exact LmseA.
-        + rewrite (Tr sstateen0 ltac:(vm_compute; reflexivity)). exact LsseA.
-        + rewrite (Tr misa ltac:(vm_compute; reflexivity)). exact LmisaA.
-      - rewrite (Tr mstatus ltac:(vm_compute; reflexivity)). exact LmsA.
-      - rewrite (Tr scause ltac:(vm_compute; reflexivity)). exact LscA.
-      - rewrite (Tr stvec ltac:(vm_compute; reflexivity)). exact LstvecA.
-      - rewrite (Tr elp ltac:(vm_compute; reflexivity)). exact LelpA.
-      - rewrite (Tr medeleg ltac:(vm_compute; reflexivity)). exact LmedlA. }
-    destruct (is_aligned_vaddr (Virtaddr pc) 4) eqn:Hal4.
-    - iMod (umode_fetch_base_4 pt M w_leaf pc w
-              (set_reg sg (R_bool minstret_increment) b)
-              Hum Hlok Hcanon Hinpage Hal4 Hbytes HnRVC
-              LpcA LmisaA LmenvA (T htif_tohost_base _ Lhtif eq_refl) LprivA
-              HSXL HpmaA
-              with "[Hreg] [Hmem] Hutlb Humem")
-        as (sf) "(%Hfetch & %Hmdev & _ & %Tr & Hreg & Hmem & Hutlb & Humem)".
-      { rewrite ?sregs_set_reg. iExact "Hreg". }
-      { rewrite ?mem_set_reg. iExact "Hmem". }
-      destruct (Hsf sf Tr)
-        as (Lpcf & Lprivf & Lmisaf & Helpf & Hagree & Lmsf & Lscf & Lstvecf & Lelpf & Lmedlf).
-      iApply (uv_ecall_post_fetch CID0 C pt Ψ sg sf b mst pc (zero_extend' 32 w)
-                ms_v sc_v stval_v sepc_v m M elp0 MISA_C
-                Hmsok HmisaS Help_ne Hsi Hhart_a Lprivf Lmsf Lscf Lstvecf Lelpf
-                Lmisaf Lmedlf
-                (uv_prog_ecall _ _ w pc LprivA HdispA Hfetch
-                   (Hdecbase sf Hagree) Helpf Lpcf Lprivf)
-                with "[Hreg Hmem Hdev] Hsys Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc
-                      Hgpr Hutlb Humem Hcfg Hmst Hmi HPsi").
-      unfold mstate_interp. rewrite Hmdev. rewrite ?mdev_set_reg.
-      iFrame "Hreg Hmem Hdev".
-    - iMod (umode_fetch_base_2 pt M w_leaf pc w
-              (set_reg sg (R_bool minstret_increment) b)
-              Hum Hlok Hcanon Hinpage Hal2 Hal4 Hbytes HnRVC
-              LpcA LmisaA LmenvA (T htif_tohost_base _ Lhtif eq_refl) LprivA
-              HSXL HpmaA
-              with "[Hreg] [Hmem] Hutlb Humem")
-        as (sf) "(%Hfetch & %Hmdev & %Tr & Hreg & Hmem & Hutlb & Humem)".
-      { rewrite ?sregs_set_reg. iExact "Hreg". }
-      { rewrite ?mem_set_reg. iExact "Hmem". }
-      destruct (Hsf sf Tr)
-        as (Lpcf & Lprivf & Lmisaf & Helpf & Hagree & Lmsf & Lscf & Lstvecf & Lelpf & Lmedlf).
-      iApply (uv_ecall_post_fetch CID0 C pt Ψ sg sf b mst pc (zero_extend' 32 w)
-                ms_v sc_v stval_v sepc_v m M elp0 MISA_C
-                Hmsok HmisaS Help_ne Hsi Hhart_a Lprivf Lmsf Lscf Lstvecf Lelpf
-                Lmisaf Lmedlf
-                (uv_prog_ecall _ _ w pc LprivA HdispA Hfetch
-                   (Hdecbase sf Hagree) Helpf Lpcf Lprivf)
-                with "[Hreg Hmem Hdev] Hsys Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc
-                      Hgpr Hutlb Humem Hcfg Hmst Hmi HPsi").
-      unfold mstate_interp. rewrite Hmdev. rewrite ?mdev_set_reg.
-      iFrame "Hreg Hmem Hdev".
+      "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
+        #Hcert & _)".
+    pose proof Hpre as (Hinj & Htok & HpinsA & LhsA & LcpA & HmsokA & LpcA &
+                        HgagA & LstvecA & LmieA & LmdlA & LmedlA & LmenvA &
+                        LsatpA & LpcfgA & LpaddrA & LmiA & Hx0).
+    assert (Hfetch : exists (rsf : regstate) (t' : ptree),
+              exec (fetch tt) (u_state rsA (uv_mm t (upa_map pt M)))
+                = Some (F_Base w, u_state rsf (uv_mm t' (upa_map pt M))) /\
+              goodmb Du_r Du_w (fetch tt) (u_state rsA (uv_mm t (upa_map pt M)))
+                (uv_mm t (upa_map pt M)) = true /\
+              u_tlb_only rsA rsf /\
+              tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rsf) /\
+              uv_tree_ok pt (upa_map pt M) t' /\
+              pt_same_shape 2 t t').
+    { destruct (is_aligned_vaddr (Virtaddr pc) 4) eqn:Hal4.
+      - destruct (uv_fetch_4 pt M t rsA w_leaf pc w
+                    Hinj Hum Hlok Hcanon Hinpage Hal4 Hbytes LpcA LcpA
+                    (proj1 HmsokA) LmenvA HpinsA Htok)
+          as (rsf & t' & Hfe & Hfg & Tr & Htlbok' & Htok' & Hshape).
+        rewrite HnRVC in Hfe.
+        exists rsf, t'. split_and!;
+          [ exact Hfe | exact Hfg | exact Tr | exact Htlbok' | exact Htok'
+          | exact Hshape ].
+      - destruct (uv_fetch_base_2 pt M t rsA w_leaf pc w
+                    Hinj Hum Hlok Hcanon Hinpage Hal2 Hal4 Hbytes HnRVC
+                    LpcA LcpA (proj1 HmsokA) LmenvA HpinsA Htok)
+          as (rsf & t' & Hfe & Hfg & Tr & Htlbok' & Htok' & Hshape).
+        exists rsf, t'. split_and!;
+          [ exact Hfe | exact Hfg | exact Tr | exact Htlbok' | exact Htok'
+          | exact Hshape ]. }
+    destruct Hfetch as (rsf & t' & Hfe & Hfg & Tr & Htlbok' & Htok' & Hshape).
+    iApply (uv_swp_fetch pt M t t' (uc_dqc C) rsA rsf (F_Base w) _ _ _
+              Hfe Hfg Hshape with "Hcert Hany Hrw Hro Hmm [Hk Hres]").
+    iIntros (rs2) "%Hag Hrw Hro Hmm Hany".
+    iDestruct (uv_res_move pt M t t' usatp pcfg paddr Hshape with "Hres")
+      as "Hres".
+    assert (T2 : forall (r : register) (val : type_of_register r),
+              r ∈ u_Drw ∪ u_Dro -> register_beq r tlb = false ->
+              register_lookup r rsA = val -> register_lookup r rs2 = val).
+    { intros r val Hin Hne Hv. rewrite (Hag r Hin) (Tr r Hne). exact Hv. }
+    assert (Ltlb2 : register_lookup tlb rs2 = register_lookup tlb rsf)
+      by exact (Hag _ u_in_tlb).
+    assert (Hpins2 : u_exec_pins pt t' rs2).
+    { apply (u_pins_move pt t t' rsA rs2);
+        [ intros q Hq _;
+          exact (T2 q _ (u_Dfix_sub q Hq) (u_fix_ne_tlb q Hq) eq_refl)
+        | rewrite Ltlb2; exact Htlbok'
+        | exact HpinsA ]. }
+    pose proof Hpins2 as ((Hmisa2 & _ & Hsenv2 & _ & _ & Helpne2) &
+                          (Hmste2 & Hsste2) & _ & Htlbok2).
+    assert (Lcp2 : register_lookup cur_privilege rs2 = User)
+      by exact (T2 _ _ u_in_priv ltac:(vm_compute; reflexivity) LcpA).
+    assert (Lmenv2 : register_lookup (R_bitvector_64 menvcfg) rs2 = MENVCFG_S)
+      by exact (T2 _ _ u_in_menv ltac:(vm_compute; reflexivity) LmenvA).
+    assert (Hagd2 : agree_on D_u (u_state rs2 ∅) dstateU)
+      by exact (UserTotalU.u_agree_decode rs2 ∅ Lcp2 Lmenv2
+                  (proj1 Hpins2) (proj1 (proj2 Hpins2))).
+    assert (Hgag2 : u_gpr_agree m rs2).
+    { intros q Hnz. rewrite (HgagA q Hnz).
+      exact (eq_sym (T2 _ _ (u_gpr_in_D q Hnz) (uv_gpr_ne_tlb (uint q)) eq_refl)). }
+    rewrite /run_fetch_post /run_fetch_base.
+    iExists rs2, (ECALL tt), pc, 8%nat.
+    iSplitR.
+    { iPureIntro. exact (T2 _ _ u_in_PC ltac:(vm_compute; reflexivity) LpcA). }
+    iSplitR.
+    { iPureIntro.
+      exact (UserTotalU.u_hval_base rs2 ∅ w (ECALL tt) Hagd2
+               (Hdecbase dstateU ltac:(intros r _; reflexivity))). }
+    iSplitR.
+    { iPureIntro. exact (hfrun_lpad (u_Drw ∪ u_Dro) u_Drw rs2 u_in_elp Helpne2). }
+    iFrame "Hrw Hro".
+    iIntros "Hrw Hro".
+    iApply (uv_ecall_post_fetch C pt R Ψ M m pc (zero_extend' 32 w) t' usatp
+              pcfg paddr rs1 rs2 Hg
+              (T2 _ _ u_in_PC ltac:(vm_compute; reflexivity) LpcA)
+              (T2 _ _ u_in_hart ltac:(vm_compute; reflexivity) LhsA)
+              Lcp2
+              ltac:(rewrite (T2 _ _ u_in_mst ltac:(vm_compute; reflexivity)
+                               (eq_refl : register_lookup (R_bitvector_64 mstatus) rsA
+                                          = register_lookup (R_bitvector_64 mstatus) rsA));
+                    exact HmsokA)
+              Hgag2 Hx0
+              (T2 _ _ u_in_stvec ltac:(vm_compute; reflexivity) LstvecA)
+              (T2 _ _ u_in_mie ltac:(vm_compute; reflexivity) LmieA)
+              (T2 _ _ u_in_mdl ltac:(vm_compute; reflexivity) LmdlA)
+              (T2 _ _ u_in_medl ltac:(vm_compute; reflexivity) LmedlA)
+              Lmenv2 Hmste2 Hsste2 Hsenv2
+              (T2 _ _ u_in_satp ltac:(vm_compute; reflexivity) LsatpA)
+              (T2 _ _ u_in_pcfg ltac:(vm_compute; reflexivity) LpcfgA)
+              (T2 _ _ u_in_paddr ltac:(vm_compute; reflexivity) LpaddrA)
+              Hmisa2 Helpne2
+              (T2 _ _ u_in_mi ltac:(vm_compute; reflexivity) LmiA)
+              Htlbok2 Htok'
+              with "Hcert Hcap Hk Hany Hmm Hres Hrw Hro").
   Qed.
 
 End UvEcall.

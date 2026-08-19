@@ -245,22 +245,25 @@ Proof.
     by exact (upt_variant (ud_tfp P) (ud_um P) (svpn_of va) w Hwfm
                 (or_intror (or_intror Hl))).
   (* the three slots, as reads and as ownership *)
+  (* the tree projections are stated at the WEAKER [u_mem_ok]; one lemma
+     application, never a re-proof *)
+  pose proof (u_mem_wf_ok P t mm Hwf) as Hokm.
   assert (Hsm2 : pt_slot_mem (u_state rs mm) (pt_addr2 t (svpn_of va)) p2)
-    by exact (u_slot_mem_at P t mm rs (pt_base t) (vpn_idx 2 (svpn_of va)) p2 Hwf
+    by exact (u_slot_mem_at P t mm rs (pt_base t) (vpn_idx 2 (svpn_of va)) p2 Hokm
                 (ptree_maps_slot2 t (svpn_of va) p2 p1 _ Hmaps)).
   assert (Hsm1 : pt_slot_mem (u_state rs mm) (pt_addr1 p2 (svpn_of va)) p1)
-    by exact (u_slot_mem_at P t mm rs (u_next_base p2) (vpn_idx 1 (svpn_of va)) p1 Hwf
+    by exact (u_slot_mem_at P t mm rs (u_next_base p2) (vpn_idx 1 (svpn_of va)) p1 Hokm
                 (ptree_maps_slot1 t (svpn_of va) p2 p1 _ Hmaps)).
   assert (Hsm0 : pt_slot_mem (u_state rs mm) (pt_addr0 p1 (svpn_of va))
                    (pte_set_ad w a0 d0))
-    by exact (u_slot_mem_at P t mm rs (u_next_base p1) (vpn_idx 0 (svpn_of va)) _ Hwf
+    by exact (u_slot_mem_at P t mm rs (u_next_base p1) (vpn_idx 0 (svpn_of va)) _ Hokm
                 (ptree_maps_slot0 t (svpn_of va) p2 p1 _ Hmaps)).
   assert (Hown2 : bytes_owned mm (pt_addr2 t (svpn_of va)) 8 = true)
-    by exact (u_slot_owned P t mm _ p2 Hwf (ptree_maps_slot2 t (svpn_of va) p2 p1 _ Hmaps)).
+    by exact (u_slot_owned P t mm _ p2 Hokm (ptree_maps_slot2 t (svpn_of va) p2 p1 _ Hmaps)).
   assert (Hown1 : bytes_owned mm (pt_addr1 p2 (svpn_of va)) 8 = true)
-    by exact (u_slot_owned P t mm _ p1 Hwf (ptree_maps_slot1 t (svpn_of va) p2 p1 _ Hmaps)).
+    by exact (u_slot_owned P t mm _ p1 Hokm (ptree_maps_slot1 t (svpn_of va) p2 p1 _ Hmaps)).
   assert (Hown0 : bytes_owned mm (pt_addr0 p1 (svpn_of va)) 8 = true)
-    by exact (u_slot_owned P t mm _ _ Hwf (ptree_maps_slot0 t (svpn_of va) p2 p1 _ Hmaps)).
+    by exact (u_slot_owned P t mm _ _ Hokm (ptree_maps_slot0 t (svpn_of va) p2 p1 _ Hmaps)).
   (* the three read-only probes of [translateAddr]'s front matter *)
   assert (Htm : exec (translationMode User) (u_state rs mm)
                 = Some (Sv39, u_state rs mm))

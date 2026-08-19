@@ -1106,8 +1106,8 @@ Section UserActiveClass.
       (Px : ext_fetch_addr_error -> iProp Σ) :
     exec (fetch tt) (u_state rsf mm) = Some (fr, u_state rsf' mm') ->
     goodmb Du_r Du_w (fetch tt) (u_state rsf mm) mm = true ->
-    u_mem_wf pt t mm ->
-    u_mem_step pt t t' mm mm' ->
+    u_mem_ok pt t mm ->
+    u_mem_step_ok pt t t' mm mm' ->
     gen_cert -∗ resv_any cpu_id -∗
     hreg_frame rsf u_Drw -∗ hreg_frame_ro (u_Df dq) rsf u_Dro -∗
     bytes_own mm -∗
@@ -1130,7 +1130,7 @@ Section UserActiveClass.
     iDestruct "Hpost"
       as (rs2 mm2) "(%Hag & %Hsub & %Hdom & Hrw & Hro & Hown & Hany)".
     assert (Hmm2 : mm2 = mm')
-      by exact (u_landing_map pt t t' mm mm2 (u_state rsf' mm') Hwf Hstep
+      by exact (u_landing_map pt t t' mm mm2 (u_state rsf' mm') Hstep
                   Hsub Hdom).
     subst mm2.
     iApply ("Hk" $! rs2 with "[%] Hrw Hro Hown Hany"). exact Hag.
@@ -1158,8 +1158,8 @@ Section UserActiveClass.
            /\ exec (execute other) (u_state rsx mm) = Some (r, s_x)
            /\ goodmb Du_r Du_w (execute other) (u_state rsx mm) mm = true)) ->
     (match r with ExecuteAs _ => False | _ => True end) ->
-    u_mem_wf pt t mm ->
-    u_mem_step pt t t' mm s_x.(mem) ->
+    u_mem_ok pt t mm ->
+    u_mem_step_ok pt t t' mm s_x.(mem) ->
     gen_cert -∗ resv_any cpu_id -∗
     hreg_frame rsx u_Drw -∗ hreg_frame_ro (u_Df dq) rsx u_Dro -∗
     bytes_own mm -∗
@@ -1184,7 +1184,7 @@ Section UserActiveClass.
       iDestruct "Hpost"
         as (rs2 mm2) "(%Hag & %Hsub & %Hdom & Hrw & Hro & Hown & Hany)".
       assert (Hmm2 : mm2 = s_x.(mem))
-        by exact (u_landing_map pt t t' mm mm2 s_x Hwf Hstep Hsub Hdom).
+        by exact (u_landing_map pt t t' mm mm2 s_x Hstep Hsub Hdom).
       subst mm2.
       iApply (run_exec_post_direct Pe ib r Hnr).
       iApply ("Hk" $! rs2 with "[%] Hrw Hro Hown Hany"). exact Hag.
@@ -1201,8 +1201,8 @@ Section UserActiveClass.
       iDestruct "Hpost"
         as (rs1 mm1) "(%Hag1 & %Hsub1 & %Hdom1 & Hrw & Hro & Hown & Hany)".
       assert (Hmm1 : mm1 = mm)
-        by exact (u_landing_map pt t t mm mm1 (u_state rsx mm) Hwf
-                    (u_mem_step_refl pt t mm Hwf) Hsub1 Hdom1).
+        by exact (u_landing_map pt t t mm mm1 (u_state rsx mm)
+                    (u_mem_step_ok_refl pt t mm Hwf) Hsub1 Hdom1).
       subst mm1.
       iApply run_exec_post_redirect.
       iApply (swp_mono with "[Hk] [Hany Hrw Hro Hown]").
@@ -1214,7 +1214,7 @@ Section UserActiveClass.
       iDestruct "Hpost"
         as (rs2 mm2) "(%Hag & %Hsub & %Hdom & Hrw & Hro & Hown & Hany)".
       assert (Hmm2 : mm2 = s_x.(mem))
-        by exact (u_landing_map pt t t' mm mm2 s_x Hwf Hstep Hsub Hdom).
+        by exact (u_landing_map pt t t' mm mm2 s_x Hstep Hsub Hdom).
       subst mm2.
       (* NO [run_exec_post_direct] here: [run_exec_post_redirect] already
          stripped the wrapper, so the second execute's continuation is
@@ -1311,176 +1311,10 @@ Section UserActiveClass.
         | rewrite (T _ u_fix_paddr eq_refl); exact Hcov ].
   Qed.
 
-  (* ===================================================================== *)
-  (* §7  THE CYCLE RULE WITH A RESOURCE THREADED PAST THE DISPATCH.          *)
-  (*                                                                        *)
-  (* [HartRunFull.swp_run_hart_active_full] takes the dispatch and the fetch *)
-  (* obligations as two SEPARATING premises and returns nothing but the      *)
-  (* frames on the None branch, so a resource the tier needs on BOTH arms    *)
-  (* -- and it has three: the reservation fragment, the byte map and the     *)
-  (* [u_open] bundle -- cannot be supplied.  Put it in the fetch obligation  *)
-  (* and the interrupt arm has none; put it in the [swp_mono] wand and the   *)
-  (* fetch cannot run.  This is the same hole [SmodeCorePt.swp_run_hart_     *)
-  (* active_gen_exf_res] fills for the S tier, and it is filled the same     *)
-  (* way: one [Wd] threaded from the dispatch's None branch into the fetch.  *)
-  (* Everything after the fetch is [swp_run_hart_active_full]'s proof node   *)
-  (* for node.                                                              *)
-  (* ===================================================================== *)
-  Local Ltac ru_glue :=
-    cbn beta iota zeta delta
-      [Defs.returnm returnM returnR Defs.returnR andb orb negb not
-       Instances.generic_eq Instances.generic_neq get_config_rvfi
-       get_config_print_instr].
+  (* [swp_run_hart_active_res] moved to [HartRunFull], beside
+     [swp_run_hart_active_full]: the verified Umode engine is its third
+     consumer, so it is generic machinery rather than tier glue. *)
 
-  Lemma swp_run_hart_active_res (Drw Dro : gset register)
-      (Df : register -> dfrac) (rs : regstate) (p : Privilege)
-      (Wd : iProp Σ)
-      (Qi : InterruptType -> Privilege -> iProp Σ)
-      (Pe : ExecutionResult -> mword 32 -> iProp Σ)
-      (Pf : mword 64 -> ExceptionType -> iProp Σ)
-      (Px : ext_fetch_addr_error -> iProp Σ) :
-    Drw ## Dro ->
-    (cur_privilege : register) ∈ Drw ∪ Dro ->
-    (R_bitvector_64 PC : register) ∈ Drw ∪ Dro ->
-    (R_bitvector_64 nextPC : register) ∈ Drw ->
-    register_lookup cur_privilege rs = p ->
-    gen_cert -∗
-    hreg_frame rs Drw -∗
-    hreg_frame_ro Df rs Dro -∗
-    Wd -∗
-    (Wd -∗ hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
-       swp (dispatchInterrupt p)
-         (fun o => match o with
-                   | Some (ii, pr) => Qi ii pr
-                   | None => Wd ∗ hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro
-                   end)) -∗
-    (Wd -∗ hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
-       swp (fetch tt) (run_fetch_post Drw Dro Df Pe Pf Px)) -∗
-    swp (run_hart_active 0)
-      (fun st => match st with
-                 | Step_Pending_Interrupt (ii, pr) => Qi ii pr
-                 | Step_Execute (r, ib)            => Pe r ib
-                 | Step_Fetch_Failure (Virtaddr xv, e) => Pf xv e
-                 | Step_Ext_Fetch_Failure x        => Px x
-                 | Step_Waiting _                  => False
-                 end).
-  Proof.
-    intros Hdisj HDpriv HDpc HDnpc Hpriv.
-    iIntros "#Hcert Hrw Hro HWd Hdisp Hfet".
-    unfold run_hart_active.
-    rewrite /swp. iIntros (K) "%HC Hcont".
-    iApply (swp_use_cer (Defs.read_reg cur_privilege) _ _ K HC
-              with "[Hrw Hro] [-]").
-    { iApply (swp_read_reg_pinned Drw Dro Df _ _ Hdisj HDpriv
-                with "Hcert Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro)". rewrite Hpriv.
-    iApply (swp_use_cer (dispatchInterrupt p) _ _ K HC
-              with "[Hrw Hro Hdisp HWd] [-]").
-    { iApply ("Hdisp" with "HWd Hrw Hro"). }
-    iIntros (o) "Ho".
-    destruct o as [[ii pr] |].
-    - (* ---- THE TRAP ARM: early return, nothing else runs ---- *)
-      cbn beta iota. rewrite mcer_early_return.
-      iApply ("Hcont" $! (Step_Pending_Interrupt (ii, pr))). iApply "Ho".
-    - (* ---- THE RETIRE ARM: on into the fetch ---- *)
-      iDestruct "Ho" as "(HWd & Hrw & Hro)".
-      cbn beta iota. rewrite mbind0_ret.
-      iApply (swp_use_cer (fetch tt) _ _ K HC with "[Hrw Hro Hfet HWd] [-]").
-      { iApply ("Hfet" with "HWd Hrw Hro"). }
-      iIntros (fr) "Hfr".
-      destruct fr as [ x | w | h | [e xv] ]; rewrite /run_fetch_post.
-      + (* ---- F_Ext_Error ---- *)
-        cbn beta iota zeta delta [ext_fetch_hook]. ru_glue.
-        rewrite mcer_ret.
-        iApply ("Hcont" $! (Step_Ext_Fetch_Failure x)). iApply "Hfr".
-      + (* ---- F_Base ---- *)
-        rewrite /run_fetch_base.
-        iDestruct "Hfr" as (rsf i pc nl)
-          "(%Hpcf & %Hdec & %Hlpad & Hrw & Hro & Hex)".
-        cbn beta iota zeta delta [ext_fetch_hook sail_instr_announce
-          fetch_callback get_config_print_instr].
-        iApply (swp_use_cer (ext_decode w) _ _ K HC with "[Hrw Hro] [-]").
-        { iApply (swp_span Drw Dro Df rsf rsf _ _ Hdisj Hdec
-                    with "Hcert Hrw Hro"). }
-        iIntros (v) "(-> & Hrw & Hro)". ru_glue.
-        rewrite mbind0_ret.
-        iApply (swp_use_cer2 (is_landing_pad_expected tt) _ _ _ K HC
-                  with "[Hrw Hro] [-]").
-        { iApply (swp_hfrun nl Drw Dro Df rsf rsf _ _ Hdisj Hlpad
-                    with "Hcert Hrw Hro"). }
-        iIntros (v) "(-> & Hrw & Hro)". ru_glue.
-        rewrite mbind_ret. ru_glue.
-        iApply (swp_use_cer (Defs.read_reg (R_bitvector_64 PC)) _ _ K HC
-                  with "[Hrw Hro] [-]").
-        { iApply (swp_read_reg_pinned Drw Dro Df rsf _ Hdisj HDpc
-                    with "Hcert Hrw Hro"). }
-        iIntros (v) "(-> & Hrw & Hro)". rewrite Hpcf.
-        iApply (swp_use_cer2
-                  (Defs.write_reg (R_bitvector_64 nextPC)
-                     (add_vec_int pc 4)) _ _ _ K HC with "[Hrw Hro] [-]").
-        { iApply (swp_write_reg_owned Drw Dro Df rsf _ _ Hdisj HDnpc
-                    with "Hcert Hrw Hro"). }
-        iIntros (u) "[Hrw Hro]".
-        iApply (swp_use_cer (execute i) _ _ K HC with "[Hrw Hro Hex] [-]").
-        { iApply ("Hex" with "Hrw Hro"). }
-        iIntros (er) "He". rewrite /run_exec_post.
-        destruct er; try (ru_glue; rewrite mcer_ret; iApply "Hcont";
-                          iApply "He").
-        ru_glue.
-        iApply (swp_use_cer (execute i0) _ _ K HC with "[He] [-]").
-        { iApply "He". }
-        iIntros (er2) "He2". ru_glue. rewrite mcer_ret.
-        iApply "Hcont". iApply "He2".
-      + (* ---- F_RVC ---- *)
-        rewrite /run_fetch_rvc.
-        iDestruct "Hfr" as (rsf i pc nl nz)
-          "(%Hpcf & %Hdec & %Hlpad & %Hzca & Hrw & Hro & Hex)".
-        cbn beta iota zeta delta [ext_fetch_hook sail_instr_announce
-          fetch_callback get_config_print_instr].
-        iApply (swp_use_cer (ext_decode_compressed h) _ _ K HC
-                  with "[Hrw Hro] [-]").
-        { iApply (swp_span Drw Dro Df rsf rsf _ _ Hdisj Hdec
-                    with "Hcert Hrw Hro"). }
-        iIntros (v) "(-> & Hrw & Hro)". ru_glue.
-        rewrite mbind0_ret.
-        iApply (swp_use_cer2 (is_landing_pad_expected tt) _ _ _ K HC
-                  with "[Hrw Hro] [-]").
-        { iApply (swp_hfrun nl Drw Dro Df rsf rsf _ _ Hdisj Hlpad
-                    with "Hcert Hrw Hro"). }
-        iIntros (v) "(-> & Hrw & Hro)". ru_glue.
-        rewrite mbind_ret. ru_glue.
-        iApply (swp_use_cer (currentlyEnabled Ext_Zca) _ _ K HC
-                  with "[Hrw Hro] [-]").
-        { iApply (swp_hfrun nz Drw Dro Df rsf rsf _ _ Hdisj Hzca
-                    with "Hcert Hrw Hro"). }
-        iIntros (v) "(-> & Hrw & Hro)". ru_glue.
-        iApply (swp_use_cer (Defs.read_reg (R_bitvector_64 PC)) _ _ K HC
-                  with "[Hrw Hro] [-]").
-        { iApply (swp_read_reg_pinned Drw Dro Df rsf _ Hdisj HDpc
-                    with "Hcert Hrw Hro"). }
-        iIntros (v) "(-> & Hrw & Hro)". rewrite Hpcf.
-        iApply (swp_use_cer2
-                  (Defs.write_reg (R_bitvector_64 nextPC)
-                     (add_vec_int pc 2)) _ _ _ K HC with "[Hrw Hro] [-]").
-        { iApply (swp_write_reg_owned Drw Dro Df rsf _ _ Hdisj HDnpc
-                    with "Hcert Hrw Hro"). }
-        iIntros (u) "[Hrw Hro]".
-        iApply (swp_use_cer (execute i) _ _ K HC with "[Hrw Hro Hex] [-]").
-        { iApply ("Hex" with "Hrw Hro"). }
-        iIntros (er) "He". rewrite /run_exec_post.
-        destruct er; try (ru_glue; rewrite mcer_ret; iApply "Hcont";
-                          iApply "He").
-        ru_glue.
-        iApply (swp_use_cer (execute i0) _ _ K HC with "[He] [-]").
-        { iApply "He". }
-        iIntros (er2) "He2". ru_glue. rewrite mcer_ret.
-        iApply "Hcont". iApply "He2".
-      + (* ---- F_Error ---- *)
-        cbn beta iota zeta delta [ext_fetch_hook]. ru_glue.
-        rewrite mcer_ret.
-        iApply ("Hcont" $! (Step_Fetch_Failure (Virtaddr xv, e))).
-        iApply "Hfr".
-  Qed.
 
   (* ===================================================================== *)
   (* §8  THE EXECUTE RESULT -> [u_step_post], once for all four shapes.      *)
@@ -1614,7 +1448,9 @@ Section UserActiveClass.
       Lpcfg Lpaddr Hpins Hwf Hex Hg Hfrok Htr Htlbok' Hstep.
     iIntros "#Hcert Hany Hrw Hro Hbytes Hoback Hrut".
     iApply (swp_fetch_of_pure (uc_dqc C) t t' mm mm' rsA rsf' fr _ _ _
-              Hex Hg Hwf Hstep with "Hcert Hany Hrw Hro Hbytes").
+              Hex Hg (u_mem_wf_ok pt t mm Hwf)
+              (u_mem_step_ok_of pt t t' mm mm' Hwf Hstep)
+              with "Hcert Hany Hrw Hro Hbytes").
     iIntros (rsF) "%Hag Hrw Hro Hbytes Hany".
     (* the landing file agrees with [rsA] off the TLB, so every pin moves *)
     assert (TF : forall q : register, q ∈ u_Dfix ->
@@ -1696,7 +1532,8 @@ Section UserActiveClass.
       iIntros "Hrw Hro".
       iApply (swp_execute_of_pure (uc_dqc C) t' t'' mm'
                 (register_set nextPC (add_vec_int va 2) rsF) instr r s_x
-                (zero_extend' 32 h) _ Hexe Hnr HwfF Hstep''
+                (zero_extend' 32 h) _ Hexe Hnr (u_mem_wf_ok pt t' mm' HwfF)
+                (u_mem_step_ok_of pt t' t'' mm' s_x.(mem) HwfF Hstep'')
                 with "Hcert Hany Hrw Hro Hbytes").
       iIntros (rsX) "%Hag2 Hrw Hro Hbytes Hany".
       assert (TX : forall q : register, q ∈ u_Dfix ->
@@ -1743,7 +1580,8 @@ Section UserActiveClass.
       iIntros "Hrw Hro".
       iApply (swp_execute_of_pure (uc_dqc C) t' t'' mm'
                 (register_set nextPC (add_vec_int va 4) rsF) instr r s_x
-                (zero_extend' 32 w) _ Hexe Hnr HwfF Hstep''
+                (zero_extend' 32 w) _ Hexe Hnr (u_mem_wf_ok pt t' mm' HwfF)
+                (u_mem_step_ok_of pt t' t'' mm' s_x.(mem) HwfF Hstep'')
                 with "Hcert Hany Hrw Hro Hbytes").
       iIntros (rsX) "%Hag2 Hrw Hro Hbytes Hany".
       assert (TX : forall q : register, q ∈ u_Dfix ->
@@ -1928,10 +1766,19 @@ Section UserActiveClass.
           destruct (fetch_classify va Hacc)
             as [(w & Hum & Hok & Hcanon) | Hfault].
           -- (* fetchable *)
+             assert (Hwin4 : forall j : nat, (j < 4)%nat ->
+                       is_Some (mm !! RiscvModelBytes.pa_add (CommonWalk.u_walk_pa w va) j))
+               by (intros j Hj;
+                   exact (u_fetch_win_in pt t mm 4 w va ltac:(lia)
+                            (Z.divide_factor_l 4 1024) Hwf Hum Hal4 j
+                            ltac:(lia))).
              destruct (u_fetch_pure pt t mm rsA w va
                          (register_lookup (R_bool minstret_increment) rsA)
-                         Hum Hok Hal4 Hcanon HcfgA HpinsA Hwf)
-               as (iw & rsf' & mm' & t' & Hex & Hg & Hfile & Htlbok' & Hstep).
+                         Hum Hok Hal4 Hcanon HcfgA HpinsA
+                         (u_mem_wf_ok pt t mm Hwf) Hwin4)
+               as (iw & rsf' & mm' & t' & Hex & Hg & Hfile & Htlbok' & Hstepk).
+             assert (Hstep : u_mem_step pt t t' mm mm')
+               by exact (u_mem_step_of_ok pt t t' mm mm' Hwf Hstepk).
              lazymatch type of Hex with
              | exec _ _ = Some (?fr, _) =>
                  assert (Hfrok : u_fr_ok va fr);
@@ -1951,8 +1798,10 @@ Section UserActiveClass.
           -- (* faults *)
              destruct (u_fetch_fault_pure pt t mm rsA va
                          (register_lookup (R_bool minstret_increment) rsA)
-                         Hfault Hal4 HcfgA HpinsA Hwf)
-               as (Hex & Hg & Htlbok' & Hstep).
+                         Hfault Hal4 HcfgA HpinsA (u_mem_wf_ok pt t mm Hwf))
+               as (Hex & Hg & Htlbok' & Hstepk).
+             assert (Hstep : u_mem_step pt t t mm mm)
+               by exact (u_mem_step_of_ok pt t t mm mm Hwf Hstepk).
              assert (Hfrok : u_fr_ok va (F_Error (E_Fetch_Page_Fault tt, va))).
              { right. exists (E_Fetch_Page_Fault tt), va.
                split; [ reflexivity | vm_compute; reflexivity ]. }
@@ -1974,12 +1823,28 @@ Section UserActiveClass.
              destruct (fetch_classify (add_vec_int va 2) Hacc)
                as [(wh & Humh & Hokh & Hcanonh) | Hfaulth].
              ++ (* both halves ok *)
+                assert (Hwin2 : forall j : nat, (j < 2)%nat ->
+                          is_Some (mm !! RiscvModelBytes.pa_add (CommonWalk.u_walk_pa w va) j))
+                  by (intros j Hj;
+                      exact (u_fetch_win_in pt t mm 2 w va ltac:(lia)
+                               (Z.divide_factor_l 2 2048) Hwf Hum Hal2 j
+                               ltac:(lia))).
+                assert (Hwin2h : forall j : nat, (j < 2)%nat ->
+                          is_Some (mm !! RiscvModelBytes.pa_add
+                                     (CommonWalk.u_walk_pa wh (add_vec_int va 2)) j))
+                  by (intros j Hj;
+                      exact (u_fetch_win_in pt t mm 2 wh (add_vec_int va 2)
+                               ltac:(lia) (Z.divide_factor_l 2 2048) Hwf Humh
+                               (u_align2_plus2 va Hal2) j ltac:(lia))).
                 destruct (u_fetch_pure_2 pt t mm rsA w wh va
                             (register_lookup (R_bool minstret_increment) rsA)
                             Hum Hok Hcanon Humh Hokh Hcanonh Hb0 Hb1 Hal4
-                            HcfgA HpinsA Hwf)
+                            HcfgA HpinsA (u_mem_wf_ok pt t mm Hwf)
+                            Hwin2 Hwin2h)
                   as (rsf' & mm' & t' & fr & Hex & Hg & Hshape & Htr &
-                      Htlbok' & Hstep).
+                      Htlbok' & Hstepk).
+                assert (Hstep : u_mem_step pt t t' mm mm')
+                  by exact (u_mem_step_of_ok pt t t' mm mm' Hwf Hstepk).
                 assert (Hfrok : u_fr_ok va fr)
                   by (left; split; [ exact Hshape | exact Hal2 ]).
                 iApply (u_swp_fetch t t' mm mm' usatp pcfg paddr mcenv scenv
@@ -1989,12 +1854,20 @@ Section UserActiveClass.
                           Hfrok Htr Htlbok' Hstep
                           with "Hcert Hany Hrw Hro Hbytes Hoback Hrut").
              ++ (* low half ok, the straddle faults at [va+2] *)
+                assert (Hwin2 : forall j : nat, (j < 2)%nat ->
+                          is_Some (mm !! RiscvModelBytes.pa_add (CommonWalk.u_walk_pa w va) j))
+                  by (intros j Hj;
+                      exact (u_fetch_win_in pt t mm 2 w va ltac:(lia)
+                               (Z.divide_factor_l 2 2048) Hwf Hum Hal2 j
+                               ltac:(lia))).
                 destruct (u_fetch_or_fault_pure_2_second pt t mm rsA w va
                             (register_lookup (R_bool minstret_increment) rsA)
                             Hum Hok Hcanon Hfaulth Hb0 Hb1 Hal4
-                            HcfgA HpinsA Hwf)
+                            HcfgA HpinsA (u_mem_wf_ok pt t mm Hwf) Hwin2)
                   as (rsf' & mm' & t' & fr & Hex & Hg & Hshape & Htr &
-                      Htlbok' & Hstep).
+                      Htlbok' & Hstepk).
+                assert (Hstep : u_mem_step pt t t' mm mm')
+                  by exact (u_mem_step_of_ok pt t t' mm mm' Hwf Hstepk).
                 assert (Hfrok : u_fr_ok va fr).
                 { destruct Hshape as [(h & ->) | (ex & -> & Hue)].
                   - left. split; [ left; by exists h | exact Hal2 ].
@@ -2009,9 +1882,12 @@ Section UserActiveClass.
           -- (* low half faults *)
              destruct (u_fetch_fault_pure_2_first pt t mm rsA va
                          (register_lookup (R_bool minstret_increment) rsA)
-                         Hfault Hb0 Hb1 Hal4 HcfgA HpinsA Hwf)
+                         Hfault Hb0 Hb1 Hal4 HcfgA HpinsA
+                         (u_mem_wf_ok pt t mm Hwf))
                as (rsf' & mm' & t' & fr & Hex & Hg & Hshape & Htr &
-                   Htlbok' & Hstep).
+                   Htlbok' & Hstepk).
+             assert (Hstep : u_mem_step pt t t' mm mm')
+               by exact (u_mem_step_of_ok pt t t' mm mm' Hwf Hstepk).
              assert (Hfrok : u_fr_ok va fr).
              { destruct Hshape as (ex & -> & Hue).
                right. exists ex, va. split; [ reflexivity | exact Hue ]. }

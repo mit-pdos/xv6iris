@@ -241,26 +241,26 @@ UserStepFull.v
 # disk untouched; reviving this tier means uncommenting these rows and porting
 # them per claude-notes/projects/user-tier-port.md's P8 entry ("the same
 # bricks").
-# UmodeMem.v
-# UmodeCap.v
-# UmodeFetch.v
-# UmodeAbi.v
-# UmodeArith.v
-# UmodeSyscall.v
-# UmodeIo.v
-# WpUmodeStep.v
+UmodeMem.v
+UmodeCap.v
+UmodeFetch.v
+UmodeAbi.v
+UmodeArith.v
+UmodeSyscall.v
+UmodeIo.v
+WpUmodeStep.v
 # WpUmodeLeaf.v
 # WpUmodeBranch.v
 # WpUmodeStore.v
 # WpUmodeLoad.v
-# USpecSync.v
-# UCodeSync.v
+USpecSync.v
+UCodeSync.v
 # UProofSync.v
-# UCodeEcho.v
-# USpecEcho.v
-# UCodeSh.v
-# USpecSh.v
-# USpecShParse.v
+UCodeEcho.v
+USpecEcho.v
+UCodeSh.v
+USpecSh.v
+USpecShParse.v
 # UmodeFrame.v
 # UmodeStub.v
 # UProofShLib.v
@@ -268,15 +268,15 @@ UserStepFull.v
 # UProofShHeap.v
 # UProofShLex.v
 # UProofShIo.v
-# UProofShInput.v
+UProofShInput.v
 # UProofShParse.v
 # UProofShCmd.v
 # UProofShTop.v
 # UProofShMain.v
 # UProofShEcho.v
-# UCodeInit.v
-# UmodeInitIo.v
-# USpecInit.v
+UCodeInit.v
+UmodeInitIo.v
+USpecInit.v
 # UProofInitLib.v
 # UProofInitPrintf.v
 # UProofInit.v

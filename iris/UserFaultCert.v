@@ -402,7 +402,7 @@ Qed.
 
 Lemma u_slot_read (P : uptd) (t : ptree) (mm : pamap) (rs : regstate)
     (b : mword 44) (i : mword 9) (q : mword 64) :
-  u_mem_wf P t mm ->
+  u_mem_ok P t mm ->
   u_exec_pins P t rs ->
   word_bytes (u_pte_addr b i) q ∈ pt_maps 2 t ->
   exec (read_pte (Physaddr (u_pte_addr b i)) 8) (u_state rs mm)
@@ -436,7 +436,7 @@ Qed.
 
 Lemma u_translate_blocked (P : uptd) (t : ptree) (mm : pamap) (rs : regstate)
     (acc : MemoryAccessType mem_payload) (vpn : mword 27) (mxr do_sum : bool) :
-  u_mem_wf P t mm ->
+  u_mem_ok P t mm ->
   u_exec_pins P t rs ->
   ptree_blocks0 t vpn ->
   exec (lookup_TLB 39 (mword_of_int 0) vpn) (u_state rs mm)
@@ -448,7 +448,7 @@ Lemma u_translate_blocked (P : uptd) (t : ptree) (mm : pamap) (rs : regstate)
        (u_state rs mm) mm = true.
 Proof.
   intros Hwf Hpins Hblk Hlk.
-  pose proof Hwf as (md & _ & _ & _ & _ & _ & _ & _ & _ & Hspec).
+  pose proof Hwf as (md & _ & _ & Hmmeq & _ & _ & Hspec).
   pose proof Hspec as (Hbase & _).
   set (s := u_state rs mm) in *.
   assert (Hwalk : exec (pt_walk 39 vpn acc User mxr do_sum (ud_root P) 2 false tt) s
@@ -536,7 +536,7 @@ Qed.
 
 Lemma u_translate_denied (P : uptd) (t : ptree) (mm : pamap) (rs : regstate)
     (acc : MemoryAccessType mem_payload) (w va : mword 64) (mxr do_sum : bool) :
-  u_mem_wf P t mm ->
+  u_mem_ok P t mm ->
   u_exec_pins P t rs ->
   upt_leaf_at (ud_tfp P) (ud_um P) (svpn_of va) w ->
   uleaf_denied acc w ->
@@ -549,7 +549,7 @@ Lemma u_translate_denied (P : uptd) (t : ptree) (mm : pamap) (rs : regstate)
           mxr do_sum tt) (u_state rs mm) mm = true.
 Proof.
   intros Hwf Hpins Hleaf Hden Hss.
-  pose proof Hwf as (md & _ & _ & _ & _ & _ & _ & _ & Hwfm & Hspec).
+  pose proof Hwf as (md & _ & _ & Hmmeq & _ & Hwfm & Hspec).
   pose proof Hspec as (Hbase & _).
   pose proof Hpins as (_ & _ & _ & Htlbok).
   set (s := u_state rs mm) in *.
@@ -681,7 +681,7 @@ Lemma u_translate_fault_pure (P : uptd) (t : ptree) (mm : PtBytes.pamap)
   register_lookup cur_privilege rs = User ->
   _get_Mstatus_SXL (register_lookup mstatus rs) = 'b"10" ->
   u_exec_pins P t rs ->
-  u_mem_wf P t mm ->
+  u_mem_ok P t mm ->
   exec (translateAddr (Virtaddr va) acc) (u_state rs mm)
     = Some (Err (e, tt), u_state rs mm)
   /\ goodmb Du_r Du_w (translateAddr (Virtaddr va) acc) (u_state rs mm) mm = true.
@@ -690,7 +690,7 @@ Proof.
   pose proof Hpins as (Hhw & _ & Hpt & Htlbok).
   destruct Hpt as ((usatp & Hsatpok & Hsatp) & _).
   destruct Hsatpok as (Hmode & Hasid & Hppn & _).
-  pose proof Hwf as (md & _ & _ & _ & _ & _ & _ & _ & _ & Hspec).
+  pose proof Hwf as (md & _ & _ & Hmmeq & _ & _ & Hspec).
   pose proof Hspec as (Hbase & _ & _ & _ & Hblkspec).
   set (s := u_state rs mm) in *.
   (* the probes' certificates, off the exec facts the caller supplies *)
@@ -900,12 +900,12 @@ Lemma u_fetch_fault_pure (P : uptd) (t : ptree) (mm : PtBytes.pamap)
   is_aligned_vaddr (Virtaddr va) 4 = true ->
   post_fetch_cfg (u_state rsf mm) va mi ->
   u_exec_pins P t rsf ->
-  u_mem_wf P t mm ->
+  u_mem_ok P t mm ->
   exec (fetch tt) (u_state rsf mm)
     = Some (F_Error (E_Fetch_Page_Fault tt, va), u_state rsf mm)
   /\ goodmb Du_r Du_w (fetch tt) (u_state rsf mm) mm = true
   /\ tlb_ok_pt (mword_of_int 0) t (register_lookup tlb rsf)
-  /\ u_mem_step P t t mm mm.
+  /\ u_mem_step_ok P t t mm mm.
 Proof.
   intros Hflavor Hal Hcfg Hpins Hwf.
   pose proof Hcfg as (Lpc & Lcp & Lms & Lmenv & _ & _).
@@ -925,7 +925,7 @@ Proof.
   - exact (goodmb_fetch_fault_4 Du_r Du_w s mm va (E_Fetch_Page_Fault tt)
              ltac:(vm_compute; reflexivity) Lpc Hal Htr Htrg).
   - exact Htlbok.
-  - exact (u_mem_step_refl P t mm Hwf).
+  - exact (u_mem_step_ok_refl P t mm Hwf).
 Qed.
 
 (* ===================================================================== *)
@@ -1281,16 +1281,21 @@ Lemma u_fetch_pure_2 (P : uptd) (t : ptree) (mm : PtBytes.pamap) (rsf : regstate
   is_aligned_vaddr (Virtaddr va) 4 = false ->
   post_fetch_cfg (u_state rsf mm) va mi ->
   u_exec_pins P t rsf ->
-  u_mem_wf P t mm ->
+  u_mem_ok P t mm ->
+  (forall j : nat, (j < 2)%nat ->
+     is_Some (mm !! pa_add (u_walk_pa w va) j)) ->
+  (forall j : nat, (j < 2)%nat ->
+     is_Some (mm !! pa_add (u_walk_pa wh (add_vec_int va 2)) j)) ->
   exists (rsf' : regstate) (mm' : PtBytes.pamap) (t' : ptree) (fr : FetchResult),
     exec (fetch tt) (u_state rsf mm) = Some (fr, u_state rsf' mm') /\
     goodmb Du_r Du_w (fetch tt) (u_state rsf mm) mm = true /\
     ((exists h : mword 16, fr = F_RVC h) \/ (exists iw : mword 32, fr = F_Base iw)) /\
     u_tlb_only rsf rsf' /\
     tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rsf') /\
-    u_mem_step P t t' mm mm'.
+    u_mem_step_ok P t t' mm mm'.
 Proof.
-  intros Hl Hleaf Hcanon Hlh Hleafh Hcanonh Hbit0 Hbit1 Hnal4 Hcfg Hpins Hwf.
+  intros Hl Hleaf Hcanon Hlh Hleafh Hcanonh Hbit0 Hbit1 Hnal4 Hcfg Hpins Hwf
+    Hwin Hwinh.
   pose proof Hcfg as (Lpc & Lcp & Lms & Lmenv & Hal2 & _).
   pose proof Lms as (Lsxl & _).
   pose proof Hpins as (Hhw & Hcfgp & Hpt & Htlbok).
@@ -1302,13 +1307,25 @@ Proof.
               Hpins Hwf)
     as (rsf1 & mm1 & t1 & Htr1 & Htr1g & Hfile1 & Htlbok1 & Hstep1).
   assert (Tr1 : u_tlb_only rsf rsf1) by exact (u_tlb_only_land rsf rsf1 Hfile1).
-  assert (Hwf1 : u_mem_wf P t1 mm1)
-    by exact (u_mem_step_wf P t t1 mm mm1 Hwf Hstep1).
+  assert (Hwf1 : u_mem_ok P t1 mm1)
+    by exact (u_mem_step_ok_wf P t t1 mm mm1 Hwf Hstep1).
+  assert (Hd1 : (dom mm1 : gset Arch.pa) = dom mm)
+    by exact (proj1 (proj2 (proj2 Hstep1))).
   (* ---- THE LOW HALFWORD, read at the state the first walk landed on ---- *)
-  destruct (u_fetch_bytes_2 P t1 mm1 w va Hwf1 Hl Hal2) as (ilo & Hbytes1).
+  assert (Hwin1 : forall j : nat, (j < 2)%nat ->
+            is_Some (mm1 !! pa_add (u_walk_pa w va) j))
+    by exact (u_win_dom mm mm1 (u_walk_pa w va) 2 Hd1 Hwin).
+  assert (HwinK : forall j : nat, (j < Z.to_nat 2)%nat ->
+            is_Some (mm !! pa_add (u_walk_pa w va) j))
+    by (intros j Hj; apply Hwin; lia).
+  assert (HwinK1 : forall j : nat, (j < Z.to_nat 2)%nat ->
+            is_Some (mm1 !! pa_add (u_walk_pa w va) j))
+    by (intros j Hj; apply Hwin1; lia).
+  destruct (u_fetch_bytes_2 mm1 w va Hwin1) as (ilo & Hbytes1).
   destruct (u_fetch_read_ok P t t1 mm mm1 rsf rsf1 2 w va
               ltac:(lia) (Z.divide_factor_l 2 2048) ltac:(lia)
-              ltac:(vm_compute; reflexivity) Hal2 Hl Lcp Hpins Hwf Hwf1 Tr1)
+              ltac:(vm_compute; reflexivity) Hal2 Hl Lcp Hpins Hwf Hwf1
+              HwinK HwinK1 Tr1)
     as (region1 & HA1 & Hord1 & Hrange1 & HX1 & Hpmam1 & Halp1 & Hexecp1 &
         Hclint1 & Hsig1 & Hhtif1 & Hdev1 & Hown1 & Lcp1).
   assert (Hmr1 : exec (mem_read (InstructionFetch tt) PBMT_PMA
@@ -1358,12 +1375,14 @@ Proof.
       by exact (u_tlb_only_land rsf1 rsf2 Hfile2).
     assert (Tr12 : u_tlb_only rsf rsf2)
       by exact (u_tlb_only_trans rsf rsf1 rsf2 Tr1 Tr2).
-    assert (Hwf2 : u_mem_wf P t2 mm2)
-      by exact (u_mem_step_wf P t1 t2 mm1 mm2 Hwf1 Hstep2).
+    assert (Hwf2 : u_mem_ok P t2 mm2)
+      by exact (u_mem_step_ok_wf P t1 t2 mm1 mm2 Hwf1 Hstep2).
+    assert (Hd2 : (dom mm2 : gset Arch.pa) = dom mm1)
+      by exact (proj1 (proj2 (proj2 Hstep2))).
     (* THE TRANSPORT: the second walk's certificate is at [mm1]; the shell
        wants every certificate at [mm]. *)
     assert (Hdom1 : (dom mm : gset Arch.pa) = dom mm1)
-      by (symmetry; exact (u_mem_step_dom P t t1 mm mm1 Hwf Hstep1)).
+      by (symmetry; exact Hd1).
     assert (Htr2gm : goodmb Du_r Du_w (translateAddr (Virtaddr (add_vec_int va 2))
                               (InstructionFetch tt)) (u_state rsf1 mm1) mm = true).
     { rewrite (goodmb_dom Du_r Du_w
@@ -1373,11 +1392,24 @@ Proof.
     (* ---- THE HIGH HALFWORD ---- *)
     assert (Hal2h : is_aligned_vaddr (Virtaddr (add_vec_int va 2)) 2 = true)
       by exact (u_align2_plus2 va Hal2).
-    destruct (u_fetch_bytes_2 P t2 mm2 wh (add_vec_int va 2) Hwf2 Hlh Hal2h)
+    assert (Hwinh1 : forall j : nat, (j < 2)%nat ->
+              is_Some (mm1 !! pa_add (u_walk_pa wh (add_vec_int va 2)) j))
+      by exact (u_win_dom mm mm1 (u_walk_pa wh (add_vec_int va 2)) 2 Hd1 Hwinh).
+    assert (Hwinh2 : forall j : nat, (j < 2)%nat ->
+              is_Some (mm2 !! pa_add (u_walk_pa wh (add_vec_int va 2)) j))
+      by exact (u_win_dom mm1 mm2 (u_walk_pa wh (add_vec_int va 2)) 2 Hd2 Hwinh1).
+    assert (HwinKh : forall j : nat, (j < Z.to_nat 2)%nat ->
+              is_Some (mm !! pa_add (u_walk_pa wh (add_vec_int va 2)) j))
+      by (intros j Hj; apply Hwinh; lia).
+    assert (HwinKh2 : forall j : nat, (j < Z.to_nat 2)%nat ->
+              is_Some (mm2 !! pa_add (u_walk_pa wh (add_vec_int va 2)) j))
+      by (intros j Hj; apply Hwinh2; lia).
+    destruct (u_fetch_bytes_2 mm2 wh (add_vec_int va 2) Hwinh2)
       as (ihi & Hbytes2).
     destruct (u_fetch_read_ok P t t2 mm mm2 rsf rsf2 2 wh (add_vec_int va 2)
                 ltac:(lia) (Z.divide_factor_l 2 2048) ltac:(lia)
-                ltac:(vm_compute; reflexivity) Hal2h Hlh Lcp Hpins Hwf Hwf2 Tr12)
+                ltac:(vm_compute; reflexivity) Hal2h Hlh Lcp Hpins Hwf Hwf2
+                HwinKh HwinKh2 Tr12)
       as (region2 & HA2 & Hord2 & Hrange2 & HX2 & Hpmam2 & Halp2 & Hexecp2 &
           Hclint2 & Hsig2 & Hhtif2 & Hdev2 & Hown2 & Lcp2).
     assert (Hmr2 : exec (mem_read (InstructionFetch tt) PBMT_PMA
@@ -1417,7 +1449,7 @@ Proof.
     + right. exists (concat_vec ihi ilo). reflexivity.
     + exact Tr12.
     + exact Htlbok2.
-    + exact (u_mem_step_trans P t t1 t2 mm mm1 mm2 Hstep1 Hstep2).
+    + exact (u_mem_step_ok_trans P t t1 t2 mm mm1 mm2 Hstep1 Hstep2).
 Qed.
 
 (* THE HIGH HALF'S PAGE IS BAD.  Both disjuncts are live -- see the section
@@ -1436,7 +1468,9 @@ Lemma u_fetch_or_fault_pure_2_second (P : uptd) (t : ptree) (mm : PtBytes.pamap)
   is_aligned_vaddr (Virtaddr va) 4 = false ->
   post_fetch_cfg (u_state rsf mm) va mi ->
   u_exec_pins P t rsf ->
-  u_mem_wf P t mm ->
+  u_mem_ok P t mm ->
+  (forall j : nat, (j < 2)%nat ->
+     is_Some (mm !! pa_add (u_walk_pa w va) j)) ->
   exists (rsf' : regstate) (mm' : PtBytes.pamap) (t' : ptree) (fr : FetchResult),
     exec (fetch tt) (u_state rsf mm) = Some (fr, u_state rsf' mm') /\
     goodmb Du_r Du_w (fetch tt) (u_state rsf mm) mm = true /\
@@ -1445,9 +1479,9 @@ Lemma u_fetch_or_fault_pure_2_second (P : uptd) (t : ptree) (mm : PtBytes.pamap)
                                     /\ user_exc ex = true)) /\
     u_tlb_only rsf rsf' /\
     tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rsf') /\
-    u_mem_step P t t' mm mm'.
+    u_mem_step_ok P t t' mm mm'.
 Proof.
-  intros Hl Hleaf Hcanon Hflavor Hbit0 Hbit1 Hnal4 Hcfg Hpins Hwf.
+  intros Hl Hleaf Hcanon Hflavor Hbit0 Hbit1 Hnal4 Hcfg Hpins Hwf Hwin.
   pose proof Hcfg as (Lpc & Lcp & Lms & Lmenv & Hal2 & _).
   pose proof Lms as (Lsxl & _).
   pose proof Hpins as (Hhw & Hcfgp & Hpt & Htlbok).
@@ -1458,12 +1492,24 @@ Proof.
               Hpins Hwf)
     as (rsf1 & mm1 & t1 & Htr1 & Htr1g & Hfile1 & Htlbok1 & Hstep1).
   assert (Tr1 : u_tlb_only rsf rsf1) by exact (u_tlb_only_land rsf rsf1 Hfile1).
-  assert (Hwf1 : u_mem_wf P t1 mm1)
-    by exact (u_mem_step_wf P t t1 mm mm1 Hwf Hstep1).
-  destruct (u_fetch_bytes_2 P t1 mm1 w va Hwf1 Hl Hal2) as (ilo & Hbytes1).
+  assert (Hwf1 : u_mem_ok P t1 mm1)
+    by exact (u_mem_step_ok_wf P t t1 mm mm1 Hwf Hstep1).
+  assert (Hd1 : (dom mm1 : gset Arch.pa) = dom mm)
+    by exact (proj1 (proj2 (proj2 Hstep1))).
+  assert (Hwin1 : forall j : nat, (j < 2)%nat ->
+            is_Some (mm1 !! pa_add (u_walk_pa w va) j))
+    by exact (u_win_dom mm mm1 (u_walk_pa w va) 2 Hd1 Hwin).
+  assert (HwinK : forall j : nat, (j < Z.to_nat 2)%nat ->
+            is_Some (mm !! pa_add (u_walk_pa w va) j))
+    by (intros j Hj; apply Hwin; lia).
+  assert (HwinK1 : forall j : nat, (j < Z.to_nat 2)%nat ->
+            is_Some (mm1 !! pa_add (u_walk_pa w va) j))
+    by (intros j Hj; apply Hwin1; lia).
+  destruct (u_fetch_bytes_2 mm1 w va Hwin1) as (ilo & Hbytes1).
   destruct (u_fetch_read_ok P t t1 mm mm1 rsf rsf1 2 w va
               ltac:(lia) (Z.divide_factor_l 2 2048) ltac:(lia)
-              ltac:(vm_compute; reflexivity) Hal2 Hl Lcp Hpins Hwf Hwf1 Tr1)
+              ltac:(vm_compute; reflexivity) Hal2 Hl Lcp Hpins Hwf Hwf1
+              HwinK HwinK1 Tr1)
     as (region1 & HA1 & Hord1 & Hrange1 & HX1 & Hpmam1 & Halp1 & Hexecp1 &
         Hclint1 & Hsig1 & Hhtif1 & Hdev1 & Hown1 & Lcp1).
   assert (Hmr1 : exec (mem_read (InstructionFetch tt) PBMT_PMA
@@ -1515,7 +1561,7 @@ Proof.
                 Lcp1 Lsxl1 Hpins1 Hwf1)
       as (Htr2 & Htr2g).
     assert (Hdom1 : (dom mm : gset Arch.pa) = dom mm1)
-      by (symmetry; exact (u_mem_step_dom P t t1 mm mm1 Hwf Hstep1)).
+      by (symmetry; exact Hd1).
     assert (Htr2gm : goodmb Du_r Du_w (translateAddr (Virtaddr (add_vec_int va 2))
                               (InstructionFetch tt)) (u_state rsf1 mm1) mm = true).
     { rewrite (goodmb_dom Du_r Du_w
@@ -1550,14 +1596,14 @@ Lemma u_fetch_fault_pure_2_first (P : uptd) (t : ptree) (mm : PtBytes.pamap)
   is_aligned_vaddr (Virtaddr va) 4 = false ->
   post_fetch_cfg (u_state rsf mm) va mi ->
   u_exec_pins P t rsf ->
-  u_mem_wf P t mm ->
+  u_mem_ok P t mm ->
   exists (rsf' : regstate) (mm' : PtBytes.pamap) (t' : ptree) (fr : FetchResult),
     exec (fetch tt) (u_state rsf mm) = Some (fr, u_state rsf' mm') /\
     goodmb Du_r Du_w (fetch tt) (u_state rsf mm) mm = true /\
     (exists ex : ExceptionType, fr = F_Error (ex, va) /\ user_exc ex = true) /\
     u_tlb_only rsf rsf' /\
     tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rsf') /\
-    u_mem_step P t t' mm mm'.
+    u_mem_step_ok P t t' mm mm'.
 Proof.
   intros Hflavor Hbit0 Hbit1 Hnal4 Hcfg Hpins Hwf.
   pose proof Hcfg as (Lpc & Lcp & Lms & Lmenv & _ & _).
@@ -1585,6 +1631,6 @@ Proof.
     split; [ reflexivity | vm_compute; reflexivity ].
   - exact (u_tlb_only_refl rsf).
   - exact Htlbok.
-  - exact (u_mem_step_refl P t mm Hwf).
+  - exact (u_mem_step_ok_refl P t mm Hwf).
 Qed.
 
