@@ -676,8 +676,17 @@ Section SRegimeDef.
               satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
               tlb ↦ᵣ tv' -∗ sr_swp_res_at satp0 tv' -∗ sr_inv))
         ∨ (⌜ bare_satp_ok satp0 ⌝ ∗
-           (satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
-            sr_swp_res_at satp0 tlbv -∗ sr_inv)) );
+           ⌜ forall (acc : MemoryAccessType mem_payload) (va : mword 64)
+                    (ppn : mword 44) (kp : kperm) (Db : register -> bool)
+                    (Drw Dro : gset register) (rs : regstate) (dst : mstate),
+               s_acc_ok acc ->
+               bare_satp_ok (register_lookup satp rs) ->
+               eq_vec (_get_Mstatus_MPRV (register_lookup mstatus rs))
+                 ('b"1") = false ->
+               sr_swp_side acc va ppn kp Db Drw Dro rs dst ⌝ ∗
+           (∀ tv' : type_of_register tlb,
+              satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+              sr_swp_res_at satp0 tv' -∗ sr_inv)) );
 
     (* ---- THE TWO INTRODUCTIONS THE REGIME-GENERIC LEAVES NEED ---------
        A leaf quantified over [R] can produce the CONFIG facts (the arm's
@@ -1149,8 +1158,17 @@ Section SRegimeDef.
             satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
             tlb ↦ᵣ tv' -∗ (True : iProp Σ) -∗ bare_inv))
       ∨ (⌜ bare_satp_ok satp0 ⌝ ∗
-         (satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
-          (True : iProp Σ) -∗ bare_inv)) ).
+         ⌜ forall (acc : MemoryAccessType mem_payload) (va : mword 64)
+                (ppn : mword 44) (kp : kperm) (Db : register -> bool)
+                (Drw Dro : gset register) (rs : regstate) (dst : mstate),
+             s_acc_ok acc ->
+             bare_satp_ok (register_lookup satp rs) ->
+             eq_vec (_get_Mstatus_MPRV (register_lookup mstatus rs))
+               ('b"1") = false ->
+             bare_swp_side acc va ppn kp Db Drw Dro rs dst ⌝ ∗
+         (∀ tv' : type_of_register tlb,
+            satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+            (True : iProp Σ) -∗ bare_inv)) ).
   Proof.
     iIntros "H". iDestruct "H" as (satp0 tlbv) "(Hsatp & %Hmode & Htlb & Hpmp)".
     iDestruct "Hpmp" as (pcfg paddr)
@@ -1163,7 +1181,8 @@ Section SRegimeDef.
     iFrame "Hsatp Hpcfg Hpaddr".
     iSplitR; [done |].
     iRight. iSplitR; [iPureIntro; exact Hmode |].
-    iIntros "Hsatp Hpcfg Hpaddr _".
+    iSplitR; [iPureIntro; exact bare_swp_side_intro |].
+    iIntros (tv') "Hsatp Hpcfg Hpaddr _".
     rewrite /bare_inv. iExists satp0, tlbv. iFrame "Hsatp Htlb".
     iSplitR; [iPureIntro; exact Hmode |].
     iApply (pmp_config_intro (mword_of_int 0) pcfg paddr HA Hord HX HW HR Hcov
@@ -1635,8 +1654,17 @@ Section SRegimeShared.
             tlb ↦ᵣ tv' -∗ kpt_res_at root_ppn satp0 tv' -∗
             tlb_res_pt root_ppn))
       ∨ (⌜ bare_satp_ok satp0 ⌝ ∗
-         (satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
-          kpt_res_at root_ppn satp0 tlbv -∗ tlb_res_pt root_ppn)) ).
+         ⌜ forall (acc : MemoryAccessType mem_payload) (va : mword 64)
+                (ppn : mword 44) (kp : kperm) (Db : register -> bool)
+                (Drw Dro : gset register) (rs : regstate) (dst : mstate),
+             s_acc_ok acc ->
+             bare_satp_ok (register_lookup satp rs) ->
+             eq_vec (_get_Mstatus_MPRV (register_lookup mstatus rs))
+               ('b"1") = false ->
+             kpt_swp_side root_ppn acc va ppn kp Db Drw Dro rs dst ⌝ ∗
+         (∀ tv' : type_of_register tlb,
+            satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+            kpt_res_at root_ppn satp0 tv' -∗ tlb_res_pt root_ppn)) ).
   Proof.
     iIntros "H".
     iDestruct (kpt_swp_open root_ppn with "H") as (satp0 tlbv pcfg paddr)

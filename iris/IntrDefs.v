@@ -1792,8 +1792,17 @@ Section IntrDefsBase.
             satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
             tlb ↦ᵣ tv' -∗ strans_res_at satp0 tv' -∗ strans_inv))
       ∨ (⌜ bare_satp_ok satp0 ⌝ ∗
-         (satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
-          strans_res_at satp0 tlbv -∗ strans_inv)) ).
+         ⌜ forall (acc : MemoryAccessType mem_payload) (va : mword 64)
+                (ppn : mword 44) (kp : kperm) (Db : register -> bool)
+                (Drw Dro : gset register) (rs : regstate) (dst : mstate),
+             s_acc_ok acc ->
+             bare_satp_ok (register_lookup satp rs) ->
+             eq_vec (_get_Mstatus_MPRV (register_lookup mstatus rs))
+               ('b"1") = false ->
+             strans_swp_side acc va ppn kp Db Drw Dro rs dst ⌝ ∗
+         (∀ tv' : type_of_register tlb,
+            satp ↦ᵣ satp0 -∗ pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+            strans_res_at satp0 tv' -∗ strans_inv)) ).
   Proof.
     iIntros "[(Hpend & Hb & Hstv) | (Hkpt & Hk)]".
     - (* ---- BARE: no cell to the frame; it stays parked here ---- *)
@@ -1810,7 +1819,8 @@ Section IntrDefsBase.
       { rewrite /strans_res_at. iLeft. iFrame "Hpend Hstv".
         iPureIntro. exact Hmode. }
       iRight. iSplitR; [iPureIntro; exact Hmode |].
-      iIntros "Hsatp Hpcfg Hpaddr Hres".
+      iSplitR; [iPureIntro; exact strans_swp_side_bare |].
+      iIntros (tv') "Hsatp Hpcfg Hpaddr Hres".
       rewrite /strans_res_at.
       iDestruct "Hres" as "[(Hpend & Hstv & _) | (Hkpt & %Hbad & _)]".
       2:{ rewrite /bare_satp_ok in Hmode. rewrite Hbad in Hmode.
