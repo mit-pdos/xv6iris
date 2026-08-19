@@ -12,12 +12,12 @@ From stdpp Require Import bitvector.definitions gmap.
 From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
-Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
 Require Import RegFile.
 Require Import WpMmodeShiftiop.
-Require Import WpMmodeLeafBase.
+Require Import WpMmodeLeafBase WpMmodeSwpBase.
 Require Import SmodeCore.
 Require Import KptExecMap.
 Require Import TrampPt UserretDefs UserretPt UserretEntryPt.
@@ -110,14 +110,9 @@ Section UserretAllPt.
     iPoseProof (ui_lui with "Hkt") as "Hi_lui".
     (* ---- lui @ 0xac ---- *)
     iApply (wp_ualu_pt uroot tfp um 0xac false ai_lui m
-              usatp
               (mword_of_int 33554432 : mword 64)
-              (fun _ : mstate => luival (mword_of_int 0x2000))
               mstatus0 mie_v mdv0 menvcfg0
  HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
-              ltac:(intro s; exact (exec_execute_UTYPE_LUI_gpr (mword_of_int 10) (mword_of_int 0x2000) s))
-              ltac:(intros s _; apply bv_eq; vm_compute; reflexivity)
-              Ha0
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
@@ -126,10 +121,20 @@ Section UserretAllPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              ltac:(vm_compute; reflexivity)
-              ltac:(vm_compute; reflexivity)
-              ltac:(intros _; vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_lui").
+              with "[] Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_lui").
+    { iIntros "#Hcert Hf".
+      assert (Hluiv : luival (mword_of_int 0x2000 : mword 20)
+                      = (mword_of_int 33554432 : mword 64))
+        by (apply bv_eq; vm_compute; reflexivity).
+      rewrite -Hluiv.
+      change (execute ai_lui)
+        with (execute (UTYPE (mword_of_int 0x2000,
+                              Regidx (mword_of_int 10 : mword 5), LUI))).
+      iApply (swp_execute_pure_w (mword_of_int 10) m
+                (execute (UTYPE (mword_of_int 0x2000,
+                                 Regidx (mword_of_int 10 : mword 5), LUI)))
+                RETIRE_SUCCESS (luival (mword_of_int 0x2000 : mword 20))
+                eq_refl ltac:(vm_compute; lia) with "Hcert Hf"). }
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile".
     iClear "Hi_lui".
     assert (Hpcx_0xac : add_vec_int (uva 0xac) (if false then 2 else 4) = uva 0xb0)
@@ -142,17 +147,9 @@ Section UserretAllPt.
     iPoseProof (ui_addiw with "Hkt") as "Hi_addiw".
     (* ---- addiw @ 0xb0 ---- *)
     iApply (wp_ualu_pt uroot tfp um 0xb0 true ai_addiw (<[Regidx (mword_of_int 10) := regval_into_reg (mword_of_int 33554432 : mword 64)]> m)
-              (regval_into_reg (mword_of_int 33554432 : mword 64))
               (mword_of_int 33554431 : mword 64)
-              (gpr_addiw_val (mword_of_int 10) (sign_extend' 12 (mword_of_int 63 : mword 6)))
               mstatus0 mie_v mdv0 menvcfg0
  HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
-              ltac:(intro s; exact (exec_execute_ADDIW_gpr (mword_of_int 10) (mword_of_int 10) (sign_extend' 12 (mword_of_int 63 : mword 6)) s))
-              ltac:(intros s Hl; unfold gpr_addiw_val;
-                    replace (Z.eqb (uint (mword_of_int 10 : mword 5)) 0) with false
-                      by (vm_compute; reflexivity);
-                    rewrite Hl; apply bv_eq; vm_compute; reflexivity)
-              Ha0_addiw
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
@@ -161,10 +158,27 @@ Section UserretAllPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              ltac:(vm_compute; reflexivity)
-              ltac:(vm_compute; reflexivity)
-              ltac:(intros _; vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_addiw").
+              with "[] Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_addiw").
+    { iIntros "#Hcert Hf".
+      assert (Haddiwv : sign_extend' 64 (subrange_vec_dec
+                (add_vec ((<[Regidx (mword_of_int 10) := regval_into_reg (mword_of_int 33554432 : mword 64)]> m) !!! Regidx (mword_of_int 10 : mword 5))
+                   (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6))))
+                31 0) = (mword_of_int 33554431 : mword 64))
+        by (rewrite Ha0_addiw; apply bv_eq; vm_compute; reflexivity).
+      rewrite -Haddiwv.
+      change (execute ai_addiw)
+        with (execute (ADDIW (sign_extend' 12 (mword_of_int 63 : mword 6),
+                              Regidx (mword_of_int 10 : mword 5),
+                              Regidx (mword_of_int 10 : mword 5)))).
+      iApply (swp_execute_rw2 (mword_of_int 10) (mword_of_int 10) (<[Regidx (mword_of_int 10) := regval_into_reg (mword_of_int 33554432 : mword 64)]> m)
+                (execute (ADDIW (sign_extend' 12 (mword_of_int 63 : mword 6),
+                                 Regidx (mword_of_int 10 : mword 5),
+                                 Regidx (mword_of_int 10 : mword 5))))
+                RETIRE_SUCCESS
+                (fun a => sign_extend' 64 (subrange_vec_dec
+                   (add_vec a (sign_extend' 64
+                      (sign_extend' 12 (mword_of_int 63 : mword 6)))) 31 0))
+                eq_refl ltac:(vm_compute; lia) with "Hcert Hf"). }
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile".
     iClear "Hi_addiw".
     assert (Hpcx_0xb0 : add_vec_int (uva 0xb0) (if true then 2 else 4) = uva 0xb2)
@@ -177,17 +191,9 @@ Section UserretAllPt.
     iPoseProof (ui_slli with "Hkt") as "Hi_slli".
     (* ---- slli @ 0xb2 ---- *)
     iApply (wp_ualu_pt uroot tfp um 0xb2 true ai_slli (<[Regidx (mword_of_int 10) := regval_into_reg (mword_of_int 33554431 : mword 64)]> (<[Regidx (mword_of_int 10) := regval_into_reg (mword_of_int 33554432 : mword 64)]> m))
-              (regval_into_reg (mword_of_int 33554431 : mword 64))
               (mword_of_int TRAPFRAME : mword 64)
-              (gpr_slli_val (mword_of_int 10) (mword_of_int 13))
               mstatus0 mie_v mdv0 menvcfg0
  HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
-              ltac:(intro s; exact (exec_execute_SHIFTIOP_SLLI_gpr (mword_of_int 10) (mword_of_int 10) (mword_of_int 13) s))
-              ltac:(intros s Hl; unfold gpr_slli_val, gpr_src;
-                    replace (Z.eqb (uint (mword_of_int 10 : mword 5)) 0) with false
-                      by (vm_compute; reflexivity);
-                    rewrite Hl; apply bv_eq; vm_compute; reflexivity)
-              Ha0_slli
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
@@ -196,10 +202,28 @@ Section UserretAllPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              ltac:(vm_compute; reflexivity)
-              ltac:(vm_compute; reflexivity)
-              ltac:(intro Hf; vm_compute in Hf; discriminate)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_slli").
+              with "[] Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_slli").
+    { iIntros "#Hcert Hf".
+      assert (Hslliv : shift_bits_left
+                ((<[Regidx (mword_of_int 10) := regval_into_reg (mword_of_int 33554431 : mword 64)]> (<[Regidx (mword_of_int 10) := regval_into_reg (mword_of_int 33554432 : mword 64)]> m)) !!! Regidx (mword_of_int 10 : mword 5))
+                (subrange_vec_dec (mword_of_int 13 : mword 6)
+                   (Z.sub log2_xlen 1) 0)
+              = (mword_of_int TRAPFRAME : mword 64))
+        by (rewrite Ha0_slli; apply bv_eq; vm_compute; reflexivity).
+      rewrite -Hslliv.
+      change (execute ai_slli)
+        with (execute (SHIFTIOP (mword_of_int 13,
+                                 Regidx (mword_of_int 10 : mword 5),
+                                 Regidx (mword_of_int 10 : mword 5), SLLI))).
+      iApply (swp_execute_rw (mword_of_int 10) (mword_of_int 10) (<[Regidx (mword_of_int 10) := regval_into_reg (mword_of_int 33554431 : mword 64)]> (<[Regidx (mword_of_int 10) := regval_into_reg (mword_of_int 33554432 : mword 64)]> m))
+                (execute (SHIFTIOP (mword_of_int 13,
+                                    Regidx (mword_of_int 10 : mword 5),
+                                    Regidx (mword_of_int 10 : mword 5), SLLI)))
+                RETIRE_SUCCESS
+                (fun a => shift_bits_left a
+                   (subrange_vec_dec (mword_of_int 13 : mword 6)
+                      (Z.sub log2_xlen 1) 0))
+                eq_refl ltac:(vm_compute; lia) with "Hcert Hf"). }
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile".
     iClear "Hi_slli".
     assert (Hpcx_0xb2 : add_vec_int (uva 0xb2) (if true then 2 else 4) = uva 0xb4)
