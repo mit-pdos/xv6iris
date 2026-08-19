@@ -2685,6 +2685,55 @@ any leaf:
 refutes the Bare arm under interrupts-enabled (the enabled arm owns `stvec`,
 and so does the Bare slot), so the SIE=1 engine is KPT-only and untouched.
 
+#### THE FIFTEEN DATA-LEAF SITES, and the single lemma that absorbs the split
+
+`sie_cap_to_cells` / `sie_cap_of_cells` are called at **fifteen sites in eight
+files** (`ProofUart` 2, `WpSconfMem` 2, `WpPlic` 2, `WpVirtioDev` 2,
+`WpSconfLock` 1, `WpSmodeWfi` 1, `WpSmodeIntr` 3, `WpIntrInv` 2).  Each takes
+the `tlb` cell out of the slot and threads it into its own data frame
+`sda_rs ... tlbv` over `WpSmodePtEngine.sda_Drw`, then calls `sda_translate` at
+`strans_regime` -- arm-blind.  That is what makes the Bare arm have to fund the
+cell at those sites too.
+
+**ALL FIFTEEN POSTDATE `6b5d1eb2`** (checked with `git merge-base
+--is-ancestor`); they were written on top of it.  Their commit messages say the
+leaf STATEMENTS are byte-identical to the exec-world ones, and the PRE-PORT
+proofs did not open the slot at all:
+
+```
+    iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hwit)".      (* Htr FOLDED *)
+    iIntros (CID Hs σ Hpceq) "Hsc Hcap Hfmap Hnpc [Hreg [Hmem Hdev]]".
+```
+
+-- the folded slot plus the STATE INTERPRETATION went to `sr_absorb`, whose own
+postcondition absorbs the walk's TLB write (`σ'.(sregs) = σ.(sregs) \/ exists
+tv, σ'.(sregs) = register_set tlb tv σ.(sregs)`).  No cell of the slot was ever
+separately owned, at either arm.  (`git show c84fb56d -- iris/WpSconfLock.v`,
+the deleted side.)
+
+The swp face was introduced for a REAL reason, stated in `SRegime.v` §5: a walk
+spans many nodes and no fupd survives a node boundary, so the shared table must
+be opened per read node.  That reason applies to the KPT arm only -- Bare's
+`translateAddr` reduces in one step and opens nothing.
+
+**SO: restore the pre-port boundary and absorb the split once.**
+* `sda_Drw` is `{[tlb]}` and nothing else, so the BARE data write set is `∅`
+  and a Bare data frame is `emp`.
+* `sda_translate` goes generic in the write set, with the regime's side
+  condition as a PREMISE (`sr_swp_side_ok` demands `tlb ∈ Drw`, which the Bare
+  instance cannot pay) -- the same shape as `spt_tr_obl_of_regime_D`.  The
+  `sda_Drw` name stays as the KPT wrapper.
+* ONE arm-blind `sda_translate_slot` takes `strans_inv` FOLDED plus the
+  `sconf` / `hw_config` cells, case-splits inside (KPT: `tlb_res_pt`'s cells at
+  `sda_Drw`; Bare: `bare_inv`'s satp/pmp at `∅`), and hands the folded slot
+  back.  It lives in `WpIntrInv.v` (_CoqProject 276), which is below all eight
+  consumers and needs `Require Import WpSmodePtFetch` added.
+* The fifteen sites go back to passing `Htr` -- SMALLER than what is there now.
+
+DO NOT split the arm at each site, and DO NOT give the tlb a fractional/half
+points-to at Bare: a different frame POSITION or FRACTION at the two arms
+forces the fifteen-way split just as deleting the cell does.
+
 #### Consequences
 
 * `6b5d1eb2` reverts (`bare_inv` loses its `tlb ↦ᵣ tlbv` conjunct);
