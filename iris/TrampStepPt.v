@@ -907,8 +907,17 @@ Section TrampFetchPt.
   (* trampoline instruction leaves S-mode: userret's [sret] to user.       *)
   (* Every wrapper below states its own [priv1] CONCRETELY.                *)
   (* ==================================================================== *)
+  (* THE LANDING RESIDUE IS ITS OWN PARAMETER.  Every ORDINARY trampoline
+     step leaves the table's residue where it found it ([Res1 := Res], which
+     is what all four wrappers below instantiate), but the switch window's
+     CLOSING [sfence.vma] does not: the flush is the very fact that turns the
+     two-table residue back into a one-table one, and per node that fact is
+     generated inside the [swp] obligation and can only leave it on the
+     residue it hands back.  Sealing it away first (as a wrapper's own
+     [_swp_close] does) is the "do not re-seal the tlb cell" trap in
+     [claude-notes]: the invariant is existential in the tlb value. *)
   Lemma wp_instr_tramp_pt
-      (Res : type_of_register tlb -> iProp Σ)
+      (Res Res1 : type_of_register tlb -> iProp Σ)
       (pc pa : mword 64) (is_rvc : bool) (i : instruction)
       (mstatus0 mie_v mdv0 menvcfg0 satp0 : mword 64)
       (pcfg : type_of_register pmpcfg_n)
@@ -970,7 +979,7 @@ Section TrampFetchPt.
                    menvcfg ↦ᵣ{ dq } menvcfg1 ∗
                    satp ↦ᵣ satp1 ∗ pmpcfg_n ↦ᵣ pcfg1 ∗
                    pmpaddr_n ↦ᵣ paddr1 ∗
-                   (∃ tv2 : type_of_register tlb, tlb ↦ᵣ tv2 ∗ Res tv2) ∗
+                   (∃ tv2 : type_of_register tlb, tlb ↦ᵣ tv2 ∗ Res1 tv2) ∗
                    clock_res ∗
                    (∃ ms1 mdv1 npc : mword 64,
                       mstatus ↦ᵣ{ dq } ms1 ∗ mideleg ↦ᵣ{ dq } mdv1 ∗
@@ -985,7 +994,7 @@ Section TrampFetchPt.
          mideleg ↦ᵣ{ dq } mdv1 -∗
          menvcfg ↦ᵣ{ dq } menvcfg1 -∗
          satp ↦ᵣ satp1 -∗ pmpcfg_n ↦ᵣ pcfg1 -∗ pmpaddr_n ↦ᵣ paddr1 -∗
-         tlb ↦ᵣ tv1 -∗ Res tv1 -∗
+         tlb ↦ᵣ tv1 -∗ Res1 tv1 -∗
          pc_is npc -∗ Rl npc ms1 mdv1 -∗
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1005,7 +1014,7 @@ Section TrampFetchPt.
     iPoseProof ("Htr" $! ms (minstret_inc_flag mc micfg Supervisor) cy ti ip mc
                   micfg misa0 mseccfg0 senv0 pmar0 elp0) as "#Htr0".
     iApply (spt_cycle (s_Df_mix dq) pc
-              (fun rs2 => (Res (register_lookup tlb rs2) ∗ resv_any cpu_id
+              (fun rs2 => (Res1 (register_lookup tlb rs2) ∗ resv_any cpu_id
                            ∗ Rl (register_lookup (R_bitvector_64 nextPC) rs2)
                                 (register_lookup mstatus rs2)
                                 (register_lookup mideleg rs2))%I)
@@ -1048,7 +1057,7 @@ Section TrampFetchPt.
                    (fun rs2 => exists (npc ms1 mdv1 cy1 ti1 ip1 : mword 64)
                                  (tv : type_of_register tlb),
                       rs2 = s_rs_p priv1 pc npc ms (minstret_inc_flag mc micfg Supervisor) cy1 ti1 ip1 ms1 pcfg1 paddr1 mc micfg misa0 mseccfg0 senv0 pmar0 elp0 satp1 mie1 mdv1 menvcfg1 tv)
-                   (fun rs2 => (Res (register_lookup tlb rs2)
+                   (fun rs2 => (Res1 (register_lookup tlb rs2)
                                 ∗ resv_any cpu_id
                                 ∗ Rl (register_lookup (R_bitvector_64 nextPC) rs2)
                                      (register_lookup mstatus rs2)
@@ -1457,7 +1466,8 @@ Section TrampFetchPt.
              Hinstr Hex Hcont".
     iDestruct (kpt_swp_open root_ppn with "Hinv") as (satp0 tlbv pcfg paddr)
       "(%Hsatpok & %Hpmpok & Hsatp & Htlbc & Hpcfg & Hpaddr & HRes)".
-    iApply (wp_instr_tramp_pt (kpt_res_at root_ppn satp0) pc pa is_rvc i
+    iApply (wp_instr_tramp_pt (kpt_res_at root_ppn satp0)
+              (kpt_res_at root_ppn satp0) pc pa is_rvc i
               mstatus0 mie_v mdv0 menvcfg0 satp0 pcfg paddr tlbv
               mie1 menvcfg1 satp0 pcfg paddr Supervisor Rl (dq := dq)
               HSIE HMPRV HSXL Hmm HPBMTE Hmenvval Hpmpok

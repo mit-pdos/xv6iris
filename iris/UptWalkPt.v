@@ -875,7 +875,8 @@ Section UptTramp.
     iDestruct (upt_swp_open uroot tfp um with "Hinv")
       as (satp0 tlbv pcfg paddr)
       "(%Hsatpok & %Hpmpok & Hsatp & Htlbc & Hpcfg & Hpaddr & HRes)".
-    iApply (wp_instr_tramp_pt (upt_res_pt uroot tfp um) pc pa is_rvc i
+    iApply (wp_instr_tramp_pt (upt_res_pt uroot tfp um)
+              (upt_res_pt uroot tfp um) pc pa is_rvc i
               mstatus0 mie_v mdv0 menvcfg0 satp0 pcfg paddr tlbv
               mie1 menvcfg1 satp0 pcfg paddr Supervisor Rl (dq := dq)
               HSIE HMPRV HSXL Hmm HPBMTE Hmenvval Hpmpok
@@ -991,7 +992,8 @@ Section UptTramp.
     iDestruct (upt_swp_open uroot tfp um with "Hinv")
       as (satp0 tlbv pcfg paddr)
       "(%Hsatpok & %Hpmpok & Hsatp & Htlbc & Hpcfg & Hpaddr & HRes)".
-    iApply (wp_instr_tramp_pt (upt_res_pt uroot tfp um) pc pa is_rvc i
+    iApply (wp_instr_tramp_pt (upt_res_pt uroot tfp um)
+              (upt_res_pt uroot tfp um) pc pa is_rvc i
               mstatus0 mie_v mdv0 menvcfg0 satp0 pcfg paddr tlbv
               mie1 menvcfg1 satp0 pcfg paddr User Rl (dq := dq)
               HSIE HMPRV HSXL Hmm HPBMTE Hmenvval Hpmpok

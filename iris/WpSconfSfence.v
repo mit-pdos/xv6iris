@@ -178,6 +178,62 @@ Section SfenceLeaf.
   (* [HartStepFull]'s waiting step uses, and the only one that can take a  *)
   (* sixty-four iteration register loop in one step.                       *)
   (* ==================================================================== *)
+  (* THE FRAME-GENERIC FORM.  The certificate
+     ([UserretDefs.execute_SFENCE_VMA_S_cert]) is already [Dr]/[Dw]-generic,
+     so nothing about this composer is tied to [sf_*] -- and the trampoline
+     tier needs it at ITS frame, whose read-only cells arrive at whatever
+     fraction the step engine lends ([WpSmodePtEngine.sda_Df dq]) rather than
+     at [sf_Df]'s [DfracOwn 1].  [swp_execute_SFENCE_VMA_S] is the instance;
+     no statement moved. *)
+  Lemma swp_execute_SFENCE_VMA_S_gen (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs : regstate) :
+    Drw ## Dro ->
+    (cur_privilege : register) ∈ Drw ∪ Dro ->
+    (mstatus : register) ∈ Drw ∪ Dro ->
+    (tlb : register) ∈ Drw ->
+    register_lookup cur_privilege rs = Supervisor ->
+    eq_vec (_get_Mstatus_TVM (register_lookup mstatus rs)) ('b"1") = false ->
+    gen_cert -∗ resv_any cpu_id -∗
+    hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+    swp (execute (SFENCE_VMA (zreg, zreg)))
+      (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
+        ∃ (rs' : regstate) (tv : type_of_register tlb),
+          ⌜reg_agree_on (Drw ∪ Dro) rs' (register_set tlb tv rs)⌝ ∗
+          ⌜forall i, 0 <= i < 64 -> vec_access_dec tv i = None⌝ ∗
+          hreg_frame rs' Drw ∗ hreg_frame_ro Df rs' Dro ∗
+          resv_any cpu_id).
+  Proof.
+    intros Hdisj Hpriv_in Hms_in Htlb_in Hpriv HTVM.
+    pose (Dr := fun r : register => bool_decide (r ∈ Drw ∪ Dro)).
+    pose (Dw := fun r : register => bool_decide (r ∈ Drw)).
+    assert (HDr_in : forall r, Dr r = true -> r ∈ Drw ∪ Dro)
+      by (intros r Hr; by apply bool_decide_eq_true_1 in Hr).
+    assert (HDw_in : forall r, Dw r = true -> r ∈ Drw)
+      by (intros r Hr; by apply bool_decide_eq_true_1 in Hr).
+    destruct (execute_SFENCE_VMA_S_cert Dr Dw (MState rs ∅ dev0_state)
+                (bool_decide_eq_true_2 _ Hpriv_in)
+                (bool_decide_eq_true_2 _ Hms_in)
+                (bool_decide_eq_true_2 _ (elem_of_union_l _ _ _ Htlb_in))
+                (bool_decide_eq_true_2 _ Htlb_in) Hpriv HTVM)
+      as (tv & Hex & Hprop & Hgm).
+    iIntros "#Hcert Hany Hrw Hro".
+    (* [bytes_own ∅] is [emp], hence persistent: it lands in the □ context *)
+    iAssert (bytes_own (∅ : gmap Arch.pa (bv 8))) with "[]" as "#Hemp";
+      [ by rewrite /bytes_own big_sepM_empty |].
+    iApply (swp_mono _ _ _ with "[] [-]"); last first.
+    { iApply (swp_hmrun_of_exec Dr Dw Drw Dro Df
+                (execute (SFENCE_VMA (zreg, zreg))) (MState rs ∅ dev0_state)
+                _ _ rs ∅ Hdisj HDr_in HDw_in (reg_agree_refl _ _)
+                (map_empty_subseteq _) (Hgm ∅) Hex
+                with "Hcert Hany Hrw Hro Hemp"). }
+    iIntros (v) "(-> & Hpost)".
+    iDestruct "Hpost" as (rs' mm') "(%Hag & _ & _ & Hrw & Hro & _ & Hany)".
+    iSplitR; [done|].
+    iExists rs', tv. iFrame "Hrw Hro Hany".
+    iSplitR; [| iPureIntro; exact Hprop].
+    iPureIntro. exact Hag.
+  Qed.
+
   Lemma swp_execute_SFENCE_VMA_S (rs : regstate) :
     register_lookup cur_privilege rs = Supervisor ->
     eq_vec (_get_Mstatus_TVM (register_lookup mstatus rs)) ('b"1") = false ->
@@ -192,25 +248,14 @@ Section SfenceLeaf.
           resv_any cpu_id).
   Proof.
     intros Hpriv HTVM.
-    destruct (execute_SFENCE_VMA_S_cert sf_Dr sf_Dw (MState rs ∅ dev0_state)
-                sf_Dr_priv sf_Dr_ms sf_Dr_tlb sf_Dw_tlb Hpriv HTVM)
-      as (tv & Hex & Hprop & Hgm).
-    iIntros "#Hcert Hany Hrw Hro".
-    (* [bytes_own ∅] is [emp], hence persistent: it lands in the □ context *)
-    iAssert (bytes_own (∅ : gmap Arch.pa (bv 8))) with "[]" as "#Hemp";
-      [ by rewrite /bytes_own big_sepM_empty |].
-    iApply (swp_mono _ _ _ with "[] [-]"); last first.
-    { iApply (swp_hmrun_of_exec sf_Dr sf_Dw sf_Drw sf_Dro sf_Df
-                (execute (SFENCE_VMA (zreg, zreg))) (MState rs ∅ dev0_state)
-                _ _ rs ∅ sf_disj sf_Dr_in sf_Dw_in (reg_agree_refl _ _)
-                (map_empty_subseteq _) (Hgm ∅) Hex
-                with "Hcert Hany Hrw Hro Hemp"). }
-    iIntros (v) "(-> & Hpost)".
-    iDestruct "Hpost" as (rs' mm') "(%Hag & _ & _ & Hrw & Hro & _ & Hany)".
-    iSplitR; [done|].
-    iExists rs', tv. iFrame "Hrw Hro Hany".
-    iSplitR; [| iPureIntro; exact Hprop].
-    iPureIntro. exact Hag.
+    assert (Hp : (cur_privilege : register) ∈ sf_Drw ∪ sf_Dro)
+      by (rewrite /sf_Drw /sf_Dro; set_solver).
+    assert (Hm : (mstatus : register) ∈ sf_Drw ∪ sf_Dro)
+      by (rewrite /sf_Drw /sf_Dro; set_solver).
+    assert (Ht : (tlb : register) ∈ sf_Drw)
+      by (rewrite /sf_Drw; set_solver).
+    exact (swp_execute_SFENCE_VMA_S_gen sf_Drw sf_Dro sf_Df rs sf_disj
+             Hp Hm Ht Hpriv HTVM).
   Qed.
 
   (* ==================================================================== *)
