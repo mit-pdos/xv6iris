@@ -296,37 +296,8 @@ UserMemArmsC.v
 UserMemArmsA.v
 UserMemClassifyAmo.v
 SpecUser.v
-# ===================================================================
-# USER-RULED TEMPORARY DESCOPE (2026-08-19): THE ProofUser STACK.
-#
-# RULING (project owner): to land the hart-node port on main sooner
-# rather than later, the general-case user-mode safety proof -- the
-# ProofUser stack, i.e. the file that closes SpecUser's [USER]
-# interface over the whole User*.v tower -- is TEMPORARILY REMOVED
-# FROM THE BUILD, and its ONE dependency (the userret link files,
-# LinkUserretClosed.v / LinkUserretUser.v) is stated as an AXIOM in
-# UserExecAxiom.v instead.  The proof is PROVEN pre-port; what is not
-# yet done is its port onto the per-node semantics, and that lane
-# continues (claude-notes/projects/user-tier-port.md).
-#
-# THE FILES REMAIN ON DISK, UNTOUCHED.  Only these two rows leave the
-# build -- the closure computed by REVERSE DEPENDENCIES over every
-# Require line in iris/*.v: ProofUser.v has exactly two consumers
-# (the two Link files, now repointed at the axiom) and
-# UserActiveClass.v has exactly one (ProofUser.v).  EVERY other User*
-# tier file has a consumer that stays in the build (UserExec.v,
-# UserTotalU.v, UserMemClassify*.v, UserFrame.v, ... are consumed by
-# ProofUserretClosed / UserretUser / UserKernelBridge / the Umode
-# tier), so they stay -- see the ledger in user-tier-port.md.
-#
-# REVIVAL, when the port lane discharges the axiom: uncomment the two
-# rows below, delete the UserExecAxiom.v row, point the two Link files
-# back at ProofUser (module UserProof), and delete
-# iris/UserExecAxiom.v.
-# ===================================================================
-# UserActiveClass.v
-# ProofUser.v
-UserExecAxiom.v
+UserActiveClass.v
+ProofUser.v
 UserKernelBridge.v
 IntrDefs.v
 LockRank.v
