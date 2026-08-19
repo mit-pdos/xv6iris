@@ -1474,6 +1474,86 @@ Section IntrEngine.
   (* them to the leaf) and takes them apart again afterwards.             *)
   (* ------------------------------------------------------------------ *)
 
+  (* the tlb resource a frame at [SD] carries: the cell at [s_Drw], nothing
+     at [s_Drwb].  Opaque to every consumer -- that is what lets the
+     instruction funnel be ONE proof over an abstract set. *)
+  Definition s_tlb_at (SD : gset register) (tv : type_of_register tlb)
+      : iProp Σ :=
+    (if bool_decide ((tlb : register) ∈ SD) then tlb ↦ᵣ tv else emp)%I.
+
+  Lemma s_tlb_at_bare (tv : type_of_register tlb) :
+    s_tlb_at s_Drwb tv ⊣⊢ (emp : iProp Σ).
+  Proof.
+    rewrite /s_tlb_at bool_decide_eq_false_2; [reflexivity |].
+    rewrite /s_Drwb. set_solver.
+  Qed.
+
+  Lemma s_tlb_at_kpt (tv : type_of_register tlb) :
+    s_tlb_at s_Drw tv ⊣⊢ (tlb ↦ᵣ tv : iProp Σ).
+  Proof.
+    rewrite /s_tlb_at bool_decide_eq_true_2; [reflexivity | exact s_w_tlb].
+  Qed.
+
+  (* WHICH ARM, as a pure fact about the pair (write set, satp value).  The
+     slot accessor exports this and the funnel turns it into the regime's
+     fetch side condition with [strans_side_of_arm]; nothing else needs to
+     know there are two arms. *)
+  Definition s_arm_ok (SD : gset register) (satp0 : mword 64) : Prop :=
+    (SD = s_Drwb /\ bare_satp_ok satp0)
+    \/ (SD = s_Drw /\ kpt_satp_ok (strans_root_of satp0) satp0).
+
+  Lemma s_arm_satp_ok (SD : gset register) (satp0 : mword 64) :
+    s_arm_ok SD satp0 -> strans_satp_ok satp0.
+  Proof.
+    intros [[_ H] | [_ H]]; [ left; exact H | right; exact H ].
+  Qed.
+
+  Lemma s_arm_frame_ok (SD : gset register) (satp0 : mword 64) :
+    s_arm_ok SD satp0 -> s_frame_ok SD.
+  Proof.
+    intros [[-> _] | [-> _]];
+      [ exact s_frame_ok_Drwb | exact s_frame_ok_Drw ].
+  Qed.
+
+  Lemma s_arm_cells (SD : gset register) (satp0 : mword 64) :
+    s_arm_ok SD satp0 -> SD = s_Drw \/ SD = s_Drwb.
+  Proof. intros [[-> _] | [-> _]]; [ right | left ]; reflexivity. Qed.
+
+  (* the regime's FETCH side condition, out of the arm.  [sr_swp_side_ok]
+     cannot serve: it demands [tlb ∈ Drw], which the Bare arm's empty-of-tlb
+     set cannot pay -- and does not need to, since Bare's translateAddr never
+     touches the cell. *)
+  Lemma strans_side_of_arm (SD : gset register) (satp0 : mword 64)
+      (acc : MemoryAccessType mem_payload) (va : mword 64) (ppn : mword 44)
+      (kp : kperm) (Db : register -> bool) (rs : regstate) (dst : mstate) :
+    s_arm_ok SD satp0 ->
+    s_acc_ok acc ->
+    register_lookup satp rs = satp0 ->
+    eq_vec (_get_Mstatus_MPRV (register_lookup mstatus rs)) ('b"1") = false ->
+    pmp_ent0_ok (register_lookup pmpcfg_n rs) (register_lookup pmpaddr_n rs) ->
+    pma_allows_ram (register_lookup pma_regions rs) ->
+    Db mstatus = true -> Db satp = true ->
+    _get_Mstatus_SXL (register_lookup mstatus dst.(sregs)) = 'b"10" ->
+    register_lookup satp dst.(sregs) = satp0 ->
+    strans_swp_side acc va ppn kp Db SD s_Dro rs dst.
+  Proof.
+    intros Harm Hacc Hsatp HMPRV Hpok Hpma HDm HDs HSXL Hdsatp.
+    destruct Harm as [[-> Hb] | [-> Hk]].
+    - apply (strans_swp_side_bare acc va ppn kp Db s_Drwb s_Dro rs dst Hacc);
+        [ rewrite Hsatp; exact Hb | exact HMPRV ].
+    - right. unfold strans_root. rewrite Hsatp.
+      apply (kpt_swp_side_intro (strans_root_of satp0) acc va ppn kp Db
+               s_Drw s_Dro rs dst).
+      + rewrite Hsatp. exact Hk.
+      + exact Hpok.
+      + exact Hpma.
+      + exact HDm.
+      + exact HDs.
+      + exact HSXL.
+      + rewrite Hdsatp Hsatp. reflexivity.
+      + exact s_w_tlb.
+  Qed.
+
   Section SCells.
     Context (pc npc ms : mword 64) (bmi : bool) (cy ti ip mst0 : mword 64)
             (pcfg : type_of_register pmpcfg_n)
@@ -1541,6 +1621,7 @@ Section IntrEngine.
        reg_pointsto senvcfg DfracDiscarded senv0 ∗
        satp ↦ᵣ satp0 ∗ mie ↦ᵣ mie0 ∗ mideleg ↦ᵣ mdv0 ∗ menvcfg ↦ᵣ menv0)%I.
 
+
     Lemma s_frames_cells_b :
       (hreg_frame SRS s_Drwb ∗ hreg_frame_ro (s_Df (DfracOwn 1)) SRS s_Dro
        : iProp Σ) ⊣⊢ s_cells_b.
@@ -1553,6 +1634,50 @@ Section IntrEngine.
         iFrame.
       - iIntros "(?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?)".
         iFrame.
+    Qed.
+
+    (* ---- THE SET-GENERIC FORM, and why it exists. ---------------------
+       The instruction funnel below is ONE proof, not two, even though its
+       two arms frame at different sets.  That works because the tlb cell is
+       the ONLY difference and the funnel never looks at it: it takes
+       [s_tlb_of SD tlbv] out of the slot, hands it to [s_frames_cells_D],
+       and gets it back.  At [s_Drw] that is the cell; at [s_Drwb] it is
+       [emp].  See claude-notes/projects/main-cycle-port.md. *)
+    Local Notation s_tlb_of SD := (s_tlb_at SD tlbv).
+
+    Definition s_cells_D (SD : gset register) : iProp Σ :=
+      ((R_bitvector_64 PC) ↦ᵣ pc ∗ (R_bitvector_64 nextPC) ↦ᵣ npc ∗
+       (R_bitvector_64 minstret) ↦ᵣ ms ∗ (R_bool minstret_increment) ↦ᵣ bmi ∗
+       (R_bitvector_64 mcycle) ↦ᵣ cy ∗ (R_bitvector_64 mtime) ↦ᵣ ti ∗
+       (R_bitvector_64 mip) ↦ᵣ ip ∗ s_tlb_of SD ∗
+       cur_privilege ↦ᵣ Supervisor ∗ mstatus ↦ᵣ mst0 ∗
+       hart_state ↦ᵣ HART_ACTIVE tt ∗ pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr ∗
+       reg_pointsto (R_bitvector_32 mcountinhibit) DfracDiscarded mc ∗
+       reg_pointsto (R_bitvector_64 minstretcfg) DfracDiscarded micfg ∗
+       reg_pointsto misa DfracDiscarded misa0 ∗
+       reg_pointsto mseccfg DfracDiscarded mseccfg0 ∗
+       reg_pointsto pma_regions DfracDiscarded pmar0 ∗
+       reg_pointsto htif_tohost_base DfracDiscarded None ∗
+       reg_pointsto elp DfracDiscarded elp0 ∗
+       reg_pointsto senvcfg DfracDiscarded senv0 ∗
+       satp ↦ᵣ satp0 ∗ mie ↦ᵣ mie0 ∗ mideleg ↦ᵣ mdv0 ∗ menvcfg ↦ᵣ menv0)%I.
+
+    Lemma s_frames_cells_D (SD : gset register) :
+      SD = s_Drw \/ SD = s_Drwb ->
+      (hreg_frame SRS SD ∗ hreg_frame_ro (s_Df (DfracOwn 1)) SRS s_Dro
+       : iProp Σ) ⊣⊢ s_cells_D SD.
+    Proof.
+      intros [-> | ->].
+      - rewrite s_frames_cells /s_cells /s_cells_D /s_tlb_at.
+        rewrite bool_decide_eq_true_2; [| exact s_w_tlb]. reflexivity.
+      - rewrite s_frames_cells_b /s_cells_b /s_cells_D /s_tlb_at.
+        rewrite bool_decide_eq_false_2;
+          [| rewrite /s_Drwb; set_solver].
+        iSplit.
+        + iIntros "(?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?)".
+          iFrame.
+        + iIntros "(?&?&?&?&?&?&?&_&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?&?)".
+          iFrame.
     Qed.
   End SCells.
 
@@ -1748,6 +1873,110 @@ Section IntrEngine.
     rewrite /sie_cap_rest.
     iFrame "Hsatp Htlb Hpcfg Hpaddr Hres Hstk Harm Hwit".
   Qed.
+
+  (* ==================================================================== *)
+  (* THE INSTRUCTION-SIDE SLOT ACCESSOR -- [sda_slot_acc]'s twin, and the   *)
+  (* second and last place the two translation arms are told apart.        *)
+  (*                                                                      *)
+  (* [sie_cap_to_cells] / [_of_cells] hand out the tlb CELL, which is what  *)
+  (* forces the Bare arm to fund one.  This hands out [s_tlb_at SD tlbv]    *)
+  (* instead -- the cell at [s_Drw], [emp] at [s_Drwb] -- with the arm as a *)
+  (* PURE fact.  The funnel stays ONE proof over an abstract set, because   *)
+  (* it never looks inside either.                                         *)
+  (*                                                                      *)
+  (* IT IS AN ACCESSOR, not an open/close pair, for the same reason         *)
+  (* [sda_slot_acc] is: on the Bare arm the cell is HELD ASIDE across the   *)
+  (* body, so the closing wand has to close over it.  The closer is ∀ over  *)
+  (* the capability's indices because the leaf may move them.              *)
+  (* ==================================================================== *)
+  Lemma sie_cap_frame_acc (kt : ktier) (m : regfile) (av : nat) (b : bool)
+      (p : mword 64) :
+    sie_cap kt m av b p -∗
+    ∃ (SD : gset register) (satp0 : mword 64) (tlbv : type_of_register tlb)
+      (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n),
+      ⌜ s_arm_ok SD satp0 ⌝ ∗ ⌜ pmp_ent0_ok pcfg paddr ⌝ ∗
+      satp ↦ᵣ satp0 ∗ s_tlb_at SD tlbv ∗
+      pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr ∗
+      strans_res_at satp0 tlbv ∗ sie_cap_rest kt m av b p ∗
+      (∀ (m' : regfile) (av' : nat) (b' : bool)
+         (tv' : type_of_register tlb),
+         satp ↦ᵣ satp0 -∗ s_tlb_at SD tv' -∗
+         pmpcfg_n ↦ᵣ pcfg -∗ pmpaddr_n ↦ᵣ paddr -∗
+         strans_res_at satp0 tv' -∗ sie_cap_rest kt m' av' b' p -∗
+         sie_cap kt m' av' b' p).
+  Proof.
+    iIntros "(Hstk & Htr & Harm & #Hwit)".
+    iDestruct "Htr" as "[(Hpend & Hb & Hstv) | (Hkpt & Hk)]".
+    - (* ---- Bare: the frame gets NO cell; the slot keeps it ---- *)
+      iDestruct "Hb" as (satp0 tlbv) "(Hsatp & %Hmode & Htlb & Hpmp)".
+      iDestruct "Hpmp" as (pcfg paddr)
+        "(Hpcfg & Hpaddr & %HA & %Hord & %HX & %HW & %HR & %Hcov)".
+      assert (Hpok : pmp_ent0_ok pcfg paddr)
+        by (unfold pmp_ent0_ok; split_and!; assumption).
+      iExists s_Drwb, satp0, tlbv, pcfg, paddr.
+      iSplitR; [iPureIntro; left; split; [reflexivity | exact Hmode] |].
+      iSplitR; [iPureIntro; exact Hpok |].
+      rewrite s_tlb_at_bare.
+      iFrame "Hsatp Hpcfg Hpaddr".
+      iSplitL "Hpend Hstv".
+      { rewrite /strans_res_at. iLeft. iFrame "Hpend Hstv".
+        iPureIntro. exact Hmode. }
+      iSplitL "Hstk Harm"; [ rewrite /sie_cap_rest; iFrame "Hstk Harm Hwit" |].
+      iIntros (m' av' b' tv') "Hsatp _ Hpcfg Hpaddr Hres Hrest".
+      rewrite /sie_cap. iDestruct "Hrest" as "(Hstk & Harm & _)".
+      iFrame "Hstk Harm Hwit".
+      rewrite /strans_res_at.
+      iDestruct "Hres" as "[(Hpend & Hstv & _) | (Hkpt & %Hbad & _)]".
+      2:{ rewrite /bare_satp_ok in Hmode. rewrite Hbad in Hmode.
+          vm_compute in Hmode. discriminate. }
+      iLeft. iFrame "Hpend Hstv".
+      (* the cell comes back at the value it went in at: the Bare frame never
+         held it, so nothing could have moved it *)
+      rewrite /bare_inv. iExists satp0, tlbv. iFrame "Hsatp Htlb".
+      iSplitR; [iPureIntro; exact Hmode |].
+      iApply (pmp_config_intro (mword_of_int 0) pcfg paddr HA Hord HX HW HR
+                Hcov with "Hpcfg Hpaddr").
+    - (* ---- KPT: the walk fills the TLB, so the cell IS the frame's ---- *)
+      iDestruct "Hk" as (root_ppn) "Hres".
+      iDestruct "Hres" as (satp0 tlbvec)
+        "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & Hsnap & Hpmp & #Hkinv)".
+      iDestruct "Hpmp" as (pcfg paddr)
+        "(Hpcfg & Hpaddr & %HA & %Hord & %HX & %HW & %HR & %Hcov)".
+      assert (Hpok : pmp_ent0_ok pcfg paddr)
+        by (unfold pmp_ent0_ok; split_and!; assumption).
+      assert (Hsokk : kpt_satp_ok (strans_root_of satp0) satp0)
+        by (unfold strans_root_of; rewrite Hppn; split_and!; assumption).
+      iExists s_Drw, satp0, tlbvec, pcfg, paddr.
+      iSplitR; [iPureIntro; right; split; [reflexivity | exact Hsokk] |].
+      iSplitR; [iPureIntro; exact Hpok |].
+      rewrite s_tlb_at_kpt.
+      iFrame "Hsatp Htlb Hpcfg Hpaddr".
+      iSplitL "Hkpt Hsnap".
+      { rewrite /strans_res_at. iRight. iFrame "Hkpt".
+        iSplitR; [iPureIntro; exact Hmode |].
+        rewrite /kpt_res_at. unfold strans_root_of. rewrite Hppn.
+        iFrame "Hsnap Hkinv". }
+      iSplitL "Hstk Harm"; [ rewrite /sie_cap_rest; iFrame "Hstk Harm Hwit" |].
+      iIntros (m' av' b' tv') "Hsatp Htlb Hpcfg Hpaddr Hres Hrest".
+      rewrite s_tlb_at_kpt.
+      rewrite /sie_cap. iDestruct "Hrest" as "(Hstk & Harm & _)".
+      iFrame "Hstk Harm Hwit".
+      rewrite /strans_res_at.
+      iDestruct "Hres" as "[(Hpend & _ & %Hbad) | (Hkpt & _ & Hres)]".
+      { rewrite /bare_satp_ok in Hbad. rewrite Hmode in Hbad.
+        vm_compute in Hbad. discriminate. }
+      iRight. iFrame "Hkpt". iExists (strans_root_of satp0).
+      rewrite /kpt_res_at. iDestruct "Hres" as "[Hsnap #Hkinv2]".
+      rewrite /tlb_res_pt. iExists satp0, tv'. iFrame "Hsatp Htlb Hsnap Hkinv2".
+      iSplitR; [iPureIntro; exact Hmode |].
+      iSplitR; [iPureIntro; exact Hasid |].
+      iSplitR; [iPureIntro; reflexivity |].
+      unfold strans_root_of. rewrite Hppn.
+      iApply (pmp_config_intro root_ppn pcfg paddr HA Hord HX HW HR Hcov
+                with "Hpcfg Hpaddr").
+  Qed.
+
+
 
   Lemma sie_cap_of_cells (kt : ktier) (m : regfile) (av : nat) (b : bool)
       (p satp0 : mword 64) (tlbv : type_of_register tlb)
