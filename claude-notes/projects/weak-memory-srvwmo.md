@@ -73,6 +73,17 @@ are renamed **R0.5–R6** as of 2026-08-19; sRVWMO items are **A1–A5** here
   `srvwmo_consistent`/`srvwmo_realizable` are the named top level;
   `promise_free_complete_local` now uses FIVE local axioms,
   ob-acyclicity still unused.  Remaining premise: `cand_pub_clean`.
+- **A3(ii) — DONE (2026-08-19, `27fb3c05`): T1 IS PREMISE-FREE.**
+  `srvwmo_realizable c : srvwmo_consistent c → exec_wf (cand_exec c) ∧
+  ex_tr … = cd_tr c ∧ ex_img … = cd_img c`.  The premise was replaced by
+  the forward bank's replay-provable content (`cand_bankdom` +
+  `cand_read_split`); `invw` unchanged; rule 12's omission is consumed
+  INSIDE the theorem.  Non-vacuity both ways: `ce_fwd` is reachable AND
+  refutes the old premise.  TIDY OWED (low priority): the dead `ctake`
+  dictionary (~110 ln, old §2) and the stale prose at
+  `WeakCompose.v:895` (says the completeness theorem still carries the
+  two deleted premises — fix to "now premise-free" once the bridge files
+  are quiet).
 - **A2 — T2 completion**: the erasure simulation (design doc's settled
   block) + `dep_dom` landed as its invariant + the safety-form adequacy;
   after R3.
