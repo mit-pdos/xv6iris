@@ -167,6 +167,15 @@ are working on that effort — the relevant `projects/` file.
   three site facts (lock protection per edge, sync-byte discipline, byte
   classification), what Ψ can export (`w_rdw`, `w_lock`) and the ⚑ choice
   for the byte→lock map (explicit side condition vs ghost export).
+- **[`weak-memory-srvwmo.md`](design/weak-memory-srvwmo.md)** — sRVWMO, the
+  DECLARED-MODEL plan of record (2026-08-19): tier 1 = adequacy ∘ the
+  characterization (sRVWMO ≡ the promise-free machine; T1 realizability +
+  T2 containment), zero xv6 side conditions; tier 2 = the certification
+  route unchanged under the WP-derived-only criterion.  Worklist and asset
+  ledger: [`weak-memory-srvwmo.md`](projects/weak-memory-srvwmo.md)
+  (projects/) — read it for what already exists (`WeakAxiomatic{,2,3}.v`:
+  rule 14, `promise_free_complete_clean`, the machine-checked refutation
+  that pins the definition).
 - **[`weak-memory-rmw-split.md`](design/weak-memory-rmw-split.md)** — the RMW
   SPLIT at the weak tier (2026-08-18, user-confirmed): the fused `LRmw` dies;
   `LExLoad`/`LExStore` + an agent-local reservation (`w_res`, per-byte read

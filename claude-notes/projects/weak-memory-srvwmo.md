@@ -9,35 +9,68 @@ are renamed **R0.5–R6** as of 2026-08-19; sRVWMO items are **A1–A5** here
 ## Status (2026-08-19, orchestrator; staging PROPOSED, awaiting the user's
 ## reaction to the plan message)
 
-- **A0 — asset inventory**: what `WeakAxiomatic.v` / the bridge /
-  `WeakCompose` §6(5) / the litmus tier already give A1/A2/A3.
-  **IN FLIGHT.**  Known already: `WeakAxiomatic.v` has the vocabulary,
-  executions, po/rf/gmo/co/fr, the RVWMO-minus-deps axiom set, and the
-  SOUNDNESS direction PROVED (`promise_free_sound`) — i.e. T2 at that
-  vocabulary is essentially done modulo the dep upgrade and the
-  projection; T1 exists only as the slice-2 conjecture at the file's
-  bottom.  The file's "machine tracks no register views" scope note is
-  STALE (D2/D3 landed).
-- **A1 — the sRVWMO definition** (design doc S1): extend `WeakAxiomatic`
-  with (a) rule 14 incl. its R×W half in the writes-only-gmo vocabulary,
-  (b) the dependency vocabulary (ppo 9–13 need dep information in the
-  axiomatic alphabet — the 4-label `lbl` carries none; without them T1 is
-  FALSE, since the machine enforces deps), (c) the fabric/disk story,
-  (d) the honest `.rl`/ppo-6 residue, (e) dangling exclusive reads
-  (project as plain reads; paired AMOs stay fused axiomatically).
-  Orchestrator writes the spec after A0; subagent mechanizes.
-- **A2 — T2 completion**: keep/extend the soundness theorems under A1's
-  added axioms + prove the PROJECTION (event-language pf runs ↔ the
-  axiomatic machine) so T2 speaks about the real carrier.
-- **A3 — T1 realizability (the tier-1 long pole)**: pf-AtoP.  Shape:
-  linearize po ∪ co ∪ rfe (acyclic by rule 14); simulation invariant
-  (log = gmo-order stores so far; per-hart views bounded by
-  prefix-derived positions; forward bank; reservation); per-event
-  enabledness lemmas (readable/fulfil_ok/excl_ok from the axioms);
-  induct; instantiate at the event language.  Recipe: PARM `AtoP.v`
-  minus promises — rule 14 is exactly what makes the promise-free
-  construction schedulable.  Orchestrator writes the invariant design
-  doc first.
+- **A0 — asset inventory: DONE (2026-08-19).**  Headline corrections to
+  this file's earlier priors: **T1 already EXISTS for a fragment** —
+  slices 2/3 landed 2026-08-12 as `iris/WeakAxiomatic2.v` (`cand`,
+  `cand_exec`, `gmo_op`/`opos`/`okey`, `ppo_op` — whose FIRST ARM IS RULE
+  14 in full, `ppo_op_gmo`, `promise_free_ob_acyclic`, `cand_reachable`,
+  `sc_cand_reachable`) and `iris/WeakAxiomatic3.v`
+  (`promise_free_complete_clean` :1340 under `cand_shape ∧ cand_values ∧
+  cand_rl_free ∧ cand_pub_clean ∧ cand_axiomatic_ok`;
+  `promise_free_complete_local` :1360 — only FOUR local axioms used,
+  ob-acyclicity NOT needed).  The unrestricted conjecture is
+  machine-checked FALSE (`promise_free_complete_false` :1793,
+  `view_domination_false` :1809): the release→acquire arm
+  (`w_vRel → load_vpre` on `.aq`) is enforced by the machine and absent
+  from `ppo_op`.  The event-level ob form is also refuted
+  (`ev_rfe_co_fr_cyclic`, WeakAxiomatic2:1109) — operations, not events,
+  are the granularity.  THE PROJECTION BLOCKER: `wp_pf_bridge`
+  (WeakPromiseBridge:692) needs `pstep_depfree`, FALSE for xv6 post-D3 —
+  dissolves only when the axiomatic alphabet carries deps.
+  `WeakCompose` §6(5) is prose, not a theorem.  The safety (reducibility)
+  form of event-language adequacy does not exist yet (two-line pattern
+  from `WeakAdequacy.v:131/:285`).  Capstone check CONFIRMED:
+  `main_premises` is a hypothesis (WeakEvCapstone:919-925), so R4 defers
+  and the tree stays green — caveat: the per-`pstep_ev` facts
+  (`pdev_ev_ok`, `pstep_ev_lat_free`, `_ts_load/_ts_rmw`, `_ldepfree`,
+  `pcls_ev_obl`, `efulfil_acct`, WeakRetag) need per-arm additions in
+  R2/R3.  Full ledger in the A0 report (session transcript).
+- **A1 — the sRVWMO definition** (design doc S1; orchestrator spec, then
+  a subagent mechanizes).  The settled shape, from the refutations:
+  sRVWMO's ppo = RVWMO rules **1–5, 7, 9–11, 13, 14**, with **rule 6
+  OMITTED** (machine is weaker: `.rl` feeds only `w_vRel`; omission is
+  SAFE — it widens the model, and the final theorem quantifies over all
+  sRVWMO executions), **rule 12 WEAKENED per D-7** (forwarded reads bank
+  0), **rule 8 replaced** by an `rmw : ev → ev → Prop` relation + the
+  RVWMO atomicity axiom `rmw ∩ (fre;coe) = ∅` (split-ready; a DANGLING
+  exclusive read is a plain read).  The rel→acq arm = the machine's
+  `w_vRel` version, noting it coincides with RVWMO rule 7 under RISC-V's
+  all-RCsc annotations — NOT a strengthening beyond RVWMO.  Rule 14 =
+  `ppo_op` arm 1, already landed.  Deps: the alphabet gains
+  `asrc`/`vsrc` on `LStore`/`LRmw` (per D-8, not on loads) + reg-write/
+  ctrl events or a per-event dep relation; `mstep` moves to the `_d`
+  step functions.  Fabric: a SCOPE CLAUSE — sRVWMO covers RAM accesses
+  of harts + the disk agent; MMIO/UART/PLIC are outside, under the
+  retained MMIO-ordering assumption.  Presentation: consistency is
+  defined over `cand` (trace presentations), the landed shape; the
+  partial-order form is later sugar.
+- **A2 — T2 completion**: extend the soundness theorems for the new
+  arms; the projection unblocks once the alphabet carries deps
+  (`proj_lbl` keeps operand lists; `cfg_match` equality then holds with
+  `_d` step functions).
+- **A3 — T1 completion** (much smaller than feared — the induction
+  exists): (i) drop `cand_rl_free` by adding the rel→acq `ppo_op` arm
+  and extending the view-domination lemma's dominator case; (ii) drop
+  `cand_pub_clean` — proof-side only post-D-7: re-prove §8's
+  `w_vrOld`/`w_vrNew` conjuncts for a forwarded read (+ the ~150-line
+  §13-shortcut generalization WeakAxiomatic3 §14(1) prices); (iii) the
+  program-carrying form of `exec_prefix_pf_run` (replace `prog_free` by
+  a per-step `pstep` supply; re-index `exec_cls_ok`); (iv) the
+  split-exclusive atomicity re-proof (replaces `cand_rmw_latest`'s
+  own-write-at-top shortcut; after R3); (v) the graph→cand scheduling
+  lemma if the partial-order presentation is wanted (linear extension of
+  po ∪ gmo|W ∪ rfe; acyclic via rule 14's contraction argument — NOT
+  gmo ∪ po, which SB refutes).
 - **A4 — tier-1 capstone**: adequacy ∘ T1; `Print Assumptions` audit
   (platform axioms + no-icache + funext + WP package; NO
   `main_premises`).
