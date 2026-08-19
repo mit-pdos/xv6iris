@@ -498,6 +498,142 @@ Proof.
   - by apply elem_of_list_In.
 Qed.
 
+
+(* ====================================================================== *)
+(* THE WEAKER MEMORY PREDICATE, and why it exists.                         *)
+(*                                                                        *)
+(* [u_mem_wf]'s fourth clause -- [forall a, a in ud_data P <-> is_Some     *)
+(* (md !! a)] -- says the owned map covers the mapped data EXACTLY.  That  *)
+(* is right for the SAFETY tier, whose arms must serve an arbitrary        *)
+(* address, and it is unpayable for any caller that owns only PART of its  *)
+(* address space.  The VERIFIED Umode tier is such a caller: its memory is *)
+(* [UmodeMem.umem pt M], the process's NAMED image, a subset.              *)
+(*                                                                        *)
+(* [u_mem_ok] is [u_mem_wf] minus that clause (and minus the two pure      *)
+(* facts about [ud_data]/[upt_acc_wf] that only exist to feed it).  What   *)
+(* the coverage clause was USED for -- proving a particular access window  *)
+(* owned -- becomes a per-access premise the caller supplies: the safety   *)
+(* tier from [u_fetch_win_in], the verified tier from its own [umem].      *)
+(*                                                                        *)
+(* THIS IS THE THIRD INSTANCE OF THE SAME OVER-STRONG-COVERAGE DISEASE.    *)
+(* [u_mem_wf] could not be instantiated by the table-only caller either,   *)
+(* and [upt_tmem] is the worked precedent: drop the half the caller cannot *)
+(* pay, keep the half it needs, and give the strong predicate a one-line   *)
+(* implication into the weak one so no existing call site is re-proved.    *)
+(* ====================================================================== *)
+
+Definition u_mem_ok (P : uptd) (t : ptree) (mm : pamap) : Prop :=
+  exists md : pamap,
+    maps_disj (pt_maps 2 t) /\
+    ptree_bytes 2 t ##ₘ md /\
+    mm = ptree_bytes 2 t ∪ md /\
+    (forall a : Arch.pa, a ∈ (dom mm : gset Arch.pa) -> addr_is_ram a) /\
+    upt_map_wf (ud_um P) /\
+    upt_tree_spec (ud_root P) (ud_tfp P) (ud_um P) t.
+
+(* every safety-tier call site pays ONE lemma application, not a re-proof *)
+Lemma u_mem_wf_ok (P : uptd) (t : ptree) (mm : pamap) :
+  u_mem_wf P t mm -> u_mem_ok P t mm.
+Proof.
+  intros (md & Hdisj & Hdj & Hmm & _ & Hram & _ & _ & Hwfm & Hspec).
+  exists md. split_and!;
+    [ exact Hdisj | exact Hdj | exact Hmm | exact Hram | exact Hwfm | exact Hspec ].
+Qed.
+
+(* --- the four TREE projections, at the weaker predicate.  None of them
+       ever used the coverage clause, so each is its old proof verbatim and
+       the [u_mem_wf] form becomes a one-line corollary. --- *)
+
+Lemma u_mem_ok_sub (P : uptd) (t : ptree) (mm : pamap)
+    (a : Arch.pa) (w : bv 64) :
+  u_mem_ok P t mm -> word_bytes a w ∈ pt_maps 2 t -> word_bytes a w ⊆ mm.
+Proof.
+  intros (md & Hdisj & Hdj & -> & _) Hm.
+  etrans; [ exact (maps_disj_subseteq _ _ Hdisj Hm) |].
+  apply map_union_subseteq_l.
+Qed.
+
+Lemma u_mem_ok_read (P : uptd) (t : ptree) (mm : pamap)
+    (a : Arch.pa) (w : bv 64) :
+  u_mem_ok P t mm -> word_bytes a w ∈ pt_maps 2 t ->
+  read_bytes mm a 8 = Some w.
+Proof. intros Hok Hm. by apply read_bytes_word, (u_mem_ok_sub P t mm a w). Qed.
+
+Lemma u_mem_ok_owned (P : uptd) (t : ptree) (mm : pamap)
+    (a : Arch.pa) (w : bv 64) :
+  u_mem_ok P t mm -> word_bytes a w ∈ pt_maps 2 t ->
+  bytes_owned mm a 8 = true.
+Proof.
+  intros Hok Hm.
+  apply (bytes_owned_word mm a w), (u_mem_ok_sub P t mm a w Hok Hm).
+Qed.
+
+Lemma u_mem_ok_not_dev (P : uptd) (t : ptree) (mm : pamap) (a : Arch.pa) :
+  u_mem_ok P t mm -> a ∈ (dom mm : gset Arch.pa) -> dev_addr a = false.
+Proof.
+  intros (md & Hd1 & Hd2 & Hmm & Hram & Hwfm & Hspec) Ha.
+  by apply addr_is_ram_not_dev, Hram.
+Qed.
+
+(* --- and the STEP, likewise.  [u_mem_step]'s own coverage clause is what
+       proves [dom mm' = dom mm]; without it the domain equality has to be
+       stated, which is exactly what [swp_hmrun_of_exec] hands back anyway. --- *)
+
+Definition u_mem_step_ok (P : uptd) (t t' : ptree) (mm mm' : pamap) : Prop :=
+  pt_same_shape 2 t t' /\
+  upt_tree_spec (ud_root P) (ud_tfp P) (ud_um P) t' /\
+  (dom mm' : gset Arch.pa) = dom mm /\
+  exists md' : pamap,
+    ptree_bytes 2 t' ##ₘ md' /\
+    mm' = ptree_bytes 2 t' ∪ md'.
+
+Lemma u_mem_step_ok_of (P : uptd) (t t' : ptree) (mm mm' : pamap) :
+  u_mem_wf P t mm -> u_mem_step P t t' mm mm' -> u_mem_step_ok P t t' mm mm'.
+Proof.
+  intros Hwf Hstep.
+  pose proof (u_mem_step_dom P t t' mm mm' Hwf Hstep) as Hdom.
+  destruct Hstep as (Hshape & Hspec & md' & Hdj' & Hmm' & _).
+  split_and!; [ exact Hshape | exact Hspec | exact Hdom |].
+  exists md'. split; [ exact Hdj' | exact Hmm' ].
+Qed.
+
+Lemma u_mem_step_ok_refl (P : uptd) (t : ptree) (mm : pamap) :
+  u_mem_ok P t mm -> u_mem_step_ok P t t mm mm.
+Proof.
+  intros (md & _ & Hdj & Hmm & _ & _ & Hspec).
+  split_and!; [ apply pt_same_shape_refl | exact Hspec | reflexivity |].
+  exists md. split; [ exact Hdj | exact Hmm ].
+Qed.
+
+Lemma u_mem_step_ok_trans (P : uptd) (t1 t2 t3 : ptree) (mm1 mm2 mm3 : pamap) :
+  u_mem_step_ok P t1 t2 mm1 mm2 -> u_mem_step_ok P t2 t3 mm2 mm3 ->
+  u_mem_step_ok P t1 t3 mm1 mm3.
+Proof.
+  intros (Hs1 & _ & Hd1 & _) (Hs2 & Hspec & Hd2 & md & Hrest).
+  split_and!;
+    [ exact (pt_same_shape_trans 2 t1 t2 t3 Hs1 Hs2) | exact Hspec
+    | rewrite Hd2; exact Hd1 |].
+  exists md. exact Hrest.
+Qed.
+
+(* ...and a step lands back in [u_mem_ok], at the new tree *)
+Lemma u_mem_step_ok_wf (P : uptd) (t t' : ptree) (mm mm' : pamap) :
+  u_mem_ok P t mm -> u_mem_step_ok P t t' mm mm' -> u_mem_ok P t' mm'.
+Proof.
+  intros Hok Hstep.
+  (* NOT [_] for the map equation: an anonymous equation gets substituted,
+     which would clear [mm] -- and [Hram] still mentions it. *)
+  destruct Hok as (md & Hdisj & Hdj0 & Hmm0 & Hram & Hwfm & Hspec0).
+  destruct Hstep as (Hshape & Hspec' & Hdom & md' & Hdj' & Hmm').
+  exists md'. split_and!.
+  - apply (pt_maps_disj_shape 2 t t' Hshape Hdisj).
+  - exact Hdj'.
+  - exact Hmm'.
+  - intros a Ha. apply Hram. rewrite <- Hdom. exact Ha.
+  - exact Hwfm.
+  - exact Hspec'.
+Qed.
+
 Lemma u_mem_wf_sub (P : uptd) (t : ptree) (mm : pamap)
     (a : Arch.pa) (w : bv 64) :
   u_mem_wf P t mm -> word_bytes a w ∈ pt_maps 2 t -> word_bytes a w ⊆ mm.
