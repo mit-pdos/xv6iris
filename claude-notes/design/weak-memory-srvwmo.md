@@ -106,17 +106,21 @@ with its reason of record:
 pf event-language run to an sRVWMO execution, three stages, each its own
 simulation:
 
-1. **ERASURE** (instance run → dep-free run of the same pf machine):
-   relabel `LRegW`/`LCtrl`/`LInstr` to `LSilent` and blank every operand
-   list.  The state relation is a ≤-SIMULATION, not equality: log/`w_fwd`
-   timestamps/`w_res` equal (with "instance `None` → erased anything" at
-   the `LInstr`-clear divergence — an exstore only fires where both are
-   the same `Some`), and the monotone views satisfy erased ≤ instance —
-   every erased side condition is thereby WEAKER, so every instance step
-   erases.  Post-D-7 `w_fwd` banks 0 on both sides, which is what makes
-   the relation this simple; `w_ldv`/`w_regv`/`w_vcap` drift is
-   unobservable (erased consumers read them only through
-   `srcs_view [] = 0`, and `rv_view` is computed from a zeroed bank).
+1. **ERASURE — LANDED (`iris/WeakErase.v`, `460ba147`)** (instance run →
+   dep-free run of the same pf machine): relabel `LRegW`/`LCtrl`/`LInstr`
+   to `LSilent` and blank every operand list.  The state relation as
+   PROVED (three corrections to this block's first draft): `er_ws` =
+   `ws_le` (erased ≤ instance) ∧ `w_relp` EQUAL ∧ `fwd_le` (the D2
+   producer banks `(t, vf)` where erased banks `(t, 0)` — the ≤-form
+   absorbs it; `dep_dom` is NOT needed) ∧ `res_rel` (same `rv_base`/
+   `rv_ts`, `rv_view` erased ≤ — exactly what `PFExStore` reads; the
+   one-way `Some` shape covers the `LInstr`-clear divergence).  The pf
+   fragment has NO `fulfil_ok` at all, so only `coh`/`w_vrNew`/`w_vRel`/
+   `w_res`/the log ever bind.  The class is pinned by `pcls_erasable`
+   (`w_relp`-indexed — a label-only equation cannot pin it), discharged
+   by the instance (`pcls_ev_erasable`).  Payoff: `erase_bridge_log` =
+   T2 containment with `pstep_depfree` DELETED; `pstep_fused` is the
+   only remaining gate (stage 2's).
 2. **RE-FUSION** (dep-free split run → dep-free fused run): commute each
    `LExLoad` right to its `LExStore` (the erased window between them is
    all `LSilent`; foreign steps don't read the agent's state; the bytes
