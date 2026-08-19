@@ -885,6 +885,38 @@ Section SdaFrames.
     by rewrite !bi.sep_assoc.
   Qed.
 
+  (* the BARE twin: [sda_Drwb] is empty, so the write frame contributes
+     nothing and the tlb cell is simply absent.  Everything else is
+     [sda_frames] verbatim -- which is what makes one combinator able to hand
+     either frame to a body that never looks at the set
+     ([WpIntrInv.sie_cap_to_frames]). *)
+  Lemma sda_frames_b (dq : dfrac) (mst0 menv0 satp0 : SailStdpp.Values.mword 64)
+      (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n) (tlbv : type_of_register tlb) :
+    (hreg_frame (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv) sda_Drwb ∗
+     hreg_frame_ro (sda_Df dq)
+       (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv) sda_Dro : iProp Σ)
+    ⊣⊢ (reg_pointsto mstatus dq mst0 ∗
+        reg_pointsto cur_privilege dq Supervisor ∗
+        reg_pointsto menvcfg dq menv0 ∗
+        reg_pointsto satp (DfracOwn 1) satp0 ∗
+        reg_pointsto pma_regions DfracDiscarded pmar0 ∗
+        reg_pointsto pmpcfg_n (DfracOwn 1) pcfg ∗
+        reg_pointsto pmpaddr_n (DfracOwn 1) paddr ∗
+        reg_pointsto htif_tohost_base DfracDiscarded None ∗
+        reg_pointsto misa DfracDiscarded MISA_C).
+  Proof.
+    rewrite /hreg_frame /hreg_frame_ro /sda_Drwb /sda_Dro.
+    rewrite big_sepS_empty left_id.
+    repeat (rewrite big_sepS_union; last set_solver).
+    rewrite !big_sepS_singleton.
+    rewrite sda_rs_mst sda_rs_priv sda_rs_menv sda_rs_satp
+            sda_rs_pma sda_rs_pcfg sda_rs_paddr sda_rs_htif sda_rs_misa.
+    rewrite sda_Df_misa sda_Df_pma sda_Df_htif sda_Df_satp sda_Df_pcfg
+            sda_Df_paddr sda_Df_mst sda_Df_priv sda_Df_menv.
+    by rewrite !bi.sep_assoc.
+  Qed.
+
   (* the two DIRECTED forms (a [⊣⊢] rewrite inside a proofmode goal is both
      awkward and, per optimization.md, occasionally very slow) *)
   Lemma sda_frames_in (dq : dfrac)

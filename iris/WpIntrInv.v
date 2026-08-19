@@ -105,6 +105,7 @@ Require Import MstatusBits WpIntrCore.
 (* the S-mode per-node cycle body: [spt_run_hart_active_instr_S] and the
    regime's fetch-translation producer [spt_tr_obl_of_regime] *)
 Require Import SmodeCorePt.
+Require Import WpSmodePtEngine WpSmodePtFetch.
 Require Export IntrDefs.
 Local Open Scope Z_scope.
 Import Defs.
@@ -1765,6 +1766,66 @@ Section IntrEngine.
     iApply (strans_swp_close satp0 tlbv pcfg paddr Hsok Hpok
               with "Hsatp Htlb Hpcfg Hpaddr Hres").
   Qed.
+
+
+  (* ==================================================================== *)
+  (* THE DATA-ACCESS FRAME, OUT OF THE FOLDED SLOT.                        *)
+  (*                                                                      *)
+  (* THIS IS THE ONE PLACE THE TWO TRANSLATION ARMS ARE TOLD APART on the  *)
+  (* data side, and it exists so that no LEAF has to.  The pre-port proofs *)
+  (* passed the translation slot FOLDED -- [iDestruct "Hcap" as "(Hstk &   *)
+  (* Htr & Harm & #Hwit)"] -- and handed [Htr] with the state              *)
+  (* interpretation to [SRegime.sr_absorb], so no cell of the slot was     *)
+  (* ever separately owned, at EITHER arm.  The swp port replaced that     *)
+  (* with [sie_cap_to_cells], and once a leaf owns the slot's tlb cell the *)
+  (* Bare arm has to fund one -- which is what buried kvminithart's        *)
+  (* flushed-TLB fact.  See claude-notes/projects/main-cycle-port.md.      *)
+  (*                                                                      *)
+  (* So this combinator restores the pre-port boundary.  It takes          *)
+  (* [strans_inv] folded, opens whichever arm is live, and hands the body: *)
+  (*                                                                      *)
+  (*   - an ABSTRACT write set [SD] -- [sda_Drw] on the KPT arm (the walk  *)
+  (*     fills the TLB), [sda_Drwb] = ∅ on the Bare arm (the model returns *)
+  (*     before the TLB is consulted).  The body never looks inside it;    *)
+  (*     every data engine below is already [Drw]-generic and takes its    *)
+  (*     translation as a WAND parameter, which is what makes this work.   *)
+  (*   - the two frames at that set, and the residue;                      *)
+  (*   - [sda_tr_obl], the translation obligation ALREADY DISCHARGED at    *)
+  (*     that set: the arm's own side condition is paid here, where the    *)
+  (*     arm is known.  ([sr_swp_side_ok] cannot serve, since it demands   *)
+  (*     [tlb ∈ Drw]; the Bare arm supplies [bare_swp_side] directly.)     *)
+  (*                                                                      *)
+  (* and takes the frames back at the walk's landing file, re-sealing the  *)
+  (* same arm.  [mstatus] / [cur_privilege] / [menvcfg] ride in [sda_Dro], *)
+  (* so they come back untouched; the three pinned cells are persistent.   *)
+  (* ==================================================================== *)
+  Definition sda_tr_obl (SD : gset register) (kt : ktier) (dq : dfrac)
+      (mst0 menv0 satp0 : mword 64) (pmar0 : list PMA_Region)
+      (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
+      (tlbv : type_of_register tlb) : iProp Σ :=
+    (∀ (kt' : ktier) (acc : MemoryAccessType mem_payload) (kp : kperm)
+       (va : mword 64) (ppn : mword 44) (rr : option resv),
+       ⌜ KtierLe kt' kt ⌝ -∗
+       ⌜ s_acc_ok acc ⌝ -∗ ⌜ kperm_allows kp acc ⌝ -∗
+       ⌜ (uint va < 274877906944)%Z ⌝ -∗ ⌜ ktier_pin kt' ppn va ⌝ -∗
+       sr_ktier_wit strans_regime kt -∗
+       kmap_at (svpn_of va) ppn kp -∗ gen_cert -∗ resv_frag cpu_id rr -∗
+       sr_swp_res strans_regime
+         (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv) -∗
+       hreg_frame (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv) SD -∗
+       hreg_frame_ro (sda_Df dq)
+         (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv) sda_Dro -∗
+       swp (translateAddr (Virtaddr va) acc)
+         (fun r => ⌜r = Values.Ok (Physaddr (pa_of ppn va), PBMT_PMA,
+                                   init_ext_ptw)⌝ ∗
+                   ∃ rsf : regstate,
+                     ⌜ rsf = sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv \/
+                       exists tv, rsf = register_set tlb tv
+                                    (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr
+                                       tlbv) ⌝ ∗
+                     hreg_frame rsf SD ∗
+                     hreg_frame_ro (sda_Df dq) rsf sda_Dro ∗
+                     sr_swp_res strans_regime rsf ∗ resv_any cpu_id))%I.
 
 End IntrEngine.
 

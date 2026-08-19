@@ -1623,6 +1623,25 @@ Section IntrDefsBase.
   (* the record's side-condition introduction, at the COMBINED slot: the
      satp arm fact is itself a disjunction, and it is what picks the arm --
      so the two per-arm introductions serve it with no extra premise. *)
+  (* THE BARE ARM'S OWN INTRODUCTION, and the reason it is worth having: it
+     does NOT ask for [tlb ∈ Drw].  [strans_swp_side_ok] must, because it is
+     the arm-blind introduction and the walking arm's walk fills the TLB; a
+     BARE access touches the cell neither way, so it can run at a write set
+     that does not contain it -- which is what lets a Bare data access run at
+     [WpSmodePtEngine.sda_Drwb], the EMPTY set.  See
+     claude-notes/projects/main-cycle-port.md, "THE KVMINITHART LANE". *)
+  Lemma strans_swp_side_bare (acc : MemoryAccessType mem_payload)
+      (va : mword 64) (ppn : mword 44) (kp : kperm) (Db : register -> bool)
+      (Drw Dro : gset register) (rs : regstate) (dst : mstate) :
+    s_acc_ok acc ->
+    bare_satp_ok (register_lookup satp rs) ->
+    eq_vec (_get_Mstatus_MPRV (register_lookup mstatus rs)) ('b"1") = false ->
+    strans_swp_side acc va ppn kp Db Drw Dro rs dst.
+  Proof.
+    intros Hacc Hmode HMPRV. left.
+    exact (bare_swp_side_intro acc va ppn kp Db Drw Dro rs dst Hacc Hmode HMPRV).
+  Qed.
+
   Lemma strans_swp_side_ok (acc : MemoryAccessType mem_payload)
       (va : mword 64) (ppn : mword 44) (kp : kperm) (Db : register -> bool)
       (Drw Dro : gset register) (rs : regstate) (dst : mstate) :
