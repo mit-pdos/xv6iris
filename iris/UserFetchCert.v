@@ -1729,6 +1729,118 @@ Proof.
 Qed.
 
 
+(* ---------------------------------------------------------------------- *)
+(* 7b. THE PHYSICAL GRANT FOR THE INSTRUCTION READ, width-generic.          *)
+(*                                                                        *)
+(* Everything [exec_mem_read_fetch_k_U] / [goodmb_mem_read_fetch_k_U] want *)
+(* EXCEPT the byte values, which the caller gets from [u_fetch_bytes_k].    *)
+(* Used three times: once at width 4 by [u_fetch_pure], and twice at width  *)
+(* 2 by the split fetch (the low halfword at [va], the high one at [va+2]). *)
+(*                                                                        *)
+(* The whole bundle is stated at the POST-walk file [rsf'] and transported  *)
+(* from [rsf] by [u_tlb_only]: a filling walk writes [tlb] and nothing the  *)
+(* read consults.  The [bytes_owned] conjunct alone is at the PRE map [mm], *)
+(* because that is the map the certificate is carried over.                 *)
+(* ---------------------------------------------------------------------- *)
+Lemma u_fetch_read_ok (P : uptd) (t t' : ptree) (mm mm' : pamap)
+    (rsf rsf' : regstate) (k : Z) (w va : mword 64) :
+  0 < k -> (k | 4096) -> k <= 16 ->
+  uint (to_bits 64 k) = k ->
+  is_aligned_vaddr (Virtaddr va) k = true ->
+  ud_um P !! svpn_of va = Some w ->
+  register_lookup cur_privilege rsf = User ->
+  u_exec_pins P t rsf ->
+  u_mem_wf P t mm ->
+  u_mem_wf P t' mm' ->
+  u_tlb_only rsf rsf' ->
+  exists region : PMA_Region,
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n rsf') 0)) = TOR /\
+    zopz0zKzJ_u (zeros' 64)
+      (vec_access_dec (register_lookup pmpaddr_n rsf') 0) = false /\
+    pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+      (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n rsf') 0)) 4)
+      (uint (u_walk_pa w va)) (uint (to_bits 64 k)) = PMP_Match /\
+    eq_vec (_get_Pmpcfg_ent_X
+      (vec_access_dec (register_lookup pmpcfg_n rsf') 0)) ('b"1") = true /\
+    matching_pma_region (register_lookup pma_regions rsf')
+      (Physaddr (u_walk_pa w va)) k = Some region /\
+    is_aligned_paddr (Physaddr (u_walk_pa w va)) k = true /\
+    (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_executable) = true /\
+    exec (within_clint (Physaddr (u_walk_pa w va)) k) (u_state rsf' mm')
+      = Some (false, u_state rsf' mm') /\
+    exec (within_sig (Physaddr (u_walk_pa w va)) k) (u_state rsf' mm')
+      = Some (false, u_state rsf' mm') /\
+    register_lookup htif_tohost_base rsf' = None /\
+    dev_addr (u_walk_pa w va) = false /\
+    bytes_owned mm (u_walk_pa w va) (Z.to_N k) = true /\
+    register_lookup cur_privilege rsf' = User.
+Proof.
+  intros Hk Hdvd Hk16 Huintk Hal Hl Lcp Hpins Hwf Hwf' Tr.
+  pose proof Hpins as (Hhw & _ & Hpt & _).
+  pose proof Hhw as (Hmisa & Hmseccfg & Hsenv & Hhtif & Hall & Help).
+  pose proof Hpt as ((usatp & Hsatpok & Hsatp) & HA & Hord & HXp & HWp & HRp & Hcovp).
+  (* the window is owned at the PRE map, and is RAM at the POST map *)
+  assert (Hown : bytes_owned mm (u_walk_pa w va) (Z.to_N k) = true).
+  { apply bytes_owned_of_dom. intros j Hj. apply elem_of_dom.
+    exact (u_fetch_win_in P t mm k w va Hk Hdvd Hwf Hl Hal j ltac:(lia)). }
+  assert (Hramj : forall j : nat, (j < Z.to_nat k)%nat ->
+            addr_is_ram (pa_add (u_walk_pa w va) j)).
+  { intros j Hj. pose proof Hwf' as (mdx & _ & _ & _ & _ & Hr & _).
+    apply Hr. apply elem_of_dom.
+    exact (u_fetch_win_in P t' mm' k w va Hk Hdvd Hwf' Hl Hal j Hj). }
+  assert (Hram0 : addr_is_ram (u_walk_pa w va))
+    by (rewrite <- (pa_add_0 (u_walk_pa w va)); apply Hramj; lia).
+  assert (Hramk : addr_is_ram (pa_add (u_walk_pa w va) (Z.to_nat k - 1)))
+    by (apply Hramj; lia).
+  (* the ambient pins survive the TLB write *)
+  assert (HA' : pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n rsf') 0)) = TOR)
+    by (rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HA).
+  assert (Hord' : zopz0zKzJ_u (zeros' 64)
+      (vec_access_dec (register_lookup pmpaddr_n rsf') 0) = false)
+    by (rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)); exact Hord).
+  assert (HX' : eq_vec (_get_Pmpcfg_ent_X
+      (vec_access_dec (register_lookup pmpcfg_n rsf') 0)) ('b"1") = true)
+    by (rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HXp).
+  assert (Hcovp' : (ram_base + ram_size
+      <= uint (vec_access_dec (register_lookup pmpaddr_n rsf') 0) * 4)%Z)
+    by (rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)); exact Hcovp).
+  assert (Hall' : pma_allows_all (register_lookup pma_regions rsf'))
+    by (rewrite (Tr pma_regions ltac:(vm_compute; reflexivity)); exact Hall).
+  assert (Hhtif' : register_lookup htif_tohost_base rsf' = None)
+    by (rewrite (Tr htif_tohost_base ltac:(vm_compute; reflexivity)); exact Hhtif).
+  assert (Lcp' : register_lookup cur_privilege rsf' = User)
+    by (rewrite (Tr cur_privilege ltac:(vm_compute; reflexivity)); exact Lcp).
+  (* [Z.of_nat (Z.to_nat k - 1)] is the access's LAST byte offset.  Named,
+     not an inline [ltac:(lia)]: nat subtraction is truncated, so lia needs
+     [1 <= Z.to_nat k] spelled out and otherwise reports the useless
+     "Cannot find witness". *)
+  assert (Hk1 : (1 <= Z.to_nat k)%nat) by lia.
+  assert (Hkk : Z.of_nat (Z.to_nat k - 1) = k - 1).
+  { rewrite Nat2Z.inj_sub by exact Hk1. rewrite Z2Nat.id by lia. reflexivity. }
+  destruct (pma_all_ram Hall' (u_walk_pa w va) k
+              (pma_access_ram_at _ _ (Z.to_nat k - 1) Hkk Hram0 Hramk
+                 (pma_width_le k 16 Hk Hk16 eq_refl)))
+    as (region & Hpmam & Hexecp & _).
+  exists region. split_and!.
+  - exact HA'.
+  - exact Hord'.
+  - exact (ram_fetch_pmp (u_walk_pa w va) _ k (Z.to_nat k - 1) Hk Hk16
+             Huintk ltac:(lia) Hram0 Hramk Hcovp').
+  - exact HX'.
+  - exact Hpmam.
+  - exact (pa_aligned_div _ va k Hk Hdvd Hal).
+  - exact Hexecp.
+  - exact (within_clint_false (u_walk_pa w va) k (u_state rsf' mm')
+             (addr_is_ram_not_in_clint _ Hram0) ltac:(lia)).
+  - exact (within_sig_false (u_walk_pa w va) k (u_state rsf' mm')
+             (addr_is_ram_not_in_sig _ Hram0) ltac:(lia)).
+  - exact Hhtif'.
+  - exact (addr_is_ram_not_dev _ Hram0).
+  - exact Hown.
+  - exact Lcp'.
+Qed.
 Lemma u_fetch_pure (P : uptd) (t : ptree) (mm : pamap) (rsf : regstate)
     (w va : mword 64) (mi : bool) :
   ud_um P !! svpn_of va = Some w ->
@@ -1768,63 +1880,13 @@ Proof.
   assert (Hwf' : u_mem_wf P t' mm')
     by exact (u_mem_step_wf P t t' mm mm' Hwf Hstep).
   destruct (u_fetch_bytes P t' mm' w va Hwf' Hl Hal) as (iw & Hbytes).
-  assert (Hown4 : bytes_owned mm (u_walk_pa w va) 4 = true).
-  { destruct (u_fetch_bytes P t mm w va Hwf Hl Hal) as (iw0 & Hb0).
-    apply bytes_owned_of_dom. intros j Hj. apply elem_of_dom.
-    exists (nth_byte iw0 j). apply Hb0. lia. }
-  assert (Hramj : forall j : nat, (j < 4)%nat ->
-            addr_is_ram (pa_add (u_walk_pa w va) j)).
-  { intros j Hj. destruct Hwf' as (mdx & _ & _ & _ & _ & Hr & _).
-    apply Hr. apply elem_of_dom. exists (nth_byte iw j). apply Hbytes. lia. }
-  assert (Hram0 : addr_is_ram (u_walk_pa w va))
-    by (rewrite <- (pa_add_0 (u_walk_pa w va)); apply Hramj; lia).
-  assert (Hram3 : addr_is_ram (pa_add (u_walk_pa w va) 3))
-    by (apply Hramj; lia).
-  (* the config cells the read consults survive the TLB write *)
-  assert (Tr : forall r : register, register_beq r (tlb : register) = false ->
-            register_lookup r rsf' = register_lookup r rsf).
-  { intros r Hne. destruct Hfile as [-> | (tv & ->)];
-      [ reflexivity | apply irrelevant_register_set; exact Hne ]. }
-  assert (HA' : pmpAddrMatchType_encdec_backwards
-      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n rsf') 0)) = TOR)
-    by (rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HA).
-  assert (Hord' : zopz0zKzJ_u (zeros' 64)
-      (vec_access_dec (register_lookup pmpaddr_n rsf') 0) = false)
-    by (rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)); exact Hord).
-  assert (HX' : eq_vec (_get_Pmpcfg_ent_X
-      (vec_access_dec (register_lookup pmpcfg_n rsf') 0)) ('b"1") = true)
-    by (rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HXp).
-  assert (Hcovp' : (ram_base + ram_size
-      <= uint (vec_access_dec (register_lookup pmpaddr_n rsf') 0) * 4)%Z)
-    by (rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)); exact Hcovp).
-  assert (Hall' : pma_allows_all (register_lookup pma_regions rsf'))
-    by (rewrite (Tr pma_regions ltac:(vm_compute; reflexivity)); exact Hall).
-  assert (Hhtif' : register_lookup htif_tohost_base rsf' = None)
-    by (rewrite (Tr htif_tohost_base ltac:(vm_compute; reflexivity)); exact Hhtif).
-  assert (Lcp' : register_lookup cur_privilege rsf' = User)
-    by (rewrite (Tr cur_privilege ltac:(vm_compute; reflexivity)); exact Lcp).
-  assert (Lsxl' : _get_Mstatus_SXL (register_lookup mstatus rsf') = 'b"10")
-    by (rewrite (Tr mstatus ltac:(vm_compute; reflexivity)); exact Lsxl).
-  destruct (pma_all_ram Hall' (u_walk_pa w va) 4
-              (pma_access_ram _ _ _ Hram0 Hram3
-                 (pma_width_ok 4 eq_refl eq_refl) eq_refl eq_refl))
-    as (region & Hpmam & Hexecp & _).
-  assert (Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-      (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n rsf') 0)) 4)
-      (uint (u_walk_pa w va)) (uint (to_bits 64 4)) = PMP_Match)
-    by exact (ram_fetch_pmp (u_walk_pa w va) _ 4 3 ltac:(lia) ltac:(lia)
-                ltac:(vm_compute; reflexivity) ltac:(reflexivity)
-                Hram0 Hram3 Hcovp').
-  assert (Halp : is_aligned_paddr (Physaddr (u_walk_pa w va)) 4 = true)
-    by exact (pa4_aligned _ va Hal).
-  assert (Hclint : exec (within_clint (Physaddr (u_walk_pa w va)) 4)
-                     (u_state rsf' mm') = Some (false, u_state rsf' mm'))
-    by exact (within_clint_false (u_walk_pa w va) 4 (u_state rsf' mm')
-                (addr_is_ram_not_in_clint _ Hram0) ltac:(lia)).
-  assert (Hsigw : exec (within_sig (Physaddr (u_walk_pa w va)) 4)
-                    (u_state rsf' mm') = Some (false, u_state rsf' mm'))
-    by exact (within_sig_false (u_walk_pa w va) 4 (u_state rsf' mm')
-                (addr_is_ram_not_in_sig _ Hram0) ltac:(lia)).
+  (* THE PHYSICAL GRANT -- section 7b, at width 4. *)
+  destruct (u_fetch_read_ok P t t' mm mm' rsf rsf' 4 w va
+              ltac:(lia) (Z.divide_factor_l 4 1024) ltac:(lia)
+              ltac:(vm_compute; reflexivity) Hal Hl Lcp Hpins Hwf Hwf'
+              (u_tlb_only_land rsf rsf' Hfile))
+    as (region & HA' & Hord' & Hrange & HX' & Hpmam & Halp & Hexecp &
+        Hclint & Hsigw & Hhtif' & Hdevp & Hown4 & Lcp').
   assert (Hmr : exec (mem_read (InstructionFetch tt) PBMT_PMA
                         (Physaddr (u_walk_pa w va)) 4 false false false)
                   (u_state rsf' mm') = Some (Ok iw, u_state rsf' mm'))
@@ -1832,7 +1894,7 @@ Proof.
                 (u_state rsf' mm') HA' Hord' Hrange HX' Hpmam Halp Hexecp
                 Hclint Hsigw
                 (within_htif_false (u_walk_pa w va) 4 (u_state rsf' mm') Hhtif')
-                (addr_is_ram_not_dev _ Hram0) Hbytes Lcp').
+                Hdevp Hbytes Lcp').
   assert (Hmrg : goodmb Du_r Du_w (mem_read (InstructionFetch tt) PBMT_PMA
                           (Physaddr (u_walk_pa w va)) 4 false false false)
                    (u_state rsf' mm') mm = true)
@@ -1842,7 +1904,7 @@ Proof.
                 ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
                 ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
                 HA' Hord' Hrange HX' Hpmam Halp Hexecp Hclint Hsigw Hhtif'
-                (addr_is_ram_not_dev _ Hram0) Hown4 Hbytes Lcp').
+                Hdevp Hown4 Hbytes Lcp').
   (* ...and the fetch on top of the two *)
   exists iw, rsf', mm', t'. split_and!.
   - exact (exec_fetch_ok_4 (u_state rsf mm) (u_state rsf' mm') va
