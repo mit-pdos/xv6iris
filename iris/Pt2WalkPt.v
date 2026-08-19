@@ -2405,7 +2405,7 @@ Section Pt2Engine.
       "(%Hsatpok & %Hpmpok & Hsatp & Htlbc & Hpcfg & Hpaddr & Hres)".
     iApply (wp_instr_tramp_pt (pt2_res_kcur rc Sp) pc pa is_rvc i
               mstatus0 mie_v mdv0 menvcfg0 satp0 pcfg paddr tlbv
-              mie_v menvcfg0 satp0 pcfg paddr Rl (dq := dq)
+              mie_v menvcfg0 satp0 pcfg paddr Supervisor Rl (dq := dq)
               HSIE HMPRV HSXL Hmm HPBMTE Hmenvval Hpmpok
               Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4
               with "Hhw Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp
@@ -2515,7 +2515,7 @@ Section Pt2Engine.
       "(%Hsatpok & %Hpmpok & Hsatp & Htlbc & Hpcfg & Hpaddr & Hres)".
     iApply (wp_instr_tramp_pt (pt2_res_kprev rc kroot Sc) pc pa is_rvc i
               mstatus0 mie_v mdv0 menvcfg0 satp0 pcfg paddr tlbv
-              mie_v menvcfg0 satp0 pcfg paddr Rl (dq := dq)
+              mie_v menvcfg0 satp0 pcfg paddr Supervisor Rl (dq := dq)
               HSIE HMPRV HSXL Hmm HPBMTE Hmenvval Hpmpok
               Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4
               with "Hhw Hminv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Hsatp
