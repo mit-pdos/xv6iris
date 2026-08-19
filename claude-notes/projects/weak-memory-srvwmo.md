@@ -84,9 +84,22 @@ are renamed **R0.5–R6** as of 2026-08-19; sRVWMO items are **A1–A5** here
   `WeakCompose.v:895` (says the completeness theorem still carries the
   two deleted premises — fix to "now premise-free" once the bridge files
   are quiet).
+- **A3(iii) — DONE (2026-08-19, `9b1ce0f2`): `iris/WeakAxRealize.v`.**
+  `exec_prog_ok`/`exec_wf_pf_run_prog` — the replay carries the real
+  program per step; `prog_free` survives only as the trivial-assignment
+  corollary (the bridge's own copies are now redundant, delete when that
+  file is quiet).  THE INTERFACE: `lbl_realizes p σ i lb l` = `lb_fused
+  l ∧ lat_free l ∧ lb_depfree l ∧ proj_lbl (pcls p l (ms_ws σ i)) l =
+  Some lb` — the three gates are NAMED CONJUNCTS: A2's erasure deletes
+  `lb_depfree`, the split lift (A3(iv)) deletes `lb_fused` (a fused
+  axiomatic rmw ↦ the machine pair, `w_res` has no `mstate` image —
+  same gate as the forward direction), `lat_free` is discharged by the
+  instance (`pstep_ev_lat_free_prog`).  `exec_cls_ok` is GONE (absorbed
+  into the projection equation).
 - **A2 — T2 completion**: the erasure simulation (design doc's settled
   block) + `dep_dom` landed as its invariant + the safety-form adequacy;
-  after R3.
+  after R3.  A3(iv) (the fused↔split lift at the projection — the
+  re-fusion spike) joins it: both directions now name the same gates.
 - **A3 — T1 completion** (much smaller than feared — the induction
   exists): (i) drop `cand_rl_free` by adding the rel→acq `ppo_op` arm
   and extending the view-domination lemma's dominator case; (ii) drop
