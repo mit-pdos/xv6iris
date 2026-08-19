@@ -2693,6 +2693,64 @@ Section SmodeCorePt.
   Notation spt_run_hart_active_instr_S :=
     (spt_run_hart_active_instr_S_D s_Drw s_frame_ok_Drw).
 
+  (* THE BARE PINNING, STATED OUTRIGHT -- and it has to be stated, not
+     spelled out at the call site.  [spt_run_hart_active_instr_S_D s_Drwb …]
+     applied to the cycle's [swp] goal does not terminate, and neither does
+     posing it first (measured; see the note at the KPT pinning above and
+     kvminithart-tlb-lane.md §3).  A stored lemma whose STATEMENT carries the
+     set concretely is the one shape that works: the [exact] below is fully
+     applied, so nothing is searched.
+     NOTE THE ARITIES -- a section [Definition] generalizes only over the
+     variables it USES, so [spt_run_post_D] takes [SD] and [Df] and nothing
+     else, while the other three take the whole tower. *)
+  Lemma spt_run_hart_active_instr_S_b
+      (Df : register -> dfrac)
+      (pc ms : mword 64) (bmi : bool)
+      (cy ti ip mst0 : mword 64)
+      (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
+      (mc : mword 32) (micfg misa0 mseccfg0 senv0 : mword 64)
+      (pmar0 : list PMA_Region) (elp0 : type_of_register elp)
+      (satp0 mie0 mdv0 menv0 : mword 64)
+      (Res : type_of_register tlb -> iProp Σ)
+      (tlbv : type_of_register tlb) (is_rvc : bool) (i : instruction)
+      (Q : regstate -> Prop) (Rr : regstate -> iProp Σ) (W : iProp Σ)
+      (Qi : InterruptType -> Privilege -> iProp Σ) :
+    misa0 = MISA_C ->
+    menv0 = MENVCFG_S ->
+    eq_vec elp0 (landing_pad_bits_backwards LP_EXPECTED) = false ->
+    pma_allows_ram pmar0 ->
+    pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec pcfg 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec paddr 0) = false ->
+    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pcfg 0)) ('b"1") = true ->
+    (ram_base + ram_size <= uint (vec_access_dec paddr 0) * 4)%Z ->
+    gen_cert -∗
+    instr pc is_rvc i -∗
+    W -∗
+    resv_frag cpu_id None -∗
+    Res tlbv -∗
+    hreg_frame (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+                  mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv)
+      s_Drwb -∗
+    hreg_frame_ro Df
+      (s_rs pc pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+         mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 tlbv) s_Dro -∗
+    spt_disp_obl_D s_Drwb Df pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+      mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 Res tlbv W Qi -∗
+    spt_tr_obl_D s_Drwb Df pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+      mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 Res -∗
+    spt_ex_obl_D s_Drwb Df pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+      mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 Res is_rvc i Q Rr W -∗
+    swp (run_hart_active 0) (spt_run_post_D s_Drwb Df Q Rr Qi).
+  Proof.
+    intros Hmisa Hmenv Help Hpallow HA Hord HX Hcov.
+    exact (spt_run_hart_active_instr_S_D s_Drwb s_frame_ok_Drwb
+             Df pc ms bmi cy ti ip mst0 pcfg paddr mc micfg misa0
+             mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0 Res
+             tlbv is_rvc i Q Rr W Qi
+             Hmisa Hmenv Help Hpallow HA Hord HX Hcov).
+  Qed.
+
 
   (* =================================================================== *)
   (* PART H -- THE THREE WRAPPERS.                                        *)
