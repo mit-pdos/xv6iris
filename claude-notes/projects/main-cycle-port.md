@@ -1924,6 +1924,14 @@ consumer outside their own file (`wp_gpr_write_s_sconf(_base)`,
 `wp_rvc_gpr_write_s_r`: exec fact -> swp obligation) were reviewed and
 accepted; everything else is byte-identical, checked mechanically per file.
 
+**FLAGGED, NOT YET APPROVED: `UserretPt.wp_ualu_pt` takes a `swp`
+obligation where it took two whole-`execute` `exec` premises.**  Same
+forced change as `wp_gpr_write_s_config_regime`'s, but this one HAS a
+consumer outside its file (`ProofUserret`, three sites), so it is flagged
+rather than filed under the engine-level exemption.  It cannot be avoided:
+an `exec` equation about a whole `execute` carries no footprint, and every
+swp lifter needs one, so the conversion cannot be pushed to the call site.
+
 **APPROVED (user, 2026-08-18): `wp_load_s_sconf_au` / `wp_store_s_sconf_au`
 take one extra premise `wordw_claim (KTR := ktd) width ea` before the AU.**
 Not an artifact of the proof approach but a requirement of the finer
@@ -1989,9 +1997,10 @@ platform ones + `functional_extensionality_dep` where inherited)
   §1-4/TotalU/ClassifyAsm green; `u_fetch_pure` (4-byte) + fault composer
   `u_fetch_fault_pure` landed; UserMemCert/UserMemArmsBase (P4b part 1)
   landed; P4b arms + UserActiveClass §5 assembly IN FLIGHT.
-- Trampoline: `TrampStepPt.wp_instr_tramp_pt` per node + `TransPt` green;
-  user-table per-node translation + UservecPt/UserretPt/UserretEntryPt/
-  UservecExitPt leaves IN FLIGHT.
+- Trampoline: `TrampStepPt` (engine + `wp_instr_ktramp_pt_share`),
+  `UptWalkPt` (user-table walk + `wp_instr_u_pt`/`_user`), `UserretPt`,
+  `UservecPt`, `TransPt` green; `UserretEntryPt` / `UservecExitPt` wait on
+  the switch-window two-table walk.
 - Bridge: `WpSconfMem.mem_claim`/`mem_pointsto_claim` (THE lemma;
   `wordw_claim := aligned ∗ mem_claim`).
 
@@ -2172,26 +2181,78 @@ recur:
   `UptWalkPt.utf_translate` is that shape at the trapframe leaf, for both
   `Load Data` and `Store Data`.
 
-**WHAT IS LEFT.**  (a) The SWITCH-WINDOW two-table invariants
+**THE TWO STEP-ENGINE WRAPPERS.**  `wp_instr_tramp_pt` is generic in the
+residue `Res`; each table that has a per-node walk carries a wrapper that
+opens its bundle into the engine's cells and closes it at the tlb value the
+walk landed on -- `SmodeCorePt.wp_instr_s_config_sr`'s open/call/close with
+the trampoline fetch underneath.  `TrampStepPt.wp_instr_ktramp_pt_share`
+sits on `tlb_res_pt` (via `kpt_swp_open`/`_close` and
+`ktramp_fetch_tr_share`); `UptWalkPt.wp_instr_u_pt` sits on `utlb_inv_pt`
+(via `upt_swp_open`/`_close` and `utramp_fetch_tr`).  Both statements are
+CONCRETE in the table's parameters: an `s_regime` -- or any record or set --
+in a parameter position makes the call site's `iApply` diverge, so the
+regime lives only inside the kernel wrapper's proof.
+
+**THE TRAMPOLINE RUNS AT SUPERVISOR, AND LANDS THERE EXCEPT ONCE.**  The
+trap raises privilege before the pc reaches the trampoline page, so every
+running-side statement pins `cur_privilege ↦ᵣ Supervisor`.  The one
+instruction that LANDS elsewhere is userret's `sret` to user, and
+`SmodeCorePt.spt_cycle` is already post-generic (its landing file is
+constrained only by the caller's `Q`), so the Supervisor pin sits in exactly
+three tower transports.  `TrampStepPt.s_rs_p` is `HartSFrame.s_rs` with the
+privilege cell peeled off the front, and `spt_frames_close_p` /
+`spt_frames_elim_p` / `s_tick_agree_p` are their `s_rs` twins over it;
+`s_rs` and its lemma family are untouched, so an S-mode caller pays nothing.
+`wp_instr_tramp_pt` takes the landing privilege, and each wrapper spells its
+own out (`wp_instr_u_pt` at Supervisor, `wp_instr_u_pt_user` at User), so no
+leaf's `iApply` against the cycle's WP goal gains a parameter.
+
+- **`s_rs_p_peel` must be `exact`, not `rewrite`.**  `s_rs`'s body IS a
+  25-deep `register_set` tower, so an ssreflect rewrite with
+  `irrelevant_register_set`'s pattern searches inside it and does not
+  terminate (measured: >20 min, no output).  The lemma IS the goal; apply it.
+  Same family as `SmodeCorePt.s_npc_agree`'s note.
+
+**`UserretPt` AND `UservecPt` ARE CONVERTED** -- six leaves, all
+admit-free, all four files under 11 s.  `wp_uld_pt` / `wp_usd_pt` are
+`WpSmodePtMem.wp_ld_s_r_t` / `wp_sd_s_r_t` with `UptWalkPt.utf_translate` in
+place of the regime's data translation and the physical trapframe word
+(`tfpa ↦ₚ₈`) in place of the claim-carrying `↦₈`; `HartSMem`'s engines take
+the translated `pa` as its own parameter, so the trapframe leaf's
+non-identity mapping costs nothing and the pa-generic exec towers UserretPt
+used to clone are gone.  `wp_ucsrw_sscratch_pt` / `wp_ucsrr_sscratch_pt` go
+through `HartSCsr`'s privilege-parametric CSR engines at Supervisor.
+
+- **THE SRET-TO-USER WALK NEEDS `senvcfg` IN THE FRAME.**
+  `WpSmodePtEngine.swp_execute_SRET_S`'s six-cell frame is enough at
+  `newpriv = Supervisor`, where the landing-pad probe is `get_xLPE
+  Supervisor` (menvcfg only).  At `newpriv = User` the probe is `get_xLPE
+  User`, which reads the SUPERVISOR envcfg through `read_senvcfg` and
+  BRANCHES on misa, so `goodb` cannot be computed at a symbolic state:
+  `UserretPt.usret_rs` is the seven-cell frame and
+  `WpDecodeBridge.dstateS` (misa = MISA_C, menvcfg = MENVCFG_S, every other
+  config CSR zero) is the reference state both `goodb` and the concrete
+  `exec` compute against.  `hw_config` pins senvcfg at 0, so no caller pays.
+- **FORCED, SPEC-VISIBLE: `wp_ualu_pt`'s two whole-`execute` `exec`
+  premises are now the `swp` obligation the node shapes conclude.**  An
+  `exec` equation about a whole `execute` carries no footprint, and every
+  swp lifter (`WpMmodeSwpBase.swp_execute_rw` & co.) needs one, so it cannot
+  be converted at the call site.  ProofUserret's three `wp_ualu_pt` sites
+  need the `swp` form; that file is blocked behind `UserretEntryPt` anyway.
+  Every other leaf statement is byte-identical, including the three
+  `is_aligned_paddr` fetch premises the per-node engine no longer reads.
+
+**WHAT IS LEFT.**  The SWITCH-WINDOW two-table invariants
 `TransPt.tlb_inv_pt2_kcur` / `_kprev` still have no per-node walk: they
 differ from `utlb_inv_pt` in the TLB agreement (`tlb_ok_pt2` over two trees)
 and in taking an ABSTRACT tree spec `Sp` rather than `upt_tree_spec`, so
 `swp_translate_upt` does not instantiate -- the exec side is
 `TransPt.ptree2_translateAddr_cases` and the certificate would have to be
-its `goodmb` twin.  (b) The four files' own leaves.
-
-`UservecPt` / `UserretPt` / `UserretEntryPt` / `UservecExitPt` need their
-own leaves converted: their obligations are the old
-`∀ σ, mstate_interp σ ={…}=∗ ∃ s_exec, ⌜exec (execute i) … ⌝ ∗ …` shape and
-the per-node engine hands them `swp (execute i)` instead.  Six leaves and
-two block lemmas: `wp_usd_pt` / `wp_uld_pt` are
-`WpSmodePtMem.wp_sd_s_r_t` / `wp_ld_s_r_t` with `UptWalkPt.utf_translate`
-in place of the regime's translation (`Rt := fun rs => upt_res_pt uroot tfp
-um (register_lookup tlb rs)`); `wp_ucsrw_sscratch_pt` /
-`wp_ucsrr_sscratch_pt` / `wp_ualu_pt` / `wp_usret_pt` are register-only and
-follow `WpSconfCsr` / `WpSmodePtAlu` / `WpSmodePtCtl`; the two block lemmas
-compose.  `UservecPt` and `UserretPt` need only the USER table and are
-unblocked today; `UserretEntryPt` and `UservecExitPt` also need (a).
+its `goodmb` twin.  `UserretEntryPt` and `UservecExitPt` (and behind them
+`ProofUserret` / `ProofUservec`) wait on it; their own leaves and the two
+block lemmas are then the same conversion as UserretPt's.  Their call sites
+of `wp_instr_ktramp_pt_share` / `wp_instr_u_pt` take the post-port argument
+lists (no `is_aligned_paddr` premises, `mie1`/`menvcfg1`/`Rl` riders).
 
 ## THE DOWNSTREAM COMPILE TAIL (2026-08-18) -- what it took, and the two
 ## things it is BLOCKED on
