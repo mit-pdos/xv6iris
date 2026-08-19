@@ -2533,3 +2533,44 @@ leaves, not broken), then the binaries' `UProof*` bottom-up — sync, echo,
 sh, init.  The ~50k lines of `UProof*` carry iff `uv_step_obl`'s
 CALLER-visible shape survives the re-basing; that is the thing to fight
 for, and a forced change there is a statement change the owner reviews.
+
+### 19.1 THE PORT CONTRACT — what may move and what may not, measured
+
+Before touching the engine, grep decides the whole plan.  **None of the ~15
+`UProof*` files, nor `UmodeFrame`, nor `UmodeStub`, mentions `uv_step_obl`,
+`mstate_interp`, `minstret_inv_body` or `riscv_step`.**  What they consume is
+~50 LEAF statements (`wp_uv_cli`, `wp_uv_cmv`, `wp_uv_jal`, `wp_uv_btype`,
+`wp_uv_frame_store`, …), `wp_uv_ecall`, and the composites in
+`UmodeFrame`/`UmodeStub`.  `wp_uv_retire` never appears above the leaves.
+
+So:
+
+* **FREE TO RESHAPE (internal):** `uv_step_obl`, `wp_uv_step_gen`,
+  `wp_uv_step`, `wp_uv_retire`/`_later`, `uv_retire_post_fetch`,
+  `uv_ecall_post_fetch`, `uv_interrupt_branch`.
+* **MUST SURVIVE BYTE-IDENTICAL:** the ~50 leaf statements, `wp_uv_ecall`,
+  and the `UmodeFrame`/`UmodeStub` composites.
+
+And they CAN, because a leaf statement is interpreter-free — `uinstr`,
+`uv_cap_gpr`, `pc_is`, `WP Loop` and nothing else.  Even
+`wp_uv_retire_later`'s execute obligation survives: it is a pure
+`exec (execute (uv_exp i o)) s_pc = Some (RETIRE_SUCCESS, uv_post s_pc jt wr)`
+over an abstract `mstate`, which is exactly the `exec` half of the pair
+convention and did not move in the port.
+
+**THE ONE THING THE PORT ADDS IS THE CERTIFICATE**, and it is affordable:
+`swp_hmrun_of_exec` wants `goodmb Du_r Du_w (execute i) s mm = true` beside
+the `exec` fact.  Put it on the FUNNEL (internal, so no statement review) and
+let each leaf discharge it — **the catalogue already covers every instruction
+this tier executes**, because it was built for the safety tier's arms:
+`goodmb_execute_C_{LI,MV,ADDI,ADDI4SPN,ADDI16SP,ADDIW,ADD,SLLI,SRLI,LUI,
+J_U,JR,JALR,BEQZ_U,BNEZ}` in `UserTotalU`, `{JAL,JALR,BTYPE,ITYPE,RTYPE,
+RTYPEW,SHIFTIOP,SHIFTIWOP,ADDIW,UTYPE}_total` in `UserExecFacts`,
+`ECALL_U` and `{LOAD,STORE}_u_ok` in `UserMemArms`.  **Do not write a new
+certificate for a leaf before grepping for its twin.**
+
+> The general shape, and it is the second half of §19's rule: **a semantics
+> swap reaches exactly the layer that NAMES the interpreter, and stops
+> there.**  Here that layer is one file.  Everything below it (image, ABI,
+> specs) and everything above it (the binaries' walks) is untouched — but
+> the layer itself is a rewrite, not a patch.
