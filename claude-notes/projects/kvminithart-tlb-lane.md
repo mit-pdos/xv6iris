@@ -180,17 +180,79 @@ Two details worth keeping:
 
 `wp_wfi_s_sconf` is the ONLY consumer of that statement (grepped).
 
-### 4b. Then, and only then, flip `bare_inv`
+### 4b. Flip `bare_inv` — **BLOCKED ON A RULING.  The checkpoint's own
+### premise for this step is FALSE; re-verified 2026-08-19.**
 
-* restrict `sie_cap_to_cells` / `_of_cells` to `b = true` (the SIE=1 engine is
-  KPT-only via `IntrDefs.sie_cap_on_kpt`), so they survive the flip;
-* add `sr_walks : bool` to `s_regime` and guard `sr_swp_open` / `sr_swp_close`
-  on it (`bare_regime`, `strans_regime` := false; `kpt_share_regime` := true).
-  Checked: every user of `wp_instr_s_config_sr` / `wp_instr_s_sr`
-  (`WpSmodePt{Mem,Btype,Leaves,Ctl}`) is instantiated at `kpt_share_regime`,
-  so they pass `eq_refl`;
-* drop `tlb ↦ᵣ tlbv` from `SRegime.bare_inv`; revert `52f89133`'s
-  BootBridge / SpecMain routing; keep kvminithart's `tlb ↦ᵣ tlbvec0` premise.
+The plan stands except for one line of it.  What this note used to say:
+
+> add `sr_walks : bool` to `s_regime` and guard `sr_swp_open` / `sr_swp_close`
+> on it.  **Checked: every user of `wp_instr_s_config_sr` / `wp_instr_s_sr`
+> (`WpSmodePt{Mem,Btype,Leaves,Ctl}`) is instantiated at `kpt_share_regime`,
+> so they pass `eq_refl`.**
+
+The bolded sentence is wrong.  Those users are not *instantiated* at
+`kpt_share_regime`; they are **`R`-generic leaves** (`Lemma wp_clw_s_r_t
+(R : s_regime) …`), and so are their own users, for two more layers.  A
+regime-generic leaf cannot produce `sr_walks R = true`, so the guard does not
+stop at `SmodeCorePt` — it propagates onto every public statement in the
+chain:
+
+| layer | statements that gain the premise |
+|---|---|
+| `SmodeCorePt` | `wp_instr_s_config_sr`, `wp_instr_s_sr` |
+| `WpSmodePtMem` | `wp_clw_s_r_t`, `wp_csw_s_r_t`, `wp_ld_s_r_t`, `wp_sd_s_r_t` |
+| `WpSmodePtLeaves` | `wp_cld_s_r_t`, `wp_csd_s_r_t`, `wp_gpr_write_s_config_regime` |
+| `WpSmodePtBtype` | `wp_btype_fall_s_r`, `wp_btype_taken_s_r` |
+| `WpSmodePtCtl` | `wp_jal_gpr_s_zca_r`, `wp_cret_s_zca_r_later`, `wp_sret_gpr_r` |
+| `WpSmodePtAlu`, `WpSmodePtMemWrap` | 4 `R`-generic wrappers each |
+| `VcGenS` | 5 `R`-generic block/branch rules; this is where
+`kpt_share_regime root_ppn` is finally supplied |
+
+≈26 caller-visible statements in 7 files, plus the call sites.  That is well
+past what this file prescribed, so it is a RULING, not a proof edit.
+
+**WHY THE GUARD IS UNAVOIDABLE.** Post-flip neither `bare_regime`'s nor
+`strans_regime`'s `sr_swp_open` can be inhabited (each has to hand out
+`tlb ↦ᵣ tlbv`, and at Bare nothing owns one).  Every dodge was checked and
+fails: moving the cell out of `bare_inv` into a Bare-only wrapper leaves
+`strans_inv`'s Bare arm still short; replacing the cell in the field with a
+per-regime predicate just moves the same premise to the consumer; splitting
+`s_regime` into a walking sub-record changes the leaves' `R` TYPE, which is
+the same statement change by another route.
+
+**WHAT IS WORTH KNOWING BEFORE RULING.** `sr_swp_open` / `sr_swp_close` have
+exactly TWO consumers in the tree — `SmodeCorePt.wp_instr_s_config_sr` and
+`wp_instr_s_sr` — and `bare_regime`'s and `strans_regime`'s copies of those
+two fields have **no consumer at all** (grepped: outside `SRegime.v`,
+`bare_regime` appears only in comments; `strans_regime` is used for
+`sr_swp_side_ok` / `sr_ktier_wit` / `sr_swp_res` / `sr_absorb`, never for the
+bundle face).  So the guard exists purely to let two consumer-less instances
+skip an uninhabitable field.
+
+Two shapes to choose between:
+
+* **`sr_walks : bool` + `sr_walks R = true ->`** (as written above) — 26
+  statements gain a premise AND every call site gains an `eq_refl`.
+* **a typeclass, `` `{!SrWalks R} ``, on the same two fields** — the same 26
+  statements gain an implicit argument, but **no call site moves**: instance
+  resolution finds the `kpt_share_regime` instance, and a caller at a
+  non-walking regime fails to resolve, which is the right error.  This is
+  strictly less churn and is the recommendation.
+
+The rest of 4b is unblocked once this lands: restrict `sie_cap_to_cells` /
+`sie_cap_of_cells` to `b = true` (4a and 4a′ removed their last generic-`b`
+consumers) and reprove them off `sie_cap_on_kpt` + `kpt_swp_open`, since
+`strans_swp_open` goes away with the field; drop `tlb ↦ᵣ tlbv` from
+`bare_inv`; simplify the Bare branch of `sie_cap_frame_acc` /
+`sie_cap_cells_at` / `sda_slot_acc` (each currently parks that cell in its
+closer — post-flip there is nothing to park); revert `52f89133`'s
+BootBridge / SpecMain routing.  kvminithart's / `ProofMain`'s /
+`ProofMainSecondary`'s `tlb ↦ᵣ tlbvec0` premises STAY.
+
+**Do not add `sie_cap_of_cells_at SD` speculatively.** Checked: post-flip
+`sie_cap_of_cells` is still provable at generic `b` (the Bare arm simply
+drops the incoming cell), so the only caller that would need a cell-free
+close is one framing at `s_Drwb` — and after 4a there is none.
 
 ### 4c. kvminithart itself (closes 3 roots)
 
