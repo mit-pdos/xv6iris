@@ -764,6 +764,10 @@ Section SRegimeDef.
       = Some (sr_swp_mode satp0);
   }.
 
+  (* the record's persistence field, as an INSTANCE -- [#Hwit] on the
+     walking arm's receipt needs resolution to find it. *)
+  Global Existing Instance sr_walk_wit_pers.
+
   (* ---- the PMP facts, off any invariant that carries [pmp_config] ---- *)
   Lemma pmp_config_grant_facts (r : mword 44) (σ : mstate) :
     reg_interp σ.(sregs) -∗ pmp_config r -∗ ⌜pmp_grant_facts σ⌝.

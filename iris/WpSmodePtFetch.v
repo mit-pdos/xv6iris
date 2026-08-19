@@ -32,6 +32,7 @@ Require Import RegFile WpGpr InstrBytes MinstretInv.
 Require Import HartLift HartSpan HartSpanChar HartSwp HartSFrame WpDecodeBridge.
 Require Import WpSmodePtEngine.
 Require Import Ktier CommonWalk.
+Require Import HartMCycle WpSFrames.
 Require Import SmodeCore SRegime KptShare SmodeCorePt.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.
@@ -60,6 +61,26 @@ Proof.
   unfold D_leafchk. intros Hr.
   apply orb_true_elim in Hr as [Hr|Hr]; apply register_beq_eq in Hr; subst r;
     [exact s_in_misa | exact s_in_menv].
+Qed.
+
+(* the same two at ANY conforming write set -- what the Bare arm's fetch
+   producer needs.  [s_frame_ok] is exactly the contract that makes them
+   hold: [sf_in_mst] / [sf_in_satp] / [sf_in_misa] / [sf_in_menv]. *)
+Lemma spf_Db_in_D (SD : gset register) (HSD : s_frame_ok SD) (r : register) :
+  spf_Db r = true -> r ∈ SD ∪ s_Dro.
+Proof.
+  unfold spf_Db. intros Hr.
+  apply orb_true_elim in Hr as [Hr|Hr]; apply register_beq_eq in Hr; subst r;
+    [exact (sf_in_mst SD HSD) | exact (sf_in_satp SD HSD)].
+Qed.
+
+Lemma spf_leafchk_in_D (SD : gset register) (HSD : s_frame_ok SD)
+    (r : register) :
+  D_leafchk r = true -> r ∈ SD ∪ s_Dro.
+Proof.
+  unfold D_leafchk. intros Hr.
+  apply orb_true_elim in Hr as [Hr|Hr]; apply register_beq_eq in Hr; subst r;
+    [exact (sf_in_misa SD HSD) | exact (sf_in_menv SD HSD)].
 Qed.
 
 Section SPtFetch.
@@ -105,6 +126,71 @@ Section SPtFetch.
                  satp0 mie0 mdv0 menv0 eq_refl Hmenv HSXL HMPRV spf_Db_in
                  spf_leafchk_in spf_Db_mst spf_Db_satp Hsatpok Hpmpok
                  (pma_all_ram Hpma) with "Hcert") as "#Hobl".
+    iApply ("Hobl" $! va ppn tv rr with "[%] [%] Hat Hfrag HRes Hrw Hro");
+      [ exact Hlt | exact Hpin ].
+  Qed.
+
+  (* THE BARE ARM'S FETCH PRODUCER.  [spt_fetch_tr_of_regime] above pays
+     [sr_swp_side_ok], whose [tlb ∈ Drw] the Bare write set cannot meet; this
+     one takes the arm's own side-condition INTRODUCTION instead -- exactly
+     the conjunct [SRegime.sr_slot_acc]'s Bare disjunct hands out -- plus the
+     satp fact it comes with. *)
+  Lemma spt_fetch_tr_of_regime_b (R : s_regime) (dq : dfrac)
+      (pc mst0 satp0 mie0 mdv0 menv0 : SailStdpp.Values.mword 64)
+      (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n) :
+    menv0 = MENVCFG_S ->
+    _get_Mstatus_SXL mst0 = 'b"10" ->
+    eq_vec (_get_Mstatus_MPRV mst0) ('b"1") = false ->
+    sr_swp_satp_ok R satp0 ->
+    pmp_ent0_ok pcfg paddr ->
+    bare_satp_ok satp0 ->
+    (forall (acc : MemoryAccessType mem_payload)
+            (va : SailStdpp.Values.mword 64)
+            (ppn : SailStdpp.Values.mword 44) (kp : kperm)
+            (Db : register -> bool) (Drw Dro : gset register)
+            (rs : regstate) (dst : mstate),
+       s_acc_ok acc ->
+       bare_satp_ok (register_lookup satp rs) ->
+       eq_vec (_get_Mstatus_MPRV (register_lookup mstatus rs)) ('b"1")
+         = false ->
+       sr_swp_side R acc va ppn kp Db Drw Dro rs dst) ->
+    hw_config -∗
+    spt_fetch_tr_b (s_Df_mix dq) (sr_swp_res_at R satp0) pc mst0 satp0 mie0
+      mdv0 menv0 pcfg paddr.
+  Proof.
+    intros Hmenv HSXL HMPRV Hsatpok Hpmpok Hbare Hbside.
+    iIntros "#Hhw".
+    iDestruct (hw_config_cert with "Hhw") as "#Hcert".
+    rewrite /spt_fetch_tr_b.
+    iIntros (ms bmi cy ti ip mc micfg misa0 mseccfg0 senv0 pmar0 elp0).
+    iModIntro.
+    iIntros (va ppn tv rr) "%Hlt %Hpin #Hat Hfrag HRes Hrw Hro".
+    iAssert (⌜ misa0 = MISA_C /\ pma_allows_all pmar0 ⌝)%I as %[Hmisa Hpma].
+    { iEval (rewrite s_ro_split_mix) in "Hro".
+      iDestruct "Hro" as "(_ & _ & _ & _ & _ & _ & _ & Hmisac & _ & Hpmac & _)".
+      rewrite s_rs_misa s_rs_pma.
+      iDestruct "Hhw" as (misaX secX pmaX elpX)
+        "(#HmisaW & _ & #HpmaW & _ & _ & _ & _ & _ & _ & _ & %HpmaV & _ & _ &
+          _ & _ & %HmisaV & _)".
+      iDestruct (reg_pointsto_agree with "Hmisac HmisaW") as %->.
+      iDestruct (reg_pointsto_agree with "Hpmac HpmaW") as %->.
+      iPureIntro. split; [exact HmisaV | exact HpmaV]. }
+    subst misa0.
+    iDestruct (spt_tr_obl_of_regime_D s_Drwb s_frame_ok_Drwb R (s_Df_mix dq)
+                 spf_Db pc ms bmi cy ti ip mst0 pcfg paddr mc micfg MISA_C
+                 mseccfg0 senv0 pmar0 elp0 satp0 mie0 mdv0 menv0
+                 eq_refl Hmenv HSXL HMPRV
+                 (spf_Db_in_D s_Drwb s_frame_ok_Drwb)
+                 (spf_leafchk_in_D s_Drwb s_frame_ok_Drwb)
+                 spf_Db_mst spf_Db_satp Hsatpok Hpmpok (pma_all_ram Hpma)
+                 ltac:(intros va0 ppn0 tv0;
+                       apply (Hbside (InstructionFetch tt) va0 ppn0 KP_rx
+                                spf_Db s_Drwb s_Dro _ _);
+                       [ left; reflexivity
+                       | rewrite s_rs_satp; exact Hbare
+                       | rewrite s_rs_mst; exact HMPRV ])
+                 with "Hcert") as "#Hobl".
     iApply ("Hobl" $! va ppn tv rr with "[%] [%] Hat Hfrag HRes Hrw Hro");
       [ exact Hlt | exact Hpin ].
   Qed.
@@ -450,5 +536,6 @@ Section SPtData.
       iEval (rewrite -sr_swp_res_agree sda_rs_satp sda_rs_tlb) in "Hres".
       iApply ("Hcl" $! tv' with "Hsatp Hpcfg Hpaddr Hres").
   Qed.
+
 
 End SPtData.

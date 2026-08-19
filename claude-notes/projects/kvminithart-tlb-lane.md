@@ -508,6 +508,56 @@ Precedent worth reading first: the nine sconf-tier sites converted onto
 `sda_slot_acc` in commits `553d1630`, `c694f217`, `25812c05` — every one came
 out SHORTER than before, and these should too.
 
+**THE FOLDED ENGINE: WALKING BRANCH PROVED, BARE BRANCH NOT WRITTEN.**  The
+walking branch compiled end to end in `WpSmodePtFetch.v` before being stripped
+(it cannot land beside an `Admitted` Bare branch).  It is a close
+transformation of `SmodeCorePt.wp_instr_s_config_regime`, and these are the
+edits — all of them verified by that compile, so redoing it is mechanical:
+
+1. Statement: drop `Res`, `satp0 pcfg paddr tlbv`, `satp1 pcfg1 paddr1` and
+   the `spt_fetch_tr` premise; add `R : s_regime` and `sr_inv R`; leaf
+   obligation and continuation as pasted in the recipe above.
+2. Open the slot FIRST: `iDestruct (sr_slot_acc R with "Hinv") as (satp0 pcfg
+   paddr tlbv) "(%Hsatpok & %Hpmpok & Hsatp & Hpcfg & Hpaddr & HRes & [Harm |
+   Harm])"`, walking disjunct `"(Htlbc & #Hwit & Hcl)"`.
+3. The engine produces the fetch translation itself:
+   `iPoseProof (spt_fetch_tr_of_regime R dq … with "Hhw") as "#Htr0"`.
+4. `Res := sr_swp_res_at R satp0`; `Q` gains `satp1 pcfg1 paddr1` to its
+   existential list (ten binders, in the order
+   `npc ms1 mdv1 cy1 ti1 ip1 satp1 pcfg1 paddr1 tv`).
+5. `Ψ rs2 := sr_swp_res R rs2 ∗ sr_close_at R rs2 ∗ resv_any ∗ Rl …`.
+   **The closer HAS to ride** — the slot is re-opened in the body, after the
+   leaf, and re-sealed in the continuation, so the rider is the only way
+   across.  `sr_close_at R rs2` is `WpSmodeIntr.off_close`'s shape, keyed on
+   the file so the continuation can name it.
+6. In the execute obligation: after `spt_frames_open`, RE-FOLD with
+   `iApply ("Hcl" $! tv' …)` to hand the leaf `sr_inv R`; after the leaf,
+   RE-OPEN with `sr_slot_reopen R` (this is what `sr_walk_wit` is for) and
+   frame its closer into the rider.
+7. `pmp_ent0_ok` is a six-way conjunction; the run engine wants four of them,
+   as `(proj1 Hpmpok)`, `(proj1 (proj2 Hpmpok))`, … — spell them out.
+
+Three traps that cost a cycle each and are now known:
+`sr_walk_wit_pers` must be a real instance (`Global Existing Instance`, landed)
+or `#Hwit` fails with "not persistent"; `WpSmodePtFetch` must
+`Require Import HartMCycle WpSFrames` (`minstret_inc_flag` is HartMCycle's);
+and the dispatch bucket is `spt_dispatch_none`, NOT a `Qi` intro — the run
+engine's argument order is `… Hrw Hro [disp] Htr0 [ex]`.
+
+**THE BARE BRANCH** is the same text with the `_b` family substituted
+(`spt_fetch_tr_of_regime_b`, `spt_frames_intro_b` / `_open_b` / `_close_b` /
+`_elim_b`, `spt_cycle_b`, `spt_run_hart_active_instr_S_b`,
+`spt_dispatch_none_D s_Drwb s_frame_ok_Drwb`, `s_tick_agree_b`,
+`s_rw_ext_D s_Drwb … (s_agree_narrow_b _ _ …)`), the tlb cell dropped from
+every frame ipat, `spt_frames_elim_b` applied at `register_lookup tlb rs3`
+(NOT at `tv` — that is the 3^N bomb), and ONE new piece: a rider closer
+`sr_close_at_b` pinned at the file's own tlb slot rather than ∀ over it, since
+a Bare frame cannot move the cell.  Its point is that the leaf MAY HAVE
+FLIPPED the arm, so the re-open after the leaf is `sr_slot_acc` (not
+`sr_slot_reopen`, there being no receipt at Bare) and BOTH disjuncts are
+served: the walking one by PARKING its tlb cell in the closer, the Bare one
+directly.
+
 **STILL TO DO (steps 2 and 3).**  Step 2: build the R-generic data-side
 absorber (the `sda_slot_acc` twin at generic `R`) on top of `sr_slot_acc` —
 the layering is already right, `WpSmodePtEngine.v` is `_CoqProject` 110 vs
