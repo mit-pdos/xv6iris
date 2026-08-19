@@ -95,7 +95,7 @@ Section IregLinkNz.
                 with "Hsls") as "[Hslot Hslback]".
     iEval (rewrite Hkey) in "Hslot".
     iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) Hep]".
-    iDestruct (link_w_ge with "Hla Hfrag") as %Hw1.
+    iDestruct (ireg_rcol_w_ge with "Hla Hfrag") as %Hw1.
     rewrite /dinode_at.
     iDestruct (ghost_map_lookup with "Ha Hdn") as %Hm.
     assert (Hdeq : ds !!! islot inum = dn).
@@ -146,12 +146,12 @@ Section IregLinkNz.
      -- when [iclaim] is actually mintable (F1.5c's (M1)), this is what lets
      ireclaim's free supply the [c = None] that §7.1.5 shows it needs. *)
   Lemma ireg_boot_no_claim (E : coPset) (γi : gname) (γfs : fs_names)
-      (inodestart : Z) (nib : nat) (inum : bv 32) :
+      (inodestart : Z) (nib : nat) (inum : bv 32) (ty : bv 16) :
     ↑iregN ⊆ E ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
     ireg_inv γi γfs inodestart nib -∗
     ireg_boot -∗
-    iclaim (bv_unsigned inum) ={E}=∗ False.
+    iclaim (bv_unsigned inum) ty ={E}=∗ False.
   Proof.
     iIntros (HE Hin) "#Hinv Hboot Hcl".
     pose proof (islot_lt inum) as Hsl.
@@ -168,7 +168,7 @@ Section IregLinkNz.
                 with "Hsls") as "[Hslot Hslback]".
     iEval (rewrite Hkey) in "Hslot".
     iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) Hep]".
-    iDestruct (link_claim_agree with "Hla Hcl") as %Hc.
+    iDestruct (ireg_rcol_claim_agree with "Hla Hcl") as %Hc.
     iDestruct "Hdisj" as "[%Hnone | Hopen]".
     { exfalso. rewrite Hnone in Hc. discriminate. }
     iDestruct (ireg_boot_open_excl with "Hboot Hopen") as %[].
@@ -205,7 +205,7 @@ Section IregLinkNz.
                 with "Hsls") as "[Hslot Hslback]".
     iEval (rewrite Hkey) in "Hslot".
     iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) Hep]".
-    iDestruct (link_wsum_ge with "Hla Hfrag") as %Hw1.
+    iDestruct (ireg_rcol_wsum_ge with "Hla Hfrag") as %Hw1.
     rewrite /dinode_at.
     iDestruct (ghost_map_lookup with "Ha Hdn") as %Hm.
     assert (Hdeq : ds !!! islot inum = dn).
@@ -261,7 +261,7 @@ Section IregLinkNz.
                 with "Hsls") as "[Hslot Hslback]".
     iEval (rewrite Hkey) in "Hslot".
     iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) Hep]".
-    iDestruct (link_wsum_ge with "Hla Hfrag") as %Hw1.
+    iDestruct (ireg_rcol_wsum_ge with "Hla Hfrag") as %Hw1.
     rewrite /dinode_at.
     iDestruct (ghost_map_lookup with "Ha Hdn") as %Hm.
     assert (Hdeq : ds !!! islot inum = dn).
@@ -322,7 +322,7 @@ Section IregLinkNz.
                 with "Hsls") as "[Hslot Hslback]".
     iEval (rewrite Hkey) in "Hslot".
     iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) Hep]".
-    iDestruct (link_wdt_ge with "Hla Hfrag") as %[Hw1 _].
+    iDestruct (ireg_rcol_wdt_ge with "Hla Hfrag") as %[Hw1 _].
     rewrite /dinode_at.
     iDestruct (ghost_map_lookup with "Ha Hdn") as %Hm.
     assert (Hdeq : ds !!! islot inum = dn).

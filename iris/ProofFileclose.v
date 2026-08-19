@@ -1327,7 +1327,7 @@ Section ProofFileclose.
              canonical and iput can spend it. *)
           iMod (inode_pay_cancel ⊤ (fp_icv pn) (fp_iq pn) (fp_ig pn) (fc_ip Cf)
                   (fc_wbool Cf) ltac:(solve_ndisj) with "Hpl") as "Hheld".
-          iDestruct "Hheld" as (kk qq inum) "(%Hipe & %Hkk & %Hinumb & Href)".
+          iDestruct "Hheld" as (kk qq inum) "(%Hipe & %Hkk & %Hinumb & Href & Hru)".
           iModIntro.
           rewrite /fileclose_fs_env /fileclose_fs_env_nopid.
           (* FIVE pure conjuncts, not six: the bundle no longer pins
@@ -1484,7 +1484,7 @@ Section ProofFileclose.
                     ltac:(rewrite HB3a0; exact Hipe)
                     ltac:(lkbelow)
                     with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlog Hitab Hitinv
-                          Hescrow Hireg Hslk Href Hsbb Hsbi Hbmres Hpid Hprocs
+                          Hescrow Hireg Hslk Href Hru Hsbb Hsbi Hbmres Hpid Hprocs
                           Hdev Hgeo Hdlk Hbsl Hop").
           all: try lkbelow.
           iIntros (CIDf6 Hsf6 mi ni us') "%Hics Hcg Hcnt Hextc Hextm Hpc Hpid Hsbb Hsbi

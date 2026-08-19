@@ -1908,3 +1908,623 @@ The split-contract fallback (two ilock lemmas) dies on the same missing
 seasoned witness as the voucher; recorded for completeness.  The heavy
 "provenance on every resource" generalization is NOT needed — units attach
 to references only.
+
+## §5″. ITEM 7a AS-BUILT (2026-08-18): the flavoured r-column, its pin, and
+## the mint's table LANDED -- and 7a splits again, at a wall §5′ could not
+## see because the standing pin it names DOES NOT EXIST
+
+### 5″.1 What landed (all Qed, admit-free, whole-tree green)
+
+**`IcacheRef.v` -- THE FLAVOURED COLUMN.**  Executed as §5′.2's "second
+column", by the f-column's own defaulted-alias trick (§2.1's RULING), so the
+widening is again a local edit:
+
+    linkElemUR1 := prodUR linkElemUR0 frzUR      (the landed element)
+    linkElemUR  := prodUR linkElemUR1 natUR      (+ the rc column)
+    lelemc … f rc                                (the widened element)
+    lelemf … f := lelemc … f 0                   (the alias)
+
+Every landed `lelem`/`lelemf` literal and every landed FRAGMENT definition is
+byte-identical; only the AUTHORITY's spelling grew, and `link_auth` is nearly
+file-local (43 applications + 27 binder lists in `IcacheRef`, 7 in
+`InodeRegion`, 3 in `IcacheBoot`, 2 in `IgetLic`, 2 in `ZZProbeIcnt`).
+
+  * the two flavours: `runit_plain z` IS the landed `iref_lic z` -- the r
+    column keeps its name, its fragment and its two landed moves, and only the
+    SECOND flavour is new -- `runit_claim z` at the rc column, and the indexed
+    `runit (b : bool) z` with `rup`/`rcup` for the two columns' bumps.
+  * COLLISION, one per flavour as RULING R requires: `link_r_ge` (landed),
+    `link_rc_ge` (new), `link_runit_ge` (indexed).
+  * MOVES, one pair per flavour: `link_mint_ref`/`link_spend_ref` (landed),
+    `link_mint_refc`/`link_spend_refc` (new), `link_mint_runit`/
+    `link_spend_runit` (indexed -- what a mover that does not know its
+    caller's flavour calls).
+  * `lelemc_local_update`: GR-43's explicit-types fix applied a SECOND time,
+    at the new outermost pair.  The twelve landed callers move by one token
+    (their `try apply link_lu_id` already discharges the rc-identity premise).
+
+**`InodeRegion.v` -- THE PIN, PURE AND PROVEN.**
+
+    ireg_ref_ok r rc n c d :=
+        (R1)  (r + rc <= n)%nat
+     /\ (R2)  di_type d = 0  -> r = 0 /\ rc = 0
+     /\ (R3)  c <> None      -> r = 0                    <-- §5′.2's PIN
+
+with the full preservation family, one lemma per mover class:
+`_zero _le _count0 _ty0 _alloc _claim _unclaimed _stable _count _claim_mint
+_unclaim _mint _spend`.
+
+**`InodeRegion.ireg_rcol` -- THE BUNDLE.**  The ledger authority packaged with
+its rc column EXISTENTIAL, exactly as A⁗ packaged the receipt and the mirror
+into `ireg_frzc` and for the same reason: `ireg_slot`'s destructuring pattern
+and `ireg_slot_intro`'s arity are UNCHANGED, so the 33 destructure sites and
+34 intro sites across seven files are untouched and only the ~8 that MOVE the
+authority peel.  Six read-throughs (`_freeze_agree _w_ge _wd_ge _wdt_ge
+_wsum_ge _claim_agree`) carry every landed READER by one token.
+
+**`IgetLic.v` -- `iname_mint_ok`, THE MINT's TABLE.**  §5′.2 asks for
+"`iname_not_claimed`, twin of the landed `iname_not_frozen`"; the mint needs
+TWO facts from the same five rows and by the same three bridges, so they are
+ONE lemma: at any licence the box is ALLOCATED (`di_type <> 0`, what (R2)
+owes), and at any NON-`ClaimL` licence it is UNCLAIMED (`c = None`, what (R3)
+owes).  Rows `LinkedL`/`HeldL`/`RootL` go through the count bridge verbatim
+from `iname_not_frozen`; `ClaimL` reads the c column itself and owes only
+allocatedness (through the claim pin's `fresh_shape`); `BufL` reads the BOOT
+one-shot against the c column's shelter (`ireg_boot_open_excl`) and transports
+its buffer-decoded type fact by block agreement -- which is why it takes the
+region's block half and `iname_buf_alloc`'s `bno` premise as arguments (its
+consumers hold `↑iregN` open and cannot re-open it).  `is_claim l` is the
+flavour index the mint sites, the contracts and (R3)'s side condition all read.
+
+### 5″.2 THE FINDING: §5′.2's establish route rests on a clause that is not
+### there, and stating it makes 7a ONE step, not two
+
+§5′.2: "ESTABLISH at `ireg_claim_au`: from the standing pin `type = 0 ⟹ r = 0`".
+**THERE IS NO SUCH STANDING CLAUSE ON THE LANE.**  `r` rode the ledger wholly
+unconstrained -- its charter (`IcacheRef.v:296`) had, and until this increment
+still has, ZERO consumers, and `ireg_slot` says nothing about it.  It is (R2),
+and it has to be STATED by this increment rather than read.
+
+Stating it drags (R1) in with it.  The one mover that writes a zero type is
+`ireg_free_au` (and `EscrowDeposit`'s twin), and it can reach `r = 0` only
+through the count: it holds `ifreeze_post`, the freeze pin puts `n = 0` there,
+and (R1) is the only thing that carries a zero count to a zero column.  Three
+alternatives were probed and all die:
+
+  * a FRAGMENT-only pin -- a fragment forces a column UP, never to zero, so no
+    premise and no token on the free can replace (R1);
+  * a `FrzPost`-gated (R1) (`f = FrzPost -> r = rc = 0`), which every
+    arbitrary-count accessor would preserve for free -- it has to be
+    ESTABLISHED at `ireg_freeze_au`, which has nothing to establish it with;
+  * a csum-flavoured cell making `iclaim` and `runit_plain` collide at the
+    FRAGMENTS with no invariant at all (`Cinl (Excl ())` vs `Cinr (to_agree
+    ())`) -- sound, and it moves the SAME obligation onto `link_mint_claim`'s
+    local update, which still needs "no plain unit outstanding" at the claim.
+
+**AND (R1) IS EXACTLY WHAT THE COUNT ACCESSORS CANNOT SATISFY UNWIRED.**  All
+four of `IcacheInv`'s count accessors -- `ireg_icnt_acc`, `ireg_icnt_frz_acc`,
+`ireg_icnt_lic_acc`, `ireg_icnt_mir_acc` -- hand out `∀ m, … icnt_half m`, an
+ARBITRARY new count.  With the conjunct parked, each must move a unit in the
+same step.  So parking the conjunct and wiring the mints/spends are ONE step:
+it is not that the proofs get harder, it is that `ireg_icnt_acc`'s contract
+becomes false.  §5′.4 priced them as separable ("the pin conjunct + claim_au
+re-establishment" listed beside "mints in the landed up-count AUs"); they are
+not.
+
+RULING (recorded, for the coordinator to confirm or replace): item 7a splits
+into **7a-core** (this increment: the column, the moves, the pure clause, the
+bundle, the table) and **7a-wire** (the conjunct + the unit threading, below).
+7b is unblocked by 7a-wire, not by 7a-core: until units are minted,
+`runit_plain` is unobtainable and §5′.3's right disjunct has no supplier.
+
+### 5″.3 THE 7a-wire BRIEF (dependency-ordered; everything it needs is Qed)
+
+1. **One line**, `InodeRegion.ireg_rcol`: add `∗ ⌜ireg_ref_ok r rc n c d⌝`.
+   `ireg_rcol_intro` regains its clause premise.
+2. **Three movers, three quoted lines each**, and all three discharges are
+   already spelled in the movers' own headers on the lane:
+   `ireg_claim_au` (`ireg_ref_ok_claim_mint`, from its own `Ht0`/`Hfr`),
+   `ireg_free_au` and `EscrowDeposit`'s deposit (`ireg_ref_ok_count0` off the
+   `FrzPost` pin, then `ireg_ref_ok_zero`), plus `ireg_ref_ok_stable` at the
+   two link movers and `ireg_ref_ok_unclaim` at `ireg_withdraw`.
+3. **Four bundle lemmas**, each a two-line composition of landed pieces:
+   `ireg_rcol_mint` = `link_mint_runit` + `ireg_ref_ok_mint`;
+   `ireg_rcol_spend` = `link_runit_ge` + `link_spend_runit` +
+   `ireg_ref_ok_spend`; `ireg_rcol_unclaimed` = `link_runit_ge` +
+   `ireg_ref_ok_unclaimed` (THE PIN's reader, what §5′.3's withdraw calls);
+   `ireg_rcol_alloc` = `link_runit_ge` + `ireg_ref_ok_alloc` (what idup's mint
+   pays its type premise with -- it holds its caller's own unit and needs no
+   licence).
+4. **The four accessors** (`IcacheInv`).  Shapes, verified against their
+   callers:
+   * `ireg_icnt_acc` (arithmetic, ONE caller = iput's non-last close, DOWN):
+     continuation gains `⌜S m = n⌝ -∗ runit bfl z -∗ …`.  The intended text is
+     quoted verbatim in the lemma's own comment on the lane.
+   * `ireg_icnt_frz_acc` (TWO callers, opposite directions -- iput's last close
+     at `n = 1 -> m = 0`, and the recycle's `FrzOff, n = 0 -> m = 1`): must
+     split, or take a direction index.  The recycle's mint side conditions can
+     only come from the LICENCE, so this accessor (or its up-half) has to take
+     `iname` and `iname_mint_ok`'s `bno` premise.
+   * `ireg_icnt_lic_acc` (both callers UP): mints at `is_claim l`, paid by
+     `iname_mint_ok`.  It therefore gains `iname_mint_ok`'s BufL premise
+     `(∀ bno ds0, l = BufL bno ds0 -> bno = IBLOCK inum inodestart)`, which
+     rides up to `SpecIget` and is `discriminate` at every non-BufL site and
+     the real equation at `ProofIreclaim`'s.
+   * `ireg_icnt_mir_acc` (idup, UP): self-paying -- the caller's own unit gives
+     allocatedness (`ireg_rcol_alloc`) and, at the plain flavour, `c = None`
+     (`ireg_rcol_unclaimed`).  No licence, no table.
+5. **The five AU movers**, then `SpecIget` (post gains
+   `runit (is_claim l) (bv_unsigned inum)` beside `inode_ref k q dev inum`),
+   `SpecIdup` (pre AND post gain the caller-flavoured unit -- the flavour is
+   the PARENT's, which is what "idup copies the flavour" means and what keeps
+   the pin true: a dup of a claim ref is claim-flavoured, so no plain unit is
+   ever created at a claim box), `SpecIput` (pre gains the unit it consumes),
+   then `ProofIget`, `ProofIdup`, and the three iput Dev walk files.
+6. **The rest homes**: `FileInv`'s fd slot beside `inode_held` (`FileInv.v:59`)
+   and the proc invariant's `p->cwd`, one token each; then sys_open's fd-alloc
+   deposit, fileclose's withdraw, chdir's cwd swap, fork's cwd idup.
+
+### 5″.4 Tripwires, as fired
+
+  * **t3 (FIRED, resolved in shape, above)**: §5′.2's standing `type = 0 ⟹ r = 0`
+    does not exist; (R2) is stated by this increment and drags (R1) with it.
+  * **the eviction's unit accounting (§5′.4)**: PRICED AND CLOSED, on the pin
+    the ledger already carried -- `ireg_free_au` and the deposit both hold
+    `ifreeze_post`, whose pin gives `n = 0`, and (R1) does the rest.  No new
+    premise, no new token, no new mask.  The three Dev walk files are
+    untouched by 7a-core and re-verify green.
+  * **rest homes beyond FileInv/`p->cwd`**: not reached in 7a-core (the
+    threading is 7a-wire's step 6); the enumeration in §5′.2 is unrefuted.
+  * **Specs beyond {SpecIget, SpecIdup, SpecIput, the FileInv/proc layer}**:
+    ONE addition found, and it is a PURE premise rather than a clause --
+    `SpecIget` gains `iname_mint_ok`'s BufL block tie (step 4 above).
+
+## §5‴. ITEM 7a-wire AS-BUILT (2026-08-18): the r-column pin is ON and the
+## unit rides every reference from the iget that mints it to the iput that
+## spends it -- and §5″.3's contract-set tripwire FIRED, at seven contracts
+## rather than the priced three
+
+### 5‴.1 What landed at the region (all Qed, admit-free)
+
+**`InodeRegion.ireg_rcol` -- THE CONJUNCT IS ON**, in the one line §5″.3
+promised:
+
+    Definition ireg_rcol … :=
+      (∃ rc : nat, link_auth z wl wdu wdt g c r p f rc
+                   ∗ ⌜ireg_ref_ok r rc n c d⌝)%I.
+
+`ireg_rcol_intro` regained its clause premise; `ireg_rcol_stable` carries the
+clause by `ireg_ref_ok_stable`; the six read-throughs peel
+`(%rc & Hla & _)`.  **NOT ONE of the eight movers' pre-written discharges
+needed amending** -- `ireg_claim_au` is `ireg_ref_ok_claim_mint` off its own
+`Ht0`/`Hfr`; `ireg_free_au` and `EscrowDeposit`'s deposit are
+`ireg_ref_ok_count0` off the `FrzPost` pin then `ireg_ref_ok_zero`;
+`ireg_withdraw` is `ireg_ref_ok_unclaim`; the two byte movers and
+`ireg_write_au`'s flush ride `ireg_ref_ok_stable`; `ireg_freeze_au` and
+`ireg_mint_grey` ride it verbatim; `IcacheBoot`'s two are
+`ireg_ref_ok_zero`.
+
+**FIVE bundle lemmas**, where §5″.3 asked for four.  `ireg_rcol_mint`,
+`ireg_rcol_spend` (both with an EXISTENTIAL new `r`, since `ireg_slot` binds
+it that way and no count mover names it), `ireg_rcol_unclaimed`,
+`ireg_rcol_alloc`, and the fifth -- `ireg_rcol_mint_ok`, the last two FUSED,
+because the mint wants them as one conjunction and because that is the shape
+`IgetLic.iname_mint_ok` already delivers.
+
+### 5‴.2 The four accessors, rewired (§5″.3's step 4)
+
+  * `ireg_icnt_acc` (iput's non-last close, DOWN): the continuation is now
+    exactly the text the lemma's own comment had quoted,
+    `∀ m bfl, ⌜ireg_frz_ok f m d⌝ -∗ ⌜S m = n⌝ -∗ runit bfl z -∗ …`.
+    Discharge: one `ireg_rcol_spend`.
+  * `ireg_icnt_frz_acc` (iput's LAST close, DOWN): the same two premises
+    inserted into its `∀ ph' m` continuation.  It did **not** have to split
+    or take a direction index.
+  * `ireg_icnt_lic_acc` (both callers UP by one): gains
+    `iname_mint_ok`'s `BufL` block premise and MINTS
+    `runit (is_claim l) z` at `⌜m = S n⌝`.  The block half is taken out of
+    the accessor's own open with
+    `iEval (rewrite -(ireg_bi_iblock inum inodestart)) in "Hfsb"`.
+  * `ireg_icnt_mir_acc` (idup, UP): gains a flavour index `bfl`; its
+    continuation TAKES the caller's own unit and returns TWO, self-paying
+    through `ireg_rcol_mint_ok`.
+
+**THE RECYCLE NEEDED NO SECOND UP-HALF.**  §5″.3 priced
+`ireg_icnt_frz_acc` as having to split, because its second caller
+(`iref_alloc_store_au`, the 0 -> 1) is an UP-count.  It does not: that
+mover's phase step is the IDENTITY one (`FrzOff -> FrzOff`), so the token it
+threads is held and never stepped.  Swapping its accessor for
+`ireg_icnt_lic_acc` -- with the licence iget already presents, borrowed and
+handed back -- is a four-line edit, and it leaves `ireg_icnt_frz_acc`
+mono-directional.  `iref_alloc_store_au` therefore gains an `iname γi γfs
+inum l` premise, returns it, and returns the minted unit beside it.
+
+### 5‴.3 THE FINDING: the contract-set tripwire FIRED, and what defused it
+
+§5″.3 priced the contract surface at `{SpecIget, SpecIdup, SpecIput}` plus
+two rest homes.  The truth is that **every contract a REFERENCE crosses owes
+the clause**, and that is SEVEN, not three:
+
+    SpecIget         post += runit (is_claim l) (bv_unsigned inum)
+                     pre  += (∀ bno ds0, l = BufL bno ds0 ->
+                                bno = IBLOCK inum inodestart)     [priced]
+    SpecIdup         pre  += one unit ; post += two                [priced]
+    SpecIput         pre  += one unit  (both bodies)               [priced]
+    SpecIunlockput   pre  += one unit  (both bodies)           NOT PRICED
+    SpecDirlookup    found-arm += one unit                     NOT PRICED
+    SpecIalloc       claim-arm += one unit  (both bodies)      NOT PRICED
+    SpecCreate       create_locked += one unit                 NOT PRICED
+    SpecCreateFreshTy claim-arm += one unit                    NOT PRICED
+
+(plus two INTERNAL stated bundles that are the same obligation one layer
+down: `FsLookup`'s tree-lifted dirlookup arm and
+`ProofKexecSeam.kxc_open`.)
+
+WHAT DEFUSED IT, and it is this increment's RULING:
+
+**`IcacheRef.runit_any z := ∃ b : bool, runit b z`, and the unit lives INSIDE
+`inode_held` / `inode_held_ty` / `inode_held_short` rather than beside them.**
+
+Three consequences, all load-bearing:
+
+  1. The two REST HOMES §5″.3 names are ALREADY spelled in those packages --
+     `ProcInv.cwd_ref` IS `inode_held`, and `FileInv`'s fd slot IS
+     `cinv fileipN γx (inode_held_short v Q)` -- so both rest homes landed as
+     one definitional edit apiece **and neither `FileInv.v` nor `ProcInv.v`
+     was touched at all**.
+  2. The whole WALKER cone returns its reference as `inode_held`, so
+     `SpecNamex`, `SpecNamei`, `SpecNameiparent`, `SpecKfork` and
+     `SpecSysFork` are byte-identical.
+  3. The FLAVOUR is existential at every seam rather than a contract binder.
+     That is not cosmetic: a `(bfl : bool)` binder on `SpecIput` /
+     `SpecIdup` / `SpecIunlockput` moves every one of their ~20 POSITIONAL
+     call sites (`… used k qi s gy inum dn' bm' …`).  The first attempt did
+     exactly that and was backed out; with `runit_any` the parameter lists
+     are byte-identical and only the `with "…"` strings grow by one name.
+
+### 5‴.4 The mint table, per iget caller
+
+    ProofIalloc      ClaimL           runit_claim   (the ONLY claim mint)
+    ProofDirlookup   HeldL / LinkedL  runit_plain   (licence existential;
+                                                     the BufL tie travels as
+                                                     a ⌜…⌝ conjunct of the
+                                                     licence package)
+    ProofNamex       RootL            runit_plain
+    ProofNamexRoot   RootL            runit_plain
+    ProofIreclaim    BufL             runit_plain   (the ONE BufL site; its
+                                                     block tie is its own
+                                                     [Hbnoeq])
+    ProofIget itself is flavour-generic on both arms: the hit
+    ([iref_incr_store_au]) and the recycle ([iref_alloc_store_au]) both mint
+    at `is_claim l` for the caller's own `l`.
+
+`discriminate` discharges the `BufL` premise at every non-`BufL` site.
+
+### 5‴.5 Tripwires, as fired
+
+  * **the contract set (FIRED, resolved -- 5‴.3)**: seven contracts, not
+    three.  `runit_any` + package-internal residence held the delta to one
+    clause each with no positional churn.
+  * **a rest home beyond FileInv / `p->cwd`**: NOT reached.  §5′.2's
+    enumeration is confirmed, and both homes turned out to be `inode_held*`
+    packages rather than sites.
+  * **a count accessor's unit move that cannot close**: did not happen.  The
+    coupling §5″.2 warned about was priced correctly, and the one place the
+    price was wrong it was too HIGH (the recycle, 5‴.2).
+  * **red-set growth**: none.
+
+### §5⁗ RULING C+F (2026-08-18): the claimant is unit-less until the retire,
+### and the unit currency goes FRACTIONAL — 7b′ executable brief
+
+7b landed the typed claim and the indexed withdraw (`263257a5cd`) and stopped
+on two walls: (1) `runit_any`'s claim-flavoured case is undischargeable at the
+withdraw; (2) `wp_ilock_sconf` takes a SHARE, which carries no unit — and the
+fd path's whole unit rests inside a cancellable invariant that no syscall may
+hold open across the ilock call, so WHOLE-unit delivery to the three fd sites
+is structurally impossible (verified: `FileInv.v` holds the inode payload only
+behind its cinv — `cinv_cancel` at :331 is its ONLY extraction, at fileclose;
+`ProofFileread` receives a caller-supplied share via a `Hpayback` wand and
+never opens the cinv; the sconf WPs conclude at the full mask, so nothing can
+stay open across them).
+
+**THE SHARE-FRACTION LEAD: mechanism ADOPTED, delivery claim REFUTED.**
+Fractionalising the unit is the only way any currency crosses the fd layer
+(a nat fragment cannot split; a fraction can ride beside each holder's cancel
+token permanently, installed at sys_open, split at filedup, gathered at
+fileclose's cancel). But it cannot ride `inode_shr` universally: under C the
+claimant's own share in the iget→fill window carries no unit at all, and the
+walker cone's shares would all re-plumb for a fact only ilock's fill wants.
+So the fraction is an EXPLICIT premise on the fill (the o-index's None arm),
+not a stowaway inside the share.
+
+**RULING C (the claimant mints no unit until the retire).**
+- `iname_mint_ok`'s ClaimL row mints NOTHING; `SpecIget`'s unit post becomes
+  the conditional `runit_after l z := if is_claim l then emp else
+  runit_plain z` (ialloc's iget returns reference + typed `iclaim`, no unit).
+- `ireg_withdraw`'s Some-arm MINTS the plain unit at the retire (one auth
+  local-update inside the region open it already takes) and RETURNS it — the
+  claimant's reference is unit-carrying from the fill onward, so create's
+  post packages `inode_held` unchanged.
+- `runit_claim` loses its only producer. The rc column is PINNED DEAD, not
+  deleted (deletion = 7a′-scale churn for zero payout; file it in the
+  push-era cleanup list): `ireg_ref_ok` gains `rc = 0`; the copy/mint true
+  cases become region-refuted (`link_rc_ge` vs `rc = 0`); new elim
+  `runit_any_plain_elim` (region open ⊢ runit_any z ⊣ runit_plain z) for the
+  rest homes' consumers. `runit_any`'s definition and every landed package
+  (`inode_held*`) stay byte-identical.
+- THE ARITHMETIC that makes the retire-mint free (no count fact in hand at
+  the fill): the pin's coupling clause becomes
+      `mass + rc <= n + cbit c`        (cbit (Some _) = 1, cbit None = 0)
+  — the claim summand IS the claimant's unit held in escrow by the region.
+  Claim mint: 0 <= 0 + 1 ✓ (n = 0, uncached). ClaimL iget (0→1, no unit
+  mint): 0 <= 1 + 1 ✓. The retire (mint +1, c→None): 1 <= 1 + 0 ✓ — the
+  claim summand converts into the unit summand with NO n-fact. Ordinary
+  boxes: cbit = 0, the landed inequality verbatim. The free: mass = 0 off
+  n = 0 (FrzPost) as landed. The other two pin conjuncts
+  (`type = 0 ⟹ mass = 0 ∧ rc = 0`, `c ≠ None ⟹ mass = 0`) stand.
+
+**RULING F (fractional plain units).** The r column's UR goes
+`natUR → optionUR ufracR` (stock `iris.algebra.ufrac`, verified present in
+the switch): the authority is the outstanding unit MASS, `runit_plain z` is
+the mass-1 fragment, `runit_frac q z` the mass-q fragment (q : Qp, any
+positive), `runit_plain = runit_frac ½ ∗ runit_frac ½` by the ufrac op.
+Collision: any fragment vs `mass = 0` is invalid — so ANY positive fraction
+derives `c = None` at the withdraw, which is RULING R's collision with a
+lendable currency. iput's spend takes the reassembled 1 (the landed
+`inode_held_gather` chain already reunites the fd pieces at fileclose).
+lelemc's r-slot literal churn (0→None, 1→Some 1) is the c-widening's
+precedent, same named-atom tricks.
+
+**The o-index on SpecIlock** (region side ALREADY LANDED at `263257a5cd`):
+`wp_ilock_sconf` gains `(o : option (bv 16))` with premise `ireg_wd_lic o`
+— `Some ty ⇒ iclaim z ty`, `None ⇒ ∃ q, runit_frac q z` (∃-bound, returned
+verbatim via `ireg_wd_back`) — and post conjuncts `ireg_wd_back o z ∗
+⌜filled = true → ireg_wd_ty o dn⌝`. NO wrapper keeps any site byte-identical:
+the None arm SUPPLIES a resource no alias can conjure. All 16 sites move.
+
+**The 16-site table** (who supplies what):
+
+| sites | o | supply |
+|---|---|---|
+| ProofCreate child fill (~:4747) | `Some ty` | the typed iclaim from SpecIalloc's receipt |
+| ProofCreate parent locks (:2918, :3563) | `None` | fraction of the in-file unit (Hru) |
+| ProofIreclaim :1650 | `None` | its BufL-minted unit (in-file) |
+| ProofSysLink :1356/:2172, ProofSysLinkTails :1184, ProofSysUnlink :1882/:3775, ProofNamex :3101, ProofSysChdir :1554, ProofSysOpen :3083, ProofKexecA :1079 | `None` | fraction of the in-file unit (all have Hru) |
+| ProofFileread :1799, ProofFilestat :690, ProofFilewrite :1853 | `None` | a `runit_frac q` threaded through THEIR contracts (SpecFileread/SpecFilewrite/SpecFilestat gain it beside the share they already take, returned on the existing payback channel), supplied by the fd layer's travelling package (installed at sys_open: the fresh unit splits q_rest into the cinv's `inode_held_short`, q_travel beside each cancel token; filedup splits q_travel; fileclose's cancel gathers) |
+
+**7b′, dependency-ordered:** (1) RULING F's UR swap + the fraction lemmas +
+RULING C's mint/retire/pin changes (IcacheRef + InodeRegion + IcacheInv's
+accessor true-case refutations + SpecIget's conditional post + ProofIget/
+ProofIalloc/ProofIdup re-green); (2) the SpecIlock o-widening + the 13
+cheap sites; (3) the fd chain (3 Spec* + sys-level callers + sys_open's
+install + filedup/fileclose); (4) §5 steps 4–5 VERBATIM (the axiom lemma at
+LinkCreateFreshTy — byte-identical statement, `create_fresh_ty_body` +
+`cr_cs_but_s3` rehomed — the SpecCreateFreshTy deletion, the six Require
+repairs, the _CoqProject row); (5) THE GATE: standing six + funext ALONE on
+the create and sys_unlink tops, audit greps, proof_coverage --check,
+lemma_diff.
+
+**Tripwires:** (T1) a landed local-update resists the ufrac slot beyond the
+named-atom pattern — stop with the goal; (T2) the cbit inequality fails at a
+mover this section did not enumerate — stop, name it; (T3) the fd chain
+crosses an invariant that cannot retain a positive remainder — stop, name
+it; (T4) any Spec outside {SpecIget, SpecIlock, SpecFileread/write/stat +
+their direct caller layer, sys_open/filedup/fileclose's fd package} needs a
+clause; (T5) red-set growth beyond {ProofIput} at gate time.
+
+### 5⁗′ RULING C′ ACCEPTED (2026-08-18, coordinator, verbatim from the 7b′
+### executor report — its probes at /home/ubuntu/probe7bp/P.v are the evidence)
+
+§5⁗'s C+F is SUPERSEDED: the cbit inequality fails at the retire by
+machine-checked counterexample (probe_C_retire_counterexample — n=0/c=Some is
+§5⁗'s own claim-mint state); Ruling F's fd-delivery premise is refuted
+(Finding 3).  ADOPTED: design C′.
+- Retire = CONVERSION: the ClaimK arm takes iclaim z ty ∗ runit_any z, returns
+  runit_plain z; the claim-flavoured case gets 1 <= n FREE from the LANDED R1
+  (r + rc <= n); ireg_ref_ok BYTE-IDENTICAL; the four ledger moves it needs
+  are already Qed on the lane.
+- runit_any z := runit_plain z (redefinition; 72 sites byte-stable; 6 intro
+  sites move; ProofIalloc's ClaimL receipt becomes runit_claim, threaded to
+  create's fill — exactly what the ClaimK arm consumes).
+- SpecIlock's index is 3-valued: ClaimK ty (create's child fill; spent; typed
+  post) | PlainK (the 12 in-file-unit sites; borrowed-returned) | ShotK ty
+  (the 3 fd sites; persistent ity_shot g ty already in hand via
+  FileInvDefs.inode_pay / fileread_pay_carve; ity_pending_shot_excl kills the
+  uncached arm; post ⌜filled = false⌝).  ProofFilestat needs the one-clause
+  carve widening (its pay_carve re-exports the shot it already holds).
+- Steps 4–5 of §5 (Axiom→Lemma, rehomes, deletion, Require repairs,
+  _CoqProject row, ProofCreate splice) are UNAFFECTED.
+- Ruling F (optionUR ufracR, the fd install/split/gather chain) is DEAD — do
+  not execute any of it.
+
+### 5⁗″ ITEM 7b″ AS-BUILT (2026-08-19): RULING C′ LANDED END TO END and
+### `create_fresh_ty` IS A THEOREM — and ProofIlock's remaining goal is NOT
+### the one every red-set line in this file has been naming
+
+#### 5⁗″.1 What landed (all `Qed`, admit-free, whole tree green but two files)
+
+1. **The ledger core.**  `IcacheRef.runit_any z := runit_plain z`
+   (redefinition).  The 72 contract positions that spell the name are
+   BYTE-STABLE — verified by a whole-tree build that touched nothing but
+   the six intro sites.  `runit_any_intro` drops its boolean
+   (`runit false z -∗ runit_any z`); the six sites move as C′ predicted:
+   `ProofIalloc:1721` keeps the claim flavour (a `change`, no intro),
+   `ProofIdup:162/747/748` pin the flavour index at `false`,
+   `ProofIreclaim:1327` and `ProofDirlookup:2168` intro at `false` —
+   dirlookup's licence existential gained a `⌜is_claim lic = false⌝`
+   conjunct, discharged `reflexivity` on both arms.
+   `SpecIalloc`'s two post clauses now say `runit_claim`.
+
+2. **The withdraw's ClaimK arm = THE CONVERSION.**  `ireg_wd_lic (ClaimK ty)`
+   takes `iclaim z ty ∗ runit_claim z`; the arm runs
+   `link_rc_ge` (`1 ≤ rc`) → `link_spend_refc` → `link_mint_ref` →
+   `link_spend_claim` in the ONE region open it already took, and returns
+   `runit_plain z`.  The pin carries by `ireg_ref_ok_retire` (the probe's
+   `probe_Cprime_retire`, ported verbatim; `probe_Cprime_count` landed
+   beside it as `ireg_ref_ok_rc_count`).  **`ireg_ref_ok` is
+   BYTE-IDENTICAL** — the tripwire did not fire.
+
+3. **`InodeRegion.ireg_claim_no_out`** (new, and it is what retires the
+   axiom): while an `iclaim` is outstanding NOBODY holds the inum's
+   `dinode_at`.  Structural, not arithmetic — `c ≠ None` refutes the MARKED
+   arm through `ireg_marked_ok`, and the IN and PENDING arms both park the
+   record fragment, so a second full-fraction element is invalid.  This is
+   fs-icache.md §20.7's "carrier for no-free-and-reclaim-since-my-claim",
+   supplied at last.
+
+4. **`SpecIlock`'s 3-valued index**, `InodeRegion.ilkc :=
+   ClaimK ty | PlainK | ShotK ty`, with `ireg_wd_lic o g z`,
+   `ireg_wd_back o g z`, `ireg_wd_ty o d`, `ilk_fills o` and
+   `ilk_post o filled d`.  ClaimK's post is
+   `filled = true ∧ di_type dn = ty` — a THEOREM, because
+   `ireg_claim_no_out` kills BOTH of ilock's non-fill routes (the cached
+   arm, and the pool's allocated bundle) and forces §16.4's box fill.
+   ShotK's post is `filled = false`, off `ity_pending_shot_excl` at the
+   uncached arm's peel exactly as C′ designed.
+
+5. **The 16 sites**, as landed:
+
+   | site | index | supply |
+   |---|---|---|
+   | ProofCreate:4764 (the span) | `ClaimK ty` | ialloc's `iclaim` + `runit_claim` |
+   | ProofCreate:2932 / :3577 | `PlainK` | `Hrud` / `Hruc` |
+   | ProofIreclaim:1658 | `PlainK` | `Hru` (BufL-minted) |
+   | ProofKexecA:1081, ProofNamex:3101, ProofSysChdir:1554, ProofSysLink:1356/:2172, ProofSysLinkTails:1190, ProofSysOpen:3099, ProofSysUnlink:1890/:3795 | `PlainK` | the in-file unit, WHOLE (RULING F is dead; no fraction was needed) |
+   | ProofFileread:1799, ProofFilewrite:1853, ProofFilestat:690 | `ShotK ty` | `#Hshot0` / `#Hty` / (new) |
+
+   `SpecFilestat.filestat_pay_carve` gained ONE output — the generation's
+   `ity_shot`, which `FileInvDefs.inode_pay` already held and the carve used
+   to put straight back.  Its payback wand is UNCHANGED, so filestat's two
+   other uses of it did not move.
+
+6. **ProofIlock's A′ DEBT, PAID EN ROUTE.**  `il_cont` did not carry
+   `ifreeze_off` although `SpecIlock`'s post has demanded it since IVb (the
+   file's own comment at :2456 called it "the SAME un-landed item as the
+   [iclaim] goal").  It is now routed: split off `ic_payload` on the cached
+   arm (`ic_payload_split`), carried past the fill on the uncached one, and
+   threaded through `il_load` → `il_epilogue` → `il_cont`.
+
+7. **§5 steps 4–5, DONE.**  `LinkCreateFreshTy.v`'s `Axiom` is a `Lemma`
+   with a `Qed`; `create_fresh_ty_body` and `cr_cs_but_s3` rehomed into it
+   BYTE-IDENTICALLY (so `ProofCreate:4764` splices unchanged — tripwire t2
+   did not fire); `SpecCreateFreshTy.v` DELETED with its `_CoqProject` row;
+   the six reference sites repaired (only ProofCreate had a real `Require`;
+   IgetLic / IregBox / LinkCreate / LinkSysMkdir / SpecIlock were comments).
+   The span proof is the six instructions +0xa4..+0xb0 plus the two callee
+   contracts, ~200 lines.
+
+       Print Assumptions CreateFreshTy.create_fresh_ty
+         rv64d.valid_reservation, rv64d.plat_term_write,
+         rv64d.match_reservation, rv64d.load_reservation,
+         rv64d.cancel_reservation,
+         FunctionalExtensionality.functional_extensionality_dep
+
+   — the standing six, ALONE.
+
+   `tools/proof_coverage.py --check`: the four `assumes Axiom
+   create_fresh_ty` lines are GONE (EXIT 0; the five CONSISTENCY ERRORS it
+   reports are the pre-existing `IputFree*Dev` / `ZZProbe*` rows).
+   `tools/lemma_diff.py --ref c48a0060a6 --dir iris`: 28 files checked,
+   ONE thing to justify — `iris/SpecCreateFreshTy.v: DELETED outright`,
+   which is this increment's own step 6.
+
+#### 5⁗″.2 THE WALL (the gate's blocker, and it is a NEW goal)
+
+`ProofIlock.v:2422` — **not** `:1123`.  Every red-set line in this file
+since IIIc has said "ProofIlock:1123"; that is only because `coqc` stops at
+the first error and :1123 hid the two behind it.  :1123 and the `il_cont`
+routing are now landed, and what surfaced is DEVIATION 1's owed obligation:
+
+    iMod (ic_swap_checkout cn gfs gi cov logstart k (DepShr s dev inum g) g
+            dev inum eq_refl with "Hbody Htok [Href]") as "(Hbody & Hdep & Hout)".
+
+`ic_swap_checkout` hands out `ic_payload_arm`, i.e. a DISJUNCTION (A⁗
+§3.16), and ilock owes the refutation of its FROZEN alternative:
+
+    ic_tok cn k ∗ ic_dep_own k d dev inum ∗ frzown (bv_unsigned inum)
+      ∗ (frzown (bv_unsigned inum) -∗ ic_escrow_body cn gfs gi cov logstart k)
+
+IcacheEscrow.v:929-934 / :970-975 record the intended discharge: "*which its
+licence pays for* (`IgetLic.iname_not_frozen` puts the column at `FrzOff`,
+at which the region's own receipt clause holds `frzown` and
+`IcacheRef.frzown_excl` closes it) — DEVIATION 1's obligation, recorded at
+ProofIlock."
+
+**THAT DISCHARGE IS EXACTLY WHAT RULING C′ TOOK AWAY, and §5⁗′ did not
+price it.**  Worked through, arm by arm (`frzown` in hand forces
+`f = Some (Excl FrzPre)` through `ireg_frzc`'s receipt clause plus
+`frzown_excl`, and the freeze pin at `FrzPre` gives `n = 1`,
+`di_nlink d = 0`, `di_type d ≠ 0`):
+
+  * **ClaimK — CLOSES.**  `iclaim z ty` forces `ireg_claim_ok`'s SECOND
+    conjunct, `f = Some (Excl FrzOff)`, against `f = FrzPre`.  One line, and
+    it is `iname_not_frozen`'s ClaimL row restated.
+  * **PlainK — DOES NOT CLOSE.**  The plain unit gives `1 ≤ r`; (R1) at
+    `n = 1` gives `r = 1, rc = 0`.  Consistent.  The information that WOULD
+    close it exists in the global state — the freezer still holds ITS unit
+    at the frozen park (its spend is at iput+0x8a, the window's far end), so
+    the true `r` is 2 and (R1) is violated — but that unit is in the
+    freezer's hand and nothing in the escrow or the region exhibits it.
+  * **ShotK — DOES NOT CLOSE, and cannot.**  The fd sites hold no unit at
+    all (that is ShotK's whole point) and the one-shot does not discriminate
+    a frozen generation from a live one: an unlinked-but-open file has
+    `nlink = 0` with a live fd, and only the reference COUNT excludes the
+    freeze.
+
+§5's ORIGINAL index (`ClaimK | LinkK | BootK`) had this for free — all three
+rows are `iname` rows and `iname_not_frozen` covers them.  C′ replaced
+LinkK/BootK with PlainK/ShotK because the sites could not produce those
+licences, and in doing so dropped the content DEVIATION 1 needs.
+
+**The two candidate repairs, priced (COORDINATOR'S CALL — neither is in this
+increment's brief):**
+
+  (R-a) **Park the freezer's unit.**  `ic_payload_arm`'s frozen alternative
+        becomes `frzown z ∗ IcacheRef.runit_plain z`: iput's +0x70 mid-free
+        park deposits its own unit and +0x8a takes it back.  Then PlainK
+        collides two units against `n = 1` and closes.  Cost: `IcacheEscrow`
+        + the iput free path (`ProofIput`, red; `IputFree*Dev`, green) —
+        i.e. it lands inside task 18's cone, not this one.  **It does NOT
+        close ShotK.**
+  (R-b) **Give ShotK (and PlainK) a freeze-side premise.**  The honest
+        content is "a share exists ⟹ this reference is not the one being
+        closed", which is `IcacheInv.live_whole_share_absurd` and needs the
+        ITABLE LOCK — which ilock does not hold at the checkout.  Closing it
+        without the lock needs a new escrow-side carrier, i.e. a ruling of
+        A⁗'s size.
+
+Recommended: rule on (R-a)+(R-b) together, or re-open whether the three fd
+sites can present something stronger than `ity_shot` (a fraction of the
+cinv's own token, say) — the C+F work already established that a whole unit
+is structurally impossible there, but the frozen-arm obligation is a
+DIFFERENT and weaker ask than a provenance unit.
+
+#### 5⁗″.3 Gate arithmetic, as it stands
+
+Whole-tree `make -k` to fixpoint: **red = {`ProofIput.v:972`,
+`ProofIlock.v:2422`}** and nothing else — every other file in `iris/` has a
+current `.vo`.  Red-set growth: NONE (t5 clear); the set is the SAME TWO
+FILES as the campaign baseline, at a strictly LATER goal in ProofIlock.
+
+`ProofIlock`'s `Link*` cone (`LinkIlock` and everything above it:
+`LinkCreate`, `LinkSysUnlink`, `LinkFileread`, …) has stale `.vo` and is not
+rebuilt, so the gate's two top-level `Print Assumptions` — on
+`Create.wp_create_sconf` and `SysUnlink.wp_sys_unlink_sconf` — CANNOT be run
+until §5⁗″.2 is ruled.  What CAN be run, and was, is the audit on the
+retired axiom itself (§5⁗″.1 item 7): it reports the standing six alone,
+which is the whole content those two tops would inherit from this item.
+
+#### 5⁗″.4 Tripwires, as fired
+
+  * (T-ireg_ref_ok moving) — DID NOT FIRE.  Byte-identical.
+  * (a site outside the table needing an arm) — DID NOT FIRE.  All 16 sites
+    took exactly the index §5⁗′ assigned them.
+  * (ShotK's exclusivity not closing at the peel) — DID NOT FIRE.  One line,
+    `ity_pending_shot_excl`.
+  * (red-set growth) — DID NOT FIRE.
+  * (t2, span statement drift) — DID NOT FIRE.  `create_fresh_ty_body` moved
+    byte-identically and `ProofCreate:4764` is unchanged.
+  * **NEW, and it is §5⁗″.2**: DEVIATION 1's frozen-checkout obligation is a
+    THIRD un-landed item at ProofIlock that no red-set line in this file has
+    ever named, and RULING C′ removed the licence content its recorded
+    discharge depends on.

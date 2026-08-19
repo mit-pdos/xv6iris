@@ -440,16 +440,18 @@ Section KexecB2Res.
     (* ...and the payload's freeze token (§3.9, RULING A-prime) *)
     ifreeze_off (bv_unsigned inumf) -∗
     inode_ref_short kf (qf + sf)%Qp qf dev inumf -∗
+    runit_any (bv_unsigned inumf) -∗
     kxc_open gfs gi cn cov logstart dev pidv kf qf sf gyf inumf dnf bmf
              gilf gislf.
   Proof.
     rewrite /kxc_open.
-    iIntros "A B C D E F G H I I2 J".
+    iIntros "A B C D E F G H I I2 J K".
     iSplitL "A"; [iExact "A" |]. iSplitL "B"; [iExact "B" |].
     iSplitL "C"; [iExact "C" |]. iSplitL "D"; [iExact "D" |].
     iSplitL "E"; [iExact "E" |]. iSplitL "F"; [iExact "F" |].
     iSplitL "G"; [iExact "G" |]. iSplitL "H"; [iExact "H" |].
-    iSplitL "I"; [iExact "I" |]. iSplitL "I2"; [iExact "I2" | iExact "J"].
+    iSplitL "I"; [iExact "I" |]. iSplitL "I2"; [iExact "I2" |].
+    iSplitL "J"; [iExact "J" | iExact "K"].
   Qed.
 
   (* ------------------------------------------------------------------ *)

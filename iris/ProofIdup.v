@@ -155,7 +155,14 @@ Section ProofIdup.
     intros pcE ret_tgt HK HnZ Hk Ha0 Hfresh.
 
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt #Htext Hpc #Hlock #Hinv #Hrinv Hislot Href Hcont".
+    iIntros "Hcg Hcnt #Htext Hpc #Hlock #Hinv #Hrinv Hislot Href Hru Hcont".
+    (* the caller's unit.  UNDER RULING C' there is only one flavour a rest
+       home can hold ([runit_any] IS [runit_plain]), so the flavour index
+       the mover still takes is pinned at [false] here rather than
+       destructed out of an existential; the copy idup mints is at the SAME
+       flavour, which is what keeps (R3) true. *)
+    iEval (change (runit_any (bv_unsigned inum))
+             with (runit false (bv_unsigned inum))) in "Hru".
     iDestruct (sie_b_agree m n K eb b p lks with "Hcg Hcnt") as %Houtb.
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64)
                         (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
@@ -472,7 +479,8 @@ Section ProofIdup.
                isl_slot (<[k := ((qt + qr/2)%Qp, Pos.succ cnt)]> M) k ∗
                iref_tok k (qr/2)%Qp ∗ live_frac k s ∗
                frzm_h (bv_unsigned inum) false ∗
-               icnt_half (bv_unsigned inum) (Pos.to_nat (Pos.succ cnt)))%I
+               icnt_half (bv_unsigned inum) (Pos.to_nat (Pos.succ cnt)) ∗
+               runit false (bv_unsigned inum) ∗ runit false (bv_unsigned inum))%I
               (* the hole widens by [↑iregN]: the count move carries the
                  ledger's [icnt] half and the region owns the other one.  The
                  store rule's outer mask is hard-coded at [⊤ ∖ ↑minstretN] and
@@ -480,21 +488,22 @@ Section ProofIdup.
                  nothing (iclaim-ledger.md §2.9's structural mask verdict). *)
               (⊤ ∖ ↑minstretN ∖ ↑icacheN ∖ ↑iregN) false
               ltac:(solve_ndisj)
-              with "Hcg Hpc Hi1c [Hhalf Hrlive Hisl Hmir Hicnt]").
+              with "Hcg Hpc Hi1c [Hhalf Hrlive Hisl Hmir Hru Hicnt]").
     { rewrite Hpa2 Hstv.
       (* THE LICENCE-FREE UP-COUNT (iclaim-ledger.md §3.13/§3.19): the mirror
          half decided [false] above stands in for the [iname] no cwd holder
          can produce. *)
       iMod (iref_upgrade_mir_store_au (⊤ ∖ ↑minstretN) γi γfs inodestart nib
-              M k inum qt (qr/2)%Qp s cnt
+              M k inum false qt (qr/2)%Qp s cnt
               ltac:(solve_ndisj) ltac:(solve_ndisj) Hinb HMk Hqv Hno
-              with "Hinv Hrinv Hhalf Hrlive Hisl Hmir Hicnt")
+              with "Hinv Hrinv Hhalf Hrlive Hisl Hmir Hru Hicnt")
         as "[Hcell Hback]".
       iModIntro. iExists (iref_word M k). iFrame "Hcell". iIntros "Hcell".
-      iMod ("Hback" with "Hcell") as "(Hhalf & Hisl & Ht1 & Hlv & Hmir & Hicnt)".
+      iMod ("Hback" with "Hcell")
+        as "(Hhalf & Hisl & Ht1 & Hlv & Hmir & Hicnt & Hru & Hru2)".
       iModIntro. iFrame. }
     iApply wp_next_off_intro.
-    iIntros "Hcg Hpc (Hhalf & Hisl & Ht1 & Hrlive & Hmir & Hicnt)".
+    iIntros "Hcg Hpc (Hhalf & Hisl & Ht1 & Hrlive & Hmir & Hicnt & Hru & Hru2)".
     (* the slot's share authority goes back into the lock's resource at the
        grown map *)
     iDestruct ("Hislback" $! (<[k := ((qt + qr/2)%Qp, Pos.succ cnt)]> M)
@@ -736,7 +745,10 @@ Section ProofIdup.
     iDestruct (cpu_own_transport CIDr CIDe6 n eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iSpecialize ("Hcont" $! CIDe6 with "[]"); [ iPureIntro; wp_next_chain | ].
-    iApply ("Hcont" $! P5 with "Hcg Hcnt Hpc [%] [Hrident Hrlive Hrslh] [Ht1 Hid2]").
+    iApply ("Hcont" $! P5 with "Hcg Hcnt Hpc [%] [Hrident Hrlive Hrslh] [Ht1 Hid2]
+                                 [Hru] [Hru2]").
+    5:{ iApply (runit_any_intro with "Hru2"). }
+    4:{ iApply (runit_any_intro with "Hru"). }
     3:{ iExists (qr/2)%Qp. rewrite /inode_ref. iFrame "Ht1 Hid2". }
     2:{ rewrite /IcacheRef.inode_shr. iFrame "Hrident Hrlive Hrslh". }
     (* callee_saved m P5, and a0 = ip *)

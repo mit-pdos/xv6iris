@@ -1827,7 +1827,7 @@ Section ProofDirlinkMain.
               = mword_of_int (DK + 0x58)) by pcw.
     destruct found.
     - (* =============== THE FOUND ARM: iput, a0 := -1 =============== *)
-      iDestruct "Hres" as "((%Hsome & %Hkslot & %Hdla0) & Href & _)".
+      iDestruct "Hres" as "((%Hsome & %Hkslot & %Hdla0) & Href & Hru & _)".
       iApply (wp_cbnez_taken_s_sconf (mword_of_int (DK + 0x1a))
                 (mword_of_int 31 : mword 8) (Cregidx (mword_of_int 2)) Ra0
                 mdl (K - 10)%nat b
@@ -1899,7 +1899,7 @@ Section ProofDirlinkMain.
                 HE1a0
                 Hbelow
                 with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlog Hitb2 Hitbl Hesck
-                      Hiregi Hslk Href Hsbb Hsbi Hbmr Hppid Hprocs Hdev Hgeom
+                      Hiregi Hslk Href Hru Hsbb Hsbi Hbmr Hppid Hprocs Hdev Hgeom
                       Hdlk Hbsl [] Hop").
       all: try lkbelow.
       { rewrite Heb /trap_csrs_ext. done. }

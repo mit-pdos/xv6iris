@@ -1297,7 +1297,7 @@ Section ProofSysLinkBody.
           iEval (rewrite Hpp42) in "Hpc".
           (* THE REFERENCE namei MADE, taken apart: the slot it names is what
              ilock / iunlock / iupdate / iunlockput are all indexed by. *)
-          iDestruct "Hheldip" as (kk qq inum) "(%Hipe & %Hkk & %Hinumc & Hrefip)".
+          iDestruct "Hheldip" as (kk qq inum) "(%Hipe & %Hkk & %Hinumc & Hrefip & Hru)".
           iEval (rewrite -Hcdev) in "Hrefip".
           assert (Hinb : bv_unsigned inum < 16 * Z.of_nat nib)
             by (rewrite Hcnib; exact Hinumc).
@@ -1355,17 +1355,18 @@ Section ProofSysLinkBody.
           sl_own_transport CID24 CID27 eb pj b.
           iApply (Ilock.wp_ilock_sconf (CID := CID27) gs j gl gu gd gk pd pav pu
                     bn gfs gi cn gil gisl cov logstart inodestart nib
-                    kk (qq/2)%Qp gsh dev inum pid (DfracOwn (1/4)) dqs
+                    kk (qq/2)%Qp gsh PlainK dev inum pid (DfracOwn (1/4)) dqs
                     R0 (K - 38)%nat eb b lks
                     ltac:(exact Kil) Hkk Hgeom Hist0 Hiblk Hinb Hj Hgl HR0a0
                     (Hlb "bcache"%string)
                     with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hitinv Hesck
-                          Hireg Hslkk Hshr Hsbi Hpidq Hprocs Hdev Hgeo Hdlk Hbs1").
+                          Hireg Hslkk Hshr Hru Hsbi Hpidq Hprocs Hdev Hgeo Hdlk
+                          Hbs1").
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }
           iIntros (CID28 Hq28 mil dn bm fl)
             "%Hcsil Hcg Hown _ _ Hpc Hpidq Hsbi Hbs1 Hslkd Hslpid Hdep
-             Hidev Hiinum Hivalid Hload #Hshot Hfrz %Hfl".
+             Hidev Hiinum Hivalid Hload #Hshot Hfrz %Hfl Hru %Hilkp".
           assert (Hpc46 : ret_pc (R0 !!! Regidx Rra : mword 64)
                           = mword_of_int (SL + 0x46)) by (rewrite HR0ra; pcw).
           iEval (rewrite Hpc46) in "Hpc".
@@ -1470,7 +1471,7 @@ Section ProofSysLinkBody.
                        (sl_regs_thr _ _ _ _ _ HR2regs) HR2s1 HR2s2 Hal
                        with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                              Hitab Hitinv Hesck Hireg Hslkk Hslkd Hslpid Hdep
-                             Hidev Hiinum Hivalid Hload Hshot Hfrz Hkeep Hsbb
+                             Hidev Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru Hsbb
                              Hsbi
                              Hbmres Hpidq Hprocs Hdev Hgeo Hdlk Hbsl [HopS]
                              Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
@@ -1623,7 +1624,7 @@ Section ProofSysLinkBody.
                           (sl_regs_thr _ _ _ _ _ HR5regs) HR5s1 HR5s2 Hal
                           with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam
                                 Hgen Hitab Hitinv Hesck Hireg Hslkk Hslkd Hslpid
-                                Hdep Hidev Hiinum Hivalid Hload Hshot Hfrz Hkeep
+                                Hdep Hidev Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru
                                 Hsbb
                                 Hsbi Hbmres Hpidq Hprocs Hdev Hgeo Hdlk Hbsl
                                 [HopS] Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
@@ -2076,7 +2077,7 @@ Section ProofSysLinkBody.
                 ** (* ---------- the parent RESOLVED ---------- *)
                    iDestruct "Hres2" as "(%Hnpe & Hhelddp & Hir1c)".
                    iDestruct "Hhelddp" as (kd qd dinum gyd)
-                     "(%Hdpe & %Hkd & %Hdinumc & Hrefdp & #Hshotd)".
+                     "(%Hdpe & %Hkd & %Hdinumc & Hrefdp & #Hshotd & Hrud)".
                    assert (Hdpnz : dpv <> (zero_reg : mword 64))
                      by (rewrite Hdpe; apply ientry_ne_zero; lia).
                    assert (Hu3 : (sl_u3 w1 w2 <= n2)%nat)
@@ -2171,19 +2172,20 @@ Section ProofSysLinkBody.
                    sl_own_transport CID48 CID51 eb pj b.
                    iApply (Ilock.wp_ilock_sconf (CID := CID51) gs j gl gu gd gk pd
                              pav pu bn gfs gi cn gild gisld cov logstart inodestart
-                             nib kd (qd/2)%Qp gyd dev dinum pid (DfracOwn (1/4)) dqs
+                             nib kd (qd/2)%Qp gyd PlainK dev dinum pid
+                             (DfracOwn (1/4)) dqs
                              U0 (K - 38)%nat eb b lks
                              ltac:(exact Kil) Hkd Hgeom Hist0 Hdiblk Hdinb Hj Hgl
                              HU0a0 (Hlb "bcache"%string)
                              with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hitinv
-                                   Hescd Hireg Hslkd0 Hshrd Hsbi Hpidq Hprocs Hdev
-                                   Hgeo Hdlk Hbs1d").
+                                   Hescd Hireg Hslkd0 Hshrd Hrud Hsbi Hpidq Hprocs
+                                   Hdev Hgeo Hdlk Hbs1d").
                    { rewrite Heb /trap_csrs_ext. done. }
                    { rewrite Heb /cpu_claim_ext. done. }
                    iIntros (CID52 Hq52 mild dnd bmd fld)
                      "%Hcsild Hcg Hown _ _ Hpc Hpidq Hsbi Hbs1d Hslkdd Hslpidd
                       Hdepd Hidevd Hiinumd Hivalidd Hloadd #Hshotd2 Hfrzd
-                      %Hfld".
+                      %Hfld Hrud %Hilkpd".
                    (* ilock's RETURN ADDRESS IS +0x84, NOT +0x8a.  The
                       relayout maps offsets by where the OLD instruction
                       went, and old +0x84 (the [c.mv a0,s2]) went to +0x8a --
@@ -2324,10 +2326,10 @@ Section ProofSysLinkBody.
                                Hncd
                                with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog Hseam
                                      Hgen Hitab Hitinv Hesck Hescd Hireg Hslkk
-                                     Hslkd0 Hkeep Hshr Hshot2 Hilink Hslkdd
+                                     Hslkd0 Hkeep Hru Hshr Hshot2 Hilink Hslkdd
                                      Hslpidd
                                      Hdepd Hidevd Hiinumd Hivalidd Hloadd Hshotd2
-                                     Hfrzd Hkeepd Hsbb Hsbi Hbmres Hpidq Hprocs Hdev
+                                     Hfrzd Hkeepd Hrud Hsbb Hsbi Hbmres Hpidq Hprocs Hdev
                                      Hgeo Hdlk Hbsl HopE Hf1 Hf2 Hf3 Hf4
                                      HbN HbW HbO
                                      [Hsbs Hir1c Hcwd Hcwdref Hpback Hcont]").
@@ -2694,10 +2696,10 @@ Section ProofSysLinkBody.
                                  Hncd
                                  with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog Hseam
                                        Hgen Hitab Hitinv Hesck Hescd Hireg Hslkk
-                                       Hslkd0 Hkeep Hshr Hshot2 Hilink Hslkdd
+                                       Hslkd0 Hkeep Hru Hshr Hshot2 Hilink Hslkdd
                                        Hslpidd
                                        Hdepd Hidevd Hiinumd Hivalidd Hloadd Hshotd2
-                                       Hfrzd Hkeepd Hsbb Hsbi Hbmres Hpidq Hprocs Hdev
+                                       Hfrzd Hkeepd Hrud Hsbb Hsbi Hbmres Hpidq Hprocs Hdev
                                        Hgeo Hdlk Hbsl HopE Hf1 Hf2 Hf3 Hf4
                                        HbN HbW HbO
                                        [Hsbs Hir1c Hcwd Hcwdref Hpback Hcont]").
@@ -2947,7 +2949,7 @@ Section ProofSysLinkBody.
                                       with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog
                                             Hitab Hitinv Hescd Hireg Hslkd0 Hslkdd
                                             Hslpidd Hdepd Hidevd Hiinumd Hivalidd
-                                            Hloadd Hshotd3 Hfrzd Hkeepd Hsbb Hsbi
+                                            Hloadd Hshotd3 Hfrzd Hkeepd Hrud Hsbb Hsbi
                                             Hbmres
                                             Hpidq Hprocs Hdev Hgeo Hdlk Hbsl [] HopE").
                             { rewrite Heb /trap_csrs_ext. done. }
@@ -3030,7 +3032,7 @@ Section ProofSysLinkBody.
                                       Hgl HW3a0
                                       ltac:(rewrite Hlkempty; apply locks_below_empty)
                                       with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog
-                                            Hitab Hitinv Hesck Hireg Hslkk Hrefip
+                                            Hitab Hitinv Hesck Hireg Hslkk Hrefip Hru
                                             Hsbb Hsbi Hbmres Hpidq Hprocs Hdev Hgeo
                                             Hdlk Hbsl [HopS]").
                             { rewrite Heb /trap_csrs_ext. done. }
@@ -3317,10 +3319,10 @@ Section ProofSysLinkBody.
                                       Hncd
                                       with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog
                                             Hseam Hgen Hitab Hitinv Hesck Hescd
-                                            Hireg Hslkk Hslkd0 Hkeep Hshr Hshot2
+                                            Hireg Hslkk Hslkd0 Hkeep Hru Hshr Hshot2
                                             Hilink
                                             Hslkdd Hslpidd Hdepd Hidevd Hiinumd
-                                            Hivalidd Hloadd Hshotd3 Hfrzd Hkeepd
+                                            Hivalidd Hloadd Hshotd3 Hfrzd Hkeepd Hrud
                                             Hsbb
                                             Hsbi Hbmres Hpidq Hprocs Hdev Hgeo
                                             Hdlk Hbsl HopE Hf1 Hf2 Hf3 Hf4
@@ -3401,7 +3403,7 @@ Section ProofSysLinkBody.
                              (sl_regs_thr _ _ _ _ _ HT3regs)
                              (sl_regs_s1 _ _ _ _ _ HT3regs) Hal Hncd
                              with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
-                                   Hitab Hitinv Hesck Hireg Hslkk Hkeep Hshr
+                                   Hitab Hitinv Hesck Hireg Hslkk Hkeep Hru Hshr
                                    Hshot2 Hilink Hsbb Hsbi Hbmres Hpidq Hprocs
                                    Hdev Hgeo
                                    Hdlk Hbsl HopS Hf1 Hf2 Hf3 Hf4 HbN HbW HbO

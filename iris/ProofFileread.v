@@ -1801,14 +1801,14 @@ Section ProofFileread.
                        (frn_bio fn) (frn_fs fn) (frn_ireg fn) (frn_ic fn)
                        gil gisl
                        (frn_cov fn) (frn_logstart fn) (frn_inodestart fn)
-                       icfg_nib ikk (ssh/2)%Qp gsh
+                       icfg_nib ikk (ssh/2)%Qp gsh (ShotK ty0)
                        icfg_dev inm
                        pidv (DfracOwn (1/4)) (frn_dqs fn)
                        I2 (K - 6)%nat eb b
                        _ (fr_av_ilock K HK) Hik Hlg Hist Hibcov Hinlt Hj Hgs
                        ltac:(rewrite HI2a0; exact Hipk) Hbelow
                        with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hitbl Hesc Hireg
-                             Hslk Href Hsb Hppid Hprocs
+                             Hslk Href Hshot0 Hsb Hppid Hprocs
                              Hdevi Hdgeom Hdlock Hbslot").
              all: try lkbelow.
              { rewrite Heb /trap_csrs_ext. done. }
@@ -1818,7 +1818,7 @@ Section ProofFileread.
                 (design §14.8) *)
              iIntros (CIDil Hsil mil dnl bml fl_)
                "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hsb Hbslot Hheld Hslpid Hdep
-                Hidev Hinum Hvalid Hlk #Hshot Hfrz %Hfr_".
+                Hidev Hinum Hvalid Hlk #Hshot Hfrz %Hfr_ _ %Hilkp".
              iDestruct ("Hpivbk" with "Hppid") as "Hpriv".
              assert (Hpc34 : ret_pc (I2 !!! Regidx Rra) = mword_of_int (FR + 0x34)).
              { rewrite HI2ra. apply bv_eq; vm_compute; reflexivity. }

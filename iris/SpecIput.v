@@ -209,6 +209,13 @@ Definition wp_iput_sconf_body
                    (slh_tok (icfg_isl k)) -∗
   (* ---- THE REFERENCE BEING DESTROYED ---- *)
   inode_ref k q dev inum -∗
+  (* THE CLOSING REFERENCE's PROVENANCE UNIT (item 7a-wire, iclaim-ledger.md
+     §5''.3).  Minted at the iget that created this reference, copied at any
+     idup of it, and SPENT here: iput's close -- last or not -- surrenders it
+     in the same ghost step that moves the in-core count, which is what
+     [InodeRegion.ireg_ref_ok]'s (R1) demands.  The flavour is the one the
+     minting licence chose and iput does not care which. *)
+  runit_any (bv_unsigned inum) -∗
   (* ---- itrunc / iupdate's own resources ---- *)
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -383,6 +390,13 @@ Definition wp_iput_gen_body
   is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k)
                    (slh_tok (icfg_isl k)) -∗
   inode_ref k q dev inum -∗
+  (* THE CLOSING REFERENCE's PROVENANCE UNIT (item 7a-wire, iclaim-ledger.md
+     §5''.3).  Minted at the iget that created this reference, copied at any
+     idup of it, and SPENT here: iput's close -- last or not -- surrenders it
+     in the same ghost step that moves the in-core count, which is what
+     [InodeRegion.ireg_ref_ok]'s (R1) demands.  The flavour is the one the
+     minting licence chose and iput does not care which. *)
+  runit_any (bv_unsigned inum) -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   bitmap_res gfs bmapstart cov logstart size used -∗

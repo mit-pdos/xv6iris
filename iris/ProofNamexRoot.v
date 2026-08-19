@@ -554,19 +554,19 @@ Section ProofNamexRoot.
     iApply (IG.wp_iget_sconf gtl cn gfs gi cov logstart inodestart nib dev ROOTINO
               RootL
               A3 n eb p (K - 12)%nat b lks
-              Kig Hn Hrino HA3a0 HA3a1 Hbelow
+              Kig Hn Hrino ltac:(discriminate) HA3a0 HA3a1 Hbelow
               with "Hcg Hcnt Htext Hkd Hpc Hitb2 Hitbl Hesc Hireg Hpenv Hisl Hlic").
-    iIntros (CIDig Hqig mig kig qig) "Hcg Hcnt Hpc %Higp Href _".
+    iIntros (CIDig Hqig mig kig qig) "Hcg Hcnt Hpc %Higp Href Hru _".
     destruct Higp as (Hcsig & Hkig & Higa0).
     assert (Hpc050 : ret_pc (A3 !!! Regidx Rra) = mword_of_int (NX + 0x50)).
     { rewrite HA3ra. pcw. }
     iEval (rewrite Hpc050) in "Hpc".
     (* the answer, in the currency the contract speaks *)
-    iAssert (inode_held (ientry kig)) with "[Href]" as "Hip".
+    iAssert (inode_held (ientry kig)) with "[Href Hru]" as "Hip".
     { rewrite /inode_held. iExists kig, qig, ROOTINO.
       iSplitR; [done |]. iSplitR; [iPureIntro; exact Hkig |].
       iSplitR; [iPureIntro; rewrite -Hnib; exact Hrino |].
-      rewrite -Hdev. iExact "Href". }
+      iFrame "Hru". rewrite -Hdev. iExact "Href". }
     (* ===== +0x050 c.mv s4,a0 ===== *)
     iApply (wp_cmv_s_sconf (mword_of_int (NX + 0x50)) Rs4 Ra0 mig (K - 12)%nat b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi050").

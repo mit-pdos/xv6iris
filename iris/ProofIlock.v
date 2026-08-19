@@ -370,7 +370,7 @@ Section IlockDefs.
      caller, so both arms of the function have to carry it to the join. *)
   Definition il_cont `{GEN : GenId} `{CID0 : CpuId} 
       (gfs : fs_names) (gi : gname) (gisl : gname) (bn : bio_names)
-      (cn : ic_names) (s : Qp) (g : gname)
+      (cn : ic_names) (s : Qp) (g : gname) (o : ilkc)
       (cov : gset Z) (logstart : Z) (inodestart : Z)
       (k : nat) (ip : mword 64) (dev inum : mword 32)
       (pidv : mword 32) (dq dqs : dfrac) (j : nat)
@@ -398,10 +398,21 @@ Section IlockDefs.
         i_valid ip ↦₄ valid_word true -∗
         ic_loaded gfs gi cov logstart k inum dn bm -∗
         ity_shot g (di_type dn) -∗
+        (* ...AND THE INUM'S FREEZE TOKEN (iclaim-ledger.md §3.9, RULING
+           A-prime).  It rides the PAYLOAD ([IcacheEscrow.ic_payload]'s
+           A-custody conjunct), so a checked-out holder has it on BOTH arms:
+           the cached one splits it off the payload it takes out, the
+           uncached one carries it past the fill.  Routing it to this post
+           is what [SpecIlock] has asked for since IVb; create's fresh child
+           pays [wp_iupdate_link]'s freeze pin with it. *)
+        ifreeze_off (bv_unsigned inum) -∗
         (* §16.4's CLAIM BOX, exposed: [true] exactly on the fill sub-arm
            [InodeRegion.ireg_withdraw] serves, where [fresh_shape] is a
            theorem the arm already had and used to drop. *)
         ⌜filled = true -> fresh_shape dn⌝ -∗
+        (* ...AND THE LICENCE's PAYOUT, per RULING C' (SpecIlock's header) *)
+        ireg_wd_back o g (bv_unsigned inum) -∗
+        ⌜ilk_post o filled dn⌝ -∗
         WP (Loop : expr riscv_lang))%I.
 
 End IlockDefs.
@@ -415,7 +426,7 @@ Section IlockEpilogue.
 
   Local Lemma il_epilogue `{GEN : GenId} `{CID0 : CpuId} 
       (j : nat) (gfs : fs_names) (gi : gname) (gisl : gname) (bn : bio_names)
-      (cn : ic_names) (s : Qp) (g : gname)
+      (cn : ic_names) (s : Qp) (g : gname) (o : ilkc)
       (cov : gset Z) (logstart : Z) (inodestart : Z)
       (k : nat) (ip : mword 64) (dev inum : mword 32)
       (dn : dinode) (bm : blkmap) (filled : bool)
@@ -425,6 +436,7 @@ Section IlockEpilogue.
     il_sp m M ->
     il_thr5 m M ->
     (filled = true -> fresh_shape dn) ->
+    ilk_post o filled dn ->
     sie_cap_gpr KT1 M (K - 4)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) b lks -∗
     trap_csrs_ext KT1 eb -∗
@@ -443,14 +455,16 @@ Section IlockEpilogue.
     i_valid ip ↦₄ valid_word true -∗
     ic_loaded gfs gi cov logstart k inum dn bm -∗
     ity_shot g (di_type dn) -∗
-    il_cont (CID0 := CID0)  gfs gi gisl bn cn s g cov logstart inodestart k ip
+    ifreeze_off (bv_unsigned inum) -∗
+    ireg_wd_back o g (bv_unsigned inum) -∗
+    il_cont (CID0 := CID0)  gfs gi gisl bn cn s g o cov logstart inodestart k ip
             dev inum pidv dq dqs j m K eb b lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hsp Hthr Hfr.
+    intros HK Hsp Hthr Hfr Hpost.
     pose proof HK as HK'. 
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc Hframe Hppid Hsb
-              Hsl Hstok Hpid Hdep Hidev Hinumc Hvalid Hlk #Hshot Hcont".
+              Hsl Hstok Hpid Hdep Hidev Hinumc Hvalid Hlk #Hshot Hfoff Hwb Hcont".
     (* LEVEL 0 TIES THE TWO INDICES: ilock never push_off's on its own (only
        acquiresleep/bread do, opaquely), so [cpu_own]'s [n] is [0] throughout
        and [cpu_own_eb_agree] gives [eb = b] outright (kept as a hypothesis,
@@ -649,9 +663,10 @@ Section IlockEpilogue.
     rewrite /il_cont.
     iSpecialize ("Hcont" $! CID5 with "[%]"); [wp_next_chain |].
     iApply ("Hcont" $! P4 dn bm filled with "[%] Hcg Hcnt Hextc Hextm Hpc Hppid Hsb
-                     Hsl Hstok Hpid Hdep Hidev Hinumc Hvalid Hlk Hshot [%]").
+                     Hsl Hstok Hpid Hdep Hidev Hinumc Hvalid Hlk Hshot Hfoff [%] Hwb [%]").
     { unfold callee_saved. split_and!; assumption. }
     { exact Hfr. }
+    { exact Hpost. }
   Qed.
 
 End IlockEpilogue.
@@ -700,13 +715,16 @@ Section IlockLoad.
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (gfs : fs_names) (gi : gname) (gisl : gname)
-      (cn : ic_names) (s : Qp) (g : gname)
+      (cn : ic_names) (s : Qp) (g : gname) (o : ilkc)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
       (dev : mword 32)
       (k : nat) (ip : mword 64) (inum : mword 32)
       (pidv : mword 32) (dq dqs : dfrac)
       (m M : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) :
     (K_ilock <= K)%nat ->
+    (* [ShotK] never gets here: its one-shot refutes this whole arm at the
+       caller, five hundred lines up (RULING C'). *)
+    ilk_fills o ->
     il_sp m M ->
     il_thr5 m M ->
     M !!! Regidx Rs1 = ip ->
@@ -761,11 +779,18 @@ Section IlockLoad.
        pair it already splits, and this arm SPENDS it against the record the
        [bread] returns.  [g] was already one of this lemma's parameters. *)
     ity_pending g -∗
-    il_cont (CID0 := CID0)  gfs gi gisl bn cn s g cov logstart inodestart k ip
+    (* ...AND THE A-PRIME TOKEN, split off the same payload and carried
+       straight through to the post (iclaim-ledger.md §3.9). *)
+    ifreeze_off (bv_unsigned inum) -∗
+    (* THE FILL's LICENCE (RULING C'): [ClaimK]'s pair, which the withdraw
+       CONVERTS, or [PlainK]'s borrowed unit, which refutes the box arm and
+       comes back.  See [SpecIlock]'s header. *)
+    ireg_wd_lic o g (bv_unsigned inum) -∗
+    il_cont (CID0 := CID0)  gfs gi gisl bn cn s g o cov logstart inodestart k ip
             dev inum pidv dq dqs j m K eb b lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hsp Hthr HMs1 Hip Hk Hgeom Hst Hcov Hinlt Hj Hgl Hbelow.
+    intros HK Hfills Hsp Hthr HMs1 Hip Hk Hgeom Hst Hcov Hinlt Hj Hgl Hbelow.
     pose proof HK as HK'. 
     destruct Hgeom as [Hcovok Hlogsub].
     destruct (Hcovok _ Hcov) as [Hibpos Hiblt].
@@ -792,7 +817,7 @@ Section IlockLoad.
     pose proof (il_thr6_of_5 m M Hthr) as Hthr6.
     iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hireg #Hprocs #Hdevi #Hdgeom
               #Hdlock Hframe Hppid Hidev Hinumc Hsb Hsl
-              Hstok Hpid Hdep Hvalid Hraw Hpool Hpend Hcont".
+              Hstok Hpid Hdep Hvalid Hraw Hpool Hpend Hfoff Hcl Hcont".
     (* LEVEL 0 TIES THE TWO INDICES, as in [il_epilogue]. *)
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Heb2b. cbn in Heb2b.
     (* THE POOL ENTRY STAYS OPAQUE UNTIL THE BUFFER HAS BEEN READ (§16.4).
@@ -1077,8 +1102,10 @@ Section IlockLoad.
     iAssert (|={⊤}=>
                ((IBLOCK inum inodestart) ↪[fs_L gfs]{#(1/2)} (diblk_bytes ds)) ∗
                ((dinode_at gi inum dn ∗
+                 ireg_wd_back o g (bv_unsigned inum) ∗
                  (∃ (fl : bool) (bm : blkmap) (data : nat -> list (bv 8)),
                     ⌜fl = true -> fresh_shape dn⌝ ∗
+                    ⌜ilk_post o fl dn⌝ ∗
                     ⌜inode_ok cov logstart dn bm data⌝ ∗
                     ⌜dir_ok icfg_nib dn data⌝ ∗
                     ⌜dir_dots_ix (bv_unsigned inum) dn data⌝ ∗
@@ -1087,7 +1114,7 @@ Section IlockLoad.
                     dir_links (bv_unsigned inum) dn data ∗
                     ind_res gfs bm ∗ inode_blocks gfs bm data))
                 ∨ ⌜bv_unsigned (di_type dn) = 0⌝))%I
-      with "[Hpool HL]" as ">[HL Hrest]".
+      with "[Hpool HL Hcl]" as ">[HL Hrest]".
     { (* NO PEEL HERE ANY MORE (iclaim-ledger.md §3.5 item 7).  OPTION A
          (b)(ii)'s redeem -- [ipool_shape_to_np] -- happened once, at the
          RECYCLE that cached this entry, and what the unloaded payload holds
@@ -1106,12 +1133,33 @@ Section IlockLoad.
         assert (Hds1 : ds1 = ds)
           by exact (diblk_bytes_inj ds1 ds Hwf1 Hdswf (eq_sym Hbs1)).
         subst ds1. rewrite Hagr in Hagr1. subst dn0.
-        iModIntro. iFrame "HL". iLeft. iFrame "Hdn".
+        (* RULING C' (iclaim-ledger.md §5'''''): THIS ARM REFUTES [ClaimK].
+           A pool bundle holds the inum's [dinode_at], i.e. the record is
+           OUT of the region -- and while an [iclaim] is outstanding the
+           record is IN it ([InodeRegion.ireg_claim_no_out]).  So a
+           claimant's fill cannot land here, which is half of why its post
+           can pin [filled = true].  The other two indices owe nothing: the
+           plain unit is returned untouched and the one-shot never got
+           here at all. *)
+        iAssert (|={⊤}=> dinode_at gi inum dn
+                         ∗ ireg_wd_back o g (bv_unsigned inum)
+                         ∗ ⌜ilk_post o false dn⌝)%I
+          with "[Hdn Hcl]" as ">(Hdn & Hwb & %Hpost0)".
+        { destruct o as [tyc | | tys].
+          - iDestruct "Hcl" as "[Hcl _]".
+            iMod (ireg_claim_no_out ⊤ gi gfs inodestart nib inum dn tyc
+                    ltac:(solve_ndisj) Hinlt with "Hireg Hdn Hcl") as %[].
+          - iModIntro. iSplitL "Hdn"; [iExact "Hdn" |].
+            iSplitL "Hcl"; [iExact "Hcl" |]. iPureIntro. exact I.
+          - iModIntro. iSplitL "Hdn"; [iExact "Hdn" |].
+            iSplitL "Hcl"; [iExact "Hcl" |]. iPureIntro. reflexivity. }
+        iModIntro. iFrame "HL". iLeft. iFrame "Hdn Hwb".
         (* THE ORDINARY FILL: the pool's allocated bundle, whose record has
            real size and real blocks -- [fresh_shape] is FALSE here, which
            is why the indicator is a boolean and not a fact. *)
         iExists false, bm0, data0.
         iSplitR; [iPureIntro; discriminate |].
+        iSplitR; [iPureIntro; exact Hpost0 |].
         iSplitR; [iPureIntro; exact Hok0 |].
         iSplitR; [iPureIntro; exact Hdok0 |].
         iSplitR; [iPureIntro; exact Hddix0 |].
@@ -1121,20 +1169,24 @@ Section IlockLoad.
       - destruct (decide (bv_unsigned (di_type dn) = 0)) as [Ht0 | Htnz].
         + iModIntro. iFrame "HL". iRight. iPureIntro. exact Ht0.
         + iMod (ireg_withdraw ⊤ gi gfs inodestart nib inum ds
-                  (IBLOCK inum inodestart) (diblk_bytes ds)
-                  ltac:(solve_ndisj) Hinlt eq_refl Hdswf eq_refl
+                  (IBLOCK inum inodestart) (diblk_bytes ds) o g
+                  ltac:(solve_ndisj) Hfills Hinlt eq_refl Hdswf eq_refl
                   ltac:(rewrite Hagr; exact Htnz)
-                  with "Hireg Hmk HL") as "(%Hfresh & Hdn & HL)".
-          rewrite Hagr in Hfresh.
+                  with "Hireg Hmk Hcl HL") as "(%Hfresh & %Hty & Hwb & Hdn & HL)".
+          rewrite Hagr in Hfresh. rewrite Hagr in Hty.
           iEval (rewrite Hagr) in "Hdn".
           pose proof Hfresh as Hfr0.
           destruct Hfresh as (Hfty & Hfsz & Hfad & _).
-          iModIntro. iFrame "HL". iLeft. iFrame "Hdn".
+          iModIntro. iFrame "HL". iLeft. iFrame "Hdn Hwb".
           (* §16.4's CLAIM BOX: [ireg_withdraw] just PAID [fresh_shape], and
              this is where it now leaves the function instead of being spent
              on [inode_ok]/[dir_ok] and dropped. *)
           iExists true, bm_empty, (fun _ => replicate BSIZE (bv_0 8)).
           iSplitR; [iPureIntro; intros _; exact Hfr0 |].
+          (* THE PAYOUT, PER INDEX: at [ClaimK] this is [create_fresh_ty]'s
+             own conjunct -- the fill IS forced and the record IS the one
+             the claim wrote. *)
+          iSplitR; [iPureIntro; exact (ilk_post_fill o dn Hfills Hty) |].
           iSplitR.
           { iPureIntro. rewrite /inode_ok. split_and!.
             - exact (bm_empty_wf cov logstart).
@@ -1889,7 +1941,7 @@ Section IlockLoad.
     iPoseProof (ili_a2 with "Htext") as "Hia2".
     iPoseProof (ili_a6 with "Htext") as "Hia6".
     iPoseProof (ili_aa with "Htext") as "Hiaa".
-    iDestruct "Hrest" as "[[Hdn Hal] | %Ht0]"; last first.
+    iDestruct "Hrest" as "[[Hdn [Hwb Hal]] | %Ht0]"; last first.
     { (* ===== FREE INODE: the branch is TAKEN, and ilock DIVERGES ===== *)
       assert (Htk2 : add_vec (mword_of_int (KernelSyms.ilock + 0x9c) : mword 64)
                        (sign_extend' 64 (sign_extend' 13
@@ -1962,7 +2014,7 @@ Section IlockLoad.
     (* ===== ALLOCATED INODE: the type is nonzero and the branch falls
        through, exactly as v1's dead arm did ===== *)
     iDestruct "Hal" as (fl bm data)
-      "(%Hfr & %Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hindres & Hblocks)".
+      "(%Hfr & %Hpost & %Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hindres & Hblocks)".
     destruct Hok as (Hwf & Hcovers & Hda & Htynz & Hszcap & Hholes & Hsized).
     pose proof (blkmap_wf_dir_len _ _ _ Hwf) as Hdirlen.
     assert (Hcelllen : length (bm_cells bm) = 13%nat)
@@ -2025,13 +2077,13 @@ Section IlockLoad.
     iDestruct (cpu_claim_ext_transport CID9 CID39 eb (proc_addr j)
                  ltac:(rewrite Heb2b; wp_next_chain) with "Hextm") as "Hextm".
     iEval (rewrite -valid_word_true) in "Hvalid".
-    iApply (il_epilogue (CID0 := CID39)  j gfs gi gisl bn cn s g cov logstart inodestart
+    iApply (il_epilogue (CID0 := CID39)  j gfs gi gisl bn cn s g o cov logstart inodestart
               k ip dev inum dn bm fl pidv dq dqs m Z0 K eb b lks
-              HK HZ0sp HZ0thr Hfr
+              HK HZ0sp HZ0thr Hfr Hpost
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hframe Hppid Hsb Hsl Hstok Hpid
                     Hdep Hidev Hinumc Hvalid
                     [Hmty Hmmaj Hmmin Hmnl Hmsz Haddrs Hindres Hblocks Hdn Hdlk]
-                    Hshot [Hcont]").
+                    Hshot Hfoff Hwb [Hcont]").
     { rewrite /ic_loaded -Hip. iExists data.
       iSplitR.
       { iPureIntro. rewrite /inode_ok. split_and!; assumption. }
@@ -2070,12 +2122,12 @@ Section ProofIlockMain.
       (cn : ic_names)
       (gil gisl : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
-      (k : nat) (s : Qp) (g : gname) (dev inum : mword 32)
+      (k : nat) (s : Qp) (g : gname) (o : ilkc) (dev inum : mword 32)
       (pidv : mword 32) (dq dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
     : wp_ilock_sconf_body gs j gl gu gd gk pd pav pu bn gfs gi cn gil gisl
-                          cov logstart inodestart nib k s g dev inum
+                          cov logstart inodestart nib k s g o dev inum
                           pidv dq dqs m K eb b lks.
   Proof.
     cbv beta delta [wp_ilock_sconf_body].
@@ -2085,10 +2137,10 @@ Section ProofIlockMain.
     assert (Hipnz : uint ip <> 0)
       by (rewrite Hipe; exact (il_entry_nonzero k Hk)).
     iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hitbl #Hesc #Hireg #Hslk
-              Href Hsb Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hcont".
+              Href Hcl Hsb Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hcont".
     (* LEVEL 0 TIES THE TWO INDICES, as in [il_epilogue]/[il_load]. *)
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Heb2b. cbn in Heb2b.
-    iAssert (il_cont (CID0 := CID)  gfs gi gisl bn cn s g cov logstart inodestart k ip
+    iAssert (il_cont (CID0 := CID)  gfs gi gisl bn cn s g o cov logstart inodestart k ip
                dev inum pidv dq dqs j m K eb b lks)%I
       with "[Hcont]" as "Hcont"; [rewrite /il_cont; iExact "Hcont" |].
     iPoseProof (ili_00 with "Htext") as "Hi00".
@@ -2415,11 +2467,39 @@ Section ProofIlockMain.
       (* the CACHED arm's witness is the one the FILL that loaded this entry
          minted, riding on the payload's TRUE polarity (design §17.6 (1)) --
          so this arm proves the post's new conjunct with no work at all. *)
+      (* A-PRIME's TOKEN comes off the payload here, exactly as it does on
+         the uncached arm below (iclaim-ledger.md §3.9). *)
+      iDestruct (ic_payload_split with "Hpay") as "[Hpay Hfoff]".
       iAssert (∃ (dn0 : dinode) (bm0 : blkmap),
                  ic_loaded gfs gi cov logstart k inum dn0 bm0 ∗
                  ity_shot g (di_type dn0))%I
         with "[Hpay]" as "Hpay2"; [iExact "Hpay" |].
       iDestruct "Hpay2" as (dnp bmp) "[Hlk #Hshot]".
+      (* THE CACHED ARM REFUTES [ClaimK] (RULING C', iclaim-ledger.md
+         §5''''').  This entry was loaded by an earlier fill, so its
+         [ic_loaded] carries the inum's [dinode_at] -- the record is OUT of
+         the region.  A standing [iclaim] says the opposite
+         ([InodeRegion.ireg_claim_no_out]), so no claimant can reach here
+         and its post's [filled = true] is a theorem.  The other two
+         indices pay nothing: the plain unit goes back untouched, the
+         one-shot is persistent and was never taken. *)
+      iApply fupd_wp.
+      iAssert (|={⊤}=> ic_loaded gfs gi cov logstart k inum dnp bmp
+                       ∗ ireg_wd_back o g (bv_unsigned inum)
+                       ∗ ⌜ilk_post o false dnp⌝)%I
+        with "[Hlk Hcl]" as ">(Hlk & Hwb & %Hpost)".
+      { destruct o as [tyc | | tys].
+        - iDestruct "Hcl" as "[Hcl _]".
+          rewrite /ic_loaded.
+          iDestruct "Hlk" as (datx)
+            "(%Hokx & %Hdokx & %Hddixx & %Hdocx & %Hduqx & Hdlkx & Hdnx & Hrestx)".
+          iMod (ireg_claim_no_out ⊤ gi gfs inodestart nib inum dnp tyc
+                  ltac:(solve_ndisj) Hinlt with "Hireg Hdnx Hcl") as %[].
+        - iModIntro. iSplitL "Hlk"; [iExact "Hlk" |].
+          iSplitL "Hcl"; [iExact "Hcl" |]. iPureIntro. exact I.
+        - iModIntro. iSplitL "Hlk"; [iExact "Hlk" |].
+          iSplitL "Hcl"; [iExact "Hcl" |]. iPureIntro. reflexivity. }
+      iModIntro.
       iDestruct (cpu_own_transport CIDa CID13 0 eb (proc_addr j) b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (trap_csrs_ext_transport CIDa CID13 eb (proc_addr j)
@@ -2431,11 +2511,11 @@ Section ProofIlockMain.
       (* THE CACHED ARM REPORTS [filled = false]: the entry was loaded by
          some earlier fill and its record is whatever that fill read, so
          [fresh_shape] is not available and not claimed. *)
-      iApply (il_epilogue (CID0 := CID13)  j gfs gi gisl bn cn s g cov logstart
+      iApply (il_epilogue (CID0 := CID13)  j gfs gi gisl bn cn s g o cov logstart
                 inodestart k ip dev inum dnp bmp false pidv dq dqs m Q1 K eb b lks
-                HK HQ1sp HQ1thr ltac:(discriminate)
+                HK HQ1sp HQ1thr ltac:(discriminate) Hpost
                 with "Hcg Hcnt Hextc Hextm Htext Hpc Hframe Hppid Hsb Hsl Hstok Hpid
-                      Hdep Hidev Hinumc Hvalid Hlk Hshot Hcont").
+                      Hdep Hidev Hinumc Hvalid Hlk Hshot Hfoff Hwb Hcont").
     - (* ---- UNCACHED: valid = 0, branch to +0x36 ---- *)
       assert (Htk : add_vec (mword_of_int (KernelSyms.ilock + 0x1c) : mword 64)
                       (sign_extend' 64 (sign_extend' 13
@@ -2467,6 +2547,22 @@ Section ProofIlockMain.
         [rewrite /ic_payload /ic_payload_np /ic_unloaded;
          iDestruct "Hpay" as "[[[$ $] $] $]" |].
       iEval (rewrite -Hipe) in "Hraw".
+      (* THE UNCACHED ARM REFUTES [ShotK] (RULING C').  This arm's payload
+         carries the generation's PENDING one-shot -- the fill has not run
+         for [g] yet -- and the fd sites hold its SHOT twin, which is what
+         they present in place of a unit.  The two cannot coexist
+         ([IcacheRef.ity_pending_shot_excl]), so the three fd callers never
+         reach the fill and their post's [filled = false] is a theorem.
+         What comes out is [ilk_fills o], the premise [il_load] takes. *)
+      iAssert (ireg_wd_lic o g (bv_unsigned inum) ∗ ity_pending g
+               ∗ ⌜ilk_fills o⌝)%I
+        with "[Hcl Hpend]" as "(Hcl & Hpend & %Hfills)".
+      { destruct o as [tyc | | tys].
+        - iSplitL "Hcl"; [iExact "Hcl" |].
+          iSplitL "Hpend"; [iExact "Hpend" |]. iPureIntro. exact I.
+        - iSplitL "Hcl"; [iExact "Hcl" |].
+          iSplitL "Hpend"; [iExact "Hpend" |]. iPureIntro. exact I.
+        - iDestruct (ity_pending_shot_excl with "Hpend Hcl") as %[]. }
       iDestruct (cpu_own_transport CIDa CID13 0 eb (proc_addr j) b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (trap_csrs_ext_transport CIDa CID13 eb (proc_addr j)
@@ -2476,13 +2572,13 @@ Section ProofIlockMain.
       iDestruct (wp_next_shift (b := true) (CIDa := CID11) (CIDb := CID13) ltac:(wp_next_chain)
                    with "Hcont") as "Hcont".
       iApply (il_load (CID0 := CID13)  gs j gl gu gd gk pd pav pu bn gfs gi gisl
-                cn s g cov logstart inodestart nib dev k ip inum
+                cn s g o cov logstart inodestart nib dev k ip inum
                 pidv dq dqs m Q1 K eb b lks
-                HK HQ1sp HQ1thr HQ1s1 Hipe Hk Hgeom Hst Hcov Hinlt Hj Hgl
+                HK Hfills HQ1sp HQ1thr HQ1s1 Hipe Hk Hgeom Hst Hcov Hinlt Hj Hgl
                 Hbelow
                 with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hireg Hprocs Hdevi Hdgeom
                       Hdlock Hframe Hppid Hidev Hinumc Hsb
-                      Hsl Hstok Hpid Hdep Hvalid Hraw Hpool Hpend Hcont").
+                      Hsl Hstok Hpid Hdep Hvalid Hraw Hpool Hpend Hfoff Hcl Hcont").
   Qed.
 
 End ProofIlockMain.

@@ -1,11 +1,12 @@
 (* ======================================================================= *)
 (*  IregBox.v -- THE CLAIM BOX'S EXCLUSION LEMMAS (T1), AND THE THREE       *)
-(*  FLANKS OF [SpecCreateFreshTy.create_fresh_ty].                          *)
+(*  FLANKS OF [LinkCreateFreshTy.create_fresh_ty].                          *)
 (* ======================================================================= *)
 
 (*  WHAT THIS FILE IS.
 
-    [SpecCreateFreshTy]'s axiom is the one assumed fact in the fs tree, and
+    [LinkCreateFreshTy]'s span was the one assumed fact in the fs tree (item 7
+    proved it), and
     eight probes have now certified that no ghost-side route retires it
     (claude-notes/design/fs-fragments.md section 7, walls indexed at 7.0,
     the station-exhaustion certificate at 7.10.6).  What those probes DID
@@ -51,7 +52,7 @@
     because a foreign filler's [ireg_withdraw] is machine-legal there and a
     ghost cannot forbid it (fs-fragments.md 7.4.4, 7.6.2, 7.10.6).  That
     residue is [create_fresh_ty], and the reduction is stated at the head of
-    [SpecCreateFreshTy.v].
+    [LinkCreateFreshTy.v].
 
     THE "EVERY FREE PASSES THROUGH A FILL" CHAIN, AND ITS HONEST FORM.  At
     the C level the fact is about a bit: [iput]'s free path tests
@@ -182,7 +183,7 @@ Section IregBox.
     iSplitR; [iPureIntro; exact Hfr |].
     iSplitL "Hla".
     { iIntros (fl) "Hfl".
-      iDestruct (link_wsum_ge with "Hla Hfl") as %Hge.
+      iDestruct (ireg_rcol_wsum_ge with "Hla Hfl") as %Hge.
       iPureIntro. lia. }
     iIntros (inum dn) "%Hk Hdn".
     iApply (dinode_at_excl gi inum d dn with "[Hfrg] Hdn").

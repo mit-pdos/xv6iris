@@ -412,6 +412,15 @@ Definition wp_dirlookup_sconf_body
              /\ mf !!! Regidx (mword_of_int 10 : mword 5) = ientry kslot⌝ ∗
             inode_ref kslot q dev
               (zero_extend' 32 (dir_inum data k : mword 16) : mword 32) ∗
+            (* THE MINTED PROVENANCE UNIT (item 7a-wire, iclaim-ledger.md
+               §5''.3): dirlookup's iget mints one, flavoured by the licence
+               it presented -- which is [HeldL] on the self record and
+               [LinkedL] on every other, so never the claim flavour.  The
+               flavour is EXISTENTIAL here because the licence is chosen
+               inside the proof; a consumer only ever needs A unit. *)
+            runit_any
+              (bv_unsigned
+                 (zero_extend' 32 (dir_inum data k : mword 16) : mword 32)) ∗
             (if hasp
              then pf ↦₄[KT1] (mword_of_int (Z.of_nat (16 * k)) : mword 32)
              else emp)

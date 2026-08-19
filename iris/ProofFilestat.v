@@ -551,7 +551,8 @@ Section ProofFilestat.
          inode.  The per-slot escrow and sleeplock then come out of the two
          families by the slot the payload named. ---- *)
       iDestruct (filestat_pay_carve γf k q Cf Hin with "Hrpay")
-        as (ikk inm ssh gsh) "(%Hipk & %Hik & %Hinlt & Hshr0 & Hpayback)".
+        as (ikk inm ssh gsh tysh)
+           "(%Hipk & %Hik & %Hinlt & #Hshot0 & Hshr0 & Hpayback)".
       assert (Hibcov : IBLOCK inm (fsn_inodestart fn) ∈ fsn_cov fn)
         by (apply Hgeo; exact Hinlt).
       iDestruct (ic_escrows_acc2 (fsn_ic fn) (fsn_fs fn) (fsn_ireg fn)
@@ -692,7 +693,7 @@ Section ProofFilestat.
                 (fsn_bio fn) (fsn_fs fn) (fsn_ireg fn) (fsn_ic fn)
                 gil gisl
                 (fsn_cov fn) (fsn_logstart fn) (fsn_inodestart fn)
-                icfg_nib ikk (ssh/2)%Qp gsh
+                icfg_nib ikk (ssh/2)%Qp gsh (ShotK tysh)
                 icfg_dev inm
                 pidv (DfracOwn (1/4)) (fsn_dqs fn)
                 Q3 (K - 10)%nat eb b
@@ -700,14 +701,14 @@ Section ProofFilestat.
                 ltac:(rewrite HQ3a0; exact Hipk)
                 Hbelow
                 with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hitbl Hesc Hireg
-                      Hslk Hshr Hsb Hppid Hprocs
+                      Hslk Hshr Hshot0 Hsb Hppid Hprocs
                       Hdevi Hdgeom Hdlock Hbslot").
       all: try lkbelow.
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
       iIntros (CIDil Hsil mil dnl bml fl_)
         "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hsb Hbslot Hheld Hslpid Hdep
-         Hidev Hinum Hvalid Hlk #Hshot Hfrz %Hfr_".
+         Hidev Hinum Hvalid Hlk #Hshot Hfrz %Hfr_ _ %Hilkp".
       iDestruct ("Hpivbk" with "Hppid") as "Hpriv".
       assert (Hpc2a : ret_pc (Q3 !!! Regidx Rra) = mword_of_int (FST + 0x2a)).
       { rewrite HQ3ra. apply bv_eq; vm_compute; reflexivity. }

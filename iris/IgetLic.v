@@ -118,7 +118,7 @@ Local Open Scope Z_scope.
 Inductive ilic :=
   | LinkedL (fl : option (option Z))
   | HeldL (d : dinode)
-  | ClaimL
+  | ClaimL (ty : bv 16)
   | BufL (bno : Z) (ds : list dinode)
   | RootL.
 
@@ -283,10 +283,10 @@ Section IgetLic.
   Qed.
 
   (* ...and (L1) reads off it: one unit at ANY flavour bounds the sum *)
-  Lemma link_paid_ge (z : Z) (wl wdu wdt g : nat) (c : option (excl unit))
+  Lemma link_paid_ge (z : Z) (wl wdu wdt g : nat) (c : ctyUR)
       (r : nat) (p : option (dfrac_agreeR (leibnizO Z)))
-      (fl : option (option Z)) (f : frzUR) :
-    link_auth z wl wdu wdt g c r p f -∗ ipaid fl z -∗
+      (fl : option (option Z)) (f : frzUR) (rc : nat) :
+    link_auth z wl wdu wdt g c r p f rc -∗ ipaid fl z -∗
     ⌜(1 <= wl + wdu + wdt)%nat⌝.
   Proof.
     iIntros "Ha Hb". rewrite /ipaid. destruct fl as [[pv |] |].
@@ -295,6 +295,28 @@ Section IgetLic.
       iPureIntro. lia.
     - iDestruct (link_w_ge with "Ha Hb") as %Hw. iPureIntro. lia.
   Qed.
+
+  (* ...THROUGH THE r-COLUMN BUNDLE (iclaim-ledger.md §5', RULING R).  Every
+     reader below holds [InodeRegion.ireg_rcol] rather than the bare
+     authority now that the ledger's authority is packaged with the r
+     column's clause; the reading itself is unchanged. *)
+  Lemma ireg_rcol_paid_ge (z : Z) (wl wdu wdt g : nat)
+      (c : ctyUR) (r : nat)
+      (p : option (dfrac_agreeR (leibnizO Z))) (f : frzUR) (n : nat)
+      (d : dinode) (fl : option (option Z)) :
+    ireg_rcol z wl wdu wdt g c r p f n d -∗ ipaid fl z -∗
+    ⌜(1 <= wl + wdu + wdt)%nat⌝.
+  Proof.
+    rewrite /ireg_rcol. iIntros "(%rc & Hla & _) Hb".
+    iApply (link_paid_ge with "Hla Hb").
+  Qed.
+
+  (* THE FLAVOUR OF THE UNIT A LICENCE MINTS (§5'.2): the [ClaimL] iget --
+     ialloc's own, into its own claim box -- mints [runit_claim]; every other
+     licence mints [runit_plain].  One function, so the mint sites, the
+     contracts and the pin's side condition all read the same index. *)
+  Definition is_claim (l : ilic) : bool :=
+    match l with ClaimL _ => true | _ => false end.
 
   (* ------------------------------------------------------------------ *)
   (*  THE LICENCE ITSELF                                                  *)
@@ -314,7 +336,7 @@ Section IgetLic.
     | HeldL d => (dinode_at γi inum d ∗
                   ⌜bv_unsigned (di_type d) <> 0⌝ ∗
                   ⌜bv_unsigned (di_nlink d) <> 0⌝)                   (* c *)
-    | ClaimL  => iclaim (bv_unsigned inum)                           (* d *)
+    | ClaimL ty => iclaim (bv_unsigned inum) ty                     (* d *)
     (* (e) BOOT-GATED BY §2.6: the presenter also LENDS [ireg_boot].
        Runtime: nobody has it after the seal fires, so licence (e) is
        unpresentable at all and the free-side table has nothing to refute.
@@ -342,7 +364,7 @@ Section IgetLic.
   (*  THE READINGS, AND THE SHAPE THEY MUST TAKE                          *)
   (* ------------------------------------------------------------------ *)
 
-  (*  STANDING CONSTRAINT (§7.1.4, the [SpecCreateFreshTy.v:34-45] test).
+  (*  STANDING CONSTRAINT (§7.1.4, the [LinkCreateFreshTy.v] header's test).
       Every reading below is an ACCESSOR OVER [ireg_inv], in
       [IregLinkNz.ireg_link_nz]'s shape: it opens the region, reads the
       ledger's own clauses at the slot the caller's [dinode_at] names, and
@@ -391,7 +413,7 @@ Section IgetLic.
                 with "Hsls") as "[Hslot Hslback]".
     iEval (rewrite Hkey) in "Hslot".
     iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) Hep]".
-    iDestruct (link_paid_ge with "Hla Hfrag") as %Hw1.
+    iDestruct (ireg_rcol_paid_ge with "Hla Hfrag") as %Hw1.
     rewrite /dinode_at.
     iDestruct (ghost_map_lookup with "Ha Hdn") as %Hm.
     assert (Hdeq : ds !!! islot inum = dn).
@@ -617,7 +639,7 @@ Section IgetLic.
                       first row's.                                        *)
   Lemma iname_not_frozen (γi : gname) (γfs : fs_names) (inum : bv 32)
       (l : ilic) (d : dinode) (mm : gmap Z dinode)
-      (wl wdu wdt g r : nat) (c : option (excl unit))
+      (wl wdu wdt g r : nat) (c : ctyUR)
       (p : option (dfrac_agreeR (leibnizO Z))) (f : frzUR) (n : nat) :
     ireg_link_ok d (wl + wdu + wdt) ->
     ireg_root_ok (bv_unsigned inum) d (wl + wdu + wdt) ->
@@ -625,7 +647,7 @@ Section IgetLic.
     ireg_frz_ok f n d ->
     mm !! bv_unsigned inum = Some d ->
     ghost_map_auth γi 1 mm -∗
-    link_auth (bv_unsigned inum) wl wdu wdt g c r p f -∗
+    ireg_rcol (bv_unsigned inum) wl wdu wdt g c r p f n d -∗
     (⌜f = Some (Excl FrzOff)⌝ ∨ ireg_open ∨ ireg_boot) -∗
     iname γi γfs inum l -∗
     ⌜f = Some (Excl FrzOff)⌝.
@@ -641,9 +663,9 @@ Section IgetLic.
       as "Hge1".
     { iIntros (Hw). iApply "Hnz". iPureIntro.
       destruct Hlok as [Hle _]. pose proof (di_nlink_nonneg d). lia. }
-    iIntros "Ha Hla Hsh Hl". rewrite /iname. destruct l as [fl | d' | | bno ds |].
+    iIntros "Ha Hla Hsh Hl". rewrite /iname. destruct l as [fl | d' | tyc | bno ds |].
     - (* (a) LinkedL *)
-      iDestruct (link_paid_ge with "Hla Hl") as %Hw1.
+      iDestruct (ireg_rcol_paid_ge with "Hla Hl") as %Hw1.
       iApply "Hge1". iPureIntro. exact Hw1.
     - (* (c) HeldL *)
       iDestruct "Hl" as "(Hd & %Hty' & %Hnl')".
@@ -652,7 +674,7 @@ Section IgetLic.
       assert (Hdd : d' = d) by congruence.
       iApply "Hnz". iPureIntro. rewrite -Hdd. exact Hnl'.
     - (* (d) ClaimL -- the c column, not the record *)
-      iDestruct (link_claim_agree with "Hla Hl") as %Hc.
+      iDestruct (ireg_rcol_claim_agree with "Hla Hl") as %Hc.
       iPureIntro.
       exact (ireg_claim_ok_off c f d ltac:(rewrite Hc; discriminate) Hclm).
     - (* (e) BufL -- the boot one-shot against the freeze's own shelter *)
@@ -668,6 +690,114 @@ Section IgetLic.
       pose proof (ireg_root_ok_alive (bv_unsigned inum) d (wl + wdu + wdt)%nat
                     Hrt Hroot) as Halive.
       lia.
+  Qed.
+
+  (* ===================================================================== *)
+  (*  THE MINT's TABLE (iclaim-ledger.md §5', RULING R)                     *)
+  (* ===================================================================== *)
+
+  (*  [iname_not_claimed] AND ITS ALLOCATEDNESS TWIN, FUSED.  §5'.2 asks for
+      "[iname_not_claimed] -- the §2.6-pattern table lemma, twin of the landed
+      [iname_not_frozen]"; the mint needs TWO facts from the same five rows
+      and by the same three bridges, so they are ONE lemma:
+
+        (i)  the box is ALLOCATED -- [di_type <> 0] -- which is what
+             [InodeRegion.ireg_ref_ok]'s (R2) owes at every up-count;
+        (ii) a NON-[ClaimL] licence's box is UNCLAIMED -- [c = None] -- which
+             is (R3), THE PIN: "no plainly-licenced reference exists to a
+             claim box".
+
+      THE THREE BRIDGES, and two of them are [iname_not_frozen]'s verbatim.
+      (a) a NAMED record has [di_nlink <> 0], which gives (i) by (L3)'s
+      contrapositive and (ii) because a claim box is [fresh_shape] and its
+      count is ZERO; (b) the ledger's sum bounds that count from below, which
+      is rows [LinkedL] and [RootL]; (c) [HeldL] carries the count outright.
+      The two rows that do NOT go through the count are the same two as in the
+      freeze table: [ClaimL] reads the c column itself (and owes only (i),
+      through the claim pin's [fresh_shape]), and [BufL] reads the BOOT
+      one-shot against the c column's own shelter clause -- [ireg_boot] versus
+      [ireg_open], [ireg_boot_open_excl], exactly as it plays the freeze's.
+
+      WHY [BufL] TAKES THE BLOCK.  Its (i) is the buffer's own decoded type
+      fact, and transporting it to the REGION's record needs the two block
+      halves to meet -- which is [iname_buf_alloc]'s [ireg_read] step, except
+      that this lemma's consumers ([IcacheInv]'s up-count movers) already hold
+      [^iregN] open and cannot re-open it.  So the region's half comes IN as
+      an argument, and the constructor's [bno] tie comes in as the same pure
+      premise [iname_buf_alloc] takes.  Everything is borrowed: the conclusion
+      is pure. *)
+  Lemma iname_mint_ok (γi : gname) (γfs : fs_names) (inodestart : Z)
+      (inum : bv 32) (l : ilic) (ds : list dinode) (mm : gmap Z dinode)
+      (wl wdu wdt g r : nat) (c : ctyUR)
+      (p : option (dfrac_agreeR (leibnizO Z))) (f : frzUR) (n : nat) :
+    (forall bno ds0, l = BufL bno ds0 -> bno = IBLOCK inum inodestart) ->
+    diblk_wf ds ->
+    ireg_link_ok (ds !!! islot inum) (wl + wdu + wdt) ->
+    ireg_root_ok (bv_unsigned inum) (ds !!! islot inum) (wl + wdu + wdt) ->
+    ireg_claim_ok c f (ds !!! islot inum) ->
+    mm !! bv_unsigned inum = Some (ds !!! islot inum) ->
+    ghost_map_auth γi 1 mm -∗
+    ireg_rcol (bv_unsigned inum) wl wdu wdt g c r p f n (ds !!! islot inum) -∗
+    fsblock γfs (IBLOCK inum inodestart) (diblk_bytes ds) -∗
+    (⌜c = None⌝ ∨ ireg_open) -∗
+    iname γi γfs inum l -∗
+    ⌜bv_unsigned (di_type (ds !!! islot inum)) <> 0
+     /\ (is_claim l = false -> c = None)⌝.
+  Proof.
+    intros Hbno Hwf Hlok Hrt Hclm Hmd.
+    (* bridge (a): a named record is neither free nor a claim box *)
+    assert (Hnzb : bv_unsigned (di_nlink (ds !!! islot inum)) <> 0 ->
+                   bv_unsigned (di_type (ds !!! islot inum)) <> 0 /\ c = None).
+    { intros Hnl. split.
+      - intros H0. exact (Hnl (proj1 (proj2 Hlok) H0)).
+      - destruct c as [x |]; [| reflexivity]. exfalso. apply Hnl.
+        exact (fresh_shape_nlink _
+                 (ireg_claim_ok_shape (Some x) f (ds !!! islot inum)
+                    ltac:(discriminate) Hclm)). }
+    (* bridge (b): the ledger's sum bounds that count from below *)
+    assert (Hge1 : (1 <= wl + wdu + wdt)%nat ->
+                   bv_unsigned (di_type (ds !!! islot inum)) <> 0 /\ c = None).
+    { intros Hw. apply Hnzb.
+      destruct Hlok as [Hle _].
+      pose proof (di_nlink_nonneg (ds !!! islot inum)). lia. }
+    iIntros "Ha Hla Hfsb Hsh Hl". rewrite /iname /is_claim.
+    destruct l as [fl | d' | tyc | bno ds0 |].
+    - (* (a) LinkedL *)
+      iDestruct (ireg_rcol_paid_ge with "Hla Hl") as %Hw1.
+      destruct (Hge1 Hw1) as [H1 H2].
+      iPureIntro. split; [exact H1 | intros _; exact H2].
+    - (* (c) HeldL -- the licence IS the record *)
+      iDestruct "Hl" as "(Hd & %Hty' & %Hnl')".
+      rewrite /dinode_at.
+      iDestruct (ghost_map_lookup with "Ha Hd") as %Hm'.
+      assert (Hdd : d' = ds !!! islot inum) by congruence.
+      destruct (Hnzb ltac:(rewrite -Hdd; exact Hnl')) as [H1 H2].
+      iPureIntro. split; [exact H1 | intros _; exact H2].
+    - (* (d) ClaimL -- the claimant's OWN box; only (i) is owed, and the
+         claim pin's [fresh_shape] is exactly it *)
+      iDestruct (ireg_rcol_claim_agree with "Hla Hl") as %Hc.
+      iPureIntro. split; [| discriminate].
+      exact (proj1 (ireg_claim_ok_shape c f (ds !!! islot inum)
+                      ltac:(rewrite Hc; discriminate) Hclm)).
+    - (* (e) BufL -- the buffer's type fact, transported; the boot one-shot
+         against the c column's shelter *)
+      iDestruct "Hl" as "(Hhalf & %Hwf0 & %Hnz0 & Hboot)".
+      rewrite (Hbno bno ds0 eq_refl) /fsblock.
+      iDestruct (ghost_map_elem_agree with "Hhalf Hfsb") as %Hbytes.
+      assert (Hdseq : ds0 = ds)
+        by exact (diblk_bytes_inj ds0 ds Hwf0 Hwf Hbytes).
+      subst ds0.
+      iAssert (⌜c = None⌝)%I as %Hc0.
+      { iDestruct "Hsh" as "[%Hn | Hopen]"; [by iPureIntro |].
+        iExFalso. iApply (ireg_boot_open_excl with "Hboot Hopen"). }
+      iPureIntro. split; [exact Hnz0 | intros _; exact Hc0].
+    - (* (f) RootL -- the root clause is (L1) made strict *)
+      iDestruct "Hl" as %Hroot.
+      assert (Hw1 : bv_unsigned (di_nlink (ds !!! islot inum)) <> 0).
+      { pose proof (ireg_root_ok_alive (bv_unsigned inum) (ds !!! islot inum)
+                      (wl + wdu + wdt)%nat Hrt Hroot). lia. }
+      destruct (Hnzb Hw1) as [H1 H2].
+      iPureIntro. split; [exact H1 | intros _; exact H2].
   Qed.
 
   (* THE TABLE AS AN ACCESSOR, for the consumer that does NOT already have
@@ -712,7 +842,7 @@ Section IgetLic.
     iEval (rewrite Hkey) in "Hslot".
     iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & %fz & %cn & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj & Hcnt & %Hclm & %Hfrz & Hfdisj & Hfrcp & Harm) Hep]".
     (* the caller's token pins the column; the table says which phase *)
-    iDestruct (link_freeze_agree with "Hla Hfz") as %Hfeq.
+    iDestruct (ireg_rcol_freeze_agree with "Hla Hfz") as %Hfeq.
     pose proof (Hcp (islot inum) Hsl) as Hmd.
     rewrite -ireg_key_split in Hmd.
     iDestruct (iname_not_frozen γi γfs inum l (ds !!! islot inum) m

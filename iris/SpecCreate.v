@@ -472,7 +472,14 @@ Section CreateSpec.
           over) and hands it on to whichever of sys_open / sys_mkdir /
           sys_mknod releases the child. *)
        ifreeze_off (bv_unsigned inum) ∗
-       inode_ref_short_gen k (qi + s)%Qp qi dev inum g)%I.
+       inode_ref_short_gen k (qi + s)%Qp qi dev inum g ∗
+       (* ...AND ITS PROVENANCE UNIT (item 7a-wire, iclaim-ledger.md §5''.3).
+          This bundle IS [SpecIunlockput]'s precondition, and since item
+          7a-wire that precondition includes the unit the closing iput
+          spends.  create holds it -- it came out of its own iget, or out of
+          [SpecIalloc]'s claim -- and hands it on to whichever of sys_open /
+          sys_mkdir / sys_mknod releases the child. *)
+       runit_any (bv_unsigned inum))%I.
 
   (* Assembled structurally, not by [iFrame]: at the syscall altitude this
      is built at (hundreds of accumulated hypotheses), even a NAMED
@@ -493,16 +500,18 @@ Section CreateSpec.
     ity_shot g (di_type dn) -∗
     ifreeze_off (bv_unsigned inum) -∗
     inode_ref_short_gen k (qi + s)%Qp qi dev inum g -∗
+    runit_any (bv_unsigned inum) -∗
     create_locked cn γfs γi cov logstart dev pidv k qi s g inum dn bm.
   Proof.
-    iIntros "Hlk Hlkd Hpid Hdep Hdev Hinum Hvalid Hload Hshot Hfrz Href".
+    iIntros "Hlk Hlkd Hpid Hdep Hdev Hinum Hvalid Hload Hshot Hfrz Href Hru".
     rewrite /create_locked. iExists γil, γisl.
     iSplitL "Hlk"; [iExact "Hlk" |]. iSplitL "Hlkd"; [iExact "Hlkd" |].
     iSplitL "Hpid"; [iExact "Hpid" |]. iSplitL "Hdep"; [iExact "Hdep" |].
     iSplitL "Hdev"; [iExact "Hdev" |]. iSplitL "Hinum"; [iExact "Hinum" |].
     iSplitL "Hvalid"; [iExact "Hvalid" |]. iSplitL "Hload"; [iExact "Hload" |].
     iSplitL "Hshot"; [iExact "Hshot" |].
-    iSplitL "Hfrz"; [iExact "Hfrz" | iExact "Href"].
+    iSplitL "Hfrz"; [iExact "Hfrz" |].
+    iSplitL "Href"; [iExact "Href" | iExact "Hru"].
   Qed.
 End CreateSpec.
 

@@ -18,8 +18,9 @@
    premises are [i < NARG] and not a branch; the [kernel_data] / [panic_env]
    the contract takes are threaded down to the callees' own arms.
 
-   So this cone's assumption count is the five platform axioms plus funext,
-   plus [create_fresh_ty].  (It also used to carry
+   So this cone's assumption count is the five platform axioms plus funext.
+   (It carried [create_fresh_ty] too until item 7 proved the span, and it
+   also used to carry
    [ProofIput.iput_acquiresleep_order_ADMITTED] in through iunlockput; that
    axiom is gone -- claude-notes/projects/iput-acquiresleep.md.) *)
 Require Import LinkBeginOp LinkArgint LinkArgstr LinkCreate LinkIunlockput

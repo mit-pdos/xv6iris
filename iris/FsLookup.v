@@ -642,6 +642,10 @@ Definition wp_dirlookup_tree_body
              /\ (mf !!! Regidx (mword_of_int 10 : mword 5) : mword 64) = ientry kslot⌝ ∗
             inode_ref kslot q dev
               (zero_extend' 32 (dir_inum data k : mword 16) : mword 32) ∗
+            (* the minted provenance unit (item 7a-wire) *)
+            runit_any
+              (bv_unsigned
+                 (zero_extend' 32 (dir_inum data k : mword 16) : mword 32)) ∗
             (if hasp
              then pf ↦₄[KT1] (mword_of_int (Z.of_nat (16 * k)) : mword 32)
              else emp)
@@ -724,7 +728,7 @@ Module FsLookupTree (DL : DIRLOOKUP).
     - iPureIntro. exact Hcs.
     - iApply (fdir_intro γi γfs dpi ents dn bm data Hrep with "Hdiat Hblocks").
     - destruct found.
-      + iDestruct "Harm" as "(%Hpure & Href & Hpf)".
+      + iDestruct "Harm" as "(%Hpure & Href & Hru & Hpf)".
         iSplitR.
         { iPureIntro.
           exact (node_lookup_found ents dn data (bname 14 fn) k Hrep

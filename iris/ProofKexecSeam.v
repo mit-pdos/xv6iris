@@ -564,7 +564,10 @@ Section KexecBSeam.
      ity_shot gyf (di_type dnf) ∗
      (* ...and the payload's freeze token (§3.9, RULING A-prime) *)
      ifreeze_off (bv_unsigned inumf) ∗
-     inode_ref_short kf (qf + sf)%Qp qf dev inumf)%I.
+     inode_ref_short kf (qf + sf)%Qp qf dev inumf ∗
+     (* ...and its PROVENANCE UNIT (item 7a-wire): the iunlockput that
+        consumes this bundle spends it. *)
+     runit_any (bv_unsigned inumf))%I.
 
   (* --------------------------------------------------------------- *)
   (*  +0x1a2 -- [elf.phnum = 0], so the phdr loop is skipped entirely. *)

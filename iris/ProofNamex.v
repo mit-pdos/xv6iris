@@ -2647,7 +2647,7 @@ Section ProofNamexMain.
                assert (HT2ra : T2 !!! Regidx Rra
                        = add_vec_int (mword_of_int (NX + 0x146) : mword 64) 4)
                  by (rewrite /T2; apply upd_eq).
-               iDestruct "Hip" as (pk pq pinum) "(%Hpe & %Hpk & %Hpb & Href)".
+               iDestruct "Hip" as (pk pq pinum) "(%Hpe & %Hpk & %Hpb & Href & Hru)".
                iEval (rewrite -Hdev) in "Href".
                assert (HT2a0 : T2 !!! Regidx Ra0 = ientry pk).
                { rewrite /T2 upd_ne; [| nz]. rewrite HT1a0. exact Hpe. }
@@ -2672,7 +2672,7 @@ Section ProofNamexMain.
                          Hibc Hibl Hpb' Hcovb HbD
                          Hj Hgs HT2a0 Hbelow
                          with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
-                               Hescp Hireg Hslkp Href Hbmap Hinos Hbits Hppid
+                               Hescp Hireg Hslkp Href Hru Hbmap Hinos Hbits Hppid
                                Hprocs Hdev Hgeom Hdlk Hbslot [] Hlog").
                all: try lkbelow.
                { rewrite Heb /trap_csrs_ext. done. }
@@ -3025,7 +3025,7 @@ Section ProofNamexMain.
                    iPoseProof (nxi_0ca with "Htext") as "Hjc0".
                    (* ---- THE SHED: ilock takes a share ---- *)
                    iDestruct "Hip" as (ik iq iinum)
-                     "(%Hie & %Hik & %Hib & Href)".
+                     "(%Hie & %Hik & %Hib & Href & Hru)".
                    iEval (rewrite -Hdev) in "Href".
                    rewrite inode_ref_shed.
                    iDestruct "Href" as "[Hkeep Hshr]".
@@ -3100,19 +3100,20 @@ Section ProofNamexMain.
                      as %->.
                    iApply (IL.wp_ilock_sconf gs j gl gu gd gk pd pav pu bn
                              gfs gi cn gilk gislk cov logstart inodestart nib
-                             ik (iq/2)%Qp gsh dev iinum pidv dq dqs
+                             ik (iq/2)%Qp gsh PlainK dev iinum pidv dq dqs
                              V2 (K - 12)%nat eb b lks
                              Kil Hik Hlg Hinos0 Hibc Hib' Hj Hgs HV2a0
                              ltac:(lkbelow)
                              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hitbl Hesck
-                                   Hireg Hslkk Hshr Hinos Hppid Hprocs Hdev
+                                   Hireg Hslkk Hshr Hru Hinos Hppid Hprocs Hdev
                                    Hgeom Hdlk Hbs1").
                    all: try lkbelow.
                    { rewrite Heb /trap_csrs_ext. done. }
                    { rewrite Heb /cpu_claim_ext. done. }
                    iIntros (CIDil Hqil mil dnl bml fl_)
                      "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hinos Hbs1 Hslkd Hslpid Hdep
-                      Hidev Hiinum Hivalid Hload #Hshot Hfrz %Hfr_".
+                      Hidev Hiinum Hivalid Hload #Hshot Hfrz %Hfr_
+                      Hru %Hilkp".
                    assert (Hpcbc : ret_pc (V2 !!! Regidx Rra)
                             = mword_of_int (NX + 0xc6)).
                    { rewrite HV2ra. pcw. }
@@ -3330,7 +3331,7 @@ Section ProofNamexMain.
                                with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc
                                      Hitb2 Hitbl Hesck Hireg Hslkk Hslkd
                                      Hslpid Hdep Hidev Hiinum Hivalid Hload
-                                     Hshot Hfrz Hkeep2 Hbmap Hinos Hbits Hppid Hprocs
+                                     Hshot Hfrz Hkeep2 Hru Hbmap Hinos Hbits Hppid Hprocs
                                      Hdev Hgeom Hdlk Hbslot [] Hlog").
                      all: try lkbelow.
                      { rewrite Heb /trap_csrs_ext. done. }
@@ -3639,13 +3640,13 @@ Section ProofNamexMain.
                        iEval (rewrite Qp.div_2) in "Href".
                        assert (HtydP : di_type dnl = T_DIR)
                          by (unfold T_DIR; exact Hty).
-                       iAssert (inode_held_ty ipv T_DIR) with "[Href]" as "Hip".
+                       iAssert (inode_held_ty ipv T_DIR) with "[Href Hru]" as "Hip".
                        { rewrite /inode_held_ty. iExists ik, iq, iinum, gsh.
                          iSplitR; [iPureIntro; exact Hie |].
                          iSplitR; [iPureIntro; exact Hik |].
                          iSplitR; [iPureIntro; exact Hib |].
                          iSplitL "Href"; [rewrite -Hdev; iExact "Href" |].
-                         rewrite -HtydP. iExact "Hshot". }
+                         iFrame "Hru". rewrite -HtydP. iExact "Hshot". }
                        assert (Hmiuregs : nx_regs m sp0 (pa_add pv o2) ipv nb
                                   (m !!! Regidx Ra1 : mword 64) miu)
                          by exact (nx_regs_cs m sp0 _ _ _ _ NP3 miu Hcsiu
@@ -3769,7 +3770,7 @@ Section ProofNamexMain.
                             WP (Loop : expr riscv_lang)))%I
                          with "[IHl Hcont Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9
                                 Hb10 Hb11 Hb12 Hisl Hbmap Hinos Hbits Hppid
-                                Hcwdc Hcwdr Hname Hbs1 Hbs2 Hlog Hkeep Hslkd
+                                Hcwdc Hcwdr Hname Hbs1 Hbs2 Hlog Hkeep Hru Hslkd
                                 Hslpid Hdep Hidev Hiinum Hivalid Hfrz Hdiat Hity
                                 Himaj Himin Hinl Hisz Haddrs Hind Hblocks
                                Hdlnk]"
@@ -3973,7 +3974,7 @@ Section ProofNamexMain.
                          destruct found.
                          - (* ============ FOUND: recurse on the child ==== *)
                            iDestruct "Harm"
-                             as "((%Hsome & %Hkslot & %Hdla0) & Href2 & _)".
+                             as "((%Hsome & %Hkslot & %Hdla0) & Href2 & Hru2 & _)".
                            assert (Hklt : (kdir < dir_nrec
                                      (bv_unsigned (di_size dnl)))%nat)
                              by exact (dir_first_lt datl _ kdir
@@ -3989,7 +3990,7 @@ Section ProofNamexMain.
                                         (dir_inum datl kdir)).
                              exact (Hdio kdir Hklt Hklive). }
                            iAssert (inode_held (ientry kslot))
-                             with "[Href2]" as "Hip2".
+                             with "[Href2 Hru2]" as "Hip2".
                            { rewrite /inode_held.
                              iExists kslot, qq,
                                (zero_extend' 32
@@ -3998,7 +3999,7 @@ Section ProofNamexMain.
                              iSplitR; [iPureIntro; exact Hkslot |].
                              iSplitR; [iPureIntro; rewrite -Hnib;
                                        exact Hcinb |].
-                             rewrite -Hdev. iExact "Href2". }
+                             iFrame "Hru2". rewrite -Hdev. iExact "Href2". }
                            (* +0xe8 c.mv s2,a0 *)
                            iApply (wp_cmv_s_sconf (mword_of_int (NX + 0xe8))
                                      Rs2 Ra0 mdl (K - 12)%nat b ltac:(nz)
@@ -4119,7 +4120,7 @@ Section ProofNamexMain.
                                      with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio
                                            Hlogc Hitb2 Hitbl Hesck Hireg
                                            Hslkk Hslkd Hslpid Hdep Hidev
-                                           Hiinum Hivalid Hload Hshot Hfrz Hkeep2 Hbmap
+                                           Hiinum Hivalid Hload Hshot Hfrz Hkeep2 Hru Hbmap
                                            Hinos Hbits Hppid Hprocs Hdev
                                            Hgeom Hdlk Hbslot Hcrz Hlog").
                            all: try lkbelow.
@@ -4337,7 +4338,7 @@ Section ProofNamexMain.
                                      with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio
                                            Hlogc Hitb2 Hitbl Hesck Hireg
                                            Hslkk Hslkd Hslpid Hdep Hidev
-                                           Hiinum Hivalid Hload Hshot Hfrz Hkeep2 Hbmap
+                                           Hiinum Hivalid Hload Hshot Hfrz Hkeep2 Hru Hbmap
                                            Hinos Hbits Hppid Hprocs Hdev
                                            Hgeom Hdlk Hbslot Hcrz Hlog").
                            all: try lkbelow.
@@ -4626,7 +4627,7 @@ Section ProofNamexMain.
                                with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc
                                      Hitb2 Hitbl Hesck Hireg Hslkk Hslkd
                                      Hslpid Hdep Hidev Hiinum Hivalid Hload
-                                     Hshot Hfrz Hkeep2 Hbmap Hinos Hbits Hppid Hprocs
+                                     Hshot Hfrz Hkeep2 Hru Hbmap Hinos Hbits Hppid Hprocs
                                      Hdev Hgeom Hdlk Hbslot [] Hlog").
                      all: try lkbelow.
                      { rewrite Heb /trap_csrs_ext. done. }
@@ -5400,11 +5401,11 @@ Section ProofNamexMain.
                 RootL
                 A3 0%nat eb (proc_addr j) (K - 12)%nat b lks
                 Kig ltac:(vm_compute; reflexivity)
-                Hrino HA3a0 HA3a1 ltac:(lkbelow)
+                Hrino ltac:(discriminate) HA3a0 HA3a1 ltac:(lkbelow)
                 with "Hcg Hcnt Htext Hkd Hpc Hitb2 Hitbl Hesc Hireg Hpenv Hisl1
                       Hlicr").
       all: try lkbelow.
-      iIntros (CIDig Hqig mig kig qig) "Hcg Hcnt Hpc %Higp Href _".
+      iIntros (CIDig Hqig mig kig qig) "Hcg Hcnt Hpc %Higp Href Hru _".
       destruct Higp as (Hcsig & Hkig & Higa0).
       assert (Hpc050 : ret_pc (A3 !!! Regidx Rra) = mword_of_int (NX + 0x50)).
       { rewrite HA3ra. pcw. }
@@ -5474,11 +5475,11 @@ Section ProofNamexMain.
           [ exact (HR7o c Hc N2 N8 N9 N18 N19 N20 N21 N22 N23 N24 N25 N26)
           | dlk_rne2 Hcsa1 Hc ]. }
       (* the walk's starting reference, in the loop's currency *)
-      iAssert (inode_held (ientry kig)) with "[Href]" as "Hip".
+      iAssert (inode_held (ientry kig)) with "[Href Hru]" as "Hip".
       { rewrite /inode_held. iExists kig, qig, ROOTINO.
         iSplitR; [done |]. iSplitR; [iPureIntro; exact Hkig |].
         iSplitR; [iPureIntro; rewrite -Hnib; exact Hrino |].
-        rewrite -Hdev. iExact "Href". }
+        iFrame "Hru". rewrite -Hdev. iExact "Href". }
       (* ===== +0x3c .. +0x46 : the four constants, then [c.j +0xf4] ===== *)
       iApply (wp_li4_s_sconf (mword_of_int (NX + 0x3c)) Rs3
                 (mword_of_int 47 : mword 12) (mword_of_int 47 : mword 64)
@@ -5632,7 +5633,7 @@ Section ProofNamexMain.
                        = mword_of_int (NX + 0x36)) by pcw.
       iEval (rewrite Hpp036) in "Hpc".
       (* ---- THE SHED: the cwd reference lends a share to idup ---- *)
-      iDestruct "Hcwdr" as (ck cq cinum) "(%Hcwde & %Hckl & %Hcinb & Hcref)".
+      iDestruct "Hcwdr" as (ck cq cinum) "(%Hcwde & %Hckl & %Hcinb & Hcref & Hcru)".
       iEval (rewrite -Hdev) in "Hcref".
       rewrite inode_ref_shed.
       iDestruct "Hcref" as "[Hckeep Hcshr]".
@@ -5665,19 +5666,21 @@ Section ProofNamexMain.
                 ck (cq/2)%Qp dev cinum
                 B3 0%nat eb (proc_addr j) (K - 12)%nat b lks
                 Kid ltac:(vm_compute; reflexivity) Hckl HB3a0 ltac:(lkbelow)
-                with "Hcg Hcnt Htext Hpc Hitb2 Hitbl Hireg Hisl1 Hcshr").
+                with "Hcg Hcnt Htext Hpc Hitb2 Hitbl Hireg Hisl1 Hcshr Hcru").
       all: try lkbelow.
-      iIntros (CIDid Hqid mid) "Hcg Hcnt Hpc %Hidp Hcshr (%qn & Href)".
+      iIntros (CIDid Hqid mid)
+        "Hcg Hcnt Hpc %Hidp Hcshr (%qn & Href) Hcru Hcru2".
       destruct Hidp as [Hcsid Hida0].
       (* ---- THE GATHER: the cwd reference is whole again ---- *)
       iDestruct (inode_ref_gather ck (cq/2)%Qp (cq/2)%Qp dev cinum
                    with "Hckeep Hcshr") as "Hcref".
       iEval (rewrite Qp.div_2) in "Hcref".
-      iAssert (inode_held cwdv) with "[Hcref]" as "Hcwdr".
+      iAssert (inode_held cwdv) with "[Hcref Hcru]" as "Hcwdr".
       { rewrite /inode_held. iExists ck, cq, cinum.
         iSplitR; [iPureIntro; exact Hcwde |].
         iSplitR; [iPureIntro; exact Hckl |].
-        iSplitR; [iPureIntro; exact Hcinb |]. rewrite -Hdev. iExact "Hcref". }
+        iSplitR; [iPureIntro; exact Hcinb |]. iFrame "Hcru".
+        rewrite -Hdev. iExact "Hcref". }
       assert (Hpc03a : ret_pc (B3 !!! Regidx Rra) = mword_of_int (NX + 0x3a)).
       { rewrite HB3ra. pcw. }
       iEval (rewrite Hpc03a) in "Hpc".
@@ -5691,10 +5694,11 @@ Section ProofNamexMain.
       assert (HB4s4 : B4 !!! Regidx Rs4 = ientry ck).
       { rewrite /B4 upd_eq. rewrite Hida0. apply add_vec_zero_l. }
       (* the walk's starting reference *)
-      iAssert (inode_held (ientry ck)) with "[Href]" as "Hip".
+      iAssert (inode_held (ientry ck)) with "[Href Hcru2]" as "Hip".
       { rewrite /inode_held. iExists ck, qn, cinum.
         iSplitR; [done |]. iSplitR; [iPureIntro; exact Hckl |].
-        iSplitR; [iPureIntro; exact Hcinb |]. rewrite -Hdev. iExact "Href". }
+        iSplitR; [iPureIntro; exact Hcinb |]. iFrame "Hcru2".
+        rewrite -Hdev. iExact "Href". }
       (* ---- the register facts the two [callee_saved]s carry over ---- *)
       assert (Hcsa1 : is_cs_idx Ra1 = false) by (vm_compute; reflexivity).
       assert (HB4sp : B4 !!! Regidx csp_rs1 = pa_stk sp0 12).

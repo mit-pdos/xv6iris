@@ -160,15 +160,30 @@ Section EscrowDeposit.
        the marker and the retired token. *)
     iMod (escA_deposit_acc (E ∖ ↑iregN) ge gr gd γi (bv_unsigned inum)
             Hesc_mask with "Hesc Hdep") as "[Hfz Hescl]".
-    iDestruct (link_freeze_agree with "Hla Hfz") as %->.
+    iDestruct (ireg_rcol_freeze_agree with "Hla Hfz") as %->.
     (* THE FREEZE RECEIPT RIDES THROUGH (iclaim-ledger.md §3.14 as built):
        the deposit runs at [FrzPost] and leaves [FrzOff], and neither is
        [FrzPre], so the slot's receipt clause is on its [frzown] arm both
        sides and this mover neither takes nor returns it. *)
     iDestruct (ireg_frzc_off_acc (bv_unsigned inum) (Some (Excl FrzPost))
                  ltac:(discriminate) with "Hfrcp") as "[Hrcpt Hmr]".
+    (* RULING R's (R2), PAID BY THE DEPOSIT (§5'.2, landed by 7a-wire).  This
+       is the deposit's own type-0 write, it runs at [FrzPost], and the freeze
+       pin puts the in-core count at ZERO there ([Hcn0]) -- so (R1) collapses
+       both r columns and the clause at the record this mover parks is
+       [ireg_ref_ok_zero].  No premise and no token beyond the one the
+       deposit already retires. *)
+    iDestruct "Hla" as (rcl) "[Hla %Href]".
+    assert (Hcn0 : cn = 0%nat) by exact (proj2 (proj2 Hfrz)).
+    destruct (ireg_ref_ok_count0 rl rcl cn cl (ds !!! islot inum) Href Hcn0)
+      as [Hrl0 Hrcl0].
+    assert (Href0 : forall d0 : dinode, ireg_ref_ok rl rcl cn cl d0)
+      by (intros d0; rewrite Hrl0 Hrcl0; exact (ireg_ref_ok_zero cn cl d0)).
     iMod (link_freeze_step _ _ _ _ _ _ _ _ FrzPost FrzOff with "Hla Hfz")
       as "[Hla Hoff]".
+    iDestruct (ireg_rcol_intro (bv_unsigned inum) wl wdu wdt gl cl rl pl
+                 (Some (Excl FrzOff)) cn rcl dn' (Href0 dn')
+                 with "Hla") as "Hla".
     assert (Hfrz' : ireg_frz_ok (Some (Excl FrzOff)) cn dn')
       by exact (ireg_frz_ok_off cn dn').
     assert (Hzm : bv_unsigned (di_nlink dn') = 0 ->

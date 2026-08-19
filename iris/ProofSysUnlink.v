@@ -1237,12 +1237,12 @@ Section ProofSysUnlinkBody.
       + (* ---------- the parent RESOLVED: the SEAM ---------- *)
         iDestruct "Hres1" as "(%Hnp & Hhelddp & Hir1)".
         iDestruct "Hhelddp" as (kd qd dinum gyd)
-          "(%Hdpe & %Hkd & %Hdinumc & Hrefdp & #Hshotd)".
+          "(%Hdpe & %Hkd & %Hdinumc & Hrefdp & #Hshotd & Hrud)".
         assert (Hdpnz : dpv <> (zero_reg : mword 64))
           by (rewrite Hdpe; apply ientry_ne_zero; lia).
-        iAssert (inode_held_ty dpv T_DIR) with "[Hrefdp]" as "Hhelddp".
+        iAssert (inode_held_ty dpv T_DIR) with "[Hrefdp Hrud]" as "Hhelddp".
         { iExists kd, qd, dinum, gyd. iSplitR; [done |]. iSplitR; [done |].
-          iSplitR; [done |]. iFrame "Hrefdp". iExact "Hshotd". }
+          iSplitR; [done |]. iFrame "Hrefdp Hrud". iExact "Hshotd". }
         iApply (wp_cbeqz_fall_s_sconf (CID := CID18)
                   (mword_of_int (SU + 0x2e)) (mword_of_int 90 : mword 8)
                   (Cregidx (mword_of_int 2)) Ra0 N4 (K - 30)%nat b
@@ -1482,6 +1482,8 @@ Section ProofSysUnlinkBody.
        [su_tail_bad]'s iunlockput *)
     ifreeze_off (bv_unsigned inum) -∗
     inode_ref_short kk (qi + s)%Qp qi dev inum -∗
+    (* its PROVENANCE UNIT (item 7a-wire): iunlockput's iput spends it. *)
+    runit_any (bv_unsigned inum) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
@@ -1535,7 +1537,7 @@ Section ProofSysUnlinkBody.
            HMs3 Hal Heb Hupt1.
     iIntros "Hcg Hown #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen #Hitab #Hitinv
              #Hesck #Hireg #Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid Hload
-             #Hshot Hfrz Hkeep Hsbb Hsbi Hsbs Hbmres Hpidq Hpre #Hprocs #Hdev
+             #Hshot Hfrz Hkeep Hru Hsbb Hsbi Hsbs Hbmres Hpidq Hpre #Hprocs #Hdev
              #Hgeo
              #Hdlk Hbsl Hir Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27
              HbE H30 Hcont".
@@ -1550,7 +1552,7 @@ Section ProofSysUnlinkBody.
               HMs1 HMs2 HMs3 Hal
               with "Hcg Hown [] [] Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen Hitab
                     Hitinv Hesck Hireg Hslkk Hslkd Hslpid Hdep Hidev Hiinum
-                    Hivalid Hload Hshot Hfrz Hkeep Hsbb Hsbi Hbmres Hpidq
+                    Hivalid Hload Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpidq
                     Hprocs
                     Hdev Hgeo Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD HbNj
                     HbP H27 HbE H30 [Hcont Hpre Hsbs Hir]").
@@ -1735,9 +1737,15 @@ Section ProofSysUnlinkBody.
        (* the payload's freeze token (§3.9, RULING A-prime) *)
        ifreeze_off (bv_unsigned dinum) -∗
        inode_ref_short kd (qdi + sd)%Qp qdi dev dinum -∗
+       (* its PROVENANCE UNIT (item 7a-wire): iunlockput's iput spends it. *)
+       runit_any (bv_unsigned dinum) -∗
        (* ---- [ip], REFERENCED (dirlookup's iget) ---- *)
        inode_ref ks qs dev
          (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32) -∗
+       (* ...with the unit that iget minted with it (item 7a-wire) *)
+       runit_any
+         (bv_unsigned
+            (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)) -∗
        log_opS g n1 Sb1 -∗
        (* ---- the frame, with slot 4 filled and slot 27 SPLIT ---- *)
        (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
@@ -1819,7 +1827,7 @@ Section ProofSysUnlinkBody.
        nameiparent's promise into [di_type dnd = T_DIR] at ilock's own
        record, which is dirlookup's first premise. ---- *)
     iDestruct "Hheld" as (kd qd dinum gyd)
-      "(%Hdpe & %Hkd & %Hdinumc & Hrefdp & #Hshotd)".
+      "(%Hdpe & %Hkd & %Hdinumc & Hrefdp & #Hshotd & Hrud)".
     assert (Hdinb : bv_unsigned dinum < 16 * Z.of_nat nib)
       by (rewrite Hcnib; exact Hdinumc).
     destruct (Hiregb dinum Hdinb) as [Hdiblk Hdiblog].
@@ -1881,16 +1889,17 @@ Section ProofSysUnlinkBody.
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iApply (Ilock.wp_ilock_sconf (CID := CID1) gs jx gl gu gd gk pd pav pu bn
               gfs gi cn gild gisld cov logstart inodestart nib kd (qd/2)%Qp
-              gyd dev dinum pid (DfracOwn (1/4)) dqs R0 (K - 30)%nat eb b lks
+              gyd PlainK dev dinum pid (DfracOwn (1/4)) dqs R0 (K - 30)%nat eb b
+              lks
               ltac:(exact Kil) Hkd Hgeom Hist0 Hdiblk Hdinb Hj Hgl HR0a0
               (Hlb "bcache"%string)
               with "Hcg Hown [] [] Htext Hdata Hpc Hpenv2 Hbio Hitinv Hescd Hireg
-                    Hslkd0 Hshrd Hsbi Hpidq Hprocs Hdev Hgeo Hdlk Hbs1").
+                    Hslkd0 Hshrd Hrud Hsbi Hpidq Hprocs Hdev Hgeo Hdlk Hbs1").
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     iIntros (CID2 Hq2 mil dnd bmd fld)
       "%Hcsil Hcg Hown _ _ Hpc Hpidq Hsbi Hbs1 Hslkdd Hslpid Hdep
-       Hidev Hiinum Hivalid Hload #Hshotl Hfrz %Hfld".
+       Hidev Hiinum Hivalid Hload #Hshotl Hfrz %Hfld Hrud %Hilkpd".
     assert (Hpc34 : ret_pc (R0 !!! Regidx Rra : mword 64)
                     = mword_of_int (SU + 0x34)) by (rewrite HR0ra; pcw).
     iEval (rewrite Hpc34) in "Hpc".
@@ -2033,7 +2042,7 @@ Section ProofSysUnlinkBody.
                 (su_regs_s3 _ _ _ _ _ _ Hn1regs) Hal Heb Hupt1
                 with "Hcg Hown Htext Hdata Hpc Hpenv2 Hbio Hlog Hseam Hgen Hitab
                       Hitinv Hescd Hireg Hslkd0 Hslkdd Hslpid Hdep Hidev
-                      Hiinum Hivalid Hload Hshotl Hfrz Hkeepd Hsbb Hsbi Hsbs
+                      Hiinum Hivalid Hload Hshotl Hfrz Hkeepd Hrud Hsbb Hsbi Hsbs
                       Hbmres Hpidq Hpre Hprocs Hdev Hgeo Hdlk
                       [Hbs1 Hbs2] Hir [HopS] Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD
                       Hnm14 Hnm2 HbP H27 HbE H30 Hcont").
@@ -2189,7 +2198,7 @@ Section ProofSysUnlinkBody.
                   (su_regs_s3 _ _ _ _ _ _ Hn2regs) Hal Heb Hupt1
                   with "Hcg Hown Htext Hdata Hpc Hpenv2 Hbio Hlog Hseam Hgen Hitab
                         Hitinv Hescd Hireg Hslkd0 Hslkdd Hslpid Hdep Hidev
-                        Hiinum Hivalid Hload Hshotl Hfrz Hkeepd Hsbb Hsbi Hsbs
+                        Hiinum Hivalid Hload Hshotl Hfrz Hkeepd Hrud Hsbb Hsbi Hsbs
                         Hbmres Hpidq Hpre Hprocs Hdev Hgeo Hdlk
                         [Hbs1 Hbs2] Hir [HopS] Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD
                         Hnm14 Hnm2 HbP H27 HbE H30 Hcont").
@@ -2389,7 +2398,7 @@ Section ProofSysUnlinkBody.
                           = mword_of_int (SU + 0x158)) by pcw.
         destruct found.
         * (* ============ THE RECORD IS THERE: the SEAM ============ *)
-          iDestruct "Hres" as "((%Hfst & %Hkslot & %Hdla0) & Hchild & H27hi)".
+          iDestruct "Hres" as "((%Hfst & %Hkslot & %Hdla0) & Hchild & Hruc & H27hi)".
           iEval (rewrite HR12a2) in "H27hi".
           (* ===== +0x6c c.mv s2,a0 -- s2 = ip ===== *)
           iApply (wp_cmv_s_sconf (CID := CID20) (mword_of_int (SU + 0x6c))
@@ -2434,8 +2443,8 @@ Section ProofSysUnlinkBody.
                     [%]
                     Hcg Hown Hpc Hseam Hgen [Hbs1 Hbs2] Hsbb Hsbi Hsbs Hbmres
                     Hpriv Hslkd0 Hslkdd Hslpid Hdep Hidev Hiinum Hivalid
-                    Hdlnk Hdiat Hmeta Haddrs Hind Hblocks Hshotl Hfrz Hkeepd
-                    Hchild HopS Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP
+                    Hdlnk Hdiat Hmeta Haddrs Hind Hblocks Hshotl Hfrz Hkeepd Hrud
+                    Hchild Hruc HopS Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP
                     H27lo H27hi HbE H30 [Hcont]").
           { exact HR13regs. }
           { exact Hkd. }
@@ -2519,7 +2528,7 @@ Section ProofSysUnlinkBody.
                     Hsp0 HR13sp HR13thr HR13s1 HR13s3 Hal
                     with "Hcg Hown [] [] Htext Hdata Hpc Hpenv2 Hbio Hlog Hseam Hgen
                           Hitab Hitinv Hescd Hireg Hslkd0 Hslkdd Hslpid Hdep
-                          Hidev Hiinum Hivalid Hload Hshotl Hfrz Hkeepd Hsbb
+                          Hidev Hiinum Hivalid Hload Hshotl Hfrz Hkeepd Hrud Hsbb
                           Hsbi
                           Hbmres Hpidq Hprocs Hdev Hgeo Hdlk [Hbs1 Hbs2]
                           [HopS] Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD HbNj HbP H27
@@ -3505,9 +3514,15 @@ Section ProofSysUnlinkBody.
     (* the payload's freeze token (§3.9, RULING A-prime) *)
     ifreeze_off (bv_unsigned dinum) -∗
     inode_ref_short kd (qdi + sd)%Qp qdi dev dinum -∗
+    (* its PROVENANCE UNIT (item 7a-wire): iunlockput's iput spends it. *)
+    runit_any (bv_unsigned dinum) -∗
     (* ---- [ip], REFERENCED (dirlookup's iget) ---- *)
     inode_ref ks qs dev
       (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32) -∗
+    (* ...with the unit that iget minted with it (item 7a-wire) *)
+    runit_any
+      (bv_unsigned
+         (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)) -∗
     log_opS g n1 Sb1 -∗
     (* ---- the frame, as the +0x72 seam hands it ---- *)
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
@@ -3580,6 +3595,8 @@ Section ProofSysUnlinkBody.
        (* the payload's freeze token (§3.9, RULING A-prime) *)
        ifreeze_off (bv_unsigned dinum) -∗
        inode_ref_short kd (qdi + sd)%Qp qdi dev dinum -∗
+       (* its PROVENANCE UNIT (item 7a-wire): iunlockput's iput spends it. *)
+       runit_any (bv_unsigned dinum) -∗
        (* ---- [ip], LOCKED and OPEN ---- *)
        is_sleeplock_gen gili gisli (i_lock (ientry ks)) "inode"%string
                         (ic_tok cn ks) (slh_tok (icfg_isl ks)) -∗
@@ -3605,6 +3622,10 @@ Section ProofSysUnlinkBody.
          (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)) -∗
        inode_ref_short ks (qsi + si)%Qp qsi dev
          (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32) -∗
+       (* its PROVENANCE UNIT (item 7a-wire): iunlockput's iput spends it. *)
+       runit_any
+         (bv_unsigned
+            (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)) -∗
        log_opS g n1 Sb1 -∗
        (* ---- the frame, slot 5 FILLED ---- *)
        (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
@@ -3672,7 +3693,7 @@ Section ProofSysUnlinkBody.
              #Hdlk Hbsl #Hitab #Hitinv #Hescrows #Hslks #Hireg Hsbb Hsbi Hsbs
              Hbmres #Hkenv #Hprocs Hpriv #Hslkd Hslkdq Hslpidd Hdepd Hidevd
              Hiinumd Hivalidd Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd
-             #Hshotd Hfrz Hkeepd Hchild HopS
+             #Hshotd Hfrz Hkeepd Hrud Hchild Hrui HopS
              Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi HbE H30
              Hseamk Hcont".
     iDestruct (cpu_own_zero_empty with "Hown") as "[%Hlkempty Hown]".
@@ -3774,18 +3795,18 @@ Section ProofSysUnlinkBody.
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iApply (Ilock.wp_ilock_sconf (CID := CID2) gs jx gl gu gd gk pd pav pu bn
               gfs gi cn gili gisli cov logstart inodestart nib ks (qs/2)%Qp
-              gyi dev
+              gyi PlainK dev
               (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)
               pid (DfracOwn (1/4)) dqs R0 (K - 30)%nat eb b lks
               ltac:(exact Kil) Hks Hgeom Hist0 Hiblki Hinb Hj Hgl HR0a0
               (Hlb "bcache"%string)
               with "Hcg Hown [] [] Htext Hkd Hpc Hpe Hbio Hitinv Hesci Hireg
-                    Hslki Hshri Hsbi Hpidq Hprocs Hdev Hgeo Hdlk Hbs1").
+                    Hslki Hshri Hrui Hsbi Hpidq Hprocs Hdev Hgeo Hdlk Hbs1").
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     iIntros (CID3 Hq3 mil dni bmi fldi)
       "%Hcsil Hcg Hown _ _ Hpc Hpidq Hsbi Hbs1 Hslkiq Hslpidi Hdepi
-       Hidevi Hiinumi Hivalidi Hloadi #Hshoti Hfrzi %Hfldi".
+       Hidevi Hiinumi Hivalidi Hloadi #Hshoti Hfrzi %Hfldi Hrui %Hilkpi".
     assert (Hpc78 : ret_pc (R0 !!! Regidx Rra : mword 64)
                     = mword_of_int (SU + 0x78)) by (rewrite HR0ra; pcw).
     iEval (rewrite Hpc78) in "Hpc".
@@ -3921,9 +3942,9 @@ Section ProofSysUnlinkBody.
          continuations, combined so [su_w4]'s exits can hand them back *)
       iCombine "Hseam Hgen Hbs2 Hsbb Hsbi Hsbs Hbmres Hpre Hslkdq Hslpidd
                 Hdepd Hidevd Hiinumd Hivalidd Hdlnkd Hdiatd Hmetad Haddrsd
-                Hindd Hblocksd Hfrz Hkeepd Hslkiq Hslpidi Hdepi Hiinumi
+                Hindd Hblocksd Hfrz Hkeepd Hrud Hslkiq Hslpidi Hdepi Hiinumi
                 Hivalidi
-                Hdlnki Hdiati Hfrzi Hkeepi HopS Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14
+                Hdlnki Hdiati Hfrzi Hkeepi Hrui HopS Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14
                 Hnm2 HbP H27lo H27hi H30 Hseamk Hcont" as "HX".
       iApply (su_w4 (CID0 := CID8) gs jx gl gu gd gk pd pav pu bn gfs ga gf
                 cov logstart dev ks
@@ -3943,10 +3964,10 @@ Section ProofSysUnlinkBody.
         iDestruct "HX" as "(Hseam & Hgen & Hbs2 & Hsbb & Hsbi & Hsbs & Hbmres
                             & Hpre & Hslkdq & Hslpidd & Hdepd & Hidevd &
                             Hiinumd & Hivalidd & Hdlnkd & Hdiatd & Hmetad &
-                            Haddrsd & Hindd & Hblocksd & Hfrz & Hkeepd &
+                            Haddrsd & Hindd & Hblocksd & Hfrz & Hkeepd & Hrud &
                             Hslkiq &
                             Hslpidi & Hdepi & Hiinumi & Hivalidi & Hdlnki &
-                            Hdiati & Hfrzi & Hkeepi & HopS & Hf1 & Hf2 & Hf3 & Hf4 &
+                            Hdiati & Hfrzi & Hkeepi & Hrui & HopS & Hf1 & Hf2 & Hf3 & Hf4 &
                             Hf5 & Hf6 & HbD & Hnm14 & Hnm2 & HbP & H27lo &
                             H27hi & H30 & Hseamk & Hcont)".
         iDestruct "Hmapi" as "[Haddrsi Hindi]".
@@ -4001,9 +4022,9 @@ Section ProofSysUnlinkBody.
                   with "Hcg Hown [] [] Htext Hkd Hpc Hpe Hbio Hlog Hseam Hgen
                         Hitab Hitinv Hescd Hesci Hireg Hslkd Hslkdq Hslpidd
                         Hdepd Hidevd Hiinumd Hivalidd Hloadd Hshotd Hfrz
-                        Hkeepd
+                        Hkeepd Hrud
                         Hslki Hslkiq Hslpidi Hdepi Hidevi Hiinumi Hivalidi
-                        Hloadi Hshoti Hfrzi Hkeepi Hsbb Hsbi Hbmres Hpidq Hprocs
+                        Hloadi Hshoti Hfrzi Hkeepi Hrui Hsbb Hsbi Hbmres Hpidq Hprocs
                         Hdev Hgeo Hdlk [Hbslot Hbs2] [HopS] Hf1 Hf2 Hf3 Hf4
                         Hf5 Hf6 HbD HbNj HbP H27 Hbuf H30
                         [Hcont Hpre Hsbs]").
@@ -4030,10 +4051,10 @@ Section ProofSysUnlinkBody.
         iDestruct "HX" as "(Hseam & Hgen & Hbs2 & Hsbb & Hsbi & Hsbs & Hbmres
                             & Hpre & Hslkdq & Hslpidd & Hdepd & Hidevd &
                             Hiinumd & Hivalidd & Hdlnkd & Hdiatd & Hmetad &
-                            Haddrsd & Hindd & Hblocksd & Hfrz & Hkeepd &
+                            Haddrsd & Hindd & Hblocksd & Hfrz & Hkeepd & Hrud &
                             Hslkiq &
                             Hslpidi & Hdepi & Hiinumi & Hivalidi & Hdlnki &
-                            Hdiati & Hfrzi & Hkeepi & HopS & Hf1 & Hf2 & Hf3 & Hf4 &
+                            Hdiati & Hfrzi & Hkeepi & Hrui & HopS & Hf1 & Hf2 & Hf3 & Hf4 &
                             Hf5 & Hf6 & HbD & Hnm14 & Hnm2 & HbP & H27lo &
                             H27hi & H30 & Hseamk & Hcont)".
         iDestruct "Hmapi" as "[Haddrsi Hindi]".
@@ -4048,10 +4069,10 @@ Section ProofSysUnlinkBody.
                   with "[%] [%] [%] [%] [%] [%] [%] [%] Hcg Hown Hpc Hseam Hgen
                         [Hbslot Hbs2] Hsbb Hsbi Hsbs Hbmres Hpriv Hslkd
                         Hslkdq Hslpidd Hdepd Hidevd Hiinumd Hivalidd Hdlnkd
-                        Hdiatd Hmetad Haddrsd Hindd Hblocksd Hshotd Hfrz Hkeepd
+                        Hdiatd Hmetad Haddrsd Hindd Hblocksd Hshotd Hfrz Hkeepd Hrud
                         Hslki Hslkiq Hslpidi Hdepi Hidevi Hiinumi Hivalidi
                         Hdlnki Hdiati Hmetai Haddrsi Hindi Hblocksi Hshoti
-                        Hfrzi Hkeepi HopS Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2
+                        Hfrzi Hkeepi Hrui HopS Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2
                         HbP H27lo H27hi Hbuf H30 [Hcont]").
         { exact Hxregs. }
         { exact Hnlzi. }
@@ -4087,9 +4108,9 @@ Section ProofSysUnlinkBody.
                 with "[%] [%] [%] [%] [%] [%] [%] [%] Hcg Hown Hpc Hseam Hgen
                       [Hbs1 Hbs2] Hsbb Hsbi Hsbs Hbmres Hpriv Hslkd Hslkdq
                       Hslpidd Hdepd Hidevd Hiinumd Hivalidd Hdlnkd Hdiatd
-                      Hmetad Haddrsd Hindd Hblocksd Hshotd Hfrz Hkeepd Hslki
+                      Hmetad Haddrsd Hindd Hblocksd Hshotd Hfrz Hkeepd Hrud Hslki
                       Hslkiq Hslpidi Hdepi Hidevi Hiinumi Hivalidi Hdlnki
-                      Hdiati Hmetai Haddrsi Hindi Hblocksi Hshoti Hfrzi Hkeepi HopS
+                      Hdiati Hmetai Haddrsi Hindi Hblocksi Hshoti Hfrzi Hkeepi Hrui HopS
                       Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi
                       HbE H30 [Hcont]").
       { exact HM5regs. }
@@ -4231,6 +4252,8 @@ Section ProofSysUnlinkBody.
     (* the payload's freeze token (§3.9, RULING A-prime) *)
     ifreeze_off (bv_unsigned dinum) -∗
     inode_ref_short kd (qdi + sd)%Qp qdi dev dinum -∗
+    (* its PROVENANCE UNIT (item 7a-wire): iunlockput's iput spends it. *)
+    runit_any (bv_unsigned dinum) -∗
     (* ---- [ip], LOCKED and OPEN ---- *)
     is_sleeplock_gen gili gisli (i_lock (ientry ks)) "inode"%string
                      (ic_tok cn ks) (slh_tok (icfg_isl ks)) -∗
@@ -4256,6 +4279,10 @@ Section ProofSysUnlinkBody.
       (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)) -∗
     inode_ref_short ks (qsi + si)%Qp qsi dev
       (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32) -∗
+    (* its PROVENANCE UNIT (item 7a-wire): iunlockput's iput spends it. *)
+    runit_any
+      (bv_unsigned
+         (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)) -∗
     log_opS g n1 Sb1 -∗
     (* ---- the frame, slot 5 FILLED ---- *)
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
@@ -4304,9 +4331,9 @@ Section ProofSysUnlinkBody.
              #Hdev #Hgeo #Hdlk Hbsl #Hitab #Hitinv #Hescrows #Hireg
              Hsbb Hsbi Hsbs Hbmres #Hkenv #Hprocs Hpriv
              #Hslkd Hslkdq Hslpidd Hdepd Hidevd Hiinumd Hivalidd Hdlnkd
-             Hdiatd Hmetad Haddrsd Hindd Hblocksd #Hshotd Hfrz Hkeepd
+             Hdiatd Hmetad Haddrsd Hindd Hblocksd #Hshotd Hfrz Hkeepd Hrud
              #Hslki Hslkiq Hslpidi Hdepi Hidevi Hiinumi Hivalidi Hdlnki
-             Hdiati Hmetai Haddrsi Hindi Hblocksi #Hshoti Hfrzi Hkeepi HopS
+             Hdiati Hmetai Haddrsi Hindi Hblocksi #Hshoti Hfrzi Hkeepi Hrui HopS
              Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi HbE H30
              Hcont".
     iPoseProof (printk_env_panic with "Hprenv") as "#Hpanenv".
@@ -5027,7 +5054,7 @@ Section ProofSysUnlinkBody.
               ltac:(unfold iput_units; lia) Hj Hgl HC5a0 (Hlb "log"%string)
               with "Hcg Hown [] [] Htext Hdata Hpc Hpanenv Hbio Hlog Hitab Hitinv
                     Hescd Hireg Hslkd Hslkdq Hslpidd Hdepd Hidevd Hiinumd
-                    Hivalidd Hloadd Hshotd2 Hfrz Hkeepd Hsbb Hsbi Hbmres Hpidq
+                    Hivalidd Hloadd Hshotd2 Hfrz Hkeepd Hrud Hsbb Hsbi Hbmres Hpidq
                     Hprocs Hdev Hgeo Hdlk Hbsl [] HopS").
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
@@ -5320,7 +5347,7 @@ Section ProofSysUnlinkBody.
               Hnu2 Hj Hgl HE2a0 (Hlb "log"%string)
               with "Hcg Hown [] [] Htext Hdata Hpc Hpanenv Hbio Hlog Hitab Hitinv
                     Hesci Hireg Hslki Hslkiq Hslpidi Hdepi Hidevi Hiinumi
-                    Hivalidi Hloadi Hshoti2 Hfrzi Hkeepi Hsbb Hsbi Hbmres Hpidq
+                    Hivalidi Hloadi Hshoti2 Hfrzi Hkeepi Hrui Hsbb Hsbi Hbmres Hpidq
                     Hprocs Hdev Hgeo Hdlk [Hbs1 Hbs2] [] HopS").
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
@@ -5681,6 +5708,8 @@ Section ProofSysUnlinkBody.
     (* the payload's freeze token (§3.9, RULING A-prime) *)
     ifreeze_off (bv_unsigned dinum) -∗
     inode_ref_short kd (qdi + sd)%Qp qdi dev dinum -∗
+    (* its PROVENANCE UNIT (item 7a-wire): iunlockput's iput spends it. *)
+    runit_any (bv_unsigned dinum) -∗
     (* ---- [ip], LOCKED and OPEN ---- *)
     is_sleeplock_gen gili gisli (i_lock (ientry ks)) "inode"%string
                      (ic_tok cn ks) (slh_tok (icfg_isl ks)) -∗
@@ -5706,6 +5735,10 @@ Section ProofSysUnlinkBody.
       (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)) -∗
     inode_ref_short ks (qsi + si)%Qp qsi dev
       (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32) -∗
+    (* its PROVENANCE UNIT (item 7a-wire): iunlockput's iput spends it. *)
+    runit_any
+      (bv_unsigned
+         (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)) -∗
     log_opS g n1 Sb1 -∗
     (* ---- the frame, slot 5 FILLED ---- *)
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
@@ -5754,9 +5787,9 @@ Section ProofSysUnlinkBody.
              #Hdev #Hgeo #Hdlk Hbsl #Hitab #Hitinv #Hescrows #Hireg
              Hsbb Hsbi Hsbs Hbmres #Hkenv #Hprocs Hpriv
              #Hslkd Hslkdq Hslpidd Hdepd Hidevd Hiinumd Hivalidd Hdlnkd
-             Hdiatd Hmetad Haddrsd Hindd Hblocksd #Hshotd Hfrz Hkeepd
+             Hdiatd Hmetad Haddrsd Hindd Hblocksd #Hshotd Hfrz Hkeepd Hrud
              #Hslki Hslkiq Hslpidi Hdepi Hidevi Hiinumi Hivalidi Hdlnki
-             Hdiati Hmetai Haddrsi Hindi Hblocksi #Hshoti Hfrzi Hkeepi HopS
+             Hdiati Hmetai Haddrsi Hindi Hblocksi #Hshoti Hfrzi Hkeepi Hrui HopS
              Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi HbE H30
              Hcont".
     iPoseProof (printk_env_panic with "Hprenv") as "#Hpanenv".
@@ -6848,7 +6881,7 @@ Section ProofSysUnlinkBody.
               Hnud2 Hj Hgl HC5a0 (Hlb "log"%string)
               with "Hcg Hown [] [] Htext Hdata Hpc Hpanenv Hbio Hlog Hitab Hitinv
                     Hescd Hireg Hslkd Hslkdq Hslpidd Hdepd Hidevd Hiinumd
-                    Hivalidd Hloadd Hshotd2 Hfrz Hkeepd Hsbb Hsbi Hbmres Hpidq
+                    Hivalidd Hloadd Hshotd2 Hfrz Hkeepd Hrud Hsbb Hsbi Hbmres Hpidq
                     Hprocs Hdev Hgeo Hdlk [Hbs1 Hbs2] [] HopS").
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
@@ -7209,7 +7242,7 @@ Section ProofSysUnlinkBody.
               Hnu2 Hj Hgl HE2a0 (Hlb "log"%string)
               with "Hcg Hown [] [] Htext Hdata Hpc Hpanenv Hbio Hlog Hitab Hitinv
                     Hesci Hireg Hslki Hslkiq Hslpidi Hdepi Hidevi Hiinumi
-                    Hivalidi Hloadi Hshoti2 Hfrzi Hkeepi Hsbb Hsbi Hbmres Hpidq
+                    Hivalidi Hloadi Hshoti2 Hfrzi Hkeepi Hrui Hsbb Hsbi Hbmres Hpidq
                     Hprocs Hdev Hgeo Hdlk [Hbs1 Hbs2] [] HopS").
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
@@ -7498,7 +7531,7 @@ Section ProofSysUnlinkBody.
              %Hnotdot %Hnotdd %Hfst %Hma02 %Hal27
              Hcg Hown Hpc Hseam Hgen Hbsl Hsbb Hsbi Hsbs Hbmres Hpriv
              Hslkd Hslkdq Hslpidd Hdepd Hidevd Hiinumd Hivalidd Hdlnkd
-             Hdiatd Hmetad Haddrsd Hindd Hblocksd Hshotd Hfrz Hkeepd Hchild HopS
+             Hdiatd Hmetad Haddrsd Hindd Hblocksd Hshotd Hfrz Hkeepd Hrud Hchild Hruc HopS
              Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi HbE H30
              Hcont".
     (* ---- W3, +0x72..+0x88: ilock(ip), the nlink panic, the T_DIR test
@@ -7517,16 +7550,16 @@ Section ProofSysUnlinkBody.
                     Hdlk Hbsl Hitab Hitinv Hescrows Hslks Hireg Hsbb Hsbi
                     Hsbs Hbmres Hkenv Hprocs Hpriv Hslkd Hslkdq Hslpidd
                     Hdepd Hidevd Hiinumd Hivalidd Hdlnkd Hdiatd Hmetad
-                    Haddrsd Hindd Hblocksd Hshotd Hfrz Hkeepd Hchild HopS
+                    Haddrsd Hindd Hblocksd Hshotd Hfrz Hkeepd Hrud Hchild Hruc HopS
                     Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi
                     HbE H30 [] Hcont").
     iIntros (CIDc M3 s3x bex isdir gili gisli gyi si qsi dni bmi dati).
     iIntros "%Hregs3 %Hnlzi %Hioki %Hdoki %Hddixi %Hdoci %Hduqi %Hisd
              Hcg Hown Hpc Hseam Hgen Hbsl Hsbb Hsbi Hsbs Hbmres Hpriv
              Hslkd Hslkdq Hslpidd Hdepd Hidevd Hiinumd Hivalidd Hdlnkd
-             Hdiatd Hmetad Haddrsd Hindd Hblocksd Hshotd Hfrz Hkeepd
+             Hdiatd Hmetad Haddrsd Hindd Hblocksd Hshotd Hfrz Hkeepd Hrud
              Hslki Hslkiq Hslpidi Hdepi Hidevi Hiinumi Hivalidi Hdlnki
-             Hdiati Hmetai Haddrsi Hindi Hblocksi Hshoti Hfrzi Hkeepi HopS
+             Hdiati Hmetai Haddrsi Hindi Hblocksi Hshoti Hfrzi Hkeepi Hrui HopS
              Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi HbE H30
              Hcont".
     (* ---- W5, +0x8a..: the zeroing and the two tails, split on the seam's
@@ -7551,9 +7584,9 @@ Section ProofSysUnlinkBody.
                       Hsbb Hsbi Hsbs Hbmres Hkenv Hprocs Hpriv
                       Hslkd Hslkdq Hslpidd Hdepd Hidevd Hiinumd Hivalidd
                       Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd Hshotd
-                      Hfrz Hkeepd Hslki Hslkiq Hslpidi Hdepi Hidevi Hiinumi
+                      Hfrz Hkeepd Hrud Hslki Hslkiq Hslpidi Hdepi Hidevi Hiinumi
                       Hivalidi Hdlnki Hdiati Hmetai Haddrsi Hindi Hblocksi
-                      Hshoti Hfrzi Hkeepi HopS
+                      Hshoti Hfrzi Hkeepi Hrui HopS
                       Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi
                       HbE H30 Hcont").
     - iApply (su_w5_file gf ga gs jx gl gu gd gk pd pav pu bn g gfs gi cn gtl
@@ -7572,9 +7605,9 @@ Section ProofSysUnlinkBody.
                       Hsbb Hsbi Hsbs Hbmres Hkenv Hprocs Hpriv
                       Hslkd Hslkdq Hslpidd Hdepd Hidevd Hiinumd Hivalidd
                       Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd Hshotd
-                      Hfrz Hkeepd Hslki Hslkiq Hslpidi Hdepi Hidevi Hiinumi
+                      Hfrz Hkeepd Hrud Hslki Hslkiq Hslpidi Hdepi Hidevi Hiinumi
                       Hivalidi Hdlnki Hdiati Hmetai Haddrsi Hindi Hblocksi
-                      Hshoti Hfrzi Hkeepi HopS
+                      Hshoti Hfrzi Hkeepi Hrui HopS
                       Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi
                       HbE H30 Hcont").
   Qed.

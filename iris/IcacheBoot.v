@@ -573,7 +573,7 @@ Section IcacheBootRegion.
        root's own [nlink = 1] is still [image_root_alive]'s business and
        nobody else's. *)
     ([∗ set] z ∈ region_inums nib,
-       link_auth z 0 0 0 0 None 0 None (Some (Excl FrzOff))) -∗
+       link_auth z 0 0 0 0 None 0 None (Some (Excl FrzOff)) 0) -∗
     (* THE COUNT COUPLING's REGION HALVES (iclaim-ledger.md §2.2), one per
        inum and all at ZERO -- boot caches no inode.  A PREMISE for the
        ledger's own reason: the gname is the ambient class's, so only the
@@ -665,6 +665,10 @@ Section IcacheBootRegion.
       rewrite /ireg_out /dinode_at (region_inum_faithful nib z Hnib Hz).
       case_decide as Hty.
       - iSplitR "Hmk"; [| iExact "Hmk"].
+        iDestruct (ireg_rcol_intro z 0 0 0 0 None 0 None (Some (Excl FrzOff))
+                     0%nat 0%nat (image_dinode dss z)
+                     (ireg_ref_ok_zero 0%nat None (image_dinode dss z))
+                     with "Hla") as "Hla".
         iApply (ireg_slot_intro γi z (image_dinode dss z) 0 0 0 0 None 0 None
                   (Some (Excl FrzOff)) 0%nat
                   Hok Hrt (ireg_dir_ok_zero _) (ireg_dir_wl0_zero _)
@@ -683,6 +687,10 @@ Section IcacheBootRegion.
                     ltac:(discriminate) with "Hrcpt Hmir"). }
         iLeft. iSplitR "Hrf"; [iLeft; iSplitR; [iPureIntro; left; exact Hty | iExact "Hfrag"] | iExists (1%positive : gname), (1%positive : gname); iExact "Hrf"].
       - iSplitR "Hfrag"; [| iExact "Hfrag"].
+        iDestruct (ireg_rcol_intro z 0 0 0 0 None 0 None (Some (Excl FrzOff))
+                     0%nat 0%nat (image_dinode dss z)
+                     (ireg_ref_ok_zero 0%nat None (image_dinode dss z))
+                     with "Hla") as "Hla".
         iApply (ireg_slot_intro γi z (image_dinode dss z) 0 0 0 0 None 0 None
                   (Some (Excl FrzOff)) 0%nat
                   Hok Hrt (ireg_dir_ok_zero _) (ireg_dir_wl0_zero _)

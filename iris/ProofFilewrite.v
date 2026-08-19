@@ -1855,7 +1855,7 @@ Section ProofFilewrite.
               (fwn_bio fn) (fwn_fs fn) (fwn_ireg fn) (fwn_ic fn)
               gil gisl
               (fwn_cov fn) (fwn_logstart fn) (fwn_inodestart fn)
-              icfg_nib ik (sh / 2)%Qp g
+              icfg_nib ik (sh / 2)%Qp g (ShotK ty)
               icfg_dev inum
               pidv (DfracOwn (1/4)) (fwn_dqs fn)
               D3 (K - 12)%nat eb b lks
@@ -1865,14 +1865,14 @@ Section ProofFilewrite.
                  and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hit Hesc Hireg
-                    Hslk2 Hshrl Hsbi Hppid Hprocs
+                    Hslk2 Hshrl Hty Hsbi Hppid Hprocs
                     Hdev Hgeo Hdlk Hbsl1").
     all: try lkbelow.
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     iIntros (CIDil Hsil mil dnl bml fl_)
       "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hsbi Hbsl1 Hheld Hslpid Hdep
-       Hidev Hinum Hvalid Hlk #Hshot Hfrz %Hfr_".
+       Hidev Hinum Hvalid Hlk #Hshot Hfrz %Hfr_ _ %Hilkp".
     iDestruct ("Hpbk2" with "Hppid") as "Hpriv".
     assert (Hpc90 : ret_pc (D3 !!! Regidx Rra) = mword_of_int (FW + 0x90)).
     { rewrite HD3ra. apply bv_eq; vm_compute; reflexivity. }

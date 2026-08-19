@@ -178,10 +178,11 @@ Section KforkB4Res.
   Lemma kfk_child_cwd (k : nat) (q : Qp) (inum : mword 32) :
     (k < NINODE)%nat ->
     bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
-    inode_ref k q icfg_dev inum -∗ cwd_ref (ientry k).
+    inode_ref k q icfg_dev inum -∗ runit_any (bv_unsigned inum) -∗
+    cwd_ref (ientry k).
   Proof.
-    iIntros (Hk Hinum) "Href". iApply cwd_ref_of_held.
-    rewrite /inode_held. iExists k, q, inum. iFrame "Href".
+    iIntros (Hk Hinum) "Href Hru". iApply cwd_ref_of_held.
+    rewrite /inode_held. iExists k, q, inum. iFrame "Href Hru".
     iSplitR; [done|]. iSplitR; [iPureIntro; exact Hk|].
     iPureIntro; exact Hinum.
   Qed.
@@ -300,7 +301,7 @@ Section KforkB4Proof.
        single-device pin), which is what lets the itable this block holds
        the lock for be named without a coherence premise. *)
     iDestruct (cwd_ref_held (pv_cwd Vp) with "Hpcref") as "Hpcref".
-    iDestruct "Hpcref" as (ck cq cinum) "(%Hcwd & %Hcklt & %Hcinumb & Hiref)".
+    iDestruct "Hpcref" as (ck cq cinum) "(%Hcwd & %Hcklt & %Hcinumb & Hiref & Hcru)".
     set (cdev := icfg_dev).
     (* THE PARENT SHEDS A SHARE (B3).  idup no longer takes a reference: it
        takes a count-0 share, hands it straight back and mints the child's
@@ -374,10 +375,10 @@ Section KforkB4Proof.
                  its literal, and only the [rsv] slack is left for [lia]. *)
               ltac:(etransitivity; [exact (kfk_b4_stack_idup K HK) | lia]) Hlvl Hcklt HM1a0
               Hfresh
-              with "Hcg Hown Htext Hpc Hitb Hitinv Hireg Hirs Hshr").
+              with "Hcg Hown Htext Hpc Hitb Hitinv Hireg Hirs Hshr Hcru").
     all: try lkbelow.
     iApply wp_next_off_intro.
-    iIntros (mr) "Hcg Hown Hpc %Hidup_post Hshr (%qn & Href2)".
+    iIntros (mr) "Hcg Hown Hpc %Hidup_post Hshr (%qn & Href2) Hcru Hcru2".
     (* THE GATHER: the share comes back at the fraction it left at (nothing
        in idup touches it), so it re-pairs with the short parent and the
        parent's block closes at the fraction it came in with -- no halving. *)
@@ -385,7 +386,7 @@ Section KforkB4Proof.
                  with "Hpkeep Hshr") as "Hiref".
     iEval (rewrite Qp.div_2) in "Hiref".
     iDestruct (kfk_child_cwd ck cq cinum Hcklt Hcinumb
-                 with "Hiref") as "Hpcref1".
+                 with "Hiref Hcru") as "Hpcref1".
     iEval (rewrite -Hcwd) in "Hpcref1".
     iDestruct ("Hpback" $! (pv_cwd Vp) with "Hpcwd Hpcref1") as "Hparent2".
     iEval (rewrite upd_cwd_id) in "Hparent2".
@@ -414,7 +415,7 @@ Section KforkB4Proof.
     { rewrite (rget_ne mr Ra0 ltac:(vm_compute; discriminate)). exact Hidup_a0. }
     iEval (rewrite Hstoreval) in "Hccwd".
     iDestruct (kfk_child_cwd ck qn cinum Hcklt Hcinumb
-                 with "Href2") as "Hccref2".
+                 with "Href2 Hcru2") as "Hccref2".
     iDestruct ("Hcback" $! (ientry ck) with "Hccwd") as "Hchild2".
     (* THE WINDOW CLOSES HERE: cell + reference = the real block. *)
     iAssert (proc_priv γf npa pid_c (upd_cwd Vc (ientry ck))) with "[Hchild2 Hccref2]"

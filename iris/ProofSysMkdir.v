@@ -1268,7 +1268,7 @@ Section ProofSysMkdirBody.
         (* the ten conjuncts create hands back ARE iunlockput's precondition *)
         iDestruct "Hlocked" as (gil gisl)
           "(Hslk & Hslkd & Hslpid & Hdep & Hidev & Hiinum & Hivalid & Hload &
-            Hshot & Hfrz & Href)".
+            Hshot & Hfrz & Href & Hru)".
         (* create's payout is GENERATION-NAMED now; iunlockput takes the
            erased reference, so weaken it back here.  One line, and the
            name is what sys_open's O_CREATE arm needs kept. *)
@@ -1290,7 +1290,7 @@ Section ProofSysMkdirBody.
                   (Hlb "log"%string)
                   with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hitab Hitinv
                         Hesc Hireg Hslk Hslkd Hslpid Hdep Hidev Hiinum Hivalid
-                        Hload Hshot Hfrz Href Hsbb Hsbi Hbmres Hpidq Hprocs Hdev
+                        Hload Hshot Hfrz Href Hru Hsbb Hsbi Hbmres Hpidq Hprocs Hdev
                         Hgeo Hdlk Hbsl [HopS]").
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }

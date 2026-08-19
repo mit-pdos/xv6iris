@@ -1508,7 +1508,7 @@ Section ProofSysChdirBody.
         iEval (rewrite Hpp34) in "Hpc".
         (* THE REFERENCE namei MADE, taken apart: the slot it names is what
            ilock / iunlock / iunlockput are all indexed by. *)
-        iDestruct "Hheldip" as (kk qq inum) "(%Hipe & %Hkk & %Hinumc & Hrefip)".
+        iDestruct "Hheldip" as (kk qq inum) "(%Hipe & %Hkk & %Hinumc & Hrefip & Hruip)".
         iEval (rewrite -Hcdev) in "Hrefip".
         assert (Hinb : bv_unsigned inum < 16 * Z.of_nat nib)
           by (rewrite Hcnib; exact Hinumc).
@@ -1553,17 +1553,18 @@ Section ProofSysChdirBody.
                      ltac:(wp_next_chain) with "Hown") as "Hown".
         iApply (Ilock.wp_ilock_sconf (CID := CID23) gs j gl gu gd gk pd pav pu
                   bn gfs gi cn gil gisl cov logstart inodestart nib
-                  kk (qq/2)%Qp gsh dev inum pid (DfracOwn (1/4)) dqs
+                  kk (qq/2)%Qp gsh PlainK dev inum pid (DfracOwn (1/4)) dqs
                   P0 (K - 20)%nat eb b lks
                   ltac:(lia) Hkk Hgeom Hist0 Hiblk Hinb Hj Hgl HP0a0
                   (Hlb "bcache"%string)
                   with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hitinv Hesck
-                        Hireg Hslkk Hshr Hsbi Hpidq Hprocs Hdev Hgeo Hdlk Hbs1").
+                        Hireg Hslkk Hshr Hruip Hsbi Hpidq Hprocs Hdev Hgeo Hdlk
+                        Hbs1").
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
         iIntros (CID24 Hq24 mil dn bm fl)
           "%Hcsil Hcg Hown _ _ Hpc Hpidq Hsbi Hbs1 Hslkd Hslpid Hdep
-           Hidev Hiinum Hivalid Hload #Hshot Hfrz %Hfl".
+           Hidev Hiinum Hivalid Hload #Hshot Hfrz %Hfl Hruip %Hilkp".
         assert (Hpc38 : ret_pc (P0 !!! Regidx Rra : mword 64)
                         = mword_of_int (SC + 0x38)) by (rewrite HP0ra; pcw).
         iEval (rewrite Hpc38) in "Hpc".
@@ -1805,7 +1806,7 @@ Section ProofSysChdirBody.
           { intros c Hc N2' N8 N9 N18. rewrite /P6 upd_ne; [| regne].
             exact (HP5thr c Hc N2' N8 N9 N18). }
           (* THE OLD WORKING DIRECTORY's reference, taken apart *)
-          iDestruct "Hcwdref" as (kc qc inumc) "(%Hcwde & %Hkc & %Hinumcc & Hrefc)".
+          iDestruct "Hcwdref" as (kc qc inumc) "(%Hcwde & %Hkc & %Hinumcc & Hrefc & Hruc)".
           iEval (rewrite -Hcdev) in "Hrefc".
           assert (Hinbc : bv_unsigned inumc < 16 * Z.of_nat nib)
             by (rewrite Hcnib; exact Hinumcc).
@@ -1825,7 +1826,7 @@ Section ProofSysChdirBody.
                     Hiblkc Hiblogc Hinbc Hcovb Hiu Hj Hgl
                     ltac:(rewrite HP6a0; exact Hcwde) (Hlb "log"%string)
                     with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hitab Hitinv
-                          Hescc Hireg Hslkc Hrefc Hsbb Hsbi Hbmres Hpidq Hprocs
+                          Hescc Hireg Hslkc Hrefc Hruc Hsbb Hsbi Hbmres Hpidq Hprocs
                           Hdev Hgeo Hdlk Hbsl [HopS]").
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }
@@ -1917,10 +1918,10 @@ Section ProofSysChdirBody.
                           = mword_of_int (SC + 0x58)) by pcw.
           iEval (rewrite Hpp58) in "Hpc".
           (* THE BLOCK, REBUILT at the new working directory *)
-          iAssert (inode_held (ientry kk)) with "[Hrefnew]" as "Hheldnew".
+          iAssert (inode_held (ientry kk)) with "[Hrefnew Hruip]" as "Hheldnew".
           { rewrite /inode_held. iExists kk, (qq/2 + qq/2)%Qp, inum.
             iSplitR; [done |]. iSplitR; [iPureIntro; exact Hkk |].
-            iSplitR; [iPureIntro; exact Hinumc |].
+            iSplitR; [iPureIntro; exact Hinumc |]. iFrame "Hruip".
             iEval (rewrite -Hcdev). iExact "Hrefnew". }
           iDestruct ("Hpback" $! (ientry kk) with "Hcwd Hpidq") as "Hpnc".
           iDestruct (cwd_ref_of_held with "Hheldnew") as "Hrefcwd".
@@ -2079,7 +2080,7 @@ Section ProofSysChdirBody.
                     Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl HQ1a0 (Hlb "log"%string)
                     with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hitab Hitinv
                           Hesck Hireg Hslkk Hslkd Hslpid Hdep Hidev Hiinum
-                          Hivalid Hload Hshot Hfrz Hkeep Hsbb Hsbi Hbmres Hpidq
+                          Hivalid Hload Hshot Hfrz Hkeep Hruip Hsbb Hsbi Hbmres Hpidq
                           Hprocs Hdev Hgeo Hdlk Hbsl [HopS]").
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }

@@ -1237,7 +1237,7 @@ Section KexecBBody.
       iDestruct (cpu_own_transport CID4 CID8 0%nat true (proc_addr jp) true
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct "Hopen" as "(#Hslkk & Hslkd & Hslpid & Hdep & Hidev & Hiinum &
-                             Hivalid & Hload & #Hity & Hfrz & Hkeep)".
+                             Hivalid & Hload & #Hity & Hfrz & Hkeep & Hru)".
       (* [kxc_bad64] is applied AT [CID8] (its [sie_cap_gpr] premise pins its
          own [CID0] from "Hcg"), so kexec's exit -- still anchored at the
          section's [CID0] -- has to be re-anchored there.  The crossing fact
@@ -1254,7 +1254,7 @@ Section KexecBBody.
                 HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib Hcovb Hn2
                 Hjp Hgs Hu2 Hsp Hra Hs0 Hs1 Hs2 HB1sp HB1s4 HB1thr
                 with "Hcg Hcnt Htext Hpc Hfab Hslkk Hslkd Hslpid Hdep
-                      Hidev Hiinum Hivalid Hload Hity Hfrz Hkeep Hbm Hins Hbits
+                      Hidev Hiinum Hivalid Hload Hity Hfrz Hkeep Hru Hbm Hins Hbits
                       Hka Hpriv Hpath Hargv Hargs Hbs Hirs Hlog [-Hcont]
                       Hcont").
       rewrite /kxc_frameA6.

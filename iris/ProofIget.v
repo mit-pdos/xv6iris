@@ -472,7 +472,7 @@ Section ProofIget.
                          m n eb p K b lks.
   Proof.
     cbv beta delta [wp_iget_sconf_body].
-    intros pcE ret_tgt HK HnZ Hnib Ha0 Ha1 Hfresh.
+    intros pcE ret_tgt HK HnZ Hnib Hbno Ha0 Ha1 Hfresh.
     
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     (* [Hlic] is the LICENCE (increment C'-lite, fs-fragments.md §7.1).
@@ -813,6 +813,9 @@ Section ProofIget.
         cpu_own (CID := CIDt) n eb p b lks -∗
         pc_is (CID := CIDt) (mword_of_int (KernelSyms.iget + 0x8c) : mword 64) -∗
         IcacheRef.inode_ref kk q dev inum -∗
+        (* THE MINTED PROVENANCE UNIT (item 7a-wire), beside the reference it
+           belongs to and flavoured by the licence that paid for it. *)
+        runit (is_claim l) (bv_unsigned inum) -∗
         (* THE LICENCE COMES BACK UP THE ARM, not out of the closure
            (increment IIIe).  Both exits now SPEND it inside their count move
            -- the hit's [iref_incr_store_au] borrows it to refute a standing
@@ -825,7 +828,7 @@ Section ProofIget.
     iAssert TAILC
       with "[Hcont Hf1 Hf2 Hf3 Hf4 Hf5 Hf6]" as "Hcont2".
     { rewrite /TAILC. iIntros (CIDt Hst).
-      iIntros (mt kk q) "%Hmt Hcg Hcnt Hpc Href Hlic".
+      iIntros (mt kk q) "%Hmt Hcg Hcnt Hpc Href Hru Hlic".
       destruct Hmt as (Hkk & Hmts3 & Hmtsp & Hmtcs).
       (* +0x8c c.mv a0,s3 *)
       iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.iget + 0x8c)) Ra0 Rs3
@@ -955,7 +958,7 @@ Section ProofIget.
       iDestruct (cpu_own_transport CIDt CIDt9 n eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iSpecialize ("Hcont" $! CIDt9 with "[]"); [ iPureIntro; wp_next_chain | ].
-      iApply ("Hcont" $! P8 kk q with "Hcg Hcnt Hpc [%] Href Hlic").
+      iApply ("Hcont" $! P8 kk q with "Hcg Hcnt Hpc [%] Href Hru Hlic").
       (* [callee_saved m P8], the slot bound, and [a0 = ientry kk] *)
       split; [| split; [exact Hkk | exact HP8a0]].
       assert (Hthread : forall c : mword 5, is_cs_idx c = true ->
@@ -1382,10 +1385,12 @@ Section ProofIget.
                        isl_slot (<[e := ((1/2/2)%Qp, 1%positive)]> M) e ∗
                        iref_tok e (1/2/2)%Qp ∗
                        (∃ g : gname, live_gen e (1/2) g ∗ ity_pending g) ∗
+                       iname γi γfs inum l ∗
                        ifreeze_off (bv_unsigned inum) ∗
-                       icnt_half (bv_unsigned inum) 1%nat)%I
+                       icnt_half (bv_unsigned inum) 1%nat ∗
+                       runit (is_claim l) (bv_unsigned inum))%I
                       (⊤ ∖ ↑minstretN ∖ ↑icacheN ∖ ↑iregN) false ltac:(solve_ndisj)
-                      with "Hcg Hpc Hi78 [Hhalf Hisl Hfoff Hicnt0]").
+                      with "Hcg Hpc Hi78 [Hhalf Hisl Hlic Hfoff Hicnt0]").
             { rewrite Hpa78 Hsv78.
               (* THE SIXTH COUNT MOVE (iclaim-ledger.md §3.1, A-AUs' last
                  bullet): [iref_alloc_store_au], the region-aware 0 -> 1
@@ -1399,15 +1404,17 @@ Section ProofIget.
                  Both come back -- the token travels on into the entry's parked
                  arm at +0x7c, the half into [islot2]'s live one. *)
               iMod (iref_alloc_store_au (⊤ ∖ ↑minstretN) γi γfs inodestart nib
-                      M e inum (1/2/2)%Qp
-                      ltac:(solve_ndisj) ltac:(solve_ndisj) Hnib He HMe ig_quarter_lt
-                      with "Hinv Hrinv Hhalf Hisl Hfoff Hicnt0") as "[Hcell Hback2]".
+                      M e inum l (1/2/2)%Qp
+                      ltac:(solve_ndisj) ltac:(solve_ndisj) Hnib Hbno He HMe
+                      ig_quarter_lt
+                      with "Hinv Hrinv Hhalf Hisl Hlic Hfoff Hicnt0")
+                as "[Hcell Hback2]".
               iModIntro. iExists (iref_word M e). iFrame "Hcell". iIntros "Hcell".
               iMod ("Hback2" with "Hcell")
-                as "(Hhalf & Hisl & Htok2 & Hgen & Hfoff & Hicnt1)".
+                as "(Hhalf & Hisl & Htok2 & Hgen & Hlic & Hfoff & Hicnt1 & Hru)".
               iModIntro. iFrame. }
             iApply wp_next_off_intro.
-            iIntros "Hcg Hpc (Hhalf & Hisl & Htok2 & (%gnew & Hlvh & Hpend) & Hfoff & Hicnt1)".
+            iIntros "Hcg Hpc (Hhalf & Hisl & Htok2 & (%gnew & Hlvh & Hpend) & Hlic & Hfoff & Hicnt1 & Hru)".
             (* the slot's share authority goes back into the lock's resource *)
             iDestruct ("Hislback" $! (<[e := ((1/2/2)%Qp, 1%positive)]> M)
                          with "[%] Hisl") as "Hipool".
@@ -1607,7 +1614,7 @@ Section ProofIget.
                       (HV1cs c Hcs N9 N19). by apply Hmcs. }
             iEval (rewrite /TAILC) in "Hcont2".
             iSpecialize ("Hcont2" $! CIDr with "[]"); [ iPureIntro; wp_next_chain | ].
-            iApply ("Hcont2" $! mr e (1/2/2)%Qp with "[%] Hcg Hcnt Hpc [Htok2 Hid2] Hlic").
+            iApply ("Hcont2" $! mr e (1/2/2)%Qp with "[%] Hcg Hcnt Hpc [Htok2 Hid2] Hru Hlic").
             * split; [exact He|]. split; [exact Hmrs3|].
               split; [exact Hmrsp | exact Hmrcs].
             * rewrite /IcacheRef.inode_ref. iFrame "Htok2 Hid2".
@@ -1916,7 +1923,8 @@ Section ProofIget.
                    isl_slot (<[j := ((qj + qj'/2)%Qp, Pos.succ nj)]> M) j ∗
                    iref_tok j (qj'/2)%Qp ∗
                    iname γi γfs inum l ∗
-                   icnt_half (bv_unsigned inum) (Pos.to_nat (Pos.succ nj)))%I
+                   icnt_half (bv_unsigned inum) (Pos.to_nat (Pos.succ nj)) ∗
+                   runit (is_claim l) (bv_unsigned inum))%I
                   (⊤ ∖ ↑minstretN ∖ ↑icacheN ∖ ↑iregN) false ltac:(solve_ndisj)
                   with "Hcg Hpc Hi58 [Hhalf Hisl Hlic Hicnt]").
         { rewrite Hpa58 Hstv.
@@ -1928,13 +1936,13 @@ Section ProofIget.
              comes straight back, and travels on to [Hcont2]. *)
           iMod (iref_incr_store_au (⊤ ∖ ↑minstretN) γi γfs inodestart nib M j inum l
                   qj (qj'/2)%Qp nj
-                  ltac:(solve_ndisj) ltac:(solve_ndisj) Hnib HMj Hqv Hno1
+                  ltac:(solve_ndisj) ltac:(solve_ndisj) Hnib HMj Hqv Hno1 Hbno
                   with "Hinv Hrinv Hhalf Hisl Hlic Hicnt") as "[Hcell Hback2]".
           iModIntro. iExists (iref_word M j). iFrame "Hcell". iIntros "Hcell".
-          iMod ("Hback2" with "Hcell") as "(Hhalf & Hisl & Htok2 & Hlic & Hicnt)".
+          iMod ("Hback2" with "Hcell") as "(Hhalf & Hisl & Htok2 & Hlic & Hicnt & Hru)".
           iModIntro. iFrame. }
         iApply wp_next_off_intro.
-        iIntros "Hcg Hpc (Hhalf & Hisl & Htok2 & Hlic & Hicnt)".
+        iIntros "Hcg Hpc (Hhalf & Hisl & Htok2 & Hlic & Hicnt & Hru)".
         iDestruct ("Hislback" $! (<[j := ((qj + qj'/2)%Qp, Pos.succ nj)]> M)
                      with "[%] Hisl") as "Hipool".
         { intros i Hi. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
@@ -2092,7 +2100,7 @@ Section ProofIget.
                      with "Hcnt") as "Hcnt".
         iEval (rewrite /TAILC) in "Hcont2".
         iSpecialize ("Hcont2" $! CIDh2 with "[]"); [ iPureIntro; wp_next_chain | ].
-        iApply ("Hcont2" $! Z1 j (qj'/2)%Qp with "[%] Hcg Hcnt Hpc [Htok2 Hid2] Hlic").
+        iApply ("Hcont2" $! Z1 j (qj'/2)%Qp with "[%] Hcg Hcnt Hpc [Htok2 Hid2] Hru Hlic").
         + split; [exact Hk|]. split; [exact HZ1s3|]. split; [exact HZ1sp | exact HZ1cs].
         + rewrite /IcacheRef.inode_ref. iFrame "Htok2 Hid2".
       - (* ===== A FREE SLOT: [bge x0,a5] is TAKEN, to +0x34 ===== *)

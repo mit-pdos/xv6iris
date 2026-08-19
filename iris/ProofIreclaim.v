@@ -1313,11 +1313,20 @@ Section IreclaimOrphan.
               (BufL (uint bno) ds)
               O6 0%nat true (proc_addr j) (K - 8)%nat b lks
               ltac:(lia) ltac:(cbn [Z.of_nat]; lia) Hnibin
+              (* THE MINT's [BufL] BLOCK TIE (item 7a-wire): this walk is the
+                 ONE site in the tree that presents licence (e), and the real
+                 equation is its own [Hbnoeq]. *)
+              ltac:(intros bno0 ds0 Heq; injection Heq as Hb1 Hb2;
+                    subst bno0; exact Hbnoeq)
               HO6a0 HO6a1
               ltac:(lkbelow)
               with "Hcg Hcnt Htext Hkdata Hpc Hitb2 Hitbl Hesc Hireg Hpanenv Hiref Hlic").
     all: try lkbelow.
-    iIntros (CID8 Hq8 mI kslot q) "Hcg Hcnt Hpc %Higfacts Href Hlic".
+    iIntros (CID8 Hq8 mI kslot q) "Hcg Hcnt Hpc %Higfacts Href Hru Hlic".
+    (* the minted unit.  [BufL] is not the claim licence, so what iget
+       minted is the PLAIN unit, which under RULING C' is exactly what a
+       rest home carries. *)
+    iDestruct (runit_any_intro with "Hru") as "Hru".
     (* ...and the half goes straight back into the handle, unspent.  The
        unfolding is done IN the hypothesis: [fs_L]'s ghost_map notation is
        not in scope in this file, and writing the target proposition out
@@ -1648,7 +1657,7 @@ Section IreclaimOrphan.
     iEval (rewrite inode_shr_gen_intro) in "Hshr".
     iDestruct "Hshr" as (gsh) "Hshr".
     iApply (IL.wp_ilock_sconf γs j γl γu γd γk pd pav pu bn γfs γi cn gil gisl
-              cov logstart inodestart nib kslot (q/2)%Qp gsh dev inum
+              cov logstart inodestart nib kslot (q/2)%Qp gsh PlainK dev inum
               pidv dq dqs OC (K - 8)%nat true b lks
               ltac:(lia) Hkslot Hgeom Hst Hibcov Hnibin Hj Hgl
               HOCa0
@@ -1656,13 +1665,13 @@ Section IreclaimOrphan.
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
               with "Hcg Hcnt [] [] Htext Hkdata Hpc Hpanenv Hbio Hitbl Hescrow Hireg Hslk
-                    Hshr Hsbi Hppid Hprocs Hdevi Hdgeom Hdlock Hsl1").
+                    Hshr Hru Hsbi Hppid Hprocs Hdevi Hdgeom Hdlock Hsl1").
     all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
     iIntros (CID18 Hq18 mL dnl bml fl_)
       "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hsbi Hsl1 Hslkd Hslpid Hdep Hidev Hiinum
-       Hvalid Hloaded #Hshot Hfrz %Hfr_".
+       Hvalid Hloaded #Hshot Hfrz %Hfr_ Hru %Hilkp".
     assert (Hpc5e : ret_pc (OC !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ireclaim + 0x5e))
       by (rewrite HOCra; pcw).
@@ -1868,7 +1877,7 @@ Section IreclaimOrphan.
               ltac:(unfold iput_units, MAXOPBLOCKS; lia) Hj Hgl HOGa0
               Hbelow
               with "Hcg Hcnt [] [] Htext Hkdata Hpc Hpanenv Hbio Hlctx Hitb2 Hitbl Hescrow
-                    Hireg Hslk Href Hsbb Hsbi Hbm Hppid Hprocs Hdevi Hdgeom
+                    Hireg Hslk Href Hru Hsbb Hsbi Hbm Hppid Hprocs Hdevi Hdgeom
                     Hdlock Hsl Hop").
     all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }

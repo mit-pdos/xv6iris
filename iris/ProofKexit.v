@@ -1603,7 +1603,7 @@ Section KexitRest.
     iDestruct (proc_priv_nocwd_cwd_pid γf pj pid V with "Hpriv")
       as "(Hcwd & Hpidq & Hpback)".
     iDestruct (cwd_ref_held (pv_cwd V) with "Href") as "Href".
-    iDestruct "Href" as (kk qq inum) "(%Hipe & %Hkk & %Hinumb & Href)".
+    iDestruct "Href" as (kk qq inum) "(%Hipe & %Hkk & %Hinumb & Href & Hru)".
     iDestruct (ic_escrows_acc _ _ _ _ _ kk Hkk with "Hescrows") as "#Hescrow".
     iDestruct (ic_sleeplocks_acc _ kk Hkk with "Hslks") as (gil gisl) "#Hslk".
     iEval (rewrite -Hcdev) in "Href".
@@ -1723,7 +1723,7 @@ Section KexitRest.
               ltac:(rewrite HQ2a0; exact Hipe)
               Hfresh
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpanenv Hbio Hlog Hitab Hitinv Hescrow
-                    Hireg Hslk Href Hsbb Hsbi Hbmres Hpidq Hprocs
+                    Hireg Hslk Href Hru Hsbb Hsbi Hbmres Hpidq Hprocs
                     Hdev Hgeo Hdlk Hbsl Hop").
     all: try lkbelow.
     iIntros (CID5 Hs5 mip n' us') "%Hcsip Hcg Hown Htce Hcce Hpc Hpidq Hsbb Hsbi

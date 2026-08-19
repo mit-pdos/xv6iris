@@ -221,6 +221,14 @@ Definition wp_idup_sconf_body
   iref_slot -∗
   (* A SHARE, not a reference -- see the header. *)
   inode_shr k s dev inum -∗
+  (* THE PARENT REFERENCE's PROVENANCE UNIT (item 7a-wire, §5''.3's step 3).
+     idup's mint is SELF-PAYING: this unit is what buys the two side
+     conditions [InodeRegion.ireg_ref_ok_mint] owes (allocatedness at either
+     flavour, and [c = None] at the plain one), so idup needs no licence --
+     which is what §3.11's wall said it could never have.  And the COPY is
+     minted at the PARENT's flavour: a dup of a claim reference is
+     claim-flavoured, which is what keeps (R3) true. *)
+  runit_any (bv_unsigned inum) -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr,
     sie_cap_gpr KT1 mr K b p -∗
@@ -234,6 +242,10 @@ Definition wp_idup_sconf_body
     (* ...beside a NEW reference, minted from the table's retained share at
        a fraction only the table knows. *)
     (∃ qn : Qp, inode_ref k qn dev inum) -∗
+    (* TWO units out: the parent's back, unspent, and the copy the new
+       reference carries -- both at the parent's flavour. *)
+    runit_any (bv_unsigned inum) -∗
+    runit_any (bv_unsigned inum) -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

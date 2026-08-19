@@ -199,6 +199,7 @@ Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
+Require Import DinodeEnc. (* [IBLOCK]: the mint premise's block tie, item 7a-wire *)
 Require Import IgetLic.
 From Kernel Require KernelSyms.
 Require Import LogInv.  (* [logG]: the region's zero-receipt, fs-log.md G.17 *)
@@ -228,6 +229,13 @@ Definition wp_iget_sconf_body
   (* the requested inum is inside the inode region: [ipool_acc]'s premise on
      the recycle arm, and the ONLY constraint on either argument *)
   bv_unsigned inum < 16 * Z.of_nat nib ->
+  (* THE MINT's ONE PURE PREMISE (item 7a-wire, iclaim-ledger.md §5''.3).
+     [IgetLic.iname_mint_ok]'s [BufL] row transports the licence's own
+     decoded type fact to the REGION's record through the two block halves,
+     so a [BufL]-licenced iget must be at the block the constructor names.
+     [discriminate] at every non-[BufL] caller in the tree; the real
+     equation only at [ProofIreclaim]'s boot walk. *)
+  (forall bno ds0, l = BufL bno ds0 -> bno = IBLOCK inum inodestart) ->
   (* a0 = dev, a1 = inum, sign-extended -- the scan's 64-bit [bne]s at
      +0x4c / +0x52 compare them against the [c.lw] of a cell *)
   m !!! Regidx (mword_of_int 10 : mword 5) = (sign_extend' 64 dev : mword 64) ->
@@ -268,6 +276,12 @@ Definition wp_iget_sconf_body
       /\ (k < NINODE)%nat
       /\ mr !!! Regidx (mword_of_int 10 : mword 5) = ientry k ⌝ -∗
     inode_ref k q dev inum -∗
+    (* THE REFERENCE's PROVENANCE UNIT (item 7a-wire): minted here, FLAVOURED
+       by the licence presented -- ialloc's own [ClaimL] iget mints
+       [runit_claim] into its own claim box, every other iget mints
+       [runit_plain].  It rides with the reference for the reference's whole
+       life and is surrendered at the iput that closes it. *)
+    runit (is_claim l) (bv_unsigned inum) -∗
     (* ...and BACK, unspent and at the SAME [l] *)
     iname γi γfs inum l -∗
     WP (Loop : expr riscv_lang)) -∗

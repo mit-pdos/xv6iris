@@ -548,7 +548,7 @@ Section KexecMain.
     iIntros (CIDa) "%Hsa".
     iIntros (M90 kf qf sf inumf dnf bmf gilf gislf gyf n2 used2)
             "%Hregs90 %Hn2u Hpc Hcg Hcnt Hslk Hslked Hslpid Hdep Hidev Hiinum
-             Hival Hloaded Hity Hfrz Hiref Hlog Hirs Hbm Hins Hbits Hbs #Hka2
+             Hival Hloaded Hity Hfrz Hiref Hru Hlog Hirs Hbm Hins Hbits Hbs #Hka2
              Hpriv
              Hpath Hargv Hargs Hframe Hcont".
     destruct Hregs90 as (HM90sp & HM90s0 & HM90s1 & HM90s2 & HM90s4 & Hkf &
@@ -558,7 +558,7 @@ Section KexecMain.
     iAssert (kxc_open gfs gi cn cov logstart dev pidv kf qf sf gyf inumf dnf
                       bmf gilf gislf)
       with "[Hslk Hslked Hslpid Hdep Hidev Hiinum Hival Hloaded Hity Hfrz
-             Hiref]"
+             Hiref Hru]"
       as "Hopen".
     { rewrite /kxc_open.
       iSplitL "Hslk"; [iExact "Hslk" |].
@@ -570,7 +570,8 @@ Section KexecMain.
       iSplitL "Hival"; [iExact "Hival" |].
       iSplitL "Hloaded"; [iExact "Hloaded" |].
       iSplitL "Hity"; [iExact "Hity" |].
-      iSplitL "Hfrz"; [iExact "Hfrz" | iExact "Hiref"]. }
+      iSplitL "Hfrz"; [iExact "Hfrz" |].
+      iSplitL "Hiref"; [iExact "Hiref" | iExact "Hru"]. }
     (* ---- PHASE B1: +0x090 .. +0x0cc, plus the +0x31c tail ---- *)
     iApply (PB.kxc_b1 (CID0 := CIDa) gs jp gl gu gd gk pd pav pu bn g gfs gi cn
               gtl ga gf cov logstart bmapstart inodestart nib size dev
