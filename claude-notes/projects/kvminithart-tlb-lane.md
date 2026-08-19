@@ -391,21 +391,37 @@ line.
 
 ### THE LEAF CONVERSION RECIPE (for a fresh agent, no context assumed)
 
-**It is THIRTEEN sites, not 44.**  The 44 figure counted every regime-generic
+**It is TWELVE sites, not 44.**  The 44 figure counted every regime-generic
 statement that would have needed the rejected `SrWalks` binder.  Under the
 folded design *no statement changes at all*, so only the proofs that actually
 call the engine move.  The other 29 are pass-throughs and are untouched.
 
 | file | lemmas to convert |
 |---|---|
-| `SmodeCorePt.v` | `wp_instr_s_sr` |
 | `WpSmodePtMem.v` | `wp_clw_s_r_t`, `wp_ld_s_r_t`, `wp_csw_s_r_t`, `wp_sd_s_r_t` |
 | `WpSmodePtLeaves.v` | `wp_gpr_write_s_config_regime`, `wp_cld_s_r_t`, `wp_csd_s_r_t` |
 | `WpSmodePtBtype.v` | `wp_btype_fall_s_r`, `wp_btype_taken_s_r` |
 | `WpSmodePtCtl.v` | `wp_jal_gpr_s_zca_r`, `wp_cret_s_zca_r_later`, `wp_sret_gpr_r` |
 
+All four already `Require` `WpSmodePtFetch`, so no import moves.
 `WpSmodePtAlu.v`, `WpSmodePtMemWrap.v` and `VcGenS.v` have **no** site — they
-reach the engine only through the leaves above.
+reach the engine only through the leaves above.  `SmodeCorePt.wp_instr_s_sr`
+is a thirteenth caller but has **no consumer anywhere** (grep finds only a
+comment), so it rides the old engine until the flip deletes both; do not
+convert it.
+
+**THE ENGINE LIVES IN `WpSmodePtFetch.v`, NOT `SmodeCorePt.v`, and that is
+forced.**  The folded engine must PRODUCE the fetch translation itself (the
+leaf can no longer supply it — at the Bare arm it would have to be
+`spt_tr_obl_D s_Drwb`, and a leaf has no way to know the arm).  The producer
+is `spt_fetch_tr_of_regime`, which lives in `WpSmodePtFetch` because it needs
+`spf_Db` / `spf_Db_in` from that file's head — so the engine has to sit there
+too.  That is also where `sda_slot_acc_R` already is, and it is below every
+leaf, so the altitude is right.  For the Bare arm it needs a `_D` twin of the
+producer: `spf_Db_in_D SD : spf_Db r = true -> r ∈ SD ∪ s_Dro` is two lines
+off `sf_in_mst` / `sf_in_satp`, and `spt_fetch_tr_of_regime_D` then goes
+through `spt_tr_obl_of_regime_D` with the arm's side condition (the one
+`sr_slot_acc`'s Bare disjunct hands out).
 
 **THE NEW OBLIGATION.**  `wp_instr_s_config_sr`'s leaf premise loses the four
 slot cells and the residue and takes the slot FOLDED, exactly as pre-port
