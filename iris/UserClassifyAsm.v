@@ -328,6 +328,73 @@ Definition u_exec_pins (P : uptd) (t : ptree) (rs : regstate) : Prop :=
   u_hw_pins rs /\ u_cfg_pins rs /\ u_pt_pins P rs /\
   tlb_ok_pt (mword_of_int 0) t (register_lookup tlb rs).
 
+(* ------------------------------------------------------------------- *)
+(* THE COMPOSABLE LANDING FACT.                                         *)
+(*                                                                     *)
+(* A ONE-walk composer says its landing file is [rs] or ONE             *)
+(* [register_set tlb], and that shape does NOT compose: collapsing      *)
+(* [register_set tlb v2 (register_set tlb v1 rs)] to                    *)
+(* [register_set tlb v2 rs] is a pointwise equality of the record's     *)
+(* field FUNCTION, i.e. functional extensionality, which this           *)
+(* development does not assume.  [u_tlb_only] is what every consumer    *)
+(* actually uses the disjunction FOR -- transporting the ambient pins   *)
+(* by [irrelevant_register_set] -- it is implied by it, and it IS       *)
+(* transitive.  Every composer that translates TWICE (the page-         *)
+(* straddling data accesses, the 2-aligned straddling fetch) concludes  *)
+(* this rather than the disjunction.                                    *)
+(* ------------------------------------------------------------------- *)
+Definition u_tlb_only (rs rs' : regstate) : Prop :=
+  forall r : register, register_beq r (tlb : register) = false ->
+    register_lookup r rs' = register_lookup r rs.
+
+Lemma u_tlb_only_land (rs rs' : regstate) :
+  (rs' = rs \/ exists tv, rs' = register_set tlb tv rs) -> u_tlb_only rs rs'.
+Proof.
+  intros [-> | (tv & ->)] r Hne;
+    [ reflexivity | apply irrelevant_register_set; exact Hne ].
+Qed.
+
+Lemma u_tlb_only_refl (rs : regstate) : u_tlb_only rs rs.
+Proof. intros r _. reflexivity. Qed.
+
+Lemma u_tlb_only_trans (rs rs1 rs2 : regstate) :
+  u_tlb_only rs rs1 -> u_tlb_only rs1 rs2 -> u_tlb_only rs rs2.
+Proof. intros H1 H2 r Hr. rewrite (H2 r Hr). exact (H1 r Hr). Qed.
+
+(* every ambient pin transports across such a landing, given the new tree's
+   own TLB fact -- which is the one conjunct the landing cannot supply *)
+Lemma u_exec_pins_only (P : uptd) (t t' : ptree) (rs rs' : regstate) :
+  u_tlb_only rs rs' ->
+  tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rs') ->
+  u_exec_pins P t rs -> u_exec_pins P t' rs'.
+Proof.
+  intros Tr Htlbok' (Hhw & Hcfgp & Hpt & _).
+  destruct Hhw as (Hmisa & Hmseccfg & Hsenv & Hhtif & Hall & Help).
+  destruct Hcfgp as (Hmst0 & Hsst0).
+  destruct Hpt as ((usatp & Hsatpok & Hsatp) & HA & Hord & HX & HW & HR & Hcovp).
+  split_and!; [ | | | exact Htlbok' ].
+  - split_and!;
+      [ rewrite (Tr misa ltac:(vm_compute; reflexivity)); exact Hmisa
+      | rewrite (Tr mseccfg ltac:(vm_compute; reflexivity)); exact Hmseccfg
+      | rewrite (Tr senvcfg ltac:(vm_compute; reflexivity)); exact Hsenv
+      | rewrite (Tr htif_tohost_base ltac:(vm_compute; reflexivity)); exact Hhtif
+      | rewrite (Tr pma_regions ltac:(vm_compute; reflexivity)); exact Hall
+      | rewrite (Tr elp ltac:(vm_compute; reflexivity)); exact Help ].
+  - split_and!;
+      [ rewrite (Tr mstateen0 ltac:(vm_compute; reflexivity)); exact Hmst0
+      | rewrite (Tr sstateen0 ltac:(vm_compute; reflexivity)); exact Hsst0 ].
+  - split_and!;
+      [ exists usatp; split;
+          [ exact Hsatpok
+          | rewrite (Tr satp ltac:(vm_compute; reflexivity)); exact Hsatp ]
+      | rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HA
+      | rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)); exact Hord
+      | rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HX
+      | rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HW
+      | rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HR
+      | rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)); exact Hcovp ].
+Qed.
+
 (* ===================================================================== *)
 (* 3. THE TWO TOTALITIES, PURE.                                           *)
 (*                                                                       *)

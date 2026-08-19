@@ -265,6 +265,22 @@ Proof.
   intros i. by destruct (pt_kids t i).
 Qed.
 
+(* TRANSITIVITY, which is what a composer running TWO walks needs: each walk
+   may write back its own leaf's A/D bits, and the two shapes must compose.
+   Both the page-straddling data accesses (UserMemCert section 8) and the
+   2-aligned straddling FETCH (UserFetchCert section 8) stand on it. *)
+Lemma pt_same_shape_trans (lvl : nat) (t1 t2 t3 : ptree) :
+  pt_same_shape lvl t1 t2 -> pt_same_shape lvl t2 t3 -> pt_same_shape lvl t1 t3.
+Proof.
+  revert t1 t2 t3. induction lvl as [| lvl IH]; intros t1 t2 t3 [Hb1 Hk1] [Hb2 Hk2].
+  - split; [ by rewrite Hb1 | exact I ].
+  - split; [ by rewrite Hb1 |]. intros i.
+    specialize (Hk1 i). specialize (Hk2 i).
+    destruct (pt_kids t1 i) as [c1|]; destruct (pt_kids t2 i) as [c2|];
+      destruct (pt_kids t3 i) as [c3|]; try contradiction; try exact I.
+    exact (IH c1 c2 c3 Hk1 Hk2).
+Qed.
+
 Lemma Forall2_refl_list {A} (Q : A -> A -> Prop) (l : list A) :
   (forall x, x ∈ l -> Q x x) -> Forall2 Q l l.
 Proof.
@@ -436,6 +452,19 @@ Proof.
   intros (md & _ & Hdj & Hmm & Hdm & _ & _ & _ & _ & Hspec).
   split_and!; [ apply pt_same_shape_refl | exact Hspec |].
   exists md. split_and!; [ exact Hdj | exact Hmm | exact Hdm ].
+Qed.
+
+(* ...and two stretches in a row compose.  Only the SHAPE conjunct needs
+   work; the tree spec and the data-half witness both come from the second
+   step alone.  Every composer that translates TWICE -- the page-straddling
+   load/store and the 2-aligned straddling fetch -- ends on this. *)
+Lemma u_mem_step_trans (P : uptd) (t1 t2 t3 : ptree) (mm1 mm2 mm3 : pamap) :
+  u_mem_step P t1 t2 mm1 mm2 -> u_mem_step P t2 t3 mm2 mm3 ->
+  u_mem_step P t1 t3 mm1 mm3.
+Proof.
+  intros (Hs1 & _ & _) (Hs2 & Hspec & md & Hrest).
+  split_and!; [ exact (pt_same_shape_trans 2 t1 t2 t3 Hs1 Hs2) | exact Hspec |].
+  exists md. exact Hrest.
 Qed.
 
 (* THE SLOT VIEW.  A page-table slot of ANY node of the tree is readable
