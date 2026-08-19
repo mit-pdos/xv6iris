@@ -26,8 +26,11 @@ Require Import HartMemRun PtreeType PtTree SmodePte PtBytes UserBytes InstrBytes
 Require Import UserFrame UserClassifyAsm.
 Require Import UserPtTree UserExec UserStep UserStepFull.
 Require Import UserFetchPt UserClassify.
+Require Import UserTrap.
+From iris.base_logic.lib Require Import ghost_map.
 Local Open Scope Z_scope.
 Import Defs.
+Set Printing Depth 40.
 
 (* ===================================================================== *)
 (* §1  Pure alignment bridges (bit0 <-> 2-alignment; +2 preserves it).    *)
@@ -107,6 +110,54 @@ Definition u_fetchable (um : gmap (mword 27) (mword 64)) (va : mword 64) : Prop 
                     (Z.sub 39 1) 0)) = false.
 
 Local Ltac u_notin_clock := apply (bool_decide_unpack _); vm_compute; reflexivity.
+
+(* ===================================================================== *)
+(* §5a  THE FILE THE U TRAP TOWER LANDS ON.                               *)
+(*                                                                       *)
+(* [UserTrap]'s [UTrapReduce] hands its landing file back only up to      *)
+(* agreement on the footprint -- the file itself is a [Let] chain that    *)
+(* section discharge INLINES, so no name for it escapes the section.      *)
+(* [u_step_post] however binds [rs2] OUTSIDE the [swp] (the [u_land] tag  *)
+(* is a pure conjunct of the arm, not of its postcondition), so a trap    *)
+(* arm has to name the landing file before it runs the tower.  This is    *)
+(* that name: [UTrapReduce]'s [s9] plus [set_next_pc], at the REGISTER    *)
+(* level (the tower's memory is untouched, so the [mstate] wrapper adds   *)
+(* nothing), written so that it is CONVERTIBLE to what the producers      *)
+(* spell -- the [let]s keep the conversion linear instead of unfolding    *)
+(* [set_reg]'s three-fold body into a 3^12 tree (RiscvLang.v:92).         *)
+(* ===================================================================== *)
+Definition u_trap_rs (rsf : regstate) (c : TrapCause) (info : option (mword 64))
+    (pcx stvec_v : mword 64) : regstate :=
+  let ms_v := register_lookup (R_bitvector_64 mstatus) rsf in
+  let sc_v := register_lookup (R_bitvector_64 scause) rsf in
+  let ms_e := update_subrange_vec_dec ms_v 23 23
+                (landing_pad_bits_backwards NO_LP_EXPECTED) in
+  let c1   := update_subrange_vec_dec sc_v (64 - 1) (64 - 1)
+                (bool_to_bit (trapCause_is_interrupt c)) in
+  let c2   := update_subrange_vec_dec c1 (64 - 2) 0
+                (zero_extend' (64 - 1) (trapCause_bits_forwards c)) in
+  let ms_a := update_subrange_vec_dec ms_e 5 5 (_get_Mstatus_SIE ms_e) in
+  let ms_b := update_subrange_vec_dec ms_a 1 1 ('b"0") in
+  let ms_c := update_subrange_vec_dec ms_b 8 8 ('b"0") in
+  register_set nextPC (stvec_base stvec_v)
+   (register_set cur_privilege Supervisor
+    (register_set sepc pcx
+     (register_set stval (tval info)
+      (register_set mstatus ms_c
+       (register_set mstatus ms_b
+        (register_set mstatus ms_a
+         (register_set scause c2
+          (register_set scause c1
+           (register_set elp (landing_pad_bits_backwards NO_LP_EXPECTED)
+            (register_set mstatus ms_e rsf)))))))))).
+
+(* peel the landing file down to [rsf]; stops on its own at the first
+   cell the tower DOES write. *)
+Local Ltac u_trap_peel :=
+  unfold u_trap_rs; cbv zeta;
+  repeat (rewrite irrelevant_register_set; [ | vm_compute; reflexivity ]).
+
+Local Ltac u_in_ro := apply (bool_decide_unpack _); vm_compute; reflexivity.
 
 Section UserActiveClass.
   Context `{!riscvGS Σ}.
@@ -517,6 +568,441 @@ Section UserActiveClass.
               ltac:(rewrite (T _ u_in_tlb ltac:(u_notin_clock) eq_refl eq_refl eq_refl); exact Ltlb)
               Htlbok Hwf
               with "Hopen Hrw Hro Hresv Hrut").
+  Qed.
+
+
+  (* ===================================================================== *)
+  (* §5  THE FOUR TRAP ARMS.                                                *)
+  (*                                                                        *)
+  (* Each is ONE instantiation of [UserTrap]'s [UTrapReduce] section at the  *)
+  (* tier's concrete state [s := UserClassifyAsm.u_state rsf mm] -- [rsf]    *)
+  (* being the file the fetch (or fetch+execute) landed on -- wrapped so     *)
+  (* that the postcondition is [u_arm_res rs1 rs2] at [rs2 := u_trap_rs …].  *)
+  (* [UTrapReduce]'s eight hypotheses come out of [active_class]' pins:      *)
+  (*   Hpriv/Hpc     the cur_privilege and PC pins,                          *)
+  (*   Hms/Hsc/Help  DEFINITIONAL (the section variables are instantiated at *)
+  (*                 [rsf]'s own lookups -- [Help] at the value              *)
+  (*                 [u_hw_pins]' elp conjunct forces, via [elp_no_lp]),     *)
+  (*   Hstvec        the [uc_stvec] pin,                                     *)
+  (*   HmisaS        [u_hw_pins]' [misa = MISA_C],                           *)
+  (*   Htvd          the record field [uc_tvd].                              *)
+  (* The ONE thing [active_class] does not pin is [medeleg]; it is recovered *)
+  (* in Iris from [u_open]'s persistent cell against the read-only frame's   *)
+  (* own discarded one ([u_medeleg_pin] below).                              *)
+  (* ===================================================================== *)
+
+  (* two persistent cells the tower needs, read off the read-only frame *)
+  Lemma u_ro_elp_acc (dq : dfrac) (rs : regstate) :
+    hreg_frame_ro (u_Df dq) rs u_Dro -∗
+    (R_bitvector_1 elp) ↦ᵣ□ (register_lookup (R_bitvector_1 elp) rs) ∗
+    hreg_frame_ro (u_Df dq) rs u_Dro.
+  Proof.
+    iIntros "H". rewrite /hreg_frame_ro.
+    iDestruct (big_sepS_elem_of_acc _ u_Dro (R_bitvector_1 elp : register)
+                 with "H") as "[Hc Hback]"; [ u_in_ro | ].
+    iAssert ((R_bitvector_1 elp) ↦ᵣ□ (register_lookup (R_bitvector_1 elp) rs))%I
+      with "[Hc]" as "#Hc'"; [ iExact "Hc" | ].
+    iFrame "Hc'". iApply "Hback". iExact "Hc'".
+  Qed.
+
+  Lemma u_ro_medl_acc (dq : dfrac) (rs : regstate) :
+    hreg_frame_ro (u_Df dq) rs u_Dro -∗
+    (R_bitvector_64 medeleg) ↦ᵣ□ (register_lookup (R_bitvector_64 medeleg) rs) ∗
+    hreg_frame_ro (u_Df dq) rs u_Dro.
+  Proof.
+    iIntros "H". rewrite /hreg_frame_ro.
+    iDestruct (big_sepS_elem_of_acc _ u_Dro (R_bitvector_64 medeleg : register)
+                 with "H") as "[Hc Hback]"; [ u_in_ro | ].
+    iAssert ((R_bitvector_64 medeleg) ↦ᵣ□
+               (register_lookup (R_bitvector_64 medeleg) rs))%I
+      with "[Hc]" as "#Hc'"; [ iExact "Hc" | ].
+    iFrame "Hc'". iApply "Hback". iExact "Hc'".
+  Qed.
+
+  Lemma u_open_medl (t : ptree) (mm : PtBytes.pamap) (usatp : mword 64)
+      (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
+      (mcenv scenv : mword 32) (hpm : type_of_register mhpmcounter) :
+    u_open C pt t mm usatp pcfg paddr mcenv scenv hpm -∗
+    (R_bitvector_64 medeleg) ↦ᵣ□ uc_medeleg C ∗
+    u_open C pt t mm usatp pcfg paddr mcenv scenv hpm.
+  Proof.
+    iIntros "H". rewrite /u_open.
+    iDestruct "H" as "(H1 & #H2 & H3)". iFrame "H2 H1 H3".
+  Qed.
+
+  Lemma u_reg_pointsto_agree (r : register) (dq1 dq2 : dfrac)
+      (v1 v2 : type_of_register r) :
+    reg_pointsto r dq1 v1 -∗ reg_pointsto r dq2 v2 -∗ ⌜v1 = v2⌝.
+  Proof.
+    iIntros "H1 H2". rewrite /reg_pointsto.
+    iDestruct (ghost_map_elem_agree with "H1 H2") as %He.
+    iPureIntro. exact (reg_existT_inj r v1 v2 He).
+  Qed.
+
+  (* [medeleg]'s VALUE, which [active_class] does not pin: [u_open] holds
+     the cell at [uc_medeleg C] and the read-only frame holds it at the
+     entry file's own lookup, and both are discarded, so they agree. *)
+  Lemma u_medeleg_pin (t : ptree) (mm : PtBytes.pamap) (usatp : mword 64)
+      (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
+      (mcenv scenv : mword 32) (hpm : type_of_register mhpmcounter)
+      (rs : regstate) :
+    u_open C pt t mm usatp pcfg paddr mcenv scenv hpm -∗
+    hreg_frame_ro (u_Df (uc_dqc C)) rs u_Dro -∗
+    ⌜register_lookup (R_bitvector_64 medeleg) rs = uc_medeleg C⌝ ∗
+    u_open C pt t mm usatp pcfg paddr mcenv scenv hpm ∗
+    hreg_frame_ro (u_Df (uc_dqc C)) rs u_Dro.
+  Proof.
+    iIntros "Hopen Hro".
+    iDestruct (u_open_medl with "Hopen") as "[#Hm1 Hopen]".
+    iDestruct (u_ro_medl_acc with "Hro") as "[#Hm2 Hro]".
+    iDestruct (u_reg_pointsto_agree with "Hm2 Hm1") as %Heq.
+    iFrame "Hopen Hro". iPureIntro. exact Heq.
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* THE SHARED CLOSER: one producer's postcondition -> [u_arm_res].       *)
+  (* ------------------------------------------------------------------- *)
+  Lemma u_arm_close (t : ptree) (mm : PtBytes.pamap) (usatp : mword 64)
+      (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
+      (mcenv scenv : mword 32) (hpm : type_of_register mhpmcounter)
+      (rs1 rsf rs' : regstate) (c : TrapCause) (info : option (mword 64))
+      (pcx : mword 64) :
+    register_lookup hart_state rsf = HART_ACTIVE tt ->
+    user_mstatus_ok (register_lookup (R_bitvector_64 mstatus) rsf) ->
+    register_lookup (R_bitvector_64 stvec) rsf = uc_stvec C ->
+    register_lookup (R_bitvector_64 mie) rsf = uc_mie C ->
+    register_lookup (R_bitvector_64 mideleg) rsf = uc_mideleg C ->
+    register_lookup (R_bitvector_64 menvcfg) rsf = MENVCFG_S ->
+    register_lookup (R_bitvector_64 satp) rsf = usatp ->
+    register_lookup pmpcfg_n rsf = pcfg ->
+    register_lookup pmpaddr_n rsf = paddr ->
+    tlb_ok_pt (mword_of_int 0) t (register_lookup tlb rsf) ->
+    u_mem_wf pt t mm ->
+    reg_agree_on (u_Drw ∪ u_Dro) rs' (u_trap_rs rsf c info pcx (uc_stvec C)) ->
+    hreg_frame rs' u_Drw -∗
+    hreg_frame_ro (u_Df (uc_dqc C)) rs' u_Dro -∗
+    resv_any cpu_id -∗
+    u_open C pt t mm usatp pcfg paddr mcenv scenv hpm -∗
+    Rut pt -∗
+    u_arm_res C pt Rut rs1 (u_trap_rs rsf c info pcx (uc_stvec C)).
+  Proof.
+    intros Lhs Hmsok Lstvec Lmie Lmdl Lmenv Lsatp Lpcfg Lpaddr Htlbok Hwf Hag.
+    iIntros "Hrw Hro Hany Hopen Hrut".
+    rewrite /u_arm_res.
+    rewrite <- (hreg_frame_ext rs' (u_trap_rs rsf c info pcx (uc_stvec C)) u_Drw
+                 ltac:(intros r Hr; apply Hag, elem_of_union_l, Hr)).
+    rewrite <- (hreg_frame_ro_ext (u_Df (uc_dqc C)) rs'
+                 (u_trap_rs rsf c info pcx (uc_stvec C)) u_Dro
+                 ltac:(intros r Hr; apply Hag, elem_of_union_r, Hr)).
+    iFrame "Hrw Hro".
+    iApply (u_psi_trap t mm usatp (register_lookup tlb rsf) pcfg paddr
+              mcenv scenv hpm rs1 (u_trap_rs rsf c info pcx (uc_stvec C))
+              ltac:(u_trap_peel; exact Lhs)
+              ltac:(u_trap_peel; apply register_lookup_set)
+              ltac:(u_trap_peel; rewrite register_lookup_set;
+                    exact (utrap_ms_ok _ _ Hmsok))
+              ltac:(u_trap_peel; apply register_lookup_set)
+              ltac:(u_trap_peel; exact Lstvec)
+              ltac:(u_trap_peel; exact Lmie)
+              ltac:(u_trap_peel; exact Lmdl)
+              ltac:(u_trap_peel; exact Lmenv)
+              ltac:(u_trap_peel; exact Lsatp)
+              ltac:(u_trap_peel; exact Lpcfg)
+              ltac:(u_trap_peel; exact Lpaddr)
+              ltac:(u_trap_peel; reflexivity)
+              Htlbok Hwf
+              with "Hany Hopen Hrut").
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* ARM 1 -- [Step_Pending_Interrupt].                                    *)
+  (* ------------------------------------------------------------------- *)
+  Lemma u_arm_pending_interrupt
+      (t : ptree) (mm : PtBytes.pamap) (usatp : mword 64)
+      (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
+      (mcenv scenv : mword 32) (hpm : type_of_register mhpmcounter)
+      (rs1 rsf : regstate) (i : InterruptType) :
+    register_lookup hart_state rsf = HART_ACTIVE tt ->
+    register_lookup cur_privilege rsf = User ->
+    user_mstatus_ok (register_lookup (R_bitvector_64 mstatus) rsf) ->
+    register_lookup (R_bool minstret_increment) rsf
+      = minstret_inc_flag (register_lookup (R_bitvector_32 mcountinhibit) rs1)
+          (register_lookup (R_bitvector_64 minstretcfg) rs1)
+          (register_lookup cur_privilege rs1) ->
+    register_lookup (R_bitvector_64 stvec) rsf = uc_stvec C ->
+    register_lookup (R_bitvector_64 mie) rsf = uc_mie C ->
+    register_lookup (R_bitvector_64 mideleg) rsf = uc_mideleg C ->
+    register_lookup (R_bitvector_64 menvcfg) rsf = MENVCFG_S ->
+    register_lookup (R_bitvector_64 satp) rsf = usatp ->
+    register_lookup pmpcfg_n rsf = pcfg ->
+    register_lookup pmpaddr_n rsf = paddr ->
+    u_exec_pins pt t rsf ->
+    u_mem_wf pt t mm ->
+    gen_cert -∗
+    resv_frag cpu_id None -∗
+    hreg_frame rsf u_Drw -∗
+    hreg_frame_ro (u_Df (uc_dqc C)) rsf u_Dro -∗
+    u_open C pt t mm usatp pcfg paddr mcenv scenv hpm -∗
+    Rut pt -∗
+    u_step_post C pt Rut rs1 (Step_Pending_Interrupt (i, Supervisor)).
+  Proof.
+    intros Lhs Lpriv Hmsok Lmi Lstvec Lmie Lmdl Lmenv Lsatp Lpcfg Lpaddr
+      Hpins Hwf.
+    destruct Hpins as ((Hmisa & _ & _ & _ & _ & Helpne) & _ & _ & Htlbok).
+    pose proof (elp_no_lp _ Helpne) as Lelp.
+    assert (HmisaS : eq_vec (_get_Misa_S (register_lookup (R_bitvector_64 misa) rsf))
+                       ('b"1") = true)
+      by (rewrite Hmisa; vm_compute; reflexivity).
+    iIntros "#Hcert Hfrag Hrw Hro Hopen Hrut".
+    iDestruct (u_ro_elp_acc with "Hro") as "[#Help Hro]".
+    rewrite Lelp.
+    iDestruct (resv_any_intro cpu_id None with "Hfrag") as "Hany".
+    rewrite /u_step_post.
+    iExists (u_trap_rs rsf (Interrupt i) None
+               (register_lookup (R_bitvector_64 PC) rsf) (uc_stvec C)).
+    iSplitR "Hany Hrw Hro Hopen Hrut".
+    { iPureIntro. rewrite /u_land. split_and!;
+        [ u_trap_peel; exact Lhs | u_trap_peel; exact Lmi | exact I ]. }
+    iApply (swp_mono with "[Hopen Hrut] [Hany Hrw Hro]").
+    2:{ iApply (swp_handle_interrupt_u (u_state rsf mm) (Interrupt i) None
+                  (register_lookup (R_bitvector_64 PC) rsf)
+                  (register_lookup (R_bitvector_64 mstatus) rsf)
+                  (register_lookup (R_bitvector_64 scause) rsf)
+                  (uc_stvec C) (landing_pad_bits_backwards NO_LP_EXPECTED)
+                  Lpriv eq_refl eq_refl Lstvec Lelp HmisaS (uc_tvd C) eq_refl
+                  Du_r Du_w u_Drw u_Dro (u_Df (uc_dqc C)) rsf i eq_refl eq_refl
+                  u_disj Du_r_sub Du_w_sub
+                  ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                  ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                  ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                  ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                  ltac:(vm_compute; reflexivity)
+                  ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                  ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                  ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                  ltac:(intros r _; reflexivity) eq_refl
+                  with "Hcert Hany Help Hrw Hro"). }
+    iIntros (v) "Hpost".
+    iDestruct "Hpost" as (rs') "(%Hag & Hrw & Hro & Hany)".
+    iApply (u_arm_close t mm usatp pcfg paddr mcenv scenv hpm rs1 rsf rs'
+              (Interrupt i) None (register_lookup (R_bitvector_64 PC) rsf)
+              Lhs Hmsok Lstvec Lmie Lmdl Lmenv Lsatp Lpcfg Lpaddr Htlbok Hwf
+              Hag with "Hrw Hro Hany Hopen Hrut").
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* ARM 2 -- [Step_Fetch_Failure]: the generic delegated-exception tower.  *)
+  (* ------------------------------------------------------------------- *)
+  Lemma u_arm_fetch_failure
+      (t : ptree) (mm : PtBytes.pamap) (usatp : mword 64)
+      (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
+      (mcenv scenv : mword 32) (hpm : type_of_register mhpmcounter)
+      (rs1 rsf : regstate) (e : ExceptionType) (xv : mword 64) :
+    user_exc e = true ->
+    register_lookup hart_state rsf = HART_ACTIVE tt ->
+    register_lookup cur_privilege rsf = User ->
+    user_mstatus_ok (register_lookup (R_bitvector_64 mstatus) rsf) ->
+    register_lookup (R_bool minstret_increment) rsf
+      = minstret_inc_flag (register_lookup (R_bitvector_32 mcountinhibit) rs1)
+          (register_lookup (R_bitvector_64 minstretcfg) rs1)
+          (register_lookup cur_privilege rs1) ->
+    register_lookup (R_bitvector_64 stvec) rsf = uc_stvec C ->
+    register_lookup (R_bitvector_64 mie) rsf = uc_mie C ->
+    register_lookup (R_bitvector_64 mideleg) rsf = uc_mideleg C ->
+    register_lookup (R_bitvector_64 menvcfg) rsf = MENVCFG_S ->
+    register_lookup (R_bitvector_64 satp) rsf = usatp ->
+    register_lookup pmpcfg_n rsf = pcfg ->
+    register_lookup pmpaddr_n rsf = paddr ->
+    u_exec_pins pt t rsf ->
+    u_mem_wf pt t mm ->
+    gen_cert -∗
+    resv_frag cpu_id None -∗
+    hreg_frame rsf u_Drw -∗
+    hreg_frame_ro (u_Df (uc_dqc C)) rsf u_Dro -∗
+    u_open C pt t mm usatp pcfg paddr mcenv scenv hpm -∗
+    Rut pt -∗
+    u_step_post C pt Rut rs1 (Step_Fetch_Failure (Virtaddr xv, e)).
+  Proof.
+    intros Hue Lhs Lpriv Hmsok Lmi Lstvec Lmie Lmdl Lmenv Lsatp Lpcfg Lpaddr
+      Hpins Hwf.
+    destruct Hpins as ((Hmisa & _ & _ & _ & _ & Helpne) & _ & _ & Htlbok).
+    pose proof (elp_no_lp _ Helpne) as Lelp.
+    assert (HmisaS : eq_vec (_get_Misa_S (register_lookup (R_bitvector_64 misa) rsf))
+                       ('b"1") = true)
+      by (rewrite Hmisa; vm_compute; reflexivity).
+    iIntros "#Hcert Hfrag Hrw Hro Hopen Hrut".
+    iDestruct (u_ro_elp_acc with "Hro") as "[#Help Hro]".
+    rewrite Lelp.
+    iDestruct (u_medeleg_pin with "Hopen Hro") as "(%Lmedl & Hopen & Hro)".
+    assert (Hdel : bit_to_bool
+                     (access_vec_dec (register_lookup (R_bitvector_64 medeleg) rsf)
+                        (uint (exceptionType_bits_forwards e))) = true)
+      by (rewrite Lmedl; exact (uc_del C e Hue)).
+    iDestruct (resv_any_intro cpu_id None with "Hfrag") as "Hany".
+    rewrite /u_step_post.
+    iExists (u_trap_rs rsf (rv64d_types.Exception e)
+               (xtval_exception_value e xv)
+               (register_lookup (R_bitvector_64 PC) rsf) (uc_stvec C)).
+    iSplitR "Hany Hrw Hro Hopen Hrut".
+    { iPureIntro. rewrite /u_land. split_and!;
+        [ u_trap_peel; exact Lhs | u_trap_peel; exact Lmi | exact I ]. }
+    iApply (swp_mono with "[Hopen Hrut] [Hany Hrw Hro]").
+    2:{ iApply (swp_handle_exception_u (u_state rsf mm)
+                  (rv64d_types.Exception e) (xtval_exception_value e xv)
+                  (register_lookup (R_bitvector_64 PC) rsf)
+                  (register_lookup (R_bitvector_64 mstatus) rsf)
+                  (register_lookup (R_bitvector_64 scause) rsf)
+                  (uc_stvec C) (landing_pad_bits_backwards NO_LP_EXPECTED)
+                  Lpriv eq_refl eq_refl Lstvec Lelp HmisaS (uc_tvd C) eq_refl
+                  Du_r Du_w u_Drw u_Dro (u_Df (uc_dqc C)) rsf e xv
+                  eq_refl eq_refl Hdel
+                  u_disj Du_r_sub Du_w_sub
+                  ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                  ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                  ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                  ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                  ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                  ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                  ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                  ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                  ltac:(intros r _; reflexivity) eq_refl
+                  with "Hcert Hany Help Hrw Hro"). }
+    iIntros (v) "Hpost".
+    iDestruct "Hpost" as (rs') "(%Hag & Hrw & Hro & Hany)".
+    iApply (u_arm_close t mm usatp pcfg paddr mcenv scenv hpm rs1 rsf rs'
+              (rv64d_types.Exception e) (xtval_exception_value e xv)
+              (register_lookup (R_bitvector_64 PC) rsf)
+              Lhs Hmsok Lstvec Lmie Lmdl Lmenv Lsatp Lpcfg Lpaddr Htlbok Hwf
+              Hag with "Hrw Hro Hany Hopen Hrut").
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* ARM 3 -- [Step_Execute (Illegal_Instruction tt, ib)]: the same tower   *)
+  (* at [E_Illegal_Instr], whose tval is the instruction bits.             *)
+  (* ------------------------------------------------------------------- *)
+  Lemma u_arm_illegal
+      (t : ptree) (mm : PtBytes.pamap) (usatp : mword 64)
+      (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
+      (mcenv scenv : mword 32) (hpm : type_of_register mhpmcounter)
+      (rs1 rsf : regstate) (ib : mword 32) :
+    register_lookup hart_state rsf = HART_ACTIVE tt ->
+    register_lookup cur_privilege rsf = User ->
+    user_mstatus_ok (register_lookup (R_bitvector_64 mstatus) rsf) ->
+    register_lookup (R_bool minstret_increment) rsf
+      = minstret_inc_flag (register_lookup (R_bitvector_32 mcountinhibit) rs1)
+          (register_lookup (R_bitvector_64 minstretcfg) rs1)
+          (register_lookup cur_privilege rs1) ->
+    register_lookup (R_bitvector_64 stvec) rsf = uc_stvec C ->
+    register_lookup (R_bitvector_64 mie) rsf = uc_mie C ->
+    register_lookup (R_bitvector_64 mideleg) rsf = uc_mideleg C ->
+    register_lookup (R_bitvector_64 menvcfg) rsf = MENVCFG_S ->
+    register_lookup (R_bitvector_64 satp) rsf = usatp ->
+    register_lookup pmpcfg_n rsf = pcfg ->
+    register_lookup pmpaddr_n rsf = paddr ->
+    u_exec_pins pt t rsf ->
+    u_mem_wf pt t mm ->
+    gen_cert -∗
+    resv_frag cpu_id None -∗
+    hreg_frame rsf u_Drw -∗
+    hreg_frame_ro (u_Df (uc_dqc C)) rsf u_Dro -∗
+    u_open C pt t mm usatp pcfg paddr mcenv scenv hpm -∗
+    Rut pt -∗
+    u_step_post C pt Rut rs1 (Step_Execute (Illegal_Instruction tt, ib)).
+  Proof.
+    intros Lhs Lpriv Hmsok Lmi Lstvec Lmie Lmdl Lmenv Lsatp Lpcfg Lpaddr
+      Hpins Hwf.
+    iIntros "Hcert Hfrag Hrw Hro Hopen Hrut".
+    iApply (u_arm_fetch_failure t mm usatp pcfg paddr mcenv scenv hpm rs1 rsf
+              (E_Illegal_Instr tt) (zero_extend' 64 ib) eq_refl
+              Lhs Lpriv Hmsok Lmi Lstvec Lmie Lmdl Lmenv Lsatp Lpcfg Lpaddr
+              Hpins Hwf with "Hcert Hfrag Hrw Hro Hopen Hrut").
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* ARM 4 -- [Step_Execute (Trap …)]: the tower entered ONE node lower,    *)
+  (* at [exception_handler] itself (the step has already made               *)
+  (* [handle_exception]'s two reads), so its sepc is the STEP's [pcx].      *)
+  (* ------------------------------------------------------------------- *)
+  Lemma u_arm_exec_trap
+      (t : ptree) (mm : PtBytes.pamap) (usatp : mword 64)
+      (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
+      (mcenv scenv : mword 32) (hpm : type_of_register mhpmcounter)
+      (rs1 rsf : regstate) (e : ExceptionType) (xv pcx : mword 64)
+      (ib : mword 32) :
+    user_exc e = true ->
+    register_lookup hart_state rsf = HART_ACTIVE tt ->
+    register_lookup cur_privilege rsf = User ->
+    user_mstatus_ok (register_lookup (R_bitvector_64 mstatus) rsf) ->
+    register_lookup (R_bool minstret_increment) rsf
+      = minstret_inc_flag (register_lookup (R_bitvector_32 mcountinhibit) rs1)
+          (register_lookup (R_bitvector_64 minstretcfg) rs1)
+          (register_lookup cur_privilege rs1) ->
+    register_lookup (R_bitvector_64 stvec) rsf = uc_stvec C ->
+    register_lookup (R_bitvector_64 mie) rsf = uc_mie C ->
+    register_lookup (R_bitvector_64 mideleg) rsf = uc_mideleg C ->
+    register_lookup (R_bitvector_64 menvcfg) rsf = MENVCFG_S ->
+    register_lookup (R_bitvector_64 satp) rsf = usatp ->
+    register_lookup pmpcfg_n rsf = pcfg ->
+    register_lookup pmpaddr_n rsf = paddr ->
+    u_exec_pins pt t rsf ->
+    u_mem_wf pt t mm ->
+    gen_cert -∗
+    resv_frag cpu_id None -∗
+    hreg_frame rsf u_Drw -∗
+    hreg_frame_ro (u_Df (uc_dqc C)) rsf u_Dro -∗
+    u_open C pt t mm usatp pcfg paddr mcenv scenv hpm -∗
+    Rut pt -∗
+    u_step_post C pt Rut rs1
+      (Step_Execute (rv64d_types.Trap (User, make_sync_exception e xv, pcx), ib)).
+  Proof.
+    intros Hue Lhs Lpriv Hmsok Lmi Lstvec Lmie Lmdl Lmenv Lsatp Lpcfg Lpaddr
+      Hpins Hwf.
+    destruct Hpins as ((Hmisa & _ & _ & _ & _ & Helpne) & _ & _ & Htlbok).
+    pose proof (elp_no_lp _ Helpne) as Lelp.
+    assert (HmisaS : eq_vec (_get_Misa_S (register_lookup (R_bitvector_64 misa) rsf))
+                       ('b"1") = true)
+      by (rewrite Hmisa; vm_compute; reflexivity).
+    iIntros "#Hcert Hfrag Hrw Hro Hopen Hrut".
+    iDestruct (u_ro_elp_acc with "Hro") as "[#Help Hro]".
+    rewrite Lelp.
+    iDestruct (u_medeleg_pin with "Hopen Hro") as "(%Lmedl & Hopen & Hro)".
+    assert (Hdel : bit_to_bool
+                     (access_vec_dec (register_lookup (R_bitvector_64 medeleg) rsf)
+                        (uint (exceptionType_bits_forwards e))) = true)
+      by (rewrite Lmedl; exact (uc_del C e Hue)).
+    iDestruct (resv_any_intro cpu_id None with "Hfrag") as "Hany".
+    rewrite /u_step_post.
+    iExists (u_trap_rs rsf (rv64d_types.Exception e)
+               (xtval_exception_value e xv) pcx (uc_stvec C)).
+    iSplitR "Hany Hrw Hro Hopen Hrut".
+    { iPureIntro. rewrite /u_land. split_and!;
+        [ u_trap_peel; exact Lhs | u_trap_peel; exact Lmi | exact I ]. }
+    iApply (swp_mono with "[Hopen Hrut] [Hany Hrw Hro]").
+    2:{ iApply (swp_exec_trap_u (u_state rsf mm)
+                  (rv64d_types.Exception e) (xtval_exception_value e xv) pcx
+                  (register_lookup (R_bitvector_64 mstatus) rsf)
+                  (register_lookup (R_bitvector_64 scause) rsf)
+                  (uc_stvec C) (landing_pad_bits_backwards NO_LP_EXPECTED)
+                  Lpriv eq_refl eq_refl Lstvec Lelp HmisaS (uc_tvd C)
+                  Du_r Du_w u_Drw u_Dro (u_Df (uc_dqc C)) rsf e xv
+                  eq_refl eq_refl Hdel
+                  u_disj Du_r_sub Du_w_sub
+                  ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                  ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                  ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                  ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                  ltac:(vm_compute; reflexivity)
+                  ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                  ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                  ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                  ltac:(intros r _; reflexivity) eq_refl
+                  with "Hcert Hany Help Hrw Hro"). }
+    iIntros (v) "Hpost".
+    iDestruct "Hpost" as (rs') "(%Hag & Hrw & Hro & Hany)".
+    iApply (u_arm_close t mm usatp pcfg paddr mcenv scenv hpm rs1 rsf rs'
+              (rv64d_types.Exception e) (xtval_exception_value e xv) pcx
+              Lhs Hmsok Lstvec Lmie Lmdl Lmenv Lsatp Lpcfg Lpaddr Htlbok Hwf
+              Hag with "Hrw Hro Hany Hopen Hrut").
   Qed.
 
 End UserActiveClass.
