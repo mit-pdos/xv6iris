@@ -936,7 +936,7 @@ Section ProofSysChdirBody.
     set (sp0 := m !!! Regidx csp_rs1).
     iIntros "Hcg Hown _ _ #Htext #Hdata Hpc #Hpe #Hbio #Hlog Hseam
              Hgen #Hdev #Hgeo #Hdlk Hbsl #Hitab #Hitinv #Hescrows #Hslks
-             #Hireg Hsbb Hsbi Hbmres #Hkenv #Hprocs Hir Hpriv Hcont".
+             #Hireg #Hropen Hsbb Hsbi Hbmres #Hkenv #Hprocs Hir Hpriv Hcont".
     iDestruct (cpu_own_zero_empty with "Hown") as "[%Hlkempty Hown]".
     assert (Hlb : forall r : string, locks_below lks r).
     { intro r. rewrite Hlkempty. apply locks_below_empty. }
@@ -1440,7 +1440,7 @@ Section ProofSysChdirBody.
                 Hbm0 Hbmcov Hbmlog Hist0 Hcovb Hiregb Hpcstr
                 (sc_plen_lt pk Hpk) (sc_bud_walk _) Hj Hgl Heb
                 with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog Hkenv Hitab Hitinv
-                      Hescrows Hslks Hireg Hprocs Hdev Hgeo Hdlk Hsbb Hsbi
+                      Hescrows Hslks Hireg Hropen Hprocs Hdev Hgeo Hdlk Hsbb Hsbi
                       Hbmres Hpidq Hcwd Hcwdref [Hbufk] Hbsl Hir HopS").
       { iEval (rewrite HN1a0). iExact "Hbufk". }
       iIntros (CID20 Hq20 mna n1 used1 Sb1 ok ipv w1)
@@ -1821,19 +1821,19 @@ Section ProofSysChdirBody.
           iApply (Iput.wp_iput_sconf (CID := CID32) gs j gl gu gd gk pd pav pu bn
                     g gfs gi cn gtl gilc gislc cov logstart bmapstart inodestart
                     nib size dev used1 kc qc inumc n1 pid (DfracOwn (1/4)) dqb dqs
-                    P6 (K - 20)%nat eb b lks
+                    P6 (K - 20)%nat eb b lks true
                     ltac:(lia) Hkc Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
                     Hiblkc Hiblogc Hinbc Hcovb Hiu Hj Hgl
                     ltac:(rewrite HP6a0; exact Hcwde) (Hlb "log"%string)
                     with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hitab Hitinv
-                          Hescc Hireg Hslkc Hrefc Hruc Hsbb Hsbi Hbmres Hpidq Hprocs
+                          Hescc Hireg Hropen Hslkc Hrefc Hruc Hsbb Hsbi Hbmres Hpidq Hprocs
                           Hdev Hgeo Hdlk Hbsl [HopS]").
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }
           { rewrite /log_op. iExists Sb1. iExact "HopS". }
           iIntros (CID33 Hq33 mip n2 used2)
             "%Hcsip Hcg Hown _ _ Hpc Hpidq Hsbb Hsbi %Hused2 Hbmres Hbsl %Hn2
-             Hop Hislot".
+             Hop Hislot _".
           assert (Hpc50 : ret_pc (P6 !!! Regidx Rra : mword 64)
                           = mword_of_int (SC + 0x50)) by (rewrite HP6ra; pcw).
           iEval (rewrite Hpc50) in "Hpc".
@@ -2075,11 +2075,11 @@ Section ProofSysChdirBody.
                     pd pav pu bn g gfs gi cn gtl gil gisl cov logstart bmapstart
                     inodestart nib size dev used1 kk (qq/2)%Qp (qq/2)%Qp gsh inum
                     dn bm n1 pid (DfracOwn (1/4)) dqb dqs
-                    Q1 (K - 20)%nat eb b lks
+                    Q1 (K - 20)%nat eb b lks true
                     ltac:(lia) Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
                     Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl HQ1a0 (Hlb "log"%string)
                     with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hitab Hitinv
-                          Hesck Hireg Hslkk Hslkd Hslpid Hdep Hidev Hiinum
+                          Hesck Hireg Hropen Hslkk Hslkd Hslpid Hdep Hidev Hiinum
                           Hivalid Hload Hshot Hfrz Hkeep Hruip Hsbb Hsbi Hbmres Hpidq
                           Hprocs Hdev Hgeo Hdlk Hbsl [HopS]").
           { rewrite Heb /trap_csrs_ext. done. }
@@ -2087,7 +2087,7 @@ Section ProofSysChdirBody.
           { rewrite /log_op. iExists Sb1. iExact "HopS". }
           iIntros (CID30 Hq30 mup n2 used2)
             "%Hcsup Hcg Hown _ _ Hpc Hpidq Hsbb Hsbi %Hused2 Hbmres Hbsl %Hn2
-             Hop Hislot".
+             Hop Hislot _".
           assert (Hpc76 : ret_pc (Q1 !!! Regidx Rra : mword 64)
                           = mword_of_int (SC + 0x76)) by (rewrite HQ1ra; pcw).
           iEval (rewrite Hpc76) in "Hpc".

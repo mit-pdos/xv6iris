@@ -1573,6 +1573,12 @@ Section KexitRest.
     itable_inv -∗
     ic_escrows cn γfs γi cov logstart -∗
     ireg_inv γi γfs inodestart nib -∗
+    (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2 RULING B, §6'' RULING
+       G').  This tail reaches iput, whose free path FREEZES; the mint takes
+       the regime the freezer is freezing under, and a runtime caller lends
+       the persistent sealed arm ([rg := true]).  It rides the same channel
+       [ireg_inv] does, out of [SpecFileclose.fileclose_ic_env]. *)
+    ireg_open -∗
     ic_sleeplocks cn -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -1588,7 +1594,7 @@ Section KexitRest.
     destruct Hregs as (Hs3 & Hs4 & Hsp0 & Hdom).
     iIntros "Hcg Hcloser Hown Htce Hcce #Htext #Hkd Hpc #Hprocs #Hpanenv #Hwl".
     iIntros "#Hbio #Hlog Hseam Hgen #Hdev #Hgeo #Hdlk Hbsl".
-    iIntros "#Hitab #Hitinv #Hescrows #Hireg #Hslks Hsbb Hsbi Hbmres".
+    iIntros "#Hitab #Hitinv #Hescrows #Hireg #Hropen #Hslks Hsbb Hsbi Hbmres".
     iIntros "Hinit Hsp Hir Hpriv".
     (* [eb = b], for the complement's transport guards ONLY.  NOT [subst b]. *)
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
@@ -1716,18 +1722,18 @@ Section KexitRest.
     iApply (Iput.wp_iput_sconf (CID := CID4) γs j γl γu γd γk pd pav pu bn γ γfs
               γi cn γtl gil gisl cov logstart bmapstart inodestart nib size
               dev us kk qq inum MAXOPBLOCKS pid (DfracOwn (1/4)) dqb dqs
-              Q2 av eb b lks
+              Q2 av eb b lks true
               ltac:(lia) Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog
               Hist0 Hiblk Hiblog Hinb Hcovb
               ltac:(unfold iput_units, MAXOPBLOCKS; lia) Hj Hgl
               ltac:(rewrite HQ2a0; exact Hipe)
               Hfresh
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpanenv Hbio Hlog Hitab Hitinv Hescrow
-                    Hireg Hslk Href Hru Hsbb Hsbi Hbmres Hpidq Hprocs
+                    Hireg Hropen Hslk Href Hru Hsbb Hsbi Hbmres Hpidq Hprocs
                     Hdev Hgeo Hdlk Hbsl Hop").
     all: try lkbelow.
     iIntros (CID5 Hs5 mip n' us') "%Hcsip Hcg Hown Htce Hcce Hpc Hpidq Hsbb Hsbi
-                                   %Hussub Hbmres Hbsl %Hn' Hop Hislot".
+                                   %Hussub Hbmres Hbsl %Hn' Hop Hislot _".
     assert (Hpc58 : ret_pc (Q2 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KX + 0x58))
       by (rewrite HQ2ra; apply bv_eq; vm_compute; reflexivity).
@@ -1877,7 +1883,8 @@ Section ProofKexit.
          fcn_cov fcn_logstart fcn_fs fcn_ireg fcn_tlock] in *.
     iDestruct "Hicenv" as "(%Hcdev & %Hcnib & %Hsize & %Hbm0 &
                             %Hbmcov & %Hbmlog & %Hist0 & %Hinumgeo & %Hcovb &
-                            #Hitab & #Hitinv & #Hescrows & #Hireg & #Hslks)".
+                            #Hitab & #Hitinv & #Hescrows & #Hireg & #Hropen &
+                            #Hslks)".
     assert (Hdom : forall r : regidx, r ∈ dom (rf_to_gmap m))
       by (intro r; apply rf_to_gmap_dom).
     (* [eb = b], for the complement's transport guard ONLY.  NOT [subst b]. *)
@@ -2203,7 +2210,8 @@ Section ProofKexit.
           iSplitR; [iExact "Hitab"|].
           iSplitR; [iExact "Hitinv"|].
           iSplitR; [iExact "Hescrows"|].
-          iSplitR; [iExact "Hireg"|]. iExact "Hslks". }
+          iSplitR; [iExact "Hireg"|].
+          iSplitR; [iExact "Hropen"|]. iExact "Hslks". }
         iExact "Hbm". }
       iPoseProof (kx_loop (CID0 := CID8)  γft γf
                     (MkFCloseNames γs j γl γkl γka γu γd γk pd pav pu bn γ γfs
@@ -2237,7 +2245,7 @@ Section ProofKexit.
                   ltac:(lkbelow)
                   with "Hcg Hcloser Hown Htce Hcce Htext Hkd Hpc Hprocs Hpanenv Hwl
                         Hbio Hlog Hseam Hgen Hdev Hgeo Hdlk Hbsl
-                        Hitab Hitinv Hescrows Hireg Hslks Hsbb Hsbi Hbmres
+                        Hitab Hitinv Hescrows Hireg Hropen Hslks Hsbb Hsbi Hbmres
                         Hinit Hsp Hir Hpriv"). }
       iApply ("Hloop" $! 0%nat A5 V with "[%] [%] [%] Hcg Hown Htce Hcce Hpc Hpriv Hpenv Hfenv").
       + unfold NOFILE. lia.

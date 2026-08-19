@@ -676,28 +676,34 @@ Definition ireg_marked_ok (c : ctyUR) (d : dinode) : Prop :=
    [false -> true] with both halves in hand, the [FrzPre -> FrzPost] step flips
    back, and the retire ([FrzPost -> FrzOff]) reads [b = false] off the old
    clause and keeps it. *)
+(* RULING G' (iclaim-ledger.md §6''): stated at [frz_preb] rather than at the
+   equation [f = Some (Excl FrzPre)], which no longer determines the column
+   now that the phase carries the regime index.  The clause is exactly the
+   same fact; every consumer discharges it by [reflexivity] at a concrete
+   column where it used to say [discriminate]. *)
 Definition ireg_frzm_ok (b : bool) (f : frzUR) : Prop :=
-  b = true <-> f = Some (Excl FrzPre).
+  b = frz_preb f.
 
 Lemma ireg_frzm_ok_false (f : frzUR) :
-  f <> Some (Excl FrzPre) -> ireg_frzm_ok false f.
-Proof. intros Hne. split; [discriminate | intros Heq; congruence]. Qed.
+  frz_preb f = false -> ireg_frzm_ok false f.
+Proof. intros Hne. rewrite /ireg_frzm_ok Hne. reflexivity. Qed.
 
-Lemma ireg_frzm_ok_true : ireg_frzm_ok true (Some (Excl FrzPre)).
-Proof. by split. Qed.
+Lemma ireg_frzm_ok_true (rg : bool) :
+  ireg_frzm_ok true (Some (Excl (FrzPre rg))).
+Proof. reflexivity. Qed.
 
 (* the one direction every DECIDER uses: at [FrzPre] the bit is up *)
 Lemma ireg_frzm_ok_pre (b : bool) (f : frzUR) :
-  ireg_frzm_ok b f -> f = Some (Excl FrzPre) -> b = true.
-Proof. intros [_ H] Hf. exact (H Hf). Qed.
+  ireg_frzm_ok b f -> frz_preb f = true -> b = true.
+Proof. intros -> Hf. exact Hf. Qed.
 
 Definition ireg_frz_ok (f : frzUR) (n : nat) (d : dinode) : Prop :=
   match f with
   | Some (Excl FrzOff)  => True
-  | Some (Excl FrzPre)  => bv_unsigned (di_nlink d) = 0
+  | Some (Excl (FrzPre _))  => bv_unsigned (di_nlink d) = 0
                            /\ bv_unsigned (di_type d) <> 0
                            /\ n = 1%nat
-  | Some (Excl FrzPost) => bv_unsigned (di_nlink d) = 0
+  | Some (Excl (FrzPost _)) => bv_unsigned (di_nlink d) = 0
                            /\ bv_unsigned (di_type d) <> 0
                            /\ n = 0%nat
   | _                   => False   (* [ExclBot], and the absent column *)
@@ -712,12 +718,12 @@ Definition ireg_frz_ok (f : frzUR) (n : nat) (d : dinode) : Prop :=
    That is the whole of the licence-free up-count A⁗ buys ([ProofIdup]'s
    OPEN(2.6b)): no [iname], no arithmetic [2 <= n]. *)
 Lemma ireg_frz_ok_not_pre (f : frzUR) (n : nat) (d : dinode) :
-  (1 <= n)%nat -> f <> Some (Excl FrzPre) -> ireg_frz_ok f n d ->
+  (1 <= n)%nat -> frz_preb f = false -> ireg_frz_ok f n d ->
   f = Some (Excl FrzOff).
 Proof.
   intros Hn Hne Hok. rewrite /ireg_frz_ok in Hok.
   destruct f as [[ph |] |]; [| destruct Hok | destruct Hok].
-  destruct ph; [reflexivity | destruct (Hne eq_refl) |].
+  destruct ph as [| rg | rg]; [reflexivity | discriminate Hne |].
   destruct Hok as (_ & _ & Hz). exfalso. lia.
 Qed.
 
@@ -793,24 +799,24 @@ Proof. intros ->. exact I. Qed.
 Lemma ireg_frz_ok_phase (ph ph' : frz) (n n' : nat) (d : dinode) :
   ireg_frz_ok (Some (Excl ph)) n d ->
   (ph = FrzOff -> ph' = FrzOff) ->
-  (ph' = FrzPre -> n' = 1%nat) ->
-  (ph' = FrzPost -> n' = 0%nat) ->
+  (forall rg, ph' = FrzPre rg -> n' = 1%nat) ->
+  (forall rg, ph' = FrzPost rg -> n' = 0%nat) ->
   ireg_frz_ok (Some (Excl ph')) n' d.
 Proof.
   intros Hok Hoff H1 H0.
-  destruct ph'; [exact I | |].
+  destruct ph' as [| rg' | rg']; [exact I | |].
   - destruct ph;
       [ exfalso; discriminate (Hoff eq_refl)
       | split_and!;
-          [exact (proj1 Hok) | exact (proj1 (proj2 Hok)) | exact (H1 eq_refl)]
+          [exact (proj1 Hok) | exact (proj1 (proj2 Hok)) | exact (H1 rg' eq_refl)]
       | split_and!;
-          [exact (proj1 Hok) | exact (proj1 (proj2 Hok)) | exact (H1 eq_refl)] ].
+          [exact (proj1 Hok) | exact (proj1 (proj2 Hok)) | exact (H1 rg' eq_refl)] ].
   - destruct ph;
       [ exfalso; discriminate (Hoff eq_refl)
       | split_and!;
-          [exact (proj1 Hok) | exact (proj1 (proj2 Hok)) | exact (H0 eq_refl)]
+          [exact (proj1 Hok) | exact (proj1 (proj2 Hok)) | exact (H0 rg' eq_refl)]
       | split_and!;
-          [exact (proj1 Hok) | exact (proj1 (proj2 Hok)) | exact (H0 eq_refl)] ].
+          [exact (proj1 Hok) | exact (proj1 (proj2 Hok)) | exact (H0 rg' eq_refl)] ].
 Qed.
 
 (* TYPE STABILITY (fs-icache.md §19.6 Part 1, fs-sysfile S5d).  "A flush
@@ -1763,7 +1769,7 @@ Section InodeRegion.
      and only the four that OPEN it (the mint, the phase step, the retire,
      boot) move. *)
   Definition ireg_frzc (z : Z) (f : frzUR) : iProp Σ :=
-    ((⌜f = Some (Excl FrzPre)⌝ ∨ frzown z)
+    ((⌜frz_preb f = true⌝ ∨ frzown z)
      ∗ (∃ b : bool, frzm_h z b ∗ ⌜ireg_frzm_ok b f⌝))%I.
 
   Global Instance ireg_frzc_timeless z f : Timeless (ireg_frzc z f).
@@ -1771,7 +1777,7 @@ Section InodeRegion.
 
   Lemma ireg_frzc_intro (z : Z) (f : frzUR) (b : bool) :
     ireg_frzm_ok b f ->
-    (⌜f = Some (Excl FrzPre)⌝ ∨ frzown z) -∗ frzm_h z b -∗ ireg_frzc z f.
+    (⌜frz_preb f = true⌝ ∨ frzown z) -∗ frzm_h z b -∗ ireg_frzc z f.
   Proof.
     intros Hok. iIntros "Hr Hb". rewrite /ireg_frzc. iFrame "Hr".
     iExists b. iFrame "Hb". iPureIntro. exact Hok.
@@ -1783,23 +1789,94 @@ Section InodeRegion.
      its [frzown] arm and the mirror's bit is DOWN, at the old column and at
      the new one alike. *)
   Lemma ireg_frzc_off_acc (z : Z) (f : frzUR) :
-    f <> Some (Excl FrzPre) ->
+    frz_preb f = false ->
     ireg_frzc z f -∗ frzown z ∗ frzm_h z false.
   Proof.
     intros Hne. iIntros "[Hr Hm]".
     iSplitL "Hr"; [iDestruct "Hr" as "[%Hbad | $]"; congruence |].
     iDestruct "Hm" as (b) "[Hb %Hok]".
     destruct b; [| iExact "Hb"].
-    destruct Hok as [Hl _]. destruct (Hne (Hl eq_refl)).
+    rewrite /ireg_frzm_ok Hne in Hok. discriminate Hok.
   Qed.
 
   Lemma ireg_frzc_off_intro (z : Z) (f : frzUR) :
-    f <> Some (Excl FrzPre) ->
+    frz_preb f = false ->
     frzown z -∗ frzm_h z false -∗ ireg_frzc z f.
   Proof.
     intros Hne. iIntros "Hr Hb".
     iApply (ireg_frzc_intro _ _ false (ireg_frzm_ok_false f Hne) with "[Hr] Hb").
     iRight. iExact "Hr".
+  Qed.
+
+  (* ---- THE FREEZE's BOOT-SHELTER CLAUSE, PHASE-INDEXED ----------------
+     (iclaim-ledger.md §6'', RULING G'.)
+
+     §2.3's last conjunct used to read [⌜f = FrzOff⌝ ∨ ireg_open ∨ ireg_boot]:
+     "whoever froze this inum exhibited SOME regime".  That is enough to keep
+     ireclaim's boot token out of a runtime freeze window, but NOT enough to
+     give it back: the off-lock deposit could only ever return the un-indexed
+     disjunction, and ireclaim -- having lent its only [ireg_boot] -- has
+     nothing left to refute the left arm with.  Since the phase now REMEMBERS
+     the arm ([frz]'s payload), the clause can be stated at the index, and the
+     deposit's agreement with the walk's [ifreeze_post rg] token selects it. *)
+  Definition ireg_fsh (f : frzUR) : iProp Σ :=
+    match f with
+    | Some (Excl FrzOff)       => True
+    | Some (Excl (FrzPre rg))  => ireg_regime rg
+    | Some (Excl (FrzPost rg)) => ireg_regime rg
+    | _                        => (ireg_open ∨ ireg_boot)
+    end%I.
+
+  Global Instance ireg_fsh_timeless f : Timeless (ireg_fsh f).
+  Proof. rewrite /ireg_fsh. destruct f as [[[| rg | rg] |] |]; apply _. Qed.
+
+  Lemma ireg_fsh_off : ⊢ ireg_fsh (Some (Excl FrzOff)).
+  Proof. rewrite /ireg_fsh. done. Qed.
+
+  Lemma ireg_fsh_pre (rg : bool) :
+    ireg_regime rg -∗ ireg_fsh (Some (Excl (FrzPre rg))).
+  Proof. iIntros "H". iExact "H". Qed.
+
+  Lemma ireg_fsh_post (rg : bool) :
+    ireg_regime rg -∗ ireg_fsh (Some (Excl (FrzPost rg))).
+  Proof. iIntros "H". iExact "H". Qed.
+
+  (* RULING G's RETURN LEG, as one line: with the column pinned at [FrzPost rg]
+     by the walk's own token, the parked arm IS the regime the freezer lent. *)
+  Lemma ireg_fsh_post_acc (rg : bool) :
+    ireg_fsh (Some (Excl (FrzPost rg))) -∗ ireg_regime rg.
+  Proof. iIntros "H". iExact "H". Qed.
+
+  (* ...and the RIDE-THROUGH every phase step wants: a mover that does not
+     change the regime index (and, at the unfrozen column, cannot leave it)
+     re-parks the arm it found. *)
+  (* THE REFUTATION §2.3 BUILT THE CLAUSE FOR (fs-fragments.md §7.12), at the
+     index: ireclaim's exclusive boot token kills EITHER arm, so a boot
+     thread that reaches a slot learns its column is unfrozen.  This is
+     [IgetLic.iname_not_frozen]'s (e)/BufL row. *)
+  Lemma ireg_fsh_boot_off (f : frzUR) :
+    ireg_fsh f -∗ ireg_boot -∗ ⌜f = Some (Excl FrzOff)⌝.
+  Proof.
+    rewrite /ireg_fsh. destruct f as [[[| rg | rg] |] |].
+    - iIntros "_ _". iPureIntro. reflexivity.
+    - iIntros "H Hb". iExFalso. iApply (ireg_regime_boot_excl with "H Hb").
+    - iIntros "H Hb". iExFalso. iApply (ireg_regime_boot_excl with "H Hb").
+    - iIntros "H Hb". iExFalso. iDestruct "H" as "[Ho | Ho]";
+        [ iApply (ireg_boot_open_excl with "Hb Ho")
+        | rewrite /ireg_boot; iApply (ity_pending_excl icfg_boot with "Hb Ho") ].
+    - iIntros "H Hb". iExFalso. iDestruct "H" as "[Ho | Ho]";
+        [ iApply (ireg_boot_open_excl with "Hb Ho")
+        | rewrite /ireg_boot; iApply (ity_pending_excl icfg_boot with "Hb Ho") ].
+  Qed.
+
+  Lemma ireg_fsh_step (ph ph' : frz) :
+    (ph' = FrzOff \/ frz_reg ph' = frz_reg ph) ->
+    ireg_fsh (Some (Excl ph)) -∗ ireg_fsh (Some (Excl ph')).
+  Proof.
+    intros [-> | Hr]; [iIntros "_"; iApply ireg_fsh_off |].
+    destruct ph' as [| rg' | rg']; [iIntros "_"; iApply ireg_fsh_off | |];
+      (destruct ph as [| rg | rg]; cbn in Hr; [discriminate Hr | |];
+       injection Hr as ->; iIntros "H"; iExact "H").
   Qed.
 
   (* ---- THE LEDGER AUTHORITY, BUNDLED WITH THE r COLUMN's CLAUSE --------
@@ -2087,7 +2164,7 @@ Section InodeRegion.
            freezer, PARKS its exclusive [ireg_boot] here for the freeze's
            duration and takes it back at the deposit.  Disjunctive rather
            than an implication so the slot stays timeless. *)
-        ∗ (⌜f = Some (Excl FrzOff)⌝ ∨ ireg_open ∨ ireg_boot)
+        ∗ ireg_fsh f
         (* THE FREEZE RECEIPT's CLAUSE (iclaim-ledger.md §3.14 as built).
            The region parks [IcacheRef.frzown z] at EVERY phase except
            [FrzPre]; the mint ([ireg_freeze_au]) hands it to the freezer and
@@ -2142,7 +2219,7 @@ Section InodeRegion.
     ireg_ep z d -∗
     (⌜c = None⌝ ∨ ireg_open) -∗
     icnt_half z n -∗
-    (⌜f = Some (Excl FrzOff)⌝ ∨ ireg_open ∨ ireg_boot) -∗
+    ireg_fsh f -∗
     ireg_frzc z f -∗
     ((((⌜ireg_in d⌝ ∗ z ↪[γi] d)
        ∨ (⌜ireg_marked_ok c d⌝ ∗ imark γi z))
@@ -2994,13 +3071,13 @@ Section InodeRegion.
      is at [c = None] and the new [ireg_claim_ok] conjunct is vacuous at the
      phase this mover writes. *)
   Lemma ireg_freeze_au (E : coPset) (γi : gname) (γfs : fs_names)
-      (inodestart : Z) (nib : nat) (inum : bv 32) (dn : dinode) :
+      (inodestart : Z) (nib : nat) (inum : bv 32) (dn : dinode) (rg : bool) :
     ↑iregN ⊆ E ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
     bv_unsigned (di_nlink dn) = 0 ->
     bv_unsigned (di_type dn) <> 0 ->
     ireg_inv γi γfs inodestart nib -∗
-    (ireg_open ∨ ireg_boot) -∗
+    ireg_regime rg -∗
     dinode_at γi inum dn -∗
     ifreeze FrzOff (bv_unsigned inum) -∗
     icnt_half (bv_unsigned inum) 1%nat -∗
@@ -3014,7 +3091,7 @@ Section InodeRegion.
        with the two live slices it is about to stop needing. *)
     frzm_h (bv_unsigned inum) false ={E}=∗
     dinode_at γi inum dn ∗
-    ifreeze_pre (bv_unsigned inum) ∗ icnt_half (bv_unsigned inum) 1%nat ∗
+    ifreeze_pre rg (bv_unsigned inum) ∗ icnt_half (bv_unsigned inum) 1%nat ∗
     (* THE FREEZE RECEIPT (iclaim-ledger.md §3.14 as built): the token the
        free path parks in the payload's token slot at iput+0x70 while it
        keeps [ifreeze_pre] in its own hand.  Returned to the region by the
@@ -3056,15 +3133,15 @@ Section InodeRegion.
     iDestruct "Hla" as (rcl) "[Hla %Href]".
     (* ...and the two halves pin the count the new pin will carry *)
     iDestruct (icnt_agree with "Hcnt Hhalf") as %->.
-    iMod (link_freeze_step _ _ _ _ _ _ _ _ FrzOff FrzPre with "Hla Hoff")
+    iMod (link_freeze_step _ _ _ _ _ _ _ _ FrzOff (FrzPre rg) with "Hla Hoff")
       as "[Hla Hpre]".
     (* THE MINT ESTABLISHES THE PIN, all three conjuncts from what the
        freezer handed in (§3.1's last mover row). *)
-    assert (Hfrz' : ireg_frz_ok (Some (Excl FrzPre)) 1%nat
+    assert (Hfrz' : ireg_frz_ok (Some (Excl (FrzPre rg))) 1%nat
                       (ds !!! islot inum)).
     { rewrite Hdeq. split_and!; [exact Hnl0 | exact Hty0 | reflexivity]. }
     (* the claim clause at the NEW phase: the marked arm says [cl = None] *)
-    assert (Hclm' : ireg_claim_ok cl (Some (Excl FrzPre)) (ds !!! islot inum))
+    assert (Hclm' : ireg_claim_ok cl (Some (Excl (FrzPre rg))) (ds !!! islot inum))
       by (rewrite (proj2 Ht2); exact I).
     assert (Hins : <[islot inum := ds !!! islot inum]> ds = ds).
     { apply list_insert_id, list_lookup_lookup_total_lt. lia. }
@@ -3083,9 +3160,7 @@ Section InodeRegion.
        disjunct of [islot2]'s live arm. *)
     iDestruct "Hmr" as (b0) "[Hmr %Hmok]".
     iDestruct (frzm_agree with "Hmr Hmir") as %<-.
-    assert (Hb0 : b0 = false).
-    { destruct b0; [| reflexivity].
-      destruct Hmok as [Hl _]. discriminate (Hl eq_refl). }
+    assert (Hb0 : b0 = false) by exact Hmok.
     subst b0.
     iMod (frzm_update (bv_unsigned inum) false true with "Hmr Hmir")
       as "[Hmr Hmir]".
@@ -3101,14 +3176,14 @@ Section InodeRegion.
       (* RULING R: the freeze moves the f column only -- neither r column,
          neither the count nor the record -- so the clause rides verbatim. *)
       iDestruct (ireg_rcol_intro (bv_unsigned inum) wl wdu wdt gl cl rl pl
-                   (Some (Excl FrzPre)) 1%nat rcl (ds !!! islot inum) Href
+                   (Some (Excl (FrzPre rg))) 1%nat rcl (ds !!! islot inum) Href
                    with "Hla") as "Hla".
       iApply (ireg_slot_intro γi (bv_unsigned inum) (ds !!! islot inum)
-                wl wdu wdt gl cl rl pl (Some (Excl FrzPre)) 1%nat
+                wl wdu wdt gl cl rl pl (Some (Excl (FrzPre rg))) 1%nat
                 Hlok Hrt Hdir Hwl0 Hpar Hclm' Hfrz'
                 with "Hla Hep Hdisj Hcnt [Hsh] [Hmr]").
-      { iRight. iExact "Hsh". }
-      { iApply (ireg_frzc_intro _ _ true ireg_frzm_ok_true with "[] Hmr").
+      { iApply (ireg_fsh_pre rg with "Hsh"). }
+      { iApply (ireg_frzc_intro _ _ true (ireg_frzm_ok_true rg) with "[] Hmr").
         iLeft. iPureIntro. reflexivity. }
       iLeft. iSplitR "Hrf"; [iRight; iSplitR; [iPureIntro; exact Ht2 | iExact "Hmk"] | iExact "Hrf"]. }
     iModIntro. rewrite /ifreeze_pre. iFrame "Hdn Hpre Hhalf Hrcpt Hmir".
@@ -3140,7 +3215,7 @@ Section InodeRegion.
     ireg_inv γi γfs inodestart nib -∗
     ifreeze ph (bv_unsigned inum) -∗
     frzm_h (bv_unsigned inum) b ={E}=∗
-      ⌜b = true <-> ph = FrzPre⌝ ∗
+      ⌜b = frz_ispre ph⌝ ∗
       ifreeze ph (bv_unsigned inum) ∗ frzm_h (bv_unsigned inum) b.
   Proof.
     iIntros (HE Hin) "#Hinv Hfz Hmir".
@@ -3162,10 +3237,7 @@ Section InodeRegion.
     iDestruct "Hfrcp" as "[Hrc Hmr]".
     iDestruct "Hmr" as (b0) "[Hmr %Hmok]".
     iDestruct (frzm_agree with "Hmr Hmir") as %<-.
-    assert (Hiff : b0 = true <-> ph = FrzPre).
-    { destruct Hmok as [Hl Hr]. split.
-      - intros Hb. pose proof (Hl Hb) as Hc. by injection Hc as ->.
-      - intros ->. exact (Hr eq_refl). }
+    assert (Hiff : b0 = frz_ispre ph) by exact Hmok.
     assert (Hins : <[islot inum := ds !!! islot inum]> ds = ds).
     { apply list_insert_id, list_lookup_lookup_total_lt. lia. }
     iMod ("Hclose" with "[Ha Hreg Hfsb Harm Hla Hep Hslback Hback Hcnt Hfdisj Hrc Hmr]")
@@ -3225,7 +3297,7 @@ Section InodeRegion.
     iDestruct "Hmr" as (b0) "[Hmr %Hmok]".
     iDestruct (frzm_agree with "Hmr Hmir") as %->.
     iDestruct "Hrc'" as "[%Hpre | Hrc']".
-    { destruct Hmok as [_ Hr]. discriminate (Hr Hpre). }
+    { rewrite /ireg_frzm_ok Hpre in Hmok. discriminate Hmok. }
     iExFalso. iApply (frzown_excl with "Hrc Hrc'").
   Qed.
 
@@ -3325,7 +3397,7 @@ Section InodeRegion.
      above, and false of the [r] half.  Stage E is unpriced again. *)
   Lemma ireg_free_au (E : coPset) (γi : gname) (γfs : fs_names)
       (inodestart : Z) (nib : nat) (inum : bv 32) (dn dn' : dinode)
-      (ds : list dinode) :
+      (ds : list dinode) (rg : bool) :
     ↑iregN ⊆ E ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
     diblk_wf ds ->
@@ -3347,7 +3419,7 @@ Section InodeRegion.
        branch; the only type-0 write left in the reordered kernel is the
        off-lock ifree, and that goes through [EscrowDeposit] -- where the
        token is in hand. *)
-    ifreeze_post (bv_unsigned inum) -∗
+    ifreeze_post rg (bv_unsigned inum) -∗
     |={E, E ∖ ↑iregN}=> ∃ bsl' : list (bv 8),
       fsblock γfs (IBLOCK inum inodestart) bsl' ∗
       (⌜bsl' = diblk_bytes ds⌝ -∗
@@ -3455,7 +3527,7 @@ Section InodeRegion.
       as [Hrl0 Hrcl0].
     assert (Href0 : forall d0 : dinode, ireg_ref_ok rl rcl cn cl d0)
       by (intros d0; rewrite Hrl0 Hrcl0; exact (ireg_ref_ok_zero cn cl d0)).
-    iMod (link_freeze_step _ _ _ _ _ _ _ _ FrzPost FrzOff with "Hla Hfz")
+    iMod (link_freeze_step _ _ _ _ _ _ _ _ (FrzPost rg) FrzOff with "Hla Hfz")
       as "[Hla Hoff]".
     assert (Hfrz' : ireg_frz_ok (Some (Excl FrzOff)) cn dn')
       by exact (ireg_frz_ok_off cn dn').
@@ -3471,8 +3543,8 @@ Section InodeRegion.
     (* THE RECEIPT RIDES THROUGH: neither the old column ([FrzPost]) nor the
        new one ([FrzOff]) is [FrzPre], so the slot's clause is on its
        [frzown] arm both sides and the deposit never touches it. *)
-    iDestruct (ireg_frzc_off_acc (bv_unsigned inum) (Some (Excl FrzPost))
-                 ltac:(discriminate) with "Hfrcp") as "[Hrcpt Hmr]".
+    iDestruct (ireg_frzc_off_acc (bv_unsigned inum) (Some (Excl (FrzPost rg)))
+                 ltac:(reflexivity) with "Hfrcp") as "[Hrcpt Hmr]".
     iMod ("Hclose" with "[Ha Hreg Hfsb' Hdn Hla Hep Hslback Hback Hrf Hcnt Hrcpt Hmr]") as "_".
     { iNext. iExists m'. iFrame "Ha Hreg".
       iApply ("Hback" $! m' with "[%] [Hfsb' Hdn Hla Hep Hslback Hrf Hcnt Hrcpt Hmr]").
@@ -3506,9 +3578,9 @@ Section InodeRegion.
                 (Some (Excl FrzOff)) cn
                 Hlok' Hrt' Hdir' Hwl0' Hpar Hclm' Hfrz'
                 with "Hla Hep Hdisj Hcnt [] [Hrcpt Hmr]").
-      { iLeft. iPureIntro. reflexivity. }
+      { iApply ireg_fsh_off. }
       { iApply (ireg_frzc_off_intro (bv_unsigned inum) (Some (Excl FrzOff))
-                  ltac:(discriminate) with "Hrcpt Hmr"). }
+                  ltac:(reflexivity) with "Hrcpt Hmr"). }
       iLeft. iSplitR "Hrf"; [iLeft; iSplitR; [iPureIntro; left; exact Hz | iExact "Hdn"] | iExact "Hrf"]. }
     iModIntro. rewrite /ifreeze_off. iFrame "Hmk Hoff".
   Qed.

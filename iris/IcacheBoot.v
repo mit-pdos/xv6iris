@@ -677,14 +677,13 @@ Section IcacheBootRegion.
         (* boot's ledger is all-[None], so the boot-shelter clause's LEFT
            disjunct is free (fs-fragments.md §7.12) *)
         { iLeft; iPureIntro; reflexivity. }
-        (* ...and the FREEZE's clause takes its own left disjunct for the
-           same reason: boot's f column is the UNFROZEN token everywhere
-           (iclaim-ledger.md §2.3) *)
-        { iLeft; iPureIntro; reflexivity. }
+        (* ...and the FREEZE's clause is vacuous at the UNFROZEN column,
+           which is boot's everywhere (iclaim-ledger.md §2.3 / §6'' G') *)
+        { iApply ireg_fsh_off. }
         (* ...and the RECEIPT's clause is on its [frzown] arm, because boot
            freezes nothing (iclaim-ledger.md §3.14 as built) *)
         { iApply (ireg_frzc_off_intro z (Some (Excl FrzOff))
-                    ltac:(discriminate) with "Hrcpt Hmir"). }
+                    ltac:(reflexivity) with "Hrcpt Hmir"). }
         iLeft. iSplitR "Hrf"; [iLeft; iSplitR; [iPureIntro; left; exact Hty | iExact "Hfrag"] | iExists (1%positive : gname), (1%positive : gname); iExact "Hrf"].
       - iSplitR "Hfrag"; [| iExact "Hfrag"].
         iDestruct (ireg_rcol_intro z 0 0 0 0 None 0 None (Some (Excl FrzOff))
@@ -699,14 +698,13 @@ Section IcacheBootRegion.
         (* boot's ledger is all-[None], so the boot-shelter clause's LEFT
            disjunct is free (fs-fragments.md §7.12) *)
         { iLeft; iPureIntro; reflexivity. }
-        (* ...and the FREEZE's clause takes its own left disjunct for the
-           same reason: boot's f column is the UNFROZEN token everywhere
-           (iclaim-ledger.md §2.3) *)
-        { iLeft; iPureIntro; reflexivity. }
+        (* ...and the FREEZE's clause is vacuous at the UNFROZEN column,
+           which is boot's everywhere (iclaim-ledger.md §2.3 / §6'' G') *)
+        { iApply ireg_fsh_off. }
         (* ...and the RECEIPT's clause is on its [frzown] arm, because boot
            freezes nothing (iclaim-ledger.md §3.14 as built) *)
         { iApply (ireg_frzc_off_intro z (Some (Excl FrzOff))
-                    ltac:(discriminate) with "Hrcpt Hmir"). }
+                    ltac:(reflexivity) with "Hrcpt Hmir"). }
         iLeft. iSplitR "Hrf"; [iRight; iSplitR; [iPureIntro; split; [exact Hty | reflexivity] | iExact "Hmk"] | iExists (1%positive : gname), (1%positive : gname); iExact "Hrf"]. }
     rewrite big_sepS_sep.
     iDestruct "Hall" as "[Hslots Hout]".

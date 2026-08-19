@@ -807,6 +807,7 @@ Section ProofSysUnlinkTails.
     itable_inv -∗
     ic_escrow cn gfs gi cov logstart kk -∗
     ireg_inv gi gfs inodestart nib -∗
+    ireg_open -∗
     is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s -∗
     sl_pid (i_lock (ientry kk)) ↦₄ pidv -∗
@@ -867,7 +868,7 @@ Section ProofSysUnlinkTails.
            Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HMsp HMthr HMs1 HMs2
            HMs3 Hal.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
-              #Hitab #Hitinv #Hesck #Hireg #Hslkk Hslkd Hslpid Hdep Hidev
+              #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd Hslpid Hdep Hidev
               Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpid #Hprocs
               #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD HbN HbP
               H27 HbE H30 Hcont".
@@ -933,17 +934,17 @@ Section ProofSysUnlinkTails.
     iApply (Iunlockput.wp_iunlockput_sconf (CID := CID2) gs jx gl gu gd gk
               pd pav pu bn g gfs gi cn gtl gil gisl cov logstart bmapstart
               inodestart nib size dev used kk qi s gy inum dn bm u pidv dq
-              dqb dqs M2 (K - 30)%nat eb b lks
+              dqb dqs M2 (K - 30)%nat eb b lks true
               HKup Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog
               Hinb Hcovb Hiu Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hitab Hitinv
-                    Hesck Hireg Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid
+                    Hesck Hireg Hropen Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid
                     Hload Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
                     Hdlk Hbsl Hop").
     iIntros (CID3 Hq3 mup n2 used2)
       "%Hcsup Hcg Hown Htce Hcce Hpc Hpid Hsbb Hsbi %Hused2 Hbmres Hbsl %Hn2
-       Hop Hislot".
+       Hop Hislot _".
     assert (Hpc160 : ret_pc (M2 !!! Regidx Rra : mword 64)
                      = mword_of_int (SU + 0x160)) by (rewrite HM2ra; pcw).
     iEval (rewrite Hpc160) in "Hpc".
@@ -1141,6 +1142,7 @@ Section ProofSysUnlinkTails.
     itable_inv -∗
     ic_escrow cn gfs gi cov logstart kk -∗
     ireg_inv gi gfs inodestart nib -∗
+    ireg_open -∗
     is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s -∗
     sl_pid (i_lock (ientry kk)) ↦₄ pidv -∗
@@ -1200,7 +1202,7 @@ Section ProofSysUnlinkTails.
     intros HKup HKeo HK30 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk
            Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HMsp HMthr HMs1 HMs3 Hal.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
-              #Hitab #Hitinv #Hesck #Hireg #Hslkk Hslkd Hslpid Hdep Hidev
+              #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd Hslpid Hdep Hidev
               Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpid #Hprocs
               #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD HbN HbP
               H27 HbE H30 Hcont".
@@ -1249,7 +1251,7 @@ Section ProofSysUnlinkTails.
               Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HM1sp HM1thr
               HM1s1 HM1s2 HM1s3 Hal
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
-                    Hitab Hitinv Hesck Hireg Hslkk Hslkd Hslpid Hdep Hidev
+                    Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd Hslpid Hdep Hidev
                     Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpid
                     Hprocs Hdev Hgeo Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
                     HbD HbN HbP H27 HbE H30 Hcont").
@@ -1332,6 +1334,7 @@ Section ProofSysUnlinkTails.
     ic_escrow cn gfs gi cov logstart kk -∗
     ic_escrow cn gfs gi cov logstart ki -∗
     ireg_inv gi gfs inodestart nib -∗
+    ireg_open -∗
     (* ---- dp, still locked: released in [bad:] ---- *)
     is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s -∗
@@ -1410,7 +1413,7 @@ Section ProofSysUnlinkTails.
            Hiblk Hiblog Hinb Hiblki Hiblogi Hinbi Hcovb Hiu Hj Hgl Hlkempty
            Hsp0 HMsp HMthr HMs1 HMs2 Hal.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
-              #Hitab #Hitinv #Hesck #Hescki #Hireg
+              #Hitab #Hitinv #Hesck #Hescki #Hireg #Hropen
               #Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hru
               #Hslkki Hslkdi Hslpidi Hdepi Hidevi Hiinumi Hivalidi Hloadi
               #Hshoti Hfrzi Hkeepi Hrui
@@ -1474,17 +1477,17 @@ Section ProofSysUnlinkTails.
     iApply (Iunlockput.wp_iunlockput_sconf (CID := CID2) gs jx gl gu gd gk
               pd pav pu bn g gfs gi cn gtl gili gisli cov logstart bmapstart
               inodestart nib size dev used ki qip si gyi inumi dni bmi u pidv
-              dq dqb dqs M2 (K - 30)%nat eb b lks
+              dq dqb dqs M2 (K - 30)%nat eb b lks true
               HKup Hki Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblki Hiblogi
               Hinbi Hcovb ltac:(unfold iput_units in *; lia) Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hitab Hitinv
-                    Hescki Hireg Hslkki Hslkdi Hslpidi Hdepi Hidevi Hiinumi
+                    Hescki Hireg Hropen Hslkki Hslkdi Hslpidi Hdepi Hidevi Hiinumi
                     Hivalidi Hloadi Hshoti Hfrzi Hkeepi Hrui Hsbb Hsbi Hbmres Hpid Hprocs
                     Hdev Hgeo Hdlk Hbsl Hop").
     iIntros (CID3 Hq3 mup n2 used2)
       "%Hcsup Hcg Hown Htce Hcce Hpc Hpid Hsbb Hsbi %Hused2 Hbmres Hbsl %Hn2
-       Hop Hislot".
+       Hop Hislot _".
     assert (Hpc17a : ret_pc (M2 !!! Regidx Rra : mword 64)
                      = mword_of_int (SU + 0x17a)) by (rewrite HM2ra; pcw).
     iEval (rewrite Hpc17a) in "Hpc".
@@ -1577,7 +1580,7 @@ Section ProofSysUnlinkTails.
               Hiblk Hiblog Hinb Hcovb ltac:(unfold iput_units in *; lia)
               Hj Hgl Hlkempty Hsp0 HP2sp HP2thr HP2s1 HP2s2 HP2s3 Hal
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
-                    Hitab Hitinv Hesck Hireg Hslkk Hslkd Hslpid Hdep Hidev
+                    Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd Hslpid Hdep Hidev
                     Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpid
                     Hprocs Hdev Hgeo Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
                     HbD HbN HbP H27 HbE H30 [Hislot Hcont]").

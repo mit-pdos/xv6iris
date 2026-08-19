@@ -146,7 +146,7 @@ Definition wp_iput_sconf_body
     (n : nat)
     (pidv : mword 32) (dq dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) :=
+    (b : bool) (lks : gset string) (rg : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iput in
   let ip : mword 64 := ientry k in
   let pj := proc_addr j in
@@ -221,7 +221,7 @@ Definition wp_iput_sconf_body
      caller passes [iLeft] on its persistent copy and may discard what comes
      back; ireclaim, the one boot caller, lends [ireg_boot] and needs it
      returned to run its next loop iteration. *)
-  (ireg_open ∨ ireg_boot) -∗
+  ireg_regime rg -∗
   (* the entry's sleeplock, over the CHECKOUT TOKEN alone *)
   (* TRACKED: what a holder deposits is a share of somebody's REFERENCE to
      the slot, keyed by the slot rather than by the lock -- which is what
@@ -288,7 +288,7 @@ Definition wp_iput_sconf_body
          iget/iput are a matched pair against the fixed IREFSLOTS supply. *)
       iref_slot -∗
       (* RULING G: the regime comes back, on every arm (see the premise). *)
-      (ireg_open ∨ ireg_boot) -∗
+      ireg_regime rg -∗
       (* ...AND NOTHING ELSE.  The reference is consumed; xv6's iput
          returns void and the caller's pointer is dead. *)
       WP (Loop : expr riscv_lang)) -∗
@@ -369,7 +369,7 @@ Definition wp_iput_gen_body
     (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
     (pidv : mword 32) (dq dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) :=
+    (b : bool) (lks : gset string) (rg : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iput in
   let ip : mword 64 := ientry k in
   let pj := proc_addr j in
@@ -420,7 +420,7 @@ Definition wp_iput_gen_body
      caller passes [iLeft] on its persistent copy and may discard what comes
      back; ireclaim, the one boot caller, lends [ireg_boot] and needs it
      returned to run its next loop iteration. *)
-  (ireg_open ∨ ireg_boot) -∗
+  ireg_regime rg -∗
   (* TRACKED: what a holder deposits is a share of somebody's REFERENCE to
      the slot, keyed by the slot rather than by the lock -- which is what
      lets iput, at [ip->ref == 1], prove the lock free instead of blocking
@@ -490,7 +490,7 @@ Definition wp_iput_gen_body
       log_opS g n' Sb' -∗
       iref_slot -∗
       (* RULING G: the regime comes back, on every arm (see the premise). *)
-      (ireg_open ∨ ireg_boot) -∗
+      ireg_regime rg -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -512,10 +512,10 @@ Module Type IPUT.
       (n : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string),
+      (b : bool) (lks : gset string) (rg : bool),
       wp_iput_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
                           cov logstart bmapstart inodestart nib size dev used
-                          k q inum n pidv dq dqb dqs m K eb b lks.
+                          k q inum n pidv dq dqb dqs m K eb b lks rg.
   (* the credited set-form contract; [wp_iput_sconf] is this at
      [crb := cru := crz := false], derived at the [log_op] existential's own
      witness ([ip_spend_w w false false <= 2], and iput's own flush is the
@@ -538,8 +538,8 @@ Module Type IPUT.
       (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string),
+      (b : bool) (lks : gset string) (rg : bool),
       wp_iput_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
                        cov logstart bmapstart inodestart nib size dev used
-                       k q inum n Sb crb cru crz e0 pidv dq dqb dqs m K eb b lks.
+                       k q inum n Sb crb cru crz e0 pidv dq dqb dqs m K eb b lks rg.
 End IPUT.

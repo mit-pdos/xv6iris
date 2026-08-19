@@ -2667,7 +2667,7 @@ Section ProofNamexMain.
                          nib size dev usedc pk pq pinum ncur Scur wc false
                          false enxA pidv dq dqb dqs
                          T2 (K - 12)%nat eb b
-                         _ Kip Hpk HbW ltac:(discriminate)
+                         _ true Kip Hpk HbW ltac:(discriminate)
                          Hlg Hsize Hbmap0 Hbmapcov Hbmaplog Hinos0
                          Hibc Hibl Hpb' Hcovb HbD
                          Hj Hgs HT2a0 Hbelow
@@ -2678,7 +2678,7 @@ Section ProofNamexMain.
                { rewrite Heb /trap_csrs_ext. done. }
                { rewrite Heb /cpu_claim_ext. done. }
                (* RULING G: a runtime caller lends the SEALED arm. *)
-               { iLeft. iExact "Hropen". }
+               { iExact "Hropen". }
                { iEval (cbn beta iota). iEmpIntro. }
                iIntros (CIDip Hqip mip nip usedip Sip wip)
                  "%Hcsip Hcg Hcnt _ _ Hpc Hppid Hbmap Hinos %Husdip Hbits Hbslot
@@ -3325,7 +3325,7 @@ Section ProofNamexMain.
                                bmapstart inodestart nib size dev usedc
                                ik (iq/2)%Qp (iq/2)%Qp gsh iinum dnl bml ncur
                                Scur wc false false enxB
-                               pidv dq dqb dqs ND2 (K - 12)%nat eb b lks
+                               pidv dq dqb dqs ND2 (K - 12)%nat eb b lks true
                                Kiup Hik HbW ltac:(discriminate)
                                Hlg Hsize Hbmap0 Hbmapcov Hbmaplog
                                Hinos0 Hibc Hibl Hib' Hcovb Hiu Hj Hgs
@@ -3339,7 +3339,7 @@ Section ProofNamexMain.
                      { rewrite Heb /trap_csrs_ext. done. }
                      { rewrite Heb /cpu_claim_ext. done. }
                      (* RULING G: a runtime caller lends the SEALED arm. *)
-                     { iLeft. iExact "Hropen". }
+                     { iExact "Hropen". }
                      { iEval (cbn beta iota). iEmpIntro. }
                      iIntros (CIDup Hqup mup nup usedup Sup wup)
                        "%Hcsup Hcg Hcnt _ _ Hpc Hppid Hbmap Hinos %Husdup Hbits
@@ -4116,7 +4116,7 @@ Section ProofNamexMain.
                                      size dev usedc ik (iq/2)%Qp (iq/2)%Qp gsh
                                      iinum dnl bml ncur Scur wc false true
                                      enx pidv dq dqb dqs
-                                     GB3 (K - 12)%nat eb b lks
+                                     GB3 (K - 12)%nat eb b lks true
                                      Kiup Hik HbW ltac:(discriminate)
                                      Hlg Hsize Hbmap0 Hbmapcov
                                      Hbmaplog Hinos0 Hibc Hibl Hib' Hcovb
@@ -4133,7 +4133,7 @@ Section ProofNamexMain.
                            (* RULING G: a runtime caller lends the SEALED arm of
                               the borrowed regime and discards what comes back --
                               its own copy is persistent. *)
-                           { iLeft. iExact "Hropen". }
+                           { iExact "Hropen". }
                            iIntros (CIDup Hqup mup nup usedup Sup wup)
                              "%Hcsup Hcg Hcnt _ _ Hpc Hppid Hbmap Hinos %Husdup
                               Hbits Hbslot %Hsup %Hwup %Hwupc %Hbdup Hlog Hisl _".
@@ -4338,7 +4338,7 @@ Section ProofNamexMain.
                                      size dev usedc ik (iq/2)%Qp (iq/2)%Qp gsh
                                      iinum dnl bml ncur Scur wc false true
                                      enx pidv dq dqb dqs
-                                     GC3 (K - 12)%nat eb b lks
+                                     GC3 (K - 12)%nat eb b lks true
                                      Kiup Hik HbW ltac:(discriminate)
                                      Hlg Hsize Hbmap0 Hbmapcov
                                      Hbmaplog Hinos0 Hibc Hibl Hib' Hcovb
@@ -4355,7 +4355,7 @@ Section ProofNamexMain.
                            (* RULING G: a runtime caller lends the SEALED arm of
                               the borrowed regime and discards what comes back --
                               its own copy is persistent. *)
-                           { iLeft. iExact "Hropen". }
+                           { iExact "Hropen". }
                            iIntros (CIDup Hqup mup nup usedup Sup wup)
                              "%Hcsup Hcg Hcnt _ _ Hpc Hppid Hbmap Hinos %Husdup
                               Hbits Hbslot %Hsup %Hwup %Hwupc %Hbdup Hlog Hisl3 _".
@@ -4631,7 +4631,7 @@ Section ProofNamexMain.
                                bmapstart inodestart nib size dev usedc
                                ik (iq/2)%Qp (iq/2)%Qp gsh iinum dnl bml ncur
                                Scur wc false false enxB
-                               pidv dq dqb dqs ND2 (K - 12)%nat eb b lks
+                               pidv dq dqb dqs ND2 (K - 12)%nat eb b lks true
                                Kiup Hik HbW ltac:(discriminate)
                                Hlg Hsize Hbmap0 Hbmapcov Hbmaplog
                                Hinos0 Hibc Hibl Hib' Hcovb Hiu Hj Hgs
@@ -4645,7 +4645,7 @@ Section ProofNamexMain.
                      { rewrite Heb /trap_csrs_ext. done. }
                      { rewrite Heb /cpu_claim_ext. done. }
                      (* RULING G: a runtime caller lends the SEALED arm. *)
-                     { iLeft. iExact "Hropen". }
+                     { iExact "Hropen". }
                      { iEval (cbn beta iota). iEmpIntro. }
                      iIntros (CIDup Hqup mup nup usedup Sup wup)
                        "%Hcsup Hcg Hcnt _ _ Hpc Hppid Hbmap Hinos %Husdup Hbits

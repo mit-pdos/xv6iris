@@ -809,7 +809,7 @@ Section KexecB2Loops.
        hypothesis of this lemma's own. *)
     iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
     iDestruct "Hfab" as "(#Hkd & #Hpenv & #Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
-                          #Hesc & #Hslks & #Hireg & #Hprocs & #Hdevi & #Hdgeom &
+                          #Hesc & #Hslks & #Hireg & #Hropen & #Hprocs & #Hdevi & #Hdgeom &
                           #Hdlock)".
     rewrite /kxc_res.
     iDestruct "Hres" as "(Hopen & Hlog & Hirs & Hbm & Hins & Hbits & Hbs & Hpt &
@@ -1579,7 +1579,7 @@ Section KexecB2Loops.
                           [Hopen Hlog Hirs Hbm Hins Hbits Hbs Hpt Hpriv Hpath
                            Hargv Hargs Helf Hframe] Hcont Hc116").
           { iApply (A.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv
-                                         Hesc Hslks Hireg Hprocs Hdevi Hdgeom
+                                         Hesc Hslks Hireg Hropen Hprocs Hdevi Hdgeom
                                          Hdlock"). }
           { rewrite /kxc_res.
             iSplitL "Hopen"; [iExact "Hopen" |].
@@ -1629,7 +1629,7 @@ Section KexecB2Loops.
                         Hpt Hpriv Hpath Hargv Hargs Helf Hbs Hirs Hlog Hframe
                         Hcont").
         { iApply (A.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv
-                                       Hesc Hslks Hireg Hprocs Hdevi Hdgeom
+                                       Hesc Hslks Hireg Hropen Hprocs Hdevi Hdgeom
                                        Hdlock"). } }
 
     (* ---- +0x10e: bgeu s9,a5,+0x0da ---- *)

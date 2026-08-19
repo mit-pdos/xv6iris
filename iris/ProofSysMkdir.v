@@ -1283,7 +1283,7 @@ Section ProofSysMkdirBody.
         iApply (Iunlockput.wp_iunlockput_sconf (CID := CID20) gs j gl gu gd gk
                   pd pav pu bn g gfs gi cn gtl gil gisl cov logstart bmapstart
                   inodestart nib size dev used1 kk qi ss gy inum dn bm un1
-                  pid (DfracOwn (1/4)) dqb dqs P0 (K - 18)%nat eb b lks
+                  pid (DfracOwn (1/4)) dqb dqs P0 (K - 18)%nat eb b lks true
                   ltac:(lia) ltac:(lia) Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
                   Hibcov Hiblog ltac:(lia) Hcovb
                   ltac:(exact (proj2 (proj2 Hun1) eq_refl)) Hj Hgl HP0a0
@@ -1297,7 +1297,7 @@ Section ProofSysMkdirBody.
         (* RULING G: a runtime caller lends iunlockput the SEALED arm of the
            borrowed regime and discards what comes back -- its own copy is
            persistent. *)
-        { iLeft. iExact "Hiopen". }
+        { iExact "Hiopen". }
         { iApply (log_opS_op with "HopS"). }
         iIntros (CID21 Hq21 miu n2 used2)
           "%Hcsiu Hcg Hown _ _ Hpc Hpidq Hsbb Hsbi %Hused2 Hbmres Hbsl %Hn2

@@ -2078,9 +2078,15 @@ Section IcacheRefInvReg.
      the ordinary (unfrozen) last close threads [FrzOff] through it. *)
   Definition frz_close (ph : frz) : frz :=
     match ph with
-    | FrzPre => FrzPost
+    | FrzPre rg => FrzPost rg
     | _ => ph
     end.
+
+  (* RULING G' (iclaim-ledger.md §6''): the close steps the PHASE and leaves
+     the regime index exactly where it found it, which is what lets the slot's
+     boot-shelter arm ride through the step ([InodeRegion.ireg_fsh_step]). *)
+  Lemma frz_close_reg (ph : frz) : frz_reg (frz_close ph) = frz_reg ph.
+  Proof. destruct ph; reflexivity. Qed.
 
   (* ---- THE FREEZE RECEIPT, PHASE-INDEXED (iclaim-ledger.md §3.14 as
      built) ------------------------------------------------------------
@@ -2096,10 +2102,10 @@ Section IcacheRefInvReg.
      Their sum is the receipt itself ([frz_rcpt_split] below), which is what
      the mint and the [FrzPre -> FrzPost] step trade across. *)
   Definition frz_rcpt (ph : frz) (z : Z) : iProp Σ :=
-    match ph with FrzPre => emp | _ => frzown z end.
+    match ph with FrzPre _ => emp | _ => frzown z end.
 
   Definition frz_rcpt_pre (ph : frz) (z : Z) : iProp Σ :=
-    match ph with FrzPre => frzown z | _ => emp end.
+    match ph with FrzPre _ => frzown z | _ => emp end.
 
   Global Instance frz_rcpt_timeless ph z : Timeless (frz_rcpt ph z).
   Proof. rewrite /frz_rcpt. destruct ph; apply _. Qed.
@@ -2118,7 +2124,7 @@ Section IcacheRefInvReg.
 
   (* the slot's clause, read at a KNOWN phase and back again *)
   Lemma frz_rcpt_of_clause (ph : frz) (z : Z) :
-    (⌜Some (Excl ph) = Some (Excl FrzPre)⌝ ∨ frzown z) -∗ frz_rcpt ph z.
+    (⌜frz_preb (Some (Excl ph)) = true⌝ ∨ frzown z) -∗ frz_rcpt ph z.
   Proof.
     rewrite /frz_rcpt.
     destruct ph;
@@ -2138,7 +2144,7 @@ Section IcacheRefInvReg.
   Qed.
 
   Lemma frz_rcpt_to_clause (ph : frz) (z : Z) :
-    frz_rcpt ph z -∗ (⌜Some (Excl ph) = Some (Excl FrzPre)⌝ ∨ frzown z).
+    frz_rcpt ph z -∗ (⌜frz_preb (Some (Excl ph)) = true⌝ ∨ frzown z).
   Proof.
     rewrite /frz_rcpt.
     destruct ph;
@@ -2165,13 +2171,13 @@ Section IcacheRefInvReg.
      comes IN only at [ph = FrzPre] and goes back OUT at the phase the step
      lands on, whatever that is. *)
   Definition frz_bit (ph : frz) : bool :=
-    match ph with FrzPre => true | _ => false end.
+    match ph with FrzPre _ => true | _ => false end.
 
   Definition frz_mir (ph : frz) (z : Z) : iProp Σ :=
-    match ph with FrzPre => frzm_h z true | _ => emp end.
+    match ph with FrzPre _ => frzm_h z true | _ => emp end.
 
   Definition frz_mir_back (ph ph' : frz) (z : Z) : iProp Σ :=
-    match ph with FrzPre => frzm_h z (frz_bit ph') | _ => emp end.
+    match ph with FrzPre _ => frzm_h z (frz_bit ph') | _ => emp end.
 
   Global Instance frz_mir_timeless ph z : Timeless (frz_mir ph z).
   Proof. rewrite /frz_mir. destruct ph; apply _. Qed.
@@ -2183,31 +2189,26 @@ Section IcacheRefInvReg.
      half at the new phase + the caller's trade back.  ZZProbeFrz P6, at the
      phase-indexed altitude. *)
   Lemma frz_mir_step (ph ph' : frz) (z : Z) :
-    (ph' = FrzPre -> ph = FrzPre) ->
+    (frz_bit ph' = true -> frz_bit ph = true) ->
     frzm_h z (frz_bit ph) -∗ frz_mir ph z ==∗
     frzm_h z (frz_bit ph') ∗ frz_mir_back ph ph' z.
   Proof.
     intros Hmint.
-    assert (Hoff : ph <> FrzPre -> frz_bit ph' = false).
+    assert (Hoff : frz_bit ph = false -> frz_bit ph' = false).
     { intros Hne. destruct ph'; cbn [frz_bit]; [reflexivity | | reflexivity].
-      exfalso. exact (Hne (Hmint eq_refl)). }
+      exfalso. rewrite (Hmint eq_refl) in Hne. discriminate Hne. }
     destruct ph; cbn [frz_bit frz_mir frz_mir_back].
-    - rewrite (Hoff ltac:(discriminate)). iIntros "Hr _ !>". iFrame.
+    - rewrite (Hoff ltac:(reflexivity)). iIntros "Hr _ !>". iFrame.
     - iIntros "Hr Hl".
       iMod (frzm_update z true (frz_bit ph') with "Hr Hl") as "[$ $]". done.
-    - rewrite (Hoff ltac:(discriminate)). iIntros "Hr _ !>". iFrame.
+    - rewrite (Hoff ltac:(reflexivity)). iIntros "Hr _ !>". iFrame.
   Qed.
 
   (* the region's half READ OFF the slot's clause: [ireg_frzm_ok] at a known
      phase IS "[b] is [frz_bit ph]" *)
   Lemma ireg_frzm_ok_bit (b : bool) (ph : frz) :
     ireg_frzm_ok b (Some (Excl ph)) -> b = frz_bit ph.
-  Proof.
-    intros [Hl Hr]. destruct ph; cbn [frz_bit].
-    - destruct b; [| reflexivity]. discriminate (Hl eq_refl).
-    - exact (Hr eq_refl).
-    - destruct b; [| reflexivity]. discriminate (Hl eq_refl).
-  Qed.
+  Proof. intros ->. destruct ph; reflexivity. Qed.
 
   (* ------------------------------------------------------------------ *)
   (*  THE REGION's SIDE OF A COUNT MOVE, AS AN ACCESSOR                   *)
@@ -2329,7 +2330,14 @@ Section IcacheRefInvReg.
       frz_rcpt ph (bv_unsigned inum) ∗
       (∀ (ph' : frz) (m : nat) (bfl : bool),
          ⌜ireg_frz_ok (Some (Excl ph')) m d⌝ -∗
-         ⌜ph' = FrzOff \/ ph <> FrzOff⌝ -∗
+         (* RULING G' (iclaim-ledger.md §6''): STRENGTHENED from
+            [ph' = FrzOff \/ ph <> FrzOff] to say that a step which stays in
+            the window keeps the REGIME INDEX it found.  Every caller in the
+            tree steps by [frz_close], which does exactly that
+            ([frz_close_reg]); and at [ph = FrzOff] the clause still forces
+            [ph' = FrzOff], so the old reading is recovered verbatim.  It is
+            what lets the slot's boot-shelter arm ride the step. *)
+         ⌜ph' = FrzOff \/ frz_reg ph' = frz_reg ph⌝ -∗
          (* RULING R, WIRED (§5''.3): this accessor is iput's LAST close --
             a DOWN count -- so the dying reference's provenance unit is
             surrendered in the same step, at whatever flavour it was
@@ -2342,7 +2350,7 @@ Section IcacheRefInvReg.
             nothing in the tree performs and which the mirror could not pay
             for (the caller would have to hand in a [false] half it does not
             hold).  Minting is [InodeRegion.ireg_freeze_au]'s, alone. *)
-         ⌜ph' = FrzPre -> ph = FrzPre⌝ -∗
+         ⌜frz_bit ph' = true -> frz_bit ph = true⌝ -∗
          frz_rcpt ph' (bv_unsigned inum) -∗
          |={E ∖ ↑iregN, E}=>
            ifreeze ph' (bv_unsigned inum) ∗ icnt_half (bv_unsigned inum) m ∗
@@ -2381,10 +2389,7 @@ Section IcacheRefInvReg.
     iMod (frz_mir_step ph ph' (bv_unsigned inum) Hmint with "Hmr Hmir")
       as "[Hmr Hmir]".
     assert (Hmok' : ireg_frzm_ok (frz_bit ph') (Some (Excl ph'))).
-    { destruct ph'; cbn [frz_bit];
-        [ apply ireg_frzm_ok_false; discriminate
-        | exact ireg_frzm_ok_true
-        | apply ireg_frzm_ok_false; discriminate ]. }
+    { destruct ph' as [| rg' | rg']; reflexivity. }
     iMod (icnt_update (bv_unsigned inum) _ m with "Hcnt Hhalf") as "[Hcnt Hhalf]".
     (* RULING R, WIRED: the phase step moves the f column, and the count goes
        DOWN by one, so the closing reference's unit is spent in the same
@@ -2409,14 +2414,14 @@ Section IcacheRefInvReg.
     { destruct cl as [x |]; [| exact I].
       destruct Hclm as [Hfs [Hoff Hty]].
       assert (Hph : ph = FrzOff) by (by simplify_eq).
-      destruct Hsh as [Hp' | Hne]; [| exfalso; exact (Hne Hph)].
+      assert (Hp' : ph' = FrzOff).
+      { destruct Hsh as [Hp' | Hr]; [exact Hp' |].
+        rewrite Hph in Hr. cbn in Hr.
+        destruct ph' as [| rg' | rg']; [reflexivity | discriminate Hr
+                                       | discriminate Hr]. }
       rewrite Hp'. split_and!; [exact Hfs | reflexivity | exact Hty]. }
-    iAssert (⌜Some (Excl ph') = Some (Excl FrzOff)⌝ ∨ ireg_open ∨ ireg_boot)%I
-      with "[Hfdisj]" as "Hfdisj'".
-    { destruct Hsh as [-> | Hne].
-      - iLeft. iPureIntro. reflexivity.
-      - iDestruct "Hfdisj" as "[%Heq | Hr]"; [| iRight; iExact "Hr"].
-        exfalso. apply Hne. by simplify_eq. }
+    iAssert (ireg_fsh (Some (Excl ph')))%I with "[Hfdisj]" as "Hfdisj'".
+    { iApply (ireg_fsh_step ph ph' Hsh with "Hfdisj"). }
     iMod ("Hclose" with "[Ha Hreg Hfsb Harm Hla Hep Hslback Hback Hcnt Hfdisj' Hfrcp Hmr]")
       as "_".
     { iNext. iExists mrg. iFrame "Ha Hreg".
@@ -2554,17 +2559,17 @@ Section IcacheRefInvReg.
      non-last-close arm at +0x8a is refuted rather than admitted.  This is
      what retires the first of [IputFreeLockedDev]'s two admits. *)
   Lemma icnt_freeze_forces_one (E : coPset) (γi : gname) (γfs : fs_names)
-      (inodestart : Z) (nib : nat) (inum : bv 32) (n : nat) :
+      (inodestart : Z) (nib : nat) (inum : bv 32) (n : nat) (rg : bool) :
     ↑iregN ⊆ E ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
     ireg_inv γi γfs inodestart nib -∗
-    ifreeze_pre (bv_unsigned inum) -∗
+    ifreeze_pre rg (bv_unsigned inum) -∗
     icnt_half (bv_unsigned inum) n ={E}=∗
-      ⌜n = 1%nat⌝ ∗ ifreeze_pre (bv_unsigned inum) ∗
+      ⌜n = 1%nat⌝ ∗ ifreeze_pre rg (bv_unsigned inum) ∗
       icnt_half (bv_unsigned inum) n.
   Proof.
     iIntros (HE Hin) "#Hinv Hpre Hcnt". rewrite /ifreeze_pre.
-    iMod (ireg_frz_pin_read E γi γfs inodestart nib inum FrzPre n HE Hin
+    iMod (ireg_frz_pin_read E γi γfs inodestart nib inum (FrzPre rg) n HE Hin
             with "Hinv Hpre Hcnt") as "((%d & %Hpin) & Hpre & Hcnt)".
     iModIntro. iFrame "Hpre Hcnt". iPureIntro.
     rewrite /ireg_frz_ok in Hpin. destruct Hpin as (_ & _ & Hn). exact Hn.
@@ -2579,13 +2584,14 @@ Section IcacheRefInvReg.
      arm's [1/2].  Together with the invariant's retained [1/2 - q] they are
      the WHOLE unit the last close surrenders ([frz_evict_mass]). *)
   Lemma frz_park_pre_reclaim (E : coPset) (γi : gname) (γfs : fs_names)
-      (inodestart : Z) (nib : nat) (inum : bv 32) (k : nat) (q : Qp) :
+      (inodestart : Z) (nib : nat) (inum : bv 32) (k : nat) (q : Qp)
+      (rg : bool) :
     ↑iregN ⊆ E ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
     ireg_inv γi γfs inodestart nib -∗
-    ifreeze_pre (bv_unsigned inum) -∗
+    ifreeze_pre rg (bv_unsigned inum) -∗
     frz_park k (bv_unsigned inum) q ={E}=∗
-      ifreeze_pre (bv_unsigned inum) ∗ frzm_h (bv_unsigned inum) true ∗
+      ifreeze_pre rg (bv_unsigned inum) ∗ frzm_h (bv_unsigned inum) true ∗
       (* RULING R-e: the MASS never left [live_slot]'s frozen alternative, so
          what comes home here is the park's QUARTER of the selector -- to be
          joined with the escrow tail's at the +0x8a retirement. *)
@@ -2594,9 +2600,9 @@ Section IcacheRefInvReg.
     iIntros (HE Hin) "#Hinv Hpre Hpark". rewrite /frz_park.
     iDestruct "Hpark" as "[[Hbf _] | [Hbt Hs]]".
     - rewrite /ifreeze_pre.
-      iMod (ireg_frzm_read E γi γfs inodestart nib inum FrzPre false HE Hin
+      iMod (ireg_frzm_read E γi γfs inodestart nib inum (FrzPre rg) false HE Hin
               with "Hinv Hpre Hbf") as "(%Hiff & _ & _)".
-      destruct Hiff as [_ Hr]. discriminate (Hr eq_refl).
+      discriminate Hiff.
     - iModIntro. iFrame.
   Qed.
 
@@ -2645,9 +2651,7 @@ Section IcacheRefInvReg.
     iDestruct "Hfrcp" as "[Hrc Hmr]".
     iDestruct "Hmr" as (b0) "[Hmr %Hmok]".
     assert (Hb0 : b0 = false).
-    { destruct b0; [| reflexivity].
-      destruct Hmok as [Hl0 _]. rewrite Hfz0 in Hl0.
-      discriminate (Hl0 eq_refl). }
+    { rewrite /ireg_frzm_ok Hfz0 in Hmok. exact Hmok. }
     subst b0.
     iAssert (frzm_h (bv_unsigned inum) false ∗ frzm_h (bv_unsigned inum) false ∗
              frzsel k (1/2)%Qp false)%I
@@ -2738,8 +2742,9 @@ Section IcacheRefInvReg.
     iDestruct "Hfrcp" as "[Hrc Hmr]".
     iDestruct "Hmr" as (b0) "[Hmr %Hmok]".
     iDestruct (frzm_agree with "Hmr Hmir") as %->.
-    assert (Hnpre : fz <> Some (Excl FrzPre)).
-    { intros Hc. destruct Hmok as [_ Hr]. discriminate (Hr Hc). }
+    assert (Hnpre : frz_preb fz = false).
+    { destruct (frz_preb fz) eqn:Hb; [| reflexivity].
+      rewrite /ireg_frzm_ok Hb in Hmok. discriminate Hmok. }
     assert (Hfz0 : fz = Some (Excl FrzOff))
       by exact (ireg_frz_ok_not_pre fz n (ds !!! islot inum) Hn Hnpre Hfrz).
     assert (Hins : <[islot inum := ds !!! islot inum]> ds = ds).
@@ -3210,14 +3215,14 @@ Section IcacheRefInvReg.
     assert (Hstep : ireg_frz_ok (Some (Excl (frz_close ph))) 0%nat dsl).
     { apply (ireg_frz_ok_phase ph (frz_close ph) 1%nat 0%nat dsl Hpin).
       - intros ->. reflexivity.
-      - destruct ph; cbn [frz_close]; intros Hc; discriminate Hc.
-      - intros _. reflexivity. }
+      - intros rg; destruct ph; cbn [frz_close]; intros Hc; discriminate Hc.
+      - intros rg _. reflexivity. }
     iMod ("Hrback" $! (frz_close ph) 0%nat bfl with "[%] [%] [%] Hu [%] [Hown]")
       as "(Hfz & Hcnt & Hmir)";
       [ exact Hstep
-      | destruct ph; [by left | by right | by right]
+      | right; exact (frz_close_reg ph)
       | reflexivity
-      | destruct ph; cbn [frz_close]; intros Hc; [discriminate Hc | reflexivity | discriminate Hc]
+      | destruct ph; cbn [frz_close frz_bit]; intros Hc; [discriminate Hc | reflexivity | discriminate Hc]
       | iApply (frz_rcpt_close ph (bv_unsigned inum) with "Hown") |].
     iMod ("Hclose" with "[Ha Hcell Hback Hslot Hpback]") as "_".
     { iNext. iExists (delete k M). iFrame "Ha".
@@ -3241,7 +3246,7 @@ Section IcacheRefInvReg.
   Lemma iref_close_last_freeze_store_au (Eo : coPset)
       (γi : gname) (γfs : fs_names) (inodestart : Z) (nib : nat)
       (M : gmap nat (Qp * positive)) (k : nat) (inum : bv 32) (qt : Qp)
-      (bfl : bool) :
+      (bfl : bool) (rg : bool) :
     ↑icacheN ⊆ Eo -> ↑iregN ⊆ Eo ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
     M !! k = Some (qt, 1%positive) ->
@@ -3256,7 +3261,7 @@ Section IcacheRefInvReg.
     isl_slot M k -∗
     (* RULING R, WIRED: the dying reference's provenance unit. *)
     runit bfl (bv_unsigned inum) -∗
-    ifreeze_pre (bv_unsigned inum) -∗ icnt_half (bv_unsigned inum) 1%nat -∗
+    ifreeze_pre rg (bv_unsigned inum) -∗ icnt_half (bv_unsigned inum) 1%nat -∗
     (* THE RECEIPT GOES HOME HERE.  [ireg_freeze_au] handed it to the walk
        at the mint (iput+0x50) so that the +0x70 mid-free park could carry
        it in the payload's token slot while the walk kept [ifreeze_pre] in
@@ -3276,7 +3281,7 @@ Section IcacheRefInvReg.
       (i_ref (ientry k) ↦₄ (mword_of_int 0 : mword 32)
          ={Eo ∖ ↑icacheN ∖ ↑iregN, Eo}=∗
          itable_half (delete k M) ∗ isl_slot (delete k M) k ∗
-         ifreeze_post (bv_unsigned inum) ∗
+         ifreeze_post rg (bv_unsigned inum) ∗
          icnt_half (bv_unsigned inum) 0%nat ∗
          frzm_h (bv_unsigned inum) false).
   Proof.
@@ -3288,9 +3293,9 @@ Section IcacheRefInvReg.
     iDestruct (iref_cells_acc_del M k Hk with "Hcells") as "[Hcell Hback]".
     iDestruct (live_pool_acc_upd M k Hk with "Hpool") as "[Hslot Hpback]".
     iMod (ireg_icnt_frz_acc (Eo ∖ ↑icacheN) γi γfs inodestart nib inum
-            FrzPre 1%nat ltac:(solve_ndisj) Hin
+            (FrzPre rg) 1%nat ltac:(solve_ndisj) Hin
             with "Hrinv Hfz Hcnt Hmir") as (dsl) "(%Hpin & Hrcpt & Hrback)".
-    iDestruct (frz_rcpt_split FrzPre (bv_unsigned inum) with "Hrcpt Hrpre") as "Hown".
+    iDestruct (frz_rcpt_split (FrzPre rg) (bv_unsigned inum) with "Hrcpt Hrpre") as "Hown".
     iModIntro. iFrame "Hcell". iIntros "Hcell".
     iDestruct (itable_half_join with "Ha Hhalf") as "Hauth".
     iMod (iref_close_last_frz_step M k qt HMk with "Hauth Hf Hsh Hsel Hslot Hislot")
@@ -3301,18 +3306,19 @@ Section IcacheRefInvReg.
        carries them off the pin it came in with and supplies only the new
        count ([InodeRegion.ireg_frz_ok_phase]).  [FrzOff] stays [FrzOff],
        which is what keeps the ordinary last close from minting a freeze. *)
-    assert (Hstep : ireg_frz_ok (Some (Excl (frz_close FrzPre))) 0%nat dsl).
-    { apply (ireg_frz_ok_phase FrzPre (frz_close FrzPre) 1%nat 0%nat dsl Hpin).
-      - intros ->. reflexivity.
-      - cbn [frz_close]; intros Hc; discriminate Hc.
-      - intros _. reflexivity. }
-    iMod ("Hrback" $! (frz_close FrzPre) 0%nat bfl with "[%] [%] [%] Hu [%] [Hown]")
+    assert (Hstep : ireg_frz_ok (Some (Excl (frz_close (FrzPre rg)))) 0%nat dsl).
+    { apply (ireg_frz_ok_phase (FrzPre rg) (frz_close (FrzPre rg))
+               1%nat 0%nat dsl Hpin).
+      - intros Hc; discriminate Hc.
+      - intros rg' Hc; cbn [frz_close] in Hc; discriminate Hc.
+      - intros rg' _. reflexivity. }
+    iMod ("Hrback" $! (frz_close (FrzPre rg)) 0%nat bfl with "[%] [%] [%] Hu [%] [Hown]")
       as "(Hfz & Hcnt & Hmir)";
       [ exact Hstep
-      | by right
+      | right; exact (frz_close_reg (FrzPre rg))
       | reflexivity
-      | cbn [frz_close]; intros Hc; reflexivity
-      | iApply (frz_rcpt_close FrzPre (bv_unsigned inum) with "Hown") |].
+      | cbn [frz_close frz_bit]; intros Hc; reflexivity
+      | iApply (frz_rcpt_close (FrzPre rg) (bv_unsigned inum) with "Hown") |].
     iMod ("Hclose" with "[Ha Hcell Hback Hslot Hpback]") as "_".
     { iNext. iExists (delete k M). iFrame "Ha".
       iSplitR.

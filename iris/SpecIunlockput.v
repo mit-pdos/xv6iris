@@ -132,7 +132,7 @@ Definition wp_iunlockput_sconf_body
     (n : nat)
     (pidv : mword 32) (dq dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) :=
+    (b : bool) (lks : gset string) (rg : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iunlockput in
   let ip : mword 64 := ientry k in
   let pj := proc_addr j in
@@ -182,7 +182,7 @@ Definition wp_iunlockput_sconf_body
      G) -- [SpecIput]'s premise verbatim, because iunlockput's whole
      obligation here is iput's.  A runtime caller passes [iLeft] on its
      persistent copy and may discard what comes back. *)
-  (ireg_open ∨ ireg_boot) -∗
+  ireg_regime rg -∗
   is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k)) -∗
   (* ---- THE HOLDER'S BUNDLE (SpecIunlock's precondition) ---- *)
   sleeplocked_q gisl s -∗
@@ -245,7 +245,7 @@ Definition wp_iunlockput_sconf_body
       log_op g n' -∗
       iref_slot -∗
       (* RULING G: the regime comes back, on every arm. *)
-      (ireg_open ∨ ireg_boot) -∗
+      ireg_regime rg -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -279,7 +279,7 @@ Definition wp_iunlockput_gen_body
     (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
     (pidv : mword 32) (dq dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) :=
+    (b : bool) (lks : gset string) (rg : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iunlockput in
   let ip : mword 64 := ientry k in
   let pj := proc_addr j in
@@ -332,7 +332,7 @@ Definition wp_iunlockput_gen_body
      G) -- [SpecIput]'s premise verbatim, because iunlockput's whole
      obligation here is iput's.  A runtime caller passes [iLeft] on its
      persistent copy and may discard what comes back. *)
-  (ireg_open ∨ ireg_boot) -∗
+  ireg_regime rg -∗
   is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k)) -∗
   (* ---- THE HOLDER'S BUNDLE (SpecIunlock's precondition) ---- *)
   sleeplocked_q gisl s -∗
@@ -411,7 +411,7 @@ Definition wp_iunlockput_gen_body
       log_opS g n' Sb' -∗
       iref_slot -∗
       (* RULING G: the regime comes back, on every arm. *)
-      (ireg_open ∨ ireg_boot) -∗
+      ireg_regime rg -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -434,11 +434,11 @@ Module Type IUNLOCKPUT.
       (n : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string),
+      (b : bool) (lks : gset string) (rg : bool),
       wp_iunlockput_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                                gil gisl cov logstart bmapstart inodestart nib
                                size dev used k qi s gy inum dn' bm' n
-                               pidv dq dqb dqs m K eb b lks.
+                               pidv dq dqb dqs m K eb b lks rg.
   (* the credited set-form contract; [wp_iunlockput_sconf] is this at
      [crb := cru := crz := false], derived at the [log_op] existential's own
      witness and at the birth epoch [LogInv.log_opS_named] opens. *)
@@ -460,9 +460,9 @@ Module Type IUNLOCKPUT.
       (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string),
+      (b : bool) (lks : gset string) (rg : bool),
       wp_iunlockput_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                              gil gisl cov logstart bmapstart inodestart nib
                              size dev used k qi s gy inum dn' bm' n Sb crb cru
-                             crz e0 pidv dq dqb dqs m K eb b lks.
+                             crz e0 pidv dq dqb dqs m K eb b lks rg.
 End IUNLOCKPUT.

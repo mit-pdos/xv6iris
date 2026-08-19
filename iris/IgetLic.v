@@ -648,7 +648,7 @@ Section IgetLic.
     mm !! bv_unsigned inum = Some d ->
     ghost_map_auth γi 1 mm -∗
     ireg_rcol (bv_unsigned inum) wl wdu wdt g c r p f n d -∗
-    (⌜f = Some (Excl FrzOff)⌝ ∨ ireg_open ∨ ireg_boot) -∗
+    ireg_fsh f -∗
     iname γi γfs inum l -∗
     ⌜f = Some (Excl FrzOff)⌝.
   Proof.
@@ -679,11 +679,7 @@ Section IgetLic.
       exact (ireg_claim_ok_off c f d ltac:(rewrite Hc; discriminate) Hclm).
     - (* (e) BufL -- the boot one-shot against the freeze's own shelter *)
       iDestruct "Hl" as "(_ & _ & _ & Hboot)".
-      iDestruct "Hsh" as "[%Hoff | [Hopen | Hboot']]".
-      + iPureIntro. exact Hoff.
-      + iExFalso. iApply (ireg_boot_open_excl with "Hboot Hopen").
-      + iExFalso. rewrite /ireg_boot.
-        iApply (ity_pending_excl icfg_boot with "Hboot Hboot'").
+      iApply (ireg_fsh_boot_off f with "Hsh Hboot").
     - (* (f) RootL *)
       iDestruct "Hl" as %Hroot.
       iApply "Hnz". iPureIntro.

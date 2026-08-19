@@ -1890,7 +1890,7 @@ Section ProofDirlinkMain.
       iApply (IP.wp_iput_gen gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                 gil gisl cov logstart bmapstart inodestart nib size dev used
                 kslot qq (zero_extend' 32 (dir_inum data kk : mword 16) : mword 32)
-                ncount Sb false false false edl pidv dq dqb dqs E1 (K - 10)%nat eb b lks
+                ncount Sb false false false edl pidv dq dqb dqs E1 (K - 10)%nat eb b lks true
                 ltac:(exact HKip) Hkslot
                 ltac:(intros Hc; discriminate Hc)
                 ltac:(intros Hc; discriminate Hc)
@@ -1907,7 +1907,7 @@ Section ProofDirlinkMain.
       (* RULING G: dirlink runs at RUNTIME, so it lends iput the SEALED arm
          of the borrowed regime and discards what comes back -- its own copy
          is persistent. *)
-      { iLeft. iExact "Hropen". }
+      { iExact "Hropen". }
       { iEval (cbn beta iota). iEmpIntro. }
       iIntros (CIDip Hsip mip nn uu Sbp wdl)
         "%Hcsip Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi %Huu Hbmr Hbsl %Hsbp %Hwdl %Hwdc %Hnn Hop

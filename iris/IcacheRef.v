@@ -344,7 +344,7 @@ Definition ityR : cmra := csumR (exclR unitO) (agreeR (leibnizO (bv 16))).
    The [None]-form mint and spend the design asks for are stated below
    anyway ([link_mint_freeze] / [link_spend_freeze]); the boot ledger uses
    the [FrzOff] form. *)
-Inductive frz := FrzOff | FrzPre | FrzPost.
+Inductive frz := FrzOff | FrzPre (rg : bool) | FrzPost (rg : bool).
 
 Global Instance frz_eq_dec : EqDecision frz.
 Proof. solve_decision. Defined.
@@ -357,6 +357,25 @@ Global Instance frz_inhabited : Inhabited frz := populate FrzOff.
    (verified both ways on the lane).  Every f binder below is at [frzUR]. *)
 Definition frzR  : cmra  := exclR (leibnizO frz).
 Definition frzUR : ucmra := optionUR frzR.
+
+(* RULING G' (iclaim-ledger.md §6''): "this phase is the window's FIRST half"
+   as a decidable boolean, so that every clause that used to be stated as the
+   equation [f = Some (Excl FrzPre)] keeps a one-[reflexivity] shape now that
+   [FrzPre] carries a payload. *)
+Definition frz_ispre (ph : frz) : bool :=
+  match ph with FrzPre _ => true | _ => false end.
+Definition frz_preb (f : frzUR) : bool :=
+  match f with Some (Excl ph) => frz_ispre ph | _ => false end.
+
+(* ...and WHICH regime arm the phase is carrying, [None] at the unfrozen
+   state.  The freeze's movers step the phase but never the index, and that
+   invariant is exactly what [InodeRegion.ireg_fsh_step] reads. *)
+Definition frz_reg (ph : frz) : option bool :=
+  match ph with
+  | FrzOff     => None
+  | FrzPre rg  => Some rg
+  | FrzPost rg => Some rg
+  end.
 
 (* THE FIVE LANDED COLUMNS, NAMED.  Naming the sub-cmra is not cosmetic
    either: with the whole seven-deep nest written as one anonymous
@@ -1111,6 +1130,42 @@ Section IcacheLink.
     iApply (ity_pending_shot_excl with "Hp Hs").
   Qed.
 
+  (* RULING G' (iclaim-ledger.md §6''): THE REGIME, INDEXED.  [true] is the
+     runtime arm -- the persistent sealed [ireg_open] every runtime freezer
+     carries and lends by copy; [false] is the boot arm -- the exclusive
+     [ireg_boot] ireclaim lends and must get back on every loop iteration.
+     Writing it as ONE index rather than a disjunction is what lets the
+     freeze phase remember which arm was parked, and hence what lets the
+     off-lock deposit RETURN the arm it was handed. *)
+  Definition ireg_regime (rg : bool) : iProp Σ :=
+    if rg then ireg_open else ireg_boot.
+
+  Global Instance ireg_regime_timeless rg : Timeless (ireg_regime rg).
+  Proof. rewrite /ireg_regime. destruct rg; apply _. Qed.
+
+  Lemma ireg_regime_true : ireg_regime true = ireg_open.
+  Proof. reflexivity. Qed.
+  Lemma ireg_regime_false : ireg_regime false = ireg_boot.
+  Proof. reflexivity. Qed.
+
+  (* the two refutations the old un-indexed disjunction gave, at the index:
+     a holder of the exclusive boot token refutes EITHER arm. *)
+  Lemma ireg_regime_boot_excl (rg : bool) :
+    ireg_regime rg -∗ ireg_boot -∗ False.
+  Proof.
+    rewrite /ireg_regime. destruct rg.
+    - iIntros "Ho Hb". iApply (ireg_boot_open_excl with "Hb Ho").
+    - rewrite /ireg_boot. iIntros "H1 H2".
+      iApply (ity_pending_excl with "H1 H2").
+  Qed.
+
+  Lemma ireg_regime_disj (rg : bool) :
+    ireg_regime rg -∗ (ireg_open ∨ ireg_boot).
+  Proof.
+    rewrite /ireg_regime. destruct rg;
+      [ iIntros "H"; iLeft; iExact "H" | iIntros "H"; iRight; iExact "H" ].
+  Qed.
+
   Definition link_auth_e (z : Z) (a : linkElemUR) : iProp Σ :=
     own icfg_link ({[ z := ● a ]} : linkUR).
   Definition link_frag_e (z : Z) (b : linkElemUR) : iProp Σ :=
@@ -1234,8 +1289,11 @@ Section IcacheLink.
   Definition ifreeze (ph : frz) (z : Z) : iProp Σ :=
     link_frag_e z (lelemf 0 0 0 0 None 0 None (Some (Excl ph))).
   Definition ifreeze_off (z : Z) : iProp Σ := ifreeze FrzOff z.
-  Definition ifreeze_pre (z : Z) : iProp Σ := ifreeze FrzPre z.
-  Definition ifreeze_post (z : Z) : iProp Σ := ifreeze FrzPost z.
+  (* RULING G' (iclaim-ledger.md §6''): the two window phases now REMEMBER
+     which regime arm the freezer lent, so the deposit can give back the one
+     it was handed rather than an un-indexed disjunction. *)
+  Definition ifreeze_pre (rg : bool) (z : Z) : iProp Σ := ifreeze (FrzPre rg) z.
+  Definition ifreeze_post (rg : bool) (z : Z) : iProp Σ := ifreeze (FrzPost rg) z.
 
   (* THE OPTION-FLAVOUR INDEX (R6's [filled]-retrofit precedent), WIDENED
      BY V5' from [option unit] to [option (option Z)].  Every landed
@@ -1289,9 +1347,9 @@ Section IcacheLink.
   Proof. apply _. Qed.
   Global Instance ifreeze_off_timeless z : Timeless (ifreeze_off z).
   Proof. apply _. Qed.
-  Global Instance ifreeze_pre_timeless z : Timeless (ifreeze_pre z).
+  Global Instance ifreeze_pre_timeless rg z : Timeless (ifreeze_pre rg z).
   Proof. apply _. Qed.
-  Global Instance ifreeze_post_timeless z : Timeless (ifreeze_post z).
+  Global Instance ifreeze_post_timeless rg z : Timeless (ifreeze_post rg z).
   Proof. apply _. Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -1972,24 +2030,25 @@ Section IcacheLink.
      [Some (Excl FrzOff)] so that the mint can be exclusive (see [frz]'s
      header) -- but the move is legal and here. *)
   Lemma link_mint_freeze (z : Z) (wl wdu wdt g : nat) (c : ctyUR)
-      (r : nat) (p : option (dfrac_agreeR (leibnizO Z))) (rc : nat) :
+      (r : nat) (p : option (dfrac_agreeR (leibnizO Z))) (rc : nat) (rg : bool) :
     link_auth z wl wdu wdt g c r p None rc ==∗
-    link_auth z wl wdu wdt g c r p (Some (Excl FrzPre)) rc ∗ ifreeze_pre z.
+    link_auth z wl wdu wdt g c r p (Some (Excl (FrzPre rg))) rc ∗ ifreeze_pre rg z.
   Proof.
     rewrite /link_auth /ifreeze_pre /ifreeze. iIntros "Ha".
     iApply (link_update_alloc with "Ha").
     rewrite /lelem /lelemf /lelemc /lelem0.
     apply (prod_local_update' (A := linkElemUR1) (B := natUR)); [| apply link_lu_id].
     apply (prod_local_update' (A := linkElemUR0) (B := frzUR)); [apply link_lu_id |].
-    apply (alloc_option_local_update (A := frzR) (Excl FrzPre)). done.
+    apply (alloc_option_local_update (A := frzR) (Excl (FrzPre rg))). done.
   Qed.
 
   (* ...AND THE [None]-FORM SPEND: [Some FrzPost -> None], the retire that
      drops the column rather than returning the off-token.  Consumes the
      fragment, so the deallocation is frame-preserving. *)
   Lemma link_spend_freeze (z : Z) (wl wdu wdt g : nat) (c : ctyUR)
-      (r : nat) (p : option (dfrac_agreeR (leibnizO Z))) (f : frzUR) (rc : nat) :
-    link_auth z wl wdu wdt g c r p f rc -∗ ifreeze_post z ==∗
+      (r : nat) (p : option (dfrac_agreeR (leibnizO Z))) (f : frzUR) (rc : nat)
+      (rg : bool) :
+    link_auth z wl wdu wdt g c r p f rc -∗ ifreeze_post rg z ==∗
     link_auth z wl wdu wdt g c r p None rc.
   Proof.
     rewrite /link_auth /ifreeze_post. iIntros "Ha Hb".

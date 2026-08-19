@@ -106,11 +106,11 @@ Section ProofIunlockputMain.
       (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string)
+      (b : bool) (lks : gset string) (rg : bool)
     : wp_iunlockput_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                              gil gisl cov logstart bmapstart inodestart nib
                              size dev used k qi s gy inum dn' bm' n Sb crb cru
-                             crz e0 pidv dq dqb dqs m K eb b lks.
+                             crz e0 pidv dq dqb dqs m K eb b lks rg.
   Proof.
     cbv beta delta [wp_iunlockput_gen_body].
     intros pcE ip pj ret_tgt HK Hk Hcrb Hcru Hlg Hsize Hbm0 Hbmcov Hbmlog Hins0
@@ -353,7 +353,7 @@ Section ProofIunlockputMain.
                  with "Hcont") as "Hcont".
     iApply (IP.wp_iput_gen gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
               cov logstart bmapstart inodestart nib size dev used
-              k (qi + s)%Qp inum n Sb crb cru crz e0 pidv dq dqb dqs R6 (K - 4)%nat eb b lks
+              k (qi + s)%Qp inum n Sb crb cru crz e0 pidv dq dqb dqs R6 (K - 4)%nat eb b lks rg
               ltac:(lia) Hk Hcrb Hcru
               Hlg Hsize Hbm0 Hbmcov Hbmlog Hins0 Hiblk Hiblklog
               Hinumb Hcovb Hnu Hj Hgl ltac:(rewrite HR6a0; exact Hipe)
@@ -587,11 +587,11 @@ Section ProofIunlockputMain.
       (n : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string)
+      (b : bool) (lks : gset string) (rg : bool)
     : wp_iunlockput_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                                gil gisl cov logstart bmapstart inodestart nib
                                size dev used k qi s gy inum dn' bm' n
-                               pidv dq dqb dqs m K eb b lks.
+                               pidv dq dqb dqs m K eb b lks rg.
   Proof.
     cbv beta delta [wp_iunlockput_sconf_body].
     intros pcE ip pj ret_tgt HK Hk Hlg Hsize Hbm0 Hbmcov Hbmlog Hins0
@@ -605,7 +605,7 @@ Section ProofIunlockputMain.
     iApply (wp_iunlockput_gen gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
               cov logstart bmapstart inodestart nib size dev used
               k qi s gy inum dn' bm' n Sb0 false false false e00
-              pidv dq dqb dqs m K eb b lks
+              pidv dq dqb dqs m K eb b lks rg
               HK Hk ltac:(discriminate) ltac:(discriminate)
               Hlg Hsize Hbm0 Hbmcov Hbmlog Hins0 Hiblk Hiblklog
               Hinumb Hcovb Hnu Hj Hgl Ha0 Hfresh

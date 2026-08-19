@@ -51,7 +51,7 @@ Section EscrowDeposit.
 
   Lemma ireg_free_deposit_au (E : coPset) (γi : gname) (γfs : fs_names)
       (inodestart : Z) (nib : nat) (inum : bv 32) (dn dn' : dinode)
-      (ds : list dinode) (ge gr gd : gname) :
+      (ds : list dinode) (ge gr gd : gname) (rg : bool) :
     ↑iregN ⊆ E ->
     ↑escAN (bv_unsigned inum) ⊆ E ∖ ↑iregN ->
     (bv_unsigned inum < 16 * Z.of_nat nib)%Z ->
@@ -60,7 +60,7 @@ Section EscrowDeposit.
     bv_unsigned (di_type dn') = 0 ->
     di_nlink_stable dn' dn ->
     ireg_inv γi γfs inodestart nib -∗
-    escA_inv ge gr gd γi (bv_unsigned inum) -∗
+    escA_inv ge gr gd γi (bv_unsigned inum) rg -∗
     dinode_at γi inum dn -∗
     (* THE FREEZE, RETIRED HERE (iclaim-ledger.md §1.4, and [ireg_free_au]'s
        own row in RULING A's mover table).  The deposit is a type-0 write over
@@ -98,7 +98,7 @@ Section EscrowDeposit.
           record the freeze window opened.  Without it a boot-thread iput
           could lend [ireg_boot] and never get it back, and ireclaim's loop
           -- which needs it on every iteration -- would not close. *)
-       ={E ∖ ↑iregN, E}=∗ committedA ge ∗ (ireg_open ∨ ireg_boot)).
+       ={E ∖ ↑iregN, E}=∗ committedA ge ∗ ireg_regime rg).
   Proof.
     iIntros (HE Hesc_mask Hin Hwf Hdn' Hz Hnl) "#Hinv #Hesc Hdn Hdep".
     pose proof (islot_lt inum) as Hsl.
@@ -168,7 +168,7 @@ Section EscrowDeposit.
     (* the escrow opens HERE, and its EMPTY state hands over the standing
        freeze; it closes again three lines below the region's re-park, with
        the marker and the retired token. *)
-    iMod (escA_deposit_acc (E ∖ ↑iregN) ge gr gd γi (bv_unsigned inum)
+    iMod (escA_deposit_acc (E ∖ ↑iregN) ge gr gd γi (bv_unsigned inum) rg
             Hesc_mask with "Hesc Hdep") as "[Hfz Hescl]".
     iDestruct (ireg_rcol_freeze_agree with "Hla Hfz") as %->.
     (* RULING G's EXTRACTION.  With the column pinned at [FrzPost] the
@@ -176,14 +176,20 @@ Section EscrowDeposit.
        slot is holding is the REGIME the freezer lent at the mint.  The
        re-park below owes nothing in its place: it lands on [FrzOff], where
        the clause's left arm holds outright. *)
-    iAssert (ireg_open ∨ ireg_boot)%I with "[Hfdisj]" as "Hgreg".
-    { iDestruct "Hfdisj" as "[%Hc | Hr]"; [discriminate Hc | iExact "Hr"]. }
+    (* RULING G' (iclaim-ledger.md §6''): the walk's own [ifreeze_post rg]
+       token has just pinned this slot's f column at [FrzPost rg]
+       ([ireg_rcol_freeze_agree], one line above), so the AGREEMENT selects the
+       parked arm and what comes out is the INDEXED regime -- the very arm the
+       mint was handed at iput+0x50, not an un-indexed disjunction ireclaim
+       could not re-bind. *)
+    iAssert (ireg_regime rg)%I with "[Hfdisj]" as "Hgreg".
+    { iApply (ireg_fsh_post_acc rg with "Hfdisj"). }
     (* THE FREEZE RECEIPT RIDES THROUGH (iclaim-ledger.md §3.14 as built):
        the deposit runs at [FrzPost] and leaves [FrzOff], and neither is
        [FrzPre], so the slot's receipt clause is on its [frzown] arm both
        sides and this mover neither takes nor returns it. *)
-    iDestruct (ireg_frzc_off_acc (bv_unsigned inum) (Some (Excl FrzPost))
-                 ltac:(discriminate) with "Hfrcp") as "[Hrcpt Hmr]".
+    iDestruct (ireg_frzc_off_acc (bv_unsigned inum) (Some (Excl (FrzPost rg)))
+                 ltac:(reflexivity) with "Hfrcp") as "[Hrcpt Hmr]".
     (* RULING R's (R2), PAID BY THE DEPOSIT (§5'.2, landed by 7a-wire).  This
        is the deposit's own type-0 write, it runs at [FrzPost], and the freeze
        pin puts the in-core count at ZERO there ([Hcn0]) -- so (R1) collapses
@@ -196,7 +202,7 @@ Section EscrowDeposit.
       as [Hrl0 Hrcl0].
     assert (Href0 : forall d0 : dinode, ireg_ref_ok rl rcl cn cl d0)
       by (intros d0; rewrite Hrl0 Hrcl0; exact (ireg_ref_ok_zero cn cl d0)).
-    iMod (link_freeze_step _ _ _ _ _ _ _ _ FrzPost FrzOff with "Hla Hfz")
+    iMod (link_freeze_step _ _ _ _ _ _ _ _ (FrzPost rg) FrzOff with "Hla Hfz")
       as "[Hla Hoff]".
     iDestruct (ireg_rcol_intro (bv_unsigned inum) wl wdu wdt gl cl rl pl
                  (Some (Excl FrzOff)) cn rcl dn' (Href0 dn')
@@ -253,9 +259,9 @@ Section EscrowDeposit.
                 (Some (Excl FrzOff)) cn
                 Hlok' Hrt' Hdir' Hwl0' Hpar Hclm' Hfrz'
                 with "Hla Hep Hdisj Hcnt [] [Hrcpt Hmr]").
-      { iLeft. iPureIntro. reflexivity. }
+      { iApply ireg_fsh_off. }
       { iApply (ireg_frzc_off_intro (bv_unsigned inum) (Some (Excl FrzOff))
-                  ltac:(discriminate) with "Hrcpt Hmr"). }
+                  ltac:(reflexivity) with "Hrcpt Hmr"). }
       iRight. iSplitR; [iPureIntro; exact Hz |].
       iSplitL "Hdn"; [iExact "Hdn" |].
       iSplitL "Hrh1"; [iExists ge, gr; iExact "Hrh1" |].

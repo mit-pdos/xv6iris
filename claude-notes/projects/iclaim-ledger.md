@@ -2673,3 +2673,33 @@ eleven call sites re-checked).
 GATE unchanged: task 18's final gate (zero failures tree-wide, three tops
 at the standing six, admits = the one pre-existing placeholder, coverage +
 lemma_diff justified).
+
+### §6″ RULING G′ (2026-08-19, coordinator): the regime is INDEXED THROUGH
+### THE FREEZE PHASE
+
+Integration-2's wall: the deposit returns an un-indexed `ireg_open ∨
+ireg_boot`; ireclaim cannot re-select its exclusive token (every refuter of
+the left arm needs the lent `ity_pending`). Candidates (b)/(c) rejected as
+the executor argued. ADOPTED (a), concretized:
+
+- `frz := FrzOff | FrzPre (rg : bool) | FrzPost (rg : bool)` — the phase
+  payload REMEMBERS which regime arm the freezer lent.
+  `ireg_regime rg := if rg then ireg_open else ireg_boot`.
+- `ireg_freeze_au` takes `ireg_regime rg`, parks it in the shelter's freeze
+  arm, mints `ifreeze_pre rg`; the pin clauses (`ireg_frz_ok`, receipts,
+  mirror) are rg-INDIFFERENT (thread the payload through, never case on it
+  except at the deposit).
+- The deposit holds `ifreeze_post rg` — AGREEMENT with the f-column gives
+  the arm's content = `ireg_regime rg` — extract and RETURN it indexed.
+  `ip_free_entry`/`ip_free_locked`/`ip_free_offlock` and
+  `SpecIput`/`SpecIunlockput` carry `(rg : bool)` as a binder beside bfl:
+  premise `ireg_regime rg`, post returns `ireg_regime rg`.
+- Runtime callers: rg = true, lend a COPY of persistent `ireg_open`
+  (return trivially absorbed). ireclaim: rg = false, lends `ireg_boot`,
+  re-binds it from the post each iteration — the exact §2.3 round-trip,
+  now ghost-complete.
+Cost: IcacheRef frz payload widening (increment-I idioms; the phase-step
+and receipt lemmas gain rg threading), InodeRegion clauses, the walk
+binders, the deposit, then the remaining ~25 RULING-G threading edits in
+their final shape (persistent ireg_open premise for runtime files;
+ireclaim's indexed round-trip). Then THE FINAL GATE, unchanged.

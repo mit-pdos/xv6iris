@@ -546,7 +546,7 @@ Module FsSysChdir (M : SYSCHDIR).
               Histnn Hcb Hib Hj Hgs eq_refl Htf
               with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlogc
                     Hseam Hgc Hdev Hdgeom Hdlk Hbsl Hitb2 Hitbl Hesc Hisl
-                    Hireg Hsbb Hsbi Hbm Hkenv Hprocs Hir Hpriv").
+                    Hireg Hiopen Hsbb Hsbi Hbm Hkenv Hprocs Hir Hpriv").
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
     iIntros (CIDn) "%Hgd".

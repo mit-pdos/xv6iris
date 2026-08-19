@@ -2470,6 +2470,7 @@ Section ProofCreateMain.
     ic_escrows cn γfs γi cov logstart -∗
     SpecDirlink.ic_sleeplocks cn -∗
     ireg_inv γi γfs inodestart nib -∗
+    ireg_open -∗
     sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
@@ -2507,7 +2508,7 @@ Section ProofCreateMain.
     destruct (cr_kb K HK)
       as (HK10 & HKnp & HKil & HKdlu & HKiup & HKia & HKiu & HKdlk & HKsum).
     iIntros "Hcg Hcnt #Htext Hpc #Hkd #Hpk #Hbio #Hlogc #Hkenv
-             #Hitb2 #Hitbl #Hesc #Hslks #Hiregi
+             #Hitb2 #Hitbl #Hesc #Hslks #Hiregi #Hiopen
              Hsbn Hsbi Hsbs Hsbb Hbmr Hpriv Hpath #Hprocs #Hdevi #Hgeom #Hdlk
              Hbsl Hislots Hop Halloc Hcont".
     iPoseProof (printk_env_panic with "Hpk") as "#Hpenv".
@@ -2816,7 +2817,7 @@ Section ProofCreateMain.
               Hbms0 Hbmsc Hbmsl Hist0 Hcovb Hiregb Hcstr Hplen31
               ltac:(exact (cr_walk_need _ u Hu)) Hj Hgs Heb
               with "Hcg Hcnt Htext Hkd Hpc Hpenv Hbio Hlogc Hkenv Hitb2 Hitbl
-                    Hesc Hslks Hiregi Hprocs Hdevi Hgeom Hdlk Hsbb Hsbi Hbmr
+                    Hesc Hslks Hiregi Hiopen Hprocs Hdevi Hgeom Hdlk Hsbb Hsbi Hbmr
                     Hppid Hpcwd Hcref Hpath Hnb14 Hbsl Hisl2 Hop").
     iIntros (CIDnp Hsnp mnp n1 used1 Sb1 okp nfp ipv w)
       "%Hcsnp Hcg Hcnt Hpc Hsbb Hsbi %Husd1 Hbmr Hppid Hpcwd Hcref Hpath Hnb14
@@ -3071,12 +3072,12 @@ Section ProofCreateMain.
                   gtl gild gisld cov logstart bmapstart inodestart nib size dev
                   used1 kd (qd/2)%Qp (qd/2)%Qp gd dind dnl bml n1 Sb1
                   false false false e0 pidv (DfracOwn (1/4)) dqb dqs
-                  G2 (K - 10)%nat eb b lks
+                  G2 (K - 10)%nat eb b lks true
                   ltac:(exact HKiup) Hkd ltac:(discriminate) ltac:(discriminate)
                   Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib' Hcovb
                   ltac:(exact Hn1ip) Hj Hgs HG2a0
                   with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
-                        Hescd Hiregi Hslkd Hslkdd Hslpid Hdep Hidev Hiinum
+                        Hescd Hiregi Hiopen Hslkd Hslkdd Hslpid Hdep Hidev Hiinum
                         Hivalid Hload Hshotl Hfrzl Hkeep2 Hrud Hsbb Hsbi Hbmr Hppid
                         Hprocs Hdevi Hgeom Hdlk Hbsl [] Hop").
         all: try lkbelow.
@@ -3085,7 +3086,7 @@ Section ProofCreateMain.
         { iEval (cbn beta iota). iEmpIntro. }
         iIntros (CIDup Hqup mup n2 used2 Sb2 wg)
           "%Hcsup Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi %Husd2 Hbmr Hbsl
-           %Hsb2 %Hwg %Hwgc %Hn2 Hop Hisl".
+           %Hsb2 %Hwg %Hwgc %Hn2 Hop Hisl _".
         assert (Hpcup : ret_pc (G2 !!! Regidx Rra : mword 64)
                         = mword_of_int (CK + 0x8a)) by (rewrite HG2ra; pcw).
         iEval (rewrite Hpcup) in "Hpc".
@@ -3502,12 +3503,12 @@ Section ProofCreateMain.
                     cn gtl gild gisld cov logstart bmapstart inodestart nib size
                     dev used1 kd (qd/2)%Qp (qd/2)%Qp gd dind dnl bml n1 Sb1
                     false false false e0 pidv (DfracOwn (1/4)) dqb dqs
-                    F3 (K - 10)%nat eb b lks
+                    F3 (K - 10)%nat eb b lks true
                     ltac:(exact HKiup) Hkd ltac:(discriminate) ltac:(discriminate)
                     Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib' Hcovb
                     ltac:(exact Hn1ip) Hj Hgs HF3a0
                     with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
-                          Hescd Hiregi Hslkd Hslkdd Hslpid Hdep Hidev Hiinum
+                          Hescd Hiregi Hiopen Hslkd Hslkdd Hslpid Hdep Hidev Hiinum
                           Hivalid Hload Hshotl Hfrzl Hkeep2 Hrud Hsbb Hsbi Hbmr Hppid
                           Hprocs Hdevi Hgeom Hdlk Hbsl [] Hop").
           all: try lkbelow.
@@ -3516,7 +3517,7 @@ Section ProofCreateMain.
           { iEval (cbn beta iota). iEmpIntro. }
           iIntros (CIDu1 Hqu1 mu1 n2 used2 Sb2 wf1)
             "%Hcsu1 Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi %Husd2 Hbmr Hbsl
-             %Hsb2 %Hwf1 %Hwf1c %Hn2 Hop Hisl".
+             %Hsb2 %Hwf1 %Hwf1c %Hn2 Hop Hisl _".
           assert (Hpcu1 : ret_pc (F3 !!! Regidx Rra : mword 64)
                           = mword_of_int (CK + 0x54)) by (rewrite HF3ra; pcw).
           iEval (rewrite Hpcu1) in "Hpc".
@@ -3725,13 +3726,13 @@ Section ProofCreateMain.
                       cn gtl gilc gislc cov logstart bmapstart inodestart nib
                       size dev used2 kslot (qq/2)%Qp (qq/2)%Qp gc cinum dnc bmc
                       n2 Sb2 false false false ec pidv (DfracOwn (1/4)) dqb dqs
-                      B2 (K - 10)%nat eb b lks
+                      B2 (K - 10)%nat eb b lks true
                       ltac:(exact HKiup) Hkslot ltac:(discriminate)
                       ltac:(discriminate)
                       Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hcblk Hcblog Hcinb Hcovb
                       ltac:(exact Hn2ip) Hj Hgs HB2a0
                       with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2
-                            Hitbl Hescc Hiregi Hslkc Hcslkd Hcslpid Hcdep
+                            Hitbl Hescc Hiregi Hiopen Hslkc Hcslkd Hcslpid Hcdep
                             Hcidev Hciinum Hcivalid Hcload Hcshotb Hcfrz Hckeep2 Hruc Hsbb
                             Hsbi Hbmr Hppid Hprocs Hdevi Hgeom Hdlk Hbsl []
                             Hop").
@@ -3741,7 +3742,7 @@ Section ProofCreateMain.
             { iEval (cbn beta iota). iEmpIntro. }
             iIntros (CIDU2 HqU2 mu2 n3 used3 Sb3 wf2)
               "%Hcsu2 Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi %Husd3 Hbmr Hbsl
-               %Hsb3 %Hwf2 %Hwf2c %Hn3 Hop Hisl2".
+               %Hsb3 %Hwf2 %Hwf2c %Hn3 Hop Hisl2 _".
             assert (Hpcu2 : ret_pc (B2 !!! Regidx Rra : mword 64)
                             = mword_of_int (CK + 0x9e)) by (rewrite HB2ra; pcw).
             iEval (rewrite Hpcu2) in "Hpc".
@@ -4250,12 +4251,12 @@ Section ProofCreateMain.
                   gtl gild gisld cov logstart bmapstart inodestart nib size dev
                   used1 kd (qd/2)%Qp (qd/2)%Qp gd dind dnl bml n1 Sb1
                   false false false e0 pidv (DfracOwn (1/4)) dqb dqs
-                  J2 (K - 10)%nat eb b lks
+                  J2 (K - 10)%nat eb b lks true
                   ltac:(exact HKiup) Hkd ltac:(discriminate) ltac:(discriminate)
                   Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib' Hcovb
                   ltac:(exact Hn1ip) Hj Hgs HJ2a0
                   with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
-                        Hescd Hiregi Hslkd Hslkdd Hslpid Hdep Hidev Hiinum
+                        Hescd Hiregi Hiopen Hslkd Hslkdd Hslpid Hdep Hidev Hiinum
                         Hivalid Hload Hshotl Hfrzl Hkeep2 Hrud Hsbb Hsbi Hbmr Hppid
                         Hprocs Hdevi Hgeom Hdlk Hbsl [] Hop").
         all: try lkbelow.
@@ -4264,7 +4265,7 @@ Section ProofCreateMain.
         { iEval (cbn beta iota). iEmpIntro. }
         iIntros (CIDup Hqup mup n2 used2 Sb2 wg)
           "%Hcsup Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi %Husd2 Hbmr Hbsl
-           %Hsb2 %Hwg %Hwgc %Hn2 Hop Hisl".
+           %Hsb2 %Hwg %Hwgc %Hn2 Hop Hisl _".
         assert (Hpcup : ret_pc (J2 !!! Regidx Rra : mword 64)
                         = mword_of_int (CK + 0x94)) by (rewrite HJ2ra; pcw).
         iEval (rewrite Hpcup) in "Hpc".
@@ -5299,7 +5300,7 @@ Section ProofCreateMain.
                   Hj Hgs HX4a0 HX4a2 Heb
                   with "Hcg Hcnt Htext Hpc Hkd Hpk Hbio Hlogc Hkenv
                         Hidev Hiinum Hmeta Hmap Hblocks Hnb14 Hsbi Hsbs Hsbb
-                        Hbmr Hiregi Hdiat Hppid Hprocs Hdevi Hgeom Hdlk Hbsl
+                        Hbmr Hiregi Hiopen Hdiat Hppid Hprocs Hdevi Hgeom Hdlk Hbsl
                         Hitb2 Hitbl Hesc Hslks Hislk Hdlnk Hop").
         all: try lkbelow.
         iIntros (CIDdl Hsdl mdl found bm' data' dn' dn0' n' used' Sb' tot)
@@ -5549,12 +5550,12 @@ Section ProofCreateMain.
                        γi cn gtl γil γisl cov logstart bmapstart inodestart nib
                        size dev used' kd (qd/2)%Qp (qd/2)%Qp gd dind dn' bm'
                        n' Sb' false true false e0 pidv (DfracOwn (1/4)) dqb dqs
-                       Y2 (K - 10)%nat eb b lks
+                       Y2 (K - 10)%nat eb b lks true
                        ltac:(exact HKiup) Hkdlt ltac:(discriminate) Hcruu
                        Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
                        ltac:(exact Hipn') Hj Hgs HY2a0
                        with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2
-                             Hitbl Hescd Hiregi Hslkd Hslkdd Hslpid Hdep Hidev
+                             Hitbl Hescd Hiregi Hiopen Hslkd Hslkdd Hslpid Hdep Hidev
                              Hiinum Hivalid Hload Hshotl' Hfrzl Hkeep2 Hrud Hsbb Hsbi Hbmr
                              Hppid Hprocs Hdevi Hgeom Hdlk Hbsl [] Hop").
              all: try lkbelow.
@@ -5563,7 +5564,7 @@ Section ProofCreateMain.
              { iEval (cbn beta iota). iEmpIntro. }
              iIntros (CIDU2 HqU2 mu2 n2 used2 Sb2 wf2)
                "%Hcsu2 Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi %Husd2 Hbmr Hbsl
-                %Hsb2 %Hwf2 %Hwf2c %Hn2 Hop Hisl2".
+                %Hsb2 %Hwf2 %Hwf2c %Hn2 Hop Hisl2 _".
              assert (Hpcu2 : ret_pc (Y2 !!! Regidx Rra : mword 64)
                              = mword_of_int (CK + 0xe6)) by (rewrite HY2ra; pcw).
              iEval (rewrite Hpcu2) in "Hpc".
@@ -5890,12 +5891,12 @@ Section ProofCreateMain.
                 gtl γil γisl cov logstart bmapstart inodestart nib size dev
                 used1 kd (qd/2)%Qp (qd/2)%Qp gd dind dn bm (S q1) Sb1
                 false false false e0 pidv (DfracOwn (1/4)) dqb dqs
-                Z2 (K - 10)%nat eb b lks
+                Z2 (K - 10)%nat eb b lks true
                 ltac:(exact HKiup) Hkdlt ltac:(discriminate) ltac:(discriminate)
                 Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
                 ltac:(exact Hn1ip) Hj Hgs HZ2a0
                 with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
-                      Hescd Hiregi Hslkd Hslkdd Hslpid Hdep Hidev Hiinum
+                      Hescd Hiregi Hiopen Hslkd Hslkdd Hslpid Hdep Hidev Hiinum
                       Hivalid Hload Hshotl Hfrzl Hkeep2 Hrud Hsbb Hsbi Hbmr Hppid
                       Hprocs Hdevi Hgeom Hdlk Hbsl [] Hop").
       all: try lkbelow.
@@ -5904,7 +5905,7 @@ Section ProofCreateMain.
       { iEval (cbn beta iota). iEmpIntro. }
       iIntros (CIDU HqU mu n2 used2 Sb2 wf)
         "%Hcsu Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi %Husd2 Hbmr Hbsl
-         %Hsb2 %Hwf %Hwfc %Hn2 Hop Hisl".
+         %Hsb2 %Hwf %Hwfc %Hn2 Hop Hisl _".
       assert (Hpcu : ret_pc (Z2 !!! Regidx Rra : mword 64)
                      = mword_of_int (CK + 0xf2)) by (rewrite HZ2ra; pcw).
       iEval (rewrite Hpcu) in "Hpc".
@@ -6090,6 +6091,7 @@ Section ProofCreateMain.
     itable_inv -∗
     ic_escrows cn γfs γi cov logstart -∗
     ireg_inv γi γfs inodestart nib -∗
+    ireg_open -∗
     procs_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
@@ -6107,7 +6109,7 @@ Section ProofCreateMain.
       as (HK10 & HKnp & HKil & HKdlu & HKiup & HKia & HKiu & HKdlk & HKsum).
     assert (Hcsa0 : is_cs_idx Ra0 = false) by (vm_compute; reflexivity).
     assert (Hcsra : is_cs_idx Rra = false) by (vm_compute; reflexivity).
-    iIntros "#Htext #Hkd #Hpenv #Hbio #Hlogc #Hitb2 #Hitbl #Hesc #Hiregi
+    iIntros "#Htext #Hkd #Hpenv #Hbio #Hlogc #Hitb2 #Hitbl #Hesc #Hiregi #Hiopen
              #Hprocs #Hdevi #Hgeom #Hdlk".
     iDestruct (cr_tail_half j m sp0 ret_tgt K b lks HKsum Hal10 Hal9 Hspm Hrt
                  with "Htext") as "#Htail".
@@ -6348,7 +6350,7 @@ Section ProofCreateMain.
               (S u0) (Sb4 ∪ {[IBLOCK cinum inodestart]})
               (bool_decide (bmapstart ∈ (Sb4 ∪ {[IBLOCK cinum inodestart]})))
               true false e0 pidv (DfracOwn (1/4)) dqb dqs
-              G4 (K - 10)%nat eb b lks
+              G4 (K - 10)%nat eb b lks true
               ltac:(exact HKiup) Hkslt
               ltac:(exact (cr_crb_honest (Sb4 ∪ {[IBLOCK cinum inodestart]})
                              bmapstart))
@@ -6357,7 +6359,7 @@ Section ProofCreateMain.
               Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hcblk Hcblog Hcinb Hcovb
               ltac:(exact (proj1 Hn4)) Hj Hgs HG4a0
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
-                    Hescc Hiregi Hslkc Hcslkd Hcslpid Hcdep Hcidev Hciinum
+                    Hescc Hiregi Hiopen Hslkc Hcslkd Hcslpid Hcdep Hcidev Hciinum
                     Hcivalid Hcload Hcshot' Hcfrz Hckp Hruc Hsbb Hsbi Hbmr Hppid Hprocs
                     Hdevi Hgeom Hdlk Hbsl [] Hop").
     all: try lkbelow.
@@ -6366,7 +6368,7 @@ Section ProofCreateMain.
     { iEval (cbn beta iota). iEmpIntro. }
     iIntros (CIDG7 HqG7 mu1 n5 used5 Sb5 w1)
       "%Hcsu1 Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi %Husd5 Hbmr Hbsl
-       %Hsb5 %Hw5 %Hw5c %Hn5 Hop Hisl1".
+       %Hsb5 %Hw5 %Hw5c %Hn5 Hop Hisl1 _".
     (* THE LEDGER, at the body's disjunction (finding (3) in the banner) *)
     assert (Hipn5 : (iput_units <= n5)%nat).
     { destruct (decide (bmapstart ∈ (Sb4 ∪ {[IBLOCK cinum inodestart]})))
@@ -6516,12 +6518,12 @@ Section ProofCreateMain.
               gtl γil γisl cov logstart bmapstart inodestart nib size dev
               used5 kd (qd/2)%Qp (qd/2)%Qp gd dind dn' bm'
               n5 Sb5 false false false e1 pidv (DfracOwn (1/4)) dqb dqs
-              G6 (K - 10)%nat eb b lks
+              G6 (K - 10)%nat eb b lks true
               ltac:(exact HKiup) Hkdlt ltac:(discriminate) ltac:(discriminate)
               Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
               ltac:(exact Hipn5) Hj Hgs HG6a0
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
-                    Hescd Hiregi Hslkd Hslkdd Hslpid Hdep Hidev Hiinum
+                    Hescd Hiregi Hiopen Hslkd Hslkdd Hslpid Hdep Hidev Hiinum
                     Hivalid Hload Hshotl' Hfrzl Hkeep2 Hrud Hsbb Hsbi Hbmr Hppid Hprocs
                     Hdevi Hgeom Hdlk Hbsl [] Hop").
     all: try lkbelow.
@@ -6530,7 +6532,7 @@ Section ProofCreateMain.
     { iEval (cbn beta iota). iEmpIntro. }
     iIntros (CIDGA HqGA mu2 n6 used6 Sb6 w2)
       "%Hcsu2 Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi %Husd6 Hbmr Hbsl
-       %Hsb6 %Hw6 %Hw6c %Hn6 Hop Hisl2".
+       %Hsb6 %Hw6 %Hw6c %Hn6 Hop Hisl2 _".
     assert (Hpcu2 : ret_pc (G6 !!! Regidx Rra : mword 64)
                     = mword_of_int (CK + 0x15c)) by (rewrite HG6ra; pcw).
     iEval (rewrite Hpcu2) in "Hpc".
@@ -6887,6 +6889,7 @@ Section ProofCreateMain.
     itable_inv -∗
     ic_escrows cn γfs γi cov logstart -∗
     ireg_inv γi γfs inodestart nib -∗
+    ireg_open -∗
     procs_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
@@ -6904,7 +6907,7 @@ Section ProofCreateMain.
       as (HK10 & HKnp & HKil & HKdlu & HKiup & HKia & HKiu & HKdlk & HKsum).
     assert (Hcsa0 : is_cs_idx Ra0 = false) by (vm_compute; reflexivity).
     assert (Hcsra : is_cs_idx Rra = false) by (vm_compute; reflexivity).
-    iIntros "#Htext #Hkd #Hpenv #Hbio #Hlogc #Hitb2 #Hitbl #Hesc #Hiregi
+    iIntros "#Htext #Hkd #Hpenv #Hbio #Hlogc #Hitb2 #Hitbl #Hesc #Hiregi #Hiopen
              #Hprocs #Hdevi #Hgeom #Hdlk".
     iDestruct (cr_tail_half j m sp0 ret_tgt K b lks HKsum Hal10 Hal9 Hspm Hrt
                  with "Htext") as "#Htail".
@@ -7163,7 +7166,7 @@ Section ProofCreateMain.
               (S u0) (Sb4 ∪ {[IBLOCK cinum inodestart]})
               (bool_decide (bmapstart ∈ (Sb4 ∪ {[IBLOCK cinum inodestart]})))
               true false e0 pidv (DfracOwn (1/4)) dqb dqs
-              G4 (K - 10)%nat eb b lks
+              G4 (K - 10)%nat eb b lks true
               ltac:(exact HKiup) Hkslt
               ltac:(exact (cr_crb_honest (Sb4 ∪ {[IBLOCK cinum inodestart]})
                              bmapstart))
@@ -7172,7 +7175,7 @@ Section ProofCreateMain.
               Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hcblk Hcblog Hcinb Hcovb
               ltac:(exact (proj1 Hn4)) Hj Hgs HG4a0
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
-                    Hescc Hiregi Hslkc Hcslkd Hcslpid Hcdep Hcidev Hciinum
+                    Hescc Hiregi Hiopen Hslkc Hcslkd Hcslpid Hcdep Hcidev Hciinum
                     Hcivalid Hcload Hcshot' Hcfrz Hckp Hruc Hsbb Hsbi Hbmr Hppid Hprocs
                     Hdevi Hgeom Hdlk Hbsl [] Hop").
     all: try lkbelow.
@@ -7181,7 +7184,7 @@ Section ProofCreateMain.
     { iEval (cbn beta iota). iEmpIntro. }
     iIntros (CIDG7 HqG7 mu1 n5 used5 Sb5 w1)
       "%Hcsu1 Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi %Husd5 Hbmr Hbsl
-       %Hsb5 %Hw5 %Hw5c %Hn5 Hop Hisl1".
+       %Hsb5 %Hw5 %Hw5c %Hn5 Hop Hisl1 _".
     assert (Hipn5 : (iput_units <= n5)%nat).
     { destruct (decide (bmapstart ∈ (Sb4 ∪ {[IBLOCK cinum inodestart]})))
         as [Hin | Hout].
@@ -7264,12 +7267,12 @@ Section ProofCreateMain.
               gtl γil γisl cov logstart bmapstart inodestart nib size dev
               used5 kd (qd/2)%Qp (qd/2)%Qp gd dind dp bmp
               n5 Sb5 false false false e1 pidv (DfracOwn (1/4)) dqb dqs
-              G6 (K - 10)%nat eb b lks
+              G6 (K - 10)%nat eb b lks true
               ltac:(exact HKiup) Hkdlt ltac:(discriminate) ltac:(discriminate)
               Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
               ltac:(exact Hipn5) Hj Hgs HG6a0
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
-                    Hescd Hiregi Hslkd Hslkdd Hslpid Hdep Hidev Hiinum
+                    Hescd Hiregi Hiopen Hslkd Hslkdd Hslpid Hdep Hidev Hiinum
                     Hivalid Hload Hshotl Hfrzl Hkeep2 Hrud Hsbb Hsbi Hbmr Hppid Hprocs
                     Hdevi Hgeom Hdlk Hbsl [] Hop").
     all: try lkbelow.
@@ -7278,7 +7281,7 @@ Section ProofCreateMain.
     { iEval (cbn beta iota). iEmpIntro. }
     iIntros (CIDGA HqGA mu2 n6 used6 Sb6 w2)
       "%Hcsu2 Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi %Husd6 Hbmr Hbsl
-       %Hsb6 %Hw6 %Hw6c %Hn6 Hop Hisl2".
+       %Hsb6 %Hw6 %Hw6c %Hn6 Hop Hisl2 _".
     assert (Hpcu2 : ret_pc (G6 !!! Regidx Rra : mword 64)
                     = mword_of_int (CK + 0x15c)) by (rewrite HG6ra; pcw).
     iEval (rewrite Hpcu2) in "Hpc".
@@ -7438,6 +7441,7 @@ Section ProofCreateMain.
     ic_escrows cn γfs γi cov logstart -∗
     SpecDirlink.ic_sleeplocks cn -∗
     ireg_inv γi γfs inodestart nib -∗
+    ireg_open -∗
     procs_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
@@ -7460,7 +7464,7 @@ Section ProofCreateMain.
     assert (Hcsa5 : is_cs_idx Ra5 = false) by (vm_compute; reflexivity).
     assert (Hcsra : is_cs_idx Rra = false) by (vm_compute; reflexivity).
     iIntros "#Htext #Hkd #Hpk #Hbio #Hlogc #Hkenv #Hitb2 #Hitbl #Hesc
-             #Hslks #Hiregi #Hprocs #Hdevi #Hgeom #Hdlk".
+             #Hslks #Hiregi #Hiopen #Hprocs #Hdevi #Hgeom #Hdlk".
     iPoseProof (printk_env_panic with "Hpk") as "#Hpenv".
     iDestruct (cr_tail_half j m sp0 ret_tgt K b lks HKsum Hal10 Hal9 Hspm Hrt
                  with "Htext") as "#Htail".
@@ -7762,7 +7766,7 @@ Section ProofCreateMain.
               Hj Hgs HZ5a0 HZ5a2 Heb
               with "Hcg Hcnt Htext Hpc Hkd Hpk Hbio Hlogc Hkenv
                     Hcidev Hciinum Hcmeta Hcmap Hcblocks Hdotw Hsbi Hsbs Hsbb
-                    Hbmr Hiregi Hcdiat Hppid Hprocs Hdevi Hgeom Hdlk Hbsl
+                    Hbmr Hiregi Hiopen Hcdiat Hppid Hprocs Hdevi Hgeom Hdlk Hbsl
                     Hitb2 Hitbl Hesc Hslks Hislk Hcdlnk0i Hop").
     all: try lkbelow.
     iIntros (CIDd1 Hsd1 md1 found1 bm1 dat1 dc1 dc01 n4 usd1 Sb4 tot1)
@@ -8107,7 +8111,7 @@ Section ProofCreateMain.
                 Hj Hgs HY5a0 HY5a2 Heb
                 with "Hcg Hcnt Htext Hpc Hkd Hpk Hbio Hlogc Hkenv
                       Hcidev Hciinum Hcmeta Hcmap Hcblocks Hddw Hsbi Hsbs Hsbb
-                      Hbmr Hiregi Hcdiat Hppid Hprocs Hdevi Hgeom Hdlk Hbsl
+                      Hbmr Hiregi Hiopen Hcdiat Hppid Hprocs Hdevi Hgeom Hdlk Hbsl
                       Hitb2 Hitbl Hesc Hslks Hislk Hcdlnk1 Hop").
       all: try lkbelow.
       iIntros (CIDd2 Hsd2 md2 found2 bm2 dat2 dc2 dc02 n5 usd2 Sb5 tot2)
@@ -8452,7 +8456,7 @@ Section ProofCreateMain.
                   Hj Hgs HW4a0 HW4a2 Heb
                   with "Hcg Hcnt Htext Hpc Hkd Hpk Hbio Hlogc Hkenv
                         Hidev Hiinum Hmeta Hmap Hblocks Hnb14 Hsbi Hsbs Hsbb
-                        Hbmr Hiregi Hdiat Hppid Hprocs Hdevi Hgeom Hdlk Hbsl
+                        Hbmr Hiregi Hiopen Hdiat Hppid Hprocs Hdevi Hgeom Hdlk Hbsl
                         Hitb2 Hitbl Hesc Hslks Hislk Hdlnk Hop").
         all: try lkbelow.
         iIntros (CIDd3 Hsd3 md3 found3 bm3 dat3 dp3 dp03 n6 usd3 Sb6 tot3)
@@ -9039,12 +9043,12 @@ Section ProofCreateMain.
                        (add_vec (di_nlink dp3 : mword 16) (mword_of_int 1 : mword 16)))
                     bm3 (S u6) (Sb6 ∪ {[IBLOCK dind inodestart]})
                     true true false e0 pidv (DfracOwn (1/4)) dqb dqs
-                    T2 (K - 10)%nat eb b lks
+                    T2 (K - 10)%nat eb b lks true
                     ltac:(exact HKiup) Hkdlt Hcrbu Hcruu
                     Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
                     ltac:(exact Hipn6) Hj Hgs HT2a0
                     with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2
-                          Hitbl Hescd Hiregi Hslkd Hslkdd Hslpid Hdep Hidev
+                          Hitbl Hescd Hiregi Hiopen Hslkd Hslkdd Hslpid Hdep Hidev
                           Hiinum Hivalid Hload Hshotf Hfrzl Hkeep2 Hrud Hsbb Hsbi Hbmr
                           Hppid Hprocs Hdevi Hgeom Hdlk Hbsl [] Hop").
           all: try lkbelow.
@@ -9053,7 +9057,7 @@ Section ProofCreateMain.
           { iEval (cbn beta iota). iEmpIntro. }
           iIntros (CIDT3 HqT3 mu2 n7 used7 Sb7 wf7)
             "%Hcsu2 Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi %Husd7 Hbmr Hbsl
-             %Hsb7 %Hwf7 %Hwf7c %Hn7 Hop Hisl2".
+             %Hsb7 %Hwf7 %Hwf7c %Hn7 Hop Hisl2 _".
           assert (Hpcu2 : ret_pc (T2 !!! Regidx Rra : mword 64)
                           = mword_of_int (CK + 0xe6)) by (rewrite HT2ra; pcw).
           iEval (rewrite Hpcu2) in "Hpc".
@@ -9225,7 +9229,7 @@ Section ProofCreateMain.
                         kd qd gd γil γisl dind nf nsl
                         HK Hglog Hist Hnib Hnib16 Hlg Hsize Hbms0 Hbmsc Hbmsl
                         Hist0 Hcovb Hiregb Hns Hj Hgs Hspm Hrt Hal10 Hal9 Heb
-                        with "Htext Hkd Hpenv Hbio Hlogc Hitb2 Hitbl Hesc Hiregi
+                        with "Htext Hkd Hpenv Hbio Hlogc Hitb2 Hitbl Hesc Hiregi Hiopen
                               Hprocs Hdevi Hgeom Hdlk") as "Hfl".
           iPoseProof ("Hfl" $! CIDX3) as "Hf".
           iSpecialize ("Hf" with "[%]"); [wp_next_chain |].
@@ -9294,7 +9298,7 @@ Section ProofCreateMain.
                       kd qd gd γil γisl dind nf nsl
                       HK Hglog Hist Hnib Hnib16 Hlg Hsize Hbms0 Hbmsc Hbmsl
                       Hist0 Hcovb Hiregb Hns Hj Hgs Hspm Hrt Hal10 Hal9 Heb
-                      with "Htext Hkd Hpenv Hbio Hlogc Hitb2 Hitbl Hesc Hiregi
+                      with "Htext Hkd Hpenv Hbio Hlogc Hitb2 Hitbl Hesc Hiregi Hiopen
                             Hprocs Hdevi Hgeom Hdlk") as "Hfl".
         iPoseProof ("Hfl" $! CIDX2) as "Hf".
         iSpecialize ("Hf" with "[%]"); [wp_next_chain |].
@@ -9364,7 +9368,7 @@ Section ProofCreateMain.
                     kd qd gd γil γisl dind nf nsl
                     HK Hglog Hist Hnib Hnib16 Hlg Hsize Hbms0 Hbmsc Hbmsl
                     Hist0 Hcovb Hiregb Hns Hj Hgs Hspm Hrt Hal10 Hal9 Heb
-                    with "Htext Hkd Hpenv Hbio Hlogc Hitb2 Hitbl Hesc Hiregi
+                    with "Htext Hkd Hpenv Hbio Hlogc Hitb2 Hitbl Hesc Hiregi Hiopen
                           Hprocs Hdevi Hgeom Hdlk") as "Hfl".
       iPoseProof ("Hfl" $! CIDX1) as "Hf".
       iSpecialize ("Hf" with "[%]"); [wp_next_chain |].
@@ -9487,7 +9491,7 @@ Section ProofCreateMain.
               Hbmsl Hist0 Hcovb Hbmgeo Hiregb Hcstr Hplen31 Hni1 Hni2 Hni3
               Htynz Hpkc Hu Hns Hj Hgs Ha1 Ha2 Ha3 Heb
               with "Hcg Hcnt Htext Hpc Hkd Hpk Hbio Hlogc Hkenv
-                    Hitb2 Hitbl Hesc Hslks Hiregi Hsbn Hsbi Hsbs Hsbb Hbmr
+                    Hitb2 Hitbl Hesc Hslks Hiregi Hiopen Hsbn Hsbi Hsbs Hsbb Hbmr
                     Hpriv Hpath Hprocs Hdevi Hgeom Hdlk Hbsl Hisl Hop
                     [] Hcont").
     iApply (cr_alloc_half γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
@@ -9513,7 +9517,7 @@ Section ProofCreateMain.
                 Hist0 Hcovb Hbmgeo Hiregb Hni1 Hni2 Hni3 Hnib16 Hpkc
                 Hu Hns Hj Hgs eq_refl eq_refl Hal10 Hal9 Heb
                 with "Htext Hkd Hpk Hbio Hlogc Hkenv Hitb2 Hitbl
-                      Hesc Hslks Hiregi Hprocs Hdevi Hgeom Hdlk").
+                      Hesc Hslks Hiregi Hiopen Hprocs Hdevi Hgeom Hdlk").
     - iIntros (kd qd gd γil γisl dind dn bm data nf nsl).
       iApply (cr_fail_half γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
                 γa γf γpr cov logstart bmapstart inodestart nib ninodes size
@@ -9524,7 +9528,7 @@ Section ProofCreateMain.
                 kd qd gd γil γisl dind dn bm data nf nsl
                 HK Hglog Hist Hnib Hnib16 Hlg Hsize Hbms0 Hbmsc Hbmsl
                 Hist0 Hcovb Hiregb Hns Hj Hgs eq_refl eq_refl Hal10 Hal9 Heb
-                with "Htext Hkd Hpenv Hbio Hlogc Hitb2 Hitbl Hesc Hiregi
+                with "Htext Hkd Hpenv Hbio Hlogc Hitb2 Hitbl Hesc Hiregi Hiopen
                       Hprocs Hdevi Hgeom Hdlk").
   Qed.
 

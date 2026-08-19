@@ -614,7 +614,8 @@ Section SyscallVocab.
         _ & #Hpanic & #Hbio & #Hlog & #Hseam & #Hgen & #Hdevi & #Hgeom &
         #Hdlock & _ & _ & #Hic & _)".
     iDestruct "Hic" as
-      "(_ & _ & _ & _ & _ & _ & _ & _ & _ & #Hit & #Hitinv & #Hesc & #Hireg & #Hsl)".
+      "(_ & _ & _ & _ & _ & _ & _ & _ & _ & #Hit & #Hitinv & #Hesc & #Hireg &
+        #Hropen & #Hsl)".
     (* assembled conjunct by conjunct rather than with [iFrame "#"]: the
        fifteen are in the fabric's own order, and a mismatch then names the
        one that moved instead of leaving an unsolved goal. *)
@@ -630,6 +631,7 @@ Section SyscallVocab.
     iSplitR; [iExact "Hesc"    |].
     iSplitR; [iExact "Hsl"     |].
     iSplitR; [iExact "Hireg"   |].
+    iSplitR; [iExact "Hropen"  |].
     iSplitR; [iExact "Hprocs"  |].
     iSplitR; [iExact "Hdevi"   |].
     iSplitR; [iExact "Hgeom"   |].

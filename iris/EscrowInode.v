@@ -54,35 +54,41 @@ Section EscrowInode.
      has already carried the marker away by REDEEMED -- and with it both bad
      arms die on one [Excl] apiece.  It is the ordinary "this one-shot has not
      fired" token; [redeem_ticketA]'s RA, at a second name. *)
-  Definition escA_body (ge gr gd γi : gname) (z : Z) : iProp Σ :=
-    ( (mono_nat_auth_own ge 1 ST_EMPTY ∗ ifreeze_post z)
+  (* RULING G' (iclaim-ledger.md §6''): the escrow is INDEXED by the regime
+     arm its freezer lent.  It has to be: the standing [ifreeze_post] lives
+     here between iput+0x8a and the off-lock deposit, and it is that token's
+     agreement with the region's f column that tells the deposit which arm to
+     hand back.  The index is carried by the walk (in [redeem_ticketA gd]'s
+     company) from the mint to the deposit, so the tie is structural. *)
+  Definition escA_body (ge gr gd γi : gname) (z : Z) (rg : bool) : iProp Σ :=
+    ( (mono_nat_auth_own ge 1 ST_EMPTY ∗ ifreeze_post rg z)
     ∨ (mono_nat_auth_own ge 1 ST_FILLED ∗ InodeRegion.imark γi z
        ∗ ifreeze_off z ∗ redeem_ticketA gd)
     ∨ (mono_nat_auth_own ge 1 ST_REDEEMED ∗ redeem_ticketA gr
        ∗ redeem_ticketA gd) )%I.
 
   Definition escAN (z : Z) : namespace := (nroot .@ "icescA") .@ z.
-  Definition escA_inv (ge gr gd γi : gname) (z : Z) : iProp Σ :=
-    inv (escAN z) (escA_body ge gr gd γi z).
-  Global Instance escA_inv_persistent ge gr gd γi z :
-    Persistent (escA_inv ge gr gd γi z).
+  Definition escA_inv (ge gr gd γi : gname) (z : Z) (rg : bool) : iProp Σ :=
+    inv (escAN z) (escA_body ge gr gd γi z rg).
+  Global Instance escA_inv_persistent ge gr gd γi z rg :
+    Persistent (escA_inv ge gr gd γi z rg).
   Proof. rewrite /escA_inv. apply _. Qed.
 
   (* minted at iput+0x86 (before itable.lock release): fresh escrow, EMPTY,
      with its exclusive ticket.  The deposit that fills it happens later, at
      the off-lock ifree. *)
-  Lemma escA_alloc E γi z :
+  Lemma escA_alloc E γi z rg :
     (* THE STANDING FREEZE GOES IN AT THE MINT (§3.16): iput's last close has
        just stepped the column to [FrzPost], and this is where the fragment
        lives until the off-lock deposit retires it. *)
-    ifreeze_post z ={E}=∗ ∃ ge gr gd,
-      escA_inv ge gr gd γi z ∗ redeem_ticketA gr ∗ redeem_ticketA gd.
+    ifreeze_post rg z ={E}=∗ ∃ ge gr gd,
+      escA_inv ge gr gd γi z rg ∗ redeem_ticketA gr ∗ redeem_ticketA gd.
   Proof.
     iIntros "Hfz".
     iMod (mono_nat_own_alloc ST_EMPTY) as (ge) "[Hauth _]".
     iMod (own_alloc (Excl ())) as (gr) "Htick"; [done|].
     iMod (own_alloc (Excl ())) as (gd) "Hdep"; [done|].
-    iMod (inv_alloc (escAN z) _ (escA_body ge gr gd γi z) with "[Hauth Hfz]")
+    iMod (inv_alloc (escAN z) _ (escA_body ge gr gd γi z rg) with "[Hauth Hfz]")
       as "#Hinv".
     { iNext. iLeft. iFrame "Hauth Hfz". }
     iModIntro. iExists ge, gr, gd. iFrame "Hinv Htick Hdep".
@@ -99,11 +105,11 @@ Section EscrowInode.
      afterwards -- so the escrow is HELD OPEN across the region step rather
      than handed a wand, and the depositor's own ticket is what rules out the
      two arms in which the token is no longer here. *)
-  Lemma escA_deposit_acc E ge gr gd γi z :
+  Lemma escA_deposit_acc E ge gr gd γi z rg :
     ↑escAN z ⊆ E →
-    escA_inv ge gr gd γi z -∗ redeem_ticketA gd
+    escA_inv ge gr gd γi z rg -∗ redeem_ticketA gd
       ={E, E ∖ ↑escAN z}=∗
-      ifreeze_post z ∗
+      ifreeze_post rg z ∗
       (InodeRegion.imark γi z -∗ ifreeze_off z
          ={E ∖ ↑escAN z, E}=∗ committedA ge).
   Proof.
@@ -122,9 +128,9 @@ Section EscrowInode.
   Qed.
 
   (* the redeemer's ticket + the region's committed recover the marker *)
-  Lemma escA_redeem E ge gr gd γi z :
+  Lemma escA_redeem E ge gr gd γi z rg :
     ↑escAN z ⊆ E →
-    escA_inv ge gr gd γi z -∗ redeem_ticketA gr -∗ committedA ge
+    escA_inv ge gr gd γi z rg -∗ redeem_ticketA gr -∗ committedA ge
       ={E}=∗ InodeRegion.imark γi z ∗ ifreeze_off z.
   Proof.
     iIntros (HE) "#Hinv Htick #Hcom".
@@ -146,9 +152,9 @@ Section EscrowInode.
      gets instead is the STANDING freeze the escrow is holding, which its own
      LICENCE refutes at the region ([IgetLic.iname_freeze_off]).  The token is
      borrowed and given straight back, so the refuter pays nothing for it. *)
-  Lemma escA_await_peel E ge gr gd γi z (P : iProp Σ) :
+  Lemma escA_await_peel E ge gr gd γi z rg (P : iProp Σ) :
     ↑escAN z ⊆ E →
-    escA_inv ge gr gd γi z -∗ redeem_ticketA gr -∗
+    escA_inv ge gr gd γi z rg -∗ redeem_ticketA gr -∗
     (* the refuter's OWN resource (in practice the peeler's licence), carried
        through so the SUCCESS branch does not lose it to the wand's closure *)
     P -∗
@@ -157,7 +163,7 @@ Section EscrowInode.
        §2.6's table, at whichever of the five constructors the caller
        presented), which needs [↑iregN] and nothing this escrow holds, so the
        mask is the peel's own minus this one namespace. *)
-    (P -∗ ifreeze_post z ={E ∖ ↑escAN z}=∗ False)
+    (P -∗ ifreeze_post rg z ={E ∖ ↑escAN z}=∗ False)
       ={E}=∗ P ∗ InodeRegion.imark γi z ∗ ifreeze_off z.
   Proof.
     iIntros (HE) "#Hinv Htick HP Href".
@@ -183,7 +189,8 @@ Section EscrowInode.
      half stays on the region side / in [ireg_body], so a recycle/fill of a
      genuine pending entry leaves nothing to dispose.  Walk-stable. *)
   Definition pool_pending (γi : gname) (z : Z) : iProp Σ :=
-    (∃ ge gr gd, escA_inv ge gr gd γi z ∗ committedA ge ∗ redeem_ticketA gr)%I.
+    (∃ ge gr gd (rg : bool),
+       escA_inv ge gr gd γi z rg ∗ committedA ge ∗ redeem_ticketA gr)%I.
   (* NOT Timeless: [escA_inv] is an [inv].  Wherever [ipool_shape] must stay
      Timeless, its pending arm is opened without the [>] later-strip. *)
 

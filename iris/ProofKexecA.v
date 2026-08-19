@@ -425,7 +425,7 @@ Section KexecABody.
        3) needs no hypothesis of this lemma's own. *)
     iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
     iDestruct "Hfab" as "(#Hkd & #Hpenv & #Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
-                          #Hesc & #Hslks & #Hireg & #Hprocs & #Hdevi & #Hdgeom &
+                          #Hesc & #Hslks & #Hireg & #Hropen & #Hprocs & #Hdevi & #Hdgeom &
                           #Hdlock)".
     (* ---- open the process's private block ONCE (convention 2) ---- *)
     iDestruct (proc_priv_cwd_pid gf (proc_addr jp) pidv V with "Hpriv")
@@ -573,7 +573,7 @@ Section KexecABody.
                     destruct (length (path_elems (bview plen pfun))); lia)
               Hjp Hgs eq_refl
               with "Hcg Hcnt Htext Hkd Hpc Hpenv Hbio Hlogc Hka Hitab Hitinv Hesc
-                    Hslks Hireg Hprocs Hdevi Hdgeom Hdlock Hbm Hins Hbits Hppid
+                    Hslks Hireg Hropen Hprocs Hdevi Hdgeom Hdlock Hbm Hins Hbits Hppid
                     Hcwd Hcref Hpath Hbs Hirs Hlog").
     iIntros (CIDn Hsn M4 n1 used1 Sb1 ok ipv w) "%Hcsn Hcg Hcnt Hpc Hbm Hins %Hused1
              Hbits Hppid Hcwd Hcref Hpath Hbs %HSbsub %Hwbm %Hn1 Hlog Harm".
@@ -971,7 +971,7 @@ Section KexecABody.
        need no hypothesis of this lemma's own. *)
     iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
     iDestruct "Hfab" as "(#Hkd & #Hpenv & #Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
-                          #Hesc & #Hslks & #Hireg & #Hprocs & #Hdevi & #Hdgeom &
+                          #Hesc & #Hslks & #Hireg & #Hropen & #Hprocs & #Hdevi & #Hdgeom &
                           #Hdlock)".
     (* ---- the inode: slot, share, and the region facts ---- *)
     iDestruct "Hheld" as (k q inum) "(%Hie & %Hk & %Hib & Href & Hru)".
@@ -1538,7 +1538,7 @@ Section KexecABody.
                         Hidev Hiinum Hivalid Hload Hity Hfrz Hkeep Hru Hbm Hins Hbits Hka
                         Hpriv Hpath Hargv Hargs Hbs Hirs Hlog [-Hcont] Hcont").
         { iApply (T.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv Hesc
-                                       Hslks Hireg Hprocs Hdevi Hdgeom Hdlock"). }
+                                       Hslks Hireg Hropen Hprocs Hdevi Hdgeom Hdlock"). }
         rewrite /kxc_frameA6.
         iDestruct (kxc_mid_join sp0 with "Hust Helf Hph") as "Hmid".
         iSplitL "Hf1"; [iExact "Hf1" |].
@@ -1611,7 +1611,7 @@ Section KexecABody.
                       Hidev Hiinum Hivalid Hload Hity Hfrz Hkeep Hru Hbm Hins Hbits Hka
                       Hpriv Hpath Hargv Hargs Hbs Hirs Hlog [-Hcont] Hcont").
       { iApply (T.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv Hesc
-                                     Hslks Hireg Hprocs Hdevi Hdgeom Hdlock"). }
+                                     Hslks Hireg Hropen Hprocs Hdevi Hdgeom Hdlock"). }
       rewrite /kxc_frameA6.
       iDestruct (kxc_mid_join sp0 with "Hust Helf Hph") as "Hmid".
       iSplitL "Hf1"; [iExact "Hf1" |].

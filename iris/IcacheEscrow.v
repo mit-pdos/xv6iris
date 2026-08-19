@@ -531,7 +531,7 @@ Section IcacheEscrow.
      what [IcacheInv.iref_close_last_freeze_store_au] consumes in between.
      One exclusive ledger cell cannot be in two places. *)
   Definition pool_await (γi : gname) (z : Z) : iProp Σ :=
-    (∃ ge gr gd, escA_inv ge gr gd γi z ∗ redeem_ticketA gr)%I.
+    (∃ ge gr gd (rg : bool), escA_inv ge gr gd γi z rg ∗ redeem_ticketA gr)%I.
 
   (* the PENDING-capable pool shape -- lives ONLY at the itable free pool,
      which is LOCK-HELD (never [iInv .. as ">"], verified), so the non-Timeless
@@ -684,8 +684,8 @@ Section IcacheEscrow.
     iIntros (HE HER HERE Hin) "#Hrinv Hl H". rewrite /ipool_shape.
     iDestruct "H" as "[Hcnt [Hmir [[Hnp Hoff] | [Hpp | Haw]]]]".
     - iModIntro. iFrame "Hl Hnp Hcnt Hmir Hoff".
-    - iDestruct "Hpp" as (ge gr gd) "(#Hesc & #Hcom & Htk)".
-      iMod (escA_redeem E ge gr gd γi (bv_unsigned inum) HE with "Hesc Htk Hcom")
+    - iDestruct "Hpp" as (ge gr gd rg) "(#Hesc & #Hcom & Htk)".
+      iMod (escA_redeem E ge gr gd γi (bv_unsigned inum) rg HE with "Hesc Htk Hcom")
         as "[Hmk Hoff]".
       iModIntro. iFrame "Hl Hcnt Hmir Hoff". rewrite /ipool_shape_np. iRight.
       iExact "Hmk".
@@ -695,13 +695,13 @@ Section IcacheEscrow.
          freeze, and the caller's LICENCE refutes it at the region.  After the
          deposit the escrow hands back the marker AND the re-armed
          [ifreeze_off], which is exactly the ordinary arm's token. *)
-      iDestruct "Haw" as (ge gr gd) "(#Hesc & Htk)".
-      iMod (escA_await_peel E ge gr gd γi (bv_unsigned inum)
+      iDestruct "Haw" as (ge gr gd rg) "(#Hesc & Htk)".
+      iMod (escA_await_peel E ge gr gd γi (bv_unsigned inum) rg
               (iname γi γfs inum l) HE with "Hesc Htk Hl []")
         as "(Hl & Hmk & Hoff)".
       { iIntros "Hl Hpost". rewrite /ifreeze_post.
         iMod (iname_freeze_off (E ∖ ↑escAN (bv_unsigned inum))
-                γi γfs inodestart nib inum l FrzPost HERE Hin
+                γi γfs inodestart nib inum l (FrzPost rg) HERE Hin
                 with "Hrinv Hl Hpost") as "(%Hc & _ & _)".
         discriminate Hc. }
       iModIntro. iFrame "Hl Hcnt Hmir Hoff". rewrite /ipool_shape_np.
@@ -1014,10 +1014,10 @@ Section IcacheEscrow.
      [ifreeze_pre] the walk has kept in hand since the mint kills the LEFT
      alternative outright ([ifreeze_excl] -- one exclusive ledger cell, two
      fragments), so what comes back is the receipt. *)
-  Lemma ic_payload_arm_decide_frz γfs γi cov logstart k inum g v :
-    ifreeze_pre (bv_unsigned inum) -∗
+  Lemma ic_payload_arm_decide_frz γfs γi cov logstart k inum g v (rg : bool) :
+    ifreeze_pre rg (bv_unsigned inum) -∗
     ic_payload_arm γfs γi cov logstart k inum g v -∗
-    ifreeze_pre (bv_unsigned inum) ∗ frzown (bv_unsigned inum) ∗
+    ifreeze_pre rg (bv_unsigned inum) ∗ frzown (bv_unsigned inum) ∗
     frzsel k ((1/2)/2)%Qp true.
   Proof.
     rewrite /ic_payload_arm. iIntros "Hpre [(_ & Hoff & _) | Hrc]".
@@ -2423,22 +2423,22 @@ Section IcacheEscrow.
      uncached ledger row the last close produced, and the escrow the freer
      minted around the [FrzPost] token it left standing. *)
   Lemma ipool_shape_await γfs γi cov logstart (inum : mword 32)
-      (ge gr gd : gname) :
+      (ge gr gd : gname) (rg : bool) :
     icnt_half (bv_unsigned inum) 0%nat -∗
     frzm_h (bv_unsigned inum) false -∗
-    escA_inv ge gr gd γi (bv_unsigned inum) -∗
+    escA_inv ge gr gd γi (bv_unsigned inum) rg -∗
     redeem_ticketA gr -∗
     ipool_shape γfs γi cov logstart inum.
   Proof.
     iIntros "Hcnt Hmir #Hesc Htk". rewrite /ipool_shape.
     iSplitL "Hcnt"; [iExact "Hcnt" |].
     iSplitL "Hmir"; [iExact "Hmir" |].
-    iRight. iRight. rewrite /pool_await. iExists ge, gr, gd.
+    iRight. iRight. rewrite /pool_await. iExists ge, gr, gd, rg.
     iSplitR; [iExact "Hesc" | iExact "Htk"].
   Qed.
 
   Lemma ic_close_to_empty_await cn γfs γi cov logstart k (v : bool)
-      (ge gr gd : gname) (dev inum : mword 32) :
+      (ge gr gd : gname) (rg : bool) (dev inum : mword 32) :
     ic_id cn k (1/2) true dev inum -∗
     ic_id cn k (1/2) true dev inum -∗
     i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev -∗
@@ -2451,7 +2451,7 @@ Section IcacheEscrow.
     ic_mid cn k -∗
     icnt_half (bv_unsigned inum) 0%nat -∗
     frzm_h (bv_unsigned inum) false -∗
-    escA_inv ge gr gd γi (bv_unsigned inum) -∗
+    escA_inv ge gr gd γi (bv_unsigned inum) rg -∗
     redeem_ticketA gr -∗
     |==> ic_escrow_body cn γfs γi cov logstart k ∗
          ic_id cn k (1/2) false dev inum ∗
@@ -2468,7 +2468,7 @@ Section IcacheEscrow.
       iExists dev, inum, (valid_word v). iFrame. }
     rewrite /ipool_shape. iSplitL "Hcnt"; [iExact "Hcnt" |].
     iSplitL "Hmir"; [iExact "Hmir" |].
-    iRight. iRight. rewrite /pool_await. iExists ge, gr, gd.
+    iRight. iRight. rewrite /pool_await. iExists ge, gr, gd, rg.
     iSplitR; [iExact "Hesc" | iExact "Htk"].
   Qed.
 
@@ -2517,12 +2517,13 @@ Section IcacheEscrow.
      arm's ½ and the table's ½ − q), refutes OUT with the sleeplock's own
      token, MID/HELD/EMPTY with the cells, and [ic_parked]'s ORDINARY
      alternative with the [ifreeze_pre] in its hand. *)
-  Lemma ic_open_frozen cn γfs γi cov logstart k (q : Qp) (dev inum : mword 32) :
+  Lemma ic_open_frozen cn γfs γi cov logstart k (q : Qp) (dev inum : mword 32)
+      (rg : bool) :
     ic_escrow_body cn γfs γi cov logstart k -∗
-    ifreeze_pre (bv_unsigned inum) -∗
+    ifreeze_pre rg (bv_unsigned inum) -∗
     inode_ident k (DfracOwn q) dev inum -∗
     ic_tok cn k -∗
-    ifreeze_pre (bv_unsigned inum) ∗ inode_ident k (DfracOwn q) dev inum ∗
+    ifreeze_pre rg (bv_unsigned inum) ∗ inode_ident k (DfracOwn q) dev inum ∗
     ic_tok cn k ∗ frzown (bv_unsigned inum) ∗ frzsel k ((1/2)/2)%Qp true ∗
     (∃ v : bool,
        i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev ∗

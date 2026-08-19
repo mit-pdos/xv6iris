@@ -1871,19 +1871,24 @@ Section IreclaimOrphan.
                  with "Hcont") as "Hcont".
     iApply (IP.wp_iput_sconf γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
               gil gisl cov logstart bmapstart inodestart nib size dev usedn
-              kslot q inum MAXOPBLOCKS pidv dq dqb dqs OG (K - 8)%nat true b lks
+              kslot q inum MAXOPBLOCKS pidv dq dqb dqs OG (K - 8)%nat true b lks false
               ltac:(lia) Hkslot Hgeom Hsize Hbm0 Hbmcov Hbmlog
               Hst Hibcov Hiblog Hnibin Hcovb
               ltac:(unfold iput_units, MAXOPBLOCKS; lia) Hj Hgl HOGa0
               Hbelow
               with "Hcg Hcnt [] [] Htext Hkdata Hpc Hpanenv Hbio Hlctx Hitb2 Hitbl Hescrow
-                    Hireg Hslk Href Hru Hsbb Hsbi Hbm Hppid Hprocs Hdevi Hdgeom
+                    Hireg Hboot Hslk Href Hru Hsbb Hsbi Hbm Hppid Hprocs Hdevi Hdgeom
                     Hdlock Hsl Hop").
     all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
+    (* RULING G' (iclaim-ledger.md §6''): ireclaim lends its EXCLUSIVE
+       [ireg_boot] at [rg := false] and the indexed post gives it back as
+       [ireg_regime false = ireg_boot] -- re-bound here under its own name, so
+       the next loop iteration has it.  This is the round-trip §2.3 asked for
+       and integration-2's un-indexed disjunction could not close. *)
     iIntros (CID24 Hq24 mQ n' usedp) "%Hcsip Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi
-                                      %Hsubp Hbm Hsl %Hn' Hop Hiref".
+                                      %Hsubp Hbm Hsl %Hn' Hop Hiref Hboot".
     assert (Hpc6a : ret_pc (OG !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ireclaim + 0x6a))
       by (rewrite HOGra; pcw).

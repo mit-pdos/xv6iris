@@ -1342,7 +1342,7 @@ Section ProofFileclose.
           iDestruct "Hicenv" as "(%Hcdev & %Hcnib & %Hsz & %Hbm0 &
                                   %Hbmcov & %Hbmlog & %Hist0 & %Hinumgeo &
                                   %Hcovb & #Hitab & #Hitinv & #Hescrows &
-                                  #Hireg & #Hslks)".
+                                  #Hireg & #Hropen & #Hslks)".
           rewrite /fileclose_bm.
           iDestruct "Hbm" as "(Hsbb & Hsbi & Hbmres)".
           (* the entry's own escrow and sleeplock, out of the two families:
@@ -1477,18 +1477,18 @@ Section ProofFileclose.
                     (fcn_inodestart fn) (fcn_nib fn) (fcn_size fn)
                     (fcn_dev fn) us kk qq inum MAXOPBLOCKS
                     (fcn_pid fn) (fcn_dq fn) (fcn_dqb fn) (fcn_dqs fn)
-                    B3 (K - 8)%nat eb b lks
+                    B3 (K - 8)%nat eb b lks true
                     ltac:(lia) Hkk Hgeom Hsz Hbm0 Hbmcov Hbmlog
                     Hist0 Hiblk Hiblog Hinb Hcovb
                     ltac:(unfold iput_units, MAXOPBLOCKS; lia) Hjlt Hgl
                     ltac:(rewrite HB3a0; exact Hipe)
                     ltac:(lkbelow)
                     with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlog Hitab Hitinv
-                          Hescrow Hireg Hslk Href Hru Hsbb Hsbi Hbmres Hpid Hprocs
+                          Hescrow Hireg Hropen Hslk Href Hru Hsbb Hsbi Hbmres Hpid Hprocs
                           Hdev Hgeo Hdlk Hbsl Hop").
           all: try lkbelow.
           iIntros (CIDf6 Hsf6 mi ni us') "%Hics Hcg Hcnt Hextc Hextm Hpc Hpid Hsbb Hsbi
-                                          %Hussub Hbmres Hbsl %Hni Hop Hislot".
+                                          %Hussub Hbmres Hbsl %Hni Hop Hislot _".
           pose proof Hics as Hics_cs.
           assert (Hpcb4 : ret_pc (B3 !!! Regidx Rra) = mword_of_int (FC + 0xb4)).
           { rewrite HB3ra. apply bv_eq; vm_compute; reflexivity. }

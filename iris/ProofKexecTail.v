@@ -1084,6 +1084,7 @@ Section KexecAExit.
     ic_escrows cn gfs gi cov logstart -∗
     ic_sleeplocks cn -∗
     ireg_inv gi gfs inodestart nib -∗
+    ireg_open -∗
     procs_inv gs -∗
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
@@ -1091,8 +1092,8 @@ Section KexecAExit.
     fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
               cov logstart inodestart nib dev.
   Proof.
-    iIntros "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv Hesc Hslks Hireg Hprocs
-             Hdevi Hdgeom Hdlock".
+    iIntros "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv Hesc Hslks Hireg Hropen
+             Hprocs Hdevi Hdgeom Hdlock".
     rewrite /fs_fabric.
     iSplitL "Hkd"; [iExact "Hkd" |].
     iSplitL "Hpenv"; [iExact "Hpenv" |].
@@ -1105,6 +1106,7 @@ Section KexecAExit.
     iSplitL "Hesc"; [iExact "Hesc" |].
     iSplitL "Hslks"; [iExact "Hslks" |].
     iSplitL "Hireg"; [iExact "Hireg" |].
+    iSplitL "Hropen"; [iExact "Hropen" |].
     iSplitL "Hprocs"; [iExact "Hprocs" |].
     iSplitL "Hdevi"; [iExact "Hdevi" |].
     iSplitL "Hdgeom"; [iExact "Hdgeom" | iExact "Hdlock"].
@@ -1361,7 +1363,7 @@ Section KexecABad.
        order premise needs no hypothesis of this lemma's own. *)
     iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
     iDestruct "Hfab" as "(#Hkd & #Hpenv & #Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
-                          #Hesc & #Hslks & #Hireg & #Hprocs & #Hdevi & #Hdgeom &
+                          #Hesc & #Hslks & #Hireg & #Hropen & #Hprocs & #Hdevi & #Hdgeom &
                           #Hdlock)".
     iDestruct (kxa_esc_acc cn gfs gi cov logstart k Hk with "Hesc") as "#Hesck".
     iDestruct (proc_priv_cwd_pid gf (proc_addr jp) pidv V with "Hpriv")
@@ -1411,18 +1413,18 @@ Section KexecABad.
     iApply (Iunlockput.wp_iunlockput_sconf gs jp gl gu gd gk pd pav pu bn g gfs
               gi cn gtl gil gisl cov logstart bmapstart inodestart nib size dev
               used2 k qi sq gy inum dn bm n2 pidv (DfracOwn (1/4)) dqb dqs
-              B2 (K - 68)%nat true true lks
+              B2 (K - 68)%nat true true lks true
               ltac:(lia) Hk Hlg Hsz Hbm0 Hbmc
               Hbml Hins0 Hibc Hibl Hib Hcovb Hn2 Hjp Hgs HB2a0
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitab Hitinv Hesck
-                    Hireg Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid Hload
+                    Hireg Hropen Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid Hload
                     Hity Hfrz Hkeep Hru Hbm Hins Hbits Hppid Hprocs Hdevi Hdgeom Hdlock Hbs
                     Hlog").
     all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
     iIntros (CIDu Hsu M1 n3 used3) "%Hcsu Hcg Hcnt _ _ Hpc Hppid Hbm Hins %Hu3
-             Hbits Hbs %Hn3 Hlog Hirs1".
+             Hbits Hbs %Hn3 Hlog Hirs1 _".
     assert (Hpc6a : ret_pc (B2 !!! Regidx Rra) = mword_of_int (KXA + 0x6a))
       by (rewrite HB2ra; pcw).
     iEval (rewrite Hpc6a) in "Hpc".

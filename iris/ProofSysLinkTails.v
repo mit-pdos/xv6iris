@@ -385,6 +385,7 @@ Section ProofSysLinkTails.
     itable_inv -∗
     ic_escrow cn gfs gi cov logstart kk -∗
     ireg_inv gi gfs inodestart nib -∗
+    ireg_open -∗
     is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s -∗
     sl_pid (i_lock (ientry kk)) ↦₄ pidv -∗
@@ -441,7 +442,7 @@ Section ProofSysLinkTails.
            Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HMsp HMthr HMs1
            HMs2 Hal.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
-              #Hitab #Hitinv #Hesck #Hireg #Hslkk Hslkd Hslpid Hdep Hidev
+              #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd Hslpid Hdep Hidev
               Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpid #Hprocs
               #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 HbN HbW HbO Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
@@ -503,17 +504,17 @@ Section ProofSysLinkTails.
     iApply (Iunlockput.wp_iunlockput_sconf (CID := CID2) gs jx gl gu gd gk
               pd pav pu bn g gfs gi cn gtl gil gisl cov logstart bmapstart
               inodestart nib size dev used kk qi s gy inum dn bm u pidv dq
-              dqb dqs M2 (K - 38)%nat eb b lks
+              dqb dqs M2 (K - 38)%nat eb b lks true
               HKup Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog
               Hinb Hcovb Hiu Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hitab Hitinv
-                    Hesck Hireg Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid
+                    Hesck Hireg Hropen Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid
                     Hload Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
                     Hdlk Hbsl Hop").
     iIntros (CID3 Hq3 mup n2 used2)
       "%Hcsup Hcg Hown Htce Hcce Hpc Hpid Hsbb Hsbi %Hused2 Hbmres Hbsl %Hn2
-       Hop Hislot".
+       Hop Hislot _".
     assert (Hpc2 : ret_pc (M2 !!! Regidx Rra : mword 64)
                    = mword_of_int (SL + 0xcc)) by (rewrite HM2ra; pcw).
     iEval (rewrite Hpc2) in "Hpc".
@@ -710,6 +711,7 @@ Section ProofSysLinkTails.
     itable_inv -∗
     ic_escrow cn gfs gi cov logstart kk -∗
     ireg_inv gi gfs inodestart nib -∗
+    ireg_open -∗
     is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
     sleeplocked_q gisl s -∗
     sl_pid (i_lock (ientry kk)) ↦₄ pidv -∗
@@ -766,7 +768,7 @@ Section ProofSysLinkTails.
            Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HMsp HMthr HMs1
            HMs2 Hal.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
-              #Hitab #Hitinv #Hesck #Hireg #Hslkk Hslkd Hslpid Hdep Hidev
+              #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd Hslpid Hdep Hidev
               Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpid #Hprocs
               #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 HbN HbW HbO Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
@@ -828,17 +830,17 @@ Section ProofSysLinkTails.
     iApply (Iunlockput.wp_iunlockput_sconf (CID := CID2) gs jx gl gu gd gk
               pd pav pu bn g gfs gi cn gtl gil gisl cov logstart bmapstart
               inodestart nib size dev used kk qi s gy inum dn bm u pidv dq
-              dqb dqs M2 (K - 38)%nat eb b lks
+              dqb dqs M2 (K - 38)%nat eb b lks true
               HKup Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog
               Hinb Hcovb Hiu Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hitab Hitinv
-                    Hesck Hireg Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid
+                    Hesck Hireg Hropen Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid
                     Hload Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
                     Hdlk Hbsl Hop").
     iIntros (CID3 Hq3 mup n2 used2)
       "%Hcsup Hcg Hown Htce Hcce Hpc Hpid Hsbb Hsbi %Hused2 Hbmres Hbsl %Hn2
-       Hop Hislot".
+       Hop Hislot _".
     assert (Hpc2 : ret_pc (M2 !!! Regidx Rra : mword 64)
                    = mword_of_int (SL + 0xdc)) by (rewrite HM2ra; pcw).
     iEval (rewrite Hpc2) in "Hpc".
@@ -1074,6 +1076,7 @@ Section ProofSysLinkTails.
     itable_inv -∗
     ic_escrow cn gfs gi cov logstart kk -∗
     ireg_inv gi gfs inodestart nib -∗
+    ireg_open -∗
     is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
     (* THE REFERENCE, ALREADY SHED: the keep half is what iunlockput spends,
        the generation-named share is what this arm's own [ilock] consumes. *)
@@ -1124,7 +1127,7 @@ Section ProofSysLinkTails.
            Hbmcov Hbmlog Hist0 Hiblk Hiblog Hinb Hcovb Hmem Hiu Hj Hgl
            Hlkempty Heb Hsp0 HMsp HMthr HMs1 Hal Hncd.
     iIntros "Hcg Hown #Htext #Hdata Hpc #Hpe #Hbio #Hlog Hseam Hgen #Hitab #Hitinv
-              #Hesck #Hireg #Hslkk Hkeep Hru Hshr #Hshotc Hilink Hsbb Hsbi Hbmres Hpid
+              #Hesck #Hireg #Hropen #Hslkk Hkeep Hru Hshr #Hshotc Hilink Hsbb Hsbi Hbmres Hpid
               #Hprocs #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
               Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
@@ -1460,12 +1463,12 @@ Section ProofSysLinkTails.
     iApply (Iunlockput.wp_iunlockput_sconf (CID := CID11) gs jx gl gu gd gk
               pd pav pu bn g gfs gi cn gtl gil gisl cov logstart bmapstart
               inodestart nib size dev used kk qi s gy inum dn' bm (S u) pidv dq
-              dqb dqs Q2 (K - 38)%nat eb b lks
+              dqb dqs Q2 (K - 38)%nat eb b lks true
               HKup Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog
               Hinb Hcovb Hiu Hj Hgl HQ2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hitab Hitinv
-                    Hesck Hireg Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid
+                    Hesck Hireg Hropen Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid
                     Hload Hshot' Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
                     Hdlk Hbsl [Hop]").
     { rewrite Heb /trap_csrs_ext. done. }
@@ -1473,7 +1476,7 @@ Section ProofSysLinkTails.
     { rewrite /log_op. iExists (Sb ∪ {[IBLOCK inum inodestart]}). iExact "Hop". }
     iIntros (CID12 Hq12 mup n2 used2)
       "%Hcsup Hcg Hown _ _ Hpc Hpid Hsbb Hsbi %Hused2 Hbmres Hbsl %Hn2
-       Hop Hislot".
+       Hop Hislot _".
     assert (Hpc110 : ret_pc (Q2 !!! Regidx Rra : mword 64)
                      = mword_of_int (SL + 0x110)) by (rewrite HQ2ra; pcw).
     iEval (rewrite Hpc110) in "Hpc".
@@ -1703,6 +1706,7 @@ Section ProofSysLinkTails.
     ic_escrow cn gfs gi cov logstart kk -∗
     ic_escrow cn gfs gi cov logstart kd -∗
     ireg_inv gi gfs inodestart nib -∗
+    ireg_open -∗
     is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
     is_sleeplock_gen gild gisld (i_lock (ientry kd)) "inode"%string (ic_tok cn kd) (slh_tok (icfg_isl kd)) -∗
     (* ---- the CHILD, unlocked, its reference already shed ---- *)
@@ -1767,7 +1771,7 @@ Section ProofSysLinkTails.
            Hcrb Hcru Hmem Hiu Hclose Hj Hgl Hlkempty Heb Hsp0 HMsp HMthr
            HMs1 HMs2 Hal Hncd.
     iIntros "Hcg Hown #Htext #Hdata Hpc #Hpe #Hbio #Hlog Hseam Hgen #Hitab #Hitinv
-              #Hesck #Hescd #Hireg #Hslkk #Hslkd0 Hkeep Hru Hshr #Hshotc Hilink Hslkd
+              #Hesck #Hescd #Hireg #Hropen #Hslkk #Hslkd0 Hkeep Hru Hshr #Hshotc Hilink Hslkd
               Hslpid Hdep Hidev Hiinum Hivalid Hload #Hshotd Hfrz Hkeepd Hrud Hsbb Hsbi
               Hbmres Hpid #Hprocs #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4
               HbN HbW HbO Hcont".
@@ -1823,12 +1827,12 @@ Section ProofSysLinkTails.
               pd pav pu bn g gfs gi cn gtl gild gisld cov logstart bmapstart
               inodestart nib size dev used kd qd sd gyd dinum dnd bmd
               n Sb crb cru false e0 pidv dq dqb dqs
-              M2 (K - 38)%nat eb b lks
+              M2 (K - 38)%nat eb b lks true
               HKup Hkd Hcrb Hcru Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
               Hdblk Hdblog Hdnb Hcovb Hiu Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hitab Hitinv
-                    Hescd Hireg Hslkd0 Hslkd Hslpid Hdep Hidev Hiinum Hivalid
+                    Hescd Hireg Hropen Hslkd0 Hslkd Hslpid Hdep Hidev Hiinum Hivalid
                     Hload Hshotd Hfrz Hkeepd Hrud Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
                     Hdlk Hbsl [] Hop").
     { rewrite Heb /trap_csrs_ext. done. }
@@ -1836,7 +1840,7 @@ Section ProofSysLinkTails.
     { done. }
     iIntros (CID3 Hq3 mup n1 used1 Sb1 w)
       "%Hcsup Hcg Hown _ _ Hpc Hpid Hsbb Hsbi %Hused1 Hbmres Hbsl %Hsb1 %Hwm
-       %Hcrbw %Hn1 Hop Hislot".
+       %Hcrbw %Hn1 Hop Hislot _".
     assert (Hpcf4 : ret_pc (M2 !!! Regidx Rra : mword 64)
                     = mword_of_int (SL + 0xf4)) by (rewrite HM2ra; pcw).
     iEval (rewrite Hpcf4) in "Hpc".
@@ -1864,7 +1868,7 @@ Section ProofSysLinkTails.
               Hbmcov Hbmlog Hist0 Hiblk Hiblog Hinb Hcovb Hmem1 Hiu1 Hj Hgl
               Hlkempty Heb Hsp0 Hupsp Hupthr Hups1 Hal Hncd
               with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen Hitab Hitinv
-                    Hesck Hireg Hslkk Hkeep Hru Hshr Hshotc Hilink Hsbb Hsbi Hbmres Hpid
+                    Hesck Hireg Hropen Hslkk Hkeep Hru Hshr Hshotc Hilink Hsbb Hsbi Hbmres Hpid
                     Hprocs Hdev Hgeo Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
                     [Hislot Hcont]").
     iEval (rewrite /wp_next).
@@ -1977,6 +1981,7 @@ Section ProofSysLinkTails.
     ic_escrow cn gfs gi cov logstart kk -∗
     ic_escrow cn gfs gi cov logstart kd -∗
     ireg_inv gi gfs inodestart nib -∗
+    ireg_open -∗
     is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
     is_sleeplock_gen gild gisld (i_lock (ientry kd)) "inode"%string (ic_tok cn kd) (slh_tok (icfg_isl kd)) -∗
     (* ---- the CHILD, unlocked, its reference already shed ---- *)
@@ -2041,7 +2046,7 @@ Section ProofSysLinkTails.
            Hmem Hiu Hclose Hj Hgl Hlkempty Heb Hsp0 HMsp HMthr
            HMs1 HMs2 Hal Hncd.
     iIntros "Hcg Hown #Htext #Hdata Hpc #Hpe #Hbio #Hlog Hseam Hgen #Hitab #Hitinv
-              #Hesck #Hescd #Hireg #Hslkk #Hslkd0 Hkeep Hru Hshr #Hshotc Hilink Hslkd
+              #Hesck #Hescd #Hireg #Hropen #Hslkk #Hslkd0 Hkeep Hru Hshr #Hshotc Hilink Hslkd
               Hslpid Hdep Hidev Hiinum Hivalid Hload #Hshotd Hfrz Hkeepd Hrud Hsbb Hsbi
               Hbmres Hpid #Hprocs #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4
               HbN HbW HbO Hcont".
@@ -2098,12 +2103,12 @@ Section ProofSysLinkTails.
               pd pav pu bn g gfs gi cn gtl gild gisld cov logstart bmapstart
               inodestart nib size dev used kd qd sd gyd dinum dnd bmd
               n Sb false false false e0 pidv dq dqb dqs
-              M2 (K - 38)%nat eb b lks
+              M2 (K - 38)%nat eb b lks true
               HKup Hkd ltac:(discriminate) ltac:(discriminate) Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
               Hdblk Hdblog Hdnb Hcovb Hiu Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hitab Hitinv
-                    Hescd Hireg Hslkd0 Hslkd Hslpid Hdep Hidev Hiinum Hivalid
+                    Hescd Hireg Hropen Hslkd0 Hslkd Hslpid Hdep Hidev Hiinum Hivalid
                     Hload Hshotd Hfrz Hkeepd Hrud Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
                     Hdlk Hbsl [] Hop").
     { rewrite Heb /trap_csrs_ext. done. }
@@ -2111,7 +2116,7 @@ Section ProofSysLinkTails.
     { done. }
     iIntros (CID3 Hq3 mup n1 used1 Sb1 w)
       "%Hcsup Hcg Hown _ _ Hpc Hpid Hsbb Hsbi %Hused1 Hbmres Hbsl %Hsb1 %Hwm
-       %Hcrbw %Hn1 Hop Hislot".
+       %Hcrbw %Hn1 Hop Hislot _".
     assert (Hpcec : ret_pc (M2 !!! Regidx Rra : mword 64)
                     = mword_of_int (SL + 0xec)) by (rewrite HM2ra; pcw).
     iEval (rewrite Hpcec) in "Hpc".
@@ -2158,7 +2163,7 @@ Section ProofSysLinkTails.
               Hbmcov Hbmlog Hist0 Hiblk Hiblog Hinb Hcovb Hmem1 Hiu1 Hj Hgl
               Hlkempty Heb Hsp0 Hupsp Hupthr Hups1 Hal Hncd
               with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen Hitab Hitinv
-                    Hesck Hireg Hslkk Hkeep Hru Hshr Hshotc Hilink Hsbb Hsbi Hbmres Hpid
+                    Hesck Hireg Hropen Hslkk Hkeep Hru Hshr Hshotc Hilink Hsbb Hsbi Hbmres Hpid
                     Hprocs Hdev Hgeo Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
                     [Hislot Hcont]").
     iEval (rewrite /wp_next).
