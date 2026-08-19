@@ -288,7 +288,7 @@ unchanged, proof unchanged (pure Löb over the obligation).
 | `SpecUservec.v:304`, `ProofUservec.v:118` | consume `user_trap_frame` | unchanged — `user_trap_frame`'s shape is preserved.  uservec's own proof is red for the *kernel*-side port reasons, not the tier's |
 | `SpecUsertrap.v:491`, `UsertrapRes.v` | `Rut pt` = `∃ ksp, usertrap_res pt ksp`, opaque to the tier | unchanged |
 | `ProofUserretClosed.v:101-148` | builds `user_trap_frame` at another hart and re-enters `wp_user_exec_closed`; uses `user_trap_frame_intro` and rebuilds `user_cfg` | ONE call site of `user_trap_frame_intro` gains the `pc_is` argument |
-| `UmodeCap.v:109`, `UmodeFrame.v:66`, `WpUmodeStep.v` (the VERIFIED Umode tier) | reuse `ucfg`, `user_mstatus_ok`, `u_dispatch`, `interrupt_branch`, the trap tower | **out of scope of this plan but ported by the same bricks**; `WpUmodeStep.wp_uv_step_gen:239` is `wp_user_step_active`'s twin, wire/mip borrow included.  Schedule it immediately after, as a separate worklist; it costs the same seam and nothing new |
+| `UmodeCap.v:109`, `UmodeFrame.v:66`, `WpUmodeStep.v` (the VERIFIED Umode tier) | reuse `ucfg`, `user_mstatus_ok`, `u_dispatch`, `interrupt_branch`, the trap tower | **out of scope of this plan but ported by the same bricks**; `WpUmodeStep.wp_uv_step_gen` is `wp_user_step_active`'s twin.  **"wire/mip borrow included … the same seam and nothing new" WAS WRONG IN BOTH DIRECTIONS — see §19** |
 
 ---
 
@@ -2484,3 +2484,52 @@ leaf reads at `(aq, aq && rl)` (`mem_flags_ok_amo`) and writes at
 `(aq && rl, rl)` (`wr_flags_ok_amo`).
 
 All nineteen arms carry their `arm_X_u_contract` typing check.
+
+## 19. P8 REVIVED — what the descoped Umode tier actually costs, measured
+
+§P8 said reviving the verified Umode tier is "the same bricks", and the
+consumer table said `wp_uv_step_gen` is `wp_user_step_active`'s twin,
+"wire/mip borrow included … the same seam and nothing new".  **That was
+wrong in BOTH directions**, and the reconnaissance is one build: uncomment
+all 41 rows, `make -k proofs`, read the error roots.
+
+**FAVOURABLE: THERE IS NO BORROW SEAM TO PORT — the borrow is DELETED.**
+Post-port the hart OWNS mcycle/mtime/mip (`clock_res` rides inside
+`user_regs`), so `UserExec.clock_mip_acc` is gone, `wire_inv` is unused, and
+the wire reads are answered from the hart's own read-only frame.  Anyone
+planning this lane around "port the borrow" is planning around a thing that
+no longer exists.
+
+**UNFAVOURABLE: the ENGINE is a rewrite, not a re-seam.**
+`wp_exec_step_minstret` — the rule `WpUmodeStep` drives — exists nowhere in
+the ported tree, and neither does `UserStepFull.interrupt_branch`
+(`interrupt_branch` now occurs only inside `WpUmodeStep.v` itself).  So
+`uv_step_obl`'s whole vocabulary (`mstate_interp σ`, `minstret_inv_body`,
+`exec (riscv_step false) σ = Some (tt, s')`) is pre-port and has to be
+re-based on `HartStepFull.swp_exec_step_full`, exactly as
+`UserStepFull.wp_user_step_active` was.
+
+**AND THE GOOD NEWS IS MUCH BIGGER THAN THE BAD.**  Of the 41 rows, **18
+compile with NO EDIT AT ALL**: the whole pure image/ABI layer (`UmodeMem`,
+`UmodeCap`, `UmodeFetch`, `UmodeAbi`, `UmodeArith`, `UmodeSyscall`,
+`UmodeIo`, `UmodeInitIo`), all four binaries' images (`UCode*`), **all five
+spec files** (`USpecSync`/`Echo`/`Sh`/`ShParse`/`Init`) and
+`UProofShInput`.  The whole-tree build after reviving exactly those is
+`MAKEEXIT=0`.
+
+> **THE RULE THIS CONFIRMS, and it is why the tier was cheap to descope and
+> is cheap to revive: A SPEC STATED OVER A CAPABILITY AND AN IMAGE DOES NOT
+> MENTION THE INTERPRETER, SO A SEMANTICS SWAP CANNOT REACH IT.**
+> `uv_cap` / `uv_cap_gpr` / `umem` / `uinstr` are about what the process
+> owns and what its bytes decode to; none of them names `mstate_interp`, a
+> step relation or a fupd mask.  The interpreter shows up for the first time
+> in the ENGINE.  Contrast the safety tier, whose `base_exec_total_u` had to
+> be re-shaped from an `iProp` obligation into a pure `Prop` — because it
+> MOVED `mstate_interp`.
+
+**The revival order that follows:** engine (`WpUmodeStep`), then the four
+`WpUmode*` leaf files, then `UmodeFrame`/`UmodeStub` (blocked by the
+leaves, not broken), then the binaries' `UProof*` bottom-up — sync, echo,
+sh, init.  The ~50k lines of `UProof*` carry iff `uv_step_obl`'s
+CALLER-visible shape survives the re-basing; that is the thing to fight
+for, and a forced change there is a statement change the owner reviews.
