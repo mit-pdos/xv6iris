@@ -302,8 +302,8 @@ Definition boot_gprs : gset register := list_to_set boot_gpr_list.
      AND nextPC, and [reset_regs] deliberately does not pin the latter;
    - what [SpecEntry.wp_entry_boot] quantifies over and then WRITES
      (pmpaddr_n, mepc, satp, medeleg, mideleg, mie, mcounteren, stimecmp);
-   - the [MinstretInv] cells the per-era invariants are allocated over, and
-     the wire pins the device client already asks for;
+   - the [MinstretInv] cells [InstrBytes.pc_is] carries ([minstret_res] /
+     [clock_res]), and the wire pins the device client already asks for;
    - the FOUR S-mode trap registers past the M-mode contract: [tlb]
      ([SpecMain.main_hart_raw], [KptShare.tlb_res_pt]) and [IntrDefs.
      trap_csrs]' [sepc] / [scause] / [stval], all of them [boot_bridge]
@@ -354,7 +354,20 @@ Definition boot_D_named : list register :=
        [hw_config_intro] and never threaded again (ruled 2026-08-18).
        [mcounteren] is NOT one of them: timerinit WRITES it, so its
        persistent form is minted later, by [TimerCap.sstc_enabled]. *)
-    ((R_bitvector_32 scounteren) : register); (mhpmcounter : register) ].
+    ((R_bitvector_32 scounteren) : register); (mhpmcounter : register);
+    (* THE TWO COUNTER-INHIBIT CELLS THE CYCLE WRAPPER READS.  [swp]'s
+       [swp_should_inc_minstret] reads both on every instruction, in both
+       modes, so they are in every step engine's read footprint
+       ([WpMmodeSwpBase.mm_in_mc] / [WpSmodeWfi.wfi_in_mc]); they are owned
+       persistently inside [MinstretInv.minstret_res], which rides in
+       [InstrBytes.pc_is].  Like the two above they are in the domain even
+       though no boot code writes them -- a register outside this set has no
+       cell in the era, and [pc_is] could not be formed at all without them.
+       Frozen ([↦ᵣ□]) by [BootChain.boot_entry_pre] on the way into the first
+       [pc_is]; their VALUES are existential, since nothing reasons about
+       them beyond the counter's own arithmetic. *)
+    ((R_bitvector_32 mcountinhibit) : register);
+    ((R_bitvector_64 minstretcfg) : register) ].
 
 Definition boot_D_list : list register := boot_D_named ++ boot_gpr_list.
 
@@ -568,6 +581,10 @@ Section BootRegs.
       sstateen0 ↦ᵣ register_lookup sstateen0 rs ∗
       (R_bitvector_32 scounteren) ↦ᵣ register_lookup (R_bitvector_32 scounteren) rs ∗
       mhpmcounter ↦ᵣ register_lookup mhpmcounter rs ∗
+      (R_bitvector_32 mcountinhibit)
+        ↦ᵣ register_lookup (R_bitvector_32 mcountinhibit) rs ∗
+      (R_bitvector_64 minstretcfg)
+        ↦ᵣ register_lookup (R_bitvector_64 minstretcfg) rs ∗
       ([∗ list] r ∈ boot_gpr_list, r ↦ᵣ register_lookup r rs).
   Proof.
     rewrite boot_reg_list /boot_D_list big_sepL_app.
@@ -576,10 +593,10 @@ Section BootRegs.
                         H11 & H12 & H13 & H14 & H15 & H16 & H17 & H18 & H19 &
                         H20 & H21 & H22 & H23 & H24 & H25 & H26 & H27 & H28 &
                         H29 & H30 & H31 & H32 & H33 & H34 & H35 & H36 & H37 &
-                        H38 & H39 & _)".
+                        H38 & H39 & H40 & H41 & _)".
     iFrame "H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17
             H18 H19 H20 H21 H22 H23 H24 H25 H26 H27 H28 H29 H30 H31 H32 H33 H34
-            H35 H36 H37 H38 H39".
+            H35 H36 H37 H38 H39 H40 H41".
   Qed.
 
   (* the register FILE a reset hart's GPRs form: x0 reads zero (the [gpr_pt]

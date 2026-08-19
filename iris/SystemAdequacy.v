@@ -131,11 +131,10 @@ Section SystemBoot.
     iMod (boot_shared_alloc g XV6_DISK_BYTES Hbf with "Hres")
       as (Hfd Hir Hpav γd γv)
       "(%Hdimg & #Htext & #Hdata & #Hstarted & #Hdev & #Hwinv &
-        #Hcinv & #Hcert & Hharts & Hlk & Hgl & Hpark & Hpst & Hresv & Huart &
+        #Hcinv & #Hcert & Hharts & Hlk & Hgl & Hpark & Hpst & Huart &
         Hdlab & Hcfg & Hclaim & #Hdone & Hkpt & Hkmap & Hdisk & Hmir & Hpages)".
-    (* [Hresv]: the harts' reservation mirrors (design §3a).  Not yet
-       threaded into the boot harts -- their [pc_is] gets it when the boot
-       chain is ported to the per-node language. *)
+    (* the harts' reservation mirrors (design §3a) are gone from this
+       interface: [boot_shared_alloc] threads each into its hart's [pc_is]. *)
     iDestruct "Huart" as (l0) "(Htx & #Hsent & #Hlb)".
     iDestruct "Hdlab" as (b0) "Hdlab".
     iDestruct "Hcfg" as (c0) "[%Hlive Hcfg]".
