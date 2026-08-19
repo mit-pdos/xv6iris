@@ -76,7 +76,7 @@ From iris.base_logic.lib Require Import gen_heap invariants ghost_var ghost_map.
 From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
-Require Import RiscvPtsto RiscvLang RiscvExtras.
+Require Import RiscvModelBytes RiscvPtsto RiscvLang RiscvExtras.
 Require Import SmodeCore.
 Require Import InstrBytes.
 Require Import WpMmodeLeafBase.
@@ -355,11 +355,11 @@ Section ProofVmfault.
     iPoseProof (vfi_18 with "Htext") as "Hi18".
     iPoseProof (vfi_1a with "Htext") as "Hi1a".
     set (PAY := (fun res : mword 64 =>
-      ((⌜res = mword_of_int 0⌝ ∗ proc_ptm P M)
-       ∨ (∃ (r : mword 64) (M' : gmap Z (bv 8)),
+      ((⌜res = mword_of_int 0⌝ ∗ proc_ptm P (uint szv) M)
+       ∨ (∃ r : mword 64,
             ⌜res = r⌝ ∗ ⌜page_valid r⌝ ∗ ⌜(uint va < uint szv)%Z⌝ ∗
-            ⌜P.(ud_um) !! svpn_of va0 = None⌝ ∗ ⌜M ⊆ M'⌝ ∗
-            proc_ptm (uptd_insert P (svpn_of va0) r) M'))%I)).
+            ⌜P.(ud_um) !! svpn_of va0 = None⌝ ∗
+            proc_ptm (uptd_insert P (svpn_of va0) r) (uint szv) M))%I)).
     set (EPI := (wp_next (CID0 := CID) b p (fun (CIDe : CpuId) =>
         ∀ (mj : regfile) (res : mword 64),
         ⌜ mj !!! Regidx csp_rs1 = spr
@@ -715,7 +715,7 @@ Section ProofVmfault.
         [| intros Hx; injection Hx as Hx2; subst c; apply H9; reflexivity].
       apply HR3thr; assumption. }
     (* ---- open the table into the exact represented view ---- *)
-    iDestruct (proc_ptm_acc_rep0 P M with "Hpt") as
+    iDestruct (proc_ptm_acc_rep0 P (uint szv) M with "Hpt") as
       (t m_ad) "(%Hrep & %Hview & %Hbase & %Hwf & Hptree & Hown)".
     assert (HL5root : L5 !!! Regidx Ra0
                       = zero_extend' 64 (concat_vec (pt_base t) (zeros' 12 : mword 12))).
@@ -959,7 +959,7 @@ Section ProofVmfault.
                   (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 1995 : mword 11) ('b"0"))))
                 = mword_of_int (KernelSyms.vmfault + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hjt7a) in "Hpc".
-        iDestruct (proc_ptm_rebuild P M t m_ad Hwf Hview Hrep Hbase with "Hptree Hown") as "Hpt".
+        iDestruct (proc_ptm_rebuild P (uint szv) M t m_ad Hwf Hview Hrep Hbase with "Hptree Hown") as "Hpt".
         iDestruct (cpu_own_transport Ckr C10A lvl eb p b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
         iSpecialize ("Hepi" $! C10A with "[%]"); [wp_next_chain|].
@@ -1102,12 +1102,20 @@ Section ProofVmfault.
           [| intros Hx; injection Hx as Hx2; subst c; apply H20; reflexivity].
         apply HA2thr; assumption. }
       (* ---- memset(mem, 0, PGSIZE) ---- *)
-      iApply (MemsetPage.wp_memset_page_sconf KT1 A6 (K - 6)%nat (mword_of_int 0 : mword 64) b p
+      (* the VALUE-PRESERVING form: what the page holds after this is the
+         whole of vmfault's contribution to the process's memory, and it is
+         ZERO -- which is why the abstract view does not move. *)
+      iApply (MemsetPage.wp_memset_page_val_sconf KT1 A6 (K - 6)%nat (mword_of_int 0 : mword 64) b p
                 ltac:(lia) ltac:(rewrite HA6a0; exact Hpv) HA6a1 HA6a2
                 with "Hcg Htext Hpc [Hpage]").
       { iEval (rewrite HA6a0). iExact "Hpage". }
-      iIntros (Cse Hsse ms) "Hcg Hpc Hpage %Hmscs".
-      iEval (rewrite HA6a0) in "Hpage".
+      iIntros (Cse Hsse ms) "Hcg Hpc Hzpage %Hmscs".
+      iEval (rewrite HA6a0) in "Hzpage".
+      assert (Hcb : nth_byte (autocast (T := mword)
+                      (subrange_vec_dec (mword_of_int 0 : mword 64)
+                         (Z.sub (Z.mul 1 8) 1) 0) : mword 8) 0 = bv_0 8)
+        by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Hcb) in "Hzpage".
       assert (Hret4c : ret_pc (A6 !!! Regidx Rra) = mword_of_int (KernelSyms.vmfault + 0x4c)).
       { rewrite HA6ra. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
       iEval (rewrite Hret4c) in "Hpc".
@@ -1385,9 +1393,33 @@ Section ProofVmfault.
           "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hkmapb & _)".
         assert (Hvpnb : (bv_unsigned (svpn_of va0) < 67108864)%Z)
           by exact (svpn_of_lt_maxva va0 Hva0b).
-        iDestruct (proc_ptm_grow P M (svpn_of va0) r t'
-                     m_ad Hwf Hview Hnone Hvpnb Hrep' Hbase'' Hpv
-                     with "Hkmapb Hptree Hpage Hown") as (M') "[%Hsub Hpt]".
+        (* the faulting va's PAGE is inside [p->sz], so every one of its vas
+           was already in the process's view -- as a lazy page reading 0 *)
+        assert (Hvpnv : (bv_unsigned (svpn_of va0) * 4096
+                         = 4096 * (bv_unsigned va / 4096))%Z).
+        { rewrite (svpn_of_unsigned_lo va0
+                     ltac:(change (2 ^ 38)%Z with 274877906944%Z in Hva0b;
+                           exact Hva0b)).
+          rewrite Z.shiftr_div_pow2; [| lia]. change (2 ^ 12)%Z with 4096%Z.
+          rewrite uint_unsigned. subst va0. rewrite pgd_unsigned.
+          pose proof (Z.div_mod (bv_unsigned va) 4096 ltac:(lia)) as Hdm.
+          pose proof (Z.mod_pos_bound (bv_unsigned va) 4096 ltac:(lia)) as Hmb.
+          replace (bv_unsigned va - bv_unsigned va mod 4096)%Z
+            with ((bv_unsigned va / 4096) * 4096)%Z by lia.
+          rewrite (Z.div_mul (bv_unsigned va / 4096) 4096 ltac:(lia)). lia. }
+        assert (Hlive : forall j : nat, (j < 4096)%nat ->
+                  uva_live (uint szv)
+                    (bv_unsigned (svpn_of va0) * 4096 + Z.of_nat j)%Z).
+        { intros j Hj. rewrite Hvpnv.
+          apply (uva_live_page (uint szv) (bv_unsigned va) j);
+            [ exact (proj1 (bv_unsigned_in_range _ va))
+            | rewrite <- uint_unsigned; exact Hvalt
+            | exact Hj ]. }
+        iDestruct (proc_ptm_fault P (uint szv) M (svpn_of va0) r t'
+                     m_ad (fun _ : nat => bv_0 8)
+                     Hwf Hview Hnone Hvpnb Hrep' Hbase'' Hpv Hlive
+                     ltac:(intros j Hj; reflexivity)
+                     with "Hkmapb Hptree Hzpage Hown") as "Hpt".
         assert (Humnone : P.(ud_um) !! svpn_of va0 = None)
           by (exact (proj2 (proj2 (proj1 (proj1 Hview (svpn_of va0)) Hnone)))).
         iDestruct (cpu_own_transport Cgr C10B lvl eb p b ltac:(wp_next_chain)
@@ -1415,12 +1447,11 @@ Section ProofVmfault.
               [| intros Hx; injection Hx as Hx2; subst c; apply H9; reflexivity].
             apply Hmgthr; assumption. }
         { iExists _, _, _. iFrame "Hk3 Hk4 Hk5". }
-        { rewrite /PAY. iRight. iExists r, M'.
+        { rewrite /PAY. iRight. iExists r.
           iSplitR; [iPureIntro; reflexivity |].
           iSplitR; [iPureIntro; exact Hpv |].
           iSplitR; [iPureIntro; exact Hvalt |].
           iSplitR; [iPureIntro; exact Humnone |].
-          iSplitR; [iPureIntro; exact Hsub |].
           iExact "Hpt". } }
       (* ============ mappages FAILED: kfree and return 0 ============= *)
       assert (Hk0 : k = 0%nat) by lia. subst k.
@@ -1493,10 +1524,14 @@ Section ProofVmfault.
                 (mword_of_int (KernelSyms.kmem + 24)) F2 None lvl eb p (K - 6)%nat b lks
                 ltac:(lia) ltac:(reflexivity) ltac:(reflexivity)
                 Hlvl Hbelow
-                with "Hcg Hcnt Htext Hpc Hlock [Hpage] Havail").
+                with "Hcg Hcnt Htext Hpc Hlock [Hzpage] Havail").
       all: try lkbelow.
       { rewrite /kfree_pre HF2a0.
-        iSplitR; [iPureIntro; exact Hpv | iExact "Hpage"]. }
+        iSplitR; [iPureIntro; exact Hpv |].
+        (* kfree wants the page contents-existential; forget the zeros *)
+        rewrite /page_own /byte_any.
+        iApply (big_sepL_impl with "Hzpage"). iIntros "!>" (k x Hx) "Hj".
+        iExists _. iExact "Hj". }
       iIntros (Cfr Hsfr mfk) "Hcg Hcnt Hpc %Hfcs _".
       assert (Hret6a : ret_pc (F2 !!! Regidx Rra) = mword_of_int (KernelSyms.vmfault + 0x6a)).
       { rewrite HF2ra. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
@@ -1572,7 +1607,7 @@ Section ProofVmfault.
                 (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 1999 : mword 11) ('b"0"))))
               = mword_of_int (KernelSyms.vmfault + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hjt72) in "Hpc".
-      iDestruct (proc_ptm_rebuild P M t' m_ad Hwf Hview Hrep' Hbase'' with "Hptree Hown") as "Hpt".
+      iDestruct (proc_ptm_rebuild P (uint szv) M t' m_ad Hwf Hview Hrep' Hbase'' with "Hptree Hown") as "Hpt".
       iDestruct (cpu_own_transport Cfr C10C lvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iSpecialize ("Hepi" $! C10C with "[%]"); [wp_next_chain|].
@@ -1654,7 +1689,7 @@ Section ProofVmfault.
               (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2029 : mword 11) ('b"0"))))
             = mword_of_int (KernelSyms.vmfault + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjt36) in "Hpc".
-    iDestruct (proc_ptm_rebuild P M t m_ad Hwf Hview Hrep Hbase with "Hptree Hown") as "Hpt".
+    iDestruct (proc_ptm_rebuild P (uint szv) M t m_ad Hwf Hview Hrep Hbase with "Hptree Hown") as "Hpt".
     iDestruct (cpu_own_transport CID C10D lvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iSpecialize ("Hepi" $! C10D with "[%]"); [wp_next_chain|].
@@ -1690,7 +1725,8 @@ Section ProofVmfault.
     cbv beta delta [wp_vmfault_sconf_body].
     intros pcE va va0 ret_tgt HK Htp Hroot Hsza1 Hszb Hlvl Hbelow.
     iIntros "Hcg Hcnt #Htext Hpc Hpt Henv Hcont".
-    iEval (rewrite proc_pt_ptm) in "Hpt". iDestruct "Hpt" as (M) "Hpt".
+    iEval (rewrite (proc_pt_ptm P (uint szv))) in "Hpt".
+    iDestruct "Hpt" as (M) "Hpt".
     iApply (wp_vmfault_sconf_mem γa mm P M szv K lvl eb p b lks
               HK Htp Hroot Hsza1 Hszb Hlvl Hbelow
               with "Hcg Hcnt Htext Hpc Hpt Henv").
@@ -1702,7 +1738,7 @@ Section ProofVmfault.
     iDestruct "Hpost" as "[(%Hz & Hp) | Hs]".
     - iLeft. iSplitR; [iPureIntro; exact Hz |].
       iApply (proc_ptm_pt with "Hp").
-    - iDestruct "Hs" as (r M') "(%Hr & %Hv & %Hlt & %Hn & _ & Hp)".
+    - iDestruct "Hs" as (r) "(%Hr & %Hv & %Hlt & %Hn & Hp)".
       iRight. iExists r.
       iSplitR; [iPureIntro; exact Hr |].
       iSplitR; [iPureIntro; exact Hv |].

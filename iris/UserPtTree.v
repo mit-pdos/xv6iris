@@ -473,6 +473,109 @@ Proof.
     rewrite (umem_write_lookup_out M a n bs va Hne). reflexivity.
 Qed.
 
+(* --------------------------------------------------------------------- *)
+(* §3d'' Pure vocabulary of the LAZY view.                                *)
+(*                                                                       *)
+(* A va below [p->sz] that the table does not map is NOT an error: it is  *)
+(* a page the kernel will allocate, ZERO-FILLED, the first time the       *)
+(* process touches it (vmfault).  The process cannot tell that page from  *)
+(* one already mapped, so neither should its abstract state.             *)
+(* --------------------------------------------------------------------- *)
+
+(* p->sz rounded up to a page boundary: the end of the address space the
+   kernel maintains for the process *)
+Definition pgroundup (sz : Z) : Z := ((sz + 4095) / 4096) * 4096.
+
+(* a va the process may touch -- mapped or not yet faulted in *)
+Definition uva_live (sz : Z) (va : Z) : Prop := (0 <= va < pgroundup sz)%Z.
+
+(* THE PAGE OF A LIVE va IS LIVE.  vmfault maps the page of a va it has
+   already checked against [p->sz]; this is what says every va of that page
+   -- not just the faulting one -- was already in the process's view. *)
+Lemma uva_live_page (sz va : Z) (j : nat) :
+  (0 <= va)%Z -> (va < sz)%Z -> (j < 4096)%nat ->
+  uva_live sz (4096 * (va / 4096) + Z.of_nat j)%Z.
+Proof.
+  intros Hva0 Hlt Hj. unfold uva_live, pgroundup.
+  pose proof (Z.div_mod va 4096 ltac:(lia)) as Hdm.
+  pose proof (Z.mod_pos_bound va 4096 ltac:(lia)) as Hmb.
+  pose proof (Z.div_mod (sz + 4095) 4096 ltac:(lia)) as Hds.
+  pose proof (Z.mod_pos_bound (sz + 4095) 4096 ltac:(lia)) as Hsb.
+  split; lia.
+Qed.
+
+Definition live_set (sz : Z) : gset Z := list_to_set (seqZ 0 (pgroundup sz)).
+
+Lemma elem_of_live_set (sz va : Z) : va ∈ live_set sz <-> uva_live sz va.
+Proof.
+  unfold live_set, uva_live. rewrite elem_of_list_to_set elem_of_seqZ. lia.
+Qed.
+
+(* the vas of ONE page, and the byte map one page's worth of bytes makes *)
+Definition upage_dom (vpn : mword 27) : gset Z :=
+  list_to_set ((fun j : nat => (bv_unsigned vpn * 4096 + Z.of_nat j)%Z)
+               <$> seq 0 4096).
+
+Lemma elem_of_upage_dom (vpn : mword 27) (va : Z) :
+  va ∈ upage_dom vpn <->
+  exists j, (j < 4096)%nat /\ va = (bv_unsigned vpn * 4096 + Z.of_nat j)%Z.
+Proof.
+  unfold upage_dom. rewrite elem_of_list_to_set elem_of_list_fmap. split.
+  - intros (j & -> & Hj). apply elem_of_seq in Hj.
+    exists j. split; [lia | reflexivity].
+  - intros (j & Hj & ->). exists j.
+    split; [reflexivity |]. apply elem_of_seq. lia.
+Qed.
+
+Definition upage_kv (vpn : mword 27) (bs : nat -> bv 8) : list (Z * bv 8) :=
+  (fun j : nat => ((bv_unsigned vpn * 4096 + Z.of_nat j)%Z, bs j)) <$> seq 0 4096.
+
+Definition upage_map (vpn : mword 27) (bs : nat -> bv 8) : gmap Z (bv 8) :=
+  list_to_map (upage_kv vpn bs).
+
+(* the KEYS, spelled without a [cbn]: [cbn] here would evaluate [seq 0 4096]
+   into a 4096-element literal (durable-notes' [seq]-explosion trap). *)
+Lemma upage_kv_fst (vpn : mword 27) (bs : nat -> bv 8) :
+  (upage_kv vpn bs).*1
+  = (fun j : nat => (bv_unsigned vpn * 4096 + Z.of_nat j)%Z) <$> seq 0 4096.
+Proof.
+  unfold upage_kv. rewrite <- list_fmap_compose.
+  apply list_fmap_ext. intros i x _. reflexivity.
+Qed.
+
+(* [base.NoDup] and not [NoDup]: this file's [List] import makes the bare
+   name Stdlib's, and [big_sepM_list_to_map] wants stdpp's. *)
+Lemma upage_kv_nodup (vpn : mword 27) (bs : nat -> bv 8) :
+  base.NoDup (upage_kv vpn bs).*1.
+Proof.
+  rewrite upage_kv_fst.
+  apply NoDup_fmap_2_strong; [| apply NoDup_seq].
+  intros x y Hx Hy Heq. apply elem_of_seq in Hx. apply elem_of_seq in Hy. lia.
+Qed.
+
+Lemma upage_map_lookup (vpn : mword 27) (bs : nat -> bv 8) (j : nat) :
+  (j < 4096)%nat ->
+  upage_map vpn bs !! (bv_unsigned vpn * 4096 + Z.of_nat j)%Z = Some (bs j).
+Proof.
+  intros Hj. unfold upage_map.
+  apply elem_of_list_to_map_1; [ apply upage_kv_nodup |].
+  unfold upage_kv. apply elem_of_list_fmap. exists j.
+  split; [reflexivity |]. apply elem_of_seq. lia.
+Qed.
+
+Lemma upage_map_dom (vpn : mword 27) (bs : nat -> bv 8) :
+  dom (upage_map vpn bs) = upage_dom vpn.
+Proof.
+  unfold upage_map, upage_dom.
+  rewrite dom_list_to_map_L upage_kv_fst. reflexivity.
+Qed.
+
+Lemma upage_map_lookup_out (vpn : mword 27) (bs : nat -> bv 8) (va : Z) :
+  va ∉ upage_dom vpn -> upage_map vpn bs !! va = None.
+Proof.
+  intros Hn. apply not_elem_of_dom. rewrite upage_map_dom. exact Hn.
+Qed.
+
 Section UserPtInv.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
@@ -769,6 +872,150 @@ Section UserPtInv.
     iApply (big_sepL_mono with "Hwin'"). intros i j Hj.
     apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
     rewrite lookup_total_alt (umem_write_lookup_in M a n bs _ Hlt). reflexivity.
+  Qed.
+
+  (* one page's worth of per-offset resources IS the map that page's
+     bytes make -- the shape vmfault's fresh page arrives in, and the
+     shape [umem_own] wants *)
+  Lemma bigL_page_map (Phi : Z -> bv 8 -> iProp Σ) (vpn : mword 27)
+      (bs : nat -> bv 8) :
+    ([∗ list] j ∈ seq 0 4096,
+       Phi (bv_unsigned vpn * 4096 + Z.of_nat j)%Z (bs j)) ⊣⊢
+    ([∗ map] va ↦ b ∈ upage_map vpn bs, Phi va b).
+  Proof.
+    rewrite /upage_map (big_sepM_list_to_map Phi _ (upage_kv_nodup vpn bs)).
+    rewrite /upage_kv big_sepL_fmap. reflexivity.
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* §3f THE LAZY VIEW: the pages the process has NOT faulted in yet.     *)
+  (*                                                                    *)
+  (* [umem_lazy P sz M] says [M] covers EVERYTHING below [p->sz] rounded *)
+  (* up -- with the real byte wherever the table has a leaf, and a 0     *)
+  (* wherever it does not.  THE OWNERSHIP OF A LAZY PAGE IS NOTHING AT   *)
+  (* ALL (there is no page to own), which is exactly why vmfault         *)
+  (* PRESERVES this view instead of extending it: the byte the process   *)
+  (* reads after the fault is the same 0 the view already recorded.      *)
+  (*                                                                    *)
+  (* [Mp] -- the mapped half -- is existential rather than a parameter   *)
+  (* because it is a FUNCTION of [M] and the table; carrying it would    *)
+  (* mean stating that function, and every user of this predicate wants  *)
+  (* [M].                                                                *)
+  (* ------------------------------------------------------------------ *)
+  Definition umem_lazy (P : uptd) (sz : Z) (M : gmap Z (bv 8)) : iProp Σ :=
+    (∃ Mp : gmap Z (bv 8),
+       ⌜Mp ⊆ M⌝ ∗
+       ⌜forall va, is_Some (M !! va) <-> (uva_mapped P va \/ uva_live sz va)⌝ ∗
+       ⌜forall va, ~ uva_mapped P va -> uva_live sz va ->
+                   M !! va = Some (bv_0 8)⌝ ∗
+       umem_own P Mp)%I.
+
+  (* the mapped half is what the OWNERSHIP is, so the lazy view weakens
+     to the mapped-only one and back *)
+  Lemma umem_lazy_any (P : uptd) (sz : Z) (M : gmap Z (bv 8)) :
+    umem_lazy P sz M -∗ umem_any P.
+  Proof.
+    iIntros "H". iDestruct "H" as (Mp) "(_ & _ & _ & Hm)".
+    iExists Mp. iExact "Hm".
+  Qed.
+
+  Lemma umem_lazy_intro (P : uptd) (sz : Z) :
+    umem_any P -∗ ∃ M : gmap Z (bv 8), umem_lazy P sz M.
+  Proof.
+    iIntros "H". iDestruct "H" as (Mp) "Hm".
+    iDestruct "Hm" as "[%Hdom Hm]".
+    iExists (Mp ∪ gset_to_gmap (bv_0 8) (live_set sz)), Mp.
+    assert (Hmp : forall va, is_Some (Mp !! va) <-> uva_mapped P va).
+    { intros va. rewrite <- elem_of_dom. rewrite Hdom. apply elem_of_uva_dom. }
+    iSplitR; [iPureIntro; apply map_union_subseteq_l |].
+    assert (Hgz : forall va, is_Some (gset_to_gmap (bv_0 8) (live_set sz) !! va)
+                             <-> uva_live sz va).
+    { intros va. rewrite <- elem_of_dom. rewrite dom_gset_to_gmap.
+      apply elem_of_live_set. }
+    iSplitR.
+    { iPureIntro. intros va. rewrite lookup_union_is_Some.
+      rewrite (Hmp va) (Hgz va). reflexivity. }
+    iSplitR.
+    { iPureIntro. intros va Hnm Hlv.
+      rewrite lookup_union_r; [| apply not_elem_of_dom; rewrite Hdom;
+                                 intros Hin; apply Hnm; by apply elem_of_uva_dom].
+      apply lookup_gset_to_gmap_Some.
+      split; [ by apply elem_of_live_set | reflexivity]. }
+    iSplitR; [iPureIntro; exact Hdom |]. iExact "Hm".
+  Qed.
+
+  (* on a MAPPED va the two halves agree, which is what makes the window
+     accessor below read [M] and hand back [Mp] *)
+  Lemma umem_lazy_mapped_lookup (P : uptd) (M Mp : gmap Z (bv 8)) (va : Z) :
+    Mp ⊆ M -> dom Mp = uva_dom P -> uva_mapped P va ->
+    Mp !!! va = M !!! va.
+  Proof.
+    intros Hsub Hdom Hm.
+    assert (Hs : is_Some (Mp !! va))
+      by (apply elem_of_dom; rewrite Hdom; by apply elem_of_uva_dom).
+    destruct Hs as [b Hb].
+    rewrite !lookup_total_alt Hb (lookup_weaken _ _ _ _ Hb Hsub). reflexivity.
+  Qed.
+
+  (* THE WINDOW, at the lazy view.  Only MAPPED vas can be borrowed --
+     a lazy page has no bytes to lend, and a caller that wants one calls
+     vmfault first. *)
+  Lemma umem_lazy_window (P : uptd) (sz : Z) (M : gmap Z (bv 8))
+      (a : Z) (n : nat) :
+    (forall j, (j < n)%nat -> uva_mapped P (a + Z.of_nat j)%Z) ->
+    umem_lazy P sz M -∗
+      ([∗ list] j ∈ seq 0 n,
+         (uva_pa P (a + Z.of_nat j)%Z : Arch.pa) ↦ₚ (M !!! (a + Z.of_nat j)%Z)) ∗
+      (∀ bs : nat -> bv 8,
+         ([∗ list] j ∈ seq 0 n,
+            (uva_pa P (a + Z.of_nat j)%Z : Arch.pa) ↦ₚ bs j) -∗
+         umem_lazy P sz (umem_write M a n bs)).
+  Proof.
+    intros Hmap. iIntros "H".
+    iDestruct "H" as (Mp) "(%Hsub & %Hdm & %Hlz & Hm)".
+    iDestruct "Hm" as "[%Hdom Hm]".
+    assert (Hsome : forall j, (j < n)%nat -> is_Some (Mp !! (a + Z.of_nat j)%Z)).
+    { intros j Hj. apply elem_of_dom. rewrite Hdom.
+      apply elem_of_uva_dom. exact (Hmap j Hj). }
+    assert (Hagree : forall j, (j < n)%nat ->
+              Mp !!! (a + Z.of_nat j)%Z = M !!! (a + Z.of_nat j)%Z)
+      by (intros j Hj; exact (umem_lazy_mapped_lookup P M Mp _ Hsub Hdom (Hmap j Hj))).
+    iAssert (umem_own P Mp) with "[Hm]" as "Hm".
+    { iSplitR; [iPureIntro; exact Hdom |]. iExact "Hm". }
+    iDestruct (umem_own_window P Mp a n Hsome with "Hm") as "[Hwin Hback]".
+    iSplitL "Hwin".
+    { iApply (big_sepL_mono with "Hwin"). intros i j Hj.
+      apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l (Hagree i Hlt).
+      reflexivity. }
+    iIntros (bs) "Hw".
+    iDestruct ("Hback" $! bs with "Hw") as "Hm".
+    iExists (umem_write Mp a n bs).
+    (* the write lands only on MAPPED vas, so the lazy half does not move *)
+    assert (Hout : forall va, ~ uva_mapped P va ->
+              forall j, (j < n)%nat -> va <> (a + Z.of_nat j)%Z)
+      by (intros va Hnm j Hj ->; exact (Hnm (Hmap j Hj))).
+    iSplitR.
+    { iPureIntro. apply map_subseteq_spec. intros va bb Hbb.
+      destruct (decide (a <= va < a + Z.of_nat n)%Z) as [Hin | Hoo].
+      - apply in_run_iff in Hin as (j & Hj & ->).
+        rewrite (umem_write_lookup_in Mp a n bs j Hj) in Hbb.
+        rewrite (umem_write_lookup_in M a n bs j Hj). exact Hbb.
+      - assert (Hne : forall j, (j < n)%nat -> va <> (a + Z.of_nat j)%Z)
+          by (intros j Hj Heq; apply Hoo; apply in_run_iff; eauto).
+        rewrite (umem_write_lookup_out Mp a n bs va Hne) in Hbb.
+        rewrite (umem_write_lookup_out M a n bs va Hne).
+        exact (lookup_weaken _ _ _ _ Hbb Hsub). }
+    iSplitR.
+    { iPureIntro. intros va. rewrite <- (Hdm va). rewrite <- !elem_of_dom.
+      rewrite (umem_write_dom M a n bs
+                 ltac:(intros j Hj; apply (proj2 (Hdm _));
+                       left; exact (Hmap j Hj))).
+      reflexivity. }
+    iSplitR.
+    { iPureIntro. intros va Hnm Hlv.
+      rewrite (umem_write_lookup_out M a n bs va (Hout va Hnm)).
+      exact (Hlz va Hnm Hlv). }
+    iExact "Hm".
   Qed.
 
 End UserPtInv.

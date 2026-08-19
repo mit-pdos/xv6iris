@@ -107,14 +107,36 @@ anyway — only the kernel can change which vas are mapped. `u_mem_wf` /
 `∀ a, u_data_pa P a ↔ is_Some (md !! a)` and the `udata_cov` conjunct is
 gone (it is derivable from the `upt_map_wf` conjunct).
 
-## The KERNEL side: `proc_ptm P M`, and the copy loops
+## The KERNEL side: `proc_ptm P sz M`, and the copy loops
 
-`proc_pt P` with the process's memory NAMED. It is the SAME resource —
+`proc_pt P` with the process's memory NAMED — and named at the view the
+PROCESS has, which is **not** the set of mapped pages.
+
+**THE LAZY PAGES ARE PART OF THE VIEW.** A va below `p->sz` that the table
+does not map is not an error: it is a page the kernel will allocate,
+ZERO-FILLED, the first time the process touches it (vmfault). The process
+cannot tell that page from one already mapped, so neither does its abstract
+state: `UserPtTree.umem_lazy P sz M` says `M` covers everything below
+`pgroundup sz`, with the real byte wherever the table has a leaf and a **0**
+wherever it does not. The ownership of a lazy page is nothing at all —
+there is no page to own — and that is the whole point: **vmfault PRESERVES
+this view instead of extending it.**
+
+`umem_lazy` keeps the mapped half `Mp` existential (`Mp ⊆ M`, `umem_own P Mp`),
+because `Mp` is a function of `M` and the table; every user of the predicate
+wants `M`.
+
+**WHY `sz` IS A PARAMETER AND NOT A FIELD OF `uptd`.** A page table does not
+have a size; a PROCESS does, and `p->sz` is a `struct proc` cell. Nothing in
+the OWNERSHIP depends on it either, so `proc_pt P` — the 260-site predicate —
+stays exactly as it is, and `proc_pt_ptm : proc_pt P ⊣⊢ ∃ M, proc_ptm P sz M`
+holds **at every `sz`** (`umem_lazy_intro` builds the lazy half out of
+`gset_to_gmap` and nothing changes hands). The three functions that care —
+vmfault, copyin, copyout — already carry the size as an argument, and it is
+exactly the size their view is relative to.
+
 `proc_pt_own_umem` (`proc_pt_own P ⊣⊢ umem_any P`, under `upt_map_wf` +
-`um_inj`) is the whole of the difference — so a caller with nothing to say
-about the bytes keeps using `proc_pt` and opens/closes with `proc_pt_ptm`
-(`proc_pt P ⊣⊢ ∃ M, proc_ptm P M`) at the one call that does. What sits on
-top of it:
+`um_inj`) is still the bridge underneath. What sits on top of it:
 
 - **`UserPtTree`'s BYTE WINDOW.** The copy loops work a chunk at a time
   inside one page, and what they need of the abstract state is ONE accessor:
@@ -133,11 +155,24 @@ top of it:
   bracket, memory-indexed; **`proc_ptm_grow`** is its insert:
   `umem_own_grow` says the new page's bytes JOIN and the bytes the process
   already had are UNTOUCHED (`M ⊆ M'`).
-- **`SpecVmfault.wp_vmfault_sconf_mem`** is the memory-indexed contract.
+- **`SpecVmfault.wp_vmfault_sconf_mem`** is the memory-indexed contract, and
+  what it says about the memory is **nothing changes**: `M` is the same on
+  the way in and on the way out, on BOTH arms. vmfault maps a page that was
+  already in the view (as a lazy page reading 0) and memsets the page it maps
+  to 0; only which half of the view is backed by ownership moves.
+  `proc_ptm_fault` is the step, `umem_lazy_fault` its memory half, and
+  `uva_live_page` the arithmetic that says the whole PAGE of a va below
+  `p->sz` is below `pgroundup sz`.
   `wp_vmfault_sconf` survives as the `proc_pt`-altitude COROLLARY, derived
   in ten lines, so vmfault's other callers (usertrap, copyinstr) are
   untouched. **Do this for copyin/copyout too**: a strengthened contract of
   record plus a derived weak one keeps the ~15 call sites off the diff.
+- **`SpecMemsetPage.wp_memset_page_val_sconf`** — the value-preserving form
+  of the page memset. The old one weakens the written page back to
+  `page_own`, contents existential, which is right for kalloc/kfree (whose
+  memsets only poison) and wrong for vmfault, whose whole contribution to the
+  process's memory is that the page reads as ZERO. The existential form is
+  now derived from it, so kalloc/kfree/uvmalloc are untouched.
 
 ### The copyin / copyout contracts — DESIGNED, NOT YET PROVEN
 
