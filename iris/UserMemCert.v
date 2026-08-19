@@ -2317,15 +2317,27 @@ Qed.
 (* ===================================================================== *)
 (* 13. [u_sc_pure] -- THE PURE U-MODE STORE-CONDITIONAL.                  *)
 (*                                                                       *)
-(* The mirror of [u_lr_pure].  Three model calls, as for a plain store:    *)
-(* the walk, the effective-address announcement and the value write, all   *)
-(* at [StoreConditional (aq, rl, Data)] and with [con = true] -- which is  *)
-(* what routes [pmaCheck] into its reservability arm and                   *)
-(* [write_kind_of_flags] into a CONDITIONAL kind.  The physical write      *)
-(* always lands (the reservation test is at the instruction level, not     *)
-(* here), so like the plain store it has one total outcome; the value is   *)
-(* existential because a width-generic [write_ram] cannot name the bytes   *)
-(* it wrote ([MemAccessGen.exec_write_ram_plain_gen]'s shape).             *)
+(* The mirror of [u_lr_pure], at [StoreConditional (aq, rl, Data)] and    *)
+(* with [con = true] -- which is what routes [pmaCheck] into its          *)
+(* reservability arm and [write_kind_of_flags] into a CONDITIONAL kind.   *)
+(*                                                                       *)
+(* IT COVERS BOTH RESERVATION OUTCOMES, AND THAT IS WHY IT ISSUES FOUR    *)
+(* CALLS, NOT THREE.  The conditional test is not inside the physical     *)
+(* write: [vmem_write_addr] itself branches on [match_reservation paddr]  *)
+(* AFTER the walk, and the two arms call DIFFERENT things --              *)
+(*   held -> [mem_write_ea] then [mem_write_value] (the write lands);     *)
+(*   lost -> [phys_access_check] alone (nothing is written).              *)
+(* The reservation is machine state no user-tier arm owns, so an arm      *)
+(* cannot force the branch and needs the certificate for BOTH.  Hence the *)
+(* fourth pair below.  It costs nothing: [phys_access_check] is the same  *)
+(* [pmpCheck] and [pmaCheck] the write path already needed, composed in   *)
+(* the other order.                                                       *)
+(*                                                                       *)
+(* The written value is existential because a width-generic [write_ram]   *)
+(* cannot name the bytes it wrote                                         *)
+(* ([MemAccessGen.exec_write_ram_plain_gen]'s shape); that is why         *)
+(* [UserMemAccess.exec_vmem_write_addr_sc] takes its post-write state as  *)
+(* a PARAMETER rather than as a [write_bytes] literal.                    *)
 (* ===================================================================== *)
 
 Lemma u_sc_pure (P : uptd) (t : ptree) (mm : pamap) (rs : regstate)
@@ -2360,6 +2372,12 @@ Lemma u_sc_pure (P : uptd) (t : ptree) (mm : pamap) (rs : regstate)
     goodmb Du_r Du_w (mem_write_value (Physaddr (u_walk_pa w va)) k v
             (StoreConditional (aq, rl, Data)) PBMT_PMA maq mrl true)
       (u_state rs' mm') mm' = true /\
+    (* the LOST-reservation arm's own call: no write, only the re-check *)
+    exec (phys_access_check (StoreConditional (aq, rl, Data)) PBMT_PMA User
+            (Physaddr (u_walk_pa w va)) k true) (u_state rs' mm')
+      = Some (Ok pma_ok_aligned, u_state rs' mm') /\
+    goodmb Du_r Du_w (phys_access_check (StoreConditional (aq, rl, Data)) PBMT_PMA
+            User (Physaddr (u_walk_pa w va)) k true) (u_state rs' mm') mm' = true /\
     (rs' = rs \/ exists tv, rs' = register_set tlb tv rs) /\
     tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rs') /\
     u_mem_step P t t' mm mm' /\
@@ -2431,6 +2449,18 @@ Proof.
     by exact (goodmb_pmpCheck_user_grant_sc Du_r Du_w aq rl pa k s' mm'
                 ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
                 HA Hord Hrange HW).
+  (* [phys_access_check] is the SAME two checks in the OTHER order -- pmp
+     first, and only on its [None] the pma plan -- so the lost-reservation
+     arm's certificate costs one composition of facts the write path already
+     needed. *)
+  assert (Hpace : exec (phys_access_check (StoreConditional (aq, rl, Data))
+                          PBMT_PMA User (Physaddr pa) k true) s'
+                  = Some (Ok pma_ok_aligned, s')).
+  { unfold phys_access_check.
+    rewrite (exec_bind_Some _ _ _ _ _ Hpmpe). cbn match. exact Hpmae. }
+  assert (Hpacg : goodmb Du_r Du_w (phys_access_check (StoreConditional (aq, rl, Data))
+                    PBMT_PMA User (Physaddr pa) k true) s' mm' = true).
+  { unfold phys_access_check. gmm_peel Hpmpg Hpmpe. cbn match. exact Hpmag. }
   assert (Hclint : exec (within_clint (Physaddr pa) k) s' = Some (false, s'))
     by exact (within_clint_false pa k s' (addr_is_ram_not_in_clint _ Hram0) Hk).
   assert (Hsig : exec (within_sig (Physaddr pa) k) s' = Some (false, s'))
@@ -2492,6 +2522,7 @@ Proof.
                   (StoreConditional (aq, rl, Data)) (register_lookup mstatus rs')
                   (register_lookup cur_privilege rs') s' mm' Lmprv)
                Heffe Hchkg Hchke)
+    | exact Hpace | exact Hpacg
     | exact Hfile | exact Htlbok' | exact Hstep
     | exact (u_mem_step_write_in P t t' mm mm' pa (Z.to_N k) vv
                (fun j Hj => proj2 (proj2 (Hwin j ltac:(lia)))) Hstep)

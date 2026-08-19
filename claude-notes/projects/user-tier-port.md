@@ -1984,3 +1984,86 @@ same gap, and it is a real one:
   `(aq && rl, rl)`.
 
 Neither is a day's work, but neither is a copy of the LR arm either.
+
+## 17. P4b IS 18 / 19 — SC, and where §16 put the composer gap in the wrong place
+
+### THE SC GAP IS AT `vmem_write_addr`, NOT AT `mem_write_value`
+
+§16 read the missing outcome as "an SC whose reservation does not match
+returns `Ok false`" from `mem_write_value`.  It does not.  The physical
+write is unconditional in this interpreter — `exec_write_ram_cond_gen`
+closes by `reflexivity` at `Some (true, …)` for every conditional write
+kind, because `RiscvFetchExec.exec_MemWrite` answers `inl None` and the
+Sail wrapper reads `None` as success — so `u_sc_pure`'s `Ok true` was
+right all along.
+
+**The branch is one level up.**  `vmem_write_addr` at `StoreConditional`
+tests `match_reservation paddr` AFTER the walk, and the two arms call
+DIFFERENT things:
+
+| `match_reservation` | what the model calls | post map |
+|---|---|---|
+| true | `mem_write_ea` then `mem_write_value` | the write lands |
+| false | `phys_access_check` alone | unchanged |
+
+So the SC composer needed a FOURTH pair, not a restated third:
+`u_sc_pure` now also concludes
+`phys_access_check (StoreConditional …) PBMT_PMA User pa k true = Ok
+pma_ok_aligned` and its `goodmb` twin.  It costs one composition —
+`phys_access_check` is the same `pmpCheck`/`pmaCheck` the write path
+already proved, in the other order (pmp first, pma only on its `None`) —
+and it is what makes ONE lemma cover both reservation outcomes, so no
+second composer and no corollary were needed (`u_sc_pure` had no other
+call site).
+
+**The rule this instantiates:** when a certificate cannot see a value,
+look for the branch that consumes it, not for a weaker conclusion.  The
+arm's outcome bool stays existential (`exists b, … = Some (Ok b, …)`),
+exactly as `UserMemArmsBase.u_vmem_write_pure`'s already was.
+
+### A COMPOSER BUILT ON A WIDTH-GENERIC LEAF CAN NEVER MEET A `write_bytes` LITERAL
+
+`UserMemAccess.exec_vmem_write_addr_sc` / `goodmb_…` spelled their
+post-write state as `MState s'.(sregs) (write_bytes s'.(mem) pa …  wv)
+s'.(mdev)`.  That is unreachable from `u_sc_pure`, whose post map is
+`write_bytes mm' pa … vv` at an EXISTENTIAL `vv` — a width-generic
+`write_ram` cannot name the bytes it wrote.  Both now take the post-write
+state as a PARAMETER `sw`, which is the discipline
+`exec_vmem_write_addr_intra` (the plain-store arm's) already followed.
+Strictly more general; the one call site (`…_sc_disj`) passes the literal.
+**State a vmem-level lemma on an opaque post STATE, never on the
+`write_bytes` term that produced it** — the same rule as §16's "state an
+access-level lemma on a `regstate`, never on the geometry".
+
+### `arm_STORECON_u` — what it is made of
+
+`UserMemArmsA.v`.  The LR arm's three-arm tree (misaligned → access fault
+before any walk; aligned+mapped → one page by construction, one walk;
+aligned+unmapped/denied → translate fault) with the write substituted:
+
+* `u_vmem_write_sc_pure` is the tree, at `vmem_write_addr`.  Both
+  reservation branches land in the SAME retiring disjunct — `destruct`
+  the `match_reservation` and hand out `mm2` / `mm'` with the matching
+  `u_mem_step`.  **`destruct <term> eqn:H` substitutes the scrutinee in
+  the HYPOTHESES too**, so a following `rewrite H in Hvwa` fails with
+  *"The LHS of H … does not match any subterm of the goal"*, naming the
+  hypothesis as "the goal"; `cbn match in Hvwa` is the whole step.
+* the fault arm is `exec/goodmb_vmem_write_addr_intra_terr` — both are
+  access-type generic, so the STORE arm's lemmas serve unchanged with
+  `or_introl Hal` for the alignment guard.
+* `exec/goodmb_execute_STORECON_u_retire` (§0b) is the `gpr_write_state`
+  shape fix, as LR's.  The extra step over LOADRES is the
+  `cancel_reservation` between the `wX` and the `returnM`; it is a TERM
+  axiom, so it moves neither state nor certificate.
+* the flag pair is NOT the access type's: `execute_STORECON` calls
+  `vmem_write` at `(aq && rl, rl)`, and `UserMemCert.wr_flags_ok_amo`
+  is exactly `wr_flags_ok (aq && rl) rl`.
+
+### WHAT AMO STILL NEEDS
+
+`arm_AMO_u` is the last one.  `u_amo_pure` issues FOUR calls (walk,
+`mem_write_ea`, `mem_read`, `mem_write_value`) whose aq/rl pairs are not
+the access type's either — the leaf reads at `(aq, aq && rl)` and writes
+at `(aq && rl, rl)` — and there is a 128-bit AMOCAS.Q path with its own
+layer (`UserMemClassifyAmo`).  The three-arm structure is the same:
+atomics are refused, not split, at a page boundary.

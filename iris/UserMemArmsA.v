@@ -112,6 +112,113 @@ Proof.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
+(* 0b. THE STORECON EXECUTE PAIR AT A SYMBOLIC [rd] -- the same shape fix.  *)
+(*                                                                        *)
+(* [UserMemArms]' [exec_execute_STORECON_u_ok] pins [uint rd <> 0] too, so  *)
+(* without this the SC arm would owe an [rd = x0] duplicate of its whole    *)
+(* case tree.  The extra step over LOADRES is the [cancel_reservation]      *)
+(* between the [wX] and the [returnM]: it is a TERM axiom                   *)
+(* ([ResvAxioms.cancel_reservation_term]), so it moves neither state nor    *)
+(* certificate.                                                            *)
+(* ---------------------------------------------------------------------- *)
+Lemma exec_execute_STORECON_u_retire (aq rl : bool) (rs2 rs1 rd : mword 5)
+    (width : Z) (b : bool) (s s' : mstate) :
+  (width <=? xlen_bytes) = true ->
+  exec (vmem_write (Regidx rs1) (zeros' 64) width
+          (autocast (T := mword) (subrange_vec_dec
+             (if Z.eqb (uint rs2) 0 then zero_reg
+              else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs2))) s.(sregs))
+             (Z.sub (Z.mul width 8) 1) 0))
+          (StoreConditional (aq, rl, Data)) (andb aq rl) rl true) s
+    = Some (Ok b, s') ->
+  exec (execute (STORECON (aq, rl, Regidx rs2, Regidx rs1, width, Regidx rd))) s
+    = Some (RETIRE_SUCCESS,
+            gpr_write_state rd (zero_extend' 64 (bool_bit_forwards (negb b))) s').
+Proof.
+  intros Hw Hvw.
+  change (execute (STORECON (aq, rl, Regidx rs2, Regidx rs1, width, Regidx rd)))
+    with (execute_STORECON aq rl (Regidx rs2) (Regidx rs1) width (Regidx rd)).
+  unfold execute_STORECON. rewrite Hw.
+  assert (Hass : exec (assert_exp' true
+                   "extensions/A/zalrsc_insts.sail:68.28-68.29" : M (true = true)) s
+                 = Some (@eq_refl bool true, s)) by reflexivity.
+  rewrite (exec_bind_Some _ _ _ _ _ Hass).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
+  rewrite (exec_bind_Some _ _ _ _ _ Hvw). cbn match.
+  assert (Hw2 : exec (wX_bits (Regidx rd)
+                        (zero_extend' 64 (bool_bit_forwards (negb b)))) s'
+                = Some (tt, gpr_write_state rd
+                              (zero_extend' 64 (bool_bit_forwards (negb b))) s'))
+    by (rewrite (exec_wX_bits_gpr rd
+                   (zero_extend' 64 (bool_bit_forwards (negb b))) s'); reflexivity).
+  assert (Hwc : exec (Defs.bind0 (wX_bits (Regidx rd)
+                        (zero_extend' 64 (bool_bit_forwards (negb b))))
+                        (cancel_reservation tt)) s'
+                = Some (tt, gpr_write_state rd
+                              (zero_extend' 64 (bool_bit_forwards (negb b))) s')).
+  { rewrite (exec_bind0_Some _ _ _ _ _ Hw2). apply exec_cancel_reservation. }
+  rewrite (exec_bind0_Some _ _ _ _ _ Hwc). apply exec_returnM.
+Qed.
+
+Lemma goodmb_execute_STORECON_u_retire (Dr Dw : register -> bool)
+    (aq rl : bool) (rs2 rs1 rd : mword 5) (width : Z) (b : bool)
+    (s s' : mstate) mm :
+  (uint rs2 <> 0 -> Dr (R_bitvector_64 (gpr_of_Z (uint rs2))) = true) ->
+  (uint rd <> 0 -> Dw (R_bitvector_64 (gpr_of_Z (uint rd))) = true) ->
+  (width <=? xlen_bytes) = true ->
+  exec (vmem_write (Regidx rs1) (zeros' 64) width
+          (autocast (T := mword) (subrange_vec_dec
+             (if Z.eqb (uint rs2) 0 then zero_reg
+              else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs2))) s.(sregs))
+             (Z.sub (Z.mul width 8) 1) 0))
+          (StoreConditional (aq, rl, Data)) (andb aq rl) rl true) s
+    = Some (Ok b, s') ->
+  goodmb Dr Dw (vmem_write (Regidx rs1) (zeros' 64) width
+          (autocast (T := mword) (subrange_vec_dec
+             (if Z.eqb (uint rs2) 0 then zero_reg
+              else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs2))) s.(sregs))
+             (Z.sub (Z.mul width 8) 1) 0))
+          (StoreConditional (aq, rl, Data)) (andb aq rl) rl true) s mm = true ->
+  goodmb Dr Dw (execute (STORECON (aq, rl, Regidx rs2, Regidx rs1, width, Regidx rd)))
+    s mm = true.
+Proof.
+  intros HDrs2 HDrd Hw Hvw Hgvw.
+  change (execute (STORECON (aq, rl, Regidx rs2, Regidx rs1, width, Regidx rd)))
+    with (execute_STORECON aq rl (Regidx rs2) (Regidx rs1) width (Regidx rd)).
+  unfold execute_STORECON. rewrite Hw.
+  assert (Hass : exec (assert_exp' true
+                   "extensions/A/zalrsc_insts.sail:68.28-68.29" : M (true = true)) s
+                 = Some (@eq_refl bool true, s)) by reflexivity.
+  assert (Hgass : goodmb Dr Dw (assert_exp' true
+                   "extensions/A/zalrsc_insts.sail:68.28-68.29" : M (true = true)) s mm
+                 = true) by reflexivity.
+  erewrite (gm_bind _ _ _ _ _ _ _ _ Hgass Hass).
+  erewrite gm_bind; [ | apply goodmb_rX_bits_gpr, HDrs2 | apply (exec_rX_bits_gpr rs2 s) ].
+  erewrite (gm_bind _ _ _ _ _ _ _ _ Hgvw Hvw). cbn match.
+  assert (Hgw2 : goodmb Dr Dw (wX_bits (Regidx rd)
+                   (zero_extend' 64 (bool_bit_forwards (negb b)))) s' mm = true)
+    by exact (goodmb_wX_bits_gpr Dr Dw rd _ s' mm HDrd).
+  assert (Hw2 : exec (wX_bits (Regidx rd)
+                        (zero_extend' 64 (bool_bit_forwards (negb b)))) s'
+                = Some (tt, gpr_write_state rd
+                              (zero_extend' 64 (bool_bit_forwards (negb b))) s'))
+    by (rewrite (exec_wX_bits_gpr rd
+                   (zero_extend' 64 (bool_bit_forwards (negb b))) s'); reflexivity).
+  assert (Hwc : exec (Defs.bind0 (wX_bits (Regidx rd)
+                        (zero_extend' 64 (bool_bit_forwards (negb b))))
+                        (cancel_reservation tt)) s'
+                = Some (tt, gpr_write_state rd
+                              (zero_extend' 64 (bool_bit_forwards (negb b))) s')).
+  { rewrite (exec_bind0_Some _ _ _ _ _ Hw2). apply exec_cancel_reservation. }
+  assert (Hgwc : goodmb Dr Dw (Defs.bind0 (wX_bits (Regidx rd)
+                        (zero_extend' 64 (bool_bit_forwards (negb b))))
+                        (cancel_reservation tt)) s' mm = true).
+  { erewrite (gm_bind0 _ _ _ _ _ _ _ Hgw2 Hw2).
+    apply (goodmb_cancel_reservation Dr Dw). }
+  erewrite (gm_bind0 _ _ _ _ _ _ _ Hgwc Hwc). apply goodmb_returnm.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
 (* THE THREE ACCESS-TYPE DISEQUALITIES [u_pmlen_pure] ASKS FOR.            *)
 (*                                                                        *)
 (* [vm_compute] CANNOT decide them at a symbolic [aq]/[rl] (or [op]): the  *)
@@ -524,6 +631,357 @@ Section UserMemArmsA.
         | exact Htlbok | exact Hstep ].
   Qed.
 
+  (* ------------------------------------------------------------------- *)
+  (* 5. THE SC CASE TREE, at the [vmem_write_addr] level.                  *)
+  (*                                                                     *)
+  (* Three arms, exactly as LR's -- but the RETIRING arm carries a BOOL    *)
+  (* the tier cannot pin.  [vmem_write_addr] at [StoreConditional]        *)
+  (* branches on [match_reservation paddr] AFTER the walk, and the two     *)
+  (* branches call different things: held -> [mem_write_ea] then           *)
+  (* [mem_write_value]; lost -> [phys_access_check] alone, with nothing    *)
+  (* written.  The reservation is machine state no arm owns, so the arm    *)
+  (* needs BOTH certificates -- which is what [u_sc_pure]'s fourth pair    *)
+  (* supplies -- and the outcome stays existential in [b], exactly as      *)
+  (* [UserMemArmsBase.u_vmem_write_pure]'s already is.  The post map       *)
+  (* differs between the branches, so the [u_mem_step] handed out is the   *)
+  (* one for the branch taken.                                            *)
+  (* ------------------------------------------------------------------- *)
+  Lemma u_vmem_write_sc_pure (t : ptree) (mm : PtBytes.pamap) (rs : regstate)
+      (k : Z) (va : mword 64) (dat : mword (8 * k)) (aq rl : bool) :
+    0 < k -> k <= 8 -> (k | 4096) -> uint (to_bits 64 k) = k -> vmem_width k ->
+    u_data_cfg rs -> u_exec_pins pt t rs -> u_mem_wf pt t mm ->
+    (exists (b : bool) (rs' : regstate) (mm' : PtBytes.pamap) (t' : ptree),
+        exec (vmem_write_addr (Virtaddr va) k dat (StoreConditional (aq, rl, Data))
+                (andb aq rl) rl true) (u_state rs mm)
+          = Some (Ok b, u_state rs' mm')
+        /\ goodmb Du_r Du_w
+             (vmem_write_addr (Virtaddr va) k dat (StoreConditional (aq, rl, Data))
+                (andb aq rl) rl true) (u_state rs mm) mm = true
+        /\ u_tlb_only rs rs'
+        /\ tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rs')
+        /\ u_mem_step pt t t' mm mm')
+    \/ (exists (rs' : regstate) (mm' : PtBytes.pamap) (t' : ptree)
+               (e : ExceptionType) (xv pcx : mword 64),
+        exec (vmem_write_addr (Virtaddr va) k dat (StoreConditional (aq, rl, Data))
+                (andb aq rl) rl true) (u_state rs mm)
+          = Some (Err (rv64d_types.Trap (User, make_sync_exception e xv, pcx)),
+                  u_state rs' mm')
+        /\ goodmb Du_r Du_w
+             (vmem_write_addr (Virtaddr va) k dat (StoreConditional (aq, rl, Data))
+                (andb aq rl) rl true) (u_state rs mm) mm = true
+        /\ user_exc e = true
+        /\ u_tlb_only rs rs'
+        /\ tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rs')
+        /\ u_mem_step pt t t' mm mm').
+  Proof.
+    intros Hk Hk8 Hkdvd Huintk Hvwid Hcfg Hpins Hwf.
+    pose proof Hwf as (md0 & _ & _ & _ & _ & _ & _ & Hacc & _ & _).
+    pose proof Hpins as (_ & _ & _ & Htlb0).
+    pose proof Hcfg as (Lcp & Lms & Lmenv).
+    destruct Lms as (_ & Lmprv & _).
+    destruct (is_aligned_vaddr (Virtaddr va) k) eqn:Hal; last first.
+    - (* MISALIGNED: refused before any walk, state untouched *)
+      right. exists rs, mm, t, (E_SAMO_Access_Fault tt), va,
+             (register_lookup PC rs).
+      split_and!;
+        [ exact (exec_vmem_write_addr_misaligned_sc va (register_lookup PC rs) k dat
+                   aq rl (andb aq rl) rl User (u_state rs mm) Hal Lcp eq_refl)
+        | exact (goodmb_vmem_write_addr_misaligned_sc Du_r Du_w va
+                   (register_lookup PC rs) k dat aq rl (andb aq rl) rl User
+                   (u_state rs mm) mm ltac:(vm_compute; reflexivity)
+                   ltac:(vm_compute; reflexivity) Hal Lcp eq_refl)
+        | vm_compute; reflexivity
+        | exact (u_tlb_only_refl rs) | exact Htlb0
+        | exact (u_mem_step_refl pt t mm Hwf) ].
+    - (* ALIGNED: one page by construction, so one walk *)
+      assert (Hin : in_one_page va k)
+        by exact (in_one_page_aligned va k Hk Hkdvd Hal).
+      pose proof (exec_split_on_page_boundary_intra va k (u_state rs mm) Hk Hin)
+        as Hsp.
+      pose proof (goodmb_split_on_page_boundary Du_r Du_w va k
+                    (u_state rs mm) (u_state rs mm) (k, 0) mm Hsp) as Hspg.
+      pose proof (u_effectivePrivilege_pure (StoreConditional (aq, rl, Data))
+                    rs mm Hcfg) as Heff.
+      pose proof (u_goodmb_effectivePrivilege_pure (StoreConditional (aq, rl, Data))
+                    rs mm mm Hcfg) as Heffg.
+      pose proof (u_translationMode_pure pt t rs mm Hcfg Hpins) as Htm.
+      pose proof (u_goodmb_translationMode_pure pt t rs mm mm Hcfg Hpins) as Htmg.
+      destruct (data_classify (StoreConditional (aq, rl, Data)) (ud_tfp pt)
+                  (ud_um pt) va
+                  (or_intror (or_intror (or_intror (or_intror
+                     (or_introl (ex_intro _ aq (ex_intro _ rl eq_refl)))))))
+                  Hacc)
+        as [ (w & Hum & Hok & Hcanon) | Hfault ].
+      + destruct (u_sc_pure pt t mm rs k w va
+                    (autocast (T := mword) (subrange_vec_dec dat (8 * k - 1) 0))
+                    aq rl (andb aq rl) rl
+                    Hk Hk8 Hkdvd Huintk Hal (wr_flags_ok_amo aq rl)
+                    Hum Hok Hcanon Hcfg Hpins Hwf)
+          as (rs' & mm' & mm2 & t' & Htr & Htrg & Hea & Heag0 & Hwv & Hwvg0
+              & Hpace & Hpacg0 & Hfile & Htlbok & Hstep & Hstep2 & Hcfg' & Hpins').
+        (* the three post-walk certificates read back at the STARTING map *)
+        assert (Heag : goodmb Du_r Du_w
+                  (mem_write_ea (Physaddr (u_walk_pa w va)) k
+                     (StoreConditional (aq, rl, Data)) PBMT_PMA (andb aq rl) rl true)
+                  (u_state rs' mm') mm = true)
+          by (rewrite <- (u_goodmb_step pt t t' mm mm' _ _ Hwf Hstep); exact Heag0).
+        assert (Hwvg : goodmb Du_r Du_w
+                  (mem_write_value (Physaddr (u_walk_pa w va)) k
+                     (autocast (T := mword) (subrange_vec_dec dat (8 * k - 1) 0))
+                     (StoreConditional (aq, rl, Data)) PBMT_PMA (andb aq rl) rl true)
+                  (u_state rs' mm') mm = true)
+          by (rewrite <- (u_goodmb_step pt t t' mm mm' _ _ Hwf Hstep); exact Hwvg0).
+        assert (Hpacg : goodmb Du_r Du_w
+                  (phys_access_check (StoreConditional (aq, rl, Data)) PBMT_PMA User
+                     (Physaddr (u_walk_pa w va)) k true) (u_state rs' mm') mm = true)
+          by (rewrite <- (u_goodmb_step pt t t' mm mm' _ _ Hwf Hstep); exact Hpacg0).
+        pose proof (u_effectivePrivilege_pure (StoreConditional (aq, rl, Data))
+                      rs' mm' Hcfg') as Heff'.
+        pose proof (u_goodmb_effectivePrivilege_pure (StoreConditional (aq, rl, Data))
+                      rs' mm' mm Hcfg') as Heff'g.
+        pose proof (exec_vmem_write_addr_sc k va (u_walk_pa w va) dat aq rl
+                      (andb aq rl) rl User User Sv39 pma_ok_aligned
+                      (u_state rs mm) (u_state rs' mm') (u_state rs' mm2)
+                      Hvwid Hal Heff Htm Htr Hea Hwv Heff' Hpace) as Hvwa.
+        pose proof (goodmb_vmem_write_addr_sc Du_r Du_w k va (u_walk_pa w va) dat
+                      aq rl (andb aq rl) rl User User Sv39 pma_ok_aligned
+                      (u_state rs mm) (u_state rs' mm') (u_state rs' mm2) mm
+                      ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                      Hvwid Hal Heff Heffg Htm Htmg Htr Htrg Hea Heag Hwv Hwvg
+                      Heff' Heff'g Hpace Hpacg) as Hvwag.
+        left.
+        (* [destruct] substitutes the scrutinee in [Hvwa] as well as in the
+           goal, so the branch's [if] is already a redex here -- do NOT
+           [rewrite Hmr in Hvwa], the LHS is gone by then. *)
+        destruct (match_reservation (bits_of_physaddr (Physaddr (u_walk_pa w va))))
+          eqn:Hmr; cbn match in Hvwa.
+        * exists true, rs', mm2, t'. split_and!;
+            [ exact Hvwa | exact Hvwag | exact (u_tlb_only_land rs rs' Hfile)
+            | exact Htlbok | exact Hstep2 ].
+        * exists false, rs', mm', t'. split_and!;
+            [ exact Hvwa | exact Hvwag | exact (u_tlb_only_land rs rs' Hfile)
+            | exact Htlbok | exact Hstep ].
+      + destruct (u_fault_pair pt t mm rs (StoreConditional (aq, rl, Data))
+                    (E_SAMO_Page_Fault tt) va
+                    (or_intror (or_intror (or_intror (or_intror
+                       (or_introl (ex_intro _ aq (ex_intro _ rl eq_refl)))))))
+                    (proj1 (u_texc_sc aq rl (u_state rs mm)))
+                    (proj1 (proj2 (u_texc_sc aq rl (u_state rs mm))))
+                    (proj2 (proj2 (u_texc_sc aq rl (u_state rs mm))))
+                    Hfault Hcfg Hpins Hwf) as (Htr & Htrg & Hme & Hmeg).
+        right. exists rs, mm, t, (E_SAMO_Page_Fault tt), va,
+               (register_lookup PC rs).
+        split_and!;
+          [ exact (exec_vmem_write_addr_intra_terr k va dat
+                     (StoreConditional (aq, rl, Data)) (andb aq rl) rl true
+                     (E_SAMO_Page_Fault tt) _ User Sv39
+                     (u_state rs mm) (u_state rs mm)
+                     Hk Hsp (or_introl Hal) Heff Htm Htr Hme)
+          | exact (goodmb_vmem_write_addr_intra_terr Du_r Du_w k va dat
+                     (StoreConditional (aq, rl, Data)) (andb aq rl) rl true
+                     (E_SAMO_Page_Fault tt) _ User Sv39
+                     (u_state rs mm) (u_state rs mm) mm
+                     ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                     Hk Hsp Hspg (or_introl Hal) Heff Heffg Htm Htmg
+                     Htr Htrg Hme Hmeg)
+          | vm_compute; reflexivity
+          | exact (u_tlb_only_refl rs) | exact Htlb0
+          | exact (u_mem_step_refl pt t mm Hwf) ].
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* 6. THE SC EXECUTE-LEVEL CLOSERS, and the arm.                        *)
+  (* ------------------------------------------------------------------- *)
+  Lemma arm_sc_retire (t t' : ptree) (mm mm' : PtBytes.pamap)
+      (rsf rs' : regstate) (va : mword 64) (w : mword 32)
+      (aq rl : bool) (rs2 rs1 rd : mword 5) (width : Z) (b : bool) :
+    exec (ext_decode w) (u_state rsf mm)
+      = Some (STORECON (aq, rl, Regidx rs2, Regidx rs1, width, Regidx rd),
+              u_state rsf mm) ->
+    hval (u_Drw ∪ u_Dro) u_Drw rsf (ext_decode w)
+      (STORECON (aq, rl, Regidx rs2, Regidx rs1, width, Regidx rd)) rsf ->
+    (width <=? xlen_bytes) = true ->
+    exec (vmem_write (Regidx rs1) (zeros' 64) width
+            (autocast (T := mword) (subrange_vec_dec
+               (if Z.eqb (uint rs2) 0 then zero_reg
+                else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs2)))
+                       (s0r rsf va))
+               (Z.sub (Z.mul width 8) 1) 0))
+            (StoreConditional (aq, rl, Data)) (andb aq rl) rl true) (s0 rsf mm va)
+      = Some (Ok b, u_state rs' mm') ->
+    goodmb Du_r Du_w (vmem_write (Regidx rs1) (zeros' 64) width
+            (autocast (T := mword) (subrange_vec_dec
+               (if Z.eqb (uint rs2) 0 then zero_reg
+                else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs2)))
+                       (s0r rsf va))
+               (Z.sub (Z.mul width 8) 1) 0))
+            (StoreConditional (aq, rl, Data)) (andb aq rl) rl true)
+            (s0 rsf mm va) mm = true ->
+    reg_agree_on u_Dfix rs' (s0r rsf va) ->
+    tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rs') ->
+    u_mem_step pt t t' mm mm' ->
+    base_post pt t mm rsf va w.
+  Proof.
+    intros Hdec Hhv Hwok Hvw Hvg Hland Htlb Hst.
+    apply (finish_mem_base pt t t' mm rsf va
+             (STORECON (aq, rl, Regidx rs2, Regidx rs1, width, Regidx rd))
+             RETIRE_SUCCESS w
+             (gpr_write_state rd (zero_extend' 64 (bool_bit_forwards (negb b)))
+                (u_state rs' mm'))
+             Hdec Hhv eq_refl).
+    - exact (exec_execute_STORECON_u_retire aq rl rs2 rs1 rd width b
+               (s0 rsf mm va) (u_state rs' mm') Hwok Hvw).
+    - exact (goodmb_execute_STORECON_u_retire Du_r Du_w aq rl rs2 rs1 rd width b
+               (s0 rsf mm va) (u_state rs' mm') mm
+               (fun H => Du_gpr_of_Z_r rs2 H) (Du_gpr_of_Z rd) Hwok Hvw Hvg).
+    - exact u_ok_retire.
+    - exact I.
+    - eapply u_fix_trans; [ apply u_fix_gpr_state | ].
+      rewrite u_state_sregs. exact Hland.
+    - rewrite u_tlb_gpr u_state_sregs. exact Htlb.
+    - rewrite u_mem_gpr u_state_mem. exact Hst.
+  Qed.
+
+  Lemma arm_sc_trap (t t' : ptree) (mm mm' : PtBytes.pamap)
+      (rsf rs' : regstate) (va : mword 64) (w : mword 32)
+      (aq rl : bool) (rs2 rs1 rd : mword 5) (width : Z)
+      (e : ExceptionType) (xv pcx : mword 64) :
+    exec (ext_decode w) (u_state rsf mm)
+      = Some (STORECON (aq, rl, Regidx rs2, Regidx rs1, width, Regidx rd),
+              u_state rsf mm) ->
+    hval (u_Drw ∪ u_Dro) u_Drw rsf (ext_decode w)
+      (STORECON (aq, rl, Regidx rs2, Regidx rs1, width, Regidx rd)) rsf ->
+    (width <=? xlen_bytes) = true ->
+    user_exc e = true ->
+    exec (vmem_write (Regidx rs1) (zeros' 64) width
+            (autocast (T := mword) (subrange_vec_dec
+               (if Z.eqb (uint rs2) 0 then zero_reg
+                else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs2)))
+                       (s0r rsf va))
+               (Z.sub (Z.mul width 8) 1) 0))
+            (StoreConditional (aq, rl, Data)) (andb aq rl) rl true) (s0 rsf mm va)
+      = Some (Err (rv64d_types.Trap (User, make_sync_exception e xv, pcx)),
+              u_state rs' mm') ->
+    goodmb Du_r Du_w (vmem_write (Regidx rs1) (zeros' 64) width
+            (autocast (T := mword) (subrange_vec_dec
+               (if Z.eqb (uint rs2) 0 then zero_reg
+                else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs2)))
+                       (s0r rsf va))
+               (Z.sub (Z.mul width 8) 1) 0))
+            (StoreConditional (aq, rl, Data)) (andb aq rl) rl true)
+            (s0 rsf mm va) mm = true ->
+    reg_agree_on u_Dfix rs' (s0r rsf va) ->
+    tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rs') ->
+    u_mem_step pt t t' mm mm' ->
+    base_post pt t mm rsf va w.
+  Proof.
+    intros Hdec Hhv Hwok Hue Hvw Hvg Hland Htlb Hst.
+    apply (finish_mem_base pt t t' mm rsf va
+             (STORECON (aq, rl, Regidx rs2, Regidx rs1, width, Regidx rd))
+             (rv64d_types.Trap (User, make_sync_exception e xv, pcx)) w
+             (u_state rs' mm') Hdec Hhv eq_refl).
+    - exact (exec_execute_STORECON_u_err aq rl rs2 rs1 rd width _
+               (s0 rsf mm va) (u_state rs' mm') Hwok Hvw).
+    - exact (goodmb_execute_STORECON_u_err Du_r Du_w aq rl rs2 rs1 rd width _
+               (s0 rsf mm va) (u_state rs' mm') mm
+               (fun H => Du_gpr_of_Z_r rs2 H) Hwok Hvw Hvg).
+    - exact (u_ok_trap e xv pcx Hue).
+    - exact I.
+    - rewrite u_state_sregs. exact Hland.
+    - rewrite u_state_sregs. exact Htlb.
+    - rewrite u_state_mem. exact Hst.
+  Qed.
+
+  (* THE ARM.  [UserTotalU]'s frozen [arm_STORECON_u], proved. *)
+  Lemma arm_STORECON_u (t : ptree) (mm : PtBytes.pamap) (rsf : regstate)
+      (va : mword 64) (mi : bool) (w : mword 32)
+      (aq rl : bool) (rs2 rs1 : regidx) (width : word_width) (rd : regidx) :
+    post_fetch_cfg (u_state rsf mm) va mi ->
+    agree_on D_u (u_state rsf mm) dstateU ->
+    (width = 4 \/ width = 8) ->
+    exec (ext_decode w) (u_state rsf mm)
+      = Some (STORECON (aq, rl, rs2, rs1, width, rd), u_state rsf mm) ->
+    hval (u_Drw ∪ u_Dro) u_Drw rsf (ext_decode w)
+      (STORECON (aq, rl, rs2, rs1, width, rd)) rsf ->
+    u_exec_pins pt t rsf -> u_mem_wf pt t mm ->
+    base_post pt t mm rsf va w.
+  Proof.
+    intros Hpfc Hag Hwid Hdec Hhv Hpins Hwf.
+    destruct rs2 as [ir2]. destruct rs1 as [ir1]. destruct rd as [ird].
+    assert (Hk : 0 < width) by (destruct Hwid as [-> | ->]; lia).
+    assert (Hk8 : width <= 8) by (destruct Hwid as [-> | ->]; lia).
+    assert (Hwok : (width <=? xlen_bytes) = true)
+      by (destruct Hwid as [-> | ->]; vm_compute; reflexivity).
+    assert (Hkdvd : (width | 4096))
+      by (destruct Hwid as [-> | ->]; [exists 1024 | exists 512]; reflexivity).
+    assert (Huintk : uint (to_bits 64 width) = width)
+      by (destruct Hwid as [-> | ->]; vm_compute; reflexivity).
+    assert (Hvwid : vmem_width width)
+      by (destruct Hwid as [-> | ->];
+          [ right; right; left | right; right; right ]; reflexivity).
+    pose proof (u_data_cfg_tick rsf va 4
+                  (u_data_cfg_of_post_fetch rsf mm va mi Hpfc)) as Hcfg.
+    pose proof (u_pins_tick pt t rsf va 4 Hpins) as Hpins'.
+    pose proof Hcfg as (Lcp & Lms & Lmenv).
+    destruct Lms as (_ & Lmprv & _).
+    assert (Heff : exec (effectivePrivilege (StoreConditional (aq, rl, Data))
+                     (register_lookup mstatus (s0 rsf mm va).(sregs)) User)
+                     (s0 rsf mm va) = Some (User, s0 rsf mm va))
+      by exact (exec_effectivePrivilege_mprv0 (StoreConditional (aq, rl, Data)) _ User
+                  (s0 rsf mm va) Lmprv).
+    assert (Heffg : goodmb Du_r Du_w
+                      (effectivePrivilege (StoreConditional (aq, rl, Data))
+                        (register_lookup mstatus (s0 rsf mm va).(sregs)) User)
+                      (s0 rsf mm va) mm = true)
+      by exact (goodmb_effectivePrivilege_mprv0 Du_r Du_w
+                  (StoreConditional (aq, rl, Data)) _ User (s0 rsf mm va) mm Lmprv).
+    destruct (u_pmlen_pure pt t mm mm (s0r rsf va) (StoreConditional (aq, rl, Data))
+                (proj1 (u_neq_sc aq rl)) (proj1 (proj2 (u_neq_sc aq rl)))
+                (proj2 (proj2 (u_neq_sc aq rl))) Hcfg Hpins') as (Hpml & Hpmlg).
+    pose proof (u_translationMode_pure pt t (s0r rsf va) mm Hcfg Hpins') as Htm.
+    pose proof (u_goodmb_translationMode_pure pt t (s0r rsf va) mm mm Hcfg Hpins')
+      as Htmg.
+    destruct (u_vmem_write_sc_pure t mm (s0r rsf va) width
+                (add_vec (if Z.eqb (uint ir1) 0 then zero_reg
+                          else register_lookup (R_bitvector_64 (gpr_of_Z (uint ir1)))
+                                 (s0 rsf mm va).(sregs))
+                         (zeros' 64))
+                (autocast (T := mword) (subrange_vec_dec
+                   (if Z.eqb (uint ir2) 0 then zero_reg
+                    else register_lookup (R_bitvector_64 (gpr_of_Z (uint ir2)))
+                           (s0r rsf va))
+                   (Z.sub (Z.mul width 8) 1) 0))
+                aq rl Hk Hk8 Hkdvd Huintk Hvwid Hcfg Hpins' Hwf)
+      as [ (b & rs' & mm' & t' & Hvw & Hvwg & Honly & Htlbok & Hstep)
+         | (rs' & mm' & t' & e & xv & pcx & Hvw & Hvwg & Hue & Honly & Htlbok & Hstep) ].
+    - apply (arm_sc_retire t t' mm mm' rsf rs' va w aq rl ir2 ir1 ird width b
+               Hdec Hhv Hwok);
+        [ exact (exec_vmem_write_u ir1 (zeros' 64) width _
+                   (StoreConditional (aq, rl, Data)) (andb aq rl) rl true Sv39 (Ok b)
+                   (s0 rsf mm va) (u_state rs' mm') Lcp Heff Hpml Htm Hvw)
+        | exact (goodmb_vmem_write_u Du_r Du_w ir1 (zeros' 64) width _
+                   (StoreConditional (aq, rl, Data)) (andb aq rl) rl true Sv39 (Ok b)
+                   (s0 rsf mm va) (u_state rs' mm') mm
+                   (fun H => Du_gpr_of_Z_r ir1 H)
+                   ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                   Lcp Heff Heffg Hpml Hpmlg Htm Htmg Hvw Hvwg)
+        | exact (u_fix_of_tlb_only _ _ Honly)
+        | exact Htlbok | exact Hstep ].
+    - apply (arm_sc_trap t t' mm mm' rsf rs' va w aq rl ir2 ir1 ird width e xv pcx
+               Hdec Hhv Hwok Hue);
+        [ exact (exec_vmem_write_u ir1 (zeros' 64) width _
+                   (StoreConditional (aq, rl, Data)) (andb aq rl) rl true Sv39 (Err _)
+                   (s0 rsf mm va) (u_state rs' mm') Lcp Heff Hpml Htm Hvw)
+        | exact (goodmb_vmem_write_u Du_r Du_w ir1 (zeros' 64) width _
+                   (StoreConditional (aq, rl, Data)) (andb aq rl) rl true Sv39 (Err _)
+                   (s0 rsf mm va) (u_state rs' mm') mm
+                   (fun H => Du_gpr_of_Z_r ir1 H)
+                   ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                   Lcp Heff Heffg Hpml Hpmlg Htm Htmg Hvw Hvwg)
+        | exact (u_fix_of_tlb_only _ _ Honly)
+        | exact Htlbok | exact Hstep ].
+  Qed.
+
 End UserMemArmsA.
 
 (* ====================================================================== *)
@@ -549,3 +1007,16 @@ Definition arm_LOADRES_u_contract (pt : uptd) :
     u_exec_pins pt t rsf -> u_mem_wf pt t mm ->
     base_post pt t mm rsf va w
   := arm_LOADRES_u pt.
+
+Definition arm_STORECON_u_contract (pt : uptd) :
+  forall (t : ptree) (mm : PtBytes.pamap) (rsf : regstate)
+      (va : mword 64) (mi : bool) (w : mword 32)
+      (aq rl : bool) (rs2 rs1 : regidx) (width : word_width) (rd : regidx),
+    post_fetch_cfg (u_state rsf mm) va mi ->
+    agree_on D_u (u_state rsf mm) dstateU ->
+    (width = 4 \/ width = 8) ->
+    exec (ext_decode w) (u_state rsf mm) = Some (STORECON (aq, rl, rs2, rs1, width, rd), u_state rsf mm) ->
+    hval (u_Drw ∪ u_Dro) u_Drw rsf (ext_decode w) (STORECON (aq, rl, rs2, rs1, width, rd)) rsf ->
+    u_exec_pins pt t rsf -> u_mem_wf pt t mm ->
+    base_post pt t mm rsf va w
+  := arm_STORECON_u pt.
