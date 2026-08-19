@@ -128,7 +128,9 @@ UserMemMis.v
 PtFetchGen.v
 TrampStepPt.v
 UptWalkPt.v
+Pt2Walk.v
 TransPt.v
+Pt2WalkPt.v
 UserretDefs.v
 UserretPt.v
 UserretEntryPt.v
