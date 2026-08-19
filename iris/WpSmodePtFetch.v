@@ -325,4 +325,130 @@ Section SPtData.
   Qed.
 
 
+  (* ==================================================================== *)
+  (* THE PT TIER'S DATA-SIDE SLOT ACCESSOR, AT GENERIC [R].                *)
+  (*                                                                      *)
+  (* [WpIntrInv.sda_slot_acc] is this at [strans_regime] and it exists for *)
+  (* the same reason: pre-port a leaf never saw the translation slot's     *)
+  (* cells at all -- it passed [sr_inv R] FOLDED and the walk's TLB write  *)
+  (* was absorbed BELOW it.  Handing the cells up is what made the Bare    *)
+  (* arm fund a tlb cell, and that is what buried kvminithart's flush.     *)
+  (*                                                                      *)
+  (* So this takes the slot FOLDED, opens whichever arm is live through    *)
+  (* the record's own [sr_slot_acc], and hands the leaf an ABSTRACT write  *)
+  (* set with its frames, the regime residue, and the SIDE CONDITION       *)
+  (* ALREADY DISCHARGED at that set -- which is the one thing a leaf       *)
+  (* cannot produce, since [sr_swp_side_ok] demands [tlb ∈ Drw] and the    *)
+  (* Bare arm's set is empty.  The leaf then runs [sda_translate_D] at the *)
+  (* abstract set and never learns which arm it is on.                     *)
+  (* ==================================================================== *)
+  Definition sda_side_at (R : s_regime) (SD : gset register)
+      (mst0 menv0 satp0 : SailStdpp.Values.mword 64)
+      (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
+      (paddr : type_of_register pmpaddr_n) : Prop :=
+    forall (acc : MemoryAccessType mem_payload) (kp : kperm)
+           (va : SailStdpp.Values.mword 64)
+           (ppn : SailStdpp.Values.mword 44) (tv : type_of_register tlb),
+      s_acc_ok acc ->
+      sr_swp_side R acc va ppn kp spf_Db SD sda_Dro
+        (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tv)
+        (MState (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tv) ∅ dev0_state).
+
+  Lemma sda_slot_acc_R (R : s_regime) (dq : dfrac)
+      (mst0 menv0 : SailStdpp.Values.mword 64) (pmar0 : list PMA_Region) :
+    menv0 = MENVCFG_S ->
+    _get_Mstatus_SXL mst0 = 'b"10" ->
+    eq_vec (_get_Mstatus_MPRV mst0) ('b"1") = false ->
+    pma_allows_ram pmar0 ->
+    reg_pointsto mstatus dq mst0 -∗
+    reg_pointsto cur_privilege dq Supervisor -∗
+    reg_pointsto menvcfg dq menv0 -∗
+    reg_pointsto pma_regions DfracDiscarded pmar0 -∗
+    reg_pointsto htif_tohost_base DfracDiscarded None -∗
+    reg_pointsto misa DfracDiscarded MISA_C -∗
+    sr_inv R -∗
+    ∃ (SD : gset register) (satp0 : SailStdpp.Values.mword 64)
+      (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
+      (tlbv : type_of_register tlb),
+      ⌜ SD ## sda_Dro ⌝ ∗ ⌜ sr_swp_satp_ok R satp0 ⌝ ∗
+      ⌜ pmp_ent0_ok pcfg paddr ⌝ ∗
+      ⌜ sda_side_at R SD mst0 menv0 satp0 pmar0 pcfg paddr ⌝ ∗
+      hreg_frame (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv) SD ∗
+      hreg_frame_ro (sda_Df dq)
+        (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv) sda_Dro ∗
+      sr_swp_res R (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv) ∗
+      (∀ tv' : type_of_register tlb,
+         hreg_frame (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tv') SD -∗
+         hreg_frame_ro (sda_Df dq)
+           (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tv') sda_Dro -∗
+         sr_swp_res R (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tv') -∗
+         reg_pointsto mstatus dq mst0 ∗
+         reg_pointsto cur_privilege dq Supervisor ∗
+         reg_pointsto menvcfg dq menv0 ∗
+         reg_pointsto pma_regions DfracDiscarded pmar0 ∗
+         reg_pointsto htif_tohost_base DfracDiscarded None ∗
+         reg_pointsto misa DfracDiscarded MISA_C ∗ sr_inv R).
+  Proof.
+    intros Hmenv HSXL HMPRV Hpma.
+    iIntros "Hms Hpriv Hmenv Hpma Hhtif Hmisa Hinv".
+    iDestruct (sr_slot_acc R with "Hinv") as (satp0 pcfg paddr tlbv)
+      "(%Hsok & %Hpok & Hsatp & Hpcfg & Hpaddr & Hres & [Harm | Harm])".
+    - (* ---- THE WALKING ARM: the cell is the frame's ---- *)
+      iDestruct "Harm" as "(Htlb & Hcl)".
+      iExists sda_Drw, satp0, pcfg, paddr, tlbv.
+      iSplitR; [iPureIntro; exact sda_disj |].
+      iSplitR; [iPureIntro; exact Hsok |].
+      iSplitR; [iPureIntro; exact Hpok |].
+      iSplitR.
+      { iPureIntro. intros acc kp va ppn tv Hacc.
+        apply (sr_swp_side_ok R acc va ppn kp spf_Db sda_Drw sda_Dro _ _ Hacc);
+          [ rewrite sda_rs_satp; exact Hsok
+          | rewrite sda_rs_pcfg sda_rs_paddr; exact Hpok
+          | rewrite sda_rs_pma; exact Hpma
+          | rewrite sda_rs_mst; exact HMPRV
+          | exact spf_Db_mst | exact spf_Db_satp
+          | cbn [sregs]; rewrite sda_rs_mst; exact HSXL
+          | cbn [sregs]; reflexivity
+          | exact sda_w_tlb ]. }
+      iDestruct (sda_frames_in dq mst0 menv0 satp0 pmar0 pcfg paddr tlbv
+                   with "Htlb Hms Hpriv Hmenv Hsatp Hpma Hpcfg Hpaddr Hhtif
+                         Hmisa") as "[Hrw Hro]".
+      iFrame "Hrw Hro".
+      iSplitL "Hres".
+      { rewrite -sr_swp_res_agree sda_rs_satp sda_rs_tlb. iExact "Hres". }
+      iIntros (tv') "Hrw Hro Hres".
+      iDestruct (sda_frames_out dq mst0 menv0 satp0 pmar0 pcfg paddr tv'
+                   with "[$Hrw $Hro]")
+        as "(Htlb & Hms & Hpriv & Hmenv & Hsatp & Hpma & Hpcfg & Hpaddr &
+             Hhtif & Hmisa)".
+      iFrame "Hms Hpriv Hmenv Hpma Hhtif Hmisa".
+      iEval (rewrite -sr_swp_res_agree sda_rs_satp sda_rs_tlb) in "Hres".
+      iApply ("Hcl" $! tv' with "Hsatp Hpcfg Hpaddr Htlb Hres").
+    - (* ---- THE BARE ARM: no cell, and the side condition comes with it -- *)
+      iDestruct "Harm" as "(%Hbare & %Hside & Hcl)".
+      iExists sda_Drwb, satp0, pcfg, paddr, tlbv.
+      iSplitR; [iPureIntro; exact sda_disj_b |].
+      iSplitR; [iPureIntro; exact Hsok |].
+      iSplitR; [iPureIntro; exact Hpok |].
+      iSplitR.
+      { iPureIntro. intros acc kp va ppn tv Hacc.
+        apply (Hside acc va ppn kp spf_Db sda_Drwb sda_Dro _ _ Hacc);
+          [ rewrite sda_rs_satp; exact Hbare
+          | rewrite sda_rs_mst; exact HMPRV ]. }
+      iDestruct (sda_frames_in_b dq mst0 menv0 satp0 pmar0 pcfg paddr tlbv
+                   with "Hms Hpriv Hmenv Hsatp Hpma Hpcfg Hpaddr Hhtif
+                         Hmisa") as "[Hrw Hro]".
+      iFrame "Hrw Hro".
+      iSplitL "Hres".
+      { rewrite -sr_swp_res_agree sda_rs_satp sda_rs_tlb. iExact "Hres". }
+      iIntros (tv') "Hrw Hro Hres".
+      iDestruct (sda_frames_out_b dq mst0 menv0 satp0 pmar0 pcfg paddr tv'
+                   with "[$Hrw $Hro]")
+        as "(Hms & Hpriv & Hmenv & Hsatp & Hpma & Hpcfg & Hpaddr &
+             Hhtif & Hmisa)".
+      iFrame "Hms Hpriv Hmenv Hpma Hhtif Hmisa".
+      iEval (rewrite -sr_swp_res_agree sda_rs_satp sda_rs_tlb) in "Hres".
+      iApply ("Hcl" $! tv' with "Hsatp Hpcfg Hpaddr Hres").
+  Qed.
+
 End SPtData.
