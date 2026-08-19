@@ -1077,7 +1077,7 @@ Section WpSmodePtMemLeaves.
     iDestruct ("Hbclose" with "Hb0") as "Hbytes".
     assert (Hev : extend_value (n := 8 * 4) false v = sign_extend' 64 v)
       by (unfold extend_value; reflexivity).
-    iApply (wp_instr_s_config_sr R pc true
+    iApply (wp_instr_s_config_folded R pc true
               (LOAD (imm, Regidx rs1, Regidx rd, false, 4))
               mstatus0 mie_v mdv0 menvcfg0 mie_v menvcfg0
               (fun npc ms1 mdv1 => (⌜npc = add_vec_int pc 2⌝ ∗
@@ -1087,24 +1087,21 @@ Section WpSmodePtMemLeaves.
                    ↦₄[kt']{ dqm } v)%I)
               (dq := dq) HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hinstr
-                    [] [Hfile Hbytes] [Hcont]").
-    - iIntros (satp0 pcfg paddr) "%Hsok %Hpok".
-      iApply (spt_fetch_tr_of_regime R dq pc mstatus0 satp0 mie_v mdv0
-                menvcfg0 pcfg paddr Hmenvval0 HSXL HMPRV Hsok Hpok with "Hhw").
-    - iIntros (satp0 pcfg paddr tv') "%Hsok %Hpok
-        Hpriv Hms Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr Htlbc HRes Hclk HPC HnPC
-        Hresv".
+                    [Hfile Hbytes] [Hcont]").
+    - iIntros "Hpriv Hms Hmie Hmdl Hmenv Hslot Hclk HPC HnPC Hresv".
+      (* THE SLOT STAYS FOLDED.  [sda_slot_acc_R] is the one place the two
+         translation arms are told apart: it hands out an ABSTRACT write set
+         with its frames, the residue, and the arm's translation SIDE
+         CONDITION already discharged -- the one thing a regime-generic leaf
+         cannot produce for itself ([sr_swp_side_ok] demands [tlb ∈ Drw], and
+         the Bare arm's write set is empty). *)
+      iDestruct (sda_slot_acc_R R dq mstatus0 menvcfg0 pmar0
+                   Hmenvval0 HSXL HMPRV (pma_all_ram Hpma_all)
+                   with "Hms Hpriv Hmenv Hpma Hhtif Hmisa Hslot")
+        as (SD satp0 pcfg paddr tv')
+           "(%Hdisj & %Hsub & %Hsok & %Hpok & %Hside & Hrw & Hro & HRes &
+             Hclose)".
       destruct Hpok as (HA & Hord & HX & HW & HR & Hcov).
-      (* the CELLS become the data-access FRAME *)
-      iDestruct (sda_frames_in dq mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv'
-                   with "Htlbc Hms Hpriv Hmenv Hsatp Hpma Hpcfg Hpaddr Hhtif
-                         Hmisa") as "[Hrw Hro]".
-      iAssert (sr_swp_res R
-                 (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv'))
-        with "[HRes]" as "HRes".
-      { rewrite -(sr_swp_res_agree R
-                    (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv')).
-        rewrite sda_rs_satp sda_rs_tlb. iExact "HRes". }
       assert (Lmxr : eq_vec (_get_Mstatus_MXR
                 (register_lookup mstatus (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv'))) ('b"0") = true)
         by (rewrite sda_rs_mst; exact HMXR).
@@ -1125,15 +1122,15 @@ Section WpSmodePtMemLeaves.
       iDestruct "Hresv" as (rr) "Hfrag".
       change (execute (LOAD (imm, Regidx rs1, Regidx rd, false, 4)))
         with (execute_LOAD imm (Regidx rs1) (Regidx rd) false 4).
-      iApply (swp_mono with "[Hmie Hmdl Hclk HPC HnPC] [-]").
-      2:{ iApply (swp_execute_LOAD_ram_S4 sda_Drw sda_Dro (sda_Df dq)
+      iApply (swp_mono with "[Hmie Hmdl Hclk HPC HnPC Hclose] [-]").
+      2:{ iApply (swp_execute_LOAD_ram_S4 SD sda_Dro (sda_Df dq)
                     (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv')
                     imm rs1 rd false m (pa_of ppn (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm))) pmar0 pcfg paddr v
                     ((add_vec (m !!! Regidx rs1) (sign_extend' 64 imm))
                        ↦₄[kt']{ dqm } v)%I (sr_swp_res R) rr
                     (sr_swp_mode R satp0)
-                    sda_disj sda_in_mst sda_in_priv sda_in_menv sda_in_satp
-                    sda_in_pma sda_in_pcfg sda_in_paddr sda_in_htif
+                    Hdisj (sda_in_mst_D SD) (sda_in_priv_D SD) (sda_in_menv_D SD) (sda_in_satp_D SD)
+                    (sda_in_pma_D SD) (sda_in_pcfg_D SD) (sda_in_paddr_D SD) (sda_in_htif_D SD)
                     (sda_rs_priv _ _ _ _ _ _ _) (sda_rs_htif _ _ _ _ _ _ _)
                     (sda_rs_pma _ _ _ _ _ _ _) (sda_rs_pcfg _ _ _ _ _ _ _)
                     (sda_rs_paddr _ _ _ _ _ _ _)
@@ -1141,11 +1138,11 @@ Section WpSmodePtMemLeaves.
                     Lpmm
                     Lsxl
                     (hval_transform_effective_address_S_mode
-                       (sda_Drw ∪ sda_Dro) sda_Drw
+                       (SD ∪ sda_Dro) SD
                        (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv')
                        (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm))
                        (Load Data) (sr_swp_mode R satp0)
-                       sda_in_mst sda_in_priv sda_in_menv sda_in_satp
+                       (sda_in_mst_D SD) (sda_in_priv_D SD) (sda_in_menv_D SD) (sda_in_satp_D SD)
                        (sda_rs_priv _ _ _ _ _ _ _)
                        Lep
                        eq_refl eq_refl eq_refl
@@ -1153,9 +1150,9 @@ Section WpSmodePtMemLeaves.
                        Lpmm
                        Lsxl
                        Lmd)
-                    (hval_translationMode_S_mode (sda_Drw ∪ sda_Dro) sda_Drw
+                    (hval_translationMode_S_mode (SD ∪ sda_Dro) SD
                        (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv')
-                       (sr_swp_mode R satp0) sda_in_mst sda_in_satp
+                       (sr_swp_mode R satp0) (sda_in_mst_D SD) (sda_in_satp_D SD)
                        Lsxl
                        Lmd)
                     Lep
@@ -1168,13 +1165,16 @@ Section WpSmodePtMemLeaves.
                     with "Hcert Hfrag HRes Hfile Hrw Hro [] [Hbytes]").
           - (* THE DATA TRANSLATION, the regime's own *)
             iIntros "Hfrag HRes Hrw Hro".
-            iApply (sda_translate R kt kt' dq (Load Data) KP_rw mstatus0 menvcfg0
-                      satp0 pmar0 pcfg paddr tv'
+            iApply (sda_translate_D R SD kt kt' dq (Load Data) KP_rw mstatus0
+                      menvcfg0 satp0 pmar0 pcfg paddr tv'
                       (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)) ppn rr
                       (or_intror (or_introl eq_refl)) I Hmenvval0 HSXL HMPRV
                       Hsok
                       ltac:(unfold pmp_ent0_ok; split_and!; assumption)
-                      (pma_all_ram Hpma_all) Hcan Hid
+                      (pma_all_ram Hpma_all) Hcan Hid Hdisj
+                      (Hside (Load Data) KP_rw
+                         (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)) ppn
+                         tv' (or_intror (or_introl eq_refl)))
                       with "Hwit Hk Hcert Hfrag HRes Hrw Hro").
           - (* THE RAM OBLIGATION, off the word the leaf owns *)
             iIntros (sigma) "Hsi".
@@ -1196,7 +1196,7 @@ Section WpSmodePtMemLeaves.
       (* the landing file back onto the tower, at ITS OWN tlb value *)
       iAssert (∃ tv2 : type_of_register tlb,
                  hreg_frame (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv2)
-                   sda_Drw ∗
+                   SD ∗
                  hreg_frame_ro (sda_Df dq)
                    (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv2) sda_Dro ∗
                  sr_swp_res_at R satp0 tv2)%I
@@ -1207,7 +1207,7 @@ Section WpSmodePtMemLeaves.
                    (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv'))
                  sda_rs_satp sda_rs_tlb) in "HRes". iExact "HRes".
         - iExists tvx.
-          iDestruct (sda_rw_ext _ _ (sda_set_tlb mstatus0 menvcfg0 satp0 pmar0
+          iDestruct (sda_rw_ext_D SD _ _ Hsub (sda_set_tlb mstatus0 menvcfg0 satp0 pmar0
                        pcfg paddr tv' tvx) with "Hrw") as "Hrw".
           iDestruct (sda_ro_ext _ _ _ (sda_set_tlb mstatus0 menvcfg0 satp0 pmar0
                        pcfg paddr tv' tvx) with "Hro") as "Hro".
@@ -1218,13 +1218,17 @@ Section WpSmodePtMemLeaves.
                  register_lookup_set) in "HRes".
           rewrite irrelevant_register_set; [| vm_compute; reflexivity].
           rewrite sda_rs_satp. iExact "HRes". }
-      iDestruct (sda_frames_out dq mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv2
-                   with "[$Hrw $Hro]")
-        as "(Htlbc & Hms & Hpriv & Hmenv & Hsatp & _ & Hpcfg & Hpaddr & _ & _)".
+      iAssert (sr_swp_res R
+                 (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv2))
+        with "[HRes]" as "HRes".
+      { rewrite -(sr_swp_res_agree R
+                    (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv2)).
+        rewrite sda_rs_satp sda_rs_tlb. iExact "HRes". }
+      (* the slot re-seals itself, at the landing tlb value *)
+      iDestruct ("Hclose" $! tv2 with "Hrw Hro HRes")
+        as "(Hms & Hpriv & Hmenv & _ & _ & _ & Hslot)".
       iSplitR; [done|].
-      iFrame "Hpriv Hmie Hmenv Hsatp Hpcfg Hpaddr".
-      iSplitL "Htlbc HRes". { iExists tv2. iFrame "Htlbc HRes". }
-      iFrame "Hclk".
+      iFrame "Hpriv Hmie Hmenv Hslot Hclk".
       iSplitR "Hany"; [| iExact "Hany"].
       iExists mstatus0, mdv0, (add_vec_int pc 2).
       iFrame "Hms Hmdl HPC HnPC".
@@ -1383,7 +1387,7 @@ Section WpSmodePtMemLeaves.
     iDestruct ("Hbclose" with "Hb0") as "Hbytes".
     assert (Hev : extend_value (n := 8 * 8) false v = v)
       by (unfold extend_value; apply sign_extend'_id).
-    iApply (wp_instr_s_config_sr R pc false
+    iApply (wp_instr_s_config_folded R pc false
               (LOAD (imm, Regidx rs1, Regidx rd, false, 8))
               mstatus0 mie_v mdv0 menvcfg0 mie_v menvcfg0
               (fun npc ms1 mdv1 => (⌜npc = add_vec_int pc 4⌝ ∗
@@ -1393,24 +1397,21 @@ Section WpSmodePtMemLeaves.
                    ↦₈[kt']{ dqm } v)%I)
               (dq := dq) HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hinstr
-                    [] [Hfile Hbytes] [Hcont]").
-    - iIntros (satp0 pcfg paddr) "%Hsok %Hpok".
-      iApply (spt_fetch_tr_of_regime R dq pc mstatus0 satp0 mie_v mdv0
-                menvcfg0 pcfg paddr Hmenvval0 HSXL HMPRV Hsok Hpok with "Hhw").
-    - iIntros (satp0 pcfg paddr tv') "%Hsok %Hpok
-        Hpriv Hms Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr Htlbc HRes Hclk HPC HnPC
-        Hresv".
+                    [Hfile Hbytes] [Hcont]").
+    - iIntros "Hpriv Hms Hmie Hmdl Hmenv Hslot Hclk HPC HnPC Hresv".
+      (* THE SLOT STAYS FOLDED.  [sda_slot_acc_R] is the one place the two
+         translation arms are told apart: it hands out an ABSTRACT write set
+         with its frames, the residue, and the arm's translation SIDE
+         CONDITION already discharged -- the one thing a regime-generic leaf
+         cannot produce for itself ([sr_swp_side_ok] demands [tlb ∈ Drw], and
+         the Bare arm's write set is empty). *)
+      iDestruct (sda_slot_acc_R R dq mstatus0 menvcfg0 pmar0
+                   Hmenvval0 HSXL HMPRV (pma_all_ram Hpma_all)
+                   with "Hms Hpriv Hmenv Hpma Hhtif Hmisa Hslot")
+        as (SD satp0 pcfg paddr tv')
+           "(%Hdisj & %Hsub & %Hsok & %Hpok & %Hside & Hrw & Hro & HRes &
+             Hclose)".
       destruct Hpok as (HA & Hord & HX & HW & HR & Hcov).
-      (* the CELLS become the data-access FRAME *)
-      iDestruct (sda_frames_in dq mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv'
-                   with "Htlbc Hms Hpriv Hmenv Hsatp Hpma Hpcfg Hpaddr Hhtif
-                         Hmisa") as "[Hrw Hro]".
-      iAssert (sr_swp_res R
-                 (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv'))
-        with "[HRes]" as "HRes".
-      { rewrite -(sr_swp_res_agree R
-                    (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv')).
-        rewrite sda_rs_satp sda_rs_tlb. iExact "HRes". }
       assert (Lmxr : eq_vec (_get_Mstatus_MXR
                 (register_lookup mstatus (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv'))) ('b"0") = true)
         by (rewrite sda_rs_mst; exact HMXR).
@@ -1431,15 +1432,15 @@ Section WpSmodePtMemLeaves.
       iDestruct "Hresv" as (rr) "Hfrag".
       change (execute (LOAD (imm, Regidx rs1, Regidx rd, false, 8)))
         with (execute_LOAD imm (Regidx rs1) (Regidx rd) false 8).
-      iApply (swp_mono with "[Hmie Hmdl Hclk HPC HnPC] [-]").
-      2:{ iApply (swp_execute_LOAD_ram_S8 sda_Drw sda_Dro (sda_Df dq)
+      iApply (swp_mono with "[Hmie Hmdl Hclk HPC HnPC Hclose] [-]").
+      2:{ iApply (swp_execute_LOAD_ram_S8 SD sda_Dro (sda_Df dq)
                     (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv')
                     imm rs1 rd false m (pa_of ppn (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm))) pmar0 pcfg paddr v
                     ((add_vec (m !!! Regidx rs1) (sign_extend' 64 imm))
                        ↦₈[kt']{ dqm } v)%I (sr_swp_res R) rr
                     (sr_swp_mode R satp0)
-                    sda_disj sda_in_mst sda_in_priv sda_in_menv sda_in_satp
-                    sda_in_pma sda_in_pcfg sda_in_paddr sda_in_htif
+                    Hdisj (sda_in_mst_D SD) (sda_in_priv_D SD) (sda_in_menv_D SD) (sda_in_satp_D SD)
+                    (sda_in_pma_D SD) (sda_in_pcfg_D SD) (sda_in_paddr_D SD) (sda_in_htif_D SD)
                     (sda_rs_priv _ _ _ _ _ _ _) (sda_rs_htif _ _ _ _ _ _ _)
                     (sda_rs_pma _ _ _ _ _ _ _) (sda_rs_pcfg _ _ _ _ _ _ _)
                     (sda_rs_paddr _ _ _ _ _ _ _)
@@ -1447,11 +1448,11 @@ Section WpSmodePtMemLeaves.
                     Lpmm
                     Lsxl
                     (hval_transform_effective_address_S_mode
-                       (sda_Drw ∪ sda_Dro) sda_Drw
+                       (SD ∪ sda_Dro) SD
                        (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv')
                        (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm))
                        (Load Data) (sr_swp_mode R satp0)
-                       sda_in_mst sda_in_priv sda_in_menv sda_in_satp
+                       (sda_in_mst_D SD) (sda_in_priv_D SD) (sda_in_menv_D SD) (sda_in_satp_D SD)
                        (sda_rs_priv _ _ _ _ _ _ _)
                        Lep
                        eq_refl eq_refl eq_refl
@@ -1459,9 +1460,9 @@ Section WpSmodePtMemLeaves.
                        Lpmm
                        Lsxl
                        Lmd)
-                    (hval_translationMode_S_mode (sda_Drw ∪ sda_Dro) sda_Drw
+                    (hval_translationMode_S_mode (SD ∪ sda_Dro) SD
                        (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv')
-                       (sr_swp_mode R satp0) sda_in_mst sda_in_satp
+                       (sr_swp_mode R satp0) (sda_in_mst_D SD) (sda_in_satp_D SD)
                        Lsxl
                        Lmd)
                     Lep
@@ -1474,13 +1475,16 @@ Section WpSmodePtMemLeaves.
                     with "Hcert Hfrag HRes Hfile Hrw Hro [] [Hbytes]").
           - (* THE DATA TRANSLATION, the regime's own *)
             iIntros "Hfrag HRes Hrw Hro".
-            iApply (sda_translate R kt kt' dq (Load Data) KP_rw mstatus0 menvcfg0
-                      satp0 pmar0 pcfg paddr tv'
+            iApply (sda_translate_D R SD kt kt' dq (Load Data) KP_rw mstatus0
+                      menvcfg0 satp0 pmar0 pcfg paddr tv'
                       (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)) ppn rr
                       (or_intror (or_introl eq_refl)) I Hmenvval0 HSXL HMPRV
                       Hsok
                       ltac:(unfold pmp_ent0_ok; split_and!; assumption)
-                      (pma_all_ram Hpma_all) Hcan Hid
+                      (pma_all_ram Hpma_all) Hcan Hid Hdisj
+                      (Hside (Load Data) KP_rw
+                         (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)) ppn
+                         tv' (or_intror (or_introl eq_refl)))
                       with "Hwit Hk Hcert Hfrag HRes Hrw Hro").
           - (* THE RAM OBLIGATION, off the word the leaf owns *)
             iIntros (sigma) "Hsi".
@@ -1502,7 +1506,7 @@ Section WpSmodePtMemLeaves.
       (* the landing file back onto the tower, at ITS OWN tlb value *)
       iAssert (∃ tv2 : type_of_register tlb,
                  hreg_frame (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv2)
-                   sda_Drw ∗
+                   SD ∗
                  hreg_frame_ro (sda_Df dq)
                    (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv2) sda_Dro ∗
                  sr_swp_res_at R satp0 tv2)%I
@@ -1513,7 +1517,7 @@ Section WpSmodePtMemLeaves.
                    (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv'))
                  sda_rs_satp sda_rs_tlb) in "HRes". iExact "HRes".
         - iExists tvx.
-          iDestruct (sda_rw_ext _ _ (sda_set_tlb mstatus0 menvcfg0 satp0 pmar0
+          iDestruct (sda_rw_ext_D SD _ _ Hsub (sda_set_tlb mstatus0 menvcfg0 satp0 pmar0
                        pcfg paddr tv' tvx) with "Hrw") as "Hrw".
           iDestruct (sda_ro_ext _ _ _ (sda_set_tlb mstatus0 menvcfg0 satp0 pmar0
                        pcfg paddr tv' tvx) with "Hro") as "Hro".
@@ -1524,13 +1528,17 @@ Section WpSmodePtMemLeaves.
                  register_lookup_set) in "HRes".
           rewrite irrelevant_register_set; [| vm_compute; reflexivity].
           rewrite sda_rs_satp. iExact "HRes". }
-      iDestruct (sda_frames_out dq mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv2
-                   with "[$Hrw $Hro]")
-        as "(Htlbc & Hms & Hpriv & Hmenv & Hsatp & _ & Hpcfg & Hpaddr & _ & _)".
+      iAssert (sr_swp_res R
+                 (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv2))
+        with "[HRes]" as "HRes".
+      { rewrite -(sr_swp_res_agree R
+                    (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv2)).
+        rewrite sda_rs_satp sda_rs_tlb. iExact "HRes". }
+      (* the slot re-seals itself, at the landing tlb value *)
+      iDestruct ("Hclose" $! tv2 with "Hrw Hro HRes")
+        as "(Hms & Hpriv & Hmenv & _ & _ & _ & Hslot)".
       iSplitR; [done|].
-      iFrame "Hpriv Hmie Hmenv Hsatp Hpcfg Hpaddr".
-      iSplitL "Htlbc HRes". { iExists tv2. iFrame "Htlbc HRes". }
-      iFrame "Hclk".
+      iFrame "Hpriv Hmie Hmenv Hslot Hclk".
       iSplitR "Hany"; [| iExact "Hany"].
       iExists mstatus0, mdv0, (add_vec_int pc 4).
       iFrame "Hms Hmdl HPC HnPC".
@@ -1686,7 +1694,7 @@ Section WpSmodePtMemLeaves.
     iDestruct ("Hbclose" with "Hb0") as "Hbytes".
     iDestruct (word4_pointsto_intro (KTR := kt') _ _ _ Hpalign4 with "Hbytes")
       as "Hword".
-    iApply (wp_instr_s_config_sr R pc true
+    iApply (wp_instr_s_config_folded R pc true
               (STORE (imm, Regidx rs2, Regidx rs1, 4))
               mstatus0 mie_v mdv0 menvcfg0 mie_v menvcfg0
               (fun npc ms1 mdv1 => (⌜npc = add_vec_int pc 2⌝ ∗
@@ -1695,23 +1703,21 @@ Section WpSmodePtMemLeaves.
                    ↦₄[kt'] (trunc32 (m !!! Regidx rs2)))%I)
               (dq := dq) HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hinstr
-                    [] [Hfile Hword] [Hcont]").
-    - iIntros (satp0 pcfg paddr) "%Hsok %Hpok".
-      iApply (spt_fetch_tr_of_regime R dq pc mstatus0 satp0 mie_v mdv0
-                menvcfg0 pcfg paddr Hmenvval0 HSXL HMPRV Hsok Hpok with "Hhw").
-    - iIntros (satp0 pcfg paddr tv') "%Hsok %Hpok
-        Hpriv Hms Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr Htlbc HRes Hclk HPC HnPC
-        Hresv".
+                    [Hfile Hword] [Hcont]").
+    - iIntros "Hpriv Hms Hmie Hmdl Hmenv Hslot Hclk HPC HnPC Hresv".
+      (* THE SLOT STAYS FOLDED.  [sda_slot_acc_R] is the one place the two
+         translation arms are told apart: it hands out an ABSTRACT write set
+         with its frames, the residue, and the arm's translation SIDE
+         CONDITION already discharged -- the one thing a regime-generic leaf
+         cannot produce for itself ([sr_swp_side_ok] demands [tlb ∈ Drw], and
+         the Bare arm's write set is empty). *)
+      iDestruct (sda_slot_acc_R R dq mstatus0 menvcfg0 pmar0
+                   Hmenvval0 HSXL HMPRV (pma_all_ram Hpma_all)
+                   with "Hms Hpriv Hmenv Hpma Hhtif Hmisa Hslot")
+        as (SD satp0 pcfg paddr tv')
+           "(%Hdisj & %Hsub & %Hsok & %Hpok & %Hside & Hrw & Hro & HRes &
+             Hclose)".
       destruct Hpok as (HA & Hord & HX & HW & HR & Hcov).
-      iDestruct (sda_frames_in dq mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv'
-                   with "Htlbc Hms Hpriv Hmenv Hsatp Hpma Hpcfg Hpaddr Hhtif
-                         Hmisa") as "[Hrw Hro]".
-      iAssert (sr_swp_res R
-                 (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv'))
-        with "[HRes]" as "HRes".
-      { rewrite -(sr_swp_res_agree R
-                    (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv')).
-        rewrite sda_rs_satp sda_rs_tlb. iExact "HRes". }
       assert (Lmxr : eq_vec (_get_Mstatus_MXR
                 (register_lookup mstatus (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv'))) ('b"0") = true)
         by (rewrite sda_rs_mst; exact HMXR).
@@ -1732,8 +1738,8 @@ Section WpSmodePtMemLeaves.
       iDestruct "Hresv" as (rr) "Hfrag".
       change (execute (STORE (imm, Regidx rs2, Regidx rs1, 4)))
         with (execute_STORE imm (Regidx rs2) (Regidx rs1) 4).
-      iApply (swp_mono with "[Hmie Hmdl Hclk HPC HnPC] [-]").
-      2:{ iApply (swp_execute_STORE_ram_S4 sda_Drw sda_Dro (sda_Df dq)
+      iApply (swp_mono with "[Hmie Hmdl Hclk HPC HnPC Hclose] [-]").
+      2:{ iApply (swp_execute_STORE_ram_S4 SD sda_Dro (sda_Df dq)
                     (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv')
                     imm rs2 rs1 m
                     (pa_of ppn (add_vec (m !!! Regidx rs1)
@@ -1744,8 +1750,8 @@ Section WpSmodePtMemLeaves.
                     (sr_swp_res R) rr
                     (sr_swp_mode R satp0)
                     (store_data4 (m !!! Regidx rs2))
-                    sda_disj sda_in_mst sda_in_priv sda_in_menv sda_in_satp
-                    sda_in_pma sda_in_pcfg sda_in_paddr sda_in_htif
+                    Hdisj (sda_in_mst_D SD) (sda_in_priv_D SD) (sda_in_menv_D SD) (sda_in_satp_D SD)
+                    (sda_in_pma_D SD) (sda_in_pcfg_D SD) (sda_in_paddr_D SD) (sda_in_htif_D SD)
                     (sda_rs_priv _ _ _ _ _ _ _) (sda_rs_pma _ _ _ _ _ _ _)
                     (sda_rs_pcfg _ _ _ _ _ _ _) (sda_rs_paddr _ _ _ _ _ _ _)
                     (sda_rs_htif _ _ _ _ _ _ _)
@@ -1753,11 +1759,11 @@ Section WpSmodePtMemLeaves.
                     Lpmm
                     Lsxl
                     (hval_transform_effective_address_S_mode
-                       (sda_Drw ∪ sda_Dro) sda_Drw
+                       (SD ∪ sda_Dro) SD
                        (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv')
                        (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm))
                        (Store Data) (sr_swp_mode R satp0)
-                       sda_in_mst sda_in_priv sda_in_menv sda_in_satp
+                       (sda_in_mst_D SD) (sda_in_priv_D SD) (sda_in_menv_D SD) (sda_in_satp_D SD)
                        (sda_rs_priv _ _ _ _ _ _ _)
                        Lep
                        eq_refl eq_refl eq_refl
@@ -1765,9 +1771,9 @@ Section WpSmodePtMemLeaves.
                        Lpmm
                        Lsxl
                        Lmd)
-                    (hval_translationMode_S_mode (sda_Drw ∪ sda_Dro) sda_Drw
+                    (hval_translationMode_S_mode (SD ∪ sda_Dro) SD
                        (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv')
-                       (sr_swp_mode R satp0) sda_in_mst sda_in_satp
+                       (sr_swp_mode R satp0) (sda_in_mst_D SD) (sda_in_satp_D SD)
                        Lsxl
                        Lmd)
                     Lep
@@ -1778,14 +1784,17 @@ Section WpSmodePtMemLeaves.
                        ltac:(lia) ltac:(exists 1024; lia) Halign4)
                     with "Hcert Hfrag HRes Hfile Hrw Hro [] [Hword]").
           - iIntros "Hfrag HRes Hrw Hro".
-            iApply (sda_translate R kt kt' dq (Store Data) KP_rw mstatus0
+            iApply (sda_translate_D R SD kt kt' dq (Store Data) KP_rw mstatus0
                       menvcfg0 satp0 pmar0 pcfg paddr tv'
                       (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)) ppn rr
                       (or_intror (or_intror (or_introl eq_refl))) eq_refl
                       Hmenvval0
                       HSXL HMPRV Hsok
                       ltac:(unfold pmp_ent0_ok; split_and!; assumption)
-                      (pma_all_ram Hpma_all) Hcan Hid
+                      (pma_all_ram Hpma_all) Hcan Hid Hdisj
+                      (Hside (Store Data) KP_rw
+                         (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)) ppn
+                         tv' (or_intror (or_intror (or_introl eq_refl))))
                       with "Hwit Hk Hcert Hfrag HRes Hrw Hro").
           - iIntros (sigma) "Hsi".
             iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
@@ -1800,7 +1809,7 @@ Section WpSmodePtMemLeaves.
       iDestruct "Hland" as (rsf) "(%Hshape & Hrw & Hro & HRes & Hword & Hfrag)".
       iAssert (∃ tv2 : type_of_register tlb,
                  hreg_frame (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv2)
-                   sda_Drw ∗
+                   SD ∗
                  hreg_frame_ro (sda_Df dq)
                    (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv2) sda_Dro ∗
                  sr_swp_res_at R satp0 tv2)%I
@@ -1811,7 +1820,7 @@ Section WpSmodePtMemLeaves.
                    (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv'))
                  sda_rs_satp sda_rs_tlb) in "HRes". iExact "HRes".
         - iExists tvx.
-          iDestruct (sda_rw_ext _ _ (sda_set_tlb mstatus0 menvcfg0 satp0 pmar0
+          iDestruct (sda_rw_ext_D SD _ _ Hsub (sda_set_tlb mstatus0 menvcfg0 satp0 pmar0
                        pcfg paddr tv' tvx) with "Hrw") as "Hrw".
           iDestruct (sda_ro_ext _ _ _ (sda_set_tlb mstatus0 menvcfg0 satp0 pmar0
                        pcfg paddr tv' tvx) with "Hro") as "Hro".
@@ -1822,13 +1831,17 @@ Section WpSmodePtMemLeaves.
                  register_lookup_set) in "HRes".
           rewrite irrelevant_register_set; [| vm_compute; reflexivity].
           rewrite sda_rs_satp. iExact "HRes". }
-      iDestruct (sda_frames_out dq mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv2
-                   with "[$Hrw $Hro]")
-        as "(Htlbc & Hms & Hpriv & Hmenv & Hsatp & _ & Hpcfg & Hpaddr & _ & _)".
+      iAssert (sr_swp_res R
+                 (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv2))
+        with "[HRes]" as "HRes".
+      { rewrite -(sr_swp_res_agree R
+                    (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv2)).
+        rewrite sda_rs_satp sda_rs_tlb. iExact "HRes". }
+      (* the slot re-seals itself, at the landing tlb value *)
+      iDestruct ("Hclose" $! tv2 with "Hrw Hro HRes")
+        as "(Hms & Hpriv & Hmenv & _ & _ & _ & Hslot)".
       iSplitR; [done|].
-      iFrame "Hpriv Hmie Hmenv Hsatp Hpcfg Hpaddr".
-      iSplitL "Htlbc HRes". { iExists tv2. iFrame "Htlbc HRes". }
-      iFrame "Hclk".
+      iFrame "Hpriv Hmie Hmenv Hslot Hclk".
       iSplitR "Hfrag"; [| by iApply resv_any_intro].
       iExists mstatus0, mdv0, (add_vec_int pc 2).
       iFrame "Hms Hmdl HPC HnPC".
@@ -1985,7 +1998,7 @@ Section WpSmodePtMemLeaves.
     iDestruct ("Hbclose" with "Hb0") as "Hbytes".
     iDestruct (word_pointsto_intro (KTR := kt') _ _ _ Hpalign4 with "Hbytes")
       as "Hword".
-    iApply (wp_instr_s_config_sr R pc false
+    iApply (wp_instr_s_config_folded R pc false
               (STORE (imm, Regidx rs2, Regidx rs1, 8))
               mstatus0 mie_v mdv0 menvcfg0 mie_v menvcfg0
               (fun npc ms1 mdv1 => (⌜npc = add_vec_int pc 4⌝ ∗
@@ -1994,23 +2007,21 @@ Section WpSmodePtMemLeaves.
                    ↦₈[kt'] (m !!! Regidx rs2))%I)
               (dq := dq) HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hinstr
-                    [] [Hfile Hword] [Hcont]").
-    - iIntros (satp0 pcfg paddr) "%Hsok %Hpok".
-      iApply (spt_fetch_tr_of_regime R dq pc mstatus0 satp0 mie_v mdv0
-                menvcfg0 pcfg paddr Hmenvval0 HSXL HMPRV Hsok Hpok with "Hhw").
-    - iIntros (satp0 pcfg paddr tv') "%Hsok %Hpok
-        Hpriv Hms Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr Htlbc HRes Hclk HPC HnPC
-        Hresv".
+                    [Hfile Hword] [Hcont]").
+    - iIntros "Hpriv Hms Hmie Hmdl Hmenv Hslot Hclk HPC HnPC Hresv".
+      (* THE SLOT STAYS FOLDED.  [sda_slot_acc_R] is the one place the two
+         translation arms are told apart: it hands out an ABSTRACT write set
+         with its frames, the residue, and the arm's translation SIDE
+         CONDITION already discharged -- the one thing a regime-generic leaf
+         cannot produce for itself ([sr_swp_side_ok] demands [tlb ∈ Drw], and
+         the Bare arm's write set is empty). *)
+      iDestruct (sda_slot_acc_R R dq mstatus0 menvcfg0 pmar0
+                   Hmenvval0 HSXL HMPRV (pma_all_ram Hpma_all)
+                   with "Hms Hpriv Hmenv Hpma Hhtif Hmisa Hslot")
+        as (SD satp0 pcfg paddr tv')
+           "(%Hdisj & %Hsub & %Hsok & %Hpok & %Hside & Hrw & Hro & HRes &
+             Hclose)".
       destruct Hpok as (HA & Hord & HX & HW & HR & Hcov).
-      iDestruct (sda_frames_in dq mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv'
-                   with "Htlbc Hms Hpriv Hmenv Hsatp Hpma Hpcfg Hpaddr Hhtif
-                         Hmisa") as "[Hrw Hro]".
-      iAssert (sr_swp_res R
-                 (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv'))
-        with "[HRes]" as "HRes".
-      { rewrite -(sr_swp_res_agree R
-                    (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv')).
-        rewrite sda_rs_satp sda_rs_tlb. iExact "HRes". }
       assert (Lmxr : eq_vec (_get_Mstatus_MXR
                 (register_lookup mstatus (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv'))) ('b"0") = true)
         by (rewrite sda_rs_mst; exact HMXR).
@@ -2031,8 +2042,8 @@ Section WpSmodePtMemLeaves.
       iDestruct "Hresv" as (rr) "Hfrag".
       change (execute (STORE (imm, Regidx rs2, Regidx rs1, 8)))
         with (execute_STORE imm (Regidx rs2) (Regidx rs1) 8).
-      iApply (swp_mono with "[Hmie Hmdl Hclk HPC HnPC] [-]").
-      2:{ iApply (swp_execute_STORE_ram_S8 sda_Drw sda_Dro (sda_Df dq)
+      iApply (swp_mono with "[Hmie Hmdl Hclk HPC HnPC Hclose] [-]").
+      2:{ iApply (swp_execute_STORE_ram_S8 SD sda_Dro (sda_Df dq)
                     (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv')
                     imm rs2 rs1 m
                     (pa_of ppn (add_vec (m !!! Regidx rs1)
@@ -2042,8 +2053,8 @@ Section WpSmodePtMemLeaves.
                        ↦₈[kt'] (m !!! Regidx rs2))%I (sr_swp_res R) rr
                     (sr_swp_mode R satp0)
                     (store_data8 (m !!! Regidx rs2))
-                    sda_disj sda_in_mst sda_in_priv sda_in_menv sda_in_satp
-                    sda_in_pma sda_in_pcfg sda_in_paddr sda_in_htif
+                    Hdisj (sda_in_mst_D SD) (sda_in_priv_D SD) (sda_in_menv_D SD) (sda_in_satp_D SD)
+                    (sda_in_pma_D SD) (sda_in_pcfg_D SD) (sda_in_paddr_D SD) (sda_in_htif_D SD)
                     (sda_rs_priv _ _ _ _ _ _ _) (sda_rs_pma _ _ _ _ _ _ _)
                     (sda_rs_pcfg _ _ _ _ _ _ _) (sda_rs_paddr _ _ _ _ _ _ _)
                     (sda_rs_htif _ _ _ _ _ _ _)
@@ -2051,11 +2062,11 @@ Section WpSmodePtMemLeaves.
                     Lpmm
                     Lsxl
                     (hval_transform_effective_address_S_mode
-                       (sda_Drw ∪ sda_Dro) sda_Drw
+                       (SD ∪ sda_Dro) SD
                        (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv')
                        (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm))
                        (Store Data) (sr_swp_mode R satp0)
-                       sda_in_mst sda_in_priv sda_in_menv sda_in_satp
+                       (sda_in_mst_D SD) (sda_in_priv_D SD) (sda_in_menv_D SD) (sda_in_satp_D SD)
                        (sda_rs_priv _ _ _ _ _ _ _)
                        Lep
                        eq_refl eq_refl eq_refl
@@ -2063,9 +2074,9 @@ Section WpSmodePtMemLeaves.
                        Lpmm
                        Lsxl
                        Lmd)
-                    (hval_translationMode_S_mode (sda_Drw ∪ sda_Dro) sda_Drw
+                    (hval_translationMode_S_mode (SD ∪ sda_Dro) SD
                        (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv')
-                       (sr_swp_mode R satp0) sda_in_mst sda_in_satp
+                       (sr_swp_mode R satp0) (sda_in_mst_D SD) (sda_in_satp_D SD)
                        Lsxl
                        Lmd)
                     Lep
@@ -2076,14 +2087,17 @@ Section WpSmodePtMemLeaves.
                        ltac:(lia) ltac:(exists 512; lia) Halign4)
                     with "Hcert Hfrag HRes Hfile Hrw Hro [] [Hword]").
           - iIntros "Hfrag HRes Hrw Hro".
-            iApply (sda_translate R kt kt' dq (Store Data) KP_rw mstatus0
+            iApply (sda_translate_D R SD kt kt' dq (Store Data) KP_rw mstatus0
                       menvcfg0 satp0 pmar0 pcfg paddr tv'
                       (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)) ppn rr
                       (or_intror (or_intror (or_introl eq_refl))) eq_refl
                       Hmenvval0
                       HSXL HMPRV Hsok
                       ltac:(unfold pmp_ent0_ok; split_and!; assumption)
-                      (pma_all_ram Hpma_all) Hcan Hid
+                      (pma_all_ram Hpma_all) Hcan Hid Hdisj
+                      (Hside (Store Data) KP_rw
+                         (add_vec (m !!! Regidx rs1) (sign_extend' 64 imm)) ppn
+                         tv' (or_intror (or_intror (or_introl eq_refl))))
                       with "Hwit Hk Hcert Hfrag HRes Hrw Hro").
           - iIntros (sigma) "Hsi".
             iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
@@ -2098,7 +2112,7 @@ Section WpSmodePtMemLeaves.
       iDestruct "Hland" as (rsf) "(%Hshape & Hrw & Hro & HRes & Hword & Hfrag)".
       iAssert (∃ tv2 : type_of_register tlb,
                  hreg_frame (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv2)
-                   sda_Drw ∗
+                   SD ∗
                  hreg_frame_ro (sda_Df dq)
                    (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv2) sda_Dro ∗
                  sr_swp_res_at R satp0 tv2)%I
@@ -2109,7 +2123,7 @@ Section WpSmodePtMemLeaves.
                    (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv'))
                  sda_rs_satp sda_rs_tlb) in "HRes". iExact "HRes".
         - iExists tvx.
-          iDestruct (sda_rw_ext _ _ (sda_set_tlb mstatus0 menvcfg0 satp0 pmar0
+          iDestruct (sda_rw_ext_D SD _ _ Hsub (sda_set_tlb mstatus0 menvcfg0 satp0 pmar0
                        pcfg paddr tv' tvx) with "Hrw") as "Hrw".
           iDestruct (sda_ro_ext _ _ _ (sda_set_tlb mstatus0 menvcfg0 satp0 pmar0
                        pcfg paddr tv' tvx) with "Hro") as "Hro".
@@ -2120,13 +2134,17 @@ Section WpSmodePtMemLeaves.
                  register_lookup_set) in "HRes".
           rewrite irrelevant_register_set; [| vm_compute; reflexivity].
           rewrite sda_rs_satp. iExact "HRes". }
-      iDestruct (sda_frames_out dq mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv2
-                   with "[$Hrw $Hro]")
-        as "(Htlbc & Hms & Hpriv & Hmenv & Hsatp & _ & Hpcfg & Hpaddr & _ & _)".
+      iAssert (sr_swp_res R
+                 (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv2))
+        with "[HRes]" as "HRes".
+      { rewrite -(sr_swp_res_agree R
+                    (sda_rs mstatus0 menvcfg0 satp0 pmar0 pcfg paddr tv2)).
+        rewrite sda_rs_satp sda_rs_tlb. iExact "HRes". }
+      (* the slot re-seals itself, at the landing tlb value *)
+      iDestruct ("Hclose" $! tv2 with "Hrw Hro HRes")
+        as "(Hms & Hpriv & Hmenv & _ & _ & _ & Hslot)".
       iSplitR; [done|].
-      iFrame "Hpriv Hmie Hmenv Hsatp Hpcfg Hpaddr".
-      iSplitL "Htlbc HRes". { iExists tv2. iFrame "Htlbc HRes". }
-      iFrame "Hclk".
+      iFrame "Hpriv Hmie Hmenv Hslot Hclk".
       iSplitR "Hfrag"; [| by iApply resv_any_intro].
       iExists mstatus0, mdv0, (add_vec_int pc 4).
       iFrame "Hms Hmdl HPC HnPC".

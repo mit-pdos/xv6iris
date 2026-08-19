@@ -456,7 +456,7 @@ Section SPtData.
     ∃ (SD : gset register) (satp0 : SailStdpp.Values.mword 64)
       (pcfg : type_of_register pmpcfg_n) (paddr : type_of_register pmpaddr_n)
       (tlbv : type_of_register tlb),
-      ⌜ SD ## sda_Dro ⌝ ∗ ⌜ sr_swp_satp_ok R satp0 ⌝ ∗
+      ⌜ SD ## sda_Dro ⌝ ∗ ⌜ SD ⊆ sda_Drw ⌝ ∗ ⌜ sr_swp_satp_ok R satp0 ⌝ ∗
       ⌜ pmp_ent0_ok pcfg paddr ⌝ ∗
       ⌜ sda_side_at R SD mst0 menv0 satp0 pmar0 pcfg paddr ⌝ ∗
       hreg_frame (sda_rs mst0 menv0 satp0 pmar0 pcfg paddr tlbv) SD ∗
@@ -483,6 +483,7 @@ Section SPtData.
       iDestruct "Harm" as "(Htlb & _ & Hcl)".
       iExists sda_Drw, satp0, pcfg, paddr, tlbv.
       iSplitR; [iPureIntro; exact sda_disj |].
+      iSplitR; [iPureIntro; reflexivity |].
       iSplitR; [iPureIntro; exact Hsok |].
       iSplitR; [iPureIntro; exact Hpok |].
       iSplitR.
@@ -514,6 +515,7 @@ Section SPtData.
       iDestruct "Harm" as "(%Hbare & %Hside & Hcl)".
       iExists sda_Drwb, satp0, pcfg, paddr, tlbv.
       iSplitR; [iPureIntro; exact sda_disj_b |].
+      iSplitR; [iPureIntro; exact (empty_subseteq sda_Drw) |].
       iSplitR; [iPureIntro; exact Hsok |].
       iSplitR; [iPureIntro; exact Hpok |].
       iSplitR.

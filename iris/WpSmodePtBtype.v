@@ -162,28 +162,21 @@ Section WpSmodePtBtype.
     iIntros (HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hred Hcmp)
       "#Hhw #Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Hinv Hpc Hfile Hinstr Hcont".
     iDestruct (hw_config_cert with "Hhw") as "#Hcert".
-    iApply (wp_instr_s_config_sr R pc false i mstatus0 mie_v mdv0 menvcfg0
+    iApply (wp_instr_s_config_folded R pc false i mstatus0 mie_v mdv0 menvcfg0
               mie_v menvcfg0
               (fun npc ms1 mdv1 => (⌜npc = add_vec_int pc 4⌝ ∗
                  ⌜ms1 = mstatus0⌝ ∗ ⌜mdv1 = mdv0⌝ ∗ gpr_file m)%I)
               (dq := dq) HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               with "Hhw Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Hinv Hpc Hinstr
-                    [] [Hfile] [Hcont]").
-    - iIntros (satp0 pcfg paddr) "%Hsok %Hpok".
-      iApply (spt_fetch_tr_of_regime R dq pc mstatus0 satp0 mie_v mdv0
-                menvcfg0 pcfg paddr Hmenvval0 HSXL HMPRV Hsok Hpok with "Hhw").
-    - iIntros (satp0 pcfg paddr tv') "%Hsok %Hpok
-        Hpriv Hms Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr Htlbc HRes Hclk HPC HnPC
-         Hresv".
-      iApply (swp_mono with "[Hmie Hmdl Hclk HPC HnPC Hpriv Hms Hmenv Hsatp
-                              Hpcfg Hpaddr Htlbc HRes Hresv] [Hfile]").
+                    [Hfile] [Hcont]").
+    - iIntros "Hpriv Hms Hmie Hmdl Hmenv Hslot Hclk HPC HnPC Hresv".
+      iApply (swp_mono with "[Hmie Hmdl Hclk HPC HnPC Hpriv Hms Hmenv Hslot
+                              Hresv] [Hfile]").
       2:{ iApply (swp_sb_BTYPE_fall imm rs2 rs1 m (execute i) cmp Hred
                     Hcmp with "Hcert Hfile"). }
       iIntros (e) "(-> & Hfile)".
       iSplitR; [done|].
-      iFrame "Hpriv Hmie Hmenv Hsatp Hpcfg Hpaddr".
-      iSplitL "Htlbc HRes". { iExists tv'. iFrame "Htlbc HRes". }
-      iFrame "Hclk".
+      iFrame "Hpriv Hmie Hmenv Hslot Hclk".
       iSplitR "Hresv"; [| iExact "Hresv"].
       iExists mstatus0, mdv0, (add_vec_int pc 4).
       iFrame "Hms Hmdl HPC HnPC".
@@ -225,30 +218,23 @@ Section WpSmodePtBtype.
       "#Hhw #Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Hinv Hpc Hfile Hinstr Hcont".
     iDestruct (hw_config_cert with "Hhw") as "#Hcert".
     iDestruct (sb_hw_config_misa with "Hhw") as "#Hmisa".
-    iApply (wp_instr_s_config_sr R pc false i mstatus0 mie_v mdv0 menvcfg0
+    iApply (wp_instr_s_config_folded R pc false i mstatus0 mie_v mdv0 menvcfg0
               mie_v menvcfg0
               (fun npc ms1 mdv1 =>
                  (⌜npc = add_vec pc (sign_extend' 64 imm)⌝ ∗
                   ⌜ms1 = mstatus0⌝ ∗ ⌜mdv1 = mdv0⌝ ∗ gpr_file m)%I)
               (dq := dq) HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               with "Hhw Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Hinv Hpc Hinstr
-                    [] [Hfile] [Hcont]").
-    - iIntros (satp0 pcfg paddr) "%Hsok %Hpok".
-      iApply (spt_fetch_tr_of_regime R dq pc mstatus0 satp0 mie_v mdv0
-                menvcfg0 pcfg paddr Hmenvval0 HSXL HMPRV Hsok Hpok with "Hhw").
-    - iIntros (satp0 pcfg paddr tv') "%Hsok %Hpok
-        Hpriv Hms Hmie Hmdl Hmenv Hsatp Hpcfg Hpaddr Htlbc HRes Hclk HPC HnPC
-         Hresv".
-      iApply (swp_mono with "[Hmie Hmdl Hclk Hpriv Hms Hmenv Hsatp
-                              Hpcfg Hpaddr Htlbc HRes Hresv] [Hfile HPC HnPC]").
+                    [Hfile] [Hcont]").
+    - iIntros "Hpriv Hms Hmie Hmdl Hmenv Hslot Hclk HPC HnPC Hresv".
+      iApply (swp_mono with "[Hmie Hmdl Hclk Hpriv Hms Hmenv Hslot Hresv]
+                             [Hfile HPC HnPC]").
       2:{ iApply (swp_sb_BTYPE_taken imm rs2 rs1 m (execute i) pc
                     (add_vec_int pc 4) cmp Hred Hcmp Hal0
                     with "Hcert Hfile HPC HnPC Hmisa"). }
       iIntros (e) "(-> & Hfile & HPC & HnPC & _)".
       iSplitR; [done|].
-      iFrame "Hpriv Hmie Hmenv Hsatp Hpcfg Hpaddr".
-      iSplitL "Htlbc HRes". { iExists tv'. iFrame "Htlbc HRes". }
-      iFrame "Hclk".
+      iFrame "Hpriv Hmie Hmenv Hslot Hclk".
       iSplitR "Hresv"; [| iExact "Hresv"].
       iExists mstatus0, mdv0, (add_vec pc (sign_extend' 64 imm)).
       iFrame "Hms Hmdl HPC HnPC".
