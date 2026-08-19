@@ -1293,6 +1293,64 @@ Proof.
   exact (proj1 (map_disjoint_spec (ptree_bytes 2 t) md) Hdj x b0 bd Hbt Hbd).
 Qed.
 
+(* THE WINDOW IS OWNED, at any width the page divides.  Factored out of
+   [u_fetch_bytes] because the 2-ALIGNED split fetch reads HALFWORDS: the
+   coverage argument is width-generic (it is [udata_cov] under
+   [UserBytes.u_walk_pa_window_wf]) and only the byte-list assembly at the
+   end is not. *)
+Lemma u_fetch_win_in (P : uptd) (t : ptree) (mm : pamap) (k : Z)
+    (w va : mword 64) :
+  0 < k -> (k | 4096) ->
+  u_mem_wf P t mm ->
+  ud_um P !! svpn_of va = Some w ->
+  is_aligned_vaddr (Virtaddr va) k = true ->
+  forall j : nat, (j < Z.to_nat k)%nat ->
+    is_Some (mm !! pa_add (u_walk_pa w va) j).
+Proof.
+  intros Hk Hdvd Hwf Hl Hal j Hj.
+  pose proof Hwf as (md & Hdisj & Hdj & Hmm & Hdm & Hram & Hcov & _).
+  assert (Hd : pa_add (u_walk_pa w va) j ∈ ud_data P).
+  { rewrite (u_walk_pa_window_wf k w va j Hk Hdvd Hal Hj).
+    exact (Hcov (svpn_of va) w (add_vec_int va (Z.of_nat j)) Hl). }
+  destruct (proj1 (Hdm _) Hd) as [bd Hbd].
+  exists bd. rewrite Hmm.
+  destruct (ptree_bytes 2 t !! pa_add (u_walk_pa w va) j) as [c|] eqn:Ht.
+  - exfalso.
+    exact (proj1 (map_disjoint_spec (ptree_bytes 2 t) md) Hdj _ c bd Ht Hbd).
+  - by rewrite (lookup_union_r _ md _ Ht).
+Qed.
+
+(* the TWO instruction bytes of a halfword fetch are in the owned map *)
+Lemma nth_byte_assemble2 (bs : list (bv 8)) (j : nat) :
+  length bs = 2%nat -> (j < 2)%nat ->
+  nth_byte (Z_to_bv 16 (assemble_bytes bs) : mword 16) j = bs !!! j.
+Proof. intros Hlen Hj. apply nth_byte_assemble_len; lia. Qed.
+
+Lemma u_fetch_bytes_2 (P : uptd) (t : ptree) (mm : pamap) (w va : mword 64) :
+  u_mem_wf P t mm ->
+  ud_um P !! svpn_of va = Some w ->
+  is_aligned_vaddr (Virtaddr va) 2 = true ->
+  exists ih : mword 16,
+    forall j : nat, (N.of_nat j < 2)%N ->
+      mm !! pa_add (u_walk_pa w va) j = Some (nth_byte ih j).
+Proof.
+  intros Hwf Hl Hal.
+  assert (Hin : forall j : nat, (j < 2)%nat ->
+            is_Some (mm !! pa_add (u_walk_pa w va) j))
+    by (intros j Hj;
+        exact (u_fetch_win_in P t mm 2 w va ltac:(lia) (Z.divide_factor_l 2 2048)
+                 Hwf Hl Hal j ltac:(lia))).
+  destruct (Hin 0%nat ltac:(lia)) as [b0 Hb0].
+  destruct (Hin 1%nat ltac:(lia)) as [b1 Hb1].
+  exists (Z_to_bv 16 (assemble_bytes [b0; b1]) : mword 16).
+  intros j HjN.
+  assert (Hj : (j < 2)%nat) by lia.
+  rewrite (nth_byte_assemble2 [b0; b1] j eq_refl Hj).
+  destruct j as [ | [ | ] ]; try lia;
+    cbn [lookup_total list_lookup_total];
+    [ exact Hb0 | exact Hb1 ].
+Qed.
+
 (* the four instruction bytes are in the owned map, with SOME value *)
 Lemma u_fetch_bytes (P : uptd) (t : ptree) (mm : pamap) (w va : mword 64) :
   u_mem_wf P t mm ->
@@ -1303,19 +1361,11 @@ Lemma u_fetch_bytes (P : uptd) (t : ptree) (mm : pamap) (w va : mword 64) :
       mm !! pa_add (u_walk_pa w va) j = Some (nth_byte iw j).
 Proof.
   intros Hwf Hl Hal.
-  pose proof Hwf as (md & Hdisj & Hdj & Hmm & Hdm & Hram & Hcov & _).
   set (pa := u_walk_pa w va).
-  assert (Hin : forall j : nat, (j < 4)%nat -> is_Some (mm !! pa_add pa j)).
-  { intros j Hj.
-    assert (Hd : pa_add pa j ∈ ud_data P).
-    { unfold pa. rewrite (u_walk_pa_window w va j Hal Hj).
-      exact (Hcov (svpn_of va) w (add_vec_int va (Z.of_nat j)) Hl). }
-    destruct (proj1 (Hdm _) Hd) as [bd Hbd].
-    exists bd. rewrite Hmm.
-    destruct (ptree_bytes 2 t !! pa_add pa j) as [c|] eqn:Ht.
-    - exfalso.
-      exact (proj1 (map_disjoint_spec (ptree_bytes 2 t) md) Hdj _ c bd Ht Hbd).
-    - by rewrite (lookup_union_r _ md _ Ht). }
+  assert (Hin : forall j : nat, (j < 4)%nat -> is_Some (mm !! pa_add pa j))
+    by (intros j Hj;
+        exact (u_fetch_win_in P t mm 4 w va ltac:(lia) (Z.divide_factor_l 4 1024)
+                 Hwf Hl Hal j ltac:(lia))).
   destruct (Hin 0%nat ltac:(lia)) as [b0 Hb0].
   destruct (Hin 1%nat ltac:(lia)) as [b1 Hb1].
   destruct (Hin 2%nat ltac:(lia)) as [b2 Hb2].
@@ -1473,34 +1523,49 @@ Time Qed.
 (* [Hland] looks at which arm ran.                                         *)
 (* ===================================================================== *)
 
-Lemma u_fetch_pure (P : uptd) (t : ptree) (mm : pamap) (rsf : regstate)
-    (w va : mword 64) (mi : bool) :
+(* ---------------------------------------------------------------------- *)
+(* 7a. THE FETCH WALK, ONCE -- factored out because the 2-ALIGNED split     *)
+(* fetch runs it TWICE (at [va], and at [va+2] when the low halfword is     *)
+(* not compressed, possibly onto another page).                            *)
+(*                                                                        *)
+(* The landing is stated as [u_tlb_only], NOT as the one-walk disjunction   *)
+(* "[rsf] or ONE [register_set tlb]": that shape does not compose, because  *)
+(* collapsing two nested [register_set tlb]s needs functional              *)
+(* extensionality (see [UserClassifyAsm.u_tlb_only]).  The one-walk caller  *)
+(* below still gets the disjunction, from [Hland] directly.                 *)
+(*                                                                        *)
+(* The three cfg pins are taken SEPARATELY rather than as                   *)
+(* [post_fetch_cfg]: at the second halfword the pc is still [va], so        *)
+(* [post_fetch_cfg _ (va+2) _] is not available, while the three registers  *)
+(* it would supply are unchanged.                                          *)
+(* ---------------------------------------------------------------------- *)
+Lemma u_walk_fetch_pure (P : uptd) (t : ptree) (mm : pamap) (rsf : regstate)
+    (w va : mword 64) :
   ud_um P !! svpn_of va = Some w ->
   uleaf_ok (InstructionFetch tt) w ->
-  is_aligned_vaddr (Virtaddr va) 4 = true ->
   neq_vec (bits_of_virtaddr (Virtaddr va))
     (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va))
                         (Z.sub 39 1) 0)) = false ->
-  post_fetch_cfg (u_state rsf mm) va mi ->
+  register_lookup cur_privilege rsf = User ->
+  _get_Mstatus_SXL (register_lookup mstatus rsf) = 'b"10" ->
+  register_lookup menvcfg rsf = MENVCFG_S ->
   u_exec_pins P t rsf ->
   u_mem_wf P t mm ->
-  exists (iw : mword 32) (rsf' : regstate) (mm' : pamap) (t' : ptree),
-    exec (fetch tt) (u_state rsf mm)
-      = Some ((if isRVC (subrange_vec_dec (autocast (T := mword) iw : mword 32) 15 0)
-               then F_RVC (subrange_vec_dec (autocast (T := mword) iw : mword 32) 15 0)
-               else F_Base (autocast (T := mword) iw)), u_state rsf' mm') /\
-    goodmb Du_r Du_w (fetch tt) (u_state rsf mm) mm = true /\
+  exists (rsf' : regstate) (mm' : pamap) (t' : ptree),
+    exec (translateAddr (Virtaddr va) (InstructionFetch tt)) (u_state rsf mm)
+      = Some (Ok (Physaddr (u_walk_pa w va), PBMT_PMA, init_ext_ptw),
+              u_state rsf' mm') /\
+    goodmb Du_r Du_w (translateAddr (Virtaddr va) (InstructionFetch tt))
+      (u_state rsf mm) mm = true /\
     (rsf' = rsf \/ exists tv, rsf' = register_set tlb tv rsf) /\
     tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rsf') /\
     u_mem_step P t t' mm mm'.
 Proof.
-  intros Hl Hleaf Hal Hcanon Hcfg Hpins Hwf.
-  destruct Hcfg as (Lpc & Lcp & Lms & Lmenv & _ & _).
+  intros Hl Hleaf Hcanon Lcp Lsxl Lmenv Hpins Hwf.
   destruct Hpins as (Hhw & Hcfgp & Hpt & Htlbok).
   destruct Hhw as (Hmisa & Hmseccfg & Hsenv & Hhtif & Hall & Help).
   destruct Hpt as ((usatp & Hsatpok & Hsatp) & HA & Hord & HXp & HWp & HRp & Hcovp).
   destruct Hsatpok as (Hmode & Hasid & Hppn & Hpmaw_of).
-  destruct Lms as (Lsxl & _).
   pose proof Hwf as (md & Hdisj & Hdj & Hmm & Hdm & Hram & Hcov & Hacc & Hwfm & Hspec).
   pose proof Hspec as (Hbase & _).
   destruct (upt_spec_maps (ud_root P) (ud_tfp P) (ud_um P) t (svpn_of va) w
@@ -1658,6 +1723,44 @@ Proof.
       + exact (u_mem_step_writeback P t mm (svpn_of va) p2 p1
                  (pte_set_ad w a0 d0) _ Hwf Hmaps Hspec'). }
   destruct Hland as (rsf' & mm' & t' & Hsf & Hfile & Htlbok' & Hstep).
+  exists rsf', mm', t'. split_and!;
+    [ rewrite <- Hsf; exact Htr | exact Htrg | exact Hfile | exact Htlbok'
+    | exact Hstep ].
+Qed.
+
+
+Lemma u_fetch_pure (P : uptd) (t : ptree) (mm : pamap) (rsf : regstate)
+    (w va : mword 64) (mi : bool) :
+  ud_um P !! svpn_of va = Some w ->
+  uleaf_ok (InstructionFetch tt) w ->
+  is_aligned_vaddr (Virtaddr va) 4 = true ->
+  neq_vec (bits_of_virtaddr (Virtaddr va))
+    (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va))
+                        (Z.sub 39 1) 0)) = false ->
+  post_fetch_cfg (u_state rsf mm) va mi ->
+  u_exec_pins P t rsf ->
+  u_mem_wf P t mm ->
+  exists (iw : mword 32) (rsf' : regstate) (mm' : pamap) (t' : ptree),
+    exec (fetch tt) (u_state rsf mm)
+      = Some ((if isRVC (subrange_vec_dec (autocast (T := mword) iw : mword 32) 15 0)
+               then F_RVC (subrange_vec_dec (autocast (T := mword) iw : mword 32) 15 0)
+               else F_Base (autocast (T := mword) iw)), u_state rsf' mm') /\
+    goodmb Du_r Du_w (fetch tt) (u_state rsf mm) mm = true /\
+    (rsf' = rsf \/ exists tv, rsf' = register_set tlb tv rsf) /\
+    tlb_ok_pt (mword_of_int 0) t' (register_lookup tlb rsf') /\
+    u_mem_step P t t' mm mm'.
+Proof.
+  intros Hl Hleaf Hal Hcanon Hcfg Hpins Hwf.
+  pose proof Hcfg as (Lpc & Lcp & Lms & Lmenv & _ & _).
+  pose proof Lms as (Lsxl & _).
+  pose proof Hpins as (Hhw & Hcfgp & Hpt & Htlbok).
+  pose proof Hhw as (Hmisa & Hmseccfg & Hsenv & Hhtif & Hall & Help).
+  pose proof Hpt as ((usatp & Hsatpok & Hsatp) & HA & Hord & HXp & HWp & HRp & Hcovp).
+  (* THE WALK, once -- section 7a.  Everything below is the instruction READ
+     at the state it landed on, and the [fetch] shell over the two. *)
+  destruct (u_walk_fetch_pure P t mm rsf w va Hl Hleaf Hcanon Lcp Lsxl Lmenv
+              Hpins Hwf)
+    as (rsf' & mm' & t' & Htr & Htrg & Hfile & Htlbok' & Hstep).
   (* THE INSTRUCTION READ, at the state the walk landed on.  The four
      bytes are in the OWNED map at BOTH ends: at [mm'] with the values the
      machine reads, and at [mm] -- the map the certificate is stated over
@@ -1741,7 +1844,6 @@ Proof.
                 HA' Hord' Hrange HX' Hpmam Halp Hexecp Hclint Hsigw Hhtif'
                 (addr_is_ram_not_dev _ Hram0) Hown4 Hbytes Lcp').
   (* ...and the fetch on top of the two *)
-  rewrite Hsf in Htr.
   exists iw, rsf', mm', t'. split_and!.
   - exact (exec_fetch_ok_4 (u_state rsf mm) (u_state rsf' mm') va
              (u_walk_pa w va) iw Lpc Hal Htr Hmr).
