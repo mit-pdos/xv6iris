@@ -48,13 +48,19 @@
     (D2) THE STORE ARM **COMPUTES** THE MESSAGE CLASS
          ([WeakInterp.wm_class_of ak ws] at the storing hart's own [wstate]),
          so there is no free class binder and [cls_canonical]/the retag die by
-         construction (design doc, decision 2 of three).  The FUSED RMW arm
-         stamps [WCexcl] outright.
+         construction (design doc, decision 2 of three).  The CONDITIONAL
+         write computes it the same way, and gets [WCexcl] — [wm_class_of]
+         returns [WCexcl] exactly at [ak_latest], which is what an exclusive
+         access kind sets.
 
-    (D3) THE RMW STAYS FUSED — exclusive read, silent window, conditional
-         write, ONE event ([esilent_run]/[ewr_node]).  A bare exclusive read
-         and a standalone conditional write each take the ordinary
-         load/store arm.
+    (D3) THE RMW IS SPLIT (design [weak-memory-rmw-split.md], slice S3): an
+         exclusive read is ONE event ([LExLoad], ordinary read semantics plus
+         the agent-local reservation) and a conditional write is ANOTHER
+         ([LExStore], ordinary write semantics plus the per-byte window
+         check at the reservation).  The window's intervening nodes take the
+         ordinary node rules; a dangling exclusive read is a LEGAL trace; and
+         the conditional-write node carries §5's silent RETRY self-loop so
+         that a dirtied window is not a stuck node.
 
     (D4) INTERRUPT DELIVERY IS **ONLY** THE PLIC THREAD'S ARM
          ([RiscvLang.plic_step]'s wire write, spelled here as [eplic_step]).
@@ -157,7 +163,13 @@ Definition ewg_store (σ : wgstate) (c : CPU) (ws : wstate) (lg : list wmsg)
   WGState (wgregs σ) (wgimg σ) lg (<[c := ws]> (wgws σ)) (wgdev σ)
           (wggen σ) (wgpow σ) (wgib σ).
 
-Definition ewg_rmw (σ : wgstate) (c : CPU) (rs : regstate) (ws : wstate)
+(** THE REGS + VIEW + LOG SHAPE.  It was called [ewg_rmw] while the FUSED
+    RMW arm was its only producer; after the RMW SPLIT no arm has it (the
+    conditional write is an ordinary [ewg_store]), but the hart-side
+    state-interpretation accessor [WeakEvLift.weak_state_interp_rmw] still
+    needs it: closing the interpretation after a silent stretch must let the
+    register file, the view and the log all move at once. *)
+Definition ewg_regwslog (σ : wgstate) (c : CPU) (rs : regstate) (ws : wstate)
     (lg : list wmsg) : wgstate :=
   WGState (<[c := rs]> (wgregs σ)) (wgimg σ) lg (<[c := ws]> (wgws σ))
           (wgdev σ) (wggen σ) (wgpow σ) (wgib σ).
@@ -385,54 +397,12 @@ Definition edeps (σ : wgstate) (c : CPU) : op_roles :=
   deps_of_ib (wgib σ c).
 
 (* ====================================================================== *)
-(** ** 3. The fused-RMW ingredients
+(** ** 3. The barrier table
 
-    [WeakSailLTS.silent1] / [silent_run] / [wr_node], RESTATED here rather
-    than imported: [WeakSailLTS] exports [psail] with its [sp_dev]/[sp_irq]
-    oracle fields, and this language must not depend on that file at all. *)
-
-Definition esilent1 (c c' : M unit * regstate) : Prop :=
-  match c.1 with
-  | Interface.Ret _ => False
-  | Interface.Next oc k =>
-      (match oc in Interface.outcome _ T return (T -> M unit) -> Prop with
-       | Interface.RegRead r _       => fun k => c' = (k (register_lookup r c.2), c.2)
-       | Interface.RegWrite r _ v    => fun k => c' = (k tt, register_set r v c.2)
-       | Interface.InstrAnnounce _   => fun k => c' = (k tt, c.2)
-       | Interface.BranchAnnounce _ _=> fun k => c' = (k tt, c.2)
-       | Interface.CacheOp _         => fun k => c' = (k tt, c.2)
-       | Interface.TlbOp _           => fun k => c' = (k tt, c.2)
-       | Interface.TakeException _   => fun k => c' = (k tt, c.2)
-       | Interface.ReturnException _ => fun k => c' = (k tt, c.2)
-       | Interface.TranslationStart _=> fun k => c' = (k tt, c.2)
-       | Interface.TranslationEnd _  => fun k => c' = (k tt, c.2)
-       | Interface.CycleCount        => fun k => c' = (k tt, c.2)
-       | Interface.Message _         => fun k => c' = (k tt, c.2)
-       | Interface.GetCycleCount     => fun k => c' = (k 0%Z, c.2)
-       | Interface.Choose _          => fun k => exists ch, c' = (k ch, c.2)
-       | _ => fun _ => False
-       end) k
-  end.
-
-Definition esilent_run : relation (M unit * regstate) := rtc esilent1.
-
-Definition ewr_node (m : M unit) (rl : bool) (base : Z) (data : list (bv 8))
-    (m' : M unit) : Prop :=
-  match m with
-  | Interface.Ret _ => False
-  | Interface.Next oc k =>
-      (match oc in Interface.outcome _ T return (T -> M unit) -> Prop with
-       | Interface.MemWrite n req => fun k =>
-           dev_addr (Interface.WriteReq.pa req) = false /\
-           n <> 0%N /\
-           ak_latest (classify (Interface.WriteReq.access_kind req)) = true /\
-           rl = ak_sync (classify (Interface.WriteReq.access_kind req)) /\
-           base = pa_z (Interface.WriteReq.pa req) /\
-           data = wbytes n (Interface.WriteReq.value req) /\
-           m' = k (inl None)
-       | _ => fun _ => False
-       end) k
-  end.
+    (The fused-RMW ingredients [esilent1]/[esilent_run]/[ewr_node] lived
+    here until the RMW SPLIT (S3): an exclusive read and a conditional
+    write are SEPARATE events now, so there is no silent window inside an
+    event and nothing to restate from [WeakSailLTS].) *)
 
 (** The barrier table, split into what fires NOW and what is PARKED. *)
 Definition ebar_now (b : barrier_kind) : option (bool * bool * bool * bool) :=
@@ -493,9 +463,10 @@ Section hart.
 
       RAM READ is LABEL-FREE: the timestamps/values it takes are chosen here
       and constrained by [WeakPromise.read_ok] against the SHARED log and
-      this hart's own view.  The FUSED RMW (delta (D3)) is the second
-      disjunct of the same arm, with [excl_ok] at the fused top.  RAM WRITE
-      COMPUTES its class (delta (D2)). *)
+      this hart's own view.  The EXCLUSIVE READ (delta (D3)) is the second
+      disjunct of the same arm.  RAM WRITE COMPUTES its class (delta (D2))
+      and splits the same way, the conditional half carrying §4's window and
+      §5's retry self-loop. *)
   Definition emonad_step (m : M unit) (e' : eexpr) (σ' : wgstate) : Prop :=
     match m with
     | Interface.Ret _ =>
@@ -529,16 +500,10 @@ Section hart.
                  σ' = ewg_dev σ d'
              else
                ak_coh (classify (Interface.ReadReq.access_kind req)) = false /\
-               ((* the PLAIN RAM read.  GUARDED by [ak_latest = false] (S5
-                   finding F6): with the guard absent the two disjuncts
-                   OVERLAP at an exclusive read, the fused RMW ceases to be
-                   atomic (the machine may take the read alone and let the
-                   write arrive as a separate store event), and no
-                   ONE-INVARIANT-ACCESS acquire rule can be stated — the
-                   caller would have to prove the instruction's remainder in
-                   the unfused case as well.  The cost of the guard is that a
-                   bare exclusive read with no fused write is STUCK; xv6
-                   executes none (its acquire is [amoswap.w.aq]). *)
+               ((* THE PLAIN RAM READ.  The guard is EXCLUSIVITY (design §6:
+                   [ak_latest] is extensionally [ak_excl] today — [classify]
+                   sets it exactly at [AV_exclusive]/[AV_atomic_rmw], and
+                   ifetch/ttw are excluded by [ak_coh] one line up). *)
                 (ak_latest (classify (Interface.ReadReq.access_kind req)) = false /\
                  exists (w : bv (8 * n)) (tvs : list (nat * bv 8)),
                    length tvs = N.to_nat n /\
@@ -553,11 +518,22 @@ Section hart.
                              (ak_sync (classify (Interface.ReadReq.access_kind req)))
                              (pa_z (Interface.ReadReq.pa req)) tvs.*1))
                 \/
-                (* THE FUSED RMW *)
+                (* THE EXCLUSIVE READ (RMW split §2/§6).  ONE step, and its
+                   read semantics are the plain arm's with [lat := false]
+                   hardwired — at ITS OWN address view, as the fused arm's
+                   read half was (deviation D-2, PARM's [Local.read]).  The
+                   RESERVATION is machine-side state: the language only names
+                   the σ-effect [exload_post_run_d], which is
+                   [load_post_run_d] plus [w_res := Some (base, tvs.*1,
+                   ldv_of …)], SUPERSEDING whatever [w_res] held.
+
+                   THE F6 GUARD IS GONE with the fusion: a bare exclusive
+                   read is no longer stuck, and a DANGLING one (the walker's
+                   A/D re-read race, [check_leaf_pte]'s Err arm, an AMOCAS
+                   mismatch) is a legal trace — superseded at the next
+                   exclusive read, cleared at [LInstr] by [instr_post]. *)
                 (ak_latest (classify (Interface.ReadReq.access_kind req)) = true /\
-                 exists (w : bv (8 * n)) (tvs : list (nat * bv 8))
-                        (data : list (bv 8)) (rl : bool) (m1 m2 : M unit)
-                        (rs1 : regstate),
+                 exists (w : bv (8 * n)) (tvs : list (nat * bv 8)),
                    length tvs = N.to_nat n /\
                    (forall j : nat, (j < N.to_nat n)%nat ->
                       tvs.*2 !! j = Some (nth_byte w j)) /\
@@ -565,24 +541,12 @@ Section hart.
                      (ak_sync (classify (Interface.ReadReq.access_kind req)))
                      false (pa_z (Interface.ReadReq.pa req)) tvs
                      (srcs_view ws0 (deps_asrc (edeps σ c))) /\
-                   excl_ok lg0 (fin_to_nat c) (pa_z (Interface.ReadReq.pa req))
-                     tvs (S (length lg0)) /\
-                   data <> [] /\ length tvs = length data /\
-                   esilent_run (k (inl (w, None)), rs0) (m1, rs1) /\
-                   ewr_node m1 rl (pa_z (Interface.ReadReq.pa req)) data m2 /\
-                   e' = ECycle gen c m2 None /\
-                   σ' = ewg_rmw σ c rs1
-                          (store_post_run_d
-                             (load_post_run_d ws0
-                                (ak_sync (classify (Interface.ReadReq.access_kind req)))
-                                (srcs_view ws0 (deps_asrc (edeps σ c)))
-                                (pa_z (Interface.ReadReq.pa req)) tvs.*1)
-                             rl (srcs_view ws0 (deps_asrc (edeps σ c)))
-                             (srcs_view ws0 (deps_vsrc (edeps σ c)))
-                             (pa_z (Interface.ReadReq.pa req)) (length data)
-                             (S (length lg0)))
-                          (lg0 ++ [WMsg (pa_z (Interface.ReadReq.pa req)) data
-                                     (Some (fin_to_nat c)) WCexcl])))
+                   e' = ECycle gen c (k (inl (w, None))) None /\
+                   σ' = ewg_ws σ c
+                          (exload_post_run_d ws0
+                             (ak_sync (classify (Interface.ReadReq.access_kind req)))
+                             (srcs_view ws0 (deps_asrc (edeps σ c)))
+                             (pa_z (Interface.ReadReq.pa req)) tvs.*1)))
          | Interface.MemWrite n req => fun k =>
              if dev_addr (Interface.WriteReq.pa req)
              then
@@ -592,20 +556,72 @@ Section hart.
                  e' = ECycle gen c (k (inl None)) None /\ σ' = ewg_dev σ d'
              else
                n <> 0%N /\
-               e' = ECycle gen c (k (inl None)) None /\
-               σ' = ewg_store σ c
-                      (store_post_run_d ws0
-                         (ak_sync (classify (Interface.WriteReq.access_kind req)))
-                         (srcs_view ws0 (deps_asrc (edeps σ c)))
-                         (srcs_view ws0 (deps_vsrc (edeps σ c)))
-                         (pa_z (Interface.WriteReq.pa req)) (N.to_nat n)
-                         (S (length lg0)))
-                      (lg0 ++ [WMsg (pa_z (Interface.WriteReq.pa req))
-                                 (wbytes n (Interface.WriteReq.value req))
-                                 (Some (fin_to_nat c))
-                                 (wm_class_of
-                                    (classify (Interface.WriteReq.access_kind req))
-                                    ws0)])
+               ((* THE PLAIN RAM WRITE, guarded by exclusivity exactly as the
+                   read is: a CONDITIONAL write must not also be able to
+                   take the unconditional arm, or the window check of §4 —
+                   i.e. atomicity — could simply be bypassed. *)
+                (ak_latest (classify (Interface.WriteReq.access_kind req)) = false /\
+                 e' = ECycle gen c (k (inl None)) None /\
+                 σ' = ewg_store σ c
+                        (store_post_run_d ws0
+                           (ak_sync (classify (Interface.WriteReq.access_kind req)))
+                           (srcs_view ws0 (deps_asrc (edeps σ c)))
+                           (srcs_view ws0 (deps_vsrc (edeps σ c)))
+                           (pa_z (Interface.WriteReq.pa req)) (N.to_nat n)
+                           (S (length lg0)))
+                        (lg0 ++ [WMsg (pa_z (Interface.WriteReq.pa req))
+                                   (wbytes n (Interface.WriteReq.value req))
+                                   (Some (fin_to_nat c))
+                                   (wm_class_of
+                                      (classify (Interface.WriteReq.access_kind req))
+                                      ws0)]))
+                \/
+                (ak_latest (classify (Interface.WriteReq.access_kind req)) = true /\
+                 ((* THE CONDITIONAL WRITE (RMW split §4): the ordinary write
+                     semantics, PLUS the reservation the matching exclusive
+                     read left and the per-byte window still being clean.
+                     There is NO plain-store fallback — a partnerless
+                     [LExStore] has no arm at all. *)
+                  (exwin_ok lg0 (fin_to_nat c)
+                     ws0 (pa_z (Interface.WriteReq.pa req)) (N.to_nat n)
+                     (S (length lg0)) /\
+                   e' = ECycle gen c (k (inl None)) None /\
+                   σ' = ewg_store σ c
+                          (store_post_run_d ws0
+                             (ak_sync (classify (Interface.WriteReq.access_kind req)))
+                             (srcs_view ws0 (deps_asrc (edeps σ c)))
+                             (srcs_view ws0 (deps_vsrc (edeps σ c)))
+                             (pa_z (Interface.WriteReq.pa req)) (N.to_nat n)
+                             (S (length lg0)))
+                          (lg0 ++ [WMsg (pa_z (Interface.WriteReq.pa req))
+                                     (wbytes n (Interface.WriteReq.value req))
+                                     (Some (fin_to_nat c))
+                                     (wm_class_of
+                                        (classify
+                                           (Interface.WriteReq.access_kind req))
+                                        ws0)]))
+                  \/
+                  (* THE RETRY SELF-LOOP (design §5).  [WeakEvAdequacy] runs
+                     at [NotStuck], and after the split a foreign append
+                     during the window can make the conditional write's
+                     [excl_ok_ts] fail — a stuck node.  So the node keeps a
+                     SILENT self-loop: same monad, same σ, label [LSilent].
+
+                     IT IS UNGUARDED, and that is forced twice over.  (i) The
+                     FACTORIZATION: the guard would have to be "the window is
+                     dirty", a MEMORY fact, and [WeakEvInst.pnode_step] — the
+                     program half the factorization theorem is an iff against
+                     — sees no memory at all.  (ii) The WP RULE: the retry is
+                     absorbed by Löb, so the caller's callback must survive a
+                     retry unconsumed; a guarded arm would have to be decided
+                     before the mask moves ⊤→∅, i.e. before the step, and the
+                     clean branch would then still have to dispose of an
+                     already-fired callback.  The cost is a silent, σ-preserving
+                     stutter that the robustness tower sees as one more
+                     [LSilent] — which is exactly what §5 budgets. *)
+                  (e' = ECycle gen c (Interface.Next (Interface.MemWrite n req) k)
+                          None /\
+                   σ' = σ))))
          | Interface.Barrier b => fun k =>
              e' = ECycle gen c (k tt) (ebar_park b) /\
              σ' = ewg_ws σ c (efence_apply ws0 (ebar_now b))
@@ -970,12 +986,11 @@ Proof.
     destruct (dev_addr _).
     + by intros (w & d' & _ & _ & ->).
     + intros (_ & [(_ & w & tvs & _ & _ & _ & _ & ->)
-                  |(_ & w & tvs & data & rl & m1 & m2 & rs1 &
-                    _ & _ & _ & _ & _ & _ & _ & _ & _ & ->)]); reflexivity.
+                  |(_ & w & tvs & _ & _ & _ & _ & ->)]); reflexivity.
   - (* MemWrite *)
     destruct (dev_addr _).
     + by intros (d' & _ & _ & ->).
-    + by intros (_ & _ & ->).
+    + by intros (_ & [(_ & _ & ->)|(_ & [(_ & _ & ->)|(_ & ->)])]).
   - (* Choose *) by intros (ch & _ & ->).
 Qed.
 
@@ -991,11 +1006,10 @@ Proof.
   - destruct (dev_addr _).
     + by intros (w & d' & _ & _ & ->).
     + intros (_ & [(_ & w & tvs & _ & _ & _ & _ & ->)
-                  |(_ & w & tvs & data & rl & m1 & m2 & rs1 &
-                    _ & _ & _ & _ & _ & _ & _ & _ & _ & ->)]); by split.
+                  |(_ & w & tvs & _ & _ & _ & _ & ->)]); by split.
   - destruct (dev_addr _).
     + by intros (d' & _ & _ & ->).
-    + by intros (_ & _ & ->).
+    + by intros (_ & [(_ & _ & ->)|(_ & [(_ & _ & ->)|(_ & ->)])]).
   - by intros (ch & _ & ->).
 Qed.
 
@@ -1014,12 +1028,12 @@ Proof.
   - destruct (dev_addr _).
     + intros (w & d' & _ & -> & _). right. by do 2 eexists.
     + intros (_ & [(_ & w & tvs & _ & _ & _ & -> & _)
-                  |(_ & w & tvs & data & rl & m1 & m2 & rs1 &
-                    _ & _ & _ & _ & _ & _ & _ & _ & -> & _)]);
+                  |(_ & w & tvs & _ & _ & _ & -> & _)]);
         right; by do 2 eexists.
   - destruct (dev_addr _).
     + intros (d' & _ & -> & _). right. by do 2 eexists.
-    + intros (_ & -> & _). right. by do 2 eexists.
+    + intros (_ & [(_ & -> & _)|(_ & [(_ & -> & _)|(-> & _)])]);
+        right; by do 2 eexists.
   - intros (ch & -> & _). right. by do 2 eexists.
 Qed.
 
@@ -1037,13 +1051,12 @@ Proof.
   - destruct (dev_addr _).
     + intros (w & d' & _ & _ & ->). exists []. by rewrite app_nil_r.
     + intros (_ & [(_ & w & tvs & _ & _ & _ & _ & ->)
-                  |(_ & w & tvs & data & rl & m1 & m2 & rs1 &
-                    _ & _ & _ & _ & _ & _ & _ & _ & _ & ->)]).
-      * exists []. by rewrite app_nil_r.
-      * by eexists.
+                  |(_ & w & tvs & _ & _ & _ & _ & ->)]);
+        exists []; by rewrite app_nil_r.
   - destruct (dev_addr _).
     + intros (d' & _ & _ & ->). exists []. by rewrite app_nil_r.
-    + intros (_ & _ & ->). by eexists.
+    + intros (_ & [(_ & _ & ->)|(_ & [(_ & _ & ->)|(_ & ->)])]);
+        [by eexists|by eexists|exists []; by rewrite app_nil_r].
   - intros (ch & _ & ->). exists []. by rewrite app_nil_r.
 Qed.
 
@@ -1062,12 +1075,14 @@ Proof.
   - destruct (dev_addr _).
     + by intros (w & d' & _ & _ & ->).
     + intros (_ & [(_ & w & tvs & _ & _ & _ & _ & ->)
-                  |(_ & w & tvs & data & rl & m1 & m2 & rs1 &
-                    _ & _ & _ & _ & _ & _ & _ & _ & _ & ->)]);
-        [rewrite /ewg_ws /=|rewrite /ewg_rmw /=]; by rewrite gws_insert_ne.
+                  |(_ & w & tvs & _ & _ & _ & _ & ->)]);
+        rewrite /ewg_ws /=; by rewrite gws_insert_ne.
   - destruct (dev_addr _).
     + by intros (d' & _ & _ & ->).
-    + intros (_ & _ & ->). rewrite /ewg_store /=. by rewrite gws_insert_ne.
+    + intros (_ & [(_ & _ & ->)|(_ & [(_ & _ & ->)|(_ & ->)])]);
+        [rewrite /ewg_store /=; by rewrite gws_insert_ne
+        |rewrite /ewg_store /=; by rewrite gws_insert_ne
+        |reflexivity].
   (* the Barrier arm is now closed by the generic [ewg_ibws] branch above:
      its σ' is [ewg_ws], whose [gws_insert_ne] is the same one. *)
   - intros (ch & _ & ->). reflexivity.
@@ -1088,15 +1103,15 @@ Proof.
   - destruct (dev_addr _).
     + intros (w & d' & _ & _ & ->). reflexivity.
     + intros (_ & [(_ & w & tvs & _ & _ & _ & _ & ->)
-                  |(_ & w & tvs & data & rl & m1 & m2 & rs1 &
-                    _ & _ & _ & _ & _ & _ & _ & _ & _ & ->)]).
-      * rewrite /ewg_ws /= gws_insert_eq. apply load_post_run_le.
-      * rewrite /ewg_rmw /= gws_insert_eq.
-        etrans; [apply load_post_run_d_le|apply store_post_run_d_le].
+                  |(_ & w & tvs & _ & _ & _ & _ & ->)]);
+        rewrite /ewg_ws /= gws_insert_eq;
+        [apply load_post_run_le|apply exload_post_run_d_le].
   - destruct (dev_addr _).
     + intros (d' & _ & _ & ->). reflexivity.
-    + intros (_ & _ & ->). rewrite /ewg_store /= gws_insert_eq.
-      apply store_post_run_d_le.
+    + intros (_ & [(_ & _ & ->)|(_ & [(_ & _ & ->)|(_ & ->)])]);
+        [rewrite /ewg_store /= gws_insert_eq; apply store_post_run_d_le
+        |rewrite /ewg_store /= gws_insert_eq; apply store_post_run_d_le
+        |reflexivity].
   - (* Barrier *) intros (_ & ->). rewrite /ewg_ws /= gws_insert_eq.
     apply efence_apply_le.
   - intros (ch & _ & ->). reflexivity.

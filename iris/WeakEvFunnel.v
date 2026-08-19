@@ -500,11 +500,11 @@ Section frame.
         iSplitR; [iPureIntro; apply erw_ws_depmove|].
         destruct k0;
           [iApply (weak_state_interp_ptwise
-                     (ewg_rmw σ c rs2 (wgws σ c) (wglog σ))
+                     (ewg_regwslog σ c rs2 (wgws σ c) (wglog σ))
                      (<[c := rs2]> (wgregs σ)) (wgws σ) (wgib σ) with "[Hσ0]")
-          |by rewrite /ewg_rmw /ewg_regws /=..].
+          |by rewrite /ewg_regwslog /ewg_regws /=..].
         + reflexivity.
-        + intros c0. rewrite /ewg_rmw /=.
+        + intros c0. rewrite /ewg_regwslog /=.
           destruct (decide (c0 = c)) as [->|Hne];
             [by rewrite gws_insert_eq|by rewrite gws_insert_ne].
         + iExact "Hσ0".
@@ -526,10 +526,10 @@ Section frame.
         iSplitR; [iPureIntro; apply instr_post_depmove|].
         rewrite /ewg_ibws.
         iApply (weak_state_interp_ptwise
-                  (ewg_rmw σ c rs2 (instr_post (wgws σ c)) (wglog σ))
+                  (ewg_regwslog σ c rs2 (instr_post (wgws σ c)) (wglog σ))
                   (wgregs σ) (<[c := instr_post (wgws σ c)]> (wgws σ))
                   (<[c := v]> (wgib σ)) with "[Hσ0]").
-        + intros c0. rewrite /ewg_rmw /= Hr.
+        + intros c0. rewrite /ewg_regwslog /= Hr.
           destruct (decide (c0 = c)) as [->|Hne];
             [by rewrite greg_insert_eq|by rewrite greg_insert_ne].
         + reflexivity.
@@ -548,12 +548,12 @@ Section frame.
         iSplitR; [iPureIntro; reflexivity|].
         destruct σ as [gr img lg f dv gn pw ib0]. simpl in Hr.
         iApply (weak_state_interp_ptwise
-                  (ewg_rmw (WGState gr img lg f dv gn pw ib0) c rs2 (f c) lg)
+                  (ewg_regwslog (WGState gr img lg f dv gn pw ib0) c rs2 (f c) lg)
                   gr f ib0 with "[Hσ0]").
-        + intros c0. rewrite /ewg_rmw /= Hr.
+        + intros c0. rewrite /ewg_regwslog /= Hr.
           destruct (decide (c0 = c)) as [->|Hne];
             [by rewrite greg_insert_eq|by rewrite greg_insert_ne].
-        + intros c0. rewrite /ewg_rmw /=.
+        + intros c0. rewrite /ewg_regwslog /=.
           destruct (decide (c0 = c)) as [->|Hne];
             [by rewrite gws_insert_eq|by rewrite gws_insert_ne].
         + iExact "Hσ0". }

@@ -130,11 +130,18 @@ Section pf_uniform.
           (srcs_view (pa_ws ag) asrc) /\
         excl_ok (pc_log cfg) i base tvs (S (length (pc_log cfg)))
     | LRegW _ _ | LCtrl _ | LInstr => True
-    (* THE RMW SPLIT (S1).  [pf_ok] is the side condition of a
-       [wp_pf_step] ARM ([wp_pf_step_intro]), and [wp_pf_step] gains
-       [PFExLoad]/[PFExStore] only in S2 — so in the additive slice the two
-       new labels have no arm. *)
-    | LExLoad _ _ _ _ | LExStore _ _ _ _ _ => False
+    (* THE RMW SPLIT (S3): the side conditions of [PFExLoad]/[PFExStore].
+       The exclusive read is NOT pinned (it is [LRmw]'s read half, and
+       [LRmw] never was — see [WeakPromise.lb_ldepfree]); the conditional
+       write's is [WeakPromise.exwin_ok], the machine arm's reservation and
+       window premises under one name. *)
+    | LExLoad aq base tvs asrc =>
+        read_ok_d (pc_img cfg) (pc_log cfg) (pa_ws ag) aq false base tvs
+          (srcs_view (pa_ws ag) asrc)
+    | LExStore _ base data _ _ =>
+        data <> [] /\
+        exwin_ok (pc_log cfg) i (pa_ws ag) base (length data)
+          (S (length (pc_log cfg)))
     end.
 
   Definition pf_log (cfg : wpcfg P D) (i : agent) (ag : wpagent P)
@@ -174,7 +181,8 @@ Section pf_uniform.
     | LRegW rd srcs => regw_post (pa_ws ag) rd (srcs_view (pa_ws ag) srcs)
     | LCtrl srcs => ctrl_post (pa_ws ag) (srcs_view (pa_ws ag) srcs)
     | LInstr => instr_post (pa_ws ag)
-    | LExLoad aq base tvs _ => load_post_run (pa_ws ag) aq base tvs.*1
+    | LExLoad aq base tvs asrc =>
+        exload_post_run_d (pa_ws ag) aq (srcs_view (pa_ws ag) asrc) base tvs.*1
     | LExStore rl base data asrc vsrc =>
         store_post_run_d (pa_ws ag) rl (srcs_view (pa_ws ag) asrc)
           (srcs_view (pa_ws ag) vsrc) base (length data)
@@ -210,8 +218,14 @@ Section pf_uniform.
     - by apply (PFRegW pstep pcls i cfg ag rdw wsrc st' d').
     - by apply (PFCtrl pstep pcls i cfg ag csrc st' d').
     - by apply (PFInstr pstep pcls i cfg ag st' d').
-    - done.
-    - done.
+    - (* THE RMW SPLIT (S3): the exclusive read *)
+      rewrite /pf_ws /pf_log.
+      by apply (PFExLoad pstep pcls i cfg ag xaq xbase xtvs xasrc st' d').
+    - (* THE RMW SPLIT (S3): the conditional write *)
+      destruct Hok as (Hne & R & HR & Hrb & Hrlen & Hex).
+      rewrite /pf_ws /pf_log.
+      by apply (PFExStore pstep pcls i cfg ag yrl ybase ydata yasrc yvsrc _ R
+                  st' d').
   Qed.
 
   (** THE LOAD PIN (D3-2, weakening D2's).  [pf_ok] pins the LOAD's operand
@@ -222,15 +236,22 @@ Section pf_uniform.
       arms land with the event language, at S3/R3), so the inversion needs
       to know the step did not emit one; at the instance the premise is
       [WeakEvInst.pstep_ev_fused]. *)
+  Local Ltac pf_inv_old :=
+    repeat (match goal with H : _ /\ _ |- _ => destruct H end); subst;
+    do 3 eexists; split_and!; try done;
+    rewrite /pf_cfg /pf_log /pf_ws //=;
+    rewrite ?srcs_view_nil ?load_post_run_d_0 ?store_post_run_d_0 //;
+    by subst.
+
   Lemma wp_pf_step_inv i l cfg c' :
-    lb_ldepfree l -> lb_fused l ->
+    lb_ldepfree l ->
     wp_pf_step pstep pcls i l cfg c' ->
     exists ag st' d', pc_ags cfg !! i = Some ag /\
       pstep (pa_st ag) (pc_dev cfg) l st' d' /\
       pf_ok cfg i ag l /\
       c' = pf_cfg cfg i ag l st' d'.
   Proof.
-    intros Hdf Hfu.
+    intros Hdf.
     destruct 1 as [cfg0 ag st' d' Hlk Hps
                   |cfg0 ag aq lat base tvs asrc st' d' Hlk Hps Hrd
                   |cfg0 ag rl base data asrc vsrc k st' d' Hlk Hps Hne Hk
@@ -243,13 +264,16 @@ Section pf_uniform.
                   |cfg0 ag aq base tvs asrc st' d' Hlk Hps Hrd
                   |cfg0 ag rl base data asrc vsrc k R st' d'
                         Hlk Hps Hne Hres Hrb Hrlen Hex Hk];
-      [| | | | | | | | |by exfalso; exact Hfu|by exfalso; exact Hfu];
       simpl in Hdf;
-      repeat (match goal with H : _ /\ _ |- _ => destruct H end); subst;
-      do 3 eexists; split_and!; try done;
-      rewrite /pf_cfg /pf_log /pf_ws //=;
-      rewrite ?srcs_view_nil ?load_post_run_d_0 ?store_post_run_d_0 //;
-      by subst k.
+      [pf_inv_old|pf_inv_old|pf_inv_old|pf_inv_old|pf_inv_old|pf_inv_old
+      |pf_inv_old|pf_inv_old|pf_inv_old| | ].
+    - (* THE RMW SPLIT (S3): the exclusive read *)
+      do 3 eexists. split_and!; [exact Hlk|exact Hps|exact Hrd|].
+      by rewrite /pf_cfg /pf_log /pf_ws //=.
+    - (* THE RMW SPLIT (S3): the conditional write *)
+      do 3 eexists. split_and!; [exact Hlk|exact Hps| |].
+      + split; [exact Hne|]. exists R. by split_and!.
+      + rewrite /pf_cfg /pf_log /pf_ws //=. by subst k.
   Qed.
 End pf_uniform.
 
@@ -364,12 +388,12 @@ Proof. destruct l; rewrite //= gws_insert_eq //. Qed.
     [lb_depfree] and collapse the machine's [_d] step functions back to
     their dependency-free instances. *)
 Lemma pf_ok_disk P σ l :
-  lb_depfree l ->
+  lb_depfree l -> lb_fused l ->
   (forall aq rl base tvs data asrc vsrc,
      l <> LRmw aq rl base tvs data asrc vsrc) ->
   pf_ok (ecfg_of P σ) n_disk (edisk_ag P) l -> edlab_ok σ (ep_dws P) l.
 Proof.
-  intros Hdf Hnr. destruct l; simpl in Hdf; try done.
+  intros Hdf Hfu Hnr. destruct l; simpl in Hdf, Hfu; try done.
   - (* LStore: [pf_ok] no longer pins the operand lists, [edlab_ok] does *)
     destruct Hdf as [Ha Hb]. rewrite Ha Hb. by intros Hc.
   - (* LRmw: the device has no atomic read-modify-write *)
@@ -382,16 +406,14 @@ Lemma pf_log_disk P σ l :
 Proof. by destruct l. Qed.
 
 Lemma pf_ws_disk P σ l :
-  lb_depfree l ->
+  lb_depfree l -> lb_fused l ->
   pf_ws (ecfg_of P σ) (edisk_ag P) l = edlab_ws σ (ep_dws P) l.
 Proof.
-  intros Hdf. destruct l; simpl in Hdf; try done.
+  intros Hdf Hfu. destruct l; simpl in Hdf, Hfu; try done.
   - destruct Hdf as [Ha Hb]. rewrite Ha Hb. apply store_post_run_d_0.
   - destruct Hdf as [Ha Hb]. rewrite Ha Hb.
     rewrite /edlab_ws /pf_ws /=.
     by rewrite load_post_run_d_0 store_post_run_d_0.
-  (* [LExStore]: [LStore]'s case verbatim (RMW split S1) *)
-  - destruct Hdf as [Ha Hb]. rewrite Ha Hb. apply store_post_run_d_0.
 Qed.
 
 (** ... and the four shapes of a projected configuration after one step. *)
@@ -496,8 +518,11 @@ Proof.
   - by split; [|rewrite gws_insert_eq].
   - by split; [|rewrite gws_insert_eq].
   - by split; [|rewrite gws_insert_eq].
-  - done.
-  - done.
+  - (* THE RMW SPLIT (S3): the exclusive read *)
+    split_and!; [exact Hok|reflexivity|by rewrite gws_insert_eq].
+  - (* THE RMW SPLIT (S3): the conditional write *)
+    destruct Hok as (Hne & Hex).
+    split_and!; [by eexists|exact Hne|exact Hex|by rewrite gws_insert_eq].
 Qed.
 
 (** The hart's program half assembles into an [epf_step]: at a boundary
@@ -579,9 +604,7 @@ Proof.
   intros Hlive Hstep.
   have Hdf : lb_ldepfree l.
   { destruct Hstep; by eapply pstep_ev_ldepfree. }
-  have Hfu : lb_fused l.
-  { destruct Hstep; by eapply pstep_ev_fused. }
-  apply (wp_pf_step_inv _ _ i l _ _ Hdf Hfu) in Hstep
+  apply (wp_pf_step_inv _ _ i l _ _ Hdf) in Hstep
     as (ag & st' & d' & Hlk & Hps & Hok & ->).
   rewrite /ecfg_of /= in Hlk.
   destruct (eags_lookup_inv P σ i ag Hlk) as [(c & -> & ->)|(-> & ->)].
@@ -606,11 +629,12 @@ Proof.
     (* THE DISK is still FULLY dependency-free (D-6), so it keeps the D2
        premise while the harts moved to [lb_ldepfree]. *)
     have Hdfd : lb_depfree l by eapply pstep_disk_depfree.
-    have Hok' := pf_ok_disk P σ l Hdfd Hnr Hok.
+    have Hfud : lb_fused l by eapply pstep_disk_no_ex.
+    have Hok' := pf_ok_disk P σ l Hdfd Hfud Hnr Hok.
     destruct Hps as [Hprog|(-> & -> & Hu)].
     + eexists _, _. split; [by apply epf_step_of_disk|].
       rewrite ecfg_of_disk_upd /pf_cfg /=.
-      by rewrite ?pf_log_disk ?(pf_ws_disk _ _ _ Hdfd).
+      by rewrite ?pf_log_disk ?(pf_ws_disk _ _ _ Hdfd Hfud).
     + eexists P, (ewg_dev σ d'). split.
       { apply (EPFUart P σ (ewg_dev σ d')); [exact Hlive|by exists d']. }
       have Hid : <[n_disk := WPAgent (PDisk (ep_dp P))
@@ -704,11 +728,12 @@ Proof.
       as (l1 & dp1 & d1 & He & Hps & Hok & ->). simplify_eq.
     exists l1.
     have Hdfd : lb_depfree l1 by eapply pstep_disk_depfree; left; exact Hps.
+    have Hfud : lb_fused l1 by eapply pstep_disk_no_ex; left; exact Hps.
     have Hstep := wp_pf_step_intro pstep_ev pcls_ev n_disk l1
                     (ecfg_of P σ) (edisk_ag P) (PDisk dp1) d1
                     (eags_disk P σ).
     rewrite ecfg_of_disk_upd.
-    rewrite /pf_cfg pf_log_disk (pf_ws_disk _ _ _ Hdfd) in Hstep.
+    rewrite /pf_cfg pf_log_disk (pf_ws_disk _ _ _ Hdfd Hfud) in Hstep.
     apply Hstep; [|by apply edlab_ok_pf_ok].
     rewrite /pstep_ev /= /edisk_ag /=. by left.
   - (* the UART thread *)
@@ -810,13 +835,31 @@ Qed.
 (* ====================================================================== *)
 (** ** 5. THE LAYER-1 SIDE CONDITIONS OF THE INSTANCE, AND THE TRANSPORT *)
 
-Lemma pstep_ev_lat_free_prog : lat_free_prog pstep_ev.
+(** THE LAT-FREE HALF, which SURVIVES the RMW split: no arm of the event
+    language emits a [lat = true] read (the fetch and the walk classify as
+    ordinary coherent reads and are excluded by [ak_coh]; the exclusive read
+    is [LExLoad], which has no [lat] field at all). *)
+Lemma pstep_ev_lat_free_half p d aq base tvs asrc p' d' :
+  ~ pstep_ev p d (LLoad aq true base tvs asrc) p' d'.
 Proof.
-  split; [|by intros p d l p' d' H; eapply pstep_ev_fused, H].
-  intros p d aq base tvs asrc p' d' Hs.
+  intros Hs.
   have Hdf : lb_ldepfree (LLoad aq true base tvs asrc)
     by eapply pstep_ev_ldepfree.
   simpl in Hdf. rewrite Hdf in Hs. by eapply pstep_ev_lat_free.
+Qed.
+
+(** ... and the FUSED half, which does NOT (R3/S4 COUPLING, the ruling).
+    [lat_free_prog]'s second conjunct says the program emits only the nine
+    pre-split constructors; the producers emit [LExLoad]/[LExStore] now, so
+    the instance's [pstep_ev_fused] is FALSE and is deleted.  Everything
+    that used to consume it takes it as a HYPOTHESIS instead — see
+    [xv6_ev_weak_robust]'s [Hfused], tagged RESTORED BY S4. *)
+Lemma pstep_ev_lat_free_prog
+    (Hfused : forall p d l p' d', pstep_ev p d l p' d' -> lb_fused l) :
+  lat_free_prog pstep_ev.
+Proof.
+  split; [|exact Hfused]. intros p d aq base tvs asrc p' d' Hs.
+  by eapply pstep_ev_lat_free_half.
 Qed.
 
 Lemma pstep_ev_ts_oblivious : ts_oblivious pstep_ev.
@@ -934,7 +977,20 @@ Theorem xv6_ev_weak_robust Σ `{!riscvGpreS Σ, !weakGpreS Σ}
     (Hgen : gen = 0%nat)
     (Hpow : wgpow σ0 = true) (Hgen0 : wggen σ0 = 0%nat)
     (Hlog : wglog σ0 = [])
-    (Hws : forall cc : CPU, wgws σ0 cc = ws_init) :
+    (Hws : forall cc : CPU, wgws σ0 cc = ws_init)
+    (* RESTORED BY S4: the robust-tower pair re-index.
+       [WeakPromiseFact.lat_free_prog]'s second conjunct — "the program
+       emits only the nine PRE-SPLIT label constructors" — was discharged
+       by the instance until R3 made the producers emit [LExLoad]/
+       [LExStore].  It is consumed by the tower's pf REPLAY
+       ([WeakRobustSim.Qinv_step] refutes the split arms from it) and the
+       repair is design §8's slice S4: the tower re-indexed to the PAIR
+       form, after which the conjunct — and this hypothesis — disappear.
+       Until then the OLD (tier-2) capstone carries it explicitly rather
+       than silently gaining a false instance lemma; tier 1
+       ([WeakRobustMain.robust_main]) never consumes this theorem. *)
+    (Hfused : forall p d l p' d',
+       pstep_ev p d l p' d' -> WeakPromise.lb_fused l) :
   (* (b) THE WP PACKAGE *)
   (forall (HR : riscvGS Σ) (HW : weakGS Σ),
      ⊢ ([∗ set] cc ∈ (fin_to_set CPU : gset CPU),
@@ -978,7 +1034,7 @@ Proof.
   (* THE TRACED DECOMPOSITION, and the canonical retag of it *)
   destruct (wp_behavior_fulfil_once_dev pstep_ev pdev_ev
               (img_z (wgimg σ0)) (wgdev σ0) (eps_init σ0) c
-              pdev_ev_ok pstep_ev_lat_free_prog Hbeh)
+              pdev_ev_ok (pstep_ev_lat_free_prog Hfused) Hbeh)
     as (mid & TS & DS & Hprom & Hofd & Hnp & Hacct).
   set f := canon_f pcls_ev TS.
   have Hbeh' : wp_behavior pstep_ev (img_z (wgimg σ0)) (wgdev σ0)
@@ -1003,7 +1059,7 @@ Proof.
   destruct (robust_main_bundle pstep_ev pcls_ev pdev_ev n_disk
               (img_z (wgimg σ0)) (wgdev σ0) (eps_init σ0)
               (retag_cfg f c) (retag_cfg f mid) (retag_traces f TS) DS
-              pstep_ev_lat_free_prog pstep_ev_ts_oblivious pcls_ev_obl
+              (pstep_ev_lat_free_prog Hfused) pstep_ev_ts_oblivious pcls_ev_obl
               Hprom' Hofd' (efulfil_acct_retag f mid TS Hacct)
               (Hprem _ _ _ _ Hbeh' Hprom' Hofd' Hcanon) Hcanon Hvf)
     as (cf & Hrun & Hpg & Hmm).

@@ -109,11 +109,16 @@ Definition lb_ok (l : wlabel) : Prop :=
   match l with
   | LStore _ _ data _ _ => data ≠ []
   | LRmw _ _ _ tvs data _ _ => data ≠ [] ∧ length tvs = length data
-  (* THE RMW SPLIT (S1).  [lb_ok] is what [lts_enabled]'s [le_lb_ok]
-     demands of EVERY label the program emits, and the promise-free
-     machine has no arm for the two split labels until S2 — so in the
-     additive slice "the LTS emits no split label" is exactly this
-     clause, and [cstep_available] reads the contradiction off it. *)
+  (* THE RMW SPLIT — R3 CHECKED, LEFT AS [False] DELIBERATELY.  [lb_ok] is
+     what [lts_enabled]'s [le_lb_ok] demands of EVERY label the LTS emits,
+     and [cstep_available] reads the contradiction off it.  The machine has
+     real arms for the split pair since S2, so the clause COULD be given
+     real content ([data ≠ []] plus the reservation/window, i.e.
+     [WeakPromise.exwin_ok]) — but no consumer in this tower needs it yet:
+     everything above [lb_ok] is reached through [lat_free_prog], whose
+     fused conjunct still restricts the alphabet, and giving the two labels
+     content here without the tower's PAIR-FORM re-index (design §8's S4)
+     would only move the [False] one file up.  Flip it as part of S4. *)
   | LExLoad _ _ _ _ | LExStore _ _ _ _ _ => False
   | LSilent | LLoad _ _ _ _ _ | LFence _ _ _ _ | LDev | LRegW _ _
   | LCtrl _ | LInstr => True
@@ -721,7 +726,8 @@ Section complete.
         exists []. rewrite /= app_nil_r. by split.
       + simpl. by eapply (lookup_insert_self _ _ _ _ Hag).
       + simpl. by exists LInstr, dd.
-    (* THE RMW SPLIT (S1): [lb_ok] refutes the two split labels *)
+    (* THE RMW SPLIT: [lb_ok] still refutes the two split labels (R3
+       checked; the flip belongs to the tower's S4 re-index) *)
     - by destruct (le_lb_ok Hen (pa_st ag) _ _ p' dd Hps).
     - by destruct (le_lb_ok Hen (pa_st ag) _ _ p' dd Hps).
   Qed.

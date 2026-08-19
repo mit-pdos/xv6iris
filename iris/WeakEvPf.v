@@ -292,9 +292,26 @@ Definition elabel_ok (σ : wgstate) (c : CPU) (l : wlabel) (σ' : wgstate)
       wglog σ' = wglog σ /\
       wgws σ' c = ctrl_post (wgws σ c) (srcs_view (wgws σ c) srcs)
   | LInstr => wglog σ' = wglog σ /\ wgws σ' c = instr_post (wgws σ c)
-  (* THE RMW SPLIT (S1): the event language emits neither label yet
-     (S3 does), and this predicate is a NODE's arm — so [False]. *)
-  | LExLoad _ _ _ _ | LExStore _ _ _ _ _ => False
+  (* THE RMW SPLIT (S3): the two halves.  [LExLoad] is [LLoad]'s clause at
+     [lat := false], with the read admissible at its OWN address view
+     (deviation D-2 — the fused [LRmw]'s read half had exactly this) and the
+     RESERVATION written into the post-state by [exload_post_run_d].
+     [LExStore] is [LStore]'s clause plus §4's window: a matching
+     reservation of the right width, still clean at the fresh top. *)
+  | LExLoad aq base tvs asrc =>
+      read_ok_d (img_z (wgimg σ)) (wglog σ) (wgws σ c) aq false base tvs
+        (srcs_view (wgws σ c) asrc) /\
+      wglog σ' = wglog σ /\
+      wgws σ' c = exload_post_run_d (wgws σ c) aq
+                    (srcs_view (wgws σ c) asrc) base tvs.*1
+  | LExStore rl base data asrc vsrc =>
+      (exists k, wglog σ' = wglog σ ++ [WMsg base data (Some (fin_to_nat c)) k]) /\
+      data <> [] /\
+      exwin_ok (wglog σ) (fin_to_nat c) (wgws σ c) base (length data)
+        (S (length (wglog σ))) /\
+      wgws σ' c = store_post_run_d (wgws σ c) rl (srcs_view (wgws σ c) asrc)
+                    (srcs_view (wgws σ c) vsrc) base (length data)
+                    (S (length (wglog σ)))
   end.
 
 (** The disk agent's version.  Since M5 the disk is an ORDINARY weak-memory
@@ -324,8 +341,8 @@ Definition edlabel_ok (P : epool) (σ : wgstate) (l : wlabel)
   | LDev => wglog σ' = wglog σ /\ dws' = ep_dws P
   | LRmw _ _ _ _ _ _ _ => False
   | LRegW _ _ | LCtrl _ | LInstr => False
-  (* THE RMW SPLIT (S1): no arm yet, and the disk has no exclusives —
-     the [LRmw] precedent two lines up. *)
+  (* THE RMW SPLIT (S3): the disk has no exclusives — the [LRmw] precedent
+     two lines up, and [WeakEvInst.pstep_disk_no_ex] is the proof. *)
   | LExLoad _ _ _ _ | LExStore _ _ _ _ _ => False
   end.
 
@@ -581,23 +598,29 @@ Proof.
     destruct (dev_addr _).
     + intros (w & d' & _ & _ & ->). exists LDev. by split.
     + intros (_ & [(_ & w & tvs & _ & _ & Hrd & _ & ->)
-                  |(_ & w & tvs & data & rl & m1 & m2 & rs1 &
-                    _ & _ & Hrd & Hex & Hne & Hlend & _ & _ & _ & ->)]).
+                  |(_ & w & tvs & _ & _ & Hrd & _ & ->)]).
       * eexists (LLoad _ false _ tvs []).
         split_and!;
           [reflexivity|reflexivity|exact Hrd|reflexivity|apply gws_insert_eq].
-      * eexists (LRmw _ rl _ tvs data _ _).
-        split_and!;
-          [exact Hne|exact Hlend|exact Hrd|exact Hex| |].
-        { exists WCexcl. reflexivity. }
-        apply gws_insert_eq.
+      * (* THE EXCLUSIVE READ (RMW split S3) *)
+        eexists (LExLoad _ _ tvs _).
+        split_and!; [exact Hrd|reflexivity|apply gws_insert_eq].
   - (* MemWrite *)
     destruct (dev_addr _).
     + intros (d' & _ & _ & ->). exists LDev. by split.
-    + intros (Hn & _ & ->). eexists (LStore _ _ _ _ _). split_and!.
-      * eexists. reflexivity.
-      * by apply wbytes_ne.
-      * rewrite wbytes_length. apply gws_insert_eq.
+    + intros (Hn & [(_ & _ & ->)|(_ & [(Hex & _ & ->)|(_ & ->)])]).
+      * eexists (LStore _ _ _ _ _). split_and!.
+        { eexists. reflexivity. }
+        { by apply wbytes_ne. }
+        rewrite wbytes_length. apply gws_insert_eq.
+      * (* THE CONDITIONAL WRITE (RMW split S3) *)
+        eexists (LExStore _ _ _ _ _). split_and!.
+        { eexists. reflexivity. }
+        { by apply wbytes_ne. }
+        { rewrite wbytes_length. exact Hex. }
+        rewrite wbytes_length. apply gws_insert_eq.
+      * (* THE RETRY SELF-LOOP (design §5): a silent, σ-preserving step *)
+        exists LSilent. by split.
   - (* D3-2: THE ANNOUNCE — [LInstr], the instruction start *)
     intros (_ & ->). exists LInstr.
     split; [reflexivity|apply gws_insert_eq].

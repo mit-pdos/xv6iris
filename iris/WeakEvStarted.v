@@ -182,8 +182,11 @@ Section started_ev.
     dev_addr (Interface.ReadReq.pa reqf) = false ->
     ak_coh (classify (Interface.ReadReq.access_kind reqf)) = false ->
     ak_latest (classify (Interface.ReadReq.access_kind reqf)) = false ->
-    (* --- the store node: the flag word --- *)
+    (* --- the store node: the flag word.  RMW split S3: the store rule is
+       the UNCONDITIONAL arm now, so the node's access kind must be
+       non-exclusive — for [sw &started] it computes to [false]. --- *)
     dev_addr (Interface.WriteReq.pa reqw) = false ->
+    ak_latest (classify (Interface.WriteReq.access_kind reqw)) = false ->
     Interface.WriteReq.pa reqw = a ->
     Interface.WriteReq.value reqw = lock_one ->
     acc_wf a 4 ->
@@ -196,8 +199,8 @@ Section started_ev.
          hart_ws c ws' -∗ ereg_frame c x3.1 D -∗ EWP (ELoop 0%nat c) @ ⊤) -∗
     EWP (ECycle 0%nat c m None) @ ⊤.
   Proof.
-    iIntros (Hx1 Hx2 Hx3 Hnf Hnw Htag Hdevf Hcohf Hlatf Hdevw Hpaw Hvalw Hacc
-             Hrelp) "#Hinv #Htext Hws Hrf HP Hcont".
+    iIntros (Hx1 Hx2 Hx3 Hnf Hnw Htag Hdevf Hcohf Hlatf Hdevw Hlatw Hpaw Hvalw
+             Hacc Hrelp) "#Hinv #Htext Hws Hrf HP Hcont".
     subst x1 x2 x3.
     (* ---------------- the FETCH event ---------------- *)
     iApply (ewp_ev_seq_fetch 0%nat c D n1 (rs, m) nf reqf wf ws
@@ -214,7 +217,7 @@ Section started_ev.
     (* ---------------- the STORE event ---------------- *)
     iApply (ewp_ev_seq_store 0%nat c D n2
               (ecur_read (bv_unsigned wf) (esil n1 D (rs, m))) 4 reqw wsf
-              eq_refl Hnw Hdevw ltac:(done) ltac:(by rewrite Hpaw)
+              eq_refl Hnw Hdevw ltac:(done) Hlatw ltac:(by rewrite Hpaw)
               with "Hws Hrf").
     iIntros (wsf') "%Hdf'". iIntros (σ2) "%Hws2 %Hwf2 %Hbnd2 #Hlb2 Hlat2".
     iDestruct (vwp_hold_mono P wsf wsf' (ws_depmove_le _ _ Hdf') with "HP")
@@ -946,7 +949,8 @@ Section instantiated.
               H1 H2 H3 ev_fetch_req ev_store_req ev_tail_ret
               ev_fetch_ram
               ltac:(by rewrite ev_fetch_plain) ltac:(by rewrite ev_fetch_plain)
-              ev_store_ram ev_store_pa ev_store_val ev_store_wf Hrelp
+              ev_store_ram ltac:(by rewrite ev_store_plain)
+              ev_store_pa ev_store_val ev_store_wf Hrelp
               with "Hinv Ht Hws Hrf HP Hcont").
   Qed.
 

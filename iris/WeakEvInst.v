@@ -166,8 +166,15 @@ Definition pcls_ev (p : pexv6) (l : wlabel) (ws : wstate) : wm_class :=
          [w_relp] is armed, i.e. right after its [DFence]. *)
       | PDisk _ => ddev_class ws
       end
-  (* THE RMW SPLIT (S1): the conditional write classifies like a plain
-     store, the exclusive read like a load (design §8). *)
+  (* THE RMW SPLIT (S3): the conditional write COMPUTES its class exactly as
+     a plain store does, and that computation returns [WCexcl] — the fused
+     [LRmw]'s constant — because [WeakInterp.wm_class_of] answers [WCexcl]
+     at [ak_latest], which is precisely what a conditional
+     ([Write_RISCV_conditional*], i.e. [AK_explicit AV_exclusive]) write
+     sets.  See [pcls_ev_exstore_excl] below: the walker's A/D write-back
+     and every AMO keep the class they had before the split.  Computing it
+     (rather than stamping [WCexcl]) is what keeps the factorization
+     theorem's conditional-write arm a CONVERSION. *)
   | LExStore _ _ _ _ _ =>
       match p with
       | PHart _ m _ _ _ => pnode_wclass m ws
@@ -176,6 +183,16 @@ Definition pcls_ev (p : pexv6) (l : wlabel) (ws : wstate) : wm_class :=
   | LSilent | LLoad _ _ _ _ _ | LFence _ _ _ _ | LDev | LRegW _ _
   | LCtrl _ | LInstr | LExLoad _ _ _ _ => WCplain
   end.
+
+(** THE CLASS DID NOT MOVE (RMW split S3), machine-checked: at the node the
+    conditional write is emitted from, [pcls_ev] returns the fused arm's
+    [WCexcl]. *)
+Lemma pcls_ev_exstore_excl (cpu : CPU) (n : N) (req : Interface.WriteReq.t n)
+    K rs fn ib ws rl base data asrc vsrc :
+  ak_latest (classify (Interface.WriteReq.access_kind req)) = true ->
+  pcls_ev (PHart cpu (Interface.Next (Interface.MemWrite n req) K) rs fn ib)
+    (LExStore rl base data asrc vsrc) ws = WCexcl.
+Proof. intros Hlat. rewrite /pcls_ev /pnode_wclass /wm_class_of Hlat //. Qed.
 
 Lemma pcls_ev_silent p ws : pcls_ev p LSilent ws = WCplain.
 Proof. reflexivity. Qed.
@@ -249,21 +266,17 @@ Definition pnode_step (m : M unit) (rs : regstate) (ib : oib32) (d : dev_state)
                  m' = k (inl (w, None)) /\ ors = None /\ fn' = None /\ d' = d /\
                  oib = None)
               \/
-              (* THE FUSED RMW; NO [read_ok]/[excl_ok] here either *)
+              (* THE EXCLUSIVE READ (RMW split S3); NO [read_ok] here
+                 either — that is the machine's, i.e. [elab_ok] *)
               (ak_latest (classify (Interface.ReadReq.access_kind req)) = true /\
-               exists (w : bv (8 * n)) (tvs : list (nat * bv 8))
-                      (data : list (bv 8)) (rl : bool) (m1 m2 : M unit)
-                      (rs1 : regstate),
+               exists (w : bv (8 * n)) (tvs : list (nat * bv 8)),
                  length tvs = N.to_nat n /\
                  (forall j : nat, (j < N.to_nat n)%nat ->
                     tvs.*2 !! j = Some (nth_byte w j)) /\
-                 data <> [] /\ length tvs = length data /\
-                 esilent_run (k (inl (w, None)), rs) (m1, rs1) /\
-                 ewr_node m1 rl (pa_z (Interface.ReadReq.pa req)) data m2 /\
-                 l = LRmw (ak_sync (classify (Interface.ReadReq.access_kind req)))
-                       rl (pa_z (Interface.ReadReq.pa req)) tvs data
-                       (deps_asrc (deps_of_ib ib)) (deps_vsrc (deps_of_ib ib)) /\
-                 m' = m2 /\ ors = Some rs1 /\ fn' = None /\ d' = d /\
+                 l = LExLoad (ak_sync (classify (Interface.ReadReq.access_kind req)))
+                       (pa_z (Interface.ReadReq.pa req)) tvs
+                       (deps_asrc (deps_of_ib ib)) /\
+                 m' = k (inl (w, None)) /\ ors = None /\ fn' = None /\ d' = d /\
                  oib = None))
        | Interface.MemWrite n req => fun k =>
            if dev_addr (Interface.WriteReq.pa req)
@@ -274,12 +287,31 @@ Definition pnode_step (m : M unit) (rs : regstate) (ib : oib32) (d : dev_state)
              oib = None
            else
              n <> 0%N /\
-             l = LStore (ak_sync (classify (Interface.WriteReq.access_kind req)))
-                   (pa_z (Interface.WriteReq.pa req))
-                   (wbytes n (Interface.WriteReq.value req))
-                   (deps_asrc (deps_of_ib ib)) (deps_vsrc (deps_of_ib ib)) /\
-             m' = k (inl None) /\ ors = None /\ fn' = None /\ d' = d /\
-             oib = None
+             ((ak_latest (classify (Interface.WriteReq.access_kind req)) = false /\
+               l = LStore (ak_sync (classify (Interface.WriteReq.access_kind req)))
+                     (pa_z (Interface.WriteReq.pa req))
+                     (wbytes n (Interface.WriteReq.value req))
+                     (deps_asrc (deps_of_ib ib)) (deps_vsrc (deps_of_ib ib)) /\
+               m' = k (inl None) /\ ors = None /\ fn' = None /\ d' = d /\
+               oib = None)
+              \/
+              (ak_latest (classify (Interface.WriteReq.access_kind req)) = true /\
+               ((* THE CONDITIONAL WRITE (RMW split S3); the reservation and
+                   the window are the machine's, i.e. [elab_ok] *)
+                (l = LExStore (ak_sync (classify (Interface.WriteReq.access_kind req)))
+                       (pa_z (Interface.WriteReq.pa req))
+                       (wbytes n (Interface.WriteReq.value req))
+                       (deps_asrc (deps_of_ib ib)) (deps_vsrc (deps_of_ib ib)) /\
+                 m' = k (inl None) /\ ors = None /\ fn' = None /\ d' = d /\
+                 oib = None)
+                \/
+                (* THE RETRY SELF-LOOP (design §5).  Memory-blind, as every
+                   arm of the program half is: the node simply always ALSO
+                   has a silent step back to itself, and [elab_ok LSilent]
+                   admits it unconditionally. *)
+                (l = LSilent /\
+                 m' = Interface.Next (Interface.MemWrite n req) k /\
+                 ors = None /\ fn' = None /\ d' = d /\ oib = None))))
        | Interface.Barrier b => fun k =>
            l = ebar_label b /\ m' = k tt /\ ors = None /\
            fn' = ebar_park b /\ d' = d /\ oib = None
@@ -477,9 +509,19 @@ Definition elab_ok (σ : wgstate) (c : CPU) (l : wlabel) : Prop :=
   | LFence _ _ _ _ => True
   | LDev => True                (* the fabric marker: [LSilent]'s twin *)
   | LRegW _ _ | LCtrl _ | LInstr => True
-  (* THE RMW SPLIT (S1): the side condition of a machine arm that does not
-     exist yet (S2 adds it), so [False]. *)
-  | LExLoad _ _ _ _ | LExStore _ _ _ _ _ => False
+  (* THE RMW SPLIT (S3): the side conditions of [WeakPromise.WPExLoad] /
+     [WeakPromiseBridge.PFExLoad] and of [WPExStore]/[PFExStore], at this
+     hart's own log and view.  The read half is [LLoad]'s at [lat := false]
+     and at its OWN address view (deviation D-2, unpinned — see
+     [WeakPromise.lb_ldepfree]); the write half is [LStore]'s plus §4's
+     window, spelled once as [WeakPromise.exwin_ok]. *)
+  | LExLoad aq base tvs asrc =>
+      read_ok_d (img_z (wgimg σ)) (wglog σ) (wgws σ c) aq false base tvs
+        (srcs_view (wgws σ c) asrc)
+  | LExStore _ base data _ _ =>
+      data <> [] /\
+      exwin_ok (wglog σ) (fin_to_nat c) (wgws σ c) base (length data)
+        (S (length (wglog σ)))
   end.
 
 Definition eregs_apply (σ : wgstate) (c : CPU) (ors : option regstate)
@@ -511,8 +553,9 @@ Definition elab_ws (σ : wgstate) (c : CPU) (l : wlabel) : CPU -> wstate :=
   | LCtrl srcs =>
       <[c := ctrl_post (wgws σ c) (srcs_view (wgws σ c) srcs)]> (wgws σ)
   | LInstr => <[c := instr_post (wgws σ c)]> (wgws σ)
-  | LExLoad aq base tvs _ =>
-      <[c := load_post_run (wgws σ c) aq base tvs.*1]> (wgws σ)
+  | LExLoad aq base tvs asrc =>
+      <[c := exload_post_run_d (wgws σ c) aq (srcs_view (wgws σ c) asrc)
+               base tvs.*1]> (wgws σ)
   | LExStore rl base data asrc vsrc =>
       <[c := store_post_run_d (wgws σ c) rl (srcs_view (wgws σ c) asrc)
                (srcs_view (wgws σ c) vsrc) base (length data)
@@ -526,7 +569,7 @@ Definition elab_log (σ : wgstate) (c : CPU) (l : wlabel) (k : wm_class)
       wglog σ ++ [WMsg base data (Some (fin_to_nat c)) k]
   | LRmw _ _ base _ data _ _ =>
       wglog σ ++ [WMsg base data (Some (fin_to_nat c)) k]
-  (* THE RMW SPLIT (S1): the conditional write APPENDS, like a store. *)
+  (* THE RMW SPLIT (S3): the conditional write APPENDS, like a store. *)
   | LExStore _ base data _ _ =>
       wglog σ ++ [WMsg base data (Some (fin_to_nat c)) k]
   | LSilent | LLoad _ _ _ _ _ | LFence _ _ _ _ | LDev | LRegW _ _
@@ -564,8 +607,8 @@ Definition edlab_ok (σ : wgstate) (dws : wstate) (l : wlabel) : Prop :=
   (* the device has no atomic read-modify-write *)
   | LRmw _ _ _ _ _ _ _ => False
   | LRegW _ _ | LCtrl _ | LInstr => True
-  (* THE RMW SPLIT (S1): no arm yet, and the disk has no exclusives
-     anyway — the [LRmw] precedent one line up. *)
+  (* THE RMW SPLIT (S3): the disk has no exclusives — the [LRmw]
+     precedent one line up, and [pstep_disk_no_ex] is the proof. *)
   | LExLoad _ _ _ _ | LExStore _ _ _ _ _ => False
   end.
 
@@ -592,7 +635,7 @@ Definition edlab_log (σ : wgstate) (l : wlabel) (k : wm_class) : list wmsg :=
   match l with
   | LStore _ base data _ _ => wglog σ ++ [WMsg base data (Some n_disk) k]
   | LRmw _ _ base _ data _ _ => wglog σ ++ [WMsg base data (Some n_disk) k]
-  (* THE RMW SPLIT (S1): the conditional write APPENDS, like a store. *)
+  (* THE RMW SPLIT (S3): the conditional write APPENDS, like a store. *)
   | LExStore _ base data _ _ => wglog σ ++ [WMsg base data (Some n_disk) k]
   | LSilent | LLoad _ _ _ _ _ | LFence _ _ _ _ | LDev | LRegW _ _
   | LCtrl _ | LInstr | LExLoad _ _ _ _ => wglog σ
@@ -652,15 +695,22 @@ Lemma elab_apply_store σ c k rl base data asrc vsrc :
       (wglog σ ++ [WMsg base data (Some (fin_to_nat c)) k]).
 Proof. reflexivity. Qed.
 
-Lemma elab_apply_rmw σ c k aq rl base tvs data asrc vsrc rs1 :
-  elab_apply σ c (LRmw aq rl base tvs data asrc vsrc) k (Some rs1) None
-    (wgdev σ)
-  = ewg_rmw σ c rs1
-      (store_post_run_d
-         (load_post_run_d (wgws σ c) aq (srcs_view (wgws σ c) asrc) base
-            tvs.*1)
-         rl (srcs_view (wgws σ c) asrc) (srcs_view (wgws σ c) vsrc) base
-         (length data) (S (length (wglog σ))))
+(** THE RMW SPLIT (S3): the two halves' σ-shapes.  The exclusive read is a
+    pure view move ([ewg_ws], exactly the plain load's shape) and the
+    conditional write is the plain store's ([ewg_store]) — which is the
+    whole content of "the split reuses the ordinary node rules". *)
+Lemma elab_apply_exload σ c k aq base tvs asrc :
+  elab_apply σ c (LExLoad aq base tvs asrc) k None None (wgdev σ)
+  = ewg_ws σ c (exload_post_run_d (wgws σ c) aq (srcs_view (wgws σ c) asrc)
+                  base tvs.*1).
+Proof. reflexivity. Qed.
+
+Lemma elab_apply_exstore σ c k rl base data asrc vsrc :
+  elab_apply σ c (LExStore rl base data asrc vsrc) k None None (wgdev σ)
+  = ewg_store σ c
+      (store_post_run_d (wgws σ c) rl (srcs_view (wgws σ c) asrc)
+         (srcs_view (wgws σ c) vsrc) base (length data)
+         (S (length (wglog σ))))
       (wglog σ ++ [WMsg base data (Some (fin_to_nat c)) k]).
 Proof. reflexivity. Qed.
 
@@ -803,9 +853,7 @@ Proof.
         by rewrite elab_apply_ldev.
     + split.
       * intros (Hcoh & [(Hlat & w & tvs & Hlen & Hby & Hrd & -> & ->)
-                       |(Hlat & w & tvs & data & rl & m1 & m2 & rs1 &
-                         Hlen & Hby & Hrd & Hex & Hne & Hlend & Hsil & Hwr
-                         & -> & ->)]).
+                       |(Hlat & w & tvs & Hlen & Hby & Hrd & -> & ->)]).
         { (* the PLAIN RAM read *)
           do 6 eexists. efac4;
             [reflexivity
@@ -813,31 +861,26 @@ Proof.
              exists w, tvs; split_and!; [exact Hlen|exact Hby|reflexivity..]
             |split; [reflexivity|exact Hrd]
             |by rewrite elab_apply_load]. }
-        { (* the FUSED RMW *)
+        { (* THE EXCLUSIVE READ (RMW split S3) *)
           do 6 eexists. efac4;
             [reflexivity
             |split; [exact Hcoh|]; right; split; [exact Hlat|];
-             exists w, tvs, data, rl, m1, m2, rs1;
-             split_and!; [exact Hlen|exact Hby|exact Hne|exact Hlend
-                         |exact Hsil|exact Hwr|reflexivity..]
-            |split_and!; [exact Hne|exact Hlend|exact Hrd|exact Hex]
-            |by rewrite elab_apply_rmw]. }
+             exists w, tvs; split_and!; [exact Hlen|exact Hby|reflexivity..]
+            |exact Hrd
+            |by rewrite elab_apply_exload]. }
       * intros (l & m' & ors & fn' & d' & oib & He &
                 (Hcoh & [(Hlat & w & tvs & Hlen & Hby & -> & -> & -> & -> & ->
                           & ->)
-                        |(Hlat & w & tvs & data & rl & m1 & m2 & rs1 &
-                          Hlen & Hby & Hne & Hlend & Hsil & Hwr & -> & -> & ->
-                          & -> & -> & ->)]) & Hok & Hs); subst.
+                        |(Hlat & w & tvs & Hlen & Hby & -> & -> & -> & -> & ->
+                          & ->)]) & Hok & Hs); subst.
         { split; [exact Hcoh|]. left. split; [exact Hlat|].
           exists w, tvs. split_and!;
             [exact Hlen|exact Hby|by destruct Hok as (_ & Hrd)|reflexivity
             |by rewrite elab_apply_load]. }
-        { destruct Hok as (_ & _ & Hrd & Hex).
-          split; [exact Hcoh|]. right. split; [exact Hlat|].
-          exists w, tvs, data, rl, m1, m2, rs1.
-          split_and!; [exact Hlen|exact Hby|exact Hrd|exact Hex|exact Hne
-                      |exact Hlend|exact Hsil|exact Hwr|reflexivity
-                      |by rewrite elab_apply_rmw]. }
+        { split; [exact Hcoh|]. right. split; [exact Hlat|].
+          exists w, tvs. split_and!;
+            [exact Hlen|exact Hby|exact Hok|reflexivity
+            |by rewrite elab_apply_exload]. }
   - (* MemWrite *)
     destruct (dev_addr _).
     + (* MMIO WRITE — the fabric absorbs it (P1) *)
@@ -850,14 +893,40 @@ Proof.
         exists d'. split_and!; [exact Hwr|reflexivity|].
         by rewrite elab_apply_ldev.
     + split.
-      * intros (Hn & -> & ->). do 6 eexists. efac4;
-          [reflexivity|split_and!; [exact Hn|reflexivity..]
-          |by apply wbytes_ne|].
-        rewrite elab_apply_store /= wbytes_length. reflexivity.
+      * intros (Hn & [(Hlat & -> & ->)
+                     |(Hlat & [(Hex & -> & ->)|(-> & ->)])]).
+        { do 6 eexists. efac4;
+            [reflexivity
+            |split; [exact Hn|]; left; split_and!; [exact Hlat|reflexivity..]
+            |by apply wbytes_ne|].
+          rewrite elab_apply_store /= wbytes_length. reflexivity. }
+        { (* THE CONDITIONAL WRITE (RMW split S3) *)
+          do 6 eexists. efac4;
+            [reflexivity
+            |split; [exact Hn|]; right; split; [exact Hlat|];
+             left; split_and!; reflexivity
+            |split; [by apply wbytes_ne|rewrite wbytes_length; exact Hex]|].
+          rewrite elab_apply_exstore /= wbytes_length. reflexivity. }
+        { (* THE RETRY SELF-LOOP (design §5) *)
+          do 6 eexists. efac4;
+            [reflexivity
+            |split; [exact Hn|]; right; split; [exact Hlat|];
+             right; split_and!; reflexivity
+            |exact I
+            |by rewrite elab_apply_silent]. }
       * intros (l & m' & ors & fn' & d' & oib & He
-                & (Hn & -> & -> & -> & -> & -> & ->) & _ & Hs); subst.
-        split; [exact Hn|]. split; [reflexivity|].
-        rewrite elab_apply_store /= wbytes_length. reflexivity.
+                & (Hn & [(Hlat & -> & -> & -> & -> & -> & ->)
+                        |(Hlat & [(-> & -> & -> & -> & -> & ->)
+                                 |(-> & -> & -> & -> & -> & ->)])])
+                & Hok & Hs); subst.
+        { split; [exact Hn|]. left. split; [exact Hlat|]. split; [reflexivity|].
+          rewrite elab_apply_store /= wbytes_length. reflexivity. }
+        { destruct Hok as (_ & Hex). rewrite wbytes_length in Hex.
+          split; [exact Hn|]. right. split; [exact Hlat|]. left.
+          split_and!; [exact Hex|reflexivity|].
+          rewrite elab_apply_exstore /= wbytes_length. reflexivity. }
+        { split; [exact Hn|]. right. split; [exact Hlat|]. right.
+          split; [reflexivity|by rewrite elab_apply_silent]. }
   - (* D3: THE ANNOUNCE — the instruction start.  It writes the bits ([oib],
        which is why it does not fall to [esil_case]) and, since D3-2, emits
        [LInstr]: the load-result bank is reset, and nothing else moves. *)
@@ -1096,11 +1165,10 @@ Proof.
   - (* MemRead *) destruct (dev_addr _).
     + by intros (w & _ & ? & _).
     + intros (_ & [(_ & w & tvs0 & _ & _ & Hl & _)
-                  |(_ & w & tvs0 & data & rl & m1 & m2 & rs1 &
-                    _ & _ & _ & _ & _ & _ & Hl & _)]); by simplify_eq.
+                  |(_ & w & tvs0 & _ & _ & Hl & _)]); by simplify_eq.
   - (* MemWrite *) destruct (dev_addr _).
     + by intros (? & ? & _).
-    + by intros (_ & ? & _).
+    + by intros (_ & [(_ & ? & _)|(_ & [(? & _)|(? & _)])]).
   - (* Barrier *) intros (Hl & _). by destruct b.
   - (* Choose *) by intros (ch & ? & _).
 Qed.
@@ -1207,8 +1275,7 @@ Proof.
   - (* MemRead *) destruct (dev_addr _).
     + by intros (w & _ & ? & _).
     + intros (Hcoh & [(Hlat & w & tvs0 & Hlen & Hby & Hl & Hrest)
-                     |(_ & w & tvs0 & data & rl & m1 & m2 & rs1 &
-                       _ & _ & _ & _ & _ & _ & Hl & _)]) Hts; [|by simplify_eq].
+                     |(_ & w & tvs0 & _ & _ & Hl & _)]) Hts; [|by simplify_eq].
       simplify_eq/=.
       have Hlen' : length tvs' = length tvs0.
       { by rewrite -(length_fmap snd tvs') -(length_fmap snd tvs0) Hts. }
@@ -1217,15 +1284,17 @@ Proof.
         by destruct Hrest as (-> & -> & -> & -> & ->).
   - (* MemWrite *) destruct (dev_addr _).
     + by intros (? & ? & _).
-    + by intros (_ & ? & _).
+    + by intros (_ & [(_ & ? & _)|(_ & [(? & _)|(? & _)])]).
   - (* Barrier *) intros (Hl & _). by destruct b.
   - (* Choose *) by intros (ch & ? & _).
 Qed.
 
-Lemma pnode_step_ts_rmw m rs ib d aq rl base tvs tvs' data asrc vsrc m' ors fn' d' oib :
-  pnode_step m rs ib d (LRmw aq rl base tvs data asrc vsrc) m' ors fn' d' oib ->
-  tvs'.*2 = tvs.*2 ->
-  pnode_step m rs ib d (LRmw aq rl base tvs' data asrc vsrc) m' ors fn' d' oib.
+(** THE RMW SPLIT (S3): NO HART ARM EMITS THE FUSED LABEL any more, so the
+    fused clause of [WeakRobustSim.ts_oblivious] is discharged by refutation
+    rather than by re-timing.  (The clause itself stays until the tower's
+    pair-form re-index, S4.) *)
+Lemma pnode_step_no_rmw m rs ib d aq rl base tvs data asrc vsrc m' ors fn' d' oib :
+  ~ pnode_step m rs ib d (LRmw aq rl base tvs data asrc vsrc) m' ors fn' d' oib.
 Proof.
   rewrite /pnode_step. destruct m as [y|T oc k].
   { by intros (? & ? & _). }
@@ -1234,21 +1303,11 @@ Proof.
     try (by intros []).
   - (* MemRead *) destruct (dev_addr _).
     + by intros (w & _ & ? & _).
-    + intros (Hcoh & [(_ & w & tvs0 & _ & _ & Hl & _)
-                     |(Hlat & w & tvs0 & data0 & rl0 & m1 & m2 & rs1 &
-                       Hlen & Hby & Hne & Hlend & Hsil & Hwr & Hl & Hrest)])
-              Hts; [by simplify_eq|].
-      inversion Hl; subst; clear Hl.
-      destruct Hrest as (-> & -> & -> & -> & ->).
-      have Hlen' : length tvs' = length tvs0.
-      { by rewrite -(length_fmap snd tvs') -(length_fmap snd tvs0) Hts. }
-      split; [exact Hcoh|]. right. split; [exact Hlat|].
-      exists w, tvs', data0, rl0, m1, m2, rs1.
-      split_and!; [by rewrite Hlen'|by rewrite Hts|exact Hne
-                  |by rewrite Hlen'|exact Hsil|exact Hwr|reflexivity..].
+    + intros (_ & [(_ & w & tvs0 & _ & _ & Hl & _)
+                  |(_ & w & tvs0 & _ & _ & Hl & _)]); by simplify_eq.
   - (* MemWrite *) destruct (dev_addr _).
     + by intros (? & ? & _).
-    + by intros (_ & ? & _).
+    + by intros (_ & [(_ & ? & _)|(_ & [(? & _)|(? & _)])]).
   - (* Barrier *) intros (Hl & _). by destruct b.
   - (* Choose *) by intros (ch & ? & _).
 Qed.
@@ -1263,14 +1322,13 @@ Proof.
   - apply pnode_step_ts_load.
 Qed.
 
-Lemma pstep_node_ts_rmw cpu m rs fn ib d aq rl base tvs tvs' data asrc vsrc m' ors fn' d' oib :
-  pstep_node cpu m rs fn ib d (LRmw aq rl base tvs data asrc vsrc) m' ors fn' d' oib ->
-  tvs'.*2 = tvs.*2 ->
-  pstep_node cpu m rs fn ib d (LRmw aq rl base tvs' data asrc vsrc) m' ors fn' d' oib.
+Lemma pstep_hart_no_rmw cpu m rs fn ib d aq rl base tvs data asrc vsrc m' ors fn' d' oib :
+  ~ pstep_hart cpu m rs fn ib d (LRmw aq rl base tvs data asrc vsrc) m' ors fn' d' oib.
 Proof.
-  rewrite /pstep_node. destruct fn as [[[[pr pw] sr] sw]|].
-  - by intros (? & _).
-  - apply pnode_step_ts_rmw.
+  intros [Hn|(Hl & _)]; [|done].
+  rewrite /pstep_node in Hn. destruct fn as [[[[pr pw] sr] sw]|].
+  - by destruct Hn as (? & _).
+  - by eapply pnode_step_no_rmw.
 Qed.
 
 Theorem pstep_ev_ts_load p d aq base tvs tvs' p' d' :
@@ -1287,19 +1345,21 @@ Proof.
   - apply pstep_disk_ts_load.
 Qed.
 
+Theorem pstep_ev_no_rmw p d aq rl base tvs data asrc vsrc p' d' :
+  ~ pstep_ev p d (LRmw aq rl base tvs data asrc vsrc) p' d'.
+Proof.
+  rewrite /pstep_ev.
+  destruct p as [cpu m rs fn ib|dp], p' as [cpu' m' rs' fn' ib'|dp']; simpl;
+    try (by intros []).
+  - intros (_ & ors & oib & _ & _ & H). by eapply pstep_hart_no_rmw.
+  - apply pstep_disk_no_rmw.
+Qed.
+
 Theorem pstep_ev_ts_rmw p d aq rl base tvs tvs' data asrc vsrc p' d' :
   pstep_ev p d (LRmw aq rl base tvs data asrc vsrc) p' d' ->
   tvs'.*2 = tvs.*2 ->
   pstep_ev p d (LRmw aq rl base tvs' data asrc vsrc) p' d'.
-Proof.
-  rewrite /pstep_ev.
-  destruct p as [cpu m rs fn ib|dp], p' as [cpu' m' rs' fn' ib'|dp']; simpl;
-    try (by intros ? ?).
-  - intros (-> & ors & oib & -> & -> & [H|(H & _)]) Hts; [|done].
-    split; [reflexivity|]. exists ors, oib. split_and!; [reflexivity..|].
-    left. by eapply pstep_node_ts_rmw.
-  - intros H. by apply pstep_disk_no_rmw in H.
-Qed.
+Proof. intros H. by destruct (pstep_ev_no_rmw _ _ _ _ _ _ _ _ _ _ _ H). Qed.
 
 (* ====================================================================== *)
 (** ** 7. THE FABRIC MARKER IS SOUND ([WeakPromiseFact.pdev_ok])
@@ -1325,18 +1385,22 @@ Proof.
     + intros (w & Hrd & Hl & _) Hne. by destruct (Hne Hl).
     + intros (Hcoh & [(Hlat & w & tvs & Hlen & Hby & Hl & -> & -> & -> & ->
                        & ->)
-                     |(Hlat & w & tvs & data & rl & m1 & m2 & rs1 &
-                       Hlen & Hby & Hnl & Hlend & Hsil & Hwr & Hl
+                     |(Hlat & w & tvs & Hlen & Hby & Hl
                        & -> & -> & -> & -> & ->)]) _;
         (split; [reflexivity|]); intros d0.
       * split; [exact Hcoh|]. left. split; [exact Hlat|].
         exists w, tvs. by split_and!.
       * split; [exact Hcoh|]. right. split; [exact Hlat|].
-        exists w, tvs, data, rl, m1, m2, rs1. by split_and!.
+        exists w, tvs. by split_and!.
   - (* MemWrite *) destruct (dev_addr _).
     + intros (Hwr & Hl & _) Hne. by destruct (Hne Hl).
-    + intros (Hn & Hl & -> & -> & -> & -> & ->) _. split; [reflexivity|].
-      intros d0. by split_and!.
+    + intros (Hn & [(Hlat & Hl & -> & -> & -> & -> & ->)
+                   |(Hlat & [(Hl & -> & -> & -> & -> & ->)
+                            |(Hl & -> & -> & -> & -> & ->)])]) _;
+        (split; [reflexivity|]); intros d0; split; try exact Hn.
+      * left. by split_and!.
+      * right. split; [exact Hlat|]. left. by split_and!.
+      * right. split; [exact Hlat|]. right. by split_and!.
   - (* Choose *) intros (ch & Hl & -> & -> & -> & -> & ->) _.
     split; [reflexivity|]. intros d0. exists ch. by split_and!.
 Qed.
@@ -1428,11 +1492,10 @@ Proof.
   - (* MemRead *)
     destruct (dev_addr _); [by intros (? & _ & -> & _)|].
     intros (_ & [(_ & w & tvs & _ & _ & -> & _)
-                |(_ & w & tvs & data & rl & m1 & m2 & rs1 &
-                  _ & _ & _ & _ & _ & _ & -> & _)]); done.
+                |(_ & w & tvs & _ & _ & -> & _)]); done.
   - (* MemWrite *)
     destruct (dev_addr _); [by intros (_ & -> & _)|].
-    by intros (_ & -> & _).
+    by intros (_ & [(_ & -> & _)|(_ & [(-> & _)|(-> & _)])]).
   - (* Barrier *) intros (-> & _). by destruct b.
   - (* Choose *) by intros (ch & -> & _).
 Qed.
@@ -1480,51 +1543,19 @@ Proof.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
-(** THE RMW SPLIT (S2): THE PRE-SPLIT ALPHABET.  Every arm of the event
-    language pins [l] to one of the nine fused constructors; the split pair
-    is emitted by NOTHING here (its producers land at S3).  The scripts are
-    the [_ldepfree] ones verbatim — each pins the same constructor, and
-    [lb_fused] is [True] on all nine. *)
+(** THE RMW SPLIT (S3): THE HART'S PRE-SPLIT-ALPHABET LEMMAS ARE GONE.
+    [pnode_step_fused] / [pstep_node_fused] / [pstep_plic_fused] /
+    [pstep_hart_fused] / [pstep_ev_fused] were the S2 residue "no producer
+    emits the split pair yet"; the producers now do, so they are FALSE and
+    are DELETED (the R3/S4 coupling ruling).  What the old capstone still
+    needs is therefore an explicit hypothesis — see
+    [WeakEvCapstone.xv6_ev_weak_robust]'s [Hfused].
 
-Lemma pnode_step_fused m rs ib d l m' ors fn' d' oib :
-  pnode_step m rs ib d l m' ors fn' d' oib -> lb_fused l.
-Proof.
-  rewrite /pnode_step. destruct m as [y|T oc k].
-  { by intros (? & -> & _). }
-  destruct oc; simpl; try (by intros (-> & _));
-    try (intros (-> & _); by destruct (erw_of (deps_of_ib ib) reg));
-    try done.
-  - (* MemRead *)
-    destruct (dev_addr _); [by intros (? & _ & -> & _)|].
-    intros (_ & [(_ & w & tvs & _ & _ & -> & _)
-                |(_ & w & tvs & data & rl & m1 & m2 & rs1 &
-                  _ & _ & _ & _ & _ & _ & -> & _)]); done.
-  - (* MemWrite *)
-    destruct (dev_addr _); [by intros (_ & -> & _)|].
-    by intros (_ & -> & _).
-  - (* Barrier *) intros (-> & _). by destruct b.
-  - (* Choose *) by intros (ch & -> & _).
-Qed.
+    WHAT SURVIVES IS THE DISK'S HALF, and it is exactly what the task calls
+    [pstep_disk_no_ex]: the device program has no exclusive access at all,
+    so no disk arm emits [LExLoad] or [LExStore] (nor, as before, [LRmw]). *)
 
-Lemma pstep_node_fused cpu m rs fn ib d l m' ors fn' d' oib :
-  pstep_node cpu m rs fn ib d l m' ors fn' d' oib -> lb_fused l.
-Proof.
-  rewrite /pstep_node. destruct fn as [[[[pr pw] sr] sw]|].
-  - by intros (-> & _).
-  - apply pnode_step_fused.
-Qed.
-
-Lemma pstep_plic_fused cpu m rs fn ib d l m' ors fn' d' oib :
-  pstep_plic cpu m rs fn ib d l m' ors fn' d' oib -> lb_fused l.
-Proof. rewrite /pstep_plic. by intros (-> & _). Qed.
-
-Lemma pstep_hart_fused cpu m rs fn ib d l m' ors fn' d' oib :
-  pstep_hart cpu m rs fn ib d l m' ors fn' d' oib -> lb_fused l.
-Proof.
-  intros [H|H]; [by eapply pstep_node_fused|by eapply pstep_plic_fused].
-Qed.
-
-Lemma pstep_disk_fused dp d l dp' d' : pstep_disk dp d l dp' d' -> lb_fused l.
+Lemma pstep_disk_no_ex dp d l dp' d' : pstep_disk dp d l dp' d' -> lb_fused l.
 Proof.
   rewrite /pstep_disk /pdisk_prog /pdisk_uart.
   intros [[(_ & -> & _)
@@ -1536,13 +1567,4 @@ Proof.
           |[(_ & -> & _)
           |(p' & _ & _ & -> & _)]]]]]]]
          |(_ & -> & _)]; exact I.
-Qed.
-
-Theorem pstep_ev_fused p d l p' d' : pstep_ev p d l p' d' -> lb_fused l.
-Proof.
-  rewrite /pstep_ev.
-  destruct p as [cpu m rs fn ib|dp], p' as [cpu' m' rs' fn' ib'|dp']; simpl;
-    try (by intros []).
-  - intros (_ & ors & oib & _ & _ & H). by eapply pstep_hart_fused.
-  - intros H. by eapply pstep_disk_fused.
 Qed.

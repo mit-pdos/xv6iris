@@ -195,13 +195,21 @@ Definition lb_depfree (l : wlabel) : Prop :=
     and the page walker's PTE read are indistinguishable at the node, so
     attaching the base register to a read would be a STRENGTHENING beyond
     RVWMO's syntactic dependencies).  That one pin is all the instance's
-    uniform-shape inversion needs, so it gets its own name. *)
+    uniform-shape inversion needs, so it gets its own name.
+
+    THE EXCLUSIVE READ IS **NOT** PINNED (RMW split S3).  [LExLoad] is the
+    read half of what used to be [LRmw], and [LRmw] was never pinned: an
+    exclusive access is unambiguous at the node, so its address operands
+    are the instruction's own and the arm is admissible at ITS OWN address
+    view (PARM's [Local.read]).  Pinning it — as the additive slice's
+    copy-from-[LLoad] did — would silently delete deviation D-2 from every
+    AMO and from the walker's A/D update. *)
 Definition lb_ldepfree (l : wlabel) : Prop :=
   match l with
   | LLoad _ _ _ _ asrc => asrc = []
-  | LExLoad _ _ _ asrc => asrc = []
   | LSilent | LStore _ _ _ _ _ | LRmw _ _ _ _ _ _ _ | LFence _ _ _ _
-  | LDev | LRegW _ _ | LCtrl _ | LInstr | LExStore _ _ _ _ _ => True
+  | LDev | LRegW _ _ | LCtrl _ | LInstr
+  | LExLoad _ _ _ _ | LExStore _ _ _ _ _ => True
   end.
 
 Lemma lb_depfree_ldepfree l : lb_depfree l → lb_ldepfree l.
@@ -401,6 +409,114 @@ Proof.
   intros He j t Ht. rewrite list_lookup_fmap in Ht.
   destruct (tvs !! j) as [[t' v]|] eqn:Hj; simplify_eq/=.
   by eapply He.
+Qed.
+
+(** *** THE CONDITIONAL WRITE'S WHOLE SIDE CONDITION, AS ONE PREDICATE —
+    AND AS A BOOLEAN (RMW split §4/§5).
+
+    [exwin_ok log i ws base n ts] is exactly what [WPExStore] /
+    [WeakPromiseBridge.PFExStore] ask of the agent besides [data ≠ []]:
+    a matching reservation of the right width whose per-byte window is
+    still clean at [ts].  Naming it once is what lets the event language's
+    side condition ([WeakEvInst.elab_ok]) and the uniform pf side condition
+    ([WeakEvCapstone.pf_ok]) be the SAME text as the machine arm.
+
+    THE BOOLEAN IS NOT A CONVENIENCE: design §5's RETRY ARM splits the
+    event language's conditional-write node on "is the window still
+    clean?", and a WP rule for that node must DECIDE the question at the
+    node's own σ before it may open the caller's callback (the mask goes
+    ⊤→∅ once, ahead of the step).  [writes_in_by] is a bounded existential
+    over the log with a decidable body, so the decision is a computation —
+    [WeakMem.writes_inb]'s pattern, refined by author. *)
+Definition writes_in_byb (log : list wmsg) (i : agent) (a : Z) (lo hi : nat)
+    : bool :=
+  existsb (λ t, bool_decide (lo < t)%nat && bool_decide (t ≤ hi)%nat &&
+                match log !! (t - 1)%nat with
+                | Some m => msg_writesb m a && bool_decide (wm_tid m ≠ Some i)
+                | None => false
+                end)
+          (seq 1 (length log)).
+
+Lemma writes_in_byb_spec log i a lo hi :
+  writes_in_by log (λ tid, tid ≠ Some i) a lo hi
+  ↔ writes_in_byb log i a lo hi = true.
+Proof.
+  rewrite /writes_in_byb existsb_exists. split.
+  - intros (t & Hlo & Hhi & m & Hm & Hs & HQ).
+    pose proof (lookup_lt_Some _ _ _ Hm) as Hlt.
+    exists t. split.
+    + apply elem_of_list_In, elem_of_seq. lia.
+    + rewrite Hm. rewrite !andb_true_iff. split_and!.
+      * by apply bool_decide_eq_true_2.
+      * by apply bool_decide_eq_true_2.
+      * by apply msg_writesb_true.
+      * by apply bool_decide_eq_true_2.
+  - intros (t & Ht & Hb). apply elem_of_list_In, elem_of_seq in Ht.
+    rewrite !andb_true_iff in Hb. destruct Hb as [[H1 H2] H3].
+    apply bool_decide_eq_true_1 in H1. apply bool_decide_eq_true_1 in H2.
+    destruct (log !! (t - 1)%nat) as [m|] eqn:Hm; [|done].
+    rewrite andb_true_iff in H3. destruct H3 as [H3 H4].
+    apply msg_writesb_true in H3. apply bool_decide_eq_true_1 in H4.
+    exists t. split_and!; [done|done|]. by exists m.
+Qed.
+
+Definition excl_ok_tsb (log : list wmsg) (i : agent) (base : Z)
+    (rts : list nat) (ts : nat) : bool :=
+  forallb (λ j, match rts !! j with
+                | Some t =>
+                    negb (writes_in_byb log i (base + Z.of_nat j) t (ts - 1)%nat)
+                | None => true
+                end)
+          (seq 0 (length rts)).
+
+Lemma excl_ok_tsb_spec log i base rts ts :
+  excl_ok_ts log i base rts ts ↔ excl_ok_tsb log i base rts ts = true.
+Proof.
+  rewrite /excl_ok_ts /excl_ok_tsb forallb_forall. split.
+  - intros He j Hj. apply elem_of_list_In, elem_of_seq in Hj.
+    destruct (rts !! j) as [t|] eqn:Ht; [|done].
+    rewrite negb_true_iff. apply not_true_is_false.
+    rewrite -writes_in_byb_spec. by eapply He.
+  - intros Hb j t Ht Hw.
+    have Hj : In j (seq 0 (length rts)).
+    { apply elem_of_list_In, elem_of_seq.
+      pose proof (lookup_lt_Some _ _ _ Ht). lia. }
+    pose proof (Hb j Hj) as Hbj. rewrite Ht negb_true_iff in Hbj.
+    apply writes_in_byb_spec in Hw. by rewrite Hw in Hbj.
+Qed.
+
+Definition exwin_ok (log : list wmsg) (i : agent) (ws : wstate) (base : Z)
+    (n : nat) (ts : nat) : Prop :=
+  ∃ R, w_res ws = Some R ∧ rv_base R = base ∧ length (rv_ts R) = n ∧
+       excl_ok_ts log i base (rv_ts R) ts.
+
+Definition exwin_okb (log : list wmsg) (i : agent) (ws : wstate) (base : Z)
+    (n : nat) (ts : nat) : bool :=
+  match w_res ws with
+  | Some R => bool_decide (rv_base R = base) &&
+              bool_decide (length (rv_ts R) = n) &&
+              excl_ok_tsb log i base (rv_ts R) ts
+  | None => false
+  end.
+
+Lemma exwin_okb_spec log i ws base n ts :
+  exwin_ok log i ws base n ts ↔ exwin_okb log i ws base n ts = true.
+Proof.
+  rewrite /exwin_ok /exwin_okb. split.
+  - intros (R & HR & Hb & Hl & He). rewrite HR !andb_true_iff. split_and!.
+    + by apply bool_decide_eq_true_2.
+    + by apply bool_decide_eq_true_2.
+    + by apply excl_ok_tsb_spec.
+  - destruct (w_res ws) as [R|] eqn:HR; [|done].
+    rewrite !andb_true_iff. intros [[H1 H2] H3].
+    apply bool_decide_eq_true_1 in H1. apply bool_decide_eq_true_1 in H2.
+    exists R. split_and!; [done|done|done|by apply excl_ok_tsb_spec].
+Qed.
+
+Lemma exwin_okb_false log i ws base n ts :
+  exwin_okb log i ws base n ts = false → ¬ exwin_ok log i ws base n ts.
+Proof.
+  intros Hf Hok. apply exwin_okb_spec in Hok. by rewrite Hok in Hf.
 Qed.
 
 (* ------------------------------------------------------------------ *)
