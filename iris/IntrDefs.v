@@ -2601,6 +2601,24 @@ Section IntrDefs.
     - iApply (strans_ktier_wit_intro with "Hkpt").
   Qed.
 
+  (* ... and the RECEIPT ITSELF, for a consumer that has to PIN THE ARM
+     rather than merely attest a tier.  [WpSmodeWfi.wp_wfi_s_sconf] is the
+     one: its ENTER step fetches, a fetch's walk fills the TLB, and its SIE
+     index is generic -- so it cannot get the arm off the capability the way
+     [sie_cap_on_kpt] does at [b = true], and once [bare_inv] stops owning
+     the tlb cell a Bare arm could not fund the frame at all.  wfi runs in
+     exactly one place (the scheduler, long after kvminithart), and there
+     the caller is holding [trap_csrs].  Persistent, so the bundle comes
+     straight back. *)
+  Lemma trap_csrs_kpt_on {kt0 : ktier} :
+    trap_csrs kt0 -∗ trap_csrs kt0 ∗ kpt_on cpu_id.
+  Proof.
+    iIntros "(Ha & Hb & Hc & Hd & Hres & #Hkpt)".
+    iSplitL "Ha Hb Hc Hd Hres".
+    - iFrame "Ha Hb Hc Hd Hres Hkpt".
+    - iExact "Hkpt".
+  Qed.
+
   (* THE CAPABILITY IS NO LONGER TIER-COVARIANT, AND THAT IS THE POINT.
      Two of the four conjuncts see the tier now: [stack_own], which weakens
      along [KtierLe] ([StackOwn.stack_ktier_mono]), and the WITNESS, which

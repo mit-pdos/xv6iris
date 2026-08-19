@@ -142,37 +142,43 @@ again:
   with the write set in a parameter position re-triggers §3 (measured — even
   at a fully CONCRETE argument, `_D s_Drw s_frame_ok_Drw` diverges).
 
-### 4a′. `WpSmodeWfi` — NOT "the same treatment", and it is its own lane
+### 4a′. `WpSmodeWfi` — **DONE**, by pinning the arm rather than generalizing
 
-`WpSmodeWfi.v:1037`'s `sie_cap_to_cells` cannot be converted the same way, and
-this is a design item rather than a proof edit.  The wfi does not run on
-`s_Drw`: it has its OWN hart-parking footprint `wfi_Drw` (= `s_Drw` with
-`hart_state` moved into the writable half), defined in that file, containing
-`tlb`, and hard-wired concretely through roughly 900 lines —
+The first reading of this site was that it needed the `wfi_frame_ok`
+treatment: the wfi does not run on `s_Drw` but on its own hart-parking
+footprint `wfi_Drw` (= `s_Drw` with `hart_state` moved into the writable
+half), defined in that file, containing `tlb`, and hard-wired concretely
+through ~900 lines — the memberships, `wfi_union`, the split/ext/`wfi_frames_s`
+bridge, the whole wait phase (`wfi_stay`/`wfi_wake`/`wfi_moved` + ten set
+lemmas, `wfi_wait_cases`, `wfi_wait_loop`, `wfi_land_cell`/`wfi_land_PC`) and
+`wfi_run_enter` (257 lines).  Every *dependency* is already set-generic
+(`swp_exec_step_full`, `swp_exec_step_waiting`, `swp_span`, `SmodeCorePt`'s
+`spt_*_D` family), so it was writable inside the one file — but as a record
+plus `_D` forms, i.e. a second `HartSFrame` refactor.
 
-* `wfi_Drw`/`wfi_Dro` plus ~20 membership lemmas, `wfi_union`,
-  `wfi_rw_split` / `wfi_ro_split` / `wfi_rw_ext` / `wfi_ro_ext`,
-  `wfi_frames_s` (the bridge to `s_Drw`/`s_Dro`);
-* the whole WAIT phase — `wfi_stay` / `wfi_wake` / `wfi_moved` and their ten
-  set lemmas, `wfi_wait_cases`, `wfi_wait_loop`, `wfi_land_cell` /
-  `wfi_land_PC` — all stated at `wfi_Drw ∪ wfi_Dro`;
-* `wfi_run_enter` (257 lines), the enter step's run layer, stated at
-  `s_Drw`/`s_Dro`.
+**USER RULING (2026-08-19): don't.  wfi runs in exactly one place — the
+scheduler — which is always at the kernel table, so the leaf never runs at
+Bare and may say so.**  `wp_wfi_s_sconf` takes `kpt_on cpu_id`
+(**user-approved statement change**, the only one in this lane), opens the
+slot with `WpIntrInv.sie_cap_cells_at` at `s_Drw` — which refutes the Bare
+arm from that receipt — and re-seals through its closer.  `tlb_res_pt` funds
+the cell, so ALL the `wfi_Drw` machinery is byte-identical: no record, no
+notation threading, no Bare branch.  The receipt costs the caller nothing:
+it is persistent and it is already a member of `IntrDefs.trap_csrs`
+(`trap_csrs_kpt_on`, added beside `trap_csrs_ktier_wit`), which
+`ProofScheduler`'s wfi site is holding.
 
-The *dependencies* are all already set-generic (`swp_exec_step_full`,
-`swp_exec_step_waiting`, `swp_span`, `SmodeCorePt`'s `spt_tr_obl_D` /
-`spt_disp_obl_D` / `spt_dispatch_none_D` / `spt_fetch_S_P` /
-`swp_run_hart_active_gen_exf_res`, and `spt_tr_obl_of_regime_D` for the Bare
-side condition), so nothing outside `WpSmodeWfi.v` has to change.  What is
-missing is the abstraction `HartSFrame` already has and this file does not: a
-`wfi_frame_ok`-style record plus the `_D` forms, so the family can be stated
-once and instantiated twice.  Writing `_b` twins by hand instead means ~900
-duplicated lines, which is the wrong answer.
+Two details worth keeping:
 
-**So: `wp_wfi_s_sconf` still calls `sie_cap_to_cells` / `_of_cells`, and 4b's
-restriction of those two to `b = true` will break it** (the wfi's `b` is
-generic, and its `intr_count 0 false` premise pins SIE=0 rather than the arm).
-Decide the `wfi_frame_ok` question before starting 4b.
+* the closer has to reach the wake continuation, but here it just rides in
+  the `[Hcont …]` bucket of `swp_exec_step_full` and of `wfi_wait_loop` —
+  no rider surgery, unlike 4a;
+* `sie_cap_cells_at`'s closer asks for `⌜SD = s_Drwb -> tv' = tlbv⌝`, and the
+  wfi's landing tlb value is NOT the one it opened at, so the antecedent has
+  to be refuted.  By named lemma (`s_Drw_ne_Drwb`, local, `clear` before
+  `set_solver`) — the leaf's context carries the towers.
+
+`wp_wfi_s_sconf` is the ONLY consumer of that statement (grepped).
 
 ### 4b. Then, and only then, flip `bare_inv`
 

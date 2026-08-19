@@ -1002,6 +1002,16 @@ Section WfiLeaf.
     - exact Hh4.
   Qed.
 
+  (* the KPT witness rules the Bare arm out of [WpIntrInv.sie_cap_cells_at]
+     only at [s_Drw], so that accessor's closer asks for [SD = s_Drwb ->
+     tv' = tlbv] and the wfi has to refute the antecedent.  By NAME, not by
+     [set_solver]: the leaf's context carries the S-mode towers. *)
+  Lemma s_Drw_ne_Drwb : s_Drw <> s_Drwb.
+  Proof.
+    intros Heq. pose proof s_w_tlb as Hin. rewrite Heq /s_Drwb in Hin.
+    revert Hin. clear. set_solver.
+  Qed.
+
   (* ------------------------------------------------------------------- *)
   (* THE LEAF.  [intr_count 0 false] is the caller's eighth at '0';        *)
   (* agreement with [sconf]'s mstatus-tied half pins the live SIE bit to   *)
@@ -1015,9 +1025,23 @@ Section WfiLeaf.
   (* so there is no [wp_next] wrapper either.  The continuation is under a *)
   (* [▷]: the ENTER cycle's own later pays for it, which is what lets an   *)
   (* outer iLöb loop (the scheduler's head) strip its IH across the wfi.   *)
+  (*                                                                      *)
+  (* [kpt_on cpu_id] IS A PREMISE, and it is what keeps this leaf on ONE   *)
+  (* footprint.  The wfi's ENTER step fetches, and a fetch's walk fills    *)
+  (* the TLB, so [tlb] has to be in the write set -- but once              *)
+  (* [SRegime.bare_inv] stops owning that cell (the kvminithart lane) a    *)
+  (* Bare-arm caller cannot fund one, and serving both arms would mean a   *)
+  (* second copy of the whole [wfi_Drw] footprint family.  It is not       *)
+  (* needed: the kernel executes wfi in exactly one place, the scheduler,  *)
+  (* which runs long after kvminithart, so the caller HAS the receipt.     *)
+  (* The witness is persistent, so it costs the caller nothing to hand     *)
+  (* over, and it pins the arm at KPT for the whole leaf --                *)
+  (* [WpIntrInv.sie_cap_cells_at] refutes Bare from it and [tlb_res_pt]    *)
+  (* funds the cell.  The arm index [b] still rides through opaque.        *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_wfi_s_sconf (pc : mword 64)
       (m : regfile) (n : nat) (b : bool) :
+    kpt_on cpu_id -∗
     sie_cap_gpr kt m n b p -∗
     intr_count 0 false -∗
     pc_is pc -∗
@@ -1028,14 +1052,21 @@ Section WfiLeaf.
           WP (Loop : expr riscv_lang))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "Hcg Hcnt Hpc #Hinstr Hcont".
+    iIntros "#Hkpt Hcg Hcnt Hpc #Hinstr Hcont".
     (* ---- the bundles, into the 25 cells ---- *)
     iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
     iDestruct (sconf_to_cells with "Hsc") as (mst0 mdv0)
       "(%Hmsf & %Hmm & #Hhw & #Hminv & Hpriv & Hms & Hhalf & Htie & Hmie &
         Hmdl & Hmenv)".
-    iDestruct (sie_cap_to_cells with "Hcap") as (satp0 tlbv pcfg paddr)
-      "(%Hsok & %Hpok & Hsatp & Htlb & Hpcfg & Hpaddr & Hres & Hrest)".
+    (* THE SLOT, AT THE KERNEL TABLE.  [sie_cap_to_cells] would serve, but
+       it is arm-BLIND and so makes the Bare arm fund a tlb cell; the
+       receipt pins the arm here instead, and the closer re-seals it. *)
+    iDestruct (sie_cap_cells_at s_Drw kt m n b p (or_introl eq_refl)
+                 with "[] Hcap") as (satp0 tlbv pcfg paddr)
+      "(%Hsok & %Hpok & Hsatp & Htlb & Hpcfg & Hpaddr & Hres & Hrest &
+        Hclose)".
+    { rewrite /s_kpt_wit. iRight. iExact "Hkpt". }
+    iEval (rewrite s_tlb_at_kpt) in "Htlb".
     (* SIE = 0 by ghost agreement: the tied half against the count's eighth *)
     iDestruct (ghost_var_agree with "Hhalf Hcnt") as %Hb0.
     assert (HSIE : eq_vec (_get_Mstatus_SIE mst0) ('b"1") = false)
@@ -1119,7 +1150,8 @@ Section WfiLeaf.
                     exact (s_pre_agree pc msr bmi cy ti ip mst0 pcfg paddr mc
                              micfg misa0 mseccfg0 (mword_of_int 0) pmar0 elp0
                              satp0 MIE_S mdv0 MENVCFG_S tlbv))
-              with "Hcert Hresv Hrw Hro [Hfile Hcnt Hhalf Htie Hrest Hres] [Hcont]").
+              with "Hcert Hresv Hrw Hro [Hfile Hcnt Hhalf Htie Hrest Hres]
+                    [Hcont Hclose]").
     - (* ---------------- THE ENTER STEP'S BODY ---------------- *)
       iIntros "Hfrag Hrw Hro".
       iCombine "Hrw Hro" as "Hf". iEval (rewrite wfi_frames_s) in "Hf".
@@ -1226,7 +1258,7 @@ Section WfiLeaf.
                  strans_res_at satp0 (register_lookup tlb rs2))%I
                 rs3 Hhart3
                 with "Hcert Hany Hrw Hro [$Hfile $Hcnt $Hhalf $Htie $Hrest $HRes]
-                      [Hcont]").
+                      [Hcont Hclose]").
       iIntros (rs4) "%Hwake Hrw Hro Hany
                      (Hfile & Hcnt & Hhalf & Htie & Hrest & HRes)".
       (* ---- the landing tower, cell by cell ---- *)
@@ -1267,15 +1299,18 @@ Section WfiLeaf.
                  ltac:(reflexivity)) s_rs_menv.
       (* ---- and the bundles back ---- *)
       iApply ("Hcont" with "[Hhs Hpriv Hms Hhalf Htie Hmie Hmdl Hmenv Hsatp
-                             Htlb Hpcfg Hpaddr HRes Hrest Hfile] Hcnt
+                             Htlb Hpcfg Hpaddr HRes Hrest Hfile Hclose] Hcnt
                             [HPC HnPC Hmsr Hmi Hcy Hti Hip Hany]").
       + iApply (sie_cap_gpr_join with "Hhs [Hpriv Hms Hhalf Htie Hmie Hmdl
                                             Hmenv] [Hsatp Htlb Hpcfg Hpaddr
-                                            HRes Hrest] Hfile").
+                                            HRes Hrest Hclose] Hfile").
         * iApply (sconf_of_cells mst0 mdv0 Hmsf Hmm
                     with "Hhw Hminv Hpriv Hms Hhalf Htie Hmie Hmdl Hmenv").
-        * iApply (sie_cap_of_cells kt m n b p satp0 tv pcfg paddr Hsok Hpok
-                    with "Hsatp Htlb Hpcfg Hpaddr [HRes] Hrest").
+        * iAssert (s_tlb_at s_Drw tv) with "[Htlb]" as "Htlb".
+          { rewrite s_tlb_at_kpt. iExact "Htlb". }
+          iApply ("Hclose" $! m n b tv
+                    with "[%] Hsatp Htlb Hpcfg Hpaddr [HRes] Hrest").
+          { intros Hbad. exfalso. exact (s_Drw_ne_Drwb Hbad). }
           rewrite Hrs2.
           iEval (rewrite (irrelevant_register_set (tlb : register)
                             (R_bitvector_64 nextPC : register) _ _ eq_refl)
