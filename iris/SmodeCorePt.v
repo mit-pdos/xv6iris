@@ -2672,7 +2672,19 @@ Section SmodeCorePt.
   (* set; every caller but the Bare branch of                              *)
   (* [WpSmodeIntr.wp_instr_s_sconf_off_clock] wants [s_Drw], so the old    *)
   (* names are re-bound to that instance and NO existing call site moves.  *)
-  (* The Bare branch spells [_D s_Drwb s_frame_ok_Drwb] out.               *)
+  (*                                                                      *)
+  (* A BARE BRANCH MUST NOT SPELL [_D s_Drwb s_frame_ok_Drwb] OUT AT AN    *)
+  (* [iApply] AGAINST THE CYCLE'S WP GOAL.  Measured 2026-08-19 on         *)
+  (* [spt_run_hart_active_instr_S_D]: that application does not terminate  *)
+  (* (killed at 10 min, against ~35 s for this whole file), and neither    *)
+  (* does the [pose proof … as H; iApply H] form, which was expected to    *)
+  (* dodge it and does not.  The write set sits in a PARAMETER position    *)
+  (* and the unifier works through it either way.  The cure that IS        *)
+  (* measured is [WpIntrInv.swp_run_hart_active_instr_S_res_b]'s: state    *)
+  (* the Bare instance as its own Lemma with the set written CONCRETELY    *)
+  (* in the statement, and discharge that by [apply]ing the generic --     *)
+  (* there the goal fixes every argument, so nothing is searched.  See     *)
+  (* claude-notes/projects/kvminithart-tlb-lane.md §3.                     *)
   Notation spt_disp_obl := (spt_disp_obl_D s_Drw).
   Notation spt_tr_obl := (spt_tr_obl_D s_Drw).
   Notation spt_ex_obl := (spt_ex_obl_D s_Drw).

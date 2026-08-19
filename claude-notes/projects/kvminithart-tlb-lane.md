@@ -85,6 +85,16 @@ Did NOT help: dropping the `s_regime` parameter; `Opaque` on `s_tlb_at`;
 splitting the funnel into two CONCRETE branches. All three still went through
 that one `iApply`.
 
+**THE RULE, IN ITS GENERAL FORM (2026-08-19).  ANY lemma with a
+`gset register` in a parameter position diverges when `iApply`ed against the
+cycle's WP goal.**  The res engine was not a special case: the pt tier's
+`SmodeCorePt.spt_run_hart_active_instr_S_D s_Drwb s_frame_ok_Drwb` reproduces
+it exactly (killed at 10 min, against ~35 s for that whole file).  Two forms
+that look like they should dodge it and DO NOT: giving the set as a fully
+CONCRETE argument, and `pose proof (generic …) as H; iApply H` — the type is
+computed before the goal is touched, and it still does not terminate.  The
+only measured cure is the one below.
+
 **The fix, verified:** generalise the *proof*, keep the call site's
 *statement* concrete. `WpIntrInv.swp_run_hart_active_instr_S_res_b` states the
 Bare instance outright and discharges it by applying the generic lemma **at the
