@@ -239,6 +239,33 @@ Two shapes to choose between:
   non-walking regime fails to resolve, which is the right error.  This is
   strictly less churn and is the recommendation.
 
+**THE TYPECLASS WAS TRIED (2026-08-19) AND REVERTED ON A CONTAINMENT RULE.
+It WORKS; it is not CONTAINED.**  Built end to end — `SrWalks` replacing the
+two record fields, a `Global Instance kpt_share_walks root_ppn`, and the
+implicit binder on the regime-generic statements — and `VcGenS.vo` went green
+first try, i.e. resolution finds the instance everywhere and **not one call
+site moved** (42 insertions / 42 deletions across the six downstream files,
+every hunk a `Lemma … (R : s_regime) `{!SrWalks R}` header).  Two corrections
+to the estimate above: it is **44** statements, not 26 — *every*
+regime-generic lemma in those files needs it, not just the direct callers —
+and the diff cannot be confined to `SRegime.v` + those files:
+
+* `IntrDefs.v` moves by one line.  The three `SRegime …` constructor
+  applications are POSITIONAL, so any change to the record's field list edits
+  all three, and `strans_regime`'s lives in `IntrDefs.v`.  A boolean guard
+  has exactly the same problem — this is inherent to changing the record,
+  not to the encoding.
+* `SmodeCorePt.v`'s two consumers have proof-body hunks as well as header
+  hunks (`sr_swp_open R` → `srw_open`, `sr_swp_close R` → `srw_close`).
+
+Neither is churn — no call site, no explicit instance, no import ripple, no
+`Proof*`/`Spec*` file, no declare-twice — but the containment rule is
+mechanical and both are outside it, so the whole SrWalks edit was reverted
+before any commit.  **Do not re-try it without a fresh ruling**; the standing
+direction is instead to re-route the consumers of `sr_swp_open`/`sr_swp_close`
+so that NO regime-generic statement changes at all, and to reprove the wfi
+leaf regime-independently (which would also revert 4a′'s `kpt_on` premise).
+
 The rest of 4b is unblocked once this lands: restrict `sie_cap_to_cells` /
 `sie_cap_of_cells` to `b = true` (4a and 4a′ removed their last generic-`b`
 consumers) and reprove them off `sie_cap_on_kpt` + `kpt_swp_open`, since
