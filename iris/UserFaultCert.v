@@ -28,13 +28,13 @@
 (* [u_translate_fault_pure]; section 8 [u_fetch_fault_pure]; section 9     *)
 (* the four [goodmb] shells of the 2-ALIGNED (split) fetch.                *)
 (*                                                                        *)
-(* THE SLOT/[translationMode] HELPERS COME FROM [UserFetchCert] DIRECTLY.  *)
-(* This file used to restate ten of them under a [ufa_] prefix because     *)
-(* [UserFetchCert.v] did not compile; it does, so the borrow is gone and   *)
-(* [mword9_uint_range] / [pt_page_maps_slot] / [ptree_maps_slot{0,1,2}] /  *)
-(* [u_slot_mem_at] / [u_slot_owned] / [goodmb_currentlyEnabled_Ziccif] /   *)
-(* [goodb_read_reg_D] / [goodb_architecture_Supervisor] /                  *)
-(* [goodb_translationMode_U] are used under their own names.               *)
+(* THE SLOT/[translationMode] HELPERS COME FROM [UserFetchCert] DIRECTLY:  *)
+(* [mword9_uint_range] / [mword9_uint_id] / [pt_page_maps_slot] /          *)
+(* [ptree_maps_slot{0,1,2}] / [u_slot_mem_at] / [u_slot_owned] /           *)
+(* [goodmb_currentlyEnabled_Ziccif] / [goodb_read_reg_D] /                 *)
+(* [goodb_architecture_Supervisor] / [goodb_translationMode_U].  At the    *)
+(* fold-back the worklist plans, the slot projections move to [UserMem.v]  *)
+(* and the walk arms to [UserPtTree.v].                                    *)
 (* ====================================================================== *)
 Set Printing Depth 40.
 From Stdlib Require Import ZArith Bool Lia List.
@@ -1211,8 +1211,3 @@ Section FetchSplit2Cert.
 
 End FetchSplit2Cert.
 
-About goodmb_fetch_rvc_2.
-About goodmb_fetch_base_2.
-About goodmb_fetch_fault_2_second.
-About goodmb_fetch_fault_2_first.
-About goodmb_currentlyEnabled_Zca.
