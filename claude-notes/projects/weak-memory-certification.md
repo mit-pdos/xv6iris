@@ -108,8 +108,38 @@ WP-exported invariants apply to it.  No kernel side conditions anywhere.
     `WeakRobustOrd.v:217`, `WeakSailLTS2.v:316,370`, `WeakSailCone.v:419`,
     `WeakEvInst.v:158,500,559`, `WeakPromise.v:182`,
     `WeakPromiseFact.v:58`).  **Status: IN FLIGHT (2026-08-18).**
-  - **S1–S6** per the design file's §8 (expand/contract; S1 additive with
-    `LRmw` still present; S6 the contract).
+  - **R1 DONE** (`9f9ef678`, additive) and **R2 DONE** (`58e66071`,
+    machine arms + reservation activation).  R2's findings of record:
+    the store's reservation clear is PER BYTE in `store_post_d`/
+    `store_post` (observationally identical to the run-level rule, saves
+    ~20 rewrite sites); front-loading needed ZERO changes; the litmus
+    repairs W3 condition 3 predicted are UNNECESSARY (the toy languages
+    have no `w_vcap` consumer, and LB survives any consumption because
+    the bank is read at the PRE-state — condition 4 is what does the
+    work); `WeakCertify.astep_ok_del_vcap`'s conditional-write arm is
+    the predicted one-liner.
+  - **W-TV: HALF-LANDED.**  Production (`load_post_at` joins
+    `fwd_view`-based bank) + reset (`instr_post`) are in;
+    **CONSUMPTION (`ctrl_post … (vaddr ⊔ w_tbank)`) is DEFERRED to its
+    own slice** — the `_d`-at-0 correspondence forces the bank into the
+    non-`_d` tier (drags `WeakAxiomatic.mstep`, ~18 rewrite sites,
+    `cfg_match`'s `w_vcap` equality, and the `lstate` mirror needing
+    `l_tbank`).  Pickup spec: the 30-line comment at
+    `WeakMem.load_post_run_d`.  Tier-1 does not need it (rule 14 gives
+    the pf tier the ordering); sequence with tier-2 resumption or after
+    A2.
+  - **R3/S4 COUPLING (ruling, 2026-08-19)**: `lat_free_prog` now carries
+    a fused-labels conjunct consumed by the replay
+    (`WeakRobustSim.Qinv_step` refutes the split arms from it).  When R3
+    makes the producers emit split labels, the instance's `pstep_fused`
+    proofs go FALSE.  Ruling: the OLD capstone converts that discharge
+    into an explicit hypothesis (tagged `RESTORED BY S4`), the
+    now-false instance lemmas are deleted, and the tower's pair-form
+    re-index (S4) stays deferred behind tier 1 — the old capstone is a
+    tier-2 artifact and tier 1 never consumes it.
+  - **Remaining: R3** (producers + retry arm + flips + the ruling
+    above), **S4/R4** (pair-form tower re-index, tier 2), **R6**
+    (contract), the W-TV consumption slice.
 - **D8-1 — `wp_cert_step` / `wp_certify` + the vcap lemmas**: **DONE
   (2026-08-18, `da090933`)** — `iris/WeakCertify.v`: `wp_cert_step i :=
   wp_astep_of i ∪ (∃ l, wp_pf_step i l)` (fully by reference, no arm
