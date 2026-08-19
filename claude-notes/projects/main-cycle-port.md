@@ -2750,8 +2750,16 @@ not broken.
 | `ProofUser` | `arm_LOAD_u C pt` — pre-port arity | P7 §5 assembly + the last 2 arms |
 | `WpUmodeStep` | `minstret_inv_body` not found | "Not started" (verified U-mode tier) |
 
-**CURRENT COUNT (2026-08-19, after the kvminithart lane, the boot chain and
-the trampoline lane): TWO red roots** — `ProofUser` and `WpUmodeStep`.
+**CURRENT COUNT (2026-08-19, after the USER-EXEC AXIOM landed): ONE red
+root** — `WpUmodeStep`. `ProofUser` is no longer a root because it is no
+longer in the build: the project owner ruled it temporarily descoped and its
+one dependency axiomatised in `iris/UserExecAxiom.v` — the register, the
+reverse-dep closure that decides which rows leave `_CoqProject`, and the
+revival procedure are in
+[`user-tier-port.md`](user-tier-port.md), "THE USER-EXEC AXIOM".
+
+The line the ruling superseded, for the record: **TWO red roots** —
+`ProofUser` and `WpUmodeStep`.
 Green now: `ProofKvminithart`, `ProofMain`, `ProofMainSecondary`,
 `BootChain`, `UserretPt`, `UservecPt`, `UserretEntryPt`, `UservecExitPt`,
 `ProofUserret`, `ProofUservec`.  `BootChain` was never a lane of its own —
@@ -3034,7 +3042,9 @@ Doing this lane turns THREE roots green and is the largest single win left.
    answer).  Beware: `make -C iris -f CoqMakefile <one>.vo` through
    `run-on-gcp` runs WITHOUT the opam switch (`rocq: not found`) — prefix it
    with `opam exec --switch=/shared/xv6rocq --` if you want a single file.
-3. Pick a lane.  TWO are left, one root each: `WpUmodeStep` (not started —
+3. Pick a lane.  TWO are left — but only `WpUmodeStep` is still a RED ROOT;
+   the `ProofUser` lane now DISCHARGES AN AXIOM rather than un-redding a
+   root (see "THE USER-EXEC AXIOM" in `user-tier-port.md`): `WpUmodeStep` (not started —
    its error is `minstret_inv_body`, i.e. the same post-port MinstretInv
    interface the boot chain was ported onto), and the last two memory arms +
    P7 §5 (`ProofUser`, and it is the biggest).  The kvminithart, boot-chain

@@ -122,7 +122,11 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   per-node semantics (sub-plan of the above: `swp_hmrun_of_exec` + `goodmb` twins).
   **Live, on branch `hart-node-port`, and the tree is RED from `MinstretInv.v`
   up by design** — open its CHECKPOINT before any work under `iris/`, and its
-  trap list before writing a proof over the new language.
+  trap list before writing a proof over the new language. Its first section,
+  "THE USER-EXEC AXIOM", registers the tree's one TEMPORARY tracked
+  assumption (`iris/UserExecAxiom.v`, a 2026-08-19 owner ruling): the proven
+  but not-yet-ported general-case user-mode safety theorem, assumed so the
+  port can land, with the revival procedure beside it.
 - **[`fs-sysfile.md`](projects/fs-sysfile.md)** — the syscall-layer campaign
   (file.c's last 2 + sysfile.c's 11). **Live and actively appended to.**
 - **[`fs-fragments-campaign.md`](projects/fs-fragments-campaign.md)** — the

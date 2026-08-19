@@ -7,6 +7,70 @@ worklist: `claude-notes/projects/main-cycle-port.md`, "THE USER TIER".
 
 ---
 
+## THE USER-EXEC AXIOM — THE TREE'S ONE TRACKED ASSUMPTION FROM THIS LANE
+
+**RULING (project owner, 2026-08-19).** To land the hart-node port on main
+sooner rather than later, the general-case user-mode safety proof — the
+**ProofUser stack** — is TEMPORARILY OUT OF THE BUILD, and its one dependency
+is stated as an AXIOM. This lane continues and will discharge it; §5.5 below
+is exactly the discharge criterion.
+
+**THE ASSUMPTION IS ABOUT THE PORT, NOT ABOUT THE MACHINE.**
+`ProofUser.UserProof.wp_user_exec_closed` is PROVEN in the pre-port tree (see
+`completed/user-mode-exec-v2.md`); what is missing is its port onto per-node
+semantics. The axiom's statement is that theorem character for character —
+both are `SpecUser.USER`'s single `Parameter` over
+`SpecUser.wp_user_exec_closed_body`, so nothing was weakened, generalised or
+re-shaped to make it assumable.
+
+### The register
+
+| | |
+|---|---|
+| **file** | `iris/UserExecAxiom.v` (screaming header: ruling, discharge, revival) |
+| **axiom** | `UserExecAxiom.UserProof_USER_RULED_TEMPORARY_AXIOM.wp_user_exec_closed_USER_RULED_TEMPORARY_AXIOM` |
+| **shape** | an `Axiom` INSIDE `Module UserProof_USER_RULED_TEMPORARY_AXIOM : USER`, per `design/spec-modules.md` "An ASSUMED callee" — never `Declare Module`, which `tools/proof_coverage.py` cannot see |
+| **consumers** | `LinkUserretClosed.v`, `LinkUserretUser.v` — the only two files that ever required `ProofUser` |
+| **reach** | five theorems: `UserretClosedD.wp_userret_closed`, `UserretUserD.wp_userret_user`, and `LinkForkret` / `LinkForkretNF` / `LinkForkretParkPaid` above them. It does NOT reach `LinkMain` / `BootChain` / `SystemAdequacy`, which do not depend on the closed trap loop |
+| **out of the build** | `iris/_CoqProject`: `ProofUser.v` and `UserActiveClass.v`, commented under a header block. **The files stay on disk, untouched.** |
+
+`Print Assumptions UserretClosedD.wp_userret_closed` is the baseline plus this
+one axiom and nothing else: the 5 rv64d platform axioms (`load_reservation`,
+`cancel_reservation`, `match_reservation`, `valid_reservation`,
+`plat_term_write`), `functional_extensionality_dep`, and the pre-existing
+assumed callee `LinkSyscall.Syscall.wp_syscall_sconf`.
+
+### Why exactly two rows leave the build
+
+The descope closure is decided by REVERSE DEPENDENCIES over every `Require`
+line in `iris/*.v`, not by the `User*` name prefix. `ProofUser.v` has exactly
+two consumers (the two Link files, now repointed at the axiom) and
+`UserActiveClass.v` has exactly one (`ProofUser.v`); the fixpoint stops there.
+**Every other `User*` tier file has a consumer that stays in the build** —
+`UserExec` / `UserPtTree` / `UserFrame` / `UserKernelBridge` feed
+`ProofUserretClosed`, `UserretUser`, `ProofUservec` and `SpecUser` itself;
+`UserTotalU` / `UserMemClassify*` / `UserMemTotal` / `UserClassifyAsm` feed the
+`UserMemArms*` roots; `UserStep` / `UserStepFull` / `UserTrap` / `UserExecFacts`
+/ `HartRunFull` / `HartStepFull` feed `WpUmodeStep` and `WpSmodeWfi`;
+`ResvAxioms` feeds `UserMemAccess` / `UserMemArms`. `SpecUser.v` stays — it is
+the interface the axiom implements. When the specific-binary Umode tier is
+descoped, more of these lose their last consumer; recompute the fixpoint then
+rather than reading a list off this table.
+
+### REVIVAL (three steps, no proof work elsewhere)
+
+1. Uncomment the `USER-RULED TEMPORARY DESCOPE (2026-08-19)` block's two rows
+   in `iris/_CoqProject` and delete the `UserExecAxiom.v` row.
+2. In `iris/LinkUserretClosed.v` and `iris/LinkUserretUser.v`, put `ProofUser`
+   back in the `Require` line and rename the functor argument
+   `UserProof_USER_RULED_TEMPORARY_AXIOM` back to `UserProof`.
+3. `rm iris/UserExecAxiom.v`.
+
+The check that it really happened is `Print Assumptions` on
+`UserretClosedD.wp_userret_closed`: the axiom must be gone.
+
+---
+
 ## 0. THE SPINE, IN ONE PARAGRAPH
 
 A user hart OWNS every register and every byte its cycle can touch — with
