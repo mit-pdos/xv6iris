@@ -790,6 +790,200 @@ Section InodeRes.
     ([∗ list] i ∈ seq 0 MAXFILE, blk_res γfs (blkmap_get bm i) (data i))%I.
 
   (* ------------------------------------------------------------------ *)
+  (*  BUILDING [inode_blocks] FROM BLOCK-GRANULAR RESOURCES              *)
+  (*                                                                     *)
+  (*  A boot client (and, in general, anyone holding one [fsblock]/       *)
+  (*  [blk_own] pair per DISK BLOCK NUMBER) has its resources keyed by    *)
+  (*  block number; [inode_blocks] is keyed by FILE INDEX.  This is that  *)
+  (*  change of granularity, and it is stated so that the 268-element     *)
+  (*  big-op is NEVER unfolded at a caller's altitude: the framing hazard *)
+  (*  on record ([IcacheEscrow.v]:1516-1522, :1704-1707) is that a search *)
+  (*  walking this big-op costs 48-172 s per sentence.  All 269 index     *)
+  (*  case splits happen ONCE, below, by an induction on an ABSTRACT      *)
+  (*  index list, at a checking cost independent of MAXFILE.             *)
+  (*                                                                     *)
+  (*  The premises are conjuncts 4 and 5 of [blkmap_wf] plus the          *)
+  (*  slot-keyed/number-keyed content conversion; nothing here knows      *)
+  (*  about an image, a superblock or [cov].                             *)
+  (* ------------------------------------------------------------------ *)
+
+  (* THE ONE INDUCTION.  A set-indexed big-op becomes a LIST-indexed one:
+     index [i] of [l] draws its resource at key [f i]; holes draw nothing.
+     Injectivity of [f] on [l]'s nonzero values is exactly what makes the
+     successive [big_sepS_delete]s legal, and it is already conjunct 5 of
+     [blkmap_wf].
+
+     The per-index TARGET [Psi] and the two pointwise steps are PARAMETERS,
+     so this is "reindex AND mono" in one pass and a caller never has to
+     match a [decide] guard the lemma invented against one its own
+     definitions carry.  (A first draft did invent one, and [destruct
+     (decide ...)] then failed to see the two as the same term -- the
+     instance terms differ although they print identically.  The general
+     rule: use [rewrite (decide_True _ _ H)], where the instance is an
+     evar and unifies.) *)
+  Lemma big_sepS_reindex (Phi : Z -> iProp Σ) (Psi : nat -> iProp Σ)
+      (f : nat -> Z) (l : list nat) (U : gset Z) :
+    (* [base.NoDup] = stdpp's; this far down the chain the plain name is
+       Stdlib's [List.NoDup], and the two are different inductives *)
+    base.NoDup l ->
+    (forall i : nat, i ∈ l -> f i <> 0 -> f i ∈ U) ->
+    (forall i j : nat, i ∈ l -> j ∈ l -> f i <> 0 -> f i = f j -> i = j) ->
+    (forall i : nat, i ∈ l -> f i = 0 -> True ⊢ Psi i) ->
+    (forall i : nat, i ∈ l -> f i <> 0 -> Phi (f i) ⊢ Psi i) ->
+    ([∗ set] b ∈ U, Phi b) -∗ ([∗ list] i ∈ l, Psi i).
+  Proof.
+    revert U. induction l as [|i l IH];
+      intros U Hnd Hmem Hinj Hhole Hstep.
+    { iIntros "_". done. }
+    (* [NoDup_cons]' two projections rather than the iff: the plain name is
+       ambiguous this far down the import chain *)
+    assert (Hni : i ∉ l) by exact (NoDup_cons_1_1 i l Hnd).
+    assert (Hndl : base.NoDup l) by exact (NoDup_cons_1_2 i l Hnd).
+    rewrite big_sepL_cons.
+    assert (Hmem' : forall j : nat, j ∈ l -> f j <> 0 -> f j ∈ U)
+      by (intros j Hj; apply Hmem; by apply elem_of_list_further).
+    assert (Hinj' : forall j k : nat, j ∈ l -> k ∈ l ->
+                      f j <> 0 -> f j = f k -> j = k)
+      by (intros j k Hj Hk; apply Hinj; by apply elem_of_list_further).
+    assert (Hhole' : forall j : nat, j ∈ l -> f j = 0 -> True ⊢ Psi j)
+      by (intros j Hj; apply Hhole; by apply elem_of_list_further).
+    assert (Hstep' : forall j : nat, j ∈ l -> f j <> 0 -> Phi (f j) ⊢ Psi j)
+      by (intros j Hj; apply Hstep; by apply elem_of_list_further).
+    destruct (decide (f i = 0)) as [Hz|Hnz].
+    - iIntros "H". iSplitR "H".
+      { iApply (Hhole i (elem_of_list_here _ _) Hz). done. }
+      iApply (IH U Hndl Hmem' Hinj' Hhole' Hstep'). iExact "H".
+    - assert (Hfi : f i ∈ U)
+        by (apply Hmem; [apply elem_of_list_here | exact Hnz]).
+      assert (Hmem2 : forall j : nat, j ∈ l -> f j <> 0 ->
+                        f j ∈ U ∖ {[f i]}).
+      { intros j Hj Hjnz. apply elem_of_difference.
+        split; [by apply Hmem' |].
+        rewrite elem_of_singleton. intros Heq.
+        assert (i = j) as ->.
+        { apply Hinj;
+            [apply elem_of_list_here | by apply elem_of_list_further
+            | exact Hnz | by rewrite Heq]. }
+        contradiction. }
+      rewrite (big_sepS_delete Phi U (f i) Hfi).
+      iIntros "[Hi Hrest]". iSplitL "Hi".
+      { iApply (Hstep i (elem_of_list_here _ _) Hnz). iExact "Hi". }
+      iApply (IH (U ∖ {[f i]}) Hndl Hmem2 Hinj' Hhole' Hstep'). iExact "Hrest".
+  Qed.
+
+  (* THE DATA HALF: the MAXFILE file slots.  [Psi] is instantiated at
+     EXACTLY [inode_blocks]' own body, so the conclusion is that big-op with
+     nothing to massage -- no [big_sepL_mono], no guard to match. *)
+  Lemma inode_blocks_of_slots (γfs : fs_names) (bm : blkmap) (V : gset Z)
+      (ct : Z -> list (bv 8)) (data : nat -> list (bv 8)) :
+    (forall i j : nat, (i < MAXFILE)%nat -> (j < MAXFILE)%nat ->
+       bv_unsigned (blkmap_get bm i) <> 0 ->
+       bv_unsigned (blkmap_get bm i) = bv_unsigned (blkmap_get bm j) ->
+       i = j) ->
+    (forall i : nat, (i < MAXFILE)%nat ->
+       bv_unsigned (blkmap_get bm i) <> 0 ->
+       bv_unsigned (blkmap_get bm i) ∈ V) ->
+    (forall i : nat, (i < MAXFILE)%nat ->
+       bv_unsigned (blkmap_get bm i) <> 0 ->
+       data i = ct (bv_unsigned (blkmap_get bm i))) ->
+    ([∗ set] b ∈ V, fsblock γfs b (ct b) ∗ blk_own γfs b) -∗
+    inode_blocks γfs bm data.
+  Proof.
+    intros Hinj Hmem Hdata. rewrite /inode_blocks.
+    apply (big_sepS_reindex
+             (fun b => fsblock γfs b (ct b) ∗ blk_own γfs b)%I
+             (fun i => blk_res γfs (blkmap_get bm i) (data i))
+             (fun i => bv_unsigned (blkmap_get bm i))
+             (seq 0 MAXFILE) V).
+    - apply NoDup_seq.
+    - intros i Hi Hnz. apply elem_of_seq in Hi.
+      apply Hmem; [lia | exact Hnz].
+    - intros i j Hi Hj Hnz Heq.
+      apply elem_of_seq in Hi. apply elem_of_seq in Hj.
+      apply (Hinj i j); [lia | lia | exact Hnz | exact Heq].
+    - intros i Hi Hz. cbv beta.
+      rewrite /blk_res (decide_True _ _ Hz). done.
+    - intros i Hi Hnz. apply elem_of_seq in Hi.
+      assert (Hi' : (i < MAXFILE)%nat) by lia.
+      cbv beta. rewrite /blk_res (decide_False _ _ Hnz) (Hdata i Hi' Hnz).
+      done.
+  Qed.
+
+  (* THE WHOLE BUNDLE, [ind_res] included.  [ct] is the block-content
+     function (at an image, [FsCrash.fs_blocks dk]), [U] the set of blocks
+     handed over, [data] the slot-keyed content.  The two [bm] hypotheses
+     are conjuncts 5 and 4 of [blkmap_wf]; the [data]/[ct] row is the
+     slot-keyed-vs-number-keyed conversion; the last row is [ind_res]'s
+     content half (at an image, [FsImg.fs_ind_bytes_round_trip]).
+
+     THE INDIRECT BLOCK IS TAKEN OUT OF [U] FIRST, by one
+     [big_sepS_delete]; the data slots then reindex over the remainder.
+     Doing it the other way round (one reindex over [seq 0 (S MAXFILE)]
+     with the top slot carrying [ind_bytes]) also works but forces the
+     caller to match a [decide] guard -- see [big_sepS_reindex]'s note. *)
+  Lemma inode_blocks_of_blocks (γfs : fs_names) (bm : blkmap) (U : gset Z)
+      (ct : Z -> list (bv 8)) (data : nat -> list (bv 8)) :
+    (forall i j : nat, (i <= MAXFILE)%nat -> (j <= MAXFILE)%nat ->
+       bv_unsigned (bm_slot bm i) <> 0 ->
+       bm_slot bm i = bm_slot bm j -> i = j) ->
+    (forall i : nat, (i <= MAXFILE)%nat -> bv_unsigned (bm_slot bm i) <> 0 ->
+       bv_unsigned (bm_slot bm i) ∈ U) ->
+    (forall i : nat, (i < MAXFILE)%nat ->
+       bv_unsigned (blkmap_get bm i) <> 0 ->
+       data i = ct (bv_unsigned (blkmap_get bm i))) ->
+    (bv_unsigned (bm_ind bm) <> 0 ->
+       ind_bytes (bm_ent bm) = ct (bv_unsigned (bm_ind bm))) ->
+    ([∗ set] b ∈ U, fsblock γfs b (ct b) ∗ blk_own γfs b) -∗
+    inode_blocks γfs bm data ∗ ind_res γfs bm.
+  Proof.
+    intros Hinj Hmem Hdata Hib.
+    (* the two slot-level premises, restated on the data slots *)
+    assert (Hinj2 : forall i j : nat, (i < MAXFILE)%nat -> (j < MAXFILE)%nat ->
+              bv_unsigned (blkmap_get bm i) <> 0 ->
+              bv_unsigned (blkmap_get bm i) = bv_unsigned (blkmap_get bm j) ->
+              i = j).
+    { intros i j Hi Hj Hnz Heq. apply (Hinj i j); [lia | lia | | ].
+      - rewrite (bm_slot_lt bm i Hi). exact Hnz.
+      - rewrite (bm_slot_lt bm i Hi) (bm_slot_lt bm j Hj).
+        apply bv_eq. exact Heq. }
+    assert (Hmem2 : forall i : nat, (i < MAXFILE)%nat ->
+              bv_unsigned (blkmap_get bm i) <> 0 ->
+              bv_unsigned (blkmap_get bm i) ∈ U).
+    { intros i Hi Hnz. rewrite -(bm_slot_lt bm i Hi).
+      apply Hmem; [lia |]. rewrite (bm_slot_lt bm i Hi). exact Hnz. }
+    destruct (decide (bv_unsigned (bm_ind bm) = 0)) as [Hz|Hnz].
+    - (* NO INDIRECT BLOCK: [ind_res] is free *)
+      iIntros "H". iSplitL "H".
+      { iApply (inode_blocks_of_slots γfs bm U ct data Hinj2 Hmem2 Hdata).
+        iExact "H". }
+      rewrite /ind_res /ind_blk /ind_tok !(decide_True _ _ Hz).
+      iSplitR; [done | done].
+    - (* THE INDIRECT BLOCK: out of [U] first, by ONE delete *)
+      assert (Hind : bv_unsigned (bm_ind bm) ∈ U).
+      { rewrite -bm_slot_top. apply Hmem; [lia |].
+        rewrite bm_slot_top. exact Hnz. }
+      assert (Hmem3 : forall i : nat, (i < MAXFILE)%nat ->
+                bv_unsigned (blkmap_get bm i) <> 0 ->
+                bv_unsigned (blkmap_get bm i)
+                  ∈ U ∖ {[bv_unsigned (bm_ind bm)]}).
+      { intros i Hi Hnzi. apply elem_of_difference.
+        split; [by apply Hmem2 |]. rewrite elem_of_singleton. intros Heq.
+        assert (Hi' : i = MAXFILE).
+        { apply (Hinj i MAXFILE); [lia | lia | |].
+          - rewrite (bm_slot_lt bm i Hi). exact Hnzi.
+          - rewrite (bm_slot_lt bm i Hi) bm_slot_top. apply bv_eq, Heq. }
+        lia. }
+      rewrite (big_sepS_delete
+                 (fun b => fsblock γfs b (ct b) ∗ blk_own γfs b)%I U
+                 (bv_unsigned (bm_ind bm)) Hind).
+      iIntros "[Hi Hrest]". iSplitR "Hi".
+      { iApply (inode_blocks_of_slots γfs bm (U ∖ {[bv_unsigned (bm_ind bm)]})
+                  ct data Hinj2 Hmem3 Hdata). iExact "Hrest". }
+      rewrite /ind_res /ind_blk /ind_tok !(decide_False _ _ Hnz) (Hib Hnz).
+      iDestruct "Hi" as "[Ha Hb]". iFrame.
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
   (*  inode_map: extracting and reinserting one addrs cell               *)
   (* ------------------------------------------------------------------ *)
 

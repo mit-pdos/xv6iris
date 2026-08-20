@@ -378,6 +378,55 @@ Section FsBoot.
     rewrite big_sepS_union; [done | set_solver].
   Qed.
 
+  (* ...AND THE SAME SPLIT ITERATED, WITH THE REMAINDER KEPT.  [X] is the
+     era's [cov]; [l] indexes a family of PAIRWISE DISJOINT subsets (at the
+     boot stocking: the live inums, [f i] being inode [i]'s own block set);
+     the conclusion hands each member its own [∗ set] and keeps everything
+     [l] did not claim -- which is what the era fupd needs, since the log
+     region, the inode region, the bitmap block and the free pool all live
+     in the remainder.
+
+     ONE induction, on an abstract list, so a caller's big-op is never
+     walked by a framing search: the peel at each step is
+     [big_sepS_split_sub] above and nothing else. *)
+  Lemma big_sepS_carve {A B : Type} `{Countable A} (Φ : A -> iProp Σ)
+      (X : gset A) (l : list B) (f : B -> gset A) :
+    (* [base.NoDup] = stdpp's; the plain name here is Stdlib's
+       [List.NoDup], and the two are different inductives *)
+    base.NoDup l ->
+    (forall i : B, i ∈ l -> f i ⊆ X) ->
+    (forall i j : B, i ∈ l -> j ∈ l -> i <> j -> f i ## f j) ->
+    ([∗ set] b ∈ X, Φ b) -∗
+    ([∗ list] i ∈ l, [∗ set] b ∈ f i, Φ b)
+      ∗ ([∗ set] b ∈ X ∖ ⋃ (f <$> l), Φ b).
+  Proof.
+    revert X. induction l as [|i l IH]; intros X Hnd Hsub Hdisj.
+    { rewrite fmap_nil union_list_nil difference_empty_L.
+      iIntros "H". iSplitR "H"; [done | iExact "H"]. }
+    assert (Hni : i ∉ l) by exact (NoDup_cons_1_1 i l Hnd).
+    assert (Hndl : base.NoDup l) by exact (NoDup_cons_1_2 i l Hnd).
+    assert (Hle : f i ⊆ X) by (apply Hsub, elem_of_list_here).
+    assert (Hsub' : forall j : B, j ∈ l -> f j ⊆ X ∖ f i).
+    { intros j Hj. apply elem_of_subseteq. intros b Hb.
+      apply elem_of_difference. split.
+      - apply (Hsub j (elem_of_list_further _ _ _ Hj)), Hb.
+      - intros Hbi.
+        assert (Hd : f j ## f i).
+        { apply Hdisj;
+            [by apply elem_of_list_further | apply elem_of_list_here |].
+          intros ->. contradiction. }
+        exact (Hd b Hb Hbi). }
+    assert (Hdisj' : forall j k : B, j ∈ l -> k ∈ l -> j <> k -> f j ## f k)
+      by (intros j k Hj Hk; apply Hdisj; by apply elem_of_list_further).
+    iIntros "H".
+    iDestruct (big_sepS_split_sub Φ X (f i) Hle with "H") as "[Hi Hrest]".
+    iDestruct (IH (X ∖ f i) Hndl Hsub' Hdisj' with "Hrest") as "[Hl Hrem]".
+    rewrite big_sepL_cons fmap_cons union_list_cons
+            -difference_difference_l_L.
+    iSplitR "Hrem"; [| iExact "Hrem"].
+    iSplitL "Hi"; [iExact "Hi" | iExact "Hl"].
+  Qed.
+
   (* the log region's halves, taken apart into the header and the thirty
      slots.  The header keeps its NAMED content; the slots go existential
      (which is all [log_batch] records for them). *)

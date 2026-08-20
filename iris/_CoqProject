@@ -1044,6 +1044,7 @@ IrefSlots.v
 IcacheInv.v
 InodeRef.v
 InodeLock.v
+FsImgBridge.v
 InodeRegion.v
 EscrowInode.v
 EscrowDeposit.v
@@ -1054,6 +1055,7 @@ IregDirBit.v
 IcacheEscrow.v
 IregBox.v
 IcacheBoot.v
+FsCfgBoot.v
 CodeIget.v
 CodeDirlink.v
 CodeDirlookup.v

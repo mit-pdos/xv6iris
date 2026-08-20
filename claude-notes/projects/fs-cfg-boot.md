@@ -472,9 +472,39 @@ Measured facts that supersede this file's earlier estimates:
   (IcacheBoot.v), `log_free_tok` / `log_ghost_alloc` (LogDefs.v; natural home
   LogInv — pure relocation debt, and LogInv's three one-name alloc lemmas are
   now dead), `disk_geom_agree` (FsReady.v).
-- **NEXT (in order):** (a) FsImg infrastructure items (1)–(5) + FsImgCheck
-  instantiations; (b) probe item (8)'s cost; then (c) `FsImgBridge.v` (6) +
-  the stocking machinery (7)/(8); then (d) staging steps 3+4 = `fileGpreS` +
+- **(a)/(b)/(c) DONE** — (a) commit `eb820d1a`; (b) probe 2 (GO, O(1));
+  (c) the stocking machinery: `InodeInv.big_sepS_reindex` /
+  `inode_blocks_of_slots` / `inode_blocks_of_blocks`,
+  `FsImg.fs_inode_blocks_disjoint` (+ `fs_nblk_max`,
+  `fs_inode_blocks_range/_set/_set_sub`, `NoDup_mjoin_cross`),
+  `FsBoot.big_sepS_carve`, NEW `FsImgBridge.v` (sections A–E at
+  `FsImg.fs_slot` directly — NOT aliased; `maxfile_eq : MAXFILE =
+  FS_MAXFILE` for the conversions — plus `img_slot_in_inode_blocks`,
+  `img_inode_blocks_res`), NEW `FsCfgBoot.v` with `ipool_alloc_of_image`
+  (Closed under the global context; conclusion = the stocked `ipool` +
+  the PAIRED remainder `[∗ set] b ∈ cov ∖ fs_live_blocks P sb A,
+  fsblock ∗ blk_own` — split with `big_sepS_sep` if a consumer wants
+  `fs_log_region_split`'s unpaired shape).
+  **Stage-(d) items the stop surfaced, IN ADDITION to the plan:**
+  (i) `dir_links` production — `ipool_alloc_of_image` takes
+  `[∗ set] z ∈ A, dir_links z …` as a premise because its only
+  constructor (`DirLinks.dir_links_of_plain`) wants one `ilink` ticket
+  per live non-self record, and `ireg_alloc`'s all-plain
+  `link_auth z 0 …` premise excludes coexisting tickets. The fix is
+  IcacheBoot.v:487-493's own documented "stage B" widening: boot mints
+  `link_auth z w_z …` at the image's link counts and pays out the
+  `ilink` fragments — which needs a NEW image sweep `fs_link_count P sb z`
+  (live non-self records naming z) + its lookup spec + the FsImgCheck
+  instantiation, and the `LM` map `icfg_alloc` is passed must match.
+  (ii) the one-line-ish bridge `image_dinode dss z = fs_dinode P sb z`
+  (parts exist: `fs_dinode_of_diblk` + `image_dinode_slot` +
+  IBLOCK/islot arithmetic; not yet a lemma) — `ireg_alloc` pays out at
+  the former, the stocking lemma is stated at the latter.
+  (iii) placement nit: `img_slot_in_inode_blocks` names only FsImg
+  notions and belongs beside `fs_inode_blocks_range` in FsImg.v — move
+  it when convenient.
+- **NEXT (in order):** (d) staging steps 3+4 = the (i)/(ii) items above +
+  `fileGpreS` +
   `FsCfgBoot.fs_cfg_alloc` + the two kits + wiring into `boot_shared_alloc`
   + the adequacy restatement (delete `adequacy_icfg`/`adequacy_fscfg`, move
   the fs corollary to the new leaf per ruling 3); then (e) staging step 5

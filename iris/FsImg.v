@@ -697,6 +697,22 @@ Proof.
   pose proof (Z.mod_pos_bound (sz + 1023) 1024 ltac:(lia)) as Hm. lia.
 Qed.
 
+(* ...and the SIZE CAP read as a block-count cap: a file no bigger than
+   MAXFILE blocks has at most MAXFILE of them.  This is what bounds the
+   indirect-entry INDEX in [fs_inode_blocks] (an entry list is only 256
+   long, so a bigger [nb] would make the list's tail read the [Inhabited]
+   default rather than a block number). *)
+Lemma fs_nblk_max (sz : Z) :
+  0 <= sz -> sz <= Z.of_nat FS_MAXFILE * BSIZE_z ->
+  fs_nblk sz <= Z.of_nat FS_MAXFILE.
+Proof.
+  assert (HM : Z.of_nat FS_MAXFILE = 268) by (vm_compute; reflexivity).
+  rewrite HM. intros H0 H. unfold fs_nblk.
+  change (BSIZE_z - 1) with 1023. change BSIZE_z with 1024 in *.
+  pose proof (Z.div_mod (sz + 1023) 1024 ltac:(lia)) as Hd.
+  pose proof (Z.mod_pos_bound (sz + 1023) 1024 ltac:(lia)) as Hm. lia.
+Qed.
+
 (* a block index whose byte range starts inside the file is below the count *)
 Lemma fs_nblk_lt (sz k : Z) : 0 <= k -> k * BSIZE_z < sz -> k < fs_nblk sz.
 Proof.
@@ -1399,6 +1415,132 @@ Proof.
   apply (fs_slot_inj_of_nodup P sb).
   - exact (fs_inodes_wf_spec P sb i Hw Hi Hnz).
   - exact (fs_used_blocks_nodup_inode P sb i Hnd Hi Hnz).
+Qed.
+
+(* ---- W4 READ THE OTHER WAY: THE INODES' BLOCK SETS ARE DISJOINT ------ *)
+
+(* **WHY THIS READING TOO.**  The stocking of the inode pool hands each
+   live inode the [fsblock]/[blk_own] pair of every block it names, carved
+   out of the ONE big-op the era fupd holds over [cov]
+   ([FsBoot.big_sepS_carve]).  A carve needs its pieces PAIRWISE DISJOINT
+   -- two inodes naming one block would have the carve claim one key twice
+   -- and needs each piece INSIDE [cov].  Both are readings of W4 plus W3
+   and neither costs a new computation: disjointness is the [NoDup] of the
+   concatenation restricted to two DIFFERENT members (the companion of
+   [fs_used_blocks_nodup_inode], which restricts it to one), and the range
+   is [fs_inode_ok]'s own three clauses. *)
+
+(* every block a live inode names is in the DATA REGION.  The converse of
+   [fs_slot]'s [fs_inode_blocks] membership ([FsImgBridge.
+   img_slot_in_inode_blocks]): there, a nonzero slot is in the list; here,
+   every list member is a real data block. *)
+Lemma fs_inode_blocks_range (P : Z -> list (bv 8)) (sb : fs_sb)
+    (dn : dinode) (b : Z) :
+  fs_inode_ok P sb dn -> b ∈ fs_inode_blocks P dn ->
+  fs_data_start sb <= b < sb_size sb.
+Proof.
+  intros Hok Hb.
+  (* the entry INDEX bound, from the size cap *)
+  assert (Hnb : fs_nblk (bv_unsigned (di_size dn)) <= Z.of_nat FS_MAXFILE).
+  { apply fs_nblk_max;
+      [exact (proj1 (bv_unsigned_in_range _ _)) | exact (fio_size P sb dn Hok)]. }
+  unfold fs_inode_blocks in Hb. cbv zeta in Hb.
+  apply elem_of_app in Hb as [Hb | Hb].
+  - (* the indirect block, which heads the list exactly when there is one *)
+    destruct (Z.ltb_spec (Z.of_nat FS_NDIRECT)
+                (fs_nblk (bv_unsigned (di_size dn)))) as [Hgt|Hle].
+    + apply elem_of_list_singleton in Hb as ->.
+      exact (fio_ind P sb dn Hok Hgt).
+    + exfalso. exact (proj1 (elem_of_nil b) Hb).
+  - apply elem_of_app in Hb as [Hb | Hb].
+    + (* a direct entry, below both [nb] and NDIRECT *)
+      apply elem_of_list_fmap in Hb as (k & -> & Hk).
+      apply elem_of_seq in Hk.
+      apply (fio_direct P sb dn Hok k); unfold FS_NDIRECT in *; lia.
+    + (* an indirect entry: [nb - NDIRECT] of them, and [nb <= MAXFILE] *)
+      apply elem_of_list_fmap in Hb as (j & -> & Hj).
+      apply elem_of_seq in Hj.
+      apply (fio_ent P sb dn Hok j);
+        unfold FS_MAXFILE, FS_NDIRECT, FS_NINDIRECT in *; lia.
+Qed.
+
+Definition fs_inode_blocks_set (P : Z -> list (bv 8)) (sb : fs_sb) (i : Z)
+  : gset Z := list_to_set (fs_inode_blocks P (fs_dinode P sb i)).
+
+Lemma fs_inode_blocks_set_sub (P : Z -> list (bv 8)) (sb : fs_sb) (i : Z)
+    (X : gset Z) :
+  fs_inode_ok P sb (fs_dinode P sb i) ->
+  (forall b : Z, fs_data_start sb <= b < sb_size sb -> b ∈ X) ->
+  fs_inode_blocks_set P sb i ⊆ X.
+Proof.
+  intros Hok HX. apply elem_of_subseteq. intros b Hb.
+  unfold fs_inode_blocks_set in Hb. rewrite elem_of_list_to_set in Hb.
+  exact (HX b (fs_inode_blocks_range P sb (fs_dinode P sb i) b Hok Hb)).
+Qed.
+
+(* one element of two DIFFERENT members of a duplicate-free concatenation
+   -- stated by hand for [NoDup_app_split]'s reason (Stdlib's
+   [List.NoDup_app] wins the name and is the introduction rule) *)
+Lemma NoDup_app_cross {A : Type} (l k : list A) (x : A) :
+  NoDup (l ++ k) -> x ∈ l -> x ∈ k -> False.
+Proof.
+  induction l as [|a l IH]; intros H Hx Hk.
+  - exact (proj1 (elem_of_nil x) Hx).
+  - apply elem_of_cons in Hx as [-> | Hx].
+    + apply (NoDup_cons_1_1 a (l ++ k) H), elem_of_app. right. exact Hk.
+    + exact (IH (NoDup_cons_1_2 a (l ++ k) H) Hx Hk).
+Qed.
+
+Lemma NoDup_mjoin_cross {A : Type} (ls : list (list A)) (n1 n2 : nat)
+    (l1 l2 : list A) (x : A) :
+  NoDup (mjoin ls) -> ls !! n1 = Some l1 -> ls !! n2 = Some l2 ->
+  n1 <> n2 -> x ∈ l1 -> x ∈ l2 -> False.
+Proof.
+  revert n1 n2.
+  induction ls as [|y ls IH]; intros n1 n2 Hnd H1 H2 Hne Hx1 Hx2.
+  { destruct n1; discriminate. }
+  rewrite mjoin_cons in Hnd.
+  destruct n1 as [|m1]; destruct n2 as [|m2]; cbn in H1, H2.
+  - exact (Hne eq_refl).
+  - injection H1 as Hl1. subst l1.
+    apply (NoDup_app_cross y (mjoin ls) x Hnd Hx1).
+    apply elem_of_list_join. exists l2.
+    split; [exact Hx2 | exact (elem_of_list_lookup_2 ls m2 l2 H2)].
+  - injection H2 as Hl2. subst l2.
+    apply (NoDup_app_cross y (mjoin ls) x Hnd Hx2).
+    apply elem_of_list_join. exists l1.
+    split; [exact Hx1 | exact (elem_of_list_lookup_2 ls m1 l1 H1)].
+  - destruct (NoDup_app_split y (mjoin ls) Hnd) as (_ & Hr).
+    exact (IH m1 m2 Hr H1 H2 ltac:(lia) Hx1 Hx2).
+Qed.
+
+(* **THE CARVE'S OTHER PREMISE**: W4, per PAIR of live inums, in
+   [FsBoot.big_sepS_carve]'s own shape.  No new computation. *)
+Lemma fs_inode_blocks_disjoint (P : Z -> list (bv 8)) (sb : fs_sb)
+    (i j : Z) :
+  NoDup (fs_used_blocks P sb) ->
+  0 <= i < sb_ninodes sb -> 0 <= j < sb_ninodes sb -> i <> j ->
+  bv_unsigned (di_type (fs_dinode P sb i)) <> 0 ->
+  bv_unsigned (di_type (fs_dinode P sb j)) <> 0 ->
+  fs_inode_blocks_set P sb i ## fs_inode_blocks_set P sb j.
+Proof.
+  intros Hnd Hi Hj Hne Hti Htj.
+  apply elem_of_disjoint. intros b Hb1 Hb2.
+  unfold fs_inode_blocks_set in Hb1, Hb2.
+  rewrite elem_of_list_to_set in Hb1. rewrite elem_of_list_to_set in Hb2.
+  unfold fs_used_blocks in Hnd.
+  apply (NoDup_mjoin_cross _ (Z.to_nat i) (Z.to_nat j)
+           (fs_inode_blocks P (fs_dinode P sb i))
+           (fs_inode_blocks P (fs_dinode P sb j)) b Hnd);
+    [ | | lia | exact Hb1 | exact Hb2].
+  - rewrite list_lookup_fmap, (lookup_seq_lt 0 _ (Z.to_nat i)) by lia.
+    cbn [fmap option_fmap option_map].
+    rewrite Nat.add_0_l, Z2Nat.id by lia.
+    rewrite (proj2 (Z.eqb_neq _ _) Hti). reflexivity.
+  - rewrite list_lookup_fmap, (lookup_seq_lt 0 _ (Z.to_nat j)) by lia.
+    cbn [fmap option_fmap option_map].
+    rewrite Nat.add_0_l, Z2Nat.id by lia.
+    rewrite (proj2 (Z.eqb_neq _ _) Htj). reflexivity.
 Qed.
 
 (* ---- W5 -------------------------------------------------------------- *)
