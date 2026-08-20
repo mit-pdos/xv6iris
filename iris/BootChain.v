@@ -663,6 +663,10 @@ Section BootPrimary.
     (* the inode region is nonempty -- [BootShared.fs_boot_image_wf]'s fifth
        conjunct, forwarded to [SpecMain]'s own row *)
     (0 < nib)%nat ->
+    (* ...and block 0 is not covered -- [fs_boot_image_wf]'s [fs_cov_in]
+       conjunct read through [FsBoot.fs_cov_in_0], forwarded the same way.
+       [BioInitAt.bio_init_at] is what needs it, at main+0x8e. *)
+    (0 : Z) ∉ cov ->
     kernel_text -∗
     kernel_data -∗
     boot_hart_res rs iv dq -∗
@@ -700,7 +704,7 @@ Section BootPrimary.
     ([∗ list] p ∈ ps, page_own p) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hreset Hz Hprun Hlen Hlive Hnib0.
+    intros Hreset Hz Hprun Hlen Hlive Hnib0 Hcov0.
     iIntros "#Htext #Hdata Hres #Hstarted Hlk Hgl Hfirst Hnext Hpark Hpst Hpav
              Hfs Hirauth
              #Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim #Hdone Hkpt Hkmap Hpages".
@@ -713,7 +717,7 @@ Section BootPrimary.
               dk sb nib cov
               (register_lookup tlb rs) (main_deposit γd γv)
               (cid_word_of_zero _ Hz) K_main_boot_le eq_refl eq_refl Hprun Hlen
-              Hlive Hnib0 eq_refl
+              Hlive Hnib0 Hcov0 eq_refl
               with "Hcap Hctx Hcpu Hg Htext Hdata Hpc Hstarted [] Hlk Hgl
                     Hfirst Hnext Hpark Hpst Hpav Hfs Hirauth
                     Hdev Htx Hsent Hlb Hdlab

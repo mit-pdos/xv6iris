@@ -68,6 +68,12 @@ Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import IcacheBoot.
 Require Import FsBoot.
+(* debt (D): the bitmap block's resource and the free pool.  [BioDefs] for
+   [BSIZE] (the block size [bitmap_bytes] and [fs_bmap_set] are taken at),
+   [BitmapEnc] for the encoder the equation is stated over. *)
+Require Import BioDefs.
+Require Import BitmapEnc.
+Require Import BitmapInv.
 Require Import FsImg.
 Require Import FsImgBridge.
 Require Import FsCfg.          (* the record this file finally gives a value *)
@@ -82,6 +88,98 @@ Local Open Scope Z_scope.
    pool onward to [bio_init]/[initlog]/[ireg_alloc] -- is statable. *)
 Definition fs_live_blocks (P : Z -> list (bv 8)) (sb : fs_sb) (A : gset Z)
   : gset Z := ⋃ (fs_inode_blocks_set P sb <$> elements A).
+
+Lemma elem_of_fs_live_blocks (P : Z -> list (bv 8)) (sb : fs_sb) (A : gset Z)
+    (b : Z) :
+  b ∈ fs_live_blocks P sb A
+  <-> exists i : Z, i ∈ A /\ b ∈ fs_inode_blocks P (fs_dinode P sb i).
+Proof.
+  rewrite /fs_live_blocks elem_of_union_list. split.
+  - intros (X & HX & Hb). apply elem_of_list_fmap in HX as (i & -> & Hi).
+    apply elem_of_elements in Hi. exists i. split; [exact Hi |].
+    rewrite /fs_inode_blocks_set elem_of_list_to_set in Hb. exact Hb.
+  - intros (i & Hi & Hb). exists (fs_inode_blocks_set P sb i). split.
+    + apply elem_of_list_fmap. exists i. split; [reflexivity |].
+      apply elem_of_elements. exact Hi.
+    + rewrite /fs_inode_blocks_set elem_of_list_to_set. exact Hb.
+Qed.
+
+(* the live inodes' blocks are DATA blocks, and they are exactly what W4's
+   used set collects.  Both readings are what puts the bitmap block and the
+   free pool OUTSIDE the live set, which is what makes the peel below
+   disjoint from the stocking carve. *)
+Lemma fs_live_blocks_range (P : Z -> list (bv 8)) (sb : fs_sb) (A : gset Z)
+    (b : Z) :
+  fsimg_wf P sb = true ->
+  (forall z : Z, z ∈ A -> 0 <= z < FsImg.sb_ninodes sb
+                          /\ bv_unsigned (di_type (fs_dinode P sb z)) <> 0) ->
+  b ∈ fs_live_blocks P sb A -> fs_data_start sb <= b < sb_size sb.
+Proof.
+  intros Hwf HA Hb. apply elem_of_fs_live_blocks in Hb as (i & Hi & Hb).
+  destruct (HA i Hi) as [Hran Hty].
+  exact (fs_inode_blocks_range P sb (fs_dinode P sb i) b
+           (fsimg_wf_inode P sb i Hwf Hran Hty) Hb).
+Qed.
+
+Lemma fs_live_blocks_used (P : Z -> list (bv 8)) (sb : fs_sb) (A u : gset Z)
+    (b : Z) :
+  fs_used_set P sb = Some u ->
+  (forall z : Z, z ∈ A -> 0 <= z < FsImg.sb_ninodes sb
+                          /\ bv_unsigned (di_type (fs_dinode P sb z)) <> 0) ->
+  b ∈ fs_live_blocks P sb A -> b ∈ u.
+Proof.
+  intros Hus HA Hb. apply elem_of_fs_live_blocks in Hb as (i & Hi & Hb).
+  destruct (HA i Hi) as [Hran Hty].
+  apply (fs_used_set_elem P sb u b Hus).
+  exact (fs_used_blocks_inode P sb i b Hran Hty Hb).
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(*  DEBT (D): THE BITMAP BLOCK AND THE FREE POOL                           *)
+(*                                                                        *)
+(*  [BitmapInv.bitmap_res] is three things, and boot has all three in the   *)
+(*  coverage remainder: the pure [bitmap_ok] (W5 plus R4's data-region      *)
+(*  corner), the bitmap block AT [bitmap_bytes used], and one               *)
+(*  [fsblock]/[blk_own] pair per CLEAR bit below [size].                    *)
+(*                                                                        *)
+(*  [used] IS THE BLOCK'S OWN BIT SET ([FsImg.fs_bmap_set]) rather than     *)
+(*  "the used set ∪ the metadata blocks": at the block's own bits the       *)
+(*  byte-level equation is a theorem ([FsImg.bm_bytes_fs_bmap_set]) and no  *)
+(*  new image sweep exists, where the reconstructed set would additionally  *)
+(*  need the 6192 bits above [size] swept clear.  Nothing distinguishes     *)
+(*  the two: [bitmap_ok] quantifies over [x < size] and [free_set]          *)
+(*  intersects [seqZ 0 size].                                              *)
+(* ---------------------------------------------------------------------- *)
+(*  The blocks the producer takes OUT of the remainder: the bitmap block
+    itself and the whole free pool.  One set, so [fs_kit_spent] can name it.
+    [FsImg.fs_bmap_set BSIZE (P (sb_bmapstart sb))] is written out at every
+    site rather than abbreviated: the set is SEALED (see FsImg.v), and an
+    abbreviation would put a delta step between two spellings of it at
+    every unification. *)
+Definition fs_bitmap_spent (P : Z -> list (bv 8)) (sb : fs_sb) : gset Z :=
+  {[ FsImg.sb_bmapstart sb ]}
+  ∪ free_set (FsImg.sb_size sb)
+      (FsImg.fs_bmap_set BSIZE (P (FsImg.sb_bmapstart sb))).
+
+(* every member is either the bitmap block or a free DATA block no inode
+   names -- which is what puts [fs_bitmap_spent] inside the remainder. *)
+Lemma fs_bitmap_spent_bound (P : Z -> list (bv 8)) (sb : fs_sb) (u : gset Z)
+    (b : Z) :
+  fsimg_wf P sb = true -> fs_used_set P sb = Some u ->
+  b ∈ fs_bitmap_spent P sb ->
+  b = FsImg.sb_bmapstart sb
+  \/ (fs_data_start sb <= b < FsImg.sb_size sb /\ b ∉ u).
+Proof.
+  intros Hwf Hus Hb.
+  pose proof (fsimg_wf_sb P sb Hwf) as Hsb.
+  destruct (fsimg_wf_used P sb Hwf) as (u' & Hus' & _ & Hbw).
+  rewrite Hus in Hus'. injection Hus' as <-.
+  rewrite /fs_bitmap_spent elem_of_union elem_of_singleton in Hb.
+  destruct Hb as [-> | Hb]; [by left |]. right.
+  apply elem_of_free_set in Hb as [Hran Hnu].
+  destruct (fs_bmap_set_free P sb u b Hsb Hbw Hran Hnu) as [Hge Hnuu].
+  split; [lia | exact Hnuu].
+Qed.
 
 (* ---------------------------------------------------------------------- *)
 (*  THE DINODE BRIDGE (stage-(d) item ii)                                  *)
@@ -723,14 +821,83 @@ Qed.
 (*  THE BLOCKS THE ERA FUPD SPENDS, as one set, so that
     [fs_kit_fsinit_ghost]'s coverage remainder is statable: block 1 (to
     fsinit), the log region (to initlog), the inode region (into
-    [ireg_inv]), and every live inode's own blocks (into the pool).  The
-    BITMAP BLOCK is deliberately NOT here -- it stays in the remainder, see
-    [fs_kit_fsinit_ghost]'s header row (D).                                *)
+    [ireg_inv]), the bitmap block AND the whole free pool (into
+    [BitmapInv.bitmap_res], debt (D)), and every live inode's own blocks
+    (into the pool).  What is LEFT in the remainder is whatever [cov] holds
+    that the file system's own geometry does not name -- at the literal
+    image, nothing.                                                        *)
 Definition fs_kit_spent (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat)
     (A : gset Z) : gset Z :=
   ({[ (1:Z) ]} ∪ log_region_set (sb_logstart sb)
-     ∪ ireg_blk_set (FsImg.sb_inodestart sb) nib)
+     ∪ ireg_blk_set (FsImg.sb_inodestart sb) nib
+     ∪ fs_bitmap_spent P sb)
   ∪ fs_live_blocks P sb A.
+
+Section FsCfgBootBitmap.
+  Context `{!riscvGS Σ, !xv6G Σ}.
+
+  (*  DEBT (D) PAID.  The whole of [BitmapInv.bitmap_res], out of the paired
+      remainder the stocking carve leaves and nothing else: no new image
+      sweep, and the era fupd still computes nothing.  The bitmap block's
+      own [blk_own] is dropped -- [bitmap_res] does not hold one for it, and
+      nothing may: the block is the invariant's own storage, not a client
+      block. *)
+  Lemma bitmap_res_of_image (γfs : fs_names) (P : Z -> list (bv 8))
+      (sb : fs_sb) (cov : gset Z) :
+    fsimg_wf P sb = true ->
+    fs_blocks_full P ->
+    (forall b : Z, fs_data_start sb <= b < FsImg.sb_size sb -> b ∈ cov) ->
+    ([∗ set] b ∈ fs_bitmap_spent P sb,
+       fsblock γfs b (P b) ∗ blk_own γfs b) -∗
+    bitmap_res γfs (FsImg.sb_bmapstart sb) cov (FsImg.sb_logstart sb)
+      (FsImg.sb_size sb) (FsImg.fs_bmap_set BSIZE (P (FsImg.sb_bmapstart sb))).
+  Proof.
+    intros Hwf Hfull Hcovd. iIntros "H".
+    pose proof (fsimg_wf_sb P sb Hwf) as Hsb.
+    destruct (fsimg_wf_used P sb Hwf) as (u & _ & _ & Hbw).
+    pose proof (fs_sb_ok_meta sb Hsb) as (Hm1 & Hm2 & Hm3).
+    (* the log region sits strictly below the inode region, hence strictly
+       below every block the pool or the bitmap block occupies *)
+    assert (HlogI : forall z : Z, z ∈ log_region_set (FsImg.sb_logstart sb) ->
+              1 < z < FsImg.sb_inodestart sb).
+    { intros z Hz. pose proof (log_region_bound (FsImg.sb_logstart sb) z Hz).
+      pose proof (sbo_logstart sb Hsb). pose proof (sbo_nlog sb Hsb).
+      pose proof (sbo_inodestart sb Hsb). unfold LOGBLOCKS in *. lia. }
+    (* the bitmap block is below the data region, so it is not in the pool *)
+    assert (Hdj : {[ FsImg.sb_bmapstart sb ]}
+                  ## free_set (FsImg.sb_size sb)
+                       (FsImg.fs_bmap_set BSIZE (P (FsImg.sb_bmapstart sb)))).
+    { apply disjoint_singleton_l. intros Hin.
+      apply elem_of_free_set in Hin as [Hran Hnu].
+      destruct (fs_bmap_set_free P sb u (FsImg.sb_bmapstart sb) Hsb Hbw
+                  Hran Hnu) as [Hge _].
+      unfold fs_data_start in Hge. lia. }
+    (* the byte-level equation, at the block's own bits *)
+    assert (Hbytes : bitmap_bytes
+                       (FsImg.fs_bmap_set BSIZE (P (FsImg.sb_bmapstart sb)))
+                     = P (FsImg.sb_bmapstart sb)).
+    { rewrite /bitmap_bytes.
+      apply bm_bytes_fs_bmap_set. apply Hfull. }
+    (* ...and the pure half *)
+    assert (Hok : bitmap_ok cov (FsImg.sb_logstart sb) (FsImg.sb_size sb)
+                            (FsImg.fs_bmap_set BSIZE
+                               (P (FsImg.sb_bmapstart sb)))).
+    { intros x Hx Hnu.
+      destruct (fs_bmap_set_free P sb u x Hsb Hbw Hx Hnu) as [Hge _].
+      split; [apply Hcovd; lia |].
+      intros Hlog. pose proof (HlogI x Hlog). lia. }
+    rewrite /fs_bitmap_spent (big_sepS_union _ _ _ Hdj) big_sepS_singleton.
+    iDestruct "H" as "[[Hbm _] Hpool]".
+    rewrite /bitmap_res Hbytes.
+    iSplitR; [iPureIntro; exact Hok |].
+    iSplitL "Hbm"; [iExact "Hbm" |].
+    rewrite /free_pool.
+    iApply (big_sepS_mono with "Hpool"). intros b Hb.
+    iIntros "[Hf Ho]".
+    iApply (free_blk_intro γfs b (P b) (Hfull b) with "Hf Ho").
+  Qed.
+
+End FsCfgBootBitmap.
 
 
 (* ====================================================================== *)
@@ -886,18 +1053,16 @@ Section FsCfgBootEra.
             [iref_slots IREFSLOTS] row, and [bio_init_at]'s POSTCONDITION
             ([bslots bn BSLOTS] is produced at main+0x8e, not at the era) --
             so the [bslots] must be carried from kit 1's consumption site.
-        (D) [BitmapInv.bitmap_res fsc_fs fsc_bmapstart fsc_cov fsc_logst
-            fsc_size used].  DEBT, not an oversight: [bitmap_res_close]
-            builds it out of [fsblock fsc_fs fsc_bmapstart (bitmap_bytes
-            used)] and [free_pool], and the coverage remainder below carries
-            the bitmap block's [fsblock]/[blk_own] pair and every free data
-            block -- but the BYTE-LEVEL equation [P bmapstart =
-            BitmapInv.bitmap_bytes used] is not a reading of W5:
-            [FsImg.fs_bitmap_wf] checks the BITS below [size], not the
-            block's bytes, and [bitmap_bytes] sets a bit for [used] where
-            the image also sets one for every metadata block.  A new
-            byte-level [FsImg] sweep (plus [used := u ∪ metadata]) is the
-            producer; it is O(1) computation and no new design.
+        (D) PAID, and it is a row below rather than an owed one:
+            [BitmapInv.bitmap_res] at [used := FsImg.fs_bmap_set BSIZE
+            (P fsc_bmapstart)], the bitmap block's OWN bit set.  Built by
+            [bitmap_res_of_image] out of the coverage remainder, which is
+            why [fs_kit_spent] now names [fs_bitmap_spent] (the bitmap
+            block plus the whole free pool) -- those leave the remainder
+            and enter the resource.  Taking [used] to be the block's own
+            bits is what makes the byte-level equation
+            [P bmapstart = bitmap_bytes used] a THEOREM
+            ([FsImg.bm_bytes_fs_bmap_set]) rather than a new image sweep.
         (E) [FsCrash.fs_crash_seam] and [RiscvPtsto.gen_cert] are
             PERSISTENT and reach fsinit through [main_deposit], not a kit.
 
@@ -924,9 +1089,14 @@ Section FsCfgBootEra.
      fsblock fsc_fs (log_hdr_bno fsc_logst) (P (log_hdr_bno fsc_logst)) ∗
      ([∗ list] i ∈ seq 0 LOGBLOCKS,
         ∃ bs : list (bv 8), fsblock fsc_fs (log_slot_bno fsc_logst i) bs) ∗
+     (* THE BITMAP, row (D): the block itself at its own bit set, plus the
+        free pool -- both carved out of the coverage remainder by
+        [bitmap_res_of_image] in the era fupd. *)
+     bitmap_res fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size
+       (FsImg.fs_bmap_set BSIZE (P fsc_bmapstart)) ∗
      (* THE COVERAGE REMAINDER, PAIRED: everything [cov] holds that the era
-        did not spend -- the bitmap block and the whole free data pool.  Row
-        (D) above is what still has to be carved out of it. *)
+        did not spend.  At an image whose [cov] is exactly its own block
+        range this is empty; it is kept because [cov] is a parameter. *)
      ([∗ set] b ∈ fsc_cov ∖ Rspent,
         fsblock fsc_fs b (P b) ∗ blk_own fsc_fs b))%I.
 
@@ -944,6 +1114,8 @@ Section FsCfgBootEra.
       fsblock fsc_fs (log_hdr_bno fsc_logst) (P (log_hdr_bno fsc_logst)) ∗
       ([∗ list] i ∈ seq 0 LOGBLOCKS,
          ∃ bs : list (bv 8), fsblock fsc_fs (log_slot_bno fsc_logst i) bs) ∗
+      bitmap_res fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size
+        (FsImg.fs_bmap_set BSIZE (P fsc_bmapstart)) ∗
       ([∗ set] b ∈ fsc_cov ∖ Rspent,
          fsblock fsc_fs b (P b) ∗ blk_own fsc_fs b).
   Proof. iIntros "H". iExact "H". Qed.
@@ -1039,10 +1211,11 @@ Section FsCfgBootEra.
   Proof.
     iIntros "H".
     iDestruct (fs_kit_fsinit_ghost_open with "H")
-      as "(Hlog & Hboot & #Hireg & Hb1 & Hauths & Hdty & Hhdr & Hslots & Hrem)".
+      as "(Hlog & Hboot & #Hireg & Hb1 & Hauths & Hdty & Hhdr & Hslots &
+           Hbmres & Hrem)".
     iSplitR; [iExact "Hireg" |].
     rewrite /fs_kit_fsinit_ghost.
-    iFrame "Hireg Hlog Hboot Hb1 Hauths Hdty Hhdr Hslots Hrem".
+    iFrame "Hireg Hlog Hboot Hb1 Hauths Hdty Hhdr Hslots Hbmres Hrem".
   Qed.
 
   (* ==================================================================== *)
@@ -1258,6 +1431,59 @@ Section FsCfgBootEra.
                  (fs_live_set_elem_of (fs_blocks dk) sb) Hcovdata HcovC
                  with "HcntP HmirP Hoff Hout Hdlk HfsbC HownC")
       as "[Hipool Hrem]".
+    (* ---- 7b. DEBT (D): the bitmap block and the free pool ------------ *)
+    (* every member of [fs_bitmap_spent] survives all four peels: it is
+       either the bitmap block (metadata, above the inode region and below
+       the data region) or a free DATA block, and a free block is in no
+       inode's block set because W4's used set contains every live inode's
+       blocks and W5 says a clear bit is outside it. *)
+    assert (HAl : forall z : Z, z ∈ fs_live_set (fs_blocks dk) sb ->
+              0 <= z < FsImg.sb_ninodes sb
+              /\ bv_unsigned (di_type (fs_dinode (fs_blocks dk) sb z)) <> 0)
+      by (intros z Hz;
+          exact (proj1 (fs_live_set_elem_of (fs_blocks dk) sb z) Hz)).
+    assert (Hbmsub : fs_bitmap_spent (fs_blocks dk) sb
+                     ⊆ ((((cov ∖ ({[ (1:Z) ]} : gset Z))
+                            ∖ log_region_set (sb_logstart sb))
+                           ∖ ireg_blk_set (FsImg.sb_inodestart sb) icfg_nib)
+                          ∖ fs_live_blocks (fs_blocks dk) sb
+                              (fs_live_set (fs_blocks dk) sb))).
+    { apply elem_of_subseteq. intros b Hb.
+      destruct (fsimg_wf_used (fs_blocks dk) sb Hwf) as (u & Hus & _ & _).
+      assert (Hlive : b ∈ fs_live_blocks (fs_blocks dk) sb
+                            (fs_live_set (fs_blocks dk) sb) -> b ∈ u)
+        by (apply (fs_live_blocks_used (fs_blocks dk) sb _ u b Hus HAl)).
+      destruct (fs_bitmap_spent_bound (fs_blocks dk) sb u b Hwf Hus Hb)
+        as [-> | [Hran Hnu]].
+      - (* the bitmap block: [inodestart + nib], i.e. just past the inode
+           region and just below the data region *)
+        assert (Hbmeq : FsImg.sb_bmapstart sb
+                        = FsImg.sb_inodestart sb + Z.of_nat icfg_nib)
+          by (unfold fs_data_start in Hds; lia).
+        assert (Hbm1 : 1 <= FsImg.sb_bmapstart sb)
+          by (unfold fs_data_start in H1lt; lia).
+        rewrite !elem_of_difference. split_and!.
+        + apply Hcovmeta. unfold fs_data_start. lia.
+        + rewrite elem_of_singleton. lia.
+        + intros Hc. pose proof (HlogI _ Hc). lia.
+        + intros Hc. apply ireg_blk_set_spec in Hc. lia.
+        + intros Hc.
+          destruct (fs_live_blocks_range (fs_blocks dk) sb _ _ Hwf HAl Hc)
+            as [Hge _].
+          unfold fs_data_start in Hge. lia.
+      - (* a free data block *)
+        rewrite !elem_of_difference. split_and!.
+        + apply Hcovdata. lia.
+        + rewrite elem_of_singleton. lia.
+        + intros Hc. pose proof (HlogI _ Hc). lia.
+        + intros Hc. pose proof (HiregI _ Hc). lia.
+        + intros Hc. exact (Hnu (Hlive Hc)). }
+    iDestruct (big_sepS_split_sub
+                 (fun b => fsblock γfs b (fs_blocks dk b) ∗ blk_own γfs b)%I
+                 _ (fs_bitmap_spent (fs_blocks dk) sb) Hbmsub with "Hrem")
+      as "[Hbmspent Hrem]".
+    iDestruct (bitmap_res_of_image γfs (fs_blocks dk) sb cov Hwf Hfull
+                 Hcovdata with "Hbmspent") as "Hbmres".
     (* ---- 8. the gname-only mints, and the record -------------------- *)
     iMod bio_names_ghost_alloc as (bn) "Hbio".
     iMod lock_ghost_alloc as (git) "Hitlk".
@@ -1285,11 +1511,12 @@ Section FsCfgBootEra.
          fsc_bmapstart fsc_size fsc_ninodes].
     rewrite Hdev Histq Hlogq.
     (* the coverage remainder's set, as the kit spells it *)
-    assert (Hset : ((((cov ∖ ({[ (1:Z) ]} : gset Z))
-                        ∖ log_region_set (sb_logstart sb))
-                       ∖ ireg_blk_set (FsImg.sb_inodestart sb) icfg_nib)
-                      ∖ fs_live_blocks (fs_blocks dk) sb
-                          (fs_live_set (fs_blocks dk) sb))
+    assert (Hset : (((((cov ∖ ({[ (1:Z) ]} : gset Z))
+                         ∖ log_region_set (sb_logstart sb))
+                        ∖ ireg_blk_set (FsImg.sb_inodestart sb) icfg_nib)
+                       ∖ fs_live_blocks (fs_blocks dk) sb
+                           (fs_live_set (fs_blocks dk) sb))
+                      ∖ fs_bitmap_spent (fs_blocks dk) sb)
                    = cov ∖ fs_kit_spent (fs_blocks dk) sb icfg_nib
                              (fs_live_set (fs_blocks dk) sb)).
     { apply set_eq. intros b. rewrite /fs_kit_spent.
@@ -1333,7 +1560,8 @@ Section FsCfgBootEra.
       iSplitL "HaL"; [iExact "HaL" | iExact "HaD"]. }
     iSplitL "Hdty"; [iExact "Hdty" |].
     iSplitL "Hhdr"; [iExact "Hhdr" |].
-    iSplitL "Hslots"; [iExact "Hslots" | iExact "Hrem"].
+    iSplitL "Hslots"; [iExact "Hslots" |].
+    iSplitL "Hbmres"; [iExact "Hbmres" | iExact "Hrem"].
   Qed.
 
 End FsCfgBootEra.

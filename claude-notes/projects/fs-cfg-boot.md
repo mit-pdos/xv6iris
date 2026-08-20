@@ -545,11 +545,10 @@ Measured facts that supersede this file's earlier estimates:
   A–C (the fsinit/initlog raw cells; `log_mirror_full` comes from
   power_boot_res via BootShared.v:874/1020 — the era fupd must NOT mint
   it; `iref_slot` + `bslots` cross main via bio_init_at's post). NEW
-  DEBTS: (D) `bitmap_res` needs a byte-level FsImg sweep with
-  `used := u ∪ metadata` (W5 checks bits below size only; the bitmap
-  block is deliberately left in the coverage remainder for that
-  producer); (E) `ProofKinit` must switch from minting `kalloc_avail` at
-  WP time to consuming `fsc_kpages` (stage-(e) item).
+  DEBTS: (D) `bitmap_res` — **PAID in (f0), and the "it needs a new
+  byte-level sweep at `used := u ∪ metadata`" ruling was WRONG: take
+  `used` to be the bitmap block's OWN bit set and the equation is a
+  theorem**; (E) `ProofKinit` consuming `fsc_kpages` — PAID in (e).
 - **(d2b) DONE, commit `bdea6b21`** — `boot_shared_alloc` spends the disk
   mint on `fs_cfg_alloc` and returns `∃ (HF : fileG Σ)` (via `fileG_of`)
   + `iref_slots_auth` + `fs_boot_supply` (= the ties + both kits,
@@ -627,38 +626,86 @@ Measured facts that supersede this file's earlier estimates:
     with no existential; `ProofKinit` drops `kalloc_avail_alloc` and uses
     `newlock_at`. This is the same `_at` discipline stage 1 applied to
     the other WP-time constructors.
-- **(e) NOT DONE, and both stops are real:**
-  - **`bio_init_at` CANNOT RUN IN MAIN YET.** Row (P2) of
-    `fs_kit_icache`'s header lists "the thirty zeroed `struct buf` rows"
-    with producer "binit's postcondition + `boot_bss_carve`". Neither
-    produces them: `SpecBinit`'s post is the four lock/lru rows only, and
-    `main_globals_raw` carries `sl_raw`/`blink_raw`/`bhead` but NO
-    `b_valid`/`b_disk`/`b_dev`/`b_blockno`/`brefcnt`/`b_data` rows —
-    `grep` for `brefcnt`/`b_valid` in BootCarve.v / BootCarveMain.v /
-    BootShared.v / SpecMain.v returns NOTHING. So `bio_init_at` needs a
-    NEW .bss carve for 30 × (5 words + 1024 data bytes), widening
-    `boot_bss_carve` and `main_globals_raw`. That also blocks kit 2's row
-    (C) (`bslots`, which "crosses main via bio_init_at's post") and
-    `bio_ctx`'s trip to `main_deposit`. `bio_init_at` additionally wants
-    `0 ∉ bv_cov V`, which is `FsBoot.fs_cov_in_0` off `fs_cov_in` — a
-    pure premise that would have to be threaded like `0 < nib` is.
-    `fs_kit_icache_rest` still carries `bio_free_tok fsc_bio` and the
-    `pool_blk` big-op; main drops them today.
-  - **Debt (D) is NOT owed in main.** `grep bitmap_res` over the tree:
-    the only producer-side demand on the boot path is
-    `SpecFsinit.v:370` — i.e. forkret's first arm, stage (f). (The other
-    hits are syscall-layer consumers: SpecNameiparent, SpecIunlockput,
-    ProofIreclaim, ProofKexecA, FsSyscalls.) So the ruling in the stage
-    brief applies: the byte-level `FsImg` sweep (`P bmapstart =
-    BitmapInv.bitmap_bytes (u ∪ metadata)`), its `FsImgCheck`
-    instantiation, and a `FsCfgBoot` producer belong in **kit 2**, not in
-    main — which means `fs_cfg_alloc`'s conclusion and
-    `fs_boot_image_wf` grow, and the bitmap block plus `free_pool` have
-    to be carved out of kit 2's coverage remainder. NOT ATTEMPTED here:
-    it is era-fupd surgery ((d2a) territory) on a 212 s leaf, not a
-    stage-(e) walk edit.
-- **NEXT (in order):** (f) staging step 6, plus the two (e) leftovers
-  above. The OLD (e) list, for reference:
+- **(f0) DONE — the two (e) leftovers are paid.** Whole-lane
+  `make -f CoqMakefile -j24 -k`: zero Error lines; `make -s audit-only`
+  still prints EXACTLY the seven-entry baseline.
+  - **The buffer-payload carve.** `BioInitAt.buf_raw k` NAMES the row
+    (`b_valid`/`b_disk`/`b_dev`/`b_blockno` + `brefcnt` at pinned 0 and
+    the 1024 `b_data` bytes contents-existential), and `bio_init_at`'s
+    premise is now that name. `BootCarveMain.bnode_raw` widened from
+    `sl_raw ∗ blink_raw` to `sl_raw ∗ blink_raw ∗ bpay_raw`, and
+    `boot_buf_node` cuts the WHOLE `buf_stride` (1112 bytes) instead of
+    the leading 88 — so **`boot_bss_carve`'s .bss range did not change**
+    (`bss_cut … buf_base (buf_base + 1112*NBUF)` already covered it; the
+    old carve simply dropped bytes 88..1112 of each element).
+    `boot_bcache_nodes` returns three big-ops; `main_globals_raw` gains
+    `[∗ list] k ∈ seq 0 NBUF, buf_raw k` after `blink_raw bhead`.
+    Two traps, both recorded in the code: the five pinned zeros make the
+    per-element carve take `img_end` (not `text_end`) like
+    `boot_inode_entry`; and a repeated `!big_sepL_sep` sees through
+    `blink_raw`'s transparent two-conjunct body and shatters it — one
+    `big_sepL_sep` per split, the second scoped with `iEval … in`.
+  - **`bio_init_at` runs at the +0x8e→+0x92 seam**, i.e. BEFORE the
+    icache group, on binit's post (all five rows of which were being
+    dropped) + `buf_raw` + kit 1's `bio_free_tok fsc_bio` and `pool_blk`
+    big-op. `fs_kit_icache_rest_open` moved to the TOP of `mn_grp_fs` so
+    one open serves both ghost interludes. The pure premise
+    `(0:Z) ∉ cov` is threaded exactly like `0 < nib`
+    (`SystemAdequacy` → `boot_hart_primary` → `SpecMain` → `mn_grp_fs`,
+    where it is stated at `fsc_cov`), discharged at the top from
+    `fs_boot_image_wf`'s `fs_cov_in` conjunct via `FsBoot.fs_cov_in_0`.
+    `bv_cov (fs_view …) = fsc_cov` is definitional, so no bridge.
+  - **Debt (D) PAID, and cheaper than the brief predicted: NO new image
+    sweep, NO new `fs_boot_image_wf` conjunct, NO FsImgCheck delta.**
+    The ruling was "`used' = the image's used-set ∪ metadata`, which
+    needs a new boolean because W5 checks BITS below `size` only". Take
+    `used'` to be **the bitmap block's OWN bit set** instead
+    (`FsImg.fs_bmap_set BSIZE (P bmapstart)`) and the byte-level equation
+    becomes a theorem about any block-sized byte list
+    (`FsImg.bm_bytes_fs_bmap_set`, generic, no hypothesis). Nothing
+    distinguishes the two sets: `bitmap_ok` quantifies over `x < size`
+    and `free_set` intersects `seqZ 0 size`, so bits above `size` are
+    invisible — and it is exactly those bits the reconstructed set would
+    have needed swept (6192 `fs_bit`s on the build's longest leaf).
+    W5 is still what makes the set USABLE: `FsImg.fs_bmap_set_free` says
+    a clear bit below `size` is a data block no inode names.
+    New in `FsImg.v`: `fs_bmap_set` / `fs_bmap_set_elem` /
+    `bv8_testbit_high` / `bm_bytes_fs_bmap_set` / `fs_bmap_set_free`.
+    New in `FsCfgBoot.v`: `elem_of_fs_live_blocks`,
+    `fs_live_blocks_range`, `fs_live_blocks_used`, `fs_bitmap_spent`,
+    `fs_bitmap_spent_bound`, `bitmap_res_of_image`. `fs_kit_spent` gains
+    `fs_bitmap_spent P sb` (the bitmap block AND the whole free pool now
+    leave the remainder); `fs_kit_fsinit_ghost` gains the row
+    `bitmap_res fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size
+    (FsImg.fs_bmap_set BSIZE (P fsc_bmapstart))`, second-to-last, just
+    before the coverage remainder.
+    **`fs_bmap_set` IS `Global Opaque`, and the seal is load-bearing.**
+    At `n = BSIZE` its body is `list_to_set (filter _ (seqZ 0 (8 *
+    Z.of_nat 1024%nat)))`; leave it transparent and a ONE-DELTA-STEP
+    conversion between two spellings of the same set becomes a
+    fifteen-minute non-answer with no error (measured; localized with
+    streaming `coqc -time`). For the same reason there is no
+    `fs_bmap_used` abbreviation — every site writes the term out.
+  - **Cost:** `FsImgCheck` **254.9 s** (was ~256 s — unchanged, which is
+    the point: debt D added no computation), `FsAdequacyImg` 4.3 s,
+    `FsImg` 5.5 s, `FsCfgBoot` unchanged. Serial `coqc` on an idle lane.
+  - **WHAT THE TRANSPORT AGENT INHERITS.** The dropped bundle sits at
+    **ProofMain.v, main+0x9e**, immediately before the
+    `Userinit.wp_userinit_sconf` application, behind a loud comment. It
+    is exactly three hypotheses, and kit 1 is no longer among them:
+    `Hkit2` = `fs_kit_fsinit_ghost _ _ (fs_blocks dk) (fs_kit_spent …)`
+    — now TEN rows (the log free token, `ireg_boot`, `ireg_inv`,
+    block 1's `fsblock`, the `fs_L`/`fs_dirty` auths, the dirty halves,
+    the log header + slots, **`bitmap_res`**, the coverage remainder);
+    `Hbslots` = `bslots fsc_bio BSLOTS`, kit 2's header row (C), produced
+    by `bio_init_at` at +0x8e and carried across the group; `Hicsl` =
+    the fifty inode sleeplock handles from `icache_boot_at`.
+    PERSISTENT and already in the context at that point, destined for
+    `main_deposit` rather than for `first_tok`: `Hbioctx` =
+    `bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov)`,
+    plus `Hitl`/`Hitinv`/`Hesc`/`Hireg` and `Hdlock`/`Hgeom`.
+- **NEXT (in order):** (f) staging step 6 proper — the TRANSPORT. The
+  old (e) list, for reference:
   thread the kits from `xv6_boot_era` through `boot_hart_primary` →
   `SpecMain` into `mn_grp_fs` (the `procs_avail` threading of
   main-boot.md §G3 is the precedent), adjoin the kit-header physical

@@ -1698,6 +1698,119 @@ Proof.
     [discriminate | right; exact Hin].
 Qed.
 
+(* ---- W5 READ BACKWARDS: THE BLOCK'S OWN BIT SET ---------------------- *)
+
+(*  [BitmapInv.bitmap_res] holds the bitmap block AT [bm_bytes BSIZE used]
+    -- an EQUATION between the image's bytes and the encoder's image of a
+    pure set -- and boot has to produce it.  The set that satisfies it is
+    not a derived quantity to be swept for: it is the block's OWN bits,
+    read back.  Then the equation is a THEOREM about any block-sized byte
+    list ([bm_bytes_fs_bmap_set]) rather than a new image check.
+
+    WHY THIS AND NOT "the used set ∪ the metadata blocks".  That set agrees
+    with the block below [sb_size] -- which is exactly what W5 says -- and
+    says NOTHING about the bits above it, so the equation would additionally
+    need the tail swept clear: 6192 [fs_bit]s at the literal image, on the
+    build's longest leaf.  Nothing needs the tail clear:
+    [BitmapInv.bitmap_ok] quantifies over [x < size] and
+    [BitmapInv.free_set] intersects [seqZ 0 size], so a [used] carrying bits
+    above [size] is indistinguishable from one that does not.  W5 is still
+    what makes the set USABLE -- [fs_bmap_set_free] below is the reading
+    that says a clear bit is a free data block.                            *)
+Definition fs_bmap_set (n : nat) (bmb : list (bv 8)) : gset Z :=
+  list_to_set (List.filter (fs_bit bmb) (seqZ 0 (8 * Z.of_nat n))).
+
+Lemma fs_bmap_set_elem (n : nat) (bmb : list (bv 8)) (b : Z) :
+  b ∈ fs_bmap_set n bmb
+  <-> (0 <= b < 8 * Z.of_nat n /\ fs_bit bmb b = true).
+Proof.
+  unfold fs_bmap_set. rewrite elem_of_list_to_set.
+  rewrite elem_of_list_In, filter_In, <- elem_of_list_In, elem_of_seqZ.
+  split; intros [H1 H2]; (split; [lia | exact H2]).
+Qed.
+
+(* a byte is determined by its low eight bits: everything above is zero.
+   [BitmapEnc.bm_byte_testbit_high] is the same fact on the encoder's side;
+   this is the one on an ARBITRARY image byte, which is what an equation
+   between the two needs. *)
+Lemma bv8_testbit_high (w : bv 8) (k : Z) :
+  8 <= k -> Z.testbit (bv_unsigned w) k = false.
+Proof.
+  intros Hk. pose proof (bv_unsigned_in_range _ w) as [Hlo Hhi].
+  unfold bv_modulus in Hhi. change (2 ^ Z.of_N 8) with 256 in Hhi.
+  apply Z.testbit_false; [lia |].
+  rewrite Z.div_small; [reflexivity |].
+  split; [lia |]. apply (Z.lt_le_trans _ 256); [lia |].
+  change 256 with (2 ^ 8). apply Z.pow_le_mono_r; lia.
+Qed.
+
+(* THE EQUATION.  A block-sized byte list IS the encoder's image of its own
+   bit set -- no image hypothesis, no computation. *)
+Lemma bm_bytes_fs_bmap_set (n : nat) (bmb : list (bv 8)) :
+  length bmb = n -> bm_bytes n (fs_bmap_set n bmb) = bmb.
+Proof.
+  intros Hlen. apply list_eq. intros j.
+  destruct (Nat.lt_ge_cases j n) as [Hj|Hj].
+  - rewrite (bm_bytes_lookup n _ j Hj).
+    assert (Hjl : (j < length bmb)%nat) by lia.
+    destruct (lookup_lt_is_Some_2 bmb j Hjl) as [w Hw].
+    rewrite Hw. f_equal.
+    assert (Hwt : bmb !!! j = w).
+    { rewrite (list_lookup_total_alt bmb). rewrite Hw. reflexivity. }
+    apply bv_eq. apply Z.bits_inj_iff'. intros k Hk.
+    destruct (Z.lt_ge_cases k 8) as [Hk8|Hk8].
+    + rewrite bm_byte_testbit by lia.
+      assert (Hdiv : (8 * Z.of_nat j + k) `div` 8 = Z.of_nat j)
+        by (apply bit_byte_of; lia).
+      assert (Hmod : (8 * Z.of_nat j + k) `mod` 8 = k).
+      { pose proof (bit_split (8 * Z.of_nat j + k)) as Hs.
+        rewrite Hdiv in Hs. lia. }
+      assert (Hbit : fs_bit bmb (8 * Z.of_nat j + k)
+                     = Z.testbit (bv_unsigned w) k).
+      { unfold fs_bit. rewrite Hdiv. rewrite Hmod. rewrite Nat2Z.id.
+        rewrite Hwt. reflexivity. }
+      rewrite <- Hbit.
+      destruct (fs_bit bmb (8 * Z.of_nat j + k)) eqn:Hfb.
+      * apply bool_decide_eq_true_2. apply fs_bmap_set_elem.
+        split; [lia | exact Hfb].
+      * apply bool_decide_eq_false_2. rewrite fs_bmap_set_elem.
+        intros [_ Hc]. congruence.
+    + rewrite bm_byte_testbit_high by lia.
+      symmetry. apply bv8_testbit_high. lia.
+  - rewrite (bm_bytes_lookup_None n _ j Hj).
+    symmetry. apply lookup_ge_None_2. lia.
+Qed.
+
+(* THE READING THAT MAKES THE SET USABLE: a block below [size] whose bit is
+   CLEAR is a data block no inode names -- [BitmapInv.free_pool]'s member,
+   stated at [fs_bmap_set] instead of at [fs_bit]. *)
+Lemma fs_bmap_set_free (P : Z -> list (bv 8)) (sb : fs_sb) (u : gset Z)
+    (b : Z) :
+  fs_sb_ok sb -> fs_bitmap_wf P sb u = true ->
+  0 <= b < sb_size sb ->
+  b ∉ fs_bmap_set BSIZE (P (sb_bmapstart sb)) ->
+  fs_data_start sb <= b /\ b ∉ u.
+Proof.
+  intros Hsb Hw Hb Hnin.
+  assert (Hclear : fs_bit (P (sb_bmapstart sb)) b = false).
+  { destruct (fs_bit (P (sb_bmapstart sb)) b) eqn:Hbit; [| reflexivity].
+    exfalso. apply Hnin, fs_bmap_set_elem.
+    pose proof (sbo_one_bitmap sb Hsb) as Hone.
+    rewrite BSIZE_z_nat. split; [lia | exact Hbit]. }
+  exact (fs_bitmap_wf_free P sb u b Hw Hb Hclear).
+Qed.
+
+(*  SEALED, AND THE SEAL IS LOAD-BEARING.  At [n = BSIZE] the body is
+    [list_to_set (filter _ (seqZ 0 (8 * Z.of_nat 1024%nat)))]: a 1024-deep
+    unary literal under [Z.of_nat], then an 8192-element list, then 8192
+    nested [gset] unions over a STUCK filter.  Nothing ever needs to
+    compute it -- every consumer goes through the three lemmas above -- but
+    the tactic unifier will happily start, and then a one-delta-step
+    conversion between two spellings of the same set becomes a fifteen-
+    minute non-answer with no error (durable-notes' "a compile that never
+    finishes").  Do not make it transparent again. *)
+Global Opaque fs_bmap_set.
+
 (* ====================================================================== *)
 (*  10.  W6 -- THE DIRECTORIES                                             *)
 (* ====================================================================== *)

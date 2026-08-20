@@ -167,6 +167,10 @@ Require Import FileInvDefs.
    main-boot.md §G3 at full width).  This file names only the bundled row;
    [ProofMain.mn_grp_fs] is what opens it. *)
 Require Import FsCfgBoot.
+(* [BioInitAt.buf_raw] -- the thirty zeroed [struct buf] payload rows, carved
+   with the buffer sleeplocks and carried across binit for [bio_init_at]
+   (fs-cfg-boot.md stage (f)). *)
+Require Import BioInitAt.
 Require Import IrefSlots.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 From Kernel Require KernelSyms.
@@ -286,6 +290,17 @@ Section SpecMain.
      ([∗ list] k ∈ seq 0 NBUF, sl_raw (buf_lock (bnode k))) ∗
      ([∗ list] k ∈ seq 0 NBUF, blink_raw (bnode k)) ∗
      blink_raw bhead ∗
+     (* ...and the REST of each buffer, which binit never touches: the four
+        zeroed metadata words (valid / disk / dev / blockno), the reference
+        count, and the 1024 data bytes.  These are [BioInitAt.bio_init_at]'s
+        physical premise -- the ghost step from binit's postcondition to the
+        buffer cache's precondition consumes them beside the thirty
+        [sl_fresh]es, at main+0x8e's return.  The five words' pinned zeros are
+        a loader FACT (the bcache is .bss past the image) on the [ientry_raw]
+        / [d_used_idx] / [kmem+24] precedent, and they are what makes
+        [BioInv.bio_init]'s "every buffer starts invalid at blockno 0" true
+        rather than assumed. *)
+     ([∗ list] k ∈ seq 0 NBUF, buf_raw k) ∗
      ([∗ list] i ∈ seq 0 NINODE, sl_raw (inode_lock i)) ∗
      (* ...and the REST of each itable entry, which iinit never touches:
         dev/inum/valid, the dinode mirror's metadata and addrs cells, and
@@ -377,6 +392,13 @@ Section SpecMain.
        namei corner, where [icfg_nib = 0] would make the returned
        [IcacheRef.inode_held] uninhabitable. *)
     (0 < nib)%nat ->
+    (* ...and block 0 is not a client block.  It is [BootShared.fs_boot_image_wf]'s
+       [FsBoot.fs_cov_in] conjunct read through [FsBoot.fs_cov_in_0], and it
+       reaches here as a PURE premise for the same reason [0 < nib] does:
+       [BioInitAt.bio_init_at]'s own premise, which main runs on binit's post
+       at +0x8e, and which is true because binit leaves all thirty buffers
+       claiming blockno 0 (design/fs-log.md, ruling R4). *)
+    (0 : Z) ∉ cov ->
     (* main has no current proc, and neither does the scheduler() it tail-
        calls. *)
     p0 = zero_reg ->

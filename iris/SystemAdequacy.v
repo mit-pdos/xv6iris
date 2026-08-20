@@ -235,6 +235,8 @@ Section SystemBoot.
                   (v_disk (g.(gdev).(dvirtio))) sb nib cov
                   (boot_regs_of_facts g Hbf 0%fin) fin_0_z Hprun Hplen Hlive
                   ltac:(destruct Himg as (_&_&_&_&Hn0&_); exact Hn0)
+                  ltac:(destruct Himg as (_&_&_&_&_&_&Hcv&_);
+                        exact (FsBoot.fs_cov_in_0 _ _ Hcv))
                   with "Htext Hdata Hh0 Hstarted Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail
                         Hfs Hirauth
                         Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim Hdone Hkpt Hkmap

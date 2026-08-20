@@ -108,6 +108,32 @@ Section BioInitAt.
   Qed.
 
   (* ------------------------------------------------------------------ *)
+  (*  THE PAYLOAD OF ONE ZEROED [struct buf], AS A NAMED ROW              *)
+  (* ------------------------------------------------------------------ *)
+
+  (*  Everything of buffer [k]'s 1112-byte record that binit does NOT touch
+      and [bio_init_at] therefore has to be handed straight out of the .bss
+      carve: the four zeroed metadata words at +0/+4/+8/+12, the reference
+      count at +64, and the 1024 data bytes at +88 (contents existential --
+      nothing reads them before the first [bread]).  binit writes only the
+      link pair at +72/+80 and the sleeplock at +16, so this row crosses the
+      binit call untouched, exactly as [IcacheInv.ientry_raw] crosses iinit.
+
+      IT IS NAMED because it is a BOOT KIT ROW in all but location: it is
+      carved by [BootCarveMain.boot_bcache_nodes], carried by
+      [SpecMain.main_globals_raw] across main+0x8e, and spent here.  Three
+      files spelling one six-conjunct big-op body is exactly the shape
+      [FsReady.fs_ready]'s "one row per subsystem" argument rejects.       *)
+  Definition buf_raw (k : nat) : iProp Σ :=
+    (b_valid (bpa k) ↦₄ (mword_of_int 0 : mword 32) ∗
+     b_disk (bpa k) ↦₄ (mword_of_int 0 : mword 32) ∗
+     b_dev (bpa k) ↦₄ (mword_of_int 0 : mword 32) ∗
+     b_blockno (bpa k) ↦₄ (mword_of_int 0 : mword 32) ∗
+     brefcnt k ↦₄ (mword_of_int 0 : mword 32) ∗
+     (∃ bs : list (bv 8), ⌜length bs = 1024%nat⌝ ∗
+        [∗ list] j ↦ byte ∈ bs, pa_add (b_data (bpa k)) j ↦ₘ byte))%I.
+
+  (* ------------------------------------------------------------------ *)
   (*  Construction at a published record                                  *)
   (* ------------------------------------------------------------------ *)
 
@@ -126,14 +152,7 @@ Section BioInitAt.
     add_vec bcache_addr (sign_extend' 64 (mword_of_int 16 : mword 12)) ↦₈
       (zero_reg : mword 64) -∗
     ([∗ list] k ∈ seq 0 NBUF, sl_fresh (buf_lock (bnode k)) "buffer"%string) -∗
-    ([∗ list] k ∈ seq 0 NBUF,
-       b_valid (bpa k) ↦₄ (mword_of_int 0 : mword 32) ∗
-       b_disk (bpa k) ↦₄ (mword_of_int 0 : mword 32) ∗
-       b_dev (bpa k) ↦₄ (mword_of_int 0 : mword 32) ∗
-       b_blockno (bpa k) ↦₄ (mword_of_int 0 : mword 32) ∗
-       brefcnt k ↦₄ (mword_of_int 0 : mword 32) ∗
-       (∃ bs : list (bv 8), ⌜length bs = 1024%nat⌝ ∗
-          [∗ list] j ↦ byte ∈ bs, pa_add (b_data (bpa k)) j ↦ₘ byte)) -∗
+    ([∗ list] k ∈ seq 0 NBUF, buf_raw k) -∗
     bcache_lru bhead (blist 0 NBUF) -∗
     ([∗ set] b ∈ bv_cov V, pool_blk V b) ={E}=∗
     bio_ctx bn V ∗ bslots bn BSLOTS.
@@ -170,7 +189,8 @@ Section BioInitAt.
                   (mword_of_int 0 : mword 32)))%I
       with "[Hbm]" as "[Hesc Hslots]".
     { rewrite -big_sepL_sep. iApply (big_sepL_mono with "Hbm").
-      intros i k Hk. iIntros "[(Hv & Hdk & Hdev & Hbno & Hrc & Hdata) Hmid]".
+      intros i k Hk. rewrite /buf_raw.
+      iIntros "[(Hv & Hdk & Hdev & Hbno & Hrc & Hdata) Hmid]".
       iDestruct (word4_pointsto_half_split with "Hdev") as "[Hdev1 Hdev2]".
       iDestruct (word4_pointsto_half_split with "Hbno") as "[Hbno1 Hbno2]".
       iDestruct "Hdata" as (bs) "[%Hlen Hdata]".

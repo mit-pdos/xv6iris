@@ -49,6 +49,10 @@ Require Import ProcGeom UserPtTree ProcInv SwtchCtx SchedCtx.
    file is [SpecIinit]'s (they are the same 50, but not the same constant). *)
 Require Import DinodeEnc IcacheRef InodeInv InodeLock IcacheBoot.
 Require Import SleepLock BcacheInv SpecIinit.
+(* the bcache's PAYLOAD rows: [BufOwn]'s field addresses, [BioInv]'s [bpa] /
+   [brefcnt], and [BioInitAt.buf_raw] -- the named row [bio_init_at] takes and
+   [SpecMain.main_globals_raw] carries across binit (stage (f)). *)
+Require Import BufOwn BioInv BioInitAt.
 Require Import DiskInv SpecVirtioDiskInit.
 Require Import SpecMain.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -198,6 +202,11 @@ Proof. unfold ram_hi. reflexivity. Qed.
 Lemma z_kmem_hi_ram_hi : kmem_hi = ram_hi.
 Proof. reflexivity. Qed.
 Lemma z_of_nat_4096 : Z.of_nat 4096%nat = 4096.
+Proof. vm_compute. reflexivity. Qed.
+(* BSIZE, for the [struct buf] data array.  A [nat] literal of this size is
+   a unary successor chain that [lia]'s zify hook cannot relate to a computed
+   bound (durable-notes), so the equation is stated once and rewritten. *)
+Lemma z_of_nat_1024 : Z.of_nat 1024%nat = 1024.
 Proof. vm_compute. reflexivity. Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -804,39 +813,148 @@ Section BootCarveMain.
   Qed.
 
   (* ------------------------------------------------------------------ *)
-  (* THE TWO SLEEPLOCK FAMILIES.                                         *)
+  (* THE BUFFER FAMILY: THE WHOLE 1112-BYTE [struct buf].                 *)
   (*                                                                    *)
-  (* A buffer's per-element carve gives BOTH things [main_globals_raw]    *)
-  (* asks of it -- the sleeplock at +16 and the LRU link pair at +72/+80  *)
-  (* -- so the two big-ops are ONE family plus [big_sepL_sep], not two    *)
-  (* traversals of the same range (which could not both own it).          *)
+  (* A buffer's per-element carve gives ALL THREE things                  *)
+  (* [main_globals_raw] asks of it -- the sleeplock at +16, the LRU link  *)
+  (* pair at +72/+80, and [BioInitAt.buf_raw]'s payload (the four zeroed  *)
+  (* metadata words, the refcnt, and the 1024 data bytes) -- so the three *)
+  (* big-ops are ONE family plus [big_sepL_sep], never three traversals   *)
+  (* of the same range (which could not all own it).                      *)
+  (*                                                                    *)
+  (* fs.h's [struct buf], and the element window is the FULL stride:      *)
+  (*                                                                    *)
+  (*   +0  valid  +4  disk  +8  dev  +12 blockno                          *)
+  (*   +16 lock (struct sleeplock, 44 B)         [+60 padding]            *)
+  (*   +64 refcnt                                [+68 padding]            *)
+  (*   +72 prev   +80 next                                                *)
+  (*   +88 data[BSIZE]                          (ends exactly at +1112)   *)
+  (*                                                                    *)
+  (* THE FIVE WORD CELLS ARE PINNED TO ZERO, which is why this lemma      *)
+  (* takes [img_end] rather than [text_end]: the bcache is .bss past the  *)
+  (* image, so the loader's zero is a FACT ([boot_ran_cell4_bss]) and     *)
+  (* [BioInv.bio_init]'s "every buffer starts invalid at blockno 0" is a  *)
+  (* reading of the image, not an assumption.  [ientry_raw]'s [ref] cell  *)
+  (* is the precedent.  The data bytes stay contents-existential --       *)
+  (* nothing reads them before the first [bread].                         *)
   (* ------------------------------------------------------------------ *)
+
+  (* the payload, at one record's own base.  Its [k]-indexed reading IS
+     [BioInitAt.buf_raw k] by conversion ([bpa k] is [bnode k] is
+     [pa_of_z (buf_base + buf_stride * k)]), which is what lets the family's
+     third half be handed over with no address bridge. *)
+  Local Definition bpay_raw (a : Arch.pa) : iProp Σ :=
+    (b_valid a ↦₄ (mword_of_int 0 : mword 32) ∗
+     b_disk a ↦₄ (mword_of_int 0 : mword 32) ∗
+     b_dev a ↦₄ (mword_of_int 0 : mword 32) ∗
+     b_blockno a ↦₄ (mword_of_int 0 : mword 32) ∗
+     (pa_add a 64%nat) ↦₄ (mword_of_int 0 : mword 32) ∗
+     (∃ bs : list (bv 8), ⌜length bs = 1024%nat⌝ ∗
+        [∗ list] j ↦ byte ∈ bs, pa_add (b_data a) j ↦ₘ byte))%I.
+
   (* the per-element shape, NAMED: the family's [Φ] is applied to the element
      address, and a LAMBDA there leaves the per-element goal a beta-redex that
      [iApply] will not see through. *)
   Local Definition bnode_raw (a : Arch.pa) : iProp Σ :=
-    (sl_raw (buf_lock a) ∗ blink_raw a)%I.
+    (sl_raw (buf_lock a) ∗ blink_raw a ∗ bpay_raw a)%I.
 
   Lemma boot_buf_node (g : gstate) (A : Z) :
     (forall x : Z, ram_lo <= x < ram_hi ->
        g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
-    text_end <= A -> A + 88 <= ram_hi -> A mod 8 = 0 ->
-    kmap_static_claims -∗ boot_raw_ran g A (A + 88) -∗ bnode_raw (pa_of_z A).
+    img_end <= A -> A + 1112 <= ram_hi -> A mod 8 = 0 ->
+    kmap_static_claims -∗ boot_raw_ran g A (A + 1112) -∗ bnode_raw (pa_of_z A).
   Proof.
-    intros Hmem Hlo Hhi Hal. iIntros "#Hcl H".
+    intros Hmem Hbss Hhi Hal. iIntros "#Hcl H".
+    assert (Hlo : text_end <= A)
+      by exact (z_lo_trans text_end img_end A ltac:(vm_compute; discriminate) Hbss).
+    assert (Hal4 : A mod 4 = 0) by exact (z_mod8_mod4 A Hal).
     assert (E16 : (sign_extend' 64 (mword_of_int 16 : mword 12) : mword 64)
                   = mword_of_int 16) by (apply bv_eq; vm_compute; reflexivity).
-    iDestruct (boot_ran_split g A (A + 16) (A + 88) ltac:(lia) ltac:(lia)
-                 with "H") as "[_ H]".
-    iDestruct (boot_ran_split g (A + 16) (A + 16 + 44) (A + 88)
+    (* the data array's bound, over [Z]: a [nat] literal this size is not
+       something [lia] can relate to a computed bound (durable-notes). *)
+    assert (Hdlo : A + 88 <= A + 88 + Z.of_nat 1024%nat)
+      by (rewrite z_of_nat_1024; lia).
+    assert (Hdhi : A + 88 + Z.of_nat 1024%nat <= A + 1112)
+      by (rewrite z_of_nat_1024; lia).
+    assert (Hdram : A + 88 + Z.of_nat 1024%nat <= ram_hi)
+      by (rewrite z_of_nat_1024; lia).
+    (* ---- +0 valid / +4 disk / +8 dev / +12 blockno: PINNED zeros ---- *)
+    iDestruct (boot_ran_split g A (A + 4) (A + 1112) ltac:(lia) ltac:(lia)
+                 with "H") as "[H0 H]".
+    iDestruct (boot_ran_cell4_bss g A (mword_of_int 0 : mword 32) Hmem Hlo Hbss
+                 ltac:(lia) Hal4
+                 ltac:(intros j _; apply nth_byte_zero; vm_compute; reflexivity)
+                 with "Hcl H0") as "H0".
+    iDestruct (boot_ran_split g (A + 4) (A + 4 + 4) (A + 1112) ltac:(lia)
+                 ltac:(lia) with "H") as "[H1 H]".
+    iDestruct (boot_ran_cell4_bss g (A + 4) (mword_of_int 0 : mword 32) Hmem
+                 ltac:(lia) ltac:(lia) ltac:(lia)
+                 ltac:(exact (z_mod_addo 4 A 4 Hal4 eq_refl))
+                 ltac:(intros j _; apply nth_byte_zero; vm_compute; reflexivity)
+                 with "Hcl H1") as "H1".
+    iDestruct (boot_ran_split g (A + 4 + 4) (A + 8) (A + 1112) ltac:(lia)
+                 ltac:(lia) with "H") as "[_ H]".
+    iDestruct (boot_ran_split g (A + 8) (A + 8 + 4) (A + 1112) ltac:(lia)
+                 ltac:(lia) with "H") as "[H2 H]".
+    iDestruct (boot_ran_cell4_bss g (A + 8) (mword_of_int 0 : mword 32) Hmem
+                 ltac:(lia) ltac:(lia) ltac:(lia)
+                 ltac:(exact (z_mod_addo 4 A 8 Hal4 eq_refl))
+                 ltac:(intros j _; apply nth_byte_zero; vm_compute; reflexivity)
+                 with "Hcl H2") as "H2".
+    iDestruct (boot_ran_split g (A + 8 + 4) (A + 12) (A + 1112) ltac:(lia)
+                 ltac:(lia) with "H") as "[_ H]".
+    iDestruct (boot_ran_split g (A + 12) (A + 12 + 4) (A + 1112) ltac:(lia)
+                 ltac:(lia) with "H") as "[H3 H]".
+    iDestruct (boot_ran_cell4_bss g (A + 12) (mword_of_int 0 : mword 32) Hmem
+                 ltac:(lia) ltac:(lia) ltac:(lia)
+                 ltac:(exact (z_mod_addo 4 A 12 Hal4 eq_refl))
+                 ltac:(intros j _; apply nth_byte_zero; vm_compute; reflexivity)
+                 with "Hcl H3") as "H3".
+    (* ---- +16: the sleeplock binit initialises ---- *)
+    iDestruct (boot_ran_split g (A + 12 + 4) (A + 16) (A + 1112) ltac:(lia)
+                 ltac:(lia) with "H") as "[_ H]".
+    iDestruct (boot_ran_split g (A + 16) (A + 16 + 44) (A + 1112)
                  ltac:(lia) ltac:(lia) with "H") as "[Hs H]".
     iDestruct (boot_sl_raw g (A + 16) Hmem ltac:(lia) ltac:(lia)
                  ltac:(exact (z_mod_addo 8 A 16 Hal eq_refl)) with "Hcl Hs")
       as "Hs".
-    iDestruct (boot_ran_split g (A + 16 + 44) (A + 72) (A + 88)
-                 ltac:(lia) ltac:(lia) with "H") as "[_ H]".
-    iDestruct (boot_blink_raw g A Hmem Hlo Hhi Hal with "Hcl H") as "H".
-    rewrite /bnode_raw /buf_lock E16 off_of_z. iFrame "Hs H".
+    (* ---- +64: refcnt, PINNED ---- *)
+    iDestruct (boot_ran_split g (A + 16 + 44) (A + 64) (A + 1112) ltac:(lia)
+                 ltac:(lia) with "H") as "[_ H]".
+    iDestruct (boot_ran_split g (A + 64) (A + 64 + 4) (A + 1112) ltac:(lia)
+                 ltac:(lia) with "H") as "[H4 H]".
+    iDestruct (boot_ran_cell4_bss g (A + 64) (mword_of_int 0 : mword 32) Hmem
+                 ltac:(lia) ltac:(lia) ltac:(lia)
+                 ltac:(exact (z_mod_addo 4 A 64 Hal4 eq_refl))
+                 ltac:(intros j _; apply nth_byte_zero; vm_compute; reflexivity)
+                 with "Hcl H4") as "H4".
+    (* ---- +72 .. +88: the LRU link pair binit threads ---- *)
+    iDestruct (boot_ran_split g (A + 64 + 4) (A + 72) (A + 1112) ltac:(lia)
+                 ltac:(lia) with "H") as "[_ H]".
+    iDestruct (boot_ran_split g (A + 72) (A + 88) (A + 1112) ltac:(lia)
+                 ltac:(lia) with "H") as "[Hln H]".
+    iDestruct (boot_blink_raw g A Hmem Hlo ltac:(lia) Hal with "Hcl Hln")
+      as "Hln".
+    (* ---- +88: the 1024 data bytes, contents existential ---- *)
+    iDestruct (boot_ran_split g (A + 88) (A + 88 + Z.of_nat 1024%nat) (A + 1112)
+                 Hdlo Hdhi with "H") as "[Hd _]".
+    iDestruct (boot_ran_bytes_list g (A + 88) 1024%nat Hmem ltac:(lia) Hdram
+                 with "Hcl Hd") as (bs) "[%Hbs Hd]".
+    (* ---- assemble ---- *)
+    rewrite /bnode_raw /bpay_raw /buf_lock /b_valid /b_disk /b_dev /b_blockno
+            /b_data E16 off_of_z
+            (pa_add_of_z A 4%nat) (pa_add_of_z A 8%nat) (pa_add_of_z A 12%nat)
+            (pa_add_of_z A 64%nat) (pa_add_of_z A 88%nat).
+    rewrite (_ : A + Z.of_nat 4%nat = A + 4); [| lia].
+    rewrite (_ : A + Z.of_nat 8%nat = A + 8); [| lia].
+    rewrite (_ : A + Z.of_nat 12%nat = A + 12); [| lia].
+    rewrite (_ : A + Z.of_nat 64%nat = A + 64); [| lia].
+    rewrite (_ : A + Z.of_nat 88%nat = A + 88); [| lia].
+    iSplitL "Hs"; [iExact "Hs" |]. iSplitL "Hln"; [iExact "Hln" |].
+    iSplitL "H0"; [iExact "H0" |]. iSplitL "H1"; [iExact "H1" |].
+    iSplitL "H2"; [iExact "H2" |]. iSplitL "H3"; [iExact "H3" |].
+    iSplitL "H4"; [iExact "H4" |].
+    iExists bs. iSplitR; [iPureIntro; exact Hbs |]. iExact "Hd".
   Qed.
 
   Lemma boot_bcache_nodes (g : gstate) :
@@ -845,35 +963,43 @@ Section BootCarveMain.
     kmap_static_claims -∗
     boot_raw_ran g buf_base (buf_base + buf_stride * Z.of_nat NBUF)
     -∗ ([∗ list] k ∈ seq 0 NBUF, sl_raw (buf_lock (bnode k))) ∗
-       ([∗ list] k ∈ seq 0 NBUF, blink_raw (bnode k)).
+       ([∗ list] k ∈ seq 0 NBUF, blink_raw (bnode k)) ∗
+       ([∗ list] k ∈ seq 0 NBUF, buf_raw k).
   Proof.
     intro Hmem. iIntros "#Hcl H".
     iDestruct (boot_stride_family_seq g bnode_raw
                  buf_base buf_stride NBUF
                  ltac:(unfold buf_stride; lia)
                  ltac:(intros i A Hi HA _ _;
-                       destruct (z_stride_side buf_base buf_stride NBUF 88
-                                   text_end ram_hi i A Hi HA
+                       destruct (z_stride_side buf_base buf_stride NBUF 1112
+                                   img_end ram_hi i A Hi HA
                                    ltac:(unfold buf_stride; lia)
                                    ltac:(vm_compute; discriminate)
                                    ltac:(vm_compute; discriminate)
                                    ltac:(vm_compute; reflexivity)
                                    ltac:(vm_compute; reflexivity))
                          as (Q1 & Q2 & Q3);
-                       assert (T1 : A <= A + 88) by lia;
-                       assert (T2 : A + 88 <= A + buf_stride)
+                       assert (Tw : A + buf_stride = A + 1112)
                          by (unfold buf_stride; lia);
                        iIntros "#Hcl H";
-                       iDestruct (boot_ran_split g A (A + 88) (A + buf_stride)
-                                    T1 T2 with "H") as "[H _]";
+                       iDestruct (boot_ran_eq g A (A + buf_stride) A (A + 1112)
+                                    eq_refl Tw with "H") as "H";
                        iApply (boot_buf_node g A Hmem Q1 Q2 Q3 with "Hcl H"))
                  with "Hcl H") as "H".
-    rewrite /bnode_raw big_sepL_sep. iDestruct "H" as "[H1 H2]".
+    (* ONE [big_sepL_sep] PER SPLIT, AND THE SECOND ONE SCOPED.  A repeated
+       [!big_sepL_sep] sees through [blink_raw]'s own two-conjunct body (it is
+       a transparent Definition) and shatters it into two big-ops nothing can
+       reassemble -- the same trap [BootShared]'s [hart_strans] note records. *)
+    rewrite /bnode_raw big_sepL_sep. iDestruct "H" as "[H1 H]".
+    iEval (rewrite big_sepL_sep) in "H". iDestruct "H" as "[H2 H3]".
     iSplitL "H1".
     - iApply (big_sepL_mono with "H1"). iIntros (n k _) "Hk".
       rewrite (bnode_of_z k). iExact "Hk".
-    - iApply (big_sepL_mono with "H2"). iIntros (n k _) "Hk".
-      rewrite (bnode_of_z k). iExact "Hk".
+    - iSplitL "H2".
+      + iApply (big_sepL_mono with "H2"). iIntros (n k _) "Hk".
+        rewrite (bnode_of_z k). iExact "Hk".
+      + iApply (big_sepL_mono with "H3"). iIntros (n k _) "Hk".
+        iExact "Hk".
   Qed.
 
   (* ------------------------------------------------------------------ *)

@@ -561,7 +561,8 @@ Section BootBssChain.
     iDestruct (bss_cut g (KernelSyms.bcache + 24) buf_base
                  (buf_base + buf_stride * Z.of_nat NBUF) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hbufs H]".
-    iDestruct (boot_bcache_nodes g Hmem with "Hcl Hbufs") as "[Hbsl Hbln]".
+    iDestruct (boot_bcache_nodes g Hmem with "Hcl Hbufs")
+      as "[Hbsl [Hbln Hbpay]]".
     iDestruct (bss_cut g (buf_base + buf_stride * Z.of_nat NBUF)
                  (buf_base + buf_stride * Z.of_nat NBUF + 72)
                  (buf_base + buf_stride * Z.of_nat NBUF + 88) ram_hi
@@ -665,7 +666,7 @@ Section BootBssChain.
     iSplitL "Hlk1 Hlk2 Hlk3 Hlk4 Hlk5 Hlk6 Hlk7 Hlk8 Hlk9 Hlk10 Hlk11".
     { iApply (boot_main_locks_raw g Hmem with
                 "Hcl Hlk1 Hlk2 Hlk3 Hlk4 Hlk5 Hlk6 Hlk7 Hlk8 Hlk9 Hlk10 Hlk11"). }
-    iSplitL "Hdr Hdw Hkm Hkpt Hpr1 Hpr2 Hfd Hir Hip Htk Hbsl Hbln Hhd Hino
+    iSplitL "Hdr Hdw Hkm Hkpt Hpr1 Hpr2 Hfd Hir Hip Htk Hbsl Hbln Hhd Hbpay Hino
              Hient Hdd Hda Hdu Hdf Hdi Hslots Hring".
     { rewrite /main_globals_raw.
       iSplitL "Hdr Hdw".
@@ -682,6 +683,7 @@ Section BootBssChain.
       iSplitL "Hbsl"; [iExact "Hbsl" |].
       iSplitL "Hbln"; [iExact "Hbln" |].
       iSplitL "Hhd"; [rewrite bhead_of_z; iExact "Hhd" |].
+      iSplitL "Hbpay"; [iExact "Hbpay" |].
       iSplitL "Hino"; [iExact "Hino" |].
       iSplitL "Hient"; [iExact "Hient" |].
       iSplitL "Hdd Hda Hdu".
