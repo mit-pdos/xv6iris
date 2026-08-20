@@ -53,6 +53,25 @@ residue honest.  RVWMO⁻ is litmus-testable per core exactly as sRVWMO is
 (it is sRVWMO's own axiom set minus the rule-14 arm and the two
 promise-free strengthenings).
 
+**F2 CAVEAT (realizability direction, 2026-08-20).**  "Needs no
+dependency data" is right for CONTAINMENT but glosses REALIZABILITY: the
+full machine enforces store-side dependency ordering (D2/D3's EXT
+floors), so it likely cannot realize an RVWMO⁻ execution that violates
+them.  T2-1 should therefore declare the model as RVWMO⁻ PLUS the
+machine's store-dep fragment in LABEL form (`asrc`/`vsrc`, which the
+alphabet already carries on stores) — still a subset of RVWMO's own
+rules 9–11, so the final theorem still covers every RVWMO-consistent
+execution; the declared model only ever errs toward MORE hardware
+behaviors.  Load-side deps stay out (D-8: the instance's loads carry
+`asrc = []`, so the machine does not enforce them — which is also why
+sRVWMO omitted rule 9's load half).  Also worth recording here, as the
+anti-masking rationale the front-end must preserve: the top-level
+theorems quantify over the DECLARED MODEL's executions, and the
+realizability lemma is the proof that the in-order hart over the view
+memory under-generates NOTHING — A5's positive verdicts (SB 0/0, the MP
+weak outcomes) are the machine-checked witnesses that the "reorderings"
+live in the view memory's nondeterminism, not in instruction order.
+
 ## 2. The miniature
 
 Lock word `L` (RMW-only in program text: acquire = `amoswap.w.aq` spin —
