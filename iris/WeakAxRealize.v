@@ -170,22 +170,114 @@ Section realize.
   Qed.
 
   (* ---------------------------------------------------------------- *)
+  (** ** (1b) THE PAIR (A3(iv)): one axiomatic rmw, two machine steps
+
+      [lb_fused] is GONE from the realization — not by deletion from
+      [lbl_realizes] (a LONE split label is genuinely unrealizable: a bare
+      [LExStore] has no reservation to consume, and a bare [LExLoad]'s
+      post-state sets [w_res], for which the axiomatic [mstate] has no
+      room), but by letting ONE axiomatic step be realized by a SHORT
+      SEQUENCE.  The sequence is the exclusive pair, back to back, same
+      agent: [LExLoad; LExStore] realizing an axiomatic [LRmw].
+
+      WHY THE PAIR IS EXACTLY EQUIVALENT HERE, with nothing left over.  Run
+      back to back the two machine steps compose to the fused one:
+      [exload_post_run_d] is [load_post_run_d] under [ws_res_set], and the
+      conditional write's [store_post_run_d] CLEARS [w_res] on its first
+      byte ([data ≠ []]), so the reservation is created and consumed inside
+      the pair and the end states are LITERALLY equal
+      ([store_post_run_d_res_pair]).  The window premise is the same fact
+      twice: the axiomatic [rmw_latest] gives [excl_ok] ([rmw_latest_excl_ok])
+      and hence [excl_ok_ts] on the reservation's own timestamp column.
+
+      THE CLASS is read at the CONDITIONAL WRITE's own program state [pm]
+      and [wstate] — which is the post-read state, not [σ]'s — because that
+      is where [PFExStore] reads it.  Naming that state in the definition is
+      what keeps the equation checkable by the caller. *)
+  Definition lbl_realizes_pair (p pm : P) (σ : mstate) (i : agent)
+      (lb : WeakAxiomatic.lbl) (l1 l2 : wlabel) : Prop :=
+    ∃ aq rl base tvs data,
+      l1 = LExLoad aq base tvs [] ∧
+      l2 = LExStore rl base data [] [] ∧
+      data ≠ [] ∧ length tvs = length data ∧
+      lb = WeakAxiomatic.LRmw aq rl base tvs.*1 tvs.*2 data
+             (pcls pm l2 (exload_post_run_d (ms_ws σ i) aq 0%nat base tvs.*1)).
+
+  (** The pair's composition, as a state equation.  [ws_res_set] is
+      invisible to a store run that writes at least one byte, because
+      [WeakMem.store_post_d] assigns [w_res := None] per byte.  (The
+      [None]-instance twin of this lemma, used by the FORWARD direction, is
+      [WeakRefuse.store_post_run_d_res]; neither file depends on the other,
+      and the fact is five lines of conversion.) *)
+  Lemma store_post_run_d_res_pair ws r rl vaddr vdata base n t :
+    (0 < n)%nat →
+    store_post_run_d (ws_res_set ws r) rl vaddr vdata base n t
+    = store_post_run_d ws rl vaddr vdata base n t.
+  Proof.
+    intros Hn. rewrite /store_post_run_d /store_post_bytes_d /store_run_as.
+    destruct n as [|m]; [lia|done].
+  Qed.
+
+  Lemma exload_store_compose ws aq rl base (tvs : list (nat * bv 8))
+      (data : list (bv 8)) t :
+    (0 < length data)%nat →
+    store_post_run_d (exload_post_run_d ws aq 0%nat base tvs.*1)
+      rl 0%nat 0%nat base (length data) t
+    = store_post_run (load_post_run ws aq base tvs.*1) rl base (length data) t.
+  Proof.
+    intros Hn. rewrite /exload_post_run_d store_post_run_d_res_pair //.
+    by rewrite load_post_run_d_0 store_post_run_d_0.
+  Qed.
+
+  (** [excl_ok] on the reservation's timestamp column — the shape
+      [PFExStore] asks for. *)
+  Lemma rmw_latest_excl_ok_ts img log i base ts :
+    rmw_latest img log base ts →
+    excl_ok_ts log i base ts (S (length log)).
+  Proof.
+    intros Hlat j t Ht Hw. destruct (Hlat j t Ht) as [_ Hnw].
+    rewrite /acc_addr in Hnw. apply Hnw.
+    eapply writes_in_mono;
+      [| |by apply (writes_in_by_writes_in log (λ tid, tid ≠ Some i))]; lia.
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
   (** ** (2) The program-carrying hypothesis
 
       A per-step assignment of program states ([pst k] = the agent list
       as of trace position [k]) and of the FABRIC ([dv k]), together with
-      the [pstep] that carries position [k] to [k+1].  The frame
-      condition — every other agent's program state is untouched — is
-      spelled as the list INSERT, which also keeps [length (pst k)]
-      constant for free. *)
+      the [pstep]s that carry position [k] to [k+1] — ONE of them, or the
+      exclusive PAIR (A3(iv)).  The frame condition — every other agent's
+      program state is untouched — is spelled as the list INSERT, which
+      also keeps [length (pst k)] constant for free; note that the pair's
+      MIDDLE program state [pm] and fabric [dm] are existential and never
+      appear in [pst]/[dv], since the axiomatic trace has no position for
+      them. *)
   Definition exec_prog_ok (pst : nat → list P) (dv : nat → D)
       (E : exec) : Prop :=
     ∀ k s, ex_tr E !! k = Some s →
-      ∃ p p' l,
+      ∃ p p',
         pst k !! es_ag s = Some p ∧
-        lbl_realizes p (stt E k) (es_ag s) (es_lb s) l ∧
-        pstep p (dv k) l p' (dv (S k)) ∧
-        pst (S k) = <[es_ag s := p']> (pst k).
+        pst (S k) = <[es_ag s := p']> (pst k) ∧
+        ((∃ l, lbl_realizes p (stt E k) (es_ag s) (es_lb s) l ∧
+               pstep p (dv k) l p' (dv (S k)))
+         ∨ (∃ pm dm l1 l2,
+              lbl_realizes_pair p pm (stt E k) (es_ag s) (es_lb s) l1 l2 ∧
+              pstep p (dv k) l1 pm dm ∧ pstep pm dm l2 p' (dv (S k)))).
+
+  (** The old one-step form is the left disjunct. *)
+  Lemma exec_prog_ok_single pst dv E :
+    (∀ k s, ex_tr E !! k = Some s →
+       ∃ p p' l,
+         pst k !! es_ag s = Some p ∧
+         lbl_realizes p (stt E k) (es_ag s) (es_lb s) l ∧
+         pstep p (dv k) l p' (dv (S k)) ∧
+         pst (S k) = <[es_ag s := p']> (pst k)) →
+    exec_prog_ok pst dv E.
+  Proof.
+    intros H k s Hs. destruct (H k s Hs) as (p & p' & l & Hp & Hre & Hps & Hn).
+    exists p, p'. split_and!; [done|done|]. left. by exists l.
+  Qed.
 
   (* ---------------------------------------------------------------- *)
   (** ** (3) One step
@@ -280,6 +372,79 @@ Section realize.
   Qed.
 
   (* ---------------------------------------------------------------- *)
+  (** ** (3b) The PAIR step (A3(iv))
+
+      [mstep_wp_pf_step_prog]'s twin for an axiomatic [LRmw] realized by
+      [LExLoad; LExStore].  Everything the fused arm needed is here in the
+      same form; what is new is only that the reservation is created by the
+      first step and consumed by the second, and that [cfg_match] is
+      restored at the END (never in the middle — the intermediate
+      configuration has a [w_res] no [mstate] can mirror, which is exactly
+      why this is a pair lift and not two applications of the one-step
+      lemma). *)
+  Lemma mstep_wp_pf_step_pair σ σ' i lb c ag p pm p' l1 l2 dm dn :
+    cfg_match c σ → pc_ags c !! i = Some ag → pa_st ag = p →
+    lbl_realizes_pair p pm σ i lb l1 l2 →
+    pstep p (pc_dev c) l1 pm dm →
+    pstep pm dm l2 p' dn →
+    mstep σ i lb σ' →
+    ∃ c1 c', wp_pf_step pstep pcls i l1 c c1 ∧
+             wp_pf_step pstep pcls i l2 c1 c' ∧ cfg_match c' σ' ∧
+             pa_st <$> pc_ags c' = <[i := p']> (pa_st <$> pc_ags c) ∧
+             pc_dev c' = dn.
+  Proof.
+    intros Hm Hlk Hag Hre Hps1 Hps2 Hms.
+    destruct σ as [img lg f].
+    destruct Hm as (Himg & Hlg & Hf). simpl in Himg, Hlg, Hf. subst img lg.
+    pose proof (lookup_lt_Some _ _ _ Hlk) as Hlti.
+    revert Hre Hps1 Hps2.
+    inversion Hms as
+      [aq0 base0 ts0 vs0 Hrd0 Hlb0 Hσ0
+      |rl0 base0 vs0 kc0 Hnn0 Hlb0 Hσ0
+      |pr0 pw0 sr0 sw0 Hlb0 Hσ0
+      |aq0 rl0 base0 ts0 rvs0 wvs0 kc0 Hnn0 Hlen0 Hrd0 Hlat0 Hlb0 Hσ0]; subst;
+      intros (aq & rl & base & tvs & data & -> & -> & Hnn & Hlen & Hlb)
+             Hps1 Hps2; try discriminate.
+    injection Hlb as -> -> -> -> -> -> ->.
+    (* the state after the exclusive read, and the two configurations *)
+    have Hfi : f i = pa_ws ag by apply (Hf i ag Hlk).
+    eexists (WPCfg (pc_img c) (pc_log c) dm
+               (<[i := WPAgent pm
+                        (exload_post_run_d (pa_ws ag) aq 0%nat base tvs.*1)
+                        (pa_prom ag)]> (pc_ags c))), _.
+    split_and!.
+    - apply (PFExLoad pstep pcls i c ag aq base tvs [] pm dm Hlk).
+      + exact Hps1.
+      + rewrite srcs_view_nil read_ok_d_0 -Hfi.
+        rewrite -{1}(zip_fst_snd tvs). by apply rd_ok_read_ok.
+    - apply (PFExStore pstep pcls i _
+               (WPAgent pm (exload_post_run_d (pa_ws ag) aq 0%nat base tvs.*1)
+                  (pa_prom ag))
+               rl base data [] []
+               (pcls pm (LExStore rl base data [] [])
+                  (exload_post_run_d (f i) aq 0%nat base tvs.*1))
+               (WResv base tvs.*1 (ldv_of (pa_ws ag) aq 0%nat base tvs.*1))
+               p' dn).
+      + simpl. by rewrite list_lookup_insert.
+      + exact Hps2.
+      + done.
+      + apply exload_post_run_d_res.
+      + done.
+      + cbn [rv_ts]. by rewrite length_fmap.
+      + cbn [rv_ts pc_log]. by apply (rmw_latest_excl_ok_ts (pc_img c)).
+      + by rewrite Hfi.
+    - simpl. rewrite list_insert_insert.
+      rewrite (exload_store_compose (pa_ws ag) aq rl base tvs data);
+        [destruct data as [|b bs]; [by exfalso; apply Hnn|simpl; lia]|].
+      rewrite Hfi.
+      eapply (cfg_match_upd_gen _ _ _ _ i ag p' _ _ f); [done|done| |].
+      + by rewrite upd_ws_eq.
+      + intros j Hne. by rewrite upd_ws_ne.
+    - simpl. rewrite list_insert_insert list_fmap_insert //.
+    - done.
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
   (** ** (4) The replay
 
       Note what is NOT a premise any more: the agent-range side condition
@@ -308,21 +473,33 @@ Section realize.
     - destruct (IH ltac:(lia)) as (c & Hrun & Hst & Hdev & Hm).
       destruct (exec_tr_lookup E n ltac:(lia)) as [s Hs].
       pose proof (exec_step_at E n s HE Hs) as Hms.
-      destruct (Hpr n s Hs) as (p & p' & l & Hp & Hre & Hps & Hnext).
+      destruct (Hpr n s Hs) as (p & p' & Hp & Hnext & Hsup).
       have Hex : ∃ ag, pc_ags c !! es_ag s = Some ag ∧ pa_st ag = p.
       { rewrite -Hst list_lookup_fmap in Hp.
         destruct (pc_ags c !! es_ag s) as [ag|] eqn:Hag; simplify_eq/=.
         by exists ag. }
       destruct Hex as (ag & Hag & Hagp).
-      destruct (mstep_wp_pf_step_prog (stt E n) (stt E (S n)) (es_ag s)
-                  (es_lb s) c ag p p' l (dv (S n)) Hm Hag Hagp Hre
-                  ltac:(by rewrite Hdev) Hms)
-        as (c2 & Hstep & Hm2 & Hst2 & Hdev2).
-      exists c2. split_and!.
-      + eapply rtc_r; [done|]. by exists (es_ag s), l.
-      + by rewrite Hst2 Hst -Hnext.
-      + done.
-      + done.
+      destruct Hsup as [(l & Hre & Hps)|(pm & dm & l1 & l2 & Hre & Hps1 & Hps2)].
+      + destruct (mstep_wp_pf_step_prog (stt E n) (stt E (S n)) (es_ag s)
+                    (es_lb s) c ag p p' l (dv (S n)) Hm Hag Hagp Hre
+                    ltac:(by rewrite Hdev) Hms)
+          as (c2 & Hstep & Hm2 & Hst2 & Hdev2).
+        exists c2. split_and!.
+        * eapply rtc_r; [done|]. by exists (es_ag s), l.
+        * by rewrite Hst2 Hst -Hnext.
+        * done.
+        * done.
+      + destruct (mstep_wp_pf_step_pair (stt E n) (stt E (S n)) (es_ag s)
+                    (es_lb s) c ag p pm p' l1 l2 dm (dv (S n)) Hm Hag Hagp Hre
+                    ltac:(by rewrite Hdev) Hps2 Hms)
+          as (c1 & c2 & Hstep1 & Hstep2 & Hm2 & Hst2 & Hdev2).
+        exists c2. split_and!.
+        * eapply rtc_r; [eapply rtc_r; [done|]|].
+          { by exists (es_ag s), l1. }
+          { by exists (es_ag s), l2. }
+        * by rewrite Hst2 Hst -Hnext.
+        * done.
+        * done.
   Qed.
 
   (** THE PROGRAM-CARRYING REVERSE BRIDGE.  Every [exec_wf] execution
@@ -357,7 +534,7 @@ Section realize.
     (∀ k s, ex_tr E !! k = Some s → (es_ag s < length ps)%nat) →
     exec_prog_ok (λ _, ps) (λ _, d0) E.
   Proof.
-    intros Hpf HE Hck Hag k s Hs.
+    intros Hpf HE Hck Hag. apply exec_prog_ok_single. intros k s Hs.
     destruct (lookup_lt_is_Some_2 ps (es_ag s) (Hag k s Hs)) as [p Hp].
     exists p, p, (unproj_lbl (es_lb s)). split_and!.
     - done.

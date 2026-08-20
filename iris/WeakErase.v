@@ -172,6 +172,22 @@ Proof. by intros (_ & _ & _ & ?). Qed.
 Global Instance er_ws_refl : Reflexive er_ws.
 Proof. intros w. by split_and!. Qed.
 
+(** Transitive because each of its four components is: [ws_le] by its own
+    instance, [w_relp] because it is an equation, and [fwd_le]/[res_rel]
+    pointwise.  Stage 2 ([WeakRefuse]) composes a one-sided step of the
+    instance side onto the relation with it. *)
+Global Instance er_ws_trans : Transitive er_ws.
+Proof.
+  intros w1 w2 w3 (Hle1 & Hrp1 & Hfw1 & Hrs1) (Hle2 & Hrp2 & Hfw2 & Hrs2).
+  split_and!.
+  - by etrans.
+  - by etrans.
+  - intros aq a t. etrans; [apply Hfw1|apply Hfw2].
+  - intros R3 HR3. destruct (Hrs2 R3 HR3) as (R2 & HR2 & Hb2 & Ht2 & Hv2).
+    destruct (Hrs1 R2 HR2) as (R1 & HR1 & Hb1 & Ht1 & Hv1).
+    exists R1. split_and!; [done|by rewrite Hb1|by rewrite Ht1|lia].
+Qed.
+
 (** The [load_vpre]/[coh] consequences the read arms consume. *)
 Lemma er_ws_load_vpre_d we wi aq vae vai :
   er_ws we wi → (vae ≤ vai)%nat →

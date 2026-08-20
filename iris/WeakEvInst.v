@@ -124,6 +124,7 @@ Require Import WeakDeps.
 Require Import WeakPromise.
 Require Import WeakPromiseFact.
 Require Import WeakErase.
+Require Import WeakRefuse.
 Require Import WeakInterp.
 Require Import WeakInterpProj.
 Require Import RiscvLang.
@@ -1593,4 +1594,71 @@ Proof.
           |[(_ & -> & _)
           |(p' & _ & _ & -> & _)]]]]]]]
          |(_ & -> & _)]; exact I.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(** THE RE-FUSION'S CLASS PREMISE (A2 stage 2, [WeakRefuse.pcls_fusable]).
+    The fused run replaces the conditional write by a [PFRmw] carrying the
+    read half's data, so the class the agent stamps must not move.  It does
+    not, and for a reason that is only visible at a STEP: [pcls_ev] answers
+    [WCexcl] at [LRmw] outright but COMPUTES the conditional write's class
+    off the monad node ([pnode_wclass]), and the event language emits
+    [LExStore] ONLY at a [MemWrite] node whose access kind has
+    [ak_latest = true] — where [WeakInterp.wm_class_of] answers [WCexcl] too.
+    (Which is why Layer 1 quantifies the premise over a step: at an
+    arbitrary program state the equation is false.)  The disk has no
+    exclusive access at all ([pstep_disk_no_ex]). *)
+Lemma pnode_step_exstore_excl m rs ib d rl base data asrc vsrc m' ors fn' d'
+    oib ws :
+  pnode_step m rs ib d (LExStore rl base data asrc vsrc) m' ors fn' d' oib ->
+  pnode_wclass m ws = WCexcl.
+Proof.
+  rewrite /pnode_step /pnode_wclass. destruct m as [y|T oc k].
+  { by intros (? & ? & _). }
+  destruct oc; simpl; try (by intros (? & _));
+    try (intros (Hl & _); by destruct (erw_of (deps_of_ib ib) reg));
+    try (by intros []).
+  - (* MemRead *) destruct (dev_addr _).
+    + by intros (w & _ & ? & _).
+    + intros (_ & [(_ & w & tvs0 & _ & _ & Hl & _)
+                  |(_ & w & tvs0 & _ & _ & Hl & _)]); by simplify_eq.
+  - (* MemWrite: the [ak_latest] arm is the only one that emits it *)
+    destruct (dev_addr _).
+    + by intros (? & ? & _).
+    + intros (_ & [(_ & Hl & _)|(Ht & [(Hl & _)|(Hl & _)])]);
+        [by simplify_eq| |by simplify_eq].
+      rewrite /wm_class_of Ht //.
+  - (* Barrier *) intros (Hl & _). by destruct b.
+  - (* Choose *) by intros (ch & ? & _).
+Qed.
+
+Lemma pstep_node_exstore_excl cpu m rs fn ib d rl base data asrc vsrc m' ors
+    fn' d' oib ws :
+  pstep_node cpu m rs fn ib d (LExStore rl base data asrc vsrc) m' ors fn' d'
+    oib ->
+  pnode_wclass m ws = WCexcl.
+Proof.
+  rewrite /pstep_node. destruct fn as [[[[pr pw] sr] sw]|].
+  - by intros (? & _).
+  - apply pnode_step_exstore_excl.
+Qed.
+
+Lemma pstep_hart_exstore_excl cpu m rs fn ib d rl base data asrc vsrc m' ors
+    fn' d' oib ws :
+  pstep_hart cpu m rs fn ib d (LExStore rl base data asrc vsrc) m' ors fn' d'
+    oib ->
+  pnode_wclass m ws = WCexcl.
+Proof.
+  intros [Hn|(Hl & _)]; [by eapply pstep_node_exstore_excl|by simplify_eq].
+Qed.
+
+Theorem pcls_ev_fusable : WeakRefuse.pcls_fusable pstep_ev pcls_ev.
+Proof.
+  intros p d rl base data asrc vsrc p' d' aq tvs wF wS Hs Hrelp.
+  rewrite /pstep_ev in Hs.
+  destruct p as [cpu m rs fn ib|dp], p' as [cpu' m' rs' fn' ib'|dp'];
+    try (by destruct Hs).
+  - destruct Hs as (_ & ors & oib & _ & _ & H). simpl.
+    by rewrite (pstep_hart_exstore_excl _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ wS H).
+  - by destruct (pstep_disk_no_ex _ _ _ _ _ Hs).
 Qed.
