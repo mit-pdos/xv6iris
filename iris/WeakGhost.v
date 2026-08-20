@@ -63,7 +63,7 @@ From stdpp Require Import bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.algebra Require Import dfrac.
 From iris.algebra.lib Require Import mono_list.
-From iris.base_logic.lib Require Import ghost_map ghost_var.
+From iris.base_logic.lib Require Import ghost_map ghost_var invariants.
 From iris.program_logic Require Import language weakestpre.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
@@ -108,8 +108,36 @@ Notation wlogR := (mono_listR (leibnizO wmsg)).
                      incompatible with the full-fraction element a [WCplain]
                      store needs, so "a sync byte is never plain-written" is
                      enforced by the dfrac algebra rather than by a side
-                     condition every store site would have to thread. *)
-Inductive wcds := WClean | WDirty (c : CPU) | WSync.
+                     condition every store site would have to thread.
+      - [WLock base n0] — THE FOURTH STATE (tier-2 T2-0, see
+                     [claude-notes/design/weak-memory-tier2-s6.md] §4/§6b):
+                     the byte belongs to the REGISTERED LOCK WORD at 4-byte
+                     base [base], registered when the log had length [n0].
+                     It is a REFINEMENT of [WClean] (see [wcds_lock]): the
+                     clean obligation, PLUS the lock word's VALUE PROTOCOL on
+                     the post-registration suffix ([wlp_at]).  Exclusive (full
+                     fraction), and the only writers are the acquire/release
+                     leaves, which alone hold the fragment (it lives inside
+                     [WeakLock.wlock_inv]).
+
+                     WHY THE SUFFIX.  A lock word is initialized by
+                     [initlock]'s PLAIN store (class [WCplain]) BEFORE it is
+                     registered, so an unsuffixed protocol is simply false;
+                     [n0] is the length of the log at registration and the
+                     protocol quantifies over positions [n0 ≤ p] only.
+
+                     WHY THE CLEAN CONJUNCT.  Everything that holds the lock
+                     word's bundle must still pay φ's per-byte obligation
+                     ([nv_ok]), and the suffix protocol alone says nothing
+                     about the pre-registration history — where [initlock]'s
+                     plain store sits.  Registration therefore CONSUMES a
+                     clean state and carries it along; every protocol store is
+                     non-plain, so clean is preserved for free. *)
+Inductive wcds :=
+  | WClean
+  | WDirty (c : CPU)
+  | WSync
+  | WLock (base : Z) (n0 : nat).
 
 Global Instance wcds_eq_dec : EqDecision wcds.
 Proof. solve_decision. Defined.
@@ -501,12 +529,86 @@ Definition wcds_dirty (log : list wmsg) (a : Z) (c : CPU) : Prop :=
 Definition wcds_sync (log : list wmsg) (a : Z) : Prop :=
   forall p m, ¬ wplain_at log a p m.
 
+(* ---------------------------------------------------------------------- *)
+(** *** THE LOCK WORD'S VALUE PROTOCOL (tier-2 T2-0 / S6 §4, §6b)
+
+    The one fact about the kernel's lock words that is NOT machine-derivable
+    (nothing stops a program from plain-storing 5 to a lock word; xv6 just
+    does not) and that tier 2's case #5 needs in order to make the two
+    critical-section windows gmo-exclusive: writes to a registered lock word
+    ALTERNATE acquire-RMW / release.  It rides the C/D/S protocol as its
+    fourth per-byte state, so the enforcement is the write rule of the state
+    and the export is one read of the same auth map [no_violation] is read
+    from. *)
+
+(** The four zero bytes a release stores. *)
+Definition wlock_zero4 : list (bv 8) := replicate 4 (Z_to_bv 8 0).
+
+Lemma wlock_zero4_eq :
+  wlock_zero4 = [Z_to_bv 8 0; Z_to_bv 8 0; Z_to_bv 8 0; Z_to_bv 8 0].
+Proof. reflexivity. Qed.
+
+(** [wlock_shaped m] — the message is ACQUIRE-SHAPED or RELEASE-SHAPED:
+
+      - four bytes wide (a lock word is an [int]);
+      - never an owned plain store ([WCplain]);
+      - and EITHER exclusive (the acquire's [amoswap] write half, whose read
+        half reads the latest write — [ak_latest]) OR a write of the ZERO
+        word (the release).
+
+    Read it contrapositively, which is the form S6 §3's case #5 consumes: a
+    message that writes a NONZERO value to a registered lock word is
+    [WCexcl], i.e. the write half of an RMW, so [excl_ok] orders it; every
+    other message on the word writes 0 and is at least release-class, so it
+    PUBLISHES.  Hence an acquire's read of 0 names its co-predecessor
+    release.
+
+    DELIBERATE WEAKENING vs. the T2-0 spec's "[WCrel] ∧ zero" release arm:
+    the release leaf's own effect ([WeakInstr.wQ_store_w]) leaves the
+    message's class EXISTENTIAL and derives only [≠ WCplain] from the
+    hart's [w_relp] flag — pinning [WCrel] there would need [ak_latest =
+    false], which no leaf at this altitude carries.  The arm admitted by the
+    weakening ([WCexcl] writing zero — an [amoswap] that swaps in 0) is
+    STRICTLY more ordered than a release, so nothing downstream loses. *)
+Definition wlock_shaped (m : wmsg) : Prop :=
+  length (wm_data m) = 4%nat /\ wm_ak m <> WCplain /\
+  (wm_ak m = WCexcl \/ wm_data m = wlock_zero4).
+
+(** THE EXPORTED PURE FACT, per byte: [a] is a byte of the lock word at
+    [base], and every message of the log AT OR AFTER the registration point
+    [n0] that writes [a] is a message of the whole word, acquire- or
+    release-shaped. *)
+Definition wlp_at (log : list wmsg) (a base : Z) (n0 : nat) : Prop :=
+  (base <= a < base + 4)%Z /\
+  forall p m, log !! p = Some m -> (n0 <= p)%nat -> is_Some (msg_byte m a) ->
+    wm_pa m = base /\ wlock_shaped m.
+
+(** ... and the state's own obligation: the protocol ON TOP OF clean (see the
+    [WLock] note at the head of the file). *)
+Definition wcds_lock (log : list wmsg) (a base : Z) (n0 : nat) : Prop :=
+  wcds_clean log a /\ wlp_at log a base n0.
+
 Definition wcds_ok (log : list wmsg) (a : Z) (s : wcds) : Prop :=
   match s with
   | WClean => wcds_clean log a
   | WDirty c => wcds_dirty log a c
   | WSync => wcds_sync log a
+  | WLock base n0 => wcds_lock log a base n0
   end.
+
+(** The state a NON-PROTOCOL store may be taken at.  A [WLock] byte is
+    exactly the one that may not (its write rule is [wcds_ok_store_lock]),
+    and this boolean is what every generic store site now threads. *)
+Definition is_wlock (s : wcds) : bool :=
+  match s with WLock _ _ => true | _ => false end.
+
+Lemma wcds_lock_clean log a base n0 :
+  wcds_ok log a (WLock base n0) -> wcds_clean log a.
+Proof. by intros [? _]. Qed.
+
+Lemma wcds_lock_wlp log a base n0 :
+  wcds_ok log a (WLock base n0) -> wlp_at log a base n0.
+Proof. by intros [_ ?]. Qed.
 
 Lemma wcds_clean_dirty log a c : wcds_clean log a -> wcds_dirty log a c.
 Proof. intros H p m Hp. destruct (H p m Hp); auto. Qed.
@@ -524,12 +626,19 @@ Proof.
     apply lookup_app_Some in Hp as [Hp|[_ Hp]]; [by split_and!|].
     exfalso. apply elem_of_list_lookup_2, Hno in Hp. rewrite Hp in Hs.
     by destruct Hs. }
-  destruct s as [|c|]; simpl.
-  - intros Hcl p m Hp. destruct (Hcl p m (Hback p m Hp)) as [?|?];
-      [by left|right; by apply wpublished_app].
+  assert (Hcln : wcds_clean log a -> wcds_clean (log ++ ms) a).
+  { intros Hcl p m Hp. destruct (Hcl p m (Hback p m Hp)) as [?|?];
+      [by left|right; by apply wpublished_app]. }
+  destruct s as [ | c | | base n0 ]; simpl.
+  - exact Hcln.
   - intros Hdi p m Hp. destruct (Hdi p m (Hback p m Hp)) as [?|[?|?]];
       [by left|right; left; by apply wpublished_app|by right; right].
   - intros Hsy p m Hp. exact (Hsy p m (Hback p m Hp)).
+  - intros [Hcl [Hrng Hlp]]. split; [by apply Hcln|]. split; [exact Hrng|].
+    intros p m Hp Hn0 Hs.
+    apply lookup_app_Some in Hp as [Hp|[_ Hp]]; [by apply (Hlp p m)|].
+    exfalso. apply elem_of_list_lookup_2, Hno in Hp.
+    rewrite Hp in Hs. by destruct Hs.
 Qed.
 
 (** ... and the STORE step at the byte the message writes.  The state moves
@@ -592,31 +701,77 @@ Proof.
 Qed.
 
 (** THE NON-PLAIN STORE: a message that is not an owned store adds no
-    obligation to ANY state, so every state survives it — including [WSync]
-    (the "a sync byte is never plain-written" clause) and [WClean] (which is
-    why an AMO or a release keeps a shared/invariant-held bundle clean). *)
+    obligation to a C/D/S state, so those three survive it — including
+    [WSync] (the "a sync byte is never plain-written" clause) and [WClean]
+    (which is why an AMO or a release keeps a shared/invariant-held bundle
+    clean).
+
+    IT IS FALSE AT [WLock] (T2-0): a non-protocol exclusive store to a lock
+    byte — an [amoswap] swapping in 5 — is non-plain and yet breaks the
+    value protocol outright.  Hence the [is_wlock] premise; a lock byte's
+    write rule is [wcds_ok_store_lock] below, and every generic store site
+    supplies the disequality off the fragment it already holds (a [wclean],
+    a [wown_st], or a [sync_byte] — none of which is [WLock]). *)
 Lemma wcds_ok_store_nonplain log mnew a s :
-  wm_ak mnew ≠ WCplain -> wcds_ok log a s -> wcds_ok (log ++ [mnew]) a s.
+  wm_ak mnew ≠ WCplain -> is_wlock s = false ->
+  wcds_ok log a s -> wcds_ok (log ++ [mnew]) a s.
 Proof.
-  intros Hk Hok.
+  intros Hk Hnl Hok.
   assert (Hback : forall p m, wplain_at (log ++ [mnew]) a p m ->
                     wplain_at log a p m).
   { intros p m (Hp & Hs & Hkm).
     apply lookup_app_Some in Hp as [Hp|[_ Hp]]; [by split_and!|].
     exfalso. destruct (p - length log)%nat as [|n]; simpl in Hp;
       [|by rewrite lookup_nil in Hp]. simplify_eq; by apply Hk. }
-  destruct s as [|c|]; simpl in Hok |- *.
+  destruct s as [ | c | | base n0 ]; simpl in Hok |- *.
   - intros p m Hp. destruct (Hok p m (Hback p m Hp)) as [?|?];
       [by left|right; by apply wpublished_app].
   - intros p m Hp. destruct (Hok p m (Hback p m Hp)) as [?|[?|?]];
       [by left|right; left; by apply wpublished_app|by right; right].
   - intros p m Hp. exact (Hok p m (Hback p m Hp)).
+  - simpl in Hnl. discriminate.
 Qed.
+
+Lemma wcds_ok_store_clean log mnew a :
+  wm_ak mnew ≠ WCplain ->
+  wcds_clean log a -> wcds_clean (log ++ [mnew]) a.
+Proof. intros Hk. exact (wcds_ok_store_nonplain log mnew a WClean Hk eq_refl). Qed.
 
 Lemma wcds_ok_store_sync log mnew a :
   wm_ak mnew ≠ WCplain ->
   wcds_sync log a -> wcds_sync (log ++ [mnew]) a.
-Proof. apply (wcds_ok_store_nonplain log mnew a WSync). Qed.
+Proof. intros Hk. exact (wcds_ok_store_nonplain log mnew a WSync Hk eq_refl). Qed.
+
+(** THE PROTOCOL STORE — the [WLock] write rule, covering BOTH the acquire's
+    exclusive write and the release's zero store in one lemma: a message of
+    the whole word, acquire- or release-shaped, keeps the state. *)
+Lemma wcds_ok_store_lock log mnew a base n0 :
+  wm_pa mnew = base -> wlock_shaped mnew ->
+  wcds_ok log a (WLock base n0) ->
+  wcds_ok (log ++ [mnew]) a (WLock base n0).
+Proof.
+  intros Hpa Hsh [Hcl [Hrng Hlp]].
+  assert (Hk : wm_ak mnew <> WCplain) by (destruct Hsh as (_ & ? & _); done).
+  split; [by apply wcds_ok_store_clean|]. split; [exact Hrng|].
+  intros p m Hp Hn0 Hs.
+  apply lookup_app_Some in Hp as [Hp|[Hge Hp]]; [by apply (Hlp p m)|].
+  destruct (p - length log)%nat as [|n]; simpl in Hp;
+    [|by rewrite lookup_nil in Hp].
+  simplify_eq. by split.
+Qed.
+
+(** THE REGISTRATION, purely.  At [n0] at or above the log's length the
+    suffix obligation is VACUOUS, so a clean byte inside the word's range
+    becomes a lock byte with nothing said about its history — which is what
+    makes registration legal AFTER [initlock]'s plain store. *)
+Lemma wcds_ok_register log a base n0 :
+  (base <= a < base + 4)%Z -> (length log <= n0)%nat ->
+  wcds_clean log a ->
+  wcds_ok log a (WLock base n0).
+Proof.
+  intros Hrng Hlen Hcl. split; [exact Hcl|]. split; [exact Hrng|].
+  intros p m Hp Hn0 _. exfalso. apply lookup_lt_Some in Hp. lia.
+Qed.
 
 (** THE FLIP, purely.  A byte that is dirty by [c] is CLEAN as soon as [c]'s
     release store is the log's LAST message: that message publishes every
@@ -679,10 +834,59 @@ Proof.
   - rewrite lookup_insert_ne // in Ha'. by apply Hag.
 Qed.
 
-(** The whole map survives a non-plain store: no state gains an obligation. *)
-Lemma wcds_agree_nonplain log mnew mc :
-  wm_ak mnew ≠ WCplain -> wcds_agree log mc -> wcds_agree (log ++ [mnew]) mc.
-Proof. intros Hk Hag a s Ha. by apply wcds_ok_store_nonplain; [|apply Hag]. Qed.
+(** The whole map survives a non-plain store PROVIDED the message's own
+    window carries no [WLock] byte (T2-0).  Outside the window nothing is
+    written and every state frames ([wcds_ok_app]); inside it, the store site
+    reads the disequality off the fragments it is already holding.  [zs] is
+    the window — the same list [wcds_agree_winsl] takes. *)
+Lemma wcds_agree_nonplain_win log mnew mc (zs : list Z) :
+  wm_ak mnew ≠ WCplain ->
+  (forall z, msg_byte mnew z <> None -> z ∈ zs) ->
+  (forall z s, z ∈ zs -> mc !! z = Some s -> is_wlock s = false) ->
+  wcds_agree log mc -> wcds_agree (log ++ [mnew]) mc.
+Proof.
+  intros Hk Hcov Hnl Hag a s Ha.
+  destruct (decide (msg_byte mnew a = None)) as [Hnone|Hsome].
+  - apply wcds_ok_app; [|by apply Hag].
+    intros m0 Hm0. by apply elem_of_list_singleton in Hm0 as ->.
+  - apply wcds_ok_store_nonplain; [done| |by apply Hag].
+    exact (Hnl a s (Hcov a Hsome) Ha).
+Qed.
+
+(** The SINGLE-BYTE instance, which is the shape [WeakVProp]'s one-byte store
+    rule has: the message writes only [a], and the caller's own fragment pins
+    [a]'s state. *)
+Lemma wcds_agree_nonplain1 log mnew mc (a : Z) (s0 : wcds) :
+  wm_ak mnew ≠ WCplain -> is_wlock s0 = false ->
+  (forall a', a' <> a -> msg_byte mnew a' = None) ->
+  mc !! a = Some s0 ->
+  wcds_agree log mc -> wcds_agree (log ++ [mnew]) mc.
+Proof.
+  intros Hk Hnl Hother Ha Hag.
+  apply (wcds_agree_nonplain_win _ _ _ [a]); [exact Hk| | |exact Hag].
+  - intros z Hz. destruct (decide (z = a)) as [->|Hne];
+      [by apply elem_of_list_here|by destruct Hz; apply Hother].
+  - intros z s Hz Hs. apply elem_of_list_singleton in Hz as ->.
+    rewrite Ha in Hs. by simplify_eq.
+Qed.
+
+(** ... and its PROTOCOL twin: the whole map survives an acquire-/release-
+    shaped store to a registered lock word, the window's bytes being exactly
+    the ones the storing site holds [WLock] fragments for. *)
+Lemma wcds_agree_store_lock log mnew mc (zs : list Z) (base : Z) (n0 : nat) :
+  wm_pa mnew = base -> wlock_shaped mnew ->
+  (forall z, msg_byte mnew z <> None -> z ∈ zs) ->
+  (forall z, z ∈ zs -> mc !! z = Some (WLock base n0)) ->
+  wcds_agree log mc -> wcds_agree (log ++ [mnew]) mc.
+Proof.
+  intros Hpa Hsh Hcov Hin Hag a s Ha.
+  destruct (decide (msg_byte mnew a = None)) as [Hnone|Hsome].
+  - apply wcds_ok_app; [|by apply Hag].
+    intros m0 Hm0. by apply elem_of_list_singleton in Hm0 as ->.
+  - assert (s = WLock base n0) as ->.
+    { rewrite (Hin a (Hcov a Hsome)) in Ha. by simplify_eq. }
+    apply wcds_ok_store_lock; [done|done|by apply Hag].
+Qed.
 
 (** The initial state map: every byte of the era-initial image is CLEAN (the
     log is empty, so there is nothing to publish). *)
@@ -908,6 +1112,14 @@ Qed.
 Lemma nv_byte_sync log c' a n : wcds_sync log a -> nv_byte log c' a n.
 Proof. intros Hsy p m c Hp Ht Hk Hnp Hs _. by destruct (Hsy p m (conj Hp (conj Hs Hk))). Qed.
 
+(** THE FOURTH ARM (T2-0), and the reason [WLock] carries the clean
+    conjunct: a registered lock byte pays φ's obligation exactly as a clean
+    one does, so the acquire/release leaves keep paying it off the very
+    bundle they hand back. *)
+Lemma nv_byte_lock log c' a n base n0 :
+  wcds_lock log a base n0 -> nv_byte log c' a n.
+Proof. intros [Hcl _]. by apply nv_byte_clean. Qed.
+
 (** The uniform reading: any state a hart may legitimately PRESENT for a
     byte — clean at any fraction, dirty by itself, or sync — discharges the
     obligation at that byte.  [WeakGhost.wown_st] is exactly the first two,
@@ -980,6 +1192,12 @@ Proof. intros H c n. by apply nv_byte_sync. Qed.
 
 Lemma nv_free_unwritten log a : latest_ts log a = 0%nat -> nv_free log a.
 Proof. intros H c n. by apply nv_byte_unwritten. Qed.
+
+Lemma nv_ok_lock log c a base n0 : wcds_lock log a base n0 -> nv_ok log c a.
+Proof. intros [H _] n. by apply nv_byte_clean. Qed.
+
+Lemma nv_free_lock log a base n0 : wcds_lock log a base n0 -> nv_free log a.
+Proof. intros [H _] c n. by apply nv_byte_clean. Qed.
 
 Lemma nv_byte_of_free log c a n : nv_free log a -> nv_byte log c a n.
 Proof. intros H. apply H. Qed.
@@ -1486,8 +1704,38 @@ Section resources.
   Proof.
     iIntros "#H0 #H1 #H2 #H3". rewrite /sync_win /=. iFrame "H0 H1 H2 H3".
   Qed.
+  (** THE LOCK-BYTE FRAGMENT (T2-0).  Exclusive, like [wdirty]: a byte of the
+      registered lock word at [base], registered at log length [n0].  It is
+      NOT persistent and NOT split — the whole point is that only its holder
+      may write the byte, and its holder is [WeakLock.wlock_inv].  There is
+      therefore no separate "registration witness" resource: the fragment
+      inside the lock invariant IS the witness, and the export
+      ([wlp_at_of_lock]) reads the pure protocol off it against the auth. *)
+  Definition wlock_st (a : Z) (base : Z) (n0 : nat) : iProp Σ :=
+    wcds_el a (DfracOwn 1) (WLock base n0).
+
   Global Instance wcds_el_timeless a dq s : Timeless (wcds_el a dq s).
   Proof. rewrite /wcds_el. apply _. Qed.
+
+  Global Instance wlock_st_timeless a base n0 : Timeless (wlock_st a base n0).
+  Proof. rewrite /wlock_st. apply _. Qed.
+
+  Lemma wlock_st_lookup a base n0 mc :
+    ghost_map_auth weak_cds_name 1 mc -∗ wlock_st a base n0 -∗
+    ⌜mc !! a = Some (WLock base n0)⌝.
+  Proof.
+    iIntros "Ha Hel". rewrite /wlock_st /wcds_el.
+    by iDestruct (ghost_map_lookup with "Ha Hel") as %Hlk.
+  Qed.
+
+  (** A lock byte is not a clean/owned/sync one: the fragments are
+      incompatible, which is what makes the C/D/S store rules and the
+      protocol rule mutually exclusive. *)
+  Lemma wlock_st_clean_excl a base n0 dq : wlock_st a base n0 -∗ wclean a dq -∗ False.
+  Proof.
+    rewrite /wlock_st /wclean /wcds_el. iIntros "H1 H2".
+    iDestruct (ghost_map_elem_agree with "H1 H2") as %Hq. by inversion Hq.
+  Qed.
 
   (** THE OWNED STATE: clean, or dirty by THIS hart.  The [∃] is what makes
       the surface absorb both, so that a store's postcondition needs no case
@@ -1640,6 +1888,60 @@ Section resources.
   Proof.
     iIntros "Hi #He". iDestruct (nv_free_of_sync with "Hi He") as %H.
     iPureIntro. by apply nv_ok_of_free.
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (** *** 3b'. THE LOCK-PROTOCOL EXPORT (T2-0 / S6 §4)
+
+      THE ONE THING T2-0 OWES: the pure per-state fact that every message
+      overlapping a registered lock word is acquire- or release-shaped, read
+      off the very auth map that carries the C/D/S states — i.e. by exactly
+      the move φ's [no_violation] export makes ([wcds_lookup] +
+      [wcds_agree]).  Nothing else is needed: the FRAGMENT is the
+      registration witness (it lives inside [WeakLock.wlock_inv], the only
+      writer of the word), and the interp tie [wcds_agree] covers the new arm
+      automatically. *)
+  Lemma wlp_at_of_lock img log a base n0 :
+    wlat_interp img log -∗ wlock_st a base n0 -∗ ⌜wlp_at log a base n0⌝.
+  Proof.
+    iIntros "Hi He". iDestruct (wcds_lookup with "Hi He") as %Hok.
+    iPureIntro. exact (wcds_lock_wlp log a base n0 Hok).
+  Qed.
+
+  Lemma nv_free_of_lock img log a base n0 :
+    wlat_interp img log -∗ wlock_st a base n0 -∗ ⌜nv_free log a⌝.
+  Proof.
+    iIntros "Hi He". iDestruct (wcds_lookup with "Hi He") as %Hok.
+    iPureIntro. by apply (nv_free_lock log a base n0).
+  Qed.
+
+  Lemma nv_ok_of_lock img log c a base n0 :
+    wlat_interp img log -∗ wlock_st a base n0 -∗ ⌜nv_ok log c a⌝.
+  Proof.
+    iIntros "Hi He". iDestruct (nv_free_of_lock with "Hi He") as %H.
+    iPureIntro. by apply nv_ok_of_free.
+  Qed.
+
+  (** THE REGISTRATION.  A clean byte inside the word's range becomes a lock
+      byte, at [n0 = length log] — where the protocol's suffix obligation is
+      vacuous, so NOTHING about the byte's history is required (which is what
+      makes it legal after [initlock]'s plain store).  The clean state the
+      caller gives up is the conjunct [WLock] carries forward. *)
+  Lemma wlock_register img log a base :
+    (base <= a < base + 4)%Z ->
+    wlat_interp img log -∗ wclean a (DfracOwn 1) ==∗
+    wlat_interp img log ∗ wlock_st a base (length log).
+  Proof.
+    intros Hrng. iIntros "Hi Hel".
+    iDestruct "Hi" as (m mc) "(Hauth & %Hag & Hc & %Hagc)".
+    rewrite /wclean /wcds_el.
+    iDestruct (ghost_map_lookup with "Hc Hel") as %Hlk.
+    iMod (ghost_map_update (WLock base (length log)) with "Hc Hel")
+      as "[Hc Hel]".
+    iModIntro. iFrame "Hel". iExists m, (<[a := WLock base (length log)]> mc).
+    iFrame "Hauth Hc". iSplitR; [iPureIntro; exact Hag|].
+    iPureIntro. apply wcds_agree_insert; [exact Hagc|].
+    apply wcds_ok_register; [exact Hrng|lia|exact (Hagc a WClean Hlk)].
   Qed.
 
 
@@ -2064,6 +2366,76 @@ Section resources.
   Lemma weak_state_interp_export (g : wgstate) :
     weak_state_interp g ⊢ ⌜no_violation (wglog g) (wgws g)⌝.
   Proof. iIntros "(_ & _ & $ & _)". Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (** *** 3d. T2-0's EXPORT AND ITS REGISTRATION SEAM
+
+      [weak_state_interp_export]'s sibling.  The lock word's value protocol
+      is NOT a pure conjunct of the state interpretation the way
+      [no_violation] is — it is a fact about the bytes a client has
+      REGISTERED, so it is read off the C/D/S auth against the client's own
+      [WLock] fragment.  That fragment is exclusive and lives inside the
+      lock's namespace invariant ([WeakLock.wlock_inv]), so what crosses to
+      the adequacy seam is [wlock_regd]: the PERSISTENT invariant assertion
+      plus an accessor saying its body contains byte [a]'s fragment (at some
+      registration point) and takes it back.
+
+      THE SEAM DECISION (T2-0 report): no persistent per-byte registration
+      witness is minted.  A [DfracDiscarded] copy of the state fragment is
+      not an option — ghost-map fragments at different fractions must AGREE
+      on the value, and the value here carries [n0]; and a discarded copy
+      would make the byte unwritable, which is exactly what the acquire and
+      release must do.  A separate registry ghost was rejected as out of
+      scope (it re-opens the ~50-site [weak_state_interp] reassembly the
+      φ-upgrade paid for).  The fragment inside the invariant IS the
+      witness, and [wlock_regd] is the shape in which it travels. *)
+
+  Definition wlock_regd (N : namespace) (a base : Z) : iProp Σ :=
+    (∃ I : iProp Σ,
+       inv N I ∗
+       □ (I -∗ ∃ n0 : nat,
+            wlock_st a base n0 ∗ (wlock_st a base n0 -∗ I)))%I.
+
+  Global Instance wlock_regd_persistent N a base :
+    Persistent (wlock_regd N a base).
+  Proof. rewrite /wlock_regd. apply _. Qed.
+
+  Lemma weak_state_interp_lat (g : wgstate) :
+    weak_state_interp g -∗ wlat_interp (wgimg g) (wglog g).
+  Proof. iIntros "(_ & _ & _ & _ & _ & _ & _ & $ & _)". Qed.
+
+  (** THE PER-STATE EXPORT, off a fragment in hand. *)
+  Lemma weak_state_interp_lockproto (g : wgstate) (a base : Z) (n0 : nat) :
+    weak_state_interp g -∗ wlock_st a base n0 -∗
+    ⌜wlp_at (wglog g) a base n0⌝.
+  Proof.
+    iIntros "Hi He". iDestruct (weak_state_interp_lat with "Hi") as "Hlat".
+    by iApply (wlp_at_of_lock with "Hlat He").
+  Qed.
+
+  (** ... and THROUGH THE SEAM, in one fancy update at a mask containing the
+      lock's namespace — which is the form the adequacy wrapper consumes
+      (the continuation of [wp_strong_adequacy] runs at ⊤). *)
+  Lemma wlock_regd_export (N : namespace) (E : coPset) (g : wgstate)
+      (a base : Z) :
+    ↑N ⊆ E ->
+    weak_state_interp g -∗ wlock_regd N a base ={E}=∗
+    ⌜exists n0 : nat, wlp_at (wglog g) a base n0⌝.
+  Proof.
+    intros HN. iIntros "Hsi #Hreg".
+    iDestruct (weak_state_interp_lat with "Hsi") as "Hlat".
+    iDestruct "Hreg" as (I) "[#Hinv #Hacc]".
+    iInv "Hinv" as "HI" "Hclose".
+    iAssert (▷ (∃ n0 : nat, wlock_st a base n0 ∗ (wlock_st a base n0 -∗ I)))%I
+      with "[HI]" as "HQ".
+    { iNext. by iApply "Hacc". }
+    rewrite bi.later_exist. iDestruct "HQ" as (n0) "HQ".
+    rewrite bi.later_sep. iDestruct "HQ" as "[>Hst Hback]".
+    iDestruct (wlp_at_of_lock with "Hlat Hst") as %Hlp.
+    iMod ("Hclose" with "[Hst Hback]") as "_".
+    { iNext. by iApply "Hback". }
+    iModIntro. iPureIntro. by exists n0.
+  Qed.
 
 End resources.
 

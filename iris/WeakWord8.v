@@ -441,10 +441,25 @@ Section store8.
             with "Hauth H6") as "[Hauth H6]".
     iMod (ghost_map_update (S (length (wm_log σ)), nth_byte v 7)
             with "Hauth H7") as "[Hauth H7]".
+    (* T2-0: the window's eight bytes are pinned CLEAN by the fragments the
+       caller handed in, so none of them is a [WLock] byte. *)
+    iDestruct (ghost_map_lookup with "Hc C0") as %K0.
+    iDestruct (ghost_map_lookup with "Hc C1") as %K1.
+    iDestruct (ghost_map_lookup with "Hc C2") as %K2.
+    iDestruct (ghost_map_lookup with "Hc C3") as %K3.
+    iDestruct (ghost_map_lookup with "Hc C4") as %K4.
+    iDestruct (ghost_map_lookup with "Hc C5") as %K5.
+    iDestruct (ghost_map_lookup with "Hc C6") as %K6.
+    iDestruct (ghost_map_lookup with "Hc C7") as %K7.
     iModIntro. iSplitL "Hauth Hc".
     - iExists (wins8 a (S (length (wm_log σ))) v mm), mc. iFrame "Hauth Hc".
       iSplitR; [iPureIntro; by apply wlat_agree_store8|].
-      iPureIntro. by apply wcds_agree_nonplain.
+      iPureIntro.
+      apply (wcds_agree_nonplain8 _ tid k a v mc WClean Hk eq_refl);
+        [|exact Hagc].
+      intros j Hj. destruct j as [|[|[|[|[|[|[|[|j]]]]]]]];
+        [exact K0|exact K1|exact K2|exact K3
+        |exact K4|exact K5|exact K6|exact K7|lia].
     - rewrite /wlat8 /wlat_pointsto /wlat_elem. iFrame.
   Qed.
 

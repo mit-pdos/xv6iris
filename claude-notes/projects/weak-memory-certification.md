@@ -15,6 +15,28 @@ finding that §5's `w_rdw`/`w_lock` are NOT needed, the route-B fallback
 trigger, and the revised staging **T2-0 … T2-6** that supersedes this
 file's bare item list as the execution order.
 
+**T2-0 LANDED (2026-08-20): the lock-word protocol export** — `wcds`
+gains `WLock (base) (n0)` whose `wcds_ok` arm is `wcds_clean ∧ wlp_at`
+(the clean half is FORCED: the suffix protocol says nothing about the
+pre-registration history where `initlock`'s plain store sits, and φ's
+`nv_ok` must still be paid); `wlock_inv` holds the new `wlat4L` bundle
+(`n0` EXISTENTIAL inside it, so every downstream lock-client statement
+is textually unchanged); `wlock_alloc` performs the C→WLock registration
+flip; both lock cores store through `wcds_ok_store_lock`; the export is
+`WeakGhost.wlock_regd` (a persistent invariant + accessor — nothing
+discarded is minted; a `DfracDiscarded` cds copy would freeze the byte)
+consumed by **`weak_ev_adequacy_lockproto`**: at every reachable σ,
+`∃ n0, wlp_at (wglog σ) a base n0`.  On the 5 rv64d axioms.  TWO
+DEVIATIONS THAT BIND T2-5: (i) the release arm of `wlock_shaped` is
+`wm_ak ≠ WCplain ∧ data = zero`, NOT `= WCrel` (`wQ_store_w` leaves the
+class existential) — so the trace-side `win_excl` derivation must take
+the unlock's COVERAGE from the trace's fence (C4's
+`covered_of_release_chain`), never from the message class, which is what
+it did anyway; (ii) `wlock_regd` is per lock word — if T2-5 wants a
+family at once, upgrade it to a finite set of `(base, N)` pairs rather
+than adding a registry ghost (rejected: it reopens the ~50-site
+`weak_state_interp` reassembly).
+
 **T2-1 slice 1 LANDED (2026-08-20): `iris/WeakRvwmoGraph.v`** — the
 RVWMO⁻ herd-style presentation (per-agent label lists; `gx_gmo` as DATA,
 so stores can be early; read `ts` entries reinterpreted as gmo-write

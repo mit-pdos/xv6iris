@@ -591,7 +591,7 @@ Section wp_park.
     { rewrite /wctx_baton wledger_pay_at. iExists V. by iFrame "Hau". }
     iAssert (⌜nv_hart (wm_log σ') cpu_id (wm_ws σ')⌝)%I as %Hnv'.
     { iDestruct "Hbody" as (st' t' v'') "[Hw' Hlk']".
-      iDestruct (nv_ok_wlat4 cpu_id _ _ hf (DfracOwn 1) t' v''
+      iDestruct (nv_ok_wlat4L cpu_id _ _ hf t' v''
                    with "Hlat Hw'") as %Hnvhf.
       iPureIntro.
       apply (nv_hart_of_wQ_eff_ok cpu_id σ σ'

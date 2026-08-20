@@ -888,11 +888,15 @@ Section pointsto.
     rewrite /wlat_elem.
     iMod (ghost_map_update (S (length (wm_log σ)), v') with "Hauth He")
       as "[Hauth He]".
+    (* T2-0: [wcds_ok_store_nonplain] is false at a [WLock] byte, so the
+       framing needs the ONE byte this message writes to be non-[WLock] —
+       which the points-to's own [wclean] half says. *)
+    iDestruct (ghost_map_lookup with "Hcauth Hc") as %K.
     iModIntro. rewrite Himg Hlog. iSplitL "Hauth Hcauth".
     - iExists _, _. iFrame "Hauth Hcauth". iSplitR.
       { iPureIntro. by apply wlat_agree_store. }
-      iPureIntro. intros a' s' Ha'.
-      by apply wcds_ok_store_nonplain; [|apply Hagc].
+      iPureIntro.
+      exact (wcds_agree_nonplain1 _ m mc a WClean Hk eq_refl Hother K Hagc).
     - rewrite wpt_at. iExists (S (length (wm_log σ))). by iFrame "He Hc".
   Qed.
 

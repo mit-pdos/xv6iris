@@ -266,8 +266,9 @@ Section clock.
             with "Hlg Hmg Hi Hel Hs") as "(Hlg & Hmg & Hi & Hel & Hs)".
     iFrame "Hlg".
     (* the lock word's own bundle moves to the fresh top, and stays CLEAN *)
-    iMod (wlat4_store_gen (Some (fin_to_nat i)) WCrel σ σ' lk t w lock_zero
-            ltac:(discriminate) Himg Hlog with "Hi Hw") as "[Hi Hw]".
+    iMod (wlat4L_store_gen (Some (fin_to_nat i)) WCrel σ σ' lk t w lock_zero
+            (wlock_shaped_rel _ WCrel _ ltac:(discriminate)) Himg Hlog
+            with "Hi Hw") as "[Hi Hw]".
     (* THE FLIP, at the post-log whose last message is this hart's release *)
     rewrite Hlog.
     iMod (wlat_flip (wm_img σ') (wm_log σ)
@@ -340,8 +341,9 @@ Section clock.
     iDestruct "Hinv" as (st t w) "(Hw & Ha & _)".
     iDestruct (locked_state with "Ha Htok") as %->.
     (* the flag word's bundle moves to the fresh top and stays CLEAN *)
-    iMod (wlat4_store_gen (Some (fin_to_nat i)) WCrel σ σ' hf t w lock_zero
-            ltac:(discriminate) Himg Hlog with "Hi Hw") as "[Hi Hw]".
+    iMod (wlat4L_store_gen (Some (fin_to_nat i)) WCrel σ σ' hf t w lock_zero
+            (wlock_shaped_rel _ WCrel _ ltac:(discriminate)) Himg Hlog
+            with "Hi Hw") as "[Hi Hw]".
     (* THE MINT: the handoff store is this hart's, release-class, at the log's
        fresh top, so it publishes every earlier position at once *)
     iMod (wlog_update (wm_log σ)

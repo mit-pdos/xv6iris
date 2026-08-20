@@ -231,8 +231,9 @@ Section yield.
     iDestruct (locked_state with "Ha Htok") as %->.
     (* the flag word's bundle moves to the fresh top and stays CLEAN — a
        [WCrel] message is not an owned store *)
-    iMod (wlat4_store_gen (Some (fin_to_nat i)) WCrel σ σ' hf t w lock_zero
-            ltac:(discriminate) Himg Hlog with "Hi Hw") as "[Hi Hw]".
+    iMod (wlat4L_store_gen (Some (fin_to_nat i)) WCrel σ σ' hf t w lock_zero
+            (wlock_shaped_rel _ WCrel _ ltac:(discriminate)) Himg Hlog
+            with "Hi Hw") as "[Hi Hw]".
     (* THE MINT.  The step's own message is this hart's, release-class, and at
        the log's fresh top — so it covers every earlier position at once. *)
     iMod (wlog_update (wm_log σ)
@@ -757,7 +758,7 @@ Section wp_yield.
     { by iApply (wbaton_intro V (wm_ws σ) HV). }
     iAssert (⌜nv_hart (wm_log σ') cpu_id (wm_ws σ')⌝)%I as %Hnv'.
     { iDestruct "Hbody" as (st' t' v'') "[Hw' Hlk']".
-      iDestruct (nv_ok_wlat4 cpu_id _ _ hf (DfracOwn 1) t' v''
+      iDestruct (nv_ok_wlat4L cpu_id _ _ hf t' v''
                    with "Hlat Hw'") as %Hnvhf.
       iPureIntro.
       apply (nv_hart_of_wQ_eff_ok cpu_id σ σ'

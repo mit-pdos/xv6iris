@@ -85,6 +85,40 @@ Definition lock_one  : bv 32 := (SailStdpp.Values.mword_of_int 1 : SailStdpp.Val
 Lemma lock_one_ne_zero : lock_one ≠ lock_zero.
 Proof. rewrite /lock_one /lock_zero. intros H. apply bv_eq in H. done. Qed.
 
+(* ---------------------------------------------------------------------- *)
+(** T2-0: THE TWO MESSAGE SHAPES the lock word's value protocol admits
+    ([WeakGhost.wlock_shaped]), as facts about the messages the two leaves
+    actually append.  The acquire's is [WCexcl] (pinned by
+    [WeakInstr.wQ_amo_aq_w]); the release's is whatever [wm_class_of]
+    computed, of which the leaf knows only [≠ WCplain] — hence the
+    protocol's release arm is keyed on the VALUE (a zero word), which the
+    leaf does pin. *)
+
+Lemma wwrite_msg_data4 tid k (a : Arch.pa) {w : N} (v : bv w) :
+  wm_data (wwrite_msg tid k a 4 v)
+  = [nth_byte v 0; nth_byte v 1; nth_byte v 2; nth_byte v 3].
+Proof. reflexivity. Qed.
+
+Lemma lock_zero_data4 tid k (a : Arch.pa) :
+  wm_data (wwrite_msg tid k a 4 lock_zero) = wlock_zero4.
+Proof.
+  rewrite wwrite_msg_data4 wlock_zero4_eq. f_equal.
+Qed.
+
+Lemma wlock_shaped_acq tid (a : Arch.pa) (v : bv 32) :
+  wlock_shaped (wwrite_msg tid WCexcl a 4 v).
+Proof.
+  rewrite /wlock_shaped wwrite_msg_length.
+  split_and!; [reflexivity|discriminate|by left].
+Qed.
+
+Lemma wlock_shaped_rel tid k (a : Arch.pa) :
+  k ≠ WCplain -> wlock_shaped (wwrite_msg tid k a 4 lock_zero).
+Proof.
+  intros Hk. rewrite /wlock_shaped wwrite_msg_length.
+  split_and!; [reflexivity|exact Hk|right; apply lock_zero_data4].
+Qed.
+
 (* ====================================================================== *)
 (** ** 1. The instruction effects the two cores consume
 
@@ -107,9 +141,22 @@ Section weak_lock.
   (** THE INVARIANT — an [iProp], hence objective, hence admissible.  [t] is
       the timestamp of the lock word's latest write AND the view the payload
       is frozen at; they are the same number, and that is the handoff. *)
+  (** T2-0 (S6 §4/§6b): THE BUNDLE IS [wlat4L], NOT [wlat4] — the lock word's
+      four bytes ride the fourth C/D/S state [WeakGhost.WLock] rather than
+      [WClean], which is what makes the VALUE PROTOCOL (acquire-RMW writes
+      nonzero exclusively / release writes zero) an invariant of the state
+      interpretation and hence EXPORTABLE at every reachable configuration
+      ([WeakStore.wlp_at_wlat4L], [WeakEvAdequacy.weak_ev_adequacy_lockproto]).
+
+      The registration point [n0] is EXISTENTIAL inside [wlat4L], not a
+      parameter of [wlock_inv]: threading it through the ~40 downstream
+      statements that mention [wlock_inv] (WeakAcquire, WkOwnPingPong,
+      WkYieldFrame, WkCtxSurface, WeakCtxLock, WeakBranch, WeakLeafAmo4Leaf)
+      would buy nothing — no client names the registration point, and the
+      export recovers it existentially. *)
   Definition wlock_inv (γ : gname) (lk : Arch.pa) (R : vProp Σ) : iProp Σ :=
     (∃ (st : lock_state) (t : nat) (v : bv 32),
-       wlat4 lk (DfracOwn 1) t v ∗ lock_auth γ st ∗
+       wlat4L lk t v ∗ lock_auth γ st ∗
        (⌜st = None⌝ ∗ ⌜v = lock_zero⌝ ∗ lock_frag γ None ∗ monPred_at R (view_scl t)
         ∨ ⌜st ≠ None⌝ ∗ ⌜v ≠ lock_zero⌝))%I.
 
@@ -138,22 +185,55 @@ Section weak_lock.
     iIntros "[H1 H2]". by iDestruct (locked_exclusive with "H1 H2") as "%".
   Qed.
 
-  (** ALLOCATION.  A free lock word (owned outright, at the timestamp its
-      elements carry) plus the payload frozen at that timestamp — which is
-      what [initlock]'s own store leaves — becomes a lock. *)
-  Lemma wlock_alloc (lk : Arch.pa) (R : vProp Σ) (t : nat) E :
+  (** ALLOCATION — AND REGISTRATION (T2-0).  A free lock word (owned
+      outright, at the timestamp its elements carry) plus the payload frozen
+      at that timestamp — which is what [initlock]'s own store leaves —
+      becomes a lock, and the C→[WLock] ghost flip happens HERE, at the
+      current log length.  That is exactly why the protocol is stated on the
+      post-registration SUFFIX: [initlock]'s own store is a [WCplain] message
+      on the very bytes being registered, and it sits below [length log]. *)
+  Lemma wlock_alloc (lk : Arch.pa) (R : vProp Σ) (t : nat) img log E :
+    wlat_interp img log -∗
     wlat4 lk (DfracOwn 1) t lock_zero -∗
     monPred_at R (view_scl t) ={E}=∗
-    ∃ γ : gname, inv wlockN (wlock_inv γ lk R).
+    wlat_interp img log ∗ ∃ γ : gname, inv wlockN (wlock_inv γ lk R).
   Proof.
-    iIntros "Hw HR".
+    iIntros "Hi Hw HR".
+    iMod (wlat4L_mint img log lk t lock_zero with "Hi Hw") as "[Hi Hw]".
     iMod (own_alloc ((●E (None : leibnizO lock_state)
                       ⋅ ◯E (None : leibnizO lock_state)) : lockUR)) as (γ) "[Ha Hf]".
     { apply excl_auth_valid. }
     iMod (inv_alloc wlockN _ (wlock_inv γ lk R) with "[Hw Ha Hf HR]") as "#Hinv".
     { iNext. iExists None, t, lock_zero. iFrame "Hw Ha".
       iLeft. iSplitR; [done|]. iSplitR; [done|]. iFrame "Hf HR". }
-    iModIntro. iExists γ. iExact "Hinv".
+    iModIntro. iFrame "Hi". iExists γ. iExact "Hinv".
+  Qed.
+
+  (** T2-0's REGISTRATION SEAM, instantiated.  [WeakGhost.wlock_regd] is
+      what travels to the adequacy export: the persistent [inv] assertion
+      plus the accessor "the body holds byte [acc_addr lk j]'s [WLock]
+      fragment at some registration point, and takes it back".  The lock
+      invariant satisfies it for each of the word's four bytes, and this is
+      the ONLY thing the export needs to know about the lock library — which
+      is why [WeakGhost] and [WeakEvAdequacy] stay independent of it. *)
+  Lemma wlock_inv_regd (γ : gname) (lk : Arch.pa) R (j : nat) :
+    (j < 4)%nat ->
+    inv wlockN (wlock_inv γ lk R) -∗ wlock_regd wlockN (acc_addr lk j) (pa_z lk).
+  Proof.
+    intros Hj. iIntros "#Hinv". rewrite /wlock_regd.
+    iExists (wlock_inv γ lk R). iFrame "Hinv". iModIntro.
+    iIntros "Hbody". iDestruct "Hbody" as (st t v) "(Hw & Ha & Harm)".
+    iDestruct "Hw" as (n0) "[Hel (L0 & L1 & L2 & L3)]".
+    iExists n0.
+    destruct j as [|[|[|[|j]]]]; [| | | |lia].
+    - iFrame "L0". iIntros "L0". iExists st, t, v. iFrame "Ha Harm".
+      iExists n0. rewrite /wlock_win. iFrame.
+    - iFrame "L1". iIntros "L1". iExists st, t, v. iFrame "Ha Harm".
+      iExists n0. rewrite /wlock_win. iFrame.
+    - iFrame "L2". iIntros "L2". iExists st, t, v. iFrame "Ha Harm".
+      iExists n0. rewrite /wlock_win. iFrame.
+    - iFrame "L3". iIntros "L3". iExists st, t, v. iFrame "Ha Harm".
+      iExists n0. rewrite /wlock_win. iFrame.
   Qed.
 
 (* ====================================================================== *)
@@ -235,12 +315,16 @@ Section weak_lock.
     destruct Heff as ((Himg & (kc & Hlog & _) & Hle & Hflr) & Hgain & Hexcl).
     iIntros "Hi Hinv".
     iDestruct "Hinv" as (st t v) "(Hw & Ha & Harm)".
-    iDestruct (wlat4_flat_gen σ lk (DfracOwn 1) t v Hwf Hacc with "Hi Hw")
+    iDestruct (wlat4L_flat_gen σ lk t v Hwf Hacc with "Hi Hw")
       as %[Hflat Hts].
     iExists v. iSplitR; [by iPureIntro|].
-    (* the machine's own write: the elements move to the fresh top, value 1 *)
-    iMod (wlat4_store_gen tid WCexcl σ σ' lk t v lock_one
-            ltac:(discriminate) Himg Hexcl with "Hi Hw") as "[Hi Hw]".
+    (* the machine's own write: the elements move to the fresh top, value 1.
+       T2-0: it goes through the PROTOCOL store — the message is [WCexcl]
+       (pinned by [wQ_amo_aq]), which is the acquire arm of
+       [WeakGhost.wlock_shaped]. *)
+    iMod (wlat4L_store_gen tid WCexcl σ σ' lk t v lock_one
+            (wlock_shaped_acq tid lk lock_one) Himg Hexcl with "Hi Hw")
+      as "[Hi Hw]".
     iDestruct "Harm" as "[(-> & -> & Hfrag & HR)|(%Hst & %Hv)]".
     - (* the lock was FREE: take it, and thaw the payload *)
       iMod (lock_take γ i with "Ha Hfrag") as "[Ha Hpre]".
@@ -302,7 +386,11 @@ Section weak_lock.
        timestamp, so it may be frozen there and handed to the invariant *)
     iAssert (monPred_at R (view_scl (S (length (wm_log σ)))))%I with "[HR]" as "HR".
     { by iApply (wwp_release_deposit R σ Hbnd with "HR"). }
-    iMod (wlat4_store_gen tid kc σ σ' lk t v lock_zero Hnp Himg Hlog
+    (* T2-0: the release arm of [WeakGhost.wlock_shaped] — the message writes
+       the ZERO word and is at least release-class (the [w_relp] flag the
+       preceding [fence rw,w] set is what rules out [WCplain]). *)
+    iMod (wlat4L_store_gen tid kc σ σ' lk t v lock_zero
+            (wlock_shaped_rel tid kc lk Hnp) Himg Hlog
             with "Hi Hw") as "[Hi Hw]".
     iMod (lock_clrcpu γ (Some (i, true)) i with "Ha Htok") as "(_ & Ha & Hpre)".
     iMod (lock_give γ (Some (i, false)) i with "Ha Hpre") as "(_ & Ha & Hfrag)".

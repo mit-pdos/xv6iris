@@ -248,7 +248,7 @@ Section wp_lock.
     (* open the lock: ⊤ -> ⊤ ∖ ↑wlockN, held across the step *)
     iInv wlockN as (st t v) "(>Hw & Hlk)" "Hclose".
     (* the swap's return value, off the elements alone *)
-    iDestruct (wlat4_flat_gen σ lk (DfracOwn 1) t v Hwf Hacclk with "Hlat Hw")
+    iDestruct (wlat4L_flat_gen σ lk t v Hwf Hacclk with "Hlat Hw")
       as %[Hflat _].
     iMod ("Hk" $! σ v with "[%] Hlat Hrest")
       as "(%Hpc & %Htext & %HP & %Hnvpc & Hlat & Hcont)"; [exact Hflat|].
@@ -274,7 +274,7 @@ Section wp_lock.
        ([WeakGhost.nv_byte_app_own]). *)
     iAssert (⌜nv_hart (wm_log σ') cpu_id (wm_ws σ')⌝)%I as %Hnv'.
     { iDestruct "Hbody" as (st' t' v'') "[Hw' Hlk']".
-      iDestruct (nv_ok_wlat4 cpu_id _ _ lk (DfracOwn 1) t' v''
+      iDestruct (nv_ok_wlat4L cpu_id _ _ lk t' v''
                    with "Hlat Hw'") as %Hnvlk.
       iPureIntro.
       apply (nv_hart_of_wQ_eff_ok cpu_id σ σ' es HQeff Hnvσ).
@@ -433,7 +433,7 @@ Section wp_lock.
        append, and [wrelease_core] hands the lock bundle back CLEAN. *)
     iAssert (⌜nv_hart (wm_log σ') cpu_id (wm_ws σ')⌝)%I as %Hnv'.
     { iDestruct "Hbody" as (st' t' v'') "[Hw' Hlk']".
-      iDestruct (nv_ok_wlat4 cpu_id _ _ lk (DfracOwn 1) t' v''
+      iDestruct (nv_ok_wlat4L cpu_id _ _ lk t' v''
                    with "Hlat Hw'") as %Hnvlk.
       iPureIntro.
       apply (nv_hart_of_wQ_eff_ok cpu_id σ σ' es HQeff Hnvσ).

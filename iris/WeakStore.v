@@ -203,6 +203,63 @@ Proof.
     |set_solver|set_solver|set_solver|set_solver|lia].
 Qed.
 
+(** T2-0's FRAMING OF THE STATE MAP ACROSS A NON-PLAIN STORE, per width.
+    [WeakGhost.wcds_ok_store_nonplain] is false at a [WLock] byte, so a
+    generic store site must say why its own window carries none — and every
+    such site holds four (eight) fragments AT ONE AND THE SAME state, whose
+    ghost-map lookups are exactly what these take. *)
+Lemma wcds_agree_nonplain4 log tid k (a : Arch.pa) {w : N} (v : bv w) mc
+    (s0 : wcds) :
+  k <> WCplain -> is_wlock s0 = false ->
+  mc !! acc_addr a 0 = Some s0 -> mc !! acc_addr a 1 = Some s0 ->
+  mc !! acc_addr a 2 = Some s0 -> mc !! acc_addr a 3 = Some s0 ->
+  wcds_agree log mc ->
+  wcds_agree (log ++ [wwrite_msg tid k a 4 v]) mc.
+Proof.
+  intros Hk Hnl K0 K1 K2 K3 Hag.
+  apply (wcds_agree_nonplain_win _ _ _
+           [acc_addr a 0; acc_addr a 1; acc_addr a 2; acc_addr a 3]);
+    [done|apply (wwrite_msg_zs4 _ _ a v)| |exact Hag].
+  intros z s Hz Hs. assert (s = s0) as ->; [|exact Hnl].
+  apply elem_of_cons in Hz as [->|Hz]; [congruence|].
+  apply elem_of_cons in Hz as [->|Hz]; [congruence|].
+  apply elem_of_cons in Hz as [->|Hz]; [congruence|].
+  apply elem_of_cons in Hz as [->|Hz]; [congruence|].
+  by apply elem_of_nil in Hz.
+Qed.
+
+Lemma wcds_agree_nonplain8 log tid k (a : Arch.pa) {w : N} (v : bv w) mc
+    (s0 : wcds) :
+  k <> WCplain -> is_wlock s0 = false ->
+  (forall j : nat, (j < 8)%nat -> mc !! acc_addr a j = Some s0) ->
+  wcds_agree log mc ->
+  wcds_agree (log ++ [wwrite_msg tid k a 8 v]) mc.
+Proof.
+  intros Hk Hnl K Hag.
+  apply (wcds_agree_nonplain_win _ _ _
+           [acc_addr a 0; acc_addr a 1; acc_addr a 2; acc_addr a 3;
+            acc_addr a 4; acc_addr a 5; acc_addr a 6; acc_addr a 7]);
+    [done|apply (wwrite_msg_zs8 _ _ a v)| |exact Hag].
+  intros z s Hz Hs. assert (s = s0) as ->; [|exact Hnl].
+  apply elem_of_cons in Hz as [->|Hz];
+    [pose proof (K 0%nat ltac:(lia)); congruence|].
+  apply elem_of_cons in Hz as [->|Hz];
+    [pose proof (K 1%nat ltac:(lia)); congruence|].
+  apply elem_of_cons in Hz as [->|Hz];
+    [pose proof (K 2%nat ltac:(lia)); congruence|].
+  apply elem_of_cons in Hz as [->|Hz];
+    [pose proof (K 3%nat ltac:(lia)); congruence|].
+  apply elem_of_cons in Hz as [->|Hz];
+    [pose proof (K 4%nat ltac:(lia)); congruence|].
+  apply elem_of_cons in Hz as [->|Hz];
+    [pose proof (K 5%nat ltac:(lia)); congruence|].
+  apply elem_of_cons in Hz as [->|Hz];
+    [pose proof (K 6%nat ltac:(lia)); congruence|].
+  apply elem_of_cons in Hz as [->|Hz];
+    [pose proof (K 7%nat ltac:(lia)); congruence|].
+  by apply elem_of_nil in Hz.
+Qed.
+
 (** THE WINDOW FLOOR.  [WeakVProp.flr_store_post] covers the ONE byte a
     single-byte store wrote; a width-[n] store raises the floor at every byte
     of its window, because [WeakMem.store_post_run] folds [store_post] over
@@ -560,10 +617,20 @@ Section store.
             with "Hauth H2") as "[Hauth H2]".
     iMod (ghost_map_update (S (length (wm_log σ)), nth_byte v 3)
             with "Hauth H3") as "[Hauth H3]".
+    (* T2-0: the window's four bytes are pinned CLEAN by the very fragments
+       the caller handed in, so none of them is a [WLock] byte — which is
+       what [wcds_agree_nonplain_win] needs to frame the state map across a
+       non-plain store. *)
+    iDestruct (ghost_map_lookup with "Hc C0") as %K0.
+    iDestruct (ghost_map_lookup with "Hc C1") as %K1.
+    iDestruct (ghost_map_lookup with "Hc C2") as %K2.
+    iDestruct (ghost_map_lookup with "Hc C3") as %K3.
     iModIntro. iSplitL "Hauth Hc".
     - iExists (wins4 a (S (length (wm_log σ))) v mm), mc. iFrame "Hauth Hc".
       iSplitR; [iPureIntro; by apply wlat_agree_store4|].
-      iPureIntro. by apply wcds_agree_nonplain.
+      iPureIntro.
+      exact (wcds_agree_nonplain4 _ tid k a v mc WClean Hk eq_refl
+               K0 K1 K2 K3 Hagc).
     - rewrite /wlat4 /wlat_pointsto /wlat_elem. iFrame.
   Qed.
 
@@ -949,10 +1016,22 @@ Section store.
             with "Hauth H2") as "[Hauth H2]".
     iMod (ghost_map_update (S (length (wm_log σ)), nth_byte v 3)
             with "Hauth H3") as "[Hauth H3]".
+    (* T2-0: the window is pinned SYNC by the persistent witnesses, so it
+       carries no [WLock] byte. *)
+    iDestruct (sync_win_byte a 4 0 ltac:(simpl; lia) with "Hs") as "S0".
+    iDestruct (sync_win_byte a 4 1 ltac:(simpl; lia) with "Hs") as "S1".
+    iDestruct (sync_win_byte a 4 2 ltac:(simpl; lia) with "Hs") as "S2".
+    iDestruct (sync_win_byte a 4 3 ltac:(simpl; lia) with "Hs") as "S3".
+    rewrite /sync_byte /wcds_el.
+    iDestruct (ghost_map_lookup with "Hc S0") as %K0.
+    iDestruct (ghost_map_lookup with "Hc S1") as %K1.
+    iDestruct (ghost_map_lookup with "Hc S2") as %K2.
+    iDestruct (ghost_map_lookup with "Hc S3") as %K3.
     iModIntro. iSplitL "Hauth Hc".
     - iExists (wins4 a (S (length (wm_log σ))) v mm), mc. iFrame "Hauth Hc".
       iSplitR; [iPureIntro; by apply wlat_agree_store4|].
-      iPureIntro. by apply wcds_agree_nonplain.
+      iPureIntro. exact (wcds_agree_nonplain4 _ tid k a v mc WSync Hk eq_refl
+                           K0 K1 K2 K3 Hagc).
     - rewrite /wlat4_sync /wlat4_el /wlat_elem. by iFrame "H0 H1 H2 H3 Hs".
   Qed.
 
@@ -1041,6 +1120,199 @@ Section store.
   Qed.
 
   (* ------------------------------------------------------------------ *)
+  (** *** 4d'. THE LOCK ALTITUDE — [wlat4L] (T2-0, S6 §4/§6b)
+
+      The lock word's four bytes ride the FOURTH C/D/S state
+      ([WeakGhost.WLock]) rather than [WClean], so the bundle
+      [WeakLock.wlock_inv] holds is the [wlat4_sync] shape with the four
+      persistent sync witnesses replaced by four EXCLUSIVE lock fragments:
+
+        the four VALUE elements at full fraction — a store retargets them —
+        plus the four [WLock] state fragments, which it hands back unchanged
+        (the state does not move; only the log grows).
+
+      What the [WLock] state buys is the VALUE PROTOCOL, which nothing else
+      in the framework can state: a store may reach these bytes only through
+      [wlat4L_store_gen], whose premise is that the message is acquire- or
+      release-shaped ([WeakGhost.wlock_shaped]).  A plain store cannot: it
+      needs [wown_st], i.e. a [WClean]/[WDirty] element, which disagrees with
+      the auth ([WeakGhost.wlock_st_clean_excl]).  And a NON-protocol
+      exclusive store cannot either, because [wlat4_store_prim]'s
+      [wlat_pointsto] carries [wclean].
+
+      [n0] — the log length at registration — is a parameter of [wlat4_lock]
+      and EXISTENTIAL in [wlat4L], so that [WeakLock.wlock_inv] keeps its
+      arity and every downstream statement about it is unchanged. *)
+
+  Definition wlock_win (a : Arch.pa) (n0 : nat) : iProp Σ :=
+    (wlock_st (acc_addr a 0) (pa_z a) n0 ∗ wlock_st (acc_addr a 1) (pa_z a) n0 ∗
+     wlock_st (acc_addr a 2) (pa_z a) n0 ∗
+     wlock_st (acc_addr a 3) (pa_z a) n0)%I.
+
+  Definition wlat4_lock (a : Arch.pa) (n0 : nat) (t : nat) (w : bv 32)
+      : iProp Σ :=
+    (wlat4_el a (DfracOwn 1) t w ∗ wlock_win a n0)%I.
+
+  (** The bundle [wlock_inv] holds.  [n0] is hidden — a client never names
+      the registration point; the export does, off the fragment. *)
+  Definition wlat4L (a : Arch.pa) (t : nat) (w : bv 32) : iProp Σ :=
+    (∃ n0 : nat, wlat4_lock a n0 t w)%I.
+
+  Global Instance wlock_win_timeless a n0 : Timeless (wlock_win a n0).
+  Proof. rewrite /wlock_win. apply _. Qed.
+  Global Instance wlat4_lock_timeless a n0 t w : Timeless (wlat4_lock a n0 t w).
+  Proof. rewrite /wlat4_lock /wlat4_el /wlat_elem. apply _. Qed.
+  Global Instance wlat4L_timeless a t w : Timeless (wlat4L a t w).
+  Proof. rewrite /wlat4L. apply _. Qed.
+  Global Instance wlat4L_objective a t w :
+    Objective (⎡wlat4L a t w⎤ : vProp Σ).
+  Proof. apply _. Qed.
+
+  Lemma wlock_win_lookup (a : Arch.pa) (n0 : nat) mc :
+    ghost_map_auth weak_cds_name 1 mc -∗ wlock_win a n0 -∗
+    ⌜forall j : nat, (j < 4)%nat ->
+       mc !! acc_addr a j = Some (WLock (pa_z a) n0)⌝.
+  Proof.
+    iIntros "Ha (S0 & S1 & S2 & S3)".
+    iDestruct (wlock_st_lookup with "Ha S0") as %K0.
+    iDestruct (wlock_st_lookup with "Ha S1") as %K1.
+    iDestruct (wlock_st_lookup with "Ha S2") as %K2.
+    iDestruct (wlock_st_lookup with "Ha S3") as %K3.
+    iPureIntro. intros j Hj.
+    destruct j as [|[|[|[|j]]]]; [exact K0|exact K1|exact K2|exact K3|lia].
+  Qed.
+
+  (** THE REGISTRATION MINT: an ordinary (clean) four-byte element bundle
+      becomes the lock word's bundle, registered at the CURRENT log length —
+      where the protocol's suffix obligation is vacuous, so the word's
+      pre-registration history ([initlock]'s plain store) is irrelevant. *)
+  Lemma wlat4L_mint (img : _) (log : list wmsg) (a : Arch.pa) (t : nat)
+      (w : bv 32) :
+    wlat_interp img log -∗ wlat4 a (DfracOwn 1) t w ==∗
+    wlat_interp img log ∗ wlat4L a t w.
+  Proof.
+    rewrite /wlat4 /wlat_pointsto.
+    iIntros "Hi ([E0 C0] & [E1 C1] & [E2 C2] & [E3 C3])".
+    iMod (wlock_register img log (acc_addr a 0) (pa_z a)
+            ltac:(rewrite /acc_addr; lia) with "Hi C0") as "[Hi L0]".
+    iMod (wlock_register img log (acc_addr a 1) (pa_z a)
+            ltac:(rewrite /acc_addr; lia) with "Hi C1") as "[Hi L1]".
+    iMod (wlock_register img log (acc_addr a 2) (pa_z a)
+            ltac:(rewrite /acc_addr; lia) with "Hi C2") as "[Hi L2]".
+    iMod (wlock_register img log (acc_addr a 3) (pa_z a)
+            ltac:(rewrite /acc_addr; lia) with "Hi C3") as "[Hi L3]".
+    iModIntro. iFrame "Hi". iExists (length log).
+    rewrite /wlat4_lock /wlat4_el /wlock_win. iFrame.
+  Qed.
+
+  (** THE PROTOCOL STORE.  [wlat4_sync_store_prim]'s twin: the state map is
+      untouched (the [WLock] entries survive by
+      [WeakGhost.wcds_ok_store_lock]), only the four value elements move —
+      and the price is the shape premise, which is the whole content of
+      T2-0. *)
+  Lemma wlat4_lock_store_prim (tid : option nat) k (σ : wmstate) (a : Arch.pa)
+      (v : bv 32) (n0 t : nat) (w : bv 32) :
+    wlock_shaped (wwrite_msg tid k a 4 v) ->
+    wlat_interp (wm_img σ) (wm_log σ) -∗
+    wlat4_lock a n0 t w ==∗
+    wlat_interp (wm_img σ) (wm_log σ ++ [wwrite_msg tid k a 4 v]) ∗
+    wlat4_lock a n0 (S (length (wm_log σ))) v.
+  Proof.
+    intros Hsh. iIntros "Hi [(H0 & H1 & H2 & H3) Hlk]".
+    iDestruct "Hi" as (mm mc) "(Hauth & %Hag & Hc & %Hagc)".
+    rewrite /wlat_elem.
+    iMod (ghost_map_update (S (length (wm_log σ)), nth_byte v 0)
+            with "Hauth H0") as "[Hauth H0]".
+    iMod (ghost_map_update (S (length (wm_log σ)), nth_byte v 1)
+            with "Hauth H1") as "[Hauth H1]".
+    iMod (ghost_map_update (S (length (wm_log σ)), nth_byte v 2)
+            with "Hauth H2") as "[Hauth H2]".
+    iMod (ghost_map_update (S (length (wm_log σ)), nth_byte v 3)
+            with "Hauth H3") as "[Hauth H3]".
+    iDestruct (wlock_win_lookup with "Hc Hlk") as %K.
+    iModIntro. iSplitL "Hauth Hc".
+    - iExists (wins4 a (S (length (wm_log σ))) v mm), mc. iFrame "Hauth Hc".
+      iSplitR; [iPureIntro; by apply wlat_agree_store4|].
+      iPureIntro.
+      apply (wcds_agree_store_lock _ _ _
+               [acc_addr a 0; acc_addr a 1; acc_addr a 2; acc_addr a 3]
+               (pa_z a) n0); [reflexivity|exact Hsh
+                             |apply (wwrite_msg_zs4 _ _ a v)| |exact Hagc].
+      intros z Hz.
+      apply elem_of_cons in Hz as [->|Hz]; [apply (K 0%nat); lia|].
+      apply elem_of_cons in Hz as [->|Hz]; [apply (K 1%nat); lia|].
+      apply elem_of_cons in Hz as [->|Hz]; [apply (K 2%nat); lia|].
+      apply elem_of_cons in Hz as [->|Hz]; [apply (K 3%nat); lia|].
+      by apply elem_of_nil in Hz.
+    - rewrite /wlat4_lock /wlat4_el /wlat_elem. by iFrame.
+  Qed.
+
+  Lemma wlat4L_store_prim (tid : option nat) k (σ : wmstate) (a : Arch.pa)
+      (v : bv 32) (t : nat) (w : bv 32) :
+    wlock_shaped (wwrite_msg tid k a 4 v) ->
+    wlat_interp (wm_img σ) (wm_log σ) -∗
+    wlat4L a t w ==∗
+    wlat_interp (wm_img σ) (wm_log σ ++ [wwrite_msg tid k a 4 v]) ∗
+    wlat4L a (S (length (wm_log σ))) v.
+  Proof.
+    intros Hsh. iIntros "Hi Hw". iDestruct "Hw" as (n0) "Hw".
+    iMod (wlat4_lock_store_prim tid k σ a v n0 t w Hsh with "Hi Hw")
+      as "[$ Hw]".
+    iModIntro. by iExists n0.
+  Qed.
+
+  (** ... at an explicitly described post-state — the shape the lock cores
+      have ([WeakLock.wlat4_store_gen]'s twin). *)
+  Lemma wlat4L_store_gen (tid : option nat) k (σ σ' : wmstate) (a : Arch.pa)
+      (t : nat) (w v : bv 32) :
+    wlock_shaped (wwrite_msg tid k a 4 v) ->
+    wm_img σ' = wm_img σ ->
+    wm_log σ' = (wm_log σ ++ [wwrite_msg tid k a 4 v])%list ->
+    wlat_interp (wm_img σ) (wm_log σ) -∗
+    wlat4L a t w ==∗
+    wlat_interp (wm_img σ') (wm_log σ') ∗
+    wlat4L a (S (length (wm_log σ))) v.
+  Proof.
+    intros Hsh Himg Hlog. iIntros "Hi Hw". rewrite Himg Hlog.
+    by iMod (wlat4L_store_prim tid k σ a v t w Hsh with "Hi Hw") as "[$ $]".
+  Qed.
+
+  (** The FLAT reading, [WeakLock.wlat4_flat_gen]'s twin over the lock
+      bundle — what the acquire's spin test branches on. *)
+  Lemma wlat4L_flat_gen (σ : wmstate) (a : Arch.pa) (t : nat) (w : bv 32) :
+    wlog_wf (wm_log σ) -> acc_wf a 4 ->
+    (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
+    wlat4L a t w -∗
+    ⌜(forall j : nat, (j < 4)%nat ->
+        wflat (wm_img σ) (wm_log σ) !! pa_add a j = Some (nth_byte w j)) /\
+     (forall j : nat, (j < 4)%nat -> latest_ts (wm_log σ) (acc_addr a j) = t)⌝.
+  Proof.
+    intros Hwf Hacc. iIntros "Hi Hw". iDestruct "Hw" as (n0) "[He _]".
+    by iApply (wlat4_el_flat_gen σ a (DfracOwn 1) t w Hwf Hacc with "Hi He").
+  Qed.
+
+  (** THE EXPORT AT THE BUNDLE ALTITUDE (T2-0's deliverable): the lock
+      word's whole VALUE PROTOCOL, per byte, read off the bundle the
+      invariant holds.  [n0] stays hidden — the statement says "there is a
+      registration point past which every message on this byte is
+      acquire- or release-shaped", which is exactly what S6 §3 case #5
+      consumes. *)
+  Lemma wlp_at_wlat4L (img : _) (log : list wmsg) (a : Arch.pa) (t : nat)
+      (w : bv 32) :
+    wlat_interp img log -∗ wlat4L a t w -∗
+    ⌜exists n0 : nat, forall j : nat, (j < 4)%nat ->
+       wlp_at log (acc_addr a j) (pa_z a) n0⌝.
+  Proof.
+    iIntros "Hi Hw". iDestruct "Hw" as (n0) "[_ (S0 & S1 & S2 & S3)]".
+    iDestruct (wlp_at_of_lock with "Hi S0") as %P0.
+    iDestruct (wlp_at_of_lock with "Hi S1") as %P1.
+    iDestruct (wlp_at_of_lock with "Hi S2") as %P2.
+    iDestruct (wlp_at_of_lock with "Hi S3") as %P3.
+    iPureIntro. exists n0. intros j Hj.
+    destruct j as [|[|[|[|j]]]]; [exact P0|exact P1|exact P2|exact P3|lia].
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
   (** *** 4e. THE φ EXPORTERS (φ-upgrade, deliverable C)
 
       What a data leaf pays its violation-freedom obligation with: one
@@ -1088,6 +1360,23 @@ Section store.
     iDestruct (nv_ok_of_pointsto _ _ c with "Hi H1") as %E1.
     iDestruct (nv_ok_of_pointsto _ _ c with "Hi H2") as %E2.
     iDestruct (nv_ok_of_pointsto _ _ c with "Hi H3") as %E3.
+    iPureIntro. intros j Hj.
+    destruct j as [|[|[|[|j]]]]; [exact E0|exact E1|exact E2|exact E3|lia].
+  Qed.
+
+  (** The lock bundle's φ payment (T2-0).  It goes through the [WLock] arm,
+      which carries [wcds_clean] as a conjunct precisely so that the
+      acquire/release leaves keep paying their obligation off the very bundle
+      they hand back. *)
+  Lemma nv_ok_wlat4L (c : CPU) img log (a : Arch.pa) (t : nat) (w : bv 32) :
+    wlat_interp img log -∗ wlat4L a t w -∗
+    ⌜forall j : nat, (j < 4)%nat -> nv_ok log c (acc_addr a j)⌝.
+  Proof.
+    iIntros "Hi Hw". iDestruct "Hw" as (n0) "[_ (S0 & S1 & S2 & S3)]".
+    iDestruct (nv_ok_of_lock _ _ c with "Hi S0") as %E0.
+    iDestruct (nv_ok_of_lock _ _ c with "Hi S1") as %E1.
+    iDestruct (nv_ok_of_lock _ _ c with "Hi S2") as %E2.
+    iDestruct (nv_ok_of_lock _ _ c with "Hi S3") as %E3.
     iPureIntro. intros j Hj.
     destruct j as [|[|[|[|j]]]]; [exact E0|exact E1|exact E2|exact E3|lia].
   Qed.
