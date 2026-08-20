@@ -285,16 +285,60 @@ Sail platform axioms (`valid_reservation`, `plat_term_write`,
 `LinkNameiRootBoot.NameiRootBoot.wp_namei_root_boot` (LEAVES) and
 `LinkForkretPark.ForkretPark.forkret_park` (STAYS).
 
-## Open — scout before sizing
+## Scout verdicts (2026-08-20) — the three opens, sized
 
-- What `BootShared.v`'s three `!fileG Σ` sections actually need it for. The
-  only real uses found so far are `FileInv.file_payload` (both in COMMENTS,
-  `:408` and `:1109`) and `ProcInv.tf_page` (a comment, `:53`); `procs_avail` /
-  `hart_full` / `pstate_full` are the live ones and are proc-layer. If none
-  needs `fileG`, `fs_cfg_alloc` goes inside `boot_shared_alloc`; otherwise it
-  is a separate lemma applied by `xv6_boot_era`.
-- `ProofMain.mn_grp_fs`'s shape — two new ghost steps plus threaded premises in
-  a large group lemma is the least predictable part of the plan.
+- **`fs_cfg_alloc` goes INSIDE `boot_shared_alloc` (R6a).** Audited twice
+  (source chase + coqtop `About` on the compiled sections): NOTHING in
+  `BootShared.v` uses `fileG` — all three binders are dead (`boot_bss_carve`
+  captures only `riscvGS/fdslotG/irefslotG`; `boot_shared_alloc` captures no
+  `fileG`). So the new instance lands in the existing existential row, exactly
+  like `fdslotG`/`irefslotG`/`pavG` (`iExists Hfd, Hir, Hpav, …` at `:1183`,
+  destructed at `SystemAdequacy.v:142` before the chain arms — which ARE the
+  genuine `fileG` consumers). One missing piece: **no `fileGpreS` exists**;
+  the class's only constructors are `subG_fileΣ` (which requires ambient
+  `icfg`/`fscfg` — the divergence engine) or a binder. So stage 3 adds a
+  camera-only `fileGpreS Σ := { file_preG : inG Σ fileUR }` beside the class,
+  `subG` instance included, and `fs_cfg_alloc` builds `FileG _ ICFG FSC` from
+  it. Comment drift to cut when there: `BootShared.v:732-733` ("capacity
+  only") and `:794-798` = `SystemAdequacy.v:126-131` ("fileG carries icacheG"
+  — stale since `icacheG` moved to `xv6G`).
+- **`ireg_alloc`/`ipool_alloc` need NO `_at` forms.** They run inside the era
+  fupd BEFORE the `FSC` record is assembled, so `γi`/`dss` are ordinary
+  in-fupd existentials and `fsc_ireg := γi`; apply them explicitly at the
+  freshly-minted `ICFG` instance. The `_at` discipline is only for the
+  WP-time constructors: `bio_init` (binit's post), `icache_boot` (after
+  iinit), `newlock` (kmem/virtio/itable/pr), `initlog` (forkret). Stage 1
+  shrinks accordingly.
+- **The `fsc_ic` ordering wrinkle dissolves.** `ic_names_alloc`'s `dvs`
+  (per-slot dev/inum words, readable only at `icache_boot` time) looked like
+  it blocked minting `fsc_ic` at the era: it does not. `ic_id` is a plain
+  `ghost_var` (`IcacheEscrow.v:382`) and `ic_id_flip` (`:404`) updates both
+  halves to ANY value. The era fupd mints `fsc_ic` at dummy dev/inum;
+  `icache_boot_at` takes the families at whatever recorded values and flips
+  `ic_id` to what it reads. No image premise.
+- **`mn_grp_fs` is better-conditioned than feared**: it already contains a
+  mid-walk ghost interlude at exactly the needed spot (`disk_res_boot` +
+  `iMod newlock` at mask ⊤, `ProofMain.v:1346-1351`, between +0x9a's return
+  and +0x9e); the new steps copy that idiom after `+0x92`'s return. 257
+  lines, 26 wand premises; the group applies the weak `SpecUserinit.USERINIT`
+  and already carries the counted regimes to the call site.
+- **`first_tok` is wired to NOTHING today** — no producer, no consumer
+  (`grep`: only FirstTok.v itself + one comment; forkret's proven arm takes
+  the raw `first_addr ↦₄□ 0` cell instead, `SpecForkret.v:230`). Widening the
+  left disjunct therefore ripples into zero existing proofs.
+- **`initlog`'s existential exits through a WP continuation**, so its `_at`
+  conversion lands on SpecInitlog's post (`∃ γ, log_ctx γ …` becomes
+  `log_ctx icfg_log …` + free-state `own` premises for the four gnames) and
+  on ProofInitlog's internal mint — and `SpecFsinit`'s post must then speak
+  `icfg_log` too, or the seal site cannot form `fs_ready`. `wp_fsinit_sconf`
+  has no consumer yet, so the reshape is cheap now.
+- Stale counts, corrected here so nobody re-trusts them: `fscfg` is **19**
+  fields (not 18); `fs_ready` is **20** conjuncts (fs_geom_ok + fs_sb_cells
+  landed with the dispatcher increment). `design/fs-ghost-state.md` §7b still
+  says 18 — refresh it at the seal increment.
+
+## Still open
+
 - **A timing probe on ONE `ipool_alloc` bundle before writing the stocking
   lemma.** `ipool_insert`'s own comment measured 106 s for a single bare
   `iFrame` over one `ipool_shape` (`inode_blocks` is a 268-element big-op per
