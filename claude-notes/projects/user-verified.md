@@ -452,6 +452,28 @@ safety tier's `u_walk_pure` could not be reused: it stands on `u_mem_wf`,
 which owns every mapped data byte, and pins its landing map by DOMAIN — a
 value-precise tier can pay neither.  That is also why `u_mem_ok` exists.
 
+**THE REVIVAL IS COMPLETE, AND THE BINARIES COST FIVE LINES.**  All 41 rows
+are in the build.  Per binary, against the ported tier:
+
+| binary | edit | statement changes |
+|---|---|---|
+| sync | 2 lines (2 `ecall` sites) | 0 |
+| echo | 2 lines (2 `ecall` sites) | 0 |
+| sh (11 files, ~25k lines) | 1 line (1 `ecall` site) | 0 |
+| init | none | 0 |
+
+Every one of those five lines is the same thing: the `goodmb` certificate
+argument the port added to `wp_uv_ecall`.  Nothing else in fifteen `UProof*`
+files moved, and every `USpec*` compiled untouched from the first day.
+
+**THE LATER-STRUCTURE HELD.**  init's two UNBOUNDED loops close by `iLöb`,
+whose IH is `▷`-guarded, so they are the only consumers of
+`wp_uv_retire_later`'s exposed later — the one part of the funnel whose shape
+the port had to preserve for a consumer no other binary exercises.  It was
+preserved without special effort, because the later was already where it
+needed to be.  That was the last place a statement could have been forced to
+move, and it did not.
+
 **AND THE AXIOM FOOTPRINT GREW BY ONE, inherited.**  `WpUmodeStore` /
 `WpUmodeLoad` close at 5 platform + funext + `ResvAxioms.load_reservation_
 term`.  It enters through `UserMemAccess`'s reservation helpers inside the

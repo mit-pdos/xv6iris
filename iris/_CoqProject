@@ -231,16 +231,13 @@ UserMem.v
 UserFetch.v
 UserCompute.v
 UserStepFull.v
-# --- BEGIN descoped tier: verified Umode WP (sync/echo/sh/init) ---
-# Ruling (project owner, 2026-08-19): the proofs of the specific user-mode
-# binaries sync/echo/sh/init, and the Umode WP infrastructure that exists only
-# to support them, are descoped from the hart-node-port build. This is NOT the
-# ProofUser/UserExec "run arbitrary user-mode code" tier, which is kept and is
-# being finished separately. Nor is it LinkUserinit/SpecUserinit, which concern
-# the KERNEL's userinit path and stay in the build. The .v files below remain on
-# disk untouched; reviving this tier means uncommenting these rows and porting
-# them per claude-notes/projects/user-tier-port.md's P8 entry ("the same
-# bricks").
+# --- BEGIN verified Umode WP tier (sync/echo/sh/init) ---
+# Descoped from the hart-node-port build on 2026-08-19 and REVIVED on
+# 2026-08-20, ported onto per-node semantics; all 41 rows are in the build.
+# Distinct from the ProofUser/UserExec "run arbitrary user-mode code" tier,
+# and from LinkUserinit/SpecUserinit, which are the KERNEL's userinit path.
+# What the port cost, and why it cost so little, is in
+# claude-notes/projects/user-verified.md.
 UmodeMem.v
 UmodeCap.v
 UmodeFetch.v
@@ -263,26 +260,26 @@ USpecSh.v
 USpecShParse.v
 UmodeFrame.v
 UmodeStub.v
-# UProofShLib.v
-# UProofShMem.v
-# UProofShHeap.v
-# UProofShLex.v
-# UProofShIo.v
+UProofShLib.v
+UProofShMem.v
+UProofShHeap.v
+UProofShLex.v
+UProofShIo.v
 UProofShInput.v
-# UProofShParse.v
-# UProofShCmd.v
-# UProofShTop.v
-# UProofShMain.v
-# UProofShEcho.v
+UProofShParse.v
+UProofShCmd.v
+UProofShTop.v
+UProofShMain.v
+UProofShEcho.v
 UCodeInit.v
 UmodeInitIo.v
 USpecInit.v
-# UProofInitLib.v
-# UProofInitPrintf.v
-# UProofInit.v
-# UProofEchoA.v
-# UProofEcho.v
-# --- END descoped tier ---
+UProofInitLib.v
+UProofInitPrintf.v
+UProofInit.v
+UProofEchoA.v
+UProofEcho.v
+# --- END verified Umode WP tier ---
 UserMemArms.v
 UserClassify.v
 UserClassifyAsm.v

@@ -150,7 +150,16 @@ Section UProofEchoA.
     assert (Ha7 : uint (m1 !!! Regidx a7_idx) = 2)
       by (rewrite /m1; reg_lookup).
     iApply (wp_uv_ecall C pt Ψxv6 M m1 (mword_of_int 0x334)
-              (ui_echo_334 pt M Hlay Htext) with "Hcg Hpc").
+              (ui_echo_334 pt M Hlay Htext)
+              (fun (s : mstate)
+                   (Hp : register_lookup cur_privilege s.(sregs) = User)
+                   (Hc : register_lookup (R_bitvector_64 PC) s.(sregs)
+                         = mword_of_int 0x334) =>
+                 UserExecFacts.goodmb_execute_ECALL_U UserFrame.Du_r UserFrame.Du_w
+                   s (mword_of_int 0x334)
+                   ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                   Hp Hc)
+              with "Hcg Hpc").
     rewrite /xv6_sys_protocol /usys_protocol_of.
     rewrite Ha7.
     change (xv6_sys_sem 2) with UsysNoRet.
@@ -205,7 +214,16 @@ Section UProofEchoA.
       by exact (upd_ne m (Regidx a7_idx) (Regidx a2_idx) _
                   ltac:(vm_compute; discriminate)).
     iApply (wp_uv_ecall C pt Ψxv6 M m1 (mword_of_int 0x354)
-              (ui_echo_354 pt M Hlay Htext) with "Hcg Hpc").
+              (ui_echo_354 pt M Hlay Htext)
+              (fun (s : mstate)
+                   (Hp : register_lookup cur_privilege s.(sregs) = User)
+                   (Hc : register_lookup (R_bitvector_64 PC) s.(sregs)
+                         = mword_of_int 0x354) =>
+                 UserExecFacts.goodmb_execute_ECALL_U UserFrame.Du_r UserFrame.Du_w
+                   s (mword_of_int 0x354)
+                   ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                   Hp Hc)
+              with "Hcg Hpc").
     rewrite /xv6_sys_protocol /usys_protocol_of.
     rewrite Ha7.
     change (xv6_sys_sem 16) with UsysReadsBuf.
