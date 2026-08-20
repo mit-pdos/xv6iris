@@ -968,6 +968,41 @@ Definition ctrl_post (ws : wstate) (v : nat) : wstate :=
      (* [LCtrl] does NOT clear the reservation either (RMW split §3). *)
      w_res   := w_res ws;   w_tbank := w_tbank ws |}.
 
+(** *** [ctrl_post] is transparent to everything but [w_vcap]
+
+    Stated here, next to the definition, because the run-level wrappers below
+    ([load_post_run] &c.) all end in a [ctrl_post] and every field fact about
+    them peels it with one of these. *)
+
+Lemma ctrl_post_coh ws v a : coh (ctrl_post ws v) a = coh ws a.
+Proof. done. Qed.
+Lemma ctrl_post_vrOld ws v : w_vrOld (ctrl_post ws v) = w_vrOld ws.
+Proof. done. Qed.
+Lemma ctrl_post_vwOld ws v : w_vwOld (ctrl_post ws v) = w_vwOld ws.
+Proof. done. Qed.
+Lemma ctrl_post_vrNew ws v : w_vrNew (ctrl_post ws v) = w_vrNew ws.
+Proof. done. Qed.
+Lemma ctrl_post_vwNew ws v : w_vwNew (ctrl_post ws v) = w_vwNew ws.
+Proof. done. Qed.
+Lemma ctrl_post_vRel ws v : w_vRel (ctrl_post ws v) = w_vRel ws.
+Proof. done. Qed.
+Lemma ctrl_post_fwd ws v : w_fwd (ctrl_post ws v) = w_fwd ws.
+Proof. done. Qed.
+Lemma ctrl_post_pub ws v : w_pub (ctrl_post ws v) = w_pub ws.
+Proof. done. Qed.
+Lemma ctrl_post_relp ws v : w_relp (ctrl_post ws v) = w_relp ws.
+Proof. done. Qed.
+Lemma ctrl_post_regv ws v r : regv (ctrl_post ws v) r = regv ws r.
+Proof. done. Qed.
+Lemma ctrl_post_ldv ws v : w_ldv (ctrl_post ws v) = w_ldv ws.
+Proof. done. Qed.
+Lemma ctrl_post_res ws v : w_res (ctrl_post ws v) = w_res ws.
+Proof. done. Qed.
+Lemma ctrl_post_tbank ws v : w_tbank (ctrl_post ws v) = w_tbank ws.
+Proof. done. Qed.
+Lemma ctrl_post_vcap ws v : w_vcap (ctrl_post ws v) = Nat.max v (w_vcap ws).
+Proof. done. Qed.
+
 (** [LInstr]: instruction start.  Resets the load-result bank, which is what
     scopes [DLdRes] to ONE instruction. *)
 Definition instr_post (ws : wstate) : wstate :=
@@ -1028,43 +1063,52 @@ Proof. done. Qed.
 Definition load_run_ats (base : Z) (ts : list nat) : list (Z * nat) :=
   zip_with (λ j t, (base + Z.of_nat j, t)) (seq 0 (length ts)) ts.
 
-(** THE RUN-LEVEL READ.  [ctrl_post … vaddr] is PARM's [vcap ⊔= view(addr)],
-    applied ONCE per access rather than per byte (per-byte would be the same
-    join, but hoisting it keeps every per-byte lemma dependency-free).
+(** THE RUN-LEVEL READ.  The [ctrl_post] wrapper is PARM's
+    [vcap ⊔= view(addr)], applied ONCE per access rather than per byte
+    (per-byte would be the same join, but hoisting it keeps every per-byte
+    lemma dependency-free), joined with W-TV's TRANSLATION BANK.
 
-    W-TV, THE CONSUMPTION SIDE, IS *NOT* HERE YET — AND IT IS NOT A ONE-LINE
-    EDIT (finding of the RMW split's R2 pass; the W2b/W3 worklist entry
-    should carry it).  [w_tbank] is PRODUCED by [load_post_at] and RESET by
-    [instr_post]; what is owed is the join into the access node's [w_vcap],
-    i.e. this [ctrl_post]'s argument becoming [Nat.max vaddr (w_tbank ws)]
-    (and the same in [store_post_run_d]).  Three things move in lockstep
-    with it, none optional:
+    W-TV, THE CONSUMPTION SIDE (W2b conditions 4/5).  [w_tbank] is PRODUCED
+    by [load_post_at] and RESET by [instr_post]; it is CONSUMED here, by
+    every run-level access, which joins it into [w_vcap] alongside the
+    address view.  Three things about the shape, none accidental:
 
-    1. [load_post_run_d_0] / [store_post_run_d_0] — the dependency-free
-       names are the [_d] ones AT ZERO, and a [w_tbank] that lives only in
-       the [_d] wrapper breaks that equation at ~20 call sites
-       ([WeakSailLTS]'s [pf_load]/[pf_store]/[pf_rmw], [WeakSailComplete],
-       [WeakSailLTS2], [WeakEvCapstone], [WeakPromiseBridge]).  Keeping it
-       means the NON-[_d] names take the bank too — which drags the
-       AXIOMATIC tier ([WeakAxiomatic.mstep] steps with [load_post_run]) and
-       the toy-language projection ([WeakLitmusProj.lcfg_match], via
-       [load_post_run_single]) with it.
-    2. [WeakPromiseBridge.cfg_match] demands per-agent [wstate] EQUALITY
-       with the axiomatic tier, so any [w_vcap] raise the promising machine
-       gains must be matched there (or [cfg_match] must stop looking at
-       [w_vcap]).
-    3. [WeakRobustProv]'s [lstate] mirror has a [w_vcap] conjunct in [lrel]
-       but no [l_tbank]; the bank has to be mirrored (leaf list + [lrel]
-       conjunct + banking in [lload_post_at] + reset in [linstr_post])
-       before [lrel_load_post_run_d] can be re-proved. *)
+    1. THE BANK IS READ AT THE ENTRY STATE ([w_tbank ws], not the bank of
+       the folded post-state): the node consumes what the translation of the
+       access in flight banked, and a load's own byte-banking must not feed
+       its own consumption (W2b condition 4).
+    2. THE NON-[_d] TIER CARRIES THE BANK TOO (option α).  The
+       dependency-free names ARE the [_d] ones at operand view [0], and
+       [Nat.max 0 x] is [x] by conversion, so [load_post_run_d_0] /
+       [store_post_run_d_0] stay EXACT equalities — which is what keeps the
+       ~20 [_0] call sites ([WeakSailLTS]'s [pf_load]/[pf_store]/[pf_rmw],
+       [WeakSailComplete], [WeakSailLTS2], [WeakEvCapstone],
+       [WeakPromiseBridge]) and [WeakPromiseBridge.cfg_match]'s per-agent
+       [wstate] EQUALITY with the axiomatic tier textually unchanged.  The
+       price is that the AXIOMATIC tier ([WeakAxiomatic.mstep], which steps
+       with [load_post_run]) consumes the bank as well; the T1 completeness
+       invariant does not constrain [w_vcap]/[w_tbank], so it does not see
+       this.
+    3. THE ERASURE ([WeakErase]) DOES NOT RELATE [w_vcap] any more: the
+       erased run maps [LInstr] to [LSilent], so it never resets the bank
+       and its [w_vcap] can OVERTAKE the instance's.  Nothing in the pf
+       fragment reads [w_vcap] (there is no [fulfil_ok] there at all), so
+       the erasure runs on [ws_le_nc] — see the note at [ws_le_nc] below.
+
+    The l-side mirror ([WeakRobustProv]: [l_tbank] + the [lrel] conjunct
+    [w_tbank w = lval σ (l_tbank S)]) mirrors production, reset AND
+    consumption. *)
 Definition load_post_run_d (ws : wstate) (aq : bool) (vaddr : nat) (base : Z)
     (ts : list nat) : wstate :=
-  ctrl_post (load_post_bytes_d ws aq vaddr (load_run_ats base ts)) vaddr.
+  ctrl_post (load_post_bytes_d ws aq vaddr (load_run_ats base ts))
+            (Nat.max vaddr (w_tbank ws)).
 
 Definition load_post_run (ws : wstate) (aq : bool) (base : Z) (ts : list nat)
     : wstate :=
-  load_post_bytes ws aq
-    (zip_with (λ j t, (base + Z.of_nat j, t)) (seq 0 (length ts)) ts).
+  ctrl_post
+    (load_post_bytes ws aq
+       (zip_with (λ j t, (base + Z.of_nat j, t)) (seq 0 (length ts)) ts))
+    (w_tbank ws).
 
 Definition store_run_as (base : Z) (n : nat) : list Z :=
   map (λ j : nat, base + Z.of_nat j) (seq 0 n).
@@ -1073,26 +1117,41 @@ Definition store_post_run_d (ws : wstate) (rl : bool) (vaddr vdata : nat)
     (base : Z) (n : nat) (t : nat) : wstate :=
   ctrl_post
     (store_post_bytes_d ws rl (Nat.max vaddr vdata) (store_run_as base n) t)
-    vaddr.
+    (Nat.max vaddr (w_tbank ws)).
 
 Definition store_post_run (ws : wstate) (rl : bool) (base : Z) (n : nat)
     (t : nat) : wstate :=
-  store_post_bytes ws rl (map (λ j : nat, base + Z.of_nat j) (seq 0 n)) t.
+  ctrl_post
+    (store_post_bytes ws rl (map (λ j : nat, base + Z.of_nat j) (seq 0 n)) t)
+    (w_tbank ws).
 
 (** The dependency-free names ARE the [_d] functions at operand view [0].
-    At the BYTE level this is conversion; at the RUN level the wrapper's
-    [ctrl_post _ 0] has to be peeled by [ctrl_post_0] (a record eta, hence
-    propositional and not definitional). *)
+    At the BYTE level this is conversion; at the RUN level it stays
+    conversion too, because [Nat.max 0 v] reduces to [v] — the [ctrl_post_0]
+    peel the pre-W-TV wrappers needed is gone with the [vaddr]-only
+    argument. *)
 Lemma ctrl_post_0 ws : ctrl_post ws 0%nat = ws.
 Proof. by destruct ws. Qed.
 
 Lemma load_post_run_d_0 ws aq base ts :
   load_post_run_d ws aq 0%nat base ts = load_post_run ws aq base ts.
-Proof. rewrite /load_post_run_d ctrl_post_0 //. Qed.
+Proof. done. Qed.
 
 Lemma store_post_run_d_0 ws rl base n t :
   store_post_run_d ws rl 0%nat 0%nat base n t = store_post_run ws rl base n t.
-Proof. rewrite /store_post_run_d ctrl_post_0 //. Qed.
+Proof. done. Qed.
+
+(** The bank equations: no run-level access CHANGES the bank (the fold's
+    per-byte banking is the load's, and [ctrl_post] is transparent), and the
+    bank it consumed is below the control view it produced — the [vcapat]
+    producer of W2b condition 5. *)
+Lemma load_post_run_d_tbank_vcap ws aq vaddr base ts :
+  (w_tbank ws ≤ w_vcap (load_post_run_d ws aq vaddr base ts))%nat.
+Proof. rewrite /load_post_run_d ctrl_post_vcap. lia. Qed.
+
+Lemma store_post_run_d_tbank_vcap ws rl vaddr vdata base n t :
+  (w_tbank ws ≤ w_vcap (store_post_run_d ws rl vaddr vdata base n t))%nat.
+Proof. rewrite /store_post_run_d ctrl_post_vcap. lia. Qed.
 
 (** THE EXCLUSIVE-BANK VIEW (PARM's [Exbank.view], deviation D-2): the read
     half's own [view_post], i.e. the max post-view over the bytes of a load
@@ -1304,6 +1363,69 @@ Proof. by intros (_ & _ & _ & _ & _ & _ & _ & ?). Qed.
 Lemma ws_le_pub w1 w2 : ws_le w1 w2 → (w_pub w1 ≤ w_pub w2)%nat.
 Proof. by intros (_ & _ & _ & _ & _ & _ & ? & _). Qed.
 
+(** [ctrl_post] only RAISES the control view — stated here (rather than with
+    the other dependency-only effects below) because every run-level wrapper
+    ends in one, so the run-level monotonicity facts need it. *)
+Lemma ctrl_post_le ws v : ws_le ws (ctrl_post ws v).
+Proof. rewrite /ws_le /ctrl_post /=. split_and!; auto with lia. Qed.
+
+(** [ws_le_nc] — [ws_le] MINUS the [w_vcap] conjunct ("no control view").
+
+    W-TV's consumption (see [load_post_run_d]) made [w_vcap] the one monotone
+    component an ERASURE cannot relate: [WeakErase]'s erased run maps
+    [LInstr] to [LSilent], so it never resets [w_tbank], and its stale bank
+    feeds a [w_vcap] that OVERTAKES the instance's at the next access.
+    [WeakErase.er_ws] therefore runs on this relation.  It costs no consumer:
+    the pf fragment has NO [fulfil_ok] at all, so the whole fulfil pre-view —
+    [w_vcap], [w_vwNew], [rv_view] — never appears in a side condition
+    there. *)
+Definition ws_le_nc (w1 w2 : wstate) : Prop :=
+  (∀ a, (coh w1 a ≤ coh w2 a)%nat) ∧
+  (w_vrOld w1 ≤ w_vrOld w2)%nat ∧ (w_vwOld w1 ≤ w_vwOld w2)%nat ∧
+  (w_vrNew w1 ≤ w_vrNew w2)%nat ∧ (w_vwNew w1 ≤ w_vwNew w2)%nat ∧
+  (w_vRel  w1 ≤ w_vRel  w2)%nat ∧ (w_pub w1 ≤ w_pub w2)%nat.
+
+Global Instance ws_le_nc_refl : Reflexive ws_le_nc.
+Proof. intros w. rewrite /ws_le_nc. split_and!; auto with lia. Qed.
+
+Global Instance ws_le_nc_trans : Transitive ws_le_nc.
+Proof.
+  intros w1 w2 w3 (?&?&?&?&?&?&?) (?&?&?&?&?&?&?).
+  rewrite /ws_le_nc; split_and!; try lia. intros a. etrans; eauto.
+Qed.
+
+Lemma ws_le_ws_le_nc w1 w2 : ws_le w1 w2 → ws_le_nc w1 w2.
+Proof. by intros (?&?&?&?&?&?&?&?). Qed.
+
+Lemma ws_le_nc_coh w1 w2 a : ws_le_nc w1 w2 → (coh w1 a ≤ coh w2 a)%nat.
+Proof. by intros (H & _). Qed.
+
+Lemma ws_le_nc_vrOld w1 w2 : ws_le_nc w1 w2 → (w_vrOld w1 ≤ w_vrOld w2)%nat.
+Proof. by intros (_ & ? & _). Qed.
+
+Lemma ws_le_nc_vwOld w1 w2 : ws_le_nc w1 w2 → (w_vwOld w1 ≤ w_vwOld w2)%nat.
+Proof. by intros (_ & _ & ? & _). Qed.
+
+Lemma ws_le_nc_vrNew w1 w2 : ws_le_nc w1 w2 → (w_vrNew w1 ≤ w_vrNew w2)%nat.
+Proof. by intros (_ & _ & _ & ? & _). Qed.
+
+Lemma ws_le_nc_vwNew w1 w2 : ws_le_nc w1 w2 → (w_vwNew w1 ≤ w_vwNew w2)%nat.
+Proof. by intros (_ & _ & _ & _ & ? & _). Qed.
+
+Lemma ws_le_nc_vRel w1 w2 : ws_le_nc w1 w2 → (w_vRel w1 ≤ w_vRel w2)%nat.
+Proof. by intros (_ & _ & _ & _ & _ & ? & _). Qed.
+
+Lemma ws_le_nc_pub w1 w2 : ws_le_nc w1 w2 → (w_pub w1 ≤ w_pub w2)%nat.
+Proof. by intros (_ & _ & _ & _ & _ & _ & ?). Qed.
+
+Lemma ctrl_post_mono w1 w2 v1 v2 :
+  ws_le w1 w2 → (v1 ≤ v2)%nat → ws_le (ctrl_post w1 v1) (ctrl_post w2 v2).
+Proof.
+  intros Hle Hv. rewrite /ws_le /ctrl_post /=.
+  destruct Hle as (Hcoh & HrO & HwO & HrN & HwN & HR & Hpub & Hvc).
+  split_and!; try lia. intros a. apply Hcoh.
+Qed.
+
 Lemma load_post_at_le ws aq vpre a t : ws_le ws (load_post_at ws aq vpre a t).
 Proof.
   rewrite /ws_le /load_post_at /=. split_and!; try (destruct aq; lia).
@@ -1344,7 +1466,9 @@ Lemma load_post_bytes_le ws aq ats : ws_le ws (load_post_bytes ws aq ats).
 Proof. apply load_post_fold_le. Qed.
 
 Lemma load_post_run_le ws aq base ts : ws_le ws (load_post_run ws aq base ts).
-Proof. apply load_post_bytes_le. Qed.
+Proof.
+  rewrite /load_post_run. etrans; [apply load_post_bytes_le|apply ctrl_post_le].
+Qed.
 
 Lemma store_post_fold_le rl t as_ ws :
   ws_le ws (foldl (λ w a, store_post w rl a t) ws as_).
@@ -1357,7 +1481,10 @@ Lemma store_post_bytes_le ws rl as_ t : ws_le ws (store_post_bytes ws rl as_ t).
 Proof. apply store_post_fold_le. Qed.
 
 Lemma store_post_run_le ws rl base n t : ws_le ws (store_post_run ws rl base n t).
-Proof. apply store_post_bytes_le. Qed.
+Proof.
+  rewrite /store_post_run.
+  etrans; [apply store_post_bytes_le|apply ctrl_post_le].
+Qed.
 
 (* ------------------------------------------------------------------ *)
 (** ** The individual view facts the litmus proofs consume *)
@@ -1413,7 +1540,7 @@ Proof. apply load_post_fold_fwd. Qed.
 
 Lemma load_post_run_fwd ws aq base ts :
   w_fwd (load_post_run ws aq base ts) = w_fwd ws.
-Proof. apply load_post_bytes_fwd. Qed.
+Proof. rewrite /load_post_run ctrl_post_fwd. apply load_post_bytes_fwd. Qed.
 
 (** THE MULTI-BYTE READ GAIN.  [load_post_vrOld_nofwd] says a single
     non-forwarded byte read of timestamp [t] leaves [t ≤ w_vrOld]; this is the
@@ -1450,7 +1577,8 @@ Lemma load_post_run_vrOld ws aq base ts j :
   (j < length ts)%nat → w_fwd ws !! (base + Z.of_nat j)%Z = None →
   (ts !!! j ≤ w_vrOld (load_post_run ws aq base ts))%nat.
 Proof.
-  intros Hj Hfwd. apply (load_post_bytes_vrOld _ _ _ (base + Z.of_nat j)%Z);
+  intros Hj Hfwd. rewrite /load_post_run ctrl_post_vrOld.
+  apply (load_post_bytes_vrOld _ _ _ (base + Z.of_nat j)%Z);
     [|exact Hfwd].
   apply elem_of_list_lookup_2 with j.
   destruct (lookup_lt_is_Some_2 ts j Hj) as [t Ht].
@@ -1816,9 +1944,6 @@ Qed.
 Lemma regw_post_le ws rd v : ws_le ws (regw_post ws rd v).
 Proof. rewrite /ws_le /regw_post /=. split_and!; auto with lia. Qed.
 
-Lemma ctrl_post_le ws v : ws_le ws (ctrl_post ws v).
-Proof. rewrite /ws_le /ctrl_post /=. split_and!; auto with lia. Qed.
-
 Lemma instr_post_le ws : ws_le ws (instr_post ws).
 Proof. rewrite /ws_le /instr_post /=. split_and!; auto with lia. Qed.
 
@@ -1912,6 +2037,7 @@ Lemma load_post_run_bounded ws aq base ts n :
   ws_bounded (load_post_run ws aq base ts) n.
 Proof.
   intros Hb Hall. rewrite /load_post_run.
+  apply ctrl_post_bounded; [|by apply ws_bounded_tbank].
   apply load_post_bytes_bounded; [exact Hb|by apply Forall_zip_seq].
 Qed.
 
@@ -1920,6 +2046,8 @@ Lemma store_post_run_bounded ws rl base cnt t n n' :
   ws_bounded (store_post_run ws rl base cnt t) n'.
 Proof.
   intros Hb Ht Hle. rewrite /store_post_run.
+  apply ctrl_post_bounded;
+    [|etrans; [by apply ws_bounded_tbank|exact Hle]].
   by apply (store_post_bytes_bounded ws rl _ t n n').
 Qed.
 
@@ -1953,14 +2081,22 @@ Qed.
 
     The byte address [base + Z.of_nat 0] normalizes to [base].  The store form
     is stated at [length [v]] rather than at [1] so that it matches the
-    step relations' post-states syntactically. *)
+    step relations' post-states syntactically.
+
+    THE [ctrl_post] ON THE RIGHT is W-TV's consumption (see the note at
+    [load_post_run_d]): a run-level access joins the entry state's
+    translation bank into [w_vcap], and the per-byte functions
+    [load_post]/[store_post] do not.  At [w_tbank ws = 0] — in particular at
+    [ws_init] — [ctrl_post_0] collapses it away. *)
 
 Lemma load_post_run_single ws aq base t :
-  load_post_run ws aq base [t] = load_post ws aq base t.
+  load_post_run ws aq base [t]
+  = ctrl_post (load_post ws aq base t) (w_tbank ws).
 Proof. rewrite /load_post_run /load_post_bytes /load_post /= Z.add_0_r //. Qed.
 
 Lemma store_post_run_single ws rl base (v : bv 8) t :
-  store_post_run ws rl base (length [v]) t = store_post ws rl base t.
+  store_post_run ws rl base (length [v]) t
+  = ctrl_post (store_post ws rl base t) (w_tbank ws).
 Proof. rewrite /store_post_run /store_post_bytes /= Z.add_0_r //. Qed.
 
 (* ------------------------------------------------------------------ *)
@@ -1995,7 +2131,7 @@ Lemma load_post_run_coh ws aq base ts (j : nat) t :
   (t ≤ coh (load_post_run ws aq base ts) (base + Z.of_nat j))%nat.
 Proof.
   intros Ht. pose proof (lookup_lt_Some _ _ _ Ht) as Hj.
-  rewrite /load_post_run /load_post_bytes. apply load_post_fold_coh.
+  rewrite /load_post_run ctrl_post_coh /load_post_bytes. apply load_post_fold_coh.
   apply elem_of_list_lookup_2 with j.
   rewrite lookup_zip_with (lookup_seq_lt 0 (length ts) j Hj) Ht //.
 Qed.
@@ -2013,7 +2149,7 @@ Qed.
 Lemma store_post_run_coh ws rl base n t (j : nat) :
   (j < n)%nat → (t ≤ coh (store_post_run ws rl base n t) (base + Z.of_nat j))%nat.
 Proof.
-  intros Hj. rewrite /store_post_run /store_post_bytes.
+  intros Hj. rewrite /store_post_run ctrl_post_coh /store_post_bytes.
   apply store_post_fold_coh, elem_of_list_In, in_map_iff.
   exists j. split; [reflexivity|]. apply in_seq. lia.
 Qed.
@@ -2029,7 +2165,7 @@ Qed.
 Lemma store_post_run_vwOld ws rl base n t :
   (0 < n)%nat → (t ≤ w_vwOld (store_post_run ws rl base n t))%nat.
 Proof.
-  intros Hn. rewrite /store_post_run /store_post_bytes.
+  intros Hn. rewrite /store_post_run ctrl_post_vwOld /store_post_bytes.
   apply store_post_fold_vwOld. by destruct n; [lia|].
 Qed.
 
@@ -2054,7 +2190,7 @@ Lemma load_post_run_vrOld' ws aq base ts (j : nat) t :
   (t ≤ w_vrOld (load_post_run ws aq base ts))%nat.
 Proof.
   intros Ht Hfv. pose proof (lookup_lt_Some _ _ _ Ht) as Hj.
-  rewrite /load_post_run /load_post_bytes.
+  rewrite /load_post_run ctrl_post_vrOld /load_post_bytes.
   apply (load_post_fold_vrOld' _ _ _ _ (base + Z.of_nat j) t); [|exact Hfv].
   apply elem_of_list_lookup_2 with j.
   rewrite lookup_zip_with (lookup_seq_lt 0 (length ts) j Hj) Ht //.
@@ -2082,7 +2218,7 @@ Lemma load_post_run_vrNew_aq ws base ts (j : nat) t :
   ts !! j = Some t → (t ≤ w_vrNew (load_post_run ws true base ts))%nat.
 Proof.
   intros Ht. pose proof (lookup_lt_Some _ _ _ Ht) as Hj.
-  rewrite /load_post_run /load_post_bytes.
+  rewrite /load_post_run ctrl_post_vrNew /load_post_bytes.
   apply (load_post_fold_vrNew_aq _ _ _ (base + Z.of_nat j) t).
   apply elem_of_list_lookup_2 with j.
   rewrite lookup_zip_with (lookup_seq_lt 0 (length ts) j Hj) Ht //.
@@ -2104,7 +2240,7 @@ Lemma load_post_run_vwNew_aq ws base ts (j : nat) t :
   ts !! j = Some t → (t ≤ w_vwNew (load_post_run ws true base ts))%nat.
 Proof.
   intros Ht. pose proof (lookup_lt_Some _ _ _ Ht) as Hj.
-  rewrite /load_post_run /load_post_bytes.
+  rewrite /load_post_run ctrl_post_vwNew /load_post_bytes.
   apply (load_post_fold_vwNew_aq _ _ _ (base + Z.of_nat j) t).
   apply elem_of_list_lookup_2 with j.
   rewrite lookup_zip_with (lookup_seq_lt 0 (length ts) j Hj) Ht //.
@@ -2130,7 +2266,7 @@ Lemma load_post_run_vrNew_aq_vpre ws base ts (j : nat) t :
   (load_vpre ws true ≤ w_vrNew (load_post_run ws true base ts))%nat.
 Proof.
   intros Ht. pose proof (lookup_lt_Some _ _ _ Ht) as Hj.
-  rewrite /load_post_run /load_post_bytes.
+  rewrite /load_post_run ctrl_post_vrNew /load_post_bytes.
   apply (load_post_fold_vrNew_aq_vpre _ _ _ (base + Z.of_nat j, t)).
   apply elem_of_list_lookup_2 with j.
   rewrite lookup_zip_with (lookup_seq_lt 0 (length ts) j Hj) Ht //.
@@ -2154,7 +2290,10 @@ Qed.
 Lemma store_post_run_fwd_inv ws rl base n t a tf vf :
   w_fwd (store_post_run ws rl base n t) !! a = Some (tf, vf) →
   tf = t ∨ w_fwd ws !! a = Some (tf, vf).
-Proof. rewrite /store_post_run /store_post_bytes. apply store_post_fold_fwd. Qed.
+Proof.
+  rewrite /store_post_run ctrl_post_fwd /store_post_bytes.
+  apply store_post_fold_fwd.
+Qed.
 
 (* ================================================================== *)
 (** ** DOMINATION: upper bounds for the step functions
@@ -2332,34 +2471,9 @@ Qed.
     lemmas restated at [store_post_d], because the banked forward view sits
     INSIDE the fold. *)
 
-(** *** [ctrl_post] is transparent to everything but [w_vcap] *)
+(** *** The load run
 
-Lemma ctrl_post_coh ws v a : coh (ctrl_post ws v) a = coh ws a.
-Proof. done. Qed.
-Lemma ctrl_post_vrOld ws v : w_vrOld (ctrl_post ws v) = w_vrOld ws.
-Proof. done. Qed.
-Lemma ctrl_post_vwOld ws v : w_vwOld (ctrl_post ws v) = w_vwOld ws.
-Proof. done. Qed.
-Lemma ctrl_post_vrNew ws v : w_vrNew (ctrl_post ws v) = w_vrNew ws.
-Proof. done. Qed.
-Lemma ctrl_post_vwNew ws v : w_vwNew (ctrl_post ws v) = w_vwNew ws.
-Proof. done. Qed.
-Lemma ctrl_post_vRel ws v : w_vRel (ctrl_post ws v) = w_vRel ws.
-Proof. done. Qed.
-Lemma ctrl_post_fwd ws v : w_fwd (ctrl_post ws v) = w_fwd ws.
-Proof. done. Qed.
-Lemma ctrl_post_pub ws v : w_pub (ctrl_post ws v) = w_pub ws.
-Proof. done. Qed.
-Lemma ctrl_post_relp ws v : w_relp (ctrl_post ws v) = w_relp ws.
-Proof. done. Qed.
-Lemma ctrl_post_regv ws v r : regv (ctrl_post ws v) r = regv ws r.
-Proof. done. Qed.
-Lemma ctrl_post_ldv ws v : w_ldv (ctrl_post ws v) = w_ldv ws.
-Proof. done. Qed.
-Lemma ctrl_post_vcap ws v : w_vcap (ctrl_post ws v) = Nat.max v (w_vcap ws).
-Proof. done. Qed.
-
-(** *** The load run *)
+    ([ctrl_post]'s field equations live next to its definition, above.) *)
 
 Lemma load_post_bytes_d_le ws aq vaddr ats :
   ws_le ws (load_post_bytes_d ws aq vaddr ats).
@@ -2385,7 +2499,8 @@ Lemma load_post_run_d_bounded ws aq vaddr base ts n :
   ws_bounded (load_post_run_d ws aq vaddr base ts) n.
 Proof.
   intros Hb Hva Hall. rewrite /load_post_run_d.
-  apply ctrl_post_bounded; [|exact Hva].
+  apply ctrl_post_bounded;
+    [|apply Nat.max_lub; [exact Hva|by apply ws_bounded_tbank]].
   apply load_post_bytes_d_bounded; [exact Hb|exact Hva|].
   rewrite /load_run_ats Forall_lookup. intros j p Hp.
   rewrite lookup_zip_with in Hp.
@@ -2550,7 +2665,9 @@ Lemma store_post_run_d_bounded ws rl vaddr vdata base cnt t n n' :
   ws_bounded (store_post_run_d ws rl vaddr vdata base cnt t) n'.
 Proof.
   intros Hb Ht Hle Hva Hvd. rewrite /store_post_run_d.
-  apply ctrl_post_bounded; [|exact Hva].
+  apply ctrl_post_bounded;
+    [|apply Nat.max_lub;
+      [exact Hva|etrans; [by apply ws_bounded_tbank|exact Hle]]].
   apply (store_post_bytes_d_bounded _ _ _ _ _ n n'); [exact Hb|exact Ht|exact Hle|lia].
 Qed.
 
@@ -2674,6 +2791,108 @@ Qed.
 Lemma load_post_run_d_mono ws aq vaddr base ts :
   ws_le (load_post_run ws aq base ts) (load_post_run_d ws aq vaddr base ts).
 Proof.
-  rewrite /load_post_run_d.
-  etrans; [|apply ctrl_post_le]. apply load_post_bytes_d_mono.
+  rewrite /load_post_run /load_post_run_d.
+  apply ctrl_post_mono; [apply load_post_bytes_d_mono|lia].
 Qed.
+
+(* ================================================================== *)
+(** ** A RAISED CONTROL VIEW, AND NOTHING ELSE ([ws_ctrl_up])
+
+    W-TV's consumption is the only thing the RUN-level wrappers do that the
+    per-byte functions do not, and it moves ONLY [w_vcap].  A machine that
+    steps with [load_post]/[store_post] — the toy hart-program machine
+    [WeakLitmus], whose accesses are all single-byte and which has no
+    [LInstr] to reset the bank with — therefore tracks one that steps with
+    the run functions ([WeakAxiomatic.mstep]) up to exactly this relation,
+    which is what [WeakLitmusProj.lcfg_match] carries in place of the
+    [wstate] equality it carried before W-TV.  The slack is invisible to
+    every side condition on either side: neither machine READS [w_vcap]
+    (the axiomatic tier has no [fulfil_ok] at all). *)
+Definition ws_ctrl_up (w1 w2 : wstate) : Prop := ∃ v, w2 = ctrl_post w1 v.
+
+Global Instance ws_ctrl_up_refl : Reflexive ws_ctrl_up.
+Proof. intros w. exists 0%nat. by rewrite ctrl_post_0. Qed.
+
+Lemma ws_ctrl_up_le w1 w2 : ws_ctrl_up w1 w2 → ws_le w1 w2.
+Proof. intros [v ->]. apply ctrl_post_le. Qed.
+
+(** Two control raises are one. *)
+Lemma ctrl_post_ctrl ws v1 v2 :
+  ctrl_post (ctrl_post ws v1) v2 = ctrl_post ws (Nat.max v1 v2).
+Proof.
+  rewrite {1 2}/ctrl_post /=. by rewrite Nat.max_assoc (Nat.max_comm v2 v1).
+Qed.
+
+Global Instance ws_ctrl_up_trans : Transitive ws_ctrl_up.
+Proof.
+  intros w1 w2 w3 [v1 ->] [v2 ->]. exists (Nat.max v1 v2).
+  by rewrite ctrl_post_ctrl.
+Qed.
+
+(** The three per-byte step functions COMMUTE with a control raise: none of
+    them reads [w_vcap], and each copies it through. *)
+Lemma load_post_at_ctrl ws aq v vpre a t :
+  load_post_at (ctrl_post ws v) aq vpre a t
+  = ctrl_post (load_post_at ws aq vpre a t) v.
+Proof. done. Qed.
+
+Lemma load_post_ctrl ws aq v a t :
+  load_post (ctrl_post ws v) aq a t = ctrl_post (load_post ws aq a t) v.
+Proof. done. Qed.
+
+Lemma store_post_ctrl ws rl v a t :
+  store_post (ctrl_post ws v) rl a t = ctrl_post (store_post ws rl a t) v.
+Proof. done. Qed.
+
+Lemma fence_post_ctrl ws v pr pw sr sw :
+  fence_post (ctrl_post ws v) pr pw sr sw
+  = ctrl_post (fence_post ws pr pw sr sw) v.
+Proof. done. Qed.
+
+(** The byte FOLD commutes too, hence so does the whole dependency-carrying
+    load run: a control raise on the entry state comes out unchanged on the
+    post-state (the bank it consumes is not the raised component). *)
+Local Lemma load_post_fold_ctrl aq vpre ats v :
+  ∀ ws,
+    foldl (λ w at_, load_post_at w aq vpre at_.1 at_.2) (ctrl_post ws v) ats
+    = ctrl_post (foldl (λ w at_, load_post_at w aq vpre at_.1 at_.2) ws ats) v.
+Proof.
+  induction ats as [|x l IH]; intros ws; [done|].
+  by rewrite /= load_post_at_ctrl IH.
+Qed.
+
+Lemma load_post_bytes_d_ctrl ws aq vaddr ats v :
+  load_post_bytes_d (ctrl_post ws v) aq vaddr ats
+  = ctrl_post (load_post_bytes_d ws aq vaddr ats) v.
+Proof. rewrite /load_post_bytes_d. apply load_post_fold_ctrl. Qed.
+
+Lemma load_post_run_d_ctrl ws aq vaddr base ts v :
+  load_post_run_d (ctrl_post ws v) aq vaddr base ts
+  = ctrl_post (load_post_run_d ws aq vaddr base ts) v.
+Proof.
+  rewrite /load_post_run_d load_post_bytes_d_ctrl ctrl_post_tbank.
+  rewrite !ctrl_post_ctrl. by rewrite Nat.max_comm.
+Qed.
+
+(** … hence the SINGLE-BYTE run-level arms preserve the relation. *)
+Lemma ws_ctrl_up_load ws1 ws2 aq base t :
+  ws_ctrl_up ws1 ws2 →
+  ws_ctrl_up (load_post ws1 aq base t) (load_post_run ws2 aq base [t]).
+Proof.
+  intros [v ->]. rewrite load_post_run_single load_post_ctrl ctrl_post_tbank.
+  rewrite ctrl_post_ctrl. by eexists.
+Qed.
+
+Lemma ws_ctrl_up_store ws1 ws2 rl base t :
+  ws_ctrl_up ws1 ws2 →
+  ws_ctrl_up (store_post ws1 rl base t) (store_post_run ws2 rl base 1 t).
+Proof.
+  intros [v ->].
+  rewrite /store_post_run /store_post_bytes /= Z.add_0_r store_post_ctrl.
+  rewrite ctrl_post_ctrl. by eexists.
+Qed.
+
+Lemma ws_ctrl_up_fence ws1 ws2 pr pw sr sw :
+  ws_ctrl_up ws1 ws2 →
+  ws_ctrl_up (fence_post ws1 pr pw sr sw) (fence_post ws2 pr pw sr sw).
+Proof. intros [v ->]. rewrite fence_post_ctrl. by eexists. Qed.

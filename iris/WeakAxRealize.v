@@ -227,7 +227,6 @@ Section realize.
     = store_post_run (load_post_run ws aq base tvs.*1) rl base (length data) t.
   Proof.
     intros Hn. rewrite /exload_post_run_d store_post_run_d_res_pair //.
-    by rewrite load_post_run_d_0 store_post_run_d_0.
   Qed.
 
   (** [excl_ok] on the reservation's timestamp column — the shape

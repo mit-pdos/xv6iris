@@ -300,6 +300,7 @@ Section astep.
       have Hts : (tvs.*1) !! j = Some ts by rewrite list_lookup_fmap Hj.
       etrans;
         [by apply (load_post_run_vwNew_aq (pa_ws ag) base (tvs.*1) j ts Hts)|].
+      rewrite /load_post_run ctrl_post_vwNew.
       apply ws_le_vwNew, load_post_bytes_d_mono.
     - intros _ _ Hin%elem_of_nil. done.
     - intros (tsf & kc & _ & _ & _ & _ & _ & _ & -> & _) ->
@@ -320,6 +321,7 @@ Section astep.
       have Hts : ((xtvs.*1)) !! j = Some ts by rewrite list_lookup_fmap Hj.
       etrans;
         [by apply (load_post_run_vwNew_aq (pa_ws ag) xbase (xtvs.*1) j ts Hts)|].
+      rewrite /load_post_run ctrl_post_vwNew.
       apply ws_le_vwNew, load_post_bytes_d_mono.
     - intros _ _ Hin%elem_of_nil. done.
   Qed.

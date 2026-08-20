@@ -8,7 +8,8 @@
 
         every [rtc lstep] run of the litmus machine from an initial
         configuration projects to an [exec_wf] execution of [WeakAxiomatic]
-        with the same image, the same log and the same per-hart [wstate]s.
+        with the same image, the same log and per-hart [wstate]s that agree
+        but for the control view (see the third bullet below).
 
     It is [WeakPromiseBridge.v] one machine over, and follows that file's
     structure exactly.  The differences are all simplifications:
@@ -18,11 +19,20 @@
       the step lemma);
 
     - every litmus access is SINGLE-BYTE, so the four arms hit [mstep]'s
-      run-shaped post-states at singleton lists.  [load_post_run_single] /
-      [store_post_run_single] collapse those to [WeakMem]'s [load_post] /
-      [store_post], which is what [lstep] writes into the hart.  Both
-      collapses go through [Z.add_0_r] (byte [j] of the access lives at
-      [base + Z.of_nat j], i.e. [acc_addr base 0 = base + 0]);
+      run-shaped post-states at singleton lists.  Those collapse to
+      [WeakMem]'s [load_post] / [store_post] — which is what [lstep] writes
+      into the hart — UP TO A RAISED CONTROL VIEW, through [Z.add_0_r] (byte
+      [j] of the access lives at [base + Z.of_nat j], i.e.
+      [acc_addr base 0 = base + 0]).  The control view is W-TV's
+      consumption ([WeakMem.load_post_run_d]): a RUN-level access joins the
+      entry state's translation bank into [w_vcap] and the per-byte
+      functions do not, and the litmus machine — which has no [LInstr] to
+      reset the bank with — never performs that join.  Hence [lcfg_match]
+      relates the per-hart [wstate]s by [WeakMem.ws_ctrl_up] ("equal but for
+      a raised [w_vcap]") rather than by equality.  Nothing on either side
+      reads [w_vcap]: the axiomatic tier has no [fulfil_ok] at all, so the
+      slack is invisible to every side condition, and the projection
+      theorem's payload (same image, same log) is untouched;
 
     - the AMO's atomicity side condition in [lstep] ([log_byte … = Some vv]
       plus [¬ writes_in log a t (length log)]) IS [WeakMem.latest] unfolded,
@@ -60,8 +70,11 @@ Local Open Scope Z_scope.
 (* ------------------------------------------------------------------ *)
 (** ** Singleton collapses of the run-shaped post-states
 
-    [load_post_run_single] / [store_post_run_single] moved to [WeakMem.v]
-    with the W4 lift batch; they are used verbatim below. *)
+    [WeakMem.ws_ctrl_up_load] / [_store] / [_fence] are the collapses this
+    file consumes: each says a litmus arm's per-byte post-state and the
+    matching [mstep] arm's run-shaped one differ by a control raise and
+    nothing else.  They are built on [load_post_run_single] /
+    [store_post_run_single], which live in [WeakMem.v]. *)
 
 (* ------------------------------------------------------------------ *)
 (** ** Singleton instances of the two read side conditions *)
@@ -76,6 +89,16 @@ Proof.
   - simplify_eq. rewrite /byte_rd /acc_addr Z.add_0_r. by split.
   - by rewrite lookup_nil in Ht.
 Qed.
+
+(** The instance the arms below meet: the [mstate]'s agent is the hart's
+    state with a RAISED CONTROL VIEW, and [readable] — hence [rd_ok] — reads
+    only [coh] and [load_vpre], neither of which sees [w_vcap]. *)
+Lemma rd_ok_single_ctrl_up img log w1 w2 aq a t v :
+  ws_ctrl_up w1 w2 →
+  log_byte img log t a = Some v →
+  readable img log w1 (load_vpre w1 aq) a t →
+  rd_ok img log w2 aq a [t] [v].
+Proof. intros [x ->] Hb Hr. by apply rd_ok_single. Qed.
 
 (** [WeakLitmus]'s AMO arm carries exactly [WeakMem.latest] unfolded. *)
 Lemma rmw_latest_single img log a t :
@@ -96,7 +119,7 @@ Qed.
     [nat] indices on both sides. *)
 Definition lcfg_match (c : config) (σ : mstate) : Prop :=
   ms_img σ = c_img c ∧ ms_log σ = c_log c ∧
-  (∀ i h, c_harts c !! i = Some h → ms_ws σ i = h_ws h).
+  (∀ i h, c_harts c !! i = Some h → ws_ctrl_up (h_ws h) (ms_ws σ i)).
 
 (** The functional projection, for consumers who want one: it matches. *)
 Definition lproj_ws (c : config) : agent → wstate :=
@@ -106,7 +129,8 @@ Definition lproj_st (c : config) : mstate :=
 
 Lemma lcfg_match_proj c : lcfg_match c (lproj_st c).
 Proof.
-  split_and!; [done|done|]. intros i h Hlk. rewrite /= /lproj_ws Hlk //.
+  split_and!; [done|done|]. intros i h Hlk.
+  rewrite /= /lproj_ws Hlk. reflexivity.
 Qed.
 
 Lemma lcfg_match_log c σ : lcfg_match c σ → ms_log σ = c_log c.
@@ -115,9 +139,9 @@ Proof. by intros (_ & ? & _). Qed.
 (** The one-hart-updated instance, shared by all four arms. *)
 Lemma lcfg_match_upd_gen (img : image) (lg : list wmsg) (hs : list hart)
     i h prog' regs' w (f g : agent → wstate) :
-  (∀ j hj, hs !! j = Some hj → f j = h_ws hj) →
+  (∀ j hj, hs !! j = Some hj → ws_ctrl_up (h_ws hj) (f j)) →
   hs !! i = Some h →
-  g i = w →
+  ws_ctrl_up w (g i) →
   (∀ j, j ≠ i → g j = f j) →
   lcfg_match (Cfg img lg (<[i := Hart prog' regs' w]> hs)) (MSt img lg g).
 Proof.
@@ -150,23 +174,24 @@ Proof.
   - (* load *)
     destruct Harm as (t & v & Hb & Hr & -> & ->).
     eexists i, (WeakAxiomatic.LLoad aq a [t] [v]), _. split.
-    + apply MStepLoad. simpl. rewrite (Hmw i h Hlk). by apply rd_ok_single.
+    + apply MStepLoad. simpl.
+      by apply (rd_ok_single_ctrl_up _ _ (h_ws h)); [by apply Hmw|done|done].
     + simpl. eapply (lcfg_match_upd_gen _ _ _ i h _ _ _ f); [done|done| |].
-      * rewrite upd_ws_eq load_post_run_single (Hmw i h Hlk) //.
+      * rewrite upd_ws_eq. by apply ws_ctrl_up_load, Hmw.
       * intros j Hne. by rewrite upd_ws_ne.
   - (* store *)
     destruct Harm as (-> & ->).
     eexists i, (WeakAxiomatic.LStore false a [v] WCplain), _. split.
     + by apply MStepStore.
     + simpl. eapply (lcfg_match_upd_gen _ _ _ i h _ _ _ f); [done|done| |].
-      * rewrite upd_ws_eq (store_post_run_single _ _ _ v) (Hmw i h Hlk) //.
+      * rewrite upd_ws_eq. by apply ws_ctrl_up_store, Hmw.
       * intros j Hne. by rewrite upd_ws_ne.
   - (* fence *)
     destruct Harm as (-> & ->).
     eexists i, (WeakAxiomatic.LFence pr pw sr sw), _. split.
     + apply MStepFence.
     + simpl. eapply (lcfg_match_upd_gen _ _ _ i h _ _ _ f); [done|done| |].
-      * rewrite upd_ws_eq (Hmw i h Hlk) //.
+      * rewrite upd_ws_eq. by apply ws_ctrl_up_fence, Hmw.
       * intros j Hne. by rewrite upd_ws_ne.
   - (* amoswap.aq: the atomicity conjunct IS [rmw_latest] at one byte *)
     destruct Harm as (t & vv & Hb & Hnw & Hr & -> & ->).
@@ -174,11 +199,11 @@ Proof.
     + apply MStepRmw.
       * done.
       * done.
-      * simpl. rewrite (Hmw i h Hlk). by apply rd_ok_single.
+      * simpl.
+        by apply (rd_ok_single_ctrl_up _ _ (h_ws h)); [by apply Hmw|done|done].
       * simpl. apply rmw_latest_single; [by eexists|done].
     + simpl. eapply (lcfg_match_upd_gen _ _ _ i h _ _ _ f); [done|done| |].
-      * rewrite upd_ws_eq (store_post_run_single _ _ _ v) load_post_run_single
-                (Hmw i h Hlk) //.
+      * rewrite upd_ws_eq. by apply ws_ctrl_up_store, ws_ctrl_up_load, Hmw.
       * intros j Hne. by rewrite upd_ws_ne.
 Qed.
 

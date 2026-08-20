@@ -465,6 +465,13 @@ Record lstate := LState {
   l_regv  : gmap wreg (list nat);
   l_vcap  : list nat;
   l_ldv   : list nat;
+  (* W-TV, THE TRANSLATION BANK, mirrored.  A view like the others, so a
+     leaf list: PRODUCED per read byte by [lload_post_at] (appending the
+     mirrored [lfwd_view]), RESET to [[]] by [linstr_post], and CONSUMED by
+     the run-level wrappers, which push it into [l_vcap] alongside the
+     address leaves — exactly [WeakMem]'s [Nat.max vaddr (w_tbank ws)] with
+     [max] ↦ [++]. *)
+  l_tbank : list nat;
 }.
 Add Printing Constructor lstate.
 
@@ -480,7 +487,8 @@ Definition lregv (S : lstate) (r : wreg) : list nat :=
 
 Definition linit : lstate :=
   {| l_coh := ∅; l_vrOld := []; l_vwOld := []; l_vrNew := []; l_vwNew := [];
-     l_vRel := []; l_fwd := ∅; l_regv := ∅; l_vcap := []; l_ldv := [] |}.
+     l_vRel := []; l_fwd := ∅; l_regv := ∅; l_vcap := []; l_ldv := [];
+     l_tbank := [] |}.
 
 (** *** Basic laws of [lval] *)
 
@@ -530,17 +538,17 @@ Qed.
 
 (** *** [lcoh] under an insert (mirrors [coh_upd_eq] / [coh_upd_ne]) *)
 
-Lemma lcoh_ins_eq m rO wO rN wN R fwd rg vc ld a L :
+Lemma lcoh_ins_eq m rO wO rN wN R fwd rg vc ld tb a L :
   lcoh {| l_coh := <[a := L]> m; l_vrOld := rO; l_vwOld := wO;
           l_vrNew := rN; l_vwNew := wN; l_vRel := R; l_fwd := fwd;
-          l_regv := rg; l_vcap := vc; l_ldv := ld |} a = L.
+          l_regv := rg; l_vcap := vc; l_ldv := ld; l_tbank := tb |} a = L.
 Proof. rewrite /lcoh /= lookup_insert //. Qed.
 
-Lemma lcoh_ins_ne m rO wO rN wN R fwd rg vc ld a a' L :
+Lemma lcoh_ins_ne m rO wO rN wN R fwd rg vc ld tb a a' L :
   a' ≠ a →
   lcoh {| l_coh := <[a := L]> m; l_vrOld := rO; l_vwOld := wO;
           l_vrNew := rN; l_vwNew := wN; l_vRel := R; l_fwd := fwd;
-          l_regv := rg; l_vcap := vc; l_ldv := ld |} a'
+          l_regv := rg; l_vcap := vc; l_ldv := ld; l_tbank := tb |} a'
   = default [] (m !! a').
 Proof. intros ?. rewrite /lcoh /= lookup_insert_ne //. Qed.
 
@@ -584,7 +592,11 @@ Definition lload_post_at (S : lstate) (aq : bool) (vpreL : list nat) (a : Z)
      l_fwd   := l_fwd S;
      l_regv  := l_regv S;
      l_vcap  := l_vcap S;
-     l_ldv   := l_ldv S ++ vpostL |}.
+     l_ldv   := l_ldv S ++ vpostL;
+     (* W-TV production: the bank takes the FORWARDED view, not [vpostL]
+        (which carries the pre-view) — [WeakMem.load_post_at]'s
+        [Nat.max (w_tbank ws) (fwd_view ws aq a t)]. *)
+     l_tbank := l_tbank S ++ lfwd_view S aq a t |}.
 
 (** [vfL] is the banked forward view — the EMPTY leaf list before D2
     (deviation D-7), now [V(asrc) ⊔ V(dsrc)]'s leaves. *)
@@ -599,7 +611,8 @@ Definition lstore_post_d (S : lstate) (rl : bool) (vfL : list nat) (a : Z)
      l_fwd   := <[a := (t, vfL)]> (l_fwd S);
      l_regv  := l_regv S;
      l_vcap  := l_vcap S;
-     l_ldv   := l_ldv S |}.
+     l_ldv   := l_ldv S;
+     l_tbank := l_tbank S |}.
 
 Definition lstore_post (S : lstate) (rl : bool) (a : Z) (t : nat) : lstate :=
   lstore_post_d S rl [] a t.
@@ -615,7 +628,8 @@ Definition lfence_post (S : lstate) (pr pw sr sw : bool) : lstate :=
      l_fwd   := l_fwd S;
      l_regv  := l_regv S;
      l_vcap  := l_vcap S;
-     l_ldv   := l_ldv S |}.
+     l_ldv   := l_ldv S;
+     l_tbank := l_tbank S |}.
 
 (** The three dependency-only effects, mirrored. *)
 Definition lregw_post (S : lstate) (rd : wreg) (vL : list nat) : lstate :=
@@ -623,19 +637,19 @@ Definition lregw_post (S : lstate) (rd : wreg) (vL : list nat) : lstate :=
      l_vrNew := l_vrNew S; l_vwNew := l_vwNew S; l_vRel := l_vRel S;
      l_fwd := l_fwd S;
      l_regv := <[rd := vL]> (l_regv S);
-     l_vcap := l_vcap S; l_ldv := l_ldv S |}.
+     l_vcap := l_vcap S; l_ldv := l_ldv S; l_tbank := l_tbank S |}.
 
 Definition lctrl_post (S : lstate) (vL : list nat) : lstate :=
   {| l_coh := l_coh S; l_vrOld := l_vrOld S; l_vwOld := l_vwOld S;
      l_vrNew := l_vrNew S; l_vwNew := l_vwNew S; l_vRel := l_vRel S;
      l_fwd := l_fwd S; l_regv := l_regv S;
-     l_vcap := vL ++ l_vcap S; l_ldv := l_ldv S |}.
+     l_vcap := vL ++ l_vcap S; l_ldv := l_ldv S; l_tbank := l_tbank S |}.
 
 Definition linstr_post (S : lstate) : lstate :=
   {| l_coh := l_coh S; l_vrOld := l_vrOld S; l_vwOld := l_vwOld S;
      l_vrNew := l_vrNew S; l_vwNew := l_vwNew S; l_vRel := l_vRel S;
      l_fwd := l_fwd S; l_regv := l_regv S;
-     l_vcap := l_vcap S; l_ldv := [] |}.
+     l_vcap := l_vcap S; l_ldv := []; l_tbank := [] |}.
 
 (** The multi-byte folds, mirroring [load_post_bytes] / [store_post_bytes]
     EXACTLY — including the compute-[vpre]-ONCE-from-the-PRE-state
@@ -657,28 +671,36 @@ Definition lstore_post_bytes (S : lstate) (rl : bool) (as_ : list Z) (t : nat)
     : lstate :=
   foldl (λ S' a, lstore_post S' rl a t) S as_.
 
+(** W-TV's CONSUMPTION, mirrored: the run-level wrapper pushes the ENTRY
+    state's bank into [l_vcap] next to the address leaves.  [lval σ] of the
+    appended list is [Nat.max] of the two halves, which is exactly
+    [WeakMem]'s [Nat.max vaddr (w_tbank ws)]. *)
 Definition lload_post_run_d (S : lstate) (aq : bool) (vaddrL : list nat)
     (base : Z) (ts : list nat) : lstate :=
   lctrl_post
     (lload_post_bytes_d S aq vaddrL
        (zip_with (λ j t, (base + Z.of_nat j, t)) (seq 0 (length ts)) ts))
-    vaddrL.
+    (vaddrL ++ l_tbank S).
 
 Definition lload_post_run (S : lstate) (aq : bool) (base : Z) (ts : list nat)
     : lstate :=
-  lload_post_bytes S aq
-    (zip_with (λ j t, (base + Z.of_nat j, t)) (seq 0 (length ts)) ts).
+  lctrl_post
+    (lload_post_bytes S aq
+       (zip_with (λ j t, (base + Z.of_nat j, t)) (seq 0 (length ts)) ts))
+    (l_tbank S).
 
 Definition lstore_post_run_d (S : lstate) (rl : bool)
     (vaddrL vdataL : list nat) (base : Z) (n : nat) (t : nat) : lstate :=
   lctrl_post
     (lstore_post_bytes_d S rl (vaddrL ++ vdataL)
        (map (λ j : nat, base + Z.of_nat j) (seq 0 n)) t)
-    vaddrL.
+    (vaddrL ++ l_tbank S).
 
 Definition lstore_post_run (S : lstate) (rl : bool) (base : Z) (n : nat)
     (t : nat) : lstate :=
-  lstore_post_bytes S rl (map (λ j : nat, base + Z.of_nat j) (seq 0 n)) t.
+  lctrl_post
+    (lstore_post_bytes S rl (map (λ j : nat, base + Z.of_nat j) (seq 0 n)) t)
+    (l_tbank S).
 
 (** The event fold, mirrored.  No σ: leaves are raw. *)
 Definition laev_post {D : Type} (ev : aev D) (S : lstate) : lstate :=
@@ -708,11 +730,13 @@ Definition laev_post {D : Type} (ev : aev D) (S : lstate) : lstate :=
   | LCtrl srcs => lctrl_post S (lsrcs_view S srcs)
   | LInstr => linstr_post S
   (* THE RMW SPLIT (S2): [LLoad]'s / [LStore]'s arm verbatim.  The [lstate]
-     mirror gains no [l_res]/[l_tbank] — [lrel] does not constrain the two
-     new [wstate] fields, and it does not need to: the reservation is
-     agent-local scratch whose timestamps the replay never has to remap
-     (they are consumed by [excl_ok_ts] at the [LExStore], which
-     [astep_ok] reads off the BEHAVIOR's state, not the replayed one). *)
+     mirror has no [l_res] — [lrel] does not constrain [w_res], and it does
+     not need to: the reservation is agent-local scratch whose timestamps
+     the replay never has to remap (they are consumed by [excl_ok_ts] at
+     the [LExStore], which [astep_ok] reads off the BEHAVIOR's state, not
+     the replayed one; S4 relates the reservation COLUMNS through
+     [res_cols] instead).  [l_tbank] IS mirrored — W-TV's bank feeds
+     [w_vcap], which [lrel] does constrain. *)
   | LExLoad aq base tvs asrc =>
       lload_post_run_d S aq (lsrcs_view S asrc) base tvs.*1
   | LExStore rl base data asrc vsrc =>
@@ -758,13 +782,21 @@ Definition lrel (σ : nat → nat) (S : lstate) (w : wstate) : Prop :=
      destructuring pattern keeps its meaning and only grows a tail. *)
   (∀ r, regv w r = lval σ (lregv S r)) ∧
   w_vcap w = lval σ (l_vcap S) ∧
-  w_ldv w = lval σ (l_ldv S).
+  w_ldv w = lval σ (l_ldv S) ∧
+  (* W-TV's bank, appended LAST so every positional destructuring pattern
+     that ends in [& _] keeps its meaning. *)
+  w_tbank w = lval σ (l_tbank S).
 
 Lemma lrel_init σ : lrel σ linit ws_init.
 Proof.
   rewrite /lrel /linit /ws_init /=. split_and!; try done;
     intros x; rewrite /coh /lcoh /regv /lregv /= ?lookup_empty ?lval_nil //.
 Qed.
+
+(** The W-TV bank's conjunct, projected: the run-level wrappers consume the
+    ENTRY state's bank, so every one of them needs it. *)
+Lemma lrel_tbank σ S w : lrel σ S w → w_tbank w = lval σ (l_tbank S).
+Proof. by intros (_&_&_&_&_&_&_&_&_&_&?). Qed.
 
 (** THE OPERAND VIEW TRANSPORTS.  This is the one new ingredient of the D2
     provenance theory: a label's operand list is a list of NAMES, so its
@@ -778,7 +810,7 @@ Proof.
   rewrite srcs_view_cons /lsrcs_view /= -/(lsrcs_view S srcs) lval_app IH.
   f_equal. destruct x as [r|]; simpl.
   - destruct Hrel as (_&_&_&_&_&_&_&Hrg&_). apply (Hrg r).
-  - by destruct Hrel as (_&_&_&_&_&_&_&_&_&Hld).
+  - by destruct Hrel as (_&_&_&_&_&_&_&_&_&Hld&_).
 Qed.
 
 (** THE ONE PLACE INJECTIVITY IS SPENT. *)
@@ -823,7 +855,7 @@ Proof.
   intros Hinj Hrel Hvp.
   have Hfv : fwd_view w aq a (σ t) = lval σ (lfwd_view S aq a t)
     by apply lrel_fwd_view.
-  destruct Hrel as (Hcoh & HrO & HwO & HrN & HwN & HR & Hfwd & Hrg & Hvc & Hld).
+  destruct Hrel as (Hcoh & HrO & HwO & HrN & HwN & HR & Hfwd & Hrg & Hvc & Hld & Htb).
   rewrite /lrel /load_post_at /lload_post_at /=. split_and!.
   - intros a'. destruct (decide (a' = a)) as [->|Hne].
     + rewrite coh_upd_eq lcoh_ins_eq !lval_app lval_singleton Hvp Hfv (Hcoh a).
@@ -838,13 +870,15 @@ Proof.
   - exact Hrg.
   - exact Hvc.
   - rewrite !lval_app Hvp Hfv Hld. lia.
+  - (* W-TV production: the bank takes [lfwd_view], not the post-view *)
+    rewrite lval_app Hfv Htb. lia.
 Qed.
 
 Lemma lrel_store_post_d σ S w rl vf vfL a t :
   lrel σ S w → vf = lval σ vfL →
   lrel σ (lstore_post_d S rl vfL a t) (store_post_d w rl vf a (σ t)).
 Proof.
-  intros (Hcoh & HrO & HwO & HrN & HwN & HR & Hfwd & Hrg & Hvc & Hld) ->.
+  intros (Hcoh & HrO & HwO & HrN & HwN & HR & Hfwd & Hrg & Hvc & Hld & Htb) ->.
   rewrite /lrel /store_post_d /lstore_post_d /=. split_and!.
   - intros a'. destruct (decide (a' = a)) as [->|Hne].
     + rewrite coh_upd_eq lcoh_ins_eq lval_app lval_singleton -(Hcoh a). lia.
@@ -860,6 +894,7 @@ Proof.
   - exact Hrg.
   - exact Hvc.
   - exact Hld.
+  - exact Htb.
 Qed.
 
 Lemma lrel_store_post σ S w rl a t :
@@ -874,7 +909,7 @@ Lemma lrel_regw_post σ S w rd v vL :
   lrel σ S w → v = lval σ vL →
   lrel σ (lregw_post S rd vL) (regw_post w rd v).
 Proof.
-  intros (Hcoh & HrO & HwO & HrN & HwN & HR & Hfwd & Hrg & Hvc & Hld) ->.
+  intros (Hcoh & HrO & HwO & HrN & HwN & HR & Hfwd & Hrg & Hvc & Hld & Htb) ->.
   rewrite /lrel /regw_post /lregw_post /=.
   split_and!; try assumption.
   intros r. rewrite /regv /lregv /=. destruct (decide (r = rd)) as [->|Hne].
@@ -885,7 +920,7 @@ Qed.
 Lemma lrel_ctrl_post σ S w v vL :
   lrel σ S w → v = lval σ vL → lrel σ (lctrl_post S vL) (ctrl_post w v).
 Proof.
-  intros (Hcoh & HrO & HwO & HrN & HwN & HR & Hfwd & Hrg & Hvc & Hld) ->.
+  intros (Hcoh & HrO & HwO & HrN & HwN & HR & Hfwd & Hrg & Hvc & Hld & Htb) ->.
   rewrite /lrel /ctrl_post /lctrl_post /=.
   split_and!; try assumption. by rewrite lval_app Hvc.
 Qed.
@@ -893,14 +928,15 @@ Qed.
 Lemma lrel_instr_post σ S w :
   lrel σ S w → lrel σ (linstr_post S) (instr_post w).
 Proof.
-  intros (Hcoh & HrO & HwO & HrN & HwN & HR & Hfwd & Hrg & Hvc & Hld).
-  rewrite /lrel /instr_post /linstr_post /=. split_and!; try assumption. done.
+  intros (Hcoh & HrO & HwO & HrN & HwN & HR & Hfwd & Hrg & Hvc & Hld & Htb).
+  rewrite /lrel /instr_post /linstr_post /=.
+  split_and!; try assumption; done.
 Qed.
 
 Lemma lrel_fence_post σ S w pr pw sr sw :
   lrel σ S w → lrel σ (lfence_post S pr pw sr sw) (fence_post w pr pw sr sw).
 Proof.
-  intros (Hcoh & HrO & HwO & HrN & HwN & HR & Hfwd & Hrg & Hvc & Hld).
+  intros (Hcoh & HrO & HwO & HrN & HwN & HR & Hfwd & Hrg & Hvc & Hld & Htb).
   have Hv1 : Nat.max (if pr then w_vrOld w else 0%nat)
                      (if pw then w_vwOld w else 0%nat)
              = lval σ ((if pr then l_vrOld S else []) ++
@@ -917,6 +953,7 @@ Proof.
   - exact Hrg.
   - exact Hvc.
   - exact Hld.
+  - exact Htb.
 Qed.
 
 (** *** Preservation through the byte folds
@@ -964,6 +1001,7 @@ Proof.
   intros Hinj Hrel.
   rewrite /lload_post_run /load_post_run /lload_post_bytes /load_post_bytes
           -tats_run.
+  apply lrel_ctrl_post; [|by apply lrel_tbank].
   apply lrel_load_fold; [done|done|by apply lrel_load_vpre].
 Qed.
 
@@ -975,7 +1013,8 @@ Proof.
   intros Hinj Hrel Hva.
   rewrite /lload_post_run_d /load_post_run_d /lload_post_bytes_d
           /load_post_bytes_d /load_run_ats -tats_run.
-  apply lrel_ctrl_post; [|exact Hva].
+  apply lrel_ctrl_post;
+    [|by rewrite lval_app -Hva -(lrel_tbank _ _ _ Hrel)].
   apply lrel_load_fold; [done|done|by eapply lrel_load_vpre_d].
 Qed.
 
@@ -1009,6 +1048,7 @@ Lemma lrel_store_post_run σ S w rl base n t :
 Proof.
   intros Hrel. rewrite /lstore_post_run /store_post_run /lstore_post_bytes
                        /store_post_bytes.
+  apply lrel_ctrl_post; [|by apply lrel_tbank].
   by apply lrel_store_fold.
 Qed.
 
@@ -1020,7 +1060,8 @@ Proof.
   intros Hrel Hva Hvd.
   rewrite /lstore_post_run_d /store_post_run_d /lstore_post_bytes_d
           /store_post_bytes_d /store_run_as.
-  apply lrel_ctrl_post; [|exact Hva].
+  apply lrel_ctrl_post;
+    [|by rewrite lval_app -Hva -(lrel_tbank _ _ _ Hrel)].
   apply lrel_store_fold_d; [by rewrite lval_app -Hva -Hvd|exact Hrel].
 Qed.
 
@@ -1104,7 +1145,7 @@ Definition lstate_leaf (S : lstate) (t : nat) : Prop :=
   (∃ a tf V, l_fwd S !! a = Some (tf, V) ∧ (t = tf ∨ t ∈ V)) ∨
   (* the three D2 components, appended *)
   (∃ r L, l_regv S !! r = Some L ∧ t ∈ L) ∨
-  t ∈ l_vcap S ∨ t ∈ l_ldv S.
+  t ∈ l_vcap S ∨ t ∈ l_ldv S ∨ t ∈ l_tbank S.
 
 Lemma lcoh_leaf S a t : t ∈ lcoh S a → lstate_leaf S t.
 Proof.
@@ -1138,7 +1179,7 @@ Lemma linit_no_leaf t : ¬ lstate_leaf linit t.
 Proof.
   rewrite /lstate_leaf /linit /=.
   intros [H|[H|[H|[H|[H|[(a & L & H & _)|[(a & tf & V & H & _)
-                        |[(r & L & H & _)|[H|H]]]]]]]]];
+                        |[(r & L & H & _)|[H|[H|H]]]]]]]]]];
     try (by apply elem_of_nil in H); by rewrite lookup_empty in H.
 Qed.
 
@@ -1175,7 +1216,7 @@ Proof.
     by destruct (lfwd_view_leaf S aq a t v Hv) as [Hl|Hl]; auto. }
   rewrite {1}/lstate_leaf /lload_post_at /=.
   intros [H|[H|[H|[H|[H|[(a' & L & HL & H)|[(a' & tf & V & HL & H)
-                        |[(r' & L & HL & H)|[H|H]]]]]]]]].
+                        |[(r' & L & HL & H)|[H|[H|H]]]]]]]]]].
   - apply elem_of_app in H as [H|H]; [|by apply Hpost].
     left. rewrite /lstate_leaf. naive_solver.
   - left. rewrite /lstate_leaf. naive_solver.
@@ -1196,6 +1237,11 @@ Proof.
   - left. rewrite /lstate_leaf. naive_solver.
   - apply elem_of_app in H as [H|H]; [|by apply Hpost].
     left. rewrite /lstate_leaf. naive_solver.
+  - (* W-TV's bank: the OLD bank, or this byte's forwarded view *)
+    apply elem_of_app in H as [H|H].
+    + left. rewrite /lstate_leaf. naive_solver.
+    + destruct (lfwd_view_leaf S aq a t u H) as [Hl|Heq];
+        [by left|by right; right].
 Qed.
 
 Lemma lstore_post_d_leaf S rl vfL a t u :
@@ -1204,7 +1250,7 @@ Lemma lstore_post_d_leaf S rl vfL a t u :
 Proof.
   rewrite {1}/lstate_leaf /lstore_post_d /=.
   intros [H|[H|[H|[H|[H|[(a' & L & HL & H)|[(a' & tf & V & HL & H)
-                        |[(r' & L & HL & H)|[H|H]]]]]]]]];
+                        |[(r' & L & HL & H)|[H|[H|H]]]]]]]]]];
     try (left; rewrite /lstate_leaf; naive_solver).
   - apply elem_of_app in H as [H|H]; [left; rewrite /lstate_leaf; naive_solver|].
     apply elem_of_list_singleton in H. by right; right.
@@ -1236,7 +1282,7 @@ Lemma lregw_post_leaf S rd vL u :
 Proof.
   rewrite {1}/lstate_leaf /lregw_post /=.
   intros [H|[H|[H|[H|[H|[(a' & L & HL & H)|[(a' & tf & V & HL & H)
-                        |[(r' & L & HL & H)|[H|H]]]]]]]]];
+                        |[(r' & L & HL & H)|[H|[H|H]]]]]]]]]];
     try (left; rewrite /lstate_leaf; naive_solver).
   apply lookup_insert_Some in HL as [[-> <-]|[Hne HL]]; [by right|].
   left. rewrite /lstate_leaf. naive_solver.
@@ -1247,7 +1293,7 @@ Lemma lctrl_post_leaf S vL u :
 Proof.
   rewrite {1}/lstate_leaf /lctrl_post /=.
   intros [H|[H|[H|[H|[H|[(a' & L & HL & H)|[(a' & tf & V & HL & H)
-                        |[(r' & L & HL & H)|[H|H]]]]]]]]];
+                        |[(r' & L & HL & H)|[H|[H|H]]]]]]]]]];
     try (left; rewrite /lstate_leaf; naive_solver).
   apply elem_of_app in H as [H|H]; [by right|].
   left. rewrite /lstate_leaf. naive_solver.
@@ -1257,8 +1303,9 @@ Lemma linstr_post_leaf S u : lstate_leaf (linstr_post S) u → lstate_leaf S u.
 Proof.
   rewrite {1}/lstate_leaf /linstr_post /=.
   intros [H|[H|[H|[H|[H|[(a' & L & HL & H)|[(a' & tf & V & HL & H)
-                        |[(r' & L & HL & H)|[H|H%elem_of_nil]]]]]]]]];
-    [..|done]; rewrite /lstate_leaf; naive_solver.
+                        |[(r' & L & HL & H)
+                        |[H|[H%elem_of_nil|H%elem_of_nil]]]]]]]]]];
+    [..|done|done]; rewrite /lstate_leaf; naive_solver.
 Qed.
 
 Lemma lfence_post_leaf S pr pw sr sw u :
@@ -1271,7 +1318,7 @@ Proof.
     - destruct pw; [rewrite /lstate_leaf; naive_solver|by apply elem_of_nil in Hv]. }
   rewrite {1}/lstate_leaf /lfence_post /=.
   intros [H|[H|[H|[H|[H|[(a' & L & HL & H)|[(a' & tf & V & HL & H)
-                        |[(r' & L & HL & H)|[H|H]]]]]]]]];
+                        |[(r' & L & HL & H)|[H|[H|H]]]]]]]]]];
     try (rewrite /lstate_leaf; naive_solver).
   - destruct sr; [|rewrite /lstate_leaf; naive_solver].
     apply elem_of_app in H as [H|H]; [rewrite /lstate_leaf; naive_solver|by apply Hv1].
@@ -1336,7 +1383,10 @@ Qed.
 Lemma lstore_post_run_leaf S rl base n t u :
   lstate_leaf (lstore_post_run S rl base n t) u → lstate_leaf S u ∨ u = t.
 Proof.
-  rewrite /lstore_post_run /lstore_post_bytes. apply lstore_fold_leaf.
+  rewrite /lstore_post_run /lstore_post_bytes.
+  intros [Hu|Hu]%lctrl_post_leaf;
+    [by eapply (lstore_fold_leaf rl t _ S)|
+     left; rewrite /lstate_leaf; naive_solver].
 Qed.
 
 Lemma lstore_post_run_d_leaf S rl vaL vdL base n t u :
@@ -1344,7 +1394,9 @@ Lemma lstore_post_run_d_leaf S rl vaL vdL base n t u :
   lstate_leaf S u ∨ u ∈ vaL ∨ u ∈ vdL ∨ u = t.
 Proof.
   rewrite /lstore_post_run_d /lstore_post_bytes_d.
-  intros [Hu|Hu]%lctrl_post_leaf; [|by right; left].
+  intros [Hu|Hu]%lctrl_post_leaf; last first.
+  { apply elem_of_app in Hu as [Hu|Hu];
+      [by right; left|left; rewrite /lstate_leaf; naive_solver]. }
   apply lstore_fold_d_leaf in Hu as [Hu|[Hu|Heq]];
     [by left| |by right; right; right].
   apply elem_of_app in Hu as [Hu|Hu]; [by right; left|by right; right; left].
@@ -1366,7 +1418,9 @@ Lemma lload_post_run_leaf S aq base ts u :
   lstate_leaf S u ∨ ∃ j, ts !! j = Some u.
 Proof.
   rewrite /lload_post_run.
-  intros [Hu|(p & Hp & ->)]%lload_post_bytes_leaf; [by left|].
+  intros [Hu|Hu]%lctrl_post_leaf;
+    [|by left; rewrite /lstate_leaf; naive_solver].
+  apply lload_post_bytes_leaf in Hu as [Hu|(p & Hp & ->)]; [by left|].
   right. exact (run_ats_ts base ts p Hp).
 Qed.
 
@@ -1375,7 +1429,9 @@ Lemma lload_post_run_d_leaf S aq vaddrL base ts u :
   lstate_leaf S u ∨ u ∈ vaddrL ∨ ∃ j, ts !! j = Some u.
 Proof.
   rewrite /lload_post_run_d.
-  intros [Hu|Hu]%lctrl_post_leaf; [|by right; left].
+  intros [Hu|Hu]%lctrl_post_leaf; last first.
+  { apply elem_of_app in Hu as [Hu|Hu];
+      [by right; left|left; rewrite /lstate_leaf; naive_solver]. }
   apply lload_post_bytes_d_leaf in Hu as [Hu|[Hu|(p & Hp & ->)]];
     [by left|by right; left|].
   right; right. exact (run_ats_ts base ts p Hp).

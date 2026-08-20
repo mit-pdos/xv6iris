@@ -1314,6 +1314,12 @@ Proof.
   - by eapply relsrc_wk.
 Qed.
 
+(** W-TV's consumption wraps every run-level access in a [ctrl_post], and
+    this invariant does not constrain [w_vcap] — the one component
+    [ctrl_post] moves — so the wrapper is transparent to it. *)
+Lemma invw_ctrl_post k i ws v : invw k i ws → invw k i (ctrl_post ws v).
+Proof. by intros H. Qed.
+
 Lemma maxcl_frdom_b i k a : maxcl (frdom_b E i k a).
 Proof. split; [apply frdom_b_0|intros ??; apply frdom_b_max]. Qed.
 Lemma maxcl_ord_dom i k : maxcl (ord_dom E i k).
@@ -1364,9 +1370,9 @@ Proof.
   (* AN EMPTY READ MOVES NOTHING — and builds no [rel_ord] edge either, which
      is why the release delivery below may assume the load reads a byte. *)
   destruct (decide (ts = [])) as [->|Hnil].
-  { assert (load_post_run ws aq base [] = ws) as ->
+  { assert (load_post_run ws aq base [] = ctrl_post ws (w_tbank ws)) as ->
       by rewrite /load_post_run /load_post_bytes //.
-    eapply invw_wk; [|exact Hinv]. lia. }
+    apply invw_ctrl_post. eapply invw_wk; [|exact Hinv]. lia. }
   set (ats := zip_with (λ (j : nat) (t : nat), (base + Z.of_nat j, t))
                        (seq 0 (length ts)) ts).
   (* THE RELEASE CHANNEL.  An [.aq] load's pre-view joins [w_vRel], and the
@@ -1396,7 +1402,8 @@ Proof.
   { intros p Hp Hpub. right. exists k, s, p.2.
     split_and!; [lia|by rewrite cand_ex_tr|done|exact Hpub|lia]. }
   (* the five conjuncts *)
-  rewrite /load_post_run /load_post_bytes -/ws -/ats.
+  rewrite /load_post_run. apply invw_ctrl_post.
+  rewrite /load_post_bytes -/ws -/ats.
   split_and!.
   - intros a. apply load_fold_coh'; [apply maxcl_frdom_b| | | |].
     + intros p Hp Heq. rewrite -Heq. by apply Hfrd.
@@ -1461,7 +1468,8 @@ Proof.
   assert (HwsT : wsrc E i (S k) (ev_ts E (ev_at k))).
   { right. exists k, s, (ev_ts E (ev_at k)).
     split_and!; [lia|by rewrite cand_ex_tr|done|exact Hpw|lia]. }
-  rewrite /store_post_run /store_post_bytes. split_and!.
+  rewrite /store_post_run. apply invw_ctrl_post.
+  rewrite /store_post_bytes. split_and!.
   - intros a. apply store_fold_coh; [apply maxcl_frdom_b|apply Hc|].
     intros Hin. destruct (elem_of_map_seq base (length vs) a Hin) as (j & Hj & ->).
     rewrite -Hag. apply (touch_frdom k s _ _ Hs). right. split; [|done].

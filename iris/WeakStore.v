@@ -285,7 +285,7 @@ Proof.
   { apply elem_of_list_In, in_map_iff. exists j.
     split; [reflexivity|apply in_seq; lia]. }
   pose proof (coh_store_post_bytes_in ws rl _ t _ Hmem) as Hc.
-  rewrite /store_post_run. lia.
+  rewrite /store_post_run ctrl_post_coh. lia.
 Qed.
 
 (** D3-2: the same, for the DEPENDENCY-CARRYING store.  The operand views go

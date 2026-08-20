@@ -26,7 +26,8 @@
     WHY IT IS A ≤-SIMULATION AND NOT AN EQUALITY.  The erased run's agents
     are NOT in the same [wstate] as the instance's: dropping the operand
     lists lowers every dependency view to [0], and dropping [LInstr] leaves
-    the erased agent's [w_ldv]/[w_res]/[w_tbank] un-reset.  What IS true is
+    the erased agent's [w_ldv]/[w_res]/[w_tbank] un-reset (and, through the
+    un-reset bank, its [w_vcap] raised past the instance's).  What IS true is
     that every erased view is BELOW its instance counterpart ([er_ws]), and
     every side condition of the pf machine is ANTI-monotone in the views:
 
@@ -43,8 +44,16 @@
 
     THE FOUR COMPONENTS OF [er_ws], each with its reason:
 
-    - [ws_le] (the monotone views: [coh], the four floors, [w_vRel],
-      [w_pub], [w_vcap]) — erased ≤ instance, as above.
+    - [ws_le_nc] (the monotone views MINUS the control view: [coh], the four
+      floors, [w_vRel], [w_pub]) — erased ≤ instance, as above.
+      [w_vcap] IS DELIBERATELY ABSENT, and joins [w_ldv]/[w_res]/[w_tbank] as
+      a component the erasure does not relate at all.  Since W-TV's
+      consumption ([WeakMem.load_post_run_d]) every access joins the ENTRY
+      state's [w_tbank] into [w_vcap], and [w_tbank] is un-reset on the
+      erased side ([LInstr] ↦ [LSilent]), so the erased [w_vcap] can
+      OVERTAKE the instance's.  It costs nothing, for the reason the third
+      bullet above already gives: the pf fragment has no [fulfil_ok], so
+      [w_vcap] never appears in a side condition here.
     - [w_relp] EQUAL.  It is a toggle, not a view, and it is moved by the
       FENCE bits and by stores — data the erasure preserves — so equality is
       maintained.  It is load-bearing twice: [w_pub]'s monotonicity needs the
@@ -158,9 +167,9 @@ Proof. intros w R HR. exists R. by split_and!. Qed.
 (** THE ERASURE'S STATE RELATION: [er_ws we wi] — "[we] (the ERASED agent's
     state) is below [wi] (the INSTANCE agent's)". *)
 Definition er_ws (we wi : wstate) : Prop :=
-  ws_le we wi ∧ w_relp we = w_relp wi ∧ fwd_le we wi ∧ res_rel we wi.
+  ws_le_nc we wi ∧ w_relp we = w_relp wi ∧ fwd_le we wi ∧ res_rel we wi.
 
-Lemma er_ws_ws_le we wi : er_ws we wi → ws_le we wi.
+Lemma er_ws_ws_le_nc we wi : er_ws we wi → ws_le_nc we wi.
 Proof. by intros (? & _). Qed.
 Lemma er_ws_relp we wi : er_ws we wi → w_relp we = w_relp wi.
 Proof. by intros (_ & ? & _). Qed.
@@ -172,7 +181,7 @@ Proof. by intros (_ & _ & _ & ?). Qed.
 Global Instance er_ws_refl : Reflexive er_ws.
 Proof. intros w. by split_and!. Qed.
 
-(** Transitive because each of its four components is: [ws_le] by its own
+(** Transitive because each of its four components is: [ws_le_nc] by its own
     instance, [w_relp] because it is an equation, and [fwd_le]/[res_rel]
     pointwise.  Stage 2 ([WeakRefuse]) composes a one-sided step of the
     instance side onto the relation with it. *)
@@ -193,8 +202,8 @@ Lemma er_ws_load_vpre_d we wi aq vae vai :
   er_ws we wi → (vae ≤ vai)%nat →
   (load_vpre_d we aq vae ≤ load_vpre_d wi aq vai)%nat.
 Proof.
-  intros Her Hv. pose proof (ws_le_vrNew _ _ (er_ws_ws_le _ _ Her)).
-  pose proof (ws_le_vRel _ _ (er_ws_ws_le _ _ Her)).
+  intros Her Hv. pose proof (ws_le_nc_vrNew _ _ (er_ws_ws_le_nc _ _ Her)).
+  pose proof (ws_le_nc_vRel _ _ (er_ws_ws_le_nc _ _ Her)).
   rewrite /load_vpre_d /load_vpre. destruct aq; lia.
 Qed.
 
@@ -221,7 +230,7 @@ Proof.
   intros Her Hv Hr j t v Hj. destruct (Hr j t v Hj) as (H1 & H2 & H3).
   split_and!; [done| |done].
   eapply readable_er; [|exact (er_ws_load_vpre_d _ _ aq _ _ Her Hv)|exact H2].
-  exact (ws_le_coh _ _ _ (er_ws_ws_le _ _ Her)).
+  exact (ws_le_nc_coh _ _ _ (er_ws_ws_le_nc _ _ Her)).
 Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -237,11 +246,11 @@ Lemma load_post_at_er we wi aq vpe vpi a t :
   er_ws (load_post_at we aq vpe a t) (load_post_at wi aq vpi a t).
 Proof.
   intros Her Hv.
-  pose proof (er_ws_ws_le _ _ Her) as Hle.
+  pose proof (er_ws_ws_le_nc _ _ Her) as Hle.
   pose proof (er_ws_fwd _ _ Her aq a t) as Hf.
   have Hvp : (Nat.max vpe (fwd_view we aq a t)
               ≤ Nat.max vpi (fwd_view wi aq a t))%nat by lia.
-  destruct Hle as (Hcoh & HrO & HwO & HrN & HwN & HrL & Hpub & Hcap).
+  destruct Hle as (Hcoh & HrO & HwO & HrN & HwN & HrL & Hpub).
   split_and!; [split_and!| | |].
   - intros a'.
     have Hca : ∀ x, (default 0%nat (w_coh we !! x)
@@ -255,7 +264,6 @@ Proof.
   - simpl. lia.
   - simpl. destruct aq; lia.
   - simpl. destruct aq; lia.
-  - simpl. lia.
   - simpl. lia.
   - simpl. lia.
   - exact (er_ws_relp _ _ Her).
@@ -296,9 +304,9 @@ Lemma store_post_d_er we wi rl vfe vfi a t :
   er_ws (store_post_d we rl vfe a t) (store_post_d wi rl vfi a t).
 Proof.
   intros Her Hv.
-  pose proof (er_ws_ws_le _ _ Her) as Hle.
+  pose proof (er_ws_ws_le_nc _ _ Her) as Hle.
   pose proof (er_ws_relp _ _ Her) as Hrp.
-  destruct Hle as (Hcoh & HrO & HwO & HrN & HwN & HrL & Hpub & Hcap).
+  destruct Hle as (Hcoh & HrO & HwO & HrN & HwN & HrL & Hpub).
   split_and!; [split_and!| | |].
   - intros a'.
     have Hca : ∀ x, (default 0%nat (w_coh we !! x)
@@ -314,7 +322,6 @@ Proof.
   - simpl. lia.
   - simpl. destruct rl; lia.
   - simpl. rewrite Hrp. destruct (w_relp wi), rl; simpl; lia.
-  - simpl. lia.
   - done.
   - intros aq' a' t'. rewrite /fwd_view /store_post_d /=.
     destruct aq'; [lia|].
@@ -333,11 +340,14 @@ Proof.
   simpl. apply IH; [by apply store_post_d_er|done].
 Qed.
 
+(** NO relation between the two control views is asked for, or available:
+    [er_ws] stopped constraining [w_vcap] when W-TV's consumption made the
+    erased side's bank un-resettable (see the header). *)
 Lemma ctrl_post_er we wi ve vi :
-  er_ws we wi → (ve ≤ vi)%nat → er_ws (ctrl_post we ve) (ctrl_post wi vi).
+  er_ws we wi → er_ws (ctrl_post we ve) (ctrl_post wi vi).
 Proof.
-  intros Her Hv. pose proof (er_ws_ws_le _ _ Her) as Hle.
-  destruct Hle as (Hcoh & HrO & HwO & HrN & HwN & HrL & Hpub & Hcap).
+  intros Her. pose proof (er_ws_ws_le_nc _ _ Her) as Hle.
+  destruct Hle as (Hcoh & HrO & HwO & HrN & HwN & HrL & Hpub).
   split_and!; [split_and!| | |]; try (simpl; lia).
   - exact Hcoh.
   - exact (er_ws_relp _ _ Her).
@@ -348,16 +358,15 @@ Qed.
 Lemma fence_post_er we wi pr pw sr sw :
   er_ws we wi → er_ws (fence_post we pr pw sr sw) (fence_post wi pr pw sr sw).
 Proof.
-  intros Her. pose proof (er_ws_ws_le _ _ Her) as Hle.
+  intros Her. pose proof (er_ws_ws_le_nc _ _ Her) as Hle.
   pose proof (er_ws_relp _ _ Her) as Hrp.
-  destruct Hle as (Hcoh & HrO & HwO & HrN & HwN & HrL & Hpub & Hcap).
+  destruct Hle as (Hcoh & HrO & HwO & HrN & HwN & HrL & Hpub).
   split_and!; [split_and!| | |].
   - exact Hcoh.
   - simpl. lia.
   - simpl. lia.
   - simpl. destruct sr, pr, pw; lia.
   - simpl. destruct sw, pr, pw; lia.
-  - simpl. lia.
   - simpl. lia.
   - simpl. lia.
   - simpl. destruct (pw && sw)%bool; [done|exact Hrp].
@@ -371,8 +380,8 @@ Qed.
 
 Lemma instr_post_er we wi : er_ws we wi → er_ws (instr_post we) (instr_post wi).
 Proof.
-  intros Her. pose proof (er_ws_ws_le _ _ Her) as Hle.
-  destruct Hle as (Hcoh & HrO & HwO & HrN & HwN & HrL & Hpub & Hcap).
+  intros Her. pose proof (er_ws_ws_le_nc _ _ Her) as Hle.
+  destruct Hle as (Hcoh & HrO & HwO & HrN & HwN & HrL & Hpub).
   split_and!; [split_and!| | |]; try (simpl; lia).
   - exact Hcoh.
   - exact (er_ws_relp _ _ Her).
@@ -384,8 +393,8 @@ Qed.
     [PFSilent] where the instance takes a dependency-only arm. *)
 Lemma er_ws_regw_r we wi rd v : er_ws we wi → er_ws we (regw_post wi rd v).
 Proof.
-  intros Her. pose proof (er_ws_ws_le _ _ Her) as Hle.
-  destruct Hle as (Hcoh & HrO & HwO & HrN & HwN & HrL & Hpub & Hcap).
+  intros Her. pose proof (er_ws_ws_le_nc _ _ Her) as Hle.
+  destruct Hle as (Hcoh & HrO & HwO & HrN & HwN & HrL & Hpub).
   split_and!; [split_and!| | |]; try (simpl; lia).
   - exact Hcoh.
   - exact (er_ws_relp _ _ Her).
@@ -395,8 +404,8 @@ Qed.
 
 Lemma er_ws_ctrl_r we wi v : er_ws we wi → er_ws we (ctrl_post wi v).
 Proof.
-  intros Her. pose proof (er_ws_ws_le _ _ Her) as Hle.
-  destruct Hle as (Hcoh & HrO & HwO & HrN & HwN & HrL & Hpub & Hcap).
+  intros Her. pose proof (er_ws_ws_le_nc _ _ Her) as Hle.
+  destruct Hle as (Hcoh & HrO & HwO & HrN & HwN & HrL & Hpub).
   split_and!; [split_and!| | |]; try (simpl; lia).
   - exact Hcoh.
   - exact (er_ws_relp _ _ Her).
@@ -409,8 +418,8 @@ Qed.
     had, which the [∀ Ri, w_res wi = Some Ri → …] shape allows. *)
 Lemma er_ws_instr_r we wi : er_ws we wi → er_ws we (instr_post wi).
 Proof.
-  intros Her. pose proof (er_ws_ws_le _ _ Her) as Hle.
-  destruct Hle as (Hcoh & HrO & HwO & HrN & HwN & HrL & Hpub & Hcap).
+  intros Her. pose proof (er_ws_ws_le_nc _ _ Her) as Hle.
+  destruct Hle as (Hcoh & HrO & HwO & HrN & HwN & HrL & Hpub).
   split_and!; [split_and!| | |]; try (simpl; lia).
   - exact Hcoh.
   - exact (er_ws_relp _ _ Her).
@@ -427,7 +436,7 @@ Lemma load_post_run_d_er we wi aq vae vai base ts :
         (load_post_run_d wi aq vai base ts).
 Proof.
   intros Her Hv. rewrite /load_post_run_d.
-  apply ctrl_post_er; [|done].
+  apply ctrl_post_er.
   rewrite /load_post_bytes_d.
   apply load_post_fold_er; [done|by apply er_ws_load_vpre_d].
 Qed.
@@ -438,7 +447,7 @@ Lemma store_post_run_d_er we wi rl vae vai vde vdi base n t :
         (store_post_run_d wi rl vai vdi base n t).
 Proof.
   intros Her Ha Hd. rewrite /store_post_run_d.
-  apply ctrl_post_er; [|done].
+  apply ctrl_post_er.
   rewrite /store_post_bytes_d. apply store_post_fold_er; [done|lia].
 Qed.
 

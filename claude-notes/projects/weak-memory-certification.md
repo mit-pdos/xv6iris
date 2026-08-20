@@ -333,8 +333,29 @@ WP-exported invariants apply to it.  No kernel side conditions anywhere.
     file, and nothing proves `lts_enabled` for the event instance), but
     the clauses need real content (`data ≠ []` + `WeakPromise.exwin_ok`)
     before any consumer of `lts_enabled` appears.
+  - **W-TV CONSUMPTION: LANDED (2026-08-20, the D-i slice, option α).**
+    All four run functions wrap in `ctrl_post … (vaddr ⊔ w_tbank
+    ws-at-ENTRY)`; the `_0` equations became CONVERSIONS (`Nat.max 0 x`
+    reduces) and `cfg_match` needed zero edits.  The vcapat producer's
+    WeakMem half is `load_post_run_d_tbank_vcap` + store twin.  What it
+    cost, all premise-free: (i) `WeakLitmusProj.lcfg_match` weakened
+    from state EQUALITY to `ws_ctrl_up` ("equal but for a raised
+    control view") — THE GENERAL RULE: after α, any relation equating
+    a per-byte-stepping machine's `wstate` with a run-level one is off
+    by a `ctrl_post`, and `WeakMem.ws_ctrl_up` (+ `ctrl_post_ctrl`,
+    `load_post_at_ctrl`, `load_post_run_d_ctrl`) is the vocabulary;
+    (ii) the erasure's `er_ws` runs on `ws_le_nc` (the vcap conjunct
+    DELETED, per the design finding); (iii) `lstate` gained the
+    `l_tbank` mirror (11th `lrel` conjunct, appended so positional
+    patterns survive; the tower replay in Sim/Cone transported it FOR
+    FREE through `lrel_aev_post`).  A ZERO-WIDTH ACCESS IS NO LONGER
+    INERT (`ts = []` still consumes the bank): "empty access moves
+    nothing" reasoning now needs a `w_vcap`-blindness lemma
+    (`invw_ctrl_post`, `rf_ws_ctrl`).  L2′'s remaining owed piece from
+    W2b condition 5: the trace-level `vcapat` producer at the access
+    node, to be designed with the L2′ slice.
   - **Remaining: R3** (producers + retry arm + flips), **R6**
-    (contract), the W-TV consumption slice.
+    (contract).
 - **D8-1 — `wp_cert_step` / `wp_certify` + the vcap lemmas**: **DONE
   (2026-08-18, `da090933`)** — `iris/WeakCertify.v`: `wp_cert_step i :=
   wp_astep_of i ∪ (∃ l, wp_pf_step i l)` (fully by reference, no arm
@@ -371,3 +392,57 @@ WP-exported invariants apply to it.  No kernel side conditions anywhere.
 
 (record per-item findings here as they land; rules and durable gotchas go up
 to the design file / durable-notes, not narrative)
+
+- **D-i DECIDED: option α (2026-08-20, orchestrator design pass; build in
+  flight).**  The bank enters the non-`_d` tier symmetrically — both
+  `_run`/`_run_d` families take `ctrl_post … (vaddr ⊔ w_tbank ws-at-ENTRY)`
+  — so the `_0` equations and `cfg_match`'s equality stay EXACT.  The recon
+  that decided it: T1's `invw` (`WeakAxiomatic3.v:1298`) never mentions
+  `w_vcap`/`w_tbank` (the whole file has zero references), and `ctrl_post`
+  is a `w_vcap`-only update, so α is invariant-transparent for T1; β would
+  smear ≤-side-conditions over ~20 call sites to avoid churn that is
+  mostly mechanical; γ's motivation dies once equality is free.  THE ONE
+  REAL CASUALTY is the ERASURE: `er_ws`'s `ws_le` carries a `w_vcap`
+  conjunct, and post-α the erased side's vcap can OVERTAKE the instance's
+  (instance resets `w_tbank` at `LInstr`; the erased run maps `LInstr` to
+  `LSilent` and never resets).  Resolution: DELETE the vcap conjunct from
+  the erasure relation (a `ws_le_nc` bundle) — justified by `WeakErase`'s
+  own header (the pf fragment has no `fulfil_ok`, so `w_vcap` never
+  appears in a side condition), and verified consumer-free
+  (`ws_le_vcap`'s uses are all machine-step monotonicity chains;
+  `WeakRefuse` never mentions vcap).  A deletion, not a premise.  Also
+  verified in design: the toy-tier LB proof SURVIVES full consumption
+  with no `LInstr` in the toy language, because `fulfil_ok` reads the
+  PRE-state's `w_vcap` and the fulfilling agent's own bank is produced
+  but not yet consumed at fulfil time (this is what W2b condition 4
+  buys); and the fused `LRmw` composition `store_post_run ∘
+  load_post_run` consumes the intermediate bank on BOTH tiers equally,
+  so the split/fused correspondence is undisturbed.  Slice spec:
+  scratchpad `di-spec.md`.
+- **T2-1c SHARPENED in the spec pass (2026-08-20): no topological
+  selection needed.**  Two upgrades over the recorded design: (i) ALL rf
+  edges are gmo-forward — the forwarding (rfi) case is same-byte po, so
+  ppo rules 1–3 (`gpoloc ⊆ gppo ⊆ gmo`) already order it — so the
+  extension order needs no rfi special-casing; (ii) the linear extension
+  has a CLOSED FORM: for each write in gmo order emit its hart's
+  po-segment ending at that write, then the write-less tails —
+  equivalently sort by the injective key `(gpos of next-po-write, hart,
+  position)`.  Rule 14 fires in exactly two places (same-hart segments
+  appear in po order; a read precedes its own next write, which places
+  it after its rf source's segment).  Acyclicity never needs stating —
+  each cand obligation is proven directly against the enumeration.
+  Slice spec: scratchpad `t21c-spec.md` (build in flight, worktree).
+- **D-ii REALIZATION SITE PICKED (2026-08-20, design pass; build queued
+  behind D-i).**  The discriminator lives in `WPExStore`'s `fulfil_ok_d`
+  view argument: when the written `data` is the A/D update of the values
+  the reservation's read observed (`data = bytes of pte_set_ad read 1 d`
+  ∧ `data ≠ read`, the spike's classifier — read values recovered from
+  `pc_log`/`pc_img` at `rv_ts`, all fulfil-time data), join
+  `w_vrOld ⊔ w_vwOld` into the EXT floor.  Nothing else changes: the pf
+  fragment has no `fulfil_ok` (tower replay untouched), constructors
+  that append at the fresh top satisfy any floor (front-loading and
+  D8-3's certify-then-fulfil pay nothing), and inverters get W2a's TOP
+  fact directly.  The spike's `update_PTE_Bits_A1`/`update_PTE_Bits_ne`
+  land in `PtAdBits.v` with this slice (probe file:
+  session-`0f027e1d` scratchpad `walker-spike/WalkDisc.v`, still
+  present and building against in-tree `PtAdBits`).

@@ -103,6 +103,13 @@
     literally [WeakErase]'s; §1's commutation lemmas are the price, and they
     are conversions.
 
+    WHAT THE RELATION DOES *NOT* RELATE: [w_ldv], [w_res] (only through
+    [res_rel], and here not at all), [w_tbank] — and, since W-TV's
+    consumption landed, [w_vcap] as well.  [er_ws]'s monotone half is
+    [WeakMem.ws_le_nc], [ws_le] minus the control view; the erased/fused
+    side never resets its translation bank, so its [w_vcap] can overtake.
+    Nothing here reads any of the four.
+
     ** THE PENDING-PAIR INVARIANT (the last conjunct of [rf_ag])
 
     R-KEYED and ∃-SHAPED, guarded by the split agent's reservation ALONE:
@@ -117,8 +124,8 @@
     Established UNCONDITIONALLY at the exload arm from the label's own
     data; maintained VERBATIM across inert steps (neither [wstate] moves,
     and the guard with them — the zero-byte load included, whose dep-free
-    [vaddr = 0] makes both post-states literal identities,
-    [load_post_run_d_nil]); killed by the GUARD everywhere else (loads,
+    [vaddr = 0] makes both post-states the entry states with only the
+    control view raised, [load_post_run_d_nil] + [rf_ws_ctrl]); killed by the GUARD everywhere else (loads,
     stores, rmws and real fences clear [w_res]; the all-false fence is
     the identity, [fence_post_id]); consumed at the exstore arm, where
     the machine's own [rv_base R = base] premise aligns the base.
@@ -161,7 +168,10 @@ Lemma ws_res_set_idem ws r1 r2 :
   ws_res_set (ws_res_set ws r1) r2 = ws_res_set ws r2.
 Proof. done. Qed.
 
-Lemma ctrl_post_res ws r v :
+(** NB the name: [WeakMem.ctrl_post_res] is the FIELD equation
+    ([w_res (ctrl_post ws v) = w_res ws]); this is the [ws_res_set]
+    COMMUTATION, and both are used in this file. *)
+Lemma ctrl_post_res_set ws r v :
   ctrl_post (ws_res_set ws r) v = ws_res_set (ctrl_post ws v) r.
 Proof. done. Qed.
 
@@ -206,7 +216,7 @@ Lemma load_post_run_d_res ws aq vaddr base ts :
   = ws_res_set (load_post_run_d ws aq vaddr base ts) None.
 Proof.
   rewrite /load_post_run_d /load_post_bytes_d.
-  by rewrite load_post_fold_res ctrl_post_res.
+  by rewrite load_post_fold_res ctrl_post_res_set.
 Qed.
 
 (** ... and the CLEAR itself, at the run level, on any non-empty access —
@@ -239,12 +249,15 @@ Proof.
   - rewrite /=. by apply IH.
 Qed.
 
-(** The ZERO-BYTE load is a literal identity at operand view [0] — which is
+(** The ZERO-BYTE load moves nothing but the CONTROL VIEW: at operand view
+    [0] it is the entry state with W-TV's bank consumed into [w_vcap]
+    (before W-TV's consumption landed it was a literal identity).  That is
     what makes it the one dirty-shaped label the pending invariant carries
-    verbatim instead of by guard death. *)
+    verbatim instead of by guard death — the invariant's four ingredients
+    are all [ctrl_post]-transparent ([rf_ws_ctrl] below). *)
 Lemma load_post_run_d_nil ws aq base :
-  load_post_run_d ws aq 0%nat base [] = ws.
-Proof. rewrite load_post_run_d_0 //. Qed.
+  load_post_run_d ws aq 0%nat base [] = ctrl_post ws (w_tbank ws).
+Proof. done. Qed.
 
 Lemma store_post_run_d_res_None ws rl vaddr vdata base n t :
   n ≠ 0%nat → w_res (store_post_run_d ws rl vaddr vdata base n t) = None.
@@ -267,7 +280,7 @@ Lemma store_post_run_d_res ws rl vaddr vdata base n t :
   = ws_res_set (store_post_run_d ws rl vaddr vdata base n t) None.
 Proof.
   rewrite /store_post_run_d /store_post_bytes_d.
-  by rewrite store_post_fold_res ctrl_post_res.
+  by rewrite store_post_fold_res ctrl_post_res_set.
 Qed.
 
 Lemma exload_post_run_d_resN ws aq vaddr base ts :
@@ -280,19 +293,30 @@ Proof. done. Qed.
 
 Definition rf_ws (wF wS : wstate) : Prop := er_ws wF (ws_res_set wS None).
 
-Lemma rf_ws_ws_le wF wS : rf_ws wF wS → ws_le wF wS.
-Proof. intros H. exact (er_ws_ws_le _ _ H). Qed.
+Lemma rf_ws_ws_le_nc wF wS : rf_ws wF wS → ws_le_nc wF wS.
+Proof. intros H. exact (er_ws_ws_le_nc _ _ H). Qed.
 
 Lemma rf_ws_relp wF wS : rf_ws wF wS → w_relp wF = w_relp wS.
 Proof. intros H. exact (er_ws_relp _ _ H). Qed.
 
 Lemma rf_ws_fwd wF wS : rf_ws wF wS → fwd_le wF wS.
 Proof. intros H. exact (er_ws_fwd _ _ H). Qed.
+(** A control raise on EITHER side is invisible to [rf_ws]: its four
+    components are [ws_le_nc] (no [w_vcap] since W-TV's consumption),
+    [w_relp], [fwd_le] and [res_rel], and [ctrl_post] moves none of them. *)
+Lemma rf_ws_ctrl wF wS vF vS :
+  rf_ws wF wS → rf_ws (ctrl_post wF vF) (ctrl_post wS vS).
+Proof.
+  rewrite /rf_ws. intros H.
+  have Heq : ws_res_set (ctrl_post wS vS) None
+             = ctrl_post (ws_res_set wS None) vS by done.
+  rewrite Heq. by apply ctrl_post_er.
+Qed.
 
 Global Instance rf_ws_refl : Reflexive rf_ws.
 Proof.
   intros w. rewrite /rf_ws. split_and!.
-  - rewrite /ws_le /ws_res_set /=. split_and!; auto with lia.
+  - rewrite /ws_le_nc /ws_res_set /=. split_and!; auto with lia.
   - done.
   - intros aq a t. rewrite /fwd_view /ws_res_set /=. lia.
   - by intros Ri HR.
@@ -304,7 +328,8 @@ Lemma rf_ws_load_r wF wS aq vaddr base ts :
   rf_ws wF wS → rf_ws wF (load_post_run_d wS aq vaddr base ts).
 Proof.
   rewrite /rf_ws. intros H. etrans; [exact H|]. split_and!.
-  - rewrite /ws_le /ws_res_set /=. by apply (load_post_run_d_le wS).
+  - rewrite /ws_le_nc /ws_res_set /=.
+    exact (ws_le_ws_le_nc _ _ (load_post_run_d_le wS aq vaddr base ts)).
   - by rewrite /= load_post_run_d_relp.
   - intros aq' a t. rewrite /fwd_view /ws_res_set /= load_post_run_d_fwd. lia.
   - by intros Ri HR.
@@ -612,7 +637,11 @@ Section refuse.
           | |].
         * by apply rf_ws_load.
         * destruct tvs as [|tv tvs0].
-          { rewrite !load_post_run_d_nil. exact Hpd. }
+          { rewrite !load_post_run_d_nil.
+            intros R HR. rewrite ctrl_post_res in HR.
+            destruct (Hpd R HR) as (aq0 & tvs0 & Hts0 & Hrok & Hrf).
+            exists aq0, tvs0. split_and!; [exact Hts0|exact Hrok|].
+            rewrite load_post_run_d_ctrl. by apply rf_ws_ctrl. }
           intros R HR.
           have Hne : (tv :: tvs0).*1 ≠ [] by rewrite fmap_cons.
           rewrite (load_post_run_d_res_None _ _ _ _ _ Hne) in HR.
