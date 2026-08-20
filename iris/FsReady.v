@@ -130,12 +130,17 @@ Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import BitmapInv.
+(* [ROOTDEV], [InodeInv.ireg_blocks_ok], [sb_ninodes]/[sb_inodestart] -- the
+   geometry record and the superblock cells of §0/§0b.  The dead-import sweep
+   (82b48f4a) dropped this Require when nothing here used it yet. *)
+Require Import InodeInv.
 Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import FsCfg.
+Require Import KallocInv.   (* [kmem_res], [kalloc_avail] *)
 Require Import KvmSpec.
 Require Import FileInvDefs.
 Require Import SpecPrintk.

@@ -48,7 +48,7 @@ Require Import IcacheRef.
 (* [ROOTDEV], for the two config ties the boot arm now carries *)
 Require Import IrefSlots.
 Require Import FsCfg.       (* [fscfg] -- the concrete instance below *)
-Require Import BioDefs FsBlocks IcacheEscrow.  (* its record constructors *)
+Require Import BioDefs FsBlocks IcacheEscrow DiskPtsto.  (* its record constructors *)
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
