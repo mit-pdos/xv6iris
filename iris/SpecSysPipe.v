@@ -177,6 +177,30 @@ Definition wp_sys_pipe_sconf_body
      three fileclose calls (inside [sp_close2]), whose own lowest rank is
      "ftable" (1).  One premise covers the whole cone. *)
   locks_below lks "log" ->
+  (* ---- THE TWO TIES THE PID QUARTER FORCES.  Same story as
+     [SpecSysClose.v]'s, and see durable-notes.md's "A CONTRACT CAN ASK FOR
+     MORE OF A CELL THAN EXISTS".
+
+     This contract used to take the pid quarter inside [fileclose_fs_env],
+     BESIDE [proc_priv] -- three quarters of [p->pid] at once, when
+     [ProcInv.proc_priv_core] owns one half and [SchedCtx.proc_pub], inside
+     [p->lock]'s payload, owns the other.  A thread not holding [p->lock] can
+     have one half and no more, and sys_pipe cannot be holding it (its own
+     [cpu_own 0] says no lock is held, and everything below it sleeps).  So
+     the premise set was unpayable, and nothing saw it: 3/4 <= 1, so the pair
+     is a consistent proposition and no proof can refute it -- what refutes it
+     is where the complementary half lives, which this function's proof never
+     mentions.
+
+     So the environment below is the NOPID bundle, and the quarter is lent out
+     of this function's OWN [proc_priv] for the duration of each fileclose
+     call ([ProcInv.proc_priv_pid] + [SpecFileclose.fileclose_fs_env_split_pid]
+     -- kexit's descriptor loop already works exactly this way).  The two
+     equations identify the lent quarter with the one [fn] describes;
+     [SpecSyscall]'s dispatch discharges [fcn_pid] from its own premise and
+     [fcn_dq] by [reflexivity]. *)
+  fcn_pid fn = pid ->
+  fcn_dq fn = DfracOwn (1/4) ->
   sie_cap_gpr KT1 m av b p -∗
   (* [n = 0]: copyout's chain reaches vmfault, whose kalloc runs with
      interrupts un-pushed (SpecCopyout.v) -- and sys_pipe holds no lock
@@ -211,7 +235,7 @@ Definition wp_sys_pipe_sconf_body
      descriptor names is going to be per-[ofile] ghost state, not something
      recoverable from the file table. *)
   fileclose_pipe_env fn on 0%nat -∗
-  fileclose_fs_env fn us 0%nat eb p -∗
+  fileclose_fs_env_nopid fn us 0%nat eb p -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  sys_pipe calls pipealloc
      and fileclose, and both cross at [true] -- fileclose's FS arm parks -- so
      sys_pipe can return on another hart.  The cost is the CALLER's: it must
@@ -230,7 +254,7 @@ Definition wp_sys_pipe_sconf_body
       (* the environment back; the page count has moved if either close was
          the pipe's last end *)
       (∃ on', fileclose_pipe_env fn on' 0%nat) -∗
-      (∃ us', fileclose_fs_env fn us' 0%nat eb p) -∗
+      (∃ us', fileclose_fs_env_nopid fn us' 0%nat eb p) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
