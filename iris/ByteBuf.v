@@ -432,6 +432,32 @@ Section ByteBuf.
      wants.  The three pieces need NOT be named by restrictions of a common
      function (memmove hands the middle one back named by the SOURCE's
      naming), which is exactly why the result is an existential. *)
+  (* THE NAMED JOIN.  [bb_join3]'s existential is the right shape when the
+     caller has nothing to say about the bytes; a caller that must state
+     what the buffer HOLDS -- copyin's promise that its destination is the
+     process's memory -- needs the naming function to survive the join, so
+     it supplies it and discharges three pointwise equations. *)
+  Lemma bb_join3_fn (p : mword 64) (a b c L : nat) (f g h u : nat -> bv 8) :
+    (a + b + c = L)%nat ->
+    (forall j, (j < a)%nat -> u j = f j) ->
+    (forall i, (i < b)%nat -> u (a + i)%nat = g i) ->
+    (forall i, (i < c)%nat -> u (a + (b + i))%nat = h i) ->
+    ([∗ list] j ∈ seq 0 a, pa_add p j ↦ₘ f j) -∗
+    ([∗ list] j ∈ seq 0 b, pa_add (pa_add p a) j ↦ₘ g j) -∗
+    ([∗ list] j ∈ seq 0 c, pa_add (pa_add (pa_add p a) b) j ↦ₘ h j) -∗
+    [∗ list] j ∈ seq 0 L, pa_add p j ↦ₘ u j.
+  Proof.
+    intros <- Hf Hg Hh. iIntros "HA HB HC".
+    rewrite (bb_split3 p a b c (a + b + c) u ltac:(lia)).
+    iSplitL "HA"; [| iSplitL "HB"].
+    - iApply (big_sepL_mono with "HA"). intros i j Hj.
+      apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l Hf; [reflexivity | lia].
+    - iApply (big_sepL_mono with "HB"). intros i j Hj.
+      apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l Hg; [reflexivity | lia].
+    - iApply (big_sepL_mono with "HC"). intros i j Hj.
+      apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l Hh; [reflexivity | lia].
+  Qed.
+
   Lemma bb_join3 (p : mword 64) (a b c L : nat) (f g h : nat -> bv 8) :
     (a + b + c = L)%nat ->
     ([∗ list] j ∈ seq 0 a, pa_add p j ↦ₘ f j) -∗

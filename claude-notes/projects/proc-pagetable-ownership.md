@@ -174,74 +174,88 @@ exactly the size their view is relative to.
   process's memory is that the page reads as ZERO. The existential form is
   now derived from it, so kalloc/kfree/uvmalloc are untouched.
 
-### The copyin / copyout contracts — DESIGNED, NOT YET PROVEN
+### The copyin / copyout contracts — DONE
 
-The shape is settled; what is missing is the two loop proofs. Contracts:
+Both are proven, each as a strengthened contract of record with a derived
+`proc_pt`-altitude corollary, so the ~15 existing call sites are untouched.
 
 ```coq
-(* copyin *)
-Definition copyin_got (M' : gmap Z (bv 8)) (srcva : mword 64) (len : nat)
+(* copyin -- SpecCopyin.v *)
+Definition copyin_got (M : gmap Z (bv 8)) (srcva : mword 64) (len : nat)
     (dst_new : nat -> bv 8) : Prop :=
   forall j, (j < len)%nat ->
-    M' !! uint (add_vec_int srcva (Z.of_nat j)) = Some (dst_new j).
-(* postcondition: proc_ptm P' M' ∗ ⌜M ⊆ M'⌝ ∗
-   ⌜(a0 = 0 ∧ copyin_got M' srcva len dst_new) ∨ a0 = -1⌝ *)
+    M !! uint (add_vec_int srcva (Z.of_nat j)) = Some (dst_new j).
+(* pre  proc_ptm P (uint szv) M
+   post proc_ptm P' (uint szv) M          -- the SAME M
+        ∗ ⌜(a0 = 0 ∧ copyin_got M srcva len dst_new) ∨ a0 = -1⌝ *)
+
+(* copyout -- SpecCopyout.v *)
+Definition copyout_wrote (M : gmap Z (bv 8)) (dstva : mword 64) (len : nat)
+    (src_bytes : nat -> bv 8) (res : mword 64) (M' : gmap Z (bv 8)) : Prop :=
+  (res = 0 ∧ M' = umem_wr M dstva len src_bytes)
+  ∨ (res = -1 ∧ ∃ d, (d <= len)%nat ∧ M' = umem_wr M dstva d src_bytes).
+(* pre  proc_ptm P (uint szv) M
+   post proc_ptm P' (uint szv) M' ∗ ⌜copyout_wrote M dstva len src_bytes a0 M'⌝ *)
 ```
 
-Stated against the FINAL `M'`, not the initial `M`, because copyin may FAULT
-PAGES IN as it goes — a va it reads need not have been mapped when it was
-called. `M ⊆ M'` is the half a caller uses. The `-1` arm promises nothing:
-a run that gives up part-way has copied a prefix, and which prefix is not
-observable from the return value. copyout is the mirror: `M'` has the source
-bytes at `dstva + j`, and every byte of `M` at an untouched va survives.
+**The M-preserving vmfault is what made both statements this simple.** The
+earlier design (above the lazy-page work) had copyin state its promise
+against the FINAL `M'` with `M ⊆ M'`, because a va it reads need not have
+been mapped when it was called. With the lazy zero pages IN the view and
+`vmfault` preserving it, `M` is CONSTANT across copyin's whole loop, and
+copyout's view moves only where the memmove wrote. `copyout_wrote` is an
+EQUATION, not a one-sided promise: it pins both what changed and what did
+not. Its `-1` arm is existential in the prefix length — copyout writes page
+by page and can fail on a later page, and that is the honest reading.
 
-**Why the loop proofs are the whole cost.** `ProofCopyin`'s header records
-that "THE USER-SIDE CURSOR HAS NO INVARIANT" and "the DESTINATION BUFFER is
-carried WHOLE at existential contents". Both have to change:
+The vocabulary (UserPtTree.v):
 
-1. `ci_loop` gains `srcva0` and `M` as outer parameters and `Mc` as an
-   iterated one; premises `m !!! Rs2 = add_vec_int srcva0 done` (the cursor,
-   which today is an arbitrary `mword 64`), `M ⊆ Mc`, and the prefix
-   invariant `∀ j < done, Mc !! uint (add_vec_int srcva0 j) = Some (fd j)`.
-2. `ci_chunk_body` carries the page as a NAMED buffer plus a closer
-   (`proc_ptm_window` at `off = 0, n = 4096`) instead of `page_own pa0` and
-   `(page_own pa0 -∗ proc_pt Pd)`, together with `Md`, `fpg`, `Mc ⊆ Md`,
-   `uint va0 < 2^38` (both arms give it: walkaddr's hit says so directly,
-   vmfault's success gives `uint va0 < uint szv ≤ 2^38`) and the page link
-   `∀ j < 4096, Md !! (uint va0 + j) = Some (fpg j)`.
-3. `ci_copy_body` gains `⌜n = 4096 - off ∨ n = rem⌝` — WITHOUT it the cursor
-   invariant cannot be re-established at the back edge, because the code
-   sets `s2 = va0 + 4096` and that is `cur + n` only in the first case.
-   Both `BODY` arms supply it.
-4. The join must keep the naming: `ByteBuf.bb_join3`'s existential loses it,
-   so a `bb_join3_fn` that takes the merged function and three pointwise
-   equations is needed.
-5. The arithmetic, all of it standard: `pgd_unsigned` for
-   `uint va0 + off = uint cur`, `uint_add_vec_int_small` for
-   `uint (add_vec_int cur i) = uint cur + i` (no wrap, since
-   `uint cur < 2^38`), `avi_assoc` for the cursor.
-6. copyout is the same plus the write side: the closer is instantiated at
-   the bytes memmove wrote, so `Md` moves by `umem_write`, and the loop
-   carries "every byte of `M` at a va outside the copied range survives".
+- `umem_write M a n bs` — a run of writes at consecutive INTEGER addresses,
+  which is what a one-page accessor can offer.
+- `umem_wr M dstva n src` — the same run keyed by `uint (add_vec_int dstva j)`,
+  which is what a CONTRACT can offer without promising `dstva + len` does not
+  wrap. `umem_wr_step` is the one bridge; `umem_wr_lookup_in` /
+  `umem_wr_lookup_out` are what a caller reads back out (the first needs the
+  caller's own no-wrap bound).
+- `umem_write_split` — a whole-page write in which only a sub-window moved IS
+  the sub-window write. This is what lets the loop keep whole-page buffer
+  plumbing (`bb_split3` / `bb_join3_fn`) over a window-sized memmove.
+- `umem_write_id` — writing back what was already there is the identity; the
+  copyin-side counterpart, so its page closer is free.
 
-`umem_write_id` (writing back the bytes that were already there is the
-identity) is the copyin-side lemma that makes step 2's closer free.
+The kernel-side accessors (ProcPtOwn.v §5c): `proc_ptm_page` /
+`proc_ptm_page_bytes` (read, copyin), `proc_ptm_page_acc` /
+`proc_ptm_page_acc_vmfault` (borrow named, give back ANY bytes, view moves by
+the whole-page write — copyout), `proc_ptm_page_write` (the same with the
+window narrowing already applied), `proc_ptm_acc_rep0` / `proc_ptm_rebuild`
+(open/close the tree for walkaddr and walk).
+
+What the loops carry that they did not before: copyin's `ci_loop` gained
+`srcva0` and the cursor premise `m !!! Rs2 = add_vec_int srcva0 done`, plus
+the copied-prefix invariant; copyout's `co_loop` gained `Mu`, `dstva0`, the
+same cursor premise, and the invariant `proc_ptm Pc (uint szv)
+(umem_wr Mu dstva0 done src_bytes)` — one equation, no separate
+"untouched bytes survive" clause. Both `*_copy_body`s gained
+`⌜n = navail ∨ n = rem⌝`, without which the cursor invariant cannot be
+re-established at the back edge (the code sets the next cursor to
+`va0 + 4096`, which is `cur + n` only in the first case). `ByteBuf.bb_join3_fn`
+(named join, three pointwise equations) replaced `bb_join3`, whose
+existential threw the naming away.
 
 ### Still to do
 
-1. **The two copy loops**, per the design above.
-2. **Pin `M` across the USER-mode memory arms.** Today a user store re-seals
+1. **Pin `M` across the USER-mode memory arms.** Today a user store re-seals
    at a fresh `M`; making the arms say *which* bytes changed means
    `u_mem_step` gains `M M'` and the width-generic store certificate
    (`UserMemCert.u_mem_step_store`) states `M' = M` with `k` bytes written at
    `va`. Everything else that mentions `u_mem_wf`/`u_mem_step` (~370 sites)
    is a mechanical extra argument.
-3. **The rest of the kernel side**: uvmcopy / uvmalloc / uvmunmap / kexec.
-4. **Retire `ud_data`.** `user_pt_inv` no longer reads it, so the
+2. **The rest of the kernel side**: uvmcopy / uvmalloc / uvmunmap / kexec.
+3. **Retire `ud_data`.** `user_pt_inv` no longer reads it, so the
    `ud_data pt = ud_pas pt` premise threaded through
    `SpecUserretClosed.loop_ok`, `SpecUservec.uservec_post`, `SpecForkret` and
    `ProcInv` is now DEAD, as is `ud_norm`. Dropping the field is a
-   mechanical sweep and was already slated (step 3 below).
+   mechanical sweep and was already slated (step 2 above).
 
 ## The design (in `iris/ProcPtOwn.v`)
 

@@ -28,15 +28,27 @@
    it faulted in, so there is nothing to roll back and no reason to split
    the resource story across the two arms.
 
-   WHAT THE DESTINATION BUFFER GETS is unconstrained: [dst_new] is
-   universally quantified in the continuation, i.e. the caller learns only
-   that it still owns [len] bytes at [dst].  THIS IS NOT A WEAKNESS OF THE
-   PROOF -- it is the honest reading of the function.  The bytes copyin
-   copies come from USER memory, which the kernel may make no assumption
-   about at all; and [proc_pt] owns the user pages with existential contents
-   (the user-safety altitude -- see SpecVmfault.v), so there is no other
-   value the postcondition could name.  A caller that wants to constrain
-   what it read must validate the bytes itself.
+   WHAT THE DESTINATION BUFFER GETS is named by the MEMORY-INDEXED form
+   below, [wp_copyin_sconf_mem]: it runs at [proc_ptm P (uint szv) M], the
+   contents-indexed refinement of [proc_pt] (ProcPtOwn.v §5c), and its
+   success arm promises [copyin_got M srcva len dst_new] -- byte [j] of the
+   destination IS what the process's memory view holds at user va
+   [srcva + j].  [M] comes back UNCHANGED: copyin only reads, and the
+   lazily-backed pages a fault may add are already in the view
+   (SpecVmfault.v), so the promise can be stated against the INPUT [M].
+
+   [wp_copyin_sconf] is the existential-[M] corollary, in which [dst_new] is
+   simply universally quantified -- the caller learns only that it still
+   owns [len] bytes at [dst].  That is what every current caller speaks, and
+   for most of them it is the right altitude: the bytes copyin copies come
+   from USER memory, which the kernel may make no assumption about, so a
+   caller that wants to constrain what it read must validate the bytes
+   itself either way.  What the indexed form buys is the ability to say
+   WHICH user bytes those were.
+
+   The [-1] arm promises nothing about the destination.  A run that gives up
+   part-way has copied a prefix, and which prefix is not observable from the
+   return value.
 
    The kalloc tier and [cpu_own] are threaded through only because vmfault
    needs them; copyin allocates nothing of its own.
@@ -132,7 +144,86 @@ Definition wp_copyin_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : 
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
+(* ===================================================================== *)
+(* THE MEMORY-INDEXED CONTRACT: WHAT THE DESTINATION BUFFER GETS.        *)
+(*                                                                       *)
+(* The contract above leaves [dst_new] universally quantified, which was *)
+(* the honest reading while [proc_pt] owned the user pages with          *)
+(* EXISTENTIAL contents.  Now that the process's memory is NAMED         *)
+(* ([ProcPtOwn.proc_ptm P sz M] -- a [gmap] from USER VIRTUAL ADDRESS to *)
+(* byte, covering the LAZY pages too), the postcondition can say what    *)
+(* the buffer holds: ON THE SUCCESS ARM byte [j] of the destination IS   *)
+(* the byte the process has at [srcva + j].                              *)
+(*                                                                       *)
+(* [M] IS THE SAME ON BOTH SIDES.  copyin writes no user memory, and the *)
+(* pages it faults in on the way were ALREADY in the view -- as lazy     *)
+(* pages reading 0 -- so vmfault does not move it either                 *)
+(* ([SpecVmfault.wp_vmfault_sconf_mem]).  The descriptor still grows     *)
+(* ([uptd_ext_sz]); the view does not.  That is what lets the promise be *)
+(* stated against the [M] the caller handed in.                          *)
+(*                                                                       *)
+(* THE -1 ARM PROMISES NOTHING about the buffer.  A run that gives up    *)
+(* part-way has copied a prefix, and which prefix is not observable from *)
+(* the return value.                                                     *)
+(*                                                                       *)
+(* [wp_copyin_sconf] stays as the [proc_pt]-altitude COROLLARY, so the   *)
+(* callers that say nothing about the bytes do not have to name a        *)
+(* memory.                                                               *)
+(* ===================================================================== *)
+
+(* byte [j] of the destination is the process's byte at [srcva + j] *)
+Definition copyin_got (M : gmap Z (bv 8)) (srcva : mword 64) (len : nat)
+    (dst_new : nat -> bv 8) : Prop :=
+  forall j : nat, (j < len)%nat ->
+    M !! uint (add_vec_int srcva (Z.of_nat j)) = Some (dst_new j).
+
+Definition wp_copyin_sconf_mem_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
+    (ktb : ktier) `{!KtierLe ktb KT1} (γa : gname) (mm : regfile)
+    (P : uptd) (M : gmap Z (bv 8)) (szv : mword 64) (len : nat)
+    (dst_olds : nat -> bv 8)
+    (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.copyin in
+  let dst := mm !!! Regidx (mword_of_int 12) in
+  let srcva := mm !!! Regidx (mword_of_int 13) in
+  let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
+  (50 <= K)%nat ->
+  mm !!! Regidx (mword_of_int 10) = page_base P.(ud_root) ->
+  mm !!! Regidx (mword_of_int 11) = szv ->
+  mm !!! Regidx (mword_of_int 14) = (mword_of_int (Z.of_nat len) : mword 64) ->
+  (Z.of_nat len < 2 ^ 64)%Z ->
+  (uint szv <= 2 ^ 38)%Z ->
+  (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
+  locks_below lks "kmem" ->
+  sie_cap_gpr KT1 mm K b p -∗
+  cpu_own lvl eb p b lks -∗
+  kernel_text -∗
+  pc_is pcE -∗
+  proc_ptm P (uint szv) M -∗
+  kalloc_env γa None -∗
+  ([∗ list] j ∈ seq 0 len, (pa_add dst j) ↦ₘ[ktb] dst_olds j) -∗
+  wp_next b p (fun (CID : CpuId) =>
+    ∀ (mr : regfile) (P' : uptd) (dst_new : nat -> bv 8),
+    sie_cap_gpr KT1 mr K b p -∗
+    cpu_own lvl eb p b lks -∗
+    pc_is ret_tgt -∗
+    proc_ptm P' (uint szv) M -∗
+    ([∗ list] j ∈ seq 0 len, (pa_add dst j) ↦ₘ[ktb] dst_new j) -∗
+    ⌜callee_saved mm mr⌝ -∗
+    ⌜uptd_ext_sz szv P P'⌝ -∗
+    ⌜ (mr !!! Regidx (mword_of_int 10) = mword_of_int 0
+       /\ copyin_got M srcva len dst_new)
+      \/ mr !!! Regidx (mword_of_int 10) = mword_of_int (-1) ⌝ -∗
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
+
 Module Type COPYIN.
+  Parameter wp_copyin_sconf_mem :
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
+      (ktb : ktier) `{!KtierLe ktb KT1} (γa : gname) (mm : regfile)
+      (P : uptd) (M : gmap Z (bv 8)) (szv : mword 64) (len : nat)
+      (dst_olds : nat -> bv 8)
+      (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string),
+      wp_copyin_sconf_mem_body ktb γa mm P M szv len dst_olds K lvl eb p b lks.
   Parameter wp_copyin_sconf :
     forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
       (ktb : ktier) `{!KtierLe ktb KT1} (γa : gname) (mm : regfile)

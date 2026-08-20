@@ -3606,6 +3606,51 @@ Section ProcPt.
              Hrep Hbase).
   Qed.
 
+  Lemma proc_ptm_wf (P : uptd) (sz : Z) (M : gmap Z (bv 8)) :
+    proc_ptm P sz M -∗ ⌜proc_pt_wf P⌝.
+  Proof. iIntros "(%Hwf & _ & _)". iPureIntro. exact Hwf. Qed.
+
+  (* the vpn of a PAGE-ALIGNED va reads back as the va itself, scaled --
+     the form the copy loops need, since walkaddr hands them [va0] and
+     [proc_ptm_window] is indexed by the vpn *)
+  Lemma svpn_of_pgd (cur : mword 64) :
+    (uint (and_vec cur (mword_of_int (-4096))) < 2 ^ 38)%Z ->
+    (bv_unsigned (svpn_of (and_vec cur (mword_of_int (-4096)))) * 4096
+     = uint (and_vec cur (mword_of_int (-4096))))%Z.
+  Proof.
+    intros Hb.
+    rewrite (svpn_of_unsigned_lo _ ltac:(change (2 ^ 38)%Z with 274877906944%Z in Hb;
+                                         exact Hb)).
+    rewrite Z.shiftr_div_pow2; [| lia]. change (2 ^ 12)%Z with 4096%Z.
+    rewrite !uint_unsigned. rewrite pgd_unsigned.
+    pose proof (Z.div_mod (bv_unsigned cur) 4096 ltac:(lia)) as Hdm.
+    pose proof (Z.mod_pos_bound (bv_unsigned cur) 4096 ltac:(lia)) as Hmb.
+    replace (bv_unsigned cur - bv_unsigned cur mod 4096)%Z
+      with ((bv_unsigned cur / 4096) * 4096)%Z by lia.
+    rewrite (Z.div_mul (bv_unsigned cur / 4096) 4096 ltac:(lia)). reflexivity.
+  Qed.
+
+  (* a MAPPED page's bytes are all recorded in [M] -- the pure fact that
+     turns [M !!! va] into [M !! va = Some _], which is what a copy loop's
+     copied-prefix invariant is stated with.  Pure conclusion, so it costs
+     the caller nothing. *)
+  Lemma proc_ptm_page_bytes (P : uptd) (sz : Z) (M : gmap Z (bv 8))
+      (vpn : mword 27) (w : mword 64) :
+    P.(ud_um) !! vpn = Some w ->
+    proc_ptm P sz M -∗
+    ⌜forall j, (j < 4096)%nat ->
+       M !! (bv_unsigned vpn * 4096 + Z.of_nat j)%Z
+       = Some (M !!! (bv_unsigned vpn * 4096 + Z.of_nat j)%Z)⌝.
+  Proof.
+    intros Hl. iIntros "(_ & _ & Hm)".
+    iDestruct "Hm" as (Mp) "(_ & %Hdm & _ & _)".
+    iPureIntro. intros j Hj.
+    assert (Hs : is_Some (M !! (bv_unsigned vpn * 4096 + Z.of_nat j)%Z)).
+    { apply (proj2 (Hdm _)). left. exists vpn, w, j.
+      split_and!; [exact Hl | exact Hj | reflexivity]. }
+    destruct Hs as [bb Hbb]. rewrite Hbb lookup_total_alt Hbb. reflexivity.
+  Qed.
+
   (* THE ACCESSOR THE COPY LOOPS RUN ON.  [n] bytes at offset [off] inside
      the page a MAPPED [vpn] names, at the values [M] records and at the
      kernel's [↦ₘ] tier (which is what memmove speaks); the wand takes them
@@ -3657,6 +3702,133 @@ Section ProcPt.
         rewrite (Haddr k Hlt). iExact "Hj". }
       iSplitR; [iPureIntro; exact Hwf' |]. iFrame "Ht Hm".
   Qed.
+
+  (* ONE WHOLE PAGE, borrowed and given back UNCHANGED -- what a copyIN
+     does.  It is [proc_ptm_window] at [off = 0, n = 4096] with the two
+     shape nuisances discharged once ([pa_add p 0] and the [+ 0] in the
+     index), and with the closer specialised to the SAME bytes so
+     [umem_write] collapses to the identity ([umem_write_id]). *)
+  Lemma proc_ptm_page (P : uptd) (sz : Z) (M : gmap Z (bv 8))
+      (vpn : mword 27) (w : mword 64) (base : Z) :
+    proc_pt_wf P -> P.(ud_um) !! vpn = Some w ->
+    base = (bv_unsigned vpn * 4096)%Z ->
+    kmap_static_claims -∗ proc_ptm P sz M -∗
+      ([∗ list] j ∈ seq 0 4096,
+         (pa_add (page_base (pte_ppn w)) j : Arch.pa)
+           ↦ₘ (M !!! (base + Z.of_nat j)%Z)) ∗
+      (([∗ list] j ∈ seq 0 4096,
+          (pa_add (page_base (pte_ppn w)) j : Arch.pa)
+            ↦ₘ (M !!! (base + Z.of_nat j)%Z)) -∗
+       proc_ptm P sz M).
+  Proof.
+    intros Hwf Hl ->. iIntros "#Hb Hpt".
+    iDestruct (proc_ptm_page_bytes P sz M vpn w Hl with "Hpt") as %Hbytes.
+    assert (Hb0 : (bv_unsigned vpn * 4096 + Z.of_nat 0)%Z
+                  = (bv_unsigned vpn * 4096)%Z) by lia.
+    iDestruct (proc_ptm_window P sz M vpn w 0 4096 Hwf Hl ltac:(lia)
+                 with "Hb Hpt") as "[Hpg Hback]".
+    iEval (rewrite Hb0 pa_add_0) in "Hpg".
+    iEval (rewrite Hb0 pa_add_0) in "Hback".
+    iFrame "Hpg". iIntros "Hp".
+    iDestruct ("Hback" $! (fun j : nat =>
+                  M !!! (bv_unsigned vpn * 4096 + Z.of_nat j)%Z) with "Hp")
+      as "Hpt".
+    rewrite (umem_write_id M (bv_unsigned vpn * 4096)%Z 4096
+               (fun j : nat => M !!! (bv_unsigned vpn * 4096 + Z.of_nat j)%Z)
+               Hbytes).
+    iExact "Hpt".
+  Qed.
+
+
+  (* THE WRITE FORM of the page accessor -- what copyout needs.  The page
+     goes out named by [M] exactly as in [proc_ptm_page], but it may come
+     back holding anything, PROVIDED the caller certifies that only the
+     window [off .. off+n) moved; [M] then advances by exactly that window
+     ([umem_write_split] is the whole content of the step).  The window is
+     not the unit of the buffer plumbing -- [bb_split3] / [bb_join3] speak
+     whole pages -- which is why this is stated at page granularity with the
+     window as a side condition, rather than as a bare [proc_ptm_window]. *)
+  Lemma proc_ptm_page_write (P : uptd) (sz : Z) (M : gmap Z (bv 8))
+      (vpn : mword 27) (w : mword 64) (base : Z) (off n : nat) :
+    proc_pt_wf P -> P.(ud_um) !! vpn = Some w ->
+    base = (bv_unsigned vpn * 4096)%Z -> (off + n <= 4096)%nat ->
+    kmap_static_claims -∗ proc_ptm P sz M -∗
+      ([∗ list] j ∈ seq 0 4096,
+         (pa_add (page_base (pte_ppn w)) j : Arch.pa)
+           ↦ₘ (M !!! (base + Z.of_nat j)%Z)) ∗
+      (∀ g : nat -> bv 8,
+         ⌜forall j, (j < 4096)%nat -> ~ (off <= j < off + n)%nat ->
+            g j = M !!! (base + Z.of_nat j)%Z⌝ -∗
+         ([∗ list] j ∈ seq 0 4096,
+            (pa_add (page_base (pte_ppn w)) j : Arch.pa) ↦ₘ g j) -∗
+         proc_ptm P sz
+           (umem_write M (base + Z.of_nat off)%Z n (fun i => g (off + i)%nat))).
+  Proof.
+    intros Hwf Hl -> Hn. iIntros "#Hb Hpt".
+    iDestruct (proc_ptm_page_bytes P sz M vpn w Hl with "Hpt") as %Hbytes.
+    assert (Hb0 : (bv_unsigned vpn * 4096 + Z.of_nat 0)%Z
+                  = (bv_unsigned vpn * 4096)%Z) by lia.
+    iDestruct (proc_ptm_window P sz M vpn w 0 4096 Hwf Hl ltac:(lia)
+                 with "Hb Hpt") as "[Hpg Hback]".
+    iEval (rewrite Hb0 pa_add_0) in "Hpg".
+    iEval (rewrite Hb0 pa_add_0) in "Hback".
+    iFrame "Hpg". iIntros (g) "%Hg Hp".
+    iDestruct ("Hback" $! g with "Hp") as "Hpt".
+    rewrite (umem_write_split M (bv_unsigned vpn * 4096)%Z 4096 off n g Hn
+               ltac:(intros j Hj Hnw; rewrite (Hg j Hj Hnw); exact (Hbytes j Hj))).
+    iExact "Hpt".
+  Qed.
+
+
+  (* THE BORROW FORM.  [proc_pt_page_acc] hands out a page with existential
+     contents and demands nothing back but a page; these two hand it out
+     NAMED by [M] and take back ANY contents, moving [M] by exactly the
+     whole-page write.  A caller that only wrote a window recovers the
+     window form with [umem_write_split] (or reaches for
+     [proc_ptm_page_write], which does that step for it). *)
+  Lemma proc_ptm_page_acc (P : uptd) (sz : Z) (M : gmap Z (bv 8))
+      (vpn : mword 27) (w : mword 64) (base : Z) :
+    P.(ud_um) !! vpn = Some w -> base = (bv_unsigned vpn * 4096)%Z ->
+    kmap_static_claims -∗ proc_ptm P sz M -∗
+      ([∗ list] j ∈ seq 0 4096,
+         (pa_add (page_base (pte_ppn w)) j : Arch.pa)
+           ↦ₘ (M !!! (base + Z.of_nat j)%Z)) ∗
+      (∀ g : nat -> bv 8,
+         ([∗ list] j ∈ seq 0 4096,
+            (pa_add (page_base (pte_ppn w)) j : Arch.pa) ↦ₘ g j) -∗
+         proc_ptm P sz (umem_write M base 4096 g)).
+  Proof.
+    intros Hl ->. iIntros "#Hb Hpt".
+    iDestruct (proc_ptm_wf with "Hpt") as %Hwf.
+    assert (Hb0 : (bv_unsigned vpn * 4096 + Z.of_nat 0)%Z
+                  = (bv_unsigned vpn * 4096)%Z) by lia.
+    iDestruct (proc_ptm_window P sz M vpn w 0 4096 Hwf Hl ltac:(lia)
+                 with "Hb Hpt") as "[Hpg Hback]".
+    iEval (rewrite Hb0 pa_add_0) in "Hpg".
+    iEval (rewrite Hb0 pa_add_0) in "Hback".
+    iFrame "Hpg". iExact "Hback".
+  Qed.
+
+  Lemma proc_ptm_page_acc_vmfault (P : uptd) (sz : Z) (M : gmap Z (bv 8))
+      (vpn : mword 27) (r : mword 64) (base : Z) :
+    page_valid r -> base = (bv_unsigned vpn * 4096)%Z ->
+    kmap_static_claims -∗ proc_ptm (uptd_insert P vpn r) sz M -∗
+      ([∗ list] j ∈ seq 0 4096,
+         (pa_add r j : Arch.pa) ↦ₘ (M !!! (base + Z.of_nat j)%Z)) ∗
+      (∀ g : nat -> bv 8,
+         ([∗ list] j ∈ seq 0 4096, (pa_add r j : Arch.pa) ↦ₘ g j) -∗
+         proc_ptm (uptd_insert P vpn r) sz (umem_write M base 4096 g)).
+  Proof.
+    intros Hval Hbase.
+    assert (Hl : (uptd_insert P vpn r).(ud_um) !! vpn = Some (vmfault_pte r))
+      by (unfold uptd_insert; cbn [ud_um]; apply lookup_insert).
+    assert (Hpb : page_base (pte_ppn (vmfault_pte r)) = r)
+      by (rewrite pte_ppn_vmfault; exact (page_base_of_valid r Hval)).
+    pose proof (proc_ptm_page_acc (uptd_insert P vpn r) sz M vpn
+                  (vmfault_pte r) base Hl Hbase) as Hacc.
+    rewrite Hpb in Hacc. exact Hacc.
+  Qed.
+
 
   (* ... tied to the two [struct proc] cells.  Both hold a page's identity
      kernel va, which is [page_base] of the ppn the table is described by:

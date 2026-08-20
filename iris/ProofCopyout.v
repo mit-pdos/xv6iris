@@ -16,12 +16,23 @@
        return 0;
      }
 
-   Spec of record: SpecCopyout.v -- stated at the [proc_pt] altitude, so the
-   loop body is bracketed by ProcPtOwn's dovetail lemmas ([proc_pt_acc_rep0]
-   to open the table into the exact [pt_rep0] view walkaddr/walk consume,
-   [proc_pt_rebuild] to close it before vmfault and before the memmove, and
-   [proc_pt_page_acc] / [proc_pt_page_acc_vmfault] to BORROW the one user
-   page the memmove writes).
+   Spec of record: SpecCopyout.v -- stated at the CONTENTS-INDEXED
+   [proc_ptm P (uint szv) M] altitude, so the loop body is bracketed by
+   ProcPtOwn's dovetail lemmas ([proc_ptm_acc_rep0] to open the table into
+   the exact [pt_rep0] view walkaddr/walk consume, [proc_ptm_rebuild] to
+   close it before vmfault and before the memmove, and [proc_ptm_page_acc]
+   / [proc_ptm_page_acc_vmfault] to BORROW the one user page the memmove
+   writes).
+
+   THE VIEW MOVES, AND THE INVARIANT SAYS BY HOW MUCH.  At the loop head
+   the process's memory is [umem_wr Mu dstva0 done src_bytes] -- the given
+   view with exactly the first [done] source bytes already written at
+   [dstva0 + j].  Each chunk advances it by [umem_wr_step]; the borrow
+   closure speaks a WHOLE-page write, which [umem_write_split] narrows to
+   the window the memmove actually touched.  Every one of the four exits
+   reports its own [done] ([copyout_wrote]'s -1 arm is existential in it),
+   so the failure arms cost the invariant nothing.  The cursor premise
+   [dstva = add_vec_int dstva0 done] is what ties the register to it.
 
    ONE CONTRACT, ONE PROOF.  xv6 `4f2fc8b` gave [vmfault] the size as an
    ARGUMENT and made it map into the table it was HANDED, so copyout --
@@ -124,7 +135,7 @@ Require Import UserPtTree.
 Require Import CpuOwn.
 Require Import KvmSpec.
 Require Import ProcPtOwn.
-Require Import ByteCursor ByteBuf.
+Require Import ByteCursor ByteBuf UserBits.
 Require Import CodeCopyout.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import SpecWalkaddr SpecVmfault SpecWalk SpecMemmove.
@@ -439,10 +450,21 @@ Section ProofCopyout.
      stay visible at each [iAssert]. *)
   Definition co_tail_body
       (b : bool) (p : mword 64) (K lvl : nat) (eb : bool) (lks : gset string)
-      (szv : mword 64) (P : uptd) (spr va0 dstva src : mword 64)
-      (rem done len : nat) (src_bytes : nat -> bv 8)
-      (CIDh : CpuId) (Pd : uptd) (Md : regfile) (pa0 : mword 64) : iProp Σ :=
+      (szv : mword 64) (P : uptd) (Mu : gmap Z (bv 8)) (dstva0 : mword 64)
+      (spr va0 dstva src : mword 64)
+      (rem done navail len : nat) (src_bytes : nat -> bv 8)
+      (CIDh : CpuId) (Pd : uptd) (Md : regfile) (pa0 : mword 64)
+      (fpg : nat -> bv 8) : iProp Σ :=
     (⌜ uptd_ext_sz szv P Pd
+       (* the borrowed page holds exactly what the current view says *)
+       /\ (forall j : nat, (j < 4096)%nat ->
+             umem_wr Mu dstva0 done src_bytes
+               !! (uint va0 + Z.of_nat j)%Z = Some (fpg j))
+       (* the user vas this page covers are consecutive integers starting at
+          [dstva] -- the ONE arithmetic fact the write half of the loop needs *)
+       /\ (forall i : nat, (i <= navail)%nat ->
+             uint (add_vec_int dstva0 (Z.of_nat (done + i)))
+             = (uint dstva + Z.of_nat i)%Z)
        /\ Md !!! Regidx csp_rs1 = spr
        /\ Md !!! Regidx Rs11 = szv
        /\ Md !!! Regidx Rs1 = va0
@@ -457,30 +479,44 @@ Section ProofCopyout.
      sie_cap_gpr KT1 (CID:=CIDh) Md (K - 14)%nat b p -∗
      cpu_own (CID:=CIDh) lvl eb p b lks -∗
      pc_is (CID:=CIDh) (mword_of_int (KernelSyms.copyout + 0x88) : mword 64) -∗
-     page_own pa0 -∗
-     (page_own pa0 -∗ proc_pt Pd) -∗
+     ([∗ list] j ∈ seq 0 4096, (pa_add pa0 j : Arch.pa) ↦ₘ fpg j) -∗
+     (∀ g : nat -> bv 8,
+        ([∗ list] j ∈ seq 0 4096, (pa_add pa0 j : Arch.pa) ↦ₘ g j) -∗
+        proc_ptm Pd (uint szv)
+          (umem_write (umem_wr Mu dstva0 done src_bytes)
+             (uint va0) 4096 g)) -∗
      ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb] src_bytes j) -∗
      wp_next (CID0:=CIDh) b p (fun (CID : CpuId) =>
-       ∀ (mj : regfile) (res : mword 64) (P' : uptd),
+       ∀ (mj : regfile) (res : mword 64) (P' : uptd) (Mu' : gmap Z (bv 8)),
          ⌜ mj !!! Regidx csp_rs1 = spr
            /\ mj !!! Regidx Ra0 = res
-           /\ (res = (mword_of_int 0 : mword 64) \/ res = (mword_of_int (-1) : mword 64))
+           /\ copyout_wrote Mu dstva0 len src_bytes res Mu'
            /\ uptd_ext_sz szv P P' ⌝ -∗
          sie_cap_gpr KT1 mj (K - 14)%nat b p -∗
          cpu_own lvl eb p b lks -∗
          pc_is (mword_of_int (KernelSyms.copyout + 0xa0) : mword 64) -∗
-         proc_pt P' -∗
+         proc_ptm P' (uint szv) Mu' -∗
          ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb] src_bytes j) -∗
          WP (Loop : expr riscv_lang)) -∗
      WP (Loop : expr riscv_lang))%I.
 
   Definition co_copy_body
       (b : bool) (p : mword 64) (K lvl : nat) (eb : bool) (lks : gset string)
-      (szv : mword 64) (P : uptd) (spr va0 dstva src : mword 64)
+      (szv : mword 64) (P : uptd) (Mu : gmap Z (bv 8)) (dstva0 : mword 64)
+      (spr va0 dstva src : mword 64)
       (rem done navail len : nat) (src_bytes : nat -> bv 8)
-      (Pd : uptd) (pa0 : mword 64)
+      (Pd : uptd) (pa0 : mword 64) (fpg : nat -> bv 8)
       (CIDc : CpuId) (Mn : regfile) (nn : nat) : iProp Σ :=
     (⌜ (1 <= nn)%nat /\ (nn <= rem)%nat /\ (nn <= navail)%nat
+       /\ (forall j : nat, (j < 4096)%nat ->
+             umem_wr Mu dstva0 done src_bytes
+               !! (uint va0 + Z.of_nat j)%Z = Some (fpg j))
+       (* the chunk either fills the page or finishes the copy -- which is
+          what makes the next [dstva] the next page boundary *)
+       /\ ((nn = navail)%nat \/ (nn = rem)%nat)
+       /\ (forall i : nat, (i <= navail)%nat ->
+             uint (add_vec_int dstva0 (Z.of_nat (done + i)))
+             = (uint dstva + Z.of_nat i)%Z)
        /\ Mn !!! Regidx csp_rs1 = spr
        /\ Mn !!! Regidx Rs11 = szv
        /\ Mn !!! Regidx Rs1 = va0
@@ -496,19 +532,23 @@ Section ProofCopyout.
      sie_cap_gpr KT1 (CID:=CIDc) Mn (K - 14)%nat b p -∗
      cpu_own (CID:=CIDc) lvl eb p b lks -∗
      pc_is (CID:=CIDc) (mword_of_int (KernelSyms.copyout + 0x36) : mword 64) -∗
-     page_own pa0 -∗
-     (page_own pa0 -∗ proc_pt Pd) -∗
+     ([∗ list] j ∈ seq 0 4096, (pa_add pa0 j : Arch.pa) ↦ₘ fpg j) -∗
+     (∀ g : nat -> bv 8,
+        ([∗ list] j ∈ seq 0 4096, (pa_add pa0 j : Arch.pa) ↦ₘ g j) -∗
+        proc_ptm Pd (uint szv)
+          (umem_write (umem_wr Mu dstva0 done src_bytes)
+             (uint va0) 4096 g)) -∗
      ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb] src_bytes j) -∗
      wp_next (CID0:=CIDc) b p (fun (CID : CpuId) =>
-       ∀ (mj : regfile) (res : mword 64) (P' : uptd),
+       ∀ (mj : regfile) (res : mword 64) (P' : uptd) (Mu' : gmap Z (bv 8)),
          ⌜ mj !!! Regidx csp_rs1 = spr
            /\ mj !!! Regidx Ra0 = res
-           /\ (res = (mword_of_int 0 : mword 64) \/ res = (mword_of_int (-1) : mword 64))
+           /\ copyout_wrote Mu dstva0 len src_bytes res Mu'
            /\ uptd_ext_sz szv P P' ⌝ -∗
          sie_cap_gpr KT1 mj (K - 14)%nat b p -∗
          cpu_own lvl eb p b lks -∗
          pc_is (mword_of_int (KernelSyms.copyout + 0xa0) : mword 64) -∗
-         proc_pt P' -∗
+         proc_ptm P' (uint szv) Mu' -∗
          ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb] src_bytes j) -∗
          WP (Loop : expr riscv_lang)) -∗
      WP (Loop : expr riscv_lang))%I.
@@ -517,9 +557,10 @@ Section ProofCopyout.
   (* THE LOOP (+0x54 .. the back edge), by induction on [fuel].           *)
   (* ------------------------------------------------------------------ *)
   Local Lemma co_loop (γa : gname) (mm : regfile)
-      (P : uptd) (szv : mword 64) (len : nat) (src_bytes : nat -> bv 8)
+      (P : uptd) (Mu : gmap Z (bv 8)) (szv : mword 64) (len : nat)
+      (src_bytes : nat -> bv 8)
       (K lvl : nat) (eb : bool) (p : mword 64)
-      (src spr : mword 64) (b : bool) (lks : gset string) :
+      (src spr dstva0 : mword 64) (b : bool) (lks : gset string) :
     (* the 14-slot frame + vmfault's 38 *)
     (52 <= K)%nat ->
     (Z.of_nat len < 2 ^ 64)%Z ->
@@ -529,6 +570,10 @@ Section ProofCopyout.
     forall (fuel rem done : nat) (Pc : uptd) (M : regfile) (dstva : mword 64) (CID0 : CpuId),
     (rem <= fuel)%nat -> (1 <= rem)%nat -> (done + rem = len)%nat ->
     uptd_ext_sz szv P Pc ->
+    (* THE CURSOR IS THE ORIGINAL [dstva] ADVANCED BY WHAT IS DONE.  This is
+       what lets the invariant say the view is [umem_wr Mu dstva0 done] --
+       the prefix already copied out, and nothing else. *)
+    dstva = add_vec_int dstva0 (Z.of_nat done) ->
     M !!! Regidx csp_rs1 = spr ->
     M !!! Regidx Rs11 = szv ->
     M !!! Regidx Rs4 = dstva ->
@@ -543,19 +588,19 @@ Section ProofCopyout.
     cpu_own (CID:=CID0) lvl eb p b lks -∗
     kernel_text -∗
     pc_is (CID:=CID0) (mword_of_int (KernelSyms.copyout + 0x54) : mword 64) -∗
-    proc_pt Pc -∗
+    proc_ptm Pc (uint szv) (umem_wr Mu dstva0 done src_bytes) -∗
     kalloc_env γa None -∗
     ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb] src_bytes j) -∗
     wp_next (CID0:=CID0) b p (fun (CID : CpuId) =>
-      ∀ (mj : regfile) (res : mword 64) (P' : uptd),
+      ∀ (mj : regfile) (res : mword 64) (P' : uptd) (Mu' : gmap Z (bv 8)),
         ⌜ mj !!! Regidx csp_rs1 = spr
           /\ mj !!! Regidx Ra0 = res
-          /\ (res = (mword_of_int 0 : mword 64) \/ res = (mword_of_int (-1) : mword 64))
+          /\ copyout_wrote Mu dstva0 len src_bytes res Mu'
           /\ uptd_ext_sz szv P P' ⌝ -∗
         sie_cap_gpr KT1 mj (K - 14)%nat b p -∗
         cpu_own lvl eb p b lks -∗
         pc_is (mword_of_int (KernelSyms.copyout + 0xa0) : mword 64) -∗
-        proc_pt P' -∗
+        proc_ptm P' (uint szv) Mu' -∗
         ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb] src_bytes j) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -563,7 +608,7 @@ Section ProofCopyout.
     intros HK Hlen64 Hszb Hlvl fuel.
     change (2 ^ 64)%Z with 18446744073709551616%Z in Hlen64.
     induction fuel as [| fuel IH];
-      intros rem done Pc M dstva CID0 Hfuel Hrem Hsum Hext
+      intros rem done Pc M dstva CID0 Hfuel Hrem Hsum Hext Hcur
              Hsp Hs11 Hs4 Hs5 Hs6 Hs7 Hs8 Hs9 Hs10 Hlkbelow;
       [ exfalso; lia |].
     iIntros "Hcg Hcnt #Htext Hpc Hpt #Henv Hsrc Hcont".
@@ -635,11 +680,12 @@ Section ProofCopyout.
                    with "Hcnt") as "Hcnt".
       iSpecialize ("Hcont" $! CIDl3 with "[%]"); [wp_next_chain|].
       iApply ("Hcont" $! Z1 (mword_of_int (-1)) Pc
+                (umem_wr Mu dstva0 done src_bytes)
                 with "[%] Hcg Hcnt Hpc Hpt Hsrc").
       split_and!.
       - rewrite /Z1. rewrite upd_ne; [exact HV1sp | reg_neq].
       - rewrite /Z1 upd_eq. reflexivity.
-      - right. reflexivity.
+      - right. split; [reflexivity | exists done; split; [lia | reflexivity]].
       - exact Hextc. }
     (* ---- va0 < MAXVA: on to walkaddr ---- *)
     assert (Hva0b : (uint va0 < 2 ^ 38)%Z).
@@ -674,12 +720,34 @@ Section ProofCopyout.
     set (navail := (4096 - off)%nat).
     assert (Hnavz : Z.of_nat navail = 4096 - Z.of_nat off).
     { unfold navail. rewrite Nat2Z.inj_sub; [reflexivity | lia]. }
-    iAssert (∀ (CIDh : CpuId) (Pd : uptd) (Md : regfile) (pa0 : mword 64),
-        co_tail_body b p K lvl eb lks szv P spr va0 dstva src rem done len
-          src_bytes CIDh Pd Md pa0)%I
+    (* THE ONE ARITHMETIC FACT THE WRITE HALF LIVES ON: inside this page the
+       user vas [dstva0 + (done + i)] are the consecutive integers starting
+       at [uint dstva].  It needs the MAXVA test (so the page sits well below
+       2^64 and the add cannot wrap) and the cursor invariant [Hcur]. *)
+    assert (Hdstb : (bv_unsigned dstva < 274877906944 + 4096)%Z).
+    { change (2 ^ 38)%Z with 274877906944%Z in Hva0b.
+      rewrite uint_unsigned in Hva0b.
+      assert (Hpgu : bv_unsigned va0
+                     = (bv_unsigned dstva - bv_unsigned dstva mod 4096)%Z)
+        by (rewrite /va0; apply pgd_unsigned).
+      pose proof (Z.mod_pos_bound (bv_unsigned dstva) 4096 ltac:(lia)) as Hmb.
+      lia. }
+    assert (Hlin : forall i : nat, (i <= navail)%nat ->
+              uint (add_vec_int dstva0 (Z.of_nat (done + i)))
+              = (uint dstva + Z.of_nat i)%Z).
+    { intros i Hi.
+      assert (Hib : (Z.of_nat i <= 4096)%Z) by (unfold navail in *; lia).
+      replace (Z.of_nat (done + i)) with (Z.of_nat done + Z.of_nat i)%Z by lia.
+      rewrite <- (avi_assoc dstva0 (Z.of_nat done) (Z.of_nat i)).
+      rewrite <- Hcur. rewrite !uint_unsigned.
+      apply uint_add_vec_int_small; lia. }
+    iAssert (∀ (CIDh : CpuId) (Pd : uptd) (Md : regfile) (pa0 : mword 64)
+               (fpg : nat -> bv 8),
+        co_tail_body b p K lvl eb lks szv P Mu dstva0 spr va0 dstva src
+          rem done navail len src_bytes CIDh Pd Md pa0 fpg)%I
       as "Htail".
-    { iIntros (CIDh Pd Md pa0)
-        "(%HText & %HTsp & %HTs11 & %HTs1 & %HTs3 & %HTs4 & %HTs5 &
+    { iIntros (CIDh Pd Md pa0 fpg)
+        "(%HText & %HTfpg & %HTlin & %HTsp & %HTs11 & %HTs1 & %HTs3 & %HTs4 & %HTs5 &
           %HTs6 & %HTs7 & %HTs8 & %HTs9 & %HTs10) Hcg Hcnt Hpc Hpage Hgive Hsrc Hexit".
       iPoseProof (coi_88 with "Htext") as "Hi88".
       iPoseProof (coi_8c with "Htext") as "Hi8c".
@@ -723,11 +791,12 @@ Section ProofCopyout.
       iPoseProof (coi_42 with "Htext") as "Hi42".
       (* both arms reach +0x36 with s2 = n; factor the rest over [nn] *)
       iAssert (∀ (CIDc : CpuId) (Mn : regfile) (nn : nat),
-          co_copy_body b p K lvl eb lks szv P spr va0 dstva src rem done navail
-            len src_bytes Pd pa0 CIDc Mn nn)%I
+          co_copy_body b p K lvl eb lks szv P Mu dstva0 spr va0 dstva src
+            rem done navail len src_bytes Pd pa0 fpg CIDc Mn nn)%I
         as "Hcopy".
       { iIntros (CIDc Mn nn)
-          "(%Hnn1 & %Hnnr & %Hnna & %HNsp & %HNs11 & %HNs1 & %HNs2 & %HNs3 &
+          "(%Hnn1 & %Hnnr & %Hnna & %Hfpg & %Hnshape & %HNlin &
+            %HNsp & %HNs11 & %HNs1 & %HNs2 & %HNs3 &
             %HNs4 & %HNs5 & %HNs6 & %HNs7 & %HNs8 & %HNs9 & %HNs10)
            Hcg Hcnt Hpc Hpage Hgive Hsrc Hexit".
         assert (Hnnb : (Z.of_nat nn < 2 ^ 64)%Z) by lia.
@@ -842,12 +911,13 @@ Section ProofCopyout.
         assert (Hsplit : (done + nn + (rem - nn))%nat = len) by lia.
         iEval (rewrite (bb_split3 src done nn (rem - nn) len src_bytes Hsplit)) in "Hsrc".
         iDestruct "Hsrc" as "(HsA & HsB & HsC)".
-        (* and the destination chunk out of the borrowed page *)
-        iDestruct (bb_page_named pa0 with "Hpage") as (fpg) "Hpg".
+        (* and the destination chunk out of the borrowed page -- which is
+           already NAMED by [fpg], so there is nothing to choose here *)
         assert (Hpsplit : (off + nn + (navail - nn))%nat = 4096%nat)
           by (unfold navail in *; lia).
-        iEval (rewrite (bb_split3 pa0 off nn (navail - nn) 4096 fpg Hpsplit)) in "Hpg".
-        iDestruct "Hpg" as "(HpA & HpB & HpC)".
+        iEval (rewrite (bb_split3 pa0 off nn (navail - nn) 4096 fpg Hpsplit))
+          in "Hpage".
+        iDestruct "Hpage" as "(HpA & HpB & HpC)".
         iApply (Memmove.wp_memmove_sconf KT1 ktb KT0 U5 (K - 14)%nat nn
                   (fun j => src_bytes (done + j)%nat) (fun j => fpg (off + j)%nat) b p
                   ltac:(lia) ltac:(change (2 ^ 32)%Z with 4294967296%Z; lia)
@@ -861,13 +931,44 @@ Section ProofCopyout.
         assert (Hret46 : ret_pc (U5 !!! Regidx Rra) = mword_of_int (KernelSyms.copyout + 0x46)).
         { rewrite HU5ra. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
         iEval (rewrite Hret46) in "Hpc".
-        (* give the page back, and put the source buffer together again *)
-        iDestruct (bb_join3 pa0 off nn (navail - nn) 4096 fpg
+        (* GIVE THE PAGE BACK -- and this is where the view moves.  The
+           page now holds [fpg] outside the window and the source bytes
+           inside it; [umem_write_split] turns the whole-page write the
+           borrow closure speaks into the window write, and [umem_wr_step]
+           turns THAT into one more chunk of the copied prefix. *)
+        set (gpg := fun j : nat =>
+                      if decide (off <= j < off + nn)%nat
+                      then src_bytes (done + (j - off))%nat else fpg j).
+        assert (Hg1 : forall j : nat, (j < off)%nat -> gpg j = fpg j)
+          by (intros j Hj; rewrite /gpg decide_False; [reflexivity | lia]).
+        assert (Hg2 : forall i : nat, (i < nn)%nat ->
+                  gpg (off + i)%nat = src_bytes (done + i)%nat).
+        { intros i Hi. rewrite /gpg decide_True; [| lia].
+          f_equal. lia. }
+        assert (Hg3 : forall i : nat, (i < navail - nn)%nat ->
+                  gpg (off + (nn + i))%nat = fpg (off + (nn + i))%nat)
+          by (intros i Hi; rewrite /gpg decide_False; [reflexivity | lia]).
+        iDestruct (bb_join3_fn pa0 off nn (navail - nn) 4096 fpg
                      (fun j => src_bytes (done + j)%nat)
-                     (fun j => fpg (off + (nn + j))%nat)
-                     Hpsplit with "HpA HpB HpC") as (fpg') "Hpg".
-        iDestruct (bb_page_of_named pa0 fpg' with "Hpg") as "Hpage".
-        iDestruct ("Hgive" with "Hpage") as "Hpt".
+                     (fun j => fpg (off + (nn + j))%nat) gpg
+                     Hpsplit Hg1 Hg2 Hg3 with "HpA HpB HpC") as "Hpage".
+        iDestruct ("Hgive" $! gpg with "Hpage") as "Hpt".
+        assert (Hvaoff : (uint va0 + Z.of_nat off = uint dstva)%Z).
+        { rewrite !uint_unsigned. rewrite /va0 pgd_unsigned. lia. }
+        assert (Hmove : umem_write (umem_wr Mu dstva0 done src_bytes)
+                          (uint va0) 4096 gpg
+                        = umem_wr Mu dstva0 (done + nn)%nat src_bytes).
+        { rewrite (umem_write_split (umem_wr Mu dstva0 done src_bytes)
+                     (uint va0) 4096 off nn gpg ltac:(lia)
+                     ltac:(intros j Hj Hnw; rewrite /gpg decide_False;
+                           [exact (Hfpg j Hj) | lia])).
+          rewrite Hvaoff.
+          rewrite (umem_write_ext (umem_wr Mu dstva0 done src_bytes) (uint dstva)
+                     nn (fun i => gpg (off + i)%nat)
+                     (fun i => src_bytes (done + i)%nat) Hg2).
+          exact (umem_wr_step Mu dstva0 done nn src_bytes (uint dstva)
+                   ltac:(intros i Hi; apply HNlin; lia)). }
+        iEval (rewrite Hmove) in "Hpt".
         iAssert ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb] src_bytes j)%I
           with "[HsA HsB HsC]" as "Hsrc".
         { rewrite (bb_split3 src done nn (rem - nn) len src_bytes Hsplit).
@@ -991,13 +1092,15 @@ Section ProofCopyout.
                        with "Hcnt") as "Hcnt".
           iSpecialize ("Hexit" $! CIDc12 with "[%]"); [wp_next_chain|].
           iApply ("Hexit" $! X1 (mword_of_int 0) Pd
+                    (umem_wr Mu dstva0 (done + nn)%nat src_bytes)
                     with "[%] Hcg Hcnt Hpc Hpt Hsrc").
           split_and!.
           * rewrite /X1. rewrite upd_ne; [| reg_neq].
             rewrite (HW3o csp_rs1 ltac:(vm_compute; reflexivity)
                        ltac:(reg_neq) ltac:(reg_neq) ltac:(reg_neq)). exact HNsp.
           * rewrite /X1 upd_eq. reflexivity.
-          * left. reflexivity.
+          * left. split; [reflexivity |].
+            replace (done + nn)%nat with len by lia. reflexivity.
           * exact HText.
         + (* more to copy: fall through to the loop head *)
           iApply (wp_beqz_x0_fall_s_sconf (mword_of_int (KernelSyms.copyout + 0x50))
@@ -1014,10 +1117,29 @@ Section ProofCopyout.
                        with "Hcnt") as "Hcnt".
           assert (Hshiftrec : b = false \/ p = zero_reg -> (CIDc10 : CPU) = (CIDc : CPU)) by wp_next_chain.
           iDestruct (wp_next_shift Hshiftrec with "Hexit") as "Hexit".
+          (* the chunk that did NOT finish the copy ran to the end of the
+             page, so the next cursor is the next page boundary -- and that
+             is the same address as [dstva0] advanced by [done + nn] *)
+          assert (Hnnav : (nn = navail)%nat)
+            by (destruct Hnshape as [Hsh | Hsh]; [exact Hsh | lia]).
+          assert (Hcurnext : add_vec va0 (mword_of_int 4096)
+                             = add_vec_int dstva0 (Z.of_nat (done + nn))).
+          { replace (Z.of_nat (done + nn)) with (Z.of_nat done + Z.of_nat nn)%Z by lia.
+            rewrite <- (avi_assoc dstva0 (Z.of_nat done) (Z.of_nat nn)).
+            rewrite <- Hcur. unfold add_vec_int.
+            apply bv_eq. rewrite !add_vec_unsigned.
+            assert (Hm4096 : bv_unsigned (mword_of_int 4096 : mword 64) = 4096%Z).
+            { rewrite moi64_unsigned. apply bv_wrap_small.
+              change (bv_modulus 64) with 18446744073709551616%Z. lia. }
+            assert (Hmn : bv_unsigned (mword_of_int (Z.of_nat nn) : mword 64)
+                          = Z.of_nat nn).
+            { rewrite moi64_unsigned. apply bv_wrap_small.
+              change (bv_modulus 64) with 18446744073709551616%Z. lia. }
+            rewrite Hm4096 Hmn. rewrite /va0 pgd_unsigned. f_equal. lia. }
           iApply (IH (rem - nn)%nat (done + nn)%nat Pd W3
                     (add_vec va0 (mword_of_int 4096)) CIDc10
                     ltac:(lia) ltac:(lia) ltac:(lia)
-                    ltac:(exact HText)
+                    ltac:(exact HText) ltac:(exact Hcurnext)
                     ltac:(rewrite (HW3o csp_rs1 ltac:(vm_compute; reflexivity)
                              ltac:(reg_neq) ltac:(reg_neq) ltac:(reg_neq)); exact HNsp)
                     ltac:(rewrite (HW3o Rs11 ltac:(vm_compute; reflexivity)
@@ -1059,6 +1181,7 @@ Section ProofCopyout.
         iApply ("Hcopy" $! CIDh3 T2 navail with "[%] Hcg Hcnt Hpc Hpage Hgive Hsrc Hexit").
         split_and!;
           [ unfold navail; lia | lia | lia
+          | exact HTfpg | left; reflexivity | exact HTlin
           | rewrite /T2 /T1; repeat (rewrite upd_ne; [| reg_neq]); exact HTsp
           | rewrite /T2 /T1; repeat (rewrite upd_ne; [| reg_neq]); exact HTs11
           | rewrite /T2 /T1; repeat (rewrite upd_ne; [| reg_neq]); exact HTs1
@@ -1117,6 +1240,7 @@ Section ProofCopyout.
         iApply ("Hcopy" $! CIDh5 T3 rem with "[%] Hcg Hcnt Hpc Hpage Hgive Hsrc Hexit").
         split_and!;
           [ lia | lia | lia
+          | exact HTfpg | right; reflexivity | exact HTlin
           | rewrite /T3 /T2 /T1; repeat (rewrite upd_ne; [| reg_neq]); exact HTsp
           | rewrite /T3 /T2 /T1; repeat (rewrite upd_ne; [| reg_neq]); exact HTs11
           | rewrite /T3 /T2 /T1; repeat (rewrite upd_ne; [| reg_neq]); exact HTs1
@@ -1192,7 +1316,8 @@ Section ProofCopyout.
                     = add_vec_int (mword_of_int (KernelSyms.copyout + 0x60) : mword 64) 4)
       by (rewrite /V4 upd_eq; reflexivity).
     (* open the table into the exact represented view *)
-    iDestruct (proc_pt_acc_rep0 Pc with "Hpt") as
+    iDestruct (proc_ptm_acc_rep0 Pc (uint szv)
+                 (umem_wr Mu dstva0 done src_bytes) with "Hpt") as
       (t m_ad) "(%Hrep & %Hview & %Hbase & %Hwf & Hptree & Hown)".
     assert (HV4root : V4 !!! Regidx Ra0
                       = zero_extend' 64 (concat_vec (pt_base t) (zeros' 12 : mword 12))).
@@ -1250,7 +1375,8 @@ Section ProofCopyout.
       iPoseProof (coi_74 with "Htext") as "Hi74".
       iPoseProof (coi_76 with "Htext") as "Hi76".
       (* vmfault wants the table CLOSED *)
-      iDestruct (proc_pt_rebuild Pc t m_ad Hwf Hview Hrep Hbase with "Hptree Hown") as "Hpt".
+      iDestruct (proc_ptm_rebuild Pc (uint szv) (umem_wr Mu dstva0 done src_bytes)
+                   t m_ad Hwf Hview Hrep Hbase with "Hptree Hown") as "Hpt".
       (* +0x68 c.li a3,0 : the [read] argument, now in a3 *)
       iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.copyout + 0x68)) Ra3 (mword_of_int 0 : mword 6)
                 (mword_of_int 0 : mword 64) R1 (K - 14)%nat b
@@ -1356,7 +1482,8 @@ Section ProofCopyout.
       iEval (rewrite <- (co_pin_sie_cap_gpr F5 (K - 14)%nat b p)) in "Hcg".
       iDestruct (cpu_own_transport CID0 CIDm5 lvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iApply (Vmfault.wp_vmfault_sconf γa (tp_pin F5) Pc szv (K - 14)%nat lvl eb p b lks
+      iApply (Vmfault.wp_vmfault_sconf_mem γa (tp_pin F5) Pc
+                (umem_wr Mu dstva0 done src_bytes) szv (K - 14)%nat lvl eb p b lks
                 ltac:(lia) (rget_tp F5) HF5a0' HF5a1' Hszb Hlvl
                 with "Hcg Hcnt Htext Hpc Hpt Henv").
       all: try lkbelow.
@@ -1427,13 +1554,14 @@ Section ProofCopyout.
                      with "Hcnt") as "Hcnt".
         iSpecialize ("Hcont" $! CIDmf3 with "[%]"); [wp_next_chain|].
         iApply ("Hcont" $! FB (mword_of_int (-1)) Pc
+                  (umem_wr Mu dstva0 done src_bytes)
                   with "[%] Hcg Hcnt Hpc Hpt Hsrc").
         split_and!.
         - rewrite /FB. rewrite upd_ne; [| reg_neq].
           rewrite (HF6get csp_rs1 ltac:(vm_compute; reflexivity) ltac:(reg_neq)).
           exact HV1sp.
         - rewrite /FB upd_eq. reflexivity.
-        - right. reflexivity.
+        - right. split; [reflexivity | exists done; split; [lia | reflexivity]].
         - exact Hextc. }
       (* ---- the page was faulted in ---- *)
       iDestruct "Hvs" as (r) "(%Hra0 & %Hrpv & %Hszlt & %Hunone & Hpt)".
@@ -1463,7 +1591,8 @@ Section ProofCopyout.
                      = mword_of_int (KernelSyms.copyout + 0x78)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp78) in "Hpc".
       (* re-open the GROWN table for the walk *)
-      iDestruct (proc_pt_acc_rep0 Pd with "Hpt") as
+      iDestruct (proc_ptm_acc_rep0 Pd (uint szv)
+                   (umem_wr Mu dstva0 done src_bytes) with "Hpt") as
         (t' m') "(%Hrep' & %Hview' & %Hbase' & %Hwf' & Hptree & Hown)".
       assert (Hum' : Pd.(ud_um) !! svpn_of va0 = Some (vmfault_pte r))
         by (rewrite /Pd /uptd_insert; cbn [ud_um]; apply lookup_insert).
@@ -1484,21 +1613,40 @@ Section ProofCopyout.
       assert (Hfget : forall c : mword 5, is_cs_idx c = true ->
                 Mf !!! Regidx c = F6 !!! Regidx c).
       { intros c Hc. exact (callee_saved_lookup Hcsf c Hc). }
-      iDestruct (proc_pt_rebuild Pd t' m' Hwf' Hview' Hrep' Hbase' with "Hptree Hown") as "Hpt".
+      iDestruct (proc_ptm_rebuild Pd (uint szv) (umem_wr Mu dstva0 done src_bytes)
+                   t' m' Hwf' Hview' Hrep' Hbase' with "Hptree Hown") as "Hpt".
       destruct wr.
       - (* writable: borrow the freshly faulted page and copy *)
         iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhwc Hcg]".
         iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
           "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hkmapb & _)".
-        iDestruct (proc_pt_page_acc_vmfault Pc (svpn_of va0) r Hrpv with "Hkmapb Hpt")
+        assert (Hvpnv : (bv_unsigned (svpn_of va0) * 4096 = uint va0)%Z)
+          by (unfold va0; apply svpn_of_pgd; exact Hva0b).
+        iDestruct (proc_ptm_page_bytes Pd (uint szv)
+                     (umem_wr Mu dstva0 done src_bytes) (svpn_of va0)
+                     (vmfault_pte r) Hum' with "Hpt") as %Hbytes.
+        assert (Hpgm : forall j : nat, (j < 4096)%nat ->
+                  umem_wr Mu dstva0 done src_bytes !! (uint va0 + Z.of_nat j)%Z
+                  = Some (umem_wr Mu dstva0 done src_bytes
+                            !!! (uint va0 + Z.of_nat j)%Z)).
+        { intros j Hj. pose proof (Hbytes j Hj) as Hb.
+          rewrite Hvpnv in Hb. exact Hb. }
+        iDestruct (proc_ptm_page_acc_vmfault Pc (uint szv)
+                     (umem_wr Mu dstva0 done src_bytes) (svpn_of va0) r
+                     (uint va0) Hrpv ltac:(lia) with "Hkmapb Hpt")
           as "[Hpage Hgive]".
         iDestruct (cpu_own_transport CIDm6 CIDms2 lvl eb p b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
         assert (Hshiftms2 : b = false \/ p = zero_reg -> (CIDms2 : CPU) = (CID0 : CPU)) by wp_next_chain.
         iDestruct (wp_next_shift Hshiftms2 with "Hcont") as "Hcont".
-        iApply ("Htail" $! CIDms2 Pd Mf r with "[%] Hcg Hcnt Hpc Hpage Hgive Hsrc Hcont").
+        iApply ("Htail" $! CIDms2 Pd Mf r
+                  (fun j : nat => umem_wr Mu dstva0 done src_bytes
+                                    !!! (uint va0 + Z.of_nat j)%Z)
+                  with "[%] Hcg Hcnt Hpc Hpage Hgive Hsrc Hcont").
         split_and!;
           [ exact Hextd
+          | exact Hpgm
+          | exact Hlin
           | rewrite (Hfget csp_rs1 ltac:(vm_compute; reflexivity));
             rewrite (HF6get csp_rs1 ltac:(vm_compute; reflexivity) ltac:(reg_neq)); exact HV1sp
           | rewrite (Hfget Rs11 ltac:(vm_compute; reflexivity));
@@ -1548,13 +1696,14 @@ Section ProofCopyout.
                      with "Hcnt") as "Hcnt".
         iSpecialize ("Hcont" $! CIDmsf2 with "[%]"); [wp_next_chain|].
         iApply ("Hcont" $! FC (mword_of_int (-1)) Pd
+                  (umem_wr Mu dstva0 done src_bytes)
                   with "[%] Hcg Hcnt Hpc Hpt Hsrc").
         split_and!.
         + rewrite /FC. rewrite upd_ne; [| reg_neq].
           rewrite (Hfget csp_rs1 ltac:(vm_compute; reflexivity)).
           rewrite (HF6get csp_rs1 ltac:(vm_compute; reflexivity) ltac:(reg_neq)). exact HV1sp.
         + rewrite /FC upd_eq. reflexivity.
-        + right. reflexivity.
+        + right. split; [reflexivity | exists done; split; [lia | reflexivity]].
         + exact Hextd. }
     (* ===== walkaddr hit: the page is already mapped ===== *)
     destruct (upt_ad_view_vu Pc.(ud_tfp) Pc.(ud_um) m_ad (svpn_of va0) w Hview Hsome Hvu)
@@ -1594,22 +1743,40 @@ Section ProofCopyout.
     assert (Hfget : forall c : mword 5, is_cs_idx c = true ->
               Mf !!! Regidx c = R1 !!! Regidx c).
     { intros c Hc. exact (callee_saved_lookup Hcsf c Hc). }
-    iDestruct (proc_pt_rebuild Pc t m_ad Hwf Hview Hrep Hbase with "Hptree Hown") as "Hpt".
+    iDestruct (proc_ptm_rebuild Pc (uint szv) (umem_wr Mu dstva0 done src_bytes)
+                 t m_ad Hwf Hview Hrep Hbase with "Hptree Hown") as "Hpt".
     destruct wr.
     - (* writable: borrow the mapped page and copy *)
       iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhwc Hcg]".
       iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
         "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hkmapb & _)".
-      iDestruct (proc_pt_page_acc Pc (svpn_of va0) w0 Hum0 with "Hkmapb Hpt")
+      assert (Hvpnv : (bv_unsigned (svpn_of va0) * 4096 = uint va0)%Z)
+        by (unfold va0; apply svpn_of_pgd; exact Hva0b).
+      iDestruct (proc_ptm_page_bytes Pc (uint szv)
+                   (umem_wr Mu dstva0 done src_bytes) (svpn_of va0) w0 Hum0
+                   with "Hpt") as %Hbytes.
+      assert (Hpgm : forall j : nat, (j < 4096)%nat ->
+                umem_wr Mu dstva0 done src_bytes !! (uint va0 + Z.of_nat j)%Z
+                = Some (umem_wr Mu dstva0 done src_bytes
+                          !!! (uint va0 + Z.of_nat j)%Z)).
+      { intros j Hj. pose proof (Hbytes j Hj) as Hb.
+        rewrite Hvpnv in Hb. exact Hb. }
+      iDestruct (proc_ptm_page_acc Pc (uint szv)
+                   (umem_wr Mu dstva0 done src_bytes) (svpn_of va0) w0
+                   (uint va0) Hum0 ltac:(lia) with "Hkmapb Hpt")
         as "[Hpage Hgive]".
       iDestruct (cpu_own_transport CID0 CIDh2 lvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       assert (Hshifth2 : b = false \/ p = zero_reg -> (CIDh2 : CPU) = (CID0 : CPU)) by wp_next_chain.
       iDestruct (wp_next_shift Hshifth2 with "Hcont") as "Hcont".
       iApply ("Htail" $! CIDh2 Pc Mf (page_base (pte_ppn w0))
+                (fun j : nat => umem_wr Mu dstva0 done src_bytes
+                                  !!! (uint va0 + Z.of_nat j)%Z)
                 with "[%] Hcg Hcnt Hpc Hpage Hgive Hsrc Hcont").
       split_and!;
         [ exact Hextc
+        | exact Hpgm
+        | exact Hlin
         | rewrite (Hfget csp_rs1 ltac:(vm_compute; reflexivity));
           rewrite (HR1get csp_rs1 ltac:(vm_compute; reflexivity) ltac:(reg_neq)); exact HV1sp
         | rewrite (Hfget Rs11 ltac:(vm_compute; reflexivity));
@@ -1659,27 +1826,29 @@ Section ProofCopyout.
                    with "Hcnt") as "Hcnt".
       iSpecialize ("Hcont" $! CIDhf2 with "[%]"); [wp_next_chain|].
       iApply ("Hcont" $! GC (mword_of_int (-1)) Pc
+                (umem_wr Mu dstva0 done src_bytes)
                 with "[%] Hcg Hcnt Hpc Hpt Hsrc").
       split_and!.
       + rewrite /GC. rewrite upd_ne; [| reg_neq].
         rewrite (Hfget csp_rs1 ltac:(vm_compute; reflexivity)).
         rewrite (HR1get csp_rs1 ltac:(vm_compute; reflexivity) ltac:(reg_neq)). exact HV1sp.
       + rewrite /GC upd_eq. reflexivity.
-      + right. reflexivity.
+      + right. split; [reflexivity | exists done; split; [lia | reflexivity]].
       + exact Hextc.
   Qed.
 
   (* ------------------------------------------------------------------ *)
   (* THE WHOLE FUNCTION.  [COPYOUT] is the only contract there is now.    *)
   (* ------------------------------------------------------------------ *)
-  Lemma wp_copyout_sconf
+  Lemma wp_copyout_sconf_mem
       (γa : gname) (mm : regfile)
-      (P : uptd) (szv : mword 64) (len : nat) (src_bytes : nat -> bv 8)
+      (P : uptd) (Mu : gmap Z (bv 8)) (szv : mword 64) (len : nat)
+      (src_bytes : nat -> bv 8)
       (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string)
-    : wp_copyout_sconf_body ktb γa mm P szv len src_bytes K lvl eb p b lks.
+    : wp_copyout_sconf_mem_body ktb γa mm P Mu szv len src_bytes K lvl eb p b lks.
   Proof.
-    cbv beta delta [wp_copyout_sconf_body].
-    intros pcE src ret_tgt HK Hroot Hsza1 Hlenr Hlen64 Hszb Hlvl Hlkbelow.
+    cbv beta delta [wp_copyout_sconf_mem_body].
+    intros pcE dstva src ret_tgt HK Hroot Hsza1 Hlenr Hlen64 Hszb Hlvl Hlkbelow.
     change (2 ^ 64)%Z with 18446744073709551616%Z in Hlen64.
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc Hpt #Henv Hsrc Hcont".
@@ -1718,11 +1887,12 @@ Section ProofCopyout.
       iDestruct (cpu_own_transport CID CIDz3 lvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iSpecialize ("Hcont" $! CIDz3 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont" $! N0 P with "Hcg Hcnt Hpc Hpt Hsrc [%] [%] [%]").
+      iApply ("Hcont" $! N0 P Mu with "Hcg Hcnt Hpc Hpt Hsrc [%] [%] [%]").
       - rewrite /N0. apply callee_saved_insert_r;
           [vm_compute; reflexivity | apply callee_saved_refl].
       - apply uptd_ext_sz_refl.
-      - left. rewrite /N0 upd_eq. reflexivity. }
+      - left. split; [rewrite /N0 upd_eq; reflexivity |].
+        rewrite Hlen0. reflexivity. }
     (* ===== len > 0: the 112-byte prologue ===== *)
     iApply (wp_cbeqz_fall_s_sconf pcE
               (mword_of_int 77 : mword 8) (Cregidx (mword_of_int 6)) Ra4 mm K b
@@ -2188,19 +2358,19 @@ Section ProofCopyout.
     (*  shrink-wrapped, so the join takes no existential slot arguments.   *)
     (* ================================================================= *)
     iAssert (wp_next b p (fun (CIDe0 : CpuId) =>
-        ∀ (mj : regfile) (res : mword 64) (P' : uptd),
+        ∀ (mj : regfile) (res : mword 64) (P' : uptd) (Mu' : gmap Z (bv 8)),
         ⌜ mj !!! Regidx csp_rs1 = spr
           /\ mj !!! Regidx Ra0 = res
-          /\ (res = (mword_of_int 0 : mword 64) \/ res = (mword_of_int (-1) : mword 64))
+          /\ copyout_wrote Mu dstva len src_bytes res Mu'
           /\ uptd_ext_sz szv P P' ⌝ -∗
         sie_cap_gpr KT1 mj (K - 14)%nat b p -∗
         cpu_own lvl eb p b lks -∗
         pc_is (mword_of_int (KernelSyms.copyout + 0xa0) : mword 64) -∗
-        proc_pt P' -∗
+        proc_ptm P' (uint szv) Mu' -∗
         ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb] src_bytes j) -∗
         WP (Loop : expr riscv_lang)))%I
       with "[Hcont Hk1 Hk2 Hk3 Hk4 Hk5 Hk6 Hk7 Hk8 Hk9 Hk10 Hk11 Hk12 Hk13 Hk14]" as "Hepi".
-    { iIntros (CIDe0 Hse0 mj res P')
+    { iIntros (CIDe0 Hse0 mj res P' Mu')
         "(%Hjsp & %Hja0 & %Hjres & %Hjext) Hcg Hcnt Hpc Hpt Hsrc".
       assert (HspE0 : mj !!! Regidx csp_rs1 = spr) by exact Hjsp.
       iPoseProof (coi_a0 with "Htext") as "HiEa0".
@@ -2460,7 +2630,7 @@ Section ProofCopyout.
       iDestruct (cpu_own_transport CIDe0 CIDe15 lvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iSpecialize ("Hcont" $! CIDe15 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont" $! E14 P' with "Hcg Hcnt Hpc Hpt Hsrc [%] [%] [%]").
+      iApply ("Hcont" $! E14 P' Mu' with "Hcg Hcnt Hpc Hpt Hsrc [%] [%] [%]").
       - unfold callee_saved. split_and!.
         + rewrite /E14 upd_eq. exact Hwv.
         + rewrite /E14. rewrite upd_ne; [| reg_neq].
@@ -2558,12 +2728,47 @@ Section ProofCopyout.
     (* ---- into the loop ---- *)
     iDestruct (cpu_own_transport CID CIDpr25 lvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (co_loop γa mm P szv len src_bytes K lvl eb p src spr b lks
+    assert (Hcur0 : (mm !!! Regidx Ra2 : mword 64)
+                    = add_vec_int (mm !!! Regidx Ra2) (Z.of_nat 0)).
+    { change (Z.of_nat 0) with 0%Z. symmetry. apply avi0. }
+    iApply (co_loop γa mm P Mu szv len src_bytes K lvl eb p src spr
+              (mm !!! Regidx Ra2) b lks
               HK Hlen64 Hszb Hlvl len len 0%nat P Q10 (mm !!! Regidx Ra2) CIDpr25
-              ltac:(lia) ltac:(lia) ltac:(lia) (uptd_ext_sz_refl szv P)
+              ltac:(lia) ltac:(lia) ltac:(lia) (uptd_ext_sz_refl szv P) Hcur0
               HQ10sp HQ10s11 HQ10s4 HQ10s5 HQ10s6 HQ10s7 HQ10s8 HQ10s9 HQ10s10
               Hlkbelow
               with "Hcg Hcnt Htext Hpc Hpt Henv Hsrc Hepi").
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* ...and the EXISTENTIAL-[M] corollary, which is what every current    *)
+  (* caller speaks.  [proc_pt_ptm] is the whole of it: the table alone    *)
+  (* determines nothing about the bytes, so a caller that does not name   *)
+  (* [M] can pick one and throw the result away.                          *)
+  (* ------------------------------------------------------------------ *)
+  Lemma wp_copyout_sconf
+      (γa : gname) (mm : regfile)
+      (P : uptd) (szv : mword 64) (len : nat) (src_bytes : nat -> bv 8)
+      (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string)
+    : wp_copyout_sconf_body ktb γa mm P szv len src_bytes K lvl eb p b lks.
+  Proof.
+    cbv beta delta [wp_copyout_sconf_body].
+    intros pcE src ret_tgt HK Hroot Hsza1 Hlenr Hlen64 Hszb Hlvl Hlkbelow.
+    iIntros "Hcg Hcnt #Htext Hpc Hpt #Henv Hsrc Hcont".
+    iEval (rewrite (proc_pt_ptm P (uint szv))) in "Hpt".
+    iDestruct "Hpt" as (Mu) "Hpt".
+    iApply (wp_copyout_sconf_mem γa mm P Mu szv len src_bytes K lvl eb p b lks
+              HK Hroot Hsza1 Hlenr Hlen64 Hszb Hlvl Hlkbelow
+              with "Hcg Hcnt Htext Hpc Hpt Henv Hsrc").
+    rewrite /wp_next. iIntros (CIDx) "%Hsx".
+    iSpecialize ("Hcont" $! CIDx with "[]"); [iPureIntro; exact Hsx|].
+    iIntros (mr P' Mu') "Hcg Hcnt Hpc Hpt Hsrc %Hcs %Hext %Hres".
+    iApply ("Hcont" $! mr P' with "Hcg Hcnt Hpc [Hpt] Hsrc [%] [%] [%]").
+    - iApply (proc_ptm_pt with "Hpt").
+    - exact Hcs.
+    - exact Hext.
+    - destruct Hres as [(H0 & _) | (H1 & _)];
+        [ left; exact H0 | right; exact H1 ].
   Qed.
 
 
