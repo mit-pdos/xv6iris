@@ -102,9 +102,12 @@ Proof. reflexivity. Qed.
 (*  2.  THE IMAGE IS WELL FORMED                                           *)
 (* ====================================================================== *)
 
-(* W1-W7 of [FsImg.fsimg_wf]: superblock arithmetic, clean log, every live
+(* W1-W8 of [FsImg.fsimg_wf]: superblock arithmetic, clean log, every live
    inode's record, no block claimed twice, the bitmap agreeing with the
-   used set, every directory's records, and the root. *)
+   used set, every directory's records, the root, and every directory's two
+   dot records AT INDEX 0 AND 1 (W8 -- what [DirView.dir_dots_ix] demands
+   and what W6/W7's [dir_first] readings cannot pin; measured cost of the
+   added sweep, [Qed]'s re-check included, ~+20 s of this file's ~210 s). *)
 Lemma fsimg_wf_ok : fsimg_wf fsimg_P fsimg_sb = true.
 Proof. vm_compute. reflexivity. Qed.
 
@@ -134,6 +137,101 @@ Lemma fsimg_wf_log_clean :
 Proof.
   unfold hdr_n, log_hdr_bno.
   exact (fsimg_wf_log fsimg_P fsimg_sb fsimg_wf_ok).
+Qed.
+
+(* ====================================================================== *)
+(*  2b.  WHAT THE BOOT-TIME STOCKING OF THE INODE POOL READS OFF THE IMAGE *)
+(* ====================================================================== *)
+
+(*  [IcacheBoot.ipool_alloc]'s ALLOCATED arm owes, per live inum, the pure
+    bundle [inode_ok] / [dir_ok] / [dir_dots_ix] / [dir_orphan_clean] /
+    [dir_uniq], and its FREE arm owes a type-0 record for every other inum
+    of the region.  Everything below is what the image side of that owes,
+    and the RULE HERE IS COST: each fact is ONE sweep with a lookup spec
+    lemma in [FsImg.v], never a per-inum [vm_compute] (208 standalone
+    decodes measured ~2 s each -- a no-go shape).  Anything W1-W8 already
+    carries is CITED off [fsimg_wf_ok] and costs nothing at all.           *)
+
+(* ---- W8, cited: the dot records ARE at index 0 and 1 ----------------- *)
+
+(* [DirView.dir_dots_ix] for every directory in the image.  NO new
+   computation: W8 of [fsimg_wf_ok] is the sweep. *)
+Lemma fsimg_dots (i : Z) :
+  0 <= i < sb_ninodes fsimg_sb ->
+  bv_unsigned (di_type (fs_dinode fsimg_P fsimg_sb i)) = T_DIR_z ->
+  dir_dots_ix i (fs_dinode fsimg_P fsimg_sb i)
+    (fs_data_of fsimg_P (fs_dinode fsimg_P fsimg_sb i)).
+Proof. exact (fsimg_wf_dots fsimg_P fsimg_sb i fsimg_wf_ok). Qed.
+
+(* the root's own, which is the one [userinit]'s [namei("/")] parks *)
+Lemma fsimg_root_dots :
+  dir_dots_ix ROOTINO (fs_dinode fsimg_P fsimg_sb ROOTINO)
+    (fs_data_of fsimg_P (fs_dinode fsimg_P fsimg_sb ROOTINO)).
+Proof.
+  apply fsimg_dots; [cbv [fsimg_sb ROOTINO sb_ninodes]; lia |].
+  (* W7's own type projection -- [fsimg_root_type] below is the same fact,
+     but this one is a citation and costs nothing *)
+  exact (fs_root_wf_type fsimg_P fsimg_sb
+           (fsimg_wf_root fsimg_P fsimg_sb fsimg_wf_ok)).
+Qed.
+
+(* ---- W4 reindexed, cited: no inode names one block twice ------------- *)
+
+(* [InodeInv.blkmap_wf]'s injectivity clause at every live inum, out of
+   W4's [NoDup (fs_used_blocks ...)].  NO new computation -- and in
+   particular NOT the per-index re-decode of the indirect block, which was
+   measured at 636 s. *)
+Lemma fsimg_slot_inj (i : Z) :
+  0 <= i < sb_ninodes fsimg_sb ->
+  bv_unsigned (di_type (fs_dinode fsimg_P fsimg_sb i)) <> 0 ->
+  fs_slot_inj fsimg_P (fs_dinode fsimg_P fsimg_sb i).
+Proof. exact (fsimg_wf_slot_inj fsimg_P fsimg_sb i fsimg_wf_ok). Qed.
+
+(* ---- the region tail: [16 * nib] records, [ninodes] sweeps ----------- *)
+
+(* [ninodes = 200] but the region is [16 * 13 = 208] records wide, so eight
+   records are inside the icache's inode region and outside every W sweep.
+   They are all free, and the pool's FREE arm needs to say so. *)
+Lemma fsimg_region_free : fs_region_free fsimg_P fsimg_sb 13 = true.
+Proof. vm_compute. reflexivity. Qed.
+
+Lemma fsimg_region_tail_free (z : Z) :
+  200 <= z < 208 -> bv_unsigned (di_type (fs_dinode fsimg_P fsimg_sb z)) = 0.
+Proof.
+  intros Hz.
+  apply (fs_region_free_spec fsimg_P fsimg_sb 13 z fsimg_region_free);
+    [lia | cbv [fsimg_sb sb_ninodes]; lia | lia].
+Qed.
+
+(* ---- WHICH inums are live, as ONE set ------------------------------- *)
+
+(* [FsImg.fs_live_set] is the [A] of the stocking split [R = A ⊎ (R ∖ A)].
+   Twenty-four allocated records, [1 .. 24]; inum 0 and everything from 25
+   up is free.  ONE sweep of the thirteen inode blocks. *)
+Lemma fsimg_live_set :
+  fs_live_set fsimg_P fsimg_sb = list_to_set (Z.of_nat <$> seq 1 24).
+Proof. vm_compute. reflexivity. Qed.
+
+(* ...and the membership law the split actually uses, off the computed set
+   and [FsImg.fs_live_set_elem_of]: the live inums are exactly [1 .. 24],
+   and they are exactly the records with a nonzero type. *)
+Lemma fsimg_live_set_elem (z : Z) :
+  z ∈ fs_live_set fsimg_P fsimg_sb <-> 1 <= z <= 24.
+Proof.
+  rewrite fsimg_live_set, elem_of_list_to_set, elem_of_list_fmap.
+  split.
+  - intros (k & -> & Hk). apply elem_of_seq in Hk. lia.
+  - intros Hz. exists (Z.to_nat z).
+    split; [rewrite Z2Nat.id by lia; reflexivity |].
+    apply elem_of_seq. lia.
+Qed.
+
+Lemma fsimg_live_iff (z : Z) :
+  1 <= z <= 24
+  <-> 0 <= z < sb_ninodes fsimg_sb
+      /\ bv_unsigned (di_type (fs_dinode fsimg_P fsimg_sb z)) <> 0.
+Proof.
+  rewrite <- fsimg_live_set_elem. apply fs_live_set_elem_of.
 Qed.
 
 (* ====================================================================== *)
