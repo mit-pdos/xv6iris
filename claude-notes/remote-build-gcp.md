@@ -347,6 +347,19 @@ md5sum kernel-rocq/Kernel*.v user-rocq/Sync*.v
 Six equal digests is the toolchain-match proof the playbook asks for, obtained
 on a machine that shares nothing with yours but the pin.
 
+**AND `--no-sync` IS FOR QUERYING THE VM, NEVER FOR DIAGNOSING YOUR OWN LATEST
+EDIT.** A `--no-sync` build compiles whatever was last pushed, so after a local
+`git reset` or an edit you have not synced it reports errors from a file you no
+longer have — confidently, with line numbers that do not match your source. Two
+ways this bites: a re-run of a failing build to "get more detail" reads the
+stale copy and blames a lemma you already fixed; and a repin/re-dump diagnostic
+run before syncing re-dumps with the OLD `tools/dump_elf.py`, so the digest
+comparison disagrees for a reason that has nothing to do with the toolchain.
+Sync first, then diagnose. Related: a build you did not FORCE is not evidence
+either — `make` reporting "up to date" after a whole-tree sync is the mtime
+artefact documented in `durable-notes.md`, so `rm` the `.vo` before timing or
+trusting a single-file result.
+
 **AND THE VM'S CLONE IS PINNED ONLY AT CREATION, SO IT GOES STALE ACROSS A
 BUMP AND THEN SILENTLY CLOBBERS THE IMAGE YOU JUST SYNCED.** The VM clones
 `xv6-riscv/` at `$(XV6_REV)` the first time a tree is built and never revisits

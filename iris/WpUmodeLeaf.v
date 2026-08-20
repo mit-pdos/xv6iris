@@ -34,6 +34,8 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras.
 Require Import InstrBytes WpGpr RegFile.
 Require Import ExecCommon WpMmodeLeafBase WpMmodeShiftiop.
 Require Import UserBits.
+Require Import HartMemRun UserFrame UserExecFacts.
+Require UserTotalU.
 Require Import UserPtTree UserExec.
 Require Import UmodeMem UmodeCap.
 Require Import WpUmodeStep.
@@ -213,6 +215,8 @@ Section WpUmodeLeaf.
     uv_redirect i o ->
     is_lpad_instruction i = false ->
     uint rd <> 0 ->
+    (forall s : mstate, goodmb Du_r Du_w (execute i) s ∅ = true) ->
+    (forall s : mstate, goodmb Du_r Du_w (execute (uv_exp i o)) s ∅ = true) ->
     (forall s : mstate,
        register_lookup PC s.(sregs) = pc ->
        exec (execute (uv_exp i o)) s
@@ -229,10 +233,12 @@ Section WpUmodeLeaf.
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hui Hred Hlpad Hrd Hop.
+    intros Hui Hred Hlpad Hrd Hg1 Hg2 Hop.
     iIntros "Hcg Hpc Hcont".
     iApply (wp_uv_retire C pt Ψ M m pc is_rvc i o None (Some (rd, wval))
-              Hui Hred Hlpad Hrd with "Hcg Hpc Hcont").
+              Hui Hred Hlpad Hrd
+              (fun s _ _ _ _ _ => Hg1 s) (fun s _ _ _ _ _ => Hg2 s)
+              with "Hcg Hpc Hcont").
     intros s_pc Lpc _ _ _ _.
     cbn [uv_post uv_jmp uv_wr].
     rewrite (Hop s_pc Lpc).
@@ -249,6 +255,8 @@ Section WpUmodeLeaf.
     uv_redirect i o ->
     is_lpad_instruction i = false ->
     uint rd <> 0 ->
+    (forall s : mstate, goodmb Du_r Du_w (execute i) s ∅ = true) ->
+    (forall s : mstate, goodmb Du_r Du_w (execute (uv_exp i o)) s ∅ = true) ->
     (forall s : mstate,
        exec (execute (uv_exp i o)) s
        = Some (RETIRE_SUCCESS,
@@ -265,10 +273,12 @@ Section WpUmodeLeaf.
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hui Hred Hlpad Hrd Hop Hwval.
+    intros Hui Hred Hlpad Hrd Hg1 Hg2 Hop Hwval.
     iIntros "Hcg Hpc Hcont".
     iApply (wp_uv_retire C pt Ψ M m pc is_rvc i o None (Some (rd, wval))
-              Hui Hred Hlpad Hrd with "Hcg Hpc Hcont").
+              Hui Hred Hlpad Hrd
+              (fun s _ _ _ _ _ => Hg1 s) (fun s _ _ _ _ _ => Hg2 s)
+              with "Hcg Hpc Hcont").
     intros s_pc _ _ _ _ Hvals.
     cbn [uv_post uv_jmp uv_wr].
     rewrite (Hop s_pc).
@@ -289,6 +299,8 @@ Section WpUmodeLeaf.
     uv_redirect i o ->
     is_lpad_instruction i = false ->
     uint rd <> 0 ->
+    (forall s : mstate, goodmb Du_r Du_w (execute i) s ∅ = true) ->
+    (forall s : mstate, goodmb Du_r Du_w (execute (uv_exp i o)) s ∅ = true) ->
     (forall s : mstate,
        exec (execute (uv_exp i o)) s
        = Some (RETIRE_SUCCESS,
@@ -305,10 +317,12 @@ Section WpUmodeLeaf.
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hui Hred Hlpad Hrd Hop Hwval.
+    intros Hui Hred Hlpad Hrd Hg1 Hg2 Hop Hwval.
     iIntros "Hcg Hpc Hcont".
     iApply (wp_uv_retire C pt Ψ M m pc is_rvc i o None (Some (rd, wval))
-              Hui Hred Hlpad Hrd with "Hcg Hpc Hcont").
+              Hui Hred Hlpad Hrd
+              (fun s _ _ _ _ _ => Hg1 s) (fun s _ _ _ _ _ => Hg2 s)
+              with "Hcg Hpc Hcont").
     intros s_pc _ _ _ _ Hvals.
     cbn [uv_post uv_jmp uv_wr].
     rewrite (Hop s_pc).
@@ -352,6 +366,10 @@ Section WpUmodeLeaf.
               None (Some (rd, wval)) Hui
               ltac:(intro s; apply exec_execute_C_LI)
               eq_refl Hrd
+              (fun s _ _ _ _ _ => UserTotalU.goodmb_execute_C_LI Du_r Du_w imm (Regidx rd) s)
+              (fun s _ _ _ _ _ => goodmb_execute_ITYPE_total Du_r Du_w
+                          (sign_extend' 12 imm) (zero_extend' 5 ('b"00")) rd ADDI s
+                          (Du_gpr_of_Z_r (zero_extend' 5 ('b"00"))) (Du_gpr_of_Z rd))
               with "Hcg Hpc Hcont").
     intros s_pc _ _ _ _ _.
     cbn [uv_exp uv_post uv_jmp uv_wr].
@@ -393,6 +411,9 @@ Section WpUmodeLeaf.
              (Some (ITYPE (sign_extend' 12 imm, Regidx rd, Regidx rd, ADDI)))
              rd rd (fun a => add_vec a (sign_extend' 64 (sign_extend' 12 imm)))
              wval Hui (fun s => exec_execute_C_ADDI imm (Regidx rd) s) eq_refl Hrd
+             (fun s => UserTotalU.goodmb_execute_C_ADDI Du_r Du_w imm (Regidx rd) s)
+             (fun s => goodmb_execute_ITYPE_total Du_r Du_w (sign_extend' 12 imm)
+                         rd rd ADDI s (Du_gpr_of_Z_r rd) (Du_gpr_of_Z rd))
              (fun s => exec_execute_ITYPE_ADDI_gpr rd rd (sign_extend' 12 imm) s)
              Hwval).
   Qed.
@@ -433,9 +454,29 @@ Section WpUmodeLeaf.
              (Some (ITYPE (caddi4spn_imm nzimm, Regidx csp_rs1, Regidx rd, ADDI)))
              csp_rs1 rd (fun a => add_vec a (sign_extend' 64 (caddi4spn_imm nzimm)))
              wval Hui Hred eq_refl Hrd
+             (fun s => UserTotalU.goodmb_execute_C_ADDI4SPN Du_r Du_w (Cregidx cr) nzimm s)
+             (fun s => goodmb_execute_ITYPE_total Du_r Du_w (caddi4spn_imm nzimm)
+                         csp_rs1 rd ADDI s (Du_gpr_of_Z_r csp_rs1) (Du_gpr_of_Z rd))
              (fun s => exec_execute_ITYPE_ADDI_gpr csp_rs1 rd (caddi4spn_imm nzimm) s)
              Hwval).
   Qed.
+
+  (* =================================================================== *)
+  (* THE FOUR JUMP LEAVES ([wp_uv_jal], [wp_uv_cjr], [wp_uv_cj],         *)
+  (* [wp_uv_jalr]) are the reason the funnel's two [goodmb] premises      *)
+  (* carry a state guard (WpUmodeStep.v, the block above                  *)
+  (* [wp_uv_retire_later]).  At an unconstrained [s] the certificate is   *)
+  (* FALSE for anything reaching [jump_to] -- it asserts bit 0 of the     *)
+  (* target is clear, and a failed [assert_exp] is a [GenericFail] node   *)
+  (* on which [goodmb] answers [false].  Each leaf below therefore takes  *)
+  (* the guard's [register_lookup PC s = pc] and turns its OWN target-    *)
+  (* alignment premise into [goodmb_execute_JAL_total]'s (the very        *)
+  (* rewrite the [exec] argument beside it already performs), and reads   *)
+  (* the two extension gates off the guard's [agree_on D_u s dstateU]     *)
+  (* ([UserTotalU.u_gm_zca] for the certificate, [agree_u_zca] for the    *)
+  (* value).  Nothing new is proved: these are the catalogue lemmas at    *)
+  (* the state the engine actually runs the execute in.                   *)
+  (* =================================================================== *)
 
   (* ------------------------------------------------------------------- *)
   (* jal rd, imm -- the base (4-byte) call: rd := pc+4 AND nextPC :=       *)
@@ -468,6 +509,18 @@ Section WpUmodeLeaf.
               (Some tgt) (Some (rd, wval)) Hui
               ltac:(intro s; exact I)
               eq_refl Hrd
+              ltac:(intros s Lpc _ _ Hag _;
+                    exact (goodmb_execute_JAL_total Du_r Du_w imm rd s
+                             UserTotalU.Du_r_nPC UserTotalU.Du_r_PC
+                             UserTotalU.Du_w_nPC (Du_gpr_of_Z rd)
+                             (UserTotalU.u_gm_zca s Hag) (agree_u_zca s Hag)
+                             ltac:(rewrite Lpc; rewrite <- Htgt; exact Hal0)))
+              ltac:(intros s Lpc _ _ Hag _;
+                    exact (goodmb_execute_JAL_total Du_r Du_w imm rd s
+                             UserTotalU.Du_r_nPC UserTotalU.Du_r_PC
+                             UserTotalU.Du_w_nPC (Du_gpr_of_Z rd)
+                             (UserTotalU.u_gm_zca s Hag) (agree_u_zca s Hag)
+                             ltac:(rewrite Lpc; rewrite <- Htgt; exact Hal0)))
               with "Hcg Hpc Hcont").
     intros s_pc Lpc Lnpc _ Hag _.
     cbn [uv_exp uv_post uv_jmp uv_wr].
@@ -507,6 +560,16 @@ Section WpUmodeLeaf.
               (Some tgt) None Hui
               ltac:(intro s; apply exec_execute_C_JR)
               eq_refl I
+              (fun s _ _ _ _ _ =>
+                 UserTotalU.goodmb_execute_C_JR Du_r Du_w (Regidx rs1) s)
+              ltac:(intros s _ _ _ Hag _;
+                    exact (goodmb_execute_JALR_total Du_r Du_w (zeros' 12) rs1
+                             (zero_extend' 5 ('b"00")) s
+                             UserTotalU.Du_r_nPC UserTotalU.Du_w_nPC
+                             (Du_gpr_of_Z_r rs1)
+                             (Du_gpr_of_Z (zero_extend' 5 ('b"00")))
+                             (UserTotalU.u_gm_zicfilp s Hag) (agree_u_zicfilp s Hag)
+                             (UserTotalU.u_gm_zca s Hag) (agree_u_zca s Hag)))
               with "Hcg Hpc Hcont").
     intros s_pc _ _ _ Hag Hvals.
     cbn [uv_exp uv_post uv_jmp uv_wr uv_upd].
@@ -560,6 +623,10 @@ Section WpUmodeLeaf.
              csp_rs1 csp_rs1
              (fun a => add_vec a (sign_extend' 64 (caddi16sp_imm imm)))
              wval Hui (fun s => exec_execute_C_ADDI16SP imm s) eq_refl Hsp
+             (fun s => UserTotalU.goodmb_execute_C_ADDI16SP Du_r Du_w imm s)
+             (fun s => goodmb_execute_ITYPE_total Du_r Du_w (caddi16sp_imm imm)
+                         csp_rs1 csp_rs1 ADDI s
+                         (Du_gpr_of_Z_r csp_rs1) (Du_gpr_of_Z csp_rs1))
              (fun s => exec_execute_ITYPE_ADDI_gpr csp_rs1 csp_rs1
                          (caddi16sp_imm imm) s)
              Hwval).
@@ -596,6 +663,12 @@ Section WpUmodeLeaf.
               None (Some (rd, wval)) Hui
               ltac:(intro s; apply exec_execute_C_MV)
               eq_refl Hrd
+              (fun s _ _ _ _ _ => UserTotalU.goodmb_execute_C_MV Du_r Du_w
+                          (Regidx rd) (Regidx rs2) s)
+              (fun s _ _ _ _ _ => goodmb_execute_RTYPE_total Du_r Du_w rs2
+                          (zero_extend' 5 ('b"00")) rd ADD s
+                          (Du_gpr_of_Z_r (zero_extend' 5 ('b"00")))
+                          (Du_gpr_of_Z_r rs2) (Du_gpr_of_Z rd))
               with "Hcg Hpc Hcont").
     intros s_pc _ _ _ _ Hvals.
     cbn [uv_exp uv_post uv_jmp uv_wr].
@@ -645,6 +718,9 @@ Section WpUmodeLeaf.
                             (add_vec a (sign_extend' 64 (sign_extend' 12 imm)))
                             31 0))
              wval Hui (fun s => exec_execute_C_ADDIW imm (Regidx rd) s) eq_refl Hrd
+             (fun s => UserTotalU.goodmb_execute_C_ADDIW Du_r Du_w imm (Regidx rd) s)
+             (fun s => goodmb_execute_ADDIW_total Du_r Du_w (sign_extend' 12 imm)
+                         rd rd s (Du_gpr_of_Z_r rd) (Du_gpr_of_Z rd))
              (fun s => exec_execute_ADDIW_gpr rd rd (sign_extend' 12 imm) s) Hwval).
   Qed.
 
@@ -679,6 +755,16 @@ Section WpUmodeLeaf.
               (Some tgt) None Hui
               ltac:(intro s; apply exec_execute_C_J)
               eq_refl I
+              (fun s _ _ _ _ _ => UserTotalU.goodmb_execute_C_J_U Du_r Du_w imm s)
+              ltac:(intros s Lpc _ _ Hag _;
+                    exact (goodmb_execute_JAL_total Du_r Du_w
+                             (sign_extend' 21 (concat_vec imm ('b"0")))
+                             (zero_extend' 5 ('b"00")) s
+                             UserTotalU.Du_r_nPC UserTotalU.Du_r_PC
+                             UserTotalU.Du_w_nPC
+                             (Du_gpr_of_Z (zero_extend' 5 ('b"00")))
+                             (UserTotalU.u_gm_zca s Hag) (agree_u_zca s Hag)
+                             ltac:(rewrite Lpc; rewrite <- Htgt; exact Hal0)))
               with "Hcg Hpc Hcont").
     intros s_pc Lpc _ _ Hag _.
     cbn [uv_exp uv_post uv_jmp uv_wr uv_upd].
@@ -718,9 +804,14 @@ Section WpUmodeLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hwval.
+    assert (Hg : forall s : mstate,
+              goodmb Du_r Du_w (execute (ITYPE (imm, Regidx rs1, Regidx rd, ADDI)))
+                s ∅ = true)
+      by (intro s; exact (goodmb_execute_ITYPE_total Du_r Du_w imm rs1 rd ADDI s
+                            (Du_gpr_of_Z_r rs1) (Du_gpr_of_Z rd))).
     exact (wp_uv_alu1 Ψ M m pc false (ITYPE (imm, Regidx rs1, Regidx rd, ADDI))
              None rs1 rd (fun a => add_vec a (sign_extend' 64 imm)) wval Hui
-             (fun _ : mstate => I) eq_refl Hrd
+             (fun _ : mstate => I) eq_refl Hrd Hg Hg
              (fun s => exec_execute_ITYPE_ADDI_gpr rs1 rd imm s) Hwval).
   Qed.
 
@@ -745,9 +836,14 @@ Section WpUmodeLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hwval.
+    assert (Hg : forall s : mstate,
+              goodmb Du_r Du_w
+                (execute (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, ADD))) s ∅ = true)
+      by (intro s; exact (goodmb_execute_RTYPE_total Du_r Du_w rs2 rs1 rd ADD s
+                            (Du_gpr_of_Z_r rs1) (Du_gpr_of_Z_r rs2) (Du_gpr_of_Z rd))).
     exact (wp_uv_alu2 Ψ M m pc false (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, ADD))
              None rs1 rs2 rd (fun a b => add_vec a b) wval Hui
-             (fun _ : mstate => I) eq_refl Hrd
+             (fun _ : mstate => I) eq_refl Hrd Hg Hg
              (fun s => exec_execute_RTYPE_ADD_gpr rs2 rs1 rd s) Hwval).
   Qed.
 
@@ -778,10 +874,15 @@ Section WpUmodeLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hwval.
+    assert (Hg : forall s : mstate,
+              goodmb Du_r Du_w
+                (execute (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SLLI))) s ∅ = true)
+      by (intro s; exact (goodmb_execute_SHIFTIOP_total Du_r Du_w shamt rs1 rd SLLI s
+                            (Du_gpr_of_Z_r rs1) (Du_gpr_of_Z rd))).
     exact (wp_uv_alu1 Ψ M m pc false (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SLLI))
              None rs1 rd
              (fun a => shift_bits_left a (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0))
-             wval Hui (fun _ : mstate => I) eq_refl Hrd
+             wval Hui (fun _ : mstate => I) eq_refl Hrd Hg Hg
              (fun s => exec_execute_SHIFTIOP_SLLI_gpr rs1 rd shamt s) Hwval).
   Qed.
 
@@ -802,10 +903,15 @@ Section WpUmodeLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hwval.
+    assert (Hg : forall s : mstate,
+              goodmb Du_r Du_w
+                (execute (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SRLI))) s ∅ = true)
+      by (intro s; exact (goodmb_execute_SHIFTIOP_total Du_r Du_w shamt rs1 rd SRLI s
+                            (Du_gpr_of_Z_r rs1) (Du_gpr_of_Z rd))).
     exact (wp_uv_alu1 Ψ M m pc false (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SRLI))
              None rs1 rd
              (fun a => shift_bits_right a (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0))
-             wval Hui (fun _ : mstate => I) eq_refl Hrd
+             wval Hui (fun _ : mstate => I) eq_refl Hrd Hg Hg
              (fun s => exec_execute_SHIFTIOP_SRLI_gpr rs1 rd shamt s) Hwval).
   Qed.
 
@@ -833,12 +939,17 @@ Section WpUmodeLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hwval.
+    assert (Hg : forall s : mstate,
+              goodmb Du_r Du_w
+                (execute (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, SUBW))) s ∅ = true)
+      by (intro s; exact (goodmb_execute_RTYPEW_total Du_r Du_w rs2 rs1 rd SUBW s
+                            (Du_gpr_of_Z_r rs1) (Du_gpr_of_Z_r rs2) (Du_gpr_of_Z rd))).
     exact (wp_uv_alu2 Ψ M m pc false (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, SUBW))
              None rs1 rs2 rd
              (fun a b => sign_extend' 64
                            (sub_vec (subrange_vec_dec a 31 0 : mword 32)
                                     (subrange_vec_dec b 31 0 : mword 32)))
-             wval Hui (fun _ : mstate => I) eq_refl Hrd
+             wval Hui (fun _ : mstate => I) eq_refl Hrd Hg Hg
              (fun s => exec_execute_RTYPEW_SUBW_gpr rs2 rs1 rd s) Hwval).
   Qed.
 
@@ -866,8 +977,12 @@ Section WpUmodeLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hwval.
+    assert (Hg : forall s : mstate,
+              goodmb Du_r Du_w (execute (UTYPE (imm, Regidx rd, AUIPC))) s ∅ = true)
+      by (intro s; exact (goodmb_execute_UTYPE_total Du_r Du_w imm rd AUIPC s
+                            UserTotalU.Du_r_PC (Du_gpr_of_Z rd))).
     apply (wp_uv_alu0 Ψ M m pc false (UTYPE (imm, Regidx rd, AUIPC)) None rd wval
-             Hui (fun _ : mstate => I) eq_refl Hrd).
+             Hui (fun _ : mstate => I) eq_refl Hrd Hg Hg).
     intros s Lpc. rewrite (exec_execute_UTYPE_AUIPC_gpr rd imm s).
     rewrite Lpc. rewrite Hwval. reflexivity.
   Qed.
@@ -895,9 +1010,14 @@ Section WpUmodeLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hwval.
+    assert (Hg : forall s : mstate,
+              goodmb Du_r Du_w
+                (execute (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SUB))) s ∅ = true)
+      by (intro s; exact (goodmb_execute_RTYPE_total Du_r Du_w rs2 rs1 rd SUB s
+                            (Du_gpr_of_Z_r rs1) (Du_gpr_of_Z_r rs2) (Du_gpr_of_Z rd))).
     exact (wp_uv_alu2 Ψ M m pc false (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SUB))
              None rs1 rs2 rd (fun a b => sub_vec a b) wval Hui
-             (fun _ : mstate => I) eq_refl Hrd
+             (fun _ : mstate => I) eq_refl Hrd Hg Hg
              (fun s => exec_execute_RTYPE_SUB_gpr rs2 rs1 rd s) Hwval).
   Qed.
 
@@ -934,9 +1054,14 @@ Section WpUmodeLeaf.
       replace (Z.eqb (uint rd) 0) with false
         by (symmetry; apply Z.eqb_neq; exact Hrd).
       exact (exec_execute_RTYPE_AND_gpr rs2 rs1 rd s Hrd). }
+    assert (Hg : forall s : mstate,
+              goodmb Du_r Du_w
+                (execute (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, AND))) s ∅ = true)
+      by (intro s; exact (goodmb_execute_RTYPE_total Du_r Du_w rs2 rs1 rd AND s
+                            (Du_gpr_of_Z_r rs1) (Du_gpr_of_Z_r rs2) (Du_gpr_of_Z rd))).
     exact (wp_uv_alu2 Ψ M m pc false (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, AND))
              None rs1 rs2 rd (fun a b => and_vec a b) wval Hui
-             (fun _ : mstate => I) eq_refl Hrd Hop Hwval).
+             (fun _ : mstate => I) eq_refl Hrd Hg Hg Hop Hwval).
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -975,10 +1100,15 @@ Section WpUmodeLeaf.
       replace (Z.eqb (uint rd) 0) with false
         by (symmetry; apply Z.eqb_neq; exact Hrd).
       exact (exec_execute_RTYPE_SLTU_gpr rs2 rs1 rd s Hrd). }
+    assert (Hg : forall s : mstate,
+              goodmb Du_r Du_w
+                (execute (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SLTU))) s ∅ = true)
+      by (intro s; exact (goodmb_execute_RTYPE_total Du_r Du_w rs2 rs1 rd SLTU s
+                            (Du_gpr_of_Z_r rs1) (Du_gpr_of_Z_r rs2) (Du_gpr_of_Z rd))).
     exact (wp_uv_alu2 Ψ M m pc false (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SLTU))
              None rs1 rs2 rd
              (fun a b => zero_extend' 64 (bool_to_bit (zopz0zI_u a b)))
-             wval Hui (fun _ : mstate => I) eq_refl Hrd Hop Hwval).
+             wval Hui (fun _ : mstate => I) eq_refl Hrd Hg Hg Hop Hwval).
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -1003,12 +1133,17 @@ Section WpUmodeLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hwval.
+    assert (Hg : forall s : mstate,
+              goodmb Du_r Du_w
+                (execute (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, ADDW))) s ∅ = true)
+      by (intro s; exact (goodmb_execute_RTYPEW_total Du_r Du_w rs2 rs1 rd ADDW s
+                            (Du_gpr_of_Z_r rs1) (Du_gpr_of_Z_r rs2) (Du_gpr_of_Z rd))).
     exact (wp_uv_alu2 Ψ M m pc false (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, ADDW))
              None rs1 rs2 rd
              (fun a b => sign_extend' 64
                            (add_vec (subrange_vec_dec a 31 0 : mword 32)
                                     (subrange_vec_dec b 31 0 : mword 32)))
-             wval Hui (fun _ : mstate => I) eq_refl Hrd
+             wval Hui (fun _ : mstate => I) eq_refl Hrd Hg Hg
              (fun s => exec_execute_RTYPEW_ADDW_gpr rs2 rs1 rd s) Hwval).
   Qed.
 
@@ -1035,11 +1170,16 @@ Section WpUmodeLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hwval.
+    assert (Hg : forall s : mstate,
+              goodmb Du_r Du_w
+                (execute (ITYPE (imm, Regidx rs1, Regidx rd, SLTIU))) s ∅ = true)
+      by (intro s; exact (goodmb_execute_ITYPE_total Du_r Du_w imm rs1 rd SLTIU s
+                            (Du_gpr_of_Z_r rs1) (Du_gpr_of_Z rd))).
     exact (wp_uv_alu1 Ψ M m pc false (ITYPE (imm, Regidx rs1, Regidx rd, SLTIU))
              None rs1 rd
              (fun a => zero_extend' 64
                          (bool_to_bit (zopz0zI_u a (sign_extend' 64 imm))))
-             wval Hui (fun _ : mstate => I) eq_refl Hrd
+             wval Hui (fun _ : mstate => I) eq_refl Hrd Hg Hg
              (fun s => exec_execute_ITYPE_SLTIU_gpr rs1 rd imm s) Hwval).
   Qed.
 
@@ -1063,9 +1203,14 @@ Section WpUmodeLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hwval.
+    assert (Hg : forall s : mstate,
+              goodmb Du_r Du_w
+                (execute (ITYPE (imm, Regidx rs1, Regidx rd, ANDI))) s ∅ = true)
+      by (intro s; exact (goodmb_execute_ITYPE_total Du_r Du_w imm rs1 rd ANDI s
+                            (Du_gpr_of_Z_r rs1) (Du_gpr_of_Z rd))).
     exact (wp_uv_alu1 Ψ M m pc false (ITYPE (imm, Regidx rs1, Regidx rd, ANDI))
              None rs1 rd (fun a => and_vec a (sign_extend' 64 imm))
-             wval Hui (fun _ : mstate => I) eq_refl Hrd
+             wval Hui (fun _ : mstate => I) eq_refl Hrd Hg Hg
              (fun s => exec_execute_ITYPE_ANDI_gpr rs1 rd imm s) Hwval).
   Qed.
 
@@ -1088,9 +1233,14 @@ Section WpUmodeLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hwval.
+    assert (Hg : forall s : mstate,
+              goodmb Du_r Du_w
+                (execute (ITYPE (imm, Regidx rs1, Regidx rd, XORI))) s ∅ = true)
+      by (intro s; exact (goodmb_execute_ITYPE_total Du_r Du_w imm rs1 rd XORI s
+                            (Du_gpr_of_Z_r rs1) (Du_gpr_of_Z rd))).
     exact (wp_uv_alu1 Ψ M m pc false (ITYPE (imm, Regidx rs1, Regidx rd, XORI))
              None rs1 rd (fun a => xor_vec a (sign_extend' 64 imm))
-             wval Hui (fun _ : mstate => I) eq_refl Hrd
+             wval Hui (fun _ : mstate => I) eq_refl Hrd Hg Hg
              (fun s => exec_execute_ITYPE_XORI_gpr rs1 rd imm s) Hwval).
   Qed.
 
@@ -1119,11 +1269,15 @@ Section WpUmodeLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hwval.
+    assert (Hg : forall s : mstate,
+              goodmb Du_r Du_w (execute (ADDIW (imm, Regidx rs1, Regidx rd))) s ∅ = true)
+      by (intro s; exact (goodmb_execute_ADDIW_total Du_r Du_w imm rs1 rd s
+                            (Du_gpr_of_Z_r rs1) (Du_gpr_of_Z rd))).
     exact (wp_uv_alu1 Ψ M m pc false (ADDIW (imm, Regidx rs1, Regidx rd))
              None rs1 rd
              (fun a => sign_extend' 64
                          (subrange_vec_dec (add_vec a (sign_extend' 64 imm)) 31 0))
-             wval Hui (fun _ : mstate => I) eq_refl Hrd
+             wval Hui (fun _ : mstate => I) eq_refl Hrd Hg Hg
              (fun s => exec_execute_ADDIW_gpr rs1 rd imm s) Hwval).
   Qed.
 
@@ -1151,11 +1305,16 @@ Section WpUmodeLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hwval.
+    assert (Hg : forall s : mstate,
+              goodmb Du_r Du_w
+                (execute (SHIFTIWOP (shamt, Regidx rs1, Regidx rd, SLLIW))) s ∅ = true)
+      by (intro s; exact (goodmb_execute_SHIFTIWOP_total Du_r Du_w shamt rs1 rd SLLIW s
+                            (Du_gpr_of_Z_r rs1) (Du_gpr_of_Z rd))).
     exact (wp_uv_alu1 Ψ M m pc false (SHIFTIWOP (shamt, Regidx rs1, Regidx rd, SLLIW))
              None rs1 rd
              (fun a => sign_extend' 64
                          (shift_bits_left (subrange_vec_dec a 31 0 : mword 32) shamt))
-             wval Hui (fun _ : mstate => I) eq_refl Hrd
+             wval Hui (fun _ : mstate => I) eq_refl Hrd Hg Hg
              (fun s => exec_execute_SHIFTIWOP_SLLIW_gpr rs1 rd shamt s) Hwval).
   Qed.
 
@@ -1179,8 +1338,12 @@ Section WpUmodeLeaf.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hwval.
+    assert (Hg : forall s : mstate,
+              goodmb Du_r Du_w (execute (UTYPE (imm, Regidx rd, LUI))) s ∅ = true)
+      by (intro s; exact (goodmb_execute_UTYPE_total Du_r Du_w imm rd LUI s
+                            UserTotalU.Du_r_PC (Du_gpr_of_Z rd))).
     apply (wp_uv_alu0 Ψ M m pc false (UTYPE (imm, Regidx rd, LUI)) None rd wval
-             Hui (fun _ : mstate => I) eq_refl Hrd).
+             Hui (fun _ : mstate => I) eq_refl Hrd Hg Hg).
     intros s _. rewrite Hwval. exact (exec_execute_UTYPE_LUI_gpr rd imm s).
   Qed.
 
@@ -1225,11 +1388,16 @@ Section WpUmodeLeaf.
       replace (Z.eqb (uint rd) 0) with false
         by (symmetry; apply Z.eqb_neq; exact Hrd).
       exact (exec_execute_DIVU_gpr_uv rs2 rs1 rd s Hrd). }
+    assert (Hg : forall s : mstate,
+              goodmb Du_r Du_w
+                (execute (DIV (Regidx rs2, Regidx rs1, Regidx rd, true))) s ∅ = true)
+      by (intro s; exact (goodmb_execute_DIV_total Du_r Du_w rs2 rs1 rd true s
+                            (Du_gpr_of_Z_r rs1) (Du_gpr_of_Z_r rs2) (Du_gpr_of_Z rd))).
     exact (wp_uv_alu2 Ψ M m pc false (DIV (Regidx rs2, Regidx rs1, Regidx rd, true))
              None rs1 rs2 rd
              (fun a b => to_bits_truncate 64
                            (if Z.eqb (uint b) 0 then -1 else Z.quot (uint a) (uint b)))
-             wval Hui (fun _ : mstate => I) eq_refl Hrd Hop Hwval).
+             wval Hui (fun _ : mstate => I) eq_refl Hrd Hg Hg Hop Hwval).
   Qed.
 
   Lemma wp_uv_remu (Ψ : usys_protocol Σ) (M : gmap Z (bv 8)) (m : regfile)
@@ -1264,11 +1432,16 @@ Section WpUmodeLeaf.
       replace (Z.eqb (uint rd) 0) with false
         by (symmetry; apply Z.eqb_neq; exact Hrd).
       exact (exec_execute_REMU_gpr_uv rs2 rs1 rd s Hrd). }
+    assert (Hg : forall s : mstate,
+              goodmb Du_r Du_w
+                (execute (REM (Regidx rs2, Regidx rs1, Regidx rd, true))) s ∅ = true)
+      by (intro s; exact (goodmb_execute_REM_total Du_r Du_w rs2 rs1 rd true s
+                            (Du_gpr_of_Z_r rs1) (Du_gpr_of_Z_r rs2) (Du_gpr_of_Z rd))).
     exact (wp_uv_alu2 Ψ M m pc false (REM (Regidx rs2, Regidx rs1, Regidx rd, true))
              None rs1 rs2 rd
              (fun a b => to_bits_truncate 64
                            (if Z.eqb (uint b) 0 then uint a else Z.rem (uint a) (uint b)))
-             wval Hui (fun _ : mstate => I) eq_refl Hrd Hop Hwval).
+             wval Hui (fun _ : mstate => I) eq_refl Hrd Hg Hg Hop Hwval).
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -1308,6 +1481,18 @@ Section WpUmodeLeaf.
     iIntros "Hcg Hpc Hcont".
     iApply (wp_uv_retire C pt Ψ M m pc false (JALR (imm, Regidx rs1, Regidx rd))
               None (Some tgt) wr Hui (fun _ : mstate => I) eq_refl Hwrok
+              ltac:(intros s _ _ _ Hag _;
+                    exact (goodmb_execute_JALR_total Du_r Du_w imm rs1 rd s
+                             UserTotalU.Du_r_nPC UserTotalU.Du_w_nPC
+                             (Du_gpr_of_Z_r rs1) (Du_gpr_of_Z rd)
+                             (UserTotalU.u_gm_zicfilp s Hag) (agree_u_zicfilp s Hag)
+                             (UserTotalU.u_gm_zca s Hag) (agree_u_zca s Hag)))
+              ltac:(intros s _ _ _ Hag _;
+                    exact (goodmb_execute_JALR_total Du_r Du_w imm rs1 rd s
+                             UserTotalU.Du_r_nPC UserTotalU.Du_w_nPC
+                             (Du_gpr_of_Z_r rs1) (Du_gpr_of_Z rd)
+                             (UserTotalU.u_gm_zicfilp s Hag) (agree_u_zicfilp s Hag)
+                             (UserTotalU.u_gm_zca s Hag) (agree_u_zca s Hag)))
               with "Hcg Hpc Hcont").
     intros s_pc _ Lnpc _ Hag Hvals.
     assert (Hrsv : register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_pc.(sregs)
@@ -1384,6 +1569,10 @@ Section WpUmodeLeaf.
              (Some (RTYPE (Regidx rs2, Regidx rd, Regidx rd, ADD)))
              rd rs2 rd (fun a b => add_vec a b) wval Hui
              (fun s => exec_execute_C_ADD (Regidx rd) (Regidx rs2) s) eq_refl Hrd
+             (fun s => UserTotalU.goodmb_execute_C_ADD Du_r Du_w
+                         (Regidx rd) (Regidx rs2) s)
+             (fun s => goodmb_execute_RTYPE_total Du_r Du_w rs2 rd rd ADD s
+                         (Du_gpr_of_Z_r rd) (Du_gpr_of_Z_r rs2) (Du_gpr_of_Z rd))
              (fun s => exec_execute_RTYPE_ADD_gpr rs2 rd rd s) Hwval).
   Qed.
 
@@ -1421,7 +1610,12 @@ Section WpUmodeLeaf.
       exact (exec_execute_RTYPE_AND_gpr rs2 rd rd s Hrd). }
     exact (wp_uv_alu2 Ψ M m pc true (C_AND (Cregidx crd, Cregidx crs2))
              (Some (RTYPE (Regidx rs2, Regidx rd, Regidx rd, AND)))
-             rd rs2 rd (fun a b => and_vec a b) wval Hui Hred eq_refl Hrd Hop Hwval).
+             rd rs2 rd (fun a b => and_vec a b) wval Hui Hred eq_refl Hrd
+             (fun s => UserTotalU.goodmb_execute_C_AND Du_r Du_w
+                         (Cregidx crd) (Cregidx crs2) s)
+             (fun s => goodmb_execute_RTYPE_total Du_r Du_w rs2 rd rd AND s
+                         (Du_gpr_of_Z_r rd) (Du_gpr_of_Z_r rs2) (Du_gpr_of_Z rd))
+             Hop Hwval).
   Qed.
 
   (* c.addw rd', rs2' -- creg-form, expanding to RTYPEW ADDW (C's `int'    *)
@@ -1456,6 +1650,9 @@ Section WpUmodeLeaf.
                            (add_vec (subrange_vec_dec a 31 0 : mword 32)
                                     (subrange_vec_dec b 31 0 : mword 32)))
              wval Hui Hred eq_refl Hrd
+             (fun s => goodmb_execute_C_ADDW Du_r Du_w (Cregidx crd) (Cregidx crs2) s)
+             (fun s => goodmb_execute_RTYPEW_total Du_r Du_w rs2 rd rd ADDW s
+                         (Du_gpr_of_Z_r rd) (Du_gpr_of_Z_r rs2) (Du_gpr_of_Z rd))
              (fun s => exec_execute_RTYPEW_ADDW_gpr rs2 rd rd s) Hwval).
   Qed.
 
@@ -1480,7 +1677,10 @@ Section WpUmodeLeaf.
     intros Hui Hrd Hwval.
     apply (wp_uv_alu0 Ψ M m pc true (C_LUI (imm, Regidx rd))
              (Some (UTYPE (sign_extend' 20 imm, Regidx rd, LUI))) rd wval Hui
-             (fun s => exec_execute_C_LUI imm (Regidx rd) s) eq_refl Hrd).
+             (fun s => exec_execute_C_LUI imm (Regidx rd) s) eq_refl Hrd
+             (fun s => UserTotalU.goodmb_execute_C_LUI Du_r Du_w imm (Regidx rd) s)
+             (fun s => goodmb_execute_UTYPE_total Du_r Du_w (sign_extend' 20 imm)
+                         rd LUI s UserTotalU.Du_r_PC (Du_gpr_of_Z rd))).
     intros s _. rewrite Hwval.
     exact (exec_execute_UTYPE_LUI_gpr rd (sign_extend' 20 imm) s).
   Qed.
@@ -1506,6 +1706,9 @@ Section WpUmodeLeaf.
              (Some (SHIFTIOP (shamt, Regidx rd, Regidx rd, SLLI))) rd rd
              (fun a => shift_bits_left a (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0))
              wval Hui (fun s => exec_execute_C_SLLI shamt (Regidx rd) s) eq_refl Hrd
+             (fun s => UserTotalU.goodmb_execute_C_SLLI Du_r Du_w shamt (Regidx rd) s)
+             (fun s => goodmb_execute_SHIFTIOP_total Du_r Du_w shamt rd rd SLLI s
+                         (Du_gpr_of_Z_r rd) (Du_gpr_of_Z rd))
              (fun s => exec_execute_SHIFTIOP_SLLI_gpr rd rd shamt s) Hwval).
   Qed.
 
@@ -1536,6 +1739,9 @@ Section WpUmodeLeaf.
              (Some (SHIFTIOP (shamt, Regidx rd, Regidx rd, SRLI))) rd rd
              (fun a => shift_bits_right a (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0))
              wval Hui Hred eq_refl Hrd
+             (fun s => UserTotalU.goodmb_execute_C_SRLI Du_r Du_w shamt (Cregidx crd) s)
+             (fun s => goodmb_execute_SHIFTIOP_total Du_r Du_w shamt rd rd SRLI s
+                         (Du_gpr_of_Z_r rd) (Du_gpr_of_Z rd))
              (fun s => exec_execute_SHIFTIOP_SRLI_gpr rd rd shamt s) Hwval).
   Qed.
 

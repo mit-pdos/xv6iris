@@ -68,6 +68,8 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep.
 Require Import InstrBytes WpGpr RegFile.
 Require Import ExecCommon WpMmodeLeafBase.
+Require Import WpDecodeBridge DecodeTotalU HartMemRun UserFrame UserExecFacts.
+Require UserTotalU.
 Require Import UserPtTree UserExec.
 Require Import UmodeMem UmodeCap.
 Require Import WpUmodeStep.
@@ -163,6 +165,86 @@ Proof.
        exact (exec_jump_to_zca _ s (Halign eq_refl) Hzca).
 Qed.
 
+(* ---------------------------------------------------------------------- *)
+(* [goodmb_execute_BTYPE_gpr_zca] -- the CERTIFICATE twin of the lemma      *)
+(* above, same binders and same hypotheses (the ⟨exec, goodmb⟩ pair         *)
+(* convention, claude-notes/projects/user-tier-port.md §I4).                *)
+(*                                                                          *)
+(* UserExecFacts.goodmb_execute_BTYPE_total does NOT serve here, and the     *)
+(* reason is the one that makes this file's exec fact local too: it demands  *)
+(* the target's alignment UNCONDITIONALLY, while a branch reaches            *)
+(* [jump_to]'s assert only when TAKEN.  The retire funnel hands its leaf the *)
+(* register READINGS at the execute state, so the walk's arm is pinned by    *)
+(* [taken] and the fall-through case needs no alignment at all -- which is   *)
+(* exactly what lets [wp_uv_btype]'s [taken = true ->] guarded premise stay  *)
+(* as it is.                                                                 *)
+(*                                                                          *)
+(* RELOCATION DEBT: belongs beside [goodmb_execute_BTYPE_total], with the    *)
+(* exec fact above it.                                                       *)
+(* ---------------------------------------------------------------------- *)
+Lemma goodmb_execute_BTYPE_gpr_zca (imm : mword 13) (rs2 rs1 : mword 5)
+    (op : bop) (v1 v2 : mword 64) (taken : bool) (s : mstate) :
+  (if Z.eqb (uint rs1) 0 then zero_reg
+   else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) = v1 ->
+  (if Z.eqb (uint rs2) 0 then zero_reg
+   else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs2))) s.(sregs)) = v2 ->
+  taken = uv_btaken op v1 v2 ->
+  (taken = true ->
+   eq_vec (access_vec_dec
+             (add_vec (register_lookup PC s.(sregs)) (sign_extend' 64 imm)) 0)
+          ('b"0") = true) ->
+  goodmb Du_r Du_w (currentlyEnabled Ext_Zca) s ∅ = true ->
+  exec (currentlyEnabled Ext_Zca) s = Some (true, s) ->
+  goodmb Du_r Du_w (execute (BTYPE (imm, Regidx rs2, Regidx rs1, op))) s ∅ = true.
+Proof.
+  intros Hv1 Hv2 Htaken Halign Hgz Hzca.
+  change (execute (BTYPE (imm, Regidx rs2, Regidx rs1, op)))
+    with (execute_BTYPE imm (Regidx rs2) (Regidx rs1) op).
+  unfold execute_BTYPE.
+  destruct op; cbn [uv_btaken] in Htaken;
+    gm_rd2_pure rs1 rs2 (Du_gpr_of_Z_r rs1) (Du_gpr_of_Z_r rs2).
+  all: cbn beta; rewrite Hv1; rewrite Hv2; rewrite <- Htaken; destruct taken.
+  all: try (apply goodmb_returnm).
+  all: gm_rr PC UserTotalU.Du_r_PC;
+       exact (goodmb_jump_to_zca Du_r Du_w _ s UserTotalU.Du_w_nPC Hgz
+                (Halign eq_refl) Hzca).
+Qed.
+
+(* [uv_btype_cert] -- the twin above, pre-composed with the retire funnel's
+   state guard and with the leaf's OWN [taken]/[tgt]/alignment premises, so a
+   leaf passes one closed term rather than an inline tactic (an inline
+   [ltac:] in an argument position whose expected type is still an evar is a
+   recorded trap, claude-notes/durable-notes.md).  Note which of the guard's
+   five facts are used: the pc reading turns the leaf's target-alignment
+   premise into the model's, the register readings pin which arm the walk
+   takes, and the [dstateU] agreement supplies the Zca gate. *)
+Lemma uv_btype_cert (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64)
+    (is_rvc : bool) (imm : mword 13) (rs2 rs1 : mword 5) (op : bop)
+    (taken : bool) (tgt : mword 64) :
+  taken = uv_btaken op (m !!! Regidx rs1) (m !!! Regidx rs2) ->
+  tgt = add_vec pc (sign_extend' 64 imm) ->
+  (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
+  forall s_pc : mstate,
+    register_lookup PC s_pc.(sregs) = pc ->
+    register_lookup nextPC s_pc.(sregs)
+      = add_vec_int pc (if is_rvc then 2 else 4) ->
+    register_lookup cur_privilege s_pc.(sregs) = User ->
+    agree_on D_u s_pc dstateU ->
+    (forall r : mword 5,
+       (if Z.eqb (uint r) 0 then zero_reg
+        else register_lookup (R_bitvector_64 (gpr_of_Z (uint r))) s_pc.(sregs))
+       = m !!! Regidx r) ->
+    goodmb Du_r Du_w (execute (BTYPE (imm, Regidx rs2, Regidx rs1, op)))
+      s_pc ∅ = true.
+Proof.
+  intros Htaken Htgt Halign s_pc Lpc _ _ Hag Hvals.
+  exact (goodmb_execute_BTYPE_gpr_zca imm rs2 rs1 op
+           (m !!! Regidx rs1) (m !!! Regidx rs2) taken s_pc
+           (Hvals rs1) (Hvals rs2) Htaken
+           ltac:(intro Ht; rewrite Lpc; rewrite <- Htgt; exact (Halign Ht))
+           (UserTotalU.u_gm_zca s_pc Hag) (agree_u_zca s_pc Hag)).
+Qed.
+
 Section WpUmodeBranch.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
@@ -190,6 +272,17 @@ Section WpUmodeBranch.
     uinstr pt M pc is_rvc i ->
     uv_redirect i o ->
     is_lpad_instruction i = false ->
+    (forall s_pc : mstate,
+       register_lookup PC s_pc.(sregs) = pc ->
+       register_lookup nextPC s_pc.(sregs)
+         = add_vec_int pc (if is_rvc then 2 else 4) ->
+       register_lookup cur_privilege s_pc.(sregs) = User ->
+       agree_on D_u s_pc dstateU ->
+       (forall r : mword 5,
+          (if Z.eqb (uint r) 0 then zero_reg
+           else register_lookup (R_bitvector_64 (gpr_of_Z (uint r))) s_pc.(sregs))
+          = m !!! Regidx r) ->
+       goodmb Du_r Du_w (execute i) s_pc ∅ = true) ->
     uv_exp i o = BTYPE (imm, Regidx rs2, Regidx rs1, op) ->
     taken = uv_btaken op (m !!! Regidx rs1) (m !!! Regidx rs2) ->
     tgt = add_vec pc (sign_extend' 64 imm) ->
@@ -203,7 +296,7 @@ Section WpUmodeBranch.
          WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hui Hred Hlpad Hexp Htaken Htgt Halign.
+    intros Hui Hred Hlpad Hg1 Hexp Htaken Htgt Halign.
     iIntros "Hcg Hpc Hcont".
     (* re-shape the continuation into the funnel's [uv_upd]/[uv_next] form *)
     iAssert (▷ (∀ CID0 : CpuId,
@@ -215,7 +308,12 @@ Section WpUmodeBranch.
     { iNext. rewrite uv_next_bool. iExact "Hcont". }
     iApply (wp_uv_retire_later C pt Ψ M m pc is_rvc i o
               (if taken then Some tgt else None) None
-              Hui Hred Hlpad I with "Hcg Hpc Hcont").
+              Hui Hred Hlpad I Hg1
+              ltac:(intros s_pc Lpc Lnpc Lcp Hag Hvals;
+                    rewrite Hexp;
+                    exact (uv_btype_cert M m pc is_rvc imm rs2 rs1 op taken tgt
+                             Htaken Htgt Halign s_pc Lpc Lnpc Lcp Hag Hvals))
+              with "Hcg Hpc Hcont").
     intros s_pc Lpc _ _ Hag Hvals.
     rewrite Hexp.
     rewrite (exec_execute_BTYPE_gpr_zca imm rs2 rs1 op
@@ -235,6 +333,17 @@ Section WpUmodeBranch.
     uinstr pt M pc is_rvc i ->
     uv_redirect i o ->
     is_lpad_instruction i = false ->
+    (forall s_pc : mstate,
+       register_lookup PC s_pc.(sregs) = pc ->
+       register_lookup nextPC s_pc.(sregs)
+         = add_vec_int pc (if is_rvc then 2 else 4) ->
+       register_lookup cur_privilege s_pc.(sregs) = User ->
+       agree_on D_u s_pc dstateU ->
+       (forall r : mword 5,
+          (if Z.eqb (uint r) 0 then zero_reg
+           else register_lookup (R_bitvector_64 (gpr_of_Z (uint r))) s_pc.(sregs))
+          = m !!! Regidx r) ->
+       goodmb Du_r Du_w (execute i) s_pc ∅ = true) ->
     uv_exp i o = BTYPE (imm, Regidx rs2, Regidx rs1, op) ->
     taken = uv_btaken op (m !!! Regidx rs1) (m !!! Regidx rs2) ->
     tgt = add_vec pc (sign_extend' 64 imm) ->
@@ -248,10 +357,11 @@ Section WpUmodeBranch.
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hui Hred Hlpad Hexp Htaken Htgt Halign.
+    intros Hui Hred Hlpad Hg1 Hexp Htaken Htgt Halign.
     iIntros "Hcg Hpc Hcont".
     iApply (wp_uv_btype_gen_later Ψ M m pc is_rvc i o imm rs2 rs1 op taken tgt
-              Hui Hred Hlpad Hexp Htaken Htgt Halign with "Hcg Hpc [Hcont]").
+              Hui Hred Hlpad Hg1 Hexp Htaken Htgt Halign
+              with "Hcg Hpc [Hcont]").
     iNext. iExact "Hcont".
   Qed.
 
@@ -282,7 +392,10 @@ Section WpUmodeBranch.
     exact (wp_uv_btype_gen Ψ M m pc false
              (BTYPE (imm, Regidx rs2, Regidx rs1, op)) None
              imm rs2 rs1 op taken tgt
-             Hui (fun _ => I) eq_refl eq_refl Htaken Htgt Halign).
+             Hui (fun _ => I) eq_refl
+             (uv_btype_cert M m pc false imm rs2 rs1 op taken tgt
+                Htaken Htgt Halign)
+             eq_refl Htaken Htgt Halign).
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -310,7 +423,10 @@ Section WpUmodeBranch.
     exact (wp_uv_btype_gen_later Ψ M m pc false
              (BTYPE (imm, Regidx rs2, Regidx rs1, op)) None
              imm rs2 rs1 op taken tgt
-             Hui (fun _ => I) eq_refl eq_refl Htaken Htgt Halign).
+             Hui (fun _ => I) eq_refl
+             (uv_btype_cert M m pc false imm rs2 rs1 op taken tgt
+                Htaken Htgt Halign)
+             eq_refl Htaken Htgt Halign).
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -418,7 +534,10 @@ Section WpUmodeBranch.
               ltac:(intro s;
                     rewrite (exec_execute_C_BEQZ imm (Cregidx cr) s);
                     rewrite Hcr; reflexivity)
-              eq_refl eq_refl
+              eq_refl
+              (fun s _ _ _ _ _ =>
+                 UserTotalU.goodmb_execute_C_BEQZ_U Du_r Du_w imm (Cregidx cr) s)
+              eq_refl
               ltac:(cbn [uv_btaken]; rewrite Hz; exact Htaken)
               Htgt Halign
               with "Hcg Hpc Hcont").
@@ -461,7 +580,10 @@ Section WpUmodeBranch.
               ltac:(intro s;
                     rewrite (exec_execute_C_BNEZ imm (Cregidx cr) s);
                     rewrite Hcr; reflexivity)
-              eq_refl eq_refl
+              eq_refl
+              (fun s _ _ _ _ _ =>
+                 UserTotalU.goodmb_execute_C_BNEZ Du_r Du_w imm (Cregidx cr) s)
+              eq_refl
               ltac:(cbn [uv_btaken]; rewrite Hz; exact Htaken)
               Htgt Halign
               with "Hcg Hpc Hcont").

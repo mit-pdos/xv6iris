@@ -2182,8 +2182,8 @@ Section UvFunnel.
       (o : option instruction) (s_x : mstate) (ib : mword 32)
       (Pe : ExecutionResult -> mword 32 -> iProp Σ) :
     uv_redirect i o ->
-    (forall s : mstate, goodmb Du_r Du_w (execute i) s ∅ = true) ->
-    (forall s : mstate, goodmb Du_r Du_w (execute (uv_exp i o)) s ∅ = true) ->
+    goodmb Du_r Du_w (execute i) (u_state rsx ∅) ∅ = true ->
+    goodmb Du_r Du_w (execute (uv_exp i o)) (u_state rsx ∅) ∅ = true ->
     exec (execute (uv_exp i o)) (u_state rsx ∅) = Some (RETIRE_SUCCESS, s_x) ->
     gen_cert -∗ resv_any cpu_id -∗
     hreg_frame rsx u_Drw -∗ hreg_frame_ro (u_Df dq) rsx u_Dro -∗
@@ -2203,7 +2203,7 @@ Section UvFunnel.
                     (execute i) (u_state rsx ∅) (u_state rsx ∅) (ExecuteAs j)
                     rsx ∅ u_disj Du_r_sub Du_w_sub
                     ltac:(intros q _; reflexivity) (map_empty_subseteq _)
-                    (Hg1 (u_state rsx ∅)) (Hred (u_state rsx ∅))
+                    Hg1 (Hred (u_state rsx ∅))
                     with "Hcert Hany Hrw Hro Hemp"). }
       iIntros (v) "(-> & Hpost)".
       iDestruct "Hpost" as (rs1 mm1) "(%Hag1 & _ & _ & Hrw & Hro & _ & Hany)".
@@ -2212,7 +2212,7 @@ Section UvFunnel.
       2:{ iApply (swp_hmrun_of_exec Du_r Du_w u_Drw u_Dro (u_Df dq)
                     (execute j) (u_state rsx ∅) s_x RETIRE_SUCCESS rs1 ∅
                     u_disj Du_r_sub Du_w_sub Hag1 (map_empty_subseteq _)
-                    (Hg2 (u_state rsx ∅)) He
+                    Hg2 He
                     with "Hcert Hany Hrw Hro Hemp"). }
       iIntros (v) "(-> & Hpost)".
       iDestruct "Hpost" as (rs2 mm2) "(%Hag & _ & _ & Hrw & Hro & _ & Hany)".
@@ -2222,7 +2222,7 @@ Section UvFunnel.
                     (execute i) (u_state rsx ∅) s_x RETIRE_SUCCESS rsx ∅
                     u_disj Du_r_sub Du_w_sub
                     ltac:(intros q _; reflexivity) (map_empty_subseteq _)
-                    (Hg2 (u_state rsx ∅)) He
+                    Hg2 He
                     with "Hcert Hany Hrw Hro Hemp"). }
       iIntros (v) "(-> & Hpost)".
       iDestruct "Hpost" as (rs2 mm2) "(%Hag & _ & _ & Hrw & Hro & _ & Hany)".
@@ -2242,8 +2242,26 @@ Section UvFunnel.
       (paddr : type_of_register pmpaddr_n) (rs1 rs2 : regstate) :
     uv_wrok wr ->
     uv_redirect i o ->
-    (forall s : mstate, goodmb Du_r Du_w (execute i) s ∅ = true) ->
-    (forall s : mstate, goodmb Du_r Du_w (execute (uv_exp i o)) s ∅ = true) ->
+    (forall s_pc : mstate,
+       register_lookup PC s_pc.(sregs) = pc ->
+       register_lookup nextPC s_pc.(sregs) = add_vec_int pc k ->
+       register_lookup cur_privilege s_pc.(sregs) = User ->
+       agree_on D_u s_pc dstateU ->
+       (forall r : mword 5,
+          (if Z.eqb (uint r) 0 then zero_reg
+           else register_lookup (R_bitvector_64 (gpr_of_Z (uint r))) s_pc.(sregs))
+          = m !!! Regidx r) ->
+       goodmb Du_r Du_w (execute i) s_pc ∅ = true) ->
+    (forall s_pc : mstate,
+       register_lookup PC s_pc.(sregs) = pc ->
+       register_lookup nextPC s_pc.(sregs) = add_vec_int pc k ->
+       register_lookup cur_privilege s_pc.(sregs) = User ->
+       agree_on D_u s_pc dstateU ->
+       (forall r : mword 5,
+          (if Z.eqb (uint r) 0 then zero_reg
+           else register_lookup (R_bitvector_64 (gpr_of_Z (uint r))) s_pc.(sregs))
+          = m !!! Regidx r) ->
+       goodmb Du_r Du_w (execute (uv_exp i o)) s_pc ∅ = true) ->
     (forall s_pc : mstate,
        register_lookup PC s_pc.(sregs) = pc ->
        register_lookup nextPC s_pc.(sregs) = add_vec_int pc k ->
@@ -2322,7 +2340,12 @@ Section UvFunnel.
     iIntros "#Hcert #Hamb #Hcap Hk Hany Hmm Hres Hrw Hro".
     iApply (uv_swp_exec (uc_dqc C) rsx i o
               (uv_post (u_state rsx ∅) jt wr) ib _
-              Hred Hg1 Hg2 Hex with "Hcert Hany Hrw Hro [Hk Hmm Hres]").
+              Hred
+              (Hg1 (u_state rsx ∅) Lpcx Lnpcx Lcpx Hagdx
+                 (uv_gpr_vals m rsx Hgagx Hx0))
+              (Hg2 (u_state rsx ∅) Lpcx Lnpcx Lcpx Hagdx
+                 (uv_gpr_vals m rsx Hgagx Hx0))
+              Hex with "Hcert Hany Hrw Hro [Hk Hmm Hres]").
     iIntros (rs3) "%Hag3 Hrw Hro Hany".
     rewrite uv_post_sregs in Hag3.
     rewrite /uv_step_post.
@@ -2416,8 +2439,26 @@ Section UvObligation.
     pt_same_shape 2 t t' ->
     udecode_base w i ->
     uv_wrok wr -> uv_redirect i o ->
-    (forall s : mstate, goodmb Du_r Du_w (execute i) s ∅ = true) ->
-    (forall s : mstate, goodmb Du_r Du_w (execute (uv_exp i o)) s ∅ = true) ->
+    (forall s_pc : mstate,
+       register_lookup PC s_pc.(sregs) = pc ->
+       register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4 ->
+       register_lookup cur_privilege s_pc.(sregs) = User ->
+       agree_on D_u s_pc dstateU ->
+       (forall r : mword 5,
+          (if Z.eqb (uint r) 0 then zero_reg
+           else register_lookup (R_bitvector_64 (gpr_of_Z (uint r))) s_pc.(sregs))
+          = m !!! Regidx r) ->
+       goodmb Du_r Du_w (execute i) s_pc ∅ = true) ->
+    (forall s_pc : mstate,
+       register_lookup PC s_pc.(sregs) = pc ->
+       register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4 ->
+       register_lookup cur_privilege s_pc.(sregs) = User ->
+       agree_on D_u s_pc dstateU ->
+       (forall r : mword 5,
+          (if Z.eqb (uint r) 0 then zero_reg
+           else register_lookup (R_bitvector_64 (gpr_of_Z (uint r))) s_pc.(sregs))
+          = m !!! Regidx r) ->
+       goodmb Du_r Du_w (execute (uv_exp i o)) s_pc ∅ = true) ->
     (forall s_pc : mstate,
        register_lookup PC s_pc.(sregs) = pc ->
        register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4 ->
@@ -2533,8 +2574,26 @@ Section UvObligation.
     pt_same_shape 2 t t' ->
     udecode_rvc h i ->
     uv_wrok wr -> uv_redirect i o ->
-    (forall s : mstate, goodmb Du_r Du_w (execute i) s ∅ = true) ->
-    (forall s : mstate, goodmb Du_r Du_w (execute (uv_exp i o)) s ∅ = true) ->
+    (forall s_pc : mstate,
+       register_lookup PC s_pc.(sregs) = pc ->
+       register_lookup nextPC s_pc.(sregs) = add_vec_int pc 2 ->
+       register_lookup cur_privilege s_pc.(sregs) = User ->
+       agree_on D_u s_pc dstateU ->
+       (forall r : mword 5,
+          (if Z.eqb (uint r) 0 then zero_reg
+           else register_lookup (R_bitvector_64 (gpr_of_Z (uint r))) s_pc.(sregs))
+          = m !!! Regidx r) ->
+       goodmb Du_r Du_w (execute i) s_pc ∅ = true) ->
+    (forall s_pc : mstate,
+       register_lookup PC s_pc.(sregs) = pc ->
+       register_lookup nextPC s_pc.(sregs) = add_vec_int pc 2 ->
+       register_lookup cur_privilege s_pc.(sregs) = User ->
+       agree_on D_u s_pc dstateU ->
+       (forall r : mword 5,
+          (if Z.eqb (uint r) 0 then zero_reg
+           else register_lookup (R_bitvector_64 (gpr_of_Z (uint r))) s_pc.(sregs))
+          = m !!! Regidx r) ->
+       goodmb Du_r Du_w (execute (uv_exp i o)) s_pc ∅ = true) ->
     (forall s_pc : mstate,
        register_lookup PC s_pc.(sregs) = pc ->
        register_lookup nextPC s_pc.(sregs) = add_vec_int pc 2 ->
@@ -2660,6 +2719,23 @@ End UvObligation.
 (* (a register-only execute never reaches a memory node) -- which is       *)
 (* exactly the shape the catalogue [UserTotalU.goodmb_execute_C_*] /       *)
 (* [UserExecFacts.*_total] already proves.                                 *)
+(*                                                                        *)
+(* IT CARRIES THE SAME STATE GUARD AS [Hexec], AND MUST.  Stated at an     *)
+(* unconstrained [forall s], the certificate is FALSE for every            *)
+(* instruction that reaches [jump_to]: [jump_to] ASSERTS bit 0 of the      *)
+(* target is clear, a failed [assert_exp] is a [GenericFail] node, and     *)
+(* [goodmb]'s catch-all arm answers [false] there -- so at an [s] whose PC *)
+(* is odd there is nothing to prove.  JAL / JALR / BTYPE's catalogue       *)
+(* certificates say exactly that: they take the target's alignment and the *)
+(* Zca / Zicfilp gate values as hypotheses, which are readings of the      *)
+(* state.  The five premises below are the ones the leaf needs to discharge*)
+(* them ([register_lookup PC s = pc] turns a leaf's own target-alignment   *)
+(* premise into [goodmb_execute_JAL_total]'s; [agree_on D_u s dstateU]     *)
+(* gives the gates through [UserTotalU.u_gm_zca] / [agree_u_zca]; the      *)
+(* register-value reading decides which arm a BTYPE walk takes), and they  *)
+(* cost the caller nothing: the funnel consumes both certificates at the   *)
+(* ONE state [u_state rsx ∅] in [uv_retire_post_fetch], where all five are *)
+(* already proved for [Hexec].  A register-only leaf ignores all five.     *)
 (* ===================================================================== *)
 
 Section UvRetire.
@@ -2675,8 +2751,28 @@ Section UvRetire.
     uv_redirect i o ->
     is_lpad_instruction i = false ->
     uv_wrok wr ->
-    (forall s : mstate, goodmb Du_r Du_w (execute i) s ∅ = true) ->
-    (forall s : mstate, goodmb Du_r Du_w (execute (uv_exp i o)) s ∅ = true) ->
+    (forall s_pc : mstate,
+       register_lookup PC s_pc.(sregs) = pc ->
+       register_lookup nextPC s_pc.(sregs)
+         = add_vec_int pc (if is_rvc then 2 else 4) ->
+       register_lookup cur_privilege s_pc.(sregs) = User ->
+       agree_on D_u s_pc dstateU ->
+       (forall r : mword 5,
+          (if Z.eqb (uint r) 0 then zero_reg
+           else register_lookup (R_bitvector_64 (gpr_of_Z (uint r))) s_pc.(sregs))
+          = m !!! Regidx r) ->
+       goodmb Du_r Du_w (execute i) s_pc ∅ = true) ->
+    (forall s_pc : mstate,
+       register_lookup PC s_pc.(sregs) = pc ->
+       register_lookup nextPC s_pc.(sregs)
+         = add_vec_int pc (if is_rvc then 2 else 4) ->
+       register_lookup cur_privilege s_pc.(sregs) = User ->
+       agree_on D_u s_pc dstateU ->
+       (forall r : mword 5,
+          (if Z.eqb (uint r) 0 then zero_reg
+           else register_lookup (R_bitvector_64 (gpr_of_Z (uint r))) s_pc.(sregs))
+          = m !!! Regidx r) ->
+       goodmb Du_r Du_w (execute (uv_exp i o)) s_pc ∅ = true) ->
     (forall s_pc : mstate,
        register_lookup PC s_pc.(sregs) = pc ->
        register_lookup nextPC s_pc.(sregs)
@@ -2774,8 +2870,28 @@ Section UvRetire.
     uv_redirect i o ->
     is_lpad_instruction i = false ->
     uv_wrok wr ->
-    (forall s : mstate, goodmb Du_r Du_w (execute i) s ∅ = true) ->
-    (forall s : mstate, goodmb Du_r Du_w (execute (uv_exp i o)) s ∅ = true) ->
+    (forall s_pc : mstate,
+       register_lookup PC s_pc.(sregs) = pc ->
+       register_lookup nextPC s_pc.(sregs)
+         = add_vec_int pc (if is_rvc then 2 else 4) ->
+       register_lookup cur_privilege s_pc.(sregs) = User ->
+       agree_on D_u s_pc dstateU ->
+       (forall r : mword 5,
+          (if Z.eqb (uint r) 0 then zero_reg
+           else register_lookup (R_bitvector_64 (gpr_of_Z (uint r))) s_pc.(sregs))
+          = m !!! Regidx r) ->
+       goodmb Du_r Du_w (execute i) s_pc ∅ = true) ->
+    (forall s_pc : mstate,
+       register_lookup PC s_pc.(sregs) = pc ->
+       register_lookup nextPC s_pc.(sregs)
+         = add_vec_int pc (if is_rvc then 2 else 4) ->
+       register_lookup cur_privilege s_pc.(sregs) = User ->
+       agree_on D_u s_pc dstateU ->
+       (forall r : mword 5,
+          (if Z.eqb (uint r) 0 then zero_reg
+           else register_lookup (R_bitvector_64 (gpr_of_Z (uint r))) s_pc.(sregs))
+          = m !!! Regidx r) ->
+       goodmb Du_r Du_w (execute (uv_exp i o)) s_pc ∅ = true) ->
     (forall s_pc : mstate,
        register_lookup PC s_pc.(sregs) = pc ->
        register_lookup nextPC s_pc.(sregs)

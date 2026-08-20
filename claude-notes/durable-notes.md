@@ -410,6 +410,42 @@ you tighten the filter. **Reduce the side condition before closing it**
 treat any `by`/`done` over a `map_lookup_filter_Some*` goal on an image map as
 a bug.
 
+### AND `dom_union_L` DOES NOT TERMINATE ON A `gset Arch.pa` GOAL
+
+The section above is about `set_solver` failing over `gset (mword n)`.  The
+same instance divergence reached through a different door does not fail — it
+**hangs**, and it hangs in a way that looks nothing like a proof bug: a
+TOP-LEVEL lemma with an EMPTY context ran over 50 minutes with no output,
+twice, and reads exactly like a stalled remote build.
+
+`rewrite dom_union_L` on a goal about `dom (A ∪ B) : gset Arch.pa` goes
+through `dom_union_L`'s `LeibnizEquiv` side condition, and that is where the
+`Decidable_eq_mword`-vs-`bv_eq_dec` divergence bites.  Note this is NOT the
+context-size blow-up `FastSetSolver` addresses and NOT the "no matching
+clauses" failure of `set_solver` — the tactic simply never returns.
+
+**Do every domain fact by hand: `elem_of_dom` plus `lookup_union_Some` /
+`lookup_union_None`, with the set type ASCRIBED at each assertion**
+(`(dom A : gset Arch.pa)`).  `UserFetchCert.dom_union_shape` and
+`WpUmodeStore.uv_mm_dom_img` are the two worked instances — they exist for
+exactly this reason and are the shape to copy.
+
+Two corollaries worth keeping:
+
+- **`elem_of_dom` applied to an `is_Some` goal leaves its set type an evar**,
+  and the next `rewrite` then declines the resulting `dom` as a non-match.
+  Ascribe the type BEFORE applying it.  The symptom is a bare *"Proof is not
+  complete"* at `Qed` naming nothing — the durable signature of an
+  unresolved instance, one door along from the typeclass section below.
+- The same file-locality applies to `rewrite` on `dom` generally: identical
+  scripts work in `UserBytes.v` and fail in `UserFetchCert.v`, because what
+  differs is the ambient instances the lemmas are keyed on, not the goal.
+
+**Localise it with streaming `coqc -time`** as the "A COMPILE THAT NEVER
+FINISHES" rule prescribes — the last line of the log is the stalling
+sentence, and that is the only cheap way to tell this apart from a slow
+proof.
+
 ## A HEDGED CONJUNCT IS A FALSE STATEMENT THAT COMPILES
 
 **Never write `⌜P \/ True⌝` (or `(H : True)`) into a contract as a
@@ -1183,6 +1219,46 @@ entry opens the page out of the residue ITSELF and takes a CLOSER
 completed at the one point the slots are back in hand.  **A `-∗` premise is
 how a linear resource that a callee borrows and returns should be threaded;
 a bare conjunct beside it is how it gets claimed twice.**
+
+### THE MIRROR CASE: A `∀`-STATE CERTIFICATE PREMISE IS UNSATISFIABLE FOR ANYTHING THAT JUMPS
+
+The section above is about a premise set that is unsatisfiable and compiles
+anyway.  The same mistake in the OTHER direction — a premise too strong to
+prove — is cheap by comparison, because it fails at the first call site
+rather than lying; but it is easy to write, and the shape recurs whenever a
+`goodmb` certificate is bolted onto a lemma that already carries a
+value-precise `exec` fact.
+
+Adding
+
+```coq
+(forall s : mstate, goodmb Dr Dw (execute i) s ∅ = true) ->
+```
+
+to the verified Umode retire funnel looked harmless: `goodmb` answers a
+`bool` and does not scrutinise the state, so quantifying the state seemed
+free.  **It is not, for any instruction routing through `jump_to`.**
+`jump_to` asserts bit 0 of the target is clear; a failed `assert_exp` is a
+fail node; and `HartMemRun.goodmb`'s catch-all arm is `| _ => fun _ => false`.
+So at any `s` whose PC makes `PC + sext imm` odd the proposition is FALSE —
+unprovable, not merely unproved.  Read from the other side, the catalogue
+says the same thing out loud: `UserExecFacts.goodmb_execute_JAL_total`
+demands `eq_vec (access_vec_dec (add_vec (register_lookup PC s.(sregs))
+(sign_extend' 64 imm)) 0) ('b"0") = true` — the TARGET's alignment, computed
+from `s`'s own PC — and JALR additionally wants the Zicfilp/Zca gates, which
+read `misa`/`menvcfg`.
+
+> **GUARD A CERTIFICATE PREMISE WITH THE STATE FACTS ITS PAIRED `exec`
+> PREMISE ALREADY CARRIES.**  The two are consumed at the SAME state, so the
+> guard costs nothing and the leaves close with no new certificate: the pc
+> pin turns each leaf's own target-alignment premise into the catalogue
+> lemma's, which is the very rewrite its `exec` proof already performs.
+
+The symptom is `Error: No product even after head-reduction.` at every
+JUMPING call site while the register-only ones type-check — a 25-of-29 split
+that reads like a botched argument list and is really a false premise.  **A
+certificate premise that quantifies more of the machine than the fact beside
+it is the thing to suspect.**
 
 ## A CLAUSE ABOUT **NAMES** MUST TAKE THE WRITE'S ATOMICITY; ONE ABOUT
 ## INUMS OR INDICES NEED NOT
