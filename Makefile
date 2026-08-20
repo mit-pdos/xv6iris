@@ -92,7 +92,7 @@ SAIL_RISCV_REV ?= c32fbf4111b849061db1812355d6da9df8c2e396
 XV6_REV ?= 4aab0eb8fb2017d64fb08e430d63794c19ad21f4
 
 KDUMP_SRCS := $(KDUMP)/KernelInstrs.v $(KDUMP)/KernelData.v $(KDUMP)/KernelSyms.v \
-              $(KDUMP)/KernelElfRaw.v
+              $(KDUMP)/KernelElfRaw.v $(KDUMP)/FsImgRaw.v
 
 # User-space programs to dump into user-rocq/, as <xv6 program>:<Rocq module
 # prefix> pairs (the ELF is $(USER_DIR)/_<program>).  Adding one here also needs
@@ -144,6 +144,12 @@ user: $(USER_DIR)/_sh
 $(USER_DIR)/_%: | $(XV6_DIR)
 	$(MAKE) -C $(XV6_DIR) fs.img
 
+# ---- 2c. the filesystem image (mkfs's packed disk: the same fs.img build
+# that produces user/_sync & friends above, dumped separately for its own
+# sake -- see kernel-rocq/FsImgRaw.v below) ----
+$(XV6_DIR)/fs.img: | $(XV6_DIR)
+	$(MAKE) -C $(XV6_DIR) fs.img
+
 # ---- 3. Dump the ELF images into Rocq and compile them ----
 #
 # The generated .v are checked in but the ELFs are not ($(XV6_DIR) is
@@ -160,6 +166,10 @@ $(KDUMP)/KernelSyms.v:   $(KERNEL_ELF) $(DUMPER)
 	$(PYTHON) $(DUMPER) --format rocq-syms --elf $< --objdump $(OBJDUMP) --out $@
 $(KDUMP)/KernelElfRaw.v: $(KERNEL_ELF) $(DUMPER)
 	$(PYTHON) $(DUMPER) --format rocq-raw  --elf $< --objdump $(OBJDUMP) --out $@
+# fs.img is not an ELF (--format rocq-bin: no disassembly, no ELF parsing),
+# so this rule needs no $(OBJDUMP).
+$(KDUMP)/FsImgRaw.v:     $(XV6_DIR)/fs.img $(DUMPER)
+	$(PYTHON) $(DUMPER) --format rocq-bin  --elf $< --prefix fsimg --out $@
 $(KDUMP)/CoqMakefile: $(KDUMP)/_CoqProject
 	cd $(KDUMP) && $(RUN) coq_makefile -f _CoqProject -o CoqMakefile
 kernel-rocq: $(KDUMP_SRCS) $(KDUMP)/CoqMakefile

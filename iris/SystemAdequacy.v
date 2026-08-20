@@ -44,6 +44,15 @@ Require Import BootConfig.
 Require Import BootChain BootShared.
 Require Import RiscvAdequacy.
 Require Import FsCrash.
+(* THE LITERAL mkfs IMAGE, for the [xv6Σ] corollary at the bottom.  This is
+   the MACHINE-FACING half only ([fsimg_dk], its block view, and the one
+   recovery fact) -- deliberately split out of [FsImgCheck.v] so that this
+   file's cone gains [PStringBytes] + the generated [Kernel.FsImgRaw] and
+   nothing else.  MEASURED, single-file [coqc] on the build VM: 3.63 s
+   before this import, 3.51 s after -- the generated image is one compact
+   [PrimString] literal, so loading it costs nothing worth naming.  Keep it
+   that way: this file sits on the strictly serial build tail. *)
+Require Import FsImgDisk.
 Require Import IcacheRef.
 (* [ROOTDEV], for the two config ties the boot arm now carries *)
 Require Import IrefSlots.
@@ -247,6 +256,18 @@ Qed.
 (* Everything else about the FS -- that its own writes maintain the        *)
 (* invariant -- is the WAL fupds' business, carried by the write permits    *)
 (* the log functions take (phase C2b/D1 stage 4).                          *)
+(*                                                                        *)
+(* ...AND THE [xv6Σ] COROLLARY BELOW NOW DISCHARGES IT AT THE LITERAL      *)
+(* mkfs IMAGE.  This theorem keeps [D0], [cov] and [logstart] abstract,     *)
+(* because a generic statement should; but                                 *)
+(* [xv6_fs_adequacy_xv6Σ] instantiates the disk at [FsImgDisk.fsimg_dk] --  *)
+(* the 2,048,000 bytes [mkfs] actually wrote (kernel-rocq/FsImgRaw.v) --    *)
+(* and supplies [Hrec] from [FsImgDisk.fsimg_recovery], which is           *)
+(* [fs_recovery_clean] at that image's own zero log header.  So mkfs's      *)
+(* obligation is not merely satisfiable at this instance, it is PROVED, and *)
+(* what the image MEANS as a file system (its superblock, [FsImg.fsimg_wf], *)
+(* and that /init /sh /echo /sync hold exactly the tracked ELF raws) is     *)
+(* [iris/FsImgCheck.v] -- deliberately NOT on this file's cone.            *)
 (* ---------------------------------------------------------------------- *)
 
 Theorem xv6_fs_adequacy Σ
@@ -372,14 +393,42 @@ Proof. apply (xv6_power_adequacy xv6Σ g Hgen0 Hpow). Qed.
    and by CI after the build.  Do not put it back here.
    (claude-notes/optimization.md records why the command is that expensive.) *)
 
-(* ...and the FS form at the same concrete functor list. *)
-Corollary xv6_fs_adequacy_xv6Σ (g : gstate) (cov : gset Z) (logstart : Z)
-    (D0 : gmap Z (list (bv 8)))
+(* ...and the FS form at the same concrete functor list AND AT THE LITERAL
+   mkfs IMAGE.
+
+   NOTHING ABOUT THE FILE SYSTEM IS ASSUMED ANY MORE.  The generic theorem
+   above takes mkfs's obligation as a hypothesis; here the initial disk IS
+   the image mkfs built -- [FsImgDisk.fsimg_dk] is kernel-rocq/FsImgRaw.v's
+   2,048,000 bytes, zero-padded beyond them (a virtio disk reads zeroes past
+   the file backing it, and [XV6_DISK_BYTES] is larger than the image) --
+   and the obligation is DISCHARGED by [FsImgDisk.fsimg_recovery], which is
+   [FsCrash.fs_recovery_clean] at that image's own zero log header.
+
+   THE THREE PARAMETERS, and why each is what it is:
+     [logstart] is pinned to [2], which is the IMAGE'S OWN [logstart] --
+       the superblock says so, and [FsImgCheck.fsimg_parse_sb] /
+       [FsImgCheck.fsimg_sb_logstart] are what check it (this file does not
+       need them: at the image, [2] is a literal, exactly as it is in the
+       bytes);
+     [D0] is pinned to [FsImgDisk.fsimg_D0 cov] -- the image's own home
+       blocks, since a clean log replays nothing;
+     [cov] STAYS PARAMETRIC.  The coverage set is the client's choice and
+       nothing about the image constrains it.
+
+   What the image MEANS as a file system -- that [FsImg.fsimg_wf] holds of
+   it, and that /init /sh /echo /sync hold exactly the tracked ELF raws the
+   U-mode proofs reason about -- is [iris/FsImgCheck.v], and is deliberately
+   NOT on this file's cone. *)
+Corollary xv6_fs_adequacy_xv6Σ (g : gstate) (cov : gset Z)
     (Hgen0 : g.(ggen) = 0%nat) (Hpow : g.(gpow) = false)
-    (Hrec : fs_recovery (fs_blocks (v_disk (g.(gdev).(dvirtio)))) D0
-              cov logstart) :
+    (Hdisk : v_disk (g.(gdev).(dvirtio)) = FsImgDisk.fsimg_dk) :
   forall t2 g2 e2,
     rtc erased_step ([PowerLoopE : expr riscv_lang], g) (t2, g2) ->
     e2 ∈ t2 ->
     reducible (Λ := riscv_lang) e2 g2.
-Proof. apply (xv6_fs_adequacy xv6Σ g cov logstart D0 Hgen0 Hpow Hrec). Qed.
+Proof.
+  apply (xv6_fs_adequacy xv6Σ g cov 2 (FsImgDisk.fsimg_D0 cov) Hgen0 Hpow).
+  (* [fsimg_P] IS [fs_blocks fsimg_dk], so once the disk is rewritten to the
+     image the recovery fact is literally [fsimg_recovery]'s. *)
+  rewrite Hdisk. exact (FsImgDisk.fsimg_recovery cov).
+Qed.

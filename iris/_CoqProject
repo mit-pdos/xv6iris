@@ -624,6 +624,9 @@ PStringBytes.v
 ElfFile.v
 ElfKernel.v
 ElfUser.v
+FsImg.v
+FsImgDisk.v
+FsImgCheck.v
 PathElems.v
 CodeWriteHead.v
 CodeInstallTrans.v

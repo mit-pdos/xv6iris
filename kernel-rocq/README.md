@@ -68,6 +68,27 @@ ELF64 semantics in `iris/ElfFile.v`) converts it to `list (bv 8)` and proves, by
 `vm_compute`, that `KernelInstrs.v`'s and `KernelData.v`'s dumps are exactly what
 this raw ELF file defines.
 
+### `FsImgRaw.v` — the whole filesystem image, byte for byte (`--format rocq-bin`)
+```coq
+Definition fsimg_hex : PrimString.string := List.fold_left PrimString.cat [ fsimg_hex_chunk0; ... ] ""%pstring.
+Definition fsimg_size : Z := 2048000%Z.
+```
+xv6's `fs.img`: the literal initial disk image `mkfs` built, packing the
+(deterministic, `-ffile-prefix-map`) user binaries, hex-encoded as one Rocq 9
+primitive string exactly like `KernelElfRaw.v` above. Unlike every other
+generated file here, `fs.img` is not an ELF, so `--format rocq-bin` does no
+ELF parsing (no magic check, no section/instruction reasoning) and the
+dumper skips disassembly for it entirely (objdump has nothing to disassemble
+in a disk image, and may not even be installed). Its only check is the same
+build-directory guard as `rocq-raw`. 2,048,000 bytes -> 4,096,000 lowercase
+hex chars, chunked at 8192 hex chars/chunk (**500** chunks, evenly divisible
+-- no partial chunk) and joined with `List.fold_left PrimString.cat`, same as
+`KernelElfRaw.v`. `iris/FsImgCheck.v` proves this image well-formed and that
+`/init /sh /echo /sync` hold exactly the tracked `*ElfRaw` binaries
+(`user-rocq/*ElfRaw.v`). `coqc -R . Kernel FsImgRaw.v` takes well under a
+second (PrimString literals are compact/O(1)-indexed, unlike a `gmap`-backed
+dump of the same size).
+
 ## The full initial memory (code + data + BSS)
 
 - **Loaded bytes** = `kernel_instrs` (code) ∪ `kernel_data` (data) — together the

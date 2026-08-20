@@ -75,6 +75,11 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   vehicle for whole binaries, the kernel-dump consistency theorem
   (`ElfKernel.v`), the measured vm_compute rules (`List.rev` is quadratic),
   and the exec() connection plan.
+- **[`fs-img.md`](design/fs-img.md)** — the mkfs disk image in Rocq: the pure
+  on-disk FS semantics (`FsImg.v`), the literal image import, the `fsimg_wf`
+  durable-state check, the /init-/sh-/echo-/sync-are-the-tracked-raws
+  theorems, the adequacy discharge (nothing about the FS is assumed any
+  more), and the measured 2 MB vm_compute traps.
 - **[`kernel-proofs.md`](design/kernel-proofs.md)** — kernel-side proof
   architecture: swtch/contexts, proc locks/wakeup, loop shapes, whole-function
   WP specs, spinlocks, kernel data-structure layout.
