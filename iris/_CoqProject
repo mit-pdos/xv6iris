@@ -280,8 +280,8 @@ USpecInit.v
 # UProofInitLib.v
 # UProofInitPrintf.v
 # UProofInit.v
-# UProofEchoA.v
-# UProofEcho.v
+UProofEchoA.v
+UProofEcho.v
 # --- END descoped tier ---
 UserMemArms.v
 UserClassify.v
