@@ -116,7 +116,36 @@ are renamed **R0.5–R6** as of 2026-08-19; sRVWMO items are **A1–A5** here
 - **A4 — tier-1 capstone**: adequacy ∘ T1; `Print Assumptions` audit
   (platform axioms + no-icache + funext + WP package; NO
   `main_premises`).
-- **A5 — litmus verdicts against the DEFINITION** (not just the machine).
+- **A5 — DONE (2026-08-20): `iris/WeakSrvwmoLitmus.v`** — the litmus
+  suite against `srvwmo_consistent` ITSELF (design S5; corollary (b)'s
+  evidence artifact).  Nine verdicts, all 17 theorems
+  `Print Assumptions`-closed.  POSITIVES (SB 0/0; MP-no-fence;
+  MP-writer-fence-only; AMO reads-latest) are concrete consistent
+  candidates discharged AXIOM-BY-AXIOM via `cand_plain_ok` — the kit
+  that reduces `cand_axiomatic_ok` to `ax_atomicity` for a candidate
+  with no sr-covering fence / no acq-po edge / no release / no same-byte
+  po — NOT via machine reachability, so each is a verdict about the
+  definition, with the machine run a corollary through `srvwmo_run`
+  (T1).  NEGATIVES (LB; MP-both-fences and MP-acquire via `ax_ord`;
+  MP-reader-fence-only via `ax_ord` + rule 14; CoRR via `ax_coherence`)
+  quantify over EVERY conformant candidate on `img0`, machine
+  corollaries via `srvwmo_of_wf`.  The file's §9 table records the TWO
+  deliberate RVWMO divergences, both rule 14's: (1) LB — forbidden by
+  the LOAD-VALUE axiom alone (`lb_values_forbidden` consults no
+  ordering axiom; no-thin-air is definitional in the candidate
+  presentation), and (2) MP-reader-fence-only — rule 14 makes the
+  writer's fence redundant where RVWMO allows the stale read.  So
+  corollary (b)'s slogan ("LB unobservable, everything else matches
+  riscv.cat") needs the recorded caveat: rule 14 narrows the class by
+  MORE than LB.  §3's acyclicity generalizations (RMW admitted, the
+  rule-14 `ppo_op` arm admitted; `ets_lt_wr` factored) cost ~70 lines,
+  as priced against WeakAxiomatic3 §15(1)'s ~150.  §8 keeps the
+  not-done ledger with prices: IRIW (~150 ln, needs write-order
+  totality — free in trace order — plus two opposed `ax_ord`
+  instances), SB-fenced both directions (its `rw,rw` fences have
+  `sr = true`, so `cand_plain_ok` does not apply), the atomicity
+  negative (~50 ln), and the split-exclusive shapes (R-track's, not
+  this alphabet's — the model keeps exclusives fused).
 - **S6 (tier-2 gate, unchanged)**: the two-hart L2′ paper exercise —
   before any further D8 porting (D8-1 predates the gate; it stands,
   parked).

@@ -899,6 +899,7 @@ WeakSailCone.v
 WeakAxiomatic.v
 WeakAxiomatic2.v
 WeakAxiomatic3.v
+WeakSrvwmoLitmus.v
 WeakAxRealize.v
 WeakInterp.v
 WeakInterpProj.v
