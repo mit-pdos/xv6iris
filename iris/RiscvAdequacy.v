@@ -837,22 +837,12 @@ Proof. rewrite elem_of_set_seq. lia. Qed.
 Section power.
   Context {Σ : gFunctors}.
   Context `{!riscvFixedGS Σ}.
-  (* [!sieG Σ] AND NOT [!xv6G Σ], DELIBERATELY -- the one place in the tree
-     that must NOT take the bundle.  [mono_natG] has FIVE providers
-     ([DiskPtsto.disk_nc_inG], [CrashProto]'s two, [riscv_pre_genGS],
-     [riscvF_genGS]), and this section's [γs] is the per-hart GENERATION
-     one-shot minted by [mono_nat_alloc_halves_cpus] at [riscvFixedGS]'s
-     instance.  Binding [xv6G] here brings [diskGhostG]'s [mono_natG] into
-     scope as well, and then [mono_nat_auth_own (γs c)] in the goal is a
-     DIFFERENT TERM from the one in the context while printing
-     character-for-character the same -- [iFrame: cannot frame], with
-     nothing in the message naming the cause.  Reordering the binders does
-     not help; the allocation lemma fixes the instance, not the section.
-     This section only ever needed [sieG], so it takes [sieG].
-     THE REAL FIX is to give [mono_natG] a single owner, the way [fileG]
-     and [riscvGpreS] were given one; until then this exception stands and
-     [Xv6G.v]'s header records it. *)
-  Context `{!sieG Σ}.
+  (* [xv6G], and it is safe again.  This section used to bind [!sieG Σ]
+     deliberately, because the bundle reached [mono_natG] through
+     [diskGhostG] and shadowed [riscvFixedGS]'s generation counter.
+     [diskGhostG] no longer owns one, so there is a single path and the
+     carve-out is retired. *)
+  Context `{!xv6G Σ}.
 
   (* What a PowerOn hands the boot client, for era [HE] at generation
      [gen] over the reset state [g']: RAW, ERA-EXPLICIT ghost forms -- the

@@ -41,6 +41,7 @@ Require Import VirtioModel.
 Require Import VirtioQueue.
 Require Import DiskImg.
 Require Import PermInv.
+Require Import RiscvPtsto.  (* [riscvFixedGS]: the sole owner of [mono_natG], and it carries [diskImgG] *)
 
 Local Open Scope Z_scope.
 
@@ -85,7 +86,13 @@ Record dclaim := DClaim {
 Class diskGhostG (Σ : gFunctors) := DiskGhostG {
   (* a receipt records the slot AND the pin map deposited at publish *)
   disk_slot_inG :: ghost_mapG Σ nat (vslot * gmap Arch.pa (bv 8));
-  disk_nc_inG   :: mono_natG Σ;
+  (* [mono_natG] IS NOT A FIELD HERE any more.  It was, and [riscvFixedGS]
+     owns one too ([riscvF_genGS], the generation counter) -- so any scope
+     holding [riscvGS] and this class had TWO paths to one [inG], and
+     [mono_nat_auth_own γ] built at one would not frame against the other
+     while printing identically.  That is what made [RiscvAdequacy]'s
+     [Section power] unprovable once it took the bundle.  [riscvFixedGS] is
+     the sole owner now; this file binds it below. *)
   disk_np_inG   :: ghost_varG Σ nat;
   (* the publisher's private claim map: dom = the positions whose state is
      still live in disk_res (in flight or parked); the fragment is how a
@@ -137,7 +144,11 @@ Record disk_names := DiskNames {
    [disk_names]-keyed forms below are those, verbatim, at [dn_img γ]. *)
 
 Section DiskPtsto.
-  Context `{!diskGhostG Σ, !diskImgG Σ}.
+  (* [riscvFixedGS] rather than [!diskImgG Σ]: it CARRIES [diskImgG]
+     ([riscvF_diskGS]), so naming both would be the same double path this
+     file just removed for [mono_natG].  It also supplies the [mono_natG]
+     the disk's [nc] counter needs. *)
+  Context `{!diskGhostG Σ, !riscvFixedGS Σ}.
 
   (* -- the frozen live configuration ------------------------------------ *)
 

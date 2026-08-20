@@ -707,14 +707,18 @@ carried capacity belonging to the one bundle:
 - `RiscvAdequacy.riscvGpreS` carried `uartGhostG`/`diskGhostG`.  Removed;
   `riscvΣ` still supplies the functors, so `subG_riscvGpreS` is unchanged in
   strength -- only who NAMES them moved.
-- **`mono_natG` has FIVE owners** (`DiskPtsto.disk_nc_inG`, `CrashProto`'s
-  two, `riscv_pre_genGS`, `riscvF_genGS`) and is NOT fixed.  It forced the
-  tree's one carve-out: `RiscvAdequacy`'s `Section power` deliberately binds
-  `!sieG Σ` rather than `xv6G`, because `xv6G` drags in `diskGhostG`'s
-  `mono_natG` and shadows the generation counter.  **Reordering the binders
-  does not help** -- the allocation lemma fixes the instance at ITS
-  statement, not at the consuming section.  Giving `mono_natG` one owner is
-  the next increment.
+- **`mono_natG` had five owners** and is now fixed, but not by bundling.
+  `riscvFixedGS` keeps it (`riscvF_genGS`): the generation counter is
+  machine-model state, consumed by the fetch/execute engine far below any
+  kernel bundle, so moving it to `xv6G` would have cost 27 deep files a new
+  binder. **The fix is to remove it only from the owner that actually SHARES
+  A SCOPE with the keeper** -- `diskGhostG`, since `riscvGS` and the bundle
+  co-occur constantly. `riscv_pre_genGS` (a `pre` class allocating it before
+  `riscvGS` exists) and `CrashProto`'s two (bound only inside an orphan
+  module) stay, because neither can collide.
+  **THE RULE: the hazard is two providers IN ONE SCOPE, not two in the
+  tree.** Count co-occurrences before evicting a field; the cheap fix is
+  usually one removal, not a migration.
 
 **Four ways a binder sweep breaks that the build reports as something else:**
 

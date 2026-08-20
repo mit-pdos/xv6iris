@@ -39,6 +39,7 @@ Require Import WpUmodeStep WpUmodeLeaf WpUmodeBranch WpUmodeStore WpUmodeLoad.
 Require Import UmodeFrame.
 Require Import UCodeSh USpecSh.
 Require User.ShSyms User.ShInstrs User.ShData.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 Set Printing Depth 40.
@@ -105,7 +106,7 @@ Local Lemma ustr_find_nil (c : bv 8) : ustr_find [] c = None.
 Proof. reflexivity. Qed.
 
 Section UProofShLib.
-  Context `{!riscvGS Σ} `{!uioG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId}.
   Context (C : ucfg) (pt : uptd).
   Context (gin gbrk : gname) (hbase hlen : Z).
