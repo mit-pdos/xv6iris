@@ -93,6 +93,7 @@ Require Import CodeSysOpen.
 Require Import SpecSysOpen.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import IrefSlots.  (* [iref_frac] rides [file_core] -- FileInvDefs *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -600,7 +601,7 @@ Section ProofSysOpenPublish.
      [icfg] as field instances, and binding a second one gives two instances
      that print identically and never unify -- SpecCreate.v's banner records
      the same rule for the same reason. *)
-  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
 
   (* the 1/2 + 1/2 join at [↦₈], which the tree has at [↦₄]
      ([RiscvPtsto.word4_pointsto_half]) and nowhere else -- and which the
@@ -623,13 +624,23 @@ Section ProofSysOpenPublish.
      half of it, [FileInvDefs.file_fields]'s one asymmetry).  Cancelling the
      UNARMED off-cinv is what produces the other half, and there is nothing
      to refute because an unarmed body carries no disjunction: blocker 1's
-     whole answer, spent in one line. *)
+     whole answer, spent in one line.
+
+     AND IT HANDS BACK THE ENTRY'S OWN IREF UNIT.  An untyped slot's payload
+     IS one unit ([FileInvDefs.file_core_none]), and the reference filealloc
+     gave away carries the payload -- so opening the slot releases it.  It is
+     not a windfall: the caller is about to park an inode reference in
+     [f->ip], and once the type is FD_INODE the payload is [inode_pay], which
+     is where that reference lives.  The entry holds exactly one unit's worth
+     either way, which is what makes sys_open's whole allowance come back
+     ([SpecSysOpen]'s ledger) rather than leak one per successful open. *)
   Lemma so_open_slot (E : coPset) (gf : gname) (kf : nat) (Cf : fcontent) :
     ↑(offN .@ kf) ⊆ E ->
     fc_type Cf = FD_NONE ->
     file_ref gf kf 1 Cf ={E}=∗
     ∃ (pn : fpnames) (voff : mword 32),
       ⌜off_wf voff⌝ ∗
+      iref_slot ∗
       fref_tok gf kf 1 ∗ flive_tok gf kf ∗ fpay_tok gf kf 1 pn ∗
       a_ftype kf     ↦₄ fc_type Cf ∗
       a_freadable kf ↦ₘ fc_readable Cf ∗
@@ -647,9 +658,11 @@ Section ProofSysOpenPublish.
     iDestruct "Hflds" as "(Hty & Hrd & Hwr & Hpip & Hip1 & Hmaj)".
     iDestruct (word_pointsto_agree with "Hip2 Hip1") as %->.
     iDestruct (so_word_half_join with "Hip1 Hip2") as "Hip".
+    iEval (rewrite (file_core_none 1 pn Cf Ht)) in "Hcore".
+    iEval (rewrite -iref_slot_frac) in "Hcore".
     iModIntro. iExists pn, voff.
     iSplitR; [iPureIntro; exact Hwf |].
-    iFrame "Href Hlive Hnames Hty Hrd Hwr Hpip Hmaj Hip Hoffc".
+    iFrame "Hcore Href Hlive Hnames Hty Hrd Hwr Hpip Hmaj Hip Hoffc".
   Qed.
 
   Lemma so_publish (E : coPset) (gf : gname) (kf kk : nat) (qi s : Qp)

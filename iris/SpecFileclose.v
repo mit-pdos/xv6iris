@@ -659,6 +659,19 @@ Definition wp_fileclose_sconf_body
      the pipe arm does not need it, but making the row an [if] over a
      content the caller cannot see buys nothing. *)
   proc_priv_bare p pidv Vpr -∗
+  (* ONE IREF UNIT, BORROWED ACROSS THE CALL -- in here, out in the post, on
+     every arm.  It is what the LAST close deposits into the slot it frees:
+     [FileInvDefs.file_core] parks the entry's provisioned unit on the
+     untyped and pipe arms, so a free slot's payload holds one, and fileclose
+     frees the slot (f->type = FD_NONE) and RELEASES ftable.lock before it
+     switches on the type -- so on the FD_INODE arm the unit [iput] will make
+     does not exist yet.  Borrowing one from the caller is what makes the
+     deposit available at the moment the slot is freed.
+     It is repaid before returning, from [file_core]'s pipe arm or from
+     [iput]'s own give-back, so every caller is net zero and neither the type
+     nor whether this was the last close appears in the post.  A NON-last
+     close frees nothing and hands the same unit straight back. *)
+  iref_slot -∗
   fileclose_env fn on us n eb p Cf -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  The FD_INODE / FD_DEVICE
      arm parks (begin_op / iput / end_op), so fileclose can return on
@@ -679,6 +692,7 @@ Definition wp_fileclose_sconf_body
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     fd_slot -∗
+    iref_slot -∗
     fileclose_env_out fn on us Cf -∗
     proc_priv_bare p pidv Vpr -∗
     WP (Loop : expr riscv_lang)) -∗

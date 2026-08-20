@@ -1658,6 +1658,14 @@ Section ProofSysOpenTails.
   (*  earning it, and why the [c.ldsp s3] sits on THIS side of the       *)
   (*  fall-through.                                                     *)
   (* ================================================================== *)
+  (* the two units [so_tail_f] returns, joined at its exit *)
+  Local Lemma so_iref_two : iref_slot -∗ iref_slot -∗ iref_slots 2.
+  Proof.
+    rewrite /iref_slot. iIntros "H1 H2".
+    iApply (iref_slots_combine 1 1 with "H1 H2").
+  Qed.
+
+
   Lemma so_tail_f `{GEN : GenId} `{CID0 : CpuId}
       (gfl gf : gname)
       (gs : list gname) (jx : nat) (gl : gname)
@@ -1739,6 +1747,9 @@ Section ProofSysOpenTails.
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
     bslots bn 3 -∗
+    (* the unit fileclose borrows for the slot it frees, in and straight
+       back out -- see SpecFileclose's own note. *)
+    iref_slot -∗
     log_op g u -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
@@ -1764,7 +1775,11 @@ Section ProofSysOpenTails.
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
         bitmap_res gfs bmapstart cov logstart size used' -∗
         bslots bn 3 -∗
-        iref_slot -∗
+        (* TWO UNITS.  [iput] released the inode the walk was holding, and
+           fileclose repaid the one it borrowed -- see [SpecFileclose]'s
+           [iref_slot] row.  Returning both is what makes sys_open's D-FAIL
+           arm balance its allowance exactly. *)
+        iref_slots 2 -∗
         fd_slot -∗
         fileclose_env_out fn on us Cf -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -1777,7 +1792,7 @@ Section ProofSysOpenTails.
               #Hbio #Hlog Hseam Hgen
               #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd Hdep Hidev
               Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpid #Hprocs
-              #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24
+              #Hdev #Hgeo #Hdlk Hbsl Hiru Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24
               Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
     iPoseProof (soi_126 with "Htext") as "Hi0".
@@ -1836,8 +1851,8 @@ Section ProofSysOpenTails.
               M2 0%nat eb (proc_addr jx) (K - 24)%nat b lks
               pidv Vpr HKfc so_noff0 HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
-              with "Hcg Hown Htce Hcce Htext Hkd Hpc Hftab Hpenv Hfref Hpid Hfenv").
-    iIntros (CID3 Hq3 mfc) "Hcg Hown Htce Hcce Hpc %Hcsfc Hfd Hfout Hpid".
+              with "Hcg Hown Htce Hcce Htext Hkd Hpc Hftab Hpenv Hfref Hpid Hiru Hfenv").
+    iIntros (CID3 Hq3 mfc) "Hcg Hown Htce Hcce Hpc %Hcsfc Hfd Hiru Hfout Hpid".
     assert (Hpc2 : ret_pc (M2 !!! Regidx Rra : mword 64)
                    = mword_of_int (SO + 0x12c)) by (rewrite HM2ra; pcw).
     iEval (rewrite Hpc2) in "Hpc".
@@ -1895,12 +1910,13 @@ Section ProofSysOpenTails.
                     Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd Hdep Hidev
                     Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpid
                     Hprocs Hdev Hgeo Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
-                    HbP H23 H24 [Hfd Hfout Hcont]").
+                    HbP H23 H24 [Hfd Hfout Hiru Hcont]").
     iEval (rewrite /wp_next).
     iIntros (CIDz) "%Hqz". iIntros (mf used')
       "%Hcsf %Ha0f %Huse Hcg Hown Htce Hcce Hpc Hpid Hsbb Hsbi Hbmres Hbsl
        Hislot".
     iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
+    iDestruct (so_iref_two with "Hiru Hislot") as "Hislot".
     iApply ("Hcont" $! mf used' with "[%] [%] [%] Hcg Hown Htce Hcce Hpc Hpid
               Hsbb Hsbi Hbmres Hbsl Hislot Hfd Hfout").
     { exact Hcsf. }

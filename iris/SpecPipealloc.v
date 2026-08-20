@@ -201,6 +201,9 @@ Definition wp_pipealloc_sconf_body
   pf0 ↦₈[KT1] v0 -∗
   pf1 ↦₈[KT1] v1 -∗
   proc_priv_bare p pidv Vpr -∗
+  (* fileclose's loan, threaded to the two error-path closes -- see
+     SpecFileclose's own note. *)
+  iref_slot -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  pipealloc's error paths
      call fileclose, whose crossing is [true] on every arm, so pipealloc can
      return on another hart; the cost is the CALLER's, which must supply its
@@ -215,6 +218,7 @@ Definition wp_pipealloc_sconf_body
     ⌜ callee_saved m mr ⌝ -∗
     pipealloc_post γf γk on pf0 pf1 (mr !!! Regidx (mword_of_int 10 : mword 5)) -∗
     proc_priv_bare p pidv Vpr -∗
+    iref_slot -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

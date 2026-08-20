@@ -198,6 +198,23 @@ Proof.
   change (2 ^ 31)%Z with 2147483648%Z. exact Hr.
 Qed.
 
+(* ...and so is the LOWER half: [bv_signed] of a 32-bit word is an [int] on
+   both sides.  Together these two ARE the whole numeric content of "the user
+   wrote a word into the trapframe", which is why sys_read and sys_write can
+   hand file.c a count with no premise about it at all (31f115a). *)
+Lemma sys_rw_count_ge (v : mword 64) : - 2 ^ 31 <= sys_rw_count v.
+Proof.
+  rewrite /sys_rw_count.
+  pose proof (bv_signed_in_range 32 (trunc32 v) ltac:(discriminate)) as Hr.
+  assert (Hhm : bv_half_modulus 32 = 2147483648%Z) by (vm_compute; reflexivity).
+  rewrite Hhm in Hr. destruct Hr as [Hr _].
+  change (2 ^ 31)%Z with 2147483648%Z. exact Hr.
+Qed.
+
+(* the two halves, in the shape file.c's contracts ask for *)
+Lemma sys_rw_count_range (v : mword 64) : - 2 ^ 31 <= sys_rw_count v < 2 ^ 31.
+Proof. split; [apply sys_rw_count_ge | apply sys_rw_count_lt]. Qed.
+
 (* ...and the register the [lw] leaves it in is that literal *)
 Lemma sys_rw_count_reg (v : mword 64) :
   (sign_extend' 64 (trunc32 v) : mword 64) = mword_of_int (sys_rw_count v).
@@ -274,12 +291,11 @@ Definition wp_sys_read_sconf_body
   pv_tf V !! tf_arg_idx 0 = Some v ->
   (exists v1 : mword 64, pv_tf V !! tf_arg_idx 1 = Some v1) ->
   pv_tf V !! tf_arg_idx 2 = Some v2 ->
-  (* THE TWO INHERITED NUMERIC PREMISES.  See the header: both are about the
-     count the USER supplied, both are fileread's (hence readi's), and
-     neither can be discharged here because sys_read checks nothing.  The
-     upper half of the range is free ([sys_rw_count_lt]). *)
-  0 <= sys_rw_count v2 ->
-  Z.of_nat MAXFILE * Z.of_nat BSIZE + sys_rw_count v2 < 2 ^ 31 ->
+  (* NO NUMERIC PREMISE.  [SpecFileread] takes [-2^31 <= n < 2^31] and a
+     trapframe word satisfies that unconditionally ([sys_rw_count_range]),
+     so this contract asks its caller for NOTHING about the count -- which is
+     what a syscall contract has to do, the argument being whatever the user
+     put in a2.  See the header. *)
   (* PARKING PREMISE (hart-generic scheduler protocol): every fileread arm
      sleeps, so this syscall parks. *)
   eb = true ->
