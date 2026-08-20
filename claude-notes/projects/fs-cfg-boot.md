@@ -1080,5 +1080,11 @@ arithmetic, mn_grp_fs's walk offsets, first_addr) is against the OLD pin.
 Sequence: finish stage (f) on the current base → gate → merge on the EC2
 lane (xv6-riscv fetch + checkout 31f115a + make clean + re-dump +
 check-decode + fix_proof_imms as needed) → whole-tree gate + audit diff.
+Merge-round prerequisites, checked 2026-08-20: (1) the local xv6-riscv
+clone is at 36c21601 (NOT the old pin 4aab0eb8, and without 31f115a) and
+cannot fetch from this environment — **ASK THE USER to run
+`git -C xv6-riscv fetch`** before the round; (2) never run local dump
+rules while the clone is off-pin (`make xv6-rev-check` already warns);
+(3) check the EC2 lane's own xv6-riscv state before re-dumping there.
 Expect real 3-way content in SpecUserinit/ProofUserinit/ProofMain (upstream
 touched the dispatcher/iref side).
