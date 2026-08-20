@@ -28,7 +28,6 @@ Require Import SmodeCore.
 Require Import StackOwn CalleeSaved.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import IntrDefs HartTp WpNext.
-Require Import WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import FdSlots ProcInv.
 Require Import FileInvDefs.

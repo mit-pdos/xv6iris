@@ -50,7 +50,6 @@ Require Import KernelRvcDecode.
 Require Import VcGen.
 Require Import IntrDefs.
 Require Import CpuOwn.
-Require Import DiskPtsto.
 Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import BufOwn BcacheInv BioInv.

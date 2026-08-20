@@ -111,7 +111,6 @@ Require Import SmodeCore.
 Require Import CalleeSaved KernelText KernelDataInv.
 Require Import IntrDefs.
 Require Import WpNext.
-Require Import WpLock.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -122,7 +121,6 @@ Require Import WpUart.
 Require Import DiskPtsto.
 Require Import BioDefs.
 Require Import FsBlocks LogInv.
-Require Import FsCrash.
 Require Import BitmapInv.
 Require Import InodeInv.
 Require Import InodeRegion.
@@ -130,7 +128,6 @@ Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
-Require Import KallocInv.
 Require Import KvmSpec.
 Require Import FileInvDefs.
 Require Import UserPtTree.

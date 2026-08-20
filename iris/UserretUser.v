@@ -42,7 +42,6 @@ Require Import RegFile.
 Require Import MinstretInv InstrBytes WireInv.
 Require Import WpGpr.
 Require Import KernelText MstatusBits.
-Require Import SmodeCore.
 Require Import PtTree.
 Require Import UptTree UserretDefs.
 Require Import KptExecMap.

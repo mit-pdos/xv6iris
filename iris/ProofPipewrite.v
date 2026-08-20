@@ -70,7 +70,6 @@ Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSmodeIntr.
 Require Import WpLock ProcGeom CpuOwn KernelRvcDecode.
 Require Import IntrDefs.
 Require Import HartTp WpNext.
-Require Import KallocInv.
 Require Import KvmSpec.
 Require Import UserPtTree.
 Require Import ProcPtOwn.

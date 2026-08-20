@@ -81,7 +81,6 @@ Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
-Require Import KallocInv.
 Require Import FileInvDefs.
 Require Import ProcInv.
 Require Import SpecEndOp.

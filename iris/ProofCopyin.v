@@ -121,7 +121,6 @@ Require Import CalleeSaved StackOwn.
 Require Import IntrDefs WpSmodeIntr.
 Require Import HartTp WpNext.
 Require Import WpLock.
-Require Import KallocInv.
 Require Import ByteCursor ByteBuf UserBits.
 Require Import PtreeType.
 Require Import UserPtTree.

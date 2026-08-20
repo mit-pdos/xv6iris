@@ -51,7 +51,6 @@ Require Import CalleeSaved StackOwn.
 Require Import IntrDefs WpSmodeIntr.
 Require Import WpNext.
 Require Import WpLock.
-Require Import KallocInv.
 Require Import PtBuild.
 Require Import TrampPt KptExecMap.
 Require Import UptTree UserPtTree.

@@ -76,7 +76,6 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes.
 Require Import RiscvPtsto.
-Require Import DiskPtsto.
 Require Import FsBlocks.
 Require Import LogInv.
 Require Import FsCrash.     (* [BSIZE] *)

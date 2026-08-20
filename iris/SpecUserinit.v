@@ -87,13 +87,10 @@ Require Import LockRank.
    ghosts [panic_env] needs.  A bare [Require Import SpecPanic] does not put
    them in scope and backtick generalization then invents fresh binders. *)
 Require Import FileInvDefs.
-Require Import WpUart DiskPtsto.
 Require Import SpecPanic.
 Require Import FdSlots.
 Require Import SchedCtx.
 Require Import KallocInv KvmSpec.
-Require Import InodeInv.
-Require Import IcacheRef.
 Require Import ProcAvail.
 Require Import SpecAllocpid.
 (* the two callee contracts whose budgets this one is the sum of.  Neither

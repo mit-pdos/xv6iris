@@ -94,12 +94,10 @@ Require Import CpuOwn.
 Require Import ProcGeom.
 Require Import FdSlots.
 Require Import FileInvDefs.
-Require Import KallocInv.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import ProcInv.
-Require Import WpUart DiskPtsto FsBlocks LogInv.
-Require Import BioDefs.
+Require Import WpUart LogInv.
 Require Import DinodeEnc.
 Require Import InodeRegion.
 Require Import IrefSlots.
@@ -113,7 +111,7 @@ Require Import DinodeEnc.
 Require Import WpLock.
 Require Import SpecMyproc SpecIlock SpecStati SpecIunlock SpecCopyout.
 Require Import SpecFilestat.
-Require Import CodeFilestat ProofFilestatParts ProofBallocParts.
+Require Import CodeFilestat ProofFilestatParts.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)

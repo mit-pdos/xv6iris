@@ -178,7 +178,6 @@ Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
-Require Import KallocInv.
 Require Import UserPtTree.
 Require Import KvmSpec.
 Require Import ProcInv.

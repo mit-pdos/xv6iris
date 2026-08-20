@@ -83,7 +83,6 @@ Require Import WpNext.
 Require Import WpLock.
 Require Import CpuOwn.
 Require Import ByteBuf.
-Require Import KallocInv.
 Require Import KvmSpec.
 Require Import UserPtTree.
 Require Import ProcPtOwn.

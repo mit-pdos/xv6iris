@@ -28,7 +28,7 @@ From iris.base_logic.lib Require Import ghost_var.
 From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvLang RiscvPtsto SmodeCore.
+Require Import RiscvLang RiscvPtsto.
 Require Import RegFile.
 Require Import WpLock DiskPtsto WpUart.
 Require Import LinkConsputc LinkPrintint LinkAcquire LinkRelease ProofPrintk.

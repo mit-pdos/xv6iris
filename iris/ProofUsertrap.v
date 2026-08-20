@@ -79,11 +79,10 @@ Require Import ProcGeom.
 Require Import UserPtTree ProcPtOwn.
 Require Import KptTree.
 Require Import TrampPt.
-Require Import KallocInv.
-Require Import DiskPtsto WpUart FsBlocks LogInv FsCrash.
+Require Import DiskPtsto WpUart LogInv.
 Require Import BioDefs.
 Require Import SpecFileclose.
-Require Import IrefSlots InodeRegion.
+Require Import IrefSlots.
 Require Import FdSlots ProcInv.
 Require Import FileInvDefs.
 Require Import SchedCtx.

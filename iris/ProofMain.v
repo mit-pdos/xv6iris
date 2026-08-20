@@ -85,7 +85,6 @@ Require Import SpecKinit SpecKvminit SpecKvminithart SpecProcinit.
 Require Import SpecTrapinit SpecTrapinithart SpecPlicinit SpecPlicinithart.
 Require Import SpecAllocpid.
 (* [ROOTDEV] / [icfg_dev] / [icfg_nib], for the two config ties main threads *)
-Require Import InodeInv IcacheRef.
 Require Import SpecPanic.
 (* [K_allocproc] -- userinit's page premise is stated at allocproc's own
    strict bound, not at a round number *)

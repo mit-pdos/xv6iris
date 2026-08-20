@@ -29,7 +29,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvFetchExec.
 Require Import MinstretInv.
-Require Import SmodeCore KernelText.
+Require Import KernelText.
 Require Import WpIntrCore.
 Require Import IntrDefs.
 (* devintr_caps: the PERSISTENT device/proc credential kerneltrap's cone needs.
@@ -37,7 +37,7 @@ Require Import IntrDefs.
    [kernel_text] already are -- the handler contract is a [□], so everything it
    needs from its caller must be persistent, and everything it needs from the
    trap rides in the bundle. *)
-Require Import WpLock FdSlots IrefSlots ProcGeom DiskPtsto WpUart.
+Require Import FdSlots IrefSlots ProcGeom DiskPtsto WpUart.
 Require Import SpecDevintr.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.

@@ -13,7 +13,6 @@ From iris.program_logic Require Import language weakestpre.
 Require Import SailStdpp.Operators_mwords Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto RiscvExec HartSwp HartLift HartSpan
         HartRegNode RegFile WpGpr.
-Require Import ColdBoot.
 Local Open Scope Z_scope.
 
 (* collapse the closed [Z.eqb] tests of the model's rX/wX cascades *)
@@ -123,7 +122,7 @@ Proof. rewrite /mm_Drw /mm_Dro. set_solver. Qed.
 (* Machine, hart_state is ACTIVE, and htif_tohost_base is None.            *)
 (* ====================================================================== *)
 
-Require Import RiscvFetchExec WpMmodeLeafBase HartMFrame InstrBytes WpInstr KptPt.
+Require Import HartMFrame.
 
 Section swpbase.
   Context `{!riscvGS Σ}.

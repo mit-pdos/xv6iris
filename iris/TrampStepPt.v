@@ -48,17 +48,15 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras.
 Require Import MinstretInv InstrBytes.
-Require Import KMap.
 Require Import KptExecMap.
-Require Import SmodeCore SmodeCorePt KptTree UptTree PtFetchGen.
-Require Import PtTree PtAdBits PtTreeAdue KptGhost KptShare.
-Require Import KptPt UserBits SRegime KptGoodb.
-Require Import HartSwp HartLift HartSpan HartSpanChar HartSFrame.
-Require Import HartEvents HartRegNode HartMCycle HartStepAny HartRunGen.
-Require Import HartMFetch HartSTrans.
-Require Import WpDecodeBridge WpIntrCore CommonWalk HartGoodb.
-Require Import WpInstrRun WpSFrames.
-Require Import SmodePte WpSmodePtFetch.
+Require Import SmodeCore SmodeCorePt.
+Require Import KptShare.
+Require Import UserBits SRegime KptGoodb.
+Require Import HartSwp HartLift HartSpan HartSFrame.
+Require Import HartMCycle HartRunGen.
+Require Import CommonWalk.
+Require Import WpInstrRun.
+Require Import WpSmodePtFetch.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.

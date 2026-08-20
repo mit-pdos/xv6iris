@@ -64,7 +64,7 @@ Require Import BootCarve.  (* the boot-image carving library: the claims-bundle
 Require Import SmodeCore.  (* sieG: the [ghost_varG Σ (mword 1)] for the SIE/SPP/SPIE ghosts *)
 Require Import KptGhost.   (* kpt_unset / kpt_ghost_alloc: the shared kernel table's one-shot agreement *)
 Require Import WireInv.
-Require Import PlicPlan DiskPtsto VirtioProto WpUart.
+Require Import PlicPlan VirtioProto WpUart.
 Require Import PowerBoot.   (* the canonical reset machine + [boot_shape_boot_gstate] *)
 (* The [set_solver] override.  EXPORT, not Import: this import is         *)
 (* deliberately "dead" -- the file compiles without it, just far slower --  *)

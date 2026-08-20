@@ -49,7 +49,6 @@ Require Import PrintintArith.
 Require Import VcGen.
 Require Import ByteCursor.
 Require Import ByteBuf.
-Require Import WpLock.
 Require Import DiskPtsto.
 Require Import BufOwn.
 Require Import BufOwn BcacheInv BioInv.

@@ -45,7 +45,6 @@ From iris.algebra Require Import auth gmap frac excl.
 From iris.base_logic.lib Require Import invariants ghost_map.
 Require Import SailStdpp.Values.
 Require Import RiscvPtsto.
-Require Import DiskPtsto.
 Require Import FsBlocks.
 Require Import LogInv.
 Require Import DinodeEnc.

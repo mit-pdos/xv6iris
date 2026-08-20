@@ -53,16 +53,14 @@ Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import WpSmodeIntr.   (* [wp_cli_s_sconf] *)
 Require Import WpKvminithart.      (* [kvi_satp_word] and its three facts *)
 Require Import IntrDefs.
-Require Import WpLock.
 Require Import KptShare UserretDefs.
 Require Import UserPtTree.
 Require Import ProcGeom.
 Require Import ProcPtOwn.
 Require Import FdSlots FileInvDefs.
 Require Import ProcInv.
-Require Import DiskPtsto WpUart FsBlocks LogInv FsCrash KallocInv.
-Require Import BioDefs.
-Require Import IrefSlots InodeRegion ProcAvail.
+Require Import WpUart LogInv.
+Require Import IrefSlots ProcAvail.
 Require Import CodeForkret.
 Require Import SpecMyproc SpecRelease SpecPrepareReturn.
 Require Import SpecUserretClosed.

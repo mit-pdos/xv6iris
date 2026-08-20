@@ -57,9 +57,8 @@ Require Import KptExecMap.
 Require Import UserPtTree UserExec UserKernelBridge.
 Require Import IntrDefs.
 Require Import ProcGeom ProcInv.
-Require Import WpLock FdSlots FileInvDefs DiskPtsto WpUart.
-Require Import BioDefs.
-Require Import FsBlocks LogInv FsCrash KallocInv IrefSlots InodeRegion.
+Require Import FdSlots FileInvDefs.
+Require Import IrefSlots.
 Require Import ProcAvail.
 Require Import SpecUserret SpecUser SpecUservec SpecUserretClosed.
 Require Import UserretUser.

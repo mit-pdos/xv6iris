@@ -72,7 +72,6 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvPtsto RiscvExtras.
 Require Import ArrCursor.
 Require Export FdSlots.
-Require Import WpLock.
 Require Import PipeInvDefs.
 Require Import IcacheRef.
 (* for [T_DIR_z] alone -- [inode_pay]'s witness says "not a directory", and

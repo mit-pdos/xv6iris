@@ -39,9 +39,7 @@ Require Import SmodeCore.
 Require Import CalleeSaved KernelText KernelDataInv.
 Require Import IntrDefs.
 Require Import WpNext.
-Require Import WpLock.
 Require Import ProcGeom CpuOwn.
-Require Import WpLock.
 Require Import FdSlots.
 Require Import IrefSlots.
 Require Import ProcDefs.

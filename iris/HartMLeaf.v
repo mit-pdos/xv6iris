@@ -18,7 +18,7 @@ Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExec HartSwp HartLift HartRegNode
         HartSpan HartSpanChar HartRunGen HartEvents HartMCycle HartMDispatch HartMPmp
         HartMFetch HartMDecode HartMStore HartMRun HartPilot.
-Require Import RiscvTryStep RiscvExtras RiscvFetchExec HartLift2.
+Require Import RiscvExtras RiscvFetchExec HartLift2.
 Require Import SailStdpp.Base.
 Local Open Scope Z_scope.
 

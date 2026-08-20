@@ -44,7 +44,6 @@ Require Import IntrDefs.
 Require Import HartTp WpNext.
 Require Import WpLock.
 Require Import ProcGeom CpuOwn.
-Require Import KallocInv.
 Require Import PtBuild.
 Require Import UserPtTree.
 Require Import ProcPtOwn.

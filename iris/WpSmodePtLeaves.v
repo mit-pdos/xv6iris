@@ -38,13 +38,11 @@ From iris.base_logic.lib Require Import ghost_var invariants gen_heap.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
-Require Import WpLoad.
 Require Import WpGpr RegFile MinstretInv InstrBytes WpMmodeLeafBase WpMmodeSwpBase.
-Require Import SmodePte.
 Require Import SmodeCore WpSmodeGpr.
 Require Import UserBits.
 Require Import SmodeCorePt SRegime WpSmodePtFetch.
-Require Import HartLift HartSpan HartSpanChar HartSwp HartSFrame HartSMem WpSmodePtEngine.
+Require Import HartLift HartSpan HartSwp HartSMem WpSmodePtEngine.
 Require Import KptShare KptGoodb.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import MemAccessGen.

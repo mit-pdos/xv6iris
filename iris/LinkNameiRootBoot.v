@@ -28,7 +28,7 @@ From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvLang RiscvPtsto SmodeCore.
+Require Import RiscvLang RiscvPtsto.
 Require Import RegFile.
 (* the classes the binder list generalizes over: [Require Import
    SpecNameiRootBoot] does not put them in scope transitively, and backtick

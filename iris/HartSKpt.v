@@ -42,7 +42,7 @@ Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvExtras
 Require Import SmodePte PtAdBits Pt4kWalk PtTree PtTreeAdue KptPt KMap KptTree.
 Require Import KptGoodb.
 Require Import KptGhost KptShare.
-Require Import HartSwp HartLift HartRegNode HartSpan HartGoodb HartEvents HartMStore.
+Require Import HartSwp HartLift HartSpan HartMStore.
 Require Import WpDecodeBridge.
 Require Import CommonWalk HartSTrans.
 Local Open Scope Z_scope.

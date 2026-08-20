@@ -109,7 +109,6 @@ Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheEscrow.
-Require Import KallocInv.
 Require Import FileInvDefs.
 Require Import ProcInv.
 Require Import SpecArgstr.

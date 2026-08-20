@@ -474,10 +474,8 @@ Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import StackOwn.
 Require Import BufOwn.
-Require Import WpLock.
 Require Import FdSlots.
 Require Import WpUart.
-Require Import DiskPtsto.
 Require Import BufOwn.
 Require Import BioInv.
 Require Import LogInv.

@@ -79,7 +79,6 @@ Require Import CalleeSaved.
 Require Import IntrDefs WpNext.
 Require Import WpLock.
 Require Import CpuOwn.
-Require Import KallocInv.
 Require Import KvmSpec.
 Require Import ByteBuf.
 Require Import UserPtTree.

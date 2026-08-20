@@ -59,11 +59,9 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvPtsto RiscvLang RiscvExtras.
 Require Import SmodeCore.
 Require Import InstrBytes KernelText.
-Require Import WpLock.
 Require Import RegFile WpNext.
 Require Import CalleeSaved.
 Require Import IntrDefs.
-Require Import KallocInv.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 From Kernel Require KernelSyms.

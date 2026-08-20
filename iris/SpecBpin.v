@@ -37,7 +37,6 @@ Require Import CalleeSaved.
 Require Import WpLock.
 Require Import IntrDefs.
 Require Import CpuOwn.
-Require Import DiskPtsto.
 Require Import BcacheInv BioInv.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)

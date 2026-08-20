@@ -110,7 +110,6 @@ Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types.
 Require Import RiscvPtsto.
 Require Import RiscvModelBytes.
-Require Import DiskPtsto.
 Require Import FsBlocks.
 Require Import BlockWords.
 Require Import DinodeEnc.

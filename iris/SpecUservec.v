@@ -104,16 +104,9 @@ Require Import ProcInv ProcPtOwn.   (* [proc_pt] / [ud_pas] / [ud_norm] -- the a
    [gFunctors -> Type] -- the same one-`Require`-isn't-enough trap as
    everywhere else in this project) if their defining modules are directly
    imported here too, not just transitively pulled in via SpecUsertrap. *)
-Require Import WpLock.
 Require Import FdSlots.
 Require Import FileInvDefs.
-Require Import BioDefs.
-Require Import DiskPtsto.
-Require Import WpUart.
-Require Import FsBlocks LogInv.
-Require Import FsCrash.
-Require Import KallocInv.
-Require Import IrefSlots InodeRegion.
+Require Import IrefSlots.
 Require Import SpecUsertrap.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.

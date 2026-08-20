@@ -36,12 +36,12 @@ From iris.proofmode Require Import proofmode.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
-Require Import WpGpr RegFile UserBits.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
+Require Import UserBits.
 Require Import HartLift HartSpan HartGoodb HartMemRun PtBytes.
-Require Import PtreeType PtTree SmodePte UptTree.
+Require Import PtreeType PtTree.
 Require Import UserFrame UserBytes.
-Require Import UserPtTree UserExec UserStep UserCompute UserClassify UserClassifyAsm.
+Require Import UserPtTree UserExec UserStep UserClassify UserClassifyAsm.
 Require Import WpDecodeBridge DecodeTotalU DecodeSetU UserExecFacts UserCsr WpMmodeLeafBase.
 Require Import WpDecode.
 Local Open Scope Z_scope.

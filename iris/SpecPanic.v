@@ -78,7 +78,6 @@ Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
 Require Import KernelText KernelDataInv.
 Require Import RegFile.
-Require Import SmodeCore.
 Require Import DiskPtsto WpUart.
 Require Import IntrDefs.
 Require Import WpLock.

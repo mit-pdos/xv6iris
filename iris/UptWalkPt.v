@@ -25,10 +25,10 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras.
 Require Import MinstretInv InstrBytes.
 Require Import SmodeCore SmodePte.
-Require Import PtreeType PtTree PtBytes PtBuild KptTree UptTree UserPtTree TrampPt.
+Require Import PtreeType PtTree PtBytes KptTree UptTree TrampPt.
 Require Import CommonWalk Pt4kWalk KptPt PtAdBits PtTreeAdue SRegime.
 Require Import UserBytes UserFetchCert PtWalkCert UserClassifyAsm.
-Require Import HartSwp HartLift HartSpan HartSpanChar HartSFrame HartMemRun.
+Require Import HartSwp HartLift HartSpan HartSFrame HartMemRun.
 Require Import WpDecodeBridge KptGoodb.
 Require Import SmodeCorePt TrampStepPt WpSmodePtEngine.
 Require Import Riscv.rv64d_types Riscv.rv64d.

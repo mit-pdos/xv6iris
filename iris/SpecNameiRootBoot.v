@@ -102,7 +102,6 @@ Require Import SpecPanic.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import DirentEnc.
 Require Import PathElems.
-Require Import InodeInv.
 Require Import IrefSlots.
 Require Import IcacheRef.
 From Kernel Require KernelSyms.

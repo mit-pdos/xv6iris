@@ -197,7 +197,6 @@ Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
-Require Import KallocInv.
 Require Import KvmSpec.
 Require Import FileInv.               (* [is_ftable], [fnode] *)
 Require Import UserPtTree.

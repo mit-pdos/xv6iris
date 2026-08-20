@@ -39,7 +39,6 @@ From iris.base_logic.lib Require Import gen_heap ghost_map.
 From iris.program_logic Require Import language weakestpre.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExec HartSwp HartLift HartRegNode
         HartSpan HartSpanChar HartPilot.
 Local Open Scope Z_scope.

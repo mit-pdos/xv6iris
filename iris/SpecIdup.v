@@ -172,7 +172,6 @@ Require Import CalleeSaved.
 Require Import WpLock.
 Require Import IntrDefs.
 Require Import CpuOwn.
-Require Import DiskPtsto.
 Require Import FsBlocks.
 Require Import InodeRegion.
 Require Import IrefSlots.

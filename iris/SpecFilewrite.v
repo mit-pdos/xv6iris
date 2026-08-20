@@ -155,7 +155,6 @@ Require Import IcacheEscrow.
 Require Import IcacheBoot.   (* [ic_sleeplocks]: the canonical entry-sleeplock
                                 family, taken because this contract cannot know
                                 WHICH entry its descriptor points at. *)
-Require Import KallocInv.
 Require Import UserPtTree.
 Require Import KvmSpec.
 Require Import ProcPtOwn.

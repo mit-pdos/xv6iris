@@ -39,7 +39,6 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvModelBytes.
 Require Import RegFile.
 Require Import WpNext.
-Require Import SmodeCore.
 Require Import CalleeSaved.
 Require Import InstrBytes.
 Require Import KernelText.
@@ -50,7 +49,6 @@ Require Import ProcGeom.
 Require Import UserPtTree.
 Require Import FdSlots.
 Require Import FileInvDefs.
-Require Import WpLock.
 Require Import ProcInv.
 Require Import KptTree TrampPt.
 Require Import ProofKforkParts.

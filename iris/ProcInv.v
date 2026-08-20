@@ -49,7 +49,6 @@ Require Import ProcGeom.
 Require Import UserPtTree ProcPtOwn.
 Require Import Pt4kWalk CommonWalk PtTree KptPt TrampPt KMap.
 Require Import SwtchCtx.
-Require Import WpLock.
 Require Import FdSlots FileInvDefs.
 Require Export ProcDefs.
 (* [Typeclasses Opaque] is compilation-local: repeat the declaration here so

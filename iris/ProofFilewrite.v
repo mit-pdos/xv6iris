@@ -806,7 +806,6 @@ Require Import WpSmodeIntr WpSmodeHalf.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import UserPtTree.
-Require Import KallocInv.
 Require Import SchedCtx.
 Require Import WpLock.
 Require Import SpecPanic.
@@ -820,7 +819,7 @@ Require Import FileInvDefs.
    the body fails with "Could not find an instance for ?diskGhostG0" and
    three more, none of which names the missing file.  Same tell as the
    [lockG]/[lockG0] one in [fw_writei_src]'s comment, one tier up. *)
-Require Import WpUart DiskPtsto BioInv FsBlocks LogInv FsCrash.
+Require Import WpUart BioInv FsBlocks LogInv FsCrash.
 Require Import UartTxInv.
 Require Import DinodeEnc InodeInv InodeLock.
 Require Import InodeRegion.

@@ -40,7 +40,6 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import WpGprCsrwCommon WpGprCsrwA.
 Require Import StackOwn CalleeSaved KernelText.
-Require Import WpLock.
 Require Import FdSlots.
 Require Import CpuOwn.
 Require Import IntrDefs.

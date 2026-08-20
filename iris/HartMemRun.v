@@ -704,7 +704,7 @@ Qed.
 (* "map after m", which is the map the walker lands on                      *)
 (* ([hmrun_of_exec_after]).                                                 *)
 (* ====================================================================== *)
-Require Import RiscvTryStep WpDecodeBridge HartGoodb.
+Require Import RiscvTryStep WpDecodeBridge.
 
 (* ---------------------------------------------------------------------- *)
 (* ONLY [dom mm] IS EVER CONSULTED (the header's claim, as a lemma): the     *)

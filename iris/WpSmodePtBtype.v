@@ -13,8 +13,8 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
 Require Import MinstretInv InstrBytes ExecCommon WpGpr RegFile.
 Require Import SRegime.
 Require Import SmodeCore.
-Require Import SmodeCorePt WpSmodePtFetch.
-Require Import HartSwp HartSFrame WpSmodePtEngine.
+Require Import WpSmodePtFetch.
+Require Import HartSwp WpSmodePtEngine.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 

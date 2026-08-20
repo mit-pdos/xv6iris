@@ -62,11 +62,9 @@ Require Import KernelText.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import SleepLock.
-Require Import WpLock.
 Require Import FdSlots.
 Require Export SwtchCtx.
 Require Import WpUart.
-Require Import FsCrash.
 Require Import InodeRegion.
 Require Import FsTree.
 Require Import IcacheEscrow.

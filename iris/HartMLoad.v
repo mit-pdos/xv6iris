@@ -37,7 +37,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExec HartSwp HartLift HartRegNode
         HartSpan HartSpanChar HartEvents HartMPmp HartMFetch HartMFrame.
-Require Import RiscvTryStep RiscvExtras RiscvFetchExec.
+Require Import RiscvExtras RiscvFetchExec.
 Require Import RegFile WpGpr.
 Local Open Scope Z_scope.
 

@@ -45,7 +45,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvFetchExec.
 Require Import InstrBytes WpGpr RegFile.
 Require Import MstatusBits WpIntrCore.
-Require Import MinstretInv UserFrame.
+Require Import UserFrame.
 Require Import UptTree UserPtTree UserExec.
 Local Open Scope Z_scope.
 Import Defs.

@@ -157,7 +157,6 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvPtsto RiscvExtras.
 Require Import WpLock.
-Require Import DiskPtsto.
 Require Import FsBlocks.
 Require Import DinodeEnc.
 Require Import DirView.

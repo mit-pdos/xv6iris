@@ -74,7 +74,7 @@ Require Import SailStdpp.Base SailStdpp.Values SailStdpp.MachineWord
         SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RegFile RiscvPtsto RiscvExec.
-Require Import HartSwp HartLift HartSpan.
+Require Import HartLift HartSpan.
 Require Import WpGpr MinstretInv InstrBytes.
 Local Open Scope Z_scope.
 

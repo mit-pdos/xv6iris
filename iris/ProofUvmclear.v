@@ -42,12 +42,11 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvPtsto RiscvLang RiscvExtras.
 Require Import SmodeCore.
 Require Import WpMmodeLeafBase.
-Require Import WpLock.
 Require Import RegFile.
 Require Import HartTp WpNext IntrDefs.
 Require Import CalleeSaved StackOwn.
 Require Import WpSmodeIntr.
-Require Import KallocInv PageGeom.
+Require Import PageGeom.
 Require Import PtAdBits.
 Require Import CommonWalk PtTree Pt4kWalk PtBuild KptTree.
 Require Import UptTree UserPtTree.

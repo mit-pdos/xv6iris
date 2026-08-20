@@ -46,20 +46,16 @@ Require Import WpLock.
 Require Import FdSlots.
 Require Export SwtchCtx.
 Require Import WpUart.
-Require Import FsCrash.
-Require Import InodeRegion.
 Require Import ByteBuf.
 Require Import W32Arith.
 Require Import PageGeom.
 Require Import ProcGeom.
 Require Import ProcInv.
-Require Import DiskPtsto.
 Require Import BioDefs.
 Require Import FsBlocks LogInv.
 Require Import BitmapInv.
 Require Import InodeInv.
 Require Import IrefSlots.
-Require Import KallocInv.
 Require Import KvmSpec.
 Require Import FileInvDefs.
 Require Import IrefSlots.

@@ -39,7 +39,6 @@ From iris.program_logic Require Import language weakestpre.
 Require Import SailStdpp.Operators_mwords Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto RiscvExec HartSwp HartLift HartSpan
         HartSpanChar HartRunGen HartRegNode HartMCycle RegFile WpGpr.
-Require Import ColdBoot.
 Require Import RiscvExtras RiscvFetchExec WpMmodeLeafBase HartMFrame
         ExecCommon HartMRun HartGoodb WpDecodeBridge.
 Local Open Scope Z_scope.

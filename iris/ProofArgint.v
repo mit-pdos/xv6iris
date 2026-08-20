@@ -28,7 +28,6 @@ Require Import HartTp WpNext.
 Require Import CpuOwn.
 Require Import StackOwn CalleeSaved.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl.
-Require Import WpLock.
 Require Import FdSlots.
 Require Import FileInvDefs.
 Require Import SpecArgraw.

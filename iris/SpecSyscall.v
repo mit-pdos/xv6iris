@@ -112,7 +112,6 @@ Require Import RegFile WpNext.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText KernelDataInv.
 Require Import IntrDefs.
-Require Import WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import WpMmodeLeafBase.  (* [csp_rs1] *)
 Require Import ProcDefs.  (* [kstack_closer] -- the exit slot's right conjunct *)
@@ -132,12 +131,6 @@ Require Import SpecFileclose. (* [fclose_names], [fileclose_bm] -- the five
    invents fresh binders with those names (durable-notes.md's typeclass-sweep
    trap: the tell is [UNDEFINED EVARS]/"unresolved implicit arguments"
    naming exactly these). *)
-Require Import KallocInv.
-Require Import DiskPtsto.
-Require Import WpUart.
-Require Import FsBlocks LogInv.
-Require Import FsCrash.
-Require Import InodeRegion.
 Require Import SpecSysExec.   (* [K_sys_exec]: the deepest entry in the table *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

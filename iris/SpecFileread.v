@@ -174,7 +174,6 @@ Require Import IcacheBoot.   (* [ic_sleeplocks]: the canonical entry-sleeplock
                                 family -- a contract that cannot know WHICH
                                 entry its descriptor points at takes the
                                 family, exactly as SpecFilestat does. *)
-Require Import KallocInv.
 Require Import UserPtTree.
 Require Import KvmSpec.
 Require Import ProcPtOwn.

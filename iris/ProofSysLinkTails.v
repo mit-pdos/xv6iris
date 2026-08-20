@@ -79,7 +79,6 @@ Require Import IcacheInv.
 Require Import FsTree.
 Require Import IcacheEscrow.
 Require Import IcacheBoot.
-Require Import KallocInv.
 Require Import FileInvDefs.
 Require Import ProcInv.
 Require Import IregLinkNz.

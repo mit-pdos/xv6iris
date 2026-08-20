@@ -65,7 +65,7 @@ Require Export PageGeom.   (* [page_valid] / [page_base]: a node page is a kallo
 Require Import SmodePte.
 (* the [swp] layer's footprint vocabulary: [hval] and the [goodb] bridge.
    Both sit BELOW this file, so the splice below adds no cycle. *)
-Require Import HartSpan HartSpanChar WpDecodeBridge HartGoodb.
+Require Import HartSpan WpDecodeBridge HartGoodb.
 Require Import PtAdBits.
 Require Import Pt4kWalk.
 Require Import WpDecodeBridge.

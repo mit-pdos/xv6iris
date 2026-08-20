@@ -28,7 +28,6 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvFetchExec.
 Require Import RegFile.
-Require Import WpMmodeShiftiop.
 Require Import WpMmodeLeafBase WpMmodeSwpBase.
 Require Import SmodeCore.
 Require Import TrampPt UptTree.
@@ -43,16 +42,11 @@ Require Import WpNext.
    own note on the same trap (must Require directly, not just
    transitively, or unqualified names below auto-generalize as fresh,
    unrelated variables instead of resolving to the concrete classes). *)
-Require Import WpLock.
 Require Import FdSlots.
 Require Import FileInvDefs.
-Require Import BioDefs.
-Require Import DiskPtsto.
 Require Import WpUart.
-Require Import FsBlocks LogInv.
-Require Import FsCrash.
-Require Import KallocInv.
-Require Import IrefSlots InodeRegion.
+Require Import LogInv.
+Require Import IrefSlots.
 Require Import IntrDefs.   (* [hart_csrs]: the residue's per-hart CSR bundle *)
 Require Import SpecUsertrap.
 Require Import SpecUserret.

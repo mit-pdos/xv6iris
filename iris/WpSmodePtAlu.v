@@ -13,10 +13,9 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvFetchExec.
 Require Import MinstretInv InstrBytes WpGpr.
 Require Import SRegime.
-Require Import SmodeCore.
 Require Import WpMmodeLeafBase.
 Require Import WpSmodePtLeaves.
-Require Import HartSwp WpMmodeSwpBase.
+Require Import WpMmodeSwpBase.
 Require Import RegFile.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.

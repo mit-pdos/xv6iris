@@ -57,7 +57,6 @@ Require Import ProcGeom CpuOwn.
 Require Import FdSlots ProcInv.
 Require Import FileInvDefs.
 Require Import SpecFetchstr.
-Require Import KallocInv.
 Require Import KvmSpec.
 Require Import UserPtTree.
 Require Import ProcPtOwn.

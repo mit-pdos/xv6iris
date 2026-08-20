@@ -58,7 +58,7 @@ Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExec HartSwp HartLift HartRegNode
         HartSpan HartSpanChar HartEvents HartMPmp HartMFetch HartMFrame
         HartMLoad HartMStore.
-Require Import RiscvTryStep RiscvExtras RiscvFetchExec.
+Require Import RiscvExtras RiscvFetchExec.
 Require Import RegFile WpGpr.
 Require Import WpMmodeLeafBase SmodePte PtTreeAdue.
 Local Open Scope Z_scope.

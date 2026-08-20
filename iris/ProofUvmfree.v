@@ -80,7 +80,6 @@ Require Import CalleeSaved StackOwn.
 Require Import IntrDefs WpSmodeIntr.
 Require Import WpNext.
 Require Import WpLock.
-Require Import KallocInv.
 Require Import PtreeType.
 Require Import CpuOwn.
 Require Import ByteCursor.

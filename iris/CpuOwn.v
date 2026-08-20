@@ -51,7 +51,6 @@ Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvPtsto RiscvLang HartTp.
 Require Import RegFile.   (* [regfile]: the index algebra below names the map *)
-Require Import SmodeCore.
 Require Import IntrDefs.
 Require Import ProcGeom.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)

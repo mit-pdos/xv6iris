@@ -56,11 +56,10 @@ Require Import WpLock.
 Require Import ProcGeom.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
-Require Import KallocInv.
-Require Import DiskPtsto WpUart FsBlocks LogInv FsCrash.
+Require Import WpUart LogInv.
 Require Import BioDefs.
 Require Import SpecFileclose.
-Require Import IrefSlots InodeRegion.
+Require Import IrefSlots.
 Require Import FdSlots ProcInv.
 Require Import SchedCtx.
 Require Import FileInvDefs.

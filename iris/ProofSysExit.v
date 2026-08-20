@@ -40,16 +40,14 @@ Require Import FdSlots.
 Require Import FileInvDefs.
 Require Import ProcInv.
 Require Import ProofKforkParts.
-Require Import KallocInv.
 Require Import UserPtTree.
-Require Import IrefSlots InodeRegion.
-Require Import IrefSlots InodeRegion IcacheEscrow.
+Require Import IrefSlots.
+Require Import IrefSlots IcacheEscrow.
 Require Import SpecFileclose.
 Require Import WpUart.
 Require Import DiskPtsto.
 Require Import BioDefs.
 Require Import FsBlocks LogInv.
-Require Import FsCrash.
 Require Import SpecArgint SpecKexit.
 Require Import SpecSysExit.
 From Kernel Require KernelInstrs KernelSyms.

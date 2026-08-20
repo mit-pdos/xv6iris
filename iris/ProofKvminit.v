@@ -25,7 +25,6 @@ Require Import CpuOwn.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import WpLock.
 Require Import CalleeSaved StackOwn.
-Require Import KallocInv.
 Require Import CodeKvminit.
 Require Import SpecKvmmake SpecKvminit.
 From Kernel Require KernelSyms.

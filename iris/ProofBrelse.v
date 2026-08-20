@@ -79,7 +79,6 @@ Require Import IntrDefs.
 Require Import HartTp WpNext.
 Require Import KernelText.
 Require Import InstrBytes.
-Require Import DiskPtsto.
 Require Import BufOwn BcacheInv BioInv.
 Require Import CodeBrelse.
 Require Import SpecHoldingsleep SpecReleasesleep.

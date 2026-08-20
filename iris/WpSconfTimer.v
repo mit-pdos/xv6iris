@@ -67,7 +67,7 @@ Require Import RegFile.
 Require Import MinstretInv InstrBytes WpGpr ExecCommon.
 Require Import WpGprCsrrCommon WpGprCsrrB.
 Require Import WpGprCsrwCommon WpGprCsrwB.
-Require Import SmodeCore WpMmodeLeafBase.
+Require Import WpMmodeLeafBase.
 Require Import HartTp WpNext.
 Require Import IntrDefs WpIntrInv WpSmodeIntr.
 (* the privilege-generic CSR swp engines and the frame kit at Supervisor *)

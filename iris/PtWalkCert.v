@@ -36,14 +36,14 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
-Require Import WpDecodeBridge HartGoodb HartMemRun HartMemAsm PtBytes.
+Require Import WpDecodeBridge HartMemRun HartMemAsm PtBytes.
 (* section 0b's peels: [goodb_bind_forall] / [goodb_and_boolM] /
    [goodb_or_boolM] / [goodb_bind_read_reg], the generic [goodb] structural
    rules.  They belong in [WpDecodeBridge] beside [goodb_bind]; they live in
    [DecodeTotalU] because that is where the decode's totality needed them
    first, and this is the second client. *)
 Require Import DecodeTotalU.
-Require Import MemAccessGen WpLoad WpMmodeLeafBase SmodePte CommonWalk PtAdBits Pt4kWalk PtreeType KptPt PtTree PtTreeAdue KptTree.
+Require Import WpLoad WpMmodeLeafBase SmodePte CommonWalk PtAdBits Pt4kWalk PtreeType KptPt PtTree PtTreeAdue KptTree.
 Local Open Scope Z_scope.
 Import Defs.
 

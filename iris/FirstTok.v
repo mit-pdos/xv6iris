@@ -42,21 +42,14 @@ From iris.base_logic.lib Require Import ghost_var invariants gen_heap ghost_map.
 From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExtras.
-Require Import SmodeCore.
-Require Import WpLock.
+Require Import RiscvLang RiscvPtsto.
 Require Import FdSlots.
 Require Import WpUart.
-Require Import DiskPtsto DiskInv.
-Require Import BioInv.
-Require Import FsBlocks LogInv.
-Require Import FsCrash.
+Require Import DiskInv.
+Require Import LogInv.
 Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheRef.
-Require Import IcacheInv.
-Require Import IcacheEscrow.
-Require Import KallocInv.
 Require Import FileInvDefs.
 Require Import ProcAvail.
 Require Import FsCfg.

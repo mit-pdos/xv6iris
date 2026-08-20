@@ -34,13 +34,13 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values
         SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvFetchExec.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
 Require Import MinstretInv.
-Require Import HartSwp HartLift HartSpan HartSpanChar HartSFrame.
+Require Import HartSwp HartLift HartSpan HartSFrame.
 Require Import HartMCycle HartStepAny HartRunGen HartSTrans.
 Require Import SmodeCore.
 (* [smode_config] lives in SmodeCore; its bridge is below *)
-Require Import InstrBytes IntrDefs KptShare SmodePte.
+Require Import InstrBytes IntrDefs KptShare.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 

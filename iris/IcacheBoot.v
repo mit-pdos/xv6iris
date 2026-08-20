@@ -96,7 +96,6 @@ Require Import RiscvPtsto RiscvModelBytes.
 Require Import ArrCursor.
 Require Import WpLock.
 Require Import SleepLock.
-Require Import DiskPtsto.
 Require Import FsBlocks.
 Require Import BlockWords.
 Require Import DinodeEnc.

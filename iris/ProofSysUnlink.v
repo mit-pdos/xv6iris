@@ -89,7 +89,6 @@ Require Import IregLinkNz.   (* V5' increment W: the root refutation at a
                                 TAGGED unit ([ireg_link_root_min2_dp]) and the
                                 [dl_root]/[ireg_root] bridge, which is what
                                 opens [dir_links_dotdot_out]'s tie leg *)
-Require Import KallocInv.
 Require Import KvmSpec.
 Require Import FileInvDefs.
 Require Import UserPtTree.

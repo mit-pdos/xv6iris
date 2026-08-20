@@ -88,7 +88,7 @@ Require Import RiscvPtsto RiscvExtras.
 Require Import LogDefs.
 (* [WpLock] for [lockG] itself -- [Import] is not transitive, and without it
    the [!lockG Σ] binders below auto-generalize into a fresh variable. *)
-Require Import WpLock SleepLock.
+Require Import SleepLock.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Export Xv6Cameras.  (* the cameras this file states its theory over *)

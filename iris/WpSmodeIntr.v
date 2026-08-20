@@ -77,7 +77,7 @@ Require Import RegFile HartTp WpNext WpGpr MinstretInv InstrBytes WpMmodeLeafBas
    that adding the import back is a one-line change. *)
 Require Import SmodeCore.
 Require Import AlignBits.
-Require Import HartSwp HartMFrame WpMmodeSwpBase.
+Require Import HartSwp WpMmodeSwpBase.
 (* the SIE=0 arm inlines the cycle: [swp_loop]'s later is taken by hand, and
    the S-mode footprint's frames/agreements come from these three. *)
 Require Import HartLift HartSpan HartMCycle HartStepAny WpSFrames HartSFrame SRegime WpIntrCore.

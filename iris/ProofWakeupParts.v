@@ -20,7 +20,6 @@ Require Import SmodeCore.
 Require Import RiscvExtras.
 Require Import RegFile.
 Require Import HartTp WpNext IntrDefs.
-Require Import WpLock.
 Require Import WpMmodeLeafBase.
 Require Import StackOwn.
 Require Import WpSmodeIntr.

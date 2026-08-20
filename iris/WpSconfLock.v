@@ -36,13 +36,12 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras.
 Require Import WpLoad.
 Require Import RegFile HartTp WpNext.
-Require Import WpGpr MinstretInv InstrBytes WpMmodeLeafBase.
-Require Import SmodePte.
+Require Import MinstretInv InstrBytes WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import SmodeCorePt WpAmo.
-Require Import HartLift HartSpan HartSpanChar HartSwp HartSFrame HartSMem.
-Require Import WpSmodePtEngine WpSmodePtFetch.
-Require Import KptShare KptGoodb KptPt.
+Require Import HartLift HartSpan HartSwp HartSMem.
+Require Import WpSmodePtEngine.
+Require Import KptGoodb.
 Require Import WpIntrInv.
 Require Import HartMemRun.
 Require Import MemAccessGen.

@@ -111,7 +111,6 @@ Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheEscrow.
 Require Import IcacheBoot.
-Require Import KallocInv.
 Require Import FileInvDefs.
 Require Import ProcInv.
 Require Import SpecMyproc.
@@ -122,7 +121,6 @@ Require Import SpecIlock.
 Require Import SpecIunlock.
 Require Import SpecIput.
 Require Import SpecIunlockput.
-Require Import SpecDirlink.
 Require Import SpecNamex.
 Require Import SpecPanic.
 Require Import SpecNamei.

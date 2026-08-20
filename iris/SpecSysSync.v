@@ -77,7 +77,6 @@ Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import CpuOwn.
 Require Import SchedCtx.
-Require Import DiskPtsto.
 Require Import BioDefs.
 Require Import FsBlocks LogInv.
 From Kernel Require KernelSyms.

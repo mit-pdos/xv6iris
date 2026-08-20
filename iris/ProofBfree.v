@@ -53,8 +53,8 @@ Require Import RiscvModelBytes.
 Require Import RiscvExtras.
 Require Import InstrBytes.
 Require Import KernelText.
-Require Import RegFile HartTp WpNext WpGpr.
-Require Import WpMmodeLeafBase WpMmodeShiftiop.
+Require Import RegFile HartTp WpNext.
+Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import StackOwn.
 Require Import CalleeSaved.

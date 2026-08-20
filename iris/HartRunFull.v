@@ -58,11 +58,9 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
         SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
-Require Import ExecCommon.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep.
 Require Import HartSwp HartLift HartRegNode HartSpan HartSpanChar HartGoodb
         WpDecodeBridge WpMmodeCsrSwp HartRunGen.
-Require Import RiscvExtras.
 Require Import SmodeCore WpIntrCore.
 Local Open Scope Z_scope.
 Import Defs.

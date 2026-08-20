@@ -73,7 +73,6 @@ Require Import IcacheRef.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import IcacheBoot.
-Require Import KallocInv.
 Require Import KvmSpec.
 Require Import DirView.
 Require Import FileInvDefs.

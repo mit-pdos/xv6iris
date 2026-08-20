@@ -60,13 +60,11 @@ Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import StackOwn.
 Require Import CalleeSaved.
-Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import FsBlocks LogInv.
-Require Import DiskPtsto.
 Require Import DirentEnc.
 Require Import PathElems.
 Require Import InodeInv.

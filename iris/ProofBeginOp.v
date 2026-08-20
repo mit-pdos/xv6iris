@@ -82,7 +82,6 @@ Require Import FdSlots.
 Require Import CpuOwn.
 Require Import SchedCtx.
 Require Import WpLock.
-Require Import DiskPtsto.
 Require Import BioDefs.
 Require Import FsBlocks LogInv.
 Require Import SpecAcquire SpecRelease SpecSleepPrepare SpecSleep.

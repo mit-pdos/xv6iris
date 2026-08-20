@@ -69,12 +69,9 @@ Require Import InstrBytes.
 Require Import KernelText.
 Require Import IntrDefs.
 Require Import CpuOwn.
-Require Import WpLock.
 Require Import FdSlots.
 Require Export SwtchCtx.
 Require Import WpUart.
-Require Import FsCrash.
-Require Import InodeRegion.
 Require Import IcacheEscrow.
 Require Import ByteBuf.
 Require Import ProcGeom.
@@ -85,7 +82,6 @@ Require Import FsBlocks LogInv.
 Require Import BitmapInv.
 Require Import InodeInv.
 Require Import IrefSlots.
-Require Import KallocInv.
 Require Import KvmSpec.
 Require Import FileInvDefs.
 Require Import IrefSlots.

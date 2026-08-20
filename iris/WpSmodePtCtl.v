@@ -10,13 +10,13 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
-Require Import MinstretInv InstrBytes WpDecode ExecCommon WpGpr.
+Require Import MinstretInv InstrBytes ExecCommon WpGpr.
 Require Import SRegime.
 Require Import KptShare.
 Require Import SmodeCore WpMmodeLeafBase.
-Require Import WpSmodeSret MstatusBits.
-Require Import SmodeCorePt WpSmodePtFetch.
-Require Import HartSwp HartSFrame WpSmodePtEngine.
+Require Import MstatusBits.
+Require Import WpSmodePtFetch.
+Require Import HartSwp WpSmodePtEngine.
 Require Import RegFile.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.

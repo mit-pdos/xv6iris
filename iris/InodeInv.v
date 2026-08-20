@@ -54,7 +54,6 @@ Require Import RiscvPtsto.
 Require Import RiscvExtras.
 Require Import InstrBytes.
 Require Import ByteBuf.
-Require Import DiskPtsto.
 Require Import FsBlocks.
 Require Import LogInv.
 Require Import FsCrash.   (* [BSIZE]: the block size [bm_covers] divides by *)

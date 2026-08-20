@@ -14,7 +14,6 @@ Require Import RiscvPtsto RiscvLang.
 Require Import SmodeCore.
 Require Import InstrBytes KernelText.
 Require Import RegFile WpNext.
-Require Import WpLock.
 Require Import WpMmodeLeafBase.
 Require Import IntrDefs.
 From Kernel Require KernelSyms.

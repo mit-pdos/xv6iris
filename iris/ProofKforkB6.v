@@ -63,7 +63,6 @@ Require Import ProcInv.
 Require Import KallocInv.
 Require Import SchedCtx.
 Require Import KvmSpec.
-Require Import DiskPtsto.
 Require Import FsBlocks.
 Require Import InodeRegion.
 Require Import IrefSlots.

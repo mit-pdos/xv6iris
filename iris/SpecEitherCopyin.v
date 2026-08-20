@@ -50,7 +50,6 @@ Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
 Require Import CpuOwn.
-Require Import KallocInv.
 Require Import UserPtTree.
 Require Import KvmSpec.
 Require Import ProcPtOwn.

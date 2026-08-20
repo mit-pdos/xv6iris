@@ -57,14 +57,13 @@ Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import RegFile.
 Require Import SmodeCore.
 Require Import IntrDefs.
-Require Import WpLock.
 Require Import ProcGeom.
 Require Import ProcDefs.
 Require Import SwtchCtx.
 Require Import FdSlots.
 Require Import FileInvDefs.
-Require Import IrefSlots InodeRegion.
-Require Import DiskPtsto WpUart FsBlocks LogInv FsCrash KallocInv BioDefs.
+Require Import IrefSlots.
+Require Import WpUart LogInv.
 Require Import ProcAvail.
 Require Import ProcInv.
 Require Import SchedCtx.

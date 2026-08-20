@@ -38,9 +38,7 @@ Require Import StackOwn CalleeSaved KernelText.
 Require Import KernelRvcDecode.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl WpSmodeIntr.
 Require Import IntrDefs HartTp WpNext.
-Require Import WpLock.
 Require Import ProcGeom CpuOwn.
-Require Import KallocInv.
 Require Import UserPtTree.
 Require Import KvmSpec.
 Require Import ProcPtOwn.

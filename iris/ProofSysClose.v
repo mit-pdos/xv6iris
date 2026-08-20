@@ -48,14 +48,10 @@ Require Import IntrDefs HartTp WpNext WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import FdSlots ProcInv.
 Require Import FileInvDefs.
-Require Import KallocInv.
 Require Import WpUart.
-Require Import DiskPtsto.
-Require Import BioDefs.
-Require Import FsBlocks LogInv.
-Require Import FsCrash.
+Require Import LogInv.
 Require Import SpecMyproc SpecArgfd SpecFileclose.
-Require Import IrefSlots InodeRegion.
+Require Import IrefSlots.
 Require Import SpecSysClose.
 Require Import CodeSysClose.
 From Kernel Require KernelInstrs.

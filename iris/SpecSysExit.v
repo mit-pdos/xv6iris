@@ -58,7 +58,6 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
 Require Import RegFile.
-Require Import SmodeCore.
 Require Import KernelText KernelDataInv.
 Require Import IntrDefs.
 Require Import WpLock.
@@ -68,7 +67,7 @@ Require Import WpMmodeLeafBase.
 Require Import ProcInv.
 Require Import SchedCtx.
 Require Import KallocInv.
-Require Import IcacheEscrow IrefSlots InodeRegion.
+Require Import IcacheEscrow IrefSlots.
 Require Import SpecFileclose.
 Require Import WaitInv.
 Require Import WpUart.

@@ -14,7 +14,7 @@ Require Import SailStdpp.Base.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras ExecCommon WpGpr RegFile.
 Require Import InstrBytes.
 Require Import WpInstr.   (* wp_instr / mm_cycle, split out of InstrBytes *)
-Require Import HartSwp HartMFrame WpMmodeSwpBase WpMmodeJump AlignBits.
+Require Import HartSwp WpMmodeJump.
 From iris.base_logic.lib Require Import invariants.
 Local Open Scope Z_scope.
 

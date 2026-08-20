@@ -60,14 +60,12 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
 Require Import RegFile InstrBytes.
-Require Import SmodeCore.
 Require Import KernelText KernelDataInv.
 Require Import IntrDefs.
 Require Import KptShare KptExecMap KvmMap.
 Require Import StartedInv.
 Require Import SpecPrintk.
 Require Import ProcGeom FdSlots CpuOwn SchedCtx.
-Require Import KallocInv.
 (* [dev_ncpu], the PLIC's modelled hart count, for plicinithart's premise *)
 Require Import DevModel.
 Require Import DiskPtsto WpUart.

@@ -50,9 +50,9 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
 Require Import RegFile HartTp WpNext WpGpr InstrBytes WpMmodeLeafBase.
 Require Import SmodeCore.
-Require Import HartSwp HartMFrame WpMmodeSwpBase.
-Require Import HartLift HartSpan HartSpanChar HartRegNode HartMCycle WpMmodeJump ColdBoot.
-Require Import HartGoodb WpDecodeBridge WpDecode RiscvExtras ExecCommon.
+Require Import HartSwp HartMFrame.
+Require Import HartLift HartSpan HartSpanChar HartMCycle WpMmodeJump.
+Require Import HartGoodb WpDecodeBridge WpDecode RiscvExtras.
 Require Import IntrDefs WpIntrInv WpSmodeIntr.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)

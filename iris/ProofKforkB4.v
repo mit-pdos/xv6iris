@@ -66,7 +66,6 @@ Require Import FdSlots.
 Require Import FileInvDefs.
 Require Import WpLock.
 Require Import ProcInv.
-Require Import DiskPtsto.
 Require Import FsBlocks.
 Require Import InodeRegion.
 Require Import IrefSlots.
