@@ -121,15 +121,34 @@ simulation:
    by the instance (`pcls_ev_erasable`).  Payoff: `erase_bridge_log` =
    T2 containment with `pstep_depfree` DELETED; `pstep_fused` is the
    only remaining gate (stage 2's).
-2. **RE-FUSION** (dep-free split run → dep-free fused run): commute each
-   `LExLoad` right to its `LExStore` (the erased window between them is
-   all `LSilent`; foreign steps don't read the agent's state; the bytes
-   are unchanged across the window by `excl_ok_ts`, so the re-read at
-   the write's position returns the same `tvs`), then replace the
-   adjacent pair by ONE `PFRmw` step (whose premises hold there given
-   the pair's).  A DANGLING `LExLoad` relabels to a plain `LLoad` (same
-   read semantics; its `w_res` is never consumed).  This is why `LRmw`
-   and `PFRmw` survive until A2 is done — R6 waits.
+2. **RE-FUSION — LANDED (`iris/WeakRefuse.v`, `e20044c6`), and it is NOT
+   unconditional.**  Machine-checked obstacle: the fused read happens at
+   the WRITE's position, so an agent step that raises its own read floor
+   inside the window (one `fence r,r` suffices) gives the fused run a
+   strictly higher post-view — `lr x; fence; sc x` has NO fused
+   counterpart, and both fallbacks are refuted by the class/log (a
+   conditional write is `WCexcl`; an early plain read invents an event).
+   Hence the premise **`pstep_paired`**: between an exclusive read and
+   its conditional write the agent takes only `wstate`-inert steps —
+   true of the erased instance's windows (post-erasure they are
+   `LSilent`/`LDev` only), and the reason stage 1 must run FIRST.  Every
+   `LExLoad` maps to `LSilent` (a DANGLING read loses its axiomatic
+   event — deciding "dangling" needs lookahead; log-level T2 loses
+   nothing).  `pcls_fusable` is quantified OVER A STEP (an unquantified
+   equation is false — the class lives on the monad node).  Endpoints:
+   `refuse_run`, `t2_bridge` (premises: `pcls_erasable`, `pcls_fusable`,
+   `pstep_paired (erase_pstep pstep)`).  **OPEN — the instance discharge
+   of `pstep_paired`** (worklist A2-s3): the AMO and walker windows are
+   register-only by the model's structure, BUT an ABANDONED walker read
+   (`check_leaf_pte` Err / `update_PTE_Bits = None`) is followed by the
+   instruction's data access while the reservation lingers, so clause 1
+   ("every exload establishes `expend`") or clause 2 ("only inert steps
+   from `expend`") as stated needs an abandonment refinement — the
+   post-state `k(value)` already determines abandonment, so `expend`
+   should be structural ("the continuation's next memory event is the
+   paired conditional write") with clause 1 weakened to
+   `expend p' ∨ aband p'`.  This is a shape predicate over the monad —
+   durable-notes' eight-refutation category; check every answer type.
 3. **THE EXISTING PROJECTION** (`wp_pf_step_mstep`): the output of
    stages 1–2 is `lb_depfree ∧ lb_fused`, discharging the gates by
    construction.  T1's realization side names the SAME gates
