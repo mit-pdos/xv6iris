@@ -186,6 +186,26 @@ restriction simulation's device component costs more than the G4/G5
   reservation axioms + the declared hardware-fidelity clauses (walker A/D
   non-promisable, no-icache) + the WP package.  Zero kernel premises.
 
+## 6b. T2-0's mechanism, refined (post-verdict scoping)
+
+The lock-protocol export's natural implementation is NOT a free-standing
+ghost map: it is a FOURTH per-byte state in the C/D/S points-to protocol
+of [`weak-memory-phi-upgrade.md`](weak-memory-phi-upgrade.md) — an
+`L`-flavored byte whose WRITE RULE enforces the value/class alternation
+(WCexcl-nonzero from an RMW that read 0 / release-class zero).  The
+enforcement then rides the same machinery φ's `no_violation` rides: the
+per-byte auth lives in `weak_state_interp`, the lock word's full
+points-to lives inside `wlock_inv` so the acquire/release leaves are the
+only writers and they use the `L`-flavored rules, every other byte keeps
+its flavor and pays nothing, and the export lemma reads the auth map
+exactly as φ's does.  The exported pure fact is a LOG predicate ("every
+message overlapping a registered lock word is acquire-shaped or
+release-shaped"), which is all §3's case #5 needs — the rest of
+`win_excl`'s derivation (the RMW read 0; reads-latest) is trace + machine.
+Consequence for sequencing: T2-0 lands most cheaply as a rider on the
+φ-upgrade's protocol surgery if that is still pending, or as its fourth
+state if it has landed — check that design's status before starting.
+
 ## 7. Honest residual risks
 
 1. `sim_dev` (T2-3) — PARM has no shared fabric; the G4/G5 machinery is
