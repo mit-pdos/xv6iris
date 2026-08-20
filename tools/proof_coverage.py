@@ -30,7 +30,8 @@ own target list -- and NOT from a ``iris/*.v`` glob.  A ``.v`` in the tree but
 absent from the project file is compiled by nobody, so a "proven" function read
 out of it would be a claim no build has ever checked; keying off ``_CoqProject``
 makes the report describe exactly what CI verifies.  Drift either way is a
-``--check`` error, never a silent adjustment (see ``coqproject_files``).
+``--check`` error, never a silent adjustment -- with one declared exception, a
+row commented out to a bare ``# Foo.v`` (see ``coqproject_files``).
 
 WHAT COUNTS AS "PROVEN"
 -----------------------
@@ -443,7 +444,7 @@ class Proofs:
 
 
 # A _CoqProject row naming a file: a bare module filename, nothing else.  Used
-# to tell a descoped "# Foo.v" row from the prose in a comment block.
+# to tell an out-of-the-build "# Foo.v" row from the prose in a comment block.
 COQPROJECT_NAME = re.compile(r"[A-Za-z0-9_]+\.v")
 
 
@@ -465,19 +466,29 @@ def coqproject_files(repo: str):
     (no subdirectories); a subdirectory entry would surface as "does not exist".
 
     ONE OMISSION IS LEGITIMATE, AND IT DECLARES ITSELF: a row commented out to
-    a bare ``# Foo.v``.  A file can be deliberately out of the build and still
-    on disk -- a descoped tier kept for a later revival, a retired proof kept
-    as provenance -- and the honest place to record that is the project file
-    itself, beside the rows it sits among, where the reviver looks.  So a bare
-    commented filename is read as a DESCOPE and exempts that file from the
-    unlisted error; anything else in a comment (the prose explaining the block,
-    an option line) is not a filename and is ignored as before.  The guarantee
-    is untouched, because a descoped file is not returned to the caller either:
-    it is compiled by nobody and counted by nobody.  What the check still
-    catches is the *accident* -- a file added to ``iris/`` and forgotten -- and
-    it now also catches a descope row that has gone stale, since a ``# Foo.v``
-    naming a file that no longer exists tells the reviver to uncomment a row
-    that cannot come back.
+    a bare ``# Foo.v``.  A file can be deliberately outside the coq_makefile
+    build and still on disk, for either of two reasons:
+
+    * it is compiled by NOBODY -- a descoped tier kept for a later revival, a
+      retired proof kept as provenance;
+    * it is compiled by SOMETHING ELSE -- ``iris/SystemAssumptions.v``, the
+      ``Print Assumptions`` audit, which ``make audit`` builds and CI runs
+      after the build.  It is out of the project file because putting it in
+      costs ~30 % of a clean build's wall clock on the serial tail, not
+      because nobody checks it.
+
+    Either way the honest place to record it is the project file itself, beside
+    the rows it sits among, where the next reader looks.  So a bare commented
+    filename exempts that file from the unlisted error; anything else in a
+    comment (the prose explaining the block, an option line) is not a filename
+    and is ignored as before.  The guarantee this check exists for is untouched
+    in both cases, because such a file is not returned to the caller either --
+    it is not a coq_makefile target, so nothing it claims is counted here, which
+    is exactly why the second kind must carry no coverage claims.  What the
+    check still catches is the *accident* -- a file added to ``iris/`` and
+    forgotten -- and it also catches a commented row that has gone stale, since
+    a ``# Foo.v`` naming a file that no longer exists points at a row that
+    cannot come back.
     """
     idir = os.path.join(repo, "iris")
     proj = os.path.join(idir, "_CoqProject")
@@ -485,7 +496,7 @@ def coqproject_files(repo: str):
         return [], [f"_CoqProject: {proj} does not exist"]
 
     errors, listed = [], []
-    seen, descoped = set(), set()
+    seen, out_of_build = set(), set()
     with open(proj, errors="replace") as fh:
         for raw in fh:
             entry = raw.strip()
@@ -495,7 +506,7 @@ def coqproject_files(repo: str):
             if entry.startswith("#"):
                 body = entry.lstrip("#").strip()
                 if COQPROJECT_NAME.fullmatch(body):
-                    descoped.add(body)
+                    out_of_build.add(body)
                 continue
             # skip blanks and the -R / -arg option lines
             if not entry or entry.startswith("-"):
@@ -511,17 +522,18 @@ def coqproject_files(repo: str):
     ondisk = {os.path.basename(p) for p in glob.glob(os.path.join(idir, "*.v"))}
     for e in sorted(seen - ondisk):
         errors.append(f"_CoqProject: lists iris/{e}, which does not exist")
-    for e in sorted(ondisk - seen - descoped):
+    for e in sorted(ondisk - seen - out_of_build):
         errors.append(f"_CoqProject: iris/{e} is not listed, so the build never "
                       f"compiles it -- nothing it claims is counted here; "
-                      f"list it, or comment out a '# {e}' row to descope it "
-                      f"deliberately")
-    for e in sorted(descoped & seen):
-        errors.append(f"_CoqProject: {e} is both listed and commented out as "
-                      f"descoped -- the commented row is a lie about the build")
-    for e in sorted(descoped - ondisk):
-        errors.append(f"_CoqProject: comments out iris/{e} as descoped, but no "
-                      f"such file exists -- drop the stale row")
+                      f"list it, or comment out a bare '# {e}' row to say it is "
+                      f"out of the build on purpose (descoped, or built by "
+                      f"another target such as `make audit`)")
+    for e in sorted(out_of_build & seen):
+        errors.append(f"_CoqProject: {e} is both listed and commented out -- "
+                      f"the commented row is a lie about the build")
+    for e in sorted(out_of_build - ondisk):
+        errors.append(f"_CoqProject: comments out iris/{e} as out of the build, "
+                      f"but no such file exists -- drop the stale row")
 
     files = sorted(os.path.join(idir, e) for e in listed if e in ondisk)
     return files, errors

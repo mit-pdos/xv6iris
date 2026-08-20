@@ -161,7 +161,58 @@ jobs:
             exit 1
           fi
 
-      # ---- 3b. Build profile (iris/, informational) ----
+      # ---- 3b. Assumption audit (iris/SystemAssumptions.v) ----
+      # `Print Assumptions` on the system theorem -- the only check that sees
+      # through every functor and seal, and so the only statement of what the
+      # whole development actually rests on.  It used to be a line inside
+      # SystemAdequacy.v, where it was 95 s of that file's 98.6 s on the serial
+      # build tail; it is now its own file, out of iris/_CoqProject on purpose
+      # (the commented row there is what tells proof_coverage.py so), compiled
+      # here by `make audit-only` against the tree the previous step built.
+      # CI pays the same 95 s it always did -- what moved is that a developer's
+      # `make proofs` no longer does.
+      #
+      # `audit-only`, not `audit`: the latter depends on `proofs`, whose
+      # kernel-rocq prerequisite pulls in the absent kernel ELF (see the note
+      # atop this file).  `-s` keeps make's recipe echo out of the captured
+      # stdout, so the log is exactly the audit's output; coqc's warnings go to
+      # stderr and stay in the job log rather than the summary.
+      #
+      # The output goes in the step summary rather than being read out of a
+      # 1900-line build log.  The step FAILS if coqc does (a broken audit is a
+      # broken tree), but the axiom list itself is only reported, not diffed
+      # against an expected set -- same contract as when it lived in the build
+      # log, so read it.  The summary is written either way: a failing run is
+      # exactly when you want to see how far it got.
+      - name: Assumption audit (iris/, Print Assumptions on the system theorem)
+        run: |
+          rc=0
+          make -s SWITCH="$GITHUB_WORKSPACE" audit-only \
+            > "$RUNNER_TEMP/assumptions.log" || rc=$?
+          {
+            echo "## Assumption audit"
+            echo
+            echo "\`Print Assumptions SystemAdequacy.xv6_power_adequacy_xv6Σ\` — the"
+            echo "transitive axiom footprint of the system theorem, through every functor"
+            echo "and every seal."
+            echo
+            echo "Expected: the five Sail platform externs (\`load_reservation\`,"
+            echo "\`cancel_reservation\`, \`match_reservation\`, \`valid_reservation\`,"
+            echo "\`plat_term_write\`), \`functional_extensionality_dep\`, and the"
+            echo "deliberately-unproven kernel functions. **Anything else is a"
+            echo "regression.**"
+            echo
+            if [ "$rc" -ne 0 ]; then
+              echo "> :x: The audit did not complete (exit $rc); the output below is partial."
+              echo
+            fi
+            echo '```'
+            cat "$RUNNER_TEMP/assumptions.log"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit $rc
+
+      # ---- 3c. Build profile (iris/, informational) ----
       # Consumes the TIMED log + the .v.timing files + coqdep's .CoqMakefile.d +
       # the .vo mtimes to report the most expensive statements and files, the
       # longest require chain (the critical path — the build is critical-path
@@ -184,7 +235,7 @@ jobs:
           # steps (checkout wipes them next run regardless, but be explicit).
           rm -f iris/*.v.timing
 
-      # ---- 3c. Check out xv6-riscv for coverage attribution (best-effort) ----
+      # ---- 3d. Check out xv6-riscv for coverage attribution (best-effort) ----
       # tools/proof_coverage.py attributes each function to a source file via
       # `nm` on xv6-riscv/kernel/*.o, falling back to scanning the .c/.S
       # sources themselves; with no xv6-riscv/ tree at all (it's .gitignored
@@ -202,7 +253,7 @@ jobs:
           test -d xv6-riscv || timeout 60 git clone --depth 1 \
             https://github.com/mit-pdos/xv6-riscv xv6-riscv || true
 
-      # ---- 3d. Proof coverage report (iris/) ----
+      # ---- 3e. Proof coverage report (iris/) ----
       # "What of the kernel is proved?" — the per-function proven / assumed /
       # partial / none hierarchy, rendered into the step summary next to the
       # build profile.  Plain Python over the checked-in kernel-rocq/ dump and
@@ -217,8 +268,11 @@ jobs:
       # fix is a one-line edit.  A file that is out of the build ON PURPOSE is
       # not drift and does not fail here, but it has to say so: comment its row
       # out to a bare `# Foo.v` (see coqproject_files' docstring), which is what
-      # distinguishes a descope from the forgotten row this check is here to
-      # catch.  A mere coverage change never fails CI.  Runs only on a
+      # distinguishes a deliberate omission -- a descoped tier, or a file some
+      # other target builds, as the step above builds SystemAssumptions.v --
+      # from the forgotten row this check is here to catch.  Either way the
+      # file is counted by nobody, so a file omitted this way must carry no
+      # coverage claims.  A mere coverage change never fails CI.  Runs only on a
       # successful build, so the report describes a green tree.
       - name: Proof coverage report (iris/)
         run: |

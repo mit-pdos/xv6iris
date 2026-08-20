@@ -3,6 +3,8 @@
 #
 #   make            build everything needed for the proofs (== make proofs)
 #   make proofs     compile the Iris proofs (iris/) + their dependencies
+#   make audit      build, then Print Assumptions on the system theorem
+#   make audit-only the same audit, against an already-built tree
 #   make model      compile the Sail-generated Coq model (model-xv6iris/)
 #   make kernel     build the xv6 kernel ELF (xv6-riscv/kernel/kernel)
 #   make user       build the xv6 user-space programs (xv6-riscv/user/_*)
@@ -95,6 +97,7 @@ USER_DUMPS ?= sync:Sync echo:Echo sh:Sh init:Init
 
 .PHONY: all proofs model kernel user dump dump-force kernel-rocq user-rocq \
         xv6-rev-check sail-rev-check gen-code check-decode update-decode \
+        audit audit-only \
         clean clean-proofs distclean model-gen
 
 all: proofs
@@ -226,6 +229,30 @@ $(IRIS)/CoqMakefile: $(IRIS)/_CoqProject
 	cd $(IRIS) && $(RUN) coq_makefile -f _CoqProject -o CoqMakefile
 proofs: model kernel-rocq user-rocq $(IRIS)/CoqMakefile
 	$(RUN) $(MAKE) -C $(IRIS) -f CoqMakefile -j$(JOBS)
+
+# ---- 4b. The assumption audit (iris/SystemAssumptions.v) ----
+# `Print Assumptions` on the system theorem -- the one check that sees through
+# every functor and seal (xv6-bump-playbook.md §7.2).  It is NOT part of `make
+# proofs` and NOT a row in iris/_CoqProject: the statement alone measured 95 s
+# of SystemAdequacy.v's 98.6 s, and that file is the serial tail of the build,
+# so it was ~30 % of a clean build's wall clock on every build.  See
+# claude-notes/optimization.md for why the command costs what it does.
+#
+# Flags come out of iris/_CoqProject so the audit compiles against exactly the
+# load paths the build uses; the -arg prefix is coq_makefile's, not coqc's, so
+# it is stripped.  -noglob is load-bearing rather than tidiness: the nightly
+# dead-import sweep shortlists candidates from whatever .glob files it finds in
+# iris/, and this file's single import is the one thing it must not lose.
+AUDIT_FLAGS = $(shell sed -n 's/^-arg //p;/^-[RQ] /p' $(IRIS)/_CoqProject)
+
+audit: proofs
+	$(MAKE) audit-only
+
+# The same audit against a tree that is already built.  This is what CI runs --
+# its iris build is driven directly rather than through `proofs`, whose
+# kernel-rocq prerequisite would pull in the (absent) kernel ELF.
+audit-only:
+	cd $(IRIS) && $(RUN) coqc $(AUDIT_FLAGS) -noglob SystemAssumptions.v
 
 # ---- cleaning ----
 clean-proofs:

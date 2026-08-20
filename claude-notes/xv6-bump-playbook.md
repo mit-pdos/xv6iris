@@ -933,9 +933,15 @@ Rules that made that work:
    before and after; equal digests mean the build compiled exactly those bytes.
 
 1. `make -k -j8` clean (`MAKEEXIT=0`).
-2. **`Print Assumptions` on the top-level theorem** —
+2. **`make audit`** — `Print Assumptions` on the top-level theorem,
    `SystemAdequacy.xv6_power_adequacy_xv6Σ`. It is the only check that sees
-   through every functor and seal. Expect the 5 Sail platform externs
+   through every functor and seal, and it is **not** part of `make proofs`
+   (it lives in `iris/SystemAssumptions.v`, a file `iris/_CoqProject`
+   deliberately does not list, because the statement alone is ~95 s on the
+   serial build tail — see `optimization.md`). CI runs it after every build
+   and prints it in the run's step summary, so a green CI run already has the
+   answer; run the target yourself when you are auditing locally.
+   Expect the 5 Sail platform externs
    (`load_reservation`, `cancel_reservation`, `match_reservation`,
    `valid_reservation`, `plat_term_write`), `functional_extensionality_dep`,
    and the deliberately-unproven kernel functions. Anything else is a

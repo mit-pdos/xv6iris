@@ -88,6 +88,18 @@ opam exec --switch=/shared/xv6rocq -- make -C iris          -f CoqMakefile -j180
 It only bites after an upstream commit MOVES the image (a dump-tool or xv6
 source change): before that the re-dump is byte-identical and invisible.
 
+**Same trap in the assumption audit: use `make audit-only`, never `make
+audit`.** `audit` depends on `proofs`, which depends on `kernel-rocq`, which is
+the rule above. `audit-only` runs `coqc` on `iris/SystemAssumptions.v` against
+the tree as it stands and touches no dump rule:
+
+```sh
+run-on-gcp --no-sync bash -c 'cd /mnt/rocq/trees/<tree> && make -s SWITCH=/shared/xv6rocq audit-only'
+```
+
+Budget ~95 s for it — that is the command, not the build (claude-notes/optimization.md
+§"`Print Assumptions` is a whole-tree walk").
+
 **`user-rocq` is a THIRD compiled directory, and forgetting it does not look
 like a missing step** — `iris/_CoqProject` maps `-R ../user-rocq User`, so the
 symptom is a wall of `make[1]: *** No rule to make target

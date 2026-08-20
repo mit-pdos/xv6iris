@@ -758,6 +758,68 @@ and runs in CI on every checkin.
   those two proofs; `mk_rvc`/`mk_base` keep their signatures. 2.8× on the band,
   which is what an `XV6_REV` bump re-pays.
 
+## `Print Assumptions` is a whole-tree walk, and it is not on the build path
+
+The assumption audit lives in **`iris/SystemAssumptions.v`**, run by `make
+audit` / `make audit-only` and by CI after every build (output in the run's
+step summary). It is deliberately **not** a row in `iris/_CoqProject` — the
+commented-out row there is what tells `tools/proof_coverage.py --check` the
+omission is on purpose. It used to be a line at the bottom of
+`SystemAdequacy.v`, and that is what it cost (measured 2026-08-20, isolated
+`coqc` on the GCP VM):
+
+| | |
+|---|---|
+| `SystemAdequacy.v` with the statement | **98.6 s**, peak RSS 2.47 GB |
+| the same file without it | **3.6 s**, peak RSS 0.85 GB |
+
+So one sentence was 96 % of the file — and `SystemAdequacy.v` is the strictly
+serial tail of the build (`BootChain → BootShared → SystemAdequacy`, all 1×),
+so it was ~30 % of a clean build's wall clock, re-paid whenever anything in the
+1000-file cone changed. CI still pays it; a developer's `make proofs` no
+longer does.
+
+**Why it costs that.** `Print Assumptions` forces the opaque body of every
+constant in the transitive cone and walks it. Forcing is not a read:
+`Library.access_opaque_table` re-runs, on **every** access,
+`Discharge.cook_opaque_proofterm` — the section discharge, a full term rebuild,
+once per enclosing `Section` that had a `Context` — and `Mod_subst.subst_mps_list`,
+another full rebuild for anything reached through an applied functor. Then
+`Assumptions.traverse` walks the result, running `Inductive.expand_case_specif`
+at every `Case` node. Each proof term in the cone is therefore rebuilt 2–3× and
+walked once. Both of this tree's universal idioms are on that path: 778 of the
+1265 `iris/*.v` use `Section`, and the whole `SpecF`/`LinkF` design routes
+lemmas through sealed functor applications. Controlled A/B, 400 lemmas with
+byte-identical proof terms:
+
+| packaging | `Print Assumptions` over all 400 |
+|---|---|
+| plain top-level lemmas | 0.18 s |
+| inside `Section` + `Context` | **0.49 s (≈ 2.7×)** |
+| inside an applied sealed functor | 0.28 s (≈ 1.5×) |
+
+So the command is ~linear in total proof-term bytes in the cone (302 MB of
+`.vo` in `iris/`) with a 2–3× constant on top. It is therefore also a **proxy
+metric for whole-tree proof-term size**: a jump in the audit's time is a jump
+in what every rule in this file is fighting.
+
+- **Negative results — do not redo these.** It is not disk I/O: `Require
+  Import SystemAdequacy` — loading the entire cone — is 0.76 s, and a *second*
+  identical `Print Assumptions` in the same process costs full price again
+  (94.5 s, then 100.6 s). Nothing is cached between calls, so **batching audits
+  in one file does not amortize** — adding an `xv6_fs_adequacy_xv6Σ` audit
+  beside the existing one would roughly double the bill, not ride along. Nor
+  does auditing at lower altitude decompose the cost: `Print Assumptions
+  BootChain.boot_hart_primary` alone is 91.4 s of the 94, against 6.5 s for
+  `BootShared.boot_shared_alloc` and 2.4 s for
+  `RiscvAdequacy.riscv_power_adequacy`. `Set Printing Depth` and the printing
+  of the seven-odd axioms are free.
+- **`-noglob` on the audit compile is load-bearing**, not tidiness. The nightly
+  dead-import sweep shortlists candidates from whatever `.glob` files it finds
+  in `iris/`, and `SystemAssumptions.v`'s single `Require` is the one thing it
+  must not lose; with no `.glob` the file is reported UNANALYSED and left alone.
+
+
 ## Smaller traps
 
 - **`lia` cannot do a nested-division chain** even mword-free and iris-free

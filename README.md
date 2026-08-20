@@ -35,6 +35,7 @@ inside the project-local opam switch, so you do **not** need to
 
 ```sh
 make            # == make proofs: build the model, the kernel dump, and all Iris proofs
+make audit      # build, then Print Assumptions on the system theorem (see below)
 make model      # compile only model-xv6iris/ (the Sail-generated Rocq model)
 make kernel     # build the xv6 kernel ELF (xv6-riscv/kernel/kernel)
 make user       # build the xv6 user programs (xv6-riscv/user/_*, via fs.img)
@@ -42,6 +43,14 @@ make dump       # compile kernel-rocq/ and user-rocq/ (re-dumping if an ELF chan
 make dump-force # force a re-dump of every image from the ELFs on disk
 make clean      # remove Rocq build artifacts; make distclean also cleans the xv6 tree
 ```
+
+`make audit` compiles `iris/SystemAssumptions.v`, which is `Print Assumptions`
+on the system theorem — the only check that sees through every functor and
+seal. It is deliberately not part of `make proofs`: the statement alone
+measures ~95 s on the build's serial tail, roughly 30 % of a clean build's wall
+clock, so it is run on demand and by CI (which puts its output in the run's
+step summary) rather than on every developer build. That is also why
+`iris/_CoqProject` carries it as a commented-out row.
 
 Build graph: each ELF is disassembled by `tools/dump_elf.py` — the kernel into
 `kernel-rocq/*.v`, each user program into `user-rocq/*.v`; `iris/` depends on

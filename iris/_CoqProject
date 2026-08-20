@@ -987,6 +987,16 @@ BootShared.v
 CodeBalloc.v
 CodeBfree.v
 SystemAdequacy.v
+# --- BEGIN out of the coq_makefile build: the assumption audit ---
+# SystemAssumptions.v is `Print Assumptions` on the system theorem.  It is a
+# real, compiled file -- `make audit` builds it, and CI runs it after the iris
+# build and puts its output in the run's step summary -- but it is deliberately
+# NOT a coq_makefile target: the statement measured 95 s of SystemAdequacy.v's
+# 98.6 s, on the strictly serial build tail, i.e. ~30 % of a clean build's wall
+# clock on every build.  The commented row below is what says that omission is
+# on purpose; see the file's own header and claude-notes/optimization.md.
+# SystemAssumptions.v
+# --- END out of the coq_makefile build ---
 CodeSysDup.v
 SpecSysDup.v
 ProofSysDup.v
