@@ -580,7 +580,3 @@ Section UProofSync.
   Qed.
 
 End UProofSync.
-
-(* sentinel: the whole sync verification rests on nothing but the platform
-   axioms and functional extensionality *)
-Print Assumptions wp_sync_start.

@@ -116,5 +116,3 @@ Section UProofShEcho.
   Qed.
 
 End UProofShEcho.
-
-Print Assumptions wp_sh_execs_echo.

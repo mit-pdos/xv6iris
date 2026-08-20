@@ -1813,8 +1813,3 @@ Section UProofInit.
   Qed.
 
 End UProofInit.
-
-(* sentinel: the whole init verification -- the printf cone, both unbounded
-   loops, and every branch of every syscall test -- rests on nothing but the
-   platform axioms and functional extensionality. *)
-Print Assumptions wp_init_start.

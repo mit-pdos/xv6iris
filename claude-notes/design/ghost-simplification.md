@@ -130,18 +130,20 @@ refers to one accessor, not the piece.)
   so).  Delete at the next touch of `IcacheInv.v`.
 - `EscrowRegionA.v` — the stage-1a de-risk twin of `EscrowDefs`/
   `EscrowInode`; VERIFIED: in `_CoqProject` (`:970`) but imported by
-  nothing — it compiles on every build for zero consumers.  Retire the
-  row (keep the file as provenance, or move it beside the probes).
-  **DONE, and the row is COMMENTED OUT rather than deleted.**  SIMP-1
+  nothing — it compiled on every build for zero consumers.
+  **DONE, in two steps, and the second is the interesting one.**  SIMP-1
   (`9e51d849`) dropped the row and left the file, which
   `proof_coverage --check` reads as the accident it exists to catch —
-  main went red on it.  The row is now a descoped `# EscrowRegionA.v`
+  main went red on it; the row then became a descoped `# EscrowRegionA.v`
   under a comment block saying why, the syntax the check accepts for a
   file that is out of the build on purpose (see the coverage bullet in
-  `durable-notes.md`).  So the file stays as the worked de-risk the three
-  `Escrow*` headers cite by name, reviving it is uncommenting one row, and
-  a later `rm` of the file fails the check instead of leaving a row that
-  promises a revival it cannot deliver.
+  `durable-notes.md`).  On 2026-08-20 the file and that row were both
+  DELETED: a descoped row is only worth carrying while somebody intends to
+  revive it, and nobody did.  The de-risk survives in git history, which is
+  where the three `Escrow*` headers' citations of it now point.  The rule
+  the episode leaves behind: **delete the row and the file together, or
+  neither** — a row without its file and a file without its row are both
+  drift errors, and the check will say so.
 - The three `ZZProbe*` scratch files are untracked and do not travel; the
   `proof_coverage --check` drift rows they cause vanish on any fresh clone.
 

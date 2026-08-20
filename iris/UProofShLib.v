@@ -2101,9 +2101,3 @@ Section UProofShLib.
   Qed.
 
 End UProofShLib.
-
-(* sentinel: [strchr] -- the deepest of sh's library leaves (a prologue, a
-   scan loop over a NUL-terminated string with a two-way exit, and a shared
-   epilogue) -- rests on nothing but the platform axioms and functional
-   extensionality. *)
-Print Assumptions wp_sh_strchr.

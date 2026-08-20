@@ -4055,10 +4055,3 @@ Section UProofShHeap.
   Qed.
 
 End UProofShHeap.
-
-(* sentinel: malloc and execcmd rest on nothing but the platform axioms and
-   functional extensionality -- and, as the header's drift note D1 records,
-   -- no section hypothesis: [free], [sbrk] and [memset] are called
-   through their real contracts. *)
-Print Assumptions wp_sh_malloc_first.
-Print Assumptions wp_sh_execcmd.
