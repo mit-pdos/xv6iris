@@ -158,6 +158,14 @@ are working on that effort — the relevant `projects/` file.
   components carry the simulation (`vcap` irreplaceable, `RES = ts` unused),
   and the three real risks for porting it (device fabric, `lat` reads,
   the fused RMW).
+- **[`weak-memory-tier2-s6.md`](design/weak-memory-tier2-s6.md)** — S6,
+  the tier-2 gate, RUN 2026-08-20 with verdict **GO** on the certification
+  route: the two-hart L2′ paper exercise's edge-inventory table (every
+  kill from machine facts / φ / the lock-protocol export; no C6 residue),
+  the RVWMO⁻ graph-front-end finding (the `cand` presentation cannot
+  express rule-14 violations — machine-checked by A5), the one new export
+  (F3, the lock protocol as a state-interp ghost), the route-B fallback
+  trigger, and the tier-2 staging T2-0…T2-6.
 - **[`weak-memory-layer2.md`](design/weak-memory-layer2.md)** — LAYER 2 as a
   DIRECT acyclicity theorem (2026-08-18): why per-edge premises are the
   wrong interface (walker A/D traffic violates any per-edge form

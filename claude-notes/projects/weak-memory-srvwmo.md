@@ -208,9 +208,14 @@ are renamed **R0.5–R6** as of 2026-08-19; sRVWMO items are **A1–A5** here
   `sr = true`, so `cand_plain_ok` does not apply), the atomicity
   negative (~50 ln), and the split-exclusive shapes (R-track's, not
   this alphabet's — the model keeps exclusives fused).
-- **S6 (tier-2 gate, unchanged)**: the two-hart L2′ paper exercise —
-  before any further D8 porting (D8-1 predates the gate; it stands,
-  parked).
+- **S6 — DONE (2026-08-20): GO.**  The two-hart L2′ paper exercise is
+  [`../design/weak-memory-tier2-s6.md`](../design/weak-memory-tier2-s6.md):
+  every cross edge of the lock/racy-byte/PTW miniature kills from
+  {machine facts, φ, the exported lock-word protocol} alone — no C6
+  residue, no kernel premise.  Route: certification (A), with the graph
+  front-end for a declared RVWMO⁻ and the one new export (F3) as the
+  first two slices; staging T2-0…T2-6 in the S6 doc; execution state in
+  the certification worklist.
 
 ## Interaction with the R-track (RMW split) and the parked tier-2 assets
 

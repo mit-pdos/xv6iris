@@ -1,5 +1,20 @@
 # The certification route (D8 / E1 / L2′) — worklist
 
+**S6 RAN AND THE GATE IS OPEN (2026-08-20): GO on this route.**  The
+two-hart L2′ paper exercise is
+[`../design/weak-memory-tier2-s6.md`](../design/weak-memory-tier2-s6.md) —
+read it FIRST: it carries the full edge-inventory table (every kill named
+M/φ/lock-protocol, none in C6), the two structural findings that reshape
+the plan (F1: the `cand` presentation cannot express rule-14 violations,
+so tier 2 needs a graph-presentation front-end for a declared **RVWMO⁻**
+— RVWMO minus ppo 6/9–13, which only strengthens the final theorem and
+dissolves the D-8 dependency-alphabet obstacle; F3: ONE new export, the
+lock-word value protocol as a `weak_state_interp` ghost — the φ mechanism
+— because `wlock_inv` is a namespace invariant adequacy cannot see), the
+finding that §5's `w_rdw`/`w_lock` are NOT needed, the route-B fallback
+trigger, and the revised staging **T2-0 … T2-6** that supersedes this
+file's bare item list as the execution order.
+
 Plan of record: [`../design/weak-memory-layer2.md`](../design/weak-memory-layer2.md)
 §8 (the route), §11 (the PARM investigation's answer), §13 (the walker
 decision: the A/D RMW is non-promisable, as Sail fidelity).  The port spec is
