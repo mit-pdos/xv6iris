@@ -98,6 +98,12 @@ Require Import SpecAllocpid.
    header says why) and [SpecAllocproc] is the proc/kalloc layer. *)
 Require Import SpecAllocproc.
 Require Import SpecNameiRootBoot.
+(* the four inode-cache rows namei's corner takes, spelled at the ambient
+   configuration (fs-cfg-boot.md stage (e)).  [Require Import] is not
+   transitive, so naming them here needs their own files even though
+   [SpecNameiRootBoot] already states them. *)
+Require Import IcacheInv IcacheEscrow InodeRegion InodeInv.
+Require Import FsBlocks FsCfg.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -125,12 +131,32 @@ Definition wp_userinit_sconf_body
   (* allocproc's own [acquire] is on "proc" (9); the only lock taken while
      it is held is namei's "itable" (14), which follows by
      [LockRank.locks_below_mono]. *)
+  (* THE TWO CONFIG TIES, forwarded to namei's root corner.  They are
+     [FsCfgBoot.fs_boot_supply]'s first two ties, which main holds because
+     the boot-era fupd minted the configuration; at [icfg_nib = 0] the
+     [inode_held] namei returns could not exist.  They sit ABOVE
+     [locks_below] so that main's call can keep discharging that one as a
+     side goal. *)
+  icfg_dev = ROOTDEV ->
+  (0 < icfg_nib)%nat ->
   locks_below lks "proc" ->
   sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0%nat eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* iget's "iget: no inodes" arm is live code *)
   panic_env -∗
+  (* ---- THE FOUR INODE-CACHE ROWS ----
+     userinit's [namei("/")] is the tree's earliest inode-cache client, and
+     these four are its whole demand ([SpecNameiRootBoot]'s header is the
+     inventory).  Stated at [fileG]'s own configuration fields, so this
+     signature grows four PERSISTENT rows and no gname binders; main builds
+     them at exactly these names with [IcacheBoot.icache_boot_at] at
+     main+0x92 (fs-cfg-boot.md stage (e)). *)
+  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst
+             icfg_nib icfg_dev -∗
+  itable_inv -∗
+  ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
+  ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
   (* the proc array's lock invariant: allocproc scans it, and release gives
      back the slot userinit found.  Persistent, so threading it is free. *)
   procs_inv γs -∗

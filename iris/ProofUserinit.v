@@ -237,10 +237,14 @@ Section ProofUserinit.
     : wp_userinit_sconf_body γa γp γs m K eb pj on np v0 b lks.
   Proof.
     cbv beta delta [wp_userinit_sconf_body].
-    intros pcE ret_tgt HK Hnb Hbelow.
+    intros pcE ret_tgt HK Hnb Hdev Hnib Hbelow.
     pose (γf := γa).
     destruct (uin_kb K HK) as (Kap & Knm & Krl & K4 & Kpop).
-    iIntros "Hcg Hcpu #Htext #Hkd Hpc #Hpenv #Hpinv #Hlpid
+    (* the four inode-cache rows are PERSISTENT and are relayed unchanged to
+       namei's root corner at +0x20 (fs-cfg-boot.md stage (e)); nothing else
+       in userinit's body names them. *)
+    iIntros "Hcg Hcpu #Htext #Hkd Hpc #Hpenv #Hitl #Hitinv #Hesc #Hireg
+             #Hpinv #Hlpid
              Hkenv Hpav Hinitproc Hcont".
     (* the boot arm: at nesting level 0 the exit arm IS the entry base *)
     iDestruct (cpu_own_eb_agree with "Hcg Hcpu") as %Heb. cbn in Heb. subst eb.
@@ -520,12 +524,13 @@ Section ProofUserinit.
     iEval (rewrite -HR8a0) in "Hp0". iEval (rewrite -HR8a0) in "Hp1".
     iApply (NR.wp_namei_root_boot DfracDiscarded R8 1%nat
               (trap_res b + (K - 4))%nat b pj false ({["proc"]} ∪ lks)
-              ltac:(lia) ltac:(lia)
+              ltac:(lia) ltac:(lia) Hdev Hnib
               ltac:(apply locks_below_union_singleton;
                     [ vm_compute; lia
                     | apply (locks_below_mono lks "proc"%string "itable"%string
                                Hbelow); vm_compute; lia ])
-              with "Hcg Hcpu Htext Hkd Hpc Hpenv Hisl Hp0 Hp1").
+              with "Hcg Hcpu Htext Hkd Hpc Hpenv Hitl Hitinv Hesc Hireg
+                    Hisl Hp0 Hp1").
     iApply wp_next_off_intro.
     iIntros (mr2 ipv) "%Hcsnm Hcg Hcpu Hpc _ _ Hip".
     destruct Hcsnm as (Hcsnm & Hnma0).

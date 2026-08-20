@@ -183,22 +183,13 @@ Section SystemBoot.
       "(%Hdimg & #Htext & #Hdata & #Hstarted & #Hdev & #Hwinv &
         #Hcinv & #Hcert & Hharts & Hlk & Hgl & Hmdata & Hpark & Hpst & Hpavail & Huart &
         Hdlab & Hcfg & Hclaim & #Hdone & Hkpt & Hkmap & Hmir & Hpages & Hirauth & Hfs)".
-    (* ################################################################ *)
-    (* THE FILE SYSTEM'S BOOT KITS ARE DROPPED HERE, ON PURPOSE, AND     *)
-    (* STAGE (e) IS THE CONSUMER.  [Hfs] is the ten configuration ties   *)
-    (* plus [fs_kit_icache] plus [fs_kit_fsinit_ghost], and [Hirauth] is *)
-    (* the iref-slot authority [icache_boot_at] takes.  Threading them   *)
-    (* through [boot_hart_primary] into [SpecMain]'s boot arm -- so that *)
-    (* [ProofMain.mn_grp_fs] can run [bio_init_at]/[icache_boot_at]/the  *)
-    (* four [newlock_at]s and [SpecUserinit] can carry kit 2 to forkret  *)
-    (* -- is stage (e)'s FIRST step (fs-cfg-boot.md staging step 5).     *)
-    (* Iris is affine, so dropping them here is sound; what it costs is  *)
-    (* exactly that main cannot yet build the cache, i.e.               *)
-    (* [LinkNameiRootBoot]'s Axiom is still assumed.  The mint itself is *)
-    (* NOT wasted: it is what gives [fileG] a value at all, which is     *)
-    (* what makes that Axiom non-vacuous.                                *)
-    (* ################################################################ *)
-    iClear "Hirauth Hfs".
+    (* THE FILE SYSTEM'S BOOT KITS ARE NO LONGER DROPPED (stage (e)).
+       [Hfs] is the ten configuration ties plus [fs_kit_icache] plus
+       [fs_kit_fsinit_ghost], and [Hirauth] is the iref-slot authority
+       [icache_boot_at] takes.  Both now ride [boot_hart_primary] into
+       [SpecMain]'s boot arm, where [ProofMain.mn_grp_fs] runs
+       [icache_boot_at] on them and hands the four inode-cache rows to
+       [userinit] -- which is what discharged [LinkNameiRootBoot]'s Axiom. *)
     (* the harts' reservation mirrors (design §3a) are gone from this
        interface: [boot_shared_alloc] threads each into its hart's [pc_is]. *)
     (* [Hmdata] IS [BootShared.main_data_raw] -- the image's writable
@@ -222,12 +213,12 @@ Section SystemBoot.
     iDestruct (dev_inv_disk with "Hdev") as "#Hvinv".
     iDestruct (dev_inv_perm with "Hdev") as "#Hqinv".
     iModIntro.
-    iSplitL "Hh0 Hhrest Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Htx Hdlab Hcfg Hclaim Hkpt Hkmap
+    iSplitL "Hh0 Hhrest Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Hfs Hirauth Htx Hdlab Hcfg Hclaim Hkpt Hkmap
              Hpages".
     { iApply (big_sepL_cpu_glue
                 (fun c => WP (LoopE gen_id c : expr riscv_lang) @ ⊤
 )%I).
-      iSplitL "Hh0 Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Htx Hdlab Hcfg Hclaim Hkpt Hkmap
+      iSplitL "Hh0 Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Hfs Hirauth Htx Hdlab Hcfg Hclaim Hkpt Hkmap
                Hpages".
       { (* THE BOOT HART: the arm that consumes the whole supply. *)
         (* AT [HF] EXPLICITLY, not by resolution.  [SpecMain.MAIN]'s
@@ -241,8 +232,11 @@ Section SystemBoot.
         iDestruct "Hh0" as (iv) "Hh0".
         iApply (boot_hart_primary (fileG0 := HF) (CID := 0%fin)
                   (g.(gregs) 0%fin) iv DfracDiscarded γd γv ps l0 b0 c0
+                  (v_disk (g.(gdev).(dvirtio))) sb nib cov
                   (boot_regs_of_facts g Hbf 0%fin) fin_0_z Hprun Hplen Hlive
+                  ltac:(destruct Himg as (_&_&_&_&Hn0&_); exact Hn0)
                   with "Htext Hdata Hh0 Hstarted Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail
+                        Hfs Hirauth
                         Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim Hdone Hkpt Hkmap
                         Hpages"). }
       (* THE SEVEN SECONDARIES: every element of the tail is an [FS]. *)

@@ -573,7 +573,92 @@ Measured facts that supersede this file's earlier estimates:
   (`FsAdequacyImg.xv6_fs_adequacy_xv6Σ` MOVED, `xv6_power_adequacy_fsimg`
   NEW) audit at baseline+10 in the leaf. `fsimg_cov =
   [1..2000)`, `fsimg_nib = 13`, no new vm_compute (leaf 15.4 s).
-- **NEXT (in order):** (e) staging step 5 =
+- **(e) DONE, THE GATE IS MET** — `make audit-only` prints **EXACTLY SEVEN**
+  entries: the five Sail platform axioms (`valid_reservation`,
+  `plat_term_write`, `match_reservation`, `load_reservation`,
+  `cancel_reservation`), `functional_extensionality_dep`, and
+  `LinkForkretPark.ForkretPark.forkret_park`.
+  **`LinkNameiRootBoot.NameiRootBoot.wp_namei_root_boot` IS GONE.**
+  `Print Assumptions LinkMain.Main.wp_main_boot_sconf` = the same seven.
+  Whole-lane `make -f CoqMakefile -j24 -k`: zero Error lines.
+  What landed:
+  - **The threading.** `fs_boot_supply` MOVED from `BootShared.v` to
+    `FsCfgBoot.v` (BootShared sits above SpecMain/BootChain, so only the
+    lower home lets all three name the row); it rides
+    `boot_hart_primary` → `SpecMain.wp_main_boot_sconf_body` (new
+    parameters `dk sb nib cov`, new premises `fs_boot_supply _ _ …` +
+    `iref_slots_auth` + the pure `0 < nib`) → `ProofMain`.
+    `xv6_boot_era` no longer drops the kits. The `_ _` holes for
+    ICFG/FSC resolve through `file_icfg`/`file_fscfg` off the ambient
+    `fileG` with no divergence (measured: SpecMain compiles).
+  - **Kit 1 is split into three named units** in FsCfgBoot —
+    `fs_kit_printk` (1 row), `fs_kit_kalloc` (3), `fs_kit_icache_rest`
+    (11) — plus `fs_kit_icache_split` / the two `_open`s, because the
+    "pr" and "kmem" locks are built at main+0x6a / +0x6e, long before the
+    icache group. Also new: `fs_kit_fsinit_ghost_ireg` (peels the
+    PERSISTENT `ireg_inv` out of kit 2 without spending it).
+  - **Three `newlock_at`s replaced three `newlock`s**: `fsc_printk` in
+    `mn_grp_printk` (γpr is now the field, so `printk_env fsc_printk …`),
+    `fsc_kalloc` inside `ProofKinit` (debt E, below), `fsc_dlock` at
+    ProofMain.v's +0x9a seam. `mn_grp_kvm`'s `γa` existential is now
+    `fsc_kalloc` and `kalloc_env`'s hidden pair is `fsc_kpages`.
+  - **`icache_boot_at` runs at the +0x92→+0x96 seam**, on iinit's post
+    (which was being dropped) + `main_globals_raw`'s fifty `ientry_raw`s
+    (which main was carrying and dropping) + `iref_slots_auth` + kit 1's
+    ghost rows. The one address crossing is
+    `IcacheBoot.inode_lock_is_ientry_lock`, and it needs
+    `rewrite /inode_lock /inode_lock_base /inode_stride` first — the
+    lemma is stated over the raw literals, so `rewrite` cannot see the
+    `acur` application through SpecIinit's two constants.
+  - **The discharge is a functor application, as chartered.**
+    `SpecNameiRootBoot.wp_namei_root_boot_body` swapped `ICFG : icfg` for
+    `!fileG Σ` + `!pavG Σ` and gained the four inode-cache rows AT THE
+    AMBIENT FIELDS (`fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst
+    icfg_nib icfg_dev icfg_ist`) plus the two ties as ordinary premises.
+    Stating them at the fields rather than at nine gname parameters is
+    what kept `SpecUserinit`'s signature to four rows + two ties instead
+    of nine binders. `LinkNameiRootBoot` is then thirteen hypotheses
+    passed straight through to `LinkNameiRoot.NameiRoot.wp_namei_root`,
+    with the two `dev = icfg_dev` / `nib = icfg_nib` ties as `eq_refl`.
+    `ProofUserinit` relays; nothing about namei was re-proved.
+  - **Debt (E) PAID.** `SpecKinit` takes `(γl : gname) (γk : gname*gname)`
+    as parameters and `lock_free_tok γl` + `kalloc_avail γk (Some 0)` +
+    `kmem_avail_auth γk 0` as premises, and its post is at those names
+    with no existential; `ProofKinit` drops `kalloc_avail_alloc` and uses
+    `newlock_at`. This is the same `_at` discipline stage 1 applied to
+    the other WP-time constructors.
+- **(e) NOT DONE, and both stops are real:**
+  - **`bio_init_at` CANNOT RUN IN MAIN YET.** Row (P2) of
+    `fs_kit_icache`'s header lists "the thirty zeroed `struct buf` rows"
+    with producer "binit's postcondition + `boot_bss_carve`". Neither
+    produces them: `SpecBinit`'s post is the four lock/lru rows only, and
+    `main_globals_raw` carries `sl_raw`/`blink_raw`/`bhead` but NO
+    `b_valid`/`b_disk`/`b_dev`/`b_blockno`/`brefcnt`/`b_data` rows —
+    `grep` for `brefcnt`/`b_valid` in BootCarve.v / BootCarveMain.v /
+    BootShared.v / SpecMain.v returns NOTHING. So `bio_init_at` needs a
+    NEW .bss carve for 30 × (5 words + 1024 data bytes), widening
+    `boot_bss_carve` and `main_globals_raw`. That also blocks kit 2's row
+    (C) (`bslots`, which "crosses main via bio_init_at's post") and
+    `bio_ctx`'s trip to `main_deposit`. `bio_init_at` additionally wants
+    `0 ∉ bv_cov V`, which is `FsBoot.fs_cov_in_0` off `fs_cov_in` — a
+    pure premise that would have to be threaded like `0 < nib` is.
+    `fs_kit_icache_rest` still carries `bio_free_tok fsc_bio` and the
+    `pool_blk` big-op; main drops them today.
+  - **Debt (D) is NOT owed in main.** `grep bitmap_res` over the tree:
+    the only producer-side demand on the boot path is
+    `SpecFsinit.v:370` — i.e. forkret's first arm, stage (f). (The other
+    hits are syscall-layer consumers: SpecNameiparent, SpecIunlockput,
+    ProofIreclaim, ProofKexecA, FsSyscalls.) So the ruling in the stage
+    brief applies: the byte-level `FsImg` sweep (`P bmapstart =
+    BitmapInv.bitmap_bytes (u ∪ metadata)`), its `FsImgCheck`
+    instantiation, and a `FsCfgBoot` producer belong in **kit 2**, not in
+    main — which means `fs_cfg_alloc`'s conclusion and
+    `fs_boot_image_wf` grow, and the bitmap block plus `free_pool` have
+    to be carved out of kit 2's coverage remainder. NOT ATTEMPTED here:
+    it is era-fupd surgery ((d2a) territory) on a 212 s leaf, not a
+    stage-(e) walk edit.
+- **NEXT (in order):** (f) staging step 6, plus the two (e) leftovers
+  above. The OLD (e) list, for reference:
   thread the kits from `xv6_boot_era` through `boot_hart_primary` →
   `SpecMain` into `mn_grp_fs` (the `procs_avail` threading of
   main-boot.md §G3 is the precedent), adjoin the kit-header physical

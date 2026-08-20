@@ -68,6 +68,10 @@ From Kernel Require KernelData.
 From Kernel Require KernelSyms.
 Require Import KernelConsts.
 Require Import ProcAvail.
+(* [fs_boot_supply] / [iref_slots_auth] -- the file system's boot-era mint
+   and the iref-slot authority, both threaded from [BootShared] into
+   [SpecMain]'s boot arm (fs-cfg-boot.md stage (e)). *)
+Require Import FsCfgBoot IrefSlots.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
@@ -638,7 +642,11 @@ Section BootPrimary.
 
   Lemma boot_hart_primary (rs : regstate)
       (iv : mword 32) (dq : dfrac) (γd : uart_names) (γv : disk_names)
-      (ps : list (mword 64)) (l0 : list (bv 8)) (b0 : bool) (c0 : virtio_cfg) :
+      (ps : list (mword 64)) (l0 : list (bv 8)) (b0 : bool) (c0 : virtio_cfg)
+      (* the file system's boot-era mint, at the era's own disk: threaded
+         straight through to [SpecMain]'s boot arm (fs-cfg-boot.md stage
+         (e)).  This chain neither reads nor opens it. *)
+      (dk : Z -> bv 8) (sb : FsImg.fs_sb) (nib : nat) (cov : gset Z) :
     reset_regs cpu_id rs ->
     (* the BOOT hart: this is what makes main's [beqz a0] take the boot path *)
     (fin_to_nat cpu_id = 0)%nat ->
@@ -652,6 +660,9 @@ Section BootPrimary.
     (K_kvmmake + 64 + 3 < length ps)%nat ->
     (* the disk's protocol is in its not-live arm at boot *)
     virtio_live c0 = false ->
+    (* the inode region is nonempty -- [BootShared.fs_boot_image_wf]'s fifth
+       conjunct, forwarded to [SpecMain]'s own row *)
+    (0 < nib)%nat ->
     kernel_text -∗
     kernel_data -∗
     boot_hart_res rs iv dq -∗
@@ -673,6 +684,11 @@ Section BootPrimary.
     (* the proc table's counted regime, straight through from
        [BootShared.boot_shared_alloc] to main -- see [SpecMain]'s own row *)
     procs_avail (Some NPROC) -∗
+    (* the file system's boot-era mint and the iref-slot authority, both out
+       of [BootShared.boot_shared_alloc] and both spent in
+       [ProofMain.mn_grp_fs] -- see [SpecMain]'s own rows *)
+    fs_boot_supply _ _ dk sb nib cov γd γv -∗
+    iref_slots_auth -∗
     dev_inv γd γv -∗
     uart_tx_own γd l0 -∗ uart_sent γd l0 -∗ uart_out_lb γd l0 -∗
     uart_dlab_is γd (DfracOwn (1/2)) b0 -∗
@@ -684,8 +700,9 @@ Section BootPrimary.
     ([∗ list] p ∈ ps, page_own p) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hreset Hz Hprun Hlen Hlive.
+    intros Hreset Hz Hprun Hlen Hlive Hnib0.
     iIntros "#Htext #Hdata Hres #Hstarted Hlk Hgl Hfirst Hnext Hpark Hpst Hpav
+             Hfs Hirauth
              #Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim #Hdone Hkpt Hkmap Hpages".
     iApply (boot_entry_bridge rs iv dq Hreset with "Htext Hres").
     iIntros (mf) "Hcap Hctx Hcpu Hg Hraw #Htimc Hpc".
@@ -693,11 +710,13 @@ Section BootPrimary.
               (add_vec (and_vec (add_vec (mword_of_int kmem_lo : mword 64)
                  (mword_of_int 4095 : mword 64)) negPGSIZEv) PGSIZEv)
               (mword_of_int 0x88000000 : mword 64) γd γv l0 b0 c0
+              dk sb nib cov
               (register_lookup tlb rs) (main_deposit γd γv)
               (cid_word_of_zero _ Hz) K_main_boot_le eq_refl eq_refl Hprun Hlen
-              Hlive eq_refl
+              Hlive Hnib0 eq_refl
               with "Hcap Hctx Hcpu Hg Htext Hdata Hpc Hstarted [] Hlk Hgl
-                    Hfirst Hnext Hpark Hpst Hpav Hdev Htx Hsent Hlb Hdlab
+                    Hfirst Hnext Hpark Hpst Hpav Hfs Hirauth
+                    Hdev Htx Hsent Hlb Hdlab
                     Hcfg Hclaim Hdone Htimc Hraw Hkpt Hkmap Hpages").
     (* THE DEPOSIT WAND: main's boot arm hands over exactly [main_deposit]'s
        nine conjuncts at exactly its eight existential witnesses, so the wand

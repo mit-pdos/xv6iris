@@ -16,6 +16,8 @@ Require Import RiscvExtras.
 Require Import CalleeSaved.
 Require Import KernelText KernelDataInv.
 Require Import WpLock.
+(* [lock_free_tok] -- the caller-minted lock ghost this contract now fills *)
+Require Import WpLockAt.
 Require Import KallocInv.
 Require Import IntrDefs WpNext.
 Require Import CpuOwn.
@@ -25,7 +27,20 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 
-Definition wp_kinit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (ps : list (mword 64)) (K ncnt : nat) (eb : bool) (pcur : mword 64) (vlock : bv 32) (vname vcpu : bv 64) (b : bool) (lks : gset string) :=
+(* THE TWO GHOST NAMES ARE THE CALLER'S (fs-cfg-boot.md stage (e), debt E).
+   [γl] is the "kmem" spinlock's own gname and [γk] the free-list count/seal
+   pair its resource is keyed by; both used to be chosen HERE, by an
+   [own_alloc] and a [WpLock.newlock] at WP time, and returned
+   existentially.  They cannot be: [FsCfg.fscfg] carries them as
+   [fsc_kalloc] / [fsc_kpages] -- because [FsReady.fs_ready] has to SPELL
+   the allocator's lock and its sealed count, and a holder of an
+   existential can never show its own name equal to a field -- and a field
+   has to have a value before the boot fupd ends.  So this contract now
+   FILLS names it is given, exactly as [WpLockAt.newlock_at],
+   [BioInitAt.bio_init_at] and [IcacheBoot.icache_boot_at] do.  The three
+   premises below are what the era fupd hands over
+   ([FsCfgBoot.fs_kit_icache]'s last three rows). *)
+Definition wp_kinit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (γk : gname * gname) (m : regfile) (ps : list (mword 64)) (K ncnt : nat) (eb : bool) (pcur : mword 64) (vlock : bv 32) (vname vcpu : bv 64) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kinit in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   let lk : mword 64 := mword_of_int KernelSyms.kmem in
@@ -51,8 +66,15 @@ Definition wp_kinit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : C
   c_cpu ↦₈ vcpu -∗
   fl ↦₈ (mword_of_int 0 : mword 64) -∗
   ([∗ list] p ∈ ps, page_own p) -∗
+  (* the "kmem" lock's ghost, unbuilt: [WpLockAt.lock_ghost_alloc]'s pair at
+     [None].  What [WpLockAt.newlock_at] fills. *)
+  lock_free_tok γl -∗
+  (* the free-list count at GENESIS -- zero pages -- in both halves.  The
+     [ghost_var] pair [KallocInv.kalloc_avail_alloc] used to mint here. *)
+  kalloc_avail γk (Some 0%nat) -∗
+  kmem_avail_auth γk 0%nat -∗
   wp_next b pcur (fun (CID : CpuId) =>
-    ∀ (γl : gname) (γk : gname * gname) (mr : regfile),
+    ∀ (mr : regfile),
     sie_cap_gpr KT0 mr K b pcur -∗
     cpu_own ncnt eb pcur b lks -∗
     pc_is ret_tgt -∗
@@ -64,6 +86,6 @@ Definition wp_kinit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : C
 
 Module Type KINIT.
   Parameter wp_kinit_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (ps : list (mword 64)) (K ncnt : nat) (eb : bool) (pcur : mword 64) (vlock : bv 32) (vname vcpu : bv 64) (b : bool) (lks : gset string),
-      wp_kinit_sconf_body m ps K ncnt eb pcur vlock vname vcpu b lks.
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (γk : gname * gname) (m : regfile) (ps : list (mword 64)) (K ncnt : nat) (eb : bool) (pcur : mword 64) (vlock : bv 32) (vname vcpu : bv 64) (b : bool) (lks : gset string),
+      wp_kinit_sconf_body γl γk m ps K ncnt eb pcur vlock vname vcpu b lks.
 End KINIT.

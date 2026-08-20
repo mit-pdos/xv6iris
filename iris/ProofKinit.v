@@ -3,9 +3,14 @@
    freerange(end, PHYSTOP), with the allocator invariant [is_kmem] and the boot
    page-count token [kalloc_avail γk (Some 0)] freshly allocated in between (the
    "newlock" ghost step).  Straight-line (no loop): a 16-byte frame, two jal
-   sub-calls, and the ghost allocation.  Post hands back the freshly minted
-   [is_kmem γl γk lk fl] and [kalloc_avail γk (Some (length ps))] -- the count of
-   pages freerange just freed. *)
+   sub-calls, and the ghost step.  NOTHING IS MINTED HERE ANY MORE
+   (fs-cfg-boot.md stage (e), debt E): [γl] and [γk] are the CALLER's --
+   [FsCfg.fscfg]'s [fsc_kalloc] and [fsc_kpages], minted in the boot-era
+   fupd because [FsReady.fs_ready] has to spell the allocator's lock and its
+   sealed count -- and the ghost step is [WpLockAt.newlock_at] over the free
+   token and the genesis count pair it is handed.  Post hands back
+   [is_kmem γl γk lk fl] and [kalloc_avail γk (Some (length ps))] at those
+   names -- the count of pages freerange just freed. *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
@@ -24,6 +29,7 @@ Require Import RiscvExtras.
 Require Import StackOwn CalleeSaved.
 Require Import KernelDataInv.
 Require Import WpLock.
+Require Import WpLockAt.   (* [newlock_at]: the lock's gname is the caller's *)
 Require Import KallocInv.
 Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.
@@ -46,17 +52,18 @@ Section ProofKinit.
 
 
   Lemma wp_kinit_sconf
-      (m : regfile)
+      (γl : gname) (γk : gname * gname) (m : regfile)
       (ps : list (mword 64)) (K ncnt : nat) (eb : bool) (pcur : mword 64)
       (vlock : bv 32) (vname vcpu : bv 64) (b : bool) (lks : gset string)
-    : wp_kinit_sconf_body m ps K ncnt eb pcur vlock vname vcpu b lks.
+    : wp_kinit_sconf_body γl γk m ps K ncnt eb pcur vlock vname vcpu b lks.
   Proof.
     cbv beta delta [wp_kinit_sconf_body].
     intros pcE ret_tgt lk fl c_name c_cpu endaddr phystop s1entry
       HK Hncnt Hprun Hlkbelow.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))).
-    iIntros "Hcg Hcnt #Htext #Hkdata Hpc Hlock Hname Hcpu Hflw Hpages Hcont".
+    iIntros "Hcg Hcnt #Htext #Hkdata Hpc Hlock Hname Hcpu Hflw Hpages
+             Hlkfree Havail Hauth Hcont".
     (* the "kmem" string literal, read out of the kernel's data image *)
     assert (Hkmem : forall j bt, cstring_bytes "kmem"%string !! j = Some bt ->
                       KernelData.kernel_data !! (0x80007040 + Z.of_nat j)%Z = Some bt).
@@ -219,17 +226,22 @@ Section ProofKinit.
     assert (Hpcil : ret_pc (R7 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kinit + 0x1c)).
     { rewrite HR7ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpcil) in "Hpc".
-    (* ===== newlock ghost: allocate is_kmem γl γk lk fl + kalloc_avail (Some 0);
-       initlock's two zeroed words (locked + cpu) go INTO the invariant and
-       every hart's not-holder ticket comes out.  Pure ghost step, unaffected
-       by which hart we are on. ===== *)
+    (* ===== newlock ghost: BUILD [is_kmem γl γk lk fl] AT THE CALLER'S TWO
+       NAMES (fs-cfg-boot.md stage (e), debt E).  Nothing is minted here any
+       more: the count pair arrives at genesis ([Havail]/[Hauth], the era
+       fupd's [kalloc_avail γk (Some 0)] + [kmem_avail_auth γk 0]) and the
+       lock's ghost arrives unbuilt ([Hlkfree]), so this step is
+       [WpLockAt.newlock_at] rather than [WpLock.newlock] -- same premises
+       plus the free token, and no existential out.  initlock's two zeroed
+       words (locked + cpu) still go INTO the invariant and every hart's
+       not-holder ticket still comes out.  Pure ghost step, unaffected by
+       which hart we are on. ===== *)
     iApply fupd_wp.
-    iMod (kalloc_avail_alloc 0%nat) as (γk) "[Havail Hauth]".
     iAssert (kmem_res γk fl) with "[Hflw Hauth]" as "HR".
     { iApply (kmem_res_close γk fl nullp []). rewrite /word_at.
       iSplitL "Hflw"; [iExact "Hflw" |]. iSplitR "Hauth"; [iPureIntro; reflexivity | iExact "Hauth"]. }
-    iMod (newlock ⊤ lk "kmem"%string (kmem_res γk fl)
-            with "Hlnm Hlock Hcpu HR") as (γl) "#Hkmem".
+    iMod (newlock_at ⊤ γl lk "kmem"%string (kmem_res γk fl)
+            with "Hlkfree Hlnm Hlock Hcpu HR") as "#Hkmem".
     iModIntro.
     pose proof Hilcs as Hilcs_full. unfold callee_saved in Hilcs.
     destruct Hilcs as (Hilsp & Hils0 & Hils1 & Hils2 & Hils3 & Hils4 & Hils5 & Hils6 & Hils7 & Hils8 & Hils9 & Hils10 & Hils11).
@@ -409,7 +421,7 @@ Section ProofKinit.
     iDestruct (cpu_own_transport CIDfr CID18 ncnt eb pcur b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iSpecialize ("Hcont" $! CID18 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! γl γk E3 with "Hcg Hcnt Hpc [%] Hkmem Havail").
+    iApply ("Hcont" $! E3 with "Hcg Hcnt Hpc [%] Hkmem Havail").
     (* callee_saved m E3: the two sub-calls preserve s1..s11; the epilogue
        restores sp/s0, and ra (caller-saved) is irrelevant. *)
     assert (Hthread : forall c : mword 5, is_cs_idx c = true ->

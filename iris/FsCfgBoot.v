@@ -949,6 +949,103 @@ Section FsCfgBootEra.
   Proof. iIntros "H". iExact "H". Qed.
 
   (* ==================================================================== *)
+  (*  KIT 1'S TWO EARLY PEELS (stage (e))                                  *)
+  (* ==================================================================== *)
+
+  (*  Three of kit 1's fifteen rows are spent BEFORE the inode-cache group:
+      the "pr" lock's ghost at main+0x6a ([ProofMain.mn_grp_printk]) and the
+      "kmem" lock's ghost plus kinit's genesis page count at main+0x6e
+      ([ProofMain.mn_grp_kvm], through [SpecKinit]'s three premises -- debt
+      (E)).  They are peeled as NAMED units rather than by opening the kit
+      at main's top and handing eleven loose rows to one group: a walk group
+      that names one opaque row says what it takes, and nothing has to carry
+      another group's material past its own call.                          *)
+  Definition fs_kit_printk (ICFG : icfg) (FSC : fscfg) : iProp Σ :=
+    lock_free_tok fsc_printk.
+
+  Definition fs_kit_kalloc (ICFG : icfg) (FSC : fscfg) : iProp Σ :=
+    (lock_free_tok fsc_kalloc ∗
+     kalloc_avail fsc_kpages (Some 0%nat) ∗
+     kmem_avail_auth fsc_kpages 0%nat)%I.
+
+  (*  ...and what is left, which is what [icache_boot_at] / [bio_init_at] /
+      the vdisk [newlock_at] take between main+0x8e and +0xa2.             *)
+  Definition fs_kit_icache_rest (ICFG : icfg) (FSC : fscfg) : iProp Σ :=
+    (own icfg_iref (● (∅ : gmap nat (Qp * positive)) : icacheUR) ∗
+     ([∗ list] k ∈ seq 0 (NINODE + NINODE), live_frac k 1%Qp) ∗
+     ([∗ list] k ∈ seq 0 NINODE,
+        sl_free_tok (icfg_isl k) ∗ slh_auth (icfg_isl k) None) ∗
+     ipool fsc_fs fsc_ireg fsc_cov fsc_logst (region_inums icfg_nib) ∗
+     lock_free_tok fsc_itlock ∗
+     ([∗ list] k ∈ seq 0 NINODE, ic_tok fsc_ic k) ∗
+     ([∗ list] k ∈ seq 0 NINODE, ic_mid fsc_ic k) ∗
+     ([∗ list] k ∈ seq 0 NINODE,
+        ∃ (v : bool) (d n : mword 32), ic_id fsc_ic k 1 v d n) ∗
+     bio_free_tok fsc_bio ∗
+     ([∗ set] b ∈ fsc_cov,
+        pool_blk (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) b) ∗
+     lock_free_tok fsc_dlock)%I.
+
+  Lemma fs_kit_icache_split (ICFG : icfg) (FSC : fscfg) :
+    fs_kit_icache ICFG FSC -∗
+      fs_kit_printk ICFG FSC ∗ fs_kit_kalloc ICFG FSC ∗
+      fs_kit_icache_rest ICFG FSC.
+  Proof.
+    iIntros "H".
+    iDestruct (fs_kit_icache_open with "H")
+      as "(Hiref & Hlive & Hislg & Hipool & Hitlk & Htok & Hmid & Hgid &
+           Hbio & Hpool & Hkmlk & Hdllk & Hprlk & Hkav & Hkauth)".
+    rewrite /fs_kit_printk /fs_kit_kalloc /fs_kit_icache_rest.
+    iFrame "Hprlk Hkmlk Hkav Hkauth Hiref Hlive Hislg Hipool Hitlk Htok
+            Hmid Hgid Hbio Hpool Hdllk".
+  Qed.
+
+  Lemma fs_kit_kalloc_open (ICFG : icfg) (FSC : fscfg) :
+    fs_kit_kalloc ICFG FSC -∗
+      lock_free_tok fsc_kalloc ∗
+      kalloc_avail fsc_kpages (Some 0%nat) ∗
+      kmem_avail_auth fsc_kpages 0%nat.
+  Proof. iIntros "H". iExact "H". Qed.
+
+  Lemma fs_kit_icache_rest_open (ICFG : icfg) (FSC : fscfg) :
+    fs_kit_icache_rest ICFG FSC -∗
+      own icfg_iref (● (∅ : gmap nat (Qp * positive)) : icacheUR) ∗
+      ([∗ list] k ∈ seq 0 (NINODE + NINODE), live_frac k 1%Qp) ∗
+      ([∗ list] k ∈ seq 0 NINODE,
+         sl_free_tok (icfg_isl k) ∗ slh_auth (icfg_isl k) None) ∗
+      ipool fsc_fs fsc_ireg fsc_cov fsc_logst (region_inums icfg_nib) ∗
+      lock_free_tok fsc_itlock ∗
+      ([∗ list] k ∈ seq 0 NINODE, ic_tok fsc_ic k) ∗
+      ([∗ list] k ∈ seq 0 NINODE, ic_mid fsc_ic k) ∗
+      ([∗ list] k ∈ seq 0 NINODE,
+         ∃ (v : bool) (d n : mword 32), ic_id fsc_ic k 1 v d n) ∗
+      bio_free_tok fsc_bio ∗
+      ([∗ set] b ∈ fsc_cov,
+         pool_blk (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) b) ∗
+      lock_free_tok fsc_dlock.
+  Proof. iIntros "H". iExact "H". Qed.
+
+  (*  THE ONE ROW OF KIT 2 THAT main ITSELF NEEDS, peeled without spending
+      the kit.  [ireg_inv] is PERSISTENT, so this is a duplication, not a
+      split: [SpecUserinit]'s namei corner takes it as one of the four
+      inode-cache rows (stage (e)), while the kit as a whole rides on to
+      forkret's [fsinit] (stage (f)).  Stated as its own lemma so neither
+      site has to know the kit's ordering.                                *)
+  Lemma fs_kit_fsinit_ghost_ireg (ICFG : icfg) (FSC : fscfg)
+      (P : Z -> list (bv 8)) (Rspent : gset Z) :
+    fs_kit_fsinit_ghost ICFG FSC P Rspent -∗
+      ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib ∗
+      fs_kit_fsinit_ghost ICFG FSC P Rspent.
+  Proof.
+    iIntros "H".
+    iDestruct (fs_kit_fsinit_ghost_open with "H")
+      as "(Hlog & Hboot & #Hireg & Hb1 & Hauths & Hdty & Hhdr & Hslots & Hrem)".
+    iSplitR; [iExact "Hireg" |].
+    rewrite /fs_kit_fsinit_ghost.
+    iFrame "Hireg Hlog Hboot Hb1 Hauths Hdty Hhdr Hslots Hrem".
+  Qed.
+
+  (* ==================================================================== *)
   (*  THE ERA FUPD                                                        *)
   (* ==================================================================== *)
 
@@ -1240,3 +1337,34 @@ Section FsCfgBootEra.
   Qed.
 
 End FsCfgBootEra.
+
+(* ====================================================================== *)
+(*  THE FILE SYSTEM'S BOOT-ERA OUTPUT, AS ONE ROW.                         *)
+(*                                                                        *)
+(*  BYTE-IDENTICAL TO [fs_cfg_alloc]'s conclusion body (ten ties, then the *)
+(*  two kits, in that order), which is what makes                          *)
+(*  [BootShared.boot_shared_alloc]'s wiring one [iExact] -- and what makes *)
+(*  stage (e)'s reading of it the same destructuring the era fupd's own    *)
+(*  post has.  [ICFG]/[FSC] are parameters rather than resolved from an    *)
+(*  ambient class: the caller passes [fileG]'s own two projections, so     *)
+(*  every row is stated AT THE INSTANCE the boot chain is applied at.      *)
+(*                                                                        *)
+(*  IT LIVES HERE, not in [BootShared.v], because stage (e) threads it     *)
+(*  through [SpecMain] -> [BootChain] into [ProofMain.mn_grp_fs], and      *)
+(*  both of those files sit BELOW [BootShared].  [BootShared] imports this *)
+(*  file already.                                                          *)
+(* ====================================================================== *)
+Definition fs_boot_supply `{!riscvGS Σ, !xv6G Σ}
+    (ICFG : icfg) (FSC : fscfg) (dk : Z -> bv 8)
+    (sb : fs_sb) (nib : nat) (cov : gset Z)
+    (γd : uart_names) (γv : disk_names) : iProp Σ :=
+  (⌜icfg_dev = InodeInv.ROOTDEV⌝ ∗ ⌜icfg_nib = nib⌝ ∗
+   ⌜icfg_ist = FsImg.sb_inodestart sb⌝ ∗
+   ⌜fsc_uart = γd⌝ ∗ ⌜fsc_disk = γv⌝ ∗ ⌜fsc_cov = cov⌝ ∗
+   ⌜fsc_logst = FsImg.sb_logstart sb⌝ ∗
+   ⌜fsc_bmapstart = FsImg.sb_bmapstart sb⌝ ∗
+   ⌜fsc_size = FsImg.sb_size sb⌝ ∗ ⌜fsc_ninodes = FsImg.sb_ninodes sb⌝ ∗
+   fs_kit_icache ICFG FSC ∗
+   fs_kit_fsinit_ghost ICFG FSC (FsCrash.fs_blocks dk)
+     (fs_kit_spent (FsCrash.fs_blocks dk) sb nib
+        (FsImg.fs_live_set (FsCrash.fs_blocks dk) sb)))%I.

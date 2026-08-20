@@ -91,6 +91,19 @@ Require Import SpecPanic.
 (* [K_allocproc] -- userinit's page premise is stated at allocproc's own
    strict bound, not at a round number *)
 Require Import SpecAllocproc.
+(* THE FILE SYSTEM'S BOOT-ERA MINT AND THE INODE CACHE (fs-cfg-boot.md
+   stage (e)).  [FsCfgBoot] carries the two boot kits and their opening
+   lemmas, [IcacheBoot] the [icache_boot_at] fupd this file now runs at
+   main+0x92 plus [ientry_raw] / [inode_lock_is_ientry_lock], and the other
+   four the four persistent rows it produces.  IMPORTED BEFORE [SpecIinit]
+   on purpose: [NINODE] below must stay [SpecIinit]'s, which is what
+   [main_globals_raw] and iinit's own postcondition are stated at
+   ([IcacheRef.NINODE] is convertible with it, and every crossing is a
+   conversion the [icache_boot_at] application does itself). *)
+Require Import FsCfgBoot.
+Require Import WpLockAt.   (* [newlock_at] / [lock_free_tok] *)
+Require Import IcacheBoot IcacheInv IcacheEscrow InodeRegion InodeInv.
+Require Import IrefSlots FsCfg FsBlocks.
 Require Import SpecBinit SpecIinit SpecFileinit SpecVirtioDiskInit.
 Require Import SpecUserinit SpecScheduler SpecKernelvec SpecFreerange.
 Require Import SpecDevintr SpecClockintr TicksInv.
@@ -398,6 +411,11 @@ Section ProofMain.
     (* the transmit spinlock's three raw fields, on their way to uartinit *)
     lk_raw (mword_of_int KernelSyms.tx_lock) -∗
     lk_raw (mword_of_int KernelSyms.pr) -∗
+    (* the "pr" lock's ghost, at the AMBIENT [fsc_printk] -- kit 1's first
+       early peel (fs-cfg-boot.md stage (e), row (P3)).  [FsReady.fs_ready]
+       spells [printk_env] at that field, so the gname cannot be an
+       existential this group invents. *)
+    fs_kit_printk _ _ -∗
     (∃ r w : mword 64, devsw_console_read ↦₈ r ∗ devsw_console_write ↦₈ w) -∗
     (* the console RING, which this group locks up behind cons.lock *)
     cons_res -∗
@@ -415,7 +433,7 @@ Section ProofMain.
   Proof.
     intros Hn.
     iIntros "Hcg #Htext #Hkdata #Hdev Hpc Hfree Hcpu Hlcons Hltx Hlpr".
-    iIntros "Hdevsw Hring Htx Hsent Hlb Hdlab Hcont".
+    iIntros "Hkprintk Hdevsw Hring Htx Hsent Hlb Hdlab Hcont".
     iPoseProof (dev_inv_uart with "Hdev") as "#Huinv".
     iPoseProof (mni_42 with "Htext") as "Hi42".
     iPoseProof (mni_46 with "Htext") as "Hi46".
@@ -510,8 +528,10 @@ Section ProofMain.
        the same persistent witness instead of re-deriving it. *)
     iDestruct "Hsent" as "#Hsent".
     iPoseProof (uart_sent_sub_nil γd l0 with "Hsent") as "#Hsub0".
-    iMod (newlock ⊤ (mword_of_int KernelSyms.pr) "pr"%string (pr_res γd)
-            with "Hprnm Hprw Hprcpu []") as (γpr) "#Hprlk".
+    (* [newlock_at] at [fsc_printk], not [newlock] with a fresh γ *)
+    rewrite /fs_kit_printk.
+    iMod (newlock_at ⊤ fsc_printk (mword_of_int KernelSyms.pr) "pr"%string
+            (pr_res γd) with "Hkprintk Hprnm Hprw Hprcpu []") as "#Hprlk".
     { rewrite /pr_res. done. }
     (* ---- THE OTHER TWO [newlock]s, and this is the point of the group.
        consoleinit has just run [initlock] on cons.lock and, through uartinit,
@@ -532,7 +552,7 @@ Section ProofMain.
        both consumers (LinkPrintk.v needs the witness to invoke the real
        [SpecPrintk.wp_printk_sconf]). *)
     iPoseProof (is_txlock_intro γtx γd with "Htxinv Hdoff") as "#Htxl".
-    iAssert (printk_env γpr γd γv) as "#Hpenv".
+    iAssert (printk_env fsc_printk γd γv) as "#Hpenv".
     { rewrite /printk_env /pr_lock. iSplitR; [iExact "Hprlk"|].
       iSplitR; [iExact "Hdoff" |].
       iSplitR; [iExact "Hdev" |].
@@ -591,7 +611,7 @@ Section ProofMain.
     assert (HA3a0 : A3 !!! Regidx (mword_of_int 10 : mword 5)
                     = (mword_of_int mn_nl_addr : mword 64))
       by (rewrite /A3 upd_ne; [exact HA2a0 | reg_neq]).
-    iApply (PrintkGen.wp_printk_gen_sconf KT0 γpr γd γv A3 n false p0
+    iApply (PrintkGen.wp_printk_gen_sconf KT0 fsc_printk γd γv A3 n false p0
               mn_nl [] false ∅ ltac:(lia) Hlnl Hnnl ltac:(rewrite Hknl; reflexivity)
               ltac:(cbn [length]; lia) (locks_below_empty "pr")
               with "Hcg Htext Hkdata Hpc Hcpu Hpenv [] [//]").
@@ -649,7 +669,7 @@ Section ProofMain.
     assert (HB3a0 : B3 !!! Regidx (mword_of_int 10 : mword 5)
                     = (mword_of_int mn_boot_addr : mword 64))
       by (rewrite /B3 upd_ne; [exact HB2a0 | reg_neq]).
-    iApply (PrintkGen.wp_printk_gen_sconf KT0 γpr γd γv B3 n false p0
+    iApply (PrintkGen.wp_printk_gen_sconf KT0 fsc_printk γd γv B3 n false p0
               mn_boot [] false ∅ ltac:(lia) Hlbt Hnbt ltac:(rewrite Hkbt; reflexivity)
               ltac:(cbn [length]; lia) (locks_below_empty "pr")
               with "Hcg Htext Hkdata Hpc Hcpu Hpenv [] [//]").
@@ -707,7 +727,7 @@ Section ProofMain.
     assert (HD3a0 : D3 !!! Regidx (mword_of_int 10 : mword 5)
                     = (mword_of_int mn_nl_addr : mword 64))
       by (rewrite /D3 upd_ne; [exact HD2a0 | reg_neq]).
-    iApply (PrintkGen.wp_printk_gen_sconf KT0 γpr γd γv D3 n false p0
+    iApply (PrintkGen.wp_printk_gen_sconf KT0 fsc_printk γd γv D3 n false p0
               mn_nl [] false ∅ ltac:(lia) Hlnl Hnnl ltac:(rewrite Hknl; reflexivity)
               ltac:(cbn [length]; lia) (locks_below_empty "pr")
               with "Hcg Htext Hkdata Hpc Hcpu Hpenv [] [//]").
@@ -720,7 +740,7 @@ Section ProofMain.
     { rewrite /D3 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hretpk3) in "Hpc".
     destruct Hcsk3 as (Hcsk3 & _).
-    iApply ("Hcont" $! γpr mk3 with "Hcg Hpc Hfree Hcpu Hpenv Hccaps").
+    iApply ("Hcont" $! fsc_printk mk3 with "Hcg Hpc Hfree Hcpu Hpenv Hccaps").
   Qed.
 
   (* =================================================================== *)
@@ -750,6 +770,12 @@ Section ProofMain.
     cpu_ctx_free -∗
     cpu_own 0 false p0 false ∅ -∗
     lk_raw (mword_of_int KernelSyms.kmem) -∗
+    (* the "kmem" lock's ghost and the free-list count at genesis, at the
+       AMBIENT [fsc_kalloc] / [fsc_kpages] -- kit 1's second early peel and
+       fs-cfg-boot.md's debt (E).  [SpecKinit] now FILLS these three rather
+       than minting a pair of its own, because [FsReady.fs_ready] has to
+       spell the allocator's lock and its sealed count. *)
+    fs_kit_kalloc _ _ -∗
     (mword_of_int (KernelSyms.kmem + 24) : mword 64) ↦₈ (mword_of_int 0 : mword 64) -∗
     ([∗ list] p ∈ ps, page_own p) -∗
     (∃ kpt0 : mword 64,
@@ -796,7 +822,7 @@ Section ProofMain.
   Proof.
     intros Hn Hphystop Hs1 Hprun Hlen.
     subst phystop s1entry.
-    iIntros "Hcg #Htext #Hkdata Hpc Hfree Hcpu Hlkmem Hkmem24 Hpages Hkpt".
+    iIntros "Hcg #Htext #Hkdata Hpc Hfree Hcpu Hlkmem Hkkalloc Hkmem24 Hpages Hkpt".
     iIntros "Hsbit Htlb Hunset Hkauth Hlpid Hlwait Hnpid Hprocs Hppub Hfds Hirs Hparks Hpst Hcont".
     iPoseProof (mni_6e with "Htext") as "Hi6e".
     iPoseProof (mni_72 with "Htext") as "Hi72".
@@ -818,19 +844,23 @@ Section ProofMain.
               = (mword_of_int KernelSyms.kinit : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtki) in "Hpc".
-    iApply (Kinit.wp_kinit_sconf V1 ps n 0%nat false p0 vkl vkn vkc
+    iDestruct (fs_kit_kalloc_open with "Hkkalloc")
+      as "(Hkmfree & Hkmav & Hkmcnt)".
+    iApply (Kinit.wp_kinit_sconf fsc_kalloc fsc_kpages V1 ps n 0%nat false p0
+              vkl vkn vkc
               false ∅ ltac:(lia) eq_refl Hprun (locks_below_empty _)
-              with "Hcg Hcpu Htext Hkdata Hpc Hkw Hkn Hkc Hkmem24 Hpages").
+              with "Hcg Hcpu Htext Hkdata Hpc Hkw Hkn Hkc Hkmem24 Hpages
+                    Hkmfree Hkmav Hkmcnt").
     all: try lkbelow.
     iApply wp_next_off_intro.
-    iIntros (γl γk mki) "Hcg Hcpu Hpc %Hcski #Hkmem Havail".
+    iIntros (mki) "Hcg Hcpu Hpc %Hcski #Hkmem Havail".
     assert (Hretki : ret_pc (V1 !!! Regidx (mword_of_int 1 : mword 5) : mword 64)
                      = (mword_of_int (KernelSyms.main + 0x72) : mword 64)).
     { rewrite /V1 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hretki) in "Hpc".
     (* ---- ASSEMBLY 1: kalloc_env out of + kalloc_avail ---- *)
-    iAssert (kalloc_env γl (Some (length ps))) with "[Havail]" as "Hkenv".
-    { rewrite /kalloc_env. iExists γk. iSplitR; [iExact "Hkmem"|].
+    iAssert (kalloc_env fsc_kalloc (Some (length ps))) with "[Havail]" as "Hkenv".
+    { rewrite /kalloc_env. iExists fsc_kpages. iSplitR; [iExact "Hkmem"|].
       iExact "Havail". }
     (* ---- +0x72 jal kvminit ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x72)) (mword_of_int 1 : mword 5)
@@ -846,7 +876,7 @@ Section ProofMain.
               = (mword_of_int KernelSyms.kvminit : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtkv) in "Hpc".
-    iApply (Kvminit.wp_kvminit_sconf γl V2 0%nat n false p0
+    iApply (Kvminit.wp_kvminit_sconf fsc_kalloc V2 0%nat n false p0
               (Some (length ps)) kpt0 false ∅ eq_refl ltac:(lia)
               ltac:(exists (length ps); split; [reflexivity | lia])
               with "Hcg Hcpu Htext Hpc Hkpt Hkenv").
@@ -966,7 +996,7 @@ Section ProofMain.
             with "Hpnm Hpw Hpc0 [Hnpid]") as (γp) "#Hpidlock".
     { rewrite /nextpid_res. iExact "Hnpid". }
     iModIntro.
-    iApply ("Hcont" $! γl γp γs mpr (pt_base t) pas
+    iApply ("Hcont" $! fsc_kalloc γp γs mpr (pt_base t) pas
               with "Hcg Hpc Hfree Hcpu Hkenv Hpinv Hpidlock Hkptr Hstvec Hkinv
                     Hkptp Htramp Hkstx").
   Qed.
@@ -1135,10 +1165,17 @@ Section ProofMain.
   Local Lemma mn_grp_fs 
       (γa γp : gname) (γs : list gname) (γv : disk_names) (γd : uart_names)
       (m : regfile) (n : nat) (p0 : mword 64)
-      (ps : list (mword 64)) (c0 : virtio_cfg) (free0 : nat -> bv 8) :
+      (ps : list (mword 64)) (c0 : virtio_cfg) (free0 : nat -> bv 8)
+      (* kit 2's two parameters, carried opaquely: this group neither reads
+         the image nor spends the kit (stage (f) does, at forkret). *)
+      (Pimg : Z -> list (bv 8)) (Rspent : gset Z) :
     (K_userinit <= n)%nat ->
     (K_kvmmake + 64 + 3 < length ps)%nat ->
     virtio_live c0 = false ->
+    (* the two configuration ties, out of [FsCfgBoot.fs_boot_supply]; this
+       group forwards them to userinit's namei corner *)
+    icfg_dev = ROOTDEV ->
+    (0 < icfg_nib)%nat ->
     sie_cap_gpr KT1 m n false p0 -∗
     kernel_text -∗ kernel_data -∗ dev_inv γd γv -∗
     (* iget's "iget: no inodes" arm, reached through userinit's namei *)
@@ -1166,6 +1203,26 @@ Section ProofMain.
     blink_raw bhead -∗
     lk_raw itable_addr -∗
     ([∗ list] i ∈ seq 0 NINODE, sl_raw (inode_lock i)) -∗
+    (* ---- THE INODE CACHE'S BOOT MATERIAL (fs-cfg-boot.md stage (e)) ----
+       [fs_kit_icache] is the era fupd's GHOST half -- the empty-table count
+       authority, the liveness pool, the fifty sleeplock ghost pairs, THE
+       STOCKED INODE POOL, the itable lock's free token and the three escrow
+       families.  Its physical counterpart is iinit's postcondition plus the
+       fifty [ientry_raw]s below (row (P1) of the kit's header), and
+       [IcacheBoot.icache_boot_at] joins the two at main+0x92.
+
+       [iref_slots_auth] is row (P4): minted by [IrefSlots.iref_slots_alloc]
+       inside [BootShared.boot_shared_alloc], not by the era fupd.
+
+       [fs_kit_fsinit_ghost] is NOT spent here.  This group takes [ireg_inv]
+       out of it (persistent -- [FsCfgBoot.fs_kit_fsinit_ghost_ireg], the
+       fourth of userinit's rows) and DROPS the rest at the userinit call;
+       stage (f) is what deposits it into [FirstTok.first_tok]'s widened
+       left disjunct so that forkret's [fsinit] can spend it. *)
+    fs_kit_icache_rest _ _ -∗
+    fs_kit_fsinit_ghost _ _ Pimg Rspent -∗
+    iref_slots_auth -∗
+    ([∗ list] k ∈ seq 0 NINODE, ientry_raw k) -∗
     lk_raw (mword_of_int KernelSyms.ftable) -∗
     lk_raw disk_lock -∗
     (∃ pd pav pu : mword 64,
@@ -1187,10 +1244,10 @@ Section ProofMain.
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hn Hlen Hlive.
+    intros Hn Hlen Hlive Hdevq Hnibq.
     iIntros "Hcg #Htext #Hkdata #Hdev #Hpanic Hpc Hfree Hcpu #Hpinv Hpavail
              #Hlpidlk Hkenv".
-    iIntros "Hlbc Hbufl Hbufn Hbhead Hlit Hinl Hlft Hldisk".
+    iIntros "Hlbc Hbufl Hbufn Hbhead Hlit Hinl Hkit1 Hkit2 Hirauth Hient Hlft Hldisk".
     iIntros "Hdiskptr Hdiskfree Hdusedidx Hdslots Hclaim #Hdone Hcfg Hinitproc Hcont".
     iPoseProof (dev_inv_disk with "Hdev") as "#Hdinv".
     iPoseProof (mni_8e with "Htext") as "Hi8e".
@@ -1252,11 +1309,52 @@ Section ProofMain.
     iApply (Iinit.wp_iinit_sconf F2 n vil vin vic false p0 ltac:(lia)
               with "Hcg Htext Hkdata Hpc Hiw Hin Hic Hinl").
     iApply wp_next_off_intro.
-    iIntros (mii) "Hcg Hpc %Hcsii _ _ _ _".
+    iIntros (mii) "Hcg Hpc %Hcsii Hitw #Hitnm Hitcpu Hslf".
     assert (Hretii : ret_pc (F2 !!! Regidx (mword_of_int 1 : mword 5))
                      = (mword_of_int (KernelSyms.main + 0x96) : mword 64)).
     { rewrite /F2 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hretii) in "Hpc".
+    (* =================================================================== *)
+    (* GHOST INTERLUDE, BETWEEN +0x92's RETURN AND +0x96: THE INODE CACHE.  *)
+    (*                                                                     *)
+    (* [IcacheBoot.icache_boot_at] joins iinit's postcondition (the zeroed  *)
+    (* itable spinlock and the fifty [sl_fresh]es) to the era fupd's ghost  *)
+    (* half ([FsCfgBoot.fs_kit_icache]) and the fifty [ientry_raw]s, and    *)
+    (* returns the four persistent rows userinit's [namei("/")] takes.      *)
+    (* This is what discharged [LinkNameiRootBoot]'s Axiom                  *)
+    (* (claude-notes/projects/fs-cfg-boot.md, stage (e)).                   *)
+    (*                                                                     *)
+    (* IT RUNS HERE AND NOT LATER because nothing between +0x92 and +0x9e   *)
+    (* touches the itable, and running it here keeps the four rows in the   *)
+    (* context across fileinit and virtio_disk_init at no cost (they are    *)
+    (* persistent).  Same idiom as the [disk_res_boot] + [newlock] step at  *)
+    (* +0x9a's return below: [iApply fupd_wp] at mask ⊤, then [iModIntro].  *)
+    (* =================================================================== *)
+    iApply fupd_wp.
+    iDestruct (fs_kit_icache_rest_open with "Hkit1") as
+      "(Hiref & Hlivef & Hislg & Hipool & Hitfree & Hictok & Hicmid & Hicid &
+        Hbiotok & Hblkpool & Hdllk)".
+    (* [ireg_inv] is persistent, so taking it out does not spend kit 2 *)
+    iDestruct (fs_kit_fsinit_ghost_ireg with "Hkit2") as "[#Hireg Hkit2]".
+    (* iinit's fifty sleeplocks are at [SpecIinit.inode_lock]; the cache
+       addresses them as [i_lock (ientry k)].  ONE conversion, and it is
+       [IcacheBoot]'s own lemma. *)
+    iAssert ([∗ list] k ∈ seq 0 NINODE,
+               sl_fresh (i_lock (ientry k)) "inode"%string)%I
+      with "[Hslf]" as "Hslf".
+    { iApply (big_sepL_mono with "Hslf"). intros i k _.
+      (* [IcacheBoot] states the bridge over the raw literals, deliberately
+         (its own note: [SpecIinit]'s [NINODE] would shadow [IcacheRef]'s),
+         so the two constants have to be unfolded for [rewrite] to see the
+         [acur] application. *)
+      rewrite /inode_lock /inode_lock_base /inode_stride.
+      rewrite inode_lock_is_ientry_lock. iIntros "H"; iExact "H". }
+    iMod (icache_boot_at ⊤ fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov
+            fsc_logst icfg_nib icfg_dev
+            with "Hiref Hlivef Hislg Hitw Hitnm Hitcpu Hslf Hient Hirauth
+                  Hipool Hitfree Hictok Hicmid Hicid")
+      as "(#Hitl & #Hitinv & #Hesc & Hicsl)".
+    iModIntro.
     (* ---- +0x96 jal fileinit ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x96)) (mword_of_int 1 : mword 5)
               (mword_of_int 12684 : mword 21) mii n false
@@ -1346,8 +1444,16 @@ Section ProofMain.
     iPoseProof (disk_res_boot γv pd pav pu Hal
                   with "Hpub Hdescpg Havpg Hdfree Hdusedidx Hdslots Hdone Hclaim")
       as "HRdisk".
-    iMod (newlock ⊤ d_lock "virtio_disk"%string (disk_res γv pd pav pu)
-            with "Hdlnm Hdlkw Hdcpu HRdisk") as (γk) "#Hdlock".
+    (* [newlock_at], NOT [newlock] (fs-cfg-boot.md stage (e), row (P3)): the
+       lock's gname is the AMBIENT [fsc_dlock], minted by
+       [FsCfgBoot.fs_cfg_alloc] in the era fupd, because
+       [FsReady.fs_ready]'s disk conjunct is stated at it -- an existential
+       γ chosen here could never be shown equal to the field.  The free
+       token [Hdllk] is kit 1's row; everything else is what the old
+       [newlock] took, in the same order. *)
+    iMod (newlock_at ⊤ fsc_dlock d_lock "virtio_disk"%string
+            (disk_res γv pd pav pu)
+            with "Hdllk Hdlnm Hdlkw Hdcpu HRdisk") as "#Hdlock".
     iModIntro.
     (* ---- +0x9e jal userinit ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x9e)) (mword_of_int 1 : mword 5)
@@ -1373,11 +1479,28 @@ Section ProofMain.
     (* one slot is all userinit needs, and NPROC of them is what boot minted *)
     iDestruct (procs_avail_le NPROC 1 ltac:(unfold NPROC; lia) with "Hpavail")
       as "Hpavail".
+    (* STAGE (f)'S PARK: kit 2 ([fs_kit_fsinit_ghost]) and the fifty inode
+       sleeplocks, plus the rows of kit 1 whose constructors this group does
+       not yet run ([bio_init_at]'s two, and the [newlock_at] tokens for
+       kmem / virtio_disk / pr with kinit's page-count pair), are DROPPED
+       here.  ([bio_init_at]'s two rows are the only ones of kit 1 left
+       unspent, and the reason is physical, not ghost: its thirty zeroed
+       [struct buf] payload rows are NOT carved by [BootShared.boot_bss_carve]
+       and are not in [main_globals_raw] -- see the report on stage (e).)
+       Iris is affine, so this is sound; what it costs is exactly
+       that [fs_ready] cannot be sealed yet -- kit 2's destination is
+       [FirstTok.first_tok]'s widened left disjunct and forkret's [fsinit],
+       which is stage (f), and the humans' forkret work is in flight.
+       fs-cfg-boot.md (e)/(f) and debts D/E record the rest. *)
+    iClear "Hicsl".
+    iDestruct "Hkit2" as "_". iDestruct "Hbiotok" as "_".
+    iDestruct "Hblkpool" as "_".
     iApply (Userinit.wp_userinit_sconf γa γp γs F5 n false p0
               (avail_sub (avail_sub (Some (length ps)) K_kvmmake) 3)
               0%nat iv0 false ∅
-              ltac:(lia) Hnb8
-              with "Hcg Hcpu Htext Hkdata Hpc Hpanic Hpinv Hlpidlk Hkenv
+              ltac:(lia) Hnb8 Hdevq Hnibq
+              with "Hcg Hcpu Htext Hkdata Hpc Hpanic Hitl Hitinv Hesc Hireg
+                    Hpinv Hlpidlk Hkenv
                     Hpavail Hinitproc").
     all: try lkbelow.
     iApply wp_next_off_intro.
@@ -1387,7 +1510,8 @@ Section ProofMain.
                      = (mword_of_int (KernelSyms.main + 0xa2) : mword 64)).
     { rewrite /F5 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hretui) in "Hpc".
-    iApply ("Hcont" $! γk pd pav pu mui with "Hcg Hpc Hfree Hcpu Hdlock Hgeom").
+    iApply ("Hcont" $! fsc_dlock pd pav pu mui
+              with "Hcg Hpc Hfree Hcpu Hdlock Hgeom").
   Qed.
 
   (* =================================================================== *)
@@ -1582,17 +1706,18 @@ Section ProofMain.
       (ps : list (mword 64)) (s1entry phystop : mword 64)
       (γd : uart_names) (γv : disk_names)
       (l0 : list (bv 8)) (b0 : bool) (c0 : virtio_cfg)
+      (dk : Z -> bv 8) (sb : FsImg.fs_sb) (nib : nat) (cov : gset Z)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6))
       (P : iProp Σ) `{!Persistent P}
     : wp_main_boot_sconf_body m K p0 ps s1entry phystop
-        γd γv l0 b0 c0 tlbvec0 P.
+        γd γv l0 b0 c0 dk sb nib cov tlbvec0 P.
   Proof.
     cbv beta delta [wp_main_boot_sconf_body].
-    intros pcE Hcid HK Hphystop Hs1 Hprun Hlen Hlive Hp0.
+    intros pcE Hcid HK Hphystop Hs1 Hprun Hlen Hlive Hnib0 Hp0.
     pose proof (mn_bounds K HK) as (Hc2 & Hn50 & Hnsched).
     iIntros "Hcg Hfree Hcpu Hq #Htext #Hkdata Hpc #Hsinv #Hwand Hlocks Hglobals".
     iIntros "Hfirst Hnpid".
-    iIntros "Hparks Hpst Hpavail".
+    iIntros "Hparks Hpst Hpavail Hfs Hirauth".
     iIntros "#Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim #Hdone #Htimc Hhart Hunset Hkauth Hpages".
     iDestruct "Hlocks" as "(Hlcons & Hltx & Hlpr & Hlkmem & Hlpid & Hlwait &
                             Hltick & Hlbc & Hlit & Hlft & Hldisk)".
@@ -1606,10 +1731,12 @@ Section ProofMain.
        [devintr_caps] entirely -- and the [newlock] step
        that would turn that [lk_fresh] into [is_txlock] is not taken here; see
        [mn_grp_printk].
-       [Hient] -- the fifty itable entries' cells -- is still carried and
-       DROPPED here: its only consumer is [IcacheBoot.icache_boot], whose other
-       input (the stocked inode pool) needs the fs BLOCK layer wired into main.
-       See claude-notes/projects/fs-icache.md, C7 owed (ii).
+       [Hient] -- the fifty itable entries' cells -- IS CONSUMED NOW: it
+       goes into [mn_grp_fs], which runs [IcacheBoot.icache_boot_at] on it at
+       main+0x92 against the era fupd's [FsCfgBoot.fs_kit_icache] (whose
+       stocked inode pool is the input that used to be missing).  That is
+       what discharged [LinkNameiRootBoot]'s Axiom -- fs-cfg-boot.md stage
+       (e).
        [Hfirst] -- forkret's [static int first], one of the image's two
        writable .data words (SpecMain's own row) -- is likewise carried and
        DROPPED: its consumer is forkret's [if (first)] arm, which is
@@ -1621,18 +1748,34 @@ Section ProofMain.
                              Hient & Hdiskptr & Hdiskfree & Hdusedidx & Hdslots & Hring)".
     iDestruct "Hhart" as "(Hsbit & Htlb & Htcsr)".
     iDestruct "Hdiskfree" as (free0) "Hdiskfree".
+    (* ---- THE FILE SYSTEM'S BOOT-ERA MINT, opened into its ten ties and
+           its two kits.  The ties are what make the two config equations
+           userinit's namei corner takes DISCHARGEABLE at all -- they used
+           to be stuck behind [subG_fileΣ]'s [Qed] (SpecNameiRootBoot.v's
+           old header).  Only the first two are read here; the other eight
+           are stage (f)'s, at the [fs_ready] seal. ---- *)
+    iDestruct "Hfs" as "(%Hdevq & %Hnibq & %Histq & %Huartq & %Hdiskq &
+                         %Hcovq & %Hlogstq & %Hbmapq & %Hsizeq & %Hninq &
+                         Hkit1 & Hkit2)".
+    assert (Hnibpos : (0 < icfg_nib)%nat) by (rewrite Hnibq; exact Hnib0).
+    (* kit 1's two EARLY peels: the "pr" lock's ghost goes to the printk
+       group at +0x6a and the "kmem" trio to the kvm group at +0x6e, so the
+       three [newlock]s that used to invent their own gnames now fill the
+       ambient [fsc_printk] / [fsc_kalloc] / [fsc_dlock]. *)
+    iDestruct (fs_kit_icache_split with "Hkit1")
+      as "(Hkprintk & Hkkalloc & Hkit1)".
     (* --- 0x00 .. 0x14 : prologue, cpuid, the taken branch --- *)
     iApply (mn_boot_entry m K p0 Hcid HK with "Hcg Htext Hpc").
     iIntros (m1) "Hcg Hpc".
     (* --- 0x42 .. 0x6a : console / printk --- *)
     iApply (mn_grp_printk γd γv m1 (K - 2)%nat p0 l0 b0 Hn50
               with "Hcg Htext Hkdata Hdev Hpc Hfree Hcpu Hlcons Hltx Hlpr
-                    Hdevsw Hring Htx Hsent Hlb Hdlab").
+                    Hkprintk Hdevsw Hring Htx Hsent Hlb Hdlab").
     iIntros (γpr m2) "Hcg Hpc Hfree Hcpu #Hpenv #Hccaps".
     (* --- 0x6e .. 0x7a : kinit / kvminit / kvminithart / procinit --- *)
     iApply (mn_grp_kvm m2 (K - 2)%nat p0 ps s1entry phystop tlbvec0
               Hn50 Hphystop Hs1 Hprun Hlen
-              with "Hcg Htext Hkdata Hpc Hfree Hcpu Hlkmem Hkmem24 Hpages Hkpt
+              with "Hcg Htext Hkdata Hpc Hfree Hcpu Hlkmem Hkkalloc Hkmem24 Hpages Hkpt
                     Hsbit Htlb Hunset Hkauth Hlpid Hlwait Hnpid Hprocs Hppub Hfds Hirs
                     Hparks Hpst").
     iIntros (γa γp γs m3 root pas)
@@ -1644,11 +1787,12 @@ Section ProofMain.
     iIntros (m4 γtl) "Hcg Hpc #Htl Hstvec Hq".
     (* --- 0x8e .. 0x9e : binit / iinit / fileinit / virtio_disk_init /
            userinit, and the disk lock --- *)
-    iApply (mn_grp_fs γa γp γs γv γd m4 (K - 2)%nat p0 ps c0 free0
-              Hn50 Hlen Hlive
+    iApply (mn_grp_fs γa γp γs γv γd m4 (K - 2)%nat p0 ps c0 free0 _ _
+              Hn50 Hlen Hlive Hdevq Hnibpos
               with "Hcg Htext Hkdata Hdev [Hpenv] Hpc Hfree Hcpu Hpinv Hpavail
                     Hpidlock Hkenv Hlbc Hbufl
-                    Hbufn Hbhead Hlit Hinl Hlft Hldisk Hdiskptr Hdiskfree
+                    Hbufn Hbhead Hlit Hinl Hkit1 Hkit2 Hirauth Hient
+                    Hlft Hldisk Hdiskptr Hdiskfree
                     Hdusedidx Hdslots Hclaim Hdone Hcfg Hinitproc").
     { iApply (printk_env_panic with "Hpenv"). }
     iIntros (γk pd pav pu m5) "Hcg Hpc Hfree Hcpu #Hdlock #Hgeom".

@@ -1,28 +1,27 @@
-(* LinkNameiRootBoot.v -- the one place the boot cone ASSUMES anything.
+(* LinkNameiRootBoot.v -- namei("/") at the boot client, DISCHARGED.
 
-   [SpecNameiRootBoot.v]'s header is the inventory: this [Axiom] says
-   [namei("/")] behaves, given everything the boot client can actually
-   produce, and it assumes over the PROVEN corner
-   ([LinkNameiRoot.NameiRoot], which discharges [SpecNamei.NAMEI_ROOT])
-   exactly four persistent rows -- the itable lock, the [ref]-word
-   invariant, the fifty escrows and the inode region.  They are [SpecIget]'s
-   premises, forwarded unchanged by namex's root corner and namei's, and
-   they do not exist at boot yet because [IcacheBoot.icache_boot] wants the
-   stocked inode pool (fs-icache.md C7 owed (ii)/(c)).
+   This file used to hold the boot cone's ONE [Axiom].  It is now what its
+   own header always said it would become: a functor application over the
+   PROVEN corner ([LinkNameiRoot.NameiRoot], which discharges
+   [SpecNamei.NAMEI_ROOT]), supplying the four persistent inode-cache rows
+   -- the itable lock, the [ref]-word invariant, the fifty escrows and the
+   inode region -- and the two configuration ties.
 
-   THIS REPLACED [LinkUserinit]'s AXIOM, which assumed userinit's WHOLE
-   BODY -- allocproc, the [initproc] store, namei, the RUNNABLE park and the
-   release.  All of that is now proven ([ProofUserinit.v]); what is left
-   assumed is one call, at premises that are four persistent conjuncts short
-   of a contract the tree already proves.
+   NOTHING ABOUT namei WAS PROVED HERE.  The four rows were the assumption's
+   entire content, and they exist now because
+   [FsCfgBoot.fs_cfg_alloc] mints the inode cache's configuration inside the
+   boot-era fupd and [ProofMain.mn_grp_fs] runs
+   [IcacheBoot.icache_boot_at] on iinit's postcondition, at main+0x92, six
+   instructions before the [userinit] call that needs them
+   (claude-notes/projects/fs-cfg-boot.md, stage (e)).  The two ties are
+   [FsCfgBoot.fs_boot_supply]'s first two, which is why they can be premises
+   at all: they used to be stuck behind [subG_fileΣ]'s [Qed].
 
-   DISCHARGING IT IS A FUNCTOR APPLICATION, not a proof: when main holds the
-   four rows, this file becomes [Module NameiRootBoot := <adapter>
-   LinkNameiRoot.NameiRoot] and nothing about [ProofUserinit.v] changes.
-
-   Written out with an explicit [Axiom] rather than a [Declare Module]: both
-   are visible to [Print Assumptions], but only the keyword is visible to
-   [tools/proof_coverage.py]'s textual axiom scan. *)
+   The premise ORDER of [SpecNameiRootBoot.wp_namei_root_boot_body] is
+   [SpecNamei.wp_namei_root_body]'s exactly, and the two pure ties
+   [dev = icfg_dev] / [nib = icfg_nib] are [eq_refl] here because this file
+   instantiates the corner AT the ambient configuration's own fields.  So
+   the proof is thirteen hypotheses passed straight through. *)
 From stdpp Require Import bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language lifting.
@@ -33,16 +32,29 @@ Require Import RegFile.
 (* the classes the binder list generalizes over: [Require Import
    SpecNameiRootBoot] does not put them in scope transitively, and backtick
    generalization then silently invents fresh binders with those names. *)
-Require Import IrefSlots IcacheRef.
+Require Import IrefSlots IcacheRef ProcAvail FileInvDefs FsCfg.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import SpecNameiRootBoot.
+Require Import SpecNamei.
+Require Import LinkNameiRoot.
 
 Module NameiRootBoot : NAMEI_ROOT_BOOT.
-  Axiom wp_namei_root_boot :
-    forall `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, !irefslotG Σ}
+  Lemma wp_namei_root_boot :
+    forall `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (dqp : dfrac)
       (m : regfile) (n K : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string),
       wp_namei_root_boot_body dqp m n K eb p b lks.
+  Proof.
+    intros. rewrite /wp_namei_root_boot_body.
+    intros HK Hn Hdev Hnib Hlks.
+    iIntros "Hcg Hcpu #Htext #Hkd Hpc #Hpenv #Hitl #Hitinv #Hesc #Hireg
+             Hisl Hp0 Hp1 Hcont".
+    iApply (NameiRoot.wp_namei_root fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov
+              fsc_logst icfg_ist icfg_nib icfg_dev dqp m n K eb p b lks
+              HK Hn eq_refl eq_refl Hdev Hnib Hlks
+              with "Hcg Hcpu Htext Hkd Hpc Hpenv Hitl Hitinv Hesc Hireg
+                    Hisl Hp0 Hp1 Hcont").
+  Qed.
 End NameiRootBoot.

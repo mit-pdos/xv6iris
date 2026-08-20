@@ -161,6 +161,13 @@ Require Import VirtioQueue VirtioProto DiskInv.
    Spec file). *)
 Require Import WpLock TicksInv.
 Require Import FileInvDefs.
+(* [FsCfgBoot.fs_boot_supply] -- the file system's boot-era mint, threaded
+   from [BootShared.boot_shared_alloc] through [BootChain.boot_hart_primary]
+   to here (fs-cfg-boot.md stage (e), the [procs_avail] threading of
+   main-boot.md §G3 at full width).  This file names only the bundled row;
+   [ProofMain.mn_grp_fs] is what opens it. *)
+Require Import FsCfgBoot.
+Require Import IrefSlots.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
@@ -288,9 +295,11 @@ Section SpecMain.
         [sl_fresh]es.  [ref]'s pinned zero is [IcacheInv.iref_cells ∅]'s
         requirement and is a loader FACT (the itable is .bss past the
         image), on the [d_used_idx] / [kmem+24] precedent above.
-        NOT YET CONSUMED: [icache_boot] also needs the stocked inode pool,
-        which needs the fs BLOCK layer wired into main (fs-icache.md C7
-        owed (ii)); until then main carries these and drops them. *)
+        CONSUMED at main+0x92 since fs-cfg-boot.md stage (e): the stocked
+        inode pool that used to be missing is [FsCfgBoot.fs_kit_icache]'s
+        [ipool] row, minted in the boot-era fupd, and
+        [ProofMain.mn_grp_fs] runs [IcacheBoot.icache_boot_at] on the two
+        halves together. *)
      ([∗ list] k ∈ seq 0 NINODE, ientry_raw k) ∗
      (∃ pd pav pu : mword 64,
         disk_desc ↦₈ pd ∗ disk_avail ↦₈ pav ∗ disk_used ↦₈ pu) ∗
@@ -334,6 +343,12 @@ Section SpecMain.
       (ps : list (mword 64)) (s1entry phystop : mword 64)
       (γd : uart_names) (γv : disk_names)
       (l0 : list (bv 8)) (b0 : bool) (c0 : virtio_cfg)
+      (* THE FILE SYSTEM'S BOOT-ERA MINT, as the era chose it: the disk's
+         bytes, the parsed superblock, the inode region's block count and
+         the coverage set.  They are PARAMETERS and not projections of the
+         ambient [icfg]/[fscfg] because [fs_boot_supply]'s ten ties are what
+         connect the two, and main spends the ties, not the image. *)
+      (dk : Z -> bv 8) (sb : FsImg.fs_sb) (nib : nat) (cov : gset Z)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6))
       (P : iProp Σ) `{!Persistent P} :=
     let pcE : mword 64 := mword_of_int KernelSyms.main in
@@ -355,6 +370,13 @@ Section SpecMain.
     (* the disk's protocol is in its not-live arm at boot: virtio_disk_init
        makes it live, and its config half [c0] is how main knows so *)
     virtio_live c0 = false ->
+    (* the inode region is nonempty.  It is [BootShared.fs_boot_image_wf]'s
+       fifth conjunct, and it reaches here as a PURE premise rather than as
+       one of [fs_boot_supply]'s ties because the era holds it about [nib]
+       and the boot chain has it in hand; main forwards it to userinit's
+       namei corner, where [icfg_nib = 0] would make the returned
+       [IcacheRef.inode_held] uninhabitable. *)
+    (0 < nib)%nat ->
     (* main has no current proc, and neither does the scheduler() it tail-
        calls. *)
     p0 = zero_reg ->
@@ -423,6 +445,26 @@ Section SpecMain.
        and it is what refutes allocproc's empty-table arm, which userinit
        does not test (claude-notes/kernel-defects.md). *)
     procs_avail (Some NPROC) -∗
+    (* ---- THE FILE SYSTEM'S BOOT-ERA MINT (fs-cfg-boot.md stage (e)) ----
+       [FsCfgBoot.fs_cfg_alloc] runs inside [BootShared.boot_shared_alloc]
+       and gives [IcacheRef.icfg] / [FsCfg.fscfg] their VALUES; this row is
+       its whole output -- ten configuration ties plus the two boot kits --
+       threaded here unopened.  Main spends kit 1 between +0x8e and +0xa2
+       ([bio_init_at], [icache_boot_at], the [newlock_at]s) and carries kit 2
+       to the userinit call, where stage (f) will deposit it into
+       [FirstTok.first_tok]'s widened left disjunct for forkret's fsinit.
+
+       Stated at [file_icfg]/[file_fscfg] -- the AMBIENT class's own two
+       projections -- so that every row is at the instance the boot chain is
+       applied at, which is the same discipline
+       [BootShared.boot_shared_alloc]'s return uses. *)
+    fs_boot_supply _ _ dk sb nib cov γd γv -∗
+    (* [IrefSlots.iref_slots_auth] -- row (P4) of [fs_kit_icache]'s header.
+       Minted by [IrefSlots.iref_slots_alloc] inside [boot_shared_alloc]
+       beside the [irefslotG] instance, NOT by the era fupd, so it travels
+       beside the kits rather than inside one.  [icache_boot_at] consumes
+       it. *)
+    iref_slots_auth -∗
     (* the device fabric, which exists from time 0 (allocated in adequacy), and
        the boot hart's tokens over it *)
     dev_inv γd γv -∗
@@ -477,8 +519,9 @@ Module Type MAIN.
       (ps : list (mword 64)) (s1entry phystop : mword 64)
       (γd : uart_names) (γv : disk_names)
       (l0 : list (bv 8)) (b0 : bool) (c0 : virtio_cfg)
+      (dk : Z -> bv 8) (sb : FsImg.fs_sb) (nib : nat) (cov : gset Z)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6))
       (P : iProp Σ) `{!Persistent P},
       wp_main_boot_sconf_body m K p0 ps s1entry phystop
-        γd γv l0 b0 c0 tlbvec0 P.
+        γd γv l0 b0 c0 dk sb nib cov tlbvec0 P.
 End MAIN.

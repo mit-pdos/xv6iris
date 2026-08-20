@@ -842,29 +842,15 @@ Definition fs_boot_image_wf (dk : Z -> bv 8) (ndisk : nat)
   /\ (forall b : Z, FsImg.fs_data_start sb <= b < FsImg.sb_size sb -> b ∈ cov).
 
 (* ---------------------------------------------------------------------- *)
-(* THE FILE SYSTEM'S BOOT-ERA OUTPUT, as one row.                          *)
+(* THE FILE SYSTEM'S BOOT-ERA OUTPUT is [FsCfgBoot.fs_boot_supply].        *)
 (*                                                                        *)
-(* BYTE-IDENTICAL TO [FsCfgBoot.fs_cfg_alloc]'s conclusion body (ten ties, *)
-(* then the two kits, in that order), which is what makes the wiring below  *)
-(* one [iExact] -- and what makes stage (e)'s reading of it the same        *)
-(* destructuring the era fupd's own post has.  [ICFG]/[FSC] are parameters  *)
-(* rather than resolved from an ambient class: the caller passes            *)
-(* [fileG]'s own two projections, so every row is stated AT THE INSTANCE    *)
-(* the boot chain is applied at.                                           *)
+(* It USED to be defined here.  Stage (e) threads it through [SpecMain] -> *)
+(* [BootChain] into [ProofMain.mn_grp_fs], and both of those files sit     *)
+(* BELOW this one, so the definition moved down to [FsCfgBoot.v] (which    *)
+(* this file already imports) where all three can name it.  Its body is    *)
+(* unchanged and still byte-identical to [fs_cfg_alloc]'s conclusion, so   *)
+(* the wiring below is still one [iExact].                                 *)
 (* ---------------------------------------------------------------------- *)
-Definition fs_boot_supply `{!riscvGS Σ, !xv6G Σ}
-    (ICFG : icfg) (FSC : fscfg) (dk : Z -> bv 8)
-    (sb : fs_sb) (nib : nat) (cov : gset Z)
-    (γd : uart_names) (γv : disk_names) : iProp Σ :=
-  (⌜icfg_dev = InodeInv.ROOTDEV⌝ ∗ ⌜icfg_nib = nib⌝ ∗
-   ⌜icfg_ist = FsImg.sb_inodestart sb⌝ ∗
-   ⌜fsc_uart = γd⌝ ∗ ⌜fsc_disk = γv⌝ ∗ ⌜fsc_cov = cov⌝ ∗
-   ⌜fsc_logst = FsImg.sb_logstart sb⌝ ∗
-   ⌜fsc_bmapstart = FsImg.sb_bmapstart sb⌝ ∗
-   ⌜fsc_size = FsImg.sb_size sb⌝ ∗ ⌜fsc_ninodes = FsImg.sb_ninodes sb⌝ ∗
-   fs_kit_icache ICFG FSC ∗
-   fs_kit_fsinit_ghost ICFG FSC (FsCrash.fs_blocks dk)
-     (fs_kit_spent (FsCrash.fs_blocks dk) sb nib (FsImg.fs_live_set (FsCrash.fs_blocks dk) sb)))%I.
 
 Section BootAlloc.
   Context `{!riscvGS Σ, !xv6G Σ}.

@@ -104,6 +104,16 @@ Require Import DirentEnc.
 Require Import PathElems.
 Require Import IrefSlots.
 Require Import IcacheRef.
+(* THE FOUR INODE-CACHE ROWS, and the ambient configuration they are stated
+   at (fs-cfg-boot.md stage (e)).  This is the whole of what USED to be
+   assumed: [is_itable2] / [itable_inv] from [IcacheInv], [ic_escrows] from
+   [IcacheEscrow], [ireg_inv] from [InodeRegion], and [ROOTDEV] from
+   [InodeInv].  The cone that comes with them is the INODE CACHE's, not
+   [SpecNamei]'s -- the log, the bio cache and the bitmap stay out, which is
+   what this file exists for. *)
+Require Import IcacheInv IcacheEscrow InodeRegion InodeInv.
+Require Import FsBlocks FsCfg FileInvDefs.
+Require Import ProcAvail.   (* [pavG], a binder of the proven corner *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Local Open Scope Z_scope.
@@ -119,7 +129,7 @@ Local Open Scope Z_scope.
 Notation K_namei_root_boot := (74%nat) (only parsing).
 
 Definition wp_namei_root_boot_body
-    `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, !irefslotG Σ}
+    `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (dqp : dfrac)
     (m : regfile) (n K : nat) (eb : bool) (p : mword 64)
@@ -131,6 +141,16 @@ Definition wp_namei_root_boot_body
   (* [+3], not [+1]: namex's iget acquires itable.lock and its LIVE panic
      arm fires inside that critical section, where printk takes two more. *)
   (Z.of_nat n + 3 < 2 ^ 31)%Z ->
+  (* THE TWO CONFIG TIES.  They used to be un-statable -- [icfg] arrived
+     behind [subG_fileΣ]'s [Qed] and nothing at this end could discharge
+     them -- and they are now ORDINARY PREMISES, because
+     [FsCfgBoot.fs_cfg_alloc] mints the record inside the boot fupd and
+     hands the two equations out with it ([FsCfgBoot.fs_boot_supply]'s first
+     and second ties).  At [icfg_nib = 0] the [inode_held] below carries
+     [bv_unsigned inum < 0] and cannot exist, which is why the second one
+     matters. *)
+  icfg_dev = ROOTDEV ->
+  (0 < icfg_nib)%nat ->
   (* iget acquires and releases "itable" internally *)
   locks_below lks "itable" ->
   sie_cap_gpr KT1 m K b p -∗
@@ -138,6 +158,20 @@ Definition wp_namei_root_boot_body
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* iget's "iget: no inodes" arm is live code *)
   panic_env -∗
+  (* ---- THE FOUR INODE-CACHE ROWS, at the AMBIENT configuration ----
+     They are [SpecIget]'s premises, forwarded unchanged by namex's root
+     corner and namei's, and they were this file's ENTIRE delta against the
+     proven corner ([SpecNamei.wp_namei_root_body]).  Stating them at
+     [fileG]'s own fields rather than at nine gname parameters is what keeps
+     [SpecUserinit]'s signature from growing nine binders: main holds them
+     at exactly these names, because [FsCfgBoot.fs_cfg_alloc] minted the
+     names and [ProofMain.mn_grp_fs] runs [IcacheBoot.icache_boot_at] at
+     them.  All four are PERSISTENT, so threading them costs a frame. *)
+  is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst
+             icfg_nib icfg_dev -∗
+  itable_inv -∗
+  ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
+  ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
   (* THE precondition that makes iget's mint safe, on both arms *)
   iref_slot -∗
   (* the path: [pv] holds '/' and [pv+1] holds the terminator.  The fraction
@@ -160,7 +194,7 @@ Definition wp_namei_root_boot_body
 
 Module Type NAMEI_ROOT_BOOT.
   Parameter wp_namei_root_boot :
-    forall `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, !irefslotG Σ}
+    forall `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (dqp : dfrac)
       (m : regfile) (n K : nat) (eb : bool) (p : mword 64)
