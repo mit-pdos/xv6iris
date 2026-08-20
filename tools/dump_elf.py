@@ -376,6 +376,7 @@ class Elf:
     entry: int
     segments: list[Segment]     # PT_LOAD only, in program-header order
     sections: list[Sect]        # SHF_ALLOC only, in address order
+    all_section_names: list[str]  # EVERY section (incl. non-alloc, e.g. .debug_*)
 
 
 def read_elf(path: str) -> Elf:
@@ -427,7 +428,9 @@ def read_elf(path: str) -> Elf:
                   has_bits=(typ != 8))                          # 8 = SHT_NOBITS
              for (nm, typ, flags, addr, _o, size) in raw if flags & 2]
     sects.sort(key=lambda s: (s.addr, s.size))
-    return Elf(path=path, entry=e_entry, segments=segs, sections=sects)
+    all_names = [shname(nm) for (nm, _t, _f, _a, _o, _s) in raw]
+    return Elf(path=path, entry=e_entry, segments=segs, sections=sects,
+               all_section_names=all_names)
 
 
 def rodata_end(elf_info: Elf) -> int:
@@ -1054,50 +1057,38 @@ def emit_rocq_syms(items: list[object], out_path: str, elf: str,
 
 def emit_rocq_raw(items: list[object], out_path: str, elf: str, objdump: str,
                   names: Names) -> tuple[int, int]:
-    """The WHOLE ELF image, debug-stripped, hex-encoded as a single Rocq 9
+    """The WHOLE ELF file, byte for byte, hex-encoded as a single Rocq 9
     primitive string (`PrimString.string`): the ground truth the general ELF64
-    semantics (`iris/ElfFile.v`) is instantiated against (`iris/ElfKernel.v`),
-    as opposed to `<prefix>_bytes`/`<prefix>_data` above, which are already
-    split into code/data by this dumper's own (fallible) instruction/section
-    reasoning.
+    semantics (`iris/ElfFile.v`) is instantiated against (`iris/ElfKernel.v`,
+    `iris/ElfUser.v`), as opposed to `<prefix>_bytes`/`<prefix>_data` above,
+    which are already split into code/data by this dumper's own (fallible)
+    instruction/section reasoning.
 
-    Debug info is stripped via `objcopy --strip-debug` because DWARF embeds
-    the absolute build directory, so the FULL file is not byte-identical
-    across clones/build directories; the STRIPPED image IS byte-identical
-    (verified: identical md5 from two build dirs) and preserves the program
-    headers, all allocated sections and loadable bytes, and the symtab --
-    everything the ELF semantics need.  We derive `objcopy` from the objdump
-    program name (same pattern as the `nm` derivation in emit_lean_syms /
-    emit_rocq_syms above) rather than defaulting silently: a wrong-arch
-    objcopy would silently corrupt the dump.
+    The dump is LITERAL -- what is proved about is exactly the binary that
+    runs (DWARF and all).  That is only tenable because the xv6 build passes
+    `-ffile-prefix-map=$(CURDIR)=.`, so DWARF records "." instead of the
+    absolute build directory and the whole file is byte-identical across
+    build trees.  The guard below refuses a file that embeds its own build
+    directory (the exact property the flag exists to prevent), so an xv6
+    checkout built without the flag fails loudly here instead of producing
+    a tree-dependent dump.
     """
-    import tempfile
-
     kernel = elf
-    base = os.path.basename(objdump)
-    objcopy = objdump[: -len("objdump")] + "objcopy" if base.endswith("objdump") else "objcopy"
-    if not shutil.which(objcopy):
-        sys.exit(
-            f"rocq-raw: could not find a matching objcopy ({objcopy!r}, derived "
-            f"from --objdump {objdump!r}) on $PATH.  A wrong-arch objcopy would "
-            "silently corrupt the dump, so this refuses to fall back to a plain "
-            "'objcopy'.  Install the matching binutils, or pass --objdump "
-            "pointing at one that has a same-prefix objcopy alongside it."
-        )
-
-    fd, tmp_path = tempfile.mkstemp(prefix="dump_elf_", suffix=".stripped")
-    os.close(fd)
-    try:
-        subprocess.run([objcopy, "--strip-debug", kernel, tmp_path],
-                       check=True, capture_output=True)
-        with open(tmp_path, "rb") as f:
-            data = f.read()
-    finally:
-        os.unlink(tmp_path)
+    with open(kernel, "rb") as f:
+        data = f.read()
 
     if data[:4] != b"\x7fELF":
-        sys.exit(f"rocq-raw: {tmp_path} (stripped {kernel}) does not start "
-                 "with the ELF magic -- objcopy corrupted the image?")
+        sys.exit(f"rocq-raw: {kernel} does not start with the ELF magic")
+
+    build_dir = os.path.dirname(os.path.dirname(os.path.abspath(kernel)))
+    if build_dir.encode() in data:
+        sys.exit(
+            f"rocq-raw: {kernel} embeds its own build directory ({build_dir}), "
+            "so this dump would differ between build trees.  The xv6 build is "
+            "expected to pass -ffile-prefix-map=$(CURDIR)=. (see DETFLAGS in "
+            "its Makefile); rebuild xv6 at a revision with that flag rather "
+            "than dumping this file."
+        )
 
     nbytes = len(data)
     hexstr = data.hex()  # lowercase, no separators
@@ -1110,23 +1101,21 @@ def emit_rocq_raw(items: list[object], out_path: str, elf: str, objdump: str,
     w = lines.append
     w("(* ------------------------------------------------------------------ *)")
     w(f"(* AUTO-GENERATED by {GEN_BY} (--format rocq-raw).             *)")
-    w(f"(* Source ELF (stripped): {os.path.relpath(kernel, REPO)}")
-    w(f"   objcopy      : {objcopy}  (derived from --objdump {objdump})")
-    w(f"   Bytes (stripped) : {nbytes}   Hex chars : {len(hexstr)}   "
+    w(f"(* Source ELF (literal, byte for byte): {os.path.relpath(kernel, REPO)}")
+    w(f"   Bytes : {nbytes}   Hex chars : {len(hexstr)}   "
       f"Chunks : {len(chunk_strs)} (<= {CHUNK} hex chars each)")
     w("")
-    w("   Debug info is stripped via `objcopy --strip-debug` because DWARF")
-    w("   embeds the absolute build directory, so the FULL (unstripped) file is")
-    w("   NOT byte-identical across clones/build directories; the STRIPPED")
-    w("   image IS byte-identical (verified: identical md5 from two build")
-    w("   dirs) and preserves the program headers, all allocated sections and")
-    w("   loadable bytes, and the symtab -- everything the general ELF64")
-    w("   semantics (iris/ElfFile.v) and the kernel instance (iris/ElfKernel.v")
-    w("   -- proving this dump consistent with KernelInstrs.v/KernelData.v)")
-    w("   need.  This is the ONLY generated file here that is PrimString-")
-    w("   specific / carries the whole image; the other dumps above split the")
-    w("   image into code/data by this dumper's own instruction/section")
-    w("   reasoning, which ElfKernel.v checks against this ground truth.  *)")
+    w("   The dump is the FILE ITSELF, DWARF and all: what the proofs are")
+    w("   about is exactly the binary that runs (and, for a user program,")
+    w("   the bytes mkfs packs into fs.img).  The file is byte-identical")
+    w("   across build trees because the xv6 build passes")
+    w("   -ffile-prefix-map=$(CURDIR)=. (DWARF would otherwise embed the")
+    w("   absolute build directory); the dumper refuses a file that embeds")
+    w("   its own build directory.  This is the ONLY generated file here that is")
+    w("   PrimString-specific / carries the whole image; the other dumps")
+    w("   above split the image into code/data by this dumper's own")
+    w("   instruction/section reasoning, which iris/ElfKernel.v and")
+    w("   iris/ElfUser.v check against this ground truth.  *)")
     w("(* ------------------------------------------------------------------ *)")
     w("")
     w("From Stdlib Require Import ZArith List.")

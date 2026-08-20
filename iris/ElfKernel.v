@@ -19,15 +19,17 @@
    reasoning are independent; agreeing on 41648 file-backed bytes and a
    103208-byte .bss is not something two independent bugs do.
 
-   THE RAW IS THE DEBUG-STRIPPED IMAGE ([objcopy --strip-debug]).  DWARF
-   embeds the absolute build directory, so the unstripped kernel is NOT
-   byte-identical across clones and could not be committed as ground
-   truth; the stripped image is (verified: identical md5 from two build
-   directories) and keeps everything that matters here -- the program
-   headers, every allocated section, all loadable bytes, and the symtab.
+   THE RAW IS THE LITERAL FILE: [kernel/kernel], the binary qemu runs, byte
+   for byte, DWARF included.  That is only committable as ground truth
+   because the xv6 build passes [-ffile-prefix-map=$(CURDIR)=.]: DWARF
+   would otherwise embed the absolute build directory, making the file
+   differ between build trees; with the flag it is byte-identical
+   (verified from two build directories).  The dumper refuses a file that
+   embeds its own build directory, so a flagless build fails loudly
+   instead of producing a tree-dependent dump.
 
    ONE [vm_compute]-HEAVY FILE, BY DESIGN, AND OUT OF EVERY CONE.  Each
-   theorem below re-decodes 55024 bytes and rebuilds the maps; that is a
+   theorem below re-decodes 285200 bytes and rebuilds the maps; that is a
    few seconds apiece and the whole file is well under the minute.  The
    price is paid HERE and nowhere else: NOTHING IN THE TREE IMPORTS THIS
    FILE, and nothing should.  It is a leaf, checked by CI, whose value is
@@ -54,12 +56,12 @@ Local Open Scope Z_scope.
 (* ====================================================================== *)
 
 (* [Typeclasses Opaque] for the same reason the generated maps carry it:
-   resolution must never force a 55024-element list. *)
+   resolution must never force a 285200-element list. *)
 Definition kernel_elf : elf_bytes := pstring_hex_bytes kernel_elf_hex.
 Global Typeclasses Opaque kernel_elf.
 
 (* The length, over [Z].  NEVER state a [nat]-vs-large-literal equality
-   (see claude-notes/durable-notes.md): [55024 : nat] is a 55024-deep
+   (see claude-notes/durable-notes.md): [285200 : nat] is a 285200-deep
    successor chain.  This one goes through [pstring_hex_bytes_length], so
    only the STRING's length is computed. *)
 Lemma kernel_elf_length : Z.of_nat (length kernel_elf) = kernel_elf_size.

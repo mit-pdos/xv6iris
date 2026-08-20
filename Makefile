@@ -76,7 +76,11 @@ SAIL_RISCV_REV ?= c32fbf4111b849061db1812355d6da9df8c2e396
 # panic(), rebased onto upstream 13602eb, which gives sleep() a prototype and
 # so rewrites sys_sync's call to it; 1a70c2e -> 515391a: seventeen more
 # panic() call sites become unreachable(), and gcc reorders four of fs.c's
-# functions).  Nothing here is a local commit:
+# functions; 4398009 -> 4aab0eb: deterministic builds (-ffile-prefix-map, so
+# every binary and fs.img is byte-identical across build trees -- what the
+# literal rocq-raw dumps depend on) plus a new usertests binary
+# (linkoverflow); no kernel/user layout change, all 20 dumps byte-identical).
+# Nothing here is a local commit:
 # `git -C xv6-riscv checkout --detach $(XV6_REV)` reproduces the image, and
 # that is the whole recipe.
 #
@@ -85,7 +89,7 @@ SAIL_RISCV_REV ?= c32fbf4111b849061db1812355d6da9df8c2e396
 # stays reachable only from your local clone -- expect the diff between two
 # consecutive pins to be an upstream commit that landed UNDER the series, not
 # on top of it.
-XV6_REV ?= 4398009f09b7142feb9ec72ce08e37e83973168a
+XV6_REV ?= 4aab0eb8fb2017d64fb08e430d63794c19ad21f4
 
 KDUMP_SRCS := $(KDUMP)/KernelInstrs.v $(KDUMP)/KernelData.v $(KDUMP)/KernelSyms.v \
               $(KDUMP)/KernelElfRaw.v

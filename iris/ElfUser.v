@@ -43,14 +43,16 @@
        has nothing to filter, so this is the first check that the filter
        is right.
 
-   As in [ElfKernel.v], the raws are the DEBUG-STRIPPED images
-   ([objcopy --strip-debug]): DWARF embeds the absolute build directory,
-   so only the stripped file is byte-identical across clones, and it keeps
-   everything that matters here (program headers, every allocated section,
-   all loadable bytes, the symtab).
+   As in [ElfKernel.v], each raw is the LITERAL file [user/_<p>] -- the
+   binary exec() runs and mkfs packs into fs.img, byte for byte, DWARF
+   included.  The files are byte-identical across build trees because the
+   xv6 build passes [-ffile-prefix-map=$(CURDIR)=.] (DWARF would otherwise
+   embed the absolute build directory); the dumper refuses a file that
+   embeds its own build directory.
 
-   These files are small -- 11-16 kB against the kernel's 55 kB -- so the
-   whole file is seconds, not the kernel file's minute.
+   These files are smaller than the kernel's -- 35-58 kB against 285 kB --
+   so the whole file stays cheap even though every theorem re-decodes its
+   program's raw.
 
    If a [vm_compute] here ever fails, DO NOT weaken the statement.  A
    mismatch between a dump and its binary is precisely the event this file
@@ -80,12 +82,12 @@ Local Open Scope Z_scope.
 (* ====================================================================== *)
 
 (* [Typeclasses Opaque] for the same reason the generated maps carry it:
-   resolution must never force a 10960-element list. *)
+   resolution must never force a 34944-element list. *)
 Definition sync_elf : elf_bytes := pstring_hex_bytes SyncElfRaw.sync_elf_hex.
 Global Typeclasses Opaque sync_elf.
 
 (* The length, over [Z].  NEVER state a [nat]-vs-large-literal equality
-   (see claude-notes/durable-notes.md): [10960 : nat] is a 10960-deep
+   (see claude-notes/durable-notes.md): [34944 : nat] is a 34944-deep
    successor chain.  This one goes through [pstring_hex_bytes_length], so
    only the STRING's length is computed. *)
 Lemma sync_elf_length : Z.of_nat (length sync_elf) = SyncElfRaw.sync_elf_size.

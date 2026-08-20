@@ -73,13 +73,14 @@ One `Definition <sym> : Z` per `nm` symbol (47 of them), so a spec says
 `SyncSyms.main` / `SyncSyms.sync` instead of a magic constant. The module
 namespace is what keeps `SyncSyms.strlen` and `KernelSyms.strlen` apart.
 
-### `SyncElfRaw.v` — the whole debug-stripped ELF (`--format rocq-raw`)
+### `SyncElfRaw.v` — the whole ELF, byte for byte (`--format rocq-raw`)
 ```coq
 Definition sync_elf_hex : PrimString.string := List.fold_left PrimString.cat [ sync_elf_hex_chunk0; ... ] ""%pstring.
-Definition sync_elf_size : Z := 10960%Z.
+Definition sync_elf_size : Z := 34944%Z.
 ```
 Same shape as [`../kernel-rocq/KernelElfRaw.v`](../kernel-rocq/README.md): the
-whole debug-stripped ELF, hex-encoded as one Rocq 9 `PrimString.string`,
+whole ELF file, literally, DWARF included (deterministic because the xv6 build
+passes `-ffile-prefix-map=$(CURDIR)=.`), hex-encoded as one Rocq 9 `PrimString.string`,
 chunked at 8192 hex chars/chunk and joined with `List.fold_left PrimString.cat`
 — the ground truth `iris/ElfFile.v`'s general ELF64 semantics get instantiated
 against, as opposed to `SyncInstrs.v`/`SyncData.v` above, which are already

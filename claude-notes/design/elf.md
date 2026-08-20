@@ -53,15 +53,19 @@ to read the file, not about the file.
 ## Importing a real binary: `KernelElfRaw.v` + `PStringBytes.v`
 
 `kernel-rocq/KernelElfRaw.v` (generated: `dump_elf.py --format rocq-raw`,
-prefix-generic like every other format, so user ELFs can get one too) carries
-the kernel ELF **byte-for-byte, debug-stripped**, hex-encoded in a Rocq 9
-`PrimString` (compact literal, O(1) `get`, native in `vm_compute`; 8192 hex
-chars per chunk, `fold_left cat` join). Stripped because DWARF embeds the
-absolute build directory, so the full file is NOT byte-identical across
-clones while the stripped image IS (verified) — and a tracked generated file
-must re-dump byte-identically, which is the dump-health check everything
-else relies on. Stripping preserves program headers, all allocated sections
-and loadable bytes, and the symtab.
+prefix-generic — the four U-mode binaries get the same treatment in
+`user-rocq/<P>ElfRaw.v`) carries the ELF **byte-for-byte, literally the file
+that runs, DWARF included**, hex-encoded in a Rocq 9 `PrimString` (compact
+literal, O(1) `get`, native in `vm_compute`; 8192 hex chars per chunk,
+`fold_left cat` join). Literal dumping is tenable because the xv6 build
+passes `-ffile-prefix-map=$(CURDIR)=.` (`DETFLAGS` in its Makefile): DWARF
+would otherwise embed the absolute build directory, making the file differ
+between build trees — and a tracked generated file must re-dump
+byte-identically, which is the dump-health check everything else relies on.
+The dumper REFUSES a file that embeds its own build directory, so a build
+without the flag fails loudly instead of producing a tree-dependent dump.
+fs.img packs these same `user/_x` binaries, so the bytes stored at `/init`
+etc. ARE the tracked raws.
 
 `iris/PStringBytes.v` decodes lowercase hex `PrimString` → `list (bv 8)`.
 PrimString appears NOWHERE else: the semantics is list-based precisely so the
