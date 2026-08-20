@@ -679,6 +679,79 @@ Proof.
   unfold live_set, uva_live. rewrite elem_of_list_to_set elem_of_seqZ. lia.
 Qed.
 
+(* THE VIEW AT A LARGER SIZE.  Growing a process's size does not move a
+   single byte it could already read: what changes is that more vas are
+   LIVE, and a live va the table does not map reads as zero.  So the view
+   at [sz] grows to [M ∪ (zeros over everything live at sz)] -- and
+   because the union is left-biased, every byte [M] already recorded
+   survives verbatim.  This is uvmalloc's whole effect on memory. *)
+Definition umem_grow (M : gmap Z (bv 8)) (sz : Z) : gmap Z (bv 8) :=
+  M ∪ gset_to_gmap (bv_0 8) (live_set sz).
+
+Lemma gset_to_gmap_union_Z {A : Type} (c : A) (X Y : gset Z) :
+  gset_to_gmap c (X ∪ Y) = gset_to_gmap c X ∪ gset_to_gmap c Y.
+Proof.
+  apply map_eq. intros a.
+  destruct (decide (a ∈ X)) as [HX | HX].
+  - assert (Hl : gset_to_gmap c (X ∪ Y) !! a = Some c).
+    { apply lookup_gset_to_gmap_Some.
+      split; [apply elem_of_union; by left | reflexivity]. }
+    rewrite Hl. symmetry.
+    apply (lookup_union_Some_l (gset_to_gmap c X) (gset_to_gmap c Y) a c).
+    apply lookup_gset_to_gmap_Some. split; [exact HX | reflexivity].
+  - rewrite (lookup_union_r (gset_to_gmap c X) (gset_to_gmap c Y) a);
+      [| apply lookup_gset_to_gmap_None; exact HX].
+    destruct (decide (a ∈ Y)) as [HY | HY].
+    + assert (Hl : gset_to_gmap c (X ∪ Y) !! a = Some c).
+      { apply lookup_gset_to_gmap_Some.
+        split; [apply elem_of_union; by right | reflexivity]. }
+      rewrite Hl. symmetry.
+      apply lookup_gset_to_gmap_Some. split; [exact HY | reflexivity].
+    + assert (Hl : gset_to_gmap c (X ∪ Y) !! a = None).
+      { apply lookup_gset_to_gmap_None.
+        intros Hin. apply elem_of_union in Hin as [Hc | Hc];
+          [exact (HX Hc) | exact (HY Hc)]. }
+      rewrite Hl. symmetry.
+      apply lookup_gset_to_gmap_None. exact HY.
+Qed.
+
+(* two sizes with the same live set give the same view *)
+Lemma umem_grow_cong (M : gmap Z (bv 8)) (sz sz' : Z) :
+  (forall a : Z, uva_live sz a <-> uva_live sz' a) ->
+  umem_grow M sz = umem_grow M sz'.
+Proof.
+  intros Hlv. unfold umem_grow.
+  assert (Hls : live_set sz = live_set sz').
+  { apply set_eq. intros a. rewrite !elem_of_live_set. apply Hlv. }
+  rewrite Hls. reflexivity.
+Qed.
+
+(* growing to a size everything of which is already recorded is a no-op --
+   how the loop's invariant starts, at [PGROUNDUP(oldsz)] *)
+Lemma umem_grow_id (M : gmap Z (bv 8)) (sz : Z) :
+  (forall a : Z, uva_live sz a -> is_Some (M !! a)) -> umem_grow M sz = M.
+Proof.
+  intros Hin. unfold umem_grow. apply map_eq. intros a.
+  destruct (M !! a) as [bb |] eqn:Hb.
+  - apply (lookup_union_Some_l M _ a bb Hb).
+  - rewrite (lookup_union_r M _ a Hb).
+    apply lookup_gset_to_gmap_None. intros Hel.
+    apply elem_of_live_set in Hel.
+    destruct (Hin a Hel) as [x Hx]. rewrite Hb in Hx. discriminate.
+Qed.
+
+(* ...and one page's worth of growth, which is what the loop does *)
+Lemma umem_grow_step (M : gmap Z (bv 8)) (sz sz' : Z) (pg : gset Z) :
+  (forall a : Z, uva_live sz' a <-> (uva_live sz a \/ a ∈ pg)) ->
+  umem_grow M sz' = umem_grow M sz ∪ gset_to_gmap (bv_0 8) pg.
+Proof.
+  intros Hlv. unfold umem_grow.
+  assert (Hls : live_set sz' = live_set sz ∪ pg).
+  { apply set_eq. intros a.
+    rewrite elem_of_union !elem_of_live_set. apply Hlv. }
+  rewrite Hls gset_to_gmap_union_Z map_union_assoc. reflexivity.
+Qed.
+
 (* the vas of ONE page, and the byte map one page's worth of bytes makes *)
 Definition upage_dom (vpn : mword 27) : gset Z :=
   list_to_set ((fun j : nat => (bv_unsigned vpn * 4096 + Z.of_nat j)%Z)

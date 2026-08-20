@@ -3438,9 +3438,9 @@ Section ProcPt.
 
   (* ---- the vmfault step, AT THE MEMORY LEVEL ------------------------ *)
 
-  Lemma uva_dom_insert (P : uptd) (vpn : mword 27) (r : mword 64) :
+  Lemma uva_dom_insert_perm (P : uptd) (perm : Z) (vpn : mword 27) (r : mword 64) :
     P.(ud_um) !! vpn = None ->
-    uva_dom (uptd_insert P vpn r) = uva_dom P ∪ upage_dom vpn.
+    uva_dom (uptd_insert_perm P perm vpn r) = uva_dom P ∪ upage_dom vpn.
   Proof.
     intros Hn. apply set_eq. intros va.
     rewrite elem_of_union elem_of_uva_dom elem_of_uva_dom elem_of_upage_dom.
@@ -3453,24 +3453,37 @@ Section ProcPt.
       + exists v0, w0, j. split_and!; [| exact Hj | reflexivity].
         apply lookup_insert_Some. right.
         split; [intros ->; rewrite Hn in Hl; discriminate | exact Hl].
-      + exists vpn, (vmfault_pte r), j.
+      + exists vpn, (uvm_pte perm r), j.
         split_and!; [apply lookup_insert | exact Hj | reflexivity].
   Qed.
 
+  Lemma uva_dom_insert (P : uptd) (vpn : mword 27) (r : mword 64) :
+    P.(ud_um) !! vpn = None ->
+    uva_dom (uptd_insert P vpn r) = uva_dom P ∪ upage_dom vpn.
+  Proof. exact (uva_dom_insert_perm P 22 vpn r). Qed.
+
   (* ...and the same fact pointwise, which is the form the lazy view's
      domain condition is stated in *)
+  Lemma uva_mapped_insert_perm (P : uptd) (perm : Z) (vpn : mword 27)
+      (r : mword 64) (va : Z) :
+    P.(ud_um) !! vpn = None ->
+    uva_mapped (uptd_insert_perm P perm vpn r) va
+    <-> (uva_mapped P va \/ va ∈ upage_dom vpn).
+  Proof.
+    intros Hn.
+    rewrite <- !elem_of_uva_dom. rewrite (uva_dom_insert_perm P perm vpn r Hn).
+    apply elem_of_union.
+  Qed.
+
   Lemma uva_mapped_insert (P : uptd) (vpn : mword 27) (r : mword 64) (va : Z) :
     P.(ud_um) !! vpn = None ->
     uva_mapped (uptd_insert P vpn r) va
     <-> (uva_mapped P va \/ va ∈ upage_dom vpn).
-  Proof.
-    intros Hn.
-    rewrite <- !elem_of_uva_dom. rewrite (uva_dom_insert P vpn r Hn).
-    apply elem_of_union.
-  Qed.
+  Proof. exact (uva_mapped_insert_perm P 22 vpn r va). Qed.
 
   Lemma uva_dom_insert_disj (P : uptd) (vpn : mword 27) (r : mword 64) :
     P.(ud_um) !! vpn = None -> uva_dom P ## upage_dom vpn.
+  (* [r] is vestigial -- the disjointness is about [P] and the vpn alone *)
   Proof.
     intros Hn. apply elem_of_disjoint. intros va Hold Hnew.
     apply elem_of_uva_dom in Hold as (v0 & w0 & j0 & Hl & Hj0 & Heq0).
@@ -3536,16 +3549,22 @@ Section ProcPt.
     rewrite lookup_delete_ne; [reflexivity | exact Hne].
   Qed.
 
-  Lemma uva_pa_insert_old (P : uptd) (vpn : mword 27) (r : mword 64) (va : Z) :
+  Lemma uva_pa_insert_old_perm (P : uptd) (perm : Z) (vpn : mword 27)
+      (r : mword 64) (va : Z) :
     upt_map_wf P.(ud_um) -> P.(ud_um) !! vpn = None ->
-    uva_mapped P va -> uva_pa (uptd_insert P vpn r) va = uva_pa P va.
+    uva_mapped P va -> uva_pa (uptd_insert_perm P perm vpn r) va = uva_pa P va.
   Proof.
     intros Hwf Hn (v0 & w0 & j & Hl & Hj & ->).
     assert (Hne : vpn <> v0) by (intros ->; rewrite Hn in Hl; discriminate).
-    unfold uva_pa, uptd_insert, uptd_insert_perm. cbn [ud_um].
+    unfold uva_pa, uptd_insert_perm. cbn [ud_um].
     rewrite (uva_svpn_of v0 j Hj (upt_map_wf_vpn_lt _ _ _ Hwf Hl)).
     rewrite lookup_insert_ne; [reflexivity | exact Hne].
   Qed.
+
+  Lemma uva_pa_insert_old (P : uptd) (vpn : mword 27) (r : mword 64) (va : Z) :
+    upt_map_wf P.(ud_um) -> P.(ud_um) !! vpn = None ->
+    uva_mapped P va -> uva_pa (uptd_insert P vpn r) va = uva_pa P va.
+  Proof. exact (uva_pa_insert_old_perm P 22 vpn r va). Qed.
 
   (* THE MEMORY SIDE OF vmfault'S INSERT -- AND IT IS THE IDENTITY.
      The page vmfault maps is INSIDE the process's size and was therefore
@@ -3759,7 +3778,59 @@ Section ProcPt.
     apply elem_of_dom. rewrite (Hdel_same va Hnin Mp) in Hbb. eauto.
   Qed.
 
-  Lemma umem_lazy_fault (P : uptd) (sz : Z) (M : gmap Z (bv 8))
+  (* ------------------------------------------------------------------ *)
+  (* GROWING THE SIZE by one page.  A page that becomes live but is not   *)
+  (* backed reads as zero, so the view gains exactly that page's vas at   *)
+  (* 0 -- no ownership moves.  uvmalloc does this and THEN faults the     *)
+  (* page in, which is why its loop can reuse the fault step verbatim.    *)
+  (* ------------------------------------------------------------------ *)
+  Lemma umem_lazy_grow (P : uptd) (sz sz' : Z) (M : gmap Z (bv 8))
+      (vpn : mword 27) :
+    P.(ud_um) !! vpn = None ->
+    (forall a : Z, uva_live sz' a <-> (uva_live sz a \/ a ∈ upage_dom vpn)) ->
+    umem_lazy P sz M -∗
+    umem_lazy P sz' (M ∪ gset_to_gmap (bv_0 8) (upage_dom vpn)).
+  Proof.
+    intros Hn Hlv. iIntros "H".
+    iDestruct "H" as (Mp) "(%Hsub & %Hdm & %Hlz & Hm)".
+    assert (Hnm : forall va, va ∈ upage_dom vpn -> ~ uva_mapped P va).
+    { intros va Hin Hmapd.
+      exact (uva_dom_insert_disj P vpn (mword_of_int 0) Hn va
+               (proj2 (elem_of_uva_dom P va) Hmapd) Hin). }
+    assert (Hg : forall va,
+              is_Some (gset_to_gmap (bv_0 8) (upage_dom vpn) !! va)
+              <-> va ∈ upage_dom vpn).
+    { intros va. rewrite <- elem_of_dom. rewrite dom_gset_to_gmap. reflexivity. }
+    iExists Mp.
+    iSplitR.
+    { iPureIntro.
+      exact (transitivity Hsub (map_union_subseteq_l M
+               (gset_to_gmap (bv_0 8) (upage_dom vpn)))). }
+    iSplitR.
+    { iPureIntro. intros va. rewrite lookup_union_is_Some.
+      rewrite (Hdm va) (Hg va) (Hlv va). tauto. }
+    iSplitR.
+    { iPureIntro. intros va Hnmv Hlvv.
+      destruct (decide (uva_live sz va)) as [Hlo | Hlo].
+      - rewrite (lookup_union_Some_l M _ va (bv_0 8) (Hlz va Hnmv Hlo)).
+        reflexivity.
+      - assert (Hin : va ∈ upage_dom vpn).
+        { destruct (proj1 (Hlv va) Hlvv) as [Hc | Hc];
+            [exfalso; exact (Hlo Hc) | exact Hc]. }
+        assert (Hnone : M !! va = None).
+        { destruct (M !! va) as [bb |] eqn:Hb; [| reflexivity].
+          exfalso. destruct (proj1 (Hdm va) ltac:(eauto)) as [Hm0 | Hlo'];
+            [exact (Hnm va Hin Hm0) | exact (Hlo Hlo')]. }
+        rewrite (lookup_union_r M _ va Hnone).
+        apply lookup_gset_to_gmap_Some. split; [exact Hin | reflexivity]. }
+    iExact "Hm".
+  Qed.
+
+  (* the fault step at an ARBITRARY leaf permission -- uvmalloc's [xperm|18]
+     rather than vmfault's fixed 22.  Nothing in the argument reads the
+     permission; [umem_lazy_fault] is the [perm := 22] instance. *)
+  Lemma umem_lazy_fault_perm (P : uptd) (perm : Z) (sz : Z)
+      (M : gmap Z (bv 8))
       (vpn : mword 27) (r : mword 64) (bs : nat -> bv 8) :
     upt_map_wf P.(ud_um) -> P.(ud_um) !! vpn = None ->
     (forall j, (j < 4096)%nat ->
@@ -3767,9 +3838,9 @@ Section ProcPt.
     (forall j, (j < 4096)%nat -> bs j = bv_0 8) ->
     umem_lazy P sz M -∗
     ([∗ list] j ∈ seq 0 4096,
-       (uva_pa (uptd_insert P vpn r) (bv_unsigned vpn * 4096 + Z.of_nat j)%Z
+       (uva_pa (uptd_insert_perm P perm vpn r) (bv_unsigned vpn * 4096 + Z.of_nat j)%Z
           : Arch.pa) ↦ₚ bs j) -∗
-    umem_lazy (uptd_insert P vpn r) sz M.
+    umem_lazy (uptd_insert_perm P perm vpn r) sz M.
   Proof.
     intros Hwf Hn Hlive Hzero.
     iIntros "H Hpg".
@@ -3786,14 +3857,14 @@ Section ProcPt.
       apply Hnm. apply elem_of_upage_dom. eauto. }
     iEval (rewrite (bigL_page_map
              (fun (va : Z) (b : bv 8) =>
-                ((uva_pa (uptd_insert P vpn r) va : Arch.pa) ↦ₚ b)%I) vpn bs))
+                ((uva_pa (uptd_insert_perm P perm vpn r) va : Arch.pa) ↦ₚ b)%I) vpn bs))
       in "Hpg".
     (* the old bytes transfer: [uva_pa] does not move off the new page *)
     iAssert ([∗ map] va ↦ b ∈ Mp,
-               (uva_pa (uptd_insert P vpn r) va : Arch.pa) ↦ₚ b)%I
+               (uva_pa (uptd_insert_perm P perm vpn r) va : Arch.pa) ↦ₚ b)%I
       with "[Hm]" as "Hm".
     { iApply (big_sepM_impl with "Hm"). iIntros "!>" (va bb Hva) "Hj".
-      rewrite (uva_pa_insert_old P vpn r va Hwf Hn
+      rewrite (uva_pa_insert_old_perm P perm vpn r va Hwf Hn
                  (proj1 (elem_of_uva_dom P va)
                     ltac:(rewrite <- Hdom; apply elem_of_dom; eauto))).
       iExact "Hj". }
@@ -3812,7 +3883,7 @@ Section ProcPt.
         injection Hbb as <-. rewrite (Hzero j Hj). exact (Hzz j Hj). }
     iSplitR.
     { iPureIntro. intros va. rewrite (Hdm va).
-      rewrite (uva_mapped_insert P vpn r va Hn).
+      rewrite (uva_mapped_insert_perm P perm vpn r va Hn).
       split.
       - intros [Hm0 | Hlv]; [ left; by left | by right ].
       - intros [[Hm0 | Hin] | Hlv]; [ by left | | by right].
@@ -3821,12 +3892,25 @@ Section ProcPt.
     iSplitR.
     { iPureIntro. intros va Hnm' Hlv. apply Hlz; [| exact Hlv].
       intros Hmapd. apply Hnm'.
-      apply (uva_mapped_insert P vpn r va Hn). by left. }
+      apply (uva_mapped_insert_perm P perm vpn r va Hn). by left. }
     iSplitR.
     { iPureIntro. rewrite dom_union_L Hdom upage_map_dom.
-      symmetry. exact (uva_dom_insert P vpn r Hn). }
+      symmetry. exact (uva_dom_insert_perm P perm vpn r Hn). }
     rewrite (big_sepM_union _ Mp (upage_map vpn bs) Hdisj). iFrame "Hm Hpg".
   Qed.
+
+  Lemma umem_lazy_fault (P : uptd) (sz : Z) (M : gmap Z (bv 8))
+      (vpn : mword 27) (r : mword 64) (bs : nat -> bv 8) :
+    upt_map_wf P.(ud_um) -> P.(ud_um) !! vpn = None ->
+    (forall j, (j < 4096)%nat ->
+       uva_live sz (bv_unsigned vpn * 4096 + Z.of_nat j)%Z) ->
+    (forall j, (j < 4096)%nat -> bs j = bv_0 8) ->
+    umem_lazy P sz M -∗
+    ([∗ list] j ∈ seq 0 4096,
+       (uva_pa (uptd_insert P vpn r) (bv_unsigned vpn * 4096 + Z.of_nat j)%Z
+          : Arch.pa) ↦ₚ bs j) -∗
+    umem_lazy (uptd_insert P vpn r) sz M.
+  Proof. exact (umem_lazy_fault_perm P 22 sz M vpn r bs). Qed.
 
   (* ...and the whole step: the tree grows, the memory does NOT move. *)
   Lemma proc_ptm_fault (P : uptd) (sz : Z) (M : gmap Z (bv 8))
@@ -3896,6 +3980,96 @@ Section ProcPt.
              (<[vpn := vmfault_pte r]> P.(ud_um))
              (<[vpn := vmfault_pte r]> m_ad) t' (proj1 Hwf')
              (upt_ad_view_insert P.(ud_tfp) P.(ud_um) m_ad vpn (vmfault_pte r)
+                Hview Hnone)
+             Hrep Hbase).
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* THE UVMALLOC STEP: map a FRESH ZEROED page at an arbitrary leaf      *)
+  (* permission, and grow the size over exactly that page.  It is         *)
+  (* [proc_ptm_fault] with two generalisations -- the permission, and     *)
+  (* the fact that the page was not live BEFORE (vmfault's was) -- and    *)
+  (* the second is why the view GAINS the page's vas at 0 rather than     *)
+  (* staying put: [umem_lazy_grow] first, then the fault step verbatim.   *)
+  (* ------------------------------------------------------------------ *)
+  Lemma proc_ptm_grow_uvm (P : uptd) (perm : Z) (sz sz' : Z)
+      (M : gmap Z (bv 8))
+      (vpn : mword 27) (r : mword 64)
+      (t' : ptree) (m_ad : gmap (mword 27) (mword 64)) (bs : nat -> bv 8) :
+    uvm_perm_ok perm ->
+    proc_pt_wf P -> upt_ad_view P.(ud_tfp) P.(ud_um) m_ad ->
+    m_ad !! vpn = None ->
+    (bv_unsigned vpn < 67108864)%Z ->
+    pt_rep0 t' (<[vpn := uvm_pte perm r]> m_ad) -> pt_base t' = P.(ud_root) ->
+    page_valid r ->
+    (forall a : Z, uva_live sz' a <-> (uva_live sz a \/ a ∈ upage_dom vpn)) ->
+    (forall j, (j < 4096)%nat -> bs j = bv_0 8) ->
+    kmap_static_claims -∗ ptree_own 2 (DfracOwn 1) t' -∗
+    ([∗ list] j ∈ seq 0 4096, (pa_add r j : Arch.pa) ↦ₘ bs j) -∗
+    umem_lazy P sz M -∗
+    proc_ptm (uptd_insert_perm P perm vpn r) sz'
+             (M ∪ gset_to_gmap (bv_0 8) (upage_dom vpn)).
+  Proof.
+    intros Hperm Hwf Hview Hnone Hlt Hrep Hbase Hval Hlv Hzero.
+    assert (Hlive : forall j, (j < 4096)%nat ->
+              uva_live sz' (bv_unsigned vpn * 4096 + Z.of_nat j)%Z).
+    { intros j Hj. apply Hlv. right. apply elem_of_upage_dom.
+      exists j. split; [exact Hj | reflexivity]. }
+    pose proof Hwf as (Hmwf & Hawf & Hpwf & Hinj & Htfv).
+    destruct (proj1 (proj1 Hview vpn) Hnone) as (Hnt & Hntf & Hunone).
+    assert (Hppn : pte_ppn (uvm_pte perm r) = autocast (T := mword)
+                     (subrange_vec_dec r 55 12))
+      by exact (pte_ppn_uvm perm r (pb_lor1_range perm (proj1 (proj1 Hperm)))).
+    assert (Hpb : page_base (pte_ppn (uvm_pte perm r)) = r)
+      by (rewrite Hppn; exact (page_base_of_valid r Hval)).
+    assert (Hvp : page_valid (page_base (pte_ppn (uvm_pte perm r))))
+      by (rewrite Hpb; exact Hval).
+    iIntros "#Hb Ht Hpg Hm".
+    (* the page's bytes, at the PHYSICAL tier and indexed by the vas the
+       new leaf translates: [uva_pa] at the GROWN descriptor *)
+    iAssert ([∗ list] j ∈ seq 0 4096,
+               (pa_add (page_base (pte_ppn (uvm_pte perm r))) (0 + j)%nat
+                  : Arch.pa) ↦ₚ bs j)%I with "[Hpg]" as "Hpg".
+    { iApply (win_mem_to_phys (pte_ppn (uvm_pte perm r)) 0 4096 bs Hvp
+                ltac:(lia) with "Hb [Hpg]").
+      iApply (big_sepL_impl with "Hpg"). iIntros "!>" (k x Hx) "Hj".
+      apply lookup_seq in Hx as [-> Hlt']. rewrite Nat.add_0_l.
+      rewrite pa_add_add Nat.add_0_l Hpb. iExact "Hj". }
+    (* freshness, from the ownership -- the [um_inj] conjunct needs it *)
+    iAssert (⌜pte_ppn (uvm_pte perm r) ∉ um_ppns P.(ud_um)⌝)%I as %Hfresh.
+    { iDestruct "Hm" as (Mp) "(_ & _ & _ & Hmm)".
+      iApply (umem_own_page_fresh_named P Mp (pte_ppn (uvm_pte perm r)) bs
+                Hmwf Hinj with "Hmm [Hpg]").
+      iApply (big_sepL_impl with "Hpg"). iIntros "!>" (k x Hx) "Hj".
+      apply lookup_seq in Hx as [-> Hlt']. rewrite Nat.add_0_l. iExact "Hj". }
+    assert (Hwf' : proc_pt_wf (uptd_insert_perm P perm vpn r)).
+    { unfold uptd_insert_perm, proc_pt_wf.
+      cbn [ud_root ud_tfp ud_um]. split_and!.
+      - exact (upt_map_wf_insert_uvm P.(ud_um) perm vpn r Hperm
+                 Hmwf Hnt Hntf Hlt).
+      - exact (upt_acc_wf_insert_uvm P.(ud_um) perm vpn r Hperm Hawf).
+      - exact (um_pages_valid_insert_uvm P.(ud_um) perm vpn r Hperm
+                 Hpwf Hval).
+      - exact (um_inj_insert P.(ud_um) vpn (uvm_pte perm r) Hinj Hfresh).
+      - exact Htfv. }
+    assert (Hl' : (uptd_insert_perm P perm vpn r).(ud_um) !! vpn = Some (uvm_pte perm r))
+      by (unfold uptd_insert_perm; cbn [ud_um]; apply lookup_insert).
+    iDestruct (umem_lazy_grow P sz sz' M vpn Hunone Hlv with "Hm") as "Hm".
+    iDestruct (umem_lazy_fault_perm P perm sz'
+                 (M ∪ gset_to_gmap (bv_0 8) (upage_dom vpn)) vpn r bs
+                 Hmwf Hunone Hlive Hzero with "Hm [Hpg]") as "Hm".
+    { iApply (big_sepL_impl with "Hpg"). iIntros "!>" (k x Hx) "Hj".
+      apply lookup_seq in Hx as [-> Hlt']. rewrite Nat.add_0_l.
+      rewrite (uva_pa_page_base (uptd_insert_perm P perm vpn r) vpn (uvm_pte perm r) k
+                 (proj1 Hwf') Hl' ltac:(lia)).
+      rewrite Nat.add_0_l. iExact "Hj". }
+    rewrite /proc_ptm. iSplitR; [iPureIntro; exact Hwf' |]. iFrame "Hm".
+    unfold uptd_insert_perm. cbn [ud_root ud_tfp ud_um].
+    rewrite /pt_frame. iExists t'. iFrame "Ht". iPureIntro.
+    exact (upt_spec_of_rep0 P.(ud_root) P.(ud_tfp)
+             (<[vpn := uvm_pte perm r]> P.(ud_um))
+             (<[vpn := uvm_pte perm r]> m_ad) t' (proj1 Hwf')
+             (upt_ad_view_insert P.(ud_tfp) P.(ud_um) m_ad vpn (uvm_pte perm r)
                 Hview Hnone)
              Hrep Hbase).
   Qed.
