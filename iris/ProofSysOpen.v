@@ -2670,8 +2670,7 @@ Section ProofSysOpenBody.
       iApply ("Hcont" $! mf used2 ns2 with "[%] [%] Hcg Hown Htce Hcce Hpc
                 Hsbn Hsbi Hsbs Hsbb Hbmres Hbsl Hisl Hpost").
       { exact Hcsf. }
-      { destruct Hns1 as (Hlo & Hhi & Hok).
-        specialize (Hok eq_refl).
+      { cbn in Hns1.
         unfold sys_open_slots, create_slots in *. split; lia. } }
     iApply (so_join (CID0 := CID8) gfl gf gs jx gl gu gd gk pd pav pu bn g
               gfs gi cn gtl gil gisl cov logstart bmapstart inodestart nib

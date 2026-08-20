@@ -69,8 +69,10 @@
    clause is the same clause.
 
    The reference ledger is likewise sys_mkdir's: create keeps one slot out
-   on success ([ok = true -> S ns' <= ns]) and the [iunlockput] hands it
-   back, so [ns - create_slots <= ns2 <= ns] covers both arms.
+   on success -- its post states that as the equation [S ns' = ns] -- and
+   the [iunlockput] hands it back, so every arm ends at [ns].  This used to
+   be the interval [ns - create_slots <= ns2 <= ns]; see [SpecSysMkdir.v]'s
+   header for why the statement was weaker than the function.
 
    ==== WHAT ITS CALLER MUST HOLD ======================================
 
@@ -288,7 +290,14 @@ Definition wp_sys_mknod_sconf_body
       (* NO ORDERING on the free pool: create both ALLOCATES and FREES. *)
       bitmap_res gfs bmapstart cov logstart size used' -∗
       (* the allowance, spend-at-most: see the header's reference ledger *)
-      ⌜((ns - create_slots)%nat <= ns')%nat /\ (ns' <= ns)%nat⌝ -∗
+      (* THE LEDGER CLOSES, EXACTLY.  This used to be create's interval
+         passed through; create states its figure exactly now (every failure
+         arm returns the ledger whole, every success arm keeps ONE out), and
+         this function's [iunlockput] is what hands that one back -- so all
+         three arms end where they started.  A client can therefore
+         re-establish its own [create_slots <= ns] and call again, which the
+         interval could not support (FsSyscalls.v's note (S3)). *)
+      ⌜ns' = ns⌝ -∗
       iref_slots ns' -∗
       proc_priv γf pj pid (upd_upt V P') -∗
       ⌜sys_mknod_ret (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗

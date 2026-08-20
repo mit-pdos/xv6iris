@@ -571,36 +571,27 @@ Lemma cr_le3 (a b c d : nat) :
   (a <= b)%nat -> (b <= c)%nat -> (c <= d)%nat -> (a <= d)%nat.
 Proof. lia. Qed.
 
-(* the three slot figures the found half hands back, against [create_slots]:
+(* the four slot figures the halves hand back, against [create_slots]:
    ARM N / ARM G return the ledger WHOLE, F-OK keeps one out for the inode
-   it returns, F-BAD's second [iunlockput] gives that one back too. *)
+   it returns, F-BAD's second [iunlockput] gives that one back too.  Each
+   states its figure EXACTLY -- the contract used to take an interval and
+   these lemmas weakened into it, which is what stopped sys_mkdir and
+   sys_mknod from showing they end where they started. *)
 Lemma cr_slots_ns (ok : bool) (ns : nat) :
   ok = false -> (create_slots <= ns)%nat ->
-  ((ns - create_slots)%nat <= ns)%nat /\ (ns <= ns)%nat
-  /\ (ok = true -> (S ns <= ns)%nat).
-Proof.
-  intros -> Hns. unfold create_slots in *.
-  split_and!; [lia | lia | discriminate].
-Qed.
+  (if ok then (S ns = ns)%nat else ns = ns).
+Proof. intros -> Hns. reflexivity. Qed.
 
-Lemma cr_slots_1 (ok : bool) (ns : nat) : (create_slots <= ns)%nat ->
-  ((ns - create_slots)%nat <= (1 + (ns - 2))%nat)%nat
-  /\ ((1 + (ns - 2))%nat <= ns)%nat
-  /\ (ok = true -> (S (1 + (ns - 2))%nat <= ns)%nat).
-Proof.
-  intro Hns. unfold create_slots in *.
-  split_and!; [lia | lia | intros _; lia].
-Qed.
+Lemma cr_slots_1 (ok : bool) (ns : nat) :
+  ok = true -> (create_slots <= ns)%nat ->
+  (if ok then (S (1 + (ns - 2))%nat = ns)%nat else (1 + (ns - 2))%nat = ns).
+Proof. intros -> Hns. unfold create_slots in *. lia. Qed.
 
 Lemma cr_slots_2 (ok : bool) (ns : nat) :
   ok = false -> (create_slots <= ns)%nat ->
-  ((ns - create_slots)%nat <= (1 + (1 + (ns - 2)))%nat)%nat
-  /\ ((1 + (1 + (ns - 2)))%nat <= ns)%nat
-  /\ (ok = true -> (S (1 + (1 + (ns - 2)))%nat <= ns)%nat).
-Proof.
-  intros -> Hns. unfold create_slots in *.
-  split_and!; [lia | lia | discriminate].
-Qed.
+  (if ok then (S (1 + (1 + (ns - 2)))%nat = ns)%nat
+   else (1 + (1 + (ns - 2)))%nat = ns).
+Proof. intros -> Hns. unfold create_slots in *. lia. Qed.
 
 Lemma cr_ns_split (ns : nat) : (create_slots <= ns)%nat -> ns = (2 + (ns - 2))%nat.
 Proof. unfold create_slots. lia. Qed.
@@ -1017,14 +1008,11 @@ Qed.
    A-FAIL's (the gate hands the slot back and [iunlockput] returns one); ARM
    C-OK keeps the child's slot out and gets one back from [dirlink]'s net
    zero and one from its [iunlockput(dp)]. *)
-Lemma cr_slots_3 (ok : bool) (ns : nat) : (create_slots <= ns)%nat ->
-  ((ns - create_slots)%nat <= (1 + (1 + (ns - 3)))%nat)%nat
-  /\ ((1 + (1 + (ns - 3)))%nat <= ns)%nat
-  /\ (ok = true -> (S (1 + (1 + (ns - 3)))%nat <= ns)%nat).
-Proof.
-  intro Hns. unfold create_slots in *.
-  split_and!; [lia | lia | intros _; lia].
-Qed.
+Lemma cr_slots_3 (ok : bool) (ns : nat) :
+  ok = true -> (create_slots <= ns)%nat ->
+  (if ok then (S (1 + (1 + (ns - 3)))%nat = ns)%nat
+   else (1 + (1 + (ns - 3)))%nat = ns).
+Proof. intros -> Hns. unfold create_slots in *. lia. Qed.
 
 Lemma cr_ns_2 (ns : nat) : (create_slots <= ns)%nat ->
   (1 + (ns - 3))%nat = (ns - 2)%nat.
@@ -1581,8 +1569,7 @@ Section ProofCreateMain.
        proc_priv γf (proc_addr j) pidv V -∗
        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
        bslots bn 3 -∗
-       ⌜((ns - create_slots)%nat <= ns')%nat /\ (ns' <= ns)%nat
-         /\ (ok = true -> (S ns' <= ns)%nat)⌝ -∗
+       ⌜if ok then (S ns' = ns)%nat else ns' = ns⌝ -∗
        iref_slots ns' -∗
        ⌜Sb ⊆ Sb' /\ (u' <= u)%nat
          /\ (ok = true -> (iput_units <= u')%nat)⌝ -∗
@@ -4056,7 +4043,7 @@ Section ProofCreateMain.
                                 Hpath Hbsl [%] Hisl [%] Hop [Hcslkd Hcdep
                                 Hcidev Hciinum Hcivalid Hcload Hcfrz Hckeep Hruc]").
                 { exact Hcsf. }
-                { exact (cr_slots_1 _ ns Hns). }
+                { exact (cr_slots_1 _ ns eq_refl Hns). }
                 { split_and!;
                     [exact (cr_sub2 _ _ _ Hsb1 Hsb2)
                     | exact (cr_le2 _ _ _ (proj2 Hn2) (proj2 Hnp1))
@@ -5654,7 +5641,7 @@ Section ProofCreateMain.
                              Hcdep Hcidev Hciinum Hcivalid Hcdlnk Hcdiat Hcmeta
                              Hcmap Hcblocks Hcfrz Hckeep Hruc]").
              { exact Hcsf. }
-             { exact (cr_slots_3 _ ns Hns). }
+             { exact (cr_slots_3 _ ns eq_refl Hns). }
              { split_and!.
                - exact (cr_sub3 _ _ _ _ Hsb1
                           (cr_sub2 _ _ _ (cr_sub_union_sing Sb1 _)
@@ -9144,7 +9131,7 @@ Section ProofCreateMain.
                           Hcdep Hcidev Hciinum Hcivalid Hcdlnk2 Hcdiat Hcmeta
                           Hcmap Hcblocks Hcfrz Hckeep Hruc]").
           { exact Hcsf. }
-          { exact (cr_slots_3 _ ns Hns). }
+          { exact (cr_slots_3 _ ns eq_refl Hns). }
           { split_and!.
             - exact (cr_sub2 _ _ _
                        (cr_sub2 _ _ _

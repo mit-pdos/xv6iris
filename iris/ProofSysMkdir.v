@@ -1388,8 +1388,7 @@ Section ProofSysMkdirBody.
         { exact Hupt. }
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
-        { destruct Hns1 as (Hlo & Hhi & Hstrict).
-          split; [lia | pose proof (Hstrict eq_refl); lia]. }
+        { cbn in Hns1. lia. }
         { rewrite /sys_mkdir_ret. left. rewrite Ha0f. exact HP2a0. }
       + (* ---------- ARM B: create returned 0 ---------- *)
         iDestruct "Hok" as "%Hcrz".
@@ -1433,7 +1432,7 @@ Section ProofSysMkdirBody.
         { exact Hupt. }
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
-        { destruct Hns1 as (Hlo & Hhi & _). split; [lia | lia]. }
+        { cbn in Hns1. exact Hns1. }
         { rewrite /sys_mkdir_ret. right. exact Ha0f. }
     - (* ================= ARM A: argstr returned -1 =================
          The [bltz] is TAKEN, straight to the shared "-1" tail at +0x40. *)
@@ -1470,7 +1469,7 @@ Section ProofSysMkdirBody.
       { exact Hupt. }
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
-      { split; lia. }
+      { reflexivity. }
       { rewrite /sys_mkdir_ret. right. exact Ha0f. }
   Qed.
 

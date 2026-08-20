@@ -45,17 +45,17 @@
          unavailable at a directory node, one level up: it is the lock
          placement, not the spec's shape.
 
-    (S3) EVEN THE PURE-RESOURCE TRIPLE IS NOT COMPOSABLE FOR mkdir.  The
-         iref ledger comes back as an INTERVAL ([SpecSysMkdir.v]:300,
-         [ns - create_slots <= ns' <= ns]), inherited from create's own
-         interval ([SpecCreate.v]:659-661).  A friendly client that wants to
-         call mkdir TWICE cannot re-establish its own precondition
-         ([create_slots <= ns]) from that.  sys_chdir does not have the
-         problem -- its ledger closes at the literal 2 on all four arms
-         ([SpecSysChdir.v]:259, :283 -- and see that file's header) -- which
-         is why the chdir wrapper below is composable and the mkdir one is
-         not.  NOTHING HERE AMENDS EITHER CONTRACT: the tightening, if it is
-         ever wanted, is create's post, not sys_mkdir's.
+    (S3) RETIRED -- THE PURE-RESOURCE TRIPLE USED NOT TO BE COMPOSABLE FOR
+         mkdir.  The iref ledger came back as an INTERVAL
+         ([ns - create_slots <= ns' <= ns]), inherited from create's own
+         interval, and a friendly client that wanted to call mkdir TWICE
+         could not re-establish its own precondition ([create_slots <= ns])
+         from that.  This note said the tightening, if ever wanted, was
+         create's post rather than sys_mkdir's, and that is exactly where it
+         was done: [SpecCreate.v] states its figure EXACTLY now (every
+         failure arm returns the ledger whole, every success arm keeps one
+         out), so mkdir's and mknod's own posts say [ns' = ns] and both
+         wrappers below are composable on the same footing as chdir's.
 
     ---- SO WHAT DOES LAND -----------------------------------------------
 
@@ -400,7 +400,7 @@ Definition wp_sys_mkdir_friendly_body
       ⌜sys_mkdir_ret (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
-      ⌜((ns - create_slots)%nat <= ns')%nat /\ (ns' <= ns)%nat⌝ -∗
+      ⌜ns' = ns⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 true pj b lks -∗
       pc_is ret_tgt -∗
