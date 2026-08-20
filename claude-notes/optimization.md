@@ -289,6 +289,21 @@ worth 20× on individual files.
   expensive in the tree after the assumption audit, and both on the critical
   path. The rewrite is mechanical: `iSplitL "Hl"; [iExact "Hl"|]`, then
   `iSplitR "<the rest>"` around the arm's own proof, then frame the tail.
+- **WHEN EVERY CONJUNCT IS DEFINITION-VALUED, THERE IS NO BIG ONE TO SPLIT OFF
+  — build the WHOLE bundle.** The two closing-bundle lemmas
+  `ProofSyscall.sysc_filestat_env` and `sysc_fclose_fs_env` assemble
+  `SpecFilestat.filestat_fs_env` (13 conjuncts) and
+  `SpecFileclose.fileclose_fs_env_nopid` (16), and their tails are `dev_inv`,
+  `disk_geom`, an `is_lock` over `disk_res`, `bslots`, `fileclose_ic_env`,
+  `fileclose_bm` — every one a definition, so every (name × conjunct) attempt
+  is a conversion and no single `iSplitL` helps. Named `iFrame`s over them cost
+  **33.1 s and 58.4 s** — 91 s of a 123 s file, with nothing else in it above
+  1.3 s. Replaced by the `iSplitR; [iExact "H"|]` chain in the goal's own
+  conjunct order (the idiom `sysc_fs_fabric` in the same file already used),
+  the **file went 122.7 s → 31.7 s** and both statements left the profile
+  entirely. Two tells that you are in this case rather than the split-one-off
+  case above: the lemma's whole job is to REASSEMBLE a named bundle, and its
+  own siblings in the file already spell out the chain.
 - **A rebuild is a construction, so build it — do not frame it.** Even fully
   named, `iFrame` walks the goal once per name, and the goal is the abstraction
   UNFOLDED, so its tail conjuncts are whatever the abstraction ends in. Handing

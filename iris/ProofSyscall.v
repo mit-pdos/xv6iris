@@ -1864,10 +1864,25 @@ Section SyscallVocab.
     iSplitR "Hbmp Hbmr".
     { rewrite /SpecFilestat.filestat_fs_env /sysc_fstat_names; cbn.
       rewrite -Hdev -Hnib.
-      iFrame "Hbio Hitinv Hesc Hireg Hsl2 Hisp Hdevi Hgeom Hdlock Hsl".
+      (* assembled conjunct by conjunct rather than with a named [iFrame]:
+         the goal's tail is [dev_inv] / [disk_geom] / an [is_lock] over
+         [disk_res], so a frame prices each of the ten names against each of
+         those as a CONVERSION -- 33.1 s of this file, measured.  The chain
+         below is a syntactic check each. *)
       iSplit; [ iPureIntro; exact Hlg |].
       iSplit; [ iPureIntro; exact Hist0 |].
-      iPureIntro. intros inum Hi. exact (proj1 (Hib inum Hi)). }
+      iSplit.
+      { iPureIntro. intros inum Hi. exact (proj1 (Hib inum Hi)). }
+      iSplitR; [ iExact "Hbio"   |].
+      iSplitR; [ iExact "Hitinv" |].
+      iSplitR; [ iExact "Hesc"   |].
+      iSplitR; [ iExact "Hireg"  |].
+      iSplitR; [ iExact "Hsl2"   |].
+      iSplitL "Hisp"; [ iExact "Hisp" |].
+      iSplitR; [ iExact "Hdevi"  |].
+      iSplitR; [ iExact "Hgeom"  |].
+      iSplitR; [ iExact "Hdlock" |].
+      iExact "Hsl". }
     iIntros "Hout".
     rewrite /SpecFilestat.filestat_fs_out /sysc_fstat_names; cbn.
     iDestruct "Hout" as "[Hisp' Hsl']".
@@ -1919,7 +1934,22 @@ Section SyscallVocab.
     iSplit; [ iPureIntro; exact Hjn |].
     iSplit; [ iPureIntro; exact Hlk |].
     iSplit; [ iPureIntro; exact Hlg |].
-    iFrame "Hpi Hbio Hlog Hseam Hgen Hdevi Hgeom Hdlock Hbs Hic Hbm".
+    (* assembled conjunct by conjunct rather than with a named [iFrame]:
+       the goal's last three conjuncts are [bslots], [fileclose_ic_env] and
+       [fileclose_bm] -- all definition-valued -- so a frame walks each of
+       the eleven names past them by CONVERSION.  Measured at 58.4 s, the
+       most expensive sentence in this file; the chain below is syntactic. *)
+    iSplitR; [ iExact "Hpi"    |].
+    iSplitR; [ iExact "Hbio"   |].
+    iSplitR; [ iExact "Hlog"   |].
+    iSplitR; [ iExact "Hseam"  |].
+    iSplitR; [ iExact "Hgen"   |].
+    iSplitR; [ iExact "Hdevi"  |].
+    iSplitR; [ iExact "Hgeom"  |].
+    iSplitR; [ iExact "Hdlock" |].
+    iSplitL "Hbs"; [ iExact "Hbs" |].
+    iSplitR; [ iExact "Hic"    |].
+    iExact "Hbm".
   Qed.
 
   (* ...and the inverse, for the two entries' RETURN: the nopid bundle's own
