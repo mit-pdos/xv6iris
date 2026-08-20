@@ -841,6 +841,26 @@ Section UsertrapRes.
       (N : ut_names) (V : pprivate) : iProp Σ :=
     (ut_caps N ∗ ut_own_nopt Rsys N V)%I.
 
+  (* the mcounteren pin, read out of the caps bundle and the bundle handed
+     back whole.  Stated HERE, over one hypothesis, so [ut_res_bare_sstc]
+     below never has to take [ut_caps] apart inside the residue's body. *)
+  Lemma ut_env_nopt_sstc (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
+      (N : ut_names) (V : pprivate) :
+    ut_env_nopt Rsys N V -∗ sstc_enabled ∗ ut_env_nopt Rsys N V.
+  Proof.
+    iIntros "H". rewrite /ut_env_nopt /ut_caps.
+    iDestruct "H" as "((Hpi & Hkd & Hks & #Hdev & Hrest) & Hown)".
+    iDestruct (devintr_caps_any_at CID with "Hdev")
+      as "(_ & _ & _ & _ & [#Hsstc _] & _)".
+    (* [iExact], not a frame, for the capability conjunct: the [sstc_enabled]
+       the caps bundle yields is CONVERTIBLE-not-syntactic with the goal's, so
+       every match attempt a frame makes against the bundle's own conjuncts is
+       a conversion over a big resource (optimization.md, "A SHAPE MISMATCH
+       turns every match attempt into a CONVERSION"). *)
+    iSplitR; [iExact "Hsstc"|].
+    iFrame "Hpi Hkd Hks Hdev Hrest Hown".
+  Qed.
+
   Lemma ut_own_pt_close (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
       (N : ut_names) (V : pprivate) :
     ut_own_nopt Rsys N V -∗ proc_pt (pv_upt V) -∗ ut_own Rsys N V.
@@ -912,13 +932,18 @@ Section UsertrapRes.
       (pt : uptd) (ksp : mword 64) :
     ut_res_bare Rsys pt ksp -∗ sstc_enabled ∗ ut_res_bare Rsys pt ksp.
   Proof.
+    (* READ THE CAPABILITY OUT WITHOUT TAKING THE BUNDLE APART.  Destructuring
+       [ut_caps] here meant rebuilding it conjunct-by-conjunct against the
+       residue's own body -- two [iFrame]s at 8.9 s and 8.0 s.  The extraction
+       is a five-line lemma below whose context is one hypothesis, and this
+       proof then reads exactly like its cheap siblings ([ut_res_tlb_close]
+       and friends): [Henv] goes back whole. *)
     iIntros "H".
-    iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & Htrap & Hcaps & Hown)".
-    iDestruct "Hcaps" as "(Hpi & Hkd & Hks & #Hdev & Hrest)".
-    iDestruct (devintr_caps_any_at CID with "Hdev") as "(_ & _ & _ & _ & [#Hsstc _] & _)".
-    iFrame "Hsstc".
-    iExists N, V, av. rewrite /ut_env_nopt /ut_caps.
-    iFrame "Htrap Hpi Hkd Hks Hdev Hrest Hown".
+    iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & Htrap & Henv)".
+    iDestruct (ut_env_nopt_sstc with "Henv") as "[#Hsstc Henv]".
+    (* same, and here the other conjunct is the residue's whole ∃ body. *)
+    iSplitR; [iExact "Hsstc"|].
+    iExists N, V, av. iFrame "Htrap Henv".
     iPureIntro. split; [| split; [| split]]; assumption.
   Qed.
 

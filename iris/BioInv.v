@@ -389,29 +389,46 @@ Section BioInv.
   (* the whole body is TIMELESS (the view's payload fields carry their own
      Timeless proofs), so every opener strips the ▷ up front with the usual
      [iInv … as ">Hbody"] -- exactly as the physical layer did. *)
+
+  (* PEEL ONE CONNECTIVE PER STEP (optimization.md, "Prove a big
+     Timeless/Persistent instance STRUCTURALLY").  A single [apply _] over
+     these ∃/∗/∨ towers backtracks across the whole space even though every
+     leaf instance already exists: [buf_parked] alone measured 19.7 s, and the
+     four instances below were 31.5 s of a 41.5 s file.  The dispatch must be
+     SYNTACTIC -- a [first [apply bi.exist_timeless; … | …]] spelling unifies
+     up to delta and peels straight THROUGH a name that has its own instance,
+     which is the regression the note warns about. *)
+  Local Ltac tl_struct :=
+    lazymatch goal with
+    | |- Timeless (bi_exist _) => apply bi.exist_timeless; intro; tl_struct
+    | |- Timeless (bi_sep _ _) => apply bi.sep_timeless; [tl_struct | tl_struct]
+    | |- Timeless (bi_or _ _)  => apply bi.or_timeless;  [tl_struct | tl_struct]
+    | |- _ => apply _
+    end.
+
   Global Instance bio_pay_timeless bn V k dev bno bsl bsd d :
     Timeless (bio_pay bn V k dev bno bsl bsd d).
-  Proof. rewrite /bio_pay. destruct d; apply _. Qed.
+  Proof. rewrite /bio_pay. destruct d; tl_struct. Qed.
 
   Global Instance pool_blk_timeless V b : Timeless (pool_blk V b).
-  Proof. apply _. Qed.
+  Proof. rewrite /pool_blk. tl_struct. Qed.
 
   Global Instance buf_pay_timeless bn V k v dev bno bs :
     Timeless (buf_pay bn V k v dev bno bs).
-  Proof. rewrite /buf_pay. case_decide; [destruct v|]; apply _. Qed.
+  Proof. rewrite /buf_pay. case_decide; [destruct v|]; tl_struct. Qed.
 
   Global Instance buf_parked_timeless bn V k : Timeless (buf_parked bn V k).
-  Proof. apply _. Qed.
+  Proof. rewrite /buf_parked. tl_struct. Qed.
 
   Global Instance buf_chain_timeless bn k : Timeless (buf_chain bn k).
-  Proof. apply _. Qed.
+  Proof. rewrite /buf_chain. tl_struct. Qed.
 
   Global Instance buf_mid_timeless V k : Timeless (buf_mid V k).
-  Proof. apply _. Qed.
+  Proof. rewrite /buf_mid. tl_struct. Qed.
 
   Global Instance buf_escrow_body_timeless bn V k :
     Timeless (buf_escrow_body bn V k).
-  Proof. apply _. Qed.
+  Proof. rewrite /buf_escrow_body. tl_struct. Qed.
 
   (* a reference fragment against an authority showing NO references: the
      refutation the free-open and the eviction reading both turn on. *)

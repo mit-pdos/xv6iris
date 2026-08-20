@@ -850,6 +850,40 @@ Ltac goodb_step :=
   first [ erewrite goodb_bind  by (vm_compute; reflexivity)
         | erewrite goodb_bind0 by (vm_compute; reflexivity) ].
 
+(* THE SAME PEEL, APPLIED RATHER THAN REWRITTEN.  [goodb_bind] is an
+   equation, so [erewrite] builds an [eq_ind_r] motive over the WHOLE
+   remaining monadic tail at every step -- and once a continuation has been
+   instantiated with symbolic bitvector data (the legalized CBIE field, in
+   [goodb_legalize_menvcfg] below) that tail is large: Ltac profiling puts
+   81.5 % of the 17.3 s LOCAL to the [erewrite], against 3 % in its
+   [vm_compute] side conditions and 11 % in their [reflexivity].  The intro
+   form has the same two side conditions and no motive: the proof term
+   becomes a chain of applications, which is why it takes the [Qed] down with
+   it.  (Only [goodb_legalize_menvcfg] uses these; the [goodb_step] sites in
+   WpSconfCsr / WpGprCsrwC are ~1.4 s and are left alone -- optimization.md,
+   "do this per file with a measurement, never as a sweep".) *)
+Lemma goodb_bind_i (D : register -> bool) {X Y} (m : M X) (f : X -> M Y)
+    (s : mstate) (x : X) :
+  goodb D m s = true -> exec m s = Some (x, s) -> goodb D (f x) s = true ->
+  goodb D (Defs.bind m f) s = true.
+Proof.
+  intros H1 H2 H3. rewrite (goodb_bind D m f s x H1 H2). exact H3.
+Qed.
+
+Lemma goodb_bind0_i (D : register -> bool) {Y} (m : M unit) (n : M Y)
+    (s : mstate) :
+  goodb D m s = true -> exec m s = Some (tt, s) -> goodb D n s = true ->
+  goodb D (Defs.bind0 m n) s = true.
+Proof.
+  intros H1 H2 H3. rewrite (goodb_bind0 D m n s H1 H2). exact H3.
+Qed.
+
+Ltac goodb_stepi :=
+  first [ eapply goodb_bind_i;
+            [ vm_compute; reflexivity | vm_compute; reflexivity | ]
+        | eapply goodb_bind0_i;
+            [ vm_compute; reflexivity | vm_compute; reflexivity | ] ].
+
 Lemma goodb_legalize_xenvcfg_cbie (x : mword 2) :
   goodb D_m (legalize_xenvcfg_cbie x) dstateM = true.
 Proof.
@@ -866,7 +900,15 @@ Proof.
   erewrite goodb_bind.
   3: apply exec_legalize_xenvcfg_cbie.
   2: apply goodb_legalize_xenvcfg_cbie.
-  repeat goodb_step.
+  (* HIDE THE LEGALIZED FIELD BEHIND A VARIABLE BEFORE THE REMAINING BINDS.
+     [exec_legalize_xenvcfg_cbie] instantiates the continuation's argument
+     with a symbolic if-then-else over bitvector data, and from here on every
+     [goodb_step] both copies it (each [erewrite] rebuilds the term) and hands
+     it to a [vm_compute] side condition -- the very data this proof exists to
+     avoid computing (see (3) in the header).  Opaque, the tail is 18.6 s of
+     tactic and 18.0 s of [Qed] cheaper, and nothing below looks at the value:
+     [goodb] answers [true] at the [Ret] without reading it. *)
+  repeat goodb_stepi.
   reflexivity.
 Qed.
 

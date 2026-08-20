@@ -666,7 +666,12 @@ Section kptnode.
       Hmisa Hmenv HPBMTE HADUE Heff Heffg Hss Hssg Htm Htmg Hppn Hasid
       Hcanon Hident HA Hord HR HW Hcov Hpallow Hchk.
     iIntros "#Hat #Hkinv Hsnap #Hcert Hfrag Hrw Hro".
-    assert (HDtlb : (tlb : register) ∈ Drw ∪ Dro) by set_solver.
+    (* NOT [set_solver] (optimization.md): a single membership in a union of
+       two [gset register] VARIABLES costs ~24 s whatever the override does --
+       it was the sixth most expensive statement in the tree.  [HWtlb] is
+       already [tlb ∈ Drw], so the union step is one lemma. *)
+    assert (HDtlb : (tlb : register) ∈ Drw ∪ Dro)
+      by (apply elem_of_union_l; exact HWtlb).
     iDestruct "Hsnap" as (t0) "(%Htlbok0 & #Hlb0)".
     iApply swp_fupd.
     iMod (kpt_path_at root_ppn t0 (svpn_of va) ppn kp ⊤ ltac:(solve_ndisj)

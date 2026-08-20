@@ -1492,7 +1492,14 @@ Section ProofIget.
                          (DfracOwn 1) wvp ltac:(lia) with "Hvldp") as "#Hclaim4".
             iMod ("Hclosep" with "[Hd1p Hincellp Hvldp Hpayp Hgid1p]") as "_".
             { iNext. iApply (ic_close_mid cn γfs γi cov logstart e).
-              rewrite /ic_mid_arm. iExists devp, inump, wvp. iFrame. }
+              (* NAMED, in the goal's conjunct order (optimization.md,
+                 "Never bare iFrame in a large context"): [ic_mid_arm]'s
+                 fourth conjunct is [ic_unloaded], whose pool bundle is an ∃
+                 over a block-map big-op, and a bare frame searches the whole
+                 spatial context against every one of its leaves -- 26.7 s,
+                 the most expensive statement in this file. *)
+              rewrite /ic_mid_arm. iExists devp, inump, wvp.
+              iFrame "Hd1p Hincellp Hvldp Hpayp Hgid1p". }
             iModIntro.
             iApply (wp_sw_au_s_sconf false (mword_of_int (KernelSyms.iget + 0x7c)) Rz Rs3
                       (mword_of_int 64 : mword 12) V1 (trap_res b + (K - 6))%nat

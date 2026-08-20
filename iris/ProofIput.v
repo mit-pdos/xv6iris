@@ -3960,8 +3960,23 @@ Section IputFreePath.
         iMod ("Hclose" with "[Hidv Hnfull Hva Hmt Hgida]") as "_".
         { iApply bi.later_intro. iApply ic_close_held. rewrite /ic_held.
           iExists dev, inum, (valid_word true). iFrame. }
-        iModIntro. iExists true. iFrame "Hhalf Hrtok Hrd Htd Hvb Hmirf".
-        iSplitR; [done |]. iExists ga.
+        (* CLOSED CONJUNCT BY CONJUNCT, never framed (optimization.md,
+           "Framing: name the context side, construct the goal side").  The
+           held arm's goal is  pure ∗ half ∗ tok ∗ (dev ∗ dev ∗ valid ∗ ∃ ga,
+           payload ∗ ...) ∗ mirror,  so a six-name [iFrame] has to walk past
+           [ic_payload_np] -- an ∃ over the inode's whole block bundle -- to
+           reach the mirror at the end, and pays a goal-side search against it
+           for each name: 26.3 s, the file's most expensive statement by 5×.
+           Following the structure instead is a syntactic check per conjunct. *)
+        iModIntro. iExists true.
+        iSplitR; [done |].
+        iSplitL "Hhalf"; [iExact "Hhalf" |].
+        iSplitL "Hrtok"; [iExact "Hrtok" |].
+        iSplitR "Hmirf"; [| iExact "Hmirf"].
+        iSplitL "Hrd"; [iExact "Hrd" |].
+        iSplitL "Htd"; [iExact "Htd" |].
+        iSplitL "Hvb"; [iExact "Hvb" |].
+        iExists ga.
         iSplitL "Hpayl"; [iExact "Hpayl" |].
         iSplitL "Hoff"; [iExact "Hoff" | iExact "Hlvh"].
       - (* UNLOADED: read-only, everything goes straight back -- the tail is

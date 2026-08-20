@@ -687,8 +687,19 @@ Section IcacheEscrow.
     - iDestruct "Hpp" as (ge gr gd rg) "(#Hesc & #Hcom & Htk)".
       iMod (escA_redeem E ge gr gd γi (bv_unsigned inum) rg HE with "Hesc Htk Hcom")
         as "[Hmk Hoff]".
-      iModIntro. iFrame "Hl Hcnt Hmir Hoff". rewrite /ipool_shape_np. iRight.
-      iExact "Hmk".
+      (* DISPATCH THE [ipool_shape_np] CONJUNCT BEFORE FRAMING ANYTHING
+         (optimization.md, "A NAMED iFrame still pays a GOAL-side search").
+         [ipool_shape_np] unfolds to [ipool_alloc ∨ imark], and [ipool_alloc]
+         is an ∃ over a block-map big-op, so an [iFrame] that still has that
+         conjunct in the goal tries all four named hypotheses against every
+         one of its leaves: 83 s here and 91 s in the await arm below, the two
+         most expensive statements in the tree after the assumption audit.
+         Splitting it off first leaves a three-conjunct goal where the frame
+         is syntactic. *)
+      iModIntro. iSplitL "Hl"; [iExact "Hl"|].
+      iSplitR "Hcnt Hmir Hoff".
+      { rewrite /ipool_shape_np. iRight. iExact "Hmk". }
+      iFrame "Hcnt Hmir Hoff".
     - (* THE AWAIT ARM (§1.3, as A⁗ rebuilt it).  There is no [committedA]
          until the off-lock deposit runs, so the peel cannot redeem -- and
          must not: what the escrow holds before the deposit is the STANDING
@@ -704,8 +715,11 @@ Section IcacheEscrow.
                 γi γfs inodestart nib inum l (FrzPost rg) HERE Hin
                 with "Hrinv Hl Hpost") as "(%Hc & _ & _)".
         discriminate Hc. }
-      iModIntro. iFrame "Hl Hcnt Hmir Hoff". rewrite /ipool_shape_np.
-      iRight. iExact "Hmk".
+      (* same shape as the redeem arm above, same reason. *)
+      iModIntro. iSplitL "Hl"; [iExact "Hl"|].
+      iSplitR "Hcnt Hmir Hoff".
+      { rewrite /ipool_shape_np. iRight. iExact "Hmk". }
+      iFrame "Hcnt Hmir Hoff".
   Qed.
 
   End PoolPeelLic.

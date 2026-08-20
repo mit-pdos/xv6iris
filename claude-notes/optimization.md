@@ -205,8 +205,12 @@ worth 20× on individual files.
     exact HWtlb)` makes it 13 s. The rule the durable notes give for
     tower-carrying proofs (name the union lemma) is therefore still the rule
     whenever the sets are VARIABLES rather than literals — which is exactly
-    the `Drw`/`Dro` frame idiom. `HartSKpt.swp_translate_kpt` still carries
-    the `set_solver` form.
+    the `Drw`/`Dro` frame idiom. `HartSKpt.swp_translate_kpt` carried the
+    `set_solver` form until 2026-08-20, at **24.5 s for that one `assert`** —
+    the whole file was 29.6 s. Its premise `HWtlb : tlb ∈ Drw` was already in
+    context, so `by (apply elem_of_union_l; exact HWtlb)` is the whole fix:
+    file **29.6 s → 5.1 s**. Grep for `∈ .* ∪ .*) by set_solver` before
+    believing a file is intrinsically slow.
   - **Two things the override does NOT fix**, both goal-side rather than
     context-side, so the old workarounds stand: `gset (mword n)` still fails
     (instance divergence — see the durable notes), and `set_unfold` still
@@ -268,6 +272,31 @@ worth 20× on individual files.
   "Hd Hn Hv Hp Hm Hg")`. Otherwise every user pays a search.
 - Where no constructor exists, close a seam by naming every conjunct
   (`iSplitL "H"; [iExact "H" |]` chains), never with `iFrame`.
+- **THE CHEAPEST FIX IS USUALLY TO SPLIT THE BIG CONJUNCT OFF FIRST, and it is
+  a two-line edit.** A frame is priced by (names × goal conjuncts it walks), so
+  it is the ONE definition-valued conjunct in the goal — the escrow arm, the
+  parked bundle, the pool shape — that makes it expensive, never the six
+  points-tos. Dispatch that conjunct into its own goal with `iSplitL`/`iSplitR`
+  *before* framing anything, and the frame that remains is syntactic. Measured
+  on the four worst frames in the tree (2026-08-20; isolated `coqc`, per file):
+  | site | what it framed past | file before → after |
+  |---|---|---|
+  | `IcacheEscrow.ipool_shape_to_np` ×2 | `ipool_shape_np` (∃ over a block-map big-op) | **183.6 s → 15.7 s** |
+  | `ProofIput` held-arm close | `ic_payload_np`, reached past to the mirror | 100.7 s → 82.3 s |
+  | `ProofIget` mid-arm re-park (bare `iFrame`) | `ic_unloaded` | 80.1 s → 52.6 s |
+  | `UsertrapRes.ut_res_bare_sstc` ×2 | the residue's whole ∃ body | 23.5 s → 14.1 s |
+  The two `IcacheEscrow` sentences were 90.9 s and 83.3 s — the two most
+  expensive in the tree after the assumption audit, and both on the critical
+  path. The rewrite is mechanical: `iSplitL "Hl"; [iExact "Hl"|]`, then
+  `iSplitR "<the rest>"` around the arm's own proof, then frame the tail.
+- **Extracting a persistent fact out of a bundle must not take the bundle
+  APART.** `ut_res_bare_sstc` destructured `ut_caps` to read one
+  `sstc_enabled` out of it and then rebuilt it conjunct-by-conjunct inside the
+  residue's body. Doing the extraction in a five-line lemma over ONE hypothesis
+  and handing the bundle back whole is the fix — and note the intermediate
+  attempt made it WORSE (16.9 s → 24.4 s) because the rebuild moved rather than
+  disappeared. The tell that you are in this case: the proof reads differently
+  from its own siblings, which pass `Henv` straight through.
 - **A SHAPE MISMATCH turns every match attempt into a CONVERSION, and that is
   the expensive kind.** `ProcInv.tf_words` is a `big_sepL`, so its conjuncts
   carry offsets `8 * Z.of_nat i` while every consumer names them as LITERALS
@@ -317,6 +346,10 @@ worth 20× on individual files.
     end.
   ```
 
+  Second file (`BioInv`, 2026-08-20): four such instances over the buffer
+  escrow's arms were 31.5 s of a 41.5 s file — `buf_parked_timeless`'s single
+  `apply _` alone was 19.7 s — and the same `tl_struct` took the file to
+  **20.1 s**. The dispatch must be SYNTACTIC:
   The `first [apply bi.exist_timeless; … | …]` spelling is a REGRESSION (33–42 s,
   an order of magnitude worse than the monolithic `apply _`): `apply` unifies up
   to delta, so it peels straight *through* a named abstraction that already has
@@ -361,6 +394,22 @@ worth 20× on individual files.
   sweep this — the tree's other sites are sub-second because their predicates are
   small. Check the `.v.timing` cost of a candidate first; the site count tells
   you nothing.
+- **PEEL A CHAIN BY `apply`, NEVER BY `erewrite` — an equation lemma builds an
+  `eq_ind_r` motive over the whole remaining term at every step.** `goodb_bind`
+  is stated as `goodb D (bind m f) s = goodb D (f x) s`, so
+  `repeat (erewrite goodb_bind by (vm_compute; reflexivity))` re-copies the
+  entire monadic tail once per bind — and once a continuation has been
+  instantiated with symbolic bitvector data the tail is large. Ltac profiling
+  is what settles it: **81.5 % LOCAL to the `erewrite`**, against 3 % in the
+  `vm_compute` side conditions and 11 % in their `reflexivity` — i.e. the side
+  conditions everyone suspects are not the cost. The intro form
+  (`goodb_bind_i : … → goodb D (f x) s = true → goodb D (bind m f) s = true`,
+  one line off the equation) has the same two side conditions and no motive,
+  and the proof term becomes a chain of applications, which takes the `Qed`
+  down with it: `WpGprCsrwA.goodb_legalize_menvcfg` **18.6 s → 6.9 s of tactic
+  and 18.0 s → 9.4 s of `Qed`**, file 46.3 s → 25.9 s. Not a sweep: the same
+  `goodb_step` in `WpSconfCsr` / `WpGprCsrwC` costs ~1.4 s, because nothing has
+  put a symbolic value in their tails.
 - **`rewrite wp_next_off` is a setoid rewrite over the whole goal — use `iApply
   wp_next_off_intro`.** Same continuation, matches only the head. A `b`-generic
   proof has no such sites at all (it threads `wp_next … b …` and discharges with
@@ -436,6 +485,15 @@ Note `mm_rw_open`/`_close` are stated **at the tower**, so the lookup rewrites
 are absorbed too and the caller neither splits nor rewrites. Rule of thumb: if a
 frame lemma appears under `rewrite` anywhere downstream of the file that proves
 it, that is a directed lemma waiting to be written.
+
+The READ-ONLY twins (`mm_ro_open` in HartMFrame, `mc_ro_close` in
+WpInstrConfig) were written on 2026-08-20 for exactly one site that had been
+missed: `WpInstrConfig.mc_ro_acc`, whose goal carries a whole `mc_rs` tower
+inside its ∀-closure, so its `rewrite mm_ro_split` was **24.9 s** — file
+38.5 s → 13.6 s once both bridges are applied instead. **Where the goal is
+small the same `rewrite` is free**, which is why the other five
+`mm_rw_split`/`mm_ro_split` sites in that file and in `InstrBytes` were left
+alone: read the `.v.timing` cost of a candidate site, never its shape.
 
 ## Register maps
 
@@ -682,7 +740,25 @@ and runs in CI on every checkin.
   leading with an expensive-to-fail branch pays that cost at every use — 42 s
   over one function, purely in the failures of the first branch, fixed by
   reordering and nothing else. `exact`/`assumption` fail cheaply on a type
-  mismatch; `rewrite … in H` and `congruence` do not.
+  mismatch; `rewrite … in H` and `congruence` do not. Second measurement
+  (`HartLift2.wp_hsil2_node`, 2026-08-20): one `all: first [RegWrite | RegRead |
+  announce]` over the monad node type's constructors, where the RegWrite branch
+  fails only after two `case_decide`s, two `injection`s, a `set_solver` and an
+  `iMod` — so every announce-class and RegRead goal paid that whole prefix.
+  Reordered announce < RegRead < RegWrite, nothing else changed: **16.2 s →
+  ~0.1 s, file 18.2 s → 2.5 s.** Each branch still ends by closing its own
+  goal, which is what makes reordering sound — `first` commits only to a branch
+  that finishes.
+- **A branch order is only worth changing where the branches FAIL, and a
+  nineteen-wide `first [apply …]` over a family of lookup lemmas is NOT that
+  case** (negative result, 2026-08-20). `HartMFrame.mm_rs_lk` /
+  `WpInstrConfig.mc_rs_lk` cost 5.7 s / 6.1 s at their `all:` sites, which
+  looks exactly like the trap above; replacing the alternation with a
+  `lazymatch` that dispatches on the register in the goal changed nothing
+  (5.65 s → 5.54 s). The towers are already `Global Opaque`, so the failing
+  `apply`s are cheap and the cost is in the ~19 SUCCEEDING ones. Do not redo
+  this; if these sites ever matter, the lever is the number of goals, not the
+  dispatch.
 - **Order `repeat (first [ … ])` loops** with cheap structural rewrites first and
   broad whole-goal normalisation LAST — the loop re-tries its first branch after
   every success.
