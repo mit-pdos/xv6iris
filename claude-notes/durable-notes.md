@@ -726,6 +726,39 @@ instruction runs: there is nothing in it to allocate (`xv6GΣ` +
 `subG_xv6GΣ`).  The rule that comes with it: **a file at or above `Xv6G.v`
 binds `xv6G` and does NOT bind any member.**  Binding both compiles.
 
+**SO GATE IT, because nothing else will.** A violation is a second instance
+path, and its symptom is an `iFrame`/`iApply` failure between two
+propositions that print identically -- arbitrarily far from the file that
+caused it. The check is a scan for a binder naming both, and it takes two
+forms, because *consecutive `Context` commands share a section*: one binder
+group holding both, and one section binding `xv6G` in one `Context` and a
+member in another. Match members **module-qualified as well** (`!WpLock.lockG
+Σ` is deliberate in places, to dodge an import) or the scan reports a clean
+tree that is not one. Run it after any merge that lands on swept files:
+"rebased without conflict" and "compiles" are different claims, and a binder
+sweep is exactly where they come apart (`e60227ef` is the worked instance --
+a textually clean three-way merge that re-introduced two member binders).
+
+```sh
+python3 - <<'EOF'
+import re,glob
+MEM=['sieG','lockG','kallocG','bioG','diskGhostG','uartGhostG','fsLogG',
+     'logG','fsCrashG','iregG','icacheG','pipeG','cinvG','uioG']
+mem=re.compile(r'!(?:[A-Za-z_]\w*\.)*(?:'+'|'.join(MEM)+r')\s+Σ')
+for f in sorted(glob.glob('iris/*.v')):
+    t=open(f).read()
+    for m in re.finditer(r'`\{([^}]*)\}', t):
+        if 'xv6G' in m.group(1) and mem.search(m.group(1)):
+            print(f, t[:m.start()].count(chr(10))+1, m.group(1)[:70])
+EOF
+```
+
+A file that binds NEITHER is fine and needs no sweep -- the tier's engine
+files (`WpUmodeStep`/`Leaf`/`Branch`/`Store`/`Load`) bind only `!riscvGS Σ`,
+so the camera reorganization passed straight through them. Check before
+sweeping; the sweep's own skip list exists because re-running it blindly
+reverted `RiscvAdequacy`'s deliberate carve-out.
+
 **WHERE THE MEMBERS ARE DEFINED IS A SEPARATE DECISION FROM WHERE THE BUNDLE
 SITS, AND IT IS THE ONE THAT COSTS BUILD TIME.**  A bundle can only sit above
 every member, so with each class written in its own subsystem's file `xv6G`'s
