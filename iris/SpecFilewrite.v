@@ -591,12 +591,15 @@ Definition wp_filewrite_sconf_body
   (* a0 = f, a1 = addr (the user source, never inspected here), a2 = n *)
   m !!! Regidx (mword_of_int 10 : mword 5) = fnode k ->
   m !!! Regidx (mword_of_int 12 : mword 5) = (mword_of_int n : mword 64) ->
-  (* THE COUNT.  An int, and non-negative because it is a write length.
-     NOTE what is NOT here: fileread's [MAXFILE*BSIZE + n < 2^31].  The
-     chunking makes writei's joint premise a closed fact (see the header and
-     [fw_chunk_joint]), which is why sys_write will be able to take [n]
-     straight from user input. *)
-  0 <= n < 2 ^ 31 ->
+  (* THE COUNT: AN int, AND NOTHING ELSE.  filewrite is the layer a syscall
+     hands unchecked user input to, so it may not ask for a SIGN --
+     [SpecSysRead.sys_rw_count_range] is what a trapframe word gives, and
+     this is exactly that.  XV6_REV 31f115a is what makes it dischargeable:
+     [srliw a5,a2,0x1f ; c.bnez a5] at +0x1c is xv6's own [n < 0] test, so
+     past the fall-through [0 <= n] is a FACT OF THE CODE.
+     NOTE what is also NOT here: fileread's [MAXFILE*BSIZE + n < 2^31] -- the
+     chunking makes writei's joint premise a closed fact ([fw_chunk_joint]). *)
+  - 2 ^ 31 <= n < 2 ^ 31 ->
   (* PARKING PREMISE (hart-generic scheduler protocol): every arm sleeps. *)
   eb = true ->
   (* filewrite's FD_INODE arm is the whole cone: begin_op/end_op ("log", 3),

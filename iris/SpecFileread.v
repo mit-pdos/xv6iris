@@ -679,13 +679,16 @@ Definition wp_fileread_sconf_body
   (* a0 = f, a1 = addr (the user destination, never inspected here), a2 = n *)
   m !!! Regidx (mword_of_int 10 : mword 5) = fnode k ->
   m !!! Regidx (mword_of_int 12 : mword 5) = (mword_of_int n : mword 64) ->
-  (* THE COUNT.  Non-negative because it is a read length, and bounded so
-     that readi's joint [off + n < 2^32] follows from the invariant's
-     [off <= MAXFILE*BSIZE] alone.  See the header: the bound is now stronger
-     than readi needs and can be relaxed to [0 <= n < 2^31], which is what
-     retires the debt sys_read inherits. *)
-  0 <= n ->
-  Z.of_nat MAXFILE * Z.of_nat BSIZE + n < 2 ^ 31 ->
+  (* THE COUNT: AN int, AND NOTHING ELSE.  fileread is the layer a syscall
+     hands unchecked user input to, so it may not ask for a SIGN and it may
+     not ask for a bound -- [SpecSysRead.sys_rw_count_range] is what a
+     trapframe word gives, unconditionally, and this is exactly that.
+     XV6_REV 31f115a made both halves discharge-able rather than owed:
+     [srliw a5,a2,0x1f ; c.bnez a5] at +0x1a is xv6's own [n < 0] test, so
+     [0 <= n] is a fact of the code past the fall-through, and from
+     [n < 2^31] with [off <= MAXFILE*BSIZE] readi's joint [off + n < 2^32]
+     is arithmetic.  See the header. *)
+  - 2 ^ 31 <= n < 2 ^ 31 ->
   (* PARKING PREMISE (hart-generic scheduler protocol): every arm sleeps. *)
   eb = true ->
   (* the order premise, at the LOWEST rank this cone touches; every

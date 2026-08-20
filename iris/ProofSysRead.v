@@ -320,7 +320,7 @@ Section ProofSysRead.
     : wp_sys_read_sconf_body γa γf γs j γlp fn pidv V v v2 m av eb b lks.
   Proof.
     cbv beta delta [wp_sys_read_sconf_body].
-    intros pcE pj ret_tgt Hav Hj Hgs Hlens Harg0 Harg1 Harg2 Hn0 Hnmax Heb.
+    intros pcE pj ret_tgt Hav Hj Hgs Hlens Harg0 Harg1 Harg2 Heb.
     (* every budget, or [lia] cannot see past [fileread_stack] -- it is an
        expression, not a literal, on purpose (SpecSysRead.v). *)
     
@@ -920,7 +920,7 @@ Section ProofSysRead.
       iApply (Fileread.wp_fileread_sconf γa γf γs j γlp kk qq Cf fn pidv V
                 S4 (av - 6)%nat eb (sys_rw_count v2) b
                 _ ltac:(lia) Hkk Hj Hgs Hlens
-                HS4a0' HS4a2 Hn0 Hnmax Heb
+                HS4a0' HS4a2 (sys_rw_count_range v2) Heb
                 with "Hcg Hcpu Htext Hdata Hpc Hpenv Href Hcore Hkenv Hprocs Hfenv").
       all: try lkbelow.
       iIntros (CID25 Hs25 mf rv P')

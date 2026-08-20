@@ -460,10 +460,62 @@ Worth knowing because none of them is an immediate next to a pc anchor:
 
 After those the whole tree is green except the two reshaped file.c proofs.
 
-### What is left, and it is the interesting half
+### The two reshaped proofs — DONE, and the premises are gone with them
 
-`ProofFilereadParts.v` was a uniform **+6** on its epilogue anchors
-(`fri_58..62` → `fri_5e..68`) and is DONE.  The other three are real work:
+The tree is green at `31f115a`, and **`SpecSysRead` and `SpecSysWrite` now
+state NOTHING about the count the user wrote.**  Debt (C) is closed.
+
+`ProofFilereadParts.v` was a uniform **+6** on its epilogue anchors.  The other
+three needed real work, and what each needed is worth recording because the
+next guard-insertion bump will look the same:
+
+**`fileread` — a pure insertion, so the offset map is a piecewise shift.**
+`+0` below `0x1a`, **+6** through `0xa6` (the guard is `srliw a5,a2,0x1f` at
+`+0x1a` and a COMPRESSED `bnez` at `+0x1e` — six bytes, not eight), then **+10**
+from `0xaa` for the arm's two `ld` restores at `+0xb0`/`+0xb2`.  Verified
+instruction-by-instruction against the two `CodeFileread.v` before applying:
+zero mismatches, and the only new offsets are the four the guard accounts for.
+The taken arm restores s1/s3 and falls into the `-1` block the
+`f->readable == 0` arm already reached, so it is four instructions.
+
+**`filewrite` — NOT a shift, and `relayout_shift.py`'s map for it is WRONG**
+(it reports offsets moving DOWN, e.g. `0x0fa -> 0x0f2`, which cannot happen in
+a function that only grew; the playbook's difflib mis-pairing, provoked as
+always by the new `li a0,-1 ; j` arm being a byte-for-byte copy of three
+existing ones).  **Build the map from a side-by-side disassembly of the two
+revisions** — `git worktree add` the old pin, `make kernel/kernel`, and diff
+the two listings — then CHECK it: injective, every image a real instruction in
+the new `Code` file, and the unmatched new offsets exactly the ones the source
+change accounts for.  Three things moved that a shift cannot express:
+
+* `sd s4,48(sp)` moved from BEFORE the zero-trip test into the six-spill run
+  after it;
+* the ZERO-TRIP is now `mv a0,a2 ; j` at `+0x126` straight into the epilogue.
+  It no longer goes through the tail at all, and none of the six late spills
+  have happened on that path — so the arm went from a join to a dozen lines;
+* the tail was merged.  Both loop exits (`bne s3,s1`, `bge s4,s5`) now branch
+  straight to `+0xe2`, and each ARM of the `bne s5,s4` there runs its own
+  six-restore run.  `fw_rest5` (five restores, run by each of the three blocks
+  that jumped to the tail) became **`fw_rest6`**, moved INSIDE `fw_tail`, and
+  `fw_m1j4` is gone.  `fw_tail` therefore takes the caller's s1/s3/s7/s8/s9
+  and their frame slots rather than arbitrary words.
+
+**Two reusable pieces landed in `ProofFilereadParts.v`:** `fr_srliw31`, the
+sign bit of a 32-bit word read off `srliw ..,0x1f` at the FULL `int` range
+(`ProofReadiParts.rd_srliw10`'s shape, but through `z mod 2^32` because the
+NEGATIVE half is the whole point), and `fr_neq0_false`/`fr_neq1_true` for the
+branch that follows.  `ProofFilewrite.v` uses both.
+
+**What the guard buys inside each proof.**  The fall-through re-establishes
+`0 <= n` as a fact of the code, so everything below keeps the premises it had:
+`fw_loop`, `fw_tail`'s `0 <= nz < 2^31`, `fw_bge0_moi`, `fw_zero_trip` and the
+`rd_arg32_small` readings are all untouched.  The only numeric restatement is
+fileread's `MAXFILE*BSIZE + n < 2^31` becoming `fr_off_n_lt32` — readi's joint
+bound is at `2^32` and `off <= MAXFILE*BSIZE` with `n < 2^31` gets there by
+arithmetic.
+
+### What is left, and it is the interesting half
+### (superseded) What was left, when this section was first written
 
 * **`ProofFileread.v`** — old offsets `>= 0x1a` shift **+6** (the guard is
   `srliw a5,a2,0x1f` at `+0x1a` and a COMPRESSED `bnez` at `+0x1e`, six bytes,

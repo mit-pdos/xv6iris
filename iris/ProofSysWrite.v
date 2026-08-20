@@ -336,16 +336,17 @@ Section ProofSysWrite.
   Proof.
     cbv beta delta [wp_sys_write_sconf_body].
     intros pcE pj ret_tgt Hav Hj Hgs Hlens Hfj Hfprocs
-           Harg0 Harg1 Harg2 Hn0 Heb.
+           Harg0 Harg1 Harg2 Heb.
     (* every budget, or [lia] cannot see past [filewrite_stack] -- it is an
        expression, not a literal, on purpose (SpecSysWrite.v). *)
     
-    (* THE UPPER HALF IS FREE (SpecSysRead.sys_rw_count_lt); only the lower
-       bound is owed upward.  Hoisted to a NAMED fact rather than written as
-       an inline [ltac:] in argument position -- durable-notes' divergence
-       trap. *)
-    assert (Hnrange : 0 <= sys_rw_count v2 < 2 ^ 31)
-      by (split; [exact Hn0 | apply sys_rw_count_lt]).
+    (* BOTH HALVES ARE FREE: the count is a [bv_signed] of a 32-bit cell, so
+       it is an [int] and nothing has to be assumed about it
+       ([SpecSysRead.sys_rw_count_range]).  Hoisted to a NAMED fact rather
+       than written as an inline [ltac:] in argument position --
+       durable-notes' divergence trap. *)
+    assert (Hnrange : - 2 ^ 31 <= sys_rw_count v2 < 2 ^ 31)
+      by apply sys_rw_count_range.
     (* the push_off bound, with [2^31] evaluated by hand: [lia] cannot reduce
        a power (durable-notes.md). *)
     assert (Hnoff : (Z.of_nat 0 + 1 < 2 ^ 31)%Z)

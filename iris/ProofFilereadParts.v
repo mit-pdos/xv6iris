@@ -203,6 +203,70 @@ Proof.
   change (2^31)%Z with 2147483648%Z in Hz. lia.
 Qed.
 
+(* ---------------------------------------------------------------------- *)
+(*  THE SIGN TEST xv6 ADDED IN 31f115a                                     *)
+(*                                                                         *)
+(*  [srliw a5,a2,0x1f] at +0x1a lifts the count's SIGN BIT into a5, and the *)
+(*  [c.bnez] at +0x1e is [if (n < 0) return -1].  Shaped like               *)
+(*  [ProofReadiParts.rd_srliw10], but that one takes [0 <= z] and reads the *)
+(*  low word through [bvw32_small]; here the NEGATIVE half is the whole     *)
+(*  point, so the low word is [z mod 2^32] and the two signs are separate   *)
+(*  arms.  Above 2^31 the wrapped value has its top bit set, which is       *)
+(*  exactly what the shift is asking.                                       *)
+(* ---------------------------------------------------------------------- *)
+Lemma fr_srliw31 (z : Z) : (- 2 ^ 31 <= z < 2 ^ 31)%Z ->
+  sign_extend' 64
+    (shift_bits_right (subrange_vec_dec (mword_of_int z : mword 64) 31 0 : mword 32)
+                      (mword_of_int 31 : mword 5))
+  = (mword_of_int (if Z_lt_dec z 0 then 1 else 0) : mword 64).
+Proof.
+  intro Hz.
+  change (2 ^ 31)%Z with 2147483648%Z in Hz.
+  rewrite -trunc32_subrange trunc32_mword_of_int.
+  assert (Hsh : shift_bits_right (mword_of_int z : mword 32) (mword_of_int 31 : mword 5)
+                = (mword_of_int (if Z_lt_dec z 0 then 1 else 0) : mword 32)).
+  { unfold shift_bits_right. apply bv_eq.
+    unfold shiftr, SailStdpp.Values.with_word, get_word,
+      MachineWord.MachineWord.logical_shift_right.
+    rewrite bv_shiftr_unsigned.
+    assert (H31 : bv_unsigned (MachineWord.MachineWord.N_to_word
+                     (MachineWord.MachineWord.Z_idx 32)
+                     (MachineWord.MachineWord.Z_idx
+                        (uint (mword_of_int 31 : mword 5)))) = 31).
+    { assert (Hu : uint (mword_of_int 31 : mword 5) = 31)
+        by (vm_compute; reflexivity).
+      rewrite Hu.
+      unfold MachineWord.MachineWord.N_to_word, MachineWord.MachineWord.Z_idx.
+      rewrite Z_to_bv_unsigned. apply bv_wrap_small.
+      unfold bv_modulus; simpl; lia. }
+    rewrite H31 !moi32_unsigned.
+    destruct (Z_lt_dec z 0) as [Hneg | Hpos].
+    - assert (Hw : bv_wrap 32 z = (z + 4294967296)%Z).
+      { unfold bv_wrap, bv_modulus.
+        change (2 ^ Z.of_N 32)%Z with 4294967296%Z.
+        symmetry. apply Z.mod_unique_pos with (q := (-1)%Z); lia. }
+      rewrite Hw Z.shiftr_div_pow2; [| lia].
+      change (2 ^ 31)%Z with 2147483648%Z.
+      rewrite (_ : ((z + 4294967296) / 2147483648)%Z = 1%Z);
+        [| symmetry; apply Z.div_unique_pos with (r := (z + 2147483648)%Z); lia].
+      symmetry. apply bvw32_small. change (2^32)%Z with 4294967296%Z. lia.
+    - assert (Hw : bv_wrap 32 z = z)
+        by (apply bvw32_small; change (2^32)%Z with 4294967296%Z; lia).
+      rewrite Hw Z.shiftr_div_pow2; [| lia].
+      change (2 ^ 31)%Z with 2147483648%Z.
+      rewrite (Z.div_small z 2147483648); [| lia].
+      symmetry. apply bvw32_small. change (2^32)%Z with 4294967296%Z. lia. }
+  rewrite Hsh. apply fr_sext_moi32.
+  destruct (Z_lt_dec z 0); change (2^31)%Z with 2147483648%Z; lia.
+Qed.
+
+(* the two readings of [c.bnez a5] once [fr_srliw31] has put 0 or 1 there *)
+Lemma fr_neq0_false : neq_vec (mword_of_int 0 : mword 64) (zero_reg : mword 64) = false.
+Proof. vm_compute. reflexivity. Qed.
+
+Lemma fr_neq1_true : neq_vec (mword_of_int 1 : mword 64) (zero_reg : mword 64) = true.
+Proof. vm_compute. reflexivity. Qed.
+
 Lemma fr_ty_eqz (w : mword 32) (z : Z) : (0 <= z < 2 ^ 31)%Z ->
   eq_vec (sign_extend' 64 w : mword 64) (mword_of_int z : mword 64)
   = eq_vec w (mword_of_int z : mword 32).

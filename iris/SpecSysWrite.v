@@ -32,16 +32,16 @@
    up.  fs-sysfile S3f banked exactly this: sys_write may take [n] straight
    from user input where sys_read cannot.
 
-   WHAT IT DOES STILL CARRY is [0 <= n].  [SpecFilewrite] takes
-   [0 <= n < 2^31], the upper half of which is free for a sign-extended
-   32-bit cell ([SpecSysRead.sys_rw_count_lt]) and the lower half of which is
-   not: nothing between argint and the call tests the sign, and the object
-   code confirms it (the function's only branch is argfd's).  A negative [n]
-   is perfectly well handled by the C -- filewrite's loop body never runs and
-   its tail [(i == n ? n : -1)] answers -1 -- so this is a MODELLING premise
-   rather than a kernel fact, and it is shared verbatim with sys_read.  See
-   SpecSysRead.v's header for the full accounting of what each of the two
-   syscalls owes.
+   AND AS OF XV6_REV 31f115a IT CARRIES NOTHING ELSE EITHER.  This contract
+   used to take [0 <= sys_rw_count v2], because [SpecFilewrite] wanted
+   [0 <= n < 2^31].  Nothing between argint and the call tests the sign --
+   the function's only branch is argfd's -- so that premise was owed to a
+   caller who could never pay it, which is not a contract about a syscall.
+   31f115a's [if (f->writable == 0 || n < 0)] makes it a FACT OF THE CODE:
+   [SpecFilewrite] now takes the whole [int] range,
+   [SpecSysRead.sys_rw_count_range] supplies it for free, and the guard
+   restores [0 <= n] past the branch, so sys_write's contract says NOTHING
+   about the count the user wrote.  sys_read's is now the same shape.
 
    ==== THE REST OF THE SHAPE ============================================
 
@@ -193,10 +193,11 @@ Definition wp_sys_write_sconf_body
   pv_tf V !! tf_arg_idx 0 = Some v ->
   (exists v1 : mword 64, pv_tf V !! tf_arg_idx 1 = Some v1) ->
   pv_tf V !! tf_arg_idx 2 = Some v2 ->
-  (* THE ONE INHERITED NUMERIC PREMISE (see the header).  Note what is NOT
-     here: fileread's [MAXFILE*BSIZE + n < 2^31].  The upper half of
-     filewrite's [0 <= n < 2^31] is free ([SpecSysRead.sys_rw_count_lt]). *)
-  0 <= sys_rw_count v2 ->
+  (* NO NUMERIC PREMISE.  [SpecFilewrite] takes [-2^31 <= n < 2^31] and a
+     trapframe word satisfies that unconditionally
+     ([SpecSysRead.sys_rw_count_range]), so this contract asks its caller for
+     NOTHING about the count -- which is what a syscall contract has to do,
+     the argument being whatever the user put in a2.  See the header. *)
   (* PARKING PREMISE (hart-generic scheduler protocol): every filewrite arm
      sleeps, so this syscall parks. *)
   eb = true ->
