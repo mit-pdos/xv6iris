@@ -35,6 +35,7 @@ Require Import RegFile.
 Require Import IrefSlots IcacheRef ProcAvail FileInvDefs FsCfg.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import SpecNameiRootBoot.
+Require Import ProcDefs UserPtTree ProcGeom.  (* the dead-binder dummy: MkPPriv/UPTD/NOFILE *)
 Require Import SpecNamei.
 Require Import LinkNameiRoot.
 
@@ -51,8 +52,17 @@ Module NameiRootBoot : NAMEI_ROOT_BOOT.
     intros HK Hn Hdev Hnib Hlks.
     iIntros "Hcg Hcpu #Htext #Hkd Hpc #Hpenv #Hitl #Hitinv #Hesc #Hireg
              Hisl Hp0 Hp1 Hcont".
+    (* [Vpr] is a DEAD binder of [wp_namei_root_body] (the proc_priv_bare
+       sweep gave the whole namei family the parameter for shape uniformity;
+       the root corner never touches the private block), so any inhabitant
+       serves.  BootCarveMain's zero record is the one other dummy in the
+       tree; duplicated rather than exported -- it is one literal. *)
     iApply (NameiRoot.wp_namei_root fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov
               fsc_logst icfg_ist icfg_nib icfg_dev dqp m n K eb p b lks
+              (MkPPriv (zero_reg : mword 64)
+                 (UPTD (mword_of_int 0 : mword 44) (mword_of_int 0 : mword 44) ∅ ∅)
+                 [] (replicate NOFILE (zero_reg : mword 64))
+                 (zero_reg : mword 64) [])
               HK Hn eq_refl eq_refl Hdev Hnib Hlks
               with "Hcg Hcpu Htext Hkd Hpc Hpenv Hitl Hitinv Hesc Hireg
                     Hisl Hp0 Hp1 Hcont").
