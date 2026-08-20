@@ -354,8 +354,20 @@ WP-exported invariants apply to it.  No kernel side conditions anywhere.
     (`invw_ctrl_post`, `rf_ws_ctrl`).  L2′'s remaining owed piece from
     W2b condition 5: the trace-level `vcapat` producer at the access
     node, to be designed with the L2′ slice.
-  - **Remaining: R3** (producers + retry arm + flips), **R6**
-    (contract).
+  - **R3/S3 IS ALREADY LANDED — the worklist line saying it remained was
+    STALE (verified 2026-08-20 post-T2-1c):** `WeakEvLang.emonad_step`
+    carries the split arms (exclusive `MemRead` → `exload_post_run_d`
+    with the F6 guard deleted; conditional `MemWrite` → `exwin_ok` +
+    the §5 UNGUARDED retry self-loop, with the two forcing reasons
+    recorded at the arm), `WeakEvInst` emits `LExLoad`/`LExStore` (the
+    disk's `LRmw` arm is `False`, marked "(S3)"), and
+    `WeakEvLift.ewp_ev_exstore` is the Löb-absorbed retry WP rule.  No
+    producer emits the fused label.  What actually remains of the
+    S-track: **R6/S6** (the deletion contract: `LRmw`/`WPRmw`/`PFRmw`/
+    `wpstep_rmw_now`/fused event machinery — cleanup, stays last) and
+    the §6 `ak_excl` rename ("flips", cosmetic — the arms still test
+    `ak_latest` with the "extensionally equal today" comment; fold into
+    R6).
 - **D8-1 — `wp_cert_step` / `wp_certify` + the vcap lemmas**: **DONE
   (2026-08-18, `da090933`)** — `iris/WeakCertify.v`: `wp_cert_step i :=
   wp_astep_of i ∪ (∃ l, wp_pf_step i l)` (fully by reference, no arm
