@@ -95,6 +95,8 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvPtsto RiscvModelBytes.
 Require Import ArrCursor.
 Require Import WpLock.
+Require Import WpLockAt.   (* [lock_free_tok] / [newlock_at]: the pre-minted
+                              lock gname, for [icache_boot_at] below *)
 Require Import SleepLock.
 Require Import FsBlocks.
 Require Import BlockWords.
@@ -1006,7 +1008,18 @@ Section IcacheBootTable.
      escrow's identification ghost ([ic_names_alloc]'s [dvs]) has to be
      allocated AT the values the cells already hold, and the cells arrive
      from the loader with those values existentially bound -- so they must
-     be collected into a function before any gname exists. *)
+     be collected into a function before any gname exists.
+
+     THIS IS WHY [icache_boot_at] EXISTS AND WHY IT DOES NOT NEED THIS TO
+     HAPPEN FIRST.  The collection has to precede the [ghost_var_alloc], and
+     the cells are only readable at iinit's post -- so an era fupd that must
+     mint [fsc_ic] long before that cannot run [ic_names_alloc] at the right
+     values.  It does not have to: [ic_id] is a plain [ghost_var], a WHOLE
+     one updates to anything ([ic_id_set] below), so the era mints the family
+     blind and [icache_boot_at] runs THIS lemma on the cells it is handed and
+     then WRITES what it read.  [fun_of_big] therefore stays here, inside the
+     [_at] lemma, and never becomes the caller's problem
+     (claude-notes/projects/fs-cfg-boot.md, scout verdict on [fsc_ic]). *)
   Lemma fun_of_big {A : Type} `{!Inhabited A} (Phi : nat -> A -> iProp Σ)
       (n j : nat) :
     ([∗ list] k ∈ seq j n, ∃ a : A, Phi k a) -∗
@@ -1114,7 +1127,42 @@ Section IcacheBootTable.
   (*  THE BOOT STEP                                                      *)
   (* ------------------------------------------------------------------ *)
 
-  (* In: the itable spinlock as iinit leaves it (zeroed word, named, cpu
+  (* ---- the two facts that let the NAMES be minted before the VALUES ---- *)
+
+  (* [ic_id] is a plain [ghost_var] ([IcacheEscrow.v] §13.8), so a WHOLE one
+     is not merely flippable ([ic_id_flip], which needs both halves) but
+     writable outright.  [icache_boot_at] spends exactly this: it is handed
+     the era fupd's blind family and re-tags each slot at the dev/inum words
+     [fun_of_big] just read off that slot's cells. *)
+  Local Lemma ic_id_set (cn : ic_names) (k : nat) (v : bool) (d n : mword 32)
+      (v' : bool) (d' n' : mword 32) :
+    ic_id cn k 1 v d n ==∗ ic_id cn k 1 v' d' n'.
+  Proof.
+    rewrite /ic_id. iIntros "H".
+    iApply (ghost_var_update (v', d', n') with "H").
+  Qed.
+
+  (* ...and the forgetful direction, which is all a caller holding
+     [ic_names_alloc]'s output needs in order to meet [icache_boot_at]'s
+     value-blind premise.  Spent by [icache_boot] just below. *)
+  Local Lemma ic_id_forget (cn : ic_names) (v : bool)
+      (dvs : nat -> mword 32 * mword 32) :
+    ([∗ list] k ∈ seq 0 NINODE, ic_id cn k 1 v (dvs k).1 (dvs k).2)
+    ⊢ ([∗ list] k ∈ seq 0 NINODE,
+         ∃ (v' : bool) (d' n' : mword 32), ic_id cn k 1 v' d' n').
+  Proof.
+    apply big_sepL_mono. intros idx k _. iIntros "H".
+    iExists v, (dvs k).1, (dvs k).2. iExact "H".
+  Qed.
+
+  (* the dummy identification values [icache_boot]'s own mint runs at -- any
+     words will do, since [icache_boot_at] overwrites them. *)
+  Local Definition ic_dv_dummy : nat -> mword 32 * mword 32 :=
+    fun _ => ((mword_of_int 0 : mword 32), (mword_of_int 0 : mword 32)).
+
+  (* THE BOOT STEP AT PRE-MINTED NAMES (fs-cfg-boot.md staging 1).
+
+     In: the itable spinlock as iinit leaves it (zeroed word, named, cpu
      field cleared), iinit's fifty [sl_fresh]es, the fifty entries' raw
      cells, the whole [iref_slots] supply, and the stocked pool.
      Out: everything every icache contract takes, at the ALL-EMPTY boot
@@ -1122,8 +1170,24 @@ Section IcacheBootTable.
      [islot_empty]s, the pool covering the whole region.
 
      The last conjunct IS [ic_sleeplocks cn], spelled out
-     because this file sits below the fileclose spec. *)
-  Lemma icache_boot (E : coPset) (γfs : fs_names) (γi : gname)
+     because this file sits below the fileclose spec.
+
+     Same premises, same conclusion -- but the itable lock's gname and the
+     whole escrow-name record are GIVEN rather than returned, so a caller
+     that had to write [is_itable2 fsc_itlock fsc_ic ...] before this fupd
+     ran (the era fupd of [FsCfgBoot.fs_cfg_alloc], whose whole reason to
+     exist is that an ambient class field cannot be an existential) can.
+     What replaces the two mints:
+       - [newlock] becomes [newlock_at γl] against [lock_free_tok γl];
+       - [ic_names_alloc] becomes the three families as PREMISES, with the
+         identification one at ARBITRARY recorded values, re-tagged per slot
+         by [ic_id_set].  [ic_tok] and [ic_mid] are value-free exclusive
+         tokens ([ghost_var … DepNone], [lock_tok_excl]), so they pass
+         straight through.
+     [icache_boot] below is this lemma plus the two mints, so there is one
+     body and the old signature is a corollary. *)
+  Lemma icache_boot_at (E : coPset) (γl : gname) (cn : ic_names)
+      (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (nib : nat) (dv : mword 32) :
     (* THE COUNT AUTHORITY, at the empty table.  A PREMISE rather than an
        allocation, because the authority's gname is CANONICAL -- it is
@@ -1156,8 +1220,21 @@ Section IcacheBootTable.
     ([∗ list] k ∈ seq 0 NINODE, sl_fresh (i_lock (ientry k)) "inode"%string) -∗
     ([∗ list] k ∈ seq 0 NINODE, ientry_raw k) -∗
     iref_slots_auth -∗
-    ipool γfs γi cov logstart (region_inums nib)
-    ={E}=∗ ∃ (γl : gname) (cn : ic_names),
+    ipool γfs γi cov logstart (region_inums nib) -∗
+    (* THE ITABLE LOCK'S GHOST, unbuilt: the two [excl_auth] halves at
+       [None], as [WpLockAt.lock_ghost_alloc] mints them.  A PREMISE for the
+       reason every other ghost here is one -- the gname is the caller's
+       (eventually [fsc_itlock]), so this lemma may not choose it. *)
+    lock_free_tok γl -∗
+    (* THE ESCROW LAYER'S THREE FAMILIES, as [IcacheEscrow.ic_names_alloc]
+       hands them over.  The first two are value-free exclusive tokens; the
+       third arrives at WHATEVER values it was minted at and is re-tagged
+       below to the dev/inum words the entry cells actually hold. *)
+    ([∗ list] k ∈ seq 0 NINODE, ic_tok cn k) -∗
+    ([∗ list] k ∈ seq 0 NINODE, ic_mid cn k) -∗
+    ([∗ list] k ∈ seq 0 NINODE,
+       ∃ (v : bool) (d n : mword 32), ic_id cn k 1 v d n)
+    ={E}=∗
       is_itable2 γl cn γfs γi cov logstart nib dv ∗
       itable_inv ∗
       ic_escrows cn γfs γi cov logstart ∗
@@ -1167,6 +1244,7 @@ Section IcacheBootTable.
                             (ic_tok cn k) (slh_tok (icfg_isl k))).
   Proof.
     iIntros "Hauth Hlive Hislg Hlkw #Hnm Hcpu Hsl Hraw Hsupply Hpool".
+    iIntros "Hfree Htok Hmid Hgid".
     (* only the ZEROS are used: they are what [itable_body] parks for a free
        slot.  The [sl_free_tok]s beside them belong to whoever wants to build
        a lock AT [icfg_isl k], and this cache does not -- its locks carry
@@ -1185,9 +1263,8 @@ Section IcacheBootTable.
     iDestruct (fun_of_big
                  (fun k p => i_dev (ientry k) ↦₄ p.1 ∗ i_inum (ientry k) ↦₄ p.2)%I
                  NINODE 0 with "Hid") as (dvs) "Hid".
-    (* ---- the count authority's two halves, and the escrow gnames ---- *)
+    (* ---- the count authority's two halves ---- *)
     iDestruct (itable_half_split with "Hauth") as "[HhalfI HhalfL]".
-    iMod (ic_names_alloc dvs) as (cn) "(Htok & Hmid & Hgid)".
     (* ---- the [ref]-word invariant ---- *)
     iMod (live_pool_empty with "Hlive") as "Hpool0".
     iMod (inv_alloc icacheN E itable_body
@@ -1205,6 +1282,11 @@ Section IcacheBootTable.
       with "[H4]" as "Hesc".
     { iApply (big_sepL_mono with "H4"). intros idx k _.
       iIntros "(((([Hd Hn] & (%w & Hv)) & Hmir) & Hmd) & Hgd)".
+      (* the caller minted this variable blind; WRITE what the cells say.
+         [Hd]/[Hn] are slot [k]'s dev/inum cells at [(dvs k).1]/[(dvs k).2],
+         so this is the one place the recorded identity can be made true. *)
+      iDestruct "Hgd" as (v0 d0 n0) "Hgd".
+      iMod (ic_id_set _ _ _ _ _ false (dvs k).1 (dvs k).2 with "Hgd") as "Hgd".
       iDestruct (ic_id_split_half with "Hgd") as "[Hgd1 Hgd2]".
       iDestruct (word4_pointsto_half_split with "Hn") as "[Hn1 Hn2]".
       iMod (inv_alloc icEscN E (ic_escrow_body cn γfs γi cov logstart k)
@@ -1228,9 +1310,9 @@ Section IcacheBootTable.
       { iApply (big_sepL_mono with "Hslots"). intros idx k _.
         rewrite /islot2 !lookup_empty. done. }
       rewrite ci_inums_empty difference_empty_L. iExact "Hpool". }
-    iMod (newlock E itable_lock "itable"%string
+    iMod (newlock_at E γl itable_lock "itable"%string
             (itable_res2 cn γfs γi cov logstart nib dv)
-            with "Hnm Hlkw Hcpu Hres") as (γl) "#Hlock".
+            with "Hfree Hnm Hlkw Hcpu Hres") as "#Hlock".
     (* ---- the fifty inode sleeplocks, sealed over the checkout tokens ---- *)
     iDestruct (big_sepL_sep_2 with "Hsl Htok") as "Hsl".
     (* THE DEPOSIT IS KEYED BY THE SLOT, NOT BY THE LOCK.  What a holder
@@ -1250,7 +1332,7 @@ Section IcacheBootTable.
               with "Hf Ht") as (γil γisl) "[#Hlk _]".
       iModIntro. iExists γil, γisl. iExact "Hlk". }
     iMod (big_sepL_fupd with "Hsl") as "Hsl".
-    iModIntro. iExists γl, cn.
+    iModIntro.
     (* structurally, NOT [iFrame "…"]: naming the four hypotheses fixes the
        context-side scan, but the GOAL still holds a fifty-slot big-op of
        sleeplocks over [ic_tok] and the whole [ic_escrows] family, and a
@@ -1261,6 +1343,43 @@ Section IcacheBootTable.
     iSplitR; [iExact "Hitinv" |].
     iSplitR; [iExact "Hescrows" |].
     iExact "Hsl".
+  Qed.
+
+  (* THE ORIGINAL SIGNATURE, as a COROLLARY: mint the two names, then fill
+     them.  One body, so nothing here is a copy of anything above.
+
+     The dvs-collection order is NOT an obstruction to this direction:
+     [icache_boot_at] overwrites the identification values, so the mint runs
+     at [ic_dv_dummy] and [fun_of_big] never has to happen before it.  That
+     is the same fact that makes the [_at] form possible at all. *)
+  Lemma icache_boot (E : coPset) (γfs : fs_names) (γi : gname)
+      (cov : gset Z) (logstart : Z) (nib : nat) (dv : mword 32) :
+    own icfg_iref (● (∅ : gmap nat (Qp * positive)) : icacheUR) -∗
+    ([∗ list] k ∈ seq 0 (NINODE + NINODE), live_frac k 1%Qp) -∗
+    ([∗ list] k ∈ seq 0 NINODE,
+       sl_free_tok (icfg_isl k) ∗ slh_auth (icfg_isl k) None) -∗
+    itable_lock ↦₄ (mword_of_int 0 : mword 32) -∗
+    lock_name itable_lock "itable"%string -∗
+    lock_cpu itable_lock ↦₈ (zero_reg : mword 64) -∗
+    ([∗ list] k ∈ seq 0 NINODE, sl_fresh (i_lock (ientry k)) "inode"%string) -∗
+    ([∗ list] k ∈ seq 0 NINODE, ientry_raw k) -∗
+    iref_slots_auth -∗
+    ipool γfs γi cov logstart (region_inums nib)
+    ={E}=∗ ∃ (γl : gname) (cn : ic_names),
+      is_itable2 γl cn γfs γi cov logstart nib dv ∗
+      itable_inv ∗
+      ic_escrows cn γfs γi cov logstart ∗
+      ([∗ list] k ∈ seq 0 NINODE,
+         ∃ γil γisl : gname,
+           is_sleeplock_gen γil γisl (i_lock (ientry k)) "inode"%string
+                            (ic_tok cn k) (slh_tok (icfg_isl k))).
+  Proof.
+    iIntros "Hauth Hlive Hislg Hlkw #Hnm Hcpu Hsl Hraw Hsupply Hpool".
+    iMod lock_ghost_alloc as (γl) "Hfree".
+    iMod (ic_names_alloc ic_dv_dummy) as (cn) "(Htok & Hmid & Hgid)".
+    iDestruct (ic_id_forget cn false ic_dv_dummy with "Hgid") as "Hgid".
+    iMod (icache_boot_at E γl cn γfs γi cov logstart nib dv with "Hauth Hlive Hislg Hlkw Hnm Hcpu Hsl Hraw Hsupply Hpool Hfree Htok Hmid Hgid") as "H".
+    iModIntro. iExists γl, cn. iExact "H".
   Qed.
 
 End IcacheBootTable.
