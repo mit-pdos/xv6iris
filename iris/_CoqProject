@@ -901,6 +901,7 @@ WeakAxiomatic2.v
 WeakAxiomatic3.v
 WeakSrvwmoLitmus.v
 WeakSrvwmoCapstone.v
+WeakRvwmoGraph.v
 WeakAxRealize.v
 WeakInterp.v
 WeakInterpProj.v

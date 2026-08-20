@@ -15,6 +15,21 @@ finding that §5's `w_rdw`/`w_lock` are NOT needed, the route-B fallback
 trigger, and the revised staging **T2-0 … T2-6** that supersedes this
 file's bare item list as the execution order.
 
+**T2-1 slice 1 LANDED (2026-08-20): `iris/WeakRvwmoGraph.v`** — the
+RVWMO⁻ herd-style presentation (per-agent label lists; `gx_gmo` as DATA,
+so stores can be early; read `ts` entries reinterpreted as gmo-write
+indices, which makes `graph_of_cand` the identity on labels), the model
+`rvwmo_minus_consistent` (gwf ∧ ppo⁻⊆gmo ∧ load-value with the
+po-forwarding disjunct ∧ atomicity; ppo⁻ = rules 1–5, 7 only), and the
+NON-COLLAPSE WITNESS `lb_graph_consistent` (the four-event LB execution
+is RVWMO⁻-consistent — machine-checked proof that the declared model
+admits exactly what sRVWMO forbids, so the tier-2 gap is real; Closed
+under the global context).  **T2-1b owed**: `graph_of_cand`'s
+well-formedness + consistency transfer (srvwmo_consistent → rvwmo⁻ +
+grule14 of the embedding).  **T2-1c owed**: the rule-14 linearization
+(graph → same-log cand; the A3(v) linear-extension shape) and the
+store-dep fragment (`gx_deps`, per the S6 F2 caveat).
+
 Plan of record: [`../design/weak-memory-layer2.md`](../design/weak-memory-layer2.md)
 §8 (the route), §11 (the PARM investigation's answer), §13 (the walker
 decision: the A/D RMW is non-promisable, as Sail fidelity).  The port spec is
