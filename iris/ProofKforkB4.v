@@ -53,7 +53,7 @@ Require Import RiscvLang RiscvPtsto.
 Require Import RiscvExtras.
 Require Import RegFile.
 Require Import WpNext.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import CalleeSaved.
 Require Import InstrBytes.
 Require Import KernelText.

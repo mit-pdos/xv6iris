@@ -39,7 +39,7 @@ Require Import RegFile.
 Require Import MinstretInv InstrBytes.
 Require Import WpGpr.
 Require Import KernelText MstatusBits.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import PtTree.
 Require Import TrampPt UptTree KptShare UserretDefs.
 From Kernel Require KernelSyms.

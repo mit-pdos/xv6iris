@@ -13,7 +13,7 @@ From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvPtsto RiscvLang RiscvExtras.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import InstrBytes KernelText.
 Require Import WpLock WpMmodeLeafBase.
 Require Import RegFile.

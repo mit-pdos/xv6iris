@@ -75,7 +75,7 @@ Require Import RegFile HartTp WpNext WpGpr MinstretInv InstrBytes WpMmodeLeafBas
    wants from it is [wp_instr_s_config_regime], and that is exactly the
    surface still moving there.  The '0' arm below is stated and isolated so
    that adding the import back is a one-line change. *)
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import AlignBits.
 Require Import HartSwp WpMmodeSwpBase.
 (* the SIE=0 arm inlines the cycle: [swp_loop]'s later is taken by hand, and

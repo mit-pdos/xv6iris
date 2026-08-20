@@ -84,7 +84,7 @@ Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import RiscvModelBytes.
 Require Import RegFile.
 Require Import InstrBytes WpMmodeLeafBase.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import StackOwn CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import HartTp WpNext.

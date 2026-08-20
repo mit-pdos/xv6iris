@@ -33,7 +33,7 @@ Require Import RiscvLang RiscvPtsto.
 Require Import RiscvExtras.
 Require Import RegFile.
 Require Import WpMmodeLeafBase.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import StackOwn.
 Require Import StackBytes.
 Require Import CalleeSaved.
@@ -45,7 +45,7 @@ Require Import SleepLock.
 Require Import FdSlots.
 Require Export SwtchCtx.
 Require Import WpUart.
-Require Import InodeRegion.
+Require Import IcacheRef.
 Require Import IcacheEscrow.
 Require Import ByteBuf.
 Require Import VcGen.

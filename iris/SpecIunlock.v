@@ -71,11 +71,11 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
 Require Import RegFile.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
-Require Import WpLock.
+Require Import LockRank.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Import CpuOwn.
@@ -85,7 +85,7 @@ Require Import FsBlocks.
 Require Import DinodeEnc.
 Require Import InodeInv.
 Require Import InodeLock.
-Require Import InodeRegion.
+Require Import IcacheRef.
 Require Import IrefSlots.
 Require Import IcacheInv.
 Require Import IcacheEscrow.

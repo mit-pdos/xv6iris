@@ -48,11 +48,11 @@ Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
 Require Import KernelText.
 Require Import RegFile WpNext.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import CalleeSaved.
 Require Import DiskPtsto WpUart.
 Require Import IntrDefs.
-Require Import WpLock.
+Require Import LockRank.
 Require Import CpuOwn.
 Require Import UartTxInv.
 From Kernel Require KernelInstrs.

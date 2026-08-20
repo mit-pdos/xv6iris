@@ -42,7 +42,7 @@ Require Import RiscvExtras.
 Require Import RegFile.
 Require Import WpNext.
 Require Import WpMmodeLeafBase.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import KernelRvcDecode.
@@ -64,7 +64,7 @@ Require Import KallocInv.
 Require Import SchedCtx.
 Require Import KvmSpec.
 Require Import FsBlocks.
-Require Import InodeRegion.
+Require Import IcacheRef.
 Require Import IrefSlots.
 Require Import IcacheInv.
 Require Import IcacheEscrow.

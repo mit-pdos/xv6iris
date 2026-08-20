@@ -44,7 +44,7 @@ Require Import InstrBytes.
 Require Import ByteBuf.
 Require Import RegFile HartTp WpNext.
 Require Import WpMmodeLeafBase.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import StackOwn.
 Require Import CalleeSaved KernelText KernelDataInv.
 Require Import WpLock.

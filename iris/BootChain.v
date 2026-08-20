@@ -49,7 +49,7 @@ Require Import StackOwn.
 Require Import KernelText KernelDataInv.
 Require Import MbootVocab.
 Require Import MstatusFacts.
-Require Import SmodeCore.
+Require Import KptPt.
 Require Import IntrDefs.
 Require Import ProcGeom CpuOwn SchedCtx.
 Require Import SpecMain.
@@ -58,7 +58,8 @@ Require Import LinkEntry.
 Require Import SpecMainSecondary LinkMainSecondary.
 Require Import StartedInv DevModel.
 Require Import WpUart DiskPtsto.
-Require Import WpLock KallocInv FdSlots.
+Require Import KallocInv FdSlots.
+Require Import LockSet.
 Require Import FileInvDefs.
 Require Import KptGhost VirtioProto VirtioModel SpecFreerange KvmSpec.
 Require Import LinkMain.

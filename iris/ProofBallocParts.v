@@ -26,7 +26,7 @@ Require Import DinodeSlot.
 Require Import FsCrash.
 Require Import BitmapEnc BitmapInv.
 Require Import InstrBytes.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Local Open Scope Z_scope.
 Import Defs.

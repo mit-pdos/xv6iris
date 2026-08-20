@@ -37,7 +37,7 @@ Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvFetchExec Ris
 Require Import WpLoad.
 Require Import RegFile HartTp WpNext.
 Require Import MinstretInv InstrBytes WpMmodeLeafBase.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import SmodeCorePt WpAmo.
 Require Import HartLift HartSpan HartSwp HartSMem.
 Require Import WpSmodePtEngine.

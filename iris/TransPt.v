@@ -24,7 +24,11 @@ Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
 Require Import SmodePte PtAdBits Pt4kWalk CommonWalk PtTree PtTreeAdue KptPt.
 Require Import KptExecMap.
 Require Import Pt4kWalk.
-Require Import SmodeCore KptTree UptTree.
+Require Import KptTree UptTree.
+Require Import KptPt.
+Require Import Pt4kWalk.
+Require Import RiscvExtras.
+Require Import SmodePte.
 Require Import KMap MinstretInv KptGhost KptShare.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.

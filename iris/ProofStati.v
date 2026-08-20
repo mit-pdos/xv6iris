@@ -30,7 +30,7 @@ Require Import RiscvLang RiscvPtsto.
 Require Import RiscvExtras.
 Require Import RegFile WpNext.
 Require Import WpMmodeLeafBase.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import VcGen.

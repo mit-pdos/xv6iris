@@ -15,7 +15,8 @@ From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvPtsto RiscvLang.
-Require Import SmodeCore RegFile WpMmodeLeafBase.
+Require Import RegFile WpMmodeLeafBase.
+Require Import RiscvExtras.
 Require Import HartTp WpNext IntrDefs.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfCsr.
 Require Import RiscvExtras.

@@ -56,7 +56,9 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
 Require Import RegFile.
 Require Import InstrBytes WpGpr ExecCommon WpGprCsrwCommon WpGprCsrwB.
-Require Import SmodeCore WpMmodeLeafBase.
+Require Import WpMmodeLeafBase.
+Require Import RiscvExtras.
+Require Import SmodePte.
 (* [exec_execute_csrr_sstatus] is proved below -- it is the read-only csrr of
    ONE csr at ONE privilege, so it belongs with the S-mode csr leaves that use
    it (the WpSmodePtCtl copy is Local).  The csr-WRITE reduction chain

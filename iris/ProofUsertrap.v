@@ -66,7 +66,7 @@ Require Import MinstretInv.
 Require Import PageGeom.
 Require Import RegFile HartTp WpGpr WpNext CpuOwn.
 Require Import WpMmodeLeafBase.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import StackOwn CalleeSaved.
 Require Import InstrBytes.
 Require Import KernelText KernelRvcDecode.

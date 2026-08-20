@@ -41,7 +41,8 @@ Require Import RiscvLang RiscvPtsto RiscvFetchExec RiscvExtras.
 Require Import InstrBytes.
 Require Import RegFile.
 Require Import KptPt KMap.
-Require Import SmodeCore.
+Require Import KptPt.
+Require Import RiscvExtras.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import HartTp WpNext.

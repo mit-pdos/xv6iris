@@ -12,7 +12,7 @@ Require Import DevModel RiscvLang RiscvPtsto.
 Require Import InstrBytes.
 Require Import RegFile HartTp WpNext.
 Require Import KptPt.
-Require Import SmodeCore.
+Require Import KptPt.
 Require Import DiskPtsto WpUart WpSmodeUart.
 Require Import IntrDefs.
 Require Import IntrDefs.

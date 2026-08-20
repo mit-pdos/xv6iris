@@ -47,7 +47,7 @@ Require Import FdSlots.
 Require Import WpUart.
 Require Import DiskInv.
 Require Import LogInv.
-Require Import InodeRegion.
+Require Import IcacheRef.
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import FileInvDefs.

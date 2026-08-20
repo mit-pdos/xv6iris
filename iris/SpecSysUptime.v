@@ -28,11 +28,11 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
 Require Import RegFile WpNext.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import CpuOwn.
-Require Import WpLock.
+Require Import LockRank.
 Require Import TicksInv.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

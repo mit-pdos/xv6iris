@@ -44,7 +44,7 @@ Require Import RegFile.
 Require Import InstrBytes.
 Require Import MinstretInv.
 Require Import KptGhost.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import HartTp WpNext.
 Require Import IntrDefs.
 Require Import WpSconfMem.

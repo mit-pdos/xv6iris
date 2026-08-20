@@ -92,7 +92,7 @@ Require Import RiscvExtras.
 Require Import InstrBytes.
 Require Import RegFile HartTp WpNext.
 Require Import WpMmodeLeafBase.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import KernelText KernelDataInv.
 Require Import StackOwn StackBytes.
 Require Import CalleeSaved.

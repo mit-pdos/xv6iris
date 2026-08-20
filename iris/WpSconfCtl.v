@@ -29,7 +29,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
 Require Import InstrBytes RegFile HartTp WpNext.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import WpMmodeLeafBase.
 Require Import HartSwp.
 Require Import IntrDefs WpSconfEngine.

@@ -47,7 +47,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvFetchExec.
 Require Import RegFile HartTp WpGpr.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import KernelDataInv MstatusBits.
 Require Import MinstretInv.
 Require Import IntrDefs.

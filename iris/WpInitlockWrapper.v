@@ -22,7 +22,7 @@ Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import RegFile HartTp WpNext IntrDefs.
 Require Import WpMmodeLeafBase.
 Require Import AlignBits.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import StackOwn CalleeSaved.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import WpLock.

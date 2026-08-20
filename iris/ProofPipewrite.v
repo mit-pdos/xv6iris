@@ -64,7 +64,7 @@ Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import RiscvModelBytes.
 Require Import RegFile.
 Require Import InstrBytes WpMmodeLeafBase.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import StackOwn StackBytes CalleeSaved KernelText.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSmodeIntr.
 Require Import WpLock ProcGeom CpuOwn KernelRvcDecode.

@@ -14,7 +14,7 @@ Require Import RiscvLang RiscvPtsto RiscvFetchExec RiscvExtras.
 Require Import RegFile.
 Require Import WpGpr MinstretInv InstrBytes WpMmodeLeafBase.
 Require Import SRegime.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import WpSmodePtLeaves.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)

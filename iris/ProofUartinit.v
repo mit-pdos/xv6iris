@@ -60,7 +60,7 @@ Require Import RiscvLang RiscvPtsto.
 Require Import RegFile.
 Require Import WpMmodeLeafBase.
 Require Import RiscvExtras.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import StackOwn CalleeSaved.
 Require Import KernelDataInv.
 Require Import DevModel WpUart.

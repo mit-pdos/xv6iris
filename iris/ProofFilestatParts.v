@@ -50,7 +50,7 @@ Require Import StackOwn StackBytes.
 Require Import RegFile.
 Require Import WpNext.
 Require Import WpMmodeLeafBase.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import CalleeSaved.
 Require Import KernelRvcDecode.
 Require Import VcGen.

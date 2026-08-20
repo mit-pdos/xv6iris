@@ -40,7 +40,7 @@ Require Import MinstretInv.   (* [minstretN]: the mask the store-AU leaf leaves 
 Require Import InstrBytes.
 Require Import RegFile.
 Require Import HartTp WpNext.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import StackOwn CalleeSaved.
 Require Import IntrDefs WpSmodeIntr.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfCsr.

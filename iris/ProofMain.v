@@ -57,7 +57,9 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvModelBytes RiscvPtsto RiscvLang RiscvExtras.
 Require Import RiscvFetchExec MinstretInv MemAccessGen.
-Require Import SmodeCore RegFile HartTp WpNext WpMmodeLeafBase InstrBytes.
+Require Import RegFile HartTp WpNext WpMmodeLeafBase InstrBytes.
+Require Import KptPt.
+Require Import RiscvExtras.
 Require Import StackOwn.
 Require Import KernelText KernelDataInv.
 Require Import IntrDefs.

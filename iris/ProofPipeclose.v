@@ -58,7 +58,7 @@ Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import RegFile.
 Require Import HartTp WpNext.
 Require Import InstrBytes WpMmodeLeafBase.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import StackOwn CalleeSaved.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import WpLock ProcGeom CpuOwn.

@@ -30,7 +30,7 @@ Require Import HartLift HartSpan HartSpanChar HartRegNode HartGoodb WpDecodeBrid
 Require Import HartSwp.
 Require Import MstatusBits WpGprMret WpMmodeLeafBase HartRunGen.
 Require Import HartMFrame HartMCycle WpMmodeJump WpDecode.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.
 Import Defs.

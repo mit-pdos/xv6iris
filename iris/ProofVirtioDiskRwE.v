@@ -56,7 +56,8 @@ Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import InstrBytes WpMmodeLeafBase.
 Require Import WpGpr RegFile.
 Require Import KptPt.
-Require Import SmodeCore.
+Require Import KptPt.
+Require Import RiscvExtras.
 Require Import StackOwn CalleeSaved KernelText.
 Require Import WpLock.
 Require Import ProcGeom.

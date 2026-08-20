@@ -103,7 +103,7 @@ Require Import MinstretInv.
 Require Import InstrBytes.
 Require Import WpGpr.
 Require Import KernelText MstatusBits.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import CalleeSaved.
 Require Import IntrDefs.
 Require Import FdSlots.

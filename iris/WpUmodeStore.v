@@ -74,20 +74,20 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
-Require Import MinstretInv WireInv WpGpr RegFile InstrBytes.
-Require Import SmodeCore WpIntrCore ExecCommon.
+Require Import WpGpr RegFile InstrBytes.
+Require Import SmodeCore.
 Require Import WpDecodeBridge DecodeTotalU.
 Require Import CommonWalk.
-Require Import PtreeType PtAdBits PtTree PtTreeAdue SmodePte KptPt KptTree.
+Require Import PtreeType PtAdBits PtTree PtTreeAdue KptPt KptTree.
 Require Import SRegime UptTree UptWalkPt.
-Require Import UserBits UserMem UserFetch UserPtTree UserTranslate.
+Require Import UserBits UserPtTree UserTranslate.
 Require Import HartSwp HartLift HartSpan HartGoodb HartMemRun HartMCycle
         HartStepFull HartRunFull HartRunGen.
 Require Import PtBytes UserBytes UserFrame UserClassifyAsm.
-Require Import UserFetchCert UserFaultCert PtWalkCert.
-Require Import UserExec UserStep UserTrap UserExecFacts.
+Require Import UserFetchCert PtWalkCert.
+Require Import UserExec.
 Require UserTotalU.
-Require Import UserStepFull UserActiveClass.
+Require Import UserActiveClass.
 Require Import MemAccessGen WpMmodeLeafBase.
 Require Import UserMemPt UserMemArms UserMemClassify UserMemAccess UserMemMis.
 Require Import UserMemCert UserMemArmsBase UserMemArmsC.

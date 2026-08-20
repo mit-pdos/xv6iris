@@ -67,7 +67,7 @@ Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExtras RiscvExec.
 Require Import RegFile.
 Require Import InstrBytes WpMmodeLeafBase.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import StackOwn StackBytes CalleeSaved.
 Require Import RiscvTryStep.
 Require Import ExecCommon WpGpr.

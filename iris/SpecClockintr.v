@@ -49,13 +49,13 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
 Require Import RegFile.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import HartTp.
 Require Import FdSlots.
 Require Import CpuOwn.
-Require Import WpLock.
+Require Import LockRank.
 Require Import TicksInv.
 Require Import TimerCap.
 Require Import SchedCtx.

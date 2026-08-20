@@ -57,7 +57,7 @@ Require Import RiscvLang RiscvPtsto.
 Require Import RiscvExtras.
 Require Import RegFile WpNext.
 Require Import WpMmodeLeafBase.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
@@ -68,7 +68,7 @@ Require Import FsBlocks LogInv.
 Require Import DirentEnc.
 Require Import PathElems.
 Require Import InodeInv.
-Require Import InodeRegion.
+Require Import IcacheRef.
 Require Import IregLinkNz.
 Require Import IgetLic.
 Require Import IrefSlots.

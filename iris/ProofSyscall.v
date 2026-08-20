@@ -285,7 +285,7 @@ Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import InstrBytes.
 Require Import RegFile HartTp WpNext CpuOwn.
 Require Import WpMmodeLeafBase.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import StackOwn CalleeSaved.
 Require Import VcGen.
 Require Import KernelText KernelDataInv RiscvModelBytes.
@@ -308,7 +308,7 @@ Require Import FsCrash.
    ([SpecKexec], [SpecPanic], [BioInv], [SpecDirlink], [InodeInv]) rather than
    imported, so nothing this file already says changes meaning. *)
 Require Import BitmapInv.
-Require Import InodeRegion.
+Require Import IcacheRef.
 Require Import IrefSlots FdSlots.
 Require Import FileInvDefs FileInv.
 Require Import ProcInv.

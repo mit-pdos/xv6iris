@@ -35,7 +35,7 @@ Require Import RiscvModelBytes.
 Require Import SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec.
 Require Import WpGpr.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Export WpSmodeLeafBase.

@@ -798,7 +798,7 @@ From iris.base_logic.lib Require Import ghost_var gen_heap invariants ghost_map.
 Require Import RegFile.
 Require Import HartTp WpNext.
 Require Import WpMmodeLeafBase.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import StackOwn.
 Require Import CalleeSaved KernelText.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.

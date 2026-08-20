@@ -63,12 +63,13 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto.
 (* [WpLock] for [lockG] itself: [Import] is not transitive, so without it the
    [!lockG Σ] binder below auto-generalizes instead of resolving. *)
-Require Import WpLock SleepLock.
+Require Import SleepLock.
+Require Import LockRank.
 Require Import RiscvExtras.
 Require Import RegFile.
 Require Import HartTp WpNext.
 Require Import WpMmodeLeafBase.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import KernelRvcDecode.
@@ -81,7 +82,7 @@ Require Import IntrDefs.
 Require Import KernelDataInv.
 Require Import PrintkArgs.
 Require Import WpUart.
-Require Import WpLock.
+Require Import LockRank.
 Require Import SpecPanic.
 Require Import CpuOwn.
 Require Import LockRank.
