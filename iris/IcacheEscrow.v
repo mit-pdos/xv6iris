@@ -272,7 +272,7 @@ Section IcacheEscrow.
      Holding [ic_tok] is what lets a winner refute the checked-out arm; the
      checkout then splits it so that the arm records "somebody is inside the
      critical section" AND WHAT THEY LEFT.  It is a [ghost_var] over
-     [IcacheRef.ic_dep] rather than a [WpLock.lock_tok_excl] for exactly one
+     [Xv6Cameras.ic_dep] rather than a [WpLock.lock_tok_excl] for exactly one
      reason (§14.8, "the two-parkers problem"): with the OUT arm able to hold
      EITHER a reference (iput's window exit) or a share (ilock's checkout), the
      two parkers are otherwise resource-indistinguishable, so neither could
@@ -647,7 +647,7 @@ Section IcacheEscrow.
      priced. *)
   (* A NESTED SECTION, and it costs the file nothing: [ireg_inv] carries
      [InodeRegion.ireg_ep]'s log-epoch lower bound, so naming it needs
-     [LogInv.logG] -- a class this file's outer context deliberately does
+     [Xv6Cameras.logG] -- a class this file's outer context deliberately does
      not have (the escrow itself never mentions the log).  Adding it to the
      outer [Section IcacheEscrow] would put an instance argument on all
      ~120 of its lemmas; a nested section puts it on this one. *)
@@ -1313,7 +1313,7 @@ Section IcacheEscrow.
      FRACTION, not the ½ discriminator halves: itrunc keeps those.
 
      AND IT IS STATED AT THE DESCRIPTOR, exactly as [ic_dep_own] is.  The
-     window deposits [IcacheRef.DepFrz q dev inum], and that buys two things
+     window deposits [Xv6Cameras.DepFrz q dev inum], and that buys two things
      at once:
 
        * every ORDINARY consumer refutes this alternative in ONE LINE.  A

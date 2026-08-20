@@ -61,18 +61,9 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes RiscvPtsto WpLock.
 Require Export PageGeom.  (* the pure page geometry: page_valid / page_base / nullp *)
 Local Open Scope Z_scope.
+Require Export Xv6Cameras.  (* the cameras this file states its theory over *)
 Import Defs.
 
-(* ghost state for the page-count layer: a nat-valued ghost_var (the count,
-   γk.1) and a one-shot (the boot->steady seal, γk.2). *)
-Definition kalloc_oneshotR := csumR (exclR unitO) (agreeR unitO).
-Class kallocG (Σ : gFunctors) := KallocG {
-  kalloc_count_inG :: ghost_varG Σ nat;
-  kalloc_seal_inG :: inG Σ kalloc_oneshotR;
-}.
-Definition kallocΣ : gFunctors := #[ghost_varΣ nat; GFunctor kalloc_oneshotR].
-Global Instance subG_kallocΣ {Σ} : subG kallocΣ Σ -> kallocG Σ.
-Proof. solve_inG. Qed.
 
 (* pure bookkeeping on the caller-side count [on : option nat]:
    [None] = count unknown (sealed);  [Some n] = exactly n pages free. *)

@@ -55,6 +55,7 @@ Require Import PermInv.
 (* intermediate files use [Require Import], so nothing downstream inherits *)
 (* it.  See FastSetSolver.v.                                              *)
 Require Export FastSetSolver.
+Require Export Xv6Cameras.  (* the cameras this file states its theory over *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -315,19 +316,6 @@ Record uart_names := UartNames {
   un_dlab : gname;
 }.
 
-Class uartGhostG (Σ : gFunctors) := UartGhostG {
-  uart_ghost_listG :: inG Σ (mono_listR (leibnizO (bv 8)));
-  uart_ghost_txG :: ghost_varG Σ (list (bv 8));
-  uart_ghost_dlabG :: inG Σ (dfrac_agreeR (leibnizO bool));
-}.
-
-Definition uartGhostΣ : gFunctors :=
-  #[ GFunctor (mono_listR (leibnizO (bv 8)));
-     ghost_varΣ (list (bv 8));
-     GFunctor (dfrac_agreeR (leibnizO bool)) ].
-
-Global Instance subG_uartGhostG Σ : subG uartGhostΣ Σ -> uartGhostG Σ.
-Proof. solve_inG. Qed.
 
 Section DevLoops.
   Context `{!riscvGS Σ}.

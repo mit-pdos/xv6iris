@@ -113,7 +113,7 @@ Section IrefSlots.
      slots is far below what an [int] can hold, so incrementing it is safe.
      This is where "there are only so many places to keep an inode" turns
      into "ip->ref++ does not overflow". *)
-  (* AT [positive], not [nat]: the count column of [IcacheRef.icacheUR] is
+  (* AT [positive], not [nat]: the count column of [Xv6Cameras.icacheUR] is
      [positiveR] (a live slot has at least one reference and the algebra
      has no zero).  The kfork line's [natR] retype of this statement is
      deferred with the rest of the count-0-share vocabulary -- see

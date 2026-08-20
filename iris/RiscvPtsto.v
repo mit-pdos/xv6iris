@@ -533,7 +533,7 @@ Definition gen_dead `{!riscvFixedGS Σ} (gen : nat) : iProp Σ :=
    of these; the slot itself and everything it means live there.
 
    SPELLED THROUGH A DEFINITION HERE, NOT RAW AT EACH SITE, FOR THE INSTANCE.
-   [DiskPtsto.diskGhostG] carries a SECOND [mono_natG Σ] ([disk_nc_inG]), and
+   [Xv6Cameras.diskGhostG] carries a SECOND [mono_natG Σ] ([disk_nc_inG]), and
    [BootShared]'s allocation section binds both it and [riscvGS] -- so a raw
    [mono_nat_auth_own] written there resolves to whichever instance search
    reaches first and then fails to unify with the one [IntrDefs] used, with

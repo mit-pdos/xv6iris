@@ -14,27 +14,13 @@ From iris.base_logic.lib Require Import own.
 Require Import SailStdpp.Values.
 Require Import DiskPtsto.
 Require Import Riscv.rv64d_types.
+Require Export Xv6Cameras.  (* the cameras this file states its theory over *)
 Local Open Scope Z_scope.
 
 (* xv6's file-system block size.  Keep this at the bottom of the dependency
    graph: both the bio client view and pure inode byte indexing need it. *)
 Definition BSIZE : nat := 1024%nat.
-
-(* The reference-count authority and the finite slot supply used to bound
-   every buffer reference count.  These functors and names are shared with
-   the log layer because [log_batch] stores the unused slot fragments. *)
-Definition bioUR : ucmra := authUR (gmapUR nat (prodR fracR positiveR)).
-
 Definition BSLOTS : nat := 1024%nat.
-Definition bioslotUR : ucmra := authUR natUR.
-
-Class bioG (Σ : gFunctors) := BioG {
-  bio_inG :: inG Σ bioUR;
-  bioslot_inG :: inG Σ bioslotUR;
-}.
-Definition bioΣ : gFunctors := #[GFunctor bioUR; GFunctor bioslotUR].
-Global Instance subG_bioΣ {Σ} : subG bioΣ Σ -> bioG Σ.
-Proof. solve_inG. Qed.
 
 Record bio_names := MkBioNames {
   bn_lk   : gname;                (* the "bcache" spinlock               *)

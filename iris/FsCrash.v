@@ -50,6 +50,7 @@ Require Import RiscvPtsto.
 Require Import WpLock.
 Require Export BioDefs.  (* preserve [BSIZE] for existing importers *)
 Require Import LogDefs.
+Require Export Xv6Cameras.  (* the cameras this file states its theory over *)
 Local Open Scope Z_scope.
 
 (* ====================================================================== *)
@@ -630,25 +631,6 @@ Proof. intros [_ Hlast] Hnil. rewrite Hnil in Hlast. discriminate. Qed.
 (* 2. THE GHOSTS.                                                         *)
 (* ====================================================================== *)
 
-(* The committed history's algebra: a mono-list of durable home maps.  Only
-   the ALGEBRA-level [mono_list] exists in this Iris (there is no
-   [base_logic.lib.mono_list]), so the [own] wrappers are spelled out. *)
-Notation fs_histO := (leibnizO (gmap Z (list (bv 8)))).
-Notation fs_histR := (mono_listR fs_histO).
-
-(* The TIE needs no class here at all any more: it is the MACHINE layer's
-   ([RiscvPtsto.riscv_fstie_name], over the raw disk image), and [P_fs] is a
-   predicate on that image rather than an owner of a half.  The FS BOOT TOKEN
-   reuses [WpLock.lock_tok_excl] rather than minting a [ghost_varG Σ bool]
-   (which WOULD be ambiguous against [riscvF_parkGS]). *)
-Class fsCrashG (Σ : gFunctors) := FsCrashG {
-  fscrash_histG :: inG Σ fs_histR;
-}.
-
-Definition fsCrashΣ : gFunctors := #[ GFunctor fs_histR ].
-
-Global Instance subG_fsCrashΣ Σ : subG fsCrashΣ Σ -> fsCrashG Σ.
-Proof. solve_inG. Qed.
 
 (* The gname record [P_fs] is parameterized by.  It stays a PARAMETER rather
    than being read off the fixed layer, because [riscv_crash_pred] is a FIELD

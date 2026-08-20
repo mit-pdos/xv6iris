@@ -53,6 +53,7 @@ Require Export SmodePte Pt4kWalk KptPt.
 Require Import KMap.   (* kmap_static_claims, extracted from [hw_config] below *)
 From Kernel Require Import KernelInstrs.
 From Kernel Require KernelSyms.
+Require Export Xv6Cameras.  (* the cameras this file states its theory over *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -985,10 +986,6 @@ Qed.
    instances breaking its Iris proofs), so it cannot spell ['b"0"] itself. *)
 Definition sie_bit_off : mword 1 := 'b"0".
 
-Class sieG (Σ : gFunctors) := SieG { sie_inG :: ghost_varG Σ (mword 1) }.
-Definition sieΣ : gFunctors := #[ ghost_varΣ (mword 1) ].
-Global Instance subG_sieΣ {Σ} : subG sieΣ Σ -> sieG Σ.
-Proof. solve_inG. Qed.
 
 Section SmodeCoreIris.
   Context `{!riscvGS Σ, !sieG Σ}.

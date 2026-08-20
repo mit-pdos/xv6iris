@@ -21,83 +21,45 @@
     binds [xv6G] and does NOT bind any of its members.**  Binding both is
     the bug this class exists to prevent, and it compiles.
 
-    ---- WHAT IS DELIBERATELY *NOT* HERE --------------------------------
+    ---- WHY THIS FILE HOLDS ONLY THE BUNDLE ----------------------------
 
-    - [icfg].  [fileG] still carries it, and that is deliberate: it is a
-      record of NAMES, not capacity, so it fails this file's membership
-      test.  It is therefore still reachable both from [fileG] and from an
-      explicit [ICFG : icfg] binder (eighteen files bind both today).  That
-      is a pre-existing double path of the CONFIG kind, untouched here and
-      worth its own increment.
+    The members are DEFINED in [Xv6Cameras.v], which sits on ten
+    base-layer files; read its header for what is in it, what is
+    deliberately not, and why.  The split is not cosmetic:
 
-    - [fdslotG], [irefslotG], [pavG].  Each is a pure [pre] class PLUS one
-      [gname] ([fdslot_name], [irefslot_name], [pav_name]), minted by
-      [fd_slots_alloc] / [iref_slots_alloc] / [procs_avail_alloc] in
-      [BootShared.v].  Their [...GpreS] halves are pure and could be bundled
-      into an [xv6Gpre]; the FULL classes cannot be, because they do not
-      exist until boot has run.
+    - The bundle can only sit above every member, so with the classes
+      spread across their subsystems' files [xv6G]'s cone was eighty-two
+      files -- the whole M-mode execution engine, the inode cache, the
+      inode region, the UART driver.  All 767 files that bind the bundle
+      waited on all of it, and editing ONE subsystem's algebra rebuilt all
+      767.  With the definitions hoisted the cone is eleven, and an edit to
+      (say) [InodeRegion.v] rebuilds 203 files instead of 768.
 
-    - [icfg], [fscfg], and [riscvGS]'s [riscv_eraGS].  These are records of
-      NAMES and configuration, not capacity: [icfg_alloc] mints one per
-      boot, [FsCfg]'s per boot, and the era record per POWER-ON
-      (RiscvAdequacy.v; design/crash.md).  They are per-run values and
-      belong where they are.
+    - Keeping the BUNDLE out of [Xv6Cameras.v] is what enforces the rule
+      above.  Every member's home file [Require Export]s [Xv6Cameras], so
+      if [xv6G] lived there too it would become visible inside its own
+      cone -- and a low file binding [xv6G] beside a member is exactly the
+      double instance path this class exists to prevent.  It compiles, and
+      nothing in the resulting error names the cause.
 
-    - [mono_natG].  [riscvFixedGS] owns it ([riscvF_genGS], the generation
-      counter), and that is the right home: [gen_cert]/[gen_started] are
-      machine-model state consumed by the fetch/execute engine
-      ([InstrBytes], [RiscvFetchExec], the twelve [Hart*] files) far below
-      any kernel bundle.  Putting it HERE would have cost twenty-seven deep
-      files a new binder to buy nothing.  What DID have to go was
-      [diskGhostG]'s copy: [riscvGS] and the bundle share a scope
-      constantly, so that pair was a live double path -- it is what made
-      [RiscvAdequacy]'s [Section power] unprovable.  Two other owners stay,
-      each because it cannot collide: [riscv_pre_genGS] allocates the
-      counter BEFORE [riscvGS] exists (that is what a [pre] class is for)
-      and never shares a scope with it; [CrashProto]'s [cp_monoGS] /
-      [cpp_monoGS] are bound only inside [CrashProto.v], an orphan module
-      with zero reverse dependencies that is independent of [RiscvPtsto] in
-      both directions.
+    THE [Require Export] BELOW IS LOAD-BEARING, not tidiness.  A member's
+    FIELD instances ([uio_stdinG], [lock_inG], ...) are only active where
+    [Xv6Cameras] is IMPORTED, and [Import] is not transitive -- so with a
+    plain [Require Import] here, a file that reaches the bundle ONLY through
+    [Xv6G] (there is one, [UmodeIo.v]) gets [xv6_uio : xv6G Σ -> uioG Σ] and
+    then no way to step from [uioG Σ] to the [ghost_varG] it wraps.  The
+    error names the innermost class and no cause: "Cannot infer the implicit
+    parameter ghost_varG0 ... (no type class instance found)", with [xv6G]
+    sitting right there in the printed environment.
 
-    - [diskImgG] is pure, but both its direct binders sit BELOW this file,
-      where [xv6G] is invisible; [permG] already arrives through
-      [diskGhostG], so naming it here would ADD a path; the [...GpreS]
-      classes share their [inG] with their full counterparts.
-
-    ADDING A MEMBER TAKES THREE THINGS, not one: the field, a row in
-    [xv6GΣ], and a [subG] instance for the member itself -- [solve_inG] has
-    to be able to CONSTRUCT it, so a class with no [subG] (as [uioG] had
-    none) breaks [subG_xv6GΣ] with "Cannot infer this placeholder".  *)
-From Stdlib Require Import ZArith List.
-From stdpp Require Import gmap list bitvector.definitions.
+    ADDING A MEMBER TAKES THREE THINGS, not one: the class (in
+    [Xv6Cameras.v], with its own [subG] instance -- [solve_inG] has to be
+    able to CONSTRUCT it, so a class with no [subG] breaks [subG_xv6GΣ]
+    with "Cannot infer this placeholder"), the field below, and a row in
+    [xv6GΣ].  *)
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import own ghost_var.   (* [gFunctors], [ghost_varG] *)
-Require Import SmodeCore.       (* sieG        *)
-Require Import WpLock.          (* lockG       *)
-Require Import KallocInv.       (* kallocG     *)
-Require Import BioDefs.         (* bioG        *)
-Require Import DiskPtsto.       (* diskGhostG  *)
-Require Import WpUart.          (* uartGhostG  *)
-Require Import FsBlocks.        (* fsLogG      *)
-Require Import LogInv.          (* logG        *)
-Require Import FsCrash.         (* fsCrashG    *)
-Require Import InodeRegion.     (* iregG       *)
-Require Import IcacheRef.       (* icacheG     *)
-Require Import PipeInvDefs.     (* pipeG       *)
-From iris.base_logic.lib Require Import cancelable_invariants.  (* cinvG *)
-
-(* THE UMODE TIER'S I/O GHOSTS, hoisted here from [UmodeIo.v].  Pure
-   capacity, nothing else provides it, and every consumer is above this
-   file -- so it belongs in the bundle.  Defined HERE rather than imported,
-   because requiring [UmodeIo] would put its 99-file cone in front of every
-   file that binds [xv6G]. *)
-Class uioG (Σ : gFunctors) := {
-  uio_stdinG :: ghost_varG Σ (list (bv 8));
-  uio_brkG   :: ghost_varG Σ Z;
-}.
-Definition uioΣ : gFunctors := #[ ghost_varΣ (list (bv 8)); ghost_varΣ Z ].
-Global Instance subG_uioΣ {Σ} : subG uioΣ Σ -> uioG Σ.
-Proof. solve_inG. Qed.
+From iris.base_logic.lib Require Import own cancelable_invariants.
+Require Export Xv6Cameras.
 
 Class xv6G (Σ : gFunctors) := Xv6G {
   xv6_sie        :: sieG Σ;

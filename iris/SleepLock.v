@@ -108,7 +108,7 @@ Section SleepLock.
   Proof. apply _. Qed.
 
   (* ===================================================================== *)
-  (*  THE GHOST STATE ([WpLock.slhUR], under the sleeplock's own gname).    *)
+  (*  THE GHOST STATE ([Xv6Cameras.slhUR], under the sleeplock's own gname).    *)
   (* ===================================================================== *)
 
   (* the holder's exclusive token, carrying the fraction it deposited.

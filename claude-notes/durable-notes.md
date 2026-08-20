@@ -117,7 +117,7 @@ file, and delete the line when the file goes.
 - **`make` SAYING "Nothing to be done" WITH ZERO COMPILE LINES IS NOT A GREEN CONE — ON A SHARED BUILD BOX IT IS USUALLY A MTIME ARTEFACT.** A whole-tree sync (`rsync -a`, a `tar` restore, a bulk `touch` of `*.vo` to force "staleness 0") leaves every `.vo` newer than every `.v` — check with `ls --time-style=full-iso`: **identical timestamps to the NANOSECOND across unrelated files is the tell**, and no compile ever produces that. `make` then skips the cone you meant to validate and reports success, which is indistinguishable at a glance from a real green. Force the cone instead of trusting it: take the reverse transitive closure of the file you edited out of `iris/.CoqMakefile.d` (the `X.vo: … Y.vo …` lines are already the dependency graph), `rm` those `.vo/.vos/.vok/.glob`, then `make -f CoqMakefile -jN -k`. The closure is small for a leaf-ish file (`DirLinks.v` → 142) and it is the only way to know the consumers actually recompiled. Do NOT reach for `-B`: that rebuilds the whole tree.
 - **A PARTIALLY-BUILT LANE HOLDS TWO GENERATIONS OF `.vo`, AND "STALENESS 0" FOR ONE TARGET PROVES NOTHING ABOUT A NEW ONE.** A lane built by `make <one>.vo` is green and `make -n` emits 0 compile lines — for that chain. The first file you add that Requires something OUTSIDE it dies with **"Compiled library X makes inconsistent assumptions over library Y"**, which reads like a corrupt checkout and is not one: X was compiled against an older Y, and `make` will never notice because every stale `.vo` is still newer than its own `.v`. **The mtime test that finds them is not "older than the file that was rebuilt"** — that flags every base file the rebuilt one sits on top of (27 false positives out of a 208-file chain) — **it is "older than a `.vo` it DEPENDS on", iterated to a fixpoint** over `iris/.CoqMakefile.d`. `rm` the few that names and re-make. And after adding a `_CoqProject` row, regenerate with `coq_makefile -f _CoqProject -o CoqMakefile` **chained into the same command as the `eval $(opam env …)`** — a regeneration under the wrong switch stamps the wrong Rocq version into `CoqMakefile` and every later build inherits it.
 - **DO NOT `set (pj := proc_addr j)` IN A BLOCK LEMMA.** A callee's contract carries its own `let pj := proc_addr j`, so its postcondition hands resources back spelled `proc_addr j`; a walk that folded its goal with `set` then meets them unfolded, and the hart-mismatch error it is really looking at (`iSpecialize: cannot instantiate (cpu_own 0 eb … -∗ …)`) loses its usual tell — the two propositions printing IDENTICALLY — and looks like a `pj`-vs-`proc_addr j` problem instead. Spell the address out and read the error as what it is: a missing `cpu_own_transport`. Plain instructions between a callee's return and a block's seam move the hart just as a call does, and a seam stated over a `∀`-bound `CpuId` demands the transport that the seam's own binder makes invisible. (`ProofSysUnlink.su_w1`'s seam at +0x30, two instructions past nameiparent.)
-- **THE REBUILD CONE IS THE DEV-LOOP COST — know it before you edit, and route around it.** Touching `ProcInv` rebuilds 316 dependents ≈ 4–5 min wall at `-j28`; `BioInv`/`InodeInv`/`LogInv`/`FileInvDefs` ≈ 350 files; `WpLock` 548; `IntrDefs`/`SmodeCore` 600–700. `Spec*` files are cheap (3–29 dependents) — the spec-module architecture works. Three consequences:
+- **THE REBUILD CONE IS THE DEV-LOOP COST — know it before you edit, and route around it.** Touching `ProcInv` rebuilds 316 dependents ≈ 4–5 min wall at `-j28`; `InodeRegion` 203, `PipeInvDefs` 283, `WpUart` 306, `IcacheRef` 348, `FsCrash` 352, `LogInv` 369, `BioDefs` 394, `DiskPtsto` 481, `KallocInv` 554, `WpLock` 657, `SmodeCore` 781. `Spec*` files are cheap (3–29 dependents) — the spec-module architecture works. Three consequences:
   - **While iterating, build the CHAIN, not the cone:** `make -f CoqMakefile Proof<X>.vo` compiles only the prerequisites of the one file you care about (seconds after a mid-tree edit), and a single-file `coqc` checks the file you edited. Pay the full cone ONCE, in the validating `make -j` before landing — never per iteration.
   - **An ADDITIVE change to a shared invariant file belongs in a NEW leaf file** (`ProcInvExtra.v`-style, folded back at a milestone): a new file Requiring `ProcInv` costs only itself; a new lemma INSIDE `ProcInv.v` costs the 316-file cone on every iteration that recompiles it.
   - **`-vos` is NOT a fast cone check in this tree and do not reach for it:** everything lives inside `Section`s, so vos still runs all the tactics and skips only the kernel check — ~40 % per file, and a whole cone at `-j16` is no better than the real vo cone at full `-j`.
@@ -683,12 +683,67 @@ Three practical points:
 
 ## ONE BUNDLE PER GHOST CLASS, OR THE SAME `inG` GETS TWO INSTANCE PATHS
 
-`Xv6G.xv6G` bundles the thirteen ghost classes that are PURE CAPACITY -- only
+`Xv6G.xv6G` bundles the fourteen ghost classes that are PURE CAPACITY -- only
 `inG`/`ghost_varG`/`ghost_mapG` fields, no `gname`.  That is the membership
 test, and it is also why adequacy can hand the whole thing out before a single
 instruction runs: there is nothing in it to allocate (`xv6GΣ` +
 `subG_xv6GΣ`).  The rule that comes with it: **a file at or above `Xv6G.v`
 binds `xv6G` and does NOT bind any member.**  Binding both compiles.
+
+**WHERE THE MEMBERS ARE DEFINED IS A SEPARATE DECISION FROM WHERE THE BUNDLE
+SITS, AND IT IS THE ONE THAT COSTS BUILD TIME.**  A bundle can only sit above
+every member, so with each class written in its own subsystem's file `xv6G`'s
+cone was 82 files -- the whole M-mode execution engine (`sieG` is one
+`ghost_varG Σ (mword 1)`, and it lived in `SmodeCore.v`), the inode cache, the
+inode region, the UART driver.  All 767 files that bind the bundle waited on
+all of it, and an edit to ONE subsystem's algebra rebuilt all 767.
+`Xv6Cameras.v` holds every member class now and `Xv6G.v` only the bundle;
+the cone is 14 base-layer files.  Touching `InodeRegion` rebuilds 203 files
+instead of 768, `PipeInvDefs` 283, `WpUart` 306, `IcacheRef` 348.  (This does
+NOT speed up a clean build -- `xv6G` was never on the critical path, which
+runs through the S-mode/page-table stack.  It is a dev-loop win only.)
+
+- **A camera is a TYPE-LEVEL claim, so it belongs at the bottom.**  The whole
+  vocabulary is pure iris/stdpp algebra over a handful of plain records
+  (`vslot`, `virtio_cfg`, `dinode`, `dclaim`, `lock_state`, `ic_dep`).
+  Nothing in it mentions `iProp`, a WP, an invariant, or the machine model.
+  A class sitting in a deep file is an accident of where it was written.
+- **Move the TYPES, keep the theory.**  `Xv6Cameras.v` holds the cameras;
+  each subsystem's file keeps the constructors, projections and lemmas stated
+  over them (`IcacheRef`'s `lelem*`/`lreg*`/boot maps, `PipeInvDefs`'s
+  `pn_end`/`pn_mark`, `WpLock`'s whole lock theory) and gains a
+  `Require Export Xv6Cameras.`, so every name it used to define is still in
+  scope for its importers and NO downstream signature changes.
+- **Keep the BUNDLE out of the cameras file.**  Every member's home file
+  re-exports the cameras, so a bundle living there would be visible inside its
+  own cone -- and a low file binding `xv6G` beside a member is precisely the
+  double instance path this section is about.
+
+Two things bite in the move and neither reads as a typeclass problem:
+
+- **A `gmap`'s KEY INSTANCES are baked into its type.**  `dclaim`'s
+  `gmap Arch.pa (bv 8)` must elaborate in the same instance environment as the
+  files that already form it, or the field stops being the type `DiskPtsto`'s
+  theory is stated over.  So `Xv6Cameras.v` carries exactly
+  `RiscvModelBytes`'s Sail imports and no more, and spells `mword` QUALIFIED
+  (`SailStdpp.Values.mword`, as `RiscvPtsto.riscvF_pstateGS` does) rather than
+  importing `SailStdpp.Values` -- which leaks instances (see the Sail-model
+  bullet near the end of this file).
+- **A module-qualified reference does NOT follow the re-export.**
+  `Require Export` re-exports for `Import`; the qualified path `WpLock.lockG`
+  names the module the constant was DEFINED in, so it stops resolving.  Grep
+  `<HostModule>.<movedName>` across the tree before building -- here that
+  found eleven hits, ten in comments and one real (`InodeRegion.v`'s
+  `` `{!WpLock.lockG Σ} ``, written to dodge an import that is now unnecessary).
+- **The bundle file must `Require Export` the cameras, not `Require Import`.**
+  A member's FIELD instances (`uio_stdinG`, `lock_inG`, …) are active only
+  where their module is IMPORTED, and `Import` is not transitive -- so under a
+  plain `Require Import`, a file that reaches the bundle ONLY through `Xv6G.v`
+  (`UmodeIo.v` is the one) gets `xv6_uio : xv6G Σ → uioG Σ` and then no step
+  from `uioG Σ` to the `ghost_varG` it wraps.  The error names the innermost
+  class and nothing else -- *"Cannot infer the implicit parameter
+  ghost_varG0 … (no type class instance found)"* -- with `xv6G` sitting right
+  there in the printed environment, which reads as a broken bundle and is not.
 
 **Why it matters.** Two instances of one `inG` are not equal, so resources
 built at each are different propositions THAT PRINT IDENTICALLY.  The failures

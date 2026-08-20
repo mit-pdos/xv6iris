@@ -118,6 +118,7 @@ Require Import RiscvPtsto.
 Require Import KallocInv.
 Require Import WpLock.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Export Xv6Cameras.  (* the cameras this file states its theory over *)
 Local Open Scope Z_scope.
 
 
@@ -303,12 +304,8 @@ Definition pipe_rw_ret (n : Z) (r : mword 64) : Prop :=
 (*  The reference algebra: one fraction ghost per end                   *)
 (* ------------------------------------------------------------------ *)
 
-Class pipeG (Σ : gFunctors) := PipeG {
-  pipe_inG :: inG Σ fracR;          (* the two end fractions *)
-  pipe_mark_inG :: inG Σ dfracR }.  (* the two "still open" markers *)
-Definition pipeΣ : gFunctors := #[GFunctor fracR; GFunctor dfracR].
-Global Instance subG_pipeΣ {Σ} : subG pipeΣ Σ -> pipeG Σ.
-Proof. solve_inG. Qed.
+(* [pipeG] is defined in Xv6Cameras.v.  The NAMES record and its
+   accessors stay here. *)
 
 (* a pipe's ghost identity: per end, the reference fraction and the
    "still open" marker. *)

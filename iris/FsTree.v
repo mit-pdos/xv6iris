@@ -21,7 +21,7 @@
 
       1. every landed inum-indexed resource is [Z]-keyed
          ([InodeRegion.dinode_at] is a [ghost_map Z dinode] element,
-         [IcacheRef.linkUR] is a [gmapUR Z _]), so a path-keyed abstract
+         [Xv6Cameras.linkUR] is a [gmapUR Z _]), so a path-keyed abstract
          state would need a coercion at every one of them;
       2. hard links make files MULTI-PARENT, so an inductive [Tree] is
          already wrong at the leaves -- the object is a DAG;

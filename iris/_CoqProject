@@ -1278,6 +1278,7 @@ ProofUserretClosed.v
 LogDefs.v
 ProcDefs.v
 BioDefs.v
+Xv6Cameras.v
 Xv6G.v
 InodeDefs.v
 SpecSysUnlink.v

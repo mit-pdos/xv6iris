@@ -138,7 +138,7 @@
    precedent): the mover's up-count carries the ledger's [icnt] half, whose
    other half lives in [InodeRegion.ireg_slot], so this contract takes
    [ireg_inv γi γfs inodestart nib] and the [inodestart] binder that goes
-   with it -- and, because [ireg_inv]'s own type has [LogInv.logG] as a real
+   with it -- and, because [ireg_inv]'s own type has [Xv6Cameras.logG] as a real
    instance argument (its [ireg_ep] carries a [log_epoch_lb], §G.13/§G.17),
    the Context gains [!logG Σ].  The handle is PERSISTENT, so it costs a
    caller a frame and nothing else, and the region open is GHOST-ONLY: idup
