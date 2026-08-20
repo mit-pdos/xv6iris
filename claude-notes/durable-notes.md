@@ -1434,6 +1434,33 @@ that reads like a botched argument list and is really a false premise.  **A
 certificate premise that quantifies more of the machine than the fact beside
 it is the thing to suspect.**
 
+> **AND A CERTIFICATE PREMISE CANNOT BE VALIDATED BY THE FILE THAT
+> INTRODUCES IT — only a call site can.**  This is the part that makes the
+> bug expensive.  A premise is never discharged where it is stated, so an
+> unguarded `∀`-state premise COMPILES FINE in its own file and detonates
+> somewhere else entirely, possibly a file and a milestone later.  "It closes
+> unguarded" is therefore not evidence of anything, and is exactly the
+> reasoning that let the same bug through twice here: once on the retire
+> funnel (caught by the jump leaves) and once on `wp_uv_ecall`, which was
+> deliberately left unguarded because ECALL does not jump — yet
+> `goodmb_execute_ECALL_U` needs `cur_privilege` and `PC` pinned all the
+> same, since `execute (ECALL tt)` branches on the privilege to choose its
+> exception.  **Guard every certificate premise at the point you add it;
+> do not wait for a call site to tell you.**
+
+The second symptom is worth knowing too, because it looks unrelated to the
+first: at a call site that simply omits the missing argument, the leftover
+goal is the CERTIFICATE, so the next tactic in the script runs against the
+wrong goal and fails as a `rewrite` that "does not match any subterm" several
+lines downstream.  Same bug, second mask.
+
+**AND GUARDING MAKES THE PREMISE EASIER TO SUPPLY, NOT HARDER** — the sign
+that the unguarded shape was wrong rather than merely strong.  Once the pins
+are hypotheses OF the certificate instead of obligations ON the caller, the
+caller discharges it with a lambda that uses nothing from its own context:
+`UmodeStub`'s ECALL argument mentions no fact from the surrounding proof at
+all.
+
 ## A CLAUSE ABOUT **NAMES** MUST TAKE THE WRITE'S ATOMICITY; ONE ABOUT
 ## INUMS OR INDICES NEED NOT
 
