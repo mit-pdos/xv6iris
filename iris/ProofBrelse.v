@@ -88,6 +88,7 @@ From Kernel Require KernelSyms.
 Require Import IrefSlots.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import ProcDefs.  (* [pprivate], [proc_priv_bare] *)
 Local Open Scope Z_scope.
 
 (* ------------------------------------------------------------------ *)
@@ -541,8 +542,8 @@ Section ProofBrelse.
       (bn : bio_names) (V : bio_view Σ) (k : nat)
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64)
-      (bs bsd : list (bv 8)) (d : bool) (b : bool) (lks : gset string)
-    : wp_brelse_sconf_body γs bn V k pidv dev bno dq m K eb p bs bsd d b lks.
+      (bs bsd : list (bv 8)) (d : bool) (b : bool) (lks : gset string) (Vpr : pprivate)
+    : wp_brelse_sconf_body γs bn V k pidv dev bno dq m K eb p bs bsd d b lks Vpr.
   Proof.
     cbv beta delta [wp_brelse_sconf_body].
     intros pcE ret_tgt HK Hk Ha0 Hbelow.
@@ -806,7 +807,7 @@ Section ProofBrelse.
                  with "Hcnt") as "Hcnt".
     iApply (Hsl.wp_holdingsleep_sconf (fst (bn_slk bn k)) (snd (bn_slk bn k))
               "buffer"%string (bown bn k) mA p pidv (K - 4)%nat b b lks
-              ltac:(lia) Hbelow_sl
+ Vpr ltac:(lia) Hbelow_sl
               with "Hcg Hcnt Htext Hpc [] [Hstok] Hppid").
     all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hslk". }

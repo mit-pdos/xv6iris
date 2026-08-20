@@ -49,6 +49,7 @@ Require Import CalleeSaved.
 Require Import VcGen.
 Require Import IntrDefs.
 Require Import CpuOwn.
+Require Import ProcDefs.  (* [proc_priv_bare] *)
 Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import WpAu4.
@@ -123,14 +124,14 @@ Section ProofIunlockMain.
       (cn : ic_names) (k : nat) (s : Qp) (g : gname) (dev inum : mword 32)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64)
-      (b : bool) (lks : gset string) : iProp Σ :=
+      (b : bool) (lks : gset string) (Vpr : pprivate) : iProp Σ :=
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
         sie_cap_gpr KT1 mf K b p -∗
         cpu_own 0 eb p b lks -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-        p_pid p ↦₄{dq} pidv -∗
+        proc_priv_bare p pidv Vpr -∗
         inode_shr_gen k s dev inum g -∗
         WP (Loop : expr riscv_lang))%I.
 
@@ -144,9 +145,9 @@ Section ProofIunlockMain.
       (dn' : dinode) (bm' : blkmap)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64)
-      (b : bool) (lks : gset string)
+      (b : bool) (lks : gset string) (Vpr : pprivate)
     : wp_iunlock_sconf_body gs gfs gi cn gil gisl cov logstart k s g dev inum
-                            dn' bm' pidv dq m K eb p b lks.
+                            dn' bm' pidv dq m K eb p b lks Vpr.
   Proof.
     cbv beta delta [wp_iunlock_sconf_body].
     intros pcE ip ret_tgt HK Hk Ha0 Hfresh.
@@ -159,7 +160,7 @@ Section ProofIunlockMain.
     iEval (rewrite Hipe) in "Hidev".
     iEval (rewrite Hipe) in "Hinumc".
     iEval (rewrite Hipe) in "Hvalid".
-    iAssert (iul_cont (CID0 := CID)  cn k s g dev inum pidv dq m K eb p b lks)%I
+    iAssert (iul_cont (CID0 := CID)  cn k s g dev inum pidv dq m K eb p b lks Vpr)%I
       with "[Hcont]" as "Hcont"; [rewrite /iul_cont; iExact "Hcont" |].
     iPoseProof (iui2_00 with "Htext") as "Hi00".
     iPoseProof (iui2_02 with "Htext") as "Hi02".
@@ -371,9 +372,9 @@ Section ProofIunlockMain.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (CIDa := CID) (CIDb := CID11) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    iApply (HS.wp_holdingsleep_gen_sconf (dq := dq) gil gisl "inode"%string
+    iApply (HS.wp_holdingsleep_gen_sconf gil gisl "inode"%string
               (ic_tok cn k) (slh_tok (icfg_isl k)) s R6 p pidv (K - 4)%nat eb b lks
-              ltac:(lia)
+ Vpr ltac:(lia)
               Hfresh
               with "Hcg Hcnt Htext Hpc [] [Hstok] Hppid").
     all: try lkbelow.

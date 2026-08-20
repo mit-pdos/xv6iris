@@ -75,6 +75,7 @@ Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import CpuOwn.
 Require Import SchedCtx.
+Require Import ProcDefs.  (* [proc_priv_bare] *)
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
 Require Import BioInv.
@@ -101,7 +102,7 @@ Definition wp_end_op_sconf_body
     (u : nat)
     (pidv : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) :=
+    (b : bool) (lks : gset string) (Vpr : pprivate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.end_op in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -143,7 +144,7 @@ Definition wp_end_op_sconf_body
   fs_crash_seam cov logstart -∗
   gen_cert -∗
   (* the caller's own pid cell (bread's acquiresleep records it) *)
-  p_pid pj ↦₄{dq} pidv -∗
+  proc_priv_bare pj pidv Vpr -∗
   (* the running-thread bundle *)
   procs_inv γs -∗
   (* the disk fabric *)
@@ -168,7 +169,7 @@ Definition wp_end_op_sconf_body
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
-      p_pid pj ↦₄{dq} pidv -∗
+      proc_priv_bare pj pidv Vpr -∗
       (* nothing log-specific comes back: the token is retired *)
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -185,7 +186,7 @@ Module Type END_OP.
       (u : nat)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string),
+      (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_end_op_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs
-                           cov logstart dev u pidv dq m K eb b lks.
+                           cov logstart dev u pidv dq m K eb b lks Vpr.
 End END_OP.

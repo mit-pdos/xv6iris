@@ -1324,7 +1324,7 @@ Section KexecB2Loops.
                & Hblocks)".
       pose proof Hiok as Hiok'.
       destruct Hiok' as (Hbmwf & Hbmcov & Hdaddr & Hdty & Hszb & Hholes & Hsized).
-      iDestruct (proc_priv_pid gf (proc_addr jp) pidv V with "Hpriv")
+      iDestruct (proc_priv_bare_acc gf (proc_addr jp) pidv V with "Hpriv")
         as "[Hppid Hpvbk]".
       iDestruct (A.kxa_bs3_split bn with "Hbs") as "[Hbs1 Hbs2]".
       iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhwc Hcg]".

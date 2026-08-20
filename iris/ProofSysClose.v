@@ -772,13 +772,13 @@ Section ProofSysClose.
       assert (HC4a0 : C4 !!! Regidx (mword_of_int 10 : mword 5) = p_ofile p fd).
       { rewrite /C4 upd_eq. rgne. rgne. rewrite HC3a0 HC3a5. reflexivity. }
       (* borrow the descriptor out of [proc_priv] *)
-      (* THE PID QUARTER RIDES WITH THE DESCRIPTOR.  [proc_priv_pid_ofile]
+      (* THE PROCESS BLOCK RIDES WITH THE DESCRIPTOR.  [proc_priv_bare_ofile]
          lends both out of [proc_priv] at once, which is precisely what this
          block needs: the store below empties [p->ofile[fd]] and the
          fileclose after it wants the quarter (SpecSysClose.v's note on why
          the quarter cannot come from the CALLER). *)
-      iDestruct (proc_priv_pid_ofile γf p pid V fd fv Hlk with "Hpriv")
-        as "(Hpidq & Hslot & Hback)".
+      iDestruct (proc_priv_bare_ofile γf p pid V fd fv Hlk with "Hpriv")
+        as "(Hpbare & Hslot & Hback)".
       iDestruct "Hslot" as "[Hcell [[%Hz _] | Href]]"; [by exfalso; apply Hfvnz|].
       iDestruct "Href" as (k q Cf) "[[%Hfv %Hklt] Href]".
       (* ---- +0x2c: sd x0,0(a0) -- p->ofile[fd] = 0 ---- *)
@@ -851,19 +851,17 @@ Section ProofSysClose.
       (* the descriptor's type is not visible here -- [ofile_slot] quantifies
          the content -- so hand fileclose whichever bundle it asks for and
          keep the other ([fileclose_env_split]). *)
-      (* the quarter, re-spelled at [fn]'s own names -- which is all the two
-         tie premises are for *)
-      iEval (rewrite Hfpj -Hfdq -Hfpid) in "Hpidq".
-      iDestruct (fileclose_loop_open fn on us n eb p Cf with "Hpenv Hfenv Hpidq")
+      (* the block, re-spelled at [fn]'s own names -- which is all the
+         remaining tie premise is for *)
+      iDestruct (fileclose_loop_open fn on us n eb p Cf with "Hpenv Hfenv")
         as "[Hfcenv Hfcback]".
-      iApply (Fileclose.wp_fileclose_sconf γl γf k q Cf fn on us D n eb p (av - 4)%nat b lks
+      iApply (Fileclose.wp_fileclose_sconf γl γf k q Cf fn on us D n eb p (av - 4)%nat b lks pid V
                 ltac:(lia) Hn HDa0
                 Hbelow
-                with "Hcg Hcpu Hextc Hextm Htext Hdata Hpc Hftab Hpe Href Hfcenv").
+                with "Hcg Hcpu Hextc Hextm Htext Hdata Hpc Hftab Hpe Href Hpbare Hfcenv").
       all: try lkbelow.
-      iIntros (CID21 Hs21 R) "Hcg Hcpu Hextc Hextm Hpc %HcsR Hfdslot Hout".
-      iDestruct ("Hfcback" with "Hout") as "(Hpenv & Hfenv & Hpidq)".
-      iEval (rewrite -Hfpj Hfdq Hfpid) in "Hpidq".
+      iIntros (CID21 Hs21 R) "Hcg Hcpu Hextc Hextm Hpc %HcsR Hfdslot Hout Hpbare".
+      iDestruct ("Hfcback" with "Hout") as "(Hpenv & Hfenv)".
       assert (Hpc38 : ret_pc (D !!! Regidx (mword_of_int 1 : mword 5))
                       = mword_of_int (KernelSyms.sys_close + 0x38))
         by (rewrite HDra; apply bv_eq; vm_compute; reflexivity).
@@ -882,7 +880,7 @@ Section ProofSysClose.
                       = mword_of_int (KernelSyms.sys_close + 0x3a)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp3a) in "Hpc".
       (* the descriptor is empty now, and it owns the unit fileclose returned *)
-      iDestruct ("Hback" $! (zero_reg : mword 64) with "Hpidq [Hcell Hfdslot]")
+      iDestruct ("Hback" $! (zero_reg : mword 64) with "Hpbare [Hcell Hfdslot]")
         as "Hpriv".
       { rewrite /ofile_slot. iFrame "Hcell". iLeft. by iFrame "Hfdslot". }
       (* rejoin frame slot 3 *)

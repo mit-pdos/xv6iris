@@ -83,6 +83,7 @@ From Kernel Require KernelSyms.
 Require Import IrefSlots.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import ProcDefs.  (* [pprivate], [proc_priv_bare] *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -131,9 +132,9 @@ Section ProofBwrite.
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (bs bsd : list (bv 8)) (b : bool)
-      (Q : iProp Σ) (lks : gset string)
+      (Q : iProp Σ) (lks : gset string) (Vpr : pprivate)
     : wp_bwrite_sconf_body γs j γl γu γd γk pd pav pu bn V k
-                           pidv dev bno dq m K eb bs bsd b Q lks.
+                           pidv dev bno dq m K eb bs bsd b Q lks Vpr.
   Proof.
     cbv beta delta [wp_bwrite_sconf_body].
     intros pcE pj ret_tgt HK Hbno HgdV Hj Hgl Hk Ha0 Hbelow.
@@ -331,7 +332,7 @@ Section ProofBwrite.
     iDestruct (cpu_claim_ext_transport CID CID8 eb pj ltac:(rewrite Hbm; wp_next_chain)
                  with "Hextm") as "Hextm".
     iApply (HSL.wp_holdingsleep_sconf (fst (bn_slk bn k)) (snd (bn_slk bn k))
-              "buffer"%string (bown bn k) mA pj pidv (K - 4)%nat eb b _ HKhsl Hbelow
+              "buffer"%string (bown bn k) mA pj pidv (K - 4)%nat eb b _ Vpr HKhsl Hbelow
               with "Hcg Hcnt Htext Hpc [] [Hstok] Hppid").
     all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hslk". }

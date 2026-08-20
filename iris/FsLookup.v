@@ -106,6 +106,7 @@ Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import CpuOwn.
 Require Import SchedCtx.
+Require Import ProcDefs.  (* [proc_priv_bare] *)
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
 Require Import BioInv.
@@ -548,7 +549,7 @@ Definition wp_dirlookup_tree_body
     (hasp : bool) (pofv : mword 32)                   (* poff, two-armed     *)
     (pidv : mword 32) (dq dqd dqn : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) :=
+    (b : bool) (lks : gset string) (Vpr : pprivate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.dirlookup in
   let pj := proc_addr j in
   let nb := (m !!! Regidx (mword_of_int 11 : mword 5) : mword 64) in
@@ -593,7 +594,7 @@ Definition wp_dirlookup_tree_body
   (* ---- poff: a 4-byte cell, or nothing ---- *)
   (if hasp then pf ↦₄[KT1] pofv else emp) -∗
   (* ---- the caller's own pid cell ---- *)
-  p_pid pj ↦₄{dq} pidv -∗
+  proc_priv_bare pj pidv Vpr -∗
   (* ---- the running-thread bundle and the disk fabric ---- *)
   procs_inv γs -∗
   dev_inv γu γd -∗
@@ -627,7 +628,7 @@ Definition wp_dirlookup_tree_body
       inode_map γfs ip bm -∗
       fdir γi γfs dpi ents dn bm data -∗
       ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1]{dqn} fn i) -∗
-      p_pid pj ↦₄{dq} pidv -∗
+      proc_priv_bare pj pidv Vpr -∗
       bslot bn -∗
       fedges dpi dn data -∗
       (* THE TWO ARMS, EACH AT BOTH ALTITUDES.  The record index [k]
@@ -680,11 +681,11 @@ Module FsLookupTree (DL : DIRLOOKUP).
       (hasp : bool) (pofv : mword 32)
       (pidv : mword 32) (dq dqd dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) :
+      (b : bool) (lks : gset string) (Vpr : pprivate) :
       wp_dirlookup_tree_body γs j γl γu γd γk pd pav pu bn γfs γi cn gtl
                              γa γf cov logstart inodestart nib dev ip bm data dn
                              dpi ents fn hasp pofv pidv dq dqd dqn
-                             m K eb b lks.
+                             m K eb b lks Vpr.
   Proof.
     unfold wp_dirlookup_tree_body. cbv zeta.
     intros HK Hlg Hbwf Hbcov Hszb Hdio Hdisj Horph Hdpi Hj Hgs Ha0 Ha2 Heb Hlkb.
@@ -704,7 +705,7 @@ Module FsLookupTree (DL : DIRLOOKUP).
     iApply (DL.wp_dirlookup_sconf γs j γl γu γd γk pd pav pu bn γfs γi cn gtl
               γa γf cov logstart inodestart nib dev ip (inum_of dpi) bm data dn dn
               fn hasp pofv
-              pidv dq dqd dqn m K eb b lks
+              pidv dq dqd dqn m K eb b lks Vpr
               HK (node_rep_T_DIR ents dn data Hrep) Hlg Hbwf Hbcov Hszb
               Hdio Hdisj Horph Htynz eq_refl Hj Hgs Ha0 Ha2 Heb Hlkb
               with "Hcg Hcnt Htext Hkd Hpc Hpenv Hbio Hkenv

@@ -538,7 +538,7 @@ Section ProofSysUnlinkTails.
       (u : nat) (pidv : mword 32) (dq : dfrac)
       (m M : regfile) (sp0 : mword 64) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
-      (w4 w5 w6 w27 w30 : mword 64) (bd bnm bp be : nat -> bv 8) :
+      (w4 w5 w6 w27 w30 : mword 64) (bd bnm bp be : nat -> bv 8) (Vpr : pprivate) :
     (K_end_op <= K - 30)%nat -> (30 <= K)%nat -> ((K - 30) + 30 = K)%nat ->
     log_geom_ok cov logstart ->
     (jx < NPROC)%nat -> gs !! jx = Some gl ->
@@ -558,7 +558,7 @@ Section ProofSysUnlinkTails.
     log_ctx g bn gfs cov logstart dev -∗
     fs_crash_seam cov logstart -∗
     gen_cert -∗
-    p_pid (proc_addr jx) ↦₄{dq} pidv -∗
+    proc_priv_bare (proc_addr jx) pidv Vpr -∗
     procs_inv gs -∗
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
@@ -585,7 +585,7 @@ Section ProofSysUnlinkTails.
         trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr jx) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-        p_pid (proc_addr jx) ↦₄{dq} pidv -∗
+        proc_priv_bare (proc_addr jx) pidv Vpr -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -630,7 +630,7 @@ Section ProofSysUnlinkTails.
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
     iApply (EndOp.wp_end_op_sconf (CID := CID1) gs jx gl gu gd gk pd pav pu bn
               g gfs cov logstart dev u pidv dq M1 (K - 30)%nat eb b lks
-              HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
+              Vpr HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hpid Hprocs Hdev Hgeo Hdlk Hop").
     iIntros (CID2 Hq2 meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpid".
@@ -771,7 +771,7 @@ Section ProofSysUnlinkTails.
       (u : nat) (pidv : mword 32) (dq dqb dqs : dfrac)
       (m M : regfile) (sp0 : mword 64) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
-      (w4 w5 w6 w27 w30 : mword 64) (bd bnm bp be : nat -> bv 8) :
+      (w4 w5 w6 w27 w30 : mword 64) (bd bnm bp be : nat -> bv 8) (Vpr : pprivate) :
     (K_iunlockput <= K - 30)%nat -> (K_end_op <= K - 30)%nat ->
     (30 <= K)%nat -> ((K - 30) + 30 = K)%nat ->
     (kk < NINODE)%nat ->
@@ -827,7 +827,7 @@ Section ProofSysUnlinkTails.
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bitmap_res gfs bmapstart cov logstart size used -∗
-    p_pid (proc_addr jx) ↦₄{dq} pidv -∗
+    proc_priv_bare (proc_addr jx) pidv Vpr -∗
     procs_inv gs -∗
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
@@ -855,7 +855,7 @@ Section ProofSysUnlinkTails.
         trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr jx) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-        p_pid (proc_addr jx) ↦₄{dq} pidv -∗
+        proc_priv_bare (proc_addr jx) pidv Vpr -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
         bitmap_res gfs bmapstart cov logstart size used' -∗
@@ -935,7 +935,7 @@ Section ProofSysUnlinkTails.
               pd pav pu bn g gfs gi cn gtl gil gisl cov logstart bmapstart
               inodestart nib size dev used kk qi s gy inum dn bm u pidv dq
               dqb dqs M2 (K - 30)%nat eb b lks
-              HKup Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog
+              Vpr HKup Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog
               Hinb Hcovb Hiu Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hitab Hitinv
@@ -992,7 +992,7 @@ Section ProofSysUnlinkTails.
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
     iApply (EndOp.wp_end_op_sconf (CID := CID4) gs jx gl gu gd gk pd pav pu bn
               g gfs cov logstart dev n2 pidv dq Q1 (K - 30)%nat eb b lks
-              HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
+              Vpr HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hpid Hprocs Hdev Hgeo Hdlk Hop").
     iIntros (CID5 Hq5 meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpid".
@@ -1106,7 +1106,7 @@ Section ProofSysUnlinkTails.
       (u : nat) (pidv : mword 32) (dq dqb dqs : dfrac)
       (m M : regfile) (sp0 : mword 64) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
-      (w5 w6 w27 w30 : mword 64) (bd bnm bp be : nat -> bv 8) :
+      (w5 w6 w27 w30 : mword 64) (bd bnm bp be : nat -> bv 8) (Vpr : pprivate) :
     (K_iunlockput <= K - 30)%nat -> (K_end_op <= K - 30)%nat ->
     (30 <= K)%nat -> ((K - 30) + 30 = K)%nat ->
     (kk < NINODE)%nat ->
@@ -1161,7 +1161,7 @@ Section ProofSysUnlinkTails.
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bitmap_res gfs bmapstart cov logstart size used -∗
-    p_pid (proc_addr jx) ↦₄{dq} pidv -∗
+    proc_priv_bare (proc_addr jx) pidv Vpr -∗
     procs_inv gs -∗
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
@@ -1189,7 +1189,7 @@ Section ProofSysUnlinkTails.
         trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr jx) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-        p_pid (proc_addr jx) ↦₄{dq} pidv -∗
+        proc_priv_bare (proc_addr jx) pidv Vpr -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
         bitmap_res gfs bmapstart cov logstart size used' -∗
@@ -1246,7 +1246,7 @@ Section ProofSysUnlinkTails.
               cn gtl gil gisl cov logstart bmapstart inodestart nib size dev
               used kk qi s gy inum dn bm u pidv dq dqb dqs m M1 sp0 K eb b lks
               (m !!! Regidx Rs2 : mword 64) w5 w6 w27 w30 bd bnm bp be
-              HKup HKeo HK30 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
+              Vpr HKup HKeo HK30 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
               Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HM1sp HM1thr
               HM1s1 HM1s2 HM1s3 Hal
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
@@ -1293,7 +1293,7 @@ Section ProofSysUnlinkTails.
       (u : nat) (pidv : mword 32) (dq dqb dqs : dfrac)
       (m M : regfile) (sp0 : mword 64) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
-      (w6 w27 w30 : mword 64) (bd bnm bp be : nat -> bv 8) :
+      (w6 w27 w30 : mword 64) (bd bnm bp be : nat -> bv 8) (Vpr : pprivate) :
     (K_iunlockput <= K - 30)%nat -> (K_end_op <= K - 30)%nat ->
     (30 <= K)%nat -> ((K - 30) + 30 = K)%nat ->
     (kk < NINODE)%nat -> (ki < NINODE)%nat ->
@@ -1369,7 +1369,7 @@ Section ProofSysUnlinkTails.
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bitmap_res gfs bmapstart cov logstart size used -∗
-    p_pid (proc_addr jx) ↦₄{dq} pidv -∗
+    proc_priv_bare (proc_addr jx) pidv Vpr -∗
     procs_inv gs -∗
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
@@ -1397,7 +1397,7 @@ Section ProofSysUnlinkTails.
         trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr jx) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-        p_pid (proc_addr jx) ↦₄{dq} pidv -∗
+        proc_priv_bare (proc_addr jx) pidv Vpr -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
         bitmap_res gfs bmapstart cov logstart size used' -∗
@@ -1475,7 +1475,7 @@ Section ProofSysUnlinkTails.
               pd pav pu bn g gfs gi cn gtl gili gisli cov logstart bmapstart
               inodestart nib size dev used ki qip si gyi inumi dni bmi u pidv
               dq dqb dqs M2 (K - 30)%nat eb b lks
-              HKup Hki Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblki Hiblogi
+              Vpr HKup Hki Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblki Hiblogi
               Hinbi Hcovb ltac:(unfold iput_units in *; lia) Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hitab Hitinv
@@ -1573,7 +1573,7 @@ Section ProofSysUnlinkTails.
               used2 kk qi s gy inum dn bm n2 pidv dq dqb dqs m P2 sp0 K eb b
               lks (m !!! Regidx Rs2 : mword 64) (m !!! Regidx Rs3 : mword 64)
               w6 w27 w30 bd bnm bp be
-              HKup HKeo HK30 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
+              Vpr HKup HKeo HK30 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
               Hiblk Hiblog Hinb Hcovb ltac:(unfold iput_units in *; lia)
               Hj Hgl Hlkempty Hsp0 HP2sp HP2thr HP2s1 HP2s2 HP2s3 Hal
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen

@@ -124,6 +124,7 @@ Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import CpuOwn.
 Require Import SchedCtx.
+Require Import ProcDefs.  (* [proc_priv_bare] *)
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
 Require Import BioInv.
@@ -155,7 +156,7 @@ Definition wp_balloc_sconf_body
     (u : nat)
     (pidv : mword 32) (dq dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) :=
+    (b : bool) (lks : gset string) (Vpr : pprivate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.balloc in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -205,7 +206,7 @@ Definition wp_balloc_sconf_body
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   log_ctx γ bn γfs cov logstart dev -∗
   (* the caller's own pid cell (bread's acquiresleep records it) *)
-  p_pid pj ↦₄{dq} pidv -∗
+  proc_priv_bare pj pidv Vpr -∗
   (* the two superblock fields, read at +0x0a and +0xa0 and never written *)
   sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -239,7 +240,7 @@ Definition wp_balloc_sconf_body
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
-      p_pid pj ↦₄{dq} pidv -∗
+      proc_priv_bare pj pidv Vpr -∗
       sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       bslots bn 2 -∗
@@ -314,7 +315,7 @@ Definition wp_balloc_gen_body
     (u : nat) (cr : bool) (Sb : gset Z)
     (pidv : mword 32) (dq dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) :=
+    (b : bool) (lks : gset string) (Vpr : pprivate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.balloc in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -351,7 +352,7 @@ Definition wp_balloc_gen_body
   printk_env γpr γu γd -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   log_ctx γ bn γfs cov logstart dev -∗
-  p_pid pj ↦₄{dq} pidv -∗
+  proc_priv_bare pj pidv Vpr -∗
   sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   bitmap_res γfs bmapstart cov logstart size used -∗
@@ -373,7 +374,7 @@ Definition wp_balloc_gen_body
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
-      p_pid pj ↦₄{dq} pidv -∗
+      proc_priv_bare pj pidv Vpr -∗
       sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       bslots bn 2 -∗
@@ -418,10 +419,10 @@ Module Type BALLOC.
       (u : nat) (cr : bool) (Sb : gset Z)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string),
+      (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_balloc_gen_body γs j γl γu γd γk pd pav pu bn γ γfs
                          cov logstart bmapstart size dev used γpr u cr Sb
-                         pidv dq dqb dqs m K eb b lks.
+                         pidv dq dqb dqs m K eb b lks Vpr.
 
   Parameter wp_balloc_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
@@ -437,8 +438,8 @@ Module Type BALLOC.
       (u : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string),
+      (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_balloc_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs
                            cov logstart bmapstart size dev used γpr u
-                           pidv dq dqb dqs m K eb b lks.
+                           pidv dq dqb dqs m K eb b lks Vpr.
 End BALLOC.

@@ -83,6 +83,7 @@ Require Import SpecNamex.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import ProcDefs.  (* [pprivate], [proc_priv_bare] *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -128,9 +129,9 @@ Section ProofNamexRoot.
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
       (dqp : dfrac)
       (m : regfile) (n K : nat) (eb : bool) (p : mword 64)
-      (b : bool) (lks : gset string)
+      (b : bool) (lks : gset string) (Vpr : pprivate)
     : wp_namex_root_body gtl cn gfs gi cov logstart inodestart nib dev dqp
-                         m n K eb p b lks.
+                         m n K eb p b lks Vpr.
   Proof.
     cbv beta delta [wp_namex_root_body].
     intros pcE pv ret_tgt HK Hn Hdev Hnib Hroot Hnib0 Ha1 Hbelow.

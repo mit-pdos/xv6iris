@@ -693,11 +693,11 @@ Section KexitLoop.
       (* ================= the body at +0x3e .. +0x4a ================= *)
       iDestruct (proc_priv_ofile_len with "Hpriv") as "%Hlen".
       destruct (lookup_lt_is_Some_2 (pv_ofile V) fd ltac:(rewrite Hlen; exact Hfd)) as [v Hv].
-      (* the pid quarter and the descriptor come out TOGETHER: fileclose's
-         file-system arm threads the pid cell down to bread's acquiresleep,
-         and neither one-at-a-time accessor can be open while the other is. *)
-      iDestruct (proc_priv_pid_ofile γf pj pid V fd v Hv with "Hpriv")
-        as "(Hpidq & Hslot & Hback)".
+      (* the process BLOCK and the descriptor come out TOGETHER: fileclose's
+         file-system arm threads the block down to bread's acquiresleep, and
+         neither one-at-a-time accessor can be open while the other is. *)
+      iDestruct (proc_priv_bare_ofile γf pj pid V fd v Hv with "Hpriv")
+        as "(Hpbare & Hslot & Hback)".
       iDestruct "Hslot" as "[Hcell Hpay]".
       iPoseProof (kxi_3e with "Htext") as "Hi3e".
       iPoseProof (kxi_40 with "Htext") as "Hi40".
@@ -746,7 +746,7 @@ Section KexitLoop.
                          = mword_of_int (KX + 0x38))
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Htgt38) in "Hpc".
-        iDestruct ("Hback" $! v with "Hpidq [Hcell Hpay]") as "Hpriv".
+        iDestruct ("Hback" $! v with "Hpbare [Hcell Hpay]") as "Hpriv".
         { rewrite /ofile_slot. iSplitL "Hcell"; [iExact "Hcell" | iExact "Hpay"]. }
         iEval (rewrite (upd_ofile_id V fd v Hv)) in "Hpriv".
         iDestruct (cpu_own_transport CIDk CIDm 0 eb pj b ltac:(wp_next_chain)
@@ -811,15 +811,14 @@ Section KexitLoop.
         iDestruct "Hpenv" as (onk) "Hpenv".
         iDestruct "Hfenv" as (usk) "Hfenv".
         iDestruct (fileclose_loop_open fn onk usk 0%nat eb pj Cf
-                     with "Hpenv Hfenv [Hpidq]") as "[Hfcenv Hfcback]".
-        { rewrite Hfnj Hfndq Hfnpid. iExact "Hpidq". }
-        iApply (Fileclose.wp_fileclose_sconf (CID := CIDn)  γft γf kf q Cf fn onk usk M42 0 eb pj av b lks
+                     with "Hpenv Hfenv") as "[Hfcenv Hfcback]".
+        iApply (Fileclose.wp_fileclose_sconf (CID := CIDn)  γft γf kf q Cf fn onk usk M42 0 eb pj av b lks pid V
                   ltac:(lia) ltac:(lia) HM42a0 Hfresh
-                  with "Hcg Hown Htce Hcce Htext Hkd Hpc Hft Hpe Href Hfcenv").
+                  with "Hcg Hown Htce Hcce Htext Hkd Hpc Hft Hpe Href [Hpbare] Hfcenv").
         all: try lkbelow.
-        iIntros (CIDo Hso mr) "Hcg Hown Htce Hcce Hpc %Hcs Hfdslot Hout".
-        iDestruct ("Hfcback" with "Hout") as "(Hpenv & Hfenv & Hpidq)".
-        iEval (rewrite Hfnj Hfndq Hfnpid) in "Hpidq".
+        { iExact "Hpbare". }
+        iIntros (CIDo Hso mr) "Hcg Hown Htce Hcce Hpc %Hcs Hfdslot Hout Hpbare".
+        iDestruct ("Hfcback" with "Hout") as "(Hpenv & Hfenv)".
         assert (Hpc46 : ret_pc (M42 !!! Regidx (mword_of_int 1 : mword 5))
                         = mword_of_int (KX + 0x46))
           by (rewrite HM42ra; apply bv_eq; vm_compute; reflexivity).
@@ -852,7 +851,7 @@ Section KexitLoop.
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hpp4a) in "Hpc".
         (* the emptied descriptor owns the unit fileclose handed back *)
-        iDestruct ("Hback" $! (zero_reg : mword 64) with "Hpidq [Hcell Hfdslot]") as "Hpriv".
+        iDestruct ("Hback" $! (zero_reg : mword 64) with "Hpbare [Hcell Hfdslot]") as "Hpriv".
         { rewrite /ofile_slot. iSplitL "Hcell"; [iExact "Hcell"|].
           iLeft. iFrame "Hfdslot". done. }
         (* +0x4a c.j -> +0x38 *)
@@ -1604,8 +1603,11 @@ Section KexitRest.
        [pv_cwd V <> 0] disappear: it is now a projection
        ([proc_priv_cwd_nonzero]) and nothing downstream needs it stated. *)
     iDestruct (proc_priv_split_cwd γf pj pid V with "Hpriv") as "[Hpriv Href]".
-    iDestruct (proc_priv_nocwd_cwd_pid γf pj pid V with "Hpriv")
-      as "(Hcwd & Hpidq & Hpback)".
+    (* THE BLOCK, NOT A QUARTER OF [p->pid].  begin_op, iput and end_op all
+       take [proc_priv_bare] now, and [p->cwd] lives INSIDE it -- so the cell
+       is borrowed for the two instructions that touch it (+0x50's load and
+       +0x5c's store) and stays in the block for everything between. *)
+    rewrite proc_priv_nocwd_bare. iDestruct "Hpriv" as "[Hpbare Hofiles]".
     iDestruct (cwd_ref_held (pv_cwd V) with "Href") as "Href".
     iDestruct "Href" as (kk qq inum) "(%Hipe & %Hkk & %Hinumb & Href & Hru)".
     iDestruct (ic_escrows_acc _ _ _ _ _ kk Hkk with "Hescrows") as "#Hescrow".
@@ -1648,12 +1650,12 @@ Section KexitRest.
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
     iApply (BeginOp.wp_begin_op_sconf (CID := CID1)  γs j γl bn γ γfs cov logstart dev
               pid (DfracOwn (1/4)) Q0 av eb b lks
-              ltac:(lia) Hj Hgl
+              V ltac:(lia) Hj Hgl
               (* "log" (3) outranks "itable" (2), [Hfresh]'s own bound. *)
               ltac:(lkbelow)
-              with "Hcg Hown Htce Hcce Htext Hpc Hlog Hpidq Hprocs").
+              with "Hcg Hown Htce Hcce Htext Hpc Hlog Hpbare Hprocs").
     all: try lkbelow.
-    iIntros (CID2 Hs2 mbo) "%Hcsbo Hcg Hown Htce Hcce Hpc Hpidq Hop".
+    iIntros (CID2 Hs2 mbo) "%Hcsbo Hcg Hown Htce Hcce Hpc Hpbare Hop".
     assert (Hpc50 : ret_pc (Q0 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KX + 0x50))
       by (rewrite HQ0ra; apply bv_eq; vm_compute; reflexivity).
@@ -1669,6 +1671,7 @@ Section KexitRest.
     (* +0x50 ld a0,336(s3) : a0 := p->cwd *)
     assert (Hrgbo19 : rget (CID := CID2) mbo (mword_of_int 19 : mword 5)
                       = mbo !!! Regidx (mword_of_int 19 : mword 5)) by (rgne; reflexivity).
+    iDestruct (proc_priv_bare_cwd pj pid V with "Hpbare") as "[Hcwd Hcwdbk]".
     iApply (wp_ld_s_sconf (CID := CID2) (kt := KT1) (ktd := KT0) (mword_of_int (KX + 0x50))
               (mword_of_int 10 : mword 5) (mword_of_int 19 : mword 5) (mword_of_int 336 : mword 12)
               mbo av (pv_cwd V) b ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -1676,6 +1679,10 @@ Section KexitRest.
     { iEval (rewrite Hrgbo19 Hbo_s3 p_cwd_sext). iExact "Hcwd". }
     iIntros (CID3 Hs3') "Hcg Hpc Hcwd".
     iEval (rewrite Hrgbo19 Hbo_s3 p_cwd_sext) in "Hcwd".
+    (* the cell goes straight back at the value it already had: a load
+       leaves it alone, so [upd_cwd_id] closes the borrow. *)
+    iDestruct ("Hcwdbk" $! (pv_cwd V) with "Hcwd") as "Hpbare".
+    rewrite upd_cwd_id.
     set (Q1 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (pv_cwd V)]> mbo).
     assert (Hpp54 : add_vec_int (mword_of_int (KX + 0x50) : mword 64) 4 = mword_of_int (KX + 0x54))
       by (apply bv_eq; vm_compute; reflexivity).
@@ -1721,16 +1728,16 @@ Section KexitRest.
               γi cn γtl gil gisl cov logstart bmapstart inodestart nib size
               dev us kk qq inum MAXOPBLOCKS pid (DfracOwn (1/4)) dqb dqs
               Q2 av eb b lks
-              ltac:(lia) Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog
+              V ltac:(lia) Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog
               Hist0 Hiblk Hiblog Hinb Hcovb
               ltac:(unfold iput_units, MAXOPBLOCKS; lia) Hj Hgl
               ltac:(rewrite HQ2a0; exact Hipe)
               Hfresh
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpanenv Hbio Hlog Hitab Hitinv Hescrow
-                    Hireg Hropen Hslk [$Href $Hru] Hsbb Hsbi Hbmres Hpidq Hprocs
+                    Hireg Hropen Hslk [$Href $Hru] Hsbb Hsbi Hbmres Hpbare Hprocs
                     Hdev Hgeo Hdlk Hbsl Hop").
     all: try lkbelow.
-    iIntros (CID5 Hs5 mip n' us') "%Hcsip Hcg Hown Htce Hcce Hpc Hpidq Hsbb Hsbi
+    iIntros (CID5 Hs5 mip n' us') "%Hcsip Hcg Hown Htce Hcce Hpc Hpbare Hsbb Hsbi
                                    %Hussub Hbmres Hbsl %Hn' Hop Hislot".
     assert (Hpc58 : ret_pc (Q2 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KX + 0x58))
@@ -1776,11 +1783,11 @@ Section KexitRest.
       by lkbelow.
     iApply (EndOp.wp_end_op_sconf (CID := CID6)  γs j γl γu γd γk pd pav pu bn γ γfs
               cov logstart dev n' pid (DfracOwn (1/4)) Q3 av eb b lks
-              ltac:(lia) Hgeom Hj Hgl
+              V ltac:(lia) Hgeom Hj Hgl
               Hfresh_log
-              with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpanenv Hbio Hlog Hseam Hgen Hpidq Hprocs Hdev Hgeo Hdlk Hop").
+              with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpanenv Hbio Hlog Hseam Hgen Hpbare Hprocs Hdev Hgeo Hdlk Hop").
     all: try lkbelow.
-    iIntros (CID7 Hs7 meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpidq".
+    iIntros (CID7 Hs7 meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpbare".
     assert (Hpc5c : ret_pc (Q3 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KX + 0x5c))
       by (rewrite HQ3ra; apply bv_eq; vm_compute; reflexivity).
@@ -1799,12 +1806,14 @@ Section KexitRest.
        the ZOMBIE park takes. *)
     assert (Hrgeo19 : rget (CID := CID7) meo (mword_of_int 19 : mword 5)
                       = meo !!! Regidx (mword_of_int 19 : mword 5)) by (rgne; reflexivity).
+    iDestruct (proc_priv_bare_cwd pj pid V with "Hpbare") as "[Hcwd Hcwdbk]".
     iApply (wp_sd_zero_s_sconf (CID := CID7) (kt := KT1) (ktd := KT0) (mword_of_int (KX + 0x5c))
               (mword_of_int 19 : mword 5) (mword_of_int 336 : mword 12) meo av (pv_cwd V) b
               with "Hcg Hpc Hi5c [Hcwd]").
     { iEval (rewrite Hrgeo19 Heo_s3 p_cwd_sext). iExact "Hcwd". }
     iIntros (CID8 Hs8) "Hcg Hpc Hcwd".
     iEval (rewrite Hrgeo19 Heo_s3 p_cwd_sext) in "Hcwd".
+    iDestruct ("Hcwdbk" $! (zero_reg : mword 64) with "Hcwd") as "Hpbare".
     assert (Hpp60 : add_vec_int (mword_of_int (KX + 0x5c) : mword 64) 4 = mword_of_int (KX + 0x60))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp60) in "Hpc".
@@ -1815,7 +1824,11 @@ Section KexitRest.
        itself.  That bijection is what makes
        [IREFSLOTS = NPROC*(1 + IREFSPARE) + NFILE] literally true. *)
     iDestruct (iref_slots_combine 1 IREFSPARE with "Hislot Hir") as "Hir".
-    iDestruct ("Hpback" $! (zero_reg : mword 64) with "Hcwd Hpidq") as "Hpriv".
+    iAssert (proc_priv_nocwd γf pj pid (upd_cwd V (zero_reg : mword 64)))
+      with "[Hpbare Hofiles]" as "Hpriv".
+    { rewrite proc_priv_nocwd_bare.
+      cbn [upd_cwd pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+      iSplitL "Hpbare"; [iExact "Hpbare" | iExact "Hofiles"]. }
     iDestruct (cpu_own_transport CID7 CID8 0 eb pj b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
     iDestruct (trap_csrs_ext_transport CID7 CID8 eb pj

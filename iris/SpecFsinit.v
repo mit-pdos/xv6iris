@@ -140,6 +140,7 @@ Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import CpuOwn.
 Require Import SchedCtx.
+Require Import ProcDefs.  (* [proc_priv_bare] *)
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
 Require Import BioInv.
@@ -247,7 +248,7 @@ Definition wp_fsinit_sconf_body
     (v_start v_dev v_nc v_n : mword 32)
     (pidv : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) :=
+    (b : bool) (lks : gset string) (Vpr : pprivate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.fsinit in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -364,7 +365,7 @@ Definition wp_fsinit_sconf_body
   ([∗ list] i ∈ seq 0 LOGBLOCKS,
      ∃ bs : list (bv 8), fsblock γfs (log_slot_bno logstart i) bs) -∗
   (* the caller's own pid cell *)
-  p_pid pj ↦₄{dq} pidv -∗
+  proc_priv_bare pj pidv Vpr -∗
   (* the running-thread bundle and the disk fabric *)
   procs_inv γs -∗
   dev_inv γu γd -∗
@@ -390,7 +391,7 @@ Definition wp_fsinit_sconf_body
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
-      p_pid pj ↦₄{dq} pidv -∗
+      proc_priv_bare pj pidv Vpr -∗
       (* ================================================================ *)
       (*  THE EIGHT CELLS ARE BORN.  This is the whole point of the        *)
       (*  contract: the caller handed in 32 raw .bss bytes and gets back   *)
@@ -449,12 +450,12 @@ Module Type FSINIT.
       (v_start v_dev v_nc v_n : mword 32)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string),
+      (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_fsinit_sconf_body γs j γl γu γd γk pd pav pu bn γfs γi cn gtl γpr
                            cov logstart bmapstart inodestart ninodes nib size
                            used dev
                            v_magic v_size v_nblocks v_ninodes v_nlog
                            v_logstart v_inodestart v_bmapstart bs_sb sb_old
                            bs_hdr L D vlock vname vcpu v_start v_dev v_nc v_n
-                           pidv dq m K eb b lks.
+                           pidv dq m K eb b lks Vpr.
 End FSINIT.

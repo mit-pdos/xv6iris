@@ -1018,11 +1018,10 @@ Section ProofDirlinkMain.
     exact (dlk_de_split (KTR := KT1) a (fun jj => file_byte data (16 * i + jj)%nat)).
   Qed.
 
-  (* the [V] slot of readi's contract is dead on the kernel arm *)
-  Definition dl_dummyV : pprivate :=
-    MkPPriv (mword_of_int 0)
-            (UPTD (mword_of_int 0) (mword_of_int 0) ∅ ∅)
-            [] [] (mword_of_int 0) [].
+  (* [dl_dummyV] USED TO BE HERE: readi's and writei's [V] slot was dead on
+     the kernel arm, which took a bare quarter of [p->pid] rather than a
+     process block.  Both take [proc_priv_bare pj pidv V] now, so the slot is
+     live and dirlink passes its OWN [Vpr] straight through. *)
 
   (* ---- THE BLOCK STATEMENTS, NAMED (claude-notes/optimization.md, RULE
      ONE) -- [Htail]/[Hafter]/[Hloop] are each stated below as a
@@ -1075,7 +1074,7 @@ Section ProofDirlinkMain.
       (bn : bio_names) (g : log_names) (ncount : nat) (Sb : gset Z) (K : nat)
       (b eb : bool) (k0 : nat) (inum : mword 16) (nrec : nat)
       (s : list (bv 8)) (ret_tgt : mword 64)
-      (CIDa : CpuId) (lks : gset string) : iProp Σ :=
+      (CIDa : CpuId) (lks : gset string) (Vpr : pprivate) : iProp Σ :=
     (∀ (Mp : regfile) (dolz : nat -> bv 8) (w5 w6 : mword 64),
        ⌜dl_pregs m sp0 ip nb
           (zero_extend' 64 (inum : mword 16) : mword 64)
@@ -1103,7 +1102,7 @@ Section ProofDirlinkMain.
        sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
        bitmap_res gfs bmapstart cov logstart size used -∗
        dinode_at gi dinum dn0 -∗
-       p_pid (proc_addr j) ↦₄{dq} pidv -∗
+       proc_priv_bare (proc_addr j) pidv Vpr -∗
        bslots bn 3 -∗
        iref_slot -∗
        log_opS g ncount Sb -∗
@@ -1129,7 +1128,7 @@ Section ProofDirlinkMain.
              sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
              bitmap_res gfs bmapstart cov logstart size used' -∗
              dinode_at gi dinum dn0' -∗
-             p_pid (proc_addr j) ↦₄{dq} pidv -∗
+             proc_priv_bare (proc_addr j) pidv Vpr -∗
              bslots bn 3 -∗
              iref_slot -∗
              dir_links (bv_unsigned dinum) dn data -∗
@@ -1185,7 +1184,7 @@ Section ProofDirlinkMain.
       (pidv : mword 32) (bn : bio_names) (g : log_names) (ncount : nat)
       (Sb : gset Z)
       (k0 : nat) (s : list (bv 8)) (ret_tgt : mword 64) (dqd : dfrac)
-      (fuel : nat) (CIDl : CpuId) (lks : gset string) : iProp Σ :=
+      (fuel : nat) (CIDl : CpuId) (lks : gset string) (Vpr : pprivate) : iProp Σ :=
     (∀ (i : nat) (Ml : regfile) (dol : nat -> bv 8),
        ⌜(S nrec - i <= fuel)%nat⌝ -∗
        (* §15(b): THE LOOP TEST, not [i < nrec] -- without
@@ -1218,7 +1217,7 @@ Section ProofDirlinkMain.
        sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
        bitmap_res gfs bmapstart cov logstart size used -∗
        dinode_at gi dinum dn0 -∗
-       p_pid (proc_addr j) ↦₄{dq} pidv -∗
+       proc_priv_bare (proc_addr j) pidv Vpr -∗
        bslot bn -∗
        bslots bn 2 -∗
        iref_slot -∗
@@ -1245,7 +1244,7 @@ Section ProofDirlinkMain.
              sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
              bitmap_res gfs bmapstart cov logstart size used' -∗
              dinode_at gi dinum dn0' -∗
-             p_pid (proc_addr j) ↦₄{dq} pidv -∗
+             proc_priv_bare (proc_addr j) pidv Vpr -∗
              bslots bn 3 -∗
              iref_slot -∗
              dir_links (bv_unsigned dinum) dn data -∗
@@ -1311,12 +1310,12 @@ Section ProofDirlinkMain.
       (ncount : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs dqf : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string)
+      (b : bool) (lks : gset string) (Vpr : pprivate)
     : wp_dirlink_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                           ga gf gpr cov logstart inodestart nib bmapstart
                           size dev used ip dinum bm data dn dn0 fn inum
                           ncount Sb pidv dq dqd dqn dqs dqb dqbs dqf
-                          m K eb b lks.
+                          m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_dirlink_gen_body].
     intros pcE pjv nb ret_tgt nrec s k0 HK Htype Hbmcov Hszb Hinums
@@ -1793,7 +1792,7 @@ Section ProofDirlinkMain.
     iApply (DL.wp_dirlookup_sconf gs j gl gu gd gk pd pav pu bn gfs gi cn gtl
               ga gf cov logstart inodestart nib dev ip dinum bm data dn dn0 fn
               false (mword_of_int 0 : mword 32)
-              pidv dq dqd dqn R7 (K - 10)%nat eb b _
+              pidv dq dqd dqn R7 (K - 10)%nat eb b _ Vpr
               ltac:(exact HKdl) Htype Hlg Hbmwf Hbmcov Hszb Hinums
               Hdisj Horph Hdn0nz
               (* premise (6'), iclaim-ledger.md §3.3.  This is the ONE caller
@@ -1889,7 +1888,7 @@ Section ProofDirlinkMain.
       iApply (IP.wp_iput_gen gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                 gil gisl cov logstart bmapstart inodestart nib size dev used
                 kslot qq (zero_extend' 32 (dir_inum data kk : mword 16) : mword 32)
-                ncount Sb false false false edl pidv dq dqb dqs E1 (K - 10)%nat eb b lks true
+                ncount Sb false false false edl pidv dq dqb dqs E1 (K - 10)%nat eb b lks Vpr true
                 ltac:(exact HKip) Hkslot
                 ltac:(intros Hc; discriminate Hc)
                 ltac:(intros Hc; discriminate Hc)
@@ -2054,7 +2053,7 @@ Section ProofDirlinkMain.
                  dl_after_body j m sp0 ip nb dqd dev dqf dinum dn dn0 gfs bm
                    data dqn fn dqs inodestart dqbs size dqb bmapstart cov
                    logstart used gi dq pidv bn g ncount Sb K b eb k0 inum
-                   nrec s ret_tgt CIDa lks))%I
+                   nrec s ret_tgt CIDa lks Vpr))%I
         with "[]" as "#Hafter".
       { iModIntro.
         iIntros (CIDa Hsa Mp dolz w5 w6)
@@ -2378,7 +2377,7 @@ Section ProofDirlinkMain.
                   ip dinum bm data dn dn0
                   false (16 * k0)%nat 16%nat
                   (fun jj => dirent_bytes (de_of_name inum s) !!! jj)
-                  dl_dummyV ncount Sb
+                  Vpr ncount Sb
                   pidv dq dqd dqf dqs dqb dqbs V6 (K - 10)%nat eb b lks
                   ltac:(exact HKwi)
                   ltac:(rewrite (dl_wi_cost_bmonly k0);
@@ -2810,7 +2809,7 @@ Section ProofDirlinkMain.
             dl_scan_body j nrec dn data m sp0 ip nb inum K b eb dev dqf
               dinum gfs bm dqn fn dqs inodestart dqbs size dqb bmapstart cov
               logstart used gi dn0 dq pidv bn g ncount Sb k0 s ret_tgt dqd
-              fuel CIDl lks))%I
+              fuel CIDl lks Vpr))%I
           with "[]" as "Hloop".
         { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
           { iIntros (CIDl Hsl i Ml dol)
@@ -2994,14 +2993,14 @@ Section ProofDirlinkMain.
             by (rewrite HL6a4; apply rd_arg32_small; lia).
           iAssert (([∗ list] ii ∈ seq 0 16,
                       pa_add (L6 !!! Regidx Ra2 : mword 64) ii ↦ₘ[KT1] dol ii)
-                   ∗ p_pid (proc_addr j) ↦₄{dq} pidv)%I
+                   ∗ proc_priv_bare (proc_addr j) pidv Vpr)%I
             with "[Hde Hppid]" as "Hdst".
           { iEval (rewrite HL6a2). iFrame. }
           iDestruct (cpu_own_transport CIDl CIDB6 0%nat eb (proc_addr j) b
                        ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
           iApply (RD.wp_readi_sconf KT1 gs j gl gu gd gk pd pav pu bn gfs ga gf
                     cov logstart dev ip bm data dn
-                    false (16 * i)%nat 16%nat dol dl_dummyV
+                    false (16 * i)%nat 16%nat dol Vpr
                     pidv dq dqd L6 (K - 10)%nat eb b lks
                     ltac:(exact HKrd) Hlg Hbmwf Hbmcov Hszb
                     ltac:(lia)
@@ -3024,7 +3023,7 @@ Section ProofDirlinkMain.
           iAssert (([∗ list] ii ∈ seq 0 16,
                       pa_add (L6 !!! Regidx Ra2 : mword 64) ii
                         ↦ₘ[KT1] rd_delivered data dol (16 * i) tot ii)
-                   ∗ p_pid (proc_addr j) ↦₄{dq} pidv)%I
+                   ∗ proc_priv_bare (proc_addr j) pidv Vpr)%I
             with "[Hdst2]" as "[Hde Hppid]".
           { iExact "Hdst2". }
           destruct Hrdret as [[_ Hbad] | [Hra0rd Hteq]]; [discriminate |].
@@ -3525,12 +3524,12 @@ Section ProofDirlinkMain.
       (ncount : nat)
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs dqf : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string)
+      (b : bool) (lks : gset string) (Vpr : pprivate)
     : wp_dirlink_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                             ga gf gpr cov logstart inodestart nib bmapstart
                             size dev used ip dinum bm data dn dn0 fn inum
                             ncount pidv dq dqd dqn dqs dqb dqbs dqf
-                            m K eb b lks.
+                            m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_dirlink_sconf_body].
     intros pcE pjv nb ret_tgt nrec s k0 HK Htype Hbmcov Hszb Hinums
@@ -3552,7 +3551,7 @@ Section ProofDirlinkMain.
     iApply (wp_dirlink_gen gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
               ga gf gpr cov logstart inodestart nib bmapstart size dev used
               ip dinum bm data dn dn0 fn inum ncount Sb0
-              pidv dq dqd dqn dqs dqb dqbs dqf m K eb b lks
+              pidv dq dqd dqn dqs dqb dqbs dqf m K eb b lks Vpr
               HK Htype Hbmcov Hszb Hinums Hdisj Horph Hstab Hnlk Hlg Hbmwf Hholes
               Haddrs Hsz31 Hist0 Hiblk Hiblog Hdinb Hcinb Hbmgeo Hpkc
               Hsize Hbms0 Hbmsc Hbmsl Hcovb Hiregb (Hncg _ _) Hj Hgs Ha0 Ha2 Heb Hbelow

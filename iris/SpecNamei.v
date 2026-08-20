@@ -50,6 +50,7 @@ Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import CpuOwn.
 Require Import SchedCtx.
+Require Import ProcDefs.  (* [proc_priv_bare] *)
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
 Require Import BioInv.
@@ -96,12 +97,11 @@ Definition wp_namei_sconf_body
     (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
     (used : gset Z)
-    (cwdv : mword 64)                                  (* p->cwd, untouched   *)
     (plen : nat) (pfun : nat -> bv 8)                  (* the path buffer     *)
     (n : nat)
-    (pidv : mword 32) (dq dqb dqs dqc : dfrac)
+    (pidv : mword 32) (dq dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) :=
+    (b : bool) (lks : gset string) (Vpr : pprivate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.namei in
   let pj := proc_addr j in
   let pv := m !!! Regidx (mword_of_int 10 : mword 5) in   (* a0 = path *)
@@ -163,9 +163,8 @@ Definition wp_namei_sconf_body
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   bitmap_res gfs bmapstart cov logstart size used -∗
-  p_pid pj ↦₄{dq} pidv -∗
-  p_cwd pj ↦₈{dqc} cwdv -∗
-  inode_held cwdv -∗
+  proc_priv_bare pj pidv Vpr -∗
+  inode_held (pv_cwd Vpr) -∗
   ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
   bslots bn 3 -∗
   iref_slots 2 -∗
@@ -186,9 +185,8 @@ Definition wp_namei_sconf_body
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       ⌜used' ⊆ used⌝ -∗
       bitmap_res gfs bmapstart cov logstart size used' -∗
-      p_pid pj ↦₄{dq} pidv -∗
-      p_cwd pj ↦₈{dqc} cwdv -∗
-      inode_held cwdv -∗
+      proc_priv_bare pj pidv Vpr -∗
+      inode_held (pv_cwd Vpr) -∗
       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
       bslots bn 3 -∗
       ⌜((n - (L + 1) * iput_units)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
@@ -223,12 +221,11 @@ Definition wp_namei_gen_body
     (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
     (used : gset Z)
-    (cwdv : mword 64)                                  (* p->cwd, untouched   *)
     (plen : nat) (pfun : nat -> bv 8)                  (* the path buffer     *)
     (n : nat) (Sb : gset Z)
-    (pidv : mword 32) (dq dqb dqs dqc : dfrac)
+    (pidv : mword 32) (dq dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) :=
+    (b : bool) (lks : gset string) (Vpr : pprivate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.namei in
   let pj := proc_addr j in
   let pv := m !!! Regidx (mword_of_int 10 : mword 5) in   (* a0 = path *)
@@ -292,9 +289,8 @@ Definition wp_namei_gen_body
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   bitmap_res gfs bmapstart cov logstart size used -∗
-  p_pid pj ↦₄{dq} pidv -∗
-  p_cwd pj ↦₈{dqc} cwdv -∗
-  inode_held cwdv -∗
+  proc_priv_bare pj pidv Vpr -∗
+  inode_held (pv_cwd Vpr) -∗
   ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
   bslots bn 3 -∗
   iref_slots 2 -∗
@@ -315,9 +311,8 @@ Definition wp_namei_gen_body
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       ⌜used' ⊆ used⌝ -∗
       bitmap_res gfs bmapstart cov logstart size used' -∗
-      p_pid pj ↦₄{dq} pidv -∗
-      p_cwd pj ↦₈{dqc} cwdv -∗
-      inode_held cwdv -∗
+      proc_priv_bare pj pidv Vpr -∗
+      inode_held (pv_cwd Vpr) -∗
       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
       bslots bn 3 -∗
       (* the set only GROWS; namex takes no credit and neither does
@@ -353,16 +348,15 @@ Module Type NAMEI.
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (used : gset Z)
-      (cwdv : mword 64)
       (plen : nat) (pfun : nat -> bv 8)
       (n : nat)
-      (pidv : mword 32) (dq dqb dqs dqc : dfrac)
+      (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string),
+      (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_namei_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                           ga gf cov logstart bmapstart inodestart nib
-                          size dev used cwdv plen pfun n
-                          pidv dq dqb dqs dqc m K eb b lks.
+                          size dev used plen pfun n
+                          pidv dq dqb dqs m K eb b lks Vpr.
   (* the set-form contract; the counted one is this at the [log_op]
      existential's own witness. *)
   Parameter wp_namei_gen :
@@ -378,16 +372,15 @@ Module Type NAMEI.
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (used : gset Z)
-      (cwdv : mword 64)
       (plen : nat) (pfun : nat -> bv 8)
       (n : nat) (Sb : gset Z)
-      (pidv : mword 32) (dq dqb dqs dqc : dfrac)
+      (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string),
+      (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_namei_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                           ga gf cov logstart bmapstart inodestart nib
-                          size dev used cwdv plen pfun n Sb
-                          pidv dq dqb dqs dqc m K eb b lks.
+                          size dev used plen pfun n Sb
+                          pidv dq dqb dqs m K eb b lks Vpr.
 End NAMEI.
 
 (* ===================================================================== *)
@@ -414,7 +407,7 @@ Definition wp_namei_root_body
     (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
     (dqp : dfrac)
     (m : regfile) (n K : nat) (eb : bool) (p : mword 64)
-    (b : bool) (lks : gset string) :=
+    (b : bool) (lks : gset string) (Vpr : pprivate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.namei in
   let pv := m !!! Regidx (mword_of_int 10 : mword 5) in    (* a0 = path *)
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -467,7 +460,7 @@ Module Type NAMEI_ROOT.
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
       (dqp : dfrac)
       (m : regfile) (n K : nat) (eb : bool) (p : mword 64)
-      (b : bool) (lks : gset string),
+      (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_namei_root_body gtl cn gfs gi cov logstart inodestart nib dev dqp
-                         m n K eb p b lks.
+                         m n K eb p b lks Vpr.
 End NAMEI_ROOT.

@@ -47,6 +47,7 @@ Require Import SpecNamei.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import ProcDefs.  (* [pprivate], [proc_priv_bare] *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -119,9 +120,9 @@ Section ProofNameiRoot.
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
       (dqp : dfrac)
       (m : regfile) (n K : nat) (eb : bool) (p : mword 64)
-      (b : bool) (lks : gset string)
+      (b : bool) (lks : gset string) (Vpr : pprivate)
     : wp_namei_root_body gtl cn gfs gi cov logstart inodestart nib dev dqp
-                         m n K eb p b lks.
+                         m n K eb p b lks Vpr.
   Proof.
     cbv beta delta [wp_namei_root_body].
     intros pcE pv ret_tgt HK Hn Hdev Hnib Hroot Hnib0 Hbelow.
@@ -287,7 +288,7 @@ Section ProofNameiRoot.
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (NX.wp_namex_root gtl cn gfs gi cov logstart inodestart nib dev dqp
               R5 n (K - 4)%nat eb p b lks
-              Knx Hn Hdev Hnib Hroot Hnib0 HR5a1 Hbelow
+              Vpr Knx Hn Hdev Hnib Hroot Hnib0 HR5a1 Hbelow
               with "Hcg Hcnt Htext Hkd Hpc Hpenv Hitb2 Hitbl Hesc Hireg Hisl Hp0 Hp1").
     iIntros (CID8 Hq8 mf ipv) "%Hcsp Hcg Hcnt Hpc Hp0 Hp1 Hip".
     destruct Hcsp as (Hcs & Hfa0).

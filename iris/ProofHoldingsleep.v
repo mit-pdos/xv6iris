@@ -28,6 +28,7 @@ Require Import WpNext.
 Require Import CpuOwn.
 Require Import SpecAcquire SpecRelease SpecMyproc.
 Require Import SpecHoldingsleep.
+Require Import ProcDefs.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
@@ -69,8 +70,8 @@ Section ProofHoldingsleep.
 
   Lemma wp_holdingsleep_gen_sconf
       (γl γsl : gname) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
-      (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (dq : dfrac) (b : bool) (lks : gset string)
-    : wp_holdingsleep_gen_sconf_body γl γsl s R H q m p pidv av eb dq b lks.
+      (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate)
+    : wp_holdingsleep_gen_sconf_body γl γsl s R H q m p pidv av eb b lks Vpr.
   Proof.
     cbv beta delta [wp_holdingsleep_gen_sconf_body].
     intros pcE slk ret_tgt Hav Hfresh.
@@ -362,14 +363,19 @@ Section ProofHoldingsleep.
       replace (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 12 : mword 5) ('b"00"))) : mword 64)
         with (sign_extend' 64 (mword_of_int 48 : mword 12) : mword 64) by (apply bv_eq; vm_compute; reflexivity).
       reflexivity. }
+    (* [p->pid] is READ here.  The field is BORROWED out of the
+       caller's [proc_priv_bare] block just for this load and handed
+       straight back below -- the contract passes the whole block. *)
+    iDestruct (proc_priv_bare_pid with "Hpidproc") as "[Hpq Hpbk]".
     iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.holdingsleep + 0x3c)) (mword_of_int 9 : mword 5) (mword_of_int 10 : mword 5)
-              (zero_extend' 12 (concat_vec (mword_of_int 12 : mword 5) ('b"00"))) MP (trap_res b + (av - 6))%nat pidv false (dqm := dq)
+              (zero_extend' 12 (concat_vec (mword_of_int 12 : mword 5) ('b"00"))) MP (trap_res b + (av - 6))%nat pidv false (dqm := DfracOwn (1/4))
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi3c [Hpidproc]").
-    { iEval (rewrite Haddr3c). iExact "Hpidproc". }
+              with "Hcg Hpc Hi3c [Hpq]").
+    { iEval (rewrite Haddr3c). iExact "Hpq". }
     iApply wp_next_off_intro.
-    iIntros "Hcg Hpc Hpidproc".
-    iEval (rewrite Haddr3c) in "Hpidproc".
+    iIntros "Hcg Hpc Hpq".
+    iEval (rewrite Haddr3c) in "Hpq".
+    iDestruct ("Hpbk" with "Hpq") as "Hpidproc".
     set (C3c := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg (sign_extend' 64 pidv)]> MP).
     change (<[Regidx (mword_of_int 9 : mword 5) := regval_into_reg (sign_extend' 64 pidv)]> MP) with C3c.
     assert (Hpp3e : add_vec_int (mword_of_int (KernelSyms.holdingsleep + 0x3c) : mword 64) 2 = mword_of_int (KernelSyms.holdingsleep + 0x3e)) by (apply bv_eq; vm_compute; reflexivity).
@@ -722,14 +728,14 @@ Section ProofHoldingsleep.
   (* the untracked instance, which is what every existing caller takes *)
   Lemma wp_holdingsleep_sconf
       (γl γsl : gname) (s : string) (R : iProp Σ)
-      (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (dq : dfrac) (b : bool) (lks : gset string)
-    : wp_holdingsleep_sconf_body γl γsl s R m p pidv av eb dq b lks.
+      (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate)
+    : wp_holdingsleep_sconf_body γl γsl s R m p pidv av eb b lks Vpr.
   Proof.
     cbv beta delta [wp_holdingsleep_sconf_body].
     intros pcE slk ret_tgt Hav Hbelow.
     iIntros "Hcg Hcnt #Htext Hpc #Hslk Hsl Hpidproc Hcont".
     iDestruct "Hsl" as (q) "Hsl".
-    iApply (wp_holdingsleep_gen_sconf γl γsl s R sl_untracked q m p pidv av eb dq b lks
+    iApply (wp_holdingsleep_gen_sconf γl γsl s R sl_untracked q m p pidv av eb b lks Vpr
               Hav Hbelow with "Hcg Hcnt Htext Hpc Hslk Hsl Hpidproc").
     iIntros (CIDf Hsf mf Hcs) "Hcg Hcnt Hpc Hsl Hpidproc".
     iSpecialize ("Hcont" $! CIDf with "[%]"); [ exact Hsf |].

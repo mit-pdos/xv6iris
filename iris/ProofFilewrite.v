@@ -1774,14 +1774,14 @@ Section ProofFilewrite.
     assert (HD1cs : forall r : mword 5, is_cs_idx r = true ->
               D1 !!! Regidx r = B0 !!! Regidx r).
     { intros r Hr. rewrite /D1 upd_ne; [reflexivity | regne]. }
-    iDestruct (proc_priv_core_pid (proc_addr jx) pidv (upd_upt V PI) with "Hpriv")
+    iDestruct (proc_priv_core_bare_acc (proc_addr jx) pidv (upd_upt V PI) with "Hpriv")
       as "[Hppid Hpbk1]".
    iDestruct (cpu_own_transport CID0 CIDa1 0%nat eb (proc_addr jx) b 
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (BeginOp.wp_begin_op_sconf gs jx glp (fwn_bio fn) (fwn_log fn)
               (fwn_fs fn) (fwn_cov fn) (fwn_logstart fn) icfg_dev
               pidv (DfracOwn (1/4)) D1 (K - 12)%nat eb b
-              _ (fw_av_begin_op K HK) Hjp Hgsj
+              _ (upd_upt V PI) (fw_av_begin_op K HK) Hjp Hgsj
               Hbelow
               with "Hcg Hcnt [] [] Htext Hpc Hlog Hppid Hprocs").
     all: try lkbelow.
@@ -1845,7 +1845,7 @@ Section ProofFilewrite.
     iDestruct "Hshr" as "[Hshrk Hshrl]".
     iEval (rewrite fw_bslots3) in "Hbsl".
     iDestruct "Hbsl" as "[Hbsl1 Hbsl2]".
-    iDestruct (proc_priv_core_pid (proc_addr jx) pidv (upd_upt V PI) with "Hpriv")
+    iDestruct (proc_priv_core_bare_acc (proc_addr jx) pidv (upd_upt V PI) with "Hpriv")
       as "[Hppid Hpbk2]".
     iDestruct (cpu_own_transport CIDbo CIDa3 0%nat eb (proc_addr jx) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
@@ -1857,7 +1857,7 @@ Section ProofFilewrite.
               icfg_nib ik (sh / 2)%Qp g (ShotK ty)
               icfg_dev inum
               pidv (DfracOwn (1/4)) (fwn_dqs fn)
-              D3 (K - 12)%nat eb b lks
+              D3 (K - 12)%nat eb b lks (upd_upt V PI)
               (fw_av_ilock K HK) P9 P1 P2 P3 P5 Hjp Hgsj
               ltac:(rewrite HD3a0; exact P8)
               (* ilock's bound is "bcache"(4); fw_loop's own is "log"(3),
@@ -2283,7 +2283,7 @@ Section ProofFilewrite.
     assert (HX2s1 : X2 !!! Regidx Rs1 = (mword_of_int rz : mword 64)).
     { rewrite /X2 upd_ne; [| vm_compute; discriminate].
       rewrite /X1 upd_ne; [exact HX0s1 | vm_compute; discriminate]. }
-    iDestruct (proc_priv_core_pid (proc_addr jx) pidv
+    iDestruct (proc_priv_core_bare_acc (proc_addr jx) pidv
                  (upd_upt (upd_upt V PI) P') with "Hpriv") as "[Hppid Hpbk3]".
     iDestruct (cpu_own_transport CIDwi CIDb4 0%nat eb (proc_addr jx) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
@@ -2293,7 +2293,7 @@ Section ProofFilewrite.
               ik (sh / 2)%Qp g icfg_dev
               inum dn' bm'
               pidv (DfracOwn (1/4)) X2 (K - 12)%nat eb (proc_addr jx) b lks
-              (fw_av_iunlock K HK) P9 ltac:(rewrite HX2a0; exact P8)
+              (upd_upt (upd_upt V PI) P') (fw_av_iunlock K HK) P9 ltac:(rewrite HX2a0; exact P8)
               (* iunlock's bound is "sleep lock"(6); fw_loop's own is
                  "log"(3), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
@@ -2345,7 +2345,7 @@ Section ProofFilewrite.
     { intros r Hr N1. rewrite /X3 upd_ne; [| regne]. exact (Hiucs r Hr N1). }
     assert (HX3s1 : X3 !!! Regidx Rs1 = (mword_of_int rz : mword 64))
       by (rewrite /X3 upd_ne; [exact Hius1 | vm_compute; discriminate]).
-    iDestruct (proc_priv_core_pid (proc_addr jx) pidv
+    iDestruct (proc_priv_core_bare_acc (proc_addr jx) pidv
                  (upd_upt (upd_upt V PI) P') with "Hpriv") as "[Hppid Hpbk4]".
     iDestruct (cpu_own_transport CIDiu CIDb5 0%nat eb (proc_addr jx) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
@@ -2353,7 +2353,7 @@ Section ProofFilewrite.
               (fwn_dlock fn) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn)
               (fwn_bio fn) (fwn_log fn) (fwn_fs fn)
               (fwn_cov fn) (fwn_logstart fn) icfg_dev n'
-              pidv (DfracOwn (1/4)) X3 (K - 12)%nat eb b lks
+              pidv (DfracOwn (1/4)) X3 (K - 12)%nat eb b lks (upd_upt (upd_upt V PI) P')
               (fw_av_end_op K HK) P1 Hjp Hgsj
               Hbelow
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlog Hcrash Hgc

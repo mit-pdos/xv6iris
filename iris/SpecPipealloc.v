@@ -77,6 +77,7 @@ From Kernel Require KernelSyms.
 Require Import IrefSlots.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import ProcDefs.  (* [pprivate], [proc_priv_bare] *)
 Local Open Scope Z_scope.
 
 
@@ -142,7 +143,13 @@ Definition wp_pipealloc_sconf_body
     (γfl γf : gname)                    (* ftable.lock, the file refcount ghost, the fd-slot ghost *)
     (γkl : gname) (γk : gname * gname) (fl : mword 64)   (* kmem.lock, kalloc's ghosts *)
     (m : regfile) (v0 v1 : mword 64) (on : option nat)
-    (n : nat) (eb : bool) (p : mword 64) (K : nat) (b : bool) (lks : gset string) :=
+    (n : nat) (eb : bool) (p : mword 64) (K : nat) (b : bool) (lks : gset string)
+    (* THE RUNNING PROCESS'S BLOCK.  pipealloc touches no process state of its
+       own, but its two error paths call fileclose, which takes the block at
+       the top level on every arm ([SpecFileclose]) because its file-system
+       arm reaches bread's acquiresleep.  A pass-through, like the trap-CSR
+       complement below: in and straight back out. *)
+    (pidv : mword 32) (Vpr : pprivate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.pipealloc in
   (* a0 = f0 (the read end's slot), a1 = f1 (the write end's slot).  They are
      SEPARATE conjuncts below, which is how the spec says the caller must pass
@@ -193,6 +200,7 @@ Definition wp_pipealloc_sconf_body
      their incoming contents are arbitrary *)
   pf0 ↦₈[KT1] v0 -∗
   pf1 ↦₈[KT1] v1 -∗
+  proc_priv_bare p pidv Vpr -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  pipealloc's error paths
      call fileclose, whose crossing is [true] on every arm, so pipealloc can
      return on another hart; the cost is the CALLER's, which must supply its
@@ -206,6 +214,7 @@ Definition wp_pipealloc_sconf_body
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     pipealloc_post γf γk on pf0 pf1 (mr !!! Regidx (mword_of_int 10 : mword 5)) -∗
+    proc_priv_bare p pidv Vpr -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -221,6 +230,7 @@ Module Type PIPEALLOC.
   Parameter wp_pipealloc_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} (γfl γf : gname) (γkl : gname) (γk : gname * gname) (fl : mword 64)
       (m : regfile) (v0 v1 : mword 64) (on : option nat)
-      (n : nat) (eb : bool) (p : mword 64) (K : nat) (b : bool) (lks : gset string),
-      wp_pipealloc_sconf_body γfl γf γkl γk fl m v0 v1 on n eb p K b lks.
+      (n : nat) (eb : bool) (p : mword 64) (K : nat) (b : bool) (lks : gset string)
+      (pidv : mword 32) (Vpr : pprivate),
+      wp_pipealloc_sconf_body γfl γf γkl γk fl m v0 v1 on n eb p K b lks pidv Vpr.
 End PIPEALLOC.

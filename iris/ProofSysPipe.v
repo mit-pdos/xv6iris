@@ -596,35 +596,35 @@ Section ProofSysPipe.
      call, and take it back.  The [us'] the closer quantifies is the bitmap
      set [sp_close2] returns at, so the two closes' effect on the free pool
      rides straight through. *)
+  (* THE LOAN, AT THE BLOCK.  It USED TO splice a quarter of [p->pid] into
+     the fs bundle, because [fileclose_fs_env] carried that cell; the bundle
+     does not carry it any more -- fileclose asks for [proc_priv_bare] at the
+     top level, at the CALLER's pid -- so what sys_pipe lends across the two
+     closes is the block itself, and the two bundle forms coincide.  Both tie
+     premises ([fcn_pid fn = pid], [fcn_dq fn = 1/4]) are gone with it. *)
   Lemma sp_lend_pid (γf : gname) (fn : fclose_names) (us : gset Z) (n : nat)
       (eb : bool) (p : mword 64) (pid : mword 32) (V : pprivate) :
-    fcn_pid fn = pid -> fcn_dq fn = DfracOwn (1/4) ->
     proc_priv γf p pid V -∗ fileclose_fs_env_nopid fn us n eb p -∗
-    fileclose_fs_env fn us n eb p ∗
-    (∀ us' : gset Z, fileclose_fs_env fn us' n eb p -∗
+    proc_priv_bare p pid V ∗ fileclose_fs_env fn us n eb p ∗
+    (∀ us' : gset Z, proc_priv_bare p pid V -∗ fileclose_fs_env fn us' n eb p -∗
        proc_priv γf p pid V ∗ fileclose_fs_env_nopid fn us' n eb p).
   Proof.
-    intros Hpid Hdq. iIntros "Hpriv Hfe".
-    (* the process the bundle is ABOUT is the one running -- the bundle says so
-       itself, in its second pure conjunct *)
-    iAssert (⌜p = proc_addr (fcn_j fn)⌝)%I as %Hpj.
-    { iEval (rewrite /fileclose_fs_env_nopid) in "Hfe".
-      iDestruct "Hfe" as "(_ & %Hp & _)". iPureIntro. exact Hp. }
-    iDestruct (proc_priv_pid with "Hpriv") as "[Hq Hback]".
-    iEval (rewrite Hpj -Hdq -Hpid) in "Hq".
-    iSplitL "Hfe Hq".
-    { rewrite /fileclose_fs_env. iFrame "Hfe Hq". }
-    iIntros (us') "Hfe'".
-    rewrite /fileclose_fs_env. iDestruct "Hfe'" as "[Hfe' Hq]".
-    iEval (rewrite -Hpj Hdq Hpid) in "Hq".
-    iDestruct ("Hback" with "Hq") as "$". iExact "Hfe'".
+    iIntros "Hpriv Hfe".
+    iDestruct (proc_priv_bare_acc with "Hpriv") as "[Hb Hback]".
+    iSplitL "Hb"; [iExact "Hb"|].
+    rewrite -fileclose_fs_env_nopid_eq.
+    iSplitL "Hfe"; [iExact "Hfe"|].
+    iIntros (us') "Hb Hfe'".
+    iDestruct ("Hback" with "Hb") as "$".
+    rewrite fileclose_fs_env_nopid_eq. iExact "Hfe'".
   Qed.
 
   Lemma sp_close2 `{CID0 : CpuId}  (γfl γf : gname)
       (fn : fclose_names) (on : option nat) (us : gset Z)
       (Mt : regfile) (nav : nat) (eb : bool) (p : mword 64)
       (sp0 : mword 64) (k0 k1 : nat) (q0 q1 : Qp) (Cf0 Cf1 : fcontent)
-      (za zb zc zd ze zf : Z) (imm1 imm2 : mword 21) (b : bool) (lks : gset string) :
+      (za zb zc zd ze zf : Z) (imm1 imm2 : mword 21) (b : bool) (lks : gset string)
+      (pidv : mword 32) (Vpr : pprivate) :
     (fileclose_stack <= nav)%nat ->
     Mt !!! Regidx Rs0 = sp0 ->
     (* the pc successors and the two relocated call targets *)
@@ -668,6 +668,10 @@ Section ProofSysPipe.
        out, is at an existential [on'] *)
     fileclose_pipe_env fn on 0%nat -∗
     fileclose_fs_env fn us 0%nat eb p -∗
+    (* THE PROCESS BLOCK, THREADED THROUGH BOTH CLOSES.  fileclose takes it at
+       the top level on every arm and gives it back, keyed on the CALLER's own
+       pid; it reaches bread's acquiresleep on the fs arm. *)
+    proc_priv_bare p pidv Vpr -∗
     (* the crossing is the literal [true]: both closes cross at [true]. *)
     wp_next true p (fun (CID : CpuId) =>
       ∀ Mr : regfile,
@@ -683,12 +687,13 @@ Section ProofSysPipe.
         fd_slot -∗ fd_slot -∗
         (∃ on', fileclose_pipe_env fn on' 0%nat) -∗
         (∃ us', fileclose_fs_env fn us' 0%nat eb p) -∗
+        proc_priv_bare p pidv Vpr -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hnav Hs0 Hr1 Hr2 Hs04 Hs812 Hs1618 Ht1 Ht2 Hbelow.
     iIntros "Hcg Hcpu Hextc Hextm #Htext #Hkd Hpc #Hftab #Hpe Hi0 Hi4 Hi8 Hic Hi10
-              Hc6 Hc7 Href0 Href1 Hpenv Hfenv Hcont".
+              Hc6 Hc7 Href0 Href1 Hpenv Hfenv Hpbare Hcont".
     (* depth 0 forces the held set empty, so every [locks_below] the callees
        raise is [locks_below ∅ _], which [lkbelow] closes outright. *)
     iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlkempty Hcpu]".
@@ -728,11 +733,11 @@ Section ProofSysPipe.
                  ltac:(rewrite Hb; wp_next_chain) with "Hextm") as "Hextm".
     iDestruct (fileclose_env_frame fn on us 0%nat eb p Cf0 with "Hpenv Hfenv")
       as "[Hfcenv0 Hfcback0]".
-    iApply (Fileclose.wp_fileclose_sconf γfl γf k0 q0 Cf0 fn on us D2 0%nat eb p nav b lks
+    iApply (Fileclose.wp_fileclose_sconf γfl γf k0 q0 Cf0 fn on us D2 0%nat eb p nav b lks pidv Vpr
               Hnav sp_noff0 HD2a0 Hbelow
-              with "Hcg Hcpu Hextc Hextm Htext Hkd Hpc Hftab Hpe Href0 Hfcenv0").
+              with "Hcg Hcpu Hextc Hextm Htext Hkd Hpc Hftab Hpe Href0 Hpbare Hfcenv0").
     all: try lkbelow.
-    iIntros (CID7 Hcr7 E1) "Hcg Hcpu Hextc Hextm Hpc %HcsE1 Hunit0 Hout0".
+    iIntros (CID7 Hcr7 E1) "Hcg Hcpu Hextc Hextm Hpc %HcsE1 Hunit0 Hout0 Hpbare".
     iDestruct ("Hfcback0" with "Hout0") as "[Hpenv Hfenv]".
     iDestruct "Hpenv" as (on1) "Hpenv".
     iDestruct "Hfenv" as (us1) "Hfenv".
@@ -779,11 +784,11 @@ Section ProofSysPipe.
                  ltac:(rewrite Hb; wp_next_chain) with "Hextm") as "Hextm".
     iDestruct (fileclose_env_frame fn on1 us1 0%nat eb p Cf1 with "Hpenv Hfenv")
       as "[Hfcenv1 Hfcback1]".
-    iApply (Fileclose.wp_fileclose_sconf γfl γf k1 q1 Cf1 fn on1 us1 F2 0%nat eb p nav b lks
+    iApply (Fileclose.wp_fileclose_sconf γfl γf k1 q1 Cf1 fn on1 us1 F2 0%nat eb p nav b lks pidv Vpr
               Hnav sp_noff0 HF2a0 Hbelow
-              with "Hcg Hcpu Hextc Hextm Htext Hkd Hpc Hftab Hpe Href1 Hfcenv1").
+              with "Hcg Hcpu Hextc Hextm Htext Hkd Hpc Hftab Hpe Href1 Hpbare Hfcenv1").
     all: try lkbelow.
-    iIntros (CID10 Hcr10 G1) "Hcg Hcpu Hextc Hextm Hpc %HcsG1 Hunit1 Hout1".
+    iIntros (CID10 Hcr10 G1) "Hcg Hcpu Hextc Hextm Hpc %HcsG1 Hunit1 Hout1 Hpbare".
     iDestruct ("Hfcback1" with "Hout1") as "[Hpenv Hfenv]".
     assert (HpcG1 : ret_pc (F2 !!! Regidx Rra) = mword_of_int ze)
       by (rewrite HF2ra; exact Hr2).
@@ -806,7 +811,7 @@ Section ProofSysPipe.
     iDestruct (cpu_claim_ext_transport CID10 CID11 eb p
                  ltac:(rewrite Hb; wp_next_chain) with "Hextm") as "Hextm".
     iSpecialize ("Hcont" $! CID11 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! G2 with "[%] Hcg Hcpu Hextc Hextm Hpc Hc6 Hc7 Hunit0 Hunit1 Hpenv Hfenv").
+    iApply ("Hcont" $! G2 with "[%] Hcg Hcpu Hextc Hextm Hpc Hc6 Hc7 Hunit0 Hunit1 Hpenv Hfenv Hpbare").
     split; [| rewrite /G2; apply upd_eq].
     intros c Hc.
     rewrite /G2 upd_ne; [| regne].
@@ -1443,12 +1448,17 @@ Section ProofSysPipe.
                  ltac:(rewrite Hb; wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID CID33 eb p
                  ltac:(rewrite Hb; wp_next_chain) with "Hextm") as "Hextm".
+    (* pipealloc passes the process block straight through to the fileclose
+       calls on its error paths, so it is lent here and taken straight back. *)
+    iDestruct (proc_priv_bare_acc with "Hpriv") as "[Hpbare Hpvback]".
     iApply (Pipealloc.wp_pipealloc_sconf γfl γf γa γk
               (mword_of_int (KernelSyms.kmem + 24)) Q3 u6 u7 None 0%nat eb p (av - 8)%nat b lks
+              pid V
               Hav24 eq_refl sp_noff0
-              with "Hcg Hcpu Hextc Hextm Htext Hdata Hpc Hftab Hkmem Hkav Hpe Hua Hub Hb6 Hb7").
+              with "Hcg Hcpu Hextc Hextm Htext Hdata Hpc Hftab Hkmem Hkav Hpe Hua Hub Hb6 Hb7 Hpbare").
     all: try lkbelow.
-    iIntros (CID34 Hcr34 W0) "Hcg Hcpu Hextc Hextm Hpc %HcsW0 Hpost".
+    iIntros (CID34 Hcr34 W0) "Hcg Hcpu Hextc Hextm Hpc %HcsW0 Hpost Hpbare".
+    iDestruct ("Hpvback" with "Hpbare") as "Hpriv".
     assert (Hpc26 : ret_pc (Q3 !!! Regidx Rra) = mword_of_int (KernelSyms.sys_pipe + 0x26))
       by (rewrite HQ3ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc26) in "Hpc".
@@ -1715,19 +1725,19 @@ Section ProofSysPipe.
                    ltac:(rewrite Hb; wp_next_chain) with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CID34 CID43 eb p
                    ltac:(rewrite Hb; wp_next_chain) with "Hextm") as "Hextm".
-      (* the pid quarter, out of this function's own half, for the span of
-         the two closes -- see [sp_lend_pid] *)
-      iDestruct (sp_lend_pid γf fn us 0%nat eb p pid _ Hfpid Hfdq
-                   with "Hpriv Hfenv") as "[Hfefull Hpback]".
+      (* the process BLOCK, lent for the span of the two closes -- see
+         [sp_lend_pid] *)
+      iDestruct (sp_lend_pid γf fn us 0%nat eb p pid _
+                   with "Hpriv Hfenv") as "(Hpbare & Hfefull & Hpback)".
       iApply (sp_close2 (CID0 := CID43)  γfl γf fn on us Y0 (av - 8)%nat eb p sp0 k0 k1 1%Qp 1%Qp Cf0 Cf1
                 (KernelSyms.sys_pipe + 0xc8) (KernelSyms.sys_pipe + 0xcc) (KernelSyms.sys_pipe + 0xd0) (KernelSyms.sys_pipe + 0xd4) (KernelSyms.sys_pipe + 0xd8) (KernelSyms.sys_pipe + 0xda)
-                (mword_of_int 2091976 : mword 21) (mword_of_int 2091968 : mword 21) b lks
+                (mword_of_int 2091976 : mword 21) (mword_of_int 2091968 : mword 21) b lks pid _
                 Havfc HY0s0 Hcc4a Hcc4b Hcc4c Hcc4d Hcc4e Hcc4f Hcc4g Hbelow
-                with "Hcg Hcpu Hextc Hextm Htext Hdata Hpc Hftab Hpe Hic8 Hicc Hid0 Hid4 Hid8 Hb6 Hb7 Href0 Href1 Hpenv Hfefull").
-      iIntros (CID44 Hcr44 Mr) "[%Hmrcs %Hmra5] Hcg Hcpu Hextc Hextm Hpc Hb6 Hb7 Hua Hub Hpenv Hfenv".
-      (* the quarter, back out of the bundle and into [proc_priv] *)
+                with "Hcg Hcpu Hextc Hextm Htext Hdata Hpc Hftab Hpe Hic8 Hicc Hid0 Hid4 Hid8 Hb6 Hb7 Href0 Href1 Hpenv Hfefull Hpbare").
+      iIntros (CID44 Hcr44 Mr) "[%Hmrcs %Hmra5] Hcg Hcpu Hextc Hextm Hpc Hb6 Hb7 Hua Hub Hpenv Hfenv Hpbare".
+      (* the block, back into [proc_priv] *)
       iDestruct "Hfenv" as (usb) "Hfeb".
-      iDestruct ("Hpback" $! usb with "Hfeb") as "[Hpriv Hfeb]".
+      iDestruct ("Hpback" $! usb with "Hpbare Hfeb") as "[Hpriv Hfeb]".
       iAssert (∃ us' : gset Z, fileclose_fs_env_nopid fn us' 0%nat eb p)%I
         with "[Hfeb]" as "Hfenv"; [iExists usb; iExact "Hfeb" |].
       iSpecialize ("Hepi" $! CID44 with "[%]"); [wp_next_chain|].
@@ -1947,19 +1957,19 @@ Section ProofSysPipe.
                    ltac:(rewrite Hb; wp_next_chain) with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CID34 CID53 eb p
                    ltac:(rewrite Hb; wp_next_chain) with "Hextm") as "Hextm".
-      (* the pid quarter, out of this function's own half, for the span of
-         the two closes -- see [sp_lend_pid] *)
-      iDestruct (sp_lend_pid γf fn us 0%nat eb p pid _ Hfpid Hfdq
-                   with "Hpriv Hfenv") as "[Hfefull Hpback]".
+      (* the process BLOCK, lent for the span of the two closes -- see
+         [sp_lend_pid] *)
+      iDestruct (sp_lend_pid γf fn us 0%nat eb p pid _
+                   with "Hpriv Hfenv") as "(Hpbare & Hfefull & Hpback)".
       iApply (sp_close2 (CID0 := CID53)  γfl γf fn on us F2 (av - 8)%nat eb p sp0 k0' k1 q0' 1%Qp C0' Cf1
                 (KernelSyms.sys_pipe + 0xc8) (KernelSyms.sys_pipe + 0xcc) (KernelSyms.sys_pipe + 0xd0) (KernelSyms.sys_pipe + 0xd4) (KernelSyms.sys_pipe + 0xd8) (KernelSyms.sys_pipe + 0xda)
-                (mword_of_int 2091976 : mword 21) (mword_of_int 2091968 : mword 21) b lks
+                (mword_of_int 2091976 : mword 21) (mword_of_int 2091968 : mword 21) b lks pid _
                 Havfc HF2s0 Hcc4a Hcc4b Hcc4c Hcc4d Hcc4e Hcc4f Hcc4g Hbelow
-                with "Hcg Hcpu Hextc Hextm Htext Hdata Hpc Hftab Hpe Hic8 Hicc Hid0 Hid4 Hid8 Hb6 Hb7 Href0 Href1 Hpenv Hfefull").
-      iIntros (CID54 Hcr54 Mr) "[%Hmrcs %Hmra5] Hcg Hcpu Hextc Hextm Hpc Hb6 Hb7 Hua Hub Hpenv Hfenv".
-      (* the quarter, back out of the bundle and into [proc_priv] *)
+                with "Hcg Hcpu Hextc Hextm Htext Hdata Hpc Hftab Hpe Hic8 Hicc Hid0 Hid4 Hid8 Hb6 Hb7 Href0 Href1 Hpenv Hfefull Hpbare").
+      iIntros (CID54 Hcr54 Mr) "[%Hmrcs %Hmra5] Hcg Hcpu Hextc Hextm Hpc Hb6 Hb7 Hua Hub Hpenv Hfenv Hpbare".
+      (* the block, back into [proc_priv] *)
       iDestruct "Hfenv" as (usb) "Hfeb".
-      iDestruct ("Hpback" $! usb with "Hfeb") as "[Hpriv Hfeb]".
+      iDestruct ("Hpback" $! usb with "Hpbare Hfeb") as "[Hpriv Hfeb]".
       iAssert (∃ us' : gset Z, fileclose_fs_env_nopid fn us' 0%nat eb p)%I
         with "[Hfeb]" as "Hfenv"; [iExists usb; iExact "Hfeb" |].
       iSpecialize ("Hepi" $! CID54 with "[%]"); [wp_next_chain|].
@@ -2455,17 +2465,17 @@ Section ProofSysPipe.
                    ltac:(rewrite Hb; wp_next_chain) with "Hextm") as "Hextm".
       iDestruct "Hpenv" as (on2) "Hpenv".
       iDestruct "Hfenv" as (us2) "Hfenv".
-            iDestruct (sp_lend_pid γf fn us2 0%nat eb p pid _ Hfpid Hfdq
-                   with "Hpriv Hfenv") as "[Hfefull Hpback]".
+            iDestruct (sp_lend_pid γf fn us2 0%nat eb p pid _
+                   with "Hpriv Hfenv") as "(Hpbare & Hfefull & Hpback)".
       iApply (sp_close2 (CID0 := CID65)  γfl γf fn on2 us2 E4 (av - 8)%nat eb p sp0 k0' k1' q0' q1' C0' C1'
                 (KernelSyms.sys_pipe + 0xa0) (KernelSyms.sys_pipe + 0xa4) (KernelSyms.sys_pipe + 0xa8) (KernelSyms.sys_pipe + 0xac) (KernelSyms.sys_pipe + 0xb0) (KernelSyms.sys_pipe + 0xb2)
-                (mword_of_int 2092016 : mword 21) (mword_of_int 2092008 : mword 21) b lks
+                (mword_of_int 2092016 : mword 21) (mword_of_int 2092008 : mword 21) b lks pid _
                 Havfc HE4s0 Hc9ca Hc9cb Hc9cc Hc9cd Hc9ce Hc9cf Hc9cg Hbelow
-                with "Hcg Hcpu Hextc Hextm Htext Hdata Hpc Hftab Hpe Hia0 Hia4 Hia8 Hiac Hib0 Hb6 Hb7 Hrf0 Hrf1 Hpenv Hfefull").
-      iIntros (CID66 Hcr66 Mr) "[%Hmrcs %Hmra5] Hcg Hcpu Hextc Hextm Hpc Hb6 Hb7 Hua Hub Hpenv Hfenv".
-      (* the quarter, back out of the bundle and into [proc_priv] *)
+                with "Hcg Hcpu Hextc Hextm Htext Hdata Hpc Hftab Hpe Hia0 Hia4 Hia8 Hiac Hib0 Hb6 Hb7 Hrf0 Hrf1 Hpenv Hfefull Hpbare").
+      iIntros (CID66 Hcr66 Mr) "[%Hmrcs %Hmra5] Hcg Hcpu Hextc Hextm Hpc Hb6 Hb7 Hua Hub Hpenv Hfenv Hpbare".
+      (* the block, back into [proc_priv] *)
       iDestruct "Hfenv" as (usb) "Hfeb".
-      iDestruct ("Hpback" $! usb with "Hfeb") as "[Hpriv Hfeb]".
+      iDestruct ("Hpback" $! usb with "Hpbare Hfeb") as "[Hpriv Hfeb]".
       iAssert (∃ us' : gset Z, fileclose_fs_env_nopid fn us' 0%nat eb p)%I
         with "[Hfeb]" as "Hfenv"; [iExists usb; iExact "Hfeb" |].
       (* +0xb2 c.j +0x28 -- into the shared epilogue *)

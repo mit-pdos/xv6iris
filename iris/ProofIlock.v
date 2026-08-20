@@ -110,6 +110,7 @@ Require Import ByteBuf.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Import SchedCtx.
+Require Import ProcDefs.  (* [proc_priv_bare] *)
 Require Import SleepLock.
 Require Import WpUart.
 Require Import BufOwn BcacheInv BioInv.
@@ -374,7 +375,7 @@ Section IlockDefs.
       (cov : gset Z) (logstart : Z) (inodestart : Z)
       (k : nat) (ip : mword 64) (dev inum : mword 32)
       (pidv : mword 32) (dq dqs : dfrac) (j : nat)
-      (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) : iProp Σ :=
+      (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate) : iProp Σ :=
     (* THE LITERAL [true], matching SpecIlock's crossing: ilock PARKS (its
        acquiresleep sleeps), so its continuation is about an arbitrary hart
        whatever SIE was doing.  Spelled [b] this was sound only because the
@@ -387,7 +388,7 @@ Section IlockDefs.
         trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb (proc_addr j) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-        p_pid (proc_addr j) ↦₄{dq} pidv -∗
+        proc_priv_bare (proc_addr j) pidv Vpr -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
         bslot bn -∗
         sleeplocked_q gisl s (i_lock ip) pidv -∗
@@ -429,7 +430,7 @@ Section IlockEpilogue.
       (k : nat) (ip : mword 64) (dev inum : mword 32)
       (dn : dinode) (bm : blkmap) (filled : bool)
       (pidv : mword 32) (dq dqs : dfrac)
-      (m M : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) :
+      (m M : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate) :
     (K_ilock <= K)%nat ->
     il_sp m M ->
     il_thr5 m M ->
@@ -442,7 +443,7 @@ Section IlockEpilogue.
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.ilock + 0x1e) : mword 64) -∗
     il_frame m -∗
-    p_pid (proc_addr j) ↦₄{dq} pidv -∗
+    proc_priv_bare (proc_addr j) pidv Vpr -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bslot bn -∗
     sleeplocked_q gisl s (i_lock ip) pidv -∗
@@ -455,7 +456,7 @@ Section IlockEpilogue.
     ifreeze_off (bv_unsigned inum) -∗
     ireg_wd_back o g (bv_unsigned inum) -∗
     il_cont (CID0 := CID0)  gfs gi gisl bn cn s g o cov logstart inodestart k ip
-            dev inum pidv dq dqs j m K eb b lks -∗
+            dev inum pidv dq dqs j m K eb b lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hsp Hthr Hfr Hpost.
@@ -716,7 +717,7 @@ Section IlockLoad.
       (dev : mword 32)
       (k : nat) (ip : mword 64) (inum : mword 32)
       (pidv : mword 32) (dq dqs : dfrac)
-      (m M : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) :
+      (m M : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate) :
     (K_ilock <= K)%nat ->
     (* [ShotK] never gets here: its one-shot refutes this whole arm at the
        caller, five hundred lines up (RULING C'). *)
@@ -750,7 +751,7 @@ Section IlockLoad.
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
     il_frame m -∗
-    p_pid (proc_addr j) ↦₄{dq} pidv -∗
+    proc_priv_bare (proc_addr j) pidv Vpr -∗
     i_dev ip ↦₄{DfracOwn (1/2)} dev -∗
     i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -782,7 +783,7 @@ Section IlockLoad.
        comes back.  See [SpecIlock]'s header. *)
     ireg_wd_lic o g (bv_unsigned inum) -∗
     il_cont (CID0 := CID0)  gfs gi gisl bn cn s g o cov logstart inodestart k ip
-            dev inum pidv dq dqs j m K eb b lks -∗
+            dev inum pidv dq dqs j m K eb b lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hfills Hsp Hthr HMs1 Hip Hk Hgeom Hst Hcov Hinlt Hj Hgl Hbelow.
@@ -1038,7 +1039,7 @@ Section IlockLoad.
     iApply (BR.wp_bread_sconf gs j gl gu gd gk pd pav pu bn
               (fs_view gfs gd dev cov) pidv dev bno dq
               L7 (K - 4)%nat eb b
-              _ HKbr Hbnolt eq_refl Hbnocov eq_refl Hj Hgl HL7a0 HL7a1
+              _ Vpr HKbr Hbnolt eq_refl Hbnocov eq_refl Hj Hgl HL7a0 HL7a1
               Hbelow
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hsl").
@@ -1845,7 +1846,7 @@ Section IlockLoad.
     iApply (BL.wp_brelse_sconf gs bn (fs_view gfs gd dev cov) kk
               pidv dev bno dq H1 (K - 4)%nat eb (proc_addr j)
               (diblk_bytes ds) bsd0 d0b b
-              _ HKbl Hkk HH1a0
+              _ Vpr HKbl Hkk HH1a0
               Hbelow
               with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hheld").
     all: try lkbelow.
@@ -2073,7 +2074,7 @@ Section IlockLoad.
                  ltac:(rewrite Heb2b; wp_next_chain) with "Hextm") as "Hextm".
     iEval (rewrite -valid_word_true) in "Hvalid".
     iApply (il_epilogue (CID0 := CID39)  j gfs gi gisl bn cn s g o cov logstart inodestart
-              k ip dev inum dn bm fl pidv dq dqs m Z0 K eb b lks
+              k ip dev inum dn bm fl pidv dq dqs m Z0 K eb b lks Vpr
               HK HZ0sp HZ0thr Hfr Hpost
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hframe Hppid Hsb Hsl Hstok
                     Hdep Hidev Hinumc Hvalid
@@ -2119,10 +2120,10 @@ Section ProofIlockMain.
       (k : nat) (s : Qp) (g : gname) (o : ilkc) (dev inum : mword 32)
       (pidv : mword 32) (dq dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string)
+      (b : bool) (lks : gset string) (Vpr : pprivate)
     : wp_ilock_sconf_body gs j gl gu gd gk pd pav pu bn gfs gi cn gil gisl
                           cov logstart inodestart nib k s g o dev inum
-                          pidv dq dqs m K eb b lks.
+                          pidv dq dqs m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_ilock_sconf_body].
     intros pcE ip pj ret_tgt HK Hk Hgeom Hst Hcov Hinlt Hj Hgl Ha0 Hbelow.
@@ -2135,7 +2136,7 @@ Section ProofIlockMain.
     (* LEVEL 0 TIES THE TWO INDICES, as in [il_epilogue]/[il_load]. *)
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Heb2b. cbn in Heb2b.
     iAssert (il_cont (CID0 := CID)  gfs gi gisl bn cn s g o cov logstart inodestart k ip
-               dev inum pidv dq dqs j m K eb b lks)%I
+               dev inum pidv dq dqs j m K eb b lks Vpr)%I
       with "[Hcont]" as "Hcont"; [rewrite /il_cont; iExact "Hcont" |].
     iPoseProof (ili_00 with "Htext") as "Hi00".
     iPoseProof (ili_02 with "Htext") as "Hi02".
@@ -2386,8 +2387,8 @@ Section ProofIlockMain.
     (* acquiresleep is index-generic now and takes the trap-CSR complement
        as a genuine pass-through: ilock's own (untouched since entry) is
        exactly what its wait loop's interior [sleep] needs. *)
-    iApply (ASL.wp_acquiresleep_gen_sconf (dq := dq) gs j gil gisl "inode"%string
-              (ic_tok cn k) (slh_tok (icfg_isl k)) s R6 pidv (K - 4)%nat eb b lks
+    iApply (ASL.wp_acquiresleep_gen_sconf gs j gil gisl "inode"%string
+              (ic_tok cn k) (slh_tok (icfg_isl k)) s R6 pidv Vpr (K - 4)%nat eb b lks
               Hj ltac:(lia)
               (* acquiresleep's bound is "sleep lock"(6); ilock's own is
                  "bcache"(4), and [locks_below_mono] weakens it. *)
@@ -2536,7 +2537,7 @@ Section ProofIlockMain.
          some earlier fill and its record is whatever that fill read, so
          [fresh_shape] is not available and not claimed. *)
       iApply (il_epilogue (CID0 := CID13)  j gfs gi gisl bn cn s g o cov logstart
-                inodestart k ip dev inum dnp bmp false pidv dq dqs m Q1 K eb b lks
+                inodestart k ip dev inum dnp bmp false pidv dq dqs m Q1 K eb b lks Vpr
                 HK HQ1sp HQ1thr ltac:(discriminate) Hpost
                 with "Hcg Hcnt Hextc Hextm Htext Hpc Hframe Hppid Hsb Hsl Hstok
                       Hdep Hidev Hinumc Hvalid Hlk Hshot Hfoff Hwb Hcont").
@@ -2597,7 +2598,7 @@ Section ProofIlockMain.
                    with "Hcont") as "Hcont".
       iApply (il_load (CID0 := CID13)  gs j gl gu gd gk pd pav pu bn gfs gi gisl
                 cn s g o cov logstart inodestart nib dev k ip inum
-                pidv dq dqs m Q1 K eb b lks
+                pidv dq dqs m Q1 K eb b lks Vpr
                 HK Hfills HQ1sp HQ1thr HQ1s1 Hipe Hk Hgeom Hst Hcov Hinlt Hj Hgl
                 Hbelow
                 with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hireg Hprocs Hdevi Hdgeom

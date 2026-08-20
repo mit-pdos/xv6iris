@@ -129,8 +129,8 @@ Definition upd_tf (V : pprivate) (ws : list (mword 64)) : pprivate :=
 Definition upd_upt (V : pprivate) (P : uptd) : pprivate :=
   MkPPriv (pv_sz V) P (pv_tf V) (pv_ofile V) (pv_cwd V) (pv_name V).
 
-Definition upd_cwd (V : pprivate) (v : mword 64) : pprivate :=
-  MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) v (pv_name V).
+(* [upd_cwd] and [upd_cwd_id] live in [ProcDefs], next to [pprivate]
+   itself and to [proc_priv_bare_cwd], the borrow that needs them. *)
 
 (* a process GAINS its address space: the descriptor and the trapframe words
    move, the scalar fields stay.  allocproc's move, once kalloc has produced
@@ -894,6 +894,34 @@ Section ProcInv.
      tf_page (ud_tfp (pv_upt V)) (pv_tf V) ∗
      cwd_ref (pv_cwd V))%I.
 
+  (* ...AND ITS FILE-LAYER-FREE PART, WHICH IS WHAT THE BLOCK LAYER TAKES.
+     [ProcDefs.proc_priv_bare] is this minus [cwd_ref]; the note at its
+     definition says why the sleeplock/buffer-cache chain must not be handed
+     anything that mentions an inode reference.  An [⊣⊢], so a caller splits
+     and rejoins with a rewrite -- no borrow and no closer to carry. *)
+  Lemma proc_priv_core_bare (pa : mword 64) (pid : mword 32) (V : pprivate) :
+    proc_priv_core pa pid V ⊣⊢ proc_priv_bare pa pid V ∗ cwd_ref (pv_cwd V).
+  Proof.
+    rewrite /proc_priv_core /proc_priv_bare. iSplit.
+    - iIntros "(%A & %B & Hpid & Hf & Hpt & Htfp & Hc)".
+      iFrame "Hc Hpid Hf Hpt Htfp". iSplitR; [done|]. done.
+    - iIntros "[(%A & %B & Hpid & Hf & Hpt & Htfp) Hc]".
+      iFrame "Hpid Hf Hpt Htfp Hc". iSplitR; [done|]. done.
+  Qed.
+
+  (* THE BORROW FORM.  Every fs callee below the file layer -- bread, bmap,
+     ilock, begin_op, ... -- asks for [proc_priv_bare], never for a fraction
+     of [p->pid]; a caller holding the full block lends the bare part for the
+     length of the call and takes it back.  Only [cwd_ref] stays behind, and
+     nothing under the file layer wants it. *)
+  Lemma proc_priv_core_bare_acc (pa : mword 64) (pid : mword 32) (V : pprivate) :
+    proc_priv_core pa pid V -∗
+    proc_priv_bare pa pid V ∗ (proc_priv_bare pa pid V -∗ proc_priv_core pa pid V).
+  Proof.
+    rewrite proc_priv_core_bare. iIntros "[Hb Hc]".
+    iSplitL "Hb"; [iExact "Hb"|]. iIntros "Hb". iFrame.
+  Qed.
+
   Definition proc_priv (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivate) : iProp Σ :=
     (proc_priv_core pa pid V ∗ proc_ofiles γf pa (pv_ofile V))%I.
 
@@ -932,6 +960,34 @@ Section ProcInv.
       iSplitR "Ho"; [|iExact "Ho"].
       iSplitR; [done|]. iSplitR; [done|]. iFrame.
   Qed.
+
+  (* ...and the same borrow one layer up, for a caller holding the WHOLE
+     block.  [proc_ofiles] and [cwd_ref] stay behind; nothing under the file
+     layer wants either. *)
+  Lemma proc_priv_bare_acc (γf : gname) (pa : mword 64) (pid : mword 32)
+      (V : pprivate) :
+    proc_priv γf pa pid V -∗
+    proc_priv_bare pa pid V ∗ (proc_priv_bare pa pid V -∗ proc_priv γf pa pid V).
+  Proof.
+    rewrite /proc_priv proc_priv_core_bare. iIntros "[[Hb Hc] Ho]".
+    iSplitL "Hb"; [iExact "Hb"|]. iIntros "Hb". iFrame.
+  Qed.
+
+  (* THE cwd-DEFICIT BLOCK IS THE BARE BLOCK PLUS THE FD TABLE.  Both sides
+     spell the same six conjuncts in the same order, so this is a regrouping
+     and not a transfer. *)
+  Lemma proc_priv_nocwd_bare (γf : gname) (pa : mword 64) (pid : mword 32)
+      (V : pprivate) :
+    proc_priv_nocwd γf pa pid V ⊣⊢
+    proc_priv_bare pa pid V ∗ proc_ofiles γf pa (pv_ofile V).
+  Proof.
+    rewrite /proc_priv_nocwd /proc_priv_bare. iSplit.
+    - iIntros "(%A & %B & Hpid & Hf & Hpt & Htfp & Ho)".
+      iFrame "Ho Hpid Hf Hpt Htfp". iSplitR; [done|]. done.
+    - iIntros "[(%A & %B & Hpid & Hf & Hpt & Htfp) Ho]".
+      iFrame "Hpid Hf Hpt Htfp Ho". iSplitR; [done|]. done.
+  Qed.
+
 
   (* ---- THE ADDRESS-SPACE SPLIT --------------------------------------
      THE BLOCK MINUS THE PAGE TABLE.  Split out for the reason the fd
@@ -1306,6 +1362,29 @@ Section ProcInv.
      be re-supplied).  Each of [proc_priv_cwd] and
      [proc_priv_pid] consumes the whole block, so they do not nest; this is
      their conjunction, proved once.  sys_chdir wants the same pair. *)
+  (* THE BLOCK AND THE cwd REFERENCE, TOGETHER.  This is what a syscall that
+     walks a path holds across the walk: namei/nameiparent/namex want
+     [proc_priv_bare] (they read [p->cwd] out of it) and [inode_held] on the
+     directory it names, which is what [cwd_ref] converts to.  [proc_ofiles]
+     is what stays behind.
+
+     Compare [proc_priv_cwd_pid] just below, which is the same move for a
+     caller that wanted the cwd CELL and a quarter of [p->pid] as loose rows.
+     Nothing wants either any more: the cell is in the block and the walk
+     borrows it for its one load. *)
+  Lemma proc_priv_bare_cref (γf : gname) (pa : mword 64) (pid : mword 32)
+      (V : pprivate) :
+    proc_priv γf pa pid V -∗
+    proc_priv_bare pa pid V ∗ cwd_ref (pv_cwd V) ∗
+    (proc_priv_bare pa pid V -∗ cwd_ref (pv_cwd V) -∗ proc_priv γf pa pid V).
+  Proof.
+    (* one [rewrite] does both occurrences -- the hypothesis AND the one
+       under the wand -- so the give-back needs no second one. *)
+    rewrite /proc_priv proc_priv_core_bare. iIntros "[[Hb Hc] Ho]".
+    iSplitL "Hb"; [iExact "Hb"|]. iSplitL "Hc"; [iExact "Hc"|].
+    iIntros "Hb Hc". iFrame.
+  Qed.
+
   Lemma proc_priv_cwd_pid (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivate) :
     proc_priv γf pa pid V -∗
     p_cwd pa ↦₈ pv_cwd V ∗ cwd_ref (pv_cwd V) ∗
@@ -1774,6 +1853,33 @@ Section ProcInv.
       iSplitR; [iPureIntro; exact Hbel|].
       rewrite Hq word4_pointsto_frac_split.
       iFrame "Hq1 Hq2 Hf Hpt Htfp Hc". }
+    iFrame "Ho". iPureIntro. rewrite length_insert. exact Hlen.
+  Qed.
+
+  (* THE SAME PAIRING, AT THE BLOCK.  A closer of one of its own descriptors
+     -- sys_close, kexit, sys_pipe on its rollback arm -- hands fileclose the
+     descriptor AND the process block, because fileclose reaches bread and
+     acquiresleep, which take [proc_priv_bare] now rather than a quarter of
+     [p->pid].  [cwd_ref] is what stays behind, and no closer needs it. *)
+  Lemma proc_priv_bare_ofile (γf : gname) (pa : mword 64) (pid : mword 32)
+      (V : pprivate) (fd : nat) (v : mword 64) :
+    pv_ofile V !! fd = Some v ->
+    proc_priv γf pa pid V -∗
+    proc_priv_bare pa pid V ∗ ofile_slot γf pa fd v ∗
+    (∀ v', proc_priv_bare pa pid V -∗ ofile_slot γf pa fd v' -∗
+           proc_priv γf pa pid (upd_ofile V fd v')).
+  Proof.
+    iIntros (Hfd) "[Hcore [%Hlen Ho]]".
+    rewrite proc_priv_core_bare. iDestruct "Hcore" as "[Hb Hc]".
+    iFrame "Hb".
+    iDestruct (big_sepL_insert_acc with "Ho") as "[$ Hback]"; first exact Hfd.
+    iIntros (v') "Hb Hslot". iDestruct ("Hback" $! v' with "Hslot") as "Ho".
+    rewrite /proc_priv /proc_ofiles.
+    cbn [upd_ofile pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+    iSplitR "Ho".
+    { rewrite proc_priv_core_bare /proc_priv_bare.
+      cbn [upd_ofile pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+      iFrame "Hb Hc". }
     iFrame "Ho". iPureIntro. rewrite length_insert. exact Hlen.
   Qed.
 

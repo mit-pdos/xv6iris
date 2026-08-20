@@ -24,6 +24,15 @@ Record pprivate := MkPPriv {
   pv_name  : list (bv 8);
 }.
 
+Definition upd_cwd (V : pprivate) (v : mword 64) : pprivate :=
+  MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) v (pv_name V).
+
+(* re-storing what was already there is the identity, which is what a BORROW
+   of the cell out of a block needs in order to close: a load leaves [p->cwd]
+   alone, so the block comes back at the same [V] it left at. *)
+Lemma upd_cwd_id (V : pprivate) : upd_cwd V (pv_cwd V) = V.
+Proof. destruct V; reflexivity. Qed.
+
 Section ProcDefs.
   Context `{!riscvGS Σ}.
 
@@ -179,6 +188,91 @@ Section ProcDefs.
     iDestruct (word_pointsto_agree with "Hks Hks'") as %<-.
     iExact "Hstk".
   Qed.
+
+  (* ================================================================== *)
+  (*  THE RUNNING PROCESS'S PRIVATE BLOCK, MINUS EVERYTHING FILE-SHAPED   *)
+  (* ================================================================== *)
+
+  (* [ProcInv.proc_priv_core] with [cwd_ref] taken off -- so: the two size
+     invariants, the thread's HALF of [p->pid], the scalar fields, the
+     address space and the trapframe page, and nothing else.
+
+     IT LIVES HERE, AND THAT IS THE WHOLE POINT.  What wants it is the
+     sleeplock chain: acquiresleep does [lk->pid = myproc()->pid], so it
+     needs read permission on [p->pid], and the honest premise is the block
+     the caller actually has rather than a bare fraction of one field --
+     [p->pid]'s permission is split permanently between this block and
+     [SchedCtx.proc_pub] behind [p->lock], so a threaded fraction can only
+     have been BORROWED out of here, and every caller had to extract it and
+     splice it back.  Worse, a contract asking for the block AND a fraction
+     was asking for three quarters of a cell of which two are reachable:
+     unpayable, and unrefutable by any proof (3/4 <= 1).  sys_close and
+     sys_pipe both shipped with exactly that defect.
+
+     But [proc_priv_core] itself cannot be that premise for the block layer,
+     because [cwd_ref] is an INODE REFERENCE: taking it would put [fileG],
+     [icfg] and the whole file layer into the binder list of every contract
+     from acquiresleep and bread up -- fifty-odd files that have no business
+     knowing what a working directory is, and a build that serialises the
+     buffer cache behind [ProcInv].  Dropping the one file-shaped conjunct
+     removes all of it: this file requires [ProcGeom]/[UserPtTree]/
+     [ProcPtOwn] and nothing above them, and [ProcInv.proc_priv_core_bare]
+     is the [⊣⊢] that puts the two back together.  A caller holding
+     [proc_priv] therefore hands the chain THIS and keeps [cwd_ref] and its
+     descriptor array in hand -- one iff, no borrow, no closer, no
+     fractions. *)
+  Definition proc_priv_bare (pa : mword 64) (pid : mword 32)
+      (V : pprivate) : iProp Σ :=
+    (⌜uint (pv_sz V) <= uvm_maxsz⌝ ∗
+     ⌜um_below (pv_sz V) (ud_um (pv_upt V))⌝ ∗
+     p_pid pa ↦₄{DfracOwn (1/2)} pid ∗
+     proc_fields pa (DfracOwn 1) V ∗
+     proc_pt_at pa (pv_upt V) ∗
+     tf_page (ud_tfp (pv_upt V)) (pv_tf V))%I.
+
+  (* the one field the chain actually reads, borrowed out of it.  Callees do
+     their own borrowing now, so this is used INSIDE acquiresleep and
+     holdingsleep rather than by anyone above them. *)
+  Lemma proc_priv_bare_pid (pa : mword 64) (pid : mword 32) (V : pprivate) :
+    proc_priv_bare pa pid V -∗
+    p_pid pa ↦₄{DfracOwn (1/4)} pid ∗
+    (p_pid pa ↦₄{DfracOwn (1/4)} pid -∗ proc_priv_bare pa pid V).
+  Proof.
+    iIntros "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp)".
+    assert (Hq : (1/2)%Qp = (1/4 + 1/4)%Qp) by compute_done.
+    rewrite Hq word4_pointsto_frac_split.
+    iDestruct "Hpid" as "[Hq1 Hq2]". iFrame "Hq1".
+    iIntros "Hq1". rewrite /proc_priv_bare Hq word4_pointsto_frac_split.
+    iSplitR; [done|]. iSplitR; [done|]. iFrame.
+  Qed.
+
+  (* THE cwd CELL, LENT OUT OF THE BARE BLOCK.  [p->cwd] lives inside
+     [proc_fields], so a caller that must STORE a new inode pointer there --
+     sys_chdir, and only sys_chdir -- borrows the cell for the length of that
+     one store rather than carrying it alongside the block across the whole
+     walk.  Compare [proc_priv_nocwd_cwd_pid], which is the same move for a
+     caller that also wanted a quarter of [p->pid]; nothing wants that any
+     more, so this one lends the cell alone. *)
+  Lemma proc_priv_bare_cwd (pa : mword 64) (pid : mword 32) (V : pprivate) :
+    proc_priv_bare pa pid V -∗
+    p_cwd pa ↦₈ pv_cwd V ∗
+    (∀ v' : mword 64,
+       p_cwd pa ↦₈ v' -∗ proc_priv_bare pa pid (upd_cwd V v')).
+  Proof.
+    iIntros "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp)".
+    rewrite /proc_fields. iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
+    iFrame "Hcwd". iIntros (v') "Hcwd".
+    rewrite /proc_priv_bare /proc_fields.
+    cbn [upd_cwd pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+    iSplitR; [done|]. iSplitR; [done|]. iFrame "Hpid".
+    iSplitL "Hsz Hcwd Hnm".
+    { iFrame "Hsz Hcwd Hnm". iPureIntro; exact Hnl. }
+    iFrame.
+  Qed.
+
+  Lemma proc_priv_bare_sz (pa : mword 64) (pid : mword 32) (V : pprivate) :
+    proc_priv_bare pa pid V -∗ ⌜uint (pv_sz V) <= uvm_maxsz⌝.
+  Proof. iIntros "($ & _)". Qed.
 
   Definition proc_dormant (pa : mword 64) (st : mword 32) : iProp Σ :=
     (∃ (V : pprivate) (pid : mword 32),

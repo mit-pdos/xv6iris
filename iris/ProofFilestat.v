@@ -66,7 +66,7 @@
      about them appears in any contract -- see SpecFilestat.v's header.
 
    * the PID QUARTER.  ilock and iunlock each want [p_pid pj ↦₄{dq} pidv]
-     separately, and copyout wants the whole [proc_priv].  [ProcInv.proc_priv_pid]
+     separately, and copyout wants the whole [proc_priv].  [ProcInv.proc_priv_bare_acc]
      is an ACCESSOR, so the quarter is lent out IMMEDIATELY before each of the
      two calls and closed IMMEDIATELY after; holding it open across copyout
      creates a [V] vs [upd_upt V P'] shape mismatch. *)
@@ -681,7 +681,7 @@ Section ProofFilestat.
         rewrite /Q2 upd_ne; [| regne].
         exact (HQ1thr c Hcs N2 N8 N9 N18 N20). }
       (* THE PID QUARTER, lent for the length of the ilock call *)
-      iDestruct (proc_priv_core_pid pj pidv V with "Hpriv") as "[Hppid Hpivbk]".
+      iDestruct (proc_priv_core_bare_acc pj pidv V with "Hpriv") as "[Hppid Hpivbk]".
       iDestruct (cpu_own_transport CID10 CID19 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                    with "Hcnt") as "Hcnt".
       (* SpecIlock v4 names the share's GENERATION (design 17.3 (A)); the
@@ -695,7 +695,7 @@ Section ProofFilestat.
                 icfg_dev inm
                 pidv (DfracOwn (1/4)) (fsn_dqs fn)
                 Q3 (K - 10)%nat eb b
-                _ (fst_av_ilock K HK) Hik Hlg Hist Hibcov Hinlt Hj Hgs
+                _ V (fst_av_ilock K HK) Hik Hlg Hist Hibcov Hinlt Hj Hgs
                 ltac:(rewrite HQ3a0; exact Hipk)
                 Hbelow
                 with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hitbl Hesc Hireg
@@ -967,7 +967,7 @@ Section ProofFilestat.
         rewrite /J2 upd_ne; [| regne].
         rewrite /J1 upd_ne; [| regne].
         exact (Hmstthr c Hcs N2 N8 N9 N18 N19 N20). }
-      iDestruct (proc_priv_core_pid pj pidv V with "Hpriv") as "[Hppid Hpivbk2]".
+      iDestruct (proc_priv_core_bare_acc pj pidv V with "Hpriv") as "[Hppid Hpivbk2]".
       iDestruct (cpu_own_transport CIDil CID26 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iApply (Iunlock.wp_iunlock_sconf γs (fsn_fs fn) (fsn_ireg fn)
@@ -976,7 +976,7 @@ Section ProofFilestat.
                 ikk (ssh/2)%Qp gsh icfg_dev inm
                 dnl bml
                 pidv (DfracOwn (1/4)) J2 (K - 10)%nat eb pj b lks
-                (fst_av_iunlock K HK) Hik
+                V (fst_av_iunlock K HK) Hik
                 ltac:(rewrite HJ2a0; exact Hipk)
                 (* iunlock's bound is "sleep lock"(6); filestat's own is
                    "bcache"(4), and [locks_below_mono] weakens it. *)

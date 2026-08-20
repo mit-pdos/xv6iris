@@ -171,6 +171,7 @@ Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import CpuOwn.
 Require Import SchedCtx.
+Require Import ProcDefs.  (* [proc_priv_bare] *)
 Require Import SleepLock.
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
@@ -210,7 +211,7 @@ Definition wp_ilock_sconf_body
     (k : nat) (s : Qp) (g : gname) (o : ilkc) (dev inum : mword 32)
     (pidv : mword 32) (dq dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) :=
+    (b : bool) (lks : gset string) (Vpr : pprivate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.ilock in
   let ip : mword 64 := ientry k in
   let pj := proc_addr j in
@@ -312,7 +313,7 @@ Definition wp_ilock_sconf_body
   (* sb.inodestart, read once *)
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   (* the caller's own pid cell (acquiresleep records it in the lock) *)
-  p_pid pj ↦₄{dq} pidv -∗
+  proc_priv_bare pj pidv Vpr -∗
   (* the running-thread bundle *)
   procs_inv gs -∗
   (* the disk fabric *)
@@ -336,7 +337,7 @@ Definition wp_ilock_sconf_body
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
-      p_pid pj ↦₄{dq} pidv -∗
+      proc_priv_bare pj pidv Vpr -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       bslot bn -∗
       (* THE LOCK IS HELD ... *)
@@ -419,8 +420,8 @@ Module Type ILOCK.
       (k : nat) (s : Qp) (g : gname) (o : ilkc) (dev inum : mword 32)
       (pidv : mword 32) (dq dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string),
+      (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_ilock_sconf_body gs j gl gu gd gk pd pav pu bn gfs gi cn gil gisl
                           cov logstart inodestart nib k s g o dev inum
-                          pidv dq dqs m K eb b lks.
+                          pidv dq dqs m K eb b lks Vpr.
 End ILOCK.

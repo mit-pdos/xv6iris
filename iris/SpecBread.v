@@ -52,6 +52,7 @@ Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import CpuOwn.
 Require Import SchedCtx.
+Require Import ProcDefs.  (* [proc_priv_bare] -- file-layer free *)
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
 Require Import BcacheInv BioInv.
@@ -73,7 +74,7 @@ Definition wp_bread_sconf_body
     (bn : bio_names) (V : bio_view Σ)
     (pidv dev bno : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) :=
+    (b : bool) (lks : gset string) (Vpr : pprivate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.bread in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -123,7 +124,7 @@ Definition wp_bread_sconf_body
   panic_env -∗
   bio_ctx bn V -∗
   (* the caller's own pid cell (acquiresleep records it in the lock) *)
-  p_pid pj ↦₄{dq} pidv -∗
+  proc_priv_bare pj pidv Vpr -∗
   (* the running-thread bundle threaded through acquiresleep and rw *)
   procs_inv γs -∗
   (* the disk fabric *)
@@ -148,7 +149,7 @@ Definition wp_bread_sconf_body
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
-      p_pid pj ↦₄{dq} pidv -∗
+      proc_priv_bare pj pidv Vpr -∗
       (* the locked buffer, keyed to the request: its bytes ARE the
          block's logical content (the payload inside indexes them) *)
       bio_locked bn V k pidv dev bno bs bsd d -∗
@@ -165,7 +166,7 @@ Module Type BREAD.
       (bn : bio_names) (V : bio_view Σ)
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string),
+      (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_bread_sconf_body γs j γl γu γd γk pd pav pu bn V
-                          pidv dev bno dq m K eb b lks.
+                          pidv dev bno dq m K eb b lks Vpr.
 End BREAD.

@@ -2194,8 +2194,8 @@ Section ProofCreateMain.
        sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
        sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
        bitmap_res γfs bmapstart cov logstart size used3 -∗
-       p_pid (proc_addr j) ↦₄{DfracOwn (1/4)} pidv -∗
-       (p_pid (proc_addr j) ↦₄{DfracOwn (1/4)} pidv -∗
+       proc_priv_bare (proc_addr j) pidv V -∗
+       (proc_priv_bare (proc_addr j) pidv V -∗
           proc_priv γf (proc_addr j) pidv V) -∗
        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
        bslots bn 3 -∗
@@ -2381,8 +2381,8 @@ Section ProofCreateMain.
        sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
        sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
        bitmap_res γfs bmapstart cov logstart size used4 -∗
-       p_pid (proc_addr j) ↦₄{DfracOwn (1/4)} pidv -∗
-       (p_pid (proc_addr j) ↦₄{DfracOwn (1/4)} pidv -∗
+       proc_priv_bare (proc_addr j) pidv V -∗
+       (proc_priv_bare (proc_addr j) pidv V -∗
           proc_priv γf (proc_addr j) pidv V) -∗
        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
        bslots bn 3 -∗
@@ -2795,9 +2795,9 @@ Section ProofCreateMain.
       by exact (cr_ns_split ns Hns).
     iEval (rewrite {1}Hnsplit iref_slots_op) in "Hislots".
     iDestruct "Hislots" as "[Hisl2 Hislr]".
-    (* ---- the running process: cwd + the pid quarter ---- *)
-    iDestruct (proc_priv_cwd_pid γf (proc_addr j) pidv V with "Hpriv")
-      as "(Hpcwd & Hcref & Hppid & Hpclose)".
+    (* ---- the running process: the BLOCK and the cwd reference ---- *)
+    iDestruct (proc_priv_bare_cref γf (proc_addr j) pidv V with "Hpriv")
+      as "(Hppid & Hcref & Hpclose)".
     iDestruct (cwd_ref_held with "Hcref") as "Hcref".
     iEval (rewrite -HR7a0) in "Hpath".
     iEval (rewrite -HR7a1) in "Hnb14".
@@ -2805,16 +2805,16 @@ Section ProofCreateMain.
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (NP.wp_nameiparent_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
               γa γf cov logstart bmapstart inodestart nib size dev used
-              (pv_cwd V) plen pfun nf0 u Sb pidv (DfracOwn (1/4)) dqb dqs
-              (DfracOwn 1) R7 (K - 10)%nat eb b lks
+              plen pfun nf0 u Sb pidv (DfracOwn (1/4)) dqb dqs
+              R7 (K - 10)%nat eb b lks V
               ltac:(exact HKnp) Hdev Hnib Hglog Hist Hroot Hnib0 Hlg Hsize
               Hbms0 Hbmsc Hbmsl Hist0 Hcovb Hiregb Hcstr Hplen31
               ltac:(exact (cr_walk_need _ u Hu)) Hj Hgs Heb
               with "Hcg Hcnt Htext Hkd Hpc Hpenv Hbio Hlogc Hkenv Hitb2 Hitbl
                     Hesc Hslks Hiregi Hiopen Hprocs Hdevi Hgeom Hdlk Hsbb Hsbi Hbmr
-                    Hppid Hpcwd Hcref Hpath Hnb14 Hbsl Hisl2 Hop").
+                    Hppid Hcref Hpath Hnb14 Hbsl Hisl2 Hop").
     iIntros (CIDnp Hsnp mnp n1 used1 Sb1 okp nfp ipv w)
-      "%Hcsnp Hcg Hcnt Hpc Hsbb Hsbi %Husd1 Hbmr Hppid Hpcwd Hcref Hpath Hnb14
+      "%Hcsnp Hcg Hcnt Hpc Hsbb Hsbi %Husd1 Hbmr Hppid Hcref Hpath Hnb14
        Hbsl %Hsb1 %Hwmem %Hnp1 Hop Hres".
     iEval (rewrite HR7a0) in "Hpath".
     iEval (rewrite HR7a1) in "Hnb14".
@@ -2827,8 +2827,7 @@ Section ProofCreateMain.
     (* the process block goes back whole: create copies nothing to or from
        user memory, so [V] is unchanged. *)
     iDestruct (cwd_ref_of_held with "Hcref") as "Hcref".
-    iDestruct ("Hpclose" $! (pv_cwd V) with "Hpcwd Hcref Hppid") as "Hpriv".
-    iEval (rewrite cr_upd_cwd_id) in "Hpriv".
+    iDestruct ("Hpclose" with "Hppid Hcref") as "Hpriv".
     iPoseProof (cri_020 with "Htext") as "Hi020".
     iPoseProof (cri_022 with "Htext") as "Hi022".
     (* ===== +0x20 c.mv s1,a0 : s1 = dp ================================ *)
@@ -2901,7 +2900,7 @@ Section ProofCreateMain.
       iDestruct (cr_esc_acc cn γfs γi cov logstart kd Hkd with "Hesc") as "#Hescd".
       iDestruct (cr_slk_acc cn kd Hkd with "Hslks") as (gild gisld) "#Hslkd".
       iDestruct (cr_bs3 bn with "Hbsl") as "[Hbs1 Hbs2]".
-      iDestruct (proc_priv_pid γf (proc_addr j) pidv V with "Hpriv")
+      iDestruct (proc_priv_bare_acc γf (proc_addr j) pidv V with "Hpriv")
         as "[Hppid Hppback]".
       iPoseProof (cri_026 with "Htext") as "Hi026".
       iPoseProof (cri_02a with "Htext") as "Hi02a".
@@ -2934,7 +2933,7 @@ Section ProofCreateMain.
                 gild gisld cov logstart inodestart nib kd (qd/2)%Qp gd PlainK
                 dev dind
                 pidv (DfracOwn (1/4)) dqs Q2 (K - 10)%nat eb b lks
-                ltac:(exact HKil) Hkd Hlg Hist0 Hdblk Hdib' Hj Hgs HQ2a0
+                V ltac:(exact HKil) Hkd Hlg Hist0 Hdblk Hdib' Hj Hgs HQ2a0
                 with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hitbl Hescd Hiregi
                       Hslkd Hshr Hrud Hsbi Hppid Hprocs Hdevi Hgeom Hdlk Hbs1").
       all: try lkbelow.
@@ -3067,7 +3066,7 @@ Section ProofCreateMain.
                   used1 kd (qd/2)%Qp (qd/2)%Qp gd dind dnl bml n1 Sb1
                   false false false e0 pidv (DfracOwn (1/4)) dqb dqs
                   G2 (K - 10)%nat eb b lks
-                  ltac:(exact HKiup) Hkd ltac:(discriminate) ltac:(discriminate)
+                  V ltac:(exact HKiup) Hkd ltac:(discriminate) ltac:(discriminate)
                   Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib' Hcovb
                   ltac:(exact Hn1ip) Hj Hgs HG2a0
                   with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
@@ -3345,7 +3344,7 @@ Section ProofCreateMain.
                   false (mword_of_int 0 : mword 32)
                   pidv (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn 1)
                   D4 (K - 10)%nat eb b lks
-                  ltac:(exact HKdlu) Htydir Hlg Hbmwf Hbmcov Hszcap
+                  V ltac:(exact HKdlu) Htydir Hlg Hbmwf Hbmcov Hszcap
                   ltac:(rewrite Hnib; exact (Hdok Hdz))
                   ltac:(left; exact (cr_nl0z dnl Hnl0))
                   ltac:(exact Hdoc)
@@ -3498,7 +3497,7 @@ Section ProofCreateMain.
                     dev used1 kd (qd/2)%Qp (qd/2)%Qp gd dind dnl bml n1 Sb1
                     false false false e0 pidv (DfracOwn (1/4)) dqb dqs
                     F3 (K - 10)%nat eb b lks
-                    ltac:(exact HKiup) Hkd ltac:(discriminate) ltac:(discriminate)
+                    V ltac:(exact HKiup) Hkd ltac:(discriminate) ltac:(discriminate)
                     Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib' Hcovb
                     ltac:(exact Hn1ip) Hj Hgs HF3a0
                     with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
@@ -3580,7 +3579,7 @@ Section ProofCreateMain.
                     gilc gislc cov logstart inodestart nib kslot (qq/2)%Qp gc
                     PlainK
                     dev cinum pidv (DfracOwn (1/4)) dqs F5 (K - 10)%nat eb b lks
-                    ltac:(exact HKil) Hkslot Hlg Hist0 Hcblk Hcinb Hj Hgs HF5a0
+                    V ltac:(exact HKil) Hkslot Hlg Hist0 Hcblk Hcinb Hj Hgs HF5a0
                     with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hitbl Hescc
                           Hiregi Hslkc Hcshr Hruc Hsbi Hppid Hprocs Hdevi Hgeom
                           Hdlk Hbs1").
@@ -3644,8 +3643,8 @@ Section ProofCreateMain.
                        sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
                        sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
                        bitmap_res γfs bmapstart cov logstart size used2 -∗
-                       p_pid (proc_addr j) ↦₄{DfracOwn (1/4)} pidv -∗
-                       (p_pid (proc_addr j) ↦₄{DfracOwn (1/4)} pidv -∗
+                       proc_priv_bare (proc_addr j) pidv V -∗
+                       (proc_priv_bare (proc_addr j) pidv V -∗
                           proc_priv γf (proc_addr j) pidv V) -∗
                        ([∗ list] i ∈ seq 0 (S plen),
                           pa_add (m !!! Regidx Ra0 : mword 64) i ↦ₘ[KT1] pfun i) -∗
@@ -3720,7 +3719,7 @@ Section ProofCreateMain.
                       size dev used2 kslot (qq/2)%Qp (qq/2)%Qp gc cinum dnc bmc
                       n2 Sb2 false false false ec pidv (DfracOwn (1/4)) dqb dqs
                       B2 (K - 10)%nat eb b lks
-                      ltac:(exact HKiup) Hkslot ltac:(discriminate)
+                      V ltac:(exact HKiup) Hkslot ltac:(discriminate)
                       ltac:(discriminate)
                       Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hcblk Hcblog Hcinb Hcovb
                       ltac:(exact Hn2ip) Hj Hgs HB2a0
@@ -4245,7 +4244,7 @@ Section ProofCreateMain.
                   used1 kd (qd/2)%Qp (qd/2)%Qp gd dind dnl bml n1 Sb1
                   false false false e0 pidv (DfracOwn (1/4)) dqb dqs
                   J2 (K - 10)%nat eb b lks
-                  ltac:(exact HKiup) Hkd ltac:(discriminate) ltac:(discriminate)
+                  V ltac:(exact HKiup) Hkd ltac:(discriminate) ltac:(discriminate)
                   Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib' Hcovb
                   ltac:(exact Hn1ip) Hj Hgs HJ2a0
                   with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
@@ -4751,14 +4750,14 @@ Section ProofCreateMain.
     assert (Hns1 : (1 + (ns - 2))%nat = (ns - 1)%nat) by exact (cr_ns_1 ns Hns).
     iEval (rewrite -Hns1 iref_slots_op) in "Hisl".
     iDestruct "Hisl" as "[Hisl1 Hislr]".
-    iDestruct (proc_priv_pid γf (proc_addr j) pidv V with "Hpriv")
+    iDestruct (proc_priv_bare_acc γf (proc_addr j) pidv V with "Hpriv")
       as "[Hppid Hppback]".
     iDestruct (cpu_own_transport CIDa CIDA1 0%nat eb (proc_addr j) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
     (* ===== +0xa4 .. +0xb0 : THE FRESH-TYPE GATE SPAN ================= *)
     iApply (CFT.create_fresh_ty γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
               γpr cov logstart inodestart ninodes nib dev ty kd (DfracOwn (1/2))
-              q1 Sb1 pidv (DfracOwn (1/4)) dqs dqn Ma (K - 10)%nat eb b lks
+              q1 Sb1 pidv (DfracOwn (1/4)) dqs dqn Ma (K - 10)%nat eb b lks V
               ltac:(exact HKia) ltac:(exact HKil) Hlg Hist0 Hiregb Hni1 Hni2
               Hni3 Htynz Hpkc Hj Hgs Hroot A20 A9 Hkdlt Heb ltac:(lkbelow)
               (fun CIDx : CpuId => IA.wp_ialloc_gen (CID := CIDx))
@@ -4967,7 +4966,7 @@ Section ProofCreateMain.
                 pidv
                 (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn (1/2)) dqs
                 W3 (K - 10)%nat eb b lks
-                ltac:(exact HKiu)
+                V ltac:(exact HKiu)
                 ltac:(intros _; exact (cr_in_union_sing Sb1 _))
                 Hlg Hist0 Hcblk Hcblog Hcinb
                 ltac:(exact (di_type_stable_eq _ _
@@ -5278,7 +5277,7 @@ Section ProofCreateMain.
                   pidv (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn 1) dqs
                   dqb dqbs (DfracOwn (1/2))
                   X4 (K - 10)%nat eb b lks
-                  ltac:(exact HKdlk) Htydir Hbmcov Hszcap
+                  V ltac:(exact HKdlk) Htydir Hbmcov Hszcap
                   ltac:(exact (Hdok Hdz))
                   (* THE RELAYED LICENCE (§7.5.6, row 5).  LEFT disjunct,
                      earned by the same [sysfile.c:269] guard the found half
@@ -5544,7 +5543,7 @@ Section ProofCreateMain.
                        size dev used' kd (qd/2)%Qp (qd/2)%Qp gd dind dn' bm'
                        n' Sb' false true false e0 pidv (DfracOwn (1/4)) dqb dqs
                        Y2 (K - 10)%nat eb b lks
-                       ltac:(exact HKiup) Hkdlt ltac:(discriminate) Hcruu
+                       V ltac:(exact HKiup) Hkdlt ltac:(discriminate) Hcruu
                        Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
                        ltac:(exact Hipn') Hj Hgs HY2a0
                        with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2
@@ -5885,7 +5884,7 @@ Section ProofCreateMain.
                 used1 kd (qd/2)%Qp (qd/2)%Qp gd dind dn bm (S q1) Sb1
                 false false false e0 pidv (DfracOwn (1/4)) dqb dqs
                 Z2 (K - 10)%nat eb b lks
-                ltac:(exact HKiup) Hkdlt ltac:(discriminate) ltac:(discriminate)
+                V ltac:(exact HKiup) Hkdlt ltac:(discriminate) ltac:(discriminate)
                 Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
                 ltac:(exact Hn1ip) Hj Hgs HZ2a0
                 with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
@@ -6234,7 +6233,7 @@ Section ProofCreateMain.
               u0 Sb4 true (cr_flav ty (bv_unsigned dind)) pidv
               (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn (1/2)) dqs
               G2 (K - 10)%nat eb b lks
-              ltac:(exact HKiu) ltac:(intros _; exact Hmem4)
+              V ltac:(exact HKiu) ltac:(intros _; exact Hmem4)
               Hlg Hist0 Hcblk Hcblog Hcinb Hstab
               ltac:(exact (cr_setf_type_nz dnc major minor _ Htyz))
               Hdec Hcadd0 Hcdirlen Hj Hgs HG2a0 Heb
@@ -6344,7 +6343,7 @@ Section ProofCreateMain.
               (bool_decide (bmapstart ∈ (Sb4 ∪ {[IBLOCK cinum inodestart]})))
               true false e0 pidv (DfracOwn (1/4)) dqb dqs
               G4 (K - 10)%nat eb b lks
-              ltac:(exact HKiup) Hkslt
+              V ltac:(exact HKiup) Hkslt
               ltac:(exact (cr_crb_honest (Sb4 ∪ {[IBLOCK cinum inodestart]})
                              bmapstart))
               ltac:(intros _; exact (cr_in_union_sing Sb4
@@ -6512,7 +6511,7 @@ Section ProofCreateMain.
               used5 kd (qd/2)%Qp (qd/2)%Qp gd dind dn' bm'
               n5 Sb5 false false false e1 pidv (DfracOwn (1/4)) dqb dqs
               G6 (K - 10)%nat eb b lks
-              ltac:(exact HKiup) Hkdlt ltac:(discriminate) ltac:(discriminate)
+              V ltac:(exact HKiup) Hkdlt ltac:(discriminate) ltac:(discriminate)
               Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
               ltac:(exact Hipn5) Hj Hgs HG6a0
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
@@ -6819,8 +6818,8 @@ Section ProofCreateMain.
        sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
        sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
        bitmap_res γfs bmapstart cov logstart size used4 -∗
-       p_pid (proc_addr j) ↦₄{DfracOwn (1/4)} pidv -∗
-       (p_pid (proc_addr j) ↦₄{DfracOwn (1/4)} pidv -∗
+       proc_priv_bare (proc_addr j) pidv V -∗
+       (proc_priv_bare (proc_addr j) pidv V -∗
           proc_priv γf (proc_addr j) pidv V) -∗
        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
        bslots bn 3 -∗
@@ -7045,7 +7044,7 @@ Section ProofCreateMain.
               u0 Sb4 true (cr_flav ty (bv_unsigned dind)) pidv
               (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn (1/2)) dqs
               G2 (K - 10)%nat eb b lks
-              ltac:(exact HKiu) ltac:(intros _; exact Hmem4)
+              V ltac:(exact HKiu) ltac:(intros _; exact Hmem4)
               Hlg Hist0 Hcblk Hcblog Hcinb Hstab Htyz0
               Hdec Hcadd0 Hcdirlen Hj Hgs HG2a0 Heb
               with "Hcg Hcnt Htext Hkd Hpc Hpenv Hbio Hlogc Hcidev Hciinum
@@ -7158,7 +7157,7 @@ Section ProofCreateMain.
               (bool_decide (bmapstart ∈ (Sb4 ∪ {[IBLOCK cinum inodestart]})))
               true false e0 pidv (DfracOwn (1/4)) dqb dqs
               G4 (K - 10)%nat eb b lks
-              ltac:(exact HKiup) Hkslt
+              V ltac:(exact HKiup) Hkslt
               ltac:(exact (cr_crb_honest (Sb4 ∪ {[IBLOCK cinum inodestart]})
                              bmapstart))
               ltac:(intros _; exact (cr_in_union_sing Sb4
@@ -7259,7 +7258,7 @@ Section ProofCreateMain.
               used5 kd (qd/2)%Qp (qd/2)%Qp gd dind dp bmp
               n5 Sb5 false false false e1 pidv (DfracOwn (1/4)) dqb dqs
               G6 (K - 10)%nat eb b lks
-              ltac:(exact HKiup) Hkdlt ltac:(discriminate) ltac:(discriminate)
+              V ltac:(exact HKiup) Hkdlt ltac:(discriminate) ltac:(discriminate)
               Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
               ltac:(exact Hipn5) Hj Hgs HG6a0
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
@@ -7743,7 +7742,7 @@ Section ProofCreateMain.
               pidv (DfracOwn (1/4)) (DfracOwn (1/2)) DfracDiscarded dqs
               dqb dqbs (DfracOwn (1/2))
               Z5 (K - 10)%nat eb b lks
-              ltac:(exact HKdlk) Hcty Hcbmcov Hccap
+              V ltac:(exact HKdlk) Hcty Hcbmcov Hccap
               ltac:(exact (Hcdok' Hcdz))
               ltac:(left; rewrite cr_setf_nlink; vm_compute; discriminate)
               ltac:(apply dir_orphan_clean_live;
@@ -8085,7 +8084,7 @@ Section ProofCreateMain.
                 pidv (DfracOwn (1/4)) (DfracOwn (1/2)) DfracDiscarded dqs
                 dqb dqbs (DfracOwn (1/2))
                 Y5 (K - 10)%nat eb b lks
-                ltac:(exact HKdlk) Hc1tyd Hcov1 (Hcap1 Hccap)
+                V ltac:(exact HKdlk) Hc1tyd Hcov1 (Hcap1 Hccap)
                 ltac:(exact (Hc1dok ltac:(rewrite Hc1ty Htdir;
                                           vm_compute; reflexivity)))
                 (* §7.5.6, row 4: LEFT disjunct from [ip->nlink = 1], the
@@ -8430,7 +8429,7 @@ Section ProofCreateMain.
                   pidv (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn 1) dqs
                   dqb dqbs (DfracOwn (1/2))
                   W4 (K - 10)%nat eb b lks
-                  ltac:(exact HKdlk) Htydir Hbmcov Hszcap
+                  V ltac:(exact HKdlk) Htydir Hbmcov Hszcap
                   ltac:(exact (Hdok Hdz))
                   (* §7.5.6, row 5 again, on the mkdir arm: LEFT disjunct
                      from the same [sysfile.c:269] guard, relayed into this
@@ -8814,7 +8813,7 @@ Section ProofCreateMain.
                        so it pays the PURE arm (§3.9). *) false pidv
                     (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn (1/2)) dqs
                     V4 (K - 10)%nat eb b lks
-                    HKiu Hmtcru
+                    V HKiu Hmtcru
                     Hlg Hist0 Hdblk Hdblog Hdib
                     Hmtstab Hmttynz
                     ltac:(intros od _; rewrite cr_setf_type Hp3ty;
@@ -9035,7 +9034,7 @@ Section ProofCreateMain.
                     bm3 (S u6) (Sb6 ∪ {[IBLOCK dind inodestart]})
                     true true false e0 pidv (DfracOwn (1/4)) dqb dqs
                     T2 (K - 10)%nat eb b lks
-                    ltac:(exact HKiup) Hkdlt Hcrbu Hcruu
+                    V ltac:(exact HKiup) Hkdlt Hcrbu Hcruu
                     Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
                     ltac:(exact Hipn6) Hj Hgs HT2a0
                     with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2

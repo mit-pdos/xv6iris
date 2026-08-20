@@ -458,44 +458,42 @@ Section WriteiDefs.
   (* ===================================================================== *)
   (*  THE SOURCE AND THE PID SHARE THAT RIDES WITH IT (S3p)                 *)
   (*                                                                        *)
-  (*  SpecWritei's premise is ONE bracket, [if user then proc_priv else      *)
-  (*  buffer ∗ p_pid], and not the pair it used to be.  THE PID FRACTION IS  *)
-  (*  THE KERNEL ARM'S.  bread/brelse/bmap/iupdate each want a share of      *)
-  (*  [p->pid] at a universally quantified dfrac either way, but on the USER *)
-  (*  arm writei holds the whole [proc_priv] block and BORROWS the quarter   *)
-  (*  out of it ([ProcInv.proc_priv_pid]); it has to, because that accessor  *)
-  (*  CONSUMES the block and returns a wand, so nobody can hold both at      *)
-  (*  once.  Asking for both was what made the user arm uncallable, and      *)
-  (*  filewrite is what found it -- [SpecReadi.v]:244-267 is the same repair *)
-  (*  one stage earlier, for the same reason, found by fileread.             *)
+  (*  SpecWritei's premise is ONE bracket, [if user then proc_priv_core     *)
+  (*  else buffer ∗ proc_priv_bare].  BOTH ARMS CARRY THE BLOCK; they        *)
+  (*  differ only in what rides alongside it -- the user arm adds [cwd_ref]  *)
+  (*  (either_copyin needs the page table, which is inside the block), the   *)
+  (*  kernel arm adds the caller's own source bytes.                         *)
   (*                                                                        *)
-  (*  [wi_q] is the dfrac the borrow carries and [wi_src_pid] is the borrow: *)
-  (*  ONE lemma serving BOTH arms, so no call site case-splits on [user].    *)
-  (*  either_copyin takes the block and never the fraction, so the borrow is *)
-  (*  always closed before the copy and re-opened after it.                  *)
+  (*  bread/brelse/bmap/iupdate each want exactly [proc_priv_bare], so       *)
+  (*  [wi_src_bare] is ONE borrow serving BOTH arms and no call site         *)
+  (*  case-splits on [user].  either_copyin wants the block whole, so the    *)
+  (*  borrow is always closed before the copy and re-opened after it.        *)
   (* ===================================================================== *)
   Definition wi_q (user : bool) (dq : dfrac) : dfrac :=
     if user then DfracOwn (1/4) else dq.
 
-  Lemma wi_src_pid (γf : gname) (j : nat) (pidv : mword 32) (dq : dfrac)
-      (user : bool) (Vc : pprivate) (srcb : mword 64) (n : nat)
+  Lemma wi_src_bare (γf : gname) (j : nat) (pidv : mword 32) (dq : dfrac)
+      (* TWO pprivate slots, one per arm: the user arm comes back at a page
+         table copyin may have GROWN, the kernel arm -- memmove, not copyin --
+         at the [V] it went in at.  Same shape as readi's [rd_dst]. *)
+      (user : bool) (Vc Vk : pprivate) (srcb : mword 64) (n : nat)
       (bytes : nat -> bv 8) :
     (if user
      then proc_priv_core (proc_addr j) pidv Vc
      else ([∗ list] i ∈ seq 0 n, pa_add srcb i ↦ₘ[ktb] bytes i) ∗
-          p_pid (proc_addr j) ↦₄{dq} pidv) -∗
-      p_pid (proc_addr j) ↦₄{wi_q user dq} pidv ∗
-      (p_pid (proc_addr j) ↦₄{wi_q user dq} pidv -∗
+          proc_priv_bare (proc_addr j) pidv Vk) -∗
+      proc_priv_bare (proc_addr j) pidv (if user then Vc else Vk) ∗
+      (proc_priv_bare (proc_addr j) pidv (if user then Vc else Vk) -∗
        (if user
         then proc_priv_core (proc_addr j) pidv Vc
         else ([∗ list] i ∈ seq 0 n, pa_add srcb i ↦ₘ[ktb] bytes i) ∗
-             p_pid (proc_addr j) ↦₄{dq} pidv)).
+             proc_priv_bare (proc_addr j) pidv Vk)).
   Proof.
-    rewrite /wi_q. destruct user.
-    - iIntros "Hp". iDestruct (proc_priv_core_pid with "Hp") as "[Hq Hback]".
-      iSplitL "Hq"; [iExact "Hq"|]. iIntros "Hq". iApply ("Hback" with "Hq").
-    - iIntros "Hd". iDestruct "Hd" as "[Hb Hq]". iSplitL "Hq"; [iExact "Hq"|].
-      iIntros "Hq". iSplitL "Hb"; [iExact "Hb"|]. iExact "Hq".
+    destruct user.
+    - rewrite proc_priv_core_bare. iIntros "[Hb Hcwd]".
+      iSplitL "Hb"; [iExact "Hb"|]. iIntros "Hb". iFrame.
+    - iIntros "[Hd Hb]". iSplitL "Hb"; [iExact "Hb"|].
+      iIntros "Hb". iSplitL "Hd"; [iExact "Hd"|]. iExact "Hb".
   Qed.
 
   (* THE CONTINUATION, named so it is not re-traversed by every proofmode
@@ -571,7 +569,7 @@ Section WriteiDefs.
          then proc_priv_core (proc_addr j) pidv (upd_upt V P')
          else ([∗ list] i ∈ seq 0 n,
                  pa_add (m !!! Regidx Ra2 : mword 64) i ↦ₘ[ktb] (src_bytes i)) ∗
-              p_pid (proc_addr j) ↦₄{dq} pidv) -∗
+              proc_priv_bare (proc_addr j) pidv V) -∗
         bslots bn 3 -∗
         log_opS γ n' Sb' -∗
         WP (Loop : expr riscv_lang))%I.
@@ -672,7 +670,7 @@ Section WriteiRet.
      then proc_priv_core (proc_addr j) pidv (upd_upt V P')
      else ([∗ list] i ∈ seq 0 n,
              pa_add (m !!! Regidx Ra2 : mword 64) i ↦ₘ[ktb] (src_bytes i)) ∗
-          p_pid (proc_addr j) ↦₄{dq} pidv) -∗
+          proc_priv_bare (proc_addr j) pidv V) -∗
     bslots bn 3 -∗
     log_opS γ n' Sb' -∗
     wi_cont (ktb := ktb) (CID0 := CID0) γfs γi bn γ γf cov logstart inodestart nib dev ip inum
@@ -1080,7 +1078,7 @@ Section WriteiJoin.
      then proc_priv_core (proc_addr j) pidv (upd_upt V P')
      else ([∗ list] i ∈ seq 0 n,
              pa_add (m !!! Regidx Ra2 : mword 64) i ↦ₘ[ktb] (src_bytes i)) ∗
-          p_pid (proc_addr j) ↦₄{dq} pidv) -∗
+          proc_priv_bare (proc_addr j) pidv V) -∗
     bslots bn 3 -∗
     log_opS γ (S u) SbC -∗
     wi_cont (ktb := ktb) (CID0 := CID0) γfs γi bn γ γf cov logstart inodestart nib dev ip inum
@@ -1177,7 +1175,7 @@ Section WriteiJoin.
        lemma serves both arms: on the user arm the quarter comes out of
        [proc_priv] and goes back into it; on the kernel arm it is the
        caller's own share, riding with the buffer. *)
-    iDestruct (wi_src_pid γf j pidv dq user (upd_upt V P')
+    iDestruct (wi_src_bare γf j pidv dq user (upd_upt V P') V
                  (m !!! Regidx Ra2 : mword 64) n src_bytes with "Hsrc")
       as "[Hppid Hsrcback]".
     (* THE CREDITED FLUSH.  [wp_iupdate_gen] is this at [cru := false]; the
@@ -1197,7 +1195,7 @@ Section WriteiJoin.
     iApply (IU.wp_iupdate_credgen γs j γl γu γd γk pd pav pu bn γ γfs γi
               cov logstart inodestart nib dev ip inum dn' dn0 bm' u SbC
               (bool_decide (IBLOCK inum inodestart ∈ SbC)) e0 0%nat
-              pidv (wi_q user dq) dqd dqn dqs T1 (K - 14)%nat eb b lks
+              pidv (wi_q user dq) dqd dqn dqs T1 (K - 14)%nat eb b lks (if user then upd_upt V P' else V)
               HKiu
               Hgeom Hist Hicov Hilog Hnib
               (* §19.6 Part 1: the flushed [dn'] keeps [dn]'s type ([Hdneq]),
@@ -1467,7 +1465,7 @@ Section WriteiSize.
      then proc_priv_core (proc_addr j) pidv (upd_upt V P')
      else ([∗ list] i ∈ seq 0 n,
              pa_add (m !!! Regidx Ra2 : mword 64) i ↦ₘ[ktb] (src_bytes i)) ∗
-          p_pid (proc_addr j) ↦₄{dq} pidv) -∗
+          proc_priv_bare (proc_addr j) pidv V) -∗
     bslots bn 3 -∗
     log_opS γ (S u) SbC -∗
     wi_cont (ktb := ktb) (CID0 := CID0) γfs γi bn γ γf cov logstart inodestart nib dev ip inum
@@ -2119,7 +2117,7 @@ Section WriteiLoop.
      then proc_priv_core (proc_addr j) pidv (upd_upt V PI)
      else ([∗ list] i ∈ seq 0 n,
              pa_add (m !!! Regidx Ra2 : mword 64) i ↦ₘ[ktb] (src_bytes i)) ∗
-          p_pid (proc_addr j) ↦₄{dq} pidv) -∗
+          proc_priv_bare (proc_addr j) pidv V) -∗
     bslots bn 3 -∗
     log_opS γ nI SI -∗
     wi_cont (ktb := ktb) (CID0 := CID0) γfs γi bn γ γf cov logstart inodestart nib dev ip inum
@@ -2238,17 +2236,17 @@ Section WriteiLoop.
        block".  It is a DECIDABLE READ of the loop's own set, not a case
        split -- [wi_bmap_need_ok] discharges bmap's reservation at either
        value of it, out of the one invariant clause. *)
-    (* BORROW the pid share for bmap ([wi_src_pid], both arms at once); it
+    (* BORROW the block for bmap ([wi_src_bare], both arms at once); it
        closes again the instant bmap returns, because the failure arm below
        exits through wi_size, which wants the bracket whole. *)
-    iDestruct (wi_src_pid γf j pidv dq user (upd_upt V PI)
+    iDestruct (wi_src_bare γf j pidv dq user (upd_upt V PI) V
                  (m !!! Regidx Ra2 : mword 64) n src_bytes with "Hsrc")
       as "[Hppid Hsrcback]".
     iApply (BM.wp_bmap_gen γs j γl γu γd γk pd pav pu bn γ γfs
               cov logstart (ba_bms A) (ba_size A) dev uIn (ba_pr A)
               ip bmI dataI fbn nI (bool_decide (ba_bms A ∈ SI)) SI
               pidv (wi_q user dq) dqd (ba_dqb A) (ba_dqs A)
-              A3 (K - 14)%nat eb b lks
+              A3 (K - 14)%nat eb b lks (if user then upd_upt V PI else V)
               HKbm
               (wi_bmap_need_ok (ba_bms A) (S W) nI SI (bmap_ind fbn)
                  ltac:(lia) HW2)
@@ -2545,13 +2543,13 @@ Section WriteiLoop.
       iDestruct (wi_slots_split bn 2 1 with "Hsl") as "[Hsl2 Hsl1]".
       (* BORROW the pid share for bread, and close it again at once: the
          body below hands the source bracket WHOLE to either_copyin. *)
-      iDestruct (wi_src_pid γf j pidv dq user (upd_upt V PI)
+      iDestruct (wi_src_bare γf j pidv dq user (upd_upt V PI) V
                    (m !!! Regidx Ra2 : mword 64) n src_bytes with "Hsrc")
         as "[Hppid Hsrcback]".
       iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
                 (fs_view γfs γd dev cov) pidv dev (blkmap_get bm2 fbn)
                 (wi_q user dq)
-                B3 (K - 14)%nat eb b lks
+                B3 (K - 14)%nat eb b lks (if user then upd_upt V PI else V)
                 HKbr Hblt' eq_refl Hbcov'
                 eq_refl Hj Hgl HB3a0 HB3a1
                 ltac:(lkbelow)
@@ -2893,7 +2891,7 @@ Section WriteiLoop.
                             user arm it is inside [proc_priv], which travels
                             as [Hsrcw]; on the kernel arm either_copyin never
                             wants it, so it waits with the untouched tail. *)
-                         ∗ p_pid (proc_addr j) ↦₄{dq} pidv))%I
+                         ∗ proc_priv_bare (proc_addr j) pidv V))%I
           with "[Hsrc]" as "[Hsrcw Hsrcrest]".
         { destruct user.
           - iSplitL "Hsrc"; [iExact "Hsrc" | done].
@@ -2966,7 +2964,7 @@ Section WriteiLoop.
                    (if user then proc_priv_core (proc_addr j) pidv (upd_upt V P2)
                     else ([∗ list] i ∈ seq 0 n,
                             pa_add (m !!! Regidx Ra2 : mword 64) i ↦ₘ[ktb] (src_bytes i))
-                         ∗ p_pid (proc_addr j) ↦₄{dq} pidv))%I
+                         ∗ proc_priv_bare (proc_addr j) pidv V))%I
           with "[Hpost Hsrcrest]" as "Hnorm".
         { destruct user.
           - iDestruct "Hpost" as "(%Hr & Hpp & Hdst)".
@@ -3237,13 +3235,13 @@ Section WriteiLoop.
           (* BORROW the pid share for brelse.  The bracket is now at
              [upd_upt V P2] -- either_copyin extended the descriptor -- and
              the borrow closes before this iteration hands the bracket on. *)
-          iDestruct (wi_src_pid γf j pidv dq user (upd_upt V P2)
+          iDestruct (wi_src_bare γf j pidv dq user (upd_upt V P2) V
                        (m !!! Regidx Ra2 : mword 64) n src_bytes with "Hsrc")
             as "[Hppid Hsrcback]".
           iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kkb
                     pidv dev (blkmap_get bm2 fbn) (wi_q user dq)
                     F4 (K - 14)%nat eb
-                    (proc_addr j) (wi_splice (data2 fbn) o mm g) bsdB true b lks
+                    (proc_addr j) (wi_splice (data2 fbn) o mm g) bsdB true b lks (if user then upd_upt V P2 else V)
                     HKbl Hkklt HF4a0
                     ltac:(lkbelow)
                     with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hheld").
@@ -3744,13 +3742,13 @@ Section WriteiLoop.
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
           assert (HKbl : (K_brelse <= K - 14)%nat) by (lia).
           (* the same borrow on the break arm *)
-          iDestruct (wi_src_pid γf j pidv dq user (upd_upt V P2)
+          iDestruct (wi_src_bare γf j pidv dq user (upd_upt V P2) V
                        (m !!! Regidx Ra2 : mword 64) n src_bytes with "Hsrc")
             as "[Hppid Hsrcback]".
           iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kkb
                     pidv dev (blkmap_get bm2 fbn) (wi_q user dq)
                     J4 (K - 14)%nat eb
-                    (proc_addr j) (wi_splice (data2 fbn) o mm g) bsdB true b lks
+                    (proc_addr j) (wi_splice (data2 fbn) o mm g) bsdB true b lks (if user then upd_upt V P2 else V)
                     HKbl Hkklt HJ4a0
                     ltac:(lkbelow)
                     with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hheld").
@@ -4229,7 +4227,7 @@ Section WriteiMain.
              then proc_priv_core (proc_addr j) pidv (upd_upt V (pv_upt V))
              else ([∗ list] i ∈ seq 0 n,
                      pa_add (m !!! Regidx Ra2 : mword 64) i ↦ₘ[ktb] (src_bytes i))
-                  ∗ p_pid (proc_addr j) ↦₄{dq} pidv)%I
+                  ∗ proc_priv_bare (proc_addr j) pidv (upd_upt V (pv_upt V)))%I
       with "[Hsrc]" as "Hsrc"; [rewrite HVid; iExact "Hsrc"|].
     iAssert (inode_meta ip dn) with "[Hmt Hmj Hmn Hml Hmz]" as "Hmeta".
     { rewrite /inode_meta.

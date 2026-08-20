@@ -683,7 +683,7 @@ Definition wp_writei_sconf_body
   (if user
    then proc_priv_core pj pidv V
    else ([∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ[ktb] src_bytes i) ∗
-        p_pid pj ↦₄{dq} pidv) -∗
+        proc_priv_bare pj pidv V) -∗
   (* the running-thread bundle *)
   procs_inv γs -∗
   (* the disk fabric *)
@@ -775,7 +775,7 @@ Definition wp_writei_sconf_body
       (if user
        then proc_priv_core pj pidv (upd_upt V P')
        else ([∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ[ktb] src_bytes i) ∗
-            p_pid pj ↦₄{dq} pidv) -∗
+            proc_priv_bare pj pidv V) -∗
       bslots bn 3 -∗
       log_op γ n' -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -960,7 +960,7 @@ Definition wp_writei_gen_body
   (if user
    then proc_priv_core pj pidv V
    else ([∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ[ktb] src_bytes i) ∗
-        p_pid pj ↦₄{dq} pidv) -∗
+        proc_priv_bare pj pidv V) -∗
   (* the running-thread bundle *)
   procs_inv γs -∗
   (* the disk fabric *)
@@ -1061,7 +1061,7 @@ Definition wp_writei_gen_body
       (if user
        then proc_priv_core pj pidv (upd_upt V P')
        else ([∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ[ktb] src_bytes i) ∗
-            p_pid pj ↦₄{dq} pidv) -∗
+            proc_priv_bare pj pidv V) -∗
       bslots bn 3 -∗
       log_opS γ n' Sb' -∗
       WP (Loop : expr riscv_lang)) -∗

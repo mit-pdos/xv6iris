@@ -157,6 +157,7 @@ Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import CpuOwn.
 Require Import SchedCtx.
+Require Import ProcDefs.  (* [proc_priv_bare] *)
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
 Require Import BioInv.
@@ -200,7 +201,7 @@ Definition wp_ireclaim_sconf_body
     (dev : mword 32)
     (pidv : mword 32) (dq dqb dqs dqn : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) :=
+    (b : bool) (lks : gset string) (Vpr : pprivate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.ireclaim in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -282,7 +283,7 @@ Definition wp_ireclaim_sconf_body
   (* itrunc's bitmap, through iput *)
   bitmap_res γfs bmapstart cov logstart size used -∗
   (* the caller's own pid cell (bread's / begin_op's acquiresleep records it) *)
-  p_pid pj ↦₄{dq} pidv -∗
+  proc_priv_bare pj pidv Vpr -∗
   (* the running-thread bundle and the disk fabric *)
   procs_inv γs -∗
   dev_inv γu γd -∗
@@ -313,7 +314,7 @@ Definition wp_ireclaim_sconf_body
       sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-      p_pid pj ↦₄{dq} pidv -∗
+      proc_priv_bare pj pidv Vpr -∗
       bslots bn 3 -∗
       iref_slot -∗
       (* THE ONLY THING THAT ACTUALLY MOVED: every orphan iput freed its
@@ -349,8 +350,8 @@ Module Type IRECLAIM.
       (dev : mword 32)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string),
+      (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_ireclaim_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr
                              cov logstart bmapstart inodestart ninodes nib size
-                             used dev pidv dq dqb dqs dqn m K eb b lks.
+                             used dev pidv dq dqb dqs dqn m K eb b lks Vpr.
 End IRECLAIM.

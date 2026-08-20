@@ -1359,8 +1359,8 @@ Section KexecABad.
                           #Hesc & #Hslks & #Hireg & #Hropen & #Hprocs & #Hdevi & #Hdgeom &
                           #Hdlock)".
     iDestruct (kxa_esc_acc cn gfs gi cov logstart k Hk with "Hesc") as "#Hesck".
-    iDestruct (proc_priv_cwd_pid gf (proc_addr jp) pidv V with "Hpriv")
-      as "(Hcwd & Hcref & Hppid & Hpvbk)".
+    iDestruct (proc_priv_bare_cref gf (proc_addr jp) pidv V with "Hpriv")
+      as "(Hppid & Hcref & Hpvbk)".
     iPoseProof (kxc_064 with "Htext") as "Hi064".
     iPoseProof (kxc_066 with "Htext") as "Hi066".
     iPoseProof (kxc_06a with "Htext") as "Hi06a".
@@ -1406,7 +1406,7 @@ Section KexecABad.
     iApply (Iunlockput.wp_iunlockput_sconf gs jp gl gu gd gk pd pav pu bn g gfs
               gi cn gtl gil gisl cov logstart bmapstart inodestart nib size dev
               used2 k qi sq gy inum dn bm n2 pidv (DfracOwn (1/4)) dqb dqs
-              B2 (K - 68)%nat true true lks
+              B2 (K - 68)%nat true true lks V
               ltac:(lia) Hk Hlg Hsz Hbm0 Hbmc
               Hbml Hins0 Hibc Hibl Hib Hcovb Hn2 Hjp Hgs HB2a0
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitab Hitinv Hesck
@@ -1447,7 +1447,7 @@ Section KexecABad.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (EndOp.wp_end_op_sconf gs jp gl gu gd gk pd pav pu bn g gfs
               cov logstart dev n3 pidv (DfracOwn (1/4)) B3 (K - 68)%nat
-              true true lks ltac:(lia) Hlg Hjp Hgs
+              true true lks V ltac:(lia) Hlg Hjp Hgs
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hcrash Hcert Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hlog").
     all: try lkbelow.
@@ -1511,8 +1511,9 @@ Section KexecABad.
         rewrite /B1 upd_ne; [| regne].
         exact (Hthr r Hr Nsp Ns0 Ns1 Ns2 Ns4). }
     (* ---- close the process back up and take the shared exit ---- *)
-    iDestruct ("Hpvbk" $! (pv_cwd V) with "Hcwd Hcref Hppid") as "Hpriv".
-    rewrite kxc_upd_cwd_id.
+    (* the block goes back at the [V] it left at -- nothing wrote [p->cwd] --
+       so there is no [upd_cwd] to normalise away any more. *)
+    iDestruct ("Hpvbk" with "Hppid Hcref") as "Hpriv".
     iDestruct (cpu_own_transport CIDe CIDd 0%nat true (proc_addr jp) true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iAssert (iref_slots 2) with "[Hirs Hirs1]" as "Hirs2".
