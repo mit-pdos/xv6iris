@@ -662,7 +662,10 @@ Section BootPrimary.
        the pid lock, see [SpecMain]'s own row.  Spelled out rather than named
        as [BootShared.main_data_raw]: that file sits ABOVE this one, so the
        name is not in scope here either; [SystemAdequacy] splits the pair. *)
-    (∃ w : mword 32, (mword_of_int KernelSyms.first_1 : mword 64) ↦₄ w) -∗
+    (* PINNED, not existential: forkret's branch is decided by this cell,
+       so a holder of the existential cannot tell which arm it is in.
+       [BootShared.main_data_raw] carries the same shape. *)
+    ((mword_of_int KernelSyms.first_1 : mword 64) ↦₄ (mword_of_int 1 : mword 32)) -∗
     (∃ w : mword 32, (mword_of_int KernelSyms.nextpid : mword 64) ↦₄ w) -∗
     ([∗ list] i ∈ seq 0 NPROC, hart_full i (0%fin : CPU)) -∗
     ([∗ list] i ∈ seq 0 NPROC, pstate_full i UNUSED) -∗

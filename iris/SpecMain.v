@@ -405,7 +405,10 @@ Section SpecMain.
        [is_lock γp alp_pid_lock "nextpid" nextpid_res] that allocproc -- and
        hence kfork, sys_fork and userinit -- takes.  `first` is forkret's;
        main carries it and drops it. *)
-    (∃ w : mword 32, (mword_of_int KernelSyms.first_1 : mword 64) ↦₄ w) -∗
+    (* PINNED, not existential: forkret's branch is decided by this cell,
+       so a holder of the existential cannot tell which arm it is in.
+       [BootShared.main_data_raw] carries the same shape. *)
+    ((mword_of_int KernelSyms.first_1 : mword 64) ↦₄ (mword_of_int 1 : mword 32)) -∗
     (∃ w : mword 32, (mword_of_int KernelSyms.nextpid : mword 64) ↦₄ w) -∗
     (* every proc slot's HART TAG, minted at adequacy
        ([RiscvAdequacy.riscv_system_adequacy]) at hart 0: main spends them in

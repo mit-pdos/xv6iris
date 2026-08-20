@@ -498,7 +498,7 @@ Section BootCarve.
   (* [KernelData] lookups above [text_end], in the form the PINNED-run lemmas
      ([boot_ran_run_at], [boot_ran_phys_word]) want them: what the dump says
      is at an address IS what the loader left there. *)
-  Lemma boot_byte_data_run (A : Z) (w : bv 64) (W : nat) :
+  Lemma boot_byte_data_run {m : N} (A : Z) (w : bv m) (W : nat) :
     text_end <= A ->
     (forall j, (j < W)%nat ->
        KernelData.kernel_data !! (A + Z.of_nat j) = Some (nth_byte w j)) ->
@@ -898,6 +898,39 @@ Section BootCarve.
     iDestruct (boot_ran_eq g A (A + 4) A (A + Z.of_nat 4%nat) eq_refl E with "H")
       as "H".
     iDestruct (boot_ran_run_bss (m := 32%N) g A 4%nat w Hmem Hlo Hbss Hhi' Hz
+                 with "Hcl H") as "Hbs".
+    assert (Hal4 : is_aligned_paddr (Physaddr (pa_of_z A)) 4 = true).
+    { apply (aligned_of_mod _ 4); [lia |].
+      rewrite (boot_uint_pa A Hram). exact Hal. }
+    iApply (word4_pointsto_intro _ _ _ Hal4 with "Hbs").
+  Qed.
+
+  (* THE SAME CELL AT ITS IMAGE VALUE.  [boot_ran_cell4_bss] above is the
+     .bss case ([img_end <= A], all bytes zero); this is the one for a
+     writable global that the image INITIALIZES -- i.e. anything in
+     [[rodata_end, img_end)], which since the [kernel_data] narrowing is
+     owned rather than persisted.
+
+     WHY THE VALUE HAS TO BE PINNED.  [boot_ran_cell4] gives [∃ w, _ ↦₄ w],
+     which is enough for a cell whose contents nobody reasons about
+     ([nextpid] is one).  It is NOT enough for [first]: forkret's branch is
+     decided by that cell, so a caller holding an existential cannot tell
+     which arm it is in.  The image says 1, and this lemma is how that fact
+     reaches a points-to. *)
+  Lemma boot_ran_cell4_at (g : gstate) (A : Z) (w : mword 32) :
+    (forall x : Z, ram_lo <= x < ram_hi ->
+       g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
+    text_end <= A -> A + 4 <= ram_hi -> A mod 4 = 0 ->
+    (forall j, (j < 4)%nat -> nth_byte w j = boot_byte (A + Z.of_nat j)) ->
+    kmap_static_claims -∗ boot_raw_ran g A (A + 4) -∗ (pa_of_z A) ↦₄ w.
+  Proof.
+    intros Hmem Hlo Hhi Hal Hbytes. iIntros "#Hcl H".
+    assert (Hram : ram_lo <= A < ram_hi) by (unfold ram_lo, text_end in *; lia).
+    assert (E : A + 4 = A + Z.of_nat 4%nat) by (cbn; lia).
+    assert (Hhi' : A + Z.of_nat 4%nat <= ram_hi) by (cbn; lia).
+    iDestruct (boot_ran_eq g A (A + 4) A (A + Z.of_nat 4%nat) eq_refl E with "H")
+      as "H".
+    iDestruct (boot_ran_run_at (m := 32%N) g A 4%nat w Hmem Hlo Hhi' Hbytes
                  with "Hcl H") as "Hbs".
     assert (Hal4 : is_aligned_paddr (Physaddr (pa_of_z A)) 4 = true).
     { apply (aligned_of_mod _ 4); [lia |].

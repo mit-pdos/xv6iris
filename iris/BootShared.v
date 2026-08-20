@@ -18,6 +18,7 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base.
+Require Import RiscvModelBytes.  (* [nth_byte], for [first_bytes] below *)
 Require Import RiscvLang RiscvPtsto.
 Require Import HartTp.
 Require Import KMap KptPt KptGhost.
@@ -754,8 +755,37 @@ Qed.
    does not drop the bytes on the floor, and it is what [SpecForkret]'s
    `first` premise and [SpecAllocpid.nextpid_res] get threaded from when
    those land ([main_globals_raw] is where they will end up). *)
+(* THE IMAGE'S TWO WRITABLE INITIALIZED GLOBALS.
+
+   [first] IS AT A PINNED VALUE and [nextpid] is not, and the asymmetry is
+   the point.  Nobody reasons about [nextpid]'s initial contents -- it is
+   spent immediately on [SpecAllocpid.nextpid_res], whose own shape is
+   [∃ v, alp_nextpid ↦₄ v].  [first] is different: forkret's [if (first)]
+   branch is decided by that cell, so a holder of [∃ w, first ↦₄ w] cannot
+   tell which arm it is in and the boot arm becomes unprovable.  The image
+   says 1 ([KernelData], via [boot_ran_cell4_at]), and pinning it here is
+   what lets the FIRST process carry the right to run that arm. *)
+(* [first]'s FOUR IMAGE BYTES, as a named lemma.  It is named for the reason
+   [BootChain.entry_got_bytes] is: the discharge is a [vm_compute] over an
+   image map, and inlining one into a proof context normalises
+   [boot_byte] -- the filtered union of BOTH image maps -- rather than a
+   single lookup.  Named, it is paid once.
+
+   [vm_compute; reflexivity] does not close these on its own: the two sides
+   are [Some <the same bv literal>] with DIFFERENT [BvWf] proofs and print
+   identically (durable-notes' [bv_eq] trap, one [option] layer up). *)
+Lemma first_bytes (j : nat) :
+  (j < 4)%nat ->
+  KernelData.kernel_data !! (KernelSyms.first_1 + Z.of_nat j)
+  = Some (nth_byte (mword_of_int 1 : mword 32) j).
+Proof.
+  intro Hj.
+  destruct j as [|[|[|[|j']]]]; [.. | cbn in Hj; lia];
+    vm_compute; apply (f_equal Some), bv_eq; reflexivity.
+Qed.
+
 Definition main_data_raw `{!riscvGS Σ} : iProp Σ :=
-  ((∃ w : bv 32, (pa_of_z KernelSyms.first_1) ↦₄ w) ∗
+  ((pa_of_z KernelSyms.first_1) ↦₄ (mword_of_int 1 : mword 32) ∗
    (∃ w : bv 32, (pa_of_z KernelSyms.nextpid)  ↦₄ w))%I.
 
 Section BootAlloc.
@@ -1040,8 +1070,16 @@ Section BootAlloc.
       as "[Hgot Hrw]".
     iDestruct (bss_cut g (entry_got + 8) img_end ram_hi ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "Hrw") as "[Hbss _]".
-    iDestruct (boot_ran_cell4 g KernelSyms.first_1 Hmem ltac:(zlit)
-                 ltac:(zlit) ltac:(zeq) with "Hcl Hfirst") as "Hfirst".
+    (* pinned, not existential -- see [main_data_raw]'s note.  The byte
+       premise goes through [first_bytes], a NAMED lemma: proving it inline
+       makes [vm_compute] normalise [boot_byte], i.e. the filtered union of
+       both 17932-entry image maps, inside this proof's context -- which is
+       not slow but non-terminating in practice. *)
+    iDestruct (boot_ran_cell4_at g KernelSyms.first_1 (mword_of_int 1)
+                 Hmem ltac:(zlit) ltac:(zlit) ltac:(zeq)
+                 (boot_byte_data_run KernelSyms.first_1
+                    (mword_of_int 1 : mword 32) 4%nat ltac:(zlit) first_bytes)
+                 with "Hcl Hfirst") as "Hfirst".
     iDestruct (boot_ran_cell4 g KernelSyms.nextpid Hmem ltac:(zlit)
                  ltac:(zlit) ltac:(zeq) with "Hcl Hnext") as "Hnext".
     (* ---- [_entry]'s GOT slot: the &stack0 word, at [DfracDiscarded] so all
