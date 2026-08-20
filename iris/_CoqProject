@@ -251,8 +251,8 @@ UmodeIo.v
 WpUmodeStep.v
 WpUmodeLeaf.v
 WpUmodeBranch.v
-# WpUmodeStore.v
-# WpUmodeLoad.v
+WpUmodeStore.v
+WpUmodeLoad.v
 USpecSync.v
 UCodeSync.v
 # UProofSync.v
