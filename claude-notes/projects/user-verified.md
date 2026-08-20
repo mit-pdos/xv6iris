@@ -1,7 +1,9 @@
 # Project: VERIFIED user-mode execution (the Umode tier) — the sync process
 
 **STATUS (2026-08-04): the sync process is FULLY VERIFIED.** The whole Umode
-tier is built and axiom-clean (5 platform axioms + funext everywhere), and
+tier is built and axiom-clean (5 platform axioms + funext everywhere -- but
+see the PORT note below: post-port the two MEMORY leaves also carry
+`ResvAxioms.load_reservation_term`), and
 `UProofSync.v` proves all four contracts — `wp_sync_start` (the
 whole-process top statement), `wp_sync_main`, the sync stub (ecall round
 trip through `xv6_sys_protocol`), and the exit stub.  What remains OPEN for
@@ -412,3 +414,48 @@ tower → concrete frame → `uv_sys_wp` with the caller's `Ψ` payload).
   restatement — the only way an `iLöb` back edge can strip its IH, and what
   every UNBOUNDED loop in this tier will need.  The funnel's proof body did
   not change; the later was already there.
+
+## THE PORT ONTO PER-NODE SEMANTICS — what it cost the tier
+
+The tier was descoped for the hart-node-port and revived afterwards.  The
+measured shape of that revival, because it is the useful part:
+
+**THE INTERPRETER REACHES EXACTLY ONE LAYER.**  Of the tier's 41 rows, 18
+compile against per-node semantics with NO EDIT AT ALL — the whole pure
+image/ABI layer (`UmodeMem`, `UmodeCap`, `UmodeFetch`, `UmodeAbi`,
+`UmodeArith`, `UmodeSyscall`, `UmodeIo`, `UmodeInitIo`), all four binaries'
+`UCode*`, and **every one of the five `USpec*` files**.  A spec stated over a
+CAPABILITY and an IMAGE does not mention the interpreter, so a semantics swap
+cannot reach it: `uv_cap` / `uv_cap_gpr` / `umem` / `uinstr` name no
+`mstate_interp`, no step relation and no fupd mask.  The engine is where it
+first appears, and the engine is a REWRITE, not a re-seam.
+
+**THE BORROW IS DELETED, NOT PORTED.**  `main-cycle-port.md` promised
+"wire/mip borrow included … the same seam and nothing new".  Post-port the
+hart OWNS mcycle/mtime/mip (`clock_res` rides inside `pc_is`), so
+`clock_mip_acc` is gone, `wire_inv` is unused, and the wire reads come off
+the hart's own read-only frame.
+
+**WHAT THE LEAVES PAID.**  The funnel's execute obligation gained a `goodmb`
+certificate beside its `exec` fact — and that premise MUST be guarded by the
+state facts the `exec` premise already carries, or it is unprovable for
+anything that jumps (durable-notes has the trap).  The ~50 leaf statements
+are otherwise byte-identical; only file-local generics moved
+(`wp_uv_alu0/1/2`, `wp_uv_btype_gen*`, `wp_uv_store`, `wp_uv_load`), each by
+a certificate premise nothing above them can see.
+
+**THE MEMORY LEAVES WERE REBUILT, NOT ADAPTED.**  Pre-port they did the
+access as an Iris `gen_heap_interp` update; per-node the image is the hart's
+byte map, so the access is a pure `exec`+`goodmb` pair and the ghost half is
+a MAP EQUATION (`upa_map pt (uM_store M a k v) = write_bytes …`).  The
+safety tier's `u_walk_pure` could not be reused: it stands on `u_mem_wf`,
+which owns every mapped data byte, and pins its landing map by DOMAIN — a
+value-precise tier can pay neither.  That is also why `u_mem_ok` exists.
+
+**AND THE AXIOM FOOTPRINT GREW BY ONE, inherited.**  `WpUmodeStore` /
+`WpUmodeLoad` close at 5 platform + funext + `ResvAxioms.load_reservation_
+term`.  It enters through `UserMemAccess`'s reservation helpers inside the
+in-one-page `vmem_*_addr_intra` composers, which the port is obliged to use
+because they are the ones carrying `goodmb` twins; the safety tier's own
+`arm_LOAD_u` already carries it and it is in the tree's sanctioned baseline.
+The register leaves still show 5 + funext.

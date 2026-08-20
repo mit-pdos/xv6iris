@@ -410,6 +410,42 @@ you tighten the filter. **Reduce the side condition before closing it**
 treat any `by`/`done` over a `map_lookup_filter_Some*` goal on an image map as
 a bug.
 
+### AND `dom_union_L` DOES NOT TERMINATE ON A `gset Arch.pa` GOAL
+
+The section above is about `set_solver` failing over `gset (mword n)`.  The
+same instance divergence reached through a different door does not fail — it
+**hangs**, and it hangs in a way that looks nothing like a proof bug: a
+TOP-LEVEL lemma with an EMPTY context ran over 50 minutes with no output,
+twice, and reads exactly like a stalled remote build.
+
+`rewrite dom_union_L` on a goal about `dom (A ∪ B) : gset Arch.pa` goes
+through `dom_union_L`'s `LeibnizEquiv` side condition, and that is where the
+`Decidable_eq_mword`-vs-`bv_eq_dec` divergence bites.  Note this is NOT the
+context-size blow-up `FastSetSolver` addresses and NOT the "no matching
+clauses" failure of `set_solver` — the tactic simply never returns.
+
+**Do every domain fact by hand: `elem_of_dom` plus `lookup_union_Some` /
+`lookup_union_None`, with the set type ASCRIBED at each assertion**
+(`(dom A : gset Arch.pa)`).  `UserFetchCert.dom_union_shape` and
+`WpUmodeStore.uv_mm_dom_img` are the two worked instances — they exist for
+exactly this reason and are the shape to copy.
+
+Two corollaries worth keeping:
+
+- **`elem_of_dom` applied to an `is_Some` goal leaves its set type an evar**,
+  and the next `rewrite` then declines the resulting `dom` as a non-match.
+  Ascribe the type BEFORE applying it.  The symptom is a bare *"Proof is not
+  complete"* at `Qed` naming nothing — the durable signature of an
+  unresolved instance, one door along from the typeclass section below.
+- The same file-locality applies to `rewrite` on `dom` generally: identical
+  scripts work in `UserBytes.v` and fail in `UserFetchCert.v`, because what
+  differs is the ambient instances the lemmas are keyed on, not the goal.
+
+**Localise it with streaming `coqc -time`** as the "A COMPILE THAT NEVER
+FINISHES" rule prescribes — the last line of the log is the stalling
+sentence, and that is the only cheap way to tell this apart from a slow
+proof.
+
 ## A HEDGED CONJUNCT IS A FALSE STATEMENT THAT COMPILES
 
 **Never write `⌜P \/ True⌝` (or `(H : True)`) into a contract as a
