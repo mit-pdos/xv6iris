@@ -2,7 +2,7 @@
 
 What fs.img MEANS: the pure semantics of an xv6 on-disk file system read off
 a block view, applied to the literal image mkfs built. Three deliverables:
-the top-level adequacy theorem (`SystemAdequacy.xv6_fs_adequacy_xv6Σ`) now
+the top-level adequacy theorem (`FsAdequacyImg.xv6_fs_adequacy_xv6Σ`) now
 assumes ONLY "the initial disk is the mkfs image" — its recovery hypothesis
 is PROVED, not taken; the image is proven well-formed (`fsimg_wf`, the
 durable-state reading the boot composition will consume); and the four
