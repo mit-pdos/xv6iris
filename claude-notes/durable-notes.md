@@ -2172,10 +2172,10 @@ The number goes up; that is the real one.
   the rule protects the user's machine, so relocation forward suffices —
   no re-verification owed.
 
-## The adequacy-print baseline (GR-36, 2026-08-16)
+## The adequacy-print baseline (GR-36, 2026-08-16; SEVEN since fs-cfg-boot stage (e), 2026-08-20)
 
 `Print Assumptions xv6_power_adequacy_xv6Σ` (SystemAdequacy.v, printed by
-every CI build since 85c21e9f) must show EXACTLY these eight, and merge
+every CI build since 85c21e9f) must show EXACTLY these seven, and merge
 rounds diff against this list textually, not by count. The anchor stays
 IMAGE-FREE in `SystemAdequacy.v` (its `fs_boot_image_eras` premise
 undischarged): any constant naming `FsImgDisk.fsimg_dk` audits at baseline
@@ -2183,36 +2183,26 @@ undischarged): any constant naming `FsImgDisk.fsimg_dk` audits at baseline
 corollaries live in `FsAdequacyImg.v` and are NOT the audit target — see
 `SystemAssumptions.v`'s header.
 
-1. `LinkNameiRootBoot.NameiRootBoot.wp_namei_root_boot`  (assumed-Link)
-2. `LinkForkretPark.ForkretPark.forkret_park`            (assumed-Link)
-3. `FunctionalExtensionality.functional_extensionality_dep`
-4. `valid_reservation`    (rv64d extern)
-5. `plat_term_write`      (rv64d extern)
-6. `match_reservation`    (rv64d extern)
-7. `load_reservation`     (rv64d extern)
-8. `cancel_reservation`   (rv64d extern)
+1. `LinkForkretPark.ForkretPark.forkret_park`            (assumed-Link)
+2. `FunctionalExtensionality.functional_extensionality_dep`
+3. `valid_reservation`    (rv64d extern)
+4. `plat_term_write`      (rv64d extern)
+5. `match_reservation`    (rv64d extern)
+6. `load_reservation`     (rv64d extern)
+7. `cancel_reservation`   (rv64d extern)
 
-**IT WAS SEVEN UNTIL 2026-08-19, AND THE SWAP IS THE POINT.** What stood at
-(1) was `LinkUserinit.Userinit.wp_userinit_sconf` — userinit's WHOLE BODY,
-assumed. userinit is now PROVEN (`ProofUserinit.v`, linked in
-`LinkUserinit.v`), and the two entries above are what its proof rests on:
-
-- (1) is `namei("/")` at the boot client's premises — the same corner
-  `ProofNameiRoot.v` already PROVES, minus the four persistent inode-cache
-  rows main cannot produce (`SpecNameiRootBoot.v`'s header is the
-  inventory). Retiring it is boot wiring, not proof work.
-- (2) is the RUNNABLE park, and it is **not new to the tree** — `kfork` and
-  `sys_fork` have carried it all along. It is new to the BOOT cone only
-  because the old axiom hid it: `SpecForkretPark.v`'s header said userinit
-  "sidesteps the question entirely by being a wholesale Axiom", and it no
-  longer does. The paid form (`SpecForkretParkPaid`, PROVED) is not
-  available to userinit either: its `forkret_park_pkg` wants the trap
-  loop's kernel-side bundle for the new process, which is the same
-  "where does a new process's half of the kernel environment come from"
-  question kfork owes.
-
-So the count went up by one while the assumed SURFACE went down by a whole
-function: prefer that trade, and do not read the count alone.
+The ONE assumed-Link left is the runnable park — the "where does a new
+process's half of the kernel environment come from" question, kfork's and
+userinit's alike; the humans' forkret effort owns it. The entry that fell
+on 2026-08-20 was `LinkNameiRootBoot.NameiRootBoot.wp_namei_root_boot`,
+retired by fs-cfg-boot stage (e) exactly as its header predicted — a
+functor application over `LinkNameiRoot.NameiRoot` once `icache_boot_at`
+ran in main's walk and the four icache rows existed at the `namei("/")`
+call; the two config ties are `eq_refl` at the minted `icfg`. The count
+history: seven → eight on 2026-08-19 (userinit's whole-body axiom traded
+for its two real dependencies — the count went UP while the assumed
+surface went DOWN by a whole function; prefer that trade, and do not read
+the count alone) → seven on 2026-08-20.
 
 `LinkPanicStub.PanicAssumed.panic_wp_holds` was an earlier assumed Link and
 is gone: `panic()` is proven and every arm links against `SpecPanic`, so the
