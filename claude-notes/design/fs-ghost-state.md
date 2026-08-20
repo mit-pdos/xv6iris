@@ -238,17 +238,24 @@ step rather than a sentence:
 | piece | statement | why |
 |---|---|---|
 | `FsReady.fs_ready_seal` | `ireg_boot ==∗ ireg_open` | one `ity_shoot`, no invariant, no mask.  **The boot-freedom witness**: `ireg_boot` is exclusive, so after this step no second seal is possible and nothing boot-shaped survives — `ireg_open` is an existential over the one-shot's value and mentions nothing else. |
-| `FsReady.fs_ready_pre` | the seventeen non-regime constituents, as one persistent assertion | what a seal SITE must hold.  Every one of them is either persistent boot material the chain already carries or a bundle `SpecFsinit`'s post hands back, so the site can be checked constituent by constituent. |
+| `FsReady.fs_ready_pre` | the NINETEEN non-regime conjuncts (two of them pure — `printk_gen_contract`, `fs_geom_ok`), as one persistent assertion | what a seal SITE must hold.  Every one of them is either persistent boot material the chain already carries or a bundle `SpecFsinit`'s post hands back, so the site can be checked constituent by constituent — the checked ledger is fs-cfg-boot.md's stage-(f) charter, table (f-3). |
 | `FsReady.fs_ready_establish` | `fs_ready_pre -∗ ireg_boot ==∗ fs_ready` | **the producer `fs_world` never had.**  Booting is over the instant the predicate exists. |
 
 ### 7b. `fs_ready` — the runtime file system as ONE persistent assertion
 
-`FsReady.fs_ready` is **PARAMETER-FREE**: 18 conjuncts (the two text/data
+`FsReady.fs_ready` is **PARAMETER-FREE**: 20 conjuncts (the two text/data
 certificates, the printk credential pair, the block/log/crash fabric,
-`gen_cert`, the disk fabric and its lock, the icache's four, `ireg_inv` +
-`ireg_open`, `kalloc_env`) and not one argument.  Every ghost name it used
-to take is ambient — the four the inode cache already owned (`icfg_log`,
-`icfg_ist`, `icfg_nib`, `icfg_dev`) and the fifteen `FsCfg.fscfg` adds.
+`gen_cert`, the disk fabric and its lock as ONE existentially-quantified
+conjunct — the three virtio ring pages left `fscfg` in fs-cfg-boot.md's R1,
+recovered by `disk_geom_agree` — the icache's four, `ireg_inv` +
+`ireg_open`, the kmem lock and `kalloc_avail … None` SPELLED rather than as
+`kalloc_env` (SpecFileclose's pipe arm names the pair, and a hidden `∃`
+admits no tie), `⌜fs_geom_ok⌝` — the nineteen pure premises every fs
+syscall used to state, as one record — and the four discarded superblock
+cells `fs_sb_cells`) and not one argument.  Every ghost name it used to
+take is ambient — the four the inode cache already owned (`icfg_log`,
+`icfg_ist`, `icfg_nib`, `icfg_dev`) and the SIXTEEN `FsCfg.fscfg` adds
+(nineteen before R1).
 
 **WHY PARAMETER-FREE, and it is not cosmetic.**  `fs_ready` is meant to be
 CARRIED — produced by forkret's not-forked arm, held by a running process,
@@ -272,12 +279,15 @@ depended on process abstractions.  A spec that wants it takes `procs_inv γs`
 as its own premise; the two friendly bodies in `FsSyscalls.v` do.
 
 `fs_world` is no longer a one-line alias: it is the predicate AT A CALLER'S
-OWN NAMES — the nineteen tie equations (`bn = fsc_bio`, `glog = icfg_log`,
-…) beside the ambient `fs_ready`.  `fs_world_all` does the substitution once
-so that a body which threads its own names still destructs ONE row and gets
-the eighteen constituents spelled the way its callee spells them.  This is
-`SpecKexec`'s existing `g = icfg_log` idiom at full width.  Three things
-changed around the assertion:
+OWN NAMES — the tie equations (`bn = fsc_bio`, `glog = icfg_log`, …) beside
+the ambient `fs_ready`, with one R1 exception: the three ring-page ties are
+now carried as `disk_geom` + the virtio `is_lock` at the caller's own
+`pd pav pu` as RESOURCES where the three `⌜⌝` equations used to be
+(interderivable with the predicate's existential via `disk_geom_agree`).
+`fs_world_all` does the substitution once so that a body which threads its
+own names still destructs ONE row and gets the constituents spelled the way
+its callee spells them.  This is `SpecKexec`'s existing `g = icfg_log`
+idiom at full width.  Three things changed around the assertion:
 
 1. **Its own file**, below the syscall layer, so any file can import the
    predicate without importing the syscall bodies that used to own it —
@@ -345,14 +355,21 @@ sweep.  The one adoption that would pay (`SpecIput`'s ~7 ambient rows) is
 gated on the `ic_sleeplocks` move, and even then it must be weighed against
 the four constituents iput does not use.
 
-**The seal's SITE is still the tree's one standing IOU.**  `LinkFsinit`'s
-`Fsinit` module has no consumer — nothing in the tree applies
-`wp_fsinit_sconf`, `ProofMain`/`LinkMain`/`SpecMain` never mention `fsinit`
-— because in xv6 `fsinit()` is called from forkret's `if (first)` arm, and
-that arm is `LinkForkretNF.wp_forkret_nf_ax`.  SIMP-2 makes the seal
-STATABLE and CHECKED (`fs_ready_establish` is `Qed`); it cannot wire it,
-because there is no landed caller to wire it into.  No new axiom either
-way.
+**The seal's SITE is still the tree's one standing IOU — and it is now
+CHARTERED.**  `LinkFsinit`'s `Fsinit` module has no consumer — nothing in
+the tree applies `wp_fsinit_sconf` — because in xv6 `fsinit()` is called
+from forkret's `if (first)` arm, and that arm is
+`LinkForkretNF.wp_forkret_nf_ax`.  SIMP-2 made the seal STATABLE and
+CHECKED (`fs_ready_establish` is `Qed`); fs-cfg-boot.md's **stage-(f)
+charter** ("transport and seal") is the funded plan for the site: the
+exclusive pile rides `FirstTok.first_tok`'s widened left disjunct
+(`first_boot_persist` / `kalloc_avail fsc_kpages None` / `first_fsinit`),
+deposited through userinit's park; the charter's table (f-3) shows every
+`fs_ready_pre` conjunct sourced from that payload, fsinit's own post, or
+the ambient world — `main_deposit` is NOT the channel (its old C7 (iii)
+role is superseded).  What remains at the site is the humans' forkret walk
+and the park seam (charter decision points D1/D2, residuals R1–R4).  No
+new axiom either way.
 
 ### 7e. `ic_sleeplocks`, and how a misplaced definition faked a dependency
 

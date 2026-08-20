@@ -687,6 +687,321 @@ Measured facts that supersede this file's earlier estimates:
   makes were observed compiling the same file. Model split: Fable
   coordinates/designs, Opus proves.
 
+## Stage (f) charter — transport and seal
+
+Ruled 2026-08-20 (design agent), against the tree AS IT IS: stage (e) landed
+(`be22f6e3`), the humans' forkret lane is at `SpecForkret.wp_forkret_gen_body`
+parametric in `Pfirst` with `LinkForkretNF.wp_forkret_nf_ax` assumed, and the
+(f0) agent is mid-flight on the buf carve + `BioInitAt.buf_raw` +
+`bio_init_at` in main (working tree: BioInitAt/BootCarveMain/SpecMain/
+ProofMain diffs) and on kit 2's `bslots`/`bitmap_res` rows (debt D).  This
+charter is the exact-statement ledger for staging step 6; where the humans'
+in-flight state makes a choice theirs, it is marked **D1/D2/D3**, not chosen.
+
+### (f-1) The `first_tok` widening — exact statement
+
+`FirstTok.first_tok` becomes (same Section, same `ICFG : icfg`-declared-last
+index discipline; `first_addr` unchanged):
+
+```
+Definition first_tok : iProp Σ :=
+  ((first_addr ↦₄ (mword_of_int 1 : mword 32)
+      ∗ first_boot_persist ∗ kalloc_avail fsc_kpages None ∗ first_fsinit)
+   ∨ (first_addr ↦₄□ (mword_of_int 0 : mword 32) ∗ fs_ready))%I.
+```
+
+**Mutual exclusion is untouched**: both payload rows are ∗-adjoined beside
+the owned cell, the right arm is unchanged, and `first_tok_boot_excl`'s
+statement AND proof stay byte-identical — exclusion rests solely on
+`word4_pointsto_agree` at `first_addr` (`DfracOwn 1` vs `DfracDiscarded`,
+value 1 vs 0).  `first_tok_done` unchanged; `first_tok_boot` gains the three
+payload premises.
+
+**The payload is purpose-built, NOT the bare kit** — the kit rides *inside*
+it opaquely.  Reason: the seal site must destructure against TWO different
+shapes (SpecFsinit's premise order, then `fs_ready_pre`'s conjunct order),
+and the kit is indexed by era-side data (`P`, `Rspent`, `dk`, `sb`) the
+forkret walk must never mention.  So: two named bundles, split by PRODUCTION
+SITE (not by persistence — see (f-4) for why the kalloc row is on its own):
+
+```
+(* FirstTok.v.  16 rows, ALL PERSISTENT, all in main's hands at +0x9e.
+   Typeclasses Opaque + Persistent instance, FsReady.v's own idiom. *)
+Definition first_boot_persist : iProp Σ :=
+  (kernel_text ∗ kernel_data ∗
+   printk_env fsc_printk fsc_uart fsc_disk ∗
+   ⌜printk_gen_contract (kt := KT1) fsc_printk fsc_uart fsc_disk⌝ ∗
+   bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) ∗
+   fs_crash_seam fsc_cov fsc_logst ∗ gen_cert ∗
+   dev_inv fsc_uart fsc_disk ∗
+   (∃ pd pav pu : mword 64,
+      disk_geom fsc_disk pd pav pu ∗
+      is_lock fsc_dlock d_lock "virtio_disk"%string
+              (disk_res fsc_disk pd pav pu)) ∗
+   is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst
+              icfg_nib icfg_dev ∗
+   itable_inv ∗
+   ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst ∗
+   ic_sleeplocks fsc_ic ∗
+   ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib ∗
+   is_lock fsc_kalloc (mword_of_int KernelSyms.kmem) "kmem"%string
+     (kmem_res fsc_kpages (mword_of_int (KernelSyms.kmem + 24))) ∗
+   ⌜fs_geom_ok⌝)%I.
+
+(* FirstTok.v.  SpecFsinit's EXCLUSIVE premise pile, era data quantified.
+   [first_sb_base := mword_of_int KernelSyms.sb] is DUPLICATED here rather
+   than imported from SpecFsinit (SpecForkretPark.forkret_pc's own
+   precedent: don't pull a function Spec's cone to name one constant);
+   the log-cell names are LogInv's, already imported. *)
+Definition first_fsinit : iProp Σ :=
+  (∃ (dk : Z -> bv 8) (sb : FsImg.fs_sb) (used : gset Z)
+     (vlock v_start v_dev v_nc v_n : mword 32) (vname vcpu : mword 64)
+     (sb_old : nat -> bv 8),
+     ⌜first_fsinit_pures dk sb⌝ ∗
+     fs_kit_fsinit_ghost file_icfg file_fscfg (FsCrash.fs_blocks dk)
+       (fs_kit_spent (FsCrash.fs_blocks dk) sb icfg_nib
+          (FsImg.fs_live_set (FsCrash.fs_blocks dk) sb)) ∗
+     (* rows (A): the raw cells fsinit/initlog write *)
+     ([∗ list] i ∈ seq 0 32, pa_add first_sb_base i ↦ₘ sb_old i) ∗
+     log_addr ↦₄ vlock ∗
+     lock_name_field log_addr ↦₈ vname ∗ lock_cpu log_addr ↦₈ vcpu ∗
+     l_start ↦₄ v_start ∗ l_dev ↦₄ v_dev ∗
+     l_out ↦₄ (mword_of_int 0 : mword 32) ∗
+     l_cmt ↦₄ (mword_of_int 0 : mword 32) ∗
+     l_ncommit ↦₄ v_nc ∗ lh_n_pa ↦₄ v_n ∗
+     ([∗ list] i ∈ seq 0 LOGBLOCKS, ∃ w : mword 32, lh_block i ↦₄ w) ∗
+     (* row (B) *) log_mirror_full ∗
+     (* row (C) *) iref_slot ∗
+     bslots fsc_bio ((LOGBLOCKS + 2) + 2 + 1)%nat ∗
+     (* row (D) -- IF the (f0) agent lands bitmap_res/bslots INSIDE the
+        kit, delete the standalone rows; the (f0) spelling governs. *)
+     bitmap_res fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size used)%I.
+```
+
+`first_fsinit_pures dk sb : Prop` is the SMALL pure block — only what
+`⌜fs_geom_ok⌝` does not already cover of SpecFsinit's hypotheses (a)–(g):
+the block-1 byte equation `∃ v_magic v_nblocks v_nlog, take 32 (fs_blocks
+dk 1) = sb_image v_magic (mword_of_int fsc_size) v_nblocks (mword_of_int
+fsc_ninodes) v_nlog (mword_of_int fsc_logst) (mword_of_int icfg_ist)
+(mword_of_int fsc_bmapstart) ∧ bv_unsigned v_magic = FSMAGIC` — stated at
+words, so no SpecFsinit import — plus `hdr_n`-of-the-header-block `= 0` (g)
+and `1 ∈ fsc_cov ∧ ¬ 1 ∈ log_region_set fsc_logst`.  Everything else in
+SpecFsinit's list ((d), (e), (f), `log_geom_ok`) is a projection of
+`fs_geom_ok` (its `fgo_*` accessors exist for exactly this).  Two producer
+lemmas land in **FsCfgBoot.v** (coordinate with (f0)'s in-flight edits;
+additive only): `fs_geom_ok_of_image` and `first_fsinit_pures_of_image`,
+each `fsimg_wf … = true -> fs_region_wf … = true -> ties -> …` in
+`image_ireg_premises`' style.  NOTE `fs_geom_ok`'s `fgo_ushort` wants
+`16·nib ≤ 2^16` where `fs_cfg_alloc` threads only `≤ 2^32`: thread the
+tighter bound the way `0 < nib` is threaded (true of the image, 208 ≤ 65536).
+
+Open lemmas (both `iExact`-style, one `iDestruct` each):
+`first_fsinit_open` emits the rows in **SpecFsinit's premise order** (the
+kit opened via `fs_kit_fsinit_ghost_open` inside it), and
+
+```
+Lemma first_persist_pre :
+  first_boot_persist -∗ kalloc_avail fsc_kpages None -∗
+  log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev -∗
+  fs_sb_cells -∗ fs_ready_pre.
+```
+
+— so the seal site's whole fs assembly is: `first_persist_pre` + the four
+`word4_pointsto_persist`s that make `fs_sb_cells` out of fsinit's returned
+cells + `fs_ready_establish` with fsinit's returned `ireg_boot`.
+
+### (f-2) The deposit path — producer, route, and both arms
+
+**Nobody writes `first_addr ↦₄ 1`.**  `static int first = 1` is one of the
+image's two writable initialized `.data` words: the value is loaded, the
+cell is cut out of the boot data run at `BootShared.v:1176`
+(`boot_ran_cell4_at` at `KernelSyms.first_1`), threaded pinned-not-
+existential through `BootChain.v:680` into `SpecMain.v:454`, and today
+**DROPPED** by `ProofMain` (`Hfirst`, the comment block at ~:1740).  Stage
+(f) stops the drop.
+
+**The route is the park, and the token is ASSEMBLED IN USERINIT, not in
+main.**  Forced, not chosen: `kalloc_avail fsc_kpages None` (fs_ready_pre
+row 17) can only be minted by `kalloc_avail_seal` AFTER allocproc's last
+counted draw — userinit's own — so main cannot finish the payload at +0x9e
+(see (f-4)).  Concretely:
+
+- `SpecMain`/`ProofMain.mn_grp_fs`: keep `Hfirst` and `Hkit2` (delete the
+  `iDestruct "Hkit2" as "_"` drop at ~:1496 and the stage-(f) park comment),
+  build `first_boot_persist` (all 16 rows are in hand between +0x9a and
+  +0x9e; `⌜fs_geom_ok⌝` via `fs_geom_ok_of_image`) and `first_fsinit`
+  (kit 2 + rows A/B/C/D — threading in (f-3)), pass both plus the cell to
+  userinit.
+- `SpecUserinit` gains three resource premises — the pinned cell
+  `first_addr ↦₄ (mword_of_int 1)`, `first_boot_persist`, `first_fsinit` —
+  and swaps its kalloc rows per (f-4).  `LinkUserinit` relays.
+- `ProofUserinit`: after allocproc's return, seal the count
+  (`kalloc_avail_seal`), form `first_tok`'s left arm, and hand it to the
+  park beside the block — the deposit is a sixth argument to
+  `FP.forkret_park` **once D1 lands**; until then it is HELD at the call
+  site and dropped there with a loud stage-(f)/D1 comment (the exact
+  pattern main used for kit 2 in stage (e)).
+
+**D1 (humans): the park seam.**  The recorded plan is their own
+(`LinkForkretNF.v` header): the first arm's proof grows forkret's contract
+by a premise, "and so, one tier up, does `forkret_park_pkg`" — i.e.
+`SpecForkret.wp_forkret_gen_body` instantiated at `Pfirst := first_tok`,
+`SpecForkretPark.forkret_park_body` + `forkret_park_pkg` each + one
+`first_tok -∗` row.  The alternative (a dispatch-payload route through
+`SchedCtx.p_sched`) is also theirs.  Our deposit works under either: the
+token is staged at the one park site either seam consumes.  We do NOT edit
+SpecForkretPark/LinkForkretPark; the one-line ProofUserinit change that
+passes the token rides their commit (or ours on their green light).
+
+**Both arms' obligations, explicitly.**  With D1 = the premise route,
+forkret destructures `first_tok`; the two arms owe:
+
+*Left (boot) arm* — the humans' walk:
+1. `iDestruct` left: owned cell (the `lw` at forkret+0x1c reads 1, the
+   `c.beqz` falls through), `first_boot_persist`, `kalloc_avail … None`,
+   `first_fsinit`.
+2. `first_fsinit_open`; apply `LinkFsinit.Fsinit.wp_fsinit_sconf` (its
+   FIRST consumer) — thread-state premises (`sie_cap_gpr`, `cpu_own`,
+   `eb = true`, `locks_below lks "log"`, `K_fsinit ≤ K`) and the
+   `γs`/`j`/`γl`/`p_pid` plumbing are forkret's own context; every fs
+   resource row and every pure hypothesis comes off the two bundles
+   (`fs_geom_ok`'s accessors + `first_fsinit_pures`).
+3. At fsinit's return: `word4_pointsto_persist` ×4 on
+   ninodes/inodestart/size/bmapstart → `fs_sb_cells`;
+   `first_persist_pre`; `fs_ready_establish` with the returned
+   `ireg_boot` ⇒ **`fs_ready`**.
+4. The store of 0 to `first_addr` (the owned cell), then
+   `word4_pointsto_persist` ⇒ `first_addr ↦₄□ 0`; `first_tok_done` ⇒ the
+   right arm, for D2's distribution.
+5. Continue into `kexec("/init")` on `fs_ready` (its kalloc is the `None`
+   regime; the null arm is a live panic path).  Leftovers — `bslots bn 3`,
+   `iref_slot`, `bitmap_res … used'`, `fsblock fsc_fs 1`, the returned raw
+   log/sb-half cells — feed the first process's URes or drop (R3 below).
+
+*Right (steady) arm*: `iDestruct` right: `↦₄□ 0` (the load reads 0, the
+`c.beqz` is taken — this is ProofForkret's existing proof with `Pfirst`
+replaced by the arm's cell) ∗ `fs_ready` for the residue.  Nothing else.
+
+**D2 (humans): right-arm distribution.**  kfork's parker must pay the right
+arm for every child.  Recommended: `first_addr ↦₄□ 0` becomes `fs_ready`'s
+21st conjunct (FsReady.v is theirs; the seal site holds the persisted cell
+if the seal is taken AFTER step 4's store — a ghost step, order is free),
+making the right arm derivable from `fs_ready` alone, which every post-boot
+parker holds.  Alternative: thread the pair separately through the syscall
+environment.  Either way it is invisible to this campaign's files.
+
+### (f-3) The persistent half: `main_deposit` is NOT the channel — ruling supersedes C7 (iii)
+
+The old plan sent the persistent fs rows through
+`SpecMainSecondary.main_deposit`.  **Dropped.**  `main_deposit`'s only
+consumer is the secondary-hart arm, forkret never reads `started_inv`, and
+the park record's closure is where a parked WP gets its world — so the
+persistent half rides `first_tok` too (persistent rows in an exclusive
+bundle cost nothing), and **SpecMainSecondary.v, the started wand in
+SpecMain, and the secondary-arm proofs are untouched by stage (f)**.  The
+two-column ledger, every `fs_ready_pre` conjunct → source at the seal site:
+
+| # | `fs_ready_pre` conjunct | source |
+|---|---|---|
+| 1 | `kernel_text` | `first_boot_persist` (also forkret's own premise) |
+| 2 | `kernel_data` | `first_boot_persist` |
+| 3 | `printk_env fsc_printk fsc_uart fsc_disk` | `first_boot_persist` (mn_grp_printk, γpr = fsc_printk since (e)) |
+| 4 | `⌜printk_gen_contract⌝` | `first_boot_persist` (pure, main's hypothesis) |
+| 5 | `bio_ctx fsc_bio (fs_view …)` | `first_boot_persist` (`bio_init_at`'s post at +0x8e — unblocked by (f0)'s buf carve) |
+| 6 | `log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev` | **fsinit's own post** (initlog at the kit's `log_free_tok icfg_log`) |
+| 7 | `fs_crash_seam fsc_cov fsc_logst` | `first_boot_persist` (boot chain's, persistent) |
+| 8 | `gen_cert` | `first_boot_persist` |
+| 9 | `dev_inv fsc_uart fsc_disk` | `first_boot_persist` |
+| 10 | `∃ pd pav pu, disk_geom ∗ is_lock fsc_dlock …` | `first_boot_persist` (+0x9a `newlock_at fsc_dlock` + `disk_geom`) |
+| 11–14 | `is_itable2`, `itable_inv`, `ic_escrows`, `ic_sleeplocks` | `first_boot_persist` (`icache_boot_at`'s post, +0x92) |
+| 15 | `ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib` | `first_boot_persist` (dup of the kit's row via `fs_kit_fsinit_ghost_ireg`) |
+| 16 | `is_lock fsc_kalloc … (kmem_res fsc_kpages …)` | `first_boot_persist` (mn_grp_kvm's `newlock_at`) |
+| 17 | `kalloc_avail fsc_kpages None` | **`first_tok`'s own third row** — sealed inside userinit, (f-4) |
+| 18 | `⌜fs_geom_ok⌝` | `first_boot_persist` (pure, `fs_geom_ok_of_image`) |
+| 19 | `fs_sb_cells` | **fsinit's post** + `word4_pointsto_persist` ×4 at the seal |
+| — | `ireg_boot` (establish's 2nd argument) | **fsinit's post** |
+
+Sources = {first_tok payload, fsinit's own post, ambient} — `main_deposit`
+appears ZERO times.
+
+### (f-4) Debt F — the kalloc pair must be SPELLED through allocproc/userinit
+
+`fs_ready` spells the kmem pair at `fsc_kpages` precisely because "a
+consumer that names the pair itself could never tie its own name to a
+hidden one" (FsReady.v) — and `KvmSpec.kalloc_env` is that hidden `∃ γk`.
+Today `SpecAllocproc`/`SpecUserinit` thread `kalloc_env γa on`, so the
+token that comes back from allocproc has LOST the `fsc_kpages` name and no
+agreement lemma can recover it (the auth lives inside the lock).  Sealing
+before userinit is impossible (the `Some nb` premise is what refutes
+allocproc's untested null arm).  Fix = stage (e)'s debt-E discipline, one
+layer up: `SpecAllocproc` takes the pair as a parameter — premise
+`is_lock γa … (kmem_res γk …) ∗ kalloc_avail γk on`, post at `γk`, no
+existential — and `SpecUserinit` likewise (`γk := fsc_kpages` at main's
+application).  `ProofUserinit` then seals post-allocproc
+(`kalloc_avail_seal : Some n ==∗ None`, persistent result) and both parks
+the row and returns it (its post's `∃ nc, kalloc_env …` row becomes
+`kalloc_avail fsc_kpages None`; ProofMain already discards the old row with
+`_`, so the consumer change is free).  Ripple: ProofAllocproc (statement
+only), ProofKfork (IMPROVES — `fs_ready_kmem` already hands kfork the
+spelled pair).  **D3 (sequencing, humans may veto timing): this touches the
+proven kfork cone; land it as its own commit before the deposit commit.**
+
+### (f-5) Residual at the seal, i.e. what stage (f) does NOT close
+
+With (f-1)–(f-4) landed, `fs_ready_establish`'s application at forkret's
+first arm is **fully funded on the fs side: no missing resource, no missing
+pure fact** — the fs ledger CLOSES, and the campaign's remaining fs
+obligation is exactly the humans' forkret walk.  Loudly: after stage (f),
+nothing the seal needs is unproduced; what remains is (all humans'):
+
+- **R1 (= D1)**: the park seam — one `first_tok` row through
+  `wp_forkret_gen_body` (`Pfirst := first_tok`), `forkret_park_body`,
+  `forkret_park_pkg`; then `LinkForkretNF`'s Axiom is discharged by the
+  first-arm proof and `ProofUserinit` passes the staged token.
+- **R2 (= D2)**: right-arm distribution to kfork's children.
+- **R3**: the first process's URes.  The exclusive syscall-era fs rows that
+  OUTLIVE the seal (`bitmap_res used'`, `bslots bn 3`, `iref_slot`,
+  `fsblock fsc_fs 1`) need a home in the trap loop's kernel-side bundle,
+  and the closer supplied at userinit's park is the only door in
+  (`SpecForkretParkPaid`'s header already names `bslots bn 3` as having "no
+  source today" — after (f) it HAS one: fsinit's post at the seal site).
+  Shape of `URes`/closer = SpecUsertrap/SchedCtx territory.
+- **R4**: the walk itself — load/branch/store/persist, fsinit's and kexec's
+  call frames, the panic tails.
+
+No new axiom anywhere in (f); `make audit-only` stays at the SEVEN-entry
+gate throughout.
+
+### (f-6) Sequencing and file ownership
+
+Order: **(f0)** (in flight: buf carve, `bio_init_at` in main, kit-2 rows
+bslots/bitmap_res — the parallel agent's) → **(f1)** FirstTok.v widening +
+`first_boot_persist`/`first_fsinit`/open lemmas + FsCfgBoot's two pure
+producer lemmas → **(f2)** rows-A/B threading: carve the 32 `&sb` `.bss`
+bytes and the `struct log` cells (NOT carved today — grep: no
+`KernelSyms.sb`/`log_addr` in BootCarve*/BootShared) the way (f0) carved
+the bufs, and thread `boot_shared_alloc`'s mirror `ghost_var` row (returned
+at BootShared.v:1106, currently dead-ends before SpecMain) down to main →
+**(f3)** SpecMain/ProofMain: stop dropping `Hfirst`/`Hkit2`, assemble, pass
+→ **(f4)** debt F commit → **(f5)** SpecUserinit/ProofUserinit deposit,
+token staged at the park.  (f1) is independent of (f0); (f3) needs all of
+(f0)–(f2); §7 of design/fs-ghost-state.md is refreshed with this charter
+(done, same increment).
+
+| files | owner |
+|---|---|
+| FirstTok.v, FsCfgBoot.v (additive), BootCarve/BootCarveMain/BootShared (rows-A carve), BootChain, SpecMain.v/ProofMain.v (mn_grp_fs + threading), SpecUserinit.v/ProofUserinit.v/LinkUserinit.v, SpecAllocproc.v/ProofAllocproc.v (+ the mechanical ProofKfork premise swap) | **implementing agent (Opus)** |
+| SpecForkret.v, LinkForkretNF.v, ProofForkret*, FsReady.v (D2), SpecForkretPark.v/LinkForkretPark.v/SpecForkretParkPaid.v/ProofForkretPark.v (D1), SchedCtx/SpecUsertrap (R3) | **humans** |
+
+Conflict notes: (i) `SpecForkretPark.forkret_park_body` is the one shared
+row — we CALL it (ProofUserinit), they OWN its statement; we do not edit
+it, we stage the token.  (ii) FsCfgBoot.v and SpecMain/ProofMain are
+concurrently edited by the (f0) agent — rebase (f1)/(f3) on its landing;
+if (f0) puts `bslots`/`bitmap_res` inside kit 2, `first_fsinit` drops its
+standalone rows.  (iii) `SpecForkret.first_addr` duplicates
+`FirstTok.first_addr` (convertible); unifying them is the humans' choice
+when SpecForkret starts importing FirstTok.
+
 ## Do not
 
 - Thread the configuration as pure premises — tried and REVERTED
