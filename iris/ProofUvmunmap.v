@@ -427,6 +427,7 @@ Section ProofUvmunmap.
   Definition uu_tail_body
       (b : bool) (p spr va : mword 64) (uroot : mword 44)
       (done npages : nat) (df : bool) (fx um : gmap (mword 27) (mword 64))
+      (Own : nat -> iProp Σ)
       (K ilvl : nat) (eb : bool) (mm : regfile)
       (CIDt : CpuId) (lks : gset string) : iProp Σ :=
     (∀ (mt : regfile) (t' : ptree) (m' : gmap (mword 27) (mword 64)),
@@ -445,12 +446,13 @@ Section ProofUvmunmap.
      cpu_own ilvl eb p b lks -∗
      pc_is (mword_of_int (KernelSyms.uvmunmap + 0x4a) : mword 64) -∗
      ptree_own 2 (DfracOwn 1) t' -∗
-     upt_pages_own (uu_um df um (svpn_of va) (S done)) -∗
+     Own (S done) -∗
      WP (Loop : expr riscv_lang))%I.
 
   Definition uu_store_body
       (b : bool) (p spr va : mword 64) (uroot : mword 44)
       (done npages : nat) (df : bool) (um : gmap (mword 27) (mword 64))
+      (Own : nat -> iProp Σ)
       (K ilvl : nat) (eb : bool) (mm mw : regfile) (t : ptree)
       (CIDs : CpuId) (lks : gset string) : iProp Σ :=
     (∀ ms : regfile,
@@ -466,7 +468,7 @@ Section ProofUvmunmap.
      cpu_own ilvl eb p b lks -∗
      pc_is (mword_of_int (KernelSyms.uvmunmap + 0x46) : mword 64) -∗
      ptree_own 2 (DfracOwn 1) t -∗
-     upt_pages_own (uu_um df um (svpn_of va) (S done)) -∗
+     Own (S done) -∗
      WP (Loop : expr riscv_lang))%I.
 
   (* ================================================================== *)
@@ -475,7 +477,8 @@ Section ProofUvmunmap.
   (* ================================================================== *)
   Local Lemma uu_loop `{CID0 : CpuId} (γa : gname)
       (mm : regfile) (fx : gmap (mword 27) (mword 64)) (uroot : mword 44)
-      (um : gmap (mword 27) (mword 64)) (npages K : nat) (eb b df : bool)
+      (um : gmap (mword 27) (mword 64)) (Own : nat -> iProp Σ)
+      (npages K : nat) (eb b df : bool)
       (p : mword 64) (va spr : mword 64) (ilvl : nat) (lks : gset string) :
     (22 <= K)%nat ->
     (Z.of_nat ilvl + 1 < 2 ^ 31)%Z ->
@@ -506,12 +509,24 @@ Section ProofUvmunmap.
     (* the loop's kfree only runs when [do_free != 0] ([destruct df] below);
        at [df = false] the run never touches a lock at all. *)
     (if df then locks_below lks "kmem" else True) ->
+    (* THE PAGE OWNERSHIP IS ABSTRACT, with the two moves the body makes
+       supplied as laws.  It is [upt_pages_own (uu_um …)] for the three
+       existing seals and the LAZY VIEW [umem_lazy] for the
+       contents-indexed one; the loop itself never looks inside. *)
+    □ (∀ (k : nat) (w : mword 64),
+         ⌜(k < npages)%nat⌝ -∗
+         ⌜uu_um df um (svpn_of va) k !! vpn_at (svpn_of va) k = Some w⌝ -∗
+         Own k -∗ page_own (page_base (pte_ppn w)) ∗ Own (S k)) -∗
+    □ (∀ k : nat,
+         ⌜(k < npages)%nat⌝ -∗
+         ⌜uu_um df um (svpn_of va) (S k) = uu_um df um (svpn_of va) k⌝ -∗
+         Own k -∗ Own (S k)) -∗
     sie_cap_gpr KT1 m (K - 8) b p -∗
     cpu_own ilvl eb p b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.uvmunmap + 0x50) : mword 64) -∗
     ptree_own 2 (DfracOwn 1) t -∗
-    upt_pages_own (uu_um df um (svpn_of va) done) -∗
+    Own done -∗
     kalloc_env γa None -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mj : regfile,
@@ -520,8 +535,9 @@ Section ProofUvmunmap.
       sie_cap_gpr KT1 mj (K - 8) b p -∗
       cpu_own ilvl eb p b lks -∗
       pc_is (mword_of_int (KernelSyms.uvmunmap + 0x76) : mword 64) -∗
-      uptg (uu_fx df fx (svpn_of va) npages)
-           uroot (uu_um df um (svpn_of va) npages) -∗
+      uptg_tree (uu_fx df fx (svpn_of va) npages)
+                uroot (uu_um df um (svpn_of va) npages) -∗
+      Own npages -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -532,7 +548,7 @@ Section ProofUvmunmap.
       intros CID0 done m t m_ad Hrem Hsum Hrep Hview Hbase
              Hsp Hs2 Hs3 Hs4 Hs5 Hs6 Hthr Hbelow;
       [ destruct (Nat.nle_succ_0 0 Hrem) |].
-    iIntros "Hcg Hcnt #Htext Hpc Hptree Hown Henv Hcont".
+    iIntros "#HPEEL #HSKIP Hcg Hcnt #Htext Hpc Hptree Hown Henv Hcont".
     iDestruct "Henv" as (γk) "(#Hlock & #Havail)".
     iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhwc Hcg]".
     iDestruct "Hhwc" as (hwmisa0 hwmseccfg0 hwpmar0 hwelp0)
@@ -585,7 +601,7 @@ Section ProofUvmunmap.
     (*  THE +0x4a JOIN: the loop tail, over the post-body descriptor.     *)
     (* ================================================================ *)
     iAssert (wp_next b p (fun (CIDt : CpuId) =>
-        uu_tail_body b p spr va uroot done npages df fx um K ilvl eb mm
+        uu_tail_body b p spr va uroot done npages df fx um Own K ilvl eb mm
           CIDt lks))%I with "[Hcont]" as "TAIL".
     { iIntros (CIDt Hst mt t' m').
       iIntros "(%Htsp & %Hts2 & %Hts3 & %Hts4 & %Hts5 & %Hts6 & %Htthr
@@ -632,15 +648,15 @@ Section ProofUvmunmap.
         iEval (rewrite Htgt76) in "Hpc".
         rewrite Hdn in Htview.
         iEval (rewrite Hdn) in "Hown".
-        iDestruct (uptg_rebuild (uu_fx df fx (svpn_of va) npages) uroot
+        iDestruct (uptg_tree_rebuild (uu_fx df fx (svpn_of va) npages) uroot
                      (uu_um df um (svpn_of va) npages)
                      t' m' (uu_um_wf df um (svpn_of va) npages Hwf)
                      (uu_fx_wf df fx (svpn_of va) npages Hfx)
-                     Htview Htrep Htbase with "Hptree Hown") as "Hpt".
+                     Htview Htrep Htbase with "Hptree") as "Hpt".
         iDestruct (cpu_own_transport CIDt CIDv ilvl eb p b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
         iSpecialize ("Hcont" $! CIDv with "[%]"); [wp_next_chain|].
-        iApply ("Hcont" $! T1 with "[%] [%] Hcg Hcnt Hpc Hpt").
+        iApply ("Hcont" $! T1 with "[%] [%] Hcg Hcnt Hpc Hpt Hown").
         - exact HT1sp.
         - exact HT1thr. }
       (* more pages to go: fall through to the loop head *)
@@ -671,7 +687,7 @@ Section ProofUvmunmap.
                    with "Hcont") as "Hcont".
       iApply (IH CIDw (S done) T1 t' m' ltac:(lia) ltac:(lia) Htrep Htview Htbase
                 HT1sp HT1s2 HT1s3 HT1s4 HT1s5 HT1s6 HT1thr Hbelow
-                with "Hcg Hcnt Htext Hpc Hptree Hown Henv2 Hcont"). }
+                with "HPEEL HSKIP Hcg Hcnt Htext Hpc Hptree Hown Henv2 Hcont"). }
     (* ================================================================ *)
     (*  THE BODY: walk(pagetable, a, 0) and the two-way verdict.         *)
     (* ================================================================ *)
@@ -820,7 +836,7 @@ Section ProofUvmunmap.
       iApply ("TAIL" $! B1 t m_ad with "[%] Hcg Hcnt Hpc Hptree [Hown]").
       { split_and!; try assumption; try exact Hbase.
         rewrite HstepF Hstep. exact Hview. }
-      { rewrite Hstep. iExact "Hown". } }
+      { iApply ("HSKIP" $! done with "[%] [%] Hown"); [lia | exact Hstep]. } }
     (* ============ walk reached the L0 slot ============ *)
     iDestruct (ptree_own_level0_ro (DfracOwn 1) t (vpn_at (svpn_of va) done) p2 p1 w0 Hl0
                  with "Hptree") as "(#Hcl0 & Hcell & Hclose)".
@@ -923,7 +939,7 @@ Section ProofUvmunmap.
       iApply ("TAIL" $! B3 t m_ad with "[%] Hcg Hcnt Hpc Hptree [Hown]").
       { split_and!; try assumption; try exact Hbase.
         rewrite HstepF Hstep. exact Hview. }
-      { rewrite Hstep. iExact "Hown". } }
+      { iApply ("HSKIP" $! done with "[%] [%] Hown"); [lia | exact Hstep]. } }
     (* ---- the vpn IS mapped: free its page and clear the leaf ---- *)
     assert (Hv0 : pte_valid w0).
     { destruct Hrep as (Hmaps & _).
@@ -955,7 +971,7 @@ Section ProofUvmunmap.
     (*  which is why the whole [df] split is ONE [destruct] here.         *)
     (* ================================================================ *)
     iAssert (wp_next b p (fun (CIDs : CpuId) =>
-        uu_store_body b p spr va uroot done npages df um K ilvl eb mm mw t
+        uu_store_body b p spr va uroot done npages df um Own K ilvl eb mm mw t
           CIDs lks))%I with "[TAIL]" as "STORE".
     { iIntros (CIDs Hss ms).
       iIntros "(%Hmksp & %Hss1 & %Hmks2 & %Hmks3 & %Hmks4 & %Hmks5 & %Hmks6 & %Hmkthr)
@@ -1036,7 +1052,7 @@ Section ProofUvmunmap.
       iSpecialize ("STORE" $! CIDz6 with "[%]"); [wp_next_chain|].
       iApply ("STORE" $! B3 with "[%] Hcg Hcnt Hpc Hptree [Hown]").
       { split_and!; assumption. }
-      { iExact "Hown". } }
+      { iApply ("HSKIP" $! done with "[%] [%] Hown"); [lia | reflexivity]. } }
     (* ============ do_free != 0: PTE2PA, kfree, then the store ========= *)
     (* --- +0x66 beq s5,zero : do_free != 0, so NOT taken --- *)
     assert (Hs5nz : eq_vec (rget B3 Rs5) zero_reg = false).
@@ -1100,9 +1116,9 @@ Section ProofUvmunmap.
     assert (Hpv : page_valid (page_base (pte_ppn wu)))
       by (exact (uptg_page_valid (um_del_run um (svpn_of va) done)
                    (vpn_at (svpn_of va) done) wu Hwfd Humsome)).
-    iDestruct (uptg_own_shrink (um_del_run um (svpn_of va) done)
-                 (vpn_at (svpn_of va) done) wu Hwfd Humsome with "Hkmapb Hown")
-      as "[Hpage Hown]".
+    iDestruct ("HPEEL" $! done wu with "[%] [%] Hown") as "[Hpage Hown]".
+    { lia. }
+    { rewrite /uu_um. exact Humsome. }
     (* --- +0x70 jal ra,kfree --- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.uvmunmap + 0x70)) Rra
               (mword_of_int 2095062 : mword 21) B5 (K - 8) b
@@ -1198,7 +1214,7 @@ Section ProofUvmunmap.
   Lemma wp_uvmunmap_gen
       (γa : gname) (mm : regfile)
       (fx : gmap (mword 27) (mword 64)) (uroot : mword 44)
-      (um : gmap (mword 27) (mword 64))
+      (um : gmap (mword 27) (mword 64)) (Own : nat -> iProp Σ)
       (npages : nat) (K : nat) (eb : bool) (p : mword 64)
       (ilvl : nat) (b df : bool) (lks : gset string) :
     let pcE : mword 64 := mword_of_int KernelSyms.uvmunmap in
@@ -1221,11 +1237,20 @@ Section ProofUvmunmap.
     (* threaded straight to [uu_loop]: kfree's "kmem" bound applies only
        when [do_free != 0]. *)
     (if df then locks_below lks "kmem" else True) ->
+    □ (∀ (k : nat) (w : mword 64),
+         ⌜(k < npages)%nat⌝ -∗
+         ⌜uu_um df um vpn0 k !! vpn_at vpn0 k = Some w⌝ -∗
+         Own k -∗ page_own (page_base (pte_ppn w)) ∗ Own (S k)) -∗
+    □ (∀ k : nat,
+         ⌜(k < npages)%nat⌝ -∗
+         ⌜uu_um df um vpn0 (S k) = uu_um df um vpn0 k⌝ -∗
+         Own k -∗ Own (S k)) -∗
     sie_cap_gpr KT1 mm K b p -∗
     cpu_own ilvl eb p b lks -∗
     kernel_text -∗
     pc_is pcE -∗
-    uptg fx uroot um -∗
+    uptg_tree fx uroot um -∗
+    Own 0%nat -∗
     kalloc_env γa None -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ (mr : regfile),
@@ -1233,14 +1258,15 @@ Section ProofUvmunmap.
       cpu_own ilvl eb p b lks -∗
       pc_is ret_tgt -∗
       ⌜callee_saved mm mr⌝ -∗
-      uptg (uu_fx df fx vpn0 npages) uroot (uu_um df um vpn0 npages) -∗
+      uptg_tree (uu_fx df fx vpn0 npages) uroot (uu_um df um vpn0 npages) -∗
+      Own npages -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros pcE va vpn0 ret_tgt HK Hilvl Hroot Hval Hnpr Hdf Hrange Hside Hbelow.
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6)))).
-    iIntros "Hcg Hcnt #Htext Hpc Hpt Henv Hcont".
+    iIntros "#HPEEL #HSKIP Hcg Hcnt #Htext Hpc Hpt Hown Henv Hcont".
     (* ---- the range premise, as plain [Z] ---- *)
     assert (Hrz : (bv_unsigned va + Z.of_nat npages * 4096 <= 274877906944)%Z).
     { rewrite uint_unsigned in Hrange.
@@ -1549,10 +1575,11 @@ Section ProofUvmunmap.
       iDestruct (cpu_own_transport CID CIDr2 ilvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iSpecialize ("Hcont" $! CIDr2 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont" $! mf with "Hcg Hcnt Hpc [%] [Hpt]").
+      iApply ("Hcont" $! mf with "Hcg Hcnt Hpc [%] [Hpt] [Hown]").
       { exact Hcs. }
       { rewrite Hnp0. rewrite /uu_fx /uu_um.
-        destruct df; rewrite um_del_run_0; iExact "Hpt". } }
+        destruct df; rewrite um_del_run_0; iExact "Hpt". }
+      { rewrite Hnp0. iExact "Hown". } }
     (* ============ npages >= 1: run the loop ============ *)
     assert (Hcmp : zopz0zKzJ_u (R9 !!! Regidx Ra1) (R9 !!! Regidx Rs3) = false).
     { rewrite HR9a1 HR9s3. apply bc_ltu. rewrite Hends.
@@ -1591,8 +1618,8 @@ Section ProofUvmunmap.
             = mword_of_int (KernelSyms.uvmunmap + 0x50)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgt50) in "Hpc".
     (* --- open the table ONCE --- *)
-    iDestruct (uptg_acc_rep0 fx uroot um with "Hpt") as (t m_ad)
-      "(%Hrep & %Hview & %Hbase & %Hwf & %Hfx & Hptree & Hown)".
+    iDestruct (uptg_tree_acc_rep0 fx uroot um with "Hpt") as (t m_ad)
+      "(%Hrep & %Hview & %Hbase & %Hwf & %Hfx & Hptree)".
     assert (HR9s2' : R9 !!! Regidx Rs2 = add_vec va (mword_of_int (4096 * Z.of_nat 0))).
     { rewrite HR9s2. cbn [Z.of_nat].
       replace (4096 * 0)%Z with 0%Z by reflexivity.
@@ -1601,15 +1628,14 @@ Section ProofUvmunmap.
     { intros c Hc H2 H8 H9 H18 H19 H20 H21 H22. apply HR9thr1; assumption. }
     iDestruct (cpu_own_transport CID CIDr5 ilvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (uu_loop γa mm fx uroot um npages K eb b df p va spr ilvl lks
+    iApply (uu_loop γa mm fx uroot um Own npages K eb b df p va spr ilvl lks
               HK Hilvl Hrz Hwf Hfx Hside
               npages 0%nat R9 t m_ad ltac:(lia) ltac:(lia) Hrep
               ltac:(rewrite /uu_fx /uu_um; destruct df;
                     rewrite um_del_run_0; exact Hview) Hbase
               HR9sp HR9s2' HR9s3 HR9s4 HR9s5 HR9s6 HR9thr Hbelow
-              with "Hcg Hcnt Htext Hpc Hptree [Hown] Henv").
-    { rewrite /uu_um. destruct df; [cbn [um_del_run] |]; iExact "Hown". }
-    iIntros (CIDr6 Hsr6 mj) "%Hjsp %Hjthr Hcg Hcnt Hpc Hpt".
+              with "HPEEL HSKIP Hcg Hcnt Htext Hpc Hptree Hown Henv").
+    iIntros (CIDr6 Hsr6 mj) "%Hjsp %Hjthr Hcg Hcnt Hpc Hpt Hown".
     (* --- +0x76 c.ldsp s1,40(sp) --- *)
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.uvmunmap + 0x76)) (mword_of_int 5 : mword 6) Rs1
               mj (K - 8) (mm !!! Regidx Rs1) b (dqm:=DfracOwn 1)
@@ -1636,7 +1662,7 @@ Section ProofUvmunmap.
     iDestruct (cpu_own_transport CIDr6 CIDr8 ilvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iSpecialize ("Hcont" $! CIDr8 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! mf with "Hcg Hcnt Hpc [%] Hpt").
+    iApply ("Hcont" $! mf with "Hcg Hcnt Hpc [%] Hpt Hown").
     exact Hcs.
   Qed.
 
@@ -1723,11 +1749,22 @@ Section SealUvmunmap.
     iDestruct (proc_pt_wf_get P with "Hpt") as %Hwf.
     destruct Hwf as (_ & Hacc & _ & _ & Htfv).
     iDestruct (proc_pt_uptg P with "Hpt") as "Hpt".
+    iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhwc Hcg]".
+    iDestruct "Hhwc" as (hwmisa0 hwmseccfg0 hwpmar0 hwelp0)
+      "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hkmapb & _)".
+    iDestruct (uptg_wf_get (upt_fixed_both P.(ud_tfp)) P.(ud_root) P.(ud_um)
+                 with "Hpt") as %[Hgwf _].
+    iDestruct (uu_pages_laws true P.(ud_um) vpn0 npages Hgwf
+                 (uu_side_user va npages Hrz) with "Hkmapb") as "[#HPEEL #HSKIP]".
+    iEval (rewrite uptg_split) in "Hpt".
+    iDestruct "Hpt" as "[Hpt Hown]".
     iApply (Core.wp_uvmunmap_gen γa mm (upt_fixed_both P.(ud_tfp)) P.(ud_root)
-              P.(ud_um) npages K eb p ilvl b true lks HK Hilvl Hroot Hval Hnpr Hdf
+              P.(ud_um) (fun k => upt_pages_own (uu_um true P.(ud_um) vpn0 k))
+              npages K eb p ilvl b true lks HK Hilvl Hroot Hval Hnpr Hdf
               (uu_range_wide va npages Hrange) (uu_side_user va npages Hrz) Hbelow
-              with "Hcg Hcnt Htext Hpc Hpt Henv").
-    iIntros (CID1 Hs1 mr) "Hcg Hcnt Hpc %Hcs Hpt".
+              with "HPEEL HSKIP Hcg Hcnt Htext Hpc Hpt Hown Henv").
+    iIntros (CID1 Hs1 mr) "Hcg Hcnt Hpc %Hcs Hpt Hown".
+    iDestruct (uptg_join with "Hpt Hown") as "Hpt".
     iSpecialize ("Hcont" $! CID1 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! mr with "Hcg Hcnt Hpc [%] [Hpt]").
     { exact Hcs. }
@@ -1765,11 +1802,22 @@ Section SealUvmunmapBare.
     { unfold uvm_maxsz in Hrange. rewrite uint_unsigned in Hrange.
       change (2 ^ 38 - 8192)%Z with 274877898752%Z in Hrange. exact Hrange. }
     iEval (rewrite /bare_pt) in "Hpt".
-    iApply (Core.wp_uvmunmap_gen γa mm ∅ uroot um npages K eb p ilvl b true lks
+    iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhwc Hcg]".
+    iDestruct "Hhwc" as (hwmisa0 hwmseccfg0 hwpmar0 hwelp0)
+      "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hkmapb & _)".
+    iDestruct (uptg_wf_get ∅ uroot um with "Hpt") as %[Hgwf _].
+    iDestruct (uu_pages_laws true um vpn0 npages Hgwf
+                 (uu_side_user va npages Hrz) with "Hkmapb") as "[#HPEEL #HSKIP]".
+    iEval (rewrite uptg_split) in "Hpt".
+    iDestruct "Hpt" as "[Hpt Hown]".
+    iApply (Core.wp_uvmunmap_gen γa mm ∅ uroot um
+              (fun k => upt_pages_own (uu_um true um vpn0 k))
+              npages K eb p ilvl b true lks
               HK Hilvl Hroot Hval Hnpr Hdf
               (uu_range_wide va npages Hrange) (uu_side_user va npages Hrz) Hbelow
-              with "Hcg Hcnt Htext Hpc Hpt Henv").
-    iIntros (CID1 Hs1 mr) "Hcg Hcnt Hpc %Hcs Hpt".
+              with "HPEEL HSKIP Hcg Hcnt Htext Hpc Hpt Hown Henv").
+    iIntros (CID1 Hs1 mr) "Hcg Hcnt Hpc %Hcs Hpt Hown".
+    iDestruct (uptg_join with "Hpt Hown") as "Hpt".
     iSpecialize ("Hcont" $! CID1 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! mr with "Hcg Hcnt Hpc [%] [Hpt]").
     { exact Hcs. }
@@ -1812,11 +1860,22 @@ Section SealUvmunmapFixed.
                       uu_vpn_ok false (vpn_at (svpn_of va) k)).
     { intros k Hk. assert (Hk0 : k = 0%nat) by lia. rewrite Hk0 uu_vpn_at_0.
       rewrite /uu_vpn_ok Hv. exact Hfixed. }
-    iApply (Core.wp_uvmunmap_gen γa mm fx uroot um 1%nat K eb p ilvl b false lks
+    iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhwc Hcg]".
+    iDestruct "Hhwc" as (hwmisa0 hwmseccfg0 hwpmar0 hwelp0)
+      "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hkmapb & _)".
+    iDestruct (uptg_wf_get fx uroot um with "Hpt") as %[Hgwf _].
+    iDestruct (uu_pages_laws false um (svpn_of va) 1%nat Hgwf Hside
+                 with "Hkmapb") as "[#HPEEL #HSKIP]".
+    iEval (rewrite uptg_split) in "Hpt".
+    iDestruct "Hpt" as "[Hpt Hown]".
+    iApply (Core.wp_uvmunmap_gen γa mm fx uroot um
+              (fun k => upt_pages_own (uu_um false um (svpn_of va) k))
+              1%nat K eb p ilvl b false lks
               HK Hilvl Hroot Hval
               ltac:(rewrite Hnpr; reflexivity) Hdf Hrange Hside I
-              with "Hcg Hcnt Htext Hpc Hpt Henv").
-    iIntros (CID1 Hs1 mr) "Hcg Hcnt Hpc %Hcs Hpt".
+              with "HPEEL HSKIP Hcg Hcnt Htext Hpc Hpt Hown Henv").
+    iIntros (CID1 Hs1 mr) "Hcg Hcnt Hpc %Hcs Hpt Hown".
+    iDestruct (uptg_join with "Hpt Hown") as "Hpt".
     iSpecialize ("Hcont" $! CID1 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! mr with "Hcg Hcnt Hpc [%] [Hpt]").
     { exact Hcs. }

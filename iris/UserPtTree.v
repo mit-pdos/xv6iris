@@ -437,6 +437,29 @@ Proof.
   - intros (j & Hj & ->). lia.
 Qed.
 
+Lemma umem_del_lookup_in (M : gmap Z (bv 8)) (a : Z) (n : nat) (j : nat) :
+  (j < n)%nat -> umem_del M a n !! (a + Z.of_nat j)%Z = None.
+Proof.
+  revert j. induction n as [| k IH]; intros j Hj; [exfalso; lia |].
+  cbn [umem_del]. destruct (decide (j = k)) as [-> | Hne].
+  - apply lookup_delete.
+  - rewrite lookup_delete_ne; [| lia]. apply IH. lia.
+Qed.
+
+Lemma umem_del_sub (M M' : gmap Z (bv 8)) (a : Z) (n : nat) :
+  M ⊆ M' -> umem_del M a n ⊆ umem_del M' a n.
+Proof.
+  intros Hsub. apply map_subseteq_spec. intros va b Hb.
+  destruct (decide (a <= va < a + Z.of_nat n)%Z) as [Hin | Hout].
+  - apply in_run_iff in Hin as (j & Hj & ->).
+    rewrite (umem_del_lookup_in M a n j Hj) in Hb. discriminate.
+  - assert (Hne : forall j, (j < n)%nat -> va <> (a + Z.of_nat j)%Z)
+      by (intros j Hj Heq; apply Hout; apply in_run_iff; eauto).
+    rewrite (umem_del_lookup_out M a n va Hne) in Hb.
+    rewrite (umem_del_lookup_out M' a n va Hne).
+    exact (lookup_weaken _ _ _ _ Hb Hsub).
+Qed.
+
 Lemma umem_del_write (M : gmap Z (bv 8)) (a : Z) (n : nat) (bs : nat -> bv 8) :
   umem_del (umem_write M a n bs) a n = umem_del M a n.
 Proof.

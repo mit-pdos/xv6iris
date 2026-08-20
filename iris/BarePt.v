@@ -513,6 +513,70 @@ Section BarePt.
   (* ---- the open / close pair uvmunmap's wrapper runs on, at any [fx].
      Both are [ProcPtOwn.proc_pt_acc_rep0] / [_rebuild] with
      [upt_ad_view] replaced by [uptg_view]. ---- *)
+  (* ------------------------------------------------------------------ *)
+  (* THE TREE HALF, on its own.  [uptg] bundles the table with the pages  *)
+  (* its map names; a function that touches only SOME of those pages      *)
+  (* should be handed the tree and just those, so whatever else the       *)
+  (* caller holds -- in the contents-indexed contracts, holds NAMED --     *)
+  (* never crosses the call and never comes back existential.  See        *)
+  (* ProofUvmunmap.v's [Own] parameter.                                   *)
+  (* ------------------------------------------------------------------ *)
+  Definition uptg_tree (fx : gmap (mword 27) (mword 64)) (uroot : mword 44)
+      (um : gmap (mword 27) (mword 64)) : iProp Σ :=
+    (⌜uptg_wf um⌝ ∗ ⌜fx_wf fx⌝ ∗ pt_frame (uptg_spec fx uroot um))%I.
+
+  Lemma uptg_split (fx : gmap (mword 27) (mword 64)) (uroot : mword 44)
+      (um : gmap (mword 27) (mword 64)) :
+    uptg fx uroot um ⊣⊢ uptg_tree fx uroot um ∗ upt_pages_own um.
+  Proof.
+    rewrite /uptg /uptg_tree. iSplit.
+    - iIntros "(%H1 & %H2 & Ht & Ho)". iFrame "Ht Ho".
+      iSplitR; iPureIntro; assumption.
+    - iIntros "((%H1 & %H2 & Ht) & Ho)". iFrame "Ht Ho".
+      iSplitR; iPureIntro; assumption.
+  Qed.
+
+  Lemma uptg_join (fx : gmap (mword 27) (mword 64)) (uroot : mword 44)
+      (um : gmap (mword 27) (mword 64)) :
+    uptg_tree fx uroot um -∗ upt_pages_own um -∗ uptg fx uroot um.
+  Proof.
+    iIntros "Ht Ho". rewrite uptg_split. iFrame "Ht Ho".
+  Qed.
+
+  Lemma uptg_tree_acc_rep0 (fx : gmap (mword 27) (mword 64)) (uroot : mword 44)
+      (um : gmap (mword 27) (mword 64)) :
+    uptg_tree fx uroot um ⊢ ∃ t m_ad,
+      ⌜pt_rep0 t m_ad⌝ ∗ ⌜uptg_view fx um m_ad⌝ ∗ ⌜pt_base t = uroot⌝ ∗
+      ⌜uptg_wf um⌝ ∗ ⌜fx_wf fx⌝ ∗ ptree_own 2 (DfracOwn 1) t.
+  Proof.
+    iIntros "H". rewrite /uptg_tree /pt_frame.
+    iDestruct "H" as "(%Hwf & %Hfx & Ht)".
+    iDestruct "Ht" as (t) "(%Hspec & Ht)".
+    destruct (uptg_spec_rep0 fx uroot um t Hspec) as (m_ad & Hrep & Hview).
+    iExists t, m_ad.
+    iSplitR; [iPureIntro; exact Hrep |].
+    iSplitR; [iPureIntro; exact Hview |].
+    iSplitR; [iPureIntro; exact (proj1 Hspec) |].
+    iSplitR; [iPureIntro; exact Hwf |].
+    iSplitR; [iPureIntro; exact Hfx |].
+    iExact "Ht".
+  Qed.
+
+  Lemma uptg_tree_rebuild (fx : gmap (mword 27) (mword 64)) (uroot : mword 44)
+      (um : gmap (mword 27) (mword 64)) (t' : ptree)
+      (m_ad : gmap (mword 27) (mword 64)) :
+    uptg_wf um -> fx_wf fx -> uptg_view fx um m_ad ->
+    pt_rep0 t' m_ad -> pt_base t' = uroot ->
+    ptree_own 2 (DfracOwn 1) t' -∗ uptg_tree fx uroot um.
+  Proof.
+    intros Hwf Hfx Hview Hrep Hbase. iIntros "Ht".
+    rewrite /uptg_tree /pt_frame.
+    iSplitR; [iPureIntro; exact Hwf |].
+    iSplitR; [iPureIntro; exact Hfx |].
+    iExists t'. iFrame "Ht". iPureIntro.
+    exact (uptg_spec_of_rep0 fx uroot um m_ad t' Hview Hrep Hbase).
+  Qed.
+
   Lemma uptg_acc_rep0 (fx : gmap (mword 27) (mword 64)) (uroot : mword 44)
       (um : gmap (mword 27) (mword 64)) :
     uptg fx uroot um ⊢ ∃ t m_ad,
@@ -692,6 +756,46 @@ Section BarePt.
   Proof.
     intros Hwf. rewrite /uu_um. destruct df; [| exact Hwf].
     exact (uptg_wf_del_run um vpn0 k Hwf).
+  Qed.
+
+  (* THE TWO PAGE-OWNERSHIP LAWS, at the ordinary [upt_pages_own] instance.
+     [ProofUvmunmap]'s loop is abstract in what it holds for the pages it is
+     about to free (so the contents-indexed seal can hold the LAZY VIEW
+     instead); these are what the three existing seals feed it.
+
+     THE PEEL LAW IS VACUOUS AT [df = false]: the vpn it names is a FIXED
+     leaf, which [upt_map_wf] keeps out of [um] entirely, so the hypothesis
+     refutes itself -- which is the same reason that branch skips kfree. *)
+  Lemma uu_pages_laws (df : bool) (um : gmap (mword 27) (mword 64))
+      (vpn0 : mword 27) (npages : nat) :
+    uptg_wf um ->
+    (forall k : nat, (k < npages)%nat -> uu_vpn_ok df (vpn_at vpn0 k)) ->
+    KMap.kmap_static_claims -∗
+      □ (∀ (k : nat) (w : mword 64),
+           ⌜(k < npages)%nat⌝ -∗
+           ⌜uu_um df um vpn0 k !! vpn_at vpn0 k = Some w⌝ -∗
+           upt_pages_own (uu_um df um vpn0 k) -∗
+             page_own (page_base (pte_ppn w))
+             ∗ upt_pages_own (uu_um df um vpn0 (S k)))
+      ∗ □ (∀ k : nat,
+           ⌜(k < npages)%nat⌝ -∗
+           ⌜uu_um df um vpn0 (S k) = uu_um df um vpn0 k⌝ -∗
+           upt_pages_own (uu_um df um vpn0 k) -∗
+           upt_pages_own (uu_um df um vpn0 (S k))).
+  Proof.
+    intros Hwf Hside. iIntros "#Hb". iSplit.
+    - iIntros "!>" (k w) "%Hk %Hl Ho".
+      destruct df.
+      + iApply (uptg_own_shrink (uu_um true um vpn0 k) (vpn_at vpn0 k) w
+                  (uu_um_wf true um vpn0 k Hwf) Hl with "Hb Ho").
+      + exfalso. rewrite /uu_um in Hl.
+        destruct Hwf as (Hmw & _ & _).
+        pose proof (proj1 (Hmw _ _ Hl)) as Hlt.
+        pose proof (Hside k Hk) as Hok. rewrite /uu_vpn_ok in Hok.
+        destruct Hok as [Heq | Heq]; rewrite Heq in Hlt.
+        * rewrite tramp_vpn_unsigned tf_vpn_unsigned in Hlt. lia.
+        * exact (Z.lt_irrefl _ Hlt).
+    - iIntros "!>" (k) "%Hk %Heq Ho". rewrite Heq. iExact "Ho".
   Qed.
 
   (* THE CONTINUE ARMS.  Walk found no leaf, or the leaf word was invalid:
