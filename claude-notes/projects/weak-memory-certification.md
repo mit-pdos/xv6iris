@@ -58,9 +58,33 @@ each read at its read-timestamp — breaks acquire ordering ACROSS bytes
 inverts them against ppo rule 5).  Both translation directions are
 genuine per-event scheduling arguments; expect interval/topological
 placement, not a projection.  **T2-1c owed** (critical path): the
-rule-14 linearization (graph → same-log cand; the A3(v)
-linear-extension shape) and the store-dep fragment (`gx_deps`, per the
-S6 F2 caveat).
+rule-14 linearization (graph → same-log cand) and the store-dep fragment
+(`gx_deps`, per the S6 F2 caveat).  DESIGN WORKED OUT (2026-08-20, to
+spec the build):
+  - THE EXTENSION ORDER: R := po ∪ gmo|W ∪ rf-placement (each read after
+    its source write).  Acyclicity by the A3(v) contraction, with the
+    detail that makes it go: R's cross-hart edges are write-sourced
+    (gmo|W, rfe), every hart segment exits through a WRITE, rule 14 maps
+    each po-exit into gmo, and rfE is gmo-forward because cross-hart
+    visibility has no po disjunct — the po-forwarding case of load-value
+    is exactly rfi, which stays inside a segment.  So every R-cycle is a
+    gmo cycle.  Linear-extension existence over the finite event set is
+    hand-rolled topological selection (no stdpp helper).
+  - THE CONSTRUCTION: place events in extension order; writes land in
+    gmo order, so the cand log IS `gwrites`' message sequence and log
+    positions equal `gwix` with NO renumbering; `cand_values` then falls
+    out of load-value's value half plus rf-placement.
+  - THE AXIOM TRANSFER (graph → `srvwmo_consistent` of the built cand):
+    everything flows from gpos arithmetic — cand `ob_op` edges embed into
+    G's gmo (ppo arms by `gppo_gmo`; fr by load-value CO-MAXIMALITY: a
+    same-byte write not visible-before the read sits gmo-at-or-after it),
+    so ob-acyclicity is a kless measure on gpos; `ax_ord`/`ax_rel_ord`
+    derive the same way (e1 ord e2 gmo-forward; the fr target w is not
+    visible-before e2, so gpos e2 ≤ gpos w and the published ts = wix e1
+    < wix w on the write suborder); coherence via the A5 kit's
+    `coh_rel_acyc_ts` with poloc-ts-monotonicity from rules 1–3.
+    Estimate 600–1000 lines, one to two sessions, all order theory — no
+    Iris, no simulation.
 
 Plan of record: [`../design/weak-memory-layer2.md`](../design/weak-memory-layer2.md)
 §8 (the route), §11 (the PARM investigation's answer), §13 (the walker
