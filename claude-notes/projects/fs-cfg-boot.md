@@ -182,10 +182,18 @@ The order is forced:
 5. `IcacheBoot.ireg_alloc_at fsc_ireg` — it needs the inode blocks' `fsblock`
    halves, which step 3 produced, so the WHOLE inode region is built here:
    `ireg_inv` plus one `dinode_at` per inum.
-6. `IcacheBoot.ipool_alloc` — the allocated arm from `fsimg_wf`'s projections
-   (W3 `fs_inodes_wf` + W5 `fs_bitmap_wf` → `inode_ok`; W6 `fs_dirs_wf` + W7
-   `fs_root_wf` → the `dir_*` conjuncts; `dinode_at` from step 5;
-   `ind_res`/`inode_blocks` from step 3's home-block halves).
+6. `IcacheBoot.ipool_alloc` — the allocated arm from `fsimg_wf`'s projections.
+   **The W-mapping, CORRECTED by the probe (the original note was wrong in two
+   places):** `inode_ok`'s clauses come from W3 + `fs_sb_ok`, EXCEPT
+   `blkmap_wf`'s injectivity, which comes from **W4**'s
+   `NoDup (fs_used_blocks)` (W5 the bitmap contributes NOTHING to `inode_ok` —
+   it is the free-pool's fact); `dir_ok`/`dir_uniq`/`dir_orphan_clean` come
+   from W6 + W3's `fio_nlink`; **`dir_dots_ix` is NOT derivable from W6+W7 at
+   all** (they pin `dir_first`, not the records at index 0/1) — a new image
+   boolean `fs_dots_wf` (W8) must be added to `FsImg.v` and re-run in
+   `FsImgCheck.v` (the image satisfies it; only the check is missing).
+   `dinode_at` from step 5; `ind_res`/`inode_blocks` from step 3's home-block
+   halves.
 
 What must NOT move here: the escrows, the fifty inode sleeplocks and the itable
 spinlock. They need `sl_fresh` and zeroed lock cells, which exist only after
@@ -357,17 +365,101 @@ Sail platform axioms (`valid_reservation`, `plat_term_write`,
   increment). `design/fs-ghost-state.md` §7b still says 18 — refresh it at
   the seal increment.
 
-## Still open
+## The stocking probe: GO, with one hard condition (2026-08-20)
 
-- **A timing probe on ONE `ipool_alloc` bundle before writing the stocking
-  lemma.** `ipool_insert`'s own comment measured 106 s for a single bare
-  `iFrame` over one `ipool_shape` (`inode_blocks` is a 268-element big-op per
-  inode), and `fsimg_wf_ok` is ~43 s of `vm_compute`. Stocking `region_inums
-  13` = 208 inums (~25 allocated, the rest type-0 and cheap) in one era fupd is
-  the biggest proof-performance risk here, and it lands on the serial build
-  tail. Never `iFrame` an `ipool_shape` — split and `iExact`; keep the per-inum
-  discharge behind a named lemma so the big-op is built by induction and never
-  unfolded at the fupd's altitude.
+The `ipool_alloc`-bundle probe ran (`iris/ZZProbeIpool.v`, untracked, on the
+EC2 lane — it builds all five pure conjuncts of the allocated arm for the root
+inum from the literal image, 33.5 s total). Verdict **GO**, on ONE condition:
+**every per-inum image fact must be a boolean sweep with a lookup spec lemma,
+in `fsimg_wf`'s own idiom** — standalone per-inum `vm_compute` is ~2 s × 208
+≈ 7 min and is a NO-GO shape. Batched, the leaf grows ~25 s on top of
+`FsImgCheck.v`'s measured 170 s, and the era fupd itself computes NOTHING
+(every image fact arrives as a hypothesis per R3).
+
+Measured facts that supersede this file's earlier estimates:
+- `fsimg_wf_ok` is **106 s, not ~43 s** (52.5 s `vm_compute` + 53.7 s `Qed`) —
+  **`Qed` re-checks and therefore DOUBLES every `vm_compute`**; budget 2×.
+- Live inums are exactly **[1..24]** (24 allocated, 184 free incl. 0); 22 of
+  24 have an indirect block (inum 15 has nb = 199); `region_inums 13` = 208
+  but `sb_ninodes` = 200, so 8 inums have NO W-clause coverage (all type 0,
+  checked, 0.44 s — a new `fs_region_free` boolean carries it).
+- Naive per-inode injectivity re-decoding `fs_ind_ents` per index costs
+  **636 s**; routed through W4's `NoDup` it is **free**. That reindexing lemma
+  (`fs_used_nodup_slot_inj`) is the single biggest missing piece.
+
+**Rulings on the probe's three stops (coordinator, 2026-08-20):**
+1. **W-mapping corrected** in `fs_cfg_alloc` step 6 above; `fs_dots_wf` (W8)
+   is added to `FsImg.v` + instantiated in `FsImgCheck.v`.
+2. **`A` (the live set) is a PARAMETER** of the stocking lemma with a
+   membership characterisation (`fs_live_set` + spec); the lemma never decides
+   liveness inum-by-inum. The `[ninodes, 16·nib)` tail rides `fs_region_free`.
+3. **The image-instantiated fs corollary MOVES to a new leaf** above both
+   `SystemAdequacy` and `FsImgCheck` (suggested name `FsAdequacyImg.v`):
+   `SystemAdequacy.v` keeps the generic `xv6_fs_adequacy` and its
+   `FsImgDisk`-only import, so the ~170 s+ of `vm_compute` stays off the
+   serial tail. R3's "the headline corollary's hypothesis list does not grow"
+   survives; "it stays in SystemAdequacy.v" does not.
+
+**The missing tracked infrastructure** (named by the probe; placement final):
+- `FsImg.v`: (1) `fs_dots_wf` (W8) + lookup spec; (2)
+  `fs_used_nodup_slot_inj` (W4 NoDup → per-live-inum `img_slot` injectivity,
+  no new vm_compute); (3) `fs_region_free` + spec; (4) `fs_live_set : gset Z`
+  + `elem_of` characterisation; (5) `fs_ind_bytes_round_trip` (ind_bytes of
+  the decoded entries = the indirect block's bytes; symbolic, ~30-40 lines;
+  needed by 22 of 24 inodes — this is `ind_res`'s content half, currently
+  absent entirely).
+- NEW `FsImgBridge.v` (imports FsImg + InodeInv/InodeLock/DirView/FsTree,
+  names no literal image, so proof files may import it): (6) `img_blkmap` /
+  `img_slot` + the probe's sections A–E verbatim (`img_inode_ok`,
+  `img_dir_ok`, `img_dir_uniq`, `img_dir_orphan_clean`, `img_dir_dots_ix`,
+  …); measured ~1.7 s.
+- `IcacheBoot.v` or the new `FsCfgBoot.v`: (7) `ipool_alloc_of_image` — the
+  generic stocking lemma, all image facts as pure premises, per-inum
+  discharge = one application of (6) inside `big_sepS_mono` so the big-op is
+  built by induction and never unfolded at the fupd's altitude; (8)
+  `inode_blocks_of_blocks` — the resource reindexing from
+  `[∗ set] b ∈ used, fsblock ∗ blk_own` to `inode_blocks γfs (img_blkmap …)
+  (fs_data_of …)`; 24 × 268 big-op elements, 998 nontrivial — **UNMEASURED,
+  probe it before writing the stocking lemma** (this is where the 106 s
+  `iFrame` warning lives: induct over `seq 0 MAXFILE`, `iExact`, never
+  `iFrame`).
+- `FsImgCheck.v`: the `= true` instantiations of (1)/(3)/(4) at
+  `fsimg_P`/`fsimg_sb` (+~25 s) plus the `cov` corner (0 s).
+
+## Execution state (2026-08-20, for the next session)
+
+- **DONE, committed, lane-gated green** (whole-tree make + `Print Assumptions
+  Fsinit.wp_fsinit_sconf` = standing six): staging steps 1 and 2, as commits
+  `05bac768` (WpLockAt/SleepLockAt/BioInitAt), `c2391d33` (icache_boot_at),
+  `3db7c047` (initlog/fsinit at a pre-minted `log_names`), `f013cb8b` (R1
+  fscfg shrink). Interfaces the later steps consume: `lock_free_tok` /
+  `lock_ghost_alloc` / `newlock_at` (WpLockAt.v), `sl_free_pair` + the
+  `*_at2` sleeplock fills (SleepLockAt.v), `bio_free_tok` /
+  `bio_names_ghost_alloc` / `bio_init_at` (BioInitAt.v), `icache_boot_at`
+  (IcacheBoot.v), `log_free_tok` / `log_ghost_alloc` (LogDefs.v; natural home
+  LogInv — pure relocation debt, and LogInv's three one-name alloc lemmas are
+  now dead), `disk_geom_agree` (FsReady.v).
+- **NEXT (in order):** (a) FsImg infrastructure items (1)–(5) + FsImgCheck
+  instantiations; (b) probe item (8)'s cost; then (c) `FsImgBridge.v` (6) +
+  the stocking machinery (7)/(8); then (d) staging steps 3+4 = `fileGpreS` +
+  `FsCfgBoot.fs_cfg_alloc` + the two kits + wiring into `boot_shared_alloc`
+  + the adequacy restatement (delete `adequacy_icfg`/`adequacy_fscfg`, move
+  the fs corollary to the new leaf per ruling 3); then (e) staging step 5
+  (mn_grp_fs: `bio_init_at` + `icache_boot_at` + the four `newlock_at`s +
+  discharge `LinkNameiRootBoot` by functor application); then (f) staging
+  step 6 (widen `first_tok`, `main_deposit` persistent half, seal at
+  forkret's first arm — COORDINATE with the humans' in-flight forkret work)
+  + refresh `design/fs-ghost-state.md` §7 (says 18 conjuncts/18 fields; truth
+  is 20/16).
+- **Build discipline for this campaign:** ALL compiles on the EC2 mirror
+  (user rule — local rocq OOMs the machine; the GCP route of
+  `remote-build-gcp.md` has no credentials in this environment). Lane:
+  `/home/ubuntu/fscfg-lane` on the EC2 box (hostname changes per restart —
+  ask the user; key `aws/ags-fk.pem`, user `ubuntu`), branch `fscfg-main`,
+  baselined at `15f597b2` + the four commits above (ship edited files, they
+  land by scp). Serialize whole-tree makes on the lane — two concurrent
+  makes were observed compiling the same file. Model split: Fable
+  coordinates/designs, Opus proves.
 
 ## Do not
 

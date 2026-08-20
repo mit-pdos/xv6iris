@@ -449,6 +449,12 @@ worth 20× on individual files.
   6.40/6.58 s baseline). Getting below this needs a different formulation — a
   multi-bind peel lemma, or a `goodb` that computes without touching the data —
   not another tactic.
+- **`Qed` re-checks and therefore DOUBLES every `vm_compute`** — the kernel
+  re-runs the reflexivity check at `Qed` time, so a lemma whose tactic is 50 s
+  of `vm_compute` costs ~100 s of wall clock (measured: `FsImgCheck.fsimg_wf_ok`
+  52.5 s tactic + 53.7 s `Qed`). Budget 2× the `-time` figure for any
+  vm_compute-heavy lemma, and prefer one big boolean sweep with lookup spec
+  lemmas over N per-item `vm_compute` lemmas — the sweep pays the 2× once.
 - **AND MEASURE ON A QUIET VM.** Three of those five variants first read as
   regressions of 20–30 % (25 s → 31 s on the same file), purely because another
   tree was building; the same variants re-measured at load 9 were within 2 %.
