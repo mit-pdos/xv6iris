@@ -401,13 +401,21 @@ Measured facts that supersede this file's earlier estimates:
    survives; "it stays in SystemAdequacy.v" does not.
 
 **The missing tracked infrastructure** (named by the probe; placement final):
-- `FsImg.v`: (1) `fs_dots_wf` (W8) + lookup spec; (2)
-  `fs_used_nodup_slot_inj` (W4 NoDup → per-live-inum `img_slot` injectivity,
-  no new vm_compute); (3) `fs_region_free` + spec; (4) `fs_live_set : gset Z`
-  + `elem_of` characterisation; (5) `fs_ind_bytes_round_trip` (ind_bytes of
-  the decoded entries = the indirect block's bytes; symbolic, ~30-40 lines;
-  needed by 22 of 24 inodes — this is `ind_res`'s content half, currently
-  absent entirely).
+- `FsImg.v` items (1)–(5): **DONE, commit `eb820d1a`** — `fs_dots_wf` /
+  `fs_dots_all` (W8, now `fsimg_wf`'s last conjunct, projection
+  `fsimg_wf_dots`), `fs_slot` / `fs_slot_inj` / `fs_used_nodup_slot_inj`
+  (+ one-premise `fsimg_wf_slot_inj`), `fs_region_free` + spec,
+  `fs_live_set` + `fs_live_set_elem_of`, `fs_ind_bytes_round_trip`.
+  FsImgCheck instantiations: `fsimg_dots`, `fsimg_slot_inj`,
+  `fsimg_region_free`/`fsimg_region_tail_free`, `fsimg_live_set` =
+  `[1..24]` + `fsimg_live_iff`. Leaf now ~212 s (+25 s load-normalized).
+  NOTES for the bridge: `img_slot := fs_slot` (they moved INTO FsImg —
+  it cannot import InodeInv; `FS_MAXFILE` is convertible with
+  `InodeInv.MAXFILE`); `fs_dots_wf_ok` already concludes
+  `DirView.dir_dots_ix`, so the probe's §E4 disappears. CORRECTION:
+  FsImg.v's only tracked importer is FsImgCheck.v (FsImgDisk/
+  SystemAdequacy name it in comments only). The `cov` corner is NOT here —
+  it names no image fact and belongs with the stocking lemma.
 - NEW `FsImgBridge.v` (imports FsImg + InodeInv/InodeLock/DirView/FsTree,
   names no literal image, so proof files may import it): (6) `img_blkmap` /
   `img_slot` + the probe's sections A–E verbatim (`img_inode_ok`,
