@@ -110,6 +110,15 @@ in `durable-notes.md` for what belongs where and what gets deleted.
 
 ## `projects/` — ongoing worklists & plans (one per effort)
 
+- **[`syscall-dispatch.md`](projects/syscall-dispatch.md)** — folding the 22
+  table entries into `syscall()` and retiring `LinkSyscall.v`'s `Axiom`
+  (the tree's only remaining `Admitted` lives here too). Sixteen entries
+  are wired; the six that are not are blocked on three debts the file
+  states — the inode-reference ledger not closing, `sys_pipe`'s pid
+  fraction, and read/write's premises about the count word the USER wrote.
+  Read it for **why `syscall_env` is now `FsReady.fs_ready` plus
+  twenty-eight equations**, and for the fraction-arithmetic defect it
+  turned up in `SpecSysClose.v`.
 - **[`main-cycle-port.md`](projects/main-cycle-port.md)** — the expression-resident
   monad port (design in [`design/main-cycle-port.md`](design/main-cycle-port.md)).
 - **[`user-tier-port.md`](projects/user-tier-port.md)** — the user tier's port onto
@@ -232,7 +241,8 @@ Seven arrived on 2026-08-20, when their work finished: `kexec.md` (the largest
 function in the tree, and the home of **the copyout story** — the most
 transferable thing that project produced), `fs-sysfile.md` (the syscall-layer
 campaign that took `sysfile.c` to 16/16 and retired the tree's last stub
-`Axiom`), `uservec.md` (uservec proven and the whole-trap-loop Löb theorem
+`Axiom`; its successor, the DISPATCHER, is
+[`projects/syscall-dispatch.md`](projects/syscall-dispatch.md)), `uservec.md` (uservec proven and the whole-trap-loop Löb theorem
 built on top of it), `console.md` and `uart-driver.md` (console.c 5/5, uart.c
 4/4, both cones axiom-clean), `kvminithart-tlb-lane.md` (the TLB lane's root,
 closed), and `iput-acquiresleep.md`. The two cleanups those files were still
