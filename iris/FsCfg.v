@@ -60,7 +60,17 @@ Local Open Scope Z_scope.
 Class fscfg := MkFscfg {
   (* printk's environment, and the page allocator's authority *)
   fsc_printk : gname;
+  (* the "kmem" spinlock's own gname... *)
   fsc_kalloc : gname;
+  (* ...AND THE FREE-LIST COUNT/SEAL PAIR THE LOCK'S RESOURCE IS KEYED BY.
+     [KvmSpec.kalloc_env] hides this behind an existential, which is exactly
+     the unreachable-witness shape [FsCfg]'s header argues against: a caller
+     that names the pair itself ([SpecFileclose.fileclose_pipe_env] does --
+     pipeclose gives a PAGE back, so it must speak about the count) can
+     never show its own name equal to a hidden one.  So the pair is ambient
+     too, and [FsReady.fs_ready] carries the lock and the sealed count
+     SPELLED OUT, with [kalloc_env] recovered as a projection. *)
+  fsc_kpages : gname * gname;
   (* the device fabric: the UART's four ghosts, the disk's seven, and the
      "virtio_disk" spinlock *)
   fsc_uart   : uart_names;
@@ -88,4 +98,19 @@ Class fscfg := MkFscfg {
      log starts.  Pure data, ambient for the same reason [icfg_ist] is. *)
   fsc_cov    : gset Z;
   fsc_logst  : Z;
+  (* ...AND THE REST OF THE SUPERBLOCK'S GEOMETRY, for the same reason and
+     by the same argument.  These three were the last fs numbers a syscall
+     contract still had to THREAD, and threading them is what kept
+     [FsReady.fs_ready] from carrying the four superblock cells and the
+     nineteen geometry premises every file-system syscall states -- the
+     cells are named by these numbers, so a predicate that did not know
+     them could not mention the cells.  Pure data, exactly as [fsc_cov] is:
+     mkfs writes it into block 1 and nothing ever moves it.
+       [fsc_bmapstart]  the first bitmap block
+       [fsc_size]       the file system's size in blocks, as the superblock
+                        records it (bounded by [BPB]: one bitmap block)
+       [fsc_ninodes]    how many inodes mkfs made *)
+  fsc_bmapstart : Z;
+  fsc_size      : Z;
+  fsc_ninodes   : Z;
 }.

@@ -328,7 +328,7 @@ Section ProofSysClose.
     : wp_sys_close_sconf_body γl γf fn on us m av n eb p v pid V b lks.
   Proof.
     cbv beta delta [wp_sys_close_sconf_body].
-    intros pcE ret_tgt Harg Hn Hav Hbelow.
+    intros pcE ret_tgt Harg Hn Hav Hbelow Hfpid Hfdq.
     
     set (sp0 := m !!! Regidx csp_rs1).
     set (ra0 := m !!! Regidx (mword_of_int 1 : mword 5)).
@@ -347,9 +347,10 @@ Section ProofSysClose.
        away ("The variable b was not found").  [Hb] is used ONLY at the
        [trap_csrs_ext]/[cpu_claim_ext] transports, to turn their [eb]-guard
        into the [b]-guard the per-instruction chain facts are stated over. *)
-    iAssert (⌜(n = 0)%nat⌝)%I as %Hn0.
-    { iEval (rewrite /fileclose_fs_env /fileclose_fs_env_nopid) in "Hfenv".
-      iDestruct "Hfenv" as "[(%Hz & _) _]". iPureIntro. exact Hz. }
+    iAssert (⌜(n = 0)%nat /\ p = proc_addr (fcn_j fn)⌝)%I as %[Hn0 Hfpj].
+    { iEval (rewrite /fileclose_fs_env_nopid) in "Hfenv".
+      iDestruct "Hfenv" as "(%Hz & %Hpa & _)". iPureIntro.
+      split; [exact Hz | exact Hpa]. }
     iDestruct (cpu_own_eb_agree with "Hcg Hcpu") as %Hbm.
     assert (Hb : eb = b) by (rewrite -Hbm Hn0; reflexivity).
     clear Hbm.
@@ -771,7 +772,13 @@ Section ProofSysClose.
       assert (HC4a0 : C4 !!! Regidx (mword_of_int 10 : mword 5) = p_ofile p fd).
       { rewrite /C4 upd_eq. rgne. rgne. rewrite HC3a0 HC3a5. reflexivity. }
       (* borrow the descriptor out of [proc_priv] *)
-      iDestruct (proc_priv_ofile γf p pid V fd fv Hlk with "Hpriv") as "[Hslot Hback]".
+      (* THE PID QUARTER RIDES WITH THE DESCRIPTOR.  [proc_priv_pid_ofile]
+         lends both out of [proc_priv] at once, which is precisely what this
+         block needs: the store below empties [p->ofile[fd]] and the
+         fileclose after it wants the quarter (SpecSysClose.v's note on why
+         the quarter cannot come from the CALLER). *)
+      iDestruct (proc_priv_pid_ofile γf p pid V fd fv Hlk with "Hpriv")
+        as "(Hpidq & Hslot & Hback)".
       iDestruct "Hslot" as "[Hcell [[%Hz _] | Href]]"; [by exfalso; apply Hfvnz|].
       iDestruct "Href" as (k q Cf) "[[%Hfv %Hklt] Href]".
       (* ---- +0x2c: sd x0,0(a0) -- p->ofile[fd] = 0 ---- *)
@@ -844,7 +851,10 @@ Section ProofSysClose.
       (* the descriptor's type is not visible here -- [ofile_slot] quantifies
          the content -- so hand fileclose whichever bundle it asks for and
          keep the other ([fileclose_env_split]). *)
-      iDestruct (fileclose_env_frame fn on us n eb p Cf with "Hpenv Hfenv")
+      (* the quarter, re-spelled at [fn]'s own names -- which is all the two
+         tie premises are for *)
+      iEval (rewrite Hfpj -Hfdq -Hfpid) in "Hpidq".
+      iDestruct (fileclose_loop_open fn on us n eb p Cf with "Hpenv Hfenv Hpidq")
         as "[Hfcenv Hfcback]".
       iApply (Fileclose.wp_fileclose_sconf γl γf k q Cf fn on us D n eb p (av - 4)%nat b lks
                 ltac:(lia) Hn HDa0
@@ -852,7 +862,8 @@ Section ProofSysClose.
                 with "Hcg Hcpu Hextc Hextm Htext Hdata Hpc Hftab Hpe Href Hfcenv").
       all: try lkbelow.
       iIntros (CID21 Hs21 R) "Hcg Hcpu Hextc Hextm Hpc %HcsR Hfdslot Hout".
-      iDestruct ("Hfcback" with "Hout") as "[Hpenv Hfenv]".
+      iDestruct ("Hfcback" with "Hout") as "(Hpenv & Hfenv & Hpidq)".
+      iEval (rewrite -Hfpj Hfdq Hfpid) in "Hpidq".
       assert (Hpc38 : ret_pc (D !!! Regidx (mword_of_int 1 : mword 5))
                       = mword_of_int (KernelSyms.sys_close + 0x38))
         by (rewrite HDra; apply bv_eq; vm_compute; reflexivity).
@@ -871,7 +882,8 @@ Section ProofSysClose.
                       = mword_of_int (KernelSyms.sys_close + 0x3a)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp3a) in "Hpc".
       (* the descriptor is empty now, and it owns the unit fileclose returned *)
-      iDestruct ("Hback" $! (zero_reg : mword 64) with "[Hcell Hfdslot]") as "Hpriv".
+      iDestruct ("Hback" $! (zero_reg : mword 64) with "Hpidq [Hcell Hfdslot]")
+        as "Hpriv".
       { rewrite /ofile_slot. iFrame "Hcell". iLeft. by iFrame "Hfdslot". }
       (* rejoin frame slot 3 *)
       iDestruct (word_pointsto_join4 _ _ _ _ Hal3 with "Hs3lo Hfdcell") as "Hs3".

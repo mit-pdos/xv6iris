@@ -66,7 +66,7 @@ Definition first_addr : mword 64 := mword_of_int KernelSyms.first_1.
 Section FirstTok.
   Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId}.
-  Context `{!xv6G Σ} `{ICFG : icfg} `{FSC : fscfg}.
+  Context `{!xv6G Σ} `{ICFG : icfg}.
 
   Definition first_tok : iProp Σ :=
     ((first_addr ↦₄ (mword_of_int 1 : mword 32))

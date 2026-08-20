@@ -469,6 +469,43 @@ FINISHES" rule prescribes — the last line of the log is the stalling
 sentence, and that is the only cheap way to tell this apart from a slow
 proof.
 
+## A CONTRACT CAN ASK FOR MORE OF A CELL THAN EXISTS, AND THE FRACTION IS
+## THE LAST THING ANYONE COUNTS
+
+`SpecSysClose.v` took `ProcInv.proc_priv γf p pid V` **and**
+`SpecFileclose.fileclose_fs_env fn us n eb p`, and the second of those
+carries a QUARTER of `p->pid` (iput's acquiresleep records the holder).
+`proc_priv` owns that cell at ONE HALF and `SchedCtx`'s state resource owns
+the other half, so **three quarters is more of `p->pid` than any thread can
+hold outside the proc lock** — the premise set was unpayable, and the
+function is fully proven.
+
+It is the "satisfiable in isolation, refutable at the call site" variant one
+step further out, and it hides better than the usual one: `↦₄{DfracOwn 1/2}`
+beside `↦₄{DfracOwn 1/4}` is *not* refutable on its own (3/4 ≤ 1), so no
+proof anywhere can derive `False` from the pair. What refutes it is the
+GLOBAL layout — where the complementary half lives — and nothing in a
+function's own proof mentions that. The only witness is a caller that
+actually holds the resources, and while the caller is an `Axiom` there is
+none.
+
+**So when a whole-function contract takes an aggregate (`proc_priv`,
+`fileclose_fs_env`, a `*_env` bundle) AND a bare fractional cell, add the
+fractions up and find the other owner before writing the proof.** The
+question to ask is not "is this consistent?" but "who holds the rest?".
+
+THE FIX IS ALMOST ALWAYS "LEND IT FROM THE AGGREGATE YOU ALREADY HAVE",
+and the lending lemma usually exists: `proc_priv` has a whole family
+(`ProcInv.proc_priv_pid`, `..._pid_ofile`, `..._pid_cwd`) whose shape is
+`aggregate -∗ quarter ∗ slot ∗ (quarter -∗ slot' -∗ aggregate')`, and the
+callee side usually has the matching re-pack (`SpecFileclose`'s
+`fileclose_fs_env_nopid` + `fileclose_loop_open`, written for kexit's
+descriptor loop). sys_close's repair was ~15 lines in a 936-line proof
+because both halves were already there; what it cost was the two tie
+premises (`fcn_pid fn = pid`, `fcn_dq fn = DfracOwn (1/4)`) that identify
+the lent quarter with the one the callee's names record describes, and its
+caller discharges both by `reflexivity`.
+
 ## A HEDGED CONJUNCT IS A FALSE STATEMENT THAT COMPILES
 
 **Never write `⌜P \/ True⌝` (or `(H : True)`) into a contract as a

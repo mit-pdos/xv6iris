@@ -47,6 +47,8 @@ Require Import FsCrash.
 Require Import IcacheRef.
 (* [ROOTDEV], for the two config ties the boot arm now carries *)
 Require Import IrefSlots.
+Require Import FsCfg.       (* [fscfg] -- the concrete instance below *)
+Require Import BioDefs FsBlocks IcacheEscrow.  (* its record constructors *)
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
@@ -309,6 +311,47 @@ Local Instance adequacy_icfg : icfg :=
          (LogDefs.MkLogNames 1%positive 1%positive 1%positive 1%positive)
          0 (fun _ => 1%positive) (fun _ => 1%positive) 1%positive 1%positive
          1%positive 1%positive 1%positive.
+
+(* ...AND A CONCRETE [FsCfg.fscfg], FOR THE SAME REASON AND WITH ONE EXTRA
+   HAZARD WORTH NAMING.
+
+   [FileInvDefs.fileG] carries an [fscfg] beside its [icfg] (see the note on
+   the class), so instantiating the file table at a concrete functor list
+   needs one of each.  The statements below are about REDUCIBILITY and
+   quantify over none of the file system's configuration, so any closed
+   choice does -- exactly as for [adequacy_icfg] above.
+
+   WITHOUT IT THE FILE DOES NOT FAIL, IT DIVERGES, and the shape is worth
+   recording because it will recur for any config record reached through a
+   class field.  [file_fscfg] is declared with [::], so it is an INSTANCE
+   [fileG Σ -> fscfg]; and [subG_fileΣ] is an instance [icfg -> fscfg ->
+   subG fileΣ Σ -> fileG Σ].  With no closed [fscfg] in scope, resolving the
+   [fileG xv6Σ] the corollaries need enters
+
+     fileG ?Σ  ->  subG_fileΣ  ->  fscfg  ->  file_fscfg  ->  fileG ?Σ' -> ...
+
+   with the functor list unconstrained at every turn, so each round allocates
+   fresh evars and the search never terminates: measured at 400 GB resident
+   and climbing, with no error and no progress.  [adequacy_icfg] is what
+   keeps the identical [icfg] cycle from firing, which is why nobody had met
+   it before.  A concrete instance at every site that RESOLVES [fileG]
+   (rather than binding it) is the cut. *)
+Local Instance adequacy_fscfg : fscfg :=
+  MkFscfg 1%positive 1%positive (1%positive, 1%positive)
+          (UartNames 1%positive 1%positive 1%positive 1%positive)
+          (DiskNames 1%positive 1%positive 1%positive 1%positive 1%positive
+                     1%positive 1%positive)
+          1%positive
+          (mword_of_int 0) (mword_of_int 0) (mword_of_int 0)
+          (MkBioNames 1%positive 1%positive 1%positive
+                      (fun _ => (1%positive, 1%positive))
+                      (fun _ => 1%positive) (fun _ => 1%positive))
+          (MkFsNames 1%positive 1%positive 1%positive)
+          1%positive
+          (MkIcNames (fun _ => 1%positive) (fun _ => 1%positive)
+                     (fun _ => 1%positive))
+          1%positive
+          ∅ 0 0 1 1.
 
 Definition xv6Σ : gFunctors :=
   #[ riscvΣ; xv6GΣ; fileΣ; fdslotΣ; irefslotΣ; pavΣ ].

@@ -110,6 +110,29 @@ Definition wp_sys_close_sconf_body
      LOWEST rank in the table, and nothing else sys_close touches (argfd,
      myproc) carries any order premise at all. *)
   locks_below lks "log" ->
+  (* ---- THE TWO TIES THE PID QUARTER FORCES, and why they are cheap.
+
+     [fileclose]'s FS arm wants a QUARTER of [p->pid] (iput's acquiresleep
+     records the holder), and this contract used to take it inside
+     [fileclose_fs_env].  That made the premise set UNPAYABLE rather than
+     merely large: [ProcInv.proc_priv] owns [p_pid] at ONE HALF and
+     [SchedCtx]'s state resource owns the other, so no thread can hold
+     [proc_priv] AND a further quarter -- three quarters is more than exists
+     outside the lock.  It is the "satisfiable in isolation, refutable at
+     the call site" shape durable-notes.md warns about: nothing in the build
+     saw it, because the only caller was an [Axiom].
+
+     So the environment below is the NOPID bundle, and the quarter is lent
+     out of this function's OWN [proc_priv] for the duration of the
+     fileclose call ([ProcInv.proc_priv_pid_ofile] lends it beside the
+     descriptor slot, which is exactly what the store to [p->ofile[fd]]
+     wants anyway; [SpecFileclose.fileclose_loop_open] is the pairing kexit's
+     loop already uses).  The two equations are what identify the lent
+     quarter with the one [fn] describes -- [SpecSyscall]'s dispatch
+     discharges both, [fcn_pid] by its own [fcn_pid fn = pid] premise and
+     [fcn_dq] by [reflexivity]. *)
+  fcn_pid fn = pid ->
+  fcn_dq fn = DfracOwn (1/4) ->
   sie_cap_gpr KT1 m av b p -∗
   cpu_own n eb p b lks -∗
   (* THE TRAP-CSR COMPLEMENT, THREADED.  [emp] at [eb = true], so no existing
@@ -134,7 +157,7 @@ Definition wp_sys_close_sconf_body
      close ANY [struct file] costs, and there is no honest way to make it
      smaller: closing an inode file writes the disk and sleeps. *)
   fileclose_pipe_env fn on n -∗
-  fileclose_fs_env fn us n eb p -∗
+  fileclose_fs_env_nopid fn us n eb p -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  sys_close calls fileclose,
      whose FD_INODE / FD_DEVICE arm parks, so sys_close can return on another
      hart whatever SIE was doing.  The cost is the CALLER's: it must supply
@@ -153,7 +176,7 @@ Definition wp_sys_close_sconf_body
          descriptor may have held a pipe's last end), which is why the pipe
          bundle returns under an existential *)
       (∃ on', fileclose_pipe_env fn on' n) -∗
-      (∃ us', fileclose_fs_env fn us' n eb p) -∗
+      (∃ us', fileclose_fs_env_nopid fn us' n eb p) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

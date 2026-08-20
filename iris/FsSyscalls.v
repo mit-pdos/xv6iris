@@ -203,10 +203,9 @@ Record fs_geom `{ICFG : icfg}
 Section FsBundles.
   Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId}.
-  (* the ambient fs names [FsReady.fs_ready] is stated at.  Not a
-     superclass of anything, so unlike [icfg] (which rides in on [fileG])
-     it has to be bound by hand. *)
-  Context `{FSC : fscfg}.
+  (* the ambient fs names [FsReady.fs_ready] is stated at.  It rides in on
+     [fileG] exactly as [icfg] does (see the note on [FileInvDefs.fileG]),
+     so there is no binder here and no second instance path. *)
 
   (* THE AMBIENT, AND IT IS PERSISTENT.  Every invariant, lock handle and
      certificate the fs cone runs on, plus the printk credential PAIR (the
@@ -284,7 +283,15 @@ Section FsBundles.
     is_itable2 gtl cn γfs γi cov logstart nib dev ∗ itable_inv ∗
     ic_escrows cn γfs γi cov logstart ∗ ic_sleeplocks cn ∗
     ireg_inv γi γfs inodestart nib ∗ ireg_open ∗
-    kalloc_env γa None.
+    kalloc_env γa None ∗
+    (* ...and the two rows SIMP-3 added to the predicate: the image's own
+       arithmetic and the four superblock cells (FsReady.v §0, §0b).  They
+       are at the AMBIENT names on purpose -- unlike the eighteen above,
+       nothing here is re-spelled at the caller's, because [fs_geom_ok] is a
+       statement about the [fscfg]/[icfg] instance itself and the cells are
+       named by its fields.  A caller that threads its own names rewrites by
+       the tie equations it just destructed. *)
+    ⌜FsReady.fs_geom_ok⌝ ∗ FsReady.fs_sb_cells.
   Proof.
     rewrite /fs_world.
     iIntros "(-> & -> & -> & -> & -> & -> & -> & -> & -> & -> & -> & -> & ->
@@ -352,7 +359,7 @@ End FsBundles.
     file header. *)
 Definition wp_sys_mkdir_friendly_body
     `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{FSC : fscfg}
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (γf γa γpr : gname)                                 (* ftable, kalloc, printk *)
     (γs : list gname) (j : nat) (γl : gname)             (* the running process *)
@@ -410,7 +417,7 @@ Module FsSysMkdir (M : SYSMKDIR).
 
   Lemma wp_sys_mkdir_friendly
       `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
-        !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{FSC : fscfg}
+        !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γf γa γpr : gname)
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
@@ -450,7 +457,7 @@ Module FsSysMkdir (M : SYSMKDIR).
     iDestruct (fs_world_all with "Hw") as
       "(Htext & Hdata & Hpr & %Hprg & Hbio & Hlogc &
         Hseam & Hgc & Hdev & Hdgeom & Hdlk & Hitb2 & Hitbl &
-        Hesc & Hisl & Hireg & Hiopen & Hkenv)".
+        Hesc & Hisl & Hireg & Hiopen & Hkenv & %Hgeo & #Hsbc)".
     iDestruct "Hres" as "(Hbsl & Hsbn & Hsbi & Hsbs & Hsbb & Hbm & Hir)".
     iApply (M.wp_sys_mkdir_sconf γf γa γpr γs j γl γu γd γk pd pav pu bn
               glog γfs γi cn gtl cov logstart bmapstart inodestart nib
@@ -524,7 +531,7 @@ End FsSysMkdir.
     nothing machine-level in it. *)
 Definition wp_sys_chdir_friendly_body
     `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
-      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{FSC : fscfg}
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (γf γa γpr : gname)
     (γs : list gname) (j : nat) (γl : gname)
@@ -579,7 +586,7 @@ Module FsSysChdir (M : SYSCHDIR).
 
   Lemma wp_sys_chdir_friendly
       `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
-        !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} `{FSC : fscfg}
+        !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γf γa γpr : gname)
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
@@ -619,7 +626,7 @@ Module FsSysChdir (M : SYSCHDIR).
     iDestruct (fs_world_all with "Hw") as
       "(Htext & Hdata & Hpr & %Hprg & Hbio & Hlogc &
         Hseam & Hgc & Hdev & Hdgeom & Hdlk & Hitb2 & Hitbl &
-        Hesc & Hisl & Hireg & Hiopen & Hkenv)".
+        Hesc & Hisl & Hireg & Hiopen & Hkenv & %Hgeo & #Hsbc)".
     iDestruct "Hres" as "(Hbsl & Hsbn & Hsbi & Hsbs & Hsbb & Hbm & Hir)".
     iPoseProof (printk_env_panic with "Hpr") as "#Hpe".
     iApply (M.wp_sys_chdir_sconf γf γa γs j γl γu γd γk pd pav pu bn

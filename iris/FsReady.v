@@ -23,6 +23,17 @@
          every one of which fsinit's own caller already holds -- complete
          the predicate in one [bupd].
 
+      2b. IT IS THE WHOLE PRECONDITION, NOT JUST THE RESOURCE HALF.  Beside
+         the invariants it carries the image's own ARITHMETIC
+         ([fs_geom_ok], §0 -- the nineteen pure premises every
+         file-system syscall used to state one by one) and the four
+         SUPERBLOCK CELLS the fs cone reads ([fs_sb_cells], §0b, at
+         [DfracDiscarded] because nothing writes them after fsinit).
+         Those were the last two things a syscall contract had to thread
+         beside this predicate, and threading them is what made "the file
+         system is ready" a claim a caller could hold and still not be
+         able to call anything.
+
       3. IT IS BOOT-FREE, AND THE TYPE ENFORCES IT.  Not one conjunct
          mentions boot state.  [ireg_boot] is EXCLUSIVE and is consumed by
          the seal, so the instant [fs_ready] exists, booting is over: there
@@ -45,7 +56,7 @@
     two.  Ambient names remove the existential instead of hiding it.
 
     So every name is ambient: the four the inode cache already owned
-    ([icfg_log], [icfg_ist], [icfg_nib], [icfg_dev]) and the fifteen
+    ([icfg_log], [icfg_ist], [icfg_nib], [icfg_dev]) and the eighteen
     [FsCfg.fscfg] adds.  That is [IcacheRef.icfg]'s own argument one layer
     out -- there is exactly one file system per boot -- and [fscfg] is
     per-era exactly as [icfg] is (the disk image ghost is re-minted at
@@ -96,9 +107,10 @@
     [fs_ready] is parametric in the cache's INDEX (though not in its
     names), and every projection below is stated at that same index, so a
     consumer elaborating at [file_icfg]/[file_icacheG] meets it on the
-    nose.  [FSC : fscfg] is bound here too and is NOT a superclass of
-    anything, so unlike [icfg] it has to be bound by hand wherever this
-    predicate is named.  *)
+    nose.  [fscfg] rides in on [fileG] beside [icfg] (see the note on
+    [FileInvDefs.fileG] for why it is a class field rather than a binder of
+    its own), so this section binds it nowhere and there is exactly one
+    instance path to its fields.  *)
 
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
@@ -129,6 +141,7 @@ Require Import FileInvDefs.
 Require Import SpecPrintk.
 Require Import ProcAvail.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
@@ -142,7 +155,104 @@ Section FsReady.
      below is at [ICFG]/[icacheG0] rather than at [fileG]'s baked fields,
      and the whole projection family is stated at the same index a
      consumer's own section would carry. *)
-  Context `{!xv6G Σ} `{ICFG : icfg} `{FSC : fscfg}.
+  Context `{!xv6G Σ} `{ICFG : icfg}.
+
+  (* ================================================================== *)
+  (*  0.  THE IMAGE'S GEOMETRY, AS ONE PROPOSITION                        *)
+  (* ================================================================== *)
+
+  (* THE NINETEEN PURE PREMISES EVERY FILE-SYSTEM SYSCALL USED TO STATE,
+     at the ambient names, as one record.
+
+     They belong here for exactly the reason the resources do.  "The file
+     system is ready to operate" is not only a pile of invariants: it is
+     also the arithmetic mkfs's image satisfies -- the log's region is
+     covered, the bitmap block is covered and outside the log, every inum
+     the region can name has its block covered, the inode count fits a
+     [ushort].  A contract that took the resources from [fs_ready] and the
+     arithmetic from nineteen separate premises would still make every
+     caller re-derive facts about a file system it was just handed; and the
+     facts are about the AMBIENT configuration, so there is exactly one
+     copy of them to have.
+
+     FOUR OF [FsSyscalls.fs_geom]'s FIELDS ARE GONE, not dropped: [fg_dev],
+     [fg_nib], [fg_log] and [fg_ist] tied a threaded name to the [icfg]
+     class, and a predicate stated AT [icfg] has nothing left to tie.  A
+     contract that still threads its own names discharges them by
+     [reflexivity] once it instantiates at the ambient ones.  Four more
+     ([fg_size], [fg_bm_nn], [fg_bm_cov], [fg_bm_out]) are literally
+     [bitmap_geom_ok]'s conjuncts and are reached through it -- see the
+     accessors below -- rather than restated, so nothing here is a hedged
+     copy of anything else. *)
+  Record fs_geom_ok : Prop := MkFsGeomOk {
+    fgo_rootdev  : icfg_dev = ROOTDEV;
+    fgo_nib_pos  : (0 < icfg_nib)%nat;
+    fgo_loggeom  : log_geom_ok fsc_cov fsc_logst;
+    fgo_ist_nn   : 0 <= icfg_ist;
+    fgo_covbelow : cov_below fsc_cov fsc_size;
+    fgo_bmgeom   : bitmap_geom_ok fsc_cov fsc_logst fsc_bmapstart fsc_size;
+    fgo_iblocks  : InodeInv.ireg_blocks_ok icfg_ist icfg_nib fsc_cov fsc_logst;
+    fgo_nin_lo   : 1 < fsc_ninodes;
+    fgo_nin_hi   : fsc_ninodes <= 16 * Z.of_nat icfg_nib;
+    fgo_nin_31   : fsc_ninodes < 2 ^ 31;
+    fgo_ushort   : 16 * Z.of_nat icfg_nib <= 2 ^ 16;
+  }.
+
+  (* [bitmap_geom_ok]'s four conjuncts, as accessors, so a contract that
+     spells them one by one (every create-family syscall does) reads them
+     off this record without unfolding [BitmapInv]'s bundle by hand. *)
+  Lemma fgo_size : fs_geom_ok -> 0 < fsc_size <= BPB.
+  Proof. intro G. apply (proj1 (fgo_bmgeom G)). Qed.
+
+  Lemma fgo_bm_nn : fs_geom_ok -> 0 <= fsc_bmapstart.
+  Proof. intro G. apply (proj1 (proj2 (fgo_bmgeom G))). Qed.
+
+  Lemma fgo_bm_cov : fs_geom_ok -> fsc_bmapstart ∈ fsc_cov.
+  Proof. intro G. apply (proj1 (proj2 (proj2 (fgo_bmgeom G)))). Qed.
+
+  Lemma fgo_bm_out : fs_geom_ok -> ~ (fsc_bmapstart ∈ log_region_set fsc_logst).
+  Proof. intro G. apply (proj2 (proj2 (proj2 (fgo_bmgeom G)))). Qed.
+
+  (* ...and the region-wide inum fact in the QUANTIFIED, split form the
+     content-independent bundles ([SpecFileread.fileread_fs_env],
+     [SpecFilestat.filestat_fs_env], [SpecFileclose.fileclose_ic_env]) state
+     it in.  Same fact, two spellings; this is the bridge. *)
+  Lemma fgo_iblock_cov : fs_geom_ok ->
+    forall inum : mword 32, bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
+      DinodeEnc.IBLOCK inum icfg_ist ∈ fsc_cov.
+  Proof. intros G inum Hi. apply (proj1 (fgo_iblocks G inum Hi)). Qed.
+
+  (* ================================================================== *)
+  (*  0b.  THE SUPERBLOCK'S FOUR CELLS                                   *)
+  (* ================================================================== *)
+
+  (* THE FOUR WORDS OF `struct superblock` THE FS CONE READS, AT
+     [DfracDiscarded].
+
+     Every fs contract in the tree takes these as [↦₄{dq}] at a threaded
+     fraction, and every one of them only ever READS: [readsb] fills the
+     global `sb` once, inside fsinit, and nothing in the kernel writes it
+     again.  A fraction is therefore an accounting cost with no
+     corresponding permission -- it forces four cells through every
+     contract, every bundle and every continuation on the way, for a value
+     that is fixed for the lifetime of the boot.
+
+     Discarding the fraction at the end of fsinit ([word4_pointsto_persist])
+     retires that cost outright: the cells become persistent, they live here
+     beside the invariants they describe, and [DfracDiscarded] instantiates
+     the [dq] of every existing contract without any of them changing.  This
+     is the one place the file system's geometry appears twice -- once as the
+     numbers in [fs_geom_ok], once as the memory that holds them -- and the
+     two are pinned to each other by construction, since both are stated at
+     the same [fscfg] fields. *)
+  Definition fs_sb_cells : iProp Σ :=
+    (sb_ninodes    ↦₄□ (mword_of_int fsc_ninodes   : mword 32) ∗
+     sb_inodestart ↦₄□ (mword_of_int icfg_ist      : mword 32) ∗
+     sb_size       ↦₄□ (mword_of_int fsc_size      : mword 32) ∗
+     sb_bmapstart  ↦₄□ (mword_of_int fsc_bmapstart : mword 32))%I.
+
+  Global Instance fs_sb_cells_persistent : Persistent fs_sb_cells.
+  Proof. rewrite /fs_sb_cells. apply _. Qed.
 
   (* ================================================================== *)
   (*  1.  THE PREDICATE                                                  *)
@@ -155,7 +265,7 @@ Section FsReady.
 
      NO PARAMETERS.  Every name it used to take is ambient: the four the
      inode cache already owned ([icfg_log], [icfg_ist], [icfg_nib],
-     [icfg_dev]) and the fifteen [FsCfg.fscfg] adds.  That file's header
+     [icfg_dev]) and the eighteen [FsCfg.fscfg] adds.  That file's header
      carries the argument; the short version is that a carried predicate
      must not be an existential, because an existential cannot be fed to a
      consumer whose own resources are keyed to concrete names.
@@ -199,7 +309,20 @@ Section FsReady.
         also the ONE conjunct the boot chain cannot already have: the seal
         below is what mints it, and minting it is what ends booting. *)
      ireg_open ∗
-     kalloc_env fsc_kalloc None)%I.
+     (* THE ALLOCATOR, SPELLED OUT rather than as [kalloc_env]: that bundle
+        hides the free-list count/seal pair behind an existential, and a
+        consumer that names the pair itself ([SpecFileclose]'s pipe arm
+        does) could never tie its own name to a hidden one.  [fs_ready_kalloc]
+        below recovers the bundled form for everyone else. *)
+     is_lock fsc_kalloc (mword_of_int KernelSyms.kmem) "kmem"%string
+       (kmem_res fsc_kpages (mword_of_int (KernelSyms.kmem + 24))) ∗
+     kalloc_avail fsc_kpages None ∗
+     (* ...AND THE IMAGE'S OWN ARITHMETIC AND THE FOUR SUPERBLOCK CELLS.
+        See §0 and §0b: what "ready to operate" means includes the geometry
+        mkfs laid down, and the cells that hold it are read-only for the
+        lifetime of the boot. *)
+     ⌜fs_geom_ok⌝ ∗
+     fs_sb_cells)%I.
 
   Global Instance fs_ready_persistent : Persistent fs_ready.
   Proof. rewrite /fs_ready. apply _. Qed.
@@ -259,7 +382,11 @@ Section FsReady.
      ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst ∗
      ic_sleeplocks fsc_ic ∗
      ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib ∗
-     kalloc_env fsc_kalloc None)%I.
+     is_lock fsc_kalloc (mword_of_int KernelSyms.kmem) "kmem"%string
+       (kmem_res fsc_kpages (mword_of_int (KernelSyms.kmem + 24))) ∗
+     kalloc_avail fsc_kpages None ∗
+     ⌜fs_geom_ok⌝ ∗
+     fs_sb_cells)%I.
 
   Global Instance fs_ready_pre_persistent : Persistent fs_ready_pre.
   Proof. rewrite /fs_ready_pre. apply _. Qed.
@@ -278,9 +405,10 @@ Section FsReady.
     iMod (fs_ready_seal with "Hboot") as "#Hopen".
     iModIntro. rewrite /fs_ready /fs_ready_pre.
     iDestruct "Hpre" as "(H1 & H2 & H3 & %H4 & H5 & H6 & H7 & H8 & H9 & H10
-                          & H11 & H12 & H13 & H14 & H15 & H16 & H17)".
-    iFrame "H1 H2 H3 H5 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17".
-    iFrame "%". iExact "Hopen".
+                          & H11 & H12 & H13 & H14 & H15 & H16 & H17 & H18
+                          & %H19 & #H20)".
+    iFrame "H1 H2 H3 H5 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16".
+    iFrame "Hopen H17 H18 H20". iFrame "%".
   Qed.
 
   (* ...and the converse half a seal site wants to READ BACK: the predicate
@@ -291,8 +419,8 @@ Section FsReady.
   Proof.
     rewrite /fs_ready /fs_ready_pre.
     iIntros "(H1 & H2 & H3 & %H4 & H5 & H6 & H7 & H8 & H9 & H10 & H11 & H12
-              & H13 & H14 & H15 & H16 & _ & H17)".
-    iFrame "H1 H2 H3 H5 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17".
+              & H13 & H14 & H15 & H16 & _ & H17 & H18 & %H19 & #H20)".
+    iFrame "H1 H2 H3 H5 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 H18 H20".
     iFrame "%".
   Qed.
 
@@ -379,12 +507,44 @@ Section FsReady.
                  & $ & $ & _)".
   Qed.
 
-  Lemma fs_ready_kalloc : fs_ready -∗ kalloc_env fsc_kalloc None.
+  (* THE ALLOCATOR, in the two forms its consumers want: the pair SPELLED
+     (what a caller that names the count itself asks for) and the BUNDLE
+     (what every kalloc-reaching contract in the tree asks for). *)
+  Lemma fs_ready_kmem :
+    fs_ready -∗
+    is_lock fsc_kalloc (mword_of_int KernelSyms.kmem) "kmem"%string
+      (kmem_res fsc_kpages (mword_of_int (KernelSyms.kmem + 24))) ∗
+    kalloc_avail fsc_kpages None.
   Proof.
     rewrite /fs_ready.
-    by iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _
-                 & _ & _ & $)".
+    by iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & $ & $ & _)".
   Qed.
+
+  Lemma fs_ready_kalloc : fs_ready -∗ kalloc_env fsc_kalloc None.
+  Proof.
+    iIntros "H". iDestruct (fs_ready_kmem with "H") as "[Hk Hav]".
+    rewrite /kalloc_env. iExists fsc_kpages. iFrame "Hk Hav".
+  Qed.
+
+  (* ---- THE GEOMETRY AND THE CELLS (§0, §0b) ----------------------------
+     The two rows that make a create-family contract's twenty-odd pure
+     premises and four superblock cells free: a caller holding [fs_ready]
+     reads them off it, and needs nothing of its own. *)
+  Lemma fs_ready_geom : fs_ready -∗ ⌜fs_geom_ok⌝.
+  Proof. rewrite /fs_ready. by iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & $ & _)". Qed.
+
+  Lemma fs_ready_sb : fs_ready -∗ fs_sb_cells.
+  Proof. rewrite /fs_ready. by iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & $)". Qed.
+
+  (* the same four cells, spelled one by one -- the form every existing fs
+     contract states them in, at [dq := DfracDiscarded]. *)
+  Lemma fs_ready_sb_four :
+    fs_ready -∗
+    sb_ninodes    ↦₄□ (mword_of_int fsc_ninodes   : mword 32) ∗
+    sb_inodestart ↦₄□ (mword_of_int icfg_ist      : mword 32) ∗
+    sb_size       ↦₄□ (mword_of_int fsc_size      : mword 32) ∗
+    sb_bmapstart  ↦₄□ (mword_of_int fsc_bmapstart : mword 32).
+  Proof. iIntros "H". iDestruct (fs_ready_sb with "H") as "$". Qed.
 
   (* ---- THE FORKRET ROW, spelled out -------------------------------
      This is the acceptance criterion of ghost-simplification.md §5.3, as a
@@ -408,8 +568,17 @@ Section FsReady.
                icfg_nib icfg_dev ∗ itable_inv ∗
     ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst ∗ ic_sleeplocks fsc_ic ∗
     ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib ∗ ireg_open ∗
-    kalloc_env fsc_kalloc None.
-  Proof. rewrite /fs_ready. by iIntros "$". Qed.
+    kalloc_env fsc_kalloc None ∗
+    ⌜fs_geom_ok⌝ ∗ fs_sb_cells.
+  Proof.
+    iIntros "H". iDestruct (fs_ready_kalloc with "H") as "#Hka".
+    rewrite /fs_ready.
+    iDestruct "H" as "(H1 & H2 & H3 & %H4 & H5 & H6 & H7 & H8 & H9 & H10
+                       & H11 & H12 & H13 & H14 & H15 & H16 & H17 & _ & _
+                       & %H20 & #H21)".
+    iFrame "H1 H2 H3 H5 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 Hka H21".
+    iFrame "%".
+  Qed.
 
 End FsReady.
 

@@ -74,6 +74,7 @@ Require Import ArrCursor.
 Require Export FdSlots.
 Require Import PipeInvDefs.
 Require Import IcacheRef.
+Require Import FsCfg.   (* [fscfg] -- see the note on [fileG] below *)
 (* for [T_DIR_z] alone -- [inode_pay]'s witness says "not a directory", and
    the number is stated once, where [IcacheEscrow.ic_loaded]'s [dir_ok]
    states it (design fs-icache.md §17.6 (5)). *)
@@ -334,12 +335,44 @@ Proof. rewrite /Mcount fmap_delete. reflexivity. Qed.
    and [icfg] -- which is not capacity at all but a record of NAMES, so it
    does not belong in [xv6G] either.  A file that needs the file table now
    takes [xv6G] and [fileG]: one path to each. *)
+(* THE TWO CONFIGURATION RECORDS RIDE ALONG, and the second one is new.
+
+   [file_icfg] has been here since the file table first had to name the
+   inode cache: "there is exactly one inode cache per system", so threading
+   its gname would have put a filesystem ghost name on [ProcInv.proc_priv]
+   and hence on the thirty-odd spec files that mention it (InodeRef.v).
+
+   [file_fscfg] is the SAME argument for the REST of the file system, and it
+   is here rather than as a binder of its own for a sharper reason.
+   [FsReady.fs_ready] -- the one predicate that says "the file system is
+   ready to operate" -- is stated at [fscfg]'s fields, and the whole point
+   of it is to be CARRIED: forkret's not-forked arm produces it, the trap
+   loop's residue holds it, every syscall reads it back.  So every interface
+   on that path has to be able to NAME it: [SpecSyscall]'s environment,
+   [UsertrapRes]'s residue, [SpecUservec]'s and [SpecUserretClosed]'s loop.
+   Reaching them by adding a binder means adding it to sixteen files' worth
+   of [Module Type] parameters and [Definition] signatures -- the interface
+   sweep claude-notes/completed/explicit-cpuid.md is about, whose failure
+   mode is a contract that compiles while meaning something else.  Reaching
+   them through the class every one of those files ALREADY binds costs one
+   field.
+
+   NEITHER RECORD IS CAPACITY, which is why they are not in [Xv6G.xv6G] --
+   see that file's "what is deliberately not here".  Both are per-boot
+   VALUES (gnames, gsets, block numbers), so there is no camera and no
+   second instance path to get wrong: a double path in a config record can
+   only disagree about a VALUE, and resolution picks one instance per use
+   site.  Files that used to bind [FSC : fscfg] beside [fileG] therefore
+   drop the binder rather than keep both (FsReady.v, FsSyscalls.v,
+   FirstTok.v). *)
 Class fileG (Σ : gFunctors) := FileG {
   file_inG :: inG Σ fileUR;
   file_icfg :: icfg;
+  file_fscfg :: fscfg;
 }.
 Definition fileΣ : gFunctors := #[GFunctor fileUR].
-Global Instance subG_fileΣ {Σ} `{ICFG : icfg} : subG fileΣ Σ -> fileG Σ.
+Global Instance subG_fileΣ {Σ} `{ICFG : icfg} `{FSC : fscfg} :
+  subG fileΣ Σ -> fileG Σ.
 Proof. solve_inG. Qed.
 
 (* The immutable-while-referenced content of a [struct file]: every field but
