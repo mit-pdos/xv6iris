@@ -67,23 +67,26 @@
     content of T2), and "emit the read early, as a plain [PFLoad]" is
     refuted by the same view arithmetic, run at the rmw's re-read.
 
-    SINCE A2-s3, the exclusion of that counterexample is the MACHINE's, not
-    the premise's: the agent's own plain loads and fences CLEAR [w_res]
-    ([WeakMem], the clear-on-own-load/-fence rules), so a dirtied window
-    starves [PFExStore] — the split run itself cannot reach the conditional
-    write, and every dirty-label arm of the simulation discharges its
-    pending obligation by the [w_res = Some R] guard.  What remains about
-    the PROGRAM is [pstep_paired] below: the instance's reachability
-    invariant [PI] is preserved; an inert ([LSilent]/[LDev]) step into a
-    window was already in it; no window resumes behind a ZERO-BYTE load
-    (the one dirty label an empty fold cannot clear on); and a conditional
-    write is emitted only inside a window.  Stage 2 still runs on stage 1's
-    output: on the raw alphabet the window is full of
-    [LRegW]/[LCtrl]/[LInstr] steps, which erasure turns into the [LSilent]
-    steps the inert clause covers ([LInstr] even CLEARS [w_res] raw — the
-    erased run keeps its reservations across the boundary instead, and the
-    next instruction's FETCH, a plain load, clears them).  See
-    [pstep_paired_erase] for the form a producer states.
+    SINCE A2-s3 (second redesign, 2026-08-20) THERE IS NO PAIRING PREMISE
+    AT ALL.  The exclusion of that counterexample is the MACHINE's: the
+    agent's own plain loads and (real) fences CLEAR [w_res] ([WeakMem],
+    the clear-on-own-load/-fence rules; stores and [LInstr] already
+    cleared), so a dirtied window starves [PFExStore] — the split run
+    itself cannot reach the conditional write — and the pending invariant
+    below is guarded by [w_res = Some R] ALONE, which makes it
+    self-maintaining: established unconditionally at the exload,
+    carried verbatim across [wstate]-inert steps, killed by the guard at
+    every dirty label, consumed at the exstore whose own machine premise
+    IS the guard.  The first redesign's program predicate ([expend]/[PI],
+    four clauses, priced at a whole-model shape traversal) was
+    unnecessary; a program predicate could not have pinned the window
+    anyway (the timestamps are not recoverable from any program state,
+    and the same monad state is reachable through clean and dirty
+    histories).  Stage 2 still runs on stage 1's output ([LInstr] clears
+    [w_res] raw, so raw windows would not survive to the write; erased,
+    the window steps are [LSilent] and the reservation rides — and a
+    reservation that outlives its instruction dies at the next
+    instruction's FETCH, a plain load).
 
     ** THE STATE RELATION
 
@@ -102,14 +105,9 @@
 
     ** THE PENDING-PAIR INVARIANT (the last conjunct of [rf_ag])
 
-    R-KEYED and ∃-SHAPED (A2-s3): guarded by the unindexed program
-    predicate [expend] AND the split agent's reservation, with the read
-    half's [(aq, tvs)] pair EXISTENTIAL inside — no program predicate ever
-    names the timestamps (they are not recoverable from any program state:
-    two exloads differing only in timestamps share their post-state), the
-    reservation pins them instead:
+    R-KEYED and ∃-SHAPED, guarded by the split agent's reservation ALONE:
 
-      [∀ R, expend (pa_st agS) → w_res (pa_ws agS) = Some R →
+      [∀ R, w_res (pa_ws agS) = Some R →
          ∃ aq tvs,
            rv_ts R = tvs.*1 ∧
            read_ok_d img log (pa_ws agF) aq false (rv_base R) tvs 0 ∧
@@ -117,14 +115,17 @@
                  (pa_ws agS)]
 
     Established UNCONDITIONALLY at the exload arm from the label's own
-    data; maintained across inert steps (neither [wstate] moves) by the
-    inert clause pulling [expend] back; killed by the GUARD everywhere
-    else (loads, stores, rmws and fences clear [w_res]; the zero-byte load
-    is the one exception and has its own vacuity clause); consumed at the
-    exstore arm, where the machine's own [rv_base R = base] premise aligns
-    the base.  ABANDONMENT needs no case — [expend] simply stops holding —
-    and the INITIAL configuration needs no [expend] premise (an agent at
-    [ws_init] has [w_res = None]), only [PI] of the initial programs.
+    data; maintained VERBATIM across inert steps (neither [wstate] moves,
+    and the guard with them — the zero-byte load included, whose dep-free
+    [vaddr = 0] makes both post-states literal identities,
+    [load_post_run_d_nil]); killed by the GUARD everywhere else (loads,
+    stores, rmws and real fences clear [w_res]; the all-false fence is
+    the identity, [fence_post_id]); consumed at the exstore arm, where
+    the machine's own [rv_base R = base] premise aligns the base.
+    ABANDONMENT, dangling reads, bare [lr]/[sc] shapes and stale
+    reservations need no cases: the invariant is simply TRUE at every
+    guarded reachable state.  The INITIAL configuration needs no premise
+    (an agent at [ws_init] has [w_res = None]).
 
     The conjuncts are what [PFRmw] needs at the write's position and the
     write itself does not supply: the READ SIDE CONDITION (weakened to the
@@ -237,6 +238,13 @@ Proof.
   - done.
   - rewrite /=. by apply IH.
 Qed.
+
+(** The ZERO-BYTE load is a literal identity at operand view [0] — which is
+    what makes it the one dirty-shaped label the pending invariant carries
+    verbatim instead of by guard death. *)
+Lemma load_post_run_d_nil ws aq base :
+  load_post_run_d ws aq 0%nat base [] = ws.
+Proof. rewrite load_post_run_d_0 //. Qed.
 
 Lemma store_post_run_d_res_None ws rl vaddr vdata base n t :
   n ≠ 0%nat → w_res (store_post_run_d ws rl vaddr vdata base n t) = None.
@@ -367,60 +375,38 @@ Section refuse.
   Context (pstep : P → D → wlabel → P → D → Prop).
   Context (pcls : P → wlabel → wstate → wm_class).
 
-  (** [expend p] — "the agent's program state [p] is inside an exclusive
-      window: its next memory event is the paired conditional write".  It is
-      a PARAMETER, not a definition — the program is what knows.  A2-s3
-      REDESIGN (design doc, stage 2): [expend] carries NO indices.  The
-      indexed form was unimplementable for the instance — the read's
-      timestamps are not recoverable from any program state (two exloads
-      differing only in timestamps share their post-state), and the read's
-      identity is not recoverable from a state reachable through both a
-      clean and a dirty history.  The reservation data now rides in the
-      MACHINE's [w_res] (which pins base and the timestamp column), and the
-      [(aq, values)] pair is EXISTENTIAL in the pending invariant
-      ([rf_pend]), established from the exload label's own data.
-
-      [PI p] — the instance's reachability invariant.  The discipline's
-      clauses are stated at [PI]-states only: the raw program space contains
-      adversarial shapes (a conditional write directly behind a register
-      read) that no structural [expend] survives, and [PI] is what confines
-      the obligation to the shapes the instance's programs actually have. *)
-  Context (expend : P → Prop).
-  Context (PI : P → Prop).
-
   Implicit Types c : wpcfg P D.
 
   (* -------------------------------------------------------------------- *)
-  (** ** 3. The pairing discipline
+  (** ** 3. THE PAIRING DISCIPLINE IS THE MACHINE'S (A2-s3, second
+      redesign, 2026-08-20)
 
-      Three clauses, all about the PROGRAM: [PI] is preserved; a
-      [wstate]-inert step into a window was already in it (W1); a
-      conditional write is emitted only inside one (W3).  What is GONE
-      relative to the 2026-08-19 form, and why (A2-s3 redesign):
+      There is NO program-side discipline left.  The first redesign kept a
+      program predicate ([expend]/[PI], four clauses) and priced its
+      instance discharge at a whole-model shape traversal; re-deriving the
+      simulation's per-arm needs killed it: with the machine clearing
+      [w_res] at every window-dirtying label (clear-on-own-load/-fence,
+      [WeakMem]; stores and [LInstr] already cleared), the pending
+      invariant can be guarded by [w_res = Some R] ALONE —
 
-      - the old clause 1 ("every exload establishes [expend]") was USED
-        NOWHERE — the establishment at the exload arm is unconditional, from
-        the label's own data — and deleting it is also what retires the
-        abandonment problem: an abandoning exload simply never enters
-        [expend];
-      - the old clause 2's non-inert prohibition is now the MACHINE's:
-        loads, stores and fences CLEAR [w_res] ([WeakMem], A2-s3), so every
-        dirty-label obligation dies by the pending invariant's
-        [w_res = Some R] guard instead. *)
-  Definition pstep_paired : Prop :=
-    (∀ p d l p' d', PI p → pstep p d l p' d' → PI p') ∧
-    (∀ p d l p' d',
-       PI p → pstep p d l p' d' →
-       l = LSilent ∨ l = LDev ∨ l = LFence false false false false →
-       expend p' → expend p) ∧
-    (* the ZERO-BYTE load: the one dirty label the machine's clear does not
-       reach (an empty fold clears nothing), so it needs its own vacuity
-       clause — a window never resumes behind ANY plain read. *)
-    (∀ p d aq lat base asrc p' d',
-       PI p → pstep p d (LLoad aq lat base [] asrc) p' d' → ¬ expend p') ∧
-    (∀ p d rl base data asrc vsrc p' d',
-       PI p → pstep p d (LExStore rl base data asrc vsrc) p' d' →
-       expend p).
+      - ESTABLISHED unconditionally at the exload arm, from the label's own
+        data;
+      - MAINTAINED verbatim across every [wstate]-inert step (silent, dev,
+        the all-false fence, the zero-byte load — whose dep-free [vaddr]
+        makes both post-states literal identities);
+      - KILLED by the guard at every dirty label (the machine cleared);
+      - CONSUMED at the exstore arm, whose own machine premise IS the
+        guard.
+
+      A program predicate would have had to pin the window's identity from
+      a state that cannot express it (the timestamps are not recoverable —
+      two exloads differing only in timestamps share a post-state — and the
+      same monad state is reachable through clean and dirty histories); the
+      reservation pins it instead, and abandonment, dangling reads, bare
+      [lr]/[sc] shapes and stale reservations all fall out: the invariant
+      is simply TRUE at every reachable guarded state.  The [lr;fence;sc]
+      counterexample is machine-unreachable ([PFExStore] starves once the
+      fence clears the reservation; the retry arm spins). *)
 
   (** THE MESSAGE-CLASS PREMISE (stage 2's twin of
       [WeakErase.pcls_erasable]).  The fused run must append the SAME
@@ -446,9 +432,9 @@ Section refuse.
 
       Same program states, same fabric, same steps — only the ALPHABET
       changes, and only on the two split labels.  [RFFuse] quantifies the
-      rebuilt read half's [(aq, tvs)] FREELY (A2-s3): the fused LTS is the
-      more permissive for it, which costs T2 nothing — the simulation picks
-      the one witness the pending invariant carries, and the machine's own
+      rebuilt read half's [(aq, tvs)] FREELY: the fused LTS is the more
+      permissive for it, which costs T2 nothing — the simulation picks the
+      one witness the pending invariant carries, and the machine's own
       [PFRmw] side conditions police whatever a run actually takes. *)
   Inductive refuse_pstep (p : P) (d : D) : wlabel → P → D → Prop :=
   | RFKeep l p' d' :
@@ -481,11 +467,10 @@ Section refuse.
   (* -------------------------------------------------------------------- *)
   (** ** 5. The configuration relation *)
 
-  (** A2-s3: [rf_pend] is R-KEYED and ∃-shaped — the reservation pins the
-      base and the timestamp column, and the read half's [(aq, values)] pair
-      is packaged inside, established at the exload arm from the label's own
-      data.  This is what dissolves the timestamp-pinning obstruction: no
-      program predicate ever has to name [tvs]. *)
+  (** [rf_pend] is R-KEYED and ∃-shaped: the reservation pins the base and
+      the timestamp column, and the read half's [(aq, values)] pair is
+      packaged inside, established at the exload arm from the label's own
+      data.  No program predicate ever has to name [tvs]. *)
   Definition rf_pend (img : image) (log : list wmsg) (wF wS : wstate)
       (R : wresv) : Prop :=
     ∃ aq tvs,
@@ -496,8 +481,8 @@ Section refuse.
   Definition rf_ag (img : image) (log : list wmsg) (agF agS : wpagent P)
       : Prop :=
     pa_st agF = pa_st agS ∧ pa_prom agF = pa_prom agS ∧
-    rf_ws (pa_ws agF) (pa_ws agS) ∧ PI (pa_st agS) ∧
-    (∀ R, expend (pa_st agS) → w_res (pa_ws agS) = Some R →
+    rf_ws (pa_ws agF) (pa_ws agS) ∧
+    (∀ R, w_res (pa_ws agS) = Some R →
        rf_pend img log (pa_ws agF) (pa_ws agS) R).
 
   Definition rf_cfg (cF cS : wpcfg P D) : Prop :=
@@ -510,23 +495,18 @@ Section refuse.
   Lemma rf_cfg_log cF cS : rf_cfg cF cS → pc_log cF = pc_log cS.
   Proof. by intros (_ & ? & _). Qed.
 
-  (** THE INITIAL CONFIGURATION needs no premise about [expend] — an agent
-      at [ws_init] holds no reservation and the pending obligation is
-      guarded by one — but it DOES need [PI] of the initial programs
-      (A2-s3): [PI] is the instance's per-agent invariant and rides in
-      [rf_ag]. *)
+  (** THE INITIAL CONFIGURATION needs no premise: an agent at [ws_init]
+      holds no reservation, and the pending obligation is guarded by
+      one. *)
   Lemma rf_cfg_init img d0 (ps : list P) :
-    (∀ p, p ∈ ps → PI p) →
     rf_cfg (wp_init img d0 ps) (wp_init img d0 ps).
   Proof.
-    intros Hpi.
     split_and!; [done|done|done|done|].
     intros i agS Hlk. exists agS. split; [done|].
     rewrite list_lookup_fmap in Hlk.
     destruct (ps !! i) as [p|] eqn:Hp; simplify_eq/=.
-    split_and!; [done|done|reflexivity| |].
-    - apply Hpi. by eapply elem_of_list_lookup_2.
-    - by intros R _ HR.
+    split_and!; [done|done|reflexivity|].
+    by intros R HR.
   Qed.
 
   (** The pending read side condition survives an append: the read's window
@@ -536,10 +516,10 @@ Section refuse.
     lg' = lg ++ ext → ws_bounded (pa_ws agF) (length lg) →
     rf_ag img lg agF agS → rf_ag img lg' agF agS.
   Proof.
-    intros -> Hb (Hst & Hpr & Hws & Hpi & Hpd).
-    split_and!; [done|done|done|done|].
-    intros R Hex HR.
-    destruct (Hpd R Hex HR) as (aq & tvs & Hrts & Hr & Hal).
+    intros -> Hb (Hst & Hpr & Hws & Hpd).
+    split_and!; [done|done|done|].
+    intros R HR.
+    destruct (Hpd R HR) as (aq & tvs & Hrts & Hr & Hal).
     exists aq, tvs. split_and!; [done| |done].
     by apply read_ok_d_app; [done|lia|].
   Qed.
@@ -556,12 +536,11 @@ Section refuse.
                ws_bounded (pa_ws agFj) (length lg)) →
     agsS !! i = Some agS → agsF !! i = Some agF →
     rf_ws wF wS →
-    PI st' →
-    (∀ R, expend st' → w_res wS = Some R → rf_pend img lg' wF wS R) →
+    (∀ R, w_res wS = Some R → rf_pend img lg' wF wS R) →
     rf_cfg (WPCfg img lg' dv (<[i := WPAgent st' wF pr]> agsF))
            (WPCfg img lg' dv (<[i := WPAgent st' wS pr]> agsS)).
   Proof.
-    intros Hext Hlen Hags Hi Hie Hws Hpi Hpd.
+    intros Hext Hlen Hags Hi Hie Hws Hpd.
     pose proof (lookup_lt_Some _ _ _ Hi) as Hlti.
     pose proof (lookup_lt_Some _ _ _ Hie) as Hltie.
     split_and!; [done|done|done| |].
@@ -581,11 +560,11 @@ Section refuse.
   (** ** 6. THE STEP SIMULATION *)
 
   Lemma refuse_step i l cS cS' cF :
-    pcls_erasable pcls → pcls_fusable → pstep_paired → pstep_depfree pstep →
+    pcls_erasable pcls → pcls_fusable → pstep_depfree pstep →
     cfg_wf cF → rf_cfg cF cS → wp_pf_step pstep pcls i l cS cS' →
     ∃ lF cF', wp_pf_step refuse_pstep pcls i lF cF cF' ∧ rf_cfg cF' cS'.
   Proof.
-    intros Hcls Hfus (Hpp & Hp2 & Hp4 & Hp3) Hdf Hwf Hm Hstep.
+    intros Hcls Hfus Hdf Hwf Hm Hstep.
     destruct Hm as (Himg & Hlog & Hdev & Hlen & Hags).
     (* the per-agent package every arm feeds to [rf_cfg_upd], already read
        at the SPLIT side's image and log (they are equal) *)
@@ -609,21 +588,18 @@ Section refuse.
       |cS ag rl base data asrc vsrc k R st' d'
          Hlk Hps Hnn Hres Hrb Hrlen He Hk];
       destruct (Hags' i ag Hlk)
-        as (agF & Hlke & (Hst & Hprm & Hws & Hpi & Hpd) & Hbd);
-      try (by destruct (Hdf _ _ _ _ _ Hps));
-      pose proof (Hpp _ _ _ _ _ Hpi Hps) as Hpi'.
-    - (* LSilent: the pending window's own step *)
+        as (agF & Hlke & (Hst & Hprm & Hws & Hpd) & Hbd);
+      try (by destruct (Hdf _ _ _ _ _ Hps)).
+    - (* LSilent: both wstates frozen — the invariant carries verbatim *)
       exists LSilent. eexists. split.
       + apply (PFSilent refuse_pstep pcls i cF agF st' d' Hlke).
         rewrite Hst Hdev. by apply RFKeep.
       + rewrite Himg Hlog Hprm.
         eapply (rf_cfg_upd _ (pc_log cS) _ []);
           [by rewrite app_nil_r|exact Hlen|exact Hags'|exact Hlk|exact Hlke
-          |exact Hws|exact Hpi'|].
-        intros R Hex HR. apply Hpd; [|done].
-        exact (Hp2 _ _ _ _ _ Hpi Hps (or_introl eq_refl) Hex).
-    - (* LLoad: the machine CLEARS the reservation (A2-s3) unless the load
-         is zero-byte, where clause W4 refutes the window instead *)
+          |exact Hws|exact Hpd].
+    - (* LLoad: the machine CLEARS the reservation unless the load is
+         zero-byte — where, dep-free, both post-states are identities *)
       pose proof (Hdf _ _ _ _ _ Hps) as Hd. simpl in Hd. subst asrc.
       exists (LLoad aq lat base tvs []). eexists. split.
       + apply (PFLoad refuse_pstep pcls i cF agF aq lat base tvs [] st' d'
@@ -633,12 +609,11 @@ Section refuse.
       + rewrite Himg Hlog Hprm.
         eapply (rf_cfg_upd _ (pc_log cS) _ []);
           [by rewrite app_nil_r|exact Hlen|exact Hags'|exact Hlk|exact Hlke
-          | | |].
+          | |].
         * by apply rf_ws_load.
-        * exact Hpi'.
-        * intros R Hex HR.
-          destruct tvs as [|tv tvs0].
-          { by destruct (Hp4 _ _ _ _ _ _ _ _ Hpi Hps Hex). }
+        * destruct tvs as [|tv tvs0].
+          { rewrite !load_post_run_d_nil. exact Hpd. }
+          intros R HR.
           have Hne : (tv :: tvs0).*1 ≠ [] by rewrite fmap_cons.
           rewrite (load_post_run_d_res_None _ _ _ _ _ Hne) in HR.
           discriminate HR.
@@ -655,10 +630,9 @@ Section refuse.
         rewrite Hst Hdev. by apply RFKeep.
       + rewrite Himg Hlog Hprm.
         eapply (rf_cfg_upd _ (pc_log cS) _ [WMsg base data (Some i) k]);
-          [done|exact Hlen|exact Hags'|exact Hlk|exact Hlke| | |].
+          [done|exact Hlen|exact Hags'|exact Hlk|exact Hlke| |].
         * by apply rf_ws_store.
-        * exact Hpi'.
-        * intros R Hex HR.
+        * intros R HR.
           have Hne : length data ≠ 0%nat by destruct data.
           rewrite (store_post_run_d_res_None _ _ _ _ _ _ _ Hne) in HR.
           discriminate HR.
@@ -679,43 +653,36 @@ Section refuse.
         * rewrite Hlog. exact He.
       + rewrite Himg Hlog Hprm.
         eapply (rf_cfg_upd _ (pc_log cS) _ [WMsg base data (Some i) k]);
-          [done|exact Hlen|exact Hags'|exact Hlk|exact Hlke| | |].
+          [done|exact Hlen|exact Hags'|exact Hlk|exact Hlke| |].
         * apply rf_ws_store. by apply rf_ws_load.
-        * exact Hpi'.
-        * intros R Hex HR.
+        * intros R HR.
           have Hne : length data ≠ 0%nat by destruct data.
           rewrite (store_post_run_d_res_None _ _ _ _ _ _ _ Hne) in HR.
           discriminate HR.
-    - (* LFence: the fence clears the reservation (A2-s3) *)
+    - (* LFence: a real fence clears the reservation; the all-false fence
+         ([fence.i]'s inert rendering) is the identity on both wstates *)
       exists (LFence pr pw sr sw). eexists. split.
       + apply (PFFence refuse_pstep pcls i cF agF pr pw sr sw st' d' Hlke).
         rewrite Hst Hdev. by apply RFKeep.
       + rewrite Himg Hlog Hprm.
         eapply (rf_cfg_upd _ (pc_log cS) _ []);
           [by rewrite app_nil_r|exact Hlen|exact Hags'|exact Hlk|exact Hlke
-          | | |].
+          | |].
         * by apply rf_ws_fence.
-        * exact Hpi'.
-        * intros R Hex HR.
+        * intros R HR.
           destruct pr, pw, sr, sw; simpl in HR; try discriminate HR.
-          (* the all-false fence: [fence.i]'s inert rendering — identity on
-             both wstates, so the OLD pending invariant carries over via
-             the inert clause *)
           rewrite !fence_post_id.
-          apply Hpd; [|done].
-          exact (Hp2 _ _ _ _ _ Hpi Hps (or_intror (or_intror eq_refl)) Hex).
-    - (* LDev: the pending window's other step *)
+          exact (Hpd R HR).
+    - (* LDev: both wstates frozen *)
       exists LDev. eexists. split.
       + apply (PFDev refuse_pstep pcls i cF agF st' d' Hlke).
         rewrite Hst Hdev. by apply RFKeep.
       + rewrite Himg Hlog Hprm.
         eapply (rf_cfg_upd _ (pc_log cS) _ []);
           [by rewrite app_nil_r|exact Hlen|exact Hags'|exact Hlk|exact Hlke
-          |exact Hws|exact Hpi'|].
-        intros R Hex HR. apply Hpd; [|done].
-        exact (Hp2 _ _ _ _ _ Hpi Hps (or_intror (or_introl eq_refl)) Hex).
+          |exact Hws|exact Hpd].
     - (* LExLoad ↦ LSilent: the pair OPENS; the pending invariant is
-         established UNCONDITIONALLY from the label's own data (A2-s3) *)
+         established UNCONDITIONALLY from the label's own data *)
       pose proof (Hdf _ _ _ _ _ Hps) as Hd. simpl in Hd. subst asrc.
       exists LSilent. eexists. split.
       + apply (PFSilent refuse_pstep pcls i cF agF st' d' Hlke).
@@ -723,20 +690,19 @@ Section refuse.
       + rewrite Himg Hlog Hprm.
         eapply (rf_cfg_upd _ (pc_log cS) _ []);
           [by rewrite app_nil_r|exact Hlen|exact Hags'|exact Hlk|exact Hlke
-          | | |].
+          | |].
         * by apply rf_ws_exload_r.
-        * exact Hpi'.
-        * intros R Hex HR.
+        * intros R HR.
           rewrite exload_post_run_d_res in HR. simplify_eq/=.
           exists aq, tvs. split_and!.
           { done. }
           { by eapply read_ok_d_rf; [exact Hws|exact Hr]. }
           { by apply rf_ws_load_exload. }
-    - (* LExStore ↦ LRmw: the pair CLOSES *)
+    - (* LExStore ↦ LRmw: the pair CLOSES — the machine's own [w_res]
+         premise IS the invariant's guard *)
       pose proof (Hdf _ _ _ _ _ Hps) as Hd. simpl in Hd.
       destruct Hd as [-> ->].
-      pose proof (Hp3 _ _ _ _ _ _ _ _ _ Hpi Hps) as Hex.
-      destruct (Hpd R Hex Hres) as (aq & tvs & Hrts & Hrok & Hal).
+      destruct (Hpd R Hres) as (aq & tvs & Hrts & Hrok & Hal).
       rewrite Hrb in Hrok. rewrite Hrb in Hal.
       have Hkk : pcls (pa_st agF) (LRmw aq rl base tvs data [] []) (pa_ws agF)
                  = k.
@@ -750,10 +716,9 @@ Section refuse.
         * rewrite Hlog. apply excl_ok_of_excl_ok_ts. by rewrite -Hrts.
       + rewrite Himg Hlog Hprm.
         eapply (rf_cfg_upd _ (pc_log cS) _ [WMsg base data (Some i) k]);
-          [done|exact Hlen|exact Hags'|exact Hlk|exact Hlke| | |].
+          [done|exact Hlen|exact Hags'|exact Hlk|exact Hlke| |].
         * by apply rf_ws_store.
-        * exact Hpi'.
-        * intros R0 Hex0 HR0.
+        * intros R0 HR0.
           have Hne : length data ≠ 0%nat by destruct data.
           rewrite (store_post_run_d_res_None _ _ _ _ _ _ _ Hne) in HR0.
           discriminate HR0.
@@ -763,14 +728,14 @@ Section refuse.
   (** ** 7. The run level and the endpoint *)
 
   Lemma refuse_run_step cF cS cS' :
-    pcls_erasable pcls → pcls_fusable → pstep_paired → pstep_depfree pstep →
+    pcls_erasable pcls → pcls_fusable → pstep_depfree pstep →
     cfg_wf cF → no_promises cF → rf_cfg cF cS →
     wp_pf_run pstep pcls cS cS' →
     ∃ cF', wp_pf_run refuse_pstep pcls cF cF' ∧ rf_cfg cF' cS' ∧
            cfg_wf cF' ∧ no_promises cF'.
   Proof.
-    intros Hcls Hfus Hpa Hdf Hwf Hnp Hm (i & l & Hs).
-    destruct (refuse_step i l cS cS' cF Hcls Hfus Hpa Hdf Hwf Hm Hs)
+    intros Hcls Hfus Hdf Hwf Hnp Hm (i & l & Hs).
+    destruct (refuse_step i l cS cS' cF Hcls Hfus Hdf Hwf Hm Hs)
       as (lF & cF' & Hse & Hm').
     have Hrun : wp_pf_run refuse_pstep pcls cF cF' by exists i, lF.
     destruct (wp_pf_run_rtc_wpstep refuse_pstep pcls cF cF' Hwf Hnp
@@ -779,27 +744,27 @@ Section refuse.
   Qed.
 
   Lemma refuse_rtc cF cS cS' :
-    pcls_erasable pcls → pcls_fusable → pstep_paired → pstep_depfree pstep →
+    pcls_erasable pcls → pcls_fusable → pstep_depfree pstep →
     cfg_wf cF → no_promises cF → rf_cfg cF cS →
     rtc (wp_pf_run pstep pcls) cS cS' →
     ∃ cF', rtc (wp_pf_run refuse_pstep pcls) cF cF' ∧ rf_cfg cF' cS'.
   Proof.
-    intros Hcls Hfus Hpa Hdf Hwf Hnp Hm Hrun. revert cF Hwf Hnp Hm.
+    intros Hcls Hfus Hdf Hwf Hnp Hm Hrun. revert cF Hwf Hnp Hm.
     induction Hrun as [x|x y z Hxy _ IH]; intros cF Hwf Hnp Hm.
     { by exists cF. }
-    destruct (refuse_run_step cF x y Hcls Hfus Hpa Hdf Hwf Hnp Hm Hxy)
+    destruct (refuse_run_step cF x y Hcls Hfus Hdf Hwf Hnp Hm Hxy)
       as (cF1 & Hs1 & Hm1 & Hwf1 & Hnp1).
     destruct (IH cF1 Hwf1 Hnp1 Hm1) as (cF2 & Hs2 & Hm2).
     exists cF2. split; [|done]. by econstructor.
   Qed.
 
-  (** THE ENDPOINT (stage 2's deliverable).  Every DEPENDENCY-FREE pf run of
-      a program that pairs its exclusives is matched, step for step, by a pf
-      run of the SAME program over the FUSED alphabet, with the same image,
-      THE SAME LOG, the same fabric and the same program states. *)
+  (** THE ENDPOINT (stage 2's deliverable).  Every DEPENDENCY-FREE pf run is
+      matched, step for step, by a pf run of the SAME program over the FUSED
+      alphabet, with the same image, THE SAME LOG, the same fabric and the
+      same program states — NO pairing premise: the machine's reservation
+      clearing is the discipline. *)
   Theorem refuse_run img d0 (ps : list P) c :
-    pcls_erasable pcls → pcls_fusable → pstep_paired → pstep_depfree pstep →
-    (∀ p, p ∈ ps → PI p) →
+    pcls_erasable pcls → pcls_fusable → pstep_depfree pstep →
     rtc (wp_pf_run pstep pcls) (wp_init img d0 ps) c →
     ∃ cF, rtc (wp_pf_run refuse_pstep pcls) (wp_init img d0 ps) cF ∧
           pc_img cF = pc_img c ∧ pc_log cF = pc_log c ∧ pc_dev cF = pc_dev c ∧
@@ -807,13 +772,13 @@ Section refuse.
              ∃ agF, pc_ags cF !! i = Some agF ∧ pa_st agF = pa_st agS) ∧
           pstep_fused refuse_pstep ∧ pstep_depfree refuse_pstep.
   Proof.
-    intros Hcls Hfus Hpa Hdf Hpi Hrun.
+    intros Hcls Hfus Hdf Hrun.
     have Hnp : no_promises (wp_init img d0 ps).
     { intros i ag Hlk. rewrite list_lookup_fmap in Hlk.
       destruct (ps !! i) as [p|]; by simplify_eq/=. }
     destruct (refuse_rtc (wp_init img d0 ps) (wp_init img d0 ps) c Hcls Hfus
-                Hpa Hdf (cfg_wf_init img d0 ps) Hnp
-                (rf_cfg_init img d0 ps Hpi) Hrun) as (cF & HrunF & Hm).
+                Hdf (cfg_wf_init img d0 ps) Hnp (rf_cfg_init img d0 ps)
+                Hrun) as (cF & HrunF & Hm).
     exists cF. split; [done|].
     destruct Hm as (Himg & Hlog & Hdev & _ & Hags).
     split_and!; [done|done|done| |apply refuse_pstep_fused
@@ -826,13 +791,12 @@ Section refuse.
       the SPLIT alphabet.  [wp_pf_bridge_log]'s [pstep_fused] premise — the
       last gate stage 1 left standing — is discharged by construction. *)
   Corollary refuse_bridge_log img d0 (ps : list P) c :
-    pcls_erasable pcls → pcls_fusable → pstep_paired → pstep_depfree pstep →
-    (∀ p, p ∈ ps → PI p) →
+    pcls_erasable pcls → pcls_fusable → pstep_depfree pstep →
     rtc (wp_pf_run pstep pcls) (wp_init img d0 ps) c →
     ∃ E, exec_wf E ∧ ex_img E = img ∧ ex_log E = pc_log c.
   Proof.
-    intros Hcls Hfus Hpa Hdf Hpi Hrun.
-    destruct (refuse_run img d0 ps c Hcls Hfus Hpa Hdf Hpi Hrun)
+    intros Hcls Hfus Hdf Hrun.
+    destruct (refuse_run img d0 ps c Hcls Hfus Hdf Hrun)
       as (cF & HrunF & Himg & Hlog & _).
     destruct (wp_pf_bridge_log refuse_pstep pcls img d0 ps cF
                 (refuse_pstep_depfree Hdf) refuse_pstep_fused HrunF)
@@ -843,7 +807,6 @@ Section refuse.
 End refuse.
 
 Global Arguments refuse_pstep {P D} _ _ _ _ _ _.
-Global Arguments pstep_paired {P D} _ _ _.
 Global Arguments pcls_fusable {P D} _ _.
 
 (* ====================================================================== *)
@@ -853,38 +816,6 @@ Section compose.
   Context {P D : Type}.
   Context (pstep : P → D → wlabel → P → D → Prop).
   Context (pcls : P → wlabel → wstate → wm_class).
-  Context (expend : P → Prop).
-  Context (PI : P → Prop).
-
-  (** The pairing discipline is stated on the ERASED LTS (stage 2's input);
-      this lemma is the convenience that lets a producer state its clauses
-      over the RAW labels and hand the result to [t2_bridge].  The erased
-      steps are in 1:1 correspondence with the raw ones (same states, the
-      label through [erase_lbl]), so each clause is an inversion. *)
-  Definition lb_win (l : wlabel) : Prop :=
-    erase_lbl l = LSilent ∨ erase_lbl l = LDev ∨
-    erase_lbl l = LFence false false false false.
-
-  Lemma pstep_paired_erase :
-    (∀ p d l p' d', PI p → pstep p d l p' d' → PI p') →
-    (∀ p d l p' d',
-       PI p → pstep p d l p' d' → lb_win l → expend p' → expend p) →
-    (∀ p d aq lat base asrc p' d',
-       PI p → pstep p d (LLoad aq lat base [] asrc) p' d' → ¬ expend p') →
-    (∀ p d rl base data asrc vsrc p' d',
-       PI p → pstep p d (LExStore rl base data asrc vsrc) p' d' →
-       expend p) →
-    pstep_paired (erase_pstep pstep) expend PI.
-  Proof.
-    intros H1 H2 H4 H3. split_and!.
-    - intros p d l p' d' Hpi (l0 & Hl0 & Hs). by eapply H1.
-    - intros p d l p' d' Hpi (l0 & -> & Hs) Hwin Hex.
-      eapply H2; [exact Hpi|exact Hs| |exact Hex]. exact Hwin.
-    - intros p d aq lat base asrc p' d' Hpi (l0 & Hl0 & Hs) Hex.
-      destruct l0; simplify_eq/=; by eapply H4.
-    - intros p d rl base data asrc vsrc p' d' Hpi (l0 & Hl0 & Hs).
-      destruct l0; simplify_eq/=. by eapply H3.
-  Qed.
 
   (** The class premise transfers to the erased LTS: an erased conditional
       write comes from a real one, and [pcls_erasable] absorbs the blanked
@@ -904,19 +835,21 @@ Section compose.
     end.
   Qed.
 
+  (** T2 FINAL for the dependency-carrying, split-alphabet instance: no
+      [pstep_depfree], no [pstep_fused], NO PAIRING PREMISE.  Every
+      promise-free run of the real program projects to an [exec_wf]
+      axiomatic execution with the SAME image and the SAME LOG. *)
   Theorem t2_bridge img d0 (ps : list P) c :
     pcls_erasable pcls → pcls_fusable pstep pcls →
-    pstep_paired (erase_pstep pstep) expend PI →
-    (∀ p, p ∈ ps → PI p) →
     rtc (wp_pf_run pstep pcls) (wp_init img d0 ps) c →
     ∃ E, exec_wf E ∧ ex_img E = img ∧ ex_log E = pc_log c.
   Proof.
-    intros Hcls Hfus Hpa Hpi Hrun.
+    intros Hcls Hfus Hrun.
     destruct (erase_rtc pstep pcls (wp_init img d0 ps) (wp_init img d0 ps) c
                 Hcls (er_cfg_init img d0 ps) Hrun) as (ce & Hrune & Hme).
-    destruct (refuse_bridge_log (erase_pstep pstep) pcls expend PI img d0 ps
-                ce Hcls (pcls_fusable_erase Hcls Hfus) Hpa
-                (erase_pstep_depfree pstep) Hpi Hrune)
+    destruct (refuse_bridge_log (erase_pstep pstep) pcls img d0 ps ce
+                Hcls (pcls_fusable_erase Hcls Hfus)
+                (erase_pstep_depfree pstep) Hrune)
       as (E & HE & Himg & Hlog).
     exists E. split_and!; [done|done|]. by rewrite Hlog (er_cfg_log _ _ Hme).
   Qed.

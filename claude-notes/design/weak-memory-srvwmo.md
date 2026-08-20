@@ -174,27 +174,30 @@ simulation:
      (erasure drops `LInstr`'s clear) die at the next instruction's FETCH
      load.
 
-   The REDESIGNED discipline: `pstep_paired := W1 ∧ W3` with
-   `expend : P → Prop` — W1: an (erased-)`LSilent`/`LDev` step into an
-   `expend` state comes from an `expend` state; W3: every `LExStore`
-   step's pre-state is `expend` — both guarded by an instance-supplied
-   invariant `PI : P → Prop` (plus a `PI`-preservation clause and `PI` on
-   the initial programs), because the raw monad space contains adversarial
-   shapes (`RegRead;sc`) that no structural predicate survives.  The
-   instance's `expend` is structural — "the continuation's next memory
-   event is the paired conditional write", walking ONLY
-   `{RegWrite, pure-silent}` nodes, hence REGISTER-FILE-INDEPENDENT, which
-   trivializes W1's PLIC arm (the PLIC rewrites `sig_seip` under the
-   window) and makes W1's boundary arm a small concrete walk
-   (`riscv_step`'s dispatch prefix dead-ends at its first
-   `RegRead`/fetch).  `PI` is the one WHOLE-MODEL fact: "every latest-write
-   node is guarded — reachable from its latest-read through
-   `{RegWrite, pure-silent}` nodes only", ∀-quantified at every answer —
-   a boolean-state traversal of `riscv_step` in exactly the
-   port-the-driver family (`DecodeSetU.goodbP` state-pinned /
-   `WeakShapeOverrides2.gpost` ∀-quantified; durable-notes: the drivers
-   transfer line for line).  That traversal (s3d) is A2-s3's irreducible
-   cost; everything else is per-arm mechanical.
+   THE SECOND REDESIGN (same day), AND THE FINAL STATE: the discipline
+   VANISHED.  The first redesign kept a program predicate
+   (`expend`/`PI`, four clauses) whose instance discharge priced out at a
+   whole-model shape traversal of `riscv_step` (the `gpost`/`goodbP`
+   driver family) — and re-deriving the simulation's per-arm needs showed
+   even that was unnecessary: with clear-on-own-load/-fence landed, the
+   pending invariant can be guarded by `w_res = Some R` ALONE.  It is
+   then SELF-MAINTAINING — established unconditionally at the exload from
+   the label's own data; carried verbatim across `wstate`-inert steps
+   (guard and states both frozen; the zero-byte load included, whose
+   dep-free `vaddr = 0` makes both post-states literal identities); killed
+   by the guard at every dirty label; consumed at the exstore, whose own
+   machine premise IS the guard.  Bare `lr`/`sc` decode branches, walker
+   abandonment, stale reservations and the PLIC's mid-window `sig_seip`
+   write — every case that made a program predicate unsatisfiable — need
+   no cases at all.  `pstep_paired`, `expend`, `PI` and the whole-model
+   traversal are DELETED; `t2_bridge` takes `pcls_erasable` and
+   `pcls_fusable` only, both instance-discharged
+   (`pcls_ev_erasable`/`pcls_ev_fusable`), and the instance endpoint
+   `WeakEvInst.t2_ev` closes A2 on the 5 rv64d axioms.  The durable
+   lesson (the eight-refutation rule taken to its limit): when a
+   machine-side rule can enforce a protocol, the program-side predicate
+   does not merely SHRINK — it can disappear, along with its whole
+   discharge apparatus.
 3. **THE EXISTING PROJECTION** (`wp_pf_step_mstep`): the output of
    stages 1–2 is `lb_depfree ∧ lb_fused`, discharging the gates by
    construction.  T1's realization side names the SAME gates

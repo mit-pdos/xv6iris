@@ -96,16 +96,21 @@ are renamed **R0.5–R6** as of 2026-08-19; sRVWMO items are **A1–A5** here
   same gate as the forward direction), `lat_free` is discharged by the
   instance (`pstep_ev_lat_free_prog`).  `exec_cls_ok` is GONE (absorbed
   into the projection equation).
-- **A2 — T2 completion**: the erasure simulation (design doc's settled
-  block) + `dep_dom` landed as its invariant + the safety-form adequacy;
-  after R3.  A3(iv) (the fused↔split lift at the projection — the
-  re-fusion spike) joins it: both directions now name the same gates.
-  **A2-s3 REDESIGNED (2026-08-20)** — the landed `pstep_paired` is
+- **A2 — DONE (2026-08-20): T2 IS CLOSED — `WeakEvInst.t2_ev`.**  Every
+  promise-free run of the event instance projects to an `exec_wf`
+  execution with the same image and THE SAME LOG, on exactly the 5 rv64d
+  axioms, with NO premise beyond the two instance-discharged class facts
+  (`pcls_ev_erasable`/`pcls_ev_fusable`): erasure ∘ re-fusion ∘ projection
+  compose unconditionally.  A3(iv) (the fused↔split lift) had landed with
+  stage 2; both directions name the same gates.
+  **A2-s3 went through TWO same-day redesigns** — first: the landed
+  `pstep_paired` was
   unimplementable for the instance (clause 1 unused; clause 2 cannot pin
   timestamps — same post-state from different-timestamp exloads; clauses
   2+3 jointly history-dependent at fence/load-reachable states, and the
-  fetch is a plain `LLoad`, `AK_explicit`).  The redesign is in the
-  design doc's stage-2 block; its slices:
+  fetch is a plain `LLoad`, `AK_explicit`); second: the surviving
+  four-clause program discipline was itself UNNECESSARY — see s3c/s3d
+  below.  The full record is the design doc's stage-2 block; the slices:
   - **s3a — DONE (2026-08-20)**: `WeakMem.load_post_at` clears `w_res`
     per byte; `fence_post` clears CONDITIONALLY on any bit set — the
     ALL-FALSE fence is exempt because it is `fence.i`'s inert rendering
@@ -117,31 +122,25 @@ are renamed **R0.5–R6** as of 2026-08-19; sRVWMO items are **A1–A5** here
     on the bits), and NOTHING else — every concrete wp-tier state has
     `w_res = None` outside windows and windows contain no loads/fences,
     so the 17k mirror and all litmus/leaf proofs were value-unchanged.
-  - **s3b — DONE (2026-08-20)**: `WeakRefuse` reshaped.  `pstep_paired`
-    is now FOUR clauses, all PI-guarded: PI-preservation; W1 (inert-step
-    pull-back of `expend`, where inert = `LSilent`/`LDev`/the all-false
-    fence); W4 (no window resumes behind a ZERO-BYTE load — the one dirty
-    label an empty fold cannot clear on); W3 (every exstore step's
-    pre-state is `expend`).  `expend : P → Prop` unindexed; `rf_pend`
-    ∃-form keyed on `w_res`; `RFFuse` premise-free (the fused LTS
-    quantifies `(aq, tvs)` freely — the machine's `PFRmw` polices runs);
-    `rf_ag` carries `PI (pa_st agS)`; `rf_cfg_init`/`refuse_run`/
-    `refuse_bridge_log`/`t2_bridge` take `∀ p ∈ ps, PI p`;
-    `pstep_paired_erase` restated for the raw labels (`lb_win` gains the
-    all-false fence).  Tree green, capstone unchanged on the 5 rv64d
-    axioms, `t2_bridge` Closed.
-  - **s3c** — instance predicates: `win` (structural window walk over
-    `{RegWrite, pure-silent}` monad nodes, register-file-independent) and
-    `PIshape` (armed-bit guardedness, ∀-quantified answers); per-arm
-    W1/W3/preservation over `pstep_ev`'s arms; the boundary walk
-    (`riscv_step`'s dispatch prefix dead-ends at its first
-    `RegRead`/fetch).
-  - **s3d** — THE WHOLE-MODEL FACT: `PIshape false (riscv_step tick)` —
-    every latest-write in every decode branch is `{RegWrite,pure}`-guarded
-    from its latest-read.  Port the `gpost`/`goodbP` traversal driver
-    (durable-notes: drivers transfer line for line); expect gen_shape-
-    style sharding if manual proving stalls.
-  - **s3e** — the instance `t2_bridge` endpoint (A2 CLOSED), then R6/A4.
+  - **s3b — DONE, then SUPERSEDED same day**: the first reshape kept a
+    four-clause PI-guarded program discipline (`expend`/`PI`; W1 inert
+    pull-back, W4 zero-byte-load vacuity, W3 exstore-pending) whose
+    instance discharge priced out at a whole-model `riscv_step` shape
+    traversal (s3d, the `gpost`/`goodbP` driver family).  Re-deriving the
+    per-arm needs then showed the machine guard suffices alone:
+  - **s3c/s3d — RETIRED (the second redesign)**: dropping the `expend`
+    guard from the pending invariant (`∀ R, w_res = Some R → rf_pend`)
+    makes it SELF-MAINTAINING — established unconditionally at the
+    exload, carried verbatim across inert steps (the zero-byte load's
+    dep-free `vaddr = 0` makes both post-states literal identities,
+    `load_post_run_d_nil`; the all-false fence is `fence_post_id`),
+    killed by the guard at dirty labels, consumed at the exstore whose
+    machine premise IS the guard.  `pstep_paired`/`expend`/`PI` are
+    DELETED from `WeakRefuse`; every case that refuted a program
+    predicate (bare `lr`/`sc` decode branches, clean-vs-dirty history
+    aliasing at one state, the PLIC's mid-window `sig_seip` write,
+    timestamp pinning) is a non-case for the machine guard.
+  - **s3e — DONE**: `WeakEvInst.t2_ev`, the instance endpoint.
 - **A3 — T1 completion** (much smaller than feared — the induction
   exists): (i) drop `cand_rl_free` by adding the rel→acq `ppo_op` arm
   and extending the view-domination lemma's dominator case; (ii) drop

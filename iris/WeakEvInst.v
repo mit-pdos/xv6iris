@@ -124,6 +124,7 @@ Require Import WeakDeps.
 Require Import WeakPromise.
 Require Import WeakPromiseFact.
 Require Import WeakErase.
+Require Import WeakPromiseBridge.
 Require Import WeakRefuse.
 Require Import WeakInterp.
 Require Import WeakInterpProj.
@@ -1658,4 +1659,22 @@ Proof.
   - destruct Hs as (_ & ors & oib & _ & _ & H). simpl.
     by rewrite (pstep_hart_exstore_excl _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ wS H).
   - by destruct (pstep_disk_no_ex _ _ _ _ _ Hs).
+Qed.
+
+(* ====================================================================== *)
+(** ** 9. THE INSTANCE T2 (A2 CLOSED)
+
+    Every promise-free run of the EVENT instance projects to an [exec_wf]
+    axiomatic execution with the same image and the SAME LOG.  No premise
+    beyond the two class facts above, and both are theorems: since A2-s3's
+    second redesign the pairing discipline is the MACHINE's ([WeakRefuse] —
+    the reservation-guarded pending invariant is self-maintaining), so the
+    whole T2 carrier pipeline (erasure ∘ re-fusion ∘ projection) composes
+    with nothing left open. *)
+Corollary t2_ev img d0 (ps : list pexv6) c :
+  rtc (WeakPromiseBridge.wp_pf_run pstep_ev pcls_ev) (wp_init img d0 ps) c →
+  ∃ E, WeakAxiomatic.exec_wf E ∧ WeakAxiomatic.ex_img E = img ∧
+       WeakAxiomatic.ex_log E = pc_log c.
+Proof.
+  apply t2_bridge; [exact pcls_ev_erasable|exact pcls_ev_fusable].
 Qed.
