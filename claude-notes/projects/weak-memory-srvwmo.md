@@ -154,9 +154,23 @@ are renamed **R0.5–R6** as of 2026-08-19; sRVWMO items are **A1–A5** here
   lemma if the partial-order presentation is wanted (linear extension of
   po ∪ gmo|W ∪ rfe; acyclic via rule 14's contraction argument — NOT
   gmo ∪ po, which SB refutes).
-- **A4 — tier-1 capstone**: adequacy ∘ T1; `Print Assumptions` audit
-  (platform axioms + no-icache + funext + WP package; NO
-  `main_premises`).
+- **A4 — DONE (2026-08-20): `iris/WeakSrvwmoCapstone.xv6_srvwmo_safe`** —
+  THE TIER-1 FINAL THEOREM, adequacy ∘ T1.  Statement: given the fresh-era
+  facts and the WP package (hypotheses, verbatim the adequacy file's),
+  every sRVWMO-consistent execution over the boot image whose trace the
+  xv6 event programs can emit (`exec_prog_ok` — T1's conformance
+  interface, exclusive-pair arm included) is REALIZED by a pf run of the
+  event language ending at the candidate's own log and program states;
+  and, candidate-independent, every `epf_run`-reachable configuration is
+  violation-free and every thread of every `erased_step`-reachable
+  configuration is reducible.  `Print Assumptions`: EXACTLY the five
+  generated-model reservation axioms — no `main_premises`, no robustness
+  package, no `Hfused`, no retag, no funext (the worklist's earlier
+  no-icache/funext expectation was conservative; neither appears).  The
+  proof is 25 lines: `srvwmo_realizable` ∘ `exec_wf_pf_run_prog` ∘
+  `ecfg_of_init` ∘ `wp_pf_rtc_epf_rtc`, plus the two adequacy exports
+  applied verbatim.  Together with `WeakEvInst.t2_ev` this is the tier-1
+  characterization consumed end to end.
 - **A5 — DONE (2026-08-20): `iris/WeakSrvwmoLitmus.v`** — the litmus
   suite against `srvwmo_consistent` ITSELF (design S5; corollary (b)'s
   evidence artifact).  Nine verdicts, all 17 theorems
