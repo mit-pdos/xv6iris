@@ -175,6 +175,50 @@ Proof.
            (fsimg_wf_root fsimg_P fsimg_sb fsimg_wf_ok)).
 Qed.
 
+(* ---- W9, cited: the LINK LEDGER's per-inum ticket counts ------------- *)
+
+(*  [IcacheBoot.ireg_alloc]'s stage-B ledger premise stands at [W z =
+    FsImg.fs_link_count P sb z] -- the number of ticket-bearing records of
+    the image that name [z] -- and the region invariant then owes (L1)
+    ([InodeRegion.ireg_link_ok]), [ireg_dir_wl0] and the strict root clause
+    [ireg_root_ok] at that value.  All three are W9 of [fsimg_wf_ok], so NO
+    new computation lands here; W9's own sweep is what added ~+20 s to this
+    file's [vm_compute]. *)
+
+(* (L1): no inum has more tickets than links *)
+Lemma fsimg_link_le (z : Z) :
+  Z.of_nat (fs_link_count fsimg_P fsimg_sb z)
+    <= bv_unsigned (di_nlink (fs_dinode fsimg_P fsimg_sb z)).
+Proof. exact (fsimg_wf_link_le fsimg_P fsimg_sb z fsimg_wf_ok). Qed.
+
+(* [ireg_dir_wl0]: a DIRECTORY's plain column is empty -- the root's ["."]
+   and [".."] are both SELF records and bear no ticket *)
+Lemma fsimg_link_dir (z : Z) :
+  bv_unsigned (di_type (fs_dinode fsimg_P fsimg_sb z)) = T_DIR_z ->
+  fs_link_count fsimg_P fsimg_sb z = 0%nat.
+Proof. exact (fsimg_wf_link_dir fsimg_P fsimg_sb z fsimg_wf_ok). Qed.
+
+(* [DirLinks.dir_links_of_plain]'s [DirView.dlc_bound] premise and its ROOT
+   EXCLUSION: every live image directory has exactly one link and IS the
+   root (mkfs lays down one directory) *)
+Lemma fsimg_dir_nlink (z : Z) :
+  0 <= z < sb_ninodes fsimg_sb ->
+  bv_unsigned (di_type (fs_dinode fsimg_P fsimg_sb z)) = T_DIR_z ->
+  bv_unsigned (di_nlink (fs_dinode fsimg_P fsimg_sb z)) = 1.
+Proof. exact (fsimg_wf_dir_nlink fsimg_P fsimg_sb z fsimg_wf_ok). Qed.
+
+Lemma fsimg_dir_root (z : Z) :
+  0 <= z < sb_ninodes fsimg_sb ->
+  bv_unsigned (di_type (fs_dinode fsimg_P fsimg_sb z)) = T_DIR_z ->
+  z = ROOTINO.
+Proof. exact (fsimg_wf_dir_root fsimg_P fsimg_sb z fsimg_wf_ok). Qed.
+
+(* ...and [ireg_root_ok]'s strict clause at the root, where the two meet *)
+Lemma fsimg_root_link :
+  fs_link_count fsimg_P fsimg_sb ROOTINO = 0%nat
+  /\ bv_unsigned (di_nlink (fs_dinode fsimg_P fsimg_sb ROOTINO)) = 1.
+Proof. exact (fsimg_wf_root_link fsimg_P fsimg_sb fsimg_wf_ok). Qed.
+
 (* ---- W4 reindexed, cited: no inode names one block twice ------------- *)
 
 (* [InodeInv.blkmap_wf]'s injectivity clause at every live inum, out of

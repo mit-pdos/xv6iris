@@ -12,8 +12,8 @@
 (* allocated in every mkfs image).                                        *)
 (*                                                                        *)
 (* WHAT IS AND IS NOT COMPUTED HERE.  NOTHING.  Every image fact arrives   *)
-(* as a HYPOTHESIS (ruling R3): [FsImg]'s eight boolean sweeps are         *)
-(* instantiated at the literal image in [FsImgCheck.v] (~212 s of          *)
+(* as a HYPOTHESIS (ruling R3): [FsImg]'s NINE boolean sweeps are          *)
+(* instantiated at the literal image in [FsImgCheck.v] (measured 241 s of  *)
 (* [vm_compute], off the adequacy cone) and reach this lemma through their *)
 (* lookup specs.  In particular the live set [A] is a PARAMETER with a     *)
 (* membership characterisation ([FsImg.fs_live_set_elem_of]'s shape): the  *)
@@ -69,6 +69,71 @@ Local Open Scope Z_scope.
    pool onward to [bio_init]/[initlog]/[ireg_alloc] -- is statable. *)
 Definition fs_live_blocks (P : Z -> list (bv 8)) (sb : fs_sb) (A : gset Z)
   : gset Z := ⋃ (fs_inode_blocks_set P sb <$> elements A).
+
+(* ---------------------------------------------------------------------- *)
+(*  THE DINODE BRIDGE (stage-(d) item ii)                                  *)
+(* ---------------------------------------------------------------------- *)
+
+(*  [IcacheBoot.ireg_alloc] pays out at [IcacheBoot.image_dinode dss z] --
+    the record it DECODED out of the inode block it was handed -- while every
+    image fact and the whole stocking lemma is stated at
+    [FsImg.fs_dinode P sb z], the record [FsImg]'s own reader produces off
+    the block CONTENTS.  Nothing tied the two, and this is the tie: both are
+    slot [z mod 16] of block [z / 16], one reached through
+    [DinodeEnc.diblk_bytes]' inverse and the other through
+    [FsImg.fs_dinode_of_diblk]'s round trip.
+
+    This file is the earliest home: [IcacheBoot.v] does not import [FsImg]
+    (and must not -- FsImg's only tracked importer is the image check), and
+    [FsImgBridge.v] does not import [IcacheBoot].  Here both sides are in
+    scope and nothing new is imported.                                     *)
+Lemma image_dinode_fs_dinode (P : Z -> list (bv 8)) (sb : fs_sb)
+    (dss : list (list dinode)) (nib : nat) (z : Z) :
+  length dss = nib -> Forall diblk_wf dss ->
+  (forall bi : nat, (bi < nib)%nat ->
+     P (FsImg.sb_inodestart sb + Z.of_nat bi) = diblk_bytes (dss !!! bi)) ->
+  0 <= z < 16 * Z.of_nat nib -> 16 * Z.of_nat nib <= 2 ^ 32 ->
+  image_dinode dss z = fs_dinode P sb z.
+Proof.
+  intros Hl Hwf He Hz Hnib.
+  (* the block index, and its two arithmetic readings *)
+  assert (Hdiv : 0 <= z / 16 < Z.of_nat nib).
+  { split; [apply Z.div_pos; lia |].
+    apply (Z.div_lt_upper_bound z 16 (Z.of_nat nib)); lia. }
+  assert (Hbi : (Z.to_nat (z / 16) < nib)%nat) by (lia).
+  (* the inum's [bv 32] round trip *)
+  assert (Hbv : bv_unsigned (fs_inum_bv z) = z).
+  { unfold fs_inum_bv. apply Z_to_bv_small.
+    assert (Hm : bv_modulus 32 = 2 ^ 32) by (reflexivity).
+    rewrite Hm. lia. }
+  assert (Hblkwf : diblk_wf (dss !!! Z.to_nat (z / 16))).
+  { apply (Forall_lookup_1 _ dss (Z.to_nat (z / 16))); [exact Hwf |].
+    apply list_lookup_lookup_total_lt. lia. }
+  assert (Hblk : P (IBLOCK (fs_inum_bv z) (FsImg.sb_inodestart sb))
+                 = diblk_bytes (dss !!! Z.to_nat (z / 16))).
+  { unfold IBLOCK. rewrite Hbv.
+    rewrite <- (He (Z.to_nat (z / 16)) Hbi).
+    f_equal. lia. }
+  rewrite (fs_dinode_of_diblk P sb z (dss !!! Z.to_nat (z / 16))
+             Hblkwf Hblk).
+  (* [islot] is QUALIFIED: another [islot] is in scope from the icache's
+     slot vocabulary, and the unqualified [unfold] silently picks it. *)
+  unfold image_dinode, DinodeEnc.islot. rewrite Hbv. reflexivity.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(*  THE TICKET COUNT, ONE ELEMENT AT A TIME                                *)
+(* ---------------------------------------------------------------------- *)
+
+Lemma fs_tick_count_cons (t z : Z) (L : list Z) :
+  fs_tick_count (t :: L) z
+  = (if decide (t = z) then S (fs_tick_count L z) else fs_tick_count L z)%nat.
+Proof.
+  unfold fs_tick_count. cbn [List.filter].
+  destruct (decide (t = z)) as [Heq | Hne].
+  - rewrite (bool_decide_eq_true_2 (t = z) Heq). reflexivity.
+  - rewrite (bool_decide_eq_false_2 (t = z) Hne). reflexivity.
+Qed.
 
 Section FsCfgBootPool.
   Context `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, !irefslotG Σ}.
@@ -256,6 +321,300 @@ Section FsCfgBootPool.
     { iApply (ireg_out_alloc_inv γi (mword_of_int z : mword 32)
                 (fs_dinode P sb z) (Hty z Hz) with "Hreg"). }
     iSplitL "Hind"; [iExact "Hind" | iExact "Hblks"].
+  Qed.
+
+  (* ==================================================================== *)
+  (*  THE [dir_links] PRODUCER (stage-(d) item i)                          *)
+  (* ==================================================================== *)
+
+  (*  [ipool_alloc_of_image] above takes the [dir_links] big-op as a PREMISE
+      because nothing could produce it: [DirLinks.dir_links_of_plain] wants
+      one [IcacheRef.ilink] per live non-self record of each image directory
+      and stage A's all-plain ledger ([link_auth z 0 ...]) excluded every
+      fragment.  Stage B mints them ([IcacheBoot.link_boot_mint_w] at
+      [W := FsImg.fs_link_count P sb]) and this is where they are SPENT.
+
+      THE BOOKKEEPING PROBLEM AND ITS SHAPE.  The mint is per NAMED inum --
+      [W z] tickets filed against [z]'s own authority -- while the payload
+      is per DIRECTORY: [dir_links z' dn data] consumes one ticket for each
+      of [z']'s records, at the inum that record NAMES.  So the supply has
+      to be reindexed across directories.  It is done in TWO moves, neither
+      of which walks a big-op by search:
+
+        (1) [big_sepS_tick_route] distributes the per-inum PILES onto the
+            image's flat ticket LIST ([FsImg.fs_all_tickets]) by ONE
+            induction on that list, peeling one pile element per ticket.
+            Its arithmetic premise is [fs_tick_count L z <= W z], which at
+            [W := fs_link_count P sb] is an equality by definition -- the
+            count function IS the pile size, so no counting argument is
+            needed anywhere.
+        (2) the list is a [mjoin] of per-inum [omap]s, so
+            [big_sepL_mjoin] + [big_sepL_omap_match] put each directory's
+            sublist back at its own record indices, which is exactly
+            [dir_links_of_plain]'s input shape.                            *)
+
+  Lemma big_sepL_mjoin {A : Type} (Φ : A -> iProp Σ) (ls : list (list A)) :
+    ([∗ list] x ∈ mjoin ls, Φ x) ⊢ [∗ list] l ∈ ls, [∗ list] x ∈ l, Φ x.
+  Proof.
+    induction ls as [| l ls IH]; [iIntros "_"; done |].
+    rewrite mjoin_cons big_sepL_app big_sepL_cons.
+    iIntros "[H1 H2]". iSplitL "H1"; [iExact "H1" |]. iApply (IH with "H2").
+  Qed.
+
+  Lemma big_sepL_to_set (Φ : Z -> iProp Σ) (l : list Z) :
+    base.NoDup l -> ([∗ list] x ∈ l, Φ x) ⊢ [∗ set] x ∈ list_to_set l, Φ x.
+  Proof. intros Hnd. rewrite -(big_sepS_list_to_set Φ l Hnd) //. Qed.
+
+  (* [omap]'s big-op, back at the SOURCE list's indices.  Stated with the
+     TARGET predicate abstract and two pointwise premises rather than with a
+     [match] in the conclusion: at a [Some] slot the caller turns the ticket
+     into the record's payload, at a [None] slot it owes an emp-valid
+     payload -- which is literally what [DirLinks.dir_link_at] is at a
+     record that bears no ticket. *)
+  Lemma big_sepL_omap_mono {A B : Type} (f : A -> option B) (l : list A)
+      (Φ : B -> iProp Σ) (Ψ : A -> iProp Σ) :
+    (forall (a : A) (b : B), f a = Some b -> Φ b ⊢ Ψ a) ->
+    (forall a : A, f a = None -> ⊢ Ψ a) ->
+    ([∗ list] x ∈ omap f l, Φ x) ⊢ [∗ list] a ∈ l, Ψ a.
+  Proof.
+    intros HS HN. induction l as [| a l IH]; [iIntros "_"; done |].
+    rewrite big_sepL_cons.
+    destruct (f a) as [b |] eqn:Hf.
+    - assert (Hc : omap f (a :: l) = b :: omap f l).
+      { cbn [omap list_omap]. rewrite Hf. reflexivity. }
+      rewrite Hc big_sepL_cons. iIntros "[H1 H2]".
+      iSplitL "H1"; [iApply (HS a b Hf); iExact "H1" |].
+      iApply (IH with "H2").
+    - assert (Hc : omap f (a :: l) = omap f l).
+      { cbn [omap list_omap]. rewrite Hf. reflexivity. }
+      rewrite Hc. iIntros "H".
+      iSplitR; [iApply (HN a Hf) |]. iApply (IH with "H").
+  Qed.
+
+  (* a pile's size is all that matters, not where its index list starts *)
+  Lemma big_sepL_seq_shift (Ψ : iProp Σ) (n j k : nat) :
+    ([∗ list] _ ∈ seq j n, Ψ) ⊢ [∗ list] _ ∈ seq k n, Ψ.
+  Proof.
+    revert j k. induction n as [| n IH]; intros j k; [iIntros "_"; done |].
+    replace (seq j (S n)) with (j :: seq (S j) n) by (reflexivity).
+    replace (seq k (S n)) with (k :: seq (S k) n) by (reflexivity).
+    rewrite !big_sepL_cons. iIntros "[H1 H2]".
+    iSplitL "H1"; [iExact "H1" |]. iApply (IH (S j) (S k) with "H2").
+  Qed.
+
+  (* **THE ROUTING.**  Per-inum piles in, the flat demand list out.  ONE
+     induction on [L]; the piles are re-formed at a decremented [W] at each
+     step, so no big-op is ever walked by a proof search. *)
+  Lemma big_sepS_tick_route (Phi : Z -> iProp Σ) (L : list Z) (P : gset Z)
+      (W : Z -> nat) :
+    (forall t : Z, t ∈ L -> t ∈ P) ->
+    (forall z : Z, (fs_tick_count L z <= W z)%nat) ->
+    ([∗ set] z ∈ P, [∗ list] _ ∈ seq 0 (W z), Phi z) ⊢ [∗ list] t ∈ L, Phi t.
+  Proof.
+    revert W. induction L as [| t L IH]; intros W HP HW.
+    { iIntros "_". done. }
+    assert (HtP : t ∈ P) by (apply HP, elem_of_list_here).
+    assert (HP' : forall x : Z, x ∈ L -> x ∈ P)
+      by (intros x Hx; apply HP, elem_of_list_further, Hx).
+    assert (Ht1 : (1 <= W t)%nat).
+    { pose proof (HW t) as H. rewrite fs_tick_count_cons in H.
+      rewrite decide_True in H; [lia | reflexivity]. }
+    assert (HW' : forall z : Z,
+              (fs_tick_count L z
+               <= (if decide (z = t) then (W t - 1)%nat else W z))%nat).
+    { intros z. destruct (decide (z = t)) as [-> | Hne].
+      - pose proof (HW t) as H. rewrite fs_tick_count_cons in H.
+        rewrite decide_True in H; [lia | reflexivity].
+      - pose proof (HW z) as H. rewrite fs_tick_count_cons in H.
+        rewrite decide_False in H; [lia |].
+        intros Heq. exact (Hne (eq_sym Heq)). }
+    rewrite (big_sepS_delete _ P t HtP) big_sepL_cons.
+    replace (W t) with (S (W t - 1))%nat by (lia).
+    replace (seq 0 (S (W t - 1))) with (0%nat :: seq 1 (W t - 1))
+      by (reflexivity).
+    rewrite big_sepL_cons.
+    iIntros "[[Htk Ht2] Hrest]".
+    iSplitL "Htk"; [iExact "Htk" |].
+    iApply (IH (fun z : Z => if decide (z = t) then (W t - 1)%nat else W z)
+              HP' HW').
+    rewrite (big_sepS_delete _ P t HtP). cbv beta.
+    iSplitL "Ht2".
+    { rewrite decide_True; [| reflexivity].
+      iApply (big_sepL_seq_shift (Phi t) (W t - 1) 1 0 with "Ht2"). }
+    iApply (big_sepS_mono with "Hrest"). intros z Hz.
+    apply elem_of_difference in Hz as [_ Hz].
+    rewrite decide_False; [done |].
+    intros ->. apply Hz, elem_of_singleton. reflexivity.
+  Qed.
+
+  (* **ONE DIRECTORY'S PAYLOAD**, out of its own ticket sublist.  Every pure
+     fact is a lookup spec: W9's [nlink = 1] discharges [DirView.dlc_bound]
+     at the all-false flavour map ([dlc_bound_le1]), W9's [z = ROOTINO] is
+     [DirLinks.dir_par_tie]'s root exclusion, and a NON-directory's sublist
+     is [] so its payload is [DirLinks.dir_links_not_dir]. *)
+  Lemma dir_links_of_tickets (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z) :
+    fsimg_wf P sb = true -> 0 <= z < FsImg.sb_ninodes sb ->
+    ([∗ list] t ∈ fs_dir_tickets_at P sb z, ilink t) -∗
+    dir_links z (fs_dinode P sb z) (fs_data_of P (fs_dinode P sb z)).
+  Proof.
+    intros Hwf Hran.
+    rewrite /fs_dir_tickets_at /fs_dir_tickets. cbv zeta.
+    destruct (bv_unsigned (di_type (fs_dinode P sb z)) =? T_DIR_z) eqn:Hty.
+    - apply Z.eqb_eq in Hty.
+      assert (Hnl : bv_unsigned (di_nlink (fs_dinode P sb z)) = 1)
+        by exact (fsimg_wf_dir_nlink P sb z Hwf Hran Hty).
+      assert (Hrt : bv_unsigned (di_nlink (fs_dinode P sb z)) <> 0 ->
+                    (2 <= dir_nrec (bv_unsigned (di_size (fs_dinode P sb z))))%nat ->
+                    z = dl_root).
+      { intros _ _. rewrite (fsimg_wf_dir_root P sb z Hwf Hran Hty).
+        reflexivity. }
+      (* the ticket guard IS [dir_link_at]'s guard, so ONE [destruct] on it
+         serves the record's payload and the ticket's [option] together *)
+      assert (HS : forall (k : nat) (t : Z),
+                fs_rec_ticket P z (fs_dinode P sb z) k = Some t ->
+                ilink t ⊢ dir_link_at z (fs_dinode P sb z)
+                            (fs_data_of P (fs_dinode P sb z)) k).
+      { intros k t. rewrite /fs_rec_ticket /dir_link_at. cbv zeta.
+        destruct (dir_liveb (fs_data_of P (fs_dinode P sb z)) k
+                  && negb (bool_decide
+                             (bv_unsigned
+                                (dir_inum (fs_data_of P (fs_dinode P sb z)) k)
+                              = z))).
+        - intros Hk. injection Hk as <-. iIntros "H". iLeft. iExact "H".
+        - discriminate. }
+      assert (HN : forall k : nat,
+                fs_rec_ticket P z (fs_dinode P sb z) k = None ->
+                ⊢ dir_link_at z (fs_dinode P sb z)
+                    (fs_data_of P (fs_dinode P sb z)) k).
+      { intros k. rewrite /fs_rec_ticket /dir_link_at. cbv zeta.
+        destruct (dir_liveb (fs_data_of P (fs_dinode P sb z)) k
+                  && negb (bool_decide
+                             (bv_unsigned
+                                (dir_inum (fs_data_of P (fs_dinode P sb z)) k)
+                              = z))).
+        - discriminate.
+        - intros _. done. }
+      iIntros "H".
+      iApply (dir_links_of_plain z (fs_dinode P sb z)
+                (fs_data_of P (fs_dinode P sb z)) Hty
+                (dlc_bound_le1 (fun _ => false) (fs_dinode P sb z)
+                   (fs_data_of P (fs_dinode P sb z)) ltac:(lia))
+                Hrt with "[H]").
+      iApply (big_sepL_omap_mono _ _ _ _ HS HN with "H").
+    - assert (Hne : bv_unsigned (di_type (fs_dinode P sb z)) <> T_DIR_z)
+        by (apply Z.eqb_neq; exact Hty).
+      iIntros "_".
+      iApply (dir_links_not_dir z (fs_dinode P sb z)
+                (fs_data_of P (fs_dinode P sb z)) Hne).
+  Qed.
+
+  (* **THE PRODUCER, off the flat ticket list.** *)
+  Lemma dir_links_of_image (P : Z -> list (bv 8)) (sb : fs_sb) (A : gset Z) :
+    fsimg_wf P sb = true ->
+    (forall z : Z, z ∈ A -> 0 <= z < FsImg.sb_ninodes sb) ->
+    ([∗ list] t ∈ fs_all_tickets P sb, ilink t) -∗
+    [∗ set] z ∈ A, dir_links z (fs_dinode P sb z)
+                     (fs_data_of P (fs_dinode P sb z)).
+  Proof.
+    intros Hwf HA. iIntros "H".
+    rewrite /fs_all_tickets.
+    iDestruct (big_sepL_mjoin (fun t => ilink t) with "H") as "H".
+    rewrite big_sepL_fmap.
+    (* one directory at a time, while still indexed by the sweep's [seq] *)
+    iAssert ([∗ list] i ∈ seq 0 (Z.to_nat (FsImg.sb_ninodes sb)),
+               dir_links (Z.of_nat i) (fs_dinode P sb (Z.of_nat i))
+                 (fs_data_of P (fs_dinode P sb (Z.of_nat i))))%I
+      with "[H]" as "H".
+    { iApply (big_sepL_mono with "H"). intros idx i Hi.
+      apply lookup_seq in Hi as [-> Hilt]. iIntros "Ht".
+      iApply (dir_links_of_tickets P sb (Z.of_nat (0 + idx)) Hwf
+                ltac:(lia) with "Ht"). }
+    (* ...then as a SET, then cut down to [A] *)
+    iAssert ([∗ list] z ∈ (Z.of_nat <$> seq 0 (Z.to_nat (FsImg.sb_ninodes sb))),
+               dir_links z (fs_dinode P sb z)
+                 (fs_data_of P (fs_dinode P sb z)))%I with "[H]" as "H".
+    { rewrite big_sepL_fmap. iExact "H". }
+    assert (Hnd : base.NoDup
+                    (Z.of_nat <$> seq 0 (Z.to_nat (FsImg.sb_ninodes sb)))).
+    { apply NoDup_fmap_2_strong;
+        [intros a b _ _ Hab; lia | apply NoDup_seq]. }
+    iDestruct (big_sepL_to_set _ _ Hnd with "H") as "H".
+    assert (Hsub : A ⊆ list_to_set
+                        (Z.of_nat <$> seq 0 (Z.to_nat (FsImg.sb_ninodes sb)))).
+    { apply elem_of_subseteq. intros z Hz.
+      apply elem_of_list_to_set, elem_of_list_fmap.
+      exists (Z.to_nat z). pose proof (HA z Hz) as Hr.
+      assert (Hz0 : 0 <= z) by (lia).
+      split; [rewrite (Z2Nat.id z Hz0); reflexivity |].
+      apply elem_of_seq. lia. }
+    iDestruct (big_sepS_split_sub _ _ A Hsub with "H") as "[H _]".
+    iExact "H".
+  Qed.
+
+  (* ==================================================================== *)
+  (*  THE BRIDGE, SPENT: [ireg_alloc]'s THREE WIDENED IMAGE PREMISES        *)
+  (* ==================================================================== *)
+
+  (*  [IcacheBoot.ireg_alloc] states its image obligations at the record it
+      DECODED ([IcacheBoot.image_dinode dss z]); [FsImg]'s sweeps state
+      theirs at [fs_dinode P sb z].  [image_dinode_fs_dinode] above is the
+      tie, and this is where it is spent: at [W := FsImg.fs_link_count P sb]
+      the three stage-B premises are exactly W9's three readings.
+      (The two STAGE-A premises, [image_free_nlink] (L3) and
+      [image_nlink_short] (L4), are NOT here: neither is a conjunct of
+      [fsimg_wf] -- W3 sweeps only the LIVE records -- so they still owe
+      their own image sweeps.  Recorded, not smuggled.) *)
+  Lemma image_link_premises (P : Z -> list (bv 8)) (sb : fs_sb)
+      (dss : list (list dinode)) (nib : nat) :
+    fsimg_wf P sb = true ->
+    length dss = nib -> Forall diblk_wf dss ->
+    (forall bi : nat, (bi < nib)%nat ->
+       P (FsImg.sb_inodestart sb + Z.of_nat bi) = diblk_bytes (dss !!! bi)) ->
+    16 * Z.of_nat nib <= 2 ^ 32 ->
+    image_link_le (fs_link_count P sb) dss nib
+    /\ image_dir_wl0 (fs_link_count P sb) dss nib
+    /\ image_root_alive (fs_link_count P sb) dss nib.
+  Proof.
+    intros Hwf Hl Hdwf He Hnib.
+    assert (Hbr : forall z : Z, z ∈ region_inums nib ->
+              image_dinode dss z = fs_dinode P sb z).
+    { intros z Hz. apply region_inums_spec in Hz.
+      exact (image_dinode_fs_dinode P sb dss nib z Hl Hdwf He Hz Hnib). }
+    split.
+    { intros z Hz. rewrite (Hbr z Hz).
+      pose proof (fsimg_wf_link_le P sb z Hwf).
+      pose proof (proj1 (bv_unsigned_in_range _
+                           (di_nlink (fs_dinode P sb z)))). lia. }
+    split.
+    { intros z Hz Hty. rewrite (Hbr z Hz) in Hty.
+      apply (fsimg_wf_link_dir P sb z Hwf).
+      (* [InodeRegion.ireg_dir_ty] and [DirView.T_DIR_z] are the same 1 *)
+      rewrite Hty. reflexivity. }
+    { intros z Hz Hroot.
+      destruct (fsimg_wf_root_link P sb Hwf) as [Hc Hnl].
+      assert (Hz1 : z = ROOTINO) by (rewrite Hroot; reflexivity).
+      rewrite (Hbr z Hz) Hz1 Hnl Hc. lia. }
+  Qed.
+
+  (* **THE FORM [fs_cfg_alloc] USES**: straight off
+     [IcacheBoot.link_boot_mint_w]'s second column. *)
+  Lemma dir_links_of_region (P : Z -> list (bv 8)) (sb : fs_sb) (A : gset Z) :
+    fsimg_wf P sb = true ->
+    FsImg.sb_ninodes sb <= 16 * Z.of_nat icfg_nib ->
+    (forall z : Z, z ∈ A -> 0 <= z < FsImg.sb_ninodes sb) ->
+    ([∗ set] z ∈ region_inums icfg_nib,
+       [∗ list] _ ∈ seq 0 (fs_link_count P sb z), ilink z) -∗
+    [∗ set] z ∈ A, dir_links z (fs_dinode P sb z)
+                     (fs_data_of P (fs_dinode P sb z)).
+  Proof.
+    intros Hwf Hnin HA. iIntros "H".
+    iApply (dir_links_of_image P sb A Hwf HA).
+    iApply (big_sepS_tick_route (fun z => ilink z) (fs_all_tickets P sb)
+              (region_inums icfg_nib) (fs_link_count P sb) with "H").
+    - intros t Ht.
+      pose proof (fs_all_tickets_range P sb t (fsimg_wf_dirs P sb Hwf) Ht).
+      apply region_inums_spec. lia.
+    - intros z. unfold fs_link_count. lia.
   Qed.
 
 End FsCfgBootPool.

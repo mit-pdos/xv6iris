@@ -379,6 +379,87 @@ Proof.
     [intros x y _ _ H; rewrite /imark_key in H; lia | apply NoDup_seq].
 Qed.
 
+(* ===================================================================== *)
+(*  1b.  THE LEDGER'S BOOT MINT AT THE IMAGE'S LINK COUNTS (§20.6 stage B) *)
+(* ===================================================================== *)
+
+(*  STAGE A minted the ledger ALL-PLAIN: [IcacheRef.link_boot_map] is one
+    element [● lelem_boot ⋅ ◯ lelem_boot] per inum with every count at zero,
+    so no [IcacheRef.ilink] fragment existed anywhere at boot and
+    [DirLinks.dir_links] had no producer -- a live directory's records each
+    want one.  THIS is the widening the [w = 0] note below [ireg_alloc]
+    promised.
+
+    IT IS A MINT, NOT A DIFFERENT BOOT MAP, and that is a measured decision.
+    The obvious route -- widen [link_boot_map] to carry [● lelem_boot_w (W z)
+    ⋅ ◯ lelem_boot_w (W z)] and CUT the fragment half into [W z] tickets --
+    needs the equation
+
+        lelem_boot_w n = lelemf 0 .. (Some (Excl FrzOff)) ⋅ lelem n ..
+
+    and although that equation is DEFINITIONAL, deciding it by conversion
+    over [linkElemUR]'s seven-deep nest does not terminate (>60 s at [n]
+    abstract, measured on the lane -- the same blowup [IcacheRef]'s
+    [lelemf_op_none] header records for [rewrite -!pair_op]).  So boot takes
+    the all-plain map UNCHANGED, hands it to [IcacheRef.link_boot_split] as
+    before, and then BUMPS each authority [W z] times with the landed
+    [IcacheRef.link_mint_link] -- one [nat_local_update] per ticket, at the
+    named atoms, where the algebra is already proven and instant.  No new
+    camera literal, no new validity obligation, and [icfg_alloc]'s [LM]
+    argument does not move.
+
+    Stage A is the instance [W = fun _ => 0]: at it the mint is the identity
+    and [ireg_alloc]'s three new image premises below are vacuous-or-zero.  *)
+
+Section IcacheBootLedger.
+  Context `{!xv6G Σ}.
+  Context `{ICFG : icfg}.
+
+  (* [n] tickets off one authority, by [n] applications of the landed
+     one-ticket mint.  The index list starts at an arbitrary [j] so the
+     induction peels from the FRONT (which is where [link_mint_link] puts
+     its ticket); every caller instantiates [j = 0]. *)
+  (* Stated at BOOT'S OWN COLUMNS rather than at nine binders: the general
+     form would have to name [dfrac_agreeR], which this file does not
+     import, and boot has no use for it. *)
+  Lemma link_mint_pile (z : Z) (n j wl : nat) :
+    link_auth z wl 0 0 0 None 0 None (Some (Excl FrzOff)) 0 ==∗
+    link_auth z (n + wl) 0 0 0 None 0 None (Some (Excl FrzOff)) 0
+    ∗ [∗ list] _ ∈ seq j n, ilink z.
+  Proof.
+    revert j wl. induction n as [| n IH]; intros j wl.
+    { iIntros "Ha". iModIntro. iSplitL "Ha"; [iExact "Ha" | done]. }
+    iIntros "Ha".
+    iMod (link_mint_link with "Ha") as "[Ha Htk]".
+    iMod (IH (S j) (S wl) with "Ha") as "[Ha Hpile]".
+    iModIntro.
+    replace (S n + wl)%nat with (n + S wl)%nat by lia.
+    iSplitL "Ha"; [iExact "Ha" |].
+    replace (seq j (S n)) with (j :: seq (S j) n) by reflexivity.
+    rewrite big_sepL_cons.
+    iSplitL "Htk"; [iExact "Htk" | iExact "Hpile"].
+  Qed.
+
+  (* **THE STAGE-B PAYOUT.**  In: [IcacheRef.link_boot_split]'s all-plain
+     authorities, verbatim.  Out: the SAME authorities standing at the
+     image's own per-inum ticket count, plus those tickets.  The authority
+     goes to [ireg_alloc] (it parks one per slot); the tickets go to
+     [DirLinks.dir_links] via [FsCfgBoot.dir_links_of_region]. *)
+  Lemma link_boot_mint_w (W : Z -> nat) (P : gset Z) :
+    ([∗ set] z ∈ P, link_auth z 0 0 0 0 None 0 None (Some (Excl FrzOff)) 0)
+    ==∗ [∗ set] z ∈ P,
+          (link_auth z (W z) 0 0 0 None 0 None (Some (Excl FrzOff)) 0
+           ∗ [∗ list] _ ∈ seq 0 (W z), ilink z).
+  Proof.
+    iIntros "H". iApply big_sepS_bupd.
+    iApply (big_sepS_mono with "H"). intros z _. iIntros "Ha".
+    iMod (link_mint_pile z (W z) 0 with "Ha") as "[Ha Hpile]".
+    rewrite Nat.add_0_r. iModIntro.
+    iSplitL "Ha"; [iExact "Ha" | iExact "Hpile"].
+  Qed.
+
+End IcacheBootLedger.
+
 Section IcacheBootRegion.
   Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{ICFG : icfg}.
@@ -486,10 +567,17 @@ Section IcacheBootRegion.
      image obligation of exactly [ipool_shape_alloc]'s kind: nothing in
      this file can manufacture a ghost the ambient [icfg_link] names.
 
-     THEY ARE STATED AT [w = 0] because stage A mints no fragment: with the
-     directory payloads' [dir_links] (stage B) the same premise grows to
-     [w_z] per inum plus the fragments that stock each directory.  The
-     authority's shape does not change when it does.
+     THEY ARE NOW STATED AT [w_z] -- STAGE B, the widening this note used to
+     promise.  [W] is the image's per-inum count of ticket-bearing directory
+     records ([FsImg.fs_link_count]), and the premise is exactly what
+     [link_boot_mint_w] above hands over: the SAME authority
+     [IcacheRef.link_boot_split] produces, bumped [W z] times, whose
+     by-product is the [W z] [IcacheRef.ilink] fragments that stock
+     [DirLinks.dir_links] (spent by [FsCfgBoot.dir_links_of_region]).
+     Stage A is the instance [W = fun _ => 0]: at it the mint is the identity,
+     the three new image premises below are vacuous-or-zero and this lemma is
+     byte-for-byte what it was.  The authority's SHAPE did not change, only
+     its value.
 
      AND (L3) IS AN IMAGE OBLIGATION (fs-sysfile S5g).  With the ledger's
      clauses landed, [ireg_slot] now says of every record that a ZERO TYPE
@@ -536,9 +624,38 @@ Section IcacheBootRegion.
      [ireg_alloc]'s arity does not move; and it is guarded by
      [z ∈ region_inums nib] like its two neighbours, which makes it VACUOUS
      at [nib = 0] -- an empty region has no root slot to constrain. *)
-  Definition image_root_alive (dss : list (list dinode)) (nib : nat) : Prop :=
+  (* WIDENED BY STAGE B: at [w = 0] the strict clause read [1 <= nlink],
+     §20.4's own words; at [w = W z] it reads [W z < nlink].  The image
+     supplies it the same way -- at the mkfs image the root IS a directory,
+     so [image_dir_wl0] pins [W root = 0] and the clause collapses back to
+     [1 <= nlink] ([FsImg.fsimg_wf_root_link]). *)
+  Definition image_root_alive (W : Z -> nat) (dss : list (list dinode))
+      (nib : nat) : Prop :=
     forall z : Z, z ∈ region_inums nib -> z = ireg_root ->
-      1 <= bv_unsigned (di_nlink (image_dinode dss z)).
+      (W z < Z.to_nat (bv_unsigned (di_nlink (image_dinode dss z))))%nat.
+
+  (* ...AND (L1) BECOMES ONE TOO, for the first time.  At [w = 0] it was
+     [0 <= nlink] and needed nothing; at [w = W z] it is the real ledger
+     clause -- "no more tickets than links" -- and it is a fact about the
+     image's directory CONTENTS, which is why it rides in the same
+     ∀-over-decodings slot as (L3)/(L4) and the root clause. *)
+  Definition image_link_le (W : Z -> nat) (dss : list (list dinode))
+      (nib : nat) : Prop :=
+    forall z : Z, z ∈ region_inums nib ->
+      (W z <= Z.to_nat (bv_unsigned (di_nlink (image_dinode dss z))))%nat.
+
+  (* ...AND SO DOES [InodeRegion.ireg_dir_wl0]: a record naming a DIRECTORY
+     pays in the d-flavoured column ([ilinkd]/[ilinkdp]), never the plain
+     one, so a directory's plain column must be EMPTY.  Boot mints no
+     d-fragment at all ([DirLinks.dir_links_of_plain] is the all-plain
+     stock), so the image owes exactly "no ticket names a directory" -- true
+     of every mkfs image, whose one directory is the root and whose root's
+     two dot records are both SELF records that bear no ticket. *)
+  Definition image_dir_wl0 (W : Z -> nat) (dss : list (list dinode))
+      (nib : nat) : Prop :=
+    forall z : Z, z ∈ region_inums nib ->
+      bv_unsigned (di_type (image_dinode dss z)) = ireg_dir_ty ->
+      W z = 0%nat.
 
   (* OPTION A: the boot registry map.  Every inum maps to a DUMMY escrow gname
      pair -- at boot no inum is in escrow, and [ireg_claim_au]'s pending-arm
@@ -556,14 +673,15 @@ Section IcacheBootRegion.
   Qed.
 
   Lemma ireg_alloc (E : coPset) (γfs : fs_names) (inodestart : Z) (nib : nat)
-      (bss : nat -> list (bv 8)) :
+      (bss : nat -> list (bv 8)) (W : Z -> nat) :
     16 * Z.of_nat nib <= 2 ^ 32 ->
     (forall bi : nat, (bi < nib)%nat -> length (bss bi) = 1024%nat) ->
     (forall dss : list (list dinode),
        length dss = nib -> Forall diblk_wf dss ->
        (forall bi : nat, (bi < nib)%nat -> bss bi = diblk_bytes (dss !!! bi)) ->
        image_free_nlink dss nib /\ image_nlink_short dss nib /\
-       image_root_alive dss nib) ->
+       image_root_alive W dss nib /\ image_link_le W dss nib
+       /\ image_dir_wl0 W dss nib) ->
     (* THE LEDGER AT BOOT, AT THE WIDENED [w] (V1's count-fact carrier;
        V4+V5's fused widening): the image's authorities are ALL-PLAIN,
        [wdu = wdt = 0] and [p = None] at every inum, so (T1), (T1') and
@@ -575,7 +693,7 @@ Section IcacheBootRegion.
        root's own [nlink = 1] is still [image_root_alive]'s business and
        nobody else's. *)
     ([∗ set] z ∈ region_inums nib,
-       link_auth z 0 0 0 0 None 0 None (Some (Excl FrzOff)) 0) -∗
+       link_auth z (W z) 0 0 0 None 0 None (Some (Excl FrzOff)) 0) -∗
     (* THE COUNT COUPLING's REGION HALVES (iclaim-ledger.md §2.2), one per
        inum and all at ZERO -- boot caches no inode.  A PREMISE for the
        ledger's own reason: the gname is the ambient class's, so only the
@@ -619,7 +737,7 @@ Section IcacheBootRegion.
   Proof.
     intros Hnib Hlen Himg.
     destruct (image_decode nib bss Hlen) as (dss & Hl & Hwf & He).
-    destruct (Himg dss Hl Hwf He) as (Hl3 & Hl4 & Hrt0).
+    destruct (Himg dss Hl Hwf He) as (Hl3 & Hl4 & Hrt0 & Hl1 & Hdw0).
     iIntros "Hlk Hcnts Hrcpts Hmirs Hepa Hblks Hboot Hrauth".
     (* OPTION A: bulk-register every inum with a dummy escrow gname pair, then
        wrap as [ireg_registry] for the region body. *)
@@ -659,21 +777,26 @@ Section IcacheBootRegion.
       with "[Hall]" as "Hall".
     { iApply (big_sepS_mono with "Hall"). intros z Hz.
       iIntros "[[[[[[[Hfrag Hmk] Hla] Hep] Hrf] Hcnt] Hrcpt] Hmir]".
-      assert (Hok : ireg_link_ok (image_dinode dss z) 0).
-      { split_and!; [lia | exact (Hl3 z Hz) | exact (Hl4 z Hz)]. }
-      (* the root clause at the EMPTY ledger, i.e. §20.4's own words *)
-      assert (Hrt : ireg_root_ok z (image_dinode dss z) 0)
-        by exact (ireg_root_ok_zero z (image_dinode dss z) (Hrt0 z Hz)).
+      assert (Hok : ireg_link_ok (image_dinode dss z) (W z + 0 + 0)).
+      { pose proof (Hl1 z Hz).
+        split_and!; [lia | exact (Hl3 z Hz) | exact (Hl4 z Hz)]. }
+      (* the root clause at the WIDENED ledger, i.e. §20.4's own words with
+         [W root] in place of the [0] stage A could hard-code *)
+      assert (Hrt : ireg_root_ok z (image_dinode dss z) (W z + 0 + 0)).
+      { intros Heq. pose proof (Hrt0 z Hz Heq). lia. }
+      (* ...and the DIRECTORY clause, which stage A got for free at [wl = 0] *)
+      assert (Hwl0 : ireg_dir_wl0 (image_dinode dss z) (W z))
+        by exact (Hdw0 z Hz).
       rewrite /ireg_out /dinode_at (region_inum_faithful nib z Hnib Hz).
       case_decide as Hty.
       - iSplitR "Hmk"; [| iExact "Hmk"].
-        iDestruct (ireg_rcol_intro z 0 0 0 0 None 0 None (Some (Excl FrzOff))
+        iDestruct (ireg_rcol_intro z (W z) 0 0 0 None 0 None (Some (Excl FrzOff))
                      0%nat 0%nat (image_dinode dss z)
                      (ireg_ref_ok_zero 0%nat None (image_dinode dss z))
                      with "Hla") as "Hla".
-        iApply (ireg_slot_intro γi z (image_dinode dss z) 0 0 0 0 None 0 None
+        iApply (ireg_slot_intro γi z (image_dinode dss z) (W z) 0 0 0 None 0 None
                   (Some (Excl FrzOff)) 0%nat
-                  Hok Hrt (ireg_dir_ok_zero _) (ireg_dir_wl0_zero _)
+                  Hok Hrt (ireg_dir_ok_zero _) Hwl0
                   ireg_par_ok_none (ireg_claim_ok_none _ _) I
                   with "Hla Hep [] Hcnt [] [Hrcpt Hmir]").
         (* boot's ledger is all-[None], so the boot-shelter clause's LEFT
@@ -688,13 +811,13 @@ Section IcacheBootRegion.
                     ltac:(reflexivity) with "Hrcpt Hmir"). }
         iLeft. iSplitR "Hrf"; [iLeft; iSplitR; [iPureIntro; left; exact Hty | iExact "Hfrag"] | iExists (1%positive : gname), (1%positive : gname); iExact "Hrf"].
       - iSplitR "Hfrag"; [| iExact "Hfrag"].
-        iDestruct (ireg_rcol_intro z 0 0 0 0 None 0 None (Some (Excl FrzOff))
+        iDestruct (ireg_rcol_intro z (W z) 0 0 0 None 0 None (Some (Excl FrzOff))
                      0%nat 0%nat (image_dinode dss z)
                      (ireg_ref_ok_zero 0%nat None (image_dinode dss z))
                      with "Hla") as "Hla".
-        iApply (ireg_slot_intro γi z (image_dinode dss z) 0 0 0 0 None 0 None
+        iApply (ireg_slot_intro γi z (image_dinode dss z) (W z) 0 0 0 None 0 None
                   (Some (Excl FrzOff)) 0%nat
-                  Hok Hrt (ireg_dir_ok_zero _) (ireg_dir_wl0_zero _)
+                  Hok Hrt (ireg_dir_ok_zero _) Hwl0
                   ireg_par_ok_none (ireg_claim_ok_none _ _) I
                   with "Hla Hep [] Hcnt [] [Hrcpt Hmir]").
         (* boot's ledger is all-[None], so the boot-shelter clause's LEFT

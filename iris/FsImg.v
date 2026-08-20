@@ -1971,6 +1971,191 @@ Proof.
 Qed.
 
 (* ====================================================================== *)
+(*  11b.  W9 -- THE LINK LEDGER'S PER-INUM TICKET COUNTS                   *)
+(* ====================================================================== *)
+
+(*  WHY THIS CONJUNCT EXISTS.  [DirLinks.dir_links] -- the resource twin
+    the icache's two payloads carry beside [DirView.dir_ok] -- holds ONE
+    LEDGER FRAGMENT per TICKET-BEARING record of a directory, and boot's
+    only constructor for it is [DirLinks.dir_links_of_plain], whose
+    fragments are all plain [IcacheRef.ilink].  A plain fragment is a unit
+    of the ledger's [wl] column, and the region's slot clause
+    ([InodeRegion.ireg_link_ok], (L1)) bounds that column by the record's
+    OWN [di_nlink].  So before boot can mint the fragments it has to KNOW,
+    per inum, how many the image demands -- and that number is a fact about
+    the image's directory CONTENTS which no decoding lemma supplies.  This
+    section computes it and W9 checks the three inequalities the region
+    invariant and [dir_links_of_plain] need.
+
+    THE TICKET DISCIPLINE IS COPIED, NOT GUESSED.  [DirLinks.dir_link_at]
+    reads
+
+        if dir_liveb data k
+           && negb (bool_decide (bv_unsigned (dir_inum data k) = self))
+        then ilink (bv_unsigned (dir_inum data k)) ∨ (grey ...) else emp
+
+    so a record bears a ticket exactly when it is LIVE and does NOT name
+    its own home.  [fs_rec_ticket] below is that guard verbatim: the SELF
+    EXEMPTION covers both dot records of any directory (["."] names the
+    home by W8, and [".."] names it too at the root), and a FREE record
+    (inum 0) carries nothing at all.
+
+    WHAT W9 CHECKS, per inum [z] of [0 .. ninodes):
+
+      (L1) the count is at most [z]'s own [di_nlink] -- [ireg_link_ok]'s
+           first clause at [wl = fs_link_count];
+      (T)  if [z] is a DIRECTORY then the count is ZERO, its [di_nlink] is
+           exactly ONE, and [z] IS the root.  All three are forced, and all
+           three are true of every mkfs image:
+             * zero, because [InodeRegion.ireg_dir_wl0] says a directory's
+               PLAIN column is empty (a record naming a directory pays in
+               the d-flavoured column, and boot mints no d-fragment);
+             * [nlink = 1], because [DirView.dlc_bound] at the all-false
+               flavour map reads [nlink <= 1] ([dlc_bound_le1]), and the
+               strict root clause [InodeRegion.ireg_root_ok] then needs
+               [0 < nlink];
+             * [z = ROOTINO], because [dir_links_of_plain]'s third premise
+               is exactly the root exclusion of [DirLinks.dir_par_tie] --
+               mkfs lays down one directory and it is the root, which is
+               the computational fact DirLinks' own header charters.
+
+    COST: one pass over the [ninodes] records to find the directories (the
+    same read W3/W6/W8 already do) plus one [O(nrec)] pass over each
+    directory's records, and then a [length (filter ...)] over the ~25-entry
+    ticket list per inum.  The ticket list is [let]-bound so it is built
+    ONCE for the whole sweep.                                              *)
+
+(* ONE RECORD'S TICKET, [DirLinks.dir_link_at]'s guard verbatim *)
+Definition fs_rec_ticket (P : Z -> list (bv 8)) (self : Z) (dn : dinode)
+    (k : nat) : option Z :=
+  let data := fs_data_of P dn in
+  if dir_liveb data k
+     && negb (bool_decide (bv_unsigned (dir_inum data k) = self))
+  then Some (bv_unsigned (dir_inum data k)) else None.
+
+(* ...one DIRECTORY's tickets, in record order.  [omap] rather than a
+   [filter]+[map] so that the list a resource-side [big_sepL] walks and the
+   record indices [dir_link_at] is stated at line up by ONE induction
+   ([FsCfgBoot.big_sepL_omap_mono]). *)
+Definition fs_dir_tickets (P : Z -> list (bv 8)) (self : Z) (dn : dinode)
+  : list Z :=
+  omap (fs_rec_ticket P self dn)
+       (seq 0 (dir_nrec (bv_unsigned (di_size dn)))).
+
+(* ...at an inum, [] unless the record is a directory *)
+Definition fs_dir_tickets_at (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z)
+  : list Z :=
+  let dn := fs_dinode P sb z in
+  if bv_unsigned (di_type dn) =? T_DIR_z then fs_dir_tickets P z dn else [].
+
+(* ...and the whole image's, in inum order.  [fs_used_blocks]' shape, at
+   the records instead of the blocks. *)
+Definition fs_all_tickets (P : Z -> list (bv 8)) (sb : fs_sb) : list Z :=
+  mjoin ((fun i => fs_dir_tickets_at P sb (Z.of_nat i))
+           <$> seq 0 (Z.to_nat (sb_ninodes sb))).
+
+(* how many of a ticket list name [z].  Named separately from
+   [fs_link_count] because the resource-side routing lemma
+   ([FsCfgBoot.big_sepS_tick_route]) is generic in the list. *)
+Definition fs_tick_count (L : list Z) (z : Z) : nat :=
+  length (List.filter (fun t => bool_decide (t = z)) L).
+
+(* **THE COUNT**: how many ticket-bearing records of the image name [z].
+   This is the [w_z] the boot ledger's authority stands at. *)
+Definition fs_link_count (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z) : nat :=
+  fs_tick_count (fs_all_tickets P sb) z.
+
+(* EVERY TICKET NAMES A LIVE INUM INSIDE [ninodes] -- W6's [fdo_ent],
+   lifted over the join.  This is what puts the whole ticket supply inside
+   the inode region (so the routing lemma's [t ∈ P] premise is free) and
+   what makes the count VANISH off the sweep's range. *)
+Lemma fs_all_tickets_range (P : Z -> list (bv 8)) (sb : fs_sb) (t : Z) :
+  fs_dirs_wf P sb = true -> t ∈ fs_all_tickets P sb ->
+  0 < t < sb_ninodes sb.
+Proof.
+  intros Hw Ht. unfold fs_all_tickets in Ht.
+  apply elem_of_list_join in Ht as (l & Hl & Hls).
+  apply elem_of_list_fmap in Hls as (i & -> & Hi).
+  apply elem_of_seq in Hi as [_ Hi].
+  unfold fs_dir_tickets_at in Hl. cbv zeta in Hl.
+  destruct (bv_unsigned (di_type (fs_dinode P sb (Z.of_nat i))) =? T_DIR_z)
+    eqn:Hty; [| by apply elem_of_nil in Hl].
+  apply elem_of_list_omap in Hl as (k & Hk & Hkt).
+  apply elem_of_seq in Hk as [_ Hk].
+  unfold fs_rec_ticket in Hkt. cbv zeta in Hkt.
+  destruct (dir_liveb (fs_data_of P (fs_dinode P sb (Z.of_nat i))) k
+            && negb (bool_decide
+                       (bv_unsigned
+                          (dir_inum
+                             (fs_data_of P (fs_dinode P sb (Z.of_nat i))) k)
+                        = Z.of_nat i))) eqn:Hg; [| discriminate].
+  injection Hkt as <-.
+  apply andb_true_iff in Hg as [Hlv _].
+  pose proof (fs_dirs_wf_spec P sb (Z.of_nat i) Hw ltac:(lia)
+                (proj1 (Z.eqb_eq _ _) Hty)) as Hdok.
+  destruct (fdo_ent P sb (Z.of_nat i) (fs_dinode P sb (Z.of_nat i)) Hdok k
+              Hk (proj1 (dir_liveb_true _ k) Hlv)) as [Hran _].
+  exact Hran.
+Qed.
+
+Lemma fs_tick_count_zero (L : list Z) (z : Z) :
+  (forall t : Z, t ∈ L -> t <> z) -> fs_tick_count L z = 0%nat.
+Proof.
+  intros H. unfold fs_tick_count.
+  assert (Hnil : List.filter (fun t => bool_decide (t = z)) L = []).
+  { induction L as [| a L IH]; [reflexivity |].
+    cbn [List.filter].
+    rewrite (bool_decide_eq_false_2 (a = z) (H a (elem_of_list_here a L))).
+    apply IH. intros t Ht. apply H. apply elem_of_list_further. exact Ht. }
+  rewrite Hnil. reflexivity.
+Qed.
+
+(* OFF the sweep's range the count is zero, by the tickets' own range *)
+Lemma fs_link_count_out (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z) :
+  fs_dirs_wf P sb = true -> ~ (0 < z < sb_ninodes sb) ->
+  fs_link_count P sb z = 0%nat.
+Proof.
+  intros Hw Hz. unfold fs_link_count. apply fs_tick_count_zero.
+  intros t Ht Heq. rewrite Heq in Ht.
+  exact (Hz (fs_all_tickets_range P sb z Hw Ht)).
+Qed.
+
+(* THE SWEEP *)
+Definition fs_links_wf (P : Z -> list (bv 8)) (sb : fs_sb) : bool :=
+  let L := fs_all_tickets P sb in
+  List.forallb
+    (fun i => let z := Z.of_nat i in
+              let dn := fs_dinode P sb z in
+              (Z.of_nat (fs_tick_count L z) <=? bv_unsigned (di_nlink dn)) &&
+              (if bv_unsigned (di_type dn) =? T_DIR_z
+               then Nat.eqb (fs_tick_count L z) 0
+                    && (bv_unsigned (di_nlink dn) =? 1)
+                    && (z =? ROOTINO)
+               else true))
+    (seq 0 (Z.to_nat (sb_ninodes sb))).
+
+Lemma fs_links_wf_at (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z) :
+  fs_links_wf P sb = true -> 0 <= z < sb_ninodes sb ->
+  Z.of_nat (fs_link_count P sb z)
+    <= bv_unsigned (di_nlink (fs_dinode P sb z))
+  /\ (bv_unsigned (di_type (fs_dinode P sb z)) = T_DIR_z ->
+      fs_link_count P sb z = 0%nat
+      /\ bv_unsigned (di_nlink (fs_dinode P sb z)) = 1
+      /\ z = ROOTINO).
+Proof.
+  intros H Hz. unfold fs_links_wf in H. cbv zeta in H.
+  pose proof (forallb_seq _ (Z.to_nat (sb_ninodes sb)) (Z.to_nat z) H
+                ltac:(lia)) as Hk.
+  cbv beta zeta in Hk. rewrite Z2Nat.id in Hk by lia.
+  apply andb_true_iff in Hk as [Hle Hdir].
+  split; [apply Z.leb_le; exact Hle |].
+  intros Hty. rewrite (proj2 (Z.eqb_eq _ _) Hty) in Hdir.
+  rewrite !andb_true_iff in Hdir. destruct Hdir as [[Hc Hnl] Hr].
+  split; [exact (proj1 (Nat.eqb_eq _ 0) Hc) |].
+  split; [apply Z.eqb_eq; exact Hnl | apply Z.eqb_eq; exact Hr].
+Qed.
+
+(* ====================================================================== *)
 (*  12.  THE CHECK                                                         *)
 (* ====================================================================== *)
 
@@ -1984,7 +2169,8 @@ Definition fsimg_wf (P : Z -> list (bv 8)) (sb : fs_sb) : bool :=
    end) &&
   fs_dirs_wf P sb &&                                      (* W6 *)
   fs_root_wf P sb &&                                      (* W7 *)
-  fs_dots_all P sb.                                       (* W8 *)
+  fs_dots_all P sb &&                                     (* W8 *)
+  fs_links_wf P sb.                                       (* W9 *)
 
 Lemma fsimg_wf_sb (P : Z -> list (bv 8)) (sb : fs_sb) :
   fsimg_wf P sb = true -> fs_sb_ok sb.
@@ -2062,6 +2248,100 @@ Proof.
   destruct (fsimg_wf_used P sb H) as (u & _ & Hnd & _).
   apply (fs_used_nodup_slot_inj P sb i Hnd); [| exact Hi | exact Hnz].
   revert H. unfold fsimg_wf. rewrite !andb_true_iff. intros H. tauto.
+Qed.
+
+(* W6, as the raw boolean: [fs_all_tickets_range] wants the SWEEP, not one
+   inum's reading, because it quantifies over the tickets and not over the
+   inums. *)
+Lemma fsimg_wf_dirs (P : Z -> list (bv 8)) (sb : fs_sb) :
+  fsimg_wf P sb = true -> fs_dirs_wf P sb = true.
+Proof.
+  unfold fsimg_wf. rewrite !andb_true_iff. intros H. tauto.
+Qed.
+
+Lemma fsimg_wf_links (P : Z -> list (bv 8)) (sb : fs_sb) :
+  fsimg_wf P sb = true -> fs_links_wf P sb = true.
+Proof.
+  unfold fsimg_wf. rewrite !andb_true_iff. intros H. tauto.
+Qed.
+
+(* ---- W9's THREE READINGS, at EVERY [z] (no range side condition) ------
+   The stocking client asks the counts of the whole inode REGION, which is
+   [16 * nib] records wide while W9 sweeps [ninodes]; off the sweep's range
+   the count is zero by [fs_link_count_out], so each reading extends for
+   free.  That is what keeps [IcacheBoot.ireg_alloc]'s premises stated over
+   [region_inums] rather than over two ranges. *)
+
+(* (L1) -- [InodeRegion.ireg_link_ok]'s first clause at [wl = the count] *)
+Lemma fsimg_wf_link_le (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z) :
+  fsimg_wf P sb = true ->
+  Z.of_nat (fs_link_count P sb z)
+    <= bv_unsigned (di_nlink (fs_dinode P sb z)).
+Proof.
+  intros H.
+  destruct (decide (0 < z < sb_ninodes sb)) as [Hin | Hout].
+  - exact (proj1 (fs_links_wf_at P sb z (fsimg_wf_links P sb H)
+                    ltac:(lia))).
+  - rewrite (fs_link_count_out P sb z (fsimg_wf_dirs P sb H) Hout).
+    cbn [Z.of_nat].
+    pose proof (proj1 (bv_unsigned_in_range _ (di_nlink (fs_dinode P sb z)))).
+    lia.
+Qed.
+
+(* [InodeRegion.ireg_dir_wl0]: a DIRECTORY's plain column is empty *)
+Lemma fsimg_wf_link_dir (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z) :
+  fsimg_wf P sb = true ->
+  bv_unsigned (di_type (fs_dinode P sb z)) = T_DIR_z ->
+  fs_link_count P sb z = 0%nat.
+Proof.
+  intros H Hty.
+  destruct (decide (0 < z < sb_ninodes sb)) as [Hin | Hout].
+  - exact (proj1 (proj2 (fs_links_wf_at P sb z (fsimg_wf_links P sb H)
+                           ltac:(lia)) Hty)).
+  - exact (fs_link_count_out P sb z (fsimg_wf_dirs P sb H) Hout).
+Qed.
+
+(* [DirView.dlc_bound] at the all-false flavour map ([dlc_bound_le1]) AND
+   [InodeRegion.ireg_root_ok]'s strict clause at the root: a live image
+   directory has EXACTLY one link. *)
+Lemma fsimg_wf_dir_nlink (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z) :
+  fsimg_wf P sb = true -> 0 <= z < sb_ninodes sb ->
+  bv_unsigned (di_type (fs_dinode P sb z)) = T_DIR_z ->
+  bv_unsigned (di_nlink (fs_dinode P sb z)) = 1.
+Proof.
+  intros H Hz Hty.
+  exact (proj1 (proj2 (proj2 (fs_links_wf_at P sb z
+                                (fsimg_wf_links P sb H) Hz) Hty))).
+Qed.
+
+(* [DirLinks.dir_links_of_plain]'s ROOT EXCLUSION: mkfs lays down exactly
+   one directory and it is the root, so [DirLinks.dir_par_tie]'s guard is
+   false at every image directory and boot owes no parent register. *)
+Lemma fsimg_wf_dir_root (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z) :
+  fsimg_wf P sb = true -> 0 <= z < sb_ninodes sb ->
+  bv_unsigned (di_type (fs_dinode P sb z)) = T_DIR_z -> z = ROOTINO.
+Proof.
+  intros H Hz Hty.
+  exact (proj2 (proj2 (proj2 (fs_links_wf_at P sb z
+                                (fsimg_wf_links P sb H) Hz) Hty))).
+Qed.
+
+(* ...and the ROOT's own pair, which is what [InodeRegion.ireg_root_ok]
+   needs at [ireg_root]: the count is zero and the link count is one, so
+   the STRICT clause [w < nlink] holds.  W7 supplies the type and W1 the
+   range, so this costs no new image fact. *)
+Lemma fsimg_wf_root_link (P : Z -> list (bv 8)) (sb : fs_sb) :
+  fsimg_wf P sb = true ->
+  fs_link_count P sb ROOTINO = 0%nat
+  /\ bv_unsigned (di_nlink (fs_dinode P sb ROOTINO)) = 1.
+Proof.
+  intros H.
+  pose proof (fs_root_wf_type P sb (fsimg_wf_root P sb H)) as Hty.
+  pose proof (sbo_ninodes sb (fsimg_wf_sb P sb H)) as Hn.
+  split.
+  - exact (fsimg_wf_link_dir P sb ROOTINO H Hty).
+  - apply (fsimg_wf_dir_nlink P sb ROOTINO H);
+      [unfold ROOTINO in *; lia | exact Hty].
 Qed.
 
 (* THE HEADLINE READING: a well-formed image's tree has a root directory,
