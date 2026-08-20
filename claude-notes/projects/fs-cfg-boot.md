@@ -704,6 +704,103 @@ Measured facts that supersede this file's earlier estimates:
     `main_deposit` rather than for `first_tok`: `Hbioctx` =
     `bio_ctx fsc_bio (fs_view fsc_fs fsc_disk icfg_dev fsc_cov)`,
     plus `Hitl`/`Hitinv`/`Hesc`/`Hireg` and `Hdlock`/`Hgeom`.
+- **(f1)+(f2) DONE, (f3) HALF DONE, (f4)/(f5) NOT STARTED.** Whole-lane
+  `make -f CoqMakefile -j24 -k`: zero Error lines. **THE EXCLUSIVE HALF OF
+  THE fs LEDGER CLOSES**: `FirstTok.first_fsinit` is ASSEMBLED at
+  `ProofMain.mn_grp_fs`, main+0x9e, out of kit 2 + rows (A)/(B)/(C) and
+  nothing else -- so every row of `SpecFsinit`'s premise pile now has a
+  producer.  It is still DROPPED there (see the loud comment at the
+  transport site), because (f-4)/(f-5) have not landed.
+  - **(f1) `FirstTok.v`.**  `first_tok`'s left arm is the charter's four
+    rows; `first_tok_boot_excl` is byte-identical; `first_tok_boot` gained
+    the three payload premises.  `first_boot_persist` = the SIXTEEN rows
+    (`Typeclasses Opaque` + `Persistent` instance, inside AND outside the
+    Section), `first_fsinit` = the exists-bundle, `first_fsinit_pures`,
+    `first_fsinit_open`, `first_persist_pre` -- all as chartered.
+    **THE FINAL `first_fsinit` ROW LIST** (charter reconciled against (f0)'s
+    actual kit): the pure block; `fs_kit_fsinit_ghost` (TEN rows, and
+    `bitmap_res` is INSIDE it, so the charter's standalone row (D) is
+    DELETED); rows (A) = the 32 `&sb` bytes + `log_addr`/name/cpu +
+    `l_start`/`l_dev`/`l_out`(0)/`l_cmt`(0)/`l_ncommit`/`lh_n_pa` + the 30
+    `lh_block`s; row (B) = `log_mirror_full`; row (C) = `iref_slot` and
+    `bslots fsc_bio 35`.  `bslots` did NOT move inside the kit (it is a
+    WP-time product), so row (C) stays.
+  - **THREE DEVIATIONS FROM THE CHARTER, all forced.**  (i) The two pure
+    producers (`fs_geom_ok_of_image`, `first_fsinit_pures_of_image`) live in
+    `FirstTok.v`, NOT in `FsCfgBoot.v`: the second is stated at
+    `first_fsinit_pures`, which is FirstTok's own definition, and FirstTok
+    imports FsCfgBoot -- the charter's placement is a cycle.  (ii)
+    `first_sb_image` and the magic constant are DUPLICATED beside
+    `first_sb_base` for the charter's own reason (do not pull SpecFsinit's
+    cone in to name a constant); all three are DEFINITIONALLY EQUAL to
+    `SpecFsinit.sb_base`/`sb_image`/`FSMAGIC`, so the seal site's bridge is
+    `reflexivity`.  (iii) **`fs_boot_image_wf` GAINED THREE CONJUNCTS**, and
+    the first of them is a real gap the charter did not predict:
+    **nothing in the tree tied block 1's BYTES to the `fs_sb` record** --
+    `FsImg.fsimg_wf`'s W1 is arithmetic on the record alone -- so
+    `SpecFsinit`'s premise (a) had no producer.  The reading is
+    `FsImg.fs_parse_sb (fs_blocks dk) = Some sb`, and
+    `FsImgCheck.fsimg_parse_sb` ALREADY PROVES IT, so the adequacy cone pays
+    NO new computation (`FsAdequacyImg` discharges it by `exact`).  The other
+    two are `16*nib <= 2^16` (`fgo_ushort`, tighter than the era's `2^32`)
+    and `ndisk <= 1024 * sb_size sb` (what turns `fs_cov_in` into
+    `cov_below`, and with W1's `size <= 8*BSIZE` into `cov_ok`).
+    `fs_boot_image_wf` MOVED from `BootShared.v` down to `FsCfgBoot.v`, for
+    the reason `fs_boot_supply` did: `SpecMain` now takes it as a pure
+    premise and sits below BootShared.
+  - **(f2) the carve.**  `BootShared.boot_bss_carve` was DROPPING both
+    windows.  Two new cuts: `&sb` (32 bytes, contents-existential, one
+    `boot_ran_mem_run`) between the buffer payloads and `itable`, and the
+    whole 168-byte `struct log` between the inode entries and `devsw`.
+    `BootCarveMain.boot_log_raw` is the producer -- three spinlock cells
+    carved DIRECTLY (not through `boot_lk_raw`, so every address lands in
+    `pa_of_z`'s spelling and the assembly is one `iFrame`), six scalars, and
+    the thirty `lh_block`s as ONE `boot_stride_family_seq` at stride 4.
+    `l_out`/`l_cmt` come out PINNED ZERO via `boot_ran_cell4_bss`, which is
+    what initlog's contract asks for.  `SpecMain.main_sb_raw` /
+    `main_log_raw` are the two new `main_globals_raw` conjuncts.  Row (B)
+    (`boot_shared_alloc`'s mirror `ghost_var`, which dead-ended) and row (C)
+    (ONE `iref_slot`, split off the file table's dropped `NFILE` share) are
+    threaded `boot_shared_alloc` -> `SystemAdequacy` -> `boot_hart_primary`
+    -> `SpecMain` -> `mn_grp_fs`.
+  - **(f3), the half that landed.**  `SpecMain` takes `(ndisk : nat)` and
+    `fs_boot_image_wf dk ndisk sb nib cov` IN PLACE OF the two readings of
+    it main used to be handed (`0 < nib`, `0 ∉ cov`); `ProofMain` derives
+    those two plus `⌜fs_geom_ok⌝` and `⌜first_fsinit_pures dk sb⌝` at its
+    top -- **it is the one place in the tree that holds both the image
+    hypothesis and the ten configuration ties, which is exactly what the two
+    producers need**.  `mn_grp_fs` stopped carrying kit 2's era data as two
+    opaque parameters and takes `dk`/`sb`/`nib` by name (the bundle has to
+    be at the spelling `first_fsinit` binds).
+  - **WHAT (f3) STILL OWES, precisely.**  `first_boot_persist` is NOT
+    assembled yet, and the blocker is plumbing, not proof: of its sixteen
+    rows main+0x9e already holds eleven (`kernel_text`, `kernel_data`,
+    `bio_ctx`, the disk `∃ pd pav pu` pair, `is_itable2`, `itable_inv`,
+    `ic_escrows`, `ic_sleeplocks`, `ireg_inv`, `dev_inv`, and `⌜fs_geom_ok⌝`
+    which is now a hypothesis).  FIVE need threading: `printk_env
+    fsc_printk fsc_uart fsc_disk` + its pure contract and the kmem
+    `is_lock` are main's but live in `mn_grp_printk` / `mn_grp_kvm`, so they
+    have to be forwarded INTO `mn_grp_fs`; and **`gen_cert` and
+    `fs_crash_seam fsc_cov fsc_logst` are not in `SpecMain`'s precondition
+    at all** -- both are persistent products of `boot_shared_alloc`
+    (`#Hcert`, and the crash seam) and need one new row each, threaded like
+    the mirror variable was.  `Hfirst` is still dropped at ProofMain's top
+    (its consumer is (f-5)'s `SpecUserinit` premise, which does not exist).
+  - **(f4)/(f5) NOT ATTEMPTED.**  Debt F (the spelled kalloc pair through
+    `SpecAllocproc`/`SpecUserinit`, ripple into `ProofAllocproc` and
+    `ProofKfork`) and the userinit deposit are untouched; `SpecUserinit`,
+    `ProofUserinit`, `LinkUserinit`, `SpecAllocproc`, `ProofAllocproc`,
+    `ProofKfork` are UNCHANGED at this increment.
+  - **D1, from the humans' side, given the token's final shape.**  The one
+    row is `FirstTok.first_tok -∗` (no parameters -- `first_tok` is stated
+    at the ambient `ICFG`/`fscfg`, exactly as `FsReady.fs_ready` is), added
+    to `SpecForkret.wp_forkret_gen_body` at `Pfirst := first_tok`, and one
+    tier up to `SpecForkretPark.forkret_park_body` and `forkret_park_pkg`.
+    The left arm destructures into FOUR conjuncts:
+    `first_addr ↦₄ 1 ∗ first_boot_persist ∗ kalloc_avail fsc_kpages None ∗
+    first_fsinit`; `first_fsinit_open` then emits SpecFsinit's premise pile
+    in its own order, and `first_persist_pre` + four
+    `word4_pointsto_persist` + `fs_ready_establish` close the seal.
 - **NEXT (in order):** (f) staging step 6 proper — the TRANSPORT. The
   old (e) list, for reference:
   thread the kits from `xv6_boot_era` through `boot_hart_primary` →

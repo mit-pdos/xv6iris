@@ -101,6 +101,10 @@ Require Import SpecAllocproc.
    ([IcacheRef.NINODE] is convertible with it, and every crossing is a
    conversion the [icache_boot_at] application does itself). *)
 Require Import FsCfgBoot.
+(* [FirstTok.first_fsinit] and the two pure producers: stage (f)'s transport
+   site is main+0x9e (fs-cfg-boot.md (f-3)). *)
+Require Import LogDefs LogInv.
+Require Import FsReady FirstTok.
 Require Import WpLockAt.   (* [newlock_at] / [lock_free_tok] *)
 Require Import BioInitAt.  (* [bio_init_at] / [bio_free_tok] / [buf_raw] *)
 Require Import IcacheBoot IcacheInv IcacheEscrow InodeRegion InodeInv.
@@ -1167,9 +1171,11 @@ Section ProofMain.
       (γa γp : gname) (γs : list gname) (γv : disk_names) (γd : uart_names)
       (m : regfile) (n : nat) (p0 : mword 64)
       (ps : list (mword 64)) (c0 : virtio_cfg) (free0 : nat -> bv 8)
-      (* kit 2's two parameters, carried opaquely: this group neither reads
-         the image nor spends the kit (stage (f) does, at forkret). *)
-      (Pimg : Z -> list (bv 8)) (Rspent : gset Z) :
+      (* kit 2's era data.  It used to be carried as two OPAQUE parameters
+         ([Pimg]/[Rspent]); stage (f) needs the kit at the spelling
+         [FirstTok.first_fsinit] binds, so the image and the superblock come
+         in by name and the spent set is written out. *)
+      (dk : Z -> bv 8) (sb : FsImg.fs_sb) (nib : nat) :
     (K_userinit <= n)%nat ->
     (K_kvmmake + 64 + 3 < length ps)%nat ->
     virtio_live c0 = false ->
@@ -1183,6 +1189,12 @@ Section ProofMain.
        [0 < nib].  It is true because binit leaves all thirty buffers
        claiming blockno 0, so block 0 cannot be a client block. *)
     (0 : Z) ∉ fsc_cov ->
+    (* ...and stage (f)'s two pure rows: the kit's [nib] IS the ambient one
+       (so the spent set the era chose is the one [FirstTok.first_fsinit]
+       spells), and [SpecFsinit]'s (a)/(b)/(g) block, which
+       [FirstTok.first_fsinit_pures_of_image] produced at main's top. *)
+    icfg_nib = nib ->
+    first_fsinit_pures dk sb ->
     sie_cap_gpr KT1 m n false p0 -∗
     kernel_text -∗ kernel_data -∗ dev_inv γd γv -∗
     (* iget's "iget: no inodes" arm, reached through userinit's namei *)
@@ -1235,7 +1247,19 @@ Section ProofMain.
        stage (f) is what deposits it into [FirstTok.first_tok]'s widened
        left disjunct so that forkret's [fsinit] can spend it. *)
     fs_kit_icache_rest _ _ -∗
-    fs_kit_fsinit_ghost _ _ Pimg Rspent -∗
+    fs_kit_fsinit_ghost _ _ (FsCrash.fs_blocks dk)
+      (fs_kit_spent (FsCrash.fs_blocks dk) sb nib
+         (FsImg.fs_live_set (FsCrash.fs_blocks dk) sb)) -∗
+    (* ---- ROWS (A)/(B)/(C) OF [FirstTok.first_fsinit] (fs-cfg-boot.md
+       (f-2)): the 32 raw [&sb] bytes and the whole [struct log], both
+       carved in [BootShared.boot_bss_carve] for the first time at this
+       stage; the era's log mirror variable; and one iref-slot unit.  This
+       group neither reads nor spends any of them -- they are joined to
+       kit 2 at the transport site below, at main+0x9e. ---- *)
+    main_sb_raw -∗
+    main_log_raw -∗
+    log_mirror_full -∗
+    iref_slot -∗
     iref_slots_auth -∗
     ([∗ list] k ∈ seq 0 NINODE, ientry_raw k) -∗
     lk_raw (mword_of_int KernelSyms.ftable) -∗
@@ -1259,10 +1283,11 @@ Section ProofMain.
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hn Hlen Hlive Hdevq Hnibq Hcov0.
+    intros Hn Hlen Hlive Hdevq Hnibq Hcov0 Hnibeq Hpures.
     iIntros "Hcg #Htext #Hkdata #Hdev #Hpanic Hpc Hfree Hcpu #Hpinv Hpavail
              #Hlpidlk Hkenv".
-    iIntros "Hlbc Hbufl Hbufn Hbhead Hbpay Hlit Hinl Hkit1 Hkit2 Hirauth Hient Hlft Hldisk".
+    iIntros "Hlbc Hbufl Hbufn Hbhead Hbpay Hlit Hinl Hkit1 Hkit2
+             Hsbb Hlogr Hmir Hirslot Hirauth Hient Hlft Hldisk".
     iIntros "Hdiskptr Hdiskfree Hdusedidx Hdslots Hclaim #Hdone Hcfg Hinitproc Hcont".
     iPoseProof (dev_inv_disk with "Hdev") as "#Hdinv".
     iPoseProof (mni_8e with "Htext") as "Hi8e".
@@ -1520,30 +1545,51 @@ Section ProofMain.
     (* one slot is all userinit needs, and NPROC of them is what boot minted *)
     iDestruct (procs_avail_le NPROC 1 ltac:(unfold NPROC; lia) with "Hpavail")
       as "Hpavail".
-    (* STAGE (f)'S PARK -- THE DROPPED BUNDLE.  Kit 1 is now fully spent;
-       what is dropped here is kit 2 plus the two EXCLUSIVE products of the
-       constructors main did run and that only forkret's [fsinit] can use:
-
-         [Hkit2]   -- [FsCfgBoot.fs_kit_fsinit_ghost], whose destination is
-                      [FirstTok.first_tok]'s widened left disjunct;
-         [Hbslots] -- [BioDefs.bslots fsc_bio BSLOTS], kit 2's header row
-                      (C), produced HERE (by [bio_init_at] at +0x8e's
-                      return) rather than in the era fupd, which is why it
-                      has to be carried across the group and joined to the
-                      kit at the transport site;
-         [Hicsl]   -- the fifty inode sleeplock handles [icache_boot_at]
-                      returned.
-
-       [bio_ctx fsc_bio (fs_view ...)] and the four inode-cache rows are
-       PERSISTENT and stay in the context; their destination is
-       [SpecMainSecondary.main_deposit] (stage (f)'s persistent channel).
-
-       Iris is affine, so dropping is sound; what it costs is exactly that
-       [fs_ready] cannot be sealed yet.  The transport agent picks the
-       bundle up HERE, at main+0x9e, and hands it to [SpecUserinit].
-       fs-cfg-boot.md (f) records the rest. *)
+    (* ================================================================= *)
+    (* STAGE (f)'S TRANSPORT SITE, AT main+0x9e.                          *)
+    (*                                                                    *)
+    (* [FirstTok.first_fsinit] IS ASSEMBLED HERE, out of the six things    *)
+    (* that reach this point and nothing else: kit 2 (ten ghost rows, the  *)
+    (* era fupd's), rows (A) -- the 32 raw [&sb] bytes and the whole       *)
+    (* [struct log], carved in [BootShared] at this stage -- row (B), the  *)
+    (* era's log mirror variable, and row (C), one iref-slot unit plus 35  *)
+    (* of the [bslots] [bio_init_at] produced at +0x8e.  The two pure      *)
+    (* blocks ride with it: [first_fsinit_pures] came down as a premise,   *)
+    (* and the kit's [nib] is the ambient one by [Hnibeq].                 *)
+    (*                                                                    *)
+    (* THE BUNDLE IS COMPLETE AND IS STILL DROPPED, and the two facts are  *)
+    (* separate.  What it is waiting for is (f-4)/(f-5): [SpecUserinit]    *)
+    (* has to grow the three deposit premises and userinit has to seal the *)
+    (* page count ([kalloc_avail fsc_kpages None]) after its allocproc, so *)
+    (* that [FirstTok.first_tok]'s left arm can be formed and STAGED at    *)
+    (* the [forkret_park] call site -- D1, the humans' seam.  Until then   *)
+    (* the assembly below is the CHECK that every row of the fsinit bundle *)
+    (* has a producer: it type-checks, so the fs ledger's exclusive half   *)
+    (* closes.  fs-cfg-boot.md (f) records the rest.                       *)
+    (*                                                                    *)
+    (* [Hfirst] (the [first_addr ↦₄ 1] cell), [Hicsl] (the fifty inode     *)
+    (* sleeplock handles) and the persistent inode-cache / bio rows are    *)
+    (* dropped here for the same reason.                                   *)
+    (* ================================================================= *)
+    iAssert first_fsinit with "[Hkit2 Hsbb Hlogr Hmir Hirslot Hbslots]"
+      as "Hfsinit".
+    { rewrite /first_fsinit.
+      iDestruct "Hsbb" as (sb_old) "Hsbb".
+      iDestruct "Hlogr" as (vlock v_start v_dev v_nc v_n vname vcpu)
+        "(Hlw & Hln & Hlc & Hlst & Hldv & Hlout & Hlcmt & Hlnc & Hln2 & Hlblk)".
+      (* 35 of the 1024 slots [bio_init_at] returned; the rest are the
+         first process's, R3. *)
+      assert (Hsl : BSLOTS = (((LOGBLOCKS + 2) + 2 + 1) + (BSLOTS - 35))%nat)
+        by (unfold BSLOTS, LOGBLOCKS; lia).
+      iEval (rewrite Hsl bslots_op) in "Hbslots".
+      iDestruct "Hbslots" as "[Hbsl _]".
+      iExists dk, sb, vlock, v_start, v_dev, v_nc, v_n, vname, vcpu, sb_old.
+      rewrite Hnibeq.
+      iFrame "Hkit2 Hsbb Hlw Hln Hlc Hlst Hldv Hlout Hlcmt Hlnc Hln2 Hlblk
+              Hmir Hirslot Hbsl".
+      iPureIntro. exact Hpures. }
     iClear "Hicsl".
-    iDestruct "Hkit2" as "_". iDestruct "Hbslots" as "_".
+    iDestruct "Hfsinit" as "_".
     iApply (Userinit.wp_userinit_sconf γa γp γs F5 n false p0
               (avail_sub (avail_sub (Some (length ps)) K_kvmmake) 3)
               0%nat iv0 false ∅
@@ -1756,17 +1802,25 @@ Section ProofMain.
       (γd : uart_names) (γv : disk_names)
       (l0 : list (bv 8)) (b0 : bool) (c0 : virtio_cfg)
       (dk : Z -> bv 8) (sb : FsImg.fs_sb) (nib : nat) (cov : gset Z)
+      (ndisk : nat)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6))
       (P : iProp Σ) `{!Persistent P}
     : wp_main_boot_sconf_body m K p0 ps s1entry phystop
-        γd γv l0 b0 c0 dk sb nib cov tlbvec0 P.
+        γd γv l0 b0 c0 dk sb nib cov ndisk tlbvec0 P.
   Proof.
     cbv beta delta [wp_main_boot_sconf_body].
-    intros pcE Hcid HK Hphystop Hs1 Hprun Hlen Hlive Hnib0 Hcov0 Hp0.
+    intros pcE Hcid HK Hphystop Hs1 Hprun Hlen Hlive Himg Hp0.
+    (* THE IMAGE HYPOTHESIS, READ HERE (fs-cfg-boot.md stage (f)).  The two
+       facts main used to be handed are its fifth and seventh conjuncts; the
+       other nine are what [FirstTok.fs_geom_ok_of_image] and
+       [FirstTok.first_fsinit_pures_of_image] consume at +0x9e. *)
+    destruct Himg as (Hiwf & Hirw & Hinin & Hinib32 & Hnib0 & Hinibeq &
+                      Hicovin & Hicovmeta & Hicovdata & Hiparse & Hiush & Hind).
+    assert (Hcov0 : (0 : Z) ∉ cov) by exact (FsBoot.fs_cov_in_0 _ _ Hicovin).
     pose proof (mn_bounds K HK) as (Hc2 & Hn50 & Hnsched).
     iIntros "Hcg Hfree Hcpu Hq #Htext #Hkdata Hpc #Hsinv #Hwand Hlocks Hglobals".
     iIntros "Hfirst Hnpid".
-    iIntros "Hparks Hpst Hpavail Hfs Hirauth".
+    iIntros "Hparks Hpst Hpavail Hfs Hmir Hirslot Hirauth".
     iIntros "#Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim #Hdone #Htimc Hhart Hunset Hkauth Hpages".
     iDestruct "Hlocks" as "(Hlcons & Hltx & Hlpr & Hlkmem & Hlpid & Hlwait &
                             Hltick & Hlbc & Hlit & Hlft & Hldisk)".
@@ -1794,8 +1848,9 @@ Section ProofMain.
        that builds the [nextpid] lock. *)
     iDestruct "Hglobals" as "(Hdevsw & Hkmem24 & Hkpt & Hprocs & Hppub &
                              Hfds & Hirs & Hinitproc & Hticks & Hbufl & Hbufn & Hbhead &
-                             Hbpay & Hinl &
-                             Hient & Hdiskptr & Hdiskfree & Hdusedidx & Hdslots & Hring)".
+                             Hbpay & Hsbb & Hinl &
+                             Hient & Hlogr & Hdiskptr & Hdiskfree & Hdusedidx &
+                             Hdslots & Hring)".
     iDestruct "Hhart" as "(Hsbit & Htlb & Htcsr)".
     iDestruct "Hdiskfree" as (free0) "Hdiskfree".
     (* ---- THE FILE SYSTEM'S BOOT-ERA MINT, opened into its ten ties and
@@ -1809,6 +1864,20 @@ Section ProofMain.
                          Hkit1 & Hkit2)".
     assert (Hnibpos : (0 < icfg_nib)%nat) by (rewrite Hnibq; exact Hnib0).
     assert (Hcovpos : (0 : Z) ∉ fsc_cov) by (rewrite Hcovq; exact Hcov0).
+    (* ---- STAGE (f)'S TWO PURE BLOCKS, produced HERE and nowhere else:
+           this is the one place in the tree that holds BOTH the image
+           hypothesis and the ten configuration ties, and the two producers
+           need exactly those.  [fs_geom_ok] is [FsReady.fs_ready_pre]'s
+           eighteenth conjunct; [first_fsinit_pures] is what is left of
+           [SpecFsinit]'s hypothesis list once [fs_geom_ok]'s accessors have
+           been taken out.  Both ride to forkret's first arm. ---- *)
+    assert (Hgeomok : fs_geom_ok)
+      by exact (fs_geom_ok_of_image dk ndisk sb nib cov Hiwf Hinin Hiush
+                  Hnib0 Hinibeq Hicovin Hind Hicovmeta
+                  Hdevq Hnibq Histq Hcovq Hlogstq Hbmapq Hsizeq Hninq).
+    assert (Hpures : first_fsinit_pures dk sb)
+      by exact (first_fsinit_pures_of_image dk sb cov Hiwf Hiparse Hicovmeta
+                  Histq Hcovq Hlogstq Hbmapq Hsizeq Hninq).
     (* kit 1's two EARLY peels: the "pr" lock's ghost goes to the printk
        group at +0x6a and the "kmem" trio to the kvm group at +0x6e, so the
        three [newlock]s that used to invent their own gnames now fill the
@@ -1838,11 +1907,12 @@ Section ProofMain.
     iIntros (m4 γtl) "Hcg Hpc #Htl Hstvec Hq".
     (* --- 0x8e .. 0x9e : binit / iinit / fileinit / virtio_disk_init /
            userinit, and the disk lock --- *)
-    iApply (mn_grp_fs γa γp γs γv γd m4 (K - 2)%nat p0 ps c0 free0 _ _
-              Hn50 Hlen Hlive Hdevq Hnibpos Hcovpos
+    iApply (mn_grp_fs γa γp γs γv γd m4 (K - 2)%nat p0 ps c0 free0 dk sb nib
+              Hn50 Hlen Hlive Hdevq Hnibpos Hcovpos Hnibq Hpures
               with "Hcg Htext Hkdata Hdev [Hpenv] Hpc Hfree Hcpu Hpinv Hpavail
                     Hpidlock Hkenv Hlbc Hbufl
-                    Hbufn Hbhead Hbpay Hlit Hinl Hkit1 Hkit2 Hirauth Hient
+                    Hbufn Hbhead Hbpay Hlit Hinl Hkit1 Hkit2
+                    Hsbb Hlogr Hmir Hirslot Hirauth Hient
                     Hlft Hldisk Hdiskptr Hdiskfree
                     Hdusedidx Hdslots Hclaim Hdone Hcfg Hinitproc").
     { iApply (printk_env_panic with "Hpenv"). }

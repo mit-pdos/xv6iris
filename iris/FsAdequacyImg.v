@@ -39,7 +39,8 @@ Require Import VirtioModel.
 Require Import FsCrash.
 Require Import FsBoot.
 Require Import FsImg.
-Require Import BootShared.      (* [fs_boot_image_wf] *)
+Require Import BootShared.
+Require Import FsCfgBoot.       (* [fs_boot_image_wf], moved down at stage (f) *)
 Require Import SystemAdequacy.  (* the two generic theorems, and [xv6Σ] *)
 Require Import FsImgDisk.       (* [fsimg_dk] / [fsimg_D0] / [fsimg_recovery] *)
 Require Import FsImgCheck.      (* what the image MEANS as a file system *)
@@ -121,8 +122,17 @@ Proof.
   { intros b Hb. apply fsimg_cov_elem_of.
     cbv [fs_data_start fsimg_sb sb_bmapstart] in Hb. lia. }
   (* (9) ...and every DATA block, up to the superblock's [size] *)
-  intros b Hb. apply fsimg_cov_elem_of.
-  cbv [fs_data_start fsimg_sb sb_bmapstart sb_size] in Hb. lia.
+  split.
+  { intros b Hb. apply fsimg_cov_elem_of.
+    cbv [fs_data_start fsimg_sb sb_bmapstart sb_size] in Hb. lia. }
+  (* (10) block 1's bytes ARE the record -- CITED, not recomputed: this is
+     [FsImgCheck.fsimg_parse_sb], which the check file already proves.
+     [fsimg_P] IS [fs_blocks fsimg_dk] by definition. *)
+  split; [exact fsimg_parse_sb |].
+  (* (11) the ushort bound: 16 * 13 = 208 <= 65536 *)
+  split; [vm_compute; discriminate |].
+  (* (12) the image is 2000 blocks: 2048000 = 1024 * 2000 *)
+  rewrite xv6_disk_bytes_z. cbv [fsimg_sb sb_size]. lia.
 Qed.
 
 (* ---------------------------------------------------------------------- *)

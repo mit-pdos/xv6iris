@@ -54,6 +54,9 @@ Require Import SleepLock BcacheInv SpecIinit.
    [SpecMain.main_globals_raw] carries across binit (stage (f)). *)
 Require Import BufOwn BioInv BioInitAt.
 Require Import DiskInv SpecVirtioDiskInit.
+(* the [struct log]'s cell names, for rows (A) of the fsinit bundle
+   (fs-cfg-boot.md (f-2)) *)
+Require Import LogDefs LogInv.
 Require Import SpecMain.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
@@ -1248,6 +1251,163 @@ Section BootCarveMain.
       rewrite (i_lock_of_entry k). iExact "Hk".
     - iApply (big_sepL_mono with "H2"). iIntros (n k _) "Hk".
       rewrite /ientry_raw -(ientry_of_z k). iExact "Hk".
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* THE STATIC [struct log], ROWS (A) OF THE fsinit BUNDLE.              *)
+  (*                                                                    *)
+  (* 168 bytes at [KernelSyms.log], and NOTHING carved them before stage *)
+  (* (f): the whole record was one of the dropped gaps in the .bss walk. *)
+  (* Layout (LogInv.v's own header): spinlock@0 (24B), start@24,         *)
+  (* outstanding@28, committing@32, dev@36, ncommit@40, lh.n@44,         *)
+  (* lh.block[i]@48+4i, thirty of them.                                  *)
+  (*                                                                    *)
+  (* [outstanding] and [committing] come out PINNED AT ZERO -- the       *)
+  (* record is .bss past [img_end], so [boot_ran_cell4_bss] gives the    *)
+  (* VALUE rather than an existential, which is what initlog's contract  *)
+  (* (and hence [SpecFsinit]'s premise pile) asks for.  The thirty       *)
+  (* [lh.block] words are a stride family at stride 4, so BootCarve §11  *)
+  (* gives them out of one range with the per-element carve written      *)
+  (* once.                                                              *)
+  (*                                                                    *)
+  (* The three spinlock cells are carved DIRECTLY rather than through    *)
+  (* [boot_lk_raw]: every other cell here lands in [pa_of_z]'s spelling  *)
+  (* and one uniform set of address bridges is what makes the assembly   *)
+  (* below an [iFrame] instead of nine conversions.                     *)
+  (* ------------------------------------------------------------------ *)
+  Lemma log_nm_of_z : lock_name_field log_addr = pa_of_z (KernelSyms.log + 8).
+  Proof. apply bv_eq; vm_compute; reflexivity. Qed.
+  Lemma log_cpu_of_z : lock_cpu log_addr = pa_of_z (KernelSyms.log + 16).
+  Proof. apply bv_eq; vm_compute; reflexivity. Qed.
+  Lemma l_start_of_z : l_start = pa_of_z (KernelSyms.log + 24).
+  Proof. apply bv_eq; vm_compute; reflexivity. Qed.
+  Lemma l_out_of_z : l_out = pa_of_z (KernelSyms.log + 28).
+  Proof. apply bv_eq; vm_compute; reflexivity. Qed.
+  Lemma l_cmt_of_z : l_cmt = pa_of_z (KernelSyms.log + 32).
+  Proof. apply bv_eq; vm_compute; reflexivity. Qed.
+  Lemma l_dev_of_z : l_dev = pa_of_z (KernelSyms.log + 36).
+  Proof. apply bv_eq; vm_compute; reflexivity. Qed.
+  Lemma l_ncommit_of_z : l_ncommit = pa_of_z (KernelSyms.log + 40).
+  Proof. apply bv_eq; vm_compute; reflexivity. Qed.
+  Lemma lh_n_of_z : lh_n_pa = pa_of_z (KernelSyms.log + 44).
+  Proof. apply bv_eq; vm_compute; reflexivity. Qed.
+  Lemma log_lk_of_z : log_addr = pa_of_z KernelSyms.log.
+  Proof. reflexivity. Qed.
+
+  Lemma lh_block_of_z (i : nat) :
+    lh_block i = pa_of_z (KernelSyms.log + 48 + 4 * Z.of_nat i).
+  Proof.
+    rewrite /lh_block /log_pa /log_addr.
+    change (mword_of_int KernelSyms.log : Arch.pa) with (pa_of_z KernelSyms.log).
+    rewrite pa_add_of_z. f_equal. lia.
+  Qed.
+
+  Lemma boot_log_raw (g : gstate) :
+    (forall x : Z, ram_lo <= x < ram_hi ->
+       g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
+    kmap_static_claims -∗
+    boot_raw_ran g KernelSyms.log (KernelSyms.log + 168) -∗ main_log_raw.
+  Proof.
+    intro Hmem. iIntros "#Hcl H".
+    assert (Hflo : text_end <= KernelSyms.log + 48)
+      by (vm_compute; discriminate).
+    assert (Hfhi : KernelSyms.log + 48 + 4 * Z.of_nat LOGBLOCKS <= ram_hi)
+      by (unfold LOGBLOCKS; vm_compute; discriminate).
+    (* ---- the spinlock's three cells ---- *)
+    iDestruct (boot_ran_split g KernelSyms.log (KernelSyms.log + 4)
+                 (KernelSyms.log + 168) ltac:(vm_compute; discriminate)
+                 ltac:(vm_compute; discriminate) with "H") as "[Hw H]".
+    iDestruct (boot_ran_cell4 g KernelSyms.log Hmem
+                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+                 ltac:(vm_compute; reflexivity) with "Hcl Hw") as (vlock) "Hw".
+    iDestruct (boot_ran_split g (KernelSyms.log + 4) (KernelSyms.log + 8)
+                 (KernelSyms.log + 168) ltac:(vm_compute; discriminate)
+                 ltac:(vm_compute; discriminate) with "H") as "[_ H]".
+    iDestruct (boot_ran_split g (KernelSyms.log + 8) (KernelSyms.log + 16)
+                 (KernelSyms.log + 168) ltac:(vm_compute; discriminate)
+                 ltac:(vm_compute; discriminate) with "H") as "[Hn H]".
+    iDestruct (boot_ran_eq g (KernelSyms.log + 8) (KernelSyms.log + 16)
+                 (KernelSyms.log + 8) (KernelSyms.log + 8 + 8) eq_refl
+                 ltac:(lia) with "Hn") as "Hn".
+    iDestruct (boot_ran_cell8 g (KernelSyms.log + 8) Hmem
+                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+                 ltac:(vm_compute; reflexivity) with "Hcl Hn") as (vname) "Hn".
+    iDestruct (boot_ran_split g (KernelSyms.log + 16) (KernelSyms.log + 24)
+                 (KernelSyms.log + 168) ltac:(vm_compute; discriminate)
+                 ltac:(vm_compute; discriminate) with "H") as "[Hc H]".
+    iDestruct (boot_ran_eq g (KernelSyms.log + 16) (KernelSyms.log + 24)
+                 (KernelSyms.log + 16) (KernelSyms.log + 16 + 8) eq_refl
+                 ltac:(lia) with "Hc") as "Hc".
+    iDestruct (boot_ran_cell8 g (KernelSyms.log + 16) Hmem
+                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+                 ltac:(vm_compute; reflexivity) with "Hcl Hc") as (vcpu) "Hc".
+    (* ---- the six scalar fields ---- *)
+    iDestruct (boot_ran_split g (KernelSyms.log + 24) (KernelSyms.log + 28)
+                 (KernelSyms.log + 168) ltac:(vm_compute; discriminate)
+                 ltac:(vm_compute; discriminate) with "H") as "[Hst H]".
+    iDestruct (boot_ran_cell4 g (KernelSyms.log + 24) Hmem
+                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+                 ltac:(vm_compute; reflexivity) with "Hcl Hst") as (v_start) "Hst".
+    iDestruct (boot_ran_split g (KernelSyms.log + 28) (KernelSyms.log + 32)
+                 (KernelSyms.log + 168) ltac:(vm_compute; discriminate)
+                 ltac:(vm_compute; discriminate) with "H") as "[Hout H]".
+    iDestruct (boot_ran_cell4_bss g (KernelSyms.log + 28)
+                 (mword_of_int 0 : mword 32) Hmem
+                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+                 ltac:(vm_compute; discriminate) ltac:(vm_compute; reflexivity)
+                 ltac:(intros j _; apply BootCarve.nth_byte_zero;
+                       vm_compute; reflexivity) with "Hcl Hout") as "Hout".
+    iDestruct (boot_ran_split g (KernelSyms.log + 32) (KernelSyms.log + 36)
+                 (KernelSyms.log + 168) ltac:(vm_compute; discriminate)
+                 ltac:(vm_compute; discriminate) with "H") as "[Hcmt H]".
+    iDestruct (boot_ran_cell4_bss g (KernelSyms.log + 32)
+                 (mword_of_int 0 : mword 32) Hmem
+                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+                 ltac:(vm_compute; discriminate) ltac:(vm_compute; reflexivity)
+                 ltac:(intros j _; apply BootCarve.nth_byte_zero;
+                       vm_compute; reflexivity) with "Hcl Hcmt") as "Hcmt".
+    iDestruct (boot_ran_split g (KernelSyms.log + 36) (KernelSyms.log + 40)
+                 (KernelSyms.log + 168) ltac:(vm_compute; discriminate)
+                 ltac:(vm_compute; discriminate) with "H") as "[Hdv H]".
+    iDestruct (boot_ran_cell4 g (KernelSyms.log + 36) Hmem
+                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+                 ltac:(vm_compute; reflexivity) with "Hcl Hdv") as (v_dev) "Hdv".
+    iDestruct (boot_ran_split g (KernelSyms.log + 40) (KernelSyms.log + 44)
+                 (KernelSyms.log + 168) ltac:(vm_compute; discriminate)
+                 ltac:(vm_compute; discriminate) with "H") as "[Hnc H]".
+    iDestruct (boot_ran_cell4 g (KernelSyms.log + 40) Hmem
+                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+                 ltac:(vm_compute; reflexivity) with "Hcl Hnc") as (v_nc) "Hnc".
+    iDestruct (boot_ran_split g (KernelSyms.log + 44) (KernelSyms.log + 48)
+                 (KernelSyms.log + 168) ltac:(vm_compute; discriminate)
+                 ltac:(vm_compute; discriminate) with "H") as "[Hn2 H]".
+    iDestruct (boot_ran_cell4 g (KernelSyms.log + 44) Hmem
+                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+                 ltac:(vm_compute; reflexivity) with "Hcl Hn2") as (v_n) "Hn2".
+    (* ---- the thirty header slots, one stride family ---- *)
+    iDestruct (boot_ran_eq g (KernelSyms.log + 48) (KernelSyms.log + 168)
+                 (KernelSyms.log + 48)
+                 (KernelSyms.log + 48 + 4 * Z.of_nat LOGBLOCKS)
+                 eq_refl ltac:(unfold LOGBLOCKS; vm_compute; reflexivity)
+                 with "H") as "H".
+    iDestruct (boot_stride_family_seq g (fun a => ∃ w : mword 32, a ↦₄ w)%I
+                 (KernelSyms.log + 48) 4 LOGBLOCKS ltac:(lia)
+                 ltac:(intros i A Hi HA HA1 HA2;
+                       iIntros "#Hcl2 Hb";
+                       iApply (boot_ran_cell4 g A Hmem ltac:(lia) ltac:(lia)
+                                 ltac:(rewrite HA;
+                                       apply (z_mod_mul 4 (KernelSyms.log + 48) 4);
+                                       [vm_compute; reflexivity | reflexivity])
+                                 with "Hcl2 Hb"))
+                 with "Hcl H") as "Hblk".
+    (* ---- assemble, every address in [pa_of_z]'s spelling ---- *)
+    rewrite /main_log_raw.
+    iExists vlock, v_start, v_dev, v_nc, v_n, vname, vcpu.
+    rewrite log_nm_of_z log_cpu_of_z l_start_of_z l_out_of_z l_cmt_of_z
+            l_dev_of_z l_ncommit_of_z lh_n_of_z log_lk_of_z.
+    iFrame "Hw Hn Hc Hst Hdv Hout Hcmt Hnc Hn2".
+    iApply (big_sepL_mono with "Hblk"). iIntros (n i _) "Hi".
+    rewrite lh_block_of_z. iExact "Hi".
   Qed.
 
   (* ------------------------------------------------------------------ *)

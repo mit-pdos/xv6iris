@@ -71,7 +71,7 @@ Require Import ProcAvail.
 (* [fs_boot_supply] / [iref_slots_auth] -- the file system's boot-era mint
    and the iref-slot authority, both threaded from [BootShared] into
    [SpecMain]'s boot arm (fs-cfg-boot.md stage (e)). *)
-Require Import FsCfgBoot IrefSlots.
+Require Import FsCfgBoot IrefSlots LogDefs.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
@@ -646,7 +646,8 @@ Section BootPrimary.
       (* the file system's boot-era mint, at the era's own disk: threaded
          straight through to [SpecMain]'s boot arm (fs-cfg-boot.md stage
          (e)).  This chain neither reads nor opens it. *)
-      (dk : Z -> bv 8) (sb : FsImg.fs_sb) (nib : nat) (cov : gset Z) :
+      (dk : Z -> bv 8) (sb : FsImg.fs_sb) (nib : nat) (cov : gset Z)
+      (ndisk : nat) :
     reset_regs cpu_id rs ->
     (* the BOOT hart: this is what makes main's [beqz a0] take the boot path *)
     (fin_to_nat cpu_id = 0)%nat ->
@@ -660,13 +661,11 @@ Section BootPrimary.
     (K_kvmmake + 64 + 3 < length ps)%nat ->
     (* the disk's protocol is in its not-live arm at boot *)
     virtio_live c0 = false ->
-    (* the inode region is nonempty -- [BootShared.fs_boot_image_wf]'s fifth
-       conjunct, forwarded to [SpecMain]'s own row *)
-    (0 < nib)%nat ->
-    (* ...and block 0 is not covered -- [fs_boot_image_wf]'s [fs_cov_in]
-       conjunct read through [FsBoot.fs_cov_in_0], forwarded the same way.
-       [BioInitAt.bio_init_at] is what needs it, at main+0x8e. *)
-    (0 : Z) ∉ cov ->
+    (* THE IMAGE HYPOTHESIS, forwarded whole (fs-cfg-boot.md stage (f)).
+       This chain still neither reads nor opens it; [ProofMain] is what
+       turns it into [FsReady.fs_geom_ok] and
+       [FirstTok.first_fsinit_pures]. *)
+    fs_boot_image_wf dk ndisk sb nib cov ->
     kernel_text -∗
     kernel_data -∗
     boot_hart_res rs iv dq -∗
@@ -692,6 +691,9 @@ Section BootPrimary.
        of [BootShared.boot_shared_alloc] and both spent in
        [ProofMain.mn_grp_fs] -- see [SpecMain]'s own rows *)
     fs_boot_supply _ _ dk sb nib cov γd γv -∗
+    (* rows (B) and (C) of the fsinit bundle -- see [SpecMain]'s own rows *)
+    log_mirror_full -∗
+    iref_slot -∗
     iref_slots_auth -∗
     dev_inv γd γv -∗
     uart_tx_own γd l0 -∗ uart_sent γd l0 -∗ uart_out_lb γd l0 -∗
@@ -704,9 +706,9 @@ Section BootPrimary.
     ([∗ list] p ∈ ps, page_own p) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hreset Hz Hprun Hlen Hlive Hnib0 Hcov0.
+    intros Hreset Hz Hprun Hlen Hlive Himg.
     iIntros "#Htext #Hdata Hres #Hstarted Hlk Hgl Hfirst Hnext Hpark Hpst Hpav
-             Hfs Hirauth
+             Hfs Hmir Hirslot Hirauth
              #Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim #Hdone Hkpt Hkmap Hpages".
     iApply (boot_entry_bridge rs iv dq Hreset with "Htext Hres").
     iIntros (mf) "Hcap Hctx Hcpu Hg Hraw #Htimc Hpc".
@@ -714,12 +716,12 @@ Section BootPrimary.
               (add_vec (and_vec (add_vec (mword_of_int kmem_lo : mword 64)
                  (mword_of_int 4095 : mword 64)) negPGSIZEv) PGSIZEv)
               (mword_of_int 0x88000000 : mword 64) γd γv l0 b0 c0
-              dk sb nib cov
+              dk sb nib cov ndisk
               (register_lookup tlb rs) (main_deposit γd γv)
               (cid_word_of_zero _ Hz) K_main_boot_le eq_refl eq_refl Hprun Hlen
-              Hlive Hnib0 Hcov0 eq_refl
+              Hlive Himg eq_refl
               with "Hcap Hctx Hcpu Hg Htext Hdata Hpc Hstarted [] Hlk Hgl
-                    Hfirst Hnext Hpark Hpst Hpav Hfs Hirauth
+                    Hfirst Hnext Hpark Hpst Hpav Hfs Hmir Hirslot Hirauth
                     Hdev Htx Hsent Hlb Hdlab
                     Hcfg Hclaim Hdone Htimc Hraw Hkpt Hkmap Hpages").
     (* THE DEPOSIT WAND: main's boot arm hands over exactly [main_deposit]'s

@@ -42,6 +42,7 @@ Require Import FileInvDefs.
 Require Import WpUart.
 Require Import BootConfig.
 Require Import BootChain BootShared.
+Require Import FsCfgBoot.   (* [fs_boot_image_wf], moved down at stage (f) *)
 Require Import RiscvAdequacy.
 Require Import FsCrash.
 (* THE LITERAL mkfs IMAGE, for the generic FS theorem's [Hrec] vocabulary.
@@ -59,6 +60,7 @@ Require Import FsImgDisk.
 Require Import IcacheRef.
 (* [ROOTDEV], for the two config ties the boot arm now carries *)
 Require Import IrefSlots.
+Require Import LogDefs.   (* [log_mirror_full] -- row (B) of the fsinit bundle *)
 Require Import FsCfg.       (* [fscfg] -- the concrete instance below *)
 Require Import BioDefs FsBlocks IcacheEscrow DiskPtsto.  (* its record constructors *)
 Require Import FsImg.  (* [fs_sb]: the era-wide image hypothesis's shape.  No
@@ -182,7 +184,8 @@ Section SystemBoot.
       as (Hfd Hir Hpav HF γd γv)
       "(%Hdimg & #Htext & #Hdata & #Hstarted & #Hdev & #Hwinv &
         #Hcinv & #Hcert & Hharts & Hlk & Hgl & Hmdata & Hpark & Hpst & Hpavail & Huart &
-        Hdlab & Hcfg & Hclaim & #Hdone & Hkpt & Hkmap & Hmir & Hpages & Hirauth & Hfs)".
+        Hdlab & Hcfg & Hclaim & #Hdone & Hkpt & Hkmap & Hmir & Hpages & Hirauth &
+        Hirslot & Hfs)".
     (* THE FILE SYSTEM'S BOOT KITS ARE NO LONGER DROPPED (stage (e)).
        [Hfs] is the ten configuration ties plus [fs_kit_icache] plus
        [fs_kit_fsinit_ghost], and [Hirauth] is the iref-slot authority
@@ -206,6 +209,12 @@ Section SystemBoot.
     (* one row out of [boot_shared_alloc], two premises at [BootChain] -- the
        halves are what main spends and drops separately *)
     iDestruct "Hmdata" as "[Hmfirst Hmnext]".
+    (* THE ERA'S MIRROR VARIABLE NO LONGER DEAD-ENDS (fs-cfg-boot.md (f-2)):
+       it is row (B) of [FirstTok.first_fsinit], and main parks it there for
+       initlog.  Weakened from the concrete genesis value to
+       [LogDefs.log_mirror_full], which is the shape [SpecInitlog] takes. *)
+    iAssert log_mirror_full with "[Hmir]" as "Hmir";
+      [rewrite /log_mirror_full; iExists _; iExact "Hmir" |].
     iDestruct (big_sepL_cpu_peel with "Hharts") as "[Hh0 Hhrest]".
     (* the three device threads' invariants, off the one device fabric *)
     iDestruct (dev_inv_uart with "Hdev") as "#Huinv".
@@ -213,12 +222,12 @@ Section SystemBoot.
     iDestruct (dev_inv_disk with "Hdev") as "#Hvinv".
     iDestruct (dev_inv_perm with "Hdev") as "#Hqinv".
     iModIntro.
-    iSplitL "Hh0 Hhrest Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Hfs Hirauth Htx Hdlab Hcfg Hclaim Hkpt Hkmap
+    iSplitL "Hh0 Hhrest Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Hfs Hmir Hirslot Hirauth Htx Hdlab Hcfg Hclaim Hkpt Hkmap
              Hpages".
     { iApply (big_sepL_cpu_glue
                 (fun c => WP (LoopE gen_id c : expr riscv_lang) @ ⊤
 )%I).
-      iSplitL "Hh0 Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Hfs Hirauth Htx Hdlab Hcfg Hclaim Hkpt Hkmap
+      iSplitL "Hh0 Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Hfs Hmir Hirslot Hirauth Htx Hdlab Hcfg Hclaim Hkpt Hkmap
                Hpages".
       { (* THE BOOT HART: the arm that consumes the whole supply. *)
         (* AT [HF] EXPLICITLY, not by resolution.  [SpecMain.MAIN]'s
@@ -232,13 +241,11 @@ Section SystemBoot.
         iDestruct "Hh0" as (iv) "Hh0".
         iApply (boot_hart_primary (fileG0 := HF) (CID := 0%fin)
                   (g.(gregs) 0%fin) iv DfracDiscarded γd γv ps l0 b0 c0
-                  (v_disk (g.(gdev).(dvirtio))) sb nib cov
+                  (v_disk (g.(gdev).(dvirtio))) sb nib cov XV6_DISK_BYTES
                   (boot_regs_of_facts g Hbf 0%fin) fin_0_z Hprun Hplen Hlive
-                  ltac:(destruct Himg as (_&_&_&_&Hn0&_); exact Hn0)
-                  ltac:(destruct Himg as (_&_&_&_&_&_&Hcv&_);
-                        exact (FsBoot.fs_cov_in_0 _ _ Hcv))
+                  Himg
                   with "Htext Hdata Hh0 Hstarted Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail
-                        Hfs Hirauth
+                        Hfs Hmir Hirslot Hirauth
                         Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim Hdone Hkpt Hkmap
                         Hpages"). }
       (* THE SEVEN SECONDARIES: every element of the tail is an [FS]. *)

@@ -574,7 +574,17 @@ Section BootBssChain.
            ARRAY's ([itable+24], ending exactly at the next symbol), not the
            sleeplock cursor's -- which started 16 bytes later and ran 16
            bytes past the array's end. ---- *)
+    (* ---- ROWS (A), part 1: the 32 bytes of the static [struct
+           superblock].  &sb sits in the .bss gap between the buffer cache
+           and the itable and was DROPPED by this walk before stage (f);
+           it is what fsinit's [memmove] kills.  Contents-existential, as
+           the [disk_free] run above is. ---- *)
     iDestruct (bss_cut g (buf_base + buf_stride * Z.of_nat NBUF + 88)
+                 KernelSyms.sb (KernelSyms.sb + Z.of_nat 32%nat) ram_hi
+                 ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hsbb H]".
+    iDestruct (boot_ran_mem_run g KernelSyms.sb 32%nat Hmem ltac:(zlit)
+                 ltac:(zlit) with "Hcl Hsbb") as "Hsbb".
+    iDestruct (bss_cut g (KernelSyms.sb + Z.of_nat 32%nat)
                  KernelSyms.itable (KernelSyms.itable + 24) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hlk9 H]".
     iDestruct (bss_cut g (KernelSyms.itable + 24) inode_entry_base
@@ -582,7 +592,13 @@ Section BootBssChain.
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hino H]".
     iDestruct (boot_inode_entries g Hmem with "Hcl Hino") as "[Hino Hient]".
     (* ---- devsw[1]'s read/write slots ---- *)
+    (* ---- ROWS (A), part 2: the whole static [struct log], likewise a
+           dropped gap before stage (f). ---- *)
     iDestruct (bss_cut g (inode_entry_base + inode_stride * Z.of_nat NINODE)
+                 KernelSyms.log (KernelSyms.log + 168) ram_hi
+                 ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hlog H]".
+    iDestruct (boot_log_raw g Hmem with "Hcl Hlog") as "Hlog".
+    iDestruct (bss_cut g (KernelSyms.log + 168)
                  (KernelSyms.devsw + 16) (KernelSyms.devsw + 24) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hdr H]".
     iDestruct (boot_ran_cell8 g (KernelSyms.devsw + 16) Hmem ltac:(zlit)
@@ -666,8 +682,8 @@ Section BootBssChain.
     iSplitL "Hlk1 Hlk2 Hlk3 Hlk4 Hlk5 Hlk6 Hlk7 Hlk8 Hlk9 Hlk10 Hlk11".
     { iApply (boot_main_locks_raw g Hmem with
                 "Hcl Hlk1 Hlk2 Hlk3 Hlk4 Hlk5 Hlk6 Hlk7 Hlk8 Hlk9 Hlk10 Hlk11"). }
-    iSplitL "Hdr Hdw Hkm Hkpt Hpr1 Hpr2 Hfd Hir Hip Htk Hbsl Hbln Hhd Hbpay Hino
-             Hient Hdd Hda Hdu Hdf Hdi Hslots Hring".
+    iSplitL "Hdr Hdw Hkm Hkpt Hpr1 Hpr2 Hfd Hir Hip Htk Hbsl Hbln Hhd Hbpay
+             Hsbb Hino Hient Hlog Hdd Hda Hdu Hdf Hdi Hslots Hring".
     { rewrite /main_globals_raw.
       iSplitL "Hdr Hdw".
       { iExists vdr, vdw. rewrite /devsw_console_read /devsw_console_write.
@@ -684,8 +700,13 @@ Section BootBssChain.
       iSplitL "Hbln"; [iExact "Hbln" |].
       iSplitL "Hhd"; [rewrite bhead_of_z; iExact "Hhd" |].
       iSplitL "Hbpay"; [iExact "Hbpay" |].
+      iSplitL "Hsbb".
+      { rewrite /main_sb_raw.
+        iExists (fun j : nat => boot_byte (KernelSyms.sb + Z.of_nat j)).
+        iExact "Hsbb". }
       iSplitL "Hino"; [iExact "Hino" |].
       iSplitL "Hient"; [iExact "Hient" |].
+      iSplitL "Hlog"; [iExact "Hlog" |].
       iSplitL "Hdd Hda Hdu".
       { iExists vdd, vda, vdu.
         rewrite disk_desc_of_z disk_avail_of_z disk_used_of_z.
@@ -814,34 +835,11 @@ Definition main_data_raw `{!riscvGS Σ} : iProp Σ :=
   ((pa_of_z KernelSyms.first_1) ↦₄ (mword_of_int 1 : mword 32) ∗
    (∃ w : bv 32, (pa_of_z KernelSyms.nextpid)  ↦₄ w))%I.
 
-(* ---------------------------------------------------------------------- *)
-(* WHAT THE ERA'S DISK MUST BE, for the file system's boot-era mint to run. *)
-(*                                                                        *)
-(* [FsCfgBoot.fs_cfg_alloc]'s nine pure premises, bundled: two image        *)
-(* sweeps ([FsImg.fsimg_wf] = W1-W9, and [FsImg.fs_region_wf] = the whole   *)
-(* [16*nib] inode region's L3/L4 and free tail), four geometry facts about  *)
-(* [nib], and ruling R4's three coverage corners.  Bundled because both     *)
-(* adequacy theorems now carry it and a nine-premise theorem statement is   *)
-(* not readable; the projections are in [fs_cfg_alloc]'s own order.         *)
-(*                                                                        *)
-(* IT COMPUTES NOTHING (ruling R3): the era fupd takes every image fact as  *)
-(* a hypothesis, and the literal-image discharge lives in                   *)
-(* [FsAdequacyImg.v] off [FsImgCheck]'s citations -- deliberately NOT on    *)
-(* this file's cone, nor on [SystemAdequacy]'s.                             *)
-(* ---------------------------------------------------------------------- *)
-Definition fs_boot_image_wf (dk : Z -> bv 8) (ndisk : nat)
-    (sb : fs_sb) (nib : nat) (cov : gset Z) : Prop :=
-  FsImg.fsimg_wf (FsCrash.fs_blocks dk) sb = true
-  /\ FsImg.fs_region_wf (FsCrash.fs_blocks dk) sb nib = true
-  /\ FsImg.sb_ninodes sb <= 16 * Z.of_nat nib
-  /\ 16 * Z.of_nat nib <= 2 ^ 32
-  /\ (0 < nib)%nat
-  (* the inode region is EXACTLY [[inodestart, bmapstart)]: mkfs rounds
-     [ninodes] up to a whole block *)
-  /\ Z.of_nat nib = FsImg.sb_ninodes sb / 16 + 1
-  /\ FsBoot.fs_cov_in cov ndisk
-  /\ (forall b : Z, 1 <= b < FsImg.fs_data_start sb -> b ∈ cov)
-  /\ (forall b : Z, FsImg.fs_data_start sb <= b < FsImg.sb_size sb -> b ∈ cov).
+(* [fs_boot_image_wf] MOVED DOWN to [FsCfgBoot.v] (fs-cfg-boot.md (f-2)),
+   for the reason [fs_boot_supply] did: [SpecMain] takes it as a pure
+   premise now -- [ProofMain] is what turns it into [FsReady.fs_geom_ok] and
+   [FirstTok.first_fsinit_pures] -- and [SpecMain] sits BELOW this file.
+   The body is unchanged; this file still names it, unqualified. *)
 
 (* ---------------------------------------------------------------------- *)
 (* THE FILE SYSTEM'S BOOT-ERA OUTPUT is [FsCfgBoot.fs_boot_supply].        *)
@@ -1113,6 +1111,10 @@ Section BootAlloc.
          -- run here, beside the [irefslotG] instance it returns -- can
          produce.  It used to be dropped on the floor at that call. *)
       iref_slots_auth ∗
+      (* ...and ONE iref-slot UNIT, row (C) of [FirstTok.first_fsinit]:
+         fsinit's ireclaim borrows it for its iget/iput pair.  It is split
+         off the file table's [NFILE] share, which nothing holds yet. *)
+      iref_slot ∗
       (* the ten config ties and the two boot kits, AT THE INSTANCE the
          chain arms above are applied at.  Stage (e) is the consumer:
          kit 1 in [ProofMain.mn_grp_fs], kit 2 through [SpecUserinit] to
@@ -1122,7 +1124,7 @@ Section BootAlloc.
   Proof.
     intros Hbf Himg.
     destruct Himg as (Hwf & Hrw & Hnin & Hnib32 & Hnib0 & Hnibeq &
-                      Hcovin & Hcovmeta & Hcovdata).
+                      Hcovin & Hcovmeta & Hcovdata & Hparse & Hush & Hnd).
     pose proof (boot_ram_of_facts g Hbf) as Hram.
     pose proof (boot_mem_of_facts g Hbf) as Hmem.
     pose proof Hbf as Hbf'.
@@ -1215,7 +1217,15 @@ Section BootAlloc.
        -- the consumers". *)
     iEval (rewrite /IREFSLOTS) in "Hirslots".
     iDestruct (iref_slots_split (NPROC * (1 + IREFSPARE)) NFILE with "Hirslots")
-      as "[Hirslots _]".
+      as "[Hirslots Hirfile]".
+    (* ONE of the file table's units is kept and threaded to main: it is
+       row (C) of [FirstTok.first_fsinit] -- [SpecFsinit] takes exactly one
+       [iref_slot] for ireclaim's iget/iput pair and hands it back
+       (fs-cfg-boot.md (f-2)).  The rest still go nowhere. *)
+    assert (Hnf : NFILE = (1 + (NFILE - 1))%nat) by (unfold NFILE; lia).
+    iEval (rewrite Hnf) in "Hirfile".
+    iDestruct (iref_slots_split 1 (NFILE - 1) with "Hirfile")
+      as "[Hirslot _]".
     (* ---- the .bss, in address order ---- *)
     iDestruct (boot_bss_carve g Hbf with "Hcl Hfdslots Hirslots Hbss") as
       "(Hstartcell & Hlocks & Hglobals & Hharts & Hpages)".
@@ -1337,6 +1347,7 @@ Section BootAlloc.
     iSplitL "Hmir"; [iExact "Hmir" |].
     iSplitL "Hpages"; [iExact "Hpages" |].
     iSplitL "Hirauth"; [iExact "Hirauth" |].
+    iSplitL "Hirslot"; [iExact "Hirslot" |].
     (* the ten ties and the two kits, restated at [fileG_of]'s projections *)
     rewrite /fs_boot_supply Hpi Hpf. iExact "Hfs".
   Qed.

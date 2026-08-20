@@ -1566,6 +1566,51 @@ Section FsCfgBootEra.
 
 End FsCfgBootEra.
 
+(* ---------------------------------------------------------------------- *)
+(* WHAT THE ERA'S DISK MUST BE, for the file system's boot-era mint to run. *)
+(*                                                                        *)
+(* [FsCfgBoot.fs_cfg_alloc]'s nine pure premises, bundled: two image        *)
+(* sweeps ([FsImg.fsimg_wf] = W1-W9, and [FsImg.fs_region_wf] = the whole   *)
+(* [16*nib] inode region's L3/L4 and free tail), four geometry facts about  *)
+(* [nib], and ruling R4's three coverage corners.  Bundled because both     *)
+(* adequacy theorems now carry it and a nine-premise theorem statement is   *)
+(* not readable; the projections are in [fs_cfg_alloc]'s own order.         *)
+(*                                                                        *)
+(* IT COMPUTES NOTHING (ruling R3): the era fupd takes every image fact as  *)
+(* a hypothesis, and the literal-image discharge lives in                   *)
+(* [FsAdequacyImg.v] off [FsImgCheck]'s citations -- deliberately NOT on    *)
+(* this file's cone, nor on [SystemAdequacy]'s.                             *)
+(* ---------------------------------------------------------------------- *)
+Definition fs_boot_image_wf (dk : Z -> bv 8) (ndisk : nat)
+    (sb : fs_sb) (nib : nat) (cov : gset Z) : Prop :=
+  FsImg.fsimg_wf (FsCrash.fs_blocks dk) sb = true
+  /\ FsImg.fs_region_wf (FsCrash.fs_blocks dk) sb nib = true
+  /\ FsImg.sb_ninodes sb <= 16 * Z.of_nat nib
+  /\ 16 * Z.of_nat nib <= 2 ^ 32
+  /\ (0 < nib)%nat
+  (* the inode region is EXACTLY [[inodestart, bmapstart)]: mkfs rounds
+     [ninodes] up to a whole block *)
+  /\ Z.of_nat nib = FsImg.sb_ninodes sb / 16 + 1
+  /\ FsBoot.fs_cov_in cov ndisk
+  /\ (forall b : Z, 1 <= b < FsImg.fs_data_start sb -> b ∈ cov)
+  /\ (forall b : Z, FsImg.fs_data_start sb <= b < FsImg.sb_size sb -> b ∈ cov)
+  (* ---- THE THREE STAGE-(f) CONJUNCTS (fs-cfg-boot.md (f-1)) ----
+     (10) BLOCK 1'S BYTES ARE THE RECORD.  [FsImg.fsimg_wf] is arithmetic on
+     [sb] ALONE -- W1 never looks at block 1 -- so nothing in the tree said
+     the superblock on the disk IS the superblock the configuration was
+     minted from.  [FsImg.fs_parse_sb] is exactly that reading, it is what
+     [SpecFsinit]'s premise (a) needs, and [FsImgCheck.fsimg_parse_sb]
+     ALREADY proves it at the literal image -- so this costs the adequacy
+     cone no new computation.
+     (11) the [ushort] bound [FsReady.fs_geom_ok]'s [fgo_ushort] wants,
+     tighter than the [2^32] the era threads (208 <= 65536 at the image).
+     (12) the disk image is no larger than [size] blocks, which is what
+     turns [FsBoot.fs_cov_in] into [IcacheInv.cov_below] (and, with W1's
+     [size <= 8*BSIZE], into [LogInv.cov_ok]).  1024*2000 = 2048000. *)
+  /\ FsImg.fs_parse_sb (FsCrash.fs_blocks dk) = Some sb
+  /\ 16 * Z.of_nat nib <= 2 ^ 16
+  /\ Z.of_nat ndisk <= 1024 * FsImg.sb_size sb.
+
 (* ====================================================================== *)
 (*  THE FILE SYSTEM'S BOOT-ERA OUTPUT, AS ONE ROW.                         *)
 (*                                                                        *)

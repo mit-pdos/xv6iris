@@ -167,6 +167,10 @@ Require Import FileInvDefs.
    main-boot.md §G3 at full width).  This file names only the bundled row;
    [ProofMain.mn_grp_fs] is what opens it. *)
 Require Import FsCfgBoot.
+(* the [struct log]'s cell names -- [SpecFsinit]'s and [SpecInitlog]'s raw
+   premises, carried here because NOTHING carved them before stage (f)
+   (fs-cfg-boot.md (f-2), rows (A)). *)
+Require Import LogDefs LogInv.
 (* [BioInitAt.buf_raw] -- the thirty zeroed [struct buf] payload rows, carved
    with the buffer sleeplocks and carried across binit for [bio_init_at]
    (fs-cfg-boot.md stage (f)). *)
@@ -261,6 +265,27 @@ Section SpecMain.
   (* to carve and no invariant to allocate -- [printk_env] is three       *)
   (* conjuncts, not four.                                                 *)
   (* ------------------------------------------------------------------- *)
+  (* the 32 dead .bss bytes at [&sb], contents-existential.  Spelled at
+     [mword_of_int KernelSyms.sb], which is [FirstTok.first_sb_base] and
+     [SpecFsinit.sb_base] on the nose. *)
+  Definition main_sb_raw : iProp Σ :=
+    (∃ sb_old : nat -> bv 8,
+       [∗ list] i ∈ seq 0 32,
+         pa_add (mword_of_int KernelSyms.sb : mword 64) i ↦ₘ sb_old i)%I.
+
+  (* the whole [struct log] at [KernelSyms.log]: the spinlock triple, the
+     six scalar fields and the thirty [lh.block] words, in exactly the
+     shape [SpecFsinit]'s premise pile spells them. *)
+  Definition main_log_raw : iProp Σ :=
+    (∃ (vlock v_start v_dev v_nc v_n : mword 32) (vname vcpu : mword 64),
+       log_addr ↦₄ vlock ∗
+       lock_name_field log_addr ↦₈ vname ∗ lock_cpu log_addr ↦₈ vcpu ∗
+       l_start ↦₄ v_start ∗ l_dev ↦₄ v_dev ∗
+       l_out ↦₄ (mword_of_int 0 : mword 32) ∗
+       l_cmt ↦₄ (mword_of_int 0 : mword 32) ∗
+       l_ncommit ↦₄ v_nc ∗ lh_n_pa ↦₄ v_n ∗
+       ([∗ list] i ∈ seq 0 LOGBLOCKS, ∃ w : mword 32, lh_block i ↦₄ w))%I.
+
   Definition main_globals_raw : iProp Σ :=
     ((∃ r w : mword 64,
         devsw_console_read ↦₈ r ∗ devsw_console_write ↦₈ w) ∗
@@ -301,6 +326,13 @@ Section SpecMain.
         [BioInv.bio_init]'s "every buffer starts invalid at blockno 0" true
         rather than assumed. *)
      ([∗ list] k ∈ seq 0 NBUF, buf_raw k) ∗
+     (* ---- ROWS (A) OF THE fsinit BUNDLE, part 1: the 32 raw bytes of the
+        static [struct superblock].  &sb sits in the .bss GAP between the
+        buffer cache and the itable, and NOTHING carved it before stage (f):
+        it is what fsinit's [memmove] at +0x26 kills, and it reaches
+        forkret's first arm inside [FirstTok.first_fsinit].  The bytes are
+        contents-existential -- they are dead .bss until that memmove. ---- *)
+     main_sb_raw ∗
      ([∗ list] i ∈ seq 0 NINODE, sl_raw (inode_lock i)) ∗
      (* ...and the REST of each itable entry, which iinit never touches:
         dev/inum/valid, the dinode mirror's metadata and addrs cells, and
@@ -316,6 +348,14 @@ Section SpecMain.
         [ProofMain.mn_grp_fs] runs [IcacheBoot.icache_boot_at] on the two
         halves together. *)
      ([∗ list] k ∈ seq 0 NINODE, ientry_raw k) ∗
+     (* ---- ROWS (A), part 2: the whole static [struct log].  Same story as
+        [main_sb_raw]: initlog writes it, nothing carved it, and it rides
+        [FirstTok.first_fsinit] to forkret.  [l_out] and [l_cmt] are at
+        PINNED ZERO on the [ientry_raw] / [d_used_idx] / [kmem+24]
+        precedent (the log record is .bss past the image, so the loader
+        zeroed it) -- and initlog's contract takes them at exactly that
+        value. ---- *)
+     main_log_raw ∗
      (∃ pd pav pu : mword 64,
         disk_desc ↦₈ pd ∗ disk_avail ↦₈ pav ∗ disk_used ↦₈ pu) ∗
      (∃ free0 : nat -> bv 8,
@@ -364,6 +404,7 @@ Section SpecMain.
          ambient [icfg]/[fscfg] because [fs_boot_supply]'s ten ties are what
          connect the two, and main spends the ties, not the image. *)
       (dk : Z -> bv 8) (sb : FsImg.fs_sb) (nib : nat) (cov : gset Z)
+      (ndisk : nat)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6))
       (P : iProp Σ) `{!Persistent P} :=
     let pcE : mword 64 := mword_of_int KernelSyms.main in
@@ -391,14 +432,16 @@ Section SpecMain.
        and the boot chain has it in hand; main forwards it to userinit's
        namei corner, where [icfg_nib = 0] would make the returned
        [IcacheRef.inode_held] uninhabitable. *)
-    (0 < nib)%nat ->
-    (* ...and block 0 is not a client block.  It is [BootShared.fs_boot_image_wf]'s
-       [FsBoot.fs_cov_in] conjunct read through [FsBoot.fs_cov_in_0], and it
-       reaches here as a PURE premise for the same reason [0 < nib] does:
-       [BioInitAt.bio_init_at]'s own premise, which main runs on binit's post
-       at +0x8e, and which is true because binit leaves all thirty buffers
-       claiming blockno 0 (design/fs-log.md, ruling R4). *)
-    (0 : Z) ∉ cov ->
+    (* THE WHOLE IMAGE HYPOTHESIS, not two readings of it (fs-cfg-boot.md
+       stage (f)).  Main used to take exactly [0 < nib] (userinit's namei
+       corner) and [0 ∉ cov] ([BioInitAt.bio_init_at]'s premise), both read
+       off this bundle one tier up.  Stage (f) needs SIX more of its
+       conjuncts -- everything [FsReady.fs_geom_ok] and
+       [FirstTok.first_fsinit_pures] are built from -- so the bundle itself
+       comes down and [ProofMain] does the reading.  [FsCfgBoot.v] is where
+       it lives (it used to be [BootShared]'s, which sits above this file);
+       [FsAdequacyImg] is where it is discharged at the mkfs image. *)
+    fs_boot_image_wf dk ndisk sb nib cov ->
     (* main has no current proc, and neither does the scheduler() it tail-
        calls. *)
     p0 = zero_reg ->
@@ -481,6 +524,18 @@ Section SpecMain.
        applied at, which is the same discipline
        [BootShared.boot_shared_alloc]'s return uses. *)
     fs_boot_supply _ _ dk sb nib cov γd γv -∗
+    (* ---- ROW (B) OF THE fsinit BUNDLE: the ERA's log-region mirror
+       variable, straight out of [BootShared.boot_shared_alloc] (the era
+       fupd cannot mint it -- [FsCfgBoot.fs_kit_fsinit_ghost]'s header says
+       why).  It reached [boot_shared_alloc]'s postcondition already and
+       dead-ended there; stage (f) threads it to main, which parks it in
+       [FirstTok.first_fsinit] for initlog. ---- *)
+    log_mirror_full -∗
+    (* ---- ROW (C), first half: ONE iref-slot unit, for ireclaim's
+       iget/iput pair inside fsinit.  Split off the file table's share in
+       [boot_shared_alloc]; the second half ([BioDefs.bslots]) is produced
+       at WP time by [bio_init_at] and never crosses this boundary. ---- *)
+    iref_slot -∗
     (* [IrefSlots.iref_slots_auth] -- row (P4) of [fs_kit_icache]'s header.
        Minted by [IrefSlots.iref_slots_alloc] inside [boot_shared_alloc]
        beside the [irefslotG] instance, NOT by the era fupd, so it travels
@@ -542,8 +597,9 @@ Module Type MAIN.
       (γd : uart_names) (γv : disk_names)
       (l0 : list (bv 8)) (b0 : bool) (c0 : virtio_cfg)
       (dk : Z -> bv 8) (sb : FsImg.fs_sb) (nib : nat) (cov : gset Z)
+      (ndisk : nat)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6))
       (P : iProp Σ) `{!Persistent P},
       wp_main_boot_sconf_body m K p0 ps s1entry phystop
-        γd γv l0 b0 c0 dk sb nib cov tlbvec0 P.
+        γd γv l0 b0 c0 dk sb nib cov ndisk tlbvec0 P.
 End MAIN.
