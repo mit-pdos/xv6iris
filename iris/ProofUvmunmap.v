@@ -1722,6 +1722,148 @@ Proof.
   exact Hcvpn.
 Qed.
 
+(* THE RUN'S VPNS COVER EXACTLY THE RUN'S ADDRESSES.  What the
+   contents-indexed seal needs and the plain one does not: the loop is
+   indexed by vpns, the memory view by byte addresses, and the M-contract
+   is stated over the address range [va, va + npages*4096). *)
+Lemma uu_vpn_addr (va : mword 64) (npages k : nat) :
+  bv_unsigned va mod 4096 = 0 ->
+  (bv_unsigned va + Z.of_nat npages * 4096 <= 274877906944)%Z ->
+  (k < npages)%nat ->
+  (bv_unsigned (vpn_at (svpn_of va) k) * 4096
+   = bv_unsigned va + 4096 * Z.of_nat k)%Z.
+Proof.
+  intros Halign Hrange Hk.
+  pose proof (bv_unsigned_in_range 64 va) as [Hva0 _].
+  assert (Hdnp : (Z.of_nat k + 1 <= Z.of_nat npages)%Z) by lia.
+  destruct (z_run_iter_gen (bv_unsigned va) (Z.of_nat k) (Z.of_nat npages)
+              Hva0 (Nat2Z.is_nonneg k) Hdnp Hrange) as (Hcnn & Hc38 & Hc64).
+  assert (Hcuru : bv_unsigned (add_vec va (mword_of_int (4096 * Z.of_nat k)))
+                  = bv_unsigned va + 4096 * Z.of_nat k)
+    by (apply pb_va_k_unsigned; exact Hc64).
+  assert (Hvpne : svpn_of (add_vec va (mword_of_int (4096 * Z.of_nat k)))
+                  = vpn_at (svpn_of va) k)
+    by (apply svpn_of_run; exact Hc38).
+  assert (Hvpnu : bv_unsigned (vpn_at (svpn_of va) k)
+                  = (bv_unsigned va + 4096 * Z.of_nat k) / 4096).
+  { rewrite <- Hvpne.
+    rewrite (svpn_of_unsigned_lo (add_vec va (mword_of_int (4096 * Z.of_nat k)))
+               ltac:(rewrite uint_unsigned; rewrite Hcuru; exact Hc38)).
+    rewrite uint_unsigned. rewrite Hcuru.
+    rewrite Z.shiftr_div_pow2; [reflexivity | lia]. }
+  rewrite Hvpnu.
+  pose proof (Z.div_mod (bv_unsigned va) 4096 ltac:(lia)) as Hdm.
+  rewrite Halign in Hdm.
+  replace (bv_unsigned va + 4096 * Z.of_nat k)%Z
+    with ((bv_unsigned va / 4096 + Z.of_nat k) * 4096)%Z by lia.
+  rewrite (Z.div_mul (bv_unsigned va / 4096 + Z.of_nat k) 4096 ltac:(lia)).
+  lia.
+Qed.
+
+(* ...and the converse: an address inside the run belongs to one of the
+   run's vpns.  The two together say the run's vpns and the run's address
+   range are the same thing, which is what lets a vpn-indexed loop have an
+   address-indexed contract. *)
+Lemma uu_vpn_in_run (va : mword 64) (npages : nat) (v : mword 27) (j : nat) :
+  bv_unsigned va mod 4096 = 0 ->
+  (bv_unsigned va + Z.of_nat npages * 4096 <= 274877906944)%Z ->
+  (j < 4096)%nat ->
+  (bv_unsigned va <= bv_unsigned v * 4096 + Z.of_nat j
+   < bv_unsigned va + 4096 * Z.of_nat npages)%Z ->
+  v ∈ vpn_run (svpn_of va) npages.
+Proof.
+  intros Halign Hrange Hj Hin.
+  pose proof (bv_unsigned_in_range 27 v) as [Hv0 _].
+  pose proof (Z.div_mod (bv_unsigned v * 4096 - bv_unsigned va) 4096
+                ltac:(lia)) as Hdm.
+  assert (Hmod : ((bv_unsigned v * 4096 - bv_unsigned va) mod 4096 = 0)%Z).
+  { rewrite Zminus_mod. rewrite Halign.
+    rewrite (Z.mod_mul (bv_unsigned v) 4096 ltac:(lia)).
+    reflexivity. }
+  assert (Hlo : (bv_unsigned va <= bv_unsigned v * 4096)%Z) by lia.
+  assert (Hhi : (bv_unsigned v * 4096
+                 < bv_unsigned va + 4096 * Z.of_nat npages)%Z) by lia.
+  set (i := Z.to_nat ((bv_unsigned v * 4096 - bv_unsigned va) / 4096)).
+  assert (Hiz : (Z.of_nat i * 4096
+                 = bv_unsigned v * 4096 - bv_unsigned va)%Z).
+  { unfold i. rewrite Z2Nat.id; [lia | apply Z.div_pos; lia]. }
+  assert (Hilt : (i < npages)%nat) by lia.
+  apply elem_of_vpn_run. exists i. split; [exact Hilt |].
+  apply bv_eq.
+  pose proof (uu_vpn_addr va npages i Halign Hrange Hilt) as Hva.
+  lia.
+Qed.
+
+(* THE EXIT LAW.  What the loop hands back is pinned by two facts it
+   already carries -- the surviving bytes are a submap of the ones we
+   started with, and [umem_lazy]'s own domain law at the shrunken
+   descriptor -- together with the caller's statement of WHICH vas stop
+   being live.  Nothing else is needed, and in particular the loop never
+   has to name its intermediate view. *)
+Lemma uu_mem_pin (P : uptd) (va : mword 64) (npages : nat) (sz szn : Z)
+    (M M' : gmap Z (bv 8)) :
+  bv_unsigned va mod 4096 = 0 ->
+  (bv_unsigned va + Z.of_nat npages * 4096 <= 274877906944)%Z ->
+  (forall a : Z, uva_live szn a <->
+     (uva_live sz a
+      /\ ~ (bv_unsigned va <= a
+            < bv_unsigned va + 4096 * Z.of_nat npages)%Z)) ->
+  M' ⊆ M ->
+  (forall a : Z, is_Some (M !! a) <-> (uva_mapped P a \/ uva_live sz a)) ->
+  (forall a : Z, is_Some (M' !! a) <->
+     (uva_mapped (uptd_del_run P (svpn_of va) npages) a \/ uva_live szn a)) ->
+  M' = umem_del M (bv_unsigned va) (4096 * npages).
+Proof.
+  intros Halign Hrange Hlive Hsub HdomM HdomM'.
+  assert (Hrun : forall a : Z,
+            (bv_unsigned va <= a < bv_unsigned va + 4096 * Z.of_nat npages)%Z
+            <-> exists k, (k < 4096 * npages)%nat
+                          /\ a = (bv_unsigned va + Z.of_nat k)%Z).
+  { intros a. split.
+    - intros [Hlo Hhi]. exists (Z.to_nat (a - bv_unsigned va)).
+      split; lia.
+    - intros (k & Hk & ->). lia. }
+  apply map_eq. intros a.
+  destruct (decide (bv_unsigned va <= a
+                    < bv_unsigned va + 4096 * Z.of_nat npages)%Z)
+    as [Hin | Hout].
+  - pose proof Hin as Hin'.
+    apply Hrun in Hin' as (k & Hk & ->).
+    rewrite (umem_del_lookup_in M (bv_unsigned va) (4096 * npages) k Hk).
+    destruct (M' !! (bv_unsigned va + Z.of_nat k)%Z) as [bb |] eqn:Hb;
+      [exfalso | reflexivity].
+    destruct (proj1 (HdomM' _) ltac:(eauto)) as [Hm | Hlv].
+    + destruct Hm as (v0 & w0 & j0 & Hl0 & Hj0 & Heq0).
+      assert (Hinr : v0 ∈ vpn_run (svpn_of va) npages).
+      { apply (uu_vpn_in_run va npages v0 j0 Halign Hrange Hj0). lia. }
+      rewrite (um_del_run_in P.(ud_um) (svpn_of va) npages v0 Hinr) in Hl0.
+      discriminate.
+    + apply (proj1 (Hlive _)) in Hlv. destruct Hlv as (_ & Hno).
+      apply Hno. lia.
+  - assert (Hne : forall k, (k < 4096 * npages)%nat ->
+              a <> (bv_unsigned va + Z.of_nat k)%Z)
+      by (intros k Hk Heq; apply Hout; apply Hrun; eauto).
+    rewrite (umem_del_lookup_out M (bv_unsigned va) (4096 * npages) a Hne).
+    destruct (M' !! a) as [bb |] eqn:Hb.
+    + exact (eq_sym (lookup_weaken M' M a bb Hb Hsub)).
+    + destruct (M !! a) as [bb |] eqn:HbM; [exfalso | reflexivity].
+      assert (Hs : is_Some (M' !! a)).
+      { apply HdomM'.
+        destruct (proj1 (HdomM a) ltac:(eauto)) as [Hm | Hlv].
+        - left. destruct Hm as (v0 & w0 & j0 & Hl0 & Hj0 & Heq0).
+          exists v0, w0, j0.
+          split_and!; [| exact Hj0 | exact Heq0].
+          assert (Hnr : v0 ∉ vpn_run (svpn_of va) npages).
+          { intros Hinr. apply Hout.
+            apply elem_of_vpn_run in Hinr as (i & Hi & ->).
+            pose proof (uu_vpn_addr va npages i Halign Hrange Hi) as Hva.
+            lia. }
+          rewrite (um_del_run_out P.(ud_um) (svpn_of va) npages v0 Hnr).
+          exact Hl0.
+        - right. apply Hlive. split; [exact Hlv | exact Hout]. }
+      rewrite Hb in Hs. exact (is_Some_None Hs).
+Qed.
+
 Module UvmunmapProof (WalkNoalloc : WALK_NOALLOC) (Kfree : KFREE) : UVMUNMAP.
 
 Module Core := UvmunmapCore WalkNoalloc Kfree.
@@ -1729,6 +1871,113 @@ Module Core := UvmunmapCore WalkNoalloc Kfree.
 Section SealUvmunmap.
   Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
+
+  (* ------------------------------------------------------------------ *)
+  (* THE CONTENTS-INDEXED SEAL.  Same machine proof; [Own] is instantiated *)
+  (* at the LAZY VIEW instead of the raw pages, so the bytes that survive  *)
+  (* the call never become existential.  Three moving parts:               *)
+  (*   - the SIZE DROP happens once, up front ([umem_lazy_shrink]), which  *)
+  (*     is what makes every va the loop unmaps already dead;              *)
+  (*   - the loop step is [umem_lazy_unmap];                               *)
+  (*   - the exit is pinned by [uu_mem_pin], from the submap fact the      *)
+  (*     invariant carries and [umem_lazy]'s own domain law.               *)
+  (* The intermediate view is never named: it is [∃ M', M' ⊆ M ∗ …].       *)
+  (* ------------------------------------------------------------------ *)
+  Lemma wp_uvmunmap_mem_sconf
+      (γa : gname) (mm : regfile)
+      (P : uptd) (sz szn : Z) (M : gmap Z (bv 8))
+      (npages : nat) (K : nat) (eb : bool) (p : mword 64)
+      (ilvl : nat) (b : bool) (lks : gset string)
+    : wp_uvmunmap_mem_sconf_body γa mm P sz szn M npages K eb p ilvl b lks.
+  Proof.
+    cbv beta delta [wp_uvmunmap_mem_sconf_body].
+    intros pcE va vpn0 ret_tgt HK Hilvl Hroot Hval Hnpr Hdf Hrange Hlive Hbelow.
+    iIntros "Hcg Hcnt #Htext Hpc Hpt Henv Hcont".
+    assert (Hrz : (bv_unsigned va + Z.of_nat npages * 4096 <= 274877898752)%Z).
+    { unfold uvm_maxsz in Hrange. rewrite uint_unsigned in Hrange.
+      change (2 ^ 38 - 8192)%Z with 274877898752%Z in Hrange. exact Hrange. }
+    assert (Hrz38 : (bv_unsigned va + Z.of_nat npages * 4096 <= 274877906944)%Z)
+      by lia.
+    assert (Halign : bv_unsigned va mod 4096 = 0)
+      by (apply aligned12_unsigned; exact Hval).
+    assert (HliveZ : forall a : Z, uva_live szn a <->
+              (uva_live sz a
+               /\ ~ (bv_unsigned va <= a
+                     < bv_unsigned va + 4096 * Z.of_nat npages)%Z)).
+    { intros a. rewrite (Hlive a). rewrite uint_unsigned. reflexivity. }
+    assert (Hmono : forall a : Z, uva_live szn a -> uva_live sz a)
+      by (intros a Ha; exact (proj1 (proj1 (HliveZ a) Ha))).
+    iDestruct (proc_ptm_wf P sz M with "Hpt") as %Hwf.
+    pose proof Hwf as Hwf2. destruct Hwf2 as (_ & Hacc & _ & _ & Htfv).
+    iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhwc Hcg]".
+    iDestruct "Hhwc" as (hwmisa0 hwmseccfg0 hwpmar0 hwelp0)
+      "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hkmapb & _)".
+    iDestruct (proc_ptm_uptg_tree P sz M with "Hpt") as "[Hpt Hm]".
+    iDestruct (umem_lazy_dom with "Hm") as %HdomM.
+    iDestruct (umem_lazy_shrink P sz szn M Hmono with "Hm") as (M1) "[%Hsub1 Hm]".
+    (* ---- the two laws, at the lazy view ---- *)
+    iAssert (□ (∀ (k : nat) (w : mword 64),
+        ⌜(k < npages)%nat⌝ -∗
+        ⌜uu_um true P.(ud_um) vpn0 k !! vpn_at vpn0 k = Some w⌝ -∗
+        (∃ M' : gmap Z (bv 8),
+           ⌜M' ⊆ M⌝ ∗ umem_lazy (uptd_del_run P vpn0 k) szn M') -∗
+        page_own (page_base (pte_ppn w))
+        ∗ (∃ M' : gmap Z (bv 8),
+             ⌜M' ⊆ M⌝ ∗ umem_lazy (uptd_del_run P vpn0 (S k)) szn M')))%I
+      as "#HPEEL".
+    { iIntros "!>" (k w) "%Hk %Hl H". iDestruct "H" as (M') "[%Hs Hm]".
+      assert (Hdead : forall j, (j < 4096)%nat ->
+                ~ uva_live szn
+                    (bv_unsigned (vpn_at (svpn_of va) k) * 4096
+                     + Z.of_nat j)%Z).
+      { intros j Hj Hlv.
+        pose proof (uu_vpn_addr va npages k Halign Hrz38 Hk) as Hva.
+        apply (proj1 (HliveZ _)) in Hlv. destruct Hlv as (_ & Hno).
+        apply Hno. lia. }
+      iDestruct (umem_lazy_unmap (uptd_del_run P vpn0 k) szn M' (vpn_at vpn0 k) w
+                   (proc_pt_wf_del_run P vpn0 k Hwf) Hl Hdead with "Hkmapb Hm")
+        as "[Hpg Hm]".
+      iFrame "Hpg".
+      iExists (umem_del M' (bv_unsigned (vpn_at vpn0 k) * 4096)%Z 4096).
+      iSplitR.
+      { iPureIntro.
+        exact (transitivity (umem_del_subseteq M' _ 4096) Hs). }
+      iExact "Hm". }
+    iAssert (□ (∀ k : nat,
+        ⌜(k < npages)%nat⌝ -∗
+        ⌜uu_um true P.(ud_um) vpn0 (S k) = uu_um true P.(ud_um) vpn0 k⌝ -∗
+        (∃ M' : gmap Z (bv 8),
+           ⌜M' ⊆ M⌝ ∗ umem_lazy (uptd_del_run P vpn0 k) szn M') -∗
+        (∃ M' : gmap Z (bv 8),
+           ⌜M' ⊆ M⌝ ∗ umem_lazy (uptd_del_run P vpn0 (S k)) szn M')))%I
+      as "#HSKIP".
+    { iIntros "!>" (k) "%Hk %Heq H". iDestruct "H" as (M') "[%Hs Hm]".
+      iExists M'. iSplitR; [iPureIntro; exact Hs |].
+      iEval (rewrite (umem_lazy_um_cong (uptd_del_run P vpn0 k)
+                        (uptd_del_run P vpn0 (S k)) szn M' (eq_sym Heq))) in "Hm".
+      iExact "Hm". }
+    iApply (Core.wp_uvmunmap_gen γa mm (upt_fixed_both P.(ud_tfp)) P.(ud_root)
+              P.(ud_um)
+              (fun k => (∃ M' : gmap Z (bv 8),
+                           ⌜M' ⊆ M⌝ ∗ umem_lazy (uptd_del_run P vpn0 k) szn M')%I)
+              npages K eb p ilvl b true lks HK Hilvl Hroot Hval Hnpr Hdf
+              (uu_range_wide va npages Hrange) (uu_side_user va npages Hrz) Hbelow
+              with "HPEEL HSKIP Hcg Hcnt Htext Hpc Hpt [Hm] Henv").
+    { iExists M1. iSplitR; [iPureIntro; exact Hsub1 |]. iExact "Hm". }
+    iIntros (CID1 Hs1 mr) "Hcg Hcnt Hpc %Hcs Hpt Hown".
+    iDestruct "Hown" as (M') "[%Hsub' Hm]".
+    iDestruct (umem_lazy_dom with "Hm") as %HdomM'.
+    assert (HM' : M' = umem_del M (bv_unsigned va) (4096 * npages))
+      by (exact (uu_mem_pin P va npages sz szn M M' Halign Hrz38 HliveZ
+                   Hsub' HdomM HdomM')).
+    iSpecialize ("Hcont" $! CID1 with "[%]"); [wp_next_chain|].
+    iApply ("Hcont" $! mr with "Hcg Hcnt Hpc [%] [Hpt Hm]").
+    { exact Hcs. }
+    rewrite uint_unsigned. rewrite <- HM'.
+    iApply (uptg_tree_proc_ptm (uptd_del_run P vpn0 npages) szn M'
+              (upt_acc_wf_del_run P.(ud_um) vpn0 npages Hacc) Htfv
+              with "Hpt Hm").
+  Qed.
 
   (* [proc_pt] IS the [upt_fixed_both] instance; the round trip owes [uptg] the two
      conjuncts it does not carry -- [upt_acc_wf] (preserved along the run

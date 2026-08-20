@@ -577,6 +577,43 @@ Section BarePt.
     exact (uptg_spec_of_rep0 fx uroot um m_ad t' Hview Hrep Hbase).
   Qed.
 
+  (* ...and the TREE-only forms, for the contents-indexed seals: they keep
+     the pages out of the conversion entirely, so a caller can hold them
+     NAMED (as [umem_lazy]) on both sides of it. *)
+  Lemma proc_ptm_uptg_tree (P : uptd) (sz : Z) (M : gmap Z (bv 8)) :
+    proc_ptm P sz M
+    ⊢ uptg_tree (upt_fixed_both P.(ud_tfp)) P.(ud_root) P.(ud_um)
+      ∗ umem_lazy P sz M.
+  Proof.
+    iIntros "H". rewrite /proc_ptm /uptg_tree /pt_frame.
+    iDestruct "H" as "(%Hwf & Ht & Hm)".
+    iDestruct "Ht" as (t) "(%Hspec & Ht)".
+    iFrame "Hm".
+    iSplitR; [iPureIntro; exact (proc_pt_wf_uptg P Hwf) |].
+    iSplitR; [iPureIntro; exact (fx_wf_both P.(ud_tfp)) |].
+    iExists t. iFrame "Ht". iPureIntro.
+    exact (proj2 (uptg_spec_both P.(ud_root) P.(ud_tfp) P.(ud_um) t (proj1 Hwf))
+             Hspec).
+  Qed.
+
+  Lemma uptg_tree_proc_ptm (P : uptd) (sz : Z) (M : gmap Z (bv 8)) :
+    upt_acc_wf P.(ud_um) -> page_valid (page_base P.(ud_tfp)) ->
+    uptg_tree (upt_fixed_both P.(ud_tfp)) P.(ud_root) P.(ud_um) -∗
+    umem_lazy P sz M -∗ proc_ptm P sz M.
+  Proof.
+    intros Hacc Hval. iIntros "H Hm".
+    rewrite /proc_ptm /uptg_tree /pt_frame.
+    iDestruct "H" as "(%Hwf & %Hfx & Ht)".
+    iDestruct "Ht" as (t) "(%Hspec & Ht)".
+    destruct Hwf as (Hm & Hp & Hi).
+    iFrame "Hm".
+    iSplitR.
+    { iPureIntro. rewrite /proc_pt_wf.
+      split_and!; [exact Hm | exact Hacc | exact Hp | exact Hi | exact Hval]. }
+    iExists t. iFrame "Ht". iPureIntro.
+    exact (proj1 (uptg_spec_both P.(ud_root) P.(ud_tfp) P.(ud_um) t Hm) Hspec).
+  Qed.
+
   Lemma uptg_acc_rep0 (fx : gmap (mword 27) (mword 64)) (uroot : mword 44)
       (um : gmap (mword 27) (mword 64)) :
     uptg fx uroot um ⊢ ∃ t m_ad,

@@ -116,7 +116,72 @@ Definition wp_uvmunmap_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID 
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
+(* ===================================================================== *)
+(*  THE MEMORY-INDEXED CONTRACT.                                          *)
+(* ===================================================================== *)
+(* Same function, same frame; the process's memory view is NAMED on the
+   way in and pinned on the way out.  What uvmunmap does to it is simply
+   "the run's vas leave": [umem_del M (uint va) (4096 * npages)] is [M]
+   with every byte of the unmapped range dropped, and every other byte
+   exactly as it was.
+
+   THE SIZE MOVES TOO, AND IT HAS TO.  [proc_ptm] is indexed by [p->sz]
+   because a va below it reads as a lazily-backed zero whether or not the
+   table maps it, so a va that is still LIVE cannot leave the view -- and
+   every caller of uvmunmap is shrinking the process (uvmdealloc, uvmfree)
+   or rolling back a growth (uvmalloc, uvmcopy).  The premise says exactly
+   that: the vas that stop being live are exactly the run's.  Note this
+   also forces the honest reading of the ORDER -- the size drop is what
+   makes the unmapping legal, not the other way round.
+
+   uvmfree passes [szn := 0]; uvmdealloc passes the new size; the two
+   rollback callers pass the size they had before the growth. *)
+Definition wp_uvmunmap_mem_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+    (γa : gname) (mm : regfile)
+    (P : uptd) (sz szn : Z) (M : gmap Z (bv 8))
+    (npages : nat) (K : nat) (eb : bool) (p : mword 64)
+    (ilvl : nat) (b : bool) (lks : gset string) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.uvmunmap in
+  let va := mm !!! Regidx (mword_of_int 11) in
+  let vpn0 := svpn_of va in
+  let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
+  (22 <= K)%nat ->
+  (Z.of_nat ilvl + 1 < 2 ^ 31)%Z ->
+  mm !!! Regidx (mword_of_int 10) = page_base P.(ud_root) ->
+  subrange_vec_dec va 11 0 = (zeros' 12 : mword 12) ->
+  mm !!! Regidx (mword_of_int 12) = (mword_of_int (Z.of_nat npages) : mword 64) ->
+  mm !!! Regidx (mword_of_int 13) <> (mword_of_int 0 : mword 64) ->
+  (uint va + Z.of_nat npages * 4096 <= uvm_maxsz)%Z ->
+  (* THE VAS THAT STOP BEING LIVE ARE EXACTLY THE RUN'S *)
+  (forall a : Z, uva_live szn a <->
+     (uva_live sz a
+      /\ ~ (uint va <= a < uint va + 4096 * Z.of_nat npages)%Z)) ->
+  locks_below lks "kmem" ->
+  sie_cap_gpr KT1 mm K b p -∗
+  cpu_own ilvl eb p b lks -∗
+  kernel_text -∗
+  pc_is pcE -∗
+  proc_ptm P sz M -∗
+  kalloc_env γa None -∗
+  wp_next b p (fun (CID : CpuId) =>
+    ∀ (mr : regfile),
+    sie_cap_gpr KT1 mr K b p -∗
+    cpu_own ilvl eb p b lks -∗
+    pc_is ret_tgt -∗
+    ⌜callee_saved mm mr⌝ -∗
+    proc_ptm (uptd_del_run P vpn0 npages) szn
+             (umem_del M (uint va) (4096 * npages)) -∗
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
+
 Module Type UVMUNMAP.
+  Parameter wp_uvmunmap_mem_sconf :
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+      (γa : gname) (mm : regfile)
+      (P : uptd) (sz szn : Z) (M : gmap Z (bv 8))
+      (npages : nat) (K : nat) (eb : bool) (p : mword 64)
+      (ilvl : nat) (b : bool) (lks : gset string),
+      wp_uvmunmap_mem_sconf_body γa mm P sz szn M npages K eb p ilvl b lks.
   Parameter wp_uvmunmap_sconf :
     forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (mm : regfile)

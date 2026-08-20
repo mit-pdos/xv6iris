@@ -3520,6 +3520,94 @@ Section ProcPt.
      already in the view, as a lazy page reading 0; vmfault memsets the
      page it maps to 0; so the view does not move.  What changes is only
      which half of it is backed by ownership. *)
+  (* the domain law, on its own -- what pins the view at a loop's exit *)
+  Lemma umem_lazy_dom (P : uptd) (sz : Z) (M : gmap Z (bv 8)) :
+    umem_lazy P sz M -∗
+    ⌜forall va, is_Some (M !! va) <-> (uva_mapped P va \/ uva_live sz va)⌝.
+  Proof.
+    iIntros "H". iDestruct "H" as (Mp) "(_ & %H & _ & _)".
+    iPureIntro. exact H.
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* DROPPING THE SIZE.  Only the vas that stop being live AND are not    *)
+  (* backed leave the view -- a mapped one stays until its leaf goes.     *)
+  (* The resulting view is not worth naming (it is [M] minus a set the    *)
+  (* caller cannot describe without deciding [uva_mapped]); what the      *)
+  (* caller needs, and what pins it at the far end of the loop, is        *)
+  (* [M1 ⊆ M] plus the domain law [umem_lazy] already carries.            *)
+  (* ------------------------------------------------------------------ *)
+  Lemma umem_lazy_shrink (P : uptd) (sz szn : Z) (M : gmap Z (bv 8)) :
+    (forall a : Z, uva_live szn a -> uva_live sz a) ->
+    umem_lazy P sz M -∗ ∃ M1 : gmap Z (bv 8), ⌜M1 ⊆ M⌝ ∗ umem_lazy P szn M1.
+  Proof.
+    intros Hmono. iIntros "H".
+    iDestruct "H" as (Mp) "(%Hsub & %Hdm & %Hlz & Hm)".
+    iDestruct "Hm" as "[%Hdom Hmp]".
+    assert (Hmpm : forall va, is_Some (Mp !! va) <-> uva_mapped P va).
+    { intros va. rewrite <- elem_of_dom. rewrite Hdom. apply elem_of_uva_dom. }
+    assert (Hgz : forall va,
+              is_Some (gset_to_gmap (bv_0 8) (live_set szn) !! va)
+              <-> uva_live szn va).
+    { intros va. rewrite <- elem_of_dom. rewrite dom_gset_to_gmap.
+      apply elem_of_live_set. }
+    iExists (Mp ∪ gset_to_gmap (bv_0 8) (live_set szn)).
+    iSplitR.
+    { iPureIntro. apply map_subseteq_spec. intros va bb Hbb.
+      apply lookup_union_Some_raw in Hbb as [Hbb | (Hnone & Hbb)].
+      - exact (lookup_weaken _ _ _ _ Hbb Hsub).
+      - apply lookup_gset_to_gmap_Some in Hbb as (Hin & <-).
+        apply Hlz; [| exact (Hmono va (proj1 (elem_of_live_set szn va) Hin))].
+        intros Hm. apply (proj2 (Hmpm va)) in Hm.
+        rewrite Hnone in Hm. exact (is_Some_None Hm). }
+    iExists Mp.
+    iSplitR; [iPureIntro; apply map_union_subseteq_l |].
+    iSplitR.
+    { iPureIntro. intros va. rewrite lookup_union_is_Some.
+      rewrite (Hmpm va) (Hgz va). reflexivity. }
+    iSplitR.
+    { iPureIntro. intros va Hnm Hlv.
+      rewrite lookup_union_r;
+        [| apply not_elem_of_dom; rewrite Hdom;
+           intros Hin; apply Hnm; by apply elem_of_uva_dom].
+      apply lookup_gset_to_gmap_Some.
+      split; [ by apply elem_of_live_set | reflexivity]. }
+    iSplitR; [iPureIntro; exact Hdom |]. iExact "Hmp".
+  Qed.
+
+  (* the view is insensitive to [ud_data] and to the descriptor's other
+     fields -- everything it reads is a function of the user map *)
+  Lemma umem_lazy_um_cong (P Q : uptd) (sz : Z) (M : gmap Z (bv 8)) :
+    P.(ud_um) = Q.(ud_um) -> umem_lazy P sz M ⊣⊢ umem_lazy Q sz M.
+  Proof.
+    intros Heq.
+    assert (Hmp : forall va, uva_mapped P va <-> uva_mapped Q va)
+      by (intros va; unfold uva_mapped; rewrite Heq; reflexivity).
+    assert (Hdo : uva_dom P = uva_dom Q)
+      by (apply set_eq; intros va; rewrite !elem_of_uva_dom; apply Hmp).
+    assert (Hpa : forall va, uva_pa P va = uva_pa Q va)
+      by (intros va; unfold uva_pa; rewrite Heq; reflexivity).
+    rewrite /umem_lazy /umem_own.
+    iSplit; iIntros "H"; iDestruct "H" as (Mp) "(%H1 & %H2 & %H3 & %H4 & Hm)";
+      iExists Mp.
+    - iSplitR; [iPureIntro; exact H1 |].
+      iSplitR; [iPureIntro; intros va; rewrite (H2 va); rewrite (Hmp va);
+                reflexivity |].
+      iSplitR; [iPureIntro; intros va Hnm Hlv; apply H3;
+                [intros Hm; apply Hnm; by apply Hmp | exact Hlv] |].
+      iSplitR; [iPureIntro; rewrite H4; exact Hdo |].
+      iApply (big_sepM_impl with "Hm"). iIntros "!>" (va bb _) "Hj".
+      rewrite <- (Hpa va). iExact "Hj".
+    - iSplitR; [iPureIntro; exact H1 |].
+      iSplitR; [iPureIntro; intros va; rewrite (H2 va); rewrite <- (Hmp va);
+                reflexivity |].
+      iSplitR; [iPureIntro; intros va Hnm Hlv; apply H3;
+                [intros Hm; apply Hnm; by apply Hmp | exact Hlv] |].
+      iSplitR; [iPureIntro; rewrite H4; exact (eq_sym Hdo) |].
+      iApply (big_sepM_impl with "Hm"). iIntros "!>" (va bb _) "Hj".
+      rewrite (Hpa va). iExact "Hj".
+  Qed.
+
   (* ------------------------------------------------------------------ *)
   (* THE UNMAP STEP, at the lazy view -- the mirror of [umem_lazy_fault]. *)
   (*                                                                     *)

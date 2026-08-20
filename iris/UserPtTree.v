@@ -446,6 +446,18 @@ Proof.
   - rewrite lookup_delete_ne; [| lia]. apply IH. lia.
 Qed.
 
+Lemma umem_del_subseteq (M : gmap Z (bv 8)) (a : Z) (n : nat) :
+  umem_del M a n ⊆ M.
+Proof.
+  apply map_subseteq_spec. intros va b Hb.
+  destruct (decide (a <= va < a + Z.of_nat n)%Z) as [Hin | Hout].
+  - apply in_run_iff in Hin as (j & Hj & ->).
+    rewrite (umem_del_lookup_in M a n j Hj) in Hb. discriminate.
+  - rewrite (umem_del_lookup_out M a n va
+               ltac:(intros j Hj Heq; apply Hout; apply in_run_iff; eauto)) in Hb.
+    exact Hb.
+Qed.
+
 Lemma umem_del_sub (M M' : gmap Z (bv 8)) (a : Z) (n : nat) :
   M ⊆ M' -> umem_del M a n ⊆ umem_del M' a n.
 Proof.
