@@ -67,8 +67,9 @@ comparing it against `c4-standard-192`, `c4d-standard-192`, and
 rather than deleted; `rocq-data-v2` is a clone of `rocq-data` taken at
 migration time, so the opam switch and already-synced work trees carried over.
 
-**NEVER RUN `make kernel-rocq` (or plain `make`) ON THE VM.** Its dump rules
-regenerate `kernel-rocq/*.v` from the VM's OWN `xv6-riscv` ELF, which is not
+**NEVER RUN `make kernel-rocq` / `make user-rocq` (or plain `make`) ON THE VM.**
+Their dump rules regenerate `kernel-rocq/*.v` and `user-rocq/*.v` from the
+VM's OWN `xv6-riscv` ELF, which is not
 necessarily the pinned revision — the rsync stamps the synced sources with the
 VM's clock, but the ELF is older still, so make happily re-dumps and **clobbers
 the tracked image the sync just pushed**. The failure surfaces later and
@@ -77,14 +78,26 @@ elsewhere, as `durable-notes.md`'s bogus-address error (`Unable to unify
 proof. Compile the SYNCED image instead:
 
 ```sh
-touch kernel-rocq/*.v            # make them newer than the VM's ELF
+touch kernel-rocq/*.v user-rocq/*.v   # make them newer than the VM's ELF
 opam exec --switch=/shared/xv6rocq -- make -C model-xv6iris -f CoqMakefile -j192
-opam exec --switch=/shared/xv6rocq -- make -C kernel-rocq  -f CoqMakefile -j192
-opam exec --switch=/shared/xv6rocq -- make -C iris         -f CoqMakefile -j180 -k
+opam exec --switch=/shared/xv6rocq -- make -C kernel-rocq   -f CoqMakefile -j192
+opam exec --switch=/shared/xv6rocq -- make -C user-rocq     -f CoqMakefile -j192
+opam exec --switch=/shared/xv6rocq -- make -C iris          -f CoqMakefile -j180 -k
 ```
 
 It only bites after an upstream commit MOVES the image (a dump-tool or xv6
 source change): before that the re-dump is byte-identical and invisible.
+
+**`user-rocq` is a THIRD compiled directory, and forgetting it does not look
+like a missing step** — `iris/_CoqProject` maps `-R ../user-rocq User`, so the
+symptom is a wall of `make[1]: *** No rule to make target
+'../user-rocq/EchoData.vo', needed by 'UCodeEcho.vo'` with **no Rocq error
+anywhere in the log**, and `make -k` then reports `Error 2` from the top rule
+alone. It appeared the day the user-program dumps landed (`959f47cd`..
+`519da425`); a build script written before that silently stops covering the
+tree. Its `CoqMakefile` may also not exist yet on the VM, so generate it if
+missing (`coq_makefile -f _CoqProject -o CoqMakefile`) — same for
+`kernel-rocq`.
 
 ## Getting the .vo back for a local recheck
 
