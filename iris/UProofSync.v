@@ -113,7 +113,16 @@ Section UProofSync.
     assert (Ha7 : uint (m1 !!! Regidx a7_idx) = 2)
       by (rewrite /m1; reg_lookup).
     iApply (wp_uv_ecall C pt Ψxv6 M m1 (mword_of_int 0x2ca)
-              (ui_sync_2ca pt M Hlay Htext) with "Hcg Hpc").
+              (ui_sync_2ca pt M Hlay Htext)
+              (fun (s : mstate)
+                   (Hp : register_lookup cur_privilege s.(sregs) = User)
+                   (Hc : register_lookup (R_bitvector_64 PC) s.(sregs)
+                         = mword_of_int 0x2ca) =>
+                 UserExecFacts.goodmb_execute_ECALL_U UserFrame.Du_r UserFrame.Du_w
+                   s (mword_of_int 0x2ca)
+                   ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                   Hp Hc)
+              with "Hcg Hpc").
     rewrite /xv6_sys_protocol /usys_protocol_of.
     rewrite Ha7.
     change (xv6_sys_sem 2) with UsysNoRet.
@@ -161,7 +170,16 @@ Section UProofSync.
     (* 0x36a  ecall -- SYS_sync, the returning arm *)
     assert (Ha7 : uint (m1 !!! Regidx a7_idx) = 22) by (rewrite /m1; reg_lookup).
     iApply (wp_uv_ecall C pt Ψxv6 M m1 (mword_of_int 0x36a)
-              (ui_sync_36a pt M Hlay Htext) with "Hcg Hpc").
+              (ui_sync_36a pt M Hlay Htext)
+              (fun (s : mstate)
+                   (Hp : register_lookup cur_privilege s.(sregs) = User)
+                   (Hc : register_lookup (R_bitvector_64 PC) s.(sregs)
+                         = mword_of_int 0x36a) =>
+                 UserExecFacts.goodmb_execute_ECALL_U UserFrame.Du_r UserFrame.Du_w
+                   s (mword_of_int 0x36a)
+                   ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                   Hp Hc)
+              with "Hcg Hpc").
     rewrite /xv6_sys_protocol /usys_protocol_of.
     rewrite Ha7.
     change (xv6_sys_sem 22) with UsysPureRet.

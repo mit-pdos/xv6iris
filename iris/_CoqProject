@@ -255,7 +255,7 @@ WpUmodeStore.v
 WpUmodeLoad.v
 USpecSync.v
 UCodeSync.v
-# UProofSync.v
+UProofSync.v
 UCodeEcho.v
 USpecEcho.v
 UCodeSh.v
