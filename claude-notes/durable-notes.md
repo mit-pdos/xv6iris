@@ -2176,7 +2176,12 @@ The number goes up; that is the real one.
 
 `Print Assumptions xv6_power_adequacy_xv6Σ` (SystemAdequacy.v, printed by
 every CI build since 85c21e9f) must show EXACTLY these eight, and merge
-rounds diff against this list textually, not by count:
+rounds diff against this list textually, not by count. The anchor stays
+IMAGE-FREE in `SystemAdequacy.v` (its `fs_boot_image_eras` premise
+undischarged): any constant naming `FsImgDisk.fsimg_dk` audits at baseline
+**+10** (PrimString/PrimInt63 primitives), so the image-discharged
+corollaries live in `FsAdequacyImg.v` and are NOT the audit target — see
+`SystemAssumptions.v`'s header.
 
 1. `LinkNameiRootBoot.NameiRootBoot.wp_namei_root_boot`  (assumed-Link)
 2. `LinkForkretPark.ForkretPark.forkret_park`            (assumed-Link)

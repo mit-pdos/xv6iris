@@ -550,7 +550,39 @@ Measured facts that supersede this file's earlier estimates:
   block is deliberately left in the coverage remainder for that
   producer); (E) `ProofKinit` must switch from minting `kalloc_avail` at
   WP time to consuming `fsc_kpages` (stage-(e) item).
-- **NEXT (in order):** (d2b) staging step 3-wiring + 4 =
+- **(d2b) DONE, commit `bdea6b21`** — `boot_shared_alloc` spends the disk
+  mint on `fs_cfg_alloc` and returns `∃ (HF : fileG Σ)` (via `fileG_of`)
+  + `iref_slots_auth` + `fs_boot_supply` (= the ties + both kits,
+  byte-identical to `fs_cfg_alloc`'s conclusion body — stage (e) reads
+  it); the three dead fileG binders and both stale comments are gone;
+  `xv6_boot_era` applies the chain arms at HF explicitly and DROPS the
+  kits (loud stage-(e) comment); **`adequacy_icfg`/`adequacy_fscfg`
+  DELETED**; audit = EXACTLY the eight-entry baseline. Two RULING
+  DEVIATIONS, both measured and documented in-line: (1) the image
+  hypothesis is ERA-QUANTIFIED — `fs_boot_image_eras sb nib cov :=
+  ∀ g', boot_facts g' → fs_boot_image_wf (v_disk …) …` — because
+  `boot_facts` says nothing about the disk and `virtio_reset` preserves
+  it across power cycles, so a fact at the initial `g` cannot reach the
+  era fupd. "Every era boots on the mkfs image" is the honest price of
+  the mint until the durability effort discharges later eras from
+  `FsCrash.P_fs` — a REAL strengthening of the corollaries' hypothesis,
+  flag it to Nickolai. (2) the audit anchor `xv6_power_adequacy_xv6Σ`
+  STAYS in SystemAdequacy.v, image-free (`Himg` a premise): `Print
+  Assumptions` on anything naming `fsimg_dk` adds exactly ten
+  PrimString/PrimInt63 entries, so the image-discharged corollaries
+  (`FsAdequacyImg.xv6_fs_adequacy_xv6Σ` MOVED, `xv6_power_adequacy_fsimg`
+  NEW) audit at baseline+10 in the leaf. `fsimg_cov =
+  [1..2000)`, `fsimg_nib = 13`, no new vm_compute (leaf 15.4 s).
+- **NEXT (in order):** (e) staging step 5 =
+  thread the kits from `xv6_boot_era` through `boot_hart_primary` →
+  `SpecMain` into `mn_grp_fs` (the `procs_avail` threading of
+  main-boot.md §G3 is the precedent), adjoin the kit-header physical
+  rows P1–P4/A/C at their named sites, run `bio_init_at` +
+  `icache_boot_at` + the `newlock_at`s in the walk, switch `ProofKinit`
+  to consuming `fsc_kpages` (debt E), pay debt D (the byte-level bitmap
+  sweep for `bitmap_res`), and discharge `LinkNameiRootBoot`'s Axiom by
+  functor application over `LinkNameiRoot.NameiRoot` — **audit 8 → 7 is
+  THIS stage's gate**. Then (f) =
   `FsCfgBoot.fs_cfg_alloc` + the two kits + wiring into `boot_shared_alloc`
   + the adequacy restatement (delete `adequacy_icfg`/`adequacy_fscfg`, move
   the fs corollary to the new leaf per ruling 3); then (e) staging step 5
