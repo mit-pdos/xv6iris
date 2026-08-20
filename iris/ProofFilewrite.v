@@ -359,6 +359,7 @@ Require Import SpecWritei.
 Require Import WriteiBudget.
 Require Import SpecPipewrite.
 Require Import SpecConsolewrite.
+Require Import ConsoleInv.  (* [NDEV_max], [a_devsw_write] *)
 Require Import SpecFilewrite.
 From Kernel Require KernelSyms.
 

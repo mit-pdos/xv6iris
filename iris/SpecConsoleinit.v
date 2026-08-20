@@ -64,6 +64,7 @@ Require Import UartTxInv.
 (* [lk_raw] / [lk_fresh] -- the three-cell spinlock bundle, before and after
    [initlock]; tx_lock's storage is pure transit through this contract. *)
 Require Import SpecProcinit.
+Require Import ConsoleInv.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -125,8 +126,15 @@ Definition wp_consoleinit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{C
      the boot assembly that owns the bss and the initlock call that consumes
      it. *)
   lk_raw UartTxInv.a_tx_lock -∗
+  (* THE DEVICE TABLE.  consoleinit's own two cells, whose old values are
+     arbitrary because it is about to overwrite them, and the eighteen it
+     never touches, still as the BSS left them.  What comes back is the
+     assembled [ConsoleInv.devsw_table] rather than the two cells: the table
+     is written once, here, and never again, so this is the moment to give
+     it up for good and make it duplicable. *)
   devsw_console_read ↦₈ dread0 -∗
   devsw_console_write ↦₈ dwrite0 -∗
+  ConsoleInv.devsw_rest -∗
   ( ∀ mr,
     sie_cap_gpr KT0 mr K false p -∗
     pc_is ret_tgt -∗
@@ -144,8 +152,11 @@ Definition wp_consoleinit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{C
        what lets a boot assembly mint [UartTxInv.is_txlock]
        ([WpLock.newlock] over [UartTxInv.tx_res]). *)
     lk_fresh UartTxInv.a_tx_lock "uart"%string -∗
-    devsw_console_read ↦₈ (mword_of_int KernelSyms.consoleread : mword 64) -∗
-    devsw_console_write ↦₈ (mword_of_int KernelSyms.consolewrite : mword 64) -∗
+    (* ...and the table, filled and DUPLICABLE.  [ConsoleInv.console_inv] is
+       this plus the [is_conslock] the caller mints from [lock_name] above,
+       which is why consoleinit produces the devsw half and not the whole
+       bundle: the lock does not exist until [newlock] runs. *)
+    ConsoleInv.devsw_table -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

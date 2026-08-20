@@ -165,6 +165,8 @@ Require Import BitmapInv.
 Require Import KernelDataInv.
 Require Import SpecPrintk.
 Require Import SpecWritei.
+Require Import ConsoleInv.  (* [a_devsw_write], [devsw_write_val] -- the
+                               devsw geometry lives with the console *)
 Require Import SpecFileread.
 Require Import UartTxInv.
 From Kernel Require KernelSyms.
@@ -193,9 +195,6 @@ Notation filewrite_stack := ((12 + K_writei)%nat) (only parsing).
    what the [slli a5,a5,4] / [ld a5,8(a5)] pair at +0x6c / +0x78 computes.
    The read side is [SpecFileread.a_devsw_read]; the two must not be
    confused, and S3a's decode note 2 exists because they were. *)
-Definition a_devsw_write (mj : Z) : mword 64 :=
-  mword_of_int (KernelSyms.devsw + 16 * mj + 8).
-
 (* THE CHUNK SIZE, as the two [lui]/[addi] pairs at +0x42..+0x4e materialise
    it: ((MAXOPBLOCKS-1-1-2)/2)*BSIZE with MAXOPBLOCKS = 10 and BSIZE = 1024. *)
 Definition FW_MAX : Z := 3072.

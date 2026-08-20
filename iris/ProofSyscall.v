@@ -309,6 +309,7 @@ Require Import FsCrash.
    ([SpecKexec], [SpecPanic], [BioInv], [SpecDirlink], [InodeInv]) rather than
    imported, so nothing this file already says changes meaning. *)
 Require Import BitmapInv.
+Require Import ConsoleInv.
 Require Import IcacheRef.
 Require Import IrefSlots FdSlots.
 Require Import FileInvDefs FileInv.
@@ -810,7 +811,24 @@ Section SyscallVocab.
         !irefslotG Σ, !pavG Σ} `{GEN : GenId}
       (γf : gname) (pj : mword 64) (bn : bio_names) (fn : fclose_names)
       : iProp Σ :=
-    (sysc_proc_env γf ∗ sysc_fs_env pj bn fn)%I.
+    (sysc_proc_env γf ∗ ConsoleInv.console_ready ∗ sysc_fs_env pj bn fn)%I.
+
+  (* THE CONSOLE, reached on its own rather than through [syscall_env_all].
+     Adding it to that projection's output would move eleven arms'
+     [iDestruct] patterns, and a mis-shifted pattern in one of eleven is a
+     silent change of which resource an arm thinks it holds
+     (completed/explicit-cpuid.md's failure mode).  The two arms that want
+     the console take it here instead.
+
+     It is NOT in [FsReady.fs_ready]: the console is not the file system, and
+     [fs_ready]'s establishment is already the boot chain's largest owed
+     row.  It is a SIBLING conjunct, so the only thing that grows is whatever
+     finally establishes [syscall_env] -- which [LinkSyscall.v] still stubs
+     as [emp]. *)
+  Lemma syscall_env_console (γf : gname) (pj : mword 64)
+      (bn : bio_names) (fn : fclose_names) :
+    syscall_env γf pj bn fn -∗ ConsoleInv.console_ready.
+  Proof. by iIntros "(_ & $ & _)". Qed.
 
   (* ...and the OLD shape, as a projection.  Same reason [sysc_fs_env_all]
      keeps its order: an arm's [iDestruct] pattern is an interface, and
@@ -830,7 +848,7 @@ Section SyscallVocab.
       printk_env γpr γud γvd ∗
       sysc_fs_env pj bn fn.
   Proof.
-    iIntros "[#Hproc #Hfs]".
+    iIntros "(#Hproc & _ & #Hfs)".
     iDestruct "Hproc" as (γp γw γft γtk)
       "(#Hnextpid & #Hpav & #Hwaitlk & #Hftable & #Htick)".
     iPoseProof "Hfs" as "#Hfsc".

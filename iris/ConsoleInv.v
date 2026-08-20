@@ -119,6 +119,75 @@ Proof. vm_compute. reflexivity. Qed.
 Lemma a_cons_nz : eq_vec a_cons (zero_reg : mword 64) = false.
 Proof. vm_compute. reflexivity. Qed.
 
+(* ===================================================================== *)
+(*  devsw[] -- THE DEVICE FUNCTION TABLE                                  *)
+(*                                                                        *)
+(*  A [struct devsw] is the two function pointers [read] and [write], so   *)
+(*  entry [mj] starts at [devsw + 16*mj] and its two fields                *)
+(*  sit at +0 and +8.  [NDEV] is 10, so the majors run 0..9, and CONSOLE   *)
+(*  is 1 -- which is why consoleinit's two cells are [devsw + 16] and      *)
+(*  [devsw + 24] ([SpecConsoleinit.devsw_console_read] / [_write]).        *)
+(*                                                                        *)
+(*  These live HERE and not with fileread/filewrite because they are the   *)
+(*  console module's geometry: what the table holds is decided by          *)
+(*  consoleinit and by the fact that nothing else ever writes it.  file.c  *)
+(*  is a reader.                                                          *)
+(* ===================================================================== *)
+
+Definition NDEV_max : Z := 9.
+Definition CONSOLE : Z := 1.
+
+Definition a_devsw_read (mj : Z) : mword 64 :=
+  mword_of_int (KernelSyms.devsw + 16 * mj).
+
+Definition a_devsw_write (mj : Z) : mword 64 :=
+  mword_of_int (KernelSyms.devsw + 16 * mj + 8).
+
+(* WHAT EACH CELL HOLDS, as a function of the major.  [consoleinit] fills
+   CONSOLE and NOTHING FILLS ANY OTHER ENTRY, so every other cell is still
+   the BSS zero it booted with.  Stating the whole table this way -- rather
+   than "null or consoleread", which is all a per-cell disjunction can say --
+   is what lets a caller that has resolved the major to CONSOLE conclude it
+   is about to call consoleread, and a caller that has resolved it to
+   anything else conclude the slot is null and the C returns -1. *)
+Definition devsw_read_val (mj : Z) : mword 64 :=
+  if decide (mj = CONSOLE)
+  then (mword_of_int KernelSyms.consoleread : mword 64)
+  else (zero_reg : mword 64).
+
+Definition devsw_write_val (mj : Z) : mword 64 :=
+  if decide (mj = CONSOLE)
+  then (mword_of_int KernelSyms.consolewrite : mword 64)
+  else (zero_reg : mword 64).
+
+(* the per-cell disjunction file.c's contracts are stated over, read off the
+   table rather than assumed of it *)
+Lemma devsw_read_val_cases (mj : Z) :
+  devsw_read_val mj = (zero_reg : mword 64)
+  \/ devsw_read_val mj = (mword_of_int KernelSyms.consoleread : mword 64).
+Proof. rewrite /devsw_read_val. case_decide; [by right | by left]. Qed.
+
+Lemma devsw_write_val_cases (mj : Z) :
+  devsw_write_val mj = (zero_reg : mword 64)
+  \/ devsw_write_val mj = (mword_of_int KernelSyms.consolewrite : mword 64).
+Proof. rewrite /devsw_write_val. case_decide; [by right | by left]. Qed.
+
+Lemma devsw_read_val_console :
+  devsw_read_val CONSOLE = (mword_of_int KernelSyms.consoleread : mword 64).
+Proof. rewrite /devsw_read_val. by case_decide. Qed.
+
+Lemma devsw_write_val_console :
+  devsw_write_val CONSOLE = (mword_of_int KernelSyms.consolewrite : mword 64).
+Proof. rewrite /devsw_write_val. by case_decide. Qed.
+
+Lemma devsw_read_val_other (mj : Z) :
+  mj <> CONSOLE -> devsw_read_val mj = (zero_reg : mword 64).
+Proof. intro H. rewrite /devsw_read_val. by case_decide. Qed.
+
+Lemma devsw_write_val_other (mj : Z) :
+  mj <> CONSOLE -> devsw_write_val mj = (zero_reg : mword 64).
+Proof. intro H. rewrite /devsw_write_val. by case_decide. Qed.
+
 Section ConsoleInv.
   Context `{!riscvGS Σ, !xv6G Σ}.
 
@@ -149,6 +218,225 @@ Section ConsoleInv.
 
   Global Instance is_conslock_persistent γ : Persistent (is_conslock γ).
   Proof. apply _. Qed.
+
+  (* =================================================================== *)
+  (*  THE CONSOLE INVARIANT                                               *)
+  (*                                                                      *)
+  (*  [is_conslock] plus the WHOLE devsw table, at DISCARDED fractions --  *)
+  (*  the table is written once, by consoleinit, and never again, so the   *)
+  (*  cells can be given up for good and the bundle is then persistent.    *)
+  (*  That is what a syscall needs: [sys_read] may be handed any           *)
+  (*  descriptor, so it must own the read column before the major is       *)
+  (*  known, and it must be able to hand a copy to every arm without       *)
+  (*  splitting a fraction it would have to gather back.                   *)
+  (*                                                                      *)
+  (*  Duplicable ownership is also the only form that can survive the      *)
+  (*  DEVICE ARM'S INDIRECT CALL: [devsw[major].read] is reached through a *)
+  (*  register, so the cell is read and then the callee runs with the      *)
+  (*  caller's resources; a fractional cell would have to be threaded      *)
+  (*  through a call whose target is only known at the load.               *)
+  (* =================================================================== *)
+  Definition devsw_table : iProp Σ :=
+    ([∗ list] i ∈ seq 0 (Z.to_nat NDEV_max + 1),
+       a_devsw_read (Z.of_nat i) ↦₈□ devsw_read_val (Z.of_nat i) ∗
+       a_devsw_write (Z.of_nat i) ↦₈□ devsw_write_val (Z.of_nat i))%I.
+
+  Global Instance devsw_table_persistent : Persistent devsw_table.
+  Proof. apply _. Qed.
+
+  Definition console_inv (γ : gname) : iProp Σ :=
+    (is_conslock γ ∗ devsw_table)%I.
+
+  Global Instance console_inv_persistent γ : Persistent (console_inv γ).
+  Proof. apply _. Qed.
+
+  (* THE GNAME-FREE FORM, which is what a bundle carries.  The cons lock has
+     exactly one gname for the lifetime of a boot, and no consumer needs to
+     tie it to anything it already holds -- a caller of consoleread passes
+     [is_conslock] by value and nothing else about the console.  So the name
+     is existential here, and an arm that needs it destructs this ONCE and
+     builds its callee's names record around what it got.  That is what keeps
+     the console out of [fclose_names] (a positional record threaded through
+     six files) and out of [FsReady.fs_ready]. *)
+  Definition console_ready : iProp Σ := (∃ γ : gname, console_inv γ)%I.
+
+  Global Instance console_ready_persistent : Persistent console_ready.
+  Proof. apply _. Qed.
+
+  Lemma console_ready_intro (γ : gname) : console_inv γ -∗ console_ready.
+  Proof. iIntros "H". by iExists γ. Qed.
+
+  (* the devsw half alone, which is all most consumers want *)
+  Lemma console_ready_devsw : console_ready -∗ devsw_table.
+  Proof. iIntros "H". iDestruct "H" as (γ) "[_ $]". Qed.
+
+  Lemma console_inv_conslock (γ : gname) : console_inv γ -∗ is_conslock γ.
+  Proof. by iIntros "[$ _]". Qed.
+
+  Lemma console_inv_devsw (γ : gname) : console_inv γ -∗ devsw_table.
+  Proof. by iIntros "[_ $]". Qed.
+
+  (* ---- ONE ENTRY, at a major the caller has already bounded ---------- *)
+  Local Lemma devsw_seq_lookup (mj : Z) :
+    (0 <= mj <= NDEV_max)%Z ->
+    seq 0 (Z.to_nat NDEV_max + 1) !! Z.to_nat mj = Some (Z.to_nat mj).
+  Proof.
+    intro H. apply lookup_seq. split; [reflexivity |].
+    rewrite /NDEV_max in H |- *. lia.
+  Qed.
+
+  Lemma devsw_table_at (mj : Z) :
+    (0 <= mj <= NDEV_max)%Z ->
+    devsw_table -∗
+    a_devsw_read mj ↦₈□ devsw_read_val mj ∗
+    a_devsw_write mj ↦₈□ devsw_write_val mj.
+  Proof.
+    intro H. rewrite /devsw_table.
+    iIntros "Ht".
+    iDestruct (big_sepL_lookup _ _ (Z.to_nat mj) (Z.to_nat mj)
+                 (devsw_seq_lookup mj H) with "Ht") as "Ht".
+    rewrite (Z2Nat.id mj (proj1 H)). iExact "Ht".
+  Qed.
+
+  (* ---- WHAT consoleinit FINDS, MINUS ITS OWN TWO CELLS ---------------
+     The eighteen entries consoleinit does not touch, still as the BSS left
+     them.  Splitting them off this way is what keeps consoleinit's WALK
+     unchanged: it goes on taking and storing its own two cells exactly as
+     before, and only the postcondition's assembly is new.
+     -------------------------------------------------------------------- *)
+  Definition devsw_rest : iProp Σ :=
+    ([∗ list] i ∈ seq 0 (Z.to_nat NDEV_max + 1),
+       if decide (Z.of_nat i = CONSOLE) then emp else
+         (a_devsw_read (Z.of_nat i) ↦₈ (zero_reg : mword 64) ∗
+          a_devsw_write (Z.of_nat i) ↦₈ (zero_reg : mword 64)))%I.
+
+  (* ---- THE EIGHTEEN, AS THE CARVE HANDS THEM OVER --------------------
+     The boot carve produces named cells, one per [bss_cut]; this is the one
+     place that turns them into the [big_sepL].  It lives HERE and not in
+     [BootShared.v] on purpose: resolving the [decide] at each index needs
+     the proposition NAMED ([decide_False (P := ...)]).  Written as
+     [rewrite (decide_False _ _ ltac:(...))] the tactic is elaborated against
+     an EVAR for [P], and [vm_compute] on an evar goal is what made
+     BootShared.v diverge.  Ten cheap rewrites in a small file instead.
+     -------------------------------------------------------------------- *)
+  (* The two readings of [devsw_rest]'s body at a LITERAL index.  Stated as
+     lemmas with no underscores on purpose: written inline as
+     [rewrite (decide_False _ _ ltac:(done))] the branches stay as evars and
+     the [ltac:] is elaborated against one, which is what made BootShared.v
+     diverge -- and even when it does not, [rewrite] leaves the undetermined
+     branch behind as an [iProp] GOAL. *)
+  Local Lemma devsw_rest_body_ne (i : nat) : Z.of_nat i <> CONSOLE ->
+    (if decide (Z.of_nat i = CONSOLE) then emp else
+       (a_devsw_read (Z.of_nat i) ↦₈ (zero_reg : mword 64) ∗
+        a_devsw_write (Z.of_nat i) ↦₈ (zero_reg : mword 64)))%I
+    = (a_devsw_read (Z.of_nat i) ↦₈ (zero_reg : mword 64) ∗
+       a_devsw_write (Z.of_nat i) ↦₈ (zero_reg : mword 64))%I.
+  Proof. intro H. case_decide; [contradiction | reflexivity]. Qed.
+
+  Local Lemma devsw_rest_body_eq :
+    (if decide (Z.of_nat 1 = CONSOLE) then emp else
+       (a_devsw_read (Z.of_nat 1) ↦₈ (zero_reg : mword 64) ∗
+        a_devsw_write (Z.of_nat 1) ↦₈ (zero_reg : mword 64)))%I = emp%I.
+  Proof. case_decide; [reflexivity | done]. Qed.
+
+  (* ---- THE EIGHTEEN, AS THE CARVE HANDS THEM OVER --------------------
+     The boot carve produces named cells, one per [bss_cut]; this is the one
+     place that turns them into the [big_sepL], and it lives HERE and not in
+     [BootShared.v] so the reduction happens in a file that compiles in
+     seconds.
+     -------------------------------------------------------------------- *)
+  Lemma devsw_rest_intro :
+    a_devsw_read (Z.of_nat 0) ↦₈ (zero_reg : mword 64) -∗
+    a_devsw_write (Z.of_nat 0) ↦₈ (zero_reg : mword 64) -∗
+    a_devsw_read (Z.of_nat 2) ↦₈ (zero_reg : mword 64) -∗
+    a_devsw_write (Z.of_nat 2) ↦₈ (zero_reg : mword 64) -∗
+    a_devsw_read (Z.of_nat 3) ↦₈ (zero_reg : mword 64) -∗
+    a_devsw_write (Z.of_nat 3) ↦₈ (zero_reg : mword 64) -∗
+    a_devsw_read (Z.of_nat 4) ↦₈ (zero_reg : mword 64) -∗
+    a_devsw_write (Z.of_nat 4) ↦₈ (zero_reg : mword 64) -∗
+    a_devsw_read (Z.of_nat 5) ↦₈ (zero_reg : mword 64) -∗
+    a_devsw_write (Z.of_nat 5) ↦₈ (zero_reg : mword 64) -∗
+    a_devsw_read (Z.of_nat 6) ↦₈ (zero_reg : mword 64) -∗
+    a_devsw_write (Z.of_nat 6) ↦₈ (zero_reg : mword 64) -∗
+    a_devsw_read (Z.of_nat 7) ↦₈ (zero_reg : mword 64) -∗
+    a_devsw_write (Z.of_nat 7) ↦₈ (zero_reg : mword 64) -∗
+    a_devsw_read (Z.of_nat 8) ↦₈ (zero_reg : mword 64) -∗
+    a_devsw_write (Z.of_nat 8) ↦₈ (zero_reg : mword 64) -∗
+    a_devsw_read (Z.of_nat 9) ↦₈ (zero_reg : mword 64) -∗
+    a_devsw_write (Z.of_nat 9) ↦₈ (zero_reg : mword 64) -∗
+    devsw_rest.
+  Proof.
+    iIntros "H0r H0w H2r H2w H3r H3w H4r H4w H5r H5w H6r H6w H7r H7w H8r H8w H9r H9w".
+    rewrite /devsw_rest.
+    change (Z.to_nat NDEV_max + 1)%nat with 10%nat.
+    cbn [seq].
+    rewrite !big_sepL_cons big_sepL_nil.
+    rewrite devsw_rest_body_eq.
+    rewrite (devsw_rest_body_ne 0 ltac:(done)).
+    rewrite (devsw_rest_body_ne 2 ltac:(done)).
+    rewrite (devsw_rest_body_ne 3 ltac:(done)).
+    rewrite (devsw_rest_body_ne 4 ltac:(done)).
+    rewrite (devsw_rest_body_ne 5 ltac:(done)).
+    rewrite (devsw_rest_body_ne 6 ltac:(done)).
+    rewrite (devsw_rest_body_ne 7 ltac:(done)).
+    rewrite (devsw_rest_body_ne 8 ltac:(done)).
+    rewrite (devsw_rest_body_ne 9 ltac:(done)).
+    iFrame.
+  Qed.
+
+  (* ...and the table, once consoleinit's two stores have landed.  An
+     update, because giving a fraction up for good is one. *)
+  Lemma devsw_table_of_rest :
+    devsw_rest -∗
+    a_devsw_read CONSOLE ↦₈ (mword_of_int KernelSyms.consoleread : mword 64) -∗
+    a_devsw_write CONSOLE ↦₈ (mword_of_int KernelSyms.consolewrite : mword 64) ==∗
+    devsw_table.
+  Proof.
+    iIntros "Hrest Hr Hw".
+    iMod (word_pointsto_persist with "Hr") as "#Hr".
+    iMod (word_pointsto_persist with "Hw") as "#Hw".
+    rewrite /devsw_table /devsw_rest.
+    iApply big_sepL_bupd.
+    (* [big_sepL_impl], NOT [big_sepL_mono]: the latter takes a Coq-level
+       implication of entailments, so the two persisted CONSOLE cells -- the
+       only thing this proof has to say about the one interesting index --
+       are not in scope inside it. *)
+    iApply (big_sepL_impl with "Hrest").
+    iModIntro. iIntros (k i Hk) "H".
+    assert (Hi : i = k) by (apply lookup_seq in Hk; lia). subst i.
+    case_decide as Hc.
+    - rewrite /devsw_read_val /devsw_write_val.
+      rewrite !(decide_True _ _ Hc) Hc.
+      iModIntro. iFrame "Hr Hw".
+    - rewrite /devsw_read_val /devsw_write_val.
+      rewrite !(decide_False _ _ Hc).
+      iDestruct "H" as "[Hzr Hzw]".
+      iMod (word_pointsto_persist with "Hzr") as "$".
+      iMod (word_pointsto_persist with "Hzw") as "$".
+      by iModIntro.
+  Qed.
+
+  (* ---- THE BOOT-SIDE CONSTRUCTOR ------------------------------------
+     The twenty cells at full ownership -- consoleinit's two, holding the
+     two function addresses it just stored, and the eighteen the BSS carve
+     hands over still zero -- are given up for good and become the table.
+     An update, because discarding a fraction is one ([word_pointsto_persist]).
+     -------------------------------------------------------------------- *)
+  Lemma devsw_table_alloc :
+    ([∗ list] i ∈ seq 0 (Z.to_nat NDEV_max + 1),
+       a_devsw_read (Z.of_nat i) ↦₈ devsw_read_val (Z.of_nat i) ∗
+       a_devsw_write (Z.of_nat i) ↦₈ devsw_write_val (Z.of_nat i))
+    ==∗ devsw_table.
+  Proof.
+    rewrite /devsw_table.
+    iIntros "H".
+    iApply big_sepL_bupd.
+    iApply (big_sepL_mono with "H").
+    iIntros (i x Hx) "[Hr Hw]".
+    iMod (word_pointsto_persist with "Hr") as "$".
+    iMod (word_pointsto_persist with "Hw") as "$".
+    by iModIntro.
+  Qed.
 
   (* ---- reading one byte out of the ring ----------------------------
 

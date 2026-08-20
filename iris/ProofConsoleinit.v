@@ -109,7 +109,7 @@ Section ConsoleinitBody.
     cbv beta delta [wp_consoleinit_sconf_body].
     intros pcE ret_tgt clk c_cname c_ccpu HK.
     pose proof (cni_cap_bounds K HK) as (Hc2 & HK4).
-    iIntros "Hcg #Htext #Hkdata Hpc #Huinv Htx #Hlb #Hsent Hdlab Hclock Hcname Hccpu Hraw Hdr Hdw Hcont".
+    iIntros "Hcg #Htext #Hkdata Hpc #Huinv Htx #Hlb #Hsent Hdlab Hclock Hcname Hccpu Hraw Hdr Hdw Hrest Hcont".
     (* the "cons" string literal (4 chars + NUL), read out of the data image *)
     pose (name := (mword_of_int cons_name_str : mword 64)).
     assert (Hcons : forall j bt, cstring_bytes "cons"%string !! j = Some bt ->
@@ -461,7 +461,13 @@ Section ConsoleinitBody.
     (* ---- hand the continuation both callees' posts + the two devsw cells;
        [Hcont] is now a plain wand chain (BOOT-ONLY: no [wp_next] wrapper),
        so there is no CID to discharge before applying it. ---- *)
-    iApply ("Hcont" $! E3 with "Hcg Hpc [%] Htx Hsent Hdoff Hclock Hcnm Hccpu Hfresh Hdr Hdw").
+    (* THE TABLE IS ASSEMBLED HERE, and this is the only place it can be:
+       the two stores have landed, nothing will ever write devsw again, so
+       the twenty cells are given up for good and become the duplicable
+       [ConsoleInv.devsw_table].  [Hdr]/[Hdw] hold [consoleread]/[consolewrite]
+       at this point -- that is what the two [c.sd]s above put there. *)
+    iMod (ConsoleInv.devsw_table_of_rest with "Hrest Hdr Hdw") as "#Htbl".
+    iApply ("Hcont" $! E3 with "Hcg Hpc [%] Htx Hsent Hdoff Hclock Hcnm Hccpu Hfresh Htbl").
     (* callee_saved m E3: the two sub-calls preserve s1..s11/tp; the epilogue
        restores sp/s0, and ra (caller-saved) is irrelevant. *)
     assert (Hthread : forall c : mword 5, is_cs_idx c = true ->

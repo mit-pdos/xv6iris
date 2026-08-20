@@ -253,6 +253,10 @@ Section SpecMain.
   Definition main_globals_raw : iProp Σ :=
     ((∃ r w : mword 64,
         devsw_console_read ↦₈ r ∗ devsw_console_write ↦₈ w) ∗
+     (* ...and the eighteen devsw entries consoleinit never writes, still as
+        the BSS left them.  consoleinit turns all twenty into the duplicable
+        [ConsoleInv.devsw_table] (SpecConsoleinit.v); this is the raw side. *)
+     ConsoleInv.devsw_rest ∗
      (mword_of_int (KernelSyms.kmem + 24) : mword 64) ↦₈ (mword_of_int 0 : mword 64) ∗
      (* the kernel page-table root: RAW here (kvminit writes it), and
         PERSISTED by main in its publication assembly right after, before

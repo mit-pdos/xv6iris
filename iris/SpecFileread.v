@@ -201,8 +201,6 @@ Notation fileread_stack := ((6 + K_readi)%nat) (only parsing).
    negative [short] is caught by the zero extension rather than by a signed
    test.  (The C says [f->major < 0 || f->major >= NDEV]; gcc merged the two
    into one unsigned compare.) *)
-Definition NDEV_max : Z := 9.
-
 Definition dev_major (Cf : fcontent) : Z := bv_unsigned (fc_major Cf).
 
 (* THE COLUMN INDEX, over plain [Z].  Stated here, outside every section and
@@ -216,9 +214,6 @@ Proof. unfold NDEV_max. lia. Qed.
 (* &devsw[mj].read.  [struct devsw] is two function pointers, [read] first,
    so the entry is 16 bytes and the field is at offset 0 -- which is what the
    [slli a5,a5,4] / [ld a5,0(a5)] pair at +0x82 / +0x8e computes. *)
-Definition a_devsw_read (mj : Z) : mword 64 :=
-  mword_of_int (KernelSyms.devsw + 16 * mj).
-
 (* WHAT FILEREAD RETURNS.  [PipeInv.pipe_rw_ret]'s reading, and deliberately
    the same predicate: three of the four arms produce it verbatim and the
    fourth (readi) is strictly inside it. *)
