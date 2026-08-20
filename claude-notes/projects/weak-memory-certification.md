@@ -24,11 +24,21 @@ po-forwarding disjunct ∧ atomicity; ppo⁻ = rules 1–5, 7 only), and the
 NON-COLLAPSE WITNESS `lb_graph_consistent` (the four-event LB execution
 is RVWMO⁻-consistent — machine-checked proof that the declared model
 admits exactly what sRVWMO forbids, so the tier-2 gap is real; Closed
-under the global context).  **T2-1b owed**: `graph_of_cand`'s
-well-formedness + consistency transfer (srvwmo_consistent → rvwmo⁻ +
-grule14 of the embedding).  **T2-1c owed**: the rule-14 linearization
-(graph → same-log cand; the A3(v) linear-extension shape) and the
-store-dep fragment (`gx_deps`, per the S6 F2 caveat).
+under the global context).  **T2-1b owed, and OFF THE
+CRITICAL PATH** (scoping finding, 2026-08-20): the safety chain consumes
+only the graph→cand direction (T2-1c); cand→graph consistency transfer
+serves the tier-2 EQUALITY statement only.  And it is NOT the easy
+direction it looks: `graph_of_cand`'s trace-order gmo placement violates
+`gload_value`'s co-maximality for STALE reads (a cand read of old `t`
+sits trace-after newer same-byte writes), and the obvious repair — place
+each read at its read-timestamp — breaks acquire ordering ACROSS bytes
+(acquire x@t=5 then read y@t=2 is machine-legal but by-ts placement
+inverts them against ppo rule 5).  Both translation directions are
+genuine per-event scheduling arguments; expect interval/topological
+placement, not a projection.  **T2-1c owed** (critical path): the
+rule-14 linearization (graph → same-log cand; the A3(v)
+linear-extension shape) and the store-dep fragment (`gx_deps`, per the
+S6 F2 caveat).
 
 Plan of record: [`../design/weak-memory-layer2.md`](../design/weak-memory-layer2.md)
 §8 (the route), §11 (the PARM investigation's answer), §13 (the walker
