@@ -771,7 +771,11 @@ Write I1–I6 as **statements with `Admitted` bodies in one commit**, then fan o
   dispatch tables at `UserTotalU.v:1514,1760`) survive verbatim provided
   `base_exec_total_u` / `rvc_exec_total_u` keep their NAMES and their
   `⌜exec …⌝` conjuncts.
-* **P8 — CANCELLED by user ruling (2026-08-19):** the verified Umode tier is
+* **P8 — CANCELLED 2026-08-19, REVIVED AND DONE 2026-08-20.**  All 41 rows
+  are back in the build, ported onto per-node semantics; what it cost is in
+  `user-verified.md`'s port section, and the short version is five lines
+  across four binaries.  The original ruling, for the record: the verified
+  Umode tier is
   descoped from the hart-node-port build; the tier's rows (`WpUmodeStep.v`
   and friends) are commented out of `iris/_CoqProject`, with the
   `.v` files left on disk. The ruling covers every Umode-tier BINARY proof,
