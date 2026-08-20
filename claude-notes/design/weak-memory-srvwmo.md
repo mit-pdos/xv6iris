@@ -138,17 +138,63 @@ simulation:
    equation is false — the class lives on the monad node).  Endpoints:
    `refuse_run`, `t2_bridge` (premises: `pcls_erasable`, `pcls_fusable`,
    `pstep_paired (erase_pstep pstep)`).  **OPEN — the instance discharge
-   of `pstep_paired`** (worklist A2-s3): the AMO and walker windows are
-   register-only by the model's structure, BUT an ABANDONED walker read
-   (`check_leaf_pte` Err / `update_PTE_Bits = None`) is followed by the
-   instruction's data access while the reservation lingers, so clause 1
-   ("every exload establishes `expend`") or clause 2 ("only inert steps
-   from `expend`") as stated needs an abandonment refinement — the
-   post-state `k(value)` already determines abandonment, so `expend`
-   should be structural ("the continuation's next memory event is the
-   paired conditional write") with clause 1 weakened to
-   `expend p' ∨ aband p'`.  This is a shape predicate over the monad —
-   durable-notes' eight-refutation category; check every answer type.
+   of `pstep_paired`** (worklist A2-s3).  The 2026-08-20 recon SUPERSEDES
+   the abandonment-refinement note that stood here: `pstep_paired` as
+   landed is UNIMPLEMENTABLE for the instance, three ways, and the repair
+   is a redesign, not a refinement.  The findings (all read off the code):
+
+   - **Clause 1 is UNUSED** — `refuse_step` destructures `Hp1` and never
+     applies it.  Deleting it (strictly weaker premise) retires the
+     abandonment problem in its recorded form: an abandoning exload simply
+     never enters `expend`.
+   - **Clause 2 cannot pin the timestamps.**  Two exload steps that differ
+     only in timestamps (equal values) land in the SAME program state
+     (`m' = k (inl (w, None))` absorbs only the value), so no
+     state-predicate `expend p aq base tvs` can satisfy clause 2's
+     label-equality disjunct.  Repair: the pending invariant goes to an
+     ∃-FORM keyed on the machine's `w_res` — `rv_base`/`rv_ts` pin base
+     and timestamps, `(aq, tvs)` are existential in `rf_pend` and are
+     established from the exload label's own data — and `expend : P → Prop`
+     loses all indices.
+   - **Clauses 2+3 are jointly history-dependent.**  The same monad state
+     (`sc;rest`) is reachable through a clean window AND through a
+     fence/load-dirtied one (and the FETCH is a plain `LLoad` —
+     `WeakEvStarted` proves the model's fetch classifies `AK_explicit`,
+     not `AK_ifetch`; the comment at `WeakEvInst.v` §6 saying otherwise is
+     stale), and the two clauses make contradictory demands on that state.
+     No state-only `expend` exists.  Repair is MACHINE-SIDE: the agent's
+     own plain LOADS and FENCES clear `w_res` (stores and `LInstr` already
+     do; ISA-legal — a reservation may be invalidated at any time, and the
+     ISA's own LR/SC forward-progress guarantee excludes loads/fences
+     inside constrained loops; no real window contains either, so the WP
+     tier never sees the difference).  Then every dirty-label obligation
+     dies by the `w_res = Some R` GUARD, the `lr;fence;sc` counterexample
+     becomes machine-unreachable (`PFExStore` starves; the retry arm
+     spins), and — a free bonus — the erased run's stale reservations
+     (erasure drops `LInstr`'s clear) die at the next instruction's FETCH
+     load.
+
+   The REDESIGNED discipline: `pstep_paired := W1 ∧ W3` with
+   `expend : P → Prop` — W1: an (erased-)`LSilent`/`LDev` step into an
+   `expend` state comes from an `expend` state; W3: every `LExStore`
+   step's pre-state is `expend` — both guarded by an instance-supplied
+   invariant `PI : P → Prop` (plus a `PI`-preservation clause and `PI` on
+   the initial programs), because the raw monad space contains adversarial
+   shapes (`RegRead;sc`) that no structural predicate survives.  The
+   instance's `expend` is structural — "the continuation's next memory
+   event is the paired conditional write", walking ONLY
+   `{RegWrite, pure-silent}` nodes, hence REGISTER-FILE-INDEPENDENT, which
+   trivializes W1's PLIC arm (the PLIC rewrites `sig_seip` under the
+   window) and makes W1's boundary arm a small concrete walk
+   (`riscv_step`'s dispatch prefix dead-ends at its first
+   `RegRead`/fetch).  `PI` is the one WHOLE-MODEL fact: "every latest-write
+   node is guarded — reachable from its latest-read through
+   `{RegWrite, pure-silent}` nodes only", ∀-quantified at every answer —
+   a boolean-state traversal of `riscv_step` in exactly the
+   port-the-driver family (`DecodeSetU.goodbP` state-pinned /
+   `WeakShapeOverrides2.gpost` ∀-quantified; durable-notes: the drivers
+   transfer line for line).  That traversal (s3d) is A2-s3's irreducible
+   cost; everything else is per-arm mechanical.
 3. **THE EXISTING PROJECTION** (`wp_pf_step_mstep`): the output of
    stages 1–2 is `lb_depfree ∧ lb_fused`, discharging the gates by
    construction.  T1's realization side names the SAME gates

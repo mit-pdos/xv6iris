@@ -100,6 +100,33 @@ are renamed **R0.5–R6** as of 2026-08-19; sRVWMO items are **A1–A5** here
   block) + `dep_dom` landed as its invariant + the safety-form adequacy;
   after R3.  A3(iv) (the fused↔split lift at the projection — the
   re-fusion spike) joins it: both directions now name the same gates.
+  **A2-s3 REDESIGNED (2026-08-20)** — the landed `pstep_paired` is
+  unimplementable for the instance (clause 1 unused; clause 2 cannot pin
+  timestamps — same post-state from different-timestamp exloads; clauses
+  2+3 jointly history-dependent at fence/load-reachable states, and the
+  fetch is a plain `LLoad`, `AK_explicit`).  The redesign is in the
+  design doc's stage-2 block; its slices:
+  - **s3a** — machine: own plain loads and fences clear `w_res`
+    (`WeakMem.load_post_at`/`load_post_d?`/`fence_post`; stores + `LInstr`
+    already clear).  Sweep the tree for `w_res`-preservation lemmas that
+    flip.
+  - **s3b** — `WeakRefuse` reshape: `expend : P → Prop`; `rf_pend` in
+    ∃-form keyed on `w_res` (`rv_base`/`rv_ts` pin; `aq`/`tvs`
+    existential); `pstep_paired := PI-preservation ∧ W1 ∧ W3`, PI-guarded;
+    `RFFuse` premise `expend p` only; `rf_ag` carries `PI (pa_st agS)`;
+    `t2_bridge` gains `Forall PI ps`.
+  - **s3c** — instance predicates: `win` (structural window walk over
+    `{RegWrite, pure-silent}` monad nodes, register-file-independent) and
+    `PIshape` (armed-bit guardedness, ∀-quantified answers); per-arm
+    W1/W3/preservation over `pstep_ev`'s arms; the boundary walk
+    (`riscv_step`'s dispatch prefix dead-ends at its first
+    `RegRead`/fetch).
+  - **s3d** — THE WHOLE-MODEL FACT: `PIshape false (riscv_step tick)` —
+    every latest-write in every decode branch is `{RegWrite,pure}`-guarded
+    from its latest-read.  Port the `gpost`/`goodbP` traversal driver
+    (durable-notes: drivers transfer line for line); expect gen_shape-
+    style sharding if manual proving stalls.
+  - **s3e** — the instance `t2_bridge` endpoint (A2 CLOSED), then R6/A4.
 - **A3 — T1 completion** (much smaller than feared — the induction
   exists): (i) drop `cand_rl_free` by adding the rel→acq `ppo_op` arm
   and extending the view-domination lemma's dominator case; (ii) drop
