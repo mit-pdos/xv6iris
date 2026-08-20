@@ -2947,7 +2947,10 @@ Section UvEcallPost.
       (M : gmap Z (bv 8)) (m : regfile) (pc : mword 64) (ib : mword 32)
       (t' : ptree) (usatp : mword 64) (pcfg : type_of_register pmpcfg_n)
       (paddr : type_of_register pmpaddr_n) (rs1 rs2 : regstate) :
-    (forall s : mstate, goodmb Du_r Du_w (execute (ECALL tt)) s ∅ = true) ->
+    (forall s : mstate,
+       register_lookup cur_privilege s.(sregs) = User ->
+       register_lookup (R_bitvector_64 PC) s.(sregs) = pc ->
+       goodmb Du_r Du_w (execute (ECALL tt)) s ∅ = true) ->
     register_lookup (R_bitvector_64 PC) rs2 = pc ->
     register_lookup hart_state rs2 = HART_ACTIVE tt ->
     register_lookup cur_privilege rs2 = User ->
@@ -3068,7 +3071,7 @@ Section UvEcallPost.
                      (User, make_sync_exception (E_U_EnvCall tt) (zeros' 64), pc))
                   rsx ∅ u_disj Du_r_sub Du_w_sub
                   ltac:(intros q _; reflexivity) (map_empty_subseteq _)
-                  (Hg (u_state rsx ∅)) Hex
+                  (Hg (u_state rsx ∅) Lcpx Lpcx) Hex
                   with "Hcert Hany Hrw Hro Hemp"). }
     iIntros (v) "(-> & Hpost)".
     iDestruct "Hpost" as (rs3 mm3) "(%Hag3 & _ & _ & Hrw & Hro & _ & Hany)".
@@ -3173,7 +3176,10 @@ Section UvEcall.
   Lemma wp_uv_ecall (Ψ : usys_protocol Σ) (M : gmap Z (bv 8)) (m : regfile)
       (pc : mword 64) :
     uinstr pt M pc false (ECALL tt) ->
-    (forall s : mstate, goodmb Du_r Du_w (execute (ECALL tt)) s ∅ = true) ->
+    (forall s : mstate,
+       register_lookup cur_privilege s.(sregs) = User ->
+       register_lookup (R_bitvector_64 PC) s.(sregs) = pc ->
+       goodmb Du_r Du_w (execute (ECALL tt)) s ∅ = true) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
     Ψ (uint (m !!! Regidx a7_idx)) m pc M -∗

@@ -261,8 +261,8 @@ USpecEcho.v
 UCodeSh.v
 USpecSh.v
 USpecShParse.v
-# UmodeFrame.v
-# UmodeStub.v
+UmodeFrame.v
+UmodeStub.v
 # UProofShLib.v
 # UProofShMem.v
 # UProofShHeap.v
