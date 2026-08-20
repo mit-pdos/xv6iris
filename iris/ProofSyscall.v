@@ -3723,8 +3723,8 @@ Section SyscallMain.
      check driving the data-dependent `k`, the address computation, the
      table read, the redundant `beqz`, the `c.jalr`) into a full dispatch:
      every one of the 22 table entries reaches `sysc_arm_goal k` for its
-     own `k`, discharged by `sysc_arm_dispatch` -- ten real arms (see the
-     file header's list) and, for the other twelve, the honest `Admitted`
+     own `k`, discharged by `sysc_arm_dispatch` -- sixteen real arms (see the
+     file header's list) and, for the other six, the honest `Admitted`
      `sysc_arm_placeholder`.  A new arm is one more `decide (k = <literal>)`
      branch inside that combinator and NOTHING here moves; see the file
      header for what each remaining entry is still waiting on. *)
