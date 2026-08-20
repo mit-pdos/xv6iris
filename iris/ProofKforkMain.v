@@ -580,7 +580,7 @@ Section KforkArms.
     set (V2 := upd_pt V1 (pv_upt V1) (<[(14%nat) := zero_reg]> (pv_tf V1))).
     change (upd_pt V1 (pv_upt V1) (<[(14%nat) := zero_reg]> (pv_tf V1))) with V2.
     assert (HofnullV2 : pv_ofile V2 = replicate NOFILE (zero_reg : mword 64)).
-    { rewrite /V2 /V1. cbn [pv_ofile upd_pt]. exact Hofnull. }
+    { rewrite /V2 /V1. cbn [pv_ofile upd_pt pv_fdg]. exact Hofnull. }
     (* ---- ProofKforkB3: the fd scan, ALL 16 iterations in one shot ---- *)
     (* [trap_res b] is the RESERVE the in-lock window is carrying; B3 is
        arm-generic and instantiated at [b := false], so it cannot compute the

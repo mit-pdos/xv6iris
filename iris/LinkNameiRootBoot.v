@@ -61,6 +61,7 @@ Module NameiRootBoot : NAMEI_ROOT_BOOT.
               (MkPPriv (zero_reg : mword 64)
                  (UPTD (mword_of_int 0 : mword 44) (mword_of_int 0 : mword 44) ∅ ∅)
                  [] (replicate NOFILE (zero_reg : mword 64))
+                 1%positive            (* the fd-state name: junk in a dummy *)
                  (zero_reg : mword 64) [])
               HK Hn eq_refl eq_refl Hdev Hnib Hlks
               with "Hcg Hcpu Htext Hkd Hpc Hpenv Hitl Hitinv Hesc Hireg

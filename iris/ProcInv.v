@@ -126,10 +126,20 @@ Qed.
    disagree.  The descriptor [pv_upt] determines both. *)
 (* functional update of one fd slot -- fdalloc / sys_close / kexit. *)
 Definition upd_ofile (V : pprivate) (fd : nat) (v : mword 64) : pprivate :=
-  MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (<[fd := v]> (pv_ofile V)) (pv_cwd V) (pv_name V).
+  MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (<[fd := v]> (pv_ofile V)) (pv_fdg V)
+          (pv_cwd V) (pv_name V).
+
+(* THE ONE UPDATE THAT MOVES THE GHOST NAME: allocproc's mint.  A slot comes
+   out of [proc_dormant] with whatever junk name its existential carried (a
+   dormant slot has no descriptors, so nothing constrains it) and the fresh
+   process is given a name nothing has ever seen -- see
+   [proc_dormant_unused], which is the only caller, and FdSlots.v's header
+   for why the name must not outlive the incarnation. *)
+Definition upd_fdg (V : pprivate) (g : gname) : pprivate :=
+  MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) g (pv_cwd V) (pv_name V).
 
 Definition upd_sz (V : pprivate) (v : mword 64) : pprivate :=
-  MkPPriv v (pv_upt V) (pv_tf V) (pv_ofile V) (pv_cwd V) (pv_name V).
+  MkPPriv v (pv_upt V) (pv_tf V) (pv_ofile V) (pv_fdg V) (pv_cwd V) (pv_name V).
 
 (* functional update of the trapframe words -- what prepare_return does to
    the four KERNEL slots (kernel_satp / kernel_sp / kernel_trap /
@@ -137,12 +147,12 @@ Definition upd_sz (V : pprivate) (v : mword 64) : pprivate :=
    return value write does to the a0 slot.  The page itself is unchanged;
    only [pv_tf]'s contents move. *)
 Definition upd_tf (V : pprivate) (ws : list (mword 64)) : pprivate :=
-  MkPPriv (pv_sz V) (pv_upt V) ws (pv_ofile V) (pv_cwd V) (pv_name V).
+  MkPPriv (pv_sz V) (pv_upt V) ws (pv_ofile V) (pv_fdg V) (pv_cwd V) (pv_name V).
 
 (* the descriptor moves, everything else stays -- what copyin / copyout /
    vmfault do to a process when they fault a page in ([uptd_ext], below). *)
 Definition upd_upt (V : pprivate) (P : uptd) : pprivate :=
-  MkPPriv (pv_sz V) P (pv_tf V) (pv_ofile V) (pv_cwd V) (pv_name V).
+  MkPPriv (pv_sz V) P (pv_tf V) (pv_ofile V) (pv_fdg V) (pv_cwd V) (pv_name V).
 
 (* [upd_cwd] and [upd_cwd_id] live in [ProcDefs], next to [pprivate]
    itself and to [proc_priv_bare_cwd], the borrow that needs them. *)
@@ -151,12 +161,12 @@ Definition upd_upt (V : pprivate) (P : uptd) : pprivate :=
    move, the scalar fields stay.  allocproc's move, once kalloc has produced
    the trapframe page and proc_pagetable the table. *)
 Definition upd_pt (V : pprivate) (P : uptd) (ws : list (mword 64)) : pprivate :=
-  MkPPriv (pv_sz V) P ws (pv_ofile V) (pv_cwd V) (pv_name V).
+  MkPPriv (pv_sz V) P ws (pv_ofile V) (pv_fdg V) (pv_cwd V) (pv_name V).
 
 (* the 16 debug-name bytes -- kfork's [safestrcpy(np->name, p->name, 16)] and
    kexec's [safestrcpy(p->name, last, 16)]. *)
 Definition upd_name (V : pprivate) (ns : list (bv 8)) : pprivate :=
-  MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) (pv_cwd V) ns.
+  MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) (pv_fdg V) (pv_cwd V) ns.
 
 (* EXEC'S MOVE: a process REPLACES its address space.  The size, the
    descriptor, the trapframe words and the name all change at once; the
@@ -167,7 +177,7 @@ Definition upd_name (V : pprivate) (ns : list (bv 8)) : pprivate :=
    SpecKexec's success arm readable. *)
 Definition upd_exec (V : pprivate) (szv : mword 64) (P : uptd)
     (ws : list (mword 64)) (ns : list (bv 8)) : pprivate :=
-  MkPPriv szv P ws (pv_ofile V) (pv_cwd V) ns.
+  MkPPriv szv P ws (pv_ofile V) (pv_fdg V) (pv_cwd V) ns.
 
 Lemma upd_exec_compose (V : pprivate) (szv : mword 64) (P : uptd)
     (ws : list (mword 64)) (ns : list (bv 8)) :
@@ -237,11 +247,27 @@ Section ProcInv.
      bounds any file's [ref] by FDSLOTS, hence what makes filedup's unchecked
      [f->ref++] safe -- so this predicate is the proc-side end of the law
      whose file-side end is [FileInv.fslot]. *)
-  Definition ofile_slot (γf : gname) (pa : mword 64) (fd : nat) (v : mword 64) : iProp Σ :=
+  (* [γd] IS THE PROCESS'S OWN fd-state ghost ([ProcDefs.pv_fdg] of its
+     private block), and this is where the ghost is PINNED TO THE MACHINE:
+     a null cell is a CLOSED descriptor, and a cell naming a file is an OPEN
+     descriptor whose state is that file's type, read off the very [fcontent]
+     the reference already carries.  So the ghost cannot drift -- there is no
+     step that moves one without the other, because they are conjuncts of one
+     predicate.  See FdSlots.v's header for the two-halves shape and why the
+     name is per-INCARNATION.
+       [fdstate_of C <> FdClosed] on the file disjunct is the statement that
+     a descriptor never names an UNTYPED file ([FileInvDefs.fdstate_of] maps
+     FD_NONE to [FdClosed]).  That is true of xv6 -- filealloc's fresh,
+     untyped file reaches a descriptor only after sys_open or pipealloc has
+     set [f->type] -- and it has to be said HERE, because it is what makes
+     "the cell is non-null" and "the ghost says open" the same fact. *)
+  Definition ofile_slot (γf γd : gname) (pa : mword 64) (fd : nat) (v : mword 64)
+      : iProp Σ :=
     (p_ofile pa fd ↦₈ v ∗
-     (⌜v = (zero_reg : mword 64)⌝ ∗ fd_slot ∨
+     (⌜v = (zero_reg : mword 64)⌝ ∗ fd_slot ∗ fd_st_both γd fd FdClosed ∨
       ∃ (k : nat) (q : Qp) (C : fcontent),
-        ⌜v = fnode k /\ (k < NFILE)%nat⌝ ∗ file_ref γf k q C))%I.
+        ⌜v = fnode k /\ (k < NFILE)%nat /\ fdstate_of C <> FdClosed⌝ ∗
+        file_ref γf k q C ∗ fd_st_both γd fd (fdstate_of C)))%I.
 
   (* ---- the two ends of "filling a descriptor", as accessors ----
      An EMPTY descriptor owns the fd-slot unit itself, so opening one YIELDS
@@ -250,24 +276,54 @@ Section ProcInv.
      the null direction the file disjunct is REFUTED rather than assumed --
      a [struct file *] out of the global table is never NULL
      ([FileInv.fnode_ne_zero]). *)
-  Lemma ofile_slot_null (γf : gname) (pa : mword 64) (fd : nat) :
-    ofile_slot γf pa fd (zero_reg : mword 64) -∗
-    p_ofile pa fd ↦₈ (zero_reg : mword 64) ∗ fd_slot.
+  Lemma ofile_slot_null (γf γd : gname) (pa : mword 64) (fd : nat) :
+    ofile_slot γf γd pa fd (zero_reg : mword 64) -∗
+    p_ofile pa fd ↦₈ (zero_reg : mword 64) ∗ fd_slot ∗
+    fd_st_both γd fd FdClosed.
   Proof.
-    iIntros "[$ [[_ $] | (%k & %q & %C & [%Hfn %Hk] & _)]]".
+    iIntros "[$ [(_ & $ & $) | (%k & %q & %C & (%Hfn & %Hk & _) & _)]]".
     exfalso. apply (fnode_ne_zero k Hk). symmetry. exact Hfn.
   Qed.
 
-  Lemma ofile_slot_file (γf : gname) (pa : mword 64) (fd k : nat) (q : Qp) (C : fcontent) :
-    (k < NFILE)%nat ->
-    p_ofile pa fd ↦₈ fnode k -∗ file_ref γf k q C -∗ ofile_slot γf pa fd (fnode k).
+  Lemma ofile_slot_file (γf γd : gname) (pa : mword 64) (fd k : nat) (q : Qp)
+      (C : fcontent) :
+    (k < NFILE)%nat -> fdstate_of C <> FdClosed ->
+    p_ofile pa fd ↦₈ fnode k -∗ file_ref γf k q C -∗
+    fd_st_both γd fd (fdstate_of C) -∗ ofile_slot γf γd pa fd (fnode k).
   Proof.
-    iIntros (Hk) "Hc Href". iFrame "Hc". iRight.
-    iExists k, q, C. iFrame "Href". iPureIntro. split; [reflexivity | exact Hk].
+    iIntros (Hk Hty) "Hc Href Hst". iFrame "Hc". iRight.
+    iExists k, q, C. iFrame "Href Hst". iPureIntro.
+    split; [reflexivity | split; [exact Hk | exact Hty]].
   Qed.
 
-  Definition proc_ofiles (γf : gname) (pa : mword 64) (fs : list (mword 64)) : iProp Σ :=
-    (⌜length fs = NOFILE⌝ ∗ [∗ list] fd ↦ v ∈ fs, ofile_slot γf pa fd v)%I.
+  (* THE READING, in BORROW form: the array knows every descriptor's state,
+     and what it knows agrees with the cell.  This is the shape the fragment
+     split will use -- what leaves is exactly the [fd_st] half this lends --
+     and it is the strongest thing that CAN be said while both halves are
+     still inside.  A client-facing agreement lemma ("a holder of [fd_st γd
+     fd st] learns whether the cell is null") would be VACUOUS today: the
+     slot already holds both halves, so a third share is invalid and the
+     premise set is unsatisfiable.  That is the one thing the next increment
+     buys, and the reason it is worth doing. *)
+  Lemma ofile_slot_state (γf γd : gname) (pa : mword 64) (fd : nat) (v : mword 64) :
+    ofile_slot γf γd pa fd v -∗
+    ∃ st : fdstate,
+      ⌜st = FdClosed <-> v = (zero_reg : mword 64)⌝ ∗ fd_st γd fd st ∗
+      (fd_st γd fd st -∗ ofile_slot γf γd pa fd v).
+  Proof.
+    iIntros "[Hc [(-> & Hu & Ha & Hf) | (%k & %q & %C & (%Hfn & %Hk & %Hty) & Href & Ha & Hf)]]".
+    - iExists FdClosed. iFrame "Hf". iSplitR; [iPureIntro; split; done|].
+      iIntros "Hf". iFrame "Hc". iLeft. by iFrame "Hu Ha Hf".
+    - iExists (fdstate_of C). iFrame "Hf". iSplitR.
+      { iPureIntro. split; [done|]. intro Hz. exfalso.
+        apply (fnode_ne_zero k Hk). by rewrite -Hfn. }
+      iIntros "Hf". iFrame "Hc". iRight. iExists k, q, C. iFrame "Href Ha Hf".
+      iPureIntro. split; [exact Hfn | split; [exact Hk | exact Hty]].
+  Qed.
+
+  Definition proc_ofiles (γf γd : gname) (pa : mword 64) (fs : list (mword 64))
+      : iProp Σ :=
+    (⌜length fs = NOFILE⌝ ∗ [∗ list] fd ↦ v ∈ fs, ofile_slot γf γd pa fd v)%I.
 
   (* =================================================================== *)
   (* THE DEFICIT: descriptors whose payload is on loan.                   *)
@@ -281,7 +337,7 @@ Section ProcInv.
      at once.  Crucially [fdalloc] itself needs the array, so the reference
      cannot merely be borrowed with [proc_ofiles_ofile] across the call: that
      accessor's wand demands a whole [ofile_slot] back first.
-       [proc_ofiles_owe γf pa fs D] is the array with the payloads of [D]
+       [proc_ofiles_owe γf γd pa fs D] is the array with the payloads of [D]
      missing -- each such descriptor contributes only its cell.
 
      WHY THE NON-NULL CLAUSE.  A lent descriptor's cell is never null (one only
@@ -291,37 +347,50 @@ Section ProcInv.
      not tell a free descriptor from a lent one, and could install a second
      reference over a loan.
 
+     WHY THE GHOST IS EXISTENTIAL ON A LENT DESCRIPTOR.  A loan is a window
+     INSIDE one syscall -- [proc_priv] is [D = ∅], so no loan survives a
+     return -- and during it the array does not know the type of the file that
+     will come back.  Both halves of the descriptor's ghost stay here, so
+     whoever settles the loan can retype it in one step
+     ([proc_ofiles_repay]); it is the repay that re-pins the ghost to the
+     file's actual [fcontent], and no client can observe the window.  Once the
+     FRAGMENT is handed out (the next increment), the fragment's own value
+     pins [st] here through [fd_st_agree] and the existential costs nothing.
+
      WHY NOT A THIRD [ofile_slot] DISJUNCT.  Because only the holder of the
      block sees [D].  A "maybe on loan" case inside [ofile_slot] would have to
      be REFUTED by every consumer of a non-null descriptor (argfd's callers,
      sys_close), and none of them can do that from [v <> 0] alone.  See
      claude-notes/design/file-table.md. *)
-  Definition ofile_lent_or_slot (γf : gname) (pa : mword 64) (D : gset nat)
+  Definition ofile_lent_or_slot (γf γd : gname) (pa : mword 64) (D : gset nat)
       (fd : nat) (v : mword 64) : iProp Σ :=
     (if bool_decide (fd ∈ D)
-     then ⌜v <> (zero_reg : mword 64)⌝ ∗ p_ofile pa fd ↦₈ v
-     else ofile_slot γf pa fd v)%I.
+     then ⌜v <> (zero_reg : mword 64)⌝ ∗ p_ofile pa fd ↦₈ v ∗
+          (∃ st : fdstate, fd_st_both γd fd st)
+     else ofile_slot γf γd pa fd v)%I.
 
-  Definition proc_ofiles_owe (γf : gname) (pa : mword 64) (fs : list (mword 64))
+  Definition proc_ofiles_owe (γf γd : gname) (pa : mword 64) (fs : list (mword 64))
       (D : gset nat) : iProp Σ :=
     (⌜length fs = NOFILE⌝ ∗
-     [∗ list] fd ↦ v ∈ fs, ofile_lent_or_slot γf pa D fd v)%I.
+     [∗ list] fd ↦ v ∈ fs, ofile_lent_or_slot γf γd pa D fd v)%I.
 
-  Lemma ofile_lent_or_slot_in (γf : gname) (pa : mword 64) (D : gset nat)
+  Lemma ofile_lent_or_slot_in (γf γd : gname) (pa : mword 64) (D : gset nat)
       (fd : nat) (v : mword 64) :
     fd ∈ D ->
-    ofile_lent_or_slot γf pa D fd v ⊣⊢ ⌜v <> (zero_reg : mword 64)⌝ ∗ p_ofile pa fd ↦₈ v.
+    ofile_lent_or_slot γf γd pa D fd v ⊣⊢
+    ⌜v <> (zero_reg : mword 64)⌝ ∗ p_ofile pa fd ↦₈ v ∗
+    (∃ st : fdstate, fd_st_both γd fd st).
   Proof. intro Hin. rewrite /ofile_lent_or_slot bool_decide_true //. Qed.
 
-  Lemma ofile_lent_or_slot_out (γf : gname) (pa : mword 64) (D : gset nat)
+  Lemma ofile_lent_or_slot_out (γf γd : gname) (pa : mword 64) (D : gset nat)
       (fd : nat) (v : mword 64) :
-    fd ∉ D -> ofile_lent_or_slot γf pa D fd v ⊣⊢ ofile_slot γf pa fd v.
+    fd ∉ D -> ofile_lent_or_slot γf γd pa D fd v ⊣⊢ ofile_slot γf γd pa fd v.
   Proof. intro Hin. rewrite /ofile_lent_or_slot bool_decide_false //. Qed.
 
   (* NO deficit is the array itself -- so [proc_priv] never has to change
      shape for a function that lends nothing. *)
-  Lemma proc_ofiles_owe_empty (γf : gname) (pa : mword 64) (fs : list (mword 64)) :
-    proc_ofiles_owe γf pa fs ∅ ⊣⊢ proc_ofiles γf pa fs.
+  Lemma proc_ofiles_owe_empty (γf γd : gname) (pa : mword 64) (fs : list (mword 64)) :
+    proc_ofiles_owe γf γd pa fs ∅ ⊣⊢ proc_ofiles γf γd pa fs.
   Proof.
     rewrite /proc_ofiles_owe /proc_ofiles.
     apply bi.sep_proper; [reflexivity|].
@@ -329,17 +398,17 @@ Section ProcInv.
     apply ofile_lent_or_slot_out. set_solver.
   Qed.
 
-  Lemma proc_ofiles_owe_len (γf : gname) (pa : mword 64) (fs : list (mword 64))
+  Lemma proc_ofiles_owe_len (γf γd : gname) (pa : mword 64) (fs : list (mword 64))
       (D : gset nat) :
-    proc_ofiles_owe γf pa fs D -∗ ⌜length fs = NOFILE⌝.
+    proc_ofiles_owe γf γd pa fs D -∗ ⌜length fs = NOFILE⌝.
   Proof. iIntros "[$ _]". Qed.
 
   (* Away from [fd], two deficit sets that agree give the same remainder. *)
-  Lemma ofiles_rest_agree (γf : gname) (pa : mword 64) (fs : list (mword 64))
+  Lemma ofiles_rest_agree (γf γd : gname) (pa : mword 64) (fs : list (mword 64))
       (D D' : gset nat) (fd : nat) :
     (forall j, j <> fd -> (j ∈ D <-> j ∈ D')) ->
-    ([∗ list] k↦y ∈ fs, if decide (k = fd) then emp else ofile_lent_or_slot γf pa D k y)
-    ⊣⊢ ([∗ list] k↦y ∈ fs, if decide (k = fd) then emp else ofile_lent_or_slot γf pa D' k y).
+    ([∗ list] k↦y ∈ fs, if decide (k = fd) then emp else ofile_lent_or_slot γf γd pa D k y)
+    ⊣⊢ ([∗ list] k↦y ∈ fs, if decide (k = fd) then emp else ofile_lent_or_slot γf γd pa D' k y).
   Proof.
     intro Hag. apply big_sepL_proper. intros k y _.
     case_decide as Hk; [reflexivity|].
@@ -353,19 +422,19 @@ Section ProcInv.
      and under a new deficit set, provided the two sets agree away from [fd].
      Lend, repay and install are all instances -- which is the point: the
      surgery happens once, here, and the three uses below are one line each. *)
-  Lemma proc_ofiles_owe_acc (γf : gname) (pa : mword 64) (fs : list (mword 64))
+  Lemma proc_ofiles_owe_acc (γf γd : gname) (pa : mword 64) (fs : list (mword 64))
       (D D' : gset nat) (fd : nat) (v : mword 64) :
     fs !! fd = Some v ->
     (forall j, j <> fd -> (j ∈ D <-> j ∈ D')) ->
-    proc_ofiles_owe γf pa fs D -∗
-    ofile_lent_or_slot γf pa D fd v ∗
-    (∀ v', ofile_lent_or_slot γf pa D' fd v' -∗
-           proc_ofiles_owe γf pa (<[fd := v']> fs) D').
+    proc_ofiles_owe γf γd pa fs D -∗
+    ofile_lent_or_slot γf γd pa D fd v ∗
+    (∀ v', ofile_lent_or_slot γf γd pa D' fd v' -∗
+           proc_ofiles_owe γf γd pa (<[fd := v']> fs) D').
   Proof.
     iIntros (Hfd Hag) "[%Hlen Ho]".
     rewrite (big_sepL_delete _ fs fd v Hfd).
     iDestruct "Ho" as "[$ Hrest]".
-    rewrite (ofiles_rest_agree _ _ _ D D' fd Hag).
+    rewrite (ofiles_rest_agree _ _ _ _ D D' fd Hag).
     iIntros (v') "Hnew". iSplitR.
     { iPureIntro. rewrite length_insert. exact Hlen. }
     rewrite (big_sepL_delete _ (<[fd := v']> fs) fd v').
@@ -376,64 +445,78 @@ Section ProcInv.
 
   (* LEND: a descriptor that names a file gives its reference up, and joins
      the deficit.  The caller only has to know the cell is non-null -- which
-     is exactly what [SpecArgfd.arg_fd] reports. *)
-  Lemma proc_ofiles_lend (γf : gname) (pa : mword 64) (fs : list (mword 64))
+     is exactly what [SpecArgfd.arg_fd] reports.
+       It hands back the file's TYPEDNESS along with the reference, because
+     that is the one thing the repay cannot re-derive: [ofile_slot] is where
+     "a descriptor names a typed file" is stated, and once the payload is out
+     of the array nothing else says it. *)
+  Lemma proc_ofiles_lend (γf γd : gname) (pa : mword 64) (fs : list (mword 64))
       (D : gset nat) (fd : nat) (v : mword 64) :
     fd ∉ D ->
     fs !! fd = Some v ->
     v <> (zero_reg : mword 64) ->
-    proc_ofiles_owe γf pa fs D -∗
+    proc_ofiles_owe γf γd pa fs D -∗
     ∃ (k : nat) (q : Qp) (C : fcontent),
-      ⌜v = fnode k /\ (k < NFILE)%nat⌝ ∗ file_ref γf k q C ∗
-      proc_ofiles_owe γf pa fs ({[fd]} ∪ D).
+      ⌜v = fnode k /\ (k < NFILE)%nat /\ fdstate_of C <> FdClosed⌝ ∗
+      file_ref γf k q C ∗
+      proc_ofiles_owe γf γd pa fs ({[fd]} ∪ D).
   Proof.
     iIntros (Hnin Hfd Hnz) "Ho".
-    iDestruct (proc_ofiles_owe_acc _ _ _ D ({[fd]} ∪ D) fd v Hfd
+    iDestruct (proc_ofiles_owe_acc _ _ _ _ D ({[fd]} ∪ D) fd v Hfd
                  ltac:(set_solver) with "Ho") as "[Hs Hback]".
-    rewrite (ofile_lent_or_slot_out _ _ _ _ _ Hnin) /ofile_slot.
-    iDestruct "Hs" as "[Hc [[%Hz _] | (%k & %q & %C & [%Hfn %Hk] & Href)]]";
+    rewrite (ofile_lent_or_slot_out _ _ _ _ _ _ Hnin) /ofile_slot.
+    iDestruct "Hs" as "[Hc [(%Hz & _) | (%k & %q & %C & (%Hfn & %Hk & %Hty) & Href & Hst)]]";
       [contradiction|].
-    iDestruct ("Hback" $! v with "[Hc]") as "Ho".
-    { rewrite (ofile_lent_or_slot_in _ _ _ _ _ (elem_of_union_l _ _ _
+    iDestruct ("Hback" $! v with "[Hc Hst]") as "Ho".
+    { rewrite (ofile_lent_or_slot_in _ _ _ _ _ _ (elem_of_union_l _ _ _
                  (elem_of_singleton_2 _ _ (eq_refl fd)))).
-      iFrame "Hc". iPureIntro. exact Hnz. }
+      iFrame "Hc". iSplitR; [iPureIntro; exact Hnz|].
+      iExists (fdstate_of C). iExact "Hst". }
     rewrite list_insert_id; [|exact Hfd].
-    iExists k, q, C. iFrame "Href Ho". iPureIntro. split; [exact Hfn|exact Hk].
+    iExists k, q, C. iFrame "Href Ho". iPureIntro.
+    split; [exact Hfn | split; [exact Hk | exact Hty]].
   Qed.
 
-  (* REPAY: hand a reference back, and the descriptor leaves the deficit. *)
-  Lemma proc_ofiles_repay (γf : gname) (pa : mword 64) (fs : list (mword 64))
+  (* REPAY: hand a reference back, and the descriptor leaves the deficit.
+     THE GHOST STEP LIVES HERE: the descriptor's state is re-pinned to the
+     type of the file actually being installed, which is why this is an
+     UPDATE and why it demands the typedness clause the lend handed out. *)
+  Lemma proc_ofiles_repay (γf γd : gname) (pa : mword 64) (fs : list (mword 64))
       (D : gset nat) (fd k : nat) (q : Qp) (C : fcontent) :
     fd ∉ D ->
     fs !! fd = Some (fnode k) ->
     (k < NFILE)%nat ->
-    proc_ofiles_owe γf pa fs ({[fd]} ∪ D) -∗ file_ref γf k q C -∗
-    proc_ofiles_owe γf pa fs D.
+    fdstate_of C <> FdClosed ->
+    proc_ofiles_owe γf γd pa fs ({[fd]} ∪ D) -∗ file_ref γf k q C ==∗
+    proc_ofiles_owe γf γd pa fs D.
   Proof.
-    iIntros (Hnin Hfd Hk) "Ho Href".
-    iDestruct (proc_ofiles_owe_acc _ _ _ ({[fd]} ∪ D) D fd (fnode k) Hfd
+    iIntros (Hnin Hfd Hk Hty) "Ho Href".
+    iDestruct (proc_ofiles_owe_acc _ _ _ _ ({[fd]} ∪ D) D fd (fnode k) Hfd
                  ltac:(set_solver) with "Ho") as "[Hs Hback]".
-    rewrite (ofile_lent_or_slot_in _ _ _ _ _ (elem_of_union_l _ _ _
+    rewrite (ofile_lent_or_slot_in _ _ _ _ _ _ (elem_of_union_l _ _ _
                (elem_of_singleton_2 _ _ (eq_refl fd)))).
-    iDestruct "Hs" as "[_ Hc]".
-    iDestruct ("Hback" $! (fnode k) with "[Hc Href]") as "Ho".
-    { rewrite (ofile_lent_or_slot_out _ _ _ _ _ Hnin).
-      iApply (ofile_slot_file _ _ _ _ q C Hk with "Hc Href"). }
-    rewrite list_insert_id; [|exact Hfd]. iExact "Ho".
+    iDestruct "Hs" as "(_ & Hc & %st & Hst)".
+    iMod (fd_st_both_update γd fd st (fdstate_of C) with "Hst") as "Hst".
+    iDestruct ("Hback" $! (fnode k) with "[Hc Href Hst]") as "Ho".
+    { rewrite (ofile_lent_or_slot_out _ _ _ _ _ _ Hnin).
+      iApply (ofile_slot_file _ _ _ _ _ q C Hk Hty with "Hc Href Hst"). }
+    rewrite list_insert_id; [|exact Hfd]. by iModIntro.
   Qed.
 
   (* INSTALL: fdalloc's whole move.  A free descriptor's unit comes out with
      its cell; writing a non-null pointer puts the descriptor in the deficit,
      for the caller to settle.  fdalloc needs no [file_ref] at all -- its code
      only stores a pointer, and [fd ∉ D] is DERIVED from the cell being null
-     (the non-null clause on the lent case). *)
-  Lemma proc_ofiles_install (γf : gname) (pa : mword 64) (fs : list (mword 64))
+     (the non-null clause on the lent case).  The ghost half goes STRAIGHT
+     THROUGH, at [FdClosed]: the descriptor is not open until the caller has
+     put a typed file behind it, which is [proc_ofiles_repay]'s step. *)
+  Lemma proc_ofiles_install (γf γd : gname) (pa : mword 64) (fs : list (mword 64))
       (D : gset nat) (fd : nat) :
     fs !! fd = Some (zero_reg : mword 64) ->
-    proc_ofiles_owe γf pa fs D -∗
+    proc_ofiles_owe γf γd pa fs D -∗
     p_ofile pa fd ↦₈ (zero_reg : mword 64) ∗ fd_slot ∗
     (∀ v', ⌜v' <> (zero_reg : mword 64)⌝ -∗ p_ofile pa fd ↦₈ v' -∗
-           proc_ofiles_owe γf pa (<[fd := v']> fs) ({[fd]} ∪ D)).
+           proc_ofiles_owe γf γd pa (<[fd := v']> fs) ({[fd]} ∪ D)).
   Proof.
     iIntros (Hfd) "Ho".
     (* the cell is null, so this descriptor is NOT on loan *)
@@ -441,42 +524,43 @@ Section ProcInv.
     { iDestruct "Ho" as "[_ Ho]".
       iDestruct (big_sepL_lookup_acc _ _ _ _ Hfd with "Ho") as "[Hs _]".
       destruct (decide (fd ∈ D)) as [Hin|Hin]; [|iPureIntro; exact Hin].
-      rewrite (ofile_lent_or_slot_in _ _ _ _ _ Hin).
+      rewrite (ofile_lent_or_slot_in _ _ _ _ _ _ Hin).
       iDestruct "Hs" as "[%Hnz _]". done. }
-    iDestruct (proc_ofiles_owe_acc _ _ _ D ({[fd]} ∪ D) fd _ Hfd
+    iDestruct (proc_ofiles_owe_acc _ _ _ _ D ({[fd]} ∪ D) fd _ Hfd
                  ltac:(set_solver) with "Ho") as "[Hs Hback]".
-    rewrite (ofile_lent_or_slot_out _ _ _ _ _ Hnin).
-    iDestruct (ofile_slot_null with "Hs") as "[$ $]".
+    rewrite (ofile_lent_or_slot_out _ _ _ _ _ _ Hnin).
+    iDestruct (ofile_slot_null with "Hs") as "($ & $ & Hst)".
     iIntros (v' Hnz) "Hc".
-    iApply ("Hback" $! v' with "[Hc]").
-    rewrite (ofile_lent_or_slot_in _ _ _ _ _ (elem_of_union_l _ _ _
+    iApply ("Hback" $! v' with "[Hc Hst]").
+    rewrite (ofile_lent_or_slot_in _ _ _ _ _ _ (elem_of_union_l _ _ _
                (elem_of_singleton_2 _ _ (eq_refl fd)))).
-    iFrame "Hc". iPureIntro. exact Hnz.
+    iFrame "Hc". iSplitR; [iPureIntro; exact Hnz|].
+    iExists FdClosed. iExact "Hst".
   Qed.
 
   (* READ one cell, loan or no loan: fdalloc's scan.  Touching the payload
      disjunction per iteration would put a case split in a loop invariant for
      no reason. *)
-  Lemma proc_ofiles_owe_read (γf : gname) (pa : mword 64) (fs : list (mword 64))
+  Lemma proc_ofiles_owe_read (γf γd : gname) (pa : mword 64) (fs : list (mword 64))
       (D : gset nat) (fd : nat) (v : mword 64) :
     fs !! fd = Some v ->
-    proc_ofiles_owe γf pa fs D -∗
-    p_ofile pa fd ↦₈ v ∗ (p_ofile pa fd ↦₈ v -∗ proc_ofiles_owe γf pa fs D).
+    proc_ofiles_owe γf γd pa fs D -∗
+    p_ofile pa fd ↦₈ v ∗ (p_ofile pa fd ↦₈ v -∗ proc_ofiles_owe γf γd pa fs D).
   Proof.
     iIntros (Hfd) "Ho".
-    iDestruct (proc_ofiles_owe_acc _ _ _ D D fd v Hfd
+    iDestruct (proc_ofiles_owe_acc _ _ _ _ D D fd v Hfd
                  (fun j _ => iff_refl (j ∈ D)) with "Ho") as "[Hs Hback]".
     destruct (decide (fd ∈ D)) as [Hin|Hin].
-    - rewrite (ofile_lent_or_slot_in _ _ _ _ _ Hin).
-      iDestruct "Hs" as "[%Hnz Hc]". iFrame "Hc". iIntros "Hc".
-      iDestruct ("Hback" $! v with "[Hc]") as "Ho".
-      { rewrite (ofile_lent_or_slot_in _ _ _ _ _ Hin). iFrame "Hc".
+    - rewrite (ofile_lent_or_slot_in _ _ _ _ _ _ Hin).
+      iDestruct "Hs" as "(%Hnz & Hc & Hst)". iFrame "Hc". iIntros "Hc".
+      iDestruct ("Hback" $! v with "[Hc Hst]") as "Ho".
+      { rewrite (ofile_lent_or_slot_in _ _ _ _ _ _ Hin). iFrame "Hc Hst".
         iPureIntro. exact Hnz. }
       rewrite list_insert_id; [|exact Hfd]. iExact "Ho".
-    - rewrite (ofile_lent_or_slot_out _ _ _ _ _ Hin) /ofile_slot.
+    - rewrite (ofile_lent_or_slot_out _ _ _ _ _ _ Hin) /ofile_slot.
       iDestruct "Hs" as "[Hc Hpay]". iFrame "Hc". iIntros "Hc".
       iDestruct ("Hback" $! v with "[Hc Hpay]") as "Ho".
-      { rewrite (ofile_lent_or_slot_out _ _ _ _ _ Hin) /ofile_slot.
+      { rewrite (ofile_lent_or_slot_out _ _ _ _ _ _ Hin) /ofile_slot.
         iFrame "Hc Hpay". }
       rewrite list_insert_id; [|exact Hfd]. iExact "Ho".
   Qed.
@@ -970,7 +1054,7 @@ Section ProcInv.
   Qed.
 
   Definition proc_priv (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivate) : iProp Σ :=
-    (proc_priv_core pa pid V ∗ proc_ofiles γf pa (pv_ofile V))%I.
+    (proc_priv_core pa pid V ∗ proc_ofiles γf (pv_fdg V) pa (pv_ofile V))%I.
 
   (* ---- THE CONSTRUCTION WINDOW -------------------------------------
      [cwd_ref] has no null arm, so a process whose [p->cwd] is still 0 does
@@ -993,7 +1077,7 @@ Section ProcInv.
      proc_fields pa (DfracOwn 1) V ∗
      proc_pt_at pa (pv_upt V) ∗
      tf_page (ud_tfp (pv_upt V)) (pv_tf V) ∗
-     proc_ofiles γf pa (pv_ofile V))%I.
+     proc_ofiles γf (pv_fdg V) pa (pv_ofile V))%I.
 
   (* THREE-WAY since the token joined the block.  The deficit block is the
      PRE-PARK shape -- what allocproc returns -- and neither the working
@@ -1031,7 +1115,7 @@ Section ProcInv.
   Lemma proc_priv_nocwd_bare (γf : gname) (pa : mword 64) (pid : mword 32)
       (V : pprivate) :
     proc_priv_nocwd γf pa pid V ⊣⊢
-    proc_priv_bare pa pid V ∗ proc_ofiles γf pa (pv_ofile V).
+    proc_priv_bare pa pid V ∗ proc_ofiles γf (pv_fdg V) pa (pv_ofile V).
   Proof.
     rewrite /proc_priv_nocwd /proc_priv_bare. iSplit.
     - iIntros "(%A & %B & Hpid & Hf & Hpt & Htfp & Ho)".
@@ -1068,7 +1152,7 @@ Section ProcInv.
      proc_pt_cells pa (pv_upt V) ∗
      tf_page (ud_tfp (pv_upt V)) (pv_tf V) ∗
      cwd_ref (pv_cwd V) ∗
-     proc_ofiles γf pa (pv_ofile V) ∗
+     proc_ofiles γf (pv_fdg V) pa (pv_ofile V) ∗
      first_tok)%I.
 
   Lemma proc_priv_split_pt (γf : gname) (pa : mword 64) (pid : mword 32)
@@ -1157,7 +1241,7 @@ Section ProcInv.
     rewrite /proc_fields. iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
     iFrame "Hcwd". iIntros (v') "Hcwd".
     rewrite /proc_priv_nocwd /proc_fields.
-    cbn [upd_cwd pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+    cbn [upd_cwd pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
     iSplitR; [done|]. iSplitR; [done|]. iFrame "Hpid".
     iSplitL "Hsz Hcwd Hnm".
     { iFrame "Hsz Hcwd Hnm". iPureIntro; exact Hnl. }
@@ -1188,7 +1272,7 @@ Section ProcInv.
     iDestruct "Hpid" as "[Hq1 Hq2]".
     iFrame "Hcwd Hq1". iIntros (v') "Hcwd Hq1".
     rewrite /proc_priv_nocwd /proc_fields.
-    cbn [upd_cwd pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+    cbn [upd_cwd pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
     iSplitR; [done|]. iSplitR; [done|].
     rewrite Hq word4_pointsto_frac_split. iFrame "Hq1 Hq2".
     iSplitL "Hsz Hcwd Hnm".
@@ -1232,15 +1316,15 @@ Section ProcInv.
       (V : pprivate) (fd : nat) (v : mword 64) :
     pv_ofile V !! fd = Some v ->
     proc_priv_nocwd γf pa pid V -∗
-    ofile_slot γf pa fd v ∗
-    (∀ v', ofile_slot γf pa fd v' -∗
+    ofile_slot γf (pv_fdg V) pa fd v ∗
+    (∀ v', ofile_slot γf (pv_fdg V) pa fd v' -∗
        proc_priv_nocwd γf pa pid (upd_ofile V fd v')).
   Proof.
     iIntros (Hfd) "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & [%Hlen Ho])".
     iDestruct (big_sepL_insert_acc with "Ho") as "[$ Hback]"; first exact Hfd.
     iIntros (v') "Hslot". iDestruct ("Hback" $! v' with "Hslot") as "Ho".
     rewrite /proc_priv_nocwd /proc_ofiles.
-    cbn [upd_ofile pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+    cbn [upd_ofile pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
     iSplitR; [iPureIntro; exact Hszb|].
     iSplitR; [iPureIntro; exact Hbel|].
     iFrame "Hpid Hf Hpt Htfp Ho". iPureIntro.
@@ -1250,7 +1334,7 @@ Section ProcInv.
   (* the split, as an equivalence -- everything below and every landed spec
      keeps using [proc_priv] and never sees the core *)
   Lemma proc_priv_split (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivate) :
-    proc_priv γf pa pid V ⊣⊢ proc_priv_core pa pid V ∗ proc_ofiles γf pa (pv_ofile V).
+    proc_priv γf pa pid V ⊣⊢ proc_priv_core pa pid V ∗ proc_ofiles γf (pv_fdg V) pa (pv_ofile V).
   Proof. reflexivity. Qed.
 
   (* The core does not constrain the descriptor array, so it survives any
@@ -1261,7 +1345,7 @@ Section ProcInv.
     proc_priv_core pa pid (upd_ofile V fd v) ⊣⊢ proc_priv_core pa pid V.
   Proof.
     rewrite /proc_priv_core.
-    by cbn [upd_ofile pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+    by cbn [upd_ofile pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
   Qed.
 
   (* BUILDING one: allocproc is the only producer, and this is exactly its
@@ -1284,12 +1368,12 @@ Section ProcInv.
     proc_fields pa (DfracOwn 1) V -∗
     proc_pt_at pa P -∗
     tf_page (ud_tfp P) ws -∗
-    proc_ofiles γf pa (pv_ofile V) -∗
+    proc_ofiles γf (pv_fdg V) pa (pv_ofile V) -∗
     proc_priv_nocwd γf pa pid (upd_pt V P ws).
   Proof.
     iIntros (Hsz Hbel) "Hpid Hf Hpt Htf Ho".
     rewrite /proc_priv_nocwd.
-    cbn [upd_pt pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+    cbn [upd_pt pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
     iSplitR; [iPureIntro; exact Hsz|].
     iSplitR; [iPureIntro; exact Hbel|]. iFrame "Hpid Hf Hpt Htf Ho".
   Qed.
@@ -1302,7 +1386,7 @@ Section ProcInv.
     proc_fields pa (DfracOwn 1) V -∗
     proc_pt_at pa P -∗
     tf_page (ud_tfp P) ws -∗
-    proc_ofiles γf pa (pv_ofile V) -∗
+    proc_ofiles γf (pv_fdg V) pa (pv_ofile V) -∗
     cwd_ref (pv_cwd V) -∗
     (* ...AND THE TOKEN.  [proc_priv_nocwd_intro] above has NO such premise
        and must not: allocproc produces the deficit block, and allocproc
@@ -1314,7 +1398,7 @@ Section ProcInv.
     iDestruct (proc_priv_nocwd_intro γf pa pid V P ws Hsz Hbel
                  with "Hpid Hf Hpt Htf Ho") as "H".
     iApply proc_priv_split_cwd. iFrame "H Hft".
-    by cbn [upd_pt pv_cwd].
+    by cbn [upd_pt pv_cwd pv_fdg].
   Qed.
 
   (* ---- projections: what callers actually use ---- *)
@@ -1400,7 +1484,7 @@ Section ProcInv.
     iSplitL "Hc"; [iExact "Hc"|].
     iIntros (v') "Hcwd Hc".
     rewrite /proc_priv /proc_priv_core /proc_fields.
-    cbn [upd_cwd pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+    cbn [upd_cwd pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
     iSplitR "Ho"; [| iExact "Ho"].
     iSplitR; [done|]. iSplitR; [done|].
     iFrame "Hpid".
@@ -1462,7 +1546,7 @@ Section ProcInv.
     iSplitL "Hq1"; [iExact "Hq1"|].
     iIntros (v') "Hcwd Hc Hq1".
     rewrite /proc_priv /proc_priv_core /proc_fields.
-    cbn [upd_cwd pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+    cbn [upd_cwd pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
     iSplitR "Ho"; [| iExact "Ho"].
     iSplitR; [done|]. iSplitR; [done|].
     rewrite Hq word4_pointsto_frac_split. iFrame "Hq1 Hq2".
@@ -1562,7 +1646,7 @@ Section ProcInv.
     iFrame "Htfc Htfp".
     iIntros (ws') "Htfc Htfp".
     rewrite /proc_priv /proc_priv_core /proc_pt_at.
-    cbn [upd_tf pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+    cbn [upd_tf pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
     iSplitR "Ho"; [| iFrame "Ho"].
     iSplitR; [iPureIntro; exact Hszb|].
     iSplitR; [iPureIntro; exact Hbel|].
@@ -1614,7 +1698,7 @@ Section ProcInv.
     iFrame "Hsz Hpg Hptt".
     iIntros (P' szv) "%Hroot %Htf %Hszb' %Hbel' Hsz Hpg Hptt".
     rewrite /proc_priv /proc_priv_core /proc_fields /proc_pt_at.
-    cbn [upd_sz upd_upt pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+    cbn [upd_sz upd_upt pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
     rewrite Hroot Htf.
     iSplitR "Ho"; [|iFrame "Ho"].
     iSplitR; [iPureIntro; exact Hszb'|].
@@ -1745,7 +1829,7 @@ Section ProcInv.
     iFrame "Hsz Hpg Hptt".
     iIntros (P' szv) "%Hroot %Htf %Hszb' %Hbel' Hsz Hpg Hptt".
     rewrite /proc_priv_core /proc_fields /proc_pt_at.
-    cbn [upd_sz upd_upt pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+    cbn [upd_sz upd_upt pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
     rewrite Hroot Htf.
     iSplitR; [iPureIntro; exact Hszb'|].
     iSplitR; [iPureIntro; exact Hbel'|].
@@ -1830,7 +1914,7 @@ Section ProcInv.
     iFrame "Hsz Hpg Htfc Hptt Htfp".
     iIntros (P' szv ws') "%Htf %Hszb' %Hbel' Hsz Hpg Htfc Hptt Htfp".
     rewrite /proc_priv /proc_priv_core /proc_fields /proc_pt_at.
-    cbn [upd_sz upd_pt pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+    cbn [upd_sz upd_pt pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
     iSplitR "Ho"; [|iFrame "Ho"].
     iSplitR; [iPureIntro; exact Hszb'|].
     iSplitR; [iPureIntro; exact Hbel'|].
@@ -1856,7 +1940,7 @@ Section ProcInv.
     iFrame "Hnm".
     iIntros (ns) "%Hnl' Hnm".
     rewrite /proc_priv /proc_priv_core /proc_fields.
-    cbn [upd_name pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+    cbn [upd_name pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
     iSplitR "Ho"; [|iFrame "Ho"].
     iSplitR; [iPureIntro; exact Hszb|].
     iSplitR; [iPureIntro; exact Hbel|].
@@ -1869,14 +1953,14 @@ Section ProcInv.
       (V : pprivate) (fd : nat) (v : mword 64) :
     pv_ofile V !! fd = Some v ->
     proc_priv γf pa pid V -∗
-    ofile_slot γf pa fd v ∗
-    (∀ v', ofile_slot γf pa fd v' -∗ proc_priv γf pa pid (upd_ofile V fd v')).
+    ofile_slot γf (pv_fdg V) pa fd v ∗
+    (∀ v', ofile_slot γf (pv_fdg V) pa fd v' -∗ proc_priv γf pa pid (upd_ofile V fd v')).
   Proof.
     iIntros (Hfd) "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft) [%Hlen Ho]]".
     iDestruct (big_sepL_insert_acc with "Ho") as "[$ Hback]"; first exact Hfd.
     iIntros (v') "Hslot". iDestruct ("Hback" $! v' with "Hslot") as "Ho".
     rewrite /proc_priv /proc_priv_core /proc_ofiles.
-    cbn [upd_ofile pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+    cbn [upd_ofile pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
     iSplitR "Ho".
     { iSplitR; [iPureIntro; exact Hszb|].
       iSplitR; [iPureIntro; exact Hbel|].
@@ -1894,8 +1978,8 @@ Section ProcInv.
       (V : pprivate) (fd : nat) (v : mword 64) :
     pv_ofile V !! fd = Some v ->
     proc_priv γf pa pid V -∗
-    p_pid pa ↦₄{DfracOwn (1/4)} pid ∗ ofile_slot γf pa fd v ∗
-    (∀ v', p_pid pa ↦₄{DfracOwn (1/4)} pid -∗ ofile_slot γf pa fd v' -∗
+    p_pid pa ↦₄{DfracOwn (1/4)} pid ∗ ofile_slot γf (pv_fdg V) pa fd v ∗
+    (∀ v', p_pid pa ↦₄{DfracOwn (1/4)} pid -∗ ofile_slot γf (pv_fdg V) pa fd v' -∗
            proc_priv γf pa pid (upd_ofile V fd v')).
   Proof.
     iIntros (Hfd) "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft) [%Hlen Ho]]".
@@ -1905,7 +1989,7 @@ Section ProcInv.
     iDestruct (big_sepL_insert_acc with "Ho") as "[$ Hback]"; first exact Hfd.
     iIntros (v') "Hq1 Hslot". iDestruct ("Hback" $! v' with "Hslot") as "Ho".
     rewrite /proc_priv /proc_priv_core /proc_ofiles.
-    cbn [upd_ofile pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+    cbn [upd_ofile pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
     iSplitR "Ho".
     { iSplitR; [iPureIntro; exact Hszb|].
       iSplitR; [iPureIntro; exact Hbel|].
@@ -1923,8 +2007,8 @@ Section ProcInv.
       (V : pprivate) (fd : nat) (v : mword 64) :
     pv_ofile V !! fd = Some v ->
     proc_priv γf pa pid V -∗
-    proc_priv_bare pa pid V ∗ ofile_slot γf pa fd v ∗
-    (∀ v', proc_priv_bare pa pid V -∗ ofile_slot γf pa fd v' -∗
+    proc_priv_bare pa pid V ∗ ofile_slot γf (pv_fdg V) pa fd v ∗
+    (∀ v', proc_priv_bare pa pid V -∗ ofile_slot γf (pv_fdg V) pa fd v' -∗
            proc_priv γf pa pid (upd_ofile V fd v')).
   Proof.
     iIntros (Hfd) "[Hcore [%Hlen Ho]]".
@@ -1933,10 +2017,10 @@ Section ProcInv.
     iDestruct (big_sepL_insert_acc with "Ho") as "[$ Hback]"; first exact Hfd.
     iIntros (v') "Hb Hslot". iDestruct ("Hback" $! v' with "Hslot") as "Ho".
     rewrite /proc_priv /proc_ofiles.
-    cbn [upd_ofile pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+    cbn [upd_ofile pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
     iSplitR "Ho".
     { rewrite proc_priv_core_bare /proc_priv_bare.
-      cbn [upd_ofile pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+      cbn [upd_ofile pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
       iFrame "Hb Hc". }
     iFrame "Ho". iPureIntro. rewrite length_insert. exact Hlen.
   Qed.
@@ -1951,13 +2035,14 @@ Section ProcInv.
     v <> (zero_reg : mword 64) ->
     proc_priv γf pa pid V -∗
     ∃ (k : nat) (q : Qp) (C : fcontent),
-      ⌜v = fnode k /\ (k < NFILE)%nat⌝ ∗ file_ref γf k q C ∗
+      ⌜v = fnode k /\ (k < NFILE)%nat /\ fdstate_of C <> FdClosed⌝ ∗
+      file_ref γf k q C ∗
       proc_priv_core pa pid V ∗
-      proc_ofiles_owe γf pa (pv_ofile V) {[fd]}.
+      proc_ofiles_owe γf (pv_fdg V) pa (pv_ofile V) {[fd]}.
   Proof.
     iIntros (Hfd Hnz) "[Hcore Ho]".
-    rewrite -(proc_ofiles_owe_empty γf pa (pv_ofile V)).
-    iDestruct (proc_ofiles_lend _ _ _ ∅ fd v ltac:(set_solver) Hfd Hnz with "Ho")
+    rewrite -(proc_ofiles_owe_empty γf (pv_fdg V) pa (pv_ofile V)).
+    iDestruct (proc_ofiles_lend _ _ _ _ ∅ fd v ltac:(set_solver) Hfd Hnz with "Ho")
       as (k q C) "[%Hk [Href Ho]]".
     iExists k, q, C. iFrame "Href Hcore".
     rewrite (union_empty_r_L {[fd]}). iFrame "Ho". iPureIntro. exact Hk.
@@ -1965,7 +2050,7 @@ Section ProcInv.
 
   (* ... and putting the block back together once every loan is settled. *)
   Lemma proc_priv_join (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivate) :
-    proc_priv_core pa pid V -∗ proc_ofiles_owe γf pa (pv_ofile V) ∅ -∗
+    proc_priv_core pa pid V -∗ proc_ofiles_owe γf (pv_fdg V) pa (pv_ofile V) ∅ -∗
     proc_priv γf pa pid V.
   Proof.
     iIntros "Hcore Ho". rewrite proc_ofiles_owe_empty. iFrame "Hcore Ho".
@@ -1983,17 +2068,18 @@ Section ProcInv.
     (fd < NOFILE)%nat ->
     length (pv_ofile V) = NOFILE ->
     (k < NFILE)%nat ->
+    fdstate_of C <> FdClosed ->
     proc_priv_core pa pid V -∗
-    proc_ofiles_owe γf pa (pv_ofile (upd_ofile V fd (fnode k))) ({[fd]} ∪ ∅) -∗
-    file_ref γf k q C -∗
+    proc_ofiles_owe γf (pv_fdg V) pa (pv_ofile (upd_ofile V fd (fnode k))) ({[fd]} ∪ ∅) -∗
+    file_ref γf k q C ==∗
     proc_priv γf pa pid (upd_ofile V fd (fnode k)).
   Proof.
-    iIntros (Hfd Hlen Hk) "Hcore Ho Href".
+    iIntros (Hfd Hlen Hk Hty) "Hcore Ho Href".
     assert (Hlk : pv_ofile (upd_ofile V fd (fnode k)) !! fd = Some (fnode k)).
-    { cbn [upd_ofile pv_ofile]. apply list_lookup_insert. rewrite Hlen. exact Hfd. }
-    iDestruct (proc_ofiles_repay _ _ _ ∅ fd k q C ltac:(set_solver) Hlk Hk
+    { cbn [upd_ofile pv_ofile pv_fdg]. apply list_lookup_insert. rewrite Hlen. exact Hfd. }
+    iMod (proc_ofiles_repay _ _ _ _ ∅ fd k q C ltac:(set_solver) Hlk Hk Hty
                  with "Ho Href") as "Ho".
-    iApply (proc_priv_join with "[Hcore] Ho").
+    iModIntro. iApply (proc_priv_join with "[Hcore] Ho").
     rewrite proc_priv_core_upd_ofile. iExact "Hcore".
   Qed.
 
@@ -2152,8 +2238,16 @@ Section ProcInv.
   (* The allowance comes out too, and separately: it is not part of the
      private field block, it is what the RUNNING THREAD carries beside
      [proc_priv] (FdSlots.v's [FDSPARE] note). *)
+  (* IT IS AN UPDATE, and that is where the fd-state ghost is BORN: the
+     process about to run in this slot gets a name nothing has ever seen,
+     and NOFILE closed descriptors under it ([FdSlots.fd_st_alloc]).  The
+     dormant block carried no such name -- a slot between processes has no
+     descriptors -- so [V]'s own [pv_fdg] is junk here and is replaced.
+     See FdSlots.v's header for why the name must not be per-SLOT: proc
+     slots are recycled, and a fragment minted for the process that used to
+     live here must say nothing about the one that is about to. *)
   Lemma proc_dormant_unused (γf : gname) (pa : mword 64) :
-    proc_dormant pa UNUSED -∗
+    proc_dormant pa UNUSED ==∗
     own_ctx (p_context pa) ∗
     p_pagetable pa ↦₈ (zero_reg : mword 64) ∗
     p_trapframe pa ↦₈ (zero_reg : mword 64) ∗
@@ -2180,18 +2274,25 @@ Section ProcInv.
        pv_cwd V = (zero_reg : mword 64) /\
        uint (pv_sz V) <= uvm_maxsz⌝ ∗
       p_pid pa ↦₄{DfracOwn (1/2)} pid ∗
-      proc_fields pa (DfracOwn 1) V ∗ proc_ofiles γf pa (pv_ofile V).
+      proc_fields pa (DfracOwn 1) V ∗ proc_ofiles γf (pv_fdg V) pa (pv_ofile V).
   Proof.
     iIntros "(%V & %pid & [%Hof [%Hcwd %Hsz]] & Hpid & Hf & Ho & Hs & Hsp & Hir & Hbs & Hkst & Hctx & Haddr)".
     rewrite bool_decide_eq_false_2; [| vm_compute; discriminate].
-    iDestruct "Haddr" as "[Hpg Htf]". iFrame "Hctx Hpg Htf Hsp Hir Hbs Hkst".
-    iExists V, pid. iSplit; [done|]. iFrame "Hpid Hf".
+    iDestruct "Haddr" as "[Hpg Htf]".
+    iMod (fd_st_alloc NOFILE) as (γd) "Hst".
+    iModIntro. iFrame "Hctx Hpg Htf Hsp Hir Hbs Hkst".
+    iExists (upd_fdg V γd), pid.
+    cbn [upd_fdg pv_sz pv_upt pv_tf pv_ofile pv_fdg pv_cwd pv_name].
+    iSplit; [done|]. iFrame "Hpid Hf".
+    iDestruct (fd_st_closed_to_any γd (replicate NOFILE (zero_reg : mword 64))
+                 with "[Hst]") as "Hst"; [by rewrite length_replicate|].
     rewrite /proc_ofiles /ofile_cells Hof length_replicate. iSplit; [done|].
     iAssert ([∗ list] fd ↦ v ∈ replicate NOFILE (zero_reg : mword 64),
-               (p_ofile pa fd ↦₈ v ∗ fd_slot))%I with "[Ho Hs]" as "Ho".
-    { rewrite big_sepL_sep. iFrame "Ho Hs". }
-    iApply (big_sepL_impl with "Ho"). iIntros "!>" (fd v Hv) "[Hcell Hslot]".
-    apply lookup_replicate in Hv as [-> _]. iFrame "Hcell". iLeft. by iFrame "Hslot".
+               (p_ofile pa fd ↦₈ v ∗ fd_slot ∗ fd_st_both γd fd FdClosed))%I
+      with "[Ho Hs Hst]" as "Ho".
+    { rewrite !big_sepL_sep. iFrame "Ho Hs Hst". }
+    iApply (big_sepL_impl with "Ho"). iIntros "!>" (fd v Hv) "(Hcell & Hslot & Hst)".
+    apply lookup_replicate in Hv as [-> _]. iFrame "Hcell". iLeft. by iFrame.
   Qed.
 
   (* ... and back, at ALL-NULL descriptors: the shape [proc_dormant] parks.
@@ -2200,9 +2301,14 @@ Section ProcInv.
      that took the block apart with [proc_dormant_unused] and now wants to
      hand freeproc the rest needs this direction.  allocproc's two failure
      tails are the first consumers. *)
-  Lemma proc_ofiles_null_split (γf : gname) (pa : mword 64) (fs : list (mword 64)) :
+  (* AND THIS IS WHERE THE fd-STATE GHOST DIES.  Every descriptor is closed,
+     so every slot's ghost is at [FdClosed] and both of its halves are here;
+     they are simply DROPPED.  Nothing gives them back and nothing may: the
+     name belonged to the incarnation that is ending, and the next process to
+     take this slot mints its own ([proc_dormant_unused]). *)
+  Lemma proc_ofiles_null_split (γf γd : gname) (pa : mword 64) (fs : list (mword 64)) :
     fs = replicate NOFILE (zero_reg : mword 64) ->
-    proc_ofiles γf pa fs -∗
+    proc_ofiles γf γd pa fs -∗
     ofile_cells pa fs ∗ ([∗ list] _ ∈ fs, fd_slot).
   Proof.
     intros Hfs. rewrite /proc_ofiles /ofile_cells.
@@ -2211,7 +2317,7 @@ Section ProcInv.
       with "[Ho]" as "Ho".
     { iApply (big_sepL_impl with "Ho"). iIntros "!>" (fd v Hv) "Hs".
       rewrite Hfs in Hv. apply lookup_replicate in Hv as [-> _].
-      iApply (ofile_slot_null γf pa fd with "Hs"). }
+      iDestruct (ofile_slot_null γf γd pa fd with "Hs") as "($ & $ & _)". }
     rewrite big_sepL_sep. iDestruct "Ho" as "[$ Hs]".
     iApply (big_sepL_mono with "Hs"). iIntros (fd v _) "$".
   Qed.
@@ -2253,7 +2359,7 @@ Section ProcInv.
     kstack_free pa -∗ proc_dormant_noctx pa ZOMBIE.
   Proof.
     iIntros (Hof Hcwd) "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Ho) Hsp Hir Hbs Hkst".
-    iDestruct (proc_ofiles_null_split γf pa (pv_ofile V) Hof with "Ho") as "[Ho Hs]".
+    iDestruct (proc_ofiles_null_split γf (pv_fdg V) pa (pv_ofile V) Hof with "Ho") as "[Ho Hs]".
     iExists V, pid. iSplit; [by iPureIntro|]. iFrame "Hpid Hf Ho Hs Hsp Hir Hbs Hkst".
     rewrite bool_decide_eq_true_2; [| reflexivity].
     iSplitR; [iPureIntro; exact Hbel|]. iFrame "Hpt Htfp".

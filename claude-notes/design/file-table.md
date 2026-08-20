@@ -614,6 +614,16 @@ exactly why it needs refusing in writing). The rule the two sides divide on:
 > The RESOURCE travels with the reference; the FACT travels with the
 > descriptor.
 
+**AND IT NOW EXISTS** (2026-08-20): the per-`ofile` ghost state is
+`FdSlots.fd_st`, a two-halved per-descriptor `fdstate` (`FdClosed` /
+`FdOpen FdInode | FdPipe | FdDevice major`) pinned to the cell and to the
+named file's type inside `ProcInv.ofile_slot`.  The ftable is untouched by it,
+exactly as this section required.  The design of record is
+[`proc-struct.md`](proc-struct.md), "The fd-state ghost"; the one obligation it
+pushes onto this layer is the clause `fdstate_of C ≠ FdClosed` on
+`ofile_slot`'s file disjunct — a descriptor never names an untyped file —
+which producers pay with `FileInvDefs.fdstate_of_open`.
+
 The pipe end rides inside `file_ref`, because references migrate between
 processes (`fork`, `filedup`) and whoever closes the last one frees the page.
 The kind is a thread-local fact about a thread-local array, and it stays true

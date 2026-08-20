@@ -29,7 +29,7 @@
    both sides should name the same thing. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list.
-From iris.algebra Require Import auth numbers.
+From iris.algebra Require Import auth numbers frac agree gmap.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import own.
 Require Import ProcGeom.
@@ -67,20 +67,131 @@ Definition FDSLOTS : nat := (NPROC * (NOFILE + FDSPARE))%nat.
 
 Definition fdslotUR : ucmra := authUR natUR.
 
+(* ===================================================================== *)
+(*  THE USER-VISIBLE STATE OF A FILE DESCRIPTOR                           *)
+(* ===================================================================== *)
+
+(* The second thing this file carries, and the other end of the law above:
+   [fd_slot] counts descriptors so that [f->ref] cannot overflow; [fd_st]
+   says what the descriptor IS.  A process's descriptor table has NOFILE
+   entries and every one of them is in exactly one of two states -- CLOSED
+   (the cell is null) or OPEN, naming a file of some type.  That is what a
+   USER program sees of the kernel's file layer: open(2) hands back a
+   descriptor of a known type, read(2) on a pipe blocks where read(2) on an
+   inode does not, close(2) makes the number free again.  Nothing in
+   [ProcInv.proc_priv] could state any of it, because the type lives inside
+   [ofile_slot]'s existential [fcontent] and the array is a list of raw
+   pointers.
+
+   So: ONE GHOST VARIABLE PER DESCRIPTOR, in two halves.
+
+   * the AUTHORITY ([fd_st_auth]) rides with the descriptor array inside
+     [ProcInv.proc_ofiles], where it is pinned to the cell and to the type
+     of the file the cell names -- so it cannot drift from the machine;
+   * the FRAGMENT ([fd_st]) is what a client holds and reasons from.  Both
+     halves currently sit in the process invariant ([fd_st_both]); the
+     fragment is what will later be handed OUT, to user-space proofs that
+     want to say "fd 1 is the console" across a syscall.
+
+   Two halves rather than an auth/frag pair because that is exactly the
+   power wanted: either half alone pins the state ([fd_st_agree]) and
+   NEITHER half alone can move it -- an update needs both ([fd_st_both_update]),
+   i.e. the kernel cannot silently retype a descriptor a client is holding,
+   and a client cannot invent a state change without the kernel's step.
+
+   PER PROCESS INCARNATION, NOT PER SLOT.  The name [γ] is minted fresh by
+   allocproc and dropped when the process dies (kexit's ZOMBIE, freeproc's
+   UNUSED) -- the same discipline the trapframe page follows, and for the
+   same reason: a proc SLOT is recycled, so a fragment minted for the
+   process that used to live in slot [i] must not say anything about the
+   process that lives there now.  A name-per-slot minted at boot would be
+   exactly that hazard.  The consequence is that nothing about the fd state
+   appears in [ProcDefs.proc_dormant] -- a dormant slot has no process,
+   hence no descriptors -- and that boot routes nothing.  The name lives in
+   [ProcDefs.pprivate] as [pv_fdg], beside the field values, so that every
+   spec that already threads a process's private state can NAME the
+   process's descriptors without a new parameter.
+
+   A GMAP UNDER ONE NAME, not NOFILE separate [ghost_var]s: a list of
+   sixteen ghost names would have to be allocated, threaded and kept in
+   step with the array, and every lemma about one descriptor would carry
+   the list.  With a gmap the per-descriptor resource is a singleton
+   fragment, [fd_st γ fd st], and the whole table is minted in one
+   [own_alloc] ([fd_st_alloc]).  NO AUTHORITY on the gmap: an exclusive
+   holder ([q = 1]) can retype its own key by a frame-preserving update
+   with nothing else in hand, which is what lets the fd-table surgery in
+   [ProcInv] stay a local step.  (This is [FileInvDefs.fpay_tok]'s
+   construction, and its header argues the point at length.) *)
+
+(* file.h's four [type] codes, minus FD_NONE, which is not a state a
+   DESCRIPTOR can be in: a descriptor either names a typed file or is
+   closed.  [FdDevice]'s [major] is what distinguishes the console
+   (CONSOLE = 1) from any other device file. *)
+Inductive fdtype :=
+| FdInode
+| FdPipe
+| FdDevice (major : Z).
+
+Inductive fdstate :=
+| FdClosed
+| FdOpen (t : fdtype).
+
+Global Instance fdtype_eq_dec : EqDecision fdtype.
+Proof. solve_decision. Defined.
+Global Instance fdstate_eq_dec : EqDecision fdstate.
+Proof. solve_decision. Defined.
+Global Instance fdstate_inhabited : Inhabited fdstate := populate FdClosed.
+
+Definition fdstElt : cmra := prodR fracR (agreeR (leibnizO fdstate)).
+Definition fdstUR : ucmra := gmapUR nat fdstElt.
+
+Definition fdst_v (st : fdstate) : fdstElt := (1%Qp, to_agree (st : leibnizO fdstate)).
+
+(* the table a fresh process is born with: NOFILE closed descriptors.
+   Stated at an arbitrary [n] because that is all the induction needs. *)
+Fixpoint fdst_map0 (n : nat) : gmap nat fdstElt :=
+  match n with
+  | O => ∅
+  | S k => <[k := fdst_v FdClosed]> (fdst_map0 k)
+  end.
+
+Lemma fdst_map0_none (n i : nat) : (n <= i)%nat -> fdst_map0 n !! i = None.
+Proof.
+  revert i. induction n as [|n IH]; intros i Hi; [done|].
+  cbn [fdst_map0]. rewrite lookup_insert_ne; [apply IH; lia | lia].
+Qed.
+
+Lemma fdst_map0_valid (n : nat) : ✓ (fdst_map0 n).
+Proof.
+  induction n as [|n IH]; [intro i; rewrite lookup_empty; done|].
+  cbn [fdst_map0]. apply insert_valid; [split; done | exact IH].
+Qed.
+
 (* The ghost NAME lives in the class, not in every predicate that mentions a
    slot.  There is exactly one fd-slot supply per system, and the alternative
    -- a [γs] parameter -- would drag a filesystem ghost name through
    [ProcInv.proc_dormant], hence [SchedCtx.proc_slots], [proc_lock_res] and
    every scheduler spec, purely so that an EMPTY descriptor can hold a token.
    That is the leakage SpecArgraw.v already argues against for [γf]. *)
-Class fdslotGpreS (Σ : gFunctors) := { fdslot_pre_inG :: inG Σ fdslotUR }.
+(* [fdstUR] RIDES ON THIS CLASS rather than getting one of its own, for the
+   reason [Xv6Cameras]'s sleeplock note gives: every file that can mention a
+   descriptor already binds [fdslotG] (283 of them), and a class of its own
+   would be a binder added to all of them for a camera they get for free
+   here.  It carries no [gname] -- fd-state names are minted per process by
+   allocproc, not once by boot -- so it is pure capacity, exactly like
+   [fdslot_pre_inG]. *)
+Class fdslotGpreS (Σ : gFunctors) := {
+  fdslot_pre_inG :: inG Σ fdslotUR;
+  fdst_pre_inG :: inG Σ fdstUR;
+}.
 Class fdslotG (Σ : gFunctors) := FdSlotG {
   fdslot_inG :: inG Σ fdslotUR;
+  fdst_inG :: inG Σ fdstUR;
   fdslot_name : gname;
 }.
 Global Instance fdslotG_preS `{!fdslotG Σ} : fdslotGpreS Σ :=
-  {| fdslot_pre_inG := fdslot_inG |}.
-Definition fdslotΣ : gFunctors := #[GFunctor fdslotUR].
+  {| fdslot_pre_inG := fdslot_inG; fdst_pre_inG := fdst_inG |}.
+Definition fdslotΣ : gFunctors := #[GFunctor fdslotUR; GFunctor fdstUR].
 Global Instance subG_fdslotΣ {Σ} : subG fdslotΣ Σ -> fdslotGpreS Σ.
 Proof. solve_inG. Qed.
 
@@ -180,6 +291,121 @@ Section FdSlots.
       iSplitL "Hn"; [iApply IH; iExact "Hn" | by iFrame].
   Qed.
 
+  (* =================================================================== *)
+  (*  THE PER-DESCRIPTOR STATE                                            *)
+  (* =================================================================== *)
+  (* See the header above [fdtype] for what these are and why they are
+     shaped this way.  [γ] is the OWNING PROCESS's fd-state name --
+     [ProcDefs.pv_fdg] of its private block. *)
+  Definition fd_st_at (γ : gname) (fd : nat) (q : Qp) (st : fdstate) : iProp Σ :=
+    own γ ({[ fd := (q, to_agree (st : leibnizO fdstate)) ]} : fdstUR).
+
+  (* THE FRAGMENT: what a client of the process holds.  Half, so that it
+     pins the state without being able to move it. *)
+  Definition fd_st (γ : gname) (fd : nat) (st : fdstate) : iProp Σ :=
+    fd_st_at γ fd (1/2) st.
+  (* THE AUTHORITY: the half [ProcInv.ofile_slot] keeps beside the cell. *)
+  Definition fd_st_auth (γ : gname) (fd : nat) (st : fdstate) : iProp Σ :=
+    fd_st_at γ fd (1/2) st.
+  (* BOTH, which is where both currently live -- the process invariant.  The
+     fragment is split out of here when it is handed to a client. *)
+  Definition fd_st_both (γ : gname) (fd : nat) (st : fdstate) : iProp Σ :=
+    (fd_st_auth γ fd st ∗ fd_st γ fd st)%I.
+
+  Global Instance fd_st_at_timeless γ fd q st : Timeless (fd_st_at γ fd q st).
+  Proof. apply _. Qed.
+
+  Lemma fd_st_at_split γ fd q1 q2 st :
+    fd_st_at γ fd (q1 + q2) st ⊣⊢ fd_st_at γ fd q1 st ∗ fd_st_at γ fd q2 st.
+  Proof.
+    rewrite /fd_st_at -own_op.
+    assert (H : (({[ fd := (q1, to_agree (st : leibnizO fdstate)) ]} : fdstUR)
+                 ⋅ {[ fd := (q2, to_agree (st : leibnizO fdstate)) ]})
+                ≡ ({[ fd := ((q1 + q2)%Qp, to_agree (st : leibnizO fdstate)) ]} : fdstUR)).
+    { rewrite singleton_op -pair_op frac_op agree_idemp. reflexivity. }
+    by rewrite H.
+  Qed.
+
+  (* EITHER HALF PINS THE STATE.  This is what a client's fragment is worth:
+     whatever the kernel's authority says, it says the same thing. *)
+  Lemma fd_st_at_agree γ fd q1 st1 q2 st2 :
+    fd_st_at γ fd q1 st1 -∗ fd_st_at γ fd q2 st2 -∗ ⌜st1 = st2⌝.
+  Proof.
+    rewrite /fd_st_at. iIntros "H1 H2".
+    iDestruct (own_valid_2 with "H1 H2") as %Hv. iPureIntro.
+    rewrite singleton_op in Hv. apply singleton_valid in Hv.
+    destruct Hv as [_ Hv]; cbn in Hv. by apply to_agree_op_valid_L in Hv.
+  Qed.
+
+  Lemma fd_st_at_update γ fd st st' :
+    fd_st_at γ fd 1 st ==∗ fd_st_at γ fd 1 st'.
+  Proof.
+    rewrite /fd_st_at. iIntros "H". iApply (own_update with "H").
+    apply singleton_update, cmra_update_exclusive. done.
+  Qed.
+
+  Lemma fd_st_both_full γ fd st : fd_st_both γ fd st ⊣⊢ fd_st_at γ fd 1 st.
+  Proof.
+    rewrite /fd_st_both /fd_st /fd_st_auth.
+    assert (Hq : (1/2 + 1/2)%Qp = 1%Qp) by compute_done.
+    rewrite -{3}Hq fd_st_at_split. reflexivity.
+  Qed.
+
+  Lemma fd_st_agree γ fd st st' :
+    fd_st_auth γ fd st -∗ fd_st γ fd st' -∗ ⌜st = st'⌝.
+  Proof. apply fd_st_at_agree. Qed.
+
+  Lemma fd_st_both_agree γ fd st st' :
+    fd_st_both γ fd st -∗ fd_st γ fd st' -∗ ⌜st = st'⌝.
+  Proof. iIntros "[Ha _]". iApply fd_st_agree. iExact "Ha". Qed.
+
+  (* THE UPDATE TAKES BOTH HALVES, which is the whole point of the shape:
+     neither the kernel's authority nor a client's fragment moves a
+     descriptor on its own. *)
+  Lemma fd_st_both_update γ fd st st' :
+    fd_st_both γ fd st ==∗ fd_st_both γ fd st'.
+  Proof. rewrite !fd_st_both_full. apply fd_st_at_update. Qed.
+
+  Lemma fdst_map0_split (γ : gname) (n : nat) :
+    own γ (fdst_map0 n) ⊢ [∗ list] fd ∈ seq 0 n, fd_st_both γ fd FdClosed.
+  Proof.
+    induction n as [|n IH]; [by iIntros "_"|].
+    rewrite seq_S big_sepL_app big_sepL_singleton. cbn [fdst_map0].
+    rewrite (insert_singleton_op (fdst_map0 n) n (fdst_v FdClosed));
+      [|apply fdst_map0_none; lia].
+    rewrite own_op. iIntros "[Hn Hm]". iSplitL "Hm"; [by iApply IH|].
+    rewrite fd_st_both_full. iExact "Hn".
+  Qed.
+
+  (* ALLOCPROC'S STEP: a process is born with [n] closed descriptors under a
+     name nothing else has ever seen.  The name dies with the process --
+     nothing gives it back, and nothing has to. *)
+  Lemma fd_st_alloc (n : nat) :
+    ⊢ |==> ∃ γ, [∗ list] fd ∈ seq 0 n, fd_st_both γ fd FdClosed.
+  Proof.
+    iMod (own_alloc (fdst_map0 n : fdstUR)) as (γ) "H"; [apply fdst_map0_valid|].
+    iModIntro. iExists γ. iApply (fdst_map0_split with "H").
+  Qed.
+
+  (* the parcelled-out form the fd table wants: one unit per ARRAY SLOT,
+     mirroring [fd_slots_to_any]. *)
+  Lemma fd_st_closed_to_any_at {A} (γ : gname) (l : list A) (o : nat) :
+    ([∗ list] fd ∈ seq o (length l), fd_st_both γ fd FdClosed) -∗
+    [∗ list] i ↦ _ ∈ l, fd_st_both γ (o + i) FdClosed.
+  Proof.
+    revert o. induction l as [|x l IH]; iIntros (o) "H"; [done|].
+    cbn [length seq big_opL]. rewrite Nat.add_0_r.
+    iDestruct "H" as "[$ H]".
+    iDestruct (IH (S o) with "H") as "H".
+    iApply (big_sepL_mono with "H"). iIntros (i y _) "H".
+    replace (S o + i)%nat with (o + S i)%nat by lia. iExact "H".
+  Qed.
+
+  Lemma fd_st_closed_to_any {A} (γ : gname) (l : list A) :
+    ([∗ list] fd ∈ seq 0 (length l), fd_st_both γ fd FdClosed) -∗
+    [∗ list] fd ↦ _ ∈ l, fd_st_both γ fd FdClosed.
+  Proof. iApply (fd_st_closed_to_any_at γ l 0). Qed.
+
 End FdSlots.
 
 (* boot: mint the supply and hand every unit out.  This CREATES the [fdslotG]
@@ -192,5 +418,5 @@ Lemma fd_slots_alloc `{!fdslotGpreS Σ} :
 Proof.
   iMod (own_alloc (● FDSLOTS ⋅ ◯ FDSLOTS)) as (γ) "[Ha Hf]".
   { apply auth_both_valid_discrete. split; [done | done]. }
-  iModIntro. iExists (FdSlotG Σ _ γ). by iFrame.
+  iModIntro. iExists (FdSlotG Σ _ _ γ). by iFrame.
 Qed.

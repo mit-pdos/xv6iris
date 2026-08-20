@@ -18,17 +18,29 @@ Require Export BioDefs.
 
 Local Open Scope Z_scope.
 
+(* [pv_fdg] IS A GHOST NAME, and the only field here that is not a machine
+   value.  It is the name of THIS PROCESS INCARNATION's per-descriptor state
+   ghost ([FdSlots.fd_st]) -- minted fresh by allocproc, dropped when the
+   process dies -- and it lives in the private block rather than as a
+   parameter of [ProcInv.proc_priv] for one reason: every spec that touches a
+   process already threads [V], and none of them would want a second ghost
+   index.  (216 files mention [proc_priv]; one more parameter is one more
+   parameter in all of them, for a name only the fd table reads.)  The
+   [upd_*] updates below all preserve it -- no xv6 operation reassigns a
+   live process's descriptor ghost, not even exec -- so it changes at exactly
+   two points, allocproc's mint and the process's death. *)
 Record pprivate := MkPPriv {
   pv_sz    : mword 64;
   pv_upt   : uptd;
   pv_tf    : list (mword 64);
   pv_ofile : list (mword 64);
+  pv_fdg   : gname;
   pv_cwd   : mword 64;
   pv_name  : list (bv 8);
 }.
 
 Definition upd_cwd (V : pprivate) (v : mword 64) : pprivate :=
-  MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) v (pv_name V).
+  MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) (pv_fdg V) v (pv_name V).
 
 (* re-storing what was already there is the identity, which is what a BORROW
    of the cell out of a block needs in order to close: a load leaves [p->cwd]
@@ -292,7 +304,7 @@ Section ProcDefs.
     rewrite /proc_fields. iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
     iFrame "Hcwd". iIntros (v') "Hcwd".
     rewrite /proc_priv_bare /proc_fields.
-    cbn [upd_cwd pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+    cbn [upd_cwd pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
     iSplitR; [done|]. iSplitR; [done|]. iFrame "Hpid".
     iSplitL "Hsz Hcwd Hnm".
     { iFrame "Hsz Hcwd Hnm". iPureIntro; exact Hnl. }

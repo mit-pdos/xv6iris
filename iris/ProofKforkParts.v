@@ -521,7 +521,7 @@ Section KforkRes.
     iFrame "Htfc Htfp".
     iIntros (ws') "Htfc Htfp".
     rewrite /proc_priv_nocwd /proc_pt_at.
-    cbn [upd_pt pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+    cbn [upd_pt pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
     iSplitR; [iPureIntro; exact Hszb|].
     iSplitR; [iPureIntro; exact Hbel|].
     iFrame "Hpid Hf Hpg Htfc Hptt Htfp Ho".
@@ -689,7 +689,7 @@ Section KforkFreeproc.
     iIntros "Hpv Hsp Hir Hbs Hctx Hkst".
     iDestruct (proc_priv_nocwd_tfp_valid with "Hpv") as "%Hpv".
     iDestruct "Hpv" as "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Ho)".
-    iDestruct (proc_ofiles_null_split γf pa (pv_ofile V) Hof with "Ho")
+    iDestruct (proc_ofiles_null_split γf (pv_fdg V) pa (pv_ofile V) Hof with "Ho")
       as "[Hcells Hunits]".
     rewrite /proc_pt_at. iDestruct "Hpt" as "(Hpg & Htfc & Hptt)".
     rewrite /SpecFreeproc.fp_rest /SpecFreeproc.fp_pt /SpecFreeproc.fp_tf.

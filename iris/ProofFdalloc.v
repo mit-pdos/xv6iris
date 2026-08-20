@@ -698,7 +698,7 @@ Section ProofFdalloc.
       cpu_own (CID:=CID0) n eb p b lks -∗
       pc_is (CID:=CID0) (mword_of_int (KernelSyms.fdalloc + 0x1a) : mword 64) -∗
       proc_priv_core p pid V -∗
-      proc_ofiles_owe γf p (pv_ofile V) D -∗
+      proc_ofiles_owe γf (pv_fdg V) p (pv_ofile V) D -∗
       (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
       (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
       (pa_stk sp0 3) ↦₈[KT1] (m !!! Regidx Rs1 : mword 64) -∗
@@ -724,7 +724,7 @@ Section ProofFdalloc.
       { apply lookup_lt_is_Some. rewrite Hlen. exact Hfd. }
       destruct Hlk as [w Hw].
       (* ---- +0x1a: c.ld a4,0(a5) -- a4 := p->ofile[fd] ---- *)
-      iDestruct (proc_ofiles_owe_read _ _ _ _ fd w Hw with "Hpv") as "[Hcell Hpvback]".
+      iDestruct (proc_ofiles_owe_read _ _ _ _ _ fd w Hw with "Hpv") as "[Hcell Hpvback]".
       assert (Haddr : add_vec (M !!! Regidx Ra5) (sign_extend' 64 (mword_of_int 0 : mword 12))
                       = p_ofile p fd) by (rewrite HMa5; apply addv_sext0).
       iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.fdalloc + 0x1a)) Ra4 Ra5 (mword_of_int 0 : mword 12)
@@ -831,7 +831,7 @@ Section ProofFdalloc.
         (* fdalloc's whole resource move, and it needs NO [file_ref]: the free
            descriptor's unit comes out with its cell, and writing the pointer
            puts the descriptor in the caller's payload deficit. *)
-        iDestruct (proc_ofiles_install _ _ _ _ fd Hw with "Hpv")
+        iDestruct (proc_ofiles_install _ _ _ _ _ fd Hw with "Hpv")
           as "(Hcell & Hfdslot & Hpvback)".
         assert (Haddr3c : add_vec (G3 !!! Regidx Ra2) (sign_extend' 64 (mword_of_int 0 : mword 12))
                           = p_ofile p fd) by (rewrite HG3a2; apply addv_sext0).
@@ -885,7 +885,7 @@ Section ProofFdalloc.
         destruct (fda_frees_found _ fd Hw Hpre) as [l Hfrees].
         iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hpc Hcore [Hpv Hfdslot]"); [exact Hcsf|].
         rewrite /fdalloc_post. iRight. iExists fd, l.
-        cbn [upd_ofile pv_ofile].
+        cbn [upd_ofile pv_ofile pv_fdg].
         iSplitR; [iPureIntro; split; [exact Hfa0 | exact Hfrees]|].
         iFrame "Hpv Hfdslot".
       - (* ============ BUSY: advance, and either loop or give up ======== *)

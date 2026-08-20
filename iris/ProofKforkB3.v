@@ -183,7 +183,7 @@ Qed.
 
 Definition kfk_childV (V0 : pprivate) (Vp_of : list (mword 64)) (i : nat) : pprivate :=
   MkPPriv (pv_sz V0) (pv_upt V0) (pv_tf V0)
-          (kfk_ofile_at Vp_of (pv_ofile V0) i) (pv_cwd V0) (pv_name V0).
+          (kfk_ofile_at Vp_of (pv_ofile V0) i) (pv_fdg V0) (pv_cwd V0) (pv_name V0).
 
 Lemma kfk_childV_0 (V0 : pprivate) (Vp_of : list (mword 64)) :
   kfk_childV V0 Vp_of 0 = V0.
@@ -192,14 +192,14 @@ Proof. unfold kfk_childV. rewrite kfk_ofile_at_0. by destruct V0. Qed.
 Lemma kfk_childV_full (V0 : pprivate) (Vp_of : list (mword 64)) :
   length Vp_of = NOFILE -> length (pv_ofile V0) = NOFILE ->
   pv_ofile (kfk_childV V0 Vp_of NOFILE) = Vp_of.
-Proof. intros. unfold kfk_childV. cbn [pv_ofile]. apply kfk_ofile_at_full; assumption. Qed.
+Proof. intros. unfold kfk_childV. cbn [pv_ofile pv_fdg]. apply kfk_ofile_at_full; assumption. Qed.
 
 Lemma kfk_childV_step (V0 : pprivate) (Vp_of : list (mword 64)) (i : nat) (v : mword 64) :
   length Vp_of = NOFILE -> length (pv_ofile V0) = NOFILE ->
   Vp_of !! i = Some v -> (i < NOFILE)%nat ->
   upd_ofile (kfk_childV V0 Vp_of i) i v = kfk_childV V0 Vp_of (S i).
 Proof.
-  intros HVp HV0 Hv Hi. unfold upd_ofile, kfk_childV. cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+  intros HVp HV0 Hv Hi. unfold upd_ofile, kfk_childV. cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
   f_equal. apply (kfk_ofile_at_step Vp_of (pv_ofile V0) i v HVp HV0 Hv Hi).
 Qed.
 
@@ -545,7 +545,7 @@ Section KforkB3Proof.
         split; [exact HL1s2|]. split; [exact HL1s3|]. split; [exact HL1s4|].
         split; [exact HL1s5|]. exact HL1thr.
       + (* ============ NON-NULL: filedup ============ *)
-        iDestruct "Hpay" as "[[%Hz0 _]|(%k & %q & %Cf & [%Hfn %Hk] & Href)]".
+        iDestruct "Hpay" as "[[%Hz0 _]|(%k & %q & %Cf & (%Hfn & %Hk & %Hty) & Href & Hst)]".
         { exfalso. apply Hvnz. exact Hz0. }
         assert (Hz : eq_vec (L1 !!! Regidx Ra0) (zero_reg : mword 64) = false)
           by (rewrite HL1a0; apply eq_vec_false_iff; exact Hvnz).
@@ -561,12 +561,12 @@ Section KforkB3Proof.
         (* the child's slot [i] is null: open it, it owns exactly the one
            [FdSlots.fd_slot] unit filedup's precondition wants. *)
         assert (Hvc : pv_ofile (kfk_childV V0 (pv_ofile Vp) i) !! i = Some (zero_reg : mword 64)).
-        { unfold kfk_childV. cbn [pv_ofile].
+        { unfold kfk_childV. cbn [pv_ofile pv_fdg].
           rewrite (kfk_ofile_at_lookup_i (pv_ofile Vp) (pv_ofile V0) i HlenVp Hi).
           rewrite HV0. apply lookup_replicate. split; [reflexivity | lia]. }
         iDestruct (proc_priv_nocwd_ofile γf npa pid_c (kfk_childV V0 (pv_ofile Vp) i) i
                      (zero_reg : mword 64) Hvc with "Hpv2") as "[Hslot2 Hback2]".
-        iDestruct (ofile_slot_null with "Hslot2") as "[Hcell2 Hfds]".
+        iDestruct (ofile_slot_null with "Hslot2") as "(Hcell2 & Hfds & Hst2)".
         (* ---- +0x9a: jal ra,filedup ---- *)
         iApply (wp_jal_s_sconf (mword_of_int (KF + 0x9a)) Rra (mword_of_int 9216 : mword 21)
                   L1 (rsv + (K - 8))%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -645,15 +645,20 @@ Section KforkB3Proof.
         assert (Hpp0a2 : add_vec_int (mword_of_int (KF + 0x9e) : mword 64) 4
                         = mword_of_int (KF + 0xa2)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hpp0a2) in "Hpc".
-        (* close the child's slot: it now names the SAME file the parent's does *)
-        iDestruct (ofile_slot_file γf npa i k (q/2)%Qp Cf Hk with "Hcell2 Hslotb") as "Hslot2".
+        (* close the child's slot: it now names the SAME file the parent's does,
+           so its ghost moves from CLOSED to that file's type -- the one place
+           kfork changes a descriptor's user-visible state. *)
+        iMod (fd_st_both_update _ i FdClosed (fdstate_of Cf) with "Hst2") as "Hst2".
+        iDestruct (ofile_slot_file γf _ npa i k (q/2)%Qp Cf Hk Hty
+                     with "Hcell2 Hslotb Hst2") as "Hslot2".
         iDestruct ("Hback2" $! (fnode k) with "Hslot2") as "Hpv2".
         assert (Hvfn : pv_ofile Vp !! i = Some (fnode k)) by (rewrite Hv Hfn; reflexivity).
         iEval (rewrite (kfk_childV_step V0 (pv_ofile Vp) i (fnode k) HlenVp HlenV0 Hvfn Hi))
           in "Hpv2".
         (* close the parent's slot back: it names the SAME file it always did *)
         iEval (rewrite Hfn) in "Hcell".
-        iDestruct (ofile_slot_file γf pme i k (q/2)%Qp Cf Hk with "Hcell Hslota") as "Hslot".
+        iDestruct (ofile_slot_file γf _ pme i k (q/2)%Qp Cf Hk Hty
+                     with "Hcell Hslota Hst") as "Hslot".
         iDestruct ("Hback" $! (fnode k) with "Hslot") as "Hpv".
         iEval (rewrite (upd_ofile_id _ _ _ Hvfn)) in "Hpv".
         (* ---- +0xa2: c.j -> +0x8e ---- *)

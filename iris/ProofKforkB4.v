@@ -98,7 +98,7 @@ Notation KF := KernelSyms.kfork (only parsing).
    projections is a no-op -- the [MkPPriv]-eta law every [upd_*] identity
    in this file reduces to. *)
 Lemma pprivate_eta (V : pprivate) :
-  MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) (pv_cwd V) (pv_name V) = V.
+  MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) (pv_fdg V) (pv_cwd V) (pv_name V) = V.
 Proof. destruct V; reflexivity. Qed.
 
 Lemma upd_cwd_id (V : pprivate) : upd_cwd V (pv_cwd V) = V.
@@ -153,7 +153,7 @@ Section KforkB4Res.
     pname_cells pa (DfracOwn 1) (pv_name V) ∗
     ⌜length (pv_name V) = PNAMELEN⌝ ∗
     (∀ ns : list (bv 8), ⌜length ns = PNAMELEN⌝ -∗ pname_cells pa (DfracOwn 1) ns -∗
-       proc_priv γf pa pid (MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) (pv_cwd V) ns)).
+       proc_priv γf pa pid (MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) (pv_fdg V) (pv_cwd V) ns)).
   Proof.
     iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft) Ho]".
     rewrite /proc_fields. iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
@@ -161,7 +161,7 @@ Section KforkB4Res.
     iSplitR; [done |].
     iIntros (ns) "%Hnl' Hnm'".
     rewrite /proc_priv /proc_priv_core /proc_fields.
-    cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+    cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
     iSplitR "Ho"; [| iExact "Ho"].
     iSplitR; [done|]. iSplitR; [done|]. iFrame "Hpid".
     iSplitL "Hsz Hcwd Hnm'".
@@ -415,7 +415,7 @@ Section KforkB4Proof.
     iAssert (proc_priv γf npa pid_c (upd_cwd Vc (ientry ck))) with "[Hchild2 Hccref2]"
       as "Hchild2".
     { iApply proc_priv_split_cwd. iFrame "Hchild2".
-      iSplitL "Hccref2"; [by cbn [upd_cwd pv_cwd] |].
+      iSplitL "Hccref2"; [by cbn [upd_cwd pv_cwd pv_fdg] |].
       (* THE MINT.  The child's token is the steady arm of the disjunction,
          built from the persistent [first_done] the caller threaded in. *)
       iApply (first_tok_of_done with "Hfdone"). }
@@ -584,7 +584,7 @@ Section KforkB4Proof.
                  with "HnmCfold") as "HnmCfold".
     iDestruct ("HnmCback" $! (h <$> seq 0 16%nat) Hlen_hn with "HnmCfold") as "Hchild3".
     set (Vc3 := MkPPriv (pv_sz Vc2) (pv_upt Vc2) (pv_tf Vc2) (pv_ofile Vc2)
-                  (pv_cwd Vc2) (h <$> seq 0 16%nat)).
+                  (pv_fdg Vc2) (pv_cwd Vc2) (h <$> seq 0 16%nat)).
     (* ------------------------------------------------------------- *)
     (* +0xbe: lw s1,48(s4) -- s1 := np->pid, THE RETURN VALUE.        *)
     (* ------------------------------------------------------------- *)
@@ -632,7 +632,7 @@ Section KforkB4Proof.
       with "[Hchild4]" as "HchildFinal".
     { iExists Vc3.
       iSplitR.
-      - iPureIntro. rewrite /Vc3 /Vc2 /upd_cwd. cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd].
+      - iPureIntro. rewrite /Vc3 /Vc2 /upd_cwd. cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_fdg].
         rewrite Hcwd. repeat split; reflexivity.
       - iExact "Hchild4". }
     iSpecialize ("Hcont" $! CID0 with "[%]"); [intros _; reflexivity |].

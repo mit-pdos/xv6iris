@@ -141,6 +141,32 @@ the SHAPE premises' churn (dir_links threading, the type bundles) but
 NOT the ledger renegotiations (wi16/dl16/crz) — those were about log
 accounting, orthogonal to shape.
 
+## 6a. The first user-visible ghost has LANDED (2026-08-20): fd state
+
+Ahead of F1, and independently of the tree layer, the process's DESCRIPTOR
+state is now ghost state: per fd, `FdClosed` or `FdOpen` of a type (inode,
+pipe, device-with-major, so the console is nameable).  `FdSlots.fd_st`, pinned
+to `p->ofile[fd]` and to the named file's type inside `ProcInv.ofile_slot`; the
+design of record is [`proc-struct.md`](proc-struct.md), "The fd-state ghost".
+
+Why it matters here.  A user program's proof needs to say what a syscall DID,
+and the smallest true statement of that for `open`/`close`/`pipe`/`dup` is
+about descriptors, not about the tree: *this number is now open on a pipe*,
+*this number is free again*.  That is expressible with no `fs_rep` at all, so
+it is the cheapest first piece of the client-facing interface and it is
+already load-bearing (the shape forced `fdalloc`'s deficit to carry the
+typedness clause its callers pay).
+
+What is left before a client can use it.  Both halves currently sit inside the
+process invariant.  The next increment SPLITS the fragment out — it is a
+`1/2`-share and nothing about the algebra changes — and decides what carries
+it across a syscall boundary.  The open question is the same one §5.3 asks of
+`fs_rep`: whether the fragments ride on the syscall contracts one at a time,
+or a client holds a whole `[∗ list] fd, fd_st γ fd st` "descriptor table"
+assertion that each syscall frames all but one slot of.  Note the second shape
+composes with F4's path-points-to the same way: both are per-object fragments
+of one process-local map.
+
 ## 7. RULED (2026-08-15): create_fresh_ty's retirement path runs through here
 
 UPDATE 2026-08-14: the F1/F1.5 design was VERIFIED against the landed

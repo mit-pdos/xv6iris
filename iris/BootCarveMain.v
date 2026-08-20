@@ -2003,8 +2003,11 @@ Section BootCarveMain.
       iExists (MkPPriv (zero_reg : mword 64)
                  (UPTD (mword_of_int 0 : mword 44) (mword_of_int 0 : mword 44) ∅ ∅)
                  [] (replicate NOFILE (zero_reg : mword 64))
+                 (* the fd-state name is JUNK on a dormant slot: it has no
+                    descriptors, and allocproc mints the real one. *)
+                 1%positive
                  (zero_reg : mword 64) bs), vpid.
-      cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+      cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
       iSplitR; [iPureIntro; split_and!;
                 [reflexivity | reflexivity | vm_compute; discriminate] |].
       iSplitL "Hpid1"; [iExact "Hpid1" |].

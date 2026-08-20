@@ -916,7 +916,7 @@ Section ProofSysRead.
       (* ---- THE B1 SEAM.  Lend the descriptor's reference out of the block,
          keep the core for fileread, and settle the loan when it returns. ---- *)
       iDestruct (proc_priv_lend γf pj pidv V fd fv Hlk Hfvnz with "Hpriv")
-        as (kk qq Cf) "([%Hfvk %Hkk] & Href & Hcore & Howe)".
+        as (kk qq Cf) "((%Hfvk & %Hkk & %Hty) & Href & Hcore & Howe)".
       assert (HS4a0' : S4 !!! Regidx Ra0 = fnode kk) by (rewrite HS4a0; exact Hfvk).
       iDestruct (read_env_frame γf fn Cf with "Henv Hdev") as "[Hfenv Hfback]".
       iDestruct (cpu_own_transport CID17 CID24 0%nat eb pj b 
@@ -934,14 +934,14 @@ Section ProofSysRead.
          the deficit the lend opened is literally the one this closes. *)
       assert (Hlkk : pv_ofile V !! fd = Some (fnode kk))
         by (rewrite Hlk Hfvk; reflexivity).
-      iDestruct (proc_ofiles_repay γf pj (pv_ofile V) ∅ fd kk qq Cf
-                   ltac:(apply not_elem_of_empty) Hlkk Hkk with "[Howe] Href")
+      iMod (proc_ofiles_repay γf (pv_fdg V) pj (pv_ofile V) ∅ fd kk qq Cf
+                   ltac:(apply not_elem_of_empty) Hlkk Hkk Hty with "[Howe] Href")
         as "Howe".
       { rewrite (union_empty_r_L {[fd]}). iExact "Howe". }
       iDestruct (proc_priv_join γf pj pidv (upd_upt V P') with "[Hcore] [Howe]")
         as "Hpriv".
       { iExact "Hcore". }
-      { cbn [upd_upt pv_ofile]. iExact "Howe". }
+      { cbn [upd_upt pv_ofile pv_fdg]. iExact "Howe". }
       assert (Hpc40 : ret_pc (S4 !!! Regidx Rra)
                       = mword_of_int (KernelSyms.sys_read + 0x40))
         by (rewrite HS4ra; apply bv_eq; vm_compute; reflexivity).

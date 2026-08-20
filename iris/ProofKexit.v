@@ -163,8 +163,8 @@ Lemma kx_nulled_close (cwdv : mword 64) (fd : nat) (V : pprivate) :
   kx_nulled cwdv fd V -> (fd < length (pv_ofile V))%nat ->
   kx_nulled cwdv (S fd) (upd_ofile V fd (zero_reg : mword 64)).
 Proof.
-  intros [Hc Hn] Hlt. split; [by cbn [upd_ofile pv_cwd]|].
-  intros i Hi. cbn [upd_ofile pv_ofile].
+  intros [Hc Hn] Hlt. split; [by cbn [upd_ofile pv_cwd pv_fdg]|].
+  intros i Hi. cbn [upd_ofile pv_ofile pv_fdg].
   destruct (Nat.eq_dec i fd) as [-> | Hne].
   - by apply list_lookup_insert.
   - rewrite list_lookup_insert_ne; [| congruence]. apply Hn. lia.
@@ -768,7 +768,7 @@ Section KexitLoop.
           intro r; apply rf_to_gmap_dom.
         + apply (kx_nulled_skip cwdv); [exact Hnul|]. rewrite -Hv0. exact Hv.
       - (* FALL: this descriptor names a file -- close it and null the cell *)
-        iDestruct "Hpay" as "[[%Hz0 _] | (%kf & %q & %Cf & [%Hfn %Hkf] & Href)]".
+        iDestruct "Hpay" as "[[%Hz0 _] | (%kf & %q & %Cf & (%Hfn & %Hkf & %Hty) & Href & Hst)]".
         { exfalso. rewrite Hz0 in Hz. rewrite eq_vec_refl in Hz. discriminate. }
         assert (Hzf : eq_vec (rget (CID := CIDl) M3e (mword_of_int 10 : mword 5)) zero_reg = false)
           by (rewrite Hrgl10 HM3e_10; exact Hz).
@@ -856,9 +856,14 @@ Section KexitLoop.
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hpp4a) in "Hpc".
         (* the emptied descriptor owns the unit fileclose handed back *)
-        iDestruct ("Hback" $! (zero_reg : mword 64) with "Hpbare [Hcell Hfdslot]") as "Hpriv".
+        (* THE GHOST STEP: the descriptor is closed, so its state goes to
+           [FdClosed].  kexit empties every one of them, which is what leaves
+           the block in the shape [proc_ofiles_null_split] can DISCARD the
+           whole fd-state ghost from. *)
+        iMod (fd_st_both_update _ fd (fdstate_of Cf) FdClosed with "Hst") as "Hst".
+        iDestruct ("Hback" $! (zero_reg : mword 64) with "Hpbare [Hcell Hfdslot Hst]") as "Hpriv".
         { rewrite /ofile_slot. iSplitL "Hcell"; [iExact "Hcell"|].
-          iLeft. iFrame "Hfdslot". done. }
+          iLeft. iFrame "Hfdslot Hst". done. }
         (* +0x4a c.j -> +0x38 *)
         iApply (wp_cj_s_sconf (CID := CIDp) (mword_of_int (KX + 0x4a))
                   (sign_extend' 21 (concat_vec (mword_of_int 2039 : mword 11) ('b"0")))
@@ -1853,7 +1858,7 @@ Section KexitRest.
     iAssert (proc_priv_nocwd γf pj pid (upd_cwd V (zero_reg : mword 64)))
       with "[Hpbare Hofiles]" as "Hpriv".
     { rewrite proc_priv_nocwd_bare.
-      cbn [upd_cwd pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+      cbn [upd_cwd pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
       iSplitL "Hpbare"; [iExact "Hpbare" | iExact "Hofiles"]. }
     iDestruct (cpu_own_transport CID7 CID8 0 eb pj b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
@@ -1869,8 +1874,8 @@ Section KexitRest.
               Hj Hgl ltac:(lia)
               ltac:(split; [exact Heo_s3 | split; [exact Heo_s4 |
                      split; [exact Heo_sp | intro r; apply rf_to_gmap_dom]]])
-              ltac:(cbn [upd_cwd pv_ofile]; exact Hof)
-              ltac:(cbn [upd_cwd pv_cwd]; reflexivity)
+              ltac:(cbn [upd_cwd pv_ofile pv_fdg]; exact Hof)
+              ltac:(cbn [upd_cwd pv_cwd pv_fdg]; reflexivity)
               Hfresh_wl
               with "Hcg Hcloser Hown Htce Hcce Htext Hpc Hprocs Hwl Hinit Hsp Hir Hbsl Hpriv").
   Qed.

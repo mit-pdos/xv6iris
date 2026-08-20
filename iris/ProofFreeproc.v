@@ -607,15 +607,15 @@ Section ProofFreeproc.
       { (* proc_dormant pa UNUSED, at the emptied V *)
         iApply (fp_to_dormant_unused pa
                   (MkPPriv (zero_reg : mword 64) (pv_upt V) (pv_tf V)
-                           (pv_ofile V) (pv_cwd V) (<[0%nat := (mword_of_int 0 : mword 8)]> (pv_name V)))
+                           (pv_ofile V) (pv_fdg V) (pv_cwd V) (<[0%nat := (mword_of_int 0 : mword 8)]> (pv_name V)))
                   (mword_of_int 0 : mword 32) (pv_sz V)
                   with "[Hpid Hsz Hcwd Hnm Hof Hunits Hspare Hkst Hctx] [Hpg] [Htf]").
-        - rewrite /fp_rest. cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+        - rewrite /fp_rest. cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
           iSplitR.
           { iPureIntro. split_and!; [exact Hofv | exact Hcwdv |].
             rewrite uint_unsigned. unfold uvm_maxsz. vm_compute. discriminate. }
           iFrame "Hpid Hof Hunits Hspare Hkst Hctx".
-          rewrite /proc_fields. cbn [pv_sz pv_cwd pv_name].
+          rewrite /proc_fields. cbn [pv_sz pv_cwd pv_name pv_fdg].
           iFrame "Hsz Hcwd".
           iSplitR. { iPureIntro. apply fr_name_len. exact Hnmlen. }
           rewrite /pname_cells. iExact "Hnm".

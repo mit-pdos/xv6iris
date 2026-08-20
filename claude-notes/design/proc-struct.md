@@ -1024,6 +1024,121 @@ genuinely moves resources and is `freeproc`'s job, not a recast.
 > `upt_pages_own`; the outer predicates need it just as much. Lemmas that must
 > see inside now say `rewrite /tf_page` explicitly.
 
+## The fd-state ghost: the user-visible state of `p->ofile[]`
+
+`FdSlots.v`, `ProcInv.ofile_slot`, `ProcDefs.pv_fdg`.  Landed 2026-08-20.
+
+The descriptor array is a list of `struct file *`.  Nothing about it says what
+a *user* of the process sees: that fd 0 is open on the console, that fd 3 is a
+pipe, that fd 7 is free.  The type is inside `ofile_slot`'s existential
+`fcontent` (deliberately — see `file-table.md`, "What kind of thing a
+descriptor names is NOT an ftable question"), and the array itself is raw
+pointers.  So the user-visible state is carried as GHOST STATE beside the
+array:
+
+```coq
+Inductive fdtype  := FdInode | FdPipe | FdDevice (major : Z).
+Inductive fdstate := FdClosed | FdOpen (t : fdtype).
+```
+
+`FdDevice`'s major is what separates the console (`CONSOLE = 1`) from any
+other device file.  There is no `FD_NONE` state: a descriptor either names a
+typed file or is closed, and `FileInvDefs.fdstate_of` maps an untyped
+`fcontent` to `FdClosed` precisely so that "the cell is non-null" and "the
+ghost says open" are ONE clause rather than two.
+
+### The shape: two halves, one gmap, per incarnation
+
+- **Two halves.**  `fd_st_auth γ fd st` rides with the array;
+  `fd_st γ fd st` is the fragment a client holds.  Both are the same
+  `1/2`-fraction resource, so either alone PINS the state (`fd_st_agree`) and
+  neither alone can move it — an update needs both (`fd_st_both_update`).
+  That is exactly the power wanted: the kernel cannot silently retype a
+  descriptor a client is reasoning about, and a client cannot invent a state
+  change without the kernel taking a step.  `fd_st_both` is both halves, and
+  it is where both currently sit — inside the process invariant.  **The next
+  increment splits the fragment out** and hands it to clients; nothing in the
+  shape has to change for that.
+- **One gmap under one name**, not NOFILE `ghost_var`s.  A list of sixteen
+  ghost names would have to be allocated, threaded through `proc_priv`, and
+  kept in step with the array, and every one-descriptor lemma would carry the
+  list.  With `gmapUR nat (frac * agree fdstate)` the per-descriptor resource
+  is a singleton fragment and the whole table is one `own_alloc`
+  (`fd_st_alloc`).  **No authority on the gmap**: an exclusive holder can
+  retype its own key by a frame-preserving update with nothing else in hand,
+  which is what keeps the fd-table surgery in `ProcInv` a local step.  This is
+  `FileInvDefs.fpay_tok`'s construction; its header argues the point.
+- **Per process INCARNATION, not per slot.**  `pv_fdg` is minted fresh by
+  `allocproc` (`proc_dormant_unused`, which is an update for exactly this
+  reason) and DROPPED when the slot goes back to being a slot
+  (`proc_ofiles_null_split`, reached from kexit's ZOMBIE hand-over, from
+  kfork's freeproc path, and from allocproc's own two failure tails).  Proc slots are recycled, so a
+  fragment minted for the process that used to live in slot `i` must say
+  nothing about the one that lives there now; a name-per-slot minted at boot
+  would be precisely that hazard.  The consequence is that `proc_dormant`
+  mentions the fd state not at all — a dormant slot has no process, hence no
+  descriptors — and that **boot routes nothing**.
+
+### Where the name lives, and why it is a field of `pprivate`
+
+`pv_fdg : gname` sits in `ProcDefs.pprivate`, beside the field values, rather
+than as a parameter of `proc_priv`.  It is the only member of that record that
+is not a machine value, and the reason is arithmetic: 216 files mention
+`proc_priv`, and a second ghost index would be a second index in all of them,
+for a name only the fd table reads.  Every `upd_*` preserves it — no xv6
+operation reassigns a live process's descriptor ghost, not even exec — so it
+changes at exactly two points, the mint and the death, and `upd_fdg` is the
+only updater that touches it.
+
+The cost of that choice is one mechanical rule: **a `cbn [upd_… pv_…]` list
+that reduces a `pprivate` projection must include `pv_fdg`**, or the goal
+keeps an unreduced `pv_fdg (upd_ofile V …)` that no `iFrame` will match.
+Every such list in the tree carries it.
+
+### Where it is pinned to the machine
+
+Inside `ofile_slot`, as conjuncts of the same predicate — so there is no step
+that moves the ghost without the cell, or the cell without the ghost:
+
+| cell | ghost | who pays |
+|---|---|---|
+| `v = 0` | `fd_st_both γd fd FdClosed` | the null disjunct |
+| `v = fnode k` | `fd_st_both γd fd (fdstate_of C)`, with `fdstate_of C ≠ FdClosed` | the file disjunct |
+
+The `fdstate_of C ≠ FdClosed` clause is the statement that **a descriptor
+never names an untyped file** — true of xv6, since filealloc's fresh
+`FD_NONE` file reaches a descriptor only after sys_open or pipealloc has set
+`f->type`.  It has to be stated here because it is what makes "non-null" and
+"open" the same fact.  Producers pay it with `FileInvDefs.fdstate_of_open`.
+
+### The loan window
+
+A LENT descriptor (`ofile_lent_or_slot`, `fd ∈ D`) carries `∃ st, fd_st_both
+γd fd st` rather than a pinned state.  A loan is a window inside ONE syscall —
+`proc_priv` is `D = ∅`, so no loan survives a return — and during it the array
+does not know the type of the file that will come back.  Both halves stay
+inside, so `proc_ofiles_repay` re-pins the ghost to the returning file's actual
+`fcontent` in one step; **that is why the repay is an update (`==∗`) and why it
+demands the typedness clause `proc_ofiles_lend` hands out.**  Once the fragment
+is held outside, its own value pins `st` here through `fd_st_agree` and the
+existential costs nothing.
+
+### The five sites that move a descriptor's state
+
+| site | move | how |
+|---|---|---|
+| `allocproc` | mint, 16 × `FdClosed` | `fd_st_alloc` in `proc_dormant_unused` |
+| `fdalloc` (install) | none — the ghost passes through at `FdClosed` | `proc_ofiles_install` |
+| the settle after fdalloc (`sys_open`, `sys_pipe`, `sys_dup`) | `FdClosed → FdOpen t` | `proc_ofiles_repay` |
+| `sys_close`, `kexit`, `sys_pipe`'s failure tails | `FdOpen t → FdClosed` | `fd_st_both_update` |
+| `kfork` | child `FdClosed → FdOpen t`, parent unchanged | `fd_st_both_update` + `ofile_slot_file` |
+| death (`kexit`; also kfork's freeproc path and allocproc's failure tails) | dropped | `proc_ofiles_null_split` |
+
+`fdalloc` is the one worth noticing: it stores the pointer but leaves the
+descriptor in the DEFICIT, so it never opens the ghost — the caller's repay
+does, at the type of the file it actually installs.  That is what keeps
+`fdalloc` generic in the file it is handed and still keeps the ghost honest.
+
 ## `sys_close`: the descriptor that gives up its reference
 
 `sys_getpid` reads one private field; `sys_close` is the first proof that

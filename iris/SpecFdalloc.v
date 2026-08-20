@@ -203,7 +203,7 @@ Section SpecFdalloc.
       (V : pprivate) (D : gset nat) (k : nat) (r : mword 64) : iProp Σ :=
     ((* the table is full: nothing happened *)
      ⌜r = (mword_of_int (-1) : mword 64) /\ fd_frees (pv_ofile V) = []⌝ ∗
-       proc_ofiles_owe γf p (pv_ofile V) D
+       proc_ofiles_owe γf (pv_fdg V) p (pv_ofile V) D
      ∨
      (* the least free descriptor now names the file.  Two things changed: the
         unit that descriptor used to own comes back to the caller, and the
@@ -212,7 +212,7 @@ Section SpecFdalloc.
      ∃ (fd : nat) (l : list nat),
        ⌜r = (mword_of_int (Z.of_nat fd) : mword 64) /\
         fd_frees (pv_ofile V) = fd :: l⌝ ∗
-       proc_ofiles_owe γf p (pv_ofile (upd_ofile V fd (fnode k)))
+       proc_ofiles_owe γf (pv_fdg V) p (pv_ofile (upd_ofile V fd (fnode k)))
          ({[fd]} ∪ D) ∗ fd_slot)%I.
 
 End SpecFdalloc.
@@ -235,7 +235,7 @@ Definition wp_fdalloc_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG
   (* the block SPLIT at the fd table: fdalloc needs the core only to reach
      myproc's tier, and the array in whatever loan state the caller left it *)
   proc_priv_core p pid V -∗
-  proc_ofiles_owe γf p (pv_ofile V) D -∗
+  proc_ofiles_owe γf (pv_fdg V) p (pv_ofile V) D -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗

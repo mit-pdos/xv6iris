@@ -732,7 +732,7 @@ Section ProofSysDup.
        reference, so the reference comes out first and the array goes in
        holed. *)
     iDestruct (proc_priv_lend γf p pid V fd0 fv Hlk0 Hfvnz with "Hpriv")
-      as (k q Cf) "([%Hfvk %Hklt] & Href & Hcore & Hof)".
+      as (k q Cf) "((%Hfvk & %Hklt & %Hty) & Href & Hcore & Hof)".
     iDestruct (cpu_own_transport CID9 CID16 n eb p b ltac:(wp_next_chain) with "Hcpu")
       as "Hcpu".
     iApply (Fdalloc.wp_fdalloc_sconf γf k {[fd0]} B4 (av - 6)%nat n eb p pid V b lks
@@ -825,9 +825,9 @@ Section ProofSysDup.
       (* NOT [set_solver]: it runs naive_solver over the WHOLE context, which
          here is ~200 hypotheses of large mword terms -- 106 s for [fd0 not in
          {}].  See claude-notes/optimization.md. *)
-      iDestruct (proc_ofiles_repay γf p (pv_ofile V) ∅ fd0 k q Cf
+      iMod (proc_ofiles_repay γf (pv_fdg V) p (pv_ofile V) ∅ fd0 k q Cf
                    ltac:(apply not_elem_of_empty)
-                   ltac:(rewrite Hlk0 Hfvk; reflexivity) Hklt
+                   ltac:(rewrite Hlk0 Hfvk; reflexivity) Hklt Hty
                    with "[Hof] Href") as "Hof".
       { rewrite (union_empty_r_L {[fd0]}). iExact "Hof". }
       iDestruct (proc_priv_join with "Hcore Hof") as "Hpriv".
@@ -1012,16 +1012,16 @@ Section ProofSysDup.
        filedup handed back two halves; one settles the destination descriptor
        fdalloc filled, the other the source we borrowed from. *)
     assert (Hlk1 : pv_ofile (upd_ofile V fd1 (fnode k)) !! fd1 = Some (fnode k)).
-    { cbn [upd_ofile pv_ofile]. apply list_lookup_insert. rewrite Hoflen. exact Hfd1N. }
+    { cbn [upd_ofile pv_ofile pv_fdg]. apply list_lookup_insert. rewrite Hoflen. exact Hfd1N. }
     assert (Hlk0' : pv_ofile (upd_ofile V fd1 (fnode k)) !! fd0 = Some (fnode k)).
-    { cbn [upd_ofile pv_ofile]. rewrite list_lookup_insert_ne; [| exact Hne01].
+    { cbn [upd_ofile pv_ofile pv_fdg]. rewrite list_lookup_insert_ne; [| exact Hne01].
       rewrite Hlk0 Hfvk. reflexivity. }
-    iDestruct (proc_ofiles_repay γf p (pv_ofile (upd_ofile V fd1 (fnode k)))
+    iMod (proc_ofiles_repay γf (pv_fdg V) p (pv_ofile (upd_ofile V fd1 (fnode k)))
                  {[fd0]} fd1 k (q/2)%Qp Cf
                  ltac:(apply not_elem_of_singleton_2; exact Hne01)
-                 Hlk1 Hklt with "Hof Href0") as "Hof".
-    iDestruct (proc_ofiles_repay γf p (pv_ofile (upd_ofile V fd1 (fnode k)))
-                 ∅ fd0 k (q/2)%Qp Cf ltac:(apply not_elem_of_empty) Hlk0' Hklt
+                 Hlk1 Hklt Hty with "Hof Href0") as "Hof".
+    iMod (proc_ofiles_repay γf (pv_fdg V) p (pv_ofile (upd_ofile V fd1 (fnode k)))
+                 ∅ fd0 k (q/2)%Qp Cf ltac:(apply not_elem_of_empty) Hlk0' Hklt Hty
                  with "[Hof] Href1") as "Hof".
     { rewrite (union_empty_r_L {[fd0]}). iExact "Hof". }
     iDestruct (proc_priv_join with "[Hcore] Hof") as "Hpriv".

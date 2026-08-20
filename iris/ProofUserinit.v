@@ -665,7 +665,7 @@ Section ProofUserinit.
     iAssert (proc_priv γf (proc_addr j) pid (upd_cwd V ipv))
       with "[Hpnc Hcref Hftok]" as "Hpriv".
     { rewrite proc_priv_split_cwd. iFrame "Hpnc".
-      iSplitL "Hcref"; [cbn [upd_cwd pv_cwd]; iExact "Hcref" |].
+      iSplitL "Hcref"; [cbn [upd_cwd pv_cwd pv_fdg]; iExact "Hcref" |].
       iExact "Hftok". }
     (* ...AND THE SLOT LEDGER'S SEAL, beside the allocator's.  allocproc's
        draw at +0x0a was the last counted proc allocation in the boot, and

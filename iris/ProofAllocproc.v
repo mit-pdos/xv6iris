@@ -934,9 +934,12 @@ Section ProofAllocproc.
         iDestruct ("Hwa" with "[Hpg]") as "Hpg"; [rewrite unclaimed_UNUSED; iFrame "Hpg"|].
         iApply fupd_wp.
         iMod (pstate_whole_update (proc_addr k) UNUSED USED with "Hpg") as "Hpg".
-        iModIntro.
-        iDestruct (proc_dormant_unused γf (proc_addr k) with "Hdorm")
+        (* THE fd-STATE GHOST IS MINTED HERE: [proc_dormant_unused] is an
+           update because a fresh process gets a fresh per-descriptor ghost
+           (FdSlots.v).  It is the one place a [pv_fdg] is chosen. *)
+        iMod (proc_dormant_unused γf (proc_addr k) with "Hdorm")
           as "(Hctx & Hpgcell & Htfcell & Hspare & Hirsp & Hbsp & Hkst & Hrest)".
+        iModIntro.
         iDestruct "Hrest" as (V pid0) "([%Hof [%Hcwd %Hszb]] & Hpidhalf & Hfields & Hofiles)".
         iDestruct "Hpub" as (kl xs pid1) "(Hkilled & Hxstate & Hpidinv)".
         iDestruct (p_pid_join (proc_addr k) pid1 pid0 with "Hpidinv Hpidhalf") as "[%Hpideq Hpidfull]".
@@ -1210,7 +1213,7 @@ Section ProofAllocproc.
              is what the post's third arm reports. *)
           iDestruct (kalloc_env_at_env with "Henv") as "#Henvb".
           iDestruct (p_pid_split (proc_addr k) pidn with "Hpidfull") as "[Hpidinv Hpidown]".
-          iDestruct (proc_ofiles_null_split γf (proc_addr k) (pv_ofile V) Hof with "Hofiles")
+          iDestruct (proc_ofiles_null_split γf (pv_fdg V) (proc_addr k) (pv_ofile V) Hof with "Hofiles")
             as "[Hofc Hofs]".
           (* p->lock is still held: freeproc's own held set (opaque -- it
              acquires nothing, so no order premise) is
@@ -1576,7 +1579,7 @@ Section ProofAllocproc.
              projection; the named copy is what this arm reports. *)
           iDestruct (kalloc_env_at_env with "Henv") as "#Henvb".
           iDestruct (p_pid_split (proc_addr k) pidn with "Hpidfull") as "[Hpidinv Hpidown]".
-          iDestruct (proc_ofiles_null_split γf (proc_addr k) (pv_ofile V) Hof with "Hofiles")
+          iDestruct (proc_ofiles_null_split γf (pv_fdg V) (proc_addr k) (pv_ofile V) Hof with "Hofiles")
             as "[Hofc Hofs]".
           iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhw Hcg]".
           iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
@@ -2050,7 +2053,7 @@ Section ProofAllocproc.
         iSplitR.
         { iPureIntro. split; [reflexivity|]. split; [exact Hk|]. split; [exact Hγl|].
           split; [reflexivity|].
-          cbn [upd_pt pv_ofile pv_cwd].
+          cbn [upd_pt pv_ofile pv_cwd pv_fdg].
           split; [exact Hof|]. split; [exact Hcwd|].
           split; [exact Hrestlen|]. exact (ap_nodes_le (pt_nodes t) Hnodes). }
         iSplitL "Hlocked Hstate Hpg Hchan Hkilled Hxstate Hpidinv".

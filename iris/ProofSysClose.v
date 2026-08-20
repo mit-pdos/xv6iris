@@ -776,7 +776,7 @@ Section ProofSysClose.
       iDestruct (proc_priv_bare_ofile γf p pid V fd fv Hlk with "Hpriv")
         as "(Hpbare & Hslot & Hback)".
       iDestruct "Hslot" as "[Hcell [[%Hz _] | Href]]"; [by exfalso; apply Hfvnz|].
-      iDestruct "Href" as (k q Cf) "[[%Hfv %Hklt] Href]".
+      iDestruct "Href" as (k q Cf) "((%Hfv & %Hklt & %Hty) & Href & Hst)".
       (* ---- +0x2c: sd x0,0(a0) -- p->ofile[fd] = 0 ---- *)
       assert (Haddrof : forall CID' : CpuId,
                 add_vec (rget (CID := CID') C4 (mword_of_int 10 : mword 5))
@@ -880,9 +880,13 @@ Section ProofSysClose.
                       = mword_of_int (KernelSyms.sys_close + 0x3a)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp3a) in "Hpc".
       (* the descriptor is empty now, and it owns the unit fileclose returned *)
-      iDestruct ("Hback" $! (zero_reg : mword 64) with "Hpbare [Hcell Hfdslot]")
+      (* THE GHOST STEP: the descriptor is closed now, so its state goes to
+         [FdClosed] -- both halves are in hand, which is what the update
+         costs (FdSlots.v). *)
+      iMod (fd_st_both_update _ fd (fdstate_of Cf) FdClosed with "Hst") as "Hst".
+      iDestruct ("Hback" $! (zero_reg : mword 64) with "Hpbare [Hcell Hfdslot Hst]")
         as "Hpriv".
-      { rewrite /ofile_slot. iFrame "Hcell". iLeft. by iFrame "Hfdslot". }
+      { rewrite /ofile_slot. iFrame "Hcell". iLeft. by iFrame "Hfdslot Hst". }
       (* rejoin frame slot 3 *)
       iDestruct (word_pointsto_join4 _ _ _ _ Hal3 with "Hs3lo Hfdcell") as "Hs3".
       (* the epilogue's register facts *)

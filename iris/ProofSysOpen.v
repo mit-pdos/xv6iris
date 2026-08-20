@@ -324,7 +324,7 @@ Section ProofSysOpenBody.
     iref_slot -∗
     (* the process, split at the descriptor table by fdalloc *)
     proc_priv_core (proc_addr jx) pidv V -∗
-    proc_ofiles_owe gf (proc_addr jx)
+    proc_ofiles_owe gf (pv_fdg V) (proc_addr jx)
       (pv_ofile (upd_ofile V fd (fnode kf))) ({[fd]} ∪ ∅) -∗
     procs_inv gs -∗
     dev_inv gu gd -∗
@@ -385,9 +385,12 @@ Section ProofSysOpenBody.
             Hwf
             with "Hkeep Hru Hshr Hshot Hfref Hflive Hflds Hfpn Hfip Hfoff")
       as "Href".
+    (* the descriptor's ghost state: the file is FD_INODE or FD_DEVICE, so
+       the descriptor sys_open returns is OPEN at that type. *)
+    iMod (proc_priv_settle gf (proc_addr jx) pidv V fd kf 1 C Hfdlt Hlen
+                 Hkf (fdstate_of_open C (or_intror Htyor))
+                 with "Hcore Howe Href") as "Hpriv".
     iModIntro.
-    iDestruct (proc_priv_settle gf (proc_addr jx) pidv V fd kf 1 C Hfdlt Hlen
-                 Hkf with "Hcore Howe Href") as "Hpriv".
     iAssert (sys_open_post gf (proc_addr jx) pidv V (mf !!! Regidx Ra0 : mword 64))
       with "[Hpriv Hfds]" as "Hpost".
     { rewrite /sys_open_post. iSplitR "Hfds"; [| iExact "Hfds"].
@@ -553,7 +556,7 @@ Section ProofSysOpenBody.
        [so_tail_pub]'s row for why the entry ends up owing nothing *)
     iref_slot -∗
     proc_priv_core (proc_addr jx) pidv V -∗
-    proc_ofiles_owe gf (proc_addr jx)
+    proc_ofiles_owe gf (pv_fdg V) (proc_addr jx)
       (pv_ofile (upd_ofile V fd (fnode kf))) ({[fd]} ∪ ∅) -∗
     procs_inv gs -∗
     dev_inv gu gd -∗
@@ -1483,8 +1486,8 @@ Section ProofSysOpenBody.
     { intros c Hc N2b N8 N9 N18 N19. rewrite /M3 upd_ne; [| regne].
       exact (HM2thr c Hc N2b N8 N9 N18 N19). }
     iDestruct (proc_priv_split with "Hpriv") as "[Hcore Hofiles]".
-    iDestruct (proc_ofiles_owe_empty gf (proc_addr jx) (pv_ofile V)) as "Hoeq".
-    iDestruct (bi.equiv_entails_1_2 _ _ (proc_ofiles_owe_empty gf (proc_addr jx)
+    iDestruct (proc_ofiles_owe_empty gf (pv_fdg V) (proc_addr jx) (pv_ofile V)) as "Hoeq".
+    iDestruct (bi.equiv_entails_1_2 _ _ (proc_ofiles_owe_empty gf (pv_fdg V) (proc_addr jx)
                  (pv_ofile V)) with "Hofiles") as "Howe".
     iDestruct (proc_ofiles_owe_len with "Howe") as %Hlen.
     iDestruct (cpu_own_transport CID3 CID7 0 eb (proc_addr jx) b

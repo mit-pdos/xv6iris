@@ -2667,7 +2667,7 @@ Section SyscallArms.
     assert (Hmfs2 : mf !!! Regidx Rs2
                     = page_base (ud_tfp (pv_upt (upd_sz (upd_upt V P') szv')))).
     { rewrite (callee_saved_lookup Hcs Rs2 ltac:(vm_compute; reflexivity)).
-      cbn [pv_upt upd_sz upd_upt]. rewrite Htfp'. exact HMs2. }
+      cbn [pv_upt upd_sz upd_upt pv_fdg]. rewrite Htfp'. exact HMs2. }
     assert (Hmfrest : forall r : mword 5, is_cs_idx r = true ->
               r <> csp_rs1 -> r <> Rs0 -> r <> Rs1 -> r <> Rs2 ->
               mf !!! Regidx r = m !!! Regidx r).
@@ -2736,7 +2736,7 @@ Section SyscallArms.
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
     assert (Hmfs2 : mf !!! Regidx Rs2 = page_base (ud_tfp (pv_upt (upd_upt V P')))).
     { rewrite (callee_saved_lookup Hcs Rs2 ltac:(vm_compute; reflexivity)).
-      cbn [pv_upt upd_upt]. rewrite Htfp'. exact HMs2. }
+      cbn [pv_upt upd_upt pv_fdg]. rewrite Htfp'. exact HMs2. }
     assert (Hmfrest : forall r : mword 5, is_cs_idx r = true ->
               r <> csp_rs1 -> r <> Rs0 -> r <> Rs1 -> r <> Rs2 ->
               mf !!! Regidx r = m !!! Regidx r).
@@ -3223,8 +3223,8 @@ Section SyscallArms.
     assert (Htfp' : ud_tfp (pv_upt V') = ud_tfp (pv_upt V)).
     { destruct Hext as (_ & Htf & _).
       destruct Hkok as [ (_ & HV') | (_ & _ & _ & _ & _ & Htf' & _) ].
-      - rewrite HV'. cbn [pv_upt upd_upt]. exact Htf.
-      - rewrite Htf'. cbn [pv_upt upd_upt]. exact Htf. }
+      - rewrite HV'. cbn [pv_upt upd_upt pv_fdg]. exact Htf.
+      - rewrite Htf'. cbn [pv_upt upd_upt pv_fdg]. exact Htf. }
     (* ---- what the shared tail needs of the returned state ---- *)
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
@@ -3503,7 +3503,7 @@ Section SyscallArms.
     rewrite /SpecFilewrite.filewrite_fs_out /sysc_fwrite_names; cbn.
     iDestruct "Hout" as "(_ & _ & _ & Hbs)".
     assert (Htfp' : ud_tfp (pv_upt (upd_upt V P')) = ud_tfp (pv_upt V)).
-    { destruct Hext as (_ & Htf & _). cbn [pv_upt upd_upt]. exact Htf. }
+    { destruct Hext as (_ & Htf & _). cbn [pv_upt upd_upt pv_fdg]. exact Htf. }
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
     assert (Hmfs2 : mf !!! Regidx Rs2 = page_base (ud_tfp (pv_upt (upd_upt V P')))).
@@ -3580,7 +3580,7 @@ Section SyscallArms.
     iDestruct ("Hback" with "Hout") as "Hsl".
     iDestruct (sysc_bslot_join with "Hsl Hbs2") as "Hbs".
     assert (Htfp' : ud_tfp (pv_upt (upd_upt V P')) = ud_tfp (pv_upt V)).
-    { destruct Hext as (_ & Htf & _). cbn [pv_upt upd_upt]. exact Htf. }
+    { destruct Hext as (_ & Htf & _). cbn [pv_upt upd_upt pv_fdg]. exact Htf. }
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
     assert (Hmfs2 : mf !!! Regidx Rs2 = page_base (ud_tfp (pv_upt (upd_upt V P')))).
@@ -3647,7 +3647,7 @@ Section SyscallArms.
     iDestruct ("Hback" with "Hout") as "Hsl".
     iDestruct (sysc_bslot_join with "Hsl Hbs2") as "Hbs".
     assert (Htfp' : ud_tfp (pv_upt (upd_upt V P')) = ud_tfp (pv_upt V)).
-    { destruct Hext as (_ & Htf & _). cbn [pv_upt upd_upt]. exact Htf. }
+    { destruct Hext as (_ & Htf & _). cbn [pv_upt upd_upt pv_fdg]. exact Htf. }
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
     assert (Hmfs2 : mf !!! Regidx Rs2 = page_base (ud_tfp (pv_upt (upd_upt V P')))).
@@ -3737,9 +3737,9 @@ Section SyscallArms.
     { destruct Hext as (_ & Htf & _).
       iDestruct "Hpost" as "[[_ Hpv] | (%ipv & _ & Hpv)]".
       - iExists (upd_upt V P'). iFrame "Hpv". iPureIntro.
-        cbn [pv_upt upd_upt]. exact Htf.
+        cbn [pv_upt upd_upt pv_fdg]. exact Htf.
       - iExists (upd_cwd (upd_upt V P') ipv). iFrame "Hpv". iPureIntro.
-        cbn [pv_upt upd_upt upd_cwd]. exact Htf. }
+        cbn [pv_upt upd_upt upd_cwd pv_fdg]. exact Htf. }
     iDestruct (sysc_iref_join with "Hirk Hirc") as "Hir".
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
@@ -3834,7 +3834,7 @@ Section SyscallArms.
       "%Hcs %Hext Hcg Hcpu _ _ Hpc Hbs _ _ _ Hiru Hpriv %Hrv".
     iDestruct (sysc_iref_join with "Hirk Hiru") as "Hir".
     assert (Htfp' : ud_tfp (pv_upt (upd_upt V P')) = ud_tfp (pv_upt V)).
-    { destruct Hext as (_ & Htf & _). cbn [pv_upt upd_upt]. exact Htf. }
+    { destruct Hext as (_ & Htf & _). cbn [pv_upt upd_upt pv_fdg]. exact Htf. }
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
     assert (Hmfs2 : mf !!! Regidx Rs2 = page_base (ud_tfp (pv_upt (upd_upt V P')))).
@@ -3914,7 +3914,7 @@ Section SyscallArms.
       "%Hcs %Hext Hcg Hcpu _ _ Hpc Hbs _ _ _ Hirl Hpriv %Hrv".
     iDestruct (sysc_iref_join3 with "Hirl Hirk") as "Hir".
     assert (Htfp' : ud_tfp (pv_upt (upd_upt V P')) = ud_tfp (pv_upt V)).
-    { destruct Hext as (_ & Htf & _). cbn [pv_upt upd_upt]. exact Htf. }
+    { destruct Hext as (_ & Htf & _). cbn [pv_upt upd_upt pv_fdg]. exact Htf. }
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
     assert (Hmfs2 : mf !!! Regidx Rs2 = page_base (ud_tfp (pv_upt (upd_upt V P')))).
@@ -4001,7 +4001,7 @@ Section SyscallArms.
     { iDestruct "Hpost" as "[[_ Hpv] | (%fd & %fv & _ & Hpv)]".
       - iExists V. iFrame "Hpv". iPureIntro; reflexivity.
       - iExists (upd_ofile V fd (zero_reg : mword 64)). iFrame "Hpv".
-        iPureIntro. cbn [pv_upt upd_ofile]. reflexivity. }
+        iPureIntro. cbn [pv_upt upd_ofile pv_fdg]. reflexivity. }
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
     assert (Hmfs2 : mf !!! Regidx Rs2 = page_base (ud_tfp (pv_upt V'))).
@@ -4117,10 +4117,10 @@ Section SyscallArms.
     { iDestruct "Hpv" as
         "[[_ Hpv] | (%fd0 & %fd1 & %l & %k0 & %k1 & _ & Hpv)]".
       - iExists (upd_upt V P'). iFrame "Hpv". iPureIntro.
-        cbn [pv_upt upd_upt]. exact Htfpe.
+        cbn [pv_upt upd_upt pv_fdg]. exact Htfpe.
       - iExists (upd_ofile (upd_ofile (upd_upt V P') fd0 (fnode k0)) fd1 (fnode k1)).
         iFrame "Hpv". iPureIntro.
-        cbn [pv_upt upd_ofile upd_upt]. exact Htfpe. }
+        cbn [pv_upt upd_ofile upd_upt pv_fdg]. exact Htfpe. }
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
     assert (Hmfs2 : mf !!! Regidx Rs2 = page_base (ud_tfp (pv_upt V'))).
@@ -4232,7 +4232,7 @@ Section SyscallArms.
     (* the trapframe page has not moved -- [uptd_ext]'s own second conjunct *)
     destruct Hext as (_ & Htfpe & _).
     assert (Htfp' : ud_tfp (pv_upt (upd_upt V P')) = ud_tfp (pv_upt V))
-      by (cbn [pv_upt upd_upt]; exact Htfpe).
+      by (cbn [pv_upt upd_upt pv_fdg]; exact Htfpe).
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
     assert (Hmfs2 : mf !!! Regidx Rs2 = page_base (ud_tfp (pv_upt (upd_upt V P')))).
@@ -4326,7 +4326,7 @@ Section SyscallArms.
     (* the trapframe page has not moved -- [uptd_ext]'s own second conjunct *)
     destruct Hext as (_ & Htfpe & _).
     assert (Htfp' : ud_tfp (pv_upt (upd_upt V P')) = ud_tfp (pv_upt V))
-      by (cbn [pv_upt upd_upt]; exact Htfpe).
+      by (cbn [pv_upt upd_upt pv_fdg]; exact Htfpe).
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
     assert (Hmfs2 : mf !!! Regidx Rs2 = page_base (ud_tfp (pv_upt (upd_upt V P')))).
@@ -4445,9 +4445,9 @@ Section SyscallArms.
       (V') "[%Htfp' Hpriv]".
     { iDestruct "Hpv" as "[[_ Hpv] | (%fd & %ll & %kf & _ & Hpv)]".
       - iExists (upd_upt V P'). iFrame "Hpv".
-        iPureIntro. cbn [pv_upt upd_upt]. exact Htfpe.
+        iPureIntro. cbn [pv_upt upd_upt pv_fdg]. exact Htfpe.
       - iExists (upd_ofile (upd_upt V P') fd (fnode kf)). iFrame "Hpv".
-        iPureIntro. cbn [pv_upt upd_ofile upd_upt]. exact Htfpe. }
+        iPureIntro. cbn [pv_upt upd_ofile upd_upt pv_fdg]. exact Htfpe. }
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
     assert (Hmfs2 : mf !!! Regidx Rs2 = page_base (ud_tfp (pv_upt V'))).

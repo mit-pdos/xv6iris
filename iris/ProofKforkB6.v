@@ -162,7 +162,7 @@ Section KforkPrologue.
     iFrame "Hsz Hpg Hptt Htfc Htfp".
     iIntros (P' szv ws') "%Hroot %Htf %Hszb' %Hbel' Hsz Hpg Hptt Htfc Htfp".
     rewrite /proc_priv /proc_priv_core /proc_fields /proc_pt_at.
-    cbn [upd_pt upd_sz pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+    cbn [upd_pt upd_sz pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
     rewrite Hroot Htf.
     iSplitR "Ho"; [|iFrame "Ho"].
     iSplitR; [iPureIntro; exact Hszb'|].
@@ -209,7 +209,7 @@ Section KforkPrologue.
     iFrame "Hsz Hpg Hptt Htfc Htfp".
     iIntros (P' szv ws') "%Hroot %Htf %Hszb' %Hbel' Hsz Hpg Hptt Htfc Htfp".
     rewrite /proc_priv_nocwd /proc_fields /proc_pt_at.
-    cbn [upd_pt upd_sz pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+    cbn [upd_pt upd_sz pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
     rewrite Hroot Htf.
     iSplitR; [iPureIntro; exact Hszb'|].
     iSplitR; [iPureIntro; exact Hbel'|].
@@ -1302,11 +1302,11 @@ Section KforkPrologue.
         * rewrite HN10a5. exact (eq_sym HN10a0).
         * rewrite HN10a4. exact (eq_sym HN10a4').
         * exact HN10a3.
-        * split; [reflexivity | cbn [upd_pt pv_upt]; exact Htf2].
+        * split; [reflexivity | cbn [upd_pt pv_upt pv_fdg]; exact Htf2].
         * intros r Hr Ncsp N8' N9' N20 N21. apply HN10thr; assumption.
         * split_and!; [reflexivity | exact HjN | exact Hgamma
-                      | cbn [upd_pt upd_sz pv_ofile]; exact HVcof
-                      | cbn [upd_pt upd_sz pv_cwd]; exact HVccwd].
+                      | cbn [upd_pt upd_sz pv_ofile pv_fdg]; exact HVcof
+                      | cbn [upd_pt upd_sz pv_cwd pv_fdg]; exact HVccwd].
         * iExists ks, rest. iSplitR; [iPureIntro; exact Hrestlen|].
           iFrame "Hks Hctx".
         * iExact "Henv'".

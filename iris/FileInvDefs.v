@@ -437,6 +437,75 @@ Record fcontent := MkFContent {
 }.
 
 (* ------------------------------------------------------------------ *)
+(*  ... AND THE PART OF IT A FILE DESCRIPTOR SHOWS ITS USER            *)
+(* ------------------------------------------------------------------ *)
+
+(* [FdSlots.fdstate] is the user-visible state of one descriptor; this is
+   the reading of a file's contents that a descriptor NAMING that file
+   reports.  It is a total function with FD_NONE mapping to [FdClosed]
+   because that is the honest reading -- an untyped [struct file] is what
+   filealloc hands back before its caller has decided what the file IS, and
+   a descriptor may not name one.  [ProcInv.ofile_slot] states exactly that
+   as [fdstate_of C <> FdClosed] on its file disjunct, so "the descriptor is
+   open" and "the file it names is typed" are ONE clause rather than two.
+
+   [fc_readable] / [fc_writable] are deliberately not read here: this
+   increment tracks only whether a descriptor is open and what KIND of file
+   it names.  Adding the mode later is a field on [fdtype], not a change of
+   shape. *)
+Definition fdstate_of (C : fcontent) : fdstate :=
+  if bool_decide (fc_type C = FD_PIPE) then FdOpen FdPipe
+  else if bool_decide (fc_type C = FD_INODE) then FdOpen FdInode
+  else if bool_decide (fc_type C = FD_DEVICE)
+       then FdOpen (FdDevice (bv_unsigned (fc_major C)))
+       else FdClosed.
+
+Lemma fdstate_of_pipe (C : fcontent) :
+  fc_type C = FD_PIPE -> fdstate_of C = FdOpen FdPipe.
+Proof. intro H. rewrite /fdstate_of bool_decide_true //. Qed.
+
+Lemma fdstate_of_inode (C : fcontent) :
+  fc_type C = FD_INODE -> fdstate_of C = FdOpen FdInode.
+Proof.
+  intro H. rewrite /fdstate_of bool_decide_false; [by rewrite bool_decide_true|].
+  rewrite H. unfold FD_INODE, FD_PIPE. intro Hc.
+  apply (f_equal bv_unsigned) in Hc. by vm_compute in Hc.
+Qed.
+
+Lemma fdstate_of_device (C : fcontent) :
+  fc_type C = FD_DEVICE ->
+  fdstate_of C = FdOpen (FdDevice (bv_unsigned (fc_major C))).
+Proof.
+  intro H. rewrite /fdstate_of bool_decide_false.
+  2:{ rewrite H. unfold FD_DEVICE, FD_PIPE. intro Hc.
+      apply (f_equal bv_unsigned) in Hc. by vm_compute in Hc. }
+  rewrite bool_decide_false; [by rewrite bool_decide_true|].
+  rewrite H. unfold FD_DEVICE, FD_INODE. intro Hc.
+  apply (f_equal bv_unsigned) in Hc. by vm_compute in Hc.
+Qed.
+
+(* the three ways a descriptor's file can be typed, as ONE fact -- what
+   every producer of an [ofile_slot] file disjunct actually has to pay. *)
+Lemma fdstate_of_open (C : fcontent) :
+  fc_type C = FD_PIPE \/ fc_type C = FD_INODE \/ fc_type C = FD_DEVICE ->
+  fdstate_of C <> FdClosed.
+Proof.
+  intros [H|[H|H]].
+  - rewrite (fdstate_of_pipe C H). discriminate.
+  - rewrite (fdstate_of_inode C H). discriminate.
+  - rewrite (fdstate_of_device C H). discriminate.
+Qed.
+
+Lemma fdstate_of_none (C : fcontent) :
+  fc_type C = FD_NONE -> fdstate_of C = FdClosed.
+Proof.
+  intro H. rewrite /fdstate_of !bool_decide_false //; rewrite H;
+    [ unfold FD_NONE, FD_DEVICE | unfold FD_NONE, FD_INODE
+    | unfold FD_NONE, FD_PIPE ];
+    intro Hc; apply (f_equal bv_unsigned) in Hc; by vm_compute in Hc.
+Qed.
+
+(* ------------------------------------------------------------------ *)
 (*  The [ref] word: zero exactly on a free slot                         *)
 (* ------------------------------------------------------------------ *)
 

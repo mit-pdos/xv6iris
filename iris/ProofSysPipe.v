@@ -313,7 +313,7 @@ Lemma sp_ofile_restore (V : pprivate) (fd : nat) (x : mword 64) :
   upd_ofile (upd_ofile V fd x) fd (zero_reg : mword 64) = V.
 Proof.
   intro Hlk. unfold upd_ofile.
-  cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+  cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
   rewrite list_insert_insert. rewrite (list_insert_id _ _ _ Hlk). by destruct V.
 Qed.
 
@@ -350,7 +350,7 @@ Lemma sp_restore_upt (V : pprivate) (P' : uptd) (fd0 fd1 : nat) (x0 x1 : mword 6
   = upd_upt V P'.
 Proof.
   intros Hne H0 H1. unfold upd_ofile, upd_upt.
-  cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+  cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
   rewrite (list_insert_commute _ fd0 fd1 (zero_reg : mword 64) x1 Hne).
   rewrite !list_insert_insert.
   rewrite (list_insert_id _ _ _ H0) (list_insert_id _ _ _ H1).
@@ -365,7 +365,7 @@ Lemma sp_ofile_restore2 (V : pprivate) (fd0 fd1 : nat) (x0 x1 : mword 64) :
             fd1 (zero_reg : mword 64) = V.
 Proof.
   intros Hne H0 H1. unfold upd_ofile.
-  cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+  cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
   rewrite (list_insert_commute _ fd0 fd1 (zero_reg : mword 64) x1 Hne).
   rewrite !list_insert_insert.
   rewrite (list_insert_id _ _ _ H0) (list_insert_id _ _ _ H1).
@@ -1677,7 +1677,7 @@ Section ProofSysPipe.
     (* fdalloc now takes the block SPLIT at the fd table and no reference of
        its own; [Href0] stays here and settles the deficit on the way out. *)
     iDestruct (proc_priv_split with "Hpriv") as "[Hcore Hof]".
-    rewrite -(proc_ofiles_owe_empty γf p (pv_ofile V)).
+    rewrite -(proc_ofiles_owe_empty γf (pv_fdg V) p (pv_ofile V)).
     iApply (Fdalloc.wp_fdalloc_sconf γf k0 ∅ X1 (av - 8)%nat 0%nat eb p pid V b lks
               HX1a0 Hk0lt sp_noff0 Havfd
               with "Hcg Hcpu Htext Hdata Hpc Hcore Hof").
@@ -1775,7 +1775,8 @@ Section ProofSysPipe.
     assert (Hfd0N : (fd0 < NOFILE)%nat) by (rewrite -Hlen1; exact Hfd0lt).
     (* SETTLE: the descriptor fdalloc filled owes a payload, and this is the
        reference pipealloc handed us for that end. *)
-    iDestruct (proc_priv_settle γf p pid V fd0 k0 1%Qp Cf0 Hfd0N Hlen1 Hk0lt
+    iMod (proc_priv_settle γf p pid V fd0 k0 1%Qp Cf0 Hfd0N Hlen1 Hk0lt
+                 (fdstate_of_open Cf0 (or_introl (proj1 Hpf0)))
                  with "Hcore Hof Href0") as "Hpriv".
     destruct (sp_fd_range fd0 Hfd0N) as [Hfd0b16 Hfd0b31].
     iApply (wp_blt_x0_fall_s_sconf (mword_of_int (KernelSyms.sys_pipe + 0x3c))
@@ -1843,7 +1844,7 @@ Section ProofSysPipe.
     iDestruct (cpu_own_transport CID41 CID47 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
     iDestruct (proc_priv_split with "Hpriv") as "[Hcore Hof]".
-    rewrite -(proc_ofiles_owe_empty γf p (pv_ofile (upd_ofile V fd0 (fnode k0)))).
+    rewrite -(proc_ofiles_owe_empty γf (pv_fdg V) p (pv_ofile (upd_ofile V fd0 (fnode k0)))).
     iApply (Fdalloc.wp_fdalloc_sconf γf k1 ∅ Z1 (av - 8)%nat 0%nat eb p pid
               (upd_ofile V fd0 (fnode k0)) b lks
               HZ1a0 Hk1lt sp_noff0 Havfd
@@ -1878,7 +1879,7 @@ Section ProofSysPipe.
     assert (Hfree0 : pv_ofile V !! fd0 = Some (zero_reg : mword 64))
       by exact (fd_frees_head (pv_ofile V) fd0 l0 Hfr0).
     assert (Hlk0 : pv_ofile (upd_ofile V fd0 (fnode k0)) !! fd0 = Some (fnode k0)).
-    { cbn [upd_ofile pv_ofile]. by apply list_lookup_insert. }
+    { cbn [upd_ofile pv_ofile pv_fdg]. by apply list_lookup_insert. }
     rewrite /fdalloc_post. iDestruct "Hpost2" as "[Hf2 | Hs2]".
     { (* ===== no second descriptor: undo the first, close both ===== *)
       iDestruct "Hf2" as "([%Hr2 %Hnone2] & Hof)".
@@ -1943,7 +1944,7 @@ Section ProofSysPipe.
                    with "Hpriv") as "[Hslot Hback]".
       iDestruct "Hslot" as "[Hcell [[%Hz _] | Href]]";
         [by exfalso; apply (fnode_ne_zero k0 Hk0lt)|].
-      iDestruct "Href" as (k0' q0' C0') "[[%Hfv0 %Hk0'lt] Href0]".
+      iDestruct "Href" as (k0' q0' C0') "((%Hfv0 & %Hk0'lt & %Hty0) & Href0 & Hst0)".
       (* +0xbc .. +0xc4: p->ofile[fd0] = 0 *)
       iApply (sp_ofile_null (CID0 := CID52) F1 (av - 8)%nat p fd0 Ra5 Rs1
                 (KernelSyms.sys_pipe + 0xbc) (KernelSyms.sys_pipe + 0xbe) (KernelSyms.sys_pipe + 0xc2) (KernelSyms.sys_pipe + 0xc4) (KernelSyms.sys_pipe + 0xc8) (fnode k0) b
@@ -1956,8 +1957,9 @@ Section ProofSysPipe.
       iIntros (CID53 Hcr53 F2) "%HF2thr Hcg Hpc Hcell".
       assert (HF2s0 : F2 !!! Regidx Rs0 = sp0)
         by (rewrite (HF2thr Rs0 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)); exact HF1s0).
-      iDestruct ("Hback" $! (zero_reg : mword 64) with "[Hcell Hu0]") as "Hpriv".
-      { rewrite /ofile_slot. iFrame "Hcell". iLeft. by iFrame "Hu0". }
+      iMod (fd_st_both_update _ fd0 (fdstate_of C0') FdClosed with "Hst0") as "Hst0".
+      iDestruct ("Hback" $! (zero_reg : mword 64) with "[Hcell Hu0 Hst0]") as "Hpriv".
+      { rewrite /ofile_slot. iFrame "Hcell". iLeft. by iFrame "Hu0 Hst0". }
       rewrite (sp_ofile_restore V fd0 (fnode k0) Hfree0).
       iEval (rewrite Hfv0) in "Hb6".
       (* +0xc8: fileclose(rf); fileclose(wf); a5 = -1 *)
@@ -2022,7 +2024,7 @@ Section ProofSysPipe.
       assert (Hc : (fnode k0 : mword 64) = (zero_reg : mword 64)) by congruence.
       exact (fnode_ne_zero k0 Hk0lt Hc). }
     assert (Hfree1V : pv_ofile V !! fd1 = Some (zero_reg : mword 64)).
-    { cbn [upd_ofile pv_ofile] in Hfree1.
+    { cbn [upd_ofile pv_ofile pv_fdg] in Hfree1.
       by rewrite list_lookup_insert_ne in Hfree1; [| congruence]. }
     assert (Hfd1lt : (fd1 < length (pv_ofile V))%nat).
     { apply lookup_lt_is_Some_1. by exists (zero_reg : mword 64). }
@@ -2031,8 +2033,9 @@ Section ProofSysPipe.
     assert (Hfd1N : (fd1 < NOFILE)%nat) by (rewrite -Hlen2; exact Hfd1lt).
     assert (Hlen2' : length (pv_ofile (upd_ofile V fd0 (fnode k0))) = NOFILE)
       by (rewrite upd_ofile_length; exact Hlen2).
-    iDestruct (proc_priv_settle γf p pid (upd_ofile V fd0 (fnode k0)) fd1 k1
+    iMod (proc_priv_settle γf p pid (upd_ofile V fd0 (fnode k0)) fd1 k1
                  1%Qp Cf1 Hfd1N Hlen2' Hk1lt
+                 (fdstate_of_open Cf1 (or_introl (proj1 Hpf1)))
                  with "Hcore Hof Href1") as "Hpriv".
     destruct (sp_fd_range fd1 Hfd1N) as [Hfd1b16 Hfd1b31].
     iApply (wp_blt_x0_fall_s_sconf (mword_of_int (KernelSyms.sys_pipe + 0x4c))
@@ -2093,12 +2096,12 @@ Section ProofSysPipe.
     (* the pure descriptor facts the tail needs *)
     assert (Hlk0' : pv_ofile (upd_ofile (upd_ofile V fd0 (fnode k0)) fd1 (fnode k1)) !! fd0
                     = Some (fnode k0)).
-    { cbn [upd_ofile pv_ofile].
+    { cbn [upd_ofile pv_ofile pv_fdg].
       rewrite list_lookup_insert_ne; [| congruence].
       by apply list_lookup_insert. }
     assert (Hlk1' : pv_ofile (upd_ofile (upd_ofile (upd_ofile V fd0 (fnode k0)) fd1 (fnode k1))
                                 fd0 (zero_reg : mword 64)) !! fd1 = Some (fnode k1)).
-    { cbn [upd_ofile pv_ofile].
+    { cbn [upd_ofile pv_ofile pv_fdg].
       rewrite list_lookup_insert_ne; [| congruence].
       apply list_lookup_insert. by rewrite length_insert. }
     (* the copy accessor, taken ONCE and closed once *)
@@ -2348,7 +2351,7 @@ Section ProofSysPipe.
       assert (Hlk1'' : pv_ofile (upd_ofile (upd_upt (upd_ofile (upd_ofile V fd0 (fnode k0))
                                    fd1 (fnode k1)) P') fd0 (zero_reg : mword 64)) !! fd1
                        = Some (fnode k1)).
-      { cbn [upd_ofile upd_upt pv_ofile].
+      { cbn [upd_ofile upd_upt pv_ofile pv_fdg].
         rewrite list_lookup_insert_ne; [| congruence].
         apply list_lookup_insert. by rewrite length_insert. }
       (* +0x80 lw a5,-60(s0) -- reload fd0 *)
@@ -2379,7 +2382,7 @@ Section ProofSysPipe.
                    fd0 (fnode k0) Hlk0' with "Hpriv") as "[Hslot Hback]".
       iDestruct "Hslot" as "[Hcell [[%Hz _] | Href]]";
         [by exfalso; apply (fnode_ne_zero k0 Hk0lt)|].
-      iDestruct "Href" as (k0' q0' C0') "[[%Hfv0 %Hk0'lt] Hrf0]".
+      iDestruct "Href" as (k0' q0' C0') "((%Hfv0 & %Hk0'lt & %Hty0) & Hrf0 & Hst0)".
       iApply (sp_ofile_null (CID0 := CID62) E1 (av - 8)%nat p fd0 Ra5 Rs1
                 (KernelSyms.sys_pipe + 0x84) (KernelSyms.sys_pipe + 0x86) (KernelSyms.sys_pipe + 0x8a) (KernelSyms.sys_pipe + 0x8c) (KernelSyms.sys_pipe + 0x90) (fnode k0) b
                 Hfd0b16 (or_introl (conj eq_refl eq_refl)) HE1a5 HE1s1 Hn80a Hn80b Hn80c Hn80d
@@ -2389,8 +2392,9 @@ Section ProofSysPipe.
       { iApply (spi_8a with "Htext"). }
       { iApply (spi_8c with "Htext"). }
       iIntros (CID63 Hcr63 E2) "%HE2thr Hcg Hpc Hcell".
-      iDestruct ("Hback" $! (zero_reg : mword 64) with "[Hcell Hua]") as "Hpriv".
-      { rewrite /ofile_slot. iFrame "Hcell". iLeft. by iFrame "Hua". }
+      iMod (fd_st_both_update _ fd0 (fdstate_of C0') FdClosed with "Hst0") as "Hst0".
+      iDestruct ("Hback" $! (zero_reg : mword 64) with "[Hcell Hua Hst0]") as "Hpriv".
+      { rewrite /ofile_slot. iFrame "Hcell". iLeft. by iFrame "Hua Hst0". }
       (* +0x90 lw a5,-64(s0) -- reload fd1 *)
       assert (HE2s0 : E2 !!! Regidx Rs0 = sp0)
         by (rewrite (HE2thr Rs0 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate));
@@ -2425,7 +2429,7 @@ Section ProofSysPipe.
                    fd1 (fnode k1) Hlk1'' with "Hpriv") as "[Hslot1 Hback1]".
       iDestruct "Hslot1" as "[Hcell1 [[%Hz1 _] | Href1']]";
         [by exfalso; apply (fnode_ne_zero k1 Hk1lt)|].
-      iDestruct "Href1'" as (k1' q1' C1') "[[%Hfv1 %Hk1'lt] Hrf1]".
+      iDestruct "Href1'" as (k1' q1' C1') "((%Hfv1 & %Hk1'lt & %Hty1) & Hrf1 & Hst1)".
       iApply (sp_ofile_null (CID0 := CID64) E3 (av - 8)%nat p fd1 Rs1 Ra5
                 (KernelSyms.sys_pipe + 0x94) (KernelSyms.sys_pipe + 0x96) (KernelSyms.sys_pipe + 0x9a) (KernelSyms.sys_pipe + 0x9c) (KernelSyms.sys_pipe + 0xa0) (fnode k1) b
                 Hfd1b16 (or_intror (conj eq_refl eq_refl)) HE3a5 HE3s1 Hn90a Hn90b Hn90c Hn90d
@@ -2435,8 +2439,9 @@ Section ProofSysPipe.
       { iApply (spi_9a with "Htext"). }
       { iApply (spi_9c with "Htext"). }
       iIntros (CID65 Hcr65 E4) "%HE4thr Hcg Hpc Hcell1".
-      iDestruct ("Hback1" $! (zero_reg : mword 64) with "[Hcell1 Hub]") as "Hpriv".
-      { rewrite /ofile_slot. iFrame "Hcell1". iLeft. by iFrame "Hub". }
+      iMod (fd_st_both_update _ fd1 (fdstate_of C1') FdClosed with "Hst1") as "Hst1".
+      iDestruct ("Hback1" $! (zero_reg : mword 64) with "[Hcell1 Hub Hst1]") as "Hpriv".
+      { rewrite /ofile_slot. iFrame "Hcell1". iLeft. by iFrame "Hub Hst1". }
       rewrite (sp_restore_upt V P' fd0 fd1 (fnode k0) (fnode k1) Hne01 Hfree0 Hfree1V).
       (* the two references, loose again, go to the two fileclose calls *)
       iEval (rewrite Hfv0) in "Hb6". iEval (rewrite Hfv1) in "Hb7".

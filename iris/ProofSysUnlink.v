@@ -392,7 +392,7 @@ Qed.
 Definition su_dummyV : pprivate :=
   MkPPriv (mword_of_int 0)
           (UPTD (mword_of_int 0) (mword_of_int 0) ∅ ∅)
-          [] [] (mword_of_int 0) [].
+          [] [] 1%positive (mword_of_int 0) [].
 
 (* readi's delivered byte at [tot = 16] is the file's byte *)
 Lemma su_rdd_eq (data : nat -> list (bv 8)) (olds : nat -> bv 8)
@@ -1085,7 +1085,7 @@ Section ProofSysUnlinkBody.
       iEval (rewrite proc_priv_nocwd_bare) in "Hpnc".
       iDestruct "Hpnc" as "[Hpidq Hofiles]".
       iDestruct (cwd_ref_held with "Href") as "Hcwdref".
-      iEval (cbn [upd_upt pv_cwd]) in "Hcwdref".
+      iEval (cbn [upd_upt pv_cwd pv_fdg]) in "Hcwdref".
       (* ===== +0x1c jal ra,begin_op ===== *)
       iApply (wp_jal_s_sconf (CID := CID11) (mword_of_int (SU + 0x1c)) Rra
                 (mword_of_int 2092218 : mword 21) mas (K - 30)%nat b

@@ -1409,7 +1409,7 @@ Section ProofSysChdirBody.
       iEval (rewrite proc_priv_nocwd_bare) in "Hpnc".
       iDestruct "Hpnc" as "[Hpbare Hofiles]".
       iDestruct (cwd_ref_held with "Href") as "Hcwdref".
-      iEval (cbn [upd_upt pv_cwd]) in "Hcwdref".
+      iEval (cbn [upd_upt pv_cwd pv_fdg]) in "Hcwdref".
       iDestruct (sc_buf_split (pa_stk sp0 20) bf pk Hpk with "Hbuf")
         as "[Hbufk Hbufrest]".
       iDestruct (log_op_openS with "Hop") as (Sb0) "[HopS Htx]".
@@ -1766,7 +1766,7 @@ Section ProofSysChdirBody.
           (* ============ +0x48 ld a0,336(s2) -- a0 := p->cwd ============ *)
           iDestruct (proc_priv_bare_cwd pj pid (upd_upt V P') with "Hpbare")
             as "[Hcwd Hcwdbk]".
-          iEval (cbn [upd_upt pv_cwd]) in "Hcwd".
+          iEval (cbn [upd_upt pv_cwd pv_fdg]) in "Hcwd".
           iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (CID := CID30) (mword_of_int (SC + 0x48)) Ra0 Rs2
                     (mword_of_int 336 : mword 12) miu (K - 20)%nat (pv_cwd V) b
                     ltac:(nz) ltac:(rdok) with "Hcg Hpc [] [Hcwd]").
@@ -1776,7 +1776,7 @@ Section ProofSysChdirBody.
           iEval (rgne; rewrite Hius2 p_cwd_sext) in "Hcwd".
           (* a load leaves the cell alone, so the block closes at the same [V] *)
           iDestruct ("Hcwdbk" $! (pv_cwd V) with "Hcwd") as "Hpbare".
-          iEval (rewrite -(upd_cwd_id (upd_upt V P')); cbn [upd_upt pv_cwd])
+          iEval (rewrite -(upd_cwd_id (upd_upt V P')); cbn [upd_upt pv_cwd pv_fdg])
             in "Hpbare".
           set (P5 := <[Regidx Ra0 := regval_into_reg (pv_cwd V)]> miu).
           assert (HP5a0 : (P5 !!! Regidx Ra0 : mword 64) = pv_cwd V)
@@ -1930,7 +1930,7 @@ Section ProofSysChdirBody.
           (* ============ +0x54 sd s1,336(s2) -- p->cwd = ip ============ *)
           iDestruct (proc_priv_bare_cwd pj pid (upd_upt V P') with "Hpbare")
             as "[Hcwd Hcwdbk]".
-          iEval (cbn [upd_upt pv_cwd]) in "Hcwd".
+          iEval (cbn [upd_upt pv_cwd pv_fdg]) in "Hcwd".
           iApply (wp_sd_s_sconf (kt := KT1) (ktd := KT0) (CID := CID35) (mword_of_int (SC + 0x54)) Rs1 Rs2
                     (mword_of_int 336 : mword 12) meo (K - 20)%nat (pv_cwd V) b
                     with "Hcg Hpc [] [Hcwd]").
@@ -1951,14 +1951,14 @@ Section ProofSysChdirBody.
           iAssert (proc_priv_nocwd gf pj pid (upd_cwd (upd_upt V P') (ientry kk)))
             with "[Hpbare Hofiles]" as "Hpnc".
           { rewrite proc_priv_nocwd_bare.
-            cbn [upd_cwd pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+            cbn [upd_cwd pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg].
             iSplitL "Hpbare"; [iExact "Hpbare" | iExact "Hofiles"]. }
           iDestruct (cwd_ref_of_held with "Hheldnew") as "Hrefcwd".
           iAssert (proc_priv gf pj pid (upd_cwd (upd_upt V P') (ientry kk)))
             with "[Hpnc Hrefcwd Hftok]" as "Hpriv".
           { rewrite (proc_priv_split_cwd gf pj pid (upd_cwd (upd_upt V P') (ientry kk))).
             iSplitL "Hpnc"; [iExact "Hpnc" |].
-            iEval (cbn [upd_cwd pv_cwd]). iFrame "Hrefcwd Hftok". }
+            iEval (cbn [upd_cwd pv_cwd pv_fdg]). iFrame "Hrefcwd Hftok". }
           iDestruct (iref_slots_combine 1 1 with "Hislot Hir") as "Hir".
           (* ============ +0x58 c.li a0,0 ============ *)
           iApply (wp_cli_s_sconf (CID := CID36) (mword_of_int (SC + 0x58)) Ra0
@@ -2242,7 +2242,7 @@ Section ProofSysChdirBody.
                     proc_priv_nocwd_bare.
             iSplitR "Href Hftok".
             - iSplitL "Hpbare"; [iExact "Hpbare" | iExact "Hofiles"].
-            - iEval (cbn [upd_upt pv_cwd]). iFrame "Href Hftok". }
+            - iEval (cbn [upd_upt pv_cwd pv_fdg]). iFrame "Href Hftok". }
           iDestruct (iref_slots_combine 1 1 with "Hislot Hir") as "Hir".
           (* the buffer, whole again *)
           iDestruct (sc_buf_join (pa_stk sp0 20) bf pk Hpk with "Hbufk Hbufrest")
@@ -2334,7 +2334,7 @@ Section ProofSysChdirBody.
                   proc_priv_nocwd_bare.
           iSplitR "Href Hftok".
           - iSplitL "Hpbare"; [iExact "Hpbare" | iExact "Hofiles"].
-          - iEval (cbn [upd_upt pv_cwd]). iFrame "Href Hftok". }
+          - iEval (cbn [upd_upt pv_cwd pv_fdg]). iFrame "Href Hftok". }
         iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
         iApply ("Hcont" $! mf P' with "[%] [%] Hcg Hown [] [] Hpc Hbsl
                   Hsbb Hsbi Hir [Hpriv]").

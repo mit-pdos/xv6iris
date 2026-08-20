@@ -172,6 +172,57 @@ tree. Its `CoqMakefile` may also not exist yet on the VM, so generate it if
 missing (`coq_makefile -f _CoqProject -o CoqMakefile`) — same for
 `kernel-rocq`.
 
+### `run-on-gcp make` CAN DIE IN THE **DUMP** RULES, AND IT IS NOT A PROOF FAILURE
+
+Seen 2026-08-20.  `run-on-gcp make proofs` failed before compiling a single
+`.v` with
+
+```
+rocq-raw: xv6-riscv/kernel/kernel embeds its own build directory
+(/mnt/rocq/trees/_shared_xv6iris-1/xv6-riscv), so this dump would differ
+between build trees.
+make: *** [Makefile:168: kernel-rocq/KernelElfRaw.v] Error 1
+```
+
+`proofs` depends on `kernel-rocq`, whose dump rules fire whenever the ELF (or
+`tools/dump_elf.py`) is newer than the tracked `kernel-rocq/*.v` — and on the
+VM mirror the ELF was rebuilt in the mirror's own path, so `--format rocq-raw`
+refuses.  Nothing is wrong with the proofs and nothing is wrong with the
+tracked dump; the ELF in the remote tree just is not the deterministic one.
+
+**Work around it by marking the dump inputs old**, which makes `make` treat
+every dump target as up to date without touching the tracked `.v`:
+
+```sh
+./gcp-rocq/run-on-gcp make \
+  -o tools/dump_elf.py \
+  -o xv6-riscv/kernel/kernel -o xv6-riscv/fs.img \
+  -o xv6-riscv/user/_sh -o xv6-riscv/user/_init \
+  -o xv6-riscv/user/_echo -o xv6-riscv/user/_sync \
+  -k proofs
+```
+
+Two traps in getting there:
+
+- `-o kernel-rocq` (the phony) is NOT the fix: it also skips building
+  `kernel-rocq/*.vo`, and the build then dies at `No rule to make target
+  '../kernel-rocq/FsImgRaw.vo'`.  Mark the ELF *inputs* old, not the phony.
+- `-o xv6-riscv/kernel/kernel` alone is not enough either — `tools/dump_elf.py`
+  is a prerequisite of every dump rule and rsync gives it the local mtime, so
+  it can be the newer one.  `-o` it too.
+- **DO NOT `-o model` (this list carried it and it was wrong).**  `model` is
+  not a dump rule and marking it old skips the generated Sail model's own
+  `.vo`, so the first pull that adds a model file dies at **`No rule to make
+  target '../model-xv6iris/xv6iris_extras.vo'`** with no Rocq error — which
+  reads like the missing-`user-rocq` symptom above and is a different cause.
+  (Cost one build round on 2026-08-27, when `xv6iris_extras.v` arrived.)  The
+  `-o` list is for the ELF and the DUMPER, and nothing else.
+
+And the usual one: `run-on-gcp … ; echo EXIT=$?` **masks make's status**, so
+the wrapper can report success while the log ends in `Error 1`.  Write the
+sentinel into the log (`> log 2>&1; echo "EXIT=$?" >> log`) and grep the log,
+never the wrapper's exit alone.
+
 ## Getting the .vo back for a local recheck
 
 Rechecking one file locally normally means building the whole tree locally

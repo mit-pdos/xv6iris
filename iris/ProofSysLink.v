@@ -1156,7 +1156,7 @@ Section ProofSysLinkBody.
         iEval (rewrite proc_priv_nocwd_bare) in "Hpnc".
         iDestruct "Hpnc" as "[Hpidq Hofiles]".
         iDestruct (cwd_ref_held with "Href") as "Hcwdref".
-        iEval (cbn [upd_upt pv_cwd]) in "Hcwdref".
+        iEval (cbn [upd_upt pv_cwd pv_fdg]) in "Hcwdref".
         iDestruct (sl_ir3 with "Hir") as "[Hir2 Hir1]".
         assert (Htgbc : add_vec (mword_of_int (SL + 0x40) : mword 64)
                   (sign_extend' 64
