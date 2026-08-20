@@ -1184,6 +1184,46 @@ completed at the one point the slots are back in hand.  **A `-∗` premise is
 how a linear resource that a callee borrows and returns should be threaded;
 a bare conjunct beside it is how it gets claimed twice.**
 
+### THE MIRROR CASE: A `∀`-STATE CERTIFICATE PREMISE IS UNSATISFIABLE FOR ANYTHING THAT JUMPS
+
+The section above is about a premise set that is unsatisfiable and compiles
+anyway.  The same mistake in the OTHER direction — a premise too strong to
+prove — is cheap by comparison, because it fails at the first call site
+rather than lying; but it is easy to write, and the shape recurs whenever a
+`goodmb` certificate is bolted onto a lemma that already carries a
+value-precise `exec` fact.
+
+Adding
+
+```coq
+(forall s : mstate, goodmb Dr Dw (execute i) s ∅ = true) ->
+```
+
+to the verified Umode retire funnel looked harmless: `goodmb` answers a
+`bool` and does not scrutinise the state, so quantifying the state seemed
+free.  **It is not, for any instruction routing through `jump_to`.**
+`jump_to` asserts bit 0 of the target is clear; a failed `assert_exp` is a
+fail node; and `HartMemRun.goodmb`'s catch-all arm is `| _ => fun _ => false`.
+So at any `s` whose PC makes `PC + sext imm` odd the proposition is FALSE —
+unprovable, not merely unproved.  Read from the other side, the catalogue
+says the same thing out loud: `UserExecFacts.goodmb_execute_JAL_total`
+demands `eq_vec (access_vec_dec (add_vec (register_lookup PC s.(sregs))
+(sign_extend' 64 imm)) 0) ('b"0") = true` — the TARGET's alignment, computed
+from `s`'s own PC — and JALR additionally wants the Zicfilp/Zca gates, which
+read `misa`/`menvcfg`.
+
+> **GUARD A CERTIFICATE PREMISE WITH THE STATE FACTS ITS PAIRED `exec`
+> PREMISE ALREADY CARRIES.**  The two are consumed at the SAME state, so the
+> guard costs nothing and the leaves close with no new certificate: the pc
+> pin turns each leaf's own target-alignment premise into the catalogue
+> lemma's, which is the very rewrite its `exec` proof already performs.
+
+The symptom is `Error: No product even after head-reduction.` at every
+JUMPING call site while the register-only ones type-check — a 25-of-29 split
+that reads like a botched argument list and is really a false premise.  **A
+certificate premise that quantifies more of the machine than the fact beside
+it is the thing to suspect.**
+
 ## A CLAUSE ABOUT **NAMES** MUST TAKE THE WRITE'S ATOMICITY; ONE ABOUT
 ## INUMS OR INDICES NEED NOT
 
