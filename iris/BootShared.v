@@ -48,6 +48,22 @@ Require Import IcacheRef.
 Require Import IrefSlots.
 Require Import TicksInv.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+(* THE FILE SYSTEM'S BOOT-ERA MINT (claude-notes/projects/fs-cfg-boot.md
+   stage (d2b)).  [FsCfgBoot.fs_cfg_alloc] is what finally gives
+   [IcacheRef.icfg] and [FsCfg.fscfg] VALUES, and it has to run here: the
+   two records reach every proof as superclass fields of
+   [FileInvDefs.fileG], so they must exist before the first hart's WP, and
+   this file's fupd is the only thing that runs earlier.  The disk mint it
+   consumes is [power_boot_res]'s own ([power_boot_res_unpack]'s [Hdimg]),
+   which this lemma used to hand back untouched and its one caller dropped
+   on the floor. *)
+Require Import LogDefs.        (* [log_mirror_full]: kit-2's row (B) *)
+Require Import FsCrash.        (* [fs_blocks] *)
+Require Import InodeInv.       (* [ROOTDEV] *)
+Require Import FsBoot.         (* [fs_cov_in] *)
+Require Import FsImg.          (* the image sweeps' vocabulary *)
+Require Import FsCfg.          (* [fscfg], and its projections in the ties *)
+Require Import FsCfgBoot.      (* [fs_cfg_alloc] and the two boot kits *)
 Local Open Scope Z_scope.
 
 (* a syscall-altitude goal contains [ProcInv.tf_page]'s 4096-conjunct big-op:
@@ -235,7 +251,10 @@ Proof. exact (fun H => H). Qed.
 (* ====================================================================== *)
 
 Section BootBss.
-  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ,
+  (* NO [fileG] BINDER: nothing in this file's carve mentions the file table
+     or either configuration record, and after stage (d2b) the only [fileG]
+     in the file is the one [boot_shared_alloc] BUILDS (see §5). *)
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
             !irefslotG Σ}.
   Context `{GEN : GenId}.
 
@@ -361,7 +380,8 @@ Proof.
 Qed.
 
 Section BootBssChain.
-  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ,
+  (* NO [fileG] BINDER -- see [BootBss]. *)
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
             !irefslotG Σ}.
   Context `{GEN : GenId}.
 
@@ -727,10 +747,13 @@ End BootBssChain.
 (*     [SpecMainSecondary.main_deposit γd γv Φ], because a secondary hart   *)
 (*     may reach its first [lw started] before hart 0 has run at all.      *)
 (*                                                                        *)
-(* [fdslotG] is the one client class that carries a GHOST NAME, so it is    *)
-(* allocated here and appears under the existential; the other seven       *)
-(* ([lockG]/[kallocG]/[fileG]/[sieG]/[uartGhostG]/[diskGhostG] and the      *)
-(* pre-class) are capacity only and are in [Σ] from the start.              *)
+(* FOUR CLIENT CLASSES CARRY PER-BOOT VALUES, so all four are allocated    *)
+(* here and appear under the existential: [fdslotG] and [irefslotG] carry a *)
+(* ghost name, [pavG] carries one, and [fileG] carries the file table's     *)
+(* camera TOGETHER WITH the two configuration records                       *)
+(* ([IcacheRef.icfg], [FsCfg.fscfg]) -- which is why it could not be a      *)
+(* functor constraint either (fs-cfg-boot.md stage 3/(d2b)).  Everything    *)
+(* else the boot needs is capacity only and is in [Σ] from the start.       *)
 (* ====================================================================== *)
 
 (* the reverse of [RiscvAdequacy.big_sepL_enum_to_set]: [power_boot_res]
@@ -789,13 +812,77 @@ Definition main_data_raw `{!riscvGS Σ} : iProp Σ :=
   ((pa_of_z KernelSyms.first_1) ↦₄ (mword_of_int 1 : mword 32) ∗
    (∃ w : bv 32, (pa_of_z KernelSyms.nextpid)  ↦₄ w))%I.
 
+(* ---------------------------------------------------------------------- *)
+(* WHAT THE ERA'S DISK MUST BE, for the file system's boot-era mint to run. *)
+(*                                                                        *)
+(* [FsCfgBoot.fs_cfg_alloc]'s nine pure premises, bundled: two image        *)
+(* sweeps ([FsImg.fsimg_wf] = W1-W9, and [FsImg.fs_region_wf] = the whole   *)
+(* [16*nib] inode region's L3/L4 and free tail), four geometry facts about  *)
+(* [nib], and ruling R4's three coverage corners.  Bundled because both     *)
+(* adequacy theorems now carry it and a nine-premise theorem statement is   *)
+(* not readable; the projections are in [fs_cfg_alloc]'s own order.         *)
+(*                                                                        *)
+(* IT COMPUTES NOTHING (ruling R3): the era fupd takes every image fact as  *)
+(* a hypothesis, and the literal-image discharge lives in                   *)
+(* [FsAdequacyImg.v] off [FsImgCheck]'s citations -- deliberately NOT on    *)
+(* this file's cone, nor on [SystemAdequacy]'s.                             *)
+(* ---------------------------------------------------------------------- *)
+Definition fs_boot_image_wf (dk : Z -> bv 8) (ndisk : nat)
+    (sb : fs_sb) (nib : nat) (cov : gset Z) : Prop :=
+  FsImg.fsimg_wf (FsCrash.fs_blocks dk) sb = true
+  /\ FsImg.fs_region_wf (FsCrash.fs_blocks dk) sb nib = true
+  /\ FsImg.sb_ninodes sb <= 16 * Z.of_nat nib
+  /\ 16 * Z.of_nat nib <= 2 ^ 32
+  /\ (0 < nib)%nat
+  (* the inode region is EXACTLY [[inodestart, bmapstart)]: mkfs rounds
+     [ninodes] up to a whole block *)
+  /\ Z.of_nat nib = FsImg.sb_ninodes sb / 16 + 1
+  /\ FsBoot.fs_cov_in cov ndisk
+  /\ (forall b : Z, 1 <= b < FsImg.fs_data_start sb -> b ∈ cov)
+  /\ (forall b : Z, FsImg.fs_data_start sb <= b < FsImg.sb_size sb -> b ∈ cov).
+
+(* ---------------------------------------------------------------------- *)
+(* THE FILE SYSTEM'S BOOT-ERA OUTPUT, as one row.                          *)
+(*                                                                        *)
+(* BYTE-IDENTICAL TO [FsCfgBoot.fs_cfg_alloc]'s conclusion body (ten ties, *)
+(* then the two kits, in that order), which is what makes the wiring below  *)
+(* one [iExact] -- and what makes stage (e)'s reading of it the same        *)
+(* destructuring the era fupd's own post has.  [ICFG]/[FSC] are parameters  *)
+(* rather than resolved from an ambient class: the caller passes            *)
+(* [fileG]'s own two projections, so every row is stated AT THE INSTANCE    *)
+(* the boot chain is applied at.                                           *)
+(* ---------------------------------------------------------------------- *)
+Definition fs_boot_supply `{!riscvGS Σ, !xv6G Σ}
+    (ICFG : icfg) (FSC : fscfg) (dk : Z -> bv 8)
+    (sb : fs_sb) (nib : nat) (cov : gset Z)
+    (γd : uart_names) (γv : disk_names) : iProp Σ :=
+  (⌜icfg_dev = InodeInv.ROOTDEV⌝ ∗ ⌜icfg_nib = nib⌝ ∗
+   ⌜icfg_ist = FsImg.sb_inodestart sb⌝ ∗
+   ⌜fsc_uart = γd⌝ ∗ ⌜fsc_disk = γv⌝ ∗ ⌜fsc_cov = cov⌝ ∗
+   ⌜fsc_logst = FsImg.sb_logstart sb⌝ ∗
+   ⌜fsc_bmapstart = FsImg.sb_bmapstart sb⌝ ∗
+   ⌜fsc_size = FsImg.sb_size sb⌝ ∗ ⌜fsc_ninodes = FsImg.sb_ninodes sb⌝ ∗
+   fs_kit_icache ICFG FSC ∗
+   fs_kit_fsinit_ghost ICFG FSC (FsCrash.fs_blocks dk)
+     (fs_kit_spent (FsCrash.fs_blocks dk) sb nib (FsImg.fs_live_set (FsCrash.fs_blocks dk) sb)))%I.
+
 Section BootAlloc.
-  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ}.
-  (* NO [icacheG] BINDER: [fileG] already carries it, and [IcacheRef.icfg]
-     with it (FileInv.v's header -- two instance paths print identically and
-     do not unify).  The itable's authority gname is CANONICAL, a field of
-     that ambient [icfg], so unlike the fd- and iref-slot supplies there is
-     nothing to mint here. *)
+  Context `{!riscvGS Σ, !xv6G Σ}.
+  (* NO [icacheG] AND NO [fileG] BINDER.  [fileG] carries the two
+     configuration records, and NOTHING in this file can be stated at them
+     before they exist -- so the class is not assumed here, it is BUILT:
+     [FsCfgBoot.fs_cfg_alloc] mints an [icfg] and an [fscfg] inside the fupd
+     below and [FileInvDefs.fileG_of] reassembles the class at [FGP]'s
+     camera, exactly as [fdslotG]/[irefslotG]/[pavG] are minted and returned
+     existentially.  The itable's authority gname is a field of that minted
+     [icfg], so there is nothing separate to mint for it.
+     THE INSTANCE IS BUILT EXPLICITLY, never resolved: a site that asks
+     resolution for a [fileG Σ] with no closed [icfg]/[fscfg] in scope walks
+     [subG_fileΣ -> fscfg -> file_fscfg -> fileG] forever (measured at
+     400 GB resident, no error and no progress -- the hazard the deleted
+     [SystemAdequacy.adequacy_fscfg] existed to block).  [fileGpreS] has no
+     such cycle: its only instance is [subG] on the functor list. *)
+  Context `{FGP : fileGpreS Σ}.
   Context `{!fdslotGpreS Σ, !irefslotGpreS Σ, !pavGpreS Σ}.
   Context `{GEN : GenId}.
 
@@ -970,11 +1057,17 @@ Section BootAlloc.
   (* ------------------------------------------------------------------ *)
   (* THE COMPANION LEMMA.                                               *)
   (* ------------------------------------------------------------------ *)
-  Lemma boot_shared_alloc (g : gstate) (ndisk : nat) :
+  Lemma boot_shared_alloc (g : gstate) (ndisk : nat)
+      (sb : fs_sb) (nib : nat) (cov : gset Z) :
     boot_facts g ->
+    (* THE ERA'S DISK IS THE FILE SYSTEM'S (fs-cfg-boot.md (d2b)).  It is a
+       hypothesis about THIS era's disk image, and it has to be: the mint
+       [power_boot_res] hands over is at [v_disk (g.(gdev).(dvirtio))], and
+       nothing in [boot_facts] says what those bytes are. *)
+    fs_boot_image_wf (v_disk (g.(gdev).(dvirtio))) ndisk sb nib cov ->
     power_boot_res riscv_eraGS gen_id boot_D NPROC ndisk g
-    ={⊤}=∗ ∃ (_ : fdslotG Σ) (_ : irefslotG Σ) (_ : pavG Σ)
-             (γd : uart_names) (γv : disk_names),
+    ={⊤}=∗ ∃ (HFd : fdslotG Σ) (HIr : irefslotG Σ) (HPav : pavG Σ)
+             (HF : fileG Σ) (γd : uart_names) (γv : disk_names),
       ⌜dn_img γv = disk_img_name⌝ ∗
       (* --- the shared persistents --- *)
       kernel_text ∗ kernel_data ∗
@@ -1010,20 +1103,38 @@ Section BootAlloc.
       ghost_map_auth (dn_claim γv) 1 (∅ : gmap nat dclaim) ∗
       disk_done_lb γv 0%nat ∗
       kpt_unset ∗ kmap_auth kmap_M0 ∗
-      (* THE BOOT MINT, restated at the disk names this lemma just allocated:
-         the whole image, in exclusive byte fragments.  Nothing consumes it
-         yet -- it is what the FS layer's block views will be carved out of
-         (claude-notes/design/fs-log.md, stage 4). *)
-      disk_bytes γv 0 (disk_read (v_disk (g.(gdev).(dvirtio))) 0 ndisk) ∗
-      (* the era's log-region mirror variable, straight through: the FS boot
-         client hands it to [initlog] (its [LogInv.log_mirror_full] premise) *)
+      (* THE BOOT MINT IS GONE FROM THIS INTERFACE, and that is stage (d2b):
+         [disk_bytes γv 0 (disk_read (v_disk (g.(gdev).(dvirtio))) 0 ndisk)]
+         used to leave here and be dropped by the one caller.  It is now
+         SPENT below, by [FsCfgBoot.fs_cfg_alloc], which is what turns those
+         bytes into the file system's block ghosts (fs-log.md stage 4). *)
+      (* the era's log-region mirror variable, straight through: it is
+         kit 2's row (B) -- [FsCfgBoot.fs_kit_fsinit_ghost]'s header says so
+         and says why the era fupd must NOT try to mint it -- and
+         [LogDefs.log_mirror_full], which [initlog] takes, is this row's
+         [∃ M].  Kept at the CONCRETE genesis value rather than weakened to
+         [log_mirror_full] here, so nothing is lost on the way to fsinit. *)
       ghost_var mirror_name 1 (MkLogMirror (0%nat, []) (fun _ => [])) ∗
       (∃ ps : list (mword 64),
          ⌜prun phystop_val s1entry_val ps⌝ ∗
          ⌜(K_kvmmake + 64 + 3 < length ps)%nat⌝ ∗
-         ([∗ list] p ∈ ps, page_own p)).
+         ([∗ list] p ∈ ps, page_own p)) ∗
+      (* ---- THE FILE SYSTEM'S BOOT-ERA MINT (stage (d2b)) ---- *)
+      (* row (P4) of [fs_kit_icache]'s header: the iref-slot AUTHORITY, which
+         [IcacheBoot.icache_boot_at] takes and which only [iref_slots_alloc]
+         -- run here, beside the [irefslotG] instance it returns -- can
+         produce.  It used to be dropped on the floor at that call. *)
+      iref_slots_auth ∗
+      (* the ten config ties and the two boot kits, AT THE INSTANCE the
+         chain arms above are applied at.  Stage (e) is the consumer:
+         kit 1 in [ProofMain.mn_grp_fs], kit 2 through [SpecUserinit] to
+         forkret's first arm. *)
+      fs_boot_supply (@file_icfg Σ HF) (@file_fscfg Σ HF)
+        (v_disk (g.(gdev).(dvirtio))) sb nib cov γd γv.
   Proof.
-    intro Hbf.
+    intros Hbf Himg.
+    destruct Himg as (Hwf & Hrw & Hnin & Hnib32 & Hnib0 & Hnibeq &
+                      Hcovin & Hcovmeta & Hcovdata).
     pose proof (boot_ram_of_facts g Hbf) as Hram.
     pose proof (boot_mem_of_facts g Hbf) as Hmem.
     pose proof Hbf as Hbf'.
@@ -1100,8 +1211,11 @@ Section BootAlloc.
        carries a gname cannot be a functor constraint adequacy assumes. *)
     iMod procs_avail_alloc as (Hpav) "Hprocsavail".
     iMod fd_slots_alloc as (Hfd) "[_ Hfdslots]".
-    (* ---- the iref-slot supply, likewise a pure ghost ---- *)
-    iMod iref_slots_alloc as (Hir) "[_ Hirslots]".
+    (* ---- the iref-slot supply, likewise a pure ghost.  THE AUTHORITY IS
+           KEPT NOW: [icache_boot_at] takes it (row (P4) of
+           [FsCfgBoot.fs_kit_icache]'s header) and nothing else can make
+           it. ---- *)
+    iMod iref_slots_alloc as (Hir) "[Hirauth Hirslots]".
     (* ### THE FILE TABLE'S NFILE UNITS ARE DROPPED HERE. ###
        [IREFSLOTS = NPROC*(1 + IREFSPARE) + NFILE]; the proc layer's share
        is routed through [main_globals_raw], and the [NFILE] units belong to
@@ -1142,6 +1256,31 @@ Section BootAlloc.
       iSplitL "Hproto"; [iExact "Hproto" |].
       iSplit; [iPureIntro; rewrite Hp0; exact plic_ok_plic0
               | iPureIntro; rewrite Hv0; exact (virtio_isr_ok_reset v0)]. }
+    (* ================================================================ *)
+    (* ---- THE FILE SYSTEM'S BOOT-ERA MINT (fs-cfg-boot.md (d2b)) ---- *)
+    (* It runs HERE, after the device ghosts: [fs_cfg_alloc] REUSES [γd] and
+       [γv] as [fsc_uart]/[fsc_disk] rather than re-minting them (its step
+       1), so it cannot run before [uart_ghosts_alloc]/[disk_ghosts_alloc];
+       and it must run before the harts' WPs exist, which is everything
+       below.  The boot mint is the only resource it takes. *)
+    iAssert (disk_bytes γv 0
+               (disk_read (v_disk (g.(gdev).(dvirtio))) 0 ndisk))
+      with "[Hdimg]" as "Hdimg".
+    { (* [disk_bytes γv] IS [disk_img_bytes (dn_img γv)], and [Himg] says
+         that gname is the era's -- the same one-line restatement this
+         lemma's postcondition used to do at its very end *)
+      rewrite /disk_bytes. iEval (rewrite -Himg) in "Hdimg". iExact "Hdimg". }
+    iMod (fs_cfg_alloc γd γv (v_disk (g.(gdev).(dvirtio))) ndisk sb cov nib ⊤
+            Hwf Hrw Hnin Hnib32 Hnib0 Hnibeq Hcovin Hcovmeta Hcovdata
+            with "Hdimg") as (ICFG FSC) "Hfs".
+    (* [fileG_of]'s two projections ARE the two minted records, by iota.
+       Named, so the postcondition's row needs no conversion step inside the
+       proofmode. *)
+    assert (Hpi : @file_icfg Σ (fileG_of FGP ICFG FSC) = ICFG)
+      by reflexivity.
+    assert (Hpf : @file_fscfg Σ (fileG_of FGP ICFG FSC) = FSC)
+      by reflexivity.
+    (* ================================================================ *)
     (* ---- the eight harts' register sides, and the sixteen wire pins ---- *)
     iDestruct (big_sepS_enum_to_list hart_resv with "Hresv") as "Hresv".
     iAssert ([∗ list] c ∈ enum CPU,
@@ -1180,7 +1319,7 @@ Section BootAlloc.
     (* [Hprocsavail] -- [procs_avail (Some NPROC)] -- now leaves in the
        postcondition: userinit is proven and its contract
        ([SpecUserinit.v]) takes exactly this. *)
-    iModIntro. iExists Hfd, Hir, Hpav, γd, γv.
+    iModIntro. iExists Hfd, Hir, Hpav, (fileG_of FGP ICFG FSC), γd, γv.
     iSplitR; [iPureIntro; exact Himg |].
     iSplitR; [iExact "Hktext" |].
     iSplitR; [iExact "Hkdata" |].
@@ -1207,12 +1346,11 @@ Section BootAlloc.
     iSplitR; [iExact "Hdone" |].
     iSplitL "Hkpt"; [iExact "Hkpt" |].
     iSplitL "Hkauth"; [iExact "Hkauth" |].
-    (* the boot mint, re-spelled at [γv]: [disk_bytes γv] IS
-       [disk_img_bytes (dn_img γv)], and [Himg] says that gname is the era's *)
-    iSplitL "Hdimg".
-    { rewrite /disk_bytes. iEval (rewrite -Himg) in "Hdimg". iExact "Hdimg". }
     iSplitL "Hmir"; [iExact "Hmir" |].
-    iExact "Hpages".
+    iSplitL "Hpages"; [iExact "Hpages" |].
+    iSplitL "Hirauth"; [iExact "Hirauth" |].
+    (* the ten ties and the two kits, restated at [fileG_of]'s projections *)
+    rewrite /fs_boot_supply Hpi Hpf. iExact "Hfs".
   Qed.
 
 End BootAlloc.

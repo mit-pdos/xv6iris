@@ -993,6 +993,7 @@ BootShared.v
 CodeBalloc.v
 CodeBfree.v
 SystemAdequacy.v
+FsAdequacyImg.v
 # --- BEGIN out of the coq_makefile build: the assumption audit ---
 # SystemAssumptions.v is `Print Assumptions` on the system theorem.  It is a
 # real, compiled file -- `make audit` builds it, and CI runs it after the iris

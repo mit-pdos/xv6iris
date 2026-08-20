@@ -44,8 +44,11 @@ Require Import BootConfig.
 Require Import BootChain BootShared.
 Require Import RiscvAdequacy.
 Require Import FsCrash.
-(* THE LITERAL mkfs IMAGE, for the [xv6Σ] corollary at the bottom.  This is
-   the MACHINE-FACING half only ([fsimg_dk], its block view, and the one
+(* THE LITERAL mkfs IMAGE, for the generic FS theorem's [Hrec] vocabulary.
+   (The corollaries AT the image live in [FsAdequacyImg.v] since stage
+   (d2b); this import stays because §3b's statement is spelled in
+   [FsBlocks]/[FsCrash] terms and the file's cone is measured below.)  This
+   is the MACHINE-FACING half only ([fsimg_dk], its block view, and the one
    recovery fact) -- deliberately split out of [FsImgCheck.v] so that this
    file's cone gains [PStringBytes] + the generated [Kernel.FsImgRaw] and
    nothing else.  MEASURED, single-file [coqc] on the build VM: 3.63 s
@@ -58,6 +61,9 @@ Require Import IcacheRef.
 Require Import IrefSlots.
 Require Import FsCfg.       (* [fscfg] -- the concrete instance below *)
 Require Import BioDefs FsBlocks IcacheEscrow DiskPtsto.  (* its record constructors *)
+Require Import FsImg.  (* [fs_sb]: the era-wide image hypothesis's shape.  No
+   computation and no literal image comes with it -- [FsImgCheck.v] is what
+   instantiates the sweeps, and it is NOT on this file's cone. *)
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
@@ -117,18 +123,52 @@ Proof. reflexivity. Qed.
    file. *)
 Definition XV6_DISK_BYTES : nat := (2000 * 1024)%nat.
 
+(* THE ERA-WIDE IMAGE HYPOTHESIS, and read its shape carefully.
+
+   [RiscvAdequacy.riscv_power_adequacy] asks for a boot entailment at EVERY
+   [g'] with [RiscvLang.boot_facts g'] -- one per era, for arbitrarily many
+   power cycles -- and [boot_facts] says NOTHING about the disk's bytes
+   ([virtio_reset] preserves [v_disk], which is exactly why a later era's
+   disk is whatever the previous era WROTE).  So an image hypothesis about
+   the initial machine's disk cannot reach the era fupd, and the honest
+   statement quantifies over the eras: "every machine this system ever boots
+   on carries the file system's image".
+
+   THAT IS A STRENGTHENING OF WHAT THE FS COROLLARY USED TO ASSUME (one
+   equation about [g]'s own disk), and it is the price of running
+   [FsCfgBoot.fs_cfg_alloc] in the era fupd: the inode cache's configuration
+   is now minted FROM THE ERA'S ACTUAL DISK, so the boot cone's assumed
+   [namei("/")] contract is non-vacuous -- but nothing yet PROVES that xv6's
+   own writes leave the disk image-shaped, which is the durability effort
+   ([FsCrash.P_fs], claude-notes/design/crash.md).  Until it does, "boots
+   twice on the image" is a hypothesis, not a theorem.
+   claude-notes/projects/fs-cfg-boot.md records this as the (d2b) stop. *)
+Definition fs_boot_image_eras (sb : fs_sb) (nib : nat) (cov : gset Z)
+  : Prop :=
+  forall g' : gstate,
+    boot_facts g' ->
+    fs_boot_image_wf (v_disk (g'.(gdev).(dvirtio))) XV6_DISK_BYTES
+      sb nib cov.
+
 Section SystemBoot.
-  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ}.
-  Context `{!fdslotGpreS Σ, !irefslotGpreS Σ, !pavGpreS Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!fileGpreS Σ, !fdslotGpreS Σ, !irefslotGpreS Σ, !pavGpreS Σ}.
   Context `{GEN : GenId}.
 
-  (* NO [icacheG] BINDER: [fileG] carries it, together with the ambient
-     [IcacheRef.icfg] whose [icfg_iref] IS the itable authority's canonical
-     gname.  Unlike the fd- and iref-slot supplies -- whose names are minted
-     inside [boot_shared_alloc] and leave existentially -- there is nothing
-     to allocate here. *)
-  Lemma xv6_boot_era (g : gstate) :
+  (* NO [fileG] AND NO [icacheG] BINDER ANY MORE (fs-cfg-boot.md stage
+     (d2b)).  [fileG] carries [IcacheRef.icfg] and [FsCfg.fscfg] as
+     superclass fields, and nothing in the tree ever produced either: the
+     two records used to be the hardcoded [adequacy_icfg]/[adequacy_fscfg]
+     of this file, at [icfg_nib = 0], where an [IcacheRef.inode_held] cannot
+     exist -- so the boot cone's one assumed contract was VACUOUS at the
+     instance the corollaries below are taken at.  [boot_shared_alloc] now
+     MINTS both inside the era fupd, off the era's own disk, and hands the
+     class back existentially; only the camera ([fileGpreS]) is a functor
+     constraint. *)
+  Lemma xv6_boot_era (g : gstate) (sb : fs_sb) (nib : nat) (cov : gset Z) :
     boot_facts g ->
+    fs_boot_image_wf (v_disk (g.(gdev).(dvirtio))) XV6_DISK_BYTES
+      sb nib cov ->
     power_boot_res riscv_eraGS gen_id boot_D NPROC XV6_DISK_BYTES g
     ={⊤}=∗
       ([∗ list] c ∈ enum CPU,
@@ -137,12 +177,28 @@ Section SystemBoot.
       WP (DiskLoopE gen_id : expr riscv_lang) @ ⊤ ∗
       WP (PlicLoopE gen_id : expr riscv_lang) @ ⊤.
   Proof.
-    intro Hbf. iIntros "Hres".
-    iMod (boot_shared_alloc g XV6_DISK_BYTES Hbf with "Hres")
-      as (Hfd Hir Hpav γd γv)
+    intros Hbf Himg. iIntros "Hres".
+    iMod (boot_shared_alloc g XV6_DISK_BYTES sb nib cov Hbf Himg with "Hres")
+      as (Hfd Hir Hpav HF γd γv)
       "(%Hdimg & #Htext & #Hdata & #Hstarted & #Hdev & #Hwinv &
         #Hcinv & #Hcert & Hharts & Hlk & Hgl & Hmdata & Hpark & Hpst & Hpavail & Huart &
-        Hdlab & Hcfg & Hclaim & #Hdone & Hkpt & Hkmap & Hdisk & Hmir & Hpages)".
+        Hdlab & Hcfg & Hclaim & #Hdone & Hkpt & Hkmap & Hmir & Hpages & Hirauth & Hfs)".
+    (* ################################################################ *)
+    (* THE FILE SYSTEM'S BOOT KITS ARE DROPPED HERE, ON PURPOSE, AND     *)
+    (* STAGE (e) IS THE CONSUMER.  [Hfs] is the ten configuration ties   *)
+    (* plus [fs_kit_icache] plus [fs_kit_fsinit_ghost], and [Hirauth] is *)
+    (* the iref-slot authority [icache_boot_at] takes.  Threading them   *)
+    (* through [boot_hart_primary] into [SpecMain]'s boot arm -- so that *)
+    (* [ProofMain.mn_grp_fs] can run [bio_init_at]/[icache_boot_at]/the  *)
+    (* four [newlock_at]s and [SpecUserinit] can carry kit 2 to forkret  *)
+    (* -- is stage (e)'s FIRST step (fs-cfg-boot.md staging step 5).     *)
+    (* Iris is affine, so dropping them here is sound; what it costs is  *)
+    (* exactly that main cannot yet build the cache, i.e.               *)
+    (* [LinkNameiRootBoot]'s Axiom is still assumed.  The mint itself is *)
+    (* NOT wasted: it is what gives [fileG] a value at all, which is     *)
+    (* what makes that Axiom non-vacuous.                                *)
+    (* ################################################################ *)
+    iClear "Hirauth Hfs".
     (* the harts' reservation mirrors (design §3a) are gone from this
        interface: [boot_shared_alloc] threads each into its hart's [pc_is]. *)
     (* [Hmdata] IS [BootShared.main_data_raw] -- the image's writable
@@ -174,8 +230,16 @@ Section SystemBoot.
       iSplitL "Hh0 Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Htx Hdlab Hcfg Hclaim Hkpt Hkmap
                Hpages".
       { (* THE BOOT HART: the arm that consumes the whole supply. *)
+        (* AT [HF] EXPLICITLY, not by resolution.  [SpecMain.MAIN]'s
+           parameters are ∀-quantified over the classes, so handing the
+           chain the instance the era fupd just built is an APPLICATION;
+           asking resolution for a [fileG Σ] here would take the
+           [subG_fileΣ -> fscfg -> file_fscfg -> fileG] cycle instead
+           (FileInv.v's "two instance paths print identically and do not
+           unify", and the 400 GB divergence the deleted [adequacy_fscfg]
+           was written to block). *)
         iDestruct "Hh0" as (iv) "Hh0".
-        iApply (boot_hart_primary (CID := 0%fin)
+        iApply (boot_hart_primary (fileG0 := HF) (CID := 0%fin)
                   (g.(gregs) 0%fin) iv DfracDiscarded γd γv ps l0 b0 c0
                   (boot_regs_of_facts g Hbf 0%fin) fin_0_z Hprun Hplen Hlive
                   with "Htext Hdata Hh0 Hstarted Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail
@@ -185,7 +249,7 @@ Section SystemBoot.
       iApply (big_sepL_impl with "Hhrest").
       iIntros "!>" (k c _) "Hh".
       iDestruct "Hh" as (iv) "Hh".
-      iApply (boot_hart_secondary (CID := FS c)
+      iApply (boot_hart_secondary (fileG0 := HF) (CID := FS c)
                 (g.(gregs) (FS c)) iv DfracDiscarded γd γv
                 (boot_regs_of_facts g Hbf (FS c)) (fin_FS_nz c)
                 with "Htext Hdata Hh Hstarted"). }
@@ -202,15 +266,24 @@ End SystemBoot.
 (* ---------------------------------------------------------------------- *)
 
 Theorem xv6_power_adequacy Σ
-    `{!xv6G Σ, !riscvGpreS Σ, !fileG Σ, !pavGpreS Σ, !fdslotGpreS Σ,
+    `{!xv6G Σ, !riscvGpreS Σ, !fileGpreS Σ, !pavGpreS Σ, !fdslotGpreS Σ,
       !irefslotGpreS Σ}
-    (g : gstate)
-    (* the ONLY hypotheses about the machine: it is off, and nothing has ever
+    (g : gstate) (sb : fs_sb) (nib : nat) (cov : gset Z)
+    (* the hypotheses about the machine: it is off, and nothing has ever
        run.  Everything else a boot needs -- RAM total and holding the loaded
        kernel image, the per-hart reset registers, the reset devices -- is
        supplied per ERA by [RiscvLang.boot_shape], which the power thread's
        PowerOn transition establishes itself. *)
-    (Hgen0 : g.(ggen) = 0%nat) (Hpow : g.(gpow) = false) :
+    (Hgen0 : g.(ggen) = 0%nat) (Hpow : g.(gpow) = false)
+    (* ...AND ONE ABOUT THE DISK, WHICH IS NEW (fs-cfg-boot.md (d2b)): every
+       era boots on a machine whose disk carries the file system's image.
+       See [fs_boot_image_eras] for why this cannot be one equation about
+       [g].  It is what [FsCfgBoot.fs_cfg_alloc] reads the configuration's
+       geometry off, and the conclusion mentions none of it -- so this is
+       the price of a NON-VACUOUS boot cone, not a weaker theorem about
+       reducibility.  [FsAdequacyImg.v] discharges it at the literal mkfs
+       image. *)
+    (Himg : fs_boot_image_eras sb nib cov) :
   forall t2 g2 e2,
     rtc erased_step ([PowerLoopE : expr riscv_lang], g) (t2, g2) ->
     e2 ∈ t2 ->
@@ -233,7 +306,8 @@ Proof.
      [riscv_eraGS] to [HE], so §2's statement at the composed instance IS
      this obligation (crash.md's M0 gotcha, in the direction that works). *)
   intros F HE gen g' Hbf.
-  exact (@xv6_boot_era Σ (RiscvGS Σ F HE) _ _ _ _ _ gen g' Hbf).
+  exact (@xv6_boot_era Σ (RiscvGS Σ F HE) _ _ _ _ _ gen g' sb nib cov Hbf
+           (Himg g' Hbf)).
 Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -257,10 +331,10 @@ Qed.
 (* invariant -- is the WAL fupds' business, carried by the write permits    *)
 (* the log functions take (phase C2b/D1 stage 4).                          *)
 (*                                                                        *)
-(* ...AND THE [xv6Σ] COROLLARY BELOW NOW DISCHARGES IT AT THE LITERAL      *)
-(* mkfs IMAGE.  This theorem keeps [D0], [cov] and [logstart] abstract,     *)
-(* because a generic statement should; but                                 *)
-(* [xv6_fs_adequacy_xv6Σ] instantiates the disk at [FsImgDisk.fsimg_dk] --  *)
+(* ...AND [FsAdequacyImg.xv6_fs_adequacy_xv6Σ] DISCHARGES IT AT THE        *)
+(* LITERAL mkfs IMAGE.  This theorem keeps [D0], [cov] and [logstart]      *)
+(* abstract, because a generic statement should; but that corollary        *)
+(* instantiates the disk at [FsImgDisk.fsimg_dk] --                        *)
 (* the 2,048,000 bytes [mkfs] actually wrote (kernel-rocq/FsImgRaw.v) --    *)
 (* and supplies [Hrec] from [FsImgDisk.fsimg_recovery], which is           *)
 (* [fs_recovery_clean] at that image's own zero log header.  So mkfs's      *)
@@ -271,14 +345,20 @@ Qed.
 (* ---------------------------------------------------------------------- *)
 
 Theorem xv6_fs_adequacy Σ
-    `{!xv6G Σ, !riscvGpreS Σ, !fileG Σ, !pavGpreS Σ, !fdslotGpreS Σ,
+    `{!xv6G Σ, !riscvGpreS Σ, !fileGpreS Σ, !pavGpreS Σ, !fdslotGpreS Σ,
       !irefslotGpreS Σ}
     (g : gstate) (cov : gset Z) (logstart : Z)
     (D0 : gmap Z (list (bv 8)))
+    (sb : fs_sb) (nib : nat)
     (Hgen0 : g.(ggen) = 0%nat) (Hpow : g.(gpow) = false)
     (* mkfs's obligation, at the image the machine powers on with *)
     (Hrec : fs_recovery (fs_blocks (v_disk (g.(gdev).(dvirtio)))) D0
-              cov logstart) :
+              cov logstart)
+    (* ...and the era-wide image hypothesis the boot-era FS mint needs, at
+       THE SAME [cov] (ruling R4: the parameter stays here and the corollary
+       instantiates it at the image's own range).  [xv6_power_adequacy]'s
+       note is the whole story. *)
+    (Himg : fs_boot_image_eras sb nib cov) :
   forall t2 g2 e2,
     rtc erased_step ([PowerLoopE : expr riscv_lang], g) (t2, g2) ->
     e2 ∈ t2 ->
@@ -294,101 +374,62 @@ Proof.
                  iSplitR; [iPureIntro; exact Hseq | iExact "HP"])
            Hgen0 Hpow).
   intros F HE gen g' Hbf.
-  exact (@xv6_boot_era Σ (RiscvGS Σ F HE) _ _ _ _ _ gen g' Hbf).
+  exact (@xv6_boot_era Σ (RiscvGS Σ F HE) _ _ _ _ _ gen g' sb nib cov Hbf
+           (Himg g' Hbf)).
 Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* 4. ...and at a CONCRETE functor list, so nothing at all is assumed.     *)
 (* ---------------------------------------------------------------------- *)
 
-(* THE INODE CACHE'S FOUR CONSTANTS ARE IRRELEVANT HERE, and this is the
-   file that has to say so.  [FileInv.fileG] carries an [IcacheRef.icfg]
-   (C6b: an FD_INODE file's payload IS an inode reference, and a reference
-   names the one cache), so instantiating the file table at a concrete
-   functor list needs one -- but the statements below are about REDUCIBILITY
-   and quantify over none of it, so any closed choice does.  Local, so it
-   cannot leak into a proof that ought to be threading a real one.
-   (The fourth field is the liveness pool's gname, design/fs-icache.md
-   §14.6; the fifth is the LINK LEDGER's, §20.2; the last is the per-slot
-   SLEEPLOCK gname family, claude-notes/projects/iput-acquiresleep.md step 4;
-   the last is the COUNT COUPLING's, claude-notes/projects/iclaim-ledger.md
-   §2.2.  This is the ONE place in the tree that names a concrete [icfg].) *)
-(* [icfg_dev] AND [icfg_nib] ARE NO LONGER ARBITRARY, and the reason is the
-   one assumption the boot cone carries.  The boot hart's arm reaches
-   [namei("/")], whose assumed contract ([SpecNameiRootBoot.v]) returns an
-   [IcacheRef.inode_held] -- and that resource carries
-   [bv_unsigned inum < 16 * icfg_nib], so at [icfg_nib = 0] it cannot exist
-   and the assumption would be VACUOUS at the very instance these
-   corollaries are taken at.  ROOTDEV is 1 and one inode block is sixteen
-   inums, so [dev := 1] and [nib := 1] make it non-vacuous.
+(* [adequacy_icfg] AND [adequacy_fscfg] ARE GONE, and their deletion is the
+   point of fs-cfg-boot.md stage (d2b).  They were two [Local Instance]s of
+   all-[1%positive] records -- an [IcacheRef.icfg] with [icfg_nib = 0] and an
+   [FsCfg.fscfg] nobody allocated -- and they existed only because [fileG]
+   had to be RESOLVED here: nothing in the tree could produce either record,
+   so the corollaries below could not be stated without inventing them.  At
+   [icfg_nib = 0] an [IcacheRef.inode_held] cannot exist, so the boot cone's
+   one assumed contract ([SpecNameiRootBoot.v]'s [namei("/")]) was VACUOUS at
+   exactly the instance the corollaries were taken at.  That was a defect in
+   the top-level statement, not a missing convenience.
 
-   IT IS A CHOICE, NOT A THEOREM, and it has to be: [icfg] reaches a proof
-   as a superclass field of [FileInv.fileG], [subG_fileΣ] closes with
-   [Qed], and so nothing downstream can prove anything about [icfg_dev] by
-   conversion -- see [SpecNameiRootBoot.v]'s header, which records what
-   trying costs.  The other constants are still irrelevant. *)
-Local Instance adequacy_icfg : icfg :=
-  MkIcfg 1%positive (mword_of_int 1 : mword 32) 1%nat 1%positive 1%positive
-         (LogDefs.MkLogNames 1%positive 1%positive 1%positive 1%positive)
-         0 (fun _ => 1%positive) (fun _ => 1%positive) 1%positive 1%positive
-         1%positive 1%positive 1%positive.
-
-(* ...AND A CONCRETE [FsCfg.fscfg], FOR THE SAME REASON AND WITH ONE EXTRA
-   HAZARD WORTH NAMING.
-
-   [FileInvDefs.fileG] carries an [fscfg] beside its [icfg] (see the note on
-   the class), so instantiating the file table at a concrete functor list
-   needs one of each.  The statements below are about REDUCIBILITY and
-   quantify over none of the file system's configuration, so any closed
-   choice does -- exactly as for [adequacy_icfg] above.
-
-   WITHOUT IT THE FILE DOES NOT FAIL, IT DIVERGES, and the shape is worth
-   recording because it will recur for any config record reached through a
-   class field.  [file_fscfg] is declared with [::], so it is an INSTANCE
-   [fileG Σ -> fscfg]; and [subG_fileΣ] is an instance [icfg -> fscfg ->
-   subG fileΣ Σ -> fileG Σ].  With no closed [fscfg] in scope, resolving the
-   [fileG xv6Σ] the corollaries need enters
-
-     fileG ?Σ  ->  subG_fileΣ  ->  fscfg  ->  file_fscfg  ->  fileG ?Σ' -> ...
-
-   with the functor list unconstrained at every turn, so each round allocates
-   fresh evars and the search never terminates: measured at 400 GB resident
-   and climbing, with no error and no progress.  [adequacy_icfg] is what
-   keeps the identical [icfg] cycle from firing, which is why nobody had met
-   it before.  A concrete instance at every site that RESOLVES [fileG]
-   (rather than binding it) is the cut. *)
-Local Instance adequacy_fscfg : fscfg :=
-  MkFscfg 1%positive 1%positive (1%positive, 1%positive)
-          (UartNames 1%positive 1%positive 1%positive 1%positive)
-          (DiskNames 1%positive 1%positive 1%positive 1%positive 1%positive
-                     1%positive 1%positive)
-          1%positive
-          (* the three virtio ring pages used to be here, as
-             [mword_of_int 0] x3.  They left [fscfg] with fs-cfg-boot.md's
-             ruling R1 -- [virtio_disk_init] [kalloc]s them at WP time, so no
-             boot-era fupd could give the record a value for them, and
-             [FsReady.fs_ready] quantifies them inside its disk conjunct
-             instead.  Sixteen fields now. *)
-          (MkBioNames 1%positive 1%positive 1%positive
-                      (fun _ => (1%positive, 1%positive))
-                      (fun _ => 1%positive) (fun _ => 1%positive))
-          (MkFsNames 1%positive 1%positive 1%positive)
-          1%positive
-          (MkIcNames (fun _ => 1%positive) (fun _ => 1%positive)
-                     (fun _ => 1%positive))
-          1%positive
-          ∅ 0 0 1 1.
+   [BootShared.boot_shared_alloc] now MINTS both records inside the era fupd
+   (off the era's own disk, at the parsed superblock's geometry) and returns
+   the reassembled [fileG] existentially, so this file resolves [fileGpreS]
+   -- whose only instance is [subG] on the functor list -- and never
+   [fileG].  The 400 GB nontermination hazard documented at [adequacy_fscfg]
+   goes with it: the cycle it blocked was
+   [fileG -> subG_fileΣ -> fscfg -> file_fscfg -> fileG], and with no site
+   resolving [fileG] there is nothing to enter it.  The compressed note now
+   lives where [FileInvDefs.fileG_of] is APPLIED (BootShared.v §5) and at the
+   chain application in §2 above. *)
 
 Definition xv6Σ : gFunctors :=
   #[ riscvΣ; xv6GΣ; fileΣ; fdslotΣ; irefslotΣ; pavΣ ].
 
+(* THE ASSUMPTION AUDIT'S TARGET, and it stays in THIS file deliberately.
+
+   This corollary is the power theorem at the concrete functor list: every
+   class is discharged, so "nothing about the ghost state is assumed" is
+   checked rather than claimed.  What it does NOT do is name the literal mkfs
+   image -- [Himg] is left as a premise here -- and that is load-bearing for
+   [SystemAssumptions.v]: a statement mentioning [FsImgDisk.fsimg_dk] pulls
+   Rocq's [PrimString]/[PrimInt63] primitives into [Print Assumptions]
+   (MEASURED: ten extra entries, on any constant naming the image), which
+   would bury the eight-entry baseline the audit diffs against
+   (durable-notes' "adequacy-print baseline").  The image-DISCHARGED
+   corollaries therefore live in [FsAdequacyImg.v], one leaf up, where
+   [FsImgCheck]'s citations are in scope and where their ~200 s of
+   [vm_compute] stays off this file's strictly serial build tail. *)
 Corollary xv6_power_adequacy_xv6Σ (g : gstate)
-    (Hgen0 : g.(ggen) = 0%nat) (Hpow : g.(gpow) = false) :
+    (sb : fs_sb) (nib : nat) (cov : gset Z)
+    (Hgen0 : g.(ggen) = 0%nat) (Hpow : g.(gpow) = false)
+    (Himg : fs_boot_image_eras sb nib cov) :
   forall t2 g2 e2,
     rtc erased_step ([PowerLoopE : expr riscv_lang], g) (t2, g2) ->
     e2 ∈ t2 ->
     reducible (Λ := riscv_lang) e2 g2.
-Proof. apply (xv6_power_adequacy xv6Σ g Hgen0 Hpow). Qed.
+Proof. apply (xv6_power_adequacy xv6Σ g sb nib cov Hgen0 Hpow Himg). Qed.
 
 (* THE ASSUMPTION AUDIT IS [SystemAssumptions.v], NOT A LINE HERE.
    [Print Assumptions xv6_power_adequacy_xv6Σ] used to sit at this point, and
@@ -398,42 +439,14 @@ Proof. apply (xv6_power_adequacy xv6Σ g Hgen0 Hpow). Qed.
    and by CI after the build.  Do not put it back here.
    (claude-notes/optimization.md records why the command is that expensive.) *)
 
-(* ...and the FS form at the same concrete functor list AND AT THE LITERAL
-   mkfs IMAGE.
-
-   NOTHING ABOUT THE FILE SYSTEM IS ASSUMED ANY MORE.  The generic theorem
-   above takes mkfs's obligation as a hypothesis; here the initial disk IS
-   the image mkfs built -- [FsImgDisk.fsimg_dk] is kernel-rocq/FsImgRaw.v's
-   2,048,000 bytes, zero-padded beyond them (a virtio disk reads zeroes past
-   the file backing it, and [XV6_DISK_BYTES] is larger than the image) --
-   and the obligation is DISCHARGED by [FsImgDisk.fsimg_recovery], which is
-   [FsCrash.fs_recovery_clean] at that image's own zero log header.
-
-   THE THREE PARAMETERS, and why each is what it is:
-     [logstart] is pinned to [2], which is the IMAGE'S OWN [logstart] --
-       the superblock says so, and [FsImgCheck.fsimg_parse_sb] /
-       [FsImgCheck.fsimg_sb_logstart] are what check it (this file does not
-       need them: at the image, [2] is a literal, exactly as it is in the
-       bytes);
-     [D0] is pinned to [FsImgDisk.fsimg_D0 cov] -- the image's own home
-       blocks, since a clean log replays nothing;
-     [cov] STAYS PARAMETRIC.  The coverage set is the client's choice and
-       nothing about the image constrains it.
-
-   What the image MEANS as a file system -- that [FsImg.fsimg_wf] holds of
-   it, and that /init /sh /echo /sync hold exactly the tracked ELF raws the
-   U-mode proofs reason about -- is [iris/FsImgCheck.v], and is deliberately
-   NOT on this file's cone. *)
-Corollary xv6_fs_adequacy_xv6Σ (g : gstate) (cov : gset Z)
-    (Hgen0 : g.(ggen) = 0%nat) (Hpow : g.(gpow) = false)
-    (Hdisk : v_disk (g.(gdev).(dvirtio)) = FsImgDisk.fsimg_dk) :
-  forall t2 g2 e2,
-    rtc erased_step ([PowerLoopE : expr riscv_lang], g) (t2, g2) ->
-    e2 ∈ t2 ->
-    reducible (Λ := riscv_lang) e2 g2.
-Proof.
-  apply (xv6_fs_adequacy xv6Σ g cov 2 (FsImgDisk.fsimg_D0 cov) Hgen0 Hpow).
-  (* [fsimg_P] IS [fs_blocks fsimg_dk], so once the disk is rewritten to the
-     image the recovery fact is literally [fsimg_recovery]'s. *)
-  rewrite Hdisk. exact (FsImgDisk.fsimg_recovery cov).
-Qed.
+(* WHERE THE IMAGE WENT.  [xv6_fs_adequacy_xv6Σ] -- the FS form at this same
+   functor list, at the LITERAL mkfs image, with mkfs's recovery obligation
+   and every image hypothesis DISCHARGED -- is now
+   [FsAdequacyImg.xv6_fs_adequacy_xv6Σ], beside
+   [FsAdequacyImg.xv6_power_adequacy_fsimg].  It moved for the reason
+   fs-cfg-boot.md's probe-STOP-3 ruling gives: discharging the image
+   hypotheses needs [FsImgCheck.v]'s ~200 s of [vm_compute] in the cone, and
+   this file is the serial tail of every build.  [FsImgDisk] stays imported
+   here (3.6 s -> 3.5 s, measured: the image is one compact [PrimString]
+   literal) because the generic theorem's [Hrec] is stated in its
+   vocabulary. *)
