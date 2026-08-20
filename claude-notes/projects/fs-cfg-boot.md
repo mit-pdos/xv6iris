@@ -1091,3 +1091,81 @@ is off-pin (`make xv6-rev-check` already warns); (3) check the EC2
 lane's own xv6-riscv state before re-dumping there.
 Expect real 3-way content in SpecUserinit/ProofUserinit/ProofMain (upstream
 touched the dispatcher/iref side).
+
+### The runbook (execute after stage (f) gates)
+
+
+Run AFTER stage (f) gates and commits. All builds on the EC2 lane
+(/home/ubuntu/fscfg-lane); nothing compiles locally. Merge-base = 15f597b2;
+our side = the campaign commits only.
+
+## 0. Preconditions (verify, don't assume)
+- Local tree clean, stage (f) committed, lane md5-matches local on all
+  campaign files.
+- `git log --oneline HEAD..origin/main` still starts at 969a9e1b..a02d9da5
+  (re-fetch check: user may have fetched again).
+- Local xv6-riscv clone HAS 31f115a (verified 2026-08-20) and is PARKED
+  off-pin — do not checkout locally at all; the whole bump happens on the
+  lane.
+
+## 1. The git merge (LOCAL, no build)
+- `git merge origin/main` — expected conflict surface: SpecUserinit/
+  ProofUserinit/ProofMain (upstream dispatcher/iref work vs our transport),
+  ProofSyscall (upstream wired 4/17/20), possibly FsReady/FsCfg if upstream
+  touched them, `_CoqProject`. kernel-rocq/* conflicts: take THEIRS wholesale
+  (regenerated at the new pin; never hand-merge generated files).
+- Resolve by classification (GR-3 recipe): generated files → theirs;
+  campaign-owned files (FsCfgBoot, FsImgBridge, FirstTok, BootCarveMain,
+  WpLockAt/SleepLockAt/BioInitAt, FsAdequacyImg) → ours unless upstream
+  touched them (check `git log origin/main -- <file>`); real 3-way for the
+  shared proof files.
+- COMMIT THE MERGE before any relayout fixups (separable blame).
+
+## 2. The kernel bump (ON THE LANE, per xv6-bump-playbook.md)
+Ship the merged tree to the lane first (bundle: `git bundle create ...
+15f597b2..HEAD`, fetch+reset on lane branch fscfg-main).
+Then on the lane:
+- `git -C xv6-riscv fetch` (lane clone is separate!) — if the lane cannot
+  fetch, bundle xv6-riscv 31f115a over too.
+- `git -C xv6-riscv checkout --detach 31f115a`
+- `make -C xv6-riscv clean` — MANDATORY (durable-notes: skipping it fails
+  with the build-dir-embedding error naming the wrong cause, and dump-force
+  rm's the dumps before dying).
+- rebuild ELF; `grep -c ffile-prefix-map` on the build log must be nonzero.
+- `make dump-force`, then `git status kernel-rocq/` — after the merge took
+  upstream's regenerated files, the re-dump should be BYTE-IDENTICAL
+  (clean status = toolchain agrees with the pin). Any diff = STOP.
+- `make check-decode`.
+- Save the OLD image aside first (/tmp/old-image) for fix_proof_imms'
+  --old-image guard, in case address fixups are needed in OUR walk files.
+
+## 3. Address fixups (expected, because of the fmt commit)
+Upstream already relaid THEIR proof files at the new pin. Our unpushed
+campaign files were written at the old pin. Candidates with baked
+addresses:
+- BootCarveMain.v (carve arithmetic incl. the new bcache stride cuts and
+  rows-A cells), FirstTok.v (first_addr = KernelSyms.first_1 — symbolic,
+  should survive), ProofMain.v (walk offsets +0x6a..+0xa2, jal immediates),
+  FsCfgBoot.v (KernelSyms-derived constants if any).
+- Tools: tools/fix_proof_imms with --old-image /tmp/old-image over OUR
+  files only; relayout_batch if shapes moved. main()'s body may have moved
+  if fmt touched proc.c/main.c — classify sweep first (the iput-optA
+  stage-2 recipe).
+- KernelSyms deltas: `git diff <old>..HEAD -- kernel-rocq/KernelSyms.v |
+  grep -E "first_1|bcache|sb|log"` to see exactly which of our symbols
+  moved.
+
+## 4. Gate
+- Whole-lane `make -f CoqMakefile -j24 -k` EXIT=0, zero Error lines,
+  staleness 0.
+- `make -s audit-only`: EXACTLY the SEVEN-entry baseline (textual diff).
+- md5 local↔lane on every merged/fixed file.
+- proof_coverage.py --check if the dispatcher entries changed counts.
+- Commit fixups; update worklist PENDING MERGE section to DONE.
+
+## 5. Post-merge opportunities (report, don't auto-start)
+- Upstream's 31f115a IS the dispatcher debt-C kernel fix: entries 5/16
+  (read/write) become wirable with relaxed premises.
+- Check whether upstream's fractional iref split (204bc02c) pays the
+  dispatcher debt-A open-holder item.
+
