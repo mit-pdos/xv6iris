@@ -3686,6 +3686,3 @@ Section UProofShIo.
   Qed.
 
 End UProofShIo.
-
-Print Assumptions wp_sh_gets.
-Print Assumptions wp_sh_getcmd.

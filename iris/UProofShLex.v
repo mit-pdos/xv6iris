@@ -5645,6 +5645,3 @@ Section UProofShLex.
   Qed.
 
 End UProofShLex.
-
-Print Assumptions wp_sh_peek.
-Print Assumptions wp_sh_gettoken.

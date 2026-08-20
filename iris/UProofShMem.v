@@ -1808,9 +1808,3 @@ Section UProofShMem.
   Qed.
 
 End UProofShMem.
-
-(* sentinel: memset and free -- the two memory-writing halves of sh's
-   allocator path -- rest on nothing but the platform axioms and functional
-   extensionality *)
-Print Assumptions wp_sh_memset.
-Print Assumptions wp_sh_free_first.

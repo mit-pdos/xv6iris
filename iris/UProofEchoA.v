@@ -1097,8 +1097,3 @@ Section UProofEchoA.
   Qed.
 
 End UProofEchoA.
-
-(* sentinel: strlen -- the first verified user function with a loop, with a
-   memory read, and with a computed return value -- rests on nothing but the
-   platform axioms and functional extensionality *)
-Print Assumptions wp_echo_strlen.

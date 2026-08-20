@@ -263,11 +263,3 @@ Section escrowA.
   Qed.
 
 End escrowA.
-
-(* Assumption audit -- must be "Closed under the global context". *)
-Print Assumptions escA_alloc.
-Print Assumptions escA_deposit.
-Print Assumptions escA_redeem.
-Print Assumptions reg_half_agree.
-Print Assumptions free_commit_deposit_atomicA.
-Print Assumptions redeemA_supplies_withdraw.

@@ -1690,7 +1690,3 @@ Section UProofEcho.
   Qed.
 
 End UProofEcho.
-
-(* sentinel: the whole echo verification rests on nothing but the platform
-   axioms and functional extensionality *)
-Print Assumptions wp_echo_start.

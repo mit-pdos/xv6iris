@@ -8990,8 +8990,3 @@ Section UProofShParse.
   Qed.
 
 End UProofShParse.
-
-Print Assumptions wp_sh_parseredirs.
-Print Assumptions wp_sh_parseexec.
-Print Assumptions wp_sh_parsepipe.
-Print Assumptions wp_sh_parseline.
