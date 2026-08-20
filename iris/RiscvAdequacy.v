@@ -1125,6 +1125,26 @@ Section power.
   Qed.
 End power.
 
+(* THE FIXED GHOST LAYER THE POWER THEOREM BUILDS, as a NAMED record rather
+   than an anonymous [set] inside the proof (fs-cfg-boot.md stage (f)).
+
+   WHY IT IS PUBLIC.  The boot obligation below is stated at an ARBITRARY
+   [riscvFixedGS], which is right for everything except one thing: a client
+   whose crash predicate is a real durability invariant has to relate the
+   record's [riscv_crash_pred] FIELD to its own predicate, and that relation
+   is not just about the field -- the two sides' GHOST CLASS instances have
+   to be the same ones as well, and they are, precisely because this proof
+   fills the record from [riscvGpreS].  Naming the record lets the
+   obligation say so, once, with every projection reducing.
+
+   Everything except the crash predicate and the five gnames is resolved
+   from [riscvGpreS]/[xv6G], exactly as the [set] did. *)
+Definition boot_fixedGS {Σ : gFunctors} `{!xv6G Σ, !riscvGpreS Σ}
+    (Hinv : invGS Σ) (γgen γstart γreg γtie γswap : gname)
+    (Pcp : (Z -> bv 8) -> iProp Σ) : riscvFixedGS Σ :=
+  RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ _ _ _ _ _ γgen γstart _ γreg
+    _ _ _ γtie Pcp γswap.
+
 (* THE POWER ADEQUACY: the machine starts POWERED OFF with nothing ever
    run; if the client can boot ANY era from ANY reset state, every
    configuration reachable under any schedule of power-cycles, hart steps
@@ -1148,6 +1168,28 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
     (Hboot : forall (F : riscvFixedGS Σ) (HE : riscvEraGS) (gen : nat)
                     (g' : gstate),
        boot_facts g' ->
+       (* THE FIXED LAYER'S SHAPE (fs-cfg-boot.md stage (f), row 7 of
+          [FirstTok.first_boot_persist]).  [Hboot] is quantified over an
+          ARBITRARY [riscvFixedGS], so without this the client learns
+          NOTHING about the record it is booting over -- in particular
+          nothing about [riscv_crash_pred], and a client whose durability
+          predicate IS the crash slot ([FsCrash.P_fs_named]) could then
+          never state, let alone prove, [FsCrash.fs_crash_seam].
+
+          AN EQUATION AND NOT A [riscv_crash_pred = Pc ...] ONE, and the
+          difference is load-bearing: the client's [Pc] is written in ITS
+          own context, where the ghost classes come from [riscvGpreS],
+          while everything it says at the ambient [riscvGS] takes them
+          from the RECORD's fields.  Those are the same instances only
+          because THIS proof fills the record from [riscvGpreS] -- a fact
+          no equation about one field can express.  Handing the whole
+          shape over says it once, and every projection then reduces.
+
+          It costs the client nothing ([eq_refl] here) and it does not
+          weaken the obligation: [boot_fixedGS] IS what this proof builds. *)
+       (exists (Hinv : invGS Σ) (γgen γstart γreg γtie γswap : gname),
+          F = boot_fixedGS Hinv γgen γstart γreg γtie γswap
+                (Pc γswap γreg γstart)) ->
        ⊢ power_boot_res HE gen D nproc ndisk g' ={⊤}=∗
           ([∗ list] c ∈ enum CPU,
              WP (LoopE gen c : expr riscv_lang) @ ⊤) ∗
@@ -1191,8 +1233,8 @@ Proof.
   (* no disk image map is allocated here: the machine starts POWERED OFF, so
      there is no era, hence no image conjunct in [state_interp].  The first
      boot mints the first one ([wp_power_loop]'s PowerOn arm). *)
-  set (F := RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ _ _ _ _ _ γgen γstart _ γreg
-              _ _ _ γtie (Pc γswap γreg γstart) γswap).
+  set (F := boot_fixedGS Hinv γgen γstart γreg γtie γswap
+              (Pc γswap γreg γstart)).
   iModIntro.
   iExists
     (fun (g' : gstate) (_ : nat) (_ : list mobs) (_ : nat) =>
@@ -1214,7 +1256,11 @@ Proof.
     rewrite Hpow. done. }
   iSplitL.
   { cbn. iSplitL; [|done].
-    iApply (@wp_power_loop Σ F _ D nproc ndisk (Hboot F)
+    assert (Hshape : exists (Hi : invGS Σ) (γg γs γr γt γsw : gname),
+              F = boot_fixedGS Hi γg γs γr γt γsw (Pc γsw γr γs))
+      by (exists Hinv, γgen, γstart, γreg, γtie, γswap; reflexivity).
+    iApply (@wp_power_loop Σ F _ D nproc ndisk
+              (fun HE gen g' Hbf => Hboot F HE gen g' Hbf Hshape)
               with "Hcinv"). }
   iIntros (es' t2') "%Heq %Hlen %Hns Hsi Hes Hts".
   iApply fupd_mask_intro; [set_solver|]. iIntros "_".

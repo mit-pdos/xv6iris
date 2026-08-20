@@ -104,6 +104,13 @@ Require Import SpecNameiRootBoot.
    [SpecNameiRootBoot] already states them. *)
 Require Import IcacheInv IcacheEscrow InodeRegion InodeInv.
 Require Import FsBlocks FsCfg.
+(* THE BOOT TOKEN'S TWO PAYLOAD BUNDLES (fs-cfg-boot.md stage (f)).  Named
+   here rather than spelled out: [FirstTok] is where they are DEFINED, main
+   assembles both at +0x9e, and this contract is the courier that carries
+   them past allocproc to the park.  [FirstTok] sits below every process
+   file (it imports only the fs and kalloc layers), so the import is a leaf
+   and not a cone. *)
+Require Import FirstTok.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -157,6 +164,28 @@ Definition wp_userinit_sconf_body
   itable_inv -∗
   ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst -∗
   ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib -∗
+  (* ---- THE BOOT TOKEN'S DEPOSIT (fs-cfg-boot.md (f-2)) ----
+     userinit is the COURIER, not a consumer: it reads none of these three
+     and spends none of them.  They are here because the ONE place the boot
+     token can be staged is the park userinit performs on the first process
+     -- forkret runs on that park's saved context, and its [if (first)] arm
+     is the token's only consumer.  main holds all three at +0x9e
+     ([ProofMain.mn_grp_fs]) and cannot stage them itself: main never parks
+     anything.
+
+     THE CELL IS PINNED, not existential, and that is the whole point: it
+     is `static int first = 1`, one of the image's two writable initialized
+     .data words, carved at [BootShared.v]'s boot data run and threaded
+     pinned through the boot chain.  A holder of [∃ w, first_addr ↦₄ w]
+     could not tell which arm of forkret's branch it is in.
+
+     STAGED, NOT YET PASSED.  Until D1 lands ([SpecForkretPark]'s package
+     grows a [FirstTok.first_tok] row -- the humans' seam), the proof holds
+     these to the [forkret_park] call site and drops them there; the loud
+     comment at that site is the handoff.  See [ProofUserinit]. ---- *)
+  first_addr ↦₄ (mword_of_int 1 : mword 32) -∗
+  first_boot_persist -∗
+  first_fsinit -∗
   (* the proc array's lock invariant: allocproc scans it, and release gives
      back the slot userinit found.  Persistent, so threading it is free. *)
   procs_inv γs -∗

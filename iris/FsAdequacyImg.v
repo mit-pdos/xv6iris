@@ -227,7 +227,12 @@ Corollary xv6_fs_adequacy_xv6Σ (g : gstate)
     e2 ∈ t2 ->
     reducible (Λ := riscv_lang) e2 g2.
 Proof.
-  apply (xv6_fs_adequacy xv6Σ g fsimg_cov 2 (FsImgDisk.fsimg_D0 fsimg_cov)
+  (* [logstart] IS NO LONGER AN ARGUMENT: [xv6_fs_adequacy] now takes the
+     crash predicate at the SUPERBLOCK'S own log start (fs-cfg-boot.md stage
+     (f) -- the boot seam's [fsc_logst] is tied to it), and
+     [FsImg.sb_logstart fsimg_sb] IS the [2] this corollary used to pass,
+     by conversion on the record literal. *)
+  apply (xv6_fs_adequacy xv6Σ g fsimg_cov (FsImgDisk.fsimg_D0 fsimg_cov)
            fsimg_sb fsimg_nib Hgen0 Hpow).
   - (* mkfs's obligation.  [fsimg_P] IS [fs_blocks fsimg_dk], so once the
        disk is rewritten to the image this is literally [fsimg_recovery]. *)

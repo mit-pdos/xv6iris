@@ -244,6 +244,7 @@ Section ProofUserinit.
        namei's root corner at +0x20 (fs-cfg-boot.md stage (e)); nothing else
        in userinit's body names them. *)
     iIntros "Hcg Hcpu #Htext #Hkd Hpc #Hpenv #Hitl #Hitinv #Hesc #Hireg
+             Hfirst #Hpersist Hfsinit
              #Hpinv #Hlpid
              Hkenv Hpav Hinitproc Hcont".
     (* the boot arm: at nesting level 0 the exit arm IS the entry base *)
@@ -609,6 +610,42 @@ Section ProofUserinit.
     (* the two files each define [forkret_pc]; they are the same constant *)
     iEval (rewrite (_ : SpecAllocproc.forkret_pc = SpecForkretPark.forkret_pc);
            [| reflexivity]) in "Hctx".
+    (* ================================================================= *)
+    (* STAGE (f)'S DEPOSIT SITE -- D1, THE HUMANS' SEAM.                  *)
+    (*                                                                   *)
+    (* THIS is where [FirstTok.first_tok] belongs: forkret runs on the    *)
+    (* context this park saves, and forkret's [if (first)] arm is the     *)
+    (* token's only consumer.  Three of the token's four rows are in hand *)
+    (* RIGHT HERE and have been carried across allocproc and namei        *)
+    (* untouched -- [Hfirst] (the pinned [first_addr ↦₄ 1] cell),         *)
+    (* [Hpersist] ([first_boot_persist], sixteen persistent rows) and     *)
+    (* [Hfsinit] ([first_fsinit], SpecFsinit's whole exclusive premise    *)
+    (* pile).  They are DROPPED, and the reason is precise:               *)
+    (*                                                                   *)
+    (*   (1) [SpecForkretPark.forkret_park_body] does not take a          *)
+    (*       [first_tok] row yet.  That row is D1 and the humans own the  *)
+    (*       statement (LinkForkretNF.v's header records their plan):     *)
+    (*       [SpecForkret.wp_forkret_gen_body] at [Pfirst := first_tok],  *)
+    (*       and one tier up [forkret_park_body] + [forkret_park_pkg].    *)
+    (*       When it lands, this call gains ONE argument and the drop     *)
+    (*       below becomes [FirstTok.first_tok_boot ...].                 *)
+    (*                                                                   *)
+    (*   (2) The token's FOURTH row -- [kalloc_avail fsc_kpages None] --  *)
+    (*       has no producer yet, so the token cannot be FORMED even if   *)
+    (*       the seam existed.  Debt (F): allocproc's post returns        *)
+    (*       [KvmSpec.kalloc_env γa _], whose [∃ γk] is re-introduced by  *)
+    (*       [SpecProcPagetable]'s own post, and [WpLock.is_lock] has no  *)
+    (*       resource-agreement lemma, so the sealed count cannot be tied *)
+    (*       back to [fsc_kpages].  fs-cfg-boot.md (f-4) records the two  *)
+    (*       ways out.                                                    *)
+    (*                                                                   *)
+    (* Until BOTH land, staging is the honest thing: the three rows reach *)
+    (* the one site that can deposit them, and the drop is a one-line     *)
+    (* edit away from being the deposit.                                  *)
+    (* ================================================================= *)
+    iClear "Hpersist".
+    iDestruct "Hfirst" as "_".
+    iDestruct "Hfsinit" as "_".
     iMod (FP.forkret_park γs γf (proc_addr j) ks rest pid (upd_cwd V ipv) Hrest
             with "Hks Hctx Hpriv Hfd Hirs") as "Hpctx".
     iMod (pstate_whole_update (proc_addr j) USED RUNNABLE with "Hpwhole")

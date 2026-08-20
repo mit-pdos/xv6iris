@@ -426,12 +426,17 @@ Section ProofMain.
     cons_res -∗
     uart_tx_own γd l0 -∗ uart_sent γd l0 -∗ uart_out_lb γd l0 -∗
     uart_dlab_is γd (DfracOwn (1/2)) b0 -∗
-    ( ∀ (γpr : gname) (m' : regfile),
+    (* NO [γpr] BINDER ANY MORE (fs-cfg-boot.md (f-3)): the "pr" lock is
+       allocated at the AMBIENT [fsc_printk] since debt (E), so the group's
+       product is spelled, and stage (f) needs it spelled -- an existential
+       γ could never be shown equal to [FirstTok.first_boot_persist]'s third
+       row.  Every caller instantiated it at [fsc_printk] already. *)
+    ( ∀ (m' : regfile),
         sie_cap_gpr KT0 m' n false p0 -∗
         pc_is (mword_of_int (KernelSyms.main + 0x6e) : mword 64) -∗
         cpu_ctx_free -∗
         cpu_own 0 false p0 false ∅ -∗
-        printk_env γpr γd γv -∗
+        printk_env fsc_printk γd γv -∗
         console_caps γd -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -745,7 +750,7 @@ Section ProofMain.
     { rewrite /D3 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hretpk3) in "Hpc".
     destruct Hcsk3 as (Hcsk3 & _).
-    iApply ("Hcont" $! fsc_printk mk3 with "Hcg Hpc Hfree Hcpu Hpenv Hccaps").
+    iApply ("Hcont" $! mk3 with "Hcg Hpc Hfree Hcpu Hpenv Hccaps").
   Qed.
 
   (* =================================================================== *)
@@ -807,6 +812,17 @@ Section ProofMain.
         cpu_ctx_free -∗
         cpu_own 0 false p0 false ∅ -∗
         kalloc_env γa (avail_sub (Some (length ps)) K_kvmmake) -∗
+        (* ...AND THE SAME LOCK, SPELLED (fs-cfg-boot.md (f-3), row 16 of
+           [FirstTok.first_boot_persist]).  [kalloc_env] hides the page
+           gname behind an [∃ γk], and a consumer that names the pair
+           itself -- [FsReady.fs_ready] does -- can never tie its own name
+           to a hidden one.  Since debt (E), [SpecKinit] FILLS the ambient
+           [fsc_kalloc]/[fsc_kpages] rather than minting a pair of its own,
+           so this row costs nothing: it is [kinit]'s own persistent
+           postcondition, forwarded instead of being sealed inside the
+           bundle one line up. *)
+        is_lock fsc_kalloc (mword_of_int KernelSyms.kmem) "kmem"%string
+          (kmem_res fsc_kpages (mword_of_int (KernelSyms.kmem + 24))) -∗
         procs_inv γs -∗
         (* THE nextpid LOCK, built here out of procinit's [lk_fresh] and the
            cell above.  Persistent.  allocproc takes it, so kfork, sys_fork
@@ -1002,8 +1018,8 @@ Section ProofMain.
     { rewrite /nextpid_res. iExact "Hnpid". }
     iModIntro.
     iApply ("Hcont" $! fsc_kalloc γp γs mpr (pt_base t) pas
-              with "Hcg Hpc Hfree Hcpu Hkenv Hpinv Hpidlock Hkptr Hstvec Hkinv
-                    Hkptp Htramp Hkstx").
+              with "Hcg Hpc Hfree Hcpu Hkenv Hkmem Hpinv Hpidlock Hkptr Hstvec
+                    Hkinv Hkptp Htramp Hkstx").
   Qed.
 
   (* =================================================================== *)
@@ -1195,8 +1211,36 @@ Section ProofMain.
        [FirstTok.first_fsinit_pures_of_image] produced at main's top. *)
     icfg_nib = nib ->
     first_fsinit_pures dk sb ->
+    (* ---- STAGE (f)'S PERSISTENT HALF: the four pure rows of
+       [FirstTok.first_boot_persist] plus the two device ties it is spelled
+       at.  [fs_geom_ok] and [printk_gen_contract] are produced at
+       [wp_main_boot_sconf]'s top (the one place holding both the image
+       hypothesis and the ten configuration ties); the ties are what let a
+       bundle written at [fsc_uart]/[fsc_disk] be assembled out of rows this
+       group holds at [γd]/[γv]. ---- *)
+    fsc_uart = γd ->
+    fsc_disk = γv ->
+    fs_geom_ok ->
+    printk_gen_contract (kt := KT1) fsc_printk fsc_uart fsc_disk ->
     sie_cap_gpr KT1 m n false p0 -∗
     kernel_text -∗ kernel_data -∗ dev_inv γd γv -∗
+    (* ---- ...AND ITS FOUR FORWARDED PERSISTENT ROWS.  [printk_env] is
+       [mn_grp_printk]'s product and the kmem [is_lock] is [mn_grp_kvm]'s;
+       [gen_cert] and [FsCrash.fs_crash_seam] come down the boot chain from
+       [SystemAdequacy] (see [SpecMain]'s rows).  None of them is READ by
+       this group -- they are parked in the boot token at +0x9e. ---- *)
+    printk_env fsc_printk fsc_uart fsc_disk -∗
+    is_lock fsc_kalloc (mword_of_int KernelSyms.kmem) "kmem"%string
+      (kmem_res fsc_kpages (mword_of_int (KernelSyms.kmem + 24))) -∗
+    gen_cert -∗
+    FsCrash.fs_crash_seam fsc_cov fsc_logst -∗
+    (* ---- `static int first = 1', PINNED (fs-cfg-boot.md (f-2)).  One of
+       the image's two writable initialized .data words, carved at
+       [BootShared]'s boot data run and threaded pinned-not-existential the
+       whole way down.  This group neither reads nor writes it: it hands it
+       to userinit at +0x9e, which stages it at the park for forkret's
+       [if (first)] arm. ---- *)
+    first_addr ↦₄ (mword_of_int 1 : mword 32) -∗
     (* iget's "iget: no inodes" arm, reached through userinit's namei *)
     panic_env -∗
     pc_is (mword_of_int (KernelSyms.main + 0x8e) : mword 64) -∗
@@ -1283,9 +1327,10 @@ Section ProofMain.
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hn Hlen Hlive Hdevq Hnibq Hcov0 Hnibeq Hpures.
-    iIntros "Hcg #Htext #Hkdata #Hdev #Hpanic Hpc Hfree Hcpu #Hpinv Hpavail
-             #Hlpidlk Hkenv".
+    intros Hn Hlen Hlive Hdevq Hnibq Hcov0 Hnibeq Hpures
+           Huartq Hdiskq Hgeomok Hpkc.
+    iIntros "Hcg #Htext #Hkdata #Hdev #Hpenv #Hkmem #Hcert #Hseam Hfirst
+             #Hpanic Hpc Hfree Hcpu #Hpinv Hpavail #Hlpidlk Hkenv".
     iIntros "Hlbc Hbufl Hbufn Hbhead Hbpay Hlit Hinl Hkit1 Hkit2
              Hsbb Hlogr Hmir Hirslot Hirauth Hient Hlft Hldisk".
     iIntros "Hdiskptr Hdiskfree Hdusedidx Hdslots Hclaim #Hdone Hcfg Hinitproc Hcont".
@@ -1557,19 +1602,11 @@ Section ProofMain.
     (* blocks ride with it: [first_fsinit_pures] came down as a premise,   *)
     (* and the kit's [nib] is the ambient one by [Hnibeq].                 *)
     (*                                                                    *)
-    (* THE BUNDLE IS COMPLETE AND IS STILL DROPPED, and the two facts are  *)
-    (* separate.  What it is waiting for is (f-4)/(f-5): [SpecUserinit]    *)
-    (* has to grow the three deposit premises and userinit has to seal the *)
-    (* page count ([kalloc_avail fsc_kpages None]) after its allocproc, so *)
-    (* that [FirstTok.first_tok]'s left arm can be formed and STAGED at    *)
-    (* the [forkret_park] call site -- D1, the humans' seam.  Until then   *)
-    (* the assembly below is the CHECK that every row of the fsinit bundle *)
-    (* has a producer: it type-checks, so the fs ledger's exclusive half   *)
-    (* closes.  fs-cfg-boot.md (f) records the rest.                       *)
-    (*                                                                    *)
-    (* [Hfirst] (the [first_addr ↦₄ 1] cell), [Hicsl] (the fifty inode     *)
-    (* sleeplock handles) and the persistent inode-cache / bio rows are    *)
-    (* dropped here for the same reason.                                   *)
+    (* BOTH BUNDLES NOW LEAVE THIS GROUP, beside the pinned `first` cell:  *)
+    (* they are the three deposit premises [SpecUserinit] grew at (f-5),   *)
+    (* and userinit carries them to its [forkret_park] call, which is the  *)
+    (* one site that can stage them for forkret.  Nothing is spent here    *)
+    (* and nothing is dropped here any more.                               *)
     (* ================================================================= *)
     iAssert first_fsinit with "[Hkit2 Hsbb Hlogr Hmir Hirslot Hbslots]"
       as "Hfsinit".
@@ -1588,13 +1625,44 @@ Section ProofMain.
       iFrame "Hkit2 Hsbb Hlw Hln Hlc Hlst Hldv Hlout Hlcmt Hlnc Hln2 Hlblk
               Hmir Hirslot Hbsl".
       iPureIntro. exact Hpures. }
-    iClear "Hicsl".
-    iDestruct "Hfsinit" as "_".
+    (* ---- AND THE PERSISTENT HALF, [FirstTok.first_boot_persist]: all
+       SIXTEEN rows, every one of them in hand between +0x8e and +0x9e.
+       Eleven are this group's own products or its persistent premises
+       ([kernel_text], [kernel_data], [bio_ctx] from +0x8e, [dev_inv], the
+       disk pair from +0x9a, the four inode-cache rows from +0x92,
+       [ireg_inv] off kit 2, and [⌜fs_geom_ok⌝]); the other five were
+       FORWARDED here rather than re-derived -- [printk_env] and its pure
+       contract are [mn_grp_printk]'s, the kmem [is_lock] is
+       [mn_grp_kvm]'s, and [gen_cert] / [FsCrash.fs_crash_seam] come down
+       the boot chain from [SystemAdequacy].  fs-cfg-boot.md (f-3) is the
+       two-column ledger this discharges. ---- *)
+    (* the fifty inode sleeplock handles are persistent; [icache_boot_at]
+       hands them over spatially, so move them once. *)
+    iDestruct "Hicsl" as "#Hicsl".
+    iAssert (dev_inv fsc_uart fsc_disk) as "#Hdevc".
+    { rewrite Huartq Hdiskq. iExact "Hdev". }
+    iAssert (∃ pd' pav' pu' : mword 64,
+               disk_geom fsc_disk pd' pav' pu' ∗
+               is_lock fsc_dlock d_lock "virtio_disk"%string
+                       (disk_res fsc_disk pd' pav' pu'))%I as "#Hdpair".
+    { rewrite Hdiskq. iExists pd, pav, pu. iFrame "Hgeom Hdlock". }
+    iAssert first_boot_persist as "#Hpersist".
+    { rewrite /first_boot_persist /ic_sleeplocks.
+      iFrame "Htext Hkdata Hpenv Hbioctx Hseam Hcert Hdevc Hdpair
+              Hitl Hitinv Hesc Hicsl Hireg Hkmem".
+      iSplitR; [iPureIntro; exact Hpkc | iPureIntro; exact Hgeomok]. }
+    (* BOTH BUNDLES GO TO USERINIT (fs-cfg-boot.md (f-5)), beside the pinned
+       `first` cell: userinit is the one function that PARKS, and forkret --
+       the token's only consumer -- runs on the context that park saves.
+       They are not spent there either; the staging site is the
+       [forkret_park] call, and [ProofUserinit]'s loud D1 block is the
+       handoff.  What main no longer does is DROP them. *)
     iApply (Userinit.wp_userinit_sconf γa γp γs F5 n false p0
               (avail_sub (avail_sub (Some (length ps)) K_kvmmake) 3)
               0%nat iv0 false ∅
               ltac:(lia) Hnb8 Hdevq Hnibq
               with "Hcg Hcpu Htext Hkdata Hpc Hpanic Hitl Hitinv Hesc Hireg
+                    Hfirst Hpersist Hfsinit
                     Hpinv Hlpidlk Hkenv
                     Hpavail Hinitproc").
     all: try lkbelow.
@@ -1820,7 +1888,7 @@ Section ProofMain.
     pose proof (mn_bounds K HK) as (Hc2 & Hn50 & Hnsched).
     iIntros "Hcg Hfree Hcpu Hq #Htext #Hkdata Hpc #Hsinv #Hwand Hlocks Hglobals".
     iIntros "Hfirst Hnpid".
-    iIntros "Hparks Hpst Hpavail Hfs Hmir Hirslot Hirauth".
+    iIntros "Hparks Hpst Hpavail Hfs Hmir Hirslot Hirauth #Hcert #Hseam".
     iIntros "#Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim #Hdone #Htimc Hhart Hunset Hkauth Hpages".
     iDestruct "Hlocks" as "(Hlcons & Hltx & Hlpr & Hlkmem & Hlpid & Hlwait &
                             Hltick & Hlbc & Hlit & Hlft & Hldisk)".
@@ -1841,11 +1909,11 @@ Section ProofMain.
        what discharged [LinkNameiRootBoot]'s Axiom -- fs-cfg-boot.md stage
        (e).
        [Hfirst] -- forkret's [static int first], one of the image's two
-       writable .data words (SpecMain's own row) -- is likewise carried and
-       DROPPED: its consumer is forkret's [if (first)] arm, which is
-       [LinkForkretNF.v]'s assumption, not main's.  Its twin [Hnpid] is NOT
-       dropped: it goes into [mn_grp_kvm], which spends it on the [newlock]
-       that builds the [nextpid] lock. *)
+       writable .data words (SpecMain's own row) -- is NO LONGER DROPPED
+       (fs-cfg-boot.md stage (f)): it goes into [mn_grp_fs] and out again
+       to userinit, which stages it at the park for forkret's [if (first)]
+       arm.  Its twin [Hnpid] goes into [mn_grp_kvm], which spends it on
+       the [newlock] that builds the [nextpid] lock. *)
     iDestruct "Hglobals" as "(Hdevsw & Hkmem24 & Hkpt & Hprocs & Hppub &
                              Hfds & Hirs & Hinitproc & Hticks & Hbufl & Hbufn & Hbhead &
                              Hbpay & Hsbb & Hinl &
@@ -1891,7 +1959,24 @@ Section ProofMain.
     iApply (mn_grp_printk γd γv m1 (K - 2)%nat p0 l0 b0 Hn50
               with "Hcg Htext Hkdata Hdev Hpc Hfree Hcpu Hlcons Hltx Hlpr
                     Hkprintk Hdevsw Hring Htx Hsent Hlb Hdlab").
-    iIntros (γpr m2) "Hcg Hpc Hfree Hcpu #Hpenv #Hccaps".
+    iIntros (m2) "Hcg Hpc Hfree Hcpu #Hpenv #Hccaps".
+    (* ---- STAGE (f): the printk half of [FirstTok.first_boot_persist],
+       re-spelled at the CONFIGURATION's device gnames.  The group produces
+       it at [γd]/[γv]; the bundle is written at [fsc_uart]/[fsc_disk], and
+       [FsCfgBoot.fs_boot_supply]'s ties are exactly the two equations.  The
+       pure contract is [LinkPrintk]'s [PRINTK_GEN] read as a [Prop] -- this
+       functor argument is already main's, so nothing new is assumed. ---- *)
+    iAssert (printk_env fsc_printk fsc_uart fsc_disk) as "#Hpenvc".
+    { rewrite Huartq Hdiskq. iExact "Hpenv". }
+    assert (Hpkc : printk_gen_contract (kt := KT1) fsc_printk fsc_uart fsc_disk).
+    { rewrite Huartq Hdiskq. rewrite /printk_gen_contract.
+      intros CIDp m0 K0 eb pj dqf f descs bb lks.
+      exact (PrintkGen.wp_printk_gen_sconf (CID := CIDp) KT1 fsc_printk γd γv
+               m0 K0 eb pj (dqf := dqf) f descs bb lks). }
+    (* ...and the crash seam, likewise: the boot chain hands it at the era's
+       [cov] and superblock, [FirstTok] spells it at the configuration. *)
+    iAssert (FsCrash.fs_crash_seam fsc_cov fsc_logst) as "#Hseamc".
+    { rewrite Hcovq Hlogstq. iExact "Hseam". }
     (* --- 0x6e .. 0x7a : kinit / kvminit / kvminithart / procinit --- *)
     iApply (mn_grp_kvm m2 (K - 2)%nat p0 ps s1entry phystop tlbvec0
               Hn50 Hphystop Hs1 Hprun Hlen
@@ -1899,7 +1984,7 @@ Section ProofMain.
                     Hsbit Htlb Hunset Hkauth Hlpid Hlwait Hnpid Hprocs Hppub Hfds Hirs
                     Hparks Hpst").
     iIntros (γa γp γs m3 root pas)
-      "Hcg Hpc Hfree Hcpu Hkenv #Hpinv #Hpidlock Hkpt Hstvec #Hkinv #Hkptp
+      "Hcg Hpc Hfree Hcpu Hkenv #Hkmem #Hpinv #Hpidlock Hkpt Hstvec #Hkinv #Hkptp
        #Htramp #Hkstx".
     (* --- 0x7e .. 0x8a : trap / plic, and the interrupt invariant --- *)
     iApply (mn_grp_trap γd γv m3 (K - 2)%nat p0 Hn50 Hcid
@@ -1909,7 +1994,9 @@ Section ProofMain.
            userinit, and the disk lock --- *)
     iApply (mn_grp_fs γa γp γs γv γd m4 (K - 2)%nat p0 ps c0 free0 dk sb nib
               Hn50 Hlen Hlive Hdevq Hnibpos Hcovpos Hnibq Hpures
-              with "Hcg Htext Hkdata Hdev [Hpenv] Hpc Hfree Hcpu Hpinv Hpavail
+              Huartq Hdiskq Hgeomok Hpkc
+              with "Hcg Htext Hkdata Hdev Hpenvc Hkmem Hcert Hseamc Hfirst
+                    [Hpenv] Hpc Hfree Hcpu Hpinv Hpavail
                     Hpidlock Hkenv Hlbc Hbufl
                     Hbufn Hbhead Hbpay Hlit Hinl Hkit1 Hkit2
                     Hsbb Hlogr Hmir Hirslot Hirauth Hient
@@ -1941,7 +2028,7 @@ Section ProofMain.
       as "Hintr".
     { iApply bi.later_intro. iExact "Hkvs". }
     (* --- 0xa2 .. the join : the deposit and the scheduler --- *)
-    iApply (mn_grp_started γpr γk γa γs γd γv m5 (K - 2)%nat p0 pd pav pu
+    iApply (mn_grp_started fsc_printk γk γa γs γd γv m5 (K - 2)%nat p0 pd pav pu
               root pas P ltac:(lia) Hp0
               with "Hcg Htext Hpc Hfree Hcpu [Htcsr Hintr Hkpt] Hsinv Hwand Hpenv
                     Hpinv Hccaps Hdlock Hgeom Hkinv Hkptp Htramp Hkstx").

@@ -542,6 +542,26 @@ Section SpecMain.
        beside the kits rather than inside one.  [icache_boot_at] consumes
        it. *)
     iref_slots_auth -∗
+    (* ---- ROWS 7 AND 8 OF [FirstTok.first_boot_persist] (fs-cfg-boot.md
+       (f-3)): the generation certificate and the FS crash seam.  BOTH
+       PERSISTENT, neither read by main's walk, both parked in the boot
+       token at +0x9e.
+
+       [gen_cert] reaches [BootShared.boot_shared_alloc]'s postcondition
+       already and used to dead-end in [SystemAdequacy].
+       [FsCrash.fs_crash_seam] does NOT and CANNOT: it relates the FIXED
+       ghost layer's [riscv_crash_pred] field to [FsCrash.P_fs], and the
+       per-era boot obligation is quantified over an arbitrary fixed layer,
+       so no fupd inside an era can mint it.  It is a premise of
+       [SystemAdequacy.xv6_boot_era] instead, discharged there off
+       [RiscvAdequacy.riscv_power_adequacy]'s [Hcp] equation.
+
+       SPELLED AT THE ERA'S [cov]/[sb], not at [fsc_cov]/[fsc_logst]: the
+       boot chain has the era's names and [FsCfgBoot.fs_boot_supply]'s ties
+       ([fsc_cov = cov], [fsc_logst = sb_logstart sb]) are what connect the
+       two.  [ProofMain] holds both and does the rewrite. ---- *)
+    gen_cert -∗
+    FsCrash.fs_crash_seam cov (FsImg.sb_logstart sb) -∗
     (* the device fabric, which exists from time 0 (allocated in adequacy), and
        the boot hart's tokens over it *)
     dev_inv γd γv -∗

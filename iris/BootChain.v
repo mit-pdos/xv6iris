@@ -695,6 +695,18 @@ Section BootPrimary.
     log_mirror_full -∗
     iref_slot -∗
     iref_slots_auth -∗
+    (* ---- STAGE (f): ROWS 7 AND 8 OF [FirstTok.first_boot_persist] ----
+       [gen_cert] is [BootShared.boot_shared_alloc]'s own persistent output
+       and used to stop at [SystemAdequacy]; [FsCrash.fs_crash_seam] is the
+       adequacy-level premise [SystemAdequacy.xv6_boot_era] takes (its
+       header says why it cannot be produced inside an era).  Both are
+       PERSISTENT, this chain neither reads nor spends either, and main
+       parks them in [FirstTok.first_boot_persist] at +0x9e.  The seam is
+       spelled at the ERA's [cov]/[sb], not at the ambient [fscfg] fields:
+       [FsCfgBoot.fs_boot_supply]'s ties are what connect the two, and
+       [ProofMain] is where they are spent. ---- *)
+    gen_cert -∗
+    FsCrash.fs_crash_seam cov (FsImg.sb_logstart sb) -∗
     dev_inv γd γv -∗
     uart_tx_own γd l0 -∗ uart_sent γd l0 -∗ uart_out_lb γd l0 -∗
     uart_dlab_is γd (DfracOwn (1/2)) b0 -∗
@@ -708,7 +720,7 @@ Section BootPrimary.
   Proof.
     intros Hreset Hz Hprun Hlen Hlive Himg.
     iIntros "#Htext #Hdata Hres #Hstarted Hlk Hgl Hfirst Hnext Hpark Hpst Hpav
-             Hfs Hmir Hirslot Hirauth
+             Hfs Hmir Hirslot Hirauth #Hcert #Hseam
              #Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim #Hdone Hkpt Hkmap Hpages".
     iApply (boot_entry_bridge rs iv dq Hreset with "Htext Hres").
     iIntros (mf) "Hcap Hctx Hcpu Hg Hraw #Htimc Hpc".
@@ -722,6 +734,7 @@ Section BootPrimary.
               Hlive Himg eq_refl
               with "Hcap Hctx Hcpu Hg Htext Hdata Hpc Hstarted [] Hlk Hgl
                     Hfirst Hnext Hpark Hpst Hpav Hfs Hmir Hirslot Hirauth
+                    Hcert Hseam
                     Hdev Htx Hsent Hlb Hdlab
                     Hcfg Hclaim Hdone Htimc Hraw Hkpt Hkmap Hpages").
     (* THE DEPOSIT WAND: main's boot arm hands over exactly [main_deposit]'s

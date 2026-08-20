@@ -171,6 +171,19 @@ Section SystemBoot.
     boot_facts g ->
     fs_boot_image_wf (v_disk (g.(gdev).(dvirtio))) XV6_DISK_BYTES
       sb nib cov ->
+    (* THE CRASH SLOT'S VALUE, as a PURE equation (fs-cfg-boot.md stage
+       (f), row 7 of [FirstTok.first_boot_persist]).  The boot cone needs
+       [FsCrash.fs_crash_seam], and no fupd inside an era can mint it:
+       the seam relates the FIXED ghost layer's [riscv_crash_pred] FIELD to
+       the FS's own [P_fs], and the per-era obligation
+       [RiscvAdequacy.riscv_power_adequacy] asks for is quantified over an
+       ARBITRARY [riscvFixedGS], so an era learns nothing about that field.
+       Adequacy is where the record is built, so adequacy is where the fact
+       has to come from -- that is [riscv_power_adequacy]'s [Hcp], and this
+       premise is [Hcp] read at the FS's own [Pc].  The seam is assembled
+       from it below and rides [first_tok] to forkret's first arm. *)
+    (forall dk : Z -> bv 8,
+       riscv_crash_pred dk = P_fs_any cov (FsImg.sb_logstart sb) dk) ->
     power_boot_res riscv_eraGS gen_id boot_D NPROC XV6_DISK_BYTES g
     ={⊤}=∗
       ([∗ list] c ∈ enum CPU,
@@ -179,7 +192,15 @@ Section SystemBoot.
       WP (DiskLoopE gen_id : expr riscv_lang) @ ⊤ ∗
       WP (PlicLoopE gen_id : expr riscv_lang) @ ⊤.
   Proof.
-    intros Hbf Himg. iIntros "Hres".
+    intros Hbf Himg Hcp. iIntros "Hres".
+    (* THE SEAM, ASSEMBLED FROM THE SLOT EQUATION and put in the
+       intuitionistic context: it rides [FirstTok.first_boot_persist] from
+       here to forkret's first arm.  Both directions are the identity once
+       [Hcp] has rewritten the field away, which is exactly what "the FS's
+       predicate IS the crash predicate" means. *)
+    iAssert (fs_crash_seam cov (FsImg.sb_logstart sb)) as "#Hseam".
+    { rewrite /fs_crash_seam. iIntros "!>" (dk).
+      rewrite (Hcp dk). iSplitL; iIntros "H"; iExact "H". }
     iMod (boot_shared_alloc g XV6_DISK_BYTES sb nib cov Hbf Himg with "Hres")
       as (Hfd Hir Hpav HF γd γv)
       "(%Hdimg & #Htext & #Hdata & #Hstarted & #Hdev & #Hwinv &
@@ -245,7 +266,7 @@ Section SystemBoot.
                   (boot_regs_of_facts g Hbf 0%fin) fin_0_z Hprun Hplen Hlive
                   Himg
                   with "Htext Hdata Hh0 Hstarted Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail
-                        Hfs Hmir Hirslot Hirauth
+                        Hfs Hmir Hirslot Hirauth Hcert Hseam
                         Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim Hdone Hkpt Hkmap
                         Hpages"). }
       (* THE SEVEN SECONDARIES: every element of the tail is an [FS]. *)
@@ -292,25 +313,49 @@ Theorem xv6_power_adequacy Σ
     e2 ∈ t2 ->
     reducible (Λ := riscv_lang) e2 g2.
 Proof.
-  (* [Pc := fun _ => True]: the crash predicate is the client's durability
-     property, and instantiating it is the FS layer's job
-     (claude-notes/design/crash.md).  It is now INDEXED by the disk image
-     (phase C2a), and at the constant-[True] instance the index costs nothing:
-     the crash invariant is allocated once into the fixed layer -- carrying
-     the FS tie's other half beside the predicate -- and opened by nothing but
-     the disk thread's completion, which finds the index move free.  So the
-     theorem still says exactly "never stuck", with the durability slot left
-     open. *)
+  (* THE CRASH SLOT IS NO LONGER [True] HERE, AND THE STATEMENT IS UNCHANGED
+     (fs-cfg-boot.md stage (f)).  This theorem used to instantiate
+     [Pc := fun _ => True] -- "never stuck, nothing claimed about a power
+     cycle".  It cannot any more: the boot cone now builds
+     [FirstTok.first_boot_persist], whose seventh row is
+     [FsCrash.fs_crash_seam], and at a constant-[True] slot that seam is
+     FALSE (it would have to produce [P_fs] out of [True]).
+
+     So the slot is filled with the FS record here too, and the recovery
+     obligation that comes with it is DISCHARGED rather than assumed:
+     [FsCrash.fs_recovery_total] says every disk image recovers to SOME
+     committed state, which is all [P_fs_alloc] needs.  Nothing about the
+     conclusion changes, nothing new is assumed, and this theorem's
+     premises are byte-identical to what they were -- what it says about a
+     power cycle is still nothing, because [D0] is existential and never
+     mentioned again.  [xv6_fs_adequacy] below is the theorem that makes a
+     DURABILITY claim, by pinning [D0] to mkfs's own recovery. *)
+  destruct (fs_recovery_total (fs_blocks (v_disk (g.(gdev).(dvirtio))))
+              cov (FsImg.sb_logstart sb)) as [D0 Hrec].
   apply (riscv_power_adequacy Σ boot_D NPROC XV6_DISK_BYTES g
-           (fun (_ _ _ : gname) (_ : Z -> bv 8) => True%I)
-           ltac:(intros γsw γreg γst; iIntros "_"; iModIntro; done) Hgen0 Hpow).
+           (fun (γsw γreg γst : gname) (dk : Z -> bv 8) =>
+              P_fs_named γsw γreg γst cov (FsImg.sb_logstart sb) dk)
+           ltac:(intros γsw γreg γst; iIntros "Hsw";
+                 iMod (P_fs_alloc γsw γreg γst _ D0 cov
+                         (FsImg.sb_logstart sb) Hrec
+                         with "Hsw") as (γs) "(%Hseq & HP & _)";
+                 iModIntro; rewrite /P_fs_named; iExists γs;
+                 iSplitR; [iPureIntro; exact Hseq | iExact "HP"])
+           Hgen0 Hpow).
   (* the per-era boot entailment, at the era instance the power thread just
      minted.  [riscv_fixedGS (RiscvGS Σ F HE)] iota-reduces to [F] and
      [riscv_eraGS] to [HE], so §2's statement at the composed instance IS
      this obligation (crash.md's M0 gotcha, in the direction that works). *)
-  intros F HE gen g' Hbf.
-  exact (@xv6_boot_era Σ (RiscvGS Σ F HE) _ _ _ _ _ gen g' sb nib cov Hbf
-           (Himg g' Hbf)).
+  intros F HE gen g' Hbf Hshape.
+  (* THE RECORD'S SHAPE, destructed: every projection below reduces, which
+     is what makes the crash slot's value -- and hence the seam -- visible
+     to the boot cone at all.  [RiscvAdequacy.boot_fixedGS]'s header is the
+     argument for why an equation about [riscv_crash_pred] alone would not
+     do (the ghost CLASS instances have to agree too). *)
+  destruct Hshape as (Hi & Gg & Gs & Gr & Gt & Gsw & ->).
+  refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ _ _ _ _ gen g' sb nib cov Hbf
+            (Himg g' Hbf) _).
+  intros dk. reflexivity.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -350,13 +395,20 @@ Qed.
 Theorem xv6_fs_adequacy Σ
     `{!xv6G Σ, !riscvGpreS Σ, !fileGpreS Σ, !pavGpreS Σ, !fdslotGpreS Σ,
       !irefslotGpreS Σ}
-    (g : gstate) (cov : gset Z) (logstart : Z)
+    (g : gstate) (cov : gset Z)
     (D0 : gmap Z (list (bv 8)))
     (sb : fs_sb) (nib : nat)
     (Hgen0 : g.(ggen) = 0%nat) (Hpow : g.(gpow) = false)
-    (* mkfs's obligation, at the image the machine powers on with *)
+    (* mkfs's obligation, at the image the machine powers on with.
+       [logstart] IS THE SUPERBLOCK'S OWN, no longer a free parameter
+       (fs-cfg-boot.md stage (f)): the boot cone builds
+       [FsCrash.fs_crash_seam] at the configuration the era mints, whose
+       [fsc_logst] is [FsImg.sb_logstart sb] by
+       [FsCfgBoot.fs_boot_supply]'s tie, so a crash predicate at some OTHER
+       log start could never be sealed into [FsReady.fs_ready].  The mkfs
+       corollary already instantiated it at exactly this value. *)
     (Hrec : fs_recovery (fs_blocks (v_disk (g.(gdev).(dvirtio)))) D0
-              cov logstart)
+              cov (FsImg.sb_logstart sb))
     (* ...and the era-wide image hypothesis the boot-era FS mint needs, at
        THE SAME [cov] (ruling R4: the parameter stays here and the corollary
        instantiates it at the image's own range).  [xv6_power_adequacy]'s
@@ -369,16 +421,24 @@ Theorem xv6_fs_adequacy Σ
 Proof.
   apply (riscv_power_adequacy Σ boot_D NPROC XV6_DISK_BYTES g
            (fun (γsw γreg γst : gname) (dk : Z -> bv 8) =>
-              P_fs_named γsw γreg γst cov logstart dk)
+              P_fs_named γsw γreg γst cov (FsImg.sb_logstart sb) dk)
            ltac:(intros γsw γreg γst; iIntros "Hsw";
-                 iMod (P_fs_alloc γsw γreg γst _ D0 cov logstart Hrec
+                 iMod (P_fs_alloc γsw γreg γst _ D0 cov
+                         (FsImg.sb_logstart sb) Hrec
                          with "Hsw") as (γs) "(%Hseq & HP & _)";
                  iModIntro; rewrite /P_fs_named; iExists γs;
                  iSplitR; [iPureIntro; exact Hseq | iExact "HP"])
            Hgen0 Hpow).
-  intros F HE gen g' Hbf.
-  exact (@xv6_boot_era Σ (RiscvGS Σ F HE) _ _ _ _ _ gen g' sb nib cov Hbf
-           (Himg g' Hbf)).
+  intros F HE gen g' Hbf Hshape.
+  (* THE RECORD'S SHAPE, destructed: every projection below reduces, which
+     is what makes the crash slot's value -- and hence the seam -- visible
+     to the boot cone at all.  [RiscvAdequacy.boot_fixedGS]'s header is the
+     argument for why an equation about [riscv_crash_pred] alone would not
+     do (the ghost CLASS instances have to agree too). *)
+  destruct Hshape as (Hi & Gg & Gs & Gr & Gt & Gsw & ->).
+  refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ _ _ _ _ gen g' sb nib cov Hbf
+            (Himg g' Hbf) _).
+  intros dk. reflexivity.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
