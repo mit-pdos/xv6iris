@@ -618,6 +618,22 @@ Proof.
   apply elem_of_dom. apply Hsome. lia.
 Qed.
 
+(* two adjacent runs of the SAME byte are one run -- what makes a loop
+   that zeroes page after page have a one-line invariant *)
+Lemma umem_write_const_app (M : gmap Z (bv 8)) (a : Z) (n m : nat) (c : bv 8) :
+  umem_write (umem_write M a n (fun _ => c)) (a + Z.of_nat n)%Z m (fun _ => c)
+  = umem_write M a (n + m)%nat (fun _ => c).
+Proof.
+  induction m as [| k IH].
+  - rewrite Nat.add_0_r. reflexivity.
+  - cbn [umem_write]. rewrite IH.
+    replace (n + S k)%nat with (S (n + k))%nat by lia.
+    cbn [umem_write].
+    replace (a + Z.of_nat n + Z.of_nat k)%Z with (a + Z.of_nat (n + k))%Z
+      by (rewrite Nat2Z.inj_add; lia).
+    reflexivity.
+Qed.
+
 Lemma umem_write_ext (M : gmap Z (bv 8)) (a : Z) (n : nat) (bs bs' : nat -> bv 8) :
   (forall j, (j < n)%nat -> bs j = bs' j) ->
   umem_write M a n bs = umem_write M a n bs'.

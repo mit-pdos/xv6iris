@@ -1979,6 +1979,143 @@ Section SealUvmunmap.
               with "Hpt Hm").
   Qed.
 
+  (* THE OTHER contents-indexed seal: the run stays live, so the view keeps
+     those vas and zeroes them.  Same core, same [Own] shape -- except that
+     here the intermediate view IS nameable (each step zeroes one more
+     page), so [Own] is exact rather than existential. *)
+  Lemma wp_uvmunmap_live_sconf
+      (γa : gname) (mm : regfile)
+      (P : uptd) (sz : Z) (M : gmap Z (bv 8))
+      (npages : nat) (K : nat) (eb : bool) (p : mword 64)
+      (ilvl : nat) (b : bool) (lks : gset string)
+    : wp_uvmunmap_live_sconf_body γa mm P sz M npages K eb p ilvl b lks.
+  Proof.
+    cbv beta delta [wp_uvmunmap_live_sconf_body].
+    intros pcE va vpn0 ret_tgt HK Hilvl Hroot Hval Hnpr Hdf Hrange Hlive Hbelow.
+    iIntros "Hcg Hcnt #Htext Hpc Hpt Henv Hcont".
+    assert (Hrz : (bv_unsigned va + Z.of_nat npages * 4096 <= 274877898752)%Z).
+    { unfold uvm_maxsz in Hrange. rewrite uint_unsigned in Hrange.
+      change (2 ^ 38 - 8192)%Z with 274877898752%Z in Hrange. exact Hrange. }
+    assert (Hrz38 : (bv_unsigned va + Z.of_nat npages * 4096 <= 274877906944)%Z)
+      by lia.
+    assert (Halign : bv_unsigned va mod 4096 = 0)
+      by (apply aligned12_unsigned; exact Hval).
+    assert (HliveZ : forall a : Z,
+              (bv_unsigned va <= a < bv_unsigned va + 4096 * Z.of_nat npages)%Z ->
+              uva_live sz a).
+    { intros a Ha. apply Hlive. rewrite uint_unsigned. exact Ha. }
+    iDestruct (proc_ptm_wf P sz M with "Hpt") as %Hwf.
+    pose proof Hwf as Hwf2. destruct Hwf2 as (_ & Hacc & _ & _ & Htfv).
+    iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhwc Hcg]".
+    iDestruct "Hhwc" as (hwmisa0 hwmseccfg0 hwpmar0 hwelp0)
+      "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hkmapb & _)".
+    iDestruct (proc_ptm_uptg_tree P sz M with "Hpt") as "[Hpt Hm]".
+    (* ---- the two laws ---- *)
+    iAssert (□ (∀ (k : nat) (w : mword 64),
+        ⌜(k < npages)%nat⌝ -∗
+        ⌜uu_um true P.(ud_um) vpn0 k !! vpn_at vpn0 k = Some w⌝ -∗
+        umem_lazy (uptd_del_run P vpn0 k) sz
+          (umem_write M (bv_unsigned va) (4096 * k)%nat (fun _ => bv_0 8)) -∗
+        page_own (page_base (pte_ppn w))
+        ∗ umem_lazy (uptd_del_run P vpn0 (S k)) sz
+            (umem_write M (bv_unsigned va) (4096 * S k)%nat (fun _ => bv_0 8))))%I
+      as "#HPEEL".
+    { iIntros "!>" (k w) "%Hk %Hl Hm".
+      pose proof (uu_vpn_addr va npages k Halign Hrz38 Hk) as Hva.
+      assert (Hlk : forall j, (j < 4096)%nat ->
+                uva_live sz
+                  (bv_unsigned (vpn_at (svpn_of va) k) * 4096 + Z.of_nat j)%Z).
+      { intros j Hj. apply HliveZ. lia. }
+      iDestruct (umem_lazy_unmap_live (uptd_del_run P vpn0 k) sz
+                   (umem_write M (bv_unsigned va) (4096 * k)%nat (fun _ => bv_0 8))
+                   (vpn_at vpn0 k) w
+                   (proc_pt_wf_del_run P vpn0 k Hwf) Hl Hlk
+                   with "Hkmapb Hm") as "[Hpg Hm]".
+      iFrame "Hpg".
+      assert (Hstep : umem_write
+                        (umem_write M (bv_unsigned va) (4096 * k)%nat
+                           (fun _ => bv_0 8))
+                        (bv_unsigned (vpn_at vpn0 k) * 4096)%Z 4096
+                        (fun _ => bv_0 8)
+                      = umem_write M (bv_unsigned va) (4096 * S k)%nat
+                          (fun _ => bv_0 8)).
+      { rewrite Hva.
+        replace (bv_unsigned va + 4096 * Z.of_nat k)%Z
+          with (bv_unsigned va + Z.of_nat (4096 * k))%Z
+          by (rewrite Nat2Z.inj_mul; lia).
+        rewrite (umem_write_const_app M (bv_unsigned va) (4096 * k)%nat 4096
+                   (bv_0 8)).
+        replace (4096 * k + 4096)%nat with (4096 * S k)%nat by lia.
+        reflexivity. }
+      rewrite Hstep. iExact "Hm". }
+    iAssert (□ (∀ k : nat,
+        ⌜(k < npages)%nat⌝ -∗
+        ⌜uu_um true P.(ud_um) vpn0 (S k) = uu_um true P.(ud_um) vpn0 k⌝ -∗
+        umem_lazy (uptd_del_run P vpn0 k) sz
+          (umem_write M (bv_unsigned va) (4096 * k)%nat (fun _ => bv_0 8)) -∗
+        umem_lazy (uptd_del_run P vpn0 (S k)) sz
+          (umem_write M (bv_unsigned va) (4096 * S k)%nat (fun _ => bv_0 8))))%I
+      as "#HSKIP".
+    { iIntros "!>" (k) "%Hk %Heq Hm".
+      pose proof (uu_vpn_addr va npages k Halign Hrz38 Hk) as Hva0.
+      assert (Hva : (bv_unsigned (vpn_at vpn0 k) * 4096
+                     = bv_unsigned va + 4096 * Z.of_nat k)%Z) by exact Hva0.
+      (* the vpn is absent, so its vas read as lazy zeros already and the
+         extra page of zeroes is the identity *)
+      iDestruct (umem_lazy_dom with "Hm") as %Hdm0.
+      iAssert (⌜forall j, (j < 4096)%nat ->
+                 umem_write M (bv_unsigned va) (4096 * k)%nat (fun _ => bv_0 8)
+                   !! (bv_unsigned va + Z.of_nat (4096 * k) + Z.of_nat j)%Z
+                 = Some (bv_0 8)⌝)%I as %Hz0.
+      { iDestruct "Hm" as (Mp) "(_ & _ & %Hlz & _)". iPureIntro.
+        intros j Hj. apply Hlz.
+        - intros (v0 & w0 & j0 & Hl0 & Hj0 & Heq0).
+          assert (Hveq : v0 = vpn_at vpn0 k).
+          { apply bv_eq.
+            pose proof (bv_unsigned_in_range 27 v0) as [Hv00 _].
+            rewrite Nat2Z.inj_mul in Heq0. lia. }
+          (* the SKIP hypothesis IS "this vpn is absent": a map that equals
+             its own delete does not have the key *)
+          assert (Habs : um_del_run P.(ud_um) vpn0 k !! vpn_at vpn0 k = None).
+          { assert (Hd : delete (vpn_at vpn0 k) (um_del_run P.(ud_um) vpn0 k)
+                         = um_del_run P.(ud_um) vpn0 k) by exact Heq.
+            rewrite <- Hd. apply lookup_delete. }
+          rewrite Hveq in Hl0. rewrite Habs in Hl0. discriminate.
+        - apply HliveZ. rewrite Nat2Z.inj_mul. lia. }
+      assert (Hid : umem_write M (bv_unsigned va) (4096 * S k)%nat
+                      (fun _ => bv_0 8)
+                    = umem_write M (bv_unsigned va) (4096 * k)%nat
+                        (fun _ => bv_0 8)).
+      { replace (4096 * S k)%nat with (4096 * k + 4096)%nat by lia.
+        rewrite <- (umem_write_const_app M (bv_unsigned va) (4096 * k)%nat 4096
+                      (bv_0 8)).
+        exact (umem_write_id
+                 (umem_write M (bv_unsigned va) (4096 * k)%nat (fun _ => bv_0 8))
+                 (bv_unsigned va + Z.of_nat (4096 * k))%Z 4096
+                 (fun _ => bv_0 8) Hz0). }
+      rewrite Hid.
+      iEval (rewrite (umem_lazy_um_cong (uptd_del_run P vpn0 k)
+                        (uptd_del_run P vpn0 (S k)) sz _ (eq_sym Heq))) in "Hm".
+      iExact "Hm". }
+    iApply (Core.wp_uvmunmap_gen γa mm (upt_fixed_both P.(ud_tfp)) P.(ud_root)
+              P.(ud_um)
+              (fun k => umem_lazy (uptd_del_run P vpn0 k) sz
+                          (umem_write M (bv_unsigned va) (4096 * k)%nat
+                             (fun _ => bv_0 8)))
+              npages K eb p ilvl b true lks HK Hilvl Hroot Hval Hnpr Hdf
+              (uu_range_wide va npages Hrange) (uu_side_user va npages Hrz) Hbelow
+              with "HPEEL HSKIP Hcg Hcnt Htext Hpc Hpt [Hm] Henv").
+    { rewrite Nat.mul_0_r. cbn [umem_write]. iExact "Hm". }
+    iIntros (CID1 Hs1 mr) "Hcg Hcnt Hpc %Hcs Hpt Hm".
+    iSpecialize ("Hcont" $! CID1 with "[%]"); [wp_next_chain|].
+    iApply ("Hcont" $! mr with "Hcg Hcnt Hpc [%] [Hpt Hm]").
+    { exact Hcs. }
+    rewrite uint_unsigned.
+    iApply (uptg_tree_proc_ptm (uptd_del_run P vpn0 npages) sz _
+              (upt_acc_wf_del_run P.(ud_um) vpn0 npages Hacc) Htfv
+              with "Hpt Hm").
+  Qed.
+
   (* [proc_pt] IS the [upt_fixed_both] instance; the round trip owes [uptg] the two
      conjuncts it does not carry -- [upt_acc_wf] (preserved along the run
      by [upt_acc_wf_del_run]) and the trapframe page's [page_valid], which

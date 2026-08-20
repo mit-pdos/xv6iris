@@ -3785,6 +3785,124 @@ Section ProcPt.
     apply elem_of_dom. rewrite (Hdel_same va Hnin Mp) in Hbb. eauto.
   Qed.
 
+  (* ...and the case where the range STAYS LIVE.  uvmcopy's [err] label
+     unmaps the child's prefix without shrinking it, so those vas do not
+     leave the view -- they go back to reading as lazily-backed zeros,
+     which is what they read before the copy put anything there.  The
+     OWNERSHIP half loses the page either way (it goes to kfree); what
+     differs from [umem_lazy_unmap] is only the view. *)
+  Lemma umem_lazy_unmap_live (P : uptd) (szn : Z) (M : gmap Z (bv 8))
+      (vpn : mword 27) (w : mword 64) :
+    proc_pt_wf P -> P.(ud_um) !! vpn = Some w ->
+    (forall j, (j < 4096)%nat ->
+       uva_live szn (bv_unsigned vpn * 4096 + Z.of_nat j)%Z) ->
+    kmap_static_claims -∗ umem_lazy P szn M -∗
+      page_own (page_base (pte_ppn w))
+      ∗ umem_lazy (uptd_delete P vpn) szn
+          (umem_write M (bv_unsigned vpn * 4096)%Z 4096 (fun _ => bv_0 8)).
+  Proof.
+    intros Hwf Hl Hlive. iIntros "#Hb H".
+    iDestruct "H" as (Mp) "(%Hsub & %Hdm & %Hlz & Hm)".
+    iDestruct "Hm" as "[%Hdom Hmp]".
+    pose proof (um_page_valid P vpn w Hwf Hl) as Hval.
+    assert (Hrun : forall va : Z,
+              (bv_unsigned vpn * 4096 <= va < bv_unsigned vpn * 4096 + Z.of_nat 4096)%Z
+              <-> va ∈ upage_dom vpn).
+    { intros va. rewrite upage_dom_range. change (Z.of_nat 4096) with 4096%Z.
+      reflexivity. }
+    assert (Hmap : forall j, (j < 4096)%nat ->
+              uva_mapped P (bv_unsigned vpn * 4096 + Z.of_nat j)%Z).
+    { intros j Hj. exists vpn, w, j.
+      split_and!; [exact Hl | exact Hj | reflexivity]. }
+    assert (Hsome : forall j, (j < 4096)%nat ->
+              is_Some (Mp !! (bv_unsigned vpn * 4096 + Z.of_nat j)%Z)).
+    { intros j Hj. apply elem_of_dom. rewrite Hdom. apply elem_of_uva_dom.
+      exact (Hmap j Hj). }
+    assert (Haddr : forall j, (j < 4096)%nat ->
+              uva_pa P (bv_unsigned vpn * 4096 + Z.of_nat j)%Z
+              = pa_add (page_base (pte_ppn w)) j)
+      by (intros j Hj; exact (uva_pa_page_base P vpn w j (proj1 Hwf) Hl Hj)).
+    assert (Hout_mapped : forall va : Z, va ∉ upage_dom vpn ->
+              (uva_mapped (uptd_delete P vpn) va <-> uva_mapped P va)).
+    { intros va Hnin. rewrite uva_mapped_delete.
+      split; [intros (Hm & _); exact Hm | intros Hm; split; [exact Hm | exact Hnin]]. }
+    rewrite (bigM_window (fun va b => ((uva_pa P va : Arch.pa) ↦ₚ b)%I)
+               Mp (bv_unsigned vpn * 4096)%Z 4096 Hsome).
+    iDestruct "Hmp" as "[Hwin Hrest]".
+    iSplitL "Hwin".
+    { iApply (phys_to_page_own (pte_ppn w) Hval with "Hb").
+      rewrite /phys_page_own.
+      iApply (big_sepL_impl with "Hwin"). iIntros "!>" (k x Hx) "Hj".
+      apply lookup_seq in Hx as [-> Hlt]. rewrite Nat.add_0_l.
+      rewrite (Haddr k Hlt). rewrite /phys_byte_any. iExists _. iExact "Hj". }
+    (* the OWNERSHIP half drops the page; the VIEW keeps the vas, at 0 *)
+    iExists (umem_del Mp (bv_unsigned vpn * 4096)%Z 4096).
+    assert (Hdn : forall va : Z, va ∈ upage_dom vpn ->
+              forall (N : gmap Z (bv 8)),
+                umem_del N (bv_unsigned vpn * 4096)%Z 4096 !! va = None).
+    { intros va Hin N. apply Hrun in Hin. destruct Hin as [Hlo Hhi].
+      replace va with (bv_unsigned vpn * 4096
+                       + Z.of_nat (Z.to_nat (va - bv_unsigned vpn * 4096)))%Z by lia.
+      apply umem_del_lookup_in. lia. }
+    assert (Hds : forall va : Z, va ∉ upage_dom vpn ->
+              forall (N : gmap Z (bv 8)),
+                umem_del N (bv_unsigned vpn * 4096)%Z 4096 !! va = N !! va).
+    { intros va Hnin N. apply umem_del_lookup_out.
+      intros j Hj ->. apply Hnin. apply Hrun. lia. }
+    assert (Hwn : forall va : Z, va ∈ upage_dom vpn ->
+              umem_write M (bv_unsigned vpn * 4096)%Z 4096 (fun _ => bv_0 8)
+                !! va = Some (bv_0 8)).
+    { intros va Hin. apply Hrun in Hin. destruct Hin as [Hlo Hhi].
+      replace va with (bv_unsigned vpn * 4096
+                       + Z.of_nat (Z.to_nat (va - bv_unsigned vpn * 4096)))%Z by lia.
+      apply umem_write_lookup_in. lia. }
+    assert (Hws : forall va : Z, va ∉ upage_dom vpn ->
+              umem_write M (bv_unsigned vpn * 4096)%Z 4096 (fun _ => bv_0 8)
+                !! va = M !! va).
+    { intros va Hnin. apply umem_write_lookup_out.
+      intros j Hj ->. apply Hnin. apply Hrun. lia. }
+    iSplitR.
+    { iPureIntro. apply map_subseteq_spec. intros va bb Hbb.
+      destruct (decide (va ∈ upage_dom vpn)) as [Hin | Hnin].
+      - rewrite (Hdn va Hin Mp) in Hbb. discriminate.
+      - rewrite (Hds va Hnin Mp) in Hbb. rewrite (Hws va Hnin).
+        exact (lookup_weaken _ _ _ _ Hbb Hsub). }
+    iSplitR.
+    { iPureIntro. intros va.
+      destruct (decide (va ∈ upage_dom vpn)) as [Hin | Hnin].
+      - rewrite (Hwn va Hin). split; [intros _ | intros _; eauto].
+        right. apply Hrun in Hin. destruct Hin as [Hlo Hhi].
+        replace va with (bv_unsigned vpn * 4096
+                         + Z.of_nat (Z.to_nat (va - bv_unsigned vpn * 4096)))%Z
+          by lia.
+        apply Hlive. lia.
+      - rewrite (Hws va Hnin). rewrite (Hdm va).
+        rewrite (Hout_mapped va Hnin). reflexivity. }
+    iSplitR.
+    { iPureIntro. intros va Hnm Hlv.
+      destruct (decide (va ∈ upage_dom vpn)) as [Hin | Hnin].
+      - exact (Hwn va Hin).
+      - rewrite (Hws va Hnin). apply Hlz; [| exact Hlv].
+        intros Hm. apply Hnm. apply (Hout_mapped va Hnin). exact Hm. }
+    iSplitR.
+    { iPureIntro. apply set_eq. intros va.
+      rewrite elem_of_dom uva_dom_delete elem_of_difference.
+      destruct (decide (va ∈ upage_dom vpn)) as [Hin | Hnin].
+      - rewrite (Hdn va Hin Mp).
+        split; [intros [? Hc]; discriminate |
+                intros (_ & Hc); exfalso; exact (Hc Hin)].
+      - rewrite (Hds va Hnin Mp).
+        rewrite <- elem_of_dom. rewrite Hdom.
+        split; [intros Hin'; split; [exact Hin' | exact Hnin] |
+                intros (Hin' & _); exact Hin']. }
+    iApply (big_sepM_impl with "Hrest"). iIntros "!>" (va bb Hbb) "Hj".
+    assert (Hnin : va ∉ upage_dom vpn).
+    { intros Hin. rewrite (Hdn va Hin Mp) in Hbb. discriminate. }
+    rewrite (uva_pa_delete P vpn va (proj1 Hwf)); [iExact "Hj" |].
+    apply (Hout_mapped va Hnin). apply elem_of_uva_dom. rewrite <- Hdom.
+    apply elem_of_dom. rewrite (Hds va Hnin Mp) in Hbb. eauto.
+  Qed.
+
   (* ------------------------------------------------------------------ *)
   (* GROWING THE SIZE by one page.  A page that becomes live but is not   *)
   (* backed reads as zero, so the view gains exactly that page's vas at   *)
@@ -3898,6 +4016,109 @@ Section ProcPt.
         exact (Hlive j Hj). }
     iSplitR.
     { iPureIntro. intros va Hnm' Hlv. apply Hlz; [| exact Hlv].
+      intros Hmapd. apply Hnm'.
+      apply (uva_mapped_insert_perm P perm vpn r va Hn). by left. }
+    iSplitR.
+    { iPureIntro. rewrite dom_union_L Hdom upage_map_dom.
+      symmetry. exact (uva_dom_insert_perm P perm vpn r Hn). }
+    rewrite (big_sepM_union _ Mp (upage_map vpn bs) Hdisj). iFrame "Hm Hpg".
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* THE UVMCOPY STEP: map a page over vas that are ALREADY live, with    *)
+  (* ARBITRARY contents.  [umem_lazy_fault_perm] is the special case      *)
+  (* where the contents are zero and so the view does not move at all;    *)
+  (* here the child's page holds the PARENT's bytes, so the view gains    *)
+  (* them -- the vas went from reading as a lazy zero to reading what was *)
+  (* copied in.                                                          *)
+  (* ------------------------------------------------------------------ *)
+  Lemma umem_lazy_fill (P : uptd) (perm : Z) (sz : Z)
+      (M : gmap Z (bv 8))
+      (vpn : mword 27) (r : mword 64) (bs : nat -> bv 8) :
+    upt_map_wf P.(ud_um) -> P.(ud_um) !! vpn = None ->
+    (forall j, (j < 4096)%nat ->
+       uva_live sz (bv_unsigned vpn * 4096 + Z.of_nat j)%Z) ->
+    umem_lazy P sz M -∗
+    ([∗ list] j ∈ seq 0 4096,
+       (uva_pa (uptd_insert_perm P perm vpn r) (bv_unsigned vpn * 4096 + Z.of_nat j)%Z
+          : Arch.pa) ↦ₚ bs j) -∗
+    umem_lazy (uptd_insert_perm P perm vpn r) sz
+              (umem_write M (bv_unsigned vpn * 4096)%Z 4096 bs).
+  Proof.
+    intros Hwf Hn Hlive.
+    iIntros "H Hpg".
+    iDestruct "H" as (Mp) "(%Hsub & %Hdm & %Hlz & Hm)".
+    iDestruct "Hm" as "[%Hdom Hm]".
+    (* the lazy vas of the new page: they were 0 in [M] *)
+    assert (Hnm : forall va, va ∈ upage_dom vpn -> ~ uva_mapped P va).
+    { intros va Hin Hmapd.
+      exact (uva_dom_insert_disj P vpn r Hn va
+               (proj2 (elem_of_uva_dom P va) Hmapd) Hin). }
+    assert (Hzz : forall j, (j < 4096)%nat ->
+              M !! (bv_unsigned vpn * 4096 + Z.of_nat j)%Z = Some (bv_0 8)).
+    { intros j Hj. apply Hlz; [| exact (Hlive j Hj)].
+      apply Hnm. apply elem_of_upage_dom. eauto. }
+    (* the page's vas are exactly where [umem_write] moves [M] *)
+    assert (Hwin : forall j, (j < 4096)%nat ->
+              umem_write M (bv_unsigned vpn * 4096)%Z 4096 bs
+                !! (bv_unsigned vpn * 4096 + Z.of_nat j)%Z = Some (bs j))
+      by (intros j Hj; apply umem_write_lookup_in; exact Hj).
+    assert (Hwout : forall va, va ∉ upage_dom vpn ->
+              umem_write M (bv_unsigned vpn * 4096)%Z 4096 bs !! va = M !! va).
+    { intros va Hnin. apply umem_write_lookup_out.
+      intros j Hj Heq. apply Hnin. apply elem_of_upage_dom. eauto. }
+    iEval (rewrite (bigL_page_map
+             (fun (va : Z) (b : bv 8) =>
+                ((uva_pa (uptd_insert_perm P perm vpn r) va : Arch.pa) ↦ₚ b)%I) vpn bs))
+      in "Hpg".
+    (* the old bytes transfer: [uva_pa] does not move off the new page *)
+    iAssert ([∗ map] va ↦ b ∈ Mp,
+               (uva_pa (uptd_insert_perm P perm vpn r) va : Arch.pa) ↦ₚ b)%I
+      with "[Hm]" as "Hm".
+    { iApply (big_sepM_impl with "Hm"). iIntros "!>" (va bb Hva) "Hj".
+      rewrite (uva_pa_insert_old_perm P perm vpn r va Hwf Hn
+                 (proj1 (elem_of_uva_dom P va)
+                    ltac:(rewrite <- Hdom; apply elem_of_dom; eauto))).
+      iExact "Hj". }
+    assert (Hdisj : Mp ##ₘ upage_map vpn bs).
+    { apply map_disjoint_dom. rewrite Hdom upage_map_dom.
+      exact (uva_dom_insert_disj P vpn r Hn). }
+    iExists (Mp ∪ upage_map vpn bs).
+    iSplitR.
+    { iPureIntro. apply map_subseteq_spec. intros va bb Hbb.
+      apply lookup_union_Some in Hbb as [Hbb | Hbb]; [| | exact Hdisj].
+      - assert (Hnin : va ∉ upage_dom vpn).
+        { intros Hin. apply (Hnm va Hin). apply elem_of_uva_dom.
+          rewrite <- Hdom. apply elem_of_dom. eauto. }
+        rewrite (Hwout va Hnin). exact (lookup_weaken _ _ _ _ Hbb Hsub).
+      - assert (Hin : va ∈ upage_dom vpn)
+          by (rewrite <- (upage_map_dom vpn bs); apply elem_of_dom; eauto).
+        apply elem_of_upage_dom in Hin as (j & Hj & ->).
+        rewrite (upage_map_lookup vpn bs j Hj) in Hbb.
+        injection Hbb as <-. exact (Hwin j Hj). }
+    iSplitR.
+    { iPureIntro. intros va.
+      assert (Hsame : is_Some (umem_write M (bv_unsigned vpn * 4096)%Z 4096 bs !! va)
+                      <-> is_Some (M !! va)).
+      { destruct (decide (va ∈ upage_dom vpn)) as [Hin | Hnin].
+        - pose proof Hin as Hin'.
+          apply elem_of_upage_dom in Hin' as (j & Hj & ->).
+          rewrite (Hwin j Hj). rewrite (Hzz j Hj).
+          split; intros _; eauto.
+        - rewrite (Hwout va Hnin). reflexivity. }
+      rewrite Hsame. rewrite (Hdm va).
+      rewrite (uva_mapped_insert_perm P perm vpn r va Hn).
+      split.
+      - intros [Hm0 | Hlv]; [ left; by left | by right ].
+      - intros [[Hm0 | Hin] | Hlv]; [ by left | | by right].
+        right. apply elem_of_upage_dom in Hin as (j & Hj & ->).
+        exact (Hlive j Hj). }
+    iSplitR.
+    { iPureIntro. intros va Hnm' Hlv.
+      assert (Hnin : va ∉ upage_dom vpn).
+      { intros Hin. apply Hnm'.
+        apply (uva_mapped_insert_perm P perm vpn r va Hn). by right. }
+      rewrite (Hwout va Hnin). apply Hlz; [| exact Hlv].
       intros Hmapd. apply Hnm'.
       apply (uva_mapped_insert_perm P perm vpn r va Hn). by left. }
     iSplitR.
@@ -4065,6 +4286,86 @@ Section ProcPt.
     iDestruct (umem_lazy_fault_perm P perm sz'
                  (M ∪ gset_to_gmap (bv_0 8) (upage_dom vpn)) vpn r bs
                  Hmwf Hunone Hlive Hzero with "Hm [Hpg]") as "Hm".
+    { iApply (big_sepL_impl with "Hpg"). iIntros "!>" (k x Hx) "Hj".
+      apply lookup_seq in Hx as [-> Hlt']. rewrite Nat.add_0_l.
+      rewrite (uva_pa_page_base (uptd_insert_perm P perm vpn r) vpn (uvm_pte perm r) k
+                 (proj1 Hwf') Hl' ltac:(lia)).
+      rewrite Nat.add_0_l. iExact "Hj". }
+    rewrite /proc_ptm. iSplitR; [iPureIntro; exact Hwf' |]. iFrame "Hm".
+    unfold uptd_insert_perm. cbn [ud_root ud_tfp ud_um].
+    rewrite /pt_frame. iExists t'. iFrame "Ht". iPureIntro.
+    exact (upt_spec_of_rep0 P.(ud_root) P.(ud_tfp)
+             (<[vpn := uvm_pte perm r]> P.(ud_um))
+             (<[vpn := uvm_pte perm r]> m_ad) t' (proj1 Hwf')
+             (upt_ad_view_insert P.(ud_tfp) P.(ud_um) m_ad vpn (uvm_pte perm r)
+                Hview Hnone)
+             Hrep Hbase).
+  Qed.
+
+  (* THE UVMCOPY STEP at the table.  Same shape as [proc_ptm_grow_uvm],
+     except the size does NOT move (the child is already indexed at the
+     parent's) and the page arrives holding the parent's bytes rather than
+     zeros, so the view gains THOSE. *)
+  Lemma proc_ptm_fill (P : uptd) (perm : Z) (sz : Z)
+      (M : gmap Z (bv 8))
+      (vpn : mword 27) (r : mword 64)
+      (t' : ptree) (m_ad : gmap (mword 27) (mword 64)) (bs : nat -> bv 8) :
+    uvm_perm_ok perm ->
+    proc_pt_wf P -> upt_ad_view P.(ud_tfp) P.(ud_um) m_ad ->
+    m_ad !! vpn = None ->
+    (bv_unsigned vpn < 67108864)%Z ->
+    pt_rep0 t' (<[vpn := uvm_pte perm r]> m_ad) -> pt_base t' = P.(ud_root) ->
+    page_valid r ->
+    (forall j, (j < 4096)%nat ->
+       uva_live sz (bv_unsigned vpn * 4096 + Z.of_nat j)%Z) ->
+    kmap_static_claims -∗ ptree_own 2 (DfracOwn 1) t' -∗
+    ([∗ list] j ∈ seq 0 4096, (pa_add r j : Arch.pa) ↦ₘ bs j) -∗
+    umem_lazy P sz M -∗
+    proc_ptm (uptd_insert_perm P perm vpn r) sz
+             (umem_write M (bv_unsigned vpn * 4096)%Z 4096 bs).
+  Proof.
+    intros Hperm Hwf Hview Hnone Hlt Hrep Hbase Hval Hlive.
+    pose proof Hwf as (Hmwf & Hawf & Hpwf & Hinj & Htfv).
+    destruct (proj1 (proj1 Hview vpn) Hnone) as (Hnt & Hntf & Hunone).
+    assert (Hppn : pte_ppn (uvm_pte perm r) = autocast (T := mword)
+                     (subrange_vec_dec r 55 12))
+      by exact (pte_ppn_uvm perm r (pb_lor1_range perm (proj1 (proj1 Hperm)))).
+    assert (Hpb : page_base (pte_ppn (uvm_pte perm r)) = r)
+      by (rewrite Hppn; exact (page_base_of_valid r Hval)).
+    assert (Hvp : page_valid (page_base (pte_ppn (uvm_pte perm r))))
+      by (rewrite Hpb; exact Hval).
+    iIntros "#Hb Ht Hpg Hm".
+    (* the page's bytes, at the PHYSICAL tier and indexed by the vas the
+       new leaf translates: [uva_pa] at the GROWN descriptor *)
+    iAssert ([∗ list] j ∈ seq 0 4096,
+               (pa_add (page_base (pte_ppn (uvm_pte perm r))) (0 + j)%nat
+                  : Arch.pa) ↦ₚ bs j)%I with "[Hpg]" as "Hpg".
+    { iApply (win_mem_to_phys (pte_ppn (uvm_pte perm r)) 0 4096 bs Hvp
+                ltac:(lia) with "Hb [Hpg]").
+      iApply (big_sepL_impl with "Hpg"). iIntros "!>" (k x Hx) "Hj".
+      apply lookup_seq in Hx as [-> Hlt']. rewrite Nat.add_0_l.
+      rewrite pa_add_add Nat.add_0_l Hpb. iExact "Hj". }
+    (* freshness, from the ownership -- the [um_inj] conjunct needs it *)
+    iAssert (⌜pte_ppn (uvm_pte perm r) ∉ um_ppns P.(ud_um)⌝)%I as %Hfresh.
+    { iDestruct "Hm" as (Mp) "(_ & _ & _ & Hmm)".
+      iApply (umem_own_page_fresh_named P Mp (pte_ppn (uvm_pte perm r)) bs
+                Hmwf Hinj with "Hmm [Hpg]").
+      iApply (big_sepL_impl with "Hpg"). iIntros "!>" (k x Hx) "Hj".
+      apply lookup_seq in Hx as [-> Hlt']. rewrite Nat.add_0_l. iExact "Hj". }
+    assert (Hwf' : proc_pt_wf (uptd_insert_perm P perm vpn r)).
+    { unfold uptd_insert_perm, proc_pt_wf.
+      cbn [ud_root ud_tfp ud_um]. split_and!.
+      - exact (upt_map_wf_insert_uvm P.(ud_um) perm vpn r Hperm
+                 Hmwf Hnt Hntf Hlt).
+      - exact (upt_acc_wf_insert_uvm P.(ud_um) perm vpn r Hperm Hawf).
+      - exact (um_pages_valid_insert_uvm P.(ud_um) perm vpn r Hperm
+                 Hpwf Hval).
+      - exact (um_inj_insert P.(ud_um) vpn (uvm_pte perm r) Hinj Hfresh).
+      - exact Htfv. }
+    assert (Hl' : (uptd_insert_perm P perm vpn r).(ud_um) !! vpn = Some (uvm_pte perm r))
+      by (unfold uptd_insert_perm; cbn [ud_um]; apply lookup_insert).
+    iDestruct (umem_lazy_fill P perm sz M vpn r bs
+                 Hmwf Hunone Hlive with "Hm [Hpg]") as "Hm".
     { iApply (big_sepL_impl with "Hpg"). iIntros "!>" (k x Hx) "Hj".
       apply lookup_seq in Hx as [-> Hlt']. rewrite Nat.add_0_l.
       rewrite (uva_pa_page_base (uptd_insert_perm P perm vpn r) vpn (uvm_pte perm r) k
