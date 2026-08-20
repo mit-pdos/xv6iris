@@ -369,3 +369,234 @@ Proof.
     destruct i as [|[|i]]; simpl in Hl; [| |done];
       destruct k as [|[|k]]; simplify_eq/=; done.
 Qed.
+
+(* ====================================================================== *)
+(** * 6. POSITION ARITHMETIC (additive; consumed by [WeakRvwmoLin.v])
+
+    The rule-14 linearization (T2-1c) is all [gpos]/[gwix] bookkeeping.  Two
+    facts carry it: [gmo] is TOTAL on its members (the order is a [NoDup]
+    list, so a member's position determines it), and the write sub-order
+    [gwrites] is a FILTER of [gx_gmo] — hence write indices and gmo positions
+    order the writes THE SAME WAY ([gwix_gpos_lt]), which is what lets a
+    read's [ts] entry be reused verbatim as a candidate log position.
+
+    Nothing above this line changes. *)
+
+From stdpp Require Import sorting.
+
+(** ** Sortedness by lookup — the generic kit the filter argument needs. *)
+
+Lemma StronglySorted_lookup_elim {A} (R : relation A) (l : list A) i j x y :
+  StronglySorted R l → l !! i = Some x → l !! j = Some y → (i < j)%nat → R x y.
+Proof.
+  intros Hss. revert i j.
+  induction Hss as [|z l Hss IH Hall]; intros i j Hi Hj Hlt.
+  { by rewrite lookup_nil in Hi. }
+  destruct i as [|i]; simpl in Hi.
+  - simplify_eq. destruct j as [|j]; [lia|]. simpl in Hj.
+    rewrite Forall_forall in Hall. apply Hall. by eapply elem_of_list_lookup_2.
+  - destruct j as [|j]; [lia|]. simpl in Hj. apply (IH i j); [done|done|lia].
+Qed.
+
+Lemma StronglySorted_lookup_intro {A} (R : relation A) (l : list A) :
+  (∀ i j x y, l !! i = Some x → l !! j = Some y → (i < j)%nat → R x y) →
+  StronglySorted R l.
+Proof.
+  induction l as [|z l IH]; intros Hl; [constructor|].
+  constructor.
+  - apply IH. intros i j x y Hi Hj Hlt. apply (Hl (S i) (S j)); [done|done|lia].
+  - apply Forall_forall. intros y Hy.
+    apply elem_of_list_lookup_1 in Hy as [j Hj].
+    apply (Hl 0%nat (S j)); [done|done|lia].
+Qed.
+
+Lemma StronglySorted_filter {A} (R : relation A) (P : A → Prop)
+    `{∀ x, Decision (P x)} (l : list A) :
+  StronglySorted R l → StronglySorted R (filter P l).
+Proof.
+  induction 1 as [|z l Hss IH Hall]; [rewrite filter_nil; constructor|].
+  rewrite filter_cons. case_decide as Hz; [|exact IH].
+  constructor; [exact IH|].
+  apply Forall_forall. intros y Hy. apply elem_of_list_filter in Hy as [_ Hy].
+  rewrite Forall_forall in Hall. by apply Hall.
+Qed.
+
+(** ** [gpos]: the gmo position of a member *)
+
+Lemma gpos_lookup G e :
+  e ∈ gx_gmo G → ∃ i, gx_gmo G !! i = Some e ∧ gpos G e = i.
+Proof.
+  intros He. rewrite /gpos.
+  destruct (list_find (λ e', e' = e) (gx_gmo G)) as [[i x]|] eqn:Hf.
+  - apply list_find_Some in Hf as (Hi & -> & _). by exists i.
+  - exfalso. rewrite list_find_None Forall_forall in Hf. by apply (Hf e He).
+Qed.
+
+Lemma gpos_elem_lookup G e : e ∈ gx_gmo G → gx_gmo G !! gpos G e = Some e.
+Proof. intros He. by destruct (gpos_lookup G e He) as (i & Hi & ->). Qed.
+
+Lemma gpos_of_lookup G i e :
+  NoDup (gx_gmo G) → gx_gmo G !! i = Some e → gpos G e = i.
+Proof.
+  intros Hnd Hi.
+  destruct (gpos_lookup G e (elem_of_list_lookup_2 _ _ _ Hi)) as (i' & Hi' & ->).
+  by apply (NoDup_lookup (gx_gmo G) i' i e).
+Qed.
+
+Lemma gpos_lt_len G e : e ∈ gx_gmo G → (gpos G e < length (gx_gmo G))%nat.
+Proof. intros He. by eapply lookup_lt_Some, gpos_elem_lookup. Qed.
+
+Lemma gpos_inj G e1 e2 :
+  NoDup (gx_gmo G) → e1 ∈ gx_gmo G → e2 ∈ gx_gmo G →
+  gpos G e1 = gpos G e2 → e1 = e2.
+Proof.
+  intros Hnd H1 H2 Heq.
+  pose proof (gpos_elem_lookup G e1 H1) as L1.
+  pose proof (gpos_elem_lookup G e2 H2) as L2.
+  rewrite Heq in L1. by simplify_eq.
+Qed.
+
+Lemma gmo_lt_trans G e1 e2 e3 : gmo_lt G e1 e2 → gmo_lt G e2 e3 → gmo_lt G e1 e3.
+Proof. intros (?&?&?) (?&?&?). split_and!; [done|done|lia]. Qed.
+
+Lemma gmo_lt_irrefl G e : ¬ gmo_lt G e e.
+Proof. intros (_ & _ & ?). lia. Qed.
+
+(** TOTALITY on members: the missing half of "gmo is a strict total order". *)
+Lemma gmo_lt_total G e1 e2 :
+  NoDup (gx_gmo G) → e1 ∈ gx_gmo G → e2 ∈ gx_gmo G → e1 ≠ e2 →
+  gmo_lt G e1 e2 ∨ gmo_lt G e2 e1.
+Proof.
+  intros Hnd H1 H2 Hne.
+  destruct (decide (gpos G e1 < gpos G e2)%nat) as [Hlt|Hge];
+    [by left; split_and!|].
+  right. split_and!; [done|done|].
+  destruct (decide (gpos G e1 = gpos G e2)) as [Heq|Hne'];
+    [by destruct Hne; eapply gpos_inj|lia].
+Qed.
+
+(** The contrapositive shape the load-value axiom hands back: not gmo-before
+    means at-or-after. *)
+Lemma gmo_nlt_ge G e1 e2 :
+  NoDup (gx_gmo G) → e1 ∈ gx_gmo G → e2 ∈ gx_gmo G →
+  ¬ gmo_lt G e1 e2 → (gpos G e2 ≤ gpos G e1)%nat.
+Proof.
+  intros Hnd H1 H2 Hn.
+  destruct (decide (gpos G e1 < gpos G e2)%nat) as [Hlt|]; [|lia].
+  destruct Hn. by split_and!.
+Qed.
+
+(** ** [gwrites] / [gwix]: the write sub-order *)
+
+Lemma gwrites_elem_of G e : e ∈ gwrites G ↔ e ∈ gx_gmo G ∧ gis_w G e = true.
+Proof.
+  rewrite /gwrites elem_of_list_filter Is_true_true. naive_solver.
+Qed.
+
+Lemma gwrites_nodup G : NoDup (gx_gmo G) → NoDup (gwrites G).
+Proof. intros Hnd. by apply NoDup_filter. Qed.
+
+Lemma gwrites_lookup_elem G i w : gwrites G !! i = Some w → w ∈ gwrites G.
+Proof. intros Hi. by eapply elem_of_list_lookup_2. Qed.
+
+Lemma gwix_lookup G w :
+  w ∈ gwrites G → ∃ i, gwrites G !! i = Some w ∧ gwix G w = S i.
+Proof.
+  intros He. rewrite /gwix.
+  destruct (list_find (λ e', e' = w) (gwrites G)) as [[i x]|] eqn:Hf.
+  - apply list_find_Some in Hf as (Hi & -> & _). by exists i.
+  - exfalso. rewrite list_find_None Forall_forall in Hf. by apply (Hf w He).
+Qed.
+
+Lemma gwix_of_lookup G i w :
+  NoDup (gx_gmo G) → gwrites G !! i = Some w → gwix G w = S i.
+Proof.
+  intros Hnd Hi.
+  destruct (gwix_lookup G w (gwrites_lookup_elem G i w Hi)) as (i' & Hi' & ->).
+  by rewrite (NoDup_lookup (gwrites G) i' i w (gwrites_nodup G Hnd) Hi' Hi).
+Qed.
+
+Lemma gwix_pos G w : w ∈ gwrites G → (0 < gwix G w)%nat.
+Proof. intros He. destruct (gwix_lookup G w He) as (i & _ & ->). lia. Qed.
+
+Lemma gwix_le G w :
+  w ∈ gwrites G → (gwix G w ≤ length (gwrites G))%nat.
+Proof.
+  intros He. destruct (gwix_lookup G w He) as (i & Hi & ->).
+  apply lookup_lt_Some in Hi. lia.
+Qed.
+
+Lemma gwrite_at_gwix G w :
+  w ∈ gwrites G → gwrite_at G (gwix G w) = Some w.
+Proof.
+  intros He. destruct (gwix_lookup G w He) as (i & Hi & ->). exact Hi.
+Qed.
+
+Lemma gwrite_at_inv G t w :
+  NoDup (gx_gmo G) → gwrite_at G t = Some w →
+  w ∈ gwrites G ∧ gwix G w = t.
+Proof.
+  destruct t as [|i]; [done|]. intros Hnd Hi. split.
+  - by eapply gwrites_lookup_elem.
+  - by apply gwix_of_lookup.
+Qed.
+
+Lemma gwix_inj G w1 w2 :
+  NoDup (gx_gmo G) → w1 ∈ gwrites G → w2 ∈ gwrites G →
+  gwix G w1 = gwix G w2 → w1 = w2.
+Proof.
+  intros Hnd H1 H2 Heq.
+  destruct (gwix_lookup G w1 H1) as (i1 & Hi1 & E1).
+  destruct (gwix_lookup G w2 H2) as (i2 & Hi2 & E2).
+  assert (i1 = i2) as -> by (rewrite E1 E2 in Heq; lia).
+  rewrite Hi1 in Hi2. by simplify_eq.
+Qed.
+
+(** THE ORDER-PRESERVATION FACT: [gwrites] is a filter of [gx_gmo], so a
+    write's INDEX and its gmo POSITION agree on order.  This is why a graph
+    read's [ts] entry (a gmo-write index) is NUMERICALLY the candidate log
+    position of the same write — the linearization renumbers nothing. *)
+Lemma gwrites_sorted G :
+  NoDup (gx_gmo G) →
+  StronglySorted (λ x y, (gpos G x < gpos G y)%nat) (gwrites G).
+Proof.
+  intros Hnd. apply StronglySorted_filter.
+  apply StronglySorted_lookup_intro. intros i j x y Hi Hj Hlt.
+  rewrite (gpos_of_lookup G i x Hnd Hi) (gpos_of_lookup G j y Hnd Hj). lia.
+Qed.
+
+Lemma gwix_gpos_lt G w1 w2 :
+  NoDup (gx_gmo G) → w1 ∈ gwrites G → w2 ∈ gwrites G →
+  ((gwix G w1 < gwix G w2)%nat ↔ (gpos G w1 < gpos G w2)%nat).
+Proof.
+  intros Hnd H1 H2.
+  destruct (gwix_lookup G w1 H1) as (i1 & Hi1 & E1).
+  destruct (gwix_lookup G w2 H2) as (i2 & Hi2 & E2).
+  pose proof (gwrites_sorted G Hnd) as Hss.
+  split.
+  - intros Hlt. apply (StronglySorted_lookup_elim _ _ i1 i2 w1 w2 Hss Hi1 Hi2).
+    lia.
+  - intros Hlt. rewrite E1 E2.
+    destruct (decide (i1 < i2)%nat) as [?|Hge]; [lia|].
+    destruct (decide (i1 = i2)) as [->|Hne].
+    { rewrite Hi1 in Hi2. simplify_eq. lia. }
+    exfalso.
+    pose proof (StronglySorted_lookup_elim _ _ i2 i1 w2 w1 Hss Hi2 Hi1
+                  ltac:(lia)) as Hgt. simpl in Hgt. lia.
+Qed.
+
+(** [gwf]'s membership clause, in the direction the linearization uses. *)
+Lemma gwf_mem_gmo G e : gwf G → gmem G e → e ∈ gx_gmo G.
+Proof. intros (_ & Hm & _) He. by apply Hm. Qed.
+
+Lemma gwf_gmo_mem G e : gwf G → e ∈ gx_gmo G → gmem G e.
+Proof. intros (_ & Hm & _) He. by apply Hm. Qed.
+
+(** A write EVENT (label-level) is a member of the write sub-order. *)
+Lemma gis_w_gwrites G e :
+  gwf G → is_Some (gx_lbl G e) → gis_w G e = true → e ∈ gwrites G.
+Proof.
+  intros Hwf [l Hl] Hw. apply gwrites_elem_of. split; [|done].
+  apply (gwf_mem_gmo G e Hwf). exists l. split; [done|].
+  rewrite /gis_w Hl in Hw. by rewrite /lb_is_mem Hw orb_true_r.
+Qed.

@@ -109,6 +109,18 @@ change that produced it.
 - **A slow `Qed` is usually proof-term SIZE, not conversion — and `rocq compile -profile <f>.json` is what tells you which.** It breaks each `Qed` into `HConstr.of_constr` / `Typeops.execute` / `close_proof` / `sort_and_universes_of_constr`; measured across this tree only ~25 % is `Typeops` (real typechecking) and the rest is term-size-linear plumbing that re-walks every *occurrence* of a shared subterm. The one-command tell is **`Set Debug "hconstr".`**, which prints each `Qed`'s `tree size` and `bindings` (the DAG): a high **tree/bindings ratio** means a small proof with an exponentially unfolded term. To localise it inside a lemma, bisect with an `Axiom cheat_ : forall (A : Type), A.` stub (unlike `Admitted` this still runs `Qed`). See `optimization.md` for the whole method and for the `unfold set_reg` 3^N trap it found.
 - **`coqc` offloads `Qed` kernel-checking to an async `rocqworker` subprocess, and `coqc -time` does NOT count that worker's time.** So `-time`'s per-sentence sum can be tiny (e.g. 14 s) while the real `/usr/bin/time` wall is minutes — the gap is the async `Qed`, NOT machine contention. A pathological `Qed` (e.g. a whole-function proof term over a transparent, eagerly-reducible register-map tower) hides this way. To see it: `/usr/bin/time -v coqc …` (wall + RSS), not `-time`. Also: a killed/`pkill`-ed `coqc` can leave orphan/zombie `rocqworker`s (`ps -eo pid,ppid,stat,comm | grep rocqworker`; `Z`/defunct = harmless, a live orphan holds a worker slot and can stall the next build) — reap them before re-measuring, and prefer `pkill -x rocqworker`/kill-by-PID over `pkill -f coqc`.
 
+- **`Stdlib.Lists.List` SHADOWS stdpp for several list lemma names** in files
+  that import both (seen in `WeakRvwmoLin.v`): `filter_app`, `NoDup_app`,
+  `NoDup_cons`, `NoDup_filter`, `NoDup_Permutation`, `Forall_forall` resolve to
+  the Stdlib versions, and the failure reads as unification nonsense ("the LHS
+  of filter_app `(List.filter _ (_ ++ _))` does not match").  Fix: qualify the
+  stdpp ones (`list_basics.filter_app`, `list_relations.NoDup_app`/`_filter`/
+  `_Permutation`), use `NoDup_cons_1_1`/`_1_2` and `Forall_lookup_1`/`_2`.
+  `filter_cons`, `elem_of_list_filter`, `list_filter_filter`, `list_filter_iff`,
+  `NoDup_alt`, `NoDup_lookup` are stdpp-only and safe.  Related paper cut:
+  `StronglySorted`-family lemmas hand back un-beta-reduced `R x y`, so `lia`
+  fails with "Cannot find witness" until `cbn in H`.
+
 ## Changing the kernel SOURCE: what an image shift breaks, and how to find it
 
 Done once, 2026-08-06, for a 6-byte fix inside `writei` (`kernel-defects.md`

@@ -419,6 +419,21 @@ to the design file / durable-notes, not narrative)
   load_post_run` consumes the intermediate bank on BOTH tiers equally,
   so the split/fused correspondence is undisturbed.  Slice spec:
   scratchpad `di-spec.md`.
+- **T2-1c LANDED (2026-08-20): `iris/WeakRvwmoLin.v`,
+  `rule14_linearization` — graph → same-log cand, `Closed under the
+  global context` (no axioms at all), statement verbatim as specced,
+  re-verified on the post-D-i/D-ii tree.**  TWO REUSABLE FINDS: (i) THE
+  BOOTSTRAP — a construct-a-candidate slice should prove ONLY
+  `cand_shape`, `cand_values`, `ax_coherence`, `ax_atomicity`,
+  `ax_ord`, `ax_rel_ord`, then get `exec_wf` + all of `axiomatic_ok` +
+  ob-acyclicity FREE from `promise_free_complete_local` +
+  `promise_free_sound` — the `tc_kless` ob replay is never needed;
+  record this as the standard route (T2-6's realizability direction
+  should use it).  (ii) the model-free order kit in `WeakRvwmoLin.v` §1
+  (`rblocks` block-decomposition family, `pidx`,
+  filter-preserves-relative-order via `StronglySorted`) — liftable.
+  Also: `grf_gmo` (EVERY rf edge gmo-forward, rfi via poloc) means the
+  linearization never cares whether a read was forwarded.
 - **T2-1c SHARPENED in the spec pass (2026-08-20): no topological
   selection needed.**  Two upgrades over the recorded design: (i) ALL rf
   edges are gmo-forward — the forwarding (rfi) case is same-byte po, so
@@ -432,6 +447,65 @@ to the design file / durable-notes, not narrative)
   it after its rf source's segment).  Acyclicity never needs stating —
   each cand obligation is proven directly against the enumeration.
   Slice spec: scratchpad `t21c-spec.md` (build in flight, worktree).
+- **D-iii DESIGN PASS, FIRST HALF (2026-08-20, orchestrator; PENDING
+  PROBE VERIFICATION — do not build D8-2 until the probes below run).
+  THE RISK IS NOT `sim_dev` — it DISSOLVES; the real obstacle is the
+  QUARANTINE, and it is larger than budgeted.**  Working through PARM's
+  `CertifySim` against our Layer-1 shape:
+  * `sim_dev` dissolves: at abstract `P` the only available program-state
+    relation is EQUALITY, so the source must replay the target's pstep
+    transitions in lockstep with retimed labels (`ts_oblivious`, the
+    existing mechanism) — and under lockstep the fabric stays EQUAL.
+    The G4/G5 reuse estimate was budgeting for a problem that does not
+    exist in this design.
+  * THE REAL PROBLEM: value divergence.  The only value the source
+    cannot match is a read of the STRIPPED foreign promise (everything
+    else exists in both logs with equal values, only timestamps
+    differing).  PARM survives divergence by per-register view
+    quarantine; our quarantine has FOUR GAPS, each a place where a
+    divergent (above-boundary) value can influence a below-boundary
+    fulfil without any view crossing the boundary first:
+    (G-0) **D-8** — loads carry `asrc = []`, so a load at a TAINTED
+    (divergent) address returns a low-timestamp value with a LOW view:
+    untainted-looking divergent data, which a later ≤-B fulfil can
+    consume as data.  PARM's essential `vcap ⊔= view(addr)` at
+    `Local.read` is exactly what D-8 dropped.  Fixing it = giving loads
+    their address operands = rule 9's load half returns to sRVWMO (the
+    residue table's own "IF D-8 IS EVER DROPPED" note) + a T1
+    completeness repair.
+    (G-i) **effect (i) is not enforced** — `fulfil_vpre` does not see
+    `w_tbank`, so a store can fulfil ≤ B even though its OWN
+    translation's walk read was > B (the privileged-spec-asserted
+    same-instruction ordering).  Fix: join the bank into fulfil EXT;
+    cost: W2b condition 3 finally bites (litmus `LInstr` repairs).
+    (G-ii) the walker's FAULT path: a divergent walk read that faults
+    emits no further access node, the bank dies at the boundary reset,
+    and the taint vanishes.  Fix: `LCtrl`/trap-redirect consumes the
+    bank.
+    (G-iii) a divergent FETCH (fetching a fresh foreign write) decodes a
+    DIFFERENT INSTRUCTION with no view mark anywhere.  Fix: the fetch
+    read is a control dependency (its view enters `w_vcap`).
+  * WORSE, AT LAYER-1 GENERALITY: even with all four closed, an abstract
+    `pstep` may consume a read VALUE invisibly (no `LRegW`, empty
+    `vsrc`) and leak it into a later ≤-B fulfil's data.  D8-2 therefore
+    needs a NEW `ts_oblivious`-genre instance-obligation family
+    ("value-dependence of pstep is guarded by emitted deps") — a
+    relational condition on `P`, dischargeable by the instance but
+    HEAVY to state.
+  * ROUTE-B COMPARISON: the exchange-lemma route stays in the
+    recorded-trace-permutation regime (values recorded and unchanged;
+    `ts_oblivious` suffices — the banked tower's own trick) and needs
+    NONE of the quarantine work.  The fallback trigger's letter
+    (`sim_dev` overrun) did not fire, but its spirit arguably has.
+  * NEXT ACTIONS, in order: (1) machine-checked PROBES of the four gaps
+    (variant-B-style: exhibit machine runs where the restriction fails
+    without each fix — especially G-0's tainted-address-low-view read
+    and G-i's same-instruction walk→fulfil shape) and a check of what
+    the EVENT INSTANCE actually emits (its `vsrc`/`LRegW` coverage may
+    close the Layer-1 leak for the instance-relativized statement);
+    (2) re-price route A (= G-0+G-i+G-ii+G-iii + sRVWMO rule-9 + T1
+    repair + the sim) against route B (exchange induction on the banked
+    tower); (3) surface the A/B decision before building either.
 - **D-ii REALIZATION SITE PICKED (2026-08-20, design pass; build queued
   behind D-i).**  The discriminator lives in `WPExStore`'s `fulfil_ok_d`
   view argument: when the written `data` is the A/D update of the values
