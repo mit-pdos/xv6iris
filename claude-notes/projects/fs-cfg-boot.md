@@ -524,8 +524,33 @@ Measured facts that supersede this file's earlier estimates:
   files importing IcacheInv (qualify `DinodeEnc.islot`); `rewrite … by`
   inside a `[ … | … ]` bracket does not parse under ssreflect —
   parenthesize or hoist.
-- **NEXT (in order):** (d2) staging steps 3+4 = the L3/L4 sweeps (debt B) +
-  `fileGpreS` +
+- **(d2a) DONE, commit `1245f258`** — `FsCfgBoot.fs_cfg_alloc` (Closed
+  under the global context; two image hypotheses: `fsimg_wf` +
+  `fs_region_wf` — the L3/L4 sweeps run the FULL `16·nib` region, NOT
+  fsimg_wf conjuncts, since `fsimg_wf` has no `nib` and `fs_region_free`
+  cannot supply L3's tail without circularity; leaf cost +13.3 s, total
+  ~256 s), the kits `fs_kit_icache` (15 ghost rows) and
+  `fs_kit_fsinit_ghost` (9 rows), `fileGpreS` + `fileG_of` (additive in
+  FileInvDefs; `file_preG` deliberately NOT an instance field), and
+  `image_ireg_premises` (all five ∀-over-decodings clauses in
+  `ireg_alloc`'s order). `ipool_alloc_of_image` gained a carve-set
+  parameter `C` (the inode region's own `fsblock` halves go to
+  `ireg_alloc`, so the pool cannot take all of cov). `fs_cfg_alloc` takes
+  NO `fileGpreS` (nothing it mints is in `fileUR`) — `fileG_of` applies
+  at (d2b)'s wiring site. THE KIT HEADERS are the (d2b)/(e) contract:
+  physical rows P1–P4 (icache_boot_at's cells from boot_bss_carve +
+  iinit's post; bio_init_at's from binit's post; the newlock cells +
+  resources incl. `disk_res_boot` at ProofMain.v:1346; `iref_slots_auth`
+  from `IrefSlots.iref_slots_alloc` inside boot_shared_alloc) and rows
+  A–C (the fsinit/initlog raw cells; `log_mirror_full` comes from
+  power_boot_res via BootShared.v:874/1020 — the era fupd must NOT mint
+  it; `iref_slot` + `bslots` cross main via bio_init_at's post). NEW
+  DEBTS: (D) `bitmap_res` needs a byte-level FsImg sweep with
+  `used := u ∪ metadata` (W5 checks bits below size only; the bitmap
+  block is deliberately left in the coverage remainder for that
+  producer); (E) `ProofKinit` must switch from minting `kalloc_avail` at
+  WP time to consuming `fsc_kpages` (stage-(e) item).
+- **NEXT (in order):** (d2b) staging step 3-wiring + 4 =
   `FsCfgBoot.fs_cfg_alloc` + the two kits + wiring into `boot_shared_alloc`
   + the adequacy restatement (delete `adequacy_icfg`/`adequacy_fscfg`, move
   the fs corollary to the new leaf per ruling 3); then (e) staging step 5
