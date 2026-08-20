@@ -85,7 +85,8 @@ SAIL_RISCV_REV ?= c32fbf4111b849061db1812355d6da9df8c2e396
 # on top of it.
 XV6_REV ?= 4398009f09b7142feb9ec72ce08e37e83973168a
 
-KDUMP_SRCS := $(KDUMP)/KernelInstrs.v $(KDUMP)/KernelData.v $(KDUMP)/KernelSyms.v
+KDUMP_SRCS := $(KDUMP)/KernelInstrs.v $(KDUMP)/KernelData.v $(KDUMP)/KernelSyms.v \
+              $(KDUMP)/KernelElfRaw.v
 
 # User-space programs to dump into user-rocq/, as <xv6 program>:<Rocq module
 # prefix> pairs (the ELF is $(USER_DIR)/_<program>).  Adding one here also needs
@@ -150,6 +151,8 @@ $(KDUMP)/KernelData.v:   $(KERNEL_ELF) $(DUMPER)
 	$(PYTHON) $(DUMPER) --format rocq-data --elf $< --objdump $(OBJDUMP) --out $@
 $(KDUMP)/KernelSyms.v:   $(KERNEL_ELF) $(DUMPER)
 	$(PYTHON) $(DUMPER) --format rocq-syms --elf $< --objdump $(OBJDUMP) --out $@
+$(KDUMP)/KernelElfRaw.v: $(KERNEL_ELF) $(DUMPER)
+	$(PYTHON) $(DUMPER) --format rocq-raw  --elf $< --objdump $(OBJDUMP) --out $@
 $(KDUMP)/CoqMakefile: $(KDUMP)/_CoqProject
 	cd $(KDUMP) && $(RUN) coq_makefile -f _CoqProject -o CoqMakefile
 kernel-rocq: $(KDUMP_SRCS) $(KDUMP)/CoqMakefile

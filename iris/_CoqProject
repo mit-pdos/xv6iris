@@ -620,6 +620,9 @@ BlockWords.v
 DinodeEnc.v
 DirentEnc.v
 ElfEnc.v
+PStringBytes.v
+ElfFile.v
+ElfKernel.v
 PathElems.v
 CodeWriteHead.v
 CodeInstallTrans.v

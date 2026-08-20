@@ -2,3 +2,4 @@
 KernelInstrs.v
 KernelData.v
 KernelSyms.v
+KernelElfRaw.v

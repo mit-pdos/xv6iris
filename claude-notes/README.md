@@ -70,6 +70,11 @@ in `durable-notes.md` for what belongs where and what gets deleted.
 - **[`tlb-translation.md`](design/tlb-translation.md)** — the kvmmake-faithful
   all-4KB kernel page table, TLB/page-walk/translation, userret/trampoline/user
   page table, the `CommonWalk.v` walk technique.
+- **[`elf.md`](design/elf.md)** — ELF file semantics: the file-side
+  `ElfFile.v` layer vs `ElfEnc.v`'s code-side readers, the PrimString import
+  vehicle for whole binaries, the kernel-dump consistency theorem
+  (`ElfKernel.v`), the measured vm_compute rules (`List.rev` is quadratic),
+  and the exec() connection plan.
 - **[`kernel-proofs.md`](design/kernel-proofs.md)** — kernel-side proof
   architecture: swtch/contexts, proc locks/wakeup, loop shapes, whole-function
   WP specs, spinlocks, kernel data-structure layout.

@@ -48,6 +48,26 @@ in theorem statements/proofs to name addresses instead of hard-coding them.
 Verified: `sym "main" = 0x80000e82`, `sym "scheduler" = 0x80001d78`,
 `sym "kinit" = 0x80000aec`, `sym "absent" = 0`.
 
+### `KernelElfRaw.v` — the whole debug-stripped ELF (`--format rocq-raw`)
+```coq
+Definition kernel_elf_hex : PrimString.string := List.fold_left PrimString.cat [ kernel_elf_hex_chunk0; ... ] ""%pstring.
+Definition kernel_elf_size : Z := 55024%Z.
+```
+The ELF file itself (not code/data split by this dumper's own instruction/section
+reasoning, as the three files above are), debug-STRIPPED via `objcopy
+--strip-debug` and hex-encoded as one Rocq 9 primitive string (`PrimString.string`:
+compact literal, O(1) `PrimString.get`, native in `vm_compute`). Stripped because
+DWARF embeds the absolute build directory, so the full file is not byte-identical
+across clones; the stripped image IS byte-identical and still preserves the
+program headers, all allocated sections and loadable bytes, and the symtab. 55024
+bytes -> 110048 lowercase hex chars, chunked at 8192 hex chars/chunk (14 chunks)
+and joined with `List.fold_left PrimString.cat`, same reason `KernelInstrs.v`
+chunks its list. This is the ONLY file here that is `PrimString`-specific / not
+already split by the dumper; `iris/ElfKernel.v` (in `iris/`, alongside the general
+ELF64 semantics in `iris/ElfFile.v`) converts it to `list (bv 8)` and proves, by
+`vm_compute`, that `KernelInstrs.v`'s and `KernelData.v`'s dumps are exactly what
+this raw ELF file defines.
+
 ## The full initial memory (code + data + BSS)
 
 - **Loaded bytes** = `kernel_instrs` (code) ∪ `kernel_data` (data) — together the
