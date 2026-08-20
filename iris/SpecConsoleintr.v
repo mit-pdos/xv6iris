@@ -66,11 +66,11 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Operators_mwords Sai
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvPtsto RiscvLang.
 Require Import RegFile.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Import InstrBytes KernelText.
-Require Import WpLock.
+Require Import LockRank.
 Require Import CalleeSaved.
 Require Import IntrDefs.
 Require Import WpNext.

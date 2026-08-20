@@ -18,7 +18,7 @@ Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExtras.
 Require Import RegFile.
 Require Import HartTp WpNext.
 Require Import WpGpr WpMmodeLeafBase.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import StackOwn.
 Require Import IntrDefs.
 Require Import VcGen.

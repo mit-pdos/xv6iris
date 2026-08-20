@@ -20,7 +20,8 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvFetchExec RiscvExtras.
 Require Import MinstretInv WireInv UserBits AlignBits.
 Require Import TrampPt KptTree UptTree.
-Require Import SmodeCore WpIntrCore.
+Require Import WpIntrCore.
+Require Import RiscvExtras.
 Require Import HartSwp HartLift HartSpan HartMCycle HartStepFull HartRunFull.
 Require Import HartMemRun PtreeType PtTree PtBytes UserBytes InstrBytes.
 Require Import UserFrame UserClassifyAsm.

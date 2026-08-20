@@ -24,7 +24,7 @@ Require Import RiscvLang RiscvPtsto.
 Require Import RegFile WpNext.
 Require Import InstrBytes WpMmodeLeafBase.
 Require Import RiscvExtras.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import CalleeSaved.
 Require Import KernelText.
 Require Import IntrDefs.

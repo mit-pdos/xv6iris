@@ -25,7 +25,8 @@ Require Import DevModel RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtra
 Require Import WpGpr InstrBytes WpMmodeLeafBase HartTp WpNext.
 Require Import RegFile.
 Require Import KptPt KMap.
-Require Import SmodeCore.
+Require Import KptPt.
+Require Import RiscvExtras.
 Require Import SRegime.
 Require Import HartLift HartSpan HartSwp HartSMem.
 Require Import WpSmodePtEngine.

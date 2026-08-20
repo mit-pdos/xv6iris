@@ -68,7 +68,7 @@ Require Import RegFile.
 Require Import HartTp.
 Require Import WpNext.
 Require Import WpMmodeLeafBase.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import StackOwn.
 Require Import StackBytes.
 Require Import CalleeSaved.
@@ -81,7 +81,7 @@ Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import LockRank.
 Require Import CpuOwn.
-Require Import WpLock.
+Require Import LockRank.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -94,7 +94,7 @@ Require Import FsBlocks LogInv.
 Require Import BitmapInv.
 Require Import ByteBuf.
 Require Import InodeInv.
-Require Import InodeRegion.
+Require Import IcacheRef.
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.

@@ -49,7 +49,8 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras.
 Require Import MinstretInv InstrBytes.
 Require Import KptExecMap.
-Require Import SmodeCore SmodeCorePt.
+Require Import SmodeCorePt.
+Require Import RiscvExtras.
 Require Import KptShare.
 Require Import UserBits SRegime KptGoodb.
 Require Import HartSwp HartLift HartSpan HartSFrame.

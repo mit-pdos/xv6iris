@@ -100,7 +100,7 @@ Require Import RegFile.
 Require Import HartTp.
 Require Import WpNext.
 Require Import WpMmodeLeafBase.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import InstrBytes.
@@ -114,7 +114,7 @@ Require Import WpLock.
 Require Import FdSlots.
 Require Export SwtchCtx.
 Require Import WpUart.
-Require Import InodeRegion.
+Require Import IcacheRef.
 Require Import IcacheEscrow.
 Require Import ElfEnc.
 Require Import PageGeom.

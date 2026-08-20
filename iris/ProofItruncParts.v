@@ -471,7 +471,7 @@ Qed.
 (* ===================================================================== *)
 
 Require Import WpMmodeLeafBase.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import StackOwn.
 Require Import BufOwn.
 Require Import FdSlots.

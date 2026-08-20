@@ -30,7 +30,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
 Require Import ExecCommon.
 Require Import WpGprMret.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 (* sret_ms1..5 / sret_newpriv / ret_pc -- the post-execute CSR tower this
    WP produces -- live with their bit theory in MstatusBits.v. *)

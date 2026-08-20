@@ -100,7 +100,10 @@ Require Import HartSwp HartLift HartSpan HartSpanChar HartRegNode
         HartMCycle HartStepAny HartRunGen HartSFrame HartSTrans HartMFrame
         HartGoodb WpDecodeBridge WpDecode DecodeTotalU CommonWalk ExecCommon
         WpGprMret.
-Require Import SmodeCore WpSFrames KptShare KptPt SRegime StackOwn.
+Require Import WpSFrames KptShare KptPt SRegime StackOwn.
+Require Import KptPt.
+Require Import RiscvExtras.
+Require Import SmodePte.
 Require Import MstatusBits WpIntrCore.
 (* the S-mode per-node cycle body: [spt_run_hart_active_instr_S] and the
    regime's fetch-translation producer [spt_tr_obl_of_regime] *)

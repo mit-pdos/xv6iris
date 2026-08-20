@@ -61,7 +61,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec.
 Require Import RegFile HartTp WpNext WpGpr InstrBytes WpMmodeLeafBase WpMmodeShiftiop ExecCommon StackOwn.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import RiscvExtras.
 Require Import HartSwp WpMmodeSwpBase.
 Require Import IntrDefs WpSconfEngine.

@@ -53,7 +53,7 @@ Require Import RiscvExtras.
 Require Import RegFile.
 Require Import WpNext.
 Require Import WpMmodeLeafBase.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import StackOwn.
 Require Import StackBytes.
 Require Import CalleeSaved.

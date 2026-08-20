@@ -67,7 +67,8 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
 Require Import RegFile.
 Require Import InstrBytes.
-Require Import SmodeCore WpMmodeLeafBase.
+Require Import WpMmodeLeafBase.
+Require Import RiscvExtras.
 Require Import MstatusBits.
 (* [exec_execute_SRET_menv] -- the SRET reduction with the get_xLPE premise
    pinned by the menvcfg VALUE, which is what [sconf] gives us. *)

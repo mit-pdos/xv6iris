@@ -16,7 +16,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import DevModel.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import WpGpr.
 Require Import WpMmodeLeafBase.
 Require Import WpUart WpSmodeUart.

@@ -90,7 +90,7 @@ Require Import InstrBytes.
 Require Import HartTp WpNext.
 Require Import WpMmodeLeafBase.
 Require Import MinstretInv.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import KernelRvcDecode.

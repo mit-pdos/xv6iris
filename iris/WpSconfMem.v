@@ -46,7 +46,7 @@ Require Import MinstretInv.
 Require Import UserBits.
 Require Import InstrBytes WpMmodeLeafBase.
 Require Import RegFile HartTp WpNext.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import SmodeCorePt.
 Require Import HartLift HartSpan HartSwp HartSMem.
 Require Import WpSmodePtEngine.

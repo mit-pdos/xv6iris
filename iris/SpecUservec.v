@@ -90,7 +90,7 @@ Require Import RegFile WpNext.
 Require Import MinstretInv InstrBytes.
 Require Import WpGpr.
 Require Import KernelText.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import TrampPt UptTree KptShare UserretDefs.
 Require Import UserPtTree UserExec.
 Require Import IntrDefs.

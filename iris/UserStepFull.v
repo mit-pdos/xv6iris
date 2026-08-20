@@ -53,7 +53,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvFetchExec.
 Require Import MinstretInv WireInv.
-Require Import SmodeCore.
+Require Import SmodePte.
 Require Import HartSwp HartLift HartSpan HartMCycle HartStepFull.
 Require Import UserFrame UserClassifyAsm.
 Require Import PtreeType PtTree SmodePte UserPtTree UserExec.

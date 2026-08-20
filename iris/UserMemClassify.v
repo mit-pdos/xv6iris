@@ -34,7 +34,8 @@ Require Import MemAccessGen.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
 Require Import UserBits.
-Require Import SmodeCore.
+Require Import Pt4kWalk.
+Require Import RiscvExtras.
 Require Import UptTree UserPtTree.
 Require Import UserExecFacts.
 Require Import UserMemAccess UserMemMis.

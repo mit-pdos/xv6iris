@@ -43,7 +43,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvFetchExec.   (* MIE_S: the pinned cause set *)
 Require Import RegFile.
 Require Import WpMmodeLeafBase.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import VcGen VcGenS.
 Require Import IntrDefs HartTp.
 Require Import WpSmodePtCtl.

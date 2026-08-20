@@ -47,7 +47,7 @@ Require Import InstrBytes.
 Require Import RegFile.
 Require Import WpMmodeLeafBase.
 Require Import VcGen.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.

@@ -81,13 +81,13 @@ Require Import RiscvLang RiscvPtsto.
 Require Import RiscvExtras.
 Require Import RegFile HartTp WpNext.
 Require Import WpMmodeLeafBase.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import KernelRvcDecode.
 Require Import VcGen.
 Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import KernelDataInv.
-Require Import WpLock.
+Require Import LockRank.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import WpSmodeIntr.
 Require Import IntrDefs.

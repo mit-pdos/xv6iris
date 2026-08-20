@@ -34,12 +34,12 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import RegFile.
 Require Import WpMmodeLeafBase.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import HartTp WpNext IntrDefs.
 Require Import StackOwn CalleeSaved.
 Require Import WpSmodeIntr.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfLock.
-Require Import WpLock.
+Require Import LockSet.
 Require Import SpecMycpu.
 Require Import CodeHolding WpHoldingInv.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

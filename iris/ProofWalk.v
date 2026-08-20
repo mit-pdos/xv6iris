@@ -16,7 +16,8 @@ Require Import KernelText.
 Require Import RegFile.
 Require Import WpNext.
 Require Import WpMmodeLeafBase.
-Require Import SmodeCore.
+Require Import KptPt.
+Require Import RiscvExtras.
 Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import KallocInv.

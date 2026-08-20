@@ -42,8 +42,14 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras.
 Require Import MinstretInv InstrBytes.
-Require Import SmodeCore SmodePte.
-Require Import PtreeType PtTree PtBytes KptTree TrampPt.
+Require Import SmodePte.
+Require Import KptPt.
+Require Import Pt4kWalk.
+Require Import RiscvExtras.
+Require Import SmodePte.
+Require Import PtreeType PtTree PtBytes KptTree.
+Require Import KptExecMap.
+Require Import Pt4kWalk.
 Require Import CommonWalk Pt4kWalk KptPt PtAdBits PtTreeAdue SRegime.
 Require Import KptGhost KptShare KptGoodb KptExecMap.
 Require Import UserBytes UserFetchCert PtWalkCert UserClassifyAsm.

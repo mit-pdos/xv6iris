@@ -14,7 +14,7 @@ Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import InstrBytes WpMmodeLeafBase.
 Require Import RegFile.
 From Stdlib Require Import FunctionalExtensionality.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import HartTp WpNext.
 Require Import StackOwn CalleeSaved KernelText.
 Require Import IntrDefs WpSmodeIntr.

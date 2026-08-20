@@ -51,7 +51,7 @@ Require Import RiscvLang RiscvPtsto RiscvFetchExec.
 Require Import RegFile WpNext.
 Require Import MinstretInv WireInv.
 Require Import KernelText MstatusBits.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import KptShare.
 Require Import KptExecMap.
 Require Import UserPtTree UserExec UserKernelBridge.

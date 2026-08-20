@@ -49,7 +49,9 @@ Require Import SmodePte.
 Require Import CommonWalk PtAdBits Pt4kWalk PtreeType PtTree PtTreeAdue PtBuild.
 Require Import UserTranslate UptTree UserPtTree UserBits UserMem UserFetch.
 Require Import UserBytes PtWalkCert UserFetchPt.
-Require Import SmodeCore.
+Require Import Pt4kWalk.
+Require Import RiscvExtras.
+Require Import SmodePte.
 Require Import UserFrame UserExec UserClassifyAsm.
 Require Import UserFetchCert.
 (* [goodb_bind_forall] / [goodb_and_boolM] / [goodb_or_boolM] /

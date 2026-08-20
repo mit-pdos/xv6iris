@@ -65,7 +65,7 @@ Require Import KernelText.
 Require Import KernelRvcDecode.
 Require Import RegFile HartTp WpNext.
 Require Import WpMmodeLeafBase.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import VcGen.
@@ -88,7 +88,7 @@ Require Import BlockWords.
 Require Import BitmapInv.
 Require Import DinodeSlot.
 Require Import InodeInv.
-Require Import InodeRegion.
+Require Import IcacheRef.
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheEscrow.

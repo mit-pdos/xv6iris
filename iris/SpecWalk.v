@@ -15,10 +15,10 @@ Require Import RiscvExtras.
 Require Import InstrBytes.
 Require Import KernelText.
 Require Import RegFile HartTp WpNext.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import CalleeSaved.
 Require Import KallocInv.
-Require Import WpLock.
+Require Import LockRank.
 Require Import PtTree.
 Require Import PtBuild KvmSpec.
 Require Import IntrDefs.

@@ -40,7 +40,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes KernelText.
 Require Import RegFile HartTp.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import IntrDefs CpuOwn.
 Require Import SwtchCtx.
 From Kernel Require KernelSyms.

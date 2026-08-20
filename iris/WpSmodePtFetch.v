@@ -33,7 +33,8 @@ Require Import HartLift HartSpan HartSwp HartSFrame WpDecodeBridge.
 Require Import WpSmodePtEngine.
 Require Import Ktier CommonWalk.
 Require Import HartMCycle WpSFrames.
-Require Import SmodeCore SRegime SmodeCorePt.
+Require Import SRegime SmodeCorePt.
+Require Import KptPt.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.

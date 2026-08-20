@@ -25,7 +25,7 @@ Require Import RiscvLang RiscvPtsto.
 Require Import RiscvExtras.
 Require Import RegFile HartTp WpNext.
 Require Import WpMmodeLeafBase.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import VcGen.
@@ -42,7 +42,7 @@ Require Import BioDefs.
 Require Import FsBlocks LogInv.
 Require Import DinodeEnc.
 Require Import InodeInv.
-Require Import InodeRegion.
+Require Import IcacheRef.
 Require Import IrefSlots.
 Require Import IcacheEscrow.
 Require Import CodeIunlockput.

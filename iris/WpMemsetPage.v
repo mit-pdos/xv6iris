@@ -20,7 +20,8 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import WpGpr.
 Require Import WpMmodeLeafBase.
-Require Import SmodeCore WpMemsetS.
+Require Import WpMemsetS.
+Require Import RiscvExtras.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)

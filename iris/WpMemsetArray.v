@@ -22,7 +22,8 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExtras ByteCursor.
 Require Import RegFile WpNext.
 Require Import WpMmodeLeafBase.
-Require Import SmodeCore WpMemsetS.
+Require Import WpMemsetS.
+Require Import RiscvExtras.
 Require Import CodeMemset WpMemsetPage.
 Require Import CalleeSaved.
 Require Import StackOwn.

@@ -38,7 +38,7 @@ Require Import RiscvExtras.
 Require Import RegFile.
 Require Import InstrBytes.
 Require Import WpMmodeLeafBase.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import KernelDataInv.

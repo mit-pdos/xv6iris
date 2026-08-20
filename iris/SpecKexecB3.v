@@ -33,7 +33,7 @@ Require Import RiscvExtras.
 Require Import RegFile.
 Require Import WpNext.
 Require Import WpMmodeLeafBase.
-Require Import SmodeCore.
+Require Import RiscvExtras.
 Require Import CalleeSaved.
 Require Import InstrBytes.
 Require Import KernelText.
@@ -42,7 +42,7 @@ Require Import CpuOwn.
 Require Import FdSlots.
 Require Export SwtchCtx.
 Require Import WpUart.
-Require Import InodeRegion.
+Require Import IcacheRef.
 Require Import IcacheEscrow.
 Require Import ProcGeom.
 Require Import ProcInv.
