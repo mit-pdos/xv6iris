@@ -85,8 +85,6 @@ Require Import RegFile WpNext.
 Require Import SmodeCore.
 Require Import CalleeSaved.
 Require Import IntrDefs.
-Require Import DiskPtsto.
-Require Import FsBlocks.
 Require Import DinodeEnc.
 Require Import InodeInv.
 From Kernel Require KernelSyms.

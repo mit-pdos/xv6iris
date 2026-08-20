@@ -106,7 +106,6 @@ Require Import RiscvLang RiscvPtsto.
 Require Import RegFile.
 Require Import InstrBytes WireInv.
 Require Import KernelText.
-Require Import SmodeCore.
 Require Import KptExecMap.
 Require Import UserPtTree UserExec.
 Require Import IntrDefs.
@@ -115,9 +114,7 @@ Require Import CpuOwn.
 Require Import ProcGeom.
 Require Import FdSlots FileInvDefs.
 Require Import ProcInv ProcPtOwn.
-Require Import DiskPtsto WpUart FsBlocks LogInv FsCrash KallocInv.
-Require Import BioDefs.
-Require Import IrefSlots InodeRegion ProcAvail.
+Require Import IrefSlots ProcAvail.
 Require Import SpecPrepareReturn.
 Require Import SpecKexec.
 Require Import SpecUsertrap.

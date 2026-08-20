@@ -62,7 +62,6 @@ Require Import RegFile WpNext.
 Require Import CalleeSaved.
 Require Import IntrDefs.
 Require Import CpuOwn.
-Require Import KallocInv.
 Require Import KvmSpec.
 Require Import UserPtTree.
 Require Import KptExecMap TrampPt.

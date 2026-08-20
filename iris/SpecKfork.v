@@ -157,12 +157,10 @@ Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
 Require Import CpuOwn.
-Require Import KallocInv.
 Require Import FdSlots FileInv.
 Require Import ProcInv.
 Require Import SchedCtx.
 Require Import KvmSpec.
-Require Import DiskPtsto.
 Require Import FsBlocks.
 Require Import InodeRegion.
 Require Import IrefSlots.

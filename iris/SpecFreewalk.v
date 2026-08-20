@@ -61,7 +61,6 @@ Require Import RegFile WpNext.
 Require Import CalleeSaved.
 Require Import IntrDefs.
 Require Import CpuOwn.
-Require Import KallocInv.
 Require Import PtTree KvmSpec.
 Require Import PtFree.
 From Kernel Require KernelSyms.

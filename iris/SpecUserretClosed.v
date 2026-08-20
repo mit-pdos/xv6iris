@@ -51,16 +51,14 @@ Require Import RegFile.
 Require Import MinstretInv InstrBytes WireInv.
 Require Import WpGpr.
 Require Import KernelText MstatusBits.
-Require Import SmodeCore.
 Require Import PtTree.
 Require Import TrampPt UptTree KptShare UserretDefs.
 Require Import UserPtTree UserExec.
 Require Import IntrDefs.
 Require Import ProcGeom ProcPtOwn.
 Require Import IrefSlots.
-Require Import WpLock FdSlots FileInvDefs DiskPtsto WpUart.
-Require Import BioDefs.
-Require Import FsBlocks LogInv FsCrash KallocInv IrefSlots InodeRegion.
+Require Import FdSlots FileInvDefs.
+Require Import IrefSlots.
 Require Import ProcAvail.
 Require Import SpecUsertrap.
 From Kernel Require KernelSyms.

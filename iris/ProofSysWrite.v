@@ -70,15 +70,11 @@ Require Import ProcInv.
 Require Import FdSlots ProcInv.
 Require Import ProofKforkParts.
 Require Import FileInvDefs.
-Require Import KallocInv.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import WpUart.
-Require Import DiskPtsto.
-Require Import BioDefs.
-Require Import FsBlocks LogInv.
+Require Import LogInv.
 Require Import FsCrash.          (* [fsCrashG] -- filewrite's extra class *)
-Require Import InodeRegion.
 Require Import IrefSlots.
 (* [consolewrite_stack] -- the stack budget unfolds to it *)
 Require Import SpecArgfd SpecArgint SpecArgaddr SpecFilewrite.

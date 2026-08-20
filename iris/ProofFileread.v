@@ -77,10 +77,9 @@ Require Import CpuOwn.
 Require Import FdSlots FileOff.
 Require Import FileInvDefs.
 Require Import PipeInvDefs.
-Require Import KallocInv.
 Require Import ProcPtOwn.
 Require Import ProcInv.
-Require Import WpUart DiskPtsto FsBlocks LogInv.
+Require Import WpUart LogInv.
 Require Import BioDefs.
 Require Import ConsoleInv.
 Require Import DinodeEnc InodeInv InodeLock.

@@ -40,14 +40,12 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes WpMmodeLeafBase.
 Require Import RegFile.
-Require Import SmodeCore.
 Require Import StackOwn KernelText.
 Require Import WpLock.
 Require Import ProcGeom.
 Require Import IntrDefs.
 Require Import HartTp WpNext.
 Require Import CpuOwn FdSlots.
-Require Import WpUart.
 Require Import DiskPtsto DiskInv.
 Require Import SpecAcquire SpecRelease SpecSleepPrepare SpecSleep SpecFreeDesc.
 Require Import ProofVirtioDiskRwB.

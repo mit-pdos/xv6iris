@@ -109,7 +109,6 @@ Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl WpSmodeIntr.
 Require Import IntrDefs WpLock.
 Require Import HartTp WpNext.
 Require Import ProcGeom CpuOwn.
-Require Import KallocInv.
 Require Import KvmSpec.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
@@ -118,12 +117,9 @@ Require Import ProofKforkParts.
 Require Import KernelDataInv.
 Require Import SpecPanic.
 Require Import WpUart.
-Require Import DiskPtsto.
-Require Import BioDefs.
-Require Import FsBlocks LogInv.
-Require Import FsCrash.
+Require Import LogInv.
 Require Import SpecMyproc SpecArgaddr SpecPipealloc SpecFdalloc SpecFileclose SpecCopyout.
-Require Import IrefSlots InodeRegion.
+Require Import IrefSlots.
 Require Import SpecSysPipe.
 Require Import CodeSysPipe.
 From Kernel Require KernelInstrs.

@@ -61,7 +61,7 @@ Require Import KptGhost.   (* kptN: named in the mask premise *)
 Require Import KptShare.   (* tlb_res_pt: the SHARED table's per-hart residue *)
 Require Import SRegime.
 (* the swp-layer vocabulary the folded regime's own fields are stated in *)
-Require Import HartSwp HartLift HartSpan HartGoodb WpDecodeBridge CommonWalk.
+Require Import HartSwp HartLift HartSpan WpDecodeBridge CommonWalk.
 Require Import ProcGeom.   (* a_cpu_noff / a_cpu_int / a_cpu_proc: the enabled arm owns them *)
 (* EXPORTED: [cpu_locks] is named inside [cpu_hart]'s body, so every file that
    unfolds [cpu_hart] (push_off, sched, the scheduler, the sret/csr leaves)

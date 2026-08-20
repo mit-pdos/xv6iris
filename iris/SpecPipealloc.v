@@ -72,12 +72,7 @@ Require Import WpNext.
 Require Import SpecPanic.
 Require Import IntrDefs.
 Require Import CpuOwn.
-Require Import WpUart.
-Require Import DiskPtsto.
-Require Import BioDefs.
-Require Import FsBlocks LogInv.
-Require Import FsCrash.
-Require Import IrefSlots InodeRegion.
+Require Import IrefSlots.
 From Kernel Require KernelSyms.
 Require Import IrefSlots.
 Require Import ProcAvail.

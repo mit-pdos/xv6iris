@@ -14,7 +14,7 @@ From iris.bi.lib Require Import fractional.
 Local Open Scope Z_scope.
 Require Import WpGprCsrrCommon.
 Require Import WpMmodeCsrSwp.   (* swp_execute_CSRReg_csrr + the cr_* footprint *)
-Require Import HartSwp HartSpan HartSpanChar HartGoodb WpDecodeBridge.
+Require Import HartSwp HartSpan HartSpanChar WpDecodeBridge.
 
 (* [read_CSR csr_csrr] IS the mhartid read -- the whole 4096-way dispatch
    collapses by conversion at a literal CSR number, which is why

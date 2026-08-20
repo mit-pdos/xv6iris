@@ -105,7 +105,6 @@ Require Import WpLock.
 Require Import FdSlots.
 Require Export SwtchCtx.
 Require Import WpUart.
-Require Import FsCrash.
 Require Import InodeRegion.
 Require Import IcacheEscrow.
 Require Import W32Arith.
@@ -119,7 +118,6 @@ Require Import BitmapInv.
 Require Import InodeInv.
 Require Import IrefSlots.
 Require Import IcacheRef.
-Require Import KallocInv.
 Require Import FileInvDefs.
 Require Import DinodeEnc.
 Require Import ProcInv.

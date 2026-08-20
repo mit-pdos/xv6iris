@@ -105,8 +105,8 @@ Require Import KptShare.   (* tlb_res_pt: the shared-table residue *)
 Require Import KptGoodb.  (* the fetch probes' footprint certificates *)
 Require Import SRegime.
 Require Import HartSwp HartLift HartSpan HartSpanChar HartSFrame.
-Require Import HartEvents HartRegNode HartMCycle HartStepAny HartRunGen.
-Require Import HartMFetch HartSTrans PtTreeAdue.
+Require Import HartEvents HartMCycle HartStepAny HartRunGen.
+Require Import HartMFetch PtTreeAdue.
 Require Import WpDecodeBridge WpIntrCore CommonWalk HartGoodb.
 Require Import WpInstrRun WpSFrames.
 Require Import SmodePte RiscvExtras.

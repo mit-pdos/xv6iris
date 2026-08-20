@@ -42,11 +42,9 @@ Require Import InstrBytes.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import SleepLock.
-Require Import WpLock.
 Require Import FdSlots.
 Require Export SwtchCtx.
 Require Import WpUart.
-Require Import FsCrash.
 Require Import InodeRegion.
 Require Import IcacheEscrow.
 Require Import ByteBuf.
@@ -56,7 +54,6 @@ Require Import ElfEnc.
 Require Import PageGeom.
 Require Import ProcGeom.
 Require Import ProcInv.
-Require Import DiskPtsto.
 Require Import BioDefs.
 Require Import FsBlocks LogInv.
 Require Import BitmapInv.

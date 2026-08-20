@@ -81,7 +81,6 @@ Require Import IntrDefs.
 Require Import KernelDataInv.
 Require Import PrintkArgs.
 Require Import WpUart.
-Require Import DiskPtsto.
 Require Import WpLock.
 Require Import SpecPanic.
 Require Import CpuOwn.

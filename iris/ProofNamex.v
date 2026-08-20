@@ -144,13 +144,12 @@ Require Import IgetLic.
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheEscrow.
-Require Import KallocInv.
 Require Import FileInvDefs.
 Require Import IcacheRef.
 Require Import IrefSlots.
 Require Import SpecMyproc SpecIdup SpecIget SpecMemmove.
 Require Import SpecIlock SpecIunlock SpecIunlockput SpecIput.
-Require Import SpecDirlookup SpecDirlink.
+Require Import SpecDirlookup.
 Require Import CodeNamex.
 Require Import SpecNamex.
 Require Import ProofDirlookupParts ProofNamexParts.

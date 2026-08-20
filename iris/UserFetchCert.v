@@ -43,8 +43,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
-Require Import WpDecodeBridge HartGoodb HartMemRun HartMemAsm PtBytes.
-Require Import MemAccessGen WpLoad WpMmodeLeafBase SmodePte.
+Require Import WpDecodeBridge HartMemRun HartMemAsm PtBytes.
 Require Import CommonWalk PtAdBits Pt4kWalk PtreeType KptPt PtTree PtTreeAdue KptTree.
 Require Import ExecCommon UserTranslate UptTree UserPtTree UserBits UserMem UserFetch.
 Require Import UserBytes PtWalkCert.
@@ -53,7 +52,7 @@ Require Import UserBytes PtWalkCert.
 Require Import SmodeCore.
 (* the tier's PURE pair convention: [u_state], [u_exec_pins], [Du_r]/[Du_w].
    [UserClassifyAsm] is Iris-free; nothing below is an [iProp]. *)
-Require Import UserFrame UserExec UserClassify UserClassifyAsm.
+Require Import UserFrame UserExec UserClassifyAsm.
 Local Open Scope Z_scope.
 Import Defs.
 

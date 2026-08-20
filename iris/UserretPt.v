@@ -22,18 +22,16 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
 Require Import MinstretInv InstrBytes.
-Require Import WpLoad ExecCommon WpGpr WpMmodeLeafBase WpMmodeSwpBase.
-Require Import SmodePte Pt4kWalk TrampPt.
-Require Import SmodeCorePt WpSmodeGpr UptTree.
-Require Import SRegime WpSmodePtLeaves WpSmodePtFetch.
-Require Import HartLift HartSpan HartSpanChar HartSwp HartSFrame HartSMem.
+Require Import ExecCommon WpGpr WpMmodeLeafBase.
+Require Import Pt4kWalk TrampPt.
+Require Import UptTree.
+Require Import HartLift HartSpan HartSpanChar HartSwp HartSMem.
 Require Import WpSmodePtEngine KptGoodb HartGoodb WpDecodeBridge HartRegNode.
-Require Import TrampStepPt UptWalkPt.
+Require Import UptWalkPt.
 Require Import UserretDefs MstatusBits WpDecode WpGprMret.
 Require Import RegFile.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 From Kernel Require KernelSyms.
-Require Import MemAccessGen.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.

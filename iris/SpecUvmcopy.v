@@ -86,7 +86,6 @@ Require Import RegFile HartTp WpNext.
 Require Import CalleeSaved.
 Require Import IntrDefs.
 Require Import CpuOwn.
-Require Import KallocInv.
 Require Import PtAdBits.
 Require Import PtBuild KvmSpec.
 Require Import UserPtTree.

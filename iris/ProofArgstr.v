@@ -53,7 +53,6 @@ Require Import VcGen.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import WpLock.
 Require Import UserPtTree.
-Require Import KallocInv.
 Require Import FdSlots ProcInv.
 Require Import FileInvDefs.
 Require Import ProofKforkParts.

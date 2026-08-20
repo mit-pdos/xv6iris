@@ -39,7 +39,7 @@ Require Import CommonWalk.
 (* the [swp] layer, for the footprinted twin of the front matter below *)
 Require Import HartSwp HartLift HartRegNode HartSpan HartSpanChar HartGoodb
         WpDecodeBridge.
-Require Import WpMmodeLeafBase HartMPmp HartMFetch HartMStore HartEvents.
+Require Import WpMmodeLeafBase HartMFetch HartMStore HartEvents.
 Require Import PtTree.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.

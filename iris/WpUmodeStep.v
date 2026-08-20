@@ -35,13 +35,13 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
-Require Import MinstretInv WireInv WpGpr RegFile InstrBytes.
-Require Import SmodeCore WpIntrCore ExecCommon.
+Require Import MinstretInv WpGpr RegFile InstrBytes.
+Require Import SmodeCore WpIntrCore.
 Require Import WpDecodeBridge DecodeTotalU.
 Require Import CommonWalk.
-Require Import PtreeType PtAdBits PtTree SmodePte KptPt KptTree.
+Require Import PtreeType PtAdBits PtTree KptTree.
 Require Import SRegime UptTree UptWalkPt.
-Require Import UserBits UserMem UserFetch UserPtTree UserTranslate.
+Require Import UserMem UserFetch UserPtTree UserTranslate.
 Require Import HartSwp HartLift HartSpan HartGoodb HartMemRun HartMCycle
         HartStepFull HartRunFull HartRunGen.
 Require Import PtBytes UserBytes UserFrame UserClassifyAsm.
@@ -50,7 +50,7 @@ Require Import UserExec UserStep UserTrap UserExecFacts.
 (* NOT [Import]ed: [UserTotalU.u_pins_tick] shadows [UserFrame.u_pins_tick],
    which is the one the frames bridge is stated over. *)
 Require UserTotalU.
-Require Import UserStepFull UserActiveClass.
+Require Import UserActiveClass.
 Require Import UmodeMem UmodeCap UmodeFetch.
 Require Import WpDecode.
 Local Open Scope Z_scope.

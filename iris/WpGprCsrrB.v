@@ -12,7 +12,6 @@ From iris.base_logic.lib Require Import invariants.
 From iris.bi.lib Require Import fractional.
 Local Open Scope Z_scope.
 Require Import WpGprCsrrCommon.
-Require Import WpGprCsrrA.
 Require Import HartSwp HartLift HartRegNode HartSpan HartSpanChar HartGoodb
         WpDecodeBridge.
 Require Import WpMmodeJump.     (* cw_Drw / cw_Dro *)

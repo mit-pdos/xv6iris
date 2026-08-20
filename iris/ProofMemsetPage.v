@@ -15,7 +15,6 @@ Require Import RiscvModelBytes.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
 Require Import RegFile WpNext.
-Require Import SmodeCore.
 Require Import WpMemsetPage.
 Require Import KallocInv.
 Require Import SpecMemset.

@@ -43,7 +43,7 @@ Require Import KernelRvcDecode.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import IntrDefs WpNext.
 Require Import WpLock CpuOwn.
-Require Import DiskPtsto WpUart.
+Require Import WpUart.
 Require Import UartTxInv.
 Require Import PrintkArgs.
 Require Import SpecPrintk.

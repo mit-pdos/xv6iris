@@ -25,11 +25,9 @@ From iris.base_logic.lib Require Import ghost_var invariants gen_heap.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
-Require Import InstrBytes ExecCommon WpGpr RegFile HartTp WpNext.
-Require Import SmodeCore.
-Require Import HartSwp HartMFrame WpMmodeSwpBase.
-Require Import IntrDefs WpSmodeIntr WpSconfEngine.
+Require Import RiscvLang RiscvPtsto RiscvExec.
+Require Import InstrBytes WpGpr RegFile HartTp WpNext.
+Require Import IntrDefs WpSconfEngine.
 Require Import IntrDefs.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.

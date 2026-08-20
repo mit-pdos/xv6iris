@@ -341,12 +341,10 @@ Require Import IcacheRef.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import SleepLock.
-Require Import KallocInv.
 Require Import KvmSpec.
 Require Import FileInvDefs.
 Require Import ProcInv.
 Require Import SpecDirlookup.
-Require Import SpecDirlink.
 (* [iput_units]: the post's [ok = true] floor is stated at iput's own
    constant, because what the floor exists for is the caller's
    [iunlockput] of the inode create hands back. *)

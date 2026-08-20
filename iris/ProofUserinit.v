@@ -86,29 +86,24 @@ Require Import KernelRvcDecode.
 Require Import VcGen.
 Require Import StackOwn.
 Require Import CalleeSaved.
-Require Import KernelText KernelDataInv.
+Require Import KernelDataInv.
 Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import LockRank.
-Require Import KallocInv KvmSpec.
+Require Import KallocInv.
 Require Import FdSlots.
 Require Import IrefSlots.
-Require Import DiskPtsto WpUart.
+Require Import WpUart.
 Require Import DirentEnc PathElems.
-Require Import InodeInv.
-Require Import IcacheRef.
 Require Import ProcGeom.
 Require Import ProcDefs.
-Require Import SwtchCtx.
 Require Import FileInvDefs.
 Require Import ProcInv.
 Require Import SchedCtx.
 Require Import ProcAvail.
-Require Import SpecPanic.
-Require Import SpecAllocpid.
 Require Import SpecAllocproc.
 Require Import SpecNameiRootBoot.
 Require Import SpecRelease.

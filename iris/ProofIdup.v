@@ -71,7 +71,6 @@ Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import WpAu4.
 Require Import IntrDefs.
 Require Import CpuOwn.
-Require Import DiskPtsto.
 Require Import FsBlocks.
 Require Import InodeRegion.
 Require Import IrefSlots.

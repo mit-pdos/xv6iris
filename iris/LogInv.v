@@ -35,7 +35,6 @@ Require Import RiscvModelBytes.
 Require Import RiscvLang.   (* [GenId]/[gen_id]: [log_ctx]'s swap receipt *)
 Require Import RiscvPtsto.
 Require Import WpLock.
-Require Import DiskPtsto.
 Require Import BioDefs.
 Require Import FsBlocks.
 Require Export LogDefs.

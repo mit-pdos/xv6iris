@@ -137,9 +137,7 @@ Require Import SpecAcquiresleep SpecReleasesleep.
 Require Import BcacheInv BioInv.
 Require Import BufOwn.
 Require Import ByteBuf.
-Require Import BlockWords.
 Require Import DiskInv.
-Require Import DirView DirLinks FsTree.
 Require Import LogDefs.
 Require Import KernelDataInv.
 Require Import RiscvModelBytes.

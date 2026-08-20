@@ -50,7 +50,6 @@ Require Import KernelText KernelDataInv.
 Require Import IntrDefs.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import WpLock.
-Require Import KallocInv.
 Require Import KptShare.
 Require Import CpuOwn SchedCtx FdSlots.
 Require Import FileInvDefs.

@@ -43,9 +43,9 @@ From stdpp Require Import gmap bitvector.definitions.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins
         SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras.
+Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec.
 Require Import RiscvTryStep ExecCommon.
-Require Import SmodePte PtAdBits Pt4kWalk PtTree KptPt KMap KptTree.
+Require Import PtAdBits Pt4kWalk PtTree KptPt KptTree.
 Require Import WpDecodeBridge.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.

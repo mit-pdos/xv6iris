@@ -31,7 +31,7 @@ Require Import RiscvLang RiscvPtsto RiscvFetchExec RegFile WpGpr.
 Require Import MinstretInv InstrBytes.
 Require Import WpInstr.   (* wp_instr / mm_cycle, split out of InstrBytes *)
 Require Import WpGprCsrwCommon WpGprCsrwA.
-Require Import RiscvExec RiscvExtras ExecCommon.
+Require Import RiscvExec.
 Require Import HartSwp HartLift HartRegNode HartSpan HartSpanChar HartMCycle
         HartMFrame HartGoodb WpDecodeBridge WpMmodeJump WpMmodeCsrSwp.
 Require Import WpGprCsrrCommon.   (* drive_csr_term *)

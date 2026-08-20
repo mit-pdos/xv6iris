@@ -49,7 +49,6 @@ Require Import CalleeSaved.
 Require Import VcGen.
 Require Import IntrDefs.
 Require Import CpuOwn.
-Require Import DiskPtsto.
 Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import WpAu4.

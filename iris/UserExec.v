@@ -69,7 +69,6 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
 Require Import InstrBytes WpGpr.
 Require Import RegFile.
 Require Import WpIntrCore.
-Require Import MinstretInv.
 Require Import UserFrame.
 Require Import UserPtTree.
 Local Open Scope Z_scope.

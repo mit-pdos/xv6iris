@@ -46,7 +46,7 @@ Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExec HartSwp HartLift HartRegNode
         HartSpan HartSpanChar HartRunGen HartEvents HartMCycle HartMDispatch
         HartMPmp HartMFetch.
-Require Import RiscvTryStep RiscvExtras RiscvFetchExec.
+Require Import RiscvFetchExec.
 Local Open Scope Z_scope.
 
 Local Notation zerobit :=

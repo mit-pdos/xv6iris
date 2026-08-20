@@ -108,7 +108,6 @@ Require Import SmodeCore.
 Require Import KernelText.
 Require Import TrampPt.
 Require Import IntrDefs.
-Require Import WpLock.
 Require Import CpuOwn.
 Require Import ProcGeom.
 Require Import FdSlots.

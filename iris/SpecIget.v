@@ -192,8 +192,6 @@ Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import KernelDataInv.
 Require Import SpecPanic.
-Require Import DiskPtsto.
-Require Import WpUart.
 Require Import FsBlocks.
 Require Import InodeRegion.
 Require Import IrefSlots.

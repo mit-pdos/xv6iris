@@ -38,7 +38,7 @@ Require Import RegFile InstrBytes WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import StackOwn CalleeSaved KernelText KernelDataInv.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSmodeIntr.
-Require Import IntrDefs WpLock.
+Require Import IntrDefs.
 Require Import HartTp WpNext.
 Require Import ProcGeom CpuOwn.
 Require Import TrampPt KptTree.

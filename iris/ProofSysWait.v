@@ -38,7 +38,6 @@ Require Import IntrDefs WpNext.
 Require Import CpuOwn.
 Require Import WpLock.
 Require Import ProcGeom.
-Require Import KallocInv.
 Require Import UserPtTree.
 Require Import FdSlots.
 Require Import FileInvDefs.

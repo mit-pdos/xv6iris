@@ -95,7 +95,6 @@ Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto RiscvExec HartSwp HartLift HartRegNode
         HartSpan HartSpanChar HartMemRun HartMCycle HartStepAny.
-Require Import RiscvTryStep RiscvExtras.
 Local Open Scope Z_scope.
 
 (* the two spine reducers, same whitelists [HartStepAny] uses *)

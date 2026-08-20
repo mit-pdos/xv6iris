@@ -299,7 +299,6 @@ Require Import BitmapInv.
 Require Import SpecBmap.
 Require Import KernelDataInv.
 Require Import SpecPrintk.
-Require Import KallocInv.
 Require Import UserPtTree.
 Require Import KvmSpec.
 Require Import ProcPtOwn.

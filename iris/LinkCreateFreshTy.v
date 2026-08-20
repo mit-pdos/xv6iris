@@ -75,16 +75,12 @@ Require Import RegFile HartTp WpNext.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import KernelText KernelDataInv.
-Require Import StackOwn StackBytes.
 Require Import CalleeSaved.
 Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
-Require Import WpSmodeHalf.
-Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import SchedCtx.
-Require Import ByteBuf.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Import SleepLock.
@@ -97,33 +93,18 @@ Require Import DinodeEnc.
 (* [trunc16_sext64]: an [sh] of a register an [lh] filled is the identity on
    the halfword -- the three metadata stores at +0xb4 / +0xb8 are exactly
    that, at the ABI's sign-extended [major] / [minor] arguments. *)
-Require Import DinodeSlot.
-Require Import DirentEnc.
-Require Import BvShift.
-Require Import PathElems.
-Require Import DirView.
-Require Import DirLinks.
 Require Import InodeInv.
 Require Import InodeLock.
 Require Import InodeRegion.
-Require Import IregLinkNz.
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
-Require Import FsTree.
 Require Import IcacheEscrow.
-Require Import KallocInv.
-Require Import KvmSpec.
 Require Import FileInvDefs.
 Require Import ProcInv.
 Require Import SpecPrintk.
-Require Import SpecPanic.
-Require Import SpecBmap SpecWritei.
-Require Import SpecIput SpecIalloc SpecIupdate.
-Require Import SpecIlock SpecIunlockput.
-Require Import SpecDirlookup SpecDirlink.
-Require Import SpecNamex SpecNameiparent.
-Require Import SpecCreate.
+Require Import SpecIalloc.
+Require Import SpecIlock.
 Require Import CodeCreate.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.

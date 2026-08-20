@@ -61,13 +61,7 @@ Require Import SpecPanic.
 Require Import ProcGeom CpuOwn.
 Require Import FdSlots FileInv ProcInv.
 Require Import SpecArgfd.
-Require Import KallocInv.
-Require Import WpUart.
-Require Import DiskPtsto.
-Require Import BioDefs.
-Require Import FsBlocks LogInv.
-Require Import FsCrash.
-Require Import IrefSlots InodeRegion.
+Require Import IrefSlots.
 Require Import SpecFileclose.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

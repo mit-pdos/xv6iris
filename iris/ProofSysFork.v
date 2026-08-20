@@ -35,13 +35,10 @@ Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import IntrDefs HartTp WpNext.
 Require Import WpLock.
 Require Import CpuOwn.
-Require Import KallocInv.
 Require Import FdSlots ProcInv.
 Require Import FileInvDefs.
 Require Import ProcInv.
-Require Import DiskPtsto.
 Require Import FsBlocks.
-Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheEscrow.
 Require Import SpecKfork.

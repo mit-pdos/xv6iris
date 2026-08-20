@@ -66,12 +66,11 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
 Require Import RegFile.
-Require Import InstrBytes WpGpr.
+Require Import InstrBytes.
 Require Import SmodeCore WpMmodeLeafBase.
 Require Import MstatusBits.
 (* [exec_execute_SRET_menv] -- the SRET reduction with the get_xLPE premise
    pinned by the menvcfg VALUE, which is what [sconf] gives us. *)
-Require Import WpSmodeSret.
 (* [wp_next_off_intro] -- this leaf is pinned to [b = false], so the funnel's
    hart-generic callback is discharged by wp_next's own introduction rule.
    (The dead-import sweep removed WpNext while the leaf did not yet consume

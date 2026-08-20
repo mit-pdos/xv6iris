@@ -172,7 +172,6 @@ Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import DinodeEnc.
 Require Import InodeInv.
-Require Import KallocInv.
 Require Import UserPtTree.
 Require Import KvmSpec.
 Require Import ProcPtOwn.

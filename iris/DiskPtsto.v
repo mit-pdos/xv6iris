@@ -40,7 +40,6 @@ Require Import Riscv.rv64d_types.
 Require Import VirtioModel.
 Require Import VirtioQueue.
 Require Import DiskImg.
-Require Import PermInv.
 Require Import RiscvPtsto.  (* [riscvFixedGS]: the sole owner of [mono_natG], and it carries [diskImgG] *)
 
 Local Open Scope Z_scope.

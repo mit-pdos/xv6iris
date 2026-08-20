@@ -82,7 +82,6 @@ Require Import WpLock.
 Require Import ArrCursor.
 Require Import ProcGeom.
 Require Import PageGeom.
-Require Import KallocInv.
 Require Import KvmSpec.
 Require Import UserPtTree.
 Require Import ProcPtOwn.

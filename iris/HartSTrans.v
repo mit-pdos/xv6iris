@@ -36,9 +36,9 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvExtras
         RiscvFetchExec RiscvTryStep.
-Require Import HartSwp HartLift HartRegNode HartSpan HartSpanChar HartGoodb HartEvents.
+Require Import HartSwp HartLift HartSpan HartSpanChar HartGoodb.
 Require Import WpDecodeBridge Pt4kWalk CommonWalk PtTree PtTreeAdue.
-Require Import HartMFetch HartMPmp HartMStore SmodePte PtAdBits.
+Require Import HartMFetch HartMStore PtAdBits.
 Local Open Scope Z_scope.
 
 (* the same spelling [HartMFetch] uses for the misalignment tests *)

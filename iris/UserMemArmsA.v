@@ -33,19 +33,19 @@ From iris.proofmode Require Import proofmode.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
-Require Import WpGpr RegFile UserBits.
-Require Import HartLift HartSpan HartGoodb HartMemRun HartMemAsm PtBytes.
-Require Import PtreeType PtTree SmodePte UptTree.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvExtras.
+Require Import WpGpr.
+Require Import HartLift HartSpan HartMemRun HartMemAsm PtBytes.
+Require Import PtreeType PtTree.
 Require Import UserFrame UserBytes.
-Require Import UserPtTree UserExec UserCompute UserClassify UserClassifyAsm.
+Require Import UserPtTree UserExec UserClassifyAsm.
 Require Import UserExecFacts UserMemArms UserMemAccess UserMemPt UserMemMis.
 Require Import UserTotalU UserMemTotal UserMemClassify UserMemArmsBase.
 Local Open Scope Z_scope.
 Import Defs.
 
-Require Import WpDecodeBridge DecodeTotalU PtWalkCert UserFetchCert.
-Require Import UserMemCert UserFaultCert MemAccessGen UserTranslate CommonWalk.
+Require Import WpDecodeBridge DecodeTotalU.
+Require Import UserMemCert MemAccessGen CommonWalk.
 (* the width-16 (AMOCAS.Q) execute layer: [wpair_state], the pair-register
    reductions and the two width-16 AMO pairs *)
 Require Import UserMemClassifyAmo.

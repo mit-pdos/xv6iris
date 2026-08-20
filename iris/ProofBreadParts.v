@@ -32,9 +32,7 @@ Require Import RiscvLang RiscvPtsto.
 Require Import RiscvExtras.
 Require Import VcGen.
 Require Import SmodeCore.
-Require Import WpLock.
 Require Import BufOwn.
-Require Import DiskPtsto.
 Require Import BufOwn BcacheInv BioInv.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)

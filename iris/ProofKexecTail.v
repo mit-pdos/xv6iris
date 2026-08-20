@@ -117,7 +117,6 @@ Require Import SpecEndOp.
 Require Import SpecIlock.
 Require Import SpecReadi.
 Require Import SpecIunlockput.
-Require Import SpecDirlink.
 Require Import SpecNamei.
 Require Import SpecProcFreepagetable.
 Require Import ProofKexecParts.

@@ -56,12 +56,9 @@ Require Import IntrDefs.
 Require Import HartTp WpNext.
 Require Import CpuOwn.
 Require Import WpUart.
-Require Import DiskPtsto.
-Require Import BioDefs.
-Require Import FsBlocks LogInv.
-Require Import FsCrash.
+Require Import LogInv.
 Require Import SpecFilealloc SpecKalloc SpecInitlock SpecFileclose.
-Require Import IrefSlots InodeRegion.
+Require Import IrefSlots.
 Require Import SpecPipealloc.
 From Kernel Require KernelSyms.
 Require Import IrefSlots.

@@ -84,7 +84,6 @@ Require Import IrefSlots.
 Require Import WpUart.
 Require Import BufOwn BcacheInv BioInv.
 Require Import FsBlocks LogInv.
-Require Import FsCrash.
 Require Import BlockWords.
 Require Import BitmapInv.
 Require Import DinodeSlot.

@@ -48,7 +48,7 @@ Require Import FdSlots.
 Require Import KernelRvcDecode.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import WpSmodeHalf.
-Require Import VirtioModel DiskPtsto DiskInv.
+Require Import VirtioModel DiskInv.
 Require Import SpecWakeup.
 Require Import CodeFreeDesc.
 Require Import SpecFreeDesc.

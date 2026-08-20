@@ -51,11 +51,10 @@ Require Import RiscvLang RiscvPtsto RiscvFetchExec.
 Require Import MinstretInv InstrBytes.
 Require Import RegFile.
 Require Import WpGpr WpGprCsrwB.
-Require Import WpSmodePtCtl.
 Require Import SmodePte PtTree PtTreeAdue.
 Require Import KptExecMap.
 Require Import UptTree.
-Require Import HartLift HartSpan HartSpanChar HartSwp HartSFrame.
+Require Import HartSpan HartSwp.
 Require Import WpDecodeBridge WpMmodeSwpBase WpMmodeJump WpMmodeCsrSwp
         HartSCsr.
 Require Import WpSmodePtEngine.

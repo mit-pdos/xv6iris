@@ -23,18 +23,18 @@ From iris.program_logic Require Import language lifting.
 From iris.base_logic.lib Require Import gen_heap ghost_map ghost_var invariants.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
+Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
 Require Import MinstretInv InstrBytes.
-Require Import ExecCommon WpGpr WpMmodeLeafBase.
+Require Import ExecCommon WpGpr.
 Require Import WpGprCsrwCommon WpGprCsrrCommon.
-Require Import SmodePte TrampPt.
-Require Import SmodeCorePt WpSmodeGpr UptTree.
-Require Import PtTree PtAdBits PtTreeAdue.
-Require Import SRegime WpSmodePtLeaves WpSmodePtFetch.
-Require Import HartLift HartSpan HartSpanChar HartSwp HartSFrame HartSMem.
+Require Import TrampPt.
+Require Import UptTree.
+Require Import PtTreeAdue.
+Require Import WpSmodePtLeaves.
+Require Import HartLift HartSpan HartSpanChar HartSwp HartSMem.
 Require Import WpSmodePtEngine HartSCsr KptGoodb WpDecodeBridge.
-Require Import WpMmodeSwpBase WpMmodeCsrSwp WpMmodeJump.
-Require Import TrampStepPt UptWalkPt.
+Require Import WpMmodeCsrSwp WpMmodeJump.
+Require Import UptWalkPt.
 Require Import UserretDefs UserretPt.
 Require Import RegFile.
 Require Import Riscv.rv64d_types Riscv.rv64d.

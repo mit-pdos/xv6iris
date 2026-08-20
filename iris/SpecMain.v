@@ -142,7 +142,6 @@ Require Import SpecProcinit.
    unambiguously [SpecIinit]'s if that ever changes. *)
 Require Import IcacheBoot.
 (* [ROOTDEV] / [icfg_dev] / [icfg_nib], for the two config ties above *)
-Require Import InodeInv IcacheRef.
 Require Import SpecIinit SpecVirtioDiskInit.
 Require Import SpecFreerange SpecPrintk.
 Require Import ProcGeom FdSlots CpuOwn SchedCtx.

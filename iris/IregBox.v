@@ -87,8 +87,6 @@ From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import invariants own ghost_map.
 Require Import SailStdpp.Values.
 Require Import RiscvPtsto.
-Require Import WpLock.
-Require Import DiskPtsto.
 Require Import FsBlocks.
 Require Import LogInv.
 Require Import DinodeEnc.

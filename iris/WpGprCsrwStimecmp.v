@@ -44,13 +44,10 @@ From iris.base_logic.lib Require Import invariants.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec ExecCommon WpGpr.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec ExecCommon WpGpr.
 Require Import RegFile.
 Require Import InstrBytes.
-Require Import WpInstr.
 Require Import WpInstrMip.
-Require Import WpGprCsrwCommon.
-Require Import RiscvExtras.
 Require Import MinstretInv.
 Require Import HartSwp HartLift HartRegNode HartSpan HartSpanChar HartMCycle
         HartMFrame HartGoodb WpDecodeBridge WpMmodeJump WpMmodeCsrSwp.

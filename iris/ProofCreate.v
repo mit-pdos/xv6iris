@@ -131,7 +131,6 @@ Require Import IcacheRef.
 Require Import IcacheInv.
 Require Import FsTree.
 Require Import IcacheEscrow.
-Require Import KallocInv.
 Require Import KvmSpec.
 Require Import FileInvDefs.
 Require Import ProcInv.

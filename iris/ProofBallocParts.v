@@ -25,9 +25,8 @@ Require Import BufOwn.
 Require Import DinodeSlot.
 Require Import FsCrash.
 Require Import BitmapEnc BitmapInv.
-Require Import RegFile HartTp WpNext WpGpr InstrBytes WpMmodeShiftiop.
+Require Import InstrBytes.
 Require Import SmodeCore.
-Require Import IntrDefs WpSmodeIntr WpSconfAlu.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Local Open Scope Z_scope.
 Import Defs.

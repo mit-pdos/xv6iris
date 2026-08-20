@@ -101,7 +101,6 @@ Require Import WpAu4.
 Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import CpuOwn.
-Require Import DiskPtsto.
 Require Import FsBlocks.
 Require Import InodeLock.
 Require Import InodeRegion.

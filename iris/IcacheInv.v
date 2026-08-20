@@ -79,7 +79,6 @@ Require Import InodeInv.
    else here -- without these lines the section [Context] below invents FRESH
    variables of those names and every [ireg_inv] in the file comes out an
    unresolved evar. *)
-Require Import DiskPtsto.
 Require Import DinodeEnc.  (* [islot]/[islot_lt]: the inum's slot in its block *)
 Require Import FsBlocks.    (* [fs_names], which [ireg_inv] is keyed by *)
 Require Import InodeRegion.

@@ -59,14 +59,10 @@ Require Import ProcInv.
 Require Import FdSlots ProcInv.
 Require Import ProofKforkParts.
 Require Import FileInvDefs.
-Require Import KallocInv.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import WpUart.
-Require Import DiskPtsto.
-Require Import BioDefs.
-Require Import FsBlocks LogInv.
-Require Import InodeRegion.
+Require Import LogInv.
 Require Import IrefSlots.
 Require Import SpecReadi.       (* [K_readi] -- the stack budget unfolds to it *)
 Require Import SpecArgfd SpecArgint SpecArgaddr SpecFileread.

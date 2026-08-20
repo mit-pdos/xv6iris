@@ -8,7 +8,6 @@ From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language.
 From stdpp Require Import bitvector.definitions gmap.
 
-Require Import SmodeCore.
 From Kernel Require Import KernelInstrs KernelSyms.
 From Stdlib Require Import Lia List.
 From iris.program_logic Require Import lifting.

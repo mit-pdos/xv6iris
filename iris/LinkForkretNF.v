@@ -44,15 +44,13 @@ From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvLang RiscvPtsto SmodeCore.
+Require Import RiscvLang RiscvPtsto.
 Require Import RegFile.
-Require Import WpLock.
 Require Import FdSlots FileInvDefs.
-Require Import IrefSlots InodeRegion ProcAvail.
+Require Import IrefSlots ProcAvail.
 Require Import IrefSlots.
 Require Import ProcDefs.
 Require Import UserPtTree.
-Require Import DiskPtsto WpUart FsBlocks LogInv FsCrash KallocInv BioDefs.
 Require Import SpecForkret.
 Require Import LinkUserretClosed.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)

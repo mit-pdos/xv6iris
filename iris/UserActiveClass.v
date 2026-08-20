@@ -18,11 +18,11 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvFetchExec RiscvExtras.
-Require Import MinstretInv WireInv RegFile UserBits AlignBits WpGpr.
+Require Import MinstretInv WireInv UserBits AlignBits.
 Require Import TrampPt KptTree UptTree.
 Require Import SmodeCore WpIntrCore.
 Require Import HartSwp HartLift HartSpan HartMCycle HartStepFull HartRunFull.
-Require Import HartMemRun PtreeType PtTree SmodePte PtBytes UserBytes InstrBytes.
+Require Import HartMemRun PtreeType PtTree PtBytes UserBytes InstrBytes.
 Require Import UserFrame UserClassifyAsm.
 Require Import UserPtTree UserExec UserStep UserStepFull.
 Require Import UserFetchPt UserClassify.
@@ -33,7 +33,7 @@ Require Import UserFetchCert UserFaultCert.
 (* the cycle rule's monadic plumbing (§7), the align-fault certificate (§2b)
    and the decode reference the totalities are stated against *)
 Require Import RiscvTryStep RiscvFetchExec.
-Require Import HartSpanChar HartRunGen HartMemAsm PtWalkCert.
+Require Import HartRunGen HartMemAsm PtWalkCert.
 Require Import UserFetch WpDecodeBridge DecodeTotalU UserTotalU.
 From iris.base_logic.lib Require Import ghost_map.
 Local Open Scope Z_scope.

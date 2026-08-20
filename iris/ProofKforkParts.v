@@ -73,11 +73,9 @@ Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import FdSlots.
 Require Import FileInvDefs.
-Require Import WpLock.
 Require Import SwtchCtx.
 Require Import ProcInv.
 Require Import TrampPt.
-Require Import KallocInv.
 Require Import SpecFreeproc.
 Require Import CodeKfork.
 From Kernel Require KernelSyms.

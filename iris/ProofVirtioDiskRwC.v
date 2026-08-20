@@ -40,7 +40,7 @@ Require Import IntrDefs WpSmodeIntr.
 Require Import HartTp WpNext.
 Require Import WpSconfAlu WpSconfMem.
 Require Import WpSmodeHalf.
-Require Import DiskPtsto DiskInv.
+Require Import DiskInv.
 Require Import CodeVirtioDiskRw.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.

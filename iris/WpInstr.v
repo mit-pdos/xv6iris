@@ -19,9 +19,9 @@ Require Import HartSwp HartLift HartLift2 HartSpan HartSpanChar HartRunGen
 Require Import SailStdpp.Base.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec MinstretInv.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
 Require Import MstatusFacts.
-Require Import KptPt KMap.
+Require Import KptPt.
 Local Open Scope Z_scope.
 
 Require Import InstrBytes WpInstrRun.

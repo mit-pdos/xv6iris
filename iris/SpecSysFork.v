@@ -66,8 +66,6 @@ Require Import CpuOwn.
 Require Import FdSlots FileInv.
 Require Import ProcInv.
 Require Import SchedCtx.
-Require Import KallocInv.
-Require Import DiskPtsto.
 Require Import FsBlocks.
 Require Import InodeRegion.
 Require Import IrefSlots.

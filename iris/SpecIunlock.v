@@ -81,7 +81,6 @@ Require Import ProcGeom.
 Require Import CpuOwn.
 Require Import SchedCtx.
 Require Import SleepLock.
-Require Import DiskPtsto.
 Require Import FsBlocks.
 Require Import DinodeEnc.
 Require Import InodeInv.

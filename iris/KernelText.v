@@ -18,7 +18,7 @@ Require Import RiscvModelBytes.
 Require Import SailStdpp.Base.
 Require Import RiscvPtsto RiscvExtras.
 Require Import RiscvLang RiscvExec.
-Require Import WpDecodeBridge HartSpan HartGoodb InstrBytes.
+Require Import WpDecodeBridge HartGoodb InstrBytes.
 (* for [MISA_C], which [close_dec] reads misa bits out of *)
 Require Import RiscvFetchExec.
 From Kernel Require KernelInstrs.

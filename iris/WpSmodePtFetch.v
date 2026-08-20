@@ -27,13 +27,13 @@ From iris.program_logic Require Import language lifting.
 From iris.base_logic.lib Require Import gen_heap ghost_map ghost_var invariants.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
-Require Import RegFile WpGpr InstrBytes MinstretInv.
-Require Import HartLift HartSpan HartSpanChar HartSwp HartSFrame WpDecodeBridge.
+Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
+Require Import InstrBytes MinstretInv.
+Require Import HartLift HartSpan HartSwp HartSFrame WpDecodeBridge.
 Require Import WpSmodePtEngine.
 Require Import Ktier CommonWalk.
 Require Import HartMCycle WpSFrames.
-Require Import SmodeCore SRegime KptShare SmodeCorePt.
+Require Import SmodeCore SRegime SmodeCorePt.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.

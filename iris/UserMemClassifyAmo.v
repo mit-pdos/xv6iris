@@ -16,11 +16,10 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
-Require Import RegFile PtAdBits.
+Require Import PtAdBits.
 Require Import WpGpr UserBits.
 Require Import SmodeCore.
-Require Import UptTree UserPtTree UserExec UserCompute.
-Require Import UserMemArms WpMmodeLeafBase.
+Require Import UptTree UserPtTree UserExec.
 (* for [goodmb_rX_bits_gpr] / [goodmb_wX_bits_gpr], which the width-16 AMO
    certificate twins need and which [UserMemArms] only LOADS (Import is not
    transitive) *)
@@ -28,7 +27,7 @@ Require Import UserExecFacts.
 Require Import WpGprCsrwC.
 Require Import UserMemAccess UserMemPt.
 Require Import UserTotalU.
-Require Import RiscvModelBytes CommonWalk MemAmo4.
+Require Import RiscvModelBytes CommonWalk.
 Require Import UserMemClassify UserMemTotal.
 Require Import UserClassifyAsm UserBytes HartMemRun HartMemAsm PtBytes UserFrame.
 Local Open Scope Z_scope.
@@ -1147,8 +1146,8 @@ Qed.
 (* at the top would put the certificate layer's names in scope for it      *)
 (* (the shadowing trap of worklist section 15).                            *)
 (* ===================================================================== *)
-Require Import WpDecodeBridge HartGoodb DecodeTotalU.
-Require Import UserExecFacts MemAccessGen HartLift HartSpan SmodePte.
+Require Import WpDecodeBridge DecodeTotalU.
+Require Import UserExecFacts HartLift HartSpan SmodePte.
 Require Import UserTranslate PtreeType PtTree KptPt PtTreeAdue KptTree PtWalkCert.
 Require Import UserFetchCert UserMemCert UserFaultCert.
 Local Open Scope Z_scope.

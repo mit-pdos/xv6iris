@@ -49,7 +49,6 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs HartTp WpNext.
-Require Import WpLock.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.

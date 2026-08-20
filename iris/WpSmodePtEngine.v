@@ -24,9 +24,9 @@ From iris.program_logic Require Import language lifting.
 From iris.base_logic.lib Require Import gen_heap ghost_map ghost_var invariants.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
-Require Import RegFile WpGpr InstrBytes MinstretInv.
-Require Import HartLift HartSpan HartSpanChar HartRegNode HartGoodb WpDecodeBridge ExecCommon.
+Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras.
+Require Import RegFile WpGpr.
+Require Import HartLift HartSpan HartSpanChar HartRegNode HartGoodb WpDecodeBridge.
 Require Import HartSwp.
 Require Import MstatusBits WpGprMret WpMmodeLeafBase HartRunGen.
 Require Import HartMFrame HartMCycle WpMmodeJump WpDecode.

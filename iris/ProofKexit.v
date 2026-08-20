@@ -78,7 +78,6 @@ Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import SpecMyproc SpecAcquire SpecRelease SpecSched.
-Require Import KallocInv.
 Require Import SpecIput.
 Require Import IrefSlots InodeRegion IcacheRef IcacheInv IcacheEscrow.
 Require Import BitmapInv DinodeEnc InodeInv.

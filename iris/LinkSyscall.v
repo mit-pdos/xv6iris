@@ -26,22 +26,16 @@ From iris.base_logic.lib Require Import ghost_var.
 From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvLang RiscvPtsto SmodeCore.
+Require Import RiscvLang RiscvPtsto.
 Require Import RegFile.
 (* the classes the binder list generalizes over: [Require Import SpecSyscall]
    does not put them in scope transitively, and backtick generalization then
    silently invents fresh binders with those names (durable-notes.md, the
    typeclass-sweep traps). *)
-Require Import WpLock FdSlots IrefSlots.
+Require Import FdSlots IrefSlots.
 Require Import FileInvDefs.
 Require Import BioDefs.
 Require Import SpecFileclose.
-Require Import KallocInv.
-Require Import DiskPtsto.
-Require Import WpUart.
-Require Import FsBlocks LogInv.
-Require Import FsCrash.
-Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import ProcDefs.
 Require Import SpecSyscall.

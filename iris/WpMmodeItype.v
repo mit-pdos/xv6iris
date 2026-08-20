@@ -1,6 +1,5 @@
 (* M-mode Itype leaf lemmas (mmode_config, decode family).
    Relocated from WpGpr*.v; helpers in WpMmodeLeafBase. *)
-Require Import WpMmodeLeafBase.
 From Stdlib Require Import ZArith.
 From stdpp Require Import bitvector.definitions gmap.
 From iris.proofmode Require Import proofmode.

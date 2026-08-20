@@ -75,7 +75,6 @@ Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import IntrDefs WpSmodeIntr.
 Require Import HartTp WpNext.
 Require Import WpLock ProcGeom CpuOwn KernelRvcDecode.
-Require Import KallocInv.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import FdSlots FileInvDefs ProcInv.

@@ -51,9 +51,9 @@ Require Import RiscvExtras.
 Require Import SmodePte.
 Require Import KptGhost.   (* kptN: the shared kernel table's namespace, named in [sr_absorb]'s mask premise *)
 Require Import KptShare.   (* the SHARED-table regime instance (§3) *)
-Require Import WpDecodeBridge CommonWalk PtTree PtTreeAdue PtAdBits Pt4kWalk.
-Require Import HartSwp HartLift HartRegNode HartSpan HartSpanChar HartGoodb HartEvents.
-Require Import HartSTrans HartSKpt KptGoodb.
+Require Import WpDecodeBridge CommonWalk.
+Require Import HartSwp HartLift HartSpan HartSpanChar.
+Require Import HartSKpt KptGoodb.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.
 Import Defs.

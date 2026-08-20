@@ -63,7 +63,6 @@ Require Import WpGprCsrwCommon.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfCsr.
 Require Import IntrDefs.
 Require Import HartTp WpNext CpuOwn.
-Require Import WpLock.
 Require Import ProcGeom.
 Require Import UserPtTree ProcPtOwn.
 Require Import KptTree.

@@ -122,11 +122,9 @@ Require Import FdSlots FileInv.
 Require Import WpLock.
 Require Import SwtchCtx.
 Require Import ProcInv.
-Require Import KallocInv.
 Require Import KvmSpec.
 Require Import SchedCtx.
 Require Import IrefSlots.
-Require Import DiskPtsto.
 Require Import FsBlocks.
 Require Import InodeRegion.
 Require Import IcacheInv.

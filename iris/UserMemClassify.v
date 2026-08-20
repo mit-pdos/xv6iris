@@ -33,17 +33,14 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import MemAccessGen.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
-Require Import RegFile.
-Require Import WpGpr UserBits.
+Require Import UserBits.
 Require Import SmodeCore.
-Require Import UptTree UserPtTree UserExec UserCompute UserClassify UserClassifyAsm.
-Require Import UserExecFacts UserMemArms WpMmodeLeafBase.
-Require Import UserMemAccess UserMemPt UserMemMis.
-Require Import TrampPt KptTree UserTranslate.
-Require Import UserTotalU Pt4kWalk.
-Require Import RiscvModelBytes CommonWalk WpLoad.
-Require Import HartMemRun HartMemAsm PtBytes UserBytes UserFrame.
-Require Import UserMemTotal.
+Require Import UptTree UserPtTree.
+Require Import UserExecFacts.
+Require Import UserMemAccess UserMemMis.
+Require Import TrampPt KptTree.
+Require Import Pt4kWalk.
+Require Import RiscvModelBytes.
 Local Open Scope Z_scope.
 Import Defs.
 

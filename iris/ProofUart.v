@@ -21,18 +21,17 @@ From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import DevModel RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras.
-Require Import WpLoad WpGpr WpMmodeLeafBase InstrBytes MinstretInv.
+Require Import WpGpr WpMmodeLeafBase InstrBytes.
 Require Import RegFile HartTp.
 Require Import KptPt.
-Require Import SmodeCore WpSmodeGpr.
+Require Import SmodeCore.
 Require Import KMap.
-Require Import SmodeCorePt SRegime.
-Require Import HartLift HartSpan HartSpanChar HartSwp HartSFrame HartSMem.
-Require Import WpSmodePtEngine WpSmodePtFetch.
-Require Import KptShare KptGoodb.
+Require Import SRegime.
+Require Import HartLift HartSpan HartSwp HartSMem.
+Require Import WpSmodePtEngine.
+Require Import KptGoodb.
 Require Import WpIntrInv.
-Require Import HartMemRun.
-Require Import DiskPtsto WpUart WpSmodeUart WpSmodePtUart.
+Require Import DiskPtsto WpUart WpSmodeUart.
 Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.
 Require Import Riscv.rv64d_types Riscv.rv64d.

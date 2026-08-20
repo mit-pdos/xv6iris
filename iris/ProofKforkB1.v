@@ -60,7 +60,6 @@ Require Import FdSlots.
 Require Import FdSlots.
 Require Import WpLock.
 Require Import ProcInv.
-Require Import KallocInv.
 Require Import KvmSpec.
 Require Import SchedCtx.
 Require Import SpecFreeproc.

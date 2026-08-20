@@ -44,16 +44,14 @@ Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep Riscv
 Require Import WpLoad.
 Require Import MinstretInv.
 Require Import UserBits.
-Require Import WpGpr InstrBytes WpMmodeLeafBase.
+Require Import InstrBytes WpMmodeLeafBase.
 Require Import RegFile HartTp WpNext.
-Require Import SmodePte.
-Require Import SmodeCore WpSmodeGpr.
+Require Import SmodeCore.
 Require Import SmodeCorePt.
-Require Import HartLift HartSpan HartSpanChar HartSwp HartSFrame HartSMem.
-Require Import WpSmodePtEngine WpSmodePtFetch.
-Require Import KptShare KptGoodb KptPt.
+Require Import HartLift HartSpan HartSwp HartSMem.
+Require Import WpSmodePtEngine.
+Require Import KptGoodb.
 Require Import WpIntrInv.
-Require Import WpSmodeMemGen.
 Require Import MemAccessGen.
 Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.

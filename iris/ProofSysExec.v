@@ -91,7 +91,6 @@ Require Import WpUart.
 Require Import DiskPtsto DiskInv.
 Require Import BioDefs.
 Require Import FsBlocks LogInv.
-Require Import FsCrash.
 Require Import BitmapInv.
 Require Import ByteBuf.
 Require Import InodeInv.

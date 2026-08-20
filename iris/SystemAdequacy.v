@@ -36,11 +36,9 @@ Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base.
 Require Import RiscvLang RiscvPtsto.
-Require Import SmodeCore.
 Require Import ProcGeom.
-Require Import WpLock KallocInv IcacheRef FdSlots.
+Require Import IcacheRef FdSlots.
 Require Import FileInvDefs.
-Require Import DiskPtsto.
 Require Import WpUart.
 Require Import BootConfig.
 Require Import BootChain BootShared.
@@ -48,7 +46,6 @@ Require Import RiscvAdequacy.
 Require Import FsCrash.
 Require Import IcacheRef.
 (* [ROOTDEV], for the two config ties the boot arm now carries *)
-Require Import InodeInv.
 Require Import IrefSlots.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)

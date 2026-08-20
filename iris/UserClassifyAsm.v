@@ -76,7 +76,7 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras.
 Require Import DevModel.
 Require Import WpGpr.
 Require Import HartLift HartSpan HartMemRun PtBytes.
-Require Import PtreeType PtTree SmodePte UptTree UserPtTree UserFrame UserBytes.
+Require Import PtreeType PtTree UserPtTree UserFrame UserBytes.
 Require Import UserExec UserClassify.
 Local Open Scope Z_scope.
 Import Defs.

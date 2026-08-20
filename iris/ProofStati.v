@@ -37,8 +37,6 @@ Require Import VcGen.
 Require Import IntrDefs.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import WpSmodeHalf.
-Require Import DiskPtsto.
-Require Import FsBlocks.
 Require Import DinodeEnc.
 Require Import InodeInv.
 Require Import CodeStati.

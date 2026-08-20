@@ -17,7 +17,6 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
 Require Import RegFile.
-Require Import SmodeCore.
 Require Import KernelDataInv.
 Require Import SpecInitlock SpecInitlockWrapper WpInitlockWrapper.
 Require Import KernelText CodeFileinit.

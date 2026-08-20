@@ -128,7 +128,6 @@ Require Import CalleeSaved StackOwn.
 Require Import IntrDefs WpSmodeIntr.
 Require Import HartTp WpNext.
 Require Import WpLock.
-Require Import KallocInv.
 Require Import CommonWalk PtTree PtBuild.
 Require Import KptTree.
 Require Import UserPtTree.

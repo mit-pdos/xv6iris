@@ -52,7 +52,6 @@ Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
-Require Import WpLock.
 Require Import CpuOwn.
 Require Import FdSlots.
 Require Import FileInvDefs.

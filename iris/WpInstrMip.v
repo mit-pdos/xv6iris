@@ -35,10 +35,10 @@ Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep
         RiscvFetchExec MinstretInv.
 Require Import MstatusFacts.
-Require Import KptPt KMap.
+Require Import KptPt.
 Local Open Scope Z_scope.
 
-Require Import InstrBytes WpInstrRun WpInstr.
+Require Import InstrBytes WpInstrRun.
 
 (* the read-only frame sees neither the nextPC commit nor the mip refresh:
    both cells are in [mm_Drw].  Discharged POSITIONALLY through

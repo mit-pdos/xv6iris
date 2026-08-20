@@ -61,7 +61,7 @@ Require Import KptShare.   (* [tlb_res_pt] -- the parked residue drops it *)
 Require Import ProcPtOwn.  (* [proc_pt] / [ud_norm] -- the bare residue drops those *)
 Require Import SchedCtx.
 Require Import KallocInv KvmSpec.
-Require Import IcacheEscrow IrefSlots InodeRegion.
+Require Import IcacheEscrow IrefSlots.
 Require Import WaitInv.
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
