@@ -15,16 +15,20 @@
    the header-copy do-while at +0x44..+0x5a is dead code and never appears
    in the proof at all.
 
-   * DELAYED SEALING.  The "log" spinlock's resource ([LogInv.log_res])
-     does not exist at the initlock call: it holds the very [lh] cells that
-     install_trans and write_head are handed a few instructions later, and
-     it is indexed by a [log_names] record whose first field IS the lock's
-     own ghost name.  So the proof uses [WpLock.newlock_delayed]: the gname
-     is chosen right after initlock returns (together with the ledger's, via
-     [LogInv.log_ledger_alloc]), and the wand it hands back is spent at the
-     very END, once [log_res] has been assembled out of everything initlog
-     was given.  This is [SpecProcinit.procs_inv_alloc]'s trick applied to a
-     single lock.
+   * SEALING AT A PRE-MINTED NAME.  The "log" spinlock's resource
+     ([LogInv.log_res]) does not exist at the initlock call: it holds the
+     very [lh] cells that install_trans and write_head are handed a few
+     instructions later, and it is indexed by a [log_names] record whose
+     first field IS the lock's own ghost name.  This used to force
+     [WpLock.newlock_delayed] -- pick the gname right after initlock
+     returns, carry its wand to the end.  It no longer does: the contract
+     now RECEIVES the four gnames ([LogDefs.log_free_tok γ], minted in the
+     era fupd, fs-cfg-boot.md THE PRINCIPLE), so there is nothing to delay.
+     The proof carries initlock's two zeroed lock cells to the very END --
+     no callee in between touches them, since install_trans and write_head
+     take [log_frozen], not [log_ctx] -- and spends them there on
+     [WpLockAt.newlock_at], once [log_res] has been assembled at the given
+     [γ] out of everything initlog was given.
 
    * THE FROZEN CELLS ARE PERSISTED BEFORE THE FIRST CALLEE.  log.start and
      log.dev are written at +0x2c / +0x30 and then discarded to
@@ -76,6 +80,7 @@ Require Import CpuOwn.
 Require Import DiskPtsto.
 Require Import BufOwn.
 Require Import WpLock.
+Require Import WpLockAt.   (* [newlock_at]: seal a lock at a GIVEN gname *)
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import WpSmodeIntr.
 Require Import ByteCursor.
@@ -275,6 +280,7 @@ Section ProofInitlog.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
+      (γ : log_names)
       (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32) (sb : mword 64)
       (bs_hdr : list (bv 8))
@@ -284,7 +290,7 @@ Section ProofInitlog.
       (pidv : mword 32) (dq dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
-    : wp_initlog_sconf_body γs j γl γu γd γk pd pav pu bn γfs
+    : wp_initlog_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs
                             cov logstart dev sb bs_hdr L D
                             vlock vname vcpu v_start v_dev v_nc v_n
                             pidv dq dqs m K eb b lks.
@@ -295,6 +301,7 @@ Section ProofInitlog.
     subst eb.
     
     iIntros "Hcg Hcnt #Htext #Hkdata Hpc #Hpenv #Hbio #Hseam #Hcert Hmirf
+              Hlfree
               Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hsbf Hlock Hname Hcpu
               Hstc Hdevc Hout Hcmt Hnc Hncell Hblk HLauth HDauth Hcovf Hfsb
               Hslotsfs Hslots Hcont".
@@ -657,19 +664,19 @@ Section ProofInitlog.
     { intros c Hcs N2 N8 N9 N18 N19.
       rewrite (callee_saved_lookup Hilcs_full c Hcs).
       exact (HRAcs c Hcs N2 N8 N9 N18 N19). }
-    (* ===== THE DELAYED SEAL: pick the lock's gname and the ledger's now,
-       and keep the wand that will take [log_res] at the very end. ===== *)
+    (* ===== THE NAME FIELD IS SEALED HERE; THE LOCK IS NOT.  The four
+       gnames arrived with the contract ([log_free_tok γ], minted in the era
+       fupd), so nothing is allocated at this point: the ledger / epoch /
+       registry halves are just unpacked for later, and initlock's two
+       zeroed lock cells ("Hlock" / "Hcpu") are carried untouched to the
+       end, where [newlock_at] seals them onto [ln_lk γ] together with the
+       assembled [log_res].  No callee in between wants them: install_trans
+       and write_head take [log_frozen], not [log_ctx]. ===== *)
     iApply fupd_wp.
     iMod (lock_name_intro with "Hstr Hlname") as "#Hlnm".
-    iMod (log_ledger_alloc) as (γops) "Hops".
-    (* GENESIS (fs-log.md §G.2): epoch 0 and an EMPTY append registry.  Both
-       are allocated here, beside the ledger, because [log_names] carries
-       them and the delayed seal below has to name the whole record. *)
-    iMod (log_epoch_alloc) as (γep) "Hepa".
-    iMod (log_reg_alloc) as (γlg) "Hxa".
-    iMod (newlock_delayed ⊤ log_addr "log"%string with "Hlnm Hlock Hcpu")
-      as (γlk) "Hmk".
     iModIntro.
+    iEval (rewrite /log_free_tok) in "Hlfree".
+    iDestruct "Hlfree" as "(Hlkf & Hops & Hepa & Hxa)".
     (* ===== +0x28 lw a1,20(s3) : a1 := sb->logstart ===== *)
     iPoseProof (ili_28 with "Htext") as "Hi28".
     iPoseProof (ili_2c with "Htext") as "Hi2c".
@@ -1448,7 +1455,7 @@ Section ProofInitlog.
       iSplitL "Hslotsfs"; [iExact "Hslotsfs"|].
       iSplitL "Hpool"; [iExact "Hpool"|].
       iExact "Hmirc". }
-    iAssert (log_res (MkLogNames γlk γops γep γlg) bn γfs cov logstart)
+    iAssert (log_res γ bn γfs cov logstart)
       with "[Hout Hcmt Hnc Hops Hepa Hxa Hbatch]" as "Hres".
     { rewrite /log_res.
       (* the epoch is ONE at genesis (fs-log.md §G.17): the region's
@@ -1480,10 +1487,15 @@ Section ProofInitlog.
       iSplitR; [iPureIntro; intros b' Hi;
                 exfalso; exact (not_elem_of_empty _ Hi)|].
       iExact "Hbatch". }
-    iMod ("Hmk" $! (log_res (MkLogNames γlk γops γep γlg) bn γfs cov logstart)
-            with "Hres") as "#Hislk".
-    iAssert (∃ γ : log_names, log_ctx γ bn γfs cov logstart dev)%I as "#Hctx".
-    { iExists (MkLogNames γlk γops γep γlg). rewrite /log_ctx.
+    (* THE SEAL, AT THE GIVEN NAME.  [newlock_at] is [newlock] over a gname
+       the caller already owns the free ghost state of -- the era fupd's
+       [lock_ghost_alloc] minted it as [ln_lk γ], so this is a FILL, not a
+       mint. *)
+    iMod (newlock_at ⊤ (ln_lk γ) log_addr "log"%string
+            (log_res γ bn γfs cov logstart)
+            with "Hlkf Hlnm Hlock Hcpu Hres") as "#Hislk".
+    iAssert (log_ctx γ bn γfs cov logstart dev)%I as "#Hctx".
+    { rewrite /log_ctx.
       iSplitR; [iExact "Hislk"|].
       iSplitR; [iExact "Hdvp"|].
       iSplitR; [iExact "Hstp" | iExact "Hswlb"]. }

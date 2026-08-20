@@ -219,7 +219,7 @@ Section FsinitDefs.
         InodeInv.sb_inodestart ↦₄ (mword_of_int inodestart : mword 32) -∗
         BitmapInv.sb_bmapstart ↦₄ (mword_of_int bmapstart : mword 32) -∗
         fsblock γfs 1 bs_sb -∗
-        (∃ γ : log_names, log_ctx γ bn γfs cov logstart dev) -∗
+        log_ctx icfg_log bn γfs cov logstart dev -∗
         bslots bn 3 -∗
         iref_slot -∗
         ⌜used' ⊆ used⌝ -∗
@@ -304,7 +304,7 @@ Section FsinitEpilogue.
     InodeInv.sb_inodestart ↦₄ (mword_of_int inodestart : mword 32) -∗
     BitmapInv.sb_bmapstart ↦₄ (mword_of_int bmapstart : mword 32) -∗
     fsblock γfs 1 bs_sb -∗
-    (∃ γ : log_names, log_ctx γ bn γfs cov logstart dev) -∗
+    log_ctx icfg_log bn γfs cov logstart dev -∗
     bslots bn 3 -∗
     iref_slot -∗
     bitmap_res γfs bmapstart cov logstart size used' -∗
@@ -574,7 +574,7 @@ Section FsinitMain.
     assert (Hbnocov : uint bno ∈ bv_cov (fs_view γfs γd dev cov))
       by (rewrite Hbnou; exact H1cov).
     iIntros "Hcg Hcnt #Htext #Hkdata Hpc #Hpenv #Hbio #Hseam #Hgen
-              Hmirror Hfsb Hsbold #Hireg Hboot #Hitb2 #Hitbl #Hesc #Hslks Hbm
+              Hmirror Hlfree Hfsb Hsbold #Hireg Hboot #Hitb2 #Hitbl #Hesc #Hslks Hbm
               Hlock0 Hlname Hlcpu Hlstart Hldev Hlout Hlcmt Hlnc Hlhn Hlhblk
               HauthL HauthD Hdirty Hhdr Hlslots Hppid #Hprocs #Hdevi #Hdgeom
               #Hdlock Hsl Hiref Hcont".
@@ -1381,7 +1381,7 @@ Section FsinitMain.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID19) (CIDb := CID29) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    iApply (IL.wp_initlog_sconf γs j γl γu γd γk pd pav pu bn γfs
+    iApply (IL.wp_initlog_sconf γs j γl γu γd γk pd pav pu bn icfg_log γfs
               cov logstart dev sb_base bs_hdr L D
               vlock vname vcpu v_start v_dev v_nc v_n
               pidv dq (DfracOwn 1) Q9 (K - 4)%nat true b lks
@@ -1391,6 +1391,7 @@ Section FsinitMain.
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
               with "Hcg Hcnt Htext Hkdata Hpc Hpanenv Hbio Hseam Hgen Hmirror
+                    Hlfree
                     Hppid Hprocs Hdevi Hdgeom Hdlock Hls Hlock0 Hlname Hlcpu
                     Hlstart Hldev Hlout Hlcmt Hlnc Hlhn Hlhblk HauthL HauthD
                     Hdirty Hhdr Hlslots Hsl34").
@@ -1454,14 +1455,16 @@ Section FsinitMain.
     { intros c Hcs N2' N8 N9 N18.
       rewrite /R1 upd_ne; [| regne]. exact (HR0thr c Hcs N2' N8 N9 N18). }
     (* [log_ctx] is PERSISTENT, and it has to be: ireclaim consumes it at
-       +0x54 and the contract hands it to the caller afterwards. *)
-    iDestruct "Hlctx" as (γlog) "#Hlctx".
+       +0x54 and the contract hands it to the caller afterwards.  No
+       existential to open any more -- initlog built the layer at
+       [icfg_log], the name the era fupd minted. *)
+    iDestruct "Hlctx" as "#Hlctx".
     iDestruct (cpu_own_transport CID30 CID32 0 true (proc_addr j) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID29) (CIDb := CID32) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (IR.wp_ireclaim_sconf γs j γl γu γd γk pd pav pu bn
-              γlog γfs γi cn gtl γpr cov logstart bmapstart inodestart
+              icfg_log γfs γi cn gtl γpr cov logstart bmapstart inodestart
               ninodes nib size used dev pidv dq (DfracOwn 1) (DfracOwn 1)
               (DfracOwn 1) R1 (K - 4)%nat true b lks
               ltac:(lia) Hgeom Hist0 Hblk Hsize Hbm0
@@ -1490,8 +1493,7 @@ Section FsinitMain.
               inodestart ninodes size used used' dev v_magic v_size v_nblocks
               v_nlog bs_sb pidv dq m mf K b lks HK Hsub Hmfsp Hmfthr
               with "Hcg Hcnt Htext Hpc Hframe Hppid Hmg Hsz Hnb Hni Hnl Hls
-                    Hist Hbms Hfsb [Hlctx] Hsl3 Hiref Hbm Hboot [Hcont]").
-    { iExists γlog. iExact "Hlctx". }
+                    Hist Hbms Hfsb Hlctx Hsl3 Hiref Hbm Hboot [Hcont]").
     { iApply (wp_next_shift (b := true) (CIDa := CID32) (CIDb := CID33)
                 ltac:(wp_next_chain) with "Hcont"). }
   Qed.

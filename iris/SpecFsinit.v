@@ -108,10 +108,28 @@
    [SpecInitlog.wp_initlog_sconf] (whose whole struct-log bundle, era mirror
    and FsBlocks material ride straight through untouched) and
    [SpecIreclaim.wp_ireclaim_sconf].  Note the ORDER is load-bearing:
-   initlog is what PRODUCES [∃ γ, log_ctx γ bn γfs cov logstart dev], and
+   initlog is what PRODUCES [log_ctx icfg_log bn γfs cov logstart dev], and
    ireclaim CONSUMES it (begin_op / end_op / iput).  So the log context does
    not cross this contract's boundary as an input at all -- it is born at
    +0x4e and handed to the caller at the end.
+
+   ---- THE LOG'S GNAMES ARE [icfg_log]'s, NOT AN EXISTENTIAL -----------
+
+   [initlog] is now an [_at] form (claude-notes/projects/fs-cfg-boot.md
+   staging step 1): it FILLS a [log_names] it is handed instead of minting
+   one, so what crosses this boundary in is [LogDefs.log_free_tok] -- the
+   era fupd's receipt for the four gnames -- and what crosses out is
+   [log_ctx] AT THOSE NAMES.  Here they are BAKED at [icfg_log], the
+   configuration record's own field, for one reason: this contract's post is
+   what the seal site turns into [FsReady.fs_ready], whose log conjunct is
+   spelled [log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev].  An
+   existential [∃ γ] could never be shown equal to the ambient field
+   (fs-ghost-state.md §7d, and IcacheRef.v's own §G.14/§G.16 note that a tie
+   carried in a body existential admits no agreement with a consumer's γ).
+   [wp_initlog_sconf] itself stays general in γ; the baking happens exactly
+   here, one level below the seal.  The boot kit is what delivers
+   [log_free_tok icfg_log] to forkret's first arm ([FirstTok.first_tok]'s
+   widened left disjunct, fs-cfg-boot.md "Transport").
 
    fsinit is single-threaded boot context, it SLEEPS (bread, and everything
    under initlog and ireclaim), so it threads the full running-process bundle
@@ -321,6 +339,11 @@ Definition wp_fsinit_sconf_body
   fs_crash_seam cov logstart -∗
   gen_cert -∗
   log_mirror_full -∗
+  (* THE LOG'S FOUR GNAMES, AT THEIR GENESIS VALUES, AND THEY ARE
+     [icfg_log]'s.  Threaded straight into [initlog] at +0x4e, which fills
+     them rather than minting its own.  See the header: this is the
+     conjunct that makes fsinit's post assemble into [FsReady.fs_ready]. *)
+  log_free_tok icfg_log -∗
   (* ================================================================== *)
   (*  THE SUPERBLOCK, BEFORE AND AFTER                                   *)
   (* ================================================================== *)
@@ -410,8 +433,12 @@ Definition wp_fsinit_sconf_body
       (* block 1's client half, untouched -- bread/brelse do not write it *)
       fsblock γfs 1 bs_sb -∗
       (* THE LOG LAYER, BUILT by initlog at +0x4e and already USED by
-         ireclaim at +0x54.  It does not cross the boundary as an input. *)
-      (∃ γ : log_names, log_ctx γ bn γfs cov logstart dev) -∗
+         ireclaim at +0x54.  It does not cross the boundary as an input.
+         AT [icfg_log], not existentially: this is [FsReady.fs_ready]'s log
+         conjunct, modulo the seal site's instantiation of [bn]/[γfs]/[cov]/
+         [logstart] at [fsc_bio]/[fsc_fs]/[fsc_cov]/[fsc_logst] and
+         [dev = icfg_dev], which premise (e) above already gives. *)
+      log_ctx icfg_log bn γfs cov logstart dev -∗
       (* three, not two: see the header *)
       bslots bn 3 -∗
       iref_slot -∗

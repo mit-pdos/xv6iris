@@ -28,9 +28,19 @@
    cells, the superblock field naming the log's start block, the FsBlocks
    authorities and the log region's client halves -- and its postcondition
    is the persistent [log_ctx], the context every other log.c function
-   takes.  The ledger authority ([LogInv.log_ledger_alloc]) and the "log"
-   spinlock's ghost name are allocated INSIDE the proof, so neither appears
-   in the interface; only [∃ γ : log_names, log_ctx ...] comes out.
+   takes.
+
+   AND IT FILLS A [log_names] IT IS GIVEN (claude-notes/projects/
+   fs-cfg-boot.md, THE PRINCIPLE).  The four gnames used to be minted
+   INSIDE the proof and returned as [∃ γ : log_names, log_ctx ...]; they
+   are now a PARAMETER, and the premise [LogDefs.log_free_tok γ] is the
+   era fupd's receipt for having minted them at their genesis values (the
+   empty ledger, epoch one, the empty append registry, and the "log"
+   spinlock's free ghost state).  The reason is [IcacheRef.icfg_log]: the
+   configuration record names the log's gnames as an AMBIENT field, so
+   they must exist before any proof runs, and an ambient field cannot be a
+   WP-time existential.  The contract stays GENERAL in [γ] -- it is the
+   era fupd, not this statement, that instantiates [γ := icfg_log].
 
    STAGE 2 IS THE CLEAN-IMAGE FORM.  The premise [hdr_n bs_hdr = 0] says the
    on-disk header's [n] field reads zero -- true of a freshly mkfs'd image,
@@ -125,6 +135,7 @@ Definition wp_initlog_sconf_body
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
+    (γ : log_names)     (* THE LOG'S FOUR GNAMES, chosen by the CALLER *)
     (γfs : fs_names)
     (cov : gset Z) (logstart : Z) (dev : mword 32) (sb : mword 64)
     (bs_hdr : list (bv 8))
@@ -179,6 +190,13 @@ Definition wp_initlog_sconf_body
      lands (stage 3).  It comes from the era boot bundle, minted at PowerOn
      beside the disk image map. *)
   log_mirror_full -∗
+  (* THE FOUR GNAMES, AT THEIR GENESIS VALUES (fs-cfg-boot.md staging step
+     1).  The era fupd minted them -- they are [IcacheRef.icfg_log]'s value
+     -- and this is the receipt initlog spends to BUILD the layer at them:
+     the empty ledger, epoch one, the empty append registry go straight into
+     [log_res], and the lock's free ghost state is what [WpLockAt.newlock_at]
+     seals the "log" spinlock with. *)
+  log_free_tok γ -∗
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle *)
   procs_inv γs -∗
@@ -239,9 +257,12 @@ Definition wp_initlog_sconf_body
       pa_add sb 20 ↦₄{dqs} (mword_of_int logstart : mword 32) -∗
       (* only initlog's own working pair: the other 32 are the batch's pool *)
       bslots bn 2 -∗
-      (* THE LOG LAYER, BUILT.  Everything else initlog was handed is now
-         sealed inside the "log" spinlock's resource. *)
-      (∃ γ : log_names, log_ctx γ bn γfs cov logstart dev) -∗
+      (* THE LOG LAYER, BUILT -- AT THE CALLER'S OWN [γ].  Everything else
+         initlog was handed is now sealed inside the "log" spinlock's
+         resource.  No existential: the names came in, so the boot client
+         that instantiates [γ := icfg_log] gets back exactly the conjunct
+         [FsReady.fs_ready] asks for. *)
+      log_ctx γ bn γfs cov logstart dev -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -253,6 +274,7 @@ Module Type INITLOG.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
+      (γ : log_names)
       (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32) (sb : mword 64)
       (bs_hdr : list (bv 8))
@@ -262,7 +284,7 @@ Module Type INITLOG.
       (pidv : mword 32) (dq dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_initlog_sconf_body γs j γl γu γd γk pd pav pu bn γfs
+      wp_initlog_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs
                             cov logstart dev sb bs_hdr L D
                             vlock vname vcpu v_start v_dev v_nc v_n
                             pidv dq dqs m K eb b lks.
