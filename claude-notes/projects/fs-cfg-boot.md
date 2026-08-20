@@ -1163,6 +1163,37 @@ when SpecForkret starts importing FirstTok.
   WRITE `is_lock fsc_dlock …` before the value exists, so `fs_ready` stays
   unstatable. Eager minting is the only route.
 
+## Stage (f) closing state (2026-08-20 night) — charter corrections + D4
+
+(f1)–(f3), (f3-rest) and the (f5) TRANSPORT are landed (commits `0d5a46b9`,
+`5ac22754`); audit SEVEN throughout. Charter corrections, measured:
+- **(f-3) row 7 was wrong**: `fs_crash_seam` was NOT boot-chain product —
+  it had no producer at all. Paid by `RiscvAdequacy.boot_fixedGS` + the
+  `Hboot` whole-record shape premise (client's obligation weakens;
+  conclusion untouched; the power theorem now boots over `P_fs_named` at
+  an existential `D0` instead of `Pc := True`, at which the seam is
+  FALSE). `xv6_fs_adequacy` lost its free `logstart` (pinned to
+  `sb_logstart sb`). **Design-owner glance requested** (statement-side
+  change to the top theorem's hypothesis).
+- **(f-4)'s "statement only" ripple estimate was wrong**: allocproc's
+  found arm re-introduces the `∃ γk` from `proc_pagetable`'s post, and
+  `is_lock` has no resource-agreement lemma, so spelling the pair rides
+  the whole kalloc call graph (125 files). Debt F as chartered is DEAD.
+- **D4 (NEW decision point, replaces debt F/D3):** relax
+  `FsReady.fs_ready_pre` rows 16+17 (the spelled kmem `is_lock` +
+  `kalloc_avail fsc_kpages None`) to ONE persistent row
+  `KvmSpec.kalloc_env fsc_kalloc None`; the seal is then
+  `kalloc_env_seal` on allocproc's own returned env inside ProofUserinit;
+  `first_tok` row 3 changes spelling to match; cost = FsReady.v (def +
+  `fs_ready_kmem` goes existential) + one `iDestruct` at
+  ProofSyscall.v:687, the only external consumer. RECOMMENDED — but
+  FsReady.v is the humans' file and upstream may have moved it: rule at
+  the Nickolai sync, AFTER the merge.
+- (f5)'s deposit completes when D4 + D1 land: at ProofUserinit's
+  `FP.forkret_park` site, `Hfirst`/`#Hpersist`/`Hfsinit` are in hand; the
+  drop block becomes `iApply (first_tok_boot with "Hfirst Hpersist Hkav
+  Hfsinit")` and the park call gains one argument.
+
 ## PENDING MERGE (fetched 2026-08-20 late, NOT yet merged)
 
 origin/main moved past the merge-base `15f597b2` (our side = this campaign's
