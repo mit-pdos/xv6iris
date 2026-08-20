@@ -194,8 +194,17 @@ dangling-deadlock analysis, `resv_ok` as a state invariant.
   `unproj_lbl`, `WeakRetag`.
 - **S3**: event language + `WeakInterp` (`ak_excl`) + `WeakEvLift` WP rules
   (incl. the §5 retry arm) + `WeakEvPf`/capstone plumbing.
-- **S4**: the robust tower re-index (Ser/Acyc/Disc/Blocks/Prov/Sim/Cone/
-  L2/L2b vocabulary).
+- **S4** (LANDED 2026-08-20): the robust tower re-index — the pf REPLAY
+  (`WeakRobustSim.Qinv_step` + its step-exporting twin
+  `WeakRobustCone.Qcfg_step`) plays the pair back, `ts_oblivious` gains an
+  `LExLoad` conjunct, `pcls_obl` an `LExStore` one, and the reservation
+  crosses σ via `WeakRobustProv.res_cols`/`aevs_post_res`/
+  `aevs_post_res_src`.  §7's "riskiest item" `excl_ok_pf` split form is
+  `WeakRobustSim.excl_ok_ts_pf`: the ONE structural difference from the
+  fused proof is that the window's lower bounds are read at the po-earlier
+  `LExLoad` EVENT (found from the reservation, in `done` by downward
+  closure), not at the write's own label.  `lat_free_prog`'s fused
+  conjunct and the old capstone's `Hfused` are gone.
 - **S5**: `WeakCertify`, the Sail-LTS tier, `WeakCompose*`, capstone
   re-verification.
 - **S6** (contract): delete `LRmw`, `WPRmw`/`PFRmw`, `wpstep_rmw_now`,

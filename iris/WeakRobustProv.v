@@ -258,6 +258,130 @@ Proof.
 Qed.
 
 (* ------------------------------------------------------------------ *)
+(** ** THE RESERVATION UNDER σ (T2-2a): [w_res] IS THE σ-RETIMED IMAGE OF
+       THE RECORDED ONE, AND ITS COLUMN NAMES AN EARLIER [LExLoad]
+
+    The conditional write's machine arm ([WeakPromiseBridge.PFExStore])
+    reads the ACTING AGENT's reservation, so the pf replay owes two facts
+    about the π-transported fold that no other field needs.
+
+    (1) [aevs_post_res]: [rv_base] survives and [rv_ts] is the σ-image of
+        the recorded column.  ([rv_view] is NOT related — it is a view, so
+        it moves with σ in the [lrel] sense rather than positionally; no
+        consumer of the reservation at the replay reads it, which is why
+        the relation below is stated on the column alone.)  Every arm is
+        either "clears", "keeps" or "sets from the label"; the first two
+        take the SAME branch on both sides because the two folds differ
+        only in timestamps, never in a length.
+
+    (2) [aevs_post_res_src]: a reservation in the RECORDED fold was set by
+        an [LExLoad] event of the same prefix, whose read column IS
+        [rv_ts].  That is what lets the replay's window transport
+        ([WeakRobustSim.excl_ok_ts_pf]) find the [gev_reads] facts of the
+        window's lower bounds — they belong to the exclusive READ's event,
+        which is po-earlier and hence already processed. *)
+
+Definition res_cols (σ : nat → nat) (r r' : option wresv) : Prop :=
+  match r, r' with
+  | None, None => True
+  | Some R, Some R' => rv_base R = rv_base R' ∧ rv_ts R = σ <$> rv_ts R'
+  | _, _ => False
+  end.
+
+Lemma res_cols_inv σ r R' :
+  res_cols σ r (Some R') →
+  ∃ R, r = Some R ∧ rv_base R = rv_base R' ∧ rv_ts R = σ <$> rv_ts R'.
+Proof.
+  rewrite /res_cols. destruct r as [R|]; [|by intros []].
+  intros [H1 H2]. by exists R.
+Qed.
+
+Lemma aev_post_res {D : Type} σ (ev : aev D) w w' :
+  res_cols σ (w_res w) (w_res w') →
+  res_cols σ (w_res (aev_post σ ev w)) (w_res (aev_post id ev w')).
+Proof.
+  intros Heq. rewrite /aev_post.
+  destruct (ae_lb ev) as [|aq lat base tvs asrc|rl base data asrc vsrc
+                          |aq rl base tvs data asrc vsrc
+                          |pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc];
+    [done| | | | |done| | | | | ].
+  - rewrite !load_post_run_d_res. by destruct (tvs.*1).
+  - destruct (ae_ts ev) as [ts|]; [|done].
+    rewrite !store_post_run_d_res. by destruct (length data).
+  - destruct (ae_ts ev) as [ts|]; [|done].
+    rewrite !store_post_run_d_res. destruct (length data); [|done].
+    rewrite !load_post_run_d_res. by destruct (tvs.*1).
+  - rewrite !fence_post_res. by destruct (pr || pw || sr || sw)%bool.
+  - exact Heq.
+  - exact Heq.
+  - done.
+  (* THE RMW SPLIT (S2): the exclusive read SETS the column from the label *)
+  - rewrite !exload_post_run_d_res /=. split; [done|].
+    by rewrite list_fmap_id.
+  - destruct (ae_ts ev) as [ts|]; [|done].
+    rewrite !store_post_run_d_res. by destruct (length ydata).
+Qed.
+
+Lemma aevs_post_res {D : Type} σ (evs : list (aev D)) :
+  ∀ w w', res_cols σ (w_res w) (w_res w') →
+    res_cols σ (w_res (aevs_post σ evs w)) (w_res (aevs_post id evs w')).
+Proof.
+  induction evs as [|ev evs IH]; intros w w' Heq; [done|].
+  rewrite /aevs_post /=. apply IH. by apply aev_post_res.
+Qed.
+
+Lemma aevs_post_res_init {D : Type} σ (evs : list (aev D)) :
+  res_cols σ (w_res (aevs_post σ evs ws_init))
+             (w_res (aevs_post id evs ws_init)).
+Proof. by apply aevs_post_res. Qed.
+
+(** (2) THE SOURCE OF A RECORDED RESERVATION. *)
+Lemma aevs_post_res_src {D : Type} (evs : list (aev D)) w R :
+  w_res w = None →
+  w_res (aevs_post id evs w) = Some R →
+  ∃ m ev aq tvs asrc,
+    evs !! m = Some ev ∧
+    ae_lb ev = LExLoad aq (rv_base R) tvs asrc ∧
+    rv_ts R = tvs.*1.
+Proof.
+  intros Hw. induction evs as [|ev evs IH] using rev_ind.
+  { rewrite aevs_post_nil Hw. intros [=]. }
+  rewrite aevs_post_app /aev_post.
+  set W := aevs_post id evs w.
+  have Hprev : w_res W = Some R →
+    ∃ m ev' aq tvs asrc, (evs ++ [ev]) !! m = Some ev' ∧
+      ae_lb ev' = LExLoad aq (rv_base R) tvs asrc ∧ rv_ts R = tvs.*1.
+  { intros HW. destruct (IH HW) as (m & ev' & aq & tvs & asrc & Hm & Hl & Hts).
+    exists m, ev', aq, tvs, asrc. split_and!; [|done|done].
+    by apply lookup_app_l_Some. }
+  destruct (ae_lb ev) as [|aq lat base tvs asrc|rl base data asrc vsrc
+                          |aq rl base tvs data asrc vsrc
+                          |pr pw sr sw| |rdw wsrc|csrc| |xaq xbase xtvs xasrc|yrl ybase ydata yasrc yvsrc]
+    eqn:Hlb.
+  - exact Hprev.
+  - rewrite load_post_run_d_res. destruct (tvs.*1); [exact Hprev|intros [=]].
+  - destruct (ae_ts ev) as [ts|]; [|exact Hprev].
+    rewrite store_post_run_d_res. destruct (length data); [exact Hprev|intros [=]].
+  - destruct (ae_ts ev) as [ts|]; [|exact Hprev].
+    rewrite store_post_run_d_res. destruct (length data); [|intros [=]].
+    rewrite load_post_run_d_res. destruct (tvs.*1); [exact Hprev|intros [=]].
+  - rewrite fence_post_res.
+    destruct (pr || pw || sr || sw)%bool; [intros [=]|exact Hprev].
+  - exact Hprev.
+  - exact Hprev.
+  - exact Hprev.
+  - rewrite /instr_post /=. intros [=].
+  (* THE RMW SPLIT (S2): the arm that SETS the reservation *)
+  - rewrite exload_post_run_d_res. intros Heq. injection Heq as <-.
+    exists (length evs), ev, xaq, xtvs, xasrc. split_and!.
+    + by apply list_lookup_middle.
+    + by rewrite Hlb /=.
+    + by rewrite /= list_fmap_id.
+  - destruct (ae_ts ev) as [ts|]; [|exact Hprev].
+    rewrite store_post_run_d_res. destruct (length ydata); [exact Hprev|intros [=]].
+Qed.
+
+(* ------------------------------------------------------------------ *)
 (** ** B. Behavior correspondence: the behavior's own [wstate] IS the
        [id]-fold of its trace prefix *)
 

@@ -603,7 +603,10 @@ Definition sail_step (next : bool → M unit)
     fused arm's read half carries no [lat] at all.  So no latest-kind load is
     ever emitted — the hypothesis [WeakPromiseFact]'s front-loading theorem
     takes. *)
-(** THE RMW SPLIT (S2): the PRE-SPLIT conjunct of [lat_free_prog].  No arm
+(** THE RMW SPLIT: THIS LTS LIVES IN THE FUSED ALPHABET.  (It used to be
+    [lat_free_prog]'s second conjunct; S4 deleted that, and the fact is
+    kept because [WeakCompose.xv6_ts_oblivious] discharges the exclusive
+    read's obliviousness clause by refutation from it.)  No arm
     of [sail_mstep] mentions [LExLoad]/[LExStore] — the RAM-read arm's
     inner [match l with … | _ => False]] refutes them outright, every other
     arm pins [l] to one of the nine — so this LTS lives in the fused
@@ -638,7 +641,6 @@ Qed.
 
 Theorem sail_lat_free next : lat_free_prog (pstep_unit (sail_step next)).
 Proof.
-  split; [|by intros p d l p' d' H; eapply sail_step_fused, H].
   intros p d aq base tvs asrc p' d' H. rewrite /pstep_unit /sail_step in H.
   destruct (sp_fence p) as [[[[pr pw] sr] sw]|]; [by destruct H as [? _]|].
   destruct H as [Hirq|H]; [by destruct Hirq as [? _]|].

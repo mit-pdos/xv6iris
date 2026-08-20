@@ -359,15 +359,19 @@ Definition lbl_class_p {P : Type} (_ : P) (l : wlabel) (ws : wstate)
 (** THE REPLAY-SIDE OBLIGATION (G6a).  [lbl_class] is the canonical [pcls]
     for the whole archive route, and the replay ([WeakRobustSim]) hands the
     same events back at PERMUTED timestamps — so the class function must look
-    at no timestamp.  [lbl_class] looks at [rl] and at [w_relp ws] on the
-    store arm and is constant on the rmw arm, so it does not.  Every archive
+    at no timestamp.  [lbl_class] looks at [rl] and at [w_relp ws] on the two
+    store arms and is constant on the rmw arm, so it does not.  Every archive
     consumer that owes [WeakRobustTrace.pcls_obl] discharges it with this. *)
 Lemma lbl_class_obl {P : Type} : pcls_obl (P := P) lbl_class_p.
 Proof.
-  split.
+  split_and!.
   - intros p rl base data asrc vsrc ws ws' Hrel.
     by rewrite /lbl_class_p /lbl_class Hrel.
   - intros p aq rl base tvs tvs' data asrc vsrc ws ws' _ _. reflexivity.
+  (* THE RMW SPLIT (S4): the conditional write classifies exactly as the
+     plain store does, so its arm is the first one verbatim. *)
+  - intros p rl base data asrc vsrc ws ws' Hrel.
+    by rewrite /lbl_class_p /lbl_class Hrel.
 Qed.
 
 (** (a) the class the step appends is the computed one. *)

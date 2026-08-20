@@ -190,8 +190,8 @@ restriction simulation's device component costs more than the G4/G5
   lemmas (A1c-style definitional work; litmus-check the declared model
   against A5's table — RVWMO⁻ must ALLOW LB and reader-fence-only MP).
 - **T2-2** — R-track debts the containment needs: R4/S4 (pair-form tower
-  re-index — deletes `Hfused`), R6 (contract), W1/W2 (walker traffic
-  naming), the W-TV consumption slice.
+  re-index — deletes `Hfused`; **DONE 2026-08-20, T2-2a**), R6
+  (contract), W1/W2 (walker traffic naming), the W-TV consumption slice.
 - **T2-3** — D8-2 (the restriction simulation `sim_wpcfg`, budgeted on
   `sim_dev`), D8-3 (`certified_exec_complete`'s backward induction).
 - **T2-4** — E1: the extended exhibit (cone replay ++ certifying solo

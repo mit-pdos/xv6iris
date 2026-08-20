@@ -1572,9 +1572,10 @@ Qed.
     [pnode_step_fused] / [pstep_node_fused] / [pstep_plic_fused] /
     [pstep_hart_fused] / [pstep_ev_fused] were the S2 residue "no producer
     emits the split pair yet"; the producers now do, so they are FALSE and
-    are DELETED (the R3/S4 coupling ruling).  What the old capstone still
-    needs is therefore an explicit hypothesis — see
-    [WeakEvCapstone.xv6_ev_weak_robust]'s [Hfused].
+    are DELETED (the R3/S4 coupling ruling).  Nothing asks for them any
+    more either: S4 landed 2026-08-20, so the robustness tower replays the
+    pair and [WeakEvCapstone.xv6_ev_weak_robust] carries no fused
+    hypothesis.
 
     WHAT SURVIVES IS THE DISK'S HALF, and it is exactly what the task calls
     [pstep_disk_no_ex]: the device program has no exclusive access at all,
@@ -1592,6 +1593,75 @@ Proof.
           |[(_ & -> & _)
           |(p' & _ & _ & -> & _)]]]]]]]
          |(_ & -> & _)]; exact I.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(** THE RMW SPLIT (S4): TIMESTAMP-OBLIVIOUSNESS OF THE EXCLUSIVE READ.
+    [WeakRobustSim.ts_oblivious]'s third conjunct.  The exclusive read's
+    node is [pnode_step_ts_load]'s node — the SECOND disjunct of the RAM
+    read — and it constrains [tvs] only through [length tvs] and [tvs.*2],
+    so retiming it is free.  Unlike the plain load's clause this one is
+    proved at an ARBITRARY [asrc] (the exclusive read's operand list is
+    REAL: it is [deps_asrc (deps_of_ib ib)], D3-2), exactly as the fused
+    [LRmw] clause was generalised. *)
+
+Lemma pnode_step_ts_exload m rs ib d aq base tvs tvs' asrc m' ors fn' d' oib :
+  pnode_step m rs ib d (LExLoad aq base tvs asrc) m' ors fn' d' oib ->
+  tvs'.*2 = tvs.*2 ->
+  pnode_step m rs ib d (LExLoad aq base tvs' asrc) m' ors fn' d' oib.
+Proof.
+  rewrite /pnode_step. destruct m as [y|T oc k].
+  { by intros (? & ? & _). }
+  destruct oc; simpl; try (by intros (? & _));
+    try (intros (Hl & _); by destruct (erw_of (deps_of_ib ib) reg));
+    try (by intros []).
+  - (* MemRead *) destruct (dev_addr _).
+    + by intros (w & _ & ? & _).
+    + intros (Hcoh & [(_ & w & tvs0 & _ & _ & Hl & _)
+                     |(Hlat & w & tvs0 & Hlen & Hby & Hl & Hrest)]) Hts;
+        [by simplify_eq|].
+      simplify_eq/=.
+      have Hlen' : length tvs' = length tvs0.
+      { by rewrite -(length_fmap snd tvs') -(length_fmap snd tvs0) Hts. }
+      split; [exact Hcoh|]. right. split; [exact Hlat|].
+      exists w, tvs'. split_and!; [by rewrite Hlen'|by rewrite Hts| | | | | |];
+        by destruct Hrest as (-> & -> & -> & -> & ->).
+  - (* MemWrite *) destruct (dev_addr _).
+    + by intros (? & ? & _).
+    + by intros (_ & [(_ & ? & _)|(_ & [(? & _)|(? & _)])]).
+  - (* Barrier *) intros (Hl & _). by destruct b.
+  - (* Choose *) by intros (ch & ? & _).
+Qed.
+
+Lemma pstep_node_ts_exload cpu m rs fn ib d aq base tvs tvs' asrc m' ors fn' d'
+    oib :
+  pstep_node cpu m rs fn ib d (LExLoad aq base tvs asrc) m' ors fn' d' oib ->
+  tvs'.*2 = tvs.*2 ->
+  pstep_node cpu m rs fn ib d (LExLoad aq base tvs' asrc) m' ors fn' d' oib.
+Proof.
+  rewrite /pstep_node. destruct fn as [[[[pr pw] sr] sw]|].
+  - by intros (? & _).
+  - apply pnode_step_ts_exload.
+Qed.
+
+Lemma pstep_disk_ts_exload dp d aq base tvs tvs' asrc dp' d' :
+  pstep_disk dp d (LExLoad aq base tvs asrc) dp' d' ->
+  tvs'.*2 = tvs.*2 ->
+  pstep_disk dp d (LExLoad aq base tvs' asrc) dp' d'.
+Proof. intros H. by destruct (pstep_disk_no_ex _ _ _ _ _ H). Qed.
+
+Theorem pstep_ev_ts_exload p d aq base tvs tvs' asrc p' d' :
+  pstep_ev p d (LExLoad aq base tvs asrc) p' d' ->
+  tvs'.*2 = tvs.*2 ->
+  pstep_ev p d (LExLoad aq base tvs' asrc) p' d'.
+Proof.
+  rewrite /pstep_ev.
+  destruct p as [cpu m rs fn ib|dp], p' as [cpu' m' rs' fn' ib'|dp']; simpl;
+    try (by intros ? ?).
+  - intros (-> & ors & oib & -> & -> & [H|(H & _)]) Hts; [|done].
+    split; [reflexivity|]. exists ors, oib. split_and!; [reflexivity..|].
+    left. by eapply pstep_node_ts_exload.
+  - apply pstep_disk_ts_exload.
 Qed.
 
 (* ---------------------------------------------------------------------- *)

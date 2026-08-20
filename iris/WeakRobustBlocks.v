@@ -109,16 +109,17 @@ Definition lb_ok (l : wlabel) : Prop :=
   match l with
   | LStore _ _ data _ _ => data ≠ []
   | LRmw _ _ _ tvs data _ _ => data ≠ [] ∧ length tvs = length data
-  (* THE RMW SPLIT — R3 CHECKED, LEFT AS [False] DELIBERATELY.  [lb_ok] is
-     what [lts_enabled]'s [le_lb_ok] demands of EVERY label the LTS emits,
-     and [cstep_available] reads the contradiction off it.  The machine has
-     real arms for the split pair since S2, so the clause COULD be given
-     real content ([data ≠ []] plus the reservation/window, i.e.
-     [WeakPromise.exwin_ok]) — but no consumer in this tower needs it yet:
-     everything above [lb_ok] is reached through [lat_free_prog], whose
-     fused conjunct still restricts the alphabet, and giving the two labels
-     content here without the tower's PAIR-FORM re-index (design §8's S4)
-     would only move the [False] one file up.  Flip it as part of S4. *)
+  (* THE RMW SPLIT — STILL [False], AND NOW IT IS THE ONLY PLACE THAT
+     RESTRICTS THE ALPHABET.  [lb_ok] is what [lts_enabled]'s [le_lb_ok]
+     demands of EVERY label the LTS emits, and [cstep_available] reads the
+     contradiction off it.  S4 (2026-08-20) deleted [lat_free_prog]'s
+     fused conjunct, so an instance that emits the pair no longer fails
+     [lat_free_prog] — it fails HERE instead.  Nothing in the tree proves
+     [lts_enabled] for such an instance yet ([lb_ok] has no prover outside
+     this file), so nothing is unsound; what is owed, whenever a consumer
+     of [lts_enabled] appears, is real content for these two clauses
+     ([data ≠ []] plus the reservation/window, i.e.
+     [WeakPromise.exwin_ok]). *)
   | LExLoad _ _ _ _ | LExStore _ _ _ _ _ => False
   | LSilent | LLoad _ _ _ _ _ | LFence _ _ _ _ | LDev | LRegW _ _
   | LCtrl _ | LInstr => True

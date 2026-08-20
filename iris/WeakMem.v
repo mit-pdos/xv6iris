@@ -1175,6 +1175,54 @@ Lemma exload_post_run_d_res ws aq vaddr base ts :
   = Some (WResv base ts (ldv_of ws aq vaddr base ts)).
 Proof. done. Qed.
 
+(** *** WHAT EACH ACCESS DOES TO [w_res], AS AN EQUATION
+
+    The per-byte clears ([load_post_at], [store_post_d]) mean an access
+    clears the reservation exactly when it has AT LEAST ONE BYTE; a
+    zero-width run folds nothing and leaves [w_res] alone.  Both facts are
+    needed by the T2 replay ([WeakRobustProv.aevs_post_res]), which must
+    show the replayed fold and the recorded one take the SAME branch — they
+    do, because the two differ only in the timestamps, never in the length. *)
+Lemma ws_init_res : w_res ws_init = None.
+Proof. done. Qed.
+
+Lemma load_post_bytes_d_res ws aq vaddr ats :
+  ats ≠ [] → w_res (load_post_bytes_d ws aq vaddr ats) = None.
+Proof.
+  induction ats as [|a ats _] using rev_ind; [done|].
+  intros _. by rewrite /load_post_bytes_d foldl_app.
+Qed.
+
+Lemma store_post_bytes_d_res ws rl vf as_ t :
+  as_ ≠ [] → w_res (store_post_bytes_d ws rl vf as_ t) = None.
+Proof.
+  induction as_ as [|a as_ _] using rev_ind; [done|].
+  intros _. by rewrite /store_post_bytes_d foldl_app.
+Qed.
+
+Lemma load_post_run_d_res ws aq vaddr base ts :
+  w_res (load_post_run_d ws aq vaddr base ts)
+  = match ts with [] => w_res ws | _ :: _ => None end.
+Proof.
+  rewrite /load_post_run_d /ctrl_post /=.
+  destruct ts as [|t ts]; [done|].
+  by apply load_post_bytes_d_res.
+Qed.
+
+Lemma store_post_run_d_res ws rl vaddr vdata base n t :
+  w_res (store_post_run_d ws rl vaddr vdata base n t)
+  = match n with 0%nat => w_res ws | S _ => None end.
+Proof.
+  rewrite /store_post_run_d /ctrl_post /=.
+  destruct n as [|n]; [done|].
+  by apply store_post_bytes_d_res.
+Qed.
+
+Lemma fence_post_res ws pr pw sr sw :
+  w_res (fence_post ws pr pw sr sw)
+  = if (pr || pw || sr || sw)%bool then None else w_res ws.
+Proof. done. Qed.
+
 (** THE RESERVATION'S BANKED VIEW as a TOTAL function of the state — the
     form a fulfil-pre-view function can consume without an existential
     ([WeakRobustAcyc.fulfil_vext]).  [0] with no reservation, which is the

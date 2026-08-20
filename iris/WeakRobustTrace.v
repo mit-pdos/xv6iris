@@ -151,7 +151,14 @@ Definition pcls_obl {P : Type} (clsf : P → wlabel → wstate → wm_class)
   (∀ p aq rl base tvs tvs' data asrc vsrc ws ws',
      tvs.*2 = tvs'.*2 → w_relp ws = w_relp ws' →
      clsf p (LRmw aq rl base tvs data asrc vsrc) ws
-     = clsf p (LRmw aq rl base tvs' data asrc vsrc) ws').
+     = clsf p (LRmw aq rl base tvs' data asrc vsrc) ws') ∧
+  (* THE RMW SPLIT (S4): the conditional write appends a message too, so
+     [wp_pf_step]'s class pinning reaches it, and the replay hands it the
+     π-transported [wstate].  Its label carries no timestamp at all, so
+     the obligation is [LStore]'s verbatim. *)
+  (∀ p rl base data asrc vsrc ws ws', w_relp ws = w_relp ws' →
+     clsf p (LExStore rl base data asrc vsrc) ws
+     = clsf p (LExStore rl base data asrc vsrc) ws').
 
 (** THE GLOBAL DEVICE-ORDER WITNESS.  [pd_init] is the fabric the state
     phase starts at ([pc_dev mid]); [pd_ord] lists, IN BEHAVIOR ORDER,

@@ -33,8 +33,8 @@
       (c) the sRVWMO-side hypotheses: [srvwmo_consistent], the boot image,
           and the conformance supply [exec_prog_ok].
     And that is all.  In particular NO [main_premises], NO robustness
-    package, NO [Hfused], NO retag: the whole [robust_main] tower — the
-    tier-2 route — is off this path.  [Print Assumptions] (recorded at the
+    package, NO retag: the whole [robust_main] tower — the tier-2 route —
+    is off this path.  [Print Assumptions] (recorded at the
     bottom): exactly the five generated-model reservation axioms.
 
     A NOTE ON DIRECTION.  The tier-2 capstone

@@ -232,10 +232,12 @@ Section pf_uniform.
       list — deviation D-8 — so the inversion needs to know the step emitted
       none THERE; everywhere else the lists are free.  At the instance the
       premise is [WeakEvInst.pstep_ev_ldepfree]. *)
-  (** THE RMW SPLIT (S2) GATE.  [pf_ok] still refutes the split pair (its
-      arms land with the event language, at S3/R3), so the inversion needs
-      to know the step did not emit one; at the instance the premise is
-      [WeakEvInst.pstep_ev_fused]. *)
+  (** THE RMW SPLIT GATE, LOCAL TO [pf_ok].  [pf_ok] (this file's OLD
+      per-step inversion) still refutes the split pair, so the inversion
+      needs to know the step did not emit one — a hypothesis of the two
+      lemmas below and nothing more.  It is unrelated to
+      [WeakPromiseFact.lat_free_prog], which since S4 (2026-08-20) says
+      only [lat_free]. *)
   Local Ltac pf_inv_old :=
     repeat (match goal with H : _ /\ _ |- _ => destruct H end); subst;
     do 3 eexists; split_and!; try done;
@@ -848,23 +850,18 @@ Proof.
   simpl in Hdf. rewrite Hdf in Hs. by eapply pstep_ev_lat_free.
 Qed.
 
-(** ... and the FUSED half, which does NOT (R3/S4 COUPLING, the ruling).
-    [lat_free_prog]'s second conjunct says the program emits only the nine
-    pre-split constructors; the producers emit [LExLoad]/[LExStore] now, so
-    the instance's [pstep_ev_fused] is FALSE and is deleted.  Everything
-    that used to consume it takes it as a HYPOTHESIS instead — see
-    [xv6_ev_weak_robust]'s [Hfused], tagged RESTORED BY S4. *)
-Lemma pstep_ev_lat_free_prog
-    (Hfused : forall p d l p' d', pstep_ev p d l p' d' -> lb_fused l) :
-  lat_free_prog pstep_ev.
+(** ...and that IS [lat_free_prog] now: S4 landed 2026-08-20, so the
+    predicate's old second conjunct (the pre-split alphabet) is gone and
+    the instance owes nothing beyond lat-freedom. *)
+Lemma pstep_ev_lat_free_prog : lat_free_prog pstep_ev.
 Proof.
-  split; [|exact Hfused]. intros p d aq base tvs asrc p' d' Hs.
+  intros p d aq base tvs asrc p' d' Hs.
   by eapply pstep_ev_lat_free_half.
 Qed.
 
 Lemma pstep_ev_ts_oblivious : ts_oblivious pstep_ev.
 Proof.
-  split.
+  split_and!.
   - intros p d aq lat base tvs tvs' asrc p' d' Hts Hs.
     have Hdf : lb_ldepfree (LLoad aq lat base tvs asrc)
       by eapply pstep_ev_ldepfree.
@@ -875,6 +872,10 @@ Proof.
        at ARBITRARY [asrc]/[vsrc] — [pstep_ev_ts_rmw] was generalised. *)
     intros p d aq rl base tvs tvs' data asrc vsrc p' d' Hts Hs.
     by eapply pstep_ev_ts_rmw.
+  (* THE RMW SPLIT (S4): the exclusive read, at ARBITRARY [asrc] — its
+     operand list is real (D3-2), exactly as the fused rmw's was. *)
+  - intros p d aq base tvs tvs' asrc p' d' Hts Hs.
+    by eapply pstep_ev_ts_exload.
 Qed.
 
 Lemma wm_class_of_relp ak ws ws' :
@@ -886,13 +887,20 @@ Proof. intros H. by rewrite /wm_class_of H. Qed.
     exactly [w_relp], and the [LRmw] class is the constant [WCexcl]. *)
 Lemma pcls_ev_obl : pcls_obl pcls_ev.
 Proof.
-  split.
+  split_and!.
   - intros p rl base data ws ws' Hrel.
     destruct p as [cpu m rs fn ib|dp]; simpl.
     + rewrite /pnode_wclass. destruct m as [y|T oc k]; [reflexivity|].
       destruct oc; try reflexivity. by apply wm_class_of_relp.
     + rewrite /ddev_class. by apply wm_class_of_relp.
   - intros. reflexivity.
+  (* THE RMW SPLIT (S4): [pcls_ev]'s conditional-write arm IS its
+     plain-store arm ([WeakEvInst]), so this is the first bullet verbatim. *)
+  - intros p rl base data ws ws' Hrel.
+    destruct p as [cpu m rs fn ib|dp]; simpl.
+    + rewrite /pnode_wclass. destruct m as [y|T oc k]; [reflexivity|].
+      destruct oc; try reflexivity. by apply wm_class_of_relp.
+    + rewrite /ddev_class. by apply wm_class_of_relp.
 Qed.
 
 (** THE TRANSPORT (B3.2, item 4): the event machine's violation-freedom IS
@@ -977,20 +985,9 @@ Theorem xv6_ev_weak_robust Σ `{!riscvGpreS Σ, !weakGpreS Σ}
     (Hgen : gen = 0%nat)
     (Hpow : wgpow σ0 = true) (Hgen0 : wggen σ0 = 0%nat)
     (Hlog : wglog σ0 = [])
-    (Hws : forall cc : CPU, wgws σ0 cc = ws_init)
-    (* RESTORED BY S4: the robust-tower pair re-index.
-       [WeakPromiseFact.lat_free_prog]'s second conjunct — "the program
-       emits only the nine PRE-SPLIT label constructors" — was discharged
-       by the instance until R3 made the producers emit [LExLoad]/
-       [LExStore].  It is consumed by the tower's pf REPLAY
-       ([WeakRobustSim.Qinv_step] refutes the split arms from it) and the
-       repair is design §8's slice S4: the tower re-indexed to the PAIR
-       form, after which the conjunct — and this hypothesis — disappear.
-       Until then the OLD (tier-2) capstone carries it explicitly rather
-       than silently gaining a false instance lemma; tier 1
-       ([WeakRobustMain.robust_main]) never consumes this theorem. *)
-    (Hfused : forall p d l p' d',
-       pstep_ev p d l p' d' -> WeakPromise.lb_fused l) :
+    (Hws : forall cc : CPU, wgws σ0 cc = ws_init) :
+  (* S4 landed 2026-08-20: the tower replays the split pair; no
+     fused-alphabet hypothesis remains. *)
   (* (b) THE WP PACKAGE *)
   (forall (HR : riscvGS Σ) (HW : weakGS Σ),
      ⊢ ([∗ set] cc ∈ (fin_to_set CPU : gset CPU),
@@ -1034,7 +1031,7 @@ Proof.
   (* THE TRACED DECOMPOSITION, and the canonical retag of it *)
   destruct (wp_behavior_fulfil_once_dev pstep_ev pdev_ev
               (img_z (wgimg σ0)) (wgdev σ0) (eps_init σ0) c
-              pdev_ev_ok (pstep_ev_lat_free_prog Hfused) Hbeh)
+              pdev_ev_ok pstep_ev_lat_free_prog Hbeh)
     as (mid & TS & DS & Hprom & Hofd & Hnp & Hacct).
   set f := canon_f pcls_ev TS.
   have Hbeh' : wp_behavior pstep_ev (img_z (wgimg σ0)) (wgdev σ0)
@@ -1059,7 +1056,7 @@ Proof.
   destruct (robust_main_bundle pstep_ev pcls_ev pdev_ev n_disk
               (img_z (wgimg σ0)) (wgdev σ0) (eps_init σ0)
               (retag_cfg f c) (retag_cfg f mid) (retag_traces f TS) DS
-              (pstep_ev_lat_free_prog Hfused) pstep_ev_ts_oblivious pcls_ev_obl
+              pstep_ev_lat_free_prog pstep_ev_ts_oblivious pcls_ev_obl
               Hprom' Hofd' (efulfil_acct_retag f mid TS Hacct)
               (Hprem _ _ _ _ Hbeh' Hprom' Hofd' Hcanon) Hcanon Hvf)
     as (cf & Hrun & Hpg & Hmm).

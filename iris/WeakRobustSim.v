@@ -35,7 +35,15 @@
     (3) EXCL_OK (rmw).  Same shape, with the behavior's [excl_ok] in the
         middle band, the rmw's own event for [t̂ = ts], and — for
         [t̂ > ts] — the observation that [Hco] would put the current
-        (unprocessed) event inside [done].
+        (unprocessed) event inside [done].  THE SPLIT PAIR (T2-2a) uses
+        [excl_ok_ts_pf], the same trichotomy over the RESERVATION's column:
+        the window's lower bounds are read at the po-EARLIER [LExLoad]
+        event (already processed, so its [gev_reads] facts are available
+        and π is stable on them), and the window itself comes off the
+        conditional write's own [astep_ok].  The replayed agent's
+        reservation is the π-image of the recorded one
+        ([WeakRobustProv.aevs_post_res]) and its column names that
+        earlier event ([aevs_post_res_src]).
     (4) FINAL MEMORY.  Every log message is fulfilled ([Hwfl]), so
         [fl full] enumerates every timestamp and [pf_log full] is a
         reordering of [pt_log TS]; per-byte [Hco]-monotonicity of π sends
@@ -431,7 +439,15 @@ Definition ts_oblivious {P D : Type}
      pstep p d (LLoad aq lat base tvs' asrc) p' d') ∧
   (∀ p d aq rl base tvs tvs' data asrc vsrc p' d', tvs.*2 = tvs'.*2 →
      pstep p d (LRmw aq rl base tvs data asrc vsrc) p' d' →
-     pstep p d (LRmw aq rl base tvs' data asrc vsrc) p' d').
+     pstep p d (LRmw aq rl base tvs' data asrc vsrc) p' d') ∧
+  (* THE RMW SPLIT (S4): the EXCLUSIVE READ is retimed by the replay just
+     as a plain load is (the conditional write carries no timestamp in its
+     label, so it owes nothing here — its retiming is the RESERVATION's,
+     which lives in the [wstate] and is handled by
+     [WeakRobustProv.aevs_post_res]). *)
+  (∀ p d aq base tvs tvs' asrc p' d', tvs.*2 = tvs'.*2 →
+     pstep p d (LExLoad aq base tvs asrc) p' d' →
+     pstep p d (LExLoad aq base tvs' asrc) p' d').
 
 Section sim.
   Context {P D : Type}.
@@ -1108,6 +1124,83 @@ Section sim.
   Qed.
 
   (* ---------------------------------------------------------------- *)
+  (** *** CRUX 3, SPLIT FORM (T2-2a): the transported EXCLUSIVITY WINDOW
+          OF A PAIR
+
+      [excl_ok_pf]'s proof, with the two facts the fused label supplied
+      IN ONE PLACE now arriving from two different events:
+
+      - the window's LOWER BOUNDS are the RESERVATION's column, and the
+        [gev_reads] facts that name their sources belong to the po-earlier
+        EXCLUSIVE READ ([e0], already processed — its own replay put it in
+        [done]); that is the ONE structural difference from the fused
+        proof, and it is why the read event is a parameter here.
+      - the window itself is the conditional write's own [excl_ok_ts],
+        read off ITS [astep_ok] rather than off a fused label.
+
+      The π-transport trichotomy ([that < tr] / [= tr] / [> tr], and above
+      it [≤ ts - 1] / [= ts] / [> ts]) is [excl_ok_pf]'s verbatim. *)
+  Lemma excl_ok_ts_pf done e e0 base rts ts :
+    qorder done →
+    e ∉ done →
+    e0 ∈ done →
+    (∀ jb t, rts !! jb = Some t →
+       gev_reads TS e0 (base + Z.of_nat jb) t) →
+    gev_ts TS e = Some ts →
+    (∀ jb, (jb < length rts)%nat → writes_b TS (base + Z.of_nat jb) e ts) →
+    excl_ok_ts (pt_log TS) e.1 base rts ts →
+    excl_ok_ts (pf_log TS done) e.1 base (pi TS done <$> rts)
+      (S (length (pf_log TS done))).
+  Proof.
+    intros Hq Hnin He0 Hrd Hgts Hwbe Hex.
+    have Hpre0 : ∀ e', gdep2 TS e' e0 → gev_wf TS e' → e' ∈ done.
+    { intros e' Hd Hw'. by eapply qorder_dc. }
+    intros jb t' Hjb. rewrite list_lookup_fmap in Hjb.
+    destruct (rts !! jb) as [tr|] eqn:Htr; simplify_eq/=.
+    have Hgr : gev_reads TS e0 (base + Z.of_nat jb) tr by apply (Hrd jb).
+    have Hwbes : writes_b TS (base + Z.of_nat jb) e ts
+      by apply Hwbe; eapply lookup_lt_Some.
+    replace (S (length (pf_log TS done)) - 1)%nat
+      with (length (pf_log TS done)) by lia.
+    intros Hw.
+    destruct (pf_writes_in_by_inv done _ (base + Z.of_nat jb) _ _ Hq Hw)
+      as (that & ehat & Hlo & Hhi & Hehat & Hwb & Hfor).
+    have Hthatpos : (0 < that)%nat by eapply writes_b_pos.
+    destruct (Nat.lt_trichotomy that tr) as [Hlt|[Heq|Hgt]].
+    - (* below the read: co-monotonicity puts it below π tr *)
+      have Htrpos : (0 < tr)%nat by lia.
+      destruct (read_source_in done e0 (base + Z.of_nat jb) tr Hpre0 Hgr Htrpos)
+        as (er & Her & Hwr).
+      have Hmono := pi_lt_of_co done (base + Z.of_nat jb) ehat er that tr
+                      Hq Her Hwb Hwr Hlt.
+      lia.
+    - subst that. lia.
+    - destruct (decide (that ≤ ts - 1)%nat) as [Hle|Habove].
+      + (* the BEHAVIOR's own exclusivity window, on the RESERVATION *)
+        eapply (Hex jb tr Htr).
+        exists that. split_and!; [lia|lia|].
+        destruct (fl_msg done that Hq) as (e2 & He2 & Hts2 & Hlog2 & Htid2).
+        { apply elem_of_fl. exists ehat. split; [done|apply Hwb]. }
+        destruct Hwb as (Hts_ & m & Hm & Hb).
+        have Hmm : msg_at TS that = m.
+        { rewrite Hlog2 in Hm. by injection Hm. }
+        exists m. split_and!; [done|done|]. rewrite -Hmm Htid2.
+        have Heq2 : e2 = ehat.
+        { eapply (grf_source_unique pstep pdev); [done|exact Hts2|exact Hts_]. }
+        rewrite Heq2. exact Hfor.
+      + destruct (decide (that = ts)) as [->|Hne].
+        * (* the conditional write's OWN message: its event is not processed *)
+          have Heq3 : ehat = e.
+          { eapply (grf_source_unique pstep pdev); [done|apply Hwb|exact Hgts]. }
+          apply Hnin. by rewrite -Heq3.
+        * (* strictly above: co would drag the current event into [done] *)
+          have Htc : tc (gdep TS) e ehat.
+          { eapply (Hco (base + Z.of_nat jb)); [exact Hwbes|exact Hwb|lia]. }
+          apply Hnin. eapply qorder_tc_in; [done|exact Hehat|].
+          by apply tc_gdep_gdep2.
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
   (** *** THE REPLAYED AGENT STATE AGREES WITH THE RECORDED ONE ON
           [w_relp] (the G6a bridge)
 
@@ -1133,6 +1226,55 @@ Section sim.
                 (at_ags T) (at_evs T) k ag0 ag);
         [exact Hwfi|exact Hag0|exact Hag]. }
     rewrite Hfold Hws0. by apply w_relp_aevs_post_indep.
+  Qed.
+
+  (** ...AND ITS RESERVATION IS THE σ-RETIMED IMAGE (T2-2a).  The same
+      fold identity, read through [WeakRobustProv.aevs_post_res] instead
+      of [w_relp_aevs_post_indep]: [rv_base] survives and the column is
+      the σ-image of the recorded one. *)
+  Lemma replay_ws_res (j : agent) (k : nat) T ag σ :
+    pt_trs TS !! j = Some T → at_ags T !! k = Some ag →
+    res_cols σ (w_res (aevs_post σ (take k (at_evs T)) ws_init))
+               (w_res (pa_ws ag)).
+  Proof.
+    intros HT Hag.
+    have Hwfi : atrace_wf pstep (pt_img TS) (pt_log TS) j T by apply Hwf.
+    destruct (atrace_first_is_Some pstep (pt_img TS) (pt_log TS) j T Hwfi)
+      as [ag0 Hag0].
+    have Hws0 : pa_ws ag0 = ws_init by eapply Hwsi.
+    have Hfold : pa_ws ag = aevs_post id (take k (at_evs T)) (pa_ws ag0).
+    { eapply (asteps_ws_fold pstep (pt_img TS) (pt_log TS) j
+                (at_ags T) (at_evs T) k ag0 ag);
+        [exact Hwfi|exact Hag0|exact Hag]. }
+    rewrite Hfold Hws0. apply aevs_post_res_init.
+  Qed.
+
+  (** ...AND THE RECORDED RESERVATION NAMES AN EARLIER EVENT OF THE SAME
+      AGENT, whose label is the exclusive read that set it.  That event is
+      po-earlier, hence already processed, which is what supplies
+      [excl_ok_ts_pf]'s [gev_reads] facts. *)
+  Lemma replay_ws_res_src (j : agent) (k : nat) T ag R :
+    pt_trs TS !! j = Some T → at_ags T !! k = Some ag →
+    w_res (pa_ws ag) = Some R →
+    ∃ m ev aq tvs asrc,
+      (m < k)%nat ∧ at_evs T !! m = Some ev ∧
+      ae_lb ev = LExLoad aq (rv_base R) tvs asrc ∧ rv_ts R = tvs.*1.
+  Proof.
+    intros HT Hag Hres.
+    have Hwfi : atrace_wf pstep (pt_img TS) (pt_log TS) j T by apply Hwf.
+    destruct (atrace_first_is_Some pstep (pt_img TS) (pt_log TS) j T Hwfi)
+      as [ag0 Hag0].
+    have Hws0 : pa_ws ag0 = ws_init by eapply Hwsi.
+    have Hfold : pa_ws ag = aevs_post id (take k (at_evs T)) (pa_ws ag0).
+    { eapply (asteps_ws_fold pstep (pt_img TS) (pt_log TS) j
+                (at_ags T) (at_evs T) k ag0 ag);
+        [exact Hwfi|exact Hag0|exact Hag]. }
+    rewrite Hfold Hws0 in Hres.
+    destruct (aevs_post_res_src (take k (at_evs T)) ws_init R
+                (ws_init_res) Hres)
+      as (m & ev & aq & tvs & asrc & Hm & Hlb & Hts).
+    apply lookup_take_Some in Hm as [Hm Hlt].
+    by exists m, ev, aq, tvs, asrc.
   Qed.
 
   (* ---------------------------------------------------------------- *)
@@ -1358,7 +1500,8 @@ Section sim.
                  aq rl base (tlabel_ts (pi TS done) tvs) data asrc vsrc kc st'
                  dnew);
           [done| |done| | | |].
-        * simpl. eapply (proj2 Hobl (pa_st ag) (pc_dev cf) aq rl base tvs);
+        * simpl.
+          eapply (proj1 (proj2 Hobl) (pa_st ag) (pc_dev cf) aq rl base tvs);
             [by rewrite tlabel_ts_snd|]. exact Hpure.
         * by rewrite tlabel_ts_length.
         * simpl. rewrite Hcimg Hclog.
@@ -1375,7 +1518,7 @@ Section sim.
           { exact (Hcls e.1 T e.2 ev ag ts (WMsg base data (Some e.1) kc)
                      HT Hev Hag Hts Hlog). }
           simpl. rewrite Hkc Hlbe.
-          apply (proj2 Hclsobl); [by rewrite tlabel_ts_snd|].
+          apply (proj1 (proj2 Hclsobl)); [by rewrite tlabel_ts_snd|].
           by eapply replay_ws_relp.
     - (* ---- LFence ---- *)
       destruct Hok as (Hf & Hts0).
@@ -1460,16 +1603,118 @@ Section sim.
                  (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) ∅) st'
                  dnew);
           [done|]. simpl. exact Hpure.
-    (* ---- THE RMW SPLIT (S2): the two split halves ----
-       The pf REPLAY is the one place in the tower that is NOT re-indexed
-       yet (design §8's slice S4): the exclusive read owes a
-       ts-obliviousness conjunct and the conditional write owes the SPLIT
-       form of [excl_ok_pf], whose window straddles two events.  Until S4
-       lands, the alphabet premise [lat_free_prog]'s second conjunct
-       (see [WeakPromiseFact]) refutes them here — vacuously for every
-       instance in this tree, since no producer emits them. *)
-    - exfalso. exact (lat_free_prog_fused pstep _ _ _ _ _ Hlf Hpure).
-    - exfalso. exact (lat_free_prog_fused pstep _ _ _ _ _ Hlf Hpure).
+    (* ---- THE RMW SPLIT: THE TWO SPLIT HALVES (S4 / T2-2a) ----
+       The exclusive read is [LLoad]'s arm at [lat := false], through the
+       ts-obliviousness conjunct the split added; the conditional write is
+       [LStore]'s arm plus the RESERVATION — which the replay owns as the
+       π-retimed image of the recorded one ([replay_ws_res]) whose column
+       names the po-earlier exclusive read ([replay_ws_res_src]), and
+       whose window transports by [excl_ok_ts_pf]. *)
+    - (* ---- LExLoad ---- *)
+      destruct Hok as (Hro & Hf & Hts0).
+      have Hgts : gev_ts TS e = None by rewrite /gev_ts Hgev /= Hts0.
+      have Hlogq : pf_log TS (done ++ [e]) = pc_log cf.
+      { by rewrite Hclog /pf_log (fl_app_none TS done e Hgts). }
+      have Hmap : (pi TS (done ++ [e])) <$> xtvs.*1 = (pi TS done) <$> xtvs.*1.
+      { apply list_fmap_ext. intros i t Hi.
+        rewrite list_lookup_fmap in Hi.
+        destruct (xtvs !! i) as [[t' v]|] eqn:Htv; simplify_eq/=.
+        apply (Hstab (xbase + Z.of_nat i)). exists (ae_lb ev).
+        split; [by rewrite /gev_lb Hgev|].
+        rewrite Hlbe /=. apply elem_of_tvs_reads. by exists i, v. }
+      eexists. eapply (qcfg_step done e T ev ag2 cf
+                 (exload_post_run_d
+                    (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) xaq
+                    (srcs_view
+                       (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init)
+                       xasrc)
+                    xbase ((tlabel_ts (pi TS done) xtvs).*1))
+                 (LExLoad xaq xbase (tlabel_ts (pi TS done) xtvs) xasrc));
+        [done|done|done|done|done|done| |exact Hfab'|].
+      + by rewrite /aev_post Hlbe tlabel_ts_fst Hmap.
+      + rewrite Hstpost Hlogq.
+        apply (PFExLoad pstep pcls e.1 cf (WPAgent (pa_st ag)
+                 (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) ∅)
+                 xaq xbase (tlabel_ts (pi TS done) xtvs) xasrc st' dnew);
+          [done| |].
+        * simpl.
+          eapply (proj2 (proj2 Hobl) (pa_st ag) (pc_dev cf) xaq xbase xtvs);
+            [by rewrite tlabel_ts_snd|]. exact Hpure.
+        * simpl. rewrite Hcimg Hclog.
+          eapply (read_ok_pf done e T ev ag (LExLoad xaq xbase xtvs xasrc)
+                    xbase xtvs false);
+            [done|done|done|done|done|done|exact Hlbe|done|done| |done].
+          exact Hro.
+    - (* ---- LExStore ---- *)
+      destruct Hok
+        as (ts & kc & R & _ & Hlog & Hres & Hrb & Hrlen & Hexw & _ & Hf & Hts).
+      have Hgts : gev_ts TS e = Some ts by rewrite /gev_ts Hgev /= Hts.
+      have Hmsg : msg_at TS ts = WMsg ybase ydata (Some e.1) kc by apply msg_at_eq.
+      have Hlogq : pf_log TS (done ++ [e])
+                   = pc_log cf ++ [WMsg ybase ydata (Some e.1) kc].
+      { by rewrite Hclog /pf_log (fl_app_some TS done e ts Hgts)
+                   fmap_app /= Hmsg. }
+      have Hpits : pi TS (done ++ [e]) ts = S (length (pc_log cf)).
+      { rewrite Hclog fl_len. eapply pi_mem; [done|].
+        rewrite (fl_app_some TS done e ts Hgts) lookup_app_r; [lia|].
+        by rewrite Nat.sub_diag. }
+      have Hnedata : ydata ≠ []
+        by exact (Hdata (ts - 1)%nat (WMsg ybase ydata (Some e.1) kc) Hlog).
+      (* THE REPLAYED RESERVATION (T2-2a): same base, π-retimed column *)
+      have Hrc := replay_ws_res e.1 e.2 T ag (pi TS done) HT Hag.
+      rewrite Hres in Hrc.
+      destruct (res_cols_inv _ _ _ Hrc) as (R' & HR' & Hrbase & Hrcol).
+      (* ITS SOURCE: the po-earlier exclusive read, already processed *)
+      destruct (replay_ws_res_src e.1 e.2 T ag R HT Hag Hres)
+        as (m & ev0 & aq0 & tvs0 & asrc0 & Hmlt & Hev0 & Hlb0 & Hcol0).
+      have Hgev0 : gev_ev TS (e.1, m) = Some ev0
+        by rewrite /gev_ev /= HT /= Hev0.
+      have Hwfe0 : gev_wf TS (e.1, m) by rewrite /gev_wf Hgev0; eauto.
+      have He0 : (e.1, m) ∈ done.
+      { apply (qorder_mem done e.1 m Hq). split; [done|]. by rewrite Hnp. }
+      rewrite Hrb in Hlb0.
+      have Hrds : ∀ jb t, rv_ts R !! jb = Some t →
+                    gev_reads TS (e.1, m) (ybase + Z.of_nat jb) t.
+      { intros jb t Hjb. rewrite Hcol0 list_lookup_fmap in Hjb.
+        destruct (tvs0 !! jb) as [[t0 v0]|] eqn:Ht0; simplify_eq/=.
+        exists (ae_lb ev0). split; [by rewrite /gev_lb Hgev0|].
+        rewrite Hlb0 /=. apply elem_of_tvs_reads. by exists jb, v0. }
+      have Hwbs : ∀ jb, (jb < length (rv_ts R))%nat →
+                    writes_b TS (ybase + Z.of_nat jb) e ts.
+      { intros jb Hjb. split; [done|].
+        exists (WMsg ybase ydata (Some e.1) kc). split; [done|].
+        apply msg_byte_run. by rewrite -Hrlen. }
+      eexists. eapply (qcfg_step done e T ev ag2 cf
+                 (store_post_run_d
+                    (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) yrl
+                    (srcs_view
+                       (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init)
+                       yasrc)
+                    (srcs_view
+                       (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init)
+                       yvsrc)
+                    ybase (length ydata) (S (length (pc_log cf))))
+                 (LExStore yrl ybase ydata yasrc yvsrc));
+        [done|done|done|done|done|done| |exact Hfab'|].
+      + by rewrite /aev_post Hlbe Hts Hpits.
+      + rewrite Hstpost Hlogq.
+        apply (PFExStore pstep pcls e.1 cf (WPAgent (pa_st ag)
+                 (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) ∅)
+                 yrl ybase ydata yasrc yvsrc kc R' st' dnew);
+          [done| |done| | | | |].
+        * simpl. exact Hpure.
+        * simpl. exact HR'.
+        * by rewrite Hrbase Hrb.
+        * by rewrite Hrcol length_fmap Hrlen.
+        * simpl. rewrite Hclog Hrcol.
+          eapply (excl_ok_ts_pf done e (e.1, m) ybase (rv_ts R) ts);
+            [done|done|done|exact Hrds|exact Hgts|exact Hwbs|exact Hexw].
+        * (* THE PINNED CLASS (G6a) *)
+          have Hkc : kc = pcls (pa_st ag) (ae_lb ev) (pa_ws ag).
+          { exact (Hcls e.1 T e.2 ev ag ts (WMsg ybase ydata (Some e.1) kc)
+                     HT Hev Hag Hts Hlog). }
+          simpl. rewrite Hkc Hlbe.
+          apply (proj2 (proj2 Hclsobl)). by eapply replay_ws_relp.
   Qed.
 
   (* ---------------------------------------------------------------- *)

@@ -214,17 +214,42 @@ WP-exported invariants apply to it.  No kernel side conditions anywhere.
     `WeakMem.load_post_run_d`.  Tier-1 does not need it (rule 14 gives
     the pf tier the ordering); sequence with tier-2 resumption or after
     A2.
-  - **R3/S4 COUPLING (ruling, 2026-08-19)**: `lat_free_prog` now carries
-    a fused-labels conjunct consumed by the replay
-    (`WeakRobustSim.Qinv_step` refutes the split arms from it).  When R3
-    makes the producers emit split labels, the instance's `pstep_fused`
-    proofs go FALSE.  Ruling: the OLD capstone converts that discharge
-    into an explicit hypothesis (tagged `RESTORED BY S4`), the
-    now-false instance lemmas are deleted, and the tower's pair-form
-    re-index (S4) stays deferred behind tier 1 — the old capstone is a
-    tier-2 artifact and tier 1 never consumes it.
-  - **Remaining: R3** (producers + retry arm + flips + the ruling
-    above), **S4/R4** (pair-form tower re-index, tier 2), **R6**
+  - **S4/R4 (pair-form tower re-index) — DONE (2026-08-20, T2-2a).**
+    `WeakRobustSim.Qinv_step` and `WeakRobustCone.Qcfg_step` (the
+    step-EXPORTING twin — it carries its own copy of all eleven arms, so
+    every replay change lands twice) now replay `LExLoad`/`LExStore`
+    directly, and `lat_free_prog`'s fused conjunct, `lat_free_prog_fused`
+    and the old capstone's `Hfused` are DELETED.  What the pair costs, as
+    three new obligations:
+    * `ts_oblivious` gains an `LExLoad` conjunct (the instance proves it
+      at ARBITRARY `asrc` — the exclusive read's operand list is real,
+      D3-2 — via `WeakEvInst.pstep_ev_ts_exload`; the Sail LTS refutes it
+      from `sail_step_fused`).
+    * `pcls_obl` gains an `LExStore` conjunct: the conditional write
+      APPENDS, so `wp_pf_step`'s class pinning reaches it.  Both provers
+      (`pcls_ev_obl`, `WeakSailLTS2.lbl_class_obl`) reuse their `LStore`
+      bullet verbatim.
+    * THE RESERVATION crosses the replay in `WeakRobustProv`:
+      `res_cols`/`aevs_post_res` (the replayed `w_res` is the recorded one
+      with `rv_base` kept and `rv_ts` σ-mapped — `rv_view` is NOT related
+      and no consumer needs it) and `aevs_post_res_src` (a recorded
+      reservation names the `LExLoad` event of the same prefix that set
+      it).  The window then transports by `WeakRobustSim.excl_ok_ts_pf`,
+      `excl_ok_pf`'s trichotomy with the lower bounds' `gev_reads` facts
+      taken at that EARLIER event (in `done` by `qorder_dc`).
+    Supporting `WeakMem` equations: `load_post_run_d_res` /
+    `store_post_run_d_res` / `fence_post_res` / `ws_init_res` — the
+    per-byte clears mean an access clears `w_res` iff it has a byte, and
+    the replayed and recorded folds take the same branch because they
+    differ only in timestamps, never in a length.
+  - **`WeakRobustBlocks.lb_ok` IS NOW THE ONLY ALPHABET GATE.**  Its
+    `LExLoad`/`LExStore` clauses are still `False`; before S4 an instance
+    that emitted the pair was excluded by `lat_free_prog`, now it is
+    excluded here.  Harmless today (`lb_ok` has no prover outside that
+    file, and nothing proves `lts_enabled` for the event instance), but
+    the clauses need real content (`data ≠ []` + `WeakPromise.exwin_ok`)
+    before any consumer of `lts_enabled` appears.
+  - **Remaining: R3** (producers + retry arm + flips), **R6**
     (contract), the W-TV consumption slice.
 - **D8-1 — `wp_cert_step` / `wp_certify` + the vcap lemmas**: **DONE
   (2026-08-18, `da090933`)** — `iris/WeakCertify.v`: `wp_cert_step i :=

@@ -225,8 +225,13 @@ Proof. destruct l; simpl; by try (intros ->). Qed.
     its [mstate] has no per-agent scratch for a two-step reservation).  A
     split pair therefore has no PER-EVENT axiomatic image: the projection
     of a split run is an ERASURE-then-RE-FUSION, which is the A2 track's
-    subject and NOT a step-local simulation.  Every instance in this tree
-    satisfies the premise today (no producer emits the split labels). *)
+    subject and NOT a step-local simulation.  The SAIL-tier LTS satisfies
+    it outright ([WeakSailLTS.sail_step_fused]); the EVENT instance does
+    not (its producers emit the pair), which is why the axiomatic
+    projection goes through [WeakErase]/[WeakRefuse] there.  It is NOT a
+    conjunct of [WeakPromiseFact.lat_free_prog] any more — S4 (2026-08-20)
+    deleted that, the robustness tower having been re-indexed to the pair
+    form. *)
 Definition lb_fused (l : wlabel) : Prop :=
   match l with
   | LSilent | LLoad _ _ _ _ _ | LStore _ _ _ _ _ | LRmw _ _ _ _ _ _ _

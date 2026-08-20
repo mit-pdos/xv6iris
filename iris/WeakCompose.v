@@ -198,18 +198,11 @@ Proof. intros p d l p' d' Hs _. split; [by destruct d, d'|done]. Qed.
     factorization takes, and hence [robust_main]. *)
 Theorem xv6_lat_free next : lat_free_prog (pstep_unit (pstep_xv6 next)).
 Proof.
-  split.
-  - intros p d0 aq base tvs asrc p' d0' H.
-    destruct p as [q|d pend], p' as [q'|d' pend']; simpl in H;
-      try (exfalso; exact H).
-    + exact (proj1 (sail_lat_free next) q d0 aq base tvs asrc q' d0' H).
-    + destruct H as [(Hc & _)|(? & ? & _ & _ & _ & Hc)]; discriminate.
-  - (* THE RMW SPLIT (S2): the pre-split conjunct *)
-    intros p d0 l p' d0' H.
-    destruct p as [q|d pend], p' as [q'|d' pend']; simpl in H;
-      try (exfalso; exact H).
-    + exact (sail_step_fused next q l q' H).
-    + by destruct H as [(-> & _)|(? & ? & _ & _ & _ & ->)].
+  intros p d0 aq base tvs asrc p' d0' H.
+  destruct p as [q|d pend], p' as [q'|d' pend']; simpl in H;
+    try (exfalso; exact H).
+  - exact (sail_lat_free next q d0 aq base tvs asrc q' d0' H).
+  - destruct H as [(Hc & _)|(? & ? & _ & _ & _ & Hc)]; discriminate.
 Qed.
 
 (** TIMESTAMP-OBLIVIOUSNESS — worklist finding (v): the pf witness steps the
@@ -219,7 +212,7 @@ Qed.
     [WeakRobustSim.ts_oblivious] asks for. *)
 Theorem xv6_ts_oblivious next : ts_oblivious (pstep_unit (pstep_xv6 next)).
 Proof.
-  split.
+  split_and!.
   - intros p dv aq lat base tvs tvs' asrc p' dv' Heq H.
     destruct p as [q|d pend], p' as [q'|d' pend']; simpl in H |- *;
       try (exfalso; exact H).
@@ -230,6 +223,14 @@ Proof.
       try (exfalso; exact H).
     + exact (sail_ts_oblivious_rmw next q aq rl base tvs tvs' data asrc vsrc
                q' Heq H).
+    + destruct H as [(Hc & _)|(? & ? & _ & _ & _ & Hc)]; discriminate.
+  (* THE RMW SPLIT (S4): no arm of the Sail LTS emits the split pair at
+     all ([sail_step_fused]), so the exclusive read's clause is discharged
+     by refutation rather than by re-timing. *)
+  - intros p dv aq base tvs tvs' asrc p' dv' Heq H.
+    destruct p as [q|d pend], p' as [q'|d' pend']; simpl in H |- *;
+      try (exfalso; exact H).
+    + by destruct (sail_step_fused next q _ q' H).
     + destruct H as [(Hc & _)|(? & ? & _ & _ & _ & Hc)]; discriminate.
 Qed.
 

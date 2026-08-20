@@ -299,40 +299,28 @@ Section fact.
         [done|done|]. by exists ts, k, R.
   Qed.
 
-  (** THE LAYER-1 PROGRAM-ALPHABET RESTRICTION.  Two conjuncts; the name
-      is historical (it was the first alone).
+  (** THE LAYER-1 PROGRAM-ALPHABET RESTRICTION: LAT-FREEDOM.  The program
+      never emits a latest-kind load.  For the kernel the [lat] users are
+      instruction fetch and the read-only page-table walk (design doc
+      Decision 6); the AMO/CAS path is already plain (both the fused
+      [WPRmw] and the split [WPExLoad] read with [lat = false] and pin
+      their window with [excl_ok]/[excl_ok_ts]), so this is a statement
+      about ifetch and walks only — precisely the surface W2's
+      violation-freedom premise takes over.
 
-      (1) LAT-FREEDOM: the program never emits a latest-kind load.  For the
-      kernel the [lat] users are instruction fetch and the read-only
-      page-table walk (design doc Decision 6); the AMO/CAS path is already
-      plain ([WPRmw] reads with [lat = false] and pins its window with
-      [excl_ok]), so this conjunct is a statement about ifetch and walks
-      only — precisely the surface W2's violation-freedom premise takes
-      over.
-
-      (2) PRE-SPLIT ([lb_fused]) — THE RMW SPLIT (S2) RESIDUE, TO DIE AT
-      S4.  The MACHINE has full arms for [LExLoad]/[LExStore] (this file's
-      [astep_ok] included); what is not yet re-indexed is the ROBUSTNESS
-      TOWER above it — the pf REPLAY (`WeakRobustSim.Qinv_step`) needs a
-      ts-obliviousness conjunct for the exclusive read and the split form
-      of `excl_ok_pf` (whose window straddles two events), which is
-      design §8's slice S4.  Rather than gate twenty tower theorems one at
-      a time, the restriction rides HERE, on the one alphabet premise
-      every one of them already carries; every instance in this tree
-      discharges it, since no producer emits the split labels yet.  When
-      S4 lands, delete the conjunct and this paragraph. *)
+      (The predicate briefly carried a SECOND conjunct, "the program emits
+      only the nine pre-split label constructors", as the RMW split's S2
+      residue: the robustness tower's pf replay had no arm for the pair.
+      S4 landed 2026-08-20 — [WeakRobustSim.Qinv_step] and
+      [WeakRobustCone.Qcfg_step] replay [LExLoad]/[LExStore] directly — so
+      the conjunct, and every hypothesis that carried it, are gone.) *)
   Definition lat_free_prog : Prop :=
-    (∀ p d aq base tvs asrc p' d',
-       ¬ pstep p d (LLoad aq true base tvs asrc) p' d') ∧
-    (∀ p d l p' d', pstep p d l p' d' → lb_fused l).
+    ∀ p d aq base tvs asrc p' d',
+      ¬ pstep p d (LLoad aq true base tvs asrc) p' d'.
 
   Lemma lat_free_prog_lat p d aq base tvs asrc p' d' :
     lat_free_prog → ¬ pstep p d (LLoad aq true base tvs asrc) p' d'.
-  Proof. intros [H _]. exact (H p d aq base tvs asrc p' d'). Qed.
-
-  Lemma lat_free_prog_fused p d l p' d' :
-    lat_free_prog → pstep p d l p' d' → lb_fused l.
-  Proof. intros [_ H]. exact (H p d l p' d'). Qed.
+  Proof. intros H. exact (H p d aq base tvs asrc p' d'). Qed.
 
   Lemma lat_free_prog_step c c' :
     lat_free_prog → wpstep pstep c c' → wp_lf_run c c'.

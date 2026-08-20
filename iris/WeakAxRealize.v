@@ -76,7 +76,8 @@
         "no writes above" evidence, so a [lat = true] load cannot be
         replayed.  The instance discharges it today
         ([WeakEvCapstone.pstep_ev_lat_free_prog], whose [lat_free_prog] is
-        literally [lat_free] + [lb_fused] over the whole LTS).
+        literally [lat_free] over the whole LTS — since S4 landed
+        (2026-08-20) that predicate has no other conjunct).
 
     - IT ABSORBS THE CLASS PREMISE.  [proj_lbl] carries the message class
       in the [LStore]/[LRmw] arms, so [proj_lbl (pcls p l ws) l = Some lb]
