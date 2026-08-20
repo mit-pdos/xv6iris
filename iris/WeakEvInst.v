@@ -679,9 +679,6 @@ Definition edlab_apply (σ : wgstate) (l : wlabel) (k : wm_class)
     One lemma per shape of [WeakEvLang] §2 — this is where the factorization
     is actually paid for, and every one of them is a conversion. *)
 
-Lemma fence_post_id ws : fence_post ws false false false false = ws.
-Proof. rewrite /fence_post /=. by destruct ws. Qed.
-
 Lemma elab_apply_silent σ c k : elab_apply σ c LSilent k None None (wgdev σ) = σ.
 Proof. rewrite /elab_apply /=. by destruct σ. Qed.
 

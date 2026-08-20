@@ -792,10 +792,20 @@ Definition load_post_at (ws : wstate) (aq : bool) (vpre : nat) (a : Z) (t : nat)
         instruction start, so nothing accumulates across instructions, and
         [ldv_of] below computes it from a zeroed bank for the RMW. *)
      w_ldv   := Nat.max (w_ldv ws) vpost;
-     (* THE RMW SPLIT (S2): the exclusive read's arm sets [w_res] at the RUN
-        level ([exload_post_run_d]), never per byte, so the fold passes it
-        through. *)
-     w_res   := w_res ws;
+     (* THE RMW SPLIT (S2) + A2-s3: A PLAIN LOAD CLEARS THE AGENT'S OWN
+        RESERVATION (the clear-on-own-load rule, design
+        weak-memory-srvwmo.md stage 2 / A2-s3).  ISA-legal (a reservation
+        may be invalidated at any time; the LR/SC forward-progress
+        guarantee itself excludes loads inside constrained loops), and no
+        real window contains a plain load — the AMO's and the walker's
+        windows are register-only — so the machine loses no behaviour any
+        kernel proof consumes.  What it buys is T2's re-fusion: a
+        load-dirtied window starves [PFExStore] (the retry arm spins), so
+        the pending-pair invariant's [w_res = Some R] guard dies exactly
+        where the fused counterpart stops existing.  The exclusive read's
+        arm still sets [w_res] at the RUN level ([exload_post_run_d]),
+        superseding this clear. *)
+     w_res   := None;
      (* W-TV, THE TRANSLATION BANK (W2b condition 2).  Every read byte BANKS
         its own contribution, and the contribution is [fwd_view] — the
         forwarded timestamp — NOT the byte's post-view [vpost]: [vpost]
@@ -905,8 +915,21 @@ Definition fence_post (ws : wstate) (pr pw sr sw : bool) : wstate :=
      w_regv  := w_regv ws;
      w_vcap  := w_vcap ws;
      w_ldv   := w_ldv ws;
-     w_res   := w_res ws;
+     (* A2-s3: A REAL FENCE CLEARS THE RESERVATION (clear-on-own-fence,
+        the twin of [load_post_at]'s clear-on-own-load — see the rationale
+        there).  This is what makes [lr; fence; sc] machine-unreachable:
+        the fused alphabet has no counterpart for it (the re-fusion
+        obstacle of 2026-08-19), so the machine starving the conditional
+        write is exactly the T1/T2 equality's sound direction.  The
+        ALL-FALSE fence is exempt: it is [fence.i]'s inert rendering
+        ([WeakEvInst] (D2)), [LSilent] in the wp-machine LTS
+        ([WeakSailLTS]), and both tiers depend on it being the identity
+        ([fence_post_id]). *)
+     w_res   := if (pr || pw || sr || sw)%bool then None else w_res ws;
      w_tbank := w_tbank ws |}.
+
+Lemma fence_post_id ws : fence_post ws false false false false = ws.
+Proof. rewrite /fence_post /=. by destruct ws. Qed.
 
 (* ------------------------------------------------------------------ *)
 (** ** The three DEPENDENCY-ONLY label effects (deps design §2.3)
@@ -1698,7 +1721,7 @@ Proof.
   - apply coh_upd_bounded; [exact Hcoh|]. pose proof (Hcoh a). lia.
   - exact Hfwd.
   - exact Hrg.
-  - exact Hres.
+  - done.
 Qed.
 
 Lemma store_post_d_bounded ws rl vf a t n n' :
@@ -1737,7 +1760,8 @@ Proof.
   - exact Hcoh.
   - exact Hfwd.
   - exact Hrg.
-  - exact Hres.
+  - destruct pr, pw, sr, sw; simpl;
+      first [ apply wresv_bounded_none | exact Hres ].
 Qed.
 
 (** The three dependency-only effects preserve both orders. *)

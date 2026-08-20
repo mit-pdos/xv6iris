@@ -106,15 +106,30 @@ are renamed **R0.5–R6** as of 2026-08-19; sRVWMO items are **A1–A5** here
   2+3 jointly history-dependent at fence/load-reachable states, and the
   fetch is a plain `LLoad`, `AK_explicit`).  The redesign is in the
   design doc's stage-2 block; its slices:
-  - **s3a** — machine: own plain loads and fences clear `w_res`
-    (`WeakMem.load_post_at`/`load_post_d?`/`fence_post`; stores + `LInstr`
-    already clear).  Sweep the tree for `w_res`-preservation lemmas that
-    flip.
-  - **s3b** — `WeakRefuse` reshape: `expend : P → Prop`; `rf_pend` in
-    ∃-form keyed on `w_res` (`rv_base`/`rv_ts` pin; `aq`/`tvs`
-    existential); `pstep_paired := PI-preservation ∧ W1 ∧ W3`, PI-guarded;
-    `RFFuse` premise `expend p` only; `rf_ag` carries `PI (pa_st agS)`;
-    `t2_bridge` gains `Forall PI ps`.
+  - **s3a — DONE (2026-08-20)**: `WeakMem.load_post_at` clears `w_res`
+    per byte; `fence_post` clears CONDITIONALLY on any bit set — the
+    ALL-FALSE fence is exempt because it is `fence.i`'s inert rendering
+    (`LSilent` in the wp-machine LTS, the (D2) label in the ev tier, and
+    `fence_post_id` — now in `WeakMem` — is load-bearing in
+    `WeakEvInst.elab_apply_barrier`).  Blast radius measured by full `-k`
+    builds: two `ws_bounded` proofs in `WeakMem`, two `res_rel` bullets in
+    `WeakErase` (both sides clear → vacuous; the fence one splits 16 ways
+    on the bits), and NOTHING else — every concrete wp-tier state has
+    `w_res = None` outside windows and windows contain no loads/fences,
+    so the 17k mirror and all litmus/leaf proofs were value-unchanged.
+  - **s3b — DONE (2026-08-20)**: `WeakRefuse` reshaped.  `pstep_paired`
+    is now FOUR clauses, all PI-guarded: PI-preservation; W1 (inert-step
+    pull-back of `expend`, where inert = `LSilent`/`LDev`/the all-false
+    fence); W4 (no window resumes behind a ZERO-BYTE load — the one dirty
+    label an empty fold cannot clear on); W3 (every exstore step's
+    pre-state is `expend`).  `expend : P → Prop` unindexed; `rf_pend`
+    ∃-form keyed on `w_res`; `RFFuse` premise-free (the fused LTS
+    quantifies `(aq, tvs)` freely — the machine's `PFRmw` polices runs);
+    `rf_ag` carries `PI (pa_st agS)`; `rf_cfg_init`/`refuse_run`/
+    `refuse_bridge_log`/`t2_bridge` take `∀ p ∈ ps, PI p`;
+    `pstep_paired_erase` restated for the raw labels (`lb_win` gains the
+    all-false fence).  Tree green, capstone unchanged on the 5 rv64d
+    axioms, `t2_bridge` Closed.
   - **s3c** — instance predicates: `win` (structural window walk over
     `{RegWrite, pure-silent}` monad nodes, register-file-independent) and
     `PIshape` (armed-bit guardedness, ∀-quantified answers); per-arm

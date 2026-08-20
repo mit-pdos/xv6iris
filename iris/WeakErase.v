@@ -260,7 +260,9 @@ Proof.
   - simpl. lia.
   - exact (er_ws_relp _ _ Her).
   - exact (er_ws_fwd _ _ Her).
-  - exact (er_ws_res _ _ Her).
+  - (* A2-s3: both sides CLEAR the reservation here, so [res_rel]
+       of the posts is vacuous. *)
+    by intros ? ?.
 Qed.
 
 Lemma load_post_at_ldv_er we wi aq vpe vpi a t :
@@ -360,7 +362,11 @@ Proof.
   - simpl. lia.
   - simpl. destruct (pw && sw)%bool; [done|exact Hrp].
   - exact (er_ws_fwd _ _ Her).
-  - exact (er_ws_res _ _ Her).
+  - (* A2-s3: a REAL fence clears the reservation on both sides (vacuous);
+       the all-false fence preserves it on both. *)
+    destruct pr, pw, sr, sw; simpl;
+      first [ by intros Ri HRi; discriminate HRi
+            | exact (er_ws_res _ _ Her) ].
 Qed.
 
 Lemma instr_post_er we wi : er_ws we wi → er_ws (instr_post we) (instr_post wi).
