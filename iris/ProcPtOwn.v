@@ -3330,30 +3330,6 @@ Section ProcPt.
       iApply (umem_lazy_any with "Hm").
   Qed.
 
-  Lemma proc_ptm_pt (P : uptd) (sz : Z) (M : gmap Z (bv 8)) :
-    proc_ptm P sz M -∗ proc_pt P.
-  Proof. iIntros "H". rewrite (proc_pt_ptm P sz). iExists M. iExact "H". Qed.
-
-  (* ---- the WINDOW a copy loop borrows, and the tier it speaks -------- *)
-
-  Local Lemma win_phys_to_mem (ppn : mword 44) (off n : nat) (f : nat -> bv 8) :
-    page_valid (page_base ppn) -> (off + n <= 4096)%nat ->
-    kmap_static_claims -∗
-    ([∗ list] j ∈ seq 0 n,
-       (pa_add (page_base ppn) (off + j)%nat : Arch.pa) ↦ₚ f j) -∗
-    ([∗ list] j ∈ seq 0 n,
-       (pa_add (pa_add (page_base ppn) off) j : Arch.pa) ↦ₘ f j).
-  Proof.
-    intros Hv Hn. iIntros "#Hb H".
-    iApply (big_sepL_impl with "H").
-    iIntros "!>" (k x Hx) "Hj".
-    apply lookup_seq in Hx as [-> Hlt]. rewrite Nat.add_0_l.
-    rewrite pa_add_add.
-    iApply (phys_ident_mem (pa_add (page_base ppn) (off + k)%nat) (DfracOwn 1) (f k)
-              (page_valid_kmap_static ppn (off + k)%nat Hv ltac:(lia))
-              (page_valid_ram ppn (off + k)%nat Hv ltac:(lia))
-              (page_valid_canon ppn (off + k)%nat Hv ltac:(lia)) with "Hb Hj").
-  Qed.
 
   Local Lemma win_mem_to_phys (ppn : mword 44) (off n : nat) (f : nat -> bv 8) :
     page_valid (page_base ppn) -> (off + n <= 4096)%nat ->
@@ -3578,6 +3554,37 @@ Section ProcPt.
   Proof.
     iIntros "H". iDestruct "H" as (Mp) "(_ & %H & _ & _)".
     iPureIntro. exact H.
+  Qed.
+
+  Lemma proc_ptm_dom (P : uptd) (sz : Z) (M : gmap Z (bv 8)) :
+    proc_ptm P sz M -∗
+    ⌜forall va : Z, is_Some (M !! va)
+       <-> (uva_mapped P va \/ uva_live sz va)⌝.
+  Proof. iIntros "(_ & _ & Hm)". iApply (umem_lazy_dom with "Hm"). Qed.
+
+  Lemma proc_ptm_pt (P : uptd) (sz : Z) (M : gmap Z (bv 8)) :
+    proc_ptm P sz M -∗ proc_pt P.
+  Proof. iIntros "H". rewrite (proc_pt_ptm P sz). iExists M. iExact "H". Qed.
+
+  (* ---- the WINDOW a copy loop borrows, and the tier it speaks -------- *)
+
+  Local Lemma win_phys_to_mem (ppn : mword 44) (off n : nat) (f : nat -> bv 8) :
+    page_valid (page_base ppn) -> (off + n <= 4096)%nat ->
+    kmap_static_claims -∗
+    ([∗ list] j ∈ seq 0 n,
+       (pa_add (page_base ppn) (off + j)%nat : Arch.pa) ↦ₚ f j) -∗
+    ([∗ list] j ∈ seq 0 n,
+       (pa_add (pa_add (page_base ppn) off) j : Arch.pa) ↦ₘ f j).
+  Proof.
+    intros Hv Hn. iIntros "#Hb H".
+    iApply (big_sepL_impl with "H").
+    iIntros "!>" (k x Hx) "Hj".
+    apply lookup_seq in Hx as [-> Hlt]. rewrite Nat.add_0_l.
+    rewrite pa_add_add.
+    iApply (phys_ident_mem (pa_add (page_base ppn) (off + k)%nat) (DfracOwn 1) (f k)
+              (page_valid_kmap_static ppn (off + k)%nat Hv ltac:(lia))
+              (page_valid_ram ppn (off + k)%nat Hv ltac:(lia))
+              (page_valid_canon ppn (off + k)%nat Hv ltac:(lia)) with "Hb Hj").
   Qed.
 
   (* ------------------------------------------------------------------ *)

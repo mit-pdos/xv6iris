@@ -752,6 +752,37 @@ Proof.
   rewrite Hls gset_to_gmap_union_Z map_union_assoc. reflexivity.
 Qed.
 
+(* ...and the ROLLBACK: deleting exactly the range that became live undoes
+   the growth.  uvmalloc's out-of-memory arm is this -- what the loop had
+   added is precisely what uvmdealloc takes away, so the caller gets back
+   the view it handed in, not a weaker one. *)
+Lemma umem_grow_del (M : gmap Z (bv 8)) (sz sz' : Z) (a : Z) (n : nat) :
+  (forall x : Z, uva_live sz x -> is_Some (M !! x)) ->
+  (forall x : Z, is_Some (M !! x) -> ~ (a <= x < a + Z.of_nat n)%Z) ->
+  (forall x : Z, uva_live sz' x
+     <-> (uva_live sz x \/ (a <= x < a + Z.of_nat n)%Z)) ->
+  umem_del (umem_grow M sz') a n = M.
+Proof.
+  intros Hcov Hout Hlv. apply map_eq. intros x.
+  destruct (decide (a <= x < a + Z.of_nat n)%Z) as [Hin | Hno].
+  - pose proof Hin as Hin'.
+    apply in_run_iff in Hin' as (j & Hj & ->).
+    rewrite (umem_del_lookup_in _ a n j Hj).
+    destruct (M !! (a + Z.of_nat j)%Z) as [bb |] eqn:Hb; [| reflexivity].
+    exfalso. exact (Hout _ ltac:(eauto) Hin).
+  - assert (Hne : forall j, (j < n)%nat -> x <> (a + Z.of_nat j)%Z)
+      by (intros j Hj Heq; apply Hno; apply in_run_iff; eauto).
+    rewrite (umem_del_lookup_out _ a n x Hne).
+    unfold umem_grow.
+    destruct (M !! x) as [bb |] eqn:Hb.
+    + apply (lookup_union_Some_l M _ x bb Hb).
+    + rewrite (lookup_union_r M _ x Hb).
+      apply lookup_gset_to_gmap_None. intros Hel.
+      apply elem_of_live_set in Hel. apply (proj1 (Hlv x)) in Hel.
+      destruct Hel as [Hlo | Hr]; [| exact (Hno Hr)].
+      destruct (Hcov x Hlo) as [y Hy]. rewrite Hb in Hy. discriminate.
+Qed.
+
 (* the vas of ONE page, and the byte map one page's worth of bytes makes *)
 Definition upage_dom (vpn : mword 27) : gset Z :=
   list_to_set ((fun j : nat => (bv_unsigned vpn * 4096 + Z.of_nat j)%Z)

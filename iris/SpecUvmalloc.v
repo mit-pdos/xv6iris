@@ -175,7 +175,81 @@ Definition wp_uvmalloc_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID 
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
+(* ===================================================================== *)
+(*  THE MEMORY-INDEXED CONTRACT.                                          *)
+(* ===================================================================== *)
+(* uvmalloc's whole effect on the process's memory is the SIZE MOVING:
+   [umem_grow M s] is [M] with zeros over everything live at [s], and the
+   union is left-biased, so not one byte the process could already read
+   changes.  What makes that honest rather than vacuous is the memset:
+   the pages the loop maps really do read as zero, which is what the
+   lazily-backed vas at those addresses already claimed.
+
+   THE FAILURE ARM GIVES BACK THE VIEW IT WAS HANDED, exactly -- same
+   descriptor, same size, same bytes.  That is the whole point of the C
+   code's uvmdealloc call, and at this altitude it is visible: the range
+   the loop grew into is precisely the range the rollback deletes
+   ([UserPtTree.umem_grow_del]).
+
+   The size is [rsz], the value uvmalloc RETURNS, for the same reason
+   uvmdealloc's is: that is the size the caller will store in [p->sz]. *)
+Definition wp_uvmalloc_mem_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+    (γa : gname) (mm : regfile)
+    (P : uptd) (M : gmap Z (bv 8)) (xperm : Z) (K : nat) (eb : bool)
+    (p : mword 64) (b : bool) (lks : gset string) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.uvmalloc in
+  let oldsz := mm !!! Regidx (mword_of_int 11) in
+  let newsz := mm !!! Regidx (mword_of_int 12) in
+  let vpn0 := svpn_of (pgroundup oldsz) in
+  let n := uvma_np oldsz newsz in
+  let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
+  (42 <= K)%nat ->
+  mm !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
+  mm !!! Regidx (mword_of_int 10) = page_base P.(ud_root) ->
+  mm !!! Regidx (mword_of_int 13) = (mword_of_int xperm : mword 64) ->
+  (0 <= xperm < 512)%Z ->
+  uvm_perm_ok (Z.lor xperm 18) ->
+  (uint oldsz <= uvm_maxsz)%Z ->
+  ((uint newsz <= uvm_maxsz)%Z \/ um_covered oldsz P.(ud_um)) ->
+  (forall i, (i < n)%nat ->
+     (bv_unsigned (pgroundup oldsz) + 4096 * Z.of_nat i + 4096 <= uvm_maxsz)%Z ->
+     P.(ud_um) !! vpn_at vpn0 i = None) ->
+  locks_below lks "kmem" ->
+  sie_cap_gpr KT1 mm K b p -∗
+  cpu_own 0%nat eb p b lks -∗
+  kernel_text -∗
+  pc_is pcE -∗
+  proc_ptm P (uint oldsz) M -∗
+  kalloc_env γa None -∗
+  wp_next b p (fun (CID : CpuId) =>
+    ∀ (mr : regfile),
+    sie_cap_gpr KT1 mr K b p -∗
+    cpu_own 0%nat eb p b lks -∗
+    pc_is ret_tgt -∗
+    ⌜callee_saved mm mr⌝ -∗
+    ( (* out of memory: the view we were handed, byte for byte *)
+      (⌜mr !!! Regidx (mword_of_int 10) = (mword_of_int 0 : mword 64)⌝ ∗
+       proc_ptm P (uint oldsz) M)
+      ∨ (∃ (P' : uptd) (rsz : mword 64),
+           ⌜uptd_ext P P'⌝ ∗
+           ⌜dom P'.(ud_um) = dom P.(ud_um) ∪ vpn_run vpn0 n⌝ ∗
+           ⌜forall v : mword 27, v ∈ vpn_run vpn0 n ->
+              ∃ r : mword 64,
+                P'.(ud_um) !! v = Some (uvm_pte (Z.lor xperm 18) r)⌝ ∗
+           ⌜ ((uint newsz < uint oldsz)%Z /\ rsz = oldsz)
+             \/ ((uint oldsz <= uint newsz)%Z /\ rsz = newsz) ⌝ ∗
+           ⌜mr !!! Regidx (mword_of_int 10) = rsz⌝ ∗
+           proc_ptm P' (uint rsz) (umem_grow M (uint rsz))) ) -∗
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
+
 Module Type UVMALLOC.
+  Parameter wp_uvmalloc_mem_sconf :
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+      (γa : gname) (mm : regfile)
+      (P : uptd) (M : gmap Z (bv 8)) (xperm : Z) (K : nat) (eb : bool)
+      (p : mword 64) (b : bool) (lks : gset string),
+      wp_uvmalloc_mem_sconf_body γa mm P M xperm K eb p b lks.
   Parameter wp_uvmalloc_sconf :
     forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (mm : regfile)

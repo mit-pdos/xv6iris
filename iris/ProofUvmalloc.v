@@ -46,7 +46,7 @@ From iris.base_logic.lib Require Import gen_heap invariants ghost_var ghost_map.
 From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
-Require Import RiscvPtsto RiscvLang RiscvExtras.
+Require Import RiscvModelBytes RiscvPtsto RiscvLang RiscvExtras.
 Require Import RiscvExtras.
 Require Import InstrBytes KernelText.
 Require Import WpMmodeLeafBase.
@@ -145,6 +145,51 @@ Proof.
   apply Z.mod_small. lia.
 Qed.
 
+(* the view's PGROUNDUP is the identity on the loop's cursor, which is a
+   multiple of 4096 by construction -- so the invariant's live set is
+   literally [0, pu + 4096*i). *)
+Lemma ua_pgu_exact (pu : Z) (i : nat) :
+  pu mod 4096 = 0 -> (0 <= pu)%Z ->
+  UserPtTree.pgroundup (pu + 4096 * Z.of_nat i)%Z = (pu + 4096 * Z.of_nat i)%Z.
+Proof.
+  intros Hmod Hpu0. unfold UserPtTree.pgroundup.
+  pose proof (Z.div_mod (pu + 4096 * Z.of_nat i + 4095) 4096 ltac:(lia)) as Hd.
+  assert (Hm : ((pu + 4096 * Z.of_nat i + 4095) mod 4096 = 4095)%Z).
+  { replace (pu + 4096 * Z.of_nat i + 4095)%Z
+      with (pu + 4095 + Z.of_nat i * 4096)%Z by lia.
+    rewrite Z_mod_plus_full. rewrite Zplus_mod Hmod.
+    change (0 + 4095 mod 4096)%Z with 4095%Z.
+    apply Z.mod_small. lia. }
+  rewrite Hm in Hd. lia.
+Qed.
+
+(* an address inside the run belongs to one of the run's vpns -- the
+   converse of [ua_z_svpn], and what says [P] maps nothing the loop has
+   grown into (so the rollback really does give [M] back). *)
+Lemma ua_vpn_of_addr (pu : Z) (vpn0 v : mword 27) (jj i : nat) :
+  pu mod 4096 = 0 -> (0 <= pu)%Z ->
+  (bv_unsigned vpn0 * 4096 = pu)%Z ->
+  (bv_unsigned vpn0 + Z.of_nat i < 134217728)%Z ->
+  (jj < 4096)%nat ->
+  (pu <= bv_unsigned v * 4096 + Z.of_nat jj < pu + 4096 * Z.of_nat i)%Z ->
+  exists k, (k < i)%nat /\ v = vpn_at vpn0 k.
+Proof.
+  intros Hmod Hpu0 Hv0 Hbnd Hjj Hin.
+  pose proof (bv_unsigned_in_range 27 v) as [Hv0' _].
+  assert (Hm : ((bv_unsigned v * 4096 - pu) mod 4096 = 0)%Z).
+  { rewrite Zminus_mod Hmod.
+    rewrite (Z.mod_mul (bv_unsigned v) 4096 ltac:(lia)). reflexivity. }
+  pose proof (Z.div_mod (bv_unsigned v * 4096 - pu) 4096 ltac:(lia)) as Hdm.
+  assert (Hlo : (pu <= bv_unsigned v * 4096)%Z) by lia.
+  assert (Hhi : (bv_unsigned v * 4096 < pu + 4096 * Z.of_nat i)%Z) by lia.
+  set (k := Z.to_nat ((bv_unsigned v * 4096 - pu) / 4096)).
+  assert (Hkz : (Z.of_nat k * 4096 = bv_unsigned v * 4096 - pu)%Z).
+  { unfold k. rewrite Z2Nat.id; [lia | apply Z.div_pos; lia]. }
+  assert (Hklt : (k < i)%nat) by lia.
+  exists k. split; [exact Hklt |].
+  apply bv_eq. rewrite (vpn_at_unsigned vpn0 k ltac:(lia)). lia.
+Qed.
+
 Lemma ua_z_avmod (pu k : Z) : pu mod 4096 = 0 -> (pu + 4096 * k) mod 4096 = 0.
 Proof.
   intros H. assert (Hr : (pu + 4096 * k)%Z = (pu + k * 4096)%Z) by ring.
@@ -217,9 +262,10 @@ Section UvmallocDefs.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* SpecUvmalloc's post disjunction, at an abstract return value *)
-  Definition ua_pay (P : uptd) (vpn0 : mword 27) (n : nat) (xperm : Z)
+  Definition ua_pay (P : uptd) (M : gmap Z (bv 8))
+      (vpn0 : mword 27) (n : nat) (xperm : Z)
       (oldsz newsz res : mword 64) : iProp Σ :=
-    ((⌜res = (mword_of_int 0 : mword 64)⌝ ∗ proc_pt P)
+    ((⌜res = (mword_of_int 0 : mword 64)⌝ ∗ proc_ptm P (uint oldsz) M)
      ∨ (∃ P' : uptd,
           ⌜uptd_ext P P'⌝ ∗
           ⌜dom P'.(ud_um) = dom P.(ud_um) ∪ vpn_run vpn0 n⌝ ∗
@@ -234,7 +280,7 @@ Section UvmallocDefs.
                P'.(ud_um) !! v = Some (uvm_pte (Z.lor xperm 18) r)⌝ ∗
           ⌜ ((uint newsz < uint oldsz)%Z /\ res = oldsz)
             \/ ((uint oldsz <= uint newsz)%Z /\ res = newsz) ⌝ ∗
-          proc_pt P'))%I.
+          proc_ptm P' (uint res) (umem_grow M (uint res))))%I.
 
   (* what every long arm hands the epilogue at +0x78.  EXPLICIT-CPUID: this
      is a DECOMPOSED helper in the sense of the porting guide -- different
@@ -243,7 +289,8 @@ Section UvmallocDefs.
      binder and wraps its whole body in [wp_next], exactly like [frepi] in
      ProofFreerange. *)
   Definition ua_exit `{GEN : GenId} `{CID0 : CpuId} (mm : regfile)
-      (P : uptd) (vpn0 : mword 27) (n : nat) (xperm : Z) (K : nat) (eb : bool) (p : mword 64)
+      (P : uptd) (M : gmap Z (bv 8))
+      (vpn0 : mword 27) (n : nat) (xperm : Z) (K : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string) (sp0 spr oldsz newsz : mword 64) : iProp Σ :=
     wp_next (CID0 := CID0) b p (fun (CID : CpuId) =>
       ∀ (mj : regfile) (res : mword 64),
@@ -258,7 +305,7 @@ Section UvmallocDefs.
       pc_is (mword_of_int (KernelSyms.uvmalloc + 0x78) : mword 64) -∗
       (∃ w1 w3 w6 : mword 64,
          pa_stk sp0 3 ↦₈[KT1] w1 ∗ pa_stk sp0 5 ↦₈[KT1] w3 ∗ pa_stk sp0 8 ↦₈[KT1] w6) -∗
-      ua_pay P vpn0 n xperm oldsz newsz res -∗
+      ua_pay P M vpn0 n xperm oldsz newsz res -∗
       WP (Loop : expr riscv_lang) )%I.
 
 End UvmallocDefs.
@@ -344,11 +391,33 @@ Section ProofUvmalloc.
     rewrite Heq. reflexivity.
   Qed.
 
+  (* ...and at the contents-indexed altitude, where the SIZE also has to
+     come back: uvmdealloc leaves the process at PGROUNDUP(oldsz), which
+     has the same live set as [oldsz] itself. *)
+  Local Lemma ua_restore_mem (P Pi : uptd) (vpn0 : mword 27) (i : nat)
+      (sz sz' : Z) (Mv : gmap Z (bv 8)) :
+    uptd_ext P Pi ->
+    dom Pi.(ud_um) = dom P.(ud_um) ∪ vpn_run vpn0 i ->
+    (forall j : nat, (j < i)%nat -> P.(ud_um) !! vpn_at vpn0 j = None) ->
+    (forall a : Z, uva_live sz a <-> uva_live sz' a) ->
+    proc_ptm (uptd_del_run Pi vpn0 i) sz Mv ⊢ proc_ptm P sz' Mv.
+  Proof.
+    intros (Hr & Ht & Hsub) Hdom Hfr Hlv.
+    assert (Hum : um_del_run Pi.(ud_um) vpn0 i = P.(ud_um))
+      by exact (um_del_run_restore P.(ud_um) Pi.(ud_um) vpn0 i Hsub Hdom Hfr).
+    rewrite (proc_ptm_data_irrel (uptd_del_run Pi vpn0 i) P sz Mv
+               ltac:(unfold uptd_del_run; cbn [ud_root]; assumption)
+               ltac:(unfold uptd_del_run; cbn [ud_tfp]; assumption)
+               ltac:(unfold uptd_del_run; cbn [ud_um]; assumption)).
+    rewrite (proc_ptm_sz_cong P sz sz' Mv Hlv). reflexivity.
+  Qed.
+
   (* ------------------------------------------------------------------ *)
   (* THE LOOP, at its head +0x36, with [i] iterations already done.       *)
   (* ------------------------------------------------------------------ *)
   Local Lemma ua_loop (γa : gname) (mm : regfile)
-      (P : uptd) (xperm : Z) (K : nat) (eb : bool) (p : mword 64)
+      (P : uptd) (Mv : gmap Z (bv 8)) (xperm : Z) (K : nat) (eb : bool)
+      (p : mword 64)
       (sp0 spr oldsz newsz : mword 64) (pu nz : Z) (n : nat) (b : bool) (lks : gset string) :
     (42 <= K)%nat ->
     (0 <= xperm < 512)%Z ->
@@ -374,6 +443,12 @@ Section ProofUvmalloc.
        dom Pj.(ud_um) = dom P.(ud_um) ∪ vpn_run (svpn_of (pgroundup oldsz)) j ->
        (pu + 4096 * Z.of_nat j + 4096 <= 274877898752)%Z) ->
     (uint oldsz <= uint newsz)%Z ->
+    (* THE VIEW WE WERE HANDED, as a pure fact: its domain law.  It is what
+       pins the rollback -- the range the loop grows into is exactly the
+       range [Mv] does not already record, so deleting it gives [Mv] back. *)
+    (forall x : Z, is_Some (Mv !! x)
+       <-> (uva_mapped P x \/ uva_live (uint oldsz) x)) ->
+    (UserPtTree.pgroundup (uint oldsz) = pu)%Z ->
     (forall j : nat, (pu + 4096 * Z.of_nat j < nz)%Z <-> (j < n)%nat) ->
     (* GUARDED, exactly as the contract states it: freshness is needed at
        the iterations the loop REACHES, and [Habi] below is the bound at
@@ -411,15 +486,17 @@ Section ProofUvmalloc.
     cpu_own (CID:=CID0) 0%nat eb p b lks -∗
     kernel_text -∗
     pc_is (CID:=CID0) (mword_of_int (KernelSyms.uvmalloc + 0x36) : mword 64) -∗
-    proc_pt Pi -∗
+    proc_ptm Pi (pu + 4096 * Z.of_nat i)%Z
+      (umem_grow Mv (pu + 4096 * Z.of_nat i)%Z) -∗
     kalloc_env γa None -∗
     pa_stk sp0 3 ↦₈[KT1] (mm !!! Regidx Rs1) -∗
     pa_stk sp0 5 ↦₈[KT1] (mm !!! Regidx Rs3) -∗
     pa_stk sp0 8 ↦₈[KT1] (mm !!! Regidx Rs6) -∗
-    ua_exit (CID0 := CID0) mm P (svpn_of (pgroundup oldsz)) n xperm K eb p b lks sp0 spr oldsz newsz -∗
+    ua_exit (CID0 := CID0) mm P Mv (svpn_of (pgroundup oldsz)) n xperm K eb p b lks sp0 spr oldsz newsz -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hxrng Hperm Hb3 Hb5 Hb8 Hpu Hnz Hpumod Hpu0 Hab Hoin Hnchar Hfresh Hbelow.
+    intros HK Hxrng Hperm Hb3 Hb5 Hb8 Hpu Hnz Hpumod Hpu0 Hab Hoin
+           HMdom Hpgo Hnchar Hfresh Hbelow.
     assert (HKka : (14 <= K - 10)%nat) by (clear -HK; lia).
     assert (HKms : (2 <= K - 10)%nat) by (clear -HK; lia).
     assert (HKmp : (32 <= K - 10)%nat) by (clear -HK; lia).
@@ -438,7 +515,8 @@ Section ProofUvmalloc.
     (* the well-formedness of the CURRENT descriptor -- what [Hab] reads.
        [iDestruct … as %_] on a PURE conclusion does not spend the resource,
        so no keep-the-hypothesis accessor is needed. *)
-    iDestruct (proc_pt_wf_get Pi with "Hpt") as %Hwfi.
+    iDestruct (proc_ptm_wf Pi (pu + 4096 * Z.of_nat i)%Z
+                 (umem_grow Mv (pu + 4096 * Z.of_nat i)%Z) with "Hpt") as %Hwfi.
     pose proof (Hab Pi i Hwfi Hin Hdom) as Habi.
     assert (Hbnd38 : (pu + 4096 * Z.of_nat i < 274877906944)%Z)
       by (clear -Habi; lia).
@@ -466,6 +544,52 @@ Section ProofUvmalloc.
     assert (Hvb : (bv_unsigned (svpn_of (pgroundup oldsz)) + Z.of_nat i < 134217728)%Z).
     { rewrite svpn_of_unsigned_gen Hpu.
       exact (ua_z_vpn0_bnd pu (Z.of_nat i) Hpu0 (Nat2Z.is_nonneg i) Hbnd38). }
+    (* ---- THE ROLLBACK, as a fact about the view ---- *)
+    assert (Havu : (uint av = pu + 4096 * Z.of_nat i)%Z)
+      by (rewrite uint_unsigned; exact Hav).
+    assert (Hnotin : forall x : Z, is_Some (Mv !! x) ->
+              ~ (pu <= x < pu + 4096 * Z.of_nat i)%Z).
+    { intros x Hs Hrng. destruct (proj1 (HMdom x) Hs) as [Hmap | Hlv].
+      - destruct Hmap as (v0 & w0 & j0 & Hl0 & Hj0 & ->).
+        destruct (ua_vpn_of_addr pu (svpn_of (pgroundup oldsz)) v0 j0 i
+                    Hpumod Hpu0
+                    ltac:(rewrite svpn_of_unsigned_gen Hpu;
+                          rewrite (Z.mod_small (pu / 4096) 134217728
+                            ltac:(split;
+                              [apply Z.div_pos; clear -Hpu0; lia
+                              | apply Z.div_lt_upper_bound;
+                                [lia | clear -Hbnd38 Hpu0; lia]]));
+                          pose proof (Z.div_mod pu 4096 ltac:(lia)) as Hdd;
+                          rewrite Hpumod in Hdd; clear -Hdd; lia)
+                    ltac:(clear -Hvb; lia) Hj0 Hrng)
+          as (k & Hk & ->).
+        rewrite (Hfresh k ltac:(clear -Hk Hin; lia)
+                   ltac:(clear -Habi Hk; lia)) in Hl0. discriminate.
+      - rewrite /uva_live Hpgo in Hlv. clear -Hlv Hrng. lia. }
+    assert (Hrszd : uvmd_rsz av (pgroundup oldsz) = pgroundup oldsz).
+    { unfold uvmd_rsz.
+      destruct (bool_decide (bv_unsigned (pgroundup oldsz)
+                             < bv_unsigned av)%Z) eqn:Hbd; [reflexivity |].
+      apply bool_decide_eq_false in Hbd.
+      rewrite Hav Hpu in Hbd. apply bv_eq. rewrite Hav Hpu.
+      clear -Hbd. lia. }
+    assert (Hlvsame : forall a : Z,
+              uva_live (uint (pgroundup oldsz)) a <-> uva_live (uint oldsz) a).
+    { intros a. rewrite /uva_live Hpgo.
+      rewrite (uint_unsigned (pgroundup oldsz)).
+      rewrite (pgroundup_live (pgroundup oldsz)
+                 ltac:(rewrite Hpu; change (2 ^ 64)%Z with 18446744073709551616%Z;
+                       clear -Habi Hpu0; lia)).
+      rewrite Hpgpu. rewrite Hpu. reflexivity. }
+    assert (Hgrowdel : umem_del (umem_grow Mv (uint av))
+                         (uint (pgroundup oldsz)) (4096 * i)%nat = Mv).
+    { rewrite (uint_unsigned (pgroundup oldsz)). rewrite Hpu.
+      apply (umem_grow_del Mv (uint oldsz) (uint av) pu (4096 * i)%nat).
+      - intros x Hlv. apply HMdom. by right.
+      - intros x Hs Hrng. apply (Hnotin x Hs).
+        clear -Hrng. rewrite Nat2Z.inj_mul in Hrng. lia.
+      - intros x. rewrite /uva_live Hpgo Havu (ua_pgu_exact pu i Hpumod Hpu0).
+        rewrite Nat2Z.inj_mul. clear -Hpu0. lia. }
     assert (Hvpn : svpn_of av = vpn_at (svpn_of (pgroundup oldsz)) i).
     { apply bv_eq. rewrite (vpn_at_unsigned _ i Hvb).
       rewrite !svpn_of_unsigned_gen. rewrite Hav Hpu.
@@ -686,12 +810,15 @@ Section ProofUvmalloc.
          handed to [Uvmdealloc] as-is; no [tp_pin] re-tagging needed. *)
       assert (Hudo : (uint (N4 !!! Regidx Ra1) <= uvm_maxsz)%Z)
         by (rewrite HN4a1; exact Hudold).
-      iApply (Uvmdealloc.wp_uvmdealloc_sconf γa N4 Pi (K - 10)%nat eb p b
+      iEval (rewrite <- Havu) in "Hpt".
+      iEval (rewrite <- HN4a1) in "Hpt".
+      iApply (Uvmdealloc.wp_uvmdealloc_mem_sconf γa N4 Pi
+                (umem_grow Mv (uint (N4 !!! Regidx Ra1))) (K - 10)%nat eb p b
                 _ HKud HN4a0 Hudo
                 with "Hcg Hcnt Htext Hpc Hpt Henv").
       all: try lkbelow.
       iIntros (CIDu9 Hsu9 md) "Hcg Hcnt Hpc %Hdcs _ Hpt".
-      iEval (rewrite HN4a1 HN4a2 Hpgpu Hnpd) in "Hpt".
+      iEval (rewrite HN4a1 HN4a2 Hpgpu Hnpd Hrszd Hgrowdel) in "Hpt".
       assert (Hret70 : ret_pc (N4 !!! Regidx Rra) = mword_of_int (KernelSyms.uvmalloc + 0x70)).
       { rewrite HN4ra. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
       iEval (rewrite Hret70) in "Hpc".
@@ -754,7 +881,9 @@ Section ProofUvmalloc.
       assert (Hq78 : add_vec_int (mword_of_int (KernelSyms.uvmalloc + 0x76) : mword 64) 2
                      = mword_of_int (KernelSyms.uvmalloc + 0x78)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hq78) in "Hpc".
-      iDestruct (ua_restore P Pi (svpn_of (pgroundup oldsz)) i Hext Hdom Hfreshi
+      iDestruct (ua_restore_mem P Pi (svpn_of (pgroundup oldsz)) i
+                   (uint (pgroundup oldsz)) (uint oldsz) Mv
+                   Hext Hdom Hfreshi Hlvsame
                    with "Hpt") as "Hpt".
       iEval (rewrite /ua_exit) in "Hexit".
       iSpecialize ("Hexit" $! CIDu13 with "[%]"); [wp_next_chain|].
@@ -869,10 +998,19 @@ Section ProofUvmalloc.
     { intros c Hc H2 H8 H9 H18 H19 H20 H21 H22 H23.
       ua_thr_peel. apply Hmkthr; assumption. }
     assert (Hmspv : page_valid (B5 !!! Regidx Ra0)) by (rewrite HB5a0; exact Hpv).
-    iApply (MemsetPage.wp_memset_page_sconf KT1 B5 (K - 10)%nat (mword_of_int 0 : mword 64) b p
+    iApply (MemsetPage.wp_memset_page_val_sconf KT1 B5 (K - 10)%nat
+              (mword_of_int 0 : mword 64) b p
               HKms Hmspv HB5a1 HB5a2 with "Hcg Htext Hpc [Hpage]").
     { iEval (rewrite HB5a0). iExact "Hpage". }
     iIntros (CIDu18 Hsu18 ms) "Hcg Hpc Hpage %Hmscs".
+    (* the page really READS AS ZERO now -- what the lazily-backed vas at
+       these addresses already claimed, and what makes the view's growth
+       honest rather than vacuous *)
+    assert (Hcb : nth_byte (autocast (T := mword)
+                    (subrange_vec_dec (mword_of_int 0 : mword 64)
+                       (Z.sub (Z.mul 1 8) 1) 0) : mword 8) 0 = bv_0 8)
+      by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hcb) in "Hpage".
     (* [MemsetPage] doesn't thread [cpu_own] at all (SpecMemsetPage.v), so
        ["Hcnt"] rides through the call framed but stranded at [CIDu2]; bring
        it up to date here before it is needed again (at Mappages). *)
@@ -1027,7 +1165,8 @@ Section ProofUvmalloc.
     { intros c Hc H2 H8 H9 H18 H19 H20 H21 H22 H23.
       ua_thr_peel. apply Hmsthr; assumption. }
     (* ---- open the table into the exact represented view ---- *)
-    iDestruct (proc_pt_acc_rep0 Pi with "Hpt") as
+    iDestruct (proc_ptm_acc_rep0 Pi (pu + 4096 * Z.of_nat i)%Z
+                 (umem_grow Mv (pu + 4096 * Z.of_nat i)%Z) with "Hpt") as
       (t m_ad) "(%Hrep & %Hview & %Hbase & %Hwf & Hptree & Hown)".
     assert (Humnone : Pi.(ud_um) !! svpn_of av = None).
     { rewrite Hvpn. apply not_elem_of_dom. rewrite Hdom. intros Hin2.
@@ -1107,9 +1246,36 @@ Section ProofUvmalloc.
       iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhwc Hcg]".
       iDestruct "Hhwc" as (hwmisa0 hwmseccfg0 hwpmar0 hwelp0)
         "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hkmapb & _)".
-      iDestruct (proc_pt_grow_uvm Pi (Z.lor xperm 18) (svpn_of av) r t' m_ad
+      assert (Hvpnu : (bv_unsigned (svpn_of av) * 4096 = bv_unsigned av)%Z).
+      { rewrite (svpn_of_unsigned_lo av
+                   ltac:(rewrite uint_unsigned; clear -Hbnd38 Hav; lia)).
+        rewrite uint_unsigned. rewrite Z.shiftr_div_pow2; [| lia].
+        change (2 ^ 12)%Z with 4096%Z.
+        pose proof (Z.div_mod (bv_unsigned av) 4096 ltac:(lia)) as Hdm.
+        rewrite Havmod in Hdm. lia. }
+      (* THE VIEW GROWS BY EXACTLY THIS PAGE.  [av] is page-aligned and
+         [svpn_of av] is its vpn, so the vas that become live going from
+         [av] to [av + 4096] are precisely that page's. *)
+      assert (Hlvstep : forall x : Z,
+                uva_live (pu + 4096 * Z.of_nat (S i))%Z x
+                <-> (uva_live (pu + 4096 * Z.of_nat i)%Z x
+                     \/ x ∈ upage_dom (svpn_of av))).
+      { intros x. rewrite upage_dom_range. rewrite /uva_live.
+        rewrite (ua_pgu_exact pu i Hpumod Hpu0).
+        rewrite (ua_pgu_exact pu (S i) Hpumod Hpu0).
+        rewrite Hvpnu Hav. rewrite Nat2Z.inj_succ. lia. }
+      iDestruct (proc_ptm_grow_uvm Pi (Z.lor xperm 18)
+                   (pu + 4096 * Z.of_nat i)%Z
+                   (pu + 4096 * Z.of_nat (S i))%Z
+                   (umem_grow Mv (pu + 4096 * Z.of_nat i)%Z)
+                   (svpn_of av) r t' m_ad
+                   (fun _ => bv_0 8)
                    Hperm Hwf Hview Hmadnone Hvpnb26 Hrep' Hbase'' Hpv
+                   Hlvstep ltac:(intros jj Hjj; reflexivity)
                    with "Hkmapb Hptree Hpage Hown") as "Hpt".
+      iEval (rewrite <- (umem_grow_step Mv (pu + 4096 * Z.of_nat i)%Z
+                           (pu + 4096 * Z.of_nat (S i))%Z
+                           (upage_dom (svpn_of av)) Hlvstep)) in "Hpt".
       set (Pj := uptd_insert_perm Pi (Z.lor xperm 18) (svpn_of av) r).
       assert (Hextj : uptd_ext P Pj)
         by (exact (uptd_ext_trans P Pi Pj Hext
@@ -1202,8 +1368,8 @@ Section ProofUvmalloc.
            last known-good anchor was [CIDu25], Mappages' own return hart). *)
         assert (Hshiftrec : b = false \/ p = zero_reg -> (CIDu28 : CPU) = (CID0 : CPU)) by wp_next_chain.
         assert (Hexit_shift1 :
-                  ⊢ (ua_exit (CID0 := CID0) mm P (svpn_of (pgroundup oldsz)) n xperm K eb p b lks sp0 spr oldsz newsz -∗
-                     ua_exit (CID0 := CIDu28) mm P (svpn_of (pgroundup oldsz)) n xperm K eb p b lks sp0 spr oldsz newsz)).
+                  ⊢ (ua_exit (CID0 := CID0) mm P Mv (svpn_of (pgroundup oldsz)) n xperm K eb p b lks sp0 spr oldsz newsz -∗
+                     ua_exit (CID0 := CIDu28) mm P Mv (svpn_of (pgroundup oldsz)) n xperm K eb p b lks sp0 spr oldsz newsz)).
         { rewrite /ua_exit. exact (wp_next_shift Hshiftrec). }
         iDestruct (Hexit_shift1 with "Hexit") as "Hexit".
         iDestruct (cpu_own_transport CIDu25 CIDu28 0%nat eb p b ltac:(wp_next_chain)
@@ -1315,6 +1481,36 @@ Section ProofUvmalloc.
         iSplitR; [iPureIntro; rewrite <- Hlast; exact Hdomj |].
         iSplitR; [iPureIntro; rewrite <- Hlast; exact Hleafj |].
         iSplitR; [iPureIntro; right; split; [exact Hoin | reflexivity] |].
+        (* THE LOOP ENDED AT PGROUNDUP(newsz): the cursor is a multiple of
+           4096 that the exit test just failed on, so it IS the view's
+           rounded size, and the invariant's live set is the final one. *)
+        assert (Hlvend : forall a : Z,
+                  uva_live (pu + 4096 * Z.of_nat (S i))%Z a
+                  <-> uva_live (uint newsz) a).
+        { intros a. rewrite /uva_live (ua_pgu_exact pu (S i) Hpumod Hpu0).
+          rewrite uint_unsigned. rewrite Hnz.
+          assert (Hpe : (UserPtTree.pgroundup nz
+                         = pu + 4096 * Z.of_nat (S i))%Z).
+          { unfold UserPtTree.pgroundup.
+            pose proof (proj2 (Hnchar i) Hin) as Hlo.
+            assert (Hhi : (nz <= pu + 4096 * Z.of_nat (S i))%Z).
+            { destruct (Z_le_gt_dec nz (pu + 4096 * Z.of_nat (S i))%Z)
+                as [Hle | Hgt]; [exact Hle |].
+              exfalso.
+              assert (Hc : (S i < n)%nat)
+                by (apply Hnchar; clear -Hgt; lia).
+              clear -Hc Hlast. lia. }
+            pose proof (Z.div_mod (nz + 4095) 4096 ltac:(lia)) as Hd.
+            pose proof (Z.mod_pos_bound (nz + 4095) 4096 ltac:(lia)) as Hmb.
+            pose proof (Z.div_mod pu 4096 ltac:(lia)) as Hdp.
+            rewrite Hpumod in Hdp. clear -Hd Hmb Hdp Hlo Hhi Hpu0. lia. }
+          rewrite Hpe. reflexivity. }
+        iEval (rewrite (proc_ptm_sz_cong Pj (pu + 4096 * Z.of_nat (S i))%Z
+                          (uint newsz)
+                          (umem_grow Mv (pu + 4096 * Z.of_nat (S i))%Z)
+                          Hlvend)) in "Hpt".
+        iEval (rewrite (umem_grow_cong Mv (pu + 4096 * Z.of_nat (S i))%Z
+                          (uint newsz) Hlvend)) in "Hpt".
         iExact "Hpt". } }
     (* =========== mappages FAILED: kfree the page and roll back ======== *)
     assert (Hk0 : k = 0%nat) by (clear -Hklt; lia). subst k.
@@ -1330,7 +1526,9 @@ Section ProofUvmalloc.
     iPoseProof (uai_9c with "Htext") as "Hi9c".
     iPoseProof (uai_9e with "Htext") as "Hi9e".
     iPoseProof (uai_a0 with "Htext") as "Hia0".
-    iDestruct (proc_pt_rebuild Pi t' m_ad Hwf Hview Hrep' Hbase'' with "Hptree Hown") as "Hpt".
+    iDestruct (proc_ptm_rebuild Pi (pu + 4096 * Z.of_nat i)%Z
+                 (umem_grow Mv (pu + 4096 * Z.of_nat i)%Z) t' m_ad
+                 Hwf Hview Hrep' Hbase'' with "Hptree Hown") as "Hpt".
     assert (Hbnt : neq_vec (mg !!! Regidx Ra0) zero_reg = true)
       by (rewrite Hga0; vm_compute; reflexivity).
     assert (Htgt88 : add_vec (mword_of_int (KernelSyms.uvmalloc + 0x54) : mword 64)
@@ -1401,7 +1599,11 @@ Section ProofUvmalloc.
               with "Hcg Hcnt Htext Hpc Hlock [Hpage] Havail").
     all: try lkbelow.
     { rewrite /kfree_pre HF2a0.
-      iSplitR; [iPureIntro; exact Hpv | iExact "Hpage"]. }
+      iSplitR; [iPureIntro; exact Hpv |].
+      (* kfree is contents-blind: forget the zeros again *)
+      rewrite /page_own /byte_any.
+      iApply (big_sepL_impl with "Hpage"). iIntros "!>" (kk x Hx) "Hj".
+      iExists _. iExact "Hj". }
     iIntros (CIDu38 Hsu38 mfk) "Hcg Hcnt Hpc %Hfcs _".
     assert (Hret8e : ret_pc (F2 !!! Regidx Rra) = mword_of_int (KernelSyms.uvmalloc + 0x8e)).
     { rewrite HF2ra. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
@@ -1493,12 +1695,15 @@ Section ProofUvmalloc.
        re-tagging needed. *)
     assert (Hudo2 : (uint (G4 !!! Regidx Ra1) <= uvm_maxsz)%Z)
       by (rewrite HG4a1; exact Hudold).
-    iApply (Uvmdealloc.wp_uvmdealloc_sconf γa G4 Pi (K - 10)%nat eb p b
+    iEval (rewrite <- Havu) in "Hpt".
+    iEval (rewrite <- HG4a1) in "Hpt".
+    iApply (Uvmdealloc.wp_uvmdealloc_mem_sconf γa G4 Pi
+              (umem_grow Mv (uint (G4 !!! Regidx Ra1))) (K - 10)%nat eb p b
               _ HKud HG4a0 Hudo2
               with "Hcg Hcnt Htext Hpc Hpt Henv").
     all: try lkbelow.
     iIntros (CIDu43 Hsu43 md2) "Hcg Hcnt Hpc %Hd2cs _ Hpt".
-    iEval (rewrite HG4a1 HG4a2 Hpgpu Hnpd) in "Hpt".
+    iEval (rewrite HG4a1 HG4a2 Hpgpu Hnpd Hrszd Hgrowdel) in "Hpt".
     assert (Hret98 : ret_pc (G4 !!! Regidx Rra) = mword_of_int (KernelSyms.uvmalloc + 0x98)).
     { rewrite HG4ra. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret98) in "Hpc".
@@ -1572,7 +1777,9 @@ Section ProofUvmalloc.
               with "Hcg Hpc Hia0").
     iIntros (CIDu48 Hsu48). iApply bi.later_intro. iIntros "Hcg Hpc".
     iEval (rewrite Hjta0) in "Hpc".
-    iDestruct (ua_restore P Pi (svpn_of (pgroundup oldsz)) i Hext Hdom Hfreshi
+    iDestruct (ua_restore_mem P Pi (svpn_of (pgroundup oldsz)) i
+                   (uint (pgroundup oldsz)) (uint oldsz) Mv
+                   Hext Hdom Hfreshi Hlvsame
                  with "Hpt") as "Hpt".
     iEval (rewrite /ua_exit) in "Hexit".
     iSpecialize ("Hexit" $! CIDu48 with "[%]"); [wp_next_chain|].
@@ -1596,19 +1803,24 @@ Section ProofUvmalloc.
     { rewrite /ua_pay. iLeft. iSplitR; [iPureIntro; reflexivity | iExact "Hpt"]. }
   Qed.
 
-  Lemma wp_uvmalloc_sconf
+  Lemma wp_uvmalloc_mem_sconf
       (γa : gname) (mm : regfile)
-      (P : uptd) (xperm : Z) (K : nat) (eb : bool) (p : mword 64)
-      (b : bool) (lks : gset string)
-    : wp_uvmalloc_sconf_body γa mm P xperm K eb p b lks.
+      (P : uptd) (Mv : gmap Z (bv 8)) (xperm : Z) (K : nat) (eb : bool)
+      (p : mword 64) (b : bool) (lks : gset string)
+    : wp_uvmalloc_mem_sconf_body γa mm P Mv xperm K eb p b lks.
   Proof.
-    cbv beta delta [wp_uvmalloc_sconf_body].
+    cbv beta delta [wp_uvmalloc_mem_sconf_body].
     intros pcE oldsz newsz vpn0 n ret_tgt HK Htp Hroot Hxp Hxrng Hperm Hobd Hnbd Hfr Hbelow.
     assert (Hnd : n = uvma_np oldsz newsz) by reflexivity.
     assert (HK10 : (10 <= K)%nat) by (clear -HK; lia).
     assert (HKback : ((K - 10) + 10)%nat = K) by (clear -HK; lia).
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc Hpt #Henv Hcont".
+    iDestruct (proc_ptm_dom P (uint oldsz) Mv with "Hpt") as %HMdom.
+    (* everything live at [oldsz] is already recorded, so growing TO
+       [oldsz] is the identity -- what the two do-nothing arms need *)
+    assert (Hgrow0 : umem_grow Mv (uint oldsz) = Mv)
+      by (apply umem_grow_id; intros a Ha; apply HMdom; by right).
     (* ---- the PGROUNDUP arithmetic, kept over plain [Z] (the zify rule) --- *)
     rewrite uint_unsigned in Hobd. rewrite uvm_maxsz_val in Hobd.
     (* the [newsz] premise is a DISJUNCTION now (SpecUvmalloc.v); put its
@@ -1678,16 +1890,16 @@ Section ProofUvmalloc.
       iApply ("Hcont" $! Y1 with "Hcg Hcnt Hpc [%] [Hpt]").
       { unfold callee_saved. split_and!;
           (rewrite /Y1; rewrite upd_ne; [reflexivity | reg_neq]). }
-      iRight. iExists P.
+      iRight. iExists P, oldsz.
       iSplitR; [iPureIntro; apply uptd_ext_refl |].
       iSplitR; [iPureIntro; rewrite Hn0; apply dom_run_0 |].
       iSplitR.
       { iPureIntro. rewrite Hn0 vpn_run_0. intros v Hv.
         exfalso. exact (not_elem_of_empty v Hv). }
+      iSplitR; [iPureIntro; left; split; [exact Hlt0 | reflexivity] |].
       iSplitR.
-      { iPureIntro. left. split; [exact Hlt0 |].
-        rewrite /Y1 upd_eq. rewrite add_vec_zero_l. reflexivity. }
-      iExact "Hpt". }
+      { iPureIntro. rewrite /Y1 upd_eq. rewrite add_vec_zero_l. reflexivity. }
+      rewrite Hgrow0. iExact "Hpt". }
 
     (* ================= newsz >= oldsz: push the frame ================== *)
     assert (Hoin : (uint oldsz <= uint newsz)%Z)
@@ -2021,7 +2233,7 @@ Section ProofUvmalloc.
     iPoseProof (uai_82 with "Htext") as "Hi82".
     iPoseProof (uai_84 with "Htext") as "Hi84".
     iPoseProof (uai_86 with "Htext") as "Hi86".
-    iAssert (ua_exit (CID0 := CID) mm P vpn0 n xperm K eb p b lks sp0 spr oldsz newsz)
+    iAssert (ua_exit (CID0 := CID) mm P Mv vpn0 n xperm K eb p b lks sp0 spr oldsz newsz)
       with "[Hcont Hk1 Hk2 Hk4 Hk6 Hk7 Hk9 Hk10]" as "Hepi".
     { rewrite /ua_exit.
       iIntros (CIDu86) "%Hsu86".
@@ -2172,7 +2384,16 @@ Section ProofUvmalloc.
       2:{ rewrite /ua_pay. rewrite HE7a0.
           iDestruct "Hpost" as "[(%Hz & Hp) | Hs]".
           - iLeft. iSplitR; [iPureIntro; exact Hz | iExact "Hp"].
-          - iRight. iExact "Hs". }
+          - (* the contract names the returned size existentially; the
+               loop's payout has it fixed at [res] *)
+            iRight. iDestruct "Hs" as (P') "(%Hx & %Hd & %Hl & %Hr & Hp)".
+            iExists P', res.
+            iSplitR; [iPureIntro; exact Hx |].
+            iSplitR; [iPureIntro; exact Hd |].
+            iSplitR; [iPureIntro; exact Hl |].
+            iSplitR; [iPureIntro; exact Hr |].
+            iSplitR; [iPureIntro; reflexivity |].
+            iExact "Hp". }
       { unfold callee_saved.
         assert (Hc2 : E7 !!! Regidx csp_rs1 = mm !!! Regidx csp_rs1).
         { rewrite /E7 upd_eq. exact Hwv. }
@@ -2268,6 +2489,41 @@ Section ProofUvmalloc.
           [ iPureIntro; rewrite Hn0 vpn_run_0; intros v Hv;
             exfalso; exact (not_elem_of_empty v Hv) |].
         iSplitR; [iPureIntro; right; split; [exact Hoin | reflexivity] |].
+        (* the loop never ran, and it never would have: [newsz] rounds to
+           the same page as [oldsz], so the live set -- and the view --
+           does not move even though the returned size does *)
+        assert (Hlvn : forall a : Z,
+                  uva_live (uint oldsz) a <-> uva_live (uint newsz) a).
+        { intros a. rewrite /uva_live !uint_unsigned.
+          unfold UserPtTree.pgroundup.
+          assert (Hpuq : (pu = ((bv_unsigned oldsz + 4095) / 4096) * 4096)%Z).
+          { rewrite <- Hpuv.
+            rewrite (pgroundup_unsigned oldsz
+                       ltac:(change (2 ^ 64)%Z with 18446744073709551616%Z;
+                             lia)).
+            pose proof (Z.div_mod (bv_unsigned oldsz + 4095) 4096
+                          ltac:(lia)) as Hd. lia. }
+          assert (Hpe : (((bv_unsigned newsz + 4095) / 4096) * 4096
+                         = ((bv_unsigned oldsz + 4095) / 4096) * 4096)%Z).
+          { pose proof (Z.div_mod (bv_unsigned newsz + 4095) 4096
+                          ltac:(lia)) as Hd2.
+            pose proof (Z.mod_pos_bound (bv_unsigned newsz + 4095) 4096
+                          ltac:(lia)) as Hbb2.
+            pose proof (Z.div_mod (bv_unsigned oldsz + 4095) 4096
+                          ltac:(lia)) as Hd1.
+            pose proof (Z.mod_pos_bound (bv_unsigned oldsz + 4095) 4096
+                          ltac:(lia)) as Hbb1.
+            assert (Hoinz : (bv_unsigned oldsz <= bv_unsigned newsz)%Z)
+              by (rewrite !uint_unsigned in Hoin; exact Hoin).
+            pose proof (Z.div_le_mono (bv_unsigned oldsz + 4095)
+                          (bv_unsigned newsz + 4095) 4096 ltac:(lia)
+                          ltac:(lia)) as Hm.
+            clear -Hd1 Hd2 Hbb1 Hbb2 Hm Hnzle Hpuq Hnz. lia. }
+          rewrite Hpe. reflexivity. }
+        iEval (rewrite (proc_ptm_sz_cong P (uint oldsz) (uint newsz) Mv Hlvn))
+          in "Hpt".
+        rewrite (umem_grow_id Mv (uint newsz)
+                   ltac:(intros a Ha; apply HMdom; right; by apply Hlvn)).
         iExact "Hpt". } }
 
     (* ---- PGROUNDUP(oldsz) < newsz: the loop runs ---- *)
@@ -2383,8 +2639,8 @@ Section ProofUvmalloc.
     { rewrite Hpuv. change (Z.of_nat 0) with 0%Z.
       rewrite Z.mul_0_r Z.add_0_r. reflexivity. }
     assert (Hshiftepi : b = false \/ p = zero_reg -> (CIDu85 : CPU) = (CID : CPU)) by wp_next_chain.
-    assert (Hexit_shift0 : ⊢ (ua_exit (CID0 := CID) mm P vpn0 n xperm K eb p b lks sp0 spr oldsz newsz -∗
-                              ua_exit (CID0 := CIDu85) mm P vpn0 n xperm K eb p b lks sp0 spr oldsz newsz)).
+    assert (Hexit_shift0 : ⊢ (ua_exit (CID0 := CID) mm P Mv vpn0 n xperm K eb p b lks sp0 spr oldsz newsz -∗
+                              ua_exit (CID0 := CIDu85) mm P Mv vpn0 n xperm K eb p b lks sp0 spr oldsz newsz)).
     { rewrite /ua_exit. exact (wp_next_shift Hshiftepi). }
     iDestruct (Hexit_shift0 with "Hepi") as "Hepi".
     iDestruct (cpu_own_transport CID CIDu85 0%nat eb p b ltac:(wp_next_chain)
@@ -2414,9 +2670,28 @@ Section ProofUvmalloc.
               (pu + 4096 * Z.of_nat j + 4096 <= 274877898752)%Z ->
               P.(ud_um) !! vpn_at (svpn_of (pgroundup oldsz)) j = None).
     { intros j Hj Hb. apply (Hfr j Hj). rewrite Hpuv uvm_maxsz_val. exact Hb. }
-    iApply (ua_loop γa mm P xperm K eb p sp0 spr oldsz newsz pu nz n b lks
+    assert (Hpgo : (UserPtTree.pgroundup (uint oldsz) = pu)%Z).
+    { rewrite uint_unsigned.
+      rewrite (pgroundup_live oldsz
+                 ltac:(change (2 ^ 64)%Z with 18446744073709551616%Z; lia)).
+      exact Hpuv. }
+    (* the invariant starts at [PGROUNDUP(oldsz)]: same live set as [oldsz],
+       and everything live there is already recorded, so the grown view IS
+       the one we were handed *)
+    assert (Hlv0 : forall a : Z,
+              uva_live (uint oldsz) a <-> uva_live (pu + 4096 * Z.of_nat 0)%Z a).
+    { intros a. rewrite /uva_live Hpgo (ua_pgu_exact pu 0%nat Hpumod Hpu0).
+      cbn [Z.of_nat]. rewrite Z.mul_0_r Z.add_0_r. reflexivity. }
+    iEval (rewrite (proc_ptm_sz_cong P (uint oldsz) (pu + 4096 * Z.of_nat 0)%Z
+                      Mv Hlv0)) in "Hpt".
+    assert (Hgrow00 : umem_grow Mv (pu + 4096 * Z.of_nat 0)%Z = Mv)
+      by (apply umem_grow_id; intros a Ha; apply HMdom; right; by apply Hlv0).
+    iAssert (proc_ptm P (pu + 4096 * Z.of_nat 0)%Z
+               (umem_grow Mv (pu + 4096 * Z.of_nat 0)%Z)) with "[Hpt]" as "Hpt".
+    { rewrite Hgrow00. iExact "Hpt". }
+    iApply (ua_loop γa mm P Mv xperm K eb p sp0 spr oldsz newsz pu nz n b lks
               HK Hxrng Hperm Hb3 Hb5 Hb8 Hpuv (eq_sym Hnz) Hpumod Hpu0 Hab Hoin
-              Hnchar Hfrg
+              HMdom Hpgo Hnchar Hfrg
               Hbelow
               n 0%nat CIDu85 P R12 (pgroundup oldsz) Hsum0 Hn1 Hav0
               (uptd_ext_refl P) (dom_run_0 (dom P.(ud_um)) (svpn_of (pgroundup oldsz)))
@@ -2424,6 +2699,40 @@ Section ProofUvmalloc.
                     exfalso; exact (not_elem_of_empty v Hv))
               HR12sp HR12s2 HR12s3 HR12s4 HR12s5 HR12s6 HR12s7 HR12thr
               with "Hcg Hcnt Htext Hpc Hpt Henv Hk3 Hk5 Hk8 Hepi").
+  Qed.
+
+  (* ...and the EXISTENTIAL-[M] corollary: every current caller speaks it,
+     and none of them cares what the new pages read as. *)
+  Lemma wp_uvmalloc_sconf
+      (γa : gname) (mm : regfile)
+      (P : uptd) (xperm : Z) (K : nat) (eb : bool) (p : mword 64)
+      (b : bool) (lks : gset string)
+    : wp_uvmalloc_sconf_body γa mm P xperm K eb p b lks.
+  Proof.
+    cbv beta delta [wp_uvmalloc_sconf_body].
+    intros pcE oldsz newsz vpn0 n ret_tgt HK Htp Hroot Hxp Hxrng Hperm
+           Hobd Hnbd Hfr Hbelow.
+    iIntros "Hcg Hcnt #Htext Hpc Hpt #Henv Hcont".
+    iEval (rewrite (proc_pt_ptm P (uint oldsz))) in "Hpt".
+    iDestruct "Hpt" as (Mv) "Hpt".
+    iApply (wp_uvmalloc_mem_sconf γa mm P Mv xperm K eb p b lks
+              HK Htp Hroot Hxp Hxrng Hperm Hobd Hnbd Hfr Hbelow
+              with "Hcg Hcnt Htext Hpc Hpt Henv").
+    rewrite /wp_next. iIntros (CIDx) "%Hsx".
+    iSpecialize ("Hcont" $! CIDx with "[]"); [iPureIntro; exact Hsx|].
+    iIntros (mr) "Hcg Hcnt Hpc %Hcs Hpay".
+    iApply ("Hcont" $! mr with "Hcg Hcnt Hpc [%] [Hpay]"); [exact Hcs |].
+    iDestruct "Hpay" as "[(%Hz & Hp) | Hs]".
+    - iLeft. iSplitR; [iPureIntro; exact Hz |].
+      iApply (proc_ptm_pt with "Hp").
+    - iRight. iDestruct "Hs" as (P' rsz) "(%Hx & %Hd & %Hl & %Hr & %Ha & Hp)".
+      iExists P'.
+      iSplitR; [iPureIntro; exact Hx |].
+      iSplitR; [iPureIntro; exact Hd |].
+      iSplitR; [iPureIntro; exact Hl |].
+      iSplitR.
+      { iPureIntro. rewrite Ha. exact Hr. }
+      iApply (proc_ptm_pt with "Hp").
   Qed.
 
 End ProofUvmalloc.
