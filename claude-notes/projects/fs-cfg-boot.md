@@ -1065,3 +1065,20 @@ when SpecForkret starts importing FirstTok.
   allocate a `to_agree` of the eventual record early, but you still cannot
   WRITE `is_lock fsc_dlock …` before the value exists, so `fs_ready` stays
   unstatable. Eager minting is the only route.
+
+## PENDING MERGE (fetched 2026-08-20 late, NOT yet merged)
+
+origin/main moved past the merge-base `15f597b2` (our side = this campaign's
+commits): upstream wired dispatcher entries 4/17/20 (pipe/mknod/mkdir),
+split iref slots fractionally, added uvmcopy contracts — and **`a02d9da5`
+bumps `XV6_REV` to `31f115a`** (negative read/write count refused at the
+source = the dispatcher's debt C kernel fix). The bump regenerates the whole
+image (KernelInstrs/KernelData/KernelSyms), so the merge is a BUMP ROUND per
+`claude-notes/xv6-bump-playbook.md`, not a plain 3-way: every
+address-sensitive fact this campaign wrote (BootCarveMain's carve
+arithmetic, mn_grp_fs's walk offsets, first_addr) is against the OLD pin.
+Sequence: finish stage (f) on the current base → gate → merge on the EC2
+lane (xv6-riscv fetch + checkout 31f115a + make clean + re-dump +
+check-decode + fix_proof_imms as needed) → whole-tree gate + audit diff.
+Expect real 3-way content in SpecUserinit/ProofUserinit/ProofMain (upstream
+touched the dispatcher/iref side).
