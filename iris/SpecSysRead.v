@@ -166,6 +166,7 @@ Require Import ProcPtOwn.
 Require Import ProcInv.
 Require Import FileInvDefs.
 Require Import SpecArgfd.
+Require Import ConsoleInv.
 Require Import SpecFileread.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -296,6 +297,13 @@ Definition wp_sys_read_sconf_body
      so this contract asks its caller for NOTHING about the count -- which is
      what a syscall contract has to do, the argument being whatever the user
      put in a2.  See the header. *)
+  (* THE NAMES RECORD IS PINNED TO THE CONSOLE TABLE.  Two equations, not a
+     resource: the record's device column is a FUNCTION of the major, and
+     these say it is the table's own ([ConsoleInv.devsw_read_val]) held at
+     the fraction the table holds it under.  A dispatcher builds the record
+     itself, so it discharges both by [reflexivity]. *)
+  frn_rp fn = ConsoleInv.devsw_read_val ->
+  frn_dqv fn = (fun _ => DfracDiscarded) ->
   (* PARKING PREMISE (hart-generic scheduler protocol): every fileread arm
      sleeps, so this syscall parks. *)
   eb = true ->
@@ -313,9 +321,15 @@ Definition wp_sys_read_sconf_body
   kalloc_env γa None -∗
   procs_inv γs -∗
   (* ...and the file system in the form that does NOT name a file, plus the
-     device table's read column for whatever major the descriptor may name *)
+     CONSOLE INVARIANT, which is where the device table's read column comes
+     from.  ONE PERSISTENT PROPOSITION, out of [syscall_env]: this contract
+     no longer threads a ten-cell family in and out, because the table is
+     written once by consoleinit and held at a discarded fraction ever after
+     ([ConsoleInv.devsw_table]).  [fileread_devsw_of_console] is the
+     projection, and the two equations above are what pin the names record to
+     the table's own values. *)
   fileread_fs_env γf fn -∗
-  fileread_devsw fn -∗
+  ConsoleInv.console_inv (frn_cons fn) -∗
   (* THE CROSSING IS THE LITERAL [true]: fileread parks, and a park moves the
      hart with interrupts off, so the crossing has nothing to do with SIE. *)
   wp_next true pj (fun (CID : CpuId) =>
@@ -335,7 +349,8 @@ Definition wp_sys_read_sconf_body
          not [fileread_fs_env].  The device column is returned whole -- the
          arm only reads it. *)
       fileread_fs_out fn -∗
-      fileread_devsw fn -∗
+      (* the device column is NOT returned: it is persistent, and the caller
+         still holds the invariant it was projected from. *)
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

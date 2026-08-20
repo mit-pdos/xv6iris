@@ -383,6 +383,35 @@ Section SpecFileread.
        a_devsw_read (Z.of_nat i) ↦₈{frn_dqv fn (Z.of_nat i)}
          frn_rp fn (Z.of_nat i))%I.
 
+  (* ---- THE COLUMN, OUT OF THE CONSOLE INVARIANT ----------------------
+     [fileread_devsw] is [ConsoleInv.console_inv] read at the read column,
+     once the names record is instantiated at the table's own values and at
+     the discarded fraction the table holds them under.  So a caller does not
+     have to own a devsw family of its own: it holds the console invariant --
+     one persistent proposition, out of [syscall_env] -- and this projects
+     what fileread asks for.
+
+     The per-cell disjunction fileread's contract is stated over is READ OFF
+     the table ([ConsoleInv.devsw_read_val_cases]) rather than assumed of it,
+     which is the point of the table saying what each slot HOLDS.
+     -------------------------------------------------------------------- *)
+  Lemma fileread_devsw_of_console (fn : fread_names) :
+    frn_rp fn = ConsoleInv.devsw_read_val ->
+    frn_dqv fn = (fun _ => DfracDiscarded) ->
+    ConsoleInv.console_inv (frn_cons fn) -∗ fileread_devsw fn.
+  Proof.
+    intros Hrp Hdq. iIntros "#Hci".
+    iDestruct (ConsoleInv.console_inv_conslock with "Hci") as "#Hlk".
+    iDestruct (ConsoleInv.console_inv_devsw with "Hci") as "#Htbl".
+    rewrite /fileread_devsw /fileread_dev_caps Hrp Hdq.
+    iSplitR; [iExact "Hlk" |].
+    rewrite /ConsoleInv.devsw_table.
+    iApply (big_sepL_impl with "Htbl").
+    iModIntro. iIntros (k i Hk) "[Hr _]".
+    iSplitR; [iPureIntro; apply ConsoleInv.devsw_read_val_cases |].
+    iExact "Hr".
+  Qed.
+
   Lemma fileread_devsw_acc (fn : fread_names) (Cf : fcontent) :
     fileread_devsw fn -∗
     fileread_dev_env fn Cf ∗ (fileread_dev_out fn Cf -∗ fileread_devsw fn).

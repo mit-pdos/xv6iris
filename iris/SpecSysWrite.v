@@ -100,6 +100,7 @@ Require Import ProcInv.
 Require Import FileInvDefs.
 Require Import SpecArgfd.
 Require Import SpecSysRead.
+Require Import ConsoleInv.
 Require Import SpecFilewrite.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -198,6 +199,11 @@ Definition wp_sys_write_sconf_body
      ([SpecSysRead.sys_rw_count_range]), so this contract asks its caller for
      NOTHING about the count -- which is what a syscall contract has to do,
      the argument being whatever the user put in a2.  See the header. *)
+  (* THE NAMES RECORD IS PINNED TO THE CONSOLE TABLE -- two equations, not a
+     resource; a dispatcher builds the record itself and discharges both by
+     [reflexivity]. *)
+  fwn_wp fn = ConsoleInv.devsw_write_val ->
+  fwn_dqv fn = (fun _ => DfracDiscarded) ->
   (* PARKING PREMISE (hart-generic scheduler protocol): every filewrite arm
      sleeps, so this syscall parks. *)
   eb = true ->
@@ -214,9 +220,15 @@ Definition wp_sys_write_sconf_body
   kalloc_env γa None -∗
   procs_inv γs -∗
   (* ...and the file system in the form that does NOT name a file, plus the
-     device table's write column for whatever major the descriptor may name *)
+     device table's write column -- which now comes from the CONSOLE TABLE
+     ([ConsoleInv.devsw_table], out of [syscall_env]) rather than from a
+     ten-cell family this contract threads in and out.  The CAPS are separate
+     and stay explicit: consolewrite drives the UART, so they are [dev_inv]
+     and the tx lock, not the cons lock, and both come from [printk_env].
+     [filewrite_devsw_of_console] is the projection. *)
   filewrite_fs_env γf fn -∗
-  filewrite_devsw fn -∗
+  filewrite_dev_caps fn -∗
+  ConsoleInv.devsw_table -∗
   (* THE CROSSING IS THE LITERAL [true]: filewrite parks. *)
   wp_next true pj (fun (CID : CpuId) =>
     ∀ (mf : regfile) (r : mword 64) (P' : uptd) (used' : gset Z),
@@ -231,7 +243,8 @@ Definition wp_sys_write_sconf_body
       kalloc_env γa None -∗
       (* the file system, back, at a bitmap set that only GREW *)
       filewrite_fs_out fn used' -∗
-      filewrite_devsw fn -∗
+      (* the device column is NOT returned: it is persistent, and the caller
+         still holds the table it was projected from. *)
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

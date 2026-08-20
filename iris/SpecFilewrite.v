@@ -371,6 +371,28 @@ Section SpecFilewrite.
        a_devsw_write (Z.of_nat i) ↦₈{fwn_dqv fn (Z.of_nat i)}
          fwn_wp fn (Z.of_nat i))%I.
 
+  (* ---- THE COLUMN, OUT OF THE CONSOLE INVARIANT ----------------------
+     [SpecFileread.fileread_devsw_of_console]'s twin.  The CAPS half differs
+     and is NOT here: consolewrite drives the UART, so [filewrite_dev_caps]
+     is [dev_inv] and the tx lock rather than [is_conslock], and both come
+     from [printk_env] -- which is why this lemma takes them rather than
+     producing them.  The CELLS are the same table.
+     -------------------------------------------------------------------- *)
+  Lemma filewrite_devsw_of_console (fn : fwrite_names) :
+    fwn_wp fn = ConsoleInv.devsw_write_val ->
+    fwn_dqv fn = (fun _ => DfracDiscarded) ->
+    filewrite_dev_caps fn -∗ ConsoleInv.devsw_table -∗ filewrite_devsw fn.
+  Proof.
+    intros Hwp Hdq. iIntros "#Hcaps #Htbl".
+    rewrite /filewrite_devsw Hwp Hdq.
+    iSplitR; [iExact "Hcaps" |].
+    rewrite /ConsoleInv.devsw_table.
+    iApply (big_sepL_impl with "Htbl").
+    iModIntro. iIntros (k i Hk) "[_ Hw]".
+    iSplitR; [iPureIntro; apply ConsoleInv.devsw_write_val_cases |].
+    iExact "Hw".
+  Qed.
+
   Lemma filewrite_devsw_acc (fn : fwrite_names) (Cf : fcontent) :
     filewrite_devsw fn -∗
     filewrite_dev_env fn Cf ∗ (filewrite_dev_out fn Cf -∗ filewrite_devsw fn).
