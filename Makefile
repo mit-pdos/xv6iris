@@ -169,7 +169,9 @@ $(UDUMP)/$(2)Data.v:   $(USER_DIR)/_$(1) $$(DUMPER)
 	$$(PYTHON) $$(DUMPER) --format rocq-data --elf $$< --prefix $(1) --objdump $$(OBJDUMP) --out $$@
 $(UDUMP)/$(2)Syms.v:   $(USER_DIR)/_$(1) $$(DUMPER)
 	$$(PYTHON) $$(DUMPER) --format rocq-syms --elf $$< --prefix $(1) --objdump $$(OBJDUMP) --out $$@
-UDUMP_SRCS += $(UDUMP)/$(2)Instrs.v $(UDUMP)/$(2)Data.v $(UDUMP)/$(2)Syms.v
+$(UDUMP)/$(2)ElfRaw.v: $(USER_DIR)/_$(1) $$(DUMPER)
+	$$(PYTHON) $$(DUMPER) --format rocq-raw  --elf $$< --prefix $(1) --objdump $$(OBJDUMP) --out $$@
+UDUMP_SRCS += $(UDUMP)/$(2)Instrs.v $(UDUMP)/$(2)Data.v $(UDUMP)/$(2)Syms.v $(UDUMP)/$(2)ElfRaw.v
 endef
 $(foreach d,$(USER_DUMPS),\
   $(eval $(call user_dump_rules,$(word 1,$(subst :, ,$(d))),$(word 2,$(subst :, ,$(d))))))

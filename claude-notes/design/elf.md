@@ -1,9 +1,9 @@
-# ELF file semantics — `ElfFile.v`, `KernelElfRaw.v`, `ElfKernel.v`
+# ELF file semantics — `ElfFile.v`, `*ElfRaw.v`, `ElfKernel.v`, `ElfUser.v`
 
 What an ELF file MEANS: the memory image a loader must establish from a byte
-sequence. One general semantics, two consumers — the whole-kernel consistency
-theorem (built), and the eventual `exec()` spec (the reason the semantics is
-shaped the way it is).
+sequence. One general semantics, two consumers — the consistency theorems for
+every dumped image (the kernel and the four verified user programs), and the
+eventual `exec()` spec (the reason the semantics is shaped the way it is).
 
 ## The two ELF layers, and which one this is
 
@@ -86,6 +86,15 @@ Nothing imports `ElfKernel.v`; it is a leaf by design (one vm_compute-heavy
 file, kept out of every rebuild cone) that `make proofs` still builds, so the
 check runs on every full build. A failing equality here means dump and ELF
 disagree — investigate the dumper or the toolchain, never weaken the theorem.
+
+`ElfUser.v` is the same theorem set four more times, for the U-mode programs
+(`sync`/`echo`/`sh`/`init`, raws in `user-rocq/<P>ElfRaw.v`, one make rule per
+`USER_DUMPS` entry). Beyond re-checking those dumps, the four instances
+exercise shapes the kernel's single RWX PT_LOAD cannot: TWO load segments
+(text R-E at vaddr 0 with `filesz = memsz`, so an EMPTY zero map; an RW
+segment above with .data+.bss), a `filesz = 0` pure-bss segment (sync, echo),
+an entry that is not the lowest text address, and non-PT_LOAD program headers
+(`RISCV_ATTRIBUTES`, `GNU_STACK`) that `elf_loads` must filter out.
 
 ## Computational rules for vm_compute over a whole file (measured)
 

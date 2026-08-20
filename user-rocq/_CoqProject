@@ -2,12 +2,16 @@
 SyncInstrs.v
 SyncData.v
 SyncSyms.v
+SyncElfRaw.v
 EchoInstrs.v
 EchoData.v
 EchoSyms.v
+EchoElfRaw.v
 ShInstrs.v
 ShData.v
 ShSyms.v
+ShElfRaw.v
 InitInstrs.v
 InitData.v
 InitSyms.v
+InitElfRaw.v
