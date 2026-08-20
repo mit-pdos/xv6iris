@@ -249,8 +249,8 @@ UmodeArith.v
 UmodeSyscall.v
 UmodeIo.v
 WpUmodeStep.v
-# WpUmodeLeaf.v
-# WpUmodeBranch.v
+WpUmodeLeaf.v
+WpUmodeBranch.v
 # WpUmodeStore.v
 # WpUmodeLoad.v
 USpecSync.v
