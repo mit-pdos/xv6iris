@@ -304,6 +304,43 @@ Lemma retag_excl_ok_ts_2 f log i base rts ts :
   excl_ok_ts log i base rts ts → excl_ok_ts (retag_log f log) i base rts ts.
 Proof. apply retag_excl_ok_ts. Qed.
 
+(** THE WALKER DISCRIMINATOR (layer2 §13, W2a) is retag-invariant for the
+    same reason as everything else on this page: it reads the log only
+    through [log_byte], and a retag moves no byte. *)
+Lemma retag_res_read_byte f img log base rts j :
+  res_read_byte img (retag_log f log) base rts j
+  = res_read_byte img log base rts j.
+Proof.
+  rewrite /res_read_byte. destruct (rts !! j) as [t|]; [|done].
+  by rewrite /= retag_log_byte.
+Qed.
+
+Lemma retag_ad_shaped f img log base rts data :
+  ad_shaped img (retag_log f log) base rts data ↔ ad_shaped img log base rts data.
+Proof.
+  rewrite /ad_shaped.
+  split; intros (Hlen & Hhi & (r0 & d0 & Hd0 & Hr0 & Hb0));
+    (split_and!; [done| |exists r0, d0; split_and!; [done| |done]]).
+  - intros j Hj. rewrite -(retag_res_read_byte f img log base rts j).
+    by apply Hhi.
+  - by rewrite -(retag_res_read_byte f img log base rts 0%nat).
+  - intros j Hj. rewrite (retag_res_read_byte f img log base rts j).
+    by apply Hhi.
+  - by rewrite (retag_res_read_byte f img log base rts 0%nat).
+Qed.
+
+Lemma retag_ad_shapedb f img log base rts data :
+  ad_shapedb img (retag_log f log) base rts data
+  = ad_shapedb img log base rts data.
+Proof.
+  destruct (ad_shapedb img (retag_log f log) base rts data) eqn:E1;
+    destruct (ad_shapedb img log base rts data) eqn:E2; [done| | |done].
+  - apply ad_shapedb_spec, (retag_ad_shaped f img log base rts data),
+      ad_shapedb_spec in E1. by rewrite E1 in E2.
+  - apply ad_shapedb_spec, (retag_ad_shaped f img log base rts data),
+      ad_shapedb_spec in E2. by rewrite E2 in E1.
+Qed.
+
 (** [fulfil_ok] mentions no log at all — recorded so the audit above is
     complete on the page. *)
 Lemma retag_fulfil_ok ws rl base n ts :
@@ -428,9 +465,12 @@ Section machine.
     - apply (WPExStore (P:=P) (D:=D) pstep
                (WPCfg (pc_img cfg) (retag_log f (pc_log cfg)) (pc_dev cfg) (pc_ags cfg))
                i ag rl base data asrc vsrc (f (ts - 1)%nat) ts R st' d'
-               Hlk Hps Hin); [|exact Hres|exact Hrb|exact Hrlen| |exact Hok].
+               Hlk Hps Hin); [|exact Hres|exact Hrb|exact Hrlen| |].
       + simpl. by rewrite retag_log_lookup Hm.
       + simpl. by apply retag_excl_ok_ts_2.
+      + cbn [pc_img pc_log].
+        by rewrite (retag_ad_shapedb f (pc_img cfg) (pc_log cfg) base
+                      (rv_ts R) data).
   Qed.
 
   Lemma wpsteps_retag f c c' :
@@ -594,16 +634,18 @@ Section machine.
     - split.
       + intros (ts & k & R & Hin & Hm & Hres & Hrb & Hrlen & He & Hok & Hf & HD).
         exists ts, (f (ts - 1)%nat), R.
-        split_and!; [done| |done|done|done| |done|done|done].
+        split_and!; [done| |done|done|done| | |done|done].
         * by rewrite retag_log_lookup Hm.
         * by apply retag_excl_ok_ts_2.
+        * by rewrite retag_ad_shapedb.
       + intros (ts & k & R & Hin & Hm & Hres & Hrb & Hrlen & He & Hok & Hf & HD).
         apply retag_log_lookup_inv in Hm as (m & Hm & Heq).
         destruct m as [pa dat tid ak]. rewrite /retag_msg /= in Heq.
         simplify_eq/=.
         exists ts, ak, R.
-        split_and!; [done|done|done|done|done| |done|done|done].
-        by eapply retag_excl_ok_ts_1.
+        split_and!; [done|done|done|done|done| | |done|done].
+        * by eapply retag_excl_ok_ts_1.
+        * by rewrite retag_ad_shapedb in Hok.
   Qed.
 
   Lemma asteps_wf_retag f img log i ags evs :

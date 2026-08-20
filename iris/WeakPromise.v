@@ -384,6 +384,17 @@ Definition fulfil_ok_d (ws : wstate) (rl : bool) (base : Z) (n : nat)
 Definition fulfil_ok (ws : wstate) (rl : bool) (base : Z) (n : nat)
     (ts : nat) : Prop := fulfil_ok_d ws rl base n ts 0%nat.
 
+(** A SMALLER label view is a WEAKER condition — the direction every
+    consumer of a raised EXT floor needs (a gate that only ADDS to [vd]
+    leaves every pre-gate consequence intact). *)
+Lemma fulfil_ok_d_mono ws rl base n ts vd vd' :
+  (vd' ≤ vd)%nat →
+  fulfil_ok_d ws rl base n ts vd → fulfil_ok_d ws rl base n ts vd'.
+Proof.
+  intros Hle [Hcoh Hext]. split; [done|].
+  rewrite /fulfil_vpre_d in Hext |- *. lia.
+Qed.
+
 Lemma fulfil_ok_d_0 ws rl base n ts :
   fulfil_ok_d ws rl base n ts 0%nat = fulfil_ok ws rl base n ts.
 Proof. done. Qed.
@@ -522,6 +533,201 @@ Lemma exwin_okb_false log i ws base n ts :
   exwin_okb log i ws base n ts = false → ¬ exwin_ok log i ws base n ts.
 Proof.
   intros Hf Hok. apply exwin_okb_spec in Hok. by rewrite Hok in Hf.
+Qed.
+
+(* ------------------------------------------------------------------ *)
+(** ** THE WALKER DISCRIMINATOR: which conditional writes are A/D updates
+       (layer2 §13, W2a)
+
+    §13's non-promisability gate, realized WITHOUT a promise-side arm and
+    WITHOUT breaking front-loading: a conditional write is WALKER-SHAPED
+    when the bytes it writes are the A/D update of the values its own
+    reservation read, and such a write fulfils at RELEASE strength (its
+    EXT floor gains [w_vrOld ⊔ w_vwOld]).  The classifier is a predicate
+    on the WRITTEN VALUE — the machine never sees which agent's page
+    walker produced the event — and it is stated over the BYTE LISTS,
+    because A and D are bits 6 and 7 of the PTE's LOW byte, so no word
+    assembly is needed here.  The bridge to the model's write-back shape
+    ([PtAdBits.update_PTE_Bits_A1] / [_ne], via [pte_set_ad]) is
+    [WeakVariant.ad_shaped_of_pte_set_ad], which is where the Sail
+    vocabulary lives; this file stays dependency-free.
+
+    THE [data ≠ read] CONJUNCT IS LOad-BEARING: without it a SOFTWARE RMW
+    that writes back exactly the word it read would be walker-shaped, and
+    the gate would charge release strength to an ordinary kernel CAS.
+    [update_PTE_Bits_ne] is what says the hardware write-back never has
+    that shape. *)
+
+(** The reservation's observed byte [j], at fulfil time, read out of the
+    log at the reservation's own timestamp column. *)
+Definition res_read_byte (img : image) (log : list wmsg) (base : Z)
+    (rts : list nat) (j : nat) : option (bv 8) :=
+  rts !! j ≫= (λ t, log_byte img log t (base + Z.of_nat j)).
+
+(** BYTE 0's clause: the written byte has A (bit 6) set, agrees with the
+    read byte on bits 0–5, is FREE at bit 7 (D may or may not be driven),
+    and differs from the read byte. *)
+Definition ad_byte0 (r d : bv 8) : Prop :=
+  Z.testbit (bv_unsigned d) 6 = true ∧
+  (∀ i : nat, (i < 6)%nat →
+     Z.testbit (bv_unsigned d) (Z.of_nat i)
+     = Z.testbit (bv_unsigned r) (Z.of_nat i)) ∧
+  d ≠ r.
+
+Definition ad_byte0b (r d : bv 8) : bool :=
+  Z.testbit (bv_unsigned d) 6 &&
+  forallb (λ i : nat, bool_decide (Z.testbit (bv_unsigned d) (Z.of_nat i)
+                                   = Z.testbit (bv_unsigned r) (Z.of_nat i)))
+          (seq 0 6) &&
+  bool_decide (d ≠ r).
+
+Lemma ad_byte0b_spec r d : ad_byte0 r d ↔ ad_byte0b r d = true.
+Proof.
+  (* [seq 0 6] is concrete, so the [forallb] simply enumerates the six
+     low bits — no [forallb_forall] detour. *)
+  rewrite /ad_byte0 /ad_byte0b !andb_true_iff !bool_decide_eq_true. split.
+  - intros (H6 & Hlo & Hne).
+    split_and!; first [exact H6 | exact Hne | reflexivity | apply Hlo; lia].
+  - intros [[H6 Hbits] Hne]. split_and!; [exact H6| |exact Hne].
+    destruct Hbits as (H0 & H1 & H2 & H3 & H4 & H5 & _).
+    intros i Hi. destruct i as [|[|[|[|[|[|i]]]]]];
+      [exact H0|exact H1|exact H2|exact H3|exact H4|exact H5|lia].
+Qed.
+
+(** THE CLASSIFIER.  [data] is an A/D update of what the reservation read:
+    same width as the reservation, bytes 1.. unchanged, byte 0 A/D-shaped. *)
+Definition ad_shaped (img : image) (log : list wmsg) (base : Z)
+    (rts : list nat) (data : list (bv 8)) : Prop :=
+  length data = length rts ∧
+  (∀ j : nat, (1 ≤ j < length data)%nat →
+     data !! j = res_read_byte img log base rts j) ∧
+  (∃ r0 d0, data !! 0%nat = Some d0 ∧
+            res_read_byte img log base rts 0%nat = Some r0 ∧
+            ad_byte0 r0 d0).
+
+Definition ad_shapedb (img : image) (log : list wmsg) (base : Z)
+    (rts : list nat) (data : list (bv 8)) : bool :=
+  bool_decide (length data = length rts) &&
+  forallb (λ j : nat,
+             bool_decide (data !! j = res_read_byte img log base rts j))
+          (seq 1 (length data - 1)) &&
+  match data !! 0%nat, res_read_byte img log base rts 0%nat with
+  | Some d0, Some r0 => ad_byte0b r0 d0
+  | _, _ => false
+  end.
+
+Lemma ad_shapedb_spec img log base rts data :
+  ad_shaped img log base rts data ↔ ad_shapedb img log base rts data = true.
+Proof.
+  rewrite /ad_shaped /ad_shapedb !andb_true_iff forallb_forall. split.
+  - intros (Hlen & Hhi & (r0 & d0 & Hd0 & Hr0 & Hb0)). split_and!.
+    + by apply bool_decide_eq_true_2.
+    + intros j Hj. apply elem_of_list_In, elem_of_seq in Hj.
+      apply bool_decide_eq_true_2, Hhi. lia.
+    + rewrite Hd0 Hr0. by apply ad_byte0b_spec.
+  - intros [[Hlen Hhi] H0].
+    apply bool_decide_eq_true_1 in Hlen.
+    destruct (data !! 0%nat) as [d0|] eqn:Hd0; [|done].
+    destruct (res_read_byte img log base rts 0%nat) as [r0|] eqn:Hr0; [|done].
+    split_and!; [done| |exists r0, d0; split_and!; [done|done|]].
+    + intros j Hj.
+      have Hin : In j (seq 1 (length data - 1))
+        by (apply elem_of_list_In, elem_of_seq; lia).
+      pose proof (Hhi j Hin) as Hj'. by apply bool_decide_eq_true_1 in Hj'.
+    + by apply ad_byte0b_spec.
+  Qed.
+
+(** THE CLASSIFIER IS A FUNCTION OF THE RESERVATION'S OWN TIMESTAMPS, so
+    it does not move when the log is END-EXTENDED: the reservation banks
+    real log positions ([WeakMem.wresv_bounded]) and the log is
+    append-only.  This is what keeps the L2 log-extension lemma
+    ([WeakPromiseFact.astep_ok_app]) a verbatim transfer. *)
+Lemma res_read_byte_app img log l base rts j :
+  (∀ j' t, rts !! j' = Some t → (t ≤ length log)%nat) →
+  res_read_byte img (log ++ l) base rts j
+  = res_read_byte img log base rts j.
+Proof.
+  intros Hb. rewrite /res_read_byte.
+  destruct (rts !! j) as [t|] eqn:Ht; [|done].
+  simpl. by rewrite (log_byte_app img log l t (base + Z.of_nat j) (Hb j t Ht)).
+Qed.
+
+Lemma ad_shaped_app img log l base rts data :
+  (∀ j t, rts !! j = Some t → (t ≤ length log)%nat) →
+  ad_shaped img (log ++ l) base rts data ↔ ad_shaped img log base rts data.
+Proof.
+  intros Hb. rewrite /ad_shaped.
+  split; intros (Hlen & Hhi & (r0 & d0 & Hd0 & Hr0 & Hb0));
+    (split_and!; [done| |exists r0, d0; split_and!; [done| |done]]).
+  - intros j Hj. rewrite -(res_read_byte_app img log l base rts j Hb).
+    by apply Hhi.
+  - by rewrite -(res_read_byte_app img log l base rts 0%nat Hb).
+  - intros j Hj. rewrite (res_read_byte_app img log l base rts j Hb).
+    by apply Hhi.
+  - by rewrite (res_read_byte_app img log l base rts 0%nat Hb).
+Qed.
+
+Lemma ad_shapedb_app img log l base rts data :
+  (∀ j t, rts !! j = Some t → (t ≤ length log)%nat) →
+  ad_shapedb img (log ++ l) base rts data
+  = ad_shapedb img log base rts data.
+Proof.
+  intros Hb.
+  destruct (ad_shapedb img (log ++ l) base rts data) eqn:E1;
+    destruct (ad_shapedb img log base rts data) eqn:E2; [done| | |done].
+  - apply ad_shapedb_spec, (ad_shaped_app img log l base rts data Hb),
+      ad_shapedb_spec in E1. by rewrite E1 in E2.
+  - apply ad_shapedb_spec, (ad_shaped_app img log l base rts data Hb),
+      ad_shapedb_spec in E2. by rewrite E2 in E1.
+Qed.
+
+(** THE GATE'S VIEW ARGUMENT, and its collapse off the walker fragment.
+    Nothing that certifies or front-loads pays anything: the else branch
+    is the pre-gate expression by [Nat.max_0_r]. *)
+Lemma exstore_vd_false (img : image) (log : list wmsg) (ws : wstate)
+    (base : Z) (data : list (bv 8)) (asrc vsrc : list dsrc) (R : wresv) :
+  ad_shapedb img log base (rv_ts R) data = false →
+  Nat.max (Nat.max (srcs_view ws asrc) (srcs_view ws vsrc))
+    (Nat.max (rv_view R)
+       (if ad_shapedb img log base (rv_ts R) data
+        then Nat.max (w_vrOld ws) (w_vwOld ws) else 0%nat))
+  = Nat.max (Nat.max (srcs_view ws asrc) (srcs_view ws vsrc)) (rv_view R).
+Proof. intros Hf. rewrite Hf. by rewrite Nat.max_0_r. Qed.
+
+(** ... and, on the walker fragment where the collapse is unavailable, the
+    ONE-WAY bound: the gated argument DOMINATES the pre-gate one, so every
+    pre-gate consequence of [WPExStore]'s [fulfil_ok_d] survives verbatim
+    (compose with [fulfil_ok_d_mono]).  This is the whole downstream cost
+    of the gate — no consumer has to know what [ad_shapedb] decided. *)
+Lemma exstore_vd_ge (img : image) (log : list wmsg) (ws : wstate) (base : Z)
+    (data : list (bv 8)) (asrc vsrc : list dsrc) (R : wresv) :
+  (Nat.max (Nat.max (srcs_view ws asrc) (srcs_view ws vsrc)) (rv_view R)
+   ≤ Nat.max (Nat.max (srcs_view ws asrc) (srcs_view ws vsrc))
+       (Nat.max (rv_view R)
+          (if ad_shapedb img log base (rv_ts R) data
+           then Nat.max (w_vrOld ws) (w_vwOld ws) else 0%nat)))%nat.
+Proof. destruct (ad_shapedb _ _ _ _ _); lia. Qed.
+
+(** THE TOP FACT (layer2 §13, W2a's deliverable).  An A/D-shaped fulfil's
+    timestamp EXCEEDS every timestamp its agent read or fulfilled before —
+    which is what closes every walker-write-EXIT segment: nothing the
+    agent had already observed can be ordered after the write-back.  The
+    two hypotheses are exactly what an inversion of [WPExStore] hands
+    you (its [fulfil_ok_d] premise, at [pc_img cfg]/[pc_log cfg]/[pa_ws
+    ag]), plus the classifier's verdict. *)
+Lemma wpstep_exstore_ad_top (img : image) (log : list wmsg) (ws : wstate)
+    (rl : bool) (base : Z) (data : list (bv 8)) (asrc vsrc : list dsrc)
+    (R : wresv) (ts : nat) :
+  ad_shapedb img log base (rv_ts R) data = true →
+  fulfil_ok_d ws rl base (length data) ts
+    (Nat.max (Nat.max (srcs_view ws asrc) (srcs_view ws vsrc))
+       (Nat.max (rv_view R)
+          (if ad_shapedb img log base (rv_ts R) data
+           then Nat.max (w_vrOld ws) (w_vwOld ws) else 0%nat))) →
+  (w_vrOld ws < ts)%nat ∧ (w_vwOld ws < ts)%nat.
+Proof.
+  intros Ht [_ Hext]. rewrite Ht in Hext.
+  rewrite /fulfil_vpre_d in Hext. lia.
 Qed.
 
 (* ------------------------------------------------------------------ *)
@@ -774,6 +980,14 @@ Section machine.
       - EXT gains [rv_view R], the read half's banked post-view — deviation
         D-2, PARM's [Exbank.view] contribution, which the fused [WPRmw]
         supplied as [ldv_of].
+      - EXT ALSO gains, on the WALKER-SHAPED fragment alone
+        ([ad_shapedb], above), the release-strength floor
+        [w_vrOld ⊔ w_vwOld] — layer2 §13's non-promisability gate,
+        realized here and NOT as a promise-side arm, so front-loading is
+        untouched.  Off that fragment the argument is the pre-gate one by
+        conversion-free rewriting ([exstore_vd_false]); ON it the TOP fact
+        [wpstep_exstore_ad_top] follows.  Constructors that append at the
+        fresh top satisfy ANY floor, so no fused/certifying site pays.
       - the fulfil CLEARS the reservation; that is already what
         [store_post_run_d] does (per byte, in [store_post_d]). *)
   | WPExStore cfg i ag rl base data asrc vsrc k ts R st' d' :
@@ -788,7 +1002,12 @@ Section machine.
       fulfil_ok_d (pa_ws ag) rl base (length data) ts
                   (Nat.max (Nat.max (srcs_view (pa_ws ag) asrc)
                                     (srcs_view (pa_ws ag) vsrc))
-                           (rv_view R)) →
+                           (Nat.max (rv_view R)
+                              (if ad_shapedb (pc_img cfg) (pc_log cfg) base
+                                    (rv_ts R) data
+                               then Nat.max (w_vrOld (pa_ws ag))
+                                            (w_vwOld (pa_ws ag))
+                               else 0%nat))) →
       wpstep cfg
         (WPCfg (pc_img cfg) (pc_log cfg) d'
                (<[i := WPAgent st'
@@ -1219,17 +1438,36 @@ Section machine.
     (* the window survives the append: it ends at the OLD top *)
     have He' : excl_ok_ts (pc_log mid) i base (rv_ts R) ts.
     { rewrite /mid /=. eapply excl_ok_ts_app; [rewrite /ts; lia|done]. }
+    (* THE GATE (layer2 §13) costs the fused form NOTHING: the message is
+       appended at the FRESH TOP, so [ts] exceeds every view the agent
+       holds — the release-strength branch is bounded exactly like the
+       others. *)
+    have Hvro : (w_vrOld (pa_ws ag) ≤ length (pc_log cfg))%nat
+      by (destruct Hb as (H & _); exact H).
+    have Hvwo : (w_vwOld (pa_ws ag) ≤ length (pc_log cfg))%nat
+      by (destruct Hb as (_ & H & _); exact H).
     have Hok : fulfil_ok_d (pa_ws ag) rl base (length data) ts
                  (Nat.max (Nat.max (srcs_view (pa_ws ag) asrc)
                                    (srcs_view (pa_ws ag) vsrc))
-                          (rv_view R)).
+                          (Nat.max (rv_view R)
+                             (if ad_shapedb (pc_img mid) (pc_log mid) base
+                                   (rv_ts R) data
+                              then Nat.max (w_vrOld (pa_ws ag))
+                                           (w_vwOld (pa_ws ag))
+                              else 0%nat))).
     { split.
       - intros j Hj. destruct Hb as (_&_&_&_&_&_&Hcoh&_).
         pose proof (Hcoh (base + Z.of_nat j)). rewrite /ts. lia.
       - have Hvdb : (Nat.max (Nat.max (srcs_view (pa_ws ag) asrc)
                                       (srcs_view (pa_ws ag) vsrc))
-                             (rv_view R)
-                     ≤ length (pc_log cfg))%nat by lia.
+                             (Nat.max (rv_view R)
+                                (if ad_shapedb (pc_img mid) (pc_log mid) base
+                                      (rv_ts R) data
+                                 then Nat.max (w_vrOld (pa_ws ag))
+                                              (w_vwOld (pa_ws ag))
+                                 else 0%nat))
+                     ≤ length (pc_log cfg))%nat.
+        { destruct (ad_shapedb _ _ _ _ _); lia. }
         pose proof (fulfil_vpre_d_bounded _ rl _ _ Hb Hvdb).
         rewrite /ts. lia. }
     have Hpd : pstep (pa_st ag) (pc_dev mid)

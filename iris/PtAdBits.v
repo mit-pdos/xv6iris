@@ -160,6 +160,103 @@ Proof.
   - tbk.
 Qed.
 
+(* ===================================================================== *)
+(* THE WRITE-BACK DISCRIMINATOR.  Two facts about [update_PTE_Bits] that   *)
+(* pin what a HARDWARE walker's A/D update looks like as a WRITTEN VALUE:  *)
+(*   - [update_PTE_Bits_A1] : the write-back always drives A to 1;         *)
+(*   - [update_PTE_Bits_ne] : the model returns [Some] only when a bit      *)
+(*     actually flips, so the written word DIFFERS from the word read.     *)
+(* Together they are what licenses the [data ≠ read] conjunct of           *)
+(* [WeakPromise.ad_shaped]: without (2) a software RMW that writes back    *)
+(* exactly the word it read would land inside the classifier              *)
+(* ([pte_set_ad_refl] is the false-positive class).                        *)
+(* ===================================================================== *)
+
+(* the A flag field IS bit 6 of the word, the D flag field bit 7 *)
+Lemma pte_flags_A_bit6 (w : mword 64) :
+  Z.testbit (bv_unsigned (_get_PTE_Flags_A (Mk_PTE_Flags (subrange_vec_dec w 7 0)))) 0
+  = Z.testbit (bv_unsigned w) 6.
+Proof.
+  unfold _get_PTE_Flags_A, Mk_PTE_Flags. mw_prep. tbk.
+Qed.
+
+Lemma pte_flags_D_bit7 (w : mword 64) :
+  Z.testbit (bv_unsigned (_get_PTE_Flags_D (Mk_PTE_Flags (subrange_vec_dec w 7 0)))) 0
+  = Z.testbit (bv_unsigned w) 7.
+Proof.
+  unfold _get_PTE_Flags_D, Mk_PTE_Flags. mw_prep. tbk.
+Qed.
+
+(* the write-back BODY, read bit by bit: it is [pte_set_ad w 'b1 d] *)
+Local Lemma upd_body_testbit (w : mword 64) (d : mword 1) (k : Z) :
+  0 <= k < 64 ->
+  Z.testbit (bv_unsigned (update_subrange_vec_dec w 7 0
+     (_update_PTE_Flags_D
+        (_update_PTE_Flags_A (Mk_PTE_Flags (subrange_vec_dec w 7 0)) ('b"1"))
+        d))) k
+  = (if Z.eqb k 6 then true
+     else if Z.eqb k 7 then Z.testbit (bv_unsigned d) 0
+     else Z.testbit (bv_unsigned w) k).
+Proof.
+  intros Hk.
+  change (update_subrange_vec_dec w 7 0
+            (_update_PTE_Flags_D
+               (_update_PTE_Flags_A (Mk_PTE_Flags (subrange_vec_dec w 7 0))
+                  ('b"1")) d))
+    with (pte_set_ad w ('b"1") d).
+  rewrite (pte_set_ad_testbit w ('b"1") d k Hk).
+  destruct (Z.eqb k 6); [reflexivity|]. reflexivity.
+Qed.
+
+(* (1) THE SHAPE: A is always driven to 1. *)
+Lemma update_PTE_Bits_A1 (w w' : mword 64) (acc : MemoryAccessType mem_payload) :
+  update_PTE_Bits w acc = Some w' ->
+  exists d : mword 1, w' = pte_set_ad w ('b"1") d.
+Proof.
+  unfold update_PTE_Bits. cbn zeta.
+  destruct (orb _ _); [| discriminate].
+  intros H. injection H as <-. eexists _. unfold pte_set_ad. reflexivity.
+Qed.
+
+(* (2) THE WRITE-BACK ALWAYS CHANGES THE WORD IT READ. *)
+Lemma update_PTE_Bits_ne (w w' : mword 64) (acc : MemoryAccessType mem_payload) :
+  update_PTE_Bits w acc = Some w' -> w' <> w.
+Proof.
+  unfold update_PTE_Bits. cbn zeta.
+  destruct (eq_vec (_get_PTE_Flags_A (Mk_PTE_Flags (subrange_vec_dec w 7 0)))
+                   ('b"0")) eqn:HA;
+  destruct (eq_vec (_get_PTE_Flags_D (Mk_PTE_Flags (subrange_vec_dec w 7 0)))
+                   ('b"0")) eqn:HD;
+  match goal with
+  | |- context [ negb (is_prefetch_access ?a) ] => destruct (negb (is_prefetch_access a)) eqn:HP
+  | |- context [ not (is_prefetch_access ?a) ] => destruct (not (is_prefetch_access a)) eqn:HP
+  end;
+  match goal with
+  | |- context [ andb _ ?s ] => destruct s eqn:HS
+  end;
+  cbn [andb orb]; try discriminate;
+  intros H; injection H as <-; intros Heq.
+  (* every surviving case: either A was 0 (bit 6 flips) or D was 0 and the
+     D update fires (bit 7 flips) *)
+  all: first
+    [ (* bit 6 *)
+      apply (f_equal (fun x : mword 64 => Z.testbit (bv_unsigned x) 6)) in Heq;
+      rewrite (upd_body_testbit w _ 6 ltac:(lia)) in Heq;
+      cbn [Z.eqb] in Heq;
+      assert (H6 : Z.testbit (bv_unsigned w) 6 = false)
+        by (rewrite <- pte_flags_A_bit6; apply eq_vec_true_iff in HA;
+            rewrite HA; reflexivity);
+      rewrite H6 in Heq; discriminate
+    | (* bit 7 *)
+      apply (f_equal (fun x : mword 64 => Z.testbit (bv_unsigned x) 7)) in Heq;
+      rewrite (upd_body_testbit w _ 7 ltac:(lia)) in Heq;
+      cbn [Z.eqb] in Heq;
+      assert (H7 : Z.testbit (bv_unsigned w) 7 = false)
+        by (rewrite <- pte_flags_D_bit7; apply eq_vec_true_iff in HD;
+            rewrite HD; reflexivity);
+      rewrite H7 in Heq; cbn in Heq; discriminate ].
+Qed.
+
 (* the two PTE FIELD extractions, read bit by bit: the PPN sits at 53:10 and
    the extension at 63:54, so a field bit is a word bit at a fixed offset.
    These are what turn [pte_set_ad_testbit] into the two field laws. *)

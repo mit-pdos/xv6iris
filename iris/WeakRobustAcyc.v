@@ -535,8 +535,17 @@ Proof.
   - by intros [_ ?].
   (* THE RMW SPLIT (S2) *)
   - by intros (_ & _ & ?).
-  - intros (ts' & kc & R & _ & _ & Hres & _ & _ & _ & (_ & Hext) & _ & Heq).
-    simplify_eq. rewrite (res_view_some _ _ Hres). by eexists.
+  - (* THE WALKER GATE (layer2 §13, W2a): the arm's EXT argument now
+       DOMINATES [fulfil_vext]'s (which is state-only, so it cannot see
+       the classifier).  [fulfil_ok_d_mono] is the whole repair — the
+       relativized coverage is stated at the SMALLER view, so it is the
+       direction that transfers. *)
+    intros (ts' & kc & R & _ & _ & Hres & _ & _ & _ & Hful & _ & Heq).
+    simplify_eq. rewrite (res_view_some _ _ Hres).
+    destruct (fulfil_ok_d_mono _ _ _ _ _ _ _
+                (exstore_vd_ge img log (pa_ws ag) ybase ydata yasrc yvsrc R)
+                Hful) as [_ Hext].
+    by eexists.
 Qed.
 
 (* ------------------------------------------------------------------ *)

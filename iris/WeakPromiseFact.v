@@ -179,10 +179,15 @@ Section fact.
           w_res (pa_ws ag) = Some R ∧
           rv_base R = base ∧ length (rv_ts R) = length data ∧
           excl_ok_ts log i base (rv_ts R) ts ∧
+          (* THE WALKER GATE (layer2 §13, W2a): [WPExStore]'s EXT argument,
+             verbatim — release strength on the A/D-update fragment alone. *)
           fulfil_ok_d (pa_ws ag) rl base (length data) ts
             (Nat.max (Nat.max (srcs_view (pa_ws ag) asrc)
                               (srcs_view (pa_ws ag) vsrc))
-                     (rv_view R)) ∧
+                     (Nat.max (rv_view R)
+                        (if ad_shapedb img log base (rv_ts R) data
+                         then Nat.max (w_vrOld (pa_ws ag)) (w_vwOld (pa_ws ag))
+                         else 0%nat))) ∧
           f = (λ w, store_post_run_d w rl (srcs_view w asrc)
                       (srcs_view w vsrc) base (length data) ts) ∧
           Dl = Some ts
@@ -451,9 +456,15 @@ Section fact.
       eapply read_ok_d_app; [done|by apply srcs_view_bounded|done].
     - intros (ts & k & R & Hin & Hlog & Hres & Hrb & Hrlen & He & Hful & -> & ->).
       pose proof (lookup_lt_Some _ _ _ Hlog) as Hlt.
+      (* THE WALKER GATE (layer2 §13) transfers VERBATIM: the classifier
+         reads the log only at the RESERVATION's own timestamps, which
+         [ws_bounded] pins inside the old log ([ad_shapedb_app]). *)
+      have Hrb' : ∀ j t, rv_ts R !! j = Some t → (t ≤ length log)%nat
+        by (destruct (ws_bounded_res _ _ Hb R Hres) as [H _]; exact H).
       exists ts, k, R. split_and!; try done.
       + rewrite lookup_app_l; [done|done].
       + eapply excl_ok_ts_app; [lia|done].
+      + by rewrite (ad_shapedb_app img log l' ybase (rv_ts R) ydata Hrb').
   Qed.
 
   Lemma wp_astep_app i l c c' m :

@@ -59,6 +59,7 @@ Require Import RiscvModelBytes.
 Require Import DevModel.
 Require Import RiscvLang RiscvPtsto.
 Require Import WeakMem WeakInterp WeakLang WeakGhost WeakBridge.
+Require Import WeakPromise WeakInterpProj.
 Require Import WeakRacy.
 Require Import WeakWord8.
 Require Import PtAdBits.
@@ -157,6 +158,86 @@ Proof.
   rewrite (pte_set_ad_nth_byte_high w0 a' d' (S j') ltac:(lia)).
   rewrite (pte_set_ad_nth_byte_high w0 a d (S j') ltac:(lia)).
   reflexivity.
+Qed.
+
+(* ====================================================================== *)
+(** ** 1b. THE WALKER DISCRIMINATOR'S CORRESPONDENCE (layer2 §13, W2a)
+
+    [WeakPromise.ad_shaped] classifies a conditional write's WRITTEN BYTES
+    against the bytes its reservation read.  This is the bridge that puts
+    the Sail walker's write-back INSIDE that classifier: the model returns
+    [Some w'] from [update_PTE_Bits w acc] only with [w' = pte_set_ad w 1 d]
+    ([PtAdBits.update_PTE_Bits_A1]) and [w' ≠ w] ([_ne]), and those two
+    facts are exactly the byte-list shape [ad_shaped] asks for — A (bit 6
+    of byte 0) set, bits 0–5 of byte 0 unchanged, D (bit 7) free, bytes 1–7
+    unchanged ([pte_set_ad_nth_byte_high]), and the whole thing different
+    from what was read.
+
+    The [w' ≠ w] half is what excludes the SOFTWARE-RMW false positive: a
+    CAS that writes back the word it read is [pte_set_ad_refl]-shaped and
+    would otherwise be classified as a walker write. *)
+
+(** Byte 0 of an A-driving variant is A/D-shaped against the base's byte 0,
+    PROVIDED the words differ (the difference must then live in byte 0,
+    bytes 1–7 being pinned). *)
+Lemma ad_byte0_pte_set_ad (w : mword 64) (d : mword 1) :
+  pte_set_ad w ('b"1") d <> w ->
+  ad_byte0 (nth_byte w 0) (nth_byte (pte_set_ad w ('b"1") d) 0).
+Proof.
+  intros Hne. split_and!.
+  - rewrite (nth_byte0_testbit (pte_set_ad w ('b"1") d) 6 ltac:(lia)).
+    rewrite (pte_set_ad_testbit w ('b"1") d 6 ltac:(lia)).
+    vm_compute. reflexivity.
+  - intros i Hi.
+    rewrite (nth_byte0_testbit (pte_set_ad w ('b"1") d) (Z.of_nat i) ltac:(lia)).
+    rewrite (nth_byte0_testbit w (Z.of_nat i) ltac:(lia)).
+    rewrite (pte_set_ad_testbit w ('b"1") d (Z.of_nat i) ltac:(lia)).
+    rewrite (proj2 (Z.eqb_neq (Z.of_nat i) 6) ltac:(lia)).
+    rewrite (proj2 (Z.eqb_neq (Z.of_nat i) 7) ltac:(lia)).
+    reflexivity.
+  - intros H0. apply Hne. apply (bv_eq_of_bytes (n := 8%N)).
+    intros j Hj. destruct j as [|j']; [exact H0|].
+    apply pte_set_ad_nth_byte_high. lia.
+Qed.
+
+(** THE CORRESPONDENCE: a write-back word, split into bytes by the tree's
+    own convention ([WeakInterpProj.wbytes]), is [ad_shaped] against a
+    reservation whose column read the pre-image word. *)
+Lemma ad_shaped_of_pte_set_ad (img : image) (log : list wmsg) (base : Z)
+    (rts : list nat) (w w' : mword 64) (d : mword 1) :
+  length rts = 8%nat ->
+  (forall j : nat, (j < 8)%nat ->
+     res_read_byte img log base rts j = Some (nth_byte w j)) ->
+  w' = pte_set_ad w ('b"1") d ->
+  w' <> w ->
+  ad_shaped img log base rts (wbytes 8 w').
+Proof.
+  intros Hlen Hread Hw' Hne. subst w'. split_and!.
+  - rewrite wbytes_length //.
+  - intros j Hj. rewrite wbytes_length in Hj.
+    rewrite (wbytes_lookup 8 _ j ltac:(lia)).
+    rewrite (Hread j ltac:(lia)). f_equal.
+    apply pte_set_ad_nth_byte_high. lia.
+  - exists (nth_byte w 0), (nth_byte (pte_set_ad w ('b"1") d) 0).
+    split_and!.
+    + rewrite (wbytes_lookup 8 _ 0%nat ltac:(lia)) //.
+    + exact (Hread 0%nat ltac:(lia)).
+    + by apply ad_byte0_pte_set_ad.
+Qed.
+
+(** ... and the packaging straight off the model's own update function. *)
+Lemma ad_shaped_of_update_PTE_Bits (img : image) (log : list wmsg) (base : Z)
+    (rts : list nat) (w w' : mword 64) (acc : MemoryAccessType mem_payload) :
+  length rts = 8%nat ->
+  (forall j : nat, (j < 8)%nat ->
+     res_read_byte img log base rts j = Some (nth_byte w j)) ->
+  update_PTE_Bits w acc = Some w' ->
+  ad_shaped img log base rts (wbytes 8 w').
+Proof.
+  intros Hlen Hread Hup.
+  destruct (update_PTE_Bits_A1 w w' acc Hup) as (d & Hw').
+  exact (ad_shaped_of_pte_set_ad img log base rts w w' d Hlen Hread Hw'
+           (update_PTE_Bits_ne w w' acc Hup)).
 Qed.
 
 (* ====================================================================== *)
