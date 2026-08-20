@@ -1,5 +1,89 @@
 # The certification route (D8 / E1 / L2′) — worklist
 
+## CHECKPOINT (2026-08-20, end of the tier-1-closure + tier-2-opening
+## session) — READ THIS FIRST WHEN RESUMING
+
+**Where things stand.**  TIER 1 IS CLOSED (`xv6_srvwmo_safe` + `t2_ev` +
+the litmus suite, all on the five rv64d axioms — see the sRVWMO worklist).
+S6 ran with verdict GO (route A, certification;
+[`../design/weak-memory-tier2-s6.md`](../design/weak-memory-tier2-s6.md)).
+Tier-2 slices LANDED this session, in commit order: **T2-0** (the
+lock-protocol export, `WLock`/`wlat4L`/`weak_ev_adequacy_lockproto`),
+**T2-1a** (`iris/WeakRvwmoGraph.v` — RVWMO⁻ declared + the LB
+non-collapse witness), **T2-2a = S4** (the tower replays the split pair;
+`lat_free_prog` is lat-only; the capstone's `Hfused` is DELETED — the
+tier-2 containment capstone is instantiable for the real instance again).
+Every landed piece keeps both capstones at EXACTLY the five reservation
+axioms; re-verify that audit after any change.
+
+**THE PENDING DESIGN DECISIONS — each needs an orchestrator design pass
+BEFORE building; none is delegate-ready as it stands:**
+
+- **(D-i) W-TV CONSUMPTION, the tier decision** (gates L2′'s walker
+  cases #7/#8, NOT D8-2).  The in-tree spec is the long comment at
+  `WeakMem.load_post_run_d` (~:1035): joining `w_tbank` into the access
+  node's `w_vcap` moves three things in lockstep — the `_0`
+  correspondence (dragging the bank into the NON-`_d` tier:
+  `WeakAxiomatic.mstep`, the litmus tier, ~20 call sites),
+  `WeakPromiseBridge.cfg_match`'s per-agent `w_vcap` EQUALITY, and
+  `WeakRobustProv`'s `lstate` mirror (needs `l_tbank`).  THE STAKES the
+  comment predates: `mstep` now carries T1
+  (`promise_free_complete_clean`) and the whole tier-1 characterization —
+  changing its load arm touches the completeness invariant.  Candidate
+  resolutions to weigh: (α) push the bank into the non-`_d` tier and
+  repair T1's invariant (honest, widest ripple); (β) keep the bank
+  `_d`-only and WEAKEN the `_0` equations to ≤-form where consumed;
+  (γ) make `cfg_match` stop looking at `w_vcap` (check what the bridge
+  actually needs it for first).  Decide against T1's proof structure,
+  not against the comment alone.
+- **(D-ii) W1/W2 — the walker discriminator wiring.**  Verdicts already
+  recorded (layer2 §12/§13 + this file's W-track): the written-value
+  discriminator (GO), W2a's release-strength-EXT-at-fulfil form, the two
+  recorded obstacles to a promise-side gate.  What remains is the
+  realization: name walker-shaped `LExStore` at fulfil from the
+  reservation + log values, gate non-promisability there, re-prove
+  `wp_behavior_factor` compatibility.  Design pass: pick the
+  discriminator's exact site against the R2 machine arms.
+- **(D-iii) T2-3 = D8-2, the restriction simulation** — the route's
+  highest-risk item.  Before building: design `sim_wpcfg`'s four
+  invariants against PARM's `CertifySim.v` (port spec:
+  [`../design/parm-certification-notes.md`](../design/parm-certification-notes.md),
+  Recommendation section — start with the two `vcap` lemmas), design
+  `sim_dev` (the fabric component PARM lacks; reuse bet: G4/G5's
+  `qfab`/`gdev` machinery), and the split-RMW in-case obligation
+  (`excl_ok` per byte in the restriction).  THE FALLBACK TRIGGER IS
+  ARMED: if `sim_dev` exceeds the `qfab`/`gdev` reuse estimate, STOP and
+  switch to route B (S6 §5's graph linearization route).
+- **(D-iv) T2-5's export seam** — recorded under T2-0 below: `wlock_regd`
+  is per lock word; upgrade to a finite set of `(base, N)` pairs if L2′
+  wants a family at once; and the trace-side `win_excl` derivation must
+  take unlock COVERAGE from trace fences, never from message class (the
+  release arm is `≠ WCplain ∧ zero`).
+- **(D-v) T2-6's front-end remainder** — `gx_deps` (the store-dep
+  fragment, S6's F2 caveat) added to `WeakRvwmoGraph` when the
+  realizability direction starts, and the `axiomatic_to_promising` port
+  (promise everything up front; M6's W4 characterization is the banked
+  half).
+- **(D-vi) the `lb_ok` debt** (surfaced by S4): `WeakRobustBlocks.lb_ok`
+  is now the ONLY alphabet gate and its `LExLoad`/`LExStore` clauses are
+  still `False`; they need real content (`data ≠ []` + `exwin_ok`)
+  before any `lts_enabled` consumer appears.
+
+**Recommended resumption order**: (D-i) design → build (it is the
+smallest gate and unblocks L2′'s walker kills); then (D-ii); then the
+T2-1c build (design fully recorded below — pure order theory, no Iris);
+then (D-iii) with the fallback watch; E1; L2′; T2-6.  R6 (the fused-
+machinery deletion contract) stays last — cleanup, not gating.
+
+**Fixed working discipline that held all session**: orchestrator (Fable)
+does recon + design + spec; Opus subagents execute mechanical
+proof/threading from precise specs with the durable-notes build
+discipline quoted; every landing is verified independently (full `-k`
+build + both capstone audits) before commit; findings that change
+statements are recorded in the notes the same day.
+
+
+
 **S6 RAN AND THE GATE IS OPEN (2026-08-20): GO on this route.**  The
 two-hart L2′ paper exercise is
 [`../design/weak-memory-tier2-s6.md`](../design/weak-memory-tier2-s6.md) —
