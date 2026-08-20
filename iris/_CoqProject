@@ -255,14 +255,14 @@ WpUmodeStore.v
 WpUmodeLoad.v
 USpecSync.v
 UCodeSync.v
-# UProofSync.v
+UProofSync.v
 UCodeEcho.v
 USpecEcho.v
 UCodeSh.v
 USpecSh.v
 USpecShParse.v
-# UmodeFrame.v
-# UmodeStub.v
+UmodeFrame.v
+UmodeStub.v
 # UProofShLib.v
 # UProofShMem.v
 # UProofShHeap.v
