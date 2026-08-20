@@ -224,7 +224,7 @@ Local Open Scope Z_scope.
 Notation K_sys_open := (148%nat) (only parsing).
 (* THE REFERENCE ALLOWANCE.  create's own, and for create's own reason; see
    the header's reference ledger. *)
-Definition sys_open_slots : nat := S create_slots.
+Definition sys_open_slots : nat := create_slots.
 
 Section SpecSysOpen.
   Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
@@ -390,9 +390,15 @@ Definition wp_sys_open_sconf_body
       (* NO ORDERING on the free pool: create ALLOCATES (balloc under
          dirlink) and both the failure arms and the O_TRUNC tail FREE. *)
       bitmap_res gfs bmapstart cov logstart size used' -∗
-      (* the allowance, spend-at-most -- and the success arm really does
-         spend one for good: it is parked in [f->ip]. *)
-      ⌜((ns - sys_open_slots)%nat <= ns')%nat /\ (ns' <= ns)%nat⌝ -∗
+      (* THE WHOLE ALLOWANCE, BACK.  The success arm parks a reference in
+         [f->ip] and it is NOT spent for good: an untyped table entry's
+         payload is itself one unit ([FileInvDefs.file_core_none]), and
+         publishing the file releases it in exchange -- the entry holds one
+         unit's worth either way, as [iref_frac] when free and as the
+         inode reference when open.  Every failure arm iputs instead.  An
+         exact ledger is what makes sys_open wireable into the dispatch,
+         which lends [IREFSPARE] and must get [IREFSPARE] back. *)
+      ⌜ns' = ns⌝ -∗
       iref_slots ns' -∗
       (* the descriptor table, the fd unit and the return value *)
       sys_open_post γf pj pid (upd_upt V P')
