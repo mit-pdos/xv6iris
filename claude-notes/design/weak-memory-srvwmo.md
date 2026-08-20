@@ -316,6 +316,11 @@ refcount > 0; recycled after) FITS both tiers with no new machinery class:
 
 ## 6. Worklist
 
+**STATUS 2026-08-20: S1–S5 ALL LANDED; tier 1 is closed** (worklist:
+A1c / A2 `t2_ev` / A3(ii-iv) `srvwmo_realizable` + `WeakAxRealize` /
+A4 `WeakSrvwmoCapstone.xv6_srvwmo_safe` / A5 `WeakSrvwmoLitmus.v`).
+S6 is the remaining, tier-2 item.
+
 - **S1**: define sRVWMO in Coq over the `WeakAxiomatic` vocabulary (rule
   14 incl. implicit walker stores; the honest `.rl`/ppo-12/13 residue
   notes as part of the definition).

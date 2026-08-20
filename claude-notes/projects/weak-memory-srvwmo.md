@@ -6,8 +6,15 @@ To avoid collision, the RMW-split slices (certification worklist S-track)
 are renamed **R0.5–R6** as of 2026-08-19; sRVWMO items are **A1–A5** here
 (A_n = the design doc's S_n), plus **A0** (inventory).
 
-## Status (2026-08-19, orchestrator; staging PROPOSED, awaiting the user's
-## reaction to the plan message)
+## Status (2026-08-20): **TIER 1 IS CLOSED.**  A0–A5 all DONE — the
+## characterization (T1 `srvwmo_realizable` premise-free, T2
+## `WeakEvInst.t2_ev` premise-free), the litmus suite
+## (`WeakSrvwmoLitmus.v`), and the final theorem
+## (`WeakSrvwmoCapstone.xv6_srvwmo_safe`, adequacy ∘ T1, exactly the five
+## generated-model reservation axioms).  What remains is TIER 2: S6 (the
+## two-hart L2′ paper exercise, the go/no-go gate), R4/S4 (the pair-form
+## tower re-index), R6 (contract), the W-TV consumption slice — see the
+## certification worklist.  Per-item history below.
 
 - **A0 — asset inventory: DONE (2026-08-19).**  Headline corrections to
   this file's earlier priors: **T1 already EXISTS for a fragment** —

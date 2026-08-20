@@ -892,7 +892,9 @@ Qed.
     (promise-free runs satisfy the axiomatic model), [WeakAxiomatic2]'s global
     memory order on per-byte OPERATIONS with [ob ⊆ gmo_op], and
     [WeakAxiomatic3.promise_free_complete_clean] (the corrected completeness
-    theorem, under [cand_rl_free] and [cand_pub_clean]).  Three of the effort's
+    theorem — now PREMISE-FREE: [cand_rl_free] fell to A1c's rel→acq arm
+    and [cand_pub_clean] to A3(ii)'s forward-bank replay content; the named
+    top level is [srvwmo_consistent]/[srvwmo_realizable]).  Three of the effort's
     findings are machine-checked REFUTATIONS
     ([ev_rfe_co_fr_cyclic], [promise_free_complete_false],
     [view_domination_false]), so the axiomatic side is pinned by counterexample
