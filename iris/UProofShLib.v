@@ -169,6 +169,14 @@ Section UProofShLib.
       by exact (upd_eq m (Regidx a7_idx) (mword_of_int n : mword 64)).
     assert (Ha7 : uint (m1 !!! Regidx a7_idx) = n) by (rewrite Em1; exact Hn).
     iApply (wp_uv_ecall C pt Psh M m1 (mword_of_int (entry + 2)) Hui2
+              (fun (s : mstate)
+                   (Hp : register_lookup cur_privilege s.(sregs) = User)
+                   (Hc : register_lookup (R_bitvector_64 PC) s.(sregs)
+                         = mword_of_int (entry + 2)) =>
+                 UserExecFacts.goodmb_execute_ECALL_U UserFrame.Du_r UserFrame.Du_w
+                   s (mword_of_int (entry + 2))
+                   ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
+                   Hp Hc)
               with "Hcg Hpc").
     rewrite /xv6_io_protocol. rewrite Ha7.
     iApply ("Harm" with "Hcap").
