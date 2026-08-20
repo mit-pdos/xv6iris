@@ -509,15 +509,49 @@ to the design file / durable-notes, not narrative)
     `ts_oblivious` suffices — the banked tower's own trick) and needs
     NONE of the quarantine work.  The fallback trigger's letter
     (`sim_dev` overrun) did not fire, but its spirit arguably has.
-  * NEXT ACTIONS, in order: (1) machine-checked PROBES of the four gaps
-    (variant-B-style: exhibit machine runs where the restriction fails
-    without each fix — especially G-0's tainted-address-low-view read
-    and G-i's same-instruction walk→fulfil shape) and a check of what
-    the EVENT INSTANCE actually emits (its `vsrc`/`LRegW` coverage may
-    close the Layer-1 leak for the instance-relativized statement);
-    (2) re-price route A (= G-0+G-i+G-ii+G-iii + sRVWMO rule-9 + T1
-    repair + the sim) against route B (exchange induction on the banked
-    tower); (3) surface the A/B decision before building either.
+  * PROBES RAN (2026-08-20, scratchpad `d8-probes/D8Probes.v`, all
+    `Closed under the global context`; tree untouched).  VERDICTS:
+    **G-0 and G-ii are REFUTED at the instance** — but by an
+    over-approximation, not by design (see the defect below); **G-i
+    CONFIRMED** (`fulfil_ok_d` is `w_tbank`-blind BY CONVERSION; the
+    exposure is exactly one instruction wide — a store's own walk
+    cannot gate it, the next fetch consumes one node too late);
+    **G-iii CONFIRMED** (the fetch's word is unguarded: ordinary
+    `LLoad asrc=[]`, decode is a PURE Sail function, the announced-bits
+    slot is `None` during the fetch, and the fetch's OWN bank is wiped
+    by the immediately-following `LInstr` — though the fetch's
+    TRANSLATION reads are already guarded).  The P-inst table adds two
+    unguarded value paths beyond the four gaps: **CSR writes are
+    `LSilent`** (load → `csrw satp` → walker addresses, fully
+    unguarded) and the **trap path's non-`rd` writes** likewise.
+  * **THE DEFECT THE PROBES SURFACED (route-independent, W2b condition
+    1 violated):** the Sail node order is fetch → `InstrAnnounce`
+    (`LInstr`) → decode → body, so the `instr_post` bank reset lands
+    ONE NODE TOO LATE and every instruction's fetch consumes the
+    PREVIOUS instruction's data-read bank into `w_vcap` — exactly what
+    condition 1 warned would happen ("with only the `LInstr` reset …
+    LB DIES").  Machine-checked: `P_inst_load_store_overordering` — a
+    blanket load → later-store ordering RVWMO does not have, so THE
+    INSTANCE FORBIDS LB and is strictly stronger than RVWMO⁻.  This is
+    what "closes" G-0/G-ii: the quarantine holds by over-ordering.
+    Consequences: (a) tier-2's REALIZATION direction (machine covers
+    RVWMO⁻) is FALSE at the instance until the reset moves before the
+    fetch; (b) moving it RE-OPENS G-0/G-ii for route A.
+  * **THE RE-PRICED BILLS.**  Route A (certification), honestly: fix
+    the reset point, then close G-0 (drop D-8 → rule 9's load half
+    returns to sRVWMO → T1 completeness repair), G-i (bank → fulfil
+    EXT + litmus `LInstr` repairs), G-ii (trap-path/`LCtrl` bank
+    consumption), G-iii (fetch-as-control), the CSR and trap value
+    paths (dependency labels for `LSilent` sites — new alphabet or
+    srcs), THEN the sim + D8-3 — in sum, a near-complete dependency
+    discipline retrofit.  Route B (exchange induction on graphs):
+    needs NONE of the quarantine work — its containment never realizes
+    a weak execution in the machine (the machine only ever runs the
+    NORMALIZED prefix, pf-tier), so even the reset-point defect stops
+    gating the capstone; its cost is the exchange induction itself
+    (M6-W2-permutation-genre, on the banked tower) + the same exports.
+  * STATUS: awaiting the route decision (user input).  Do not build
+    D8-2, E1, or L2′ until it is made.
 - **D-ii REALIZATION SITE PICKED (2026-08-20, design pass; build queued
   behind D-i).**  The discriminator lives in `WPExStore`'s `fulfil_ok_d`
   view argument: when the written `data` is the A/D update of the values
