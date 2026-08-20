@@ -1382,10 +1382,10 @@ Section KexecABad.
     iEval (rewrite Hpp066) in "Hpc".
     (* ---- +0x066: jal ra,iunlockput ---- *)
     assert (Htiu : add_vec (mword_of_int (KXA + 0x66) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2092100 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2092080 : mword 21))
                    = mword_of_int KernelSyms.iunlockput) by pcw.
     iApply (wp_jal_s_sconf (mword_of_int (KXA + 0x66)) Rra
-              (mword_of_int 2092100 : mword 21) B1 (K - 68)%nat true
+              (mword_of_int 2092080 : mword 21) B1 (K - 68)%nat true
               ltac:(nz) ltac:(rdok)
               ltac:(rewrite Htiu; vm_compute; reflexivity)
               with "Hcg Hpc Hi066").
@@ -1426,10 +1426,10 @@ Section KexecABad.
       exact HB2sp. }
     (* ---- +0x06a: jal ra,end_op ---- *)
     assert (Hteo : add_vec (mword_of_int (KXA + 0x6a) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2094306 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2094286 : mword 21))
                    = mword_of_int KernelSyms.end_op) by pcw.
     iApply (wp_jal_s_sconf (mword_of_int (KXA + 0x6a)) Rra
-              (mword_of_int 2094306 : mword 21) M1 (K - 68)%nat true
+              (mword_of_int 2094286 : mword 21) M1 (K - 68)%nat true
               ltac:(nz) ltac:(rdok)
               ltac:(rewrite Hteo; vm_compute; reflexivity)
               with "Hcg Hpc Hi06a").
@@ -1774,10 +1774,10 @@ Section KexecCBad.
     iEval (rewrite Hpp1da) in "Hpc".
     (* ---- +0x1da: jal ra,proc_freepagetable ---- *)
     assert (Htpfp : add_vec (mword_of_int (KXA + 0x1da) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2085114 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2085094 : mword 21))
                    = mword_of_int KernelSyms.proc_freepagetable) by pcw.
     iApply (wp_jal_s_sconf (mword_of_int (KXA + 0x1da)) Rra
-              (mword_of_int 2085114 : mword 21) B2 (K - 68)%nat true
+              (mword_of_int 2085094 : mword 21) B2 (K - 68)%nat true
               ltac:(nz) ltac:(rdok)
               ltac:(rewrite Htpfp; vm_compute; reflexivity)
               with "Hcg Hpc Hi1da").

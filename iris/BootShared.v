@@ -511,7 +511,7 @@ Section BootBssChain.
     iDestruct (bss_cut g (KernelSyms.pid_lock + 24) KernelSyms.wait_lock
                  (KernelSyms.wait_lock + 24) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hlk6 H]".
-    (* ---- 0x80012378 cpus[8]: the per-hart cell family ---- *)
+    (* ---- 0x80012368 cpus[8]: the per-hart cell family ---- *)
     iDestruct (bss_cut g (KernelSyms.wait_lock + 24) KernelSyms.cpus
                  (KernelSyms.cpus + 128 * Z.of_nat NCPU) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hcpus H]".
@@ -526,7 +526,7 @@ Section BootBssChain.
                                  (z_lo_trans text_end img_end A
                                     ltac:(zlit) Q1) Q1 Q2 Q3))
                  with "Hcl Hcpus") as "Hcpus".
-    (* ---- 0x80012778 proc[64] ---- *)
+    (* ---- 0x80012768 proc[64] ---- *)
     iDestruct (bss_cut g (KernelSyms.cpus + 128 * Z.of_nat NCPU) KernelSyms.proc
                  (KernelSyms.proc + proc_size * Z.of_nat NPROC) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hprocs H]".

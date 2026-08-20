@@ -980,7 +980,7 @@ Section KexitPark.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp64) in "Hpc".
     iApply (wp_addi4_s_sconf (CID := CIDu) (mword_of_int (KX + 0x64))
-              (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 884 : mword 12)
+              (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 868 : mword 12)
               P0 av b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi64").
     iIntros (CIDv Hsv2) "Hcg Hpc".
@@ -988,7 +988,7 @@ Section KexitPark.
                      = P0 !!! Regidx (mword_of_int 10 : mword 5)) by (rgne; reflexivity).
     iEval (rewrite Hrgu10) in "Hcg".
     set (P1 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
-         (add_vec (P0 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 884 : mword 12)))]> P0).
+         (add_vec (P0 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 868 : mword 12)))]> P0).
     assert (HP1a0 : P1 !!! Regidx (mword_of_int 10 : mword 5) = wait_lock_addr).
     { rewrite /P1 upd_eq /P0 upd_eq. unfold wait_lock_addr.
       apply bv_eq; vm_compute; reflexivity. }
@@ -1372,7 +1372,7 @@ Section KexitPark.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp8e) in "Hpc".
     iApply (wp_addi4_s_sconf (CID := CIDa) (mword_of_int (KX + 0x8e))
-              (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 842 : mword 12)
+              (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 826 : mword 12)
               PA (trap_res b + av)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi8e").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
@@ -1380,7 +1380,7 @@ Section KexitPark.
                      = PA !!! Regidx (mword_of_int 10 : mword 5)) by (rgne; reflexivity).
     iEval (rewrite HrgA10) in "Hcg".
     set (PB := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
-         (add_vec (PA !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 842 : mword 12)))]> PA).
+         (add_vec (PA !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 826 : mword 12)))]> PA).
     assert (HPAsp : PA !!! Regidx csp_rs1 = spF)
       by (rewrite /PA upd_ne; [exact HP9sp | vm_compute; discriminate]).
     assert (HPBsp : PB !!! Regidx csp_rs1 = spF)
@@ -1993,11 +1993,11 @@ Section ProofKexit.
     assert (Hrg4_15 : rget (CID := CID4) A2 (mword_of_int 15 : mword 5)
                       = A2 !!! Regidx (mword_of_int 15 : mword 5)) by (rgne; reflexivity).
     assert (Hipa : add_vec (rget (CID := CID4) A2 (mword_of_int 15 : mword 5))
-                     (sign_extend' 64 (mword_of_int 668 : mword 12))
+                     (sign_extend' 64 (mword_of_int 652 : mword 12))
                    = (mword_of_int KernelSyms.initproc : mword 64)).
     { rewrite Hrg4_15 /A2 upd_eq. apply bv_eq; vm_compute; reflexivity. }
     iApply (wp_ld_s_sconf (CID := CID4) (kt := KT1) (ktd := KT0) (mword_of_int (KX + 0x1c))
-              (mword_of_int 15 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 668 : mword 12)
+              (mword_of_int 15 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 652 : mword 12)
               A2 (av - 6)%nat ip b (dqm := dqi) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1c [Hinit]").
     { iEval (rewrite Hipa). iExact "Hinit". }

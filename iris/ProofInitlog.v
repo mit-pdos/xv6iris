@@ -121,13 +121,13 @@ Qed.
    then [ByteBuf.bb_align_z] (ProofWriteHead's [wh_align4] at q = 0) ---- *)
 Lemma il_align_arith (kk : Z) :
   0 <= kk -> kk < 30 ->
-  (2147582504 + 1112 * kk + 88) `mod` 4 = 0
-  /\ 0 <= 2147582504 + 1112 * kk + 88
-  /\ 2147582504 + 1112 * kk + 88 < 18446744073709551616.
+  (2147582488 + 1112 * kk + 88) `mod` 4 = 0
+  /\ 0 <= 2147582488 + 1112 * kk + 88
+  /\ 2147582488 + 1112 * kk + 88 < 18446744073709551616.
 Proof.
   intros H1 H2. split_and!; [| lia | lia].
-  replace (2147582504 + 1112 * kk + 88)
-    with ((536895648 + 278 * kk) * 4) by lia.
+  replace (2147582488 + 1112 * kk + 88)
+    with ((536895644 + 278 * kk) * 4) by lia.
   apply Z_mod_mult.
 Qed.
 
@@ -144,8 +144,8 @@ Proof.
   destruct (il_align_arith (Z.of_nat k)
               ltac:(lia) ltac:(unfold NBUF in Hk; lia))
     as (Hm & Hlo & Hhi).
-  replace (0x80018210 + 24 + 1112 * Z.of_nat k + Z.of_nat 88)
-    with (2147582504 + 1112 * Z.of_nat k + 88) by lia.
+  replace (0x80018200 + 24 + 1112 * Z.of_nat k + Z.of_nat 88)
+    with (2147582488 + 1112 * Z.of_nat k + 88) by lia.
   apply bb_align_z; assumption.
 Qed.
 
@@ -507,13 +507,13 @@ Section ProofInitlog.
     iEval (rewrite Hpp16) in "Hpc".
     (* +0x16 addi s2,s2,1966 : s2 := &log *)
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.initlog + 0x16)) Rs2 Rs2
-              (mword_of_int 1960 : mword 12) R5 (K - 6)%nat b
+              (mword_of_int 1944 : mword 12) R5 (K - 6)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi16").
     iIntros (CID11 Hs11) "Hcg Hpc".
     set (R6 := <[Regidx Rs2 := regval_into_reg
                   (add_vec (rget R5 Rs2)
-                     (sign_extend' 64 (mword_of_int 1960 : mword 12)))]> R5).
+                     (sign_extend' 64 (mword_of_int 1944 : mword 12)))]> R5).
     assert (HR6s2 : R6 !!! Regidx Rs2 = log_addr).
     { rewrite /R6 upd_eq. rgne. rewrite /R5 upd_eq /log_addr.
       apply bv_eq; vm_compute; reflexivity. }
@@ -1141,14 +1141,14 @@ Section ProofInitlog.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp6c) in "Hpc".
     assert (Hlhad2 : add_vec (rget D1 Ra5)
-                       (sign_extend' 64 (mword_of_int 1918 : mword 12)) = lh_n_pa).
+                       (sign_extend' 64 (mword_of_int 1902 : mword 12)) = lh_n_pa).
     { rgne. rewrite /D1 upd_eq /lh_n_pa /log_pa /log_addr /pa_add /add_vec_int.
       apply bv_eq; vm_compute; reflexivity. }
     iAssert (lh_n_pa ↦₄ (mword_of_int 0 : mword 32))%I with "[Hncell]" as "Hncell";
       [iExact "Hncell"|].
     iEval (rewrite -Hlhad2) in "Hncell".
     iApply (wp_sw_zero_s_sconf (mword_of_int (KernelSyms.initlog + 0x6c)) Ra5
-              (mword_of_int 1918 : mword 12) D1 (K - 6)%nat
+              (mword_of_int 1902 : mword 12) D1 (K - 6)%nat
               (mword_of_int 0 : mword 32) b
               with "Hcg Hpc Hi6c Hncell").
     iIntros (CID32 Hs32) "Hcg Hpc Hncell".

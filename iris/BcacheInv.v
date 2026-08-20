@@ -89,7 +89,7 @@ Qed.
 
 (* EVERY BUFFER'S DATA AREA IS KERNEL DATA -- the [addr_is_kdata] premise
    virtio_disk_rw takes on b->data, discharged once for the whole cache.
-   [bcache] is a .bss object at 0x80018190, so buffer k's base is
+   [bcache] is a .bss object at 0x80018180, so buffer k's base is
    [buf_base + 1112*k] with buf_base = bcache+24 and k < NBUF = 30: the whole
    object sits inside [text_end, ram_base+ram_size) and the address arithmetic
    never wraps.  (bwrite and bread are both rw callers and need exactly this;

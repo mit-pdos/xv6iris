@@ -130,13 +130,13 @@ Proof. vm_compute. reflexivity. Qed.
 Lemma ss_reloc_a0_08 :
   add_vec (add_vec (mword_of_int (SS + 0x08) : mword 64)
                    (auipc_off (mword_of_int 30 : mword 20)))
-          (sign_extend' 64 (mword_of_int 1214 : mword 12)) = log_addr.
+          (sign_extend' 64 (mword_of_int 1198 : mword 12)) = log_addr.
 Proof. rewrite /log_addr. apply bv_eq; vm_compute; reflexivity. Qed.
 
 Lemma ss_reloc_cmt_14 :
   add_vec (add_vec (mword_of_int (SS + 0x14) : mword 64)
                    (auipc_off (mword_of_int 30 : mword 20)))
-          (sign_extend' 64 (mword_of_int 1234 : mword 12)) = l_cmt.
+          (sign_extend' 64 (mword_of_int 1218 : mword 12)) = l_cmt.
 Proof.
   rewrite /l_cmt /log_pa /log_addr /pa_add /add_vec_int.
   apply bv_eq; vm_compute; reflexivity.
@@ -145,7 +145,7 @@ Qed.
 Lemma ss_reloc_out_1e :
   add_vec (add_vec (mword_of_int (SS + 0x1e) : mword 64)
                    (auipc_off (mword_of_int 30 : mword 20)))
-          (sign_extend' 64 (mword_of_int 1220 : mword 12)) = l_out.
+          (sign_extend' 64 (mword_of_int 1204 : mword 12)) = l_out.
 Proof.
   rewrite /l_out /log_pa /log_addr /pa_add /add_vec_int.
   apply bv_eq; vm_compute; reflexivity.
@@ -154,7 +154,7 @@ Qed.
 Lemma ss_reloc_nc_2e :
   add_vec (add_vec (mword_of_int (SS + 0x2e) : mword 64)
                    (auipc_off (mword_of_int 30 : mword 20)))
-          (sign_extend' 64 (mword_of_int 1216 : mword 12)) = l_ncommit.
+          (sign_extend' 64 (mword_of_int 1200 : mword 12)) = l_ncommit.
 Proof.
   rewrite /l_ncommit /log_pa /log_addr /pa_add /add_vec_int.
   apply bv_eq; vm_compute; reflexivity.
@@ -163,13 +163,13 @@ Qed.
 Lemma ss_reloc_s1_36 :
   add_vec (add_vec (mword_of_int (SS + 0x36) : mword 64)
                    (auipc_off (mword_of_int 30 : mword 20)))
-          (sign_extend' 64 (mword_of_int 1168 : mword 12)) = log_addr.
+          (sign_extend' 64 (mword_of_int 1152 : mword 12)) = log_addr.
 Proof. rewrite /log_addr. apply bv_eq; vm_compute; reflexivity. Qed.
 
 Lemma ss_reloc_a0_5e :
   add_vec (add_vec (mword_of_int (SS + 0x5e) : mword 64)
                    (auipc_off (mword_of_int 30 : mword 20)))
-          (sign_extend' 64 (mword_of_int 1128 : mword 12)) = log_addr.
+          (sign_extend' 64 (mword_of_int 1112 : mword 12)) = log_addr.
 Proof. rewrite /log_addr. apply bv_eq; vm_compute; reflexivity. Qed.
 
 (* the loop test's own cell address, off s1 = &log *)
@@ -451,15 +451,15 @@ Section SsBodies.
     iEval (rewrite Hp62) in "Hpc".
     (* +0x62 addi a0,a0,1168 *)
     iApply (wp_addi4_s_sconf (mword_of_int (SS + 0x62)) Ra0 Ra0
-              (mword_of_int 1128 : mword 12) X1 (trap_res eb + (K - 4))%nat false
+              (mword_of_int 1112 : mword 12) X1 (trap_res eb + (K - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi62").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (X2 := <[Regidx Ra0 := regval_into_reg
-        (add_vec (X1 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 1128 : mword 12)))]> X1).
+        (add_vec (X1 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 1112 : mword 12)))]> X1).
     change (<[Regidx Ra0 := regval_into_reg
-        (add_vec (X1 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 1128 : mword 12)))]> X1) with X2.
+        (add_vec (X1 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 1112 : mword 12)))]> X1) with X2.
     assert (Hp66 : add_vec_int (mword_of_int (SS + 0x62) : mword 64) 4 = mword_of_int (SS + 0x66))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp66) in "Hpc".
@@ -1066,11 +1066,11 @@ Section SsBodies.
       by (rewrite /Y1; apply upd_eq).
     (* +0x32 lw s2,1256(s2) : s2 := log.ncommit *)
     iDestruct (ss_cells with "Hres") as (out cmt nc) "(%Hout3 & Hout & Hcmt & Hnc & Hclose)".
-    assert (Hnca : add_vec (rget Y1 Rs2) (sign_extend' 64 (mword_of_int 1216 : mword 12)) = l_ncommit).
+    assert (Hnca : add_vec (rget Y1 Rs2) (sign_extend' 64 (mword_of_int 1200 : mword 12)) = l_ncommit).
     { rgne. rewrite HY1s2. exact ss_reloc_nc_2e. }
     iEval (rewrite -Hnca) in "Hnc".
     iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (SS + 0x32)) Rs2 Rs2
-              (mword_of_int 1216 : mword 12) Y1 (trap_res eb + (K - 4))%nat nc false
+              (mword_of_int 1200 : mword 12) Y1 (trap_res eb + (K - 4))%nat nc false
               (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi32 Hnc").
@@ -1097,15 +1097,15 @@ Section SsBodies.
     iEval (rewrite Hp3a) in "Hpc".
     (* +0x3a addi s1,s1,1208 *)
     iApply (wp_addi4_s_sconf (mword_of_int (SS + 0x3a)) Rs1 Rs1
-              (mword_of_int 1168 : mword 12) Y3 (trap_res eb + (K - 4))%nat false
+              (mword_of_int 1152 : mword 12) Y3 (trap_res eb + (K - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi3a").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (Y4 := <[Regidx Rs1 := regval_into_reg
-        (add_vec (Y3 !!! Regidx Rs1) (sign_extend' 64 (mword_of_int 1168 : mword 12)))]> Y3).
+        (add_vec (Y3 !!! Regidx Rs1) (sign_extend' 64 (mword_of_int 1152 : mword 12)))]> Y3).
     change (<[Regidx Rs1 := regval_into_reg
-        (add_vec (Y3 !!! Regidx Rs1) (sign_extend' 64 (mword_of_int 1168 : mword 12)))]> Y3) with Y4.
+        (add_vec (Y3 !!! Regidx Rs1) (sign_extend' 64 (mword_of_int 1152 : mword 12)))]> Y3) with Y4.
     assert (Hp3e : add_vec_int (mword_of_int (SS + 0x3a) : mword 64) 4 = mword_of_int (SS + 0x3e))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp3e) in "Hpc".
@@ -1239,15 +1239,15 @@ Section ProofSysSync.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp0c) in "Hpc".
     iApply (wp_addi4_s_sconf (mword_of_int (SS + 0x0c)) Ra0 Ra0
-              (mword_of_int 1214 : mword 12) R3 (K - 4)%nat eb
+              (mword_of_int 1198 : mword 12) R3 (K - 4)%nat eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi0c").
     iIntros (CID6 Hs6) "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (R4 := <[Regidx Ra0 := regval_into_reg
-        (add_vec (R3 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 1214 : mword 12)))]> R3).
+        (add_vec (R3 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 1198 : mword 12)))]> R3).
     change (<[Regidx Ra0 := regval_into_reg
-        (add_vec (R3 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 1214 : mword 12)))]> R3) with R4.
+        (add_vec (R3 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 1198 : mword 12)))]> R3) with R4.
     assert (Hp10 : add_vec_int (mword_of_int (SS + 0x0c) : mword 64) 4 = mword_of_int (SS + 0x10))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp10) in "Hpc".
@@ -1349,11 +1349,11 @@ Section ProofSysSync.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp18) in "Hpc".
     (* +0x18 lw a5,1274(a5) : a5 := log.committing *)
-    assert (Hcmta : add_vec (rget G1 Ra5) (sign_extend' 64 (mword_of_int 1234 : mword 12)) = l_cmt).
+    assert (Hcmta : add_vec (rget G1 Ra5) (sign_extend' 64 (mword_of_int 1218 : mword 12)) = l_cmt).
     { rgne. rewrite HG1a5. exact ss_reloc_cmt_14. }
     iEval (rewrite -Hcmta) in "Hcmt".
     iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (SS + 0x18)) Ra5 Ra5
-              (mword_of_int 1234 : mword 12) G1 (trap_res eb + (K - 4))%nat
+              (mword_of_int 1218 : mword 12) G1 (trap_res eb + (K - 4))%nat
               (mword_of_int (if cmt then 1 else 0) : mword 32) false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi18 Hcmt").
@@ -1423,11 +1423,11 @@ Section ProofSysSync.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp22) in "Hpc".
       (* +0x22 lw a5,1260(a5) : a5 := log.outstanding *)
-      assert (Houta : add_vec (rget G3 Ra5) (sign_extend' 64 (mword_of_int 1220 : mword 12)) = l_out).
+      assert (Houta : add_vec (rget G3 Ra5) (sign_extend' 64 (mword_of_int 1204 : mword 12)) = l_out).
       { rgne. rewrite HG3a5. exact ss_reloc_out_1e. }
       iEval (rewrite -Houta) in "Hout".
       iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (SS + 0x22)) Ra5 Ra5
-                (mword_of_int 1220 : mword 12) G3 (trap_res eb + (K - 4))%nat
+                (mword_of_int 1204 : mword 12) G3 (trap_res eb + (K - 4))%nat
                 (mword_of_int (Z.of_nat out) : mword 32) false (dqm := DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi22 Hout").

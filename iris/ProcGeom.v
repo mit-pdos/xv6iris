@@ -9,9 +9,9 @@
 
    Layout (kernel/proc.h, corroborated by the compiled image):
 
-     struct cpu (128 B, cpus[8] @ 0x80012378 = pid_lock + 48):
+     struct cpu (128 B, cpus[8] @ 0x80012368 = pid_lock + 48):
        proc@0, context@8 (14*8 B), noff@120, intena@124.
-     struct proc (360 B, proc[64] @ 0x80012778 -- directly after cpus[]):
+     struct proc (360 B, proc[64] @ 0x80012768 -- directly after cpus[]):
        lock@0 (locked word@0, cpu ptr@16), state@24, chan@32, context@96.
 
    [cur_proc p] is THE current-process resource: the current proc structure
@@ -777,7 +777,7 @@ Proof.
 Qed.
 
 (* the scheduler-context address of a valid hart never collides with a proc
-   context: cpus[] ends exactly where proc[] begins (0x80012778), and the
+   context: cpus[] ends exactly where proc[] begins (0x80012768), and the
    context field sits 8 bytes in / 96 bytes in respectively. *)
 Lemma a_cpu_ctx_ne_p_context (tp0 : mword 64) (j : nat) :
   tp_ok tp0 -> (j < NPROC)%nat ->

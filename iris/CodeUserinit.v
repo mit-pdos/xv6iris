@@ -17,6 +17,7 @@ Require Import WpMmodeLeafBase.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import KernelDecode04.
+Require Import KernelDecode09.
 Require Import KernelDecode10.
 Require Import KernelDecode12.
 Require Import KernelDecode13.
@@ -73,9 +74,9 @@ Section CodeUserinit.
   Proof. mk_base (KernelSyms.userinit + 0x10) (mword_of_int 0x00008797 : mword 32)
     (mword_of_int (KernelSyms.userinit + 0x10) : mword 64) (UTYPE (mword_of_int 8 : mword 20, Regidx (mword_of_int 15), AUIPC)) kd_00008797. Qed.
 
-  Lemma uin_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.userinit + 0x14) : mword 64) false (STORE (mword_of_int 1796 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 15), 8)).
-  Proof. mk_base (KernelSyms.userinit + 0x14) (mword_of_int 0x70a7b223 : mword 32)
-    (mword_of_int (KernelSyms.userinit + 0x14) : mword 64) (STORE (mword_of_int 1796 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 15), 8)) kd_70a7b223. Qed.
+  Lemma uin_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.userinit + 0x14) : mword 64) false (STORE (mword_of_int 1780 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 15), 8)).
+  Proof. mk_base (KernelSyms.userinit + 0x14) (mword_of_int 0x6ea7ba23 : mword 32)
+    (mword_of_int (KernelSyms.userinit + 0x14) : mword 64) (STORE (mword_of_int 1780 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 15), 8)) kd_6ea7ba23. Qed.
 
   Lemma uin_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.userinit + 0x18) : mword 64) false (UTYPE (mword_of_int 5 : mword 20, Regidx (mword_of_int 10), AUIPC)).
   Proof. mk_base (KernelSyms.userinit + 0x18) (mword_of_int 0x00005517 : mword 32)

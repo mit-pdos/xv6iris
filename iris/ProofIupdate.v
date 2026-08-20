@@ -1225,12 +1225,12 @@ Section ProofIupdateMain.
     iEval (rewrite Hpp18) in "Hpc".
     (* ===== +0x18 lw a1,1850(a1) : a1 := sb.inodestart ===== *)
     assert (Hsbadr : add_vec (rget R6 Ra1)
-                       (sign_extend' 64 (mword_of_int 1938 : mword 12))
+                       (sign_extend' 64 (mword_of_int 1922 : mword 12))
                      = sb_inodestart).
     { rgne. rewrite HR6a1. rewrite /sb_inodestart /pa_add /add_vec_int. pcw. }
     iEval (rewrite -Hsbadr) in "Hsb".
     iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.iupdate + 0x18)) Ra1 Ra1
-              (mword_of_int 1938 : mword 12) R6 (K - 4)%nat
+              (mword_of_int 1922 : mword 12) R6 (K - 4)%nat
               (mword_of_int inodestart : mword 32) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi18 Hsb").
     iIntros (CID11 Hq11) "Hcg Hpc Hsb".

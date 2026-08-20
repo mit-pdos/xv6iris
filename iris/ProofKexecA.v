@@ -438,10 +438,10 @@ Section KexecABody.
     (* ---- +0x020: jal ra,myproc ---- *)
     iPoseProof (kxc_020 with "Htext") as "Hi020".
     assert (Htmp : add_vec (mword_of_int (KXA + 0x20) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2085146 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2085126 : mword 21))
                    = mword_of_int KernelSyms.myproc) by pcw.
     iApply (wp_jal_s_sconf (mword_of_int (KXA + 0x20)) Rra
-              (mword_of_int 2085146 : mword 21) M1 (K - 68)%nat true
+              (mword_of_int 2085126 : mword 21) M1 (K - 68)%nat true
               ltac:(nz) ltac:(rdok)
               ltac:(rewrite Htmp; vm_compute; reflexivity)
               with "Hcg Hpc Hi020").
@@ -479,10 +479,10 @@ Section KexecABody.
     (* ---- +0x026: jal ra,begin_op ---- *)
     iPoseProof (kxc_026 with "Htext") as "Hi026".
     assert (Htbo : add_vec (mword_of_int (KXA + 0x26) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2094234 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2094214 : mword 21))
                    = mword_of_int KernelSyms.begin_op) by pcw.
     iApply (wp_jal_s_sconf (mword_of_int (KXA + 0x26)) Rra
-              (mword_of_int 2094234 : mword 21) N2 (K - 68)%nat true
+              (mword_of_int 2094214 : mword 21) N2 (K - 68)%nat true
               ltac:(nz) ltac:(rdok)
               ltac:(rewrite Htbo; vm_compute; reflexivity)
               with "Hcg Hpc Hi026").
@@ -530,10 +530,10 @@ Section KexecABody.
     (* ---- +0x02c: jal ra,namei ---- *)
     iPoseProof (kxc_02c with "Htext") as "Hi02c".
     assert (Htnm : add_vec (mword_of_int (KXA + 0x2c) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2093750 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2093730 : mword 21))
                    = mword_of_int KernelSyms.namei) by pcw.
     iApply (wp_jal_s_sconf (mword_of_int (KXA + 0x2c)) Rra
-              (mword_of_int 2093750 : mword 21) N4 (K - 68)%nat true
+              (mword_of_int 2093730 : mword 21) N4 (K - 68)%nat true
               ltac:(nz) ltac:(rdok)
               ltac:(rewrite Htnm; vm_compute; reflexivity)
               with "Hcg Hpc Hi02c").
@@ -699,10 +699,10 @@ Section KexecABody.
       iPoseProof (kxc_08c with "Htext") as "Hi08c".
       iPoseProof (kxc_08e with "Htext") as "Hi08e".
       assert (Hteo : add_vec (mword_of_int (KXA + 0x88) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2094276 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2094256 : mword 21))
                      = mword_of_int KernelSyms.end_op) by pcw.
       iApply (wp_jal_s_sconf (mword_of_int (KXA + 0x88)) Rra
-                (mword_of_int 2094276 : mword 21) M4 (K - 68)%nat true
+                (mword_of_int 2094256 : mword 21) M4 (K - 68)%nat true
                 ltac:(nz) ltac:(rdok)
                 ltac:(rewrite Hteo; vm_compute; reflexivity)
                 with "Hcg Hpc Hi088").
@@ -1059,10 +1059,10 @@ Section KexecABody.
     iEval (rewrite Hpp036) in "Hpc".
     (* ---- +0x036: jal ra,ilock ---- *)
     assert (Htil : add_vec (mword_of_int (KXA + 0x36) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2091552 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2091532 : mword 21))
                    = mword_of_int KernelSyms.ilock) by pcw.
     iApply (wp_jal_s_sconf (mword_of_int (KXA + 0x36)) Rra
-              (mword_of_int 2091552 : mword 21) Q1 (K - 68)%nat true
+              (mword_of_int 2091532 : mword 21) Q1 (K - 68)%nat true
               ltac:(nz) ltac:(rdok)
               ltac:(rewrite Htil; vm_compute; reflexivity)
               with "Hcg Hpc Hi036").
@@ -1193,10 +1193,10 @@ Section KexecABody.
     iEval (rewrite Hpp048) in "Hpc".
     (* ---- +0x048: jal ra,readi ---- *)
     assert (Htrd : add_vec (mword_of_int (KXA + 0x48) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2092520 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2092500 : mword 21))
                    = mword_of_int KernelSyms.readi) by pcw.
     iApply (wp_jal_s_sconf (mword_of_int (KXA + 0x48)) Rra
-              (mword_of_int 2092520 : mword 21) Q7 (K - 68)%nat true
+              (mword_of_int 2092500 : mword 21) Q7 (K - 68)%nat true
               ltac:(nz) ltac:(rdok)
               ltac:(rewrite Htrd; vm_compute; reflexivity)
               with "Hcg Hpc Hi048").

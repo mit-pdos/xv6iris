@@ -36,7 +36,7 @@ Section CodeFileinitBundle.
      whole-function proof needs to know about fileinit's code. *)
   Lemma fii_code :
     kernel_text -∗ ilw_code KernelSyms.fileinit (mword_of_int 3) (mword_of_int 30)
-                            (mword_of_int 1310) (mword_of_int 1150) (mword_of_int 2083536).
+                            (mword_of_int 1310) (mword_of_int 1134) (mword_of_int 2083536).
   Proof.
     iIntros "#Ht". rewrite /ilw_code.
     iSplitR; [iApply (fii_00 with "Ht")|].
@@ -86,7 +86,7 @@ Section ProofFileinit.
                                                                                 ltac:(vm_compute; discriminate) Hftable
                   with "Hkdata") as "#Hstr".
     iApply (ILW.wp_initlock_wrapper_sconf KT1 m K KernelSyms.fileinit
-              (mword_of_int 3) (mword_of_int 30) (mword_of_int 1310) (mword_of_int 1150)
+              (mword_of_int 3) (mword_of_int 30) (mword_of_int 1310) (mword_of_int 1134)
               (mword_of_int 2083536) lk name "ftable"%string vlock vname vcpu b p HK
               ltac:(vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)

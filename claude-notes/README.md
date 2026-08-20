@@ -31,8 +31,9 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   recheck, preemption and cost, and the two things that silently break (the
   VM's Ubuntu must match, and the opam switch must be byte-identical).
 - **[`kernel-defects.md`](kernel-defects.md)** — how to tell a defect in the xv6
-  SOURCE from a problem in a spec, plus the register of open ones (currently
-  empty) and the provably dead code.
+  SOURCE from a problem in a spec, the register of open ones, and the provably
+  dead code.  The newest entry -- `read(fd, buf, -1)` delivering the rest of
+  the file -- is FIXED UPSTREAM, and is why `XV6_REV` is at `31f115a`.
 
 ## `design/` — how each part of the project is built
 
@@ -128,7 +129,9 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   fraction, and read/write's premises about the count word the USER wrote.
   Read it for **why `syscall_env` is now `FsReady.fs_ready` plus
   twenty-eight equations**, and for the fraction-arithmetic defect it
-  turned up in `SpecSysClose.v`.
+  turned up in `SpecSysClose.v`.  Its LAST section is the plan for making
+  read/write TOTAL in the user-supplied count — read it before touching
+  either entry.
 - **[`main-cycle-port.md`](projects/main-cycle-port.md)** — the expression-resident
   monad port (design in [`design/main-cycle-port.md`](design/main-cycle-port.md)).
 - **[`user-tier-port.md`](projects/user-tier-port.md)** — the user tier's port onto

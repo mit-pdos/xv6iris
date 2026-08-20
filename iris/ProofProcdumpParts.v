@@ -371,12 +371,12 @@ Section ProofProcdumpParts.
     assert (Hp26 : add_vec_int (mword_of_int (PD + 0x22) : mword 64) 4 = mword_of_int (PD + 0x26)) by pcstep.
     iEval (rewrite Hp26) in "Hpc".
     assert (Hrg26 : rget (CID := CID1) Q1 Rs1 = Q1 !!! Regidx Rs1) by (rgne; reflexivity).
-    iApply (wp_addi4_s_sconf (mword_of_int (PD + 0x26)) Rs1 Rs1 (mword_of_int 1574 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (PD + 0x26)) Rs1 Rs1 (mword_of_int 1558 : mword 12)
               Q1 K' b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi26").
     iIntros (CID2 Hs2) "Hcg Hpc". iEval (rewrite Hrg26) in "Hcg".
     set (Q2 := <[Regidx Rs1 := regval_into_reg
-                  (add_vec (Q1 !!! Regidx Rs1) (sign_extend' 64 (mword_of_int 1574 : mword 12)))]> Q1).
+                  (add_vec (Q1 !!! Regidx Rs1) (sign_extend' 64 (mword_of_int 1558 : mword 12)))]> Q1).
     assert (HQ2s1 : Q2 !!! Regidx Rs1 = pd_cur 0).
     { rewrite /Q2 upd_eq /Q1 upd_eq.
       unfold pd_cur, acur, pd_base, pd_name_off, proc_size.
@@ -394,12 +394,12 @@ Section ProofProcdumpParts.
     assert (Hp2e : add_vec_int (mword_of_int (PD + 0x2a) : mword 64) 4 = mword_of_int (PD + 0x2e)) by pcstep.
     iEval (rewrite Hp2e) in "Hpc".
     assert (Hrg2e : rget (CID := CID3) Q3 Rs2 = Q3 !!! Regidx Rs2) by (rgne; reflexivity).
-    iApply (wp_addi4_s_sconf (mword_of_int (PD + 0x2e)) Rs2 Rs2 (mword_of_int 30 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (PD + 0x2e)) Rs2 Rs2 (mword_of_int 14 : mword 12)
               Q3 K' b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi2e").
     iIntros (CID4 Hs4) "Hcg Hpc". iEval (rewrite Hrg2e) in "Hcg".
     set (Q4 := <[Regidx Rs2 := regval_into_reg
-                  (add_vec (Q3 !!! Regidx Rs2) (sign_extend' 64 (mword_of_int 30 : mword 12)))]> Q3).
+                  (add_vec (Q3 !!! Regidx Rs2) (sign_extend' 64 (mword_of_int 14 : mword 12)))]> Q3).
     assert (HQ4s2 : Q4 !!! Regidx Rs2 = pd_cur NPROC).
     { rewrite /Q4 upd_eq /Q3 upd_eq.
       unfold pd_cur, acur, pd_base, pd_name_off, proc_size, NPROC.

@@ -496,10 +496,10 @@ Proof.
   iEval (rewrite Hpp0a8) in "Hpc".
   (* ===== +0xa8  jal ialloc ========================================== *)
   assert (Htgia : add_vec (mword_of_int (CK + 0xa8) : mword 64)
-                    (sign_extend' 64 (mword_of_int 2090052 : mword 21))
+                    (sign_extend' 64 (mword_of_int 2090032 : mword 21))
                   = mword_of_int KernelSyms.ialloc) by pcw.
   iApply (wp_jal_s_sconf (mword_of_int (CK + 0xa8)) Rra
-            (mword_of_int 2090052 : mword 21) A2 K b
+            (mword_of_int 2090032 : mword 21) A2 K b
             ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
             with "Hcg Hpc Hi0a8").
   iIntros (CID3 Hq3) "Hcg Hpc".
@@ -574,10 +574,10 @@ Proof.
     iEval (rewrite Hpp0b0) in "Hpc".
     (* ===== +0xb0  jal ilock ======================================== *)
     assert (Htgil : add_vec (mword_of_int (CK + 0xb0) : mword 64)
-                      (sign_extend' 64 (mword_of_int 2090412 : mword 21))
+                      (sign_extend' 64 (mword_of_int 2090392 : mword 21))
                     = mword_of_int KernelSyms.ilock) by pcw.
     iApply (wp_jal_s_sconf (mword_of_int (CK + 0xb0)) Rra
-              (mword_of_int 2090412 : mword 21) F1 K b
+              (mword_of_int 2090392 : mword 21) F1 K b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi0b0").
     iIntros (CID7 Hq7) "Hcg Hpc".

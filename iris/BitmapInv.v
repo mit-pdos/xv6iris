@@ -124,12 +124,12 @@ Qed.
 (*  There is deliberately still no superblock abstraction.                 *)
 (* ---------------------------------------------------------------------- *)
 
-(* balloc +0x0a: [auipc a5,0x1e / lw a5,-1370(a5)] -> 0x80020854 = sb + 4 *)
+(* balloc +0x0a: [auipc a5,0x1e / lw a5,-1370(a5)] -> 0x80020844 = sb + 4 *)
 Definition sb_size : mword 64 :=
   pa_add (mword_of_int KernelSyms.sb : mword 64) 4.
 
 (* balloc +0xa0: [lw a5,28(s6)] with s6 = &sb; bfree +0x16 resolves to
-   0x8002086c = sb + 0x1c *)
+   0x8002085c = sb + 0x1c *)
 Definition sb_bmapstart : mword 64 :=
   pa_add (mword_of_int KernelSyms.sb : mword 64) 28.
 
