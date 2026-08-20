@@ -289,6 +289,15 @@ worth 20× on individual files.
   expensive in the tree after the assumption audit, and both on the critical
   path. The rewrite is mechanical: `iSplitL "Hl"; [iExact "Hl"|]`, then
   `iSplitR "<the rest>"` around the arm's own proof, then frame the tail.
+- **A rebuild is a construction, so build it — do not frame it.** Even fully
+  named, `iFrame` walks the goal once per name, and the goal is the abstraction
+  UNFOLDED, so its tail conjuncts are whatever the abstraction ends in. Handing
+  `ut_caps` back with `iFrame "Hpi Hkd Hks Hdev Hrest Hown"` cost **7.5 s of a
+  14.1 s file** — its tail is `is_lock`s over `disk_res` / `kmem_res` and an
+  `is_ftable`, and each match attempt against one of those is a conversion over
+  a big resource. The `iSplitL "H"; [iExact "H"|]` chain over the same six
+  conjuncts is a syntactic check each: **file 14.1 s → 6.6 s**, and the
+  statement leaves the profile entirely (nothing in the file is above 1 s).
 - **Extracting a persistent fact out of a bundle must not take the bundle
   APART.** `ut_res_bare_sstc` destructured `ut_caps` to read one
   `sstc_enabled` out of it and then rebuilt it conjunct-by-conjunct inside the
@@ -410,6 +419,26 @@ worth 20× on individual files.
   and 18.0 s → 9.4 s of `Qed`**, file 46.3 s → 25.9 s. Not a sweep: the same
   `goodb_step` in `WpSconfCsr` / `WpGprCsrwC` costs ~1.4 s, because nothing has
   put a symbolic value in their tails.
+- **WHAT IS LEFT OF THAT PEEL IS THE `eapply` ITSELF, and five further
+  interventions all measured null** (2026-08-20; do not redo them). Ltac
+  profiling: **61.8 % LOCAL to `eapply goodb_bind_i`**, 30 % `reflexivity`,
+  8 % `vm_compute`. Unrolling the `repeat` shows the cost is not spread — the
+  five steps are 2.4 s, 2.1 s, 2.0 s, then under 0.3 s each — i.e. it tracks the
+  size of the CONTINUATION the step has to retype, which is exactly what a
+  one-node-at-a-time peel cannot avoid. Tried and within noise: `cbv beta`
+  before the loop; `cbv beta` after every step (worse); `vm_cast_no_check
+  (eq_refl true)` for the `goodb` side condition; a `lazymatch` dispatch on
+  `bind`/`bind0` instead of `first` (so no branch ever fails); and a
+  `Hint Resolve` database of the per-leaf `exec_*` lemmas so the exec side
+  condition is a lookup rather than a `vm_compute` (6.25/6.38 s against a
+  6.40/6.58 s baseline). Getting below this needs a different formulation — a
+  multi-bind peel lemma, or a `goodb` that computes without touching the data —
+  not another tactic.
+- **AND MEASURE ON A QUIET VM.** Three of those five variants first read as
+  regressions of 20–30 % (25 s → 31 s on the same file), purely because another
+  tree was building; the same variants re-measured at load 9 were within 2 %.
+  `uptime` before an A/B is worth the second it costs — the builder is SHARED,
+  which the isolation rule at the top of this file assumes away.
 - **`rewrite wp_next_off` is a setoid rewrite over the whole goal — use `iApply
   wp_next_off_intro`.** Same continuation, matches only the head. A `b`-generic
   proof has no such sites at all (it threads `wp_next … b …` and discharges with

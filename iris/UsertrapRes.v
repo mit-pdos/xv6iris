@@ -858,7 +858,17 @@ Section UsertrapRes.
        a conversion over a big resource (optimization.md, "A SHAPE MISMATCH
        turns every match attempt into a CONVERSION"). *)
     iSplitR; [iExact "Hsstc"|].
-    iFrame "Hpi Hkd Hks Hdev Hrest Hown".
+    (* AND THE BUNDLE GOES BACK CONJUNCT BY CONJUNCT, not by a frame: even
+       named, a frame walks the goal for each of the six, and the goal here is
+       [ut_caps] unfolded -- whose tail conjuncts are [is_lock]s over
+       [disk_res] / [kmem_res] and an [is_ftable].  Every match attempt
+       against one of those is a conversion over a big resource: 7.5 s, and
+       the whole file is 14 s. *)
+    iSplitR "Hown"; [| iExact "Hown"].
+    iSplitL "Hpi"; [iExact "Hpi"|].
+    iSplitL "Hkd"; [iExact "Hkd"|].
+    iSplitL "Hks"; [iExact "Hks"|].
+    iSplitR "Hrest"; [iExact "Hdev" | iExact "Hrest"].
   Qed.
 
   Lemma ut_own_pt_close (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
