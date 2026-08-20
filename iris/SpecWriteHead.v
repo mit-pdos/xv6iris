@@ -70,6 +70,7 @@ Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import CpuOwn.
 Require Import SchedCtx.
+Require Import ProcDefs.  (* [proc_priv_bare] *)
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
 Require Import BioInv.
@@ -96,7 +97,7 @@ Definition wp_write_head_sconf_body
     (n : nat) (W : list (mword 32)) (L : gmap Z (list (bv 8)))
     (pidv : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (Q : iProp Σ) (lks : gset string) :=
+    (b : bool) (Q : iProp Σ) (lks : gset string) (Vpr : pprivate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.write_head in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -121,7 +122,7 @@ Definition wp_write_head_sconf_body
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   (* NOT [log_ctx]: this helper holds no lock -- see LogInv.log_frozen *)
   log_frozen logstart dev -∗
-  p_pid pj ↦₄{dq} pidv -∗
+  proc_priv_bare pj pidv Vpr -∗
   (* the running-thread bundle *)
   procs_inv γs -∗
   (* the disk fabric *)
@@ -166,7 +167,7 @@ Definition wp_write_head_sconf_body
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
-      p_pid pj ↦₄{dq} pidv -∗
+      proc_priv_bare pj pidv Vpr -∗
       (* the in-memory header, unchanged *)
       lh_n_pa ↦₄ (mword_of_int (Z.of_nat n) : mword 32) -∗
       ([∗ list] i ↦ w ∈ W, lh_block i ↦₄ w) -∗
@@ -196,7 +197,7 @@ Module Type WRITE_HEAD.
       (n : nat) (W : list (mword 32)) (L : gmap Z (list (bv 8)))
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (Q : iProp Σ) (lks : gset string),
+      (b : bool) (Q : iProp Σ) (lks : gset string) (Vpr : pprivate),
       wp_write_head_sconf_body γs j γl γu γd γk pd pav pu bn γfs
-                               cov logstart dev n W L pidv dq m K eb b Q lks.
+                               cov logstart dev n W L pidv dq m K eb b Q lks Vpr.
 End WRITE_HEAD.

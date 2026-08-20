@@ -358,7 +358,7 @@ Definition wp_readi_sconf_body
   (if user
    then proc_priv_core pj pidv V
    else ([∗ list] i ∈ seq 0 n, pa_add dst i ↦ₘ[ktb] dst_olds i) ∗
-        p_pid pj ↦₄{dq} pidv) -∗
+        proc_priv_bare pj pidv V) -∗
   (* the running-thread bundle *)
   procs_inv γs -∗
   (* the disk fabric *)
@@ -408,7 +408,7 @@ Definition wp_readi_sconf_body
        then proc_priv_core pj pidv (upd_upt V P')
        else ([∗ list] i ∈ seq 0 n,
               pa_add dst i ↦ₘ[ktb] rd_delivered data dst_olds off tot i) ∗
-            p_pid pj ↦₄{dq} pidv) -∗
+            proc_priv_bare pj pidv V) -∗
       bslot bn -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).

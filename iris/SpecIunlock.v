@@ -80,6 +80,7 @@ Require Import FdSlots.
 Require Import ProcGeom.
 Require Import CpuOwn.
 Require Import SchedCtx.
+Require Import ProcDefs.  (* [proc_priv_bare] *)
 Require Import SleepLock.
 Require Import FsBlocks.
 Require Import DinodeEnc.
@@ -112,7 +113,7 @@ Definition wp_iunlock_sconf_body
     (dn' : dinode) (bm' : blkmap)
     (pidv : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool) (p : mword 64)
-    (b : bool) (lks : gset string) :=
+    (b : bool) (lks : gset string) (Vpr : pprivate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iunlock in
   let ip : mword 64 := ientry k in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -135,7 +136,7 @@ Definition wp_iunlock_sconf_body
                    (slh_tok (icfg_isl k)) -∗
   (* THE HOLDER'S BUNDLE -- the third dead panic test is exactly this *)
   sleeplocked_q gisl s (i_lock ip) pidv -∗
-  p_pid p ↦₄{dq} pidv -∗
+  proc_priv_bare p pidv Vpr -∗
   (* wakeup's resources (releasesleep wakes the lock's sleepers) *)
   procs_inv gs -∗
   (* THE CHECKED-OUT ENTRY, surrendered back into the escrow.  Exactly
@@ -169,7 +170,7 @@ Definition wp_iunlock_sconf_body
       sie_cap_gpr KT1 mf K b p -∗
       cpu_own 0 eb p b lks -∗
       pc_is ret_tgt -∗
-      p_pid p ↦₄{dq} pidv -∗
+      proc_priv_bare p pidv Vpr -∗
       (* the caller's share, back whole, at ITS OWN fraction and device --
          AND AT THE GENERATION IT CAME IN ON.  The share the caller still
          holds is what denies [IcacheRef.live_gen_bump] the slot's whole
@@ -195,7 +196,7 @@ Module Type IUNLOCK.
       (dn' : dinode) (bm' : blkmap)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64)
-      (b : bool) (lks : gset string),
+      (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_iunlock_sconf_body gs gfs gi cn gil gisl cov logstart k s g dev inum
-                            dn' bm' pidv dq m K eb p b lks.
+                            dn' bm' pidv dq m K eb p b lks Vpr.
 End IUNLOCK.

@@ -532,8 +532,26 @@ Two consequences for `fileread`'s contract:
 
   The OTHER half of the S4 debt is untouched by this: **`0 <= n` is owed by
   sys_read AND sys_write**, because `SpecReadi`/`SpecWritei` type `n` as a
-  `nat` and so cannot express the negative case the C handles perfectly well.
-  That one is a modelling premise rather than a kernel fact.
+  `nat` and so cannot express the negative case.
+
+  **AMENDED TWICE ON 2026-08-20, and the second one retires it.**  The text
+  here used to read "a modelling premise rather than a kernel fact", which is
+  TRUE of sys_write and was FALSE of sys_read: a negative `int n` reached
+  readi's `uint n` as `2^32 - k`, the `off + n < off` overflow test caught only
+  the WRAPPING case `k <= off`, and otherwise the `n = ip->size - off` clamp
+  fired and readi read the rest of the file into the user's buffer.  At
+  `f->off = 0` that was every negative `n`.
+
+  **`XV6_REV` 31f115a fixes it in the source** -- `if (f->readable == 0 ||
+  n < 0)` and its write twin -- so the premise is now DISCHARGED BY THE CODE
+  rather than owed upward.  Both contracts take the `int` range
+  `-2^31 <= n < 2^31`, which `SpecSysRead.sys_rw_count_range` gives a trapframe
+  word for free; the guard restores `0 <= n` past the branch, so everything
+  below keeps the premises it already had, `fileread_ret` stays `pipe_rw_ret`,
+  and readi's overflow arm stays dead by premise.  The defect entry is in
+  `kernel-defects.md`; the bump's ledger is in
+  `projects/syscall-dispatch.md`, "THE BUMP TO `31f115a`".
+
 * **the delivered bytes are not describable, and this too is inherited.**
   `readi`'s postcondition describes the destination bytes only on its KERNEL
   arm; on the user arm — the one fileread takes, `a1 = 1` at `+0x3a` — it says

@@ -70,6 +70,7 @@ Require Import PrintintArith.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Import SchedCtx.
+Require Import ProcDefs.  (* [proc_priv_bare] *)
 Require Import WpUart.
 Require Import BufOwn BcacheInv BioInv.
 Require Import FsBlocks LogInv.
@@ -493,7 +494,7 @@ Section BfreeDefs.
       (γfs : fs_names) (bn : bio_names) (γ : log_names)
       (cov : gset Z) (logstart bmapstart size : Z) (used : gset Z) (bi : Z)
       (Bud : iProp Σ) (pidv : mword 32) (dq dqb : dfrac) (j : nat)
-      (m : regfile) (K : nat) (b : bool) (lks : gset string) : iProp Σ :=
+      (m : regfile) (K : nat) (b : bool) (lks : gset string) (Vpr : pprivate) : iProp Σ :=
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
@@ -506,7 +507,7 @@ Section BfreeDefs.
         trap_csrs_ext KT1 b -∗
         cpu_claim_ext b (proc_addr j) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-        p_pid (proc_addr j) ↦₄{dq} pidv -∗
+        proc_priv_bare (proc_addr j) pidv Vpr -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         bitmap_res γfs bmapstart cov logstart size (used ∖ {[ bi ]}) -∗
         bslots bn 2 -∗
@@ -539,7 +540,7 @@ Section BfreeTail.
       (used : gset Z) (bi : Z) (u : nat) (cr : bool) (Sb : gset Z) (e0 : nat)
       (kk : nat) (bnoB : mword 32) (bsd : list (bv 8)) (d0 : bool)
       (pidv : mword 32) (dq dqb : dfrac)
-      (m M : regfile) (K : nat) (b : bool) (lks : gset string) :
+      (m M : regfile) (K : nat) (b : bool) (lks : gset string) (Vpr : pprivate) :
     locks_below lks "log" ->
     (K_bfree <= K)%nat ->
     bf_sp m M ->
@@ -561,7 +562,7 @@ Section BfreeTail.
     log_ctx γ bn γfs cov logstart dev -∗
     procs_inv γs -∗
     bf_frame m -∗
-    p_pid (proc_addr j) ↦₄{dq} pidv -∗
+    proc_priv_bare (proc_addr j) pidv Vpr -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     bslots bn 1 -∗
     log_credit γ cr Sb e0 bmapstart -∗
@@ -572,7 +573,7 @@ Section BfreeTail.
        (bitmap_bytes (used ∖ {[ bi ]})) (bitmap_bytes used) bsd d0 -∗
     bf_cont (CID0 := CID0) γfs bn γ cov logstart bmapstart size used bi
             (log_opSe γ (if cr then S u else u) (Sb ∪ {[bmapstart]}) e0)
-            pidv dq dqb j m K b lks -∗
+            pidv dq dqb j m K b lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hbelow HK Hsp Hthr Ha0 Hs2 Hkk Hbno Hcov Hlog Hokdel.
@@ -703,7 +704,7 @@ Section BfreeTail.
        stranding as log_write above. *)
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
               pidv dev bnoB dq T2 (K - 4)%nat b (proc_addr j)
-              (bitmap_bytes (used ∖ {[ bi ]})) bsd true b lks
+              (bitmap_bytes (used ∖ {[ bi ]})) bsd true b lks Vpr
               HKbl Hkk HT2a0
               (* brelse's bound is at "bcache"(4); ours is at "log"(3), and
                  [locks_below_mono] weakens it.  This is the composition the
@@ -964,10 +965,10 @@ Section ProofBfreeMain.
       (u : nat) (cr : bool) (Sb : gset Z) (e0 : nat)
       (pidv : mword 32) (dq dqb : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string)
+      (b : bool) (lks : gset string) (Vpr : pprivate)
     : wp_bfree_gen_body γs j γl γu γd γk pd pav pu bn γ γfs
                         cov logstart bmapstart size dev used bno bs u cr Sb e0
-                        pidv dq dqb m K eb b lks.
+                        pidv dq dqb m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_bfree_gen_body].
     intros pcE pj ret_tgt HK Hgeom Hsize Hbm0 Hbmcov Hbmlog
@@ -1008,7 +1009,7 @@ Section ProofBfreeMain.
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbe. cbn in Hbe. subst eb.
     iAssert (bf_cont (CID0 := CID) γfs bn γ cov logstart bmapstart size used bi
                (log_opSe γ (if cr then S u else u) (Sb ∪ {[bmapstart]}) e0)
-               pidv dq dqb j m K b lks)%I with "[Hcont]" as "Hcont";
+               pidv dq dqb j m K b lks Vpr)%I with "[Hcont]" as "Hcont";
       [rewrite /bf_cont; iExact "Hcont" |].
     (* ---- THE PANIC REFUTATION, done before a single instruction ---- *)
     iDestruct (bitmap_res_open with "Hbmr") as "(%Hok & Hfsbm & Hpool)".
@@ -1217,12 +1218,12 @@ Section ProofBfreeMain.
     iEval (rewrite Hpp16) in "Hpc".
     (* ===== +0x16 lw a1,-1246(a1) : a1 := sb.bmapstart ===== *)
     assert (Hsbadr : add_vec (rget R5 Ra1)
-                       (sign_extend' 64 (mword_of_int 2520 : mword 12))
+                       (sign_extend' 64 (mword_of_int 2504 : mword 12))
                      = sb_bmapstart).
     { rgne. rewrite HR5a1. rewrite /sb_bmapstart /pa_add /add_vec_int. pcw. }
     iEval (rewrite -Hsbadr) in "Hsb".
     iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.bfree + 0x16)) Ra1 Ra1
-              (mword_of_int 2520 : mword 12) R5 (K - 4)%nat
+              (mword_of_int 2504 : mword 12) R5 (K - 4)%nat
               (mword_of_int bmapstart : mword 32) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi16 Hsb").
     iIntros (CID10 Hq10) "Hcg Hpc Hsb".
@@ -1311,7 +1312,7 @@ Section ProofBfreeMain.
     iDestruct (iu_slots_split bn 1 1 with "Hsl") as "[Hsl Hsl1]".
     iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev bnoB dq
-              RA (K - 4)%nat b b lks
+              RA (K - 4)%nat b b lks Vpr
               HKbr HbnoBlt eq_refl HbnoBcov eq_refl Hj Hgl HRAa0 HRAa1
               ltac:(lkbelow)
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hppid Hprocs
@@ -1761,7 +1762,7 @@ Section ProofBfreeMain.
     assert (HB11a0' : B11 !!! Regidx Ra0 = bnode kk) by exact HB11a0.
     iApply (bf_tail (CID0 := CID27)  γs j γfs γd bn γ cov logstart bmapstart size
               dev used bi u cr Sb e0 kk bnoB bsd0 d0 pidv dq dqb m B11 K b lks
-              Hbelow HK HB11sp HB11thr HB11a0' HB11s2 Hkk HbnoB Hbmcov Hbmlog Hokdel
+              Vpr Hbelow HK HB11sp HB11thr HB11a0' HB11s2 Hkk HbnoB Hbmcov Hbmlog Hokdel
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hbio Hlctx Hprocs Hframe
                     Hppid Hsb Hsl Hcredit Hop Hfsbm Hpool Hheld [Hcont]").
     { iApply (wp_next_shift (b := true) (CIDa := CID12) (CIDb := CID27) ltac:(wp_next_chain)
@@ -1782,10 +1783,10 @@ Section ProofBfreeMain.
       (u : nat)
       (pidv : mword 32) (dq dqb : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string)
+      (b : bool) (lks : gset string) (Vpr : pprivate)
     : wp_bfree_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs
                           cov logstart bmapstart size dev used bno bs u
-                          pidv dq dqb m K eb b lks.
+                          pidv dq dqb m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_bfree_sconf_body].
     intros pcE pj ret_tgt HK Hgeom Hsize Hbm0 Hbmcov Hbmlog
@@ -1802,7 +1803,7 @@ Section ProofBfreeMain.
     iApply (wp_bfree_gen γs j γl γu γd γk pd pav pu bn γ γfs
               cov logstart bmapstart size dev used bno bs u false Sb e0
               pidv dq dqb m K eb b lks
-              HK Hgeom Hsize Hbm0 Hbmcov Hbmlog
+              Vpr HK Hgeom Hsize Hbm0 Hbmcov Hbmlog
               Hbirange Hbicov Hbilog Hbslen Hj Hgl Ha0 Ha1 Hbelow
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hsb Hbmr Hfsb Hown Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hsl Hcredit Hop [Hcont]").

@@ -81,6 +81,7 @@ Require Import ProcGeom.
 Require Import FdSlots.
 Require Import CpuOwn.
 Require Import SchedCtx.
+Require Import ProcDefs.  (* [proc_priv_bare] *)
 Require Import WpLock.
 Require Import BioDefs.
 Require Import FsBlocks LogInv.
@@ -274,25 +275,25 @@ Qed.
 Lemma bo_reloc_a0_0c :
   add_vec (add_vec (mword_of_int (KernelSyms.begin_op + 0x0c) : mword 64)
                    (auipc_off (mword_of_int 30 : mword 20)))
-          (sign_extend' 64 (mword_of_int 1836 : mword 12)) = log_addr.
+          (sign_extend' 64 (mword_of_int 1820 : mword 12)) = log_addr.
 Proof. rewrite /log_addr. apply bv_eq; vm_compute; reflexivity. Qed.
 
 Lemma bo_reloc_s1_18 :
   add_vec (add_vec (mword_of_int (KernelSyms.begin_op + 0x18) : mword 64)
                    (auipc_off (mword_of_int 30 : mword 20)))
-          (sign_extend' 64 (mword_of_int 1824 : mword 12)) = log_addr.
+          (sign_extend' 64 (mword_of_int 1808 : mword 12)) = log_addr.
 Proof. rewrite /log_addr. apply bv_eq; vm_compute; reflexivity. Qed.
 
 Lemma bo_reloc_a0_58 :
   add_vec (add_vec (mword_of_int (KernelSyms.begin_op + 0x74) : mword 64)
                    (auipc_off (mword_of_int 30 : mword 20)))
-          (sign_extend' 64 (mword_of_int 1732 : mword 12)) = log_addr.
+          (sign_extend' 64 (mword_of_int 1716 : mword 12)) = log_addr.
 Proof. rewrite /log_addr. apply bv_eq; vm_compute; reflexivity. Qed.
 
 Lemma bo_reloc_out_50 :
   add_vec (add_vec (mword_of_int (KernelSyms.begin_op + 0x6c) : mword 64)
                    (auipc_off (mword_of_int 30 : mword 20)))
-          (sign_extend' 64 (mword_of_int 1768 : mword 12)) = l_out.
+          (sign_extend' 64 (mword_of_int 1752 : mword 12)) = l_out.
 Proof.
   rewrite /l_out /log_pa /log_addr /pa_add /add_vec_int.
   apply bv_eq; vm_compute; reflexivity.
@@ -396,7 +397,7 @@ Section BoProps.
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z)
       (m : regfile) (pidv : mword 32) (dq : dfrac)
-      (K : nat) (eb : bool) (spd sp0 : mword 64) (lks : gset string) : iProp Σ :=
+      (K : nat) (eb : bool) (spd sp0 : mword 64) (lks : gset string) (Vpr : pprivate) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (M : regfile),
       ⌜ bo_regs m M spd ⌝ -∗
@@ -407,7 +408,7 @@ Section BoProps.
       locked (ln_lk γ) cpu_id -∗
       log_res γ bn γfs cov logstart -∗
       log_op γ MAXOPBLOCKS -∗
-      p_pid (proc_addr j) ↦₄{dq} pidv -∗
+      proc_priv_bare (proc_addr j) pidv Vpr -∗
       (* HELD: "log" is still taken at this point (it is released by the
          [+0x7c jal release] this covers) -- [lks] itself is the OUTER set,
          matching what this stretch's own continuation ([Hcont], threaded
@@ -425,7 +426,7 @@ Section BoProps.
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z)
       (m : regfile) (pidv : mword 32) (dq : dfrac)
-      (K : nat) (eb : bool) (spd sp0 : mword 64) (lks : gset string) : iProp Σ :=
+      (K : nat) (eb : bool) (spd sp0 : mword 64) (lks : gset string) (Vpr : pprivate) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (M : regfile),
       ⌜ bo_regs m M spd ⌝ -∗
@@ -435,7 +436,7 @@ Section BoProps.
       pa_stk sp0 4 ↦₈[KT1] (m !!! Regidx (mword_of_int 18 : mword 5)) -∗
       locked (ln_lk γ) cpu_id -∗
       log_res γ bn γfs cov logstart -∗
-      p_pid (proc_addr j) ↦₄{dq} pidv -∗
+      proc_priv_bare (proc_addr j) pidv Vpr -∗
       (* same convention as [bo_exit]: [lks] is the OUTER set, this loop
          iteration is entered still HOLDING "log". *)
       cpu_own 1 eb (proc_addr j) false ({["log"]} ∪ lks) -∗
@@ -443,7 +444,7 @@ Section BoProps.
       cpu_claim (proc_addr j) -∗
       sie_cap_gpr KT1 M (trap_res eb + (K - 4))%nat false (proc_addr j) -∗
       pc_is (mword_of_int (KernelSyms.begin_op + 0x3a)) -∗
-      bo_exit CID0 j γ bn γfs cov logstart m pidv dq K eb spd sp0 lks -∗
+      bo_exit CID0 j γ bn γfs cov logstart m pidv dq K eb spd sp0 lks Vpr -∗
       WP (Loop : expr riscv_lang)))%I.
 
 End BoProps.
@@ -465,7 +466,7 @@ Section BoBodies.
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (m M : regfile) (pidv : mword 32) (dq : dfrac)
-      (K : nat) (eb : bool) (spd sp0 : mword 64) (lks : gset string) :
+      (K : nat) (eb : bool) (spd sp0 : mword 64) (lks : gset string) (Vpr : pprivate) :
     let pj := proc_addr j in
     (K_begin_op <= K)%nat ->
     (true = false \/ pj = zero_reg -> (CID : CPU) = CID0) ->
@@ -485,7 +486,7 @@ Section BoBodies.
     locked (ln_lk γ) cpu_id -∗
     log_res γ bn γfs cov logstart -∗
     log_op γ MAXOPBLOCKS -∗
-    p_pid pj ↦₄{dq} pidv -∗
+    proc_priv_bare pj pidv Vpr -∗
     cpu_own 1 eb pj false ({["log"]} ∪ lks) -∗
     trap_csrs KT1 -∗
     cpu_claim pj -∗
@@ -499,7 +500,7 @@ Section BoBodies.
         trap_csrs_ext KT1 eb -∗
         cpu_claim_ext eb pj -∗
         pc_is (ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))) -∗
-        p_pid pj ↦₄{dq} pidv -∗
+        proc_priv_bare pj pidv Vpr -∗
         log_op γ MAXOPBLOCKS -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -547,16 +548,16 @@ Section BoBodies.
     iEval (rewrite Hp5c) in "Hpc".
     (* +0x5c addi a0,a0,1766 *)
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.begin_op + 0x78)) (mword_of_int 10 : mword 5)
-              (mword_of_int 10 : mword 5) (mword_of_int 1732 : mword 12) X1 (trap_res eb + (K - 4))%nat false
+              (mword_of_int 10 : mword 5) (mword_of_int 1716 : mword 12) X1 (trap_res eb + (K - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi5c").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (X2 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
-        (add_vec (X1 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 1732 : mword 12)))]> X1).
+        (add_vec (X1 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 1716 : mword 12)))]> X1).
     change (<[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
-        (add_vec (X1 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 1732 : mword 12)))]> X1) with X2.
+        (add_vec (X1 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 1716 : mword 12)))]> X1) with X2.
     assert (Hp60 : add_vec_int (mword_of_int (KernelSyms.begin_op + 0x78) : mword 64) 4 = mword_of_int (KernelSyms.begin_op + 0x7c))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp60) in "Hpc".
@@ -751,7 +752,7 @@ Section BoBodies.
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (m M : regfile) (pidv : mword 32) (dq : dfrac)
-      (K : nat) (eb : bool) (spd sp0 : mword 64) (lks : gset string) :
+      (K : nat) (eb : bool) (spd sp0 : mword 64) (lks : gset string) (Vpr : pprivate) :
     let pj := proc_addr j in
     (K_begin_op <= K)%nat ->
     (j < NPROC)%nat ->
@@ -766,15 +767,15 @@ Section BoBodies.
     kernel_text -∗
     log_ctx γ bn γfs cov logstart dev -∗
     procs_inv γs -∗
-    bo_loop CID0 j γ bn γfs cov logstart m pidv dq K eb spd sp0 lks -∗
-    bo_exit CID0 j γ bn γfs cov logstart m pidv dq K eb spd sp0 lks -∗
+    bo_loop CID0 j γ bn γfs cov logstart m pidv dq K eb spd sp0 lks Vpr -∗
+    bo_exit CID0 j γ bn γfs cov logstart m pidv dq K eb spd sp0 lks Vpr -∗
     pa_stk sp0 1 ↦₈[KT1] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
     pa_stk sp0 2 ↦₈[KT1] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
     pa_stk sp0 3 ↦₈[KT1] (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
     pa_stk sp0 4 ↦₈[KT1] (m !!! Regidx (mword_of_int 18 : mword 5)) -∗
     locked (ln_lk γ) cpu_id -∗
     log_res γ bn γfs cov logstart -∗
-    p_pid pj ↦₄{dq} pidv -∗
+    proc_priv_bare pj pidv Vpr -∗
     cpu_own 1 eb pj false ({["log"]} ∪ lks) -∗
     trap_csrs KT1 -∗
     cpu_claim pj -∗
@@ -1021,7 +1022,7 @@ Section BoBodies.
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (m M : regfile) (pidv : mword 32) (dq : dfrac)
-      (K : nat) (eb : bool) (spd sp0 : mword 64) (lks : gset string) :
+      (K : nat) (eb : bool) (spd sp0 : mword 64) (lks : gset string) (Vpr : pprivate) :
     let pj := proc_addr j in
     (K_begin_op <= K)%nat ->
     (j < NPROC)%nat ->
@@ -1033,15 +1034,15 @@ Section BoBodies.
     kernel_text -∗
     log_ctx γ bn γfs cov logstart dev -∗
     procs_inv γs -∗
-    ▷ bo_loop CID0 j γ bn γfs cov logstart m pidv dq K eb spd sp0 lks -∗
-    bo_exit CID0 j γ bn γfs cov logstart m pidv dq K eb spd sp0 lks -∗
+    ▷ bo_loop CID0 j γ bn γfs cov logstart m pidv dq K eb spd sp0 lks Vpr -∗
+    bo_exit CID0 j γ bn γfs cov logstart m pidv dq K eb spd sp0 lks Vpr -∗
     pa_stk sp0 1 ↦₈[KT1] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
     pa_stk sp0 2 ↦₈[KT1] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
     pa_stk sp0 3 ↦₈[KT1] (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
     pa_stk sp0 4 ↦₈[KT1] (m !!! Regidx (mword_of_int 18 : mword 5)) -∗
     locked (ln_lk γ) cpu_id -∗
     log_res γ bn γfs cov logstart -∗
-    p_pid pj ↦₄{dq} pidv -∗
+    proc_priv_bare pj pidv Vpr -∗
     cpu_own 1 eb pj false ({["log"]} ∪ lks) -∗
     trap_csrs KT1 -∗
     cpu_claim pj -∗
@@ -1296,7 +1297,7 @@ Section BoBodies.
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (m M : regfile) (pidv : mword 32) (dq : dfrac)
-      (K : nat) (eb : bool) (spd sp0 : mword 64) (lks : gset string) :
+      (K : nat) (eb : bool) (spd sp0 : mword 64) (lks : gset string) (Vpr : pprivate) :
     let pj := proc_addr j in
     (K_begin_op <= K)%nat ->
     (j < NPROC)%nat ->
@@ -1309,15 +1310,15 @@ Section BoBodies.
     kernel_text -∗
     log_ctx γ bn γfs cov logstart dev -∗
     procs_inv γs -∗
-    ▷ bo_loop CID0 j γ bn γfs cov logstart m pidv dq K eb spd sp0 lks -∗
-    bo_exit CID0 j γ bn γfs cov logstart m pidv dq K eb spd sp0 lks -∗
+    ▷ bo_loop CID0 j γ bn γfs cov logstart m pidv dq K eb spd sp0 lks Vpr -∗
+    bo_exit CID0 j γ bn γfs cov logstart m pidv dq K eb spd sp0 lks Vpr -∗
     pa_stk sp0 1 ↦₈[KT1] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
     pa_stk sp0 2 ↦₈[KT1] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
     pa_stk sp0 3 ↦₈[KT1] (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
     pa_stk sp0 4 ↦₈[KT1] (m !!! Regidx (mword_of_int 18 : mword 5)) -∗
     locked (ln_lk γ) cpu_id -∗
     log_res γ bn γfs cov logstart -∗
-    p_pid pj ↦₄{dq} pidv -∗
+    proc_priv_bare pj pidv Vpr -∗
     cpu_own 1 eb pj false ({["log"]} ∪ lks) -∗
     trap_csrs KT1 -∗
     cpu_claim pj -∗
@@ -1426,7 +1427,7 @@ Section BoBodies.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgt24) in "Hpc".
       iApply (bo_armA_body (CID := CID) CID0 γs j γl γ bn γfs cov logstart dev m E1 pidv dq K eb spd sp0 lks
-                HK Hj Hjl Hanch HboE1 Hbelow
+                Vpr HK Hj Hjl Hanch HboE1 Hbelow
                 with "Htext Hlog Hpinv IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hown Htc Hclm Hcg Hpc").
     - (* ================= NOT COMMITTING: fall through to +0x30 ============ *)
       iDestruct "Hrest" as (n LB) "(%Hsum & %Hsub & %Hreg & Hbatch)".
@@ -1657,10 +1658,10 @@ Section BoBodies.
         assert (HboE9 : bo_regs m E9 spd) by (apply (bo_regs_cs m E8 E9 spd HcsE9 HboE8)).
         (* +0x54 sw a4,1802(a5) : log.outstanding := out+1 *)
         assert (Hsta : add_vec (rget E9 (mword_of_int 15 : mword 5))
-                         (sign_extend' 64 (mword_of_int 1768 : mword 12)) = l_out).
+                         (sign_extend' 64 (mword_of_int 1752 : mword 12)) = l_out).
         { rgne. rewrite HE9a5. exact bo_reloc_out_50. }
         iApply (wp_sw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.begin_op + 0x70)) (mword_of_int 14 : mword 5) (mword_of_int 15 : mword 5)
-                  (mword_of_int 1768 : mword 12) E9 (trap_res eb + (K - 4))%nat
+                  (mword_of_int 1752 : mword 12) E9 (trap_res eb + (K - 4))%nat
                   (mword_of_int (Z.of_nat out) : mword 32) false
                   with "Hcg Hpc Hi54 [Hout]").
         { iEval (rewrite Hsta). iExact "Hout". }
@@ -1769,7 +1770,7 @@ Section BoBodies.
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hp46) in "Hpc".
         iApply (bo_armB_body (CID := CID) CID0 γs j γl γ bn γfs cov logstart dev m E8 pidv dq K eb spd sp0 lks
-                  HK Hj Hjl Hanch HboE8 Hbelow
+                  Vpr HK Hj Hjl Hanch HboE8 Hbelow
                   with "Htext Hlog Hpinv IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hown Htc Hclm Hcg Hpc").
   Qed.
 
@@ -1788,8 +1789,8 @@ Section ProofBeginOp.
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string)
-    : wp_begin_op_sconf_body γs j γl bn γ γfs cov logstart dev pidv dq m K eb b lks.
+      (b : bool) (lks : gset string) (Vpr : pprivate)
+    : wp_begin_op_sconf_body γs j γl bn γ γfs cov logstart dev pidv dq m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_begin_op_sconf_body].
     intros pcE pj ret_tgt HK Hj Hjl Hbelow.
@@ -1921,15 +1922,15 @@ Section ProofBeginOp.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp10) in "Hpc".
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.begin_op + 0x10)) (mword_of_int 10 : mword 5)
-              (mword_of_int 10 : mword 5) (mword_of_int 1836 : mword 12) R3 (K - 4)%nat eb
+              (mword_of_int 10 : mword 5) (mword_of_int 1820 : mword 12) R3 (K - 4)%nat eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi10").
     iIntros (CID8 Hs8) "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (R4 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
-        (add_vec (R3 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 1836 : mword 12)))]> R3).
+        (add_vec (R3 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 1820 : mword 12)))]> R3).
     change (<[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
-        (add_vec (R3 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 1836 : mword 12)))]> R3) with R4.
+        (add_vec (R3 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 1820 : mword 12)))]> R3) with R4.
     assert (Hp14 : add_vec_int (mword_of_int (KernelSyms.begin_op + 0x10) : mword 64) 4 = mword_of_int (KernelSyms.begin_op + 0x14))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp14) in "Hpc".
@@ -1994,18 +1995,18 @@ Section ProofBeginOp.
     { intros c Hcs N2 N8 N10 N1.
       rewrite (callee_saved_lookup Hcsacq c Hcs). exact (Hpro_cs c N2 N8 N10 N1). }
     (* ============ the anchored EXIT continuation (+0x58 -> ret) ============ *)
-    iAssert (bo_exit CID j γ bn γfs cov logstart m pidv dq K eb spd sp0 lks) with "[Hcont]" as "Hexit".
+    iAssert (bo_exit CID j γ bn γfs cov logstart m pidv dq K eb spd sp0 lks Vpr) with "[Hcont]" as "Hexit".
     { rewrite /bo_exit.
       iIntros (CIDx Hsx Mx) "%HboE Hr24 Hr16 Hr8 Hr0 Htok Hres Hop Hpid Hown Htc Hclm Hcg Hpc".
       iApply (bo_exit_body (CID := CIDx) CID j γ bn γfs cov logstart dev m Mx pidv dq K eb spd sp0 lks
-                HK Hsx Hspd Hsp0 HboE Hbelow
+                Vpr HK Hsx Hspd Hsp0 HboE Hbelow
                 with "Htext Hlog Hr24 Hr16 Hr8 Hr0 Htok Hres Hop Hpid Hown Htc Hclm Hcg Hpc Hcont"). }
     (* ============ the WAIT LOOP (iLöb over the anchored invariant) ======== *)
-    iAssert (bo_loop CID j γ bn γfs cov logstart m pidv dq K eb spd sp0 lks) with "[]" as "Hloop".
+    iAssert (bo_loop CID j γ bn γfs cov logstart m pidv dq K eb spd sp0 lks Vpr) with "[]" as "Hloop".
     { iLöb as "IH". rewrite /bo_loop.
       iIntros (CIDy Hsy My) "%HboL Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hown Htc Hclm Hcg Hpc Hexit".
       iApply (bo_loop_body (CID := CIDy) CID γs j γl γ bn γfs cov logstart dev m My pidv dq K eb spd sp0 lks
-                HK Hj Hjl Hsy HboL Hbelow
+                Vpr HK Hj Hjl Hsy HboL Hbelow
                 with "Htext Hlog Hpinv IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hown Htc Hclm Hcg Hpc"). }
     (* ============ +0x18..+0x22: s1 := &log, s2 := 30, jump to the test ==== *)
     iPoseProof (boi_18 with "Htext") as "Hi18".
@@ -2026,16 +2027,16 @@ Section ProofBeginOp.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp1c) in "Hpc".
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.begin_op + 0x1c)) (mword_of_int 9 : mword 5)
-              (mword_of_int 9 : mword 5) (mword_of_int 1824 : mword 12) T1 (trap_res eb + (K - 4))%nat false
+              (mword_of_int 9 : mword 5) (mword_of_int 1808 : mword 12) T1 (trap_res eb + (K - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1c").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (T2 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg
-        (add_vec (T1 !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 1824 : mword 12)))]> T1).
+        (add_vec (T1 !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 1808 : mword 12)))]> T1).
     change (<[Regidx (mword_of_int 9 : mword 5) := regval_into_reg
-        (add_vec (T1 !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 1824 : mword 12)))]> T1) with T2.
+        (add_vec (T1 !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 1808 : mword 12)))]> T1) with T2.
     assert (Hp20 : add_vec_int (mword_of_int (KernelSyms.begin_op + 0x1c) : mword 64) 4 = mword_of_int (KernelSyms.begin_op + 0x20))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp20) in "Hpc".

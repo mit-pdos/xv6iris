@@ -99,6 +99,7 @@ From Kernel Require KernelSyms.
 Require Import IrefSlots.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import ProcDefs.  (* [pprivate], [proc_priv_bare] *)
 Local Open Scope Z_scope.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
@@ -125,13 +126,13 @@ Qed.
    then [ByteBuf.bb_align_z] (ProofWriteHead's [wh_align4] at q = 0) ---- *)
 Lemma il_align_arith (kk : Z) :
   0 <= kk -> kk < 30 ->
-  (2147582504 + 1112 * kk + 88) `mod` 4 = 0
-  /\ 0 <= 2147582504 + 1112 * kk + 88
-  /\ 2147582504 + 1112 * kk + 88 < 18446744073709551616.
+  (2147582488 + 1112 * kk + 88) `mod` 4 = 0
+  /\ 0 <= 2147582488 + 1112 * kk + 88
+  /\ 2147582488 + 1112 * kk + 88 < 18446744073709551616.
 Proof.
   intros H1 H2. split_and!; [| lia | lia].
-  replace (2147582504 + 1112 * kk + 88)
-    with ((536895648 + 278 * kk) * 4) by lia.
+  replace (2147582488 + 1112 * kk + 88)
+    with ((536895644 + 278 * kk) * 4) by lia.
   apply Z_mod_mult.
 Qed.
 
@@ -148,8 +149,8 @@ Proof.
   destruct (il_align_arith (Z.of_nat k)
               ltac:(lia) ltac:(unfold NBUF in Hk; lia))
     as (Hm & Hlo & Hhi).
-  replace (0x80018210 + 24 + 1112 * Z.of_nat k + Z.of_nat 88)
-    with (2147582504 + 1112 * Z.of_nat k + 88) by lia.
+  replace (0x80018200 + 24 + 1112 * Z.of_nat k + Z.of_nat 88)
+    with (2147582488 + 1112 * Z.of_nat k + 88) by lia.
   apply bb_align_z; assumption.
 Qed.
 
@@ -289,11 +290,11 @@ Section ProofInitlog.
       (v_start v_dev v_nc v_n : mword 32)
       (pidv : mword 32) (dq dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string)
+      (b : bool) (lks : gset string) (Vpr : pprivate)
     : wp_initlog_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs
                             cov logstart dev sb bs_hdr L D
                             vlock vname vcpu v_start v_dev v_nc v_n
-                            pidv dq dqs m K eb b lks.
+                            pidv dq dqs m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_initlog_sconf_body].
     intros pcE pj ret_tgt c_name c_cpu HK Hgeom Hj Hgl Heb Hhdr0 Hma0 Hma1 Hbelow.
@@ -513,13 +514,13 @@ Section ProofInitlog.
     iEval (rewrite Hpp16) in "Hpc".
     (* +0x16 addi s2,s2,1966 : s2 := &log *)
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.initlog + 0x16)) Rs2 Rs2
-              (mword_of_int 1960 : mword 12) R5 (K - 6)%nat b
+              (mword_of_int 1944 : mword 12) R5 (K - 6)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi16").
     iIntros (CID11 Hs11) "Hcg Hpc".
     set (R6 := <[Regidx Rs2 := regval_into_reg
                   (add_vec (rget R5 Rs2)
-                     (sign_extend' 64 (mword_of_int 1960 : mword 12)))]> R5).
+                     (sign_extend' 64 (mword_of_int 1944 : mword 12)))]> R5).
     assert (HR6s2 : R6 !!! Regidx Rs2 = log_addr).
     { rewrite /R6 upd_eq. rgne. rewrite /R5 upd_eq /log_addr.
       apply bv_eq; vm_compute; reflexivity. }
@@ -822,7 +823,7 @@ Section ProofInitlog.
     iApply (Bread.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev (mword_of_int logstart : mword 32) dq
               T3 (K - 6)%nat true b
-              _ HKbr Hbnolt eq_refl Hcovin eq_refl Hj Hgl HT3a0 HT3a1
+              _ Vpr HKbr Hbnolt eq_refl Hcovin eq_refl Hj Hgl HT3a0 HT3a1
               Hbelow
               with "Hcg Hcnt [] [] Htext Hkdata Hpc Hpenv Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hs1u").
@@ -979,7 +980,7 @@ Section ProofInitlog.
     assert (HKbl : (K_brelse <= K - 6)%nat) by (lia).
     iApply (Brelse.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk pidv dev
               (mword_of_int logstart : mword 32) dq B2 (K - 6)%nat true pj
-              bs_hdr bsd0 d0 b _ HKbl HA HB2a0
+              bs_hdr bsd0 d0 b _ Vpr HKbl HA HB2a0
               Hbelow
               with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hheld").
     all: try lkbelow.
@@ -1089,7 +1090,7 @@ Section ProofInitlog.
               cov logstart dev true 0%nat ([] : list (mword 32))
               (fun _ : nat => ([] : list (bv 8))) L D pidv dq
               C2 (K - 6)%nat true b True%I
-              _ HKit Hgeomok Hj Hgl
+              _ Vpr HKit Hgeomok Hj Hgl
               Hrec0 HC2a0 Hshape0 Hnodup0 Hwcov0 Hlw0
               Hbelow
               with "Hcg Hcnt [] [] Htext Hkdata Hpc Hpenv Hbio Hfroz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell Hnil1 HLauth HDauth
@@ -1147,14 +1148,14 @@ Section ProofInitlog.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp6c) in "Hpc".
     assert (Hlhad2 : add_vec (rget D1 Ra5)
-                       (sign_extend' 64 (mword_of_int 1918 : mword 12)) = lh_n_pa).
+                       (sign_extend' 64 (mword_of_int 1902 : mword 12)) = lh_n_pa).
     { rgne. rewrite /D1 upd_eq /lh_n_pa /log_pa /log_addr /pa_add /add_vec_int.
       apply bv_eq; vm_compute; reflexivity. }
     iAssert (lh_n_pa ↦₄ (mword_of_int 0 : mword 32))%I with "[Hncell]" as "Hncell";
       [iExact "Hncell"|].
     iEval (rewrite -Hlhad2) in "Hncell".
     iApply (wp_sw_zero_s_sconf (mword_of_int (KernelSyms.initlog + 0x6c)) Ra5
-              (mword_of_int 1918 : mword 12) D1 (K - 6)%nat
+              (mword_of_int 1902 : mword 12) D1 (K - 6)%nat
               (mword_of_int 0 : mword 32) b
               with "Hcg Hpc Hi6c Hncell").
     iIntros (CID32 Hs32) "Hcg Hpc Hncell".
@@ -1203,7 +1204,7 @@ Section ProofInitlog.
               cov logstart dev 0%nat ([] : list (mword 32)) L pidv dq
               D2 (K - 6)%nat true b
               (log_mirror_at (0%nat, []) ∗ swap_lb (S gen_id))%I
-              _ HKwh Hgeomok Hj Hgl Hshape0
+              _ Vpr HKwh Hgeomok Hj Hgl Hshape0
               with "Hcg Hcnt [] [] Htext Hkdata Hpc Hpenv Hbio Hfroz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell Hnil3 HLauth [Hfsb]
                     Hs1u [Hmirf]").
     all: try lkbelow.

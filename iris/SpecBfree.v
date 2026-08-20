@@ -81,6 +81,7 @@ Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import CpuOwn.
 Require Import SchedCtx.
+Require Import ProcDefs.  (* [proc_priv_bare] *)
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
 Require Import BioInv.
@@ -111,7 +112,7 @@ Definition wp_bfree_gen_body
     (u : nat) (cr : bool) (Sb : gset Z) (e0 : nat)
     (pidv : mword 32) (dq dqb : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) :=
+    (b : bool) (lks : gset string) (Vpr : pprivate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.bfree in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -171,7 +172,7 @@ Definition wp_bfree_gen_body
   fsblock γfs (bv_unsigned bno) bs -∗
   blk_own γfs (bv_unsigned bno) -∗
   (* the caller's own pid cell (bread's acquiresleep records it) *)
-  p_pid pj ↦₄{dq} pidv -∗
+  proc_priv_bare pj pidv Vpr -∗
   (* the running-thread bundle *)
   procs_inv γs -∗
   (* the disk fabric *)
@@ -218,7 +219,7 @@ Definition wp_bfree_gen_body
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
-      p_pid pj ↦₄{dq} pidv -∗
+      proc_priv_bare pj pidv Vpr -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       (* THE FREE: bit [bno] is clear, and the block's content half and its
          token are back in the pool *)
@@ -241,7 +242,7 @@ Definition wp_bfree_sconf_body
     (u : nat)
     (pidv : mword 32) (dq dqb : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) :=
+    (b : bool) (lks : gset string) (Vpr : pprivate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.bfree in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -301,7 +302,7 @@ Definition wp_bfree_sconf_body
   fsblock γfs (bv_unsigned bno) bs -∗
   blk_own γfs (bv_unsigned bno) -∗
   (* the caller's own pid cell (bread's acquiresleep records it) *)
-  p_pid pj ↦₄{dq} pidv -∗
+  proc_priv_bare pj pidv Vpr -∗
   (* the running-thread bundle *)
   procs_inv γs -∗
   (* the disk fabric *)
@@ -329,7 +330,7 @@ Definition wp_bfree_sconf_body
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
-      p_pid pj ↦₄{dq} pidv -∗
+      proc_priv_bare pj pidv Vpr -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       (* THE FREE: bit [bno] is clear, and the block's content half and its
          token are back in the pool *)
@@ -356,10 +357,10 @@ Module Type BFREE.
       (u : nat) (cr : bool) (Sb : gset Z) (e0 : nat)
       (pidv : mword 32) (dq dqb : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string),
+      (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_bfree_gen_body γs j γl γu γd γk pd pav pu bn γ γfs
                         cov logstart bmapstart size dev used bno bs u cr Sb e0
-                        pidv dq dqb m K eb b lks.
+                        pidv dq dqb m K eb b lks Vpr.
 
   Parameter wp_bfree_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
@@ -374,8 +375,8 @@ Module Type BFREE.
       (u : nat)
       (pidv : mword 32) (dq dqb : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string),
+      (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_bfree_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs
                           cov logstart bmapstart size dev used bno bs u
-                          pidv dq dqb m K eb b lks.
+                          pidv dq dqb m K eb b lks Vpr.
 End BFREE.

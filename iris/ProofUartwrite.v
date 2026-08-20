@@ -1586,13 +1586,13 @@ Section ProofUartwrite.
       change (<[Regidx Rs5 := regval_into_reg
           (add_vec (mword_of_int (KernelSyms.uartwrite + 0x20) : mword 64) (auipc_off (mword_of_int 10 : mword 20)))]> A4) with A5.
       iEval (rewrite P24) in "Hpc".
-      iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.uartwrite + 0x24)) Rs5 Rs5 (mword_of_int 2504 : mword 12)
+      iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.uartwrite + 0x24)) Rs5 Rs5 (mword_of_int 2488 : mword 12)
                 A5 (av - 10)%nat true ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi24").
       iIntros (CID17 Hs17) "Hcg Hpc". iEval (rgne) in "Hcg".
       set (A6 := <[Regidx Rs5 := regval_into_reg
-          (add_vec (A5 !!! Regidx Rs5) (sign_extend' 64 (mword_of_int 2504 : mword 12)))]> A5).
+          (add_vec (A5 !!! Regidx Rs5) (sign_extend' 64 (mword_of_int 2488 : mword 12)))]> A5).
       change (<[Regidx Rs5 := regval_into_reg
-          (add_vec (A5 !!! Regidx Rs5) (sign_extend' 64 (mword_of_int 2504 : mword 12)))]> A5) with A6.
+          (add_vec (A5 !!! Regidx Rs5) (sign_extend' 64 (mword_of_int 2488 : mword 12)))]> A5) with A6.
       iEval (rewrite P28) in "Hpc".
       (* ---- +0x28/+0x2c  s2 := &tx_lock ---- *)
       iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.uartwrite + 0x28)) Rs2 (mword_of_int 18 : mword 20)
@@ -1603,13 +1603,13 @@ Section ProofUartwrite.
       change (<[Regidx Rs2 := regval_into_reg
           (add_vec (mword_of_int (KernelSyms.uartwrite + 0x28) : mword 64) (auipc_off (mword_of_int 18 : mword 20)))]> A6) with A7.
       iEval (rewrite P2c) in "Hpc".
-      iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.uartwrite + 0x2c)) Rs2 Rs2 (mword_of_int 2720 : mword 12)
+      iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.uartwrite + 0x2c)) Rs2 Rs2 (mword_of_int 2704 : mword 12)
                 A7 (av - 10)%nat true ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi2c").
       iIntros (CID19 Hs19) "Hcg Hpc". iEval (rgne) in "Hcg".
       set (A8 := <[Regidx Rs2 := regval_into_reg
-          (add_vec (A7 !!! Regidx Rs2) (sign_extend' 64 (mword_of_int 2720 : mword 12)))]> A7).
+          (add_vec (A7 !!! Regidx Rs2) (sign_extend' 64 (mword_of_int 2704 : mword 12)))]> A7).
       change (<[Regidx Rs2 := regval_into_reg
-          (add_vec (A7 !!! Regidx Rs2) (sign_extend' 64 (mword_of_int 2720 : mword 12)))]> A7) with A8.
+          (add_vec (A7 !!! Regidx Rs2) (sign_extend' 64 (mword_of_int 2704 : mword 12)))]> A7) with A8.
       iEval (rewrite P30) in "Hpc".
       (* ---- +0x30/+0x34  s4 := &LSR ---- *)
       iApply (wp_lui_s_sconf (mword_of_int (KernelSyms.uartwrite + 0x30)) Rs4 (mword_of_int 65536 : mword 20)

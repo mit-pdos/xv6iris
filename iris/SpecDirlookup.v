@@ -171,6 +171,7 @@ Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import CpuOwn.
 Require Import SchedCtx.
+Require Import ProcDefs.  (* [proc_priv_bare] *)
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
 Require Import BioInv.
@@ -267,7 +268,7 @@ Definition wp_dirlookup_sconf_body
     (hasp : bool) (pofv : mword 32)                   (* poff, two-armed     *)
     (pidv : mword 32) (dq dqd dqn : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) :=
+    (b : bool) (lks : gset string) (Vpr : pprivate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.dirlookup in
   let pj := proc_addr j in
   let nb := m !!! Regidx (mword_of_int 11 : mword 5) in
@@ -358,7 +359,7 @@ Definition wp_dirlookup_sconf_body
   (* ---- poff: a 4-byte cell, or nothing ---- *)
   (if hasp then pf ↦₄[KT1] pofv else emp) -∗
   (* ---- the caller's own pid cell (bread's acquiresleep records it) ---- *)
-  p_pid pj ↦₄{dq} pidv -∗
+  proc_priv_bare pj pidv Vpr -∗
   (* ---- the running-thread bundle and the disk fabric ---- *)
   procs_inv γs -∗
   dev_inv γu γd -∗
@@ -398,7 +399,7 @@ Definition wp_dirlookup_sconf_body
       inode_map γfs ip bm -∗
       inode_blocks γfs bm data -∗
       ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1]{dqn} fn i) -∗
-      p_pid pj ↦₄{dq} pidv -∗
+      proc_priv_bare pj pidv Vpr -∗
       bslot bn -∗
       (* ...AND THE BORROW, BACK VERBATIM ON BOTH ARMS *)
       dir_links (bv_unsigned dinum) dn data -∗
@@ -449,8 +450,8 @@ Module Type DIRLOOKUP.
       (hasp : bool) (pofv : mword 32)
       (pidv : mword 32) (dq dqd dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string),
+      (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_dirlookup_sconf_body γs j γl γu γd γk pd pav pu bn γfs γi cn gtl
                               γa γf cov logstart inodestart nib dev ip dinum bm data dn dr
-                              fn hasp pofv pidv dq dqd dqn m K eb b lks.
+                              fn hasp pofv pidv dq dqd dqn m K eb b lks Vpr.
 End DIRLOOKUP.

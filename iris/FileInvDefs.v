@@ -136,7 +136,7 @@ Proof.
 Qed.
 
 (* A FILE SLOT'S ADDRESS IS NEVER NULL.  The geometry alone says so
-   ([file_base] is 0x80022478), and several proofs need it: it is what kills
+   ([file_base] is 0x80022468), and several proofs need it: it is what kills
    pipealloc's two dead "*f0 == 0" arms, and what tells sys_pipe that
    installing a file pointer in a descriptor really does fill it. *)
 Lemma fnode_nonzero (k : nat) :

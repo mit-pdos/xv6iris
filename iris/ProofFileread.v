@@ -1789,7 +1789,7 @@ Section ProofFileread.
                exact (HB7thr c Hcs N2 N8 N9 N18 N19). }
              (* THE PID QUARTER, lent out of the block for the length of the
                 ilock call and closed again the instant it returns. *)
-             iDestruct (proc_priv_core_pid pj pidv V with "Hpriv") as "[Hppid Hpivbk]".
+             iDestruct (proc_priv_core_bare_acc pj pidv V with "Hpriv") as "[Hppid Hpivbk]".
              iDestruct (cpu_own_transport CID CID72 0%nat eb pj b ltac:(wp_next_chain)
                           with "Hcnt") as "Hcnt".
              (* SpecIlock v4 names the share's GENERATION (design 17.3 (A));
@@ -1805,7 +1805,7 @@ Section ProofFileread.
                        icfg_dev inm
                        pidv (DfracOwn (1/4)) (frn_dqs fn)
                        I2 (K - 6)%nat eb b
-                       _ (fr_av_ilock K HK) Hik Hlg Hist Hibcov Hinlt Hj Hgs
+                       _ V (fr_av_ilock K HK) Hik Hlg Hist Hibcov Hinlt Hj Hgs
                        ltac:(rewrite HI2a0; exact Hipk) Hbelow
                        with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hitbl Hesc Hireg
                              Hslk Href Hshot0 Hsb Hppid Hprocs
@@ -2202,7 +2202,7 @@ Section ProofFileread.
                   rewrite /N2 upd_ne; [| regne].
                   rewrite /N1 upd_ne; [| regne].
                   exact (HM1thr c Hcs N2n N8 N9 N18 N19). }
-                iDestruct (proc_priv_core_pid pj pidv (upd_upt V P') with "Hpriv")
+                iDestruct (proc_priv_core_bare_acc pj pidv (upd_upt V P') with "Hpriv")
                   as "[Hppid Hpivbk2]".
                 iDestruct (cpu_own_transport CIDrd CID82 0%nat eb pj b
                              ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -2212,7 +2212,7 @@ Section ProofFileread.
                           ikk (ssh/2)%Qp gsh icfg_dev inm
                           dnl bml
                           pidv (DfracOwn (1/4)) N2 (K - 6)%nat eb pj b
-                          lks (fr_av_iunlock K HK) Hik
+                          lks (upd_upt V P') (fr_av_iunlock K HK) Hik
                           ltac:(rewrite HN2a0; exact Hipk)
                           ltac:(lkbelow)
                           with "Hcg Hcnt Htext Hpc Hitbl Hesc Hslk
@@ -2480,7 +2480,7 @@ Section ProofFileread.
                   rewrite /N2 upd_ne; [| regne].
                   rewrite /N1 upd_ne; [| regne].
                   exact (HM4thr c Hcs N2n N8 N9 N18 N19). }
-                iDestruct (proc_priv_core_pid pj pidv (upd_upt V P') with "Hpriv")
+                iDestruct (proc_priv_core_bare_acc pj pidv (upd_upt V P') with "Hpriv")
                   as "[Hppid Hpivbk2]".
                 iDestruct (cpu_own_transport CIDrd CID92 0%nat eb pj b
                              ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -2490,7 +2490,7 @@ Section ProofFileread.
                           ikk (ssh/2)%Qp gsh icfg_dev inm
                           dnl bml
                           pidv (DfracOwn (1/4)) N2 (K - 6)%nat eb pj b
-                          lks (fr_av_iunlock K HK) Hik
+                          lks (upd_upt V P') (fr_av_iunlock K HK) Hik
                           ltac:(rewrite HN2a0; exact Hipk)
                           ltac:(lkbelow)
                           with "Hcg Hcnt Htext Hpc Hitbl Hesc Hslk

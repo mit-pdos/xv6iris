@@ -42,6 +42,7 @@ Require Import FdSlots.
 Require Import ProcGeom.
 Require Import CpuOwn.
 Require Import SchedCtx.
+Require Import ProcDefs.  (* [proc_priv_bare] *)
 Require Import BcacheInv BioInv.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -59,7 +60,7 @@ Definition wp_brelse_sconf_body
     (bn : bio_names) (V : bio_view Σ) (k : nat)
     (pidv dev bno : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool) (p : mword 64)
-    (bs bsd : list (bv 8)) (d : bool) (b : bool) (lks : gset string) :=
+    (bs bsd : list (bv 8)) (d : bool) (b : bool) (lks : gset string) (Vpr : pprivate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.brelse in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_brelse <= K)%nat ->
@@ -77,7 +78,7 @@ Definition wp_brelse_sconf_body
   kernel_text -∗ pc_is pcE -∗
   bio_ctx bn V -∗
   (* the caller's own pid cell, agreeing with the handle's *)
-  p_pid p ↦₄{dq} pidv -∗
+  proc_priv_bare p pidv Vpr -∗
   (* wakeup's resources (releasesleep wakes the lock's sleepers) *)
   procs_inv γs -∗
   (* the locked buffer being released.  [bio_locked] -- not [bio_held] --
@@ -91,7 +92,7 @@ Definition wp_brelse_sconf_body
       sie_cap_gpr KT1 mf K b p -∗
       cpu_own 0 eb p b lks -∗
       pc_is ret_tgt -∗
-      p_pid p ↦₄{dq} pidv -∗
+      proc_priv_bare p pidv Vpr -∗
       (* the reference's slot unit comes back *)
       bslot bn -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -105,6 +106,6 @@ Module Type BRELSE.
       (bn : bio_names) (V : bio_view Σ) (k : nat)
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64)
-      (bs bsd : list (bv 8)) (d : bool) (b : bool) (lks : gset string),
-      wp_brelse_sconf_body γs bn V k pidv dev bno dq m K eb p bs bsd d b lks.
+      (bs bsd : list (bv 8)) (d : bool) (b : bool) (lks : gset string) (Vpr : pprivate),
+      wp_brelse_sconf_body γs bn V k pidv dev bno dq m K eb p bs bsd d b lks Vpr.
 End BRELSE.

@@ -19,6 +19,7 @@ From Kernel Require KernelSyms.
 Require Import KernelDecode02.
 Require Import KernelDecode03.
 Require Import KernelDecode04.
+Require Import KernelDecode05.
 Require Import KernelDecode07.
 Require Import KernelDecode09.
 Require Import KernelDecode10.
@@ -27,6 +28,7 @@ Require Import KernelDecode12.
 Require Import KernelDecode13.
 Require Import KernelDecode14.
 Require Import KernelDecode15.
+Require Import KernelDecode18.
 Require Import KernelDecode19.
 Require Import KernelDecode21.
 Require Import KernelDecode23.
@@ -97,9 +99,9 @@ Section CodeFsinit.
   Proof. mk_base (KernelSyms.fsinit + 0x1e) (mword_of_int 0x0001d517 : mword 32)
     (mword_of_int (KernelSyms.fsinit + 0x1e) : mword 64) (UTYPE (mword_of_int 29 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_0001d517. Qed.
 
-  Lemma fsi_22 : kernel_text -∗ instr (mword_of_int (KernelSyms.fsinit + 0x22) : mword 64) false (ITYPE (mword_of_int 896 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.fsinit + 0x22) (mword_of_int 0x38050513 : mword 32)
-    (mword_of_int (KernelSyms.fsinit + 0x22) : mword 64) (ITYPE (mword_of_int 896 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_38050513. Qed.
+  Lemma fsi_22 : kernel_text -∗ instr (mword_of_int (KernelSyms.fsinit + 0x22) : mword 64) false (ITYPE (mword_of_int 880 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.fsinit + 0x22) (mword_of_int 0x37050513 : mword 32)
+    (mword_of_int (KernelSyms.fsinit + 0x22) : mword 64) (ITYPE (mword_of_int 880 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_37050513. Qed.
 
   Lemma fsi_26 : kernel_text -∗ instr (mword_of_int (KernelSyms.fsinit + 0x26) : mword 64) false (JAL (mword_of_int 2086786 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (KernelSyms.fsinit + 0x26) (mword_of_int 0xf82fd0ef : mword 32)
@@ -117,9 +119,9 @@ Section CodeFsinit.
   Proof. mk_base (KernelSyms.fsinit + 0x30) (mword_of_int 0x0001d717 : mword 32)
     (mword_of_int (KernelSyms.fsinit + 0x30) : mword 64) (UTYPE (mword_of_int 29 : mword 20, Regidx (mword_of_int 14), AUIPC)) kd_0001d717. Qed.
 
-  Lemma fsi_34 : kernel_text -∗ instr (mword_of_int (KernelSyms.fsinit + 0x34) : mword 64) false (LOAD (mword_of_int 878 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), false, 4)).
-  Proof. mk_base (KernelSyms.fsinit + 0x34) (mword_of_int 0x36e72703 : mword 32)
-    (mword_of_int (KernelSyms.fsinit + 0x34) : mword 64) (LOAD (mword_of_int 878 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), false, 4)) kd_36e72703. Qed.
+  Lemma fsi_34 : kernel_text -∗ instr (mword_of_int (KernelSyms.fsinit + 0x34) : mword 64) false (LOAD (mword_of_int 862 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), false, 4)).
+  Proof. mk_base (KernelSyms.fsinit + 0x34) (mword_of_int 0x35e72703 : mword 32)
+    (mword_of_int (KernelSyms.fsinit + 0x34) : mword 64) (LOAD (mword_of_int 862 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), false, 4)) kd_35e72703. Qed.
 
   Lemma fsi_38 : kernel_text -∗ instr (mword_of_int (KernelSyms.fsinit + 0x38) : mword 64) false (UTYPE (mword_of_int 66051 : mword 20, Regidx (mword_of_int 15), LUI)).
   Proof. mk_base (KernelSyms.fsinit + 0x38) (mword_of_int 0x102037b7 : mword 32)
@@ -137,9 +139,9 @@ Section CodeFsinit.
   Proof. mk_base (KernelSyms.fsinit + 0x44) (mword_of_int 0x0001d597 : mword 32)
     (mword_of_int (KernelSyms.fsinit + 0x44) : mword 64) (UTYPE (mword_of_int 29 : mword 20, Regidx (mword_of_int 11), AUIPC)) kd_0001d597. Qed.
 
-  Lemma fsi_48 : kernel_text -∗ instr (mword_of_int (KernelSyms.fsinit + 0x48) : mword 64) false (ITYPE (mword_of_int 858 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)).
-  Proof. mk_base (KernelSyms.fsinit + 0x48) (mword_of_int 0x35a58593 : mword 32)
-    (mword_of_int (KernelSyms.fsinit + 0x48) : mword 64) (ITYPE (mword_of_int 858 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)) kd_35a58593. Qed.
+  Lemma fsi_48 : kernel_text -∗ instr (mword_of_int (KernelSyms.fsinit + 0x48) : mword 64) false (ITYPE (mword_of_int 842 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)).
+  Proof. mk_base (KernelSyms.fsinit + 0x48) (mword_of_int 0x34a58593 : mword 32)
+    (mword_of_int (KernelSyms.fsinit + 0x48) : mword 64) (ITYPE (mword_of_int 842 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)) kd_34a58593. Qed.
 
   Lemma fsi_4c : kernel_text -∗ instr (mword_of_int (KernelSyms.fsinit + 0x4c) : mword 64) true (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (KernelSyms.fsinit + 0x4c) (mword_of_int 0x854a : mword 16)

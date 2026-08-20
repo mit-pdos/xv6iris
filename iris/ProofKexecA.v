@@ -425,8 +425,11 @@ Section KexecABody.
                           #Hesc & #Hslks & #Hireg & #Hropen & #Hprocs & #Hdevi & #Hdgeom &
                           #Hdlock)".
     (* ---- open the process's private block ONCE (convention 2) ---- *)
-    iDestruct (proc_priv_cwd_pid gf (proc_addr jp) pidv V with "Hpriv")
-      as "(Hcwd & Hcref & Hppid & Hpvbk)".
+    (* the BLOCK and the cwd reference: [p->cwd] is one of the block's own
+       cells now, so namei borrows it for its own load and nothing here has
+       to carry it. *)
+    iDestruct (proc_priv_bare_cref gf (proc_addr jp) pidv V with "Hpriv")
+      as "(Hppid & Hcref & Hpvbk)".
     (* ---- +0x000 .. +0x01c ---- *)
     iApply (kxc_prologue m K true (proc_addr jp) sp0 ra0 s00 s10 s20 pv av
               ltac:(lia) Hsp Hra Hs0 Hs1 Hs2 Ha0 Ha1 with "Hcg Htext Hpc").
@@ -435,10 +438,10 @@ Section KexecABody.
     (* ---- +0x020: jal ra,myproc ---- *)
     iPoseProof (kxc_020 with "Htext") as "Hi020".
     assert (Htmp : add_vec (mword_of_int (KXA + 0x20) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2085146 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2085126 : mword 21))
                    = mword_of_int KernelSyms.myproc) by pcw.
     iApply (wp_jal_s_sconf (mword_of_int (KXA + 0x20)) Rra
-              (mword_of_int 2085146 : mword 21) M1 (K - 68)%nat true
+              (mword_of_int 2085126 : mword 21) M1 (K - 68)%nat true
               ltac:(nz) ltac:(rdok)
               ltac:(rewrite Htmp; vm_compute; reflexivity)
               with "Hcg Hpc Hi020").
@@ -476,10 +479,10 @@ Section KexecABody.
     (* ---- +0x026: jal ra,begin_op ---- *)
     iPoseProof (kxc_026 with "Htext") as "Hi026".
     assert (Htbo : add_vec (mword_of_int (KXA + 0x26) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2094234 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2094214 : mword 21))
                    = mword_of_int KernelSyms.begin_op) by pcw.
     iApply (wp_jal_s_sconf (mword_of_int (KXA + 0x26)) Rra
-              (mword_of_int 2094234 : mword 21) N2 (K - 68)%nat true
+              (mword_of_int 2094214 : mword 21) N2 (K - 68)%nat true
               ltac:(nz) ltac:(rdok)
               ltac:(rewrite Htbo; vm_compute; reflexivity)
               with "Hcg Hpc Hi026").
@@ -497,7 +500,7 @@ Section KexecABody.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (BeginOp.wp_begin_op_sconf gs jp gl bn g gfs cov logstart dev
               pidv (DfracOwn (1/4)) N3 (K - 68)%nat true true lks
-              ltac:(lia) Hjp Hgs
+              V ltac:(lia) Hjp Hgs
               with "Hcg Hcnt [] [] Htext Hpc Hlogc Hppid Hprocs").
     all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }
@@ -527,10 +530,10 @@ Section KexecABody.
     (* ---- +0x02c: jal ra,namei ---- *)
     iPoseProof (kxc_02c with "Htext") as "Hi02c".
     assert (Htnm : add_vec (mword_of_int (KXA + 0x2c) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2093750 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2093730 : mword 21))
                    = mword_of_int KernelSyms.namei) by pcw.
     iApply (wp_jal_s_sconf (mword_of_int (KXA + 0x2c)) Rra
-              (mword_of_int 2093750 : mword 21) N4 (K - 68)%nat true
+              (mword_of_int 2093730 : mword 21) N4 (K - 68)%nat true
               ltac:(nz) ltac:(rdok)
               ltac:(rewrite Htnm; vm_compute; reflexivity)
               with "Hcg Hpc Hi02c").
@@ -562,18 +565,18 @@ Section KexecABody.
     iDestruct "Hlog" as (Sb0) "Hlog".
     iApply (Namei.wp_namei_gen gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
               ga gf cov logstart bmapstart inodestart nib size dev used
-              (pv_cwd V) plen pfun MAXOPBLOCKS Sb0 pidv (DfracOwn (1/4)) dqb dqs
-              (DfracOwn 1) N5 (K - 68)%nat true true lks
-              ltac:(lia) Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsz Hbm0
+              plen pfun MAXOPBLOCKS Sb0 pidv (DfracOwn (1/4)) dqb dqs
+              N5 (K - 68)%nat true true lks
+              V ltac:(lia) Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsz Hbm0
               Hbmc Hbml Hins0 Hcovb Hiregb Hcstr Hplen
               ltac:(unfold walk_need, iput_units, MAXOPBLOCKS;
                     destruct (length (path_elems (bview plen pfun))); lia)
               Hjp Hgs eq_refl
               with "Hcg Hcnt Htext Hkd Hpc Hpenv Hbio Hlogc Hka Hitab Hitinv Hesc
                     Hslks Hireg Hropen Hprocs Hdevi Hdgeom Hdlock Hbm Hins Hbits Hppid
-                    Hcwd Hcref Hpath Hbs Hirs Hlog").
+                    Hcref Hpath Hbs Hirs Hlog").
     iIntros (CIDn Hsn M4 n1 used1 Sb1 ok ipv w) "%Hcsn Hcg Hcnt Hpc Hbm Hins %Hused1
-             Hbits Hppid Hcwd Hcref Hpath Hbs %HSbsub %Hwbm %Hn1 Hlog Harm".
+             Hbits Hppid Hcref Hpath Hbs %HSbsub %Hwbm %Hn1 Hlog Harm".
     iDestruct (log_opS_op with "Hlog") as "Hlog".
     (* what the seam actually carries: the closing iunlockput's three units.
        The walk spent at most two of the ten. *)
@@ -635,9 +638,8 @@ Section KexecABody.
                        = mword_of_int (KXA + 0x32)) by pcw.
       iEval (rewrite Hpp032) in "Hpc".
       (* close the private block back up, at the cwd it lent out *)
-      iDestruct ("Hpvbk" $! (pv_cwd V) with "Hcwd [Hcref] Hppid") as "Hpriv".
+      iDestruct ("Hpvbk" with "Hppid [Hcref]") as "Hpriv".
       { iEval (rewrite /cwd_ref). iExact "Hcref". }
-      rewrite kxc_upd_cwd_id.
       iDestruct (cpu_own_transport CIDn CIDz 0%nat true (proc_addr jp) true
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iSpecialize ("Hcont32" $! CIDz with "[%]"); [wp_next_chain |].
@@ -697,10 +699,10 @@ Section KexecABody.
       iPoseProof (kxc_08c with "Htext") as "Hi08c".
       iPoseProof (kxc_08e with "Htext") as "Hi08e".
       assert (Hteo : add_vec (mword_of_int (KXA + 0x88) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2094276 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2094256 : mword 21))
                      = mword_of_int KernelSyms.end_op) by pcw.
       iApply (wp_jal_s_sconf (mword_of_int (KXA + 0x88)) Rra
-                (mword_of_int 2094276 : mword 21) M4 (K - 68)%nat true
+                (mword_of_int 2094256 : mword 21) M4 (K - 68)%nat true
                 ltac:(nz) ltac:(rdok)
                 ltac:(rewrite Hteo; vm_compute; reflexivity)
                 with "Hcg Hpc Hi088").
@@ -716,7 +718,7 @@ Section KexecABody.
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iApply (EndOp.wp_end_op_sconf gs jp gl gu gd gk pd pav pu bn g gfs
                 cov logstart dev n1 pidv (DfracOwn (1/4)) P1 (K - 68)%nat
-                true true lks ltac:(lia) Hlg Hjp Hgs
+                true true lks V ltac:(lia) Hlg Hjp Hgs
                 with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hcrash Hcert
                       Hppid Hprocs Hdevi Hdgeom Hdlock Hlog").
       all: try lkbelow.
@@ -753,9 +755,8 @@ Section KexecABody.
       iIntros (CIDz2 Hsz2). iNext. iIntros "Hcg Hpc".
       iEval (rewrite Htj72) in "Hpc".
       (* ---- close the private block and take the shared exit ---- *)
-      iDestruct ("Hpvbk" $! (pv_cwd V) with "Hcwd [Hcref] Hppid") as "Hpriv".
+      iDestruct ("Hpvbk" with "Hppid [Hcref]") as "Hpriv".
       { iEval (rewrite /cwd_ref). iExact "Hcref". }
-      rewrite kxc_upd_cwd_id.
       iDestruct (cpu_own_transport CIDe1 CIDz2 0%nat true (proc_addr jp) true
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       (* the register facts at +0x072 *)
@@ -985,8 +986,11 @@ Section KexecABody.
     iDestruct (T.kxa_slk_acc cn k Hk with "Hslks") as (gilk gislk) "#Hslkk".
     iDestruct (T.kxa_bs3_split bn with "Hbs") as "[Hbs1 Hbs2]".
     (* ---- open the process for the pid quarter ---- *)
-    iDestruct (proc_priv_cwd_pid gf (proc_addr jp) pidv V with "Hpriv")
-      as "(Hcwd & Hcref & Hppid & Hpvbk)".
+    (* the BLOCK and the cwd reference: [p->cwd] is one of the block's own
+       cells now, so namei borrows it for its own load and nothing here has
+       to carry it. *)
+    iDestruct (proc_priv_bare_cref gf (proc_addr jp) pidv V with "Hpriv")
+      as "(Hppid & Hcref & Hpvbk)".
     (* ---- the frame: slot 6, and the elf slots ---- *)
     rewrite /kxc_frameA.
     iDestruct "Hframe" as "(Hf1 & Hf2 & Hf3 & Hf4 & Hf5 & (%w6 & Hf6) & Hf7 &
@@ -1055,10 +1059,10 @@ Section KexecABody.
     iEval (rewrite Hpp036) in "Hpc".
     (* ---- +0x036: jal ra,ilock ---- *)
     assert (Htil : add_vec (mword_of_int (KXA + 0x36) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2091552 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2091532 : mword 21))
                    = mword_of_int KernelSyms.ilock) by pcw.
     iApply (wp_jal_s_sconf (mword_of_int (KXA + 0x36)) Rra
-              (mword_of_int 2091552 : mword 21) Q1 (K - 68)%nat true
+              (mword_of_int 2091532 : mword 21) Q1 (K - 68)%nat true
               ltac:(nz) ltac:(rdok)
               ltac:(rewrite Htil; vm_compute; reflexivity)
               with "Hcg Hpc Hi036").
@@ -1078,7 +1082,7 @@ Section KexecABody.
               gilk gislk cov logstart inodestart nib k (q/2)%Qp gy PlainK
               dev inum
               pidv (DfracOwn (1/4)) dqs Q2 (K - 68)%nat true true lks
-              ltac:(lia) Hk Hlg Hins0 Hibc Hib' Hjp Hgs HQ2a0
+              V ltac:(lia) Hk Hlg Hins0 Hibc Hib' Hjp Hgs HQ2a0
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hitinv Hesck Hireg Hslkk
                     Hshr Hru Hins Hppid Hprocs Hdevi Hdgeom Hdlock Hbs1").
     all: try lkbelow.
@@ -1189,10 +1193,10 @@ Section KexecABody.
     iEval (rewrite Hpp048) in "Hpc".
     (* ---- +0x048: jal ra,readi ---- *)
     assert (Htrd : add_vec (mword_of_int (KXA + 0x48) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2092520 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2092500 : mword 21))
                    = mword_of_int KernelSyms.readi) by pcw.
     iApply (wp_jal_s_sconf (mword_of_int (KXA + 0x48)) Rra
-              (mword_of_int 2092520 : mword 21) Q7 (K - 68)%nat true
+              (mword_of_int 2092500 : mword 21) Q7 (K - 68)%nat true
               ltac:(nz) ltac:(rdok)
               ltac:(rewrite Htrd; vm_compute; reflexivity)
               with "Hcg Hpc Hi048").
@@ -1432,8 +1436,7 @@ Section KexecABody.
                   with "Hcg Hpc Hi060").
         iIntros (CID15 Hsq15). iNext. iIntros "Hcg Hpc".
         iEval (rewrite Htgt90) in "Hpc".
-        iDestruct ("Hpvbk" $! (pv_cwd V) with "Hcwd Hcref Hppid") as "Hpriv".
-        rewrite kxc_upd_cwd_id.
+        iDestruct ("Hpvbk" with "Hppid Hcref") as "Hpriv".
         iDestruct (cpu_own_transport CIDrd CID15 0%nat true (proc_addr jp) true
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         iAssert (ic_loaded gfs gi cov logstart k inum dnl bml)
@@ -1493,8 +1496,7 @@ Section KexecABody.
         assert (Hpp064 : add_vec_int (mword_of_int (KXA + 0x60) : mword 64) 4
                          = mword_of_int (KXA + 0x64)) by pcw.
         iEval (rewrite Hpp064) in "Hpc".
-        iDestruct ("Hpvbk" $! (pv_cwd V) with "Hcwd Hcref Hppid") as "Hpriv".
-        rewrite kxc_upd_cwd_id.
+        iDestruct ("Hpvbk" with "Hppid Hcref") as "Hpriv".
         iDestruct (cpu_own_transport CIDrd CID15 0%nat true (proc_addr jp) true
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         iAssert (ic_loaded gfs gi cov logstart k inum dnl bml)
@@ -1567,8 +1569,7 @@ Section KexecABody.
                 with "Hcg Hpc Hi050").
       iIntros (CID11 Hsq11). iNext. iIntros "Hcg Hpc".
       iEval (rewrite Htgt64) in "Hpc".
-      iDestruct ("Hpvbk" $! (pv_cwd V) with "Hcwd Hcref Hppid") as "Hpriv".
-      rewrite kxc_upd_cwd_id.
+      iDestruct ("Hpvbk" with "Hppid Hcref") as "Hpriv".
       iDestruct (cpu_own_transport CIDrd CID11 0%nat true (proc_addr jp) true
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iAssert (ic_loaded gfs gi cov logstart k inum dnl bml)

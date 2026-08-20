@@ -198,6 +198,108 @@ R9).  In the model the discarded record's `ilink ip` is STRANDED by
 — a blocker on a reachable step".  Recorded with the amendment it forces
 in projects/fs-fragments-campaign.md, "F1.5b's FIRST-CONSUMER VERDICT".
 
+## FIXED UPSTREAM (`31f115a`) — a NEGATIVE count to `read()` delivered the
+## rest of the file, overflowing the caller's buffer
+
+`sys_read` passes `argint(2,&n)`'s `int` straight to `fileread` and thence to
+`readi(ip, 1, dst, off, n)`, whose `n` is a `uint`. A negative `n` therefore
+arrives as `2^32 - k` (`k = -n`), and readi's two guards then read:
+
+```c
+if (off > ip->size || off + n < off) return 0;   /* fires iff k <= off */
+if (off + n > ip->size) n = ip->size - off;      /* else CLAMPS TO THE END OF THE FILE */
+```
+
+The overflow test catches only the case where the sum WRAPS, i.e. `k <= off`.
+When `k > off` the sum is `2^32 + off - k >= 2^31` — far above any legal
+`ip->size` — so the second test takes the clamp and readi reads
+**`ip->size - off` bytes into the user buffer** and returns that count.
+`fileread` advances `f->off` by it and `sys_read` returns it.
+
+`off_wf` bounds `f->off` by `MAXFILE*BSIZE = 274432`, so `k > off` is
+reachable for every `n <= -274433`, and **at `off = 0` for EVERY negative
+`n`**:
+
+```
+off=    0  n=      -1  -> readi returns 5000   (a 5000-byte file: ALL of it)
+off=    0  n= -274433  -> readi returns 5000
+off=   10  n=      -1  -> readi returns 0      (k <= off: the overflow test fires)
+off=   10  n=   -4096  -> readi returns 4990
+off= 5000  n=      -1  -> readi returns 0      (off > size: the pre-frame exit)
+```
+
+So **`read(fd, buf, -1)` on a regular file at offset 0 copies the whole file
+into `buf`** — a user-triggerable overflow of the caller's own buffer.
+
+**Severity.** Not a kernel compromise: the destination is resolved by
+`copyout`'s page walk, so the bytes land only in the calling process's own
+mapped pages below `p->sz`, and an unmapped page answers −1. It is a
+user-visible memory-safety defect in `read(2)`'s contract, nothing more —
+and nothing less. The write side is CLEAN: `filewrite`'s `while (i < n)` is
+a SIGNED test, so a negative count runs the loop zero times and the tail
+`(i == n ? n : -1)` answers −1; `piperead`/`pipewrite`/`consoleread`/
+`consolewrite` are signed-loop total for the same reason.
+
+**How it surfaced, and what it costs the proofs.** `SpecSysRead` and
+`SpecSysWrite` both carry `0 <= sys_rw_count v2`, a premise about a
+trapframe word the USER wrote, which no dispatcher can supply. It was
+recorded (here, in `design/file-table.md`, and in
+`completed/fs-sysfile.md`'s table) as a MODELLING premise — "a negative `n`
+is handled fine by the C ... it is only `SpecReadi`/`SpecWritei`'s
+`nat`-typed `n` that cannot express it". That reading is correct for
+`sys_write` and **wrong for `sys_read`**: the case it names is the wrapping
+one, `k <= off`, and the non-wrapping one is the defect. The tell is
+`kernel-defects.md`'s own first rule — the honest contract for a total
+function needed an extra case. Concretely, `SpecFileread`'s postcondition
+`fileread_ret n r = pipe_rw_ret n r` (−1, or `0 <= i <= Z.max 0 n`) is
+**false at `n < 0`** on the FD_INODE arm, so the premise cannot simply be
+deleted; the postcondition has to be restated first.
+
+**THE FIX, and what it settles.**  `31f115a` folds the test into the guard
+that was already there, in both directions:
+
+```c
+-  if (f->readable == 0)          +  if (f->readable == 0 || n < 0)
+-  if (f->writable == 0)          +  if (f->writable == 0 || n < 0)
+```
+
+Two instructions each -- `srliw a5,a2,0x1f` to lift the sign bit, then a
+branch to the -1 exit the function already had.  All six paths now answer -1,
+measured under qemu; `usertests` passes.  `XV6_REV` is bumped to it.
+
+Three things it settles for the proofs, and they are why the SOURCE route beat
+the scaffolding here (this file's own rule):
+
+* **readi's `off + n < off` arm stays DEAD BY PREMISE.**  No caller can reach
+  it any more, so `SpecReadi`'s guarded joint premise stands, `rd_clamp` keeps
+  its two cases, and the five other readi callers (dirlookup, dirlink,
+  sys_unlink, kexec) are untouched.  Proving that arm was the expensive half of
+  the retirement plan and is now unnecessary.
+* **`0 <= n` becomes a FACT OF THE CODE.**  `SpecFileread`/`SpecFilewrite` take
+  the `int` range `-2^31 <= n < 2^31`, which `SpecSysRead.sys_rw_count_range`
+  gives a trapframe word unconditionally, and the guard restores `0 <= n` past
+  the branch -- so the syscall contracts ask their caller for NOTHING about the
+  count, which is what an OS kernel's syscall contract has to do.
+* **`fileread_ret` does not have to move.**  It stays `pipe_rw_ret`.
+
+What it cost: the relayout of everything after `filewrite` (three text groups,
+and -16 on all of data/bss), and a genuine reshape of `fileread` and
+`filewrite`.  The ledger is in
+[`projects/syscall-dispatch.md`](projects/syscall-dispatch.md), "THE BUMP TO
+`31f115a`".
+
+**Two smaller inconsistencies in the same family are NOT fixed**, and are
+recorded here rather than lost:
+
+* `read(pipefd, buf, 0)` still BLOCKS until a writer produces a byte and then
+  returns 0 -- which a caller reads as end-of-file.  `consoleread`, whose loop
+  guard is `while (n > 0)`, returns immediately.  piperead waits before it ever
+  looks at `n`; testing `n > 0` first in its wait condition is the one-line fix.
+* `consoleread` copies its `int n` into a `uint target`, which makes both
+  `n < target` and the `target - n` return mixed-sign expressions.  Benign now
+  that `n >= 0` is guaranteed, but it is the same conversion, in the same
+  direction, as the one that caused this defect.
+
 Fixing the C is never free: the image is pinned by `XV6_REV` in the top-level
 `Makefile` and the tracked `kernel-rocq/*.v` dumps come from that revision, so
 every proof naming an address moves. The procedure and the gate that must pass

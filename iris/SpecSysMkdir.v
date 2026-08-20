@@ -66,15 +66,24 @@
 
    ==== THE REFERENCE LEDGER ============================================
 
-   create is entered with [iref_slots ns] for [create_slots <= ns] and
-   spends at most that; on success it keeps exactly ONE out -- the
-   reference to the inode it returns -- which is the [ok = true ->
-   S ns' <= ns] half of its post.  [iunlockput(ip)] then spends that
-   reference and hands the slot back, so the success arm ends at [ns' + 1
-   <= ns]; the failure arm never made a reference at all and ends at
-   [ns'].  The interval [ns - create_slots <= ns2 <= ns] covers both, and
-   it is the tightest thing statable: create's own figure is an interval,
-   not a number.
+   create is entered with [iref_slots ns] for [create_slots <= ns] and, on
+   success, keeps exactly ONE out -- the reference to the inode it returns
+   -- which its post now states as the equation [S ns' = ns].
+   [iunlockput(ip)] spends that reference and hands the slot back, so the
+   success arm ends at [ns' + 1 = ns]; the failure arms never made a
+   reference and create's post gives [ns' = ns] outright; and the argstr
+   arm never reached create.  All three therefore end at [ns], which is
+   what this contract says.
+
+   IT USED TO SAY THE INTERVAL [ns - create_slots <= ns2 <= ns], on the
+   grounds that create's own figure was an interval and this was the
+   tightest thing statable.  That was true of the STATEMENT and not of the
+   function: all nine of create's continuation sites already computed the
+   exact figure and then weakened it.  Saying it outright is what lets a
+   caller re-establish [create_slots <= ns] and go round again, and what
+   lets [SpecSyscall]'s dispatch hand [iref_slots IREFSPARE] back
+   unchanged -- which it must, because [UsertrapRes.ut_own] carries the
+   allowance at that literal.
 
    NO COLOUR-LEDGER RESOURCE APPEARS HERE (design/fs-icache.md 20.18
    ruling 1).  Every directory record this syscall writes is written
@@ -300,7 +309,14 @@ Definition wp_sys_mkdir_sconf_body
          link-count-zero inode), and the two do not cancel. *)
       bitmap_res gfs bmapstart cov logstart size used' -∗
       (* the allowance, spend-at-most: see the header's reference ledger *)
-      ⌜((ns - create_slots)%nat <= ns')%nat /\ (ns' <= ns)%nat⌝ -∗
+      (* THE LEDGER CLOSES, EXACTLY.  This used to be create's interval
+         passed through; create states its figure exactly now (every failure
+         arm returns the ledger whole, every success arm keeps ONE out), and
+         this function's [iunlockput] is what hands that one back -- so all
+         three arms end where they started.  A client can therefore
+         re-establish its own [create_slots <= ns] and call again, which the
+         interval could not support (FsSyscalls.v's note (S3)). *)
+      ⌜ns' = ns⌝ -∗
       iref_slots ns' -∗
       proc_priv γf pj pid (upd_upt V P') -∗
       ⌜sys_mkdir_ret (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗

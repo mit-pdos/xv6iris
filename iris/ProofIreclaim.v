@@ -97,6 +97,7 @@ Require Import PrintkFmt.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Import SchedCtx.
+Require Import ProcDefs.  (* [proc_priv_bare] *)
 Require Import WpUart.
 Require Import BufOwn BcacheInv BioInv.
 Require Import FsBlocks LogInv.
@@ -220,7 +221,7 @@ Section IreclaimDefs.
       (cov : gset Z) (logstart bmapstart inodestart ninodes size : Z)
       (used : gset Z)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac) (j : nat)
-      (m : regfile) (K : nat) (b : bool) (lks : gset string) : iProp Σ :=
+      (m : regfile) (K : nat) (b : bool) (lks : gset string) (Vpr : pprivate) : iProp Σ :=
     (* the LITERAL [true], matching the contract's crossing: this function
        can sleep, so its continuation is about an arbitrary hart. *)
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
@@ -232,7 +233,7 @@ Section IreclaimDefs.
         sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-        p_pid (proc_addr j) ↦₄{dq} pidv -∗
+        proc_priv_bare (proc_addr j) pidv Vpr -∗
         bslots bn 3 -∗
         iref_slot -∗
         ⌜used' ⊆ used⌝ -∗
@@ -249,7 +250,7 @@ Section IreclaimDefs.
       (cov : gset Z) (logstart bmapstart inodestart ninodes size : Z)
       (used : gset Z) (dev : mword 32)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac) (j : nat)
-      (m : regfile) (K : nat) (b : bool) (lks : gset string) (fuel : nat) : iProp Σ :=
+      (m : regfile) (K : nat) (b : bool) (lks : gset string) (Vpr : pprivate) (fuel : nat) : iProp Σ :=
     (∀ (Mn : regfile) (inumn : mword 32) (usedn : gset Z) (CIDn : CpuId),
        ⌜(Z.to_nat (ninodes - bv_unsigned inumn) <= fuel)%nat⌝ -∗
        ⌜0 < bv_unsigned inumn < ninodes⌝ -∗
@@ -264,7 +265,7 @@ Section IreclaimDefs.
        cpu_own 0 true (proc_addr j) b lks -∗
        pc_is (mword_of_int (KernelSyms.ireclaim + 0x7c) : mword 64) -∗
        irc_frame m -∗
-       p_pid (proc_addr j) ↦₄{dq} pidv -∗
+       proc_priv_bare (proc_addr j) pidv Vpr -∗
        sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
        sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
        sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -273,7 +274,7 @@ Section IreclaimDefs.
        bitmap_res γfs bmapstart cov logstart size usedn -∗
        ireg_boot -∗
        irc_cont (CID0 := CIDn) γfs bn cov logstart bmapstart inodestart ninodes
-                size used pidv dq dqb dqs dqn j m K b lks -∗
+                size used pidv dq dqb dqs dqn j m K b lks Vpr -∗
        WP (Loop : expr riscv_lang))%I.
 
   (* the escrow family's projection -- ProofDirlink's [dl_esc_acc] restated,
@@ -303,7 +304,7 @@ Section IreclaimEpilogue.
       (cov : gset Z) (logstart bmapstart inodestart ninodes size : Z)
       (used used' : gset Z)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac)
-      (m M : regfile) (K : nat) (b : bool) (lks : gset string) :
+      (m M : regfile) (K : nat) (b : bool) (lks : gset string) (Vpr : pprivate) :
     (K_ireclaim <= K)%nat ->
     used' ⊆ used ->
     irc_sp m M ->
@@ -313,7 +314,7 @@ Section IreclaimEpilogue.
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.ireclaim + 0xb2) : mword 64) -∗
     irc_frame m -∗
-    p_pid (proc_addr j) ↦₄{dq} pidv -∗
+    proc_priv_bare (proc_addr j) pidv Vpr -∗
     sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -322,7 +323,7 @@ Section IreclaimEpilogue.
     bitmap_res γfs bmapstart cov logstart size used' -∗
     ireg_boot -∗
     irc_cont (CID0 := CID0) γfs bn cov logstart bmapstart inodestart ninodes size
-             used pidv dq dqb dqs dqn j m K b lks -∗
+             used pidv dq dqb dqs dqn j m K b lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hsub Hsp Hthr.
@@ -678,7 +679,7 @@ Section IreclaimStep.
       (cov : gset Z) (logstart bmapstart inodestart ninodes size : Z)
       (used usedn : gset Z) (dev : mword 32) (inum : mword 32) (fuel : nat)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac)
-      (m Ml : regfile) (K : nat) (b : bool) (lks : gset string) :
+      (m Ml : regfile) (K : nat) (b : bool) (lks : gset string) (Vpr : pprivate) :
     (K_ireclaim <= K)%nat ->
     ninodes < 2 ^ 31 ->
     usedn ⊆ used ->
@@ -695,7 +696,7 @@ Section IreclaimStep.
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.ireclaim + 0x6e) : mword 64) -∗
     irc_frame m -∗
-    p_pid (proc_addr j) ↦₄{dq} pidv -∗
+    proc_priv_bare (proc_addr j) pidv Vpr -∗
     sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -704,9 +705,9 @@ Section IreclaimStep.
     bitmap_res γfs bmapstart cov logstart size usedn -∗
     ireg_boot -∗
     irc_loop γfs bn cov logstart bmapstart inodestart ninodes size used dev
-             pidv dq dqb dqs dqn j m K b lks fuel -∗
+             pidv dq dqb dqs dqn j m K b lks Vpr fuel -∗
     irc_cont (CID0 := CID0) γfs bn cov logstart bmapstart inodestart ninodes size
-             used pidv dq dqb dqs dqn j m K b lks -∗
+             used pidv dq dqb dqs dqn j m K b lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hn31 Hsub Hfuel Hinum Hsp Hthr Hs1 Hs4 Hs5 Hs6.
@@ -853,7 +854,7 @@ Section IreclaimStep.
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iApply (irc_epilogue (CID0 := CID4) j bn γfs cov logstart bmapstart
                 inodestart ninodes size used usedn pidv dq dqb dqs dqn
-                m S3 K b lks HK Hsub HS3sp HS3thr
+                m S3 K b lks Vpr HK Hsub HS3sp HS3thr
                 with "Hcg Hcnt Htext Hpc Hframe Hppid Hsbn Hsbi Hsbb Hsl
                       Hiref Hbm Hboot [Hcont]").
       { iApply (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID4)
@@ -925,7 +926,7 @@ Section IreclaimOrphan.
       (dev inum bno : mword 32) (kk : nat)
       (bs bsd0 : list (bv 8)) (ds : list dinode) (d0 : bool) (fuel : nat)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac)
-      (m Ml : regfile) (K : nat) (b : bool) (lks : gset string) :
+      (m Ml : regfile) (K : nat) (b : bool) (lks : gset string) (Vpr : pprivate) :
     (K_ireclaim <= K)%nat ->
     log_geom_ok cov logstart ->
     0 <= inodestart ->
@@ -986,7 +987,7 @@ Section IreclaimOrphan.
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     irc_frame m -∗
-    p_pid (proc_addr j) ↦₄{dq} pidv -∗
+    proc_priv_bare (proc_addr j) pidv Vpr -∗
     sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -996,9 +997,9 @@ Section IreclaimOrphan.
     ireg_boot -∗
     bio_locked bn (fs_view γfs γd dev cov) kk pidv dev bno bs bsd0 d0 -∗
     irc_loop γfs bn cov logstart bmapstart inodestart ninodes size used dev
-             pidv dq dqb dqs dqn j m K b lks fuel -∗
+             pidv dq dqb dqs dqn j m K b lks Vpr fuel -∗
     irc_cont (CID0 := CID0) γfs bn cov logstart bmapstart inodestart ninodes size
-             used pidv dq dqb dqs dqn j m K b lks -∗
+             used pidv dq dqb dqs dqn j m K b lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hgeom Hst Hblk Hsize Hbm0 Hbmcov Hbmlog Hcovb Hnnib Hn31 Hpk
@@ -1460,7 +1461,7 @@ Section IreclaimOrphan.
                  with "Hcont") as "Hcont".
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
               pidv dev bno dq O9 (K - 8)%nat true (proc_addr j)
-              bs bsd0 d0 b lks ltac:(lia) Hkk HO9a0
+              bs bsd0 d0 b lks Vpr ltac:(lia) Hkk HO9a0
               (* brelse's bound is "bcache"(4); irc_orphan's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
@@ -1544,7 +1545,7 @@ Section IreclaimOrphan.
     iDestruct (wp_next_shift (b := true) (CIDa := CID11) (CIDb := CID14) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (BO.wp_begin_op_sconf γs j γl bn γ γfs cov logstart dev pidv dq
-              OA (K - 8)%nat true b lks
+              OA (K - 8)%nat true b lks Vpr
               ltac:(lia) Hj Hgl
               (* begin_op's bound is "log"(3); irc_orphan's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
@@ -1655,7 +1656,7 @@ Section IreclaimOrphan.
     iDestruct "Hshr" as (gsh) "Hshr".
     iApply (IL.wp_ilock_sconf γs j γl γu γd γk pd pav pu bn γfs γi cn gil gisl
               cov logstart inodestart nib kslot (q/2)%Qp gsh PlainK dev inum
-              pidv dq dqs OC (K - 8)%nat true b lks
+              pidv dq dqs OC (K - 8)%nat true b lks Vpr
               ltac:(lia) Hkslot Hgeom Hst Hibcov Hnibin Hj Hgl
               HOCa0
               (* ilock's bound is "bcache"(4); irc_orphan's own is
@@ -1764,7 +1765,7 @@ Section IreclaimOrphan.
                  with "Hcont") as "Hcont".
     iApply (IU.wp_iunlock_sconf γs γfs γi cn gil gisl cov logstart kslot
               (q/2)%Qp gsh dev inum dnl bml pidv dq OE (K - 8)%nat true
-              (proc_addr j) b lks
+              (proc_addr j) b lks Vpr
               ltac:(lia) Hkslot HOEa0
               (* iunlock's bound is "sleep lock"(6); irc_orphan's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
@@ -1878,7 +1879,7 @@ Section IreclaimOrphan.
     iApply (IP.wp_iput_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
               gil gisl cov logstart bmapstart inodestart nib size dev usedn
               kslot q inum MAXOPBLOCKS Sb0 false false false e00
-              pidv dq dqb dqs OG (K - 8)%nat true b lks false
+              pidv dq dqb dqs OG (K - 8)%nat true b lks Vpr false
               ltac:(lia) Hkslot ltac:(discriminate) ltac:(discriminate)
               Hgeom Hsize Hbm0 Hbmcov Hbmlog
               Hst Hibcov Hiblog Hnibin Hcovb
@@ -1959,7 +1960,7 @@ Section IreclaimOrphan.
     iDestruct (wp_next_shift (b := true) (CIDa := CID23) (CIDb := CID25) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (EO.wp_end_op_sconf γs j γl γu γd γk pd pav pu bn γ γfs cov logstart
-              dev n' pidv dq OH (K - 8)%nat true b lks
+              dev n' pidv dq OH (K - 8)%nat true b lks Vpr
               ltac:(lia) Hgeom Hj Hgl
               (* end_op's bound is "log"(3); irc_orphan's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
@@ -1998,7 +1999,7 @@ Section IreclaimOrphan.
     (* ===== FALL into the step at +0x6e ===== *)
     iApply (irc_step (CID0 := CID26) j bn γfs cov logstart bmapstart inodestart
               ninodes size used usedp dev inum fuel pidv dq dqb dqs dqn
-              m mE K b lks HK Hn31
+              m mE K b lks Vpr HK Hn31
               ltac:(transitivity usedn; [exact Hsubp | exact Hsub])
               Hfuel Hinum HmEsp HmEthr
               HmEs1 HmEs4 HmEs5 HmEs6
@@ -2029,7 +2030,7 @@ Section IreclaimRelease.
       (dev inum bno : mword 32) (kk : nat)
       (bs bsd0 : list (bv 8)) (d0 : bool) (fuel : nat)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac)
-      (m Ml : regfile) (K : nat) (b : bool) (lks : gset string) :
+      (m Ml : regfile) (K : nat) (b : bool) (lks : gset string) (Vpr : pprivate) :
     (K_ireclaim <= K)%nat ->
     ninodes < 2 ^ 31 ->
     (Z.to_nat (ninodes - bv_unsigned inum) <= S fuel)%nat ->
@@ -2052,7 +2053,7 @@ Section IreclaimRelease.
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     procs_inv γs -∗
     irc_frame m -∗
-    p_pid (proc_addr j) ↦₄{dq} pidv -∗
+    proc_priv_bare (proc_addr j) pidv Vpr -∗
     sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -2062,9 +2063,9 @@ Section IreclaimRelease.
     ireg_boot -∗
     bio_locked bn (fs_view γfs γd dev cov) kk pidv dev bno bs bsd0 d0 -∗
     irc_loop γfs bn cov logstart bmapstart inodestart ninodes size used dev
-             pidv dq dqb dqs dqn j m K b lks fuel -∗
+             pidv dq dqb dqs dqn j m K b lks Vpr fuel -∗
     irc_cont (CID0 := CID0) γfs bn cov logstart bmapstart inodestart ninodes size
-             used pidv dq dqb dqs dqn j m K b lks -∗
+             used pidv dq dqb dqs dqn j m K b lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hn31 Hfuel Hinum Hsub Hkk Hsp Hthr Hs1 Hs2 Hs4 Hs5 Hs6 Hbelow.
@@ -2136,7 +2137,7 @@ Section IreclaimRelease.
                  with "Hcont") as "Hcont".
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
               pidv dev bno dq V2 (K - 8)%nat true (proc_addr j)
-              bs bsd0 d0 b lks ltac:(lia) Hkk HV2a0
+              bs bsd0 d0 b lks Vpr ltac:(lia) Hkk HV2a0
               ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hlk").
     all: try lkbelow.
@@ -2182,7 +2183,7 @@ Section IreclaimRelease.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (irc_step (CID0 := CID4) j bn γfs cov logstart bmapstart inodestart
               ninodes size used usedn dev inum fuel pidv dq dqb dqs dqn
-              m mR K b lks HK Hn31 Hsub Hfuel Hinum HmRsp HmRthr
+              m mR K b lks Vpr HK Hn31 Hsub Hfuel Hinum HmRsp HmRthr
               HmRs1 HmRs4 HmRs5 HmRs6
               with "Hcg Hcnt Htext Hpc Hframe Hppid Hsbn Hsbi Hsbb Hsl Hiref
                     Hbm Hboot [Hloop] [Hcont]").
@@ -2214,7 +2215,7 @@ Section IreclaimScan.
       (cov : gset Z) (logstart bmapstart inodestart ninodes size : Z)
       (nib : nat) (used : gset Z) (dev : mword 32)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac)
-      (m : regfile) (K : nat) (b : bool) (lks : gset string) :
+      (m : regfile) (K : nat) (b : bool) (lks : gset string) (Vpr : pprivate) :
     (K_ireclaim <= K)%nat ->
     log_geom_ok cov logstart ->
     0 <= inodestart ->
@@ -2250,7 +2251,7 @@ Section IreclaimScan.
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     ∀ fuel : nat,
       irc_loop γfs bn cov logstart bmapstart inodestart ninodes size used dev
-               pidv dq dqb dqs dqn j m K b lks fuel.
+               pidv dq dqb dqs dqn j m K b lks Vpr fuel.
   Proof.
     intros HK Hgeom Hst Hblk Hsize Hbm0 Hbmcov Hbmlog Hcovb Hn1 Hnnib Hn31
            Hpk Hj Hgl Hbelow.
@@ -2512,7 +2513,7 @@ Section IreclaimScan.
       iDestruct (iu_slots_split bn 2 1 with "Hsl") as "[Hsl Hsl1]".
       iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
                 (fs_view γfs γd dev cov) pidv dev bno dq
-                W6 (K - 8)%nat true b lks
+                W6 (K - 8)%nat true b lks Vpr
                 ltac:(lia) Hbnolt eq_refl Hbnocov eq_refl Hj Hgl
                 HW6a0 HW6a1
                 (* bread's bound is "bcache"(4); irc_scan's own is
@@ -2834,7 +2835,7 @@ Section IreclaimScan.
         iApply (irc_release (CID0 := CID14) γs j γd bn γfs cov logstart bmapstart
                   inodestart ninodes size used usedn dev inum bno kk
                   (diblk_bytes ds) bsd0 d0 fuel pidv dq dqb dqs dqn
-                  m WC K b lks HK Hn31 Hfuel Hinum Hsub Hkk HWCsp HWCthr
+                  m WC K b lks Vpr HK Hn31 Hfuel Hinum Hsub Hkk HWCsp HWCthr
                   HWCs1 HWCs2 HWCs4 HWCs5 HWCs6
                   (* irc_release's bound is "bcache"(4); irc_scan's own is
                      "itable"(2), and [locks_below_mono] weakens it. *)
@@ -2931,7 +2932,7 @@ Section IreclaimScan.
                     nib used usedn dev inum bno kk (diblk_bytes ds) bsd0 ds d0
                     fuel
                     pidv dq dqb dqs dqn m WD K b lks
-                    HK Hgeom Hst Hblk Hsize Hbm0 Hbmcov Hbmlog Hcovb Hnnib Hn31
+                    Vpr HK Hgeom Hst Hblk Hsize Hbm0 Hbmcov Hbmlog Hcovb Hnnib Hn31
                     Hpk Hj Hgl Hfuel Hinum Hsub Hkk
                     (* LICENCE (e)'s four premises (§7.1): the block this
                        walk bread, decoded, with the claim-shaped record the
@@ -2962,7 +2963,7 @@ Section IreclaimScan.
           iApply (irc_release (CID0 := CID16) γs j γd bn γfs cov logstart bmapstart
                     inodestart ninodes size used usedn dev inum bno kk
                     (diblk_bytes ds) bsd0 d0 fuel pidv dq dqb dqs dqn
-                    m WD K b lks HK Hn31 Hfuel Hinum Hsub Hkk HWDsp HWDthr
+                    m WD K b lks Vpr HK Hn31 Hfuel Hinum Hsub Hkk HWDsp HWDthr
                     HWDs1 HWDs2 HWDs4 HWDs5 HWDs6
                     (* irc_release's bound is "bcache"(4); irc_scan's own is
                        "itable"(2), and [locks_below_mono] weakens it. *)
@@ -3003,10 +3004,10 @@ Section IreclaimMain.
       (dev : mword 32)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) :
+      (b : bool) (lks : gset string) (Vpr : pprivate) :
       wp_ireclaim_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr
                              cov logstart bmapstart inodestart ninodes nib size
-                             used dev pidv dq dqb dqs dqn m K eb b lks.
+                             used dev pidv dq dqb dqs dqn m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_ireclaim_sconf_body].
     intros pcE pj ret_tgt HK Hgeom Hst Hblk Hsize Hbm0 Hbmcov Hbmlog Hcovb
@@ -3029,7 +3030,7 @@ Section IreclaimMain.
               #Hseam #Hgen Hsbn Hsbi Hsbb #Hireg Hboot #Hitb2 #Hitbl #Hesc #Hslks
               Hbm Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hiref Hcont".
     iAssert (irc_cont (CID0 := CID) γfs bn cov logstart bmapstart inodestart
-               ninodes size used pidv dq dqb dqs dqn j m K b lks)%I
+               ninodes size used pidv dq dqb dqs dqn j m K b lks Vpr)%I
       with "[Hcont]" as "Hcont"; [rewrite /irc_cont; iExact "Hcont" |].
     iPoseProof (irci_00 with "Htext") as "Hi00".
     iPoseProof (irci_04 with "Htext") as "Hi04".
@@ -3069,12 +3070,12 @@ Section IreclaimMain.
     iEval (rewrite Hpp04) in "Hpc".
     (* ===== +0x04 lw a4,1192(a4) : a4 := sb.ninodes ===== *)
     assert (Hnadr : add_vec (rget R1 Ra4)
-                      (sign_extend' 64 (mword_of_int 1138 : mword 12))
+                      (sign_extend' 64 (mword_of_int 1122 : mword 12))
                     = sb_ninodes).
     { rgne. rewrite HR1a4. rewrite /sb_ninodes /pa_add /add_vec_int. pcw. }
     iEval (rewrite -Hnadr) in "Hsbn".
     iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.ireclaim + 0x4)) Ra4 Ra4
-              (mword_of_int 1138 : mword 12) R1 K
+              (mword_of_int 1122 : mword 12) R1 K
               (mword_of_int ninodes : mword 32) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi04 Hsbn").
     iIntros (CID2 Hq2) "Hcg Hpc Hsbn".
@@ -3401,12 +3402,12 @@ Section IreclaimMain.
     iEval (rewrite Hpp2a) in "Hpc".
     (* ===== +0x2a addi s4,s4,1142 : s4 := &sb ===== *)
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.ireclaim + 0x2a)) Rs4 Rs4
-              (mword_of_int 1088 : mword 12) R8 (K - 8)%nat b
+              (mword_of_int 1072 : mword 12) R8 (K - 8)%nat b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi2a").
     iIntros (CID18 Hq18) "Hcg Hpc".
     set (R9 := <[Regidx Rs4 := regval_into_reg
                   (add_vec (rget R8 Rs4)
-                     (sign_extend' 64 (mword_of_int 1088 : mword 12)))]> R8).
+                     (sign_extend' 64 (mword_of_int 1072 : mword 12)))]> R8).
     assert (HR9s4 : R9 !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64)).
     { rewrite /R9 upd_eq. rgne. rewrite HR8s4. pcw. }
     assert (HR9s1 : R9 !!! Regidx Rs1
@@ -3498,7 +3499,7 @@ Section IreclaimMain.
     iPoseProof (irc_scan γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr
                   cov logstart bmapstart inodestart ninodes size nib used dev
                   pidv dq dqb dqs dqn m K b lks
-                  HK Hgeom Hst Hblk Hsize Hbm0 Hbmcov Hbmlog Hcovb Hn1 Hnnib
+                  Vpr HK Hgeom Hst Hblk Hsize Hbm0 Hbmcov Hbmlog Hcovb Hn1 Hnnib
                   Hn31 Hpk Hj Hgl Hbelow
                   with "Htext Hkdata Hpenv Hbio Hlctx Hseam Hgen Hireg
                         Hitb2 Hitbl Hesc Hslks Hprocs Hdevi Hdgeom Hdlock")

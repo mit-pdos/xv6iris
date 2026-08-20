@@ -48,6 +48,7 @@ Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import CpuOwn.
 Require Import SchedCtx.
+Require Import ProcDefs.  (* [proc_priv_bare] *)
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
 Require Import BioInv.
@@ -95,13 +96,12 @@ Definition wp_nameiparent_sconf_body
     (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
     (used : gset Z)
-    (cwdv : mword 64)                                  (* p->cwd, untouched   *)
     (plen : nat) (pfun : nat -> bv 8)                  (* the path buffer     *)
     (nfun : nat -> bv 8)                               (* the name buffer, in *)
     (n : nat)
-    (pidv : mword 32) (dq dqb dqs dqc : dfrac)
+    (pidv : mword 32) (dq dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) :=
+    (b : bool) (lks : gset string) (Vpr : pprivate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.nameiparent in
   let pj := proc_addr j in
   let pv := m !!! Regidx (mword_of_int 10 : mword 5) in   (* a0 = path *)
@@ -164,9 +164,8 @@ Definition wp_nameiparent_sconf_body
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   bitmap_res gfs bmapstart cov logstart size used -∗
-  p_pid pj ↦₄{dq} pidv -∗
-  p_cwd pj ↦₈{dqc} cwdv -∗
-  inode_held cwdv -∗
+  proc_priv_bare pj pidv Vpr -∗
+  inode_held (pv_cwd Vpr) -∗
   ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
   ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1] nfun i) -∗
   bslots bn 3 -∗
@@ -188,9 +187,8 @@ Definition wp_nameiparent_sconf_body
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       ⌜used' ⊆ used⌝ -∗
       bitmap_res gfs bmapstart cov logstart size used' -∗
-      p_pid pj ↦₄{dq} pidv -∗
-      p_cwd pj ↦₈{dqc} cwdv -∗
-      inode_held cwdv -∗
+      proc_priv_bare pj pidv Vpr -∗
+      inode_held (pv_cwd Vpr) -∗
       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
       ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1] nf i) -∗
       bslots bn 3 -∗
@@ -227,13 +225,12 @@ Definition wp_nameiparent_gen_body
     (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
     (used : gset Z)
-    (cwdv : mword 64)                                  (* p->cwd, untouched   *)
     (plen : nat) (pfun : nat -> bv 8)                  (* the path buffer     *)
     (nfun : nat -> bv 8)                               (* the name buffer, in *)
     (n : nat) (Sb : gset Z)
-    (pidv : mword 32) (dq dqb dqs dqc : dfrac)
+    (pidv : mword 32) (dq dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) :=
+    (b : bool) (lks : gset string) (Vpr : pprivate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.nameiparent in
   let pj := proc_addr j in
   let pv := m !!! Regidx (mword_of_int 10 : mword 5) in   (* a0 = path *)
@@ -298,9 +295,8 @@ Definition wp_nameiparent_gen_body
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   bitmap_res gfs bmapstart cov logstart size used -∗
-  p_pid pj ↦₄{dq} pidv -∗
-  p_cwd pj ↦₈{dqc} cwdv -∗
-  inode_held cwdv -∗
+  proc_priv_bare pj pidv Vpr -∗
+  inode_held (pv_cwd Vpr) -∗
   ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
   ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1] nfun i) -∗
   bslots bn 3 -∗
@@ -322,9 +318,8 @@ Definition wp_nameiparent_gen_body
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       ⌜used' ⊆ used⌝ -∗
       bitmap_res gfs bmapstart cov logstart size used' -∗
-      p_pid pj ↦₄{dq} pidv -∗
-      p_cwd pj ↦₈{dqc} cwdv -∗
-      inode_held cwdv -∗
+      proc_priv_bare pj pidv Vpr -∗
+      inode_held (pv_cwd Vpr) -∗
       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
       ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1] nf i) -∗
       bslots bn 3 -∗
@@ -368,17 +363,16 @@ Module Type NAMEIPARENT.
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (used : gset Z)
-      (cwdv : mword 64)
       (plen : nat) (pfun : nat -> bv 8)
       (nfun : nat -> bv 8)
       (n : nat)
-      (pidv : mword 32) (dq dqb dqs dqc : dfrac)
+      (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string),
+      (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_nameiparent_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                                 ga gf cov logstart bmapstart inodestart nib
-                                size dev used cwdv plen pfun nfun n
-                                pidv dq dqb dqs dqc m K eb b lks.
+                                size dev used plen pfun nfun n
+                                pidv dq dqb dqs m K eb b lks Vpr.
   (* the set-form contract; the counted one is this at the [log_op]
      existential's own witness. *)
   Parameter wp_nameiparent_gen :
@@ -394,15 +388,14 @@ Module Type NAMEIPARENT.
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (used : gset Z)
-      (cwdv : mword 64)
       (plen : nat) (pfun : nat -> bv 8)
       (nfun : nat -> bv 8)
       (n : nat) (Sb : gset Z)
-      (pidv : mword 32) (dq dqb dqs dqc : dfrac)
+      (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string),
+      (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_nameiparent_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                                 ga gf cov logstart bmapstart inodestart nib
-                                size dev used cwdv plen pfun nfun n Sb
-                                pidv dq dqb dqs dqc m K eb b lks.
+                                size dev used plen pfun nfun n Sb
+                                pidv dq dqb dqs m K eb b lks Vpr.
 End NAMEIPARENT.

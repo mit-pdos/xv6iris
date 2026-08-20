@@ -75,6 +75,7 @@ Require Import CodeFileclose ProofFilecloseParts.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import ProcDefs.  (* [pprivate], [proc_priv_bare] *)
 Local Open Scope Z_scope.
 Set Printing Depth 40.
 
@@ -144,15 +145,15 @@ Section ProofFileclose.
       (k : nat) (q : Qp) (Cf : fcontent)
       (fn : fclose_names) (on : option nat) (us : gset Z)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
-      (K : nat) (b : bool) (lks : gset string)
-    : wp_fileclose_sconf_body γfl γf k q Cf fn on us m n eb p K b lks.
+      (K : nat) (b : bool) (lks : gset string) (pidv : mword 32) (Vpr : pprivate)
+    : wp_fileclose_sconf_body γfl γf k q Cf fn on us m n eb p K b lks pidv Vpr.
   Proof.
     cbv beta delta [wp_fileclose_sconf_body].
     intros pcE ret_tgt HK HnZ Ha0 Hbelow.
     pose proof (locks_below_not_elem _ _ Hbelow) as Hfresh.
     
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hlock #Hpenv Href Henv Hcont".
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hlock #Hpenv Href Hpbare Henv Hcont".
     iDestruct (sie_b_agree m n K eb b p lks with "Hcg Hcnt") as %Houtb.
     (* THE ONE FACT THE COMPLEMENT'S TRANSPORTS NEED (see [ext_chain]): the
        disabled base forces the disabled arm, at any nesting depth. *)
@@ -268,12 +269,12 @@ Section ProofFileclose.
     assert (Hpp10 : add_vec_int (mword_of_int (FC + 0x0c) : mword 64) 4
                     = mword_of_int (FC + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp10) in "Hpc".
-    iApply (wp_addi4_s_sconf (mword_of_int (FC + 0x10)) Ra0 Ra0 (mword_of_int 954 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (FC + 0x10)) Ra0 Ra0 (mword_of_int 938 : mword 12)
               R4 (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi10").
     iIntros (CID8 Hs8) "Hcg Hpc". iEval (rgne) in "Hcg".
     set (R5 := <[Regidx Ra0 := regval_into_reg
-                  (add_vec (R4 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 954 : mword 12)))]> R4).
+                  (add_vec (R4 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 938 : mword 12)))]> R4).
     assert (HR5a0 : R5 !!! Regidx Ra0 = ftable_addr).
     { rewrite /R5 upd_eq /R4 upd_eq. rewrite /ftable_addr.
       apply bv_eq; vm_compute; reflexivity. }
@@ -501,13 +502,13 @@ Section ProofFileclose.
                       = mword_of_int (FC + 0x86)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp86) in "Hpc".
       iApply (wp_addi4_s_sconf (mword_of_int (FC + 0x86)) Ra0 Ra0
-                (mword_of_int 836 : mword 12) E1 (trap_res b + (K - 8))%nat false
+                (mword_of_int 820 : mword 12) E1 (trap_res b + (K - 8))%nat false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi86").
       iApply wp_next_off_intro. iIntros "Hcg Hpc". iEval (rgne) in "Hcg".
       set (E2 := <[Regidx Ra0 := regval_into_reg
                     (add_vec (E1 !!! Regidx Ra0)
-                       (sign_extend' 64 (mword_of_int 836 : mword 12)))]> E1).
+                       (sign_extend' 64 (mword_of_int 820 : mword 12)))]> E1).
       assert (HE2a0 : E2 !!! Regidx Ra0 = ftable_addr).
       { rewrite /E2 upd_eq /E1 upd_eq. rewrite /ftable_addr.
         apply bv_eq; vm_compute; reflexivity. }
@@ -600,7 +601,7 @@ Section ProofFileclose.
       iDestruct (cpu_claim_ext_transport CID CIDe eb p ltac:(ext_chain Hebf b)
                    with "Hextm") as "Hextm".
       iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
-      iApply ("Hcont" $! mf with "Hcg Hcnt Hextc Hextm [Hpc] [%] Hunit [Henv]").
+      iApply ("Hcont" $! mf with "Hcg Hcnt Hextc Hextm [Hpc] [%] Hunit [Henv] Hpbare").
       { iEval (rewrite /ret_tgt). iExact "Hpc". }
       { exact Hcsf. }
       { by iApply fileclose_env_out_of_env. }
@@ -886,13 +887,13 @@ Section ProofFileclose.
                       = mword_of_int (FC + 0x4c)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp4c) in "Hpc".
       iApply (wp_addi4_s_sconf (mword_of_int (FC + 0x4c)) Ra0 Ra0
-                (mword_of_int 894 : mword 12) G1 (trap_res b + (K - 8))%nat false
+                (mword_of_int 878 : mword 12) G1 (trap_res b + (K - 8))%nat false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi4c").
       iApply wp_next_off_intro. iIntros "Hcg Hpc". iEval (rgne) in "Hcg".
       set (G2 := <[Regidx Ra0 := regval_into_reg
                     (add_vec (G1 !!! Regidx Ra0)
-                       (sign_extend' 64 (mword_of_int 894 : mword 12)))]> G1).
+                       (sign_extend' 64 (mword_of_int 878 : mword 12)))]> G1).
       assert (HG2a0 : G2 !!! Regidx Ra0 = ftable_addr).
       { rewrite /G2 upd_eq /G1 upd_eq. rewrite /ftable_addr.
         apply bv_eq; vm_compute; reflexivity. }
@@ -1094,14 +1095,14 @@ Section ProofFileclose.
         iEval (rewrite Hpp9c) in "Hpc".
         (* +0x9c jal pipeclose *)
         iApply (wp_jal_s_sconf (mword_of_int (FC + 0x9c)) Rra
-                  (mword_of_int 844 : mword 21) P2 (K - 8)%nat b
+                  (mword_of_int 864 : mword 21) P2 (K - 8)%nat b
                   ltac:(vm_compute; discriminate) ltac:(rdok)
                   ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi9c").
         iIntros (CIDp4 Hsp4) "Hcg Hpc".
         set (P3 := <[Regidx Rra := regval_into_reg
                       (add_vec_int (mword_of_int (FC + 0x9c) : mword 64) 4)]> P2).
         assert (Htgtpc : add_vec (mword_of_int (FC + 0x9c) : mword 64)
-                           (sign_extend' 64 (mword_of_int 844 : mword 21))
+                           (sign_extend' 64 (mword_of_int 864 : mword 21))
                          = mword_of_int KernelSyms.pipeclose)
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Htgtpc) in "Hpc".
@@ -1220,7 +1221,7 @@ Section ProofFileclose.
         iDestruct (cpu_claim_ext_transport CID CIDp7 eb p ltac:(ext_chain Hebf b)
                      with "Hextm") as "Hextm".
         iSpecialize ("Hcont" $! CIDp7 with "[]"); [iPureIntro; wp_next_chain|].
-        iApply ("Hcont" $! mf with "Hcg Hcnt Hextc Hextm [Hpc] [%] Hfd [Hav]").
+        iApply ("Hcont" $! mf with "Hcg Hcnt Hextc Hextm [Hpc] [%] Hfd [Hav] Hpbare").
         { iEval (rewrite /ret_tgt). iExact "Hpc". }
         { exact Hcsf. }
         { rewrite /fileclose_env_out Hpipe bool_decide_eq_true_2; [|reflexivity].
@@ -1331,10 +1332,10 @@ Section ProofFileclose.
           (* FIVE pure conjuncts, not six: the bundle no longer pins
              [eb = true], and this arm runs at a generic index.  [n] and [p]
              still are pinned, and both substitutions stay. *)
-          iDestruct "Henv" as "[(%Hn0 & %Hpj & %Hjlt & %Hgl & %Hgeom &
-                                 #Hprocs & #Hbio & #Hlog & #Hseam &
-                                 #Hgen & #Hdev & #Hgeo & #Hdlk & Hbsl &
-                                 #Hicenv & Hbm) Hpid]".
+          iDestruct "Henv" as "(%Hn0 & %Hpj & %Hjlt & %Hgl & %Hgeom &
+                                #Hprocs & #Hbio & #Hlog & #Hseam &
+                                #Hgen & #Hdev & #Hgeo & #Hdlk & Hbsl &
+                                #Hicenv & Hbm)".
           subst n. subst p.
           rewrite /fileclose_ic_env.
           iDestruct "Hicenv" as "(%Hcdev & %Hcnib & %Hsz & %Hbm0 &
@@ -1407,12 +1408,12 @@ Section ProofFileclose.
           iApply (BeginOp.wp_begin_op_sconf (CID := CIDf2)  (fcn_procs fn)
                     (fcn_j fn) (fcn_plock fn) (fcn_bio fn) (fcn_log fn) (fcn_fs fn)
                     (fcn_cov fn) (fcn_logstart fn) (fcn_dev fn)
-                    (fcn_pid fn) (fcn_dq fn) B1 (K - 8)%nat eb b lks
+                    pidv (fcn_dq fn) B1 (K - 8)%nat eb b lks Vpr
                     ltac:(lia) Hjlt Hgl
                     ltac:(lkbelow)
-                    with "Hcg Hcnt Hextc Hextm Htext Hpc Hlog Hpid Hprocs").
+                    with "Hcg Hcnt Hextc Hextm Htext Hpc Hlog Hpbare Hprocs").
           all: try lkbelow.
-          iIntros (CIDf3 Hsf3 mb) "%Hbcs Hcg Hcnt Hextc Hextm Hpc Hpid Hop".
+          iIntros (CIDf3 Hsf3 mb) "%Hbcs Hcg Hcnt Hextc Hextm Hpc Hpbare Hop".
           pose proof Hbcs as Hbcs_cs.
           assert (Hpcae : ret_pc (B1 !!! Regidx Rra) = mword_of_int (FC + 0xae)).
           { rewrite HB1ra. apply bv_eq; vm_compute; reflexivity. }
@@ -1474,18 +1475,18 @@ Section ProofFileclose.
                     (fcn_cov fn) (fcn_logstart fn) (fcn_bmapstart fn)
                     (fcn_inodestart fn) (fcn_nib fn) (fcn_size fn)
                     (fcn_dev fn) us kk qq inum MAXOPBLOCKS
-                    (fcn_pid fn) (fcn_dq fn) (fcn_dqb fn) (fcn_dqs fn)
-                    B3 (K - 8)%nat eb b lks
+                    pidv (fcn_dq fn) (fcn_dqb fn) (fcn_dqs fn)
+                    B3 (K - 8)%nat eb b lks Vpr
                     ltac:(lia) Hkk Hgeom Hsz Hbm0 Hbmcov Hbmlog
                     Hist0 Hiblk Hiblog Hinb Hcovb
                     ltac:(unfold iput_units, MAXOPBLOCKS; lia) Hjlt Hgl
                     ltac:(rewrite HB3a0; exact Hipe)
                     ltac:(lkbelow)
                     with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlog Hitab Hitinv
-                          Hescrow Hireg Hropen Hslk [$Href $Hru] Hsbb Hsbi Hbmres Hpid Hprocs
+                          Hescrow Hireg Hropen Hslk [$Href $Hru] Hsbb Hsbi Hbmres Hpbare Hprocs
                           Hdev Hgeo Hdlk Hbsl Hop").
           all: try lkbelow.
-          iIntros (CIDf6 Hsf6 mi ni us') "%Hics Hcg Hcnt Hextc Hextm Hpc Hpid Hsbb Hsbi
+          iIntros (CIDf6 Hsf6 mi ni us') "%Hics Hcg Hcnt Hextc Hextm Hpc Hpbare Hsbb Hsbi
                                           %Hussub Hbmres Hbsl %Hni Hop Hislot".
           pose proof Hics as Hics_cs.
           assert (Hpcb4 : ret_pc (B3 !!! Regidx Rra) = mword_of_int (FC + 0xb4)).
@@ -1520,14 +1521,14 @@ Section ProofFileclose.
                     (fcn_plock fn) (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
                     (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) (fcn_bio fn)
                     (fcn_log fn) (fcn_fs fn) (fcn_cov fn) (fcn_logstart fn)
-                    (fcn_dev fn) ni (fcn_pid fn) (fcn_dq fn)
-                    B4 (K - 8)%nat eb b lks
+                    (fcn_dev fn) ni pidv (fcn_dq fn)
+                    B4 (K - 8)%nat eb b lks Vpr
                     ltac:(lia) Hgeom Hjlt Hgl
                     ltac:(lkbelow)
-                    with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen Hpid
+                    with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen Hpbare
                           Hprocs Hdev Hgeo Hdlk Hop").
           all: try lkbelow.
-          iIntros (CIDf8 Hsf8 me) "%Hecs Hcg Hcnt Hextc Hextm Hpc Hpid".
+          iIntros (CIDf8 Hsf8 me) "%Hecs Hcg Hcnt Hextc Hextm Hpc Hpbare".
           pose proof Hecs as Hecs_cs.
           assert (Hpcb8 : ret_pc (B4 !!! Regidx Rra) = mword_of_int (FC + 0xb8)).
           { rewrite HB4ra. apply bv_eq; vm_compute; reflexivity. }
@@ -1602,12 +1603,11 @@ Section ProofFileclose.
                        ltac:(ext_chain Hebf b) with "Hextm") as "Hextm".
           iSpecialize ("Hcont" $! CIDf10 with "[]"); [iPureIntro; wp_next_chain|].
           iApply ("Hcont" $! mf with
-                    "Hcg Hcnt Hextc Hextm [Hpc] [%] Hfd [Hpid Hbsl Hsbb Hsbi Hbmres]").
+                    "Hcg Hcnt Hextc Hextm [Hpc] [%] Hfd [Hbsl Hsbb Hsbi Hbmres] Hpbare").
           { iEval (rewrite /ret_tgt). iExact "Hpc". }
           { exact Hcsf. }
           { rewrite /fileclose_env_out bool_decide_eq_false_2; [|exact Hnpipe].
             rewrite Hib /fileclose_fs_out.
-            iSplitL "Hpid"; [iExact "Hpid"|].
             iSplitL "Hbsl"; [iExact "Hbsl"|].
             (* the bitmap comes back smaller iff the truncate arm ran; iput
                states exactly that and no more.  (iput's [iref_slot] is
@@ -1681,7 +1681,7 @@ Section ProofFileclose.
           iDestruct (cpu_claim_ext_transport CID CIDz3 eb p ltac:(ext_chain Hebf b)
                        with "Hextm") as "Hextm".
           iSpecialize ("Hcont" $! CIDz3 with "[]"); [iPureIntro; wp_next_chain|].
-          iApply ("Hcont" $! mf with "Hcg Hcnt Hextc Hextm [Hpc] [%] Hfd [Henv]").
+          iApply ("Hcont" $! mf with "Hcg Hcnt Hextc Hextm [Hpc] [%] Hfd [Henv] Hpbare").
           { iEval (rewrite /ret_tgt). iExact "Hpc". }
           { exact Hcsf. }
           { by iApply fileclose_env_out_of_env. }

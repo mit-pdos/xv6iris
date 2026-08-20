@@ -9,16 +9,16 @@
    (`sysc_epilogue_tail`) AND the whole unknown-syscall printk fallback
    (`sysc_fallback`, +0x40..+0x56).
 
-   SIXTEEN of the 22 table entries are WIRED to real, `Qed`'d arms calling
-   their own whole-function contracts: 1 fork, 2 exit, 3 wait, 6 kill,
-   7 exec, 8 fstat, 9 chdir, 10 dup, 11 getpid, 12 sbrk, 13 pause,
-   14 uptime, 18 unlink, 19 link, 21 close, 22 sync.  Count the `decide`
-   branches in `sysc_arm_dispatch`, not this list.
+   NINETEEN of the 22 table entries are WIRED to real, `Qed`'d arms calling
+   their own whole-function contracts: 1 fork, 2 exit, 3 wait, 4 pipe,
+   6 kill, 7 exec, 8 fstat, 9 chdir, 10 dup, 11 getpid, 12 sbrk, 13 pause,
+   14 uptime, 17 mknod, 18 unlink, 19 link, 20 mkdir, 21 close, 22 sync.
+   Count the `decide` branches in `sysc_arm_dispatch`, not this list.
 
    The file's ONE remaining `Admitted` is `sysc_arm_placeholder`, standing
-   in for the SIX entries that are not wired: 4 pipe, 5 read, 15 open,
-   16 write, 17 mknod, 20 mkdir.  What blocks each is stated below, and
-   none of it is a missing resource any more -- see THE ENVIRONMENT, below.
+   in for the THREE entries that are not wired: 5 read, 15 open, 16 write.
+   What blocks each is stated below, and none of it is a missing resource
+   any more -- see THE ENVIRONMENT, below.
 
    ==== THE ENVIRONMENT IS [FsReady.fs_ready] NOW, AND THAT CLOSED THE
         WHOLE "GENUINELY MISSING RESOURCES" CATEGORY ====================
@@ -63,24 +63,34 @@
        boot wiring still owes the call, but the obligation is now a named
        lemma rather than an open question.
 
-   ==== WHAT BLOCKS THE REMAINING SIX, measured against their own
-        `SpecSysXxx.v` -- three independent debts, none of them an
+   ==== WHAT BLOCKS THE REMAINING THREE, measured against their own
+        `SpecSysXxx.v` -- two independent debts, none of them an
         environment problem ==============================================
 
-   (A) THE REFERENCE LEDGER DOES NOT CLOSE.  `sys_open` (15), `sys_mkdir`
-       (20) and `sys_mknod` (17) return `iref_slots ns'` at an INTERVAL
-       (`ns - create_slots <= ns' <= ns`), while `wp_syscall_sconf_body`
-       hands out `iref_slots IREFSPARE` and must get `IREFSPARE` back --
-       and it must, because [UsertrapRes.ut_own] carries the allowance at
-       the literal `IREFSPARE` and [SpecUserretClosed]'s trap loop gets its
-       residue back UNCHANGED on the next trap.  A leak of one unit per
-       `open` breaks the Löb invariant, so no honest weakening of this
-       contract helps: the ledger has to close.
-       - For mkdir/mknod the fact is TRUE and only the statement is weak:
-         [SpecCreate.v]:101 says so outright ("the `iunlockput` returns the
-         second, so `ns' = ns`") -- on the SUCCESS arm.  The failure arm is
-         where create's own post gives only the interval, so tightening it
-         is create's job, not the syscall's.
+   (Debt (B) below is RETIRED, and so is the mkdir/mknod half of (A).  Both
+   are kept for their shapes: (B) is the one that stops a proof dead without
+   any build noticing, and (A)'s retired half is the one where the FUNCTION
+   was already right and only its CONTRACT was weak.)
+
+   (A) THE REFERENCE LEDGER DOES NOT CLOSE -- FOR `sys_open` (15) ONLY NOW.
+       An entry returning `iref_slots ns'` at less than `IREFSPARE` cannot
+       be wired: `wp_syscall_sconf_body` hands out `iref_slots IREFSPARE`
+       and must get `IREFSPARE` back, because [UsertrapRes.ut_own] carries
+       the allowance at that literal and [SpecUserretClosed]'s trap loop
+       gets its residue back UNCHANGED on the next trap.  A leak of one unit
+       per `open` breaks the Löb invariant, so no honest weakening helps:
+       the ledger has to close.
+       - `sys_mkdir` (20) and `sys_mknod` (17) ARE WIRED.  This entry used
+         to say the fact was TRUE for them and only the statement weak --
+         create returned the INTERVAL `ns - create_slots <= ns' <= ns` --
+         and that tightening it was create's job rather than the syscall's.
+         That is what was done: all nine of create's continuation sites
+         already computed the exact figure and then weakened into the
+         interval, so [SpecCreate]'s post states it outright now
+         (`if ok then S ns' = ns else ns' = ns`), mkdir's and mknod's own
+         posts say `ns' = ns`, and the arms pass the whole allowance in and
+         take the whole allowance out.  It also made both wrappers in
+         [FsSyscalls.v] composable, which its note (S3) had ruled out.
        - For `sys_open` the unit is genuinely spent for good: the success
          arm PARKS the reference in `f->ip` ([FileInvDefs.inode_pay]), where
          it lives as long as the descriptor does.  [IrefSlots.v]'s supply is
@@ -92,21 +102,24 @@
          per-slot knowledge of whether the file is inode-typed, which is the
          "wants per-`ofile` ghost state" item in
          claude-notes/projects/fs-icache.md, "Deferred / owed".
-   (B) A CONTRACT WHOSE PID FRACTION EXCEEDS WHAT EXISTS.  `sys_pipe` (4)
-       takes `proc_priv` AND `SpecFileclose.fileclose_fs_env`, and the
-       latter carries a QUARTER of `p->pid`; [ProcInv.proc_priv] owns one
-       half and [SchedCtx]'s state resource the other, so three quarters is
-       more than any thread can hold outside the proc lock.  Nothing in the
-       build sees it (the premise set is satisfiable in isolation --
-       durable-notes.md's "satisfiable in isolation, refutable at the call
-       site"), and the only caller was an `Axiom`.
-       `sys_close` (21) HAD THE SAME DEFECT AND IT IS FIXED: its contract
-       takes `fileclose_fs_env_nopid` and lends the quarter out of its own
-       `proc_priv` at the fileclose call
-       ([ProcInv.proc_priv_pid_ofile] + [SpecFileclose.fileclose_loop_open],
-       the pairing kexit's descriptor loop already used).  sys_pipe wants
-       the same edit; it is bigger only because four of ProofSysPipe.v's own
-       block lemmas thread the bundle in their statements.
+   (B) RETIRED -- A CONTRACT WHOSE PID FRACTION EXCEEDED WHAT EXISTS.
+       `sys_pipe` (4) used to take `proc_priv` AND
+       `SpecFileclose.fileclose_fs_env`, and the latter carried a QUARTER of
+       `p->pid`; [ProcInv.proc_priv] owns one half and [SchedCtx]'s state
+       resource the other, so three quarters was more than any thread can
+       hold outside the proc lock.  Nothing in the build saw it (the premise
+       set is satisfiable in isolation -- durable-notes.md's "satisfiable in
+       isolation, refutable at the call site"), and the only caller was an
+       `Axiom`.  `sys_close` (21) had the same defect.
+
+       BOTH ARE FIXED, and the fix went further than either contract: NO
+       file-system contract asks for a fraction of `p->pid` any more.  The
+       block ([ProcDefs.proc_priv_bare]) is what travels, from `bread` and
+       `bmap` up through `namex` and `fileclose`, and only `acquiresleep`
+       and `holdingsleep` -- the two functions that actually load the field
+       -- ever see it, borrowing it for that one instruction.  `sys_pipe` is
+       WIRED as `sysc_arm_pipe`; its two surviving tie premises (`fcn_pid`,
+       `fcn_dq`) are discharged there the way sys_close's are.
    (C) A PREMISE ABOUT UNCHECKED USER INPUT, which no dispatcher can ever
        supply.  `sys_read` (5) takes `0 <= sys_rw_count v2` and
        `MAXFILE*BSIZE + sys_rw_count v2 < 2^31`, and `sys_write` (16) the
@@ -3421,6 +3434,328 @@ Section SyscallArms.
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hfc Hip Hfd Hir Henv Hpriv Hpc Hcont").
   Qed.
 
+  (* ------------------------------------------------------------------- *)
+  (* ENTRY 4, `pipe`.  Shaped exactly like `sysc_arm_close` -- both close
+     descriptors they took back out of the fd table, so both carry BOTH of
+     fileclose's bundles and let the type select -- with three differences,
+     all of them visible in the [with] list:
+
+       - it needs [kalloc_env], because pipealloc allocates the pipe page and
+         copyout's vmfault allocates again.  It comes off the environment
+         like everything else ([syscall_env_all]'s first conjunct).
+       - it takes TWO of the four spare fd units.  sys_pipe can hold two
+         references in locals before either reaches a descriptor; both come
+         back in its post, which is why [sysc_ret_tail] gets [FDSPARE] again.
+       - its post moves the page table.  copyout writes the two descriptor
+         numbers into user memory and may fault a page in on the way, so the
+         block returns at [upd_upt V P'] rather than at [V] -- and the
+         trapframe page, which is what the epilogue's [Rs2] names, is pinned
+         by [uptd_ext]'s own second conjunct.
+
+     THE PID FRACTION USED TO BLOCK THIS ENTRY and no longer does: this
+     contract takes the NOPID bundle beside [proc_priv] and lends the block
+     out of it at each fileclose call.  Its two remaining tie premises are
+     discharged the way sys_close's are -- [fcn_pid] from the dispatch's own
+     [Hpidt], [fcn_dq] off the [sysc_ties] record. *)
+  Lemma sysc_arm_pipe (γf : gname) (pj : mword 64)
+      (γs : list gname) (j : nat) (γl : gname) (bn : bio_names)
+      (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
+      (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
+      (m M : regfile) (us : gset Z) :
+    sysc_arm_goal 4 γf pj γs j γl bn fn dqi ip pid V lks av m M us.
+  Proof.
+    rewrite /sysc_arm_goal /sysc_arm_pre.
+    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
+    subst pj.
+    iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
+    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
+    iDestruct "Hcont" as "[Hcont _]".
+    assert (Hpce : (mword_of_int (sysc_target 4) : mword 64)
+                   = mword_of_int KernelSyms.sys_pipe) by reflexivity.
+    iEval (rewrite Hpce) in "Hpc".
+    iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlks Hcpu]". subst lks.
+    (* syscall argument 0 -- the user address of the two-int array -- out of
+       the trapframe page the block carries.  Nothing is assumed about it;
+       copyout is the check. *)
+    iDestruct (proc_priv_tf with "Hpriv") as "(Htfc & Htfp & Hpvback)".
+    iDestruct (tf_page_length with "Htfp") as "%Htflen".
+    iDestruct ("Hpvback" with "Htfc Htfp") as "Hpriv".
+    destruct (lookup_lt_is_Some_2 (pv_tf V) (tf_arg_idx 0)
+                ltac:(rewrite Htflen; unfold TFWORDS, tf_arg_idx; lia)) as [v0 Hv0].
+    iPoseProof "Henv" as "#Henvc".
+    iDestruct (syscall_env_all with "Henvc") as (γa γp γw γft γtk γpr γud γvd)
+      "(#Hkalloc & _ & _ & _ & #Hftable & _ & _ & #Hfsenv)".
+    iDestruct (sysc_fs_env_ties with "Hfsenv") as "%T".
+    iDestruct (sysc_fs_env_all with "Hfsenv") as
+      "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hpanic & _)".
+    iPoseProof (sysc_fclose_pipe_env (proc_addr j) bn fn with "Hfsenv") as "#Hpenv".
+    iDestruct (sysc_fclose_fs_env (proc_addr j) bn fn us true
+                 with "Hfsenv Hbs Hfc") as "Hfenv".
+    (* two of the four spare units out, and the same two back below *)
+    iDestruct (fd_slots_split 1 3 with "Hfd") as "[Hfd0 Hfd]".
+    iDestruct (fd_slots_split 1 2 with "Hfd") as "[Hfd1 Hfd]".
+    iPoseProof sysc_trap_ext_true as "Htcx".
+    iPoseProof (sysc_claim_ext_true (proc_addr j)) as "Hccx".
+    iApply (SysPipe.wp_sys_pipe_sconf γa γft γf fn None us M (av - 4)%nat
+              true (proc_addr j) v0 pid V true ∅
+              Hv0 ltac:(lia) (locks_below_empty "log")
+              Hpidt (sct_dq _ _ _ T)
+              with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hpanic Hftable Hkalloc
+                    Hpriv Hfd0 Hfd1 Hpenv Hfenv").
+    iIntros (CIDy Hsy mf P') "%Hcs %Hupt Hcg Hcpu _ _ Hpc Hpost Hpe' Hfe'".
+    iDestruct "Hfe'" as (us') "Hfe'".
+    (* the three block slots and the bitmap, back out of the nopid bundle *)
+    iDestruct (sysc_fclose_fs_out bn fn us' 0%nat true (proc_addr j)
+                 (sct_bio _ _ _ T) with "Hfe'") as "[Hbs Hfc]".
+    iDestruct "Hpost" as "(Hpv & Hfd0 & Hfd1)".
+    iDestruct (fd_slots_combine 1 2 with "Hfd1 Hfd") as "Hfd".
+    iDestruct (fd_slots_combine 1 3 with "Hfd0 Hfd") as "Hfd".
+    (* BOTH ARMS RETURN THE BLOCK, and the epilogue needs only that its
+       trapframe page has not moved -- which is [uptd_ext]'s own second
+       conjunct, at whichever [V'] the arm hands back. *)
+    destruct Hupt as (_ & Htfpe & _).
+    iAssert (∃ V' : pprivate,
+               ⌜ud_tfp (pv_upt V') = ud_tfp (pv_upt V)⌝ ∗
+               proc_priv γf (proc_addr j) pid V')%I with "[Hpv]" as
+      (V') "[%Htfp' Hpriv]".
+    { iDestruct "Hpv" as
+        "[[_ Hpv] | (%fd0 & %fd1 & %l & %k0 & %k1 & _ & Hpv)]".
+      - iExists (upd_upt V P'). iFrame "Hpv". iPureIntro.
+        cbn [pv_upt upd_upt]. exact Htfpe.
+      - iExists (upd_ofile (upd_ofile (upd_upt V P') fd0 (fnode k0)) fd1 (fnode k1)).
+        iFrame "Hpv". iPureIntro.
+        cbn [pv_upt upd_ofile upd_upt]. exact Htfpe. }
+    assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
+    { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
+    assert (Hmfs2 : mf !!! Regidx Rs2 = page_base (ud_tfp (pv_upt V'))).
+    { rewrite (callee_saved_lookup Hcs Rs2 ltac:(vm_compute; reflexivity)).
+      rewrite Htfp'. exact HMs2. }
+    assert (Hmfrest : forall r : mword 5, is_cs_idx r = true ->
+              r <> csp_rs1 -> r <> Rs0 -> r <> Rs1 -> r <> Rs2 ->
+              mf !!! Regidx r = m !!! Regidx r).
+    { intros r Hr Ncsp N8 N9 N18.
+      rewrite (callee_saved_lookup Hcs r Hr). exact (HMother r Hr Ncsp N8 N9 N18). }
+    assert (Hret : ret_pc (M !!! Regidx Rra)
+                   = (mword_of_int (KernelSyms.syscall + 0x3a) : mword 64))
+      by (rewrite HMra; apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hret) in "Hpc".
+    assert (Hcry : true = false \/ proc_addr j = zero_reg -> (CIDy : CPU) = (CID : CPU))
+      by wp_next_chain.
+    iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
+    iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) bn fn dqi ip pid V V'
+              ∅ av us' m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) Htfp'
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hfc Hip Hfd Hir Henv Hpriv Hpc Hcont").
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* ENTRIES 20 and 17, `mkdir` and `mknod` -- the two create-family entries
+     whose ledgers CLOSE.  They are one arm twice over: identical premise
+     lists (the icache's four ties, the block layer's nine geometry facts,
+     mkfs's inode geometry and the printk credential pair ialloc's
+     out-of-inodes arm needs) and identical resource lists, differing only in
+     how many syscall arguments they read -- one for mkdir, three for mknod.
+
+     WHAT USED TO BLOCK THEM was debt (A) in this file's header, and only
+     half of it: create returned its slot ledger as the INTERVAL
+     [ns - create_slots <= ns' <= ns], while `wp_syscall_sconf_body` hands
+     out [iref_slots IREFSPARE] and must get IREFSPARE back -- it must,
+     because [UsertrapRes.ut_own] carries the allowance at that literal and
+     the trap loop gets its residue back unchanged, so a leak of one unit per
+     mkdir would break the Löb invariant.  The header also recorded that the
+     fact was TRUE and only the statement weak, and that tightening it was
+     create's job.  It is done: [SpecCreate]'s post states the figure
+     exactly ([if ok then S ns' = ns else ns' = ns]) -- all nine of its
+     continuation sites already computed it and then weakened -- so
+     mkdir's and mknod's own posts say [ns' = ns] and this arm can pass the
+     whole allowance in and take the whole allowance out.
+
+     NO SPLIT of [iref_slots], unlike the chdir/link/unlink arms: create
+     wants [create_slots = 3] and IREFSPARE is 4, so the entry takes the
+     ledger whole.  Both superblock cells create needs beyond the two in
+     [fileclose_bm] -- [sb_ninodes] and [sb_size] -- come off [fs_ready] at
+     [DfracDiscarded], which is the second of the four rows the old
+     twenty-five-conjunct environment could not state at all. *)
+  Lemma sysc_arm_mkdir (γf : gname) (pj : mword 64)
+      (γs : list gname) (j : nat) (γl : gname) (bn : bio_names)
+      (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
+      (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
+      (m M : regfile) (us : gset Z) :
+    sysc_arm_goal 20 γf pj γs j γl bn fn dqi ip pid V lks av m M us.
+  Proof.
+    rewrite /sysc_arm_goal /sysc_arm_pre.
+    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
+    subst pj.
+    iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
+    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
+    iDestruct "Hcont" as "[Hcont _]".
+    assert (Hpce : (mword_of_int (sysc_target 20) : mword 64)
+                   = mword_of_int KernelSyms.sys_mkdir) by reflexivity.
+    iEval (rewrite Hpce) in "Hpc".
+    iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlks Hcpu]". subst lks.
+    iDestruct (proc_priv_tf with "Hpriv") as "(Htfc & Htfp & Hpvback)".
+    iDestruct (tf_page_length with "Htfp") as "%Htflen".
+    iDestruct ("Hpvback" with "Htfc Htfp") as "Hpriv".
+    destruct (lookup_lt_is_Some_2 (pv_tf V) (tf_arg_idx 0)
+                ltac:(rewrite Htflen; unfold TFWORDS, tf_arg_idx; lia)) as [v0 Hv0].
+    iPoseProof "Henv" as "#Henvc".
+    iDestruct (syscall_env_all with "Henvc") as (γa γp γw γft γtk γpr γud γvd)
+      "(#Hkalloc & _ & _ & _ & _ & _ & _ & #Hfsenv)".
+    iDestruct (sysc_fs_env_all with "Hfsenv") as
+      "(%Hdev & %Hnib & %Hlogn & %Hist & %Hroot & %Hnib0 & _ & _ & _ & _ & _ &
+        %Hlg & _ & _ & #Hbio & #Hlog & #Hseam & #Hgen & #Hdevi & #Hgeom &
+        #Hdlock & _ & _ & #Hic & _ & %Hbmgeo & %Hnin & #Hsbn & #Hsbs &
+        %Hprg & #Hpr)".
+    iDestruct "Hic" as
+      "(_ & _ & %Hsize & %Hbm0 & %Hbmc & %Hbml & %Hist0 & %Hib & %Hcb &
+        #Hit & #Hitinv & #Hesc & #Hireg & #Hropen & #Hsl2)".
+    destruct Hnin as (Hn1 & Hn2 & Hn3 & Hn4).
+    iDestruct (sysc_bm_split with "Hfc") as "(Hbmp & Hisp & Hbmr)".
+    iPoseProof sysc_trap_ext_true as "Htcx".
+    iPoseProof (sysc_claim_ext_true (proc_addr j)) as "Hccx".
+    iApply (SysMkdir.wp_sys_mkdir_sconf γf γa fsc_printk γs j γl
+              (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
+              (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn
+              (fcn_log fn) (fcn_fs fn) (fcn_ireg fn) (fcn_ic fn) (fcn_tlock fn)
+              (fcn_cov fn) (fcn_logstart fn) (fcn_bmapstart fn)
+              (fcn_inodestart fn) (fcn_nib fn) fsc_ninodes (fcn_size fn)
+              (fcn_dev fn) us IREFSPARE
+              (fcn_dqb fn) (fcn_dqs fn) DfracDiscarded DfracDiscarded
+              v0 pid V M (av - 4)%nat true true ∅
+              ltac:(lia) Hdev Hnib Hlogn Hist Hroot Hnib0 Hlg Hsize Hbm0 Hbmc
+              Hbml Hist0 Hcb Hbmgeo Hib Hn1 Hn2 Hn3 Hn4 Hprg
+              ltac:(compute; lia) Hj Hgamma eq_refl Hv0
+              with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hpr Hbio Hlog Hseam
+                    Hgen Hdevi Hgeom Hdlock Hbs Hit Hitinv Hesc Hsl2 Hireg
+                    Hropen Hsbn Hisp Hsbs Hbmp Hbmr Hkalloc Hprocs Hir Hpriv").
+    iIntros (CIDy Hsy mf used' ns' P')
+      "%Hcs %Hext Hcg Hcpu _ _ Hpc Hbs Hsbn' Hisp Hsbs' Hbmp Hbmr
+       %Hns Hir Hpriv %Hret0".
+    (* THE LEDGER CLOSES: [ns' = ns = IREFSPARE], so what the epilogue hands
+       on is the allowance the trap loop expects, unchanged. *)
+    subst ns'.
+    iDestruct (sysc_bm_join with "Hbmp Hisp Hbmr") as "Hfc".
+    (* the trapframe page has not moved -- [uptd_ext]'s own second conjunct *)
+    destruct Hext as (_ & Htfpe & _).
+    assert (Htfp' : ud_tfp (pv_upt (upd_upt V P')) = ud_tfp (pv_upt V))
+      by (cbn [pv_upt upd_upt]; exact Htfpe).
+    assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
+    { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
+    assert (Hmfs2 : mf !!! Regidx Rs2 = page_base (ud_tfp (pv_upt (upd_upt V P')))).
+    { rewrite (callee_saved_lookup Hcs Rs2 ltac:(vm_compute; reflexivity)).
+      rewrite Htfp'. exact HMs2. }
+    assert (Hmfrest : forall r : mword 5, is_cs_idx r = true ->
+              r <> csp_rs1 -> r <> Rs0 -> r <> Rs1 -> r <> Rs2 ->
+              mf !!! Regidx r = m !!! Regidx r).
+    { intros r Hr Ncsp N8 N9 N18.
+      rewrite (callee_saved_lookup Hcs r Hr). exact (HMother r Hr Ncsp N8 N9 N18). }
+    assert (Hretpc : ret_pc (M !!! Regidx Rra)
+                   = (mword_of_int (KernelSyms.syscall + 0x3a) : mword 64))
+      by (rewrite HMra; apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hretpc) in "Hpc".
+    assert (Hcry : true = false \/ proc_addr j = zero_reg -> (CIDy : CPU) = (CID : CPU))
+      by wp_next_chain.
+    iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
+    iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) bn fn dqi ip pid V
+              (upd_upt V P') ∅ av used' m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) Htfp'
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hfc Hip Hfd Hir Henv Hpriv Hpc Hcont").
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* ENTRY 17, `mknod` -- [sysc_arm_mkdir]'s twin.  The only difference is
+     that it reads THREE syscall arguments (path, major, minor) where mkdir
+     reads one, so it takes three [tf_arg_idx] witnesses out of the same
+     trapframe page.  Everything else -- premise list, resource list,
+     postcondition, and the ledger that closes at [IREFSPARE] -- is the
+     same; see [sysc_arm_mkdir] for why the entry is wirable at all. *)
+  Lemma sysc_arm_mknod (γf : gname) (pj : mword 64)
+      (γs : list gname) (j : nat) (γl : gname) (bn : bio_names)
+      (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
+      (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
+      (m M : regfile) (us : gset Z) :
+    sysc_arm_goal 17 γf pj γs j γl bn fn dqi ip pid V lks av m M us.
+  Proof.
+    rewrite /sysc_arm_goal /sysc_arm_pre.
+    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
+    subst pj.
+    iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
+    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
+    iDestruct "Hcont" as "[Hcont _]".
+    assert (Hpce : (mword_of_int (sysc_target 17) : mword 64)
+                   = mword_of_int KernelSyms.sys_mknod) by reflexivity.
+    iEval (rewrite Hpce) in "Hpc".
+    iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlks Hcpu]". subst lks.
+    iDestruct (proc_priv_tf with "Hpriv") as "(Htfc & Htfp & Hpvback)".
+    iDestruct (tf_page_length with "Htfp") as "%Htflen".
+    iDestruct ("Hpvback" with "Htfc Htfp") as "Hpriv".
+    destruct (lookup_lt_is_Some_2 (pv_tf V) (tf_arg_idx 0)
+                ltac:(rewrite Htflen; unfold TFWORDS, tf_arg_idx; lia)) as [v0 Hv0].
+    destruct (lookup_lt_is_Some_2 (pv_tf V) (tf_arg_idx 1)
+                ltac:(rewrite Htflen; unfold TFWORDS, tf_arg_idx; lia)) as [v1 Hv1].
+    destruct (lookup_lt_is_Some_2 (pv_tf V) (tf_arg_idx 2)
+                ltac:(rewrite Htflen; unfold TFWORDS, tf_arg_idx; lia)) as [v2 Hv2].
+    iPoseProof "Henv" as "#Henvc".
+    iDestruct (syscall_env_all with "Henvc") as (γa γp γw γft γtk γpr γud γvd)
+      "(#Hkalloc & _ & _ & _ & _ & _ & _ & #Hfsenv)".
+    iDestruct (sysc_fs_env_all with "Hfsenv") as
+      "(%Hdev & %Hnib & %Hlogn & %Hist & %Hroot & %Hnib0 & _ & _ & _ & _ & _ &
+        %Hlg & _ & _ & #Hbio & #Hlog & #Hseam & #Hgen & #Hdevi & #Hgeom &
+        #Hdlock & _ & _ & #Hic & _ & %Hbmgeo & %Hnin & #Hsbn & #Hsbs &
+        %Hprg & #Hpr)".
+    iDestruct "Hic" as
+      "(_ & _ & %Hsize & %Hbm0 & %Hbmc & %Hbml & %Hist0 & %Hib & %Hcb &
+        #Hit & #Hitinv & #Hesc & #Hireg & #Hropen & #Hsl2)".
+    destruct Hnin as (Hn1 & Hn2 & Hn3 & Hn4).
+    iDestruct (sysc_bm_split with "Hfc") as "(Hbmp & Hisp & Hbmr)".
+    iPoseProof sysc_trap_ext_true as "Htcx".
+    iPoseProof (sysc_claim_ext_true (proc_addr j)) as "Hccx".
+    iApply (SysMknod.wp_sys_mknod_sconf γf γa fsc_printk γs j γl
+              (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
+              (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn
+              (fcn_log fn) (fcn_fs fn) (fcn_ireg fn) (fcn_ic fn) (fcn_tlock fn)
+              (fcn_cov fn) (fcn_logstart fn) (fcn_bmapstart fn)
+              (fcn_inodestart fn) (fcn_nib fn) fsc_ninodes (fcn_size fn)
+              (fcn_dev fn) us IREFSPARE
+              (fcn_dqb fn) (fcn_dqs fn) DfracDiscarded DfracDiscarded
+              v0 v1 v2 pid V M (av - 4)%nat true true ∅
+              ltac:(lia) Hdev Hnib Hlogn Hist Hroot Hnib0 Hlg Hsize Hbm0 Hbmc
+              Hbml Hist0 Hcb Hbmgeo Hib Hn1 Hn2 Hn3 Hn4 Hprg
+              ltac:(compute; lia) Hj Hgamma eq_refl Hv0 Hv1 Hv2
+              with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hpr Hbio Hlog Hseam
+                    Hgen Hdevi Hgeom Hdlock Hbs Hit Hitinv Hesc Hsl2 Hireg
+                    Hropen Hsbn Hisp Hsbs Hbmp Hbmr Hkalloc Hprocs Hir Hpriv").
+    iIntros (CIDy Hsy mf used' ns' P')
+      "%Hcs %Hext Hcg Hcpu _ _ Hpc Hbs Hsbn' Hisp Hsbs' Hbmp Hbmr
+       %Hns Hir Hpriv %Hret0".
+    (* THE LEDGER CLOSES: [ns' = ns = IREFSPARE], so what the epilogue hands
+       on is the allowance the trap loop expects, unchanged. *)
+    subst ns'.
+    iDestruct (sysc_bm_join with "Hbmp Hisp Hbmr") as "Hfc".
+    (* the trapframe page has not moved -- [uptd_ext]'s own second conjunct *)
+    destruct Hext as (_ & Htfpe & _).
+    assert (Htfp' : ud_tfp (pv_upt (upd_upt V P')) = ud_tfp (pv_upt V))
+      by (cbn [pv_upt upd_upt]; exact Htfpe).
+    assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
+    { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
+    assert (Hmfs2 : mf !!! Regidx Rs2 = page_base (ud_tfp (pv_upt (upd_upt V P')))).
+    { rewrite (callee_saved_lookup Hcs Rs2 ltac:(vm_compute; reflexivity)).
+      rewrite Htfp'. exact HMs2. }
+    assert (Hmfrest : forall r : mword 5, is_cs_idx r = true ->
+              r <> csp_rs1 -> r <> Rs0 -> r <> Rs1 -> r <> Rs2 ->
+              mf !!! Regidx r = m !!! Regidx r).
+    { intros r Hr Ncsp N8 N9 N18.
+      rewrite (callee_saved_lookup Hcs r Hr). exact (HMother r Hr Ncsp N8 N9 N18). }
+    assert (Hretpc : ret_pc (M !!! Regidx Rra)
+                   = (mword_of_int (KernelSyms.syscall + 0x3a) : mword 64))
+      by (rewrite HMra; apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hretpc) in "Hpc".
+    assert (Hcry : true = false \/ proc_addr j = zero_reg -> (CIDy : CPU) = (CID : CPU))
+      by wp_next_chain.
+    iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
+    iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) bn fn dqi ip pid V
+              (upd_upt V P') ∅ av used' m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) Htfp'
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hfc Hip Hfd Hir Henv Hpriv Hpc Hcont").
+  Qed.
+
   (* THE COMBINATOR.  One [decide (k = <literal>)] branch per wired entry,
      ahead of the generic placeholder: adding an arm is adding a branch, and
      nothing already wired moves.  Kept in THIS section (rather than beside
@@ -3466,6 +3801,12 @@ Section SyscallArms.
     { exact (sysc_arm_close γf pj γs j γl bn fn dqi ip pid V lks av m M us). }
     destruct (decide (k = 22%nat)) as [-> | _].
     { exact (sysc_arm_sync γf pj γs j γl bn fn dqi ip pid V lks av m M us). }
+    destruct (decide (k = 4%nat)) as [-> | _].
+    { exact (sysc_arm_pipe γf pj γs j γl bn fn dqi ip pid V lks av m M us). }
+    destruct (decide (k = 20%nat)) as [-> | _].
+    { exact (sysc_arm_mkdir γf pj γs j γl bn fn dqi ip pid V lks av m M us). }
+    destruct (decide (k = 17%nat)) as [-> | _].
+    { exact (sysc_arm_mknod γf pj γs j γl bn fn dqi ip pid V lks av m M us). }
     exact (sysc_arm_placeholder k γf pj γs j γl bn fn dqi ip pid V lks av m M us Hk).
   Qed.
 
@@ -3798,8 +4139,8 @@ Section SyscallMain.
      check driving the data-dependent `k`, the address computation, the
      table read, the redundant `beqz`, the `c.jalr`) into a full dispatch:
      every one of the 22 table entries reaches `sysc_arm_goal k` for its
-     own `k`, discharged by `sysc_arm_dispatch` -- sixteen real arms (see the
-     file header's list) and, for the other six, the honest `Admitted`
+     own `k`, discharged by `sysc_arm_dispatch` -- nineteen real arms (see the
+     file header's list) and, for the other three, the honest `Admitted`
      `sysc_arm_placeholder`.  A new arm is one more `decide (k = <literal>)`
      branch inside that combinator and NOTHING here moves; see the file
      header for what each remaining entry is still waiting on. *)

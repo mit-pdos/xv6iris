@@ -261,11 +261,10 @@ Section ProofDirlookupMain.
     exact (dlk_de_split (KTR := KT1) a (fun jj => file_byte data (16 * i + jj)%nat)).
   Qed.
 
-  (* the [V] slot of readi's contract is dead on the kernel arm *)
-  Definition dlk_dummyV : pprivate :=
-    MkPPriv (mword_of_int 0)
-            (UPTD (mword_of_int 0) (mword_of_int 0) ∅ ∅)
-            [] [] (mword_of_int 0) [].
+  (* [dlk_dummyV] USED TO BE HERE: readi's [V] slot was dead on the kernel
+     arm, which took a bare quarter of [p->pid] rather than a process block.
+     It takes [proc_priv_bare pj pidv V] now, so the slot is live and
+     dirlookup passes its OWN [Vpr] straight through. *)
 
   (* ---- THE BLOCK STATEMENTS, NAMED (claude-notes/optimization.md, RULE
      ONE) -- [Htail]/[Hloop]/[Hlatch] are each stated below as a
@@ -317,7 +316,7 @@ Section ProofDirlookupMain.
   Definition dl_found_cont
       (nrec : nat) (dn : dinode) (data : nat -> list (bv 8)) (s : list (bv 8))
       (m : regfile) (ip nb pf pj ret_tgt : mword 64) (K : nat)
-      (b eb hasp : bool) (lks : gset string) (dq dqd dqn : dfrac)
+      (b eb hasp : bool) (lks : gset string) (Vpr : pprivate) (dq dqd dqn : dfrac)
       (dev pofv pidv : mword 32) (fn : nat -> bv 8) (bn : bio_names)
       (gfs : fs_names) (gi : gname) (dinum : mword 32) (dr : dinode)
       (bm : blkmap) (CIDc : CpuId) : iProp Σ :=
@@ -331,7 +330,7 @@ Section ProofDirlookupMain.
        inode_map gfs ip bm -∗
        inode_blocks gfs bm data -∗
        ([∗ list] ii ∈ seq 0 14, pa_add nb ii ↦ₘ[KT1]{dqn} fn ii) -∗
-       p_pid pj ↦₄{dq} pidv -∗
+       proc_priv_bare pj pidv Vpr -∗
        bslot bn -∗
        (* the borrow, back verbatim on both arms (fs-fragments.md §7.1) *)
        dir_links (bv_unsigned dinum) dn data -∗
@@ -358,7 +357,7 @@ Section ProofDirlookupMain.
   Definition dl_loop_body
       (nrec : nat) (dn : dinode) (data : nat -> list (bv 8)) (s : list (bv 8))
       (m : regfile) (sp0 ip nb pf pj ret_tgt : mword 64) (K : nat)
-      (b eb hasp : bool) (lks : gset string) (dq dqd dqn : dfrac)
+      (b eb hasp : bool) (lks : gset string) (Vpr : pprivate) (dq dqd dqn : dfrac)
       (dev pofv pidv : mword 32) (fn : nat -> bv 8) (bn : bio_names)
       (gfs : fs_names) (gi : gname) (dinum : mword 32) (dr : dinode)
       (bm : blkmap) (fuel : nat) (CIDl : CpuId) : iProp Σ :=
@@ -387,20 +386,20 @@ Section ProofDirlookupMain.
        inode_blocks gfs bm data -∗
        ([∗ list] ii ∈ seq 0 14, pa_add nb ii ↦ₘ[KT1]{dqn} fn ii) -∗
        (if hasp then pf ↦₄[KT1] pofv else emp) -∗
-       p_pid pj ↦₄{dq} pidv -∗
+       proc_priv_bare pj pidv Vpr -∗
        bslot bn -∗
        iref_slot -∗
        dir_links (bv_unsigned dinum) dn data -∗
        dinode_at gi dinum dr -∗
        wp_next (CID0 := CID) true pj (fun (CIDc : CpuId) =>
-         dl_found_cont nrec dn data s m ip nb pf pj ret_tgt K b eb hasp lks
+         dl_found_cont nrec dn data s m ip nb pf pj ret_tgt K b eb hasp lks Vpr
            dq dqd dqn dev pofv pidv fn bn gfs gi dinum dr bm CIDc) -∗
        WP (Loop : expr riscv_lang))%I.
 
   Definition dl_latch_body
       (nrec : nat) (dn : dinode) (data : nat -> list (bv 8)) (s : list (bv 8))
       (m : regfile) (sp0 ip nb pf pj ret_tgt : mword 64) (K : nat)
-      (b eb hasp : bool) (lks : gset string) (dq dqd dqn : dfrac)
+      (b eb hasp : bool) (lks : gset string) (Vpr : pprivate) (dq dqd dqn : dfrac)
       (dev pofv pidv : mword 32) (fn : nat -> bv 8) (bn : bio_names)
       (gfs : fs_names) (gi : gname) (dinum : mword 32) (dr : dinode)
       (bm : blkmap) (i : nat) (CIDp : CpuId) : iProp Σ :=
@@ -427,13 +426,13 @@ Section ProofDirlookupMain.
        inode_blocks gfs bm data -∗
        ([∗ list] ii ∈ seq 0 14, pa_add nb ii ↦ₘ[KT1]{dqn} fn ii) -∗
        (if hasp then pf ↦₄[KT1] pofv else emp) -∗
-       p_pid pj ↦₄{dq} pidv -∗
+       proc_priv_bare pj pidv Vpr -∗
        bslot bn -∗
        iref_slot -∗
        dir_links (bv_unsigned dinum) dn data -∗
        dinode_at gi dinum dr -∗
        wp_next (CID0 := CID) true pj (fun (CIDc : CpuId) =>
-         dl_found_cont nrec dn data s m ip nb pf pj ret_tgt K b eb hasp lks
+         dl_found_cont nrec dn data s m ip nb pf pj ret_tgt K b eb hasp lks Vpr
            dq dqd dqn dev pofv pidv fn bn gfs gi dinum dr bm CIDc) -∗
        WP (Loop : expr riscv_lang))%I.
 
@@ -453,10 +452,10 @@ Section ProofDirlookupMain.
       (hasp : bool) (pofv : mword 32)
       (pidv : mword 32) (dq dqd dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string)
+      (b : bool) (lks : gset string) (Vpr : pprivate)
     : wp_dirlookup_sconf_body gs j gl gu gd gk pd pav pu bn gfs gi cn gtl
                               ga gf cov logstart inodestart nib dev ip dinum bm data dn dr
-                              fn hasp pofv pidv dq dqd dqn m K eb b lks.
+                              fn hasp pofv pidv dq dqd dqn m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_dirlookup_sconf_body].
     intros pcE pj nb pf ret_tgt nrec s HK Htype Hlg Hbmwf Hbmcov Hszb
@@ -1242,7 +1241,7 @@ Section ProofDirlookupMain.
       (* =============================================================== *)
       iAssert (∀ fuel : nat,
         wp_next (CID0 := CID) true pj (fun CIDl : CpuId =>
-          dl_loop_body nrec dn data s m sp0 ip nb pf pj ret_tgt K b eb hasp lks
+          dl_loop_body nrec dn data s m sp0 ip nb pf pj ret_tgt K b eb hasp lks Vpr
             dq dqd dqn dev pofv pidv fn bn gfs gi dinum dr bm fuel CIDl))%I
         with "[]" as "Hloop".
       { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
@@ -1266,7 +1265,7 @@ Section ProofDirlookupMain.
         (* ------------- THE LATCH at +0x52 (both misses land here) ------- *)
         iAssert (wp_next (CID0 := CIDl) true pj (fun CIDp : CpuId =>
                    dl_latch_body nrec dn data s m sp0 ip nb pf pj ret_tgt K b
-                     eb hasp lks dq dqd dqn dev pofv pidv fn bn gfs gi dinum dr
+                     eb hasp lks Vpr dq dqd dqn dev pofv pidv fn bn gfs gi dinum dr
                      bm i CIDp))%I
           with "[]" as "Hlatch".
         { iIntros (CIDp Hsp Mp dol' mt10')
@@ -1591,13 +1590,13 @@ Section ProofDirlookupMain.
         (* readi's destination buffer, at the address readi names it by *)
         iAssert (([∗ list] ii ∈ seq 0 16,
                     pa_add (L6 !!! Regidx Ra2 : mword 64) ii ↦ₘ[KT1] dol ii)
-                 ∗ p_pid (proc_addr j) ↦₄{dq} pidv)%I with "[Hde Hppid]" as "Hdst".
+                 ∗ proc_priv_bare (proc_addr j) pidv Vpr)%I with "[Hde Hppid]" as "Hdst".
         { iEval (rewrite HL6a2 Hpjd). iFrame. }
         iDestruct (cpu_own_transport CIDl CIDB6 0%nat eb pj b 
                      ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
         iApply (RD.wp_readi_sconf KT1 gs j gl gu gd gk pd pav pu bn gfs ga gf
                   cov logstart dev ip bm data dn
-                  false (16 * i)%nat 16%nat dol dlk_dummyV
+                  false (16 * i)%nat 16%nat dol Vpr
                   pidv dq dqd L6 (K - 12)%nat eb b lks
                   ltac:(lia) Hlg Hbmwf Hbmcov Hszb
                   ltac:(lia)
@@ -1619,7 +1618,7 @@ Section ProofDirlookupMain.
         iAssert (([∗ list] ii ∈ seq 0 16,
                     pa_add (L6 !!! Regidx Ra2 : mword 64) ii
                       ↦ₘ[KT1] rd_delivered data dol (16 * i) tot ii)
-                 ∗ p_pid (proc_addr j) ↦₄{dq} pidv)%I with "[Hdst2]" as "[Hde Hppid]".
+                 ∗ proc_priv_bare (proc_addr j) pidv Vpr)%I with "[Hdst2]" as "[Hde Hppid]".
         { iExact "Hdst2". }
         first [ iEval (rewrite Hpjd) in "Hppid" | idtac ].
         destruct Hrdret as [[_ Hbad] | [Hra0rd Hteq]]; [discriminate |].

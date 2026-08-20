@@ -368,15 +368,15 @@ Proof.
   iEval (rewrite Hp18) in "Hpc".
   (* ---- +0x18: addi a5,a5,-1712 -- a5 = &first ---- *)
   iApply (wp_addi4_s_sconf (mword_of_int (FR + 0x18)) Ra5 Ra5
-            (mword_of_int 2400 : mword 12) T1 av2 eb
+            (mword_of_int 2384 : mword 12) T1 av2 eb
             ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc Hi18").
   iIntros (CID2 Hk2) "Hcg Hpc".
   set (T2 := <[Regidx Ra5 := regval_into_reg
                  (add_vec (rget T1 Ra5)
-                    (sign_extend' 64 (mword_of_int 2400 : mword 12)))]> T1).
+                    (sign_extend' 64 (mword_of_int 2384 : mword 12)))]> T1).
   change (<[Regidx Ra5 := regval_into_reg
              (add_vec (rget T1 Ra5)
-                (sign_extend' 64 (mword_of_int 2400 : mword 12)))]> T1) with T2.
+                (sign_extend' 64 (mword_of_int 2384 : mword 12)))]> T1) with T2.
   assert (HT2a5 : rget T2 Ra5 = first_addr).
   { rgne. rewrite /T2 upd_eq. rgne. rewrite /T1 upd_eq. exact fkr_first_addr. }
   assert (Hp1c : add_vec_int (mword_of_int (FR + 0x18) : mword 64) 4

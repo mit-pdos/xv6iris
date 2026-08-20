@@ -174,7 +174,63 @@ Definition wp_uvmunmap_mem_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
+(* ...and the OTHER memory-indexed contract: the run STAYS LIVE.
+   uvmcopy's [err] label unmaps the child's prefix without shrinking the
+   child, and uvmalloc's rollback is the same shape one level up.  Those
+   vas therefore do not leave the view -- they go back to reading as
+   lazily-backed zeros, which is exactly what they read before anything
+   was mapped there.  So the view is [M] with the range ZEROED rather
+   than deleted, and the size does not move at all.
+
+   The two contracts are genuinely different postconditions, not one
+   generalisation: which one applies is decided by whether the caller is
+   shrinking the process ([wp_uvmunmap_mem_sconf]) or undoing a growth
+   that never became visible (this one). *)
+Definition wp_uvmunmap_live_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+    (γa : gname) (mm : regfile)
+    (P : uptd) (sz : Z) (M : gmap Z (bv 8))
+    (npages : nat) (K : nat) (eb : bool) (p : mword 64)
+    (ilvl : nat) (b : bool) (lks : gset string) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.uvmunmap in
+  let va := mm !!! Regidx (mword_of_int 11) in
+  let vpn0 := svpn_of va in
+  let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
+  (22 <= K)%nat ->
+  (Z.of_nat ilvl + 1 < 2 ^ 31)%Z ->
+  mm !!! Regidx (mword_of_int 10) = page_base P.(ud_root) ->
+  subrange_vec_dec va 11 0 = (zeros' 12 : mword 12) ->
+  mm !!! Regidx (mword_of_int 12) = (mword_of_int (Z.of_nat npages) : mword 64) ->
+  mm !!! Regidx (mword_of_int 13) <> (mword_of_int 0 : mword 64) ->
+  (uint va + Z.of_nat npages * 4096 <= uvm_maxsz)%Z ->
+  (* THE RUN STAYS LIVE *)
+  (forall a : Z, (uint va <= a < uint va + 4096 * Z.of_nat npages)%Z ->
+     uva_live sz a) ->
+  locks_below lks "kmem" ->
+  sie_cap_gpr KT1 mm K b p -∗
+  cpu_own ilvl eb p b lks -∗
+  kernel_text -∗
+  pc_is pcE -∗
+  proc_ptm P sz M -∗
+  kalloc_env γa None -∗
+  wp_next b p (fun (CID : CpuId) =>
+    ∀ (mr : regfile),
+    sie_cap_gpr KT1 mr K b p -∗
+    cpu_own ilvl eb p b lks -∗
+    pc_is ret_tgt -∗
+    ⌜callee_saved mm mr⌝ -∗
+    proc_ptm (uptd_del_run P vpn0 npages) sz
+             (umem_write M (uint va) (4096 * npages) (fun _ => bv_0 8)) -∗
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
+
 Module Type UVMUNMAP.
+  Parameter wp_uvmunmap_live_sconf :
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+      (γa : gname) (mm : regfile)
+      (P : uptd) (sz : Z) (M : gmap Z (bv 8))
+      (npages : nat) (K : nat) (eb : bool) (p : mword 64)
+      (ilvl : nat) (b : bool) (lks : gset string),
+      wp_uvmunmap_live_sconf_body γa mm P sz M npages K eb p ilvl b lks.
   Parameter wp_uvmunmap_mem_sconf :
     forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (mm : regfile)

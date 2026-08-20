@@ -618,6 +618,54 @@ Proof.
   apply elem_of_dom. apply Hsome. lia.
 Qed.
 
+(* overwriting the same run wins outright *)
+Lemma umem_write_overwrite (M : gmap Z (bv 8)) (a : Z) (n : nat) (f g : nat -> bv 8) :
+  umem_write (umem_write M a n f) a n g = umem_write M a n g.
+Proof.
+  apply map_eq. intros va.
+  destruct (decide (a <= va < a + Z.of_nat n)%Z) as [Hin | Hout].
+  - apply in_run_iff in Hin as (k & Hk & ->).
+    rewrite (umem_write_lookup_in (umem_write M a n f) a n g k Hk).
+    rewrite (umem_write_lookup_in M a n g k Hk). reflexivity.
+  - assert (Hne : forall k, (k < n)%nat -> va <> (a + Z.of_nat k)%Z)
+      by (intros k Hk Heq; apply Hout; apply in_run_iff; eauto).
+    rewrite (umem_write_lookup_out (umem_write M a n f) a n g va Hne).
+    rewrite (umem_write_lookup_out M a n f va Hne).
+    rewrite (umem_write_lookup_out M a n g va Hne). reflexivity.
+Qed.
+
+(* two ADJACENT runs are one run -- what makes a loop that fills page
+   after page from a single source have a one-line invariant *)
+Lemma umem_write_app (M : gmap Z (bv 8)) (a : Z) (n m : nat) (f : nat -> bv 8) :
+  umem_write (umem_write M a n f) (a + Z.of_nat n)%Z m (fun i => f (n + i)%nat)
+  = umem_write M a (n + m)%nat f.
+Proof.
+  induction m as [| k IH].
+  - rewrite Nat.add_0_r. reflexivity.
+  - cbn [umem_write]. rewrite IH.
+    replace (n + S k)%nat with (S (n + k))%nat by lia.
+    cbn [umem_write].
+    replace (a + Z.of_nat n + Z.of_nat k)%Z with (a + Z.of_nat (n + k))%Z
+      by (rewrite Nat2Z.inj_add; lia).
+    reflexivity.
+Qed.
+
+(* two adjacent runs of the SAME byte are one run -- what makes a loop
+   that zeroes page after page have a one-line invariant *)
+Lemma umem_write_const_app (M : gmap Z (bv 8)) (a : Z) (n m : nat) (c : bv 8) :
+  umem_write (umem_write M a n (fun _ => c)) (a + Z.of_nat n)%Z m (fun _ => c)
+  = umem_write M a (n + m)%nat (fun _ => c).
+Proof.
+  induction m as [| k IH].
+  - rewrite Nat.add_0_r. reflexivity.
+  - cbn [umem_write]. rewrite IH.
+    replace (n + S k)%nat with (S (n + k))%nat by lia.
+    cbn [umem_write].
+    replace (a + Z.of_nat n + Z.of_nat k)%Z with (a + Z.of_nat (n + k))%Z
+      by (rewrite Nat2Z.inj_add; lia).
+    reflexivity.
+Qed.
+
 Lemma umem_write_ext (M : gmap Z (bv 8)) (a : Z) (n : nat) (bs bs' : nat -> bv 8) :
   (forall j, (j < n)%nat -> bs j = bs' j) ->
   umem_write M a n bs = umem_write M a n bs'.

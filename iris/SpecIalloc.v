@@ -128,6 +128,7 @@ Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import CpuOwn.
 Require Import SchedCtx.
+Require Import ProcDefs.  (* [proc_priv_bare] *)
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
 Require Import BioInv.
@@ -191,7 +192,7 @@ Definition wp_ialloc_sconf_body
     (u : nat)
     (pidv : mword 32) (dq dqs dqn : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) :=
+    (b : bool) (lks : gset string) (Vpr : pprivate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.ialloc in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -256,7 +257,7 @@ Definition wp_ialloc_sconf_body
      [Print Assumptions] at the gate targets. *)
   ireg_open -∗
   (* the caller's own pid cell (bread's acquiresleep records it) *)
-  p_pid pj ↦₄{dq} pidv -∗
+  proc_priv_bare pj pidv Vpr -∗
   (* the running-thread bundle and the disk fabric *)
   procs_inv γs -∗
   dev_inv γu γd -∗
@@ -290,7 +291,7 @@ Definition wp_ialloc_sconf_body
       pc_is ret_tgt -∗
       sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-      p_pid pj ↦₄{dq} pidv -∗
+      proc_priv_bare pj pidv Vpr -∗
       bslots bn 2 -∗
       (if alloc
        then (* SUCCESS: iget's postcondition verbatim, at the claimed inum *)
@@ -369,7 +370,7 @@ Definition wp_ialloc_gen_body
     (u : nat) (Sb : gset Z)
     (pidv : mword 32) (dq dqs dqn : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) :=
+    (b : bool) (lks : gset string) (Vpr : pprivate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.ialloc in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -434,7 +435,7 @@ Definition wp_ialloc_gen_body
      [Print Assumptions] at the gate targets. *)
   ireg_open -∗
   (* the caller's own pid cell (bread's acquiresleep records it) *)
-  p_pid pj ↦₄{dq} pidv -∗
+  proc_priv_bare pj pidv Vpr -∗
   (* the running-thread bundle and the disk fabric *)
   procs_inv γs -∗
   dev_inv γu γd -∗
@@ -472,7 +473,7 @@ Definition wp_ialloc_gen_body
       pc_is ret_tgt -∗
       sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-      p_pid pj ↦₄{dq} pidv -∗
+      proc_priv_bare pj pidv Vpr -∗
       bslots bn 2 -∗
       (if alloc
        then (* SUCCESS: iget's postcondition verbatim, at the claimed inum *)
@@ -518,10 +519,10 @@ Module Type IALLOC.
       (u : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string),
+      (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_ialloc_gen_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr
                          cov logstart inodestart ninodes nib dev ty u Sb
-                         pidv dq dqs dqn m K eb b lks.
+                         pidv dq dqs dqn m K eb b lks Vpr.
 
   Parameter wp_ialloc_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
@@ -538,8 +539,8 @@ Module Type IALLOC.
       (u : nat)
       (pidv : mword 32) (dq dqs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string),
+      (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_ialloc_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr
                            cov logstart inodestart ninodes nib dev ty u
-                           pidv dq dqs dqn m K eb b lks.
+                           pidv dq dqs dqn m K eb b lks Vpr.
 End IALLOC.

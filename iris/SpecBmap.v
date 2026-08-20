@@ -113,6 +113,7 @@ Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import CpuOwn.
 Require Import SchedCtx.
+Require Import ProcDefs.  (* [proc_priv_bare] *)
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
 Require Import BioInv.
@@ -273,7 +274,7 @@ Definition wp_bmap_sconf_body
     (n : nat)
     (pidv : mword 32) (dq dqd dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) :=
+    (b : bool) (lks : gset string) (Vpr : pprivate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.bmap in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -340,7 +341,7 @@ Definition wp_bmap_sconf_body
   inode_map γfs ip bm -∗
   inode_blocks γfs bm data -∗
   (* the caller's own pid cell (bread's acquiresleep records it) *)
-  p_pid pj ↦₄{dq} pidv -∗
+  proc_priv_bare pj pidv Vpr -∗
   (* the two superblock fields and the bitmap, all three for balloc's sake *)
   sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -405,7 +406,7 @@ Definition wp_bmap_sconf_body
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
-      p_pid pj ↦₄{dq} pidv -∗
+      proc_priv_bare pj pidv Vpr -∗
       sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       bitmap_res γfs bmapstart cov logstart size used' -∗
@@ -459,7 +460,7 @@ Definition wp_bmap_gen_body
     (n : nat) (cr : bool) (Sb : gset Z)
     (pidv : mword 32) (dq dqd dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) :=
+    (b : bool) (lks : gset string) (Vpr : pprivate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.bmap in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -511,7 +512,7 @@ Definition wp_bmap_gen_body
   i_dev ip ↦₄{dqd} dev -∗
   inode_map γfs ip bm -∗
   inode_blocks γfs bm data -∗
-  p_pid pj ↦₄{dq} pidv -∗
+  proc_priv_bare pj pidv Vpr -∗
   sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   bitmap_res γfs bmapstart cov logstart size used -∗
@@ -543,7 +544,7 @@ Definition wp_bmap_gen_body
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
-      p_pid pj ↦₄{dq} pidv -∗
+      proc_priv_bare pj pidv Vpr -∗
       sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       bitmap_res γfs bmapstart cov logstart size used' -∗
@@ -607,10 +608,10 @@ Module Type BMAP.
       (n : nat)
       (pidv : mword 32) (dq dqd dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string),
+      (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_bmap_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs
                          cov logstart bmapstart size dev used γpr ip bm data fbn n
-                         pidv dq dqd dqb dqs m K eb b lks.
+                         pidv dq dqd dqb dqs m K eb b lks Vpr.
 
   (* the SET-FORM contract; [wp_bmap_sconf] above is its instance at
      [cr := false] with the set forgotten, kept as its own parameter so
@@ -629,11 +630,11 @@ Module Type BMAP.
       (n : nat) (cr : bool) (Sb : gset Z)
       (pidv : mword 32) (dq dqd dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string),
+      (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_bmap_gen_body γs j γl γu γd γk pd pav pu bn γ γfs
                        cov logstart bmapstart size dev used γpr ip bm data fbn
                        n cr Sb
-                       pidv dq dqd dqb dqs m K eb b lks.
+                       pidv dq dqd dqb dqs m K eb b lks Vpr.
 End BMAP.
 
 (* ===================================================================== *)
@@ -686,7 +687,7 @@ Definition wp_bmap_noalloc_sconf_body
     (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8)) (fbn : nat)
     (pidv : mword 32) (dq dqd : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) :=
+    (b : bool) (lks : gset string) (Vpr : pprivate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.bmap in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -718,7 +719,7 @@ Definition wp_bmap_noalloc_sconf_body
   i_dev ip ↦₄{dqd} dev -∗
   inode_map γfs ip bm -∗
   inode_blocks γfs bm data -∗
-  p_pid pj ↦₄{dq} pidv -∗
+  proc_priv_bare pj pidv Vpr -∗
   (* the running-thread bundle: bmap still SLEEPS, in bread *)
   procs_inv γs -∗
   (* the disk fabric *)
@@ -746,7 +747,7 @@ Definition wp_bmap_noalloc_sconf_body
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
-      p_pid pj ↦₄{dq} pidv -∗
+      proc_priv_bare pj pidv Vpr -∗
       i_dev ip ↦₄{dqd} dev -∗
       inode_map γfs ip bm -∗
       inode_blocks γfs bm data -∗
@@ -767,8 +768,8 @@ Module Type BMAP_NOALLOC.
       (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8)) (fbn : nat)
       (pidv : mword 32) (dq dqd : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string),
+      (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_bmap_noalloc_sconf_body γs j γl γu γd γk pd pav pu bn γfs
                                  cov logstart dev ip bm data fbn pidv dq dqd
-                                 m K eb b lks.
+                                 m K eb b lks Vpr.
 End BMAP_NOALLOC.

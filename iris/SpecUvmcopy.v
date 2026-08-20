@@ -160,7 +160,96 @@ Definition wp_uvmcopy_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID :
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
+(* ===================================================================== *)
+(*  THE MEMORY-INDEXED CONTRACT.                                          *)
+(* ===================================================================== *)
+(* THE CHILD ENDS UP HOLDING THE PARENT'S BYTES over the copied region,
+   and its own elsewhere:
+
+     M' = umem_write Mnew 0 (4096 * n) (fun a => Mold !!! a)
+
+   -- which is what the memmove does, said once.  The parent comes back
+   with its view untouched, byte for byte.
+
+   THE ONE PREMISE THIS ALTITUDE ADDS is that the copied region is LIVE
+   IN BOTH tables.  It is not bookkeeping: where the parent has no page
+   the loop copies nothing, so the child's bytes there are whatever the
+   child's own view says, and the two agree only because BOTH read a
+   lazily-backed zero.  fork supplies it by indexing the child at the
+   parent's size, which is the size it is about to store in [np->sz].
+
+   THE FAILURE ARM RESTORES [Mnew] EXACTLY, like uvmalloc's.  The [err]
+   label unmaps the prefix the loop had mapped WITHOUT shrinking the
+   child, so those vas go back to reading as lazily-backed zeros -- which
+   is what they read before the copy put anything there.  That is
+   [SpecUvmunmap.wp_uvmunmap_live_sconf], and it is why uvmunmap needs
+   two memory-indexed contracts rather than one. *)
+Definition wp_uvmcopy_mem_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+    (γa : gname) (mm : regfile)
+    (Pold Pnew : uptd) (szold sznew : Z) (Mold Mnew : gmap Z (bv 8))
+    (K : nat) (eb : bool) (p : mword 64)
+    (ilvl : nat) (b : bool) (lks : gset string) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.uvmcopy in
+  let sz := mm !!! Regidx (mword_of_int 12) in
+  let vpn0 := svpn_of (mword_of_int 0 : mword 64) in
+  let n := uvm_np sz in
+  let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
+  (42 <= K)%nat ->
+  (Z.of_nat ilvl + 1 < 2 ^ 31)%Z ->
+  mm !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
+  mm !!! Regidx (mword_of_int 10) = page_base Pold.(ud_root) ->
+  mm !!! Regidx (mword_of_int 11) = page_base Pnew.(ud_root) ->
+  (uint sz <= uvm_maxsz)%Z ->
+  (forall i, (i < n)%nat -> Pnew.(ud_um) !! vpn_at vpn0 i = None) ->
+  (* THE COPIED REGION IS LIVE IN BOTH *)
+  (forall a : Z, (0 <= a < 4096 * Z.of_nat n)%Z ->
+     uva_live szold a /\ uva_live sznew a) ->
+  locks_below lks "kmem" ->
+  sie_cap_gpr KT1 mm K b p -∗
+  cpu_own ilvl eb p b lks -∗
+  kernel_text -∗
+  pc_is pcE -∗
+  proc_ptm Pold szold Mold -∗
+  proc_ptm Pnew sznew Mnew -∗
+  kalloc_env γa None -∗
+  wp_next b p (fun (CID : CpuId) =>
+    ∀ (mr : regfile),
+    sie_cap_gpr KT1 mr K b p -∗
+    cpu_own ilvl eb p b lks -∗
+    pc_is ret_tgt -∗
+    ⌜callee_saved mm mr⌝ -∗
+    (* the parent's table AND its view come back verbatim *)
+    proc_ptm Pold szold Mold -∗
+    ( (⌜mr !!! Regidx (mword_of_int 10) = (mword_of_int (-1) : mword 64)⌝ ∗
+       proc_ptm Pnew sznew Mnew)
+      ∨ (∃ P' : uptd,
+           ⌜mr !!! Regidx (mword_of_int 10) = (mword_of_int 0 : mword 64)⌝ ∗
+           ⌜uptd_ext Pnew P'⌝ ∗
+           ⌜forall vpn, vpn ∉ vpn_run vpn0 n ->
+              P'.(ud_um) !! vpn = Pnew.(ud_um) !! vpn⌝ ∗
+           ⌜forall i, (i < n)%nat ->
+              match Pold.(ud_um) !! vpn_at vpn0 i with
+              | None => P'.(ud_um) !! vpn_at vpn0 i = Pnew.(ud_um) !! vpn_at vpn0 i
+              | Some w => exists (r w' : mword 64) (a d : mword 1),
+                  page_valid r /\
+                  P'.(ud_um) !! vpn_at vpn0 i = Some w' /\
+                  w' = pte_set_ad (uvm_pte (pte_flags10 w) r) a d
+              end⌝ ∗
+           proc_ptm P' sznew
+             (umem_write Mnew 0%Z (4096 * n)%nat
+                (fun a => Mold !!! Z.of_nat a))) ) -∗
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
+
 Module Type UVMCOPY.
+  Parameter wp_uvmcopy_mem_sconf :
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+      (γa : gname) (mm : regfile)
+      (Pold Pnew : uptd) (szold sznew : Z) (Mold Mnew : gmap Z (bv 8))
+      (K : nat) (eb : bool) (p : mword 64)
+      (ilvl : nat) (b : bool) (lks : gset string),
+      wp_uvmcopy_mem_sconf_body γa mm Pold Pnew szold sznew Mold Mnew
+        K eb p ilvl b lks.
   Parameter wp_uvmcopy_sconf :
     forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (mm : regfile)

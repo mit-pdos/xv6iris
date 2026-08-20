@@ -441,11 +441,11 @@ Section ProofPMS.
       = zero_extend' 64 (concat_vec (pt_base t) (zeros' 12 : mword 12)) ->
     (forall j, (j < 64)%nat -> m0 !! kstack_vpn j = None) ->
     Mk !!! Regidx csp_rs1 = spr ->
-    Mk !!! Regidx (mword_of_int 9 : mword 5) = mword_of_int (0x800127f8 + 360 * Z.of_nat i) ->
-    Mk !!! Regidx (mword_of_int 24 : mword 5) = mword_of_int 0x800127f8 ->
+    Mk !!! Regidx (mword_of_int 9 : mword 5) = mword_of_int (0x800127e8 + 360 * Z.of_nat i) ->
+    Mk !!! Regidx (mword_of_int 24 : mword 5) = mword_of_int 0x800127e8 ->
     Mk !!! Regidx (mword_of_int 18 : mword 5) = mword_of_int 0x4fa4fa4fa4fa4fa5 ->
     Mk !!! Regidx (mword_of_int 19 : mword 5) = mword_of_int 0x3FFFFFF000 ->
-    Mk !!! Regidx (mword_of_int 21 : mword 5) = mword_of_int 0x800181f8 ->
+    Mk !!! Regidx (mword_of_int 21 : mword 5) = mword_of_int 0x800181e8 ->
     Mk !!! Regidx (mword_of_int 22 : mword 5) = mword_of_int 4096 ->
     Mk !!! Regidx (mword_of_int 23 : mword 5) = mword_of_int 6 ->
     Mk !!! Regidx (mword_of_int 20 : mword 5) = mm !!! Regidx (mword_of_int 10) ->
@@ -573,10 +573,10 @@ Section ProofPMS.
     assert (HmkJ : forall r : mword 5, is_cs_idx r = true -> Mk !!! Regidx r = J !!! Regidx r).
     { intros r Hr. rewrite /J. rewrite upd_ne; [reflexivity |].
       intro Habs; injection Habs as Habs2; subst r; vm_compute in Hr; discriminate. }
-    assert (Hmr0_9 : mr0 !!! Regidx (mword_of_int 9 : mword 5) = mword_of_int (0x800127f8 + 360 * Z.of_nat i)).
+    assert (Hmr0_9 : mr0 !!! Regidx (mword_of_int 9 : mword 5) = mword_of_int (0x800127e8 + 360 * Z.of_nat i)).
     { rewrite (callee_saved_lookup Hkcs0 (mword_of_int 9) ltac:(vm_compute; reflexivity)).
       rewrite <- (HmkJ (mword_of_int 9) ltac:(vm_compute; reflexivity)). exact Hs1. }
-    assert (Hmr0_24 : mr0 !!! Regidx (mword_of_int 24 : mword 5) = mword_of_int 0x800127f8).
+    assert (Hmr0_24 : mr0 !!! Regidx (mword_of_int 24 : mword 5) = mword_of_int 0x800127e8).
     { rewrite (callee_saved_lookup Hkcs0 (mword_of_int 24) ltac:(vm_compute; reflexivity)).
       rewrite <- (HmkJ (mword_of_int 24) ltac:(vm_compute; reflexivity)). exact Hs8. }
     assert (Hmr0_18 : mr0 !!! Regidx (mword_of_int 18 : mword 5) = mword_of_int 0x4fa4fa4fa4fa4fa5).
@@ -585,7 +585,7 @@ Section ProofPMS.
     assert (Hmr0_19 : mr0 !!! Regidx (mword_of_int 19 : mword 5) = mword_of_int 0x3FFFFFF000).
     { rewrite (callee_saved_lookup Hkcs0 (mword_of_int 19) ltac:(vm_compute; reflexivity)).
       rewrite <- (HmkJ (mword_of_int 19) ltac:(vm_compute; reflexivity)). exact Hs3. }
-    assert (Hmr0_21 : mr0 !!! Regidx (mword_of_int 21 : mword 5) = mword_of_int 0x800181f8).
+    assert (Hmr0_21 : mr0 !!! Regidx (mword_of_int 21 : mword 5) = mword_of_int 0x800181e8).
     { rewrite (callee_saved_lookup Hkcs0 (mword_of_int 21) ltac:(vm_compute; reflexivity)).
       rewrite <- (HmkJ (mword_of_int 21) ltac:(vm_compute; reflexivity)). exact Hs5. }
     assert (Hmr0_22 : mr0 !!! Regidx (mword_of_int 22 : mword 5) = mword_of_int 4096).
@@ -625,9 +625,9 @@ Section ProofPMS.
     assert (Hp5a : add_vec_int (mword_of_int (KernelSyms.proc_mapstacks + 0x58) : mword 64) 2 = mword_of_int (KernelSyms.proc_mapstacks + 0x5a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp5a) in "Hpc".
     (* +0x5a sub a1,s1,s8 => 360*i *)
-    assert (HW2s1 : W2 !!! Regidx (mword_of_int 9 : mword 5) = mword_of_int (0x800127f8 + 360 * Z.of_nat i)).
+    assert (HW2s1 : W2 !!! Regidx (mword_of_int 9 : mword 5) = mword_of_int (0x800127e8 + 360 * Z.of_nat i)).
     { rewrite /W2. rewrite upd_ne; [| reg_neq]. exact Hmr0_9. }
-    assert (HW2s8 : W2 !!! Regidx (mword_of_int 24 : mword 5) = mword_of_int 0x800127f8).
+    assert (HW2s8 : W2 !!! Regidx (mword_of_int 24 : mword 5) = mword_of_int 0x800127e8).
     { rewrite /W2. rewrite upd_ne; [| reg_neq]. exact Hmr0_24. }
     iApply (wp_sub_s_sconf (mword_of_int (KernelSyms.proc_mapstacks + 0x5a)) (mword_of_int 11 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 24 : mword 5)
               (mword_of_int (360 * Z.of_nat i))
@@ -635,7 +635,7 @@ Section ProofPMS.
               ltac:(rgne; rgne; rewrite HW2s1 HW2s8;
                     assert (Hnn : (0 <= 360 * Z.of_nat i)%Z) by (apply Z.mul_nonneg_nonneg; lia);
                     assert (Hle : (360 * Z.of_nat i <= 360 * 64)%Z) by (apply Z.mul_le_mono_nonneg_l; lia);
-                    rewrite (subvec_moi (0x800127f8 + 360 * Z.of_nat i) 0x800127f8 ltac:(lia) ltac:(lia) ltac:(lia));
+                    rewrite (subvec_moi (0x800127e8 + 360 * Z.of_nat i) 0x800127e8 ltac:(lia) ltac:(lia) ltac:(lia));
                     f_equal; lia)
               with "Hcg Hpc Hi5a").
     iIntros (CIDl5 Hsl5) "Hcg Hpc".
@@ -836,7 +836,7 @@ Section ProofPMS.
     { rewrite HWk1. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret78) in "Hpc".
     (* recover callee-saved through kvmmap *)
-    assert (Hmr1_9 : mr1 !!! Regidx (mword_of_int 9 : mword 5) = mword_of_int (0x800127f8 + 360 * Z.of_nat i)).
+    assert (Hmr1_9 : mr1 !!! Regidx (mword_of_int 9 : mword 5) = mword_of_int (0x800127e8 + 360 * Z.of_nat i)).
     { rewrite (callee_saved_lookup Hkcs1 (mword_of_int 9) ltac:(vm_compute; reflexivity)).
       peel_reg_step.
       exact Hmr0_9. }
@@ -844,7 +844,7 @@ Section ProofPMS.
     { rewrite (callee_saved_lookup Hkcs1 csp_rs1 ltac:(vm_compute; reflexivity)). exact HWksp. }
     assert (HWkcs : forall r : mword 5, is_cs_idx r = true -> Wk !!! Regidx r = mr1 !!! Regidx r)
       by (intros r Hr; symmetry; apply (callee_saved_lookup Hkcs1 r Hr)).
-    assert (Hmr1_24 : mr1 !!! Regidx (mword_of_int 24 : mword 5) = mword_of_int 0x800127f8).
+    assert (Hmr1_24 : mr1 !!! Regidx (mword_of_int 24 : mword 5) = mword_of_int 0x800127e8).
     { rewrite <- (HWkcs (mword_of_int 24) ltac:(vm_compute; reflexivity)).
       peel_reg_step. exact Hmr0_24. }
     assert (Hmr1_18 : mr1 !!! Regidx (mword_of_int 18 : mword 5) = mword_of_int 0x4fa4fa4fa4fa4fa5).
@@ -853,7 +853,7 @@ Section ProofPMS.
     assert (Hmr1_19 : mr1 !!! Regidx (mword_of_int 19 : mword 5) = mword_of_int 0x3FFFFFF000).
     { rewrite <- (HWkcs (mword_of_int 19) ltac:(vm_compute; reflexivity)).
       peel_reg_step. exact Hmr0_19. }
-    assert (Hmr1_21 : mr1 !!! Regidx (mword_of_int 21 : mword 5) = mword_of_int 0x800181f8).
+    assert (Hmr1_21 : mr1 !!! Regidx (mword_of_int 21 : mword 5) = mword_of_int 0x800181e8).
     { rewrite <- (HWkcs (mword_of_int 21) ltac:(vm_compute; reflexivity)).
       peel_reg_step. exact Hmr0_21. }
     assert (Hmr1_22 : mr1 !!! Regidx (mword_of_int 22 : mword 5) = mword_of_int 4096).
@@ -889,7 +889,7 @@ Section ProofPMS.
               with "Hcg Hpc Hi78").
     iIntros (CIDl17 Hsl17) "Hcg Hpc". iEval (rgne) in "Hcg".
     set (F1 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg (add_vec (mr1 !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 360 : mword 12)))]> mr1).
-    assert (HF1s1 : F1 !!! Regidx (mword_of_int 9 : mword 5) = mword_of_int (0x800127f8 + 360 * Z.of_nat (S i))).
+    assert (HF1s1 : F1 !!! Regidx (mword_of_int 9 : mword 5) = mword_of_int (0x800127e8 + 360 * Z.of_nat (S i))).
     { rewrite /F1 upd_eq. rewrite Hmr1_9.
       assert (Hsx : sign_extend' 64 (mword_of_int 360 : mword 12) = (mword_of_int 360 : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
       rewrite Hsx. apply bv_eq.
@@ -897,21 +897,21 @@ Section ProofPMS.
       rewrite bv_add_unsigned.
       assert (Hii : (0 <= 360 * Z.of_nat i)%Z /\ (360 * Z.of_nat i <= 360 * 64)%Z) by (split; [apply Z.mul_nonneg_nonneg; lia | apply Z.mul_le_mono_nonneg_l; lia]).
       assert (Hsi : (0 <= 360 * Z.of_nat (S i))%Z /\ (360 * Z.of_nat (S i) <= 360 * 64)%Z) by (split; [apply Z.mul_nonneg_nonneg; lia | apply Z.mul_le_mono_nonneg_l; lia]).
-      assert (Bi : (0 <= 0x800127f8 + 360 * Z.of_nat i < 18446744073709551616)%Z).
+      assert (Bi : (0 <= 0x800127e8 + 360 * Z.of_nat i < 18446744073709551616)%Z).
       { split; [apply Z.add_nonneg_nonneg; [apply Z.leb_le; vm_compute; reflexivity | exact (proj1 Hii)]
-               | apply (Z.le_lt_trans _ (0x800127f8 + 360 * 64)); [apply Z.add_le_mono_l; exact (proj2 Hii) | apply Z.ltb_lt; vm_compute; reflexivity]]. }
-      assert (Bsi : (0 <= 0x800127f8 + 360 * Z.of_nat (S i) < 18446744073709551616)%Z).
+               | apply (Z.le_lt_trans _ (0x800127e8 + 360 * 64)); [apply Z.add_le_mono_l; exact (proj2 Hii) | apply Z.ltb_lt; vm_compute; reflexivity]]. }
+      assert (Bsi : (0 <= 0x800127e8 + 360 * Z.of_nat (S i) < 18446744073709551616)%Z).
       { split; [apply Z.add_nonneg_nonneg; [apply Z.leb_le; vm_compute; reflexivity | exact (proj1 Hsi)]
-               | apply (Z.le_lt_trans _ (0x800127f8 + 360 * 64)); [apply Z.add_le_mono_l; exact (proj2 Hsi) | apply Z.ltb_lt; vm_compute; reflexivity]]. }
-      rewrite (moi64_small (0x800127f8 + 360 * Z.of_nat i) Bi).
+               | apply (Z.le_lt_trans _ (0x800127e8 + 360 * 64)); [apply Z.add_le_mono_l; exact (proj2 Hsi) | apply Z.ltb_lt; vm_compute; reflexivity]]. }
+      rewrite (moi64_small (0x800127e8 + 360 * Z.of_nat i) Bi).
       change (bv_unsigned (mword_of_int 360 : mword 64)) with 360.
-      replace (0x800127f8 + 360 * Z.of_nat i + 360)%Z with (0x800127f8 + 360 * Z.of_nat (S i))%Z by (rewrite Nat2Z.inj_succ; ring).
-      rewrite (moi64_small (0x800127f8 + 360 * Z.of_nat (S i)) Bsi).
+      replace (0x800127e8 + 360 * Z.of_nat i + 360)%Z with (0x800127e8 + 360 * Z.of_nat (S i))%Z by (rewrite Nat2Z.inj_succ; ring).
+      rewrite (moi64_small (0x800127e8 + 360 * Z.of_nat (S i)) Bsi).
       apply bv_wrap_small. unfold bv_modulus. change (2 ^ Z.of_N 64)%Z with 18446744073709551616%Z. exact Bsi. }
     assert (Hp7c : add_vec_int (mword_of_int (KernelSyms.proc_mapstacks + 0x78) : mword 64) 4 = mword_of_int (KernelSyms.proc_mapstacks + 0x7c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp7c) in "Hpc".
     (* facts for the new invariant / bne *)
-    assert (HF1s5 : F1 !!! Regidx (mword_of_int 21 : mword 5) = mword_of_int 0x800181f8).
+    assert (HF1s5 : F1 !!! Regidx (mword_of_int 21 : mword 5) = mword_of_int 0x800181e8).
     { rewrite /F1. rewrite upd_ne; [| reg_neq]. exact Hmr1_21. }
     assert (Hg'le : (g' <= pt_missing tk (kstack_vpn i) 1)%nat).
     { rewrite HWka1 in Hg'miss. rewrite (va_i_svpn i Hilt) in Hg'miss. unfold VA in Hg'miss. exact Hg'miss. }
@@ -990,10 +990,10 @@ Section ProofPMS.
               F1 (K - 10)%nat b ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
               ltac:(rgne; rgne; rewrite HF1s1 HF1s5; unfold neq_vec; apply negb_true_iff; apply eq_vec_false_iff;
                     intro Heq; apply (f_equal bv_unsigned) in Heq;
-                    rewrite (moi64_small (0x800127f8 + 360 * Z.of_nat (S i))
+                    rewrite (moi64_small (0x800127e8 + 360 * Z.of_nat (S i))
                        ltac:(split; [apply Z.add_nonneg_nonneg; [apply Z.leb_le; vm_compute; reflexivity | apply Z.mul_nonneg_nonneg; lia]
-                                    | apply (Z.le_lt_trans _ (0x800127f8 + 360 * 64)); [apply Z.add_le_mono_l; apply Z.mul_le_mono_nonneg_l; lia | apply Z.ltb_lt; vm_compute; reflexivity]])) in Heq;
-                    change (bv_unsigned (mword_of_int 0x800181f8 : mword 64)) with 2147582456%Z in Heq;
+                                    | apply (Z.le_lt_trans _ (0x800127e8 + 360 * 64)); [apply Z.add_le_mono_l; apply Z.mul_le_mono_nonneg_l; lia | apply Z.ltb_lt; vm_compute; reflexivity]])) in Heq;
+                    change (bv_unsigned (mword_of_int 0x800181e8 : mword 64)) with 2147582440%Z in Heq;
                     assert (Hbd : (360 * Z.of_nat (S i) <= 360 * 63)%Z) by (apply Z.mul_le_mono_nonneg_l; lia); lia)
               ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi7c").
@@ -1210,10 +1210,10 @@ Section ProofPMS.
     assert (Hp1e : add_vec_int (mword_of_int (KernelSyms.proc_mapstacks + 0x1a) : mword 64) 4 = mword_of_int (KernelSyms.proc_mapstacks + 0x1e)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp1e) in "Hpc".
     (* +0x1e addi s1,s1,-24 *)
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.proc_mapstacks + 0x1e)) (mword_of_int 9 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 146 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.proc_mapstacks + 0x1e)) (mword_of_int 9 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 130 : mword 12)
               P4 (K - 10)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc Hi1e").
     iIntros (CIDp15 Hsp15) "Hcg Hpc". iEval (rgne) in "Hcg".
-    set (P5 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg (add_vec (P4 !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 146 : mword 12)))]> P4).
+    set (P5 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg (add_vec (P4 !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 130 : mword 12)))]> P4).
     assert (Hp22 : add_vec_int (mword_of_int (KernelSyms.proc_mapstacks + 0x1e) : mword 64) 4 = mword_of_int (KernelSyms.proc_mapstacks + 0x22)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp22) in "Hpc".
     (* +0x22 mv s8,s1 *)
@@ -1322,25 +1322,25 @@ Section ProofPMS.
     assert (Hp4e : add_vec_int (mword_of_int (KernelSyms.proc_mapstacks + 0x4a) : mword 64) 4 = mword_of_int (KernelSyms.proc_mapstacks + 0x4e)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp4e) in "Hpc".
     (* +0x4e addi s5,s5,-1608 *)
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.proc_mapstacks + 0x4e)) (mword_of_int 21 : mword 5) (mword_of_int 21 : mword 5) (mword_of_int 2658 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.proc_mapstacks + 0x4e)) (mword_of_int 21 : mword 5) (mword_of_int 21 : mword 5) (mword_of_int 2642 : mword 12)
               P20 (K - 10)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc Hi4e").
     iIntros (CIDp31 Hsp31) "Hcg Hpc". iEval (rgne) in "Hcg".
-    set (P21 := <[Regidx (mword_of_int 21 : mword 5) := regval_into_reg (add_vec (P20 !!! Regidx (mword_of_int 21 : mword 5)) (sign_extend' 64 (mword_of_int 2658 : mword 12)))]> P20).
+    set (P21 := <[Regidx (mword_of_int 21 : mword 5) := regval_into_reg (add_vec (P20 !!! Regidx (mword_of_int 21 : mword 5)) (sign_extend' 64 (mword_of_int 2642 : mword 12)))]> P20).
     assert (Hp52 : add_vec_int (mword_of_int (KernelSyms.proc_mapstacks + 0x4e) : mword 64) 4 = mword_of_int (KernelSyms.proc_mapstacks + 0x52)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp52) in "Hpc".
     (* ---- loop-entry register facts (all concrete) ---- *)
     assert (HE_sp : P21 !!! Regidx csp_rs1 = spr).
     { peel_reg_step.
       rewrite -HspW1 /W1 upd_eq. reflexivity. }
-    assert (HE_s1 : P21 !!! Regidx (mword_of_int 9 : mword 5) = mword_of_int (0x800127f8 + 360 * Z.of_nat 0)).
+    assert (HE_s1 : P21 !!! Regidx (mword_of_int 9 : mword 5) = mword_of_int (0x800127e8 + 360 * Z.of_nat 0)).
     { peel_reg_step. apply bv_eq; vm_compute; reflexivity. }
-    assert (HE_s8 : P21 !!! Regidx (mword_of_int 24 : mword 5) = mword_of_int 0x800127f8).
+    assert (HE_s8 : P21 !!! Regidx (mword_of_int 24 : mword 5) = mword_of_int 0x800127e8).
     { peel_reg_step. apply bv_eq; vm_compute; reflexivity. }
     assert (HE_s2 : P21 !!! Regidx (mword_of_int 18 : mword 5) = mword_of_int 0x4fa4fa4fa4fa4fa5).
     { peel_reg_step. apply bv_eq; vm_compute; reflexivity. }
     assert (HE_s3 : P21 !!! Regidx (mword_of_int 19 : mword 5) = mword_of_int 0x3FFFFFF000).
     { peel_reg_step. apply bv_eq; vm_compute; reflexivity. }
-    assert (HE_s5 : P21 !!! Regidx (mword_of_int 21 : mword 5) = mword_of_int 0x800181f8).
+    assert (HE_s5 : P21 !!! Regidx (mword_of_int 21 : mword 5) = mword_of_int 0x800181e8).
     { peel_reg_step. apply bv_eq; vm_compute; reflexivity. }
     assert (HE_s6 : P21 !!! Regidx (mword_of_int 22 : mword 5) = mword_of_int 4096).
     { peel_reg_step. apply bv_eq; vm_compute; reflexivity. }

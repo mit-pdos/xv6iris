@@ -33,7 +33,7 @@ Notation FR := KernelSyms.forkret.
 Lemma fkr_first_addr :
   add_vec (add_vec (mword_of_int (FR + 0x14) : mword 64)
              (auipc_off (mword_of_int 9 : mword 20)))
-    (sign_extend' 64 (mword_of_int 2400 : mword 12))
+    (sign_extend' 64 (mword_of_int 2384 : mword 12))
   = first_addr.
 Proof. rewrite /first_addr. apply bv_eq. vm_compute. reflexivity. Qed.
 

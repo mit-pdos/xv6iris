@@ -136,6 +136,7 @@ Require Import SpecEndOp.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import ProcDefs.  (* [pprivate], [proc_priv_bare] *)
 Local Open Scope Z_scope.
 
 
@@ -371,23 +372,31 @@ Section SpecFileclose.
      fileclose_ic_env fn ∗
      fileclose_bm fn us)%I.
 
-  (* the whole arm IS the nopid bundle plus the cell -- stated that way
-     rather than spelled twice, which is what makes [_split_pid] a
-     [reflexivity] and keeps the two from drifting apart. *)
+  (* THE PID CELL IS GONE FROM THIS BUNDLE, and with it the whole
+     nopid/withpid pair.  It was here because iput reaches acquiresleep,
+     which records its holder ([lk->pid = myproc()->pid]) -- and a bundle is
+     the wrong place for a piece of the caller's process block: a caller
+     holding [ProcInv.proc_priv] and this side by side was asking for three
+     quarters of [p->pid], of which two are reachable.  sys_close and
+     sys_pipe both shipped with exactly that.
+
+     acquiresleep now takes [ProcDefs.proc_priv_bare] and does its own
+     borrowing, so what fileclose needs is the block, and it takes it as a
+     row of its own contract rather than smuggling a fraction through the
+     file system's environment.  A caller that tried the old thing now gets
+     a REFUTABLE premise set rather than a silently unpayable one: two
+     copies of the block are [p->pid] at one whole, and the lock invariant's
+     half refutes it. *)
   Definition fileclose_fs_env (fn : fclose_names) (us : gset Z)
       (n : nat) (eb : bool) (p : mword 64) : iProp Σ :=
-    (fileclose_fs_env_nopid fn us n eb p ∗
-     p_pid (proc_addr (fcn_j fn)) ↦₄{fcn_dq fn} fcn_pid fn)%I.
+    fileclose_fs_env_nopid fn us n eb p.
 
-  Lemma fileclose_fs_env_split_pid fn us n eb p :
-    fileclose_fs_env fn us n eb p ⊣⊢
-    fileclose_fs_env_nopid fn us n eb p ∗
-    p_pid (proc_addr (fcn_j fn)) ↦₄{fcn_dq fn} fcn_pid fn.
+  Lemma fileclose_fs_env_nopid_eq fn us n eb p :
+    fileclose_fs_env fn us n eb p ⊣⊢ fileclose_fs_env_nopid fn us n eb p.
   Proof. reflexivity. Qed.
 
   Definition fileclose_fs_out (fn : fclose_names) (us : gset Z) : iProp Σ :=
-    (p_pid (proc_addr (fcn_j fn)) ↦₄{fcn_dq fn} fcn_pid fn ∗
-     bslots (fcn_bio fn) 3 ∗
+    (bslots (fcn_bio fn) 3 ∗
      (* the bitmap, possibly smaller: an inode was freed iff this was the
         last reference AND its link count had reached zero, and no caller
         can know that.  ([iput]'s [iref_slot] give-back is NOT here for the
@@ -444,9 +453,8 @@ Section SpecFileclose.
     fileclose_fs_env fn us n eb p -∗ fileclose_fs_out fn us.
   Proof.
     rewrite /fileclose_fs_env /fileclose_fs_env_nopid /fileclose_fs_out.
-    iIntros "[(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
-               Hbs & _ & Hbm) Hpid]".
-    iSplitL "Hpid"; [iExact "Hpid"|].
+    iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
+              Hbs & _ & Hbm)".
     iSplitL "Hbs"; [iExact "Hbs"|].
     iExists us. iSplitR; [iPureIntro; reflexivity|]. iExact "Hbm".
   Qed.
@@ -498,12 +506,10 @@ Section SpecFileclose.
     □ (fileclose_fs_out fn us -∗ ∃ us', fileclose_fs_env fn us' n eb p).
   Proof.
     rewrite /fileclose_fs_env /fileclose_fs_env_nopid /fileclose_fs_out.
-    iIntros "[(%H1 & %H2 & %H3 & %H4 & %H5 & #Hpr & #Hbio & #Hlog &
-               #Hseam & #Hcert & #Hdev & #Hgeom & #Hdlk & Hbs & #Hic & Hbm)
-              Hpid]".
-    iSplitL "Hbs Hpid Hbm".
-    { iSplitR "Hpid"; [| iExact "Hpid"].
-      do 5 (iSplitR; [iPureIntro; assumption|]).
+    iIntros "(%H1 & %H2 & %H3 & %H4 & %H5 & #Hpr & #Hbio & #Hlog &
+              #Hseam & #Hcert & #Hdev & #Hgeom & #Hdlk & Hbs & #Hic & Hbm)".
+    iSplitL "Hbs Hbm".
+    { do 5 (iSplitR; [iPureIntro; assumption|]).
       (* Split STRUCTURALLY before framing, front to back -- a named [iFrame]
          still walks the whole goal per hypothesis (measured ~7 s a side
          here); [iSplitL]/[iExact] name both sides, so nothing is
@@ -518,8 +524,8 @@ Section SpecFileclose.
       iSplitL "Hdlk"; [iExact "Hdlk"|].
       iSplitL "Hbs"; [iExact "Hbs"|].
       iSplitR; [iExact "Hic"|]. iExact "Hbm". }
-    iModIntro. iIntros "(Hpid & Hbs & %us' & _ & Hbm)".
-    iExists us'. iSplitR "Hpid"; [| iExact "Hpid"].
+    iModIntro. iIntros "(Hbs & %us' & _ & Hbm)".
+    iExists us'.
     do 5 (iSplitR; [iPureIntro; assumption|]).
     iSplitL "Hpr"; [iExact "Hpr"|].
     iSplitL "Hbio"; [iExact "Hbio"|].
@@ -583,34 +589,24 @@ Section SpecFileclose.
     iSplitL "Hpo"; [by iApply "Hpre" | by iApply "Hfre"].
   Qed.
 
-  (* WHAT A LOOP OVER DESCRIPTORS CARRIES.  The pid quarter is lent per
-     iteration out of [proc_priv]; everything else goes round. *)
+  (* THE LOOP'S OWN OPENING, for a caller that carries the fs bundle in its
+     [_nopid] form.  It USED TO take the caller's quarter of [p->pid] as a
+     third argument and splice it into the bundle, because [fileclose_fs_env]
+     carried that cell; the bundle does not carry it any more (fileclose asks
+     for [proc_priv_bare] at the top level instead), so the two forms
+     coincide and this is [fileclose_env_frame] under the other name. *)
   Lemma fileclose_loop_open fn on us n eb p Cf :
     fileclose_pipe_env fn on n -∗
     fileclose_fs_env_nopid fn us n eb p -∗
-    p_pid (proc_addr (fcn_j fn)) ↦₄{fcn_dq fn} fcn_pid fn -∗
     fileclose_env fn on us n eb p Cf ∗
     (fileclose_env_out fn on us Cf -∗
        (∃ on', fileclose_pipe_env fn on' n) ∗
-       (∃ us', fileclose_fs_env_nopid fn us' n eb p) ∗
-       p_pid (proc_addr (fcn_j fn)) ↦₄{fcn_dq fn} fcn_pid fn).
+       (∃ us', fileclose_fs_env_nopid fn us' n eb p)).
   Proof.
-    iIntros "Hp Hf Hpid".
-    iDestruct (fileclose_fs_env_split_pid with "[Hf Hpid]") as "Hf";
-      [iFrame "Hf Hpid"|].
-    iDestruct (fileclose_env_frame fn on us n eb p Cf with "Hp Hf")
-      as "[$ Hback]".
-    iIntros "Hout". iDestruct ("Hback" with "Hout") as "[Hpo (%us' & Hf)]".
-    iDestruct (fileclose_fs_env_split_pid with "Hf") as "[Hf Hpid]".
-    (* structurally: the [$] that used to frame the pid cell had to search
-       past [∃ us', fileclose_fs_env_nopid …] -- fifteen conjuncts including
-       [procs_inv], [bio_ctx], [log_ctx] and the whole [fileclose_ic_env] --
-       instantiating the existential with an evar on the way.  69 s in this
-       one sentence (optimization.md). *)
-    iSplitL "Hpo"; [iExact "Hpo" |].
-    iSplitR "Hpid"; [| iExact "Hpid"].
-    iExists us'. iExact "Hf".
+    rewrite -!fileclose_fs_env_nopid_eq.
+    exact (fileclose_env_frame fn on us n eb p Cf).
   Qed.
+
 
 End SpecFileclose.
 
@@ -621,7 +617,14 @@ Definition wp_fileclose_sconf_body
     (k : nat) (q : Qp) (Cf : fcontent)                (* the reference        *)
     (fn : fclose_names) (on : option nat) (us : gset Z) (* the arms' ghosts   *)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64)
-    (K : nat) (b : bool) (lks : gset string) :=
+    (K : nat) (b : bool) (lks : gset string)
+    (* THE CALLER'S OWN PID, not [fcn_pid fn].  The block row below used to be
+       keyed on the names record's field, which no caller can pay: every one
+       of them holds [proc_priv_bare] at the pid IT knows, and nothing ties
+       that to [fn]'s.  acquiresleep only records whatever [p->pid] holds, so
+       keying on the caller is both payable and what the code does.  This is
+       what retires the [fcn_pid fn = pid] tie premise on sys_close. *)
+    (pidv : mword 32) (Vpr : pprivate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.fileclose in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   (fileclose_stack <= K)%nat ->
@@ -646,6 +649,16 @@ Definition wp_fileclose_sconf_body
   is_ftable γfl γf -∗
   panic_env -∗
   file_ref γf k q Cf -∗
+  (* THE RUNNING THREAD'S PROCESS BLOCK, in and straight back out.  The FS
+     arm reaches iput -> itrunc/iupdate -> bread -> acquiresleep, which
+     records its holder ([lk->pid = myproc()->pid]); acquiresleep takes the
+     block and borrows the field itself, so this is what fileclose forwards.
+     It used to be a quarter of [p->pid] smuggled through
+     [fileclose_fs_env] -- see the note there for why that could not be paid
+     beside [ProcInv.proc_priv].  Unconditional rather than type-selected:
+     the pipe arm does not need it, but making the row an [if] over a
+     content the caller cannot see buys nothing. *)
+  proc_priv_bare p pidv Vpr -∗
   fileclose_env fn on us n eb p Cf -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  The FD_INODE / FD_DEVICE
      arm parks (begin_op / iput / end_op), so fileclose can return on
@@ -667,6 +680,7 @@ Definition wp_fileclose_sconf_body
     ⌜ callee_saved m mr ⌝ -∗
     fd_slot -∗
     fileclose_env_out fn on us Cf -∗
+    proc_priv_bare p pidv Vpr -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -677,6 +691,6 @@ Module Type FILECLOSE.
       (k : nat) (q : Qp) (Cf : fcontent)
       (fn : fclose_names) (on : option nat) (us : gset Z)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
-      (K : nat) (b : bool) (lks : gset string),
-      wp_fileclose_sconf_body γfl γf k q Cf fn on us m n eb p K b lks.
+      (K : nat) (b : bool) (lks : gset string) (pidv : mword 32) (Vpr : pprivate),
+      wp_fileclose_sconf_body γfl γf k q Cf fn on us m n eb p K b lks pidv Vpr.
 End FILECLOSE.

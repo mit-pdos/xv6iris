@@ -95,6 +95,7 @@ Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import CpuOwn.
 Require Import SchedCtx.
+Require Import ProcDefs.  (* [proc_priv_bare] *)
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
 Require Import BioInv.
@@ -131,7 +132,7 @@ Definition wp_iupdate_sconf_body
     (u : nat)
     (pidv : mword 32) (dq dqd dqn dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) :=
+    (b : bool) (lks : gset string) (Vpr : pprivate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iupdate in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -237,7 +238,7 @@ Definition wp_iupdate_sconf_body
   ireg_inv γi γfs inodestart nib -∗
   dinode_at γi inum dn0 -∗
   (* the caller's own pid cell (bread's acquiresleep records it) *)
-  p_pid pj ↦₄{dq} pidv -∗
+  proc_priv_bare pj pidv Vpr -∗
   (* the running-thread bundle *)
   procs_inv γs -∗
   (* the disk fabric *)
@@ -265,7 +266,7 @@ Definition wp_iupdate_sconf_body
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
-      p_pid pj ↦₄{dq} pidv -∗
+      proc_priv_bare pj pidv Vpr -∗
       i_dev ip ↦₄{dqd} dev -∗
       i_inum ip ↦₄{dqn} inum -∗
       inode_meta ip dn -∗
@@ -313,7 +314,7 @@ Definition wp_iupdate_gen_body
     (u : nat) (Sb : gset Z)
     (pidv : mword 32) (dq dqd dqn dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) :=
+    (b : bool) (lks : gset string) (Vpr : pprivate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iupdate in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -414,7 +415,7 @@ Definition wp_iupdate_gen_body
   ireg_inv γi γfs inodestart nib -∗
   dinode_at γi inum dn0 -∗
   (* the caller's own pid cell (bread's acquiresleep records it) *)
-  p_pid pj ↦₄{dq} pidv -∗
+  proc_priv_bare pj pidv Vpr -∗
   (* the running-thread bundle *)
   procs_inv γs -∗
   (* the disk fabric *)
@@ -441,7 +442,7 @@ Definition wp_iupdate_gen_body
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
-      p_pid pj ↦₄{dq} pidv -∗
+      proc_priv_bare pj pidv Vpr -∗
       i_dev ip ↦₄{dqd} dev -∗
       i_inum ip ↦₄{dqn} inum -∗
       inode_meta ip dn -∗
@@ -489,7 +490,7 @@ Definition wp_iupdate_cred_body
     (u : nat) (Sb : gset Z) (cru : bool)
     (pidv : mword 32) (dq dqd dqn dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) :=
+    (b : bool) (lks : gset string) (Vpr : pprivate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iupdate in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -593,7 +594,7 @@ Definition wp_iupdate_cred_body
   ireg_inv γi γfs inodestart nib -∗
   dinode_at γi inum dn0 -∗
   (* the caller's own pid cell (bread's acquiresleep records it) *)
-  p_pid pj ↦₄{dq} pidv -∗
+  proc_priv_bare pj pidv Vpr -∗
   (* the running-thread bundle *)
   procs_inv γs -∗
   (* the disk fabric *)
@@ -620,7 +621,7 @@ Definition wp_iupdate_cred_body
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
-      p_pid pj ↦₄{dq} pidv -∗
+      proc_priv_bare pj pidv Vpr -∗
       i_dev ip ↦₄{dqd} dev -∗
       i_inum ip ↦₄{dqn} inum -∗
       inode_meta ip dn -∗
@@ -684,7 +685,7 @@ Definition wp_iupdate_credgen_body
     (u : nat) (Sb : gset Z) (cru : bool) (e0 : nat) (v : nat)
     (pidv : mword 32) (dq dqd dqn dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) :=
+    (b : bool) (lks : gset string) (Vpr : pprivate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iupdate in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -753,7 +754,7 @@ Definition wp_iupdate_credgen_body
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   ireg_inv γi γfs inodestart nib -∗
   dinode_at γi inum dn0 -∗
-  p_pid pj ↦₄{dq} pidv -∗
+  proc_priv_bare pj pidv Vpr -∗
   procs_inv γs -∗
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
@@ -776,7 +777,7 @@ Definition wp_iupdate_credgen_body
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
-      p_pid pj ↦₄{dq} pidv -∗
+      proc_priv_bare pj pidv Vpr -∗
       i_dev ip ↦₄{dqd} dev -∗
       i_inum ip ↦₄{dqn} inum -∗
       inode_meta ip dn -∗
@@ -877,7 +878,7 @@ Definition wp_iupdate_link_body
     (pin : bool)
     (pidv : mword 32) (dq dqd dqn dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) :=
+    (b : bool) (lks : gset string) (Vpr : pprivate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iupdate in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -978,7 +979,7 @@ Definition wp_iupdate_link_body
      a disjunction so that a caller which paid the token gets the TOKEN
      back (see [InodeRegion.ireg_link_pin]'s header). *)
   InodeRegion.ireg_link_pin pin (bv_unsigned inum) dn0 -∗
-  p_pid pj ↦₄{dq} pidv -∗
+  proc_priv_bare pj pidv Vpr -∗
   procs_inv γs -∗
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
@@ -991,7 +992,7 @@ Definition wp_iupdate_link_body
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
-      p_pid pj ↦₄{dq} pidv -∗
+      proc_priv_bare pj pidv Vpr -∗
       i_dev ip ↦₄{dqd} dev -∗
       i_inum ip ↦₄{dqn} inum -∗
       inode_meta ip dn -∗
@@ -1089,7 +1090,7 @@ Definition wp_iupdate_unlink_body
     (u : nat) (Sb : gset Z) (cru : bool) (fl : option (option Z))
     (pidv : mword 32) (dq dqd dqn dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
-    (b : bool) (lks : gset string) :=
+    (b : bool) (lks : gset string) (Vpr : pprivate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iupdate in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -1151,7 +1152,7 @@ Definition wp_iupdate_unlink_body
      choice is made with one [iLeft]/[iRight]. *)
   (⌜γ = icfg_log⌝ ∗ ⌜inodestart = icfg_ist⌝
    ∨ ⌜bv_unsigned (di_nlink dn) <> 0⌝) -∗
-  p_pid pj ↦₄{dq} pidv -∗
+  proc_priv_bare pj pidv Vpr -∗
   procs_inv γs -∗
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
@@ -1164,7 +1165,7 @@ Definition wp_iupdate_unlink_body
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
-      p_pid pj ↦₄{dq} pidv -∗
+      proc_priv_bare pj pidv Vpr -∗
       i_dev ip ↦₄{dqd} dev -∗
       i_inum ip ↦₄{dqn} inum -∗
       inode_meta ip dn -∗
@@ -1194,10 +1195,10 @@ Module Type IUPDATE.
       (u : nat)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string),
+      (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_iupdate_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                             cov logstart inodestart nib dev ip inum dn dn0 bm u
-                            pidv dq dqd dqn dqs m K eb b lks.
+                            pidv dq dqd dqn dqs m K eb b lks Vpr.
 
   (* the SET-FORM contract; [wp_iupdate_sconf] above is its instance with the
      set forgotten, kept as its own parameter so that every existing caller
@@ -1216,10 +1217,10 @@ Module Type IUPDATE.
       (u : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string),
+      (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_iupdate_gen_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                           cov logstart inodestart nib dev ip inum dn dn0 bm u Sb
-                          pidv dq dqd dqn dqs m K eb b lks.
+                          pidv dq dqd dqn dqs m K eb b lks Vpr.
   (* the CREDITED set-form contract (S5a finding 3): the same walk with the
      unit returned when the op has already logged this inode's block.
      [wp_iupdate_gen] is its [cru := false] instance. *)
@@ -1237,10 +1238,10 @@ Module Type IUPDATE.
       (u : nat) (Sb : gset Z) (cru : bool)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string),
+      (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_iupdate_cred_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                            cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru
-                           pidv dq dqd dqn dqs m K eb b lks.
+                           pidv dq dqd dqn dqs m K eb b lks Vpr.
   (* the credited set-form contract at itrunc's altitude: eb-generic, so a
      pure pass-through caller can hand its own complements through, and
      RESOURCE-credited, so a caller holding the group witness rather than
@@ -1262,10 +1263,10 @@ Module Type IUPDATE.
       (u : nat) (Sb : gset Z) (cru : bool) (e0 : nat) (v : nat)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string),
+      (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_iupdate_credgen_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                               cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru e0 v
-                              pidv dq dqd dqn dqs m K eb b lks.
+                              pidv dq dqd dqn dqs m K eb b lks Vpr.
 
   (* the LINK-MINTING contract (design §20.18 stage C2): the credited walk
      at a flush that RAISES [nlink] by one, paying out the [ilink] fragment
@@ -1287,10 +1288,10 @@ Module Type IUPDATE.
       (pin : bool)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string),
+      (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_iupdate_link_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                            cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru fl
-                           pin pidv dq dqd dqn dqs m K eb b lks.
+                           pin pidv dq dqd dqn dqs m K eb b lks Vpr.
 
   (* the LINK-SPENDING contract (design §20.18 stage C4): the credited walk
      at a flush that LOWERS [nlink] by one, spending the [ilink] that drop
@@ -1310,8 +1311,8 @@ Module Type IUPDATE.
       (u : nat) (Sb : gset Z) (cru : bool) (fl : option (option Z))
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string),
+      (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_iupdate_unlink_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                              cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru fl
-                             pidv dq dqd dqn dqs m K eb b lks.
+                             pidv dq dqd dqn dqs m K eb b lks Vpr.
 End IUPDATE.

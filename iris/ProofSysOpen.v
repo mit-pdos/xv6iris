@@ -335,24 +335,24 @@ Section ProofSysOpenBody.
               Hload #Hshot Hfrz Hkeep Hru Hfref Hflive Hflds Hfpn Hfip Hfoff
               Hcore Howe #Hprocs #Hdev #Hgeo #Hdlk Hop Hsbb Hsbi Hbmres Hbsl
               Hisl Hfds Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24 Hcont".
-    iDestruct (proc_priv_core_pid with "Hcore") as "[Hpidq Hcback]".
+    iDestruct (proc_priv_core_bare_acc with "Hcore") as "[Hpbare Hcback]".
     iApply (Tails.so_tail_s (CID0 := CID0) gs jx gl gu gd gk pd pav pu bn g gfs
               gi cn gil gisl cov logstart icfg_dev kk s gy inum dn bm
               (mword_of_int (Z.of_nat fd) : mword 64) u pidv (DfracOwn (1/4))
-              m M sp0 K eb b lks w6 w23 w24 bp
+              m M sp0 K eb b lks w6 w23 w24 bp V
               HKiu HKeo HK24 Kpop Hkk Hgeom Hj Hgl Hlkempty Hsp0 HMsp HMthr
               HMs1 HMs3 Hal
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hitinv Hesck Hslkk Hslkd Hdep Hidev Hiinum Hivalid
-                    Hload Hshot Hfrz Hpidq Hprocs Hdev Hgeo Hdlk Hop Hf1 Hf2 Hf3
+                    Hload Hshot Hfrz Hpbare Hprocs Hdev Hgeo Hdlk Hop Hf1 Hf2 Hf3
                     Hf4
                     Hf5 Hf6 HbP H23 H24
                     [Hkeep Hru Hfref Hflive Hflds Hfpn Hfip Hfoff Hcback Howe Hsbb
                      Hsbi Hbmres Hbsl Hisl Hfds Hcont]").
     iEval (rewrite /wp_next).
     iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc
-                                         Hpidq Hshr".
-    iDestruct ("Hcback" with "Hpidq") as "Hcore".
+                                         Hpbare Hshr".
+    iDestruct ("Hcback" with "Hpbare") as "Hcore".
     (* ---- THE PUBLICATION: one ghost step ---- *)
     iApply fupd_wp.
     iMod (so_publish ⊤ gf kf kk qi s gy inum (di_type dn) C pn om voff
@@ -922,14 +922,14 @@ Section ProofSysOpenBody.
     iEval (rewrite Hpp14e) in "Hpc".
     (* ===== +0x150 jal ra,itrunc ===== *)
     iApply (wp_jal_s_sconf (CID := CID14) (mword_of_int (SO + 0x150)) Rra
-              (mword_of_int 2089112 : mword 21) P1 (K - 24)%nat b
+              (mword_of_int 2089092 : mword 21) P1 (K - 24)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi150").
     iIntros (CID15 Hq15) "Hcg Hpc".
     set (P2 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (SO + 0x150) : mword 64) 4)]> P1).
     assert (Hjit : add_vec (mword_of_int (SO + 0x150) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2089112 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2089092 : mword 21))
                    = mword_of_int KernelSyms.itrunc) by pcw.
     iEval (rewrite Hjit) in "Hpc".
     assert (HP2ra : (P2 !!! Regidx Rra : mword 64)
@@ -957,23 +957,23 @@ Section ProofSysOpenBody.
     iDestruct (so_loaded_open with "Hload")
       as (data) "(%Hok & %Hdok & Hlnk & Hat & Hmeta & Hmap & Hblk)".
     destruct Hok as (Hbwf & Hbcov & Haddrs & Htynz & Hszcap & Hholes & Hsized).
-    iDestruct (proc_priv_core_pid with "Hcore") as "[Hpidq Hcback]".
+    iDestruct (proc_priv_core_bare_acc with "Hcore") as "[Hpbare Hcback]".
     iApply (Itrunc.wp_itrunc_sconf (CID := CID15) gs jx gl gu gd gk pd pav pu
               bn g gfs gi cov logstart bmapstart inodestart icfg_nib size
               icfg_dev used (ientry kk) inum dn dn bm data u2 pidv
               (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn (1/2)) dqb dqs
-              P2 (K - 24)%nat eb b lks
+              P2 (K - 24)%nat eb b lks V
               HKit Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog Hinb
               Htynz (di_type_stable_refl dn) (di_nlink_stable_refl dn Htynz)
               Hbwf Hcovb Hsized Haddrs Hj Hgl HP2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hidev Hiinum
-                    Hmeta Hmap Hblk Hsbb Hsbi Hbmres Hireg Hat Hpidq Hprocs
+                    Hmeta Hmap Hblk Hsbb Hsbi Hbmres Hireg Hat Hpbare Hprocs
                     Hdev Hgeo Hdlk Hbsl Hop").
-    iIntros (CID16 Hq16 mit) "%Hcsit Hcg Hown Htce Hcce Hpc Hpidq Hidev Hiinum
+    iIntros (CID16 Hq16 mit) "%Hcsit Hcg Hown Htce Hcce Hpc Hpbare Hidev Hiinum
                               Hsbb Hsbi Hmeta Hmap Hblk Hbmres Hat Hbsl Hop".
     iDestruct "Hop" as (u3) "[%Hu3 Hop]".
-    iDestruct ("Hcback" with "Hpidq") as "Hcore".
+    iDestruct ("Hcback" with "Hpbare") as "Hcore".
     assert (Hpcit : ret_pc (P2 !!! Regidx Rra : mword 64)
                     = mword_of_int (SO + 0x154)) by (rewrite HP2ra; pcw).
     iEval (rewrite Hpcit) in "Hpc".
@@ -1196,14 +1196,14 @@ Section ProofSysOpenBody.
     iEval (rewrite Hpp5e) in "Hpc".
     (* ===== +0x60 jal ra,filealloc ===== *)
     iApply (wp_jal_s_sconf (CID := CID1) (mword_of_int (SO + 0x60)) Rra
-              (mword_of_int 2092826 : mword 21) N (K - 24)%nat b
+              (mword_of_int 2092806 : mword 21) N (K - 24)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi60").
     iIntros (CID2 Hq2) "Hcg Hpc".
     set (M1 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (SO + 0x60) : mword 64) 4)]> N).
     assert (Hjfa : add_vec (mword_of_int (SO + 0x60) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2092826 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2092806 : mword 21))
                    = mword_of_int KernelSyms.filealloc) by pcw.
     iEval (rewrite Hjfa) in "Hpc".
     assert (HM1ra : (M1 !!! Regidx Rra : mword 64)
@@ -1297,7 +1297,7 @@ Section ProofSysOpenBody.
                       = mword_of_int (SO + 0x12e)) by pcw.
       iEval (rewrite Htg66) in "Hpc".
       iDestruct (so_omode_join sp0 lo om Hal23 with "H23lo H23hi") as "H23".
-      iDestruct (proc_priv_pid with "Hpriv") as "[Hpidq Hpback]".
+      iDestruct (proc_priv_bare_acc with "Hpriv") as "[Hpbare Hpback]".
       iDestruct (inode_ref_short_gen_forget with "Hkeep") as "Hkeep".
       iDestruct (cpu_own_transport CID3 CID5 0 eb (proc_addr jx) b
                    ltac:(wp_next_chain) with "Hown") as "Hown".
@@ -1309,20 +1309,20 @@ Section ProofSysOpenBody.
                 gfs gi cn gtl gil gisl cov logstart bmapstart inodestart
                 icfg_nib size icfg_dev used kk qi s gy inum dn bm u pidv
                 (DfracOwn (1/4)) dqb dqs m M2 sp0 K eb b lks w5 w6
-                (word_of_words lo om) w24 bp
+                (word_of_words lo om) w24 bp V
                 HKup HKeo HK24 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
                 Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HM2sp HM2thr
                 HM2s1 HM2s3 Hal
                 with "Hcg Hown Htce Hcce Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                       Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd Hdep Hidev
-                      Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpidq
+                      Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpbare
                       Hprocs Hdev Hgeo Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
                       HbP H23 H24 [Hpback Hfds Hisl Hcont]").
       iEval (rewrite /wp_next).
       iIntros (CIDy) "%Hqy". iIntros (mf used2)
-        "%Hcsf %Ha0f %Hused2 Hcg Hown Htce Hcce Hpc Hpidq Hsbb Hsbi Hbmres
+        "%Hcsf %Ha0f %Hused2 Hcg Hown Htce Hcce Hpc Hpbare Hsbb Hsbi Hbmres
          Hbsl Hislot".
-      iDestruct ("Hpback" with "Hpidq") as "Hpriv".
+      iDestruct ("Hpback" with "Hpbare") as "Hpriv".
       iDestruct (iref_slots_combine nsj 1 with "Hisl Hislot") as "Hisl".
       replace (nsj + 1)%nat with (S nsj) by lia.
       iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
@@ -1464,7 +1464,7 @@ Section ProofSysOpenBody.
                       = mword_of_int (SO + 0x126)) by pcw.
       iEval (rewrite Htg70) in "Hpc".
       iDestruct (so_omode_join sp0 lo om Hal23 with "H23lo H23hi") as "H23".
-      iDestruct (proc_priv_core_pid with "Hcore") as "[Hpidq Hcback]".
+      iDestruct (proc_priv_core_bare_acc with "Hcore") as "[Hpbare Hcback]".
       iDestruct (inode_ref_short_gen_forget with "Hkeep") as "Hkeep".
       iDestruct (cpu_own_transport CID8 CID10 0 eb (proc_addr jx) b
                    ltac:(wp_next_chain) with "Hown") as "Hown".
@@ -1477,22 +1477,22 @@ Section ProofSysOpenBody.
                 inodestart icfg_nib size icfg_dev used kk qi s gy inum dn bm
                 kf 1%Qp Cf inhabitant None ∅ u pidv
                 (DfracOwn (1/4)) dqb dqs m M4 sp0 K eb b lks w6
-                (word_of_words lo om) w24 bp
+                (word_of_words lo om) w24 bp V
                 HKup HKeo HKfc HK24 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog
                 Hist0 Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HM4sp
                 HM4thr HM4s1 HM4s2 Hal
                 with "Hcg Hown Htce Hcce Htext Hdata Hpc Hpe Hftab Href
                       [] Hbio Hlog Hseam Hgen
                       Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd Hdep Hidev
-                      Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpidq
+                      Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpbare
                       Hprocs Hdev Hgeo Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
                       HbP H23 H24 [Hcback Howe Hisl Hcont]").
       { iApply (fileclose_env_none _ _ _ _ _ _ Cf Hty0). }
       iEval (rewrite /wp_next).
       iIntros (CIDy) "%Hqy". iIntros (mf used2)
-        "%Hcsf %Ha0f %Hused2 Hcg Hown Htce Hcce Hpc Hpidq Hsbb Hsbi Hbmres
+        "%Hcsf %Ha0f %Hused2 Hcg Hown Htce Hcce Hpc Hpbare Hsbb Hsbi Hbmres
          Hbsl Hislot Hfds Hfout".
-      iDestruct ("Hcback" with "Hpidq") as "Hcore".
+      iDestruct ("Hcback" with "Hpbare") as "Hcore".
       iDestruct (proc_priv_join with "Hcore Howe") as "Hpriv".
       iDestruct (iref_slots_combine nsj 1 with "Hisl Hislot") as "Hisl".
       replace (nsj + 1)%nat with (S nsj) by lia.
@@ -2102,7 +2102,7 @@ Section ProofSysOpenBody.
                       = mword_of_int (SO + 0x116)) by pcw.
       iEval (rewrite Htg5a) in "Hpc".
       iDestruct (so_omode_join sp0 lo om Hal23 with "H23lo H23hi") as "H23".
-      iDestruct (proc_priv_pid with "Hpriv") as "[Hpidq Hpback]".
+      iDestruct (proc_priv_bare_acc with "Hpriv") as "[Hpbare Hpback]".
       iDestruct (inode_ref_short_gen_forget with "Hkeep") as "Hkeep".
       iDestruct (cpu_own_transport CID0 CID6 0 eb (proc_addr jx) b
                    ltac:(wp_next_chain) with "Hown") as "Hown".
@@ -2114,20 +2114,20 @@ Section ProofSysOpenBody.
                 gfs gi cn gtl gil gisl cov logstart bmapstart inodestart
                 icfg_nib size icfg_dev used kk qi s gy inum dn bm u pidv
                 (DfracOwn (1/4)) dqb dqs m M4 sp0 K eb b lks w4 w5 w6
-                (word_of_words lo om) w24 bp
+                (word_of_words lo om) w24 bp V
                 HKup HKeo HK24 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
                 Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HM4sp HM4thr
                 HM4s1 HM4s2 HM4s3 Hal
                 with "Hcg Hown Htce Hcce Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                       Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd Hdep Hidev
-                      Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpidq
+                      Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpbare
                       Hprocs Hdev Hgeo Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
                       HbP H23 H24 [Hpback Hfds Hisl Hcont]").
       iEval (rewrite /wp_next).
       iIntros (CIDy) "%Hqy". iIntros (mf used2)
-        "%Hcsf %Ha0f %Hused2 Hcg Hown Htce Hcce Hpc Hpidq Hsbb Hsbi Hbmres
+        "%Hcsf %Ha0f %Hused2 Hcg Hown Htce Hcce Hpc Hpbare Hsbb Hsbi Hbmres
          Hbsl Hislot".
-      iDestruct ("Hpback" with "Hpidq") as "Hpriv".
+      iDestruct ("Hpback" with "Hpbare") as "Hpriv".
       iDestruct (iref_slots_combine nsj 1 with "Hisl Hislot") as "Hisl".
       replace (nsj + 1)%nat with (S nsj) by lia.
       iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
@@ -2591,25 +2591,25 @@ Section ProofSysOpenBody.
                       = mword_of_int (SO + 0xd2)) by pcw.
       iEval (rewrite Htg48) in "Hpc".
       iDestruct (so_omode_join sp0 lo om Hal23 with "H23lo H23hi") as "H23".
-      iDestruct (proc_priv_pid with "Hpriv") as "[Hpidq Hpback]".
+      iDestruct (proc_priv_bare_acc with "Hpriv") as "[Hpbare Hpback]".
       iDestruct (cpu_own_transport CID6 CID8 0 eb (proc_addr jx) b
                    ltac:(wp_next_chain) with "Hown") as "Hown".
       iDestruct (log_opS_op with "HopS") as "Hop".
       iApply (Tails.so_tail_a (CID0 := CID8) gs jx gl gu gd gk pd pav pu bn g
                 gfs cov logstart dev u1 pidv (DfracOwn (1/4)) m P1 sp0 K eb b
-                lks w4 w5 w6 (word_of_words lo om) w24 bp1
+                lks w4 w5 w6 (word_of_words lo om) w24 bp1 V
                 HKeo HK24 Kpop Hgeom Hj Hgl Hlkempty Hsp0 HP1sp HP1thr HP1s2
                 HP1s3 Hal
                 with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
-                      Hpidq Hprocs Hdev Hgeo Hdlk Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
+                      Hpbare Hprocs Hdev Hgeo Hdlk Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
                       HbP H23 H24 [Hpback Hfds Hisl Hsbn Hsbi Hsbs Hsbb Hbmres
                       Hbsl Hcont]").
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
       iEval (rewrite /wp_next).
       iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc
-                                           Hpidq".
-      iDestruct ("Hpback" with "Hpidq") as "Hpriv".
+                                           Hpbare".
+      iDestruct ("Hpback" with "Hpbare") as "Hpriv".
       iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
       iApply ("Hcont" $! mf used1 ns1 with "[%] [%] Hcg Hown Htce Hcce Hpc
                 Hsbn Hsbi Hsbs Hsbb Hbmres Hbsl Hisl [Hpriv Hfds]").
@@ -2670,8 +2670,7 @@ Section ProofSysOpenBody.
       iApply ("Hcont" $! mf used2 ns2 with "[%] [%] Hcg Hown Htce Hcce Hpc
                 Hsbn Hsbi Hsbs Hsbb Hbmres Hbsl Hisl Hpost").
       { exact Hcsf. }
-      { destruct Hns1 as (Hlo & Hhi & Hok).
-        specialize (Hok eq_refl).
+      { cbn in Hns1.
         unfold sys_open_slots, create_slots in *. split; lia. } }
     iApply (so_join (CID0 := CID8) gfl gf gs jx gl gu gd gk pd pav pu bn g
               gfs gi cn gtl gil gisl cov logstart bmapstart inodestart nib
@@ -2868,14 +2867,14 @@ Section ProofSysOpenBody.
     iEval (rewrite Hppdc) in "Hpc".
     (* ===== +0xe0 jal ra,namei ===== *)
     iApply (wp_jal_s_sconf (CID := CID1) (mword_of_int (SO + 0xe0)) Rra
-              (mword_of_int 2091174 : mword 21) N1 (K - 24)%nat b
+              (mword_of_int 2091154 : mword 21) N1 (K - 24)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hie0").
     iIntros (CID2 Hq2) "Hcg Hpc".
     set (N2 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (SO + 0xe0) : mword 64) 4)]> N1).
     assert (Hjna : add_vec (mword_of_int (SO + 0xe0) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2091174 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2091154 : mword 21))
                    = mword_of_int KernelSyms.namei) by pcw.
     iEval (rewrite Hjna) in "Hpc".
     assert (HN2ra : (N2 !!! Regidx Rra : mword 64)
@@ -2894,12 +2893,14 @@ Section ProofSysOpenBody.
     assert (HN2thr : so_thr m N2).
     { intros c Hc N2b N8 N9 N18 N19. rewrite /N2 upd_ne; [| regne].
       exact (HN1thr c Hc N2b N8 N9 N18 N19). }
-    (* ---- the process, carved for namei: the cwd REFERENCE and the pid
-       quarter, and the two-slot allowance the walk takes EXACTLY. ---- *)
+    (* ---- the process, carved for namei: the BLOCK and the cwd REFERENCE,
+       and the two-slot allowance the walk takes EXACTLY.  [p->cwd] is one of
+       the block's own cells now, so namei borrows it for its own load and
+       nothing here carries it. ---- *)
     iDestruct (proc_priv_split_cwd gf (proc_addr jx) pidv V with "Hpriv")
       as "[Hpnc Href]".
-    iDestruct (proc_priv_nocwd_cwd_pid gf (proc_addr jx) pidv V with "Hpnc")
-      as "(Hcwd & Hpidq & Hpback)".
+    iEval (rewrite proc_priv_nocwd_bare) in "Hpnc".
+    iDestruct "Hpnc" as "[Hpbare Hofiles]".
     iDestruct (cwd_ref_held with "Href") as "Hcwdref".
     iDestruct (iref_slots_split 2 (ns - 2) with "[Hisl]") as "[Hir2 Hirr]".
     { replace (2 + (ns - 2))%nat with ns by lia. iExact "Hisl". }
@@ -2909,19 +2910,19 @@ Section ProofSysOpenBody.
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iApply (Namei.wp_namei_gen (CID := CID2) gs jx gl gu gd gk pd pav pu bn
               g gfs gi cn gtl ga gf cov logstart bmapstart inodestart nib
-              size dev used (pv_cwd V) plen bp MAXOPBLOCKS Sb
-              pidv (DfracOwn (1/4)) dqb dqs (DfracOwn 1)
-              N2 (K - 24)%nat eb b lks
+              size dev used plen bp MAXOPBLOCKS Sb
+              pidv (DfracOwn (1/4)) dqb dqs
+              N2 (K - 24)%nat eb b lks V
               HKna Hdevc Hnibc Hlogc Histc HdevR Hnib0 Hgeom Hsize Hbm0 Hbmcov
               Hbmlog Hist0 Hcovb Hiregb Hpcstr
               ltac:(exact (proj2 (so_len_range plen Hplen)))
               ltac:(apply so_namei_need) Hj Hgl Heb
               with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog Hkenv Hitab Hitinv
                     Hescrows Hslks Hireg Hropen Hprocs Hdev Hgeo Hdlk Hsbb Hsbi
-                    Hbmres Hpidq Hcwd Hcwdref [Hbufk] Hbsl Hir2 HopS").
+                    Hbmres Hpbare Hcwdref [Hbufk] Hbsl Hir2 HopS").
     { iEval (rewrite HN2a0). iExact "Hbufk". }
     iIntros (CID3 Hq3 mna n1 used1 Sb1 ok ipv w1)
-      "%Hcsna Hcg Hown Hpc Hsbb Hsbi %Hused1 Hbmres Hpidq Hcwd Hcwdref
+      "%Hcsna Hcg Hown Hpc Hsbb Hsbi %Hused1 Hbmres Hpbare Hcwdref
        Hbufk Hbsl %HSb1 %Hw1 %Hn1 HopS Hres".
     iEval (rewrite HN2a0) in "Hbufk".
     assert (Hpcna : ret_pc (N2 !!! Regidx Rra : mword 64)
@@ -2988,12 +2989,12 @@ Section ProofSysOpenBody.
       iEval (rewrite Htge6) in "Hpc".
       (* the process, put back whole and then re-carved for the tail's pid *)
       iDestruct (cwd_ref_of_held with "Hcwdref") as "Href".
-      iDestruct ("Hpback" $! (pv_cwd V) with "Hcwd Hpidq") as "Hpnc".
-      iEval (rewrite so_upd_cwd_id) in "Hpnc".
+      iCombine "Hpbare Hofiles" as "Hpnc".
+    iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
       iDestruct (proc_priv_split_cwd gf (proc_addr jx) pidv V
                    with "[Hpnc Href]") as "Hpriv";
         [iSplitL "Hpnc"; [iExact "Hpnc" | iExact "Href"] |].
-      iDestruct (proc_priv_pid with "Hpriv") as "[Hpidq Hpback2]".
+      iDestruct (proc_priv_bare_acc with "Hpriv") as "[Hpbare Hpback2]".
       iDestruct (iref_slots_combine 2 (ns - 2) with "Hir2b Hirr") as "Hisl".
       assert (Hnsb2 : (2 + (ns - 2))%nat = ns) by lia.
       iEval (rewrite Hnsb2) in "Hisl".
@@ -3003,19 +3004,19 @@ Section ProofSysOpenBody.
                    ltac:(wp_next_chain) with "Hown") as "Hown".
       iApply (Tails.so_tail_b (CID0 := CID5) gs jx gl gu gd gk pd pav pu bn g
                 gfs cov logstart dev n1 pidv (DfracOwn (1/4)) m P1 sp0 K eb b
-                lks w4 w5 w6 (word_of_words lo om) w24 bp1
+                lks w4 w5 w6 (word_of_words lo om) w24 bp1 V
                 HKeo HK24 Kpop Hgeom Hj Hgl Hlkempty Hsp0 HP1sp HP1thr HP1s2
                 HP1s3 Hal
                 with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
-                      Hpidq Hprocs Hdev Hgeo Hdlk Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
+                      Hpbare Hprocs Hdev Hgeo Hdlk Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
                       HbP H23 H24 [Hpback2 Hfds Hisl Hsbn Hsbi Hsbs Hsbb Hbmres
                       Hbsl Hcont]").
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
       iEval (rewrite /wp_next).
       iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc
-                                           Hpidq".
-      iDestruct ("Hpback2" with "Hpidq") as "Hpriv".
+                                           Hpbare".
+      iDestruct ("Hpback2" with "Hpbare") as "Hpriv".
       iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
       iApply ("Hcont" $! mf used1 ns with "[%] [%] Hcg Hown Htce Hcce Hpc
                 Hsbn Hsbi Hsbs Hsbb Hbmres Hbsl Hisl [Hpriv Hfds]").
@@ -3063,14 +3064,14 @@ Section ProofSysOpenBody.
     rewrite Hnaip Hipe in HP1a0.
     (* ===== +0xe8 jal ra,ilock  (a0 is STILL namei's return) ===== *)
     iApply (wp_jal_s_sconf (CID := CID5) (mword_of_int (SO + 0xe8)) Rra
-              (mword_of_int 2088978 : mword 21) P1 (K - 24)%nat b
+              (mword_of_int 2088958 : mword 21) P1 (K - 24)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hie8").
     iIntros (CID6 Hq6) "Hcg Hpc".
     set (P2 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (SO + 0xe8) : mword 64) 4)]> P1).
     assert (Hjil : add_vec (mword_of_int (SO + 0xe8) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2088978 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2088958 : mword 21))
                    = mword_of_int KernelSyms.ilock) by pcw.
     iEval (rewrite Hjil) in "Hpc".
     assert (HP2ra : (P2 !!! Regidx Rra : mword 64)
@@ -3096,15 +3097,15 @@ Section ProofSysOpenBody.
     iApply (Ilock.wp_ilock_sconf (CID := CID6) gs jx gl gu gd gk pd pav pu bn
               gfs gi cn gil gisl cov logstart inodestart nib
               kk (qq/2)%Qp gy PlainK dev inum pidv (DfracOwn (1/4)) dqs
-              P2 (K - 24)%nat eb b lks
+              P2 (K - 24)%nat eb b lks V
               HKil Hkk Hgeom Hist0 Hiblk Hinb Hj Hgl HP2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hitinv Hesck Hireg
-                    Hslkk Hshr Hru Hsbi Hpidq Hprocs Hdev Hgeo Hdlk Hbs1").
+                    Hslkk Hshr Hru Hsbi Hpbare Hprocs Hdev Hgeo Hdlk Hbs1").
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     iIntros (CID7 Hq7 mil dn bm fl)
-      "%Hcsil Hcg Hown _ _ Hpc Hpidq Hsbi Hbs1 Hslkd Hdep
+      "%Hcsil Hcg Hown _ _ Hpc Hpbare Hsbi Hbs1 Hslkd Hdep
        Hidev Hiinum Hivalid Hload #Hshot Hfrz %Hfl Hru %Hilkp".
     assert (Hpcil : ret_pc (P2 !!! Regidx Rra : mword 64)
                     = mword_of_int (SO + 0xec)) by (rewrite HP2ra; pcw).
@@ -3113,8 +3114,8 @@ Section ProofSysOpenBody.
       [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
     (* the process, put back whole: everything below wants [proc_priv] *)
     iDestruct (cwd_ref_of_held with "Hcwdref") as "Href".
-    iDestruct ("Hpback" $! (pv_cwd V) with "Hcwd Hpidq") as "Hpnc".
-    iEval (rewrite so_upd_cwd_id) in "Hpnc".
+    iCombine "Hpbare Hofiles" as "Hpnc".
+    iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
     iDestruct (proc_priv_split_cwd gf (proc_addr jx) pidv V
                  with "[Hpnc Href]") as "Hpriv";
       [iSplitL "Hpnc"; [iExact "Hpnc" | iExact "Href"] |].
@@ -3339,7 +3340,7 @@ Section ProofSysOpenBody.
                     = mword_of_int (SO + 0xfc)) by pcw.
     iEval (rewrite Hppfa) in "Hpc".
     iDestruct (inode_ref_short_gen_forget with "Hkeep") as "Hkeepe".
-    iDestruct (proc_priv_pid with "Hpriv") as "[Hpidq Hpback2]".
+    iDestruct (proc_priv_bare_acc with "Hpriv") as "[Hpbare Hpback2]".
     iDestruct (so_omode_join sp0 lo om Hal23 with "H23lo H23hi") as "H23".
     iDestruct (log_opS_op with "HopS") as "Hop".
     iDestruct (cpu_own_transport CID7 CID12 0 eb (proc_addr jx) b
@@ -3348,22 +3349,22 @@ Section ProofSysOpenBody.
               gfs gi cn gtl gil gisl cov logstart bmapstart inodestart nib
               size dev used1 kk (qq/2)%Qp (qq/2)%Qp gy inum dn bm n1 pidv
               (DfracOwn (1/4)) dqb dqs m Q3 sp0 K eb b lks w4 w5 w6
-              (word_of_words lo om) w24 bp1
+              (word_of_words lo om) w24 bp1 V
               HKup HKeo HK24 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
               Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HQ3sp HQ3thr
               HQ3s1 HQ3s2 HQ3s3 Hal
               with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen Hitab
                     Hitinv Hesck Hireg Hropen Hslkk Hslkd Hdep Hidev Hiinum
-                    Hivalid Hload Hshot Hfrz Hkeepe Hru Hsbb Hsbi Hbmres Hpidq Hprocs
+                    Hivalid Hload Hshot Hfrz Hkeepe Hru Hsbb Hsbi Hbmres Hpbare Hprocs
                     Hdev Hgeo Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23
                     H24 [Hpback2 Hfds Hisl Hsbn Hsbs Hcont]").
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     iEval (rewrite /wp_next).
     iIntros (CIDy) "%Hqy". iIntros (mf used2)
-      "%Hcsf %Ha0f %Huse2 Hcg Hown Htce Hcce Hpc Hpidq Hsbb Hsbi Hbmres Hbsl
+      "%Hcsf %Ha0f %Huse2 Hcg Hown Htce Hcce Hpc Hpbare Hsbb Hsbi Hbmres Hbsl
        Hislot".
-    iDestruct ("Hpback2" with "Hpidq") as "Hpriv".
+    iDestruct ("Hpback2" with "Hpbare") as "Hpriv".
     iEval (rewrite /iref_slot) in "Hislot".
     iDestruct (iref_slots_combine 1 (ns - 1) with "Hislot Hisl") as "Hisl".
     assert (Hnsc : (1 + (ns - 1))%nat = ns) by lia.
@@ -3616,14 +3617,14 @@ Section ProofSysOpenBody.
     iEval (rewrite Hpp0e) in "Hpc".
     (* ===== +0x0e jal ra,argint ===== *)
     iApply (wp_jal_s_sconf (CID := CID6) (mword_of_int (SO + 0x0e)) Rra
-              (mword_of_int 2086674 : mword 21) M4 (K - 24)%nat b
+              (mword_of_int 2086654 : mword 21) M4 (K - 24)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi0e").
     iIntros (CID7 Hq7) "Hcg Hpc".
     set (M5 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (SO + 0x0e) : mword 64) 4)]> M4).
     assert (Hjai : add_vec (mword_of_int (SO + 0x0e) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2086674 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2086654 : mword 21))
                    = mword_of_int KernelSyms.argint) by pcw.
     iEval (rewrite Hjai) in "Hpc".
     assert (HM5ra : (M5 !!! Regidx Rra : mword 64)
@@ -3772,14 +3773,14 @@ Section ProofSysOpenBody.
     iEval (rewrite Hpp1c) in "Hpc".
     (* ===== +0x1c jal ra,argstr ===== *)
     iApply (wp_jal_s_sconf (CID := CID11) (mword_of_int (SO + 0x1c)) Rra
-              (mword_of_int 2086716 : mword 21) M8 (K - 24)%nat b
+              (mword_of_int 2086696 : mword 21) M8 (K - 24)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi1c").
     iIntros (CID12 Hq12) "Hcg Hpc".
     set (M9 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (SO + 0x1c) : mword 64) 4)]> M8).
     assert (Hjas : add_vec (mword_of_int (SO + 0x1c) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2086716 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2086696 : mword 21))
                    = mword_of_int KernelSyms.argstr) by pcw.
     iEval (rewrite Hjas) in "Hpc".
     assert (HM9ra : (M9 !!! Regidx Rra : mword 64)
@@ -3943,14 +3944,14 @@ Section ProofSysOpenBody.
     iEval (rewrite Hpp2a) in "Hpc".
     (* ===== +0x2a jal ra,begin_op ===== *)
     iApply (wp_jal_s_sconf (CID := CID17) (mword_of_int (SO + 0x2a)) Rra
-              (mword_of_int 2091834 : mword 21) R2 (K - 24)%nat b
+              (mword_of_int 2091814 : mword 21) R2 (K - 24)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi2a").
     iIntros (CID18 Hq18) "Hcg Hpc".
     set (R3 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (SO + 0x2a) : mword 64) 4)]> R2).
     assert (Hjbo : add_vec (mword_of_int (SO + 0x2a) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2091834 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2091814 : mword 21))
                    = mword_of_int KernelSyms.begin_op) by pcw.
     iEval (rewrite Hjbo) in "Hpc".
     assert (HR3ra : (R3 !!! Regidx Rra : mword 64)
@@ -3967,21 +3968,21 @@ Section ProofSysOpenBody.
     assert (HR3thr : so_thr m R3).
     { intros c Hc N2 N8b N9 N18 N19. rewrite /R3 upd_ne; [| regne].
       exact (HR2thr c Hc N2 N8b N9 N18 N19). }
-    iDestruct (proc_priv_pid gf (proc_addr j) pid (upd_upt V P') with "Hpriv")
-      as "[Hpidq Hpback0]".
+    iDestruct (proc_priv_bare_acc gf (proc_addr j) pid (upd_upt V P') with "Hpriv")
+      as "[Hpbare Hpback0]".
     iDestruct (cpu_own_transport CID13 CID18 0 eb (proc_addr j) b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
     iApply (BeginOp.wp_begin_op_sconf (CID := CID18) gs j gl bn g gfs cov
               logstart dev pid (DfracOwn (1/4)) R3 (K - 24)%nat eb b lks
-              HKbo Hj Hgl (Hlb "log"%string)
-              with "Hcg Hown [] [] Htext Hpc Hlog Hpidq Hprocs").
+              (upd_upt V P') HKbo Hj Hgl (Hlb "log"%string)
+              with "Hcg Hown [] [] Htext Hpc Hlog Hpbare Hprocs").
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
-    iIntros (CID19 Hq19 mbo) "%Hcsbo Hcg Hown _ _ Hpc Hpidq Hop".
+    iIntros (CID19 Hq19 mbo) "%Hcsbo Hcg Hown _ _ Hpc Hpbare Hop".
     assert (Hpc2e : ret_pc (R3 !!! Regidx Rra : mword 64)
                     = mword_of_int (SO + 0x2e)) by (rewrite HR3ra; pcw).
     iEval (rewrite Hpc2e) in "Hpc".
-    iDestruct ("Hpback0" with "Hpidq") as "Hpriv".
+    iDestruct ("Hpback0" with "Hpbare") as "Hpriv".
     iDestruct "Hop" as (Sb0) "HopS".
     assert (Hbosp : so_sp sp0 mbo).
     { rewrite /so_sp (callee_saved_lookup Hcsbo csp_rs1 ltac:(vm_compute; reflexivity)).

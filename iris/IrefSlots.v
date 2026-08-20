@@ -41,7 +41,8 @@
    against the supply in one place.                                      *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list.
-From iris.algebra Require Import auth numbers.
+From iris.algebra Require Import auth numbers ufrac.
+From iris.bi.lib Require Import fractional.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import own.
 Require Import ProcGeom.
@@ -54,7 +55,56 @@ Definition IREFSPARE : nat := 4%nat.
 (* one cwd per process, one per open file, plus the per-process allowance *)
 Definition IREFSLOTS : nat := (NPROC * (1 + IREFSPARE) + NFILE)%nat.
 
-Definition irefslotUR : ucmra := authUR natUR.
+(* THE CMRA IS FRACTIONAL, and it has to be.  A unit is evidence that the
+   system has somewhere to put a reference, and for the [NFILE] units that
+   somewhere is an ftable entry -- but an ftable entry's content is held at a
+   FRACTION ([FileInvDefs.file_core] splits with [q], because filedup hands
+   out shares of one file), so the unit backing it has to split the same way
+   or it cannot live there at all.
+
+   [ufracR] is [Qp] under [+] with no upper bound; [optionUR] adds the zero
+   the auth needs as its unit.  The nat-indexed API below is unchanged and is
+   what every existing caller still uses -- [iref_slots n] is [n] whole units
+   -- with [iref_frac] the same resource read at an arbitrary share. *)
+Definition irefslotUR : ucmra := authUR (optionUR ufracR).
+
+(* [n] whole units, with zero as the cmra's own unit so that [iref_slots 0]
+   is [emp]-like exactly as [◯ 0] was. *)
+(* [optionUR ufracR], NOT [option ufrac]: [ufrac] is a Definition for [Qp]
+   and Coq infers the BOUNDED [frac] camera for a bare [Qp] (see ufrac.v's
+   own header), which is the wrong algebra and fails to unify silently. *)
+Definition nat_ufrac (n : nat) : optionUR ufracR :=
+  match n with
+  | O    => None
+  | S k  => Some (pos_to_Qp (Pos.of_succ_nat k))
+  end.
+
+Lemma nat_ufrac_1 : nat_ufrac 1 = Some 1%Qp.
+Proof. reflexivity. Qed.
+
+Lemma nat_ufrac_op (a b : nat) : nat_ufrac (a + b) = nat_ufrac a ⋅ nat_ufrac b.
+Proof.
+  destruct a as [|a]; destruct b as [|b]; cbn; try done.
+  - by rewrite Nat.add_0_r.
+  - rewrite -Some_op ufrac_op pos_to_Qp_add. do 2 f_equal. lia.
+Qed.
+
+(* the ORDER on whole units, which is what the supply bound turns into *)
+Lemma nat_ufrac_incl (n m : nat) :
+  nat_ufrac n ≼ nat_ufrac m -> (n <= m)%nat.
+Proof.
+  destruct n as [|n]; [lia|].
+  destruct m as [|m]; cbn.
+  - intros [z Hz]. destruct z; by inversion Hz.
+  - intros Hincl.
+    apply option_included in Hincl as [Hn | (x & y & Hx & Hy & Hxy)];
+      [discriminate|].
+    injection Hx as <-. injection Hy as <-.
+    destruct Hxy as [Heq | Hlt].
+    + apply leibniz_equiv in Heq. apply pos_to_Qp_inj in Heq. lia.
+    + apply ufrac_included in Hlt.
+      apply pos_to_Qp_inj_lt in Hlt. lia.
+Qed.
 
 (* As in [FdSlots], the ghost NAME lives in the class: there is exactly one
    iref-slot supply per system, and threading a [γ] would drag a filesystem
@@ -74,12 +124,23 @@ Proof. solve_inG. Qed.
 Section IrefSlots.
   Context `{!irefslotG Σ}.
 
+  (* A SHARE of the supply.  [iref_frac 1] is one whole unit; a share below
+     one is what an ftable entry's fraction of a file carries, and the shares
+     of one entry always add back to the one unit that entry is provisioned
+     for.  Nothing outside the file layer uses this reading. *)
+  Definition iref_frac (q : Qp) : iProp Σ :=
+    own irefslot_name (◯ (Some q : optionUR ufracR)).
+
   (* [n] units of iref-slot capability.  [iref_slot] is one. *)
-  Definition iref_slots (n : nat) : iProp Σ := own irefslot_name (◯ n).
+  Definition iref_slots (n : nat) : iProp Σ := own irefslot_name (◯ nat_ufrac n).
   Definition iref_slot : iProp Σ := iref_slots 1.
 
+  Lemma iref_slot_frac : iref_slot ⊣⊢ iref_frac 1.
+  Proof. rewrite /iref_slot /iref_slots /iref_frac nat_ufrac_1. reflexivity. Qed.
+
   (* the fixed supply, held by the itable lock's resource *)
-  Definition iref_slots_auth : iProp Σ := own irefslot_name (● IREFSLOTS).
+  Definition iref_slots_auth : iProp Σ :=
+    own irefslot_name (● nat_ufrac IREFSLOTS).
 
   Global Instance iref_slots_timeless n : Timeless (iref_slots n).
   Proof. apply _. Qed.
@@ -88,11 +149,37 @@ Section IrefSlots.
      in the table as one [◯ n] and still hand one back on iput. *)
   Lemma iref_slots_op a b : iref_slots (a + b) ⊣⊢ iref_slots a ∗ iref_slots b.
   Proof.
-    rewrite /iref_slots.
-    assert (Hop : (◯ (a + b)%nat : irefslotUR) = ◯ a ⋅ ◯ b)
+    rewrite /iref_slots nat_ufrac_op.
+    assert (Hop : (◯ (nat_ufrac a ⋅ nat_ufrac b) : irefslotUR)
+                  = ◯ nat_ufrac a ⋅ ◯ nat_ufrac b)
       by (rewrite -auth_frag_op; reflexivity).
     rewrite Hop own_op. reflexivity.
   Qed.
+
+  (* ---- and the same at an arbitrary share, which is what
+     [FileInvDefs.file_core_split] needs ---- *)
+  Lemma iref_frac_op q1 q2 : iref_frac (q1 + q2) ⊣⊢ iref_frac q1 ∗ iref_frac q2.
+  Proof.
+    rewrite /iref_frac.
+    assert (Hop : (◯ (Some (q1 + q2)%Qp : optionUR ufracR) : irefslotUR)
+                  = ◯ (Some q1 : optionUR ufracR) ⋅ ◯ (Some q2 : optionUR ufracR))
+      by (rewrite -auth_frag_op -Some_op ufrac_op; reflexivity).
+    rewrite Hop own_op. reflexivity.
+  Qed.
+
+  Lemma iref_frac_split q1 q2 : iref_frac (q1 + q2) -∗ iref_frac q1 ∗ iref_frac q2.
+  Proof. rewrite iref_frac_op. iIntros "$". Qed.
+  Lemma iref_frac_combine q1 q2 : iref_frac q1 -∗ iref_frac q2 -∗ iref_frac (q1 + q2).
+  Proof. iIntros "H1 H2". rewrite iref_frac_op. iFrame. Qed.
+
+  Global Instance iref_frac_fractional : Fractional iref_frac.
+  Proof. intros q1 q2. apply iref_frac_op. Qed.
+  Global Instance iref_frac_as_fractional q :
+    AsFractional (iref_frac q) iref_frac q.
+  Proof. split; [reflexivity | apply _]. Qed.
+
+  Global Instance iref_frac_timeless q : Timeless (iref_frac q).
+  Proof. apply _. Qed.
 
   Lemma iref_slots_split a b : iref_slots (a + b) -∗ iref_slots a ∗ iref_slots b.
   Proof. rewrite iref_slots_op. iIntros "$". Qed.
@@ -106,7 +193,7 @@ Section IrefSlots.
   Proof.
     rewrite /iref_slots_auth /iref_slots. iIntros "Ha Hf".
     iDestruct (own_valid_2 with "Ha Hf") as %[Hincl _]%auth_both_valid_discrete.
-    iPureIntro. by apply nat_included in Hincl.
+    iPureIntro. by apply nat_ufrac_incl in Hincl.
   Qed.
 
   (* ... and its consequence, the one idup needs: a count backed by iref
@@ -176,7 +263,7 @@ End IrefSlots.
 Lemma iref_slots_alloc `{!irefslotGpreS Σ} :
   ⊢ |==> ∃ _ : irefslotG Σ, iref_slots_auth ∗ iref_slots IREFSLOTS.
 Proof.
-  iMod (own_alloc (● IREFSLOTS ⋅ ◯ IREFSLOTS)) as (γ) "[Ha Hf]".
-  { apply auth_both_valid_discrete. split; [done | done]. }
+  iMod (own_alloc (● nat_ufrac IREFSLOTS ⋅ ◯ nat_ufrac IREFSLOTS)) as (γ) "[Ha Hf]".
+  { apply auth_both_valid_discrete. split; [done | by destruct (nat_ufrac IREFSLOTS)]. }
   iModIntro. iExists (IrefSlotG Σ _ γ). by iFrame.
 Qed.

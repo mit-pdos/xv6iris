@@ -29,7 +29,7 @@
      +0x3a            c.jr ra
 
    Every [jal] target was resolved numerically against KernelSyms; so was
-   [initproc] (0x8000a2c0, the auipc/sd pair) and the "/" literal
+   [initproc] (0x8000a2b0, the auipc/sd pair) and the "/" literal
    (0x80007190, the auipc/addi pair).  THIS KERNEL'S userinit is SHORTER
    than upstream's -- no uvmfirst, no trapframe writes, no safestrcpy --
    and the decode is what says so: three calls, two stores, nothing else.
@@ -452,12 +452,12 @@ Section ProofUserinit.
     iEval (rewrite Hpp14) in "Hpc".
     (* ===== +0x14 sd a0,1796(a5) : initproc = p ===== *)
     assert (Hinitaddr : add_vec (rget R5 Ra5)
-                          (sign_extend' 64 (mword_of_int 1796 : mword 12))
+                          (sign_extend' 64 (mword_of_int 1780 : mword 12))
                         = (mword_of_int KernelSyms.initproc : mword 64)).
     { assert (Hr : rget R5 Ra5 = R5 !!! Regidx Ra5) by (rgne; reflexivity).
       rewrite Hr /R5 upd_eq. pcw. }
     iApply (wp_sd_s_sconf (kt := KT1) (ktd := KT0)
-              (mword_of_int (UI + 0x14)) Ra0 Ra5 (mword_of_int 1796 : mword 12)
+              (mword_of_int (UI + 0x14)) Ra0 Ra5 (mword_of_int 1780 : mword 12)
               R5 (trap_res b + (K - 4))%nat v0 false
               with "Hcg Hpc Hi14 [Hinitproc]").
     { iEval (rewrite Hinitaddr). iExact "Hinitproc". }

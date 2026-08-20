@@ -911,14 +911,14 @@ Section ProofSysLinkBody.
     iEval (rewrite Hpp12) in "Hpc".
     (* ================= +0x12 jal ra,argstr ================= *)
     iApply (wp_jal_s_sconf (CID := CID7) (mword_of_int (SL + 0x12)) Rra
-              (mword_of_int 2087402 : mword 21) M5 (K - 38)%nat b
+              (mword_of_int 2087382 : mword 21) M5 (K - 38)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi12").
     iIntros (CID8 Hq8) "Hcg Hpc".
     set (M6 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (SL + 0x12) : mword 64) 4)]> M5).
     assert (Hjas : add_vec (mword_of_int (SL + 0x12) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2087402 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2087382 : mword 21))
                    = mword_of_int KernelSyms.argstr) by pcw.
     iEval (rewrite Hjas) in "Hpc".
     assert (HM6ra : (M6 !!! Regidx Rra : mword 64)
@@ -1043,14 +1043,14 @@ Section ProofSysLinkBody.
       iEval (rewrite Hpp26) in "Hpc".
       (* ================= +0x26 jal ra,argstr ================= *)
       iApply (wp_jal_s_sconf (CID := CID14) (mword_of_int (SL + 0x26)) Rra
-                (mword_of_int 2087382 : mword 21) N2 (K - 38)%nat b
+                (mword_of_int 2087362 : mword 21) N2 (K - 38)%nat b
                 ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi26").
       iIntros (CID15 Hq15) "Hcg Hpc".
       set (N3 := <[Regidx Rra := regval_into_reg
                     (add_vec_int (mword_of_int (SL + 0x26) : mword 64) 4)]> N2).
       assert (Hjas2 : add_vec (mword_of_int (SL + 0x26) : mword 64)
-                        (sign_extend' 64 (mword_of_int 2087382 : mword 21))
+                        (sign_extend' 64 (mword_of_int 2087362 : mword 21))
                       = mword_of_int KernelSyms.argstr) by pcw.
       iEval (rewrite Hjas2) in "Hpc".
       assert (HN3ra : (N3 !!! Regidx Rra : mword 64)
@@ -1125,10 +1125,9 @@ Section ProofSysLinkBody.
            out until whichever arm rebuilds the block. *)
         iDestruct (proc_priv_split_cwd γf pj pid (upd_upt V P2) with "Hpriv")
           as "[Hpnc Href]".
-        iDestruct (proc_priv_nocwd_cwd_pid γf pj pid (upd_upt V P2) with "Hpnc")
-          as "(Hcwd & Hpidq & Hpback)".
+        iEval (rewrite proc_priv_nocwd_bare) in "Hpnc".
+        iDestruct "Hpnc" as "[Hpidq Hofiles]".
         iDestruct (cwd_ref_held with "Href") as "Hcwdref".
-        iEval (cbn [upd_upt pv_cwd]) in "Hcwd".
         iEval (cbn [upd_upt pv_cwd]) in "Hcwdref".
         iDestruct (sl_ir3 with "Hir") as "[Hir2 Hir1]".
         iClear "Hi00 Hi02 Hi04 Hi06 Hi08 Hi0c Hi10 Hi12 Hi16 Hi18 Hi1c Hi20
@@ -1164,14 +1163,14 @@ Section ProofSysLinkBody.
         iEval (rewrite Hpp32) in "Hpc".
         (* ===== +0x32 jal ra,begin_op ===== *)
         iApply (wp_jal_s_sconf (CID := CID19) (mword_of_int (SL + 0x32)) Rra
-                  (mword_of_int 2092502 : mword 21) N4 (K - 38)%nat b
+                  (mword_of_int 2092482 : mword 21) N4 (K - 38)%nat b
                   ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi32").
         iIntros (CID20 Hq20) "Hcg Hpc".
         set (Q0 := <[Regidx Rra := regval_into_reg
                       (add_vec_int (mword_of_int (SL + 0x32) : mword 64) 4)]> N4).
         assert (Hjbo : add_vec (mword_of_int (SL + 0x32) : mword 64)
-                         (sign_extend' 64 (mword_of_int 2092502 : mword 21))
+                         (sign_extend' 64 (mword_of_int 2092482 : mword 21))
                        = mword_of_int KernelSyms.begin_op) by pcw.
         iEval (rewrite Hjbo) in "Hpc".
         assert (HQ0ra : (Q0 !!! Regidx Rra : mword 64)
@@ -1183,7 +1182,7 @@ Section ProofSysLinkBody.
         sl_own_transport CID16 CID20 eb pj b.
         iApply (BeginOp.wp_begin_op_sconf (CID := CID20) gs j gl bn g gfs cov
                   logstart dev pid (DfracOwn (1/4)) Q0 (K - 38)%nat eb b lks
-                  ltac:(exact Kbo) Hj Hgl (Hlb "log"%string)
+                  (upd_upt V P2) ltac:(exact Kbo) Hj Hgl (Hlb "log"%string)
                   with "Hcg Hown [] [] Htext Hpc Hlog Hpidq Hprocs").
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
@@ -1213,14 +1212,14 @@ Section ProofSysLinkBody.
         iEval (rewrite Hpp3a) in "Hpc".
         (* ===== +0x3a jal ra,namei ===== *)
         iApply (wp_jal_s_sconf (CID := CID22) (mword_of_int (SL + 0x3a)) Rra
-                  (mword_of_int 2092016 : mword 21) Q1 (K - 38)%nat b
+                  (mword_of_int 2091996 : mword 21) Q1 (K - 38)%nat b
                   ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi3a").
         iIntros (CID23 Hq23) "Hcg Hpc".
         set (Q2 := <[Regidx Rra := regval_into_reg
                       (add_vec_int (mword_of_int (SL + 0x3a) : mword 64) 4)]> Q1).
         assert (Hjna : add_vec (mword_of_int (SL + 0x3a) : mword 64)
-                         (sign_extend' 64 (mword_of_int 2092016 : mword 21))
+                         (sign_extend' 64 (mword_of_int 2091996 : mword 21))
                        = mword_of_int KernelSyms.namei) by pcw.
         iEval (rewrite Hjna) in "Hpc".
         assert (HQ2ra : (Q2 !!! Regidx Rra : mword 64)
@@ -1237,18 +1236,18 @@ Section ProofSysLinkBody.
         sl_own_transport CID21 CID23 eb pj b.
         iApply (Namei.wp_namei_gen (CID := CID23) gs j gl gu gd gk pd pav pu bn
                   g gfs gi cn gtl γa γf cov logstart bmapstart inodestart nib
-                  size dev used (pv_cwd V) pk1 bo1 MAXOPBLOCKS Sb0
-                  pid (DfracOwn (1/4)) dqb dqs (DfracOwn 1)
-                  Q2 (K - 38)%nat eb b lks
+                  size dev used pk1 bo1 MAXOPBLOCKS Sb0
+                  pid (DfracOwn (1/4)) dqb dqs
+                  Q2 (K - 38)%nat eb b lks (upd_upt V P2)
                   ltac:(exact Kna) Hcdev Hcnib Hclog Hcist HdevR Hnib0 Hgeom
                   Hsize Hbm0 Hbmcov Hbmlog Hist0 Hcovb Hiregb Hpcstr1
                   (sl_plen_lt pk1 Hpk1) (sl_bud_walk _) Hj Hgl Heb
                   with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog Hkenv Hitab Hitinv
                         Hescrows Hslks Hireg Hropen Hprocs Hdev Hgeo Hdlk Hsbb Hsbi
-                        Hbmres Hpidq Hcwd Hcwdref [Hbufk] Hbsl Hir2 HopS").
+                        Hbmres Hpidq Hcwdref [Hbufk] Hbsl Hir2 HopS").
         { iEval (rewrite HQ2a0). iExact "Hbufk". }
         iIntros (CID24 Hq24 mna n1 used1 Sb1 ok ipv w1)
-          "%Hcsna Hcg Hown Hpc Hsbb Hsbi %Hused1 Hbmres Hpidq Hcwd Hcwdref
+          "%Hcsna Hcg Hown Hpc Hsbb Hsbi %Hused1 Hbmres Hpidq Hcwdref
            Hbufk Hbsl %HSb1 %Hw1 %Hn1 HopS Hres".
         iEval (rewrite HQ2a0) in "Hbufk".
         assert (Hpc3e : ret_pc (Q2 !!! Regidx Rra : mword 64)
@@ -1331,14 +1330,14 @@ Section ProofSysLinkBody.
                     = mword_of_int (SL + 0xd6)) by pcw.
           (* ===== +0x42 jal ra,ilock ===== *)
           iApply (wp_jal_s_sconf (CID := CID26) (mword_of_int (SL + 0x42)) Rra
-                    (mword_of_int 2089820 : mword 21) Q3 (K - 38)%nat b
+                    (mword_of_int 2089800 : mword 21) Q3 (K - 38)%nat b
                     ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc Hi42").
           iIntros (CID27 Hq27) "Hcg Hpc".
           set (R0 := <[Regidx Rra := regval_into_reg
                         (add_vec_int (mword_of_int (SL + 0x42) : mword 64) 4)]> Q3).
           assert (Hjil : add_vec (mword_of_int (SL + 0x42) : mword 64)
-                           (sign_extend' 64 (mword_of_int 2089820 : mword 21))
+                           (sign_extend' 64 (mword_of_int 2089800 : mword 21))
                          = mword_of_int KernelSyms.ilock) by pcw.
           iEval (rewrite Hjil) in "Hpc".
           assert (HR0ra : (R0 !!! Regidx Rra : mword 64)
@@ -1354,7 +1353,7 @@ Section ProofSysLinkBody.
                     bn gfs gi cn gil gisl cov logstart inodestart nib
                     kk (qq/2)%Qp gsh PlainK dev inum pid (DfracOwn (1/4)) dqs
                     R0 (K - 38)%nat eb b lks
-                    ltac:(exact Kil) Hkk Hgeom Hist0 Hiblk Hinb Hj Hgl HR0a0
+                    (upd_upt V P2) ltac:(exact Kil) Hkk Hgeom Hist0 Hiblk Hinb Hj Hgl HR0a0
                     (Hlb "bcache"%string)
                     with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hitinv Hesck
                           Hireg Hslkk Hshr Hru Hsbi Hpidq Hprocs Hdev Hgeo Hdlk
@@ -1461,7 +1460,7 @@ Section ProofSysLinkBody.
                        inodestart nib size dev used1 kk (qq/2)%Qp (qq/2)%Qp gsh
                        inum dn bm n1 pid (DfracOwn (1/4)) dqb dqs
                        m R2 sp0 K eb b lks u4 bn0 bw1 bo2
-                       ltac:(exact Kiup) ltac:(exact Keo) K38 Kpop Hkk Hgeom
+                       (upd_upt V P2) ltac:(exact Kiup) ltac:(exact Keo) K38 Kpop Hkk Hgeom
                        Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog Hinb Hcovb
                        Hiu1 Hj Hgl Hlkempty ltac:(reflexivity)
                        (sl_regs_sp _ _ _ _ _ HR2regs)
@@ -1472,7 +1471,7 @@ Section ProofSysLinkBody.
                              Hsbi
                              Hbmres Hpidq Hprocs Hdev Hgeo Hdlk Hbsl [HopS]
                              Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
-                             [Hsbs Hir1 Hir1b Hcwd Hcwdref Hpback Hcont]").
+                             [Hsbs Hir1 Hir1b Hcwdref Hofiles Hcont]").
              { rewrite Heb /trap_csrs_ext. done. }
              { rewrite Heb /cpu_claim_ext. done. }
              { rewrite /log_op. iExists Sb1. iExact "HopS". }
@@ -1482,8 +1481,8 @@ Section ProofSysLinkBody.
                 Hbmres Hbsl Hislot".
              iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
              iDestruct (cwd_ref_of_held with "Hcwdref") as "Href".
-             iDestruct ("Hpback" $! (pv_cwd V) with "Hcwd Hpidq") as "Hpnc".
-             iEval (rewrite sl_upd_cwd_upt) in "Hpnc".
+             iCombine "Hpidq Hofiles" as "Hpnc".
+             iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
              iDestruct (proc_priv_split_cwd γf pj pid (upd_upt V P2)
                           with "[Hpnc Href]") as "Hpriv";
                [iSplitL "Hpnc"; [iExact "Hpnc" | iExact "Href"] |].
@@ -1614,7 +1613,7 @@ Section ProofSysLinkBody.
                           inodestart nib size dev used1 kk (qq/2)%Qp (qq/2)%Qp gsh
                           inum dn bm n1 pid (DfracOwn (1/4)) dqb dqs
                           m R5 sp0 K eb b lks u4 bn0 bw1 bo2
-                          ltac:(exact Kiup) ltac:(exact Keo) K38 Kpop Hkk Hgeom
+                          (upd_upt V P2) ltac:(exact Kiup) ltac:(exact Keo) K38 Kpop Hkk Hgeom
                           Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog Hinb Hcovb
                           Hiu1 Hj Hgl Hlkempty ltac:(reflexivity)
                           (sl_regs_sp _ _ _ _ _ HR5regs)
@@ -1625,7 +1624,7 @@ Section ProofSysLinkBody.
                                 Hsbb
                                 Hsbi Hbmres Hpidq Hprocs Hdev Hgeo Hdlk Hbsl
                                 [HopS] Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
-                                [Hsbs Hir1 Hir1b Hcwd Hcwdref Hpback Hcont]").
+                                [Hsbs Hir1 Hir1b Hcwdref Hofiles Hcont]").
                 { rewrite Heb /trap_csrs_ext. done. }
                 { rewrite Heb /cpu_claim_ext. done. }
                 { rewrite /log_op. iExists Sb1. iExact "HopS". }
@@ -1635,8 +1634,8 @@ Section ProofSysLinkBody.
                    Hbmres Hbsl Hislot".
                 iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
                 iDestruct (cwd_ref_of_held with "Hcwdref") as "Href".
-                iDestruct ("Hpback" $! (pv_cwd V) with "Hcwd Hpidq") as "Hpnc".
-                iEval (rewrite sl_upd_cwd_upt) in "Hpnc".
+                iCombine "Hpidq Hofiles" as "Hpnc".
+                iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
                 iDestruct (proc_priv_split_cwd γf pj pid (upd_upt V P2)
                              with "[Hpnc Href]") as "Hpriv";
                   [iSplitL "Hpnc"; [iExact "Hpnc" | iExact "Href"] |].
@@ -1761,14 +1760,14 @@ Section ProofSysLinkBody.
                 iEval (rewrite Hpp66) in "Hpc".
                 (* ===== +0x66 jal ra,iupdate -- THE MINT ===== *)
                 iApply (wp_jal_s_sconf (CID := CID39) (mword_of_int (SL + 0x66)) Rra
-                          (mword_of_int 2089604 : mword 21) S1 (K - 38)%nat b
+                          (mword_of_int 2089584 : mword 21) S1 (K - 38)%nat b
                           ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                           with "Hcg Hpc Hi66").
                 iIntros (CID40 Hq40) "Hcg Hpc".
                 set (S2 := <[Regidx Rra := regval_into_reg
                               (add_vec_int (mword_of_int (SL + 0x66) : mword 64) 4)]> S1).
                 assert (Hjiu : add_vec (mword_of_int (SL + 0x66) : mword 64)
-                                 (sign_extend' 64 (mword_of_int 2089604 : mword 21))
+                                 (sign_extend' 64 (mword_of_int 2089584 : mword 21))
                                = mword_of_int KernelSyms.iupdate) by pcw.
                 iEval (rewrite Hjiu) in "Hpc".
                 assert (HS2ra : (S2 !!! Regidx Rra : mword 64)
@@ -1794,7 +1793,7 @@ Section ProofSysLinkBody.
                           true pid
                           (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn (1/2)) dqs
                           S2 (K - 38)%nat eb b lks
-                          ltac:(exact Kiupd) ltac:(discriminate) Hgeom Hist0
+                          (upd_upt V P2) ltac:(exact Kiupd) ltac:(discriminate) Hgeom Hist0
                           Hiblk Hiblog Hinb
                           ltac:(exact (sl_setnl_type_stable dn _))
                           ltac:(rewrite /sl_incnl sl_setnl_type; exact Htynz)
@@ -1904,14 +1903,14 @@ Section ProofSysLinkBody.
                 iEval (rewrite Hpp6c) in "Hpc".
                 (* ===== +0x6c jal ra,iunlock ===== *)
                 iApply (wp_jal_s_sconf (CID := CID42) (mword_of_int (SL + 0x6c)) Rra
-                          (mword_of_int 2089952 : mword 21) S3 (K - 38)%nat b
+                          (mword_of_int 2089932 : mword 21) S3 (K - 38)%nat b
                           ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                           with "Hcg Hpc Hi6c").
                 iIntros (CID43 Hq43) "Hcg Hpc".
                 set (S4 := <[Regidx Rra := regval_into_reg
                               (add_vec_int (mword_of_int (SL + 0x6c) : mword 64) 4)]> S3).
                 assert (Hjul : add_vec (mword_of_int (SL + 0x6c) : mword 64)
-                                 (sign_extend' 64 (mword_of_int 2089952 : mword 21))
+                                 (sign_extend' 64 (mword_of_int 2089932 : mword 21))
                                = mword_of_int KernelSyms.iunlock) by pcw.
                 iEval (rewrite Hjul) in "Hpc".
                 assert (HS4ra : (S4 !!! Regidx Rra : mword 64)
@@ -1928,7 +1927,7 @@ Section ProofSysLinkBody.
                           gisl cov logstart kk (qq/2)%Qp gsh dev inum
                           (sl_incnl dn) bm pid (DfracOwn (1/4))
                           S4 (K - 38)%nat eb pj b lks
-                          ltac:(exact Kiu) Hkk HS4a0 (Hlb "sleep lock"%string)
+                          (upd_upt V P2) ltac:(exact Kiu) Hkk HS4a0 (Hlb "sleep lock"%string)
                           with "Hcg Hown Htext Hpc Hitinv Hesck Hslkk
                                 Hslkd Hpidq Hprocs Hdep Hidev Hiinum
                                 Hivalid Hload Hshot2 Hfrz").
@@ -1985,14 +1984,14 @@ Section ProofSysLinkBody.
                 iEval (rewrite Hpp78) in "Hpc".
                 (* ===== +0x78 jal ra,nameiparent ===== *)
                 iApply (wp_jal_s_sconf (CID := CID46) (mword_of_int (SL + 0x78)) Rra
-                          (mword_of_int 2091980 : mword 21) T1 (K - 38)%nat b
+                          (mword_of_int 2091960 : mword 21) T1 (K - 38)%nat b
                           ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                           with "Hcg Hpc Hi78").
                 iIntros (CID47 Hq47) "Hcg Hpc".
                 set (T2 := <[Regidx Rra := regval_into_reg
                               (add_vec_int (mword_of_int (SL + 0x78) : mword 64) 4)]> T1).
                 assert (Hjnp : add_vec (mword_of_int (SL + 0x78) : mword 64)
-                                 (sign_extend' 64 (mword_of_int 2091980 : mword 21))
+                                 (sign_extend' 64 (mword_of_int 2091960 : mword 21))
                                = mword_of_int KernelSyms.nameiparent) by pcw.
                 iEval (rewrite Hjnp) in "Hpc".
                 assert (HT2ra : (T2 !!! Regidx Rra : mword 64)
@@ -2017,22 +2016,22 @@ Section ProofSysLinkBody.
                 sl_own_transport CID44 CID47 eb pj b.
                 iApply (Nameiparent.wp_nameiparent_gen (CID := CID47) gs j gl gu
                           gd gk pd pav pu bn g gfs gi cn gtl γa γf cov logstart
-                          bmapstart inodestart nib size dev used1 (pv_cwd V)
+                          bmapstart inodestart nib size dev used1
                           pk2 bw1 bn0 c1 (Sb1 ∪ {[IBLOCK inum inodestart]})
-                          pid (DfracOwn (1/4)) dqb dqs (DfracOwn 1)
-                          T2 (K - 38)%nat eb b lks
+                          pid (DfracOwn (1/4)) dqb dqs
+                          T2 (K - 38)%nat eb b lks (upd_upt V P2)
                           ltac:(exact Knp) Hcdev Hcnib Hclog Hcist HdevR Hnib0
                           Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hcovb Hiregb
                           Hpcstr2 (sl_plen_lt pk2 Hpk2)
                           ltac:(exact (sl_walk2_need _ w1 c1 Hu2)) Hj Hgl Heb
                           with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog Hkenv Hitab
                                 Hitinv Hescrows Hslks Hireg Hropen Hprocs Hdev Hgeo Hdlk
-                                Hsbb Hsbi Hbmres Hpidq Hcwd Hcwdref [Hbufw]
+                                Hsbb Hsbi Hbmres Hpidq Hcwdref [Hbufw]
                                 [Hnm14] Hbsl Hir2 HopS").
                 { iEval (rewrite HT2a0). iExact "Hbufw". }
                 { iEval (rewrite HT2a1). iExact "Hnm14". }
                 iIntros (CID48 Hq48 mnp n2 used2 Sb2 ok2 nf dpv w2)
-                  "%Hcsnp Hcg Hown Hpc Hsbb Hsbi %Hused2 Hbmres Hpidq Hcwd
+                  "%Hcsnp Hcg Hown Hpc Hsbb Hsbi %Hused2 Hbmres Hpidq
                    Hcwdref Hbufw Hnm14 Hbsl %HSb2 %Hw2 %Hn2 HopS Hres2".
                 iEval (rewrite HT2a0) in "Hbufw".
                 iEval (rewrite HT2a1) in "Hnm14".
@@ -2148,14 +2147,14 @@ Section ProofSysLinkBody.
                      by exact (sl_regs_s2 _ _ _ _ _ HT3regs).
                    (* ===== +0x80 jal ra,ilock ===== *)
                    iApply (wp_jal_s_sconf (CID := CID50) (mword_of_int (SL + 0x80))
-                             Rra (mword_of_int 2089758 : mword 21) T3 (K - 38)%nat b
+                             Rra (mword_of_int 2089738 : mword 21) T3 (K - 38)%nat b
                              ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                              with "Hcg Hpc Hi80").
                    iIntros (CID51 Hq51) "Hcg Hpc".
                    set (U0 := <[Regidx Rra := regval_into_reg
                                  (add_vec_int (mword_of_int (SL + 0x80) : mword 64) 4)]> T3).
                    assert (Hjild : add_vec (mword_of_int (SL + 0x80) : mword 64)
-                                     (sign_extend' 64 (mword_of_int 2089758 : mword 21))
+                                     (sign_extend' 64 (mword_of_int 2089738 : mword 21))
                                    = mword_of_int KernelSyms.ilock) by pcw.
                    iEval (rewrite Hjild) in "Hpc".
                    assert (HU0ra : (U0 !!! Regidx Rra : mword 64)
@@ -2172,7 +2171,7 @@ Section ProofSysLinkBody.
                              nib kd (qd/2)%Qp gyd PlainK dev dinum pid
                              (DfracOwn (1/4)) dqs
                              U0 (K - 38)%nat eb b lks
-                             ltac:(exact Kil) Hkd Hgeom Hist0 Hdiblk Hdinb Hj Hgl
+                             (upd_upt V P2) ltac:(exact Kil) Hkd Hgeom Hist0 Hdiblk Hdinb Hj Hgl
                              HU0a0 (Hlb "bcache"%string)
                              with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hitinv
                                    Hescd Hireg Hslkd0 Hshrd Hrud Hsbi Hpidq Hprocs
@@ -2308,7 +2307,7 @@ Section ProofSysLinkBody.
                                kd (qd/2)%Qp (qd/2)%Qp gyd dinum dnd bmd
                                n2 Sb2 e0 pid (DfracOwn (1/4)) dqb dqs
                                m Ug sp0 K eb b lks bn1 bw2 bo2
-                               ltac:(exact Kil) ltac:(exact Kiupd)
+                               (upd_upt V P2) ltac:(exact Kil) ltac:(exact Kiupd)
                                ltac:(exact Kiup) ltac:(exact Keo) K38 Kpop
                                Hkk Hkd Hclog Hcist Hgeom Hsize Hbm0 Hbmcov
                                Hbmlog Hist0 Hiblk Hiblog Hinb
@@ -2328,15 +2327,15 @@ Section ProofSysLinkBody.
                                      Hfrzd Hkeepd Hrud Hsbb Hsbi Hbmres Hpidq Hprocs Hdev
                                      Hgeo Hdlk Hbsl HopE Hf1 Hf2 Hf3 Hf4
                                      HbN HbW HbO
-                                     [Hsbs Hir1c Hcwd Hcwdref Hpback Hcont]").
+                                     [Hsbs Hir1c Hcwdref Hofiles Hcont]").
                      iEval (rewrite /wp_next).
                      iIntros (CIDy) "%Hqy". iIntros (mf used3)
                        "%Hcsf %Ha0f %Hused3 Hcg Hown Htce Hcce Hpc Hpidq Hsbb
                         Hsbi Hbmres Hbsl Hislots".
                      iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
                      iDestruct (cwd_ref_of_held with "Hcwdref") as "Href".
-                     iDestruct ("Hpback" $! (pv_cwd V) with "Hcwd Hpidq") as "Hpnc".
-                     iEval (rewrite sl_upd_cwd_upt) in "Hpnc".
+                     iCombine "Hpidq Hofiles" as "Hpnc".
+                     iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
                      iDestruct (proc_priv_split_cwd γf pj pid (upd_upt V P2)
                                   with "[Hpnc Href]") as "Hpriv";
                        [iSplitL "Hpnc"; [iExact "Hpnc" | iExact "Href"] |].
@@ -2493,14 +2492,14 @@ Section ProofSysLinkBody.
                    iEval (rewrite Hpp9c) in "Hpc".
                    (* ===== +0x9c jal ra,dirlink ===== *)
                    iApply (wp_jal_s_sconf (CID := CID58) (mword_of_int (SL + 0x9c))
-                             Rra (mword_of_int 2091748 : mword 21) U5 (K - 38)%nat b
+                             Rra (mword_of_int 2091728 : mword 21) U5 (K - 38)%nat b
                              ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                              with "Hcg Hpc Hi9c").
                    iIntros (CID59 Hq59) "Hcg Hpc".
                    set (U6 := <[Regidx Rra := regval_into_reg
                                  (add_vec_int (mword_of_int (SL + 0x9c) : mword 64) 4)]> U5).
                    assert (Hjdl : add_vec (mword_of_int (SL + 0x9c) : mword 64)
-                                    (sign_extend' 64 (mword_of_int 2091748 : mword 21))
+                                    (sign_extend' 64 (mword_of_int 2091728 : mword 21))
                                   = mword_of_int KernelSyms.dirlink) by pcw.
                    iEval (rewrite Hjdl) in "Hpc".
                    assert (HU6ra : (U6 !!! Regidx Rra : mword 64)
@@ -2544,7 +2543,7 @@ Section ProofSysLinkBody.
                              pid (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn 1)
                              dqs dqb dqbs (DfracOwn (1/2))
                              U6 (K - 38)%nat eb b lks
-                             ltac:(exact Kdl) Htyd
+                             (upd_upt V P2) ltac:(exact Kdl) Htyd
                              ltac:(exact (proj1 (proj2 Hdiok)))
                              ltac:(exact (proj1 (proj2 (proj2 (proj2 (proj2 Hdiok))))))
                              ltac:(rewrite Hcnib;
@@ -2675,7 +2674,7 @@ Section ProofSysLinkBody.
                                  n3 Sb3 (bool_decide (bmapstart ∈ Sb3)) false e0
                                  pid (DfracOwn (1/4)) dqb dqs
                                  m mdl sp0 K eb b lks bn1 bw2 bo2
-                                 ltac:(exact Kil) ltac:(exact Kiupd)
+                                 (upd_upt V P2) ltac:(exact Kil) ltac:(exact Kiupd)
                                  ltac:(exact Kiup) ltac:(exact Keo) K38 Kpop
                                  Hkk Hkd Hclog Hcist Hgeom Hsize Hbm0 Hbmcov
                                  Hbmlog Hist0 Hiblk Hiblog Hinb
@@ -2697,15 +2696,15 @@ Section ProofSysLinkBody.
                                        Hfrzd Hkeepd Hrud Hsbb Hsbi Hbmres Hpidq Hprocs Hdev
                                        Hgeo Hdlk Hbsl HopE Hf1 Hf2 Hf3 Hf4
                                        HbN HbW HbO
-                                       [Hsbs Hir1c Hcwd Hcwdref Hpback Hcont]").
+                                       [Hsbs Hir1c Hcwdref Hofiles Hcont]").
                        iEval (rewrite /wp_next).
                        iIntros (CIDy) "%Hqy". iIntros (mf used4)
                          "%Hcsf %Ha0f %Hused4 Hcg Hown Htce Hcce Hpc Hpidq Hsbb
                           Hsbi Hbmres Hbsl Hislots".
                        iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
                        iDestruct (cwd_ref_of_held with "Hcwdref") as "Href".
-                       iDestruct ("Hpback" $! (pv_cwd V) with "Hcwd Hpidq") as "Hpnc".
-                       iEval (rewrite sl_upd_cwd_upt) in "Hpnc".
+                       iCombine "Hpidq Hofiles" as "Hpnc".
+                       iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
                        iDestruct (proc_priv_split_cwd γf pj pid (upd_upt V P2)
                                     with "[Hpnc Href]") as "Hpriv";
                          [iSplitL "Hpnc"; [iExact "Hpnc" | iExact "Href"] |].
@@ -2899,7 +2898,7 @@ Section ProofSysLinkBody.
                             (* ===== +0xa6 jal ra,iunlockput -- the PARENT ===== *)
                             iApply (wp_jal_s_sconf (CID := CID62)
                                       (mword_of_int (SL + 0xa6)) Rra
-                                      (mword_of_int 2090316 : mword 21) W0
+                                      (mword_of_int 2090296 : mword 21) W0
                                       (K - 38)%nat b ltac:(nz) ltac:(rdok)
                                       ltac:(vm_compute; reflexivity)
                                       with "Hcg Hpc Hia6").
@@ -2909,7 +2908,7 @@ Section ProofSysLinkBody.
                                              (mword_of_int (SL + 0xa6) : mword 64) 4)]> W0).
                             assert (Hjupd : add_vec
                                       (mword_of_int (SL + 0xa6) : mword 64)
-                                      (sign_extend' 64 (mword_of_int 2090316 : mword 21))
+                                      (sign_extend' 64 (mword_of_int 2090296 : mword 21))
                                       = mword_of_int KernelSyms.iunlockput) by pcw.
                             iEval (rewrite Hjupd) in "Hpc".
                             assert (HW1ra : (W1 !!! Regidx Rra : mword 64)
@@ -2935,7 +2934,7 @@ Section ProofSysLinkBody.
                                       (bool_decide (bmapstart ∈ Sb3)) true false e0
                                       pid (DfracOwn (1/4)) dqb dqs
                                       W1 (K - 38)%nat eb b lks
-                                      ltac:(exact Kiup) Hkd
+                                      (upd_upt V P2) ltac:(exact Kiup) Hkd
                                       ltac:(exact (proj1 (bool_decide_eq_true _)))
                                       ltac:(intros _; exact Hmiblk)
                                       Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hdiblk
@@ -2988,7 +2987,7 @@ Section ProofSysLinkBody.
                             (* ===== +0xac jal ra,iput -- the CHILD ===== *)
                             iApply (wp_jal_s_sconf (CID := CID65)
                                       (mword_of_int (SL + 0xac)) Rra
-                                      (mword_of_int 2090100 : mword 21) W2
+                                      (mword_of_int 2090080 : mword 21) W2
                                       (K - 38)%nat b ltac:(nz) ltac:(rdok)
                                       ltac:(vm_compute; reflexivity)
                                       with "Hcg Hpc Hiac").
@@ -2998,7 +2997,7 @@ Section ProofSysLinkBody.
                                              (mword_of_int (SL + 0xac) : mword 64) 4)]> W2).
                             assert (Hjip : add_vec
                                       (mword_of_int (SL + 0xac) : mword 64)
-                                      (sign_extend' 64 (mword_of_int 2090100 : mword 21))
+                                      (sign_extend' 64 (mword_of_int 2090080 : mword 21))
                                       = mword_of_int KernelSyms.iput) by pcw.
                             iEval (rewrite Hjip) in "Hpc".
                             assert (HW3ra : (W3 !!! Regidx Rra : mword 64)
@@ -3022,7 +3021,7 @@ Section ProofSysLinkBody.
                                       used4 kk (qq/2 + qq/2)%Qp inum n4
                                       pid (DfracOwn (1/4)) dqb dqs
                                       W3 (K - 38)%nat eb b lks
-                                      ltac:(exact Kip) Hkk Hgeom Hsize Hbm0 Hbmcov
+                                      (upd_upt V P2) ltac:(exact Kip) Hkk Hgeom Hsize Hbm0 Hbmcov
                                       Hbmlog Hist0 Hiblk Hiblog Hinb Hcovb Hiu4 Hj
                                       Hgl HW3a0
                                       ltac:(rewrite Hlkempty; apply locks_below_empty)
@@ -3045,7 +3044,7 @@ Section ProofSysLinkBody.
                             (* ===== +0xb0 jal ra,end_op ===== *)
                             iApply (wp_jal_s_sconf (CID := CID67)
                                       (mword_of_int (SL + 0xb0)) Rra
-                                      (mword_of_int 2092516 : mword 21) mip
+                                      (mword_of_int 2092496 : mword 21) mip
                                       (K - 38)%nat b ltac:(nz) ltac:(rdok)
                                       ltac:(vm_compute; reflexivity)
                                       with "Hcg Hpc Hib0").
@@ -3055,7 +3054,7 @@ Section ProofSysLinkBody.
                                              (mword_of_int (SL + 0xb0) : mword 64) 4)]> mip).
                             assert (Hjeo : add_vec
                                       (mword_of_int (SL + 0xb0) : mword 64)
-                                      (sign_extend' 64 (mword_of_int 2092516 : mword 21))
+                                      (sign_extend' 64 (mword_of_int 2092496 : mword 21))
                                       = mword_of_int KernelSyms.end_op) by pcw.
                             iEval (rewrite Hjeo) in "Hpc".
                             assert (HW4ra : (W4 !!! Regidx Rra : mword 64)
@@ -3069,7 +3068,7 @@ Section ProofSysLinkBody.
                             iApply (EndOp.wp_end_op_sconf (CID := CID68) gs j gl gu gd
                                       gk pd pav pu bn g gfs cov logstart dev n5 pid
                                       (DfracOwn (1/4)) W4 (K - 38)%nat eb b lks
-                                      ltac:(exact Keo) Hgeom Hj Hgl
+                                      (upd_upt V P2) ltac:(exact Keo) Hgeom Hj Hgl
                                       ltac:(rewrite Hlkempty; apply locks_below_empty)
                                       with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog
                                             Hseam Hgen Hpidq Hprocs Hdev Hgeo Hdlk Hop").
@@ -3200,7 +3199,7 @@ Section ProofSysLinkBody.
                                       (sl_regs_s2 _ _ _ _ _ HW7regs) Hal
                                       with "Hcg Htext Hpc Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
                                             [Hown Hbsl Hsbb Hsbi Hsbs Hbmres Hir1c
-                                             Hislotd Hisloti Hcwd Hcwdref Hpback
+                                             Hislotd Hisloti Hcwdref Hofiles
                                              Hpidq Hcont]").
                             iEval (rewrite /wp_next).
                             iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
@@ -3208,9 +3207,8 @@ Section ProofSysLinkBody.
                             iSpecialize ("Hcont" $! CIDy with "[%]");
                               [wp_next_chain |].
                             iDestruct (cwd_ref_of_held with "Hcwdref") as "Href".
-                            iDestruct ("Hpback" $! (pv_cwd V) with "Hcwd Hpidq")
-                              as "Hpnc".
-                            iEval (rewrite sl_upd_cwd_upt) in "Hpnc".
+                            iCombine "Hpidq Hofiles" as "Hpnc".
+                            iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
                             iDestruct (proc_priv_split_cwd γf pj pid (upd_upt V P2)
                                          with "[Hpnc Href]") as "Hpriv";
                               [iSplitL "Hpnc"; [iExact "Hpnc" | iExact "Href"] |].
@@ -3296,7 +3294,7 @@ Section ProofSysLinkBody.
                                       n3 Sb3 (bool_decide (bmapstart ∈ Sb3)) false e0
                                       pid (DfracOwn (1/4)) dqb dqs
                                       m mdl sp0 K eb b lks bn1 bw2 bo2
-                                      ltac:(exact Kil) ltac:(exact Kiupd)
+                                      (upd_upt V P2) ltac:(exact Kil) ltac:(exact Kiupd)
                                       ltac:(exact Kiup) ltac:(exact Keo) K38 Kpop
                                       Hkk Hkd Hclog Hcist Hgeom Hsize Hbm0 Hbmcov
                                       Hbmlog Hist0 Hiblk Hiblog Hinb
@@ -3322,7 +3320,7 @@ Section ProofSysLinkBody.
                                             Hsbi Hbmres Hpidq Hprocs Hdev Hgeo
                                             Hdlk Hbsl HopE Hf1 Hf2 Hf3 Hf4
                                             HbN HbW HbO
-                                            [Hsbs Hir1c Hcwd Hcwdref Hpback Hcont]").
+                                            [Hsbs Hir1c Hcwdref Hofiles Hcont]").
                             iEval (rewrite /wp_next).
                             iIntros (CIDy) "%Hqy". iIntros (mf used4)
                               "%Hcsf %Ha0f %Hused4 Hcg Hown Htce Hcce Hpc Hpidq
@@ -3330,9 +3328,8 @@ Section ProofSysLinkBody.
                             iSpecialize ("Hcont" $! CIDy with "[%]");
                               [wp_next_chain |].
                             iDestruct (cwd_ref_of_held with "Hcwdref") as "Href".
-                            iDestruct ("Hpback" $! (pv_cwd V) with "Hcwd Hpidq")
-                              as "Hpnc".
-                            iEval (rewrite sl_upd_cwd_upt) in "Hpnc".
+                            iCombine "Hpidq Hofiles" as "Hpnc".
+                            iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
                             iDestruct (proc_priv_split_cwd γf pj pid (upd_upt V P2)
                                          with "[Hpnc Href]") as "Hpriv";
                               [iSplitL "Hpnc"; [iExact "Hpnc" | iExact "Href"] |].
@@ -3388,7 +3385,7 @@ Section ProofSysLinkBody.
                              (di_type (sl_incnl dn)) c2 Sb2
                              pid (DfracOwn (1/4)) dqb dqs
                              m T3 sp0 K eb b lks bn1 bw2 bo2
-                             ltac:(exact Kil) ltac:(exact Kiupd) ltac:(exact Kiup)
+                             (upd_upt V P2) ltac:(exact Kil) ltac:(exact Kiupd) ltac:(exact Kiup)
                              ltac:(exact Keo) K38 Kpop Hkk Hclog Hcist Hgeom
                              Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog Hinb
                              Hcovb Hmem2'
@@ -3402,15 +3399,15 @@ Section ProofSysLinkBody.
                                    Hshot2 Hilink Hsbb Hsbi Hbmres Hpidq Hprocs
                                    Hdev Hgeo
                                    Hdlk Hbsl HopS Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
-                                   [Hsbs Hir2d Hcwd Hcwdref Hpback Hcont]").
+                                   [Hsbs Hir2d Hcwdref Hofiles Hcont]").
                    iEval (rewrite /wp_next).
                    iIntros (CIDy) "%Hqy". iIntros (mf used3)
                      "%Hcsf %Ha0f %Hused3 Hcg Hown Htce Hcce Hpc Hpidq Hsbb Hsbi
                       Hbmres Hbsl Hislot".
                    iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
                    iDestruct (cwd_ref_of_held with "Hcwdref") as "Href".
-                   iDestruct ("Hpback" $! (pv_cwd V) with "Hcwd Hpidq") as "Hpnc".
-                   iEval (rewrite sl_upd_cwd_upt) in "Hpnc".
+                   iCombine "Hpidq Hofiles" as "Hpnc".
+                   iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
                    iDestruct (proc_priv_split_cwd γf pj pid (upd_upt V P2)
                                 with "[Hpnc Href]") as "Hpriv";
                      [iSplitL "Hpnc"; [iExact "Hpnc" | iExact "Href"] |].
@@ -3441,15 +3438,15 @@ Section ProofSysLinkBody.
           iApply (Tails.sl_tail_b (CID0 := CID26) gs j gl gu gd gk pd pav pu bn
                     g gfs cov logstart dev n1 pid (DfracOwn (1/4)) m Q3 sp0 K eb
  b lks u4 bn0 bw1 bo2
-                    ltac:(exact Keo) K38 Kpop Hgeom Hj Hgl Hlkempty
+                    (upd_upt V P2) ltac:(exact Keo) K38 Kpop Hgeom Hj Hgl Hlkempty
                     ltac:(reflexivity)
                     (sl_regs_sp _ _ _ _ _ HQ3regs) (sl_regs_thr _ _ _ _ _ HQ3regs)
                     HQ3s2 Hal
                     with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                           Hpidq Hprocs Hdev Hgeo Hdlk [HopS] Hf1 Hf2 Hf3 Hf4
                           HbN HbW HbO
-                          [Hbsl Hsbb Hsbi Hsbs Hbmres Hir1 Hir2b Hcwd Hcwdref
-                           Hpback Hcont]").
+                          [Hbsl Hsbb Hsbi Hsbs Hbmres Hir1 Hir2b Hcwdref
+                           Hofiles Hcont]").
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }
           { rewrite /log_op. iExists Sb1. iExact "HopS". }
@@ -3458,8 +3455,8 @@ Section ProofSysLinkBody.
                                                Hpc Hpidq".
           iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
           iDestruct (cwd_ref_of_held with "Hcwdref") as "Href".
-          iDestruct ("Hpback" $! (pv_cwd V) with "Hcwd Hpidq") as "Hpnc".
-          iEval (rewrite sl_upd_cwd_upt) in "Hpnc".
+          iCombine "Hpidq Hofiles" as "Hpnc".
+          iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
           iDestruct (proc_priv_split_cwd γf pj pid (upd_upt V P2)
                        with "[Hpnc Href]") as "Hpriv";
             [iSplitL "Hpnc"; [iExact "Hpnc" | iExact "Href"] |].

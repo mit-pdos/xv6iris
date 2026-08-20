@@ -666,16 +666,19 @@ Definition wp_create_sconf_body
       proc_priv γf pj pidv V -∗
       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
       bslots bn 3 -∗
-      (* at most [create_slots] of the ledger gone, and none gained --
-         AND, on the SUCCESS arms, one is still OUT.  The interval alone
-         cannot say that, and an [ok = true] caller needs it: it holds the
-         inode create returned and runs its own [iunlockput], which gives a
-         slot BACK, so without the strict decrement it cannot show it ends
-         no worse than it started.  Both success figures are [ns - 1] and
-         both failure figures are [ns], which is why the bound is guarded
-         on [ok] rather than folded into the interval. *)
-      ⌜((ns - create_slots)%nat <= ns')%nat /\ (ns' <= ns)%nat
-        /\ (ok = true -> (S ns' <= ns)%nat)⌝ -∗
+      (* THE LEDGER, EXACTLY.  This used to be the interval
+         [ns - create_slots <= ns' <= ns] with an [ok = true -> S ns' <= ns]
+         floor bolted on, and the header's ARM-G note recorded what was
+         actually true underneath it: every failure arm returns the ledger
+         WHOLE and every success arm keeps exactly ONE out (the reference to
+         the inode it returns).  All nine of this function's continuation
+         sites already computed those figures and then weakened them, so
+         saying them outright costs nothing here and is what a CALLER needs:
+         sys_mkdir and sys_mknod run their own [iunlockput], which hands the
+         success arm's one back, and an interval cannot show that they end
+         where they started.  The interval is recovered from this by [lia]
+         under [create_slots <= ns]. *)
+      ⌜if ok then (S ns' = ns)%nat else ns' = ns⌝ -∗
       iref_slots ns' -∗
       (* THE OP-WIDE SET GREW MONOTONICALLY AND THE COUNTER ONLY FELL, AND
          ON THE SUCCESS ARMS THE COUNTER STILL COVERS AN [iput].  No ceiling

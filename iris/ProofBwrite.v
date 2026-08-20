@@ -29,7 +29,7 @@
 
    * rw's [addr_is_kdata] premise on [b->data].  [b] is [bnode k] for
      k < NBUF, i.e. an element of bio.c's static [bcache] object at
-     0x80018190, which lies well above [text_end] and well below PHYSTOP --
+     0x80018180, which lies well above [text_end] and well below PHYSTOP --
      [BcacheInv.bnode_data_kdata] is that one arithmetic fact.
 
    The buffer's [valid] cell and its half of [dev] are untouched by both
@@ -83,6 +83,7 @@ From Kernel Require KernelSyms.
 Require Import IrefSlots.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import ProcDefs.  (* [pprivate], [proc_priv_bare] *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -131,9 +132,9 @@ Section ProofBwrite.
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (bs bsd : list (bv 8)) (b : bool)
-      (Q : iProp Σ) (lks : gset string)
+      (Q : iProp Σ) (lks : gset string) (Vpr : pprivate)
     : wp_bwrite_sconf_body γs j γl γu γd γk pd pav pu bn V k
-                           pidv dev bno dq m K eb bs bsd b Q lks.
+                           pidv dev bno dq m K eb bs bsd b Q lks Vpr.
   Proof.
     cbv beta delta [wp_bwrite_sconf_body].
     intros pcE pj ret_tgt HK Hbno HgdV Hj Hgl Hk Ha0 Hbelow.
@@ -331,7 +332,7 @@ Section ProofBwrite.
     iDestruct (cpu_claim_ext_transport CID CID8 eb pj ltac:(rewrite Hbm; wp_next_chain)
                  with "Hextm") as "Hextm".
     iApply (HSL.wp_holdingsleep_sconf (fst (bn_slk bn k)) (snd (bn_slk bn k))
-              "buffer"%string (bown bn k) mA pj pidv (K - 4)%nat eb b _ HKhsl Hbelow
+              "buffer"%string (bown bn k) mA pj pidv (K - 4)%nat eb b _ Vpr HKhsl Hbelow
               with "Hcg Hcnt Htext Hpc [] [Hstok] Hppid").
     all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hslk". }
@@ -389,14 +390,14 @@ Section ProofBwrite.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp18) in "Hpc".
     (* ===== +0x18 jal ra,virtio_disk_rw ===== *)
-    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.bwrite + 0x18)) Rra (mword_of_int 0x2c54 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.bwrite + 0x18)) Rra (mword_of_int 0x2c64 : mword 21)
               D2 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi18").
     iIntros (CID13 Hs13) "Hcg Hpc".
     set (D3 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.bwrite + 0x18) : mword 64) 4)]> D2).
     assert (Htgtrw : add_vec (mword_of_int (KernelSyms.bwrite + 0x18) : mword 64)
-                       (sign_extend' 64 (mword_of_int 0x2c54 : mword 21))
+                       (sign_extend' 64 (mword_of_int 0x2c64 : mword 21))
                      = mword_of_int KernelSyms.virtio_disk_rw)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtrw) in "Hpc".

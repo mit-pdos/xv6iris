@@ -179,7 +179,7 @@ Qed.
 (*                                                                          *)
 (*  [sb.inodestart] is at [sb + 24] -- the [lw a1,<off>(a1)] off the        *)
 (*  [auipc a1,0x1d] in iupdate (+0x14) and in ilock (+0x3e) both resolve to *)
-(*  0x80020868, i.e. KernelSyms.sb + 0x18.  It rides through every contract *)
+(*  0x80020858, i.e. KernelSyms.sb + 0x18.  It rides through every contract *)
 (*  as a plain FRACTIONAL cell, the way SpecInitlog.v takes [sb + 20] for   *)
 (*  logstart: read once, handed straight back.  There is deliberately no    *)
 (*  superblock abstraction for one field.                                   *)

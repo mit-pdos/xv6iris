@@ -416,7 +416,7 @@ Section ProofFilereadParts.
         r <> Rs0 -> r <> Rs2 -> Mt !!! Regidx r = m !!! Regidx r) ->
     sie_cap_gpr KT1 Mt (K - 6)%nat b p -∗
     kernel_text -∗
-    pc_is (mword_of_int (FR + 0x58) : mword 64) -∗
+    pc_is (mword_of_int (FR + 0x5e) : mword 64) -∗
     word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
     word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
     word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) w3 -∗
@@ -433,16 +433,16 @@ Section ProofFilereadParts.
   Proof.
     intros HK Hsp0 Hra0 Hs00 Hs20 Hmtsp Hmts2 Hthr.
     iIntros "Hcg #Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hcont".
-    iPoseProof (fri_58 with "Htext") as "Hi58".
-    iPoseProof (fri_5a with "Htext") as "Hi5a".
-    iPoseProof (fri_5c with "Htext") as "Hi5c".
     iPoseProof (fri_5e with "Htext") as "Hi5e".
     iPoseProof (fri_60 with "Htext") as "Hi60".
     iPoseProof (fri_62 with "Htext") as "Hi62".
+    iPoseProof (fri_64 with "Htext") as "Hi64".
+    iPoseProof (fri_66 with "Htext") as "Hi66".
+    iPoseProof (fri_68 with "Htext") as "Hi68".
     (* ---- +0x58: c.mv a0,s2 ---- *)
-    iApply (wp_cmv_s_sconf (mword_of_int (FR + 0x58)) Ra0 Rs2 Mt (K - 6)%nat b
+    iApply (wp_cmv_s_sconf (mword_of_int (FR + 0x5e)) Ra0 Rs2 Mt (K - 6)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi58").
+              with "Hcg Hpc Hi5e").
     iIntros (CID1 Hs1) "Hcg Hpc". iEval (rgne) in "Hcg".
     set (T0 := <[Regidx Ra0 := regval_into_reg (add_vec zero_reg (Mt !!! Regidx Rs2))]> Mt).
     assert (HT0a0 : T0 !!! Regidx Ra0 = rv).
@@ -450,57 +450,57 @@ Section ProofFilereadParts.
       apply add_vec_zero_l. }
     assert (HT0sp : T0 !!! Regidx csp_rs1 = pa_stk sp0 6)
       by (rewrite /T0 upd_ne; [exact Hmtsp | vm_compute; discriminate]).
-    assert (Hpp5a : add_vec_int (mword_of_int (FR + 0x58) : mword 64) 2
-                    = mword_of_int (FR + 0x5a)) by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpp5a) in "Hpc".
+    assert (Hpp60 : add_vec_int (mword_of_int (FR + 0x5e) : mword 64) 2
+                    = mword_of_int (FR + 0x60)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp60) in "Hpc".
     (* ---- +0x5a: c.ldsp ra,40(sp) ---- *)
     assert (Hpa1 : add_vec (T0 !!! Regidx csp_rs1)
                      (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000")))
                    = pa_stk sp0 1) by (rewrite HT0sp; apply fr_frm1).
     iEval (rewrite -Hpa1) in "Hb1".
-    iApply (wp_cldsp_s_sconf (mword_of_int (FR + 0x5a)) (mword_of_int 5 : mword 6) Rra
+    iApply (wp_cldsp_s_sconf (mword_of_int (FR + 0x60)) (mword_of_int 5 : mword 6) Rra
               T0 (K - 6)%nat ra0 b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi5a Hb1").
+              with "Hcg Hpc Hi60 Hb1").
     iIntros (CID2 Hs2) "Hcg Hpc Hb1". iEval (rewrite Hpa1) in "Hb1".
     set (T1 := <[Regidx Rra := regval_into_reg ra0]> T0).
     assert (HT1sp : T1 !!! Regidx csp_rs1 = pa_stk sp0 6)
       by (rewrite /T1 upd_ne; [exact HT0sp | vm_compute; discriminate]).
-    assert (Hpp5c : add_vec_int (mword_of_int (FR + 0x5a) : mword 64) 2
-                    = mword_of_int (FR + 0x5c)) by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpp5c) in "Hpc".
+    assert (Hpp62 : add_vec_int (mword_of_int (FR + 0x60) : mword 64) 2
+                    = mword_of_int (FR + 0x62)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp62) in "Hpc".
     (* ---- +0x5c: c.ldsp s0,32(sp) ---- *)
     assert (Hpa2 : add_vec (T1 !!! Regidx csp_rs1)
                      (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000")))
                    = pa_stk sp0 2) by (rewrite HT1sp; apply fr_frm2).
     iEval (rewrite -Hpa2) in "Hb2".
-    iApply (wp_cldsp_s_sconf (mword_of_int (FR + 0x5c)) (mword_of_int 4 : mword 6) Rs0
+    iApply (wp_cldsp_s_sconf (mword_of_int (FR + 0x62)) (mword_of_int 4 : mword 6) Rs0
               T1 (K - 6)%nat s00 b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi5c Hb2").
+              with "Hcg Hpc Hi62 Hb2").
     iIntros (CID3 Hs3) "Hcg Hpc Hb2". iEval (rewrite Hpa2) in "Hb2".
     set (T2 := <[Regidx Rs0 := regval_into_reg s00]> T1).
     assert (HT2sp : T2 !!! Regidx csp_rs1 = pa_stk sp0 6)
       by (rewrite /T2 upd_ne; [exact HT1sp | vm_compute; discriminate]).
-    assert (Hpp5e : add_vec_int (mword_of_int (FR + 0x5c) : mword 64) 2
-                    = mword_of_int (FR + 0x5e)) by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpp5e) in "Hpc".
+    assert (Hpp64 : add_vec_int (mword_of_int (FR + 0x62) : mword 64) 2
+                    = mword_of_int (FR + 0x64)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp64) in "Hpc".
     (* ---- +0x5e: c.ldsp s2,16(sp) ---- *)
     assert (Hpa4 : add_vec (T2 !!! Regidx csp_rs1)
                      (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000")))
                    = pa_stk sp0 4) by (rewrite HT2sp; apply fr_frm4).
     iEval (rewrite -Hpa4) in "Hb4".
-    iApply (wp_cldsp_s_sconf (mword_of_int (FR + 0x5e)) (mword_of_int 2 : mword 6) Rs2
+    iApply (wp_cldsp_s_sconf (mword_of_int (FR + 0x64)) (mword_of_int 2 : mword 6) Rs2
               T2 (K - 6)%nat s20 b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi5e Hb4").
+              with "Hcg Hpc Hi64 Hb4").
     iIntros (CID4 Hs4) "Hcg Hpc Hb4". iEval (rewrite Hpa4) in "Hb4".
     set (T3 := <[Regidx Rs2 := regval_into_reg s20]> T2).
     assert (HT3sp : T3 !!! Regidx csp_rs1 = pa_stk sp0 6)
       by (rewrite /T3 upd_ne; [exact HT2sp | vm_compute; discriminate]).
-    assert (Hpp60 : add_vec_int (mword_of_int (FR + 0x5e) : mword 64) 2
-                    = mword_of_int (FR + 0x60)) by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpp60) in "Hpc".
+    assert (Hpp66 : add_vec_int (mword_of_int (FR + 0x64) : mword 64) 2
+                    = mword_of_int (FR + 0x66)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp66) in "Hpc".
     (* ---- +0x60: c.addi16sp sp,48 -- the frame goes back ---- *)
     assert (Hwv : add_vec (T3 !!! Regidx csp_rs1)
                     (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6))) = sp0)
@@ -519,8 +519,8 @@ Section ProofFilereadParts.
       iSplitL "Hb6"; [iExists _; iExact "Hb6"|].
       done. }
     iEval (rewrite -Hwv) in "Hframe".
-    iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (FR + 0x60)) (mword_of_int 3 : mword 6)
-              T3 (K - 6)%nat 6 b Hpop with "Hcg Hpc Hi60 Hframe").
+    iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (FR + 0x66)) (mword_of_int 3 : mword 6)
+              T3 (K - 6)%nat 6 b Hpop with "Hcg Hpc Hi66 Hframe").
     iIntros (CID5 Hs5) "Hcg Hpc".
     assert (Hnk : ((K - 6) + 6)%nat = K) by exact (fr_frame_back K HK).
     iEval (rewrite Hnk) in "Hcg".
@@ -530,17 +530,17 @@ Section ProofFilereadParts.
     change (<[Regidx csp_rs1 := regval_into_reg
         (add_vec (T3 !!! Regidx csp_rs1)
            (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6))))]> T3) with T4.
-    assert (Hpp62 : add_vec_int (mword_of_int (FR + 0x60) : mword 64) 2
-                    = mword_of_int (FR + 0x62)) by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpp62) in "Hpc".
+    assert (Hpp68 : add_vec_int (mword_of_int (FR + 0x66) : mword 64) 2
+                    = mword_of_int (FR + 0x68)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp68) in "Hpc".
     (* ---- +0x62: c.jr ra ---- *)
     assert (HT4ra : T4 !!! Regidx Rra = ra0).
     { rewrite /T4 upd_ne; [| vm_compute; discriminate].
       rewrite /T3 upd_ne; [| vm_compute; discriminate].
       rewrite /T2 upd_ne; [| vm_compute; discriminate].
       rewrite /T1; apply upd_eq. }
-    iApply (wp_cret_s_sconf (mword_of_int (FR + 0x62)) Rra T4 K b
-              ltac:(vm_compute; discriminate) with "Hcg Hpc Hi62").
+    iApply (wp_cret_s_sconf (mword_of_int (FR + 0x68)) Rra T4 K b
+              ltac:(vm_compute; discriminate) with "Hcg Hpc Hi68").
     iIntros (CID6 Hs6) "Hcg Hpc".
     iEval (rgne) in "Hpc".
     iEval (rewrite HT4ra) in "Hpc".
@@ -661,7 +661,7 @@ Section ProofFilereadParts.
     add_vec_int (mword_of_int zc : mword 64) 2 = mword_of_int zd ->
     add_vec_int (mword_of_int zd : mword 64) 2 = mword_of_int ze ->
     add_vec (mword_of_int ze : mword 64) (sign_extend' 64 jimm)
-      = mword_of_int (FR + 0x58) ->
+      = mword_of_int (FR + 0x5e) ->
     sie_cap_gpr KT1 Mt K b p -∗
     pc_is (mword_of_int za : mword 64) -∗
     instr (mword_of_int za : mword 64) true
@@ -685,7 +685,7 @@ Section ProofFilereadParts.
           /\ (forall r : mword 5, is_cs_idx r = true ->
                 r <> Rs1 -> r <> Rs2 -> r <> Rs3 -> Mr !!! Regidx r = Mt !!! Regidx r) ⌝ -∗
         sie_cap_gpr KT1 Mr K b p -∗
-        pc_is (mword_of_int (FR + 0x58) : mword 64) -∗
+        pc_is (mword_of_int (FR + 0x5e) : mword 64) -∗
         word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) v1 -∗
         word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) v3 -∗
         WP (Loop : expr riscv_lang)) -∗

@@ -22,7 +22,6 @@ Require Import KernelDecode02.
 Require Import KernelDecode03.
 Require Import KernelDecode04.
 Require Import KernelDecode05.
-Require Import KernelDecode06.
 Require Import KernelDecode07.
 Require Import KernelDecode08.
 Require Import KernelDecode09.
@@ -33,7 +32,6 @@ Require Import KernelDecode13.
 Require Import KernelDecode14.
 Require Import KernelDecode15.
 Require Import KernelDecode16.
-Require Import KernelDecode17.
 Require Import KernelDecode18.
 Require Import KernelDecode19.
 Require Import KernelDecode20.
@@ -42,6 +40,7 @@ Require Import KernelDecode24.
 Require Import KernelDecode25.
 Require Import KernelDecode26.
 Require Import KernelDecode27.
+Require Import KernelDecode28.
 Require Import KernelDecode29.
 Require Import KernelDecode30.
 Require Import KernelDecode31.
@@ -95,9 +94,9 @@ Section CodePipealloc.
   Proof. mk_base (KernelSyms.pipealloc + 0x14) (mword_of_int 0x00053023 : mword 32)
     (mword_of_int (KernelSyms.pipealloc + 0x14) : mword 64) (STORE (mword_of_int 0 : mword 12, zreg, Regidx (mword_of_int 10), 8)) kd_00053023. Qed.
 
-  Lemma pai_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.pipealloc + 0x18) : mword 64) false (JAL (mword_of_int 2096164 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.pipealloc + 0x18) (mword_of_int 0xc25ff0ef : mword 32)
-    (mword_of_int (KernelSyms.pipealloc + 0x18) : mword 64) (JAL (mword_of_int 2096164 : mword 21, Regidx (mword_of_int 1))) kd_c25ff0ef. Qed.
+  Lemma pai_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.pipealloc + 0x18) : mword 64) false (JAL (mword_of_int 2096144 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.pipealloc + 0x18) (mword_of_int 0xc11ff0ef : mword 32)
+    (mword_of_int (KernelSyms.pipealloc + 0x18) : mword 64) (JAL (mword_of_int 2096144 : mword 21, Regidx (mword_of_int 1))) kd_c11ff0ef. Qed.
 
   Lemma pai_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.pipealloc + 0x1c) : mword 64) true (STORE (mword_of_int 0 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 9), 8)).
   Proof. mk_rvc (KernelSyms.pipealloc + 0x1c) (mword_of_int 0xe088 : mword 16)
@@ -107,9 +106,9 @@ Section CodePipealloc.
   Proof. mk_rvc (KernelSyms.pipealloc + 0x1e) (mword_of_int 0xc549 : mword 16)
     (mword_of_int (KernelSyms.pipealloc + 0x1e) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 69 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BEQ)) kd_c549 exec_execute_C_BEQZ. Qed.
 
-  Lemma pai_20 : kernel_text -∗ instr (mword_of_int (KernelSyms.pipealloc + 0x20) : mword 64) false (JAL (mword_of_int 2096156 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.pipealloc + 0x20) (mword_of_int 0xc1dff0ef : mword 32)
-    (mword_of_int (KernelSyms.pipealloc + 0x20) : mword 64) (JAL (mword_of_int 2096156 : mword 21, Regidx (mword_of_int 1))) kd_c1dff0ef. Qed.
+  Lemma pai_20 : kernel_text -∗ instr (mword_of_int (KernelSyms.pipealloc + 0x20) : mword 64) false (JAL (mword_of_int 2096136 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.pipealloc + 0x20) (mword_of_int 0xc09ff0ef : mword 32)
+    (mword_of_int (KernelSyms.pipealloc + 0x20) : mword 64) (JAL (mword_of_int 2096136 : mword 21, Regidx (mword_of_int 1))) kd_c09ff0ef. Qed.
 
   Lemma pai_24 : kernel_text -∗ instr (mword_of_int (KernelSyms.pipealloc + 0x24) : mword 64) false (STORE (mword_of_int 0 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 20), 8)).
   Proof. mk_base (KernelSyms.pipealloc + 0x24) (mword_of_int 0x00aa3023 : mword 32)
@@ -123,9 +122,9 @@ Section CodePipealloc.
   Proof. mk_rvc (KernelSyms.pipealloc + 0x2a) (mword_of_int 0xe84a : mword 16)
     (mword_of_int (KernelSyms.pipealloc + 0x2a) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), Regidx (mword_of_int 18), sp, 8)) kd_e84a exec_execute_C_SDSP. Qed.
 
-  Lemma pai_2c : kernel_text -∗ instr (mword_of_int (KernelSyms.pipealloc + 0x2c) : mword 64) false (JAL (mword_of_int 2082426 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.pipealloc + 0x2c) (mword_of_int 0xe7afc0ef : mword 32)
-    (mword_of_int (KernelSyms.pipealloc + 0x2c) : mword 64) (JAL (mword_of_int 2082426 : mword 21, Regidx (mword_of_int 1))) kd_e7afc0ef. Qed.
+  Lemma pai_2c : kernel_text -∗ instr (mword_of_int (KernelSyms.pipealloc + 0x2c) : mword 64) false (JAL (mword_of_int 2082406 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.pipealloc + 0x2c) (mword_of_int 0xe66fc0ef : mword 32)
+    (mword_of_int (KernelSyms.pipealloc + 0x2c) : mword 64) (JAL (mword_of_int 2082406 : mword 21, Regidx (mword_of_int 1))) kd_e66fc0ef. Qed.
 
   Lemma pai_30 : kernel_text -∗ instr (mword_of_int (KernelSyms.pipealloc + 0x30) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 18), ADD)).
   Proof. mk_rvc (KernelSyms.pipealloc + 0x30) (mword_of_int 0x892a : mword 16)
@@ -163,13 +162,13 @@ Section CodePipealloc.
   Proof. mk_base (KernelSyms.pipealloc + 0x48) (mword_of_int 0x00003597 : mword 32)
     (mword_of_int (KernelSyms.pipealloc + 0x48) : mword 64) (UTYPE (mword_of_int 3 : mword 20, Regidx (mword_of_int 11), AUIPC)) kd_00003597. Qed.
 
-  Lemma pai_4c : kernel_text -∗ instr (mword_of_int (KernelSyms.pipealloc + 0x4c) : mword 64) false (ITYPE (mword_of_int 310 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)).
-  Proof. mk_base (KernelSyms.pipealloc + 0x4c) (mword_of_int 0x13658593 : mword 32)
-    (mword_of_int (KernelSyms.pipealloc + 0x4c) : mword 64) (ITYPE (mword_of_int 310 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)) kd_13658593. Qed.
+  Lemma pai_4c : kernel_text -∗ instr (mword_of_int (KernelSyms.pipealloc + 0x4c) : mword 64) false (ITYPE (mword_of_int 290 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)).
+  Proof. mk_base (KernelSyms.pipealloc + 0x4c) (mword_of_int 0x12258593 : mword 32)
+    (mword_of_int (KernelSyms.pipealloc + 0x4c) : mword 64) (ITYPE (mword_of_int 290 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)) kd_12258593. Qed.
 
-  Lemma pai_50 : kernel_text -∗ instr (mword_of_int (KernelSyms.pipealloc + 0x50) : mword 64) false (JAL (mword_of_int 2082480 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.pipealloc + 0x50) (mword_of_int 0xeb0fc0ef : mword 32)
-    (mword_of_int (KernelSyms.pipealloc + 0x50) : mword 64) (JAL (mword_of_int 2082480 : mword 21, Regidx (mword_of_int 1))) kd_eb0fc0ef. Qed.
+  Lemma pai_50 : kernel_text -∗ instr (mword_of_int (KernelSyms.pipealloc + 0x50) : mword 64) false (JAL (mword_of_int 2082460 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.pipealloc + 0x50) (mword_of_int 0xe9cfc0ef : mword 32)
+    (mword_of_int (KernelSyms.pipealloc + 0x50) : mword 64) (JAL (mword_of_int 2082460 : mword 21, Regidx (mword_of_int 1))) kd_e9cfc0ef. Qed.
 
   Lemma pai_54 : kernel_text -∗ instr (mword_of_int (KernelSyms.pipealloc + 0x54) : mword 64) true (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 8)).
   Proof. mk_rvc (KernelSyms.pipealloc + 0x54) (mword_of_int 0x609c : mword 16)
@@ -283,9 +282,9 @@ Section CodePipealloc.
   Proof. mk_rvc (KernelSyms.pipealloc + 0xa2) (mword_of_int 0xc10d : mword 16)
     (mword_of_int (KernelSyms.pipealloc + 0xa2) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 17 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BEQ)) kd_c10d exec_execute_C_BEQZ. Qed.
 
-  Lemma pai_a4 : kernel_text -∗ instr (mword_of_int (KernelSyms.pipealloc + 0xa4) : mword 64) false (JAL (mword_of_int 2096188 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.pipealloc + 0xa4) (mword_of_int 0xc3dff0ef : mword 32)
-    (mword_of_int (KernelSyms.pipealloc + 0xa4) : mword 64) (JAL (mword_of_int 2096188 : mword 21, Regidx (mword_of_int 1))) kd_c3dff0ef. Qed.
+  Lemma pai_a4 : kernel_text -∗ instr (mword_of_int (KernelSyms.pipealloc + 0xa4) : mword 64) false (JAL (mword_of_int 2096168 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.pipealloc + 0xa4) (mword_of_int 0xc29ff0ef : mword 32)
+    (mword_of_int (KernelSyms.pipealloc + 0xa4) : mword 64) (JAL (mword_of_int 2096168 : mword 21, Regidx (mword_of_int 1))) kd_c29ff0ef. Qed.
 
   Lemma pai_a8 : kernel_text -∗ instr (mword_of_int (KernelSyms.pipealloc + 0xa8) : mword 64) false (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 20), Regidx (mword_of_int 15), false, 8)).
   Proof. mk_base (KernelSyms.pipealloc + 0xa8) (mword_of_int 0x000a3783 : mword 32)
@@ -303,9 +302,9 @@ Section CodePipealloc.
   Proof. mk_rvc (KernelSyms.pipealloc + 0xb0) (mword_of_int 0x853e : mword 16)
     (mword_of_int (KernelSyms.pipealloc + 0xb0) : mword 64) (RTYPE (Regidx (mword_of_int 15), zreg, Regidx (mword_of_int 10), ADD)) kd_853e exec_execute_C_MV. Qed.
 
-  Lemma pai_b2 : kernel_text -∗ instr (mword_of_int (KernelSyms.pipealloc + 0xb2) : mword 64) false (JAL (mword_of_int 2096174 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.pipealloc + 0xb2) (mword_of_int 0xc2fff0ef : mword 32)
-    (mword_of_int (KernelSyms.pipealloc + 0xb2) : mword 64) (JAL (mword_of_int 2096174 : mword 21, Regidx (mword_of_int 1))) kd_c2fff0ef. Qed.
+  Lemma pai_b2 : kernel_text -∗ instr (mword_of_int (KernelSyms.pipealloc + 0xb2) : mword 64) false (JAL (mword_of_int 2096154 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.pipealloc + 0xb2) (mword_of_int 0xc1bff0ef : mword 32)
+    (mword_of_int (KernelSyms.pipealloc + 0xb2) : mword 64) (JAL (mword_of_int 2096154 : mword 21, Regidx (mword_of_int 1))) kd_c1bff0ef. Qed.
 
   Lemma pai_b6 : kernel_text -∗ instr (mword_of_int (KernelSyms.pipealloc + 0xb6) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)).
   Proof. mk_rvc (KernelSyms.pipealloc + 0xb6) (mword_of_int 0x557d : mword 16)

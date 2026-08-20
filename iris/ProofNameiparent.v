@@ -64,6 +64,7 @@ Require Import SpecNameiparent.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import ProcDefs.  (* [pprivate], [proc_priv_bare] *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -163,17 +164,16 @@ Section ProofNameiparentMain.
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (used : gset Z)
-      (cwdv : mword 64)
       (plen : nat) (pfun : nat -> bv 8)
       (nfun : nat -> bv 8)
       (n : nat) (Sb : gset Z)
-      (pidv : mword 32) (dq dqb dqs dqc : dfrac)
+      (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string)
+      (b : bool) (lks : gset string) (Vpr : pprivate)
     : wp_nameiparent_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                                 ga gf cov logstart bmapstart inodestart nib
-                                size dev used cwdv plen pfun nfun n Sb
-                                pidv dq dqb dqs dqc m K eb b lks.
+                                size dev used plen pfun nfun n Sb
+                                pidv dq dqb dqs m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_nameiparent_gen_body].
     intros pcE pjv pv nb ret_tgt pl L
@@ -185,14 +185,13 @@ Section ProofNameiparentMain.
     assert (Hpjd : proc_addr j = pjv) by reflexivity.
     iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv #Hbio #Hlogc #Hkenv #Hitb2 #Hitbl
               #Hesc #Hslks #Hireg #Hropen #Hprocs #Hdev #Hgeom #Hdlk Hbmap Hinos
-              Hbits Hppid Hcwdc Hcwdr Hpath Hname Hbslot Hislot Hlog Hcont".
+              Hbits Hppid Hcwdr Hpath Hname Hbslot Hislot Hlog Hcont".
     (* depth 0 forces the held set empty, so every [locks_below] the callees
        raise is [locks_below ∅ _], which [lkbelow] closes outright. *)
     iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
     iEval (rewrite -Hpjd) in "Hcg".
     iEval (rewrite -Hpjd) in "Hcnt".
     iEval (rewrite -Hpjd) in "Hppid".
-    iEval (rewrite -Hpjd) in "Hcwdc".
     iEval (rewrite -Hpjd) in "Hcont".
     iPoseProof (npi_00 with "Htext") as "Hi00".
     iPoseProof (npi_02 with "Htext") as "Hi02".
@@ -356,17 +355,17 @@ Section ProofNameiparentMain.
     iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID7) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (NX.wp_namex_gen gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
-              ga gf cov logstart bmapstart inodestart nib size dev used cwdv
-              plen pfun nfun true n Sb pidv dq dqb dqs dqc R5 (K - 2)%nat eb b
-              _ Knx Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov
+              ga gf cov logstart bmapstart inodestart nib size dev used
+              plen pfun nfun true n Sb pidv dq dqb dqs R5 (K - 2)%nat eb b
+              _ Vpr Knx Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov
               Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen Hbud Hj Hgs
               ltac:(rewrite HR5a1; exact npi_a1_true) Heb
               with "Hcg Hcnt Htext Hkd Hpc Hpenv Hbio Hlogc Hkenv Hitb2 Hitbl
                     Hesc Hslks Hireg Hropen Hprocs Hdev Hgeom Hdlk Hbmap Hinos
-                    Hbits Hppid Hcwdc Hcwdr Hpath Hname Hbslot Hislot Hlog").
+                    Hbits Hppid Hcwdr Hpath Hname Hbslot Hislot Hlog").
     all: try lkbelow.
     iIntros (CID8 Hq8 mf n' used' Sb' ok nf ipv w)
-            "%Hcs Hcg Hcnt Hpc Hbmap Hinos %Hsub Hbits Hppid Hcwdc Hcwdr
+            "%Hcs Hcg Hcnt Hpc Hbmap Hinos %Hsub Hbits Hppid Hcwdr
              Hpath Hname Hbslot %Hssub %Hwbm %Hbudo Hlog Hok".
     iEval (rewrite HR5a0) in "Hpath".
     iEval (rewrite HR5a2) in "Hname".
@@ -530,7 +529,7 @@ Section ProofNameiparentMain.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iSpecialize ("Hcont" $! CID12 with "[%]"); [wp_next_chain |].
     iApply ("Hcont" $! P3 n' used' Sb' ok nf ipv w
-              with "[%] Hcg Hcnt Hpc Hbmap Hinos [%] Hbits Hppid Hcwdc Hcwdr
+              with "[%] Hcg Hcnt Hpc Hbmap Hinos [%] Hbits Hppid Hcwdr
                     Hpath Hname Hbslot [%] [%] [%] Hlog Hok").
     { unfold callee_saved. split_and!; assumption. }
     { exact Hsub. }
@@ -556,17 +555,16 @@ Section ProofNameiparentMain.
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
       (used : gset Z)
-      (cwdv : mword 64)
       (plen : nat) (pfun : nat -> bv 8)
       (nfun : nat -> bv 8)
       (n : nat)
-      (pidv : mword 32) (dq dqb dqs dqc : dfrac)
+      (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string)
+      (b : bool) (lks : gset string) (Vpr : pprivate)
     : wp_nameiparent_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                           ga gf cov logstart bmapstart inodestart nib
-                          size dev used cwdv plen pfun nfun n
-                          pidv dq dqb dqs dqc m K eb b lks.
+                          size dev used plen pfun nfun n
+                          pidv dq dqb dqs m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_nameiparent_sconf_body].
     intros pcE pjv pv nb ret_tgt pl L
@@ -574,21 +572,21 @@ Section ProofNameiparentMain.
            Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen Hbud Hj Hgs Heb.
     iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv #Hbio #Hlogc #Hkenv #Hitb2 #Hitbl
               #Hesc #Hslks #Hireg #Hropen #Hprocs #Hdev #Hgeom #Hdlk Hbmap Hinos
-              Hbits Hppid Hcwdc Hcwdr Hpath Hname Hbslot Hislot Hlog Hcont".
+              Hbits Hppid Hcwdr Hpath Hname Hbslot Hislot Hlog Hcont".
     (* depth 0 forces the held set empty, so every [locks_below] the callees
        raise is [locks_below ∅ _], which [lkbelow] closes outright. *)
     iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
     iDestruct "Hlog" as (Sb0) "Hlog".
     iApply (wp_nameiparent_gen gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
               ga gf cov logstart bmapstart inodestart nib
-              size dev used cwdv plen pfun nfun n Sb0
-              pidv dq dqb dqs dqc m K eb b
-              _ HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen (walk_need_counted L n Hbud) Hj Hgs Heb
-              with "Hcg Hcnt Htext Hkd Hpc Hpenv Hbio Hlogc Hkenv Hitb2 Hitbl Hesc Hslks Hireg Hropen Hprocs Hdev Hgeom Hdlk Hbmap Hinos Hbits Hppid Hcwdc Hcwdr Hpath Hname Hbslot Hislot Hlog [Hcont]").
+              size dev used plen pfun nfun n Sb0
+              pidv dq dqb dqs m K eb b
+              _ Vpr HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen (walk_need_counted L n Hbud) Hj Hgs Heb
+              with "Hcg Hcnt Htext Hkd Hpc Hpenv Hbio Hlogc Hkenv Hitb2 Hitbl Hesc Hslks Hireg Hropen Hprocs Hdev Hgeom Hdlk Hbmap Hinos Hbits Hppid Hcwdr Hpath Hname Hbslot Hislot Hlog [Hcont]").
     iEval (rewrite /wp_next).
     iIntros (CIDf) "%Hchain".
     iIntros (mf n' used' Sb' ok nf ipv w)
-      "%Hcs Hcg Hcnt Hpc Hbmap Hinos %Husub Hbits Hppid Hcwdc Hcwdr
+      "%Hcs Hcg Hcnt Hpc Hbmap Hinos %Husub Hbits Hppid Hcwdr
        Hpath Hname Hbslot %Hssub %Hwbm %Hbnd Hlog Hok".
     iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
     (* the counted caller asked for a plain reference; the type witness
@@ -605,7 +603,7 @@ Section ProofNameiparentMain.
       iSplitR; [iPureIntro; exact Hp |]. iSplitR "Hsl"; [| iExact "Hsl"].
       iApply (inode_held_ty_forget with "Hip"). }
     iApply ("Hcont" $! mf n' used' ok nf ipv
-              with "[%] Hcg Hcnt Hpc Hbmap Hinos [%] Hbits Hppid Hcwdc Hcwdr
+              with "[%] Hcg Hcnt Hpc Hbmap Hinos [%] Hbits Hppid Hcwdr
                     Hpath Hname Hbslot [%] [Hlog] Hok").
     { exact Hcs. }
     { exact Husub. }
