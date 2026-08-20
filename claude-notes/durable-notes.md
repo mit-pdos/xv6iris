@@ -1792,8 +1792,10 @@ and axioms each proven function rests on. `--format text|md|html|json`.
   Then reviving the file is uncommenting one row. Two new drift errors keep
   that honest: a `# Foo.v` naming a file that no longer exists (it promises the
   reviver a row that cannot come back), and a name both listed and commented
-  out. In the tree today: the descoped Umode tier (~41 rows) and
-  `EscrowRegionA.v`.
+  out. In the tree today: the descoped Umode tier (~41 rows). (`EscrowRegionA.v`
+  was the other one until 2026-08-20, when the file and its row were both
+  deleted -- which is the OTHER way to resolve a descoped row, and the right
+  one once nobody intends to revive it.)
 - **THE PROOF FUNCTOR NEEDS ITS `: <MODTYPE>` ASCRIPTION, and without it the
   function reads `assumed` with the build green.** `module_status` matches a
   `Link` instance to a spec through `Module <F>Proof (…) : <MODTYPE>.`; a
