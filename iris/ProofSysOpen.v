@@ -186,6 +186,17 @@ Section ProofSysOpenBody.
   (*  at most one (the failure arms' [iunlockput] hands a slot back; the *)
   (*  success arm parks it in [f->ip]).                                  *)
   (* ================================================================== *)
+  (* Peel the one unit sys_open holds back for [fileclose]'s loan (see the
+     [iref_slot] row on [so_alloc]).  [sys_open_slots] is [S create_slots]
+     precisely so this peel leaves create its full allowance. *)
+  Local Lemma so_iref_take (n : nat) :
+    (1 <= n)%nat -> iref_slots n -∗ iref_slot ∗ iref_slots (n - 1).
+  Proof.
+    intros Hn. rewrite /iref_slot.
+    replace n with (1 + (n - 1))%nat at 1 by lia.
+    iIntros "H". iApply (iref_slots_split with "H").
+  Qed.
+
   Definition so_cont `{GEN : GenId}
       (gf : gname) (bn : bio_names) (gfs : fs_names)
       (cov : gset Z) (logstart bmapstart inodestart size : Z)
@@ -1137,6 +1148,13 @@ Section ProofSysOpenBody.
     bitmap_res gfs bmapstart cov logstart size used -∗
     bslots bn 3 -∗
     iref_slots nsj -∗
+    (* ONE UNIT HELD BACK FOR [fileclose]'s LOAN.  The D-FAIL tail closes the
+       file it just allocated, and [SpecFileclose] borrows an iref unit
+       across the call -- see the note on its [iref_slot] row.  The ledger
+       [nsj] above says nothing positive, so the loan cannot come out of it;
+       sys_open splits this unit off its allowance at entry instead, which
+       is why [sys_open_slots] is one MORE than [create_slots]. *)
+    iref_slot -∗
     fd_slot -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
@@ -1164,7 +1182,7 @@ Section ProofSysOpenBody.
     iIntros "Hcg Hown Htce Hcce #Htext #Hdata Hpc #Hpe #Hftab #Hbio #Hlog
               Hseam Hgen #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd Hdep
               Hidev Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hru Hpriv #Hprocs #Hdev #Hgeo
-              #Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
+              #Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hires Hfds Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
               HbP H23lo H23hi H24 Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
     iPoseProof (soi_05e with "Htext") as "Hi5e".
@@ -1485,7 +1503,7 @@ Section ProofSysOpenBody.
                       [] Hbio Hlog Hseam Hgen
                       Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd Hdep Hidev
                       Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpbare
-                      Hprocs Hdev Hgeo Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
+                      Hprocs Hdev Hgeo Hdlk Hbsl Hires Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
                       HbP H23 H24 [Hcback Howe Hisl Hcont]").
       { iApply (fileclose_env_none _ _ _ _ _ _ Cf Hty0). }
       iEval (rewrite /wp_next).
@@ -1898,6 +1916,13 @@ Section ProofSysOpenBody.
     bitmap_res gfs bmapstart cov logstart size used -∗
     bslots bn 3 -∗
     iref_slots nsj -∗
+    (* ONE UNIT HELD BACK FOR [fileclose]'s LOAN.  The D-FAIL tail closes the
+       file it just allocated, and [SpecFileclose] borrows an iref unit
+       across the call -- see the note on its [iref_slot] row.  The ledger
+       [nsj] above says nothing positive, so the loan cannot come out of it;
+       sys_open splits this unit off its allowance at entry instead, which
+       is why [sys_open_slots] is one MORE than [create_slots]. *)
+    iref_slot -∗
     fd_slot -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
@@ -1925,7 +1950,7 @@ Section ProofSysOpenBody.
     iIntros "Hcg Hown Htce Hcce #Htext #Hdata Hpc #Hpe #Hftab #Hbio #Hlog
               Hseam Hgen #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd Hdep
               Hidev Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hru Hpriv #Hprocs #Hdev #Hgeo
-              #Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
+              #Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hires Hfds Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
               HbP H23lo H23hi H24 Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
     iPoseProof (soi_04a with "Htext") as "Hi4a".
@@ -2020,7 +2045,7 @@ Section ProofSysOpenBody.
                 with "Hcg Hown Htce Hcce Htext Hdata Hpc Hpe Hftab Hbio Hlog
                       Hseam Hgen Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd
                       Hdep Hidev Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru Hpriv Hprocs
-                      Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hf1
+                      Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hires Hfds Hf1
                       Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23lo H23hi H24 Hcont"). }
     (* ---- T_DEVICE: the [major] bounds test ---- *)
     iApply (wp_bne_fall_s_sconf (CID := CID2) (mword_of_int (SO + 0x50))
@@ -2167,7 +2192,7 @@ Section ProofSysOpenBody.
               with "Hcg Hown Htce Hcce Htext Hdata Hpc Hpe Hftab Hbio Hlog
                     Hseam Hgen Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd
                     Hdep Hidev Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru Hpriv Hprocs
-                    Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hf1
+                    Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hires Hfds Hf1
                     Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23lo H23hi H24 Hcont").
   Qed.
 
@@ -2517,7 +2542,7 @@ Section ProofSysOpenBody.
                       by (vm_compute; reflexivity); lia)
               Hni1 Hni2 Hni3 Hush
               ltac:(rewrite SpecCreate.T_FILE_value; lia) Hprkc
-              ltac:(unfold create_units; lia) Hnsb Hj Hgl
+              ltac:(unfold create_units; lia) ltac:(revert Hnsb; unfold sys_open_slots; lia) Hj Hgl
               HN5a1 HN5a2 HN5a3 Heb
               with "Hcg Hown Htext Hpc Hdata Hpre Hbio Hlog Hkenv Hitab
                     Hitinv Hescrows Hslks Hireg Hropen Hsbn Hsbi Hsbs Hsbb
@@ -2655,13 +2680,20 @@ Section ProofSysOpenBody.
     iDestruct (log_opS_op with "HopS") as "Hop".
     iDestruct (cpu_own_transport CID6 CID8 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
+    (* PEEL THE LOAN UNIT.  [so_join]/[so_alloc] reach the D-FAIL tail, which
+       closes the file it just allocated, and [SpecFileclose] borrows one
+       iref unit across the call.  create's ledger [S ns1 = ns] plus
+       [sys_open_slots <= ns] is what makes [ns1] positive here. *)
+    iDestruct (so_iref_take ns1
+                 ltac:(cbn in Hns1; unfold sys_open_slots, create_slots in *; lia)
+                 with "Hisl") as "[Hires Hisl]".
     (* ---- THE ADAPTER: the syscall's exit continuation, weakened to the
        join's two extra clauses.  [used'] is free (the syscall claims no
        ordering) and the iref arithmetic is create's [S ns1 <= ns] plus the
        join's [ns1 <= ns' <= S ns1]. ---- *)
     iAssert (wp_next true (proc_addr jx)
                (so_cont gf bn gfs cov logstart bmapstart inodestart size used1
-                        ns1 dqb dqs (proc_addr jx) pidv V m K eb b lks))
+                        (ns1 - 1)%nat dqb dqs (proc_addr jx) pidv V m K eb b lks))
       with "[Hcont Hsbn Hsbs]" as "Hcontj".
     { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz".
       iEval (rewrite /so_cont). iIntros (mf used2 ns2) "%Hcsf %Huse %Hns2".
@@ -2674,7 +2706,7 @@ Section ProofSysOpenBody.
         unfold sys_open_slots, create_slots in *. split; lia. } }
     iApply (so_join (CID0 := CID8) gfl gf gs jx gl gu gd gk pd pav pu bn g
               gfs gi cn gtl gil gisl cov logstart bmapstart inodestart nib
-              size dev used1 kk qi ss gy inum dn bm om lo ns1 u1 pidv dqb dqs
+              size dev used1 kk qi ss gy inum dn bm om lo (ns1 - 1)%nat u1 pidv dqb dqs
               V m P1 sp0 K eb b lks w4 w5 w6 w24 bp1
               HKfull Hkk Hdevc Hnibc ltac:(lia) Hgeom Hsize Hbm0 Hbmcov Hbmlog
               Hist0 Hibcov Hiblog Hcovb
@@ -2684,7 +2716,7 @@ Section ProofSysOpenBody.
                     Hseam Hgen Hitab Hitinv Hesc Hireg Hropen Hslk Hslkd Hdep
                     Hidev Hiinum Hivalid Hload Hshot Hfrz Href Hru Hpriv Hprocs
                     Hdev
-                    Hgeo Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hf1 Hf2 Hf3
+                    Hgeo Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hires Hfds Hf1 Hf2 Hf3
                     Hf4 Hf5 Hf6 HbP H23lo H23hi H24 Hcontj").
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
@@ -3211,12 +3243,18 @@ Section ProofSysOpenBody.
       iDestruct (log_opS_op with "HopS") as "Hop".
       iDestruct (cpu_own_transport CID7 CID10 0 eb (proc_addr jx) b
                    ltac:(wp_next_chain) with "Hown") as "Hown".
+      (* PEEL THE LOAN UNIT -- see [so_alloc]'s [iref_slot] row.  namei has
+         spent one of the allowance, and [sys_open_slots = S create_slots]
+         leaves this one on top of create's three. *)
+      iDestruct (so_iref_take (ns - 1)%nat
+                   ltac:(unfold sys_open_slots, create_slots in *; lia)
+                   with "Hisl") as "[Hires Hisl]".
       (* THE ADAPTER, the else arm's copy: [used'] is dropped and the iref
          interval widens from the join's [nsj <= ns' <= S nsj] to the
          syscall's, namei having spent one of the three. *)
       iAssert (wp_next true (proc_addr jx)
                  (so_cont gf bn gfs cov logstart bmapstart inodestart size used1
-                          (ns - 1)%nat dqb dqs (proc_addr jx) pidv V m K eb b lks))
+                          (ns - 1 - 1)%nat dqb dqs (proc_addr jx) pidv V m K eb b lks))
         with "[Hcont Hsbn Hsbs]" as "Hcontj".
       { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz".
         iEval (rewrite /so_cont). iIntros (mf used2 ns2) "%Hcsf %Huse %Hns2".
@@ -3229,7 +3267,7 @@ Section ProofSysOpenBody.
       iApply (so_join (CID0 := CID10) gfl gf gs jx gl gu gd gk pd pav pu bn g
                 gfs gi cn gtl gil gisl cov logstart bmapstart inodestart nib
                 size dev used1 kk (qq/2)%Qp (qq/2)%Qp gy inum dn bm om lo
-                (ns - 1)%nat n1 pidv dqb dqs V m Q2 sp0 K eb b lks w4 w5 w6 w24
+                (ns - 1 - 1)%nat n1 pidv dqb dqs V m Q2 sp0 K eb b lks w4 w5 w6 w24
                 bp1
                 HKfull Hkk Hdevc Hnibc Hinb Hgeom Hsize Hbm0 Hbmcov Hbmlog
                 Hist0 Hiblk Hiblog Hcovb Hiu Hj Hgl Hlkempty Hdirw
@@ -3237,7 +3275,7 @@ Section ProofSysOpenBody.
                 with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hftab Hbio Hlog
                       Hseam Hgen Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd
                       Hdep Hidev Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru Hpriv Hprocs
-                      Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hf1
+                      Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hires Hfds Hf1
                       Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23lo H23hi H24 Hcontj").
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. } }
@@ -3298,9 +3336,15 @@ Section ProofSysOpenBody.
       iDestruct (log_opS_op with "HopS") as "Hop".
       iDestruct (cpu_own_transport CID7 CID12 0 eb (proc_addr jx) b
                    ltac:(wp_next_chain) with "Hown") as "Hown".
+      (* PEEL THE LOAN UNIT -- see [so_alloc]'s [iref_slot] row.  namei has
+         spent one of the allowance, and [sys_open_slots = S create_slots]
+         leaves this one on top of create's three. *)
+      iDestruct (so_iref_take (ns - 1)%nat
+                   ltac:(unfold sys_open_slots, create_slots in *; lia)
+                   with "Hisl") as "[Hires Hisl]".
       iAssert (wp_next true (proc_addr jx)
                  (so_cont gf bn gfs cov logstart bmapstart inodestart size used1
-                          (ns - 1)%nat dqb dqs (proc_addr jx) pidv V m K eb b lks))
+                          (ns - 1 - 1)%nat dqb dqs (proc_addr jx) pidv V m K eb b lks))
         with "[Hcont Hsbn Hsbs]" as "Hcontj".
       { iEval (rewrite /wp_next). iIntros (CIDz) "%Hqz".
         iEval (rewrite /so_cont). iIntros (mf used2 ns2) "%Hcsf %Huse %Hns2".
@@ -3313,7 +3357,7 @@ Section ProofSysOpenBody.
       iApply (so_alloc (CID0 := CID12) gfl gf gs jx gl gu gd gk pd pav pu bn g
                 gfs gi cn gtl gil gisl cov logstart bmapstart inodestart nib
                 size dev used1 kk (qq/2)%Qp (qq/2)%Qp gy inum dn bm om lo
-                (ns - 1)%nat n1 pidv dqb dqs V m Q3 sp0 K eb b lks w4 w5 w6 w24
+                (ns - 1 - 1)%nat n1 pidv dqb dqs V m Q3 sp0 K eb b lks w4 w5 w6 w24
                 bp1
                 HKfull Hkk Hdevc Hnibc Hinb Hgeom Hsize Hbm0 Hbmcov Hbmlog
                 Hist0 Hiblk Hiblog Hcovb Hiu Hj Hgl Hlkempty
@@ -3322,7 +3366,7 @@ Section ProofSysOpenBody.
                 with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hftab Hbio Hlog
                       Hseam Hgen Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd
                       Hdep Hidev Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru Hpriv Hprocs
-                      Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hfds Hf1
+                      Hdev Hgeo Hdlk Hop Hsbb Hsbi Hbmres Hbsl Hisl Hires Hfds Hf1
                       Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23lo H23hi H24 Hcontj").
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. } }

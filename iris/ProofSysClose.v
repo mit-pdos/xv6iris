@@ -336,7 +336,7 @@ Section ProofSysClose.
     set (M1 := <[Regidx csp_rs1 := regval_into_reg
                   (add_vec (m !!! Regidx csp_rs1)
                      (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m).
-    iIntros "Hcg Hcpu Hextc Hextm #Htext #Hdata Hpc #Hftab #Hpe Hpriv Hpenv
+    iIntros "Hcg Hcpu Hextc Hextm #Htext #Hdata Hpc #Hftab #Hpe Hpriv Hiru Hpenv
               Hfenv Hcont".
     (* [b] AND [eb] ARE DERIVABLY EQUAL HERE, and the derivation is available
        because fileclose's FS bundle carries [⌜n = 0⌝]: sys_close has no
@@ -634,7 +634,7 @@ Section ProofSysClose.
       iDestruct (cpu_claim_ext_transport CID CID12 eb p
                    ltac:(rewrite Hb; wp_next_chain) with "Hextm") as "Hextm".
       iSpecialize ("Hcont" $! CID12 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hextc Hextm Hpc [Hpriv] [Hpenv] [Hfenv]");
+      iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hextc Hextm Hpc [Hpriv] [Hpenv] [Hfenv] Hiru");
         [exact Hcsf| | |].
       { rewrite /sys_close_post. iLeft. iFrame "Hpriv". iPureIntro.
         split; [exact Hmfa0 | exact Hnone]. }
@@ -858,9 +858,9 @@ Section ProofSysClose.
       iApply (Fileclose.wp_fileclose_sconf γl γf k q Cf fn on us D n eb p (av - 4)%nat b lks pid V
                 ltac:(lia) Hn HDa0
                 Hbelow
-                with "Hcg Hcpu Hextc Hextm Htext Hdata Hpc Hftab Hpe Href Hpbare Hfcenv").
+                with "Hcg Hcpu Hextc Hextm Htext Hdata Hpc Hftab Hpe Href Hpbare Hiru Hfcenv").
       all: try lkbelow.
-      iIntros (CID21 Hs21 R) "Hcg Hcpu Hextc Hextm Hpc %HcsR Hfdslot Hout Hpbare".
+      iIntros (CID21 Hs21 R) "Hcg Hcpu Hextc Hextm Hpc %HcsR Hfdslot Hiru Hout Hpbare".
       iDestruct ("Hfcback" with "Hout") as "(Hpenv & Hfenv)".
       assert (Hpc38 : ret_pc (D !!! Regidx (mword_of_int 1 : mword 5))
                       = mword_of_int (KernelSyms.sys_close + 0x38))
@@ -931,7 +931,7 @@ Section ProofSysClose.
       iDestruct (cpu_claim_ext_transport CID21 CID23 eb p
                    ltac:(rewrite Hb; wp_next_chain) with "Hextm") as "Hextm".
       iSpecialize ("Hcont" $! CID23 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hextc Hextm Hpc [Hpriv] Hpenv Hfenv");
+      iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hextc Hextm Hpc [Hpriv] Hpenv Hfenv Hiru");
         [exact Hcsf|].
       rewrite /sys_close_post. iRight. iExists fd, fv. iFrame "Hpriv". iPureIntro.
       split; [exact Hmfa0 | exact Hsome].

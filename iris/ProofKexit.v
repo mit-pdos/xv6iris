@@ -516,6 +516,7 @@ Section KexitLoop.
         proc_priv γf pj pid Vx -∗
         (∃ on', fileclose_pipe_env fn on' 0%nat) -∗
         (∃ usx : gset Z, fileclose_fs_env_nopid fn usx 0%nat eb pj) -∗
+        iref_slot -∗
         WP (Loop : expr riscv_lang)) -∗
     ∀ (fd : nat) (M : regfile) (V : pprivate),
       ⌜(fd < NOFILE)%nat⌝ -∗ ⌜kxl_regs M pj sv spF fd⌝ -∗ ⌜kx_nulled cwdv fd V⌝ -∗
@@ -530,6 +531,7 @@ Section KexitLoop.
       proc_priv γf pj pid V -∗
       (∃ on', fileclose_pipe_env fn on' 0%nat) -∗
       (∃ usx : gset Z, fileclose_fs_env_nopid fn usx 0%nat eb pj) -∗
+       iref_slot -∗
       WP (Loop : expr riscv_lang).
   Proof.
     intros pj Hj Hfnj Hfndq Hfnpid Hav Hfresh.
@@ -552,6 +554,7 @@ Section KexitLoop.
                        proc_priv γf pj pid Vx -∗
                        (∃ on', fileclose_pipe_env fn on' 0%nat) -∗
                        (∃ usx : gset Z, fileclose_fs_env_nopid fn usx 0%nat eb pj) -∗
+                        iref_slot -∗
                        WP (Loop : expr riscv_lang)) -∗
                    sie_cap_gpr KT1 M av b pj -∗
                    cpu_own 0 eb pj b lks -∗
@@ -561,11 +564,12 @@ Section KexitLoop.
                    proc_priv γf pj pid V -∗
                    (∃ on', fileclose_pipe_env fn on' 0%nat) -∗
                    (∃ usx : gset Z, fileclose_fs_env_nopid fn usx 0%nat eb pj) -∗
+                    iref_slot -∗
                    WP (Loop : expr riscv_lang)))%I with "[]" as "Hloop".
     { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
-      { iIntros (CIDk Hsk fd M V) "%Hfuel %Hfd %Hregs %Hnul Hqx Hcg Hown Htce Hcce Hpc Hpriv Hpenv Hfenv".
+      { iIntros (CIDk Hsk fd M V) "%Hfuel %Hfd %Hregs %Hnul Hqx Hcg Hown Htce Hcce Hpc Hpriv Hpenv Hfenv Hiru".
         exfalso. lia. }
-      iIntros (CIDk Hsk fd M V) "%Hfuel %Hfd %Hregs %Hnul Hqx Hcg Hown Htce Hcce Hpc Hpriv Hpenv Hfenv".
+      iIntros (CIDk Hsk fd M V) "%Hfuel %Hfd %Hregs %Hnul Hqx Hcg Hown Htce Hcce Hpc Hpriv Hpenv Hfenv Hiru".
       destruct Hregs as (Hs1 & Hs2 & Hs3 & Hs4 & Hsp & Hdom).
       (* [eb = b] at level 0, for the COMPLEMENT's transport guards only --
          [trap_csrs_ext_transport] / [cpu_claim_ext_transport] are indexed by
@@ -585,9 +589,10 @@ Section KexitLoop.
                    proc_priv γf pj pid Vt -∗
                    (∃ on', fileclose_pipe_env fn on' 0%nat) -∗
                    (∃ usx : gset Z, fileclose_fs_env_nopid fn usx 0%nat eb pj) -∗
+                   iref_slot -∗
                    WP (Loop : expr riscv_lang)))%I
         with "[Hqx]" as "Htail".
-      { iIntros (CIDt Hst Mt Vt) "%Hmt %Hnt Hcg Hown Htce Hcce Hpc Hpriv Hpenv Hfenv".
+      { iIntros (CIDt Hst Mt Vt) "%Hmt %Hnt Hcg Hown Htce Hcce Hpc Hpriv Hpenv Hfenv Hiru".
         destruct Hmt as (Ht9 & Ht18 & Ht19 & Ht20 & Htsp & Htdom).
         iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hbt. cbn in Hbt.
         iPoseProof (kxi_38 with "Htext") as "Hi38".
@@ -652,7 +657,7 @@ Section KexitLoop.
           iDestruct (cpu_claim_ext_transport CIDt CIDt2 eb pj
                        ltac:(rewrite Hbt; wp_next_chain) with "Hcce") as "Hcce".
           iSpecialize ("Hqx" $! CIDt2 with "[%]"); [wp_next_chain|].
-          iApply ("Hqx" $! Mt38 Vt with "[%] [%] [%] Hcg Hown Htce Hcce Hpc Hpriv Hpenv Hfenv").
+          iApply ("Hqx" $! Mt38 Vt with "[%] [%] [%] Hcg Hown Htce Hcce Hpc Hpriv Hpenv Hfenv Hiru").
           * split; [exact HM19|]. split; [exact HM20|]. split; [exact HMsp|].
             exact HMdom.
           * apply (kx_nulled_all cwdv); [exact Hlen | rewrite -HkS; exact Hnt].
@@ -684,7 +689,7 @@ Section KexitLoop.
           iDestruct (cpu_claim_ext_transport CIDt CIDt2 eb pj
                        ltac:(rewrite Hbt; wp_next_chain) with "Hcce") as "Hcce".
           iSpecialize ("IHf" $! CIDt2 with "[%]"); [wp_next_chain|].
-          iApply ("IHf" $! (S fd) Mt38 Vt with "[%] [%] [%] [%] Hqx Hcg Hown Htce Hcce Hpc Hpriv Hpenv Hfenv").
+          iApply ("IHf" $! (S fd) Mt38 Vt with "[%] [%] [%] [%] Hqx Hcg Hown Htce Hcce Hpc Hpriv Hpenv Hfenv Hiru").
           * unfold NOFILE in *; lia.
           * exact HkS.
           * split; [exact HM9|]. split; [exact HM18|]. split; [exact HM19|].
@@ -756,7 +761,7 @@ Section KexitLoop.
         iDestruct (cpu_claim_ext_transport CIDk CIDm eb pj
                      ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
         iSpecialize ("Htail" $! CIDm with "[%]"); [wp_next_chain|].
-        iApply ("Htail" $! M3e V with "[%] [%] Hcg Hown Htce Hcce Hpc Hpriv Hpenv Hfenv").
+        iApply ("Htail" $! M3e V with "[%] [%] Hcg Hown Htce Hcce Hpc Hpriv Hpenv Hfenv Hiru").
         + split; [exact HM3e_9|]. split; [exact HM3e_18|]. split; [exact HM3e_19|].
           split; [exact HM3e_20|]. split; [exact HM3e_sp|].
           intro r; apply rf_to_gmap_dom.
@@ -814,10 +819,10 @@ Section KexitLoop.
                      with "Hpenv Hfenv") as "[Hfcenv Hfcback]".
         iApply (Fileclose.wp_fileclose_sconf (CID := CIDn)  γft γf kf q Cf fn onk usk M42 0 eb pj av b lks pid V
                   ltac:(lia) ltac:(lia) HM42a0 Hfresh
-                  with "Hcg Hown Htce Hcce Htext Hkd Hpc Hft Hpe Href [Hpbare] Hfcenv").
+                  with "Hcg Hown Htce Hcce Htext Hkd Hpc Hft Hpe Href [Hpbare] Hiru Hfcenv").
         all: try lkbelow.
         { iExact "Hpbare". }
-        iIntros (CIDo Hso mr) "Hcg Hown Htce Hcce Hpc %Hcs Hfdslot Hout Hpbare".
+        iIntros (CIDo Hso mr) "Hcg Hown Htce Hcce Hpc %Hcs Hfdslot Hiru Hout Hpbare".
         iDestruct ("Hfcback" with "Hout") as "(Hpenv & Hfenv)".
         assert (Hpc46 : ret_pc (M42 !!! Regidx (mword_of_int 1 : mword 5))
                         = mword_of_int (KX + 0x46))
@@ -874,7 +879,7 @@ Section KexitLoop.
                      ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
         iSpecialize ("Htail" $! CIDr with "[%]"); [wp_next_chain|].
         iApply ("Htail" $! mr (upd_ofile V fd (zero_reg : mword 64))
-                  with "[%] [%] Hcg Hown Htce Hcce Hpc Hpriv Hpenv Hfenv").
+                  with "[%] [%] Hcg Hown Htce Hcce Hpc Hpriv Hpenv Hfenv Hiru").
         + split; [exact Hmr9|]. split; [exact Hmr18|]. split; [exact Hmr19|].
           split; [exact Hmr20|]. split; [exact Hmrsp|].
           intro r; apply rf_to_gmap_dom.
@@ -2232,8 +2237,14 @@ Section ProofKexit.
                     ltac:(lia)
                     Hfresh
                     with "Htext Hkd Hft Hpanenv") as "Hloop".
+      (* ONE UNIT OUT OF THE ALLOWANCE, lent to the descriptor loop for the
+         fileclose in each iteration to deposit into the slot it frees.  The
+         loop hands it back at its exit, where it rejoins [Hir] before
+         [kx_rest] -- which wants the whole [IREFSPARE]. *)
+      iDestruct (iref_slots_split 1 (IREFSPARE - 1) with "Hir") as "[Hiru0 Hir]".
       iSpecialize ("Hloop" with "[Hinit Hsp Hir Hcloser]").
-      { iIntros (CIDx Hsx Mx Vx) "%Hxregs %Hxof %Hxcwd Hcg Hown Htce Hcce Hpc Hpriv Hpenv Hfenv".
+      { iIntros (CIDx Hsx Mx Vx) "%Hxregs %Hxof %Hxcwd Hcg Hown Htce Hcce Hpc Hpriv Hpenv Hfenv Hiru".
+        iDestruct (iref_slots_combine 1 (IREFSPARE - 1) with "Hiru Hir") as "Hir".
         iDestruct "Hfenv" as (usx) "Hfenv".
         iDestruct "Hfenv" as "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
                                _ & _ & Hbsl & _ & Hbm)".
@@ -2256,7 +2267,7 @@ Section ProofKexit.
                         Hbio Hlog Hseam Hgen Hdev Hgeo Hdlk Hbsl
                         Hitab Hitinv Hescrows Hireg Hropen Hslks Hsbb Hsbi Hbmres
                         Hinit Hsp Hir Hpriv"). }
-      iApply ("Hloop" $! 0%nat A5 V with "[%] [%] [%] Hcg Hown Htce Hcce Hpc Hpriv Hpenv Hfenv").
+      iApply ("Hloop" $! 0%nat A5 V with "[%] [%] [%] Hcg Hown Htce Hcce Hpc Hpriv Hpenv Hfenv Hiru0").
       + unfold NOFILE. lia.
       + split; [exact HA5s1|]. split; [exact HA5s2|]. split; [exact HA5s3|].
         split; [exact HA5s4|]. split; [exact HA5sp|].

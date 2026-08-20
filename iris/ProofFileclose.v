@@ -153,7 +153,7 @@ Section ProofFileclose.
     pose proof (locks_below_not_elem _ _ Hbelow) as Hfresh.
     
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hlock #Hpenv Href Hpbare Henv Hcont".
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hlock #Hpenv Href Hpbare Hiru Henv Hcont".
     iDestruct (sie_b_agree m n K eb b p lks with "Hcg Hcnt") as %Houtb.
     (* THE ONE FACT THE COMPLEMENT'S TRANSPORTS NEED (see [ext_chain]): the
        disabled base forces the disabled arm, at any nesting depth. *)
@@ -601,7 +601,7 @@ Section ProofFileclose.
       iDestruct (cpu_claim_ext_transport CID CIDe eb p ltac:(ext_chain Hebf b)
                    with "Hextm") as "Hextm".
       iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
-      iApply ("Hcont" $! mf with "Hcg Hcnt Hextc Hextm [Hpc] [%] Hunit [Henv] Hpbare").
+      iApply ("Hcont" $! mf with "Hcg Hcnt Hextc Hextm [Hpc] [%] Hunit Hiru [Henv] Hpbare").
       { iEval (rewrite /ret_tgt). iExact "Hpc". }
       { exact Hcsf. }
       { by iApply fileclose_env_out_of_env. }
@@ -848,14 +848,21 @@ Section ProofFileclose.
       (* ---- the slot goes back FREE, and the payload leaves with us ---- *)
       set (C0 := MkFContent (mword_of_int 0 : mword 32) (fc_readable Cf)
                    (fc_writable Cf) (fc_pipe Cf) (fc_ip Cf) (fc_major Cf)).
-      iAssert (file_pay γf k 1 C0) with "[Hpn Hoh0]" as "Hpy0".
+      (* THE FREED SLOT GETS ITS IREF UNIT, out of the one the caller lent us.
+         [file_core]'s untyped arm holds the entry's provisioned unit, so a
+         free slot's payload carries one -- and this is the moment it has to
+         be there, because [f->type = FD_NONE] is written and ftable.lock
+         released BEFORE the type is tested, so on the FD_INODE arm the unit
+         [iput] will make does not exist yet.  Each arm repays the loan below
+         from what it does have. *)
+      iAssert (file_pay γf k 1 C0) with "[Hpn Hoh0 Hiru]" as "Hpy0".
       { iExists pn0. iFrame "Hpn".
         rewrite /file_payload /file_core /C0 /pn0; cbn [fc_type fp_ocv].
         rewrite bool_decide_eq_false_2; [|by vm_compute].
         rewrite bool_decide_eq_false_2; [|by vm_compute].
         rewrite bool_decide_eq_false_2; [|by vm_compute].
         rewrite (file_armed_none C0 ltac:(rewrite /C0 /FD_NONE; reflexivity)).
-        iSplitR; [done|]. iExact "Hoh0". }
+        iSplitL "Hiru"; [iApply iref_slot_frac; iExact "Hiru" | iExact "Hoh0"]. }
       (* NB: [Hfd] is NOT handed over.  The free arm of [fslot] holds no fd
          slots, and the unit the destroyed reference was accounted by is
          exactly what the postcondition returns -- framing it here would
@@ -1130,7 +1137,10 @@ Section ProofFileclose.
         (* the payload IS the pipe end this call closes *)
         iEval (rewrite /file_core Hpipe bool_decide_eq_true_2; [|reflexivity])
           in "Hcore".
-        iDestruct "Hcore" as "[#Hispipe Hpref]".
+        (* the pipe arm's own iref unit REPAYS the loan deposited above: a pipe
+           never spent it, so [file_core] still has it and pipeclose has no
+           use for it. *)
+        iDestruct "Hcore" as "(#Hispipe & Hpref & Hiru)".
         iEval (rewrite /fileclose_env Hpipe bool_decide_eq_true_2; [|reflexivity])
           in "Henv".
         rewrite /fileclose_pipe_env.
@@ -1221,7 +1231,7 @@ Section ProofFileclose.
         iDestruct (cpu_claim_ext_transport CID CIDp7 eb p ltac:(ext_chain Hebf b)
                      with "Hextm") as "Hextm".
         iSpecialize ("Hcont" $! CIDp7 with "[]"); [iPureIntro; wp_next_chain|].
-        iApply ("Hcont" $! mf with "Hcg Hcnt Hextc Hextm [Hpc] [%] Hfd [Hav] Hpbare").
+        iApply ("Hcont" $! mf with "Hcg Hcnt Hextc Hextm [Hpc] [%] Hfd Hiru [Hav] Hpbare").
         { iEval (rewrite /ret_tgt). iExact "Hpc". }
         { exact Hcsf. }
         { rewrite /fileclose_env_out Hpipe bool_decide_eq_true_2; [|reflexivity].
@@ -1602,8 +1612,12 @@ Section ProofFileclose.
           iDestruct (cpu_claim_ext_transport CIDf8 CIDf10 eb (proc_addr (fcn_j fn))
                        ltac:(ext_chain Hebf b) with "Hextm") as "Hextm".
           iSpecialize ("Hcont" $! CIDf10 with "[]"); [iPureIntro; wp_next_chain|].
+          (* [Hislot] is [iput]'s give-back, and it is what REPAYS the loan the
+             free-slot construction above spent.  It used to be dropped here
+             -- SpecFileclose.v recorded that as a leak of one unit of the
+             IrefSlots supply per inode file closed; it has a home now. *)
           iApply ("Hcont" $! mf with
-                    "Hcg Hcnt Hextc Hextm [Hpc] [%] Hfd [Hbsl Hsbb Hsbi Hbmres] Hpbare").
+                    "Hcg Hcnt Hextc Hextm [Hpc] [%] Hfd Hislot [Hbsl Hsbb Hsbi Hbmres] Hpbare").
           { iEval (rewrite /ret_tgt). iExact "Hpc". }
           { exact Hcsf. }
           { rewrite /fileclose_env_out bool_decide_eq_false_2; [|exact Hnpipe].
@@ -1681,9 +1695,21 @@ Section ProofFileclose.
           iDestruct (cpu_claim_ext_transport CID CIDz3 eb p ltac:(ext_chain Hebf b)
                        with "Hextm") as "Hextm".
           iSpecialize ("Hcont" $! CIDz3 with "[]"); [iPureIntro; wp_next_chain|].
-          iApply ("Hcont" $! mf with "Hcg Hcnt Hextc Hextm [Hpc] [%] Hfd [Henv] Hpbare").
+          iApply ("Hcont" $! mf with
+                    "Hcg Hcnt Hextc Hextm [Hpc] [%] Hfd [Hcore] [Henv] Hpbare").
           { iEval (rewrite /ret_tgt). iExact "Hpc". }
           { exact Hcsf. }
+          (* AN UNTYPED FILE'S PAYLOAD IS ITS IREF UNIT.  [file_core]'s else
+             arm is where a slot that holds no inode reference keeps the one
+             the entry is provisioned for, so closing an untyped file repays
+             the loan out of the payload itself -- no [iput] and no pipe. *)
+          { iApply iref_slot_frac.
+            rewrite /file_core bool_decide_eq_false_2; [|exact Hnpipe].
+            rewrite bool_decide_eq_false_2;
+              [| intro Hc; apply Hnone; by left].
+            rewrite bool_decide_eq_false_2;
+              [| intro Hc; apply Hnone; by right].
+            iExact "Hcore". }
           { by iApply fileclose_env_out_of_env. }
   Qed.
 

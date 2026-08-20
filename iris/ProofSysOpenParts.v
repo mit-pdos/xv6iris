@@ -93,6 +93,7 @@ Require Import CodeSysOpen.
 Require Import SpecSysOpen.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import IrefSlots.  (* [iref_frac] rides [file_core] -- FileInvDefs *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -600,7 +601,7 @@ Section ProofSysOpenPublish.
      [icfg] as field instances, and binding a second one gives two instances
      that print identically and never unify -- SpecCreate.v's banner records
      the same rule for the same reason. *)
-  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
 
   (* the 1/2 + 1/2 join at [↦₈], which the tree has at [↦₄]
      ([RiscvPtsto.word4_pointsto_half]) and nowhere else -- and which the

@@ -3348,13 +3348,16 @@ Section SyscallArms.
                  with "Hfsenv Hbs Hfc") as "Hfenv".
     iPoseProof sysc_trap_ext_true as "Htcx".
     iPoseProof (sysc_claim_ext_true (proc_addr j)) as "Hccx".
+    (* fileclose's loan, out of the dispatch's four spare iref units and
+       straight back in below -- see [SpecFileclose]'s [iref_slot] row. *)
+    iDestruct (sysc_iref_split3 with "Hir") as "[Hir Hiru]".
     iApply (SysClose.wp_sys_close_sconf γft γf fn None us M (av - 4)%nat 0%nat
               true (proc_addr j) v0 pid V true ∅
               Hv0 ltac:(cbn; lia) ltac:(lia) (locks_below_empty "log")
               Hpidt (sct_dq _ _ _ T)
               with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hftable Hpanic Hpriv
-                    Hpenv Hfenv").
-    iIntros (CIDy Hsy mf) "%Hcs Hcg Hcpu _ _ Hpc Hpost Hpe' Hfe'".
+                    Hiru Hpenv Hfenv").
+    iIntros (CIDy Hsy mf) "%Hcs Hcg Hcpu _ _ Hpc Hpost Hpe' Hfe' Hiru".
     iDestruct "Hfe'" as (us') "Hfe'".
     (* the three block slots and the bitmap, back out of the nopid bundle *)
     iDestruct (sysc_fclose_fs_out bn fn us' 0%nat true (proc_addr j)
@@ -3386,7 +3389,8 @@ Section SyscallArms.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) bn fn dqi ip pid V V'
               ∅ av us' m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) Htfp'
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hfc Hip Hfd Hir Henv Hpriv Hpc Hcont").
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hfc Hip Hfd [Hir Hiru] Henv Hpriv Hpc Hcont").
+    iApply (sysc_iref_join3 with "Hir Hiru").
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -3451,13 +3455,17 @@ Section SyscallArms.
     iDestruct (fd_slots_split 1 2 with "Hfd") as "[Hfd1 Hfd]".
     iPoseProof sysc_trap_ext_true as "Htcx".
     iPoseProof (sysc_claim_ext_true (proc_addr j)) as "Hccx".
+    (* fileclose's loan -- see [SpecFileclose]'s [iref_slot] row.  sys_pipe
+       reaches fileclose on three error paths and through pipealloc, and one
+       unit serves them all. *)
+    iDestruct (sysc_iref_split3 with "Hir") as "[Hir Hiru]".
     iApply (SysPipe.wp_sys_pipe_sconf γa γft γf fn None us M (av - 4)%nat
               true (proc_addr j) v0 pid V true ∅
               Hv0 ltac:(lia) (locks_below_empty "log")
               Hpidt (sct_dq _ _ _ T)
               with "Hcg Hcpu Htcx Hccx Htext Hdata Hpc Hpanic Hftable Hkalloc
-                    Hpriv Hfd0 Hfd1 Hpenv Hfenv").
-    iIntros (CIDy Hsy mf P') "%Hcs %Hupt Hcg Hcpu _ _ Hpc Hpost Hpe' Hfe'".
+                    Hpriv Hfd0 Hfd1 Hiru Hpenv Hfenv").
+    iIntros (CIDy Hsy mf P') "%Hcs %Hupt Hcg Hcpu _ _ Hpc Hpost Hiru Hpe' Hfe'".
     iDestruct "Hfe'" as (us') "Hfe'".
     (* the three block slots and the bitmap, back out of the nopid bundle *)
     iDestruct (sysc_fclose_fs_out bn fn us' 0%nat true (proc_addr j)
@@ -3499,7 +3507,8 @@ Section SyscallArms.
     iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
     iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) bn fn dqi ip pid V V'
               ∅ av us' m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) Htfp'
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hfc Hip Hfd Hir Henv Hpriv Hpc Hcont").
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hfc Hip Hfd [Hir Hiru] Henv Hpriv Hpc Hcont").
+    iApply (sysc_iref_join3 with "Hir Hiru").
   Qed.
 
   (* ------------------------------------------------------------------- *)

@@ -3034,7 +3034,9 @@ Section ProofFilewrite.
         iDestruct "Hrpay" as (pn) "[Hpn Hpl]".
         iEval (rewrite /file_payload /file_core Htyp bool_decide_eq_true_2;
                [| reflexivity]) in "Hpl".
-        iDestruct "Hpl" as "[[#Hpipe Hpref] Hoh]".
+        (* the entry's iref unit rides the pipe arm now ([file_core]); it is
+           not piperead's business, so it stays here and goes back below. *)
+        iDestruct "Hpl" as "[(#Hpipe & Hpref & Hiru) Hoh]".
         assert (Htgt54 : add_vec (mword_of_int (FW + 0x28) : mword 64)
                   (sign_extend' 64 (mword_of_int 52 : mword 13))
                   = mword_of_int (FW + 0x5c))
@@ -3151,7 +3153,7 @@ Section ProofFilewrite.
         iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
         iApply ("Hcont" $! mfin (mf !!! Regidx Ra0) P' (fwn_used fn)
                   with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
-                        [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hpn Hpref Hoh Hrlv]
+                        [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hpn Hpref Hiru Hoh Hrlv]
                         Hpriv [Henv]").
         { exact Hcsf. }
         { exact Hupt. }
@@ -3163,7 +3165,7 @@ Section ProofFilewrite.
           iExists pn. iFrame "Hpn".
           rewrite /file_payload /file_core Htyp bool_decide_eq_true_2;
             [| reflexivity].
-          iFrame "Hpipe Hpref Hoh". }
+          iFrame "Hpipe Hpref Hiru Hoh". }
         { by iApply filewrite_env_out_of_env. }
       + (* ---- +0x24 c.li a4,3 ; +0x26 beq a5,a4 -> +0x5c (FD_DEVICE) ---- *)
         iApply (wp_beq_fall_s_sconf (mword_of_int (FW + 0x28))

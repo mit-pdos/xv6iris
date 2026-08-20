@@ -86,6 +86,9 @@ Require Import InodeInv.
 Require Import FsCrash.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import IrefSlots.  (* [iref_frac]: an ftable entry holds one unit.
+     NO CYCLE -- IrefSlots reaches only ProcGeom and FdSlots, which is exactly
+     why [NFILE] was moved to FdSlots (see the note below). *)
 Local Open Scope Z_scope.
 
 
@@ -515,7 +518,7 @@ Section FileInv.
      BELOW [Xv6G.v] -- it is one of the files the bundle is built out of --
      so it names them individually; everything above takes [xv6G]. *)
   Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ,
-            !icacheG Σ, !pipeG Σ, !cinvG Σ}.
+            !icacheG Σ, !pipeG Σ, !cinvG Σ, !irefslotG Σ}.
 
   (* ---- the content cells, at an arbitrary fraction ----
 
@@ -1030,24 +1033,62 @@ Section FileInv.
      beside the payload rather than inside it -- [file_payload_split] is a
      ⊣⊢ at every arm and two full points-tos do not split, while
      [cinv]/[cinv_own] do. *)
+  (* THE ENTRY'S IREF UNIT RIDES THE UNTYPED AND PIPE ARMS.  [IREFSLOTS]
+     provisions one unit per ftable entry ([IrefSlots.v]'s header: "each
+     ftable entry holding an FD_INODE / FD_DEVICE file"), and this is where
+     that unit lives when the entry is NOT holding an inode reference: a free
+     slot's payload holds it, so does a pipe's.  The FD_INODE / FD_DEVICE arm
+     holds none, because there the unit has been SPENT -- it is what justifies
+     the reference parked in [f->ip], which is exactly what [inode_pay] is.
+
+     This is why [IrefSlots]'s counter is fractional.  The arm splits with
+     [q] (filedup hands out shares of one file), so a unit that could not
+     split could not live here at all -- and the alternatives all fail: at
+     [q = 1] the invariant's [file_rest] is [emp] and cannot see the type, a
+     descriptor's [ofile_slot] would need one unit per REFERENCE where the
+     supply provisions one per FILE, and nothing can move into or out of the
+     table when sys_open types the file, because filealloc has released
+     ftable.lock by then.
+
+     What it buys: sys_open's ledger CLOSES.  filealloc hands out an untyped
+     slot, so its caller gets the unit for free; sys_open spends it retyping
+     to FD_INODE, and its net is zero.  sys_pipe's stays inside the reference
+     and rides into the descriptor.  At the last close the holder has [q = 1],
+     so a WHOLE unit either way -- from here on the pipe arm, from [iput] on
+     the inode arm -- which is what goes back into the freed slot.  Neither
+     the type nor the lastness has to appear in fileclose's postcondition. *)
   Definition file_core (q : Qp) (pn : fpnames) (C : fcontent) : iProp Σ :=
     (if bool_decide (fc_type C = FD_PIPE)
      then is_pipe (fp_lock pn) (fp_pipe pn) (fc_pipe C) ∗
-          pipe_ref (fp_pipe pn) (fc_wbool C) q
+          pipe_ref (fp_pipe pn) (fc_wbool C) q ∗ iref_frac q
      else if bool_decide (fc_type C = FD_INODE) || bool_decide (fc_type C = FD_DEVICE)
      then inode_pay (fp_icv pn) (fp_iq pn) (fp_ig pn) (fc_ip C) (fc_wbool C) q
-     else emp)%I.
+     else iref_frac q)%I.
+
+  (* AN UNTYPED SLOT'S PAYLOAD IS EXACTLY ITS IREF UNIT.  What filealloc
+     hands out and what a retype to FD_PIPE moves into the pipe arm. *)
+  Lemma file_core_none q pn C :
+    fc_type C = FD_NONE -> file_core q pn C ⊣⊢ iref_frac q.
+  Proof.
+    intro Ht. rewrite /file_core Ht.
+    rewrite bool_decide_eq_false_2; [|by vm_compute].
+    rewrite bool_decide_eq_false_2; [|by vm_compute].
+    rewrite bool_decide_eq_false_2; [|by vm_compute].
+    reflexivity.
+  Qed.
 
   Lemma file_core_split q1 q2 pn C :
     file_core (q1 + q2) pn C ⊣⊢ file_core q1 pn C ∗ file_core q2 pn C.
   Proof.
     rewrite /file_core.
     case_bool_decide as Hp; [|case_match].
-    - rewrite pipe_ref_split. iSplit.
-      + iIntros "(#Hi & H1 & H2)". iSplitL "H1"; (iSplitR; [iExact "Hi"|iFrame]).
-      + iIntros "[[#Hi H1] [_ H2]]". iSplitR; [iExact "Hi"|]. iFrame.
+    - rewrite pipe_ref_split iref_frac_op. iSplit.
+      + iIntros "(#Hi & [H1 H2] & [R1 R2])".
+        iSplitL "H1 R1"; (iSplitR; [iExact "Hi"|iFrame]).
+      + iIntros "[(#Hi & H1 & R1) (_ & H2 & R2)]".
+        iSplitR; [iExact "Hi"|]. iFrame.
     - apply inode_pay_split.
-    - by rewrite left_id.
+    - apply iref_frac_op.
   Qed.
 
   (* THE CINV IS ARMED EXACTLY ON THE TWO TYPES THAT BORROW [off].  Only

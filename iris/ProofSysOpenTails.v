@@ -1739,6 +1739,9 @@ Section ProofSysOpenTails.
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
     bslots bn 3 -∗
+    (* the unit fileclose borrows for the slot it frees, in and straight
+       back out -- see SpecFileclose's own note. *)
+    iref_slot -∗
     log_op g u -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
@@ -1777,7 +1780,7 @@ Section ProofSysOpenTails.
               #Hbio #Hlog Hseam Hgen
               #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd Hdep Hidev
               Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpid #Hprocs
-              #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24
+              #Hdev #Hgeo #Hdlk Hbsl Hiru Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24
               Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
     iPoseProof (soi_126 with "Htext") as "Hi0".
@@ -1836,8 +1839,8 @@ Section ProofSysOpenTails.
               M2 0%nat eb (proc_addr jx) (K - 24)%nat b lks
               pidv Vpr HKfc so_noff0 HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
-              with "Hcg Hown Htce Hcce Htext Hkd Hpc Hftab Hpenv Hfref Hpid Hfenv").
-    iIntros (CID3 Hq3 mfc) "Hcg Hown Htce Hcce Hpc %Hcsfc Hfd Hfout Hpid".
+              with "Hcg Hown Htce Hcce Htext Hkd Hpc Hftab Hpenv Hfref Hpid Hiru Hfenv").
+    iIntros (CID3 Hq3 mfc) "Hcg Hown Htce Hcce Hpc %Hcsfc Hfd Hiru Hfout Hpid".
     assert (Hpc2 : ret_pc (M2 !!! Regidx Rra : mword 64)
                    = mword_of_int (SO + 0x12c)) by (rewrite HM2ra; pcw).
     iEval (rewrite Hpc2) in "Hpc".

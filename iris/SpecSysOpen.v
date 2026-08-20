@@ -224,10 +224,10 @@ Local Open Scope Z_scope.
 Notation K_sys_open := (148%nat) (only parsing).
 (* THE REFERENCE ALLOWANCE.  create's own, and for create's own reason; see
    the header's reference ledger. *)
-Definition sys_open_slots : nat := create_slots.
+Definition sys_open_slots : nat := S create_slots.
 
 Section SpecSysOpen.
-  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
 
   (* sys_open's result, keyed by the returned a0, over the process state [W]
      the syscall ends with -- i.e. the incoming [V] with argstr's page-table

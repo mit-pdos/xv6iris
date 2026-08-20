@@ -156,6 +156,9 @@ Definition wp_sys_close_sconf_body
      untouched and comes straight back.  This is what a syscall that can
      close ANY [struct file] costs, and there is no honest way to make it
      smaller: closing an inode file writes the disk and sleeps. *)
+  (* the unit fileclose borrows to deposit into the slot it frees, in and
+     straight back out -- see SpecFileclose's own note. *)
+  iref_slot -∗
   fileclose_pipe_env fn on n -∗
   fileclose_fs_env_nopid fn us n eb p -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  sys_close calls fileclose,
@@ -177,6 +180,7 @@ Definition wp_sys_close_sconf_body
          bundle returns under an existential *)
       (∃ on', fileclose_pipe_env fn on' n) -∗
       (∃ us', fileclose_fs_env_nopid fn us' n eb p) -∗
+      iref_slot -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

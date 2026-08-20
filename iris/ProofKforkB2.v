@@ -50,6 +50,7 @@ Require Import ProofKforkParts.
 Require Import CodeKfork.
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import IrefSlots.  (* [iref_frac] rides [file_core] -- FileInvDefs *)
 Local Open Scope Z_scope.
 
 (* durable-notes: a syscall-altitude goal over [ProcInv.tf_page] carries a
@@ -149,7 +150,7 @@ Qed.
 
 (* ===================================================================== *)
 Section KforkTfLoop.
-  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Notation Ra0 := (mword_of_int 10 : mword 5).

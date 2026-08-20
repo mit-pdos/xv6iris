@@ -227,6 +227,12 @@ Definition wp_sys_pipe_sconf_body
   (* the syscall's own allowance -- two references may be live in locals
      before they reach descriptors.  Both come back. *)
   fd_slot -∗ fd_slot -∗
+  (* FILECLOSE'S LOAN, ONE UNIT IN AND STRAIGHT BACK OUT.  sys_pipe reaches
+     fileclose on three error paths and through pipealloc, and every one of
+     them borrows an iref unit across the call and repays it -- see the note
+     on [SpecFileclose]'s [iref_slot] row.  One unit serves them all, and
+     sys_pipe is net zero. *)
+  iref_slot -∗
   (* THE CLOSING ENVIRONMENT.  sys_pipe closes files it took back out of the
      fd table, and [ProcInv.ofile_slot] quantifies their contents -- so, like
      sys_close, it carries both of fileclose's bundles and hands over
@@ -251,6 +257,7 @@ Definition wp_sys_pipe_sconf_body
       pc_is ret_tgt -∗
       sys_pipe_post γf p pid (upd_upt V P')
         (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
+      iref_slot -∗
       (* the environment back; the page count has moved if either close was
          the pipe's last end *)
       (∃ on', fileclose_pipe_env fn on' 0%nat) -∗
