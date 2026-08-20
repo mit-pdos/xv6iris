@@ -243,6 +243,22 @@ Section FsBundles.
      resource rather than a file-system one, and it was the only conjunct
      that reached back into the process layer.  The two bodies below take
      it as their own premise. *)
+  (* THE THREE RING PAGES ARE A RESOURCE HERE, NOT AN EQUATION (R1).
+     [fsc_desc]/[fsc_avail]/[fsc_used] left [FsCfg.fscfg] because
+     [virtio_disk_init] [kalloc]s them at WP time, so there is no field left
+     for [⌜pd = fsc_desc⌝] to name.  What replaces the three equations is the
+     disk fabric SPELLED AT THE CALLER'S OWN [pd]/[pav]/[pu] -- which is what
+     the equations bought in the first place, and it is the same trade every
+     other row here makes, only one step earlier.
+
+     IT IS A RE-SPELLING, NOT A STRENGTHENING.  [fs_ready] carries
+     [∃ pd pav pu, disk_geom fsc_disk pd pav pu ∗ is_lock fsc_dlock ...], and
+     [⌜γd = fsc_disk⌝] is still here, so a producer discharges the two new
+     rows by unpacking that existential and instantiating this predicate's
+     [pd]/[pav]/[pu] at the witness; conversely a consumer that wants the
+     ambient form gets it back by [FsReady.disk_geom_agree].  The two forms
+     are interderivable, [fs_world_all]'s statement is unchanged, and so is
+     every contract below that takes [pd]/[pav]/[pu] as parameters. *)
   Definition fs_world (γpr γa : gname) (γs : list gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64) (bn : bio_names) (glog : log_names)
@@ -251,11 +267,12 @@ Section FsBundles.
       : iProp Σ :=
     (⌜γpr = fsc_printk⌝ ∗ ⌜γa = fsc_kalloc⌝ ∗
      ⌜γu = fsc_uart⌝ ∗ ⌜γd = fsc_disk⌝ ∗ ⌜γk = fsc_dlock⌝ ∗
-     ⌜pd = fsc_desc⌝ ∗ ⌜pav = fsc_avail⌝ ∗ ⌜pu = fsc_used⌝ ∗
      ⌜bn = fsc_bio⌝ ∗ ⌜glog = icfg_log⌝ ∗ ⌜γfs = fsc_fs⌝ ∗
      ⌜γi = fsc_ireg⌝ ∗ ⌜cn = fsc_ic⌝ ∗ ⌜gtl = fsc_itlock⌝ ∗
      ⌜cov = fsc_cov⌝ ∗ ⌜logstart = fsc_logst⌝ ∗ ⌜inodestart = icfg_ist⌝ ∗
      ⌜nib = icfg_nib⌝ ∗ ⌜dev = icfg_dev⌝ ∗
+     disk_geom γd pd pav pu ∗
+     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) ∗
      FsReady.fs_ready)%I.
 
   Global Instance fs_world_persistent γpr γa γs γu γd γk pd pav pu bn glog
@@ -294,23 +311,51 @@ Section FsBundles.
     ⌜FsReady.fs_geom_ok⌝ ∗ FsReady.fs_sb_cells.
   Proof.
     rewrite /fs_world.
+    (* SIXTEEN equations now, not nineteen, and the disk fabric arrives as
+       two RESOURCES at the caller's own [pd]/[pav]/[pu] (R1).  So the two
+       disk rows of the conclusion come from them rather than from
+       [fs_ready], whose own disk conjunct is the existential this predicate
+       replaced -- and it is dropped ([_] at slot 10). *)
     iIntros "(-> & -> & -> & -> & -> & -> & -> & -> & -> & -> & -> & -> & ->
-              & -> & -> & -> & -> & -> & -> & Hw)".
-    by iApply FsReady.fs_ready_all.
+              & -> & -> & -> & #Hgeom & #Hdlock & Hw)".
+    iDestruct (FsReady.fs_ready_all with "Hw") as
+      "(H1 & H2 & H3 & %H4 & H5 & H6 & H7 & H8 & H9 & _ & H11 & H12 & H13
+        & H14 & H15 & H16 & H17 & %H18 & #H19)".
+    iFrame "H1 H2 H3 H5 H6 H7 H8 H9 Hgeom Hdlock H11 H12 H13 H14 H15 H16 H17
+            H19".
+    iFrame "%".
   Qed.
 
   (* the alias, as a lemma, so a reader need not take the [Definition]'s
-     word for it: at the ambient names, [fs_world] IS [fs_ready]. *)
-  Lemma fs_world_ready γs :
+     word for it: at the ambient names, [fs_world] IS [fs_ready] -- MODULO
+     THE THREE RING PAGES, which are no longer ambient (R1).  That is the
+     whole content of the change, and it is why this is now two one-way
+     lemmas rather than one [⊣⊢]: the pages are universally quantified going
+     down (any [pd] whose [disk_geom] you can show) and existentially coming
+     back (the witness [fs_ready] already holds). *)
+  Lemma fs_world_ready γs pd pav pu :
     fs_world fsc_printk fsc_kalloc γs fsc_uart fsc_disk fsc_dlock
-             fsc_desc fsc_avail fsc_used fsc_bio icfg_log fsc_fs fsc_ireg
+             pd pav pu fsc_bio icfg_log fsc_fs fsc_ireg
              fsc_ic fsc_itlock fsc_cov fsc_logst icfg_ist icfg_nib icfg_dev
-    ⊣⊢ FsReady.fs_ready.
+    ⊢ FsReady.fs_ready.
   Proof.
-    rewrite /fs_world. iSplit.
-    - by iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _
-                   & _ & _ & _ & _ & $)".
-    - iIntros "$". by repeat iSplit.
+    rewrite /fs_world.
+    by iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _
+                 & _ & _ & _ & $)".
+  Qed.
+
+  Lemma fs_ready_world γs :
+    FsReady.fs_ready ⊢
+    ∃ pd pav pu, fs_world fsc_printk fsc_kalloc γs fsc_uart fsc_disk fsc_dlock
+                   pd pav pu fsc_bio icfg_log fsc_fs fsc_ireg
+                   fsc_ic fsc_itlock fsc_cov fsc_logst icfg_ist icfg_nib
+                   icfg_dev.
+  Proof.
+    iIntros "#H".
+    iDestruct (FsReady.fs_ready_disk with "H") as "[_ Hd]".
+    iDestruct "Hd" as (pd pav pu) "[#Hg #Hl]".
+    iExists pd, pav, pu. rewrite /fs_world.
+    iFrame "Hg Hl H". by repeat iSplit.
   Qed.
 
   (* THE CONSUMABLES.  What actually crosses the call and comes back: the

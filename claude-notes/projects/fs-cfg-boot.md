@@ -265,7 +265,25 @@ No conclusion mentions the configuration, so this weakens nothing.
    `bio_init_at`, `icache_boot_at`, `ireg_alloc_at`, `SpecInitlog` at
    `icfg_log`, expose `fs_boot_ghosts`. Additive, no contract changes meaning,
    independent of every ruling above, parallelizable.
-2. **Shrink `fscfg`** (R1) and instantiate the geometry fields (R2).
+2. **Shrink `fscfg`** (R1) — **DONE, whole lane green.** `fscfg` is **16**
+   fields. `fs_ready`/`fs_ready_pre` carry the disk fabric as ONE conjunct,
+   `∃ pd pav pu, disk_geom fsc_disk pd pav pu ∗ is_lock fsc_dlock d_lock
+   "virtio_disk" (disk_res fsc_disk pd pav pu)` (20 / 19 conjuncts). New
+   recovery lemma `FsReady.disk_geom_agree`. The three ties reached
+   `FsSyscalls.fs_world` and `ProofSyscall.sysc_ties` (`sct_pd`/`sct_pav`/
+   `sct_pu`) — NOT a design stop: each bundle keeps its `pd pav pu`
+   parameters and now carries `disk_geom` + the virtio `is_lock` at the
+   caller's own three as RESOURCES where the three ⌜⌝ equations used to be.
+   `fs_world_all`/`sysc_fs_env_all`'s statements are byte-identical, so all
+   eleven syscall arms and both friendly wrappers are untouched; a producer
+   discharges the new rows by unpacking `fs_ready`'s existential and building
+   its own `fn`/parameters at the witness, and `disk_geom_agree` goes the
+   other way, so the two spellings are interderivable. `fs_world_ready`'s
+   `⊣⊢` split into `fs_world_ready` (⊢, `pd pav pu` universal) and
+   `fs_ready_world` (⊢ ∃). One tactic casualty: `sct_dlock` had to leave
+   `sysc_fs_env_all`'s blanket rewrite chain — `fsc_dlock` no longer occurs
+   anywhere in that goal. `adequacy_fscfg` lost three `mword_of_int 0` args.
+   Instantiate the geometry fields (R2) — still open.
 3. **`FsCfgBoot.fs_cfg_alloc`**, wired into `boot_shared_alloc`.
 4. **Restate adequacy**, delete the two `Local Instance`s. Do this WITH 3, not
    later — it is what makes the boot cone's assumption non-vacuous.
@@ -332,10 +350,12 @@ Sail platform axioms (`valid_reservation`, `plat_term_write`,
   on ProofInitlog's internal mint — and `SpecFsinit`'s post must then speak
   `icfg_log` too, or the seal site cannot form `fs_ready`. `wp_fsinit_sconf`
   has no consumer yet, so the reshape is cheap now.
-- Stale counts, corrected here so nobody re-trusts them: `fscfg` is **19**
-  fields (not 18); `fs_ready` is **20** conjuncts (fs_geom_ok + fs_sb_cells
-  landed with the dispatcher increment). `design/fs-ghost-state.md` §7b still
-  says 18 — refresh it at the seal increment.
+- Stale counts, corrected here so nobody re-trusts them: `fscfg` was **19**
+  fields (not 18) and is **16** since R1 landed; `fs_ready` was **21**
+  conjuncts and is **20** since R1 merged the two disk rows into one
+  existential (fs_geom_ok + fs_sb_cells landed with the dispatcher
+  increment). `design/fs-ghost-state.md` §7b still says 18 — refresh it at
+  the seal increment.
 
 ## Still open
 

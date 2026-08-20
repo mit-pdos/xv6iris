@@ -76,15 +76,30 @@ Class fscfg := MkFscfg {
   fsc_uart   : uart_names;
   fsc_disk   : disk_names;
   fsc_dlock  : gname;
-  (* the three virtio ring pages.  These are ADDRESSES, not ghost names,
-     and they are already pinned by the persistent cells inside
-     [DiskInv.disk_geom] ([d_desc_ptr ↦₈□ pd], ...) -- so they could have
-     been recovered from an existential by agreement.  They are here
-     anyway: one door for the whole fs configuration is simpler than two,
-     and it costs nothing. *)
-  fsc_desc   : mword 64;
-  fsc_avail  : mword 64;
-  fsc_used   : mword 64;
+  (* THE THREE VIRTIO RING PAGES ARE NOT HERE, AND THAT IS THE ONE PLACE
+     THIS RECORD DRAWS A LINE (fs-cfg-boot.md, ruling R1).
+
+     They used to be: [fsc_desc]/[fsc_avail]/[fsc_used], the addresses
+     [virtio_disk_init] gets back from three [kalloc]s.  The argument for
+     including them was "one door for the whole fs configuration is simpler
+     than two, and it costs nothing".  It costs exactly one thing, and it is
+     fatal: every field of this record has to have a VALUE at the boot-era
+     [fupd] that allocates the file system's ghost state, and these three do
+     not exist until [virtio_disk_init] runs, which is WP time.  A field
+     cannot be an existential (see the header), so a record that carries
+     them cannot be built at all.
+
+     THE DISTINCTION IS THAT AN EXISTENTIAL IS RECOVERABLE HERE AND WOULD
+     NOT BE FOR A GNAME.  These are ADDRESSES, and they are pinned by the
+     persistent cells inside [DiskInv.disk_geom] ([d_desc_ptr ↦₈□ pd], ...),
+     so any two [disk_geom]s at the same [disk_names] agree on them
+     ([FsReady.disk_geom_agree]).  So [FsReady.fs_ready] quantifies them
+     INSIDE its disk conjuncts -- exactly as [SpecMainSecondary.main_deposit]
+     already does -- and a contract that threads its own [pd]/[pav]/[pu]
+     carries [disk_geom] at them rather than an equation against a field
+     here.  That is a re-spelling, not a weakening: the two forms are
+     interderivable in the presence of [fs_ready].  A gname behind an
+     existential has no such witness, which is why every OTHER field stays. *)
   (* the block layer: the bcache's three scalars and three per-buffer
      families, and the logged-view / dirty / block-ownership ghosts *)
   fsc_bio    : bio_names;

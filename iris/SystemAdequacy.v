@@ -363,7 +363,12 @@ Local Instance adequacy_fscfg : fscfg :=
           (DiskNames 1%positive 1%positive 1%positive 1%positive 1%positive
                      1%positive 1%positive)
           1%positive
-          (mword_of_int 0) (mword_of_int 0) (mword_of_int 0)
+          (* the three virtio ring pages used to be here, as
+             [mword_of_int 0] x3.  They left [fscfg] with fs-cfg-boot.md's
+             ruling R1 -- [virtio_disk_init] [kalloc]s them at WP time, so no
+             boot-era fupd could give the record a value for them, and
+             [FsReady.fs_ready] quantifies them inside its disk conjunct
+             instead.  Sixteen fields now. *)
           (MkBioNames 1%positive 1%positive 1%positive
                       (fun _ => (1%positive, 1%positive))
                       (fun _ => 1%positive) (fun _ => 1%positive))

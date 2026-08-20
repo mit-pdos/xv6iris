@@ -299,9 +299,22 @@ Section FsReady.
      fs_crash_seam fsc_cov fsc_logst ∗
      gen_cert ∗
      dev_inv fsc_uart fsc_disk ∗
-     disk_geom fsc_disk fsc_desc fsc_avail fsc_used ∗
-     is_lock fsc_dlock d_lock "virtio_disk"%string
-             (disk_res fsc_disk fsc_desc fsc_avail fsc_used) ∗
+     (* THE DISK FABRIC, WITH THE THREE RING PAGES QUANTIFIED HERE.
+        [fsc_desc]/[fsc_avail]/[fsc_used] are gone from [fscfg]
+        (fs-cfg-boot.md R1, and FsCfg.v's note where they used to be):
+        [virtio_disk_init] [kalloc]s them at WP time, so no boot-era [fupd]
+        could give the record a value for them.  Quantifying them is sound
+        precisely because they are ADDRESSES pinned by [disk_geom]'s own
+        persistent cells -- [disk_geom_agree] below is the recovery, and
+        [SpecMainSecondary.main_deposit] already carries the pair in exactly
+        this shape.  The two rows are ONE conjunct now because the
+        existential has to scope over both: the lock's resource
+        [disk_res fsc_disk pd pav pu] names the same three pages, and
+        [is_lock] is not covariant in its resource. *)
+     (∃ pd pav pu : mword 64,
+        disk_geom fsc_disk pd pav pu ∗
+        is_lock fsc_dlock d_lock "virtio_disk"%string
+                (disk_res fsc_disk pd pav pu)) ∗
      is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst
                 icfg_nib icfg_dev ∗
      itable_inv ∗
@@ -378,9 +391,11 @@ Section FsReady.
      fs_crash_seam fsc_cov fsc_logst ∗
      gen_cert ∗
      dev_inv fsc_uart fsc_disk ∗
-     disk_geom fsc_disk fsc_desc fsc_avail fsc_used ∗
-     is_lock fsc_dlock d_lock "virtio_disk"%string
-             (disk_res fsc_disk fsc_desc fsc_avail fsc_used) ∗
+     (* the same one conjunct [fs_ready] carries; see the note there *)
+     (∃ pd pav pu : mword 64,
+        disk_geom fsc_disk pd pav pu ∗
+        is_lock fsc_dlock d_lock "virtio_disk"%string
+                (disk_res fsc_disk pd pav pu)) ∗
      is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst
                 icfg_nib icfg_dev ∗
      itable_inv ∗
@@ -409,11 +424,13 @@ Section FsReady.
     iIntros "Hpre Hboot".
     iMod (fs_ready_seal with "Hboot") as "#Hopen".
     iModIntro. rewrite /fs_ready /fs_ready_pre.
+    (* NINETEEN rows now, not twenty: the [disk_geom]/[is_lock] pair is one
+       existentially-quantified conjunct (R1). *)
     iDestruct "Hpre" as "(H1 & H2 & H3 & %H4 & H5 & H6 & H7 & H8 & H9 & H10
-                          & H11 & H12 & H13 & H14 & H15 & H16 & H17 & H18
-                          & %H19 & #H20)".
-    iFrame "H1 H2 H3 H5 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16".
-    iFrame "Hopen H17 H18 H20". iFrame "%".
+                          & H11 & H12 & H13 & H14 & H15 & H16 & H17
+                          & %H18 & #H19)".
+    iFrame "H1 H2 H3 H5 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15".
+    iFrame "Hopen H16 H17 H19". iFrame "%".
   Qed.
 
   (* ...and the converse half a seal site wants to READ BACK: the predicate
@@ -423,9 +440,9 @@ Section FsReady.
   Lemma fs_ready_pre_of : fs_ready -∗ fs_ready_pre.
   Proof.
     rewrite /fs_ready /fs_ready_pre.
-    iIntros "(H1 & H2 & H3 & %H4 & H5 & H6 & H7 & H8 & H9 & H10 & H11 & H12
-              & H13 & H14 & H15 & H16 & _ & H17 & H18 & %H19 & #H20)".
-    iFrame "H1 H2 H3 H5 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 H18 H20".
+    iIntros "(H1 & H2 & H3 & %H4 & H5 & H6 & H7 & H8 & H9 & H10 & H11
+              & H12 & H13 & H14 & H15 & _ & H16 & H17 & %H18 & #H19)".
+    iFrame "H1 H2 H3 H5 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 H19".
     iFrame "%".
   Qed.
 
@@ -476,15 +493,41 @@ Section FsReady.
   Lemma fs_ready_gen : fs_ready -∗ gen_cert.
   Proof. rewrite /fs_ready. by iIntros "(_ & _ & _ & _ & _ & _ & _ & $ & _)". Qed.
 
-  (* the disk fabric, as the three rows every fs contract spells together *)
+  (* THE RECOVERY R1 RESTS ON.  The three ring pages left [fscfg] because
+     [virtio_disk_init] [kalloc]s them at WP time, so [fs_ready] quantifies
+     them -- and this is what makes the existential harmless: the pages are
+     ADDRESSES held in [disk_geom]'s own persistent cells, so any two
+     [disk_geom]s at one [disk_names] agree on all three.  A consumer that
+     threads its own [pd]/[pav]/[pu] and carries [disk_geom] at them (which
+     is how [FsSyscalls.fs_world] and [ProofSyscall.sysc_fs_env] now spell
+     the disk fabric) can therefore always identify them with [fs_ready]'s
+     witness.  Nothing analogous exists for a gname, which is why R1 stops
+     at these three fields. *)
+  (* [γ]'s type is left to inference: [DiskPtsto.disk_names] is not among
+     this file's direct imports, and [disk_geom] fixes it. *)
+  Lemma disk_geom_agree γ (pd pav pu pd' pav' pu' : mword 64) :
+    disk_geom γ pd pav pu -∗ disk_geom γ pd' pav' pu' -∗
+    ⌜pd = pd' /\ pav = pav' /\ pu = pu'⌝.
+  Proof.
+    rewrite /disk_geom.
+    iIntros "(Hd & Ha & Hu & _) (Hd' & Ha' & Hu' & _)".
+    iDestruct (word_pointsto_agree with "Hd Hd'") as %Hd.
+    iDestruct (word_pointsto_agree with "Ha Ha'") as %Ha.
+    iDestruct (word_pointsto_agree with "Hu Hu'") as %Hu.
+    iPureIntro. split_and!; assumption.
+  Qed.
+
+  (* the disk fabric, as the rows every fs contract spells together -- the
+     pages quantified, exactly as the predicate carries them *)
   Lemma fs_ready_disk :
     fs_ready -∗ dev_inv fsc_uart fsc_disk ∗
-                disk_geom fsc_disk fsc_desc fsc_avail fsc_used ∗
-                is_lock fsc_dlock d_lock "virtio_disk"%string
-                        (disk_res fsc_disk fsc_desc fsc_avail fsc_used).
+                (∃ pd pav pu : mword 64,
+                   disk_geom fsc_disk pd pav pu ∗
+                   is_lock fsc_dlock d_lock "virtio_disk"%string
+                           (disk_res fsc_disk pd pav pu)).
   Proof.
     rewrite /fs_ready.
-    by iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & $ & $ & $ & _)".
+    by iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & $ & $ & _)".
   Qed.
 
   (* the icache's four, likewise *)
@@ -495,7 +538,7 @@ Section FsReady.
                 ic_sleeplocks fsc_ic.
   Proof.
     rewrite /fs_ready.
-    by iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _
+    by iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _
                  & $ & $ & $ & $ & _)".
   Qed.
 
@@ -508,7 +551,7 @@ Section FsReady.
     fs_ready -∗ ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib ∗ ireg_open.
   Proof.
     rewrite /fs_ready.
-    by iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _
+    by iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _
                  & $ & $ & _)".
   Qed.
 
@@ -522,7 +565,7 @@ Section FsReady.
     kalloc_avail fsc_kpages None.
   Proof.
     rewrite /fs_ready.
-    by iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & $ & $ & _)".
+    by iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & $ & $ & _)".
   Qed.
 
   Lemma fs_ready_kalloc : fs_ready -∗ kalloc_env fsc_kalloc None.
@@ -536,10 +579,10 @@ Section FsReady.
      premises and four superblock cells free: a caller holding [fs_ready]
      reads them off it, and needs nothing of its own. *)
   Lemma fs_ready_geom : fs_ready -∗ ⌜fs_geom_ok⌝.
-  Proof. rewrite /fs_ready. by iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & $ & _)". Qed.
+  Proof. rewrite /fs_ready. by iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & $ & _)". Qed.
 
   Lemma fs_ready_sb : fs_ready -∗ fs_sb_cells.
-  Proof. rewrite /fs_ready. by iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & $)". Qed.
+  Proof. rewrite /fs_ready. by iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & $)". Qed.
 
   (* the same four cells, spelled one by one -- the form every existing fs
      contract states them in, at [dq := DfracDiscarded]. *)
@@ -566,9 +609,14 @@ Section FsReady.
     log_ctx icfg_log fsc_bio fsc_fs fsc_cov fsc_logst icfg_dev ∗
     fs_crash_seam fsc_cov fsc_logst ∗ gen_cert ∗
     dev_inv fsc_uart fsc_disk ∗
-    disk_geom fsc_disk fsc_desc fsc_avail fsc_used ∗
-    is_lock fsc_dlock d_lock "virtio_disk"%string
-            (disk_res fsc_disk fsc_desc fsc_avail fsc_used) ∗
+    (* ONE row where there were two, and the ring pages quantified (R1).  A
+       body that threads its own three unpacks this and identifies them with
+       [disk_geom_agree], or -- as the two bundles downstream do -- carries
+       [disk_geom] at its own three beside this predicate. *)
+    (∃ pd pav pu : mword 64,
+       disk_geom fsc_disk pd pav pu ∗
+       is_lock fsc_dlock d_lock "virtio_disk"%string
+               (disk_res fsc_disk pd pav pu)) ∗
     is_itable2 fsc_itlock fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst
                icfg_nib icfg_dev ∗ itable_inv ∗
     ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst ∗ ic_sleeplocks fsc_ic ∗
@@ -579,9 +627,9 @@ Section FsReady.
     iIntros "H". iDestruct (fs_ready_kalloc with "H") as "#Hka".
     rewrite /fs_ready.
     iDestruct "H" as "(H1 & H2 & H3 & %H4 & H5 & H6 & H7 & H8 & H9 & H10
-                       & H11 & H12 & H13 & H14 & H15 & H16 & H17 & _ & _
-                       & %H20 & #H21)".
-    iFrame "H1 H2 H3 H5 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 Hka H21".
+                       & H11 & H12 & H13 & H14 & H15 & H16 & _ & _
+                       & %H19 & #H20)".
+    iFrame "H1 H2 H3 H5 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 Hka H20".
     iFrame "%".
   Qed.
 

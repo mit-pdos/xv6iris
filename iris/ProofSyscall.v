@@ -29,12 +29,21 @@
 
        syscall_env γf pj bn fn  =  sysc_proc_env γf ∗ sysc_fs_env pj bn fn
        sysc_fs_env pj bn fn     =  ⌜sysc_ties pj bn fn⌝ ∗ procs_inv (fcn_procs fn)
+                                   ∗ disk_geom (fcn_disk fn) (fcn_pd fn) …
+                                   ∗ is_lock (fcn_dlock fn) … (disk_res …)
                                    ∗ FsReady.fs_ready
 
-   -- twenty-eight EQUATIONS saying the caller's threaded `bn`/`fn` name the
-   ambient file system, and the one predicate that says the file system is
-   ready to operate.  Three consequences, and they are the reason six
-   entries could be wired in one increment:
+   -- twenty-five EQUATIONS saying the caller's threaded `bn`/`fn` name the
+   ambient file system, the disk fabric at `fn`'s three virtio ring pages,
+   and the one predicate that says the file system is ready to operate.
+   (The three ring pages were equations too, until `fs-cfg-boot.md` R1 took
+   `fsc_desc`/`fsc_avail`/`fsc_used` out of `FsCfg.fscfg`: `virtio_disk_init`
+   `kalloc`s them at WP time, so the boot-era fupd that builds the record
+   cannot know them.  `fs_ready` quantifies them and the pair of resources
+   above is what an equation against a field used to buy -- see
+   `sysc_ties`' note.  Interderivable, so nothing below moved.)  Three
+   consequences, and they are the reason six entries could be wired in one
+   increment:
 
    (1) THE UNREACHABLE-WITNESS PROBLEM IS GONE BY CONSTRUCTION.  There is
        exactly one file system per boot ([FsCfg.fscfg]), so a bundle at the
@@ -460,9 +469,17 @@ Record sysc_ties `{ICFG : icfg} `{FSC : fscfg}
   sct_uart       : fcn_uart fn = fsc_uart;
   sct_disk       : fcn_disk fn = fsc_disk;
   sct_dlock      : fcn_dlock fn = fsc_dlock;
-  sct_pd         : fcn_pd fn = fsc_desc;
-  sct_pav        : fcn_pav fn = fsc_avail;
-  sct_pu         : fcn_pu fn = fsc_used;
+  (* [sct_pd]/[sct_pav]/[sct_pu] ARE GONE, and they are the only three
+     equations this record has ever lost.  [fsc_desc]/[fsc_avail]/[fsc_used]
+     left [FsCfg.fscfg] (ruling R1: [virtio_disk_init] [kalloc]s the three
+     ring pages at WP time, so no boot-era [fupd] can give the record a
+     value for them), so there is no field left for an equation to name.
+     [fclose_names] KEEPS [fcn_pd]/[fcn_pav]/[fcn_pu] -- every callee still
+     threads them -- and what pins them is now a RESOURCE rather than an
+     equation: [sysc_fs_env] carries [disk_geom (fcn_disk fn) (fcn_pd fn)
+     ...] and the virtio lock at [fn]'s own three, which is what the three
+     equations were there to buy.  [sysc_fs_env_all]'s statement, and hence
+     every arm below, is unchanged. *)
   (* ---- the inode cache, the region and the log ---- *)
   sct_ireg       : fcn_ireg fn = fsc_ireg;
   sct_ic         : fcn_ic fn = fsc_ic;
@@ -569,6 +586,22 @@ Section SyscallVocab.
         costs nothing and it is what lets an arm instantiate a callee at
         either spelling. *)
      procs_inv (fcn_procs fn) ∗
+     (* THE DISK FABRIC AT [fn]'s OWN THREE PAGES (R1).  This replaces
+        [sysc_ties]' [sct_pd]/[sct_pav]/[sct_pu]: the pages are no longer
+        [fscfg] fields, so [fs_ready] quantifies them
+        ([FsReady.fs_ready]'s disk conjunct) and there is nothing for an
+        equation to point at.  Both rows are Persistent, so the bundle is
+        still held with [#] and still needs no reassembly.
+
+        A PRODUCER PAYS NOTHING NEW.  It holds [fs_ready], unpacks the
+        existential, and builds [fn] with [fcn_pd] at the witness -- [fn] is
+        the producer's own record ([UsertrapRes.un_fn]).  Going the other
+        way, [FsReady.disk_geom_agree] identifies any two.  So the
+        precondition is the SAME precondition, spelled where the pages
+        actually live. *)
+     disk_geom (fcn_disk fn) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) ∗
+     is_lock (fcn_dlock fn) d_lock "virtio_disk"%string
+       (disk_res (fcn_disk fn) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)) ∗
      FsReady.fs_ready)%I.
 
   (* no explicit binder list here -- unlike the Definition above, an
@@ -642,11 +675,14 @@ Section SyscallVocab.
     ⌜printk_gen_contract (kt := KT1) fsc_printk (fcn_uart fn) (fcn_disk fn)⌝ ∗
     printk_env fsc_printk (fcn_uart fn) (fcn_disk fn).
   Proof.
-    iIntros "(%T & #Hprocs & #Hrdy)".
+    (* [Hgeom]/[Hdlock] come out of the BUNDLE now, at [fn]'s own three ring
+       pages, and [fs_ready]'s own disk conjunct -- which quantifies them
+       (R1) -- is dropped ([_] at slot 10 below). *)
+    iIntros "(%T & #Hprocs & #Hgeom & #Hdlock & #Hrdy)".
     iDestruct (FsReady.fs_ready_geom with "Hrdy") as "%G".
     iDestruct (FsReady.fs_ready_all with "Hrdy") as
       "(_ & _ & #Hpr & %Hprg & #Hbio & #Hlog & #Hseam & #Hgen & #Hdevi &
-        #Hgeom & #Hdlock & #Hit & #Hitinv & #Hesc & #Hsl & #Hireg & #Hropen &
+        _ & #Hit & #Hitinv & #Hesc & #Hsl & #Hireg & #Hropen &
         #Hka & _ & _)".
     iDestruct (FsReady.fs_ready_kmem with "Hrdy") as "[#Hkm #Hav]".
     iDestruct (FsReady.fs_ready_sb with "Hrdy") as "(#Hsbn & #Hsbi & #Hsbs & #Hsbb)".
@@ -662,8 +698,15 @@ Section SyscallVocab.
        [sysc_arm_exit]). *)
     rewrite -(sct_bn _ _ _ T) -(sct_fs _ _ _ T) -(sct_cov _ _ _ T)
             -(sct_logstart _ _ _ T) -(sct_bmapstart _ _ _ T) -(sct_size _ _ _ T)
-            -(sct_uart _ _ _ T) -(sct_disk _ _ _ T) -(sct_dlock _ _ _ T)
-            -(sct_pd _ _ _ T) -(sct_pav _ _ _ T) -(sct_pu _ _ _ T)
+            -(sct_uart _ _ _ T) -(sct_disk _ _ _ T)
+            (* [sct_dlock] IS NOT IN THIS CHAIN, and that is R1's doing:
+               [fsc_dlock] used to reach the goal only through [fs_ready]'s
+               [is_lock fsc_dlock … (disk_res fsc_disk fsc_desc …)] row, and
+               that row is now the BUNDLE's own [is_lock (fcn_dlock fn) …].
+               So there is no [fsc_dlock] left anywhere in [Δ] or the
+               conclusion, and the rewrite would fail with "does not match
+               any subterm".  The tie itself stays on the record -- a
+               consumer still reads [fcn_dlock fn = fsc_dlock]. *)
             -(sct_ireg _ _ _ T) -(sct_ic _ _ _ T) -(sct_tlock _ _ _ T)
             -(sct_log _ _ _ T) -(sct_inodestart _ _ _ T) -(sct_nib _ _ _ T)
             -(sct_dev _ _ _ T) -(sct_kmem _ _ _ T) -(sct_kalloc _ _ _ T).
@@ -807,7 +850,9 @@ Section SyscallVocab.
     iDestruct "Hproc" as (γp γw γft γtk)
       "(#Hnextpid & #Hpav & #Hwaitlk & #Hftable & #Htick)".
     iPoseProof "Hfs" as "#Hfsc".
-    iDestruct "Hfsc" as "(_ & _ & #Hrdy)".
+    (* five rows now: the ties, [procs_inv], the two disk rows R1 moved in,
+       and [fs_ready] *)
+    iDestruct "Hfsc" as "(_ & _ & _ & _ & #Hrdy)".
     iDestruct (FsReady.fs_ready_kalloc with "Hrdy") as "#Hkalloc".
     iDestruct (FsReady.fs_ready_printk with "Hrdy") as "[#Hpr _]".
     iExists fsc_kalloc, γp, γw, γft, γtk, fsc_printk, fsc_uart, fsc_disk.
