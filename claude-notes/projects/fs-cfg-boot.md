@@ -503,7 +503,28 @@ Measured facts that supersede this file's earlier estimates:
   (iii) placement nit: `img_slot_in_inode_blocks` names only FsImg
   notions and belongs beside `fs_inode_blocks_range` in FsImg.v — move
   it when convenient.
-- **NEXT (in order):** (d) staging steps 3+4 = the (i)/(ii) items above +
+- **(d1) DONE, commit `c651599c`** — items (i)/(ii): W9 `fs_links_wf` in
+  `fsimg_wf` (ticket counts off `dir_link_at`'s guard verbatim; readings
+  unconditional in z via `fs_link_count_out`; leaf +30 s), `ireg_alloc`
+  stage-B (`W : Z -> nat` premise, decoding slot 3→5 clauses,
+  `image_root_alive` widened to `W z < Z.to_nat nlink`), ticket payout =
+  `link_boot_mint_w` (a SEPARATE `==∗` after `link_boot_split` — the
+  boot-map-split route dies in a >60 s `linkElemUR` conversion, measured;
+  do NOT retry it), `image_dinode_fs_dinode` + `image_link_premises` +
+  `dir_links_of_region` in FsCfgBoot (conclusion byte-identical to
+  `ipool_alloc_of_image`'s premise). Chain: `link_boot_split` →
+  `link_boot_mint_w` → `dir_links_of_region` → `ipool_alloc_of_image`.
+  DEBTS: (A) boot can never hand a plain `ilink` to a DIRECTORY inum — an
+  image with a real subdirectory FAILS W9 by design until the tagged
+  d-unit (`ilinkdp`/`iparent`) gets a boot mint (DirLinks' header charters
+  that for the crash-model effort); (B) `ireg_alloc`'s stage-A premises
+  `image_free_nlink` (L3) / `image_nlink_short` (L4) are still un-swept —
+  `fs_cfg_alloc` needs two more FsImg sweeps (W3 sweeps only live
+  records); (C) traps: `unfold islot` resolves to `IcacheInv.islot` in
+  files importing IcacheInv (qualify `DinodeEnc.islot`); `rewrite … by`
+  inside a `[ … | … ]` bracket does not parse under ssreflect —
+  parenthesize or hoist.
+- **NEXT (in order):** (d2) staging steps 3+4 = the L3/L4 sweeps (debt B) +
   `fileGpreS` +
   `FsCfgBoot.fs_cfg_alloc` + the two kits + wiring into `boot_shared_alloc`
   + the adequacy restatement (delete `adequacy_icfg`/`adequacy_fscfg`, move
