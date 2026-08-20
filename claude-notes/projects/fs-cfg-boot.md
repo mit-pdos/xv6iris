@@ -417,22 +417,47 @@ Measured facts that supersede this file's earlier estimates:
   SystemAdequacy name it in comments only). The `cov` corner is NOT here —
   it names no image fact and belongs with the stocking lemma.
 - NEW `FsImgBridge.v` (imports FsImg + InodeInv/InodeLock/DirView/FsTree,
-  names no literal image, so proof files may import it): (6) `img_blkmap` /
-  `img_slot` + the probe's sections A–E verbatim (`img_inode_ok`,
-  `img_dir_ok`, `img_dir_uniq`, `img_dir_orphan_clean`, `img_dir_dots_ix`,
-  …); measured ~1.7 s.
-- `IcacheBoot.v` or the new `FsCfgBoot.v`: (7) `ipool_alloc_of_image` — the
-  generic stocking lemma, all image facts as pure premises, per-inum
-  discharge = one application of (6) inside `big_sepS_mono` so the big-op is
-  built by induction and never unfolded at the fupd's altitude; (8)
-  `inode_blocks_of_blocks` — the resource reindexing from
-  `[∗ set] b ∈ used, fsblock ∗ blk_own` to `inode_blocks γfs (img_blkmap …)
-  (fs_data_of …)`; 24 × 268 big-op elements, 998 nontrivial — **UNMEASURED,
-  probe it before writing the stocking lemma** (this is where the 106 s
-  `iFrame` warning lives: induct over `seq 0 MAXFILE`, `iExact`, never
-  `iFrame`).
-- `FsImgCheck.v`: the `= true` instantiations of (1)/(3)/(4) at
-  `fsimg_P`/`fsimg_sb` (+~25 s) plus the `cov` corner (0 s).
+  names no literal image, so proof files may import it): (6) `img_blkmap` +
+  the probe's sections A–E verbatim (`img_inode_ok`, `img_dir_ok`,
+  `img_dir_uniq`, `img_dir_orphan_clean`; §E4 disappears — FsImg's
+  `fs_dots_wf_ok` already concludes `dir_dots_ix`; alias `img_slot :=
+  FsImg.fs_slot`), PLUS `img_slot_in_inode_blocks` (probe 2's new fact: a
+  nonzero slot of an inode is in `fs_inode_blocks P dn`, W4's summand —
+  0.2 s, generic in nb); measured ~1.9 s total.
+- **Item (8) is MEASURED — probe 2 verdict GO, and it is O(1), not the
+  106 s hazard.** The reindexing never unfolds `seq 0 MAXFILE`: ONE generic
+  induction over an abstract index list does all 269 case splits (0.185 s);
+  nb=1 and nb=199 leaves cost the same 0.002 s; all of item (8) tracked
+  ≈0.75 s. It belongs in **`InodeInv.v`** (it needs no cov/logstart/image,
+  only injectivity), as THREE lemmas: `big_sepS_reindex` (reindex+mono in
+  one pass, two pointwise premises: `f i = 0 → True ⊢ Psi i` and
+  `f i ≠ 0 → Phi (f i) ⊢ Psi i`), `inode_blocks_of_slots` (Psi :=
+  `inode_blocks`' own body), `inode_blocks_of_blocks` (premises = slot
+  injectivity + nonzero-slot-∈-U + `data i = ct (blkmap_get bm i)` +
+  the `ind_bytes` row; conclusion `([∗ set] b ∈ U, fsblock ∗ blk_own) -∗
+  inode_blocks ∗ ind_res`; internally `big_sepS_delete` the indirect block
+  FIRST, then reindex — the alternative forces a `decide` guard on
+  callers). The 106 s `iFrame` warning stays live only for CONSUMERS of
+  `ipool_alloc`'s bundle, not for building it. Working proofs of all of
+  this are in untracked `iris/ZZProbeInodeBlocks.v` — PORT, don't rewrite.
+- Also from probe 2: `fs_inode_blocks_disjoint` in **`FsImg.v`** (pairwise
+  disjointness of the live inodes' block sets off W4's NoDup; ⊆-half is
+  `fs_used_blocks_inode`, FsImg.v:1017; no new vm_compute) — the carve
+  needs it. `big_sepS_carve` (24-fold partition with remainder kept) goes
+  in **`FsBoot.v`** beside the existing `big_sepS_split_sub` (FsBoot.v:372
+  — reuse it, don't re-add). `fs_boot_ghosts` hands `fsblock`/`blk_own`
+  UNPAIRED — pair once with `big_sepS_sep_2` in `fs_cfg_alloc`, not per
+  inode. `fs_blocks`-vs-`P` is a non-issue (`fsimg_P := fs_blocks fsimg_dk`
+  definitionally; state the stocking lemma at `P := fs_blocks dk` and
+  `data i = …` falls out of `fs_data_of_addr`). Inums 1 and 2 have
+  `bm_ind = 0` derivable from `fs_inode_ok` + size (no round-trip needed).
+- `FsCfgBoot.v` (NEW, stage 3's home): (7) `ipool_alloc_of_image` — the
+  generic stocking lemma, all image facts as pure premises, the live set
+  `A` a parameter with its membership characterisation, per-inum discharge
+  = one application of (6)+(8) inside `big_sepS`/`big_sepL` mono; the fupd
+  never sees an unfolded big-op.
+- `FsImgCheck.v`: DONE for (1)/(3)/(4) (commit `eb820d1a`); the `cov`
+  corner rides with the stocking lemma.
 
 ## Execution state (2026-08-20, for the next session)
 
