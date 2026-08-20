@@ -1153,6 +1153,22 @@ Qed.
 Definition uvm_np (sz : mword 64) : nat :=
   Z.to_nat ((uint sz + 4095) / 4096).
 
+(* the run uvmcopy/uvmfree walk IS the live region at that size: its page
+   count times 4096 is the view's PGROUNDUP. *)
+Lemma uvm_np_live (sz : mword 64) :
+  (4096 * Z.of_nat (uvm_np sz) = UserPtTree.pgroundup (uint sz))%Z.
+Proof.
+  unfold uvm_np, UserPtTree.pgroundup.
+  pose proof (bv_unsigned_in_range 64 sz) as [Hs0 _].
+  set (x := uint sz).
+  assert (Hx0 : (0 <= x)%Z)
+    by (unfold x; rewrite uint_unsigned; exact Hs0).
+  assert (Hq0 : (0 <= (x + 4095) / 4096)%Z).
+  { pose proof (Z.div_mod (x + 4095) 4096 ltac:(lia)) as Hd.
+    pose proof (Z.mod_pos_bound (x + 4095) 4096 ltac:(lia)) as Hm. lia. }
+  rewrite (Z2Nat.id _ Hq0). lia.
+Qed.
+
 (* THE REUSABLE PGROUNDUP FACT: masking the low 12 bits off cannot change a
    division by 4096, so PGROUNDUP's quotient IS the raw sum's quotient.
    UNCONDITIONAL -- [pgd_unsigned] reads [uint (pgroundup x)] as [a - a mod
@@ -3553,6 +3569,15 @@ Section ProcPt.
     ⌜forall va, is_Some (M !! va) <-> (uva_mapped P va \/ uva_live sz va)⌝.
   Proof.
     iIntros "H". iDestruct "H" as (Mp) "(_ & %H & _ & _)".
+    iPureIntro. exact H.
+  Qed.
+
+  Lemma proc_ptm_zero (P : uptd) (sz : Z) (M : gmap Z (bv 8)) :
+    proc_ptm P sz M -∗
+    ⌜forall va : Z, ~ uva_mapped P va -> uva_live sz va ->
+       M !! va = Some (bv_0 8)⌝.
+  Proof.
+    iIntros "(_ & _ & Hm)". iDestruct "Hm" as (Mp) "(_ & _ & %H & _)".
     iPureIntro. exact H.
   Qed.
 
