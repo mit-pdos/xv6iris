@@ -247,6 +247,43 @@ Proof.
     [lia | cbv [fsimg_sb sb_ninodes]; lia | lia].
 Qed.
 
+(* ---- the region's LINK counts: [ireg_alloc]'s stage-A premises -------- *)
+
+(* L3 and L4 ([IcacheBoot.image_free_nlink] / [image_nlink_short]) are the
+   two claims no W conjunct carries -- W3 skips a type-0 record entirely,
+   so the free records' [nlink]s are unswept, and nothing bounds [nlink]
+   above.  Region-wide, for the reason [FsImg.fs_region_nlink]'s header
+   gives: the tail's L3 cannot be recovered from [fs_region_free] (that
+   would be circular) and L4 is about arbitrary bytes.  Same thirteen
+   inode blocks as [fsimg_region_free]; measured together below. *)
+Lemma fsimg_region_nlink : fs_region_nlink fsimg_P fsimg_sb 13 = true.
+Proof. vm_compute. reflexivity. Qed.
+
+(* THE ONE REGION-WIDE HYPOTHESIS [FsCfgBoot.fs_cfg_alloc] takes beside
+   [fsimg_wf_ok]: the tail's type plus L3/L4 over the whole region. *)
+Lemma fsimg_region_wf : fs_region_wf fsimg_P fsimg_sb 13 = true.
+Proof.
+  unfold fs_region_wf.
+  rewrite fsimg_region_free, fsimg_region_nlink. reflexivity.
+Qed.
+
+Lemma fsimg_free_nlink (z : Z) :
+  0 <= z < 208 ->
+  bv_unsigned (di_type (fs_dinode fsimg_P fsimg_sb z)) = 0 ->
+  bv_unsigned (di_nlink (fs_dinode fsimg_P fsimg_sb z)) = 0.
+Proof.
+  intros Hz.
+  apply (fs_region_nlink_free fsimg_P fsimg_sb 13 z fsimg_region_nlink). lia.
+Qed.
+
+Lemma fsimg_nlink_short (z : Z) :
+  0 <= z < 208 ->
+  bv_unsigned (di_nlink (fs_dinode fsimg_P fsimg_sb z)) <= 32767.
+Proof.
+  intros Hz.
+  apply (fs_region_nlink_short fsimg_P fsimg_sb 13 z fsimg_region_nlink). lia.
+Qed.
+
 (* ---- WHICH inums are live, as ONE set ------------------------------- *)
 
 (* [FsImg.fs_live_set] is the [A] of the stocking split [R = A ⊎ (R ∖ A)].

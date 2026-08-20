@@ -1085,6 +1085,93 @@ Proof.
   rewrite (proj2 (Z.ltb_ge _ _) Hlo) in Hk. exact Hk.
 Qed.
 
+(* **THE TWO CLAUSES W3 CANNOT CARRY (fs-cfg-boot.md (d1) debt B).**
+   [IcacheBoot.ireg_alloc]'s stage-A image premises are
+   [image_free_nlink] (L3: a type-0 record has [nlink = 0]) and
+   [image_nlink_short] (L4: every [nlink] is a non-negative short), and
+   NEITHER is a reading of any W conjunct: W3 ([fs_inodes_wf]) skips a
+   type-0 record entirely, so it says nothing about the free records'
+   link counts, and no clause anywhere bounds [nlink] above.
+
+   THEY RUN OVER THE WHOLE REGION, NOT OVER [seq 0 ninodes], and that is
+   forced rather than chosen.  [ireg_alloc] states both at every
+   [z ∈ region_inums nib], i.e. over [16 * nib] records; the tail
+   [[ninodes, 16*nib)] is covered for the TYPE by [fs_region_free] above,
+   but a type-0 tail record's [nlink] is exactly what L3 is about, so
+   deriving L3 in the tail from [fs_region_free] is circular, and L4 is
+   about arbitrary bytes.  Hence: one sweep of the region, in
+   [fs_region_free]'s own idiom and reading the same thirteen inode
+   blocks.  It cannot be an [fsimg_wf] conjunct because [fsimg_wf] does
+   not take [nib].
+   Both clauses ride in ONE sweep so the region's records are decoded
+   once (measured: [fs_region_free] alone is 0.44 s at the literal
+   image). *)
+Definition fs_region_nlink (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat)
+  : bool :=
+  List.forallb
+    (fun i => let z := Z.of_nat i in
+              let dn := fs_dinode P sb z in
+              (if bv_unsigned (di_type dn) =? 0
+               then bv_unsigned (di_nlink dn) =? 0
+               else true) &&
+              (bv_unsigned (di_nlink dn) <=? 32767))
+    (seq 0 (16 * nib)%nat).
+
+Local Lemma fs_region_nlink_at (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat)
+    (z : Z) :
+  fs_region_nlink P sb nib = true -> 0 <= z < 16 * Z.of_nat nib ->
+  (if bv_unsigned (di_type (fs_dinode P sb z)) =? 0
+   then bv_unsigned (di_nlink (fs_dinode P sb z)) =? 0
+   else true) = true
+  /\ (bv_unsigned (di_nlink (fs_dinode P sb z)) <=? 32767) = true.
+Proof.
+  intros H Hz.
+  pose proof (forallb_seq _ (16 * nib)%nat (Z.to_nat z) H ltac:(lia)) as Hk.
+  cbv beta zeta in Hk. rewrite Z2Nat.id in Hk by lia.
+  apply andb_true_iff. exact Hk.
+Qed.
+
+(* L3, at the region's width *)
+Lemma fs_region_nlink_free (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat)
+    (z : Z) :
+  fs_region_nlink P sb nib = true -> 0 <= z < 16 * Z.of_nat nib ->
+  bv_unsigned (di_type (fs_dinode P sb z)) = 0 ->
+  bv_unsigned (di_nlink (fs_dinode P sb z)) = 0.
+Proof.
+  intros H Hz Hty.
+  destruct (fs_region_nlink_at P sb nib z H Hz) as [H1 _].
+  rewrite (proj2 (Z.eqb_eq _ _) Hty) in H1. apply Z.eqb_eq. exact H1.
+Qed.
+
+(* L4, at the region's width *)
+Lemma fs_region_nlink_short (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat)
+    (z : Z) :
+  fs_region_nlink P sb nib = true -> 0 <= z < 16 * Z.of_nat nib ->
+  bv_unsigned (di_nlink (fs_dinode P sb z)) <= 32767.
+Proof.
+  intros H Hz.
+  destruct (fs_region_nlink_at P sb nib z H Hz) as [_ H2].
+  apply Z.leb_le. exact H2.
+Qed.
+
+(* **THE ONE REGION-WIDE HYPOTHESIS.**  [fsimg_wf] cannot see [nib], so the
+   region's three claims (the tail's type, and L3/L4 everywhere) cannot be
+   conjuncts of it; they are collected here instead so that
+   [FsCfgBoot.fs_cfg_alloc] takes exactly TWO image hypotheses --
+   [fsimg_wf P sb = true] and [fs_region_wf P sb nib = true] -- rather than
+   three.  [fs_region_free] keeps its own name and spec: it is already
+   [FsCfgBoot.ipool_alloc_of_image]'s premise. *)
+Definition fs_region_wf (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat)
+  : bool := fs_region_free P sb nib && fs_region_nlink P sb nib.
+
+Lemma fs_region_wf_free (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat) :
+  fs_region_wf P sb nib = true -> fs_region_free P sb nib = true.
+Proof. unfold fs_region_wf. rewrite andb_true_iff. tauto. Qed.
+
+Lemma fs_region_wf_nlink (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat) :
+  fs_region_wf P sb nib = true -> fs_region_nlink P sb nib = true.
+Proof. unfold fs_region_wf. rewrite andb_true_iff. tauto. Qed.
+
 (* **THE LIVE SET, AS AN OBJECT.**  The stocking of the inode pool splits
    the region as [R = A ⊎ (R ∖ A)] with [A] the ALLOCATED inums; the split
    needs [A] as one [gset] with a membership law, not 208 separate

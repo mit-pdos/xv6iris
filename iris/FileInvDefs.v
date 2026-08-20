@@ -375,6 +375,44 @@ Global Instance subG_fileΣ {Σ} `{ICFG : icfg} `{FSC : fscfg} :
   subG fileΣ Σ -> fileG Σ.
 Proof. solve_inG. Qed.
 
+(* ---- THE CAPACITY-ONLY HALF (fs-cfg-boot.md stage 3) ------------------
+   [fileG] is not obtainable before boot runs, and that is the whole
+   obstruction the boot-era allocation exists to remove: its only
+   constructors are [subG_fileΣ] -- which needs an AMBIENT [icfg] and
+   [fscfg], i.e. two records nothing in the tree ever produced -- or a
+   section binder.  So a boot fupd that wants to MINT the two records has
+   nowhere to stand: the instance it is supposed to build is a premise of
+   its own statement.
+
+   [fileGpreS] is the way out, and it is [BootShared.boot_shared_alloc]'s
+   own move for [fdslotG]/[irefslotG]/[pavG] applied once more: the class
+   splits into the CAMERA (which the [gFunctors] fixes once, before any
+   fupd) and the two per-boot VALUES (which the era fupd chooses).
+   [FsCfgBoot.fs_cfg_alloc] runs at [fileGpreS], returns [icfg] and [fscfg]
+   existentially, and the caller reassembles [fileG] with [fileG_of] below.
+
+   [file_preG] is deliberately NOT declared as an instance ([::]).  If it
+   were, a context holding both [fileGpreS Σ] and [fileG Σ] -- which the
+   wiring site does hold, since it builds the latter from the former --
+   would have TWO resolution paths to [inG Σ fileUR], the exact hazard
+   this file's header records for the capacity classes that moved to
+   [Xv6G.xv6G] ("two instance paths print identically and do not unify").
+   Nothing needs it as an instance: the one consumer is [fileG_of].
+
+   [subG_fileΣ] and [fileG] itself are UNTOUCHED here; retiring the former
+   is stage 4's business, not this file's. *)
+Class fileGpreS (Σ : gFunctors) := FileGpreS { file_preG : inG Σ fileUR }.
+
+Global Instance subG_fileGpreS {Σ} : subG fileΣ Σ -> fileGpreS Σ.
+Proof. solve_inG. Qed.
+
+(* THE CONSTRUCTOR.  [fileG] = capacity + the two records, so the boot
+   fupd's existentials plug straight in.  Applied EXPLICITLY at the wiring
+   site (fs-cfg-boot.md stage 4: "this is an application, not an
+   elaboration"), which is what keeps the double-path trap shut. *)
+Definition fileG_of {Σ} (FGP : fileGpreS Σ) (ICFG : icfg) (FSC : fscfg)
+  : fileG Σ := @FileG Σ (@file_preG Σ FGP) ICFG FSC.
+
 (* The immutable-while-referenced content of a [struct file]: every field but
    [ref] AND [off].
 

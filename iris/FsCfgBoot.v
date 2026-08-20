@@ -36,10 +36,15 @@ From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.algebra Require Import auth gmap frac excl.
-From iris.base_logic.lib Require Import invariants own ghost_map ghost_var.
+From iris.base_logic.lib Require Import invariants own ghost_map ghost_var mono_nat.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvPtsto RiscvModelBytes.
+(* the four name records [fscfg] carries and this file must be able to spell *)
+Require Import WpUart.         (* [uart_names]  *)
+Require Import VirtioModel.    (* [disk_read]    *)
+Require Import DiskPtsto.      (* [disk_names]  *)
+Require Import BioDefs.        (* [bio_names]   *)
 Require Import FsBlocks.
 Require Import BlockWords.
 Require Import DinodeEnc.
@@ -47,7 +52,14 @@ Require Import DirView.
 Require Import DirLinks.
 Require Import FsTree.
 Require Import FsCrash.
+Require Import LogDefs.
 Require Import LogInv.
+(* the era fupd's gname-only mints: the four spinlock ghosts, the buffer
+   cache's whole ghost record, the page allocator's count/seal pair *)
+Require Import WpLockAt.
+Require Import SleepLock.      (* [sl_free_tok] / [slh_auth]: [icfg_isl]'s pair *)
+Require Import BioInitAt.
+Require Import KallocInv.
 Require Import InodeInv.
 Require Import InodeLock.
 Require Import InodeRegion.
@@ -58,6 +70,7 @@ Require Import IcacheBoot.
 Require Import FsBoot.
 Require Import FsImg.
 Require Import FsImgBridge.
+Require Import FsCfg.          (* the record this file finally gives a value *)
 Require Import Xv6G.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 
@@ -168,8 +181,20 @@ Section FsCfgBootPool.
      directory, which [ireg_alloc]'s all-plain ledger premise
      ([link_auth z 0 ...]) cannot coexist with.  Nothing is improvised for
      it here. *)
+  (* [C] IS THE RESOURCE SET, AND IT IS NOT [cov].  The pool's LOGICAL
+     coverage is [cov] ([inode_ok]'s [blkmap_wf] is stated at it and the
+     pool carries it), but the blocks this lemma is HANDED cannot be all of
+     [cov]: [IcacheBoot.ireg_alloc] must run FIRST (it is what pays out the
+     [ireg_out] fragments below) and it CONSUMES the inode region's
+     [fsblock] halves, and the log region's and block 1's go to fsinit.
+     So the era fupd peels those off [cov] and passes the rest as [C]; the
+     only thing the carve needs of [C] is that it holds the DATA region,
+     which is [HcovC] and which the geometry makes free.  Stated with two
+     coverage premises rather than [C ⊆ cov] because neither direction of
+     inclusion is used: [Hcov] feeds [img_inode_ok], [HcovC] feeds the
+     carve. *)
   Lemma ipool_alloc_of_image (γfs : fs_names) (γi : gname)
-      (P : Z -> list (bv 8)) (sb : fs_sb) (cov A : gset Z) :
+      (P : Z -> list (bv 8)) (sb : fs_sb) (cov C A : gset Z) :
     (* W1-W8, at an arbitrary image *)
     fsimg_wf P sb = true ->
     (* the [ninodes, 16*nib) tail of the inode region, which no W clause
@@ -187,6 +212,9 @@ Section FsCfgBootPool.
        thing the block layer's [cov] parameter owes the file system, and
        [blkmap_wf]'s home-block clause is what needs it. *)
     (forall b : Z, fs_data_start sb <= b < sb_size sb -> b ∈ cov) ->
+    (* ...and the same corner for the RESOURCE set: the carve cuts each live
+       inode's block set out of [C], so [C] must hold the data region. *)
+    (forall b : Z, fs_data_start sb <= b < sb_size sb -> b ∈ C) ->
     (* the three uncached ledger columns, at [IcacheRef]'s boot splits' own
        keys (plain [Z] over the region; [region_key_shift] is the bridge to
        the pool's [mword] round trip) *)
@@ -199,14 +227,15 @@ Section FsCfgBootPool.
        ireg_out γi (mword_of_int z : mword 32) (fs_dinode P sb z)) -∗
     ([∗ set] z ∈ A, dir_links z (fs_dinode P sb z)
                       (fs_data_of P (fs_dinode P sb z))) -∗
-    (* [fs_boot_ghosts]' two block big-ops, UNPAIRED as it hands them over *)
-    ([∗ set] b ∈ cov, fsblock γfs b (P b)) -∗
-    ([∗ set] b ∈ cov, blk_own γfs b) -∗
+    (* [fs_boot_ghosts]' two block big-ops, UNPAIRED as it hands them over,
+       and cut down to [C] by the era fupd's own peels *)
+    ([∗ set] b ∈ C, fsblock γfs b (P b)) -∗
+    ([∗ set] b ∈ C, blk_own γfs b) -∗
     ipool γfs γi cov (sb_logstart sb) (region_inums icfg_nib)
-      ∗ ([∗ set] b ∈ cov ∖ fs_live_blocks P sb A,
+      ∗ ([∗ set] b ∈ C ∖ fs_live_blocks P sb A,
            fsblock γfs b (P b) ∗ blk_own γfs b).
   Proof.
-    iIntros (Hwf Hrf Hfull Hnin Hnib HA Hcov)
+    iIntros (Hwf Hrf Hfull Hnin Hnib HA Hcov HcovC)
             "Hcnt Hmir Hoff Hout Hdlk Hfsb Hown".
     (* ---- the pure preliminaries, all from the sweeps' lookup specs --- *)
     pose proof (fsimg_wf_sb P sb Hwf) as Hsb.
@@ -244,9 +273,9 @@ Section FsCfgBootPool.
                  ltac:(lia) ltac:(lia) ltac:(lia)). }
     (* the carve's two premises *)
     assert (Hsub : forall i : Z, i ∈ elements A ->
-              fs_inode_blocks_set P sb i ⊆ cov).
+              fs_inode_blocks_set P sb i ⊆ C).
     { intros i Hi. apply elem_of_elements in Hi.
-      exact (fs_inode_blocks_set_sub P sb i cov (Hok i Hi) Hcov). }
+      exact (fs_inode_blocks_set_sub P sb i C (Hok i Hi) HcovC). }
     assert (Hdisj : forall i j : Z, i ∈ elements A -> j ∈ elements A ->
               i <> j ->
               fs_inode_blocks_set P sb i ## fs_inode_blocks_set P sb j).
@@ -266,7 +295,7 @@ Section FsCfgBootPool.
     rewrite /fs_live_blocks.
     iDestruct (big_sepS_carve
                  (fun b => fsblock γfs b (P b) ∗ blk_own γfs b)%I
-                 cov (elements A) (fs_inode_blocks_set P sb)
+                 C (elements A) (fs_inode_blocks_set P sb)
                  (NoDup_elements A) Hsub Hdisj with "Hblk") as "[Hpc Hrem]".
     iSplitR "Hrem"; [| iExact "Hrem"].
     iDestruct (big_sepS_of_elements
@@ -617,4 +646,597 @@ Section FsCfgBootPool.
     - intros z. unfold fs_link_count. lia.
   Qed.
 
+  (* **ALL FIVE CLAUSES OF [ireg_alloc]'s DECODING SLOT**, which is what
+      [fs_cfg_alloc] actually has to hand over.  [image_link_premises] above
+      supplies the three STAGE-B ones; the two STAGE-A ones (fs-cfg-boot.md
+      (d1) debt B) are (L3) [image_free_nlink] and (L4) [image_nlink_short],
+      and they are NOT readings of [fsimg_wf]: W3 skips a type-0 record
+      entirely, so the free records' link counts are unswept, and nothing
+      bounds [nlink] above.  They come off the region-wide sweep
+      [FsImg.fs_region_nlink] instead -- region-wide because [ireg_alloc]
+      states both over [region_inums nib] and the [[ninodes, 16*nib)] tail's
+      (L3) cannot be recovered from [fs_region_free] without circularity
+      (that clause is about a type-0 record's [nlink], which is exactly what
+      (L3) says).  The conjunction's ORDER is [ireg_alloc]'s own. *)
+  Lemma image_ireg_premises (P : Z -> list (bv 8)) (sb : fs_sb)
+      (dss : list (list dinode)) (nib : nat) :
+    fsimg_wf P sb = true -> fs_region_wf P sb nib = true ->
+    length dss = nib -> Forall diblk_wf dss ->
+    (forall bi : nat, (bi < nib)%nat ->
+       P (FsImg.sb_inodestart sb + Z.of_nat bi) = diblk_bytes (dss !!! bi)) ->
+    16 * Z.of_nat nib <= 2 ^ 32 ->
+    image_free_nlink dss nib /\ image_nlink_short dss nib /\
+    image_root_alive (fs_link_count P sb) dss nib /\
+    image_link_le (fs_link_count P sb) dss nib
+    /\ image_dir_wl0 (fs_link_count P sb) dss nib.
+  Proof.
+    intros Hwf Hrw Hl Hdwf He Hnib.
+    assert (Hbr : forall z : Z, z ∈ region_inums nib ->
+              image_dinode dss z = fs_dinode P sb z).
+    { intros z Hz. apply region_inums_spec in Hz.
+      exact (image_dinode_fs_dinode P sb dss nib z Hl Hdwf He Hz Hnib). }
+    split.
+    { intros z Hz Hty. rewrite (Hbr z Hz). rewrite (Hbr z Hz) in Hty.
+      apply region_inums_spec in Hz.
+      exact (fs_region_nlink_free P sb nib z (fs_region_wf_nlink _ _ _ Hrw)
+               Hz Hty). }
+    split.
+    { intros z Hz. rewrite (Hbr z Hz). apply region_inums_spec in Hz.
+      exact (fs_region_nlink_short P sb nib z (fs_region_wf_nlink _ _ _ Hrw)
+               Hz). }
+    (* [image_link_premises] lists them in ITS order; [ireg_alloc]'s slot
+       wants root-alive first. *)
+    destruct (image_link_premises P sb dss nib Hwf Hl Hdwf He Hnib)
+      as (Hle & Hw0 & Hrt).
+    split; [exact Hrt |]. split; [exact Hle | exact Hw0].
+  Qed.
+
 End FsCfgBootPool.
+
+(* ====================================================================== *)
+(*  THE INODE REGION'S BLOCKS, AS A SET                                    *)
+(* ====================================================================== *)
+
+(*  [IcacheBoot.ireg_alloc] wants the region's [fsblock] halves as a
+    [[∗ list] bi ∈ seq 0 nib]; [FsBoot.fs_boot_ghosts] hands out a
+    [[∗ set] b ∈ cov].  This is the set the era fupd peels off [cov] for it,
+    and [ireg_blk_of_set] below is the one conversion.  ([LogDefs] already
+    has the log region's twin, [log_region_set].)                          *)
+Definition ireg_blk_set (ist : Z) (nib : nat) : gset Z :=
+  list_to_set ((fun bi : nat => ist + Z.of_nat bi) <$> seq 0 nib).
+
+Lemma ireg_blk_list_nodup (ist : Z) (nib : nat) :
+  base.NoDup ((fun bi : nat => ist + Z.of_nat bi) <$> seq 0 nib).
+Proof.
+  apply NoDup_fmap_2_strong; [intros x y _ _ H; lia | apply NoDup_seq].
+Qed.
+
+Lemma ireg_blk_set_spec (ist : Z) (nib : nat) (b : Z) :
+  b ∈ ireg_blk_set ist nib <-> ist <= b < ist + Z.of_nat nib.
+Proof.
+  rewrite /ireg_blk_set elem_of_list_to_set elem_of_list_fmap. split.
+  - intros (bi & -> & Hbi). apply elem_of_seq in Hbi. lia.
+  - intros Hb. exists (Z.to_nat (b - ist)).
+    split; [lia | apply elem_of_seq; lia].
+Qed.
+
+(*  THE BLOCKS THE ERA FUPD SPENDS, as one set, so that
+    [fs_kit_fsinit_ghost]'s coverage remainder is statable: block 1 (to
+    fsinit), the log region (to initlog), the inode region (into
+    [ireg_inv]), and every live inode's own blocks (into the pool).  The
+    BITMAP BLOCK is deliberately NOT here -- it stays in the remainder, see
+    [fs_kit_fsinit_ghost]'s header row (D).                                *)
+Definition fs_kit_spent (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat)
+    (A : gset Z) : gset Z :=
+  ({[ (1:Z) ]} ∪ log_region_set (sb_logstart sb)
+     ∪ ireg_blk_set (FsImg.sb_inodestart sb) nib)
+  ∪ fs_live_blocks P sb A.
+
+
+(* ====================================================================== *)
+(*  THE TWO BOOT KITS (ruling R6), GHOST ROWS ONLY                         *)
+(* ====================================================================== *)
+
+Section FsCfgBootEra.
+  Context `{!riscvGS Σ, !xv6G Σ, !irefslotG Σ}.
+  Context `{GEN : GenId}.
+
+  (* ---- two list/set conversions the era fupd needs -------------------- *)
+
+  Lemma ireg_blk_of_set (Phi : Z -> iProp Σ) (ist : Z) (nib : nat) :
+    ([∗ set] b ∈ ireg_blk_set ist nib, Phi b)
+    ⊢ [∗ list] bi ∈ seq 0 nib, Phi (ist + Z.of_nat bi).
+  Proof.
+    rewrite /ireg_blk_set
+            (big_sepS_list_to_set Phi _ (ireg_blk_list_nodup ist nib)).
+    rewrite big_sepL_fmap //.
+  Qed.
+
+  Lemma region_of_seq (Phi : Z -> iProp Σ) (nib : nat) :
+    ([∗ list] k ∈ seq 0 (16 * nib), Phi (Z.of_nat k))
+    ⊢ [∗ set] z ∈ region_inums nib, Phi z.
+  Proof.
+    rewrite /region_inums
+            (big_sepS_list_to_set Phi _ (region_list_nodup nib)).
+    rewrite big_sepL_fmap //.
+  Qed.
+
+  (* ==================================================================== *)
+  (*  KIT 1 -- WHAT main SPENDS BEFORE +0x9e                               *)
+  (* ==================================================================== *)
+
+  (*  Consumed by [IcacheBoot.icache_boot_at] (after iinit, main+0x92),
+      [BioInitAt.bio_init_at] (on binit's post, main+0x8e) and the four
+      [WpLockAt.newlock_at]s (kmem / virtio_disk / itable / pr) that
+      [ProofMain.mn_grp_fs] runs between +0x8e and +0xa2.  ONE opaque
+      definition at the ambient names, [FsReady.fs_ready]'s own argument
+      applied to the boot side; open it with [fs_kit_icache_open].
+
+      *** WHAT (d2b) MUST ADJOIN, AND FROM WHERE ***  Every row below is a
+      GHOST row, because [fs_cfg_alloc] holds no memory at all.  The
+      PHYSICAL halves of the same three constructors join at the assembly
+      site, and none of them can come from here:
+
+        (P1) [icache_boot_at]'s five physical premises -- [itable_lock ↦₄ 0],
+             [lock_name itable_lock "itable"], [lock_cpu itable_lock ↦₈ 0],
+             the fifty [SleepLock.sl_fresh (i_lock (ientry k)) "inode"] and
+             the fifty [IcacheInv.ientry_raw k].  Producer:
+             [BootShared.boot_bss_carve]'s .bss rows plus iinit's own
+             postcondition (the [sl_fresh]es exist only after [iinit] runs,
+             fs-cfg-boot.md "What must NOT move here").
+        (P2) [bio_init_at]'s physical premises -- [bcache_addr ↦₄ 0], its
+             name and cpu cells, the thirty [sl_fresh (buf_lock (bnode k))]
+             and the thirty zeroed [struct buf] rows, and
+             [BcacheInv.bcache_lru bhead (blist 0 NBUF)].  Producer: binit's
+             postcondition + [boot_bss_carve].
+        (P3) each [newlock_at]'s three cells ([lk ↦₄ 0], [lock_name lk s],
+             [lock_cpu lk ↦₈ 0]) and its RESOURCE: [KallocInv.kmem_res] for
+             kmem (kinit's post), [DiskInv.disk_res] for virtio_disk
+             ([SpecMainSecondary]'s [disk_res_boot], already at
+             ProofMain.v:1346-1351), [SpecPrintk.pr_res] for pr.
+        (P4) [IrefSlots.iref_slots_auth] and [iref_slots IREFSLOTS] -- NOT
+             minted here: their home is [IrefSlots.iref_slots_alloc], run
+             inside [BootShared.boot_shared_alloc] beside the [irefslotG]
+             instance it returns.  [icache_boot_at] wants the auth; fsinit
+             wants one [iref_slot] unit.  Adjoin both from the existing
+             boot-shared row.
+
+      The three PERSISTENT products of these constructors ([bio_ctx],
+      [is_itable2], [itable_inv], [ic_escrows], [ic_sleeplocks], the three
+      locks) go on to [SpecMainSecondary.main_deposit], not into a kit.   *)
+  Definition fs_kit_icache (ICFG : icfg) (FSC : fscfg) : iProp Σ :=
+    ((* --- [icache_boot_at]'s ghost premises, in its own order --- *)
+     own icfg_iref (● (∅ : gmap nat (Qp * positive)) : icacheUR) ∗
+     ([∗ list] k ∈ seq 0 (NINODE + NINODE), live_frac k 1%Qp) ∗
+     ([∗ list] k ∈ seq 0 NINODE,
+        sl_free_tok (icfg_isl k) ∗ slh_auth (icfg_isl k) None) ∗
+     (* THE STOCKED POOL (R5): image-accurate before [userinit] runs, so
+        that [iget] inside [namei("/")] can move the root's bundle out of
+        it.  This is the row [ipool_alloc_of_image] produces. *)
+     ipool fsc_fs fsc_ireg fsc_cov fsc_logst (region_inums icfg_nib) ∗
+     lock_free_tok fsc_itlock ∗
+     ([∗ list] k ∈ seq 0 NINODE, ic_tok fsc_ic k) ∗
+     ([∗ list] k ∈ seq 0 NINODE, ic_mid fsc_ic k) ∗
+     (* the identification family at DUMMY recorded values: [ic_id] is a
+        plain [ghost_var] and [icache_boot_at] re-tags every slot to the
+        dev/inum words the entry cells actually hold ([ic_id_set]), so the
+        era owes no image premise for it (scout verdict 3). *)
+     ([∗ list] k ∈ seq 0 NINODE,
+        ∃ (v : bool) (d n : mword 32), ic_id fsc_ic k 1 v d n) ∗
+     (* --- [bio_init_at]'s ghost premises --- *)
+     bio_free_tok fsc_bio ∗
+     ([∗ set] b ∈ fsc_cov,
+        pool_blk (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) b) ∗
+     (* --- the four [newlock_at] ghosts --- *)
+     lock_free_tok fsc_kalloc ∗
+     lock_free_tok fsc_dlock ∗
+     lock_free_tok fsc_printk ∗
+     (* --- kinit's page count, at zero: the pair [fsc_kpages] names --- *)
+     kalloc_avail fsc_kpages (Some 0%nat) ∗
+     kmem_avail_auth fsc_kpages 0%nat)%I.
+
+  Lemma fs_kit_icache_open (ICFG : icfg) (FSC : fscfg) :
+    fs_kit_icache ICFG FSC -∗
+      own icfg_iref (● (∅ : gmap nat (Qp * positive)) : icacheUR) ∗
+      ([∗ list] k ∈ seq 0 (NINODE + NINODE), live_frac k 1%Qp) ∗
+      ([∗ list] k ∈ seq 0 NINODE,
+         sl_free_tok (icfg_isl k) ∗ slh_auth (icfg_isl k) None) ∗
+      ipool fsc_fs fsc_ireg fsc_cov fsc_logst (region_inums icfg_nib) ∗
+      lock_free_tok fsc_itlock ∗
+      ([∗ list] k ∈ seq 0 NINODE, ic_tok fsc_ic k) ∗
+      ([∗ list] k ∈ seq 0 NINODE, ic_mid fsc_ic k) ∗
+      ([∗ list] k ∈ seq 0 NINODE,
+         ∃ (v : bool) (d n : mword 32), ic_id fsc_ic k 1 v d n) ∗
+      bio_free_tok fsc_bio ∗
+      ([∗ set] b ∈ fsc_cov,
+         pool_blk (fs_view fsc_fs fsc_disk icfg_dev fsc_cov) b) ∗
+      lock_free_tok fsc_kalloc ∗
+      lock_free_tok fsc_dlock ∗
+      lock_free_tok fsc_printk ∗
+      kalloc_avail fsc_kpages (Some 0%nat) ∗
+      kmem_avail_auth fsc_kpages 0%nat.
+  Proof. iIntros "H". iExact "H". Qed.
+
+  (* ==================================================================== *)
+  (*  KIT 2 -- WHAT MUST SURVIVE TO forkret'S FIRST ARM                    *)
+  (* ==================================================================== *)
+
+  (*  [SpecFsinit.wp_fsinit_sconf_body]'s exclusive premise pile, restricted
+      to the rows a fupd that holds NO MEMORY can mint.  Transported by
+      widening [FirstTok.first_tok]'s left disjunct (fs-cfg-boot.md
+      "Transport to forkret's first arm"); the name says GHOST so the split
+      against the physical rows is explicit at the call site.
+
+      *** WHAT (d2b) MUST ADJOIN, AND FROM WHERE ***
+
+        (A) THE RAW CELLS fsinit and initlog write: the 32 [.bss] bytes at
+            [&sb] ([∗ list] i ∈ seq 0 32, pa_add sb_base i ↦ₘ _), and
+            [log_addr ↦₄ _], [lock_name_field log_addr], [lock_cpu log_addr],
+            [l_start], [l_dev], [l_out], [l_cmt], [l_ncommit], [lh_n_pa],
+            the thirty [lh_block i].  Producer:
+            [BootShared.boot_bss_carve] / [boot_shared_alloc]'s globals row.
+        (B) [LogDefs.log_mirror_full].  Producer:
+            [BootShared.boot_shared_alloc] -- it is the ERA's mirror
+            variable ([RiscvPtsto.mirror_name] = [era_mirror_name
+            riscv_eraGS], minted by [RiscvAdequacy] at power-on and handed
+            through [power_boot_res] at BootShared.v:874/1020), so this fupd
+            cannot mint it and must not try to.
+        (C) [IrefSlots.iref_slot] (one unit, for ireclaim's iget/iput pair)
+            and [BioDefs.bslots fsc_bio 35].  Producers: the boot-shared
+            [iref_slots IREFSLOTS] row, and [bio_init_at]'s POSTCONDITION
+            ([bslots bn BSLOTS] is produced at main+0x8e, not at the era) --
+            so the [bslots] must be carried from kit 1's consumption site.
+        (D) [BitmapInv.bitmap_res fsc_fs fsc_bmapstart fsc_cov fsc_logst
+            fsc_size used].  DEBT, not an oversight: [bitmap_res_close]
+            builds it out of [fsblock fsc_fs fsc_bmapstart (bitmap_bytes
+            used)] and [free_pool], and the coverage remainder below carries
+            the bitmap block's [fsblock]/[blk_own] pair and every free data
+            block -- but the BYTE-LEVEL equation [P bmapstart =
+            BitmapInv.bitmap_bytes used] is not a reading of W5:
+            [FsImg.fs_bitmap_wf] checks the BITS below [size], not the
+            block's bytes, and [bitmap_bytes] sets a bit for [used] where
+            the image also sets one for every metadata block.  A new
+            byte-level [FsImg] sweep (plus [used := u ∪ metadata]) is the
+            producer; it is O(1) computation and no new design.
+        (E) [FsCrash.fs_crash_seam] and [RiscvPtsto.gen_cert] are
+            PERSISTENT and reach fsinit through [main_deposit], not a kit.
+
+      [ireg_inv] is persistent and also travels via [main_deposit]; it is
+      here because THIS is where it is produced and it is cheap to carry. *)
+  Definition fs_kit_fsinit_ghost (ICFG : icfg) (FSC : fscfg)
+      (P : Z -> list (bv 8)) (Rspent : gset Z) : iProp Σ :=
+    ((* the log's four gnames at genesis, AT [icfg_log] -- which is what
+        makes fsinit's post assemble into [FsReady.fs_ready] *)
+     log_free_tok icfg_log ∗
+     (* the boot shelter, carried through fsinit into ireclaim *)
+     ireg_boot ∗
+     ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib ∗
+     (* block 1: the superblock's own block, whose bytes pin what bread
+        returns to the image *)
+     fsblock fsc_fs 1 (P 1) ∗
+     (* initlog's FsBlocks material.  [L]/[D] are universally quantified in
+        [SpecFsinit]'s contract, so an existential here is exactly right. *)
+     (∃ (L : gmap Z (list (bv 8))) (D : gmap Z bool),
+        ghost_map_auth (fs_L fsc_fs) 1 L ∗
+        ghost_map_auth (fs_dirty fsc_fs) 1 D) ∗
+     ([∗ set] z ∈ fsc_cov, z ↪[fs_dirty fsc_fs]{#(1/2)} false) ∗
+     (* the log region, split as [initlog] wants it *)
+     fsblock fsc_fs (log_hdr_bno fsc_logst) (P (log_hdr_bno fsc_logst)) ∗
+     ([∗ list] i ∈ seq 0 LOGBLOCKS,
+        ∃ bs : list (bv 8), fsblock fsc_fs (log_slot_bno fsc_logst i) bs) ∗
+     (* THE COVERAGE REMAINDER, PAIRED: everything [cov] holds that the era
+        did not spend -- the bitmap block and the whole free data pool.  Row
+        (D) above is what still has to be carved out of it. *)
+     ([∗ set] b ∈ fsc_cov ∖ Rspent,
+        fsblock fsc_fs b (P b) ∗ blk_own fsc_fs b))%I.
+
+  Lemma fs_kit_fsinit_ghost_open (ICFG : icfg) (FSC : fscfg)
+      (P : Z -> list (bv 8)) (Rspent : gset Z) :
+    fs_kit_fsinit_ghost ICFG FSC P Rspent -∗
+      log_free_tok icfg_log ∗
+      ireg_boot ∗
+      ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib ∗
+      fsblock fsc_fs 1 (P 1) ∗
+      (∃ (L : gmap Z (list (bv 8))) (D : gmap Z bool),
+         ghost_map_auth (fs_L fsc_fs) 1 L ∗
+         ghost_map_auth (fs_dirty fsc_fs) 1 D) ∗
+      ([∗ set] z ∈ fsc_cov, z ↪[fs_dirty fsc_fs]{#(1/2)} false) ∗
+      fsblock fsc_fs (log_hdr_bno fsc_logst) (P (log_hdr_bno fsc_logst)) ∗
+      ([∗ list] i ∈ seq 0 LOGBLOCKS,
+         ∃ bs : list (bv 8), fsblock fsc_fs (log_slot_bno fsc_logst i) bs) ∗
+      ([∗ set] b ∈ fsc_cov ∖ Rspent,
+         fsblock fsc_fs b (P b) ∗ blk_own fsc_fs b).
+  Proof. iIntros "H". iExact "H". Qed.
+
+  (* ==================================================================== *)
+  (*  THE ERA FUPD                                                        *)
+  (* ==================================================================== *)
+
+  (*  THE POINT.  [IcacheRef.icfg] and [FsCfg.fscfg] reach every proof as
+      superclass fields of [FileInvDefs.fileG], an ambient assumption of
+      [Main.xv6_boot_era] and of both adequacy theorems, so they are fixed
+      before any fupd runs -- and NOTHING in the tree ever produced one.
+      This lemma produces both, at the image's own geometry, and hands back
+      every ghost the boot chain will need at them.  It runs inside
+      [BootShared.boot_shared_alloc] (scout verdict 1: nothing in
+      [BootShared.v] uses [fileG], so the new instance lands in the existing
+      existential row beside [fdslotG]/[irefslotG]/[pavG]) and the caller
+      rebuilds the class with [FileInvDefs.fileG_of].
+
+      IT COMPUTES NOTHING (R3): every image fact is a hypothesis, and the
+      geometry fields are instantiated at the parsed superblock's own
+      projections (R2).  [γd]/[γv] are REUSED, not re-minted (step 1).
+
+      THE ORDER IS FORCED, and it is the plan's steps 1-6:
+        (1) the log's gnames, so [icfg_log] can be filled;
+        (2) [IcacheRef.icfg_alloc] at the four ALL-PLAIN boot maps -> ICFG;
+        (3) stage B: [link_boot_split] then [link_boot_mint_w] at
+            [W := FsImg.fs_link_count] -> the ledger authorities at the
+            image's counts AND the [ilink] tickets [dir_links] needs
+            (the boot-map-split route is a measured >60 s [linkElemUR]
+            conversion -- do not retry it);
+        (4) [FsBoot.fs_boot_ghosts] -> γfs and the block ghosts;
+        (5) THREE PEELS off [cov], because [ireg_alloc] must run before the
+            pool and consumes the inode region's halves;
+        (6) [ireg_alloc] -> γi + [ireg_inv] + the [ireg_out] payout,
+            restated at [fs_dinode] by [image_dinode_fs_dinode];
+        (7) [dir_links_of_region] + [ipool_alloc_of_image] -> the stocked
+            pool;
+        (8) the gname-only mints, and FSC.                                *)
+  Lemma fs_cfg_alloc (γd : uart_names) (γv : disk_names)
+      (dk : Z -> bv 8) (ndisk : nat) (sb : fs_sb) (cov : gset Z)
+      (nib : nat) (E : coPset) :
+    (* ---- the image, all as hypotheses (R3) ---- *)
+    fsimg_wf (fs_blocks dk) sb = true ->
+    fs_region_wf (fs_blocks dk) sb nib = true ->
+    FsImg.sb_ninodes sb <= 16 * Z.of_nat nib ->
+    16 * Z.of_nat nib <= 2 ^ 32 ->
+    (0 < nib)%nat ->
+    (* the inode region is EXACTLY [[inodestart, bmapstart)]: mkfs rounds
+       [ninodes] up to a whole block, and this is the equation that makes
+       the block layout below linear. *)
+    Z.of_nat nib = FsImg.sb_ninodes sb / 16 + 1 ->
+    (* ---- R4's coverage corners ---- *)
+    fs_cov_in cov ndisk ->
+    (forall b : Z, 1 <= b < fs_data_start sb -> b ∈ cov) ->
+    (forall b : Z, fs_data_start sb <= b < sb_size sb -> b ∈ cov) ->
+    disk_bytes γv 0 (disk_read dk 0 ndisk) ={E}=∗
+    ∃ (ICFG : icfg) (FSC : fscfg),
+      ⌜icfg_dev = ROOTDEV⌝ ∗ ⌜icfg_nib = nib⌝ ∗
+      ⌜icfg_ist = FsImg.sb_inodestart sb⌝ ∗
+      ⌜fsc_uart = γd⌝ ∗ ⌜fsc_disk = γv⌝ ∗ ⌜fsc_cov = cov⌝ ∗
+      ⌜fsc_logst = sb_logstart sb⌝ ∗
+      ⌜fsc_bmapstart = FsImg.sb_bmapstart sb⌝ ∗
+      ⌜fsc_size = sb_size sb⌝ ∗ ⌜fsc_ninodes = FsImg.sb_ninodes sb⌝ ∗
+      fs_kit_icache ICFG FSC ∗
+      fs_kit_fsinit_ghost ICFG FSC (fs_blocks dk)
+        (fs_kit_spent (fs_blocks dk) sb nib (fs_live_set (fs_blocks dk) sb)).
+  Proof.
+    intros Hwf Hrw Hnin Hnib32 Hnib0 Hnibeq Hcovin Hcovmeta Hcovdata.
+    iIntros "Hdisk".
+    (* ---- 1. the log's four gnames, at their genesis values ---------- *)
+    iMod log_ghost_alloc as (γlog) "Hlogtok".
+    (* ---- 2. THE INODE CACHE'S RECORD -------------------------------- *)
+    iMod (icfg_alloc ROOTDEV nib
+            (link_boot_map (region_inums nib))
+            (icnt_boot_map (region_inums nib))
+            (frzo_boot_map (region_inums nib))
+            (frzm_boot_map (region_inums nib))
+            γlog (FsImg.sb_inodestart sb)
+            (link_boot_map_valid _) (icnt_boot_map_valid _)
+            (frzo_boot_map_valid _) (frzm_boot_map_valid _))
+      as (ICFG g0) "(%Hdev & %Hnibq & %Hlogq & %Histq & Hiref & Hlive &
+                     Hlk & Hcnt & Hfrzo & Hfrzm & Hboot & Hep & Hisl &
+                     Hrauth)".
+    (* every ambient form below is stated at [icfg_nib]; make the caller's
+       [nib] BE it, so no lemma has to be re-instantiated *)
+    symmetry in Hnibq. subst nib.
+    (* ---- the pure geometry, off [fs_sb_ok] alone -------------------- *)
+    pose proof (fsimg_wf_sb _ _ Hwf) as Hsb.
+    pose proof (sbo_logstart sb Hsb) as Hls.
+    pose proof (sbo_nlog sb Hsb) as Hnl.
+    pose proof (sbo_inodestart sb Hsb) as Hist.
+    pose proof (sbo_bmapstart sb Hsb) as Hbms.
+    assert (Hfull : fs_blocks_full (fs_blocks dk))
+      by (intros b; apply fs_blocks_length).
+    assert (Hds : fs_data_start sb
+                  = FsImg.sb_inodestart sb + Z.of_nat icfg_nib + 1)
+      by (rewrite /fs_data_start; lia).
+    assert (HlogI : forall b : Z, b ∈ log_region_set (sb_logstart sb) ->
+              1 < b < FsImg.sb_inodestart sb).
+    { intros b Hb. pose proof (log_region_bound (sb_logstart sb) b Hb).
+      unfold LOGBLOCKS in *. lia. }
+    assert (HiregI : forall b : Z,
+              b ∈ ireg_blk_set (FsImg.sb_inodestart sb) icfg_nib ->
+              FsImg.sb_inodestart sb <= b < fs_data_start sb).
+    { intros b Hb. apply ireg_blk_set_spec in Hb. lia. }
+    assert (H1lt : 1 < fs_data_start sb) by lia.
+    (* the three peels, each a subset of what is left of [cov] *)
+    assert (H1cov : ({[ (1:Z) ]} : gset Z) ⊆ cov).
+    { apply elem_of_subseteq. intros b Hb.
+      apply elem_of_singleton in Hb as ->. apply Hcovmeta. lia. }
+    assert (Hlogcov : log_region_set (sb_logstart sb)
+                      ⊆ cov ∖ ({[ (1:Z) ]} : gset Z)).
+    { apply elem_of_subseteq. intros b Hb. pose proof (HlogI b Hb).
+      apply elem_of_difference. split; [apply Hcovmeta; lia |].
+      rewrite elem_of_singleton. lia. }
+    assert (Hiregcov : ireg_blk_set (FsImg.sb_inodestart sb) icfg_nib
+                       ⊆ (cov ∖ ({[ (1:Z) ]} : gset Z))
+                           ∖ log_region_set (sb_logstart sb)).
+    { apply elem_of_subseteq. intros b Hb. pose proof (HiregI b Hb).
+      apply elem_of_difference. split.
+      - apply elem_of_difference. split; [apply Hcovmeta; lia |].
+        rewrite elem_of_singleton. lia.
+      - intros Hc. pose proof (HlogI b Hc). lia. }
+    assert (HcovC : forall b : Z, fs_data_start sb <= b < sb_size sb ->
+              b ∈ ((cov ∖ ({[ (1:Z) ]} : gset Z))
+                     ∖ log_region_set (sb_logstart sb))
+                    ∖ ireg_blk_set (FsImg.sb_inodestart sb) icfg_nib).
+    { intros b Hb. apply elem_of_difference. split.
+      - apply elem_of_difference. split.
+        + apply elem_of_difference. split; [apply Hcovdata; exact Hb |].
+          rewrite elem_of_singleton. lia.
+        + intros Hc. pose proof (HlogI b Hc). lia.
+      - intros Hc. pose proof (HiregI b Hc). lia. }
+    (* ---- 3. STAGE B: the ledger at the image's link counts ---------- *)
+    iDestruct (link_boot_split (region_inums icfg_nib) with "Hlk") as "Hlk".
+    iEval (rewrite big_sepS_sep) in "Hlk".
+    iDestruct "Hlk" as "[Hla Hoff]".
+    iMod (link_boot_mint_w (fs_link_count (fs_blocks dk) sb)
+            (region_inums icfg_nib) with "Hla") as "Hla".
+    iEval (rewrite big_sepS_sep) in "Hla".
+    iDestruct "Hla" as "[Hla Htk]".
+    iDestruct (icnt_boot_split (region_inums icfg_nib) with "Hcnt") as "Hcnt".
+    iEval (rewrite big_sepS_sep) in "Hcnt".
+    iDestruct "Hcnt" as "[HcntR HcntP]".
+    iDestruct (frzo_boot_split (region_inums icfg_nib) with "Hfrzo")
+      as "Hrcpt".
+    iDestruct (frzm_boot_split (region_inums icfg_nib) with "Hfrzm")
+      as "Hmir".
+    iEval (rewrite big_sepS_sep) in "Hmir".
+    iDestruct "Hmir" as "[HmirR HmirP]".
+    iDestruct (region_of_seq (fun z => mono_nat_auth_own (icfg_iep z) 1 0)
+                 icfg_nib with "Hep") as "Hep".
+    iDestruct (live_boot_split g0 with "Hlive") as "Hlive".
+    (* ---- 4. the block layer's ghosts -------------------------------- *)
+    iMod (fs_boot_ghosts γv dk ndisk cov ROOTDEV E Hcovin with "Hdisk")
+      as (γfs) "(Hpool & HaL & HaD & Hdty & Hfsb & Hown)".
+    (* ---- 5. THE THREE PEELS ----------------------------------------- *)
+    iDestruct (big_sepS_sep_2 with "Hfsb Hown") as "Hblk".
+    iDestruct (big_sepS_split_sub _ cov ({[ (1:Z) ]} : gset Z) H1cov
+                 with "Hblk") as "[Hb1 Hblk]".
+    iDestruct (big_sepS_split_sub _ _ (log_region_set (sb_logstart sb))
+                 Hlogcov with "Hblk") as "[Hblog Hblk]".
+    iDestruct (big_sepS_split_sub _ _
+                 (ireg_blk_set (FsImg.sb_inodestart sb) icfg_nib)
+                 Hiregcov with "Hblk") as "[Hbireg Hblk]".
+    iEval (rewrite big_sepS_singleton) in "Hb1".
+    iDestruct "Hb1" as "[Hb1 _]".
+    iEval (rewrite big_sepS_sep) in "Hblog".
+    iDestruct "Hblog" as "[Hblog _]".
+    iDestruct (fs_log_region_split γfs dk (sb_logstart sb) with "Hblog")
+      as "[Hhdr Hslots]".
+    iEval (rewrite big_sepS_sep) in "Hbireg".
+    iDestruct "Hbireg" as "[Hbireg _]".
+    iDestruct (ireg_blk_of_set (fun b => fsblock γfs b (fs_blocks dk b))
+                 (FsImg.sb_inodestart sb) icfg_nib with "Hbireg")
+      as "Hbireg".
+    iEval (rewrite big_sepS_sep) in "Hblk".
+    iDestruct "Hblk" as "[HfsbC HownC]".
+    (* ---- 6. THE INODE REGION ---------------------------------------- *)
+    iAssert (ireg_boot) with "[Hboot]" as "Hboot".
+    { rewrite /ireg_boot /ity_pending. iExact "Hboot". }
+    iMod (ireg_alloc E γfs (FsImg.sb_inodestart sb) icfg_nib
+            (fun bi : nat =>
+               fs_blocks dk (FsImg.sb_inodestart sb + Z.of_nat bi))
+            (fs_link_count (fs_blocks dk) sb) Hnib32
+            ltac:(intros bi _; rewrite fs_blocks_length; reflexivity)
+            ltac:(intros dss Hdl Hdwf Hde;
+                  exact (image_ireg_premises (fs_blocks dk) sb dss icfg_nib
+                           Hwf Hrw Hdl Hdwf Hde Hnib32))
+            with "Hla HcntR Hrcpt HmirR Hep Hbireg Hboot Hrauth")
+      as (γi dss) "(%Hdl & %Hdwf & %Hde & Hireginv & Hboot & Hout)".
+    (* the payout is at the DECODED record; restate it at [FsImg]'s own *)
+    iAssert ([∗ set] z ∈ region_inums icfg_nib,
+               ireg_out γi (mword_of_int z : mword 32)
+                 (fs_dinode (fs_blocks dk) sb z))%I with "[Hout]" as "Hout".
+    { iApply (big_sepS_mono with "Hout"). intros z Hz.
+      rewrite (image_dinode_fs_dinode (fs_blocks dk) sb dss icfg_nib z
+                 Hdl Hdwf Hde (proj1 (region_inums_spec icfg_nib z) Hz)
+                 Hnib32) //. }
+    (* ---- 7. the tickets, spent; then the pool ----------------------- *)
+    assert (HAran : forall z : Z, z ∈ fs_live_set (fs_blocks dk) sb ->
+              0 <= z < FsImg.sb_ninodes sb).
+    { intros z Hz. apply (fs_live_set_elem_of (fs_blocks dk) sb z) in Hz.
+      tauto. }
+    iDestruct (dir_links_of_region (fs_blocks dk) sb
+                 (fs_live_set (fs_blocks dk) sb) Hwf Hnin HAran with "Htk")
+      as "Hdlk".
+    iDestruct (ipool_alloc_of_image γfs γi (fs_blocks dk) sb cov
+                 (((cov ∖ ({[ (1:Z) ]} : gset Z))
+                     ∖ log_region_set (sb_logstart sb))
+                    ∖ ireg_blk_set (FsImg.sb_inodestart sb) icfg_nib)
+                 (fs_live_set (fs_blocks dk) sb)
+                 Hwf (fs_region_wf_free _ _ _ Hrw) Hfull Hnin Hnib32
+                 (fs_live_set_elem_of (fs_blocks dk) sb) Hcovdata HcovC
+                 with "HcntP HmirP Hoff Hout Hdlk HfsbC HownC")
+      as "[Hipool Hrem]".
+    (* ---- 8. the gname-only mints, and the record -------------------- *)
+    iMod bio_names_ghost_alloc as (bn) "Hbio".
+    iMod lock_ghost_alloc as (git) "Hitlk".
+    iMod lock_ghost_alloc as (gkm) "Hkmlk".
+    iMod lock_ghost_alloc as (gdl) "Hdllk".
+    iMod lock_ghost_alloc as (gpr) "Hprlk".
+    iMod (kalloc_avail_alloc 0%nat) as (gkp) "[Hkav Hkauth]".
+    iMod (ic_names_alloc (fun _ : nat => ((mword_of_int 0 : mword 32),
+                                          (mword_of_int 0 : mword 32))))
+      as (cn) "(Htok & Hmid & Hgid)".
+    iAssert ([∗ list] k ∈ seq 0 NINODE,
+               ∃ (v : bool) (d n : mword 32), ic_id cn k 1 v d n)%I
+      with "[Hgid]" as "Hgid".
+    { iApply (big_sepL_mono with "Hgid"). intros idx k _. iIntros "H".
+      iExists false, (mword_of_int 0 : mword 32),
+              (mword_of_int 0 : mword 32). iExact "H". }
+    iModIntro.
+    iExists ICFG,
+      (MkFscfg gpr gkm gkp γd γv gdl bn γfs γi cn git
+               cov (sb_logstart sb) (FsImg.sb_bmapstart sb)
+               (sb_size sb) (FsImg.sb_ninodes sb)).
+    rewrite /fs_kit_icache /fs_kit_fsinit_ghost.
+    cbn [fsc_printk fsc_kalloc fsc_kpages fsc_uart fsc_disk fsc_dlock
+         fsc_bio fsc_fs fsc_ireg fsc_ic fsc_itlock fsc_cov fsc_logst
+         fsc_bmapstart fsc_size fsc_ninodes].
+    rewrite Hdev Histq Hlogq.
+    (* the coverage remainder's set, as the kit spells it *)
+    assert (Hset : ((((cov ∖ ({[ (1:Z) ]} : gset Z))
+                        ∖ log_region_set (sb_logstart sb))
+                       ∖ ireg_blk_set (FsImg.sb_inodestart sb) icfg_nib)
+                      ∖ fs_live_blocks (fs_blocks dk) sb
+                          (fs_live_set (fs_blocks dk) sb))
+                   = cov ∖ fs_kit_spent (fs_blocks dk) sb icfg_nib
+                             (fs_live_set (fs_blocks dk) sb)).
+    { apply set_eq. intros b. rewrite /fs_kit_spent.
+      rewrite !elem_of_difference !elem_of_union. tauto. }
+    rewrite Hset.
+    (* ---- the ten ties ---- *)
+    iSplitR; [iPureIntro; reflexivity |].
+    iSplitR; [iPureIntro; reflexivity |].
+    iSplitR; [iPureIntro; reflexivity |].
+    iSplitR; [iPureIntro; reflexivity |].
+    iSplitR; [iPureIntro; reflexivity |].
+    iSplitR; [iPureIntro; reflexivity |].
+    iSplitR; [iPureIntro; reflexivity |].
+    iSplitR; [iPureIntro; reflexivity |].
+    iSplitR; [iPureIntro; reflexivity |].
+    iSplitR; [iPureIntro; reflexivity |].
+    (* ---- kit 1 ---- *)
+    iSplitL "Hiref Hlive Hisl Hipool Hitlk Htok Hmid Hgid Hbio Hpool
+             Hkmlk Hdllk Hprlk Hkav Hkauth".
+    { iSplitL "Hiref"; [iExact "Hiref" |].
+      iSplitL "Hlive"; [iExact "Hlive" |].
+      iSplitL "Hisl"; [iExact "Hisl" |].
+      iSplitL "Hipool"; [iExact "Hipool" |].
+      iSplitL "Hitlk"; [iExact "Hitlk" |].
+      iSplitL "Htok"; [iExact "Htok" |].
+      iSplitL "Hmid"; [iExact "Hmid" |].
+      iSplitL "Hgid"; [iExact "Hgid" |].
+      iSplitL "Hbio"; [iExact "Hbio" |].
+      iSplitL "Hpool"; [iExact "Hpool" |].
+      iSplitL "Hkmlk"; [iExact "Hkmlk" |].
+      iSplitL "Hdllk"; [iExact "Hdllk" |].
+      iSplitL "Hprlk"; [iExact "Hprlk" |].
+      iSplitL "Hkav"; [iExact "Hkav" | iExact "Hkauth"]. }
+    (* ---- kit 2 ---- *)
+    iSplitL "Hlogtok"; [iExact "Hlogtok" |].
+    iSplitL "Hboot"; [iExact "Hboot" |].
+    iSplitL "Hireginv"; [iExact "Hireginv" |].
+    iSplitL "Hb1"; [iExact "Hb1" |].
+    iSplitL "HaL HaD".
+    { iExists (fs_L0 dk cov), (fs_D0 dk cov).
+      iSplitL "HaL"; [iExact "HaL" | iExact "HaD"]. }
+    iSplitL "Hdty"; [iExact "Hdty" |].
+    iSplitL "Hhdr"; [iExact "Hhdr" |].
+    iSplitL "Hslots"; [iExact "Hslots" | iExact "Hrem"].
+  Qed.
+
+End FsCfgBootEra.
