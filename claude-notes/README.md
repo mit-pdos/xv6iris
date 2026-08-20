@@ -145,6 +145,13 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   [`design/fs-fragments.md`](design/fs-fragments.md)): the staged slate, what
   each increment cost, where the landed tree diverged from the report's
   sketches, and the standing constraints.
+- **[`fs-cfg-boot.md`](projects/fs-cfg-boot.md)** — giving `IcacheRef.icfg` and
+  `FsCfg.fscfg` VALUES: the era-fupd allocation, the `_at` constructor
+  discipline that replaces every existential name, the stocked inode pool, the
+  two boot kits and how each reaches its consumer, and the adequacy
+  restatement that deletes `adequacy_icfg`. Subsumes `fs-icache.md`'s C7 (b),
+  (c), (iii) and (iv), and is the gate `main-boot.md` §G3 names. **Read R5
+  before assuming `valid = 0` means the ghost state says nothing.**
 - **[`fs-icache.md`](projects/fs-icache.md)** — the inode-cache implementation
   effort (design in [`design/fs-icache.md`](design/fs-icache.md)): the staged
   cycle plan, the branch-per-cycle strategy, the owed boot wiring.

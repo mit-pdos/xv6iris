@@ -487,7 +487,11 @@ Proof gotchas worth keeping:
 **OWED after C7 — STAGE-0 CLASSIFICATION OF `icache_boot`'s INPUTS
 (2026-08-10).** The fupd takes eight things; classifying them is what
 decides how much of the boot wiring can land, and the answer is smaller
-than the C7 write-up assumed:
+than the C7 write-up assumed. **(b), (c), (iii) and (iv) below are now
+[`fs-cfg-boot.md`](fs-cfg-boot.md)'s, which supersedes their treatment
+here** — in particular the "publishable set is empty, do not split it"
+ruling is about splitting the fupd INTERNALLY and does not stop it running
+EARLIER, at main+0x92, which is what that plan does:
 
 | input | status |
 | --- | --- |

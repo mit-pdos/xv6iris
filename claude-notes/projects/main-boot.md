@@ -428,7 +428,7 @@ pay are exactly the ones `SpecNameiRootBoot` assumes away:
 | --- | --- |
 | `procs_avail (Some (S k))` | **DONE 2026-08-19** — threaded out of `BootShared.boot_shared_alloc` (where it was minted and dropped) through `BootChain.boot_hart_primary` and `SpecMain` into `mn_grp_fs`, which carries it to the +0x9e call and drops it there |
 | `is_lock γp alp_pid_lock "nextpid" nextpid_res` | **DONE 2026-08-19, and it was NOT plumbing** — see below |
-| `is_itable2` / `itable_inv` / `ic_escrows` / `ireg_inv` | **NO** — `IcacheBoot.icache_boot` needs the stocked inode pool, which needs the fs BLOCK layer wired into main (fs-icache.md C7 owed (ii)), and that in turn wants the ambient-`icfg` tie (C7 (c)).  These four ARE `LinkNameiRootBoot.v`'s `Axiom`, and discharging it is a functor application over `LinkNameiRoot.NameiRoot`, not a proof |
+| `is_itable2` / `itable_inv` / `ic_escrows` / `ireg_inv` | **NO** — `IcacheBoot.icache_boot` needs the stocked inode pool, which needs the fs BLOCK layer wired into main (fs-icache.md C7 owed (ii)), and that in turn wants the ambient-`icfg` tie (C7 (c)).  These four ARE `LinkNameiRootBoot.v`'s `Axiom`, and discharging it is a functor application over `LinkNameiRoot.NameiRoot`, not a proof.  **The plan that pays this row is [`fs-cfg-boot.md`](fs-cfg-boot.md)**, whose step 5a is exactly it: `icache_boot_at` between iinit (+0x92) and userinit (+0x9e), so no transport is needed — userinit runs inside main |
 
 **DO NOT TRY TO PIN THE CACHE'S CONFIGURATION BY THREADING A PREMISE.**
 `namei`'s corner is only justified at `icfg_dev = ROOTDEV` and
