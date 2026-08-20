@@ -444,6 +444,7 @@ WpAmo.v
 CodeHolding.v
 CodeAcquire.v
 WpLock.v
+WpLockAt.v
 ArrCursor.v
 FdSlots.v
 IcacheRef.v
@@ -576,6 +577,7 @@ CodePlicClaim.v
 ProofPlicClaim.v
 LinkPlicClaim.v
 SleepLock.v
+SleepLockAt.v
 SpecInitsleeplock.v
 SpecAcquiresleep.v
 SpecReleasesleep.v
@@ -615,6 +617,7 @@ SpecBinit.v
 ProofBinit.v
 LinkBinit.v
 BioInv.v
+BioInitAt.v
 FsBlocks.v
 BlockWords.v
 DinodeEnc.v
