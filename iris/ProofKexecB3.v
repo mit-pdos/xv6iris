@@ -1076,7 +1076,7 @@ Section KexecB3Body.
     { rewrite HU5a4. change (Z.of_nat 56%nat) with 56%Z.
       apply (w32_moi_arg 56); lia. }
     (* ---- what readi borrows ---- *)
-    iDestruct "Hopen" as "(#Hslkk & Hslkd & Hslpid & Hdep & Hidev & Hiinum &
+    iDestruct "Hopen" as "(#Hslkk & Hslkd & Hdep & Hidev & Hiinum &
                            Hivalid & Hload & #Hity & Hfrz & Hkeep & Hru)".
     iDestruct (kxc_load_peel with "Hload") as
       (datl) "(%Hiok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdiat & Hmeta & Hmap
@@ -1119,7 +1119,7 @@ Section KexecB3Body.
     iDestruct (A.kxa_bs3_join bn with "Hbs1 Hbs2") as "Hbs".
     iDestruct (kxc_open_intro gfs gi cn cov logstart dev pidv kf qf sf gyf
                  inumf dnf bmf gilf gislf
-                 with "Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid Hload
+                 with "Hslkk Hslkd Hdep Hidev Hiinum Hivalid Hload
                        Hity Hfrz Hkeep Hru") as "Hopen".
     set (pf := rd_delivered datl phb offn tot).
     assert (HM2get : forall r : mword 5, is_cs_idx r = true ->
@@ -3174,7 +3174,7 @@ Section KexecB3Close.
     iDestruct "Hfab" as "(#Hkd & #Hpenv & #Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
                           #Hesc & #Hslks & #Hireg & #Hropen & #Hprocs & #Hdevi & #Hdgeom &
                           #Hdlock)".
-    iDestruct "Hopen" as "(#Hslkk & Hslkd & Hslpid & Hdep & Hidev & Hiinum &
+    iDestruct "Hopen" as "(#Hslkk & Hslkd & Hdep & Hidev & Hiinum &
                            Hivalid & Hload & #Hity & Hfrz & Hkeep & Hru)".
     iDestruct (proc_priv_pid gf (proc_addr jp) pidv V with "Hpriv")
       as "[Hppid Hpvbk]".
@@ -3239,7 +3239,7 @@ Section KexecB3Close.
               ltac:(lia) Hk Hlg Hsz Hbm0 Hbmc
               Hbml Hins0 Hibc Hibl Hib Hcovb Hn2 Hjp Hgs HB2a0
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitab Hitinv Hesck
-                    Hireg Hropen Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid Hload
+                    Hireg Hropen Hslkk Hslkd Hdep Hidev Hiinum Hivalid Hload
                     Hity Hfrz [$Hkeep $Hru] Hbm Hins Hbits Hppid Hprocs Hdevi Hdgeom Hdlock
                     Hbs Hlog").
     all: try lkbelow.

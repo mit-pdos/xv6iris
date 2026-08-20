@@ -566,7 +566,7 @@ Section ProofBrelse.
     iDestruct (bio_ctx_buf bn V k Hk with "Hbio") as "[#Hslk #Hesc0]".
     iDestruct (buf_escrow_inv with "Hesc0") as "#Hesc".
     iDestruct "Hlocked"
-      as "(_ & %Hcov & %Hdv & Hstok & Hpid & Hvalid & Hbdev & Hbuf & Hdb & Hbpay)".
+      as "(_ & %Hcov & %Hdv & Hstok & Hvalid & Hbdev & Hbuf & Hdb & Hbpay)".
     (* the payload the park deposits: the handle's disk cell and [bio_pay],
        re-packaged at the escrow's [buf_pay] shape.  The blockno is covered
        (bio_held's second conjunct), so the [decide] resolves LEFT and the
@@ -807,13 +807,13 @@ Section ProofBrelse.
     iApply (Hsl.wp_holdingsleep_sconf (fst (bn_slk bn k)) (snd (bn_slk bn k))
               "buffer"%string (bown bn k) mA p pidv (K - 4)%nat b b lks
               ltac:(lia) Hbelow_sl
-              with "Hcg Hcnt Htext Hpc [] Hstok [Hpid] Hppid").
+              with "Hcg Hcnt Htext Hpc [] [Hstok] Hppid").
     all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hslk". }
-    { iEval (rewrite HmAa0). iExact "Hpid". }
-    iIntros (CID11 Hs11 mH) "%Hhs Hcg Hcnt Hpc Hstok Hpid Hppid".
+    { iEval (rewrite HmAa0). iExact "Hstok". }
+    iIntros (CID11 Hs11 mH) "%Hhs Hcg Hcnt Hpc Hstok Hppid".
     destruct Hhs as [Hcs1 Hha0].
-    iEval (rewrite HmAa0) in "Hpid".
+    iEval (rewrite HmAa0) in "Hstok".
     assert (Hpc18 : ret_pc (mA !!! Regidx Rra) = mword_of_int (KernelSyms.brelse + 0x18)).
     { rewrite HmAra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc18) in "Hpc".
@@ -889,10 +889,10 @@ Section ProofBrelse.
     iApply (Rsl.wp_releasesleep_sconf γs (fst (bn_slk bn k)) (snd (bn_slk bn k))
               "buffer"%string (bown bn k) H2 pidv p (K - 4)%nat b b lks
               ltac:(lia) Hbelow_sl
-              with "Hcg Hcnt Htext Hpc [] Hstok [Hpid] Hbown Hprocs").
+              with "Hcg Hcnt Htext Hpc [] [Hstok] Hbown Hprocs").
     all: try lkbelow.
     { iEval (rewrite HH2a0). iExact "Hslk". }
-    { iEval (rewrite HH2a0). iExact "Hpid". }
+    { iEval (rewrite HH2a0). iExact "Hstok". }
     iIntros (CID15 Hs15 mR) "%Hcs2 Hcg Hcnt Hpc".
     assert (Hpc20 : ret_pc (H2 !!! Regidx Rra) = mword_of_int (KernelSyms.brelse + 0x20)).
     { rewrite HH2ra. apply bv_eq; vm_compute; reflexivity. }

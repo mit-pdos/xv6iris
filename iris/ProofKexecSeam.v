@@ -550,8 +550,7 @@ Section KexecBSeam.
       (dnf : dinode) (bmf : blkmap)
       (gilf gislf : gname) : iProp Σ :=
     (is_sleeplock_gen gilf gislf (i_lock (ientry kf)) "inode"%string (ic_tok cn kf) (slh_tok (icfg_isl kf)) ∗
-     sleeplocked_q gislf sf ∗
-     sl_pid (i_lock (ientry kf)) ↦₄ pidv ∗
+     sleeplocked_q gislf sf (i_lock (ientry kf)) pidv ∗
      ic_deposit cn kf (DepShr sf dev inumf gyf) ∗
      i_dev (ientry kf) ↦₄{DfracOwn (1/2)} dev ∗
      i_inum (ientry kf) ↦₄{DfracOwn (1/2)} inumf ∗

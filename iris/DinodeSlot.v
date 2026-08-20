@@ -676,11 +676,11 @@ Section IupdateRes.
          bio_held bn V k pidv dev bno bs' bsl bsd d).
   Proof.
     rewrite /bio_held.
-    iIntros "(%A & %B & %C & H1 & H2 & H3 & H4 & H5 & H6 & H7)".
+    iIntros "(%A & %B & %C & H1 & H3 & H4 & H5 & H6 & H7)".
     iSplitL "H5"; [iExact "H5" |].
     iIntros (bs') "H5".
     iSplitR; [done |]. iSplitR; [done |]. iSplitR; [done |].
-    iSplitL "H1"; [iExact "H1" |]. iSplitL "H2"; [iExact "H2" |].
+    iSplitL "H1"; [iExact "H1" |].
     iSplitL "H3"; [iExact "H3" |]. iSplitL "H4"; [iExact "H4" |].
     iSplitL "H5"; [iExact "H5" |]. iSplitL "H6"; [iExact "H6" |]. iExact "H7".
   Qed.
@@ -696,7 +696,7 @@ Section IupdateRes.
     ⌜bsl = bs0⌝.
   Proof.
     rewrite /bio_held /bio_pay /fs_view /=.
-    iIntros "Hc (_ & _ & _ & _ & _ & _ & _ & _ & _ & Hpay)".
+    iIntros "Hc (_ & _ & _ & _ & _ & _ & _ & _ & Hpay)".
     destruct d.
     - iDestruct "Hpay" as "[Hm _]".
       iApply (fsblock_mdirty_agree with "Hc Hm").
@@ -758,16 +758,16 @@ Section IupdateRes.
        bio_held bn (fs_view γfs γd dev cov) k pidv dv bno bs bsl bsd d).
   Proof.
     rewrite /bio_held /bio_pay /fs_view /=.
-    iIntros "(%A & %B & %C & H1 & H2 & H3 & H4 & H5 & H6 & Hpay)".
+    iIntros "(%A & %B & %C & H1 & H3 & H4 & H5 & H6 & Hpay)".
     destruct d.
     - rewrite /fs_mdirty. iDestruct "Hpay" as "[[HL HD] Hq]".
       iFrame "HL". iIntros "HL".
       iSplitR; [done |]. iSplitR; [done |]. iSplitR; [done |].
-      iFrame "H1 H2 H3 H4 H5 H6". iFrame "HL HD Hq".
+      iFrame "H1 H3 H4 H5 H6". iFrame "HL HD Hq".
     - rewrite /fs_mclean. iDestruct "Hpay" as "[[HL HD] %He]".
       iFrame "HL". iIntros "HL".
       iSplitR; [done |]. iSplitR; [done |]. iSplitR; [done |].
-      iFrame "H1 H2 H3 H4 H5 H6". iFrame "HL HD". done.
+      iFrame "H1 H3 H4 H5 H6". iFrame "HL HD". done.
   Qed.
 
 End IupdateRes.

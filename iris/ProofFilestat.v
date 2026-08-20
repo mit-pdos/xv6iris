@@ -705,7 +705,7 @@ Section ProofFilestat.
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
       iIntros (CIDil Hsil mil dnl bml fl_)
-        "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hsb Hbslot Hheld Hslpid Hdep
+        "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hsb Hbslot Hheld Hdep
          Hidev Hinum Hvalid Hlk #Hshot Hfrz %Hfr_ _ %Hilkp".
       iDestruct ("Hpivbk" with "Hppid") as "Hpriv".
       assert (Hpc2a : ret_pc (Q3 !!! Regidx Rra) = mword_of_int (FST + 0x2a)).
@@ -982,7 +982,7 @@ Section ProofFilestat.
                    "bcache"(4), and [locks_below_mono] weakens it. *)
                 ltac:(lkbelow)
                 with "Hcg Hcnt Htext Hpc Hitbl Hesc Hslk
-                      Hheld Hslpid Hppid Hprocs
+                      Hheld Hppid Hprocs
                       Hdep Hidev Hinum Hvalid Hlk Hshot Hfrz").
       all: try lkbelow.
       iIntros (CIDiu Hsiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hshr".

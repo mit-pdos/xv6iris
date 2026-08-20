@@ -844,7 +844,7 @@ Section ProofInitlog.
     (* ---- the handle: its bytes ARE the header block's logical content ---- *)
     rewrite /bio_locked /bio_held.
     iDestruct "Hheld" as
-      "(%HA & %HB & %HC & Hslk & Hpid & Hvalid & Hbdev & Hbown & Hdisk & Hpay)".
+      "(%HA & %HB & %HC & Hslk & Hvalid & Hbdev & Hbown & Hdisk & Hpay)".
     assert (Huintl : uint (mword_of_int logstart : mword 32)
                      = log_hdr_bno logstart)
       by (rewrite /log_hdr_bno; exact Huint).
@@ -897,10 +897,10 @@ Section ProofInitlog.
     (* rebuild the handle: the buffer was only READ *)
     iAssert (bio_locked bn (fs_view γfs γd dev cov) kk pidv dev
                (mword_of_int logstart : mword 32) bs_hdr bsd0 d0)
-      with "[Hslk Hpid Hvalid Hbdev Hbno Hbdsk Hby Hdisk Hpay]" as "Hheld".
+      with "[Hslk Hvalid Hbdev Hbno Hbdsk Hby Hdisk Hpay]" as "Hheld".
     { rewrite /bio_locked /bio_held /buf_own /bpa.
       iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
-      iSplitL "Hslk"; [iExact "Hslk"|]. iSplitL "Hpid"; [iExact "Hpid"|].
+      iSplitL "Hslk"; [iExact "Hslk"|].
       iSplitL "Hvalid"; [iExact "Hvalid"|]. iSplitL "Hbdev"; [iExact "Hbdev"|].
       iSplitR "Hdisk Hpay".
       { iSplitL "Hbno"; [iExact "Hbno"|]. iSplitL "Hbdsk"; [iExact "Hbdsk"|].

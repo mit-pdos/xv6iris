@@ -3112,7 +3112,7 @@ Section ProofNamexMain.
                    { rewrite Heb /trap_csrs_ext. done. }
                    { rewrite Heb /cpu_claim_ext. done. }
                    iIntros (CIDil Hqil mil dnl bml fl_)
-                     "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hinos Hbs1 Hslkd Hslpid Hdep
+                     "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hinos Hbs1 Hslkd Hdep
                       Hidev Hiinum Hivalid Hload #Hshot Hfrz %Hfr_
                       Hru %Hilkp".
                    assert (Hpcbc : ret_pc (V2 !!! Regidx Rra)
@@ -3331,7 +3331,7 @@ Section ProofNamexMain.
                                HND2a0 Hbelow
                                with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc
                                      Hitb2 Hitbl Hesck Hireg [] Hslkk Hslkd
-                                     Hslpid Hdep Hidev Hiinum Hivalid Hload
+                                     Hdep Hidev Hiinum Hivalid Hload
                                      Hshot Hfrz [$Hkeep2 $Hru] Hbmap Hinos Hbits Hppid Hprocs
                                      Hdev Hgeom Hdlk Hbslot [] Hlog").
                      all: try lkbelow.
@@ -3613,7 +3613,7 @@ Section ProofNamexMain.
                                  Kiu Hik HP3a0
                                  ltac:(lkbelow)
                                  with "Hcg Hcnt Htext Hpc Hitbl Hesck
-                                       Hslkk Hslkd Hslpid Hppid Hprocs Hdep
+                                       Hslkk Hslkd Hppid Hprocs Hdep
                                        Hidev Hiinum Hivalid Hload Hshot Hfrz").
                        all: try lkbelow.
                        iIntros (CIDiu Hqiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid
@@ -3774,7 +3774,7 @@ Section ProofNamexMain.
                          with "[IHl Hcont Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9
                                 Hb10 Hb11 Hb12 Hisl Hbmap Hinos Hbits Hppid
                                 Hcwdc Hcwdr Hname Hbs1 Hbs2 Hlog Hkeep Hru Hslkd
-                                Hslpid Hdep Hidev Hiinum Hivalid Hfrz Hdiat Hity
+                                Hdep Hidev Hiinum Hivalid Hfrz Hdiat Hity
                                 Himaj Himin Hinl Hisz Haddrs Hind Hblocks
                                Hdlnk]"
                          as "Hdlblk".
@@ -4122,7 +4122,7 @@ Section ProofNamexMain.
                                      Hiu Hj Hgs HGB3a0 Hbelow
                                      with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio
                                            Hlogc Hitb2 Hitbl Hesck Hireg []
-                                           Hslkk Hslkd Hslpid Hdep Hidev
+                                           Hslkk Hslkd Hdep Hidev
                                            Hiinum Hivalid Hload Hshot Hfrz [$Hkeep2 $Hru] Hbmap
                                            Hinos Hbits Hppid Hprocs Hdev
                                            Hgeom Hdlk Hbslot Hcrz Hlog").
@@ -4344,7 +4344,7 @@ Section ProofNamexMain.
                                      Hiu Hj Hgs HGC3a0 Hbelow
                                      with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio
                                            Hlogc Hitb2 Hitbl Hesck Hireg []
-                                           Hslkk Hslkd Hslpid Hdep Hidev
+                                           Hslkk Hslkd Hdep Hidev
                                            Hiinum Hivalid Hload Hshot Hfrz [$Hkeep2 $Hru] Hbmap
                                            Hinos Hbits Hppid Hprocs Hdev
                                            Hgeom Hdlk Hbslot Hcrz Hlog").
@@ -4637,7 +4637,7 @@ Section ProofNamexMain.
                                HND2a0 Hbelow
                                with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc
                                      Hitb2 Hitbl Hesck Hireg [] Hslkk Hslkd
-                                     Hslpid Hdep Hidev Hiinum Hivalid Hload
+                                     Hdep Hidev Hiinum Hivalid Hload
                                      Hshot Hfrz [$Hkeep2 $Hru] Hbmap Hinos Hbits Hppid Hprocs
                                      Hdev Hgeom Hdlk Hbslot [] Hlog").
                      all: try lkbelow.

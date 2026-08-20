@@ -657,8 +657,7 @@ Section BreadBlocks.
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-    sleeplocked (snd (bn_slk bn k)) -∗
-    sl_pid (buf_lock (bnode k)) ↦₄ pidv -∗
+    sleeplocked (snd (bn_slk bn k)) (buf_lock (bnode k)) pidv -∗
     bown bn k -∗
     bref bn k q dev bno -∗
     bd_cont (CID0 := CID0)  j bn V pidv dev bno dq m K eb (proc_addr j) lks -∗
@@ -667,7 +666,7 @@ Section BreadBlocks.
     intros HK Hbno Hk Hgd Hcov Hdv Hj Hgl Hregs HMs1.
     pose proof Hregs as (HMsp & HMs2 & HMs3 & HMthr).
     iIntros "Hcg #Htext Hpc #Hesc Hframe Hcnt Hextc Hextm #Hprocs Hppid".
-    iIntros "#Hdev #Hgeom #Hdlock Hstok Hpid Hbown Hbref Hcont".
+    iIntros "#Hdev #Hgeom #Hdlock Hstok Hbown Hbref Hcont".
     (* the tail runs at depth 0 -- bread's own acquire/release around the
        buffer table is already behind it -- so the held set is forced empty
        and the rw call's order premise needs no hypothesis of its own. *)
@@ -773,12 +772,12 @@ Section BreadBlocks.
       iApply (bread_epi (CID0 := CIDv2)  j bn V k pidv dev bno dq m T1 K eb
                 bs bsd d lks HK HT1regs HT1s1
                 with "Hcg Htext Hpc Hframe Hcnt Hextc Hextm Hppid
-                      [Hstok Hpid Hvld Hbdev Hbuf Hdb Hpy] Hcont").
+                      [Hstok Hvld Hbdev Hbuf Hdb Hpy] Hcont").
       rewrite /bio_locked /bio_held /bpa.
       iSplitR; [by iPureIntro|].
       iSplitR; [by iPureIntro|].
       iSplitR; [by iPureIntro|].
-      iFrame "Hstok Hpid Hvld Hbdev Hbuf Hdb Hpy".
+      iFrame "Hstok Hvld Hbdev Hbuf Hdb Hpy".
     - (* ============ b->valid = 0: the disk read ============ *)
       (* the parked payload of an INVALID covered buffer IS the block's pool
          bundle: whoever wins the sleeplock race after a recycle finds it
@@ -979,12 +978,12 @@ Section BreadBlocks.
       iApply (bread_epi (CID0 := CIDt8)  j bn V k pidv dev bno dq m T5 K eb
                 bsl bsl false lks HK HT5regs HT5s1
                 with "Hcg Htext Hpc Hframe Hcnt Hextc Hextm Hppid
-                      [Hstok Hpid Hvld Hbdev Hbuf Hdb Hpy] Hcont").
+                      [Hstok Hvld Hbdev Hbuf Hdb Hpy] Hcont").
       rewrite /bio_locked /bio_held /bpa.
       iSplitR; [by iPureIntro|].
       iSplitR; [by iPureIntro|].
       iSplitR; [by iPureIntro|].
-      iFrame "Hstok Hpid Hvld Hbdev Hbuf Hdb Hpy".
+      iFrame "Hstok Hvld Hbdev Hbuf Hdb Hpy".
   Qed.
 
   (* ================================================================== *)
@@ -1233,8 +1232,8 @@ Section BreadBlocks.
     { iEval (rewrite HH7a0). iExact "Hslk". }
     (* acquiresleep PARKS: it returns on hart [CIDs], handing the complement
        back too. *)
-    iIntros (CIDs Hss mf) "%Hcsasl Hcg Hcnt Hextc Hextm Hpc Hstok Hpid Hbown Hppid".
-    iEval (rewrite HH7a0) in "Hpid".
+    iIntros (CIDs Hss mf) "%Hcsasl Hcg Hcnt Hextc Hextm Hpc Hstok Hbown Hppid".
+    iEval (rewrite HH7a0) in "Hstok".
     iPoseProof (bdi_62 with "Htext") as "Hi62".
     assert (Hpc62 : ret_pc (H7 !!! Regidx Rra) = mword_of_int (KernelSyms.bread + 0x62)).
     { rewrite HH7ra. apply bv_eq; vm_compute; reflexivity. }
@@ -1275,7 +1274,7 @@ Section BreadBlocks.
     iApply (bread_tail (CID0 := CIDh3)  γs j γl γu γd γk pd pav pu bn V k qref pidv dev bno dq
               m mf K eb lks HK Hbno Hk Hgd Hcov Hdv Hj Hgl Hmfregs Hmfs1
               with "Hcg Htext Hpc Hesc Hframe Hcnt Hextc Hextm Hprocs Hppid
-                    Hdev Hgeom Hdlock Hstok Hpid Hbown Href Hcont").
+                    Hdev Hgeom Hdlock Hstok Hbown Href Hcont").
   Qed.
 
   (* ================================================================== *)
@@ -1628,8 +1627,8 @@ Section BreadBlocks.
     { iEval (rewrite HC6a0). iExact "Hslk". }
     (* acquiresleep PARKS: it returns on hart [CIDs], handing the complement
        back too. *)
-    iIntros (CIDs Hss mf) "%Hcsasl Hcg Hcnt Hextc Hextm Hpc Hstok Hpid Hbown Hppid".
-    iEval (rewrite HC6a0) in "Hpid".
+    iIntros (CIDs Hss mf) "%Hcsasl Hcg Hcnt Hextc Hextm Hpc Hstok Hbown Hppid".
+    iEval (rewrite HC6a0) in "Hstok".
     assert (Hpcb4 : ret_pc (C6 !!! Regidx Rra) = mword_of_int (KernelSyms.bread + 0xb4)).
     { rewrite HC6ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpcb4) in "Hpc".
@@ -1651,7 +1650,7 @@ Section BreadBlocks.
     iApply (bread_tail (CID0 := CIDs)  γs j γl γu γd γk pd pav pu bn V k (1/4)%Qp pidv dev bno dq
               m mf K eb lks HK Hbno Hk Hgd Hcov Hdv Hj Hgl Hmfregs Hmfs1
               with "Hcg Htext Hpc Hesc Hframe Hcnt Hextc Hextm Hprocs Hppid
-                    Hdev Hgeom Hdlock Hstok Hpid Hbown Href Hcont").
+                    Hdev Hgeom Hdlock Hstok Hbown Href Hcont").
   Qed.
 
   (* ================================================================== *)

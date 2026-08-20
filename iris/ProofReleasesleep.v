@@ -85,7 +85,7 @@ Section ProofReleasesleep.
     set (spr := add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     assert (Hcpune : forall i : CPU, eq_vec (zero_reg : mword 64) (mycpu_ret (cid_word_of i)) = false)
       by (intro i; apply mycpu_ret_nonzero; apply tp_ok_cid_of).
-    iIntros "Hcg Hown #Htext Hpc #Hslp Hslk Hpid HRcaller #Hpinv Hcont".
+    iIntros "Hcg Hown #Htext Hpc #Hslp Hslk HRcaller #Hpinv Hcont".
     (* [b] and [eb] coincide here: the entry level is 0, so the ghost
        agreement pins the ambient SIE index to the saved base enable -- which
        is also release's own exit index.  Collapsing the two names is what
@@ -264,6 +264,10 @@ Section ProofReleasesleep.
     { rgne. rewrite HMacqs1. reflexivity. }
     (* open sl_res as the holder: the token refutes the free arm. *)
     iDestruct (sl_res_open_held_q γsl slk R H q with "HRsl Hslk") as "(Hslk & Hha & HHdep & Hcell)".
+    (* the pid field now rides INSIDE the holder token (SleepLock.v's
+       [sleeplocked_q]); open it for the [sw zero,40(s1)] below and close it
+       back at 0, which is exactly the free arm's shape. *)
+    iDestruct (sleeplocked_q_pid with "Hslk") as "[Hpid Hslkback]".
     iDestruct "Hcell" as (v) "[Hslkw %Hnz]".
     (* ===== sw zero,0(s1) : slk->locked := 0 ===== *)
     iPoseProof (rsl_18 with "Htext") as "Hi18".
@@ -283,6 +287,7 @@ Section ProofReleasesleep.
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc Hpid".
     iEval (rewrite Hpidaddr) in "Hpid".
+    iDestruct ("Hslkback" $! (mword_of_int 0 : mword 32) with "Hpid") as "Hslk".
     assert (Hpp20 : add_vec_int (mword_of_int (KernelSyms.releasesleep + 0x1c) : mword 64) 4 = mword_of_int (KernelSyms.releasesleep + 0x20)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp20) in "Hpc".
     (* ===== a0 := s1 (slk) ; jal wakeup ===== *)
@@ -375,7 +380,7 @@ Section ProofReleasesleep.
       rewrite /R2 upd_ne; [| vm_compute; discriminate].
       rewrite /R1 upd_eq. reflexivity. }
     (* rebuild the FREE sl_res: zeroed word + token + zeroed pid + R. *)
-    iDestruct (sl_res_close_free γsl slk R H q with "Hslkw Hslk Hha Hpid HRcaller") as "HRsl".
+    iDestruct (sl_res_close_free γsl slk R H q with "Hslkw Hslk Hha HRcaller") as "HRsl".
     (* release(&slk->lk): intr_count 1 -> 0. *)
     iApply (Release.wp_release_sconf KT1 γl (sl_lk slk) "sleep lock"%string (sl_res_gen γsl slk R H) Krel
               0%nat b pme (av - 4)%nat
@@ -558,10 +563,10 @@ Section ProofReleasesleep.
   Proof.
     cbv beta delta [wp_releasesleep_sconf_body].
     intros pcE slk ret_tgt Hav Hno.
-    iIntros "Hcg Hown #Htext Hpc #Hslp Hslk Hpid HR #Hpinv Hcont".
+    iIntros "Hcg Hown #Htext Hpc #Hslp Hslk HR #Hpinv Hcont".
     iDestruct "Hslk" as (q) "Hslk".
     iApply (wp_releasesleep_gen_sconf γs γl γsl s R sl_untracked q m pd pme av eb b lks
-              Hav Hno with "Hcg Hown Htext Hpc Hslp Hslk Hpid HR Hpinv").
+              Hav Hno with "Hcg Hown Htext Hpc Hslp Hslk HR Hpinv").
     iIntros (CIDf Hsf mf Hcs) "Hcg Hown Hpc _".
     iSpecialize ("Hcont" $! CIDf with "[%]"); [ exact Hsf |].
     iApply ("Hcont" $! mf with "[%] Hcg Hown Hpc"). exact Hcs.

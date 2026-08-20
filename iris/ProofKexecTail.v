@@ -1293,8 +1293,7 @@ Section KexecABad.
               cov logstart inodestart nib dev -∗
     is_sleeplock_gen gil gisl (i_lock (ientry k)) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k)) -∗
     (* ---- the open inode: exactly SpecIunlockput's input ---- *)
-    sleeplocked_q gisl sq -∗
-    sl_pid (i_lock (ientry k)) ↦₄ pidv -∗
+    sleeplocked_q gisl sq (i_lock (ientry k)) pidv -∗
     ic_deposit cn k (DepShr sq dev inum gy) -∗
     i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum -∗
@@ -1350,7 +1349,7 @@ Section KexecABad.
     intros HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib Hcovb Hn2
            Hjp Hgs Hu2 Hsp Hra Hs0 Hs1 Hs2 Hmtsp Hmts4 Hthr.
     
-    iIntros "Hcg Hcnt #Htext Hpc #Hfab #Hslkk Hslkd Hslpid Hdep Hidev
+    iIntros "Hcg Hcnt #Htext Hpc #Hfab #Hslkk Hslkd Hdep Hidev
              Hiinum Hivalid Hload Hity Hfrz Hkeep Hru Hbm Hins Hbits #Hka Hpriv Hpath Hargv
              Hargs Hbs Hirs Hlog Hframe Hcont".
     (* depth 0 with interrupts on forces the held set empty, so iunlockput's
@@ -1411,7 +1410,7 @@ Section KexecABad.
               ltac:(lia) Hk Hlg Hsz Hbm0 Hbmc
               Hbml Hins0 Hibc Hibl Hib Hcovb Hn2 Hjp Hgs HB2a0
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitab Hitinv Hesck
-                    Hireg Hropen Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid Hload
+                    Hireg Hropen Hslkk Hslkd Hdep Hidev Hiinum Hivalid Hload
                     Hity Hfrz [$Hkeep $Hru] Hbm Hins Hbits Hppid Hprocs Hdevi Hdgeom Hdlock Hbs
                     Hlog").
     all: try lkbelow.

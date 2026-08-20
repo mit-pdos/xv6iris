@@ -1064,8 +1064,10 @@ Section BioInv.
     (⌜(k < NBUF)%nat⌝ ∗
      ⌜uint bno ∈ bv_cov V⌝ ∗
      ⌜dev = bv_dev V⌝ ∗
-     sleeplocked (snd (bn_slk bn k)) ∗
-     sl_pid (buf_lock (bnode k)) ↦₄ pidv ∗
+     (* the buffer's sleeplock, held -- its [pid] field is INSIDE the token
+        now (SleepLock.v's [sleeplocked_q]), so [pidv] indexes the token
+        rather than a row of its own. *)
+     sleeplocked (snd (bn_slk bn k)) (buf_lock (bnode k)) pidv ∗
      b_valid (bpa k) ↦₄ (mword_of_int 1 : mword 32) ∗
      b_dev (bpa k) ↦₄{DfracOwn (1/2)} dev ∗
      buf_own (bpa k) bno (mword_of_int 0 : mword 32) bs ∗
@@ -1087,8 +1089,10 @@ Section BioInv.
     (⌜(k < NBUF)%nat⌝ ∗
      ⌜uint bno ∈ bv_cov V⌝ ∗
      ⌜dev = bv_dev V⌝ ∗
-     sleeplocked (snd (bn_slk bn k)) ∗
-     sl_pid (buf_lock (bnode k)) ↦₄ pidv ∗
+     (* the buffer's sleeplock, held -- its [pid] field is INSIDE the token
+        now (SleepLock.v's [sleeplocked_q]), so [pidv] indexes the token
+        rather than a row of its own. *)
+     sleeplocked (snd (bn_slk bn k)) (buf_lock (bnode k)) pidv ∗
      b_valid (bpa k) ↦₄ (mword_of_int 1 : mword 32) ∗
      b_dev (bpa k) ↦₄{DfracOwn (1/2)} dev ∗
      buf_own (bpa k) bno (mword_of_int 0 : mword 32) bs ∗
@@ -1101,10 +1105,10 @@ Section BioInv.
   Proof.
     rewrite /bio_held /bio_hold0.
     iSplit.
-    - iIntros "(%A & %B & %C & H1 & H2 & H3 & H4 & H5 & H6 & H7)".
-      iSplitR "H7"; [|iExact "H7"].
+    - iIntros "(%A & %B & %C & H1 & H2 & H3 & H4 & H5 & H6)".
+      iSplitR "H6"; [|iExact "H6"].
       iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|]. iFrame.
-    - iIntros "[(%A & %B & %C & H1 & H2 & H3 & H4 & H5 & H6) H7]".
+    - iIntros "[(%A & %B & %C & H1 & H2 & H3 & H4 & H5) H6]".
       iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|]. iFrame.
   Qed.
 

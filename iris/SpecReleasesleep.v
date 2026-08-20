@@ -5,7 +5,7 @@
 
    The separation-logic lock spec, sleeplock flavour:
 
-     { is_sleeplock γl γ slk s R ∗ sleeplocked γ ∗ sl_pid slk ↦₄ pd ∗ R
+     { is_sleeplock γl γ slk s R ∗ sleeplocked γ slk pd ∗ R
        ∗ <thread resources> }
        releasesleep(slk)
      { <thread resources> }
@@ -66,8 +66,7 @@ Definition wp_releasesleep_gen_sconf_body `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, 
   kernel_text -∗ pc_is pcE -∗
   is_sleeplock_gen γl γsl slk s R H -∗
   (* the holder's bundle, surrendered back into the lock *)
-  sleeplocked_q γsl q -∗
-  sl_pid slk ↦₄ pd -∗
+  sleeplocked_q γsl q slk pd -∗
   R -∗
   (* wakeup's resources *)
   procs_inv γs -∗
@@ -106,8 +105,7 @@ Definition wp_releasesleep_sconf_body `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !ire
   kernel_text -∗ pc_is pcE -∗
   is_sleeplock γl γsl slk s R -∗
   (* the holder's bundle, surrendered back into the lock *)
-  sleeplocked γsl -∗
-  sl_pid slk ↦₄ pd -∗
+  sleeplocked γsl slk pd -∗
   R -∗
   (* wakeup's resources *)
   procs_inv γs -∗

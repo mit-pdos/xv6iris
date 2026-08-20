@@ -1373,16 +1373,16 @@ Section IputFreePath.
        bio_held bn (fs_view γfs γd dev cov) k pidv dv bno bs bsl bsd d).
   Proof.
     rewrite /bio_held /bio_pay /fs_view /=.
-    iIntros "(%A & %B & %C & H1 & H2 & H3 & H4 & H5 & H6 & Hpay)".
+    iIntros "(%A & %B & %C & H1 & H3 & H4 & H5 & H6 & Hpay)".
     destruct d.
     - rewrite /fs_mdirty. iDestruct "Hpay" as "[[HL HD] Hq]".
       iFrame "HL". iIntros "HL".
       iSplitR; [done |]. iSplitR; [done |]. iSplitR; [done |].
-      iFrame "H1 H2 H3 H4 H5 H6". iFrame "HL HD Hq".
+      iFrame "H1 H3 H4 H5 H6". iFrame "HL HD Hq".
     - rewrite /fs_mclean. iDestruct "Hpay" as "[[HL HD] %He]".
       iFrame "HL". iIntros "HL".
       iSplitR; [done |]. iSplitR; [done |]. iSplitR; [done |].
-      iFrame "H1 H2 H3 H4 H5 H6". iFrame "HL HD". done.
+      iFrame "H1 H3 H4 H5 H6". iFrame "HL HD". done.
   Qed.
 
   (* ======================================================================
@@ -2408,10 +2408,10 @@ Section IputFreePath.
     { iEval (rewrite HR0a0). iExact "Hslk". }
     (* ===== acquiresleep returns: place the deposit, re-park, release itable ===== *)
     iApply wp_next_off_intro.
-    iIntros (mfa) "%Hcsa Hcg Hcnt Hpc Hstok Hisl Hspid Hictok Hppid".
+    iIntros (mfa) "%Hcsa Hcg Hcnt Hpc Hstok Hisl Hictok Hppid".
     rewrite -(isl_slot_some Mt k q 1%positive HMk1).
     iDestruct ("Hislback" $! Mt with "[%] Hisl") as "Hipool"; [ done |].
-    iEval (rewrite HR0a0) in "Hspid".
+    iEval (rewrite HR0a0) in "Hstok".
     assert (Hpc5e : ret_pc (R0 !!! Regidx Rra) = mword_of_int (KernelSyms.iput + 0x5e))
       by (rewrite HR0ra; pcw).
     iEval (rewrite Hpc5e) in "Hpc".
@@ -2801,10 +2801,10 @@ Section IputFreePath.
     iApply (RS.wp_releasesleep_gen_sconf γs gil gisl "inode"%string (ic_tok cn k)
               (slh_tok (icfg_isl k)) q J6 pidv pj (K - 6)%nat eb eb lks
               ltac:(lia) ltac:(lkbelow)
-              with "Hcg Hcnt Htext Hpc [] Hstok [Hspid] Hictok Hprocs").
+              with "Hcg Hcnt Htext Hpc [] [Hstok] Hictok Hprocs").
     all: try lkbelow.
     { iEval (rewrite HJ6a0). iExact "Hslk". }
-    { iEval (rewrite HJ6a0). iExact "Hspid". }
+    { iEval (rewrite HJ6a0). iExact "Hstok". }
     iIntros (CIDrs Hsrs mrs) "%Hcsr Hcg Hcnt Hpc Hrslh".
     (* the sleeplock's share comes home, but NOT the live slice: that one is
        in [islot2]'s frozen park until +0x82.  So what this thread holds

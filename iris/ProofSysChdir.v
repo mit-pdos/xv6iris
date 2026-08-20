@@ -1559,7 +1559,7 @@ Section ProofSysChdirBody.
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
         iIntros (CID24 Hq24 mil dn bm fl)
-          "%Hcsil Hcg Hown _ _ Hpc Hpidq Hsbi Hbs1 Hslkd Hslpid Hdep
+          "%Hcsil Hcg Hown _ _ Hpc Hpidq Hsbi Hbs1 Hslkd Hdep
            Hidev Hiinum Hivalid Hload #Hshot Hfrz %Hfl Hruip %Hilkp".
         assert (Hpc38 : ret_pc (P0 !!! Regidx Rra : mword 64)
                         = mword_of_int (SC + 0x38)) by (rewrite HP0ra; pcw).
@@ -1725,7 +1725,7 @@ Section ProofSysChdirBody.
                     pid (DfracOwn (1/4)) P4 (K - 20)%nat eb pj b lks
                     ltac:(lia) Hkk HP4a0 (Hlb "sleep lock"%string)
                     with "Hcg Hown Htext Hpc Hitinv Hesck Hslkk Hslkd
-                          Hslpid Hpidq Hprocs Hdep Hidev Hiinum Hivalid Hload
+                          Hpidq Hprocs Hdep Hidev Hiinum Hivalid Hload
                           Hshot Hfrz").
           iIntros (CID30 Hq30 miu) "%Hcsiu Hcg Hown Hpc Hpidq Hshr".
           iDestruct (inode_shr_gen_forget with "Hshr") as "Hshr".
@@ -2075,7 +2075,7 @@ Section ProofSysChdirBody.
                     ltac:(lia) Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
                     Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl HQ1a0 (Hlb "log"%string)
                     with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hitab Hitinv
-                          Hesck Hireg Hropen Hslkk Hslkd Hslpid Hdep Hidev Hiinum
+                          Hesck Hireg Hropen Hslkk Hslkd Hdep Hidev Hiinum
                           Hivalid Hload Hshot Hfrz [$Hkeep $Hruip] Hsbb Hsbi Hbmres Hpidq
                           Hprocs Hdev Hgeo Hdlk Hbsl [HopS]").
           { rewrite Heb /trap_csrs_ext. done. }

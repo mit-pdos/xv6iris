@@ -266,8 +266,7 @@ Definition create_fresh_ty_body
          pc_is (mword_of_int (KernelSyms.create + 0xb4) : mword 64) ∗
          is_sleeplock_gen gil gisl (i_lock (ientry kslot)) "inode"%string
                           (ic_tok cn kslot) (slh_tok (icfg_isl kslot)) ∗
-         sleeplocked_q gisl (q/2)%Qp ∗
-         sl_pid (i_lock (ientry kslot)) ↦₄ pidv ∗
+         sleeplocked_q gisl (q/2)%Qp (i_lock (ientry kslot)) pidv ∗
          ic_deposit cn kslot (DepShr (q/2)%Qp dev inum g) ∗
          i_dev (ientry kslot) ↦₄{DfracOwn (1/2)} dev ∗
          i_inum (ientry kslot) ↦₄{DfracOwn (1/2)} inum ∗
@@ -632,7 +631,7 @@ Proof.
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     iIntros (CID8 Hq8 Mo dnc bmc filled)
-      "%Hcso Hcg Hcnt _ _ Hpc Hppid Hsbi Hbs1 Hslq Hslpid Hdep
+      "%Hcso Hcg Hcnt _ _ Hpc Hppid Hsbi Hbs1 Hslq Hdep
        Hcidev Hciinum Hcivalid Hcload #Hcshot Hcfrz %Hfrf Hwb %Hilkp".
     destruct Hilkp as [Hfilled Htyeq].
     pose proof (Hfrf Hfilled) as Hfresh.
@@ -645,7 +644,7 @@ Proof.
     iSpecialize ("Hcont" $! CID8 with "[%]"); [wp_next_chain |].
     iApply ("Hcont" $! Mo true kslot q gsh inum gilc gislc dnc bmc
               with "[%] Hcg Hcnt Hsbn Hsbi Hppid Hbsl Hidev
-                    [Hpc Hslq Hslpid Hdep Hcidev Hciinum Hcivalid Hcload Hcfrz
+                    [Hpc Hslq Hdep Hcidev Hciinum Hcivalid Hcload Hcfrz
                      Hkeep Hwb Hop]").
     { intros c Hc Hne.
       rewrite (callee_saved_lookup Hcso c Hc) (HB1cs c Hc Hne)
@@ -659,7 +658,7 @@ Proof.
     iSplitL "Hpc"; [iExact "Hpc" |].
     iSplitR; [iExact "Hslkc" |].
     iSplitL "Hslq"; [iExact "Hslq" |].
-    iSplitL "Hslpid"; [iExact "Hslpid" |].
+
     iSplitL "Hdep"; [iExact "Hdep" |].
     iSplitL "Hcidev"; [iExact "Hcidev" |].
     iSplitL "Hciinum"; [iExact "Hciinum" |].

@@ -76,7 +76,7 @@ Section ProofHoldingsleep.
     intros pcE slk ret_tgt Hav Hfresh.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6)))).
-    iIntros "Hcg Hcnt #Htext Hpc #Hsleeplock Hsl Hpidfield Hpidproc Hcont".
+    iIntros "Hcg Hcnt #Htext Hpc #Hsleeplock Hsl Hpidproc Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Heb. cbn in Heb.
     subst eb.
     (* stack-slot address bridges (spr-relative store offset -> pa_stk sp0 k). *)
@@ -249,6 +249,10 @@ Section ProofHoldingsleep.
     (* open sl_res with the caller's token: refute the free arm. *)
     iDestruct (sl_res_open_held_q γsl slk R H q with "HR Hsl")
       as "(Hsl & Hha & HHq & Hcellex)".
+    (* the lock's pid field rides inside the holder token now (SleepLock.v's
+       [sleeplocked_q]); holdingsleep only READS it, so it comes out and goes
+       straight back at the same value. *)
+    iDestruct (sleeplocked_q_pid with "Hsl") as "[Hpidfield Hslback]".
     iAssert (sl_dep γsl H) with "[Hha HHq]" as "Hdep"; [ iExists q; iFrame |].
     iDestruct "Hcellex" as (v) "(Hslk & %Hvnz)".
     (* +0x18 c.lw a5,0(s1) : a5 := sext v *)
@@ -318,6 +322,7 @@ Section ProofHoldingsleep.
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc Hpidfield".
     iEval (rewrite Haddr34) in "Hpidfield".
+    iDestruct ("Hslback" $! pidv with "Hpidfield") as "Hsl".
     set (B34 := <[Regidx (mword_of_int 19 : mword 5) := regval_into_reg (sign_extend' 64 pidv)]> B18).
     change (<[Regidx (mword_of_int 19 : mword 5) := regval_into_reg (sign_extend' 64 pidv)]> B18) with B34.
     assert (Hpp38 : add_vec_int (mword_of_int (KernelSyms.holdingsleep + 0x34) : mword 64) 4 = mword_of_int (KernelSyms.holdingsleep + 0x38)) by (apply bv_eq; vm_compute; reflexivity).
@@ -695,7 +700,7 @@ Section ProofHoldingsleep.
     iDestruct (cpu_own_transport CIDrel CIDe7 0%nat b p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iSpecialize ("Hcont" $! CIDe7 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! E2e with "[%] Hcg Hcnt Hpc Hsl Hpidfield Hpidproc").
+    iApply ("Hcont" $! E2e with "[%] Hcg Hcnt Hpc Hsl Hpidproc").
     { split.
       - unfold callee_saved.
         split; [exact HE2e_csp|].
@@ -722,13 +727,13 @@ Section ProofHoldingsleep.
   Proof.
     cbv beta delta [wp_holdingsleep_sconf_body].
     intros pcE slk ret_tgt Hav Hbelow.
-    iIntros "Hcg Hcnt #Htext Hpc #Hslk Hsl Hpidfield Hpidproc Hcont".
+    iIntros "Hcg Hcnt #Htext Hpc #Hslk Hsl Hpidproc Hcont".
     iDestruct "Hsl" as (q) "Hsl".
     iApply (wp_holdingsleep_gen_sconf γl γsl s R sl_untracked q m p pidv av eb dq b lks
-              Hav Hbelow with "Hcg Hcnt Htext Hpc Hslk Hsl Hpidfield Hpidproc").
-    iIntros (CIDf Hsf mf Hcs) "Hcg Hcnt Hpc Hsl Hpidfield Hpidproc".
+              Hav Hbelow with "Hcg Hcnt Htext Hpc Hslk Hsl Hpidproc").
+    iIntros (CIDf Hsf mf Hcs) "Hcg Hcnt Hpc Hsl Hpidproc".
     iSpecialize ("Hcont" $! CIDf with "[%]"); [ exact Hsf |].
-    iApply ("Hcont" $! mf with "[%] Hcg Hcnt Hpc [Hsl] Hpidfield Hpidproc"); [ exact Hcs |].
+    iApply ("Hcont" $! mf with "[%] Hcg Hcnt Hpc [Hsl] Hpidproc"); [ exact Hcs |].
     iExists q. iExact "Hsl".
   Qed.
 

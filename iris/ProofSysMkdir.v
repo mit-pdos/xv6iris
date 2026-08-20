@@ -1264,7 +1264,7 @@ Section ProofSysMkdirBody.
           exact (Hcrthr c Hc N2' N8). }
         (* the ten conjuncts create hands back ARE iunlockput's precondition *)
         iDestruct "Hlocked" as (gil gisl)
-          "(Hslk & Hslkd & Hslpid & Hdep & Hidev & Hiinum & Hivalid & Hload &
+          "(Hslk & Hslkd & Hdep & Hidev & Hiinum & Hivalid & Hload &
             Hshot & Hfrz & Href & Hru)".
         (* create's payout is GENERATION-NAMED now; iunlockput takes the
            erased reference, so weaken it back here.  One line, and the
@@ -1286,7 +1286,7 @@ Section ProofSysMkdirBody.
                   ltac:(exact (proj2 (proj2 Hun1) eq_refl)) Hj Hgl HP0a0
                   (Hlb "log"%string)
                   with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hitab Hitinv
-                        Hesc Hireg [] Hslk Hslkd Hslpid Hdep Hidev Hiinum Hivalid
+                        Hesc Hireg [] Hslk Hslkd Hdep Hidev Hiinum Hivalid
                         Hload Hshot Hfrz [$Href $Hru] Hsbb Hsbi Hbmres Hpidq Hprocs Hdev
                         Hgeo Hdlk Hbsl [HopS]").
         { rewrite Heb /trap_csrs_ext. done. }

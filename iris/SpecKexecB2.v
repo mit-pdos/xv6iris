@@ -426,8 +426,7 @@ Section KexecB2Res.
       (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap) (gilf gislf : gname) :
     is_sleeplock_gen gilf gislf (i_lock (ientry kf)) "inode"%string (ic_tok cn kf) (slh_tok (icfg_isl kf)) -∗
-    sleeplocked_q gislf sf -∗
-    sl_pid (i_lock (ientry kf)) ↦₄ pidv -∗
+    sleeplocked_q gislf sf (i_lock (ientry kf)) pidv -∗
     ic_deposit cn kf (DepShr sf dev inumf gyf) -∗
     i_dev (ientry kf) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry kf) ↦₄{DfracOwn (1/2)} inumf -∗
@@ -442,9 +441,9 @@ Section KexecB2Res.
              gilf gislf.
   Proof.
     rewrite /kxc_open.
-    iIntros "A B C D E F G H I I2 J K".
+    iIntros "A B D E F G H I I2 J K".
     iSplitL "A"; [iExact "A" |]. iSplitL "B"; [iExact "B" |].
-    iSplitL "C"; [iExact "C" |]. iSplitL "D"; [iExact "D" |].
+    iSplitL "D"; [iExact "D" |].
     iSplitL "E"; [iExact "E" |]. iSplitL "F"; [iExact "F" |].
     iSplitL "G"; [iExact "G" |]. iSplitL "H"; [iExact "H" |].
     iSplitL "I"; [iExact "I" |]. iSplitL "I2"; [iExact "I2" |].

@@ -1465,7 +1465,7 @@ Section InstallTransBlocks.
     (* the log slot's bytes ARE the logged content: the payload's L-half
        against the batch's own client half *)
     iEval (rewrite /bio_locked /bio_held) in "Hlk1".
-    iDestruct "Hlk1" as "(%Hk1 & %Hcv1 & %Hdv1 & Hslk1 & Hspid1 & Hvld1 & Hbdev1 & Hbuf1 & Hdsk1 & Hpay1)".
+    iDestruct "Hlk1" as "(%Hk1 & %Hcv1 & %Hdv1 & Hslk1 & Hvld1 & Hbdev1 & Hbuf1 & Hdsk1 & Hpay1)".
     iDestruct (it_pay_bs with "Hfblog Hpay1") as %Hbs1. subst bs1.
     (* ===== +0x82 c.mv s2,a0 : s2 := lbuf ===== *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.install_trans + 0x82)) Rs2 Ra0
@@ -1579,7 +1579,7 @@ Section InstallTransBlocks.
     (* the home block arrives DIRTY (its dirty half agrees with the batch's,
        which is at true), and its bytes are the logged content *)
     iEval (rewrite /bio_locked /bio_held) in "Hlk2".
-    iDestruct "Hlk2" as "(%Hk2 & %Hcv2 & %Hdv2 & Hslk2 & Hspid2 & Hvld2 & Hbdev2 & Hbuf2 & Hdsk2 & Hpay2)".
+    iDestruct "Hlk2" as "(%Hk2 & %Hcv2 & %Hdv2 & Hslk2 & Hvld2 & Hbdev2 & Hbuf2 & Hdsk2 & Hpay2)".
     iDestruct (it_pay_d with "Hdirty Hpay2") as %Hd2. subst d2.
     iDestruct (it_pay_bs_auth with "HauthL Hpay2") as %Hlk2.
     assert (Hbs2 : bs2 = Lw t).
@@ -1767,12 +1767,12 @@ Section InstallTransBlocks.
       with "[Hbno2 Hbdsk2 Hdata2]" as "Hbuf2".
     { rewrite /buf_own. iFrame "Hbno2 Hbdsk2 Hdata2". iPureIntro. exact Hlen2. }
     iAssert (bio_hold0 bn (fs_view γfs γd dev cov) k2 pidv dev w (Lw t) bsd2)
-      with "[Hslk2 Hspid2 Hvld2 Hbdev2 Hbuf2 Hdsk2]" as "Hhold".
+      with "[Hslk2 Hvld2 Hbdev2 Hbuf2 Hdsk2]" as "Hhold".
     { rewrite /bio_hold0.
       iSplitR; [iPureIntro; exact Hk2|].
       iSplitR; [iPureIntro; exact Hcv2|].
       iSplitR; [iPureIntro; exact Hdv2|].
-      iFrame "Hslk2 Hspid2 Hvld2 Hbdev2 Hbuf2 Hdsk2". }
+      iFrame "Hslk2 Hvld2 Hbdev2 Hbuf2 Hdsk2". }
     iDestruct (cpu_own_transport CIDb2 CIDa18 0%nat eb (proc_addr j) eb
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (trap_csrs_ext_transport CIDb2 CIDa18 eb (proc_addr j) ltac:(wp_next_chain) with "Hextc") as "Hextc".
@@ -1936,12 +1936,12 @@ Section InstallTransBlocks.
       with "[Hbno1 Hbdsk1 Hdata1]" as "Hbuf1".
     { rewrite /buf_own. iFrame "Hbno1 Hbdsk1 Hdata1". iPureIntro. exact Hlen1. }
     iAssert (bio_locked bn (fs_view γfs γd dev cov) k1 pidv dev bnol (Lw t) bsd1 d1)
-      with "[Hslk1 Hspid1 Hvld1 Hbdev1 Hbuf1 Hdsk1 Hpay1]" as "Hlk1".
+      with "[Hslk1 Hvld1 Hbdev1 Hbuf1 Hdsk1 Hpay1]" as "Hlk1".
     { rewrite /bio_locked /bio_held.
       iSplitR; [iPureIntro; exact Hk1|].
       iSplitR; [iPureIntro; exact Hcv1|].
       iSplitR; [iPureIntro; exact Hdv1|].
-      iFrame "Hslk1 Hspid1 Hvld1 Hbdev1 Hbuf1 Hdsk1 Hpay1". }
+      iFrame "Hslk1 Hvld1 Hbdev1 Hbuf1 Hdsk1 Hpay1". }
     iDestruct (cpu_own_transport CIDb4 CIDa24 0%nat eb (proc_addr j) eb
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Brelse.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) k1 pidv dev bnol dq
@@ -1992,14 +1992,14 @@ Section InstallTransBlocks.
     assert (HB13regs : it_lregs m B13 t)
       by (apply it_lregs_upd; [vm_compute; reflexivity | exact HB12regs]).
     iEval (rewrite /bio_hold0) in "Hhold".
-    iDestruct "Hhold" as "(%Hk2b & %Hcv2b & %Hdv2b & Hslk2 & Hspid2 & Hvld2 & Hbdev2 & Hbuf2 & Hdsk2)".
+    iDestruct "Hhold" as "(%Hk2b & %Hcv2b & %Hdv2b & Hslk2 & Hvld2 & Hbdev2 & Hbuf2 & Hdsk2)".
     iAssert (bio_locked bn (fs_view γfs γd dev cov) k2 pidv dev w (Lw t) (Lw t) false)
-      with "[Hslk2 Hspid2 Hvld2 Hbdev2 Hbuf2 Hdsk2 Hpay2c]" as "Hlk2".
+      with "[Hslk2 Hvld2 Hbdev2 Hbuf2 Hdsk2 Hpay2c]" as "Hlk2".
     { rewrite /bio_locked /bio_held.
       iSplitR; [iPureIntro; exact Hk2|].
       iSplitR; [iPureIntro; exact Hcv2|].
       iSplitR; [iPureIntro; exact Hdv2|].
-      iFrame "Hslk2 Hspid2 Hvld2 Hbdev2 Hbuf2 Hdsk2 Hpay2c". }
+      iFrame "Hslk2 Hvld2 Hbdev2 Hbuf2 Hdsk2 Hpay2c". }
     iDestruct (cpu_own_transport CIDb5 CIDa26 0%nat eb (proc_addr j) eb
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Brelse.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) k2 pidv dev w dq

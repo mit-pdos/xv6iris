@@ -540,7 +540,7 @@ Section KexecMain.
                     Hpath Hargv Hargs Hbs Hirs Hcont []").
     iIntros (CIDa) "%Hsa".
     iIntros (M90 kf qf sf inumf dnf bmf gilf gislf gyf n2 used2)
-            "%Hregs90 %Hn2u Hpc Hcg Hcnt Hslk Hslked Hslpid Hdep Hidev Hiinum
+            "%Hregs90 %Hn2u Hpc Hcg Hcnt Hslk Hslked Hdep Hidev Hiinum
              Hival Hloaded Hity Hfrz Hiref Hru Hlog Hirs Hbm Hins Hbits Hbs #Hka2
              Hpriv
              Hpath Hargv Hargs Hframe Hcont".
@@ -550,13 +550,13 @@ Section KexecMain.
     (* the nine resources phase B threads whole and never looks inside *)
     iAssert (kxc_open gfs gi cn cov logstart dev pidv kf qf sf gyf inumf dnf
                       bmf gilf gislf)
-      with "[Hslk Hslked Hslpid Hdep Hidev Hiinum Hival Hloaded Hity Hfrz
+      with "[Hslk Hslked Hdep Hidev Hiinum Hival Hloaded Hity Hfrz
              Hiref Hru]"
       as "Hopen".
     { rewrite /kxc_open.
       iSplitL "Hslk"; [iExact "Hslk" |].
       iSplitL "Hslked"; [iExact "Hslked" |].
-      iSplitL "Hslpid"; [iExact "Hslpid" |].
+
       iSplitL "Hdep"; [iExact "Hdep" |].
       iSplitL "Hidev"; [iExact "Hidev" |].
       iSplitL "Hiinum"; [iExact "Hiinum" |].

@@ -1870,7 +1870,7 @@ Section ProofFilewrite.
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     iIntros (CIDil Hsil mil dnl bml fl_)
-      "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hsbi Hbsl1 Hheld Hslpid Hdep
+      "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hsbi Hbsl1 Hheld Hdep
        Hidev Hinum Hvalid Hlk #Hshot Hfrz %Hfr_ _ %Hilkp".
     iDestruct ("Hpbk2" with "Hppid") as "Hpriv".
     assert (Hpc90 : ret_pc (D3 !!! Regidx Rra) = mword_of_int (FW + 0x90)).
@@ -2298,7 +2298,7 @@ Section ProofFilewrite.
                  "log"(3), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hit Hesc Hslk2
-                    Hheld Hslpid Hppid Hprocs
+                    Hheld Hppid Hprocs
                     Hdep Hidev Hinum Hvalid Hlk [Hshot] Hfrz").
     all: try lkbelow.
     { rewrite Htyq. iExact "Hshot". }

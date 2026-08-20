@@ -2504,7 +2504,7 @@ Section EndOpBlocks.
         exact (proj2 HA5regs c Hcs N2 N8 N9 N18 N19 N20 N21). }
     iEval (rewrite /bio_locked /bio_held) in "Hlk1".
     iDestruct "Hlk1" as
-      "(%Hk1 & %Hcv1 & %Hdv1 & Hslk1 & Hspid1 & Hvld1 & Hbdev1 & Hbuf1 & Hdsk1 & Hpay1)".
+      "(%Hk1 & %Hcv1 & %Hdv1 & Hslk1 & Hvld1 & Hbdev1 & Hbuf1 & Hdsk1 & Hpay1)".
     (* ===== +0xc6 c.mv s1,a0 : s1 := the log-slot buffer ===== *)
     iPoseProof (eoi_c6 with "Htext") as "Hic6".
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.end_op + 0xc6)) Rs1 Ra0
@@ -2680,7 +2680,7 @@ Section EndOpBlocks.
         exact (proj2 HB4regs c Hcs N2 N8 N9 N18 N19 N20 N21). }
     iEval (rewrite /bio_locked /bio_held) in "Hlk2".
     iDestruct "Hlk2" as
-      "(%Hk2 & %Hcv2 & %Hdv2 & Hslk2 & Hspid2 & Hvld2 & Hbdev2 & Hbuf2 & Hdsk2 & Hpay2)".
+      "(%Hk2 & %Hcv2 & %Hdv2 & Hslk2 & Hvld2 & Hbdev2 & Hbuf2 & Hdsk2 & Hpay2)".
     (* THE HOME BLOCK'S BYTES, off the checked-out AUTHORITY *)
     iDestruct (eo_pay_bs_auth with "HauthL Hpay2") as %Hlkhome.
     (* ===== +0xd4 c.mv s3,a0 : s3 := the home buffer ===== *)
@@ -2899,11 +2899,11 @@ Section EndOpBlocks.
         exact (proj2 HG5regs c Hcs N2 N8 N9 N18 N19 N20 N21). }
     (* the HOME handle goes back together, untouched *)
     iAssert (bio_locked bn (fs_view γfs γd dev cov) k2 pidv dev w bs2 bsd2 d2)
-      with "[Hslk2 Hspid2 Hvld2 Hbdev2 Hbno2 Hbdsk2 Hdata2 Hdsk2 Hpay2]" as "Hlk2".
+      with "[Hslk2 Hvld2 Hbdev2 Hbno2 Hbdsk2 Hdata2 Hdsk2 Hpay2]" as "Hlk2".
     { rewrite /bio_locked /bio_held.
       iSplitR; [iPureIntro; exact Hk2|]. iSplitR; [iPureIntro; exact Hcv2|].
       iSplitR; [iPureIntro; exact Hdv2|].
-      iSplitL "Hslk2"; [iExact "Hslk2"|]. iSplitL "Hspid2"; [iExact "Hspid2"|].
+      iSplitL "Hslk2"; [iExact "Hslk2"|].
       iSplitL "Hvld2"; [iExact "Hvld2"|]. iSplitL "Hbdev2"; [iExact "Hbdev2"|].
       iSplitR "Hdsk2 Hpay2".
       { rewrite /buf_own. iSplitL "Hbno2"; [iExact "Hbno2"|].
@@ -2979,11 +2979,11 @@ Section EndOpBlocks.
         rewrite /H2 upd_ne; [| regne].
         exact (proj2 HH1regs c Hcs N2 N8 N9 N18 N19 N20 N21). }
     iAssert (bio_hold0 bn (fs_view γfs γd dev cov) k1 pidv dev bnol bs2 bsd1)
-      with "[Hslk1 Hspid1 Hvld1 Hbdev1 Hbno1 Hbdsk1 Hdata1 Hdsk1]" as "Hhold".
+      with "[Hslk1 Hvld1 Hbdev1 Hbno1 Hbdsk1 Hdata1 Hdsk1]" as "Hhold".
     { rewrite /bio_hold0.
       iSplitR; [iPureIntro; exact Hk1|]. iSplitR; [iPureIntro; exact Hcv1|].
       iSplitR; [iPureIntro; exact Hdv1|].
-      iSplitL "Hslk1"; [iExact "Hslk1"|]. iSplitL "Hspid1"; [iExact "Hspid1"|].
+      iSplitL "Hslk1"; [iExact "Hslk1"|].
       iSplitL "Hvld1"; [iExact "Hvld1"|]. iSplitL "Hbdev1"; [iExact "Hbdev1"|].
       iSplitR "Hdsk1"; [| iExact "Hdsk1"].
       rewrite /buf_own. iSplitL "Hbno1"; [iExact "Hbno1"|].

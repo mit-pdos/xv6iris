@@ -382,16 +382,16 @@ Section IallocBytes.
        bio_held bn (fs_view γfs γd dev cov) k pidv dv bno bs bsl bsd d).
   Proof.
     rewrite /bio_held /bio_pay /fs_view /=.
-    iIntros "(%A & %B & %C & H1 & H2 & H3 & H4 & H5 & H6 & Hpay)".
+    iIntros "(%A & %B & %C & H1 & H3 & H4 & H5 & H6 & Hpay)".
     destruct d.
     - rewrite /fs_mdirty. iDestruct "Hpay" as "[[HL HD] Hq]".
       iFrame "HL". iIntros "HL".
       iSplitR; [done |]. iSplitR; [done |]. iSplitR; [done |].
-      iFrame "H1 H2 H3 H4 H5 H6". iFrame "HL HD Hq".
+      iFrame "H1 H3 H4 H5 H6". iFrame "HL HD Hq".
     - rewrite /fs_mclean. iDestruct "Hpay" as "[[HL HD] %He]".
       iFrame "HL". iIntros "HL".
       iSplitR; [done |]. iSplitR; [done |]. iSplitR; [done |].
-      iFrame "H1 H2 H3 H4 H5 H6". iFrame "HL HD". done.
+      iFrame "H1 H3 H4 H5 H6". iFrame "HL HD". done.
   Qed.
 
 End IallocBytes.

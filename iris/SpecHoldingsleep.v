@@ -7,7 +7,7 @@
    the lock is held): with the token, the pid field the holder carries, and
    the caller's own pid cell agreeing on the value, holdingsleep returns 1.
 
-     { is_sleeplock γl γ slk s R ∗ sleeplocked γ ∗ sl_pid slk ↦₄ pidv
+     { is_sleeplock γl γ slk s R ∗ sleeplocked γ slk pidv
        ∗ cur_proc p ∗ p_pid p ↦₄{dq} pidv ∗ <cells> }
        holdingsleep(slk)
      { a0 = 1 ∗ (everything back) }
@@ -62,8 +62,7 @@ Definition wp_holdingsleep_gen_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId
   kernel_text -∗ pc_is pcE -∗
   is_sleeplock_gen γl γsl slk s R H -∗
   (* the holder's bundle (returned untouched) *)
-  sleeplocked_q γsl q -∗
-  sl_pid slk ↦₄ pidv -∗
+  sleeplocked_q γsl q slk pidv -∗
   (* the caller's own pid, agreeing with the lock's pid field *)
   p_pid p ↦₄{dq} pidv -∗
   wp_next b p (fun (CID : CpuId) =>
@@ -73,8 +72,7 @@ Definition wp_holdingsleep_gen_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId
       sie_cap_gpr KT1 mf av b p -∗
       cpu_own 0 eb p b lks -∗
       pc_is ret_tgt -∗
-      sleeplocked_q γsl q -∗
-      sl_pid slk ↦₄ pidv -∗
+      sleeplocked_q γsl q slk pidv -∗
       p_pid p ↦₄{dq} pidv -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -94,8 +92,7 @@ Definition wp_holdingsleep_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{
   cpu_own 0 eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   is_sleeplock γl γsl slk s R -∗
-  sleeplocked γsl -∗
-  sl_pid slk ↦₄ pidv -∗
+  sleeplocked γsl slk pidv -∗
   p_pid p ↦₄{dq} pidv -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,
@@ -104,8 +101,7 @@ Definition wp_holdingsleep_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{
       sie_cap_gpr KT1 mf av b p -∗
       cpu_own 0 eb p b lks -∗
       pc_is ret_tgt -∗
-      sleeplocked γsl -∗
-      sl_pid slk ↦₄ pidv -∗
+      sleeplocked γsl slk pidv -∗
       p_pid p ↦₄{dq} pidv -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).

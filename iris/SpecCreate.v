@@ -214,7 +214,7 @@
    this contract's success payout is, verbatim, [SpecIunlock]'s /
    [SpecIunlockput]'s PRECONDITION:
 
-     is_sleeplock .. ∗ sleeplocked ∗ sl_pid ↦ pidv ∗ ic_deposit ∗
+     is_sleeplock .. ∗ sleeplocked_q .. pidv ∗ ic_deposit ∗
      i_dev/i_inum halves ∗ i_valid ↦ true ∗ ic_loaded ∗ ity_shot ∗
      inode_ref_short_gen k (qi + s) qi dev inum g
 
@@ -455,8 +455,7 @@ Section CreateSpec.
       (dn : dinode) (bm : blkmap) : iProp Σ :=
     (∃ γil γisl : gname,
        is_sleeplock_gen γil γisl (i_lock (ientry k)) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k)) ∗
-       sleeplocked_q γisl s ∗
-       sl_pid (i_lock (ientry k)) ↦₄ pidv ∗
+       sleeplocked_q γisl s (i_lock (ientry k)) pidv ∗
        ic_deposit cn k (DepShr s dev inum g) ∗
        i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev ∗
        i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum ∗
@@ -488,8 +487,7 @@ Section CreateSpec.
   Lemma create_locked_mk cn γfs γi cov logstart dev pidv k qi s g inum dn bm
       γil γisl :
     is_sleeplock_gen γil γisl (i_lock (ientry k)) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k)) -∗
-    sleeplocked_q γisl s -∗
-    sl_pid (i_lock (ientry k)) ↦₄ pidv -∗
+    sleeplocked_q γisl s (i_lock (ientry k)) pidv -∗
     ic_deposit cn k (DepShr s dev inum g) -∗
     i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum -∗
@@ -501,10 +499,10 @@ Section CreateSpec.
     runit_any (bv_unsigned inum) -∗
     create_locked cn γfs γi cov logstart dev pidv k qi s g inum dn bm.
   Proof.
-    iIntros "Hlk Hlkd Hpid Hdep Hdev Hinum Hvalid Hload Hshot Hfrz Href Hru".
+    iIntros "Hlk Hlkd Hdep Hdev Hinum Hvalid Hload Hshot Hfrz Href Hru".
     rewrite /create_locked. iExists γil, γisl.
     iSplitL "Hlk"; [iExact "Hlk" |]. iSplitL "Hlkd"; [iExact "Hlkd" |].
-    iSplitL "Hpid"; [iExact "Hpid" |]. iSplitL "Hdep"; [iExact "Hdep" |].
+    iSplitL "Hdep"; [iExact "Hdep" |].
     iSplitL "Hdev"; [iExact "Hdev" |]. iSplitL "Hinum"; [iExact "Hinum" |].
     iSplitL "Hvalid"; [iExact "Hvalid" |]. iSplitL "Hload"; [iExact "Hload" |].
     iSplitL "Hshot"; [iExact "Hshot" |].

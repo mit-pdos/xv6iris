@@ -407,11 +407,11 @@ Section BmapRes.
          bio_held bn V k pidv dev bno bs' bsl bsd d).
   Proof.
     rewrite /bio_held.
-    iIntros "(%A & %B & %C & H1 & H2 & H3 & H4 & H5 & H6 & H7)".
+    iIntros "(%A & %B & %C & H1 & H3 & H4 & H5 & H6 & H7)".
     iSplitL "H5"; [iExact "H5"|].
     iIntros (bs') "H5".
     iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
-    iSplitL "H1"; [iExact "H1"|]. iSplitL "H2"; [iExact "H2"|].
+    iSplitL "H1"; [iExact "H1"|].
     iSplitL "H3"; [iExact "H3"|]. iSplitL "H4"; [iExact "H4"|].
     iSplitL "H5"; [iExact "H5"|]. iSplitL "H6"; [iExact "H6"|]. iExact "H7".
   Qed.
@@ -433,7 +433,7 @@ Section BmapRes.
     ⌜bsl = bs0⌝.
   Proof.
     rewrite /bio_held /bio_pay /fs_view /=.
-    iIntros "Hc (_ & _ & _ & _ & _ & _ & _ & _ & _ & Hpay)".
+    iIntros "Hc (_ & _ & _ & _ & _ & _ & _ & _ & Hpay)".
     destruct d.
     - iDestruct "Hpay" as "[Hm _]".
       iApply (fsblock_mdirty_agree with "Hc Hm").

@@ -389,8 +389,7 @@ Section WriteHeadDefs.
     (⌜(k < NBUF)%nat⌝ ∗
      ⌜uint bno ∈ bv_cov V⌝ ∗
      ⌜dev = bv_dev V⌝ ∗
-     sleeplocked (snd (bn_slk bn k)) ∗
-     sl_pid (buf_lock (bnode k)) ↦₄ pidv ∗
+     sleeplocked (snd (bn_slk bn k)) (buf_lock (bnode k)) pidv ∗
      b_valid (bnode k) ↦₄ (mword_of_int 1 : mword 32) ∗
      b_dev (bnode k) ↦₄{DfracOwn (1/2)} dev ∗
      b_blockno (bnode k) ↦₄{DfracOwn (1/2)} bno ∗
@@ -404,12 +403,12 @@ Section WriteHeadDefs.
     wh_hold bn V k pidv dev bno (fun j => bs !!! j) bsd.
   Proof.
     rewrite /bio_hold0 /wh_hold /buf_own /bpa.
-    iIntros "(%A & %B & %C & H1 & H2 & H3 & H4 & (Hb & Hd & %Hlen & Hby) & H6)".
+    iIntros "(%A & %B & %C & H1 & H3 & H4 & (Hb & Hd & %Hlen & Hby) & H6)".
     iEval (rewrite (bb_bytes_of_list (b_data (bnode k)) bs) Hlen) in "Hby".
     (* NEVER [iFrame] a goal mentioning [bb_bytes]: the framing search walks
        into the 1024-element [seq] big-op and does not come back. *)
     iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
-    iSplitL "H1"; [iExact "H1"|]. iSplitL "H2"; [iExact "H2"|].
+    iSplitL "H1"; [iExact "H1"|].
     iSplitL "H3"; [iExact "H3"|]. iSplitL "H4"; [iExact "H4"|].
     iSplitL "Hb"; [iExact "Hb"|]. iSplitL "Hd"; [iExact "Hd"|].
     iSplitL "Hby"; [iExact "Hby"|]. iExact "H6".
@@ -421,10 +420,10 @@ Section WriteHeadDefs.
     bio_hold0 bn V k pidv dev bno (f <$> seq 0 1024) bsd.
   Proof.
     rewrite /bio_hold0 /wh_hold /buf_own /bpa.
-    iIntros "(%A & %B & %C & H1 & H2 & H3 & H4 & Hb & Hd & Hby & H6)".
+    iIntros "(%A & %B & %C & H1 & H3 & H4 & Hb & Hd & Hby & H6)".
     iEval (rewrite bb_bytes_to_list) in "Hby".
     iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
-    iSplitL "H1"; [iExact "H1"|]. iSplitL "H2"; [iExact "H2"|].
+    iSplitL "H1"; [iExact "H1"|].
     iSplitL "H3"; [iExact "H3"|]. iSplitL "H4"; [iExact "H4"|].
     (* [buf_own] is one parenthesised group, so peel it off whole first *)
     iSplitR "H6"; [| iExact "H6"].
@@ -1152,7 +1151,7 @@ Section WriteHeadBlocks.
       by (apply wh_align4; [exact Hk | clear -Hi HnB; unfold LOGBLOCKS in HnB; lia]).
     rewrite /wh_hold.
     iDestruct "Hhold" as
-      "(%HA & %HB & %HC & Hslk & Hpid & Hvalid & Hbdev & Hbno & Hbdsk & Hby & Hdisk)".
+      "(%HA & %HB & %HC & Hslk & Hvalid & Hbdev & Hbno & Hbdsk & Hby & Hdisk)".
     iDestruct (bb_word4_acc (b_data (bnode kk)) 1024 (4 * S i)%nat
                  (1016 - 4 * i)%nat f Hsum Hal with "Hby") as "[Hcell Hback2]".
     iEval (rewrite -Hdst) in "Hcell".
@@ -1186,9 +1185,9 @@ Section WriteHeadBlocks.
                        ltac:(left; lia)).
         exact (Henc i' jj ltac:(lia) Hjj). }
     iAssert (wh_hold bn (fs_view γfs γd dev cov) kk pidv dev bno f' bsd0)
-      with "[Hslk Hpid Hvalid Hbdev Hbno Hbdsk Hby Hdisk]" as "Hhold".
+      with "[Hslk Hvalid Hbdev Hbno Hbdsk Hby Hdisk]" as "Hhold".
     { rewrite /wh_hold. iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
-      iSplitL "Hslk"; [iExact "Hslk"|]. iSplitL "Hpid"; [iExact "Hpid"|].
+      iSplitL "Hslk"; [iExact "Hslk"|].
       iSplitL "Hvalid"; [iExact "Hvalid"|]. iSplitL "Hbdev"; [iExact "Hbdev"|].
       iSplitL "Hbno"; [iExact "Hbno"|]. iSplitL "Hbdsk"; [iExact "Hbdsk"|].
       iSplitL "Hby"; [iExact "Hby"|]. iExact "Hdisk". }
@@ -1641,7 +1640,7 @@ Section ProofWriteHead.
        alignment facts below need, and it only lives inside the handle *)
     iEval (rewrite /wh_hold) in "Hhold".
     iDestruct "Hhold" as
-      "(%HA & %HB & %HC & Hslk & Hpid & Hvalid & Hbdev & Hbnoc & Hbdsk & Hby & Hdisk)".
+      "(%HA & %HB & %HC & Hslk & Hvalid & Hbdev & Hbnoc & Hbdsk & Hby & Hdisk)".
     (* ===== +0x20 c.mv s1,a0 ===== *)
     iPoseProof (whi_20 with "Htext") as "Hi20".
     iPoseProof (whi_22 with "Htext") as "Hi22".
@@ -1730,9 +1729,9 @@ Section ProofWriteHead.
       f_equal. lia. }
     iAssert (wh_hold bn (fs_view γfs γd dev cov) kk pidv dev
                (mword_of_int logstart : mword 32) f1 bsd0)
-      with "[Hslk Hpid Hvalid Hbdev Hbnoc Hbdsk Hby Hdisk]" as "Hhold".
+      with "[Hslk Hvalid Hbdev Hbnoc Hbdsk Hby Hdisk]" as "Hhold".
     { rewrite /wh_hold. iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
-      iSplitL "Hslk"; [iExact "Hslk"|]. iSplitL "Hpid"; [iExact "Hpid"|].
+      iSplitL "Hslk"; [iExact "Hslk"|].
       iSplitL "Hvalid"; [iExact "Hvalid"|]. iSplitL "Hbdev"; [iExact "Hbdev"|].
       iSplitL "Hbnoc"; [iExact "Hbnoc"|]. iSplitL "Hbdsk"; [iExact "Hbdsk"|].
       iSplitL "Hby"; [iExact "Hby"|]. iExact "Hdisk". }

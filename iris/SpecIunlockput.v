@@ -186,8 +186,7 @@ Definition wp_iunlockput_sconf_body
   ireg_open -∗
   is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k)) -∗
   (* ---- THE HOLDER'S BUNDLE (SpecIunlock's precondition) ---- *)
-  sleeplocked_q gisl s -∗
-  sl_pid (i_lock ip) ↦₄ pidv -∗
+  sleeplocked_q gisl s (i_lock ip) pidv -∗
   ic_deposit cn k (DepShr s dev inum gy) -∗
   i_dev ip ↦₄{DfracOwn (1/2)} dev -∗
   i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
@@ -333,8 +332,7 @@ Definition wp_iunlockput_gen_body
   ireg_open -∗
   is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k)) -∗
   (* ---- THE HOLDER'S BUNDLE (SpecIunlock's precondition) ---- *)
-  sleeplocked_q gisl s -∗
-  sl_pid (i_lock ip) ↦₄ pidv -∗
+  sleeplocked_q gisl s (i_lock ip) pidv -∗
   ic_deposit cn k (DepShr s dev inum gy) -∗
   i_dev ip ↦₄{DfracOwn (1/2)} dev -∗
   i_inum ip ↦₄{DfracOwn (1/2)} inum -∗

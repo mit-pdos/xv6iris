@@ -240,14 +240,14 @@ Section FsinitDefs.
        bio_held bn V k pidv dv bno bs bsl bsd d).
   Proof.
     rewrite /bio_held.
-    iIntros "(%A & %B & %C & H1 & H2 & H3 & H4 & Hbo & H5 & H6)".
+    iIntros "(%A & %B & %C & H1 & H3 & H4 & Hbo & H5 & H6)".
     rewrite /buf_own.
     iDestruct "Hbo" as "(Hb & Hdk & %Hlen & Hbytes)".
     iEval (rewrite (bb_bytes_of_list (b_data (bpa k)) bs)) in "Hbytes".
     iSplitR; [done |]. iFrame "Hbytes". iIntros "Hbytes".
     iEval (rewrite -(bb_bytes_of_list (b_data (bpa k)) bs)) in "Hbytes".
     iSplitR; [done |]. iSplitR; [done |]. iSplitR; [done |].
-    iFrame "H1 H2 H3 H4 H5 H6 Hb Hdk Hbytes". done.
+    iFrame "H1 H3 H4 H5 H6 Hb Hdk Hbytes". done.
   Qed.
 
   (* ------------------------------------------------------------------ *)

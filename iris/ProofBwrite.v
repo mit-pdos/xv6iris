@@ -150,7 +150,7 @@ Section ProofBwrite.
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
     iEval (rewrite /bio_hold0) in "Hlocked".
     iDestruct "Hlocked" as
-      "(%Hk2 & %Hcov & %Hdv & Hstok & Hpid & Hvalid & Hbdev & Hbuf & Hdisk)".
+      "(%Hk2 & %Hcov & %Hdv & Hstok & Hvalid & Hbdev & Hbuf & Hdisk)".
     (* the handle's disk fragment, restated at the fabric's ghost so rw's
        spec can take it; it is rewritten back at re-assembly. *)
     iEval (rewrite HgdV) in "Hdisk".
@@ -332,13 +332,13 @@ Section ProofBwrite.
                  with "Hextm") as "Hextm".
     iApply (HSL.wp_holdingsleep_sconf (fst (bn_slk bn k)) (snd (bn_slk bn k))
               "buffer"%string (bown bn k) mA pj pidv (K - 4)%nat eb b _ HKhsl Hbelow
-              with "Hcg Hcnt Htext Hpc [] Hstok [Hpid] Hppid").
+              with "Hcg Hcnt Htext Hpc [] [Hstok] Hppid").
     all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hslk". }
-    { iEval (rewrite HmAa0). iExact "Hpid". }
-    iIntros (CID9 Hs9 mH) "%Hhs Hcg Hcnt Hpc Hstok Hpid Hppid".
+    { iEval (rewrite HmAa0). iExact "Hstok". }
+    iIntros (CID9 Hs9 mH) "%Hhs Hcg Hcnt Hpc Hstok Hppid".
     destruct Hhs as [Hcs1 Hha0].
-    iEval (rewrite HmAa0) in "Hpid".
+    iEval (rewrite HmAa0) in "Hstok".
     assert (Hpc12 : ret_pc (mA !!! Regidx Rra) = mword_of_int (KernelSyms.bwrite + 0x12)).
     { rewrite HmAra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc12) in "Hpc".
@@ -467,12 +467,12 @@ Section ProofBwrite.
        calls, the token and pid came back from holdingsleep, the bundle from
        virtio_disk_rw.  All of it is hart-free, so it is rebuilt here. *)
     iAssert (bio_hold0 bn V k pidv dev bno bs bs)
-      with "[Hstok Hpid Hvalid Hbdev Hbuf Hdisk]" as "Hlocked".
+      with "[Hstok Hvalid Hbdev Hbuf Hdisk]" as "Hlocked".
     { rewrite /bio_hold0 /bpa.
       iSplitR; [iPureIntro; exact Hk2|].
       iSplitR; [iPureIntro; exact Hcov|].
       iSplitR; [iPureIntro; exact Hdv|].
-      iFrame "Hstok Hpid Hvalid Hbdev Hbuf Hdisk". }
+      iFrame "Hstok Hvalid Hbdev Hbuf Hdisk". }
     assert (HmRsp : mR !!! Regidx csp_rs1 = spr)
       by (rewrite (callee_saved_lookup Hcs2 csp_rs1 ltac:(vm_compute; reflexivity)); exact HD3sp).
     assert (HmRthr : forall c : mword 5, is_cs_idx c = true ->

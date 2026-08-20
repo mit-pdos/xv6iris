@@ -154,7 +154,7 @@ Section ProofIunlockMain.
     assert (Hipe : ip = ientry k) by reflexivity.
     assert (Hipnz : uint ip <> 0)
       by (rewrite Hipe; exact (iul_entry_nonzero k Hk)).
-    iIntros "Hcg Hcnt #Htext Hpc #Hitbl #Hesc #Hslk Hstok Hpid Hppid
+    iIntros "Hcg Hcnt #Htext Hpc #Hitbl #Hesc #Hslk Hstok Hppid
               #Hprocs Hdep Hidev Hinumc Hvalid Hlk #Hshot Hfrz Hcont".
     iEval (rewrite Hipe) in "Hidev".
     iEval (rewrite Hipe) in "Hinumc".
@@ -375,13 +375,15 @@ Section ProofIunlockMain.
               (ic_tok cn k) (slh_tok (icfg_isl k)) s R6 p pidv (K - 4)%nat eb b lks
               ltac:(lia)
               Hfresh
-              with "Hcg Hcnt Htext Hpc [] Hstok [Hpid] Hppid").
+              with "Hcg Hcnt Htext Hpc [] [Hstok] Hppid").
     all: try lkbelow.
     { iEval (rewrite HR6a0). iExact "Hslk". }
-    { iEval (rewrite HR6a0). iExact "Hpid". }
-    iIntros (CID12 Hq12 mH) "%Hhs Hcg Hcnt Hpc Hstok Hpid Hppid".
+    (* the holder token carries the lock's own [pid] field now, so it is
+       indexed by the lock ADDRESS -- which the callee spells as its own a0. *)
+    { iEval (rewrite HR6a0). iExact "Hstok". }
+    iIntros (CID12 Hq12 mH) "%Hhs Hcg Hcnt Hpc Hstok Hppid".
     destruct Hhs as [Hcs1 Hha0].
-    iEval (rewrite HR6a0) in "Hpid".
+    iEval (rewrite HR6a0) in "Hstok".
     assert (Hpc1a : ret_pc (R6 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.iunlock + 0x1a)) by (rewrite HR6ra; pcw).
     iEval (rewrite Hpc1a) in "Hpc".
@@ -566,10 +568,10 @@ Section ProofIunlockMain.
               (ic_tok cn k) (slh_tok (icfg_isl k)) s R9 pidv p (K - 4)%nat eb b lks
               ltac:(lia)
               Hfresh
-              with "Hcg Hcnt Htext Hpc [] Hstok [Hpid] Htok Hprocs").
+              with "Hcg Hcnt Htext Hpc [] [Hstok] Htok Hprocs").
     all: try lkbelow.
     { iEval (rewrite HR9a0). iExact "Hslk". }
-    { iEval (rewrite HR9a0). iExact "Hpid". }
+    { iEval (rewrite HR9a0). iExact "Hstok". }
     (* the lock hands the deposit back at the holder's OWN fraction, which is
        what rebuilds the caller's share: the arm kept the other two slices. *)
     iIntros (CID18 Hq18 mR) "%Hcs2 Hcg Hcnt Hpc Hslh".

@@ -1667,7 +1667,7 @@ Section IreclaimOrphan.
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
     iIntros (CID18 Hq18 mL dnl bml fl_)
-      "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hsbi Hsl1 Hslkd Hslpid Hdep Hidev Hiinum
+      "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hsbi Hsl1 Hslkd Hdep Hidev Hiinum
        Hvalid Hloaded #Hshot Hfrz %Hfr_ Hru %Hilkp".
     assert (Hpc5e : ret_pc (OC !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ireclaim + 0x5e))
@@ -1769,7 +1769,7 @@ Section IreclaimOrphan.
               (* iunlock's bound is "sleep lock"(6); irc_orphan's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
-              with "Hcg Hcnt Htext Hpc Hitbl Hescrow Hslk Hslkd Hslpid
+              with "Hcg Hcnt Htext Hpc Hitbl Hescrow Hslk Hslkd
                     Hppid Hprocs Hdep Hidev Hiinum Hvalid Hloaded Hshot Hfrz").
     all: try lkbelow.
     iIntros (CID21 Hq21 mU) "%Hcsiu Hcg Hcnt Hpc Hppid Hshr".

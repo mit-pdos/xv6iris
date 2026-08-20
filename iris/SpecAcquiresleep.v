@@ -7,7 +7,7 @@
 
      { is_sleeplock γl γ slk s R ∗ <thread resources> }
        acquiresleep(slk)
-     { sleeplocked γ ∗ sl_pid slk ↦₄ pid ∗ R ∗ <thread resources> }
+     { sleeplocked γ slk pid ∗ R ∗ <thread resources> }
 
    The <thread resources> are what the body's callees demand: the per-cpu
    push_off cells and the inner lock's cpu word (acquire/release), the
@@ -100,8 +100,10 @@ Definition wp_acquiresleep_gen_sconf_body `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, 
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
-      sleeplocked_q γsl q -∗
-      sl_pid slk ↦₄ pidv -∗
+      (* the holder token, WITH the pid field inside it (SleepLock.v's
+         [sleeplocked_q]): acquiresleep's store into [lk->pid] lands through
+         [sleeplocked_q_pid], so what a holder walks away with is one row. *)
+      sleeplocked_q γsl q slk pidv -∗
       R -∗
       p_pid pj ↦₄{dq} pidv -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -158,9 +160,8 @@ Definition wp_acquiresleep_sconf_body `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !ire
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
-      (* the lock is now HELD: token + pid field + protected resource *)
-      sleeplocked γsl -∗
-      sl_pid slk ↦₄ pidv -∗
+      (* the lock is now HELD: the token (pid field inside it) + R *)
+      sleeplocked γsl slk pidv -∗
       R -∗
       p_pid pj ↦₄{dq} pidv -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -247,9 +248,8 @@ Definition wp_acquiresleep_nb_body `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefsl
       sie_cap_gpr KT1 mf av false pj -∗
       cpu_own (S n) eb pj false lks -∗
       pc_is ret_tgt -∗
-      sleeplocked_q γsl q -∗
+      sleeplocked_q γsl q slk pidv -∗
       slh_auth γt (Some q) -∗
-      sl_pid slk ↦₄ pidv -∗
       R -∗
       p_pid pj ↦₄{dq} pidv -∗
       WP (Loop : expr riscv_lang)) -∗

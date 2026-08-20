@@ -1,25 +1,38 @@
 (* SleepLock.v -- the separation-logic sleeplock (kernel/sleeplock.c),
    mirroring the spinlock layer in WpLock.v one level up:
 
-     sleeplocked_q γ q -- the sleeplock-ownership token, carrying the
-                        FRACTION its holder deposited
-     sleeplocked γ    -- the same with the fraction forgotten; what a client
+     sleeplocked_q γ q slk pid
+                     -- WHAT IT MEANS TO HOLD THE SLEEPLOCK AT [slk]: the
+                        ownership token carrying the FRACTION its holder
+                        deposited, AND the lock's [pid] field, at [pid]
+     sleeplocked γ slk pid
+                     -- the same with the fraction forgotten; what a client
                         that does not track holders says
      sl_res_gen       -- the resource protected by the INNER spinlock:
                         ∃ v, locked word ↦₄ v ∗
-                          (v = 0 ∗ sl_free_tok γ ∗ pid ↦₄ 0 ∗ R
+                          (v = 0 ∗ sl_free_hold γ slk ∗ R
                            ∨ v ≠ 0 ∗ ∃ q, sl_hauth γ q ∗ H q)
      is_sleeplock_gen -- the sleeplock's name + the inner spinlock (is_lock,
                         named "sleep lock") protecting it  (persistent)
 
    When the sleeplock word is 0 (free) the inner critical section holds the
-   token, the pid field (pinned 0: both initsleeplock and releasesleep write
-   it back to 0) and the protected resource R; acquiresleep takes all three
-   out and re-closes with the "held" disjunct, so the HOLDER of a sleeplock
-   carries [sleeplocked_q γ q ∗ sl_pid slk ↦₄ pid ∗ R] -- the pid field rides
-   with the holder exactly like the spinlock's cpu word rides with the
-   caller.  The held disjunct records the word's non-zeroness in the shape
+   token together with the pid field (pinned 0: both initsleeplock and
+   releasesleep write it back to 0), and the protected resource R;
+   acquiresleep takes both out and re-closes with the "held" disjunct, so the
+   HOLDER of a sleeplock carries [sleeplocked_q γ q slk pid ∗ R] -- the pid
+   field rides with the holder exactly like the spinlock's cpu word rides with
+   the caller.  The held disjunct records the word's non-zeroness in the shape
    the c.beqz/c.bnez tests consume.
+
+   THE pid FIELD IS INSIDE THE TOKEN, and that is the point of the pairing
+   rather than an implementation detail.  It is written exactly twice (to
+   [myproc()->pid] by acquiresleep, back to 0 by releasesleep), read by
+   holdingsleep and by nobody else, and it moves between the free arm and the
+   holder in lockstep with the ghost.  As a separate row it was threaded by
+   every client from the buffer cache up to sys_unlink, each of which had to
+   name which pid was in it and hand it back beside the token; there is no
+   state in which one travels without the other.  [sleeplocked_q_pid] is the
+   accessor the two stores use.
 
    ==================================================================== *)
 (*  THE HOLDER DEPOSIT [H], AND WHAT IT BUYS: A NON-BLOCKING acquiresleep.
@@ -111,11 +124,16 @@ Section SleepLock.
   (*  THE GHOST STATE ([Xv6Cameras.slhUR], under the sleeplock's own gname).    *)
   (* ===================================================================== *)
 
-  (* the holder's exclusive token, carrying the fraction it deposited.
+  (* the holder's exclusive GHOST token, carrying the fraction it deposited.
      Deliberately NOT the spinlock's [locked], which is keyed by the holding
      HART -- a sleeplock is held by a PROCESS (its pid rides in [sl_pid]),
-     across context switches and possibly harts. *)
-  Definition sleeplocked_q (γ : gname) (q : Qp) : iProp Σ :=
+     across context switches and possibly harts.
+
+     INTERNAL.  What a holder carries is [sleeplocked_q] below, which is this
+     PLUS the pid field; the bare token exists only so that the three ghost
+     laws (exclusivity, agreement, re-targeting) can be stated where they
+     belong -- over the ghost -- and lifted once. *)
+  Definition sl_htok (γ : gname) (q : Qp) : iProp Σ :=
     own γ ((◯E (q : leibnizO Qp), ε) : slhUR).
 
   (* the authority that pins it, and which rides with the DEPOSIT inside the
@@ -132,11 +150,60 @@ Section SleepLock.
   Definition slh_auth (γ : gname) (t : option Qp) : iProp Σ :=
     own γ ((ε, ● (t : optionUR ufracR)) : slhUR).
 
+  (* ===================================================================== *)
+  (*  WHAT IT MEANS TO HOLD A SLEEPLOCK: THE TOKEN *AND* THE pid FIELD.
+
+     [lk->pid] is not a resource a holder should have to manage.  It is
+     written exactly twice -- to [myproc()->pid] by acquiresleep and back to
+     0 by releasesleep -- it is readable by holdingsleep and by nobody else,
+     and it moves between the lock's free arm and the holder in lockstep
+     with the ghost token.  Carrying it separately meant every client from
+     the buffer cache to sys_unlink threaded a second row that says nothing
+     it did not already know, and had to be reminded which pid was in it.
+
+     So it lives here.  [sleeplocked_q γ q slk pid] is "I hold the sleeplock
+     at [slk], I deposited [q], and its pid field says [pid]" -- one row.
+     [sleeplocked_q_pid] is the accessor the two stores use.
+
+     WHY TWO EXTRA ARGUMENTS AND NOT ONE.  [pid] is the interesting one, but
+     [sl_pid] is an ADDRESS computed from the lock's own, and nothing ties
+     the gname to the address: [is_sleeplock_gen] relates them, but it is
+     persistent and a holder need not have it in hand.  Tying them would
+     mean a second persistent agreement ghost minted at construction, to
+     save an argument every use site already has in scope. *)
+  Definition sleeplocked_q (γ : gname) (q : Qp) (slk : mword 64)
+      (pid : mword 32) : iProp Σ :=
+    (sl_htok γ q ∗ sl_pid slk ↦₄ pid)%I.
+
   (* the holder token with the fraction forgotten: what [sl_res]'s clients
      that do not track holders (every untracked sleeplock) carry. *)
-  Definition sleeplocked (γ : gname) : iProp Σ := (∃ q : Qp, sleeplocked_q γ q)%I.
+  Definition sleeplocked (γ : gname) (slk : mword 64) (pid : mword 32) : iProp Σ :=
+    (∃ q : Qp, sleeplocked_q γ q slk pid)%I.
 
-  Global Instance sleeplocked_q_timeless γ q : Timeless (sleeplocked_q γ q).
+  (* THE FIELD, OPENED FOR A STORE AND CLOSED AT THE NEW VALUE.  acquiresleep
+     stores [myproc()->pid] into it and releasesleep stores 0; both are
+     ordinary store leaves, so both want the bare cell for one instruction. *)
+  Lemma sleeplocked_q_pid γ q slk pid :
+    sleeplocked_q γ q slk pid -∗
+    sl_pid slk ↦₄ pid ∗
+    (∀ pid' : mword 32, sl_pid slk ↦₄ pid' -∗ sleeplocked_q γ q slk pid').
+  Proof.
+    iIntros "[Htok $]". iIntros (pid') "Hpid". iFrame "Htok Hpid".
+  Qed.
+
+  Lemma sleeplocked_pid γ slk pid :
+    sleeplocked γ slk pid -∗
+    sl_pid slk ↦₄ pid ∗
+    (∀ pid' : mword 32, sl_pid slk ↦₄ pid' -∗ sleeplocked γ slk pid').
+  Proof.
+    iIntros "[%q Hq]". iDestruct (sleeplocked_q_pid with "Hq") as "[$ Hback]".
+    iIntros (pid') "Hpid". iExists q. iApply ("Hback" with "Hpid").
+  Qed.
+
+  Global Instance sl_htok_timeless γ q : Timeless (sl_htok γ q).
+  Proof. apply _. Qed.
+  Global Instance sleeplocked_q_timeless γ q slk pid :
+    Timeless (sleeplocked_q γ q slk pid).
   Proof. apply _. Qed.
   Global Instance sl_hauth_timeless γ q : Timeless (sl_hauth γ q).
   Proof. apply _. Qed.
@@ -144,13 +211,13 @@ Section SleepLock.
   Proof. apply _. Qed.
   Global Instance slh_auth_timeless γ t : Timeless (slh_auth γ t).
   Proof. apply _. Qed.
-  Global Instance sleeplocked_timeless γ : Timeless (sleeplocked γ).
+  Global Instance sleeplocked_timeless γ slk pid : Timeless (sleeplocked γ slk pid).
   Proof. apply _. Qed.
 
   (* ---- the excl_auth half: exclusivity and agreement ------------------ *)
 
-  Lemma sleeplocked_q_exclusive γ q q' :
-    sleeplocked_q γ q -∗ sleeplocked_q γ q' -∗ False.
+  Lemma sl_htok_exclusive γ q q' :
+    sl_htok γ q -∗ sl_htok γ q' -∗ False.
   Proof.
     iIntros "H1 H2".
     iDestruct (own_valid_2 with "H1 H2") as %Hv.
@@ -158,7 +225,14 @@ Section SleepLock.
     destruct (proj1 (excl_auth_frag_op_valid _ _) Hv1).
   Qed.
 
-  Lemma sleeplocked_exclusive γ : sleeplocked γ -∗ sleeplocked γ -∗ False.
+  Lemma sleeplocked_q_exclusive γ q q' slk slk' pid pid' :
+    sleeplocked_q γ q slk pid -∗ sleeplocked_q γ q' slk' pid' -∗ False.
+  Proof.
+    iIntros "[H1 _] [H2 _]". iApply (sl_htok_exclusive with "H1 H2").
+  Qed.
+
+  Lemma sleeplocked_exclusive γ slk slk' pid pid' :
+    sleeplocked γ slk pid -∗ sleeplocked γ slk' pid' -∗ False.
   Proof.
     iIntros "H1 H2". iDestruct "H1" as (q) "H1". iDestruct "H2" as (q') "H2".
     iApply (sleeplocked_q_exclusive with "H1 H2").
@@ -167,7 +241,7 @@ Section SleepLock.
   (* THE PINNING LAW: the deposit's authority agrees with the holder's token,
      so a releaser recovers exactly the fraction it deposited. *)
   Lemma sl_hauth_agree γ q q' :
-    sl_hauth γ q -∗ sleeplocked_q γ q' -∗ ⌜q = q'⌝.
+    sl_hauth γ q -∗ sl_htok γ q' -∗ ⌜q = q'⌝.
   Proof.
     iIntros "Ha Hf".
     iDestruct (own_valid_2 with "Ha Hf") as %Hv.
@@ -178,7 +252,7 @@ Section SleepLock.
   (* re-targeting: whoever holds BOTH halves may set the fraction, which is
      what an acquirer does with the junk fraction it finds in the free arm. *)
   Lemma sl_hauth_update γ q q' :
-    sl_hauth γ q -∗ sleeplocked_q γ q ==∗ sl_hauth γ q' ∗ sleeplocked_q γ q'.
+    sl_hauth γ q -∗ sl_htok γ q ==∗ sl_hauth γ q' ∗ sl_htok γ q'.
   Proof.
     iIntros "Ha Hf".
     iMod (own_update_2 _ _ _ ((●E (q' : leibnizO Qp) ⋅ ◯E (q' : leibnizO Qp), ε) : slhUR)
@@ -187,6 +261,11 @@ Section SleepLock.
       apply prod_update; simpl; [ apply excl_auth_update | done ]. }
     iModIntro. rewrite pair_op_1 own_op. iDestruct "H" as "[$ $]".
   Qed.
+
+  (* ...and the two lifted to what a holder actually carries. *)
+  Lemma sl_hauth_agree_q γ q q' slk pid :
+    sl_hauth γ q -∗ sleeplocked_q γ q' slk pid -∗ ⌜q = q'⌝.
+  Proof. iIntros "Ha [Ht _]". iApply (sl_hauth_agree with "Ha Ht"). Qed.
 
   (* ---- the counting half: shares, the zero, and the two ghost steps ---- *)
 
@@ -307,7 +386,23 @@ Section SleepLock.
      The fraction is junk while free -- an acquirer re-targets it to its own
      ([sl_free_retarget]). *)
   Definition sl_free_tok (γ : gname) : iProp Σ :=
-    (∃ q : Qp, sleeplocked_q γ q ∗ sl_hauth γ q)%I.
+    (∃ q : Qp, sl_htok γ q ∗ sl_hauth γ q)%I.
+
+  (* THE FREE ARM'S HOLDER-SHAPED FORM: the idle token pair AND the pid field
+     pinned at 0, which is what an acquirer walks away with (re-targeted, and
+     then stored into).  [sl_free_tok] itself stays GHOST-ONLY on purpose --
+     [IcacheBoot.v] allocates all fifty inode-sleeplock gnames before a single
+     lock address exists, so nothing address-shaped may be in it. *)
+  Definition sl_free_hold (γ : gname) (slk : mword 64) : iProp Σ :=
+    (∃ q : Qp, sleeplocked_q γ q slk (mword_of_int 0 : mword 32) ∗
+               sl_hauth γ q)%I.
+
+  Lemma sl_free_hold_intro γ slk :
+    sl_free_tok γ -∗ sl_pid slk ↦₄ (mword_of_int 0 : mword 32) -∗
+    sl_free_hold γ slk.
+  Proof.
+    iIntros "[%q [Ht Ha]] Hpid". iExists q. iFrame "Ha Ht Hpid".
+  Qed.
 
   (* the held arm's DEPOSIT: the acquirer's share of [H], with the authority
      that says which fraction it was. *)
@@ -321,8 +416,7 @@ Section SleepLock.
       (H : Qp -> iProp Σ) : iProp Σ :=
     (∃ v : mword 32,
        slk ↦₄ v ∗
-       (⌜v = (mword_of_int 0 : mword 32)⌝ ∗ sl_free_tok γ ∗
-          sl_pid slk ↦₄ (mword_of_int 0 : mword 32) ∗ R
+       (⌜v = (mword_of_int 0 : mword 32)⌝ ∗ sl_free_hold γ slk ∗ R
         ∨ ⌜neq_vec (sign_extend' 64 v) zero_reg = true⌝ ∗ sl_dep γ H))%I.
 
   Definition sl_res (γ : gname) (slk : mword 64) (R : iProp Σ) : iProp Σ :=
@@ -388,9 +482,9 @@ Section SleepLock.
   (* as the HOLDER (token in hand): the free disjunct is refuted by token
      exclusivity, leaving the held shape (word cell + non-zeroness) and the
      deposit, which the holder must put back when it re-closes. *)
-  Lemma sl_res_open_held γ slk R H :
-    sl_res_gen γ slk R H -∗ sleeplocked γ -∗
-    sleeplocked γ ∗ sl_dep γ H ∗
+  Lemma sl_res_open_held γ slk R H pid :
+    sl_res_gen γ slk R H -∗ sleeplocked γ slk pid -∗
+    sleeplocked γ slk pid ∗ sl_dep γ H ∗
     (∃ v : mword 32,
        slk ↦₄ v ∗ ⌜neq_vec (sign_extend' 64 v) zero_reg = true⌝).
   Proof.
@@ -406,9 +500,9 @@ Section SleepLock.
      fraction, so what comes out is exactly [H q] for the holder's [q].  This
      is what releasesleep needs -- see the header on why "some fraction" will
      not do. *)
-  Lemma sl_res_open_held_q γ slk R H q :
-    sl_res_gen γ slk R H -∗ sleeplocked_q γ q -∗
-    sleeplocked_q γ q ∗ sl_hauth γ q ∗ H q ∗
+  Lemma sl_res_open_held_q γ slk R H q pid :
+    sl_res_gen γ slk R H -∗ sleeplocked_q γ q slk pid -∗
+    sleeplocked_q γ q slk pid ∗ sl_hauth γ q ∗ H q ∗
     (∃ v : mword 32,
        slk ↦₄ v ∗ ⌜neq_vec (sign_extend' 64 v) zero_reg = true⌝).
   Proof.
@@ -417,7 +511,7 @@ Section SleepLock.
     { iExFalso. iDestruct "Hfree" as (q0) "[Htok' _]".
       iApply (sleeplocked_q_exclusive with "Htok Htok'"). }
     iDestruct "Hdep" as (q0) "[Hha HH]".
-    iDestruct (sl_hauth_agree with "Hha Htok") as %<-.
+    iDestruct (sl_hauth_agree_q with "Hha Htok") as %<-.
     iFrame "Htok Hha HH". iExists v. by iFrame "Hw".
   Qed.
 
@@ -437,26 +531,31 @@ Section SleepLock.
   Qed.
 
   (* close in the free state (releasesleep after its two zero stores). *)
+  (* close in the free state (releasesleep after its two zero stores).  The
+     pid field is no longer a separate argument: releasesleep's store into it
+     lands through [sleeplocked_q_pid], so what arrives here is the holder
+     token AT VALUE 0, which is exactly the free arm's shape. *)
   Lemma sl_res_close_free γ slk R H (q : Qp) :
     slk ↦₄ (mword_of_int 0 : mword 32) -∗
-    sleeplocked_q γ q -∗
+    sleeplocked_q γ q slk (mword_of_int 0 : mword 32) -∗
     sl_hauth γ q -∗
-    sl_pid slk ↦₄ (mword_of_int 0 : mword 32) -∗
     R -∗
     sl_res_gen γ slk R H.
   Proof.
-    iIntros "Hw Htok Hha Hpid HR". iExists (mword_of_int 0 : mword 32).
-    iFrame "Hw". iLeft. iFrame "Hpid HR". iSplitR; [ done |]. iExists q. iFrame.
+    iIntros "Hw Htok Hha HR". iExists (mword_of_int 0 : mword 32).
+    iFrame "Hw". iLeft. iFrame "HR". iSplitR; [ done |]. iExists q. iFrame.
   Qed.
 
   (* the acquirer's ghost step: the free arm's junk fraction becomes the
      acquirer's own, so that the deposit it is about to make is pinned to the
      token it walks away with. *)
-  Lemma sl_free_retarget γ (q : Qp) :
-    sl_free_tok γ ==∗ sleeplocked_q γ q ∗ sl_hauth γ q.
+  Lemma sl_free_retarget γ slk (q : Qp) :
+    sl_free_hold γ slk ==∗
+    sleeplocked_q γ q slk (mword_of_int 0 : mword 32) ∗ sl_hauth γ q.
   Proof.
-    iIntros "Hfree". iDestruct "Hfree" as (q0) "[Htok Hha]".
-    iMod (sl_hauth_update γ q0 q with "Hha Htok") as "[$ $]". done.
+    iIntros "Hfree". iDestruct "Hfree" as (q0) "[[Htok Hpid] Hha]".
+    iMod (sl_hauth_update γ q0 q with "Hha Htok") as "[$ Ht]".
+    iModIntro. iFrame "Ht Hpid".
   Qed.
 
   (* ---- construction (the "newsleeplock" ghost step): what a caller does
@@ -500,10 +599,10 @@ Section SleepLock.
     R ={E}=∗ ∃ γl : gname, is_sleeplock_gen γl γ slk s R H.
   Proof.
     iIntros "Hfree #Hlnm #Hsnm Hlkw Hcpu Hw Hpid HR".
-    iDestruct "Hfree" as (q0) "[Htok Hha]".
+    iDestruct (sl_free_hold_intro with "Hfree Hpid") as (q0) "[Htok Hha]".
     iMod (newlock E (sl_lk slk) "sleep lock"%string (sl_res_gen γ slk R H)
-            with "Hlnm Hlkw Hcpu [Hw Htok Hha Hpid HR]") as (γl) "#Hlk".
-    { iApply (sl_res_close_free with "Hw Htok Hha Hpid HR"). }
+            with "Hlnm Hlkw Hcpu [Hw Htok Hha HR]") as (γl) "#Hlk".
+    { iApply (sl_res_close_free with "Hw Htok Hha HR"). }
     iModIntro. iExists γl.
     iApply (is_sleeplock_gen_intro with "Hsnm Hlk").
   Qed.
@@ -527,7 +626,8 @@ Section SleepLock.
     iDestruct "Hg" as "[[Hha Htok] Hauth]".
     iMod (newlock E (sl_lk slk) "sleep lock"%string (sl_res_gen γ slk R (H γ))
             with "Hlnm Hlkw Hcpu [Hw Htok Hha Hpid HR]") as (γl) "#Hlk".
-    { iApply (sl_res_close_free with "Hw Htok Hha Hpid HR"). }
+    { iApply (sl_res_close_free with "Hw [Htok Hpid] Hha HR").
+      iFrame "Htok Hpid". }
     iModIntro. iExists γl, γ. iFrame "Hauth".
     iApply (is_sleeplock_gen_intro with "Hsnm Hlk").
   Qed.

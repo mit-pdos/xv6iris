@@ -627,8 +627,7 @@ Section ProofSysOpenTails.
     ireg_inv gi gfs inodestart nib -∗
     ireg_open -∗
     is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
-    sleeplocked_q gisl s -∗
-    sl_pid (i_lock (ientry kk)) ↦₄ pidv -∗
+    sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
     ic_deposit cn kk (DepShr s dev inum gy) -∗
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
@@ -684,7 +683,7 @@ Section ProofSysOpenTails.
            Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HMsp HMthr HMs1
            HMs2 HMs3 Hal.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
-              #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd Hslpid Hdep Hidev
+              #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd Hdep Hidev
               Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpid #Hprocs
               #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24
               Hcont".
@@ -756,7 +755,7 @@ Section ProofSysOpenTails.
               Hinb Hcovb Hiu Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hitab Hitinv
-                    Hesck Hireg Hropen Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid
+                    Hesck Hireg Hropen Hslkk Hslkd Hdep Hidev Hiinum Hivalid
                     Hload Hshot Hfrz [$Hkeep $Hru] Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
                     Hdlk Hbsl Hop").
     iIntros (CID3 Hq3 mup n2 used2)
@@ -976,8 +975,7 @@ Section ProofSysOpenTails.
     ireg_inv gi gfs inodestart nib -∗
     ireg_open -∗
     is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
-    sleeplocked_q gisl s -∗
-    sl_pid (i_lock (ientry kk)) ↦₄ pidv -∗
+    sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
     ic_deposit cn kk (DepShr s dev inum gy) -∗
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
@@ -1033,7 +1031,7 @@ Section ProofSysOpenTails.
            Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HMsp HMthr HMs1
            HMs2 HMs3 Hal.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
-              #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd Hslpid Hdep Hidev
+              #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd Hdep Hidev
               Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpid #Hprocs
               #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24
               Hcont".
@@ -1105,7 +1103,7 @@ Section ProofSysOpenTails.
               Hinb Hcovb Hiu Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hitab Hitinv
-                    Hesck Hireg Hropen Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid
+                    Hesck Hireg Hropen Hslkk Hslkd Hdep Hidev Hiinum Hivalid
                     Hload Hshot Hfrz [$Hkeep $Hru] Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
                     Hdlk Hbsl Hop").
     iIntros (CID3 Hq3 mup n2 used2)
@@ -1324,8 +1322,7 @@ Section ProofSysOpenTails.
     ireg_inv gi gfs inodestart nib -∗
     ireg_open -∗
     is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
-    sleeplocked_q gisl s -∗
-    sl_pid (i_lock (ientry kk)) ↦₄ pidv -∗
+    sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
     ic_deposit cn kk (DepShr s dev inum gy) -∗
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
@@ -1381,7 +1378,7 @@ Section ProofSysOpenTails.
            Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HMsp HMthr HMs1
            HMs3 Hal.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
-              #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd Hslpid Hdep Hidev
+              #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd Hdep Hidev
               Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpid #Hprocs
               #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24
               Hcont".
@@ -1450,7 +1447,7 @@ Section ProofSysOpenTails.
               Hinb Hcovb Hiu Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hitab Hitinv
-                    Hesck Hireg Hropen Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid
+                    Hesck Hireg Hropen Hslkk Hslkd Hdep Hidev Hiinum Hivalid
                     Hload Hshot Hfrz [$Hkeep $Hru] Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
                     Hdlk Hbsl Hop").
     iIntros (CID3 Hq3 mup n2 used2)
@@ -1719,8 +1716,7 @@ Section ProofSysOpenTails.
     ireg_inv gi gfs inodestart nib -∗
     ireg_open -∗
     is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
-    sleeplocked_q gisl s -∗
-    sl_pid (i_lock (ientry kk)) ↦₄ pidv -∗
+    sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
     ic_deposit cn kk (DepShr s dev inum gy) -∗
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
@@ -1779,7 +1775,7 @@ Section ProofSysOpenTails.
            HMs2 Hal.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hftab Hfref Hfenv
               #Hbio #Hlog Hseam Hgen
-              #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd Hslpid Hdep Hidev
+              #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd Hdep Hidev
               Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpid #Hprocs
               #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24
               Hcont".
@@ -1896,7 +1892,7 @@ Section ProofSysOpenTails.
               Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HP1sp HP1thr
               HP1s1 HP1s3 Hal
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
-                    Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd Hslpid Hdep Hidev
+                    Hitab Hitinv Hesck Hireg Hropen Hslkk Hslkd Hdep Hidev
                     Hiinum Hivalid Hload Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpid
                     Hprocs Hdev Hgeo Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
                     HbP H23 H24 [Hfd Hfout Hcont]").
@@ -1979,8 +1975,7 @@ Section ProofSysOpenTails.
     itable_inv -∗
     ic_escrow cn gfs gi cov logstart kk -∗
     is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
-    sleeplocked_q gisl s -∗
-    sl_pid (i_lock (ientry kk)) ↦₄ pidv -∗
+    sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
     ic_deposit cn kk (DepShr s dev inum gy) -∗
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
@@ -2023,7 +2018,7 @@ Section ProofSysOpenTails.
     intros HKiu HKeo HK24 Kpop Hkk Hgeom Hj Hgl Hlkempty Hsp0 HMsp HMthr HMs1
            HMs3 Hal.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
-              #Hitinv #Hesck #Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid
+              #Hitinv #Hesck #Hslkk Hslkd Hdep Hidev Hiinum Hivalid
               Hload #Hshot Hfrz Hpid #Hprocs #Hdev #Hgeo #Hdlk Hop Hf1 Hf2 Hf3 Hf4
               Hf5 Hf6 HbP H23 H24 Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
@@ -2084,7 +2079,7 @@ Section ProofSysOpenTails.
               (proc_addr jx) b lks
               HKiu Hkk HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
-              with "Hcg Hown Htext Hpc Hitinv Hesck Hslkk Hslkd Hslpid
+              with "Hcg Hown Htext Hpc Hitinv Hesck Hslkk Hslkd
                     Hpid Hprocs Hdep Hidev Hiinum Hivalid Hload Hshot Hfrz").
     iIntros (CID3 Hq3 miu) "%Hcsiu Hcg Hown Hpc Hpid Hshr".
     iDestruct (inode_shr_gen_forget with "Hshr") as "Hshr".

@@ -898,8 +898,7 @@ Section KexecABody.
         cpu_own 0 eb (proc_addr jp) b lks -∗
         is_sleeplock_gen gilf gislf (i_lock (ientry kf)) "inode"%string
                      (ic_tok cn kf) (slh_tok (icfg_isl kf)) -∗
-        sleeplocked_q gislf sf -∗
-        sl_pid (i_lock (ientry kf)) ↦₄ pidv -∗
+        sleeplocked_q gislf sf (i_lock (ientry kf)) pidv -∗
         ic_deposit cn kf (DepShr sf dev inumf gyf) -∗
         i_dev (ientry kf) ↦₄{DfracOwn (1/2)} dev -∗
         i_inum (ientry kf) ↦₄{DfracOwn (1/2)} inumf -∗
@@ -1086,7 +1085,7 @@ Section KexecABody.
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
     iIntros (CIDil Hsil M1 dnl bml fl_) "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hins Hbs1
-             Hslkd Hslpid Hdep Hidev Hiinum Hivalid Hload Hity Hfrz %Hfr_
+             Hslkd Hdep Hidev Hiinum Hivalid Hload Hity Hfrz %Hfr_
              Hru %Hilkp".
     assert (Hpc3a : ret_pc (Q2 !!! Regidx Rra) = mword_of_int (KXA + 0x3a))
       by (rewrite HQ2ra; pcw).
@@ -1460,7 +1459,7 @@ Section KexecABody.
         iDestruct (wp_next_retarget CID0 CID15 true (proc_addr jp) _
                      ltac:(wp_next_chain) with "Hcont") as "Hcont".
         iApply ("Hcont90" $! Q12 k (q/2)%Qp (q/2)%Qp inum dnl bml gilk gislk gy
-                  n1 used1 with "[%] [%] Hpc Hcg Hcnt Hslkk Hslkd Hslpid Hdep
+                  n1 used1 with "[%] [%] Hpc Hcg Hcnt Hslkk Hslkd Hdep
                   Hidev Hiinum Hivalid Hload Hity Hfrz Hkeep Hru Hlog Hirs Hbm Hins Hbits
                   Hbs Hka Hpriv Hpath Hargv Hargs [-Hcont] Hcont").
         * split_and!; [exact HQ12sp | exact HQ12s0 | exact HQ12s1 | exact HQ12s2
@@ -1531,7 +1530,7 @@ Section KexecABody.
                   m Q12 K lks sp0 ra0 s00 s10 s20 pv av
                   HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib' Hcovb Hiu
                   Hjp Hgs Hused1 Hsp Hra Hs0 Hs1 Hs2 HQ12sp HQ12s4 HQ12thr
-                  with "Hcg Hcnt Htext Hpc [] Hslkk Hslkd Hslpid Hdep
+                  with "Hcg Hcnt Htext Hpc [] Hslkk Hslkd Hdep
                         Hidev Hiinum Hivalid Hload Hity Hfrz Hkeep Hru Hbm Hins Hbits Hka
                         Hpriv Hpath Hargv Hargs Hbs Hirs Hlog [-Hcont] Hcont").
         { iApply (T.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv Hesc
@@ -1604,7 +1603,7 @@ Section KexecABody.
                 m Q9 K lks sp0 ra0 s00 s10 s20 pv av
                 HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib' Hcovb Hiu
                 Hjp Hgs Hused1 Hsp Hra Hs0 Hs1 Hs2 HQ9sp HQ9s4 HQ9thr
-                with "Hcg Hcnt Htext Hpc [] Hslkk Hslkd Hslpid Hdep
+                with "Hcg Hcnt Htext Hpc [] Hslkk Hslkd Hdep
                       Hidev Hiinum Hivalid Hload Hity Hfrz Hkeep Hru Hbm Hins Hbits Hka
                       Hpriv Hpath Hargv Hargs Hbs Hirs Hlog [-Hcont] Hcont").
       { iApply (T.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv Hesc
@@ -1776,8 +1775,7 @@ Section KexecAMain.
         cpu_own 0 eb (proc_addr jp) b lks -∗
         is_sleeplock_gen gilf gislf (i_lock (ientry kf)) "inode"%string
                      (ic_tok cn kf) (slh_tok (icfg_isl kf)) -∗
-        sleeplocked_q gislf sf -∗
-        sl_pid (i_lock (ientry kf)) ↦₄ pidv -∗
+        sleeplocked_q gislf sf (i_lock (ientry kf)) pidv -∗
         ic_deposit cn kf (DepShr sf dev inumf gyf) -∗
         i_dev (ientry kf) ↦₄{DfracOwn (1/2)} dev -∗
         i_inum (ientry kf) ↦₄{DfracOwn (1/2)} inumf -∗

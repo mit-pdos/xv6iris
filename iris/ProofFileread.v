@@ -1817,7 +1817,7 @@ Section ProofFileread.
                 half, which iunlock consumes to select its own escrow arm
                 (design §14.8) *)
              iIntros (CIDil Hsil mil dnl bml fl_)
-               "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hsb Hbslot Hheld Hslpid Hdep
+               "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hsb Hbslot Hheld Hdep
                 Hidev Hinum Hvalid Hlk #Hshot Hfrz %Hfr_ _ %Hilkp".
              iDestruct ("Hpivbk" with "Hppid") as "Hpriv".
              assert (Hpc34 : ret_pc (I2 !!! Regidx Rra) = mword_of_int (FR + 0x34)).
@@ -1858,7 +1858,6 @@ Section ProofFileread.
              iEval (rewrite -Hipk) in "Hidev".
              iAssert (i_valid (fc_ip Cf) ↦₄ (mword_of_int 1 : mword 32))%I
                with "[Hvalid]" as "Hvalid"; [rewrite Hipk; iExact "Hvalid" |].
-             iEval (rewrite -Hipk) in "Hslpid".
              iAssert (inode_map (frn_fs fn) (fc_ip Cf) bml)
                with "[Haddrs Hindres]" as "Hmap".
              { rewrite /inode_map. iFrame. }
@@ -2155,7 +2154,6 @@ Section ProofFileread.
                 iAssert (i_valid (ientry ikk) ↦₄ valid_word true)%I
                   with "[Hvalid]" as "Hvalid"; [rewrite -Hipk; iExact "Hvalid" |].
                 iEval (rewrite Hipk) in "Hidev".
-                iEval (rewrite Hipk) in "Hslpid".
                 (* ---- +0x4e c.ld a0,24(s1) ; +0x50 jal ra,iunlock ---- *)
                 assert (Hpip3 : add_vec (rget M1 Rs1)
                                   (sign_extend' 64 (mword_of_int 24 : mword 12))
@@ -2218,7 +2216,7 @@ Section ProofFileread.
                           ltac:(rewrite HN2a0; exact Hipk)
                           ltac:(lkbelow)
                           with "Hcg Hcnt Htext Hpc Hitbl Hesc Hslk
-                                Hheld Hslpid Hppid Hprocs
+                                Hheld Hppid Hprocs
                                 Hdep Hidev Hinum Hvalid Hlk Hshot Hfrz").
                 all: try lkbelow.
                 iIntros (CIDiu Hsiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hrefout".
@@ -2434,7 +2432,6 @@ Section ProofFileread.
                 iAssert (i_valid (ientry ikk) ↦₄ valid_word true)%I
                   with "[Hvalid]" as "Hvalid"; [rewrite -Hipk; iExact "Hvalid" |].
                 iEval (rewrite Hipk) in "Hidev".
-                iEval (rewrite Hipk) in "Hslpid".
                 (* ---- +0x4e c.ld a0,24(s1) ; +0x50 jal ra,iunlock ---- *)
                 assert (Hpip3 : add_vec (rget M4 Rs1)
                                   (sign_extend' 64 (mword_of_int 24 : mword 12))
@@ -2497,7 +2494,7 @@ Section ProofFileread.
                           ltac:(rewrite HN2a0; exact Hipk)
                           ltac:(lkbelow)
                           with "Hcg Hcnt Htext Hpc Hitbl Hesc Hslk
-                                Hheld Hslpid Hppid Hprocs
+                                Hheld Hppid Hprocs
                                 Hdep Hidev Hinum Hvalid Hlk Hshot Hfrz").
                 all: try lkbelow.
                 iIntros (CIDiu Hsiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hrefout".

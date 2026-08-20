@@ -1987,8 +1987,7 @@ Section ProofCreateMain.
        (* THE LOCKED PARENT, in pieces *)
        is_sleeplock_gen γil γisl (i_lock (ientry kd)) "inode"%string
                     (ic_tok cn kd) (slh_tok (icfg_isl kd)) -∗
-       sleeplocked_q γisl (qd/2)%Qp -∗
-       sl_pid (i_lock (ientry kd)) ↦₄ pidv -∗
+       sleeplocked_q γisl (qd/2)%Qp (i_lock (ientry kd)) pidv -∗
        ic_deposit cn kd (DepShr (qd/2)%Qp dev dind gd) -∗
        i_dev (ientry kd) ↦₄{DfracOwn (1/2)} dev -∗
        i_inum (ientry kd) ↦₄{DfracOwn (1/2)} dind -∗
@@ -2147,8 +2146,7 @@ Section ProofCreateMain.
        (* THE LOCKED PARENT, in pieces *)
        is_sleeplock_gen γil γisl (i_lock (ientry kd)) "inode"%string
                     (ic_tok cn kd) (slh_tok (icfg_isl kd)) -∗
-       sleeplocked_q γisl (qd/2)%Qp -∗
-       sl_pid (i_lock (ientry kd)) ↦₄ pidv -∗
+       sleeplocked_q γisl (qd/2)%Qp (i_lock (ientry kd)) pidv -∗
        ic_deposit cn kd (DepShr (qd/2)%Qp dev dind gd) -∗
        i_dev (ientry kd) ↦₄{DfracOwn (1/2)} dev -∗
        i_inum (ientry kd) ↦₄{DfracOwn (1/2)} dind -∗
@@ -2171,8 +2169,7 @@ Section ProofCreateMain.
        (* THE LOCKED CHILD, in pieces, at the FLUSHED record *)
        is_sleeplock_gen gil gisl (i_lock (ientry kslot)) "inode"%string
                     (ic_tok cn kslot) (slh_tok (icfg_isl kslot)) -∗
-       sleeplocked_q gisl (q/2)%Qp -∗
-       sl_pid (i_lock (ientry kslot)) ↦₄ pidv -∗
+       sleeplocked_q gisl (q/2)%Qp (i_lock (ientry kslot)) pidv -∗
        ic_deposit cn kslot (DepShr (q/2)%Qp dev cinum g) -∗
        i_dev (ientry kslot) ↦₄{DfracOwn (1/2)} dev -∗
        i_inum (ientry kslot) ↦₄{DfracOwn (1/2)} cinum -∗
@@ -2335,8 +2332,7 @@ Section ProofCreateMain.
           with [dir_links] still at the ENTRY ones and the ticket in hand *)
        is_sleeplock_gen γil γisl (i_lock (ientry kd)) "inode"%string
                     (ic_tok cn kd) (slh_tok (icfg_isl kd)) -∗
-       sleeplocked_q γisl (qd/2)%Qp -∗
-       sl_pid (i_lock (ientry kd)) ↦₄ pidv -∗
+       sleeplocked_q γisl (qd/2)%Qp (i_lock (ientry kd)) pidv -∗
        ic_deposit cn kd (DepShr (qd/2)%Qp dev dind gd) -∗
        i_dev (ientry kd) ↦₄{DfracOwn (1/2)} dev -∗
        i_inum (ientry kd) ↦₄{DfracOwn (1/2)} dind -∗
@@ -2359,8 +2355,7 @@ Section ProofCreateMain.
        (* THE LOCKED CHILD, at the flushed record *)
        is_sleeplock_gen gil gisl (i_lock (ientry kslot)) "inode"%string
                     (ic_tok cn kslot) (slh_tok (icfg_isl kslot)) -∗
-       sleeplocked_q gisl (q/2)%Qp -∗
-       sl_pid (i_lock (ientry kslot)) ↦₄ pidv -∗
+       sleeplocked_q gisl (q/2)%Qp (i_lock (ientry kslot)) pidv -∗
        ic_deposit cn kslot (DepShr (q/2)%Qp dev cinum g) -∗
        i_dev (ientry kslot) ↦₄{DfracOwn (1/2)} dev -∗
        i_inum (ientry kslot) ↦₄{DfracOwn (1/2)} cinum -∗
@@ -2946,7 +2941,7 @@ Section ProofCreateMain.
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
       iIntros (CIDil Hqil mil dnl bml fld)
-        "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hsbi Hbs1 Hslkdd Hslpid Hdep
+        "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hsbi Hbs1 Hslkdd Hdep
          Hidev Hiinum Hivalid Hload #Hshotl Hfrzl %Hfrd Hrud %Hilkpd".
       assert (Hpcil : ret_pc (Q2 !!! Regidx Rra : mword 64)
                       = mword_of_int (CK + 0x2a)) by (rewrite HQ2ra; pcw).
@@ -3076,7 +3071,7 @@ Section ProofCreateMain.
                   Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib' Hcovb
                   ltac:(exact Hn1ip) Hj Hgs HG2a0
                   with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
-                        Hescd Hiregi Hiopen Hslkd Hslkdd Hslpid Hdep Hidev Hiinum
+                        Hescd Hiregi Hiopen Hslkd Hslkdd Hdep Hidev Hiinum
                         Hivalid Hload Hshotl Hfrzl [$Hkeep2 $Hrud] Hsbb Hsbi Hbmr Hppid
                         Hprocs Hdevi Hgeom Hdlk Hbsl [] Hop").
         all: try lkbelow.
@@ -3507,7 +3502,7 @@ Section ProofCreateMain.
                     Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib' Hcovb
                     ltac:(exact Hn1ip) Hj Hgs HF3a0
                     with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
-                          Hescd Hiregi Hiopen Hslkd Hslkdd Hslpid Hdep Hidev Hiinum
+                          Hescd Hiregi Hiopen Hslkd Hslkdd Hdep Hidev Hiinum
                           Hivalid Hload Hshotl Hfrzl [$Hkeep2 $Hrud] Hsbb Hsbi Hbmr Hppid
                           Hprocs Hdevi Hgeom Hdlk Hbsl [] Hop").
           all: try lkbelow.
@@ -3593,7 +3588,7 @@ Section ProofCreateMain.
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }
           iIntros (CIDic Hqic mic dnc bmc flc)
-            "%Hcsic Hcg Hcnt _ _ Hpc Hppid Hsbi Hbs1 Hcslkd Hcslpid Hcdep
+            "%Hcsic Hcg Hcnt _ _ Hpc Hppid Hsbi Hbs1 Hcslkd Hcdep
              Hcidev Hciinum Hcivalid Hcload #Hcshot Hcfrz %Hfrc Hruc %Hilkpc".
           assert (Hpcic : ret_pc (F5 !!! Regidx Rra : mword 64)
                           = mword_of_int (CK + 0x5a)) by (rewrite HF5ra; pcw).
@@ -3631,8 +3626,7 @@ Section ProofCreateMain.
                           pa_add (pa_stk sp0 10) jj ↦ₘ[KT1] nfp jj) -∗
                        ([∗ list] jj ∈ seq 14 2,
                           pa_add (pa_stk sp0 10) jj ↦ₘ[KT1] nf0 jj) -∗
-                       sleeplocked_q gislc (qq/2)%Qp -∗
-                       sl_pid (i_lock (ientry kslot)) ↦₄ pidv -∗
+                       sleeplocked_q gislc (qq/2)%Qp (i_lock (ientry kslot)) pidv -∗
                        ic_deposit cn kslot (DepShr (qq/2)%Qp dev cinum gc) -∗
                        i_dev (ientry kslot) ↦₄{DfracOwn (1/2)} dev -∗
                        i_inum (ientry kslot) ↦₄{DfracOwn (1/2)} cinum -∗
@@ -3670,7 +3664,7 @@ Section ProofCreateMain.
           { iModIntro.
             iIntros (CIDb Hsb Mb)
               "%HBr Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb14 Hnb2
-               Hcslkd Hcslpid Hcdep Hcidev Hciinum Hcivalid Hcload Hcshotb
+               Hcslkd Hcdep Hcidev Hciinum Hcivalid Hcload Hcshotb
                Hcfrz Hckeep Hruc Hsbn Hsbi Hsbs Hsbb Hbmr Hppid Hppback Hpath Hbsl
                Hisl Hislr Hop Hcontb".
             iPoseProof (cri_098 with "Htext") as "Hi098".
@@ -3731,7 +3725,7 @@ Section ProofCreateMain.
                       Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hcblk Hcblog Hcinb Hcovb
                       ltac:(exact Hn2ip) Hj Hgs HB2a0
                       with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2
-                            Hitbl Hescc Hiregi Hiopen Hslkc Hcslkd Hcslpid Hcdep
+                            Hitbl Hescc Hiregi Hiopen Hslkc Hcslkd Hcdep
                             Hcidev Hciinum Hcivalid Hcload Hcshotb Hcfrz [$Hckeep2 $Hruc] Hsbb
                             Hsbi Hbmr Hppid Hprocs Hdevi Hgeom Hdlk Hbsl []
                             Hop").
@@ -4029,7 +4023,7 @@ Section ProofCreateMain.
                 iSpecialize ("Hfb" with "[%]"); [wp_next_chain |].
                 iApply ("Hfb" $! FB with
                           "[%] Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8
-                           Hnb14 Hnb2 Hcslkd Hcslpid Hcdep Hcidev Hciinum
+                           Hnb14 Hnb2 Hcslkd Hcdep Hcidev Hciinum
                            Hcivalid Hcload Hcshot Hcfrz Hckeep Hruc Hsbn Hsbi Hsbs
                            Hsbb
                            Hbmr Hppid Hppback Hpath Hbsl Hisl Hislr Hop Hcont").
@@ -4060,7 +4054,7 @@ Section ProofCreateMain.
                 iApply ("Hcont" $! mf true false kslot (qq/2)%Qp (qq/2)%Qp gc
                           cinum dnc bmc n2 Sb2 (1 + (ns - 2))%nat used2
                           with "[%] Hcg Hcnt Hpc Hsbn Hsbi Hsbs Hsbb Hbmr Hpriv
-                                Hpath Hbsl [%] Hisl [%] Hop [Hcslkd Hcslpid Hcdep
+                                Hpath Hbsl [%] Hisl [%] Hop [Hcslkd Hcdep
                                 Hcidev Hciinum Hcivalid Hcload Hcfrz Hckeep Hruc]").
                 { exact Hcsf. }
                 { exact (cr_slots_1 _ ns Hns). }
@@ -4076,7 +4070,7 @@ Section ProofCreateMain.
                   exact (cr_trange_in (di_type dnc) Hrng). }
                 iApply (create_locked_mk cn γfs γi cov logstart
                           _ _ _ _ _ _ _ _ _ gilc gislc
-                          with "Hslkc Hcslkd Hcslpid Hcdep Hcidev Hciinum
+                          with "Hslkc Hcslkd Hcdep Hcidev Hciinum
                                 Hcivalid Hcload Hcshot Hcfrz Hckeep Hruc").
           -- (* ===== ARM F-BAD (first entry): type != T_FILE ========== *)
              iApply (wp_bne_taken_s_sconf (mword_of_int (CK + 0x5c))
@@ -4096,7 +4090,7 @@ Section ProofCreateMain.
              iSpecialize ("Hfb" with "[%]"); [wp_next_chain |].
              iApply ("Hfb" $! F6 with
                        "[%] Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8
-                        Hnb14 Hnb2 Hcslkd Hcslpid Hcdep Hcidev Hciinum
+                        Hnb14 Hnb2 Hcslkd Hcdep Hcidev Hciinum
                         Hcivalid Hcload Hcshot Hcfrz Hckeep Hruc Hsbn Hsbi Hsbs
                         Hsbb
                         Hbmr Hppid Hppback Hpath Hbsl Hisl Hislr Hop Hcont").
@@ -4154,7 +4148,7 @@ Section ProofCreateMain.
                     with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                           [%] [%] [%]
                           Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8
-                          Hnb14 Hnb2 Hslkd Hslkdd Hslpid Hdep Hidev Hiinum
+                          Hnb14 Hnb2 Hslkd Hslkdd Hdep Hidev Hiinum
                           Hivalid Hdlnk Hdiat Hmeta Hmap Hblocks Hshotl Hfrzl Hkeep Hrud
                           Hsbn Hsbi Hsbs Hsbb Hbmr Hpriv Hpath Hbsl Hisl Hop
                           Hcont").
@@ -4255,7 +4249,7 @@ Section ProofCreateMain.
                   Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib' Hcovb
                   ltac:(exact Hn1ip) Hj Hgs HJ2a0
                   with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
-                        Hescd Hiregi Hiopen Hslkd Hslkdd Hslpid Hdep Hidev Hiinum
+                        Hescd Hiregi Hiopen Hslkd Hslkdd Hdep Hidev Hiinum
                         Hivalid Hload Hshotl Hfrzl [$Hkeep2 $Hrud] Hsbb Hsbi Hbmr Hppid
                         Hprocs Hdevi Hgeom Hdlk Hbsl [] Hop").
         all: try lkbelow.
@@ -4716,7 +4710,7 @@ Section ProofCreateMain.
     iIntros "%HAregs %Hkdlt %Hdib %Htydir %Hnl0 %Hnlmax %Hiok %Hdok %Hddix %Hduq %Hnpname
              %Hnone %Hsb1 %Hwmem %Hnp1 %Husd1".
     iIntros "Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb14 Hnb2
-             #Hslkd Hslkdd Hslpid Hdep Hidev Hiinum Hivalid Hdlnk Hdiat
+             #Hslkd Hslkdd Hdep Hidev Hiinum Hivalid Hdlnk Hdiat
              Hmeta Hmap Hblocks #Hshotl Hfrzl Hkeep Hrud
              Hsbn Hsbi Hsbs Hsbb Hbmr Hpriv Hpath Hbsl Hisl Hop Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
@@ -4783,7 +4777,7 @@ Section ProofCreateMain.
          [ilock]'s return, and [SpecIlock]'s post now hands it over).  It is
          what pays the freeze pin at the +0xc4 [ip->nlink = 1] below, where
          the pure arm is FALSE. *)
-      iDestruct "Hres" as "(%Hpure & Hpc & #Hslkc & Hcslkd & Hcslpid & Hcdep &
+      iDestruct "Hres" as "(%Hpure & Hpc & #Hslkc & Hcslkd & Hcdep &
                             Hcidev & Hciinum & Hcivalid & Hcload & #Hcshot &
                             Hcfrz & Hckeep & Hruc & Hop)".
       destruct Hpure as (Hs3 & Hkslt & Hcpos & Hcinb & Htyc & Hfresh).
@@ -5079,9 +5073,9 @@ Section ProofCreateMain.
                   with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                         [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                         Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8
-                        Hnb14 Hnb2 Hslkd Hslkdd Hslpid Hdep Hidev Hiinum
+                        Hnb14 Hnb2 Hslkd Hslkdd Hdep Hidev Hiinum
                         Hivalid Hdlnk Hdiat Hmeta Hmap Hblocks Hshotl Hfrzl Hkeep Hrud
-                        Hslkc Hcslkd Hcslpid Hcdep Hcidev Hciinum Hcivalid
+                        Hslkc Hcslkd Hcdep Hcidev Hciinum Hcivalid
                         Hcdlnk Hcdiat Hcmeta Hcmap Hcblocks Hcshot Hcfrz
                         Hckeep Hruc Hilink Hsbn Hsbi Hsbs Hsbb Hbmr Hppid Hppback Hpath
                         Hbsl Hislr Hop Hcont").
@@ -5554,7 +5548,7 @@ Section ProofCreateMain.
                        Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
                        ltac:(exact Hipn') Hj Hgs HY2a0
                        with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2
-                             Hitbl Hescd Hiregi Hiopen Hslkd Hslkdd Hslpid Hdep Hidev
+                             Hitbl Hescd Hiregi Hiopen Hslkd Hslkdd Hdep Hidev
                              Hiinum Hivalid Hload Hshotl' Hfrzl [$Hkeep2 $Hrud] Hsbb Hsbi Hbmr
                              Hppid Hprocs Hdevi Hgeom Hdlk Hbsl [] Hop").
              all: try lkbelow.
@@ -5657,7 +5651,7 @@ Section ProofCreateMain.
                        (cr_setf dnc major minor (mword_of_int 1 : mword 16)) bmc
                        n2 Sb2 (1 + (1 + (ns - 3)))%nat used2
                        with "[%] Hcg Hcnt Hpc Hsbn Hsbi Hsbs Hsbb Hbmr Hpriv
-                             Hpath Hbsl [%] Hisl [%] Hop [Hslkc Hcslkd Hcslpid
+                             Hpath Hbsl [%] Hisl [%] Hop [Hslkc Hcslkd
                              Hcdep Hcidev Hciinum Hcivalid Hcdlnk Hcdiat Hcmeta
                              Hcmap Hcblocks Hcfrz Hckeep Hruc]").
              { exact Hcsf. }
@@ -5731,7 +5725,7 @@ Section ProofCreateMain.
              { rewrite cr_setf_type. iExact "Hcshot". }
              iApply (create_locked_mk cn γfs γi cov logstart
                        _ _ _ _ _ _ _ _ _ gil gisl
-                       with "Hslkc Hcslkd Hcslpid Hcdep Hcidev Hciinum
+                       with "Hslkc Hcslkd Hcdep Hcidev Hciinum
                              Hcivalid Hcload Hcshot1 Hcfrz Hckeep Hruc").
           -- (* ======================================================== *)
              (*  ARM FAIL's non-directory entry: the append fell short    *)
@@ -5767,9 +5761,9 @@ Section ProofCreateMain.
                              [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                              [%] [%] [%] [%] [%] [%] [%] [%]
                              Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8
-                             Hnb14 Hnb2 Hslkd Hslkdd Hslpid Hdep Hidev Hiinum
+                             Hnb14 Hnb2 Hslkd Hslkdd Hdep Hidev Hiinum
                              Hivalid Hdlnk Hdiat Hmeta Hmap Hblocks Hshotl
-                             Hfrzl Hkeep Hrud Hslkc Hcslkd Hcslpid Hcdep Hcidev
+                             Hfrzl Hkeep Hrud Hslkc Hcslkd Hcdep Hcidev
                              Hciinum Hcivalid Hcdlnk Hcdiat Hcmeta Hcmap
                              Hcblocks Hcshot Hcfrz Hckeep Hruc Hilink Hsbn Hsbi Hsbs Hsbb Hbmr
                              Hppid Hppback Hpath Hbsl Hislr Hop Hcont").
@@ -5895,7 +5889,7 @@ Section ProofCreateMain.
                 Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
                 ltac:(exact Hn1ip) Hj Hgs HZ2a0
                 with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
-                      Hescd Hiregi Hiopen Hslkd Hslkdd Hslpid Hdep Hidev Hiinum
+                      Hescd Hiregi Hiopen Hslkd Hslkdd Hdep Hidev Hiinum
                       Hivalid Hload Hshotl Hfrzl [$Hkeep2 $Hrud] Hsbb Hsbi Hbmr Hppid
                       Hprocs Hdevi Hgeom Hdlk Hbsl [] Hop").
       all: try lkbelow.
@@ -6120,9 +6114,9 @@ Section ProofCreateMain.
              %Haddr' %Hsz31' %Hcov' %Hszcap' %Hsized' %Hdn' %Hdn0' %Hrng
              %Hsb4 %Hmem4 %Hn4 %Hledge".
     iIntros "Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb14 Hnb2
-             #Hslkd Hslkdd Hslpid Hdep Hidev Hiinum Hivalid Hdlnk Hdiat
+             #Hslkd Hslkdd Hdep Hidev Hiinum Hivalid Hdlnk Hdiat
              Hmeta Hmap Hblocks #Hshotl Hfrzl Hkeep Hrud
-             #Hslkc Hcslkd Hcslpid Hcdep Hcidev Hciinum Hcivalid Hcdlnk
+             #Hslkc Hcslkd Hcdep Hcidev Hciinum Hcivalid Hcdlnk
              Hcdiat Hcmeta Hcmap Hcblocks #Hcshot Hcfrz Hckeep Hruc Hilink
              Hsbn Hsbi Hsbs Hsbb Hbmr Hppid Hppback Hpath Hbsl Hislr Hop
              Hcont".
@@ -6358,7 +6352,7 @@ Section ProofCreateMain.
               Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hcblk Hcblog Hcinb Hcovb
               ltac:(exact (proj1 Hn4)) Hj Hgs HG4a0
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
-                    Hescc Hiregi Hiopen Hslkc Hcslkd Hcslpid Hcdep Hcidev Hciinum
+                    Hescc Hiregi Hiopen Hslkc Hcslkd Hcdep Hcidev Hciinum
                     Hcivalid Hcload Hcshot' Hcfrz [$Hckp $Hruc] Hsbb Hsbi Hbmr Hppid Hprocs
                     Hdevi Hgeom Hdlk Hbsl [] Hop").
     all: try lkbelow.
@@ -6522,7 +6516,7 @@ Section ProofCreateMain.
               Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
               ltac:(exact Hipn5) Hj Hgs HG6a0
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
-                    Hescd Hiregi Hiopen Hslkd Hslkdd Hslpid Hdep Hidev Hiinum
+                    Hescd Hiregi Hiopen Hslkd Hslkdd Hdep Hidev Hiinum
                     Hivalid Hload Hshotl' Hfrzl [$Hkeep2 $Hrud] Hsbb Hsbi Hbmr Hppid Hprocs
                     Hdevi Hgeom Hdlk Hbsl [] Hop").
     all: try lkbelow.
@@ -6780,8 +6774,7 @@ Section ProofCreateMain.
        (* THE LOCKED PARENT *)
        is_sleeplock_gen γil γisl (i_lock (ientry kd)) "inode"%string
                     (ic_tok cn kd) (slh_tok (icfg_isl kd)) -∗
-       sleeplocked_q γisl (qd/2)%Qp -∗
-       sl_pid (i_lock (ientry kd)) ↦₄ pidv -∗
+       sleeplocked_q γisl (qd/2)%Qp (i_lock (ientry kd)) pidv -∗
        ic_deposit cn kd (DepShr (qd/2)%Qp dev dind gd) -∗
        i_dev (ientry kd) ↦₄{DfracOwn (1/2)} dev -∗
        i_inum (ientry kd) ↦₄{DfracOwn (1/2)} dind -∗
@@ -6804,8 +6797,7 @@ Section ProofCreateMain.
        (* THE LOCKED CHILD -- WITHOUT its [dir_links] (see the header) *)
        is_sleeplock_gen gil gisl (i_lock (ientry kslot)) "inode"%string
                     (ic_tok cn kslot) (slh_tok (icfg_isl kslot)) -∗
-       sleeplocked_q gisl (q/2)%Qp -∗
-       sl_pid (i_lock (ientry kslot)) ↦₄ pidv -∗
+       sleeplocked_q gisl (q/2)%Qp (i_lock (ientry kslot)) pidv -∗
        ic_deposit cn kslot (DepShr (q/2)%Qp dev cinum g) -∗
        i_dev (ientry kslot) ↦₄{DfracOwn (1/2)} dev -∗
        i_inum (ientry kslot) ↦₄{DfracOwn (1/2)} cinum -∗
@@ -6917,9 +6909,9 @@ Section ProofCreateMain.
              %Hcpos %Hcinb %Htyc %Hcmaj %Hcmin %Hcnl1 %Hciok %Hcdok %Hcduq %Hcdots
              %Hsb4 %Hmem4 %Hn4 %Hledge".
     iIntros "Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb14 Hnb2
-             #Hslkd Hslkdd Hslpid Hdep Hidev Hiinum Hivalid Hdlnk Hdiat
+             #Hslkd Hslkdd Hdep Hidev Hiinum Hivalid Hdlnk Hdiat
              Hmeta Hmap Hblocks #Hshotl Hfrzl Hkeep Hrud
-             #Hslkc Hcslkd Hcslpid Hcdep Hcidev Hciinum Hcivalid
+             #Hslkc Hcslkd Hcdep Hcidev Hciinum Hcivalid
              Hcdiat Hcmeta Hcmap Hcblocks #Hcshot Hcfrz Hckeep Hruc Hilink
              Hsbn Hsbi Hsbs Hsbb Hbmr Hppid Hppback Hpath Hbsl Hislr Hop
              Hcont".
@@ -7174,7 +7166,7 @@ Section ProofCreateMain.
               Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hcblk Hcblog Hcinb Hcovb
               ltac:(exact (proj1 Hn4)) Hj Hgs HG4a0
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
-                    Hescc Hiregi Hiopen Hslkc Hcslkd Hcslpid Hcdep Hcidev Hciinum
+                    Hescc Hiregi Hiopen Hslkc Hcslkd Hcdep Hcidev Hciinum
                     Hcivalid Hcload Hcshot' Hcfrz [$Hckp $Hruc] Hsbb Hsbi Hbmr Hppid Hprocs
                     Hdevi Hgeom Hdlk Hbsl [] Hop").
     all: try lkbelow.
@@ -7271,7 +7263,7 @@ Section ProofCreateMain.
               Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
               ltac:(exact Hipn5) Hj Hgs HG6a0
               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
-                    Hescd Hiregi Hiopen Hslkd Hslkdd Hslpid Hdep Hidev Hiinum
+                    Hescd Hiregi Hiopen Hslkd Hslkdd Hdep Hidev Hiinum
                     Hivalid Hload Hshotl Hfrzl [$Hkeep2 $Hrud] Hsbb Hsbi Hbmr Hppid Hprocs
                     Hdevi Hgeom Hdlk Hbsl [] Hop").
     all: try lkbelow.
@@ -7473,9 +7465,9 @@ Section ProofCreateMain.
              %Hddix %Hduq %Hnpname %Hnone %Hkslt %Hcpos %Hcinb %Hfresh %Htyc %Hciok %Hcdok
              %Hsb3 %Hmem3 %Hn3 %Hcorr %Husd3".
     iIntros "Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb14 Hnb2
-             #Hslkd Hslkdd Hslpid Hdep Hidev Hiinum Hivalid Hdlnk Hdiat
+             #Hslkd Hslkdd Hdep Hidev Hiinum Hivalid Hdlnk Hdiat
              Hmeta Hmap Hblocks #Hshotl Hfrzl Hkeep Hrud
-             #Hslkc Hcslkd Hcslpid Hcdep Hcidev Hciinum Hcivalid
+             #Hslkc Hcslkd Hcdep Hcidev Hciinum Hcivalid
              Hcdlnk Hcdiat Hcmeta Hcmap Hcblocks #Hcshot Hcfrz Hckeep Hruc Hilink
              Hsbn Hsbi Hsbs Hsbb Hbmr Hppid Hppback Hpath Hbsl Hislr Hop
              Hcont".
@@ -9047,7 +9039,7 @@ Section ProofCreateMain.
                     Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
                     ltac:(exact Hipn6) Hj Hgs HT2a0
                     with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2
-                          Hitbl Hescd Hiregi Hiopen Hslkd Hslkdd Hslpid Hdep Hidev
+                          Hitbl Hescd Hiregi Hiopen Hslkd Hslkdd Hdep Hidev
                           Hiinum Hivalid Hload Hshotf Hfrzl [$Hkeep2 $Hrud] Hsbb Hsbi Hbmr
                           Hppid Hprocs Hdevi Hgeom Hdlk Hbsl [] Hop").
           all: try lkbelow.
@@ -9149,7 +9141,7 @@ Section ProofCreateMain.
           iApply ("Hcont" $! mf true true kslot (q/2)%Qp (q/2)%Qp g cinum
                     dc2 bm2 n7 Sb7 (1 + (1 + (ns - 3)))%nat used7
                     with "[%] Hcg Hcnt Hpc Hsbn Hsbi Hsbs Hsbb Hbmr Hpriv
-                          Hpath Hbsl [%] Hisl [%] Hop [Hslkc Hcslkd Hcslpid
+                          Hpath Hbsl [%] Hisl [%] Hop [Hslkc Hcslkd
                           Hcdep Hcidev Hciinum Hcivalid Hcdlnk2 Hcdiat Hcmeta
                           Hcmap Hcblocks Hcfrz Hckeep Hruc]").
           { exact Hcsf. }
@@ -9184,7 +9176,7 @@ Section ProofCreateMain.
             intro Hnd. exfalso. exact (Hnd Htdir). }
           iApply (create_locked_mk cn γfs γi cov logstart
                     _ _ _ _ _ _ _ _ _ gil gisl
-                    with "Hslkc Hcslkd Hcslpid Hcdep Hcidev Hciinum
+                    with "Hslkc Hcslkd Hcdep Hcidev Hciinum
                           Hcivalid Hcloadf Hcshot2 Hcfrz Hckeep Hruc").
         * (* =========================================================== *)
           (*  FAIL ENTRY 3 (+0x130 taken): the PARENT's own [dirlink]     *)
@@ -9237,9 +9229,9 @@ Section ProofCreateMain.
                     with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                           [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                           Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb14
-                          Hnb2 Hslkd Hslkdd Hslpid Hdep Hidev Hiinum Hivalid
+                          Hnb2 Hslkd Hslkdd Hdep Hidev Hiinum Hivalid
                           Hdlnk Hdiat Hmeta Hmap Hblocks Hshotp3 Hfrzl Hkeep Hrud
-                          Hslkc Hcslkd Hcslpid Hcdep Hcidev Hciinum Hcivalid
+                          Hslkc Hcslkd Hcdep Hcidev Hciinum Hcivalid
                           Hcdiat Hcmeta Hcmap Hcblocks Hcshot2 Hcfrz Hckeep Hruc
                           Hilink
                           Hsbn Hsbi Hsbs Hsbb Hbmr Hppid Hppback Hpath Hbsl
@@ -9306,9 +9298,9 @@ Section ProofCreateMain.
                   with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                         [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                         Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb14 Hnb2
-                        Hslkd Hslkdd Hslpid Hdep Hidev Hiinum Hivalid Hdlnk
+                        Hslkd Hslkdd Hdep Hidev Hiinum Hivalid Hdlnk
                         Hdiat Hmeta Hmap Hblocks Hshotl Hfrzl Hkeep Hrud
-                        Hslkc Hcslkd Hcslpid Hcdep Hcidev Hciinum Hcivalid
+                        Hslkc Hcslkd Hcdep Hcidev Hciinum Hcivalid
                         Hcdiat Hcmeta Hcmap Hcblocks Hcshot2 Hcfrz Hckeep Hruc Hilink
                         Hsbn Hsbi Hsbs Hsbb Hbmr Hppid Hppback Hpath Hbsl
                         Hislr Hop Hcont").
@@ -9376,9 +9368,9 @@ Section ProofCreateMain.
                 with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                       [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                       Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb14 Hnb2
-                      Hslkd Hslkdd Hslpid Hdep Hidev Hiinum Hivalid Hdlnk
+                      Hslkd Hslkdd Hdep Hidev Hiinum Hivalid Hdlnk
                       Hdiat Hmeta Hmap Hblocks Hshotl Hfrzl Hkeep Hrud
-                      Hslkc Hcslkd Hcslpid Hcdep Hcidev Hciinum Hcivalid
+                      Hslkc Hcslkd Hcdep Hcidev Hciinum Hcivalid
                       Hcdiat Hcmeta Hcmap Hcblocks Hcshot1 Hcfrz Hckeep Hruc Hilink
                       Hsbn Hsbi Hsbs Hsbb Hbmr Hppid Hppback Hpath Hbsl
                       Hislr Hop Hcont").

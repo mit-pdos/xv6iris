@@ -340,8 +340,7 @@ Definition wp_ilock_sconf_body
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       bslot bn -∗
       (* THE LOCK IS HELD ... *)
-      sleeplocked_q gisl s -∗
-      sl_pid (i_lock ip) ↦₄ pidv -∗
+      sleeplocked_q gisl s (i_lock ip) pidv -∗
       (* ... and the entry is CHECKED OUT and LOADED: the checkout
          descriptor's other half (§14.8 -- what the parker selects its arm
          with, and what pins [s], [dev] and [inum] there), the escrow's two

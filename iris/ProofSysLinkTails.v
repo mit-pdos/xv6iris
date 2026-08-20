@@ -385,8 +385,7 @@ Section ProofSysLinkTails.
     ireg_inv gi gfs inodestart nib -∗
     ireg_open -∗
     is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
-    sleeplocked_q gisl s -∗
-    sl_pid (i_lock (ientry kk)) ↦₄ pidv -∗
+    sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
     ic_deposit cn kk (DepShr s dev inum gy) -∗
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
@@ -440,7 +439,7 @@ Section ProofSysLinkTails.
            Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HMsp HMthr HMs1
            HMs2 Hal.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
-              #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd Hslpid Hdep Hidev
+              #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd Hdep Hidev
               Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpid #Hprocs
               #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 HbN HbW HbO Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
@@ -507,7 +506,7 @@ Section ProofSysLinkTails.
               Hinb Hcovb Hiu Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hitab Hitinv
-                    Hesck Hireg Hropen Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid
+                    Hesck Hireg Hropen Hslkk Hslkd Hdep Hidev Hiinum Hivalid
                     Hload Hshot Hfrz [$Hkeep $Hru] Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
                     Hdlk Hbsl Hop").
     iIntros (CID3 Hq3 mup n2 used2)
@@ -711,8 +710,7 @@ Section ProofSysLinkTails.
     ireg_inv gi gfs inodestart nib -∗
     ireg_open -∗
     is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
-    sleeplocked_q gisl s -∗
-    sl_pid (i_lock (ientry kk)) ↦₄ pidv -∗
+    sleeplocked_q gisl s (i_lock (ientry kk)) pidv -∗
     ic_deposit cn kk (DepShr s dev inum gy) -∗
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
@@ -766,7 +764,7 @@ Section ProofSysLinkTails.
            Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HMsp HMthr HMs1
            HMs2 Hal.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
-              #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd Hslpid Hdep Hidev
+              #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd Hdep Hidev
               Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpid #Hprocs
               #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 HbN HbW HbO Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
@@ -833,7 +831,7 @@ Section ProofSysLinkTails.
               Hinb Hcovb Hiu Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hitab Hitinv
-                    Hesck Hireg Hropen Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid
+                    Hesck Hireg Hropen Hslkk Hslkd Hdep Hidev Hiinum Hivalid
                     Hload Hshot Hfrz [$Hkeep $Hru] Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
                     Hdlk Hbsl Hop").
     iIntros (CID3 Hq3 mup n2 used2)
@@ -1199,7 +1197,7 @@ Section ProofSysLinkTails.
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     iIntros (CID3 Hq3 mil dn bm fl)
-      "%Hcsil Hcg Hown _ _ Hpc Hpid Hsbi Hbs1 Hslkd Hslpid Hdep Hidev Hiinum
+      "%Hcsil Hcg Hown _ _ Hpc Hpid Hsbi Hbs1 Hslkd Hdep Hidev Hiinum
        Hivalid Hload #Hshot Hfrz %Hfl Hru %Hilkp".
     assert (Hpcfa : ret_pc (M2 !!! Regidx Rra : mword 64)
                     = mword_of_int (SL + 0xfa)) by (rewrite HM2ra; pcw).
@@ -1466,7 +1464,7 @@ Section ProofSysLinkTails.
               Hinb Hcovb Hiu Hj Hgl HQ2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hitab Hitinv
-                    Hesck Hireg Hropen Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid
+                    Hesck Hireg Hropen Hslkk Hslkd Hdep Hidev Hiinum Hivalid
                     Hload Hshot' Hfrz [$Hkeep $Hru] Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
                     Hdlk Hbsl [Hop]").
     { rewrite Heb /trap_csrs_ext. done. }
@@ -1715,8 +1713,7 @@ Section ProofSysLinkTails.
     ity_shot gy ty -∗
     ilink (bv_unsigned inum) -∗
     (* ---- the PARENT, still locked ---- *)
-    sleeplocked_q gisld sd -∗
-    sl_pid (i_lock (ientry kd)) ↦₄ pidv -∗
+    sleeplocked_q gisld sd (i_lock (ientry kd)) pidv -∗
     ic_deposit cn kd (DepShr sd dev dinum gyd) -∗
     i_dev (ientry kd) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry kd) ↦₄{DfracOwn (1/2)} dinum -∗
@@ -1770,7 +1767,7 @@ Section ProofSysLinkTails.
            HMs1 HMs2 Hal Hncd.
     iIntros "Hcg Hown #Htext #Hdata Hpc #Hpe #Hbio #Hlog Hseam Hgen #Hitab #Hitinv
               #Hesck #Hescd #Hireg #Hropen #Hslkk #Hslkd0 Hkeep Hru Hshr #Hshotc Hilink Hslkd
-              Hslpid Hdep Hidev Hiinum Hivalid Hload #Hshotd Hfrz Hkeepd Hrud Hsbb Hsbi
+              Hdep Hidev Hiinum Hivalid Hload #Hshotd Hfrz Hkeepd Hrud Hsbb Hsbi
               Hbmres Hpid #Hprocs #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4
               HbN HbW HbO Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
@@ -1830,7 +1827,7 @@ Section ProofSysLinkTails.
               Hdblk Hdblog Hdnb Hcovb Hiu Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hitab Hitinv
-                    Hescd Hireg Hropen Hslkd0 Hslkd Hslpid Hdep Hidev Hiinum Hivalid
+                    Hescd Hireg Hropen Hslkd0 Hslkd Hdep Hidev Hiinum Hivalid
                     Hload Hshotd Hfrz [$Hkeepd $Hrud] Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
                     Hdlk Hbsl [] Hop").
     { rewrite Heb /trap_csrs_ext. done. }
@@ -1990,8 +1987,7 @@ Section ProofSysLinkTails.
     ity_shot gy ty -∗
     ilink (bv_unsigned inum) -∗
     (* ---- the PARENT, still locked ---- *)
-    sleeplocked_q gisld sd -∗
-    sl_pid (i_lock (ientry kd)) ↦₄ pidv -∗
+    sleeplocked_q gisld sd (i_lock (ientry kd)) pidv -∗
     ic_deposit cn kd (DepShr sd dev dinum gyd) -∗
     i_dev (ientry kd) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry kd) ↦₄{DfracOwn (1/2)} dinum -∗
@@ -2045,7 +2041,7 @@ Section ProofSysLinkTails.
            HMs1 HMs2 Hal Hncd.
     iIntros "Hcg Hown #Htext #Hdata Hpc #Hpe #Hbio #Hlog Hseam Hgen #Hitab #Hitinv
               #Hesck #Hescd #Hireg #Hropen #Hslkk #Hslkd0 Hkeep Hru Hshr #Hshotc Hilink Hslkd
-              Hslpid Hdep Hidev Hiinum Hivalid Hload #Hshotd Hfrz Hkeepd Hrud Hsbb Hsbi
+              Hdep Hidev Hiinum Hivalid Hload #Hshotd Hfrz Hkeepd Hrud Hsbb Hsbi
               Hbmres Hpid #Hprocs #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4
               HbN HbW HbO Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
@@ -2106,7 +2102,7 @@ Section ProofSysLinkTails.
               Hdblk Hdblog Hdnb Hcovb Hiu Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hitab Hitinv
-                    Hescd Hireg Hropen Hslkd0 Hslkd Hslpid Hdep Hidev Hiinum Hivalid
+                    Hescd Hireg Hropen Hslkd0 Hslkd Hdep Hidev Hiinum Hivalid
                     Hload Hshotd Hfrz [$Hkeepd $Hrud] Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
                     Hdlk Hbsl [] Hop").
     { rewrite Heb /trap_csrs_ext. done. }

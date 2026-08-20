@@ -2193,7 +2193,7 @@ Section ProofLogWrite.
     (* ---- the handle, opened ---- *)
     rewrite /bio_held.
     iDestruct "Hheld" as
-      "(%Hk2 & %Hcov2 & %Hdev2 & Hslk & Hpid & Hvalid & Hdevh & Hbufown & Hdisk & Hbpay)".
+      "(%Hk2 & %Hcov2 & %Hdev2 & Hslk & Hvalid & Hdevh & Hbufown & Hdisk & Hbpay)".
     rewrite /buf_own.
     iDestruct "Hbufown" as "(Hbnoc & Hbdisk & %Hlenbs & Hbytes)".
     iDestruct (lw_pay_split with "Hbpay") as "(HpL & HpD & Hextra)".
@@ -2404,7 +2404,7 @@ Section ProofLogWrite.
     iAssert (lw_closeA γ bn γfs γd cov logstart dev k pidv bno bs bsd Φfsb Bud nl W
              ∧ lw_closeB γ bn γfs γd cov logstart dev k pidv bno bs bsd Φfsb Bud nl W)%I
       with "[Houtc Hcmtc Hncc Hoauth Hepa Hxa HLauth HDauth Hcovrest Hcovb Hhdr Hlogr Hpool
-             Hmirc Hjtail HpL HpD Hextra Hslk Hpid Hvalid Hdevh Hbdisk Hbytes Hdisk
+             Hmirc Hjtail HpL HpD Hextra Hslk Hvalid Hdevh Hbdisk Hbytes Hdisk
              HPhifsb Hop]"
       as "Hcl".
     { iSplit.
@@ -2416,7 +2416,7 @@ Section ProofLogWrite.
         clear Hdtie. subst d.
         iDestruct "Hextra" as (q) "Href".
         iModIntro.
-        iSplitR "HpL HpD Href Hslk Hpid Hvalid Hdevh Hbnoc Hbdisk Hbytes Hdisk HPhifsb Hop Hslot".
+        iSplitR "HpL HpD Href Hslk Hvalid Hdevh Hbnoc Hbdisk Hbytes Hdisk HPhifsb Hop Hslot".
         + rewrite /log_res.
           iExists out, false, nc, om', Ep, (Xr ∪ {[(Ep, uint bno)]}).
           iFrame "Houtc Hcmtc Hncc Hoauth".
@@ -2466,7 +2466,7 @@ Section ProofLogWrite.
           iSplitR; [iPureIntro; exact Hk2|].
           iSplitR; [iPureIntro; exact Hcov2|].
           iSplitR; [iPureIntro; exact Hdev2|].
-          iFrame "Hslk Hpid Hvalid Hdevh".
+          iFrame "Hslk Hvalid Hdevh".
           iSplitL "Hbnoc Hbdisk Hbytes".
           { rewrite /buf_own.
             iSplitL "Hbnoc"; [iExact "Hbnoc"|].
@@ -2498,7 +2498,7 @@ Section ProofLogWrite.
         assert (HbdT : bool_decide (uint bno ∈ map uint (W ++ [bno])) = true)
           by (apply bool_decide_eq_true_2; apply lw_mem_snoc).
         iModIntro.
-        iSplitR "HpL HpD Hrt Hrdev Hrbno Hslk Hpid Hvalid Hdevh Hbnoc Hbdisk Hbytes
+        iSplitR "HpL HpD Hrt Hrdev Hrbno Hslk Hvalid Hdevh Hbnoc Hbdisk Hbytes
                  Hdisk HPhifsb Hop Hslot".
         + rewrite /log_res.
           iExists out, false, nc, om', Ep, (Xr ∪ {[(Ep, uint bno)]}).
@@ -2569,7 +2569,7 @@ Section ProofLogWrite.
           iSplitR; [iPureIntro; exact Hk2|].
           iSplitR; [iPureIntro; exact Hcov2|].
           iSplitR; [iPureIntro; exact Hdev2|].
-          iFrame "Hslk Hpid Hvalid Hdevh".
+          iFrame "Hslk Hvalid Hdevh".
           iSplitL "Hbnoc Hbdisk Hbytes".
           { rewrite /buf_own.
             iSplitL "Hbnoc"; [iExact "Hbnoc"|].

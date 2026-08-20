@@ -134,8 +134,7 @@ Definition wp_iunlock_sconf_body
   is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k)
                    (slh_tok (icfg_isl k)) -∗
   (* THE HOLDER'S BUNDLE -- the third dead panic test is exactly this *)
-  sleeplocked_q gisl s -∗
-  sl_pid (i_lock ip) ↦₄ pidv -∗
+  sleeplocked_q gisl s (i_lock ip) pidv -∗
   p_pid p ↦₄{dq} pidv -∗
   (* wakeup's resources (releasesleep wakes the lock's sleepers) *)
   procs_inv gs -∗
