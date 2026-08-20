@@ -52,7 +52,6 @@ Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import FileInvDefs.
 Require Import ProcAvail.
-Require Import FsCfg.
 Require Import FsReady.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 From Kernel Require KernelSyms.

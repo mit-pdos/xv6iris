@@ -97,7 +97,6 @@ Require Import BioDefs.  (* [BSIZE]: [InodeDefs.file_byte] indexes with it,
 Require Import BlockWords.
 Require Import BitmapEnc.
 Require Import DinodeEnc.
-Require Import DirentEnc.
 Require Import InodeDefs.
 Require Import DirView.
 Require Import FsTree.
