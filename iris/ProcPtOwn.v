@@ -1115,6 +1115,22 @@ Definition uvmd_np (oldsz newsz : mword 64) : nat :=
   then Z.to_nat ((bv_unsigned (pgroundup oldsz) - bv_unsigned (pgroundup newsz)) / 4096)
   else 0%nat.
 
+(* ...and the SIZE uvmdealloc leaves the process at, which is what it
+   returns: the new one when it really shrank, the old one otherwise.
+   Named because the contents-indexed contract is indexed by it. *)
+Definition uvmd_rsz (oldsz newsz : mword 64) : mword 64 :=
+  if bool_decide (bv_unsigned newsz < bv_unsigned oldsz)%Z then newsz else oldsz.
+
+Lemma uvmd_rsz_lt (oldsz newsz : mword 64) :
+  (bv_unsigned newsz < bv_unsigned oldsz)%Z -> uvmd_rsz oldsz newsz = newsz.
+Proof. intros H. unfold uvmd_rsz. by rewrite bool_decide_eq_true_2. Qed.
+
+Lemma uvmd_rsz_ge (oldsz newsz : mword 64) :
+  (bv_unsigned oldsz <= bv_unsigned newsz)%Z -> uvmd_rsz oldsz newsz = oldsz.
+Proof.
+  intros H. unfold uvmd_rsz. rewrite bool_decide_eq_false_2; [reflexivity | lia].
+Qed.
+
 Lemma uvmd_np_lt (oldsz newsz : mword 64) :
   (bv_unsigned newsz < bv_unsigned oldsz)%Z ->
   uvmd_np oldsz newsz
@@ -1319,6 +1335,22 @@ Proof.
     exact (z_pgu_small _ (proj1 (bv_unsigned_in_range 64 x)) Hlt). }
   unfold pgroundup. rewrite pgd_unsigned Hsum. reflexivity.
 Qed.
+
+(* THE TWO PGROUNDUPs AGREE.  [ProcPtOwn.pgroundup] is the machine's, on
+   [mword 64]; [UserPtTree.pgroundup] is the view's, on [Z].  A size that
+   does not wrap rounds the same way in both, which is what lets a
+   size-indexed contract be stated over the [Z] one while the code
+   computes the other. *)
+Lemma pgroundup_live (x : mword 64) :
+  (bv_unsigned x + 4095 < 2 ^ 64)%Z ->
+  UserPtTree.pgroundup (bv_unsigned x) = bv_unsigned (pgroundup x).
+Proof.
+  intros Hlt. rewrite (pgroundup_unsigned x Hlt).
+  unfold UserPtTree.pgroundup.
+  pose proof (Z.div_mod (bv_unsigned x + 4095) 4096 ltac:(lia)) as Hdm.
+  lia.
+Qed.
+
 
 Lemma pgroundup_low12 (x : mword 64) :
   subrange_vec_dec (pgroundup x) 11 0 = (zeros' 12 : mword 12).
@@ -4380,6 +4412,40 @@ Section ProcPt.
      the same predicate.  This is what lets uvmalloc's failure arm hand
      back [proc_pt P] itself after uvmdealloc deleted its way back to
      [P]'s map. *)
+  (* the contents-indexed forms of the two transport laws *)
+  Lemma proc_ptm_data_irrel (P Q : uptd) (sz : Z) (M : gmap Z (bv 8)) :
+    P.(ud_root) = Q.(ud_root) -> P.(ud_tfp) = Q.(ud_tfp) ->
+    P.(ud_um) = Q.(ud_um) ->
+    proc_ptm P sz M ⊣⊢ proc_ptm Q sz M.
+  Proof.
+    intros Hr Ht Hu. rewrite /proc_ptm /proc_pt_wf.
+    rewrite (umem_lazy_um_cong P Q sz M Hu).
+    rewrite Hr Ht Hu. reflexivity.
+  Qed.
+
+  (* the SIZE only ever enters through [uva_live], so two sizes with the
+     same live set are the same view.  uvmdealloc needs it: on the arm
+     where the two page-rounded sizes coincide the code unmaps nothing but
+     the returned size still moves. *)
+  Lemma proc_ptm_sz_cong (P : uptd) (sz sz' : Z) (M : gmap Z (bv 8)) :
+    (forall a : Z, uva_live sz a <-> uva_live sz' a) ->
+    proc_ptm P sz M ⊣⊢ proc_ptm P sz' M.
+  Proof.
+    intros Hlv. rewrite /proc_ptm /umem_lazy.
+    iSplit; iIntros "(%Hwf & Ht & Hm)";
+      (iSplitR; [iPureIntro; exact Hwf |]); iFrame "Ht";
+      iDestruct "Hm" as (Mp) "(%H1 & %H2 & %H3 & Hm)"; iExists Mp;
+      iSplitR; [iPureIntro; exact H1 | | iPureIntro; exact H1 |].
+    - iSplitR.
+      { iPureIntro. intros va. rewrite (H2 va). rewrite (Hlv va). reflexivity. }
+      iSplitR; [| iExact "Hm"].
+      iPureIntro. intros va Hnm Hlv'. apply H3; [exact Hnm | by apply Hlv].
+    - iSplitR.
+      { iPureIntro. intros va. rewrite (H2 va). rewrite <- (Hlv va). reflexivity. }
+      iSplitR; [| iExact "Hm"].
+      iPureIntro. intros va Hnm Hlv'. apply H3; [exact Hnm | by apply Hlv].
+  Qed.
+
   Lemma proc_pt_data_irrel (P Q : uptd) :
     P.(ud_root) = Q.(ud_root) -> P.(ud_tfp) = Q.(ud_tfp) ->
     P.(ud_um) = Q.(ud_um) ->

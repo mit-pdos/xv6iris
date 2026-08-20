@@ -115,7 +115,8 @@ Section ProofUvmdealloc.
      own entry hart -- same reasoning as ProofConsputc.v's
      [wp_consputc_epi]. *)
   Lemma wp_uvmdealloc_epi `{CID0 : CpuId}
-      (mm mj : regfile) (P : uptd) (K : nat) (eb : bool) (p : mword 64)
+      (mm mj : regfile) (P : uptd) (Res : iProp Σ)
+      (K : nat) (eb : bool) (p : mword 64)
       (b : bool) (oldsz newsz res ret_tgt : mword 64) (lks : gset string) :
     (4 <= K)%nat ->
     (b = false \/ p = zero_reg -> (CID0 : CPU) = (CID : CPU)) ->
@@ -143,7 +144,7 @@ Section ProofUvmdealloc.
     add_vec (add_vec (mm !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))
       (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) ↦₈[KT1] (mm !!! Regidx Rs1) -∗
     (∃ v, pa_stk (mm !!! Regidx csp_rs1) 4 ↦₈[KT1] v) -∗
-    proc_pt (uptd_del_run P (svpn_of (pgroundup newsz)) (uvmd_np oldsz newsz)) -∗
+    Res -∗
     (* [wp_next]'s OWN implicit "entry hart" argument must be pinned to the
        WHOLE FUNCTION's entry hart [CID] (the section's own, ambient here
        too) explicitly -- left bare, it would silently resolve to EPI's OWN
@@ -159,7 +160,7 @@ Section ProofUvmdealloc.
       ⌜callee_saved mm mr⌝ -∗
       ⌜ ((uint newsz >= uint oldsz)%Z /\ mr !!! Regidx Ra0 = oldsz)
         \/ ((uint newsz < uint oldsz)%Z /\ mr !!! Regidx Ra0 = newsz) ⌝ -∗
-      proc_pt (uptd_del_run P (svpn_of (pgroundup newsz)) (uvmd_np oldsz newsz)) -∗
+      Res -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -334,12 +335,13 @@ Section ProofUvmdealloc.
     { rewrite HE4a0. exact Hpay. }
   Qed.
 
-  Lemma wp_uvmdealloc_sconf
+  Lemma wp_uvmdealloc_mem_sconf
       (γa : gname) (mm : regfile)
-      (P : uptd) (K : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string)
-    : wp_uvmdealloc_sconf_body γa mm P K eb p b lks.
+      (P : uptd) (M : gmap Z (bv 8)) (K : nat) (eb : bool) (p : mword 64)
+      (b : bool) (lks : gset string)
+    : wp_uvmdealloc_mem_sconf_body γa mm P M K eb p b lks.
   Proof.
-    cbv beta delta [wp_uvmdealloc_sconf_body].
+    cbv beta delta [wp_uvmdealloc_mem_sconf_body].
     intros pcE oldsz newsz ret_tgt HK Hroot Hob Hlkbelow.
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
@@ -521,13 +523,20 @@ Section ProofUvmdealloc.
          PGROUNDUP arithmetic, which is the point of guarding it *)
       assert (Hnp0 : uvmd_np oldsz newsz = 0%nat)
         by (apply uvmd_np_ge; rewrite -!uint_unsigned; exact Hge).
-      iAssert (proc_pt (uptd_del_run P (svpn_of (pgroundup newsz)) (uvmd_np oldsz newsz)))
+      assert (Hrsz0 : uvmd_rsz oldsz newsz = oldsz)
+        by (apply uvmd_rsz_ge; rewrite -!uint_unsigned; exact Hge).
+      iAssert (proc_ptm (uptd_del_run P (svpn_of (pgroundup newsz))
+                           (uvmd_np oldsz newsz))
+                 (uint (uvmd_rsz oldsz newsz))
+                 (umem_del M (uint (pgroundup newsz))
+                    (4096 * uvmd_np oldsz newsz)))
         with "[Hpt]" as "Hpt".
-      { iEval (rewrite (proc_pt_data_irrel P
-                 (uptd_del_run P (svpn_of (pgroundup newsz)) (uvmd_np oldsz newsz))
-                 ltac:(rewrite Hnp0; reflexivity)
-                 ltac:(rewrite Hnp0; reflexivity)
-                 ltac:(rewrite Hnp0; reflexivity))) in "Hpt".
+      { rewrite Hnp0 Hrsz0. cbn [Nat.mul umem_del].
+        iEval (rewrite (proc_ptm_data_irrel P
+                 (uptd_del_run P (svpn_of (pgroundup newsz)) 0%nat)
+                 (uint oldsz) M
+                 ltac:(reflexivity) ltac:(reflexivity) ltac:(reflexivity)))
+          in "Hpt".
         iExact "Hpt". }
       iApply (wp_bgeu_taken_s_sconf (mword_of_int (KernelSyms.uvmdealloc + 0x0c))
                 (mword_of_int 26 : mword 13) Ra1 Ra2 A2 (K - 4)%nat b
@@ -542,7 +551,7 @@ Section ProofUvmdealloc.
       iEval (rewrite Htgt26) in "Hpc".
       iDestruct (cpu_own_transport CID CID7a 0%nat eb p b ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
-      iApply (wp_uvmdealloc_epi mm A2 P K eb p b oldsz newsz oldsz ret_tgt lks
+      iApply (wp_uvmdealloc_epi mm A2 P _ K eb p b oldsz newsz oldsz ret_tgt lks
                 ltac:(lia) ltac:(wp_next_chain) eq_refl HA2sp HA2s1 HA2thr
                 ltac:(left; split; [apply Z.le_ge; exact Hge | reflexivity])
                 with "Hcg Hcpu Htext Hpc Hr24 Hr16 Hr8 [Hgap] Hpt Hcont").
@@ -800,13 +809,44 @@ Section ProofUvmdealloc.
         rewrite -!uint_unsigned. exact (proj1 (Z.ltb_ge _ _) Hcmp2). }
       assert (Hnp0 : uvmd_np oldsz newsz = 0%nat)
         by (rewrite Hnpdef; apply z_np_zero; exact Hple).
-      iAssert (proc_pt (uptd_del_run P (svpn_of (pgroundup newsz)) (uvmd_np oldsz newsz)))
+      assert (Hrszn : uvmd_rsz oldsz newsz = newsz)
+        by (apply uvmd_rsz_lt; rewrite -!uint_unsigned; exact Hlt).
+      (* the rounded sizes coincide, so the LIVE SET does not move even
+         though the returned size does -- which is the whole reason
+         [proc_ptm_sz_cong] exists *)
+      assert (Hpmono : bv_unsigned (pgroundup newsz)
+                       <= bv_unsigned (pgroundup oldsz)).
+      { rewrite Hpuz Hpnz.
+        pose proof (Z.div_mod (bv_unsigned newsz + 4095) 4096 ltac:(lia)) as Hd1.
+        pose proof (Z.div_mod (bv_unsigned oldsz + 4095) 4096 ltac:(lia)) as Hd2.
+        assert (Hltz : (bv_unsigned newsz < bv_unsigned oldsz)%Z)
+          by (rewrite !uint_unsigned in Hlt; exact Hlt).
+        pose proof (Z.div_le_mono (bv_unsigned newsz + 4095)
+                      (bv_unsigned oldsz + 4095) 4096 ltac:(lia)
+                      ltac:(lia)) as Hm.
+        lia. }
+      assert (Hlvsame : forall a : Z,
+                uva_live (uint oldsz) a <-> uva_live (uint newsz) a).
+      { intros a. rewrite /uva_live !uint_unsigned.
+        rewrite (pgroundup_live oldsz ltac:(apply z_maxsz_no_wrap; exact Hobz)).
+        rewrite (pgroundup_live newsz ltac:(apply z_maxsz_no_wrap; exact Hnbz)).
+        assert (Hpe : bv_unsigned (pgroundup newsz)
+                      = bv_unsigned (pgroundup oldsz)) by lia.
+        rewrite Hpe. reflexivity. }
+      iAssert (proc_ptm (uptd_del_run P (svpn_of (pgroundup newsz))
+                           (uvmd_np oldsz newsz))
+                 (uint (uvmd_rsz oldsz newsz))
+                 (umem_del M (uint (pgroundup newsz))
+                    (4096 * uvmd_np oldsz newsz)))
         with "[Hpt]" as "Hpt".
-      { iEval (rewrite (proc_pt_data_irrel P
-                 (uptd_del_run P (svpn_of (pgroundup newsz)) (uvmd_np oldsz newsz))
-                 ltac:(rewrite Hnp0; reflexivity)
-                 ltac:(rewrite Hnp0; reflexivity)
-                 ltac:(rewrite Hnp0; reflexivity))) in "Hpt".
+      { rewrite Hnp0 Hrszn. cbn [Nat.mul umem_del].
+        iEval (rewrite (proc_ptm_sz_cong P (uint oldsz) (uint newsz) M Hlvsame))
+          in "Hpt".
+        iEval (rewrite (proc_ptm_data_irrel P
+                 (uptd_del_run P (svpn_of (pgroundup newsz)) 0%nat)
+                 (uint newsz) M
+                 ltac:(reflexivity) ltac:(reflexivity) ltac:(reflexivity)))
+          in "Hpt".
         iExact "Hpt". }
       assert (Hcmp2' : zopz0zI_u (rget A10 Ra4) (rget A10 Ra5) = false).
       { rgne. rgne. rewrite HA10a4 HA10a5. exact Hcmp2. }
@@ -821,7 +861,7 @@ Section ProofUvmdealloc.
       iEval (rewrite Hpc26) in "Hpc".
       iDestruct (cpu_own_transport CID CID16 0%nat eb p b ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
-      iApply (wp_uvmdealloc_epi mm A10 P K eb p b oldsz newsz newsz ret_tgt lks
+      iApply (wp_uvmdealloc_epi mm A10 P _ K eb p b oldsz newsz newsz ret_tgt lks
                 ltac:(lia) ltac:(wp_next_chain) eq_refl HA10sp HA10s1 HA10thr
                 ltac:(right; split; [exact Hlt | reflexivity])
                 with "Hcg Hcpu Htext Hpc Hr24 Hr16 Hr8 [Hgap] Hpt Hcont").
@@ -1057,12 +1097,37 @@ Section ProofUvmdealloc.
        hart crossing). *)
     iDestruct (cpu_own_transport CID CID23 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (Uvmunmap.wp_uvmunmap_sconf γa B6 P (uvmd_np oldsz newsz) (K - 4)%nat eb p 0%nat b lks
-              ltac:(lia) ltac:(vm_compute; reflexivity) HB6a0 Halign HB6a2 Hdofree Hrange
+    (* WHICH VAS STOP BEING LIVE: exactly [PGROUNDUP(newsz) .. PGROUNDUP(oldsz))
+       -- and that IS the run, because [uvmd_np] is its length in pages.
+       This is uvmunmap's one extra premise at the contents-indexed
+       altitude, and it is where the size drop is justified. *)
+    assert (Hlvrun : forall a : Z,
+              uva_live (uint newsz) a <->
+              (uva_live (uint oldsz) a
+               /\ ~ (uint (B6 !!! Regidx Ra1) <= a
+                     < uint (B6 !!! Regidx Ra1)
+                       + 4096 * Z.of_nat (uvmd_np oldsz newsz))%Z)).
+    { intros a. rewrite HB6a1. rewrite /uva_live !uint_unsigned.
+      rewrite (pgroundup_live oldsz ltac:(apply z_maxsz_no_wrap; exact Hobz)).
+      rewrite (pgroundup_live newsz ltac:(apply z_maxsz_no_wrap; exact Hnbz)).
+      lia. }
+    iApply (Uvmunmap.wp_uvmunmap_mem_sconf γa B6 P (uint oldsz) (uint newsz) M
+              (uvmd_np oldsz newsz) (K - 4)%nat eb p 0%nat b lks
+              ltac:(lia) ltac:(vm_compute; reflexivity) HB6a0 Halign HB6a2 Hdofree
+              Hrange Hlvrun
               with "Hcg Hcpu Htext Hpc Hpt Henv").
     all: try lkbelow.
     iIntros (CID24 Hs24 mr) "Hcg Hcpu Hpc %Hcs Hpt".
+    assert (Hrszn : uvmd_rsz oldsz newsz = newsz)
+      by (apply uvmd_rsz_lt; rewrite -!uint_unsigned; exact Hlt).
     iEval (rewrite HB6a1) in "Hpt".
+    iAssert (proc_ptm (uptd_del_run P (svpn_of (pgroundup newsz))
+                         (uvmd_np oldsz newsz))
+               (uint (uvmd_rsz oldsz newsz))
+               (umem_del M (uint (pgroundup newsz))
+                  (4096 * uvmd_np oldsz newsz)))
+      with "[Hpt]" as "Hpt".
+    { rewrite Hrszn. iExact "Hpt". }
     assert (Hret42 : ret_pc (B6 !!! Regidx Rra) = mword_of_int (KernelSyms.uvmdealloc + 0x42)).
     { rewrite HB6ra. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret42) in "Hpc".
@@ -1091,11 +1156,34 @@ Section ProofUvmdealloc.
     iEval (rewrite Htgt26') in "Hpc".
     iDestruct (cpu_own_transport CID24 CID25 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (wp_uvmdealloc_epi mm mr P K eb p b oldsz newsz newsz ret_tgt lks
+    iApply (wp_uvmdealloc_epi mm mr P _ K eb p b oldsz newsz newsz ret_tgt lks
               ltac:(lia) ltac:(wp_next_chain) eq_refl Hmrsp Hmrs1 Hmrthr
               ltac:(right; split; [exact Hlt | reflexivity])
               with "Hcg Hcpu Htext Hpc Hr24 Hr16 Hr8 [Hgap] Hpt Hcont").
     { iExists _. iExact "Hgap". }
+  Qed.
+
+  (* ...and the EXISTENTIAL-[M] corollary, which is what the callers that
+     do not care about the bytes still speak. *)
+  Lemma wp_uvmdealloc_sconf
+      (γa : gname) (mm : regfile)
+      (P : uptd) (K : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string)
+    : wp_uvmdealloc_sconf_body γa mm P K eb p b lks.
+  Proof.
+    cbv beta delta [wp_uvmdealloc_sconf_body].
+    intros pcE oldsz newsz ret_tgt HK Hroot Hob Hlkbelow.
+    iIntros "Hcg Hcpu #Htext Hpc Hpt Henv Hcont".
+    iEval (rewrite (proc_pt_ptm P (uint oldsz))) in "Hpt".
+    iDestruct "Hpt" as (M) "Hpt".
+    iApply (wp_uvmdealloc_mem_sconf γa mm P M K eb p b lks
+              HK Hroot Hob Hlkbelow with "Hcg Hcpu Htext Hpc Hpt Henv").
+    rewrite /wp_next. iIntros (CIDx) "%Hsx".
+    iSpecialize ("Hcont" $! CIDx with "[]"); [iPureIntro; exact Hsx|].
+    iIntros (mr) "Hcg Hcpu Hpc %Hcs %Hres Hpt".
+    iApply ("Hcont" $! mr with "Hcg Hcpu Hpc [%] [%] [Hpt]").
+    - exact Hcs.
+    - exact Hres.
+    - iApply (proc_ptm_pt with "Hpt").
   Qed.
 
 End ProofUvmdealloc.

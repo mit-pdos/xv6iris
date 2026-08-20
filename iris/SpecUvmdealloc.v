@@ -88,7 +88,57 @@ Definition wp_uvmdealloc_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CI
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
+(* ===================================================================== *)
+(*  THE MEMORY-INDEXED CONTRACT.                                          *)
+(* ===================================================================== *)
+(* uvmunmap's, lifted through the one call: the run of vas that stops
+   being live leaves the view, and the size the process is left at is the
+   value uvmdealloc returns ([uvmd_rsz] -- the new size when it really
+   shrank, the old one otherwise).  On the two arms where the C code
+   unmaps nothing, [uvmd_np] is 0 and [umem_del M _ 0] is [M], so one
+   postcondition covers all three, exactly as at the [proc_pt] altitude. *)
+Definition wp_uvmdealloc_mem_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+    (γa : gname) (mm : regfile)
+    (P : uptd) (M : gmap Z (bv 8)) (K : nat) (eb : bool) (p : mword 64)
+    (b : bool) (lks : gset string) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.uvmdealloc in
+  let oldsz := mm !!! Regidx (mword_of_int 11) in
+  let newsz := mm !!! Regidx (mword_of_int 12) in
+  let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
+  (26 <= K)%nat ->
+  mm !!! Regidx (mword_of_int 10) = page_base P.(ud_root) ->
+  (uint oldsz <= uvm_maxsz)%Z ->
+  locks_below lks "kmem" ->
+  sie_cap_gpr KT1 mm K b p -∗
+  cpu_own 0%nat eb p b lks -∗
+  kernel_text -∗
+  pc_is pcE -∗
+  proc_ptm P (uint oldsz) M -∗
+  kalloc_env γa None -∗
+  wp_next b p (fun (CID : CpuId) =>
+    ∀ (mr : regfile),
+    sie_cap_gpr KT1 mr K b p -∗
+    cpu_own 0%nat eb p b lks -∗
+    pc_is ret_tgt -∗
+    ⌜callee_saved mm mr⌝ -∗
+    ⌜ ((uint newsz >= uint oldsz)%Z /\
+        mr !!! Regidx (mword_of_int 10) = oldsz)
+      \/ ((uint newsz < uint oldsz)%Z /\
+          mr !!! Regidx (mword_of_int 10) = newsz) ⌝ -∗
+    proc_ptm (uptd_del_run P (svpn_of (pgroundup newsz)) (uvmd_np oldsz newsz))
+             (uint (uvmd_rsz oldsz newsz))
+             (umem_del M (uint (pgroundup newsz))
+                (4096 * uvmd_np oldsz newsz)) -∗
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
+
 Module Type UVMDEALLOC.
+  Parameter wp_uvmdealloc_mem_sconf :
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+      (γa : gname) (mm : regfile)
+      (P : uptd) (M : gmap Z (bv 8)) (K : nat) (eb : bool) (p : mword 64)
+      (b : bool) (lks : gset string),
+      wp_uvmdealloc_mem_sconf_body γa mm P M K eb p b lks.
   Parameter wp_uvmdealloc_sconf :
     forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (mm : regfile)
