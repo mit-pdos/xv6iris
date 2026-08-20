@@ -74,6 +74,7 @@ Require Import CodePrintint.
 Require Import SpecConsputc SpecPrintint.
 From Kernel Require KernelInstrs KernelData.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -90,8 +91,7 @@ Proof. lia. Qed.
 Module PrintintProof (Consputc : CONSPUTC) : PRINTINT.
 
 Section ProofPrintint.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
-  Context `{!uartGhostG Σ, !diskGhostG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 
@@ -1595,7 +1595,7 @@ End ProofPrintint.
 (* THE SEALED FUNCTOR: instantiate the callee's WP hypothesis with its     *)
 (* proven spec, discharging the PRINTINT Module Type.                      *)
 (* ===================================================================== *)
-  Definition wp_printint_sconf `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
+  Definition wp_printint_sconf `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
       {kt : ktier} (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
       (bs : list (bv 8)) (n : nat) (eb : bool) (b : bool) (pcur : mword 64) (lks : gset string)
       : wp_printint_sconf_body kt γl γd γv m0 K bs n eb b pcur lks :=

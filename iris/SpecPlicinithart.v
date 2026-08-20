@@ -57,6 +57,7 @@ Require Import DevModel PlicPlan DiskPtsto WpUart.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 
 
@@ -80,7 +81,7 @@ Definition plic_senable_word : bv 32 := Z_to_bv 32 plic_dev_irq_mask.
    contract is stated at the literal index [false] rather than a generic
    [b], with no [wp_next] wrapper (it would collapse via [wp_next_off]
    anyway, since the hart cannot move). *)
-Definition wp_plicinithart_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_plicinithart_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
     (γd : uart_names) (γv : disk_names) (m0 : regfile) (n : nat) (p : mword 64) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let tp_idx : mword 5 := mword_of_int 4 in
@@ -103,7 +104,7 @@ Definition wp_plicinithart_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ,
 
 Module Type PLICINITHART.
   Parameter wp_plicinithart_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
       (γd : uart_names) (γv : disk_names) (m0 : regfile) (n : nat) (p : mword 64),
       wp_plicinithart_sconf_body γd γv m0 n p.
 End PLICINITHART.

@@ -26,7 +26,10 @@ every callee, but nothing yet DRIVES them.
   hart's device tokens (G1).
 - **`SpecPrintkGen.v` / `LinkPrintkGen.v`** and **`SpecUserinit.v` /
   `LinkUserinit.v`** — the two assumed-callee interfaces (G2, G3 below, with
-  their design decisions).
+  their design decisions).  **userinit itself is PROVEN** since 2026-08-19
+  (`SpecUserinit.v` / `ProofUserinit.v` / `LinkUserinit.v`); the
+  `LinkUserinit.v` axiom is now the DELTA between the real contract and what
+  main can pay, not a missing proof — §G3.
 - **`wp_fence_gen_later_s_sconf`** (WpSconfCtl.v, G4) and
   **`procs_inv_alloc`** (SpecProcinit.v §ProcinitProcsInv — NOT SchedCtx.v:
   SchedCtx cannot import SpecProcinit, that would be a cycle). The alloc
@@ -353,48 +356,130 @@ The contract threads `cpu_own` net-zero and the tp premise (it acquires
 `pr.lock`), and its post is minimal: `callee_saved` + ra restored, no `a0`
 claim, no output claim.
 
-### G3 — `userinit()` has no spec
+### G3 — `userinit()` — PROVEN AND LINKED (2026-08-19); the axiom moved to `namei`
 
-`SpecUserinit.v` + `LinkUserinit.v`, same assumed-callee shape:
-the weakest interface main can pay — `sie_cap_gpr`, `cpu_own γ 0 …` net-zero,
-`kernel_text`/`kernel_data`, `panic_wp`, `procs_inv`, `kalloc_env` (consumed
-by `userinit_pages := 8`, provisional), the `initproc` cell (back
-existentially). `K_userinit := 50` is provisional — namei's true depth is
-unknown; adjusting either constant, or adding the FS-side resources namei's
-real proof will demand, replaces exactly this one file plus its Axiom.
-(Typeclass note: the context deliberately drops `SpecMain`'s `!fileG Σ` —
-nothing in the statement needs it.)
+`ProofUserinit.v` discharges `SpecUserinit.wp_userinit_sconf_body`;
+`LinkUserinit.v` links it over `Allocproc` (the COUNTED instance),
+`NameiRoot`, `Release` and `ForkretPark`. `Print Assumptions` on the linked
+`wp_userinit_boot` is the Sail platform externs, funext, and
+`LinkForkretPark.ForkretPark.forkret_park` — the same single assumption
+`LinkKfork.v` already carries, and no new one. `tools/proof_coverage.py` now
+reads `+! userinit … proven`.
 
-**WHAT PROVING IT NOW NEEDS, and what is already built.** userinit's body is
-`allocproc(); initproc = p; p->cwd = namei("/"); p->state = RUNNABLE;
-release(&p->lock)`, and three of the five are ready:
+**WHAT THE PROOF IS ABOUT**, in the order the three hard parts appear:
 
-* `allocproc` is proven and takes the COUNTED regime
-  (`design/proc-struct.md`, "The proc table's two regimes"): with
-  `procs_avail (Some (S k))` its empty-table arm is refutable, which is what
-  a caller that does not check the result requires (kernel-defects.md).
-  `BootShared.boot_shared_alloc` already mints `procs_avail (Some NPROC)` —
-  it is DROPPED there today, and threading it to main is the wiring left.
-* `namei("/")` is proven at its ROOT CORNER (`SpecNamex.NAMEX_ROOT` /
-  `SpecNamei.NAMEI_ROOT`, `ProofNamexRoot.v` / `ProofNameiRoot.v`). The
-  general contract is unusable at boot and not for want of plumbing: it
-  names a running process, an OPEN `log_op`, and the whole block layer,
-  none of which exists before `fsinit`. For a path of one `/` the walk's
-  loop never runs, so the corner assumes only the ICACHE.
-* `release` at RUNNABLE is `SpecForkretPark.forkret_park` plus
-  `SchedCtx.proc_slots_park`, exactly as `ProofKforkB5` does it.
+* **allocproc's result is not tested.** `+0x24` stores through it
+  (`sd a0,336(s1)`), so two of `allocproc_post`'s three arms have to be
+  REFUTED. `ProcAvail.procs_avail (Some (S np))` kills the empty-table arm
+  (`avail_zero (Some (S np))` is `S np = 0`) and `K_allocproc < nb` kills the
+  freeproc-tail arm (`avail_sub (Some nb) n = Some (nb - n)`, `n ≤ 7 < nb`).
+  Both are one `lia` — the counted regime pays off exactly as
+  `ProcAvail.v`'s header predicted. This is the "thread the counted-regime
+  allocproc resource" half of the job, and it lives INSIDE userinit's own
+  contract: in at `Some (S np)`, out at `Some np`.
+* **`namei("/")` runs with `p->lock` held and before the file system
+  exists.** It is called at namei's ROOT CORNER, whose premise list had to be
+  reduced first — see below. The held `p->lock` costs exactly one order fact:
+  `"proc"` (9) `< "itable"` (14), so `locks_below lks "proc"` gives the
+  corner's own premise through `locks_below_union_singleton` +
+  `locks_below_mono`.
+* **the release is a RUNNABLE park**, i.e. `ProofKforkB5.v`'s move with one
+  crossing instead of three: `FORKRET_PARK` on allocproc's raw context, the
+  whole state mirror USED → RUNNABLE under the held lock
+  (`pstate_whole_update`, no side condition, then `pstate_whole_split` at
+  `unclaimed RUNNABLE = true`), `proc_slots_park`, `proc_lock_res_intro`.
+  The cwd is installed first: `proc_priv_nocwd_cwd_pid` gives the cell and
+  the give-back wand, and `proc_priv_split_cwd` closes the block at
+  `upd_cwd V ipv` with namei's `inode_held ipv` as the `cwd_ref`.
 
-So what userinit's contract must take, and main must therefore pay, is: the
-`nextpid` lock (`is_lock γp alp_pid_lock "nextpid" nextpid_res` — procinit
-returns the `lk_fresh`, and the `nextpid` cell has to join
-`main_globals_raw`; the CELL is already carved and handed out, as
-`BootShared.main_data_raw`'s second conjunct, so that step is a move rather
-than a new carve), `procs_avail (Some (S k))`, and the icache bundle
-(`is_itable2` / `itable_inv` / `ic_escrows` / one `iref_slot`).
-**THE ICACHE IS THE ONE THAT IS NOT READY**: `IcacheBoot.icache_boot` needs
-the stocked inode pool, which needs the fs BLOCK layer wired into main
-(fs-icache.md C7 owed (ii)). That is the gate on userinit, and it is the
-same gate `procs_inv`'s `ientry_raw`s are already waiting on.
+**THE `iref_slots` SPLIT IS THE DESIGN'S, NOT AN INVENTION.** allocproc hands
+back `iref_slots (1 + IREFSPARE)`; the `1` is the working directory's unit.
+kfork spends it on `idup`, userinit spends it on the root's `iget`, and
+`IREFSPARE` goes into the park either way. Nothing new had to be threaded.
+
+**THE ROOT CORNER'S PREMISE LIST WAS REDUCED FIRST**, and this is the durable
+part. `SpecNamex.wp_namex_root_body` / `SpecNamei.wp_namei_root_body` took
+`InodeRegion.ireg_open` — the SEALED regime — and **`ireg_open` cannot exist
+at userinit**: `FsReady.fs_ready_seal` mints it by shooting fsinit's exclusive
+`ireg_boot`, and userinit runs before fsinit. It was there because the general
+walk reaches `iput`, which freezes an inode and must exhibit the regime it
+freezes under; the corner never reaches `iput` (`nameiparent = 0` sends
+`+0x140` straight to the epilogue) and `ProofNamexRoot` introduced the row and
+never used it. Dropping it is a pure weakening — the two proofs lost one
+`iIntros` name each and nothing else. **A premise the one caller cannot
+satisfy is not a premise, it is a hole**; the corner exists precisely to
+assume less than the walk, so an unsatisfiable row in it defeats the file.
+
+**THE AXIOM MOVED DOWN THE CALL GRAPH (2026-08-19, second cycle).**
+`SpecUserinit.v` is now the REAL contract and `LinkUserinit.v` is a functor
+application; `ProofMain` applies it at +0x9e. What is assumed instead is
+`SpecNameiRootBoot.NAMEI_ROOT_BOOT` — `namei("/")` at the premises the boot
+client can produce, i.e. the corner `ProofNameiRoot.v` already PROVES minus
+the four persistent icache rows. `Print Assumptions
+xv6_power_adequacy_xv6Σ` went from seven entries to eight: userinit's whole
+body left, `wp_namei_root_boot` and `forkret_park` arrived (the latter was
+already kfork's and sys_fork's — the old axiom was hiding it). See
+`durable-notes.md`'s adequacy baseline.
+
+**WHAT IS LEFT: BOOT WIRING, NOT PROOF WORK.** The rows main still cannot
+pay are exactly the ones `SpecNameiRootBoot` assumes away:
+
+| row | can main pay it? |
+| --- | --- |
+| `procs_avail (Some (S k))` | **DONE 2026-08-19** — threaded out of `BootShared.boot_shared_alloc` (where it was minted and dropped) through `BootChain.boot_hart_primary` and `SpecMain` into `mn_grp_fs`, which carries it to the +0x9e call and drops it there |
+| `is_lock γp alp_pid_lock "nextpid" nextpid_res` | **DONE 2026-08-19, and it was NOT plumbing** — see below |
+| `is_itable2` / `itable_inv` / `ic_escrows` / `ireg_inv` | **NO** — `IcacheBoot.icache_boot` needs the stocked inode pool, which needs the fs BLOCK layer wired into main (fs-icache.md C7 owed (ii)), and that in turn wants the ambient-`icfg` tie (C7 (c)).  These four ARE `LinkNameiRootBoot.v`'s `Axiom`, and discharging it is a functor application over `LinkNameiRoot.NameiRoot`, not a proof |
+
+**DO NOT TRY TO PIN THE CACHE'S CONFIGURATION BY THREADING A PREMISE.**
+`namei`'s corner is only justified at `icfg_dev = ROOTDEV` and
+`0 < icfg_nib` (at `nib = 0` the `inode_held` it returns cannot exist), and
+the obvious move — state those as pure rows and carry them to adequacy —
+was tried and REVERTED: nothing at the far end can discharge them, because
+`icfg` arrives as a superclass field of `fileG` and `subG_fileΣ` is `Qed`.
+`reflexivity` fails; `vm_compute` does not fail, it grinds for fifteen
+minutes. The configuration is a property of `SystemAdequacy.adequacy_icfg`
+instead, chosen and documented there. `durable-notes.md` has the general
+rule.
+
+**WHY THE `nextpid` LOCK WAS NOT PLUMBING.** `nextpid_res` is
+`∃ v, alp_nextpid ↦₄ v` — EXCLUSIVE, because `allocpid` writes the word. But
+`nextpid` is `int nextpid = 1;`: it lives at `0x8000a284`, which is *below*
+`img_end` (`0x8000a2b0`), i.e. inside the loaded image and NOT in the `.bss`
+`boot_bss_carve` hands out. `BootShared` persisted `[text_end, img_end)`
+wholesale into `KernelDataInv.kernel_data` at `↦ₘ□`, so the word's fraction
+had been discarded before any client could ask for it: **the premise
+allocproc, kfork, sys_fork and userinit all take was not satisfiable by
+anybody**, and nothing in the build could see that, because a contract's
+premises are never checked for satisfiability.
+
+The fix cuts a hole in `kernel_data` at `[0x8000a280, 0x8000a290)` — the two
+writable `.data` words (`first_1`, `nextpid`) and the linker's padding before
+the GOT — keeps those sixteen bytes exclusive at boot, routes them through
+`main_globals_raw`, and lets `mn_grp_kvm` run the `newlock` on procinit's
+`lk_fresh`. The transferable half of that is written up in
+`durable-notes.md`, "A WRITABLE GLOBAL INSIDE THE LOADED IMAGE CANNOT BE
+OWNED IF THE BOOT CHAIN PERSISTS THE IMAGE WHOLESALE"; the reader-side
+`KdRo` class is what kept it off fifty-five call sites.
+
+**IT ALSO UNBLOCKS forkret.** `first_1` is the other word in the hole, and
+`SpecForkret`'s `Pfirst` is a points-to on it. main carries the cell and
+drops it today (forkret's `if (first)` arm is `LinkForkretNF.v`'s
+assumption, not main's), but the resource now exists.
+
+So the gate is unchanged and it is the SAME gate `SpecMain.main_globals_raw`'s
+fifty `ientry_raw`s are already waiting on. **Do not try to close it by
+growing `SpecMain`'s premises**: `Main.wp_main_boot_sconf` is applied by
+`BootChain.boot_hart_primary`, which `SystemAdequacy.xv6_boot_era` applies,
+which is what `xv6_power_adequacy` — a theorem with two hypotheses, both about
+the machine being off — rests on. An unpayable premise added there is a
+regression in the top-level statement, not plumbing. (Note too that
+`SystemAdequacy`'s `adequacy_icfg` hardcodes `icfg_nib = 0`, so at the
+concrete functor list `0 < nib` is false and no icache bundle for the root
+inode can exist at all until C7 (c) lands.)
+
+This split — the same function stated twice, once assumed at what a caller
+can pay and once proved at what it really needs — is `SpecForkretPark.v` /
+`SpecForkretParkPaid.v`'s, one level up.
 
 ### G4 — the payload arrives under a `▷` and nothing on the loop-exit path strips it
 
@@ -505,7 +590,7 @@ Boot arm, the raw global inventory (each spinlock as
 | `iinit` | `lk_raw itable`, `NINODE × sl_raw (inode_lock i)` (the `NINODE × ientry_raw` beside them are NOT iinit's — they ride past it to `icache_boot`) | `lk_fresh`, `NINODE × sl_fresh "inode"` |
 | `fileinit` | `lk_raw ftable` | `lk_fresh ftable "ftable"` |
 | `virtio_disk_init` | `lk_raw disk_lock`, `disk_{desc,avail,used} ↦₈`, 8 × `disk_free+j ↦ₘ`, `disk_inv γv` + the config-tracker half `disk_cfg_is γv ½ c0` at `⌜virtio_live c0 = false⌝`, `kalloc_env` with ≥3 pages | `vdi_post` |
-| `userinit` | G3 | — |
+| `userinit` | G3 — PROVEN and linked; the assumed contract in this cone is now `namei`'s root corner (`SpecNameiRootBoot`) | — |
 | `scheduler` | `procs_inv γ Φ γs`, `cpu_ctx_free`, `cpu_own γ 0 false p0`, `trap_csrs`, `intr_handler_avail γ` | never returns |
 
 Three assemblies main itself owes, none of them a callee call:

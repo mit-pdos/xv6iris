@@ -71,6 +71,7 @@ Require Import ProcPtOwn.
 Require Import SpecUvmcreate SpecMappages SpecUvmfree SpecUvmunmap SpecProcPagetable.
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -132,7 +133,7 @@ Module ProcPagetableCore (UV : UVMCREATE) (MP : MAPPAGES)
                          (UF : UVMFREE) (UUF : UVMUNMAP_FIXED) : PROC_PAGETABLE_GEN.
 
 Section ProofProcPagetable.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 
@@ -1303,7 +1304,7 @@ Module ProcPagetableProof (UV : UVMCREATE) (MP : MAPPAGES)
 Module Core := ProcPagetableCore UV MP UF UUF.
 
 Section SealProcPagetable.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_proc_pagetable_sconf (γa : gname)

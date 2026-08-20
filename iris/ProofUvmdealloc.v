@@ -72,6 +72,7 @@ Require Import SpecUvmunmap.
 Require Import SpecUvmdealloc.
 Require Import KernelRvcDecode.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -82,7 +83,7 @@ Import Defs.
 Module UvmdeallocProof (Uvmunmap : UVMUNMAP) : UVMDEALLOC.
 
 Section ProofUvmdealloc.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).

@@ -133,6 +133,7 @@ Require Import LogInv.
    [Require Import] in a sibling does not put its lemmas in scope. *)
 Require Import SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvExtras.
+Require Export Xv6Cameras.  (* the cameras this file states its theory over *)
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -1080,7 +1081,7 @@ Proof. intros Hnl H Hz. exact (ireg_wlt_succ _ _ w (H Hz) Hnl). Qed.
 
 (* ---- (T1), THE COUNT-FACT CARRIER's CLAUSE (S7-unlink FINDING 3, V1) ----
 
-   THE LEDGER'S [w] IS A PAIR [(wl, wd)] SINCE V1 ([IcacheRef.linkElemUR]),
+   THE LEDGER'S [w] IS A PAIR [(wl, wd)] SINCE V1 ([Xv6Cameras.linkElemUR]),
    and (L1) is the SUM: [wl + wd <= di_nlink].  [wd] counts the paid records
    whose holder ALSO knows the target is a DIRECTORY -- the fragment is
    [IcacheRef.ilinkd] -- and (T1) is what makes that knowledge true:
@@ -1326,12 +1327,8 @@ Proof. rewrite /imark_key. lia. Qed.
 (*  3.  THE GHOST, AND WHAT A CALLER HOLDS                                *)
 (* ===================================================================== *)
 
-Class iregG (Σ : gFunctors) := IregG {
-  ireg_inG :: ghost_mapG Σ Z dinode;
-}.
-Definition iregΣ : gFunctors := #[ghost_mapΣ Z dinode].
-Global Instance subG_iregΣ {Σ} : subG iregΣ Σ -> iregG Σ.
-Proof. solve_inG. Qed.
+(* [iregG] -- one [ghost_mapG Σ Z dinode] -- is defined in
+   Xv6Cameras.v; what a caller holds is below. *)
 
 Section InodeRegion.
   Context `{!riscvGS Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ, !icacheG Σ,
@@ -3050,7 +3047,7 @@ Section InodeRegion.
      persistent [ireg_open] does not), and the region has no other handle on
      it.  With the unfrozen state spelled as [FrzOff] the right to freeze IS
      the exclusive fragment, it rides under the itable lock beside the count
-     half, and double-freeze dies on [Excl] alone -- see [IcacheRef.frz]'s
+     half, and double-freeze dies on [Excl] alone -- see [Xv6Cameras.frz]'s
      header for the same argument from the algebra's side.
 
      THE BOOT-SHELTER SIDE (§2.3's last conjunct) is the caller's
@@ -3663,7 +3660,7 @@ Section InodeRegion.
      (The extra [lockG] binder is [IcacheRef.inode_ref]'s, not this
      lemma's: the reference's liveness slice is stated over the icache
      lock's ghost theory, and this section does not carry it.) *)
-  Lemma inode_claimed_to_ClaimK `{!WpLock.lockG Σ} ty k q dev inum g :
+  Lemma inode_claimed_to_ClaimK `{!lockG Σ} ty k q dev inum g :
     IcacheRef.inode_claimed ty k q dev inum ⊢
     IcacheRef.inode_ref k q dev inum ∗
     ireg_wd_lic (ClaimK ty) g (bv_unsigned inum).

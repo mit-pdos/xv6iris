@@ -48,6 +48,7 @@ Require Import SpecAcquire SpecRelease.
 Require Import PrintkFmt SpecConsputc SpecPrintint SpecPrintk.
 From Kernel Require KernelInstrs KernelData.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -70,8 +71,7 @@ Module PrintkProof (Consputc : CONSPUTC) (Printint : PRINTINT)
                    (Acquire : ACQUIRE) (Release : RELEASE) : PRINTK.
 
 Section ProofPrintk.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
-  Context `{!uartGhostG Σ, !diskGhostG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 
@@ -8320,7 +8320,7 @@ End ProofPrintk.
 (* THE SEALED FUNCTOR: instantiate the callees' WP hypotheses with their  *)
 (* proven specs, discharging the PRINTK Module Type.                      *)
 (* ===================================================================== *)
-  Definition wp_printk_sconf `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
+  Definition wp_printk_sconf `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
       {kt : ktier} (γpr : gname) (γl : gname) (γd : uart_names) (γv : disk_names)
       (m0 : regfile) (K : nat) (bs : list (bv 8))
       (n : nat) (eb : bool) {dqf : dfrac}

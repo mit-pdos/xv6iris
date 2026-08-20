@@ -26,10 +26,11 @@ Require Import Riscv.rv64d.
 Require Import RiscvPtsto.
 Require Import WpLock.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 Section TicksInv.
-  Context `{!riscvGS Σ, !lockG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
 
   (* ---- geometry.  The lock's own two words ([locked] at +0, [cpu] at +16)
      belong to [lock_inv] (WpLock.v); nothing here names the cpu word. *)

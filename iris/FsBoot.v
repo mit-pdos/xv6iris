@@ -76,6 +76,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 (* intermediate files use [Require Import], so nothing downstream inherits *)
 (* it.  See FastSetSolver.v.                                              *)
 Require Export FastSetSolver.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 (* ====================================================================== *)
@@ -232,7 +233,7 @@ Qed.
 (* ====================================================================== *)
 
 Section FsBoot.
-  Context `{!riscvGS Σ, !lockG Σ, !bioG Σ, !diskGhostG Σ, !fsLogG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
 
   (* the append/split law the whole carve rests on *)
   Lemma disk_bytes_app (γ : disk_names) (o : Z) (bs1 bs2 : list (bv 8)) :

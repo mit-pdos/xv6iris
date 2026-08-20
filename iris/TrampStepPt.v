@@ -60,6 +60,7 @@ Require Import WpDecodeBridge WpIntrCore CommonWalk HartGoodb.
 Require Import WpInstrRun WpSFrames.
 Require Import SmodePte WpSmodePtFetch.
 Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -381,7 +382,7 @@ Proof.
 Qed.
 
 Section TrampFetchPt.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Definition tramp_tr_obl (Df : register -> dfrac)

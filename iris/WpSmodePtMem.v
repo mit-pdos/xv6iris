@@ -21,6 +21,7 @@ Require Import SmodeCorePt SRegime WpSmodePtLeaves WpSmodePtFetch.
 Require Import HartLift HartSpan HartSpanChar HartSwp HartSFrame HartSMem WpSmodePtEngine KptGoodb KptShare Ktier.
 Require Import MemAccessGen.
 Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -981,7 +982,7 @@ Lemma store_data4 (w : SailStdpp.Values.mword 64) :
 Proof. reflexivity. Qed.
 
 Section WpSmodePtMemLeaves.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 

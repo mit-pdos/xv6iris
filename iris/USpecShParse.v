@@ -32,11 +32,12 @@ Require Import UserPtTree UserExec.
 Require Import UmodeMem UmodeCap UmodeAbi UmodeIo.
 Require Import UCodeSh USpecSh.
 Require User.ShSyms User.ShInstrs.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
 Section USpecShParse.
-  Context `{!riscvGS Σ} `{!uioG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context (C : ucfg) (pt : uptd).
   Context (gin gbrk : gname) (hbase hlen : Z).

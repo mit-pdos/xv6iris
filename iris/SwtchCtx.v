@@ -20,6 +20,7 @@ Require Import SmodeCore.
 Require Import StackOwn.
 Require Import IntrDefs.
 Require Import CpuOwn.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 (* struct-context field layout: field i (0..13) holds register [ctx_regs !! i]
@@ -90,7 +91,7 @@ Proof. intro H; exact H. Qed.
 
 Section SwtchCtx.
   Context `{!riscvGS Σ}.
-  Context `{!sieG Σ}.
+  Context `{!xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ================================================================== *)
@@ -270,7 +271,7 @@ Section SwtchCtx.
 End SwtchCtx.
 
 Section Swconf.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ------------------------------------------------------------------ *)

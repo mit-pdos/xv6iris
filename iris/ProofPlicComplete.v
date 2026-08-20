@@ -52,6 +52,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvExtras.
 Require Import CodePlicComplete.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 
 (* ---- the decodes used only by plic_complete ---- *)
@@ -74,8 +75,7 @@ Local Ltac rgne :=
 Module PlicCompleteProof (Cpuid : CPUID) : PLIC_COMPLETE.
 
 Section ProofPlicComplete.
-  Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{!uartGhostG Σ, !diskGhostG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 

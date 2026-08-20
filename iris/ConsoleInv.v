@@ -82,6 +82,7 @@ Require Import RiscvPtsto RiscvExtras.
 Require Import WpLock.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 
@@ -119,7 +120,7 @@ Lemma a_cons_nz : eq_vec a_cons (zero_reg : mword 64) = false.
 Proof. vm_compute. reflexivity. Qed.
 
 Section ConsoleInv.
-  Context `{!riscvGS Σ, !lockG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
 
   (* the ring, byte by byte -- [PipeInvDefs.pipe_data]'s shape.  The contents
      are a list rather than a function so that a single-byte update is a

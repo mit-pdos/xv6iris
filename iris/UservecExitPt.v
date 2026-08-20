@@ -70,6 +70,7 @@ Require Import SRegime TrampStepPt UptWalkPt TransPt Pt2WalkPt KptShare.
 Require Import UserretDefs.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -165,7 +166,7 @@ Section UveJalr.
 End UveJalr.
 
 Section UservecExitPt.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_uservec_exit_pt (kroot uroot tfp : mword 44)

@@ -53,6 +53,7 @@ Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import IntrDefs.
 Require Import CodeFileclose.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 Notation FC := KernelSyms.fileclose (only parsing).
@@ -324,7 +325,7 @@ Proof.
 Qed.
 
 Section ProofFilecloseParts.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).

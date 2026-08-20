@@ -15,6 +15,7 @@ Require Import SRegime.
 Require Import SmodeCore.
 Require Import SmodeCorePt WpSmodePtFetch.
 Require Import HartSwp HartSFrame WpSmodePtEngine.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 
 (* ---- Local helpers copied from WpSmodeBtype.v ---- *)
@@ -120,7 +121,7 @@ Local Lemma exec_execute_BTYPE_BEQ_taken_zca (imm : mword 13) (rs2 rs1 : mword 5
 
 
 Section WpSmodePtBtype.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ==================================================================== *)

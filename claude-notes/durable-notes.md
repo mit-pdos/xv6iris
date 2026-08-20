@@ -117,7 +117,7 @@ file, and delete the line when the file goes.
 - **`make` SAYING "Nothing to be done" WITH ZERO COMPILE LINES IS NOT A GREEN CONE — ON A SHARED BUILD BOX IT IS USUALLY A MTIME ARTEFACT.** A whole-tree sync (`rsync -a`, a `tar` restore, a bulk `touch` of `*.vo` to force "staleness 0") leaves every `.vo` newer than every `.v` — check with `ls --time-style=full-iso`: **identical timestamps to the NANOSECOND across unrelated files is the tell**, and no compile ever produces that. `make` then skips the cone you meant to validate and reports success, which is indistinguishable at a glance from a real green. Force the cone instead of trusting it: take the reverse transitive closure of the file you edited out of `iris/.CoqMakefile.d` (the `X.vo: … Y.vo …` lines are already the dependency graph), `rm` those `.vo/.vos/.vok/.glob`, then `make -f CoqMakefile -jN -k`. The closure is small for a leaf-ish file (`DirLinks.v` → 142) and it is the only way to know the consumers actually recompiled. Do NOT reach for `-B`: that rebuilds the whole tree.
 - **A PARTIALLY-BUILT LANE HOLDS TWO GENERATIONS OF `.vo`, AND "STALENESS 0" FOR ONE TARGET PROVES NOTHING ABOUT A NEW ONE.** A lane built by `make <one>.vo` is green and `make -n` emits 0 compile lines — for that chain. The first file you add that Requires something OUTSIDE it dies with **"Compiled library X makes inconsistent assumptions over library Y"**, which reads like a corrupt checkout and is not one: X was compiled against an older Y, and `make` will never notice because every stale `.vo` is still newer than its own `.v`. **The mtime test that finds them is not "older than the file that was rebuilt"** — that flags every base file the rebuilt one sits on top of (27 false positives out of a 208-file chain) — **it is "older than a `.vo` it DEPENDS on", iterated to a fixpoint** over `iris/.CoqMakefile.d`. `rm` the few that names and re-make. And after adding a `_CoqProject` row, regenerate with `coq_makefile -f _CoqProject -o CoqMakefile` **chained into the same command as the `eval $(opam env …)`** — a regeneration under the wrong switch stamps the wrong Rocq version into `CoqMakefile` and every later build inherits it.
 - **DO NOT `set (pj := proc_addr j)` IN A BLOCK LEMMA.** A callee's contract carries its own `let pj := proc_addr j`, so its postcondition hands resources back spelled `proc_addr j`; a walk that folded its goal with `set` then meets them unfolded, and the hart-mismatch error it is really looking at (`iSpecialize: cannot instantiate (cpu_own 0 eb … -∗ …)`) loses its usual tell — the two propositions printing IDENTICALLY — and looks like a `pj`-vs-`proc_addr j` problem instead. Spell the address out and read the error as what it is: a missing `cpu_own_transport`. Plain instructions between a callee's return and a block's seam move the hart just as a call does, and a seam stated over a `∀`-bound `CpuId` demands the transport that the seam's own binder makes invisible. (`ProofSysUnlink.su_w1`'s seam at +0x30, two instructions past nameiparent.)
-- **THE REBUILD CONE IS THE DEV-LOOP COST — know it before you edit, and route around it.** Touching `ProcInv` rebuilds 316 dependents ≈ 4–5 min wall at `-j28`; `BioInv`/`InodeInv`/`LogInv`/`FileInvDefs` ≈ 350 files; `WpLock` 548; `IntrDefs`/`SmodeCore` 600–700. `Spec*` files are cheap (3–29 dependents) — the spec-module architecture works. Three consequences:
+- **THE REBUILD CONE IS THE DEV-LOOP COST — know it before you edit, and route around it.** Touching `ProcInv` rebuilds 316 dependents ≈ 4–5 min wall at `-j28`; `InodeRegion` 203, `PipeInvDefs` 283, `WpUart` 306, `IcacheRef` 348, `FsCrash` 352, `LogInv` 369, `BioDefs` 394, `DiskPtsto` 481, `KallocInv` 554, `WpLock` 657, `SmodeCore` 781. `Spec*` files are cheap (3–29 dependents) — the spec-module architecture works. Three consequences:
   - **While iterating, build the CHAIN, not the cone:** `make -f CoqMakefile Proof<X>.vo` compiles only the prerequisites of the one file you care about (seconds after a mid-tree edit), and a single-file `coqc` checks the file you edited. Pay the full cone ONCE, in the validating `make -j` before landing — never per iteration.
   - **An ADDITIVE change to a shared invariant file belongs in a NEW leaf file** (`ProcInvExtra.v`-style, folded back at a milestone): a new file Requiring `ProcInv` costs only itself; a new lemma INSIDE `ProcInv.v` costs the 316-file cone on every iteration that recompiles it.
   - **`-vos` is NOT a fast cone check in this tree and do not reach for it:** everything lives inside `Section`s, so vos still runs all the tactics and skips only the kernel check — ~40 % per file, and a whole cone at `-j16` is no better than the real vo cone at full `-j`.
@@ -210,6 +210,29 @@ streamed line is the sentence BEFORE it, so the log blames the wrong
 sentence. **Rule: `vm_compute` only closed immediates.** Pull the immediate
 out as its own `Hc : sign_extend' 64 … = mword_of_int k` (closed, so
 `vm_compute` is instant), then `rewrite Hc moi_add; f_equal; lia`.
+
+**AND THE SAME TRAP AT AN OPAQUE INSTANCE, which is the shape that bites at
+the top of the tree (2026-08-19).** `vm_compute` ignores `Qed`-opacity: point
+it at a goal whose head sits behind an opaque instance and it will unfold
+that instance's proof term. `FileInv.subG_fileΣ` is `solve_inG. Qed.`, so at
+`xv6Σ` the ambient `IcacheRef.icfg` — a superclass FIELD of `fileG` — is
+behind it, and a goal as small as `icfg_dev = ROOTDEV` behaves like this:
+
+- `reflexivity` FAILS, with *"Unable to unify `ROOTDEV` with `icfg_dev`"*,
+  even though the instance visibly says `mword_of_int 1`;
+- `apply bv_eq; vm_compute; reflexivity` does NOT fail — it grinds through
+  the `solve_inG` term for **fifteen minutes** and reports nothing, and
+  `make` looks stalled rather than wrong.
+
+**The rule: a fact about the ambient `icfg` is not provable by conversion
+anywhere below the boot fupd, and reaching for `vm_compute` to force it is
+the failure above.** It is `fs-icache.md` C7 (c)'s ambient-`icfg` tie seen
+from below — only `IcacheRef.icfg_alloc` can establish anything about the
+cache's configuration. Where the configuration matters (it does: at
+`icfg_nib = 0` an `IcacheRef.inode_held` cannot exist), make it a property
+of the concrete INSTANCE and say so at its definition, as
+`SystemAdequacy.adequacy_icfg` now does — do not make it a premise and
+thread it, because nothing at the far end can discharge it.
 
 Three smaller ones from the same effort:
 
@@ -693,6 +716,124 @@ Three practical points:
   needs the BODY one unfold away, and a transparent alias leaves them one
   unfold short.  Check for `rewrite /<name>` at the call sites before
   promising a zero-churn move.
+
+## ONE BUNDLE PER GHOST CLASS, OR THE SAME `inG` GETS TWO INSTANCE PATHS
+
+`Xv6G.xv6G` bundles the fourteen ghost classes that are PURE CAPACITY -- only
+`inG`/`ghost_varG`/`ghost_mapG` fields, no `gname`.  That is the membership
+test, and it is also why adequacy can hand the whole thing out before a single
+instruction runs: there is nothing in it to allocate (`xv6GΣ` +
+`subG_xv6GΣ`).  The rule that comes with it: **a file at or above `Xv6G.v`
+binds `xv6G` and does NOT bind any member.**  Binding both compiles.
+
+**WHERE THE MEMBERS ARE DEFINED IS A SEPARATE DECISION FROM WHERE THE BUNDLE
+SITS, AND IT IS THE ONE THAT COSTS BUILD TIME.**  A bundle can only sit above
+every member, so with each class written in its own subsystem's file `xv6G`'s
+cone was 82 files -- the whole M-mode execution engine (`sieG` is one
+`ghost_varG Σ (mword 1)`, and it lived in `SmodeCore.v`), the inode cache, the
+inode region, the UART driver.  All 767 files that bind the bundle waited on
+all of it, and an edit to ONE subsystem's algebra rebuilt all 767.
+`Xv6Cameras.v` holds every member class now and `Xv6G.v` only the bundle;
+the cone is 14 base-layer files.  Touching `InodeRegion` rebuilds 203 files
+instead of 768, `PipeInvDefs` 283, `WpUart` 306, `IcacheRef` 348.  (This does
+NOT speed up a clean build -- `xv6G` was never on the critical path, which
+runs through the S-mode/page-table stack.  It is a dev-loop win only.)
+
+- **A camera is a TYPE-LEVEL claim, so it belongs at the bottom.**  The whole
+  vocabulary is pure iris/stdpp algebra over a handful of plain records
+  (`vslot`, `virtio_cfg`, `dinode`, `dclaim`, `lock_state`, `ic_dep`).
+  Nothing in it mentions `iProp`, a WP, an invariant, or the machine model.
+  A class sitting in a deep file is an accident of where it was written.
+- **Move the TYPES, keep the theory.**  `Xv6Cameras.v` holds the cameras;
+  each subsystem's file keeps the constructors, projections and lemmas stated
+  over them (`IcacheRef`'s `lelem*`/`lreg*`/boot maps, `PipeInvDefs`'s
+  `pn_end`/`pn_mark`, `WpLock`'s whole lock theory) and gains a
+  `Require Export Xv6Cameras.`, so every name it used to define is still in
+  scope for its importers and NO downstream signature changes.
+- **Keep the BUNDLE out of the cameras file.**  Every member's home file
+  re-exports the cameras, so a bundle living there would be visible inside its
+  own cone -- and a low file binding `xv6G` beside a member is precisely the
+  double instance path this section is about.
+
+Two things bite in the move and neither reads as a typeclass problem:
+
+- **A `gmap`'s KEY INSTANCES are baked into its type.**  `dclaim`'s
+  `gmap Arch.pa (bv 8)` must elaborate in the same instance environment as the
+  files that already form it, or the field stops being the type `DiskPtsto`'s
+  theory is stated over.  So `Xv6Cameras.v` carries exactly
+  `RiscvModelBytes`'s Sail imports and no more, and spells `mword` QUALIFIED
+  (`SailStdpp.Values.mword`, as `RiscvPtsto.riscvF_pstateGS` does) rather than
+  importing `SailStdpp.Values` -- which leaks instances (see the Sail-model
+  bullet near the end of this file).
+- **A module-qualified reference does NOT follow the re-export.**
+  `Require Export` re-exports for `Import`; the qualified path `WpLock.lockG`
+  names the module the constant was DEFINED in, so it stops resolving.  Grep
+  `<HostModule>.<movedName>` across the tree before building -- here that
+  found eleven hits, ten in comments and one real (`InodeRegion.v`'s
+  `` `{!WpLock.lockG Σ} ``, written to dodge an import that is now unnecessary).
+- **The bundle file must `Require Export` the cameras, not `Require Import`.**
+  A member's FIELD instances (`uio_stdinG`, `lock_inG`, …) are active only
+  where their module is IMPORTED, and `Import` is not transitive -- so under a
+  plain `Require Import`, a file that reaches the bundle ONLY through `Xv6G.v`
+  (`UmodeIo.v` is the one) gets `xv6_uio : xv6G Σ → uioG Σ` and then no step
+  from `uioG Σ` to the `ghost_varG` it wraps.  The error names the innermost
+  class and nothing else -- *"Cannot infer the implicit parameter
+  ghost_varG0 … (no type class instance found)"* -- with `xv6G` sitting right
+  there in the printed environment, which reads as a broken bundle and is not.
+
+**Why it matters.** Two instances of one `inG` are not equal, so resources
+built at each are different propositions THAT PRINT IDENTICALLY.  The failures
+read `iFrame: cannot frame`, `iSpecialize: cannot instantiate`, or eleven
+UNDEFINED EVARS naming classes that are not the culprit.
+
+**What was found doing it, and the general shape.** Three ad-hoc bundles each
+carried capacity belonging to the one bundle:
+
+- `FileInvDefs.fileG` carried `pipeG`/`icacheG`/`cinvG`.  Its own comment
+  stated the right motive and the wrong remedy, with an unenforceable rule
+  ("a file that needs both takes `fileG` alone") -- **twenty-seven files bound
+  `fileG` and `!icacheG` side by side**, and `FsReady.v` deliberately declared
+  `icacheG`/`icfg` LAST so resolution would prefer them.  `fileG` now keeps
+  only its own camera and `icfg`.
+- `RiscvAdequacy.riscvGpreS` carried `uartGhostG`/`diskGhostG`.  Removed;
+  `riscvΣ` still supplies the functors, so `subG_riscvGpreS` is unchanged in
+  strength -- only who NAMES them moved.
+- **`mono_natG` had five owners** and is now fixed, but not by bundling.
+  `riscvFixedGS` keeps it (`riscvF_genGS`): the generation counter is
+  machine-model state, consumed by the fetch/execute engine far below any
+  kernel bundle, so moving it to `xv6G` would have cost 27 deep files a new
+  binder. **The fix is to remove it only from the owner that actually SHARES
+  A SCOPE with the keeper** -- `diskGhostG`, since `riscvGS` and the bundle
+  co-occur constantly. `riscv_pre_genGS` (a `pre` class allocating it before
+  `riscvGS` exists) and `CrashProto`'s two (bound only inside an orphan
+  module) stay, because neither can collide.
+  **THE RULE: the hazard is two providers IN ONE SCOPE, not two in the
+  tree.** Count co-occurrences before evicting a field; the cheap fix is
+  usually one removal, not a migration.
+
+**Four ways a binder sweep breaks that the build reports as something else:**
+
+- **Duplicate insertion.**  The unit is not the binder GROUP: adjacent groups
+  (`` `{…} `{…} ``) are one construct, and consecutive `Context` COMMANDS
+  share a section.  Insert once per construct and once per lexical scope
+  (a `Section`/`End` stack), or you manufacture the very double path you are
+  removing.  Symptom: `Signature components ... do not match` with the class
+  appearing twice in the expected type.
+- **Import placed after first use.**  A file with a SECOND `Require` block
+  below its sections gets the import too late, and backtick generalization
+  then invents a fresh `xv6G : gFunctors → Type` VARIABLE, silently.  Insert
+  after the FIRST `Require` block.
+- **Module-qualified binders.**  `!WpLock.lockG Σ`, `!LogInv.logG Σ` -- some
+  written deliberately, with a comment, to dodge an import.  A pattern
+  matching only unqualified names leaves them, and they are then a second
+  path beside the bundle.
+- **Positional `@` applications.**  Changing a section's binder count
+  silently mis-aligns `@f Σ inst _ _ _ …`.  Symptom: `Illegal application
+  (Non-functional construction)`, naming nothing relevant.
+
+Selecting files by NAME (`Spec*`/`Proof*`/`Link*`) is also wrong: select by
+dependency position (not in the bundle's own cone), or the `Wp*`/`User*`
+files above the boundary keep their own binders and fail.
 
 ## A CLASS USED AS AN INDEX NEEDS ITS INSTANCES DECLARED TWICE
 
@@ -1927,18 +2068,41 @@ The number goes up; that is the real one.
 ## The adequacy-print baseline (GR-36, 2026-08-16)
 
 `Print Assumptions xv6_power_adequacy_xv6Σ` (SystemAdequacy.v, printed by
-every CI build since 85c21e9f) must show EXACTLY these seven, and merge
+every CI build since 85c21e9f) must show EXACTLY these eight, and merge
 rounds diff against this list textually, not by count:
 
-1. `LinkUserinit.Userinit.wp_userinit_sconf`   (assumed-Link — the ONLY one)
-2. `FunctionalExtensionality.functional_extensionality_dep`
-3. `valid_reservation`    (rv64d extern)
-4. `plat_term_write`      (rv64d extern)
-5. `match_reservation`    (rv64d extern)
-6. `load_reservation`     (rv64d extern)
-7. `cancel_reservation`   (rv64d extern)
+1. `LinkNameiRootBoot.NameiRootBoot.wp_namei_root_boot`  (assumed-Link)
+2. `LinkForkretPark.ForkretPark.forkret_park`            (assumed-Link)
+3. `FunctionalExtensionality.functional_extensionality_dep`
+4. `valid_reservation`    (rv64d extern)
+5. `plat_term_write`      (rv64d extern)
+6. `match_reservation`    (rv64d extern)
+7. `load_reservation`     (rv64d extern)
+8. `cancel_reservation`   (rv64d extern)
 
-`LinkPanicStub.PanicAssumed.panic_wp_holds` was the second assumed Link and
+**IT WAS SEVEN UNTIL 2026-08-19, AND THE SWAP IS THE POINT.** What stood at
+(1) was `LinkUserinit.Userinit.wp_userinit_sconf` — userinit's WHOLE BODY,
+assumed. userinit is now PROVEN (`ProofUserinit.v`, linked in
+`LinkUserinit.v`), and the two entries above are what its proof rests on:
+
+- (1) is `namei("/")` at the boot client's premises — the same corner
+  `ProofNameiRoot.v` already PROVES, minus the four persistent inode-cache
+  rows main cannot produce (`SpecNameiRootBoot.v`'s header is the
+  inventory). Retiring it is boot wiring, not proof work.
+- (2) is the RUNNABLE park, and it is **not new to the tree** — `kfork` and
+  `sys_fork` have carried it all along. It is new to the BOOT cone only
+  because the old axiom hid it: `SpecForkretPark.v`'s header said userinit
+  "sidesteps the question entirely by being a wholesale Axiom", and it no
+  longer does. The paid form (`SpecForkretParkPaid`, PROVED) is not
+  available to userinit either: its `forkret_park_pkg` wants the trap
+  loop's kernel-side bundle for the new process, which is the same
+  "where does a new process's half of the kernel environment come from"
+  question kfork owes.
+
+So the count went up by one while the assumed SURFACE went down by a whole
+function: prefer that trade, and do not read the count alone.
+
+`LinkPanicStub.PanicAssumed.panic_wp_holds` was an earlier assumed Link and
 is gone: `panic()` is proven and every arm links against `SpecPanic`, so the
 placeholder was deleted outright (`claude-notes/projects/panic.md`).
 

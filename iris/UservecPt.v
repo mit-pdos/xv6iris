@@ -39,6 +39,7 @@ Require Import UserretDefs UserretPt.
 Require Import RegFile.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -65,7 +66,7 @@ Import Defs.
 (* ===================================================================== *)
 
 Section WpUsdPt.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_usd_pt (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64))
@@ -460,7 +461,7 @@ Qed.
 (* ===================================================================== *)
 
 Section WpUCsrPt.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_ucsrw_sscratch_pt (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64))

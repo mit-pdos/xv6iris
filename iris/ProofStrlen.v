@@ -72,6 +72,7 @@ Require Import CodeStrlen.
 Require Import SpecStrlen.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -87,7 +88,7 @@ Local Ltac rgne :=
 Module StrlenProof : STRLEN.
 
 Section ProofStrlen.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context {kts : ktier}.
 

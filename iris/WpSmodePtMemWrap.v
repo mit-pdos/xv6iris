@@ -17,11 +17,12 @@ Require Import SRegime.
 Require Import SmodeCore.
 Require Import WpSmodePtLeaves.
 Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
 Section WpSmodePtMemWrap.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_cldsp_gpr_s_r_t (R : s_regime) (kt kt' : ktier) `{!KtierLe kt' kt}

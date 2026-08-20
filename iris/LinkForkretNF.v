@@ -55,15 +55,13 @@ Require Import UserPtTree.
 Require Import DiskPtsto WpUart FsBlocks LogInv FsCrash KallocInv BioDefs.
 Require Import SpecForkret.
 Require Import LinkUserretClosed.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 (* The Axiom is stated at the CLOSED trap loop's residue -- the same
    [usertrap_res_bare] [LinkForkret.v] instantiates the real proof at -- or
    the two contracts would be about different bundles. *)
 Axiom wp_forkret_nf_ax :
-  forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
-           !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-           !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
-    `{GEN : GenId} `{CID : CpuId}
+  forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (pt : uptd) (j : nat)
     (γl γf : gname) (s : string) (Rlk : iProp Σ)
     (pid : mword 32) (V : pprivate)
@@ -78,9 +76,7 @@ Module ForkretNF : FORKRET_NF.
      parameters carry fifteen implicit ghost-state arguments, and only a
      Context can resolve them. *)
   Section Res.
-    Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
-              !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-              !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
+    Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
     Context `{GEN : GenId} `{CID : CpuId}.
 
     Definition usertrap_res := UserretClosedD.usertrap_res.

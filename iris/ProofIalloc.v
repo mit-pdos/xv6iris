@@ -117,6 +117,7 @@ Require Import SpecBread SpecBrelse SpecLogWrite SpecMemset SpecIget.
 Require Import SpecIalloc.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
@@ -318,7 +319,7 @@ Lemma ia_fresh_of_zero (ty : mword 16) :
 Proof. reflexivity. Qed.
 
 Section IallocBytes.
-  Context `{!riscvGS Σ, !lockG Σ, !diskGhostG Σ, !fsLogG Σ, !bioG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
 
   (* THE RAW 64-BYTE WINDOW of slot [k], borrowed out of the block's byte
      image and given back AT A NEW RECORD.  [DinodeSlot.diblk_slot_acc] is
@@ -423,9 +424,8 @@ Local Ltac iaidx := first [ vm_compute; reflexivity | vm_compute; discriminate ]
 (*  continuation.                                                         *)
 (* ===================================================================== *)
 Section IallocDefs.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
+            ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
   (* ialloc's 64-byte frame: ra@56 s0@48 s1@40 s2@32 s3@24 s4@16 s5@8 s6@0.
      [pa_stk sp j] counts DOWN from the entry sp, so slot j holds the
@@ -537,9 +537,8 @@ Definition ia_sp (m M : regfile) : Prop :=
 (*  a0 already carries the arm's return value.                            *)
 (* ===================================================================== *)
 Section IallocEpilogue.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
+            ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
   Local Lemma ia_epilogue `{GEN : GenId} `{CID0 : CpuId}
       (j : nat) (bn : bio_names) (γ : log_names)
@@ -762,9 +761,8 @@ End IallocEpilogue.
 (*  stays at the standing six.                                           *)
 (* ===================================================================== *)
 Section IallocOut.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
+            ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
   Local Lemma ia_out `{GEN : GenId} `{CID0 : CpuId}
       (j : nat) (bn : bio_names) (γ : log_names)
@@ -1097,9 +1095,8 @@ End IallocOut.
 (*  (ialloc_fresh ty) ds] -- no resource in, [True] out.                  *)
 (* ===================================================================== *)
 Section IallocClaim.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
+            ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
   Local Lemma ia_claim `{GEN : GenId} `{CID0 : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
@@ -1939,9 +1936,8 @@ End IallocClaim.
 (*  fresh [CpuId] and the whole bundle.                                   *)
 (* ===================================================================== *)
 Section IallocScan.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
+            ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
   Local Lemma ia_scan `{GEN : GenId} `{CIDe : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
@@ -2802,9 +2798,8 @@ End IallocScan.
 (*  +0x00 .. +0x2e : THE PROLOGUE, and the contract.                      *)
 (* ===================================================================== *)
 Section IallocMain.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
+            ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
   Lemma wp_ialloc_gen `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)

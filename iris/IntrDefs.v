@@ -74,6 +74,7 @@ Require Import MstatusFacts.
    namespace doesn't shadow anything here. *)
 Require WpGprCsrwCommon.
 Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -282,7 +283,7 @@ Notation kv_frame_slots := (90%nat) (only parsing).
 
 Section IntrDefsBase.
   Context `{!riscvGS Σ}.
-  Context `{!sieG Σ}.
+  Context `{!xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* =================================================================== *)
@@ -2100,7 +2101,7 @@ End IntrDefsBase.
 (* ===================================================================== *)
 Section IntrDefs.
   Context `{!riscvGS Σ}.
-  Context `{!sieG Σ}.
+  Context `{!xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 
@@ -3439,7 +3440,7 @@ End IntrDefs.
 (* conditional equality pins the hart.  Chain the per-step equalities     *)
 (* with [wp_next_chain] and apply this once, exactly as for [cpu_own].    *)
 (* ===================================================================== *)
-Lemma trap_csrs_ext_transport `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId}
+Lemma trap_csrs_ext_transport `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId}
     {kt : ktier} (CID0 CID1 : CpuId) (eb : bool) (p : mword 64) :
   (eb = false \/ p = zero_reg -> (CID1 : CPU) = (CID0 : CPU)) ->
   trap_csrs_ext (CID := CID0) kt eb -∗ trap_csrs_ext (CID := CID1) kt eb.

@@ -73,12 +73,13 @@ Require Import CpuOwn.
 Require Import SpecAcquire SpecRelease.
 Require Import SpecFiledup.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 Module FiledupProof (Acquire : ACQUIRE) (Release : RELEASE) : FILEDUP.
 
 Section ProofFiledup.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 

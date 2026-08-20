@@ -54,11 +54,12 @@ Require Import RegFile.   (* [regfile]: the index algebra below names the map *)
 Require Import SmodeCore.
 Require Import IntrDefs.
 Require Import ProcGeom.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 Section CpuOwn.
   Context `{!riscvGS Σ}.
-  Context `{!sieG Σ}.
+  Context `{!xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Context {kt : ktier}.
@@ -338,7 +339,7 @@ End CpuOwn.
 (* [wp_next]'s conditional equality.  Chain the per-step equalities with   *)
 (* [wp_next_chain] and apply this once. *)
 (* ===================================================================== *)
-Lemma cpu_own_transport `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId}
+Lemma cpu_own_transport `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId}
     (CID0 CID1 : CpuId) (n : nat) (eb : bool) (p : mword 64)
     (b : bool) {lks : gset string} :
   (b = false \/ p = zero_reg -> (CID1 : CPU) = (CID0 : CPU)) ->

@@ -44,6 +44,7 @@ Require Import InodeInv.
 Require Import CodeStati.
 Require Import SpecStati.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -98,7 +99,7 @@ Definition sti_sp (m M : regfile) : Prop :=
       (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))).
 
 Section ProofStatiMain.
-  Context `{!riscvGS Σ, !sieG Σ, !diskGhostG Σ, !fsLogG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_stati_sconf

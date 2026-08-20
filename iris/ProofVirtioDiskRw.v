@@ -59,12 +59,13 @@ Local Open Scope Z_scope.
    from tp the two are the same lookup and every index here is a literal. *)
 Ltac rgall := repeat (rewrite rget_ne; [| vm_compute; discriminate]).
 Require Import VirtioDiskRwDefs.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 Module VirtioDiskRwPhases (Acquire : ACQUIRE) (Release : RELEASE)
                           (Sleep : SLEEP) (FreeDesc : FREEDESC).
 
 Section ProofVirtioDiskRw.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ, !uartGhostG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 

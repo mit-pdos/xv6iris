@@ -37,13 +37,13 @@ Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SpecUart.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 
 Module UartProof : UART.
 
 Section ProofUart.
-Context `{!riscvGS Σ, !sieG Σ}.
-Context `{!uartGhostG Σ, !diskGhostG Σ}.
+Context `{!riscvGS Σ, !xv6G Σ}.
 Context `{GEN : GenId} `{CID : CpuId}.
 
   Context {kt : ktier}.

@@ -96,6 +96,7 @@ Require Import UartTxInv.
 Require Export PrintkArgs.
 Require Import SpecPanic.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 
 (* [pk_arg_desc] / [pk_desc_kind] / [pk_desc_res] / [pk_vararg] / [pk_pr_lock]
@@ -106,7 +107,7 @@ From Kernel Require KernelSyms.
 (* printk's own frame is 24 slots ([addi sp,sp,-192] at 0x8000050a), over
    printint's 24. *)
 Notation printk_stack := (48%nat) (only parsing).
-Definition wp_printk_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_printk_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
     (kt : ktier) (γpr : gname) (γl : gname) (γd : uart_names) (γv : disk_names)
     (m0 : regfile) (K : nat) (bs : list (bv 8))
     (n : nat) (eb : bool) (dqf : dfrac)
@@ -163,7 +164,7 @@ Definition wp_printk_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGhost
 
 Module Type PRINTK.
   Parameter wp_printk_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
       (kt : ktier) (γpr : gname) (γl : gname) (γd : uart_names) (γv : disk_names)
       (m0 : regfile) (K : nat) (bs : list (bv 8))
       (n : nat) (eb : bool) {dqf : dfrac}
@@ -197,8 +198,7 @@ End PRINTK.
 Definition pr_lock : mword 64 := mword_of_int KernelSyms.pr.
 
 Section PrintkGen.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
-  Context `{!uartGhostG Σ, !diskGhostG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* pr.lock protects NOTHING: d80e61c5 put uartputc_sync's THR write under
@@ -244,8 +244,7 @@ Section PrintkGen.
 
 End PrintkGen.
 
-Definition wp_printk_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
-    `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_printk_gen_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
     (kt : ktier) (γpr : gname) (γd : uart_names) (γv : disk_names)
     (m0 : regfile) (K : nat) (eb : bool) (pj : mword 64)
     (dqf : dfrac) (f : string) (descs : list pk_arg_desc) (b : bool) (lks : gset string) :=
@@ -292,8 +291,7 @@ Definition wp_printk_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
    [SpecPanic]'s own credentials, and the same idiom [ProofBmap.balloc_contract]
    uses.  [LinkPrintk.printk_gen_contract_holds] proves it unconditionally, so
    a holder pays nothing beyond the standing platform/stdlib axioms. *)
-Definition printk_gen_contract `{!riscvGS Σ, !sieG Σ, !lockG Σ}
-    `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId}
+Definition printk_gen_contract `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId}
     {kt : ktier} (γpr : gname) (γd : uart_names) (γv : disk_names) : Prop :=
   forall (CIDp : CpuId)
     (m0 : regfile) (K : nat) (eb : bool) (pj : mword 64)
@@ -302,8 +300,7 @@ Definition printk_gen_contract `{!riscvGS Σ, !sieG Σ, !lockG Σ}
 
 Module Type PRINTK_GEN.
   Parameter wp_printk_gen_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ}
-      `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
       (kt : ktier) (γpr : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat) (eb : bool) (pj : mword 64)
       {dqf : dfrac} (f : string) (descs : list pk_arg_desc) (b : bool) (lks : gset string),
       wp_printk_gen_sconf_body kt γpr γd γv m0 K eb pj dqf f descs b lks.

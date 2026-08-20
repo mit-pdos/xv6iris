@@ -48,6 +48,7 @@ Require Import SpecNamex.
 Require Import SpecNamei.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -105,8 +106,8 @@ Local Ltac regne :=
         | congruence ].
 
 Section ProofNameiRoot.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !logG Σ,
-            !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, ICFG : icfg,
+            !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -127,7 +128,7 @@ Section ProofNameiRoot.
     cbv beta delta [wp_namei_root_body].
     intros pcE pv ret_tgt HK Hn Hdev Hnib Hroot Hnib0 Hbelow.
     destruct (nmr_kb K HK) as (Knx & K4 & Kpop).
-    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv #Hitb2 #Hitbl #Hesc #Hireg #Hropen Hisl Hp0 Hp1 Hcont".
+    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv #Hitb2 #Hitbl #Hesc #Hireg Hisl Hp0 Hp1 Hcont".
     iPoseProof (nmi_00 with "Htext") as "Hi00".
     iPoseProof (nmi_02 with "Htext") as "Hi02".
     iPoseProof (nmi_04 with "Htext") as "Hi04".
@@ -289,7 +290,7 @@ Section ProofNameiRoot.
     iApply (NX.wp_namex_root gtl cn gfs gi cov logstart inodestart nib dev dqp
               R5 n (K - 4)%nat eb p b lks
               Knx Hn Hdev Hnib Hroot Hnib0 HR5a1 Hbelow
-              with "Hcg Hcnt Htext Hkd Hpc Hpenv Hitb2 Hitbl Hesc Hireg Hropen Hisl Hp0 Hp1").
+              with "Hcg Hcnt Htext Hkd Hpc Hpenv Hitb2 Hitbl Hesc Hireg Hisl Hp0 Hp1").
     iIntros (CID8 Hq8 mf ipv) "%Hcsp Hcg Hcnt Hpc Hp0 Hp1 Hip".
     destruct Hcsp as (Hcs & Hfa0).
     iEval (rewrite HR5a0) in "Hp0".

@@ -111,6 +111,7 @@ Require Import WpDecodeBridge WpIntrCore CommonWalk HartGoodb.
 Require Import WpInstrRun WpSFrames.
 Require Import SmodePte RiscvExtras.
 Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -209,7 +210,7 @@ Proof. reflexivity. Qed.
 
 Section SmodeCorePt.
   Context `{!riscvGS Σ}.
-  Context `{!sieG Σ}.
+  Context `{!xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* =================================================================== *)

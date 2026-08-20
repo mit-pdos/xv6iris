@@ -80,12 +80,13 @@ Require Import SchedCtx.
 Require Import KvmSpec.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 Notation FRP := KernelSyms.freeproc.
 
 Section SpecFreeproc.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* p->pagetable, and what comes with it.  The [Some] arm's two pure facts
@@ -277,8 +278,7 @@ Module Type FREEPROC.
     (* NO [!fileG Σ]: the contract reaches [ProcInv.proc_dormant], which uses
        only the fd-SLOT ghost, so Rocq prunes [fileG] from the body and the
        Parameter must not re-introduce it. *)
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ}
-      `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (mm : regfile)
       (j : nat) (γl : gname) (V : pprivate) (pid st : mword 32) (ch : mword 64)
       (opt : option uptd) (otf : option (mword 44 * list (mword 64)))

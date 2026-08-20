@@ -37,6 +37,7 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import SpecWalk.
 Require Import KernelRvcDecode.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -44,7 +45,7 @@ Local Open Scope Z_scope.
 Module WalkProof (Kalloc : KALLOC) (MemsetArray : MEMSET) : WALK.
 
 Section ProofWalk.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context {kt : ktier}.
   (* NOTE: no shared [Context `{GEN : GenId} `{CID : CpuId}] here -- the epilogue/tail/probe/
      alloc/loop lemmas below apply EACH OTHER at a hart that a [wp_next]

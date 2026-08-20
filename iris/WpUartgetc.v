@@ -42,6 +42,7 @@ Require Import HartTp WpNext.
 Require Import SpecUart.
 Require Import WpSconfAlu WpSconfBtype.
 Require Import WpSconfUartAccess.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 Module UartgetcProof (Uart : UART).
@@ -49,8 +50,7 @@ Module UAcc := UartAccessProof Uart.
 
 Section WpUartgetc.
   Context `{!riscvGS Σ}.
-  Context `{!sieG Σ}.
-  Context `{!uartGhostG Σ, !diskGhostG Σ}.
+  Context `{!xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context {p : mword 64}.
 

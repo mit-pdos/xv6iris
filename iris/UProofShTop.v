@@ -85,6 +85,7 @@ Require Import UmodeMem UmodeCap UmodeAbi UmodeArith UmodeSyscall UmodeIo.
 Require Import WpUmodeLeaf WpUmodeBranch WpUmodeStore WpUmodeLoad.
 Require Import UmodeFrame.
 Require Import UCodeSh USpecSh UProofShLib.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 (* for [wp_sh_spill], the frame-generic c.sdsp -- protocol- and
    program-generic already, so runcmd's 48-byte frame is an instance. *)
 Require Import UProofShIo.
@@ -165,7 +166,7 @@ Local Lemma upd_read (m : regfile) (i j : mword 5) (v w : mword 64) :
 Proof. intros Hne Hm. rewrite (upd_ne m (Regidx i) (Regidx j) v Hne). exact Hm. Qed.
 
 Section UProofShTop.
-  Context `{!riscvGS Σ} `{!uioG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId}.
   Context (C : ucfg) (pt : uptd).
   Context (gin gbrk : gname) (hbase hlen : Z).

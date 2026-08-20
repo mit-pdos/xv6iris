@@ -41,6 +41,7 @@ Require Import HartMCycle HartStepAny HartRunGen HartSTrans.
 Require Import SmodeCore.
 (* [smode_config] lives in SmodeCore; its bridge is below *)
 Require Import InstrBytes IntrDefs KptShare SmodePte.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 (* the misalignment tests' spelling, as [HartMFetch] and [HartSTrans] use it *)
@@ -50,7 +51,7 @@ Local Notation zerobit :=
 
 Section sframes.
   Context `{!riscvGS Σ}.
-  Context `{!sieG Σ}.
+  Context `{!xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma s_frames_intro (pc : mword 64) (root_ppn : mword 44) :

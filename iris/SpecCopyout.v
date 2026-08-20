@@ -27,19 +27,25 @@
    one functional guarantee this contract makes, and the one a caller needs
    (it still owns, and can still read, what it asked to be copied out).
 
-   WHAT THE USER PAGES END UP HOLDING is deliberately NOT stated.  [proc_pt]
-   owns the pages it maps with EXISTENTIAL contents (the user-safety
-   altitude -- see SpecVmfault.v), so there is no resource in this contract
-   that could record the bytes that were written.  Saying what the process
-   will read back needs a contents-indexed refinement of [proc_pt], which
-   the user-execution layer cannot carry through a return to user mode
-   anyway (user code overwrites its own pages); noted, not built.
+   WHAT THE USER PAGES END UP HOLDING is stated by the MEMORY-INDEXED form
+   below, [wp_copyout_sconf_mem]: it runs at [proc_ptm P (uint szv) M],
+   the contents-indexed refinement of [proc_pt] (ProcPtOwn.v §5c), and says
+   the process's memory view ends up at [umem_wr M dstva len src_bytes] --
+   the given view with the source buffer written at [dstva + j].  That is
+   an EQUATION, not a one-sided promise: it pins both what changed and
+   what did not.  [wp_copyout_sconf] is the existential-[M] corollary,
+   which is what every current caller still speaks.
 
-   Note also what the [PTE_W] test does NOT buy: [proc_pt] is preserved
-   whether or not the target leaf is writable, since its pages are
-   contents-existential either way.  The test is honoured as a third
-   failure arm, not as a precondition -- so a caller need know nothing
-   about which of its pages are read-only. *)
+   THE FAILURE ARM IS HONEST ABOUT THE PREFIX.  copyout writes page by page
+   and can fail on a later page (bad va, no backing, read-only leaf), so
+   the -1 arm promises [umem_wr M dstva d src_bytes] for SOME [d <= len],
+   not [M].  A caller that needs the all-or-nothing reading has to rule -1
+   out, which needs writable leaves -- see below.
+
+   Note what the [PTE_W] test does NOT buy: [proc_ptm] is preserved
+   whether or not the target leaf is writable.  The test is honoured as a
+   third failure arm, not as a precondition -- so a caller need know
+   nothing about which of its pages are read-only. *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
@@ -61,6 +67,7 @@ Require Import KvmSpec.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 
 
@@ -113,7 +120,7 @@ Import Defs.
    leaves have: this function's kernel buffer is a FRAME local at [KT1] for
    one caller and a KT0 page/bio window for the next, and one shared tier
    cannot state both.  See SpecMemmove.v's note. *)
-Definition wp_copyout_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_copyout_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
     (ktb : ktier) `{!KtierLe ktb KT1} (γa : gname) (mm : regfile)
     (P : uptd) (szv : mword 64) (len : nat) (src_bytes : nat -> bv 8)
     (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string) :=
@@ -167,9 +174,81 @@ Definition wp_copyout_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
+(* ===================================================================== *)
+(*  THE MEMORY-INDEXED CONTRACT.                                          *)
+(* ===================================================================== *)
+(* Same function, same frame, same failure arms -- the only difference is
+   that the process's memory view [M] is NAMED on the way in and pinned on
+   the way out.  [umem_wr M dstva n src_bytes] (UserPtTree.v) is [M] with
+   [src_bytes j] written at user va [uint (add_vec_int dstva j)] for every
+   [j < n]; it is keyed by the 64-bit va rather than by an integer base
+   precisely so this contract need not promise that [dstva + len] does not
+   wrap.  A caller that knows it does not wrap reads individual bytes back
+   out with [umem_wr_lookup_in], and reads untouched bytes back out with
+   [umem_wr_lookup_out].
+
+   [vmfault] preserves [M] (SpecVmfault.v), which is what makes this
+   statement as simple as it is: the lazily-backed zero pages are already
+   IN [M], so backing one on the fault path moves no byte, and the only
+   thing that ever moves [M] here is the memmove. *)
+(* WHAT THE CALL DID TO THE PROCESS'S MEMORY, as one predicate over the
+   returned [a0] and the returned view.  It subsumes the plain
+   "returns 0 or -1" of [wp_copyout_sconf_body]: each arm names the value. *)
+Definition copyout_wrote (M : gmap Z (bv 8)) (dstva : mword 64) (len : nat)
+    (src_bytes : nat -> bv 8) (res : mword 64) (M' : gmap Z (bv 8)) : Prop :=
+  (res = (mword_of_int 0 : mword 64)
+   /\ M' = umem_wr M dstva len src_bytes)
+  \/ (res = (mword_of_int (-1) : mword 64)
+      /\ exists d : nat, (d <= len)%nat /\ M' = umem_wr M dstva d src_bytes).
+
+Definition wp_copyout_sconf_mem_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+    (ktb : ktier) `{!KtierLe ktb KT1} (γa : gname) (mm : regfile)
+    (P : uptd) (M : gmap Z (bv 8)) (szv : mword 64) (len : nat)
+    (src_bytes : nat -> bv 8)
+    (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.copyout in
+  let dstva := mm !!! Regidx (mword_of_int 12) in
+  let src := mm !!! Regidx (mword_of_int 13) in
+  let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
+  (52 <= K)%nat ->
+  mm !!! Regidx (mword_of_int 10) = page_base P.(ud_root) ->
+  mm !!! Regidx (mword_of_int 11) = szv ->
+  mm !!! Regidx (mword_of_int 14) = (mword_of_int (Z.of_nat len) : mword 64) ->
+  (Z.of_nat len < 2 ^ 64)%Z ->
+  (uint szv <= 2 ^ 38)%Z ->
+  (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
+  locks_below lks "kmem" ->
+  sie_cap_gpr KT1 mm K b p -∗
+  cpu_own lvl eb p b lks -∗
+  kernel_text -∗
+  pc_is pcE -∗
+  proc_ptm P (uint szv) M -∗
+  kalloc_env γa None -∗
+  ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb] src_bytes j) -∗
+  wp_next b p (fun (CID : CpuId) =>
+    ∀ (mr : regfile) (P' : uptd) (M' : gmap Z (bv 8)),
+    sie_cap_gpr KT1 mr K b p -∗
+    cpu_own lvl eb p b lks -∗
+    pc_is ret_tgt -∗
+    proc_ptm P' (uint szv) M' -∗
+    ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb] src_bytes j) -∗
+    ⌜callee_saved mm mr⌝ -∗
+    ⌜uptd_ext_sz szv P P'⌝ -∗
+    ⌜ copyout_wrote M dstva len src_bytes
+        (mr !!! Regidx (mword_of_int 10)) M' ⌝ -∗
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
+
 Module Type COPYOUT.
+  Parameter wp_copyout_sconf_mem :
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+      (ktb : ktier) `{!KtierLe ktb KT1} (γa : gname) (mm : regfile)
+      (P : uptd) (M : gmap Z (bv 8)) (szv : mword 64) (len : nat)
+      (src_bytes : nat -> bv 8)
+      (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string),
+      wp_copyout_sconf_mem_body ktb γa mm P M szv len src_bytes K lvl eb p b lks.
   Parameter wp_copyout_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
       (ktb : ktier) `{!KtierLe ktb KT1} (γa : gname) (mm : regfile)
       (P : uptd) (szv : mword 64) (len : nat) (src_bytes : nat -> bv 8)
       (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string),

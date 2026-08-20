@@ -41,6 +41,7 @@ From Kernel Require KernelSyms.
 From iris.base_logic.lib Require Import invariants ghost_var.
 Require Import SwtchCtx.
 Require Import CodeSwtch.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -141,7 +142,7 @@ Proof. vm_compute. reflexivity. Qed.
 
 Section WpSwtchVc.
   Context `{!riscvGS Σ}.
-  Context `{!sieG Σ}.
+  Context `{!xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 

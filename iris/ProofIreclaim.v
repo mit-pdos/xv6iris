@@ -120,6 +120,7 @@ Require Import SpecIlock SpecIunlock SpecIput.
 Require Import SpecIreclaim.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
@@ -195,9 +196,8 @@ Definition irc_thr8 (m M : regfile) : Prop :=
 (*  Vocabulary: the frame, the continuation, the loop wand.               *)
 (* ===================================================================== *)
 Section IreclaimDefs.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-            ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
+            ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
   (* ireclaim's 64-byte frame: ra@56 s0@48 s1@40 s2@32 s3@24 s4@16 s5@8 s6@0 *)
   Definition irc_frame (m : regfile) : iProp Σ :=
@@ -295,9 +295,8 @@ End IreclaimDefs.
 (*  +0xb2 .. +0xc4 : THE ONLY EXIT.  restore all eight, pop, return.      *)
 (* ===================================================================== *)
 Section IreclaimEpilogue.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-            ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
+            ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
   Local Lemma irc_epilogue `{GEN : GenId} `{CID0 : CpuId}
       (j : nat) (bn : bio_names) (γfs : fs_names)
@@ -671,9 +670,8 @@ End IreclaimEpilogue.
 (*  itself being inside it.                                               *)
 (* ===================================================================== *)
 Section IreclaimStep.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-            ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
+            ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
   Local Lemma irc_step `{GEN : GenId} `{CID0 : CpuId}
       (j : nat) (bn : bio_names) (γfs : fs_names)
@@ -913,9 +911,8 @@ End IreclaimStep.
 (*  anything about it.                                                    *)
 (* ===================================================================== *)
 Section IreclaimOrphan.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-            ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
+            ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
   Local Lemma irc_orphan `{GEN : GenId} `{CID0 : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
@@ -2020,9 +2017,8 @@ End IreclaimOrphan.
 (*  zero type at +0xa2 and a nonzero nlink at +0xa8.                      *)
 (* ===================================================================== *)
 Section IreclaimRelease.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-            ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
+            ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
   Local Lemma irc_release `{GEN : GenId} `{CID0 : CpuId}
       (γs : list gname) (j : nat)
@@ -2206,9 +2202,8 @@ End IreclaimRelease.
 (*  resources over at the hart they were produced at.                     *)
 (* ===================================================================== *)
 Section IreclaimScan.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-            ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
+            ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
   Local Lemma irc_scan `{GEN : GenId}
       (γs : list gname) (j : nat) (γl : gname)
@@ -2991,9 +2986,8 @@ End IreclaimScan.
 (*  skipping the step block, which is why [irc_scan] is stated there.      *)
 (* ===================================================================== *)
 Section IreclaimMain.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-            ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
+            ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
   Lemma wp_ireclaim_sconf `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)

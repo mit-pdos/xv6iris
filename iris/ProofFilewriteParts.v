@@ -90,6 +90,7 @@ Require Import IcacheRef.
 Require Import CodeFilewrite.
 Require Import ProofFilereadParts.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Set Printing Depth 40.
 
@@ -394,7 +395,7 @@ Qed.
 (*  [live_gen_agree].  Two lemmas, and nothing else changes.                *)
 (* ---------------------------------------------------------------------- *)
 Section FwShare.
-  Context `{!riscvGS Σ, ICFG : icfg, !icacheG Σ, !lockG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, ICFG : icfg}.
 
   Lemma fw_shr_gen_split (k : nat) (s1 s2 : Qp) (dev inum : mword 32) (g : gname) :
     inode_shr_gen k (s1 + s2)%Qp dev inum g ⊣⊢
@@ -431,7 +432,7 @@ Section FwShare.
 End FwShare.
 
 Section ProofFilewriteParts.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
@@ -1258,7 +1259,6 @@ Section ProofFilewriteParts.
   (*  supplies it from its own [(PN : PANIC)].                             *)
   (* =================================================================== *)
   Section FwPanicArm.
-    Context `{!lockG Σ, !uartGhostG Σ, !diskGhostG Σ}.
     Context `{GEN : GenId}.
 
     (* CID is EXPLICIT here, unlike [PANIC]'s own [`{CID : CpuId}]: a

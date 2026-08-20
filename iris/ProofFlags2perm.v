@@ -61,6 +61,7 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecFlags2perm.
 Require Import CodeFlags2perm.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -179,7 +180,7 @@ Local Ltac rgne :=
 Module Flags2permProof : FLAGS2PERM.
 
 Section ProofFlags2perm.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_flags2perm_sconf

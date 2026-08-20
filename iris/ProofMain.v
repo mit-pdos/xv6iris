@@ -83,6 +83,13 @@ Require Import StartedInv.
 Require Import SpecCpuid SpecConsoleinit SpecPrintkinit SpecPrintk.
 Require Import SpecKinit SpecKvminit SpecKvminithart SpecProcinit.
 Require Import SpecTrapinit SpecTrapinithart SpecPlicinit SpecPlicinithart.
+Require Import SpecAllocpid.
+(* [ROOTDEV] / [icfg_dev] / [icfg_nib], for the two config ties main threads *)
+Require Import InodeInv IcacheRef.
+Require Import SpecPanic.
+(* [K_allocproc] -- userinit's page premise is stated at allocproc's own
+   strict bound, not at a round number *)
+Require Import SpecAllocproc.
 Require Import SpecBinit SpecIinit SpecFileinit SpecVirtioDiskInit.
 Require Import SpecUserinit SpecScheduler SpecKernelvec SpecFreerange.
 Require Import SpecDevintr SpecClockintr TicksInv.
@@ -94,6 +101,7 @@ Require Import CodeMain.
 Require Import KernelRvcDecode.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -156,8 +164,7 @@ Module MainProof
   : MAIN.
 
 Section ProofMain.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
-  Context `{!uartGhostG Σ, !diskGhostG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Ltac reg_neq :=
@@ -749,6 +756,11 @@ Section ProofMain.
     strans_pending -∗ tlb ↦ᵣ tlbvec0 -∗ kpt_unset -∗
     kmap_auth kmap_M0 -∗
     lk_raw pid_lock_addr -∗ lk_raw wait_lock_addr -∗
+    (* [SpecAllocpid.nextpid_res] itself: the .data word procinit's
+       [initlock(&pid_lock,"nextpid")] brings under its lock.  It is NOT
+       .bss and it is not [kernel_data]'s -- see [SpecMain]'s own row and
+       [KernelDataInv]'s header. *)
+    (∃ v : mword 32, alp_nextpid ↦₄ v) -∗
     ([∗ list] i ∈ seq 0 NPROC, proc_raw (proc_addr i)) -∗
     ([∗ list] i ∈ seq 0 NPROC,
        (∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗ proc_pub (proc_addr i)) -∗
@@ -756,7 +768,7 @@ Section ProofMain.
     iref_slots (NPROC * (1 + IREFSPARE)) -∗
     ([∗ list] i ∈ seq 0 NPROC, hart_full i (0%fin : CPU)) -∗
     ([∗ list] i ∈ seq 0 NPROC, pstate_full i UNUSED) -∗
-    ( ∀ (γa : gname) (γs : list gname) (m' : regfile)
+    ( ∀ (γa γp : gname) (γs : list gname) (m' : regfile)
         (root : mword 44) (pas : nat -> mword 44),
         sie_cap_gpr KT1 m' n false p0 -∗
         pc_is (mword_of_int (KernelSyms.main + 0x7e) : mword 64) -∗
@@ -764,6 +776,10 @@ Section ProofMain.
         cpu_own 0 false p0 false ∅ -∗
         kalloc_env γa (avail_sub (Some (length ps)) K_kvmmake) -∗
         procs_inv γs -∗
+        (* THE nextpid LOCK, built here out of procinit's [lk_fresh] and the
+           cell above.  Persistent.  allocproc takes it, so kfork, sys_fork
+           and -- at its real contract -- userinit all do. *)
+        is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
         (* the KPT receipt kvminithart minted, on its way to [trap_csrs] *)
         kpt_on cpu_id -∗
         (∃ v : mword 64, stvec ↦ᵣ v) -∗
@@ -780,7 +796,7 @@ Section ProofMain.
     intros Hn Hphystop Hs1 Hprun Hlen.
     subst phystop s1entry.
     iIntros "Hcg #Htext #Hkdata Hpc Hfree Hcpu Hlkmem Hkmem24 Hpages Hkpt".
-    iIntros "Hsbit Htlb Hunset Hkauth Hlpid Hlwait Hprocs Hppub Hfds Hirs Hparks Hpst Hcont".
+    iIntros "Hsbit Htlb Hunset Hkauth Hlpid Hlwait Hnpid Hprocs Hppub Hfds Hirs Hparks Hpst Hcont".
     iPoseProof (mni_6e with "Htext") as "Hi6e".
     iPoseProof (mni_72 with "Htext") as "Hi72".
     iPoseProof (mni_76 with "Htext") as "Hi76".
@@ -912,7 +928,7 @@ Section ProofMain.
     iApply (Procinit.wp_procinit_sconf V4 n false p0 ltac:(lia)
               with "Hcg Htext Hkdata Hpc Hlpid Hlwait Hprocs Hfds Hirs").
     iApply wp_next_off_intro.
-    iIntros (mpr) "Hcg Hpc %Hcspr _ _ Hready".
+    iIntros (mpr) "Hcg Hpc %Hcspr Hlpidf _ Hready".
     assert (Hretpr : ret_pc (V4 !!! Regidx (mword_of_int 1 : mword 5) : mword 64)
                      = (mword_of_int (KernelSyms.main + 0x7e) : mword 64)).
     { rewrite /V4 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
@@ -937,9 +953,21 @@ Section ProofMain.
                  (fun _ i => pstate_full i UNUSED)
                  (seq 0 NPROC) with "Hin Hpst") as "Hin".
     iMod (procs_inv_alloc ⊤ with "Hin Hbank") as (γs) "#Hpinv".
+    (* ---- ASSEMBLY 2b: the nextpid LOCK.  procinit's [lk_fresh] plus the
+           .data cell IS [WpLock.newlock]'s premise list at
+           [SpecAllocpid.nextpid_res], and the result is what allocproc --
+           hence kfork, sys_fork and userinit -- takes.  It could not be
+           built before the boot chain stopped persisting the image's two
+           writable .data words; see [KernelDataInv]'s header. ---- *)
+    iDestruct (lk_fresh_pieces pid_lock_addr "nextpid"%string with "Hlpidf")
+      as "(#Hpnm & Hpw & Hpc0)".
+    iMod (newlock ⊤ alp_pid_lock "nextpid"%string nextpid_res
+            with "Hpnm Hpw Hpc0 [Hnpid]") as (γp) "#Hpidlock".
+    { rewrite /nextpid_res. iExact "Hnpid". }
     iModIntro.
-    iApply ("Hcont" $! γl γs mpr (pt_base t) pas
-              with "Hcg Hpc Hfree Hcpu Hkenv Hpinv Hkptr Hstvec Hkinv Hkptp Htramp Hkstx").
+    iApply ("Hcont" $! γl γp γs mpr (pt_base t) pas
+              with "Hcg Hpc Hfree Hcpu Hkenv Hpinv Hpidlock Hkptr Hstvec Hkinv
+                    Hkptp Htramp Hkstx").
   Qed.
 
   (* =================================================================== *)
@@ -1104,7 +1132,7 @@ Section ProofMain.
   (* userinit(), plus [DiskBoot.disk_res_boot] and the vdisk [newlock].    *)
   (* =================================================================== *)
   Local Lemma mn_grp_fs 
-      (γa : gname) (γs : list gname) (γv : disk_names) (γd : uart_names)
+      (γa γp : gname) (γs : list gname) (γv : disk_names) (γd : uart_names)
       (m : regfile) (n : nat) (p0 : mword 64)
       (ps : list (mword 64)) (c0 : virtio_cfg) (free0 : nat -> bv 8) :
     (K_userinit <= n)%nat ->
@@ -1112,10 +1140,24 @@ Section ProofMain.
     virtio_live c0 = false ->
     sie_cap_gpr KT1 m n false p0 -∗
     kernel_text -∗ kernel_data -∗ dev_inv γd γv -∗
+    (* iget's "iget: no inodes" arm, reached through userinit's namei *)
+    panic_env -∗
     pc_is (mword_of_int (KernelSyms.main + 0x8e) : mword 64) -∗
     cpu_ctx_free -∗
     cpu_own 0 false p0 false ∅ -∗
     procs_inv γs -∗
+    (* THE COUNTED PROC REGIME, carried to the userinit call site at +0x9e.
+       [SpecUserinit.wp_userinit_sconf_body] -- userinit's REAL contract,
+       which [ProofUserinit.v] proves -- takes [procs_avail (Some (S k))] and
+       is what refutes allocproc's empty-table arm.  The WEAK contract this
+       group actually applies ([SpecUserinit.USERINIT]) does not take it, so
+       it is dropped at the call below; swapping the two contracts is then a
+       local edit.  See claude-notes/projects/main-boot.md §G3. *)
+    procs_avail (Some NPROC) -∗
+    (* ...and the [nextpid] lock, for the same reason and to the same place:
+       userinit's real contract takes it (allocproc's own premise), the weak
+       one does not.  Persistent, so carrying it costs a frame. *)
+    is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
     kalloc_env γa (avail_sub (Some (length ps)) K_kvmmake) -∗
     lk_raw bcache_addr -∗
     ([∗ list] k ∈ seq 0 NBUF, sl_raw (buf_lock (bnode k))) -∗
@@ -1145,7 +1187,8 @@ Section ProofMain.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hn Hlen Hlive.
-    iIntros "Hcg #Htext #Hkdata #Hdev Hpc Hfree Hcpu #Hpinv Hkenv".
+    iIntros "Hcg #Htext #Hkdata #Hdev #Hpanic Hpc Hfree Hcpu #Hpinv Hpavail
+             #Hlpidlk Hkenv".
     iIntros "Hlbc Hbufl Hbufn Hbhead Hlit Hinl Hlft Hldisk".
     iIntros "Hdiskptr Hdiskfree Hdusedidx Hdslots Hclaim #Hdone Hcfg Hinitproc Hcont".
     iPoseProof (dev_inv_disk with "Hdev") as "#Hdinv".
@@ -1166,9 +1209,9 @@ Section ProofMain.
     { exists (length ps - K_kvmmake)%nat. split; [apply avail_sub_Some | lia]. }
     assert (Hnb8 : exists nb,
               avail_sub (avail_sub (Some (length ps)) K_kvmmake) 3 = Some nb
-              /\ (userinit_pages <= nb)%nat).
+              /\ (K_allocproc < nb)%nat).
     { exists (length ps - K_kvmmake - 3)%nat.
-      rewrite !avail_sub_Some. split; [reflexivity | unfold userinit_pages; lia]. }
+      rewrite !avail_sub_Some. split; [reflexivity | lia]. }
     (* ---- +0x8e jal binit ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x8e)) (mword_of_int 1 : mword 5)
               (mword_of_int 7194 : mword 21) m n false
@@ -1319,12 +1362,25 @@ Section ProofMain.
               = (mword_of_int KernelSyms.userinit : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtui) in "Hpc".
-    iApply (Userinit.wp_userinit_sconf γa γs F5 n false p0
-              (avail_sub (avail_sub (Some (length ps)) K_kvmmake) 3) iv0 false ∅
+    (* ---- THE REAL CONTRACT ([SpecUserinit], proven in [ProofUserinit.v]).
+           [Hpavail] and [Hlpidlk] are what it takes over the axiom that used
+           to stand here: the counted proc regime refutes allocproc's
+           empty-table arm, which userinit does not test, and the [nextpid]
+           lock is allocproc's own premise.  The counted PAGE budget goes in
+           as [K_allocproc < nb] rather than a round number, and the two
+           config ties ride down to namei's root corner. ---- *)
+    (* one slot is all userinit needs, and NPROC of them is what boot minted *)
+    iDestruct (procs_avail_le NPROC 1 ltac:(unfold NPROC; lia) with "Hpavail")
+      as "Hpavail".
+    iApply (Userinit.wp_userinit_sconf γa γp γs F5 n false p0
+              (avail_sub (avail_sub (Some (length ps)) K_kvmmake) 3)
+              0%nat iv0 false ∅
               ltac:(lia) Hnb8
-              with "Hcg Htext Hkdata Hpc Hcpu Hpinv Hkenv Hinitproc").
+              with "Hcg Hcpu Htext Hkdata Hpc Hpanic Hpinv Hlpidlk Hkenv
+                    Hpavail Hinitproc").
+    all: try lkbelow.
     iApply wp_next_off_intro.
-    iIntros (mui) "Hcg Hpc %Hcsui Hcpu _ _".
+    iIntros (mui) "Hcg Hpc %Hcsui Hcpu _ _ _".
     destruct Hcsui as (Hcsui & _).
     assert (Hretui : ret_pc (F5 !!! Regidx (mword_of_int 1 : mword 5))
                      = (mword_of_int (KernelSyms.main + 0xa2) : mword 64)).
@@ -1534,7 +1590,8 @@ Section ProofMain.
     intros pcE Hcid HK Hphystop Hs1 Hprun Hlen Hlive Hp0.
     pose proof (mn_bounds K HK) as (Hc2 & Hn50 & Hnsched).
     iIntros "Hcg Hfree Hcpu Hq #Htext #Hkdata Hpc #Hsinv #Hwand Hlocks Hglobals".
-    iIntros "Hparks Hpst".
+    iIntros "Hfirst Hnpid".
+    iIntros "Hparks Hpst Hpavail".
     iIntros "#Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim #Hdone #Htimc Hhart Hunset Hkauth Hpages".
     iDestruct "Hlocks" as "(Hlcons & Hltx & Hlpr & Hlkmem & Hlpid & Hlwait &
                             Hltick & Hlbc & Hlit & Hlft & Hldisk)".
@@ -1551,7 +1608,13 @@ Section ProofMain.
        [Hient] -- the fifty itable entries' cells -- is still carried and
        DROPPED here: its only consumer is [IcacheBoot.icache_boot], whose other
        input (the stocked inode pool) needs the fs BLOCK layer wired into main.
-       See claude-notes/projects/fs-icache.md, C7 owed (ii). *)
+       See claude-notes/projects/fs-icache.md, C7 owed (ii).
+       [Hfirst] -- forkret's [static int first], one of the image's two
+       writable .data words (SpecMain's own row) -- is likewise carried and
+       DROPPED: its consumer is forkret's [if (first)] arm, which is
+       [LinkForkretNF.v]'s assumption, not main's.  Its twin [Hnpid] is NOT
+       dropped: it goes into [mn_grp_kvm], which spends it on the [newlock]
+       that builds the [nextpid] lock. *)
     iDestruct "Hglobals" as "(Hdevsw & Hkmem24 & Hkpt & Hprocs & Hppub &
                              Hfds & Hirs & Hinitproc & Hticks & Hbufl & Hbufn & Hbhead & Hinl &
                              Hient & Hdiskptr & Hdiskfree & Hdusedidx & Hdslots & Hring)".
@@ -1569,21 +1632,24 @@ Section ProofMain.
     iApply (mn_grp_kvm m2 (K - 2)%nat p0 ps s1entry phystop tlbvec0
               Hn50 Hphystop Hs1 Hprun Hlen
               with "Hcg Htext Hkdata Hpc Hfree Hcpu Hlkmem Hkmem24 Hpages Hkpt
-                    Hsbit Htlb Hunset Hkauth Hlpid Hlwait Hprocs Hppub Hfds Hirs
+                    Hsbit Htlb Hunset Hkauth Hlpid Hlwait Hnpid Hprocs Hppub Hfds Hirs
                     Hparks Hpst").
-    iIntros (γa γs m3 root pas)
-      "Hcg Hpc Hfree Hcpu Hkenv #Hpinv Hkpt Hstvec #Hkinv #Hkptp #Htramp #Hkstx".
+    iIntros (γa γp γs m3 root pas)
+      "Hcg Hpc Hfree Hcpu Hkenv #Hpinv #Hpidlock Hkpt Hstvec #Hkinv #Hkptp
+       #Htramp #Hkstx".
     (* --- 0x7e .. 0x8a : trap / plic, and the interrupt invariant --- *)
     iApply (mn_grp_trap γd γv m3 (K - 2)%nat p0 Hn50 Hcid
               with "Hcg Htext Hkdata Hdev Hpc Hltick Hticks Hstvec Hq").
     iIntros (m4 γtl) "Hcg Hpc #Htl Hstvec Hq".
     (* --- 0x8e .. 0x9e : binit / iinit / fileinit / virtio_disk_init /
            userinit, and the disk lock --- *)
-    iApply (mn_grp_fs γa γs γv γd m4 (K - 2)%nat p0 ps c0 free0
+    iApply (mn_grp_fs γa γp γs γv γd m4 (K - 2)%nat p0 ps c0 free0
               Hn50 Hlen Hlive
-              with "Hcg Htext Hkdata Hdev Hpc Hfree Hcpu Hpinv Hkenv Hlbc Hbufl
+              with "Hcg Htext Hkdata Hdev [Hpenv] Hpc Hfree Hcpu Hpinv Hpavail
+                    Hpidlock Hkenv Hlbc Hbufl
                     Hbufn Hbhead Hlit Hinl Hlft Hldisk Hdiskptr Hdiskfree
                     Hdusedidx Hdslots Hclaim Hdone Hcfg Hinitproc").
+    { iApply (printk_env_panic with "Hpenv"). }
     iIntros (γk pd pav pu m5) "Hcg Hpc Hfree Hcpu #Hdlock #Hgeom".
     (* ---- THE INSTALLED-HANDLER RESOURCE, folded HERE and not earlier: the
            handler contract closes over [devintr_caps], and its disk lock and

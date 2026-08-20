@@ -47,6 +47,7 @@ Require Import VcGen VcGenS.
 Require Import StackOwn.
 Require Import IntrDefs.
 Require Import WpSconfAlu WpSconfMem.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -439,7 +440,7 @@ Qed.
 
 Section WpSconfVc.
   Context `{!riscvGS Σ}.
-  Context `{!sieG Σ}.
+  Context `{!xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context {kt : ktier}.
   (* the value of [cpus[cid].proc]: a THREAD invariant, threaded through the

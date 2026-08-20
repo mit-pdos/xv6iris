@@ -44,17 +44,9 @@ Require Import Riscv.rv64d_types.
 Require Import RiscvPtsto.
 Require Import DiskPtsto.
 Require Import BioDefs.
+Require Export Xv6Cameras.  (* the cameras this file states its theory over *)
 Local Open Scope Z_scope.
 
-Class fsLogG (Σ : gFunctors) := FsLogG {
-  fsL_inG :: ghost_mapG Σ Z (list (bv 8));
-  fsdirty_inG :: ghost_mapG Σ Z bool;
-  fsown_inG :: ghost_mapG Σ Z unit;
-}.
-Definition fsLogΣ : gFunctors :=
-  #[ghost_mapΣ Z (list (bv 8)); ghost_mapΣ Z bool; ghost_mapΣ Z unit].
-Global Instance subG_fsLogΣ {Σ} : subG fsLogΣ Σ -> fsLogG Σ.
-Proof. solve_inG. Qed.
 
 Record fs_names := MkFsNames {
   fs_L     : gname;   (* the logged view *)

@@ -20,9 +20,10 @@ Require Import WpLock.
 Require Import RegFile.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 
-Definition wp_initlock_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (m : regfile) (vlock : bv 32) (vname vcpu : bv 64) (s : string) (K : nat) (b : bool) (p : mword 64) :=
+Definition wp_initlock_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (m : regfile) (vlock : bv 32) (vname vcpu : bv 64) (s : string) (K : nat) (b : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.initlock in
   let lk := m !!! Regidx (mword_of_int 10 : mword 5) in
   let name := m !!! Regidx (mword_of_int 11 : mword 5) in
@@ -57,6 +58,6 @@ Definition wp_initlock_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CI
 
 Module Type INITLOCK.
   Parameter wp_initlock_sconf :
-    forall `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (m : regfile) (vlock : bv 32) (vname vcpu : bv 64) (s : string) (K : nat) (b : bool) (p : mword 64),
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (m : regfile) (vlock : bv 32) (vname vcpu : bv 64) (s : string) (K : nat) (b : bool) (p : mword 64),
       wp_initlock_sconf_body kt m vlock vname vcpu s K b p.
 End INITLOCK.

@@ -24,11 +24,12 @@ Require Import KernelRvcDecode.
 Require Import CodeTrapinithart.
 Require Import SpecTrapinithart.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
 Section TrapinithartBody.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Ltac reg_neq :=
@@ -222,7 +223,7 @@ End TrapinithartBody.
 
 Module TrapinithartProof : TRAPINITHART.
   Definition wp_trapinithart_sconf
-      `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
+      `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
       (mm : regfile) (K : nat)
       (tv0 : mword 64) (p : mword 64)
       : wp_trapinithart_sconf_body mm K tv0 p :=

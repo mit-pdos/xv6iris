@@ -53,6 +53,7 @@ Require Import WpDecodeBridge.
 Require Import SmodeCorePt TrampStepPt.
 Require Import UptWalkPt Pt2Walk TransPt.
 Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -1977,7 +1978,7 @@ End Pt2Window.
 (* ===================================================================== *)
 
 Section Pt2Tramp.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Ltac tlbpeel :=
@@ -2317,7 +2318,7 @@ End Pt2Tramp.
 (* ===================================================================== *)
 
 Section Pt2Engine.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_instr_pt2_tramp_kcur (rc : mword 44) (Sp : ptree -> Prop)

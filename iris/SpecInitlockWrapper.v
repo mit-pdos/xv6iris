@@ -31,6 +31,7 @@ Require Import IntrDefs.
 Require Import WpLock.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 (* The thirteen instructions of a thin initlock wrapper entered at [F].
@@ -68,7 +69,7 @@ Definition ilw_code `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} (F : Z)
    [kernel_data]: WHERE the bytes come from is the member's business (each reads
    them out of the image with [kernel_data_string], at its own literal's length),
    and the shape stays independent of the data image. *)
-Definition wp_initlock_wrapper_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (m : regfile) (K : nat)
+Definition wp_initlock_wrapper_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (m : regfile) (K : nat)
     (F : Z) (uname ulk : mword 20) (iname ilk : mword 12) (j : mword 21)
     (lk name : mword 64) (s : string) (vlock : bv 32) (vname vcpu : bv 64) (b : bool) (p : mword 64) :=
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
@@ -104,7 +105,7 @@ Definition wp_initlock_wrapper_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{GEN : Gen
 
 Module Type INITLOCK_WRAPPER.
   Parameter wp_initlock_wrapper_sconf :
-    forall `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (m : regfile) (K : nat)
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (m : regfile) (K : nat)
       (F : Z) (uname ulk : mword 20) (iname ilk : mword 12) (j : mword 21)
       (lk name : mword 64) (s : string) (vlock : bv 32) (vname vcpu : bv 64) (b : bool) (p : mword 64),
       wp_initlock_wrapper_sconf_body kt m K F uname ulk iname ilk j lk name s vlock vname vcpu b p.

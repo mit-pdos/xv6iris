@@ -96,6 +96,7 @@ Require Import CodeSafestrcpy.
 Require Import SpecSafestrcpy.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -394,7 +395,7 @@ Proof. intros j _. reflexivity. Qed.
 Module SafestrcpyProof : SAFESTRCPY.
 
 Section ProofSafestrcpy.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context {kts ktt : ktier}.
 

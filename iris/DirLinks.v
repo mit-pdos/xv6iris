@@ -63,6 +63,7 @@ Require Import DirentEnc.
 Require Import InodeDefs.
 Require Import DirView.
 Require Import IcacheRef.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 Local Open Scope Z_scope.
 
@@ -87,7 +88,7 @@ Local Open Scope Z_scope.
 Definition dl_root : Z := 1.
 
 Section DirLinks.
-  Context `{!icacheG Σ} `{ICFG : icfg}.
+  Context `{!xv6G Σ} `{ICFG : icfg}.
 
   (* ------------------------------------------------------------------ *)
   (*  THE PER-RECORD FRAGMENT                                            *)

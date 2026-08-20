@@ -64,6 +64,7 @@ Require Import UCodeSh USpecSh USpecShParse.
 Require Import UProofShLib.
 Require User.ShSyms User.ShInstrs User.ShData.
 Require Import UmodeAbi.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 Set Printing Depth 40.
@@ -335,7 +336,7 @@ Qed.
 (* ===================================================================== *)
 
 Section UProofShLex.
-  Context `{!riscvGS Σ} `{!uioG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId}.
   Context (C : ucfg) (pt : uptd).
   Context (gin gbrk : gname) (hbase hlen : Z).

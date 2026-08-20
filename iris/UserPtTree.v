@@ -459,6 +459,139 @@ Proof.
     apply (umem_write_lookup_out M a n bs va Hne).
 Qed.
 
+(* writing back the bytes that were already there is the identity -- what a
+   copyIN does to the process's memory *)
+Lemma umem_write_id (M : gmap Z (bv 8)) (a : Z) (n : nat) (bs : nat -> bv 8) :
+  (forall j, (j < n)%nat -> M !! (a + Z.of_nat j)%Z = Some (bs j)) ->
+  umem_write M a n bs = M.
+Proof.
+  induction n as [| k IH]; intros Hb; [reflexivity |].
+  cbn [umem_write]. rewrite (IH ltac:(intros j Hj; apply Hb; lia)).
+  apply insert_id. apply Hb. lia.
+Qed.
+
+(* A whole-PAGE write in which only a sub-window actually changed is the
+   same map as the sub-window write.  This is what lets the copyout loop
+   hand its user page back through a page-level accessor -- the buffer
+   plumbing ([bb_split3] / [bb_join3]) is whole-page, but only the middle
+   third of it is new. *)
+Lemma umem_write_split (M : gmap Z (bv 8)) (a : Z) (N off n : nat)
+    (g : nat -> bv 8) :
+  (off + n <= N)%nat ->
+  (forall j, (j < N)%nat -> ~ (off <= j < off + n)%nat ->
+     M !! (a + Z.of_nat j)%Z = Some (g j)) ->
+  umem_write M a N g
+  = umem_write M (a + Z.of_nat off)%Z n (fun i => g (off + i)%nat).
+Proof.
+  intros HN Hout. apply map_eq. intros va.
+  destruct (decide (a <= va < a + Z.of_nat N)%Z) as [Hin | Hno].
+  - apply in_run_iff in Hin as (j & Hj & ->).
+    rewrite (umem_write_lookup_in M a N g j Hj).
+    destruct (decide (off <= j < off + n)%nat) as [Hw | Hnw].
+    + replace (a + Z.of_nat j)%Z
+        with ((a + Z.of_nat off) + Z.of_nat (j - off)%nat)%Z by lia.
+      rewrite (umem_write_lookup_in M (a + Z.of_nat off)%Z n
+                 (fun i => g (off + i)%nat) (j - off)%nat ltac:(lia)).
+      do 2 f_equal. lia.
+    + rewrite (umem_write_lookup_out M (a + Z.of_nat off)%Z n
+                 (fun i => g (off + i)%nat) (a + Z.of_nat j)%Z
+                 ltac:(intros i Hi Heq; lia)).
+      symmetry. exact (Hout j Hj Hnw).
+  - assert (Hne : forall j, (j < N)%nat -> va <> (a + Z.of_nat j)%Z)
+      by (intros j Hj Heq; apply Hno; apply in_run_iff; eauto).
+    rewrite (umem_write_lookup_out M a N g va Hne).
+    rewrite (umem_write_lookup_out M (a + Z.of_nat off)%Z n
+               (fun i => g (off + i)%nat) va
+               ltac:(intros i Hi Heq; apply Hno;
+                     apply in_run_iff; exists (off + i)%nat;
+                     split; [lia | rewrite Nat2Z.inj_add; lia])).
+    reflexivity.
+Qed.
+
+(* ---- the same run of writes, but keyed by the 64-bit va it started at ---- *)
+(* [umem_write] is indexed by an INTEGER base [a + j], which is what an
+   accessor over one page can offer: inside a page the vas really are
+   consecutive integers.  A copyOUT, though, walks a range given by a
+   [mword 64] and a length, and its contract must not have to promise that
+   [dstva + j] does not wrap -- so the CONTRACT-level run is keyed by
+   [uint (add_vec_int dstva j)] instead, and [umem_wr_step] is the one
+   bridge between the two: as long as one chunk's vas are consecutive
+   integers (which [uva_pa] forces, since they live in one page), writing
+   that chunk advances the va-keyed run by exactly its length. *)
+Fixpoint umem_wr (M : gmap Z (bv 8)) (dstva : mword 64) (n : nat)
+    (src : nat -> bv 8) : gmap Z (bv 8) :=
+  match n with
+  | O => M
+  | S k => <[uint (add_vec_int dstva (Z.of_nat k)) := src k]>
+             (umem_wr M dstva k src)
+  end.
+
+Lemma umem_wr_step (M : gmap Z (bv 8)) (dstva : mword 64) (done n : nat)
+    (src : nat -> bv 8) (a : Z) :
+  (forall i, (i < n)%nat ->
+     uint (add_vec_int dstva (Z.of_nat (done + i))) = (a + Z.of_nat i)%Z) ->
+  umem_write (umem_wr M dstva done src) a n (fun i => src (done + i)%nat)
+  = umem_wr M dstva (done + n) src.
+Proof.
+  induction n as [| k IH]; intros Hva.
+  - rewrite Nat.add_0_r. reflexivity.
+  - cbn [umem_write]. rewrite (IH ltac:(intros i Hi; apply Hva; lia)).
+    replace (done + S k)%nat with (S (done + k))%nat by lia.
+    cbn [umem_wr]. rewrite (Hva k ltac:(lia)). reflexivity.
+Qed.
+
+(* what a caller reads back out of the run: needs the vas of the run to be
+   distinct, which the caller gets from its own no-wrap bound *)
+Lemma umem_wr_lookup_in (M : gmap Z (bv 8)) (dstva : mword 64) (n : nat)
+    (src : nat -> bv 8) (j : nat) :
+  (j < n)%nat ->
+  (forall i, (i < n)%nat ->
+     uint (add_vec_int dstva (Z.of_nat i)) = (uint dstva + Z.of_nat i)%Z) ->
+  umem_wr M dstva n src !! uint (add_vec_int dstva (Z.of_nat j)) = Some (src j).
+Proof.
+  induction n as [| k IH]; intros Hj Hlin; [lia |].
+  cbn [umem_wr]. destruct (decide (j = k)) as [-> | Hne].
+  - apply lookup_insert.
+  - rewrite lookup_insert_ne.
+    + apply IH; [lia |]. intros i Hi. apply Hlin. lia.
+    + rewrite (Hlin j ltac:(lia)) (Hlin k ltac:(lia)). lia.
+Qed.
+
+(* and what SURVIVES it: any va outside the run *)
+Lemma umem_wr_lookup_out (M : gmap Z (bv 8)) (dstva : mword 64) (n : nat)
+    (src : nat -> bv 8) (va : Z) :
+  (forall i, (i < n)%nat -> va <> uint (add_vec_int dstva (Z.of_nat i))) ->
+  umem_wr M dstva n src !! va = M !! va.
+Proof.
+  induction n as [| k IH]; intros Hne; [reflexivity |].
+  cbn [umem_wr].
+  rewrite lookup_insert_ne;
+    [| intros Heq; exact (Hne k ltac:(lia) (eq_sym Heq))].
+  apply IH. intros i Hi. apply Hne. lia.
+Qed.
+
+Lemma umem_wr_dom (M : gmap Z (bv 8)) (dstva : mword 64) (n : nat)
+    (src : nat -> bv 8) :
+  (forall i, (i < n)%nat ->
+     is_Some (M !! uint (add_vec_int dstva (Z.of_nat i)))) ->
+  dom (umem_wr M dstva n src) = dom M.
+Proof.
+  induction n as [| k IH]; intros Hsome; [reflexivity |].
+  cbn [umem_wr]. rewrite dom_insert_L.
+  rewrite (IH ltac:(intros i Hi; apply Hsome; lia)).
+  apply subseteq_union_1_L. apply singleton_subseteq_l.
+  apply elem_of_dom. apply Hsome. lia.
+Qed.
+
+Lemma umem_write_ext (M : gmap Z (bv 8)) (a : Z) (n : nat) (bs bs' : nat -> bv 8) :
+  (forall j, (j < n)%nat -> bs j = bs' j) ->
+  umem_write M a n bs = umem_write M a n bs'.
+Proof.
+  induction n as [| k IH]; intros He; [reflexivity |].
+  cbn [umem_write]. rewrite (IH ltac:(intros j Hj; apply He; lia)).
+  rewrite (He k ltac:(lia)). reflexivity.
+Qed.
+
 Lemma umem_write_dom (M : gmap Z (bv 8)) (a : Z) (n : nat) (bs : nat -> bv 8) :
   (forall j, (j < n)%nat -> is_Some (M !! (a + Z.of_nat j)%Z)) ->
   dom (umem_write M a n bs) = dom M.

@@ -39,6 +39,7 @@ Require Import CodeIinit.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecIinit.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -46,8 +47,7 @@ Module IinitProof (Initlock : INITLOCK) (Initsleeplock : INITSLEEPLOCK) : IINIT.
 
 Section ProofIinit.
   Context `{!riscvGS Σ}.
-  Context `{!sieG Σ}.
-  Context `{!lockG Σ}.
+  Context `{!xv6G Σ}.
   (* NOTE: no shared [Context `{GEN : GenId} `{CID : CpuId}] here -- the epilogue/loop
      lemmas below apply EACH OTHER at a hart that a [wp_next] crossing may
      have migrated to, so each needs its OWN implicit per-lemma [CID]

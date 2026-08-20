@@ -176,6 +176,7 @@ Require Import IgetLic.
 Require Import IcacheInv.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 Local Open Scope Z_scope.
 
@@ -194,8 +195,7 @@ Record ic_names := MkIcNames {
 }.
 
 Section IcacheEscrow.
-  Context `{!riscvGS Σ, !lockG Σ, !icacheG Σ, !irefslotG Σ,
-            !diskGhostG Σ, !fsLogG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !irefslotG Σ}.
   Context `{GEN : GenId}.
   Context `{ICFG : icfg}.
 
@@ -272,7 +272,7 @@ Section IcacheEscrow.
      Holding [ic_tok] is what lets a winner refute the checked-out arm; the
      checkout then splits it so that the arm records "somebody is inside the
      critical section" AND WHAT THEY LEFT.  It is a [ghost_var] over
-     [IcacheRef.ic_dep] rather than a [WpLock.lock_tok_excl] for exactly one
+     [Xv6Cameras.ic_dep] rather than a [WpLock.lock_tok_excl] for exactly one
      reason (§14.8, "the two-parkers problem"): with the OUT arm able to hold
      EITHER a reference (iput's window exit) or a share (ilock's checkout), the
      two parkers are otherwise resource-indistinguishable, so neither could
@@ -647,7 +647,7 @@ Section IcacheEscrow.
      priced. *)
   (* A NESTED SECTION, and it costs the file nothing: [ireg_inv] carries
      [InodeRegion.ireg_ep]'s log-epoch lower bound, so naming it needs
-     [LogInv.logG] -- a class this file's outer context deliberately does
+     [Xv6Cameras.logG] -- a class this file's outer context deliberately does
      not have (the escrow itself never mentions the log).  Adding it to the
      outer [Section IcacheEscrow] would put an instance argument on all
      ~120 of its lemmas; a nested section puts it on this one. *)
@@ -657,7 +657,6 @@ Section IcacheEscrow.
        variable of that name instead of the class (the trap IcacheInv's
        preamble records), and every use of [ireg_inv] below would then fail
        to find the real instance. *)
-    Context `{!LogInv.logG Σ}.
 
   Lemma ipool_shape_to_np E γfs γi (inodestart : Z) (nib : nat)
       cov logstart (inum : mword 32) (l : ilic) :
@@ -688,8 +687,19 @@ Section IcacheEscrow.
     - iDestruct "Hpp" as (ge gr gd rg) "(#Hesc & #Hcom & Htk)".
       iMod (escA_redeem E ge gr gd γi (bv_unsigned inum) rg HE with "Hesc Htk Hcom")
         as "[Hmk Hoff]".
-      iModIntro. iFrame "Hl Hcnt Hmir Hoff". rewrite /ipool_shape_np. iRight.
-      iExact "Hmk".
+      (* DISPATCH THE [ipool_shape_np] CONJUNCT BEFORE FRAMING ANYTHING
+         (optimization.md, "A NAMED iFrame still pays a GOAL-side search").
+         [ipool_shape_np] unfolds to [ipool_alloc ∨ imark], and [ipool_alloc]
+         is an ∃ over a block-map big-op, so an [iFrame] that still has that
+         conjunct in the goal tries all four named hypotheses against every
+         one of its leaves: 83 s here and 91 s in the await arm below, the two
+         most expensive statements in the tree after the assumption audit.
+         Splitting it off first leaves a three-conjunct goal where the frame
+         is syntactic. *)
+      iModIntro. iSplitL "Hl"; [iExact "Hl"|].
+      iSplitR "Hcnt Hmir Hoff".
+      { rewrite /ipool_shape_np. iRight. iExact "Hmk". }
+      iFrame "Hcnt Hmir Hoff".
     - (* THE AWAIT ARM (§1.3, as A⁗ rebuilt it).  There is no [committedA]
          until the off-lock deposit runs, so the peel cannot redeem -- and
          must not: what the escrow holds before the deposit is the STANDING
@@ -705,8 +715,11 @@ Section IcacheEscrow.
                 γi γfs inodestart nib inum l (FrzPost rg) HERE Hin
                 with "Hrinv Hl Hpost") as "(%Hc & _ & _)".
         discriminate Hc. }
-      iModIntro. iFrame "Hl Hcnt Hmir Hoff". rewrite /ipool_shape_np.
-      iRight. iExact "Hmk".
+      (* same shape as the redeem arm above, same reason. *)
+      iModIntro. iSplitL "Hl"; [iExact "Hl"|].
+      iSplitR "Hcnt Hmir Hoff".
+      { rewrite /ipool_shape_np. iRight. iExact "Hmk". }
+      iFrame "Hcnt Hmir Hoff".
   Qed.
 
   End PoolPeelLic.
@@ -1300,7 +1313,7 @@ Section IcacheEscrow.
      FRACTION, not the ½ discriminator halves: itrunc keeps those.
 
      AND IT IS STATED AT THE DESCRIPTOR, exactly as [ic_dep_own] is.  The
-     window deposits [IcacheRef.DepFrz q dev inum], and that buys two things
+     window deposits [Xv6Cameras.DepFrz q dev inum], and that buys two things
      at once:
 
        * every ORDINARY consumer refutes this alternative in ONE LINE.  A
@@ -3309,7 +3322,7 @@ End IcacheEscrow.
 (* ===================================================================== *)
 
 Section IcacheEscrowAlloc.
-  Context `{!riscvGS Σ, !lockG Σ, !icacheG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
 
   Local Lemma ic_seq_cons (j n : nat) : seq j (S n) = j :: seq (S j) n.
   Proof. reflexivity. Qed.

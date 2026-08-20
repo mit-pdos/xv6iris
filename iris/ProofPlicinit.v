@@ -53,6 +53,7 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import CodePlicinit.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 
 (* A closed [lo <= x < hi] bound over Z.  [lia] is unusable here: the heavy
@@ -78,7 +79,7 @@ Local Ltac rgne :=
 Module PlicinitProof : PLICINIT.
 
 Section ProofPlicinit.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 

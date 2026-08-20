@@ -47,8 +47,11 @@ Require Import BootChain BootShared.
 Require Import RiscvAdequacy.
 Require Import FsCrash.
 Require Import IcacheRef.
+(* [ROOTDEV], for the two config ties the boot arm now carries *)
+Require Import InodeInv.
 Require Import IrefSlots.
 Require Import ProcAvail.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -107,9 +110,8 @@ Proof. reflexivity. Qed.
 Definition XV6_DISK_BYTES : nat := (2000 * 1024)%nat.
 
 Section SystemBoot.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ}.
-  Context `{!fdslotGpreS Σ, !irefslotGpreS Σ, !pavGpreS Σ,
-            !uartGhostG Σ, !diskGhostG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ}.
+  Context `{!fdslotGpreS Σ, !irefslotGpreS Σ, !pavGpreS Σ}.
   Context `{GEN : GenId}.
 
   (* NO [icacheG] BINDER: [fileG] carries it, together with the ambient
@@ -131,20 +133,24 @@ Section SystemBoot.
     iMod (boot_shared_alloc g XV6_DISK_BYTES Hbf with "Hres")
       as (Hfd Hir Hpav γd γv)
       "(%Hdimg & #Htext & #Hdata & #Hstarted & #Hdev & #Hwinv &
-        #Hcinv & #Hcert & Hharts & Hlk & Hgl & _ & Hpark & Hpst & Huart &
+        #Hcinv & #Hcert & Hharts & Hlk & Hgl & Hmdata & Hpark & Hpst & Hpavail & Huart &
         Hdlab & Hcfg & Hclaim & #Hdone & Hkpt & Hkmap & Hdisk & Hmir & Hpages)".
     (* the harts' reservation mirrors (design §3a) are gone from this
        interface: [boot_shared_alloc] threads each into its hart's [pc_is]. *)
-    (* THE [_] IS [BootShared.main_data_raw] -- the image's writable
+    (* [Hmdata] IS [BootShared.main_data_raw] -- the image's writable
        initialized globals (`first`, `nextpid`), which [kernel_data] stopped
-       claiming when it was narrowed to [rodata_end].  Nothing consumes them
-       until forkret's [first] arm and userinit's [nextpid] land, and Iris is
-       affine, so they are dropped here exactly as [Hprocsavail] is dropped
-       inside [boot_shared_alloc].  Name it when a client wants it. *)
+       claiming when it was narrowed to [rodata_end].  It is threaded to main
+       now: [ProofMain.mn_grp_kvm] spends `nextpid` on the [newlock] that
+       builds [SpecAllocpid]'s lock, which is allocproc's premise and hence
+       userinit's.  `first` rides along and is dropped there -- its consumer
+       is forkret's [if (first)] arm. *)
     iDestruct "Huart" as (l0) "(Htx & #Hsent & #Hlb)".
     iDestruct "Hdlab" as (b0) "Hdlab".
     iDestruct "Hcfg" as (c0) "[%Hlive Hcfg]".
     iDestruct "Hpages" as (ps) "(%Hprun & %Hplen & Hpages)".
+    (* one row out of [boot_shared_alloc], two premises at [BootChain] -- the
+       halves are what main spends and drops separately *)
+    iDestruct "Hmdata" as "[Hmfirst Hmnext]".
     iDestruct (big_sepL_cpu_peel with "Hharts") as "[Hh0 Hhrest]".
     (* the three device threads' invariants, off the one device fabric *)
     iDestruct (dev_inv_uart with "Hdev") as "#Huinv".
@@ -152,19 +158,19 @@ Section SystemBoot.
     iDestruct (dev_inv_disk with "Hdev") as "#Hvinv".
     iDestruct (dev_inv_perm with "Hdev") as "#Hqinv".
     iModIntro.
-    iSplitL "Hh0 Hhrest Hlk Hgl Hpark Hpst Htx Hdlab Hcfg Hclaim Hkpt Hkmap
+    iSplitL "Hh0 Hhrest Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Htx Hdlab Hcfg Hclaim Hkpt Hkmap
              Hpages".
     { iApply (big_sepL_cpu_glue
                 (fun c => WP (LoopE gen_id c : expr riscv_lang) @ ⊤
 )%I).
-      iSplitL "Hh0 Hlk Hgl Hpark Hpst Htx Hdlab Hcfg Hclaim Hkpt Hkmap
+      iSplitL "Hh0 Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail Htx Hdlab Hcfg Hclaim Hkpt Hkmap
                Hpages".
       { (* THE BOOT HART: the arm that consumes the whole supply. *)
         iDestruct "Hh0" as (iv) "Hh0".
         iApply (boot_hart_primary (CID := 0%fin)
                   (g.(gregs) 0%fin) iv DfracDiscarded γd γv ps l0 b0 c0
                   (boot_regs_of_facts g Hbf 0%fin) fin_0_z Hprun Hplen Hlive
-                  with "Htext Hdata Hh0 Hstarted Hlk Hgl Hpark Hpst
+                  with "Htext Hdata Hh0 Hstarted Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail
                         Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim Hdone Hkpt Hkmap
                         Hpages"). }
       (* THE SEVEN SECONDARIES: every element of the tail is an [FS]. *)
@@ -188,7 +194,7 @@ End SystemBoot.
 (* ---------------------------------------------------------------------- *)
 
 Theorem xv6_power_adequacy Σ
-    `{!riscvGpreS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !pavGpreS Σ, !fdslotGpreS Σ,
+    `{!xv6G Σ, !riscvGpreS Σ, !fileG Σ, !pavGpreS Σ, !fdslotGpreS Σ,
       !irefslotGpreS Σ}
     (g : gstate)
     (* the ONLY hypotheses about the machine: it is off, and nothing has ever
@@ -219,7 +225,7 @@ Proof.
      [riscv_eraGS] to [HE], so §2's statement at the composed instance IS
      this obligation (crash.md's M0 gotcha, in the direction that works). *)
   intros F HE gen g' Hbf.
-  exact (@xv6_boot_era Σ (RiscvGS Σ F HE) _ _ _ _ _ _ _ _ _ gen g' Hbf).
+  exact (@xv6_boot_era Σ (RiscvGS Σ F HE) _ _ _ _ _ gen g' Hbf).
 Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -245,8 +251,8 @@ Qed.
 (* ---------------------------------------------------------------------- *)
 
 Theorem xv6_fs_adequacy Σ
-    `{!riscvGpreS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !pavGpreS Σ, !fdslotGpreS Σ,
-      !irefslotGpreS Σ, !fsCrashG Σ}
+    `{!xv6G Σ, !riscvGpreS Σ, !fileG Σ, !pavGpreS Σ, !fdslotGpreS Σ,
+      !irefslotGpreS Σ}
     (g : gstate) (cov : gset Z) (logstart : Z)
     (D0 : gmap Z (list (bv 8)))
     (Hgen0 : g.(ggen) = 0%nat) (Hpow : g.(gpow) = false)
@@ -268,7 +274,7 @@ Proof.
                  iSplitR; [iPureIntro; exact Hseq | iExact "HP"])
            Hgen0 Hpow).
   intros F HE gen g' Hbf.
-  exact (@xv6_boot_era Σ (RiscvGS Σ F HE) _ _ _ _ _ _ _ _ _ gen g' Hbf).
+  exact (@xv6_boot_era Σ (RiscvGS Σ F HE) _ _ _ _ _ gen g' Hbf).
 Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -287,15 +293,28 @@ Qed.
    SLEEPLOCK gname family, claude-notes/projects/iput-acquiresleep.md step 4;
    the last is the COUNT COUPLING's, claude-notes/projects/iclaim-ledger.md
    §2.2.  This is the ONE place in the tree that names a concrete [icfg].) *)
+(* [icfg_dev] AND [icfg_nib] ARE NO LONGER ARBITRARY, and the reason is the
+   one assumption the boot cone carries.  The boot hart's arm reaches
+   [namei("/")], whose assumed contract ([SpecNameiRootBoot.v]) returns an
+   [IcacheRef.inode_held] -- and that resource carries
+   [bv_unsigned inum < 16 * icfg_nib], so at [icfg_nib = 0] it cannot exist
+   and the assumption would be VACUOUS at the very instance these
+   corollaries are taken at.  ROOTDEV is 1 and one inode block is sixteen
+   inums, so [dev := 1] and [nib := 1] make it non-vacuous.
+
+   IT IS A CHOICE, NOT A THEOREM, and it has to be: [icfg] reaches a proof
+   as a superclass field of [FileInv.fileG], [subG_fileΣ] closes with
+   [Qed], and so nothing downstream can prove anything about [icfg_dev] by
+   conversion -- see [SpecNameiRootBoot.v]'s header, which records what
+   trying costs.  The other constants are still irrelevant. *)
 Local Instance adequacy_icfg : icfg :=
-  MkIcfg 1%positive (mword_of_int 0 : mword 32) 0%nat 1%positive 1%positive
+  MkIcfg 1%positive (mword_of_int 1 : mword 32) 1%nat 1%positive 1%positive
          (LogDefs.MkLogNames 1%positive 1%positive 1%positive 1%positive)
          0 (fun _ => 1%positive) (fun _ => 1%positive) 1%positive 1%positive
          1%positive 1%positive 1%positive.
 
 Definition xv6Σ : gFunctors :=
-  #[ riscvΣ; sieΣ; lockΣ; kallocΣ; fileΣ; fdslotΣ; irefslotΣ; icacheΣ;
-     pavΣ; fsCrashΣ ].
+  #[ riscvΣ; xv6GΣ; fileΣ; fdslotΣ; irefslotΣ; pavΣ ].
 
 Corollary xv6_power_adequacy_xv6Σ (g : gstate)
     (Hgen0 : g.(ggen) = 0%nat) (Hpow : g.(gpow) = false) :

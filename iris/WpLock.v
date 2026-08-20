@@ -45,59 +45,9 @@ Require Import RiscvPtsto RiscvLang.
    [lock_cpu] through this one keep working. *)
 Require Export LockSet.
 Require Import ProcGeom.
+Require Export Xv6Cameras.  (* the cameras this file states its theory over *)
 Local Open Scope Z_scope.
 
-(* ===================================================================== *)
-(* The lock's ghost state.                                               *)
-(*                                                                       *)
-(* An excl_auth over [lock_state]: the invariant keeps the authority, the *)
-(* holder keeps the fragment -- so the holder's token pins the [cpu]      *)
-(* field, and the fragment cannot be forged.                              *)
-(* ===================================================================== *)
-Definition lock_state : Type := option (CPU * bool).
-
-Definition lockUR : ucmra := excl_authUR (leibnizO lock_state).
-
-(* ===================================================================== *)
-(* The SLEEPlock's ghost state (SleepLock.v).                             *)
-(*                                                                       *)
-(* It lives here, and inside [lockG], for one reason: putting it in a     *)
-(* class of its own would add a [!slhG Σ] to the ambient context of every *)
-(* one of the ~35 files that so much as mentions [is_sleeplock].  A       *)
-(* sleeplock already needs [lockG] for its inner spinlock, so a second    *)
-(* field on the same class reaches every one of them for free -- and      *)
-(* [lockΣ] gains the functor in the same breath, so SystemAdequacy's      *)
-(* instantiation is unchanged.                                            *)
-(*                                                                       *)
-(* Two components, under the sleeplock's OWN gname (the [γ] of            *)
-(* [is_sleeplock γl γ ...]), so that no client-visible predicate gains an *)
-(* index:                                                                 *)
-(*                                                                       *)
-(*   excl_auth Qp        -- WHICH FRACTION THE HOLDER DEPOSITED.  The     *)
-(*      fragment is the holder's token ([SleepLock.sleeplocked_q]); the   *)
-(*      authority rides with the deposit inside the lock, so a releaser   *)
-(*      gets back exactly the fraction it put in rather than "some"       *)
-(*      fraction -- which is what lets a client whose reference is itself *)
-(*      split (many [struct file]s sharing one inode reference) rebuild   *)
-(*      its own share.                                                     *)
-(*                                                                       *)
-(*   auth (option ufrac) -- THE OUTSTANDING-TOKEN COUNT.  [◯ Some q] is   *)
-(*      a q-share of the "somebody may hold this sleeplock" right and     *)
-(*      [● t] is the total handed out, [None] meaning NONE -- the         *)
-(*      authoritative zero that refutes the lock being held at all.       *)
-(*      UNBOUNDED fractions ([ufrac], not [frac]): the total is the sum   *)
-(*      over however many references exist, so it is not capped at 1.     *)
-(* ===================================================================== *)
-Definition slhUR : ucmra :=
-  prodUR (excl_authUR (leibnizO Qp)) (authUR (optionUR ufracR)).
-
-Class lockG (Σ : gFunctors) := LockG {
-  lock_inG :: inG Σ lockUR;
-  slh_inG :: inG Σ slhUR;
-}.
-Definition lockΣ : gFunctors := #[GFunctor lockUR; GFunctor slhUR].
-Global Instance subG_lockΣ {Σ} : subG lockΣ Σ -> lockG Σ.
-Proof. solve_inG. Qed.
 
 Section Lock.
   Context `{!riscvGS Σ, !lockG Σ}.

@@ -30,11 +30,12 @@ Require Import WpKvminithart CodeKvminithart.
 Require Import SpecKvminithart.
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
 Section KvminithartBody.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 
@@ -350,7 +351,7 @@ End KvminithartBody.
 
 Module KvminithartProof : KVMINITHART.
   Definition wp_kvminithart_sconf
-      `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
+      `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
       (mm : regfile) (lvl K : nat)
       (root : mword 44)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) (pcur : mword 64)

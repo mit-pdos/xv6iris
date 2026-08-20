@@ -25,6 +25,7 @@ Require Import KernelText CodePrintkinit.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecPrintkinit.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -63,7 +64,7 @@ Module ILW := InitlockWrapperProof Initlock.
 
 Section ProofPrintkinit.
   Context `{!riscvGS Σ}.
-  Context `{!sieG Σ}.
+  Context `{!xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_printkinit_sconf

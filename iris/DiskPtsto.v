@@ -41,75 +41,11 @@ Require Import VirtioModel.
 Require Import VirtioQueue.
 Require Import DiskImg.
 Require Import PermInv.
+Require Import RiscvPtsto.  (* [riscvFixedGS]: the sole owner of [mono_natG], and it carries [diskImgG] *)
 
 Local Open Scope Z_scope.
+Require Export Xv6Cameras.  (* the cameras this file states its theory over *)
 
-(* ---------------------------------------------------------------------- *)
-(* THE CLAIM VALUE.                                                        *)
-(*                                                                         *)
-(* [dn_claim] is the publisher's private handle on its own position, and    *)
-(* the ONLY thing a process that slept through the request still holds      *)
-(* when it wakes.  So every fact the woken publisher needs about "its"      *)
-(* request has to be recoverable from the claim's VALUE -- recovering the   *)
-(* [struct buf] alone would not even tell it that the parked payoff is the  *)
-(* one IT published.  Four fields, one per downstream obligation:           *)
-(*                                                                         *)
-(*   dc_buf   the [struct buf]: which cache entry the payoff belongs to;    *)
-(*   dc_slot  the published slot: fixes [vs_data] (a write's payload) and   *)
-(*            [vs_sector_off] (which block), i.e. the postcondition's       *)
-(*            [disk_block bno (if wr then bs_buf else bs_disk)];            *)
-(*   dc_tri   the three descriptors of the chain: [disk_res] ties it to     *)
-(*            the triple map, whose "no member is free" conjunct is what    *)
-(*            tells the woken publisher its descriptors were NOT recycled   *)
-(*            while it slept -- hence that [free_desc] may have them back;  *)
-(*   dc_pin   the pinned bytes: [free_chain] has to take the descriptor     *)
-(*            entries apart again, and the reclaim payoff hands them back   *)
-(*            as one opaque [phys_map].  Naming the map is what lets the    *)
-(*            publisher split it back into the windows it wrote.            *)
-(* ---------------------------------------------------------------------- *)
-Record dclaim := DClaim {
-  dc_buf  : Arch.pa;
-  dc_slot : vslot;
-  dc_tri  : nat * nat * nat;
-  dc_pin  : gmap Arch.pa (bv 8);
-}.
-
-(* ---------------------------------------------------------------------- *)
-(* the ghost classes and the name bundle                                   *)
-(* ---------------------------------------------------------------------- *)
-
-(* NB: the disk IMAGE map is deliberately NOT here -- it is [DiskImg.diskImgG],
-   below both this file and RiscvPtsto.v, because the era auth rides in
-   [state_interp] while the fragments below are elements of the same map, and
-   the CLASS typing both is fixed-layer (claude-notes/design/crash.md). *)
-Class diskGhostG (Σ : gFunctors) := DiskGhostG {
-  (* a receipt records the slot AND the pin map deposited at publish *)
-  disk_slot_inG :: ghost_mapG Σ nat (vslot * gmap Arch.pa (bv 8));
-  disk_nc_inG   :: mono_natG Σ;
-  disk_np_inG   :: ghost_varG Σ nat;
-  (* the publisher's private claim map: dom = the positions whose state is
-     still live in disk_res (in flight or parked); the fragment is how a
-     sleeping rw re-finds its own request (DiskInv.v).  See [dclaim]. *)
-  disk_claim_inG :: ghost_mapG Σ nat dclaim;
-  (* the LIVE configuration, frozen: the invariant publishes it as a
-     persistent fact so a driver can tie [v_cfg v] to the pages it
-     programmed at init (see [disk_cfg] below) *)
-  disk_cfg_inG :: inG Σ (dfrac_agreeR (leibnizO virtio_cfg));
-  (* THE CRASH-PERMIT CHANNEL's typing (PermInv.v).  Bundled HERE rather than
-     added as a separate class to every driver signature: [diskGhostG] is
-     already a premise of every statement that mentions a [disk_names], so
-     nesting it means NO spec signature in the tree changes. *)
-  disk_permG :: permG Σ;
-}.
-
-Definition diskGhostΣ : gFunctors :=
-  #[ghost_mapΣ nat (vslot * gmap Arch.pa (bv 8));
-    mono_natΣ; ghost_varΣ nat; ghost_mapΣ nat dclaim;
-    GFunctor (dfrac_agreeR (leibnizO virtio_cfg));
-    permΣ].
-
-Global Instance subG_diskGhostG Σ : subG diskGhostΣ Σ -> diskGhostG Σ.
-Proof. solve_inG. Qed.
 
 Record disk_names := DiskNames {
   dn_img   : gname;
@@ -137,7 +73,11 @@ Record disk_names := DiskNames {
    [disk_names]-keyed forms below are those, verbatim, at [dn_img γ]. *)
 
 Section DiskPtsto.
-  Context `{!diskGhostG Σ, !diskImgG Σ}.
+  (* [riscvFixedGS] rather than [!diskImgG Σ]: it CARRIES [diskImgG]
+     ([riscvF_diskGS]), so naming both would be the same double path this
+     file just removed for [mono_natG].  It also supplies the [mono_natG]
+     the disk's [nc] counter needs. *)
+  Context `{!diskGhostG Σ, !riscvFixedGS Σ}.
 
   (* -- the frozen live configuration ------------------------------------ *)
 

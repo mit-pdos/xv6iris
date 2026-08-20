@@ -92,6 +92,7 @@ Require Import SpecFileclose.
 Require Import CodeSysOpen.
 Require Import SpecSysOpen.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -599,7 +600,7 @@ Section ProofSysOpenPublish.
      [icfg] as field instances, and binding a second one gives two instances
      that print identically and never unify -- SpecCreate.v's banner records
      the same rule for the same reason. *)
-  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !fsLogG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ}.
 
   (* the 1/2 + 1/2 join at [↦₈], which the tree has at [↦₄]
      ([RiscvPtsto.word4_pointsto_half]) and nowhere else -- and which the
@@ -995,7 +996,7 @@ Local Ltac nz := vm_compute; discriminate.
 Local Ltac scidx := first [ vm_compute; reflexivity | vm_compute; discriminate ].
 
 Section ProofSysOpenEpilogue.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).

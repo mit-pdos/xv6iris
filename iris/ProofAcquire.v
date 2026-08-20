@@ -27,6 +27,7 @@ Require Import CodeAcquire.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecAcquire.
 Require Import ProcGeom.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 
 (* ---- the sext.w round-trip on the amoswap result (acquire +0x20) ---- *)
@@ -76,7 +77,7 @@ Qed.
 Module AcquireGenProof (Mycpu : MYCPU) (Holding : HOLDING) (PushOff : PUSHOFF) : ACQUIRE_GEN.
 
 Section ProofAcquire.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Context {kt : ktier}.
@@ -807,7 +808,7 @@ End AcquireGenProof.
 Module AcquireOfGen (G : ACQUIRE_GEN) : ACQUIRE.
 
 Section OfGen.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Context {kt : ktier}.

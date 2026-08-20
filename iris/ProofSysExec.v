@@ -125,6 +125,7 @@ Require Import CodeSysExec.
 Require Import SpecSysExec.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 (* A syscall-altitude goal carries [ProcInv.tf_page]'s 4096-conjunct big-op;
@@ -646,7 +647,7 @@ End SysExecFrame.
 (*  they arrive as premises rather than as loads. *)
 (* ===================================================================== *)
 Section SysExecEpilogue.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
@@ -908,7 +909,7 @@ Module SysExecProof (Argaddr : ARGADDR) (Argstr : ARGSTR) (Memset : MEMSET)
 (*  its entry value.                                                      *)
 (* ===================================================================== *)
 Section SysExecHead.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
@@ -1460,7 +1461,7 @@ End SysExecHead.
 (*  weaker will do.                                                       *)
 (* ===================================================================== *)
 Section SysExecSetup.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -1972,7 +1973,7 @@ End SysExecSetup.
 (*  the fall-through at [k = t = 32], where every slot has been freed.     *)
 (* ===================================================================== *)
 Section SysExecFree.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -2533,7 +2534,7 @@ End SysExecFree.
 (*  three calls would otherwise be ~250 near-identical [upd_ne] lines.     *)
 (* ===================================================================== *)
 Section SysExecLoop.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId}.
 
@@ -2842,7 +2843,7 @@ End SysExecLoop.
 (*  [(CID0 := ...)].                                                      *)
 (* ===================================================================== *)
 Section SysExecState.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
@@ -2964,7 +2965,7 @@ End SysExecState.
 (*  whichever hart the previous one ended on.                             *)
 (* ===================================================================== *)
 Section SysExecStep.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId}.
 
@@ -3742,7 +3743,7 @@ End SysExecStep.
 (*  and each tail is three lines around it.                               *)
 (* ===================================================================== *)
 Section SysExecReload.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -4105,7 +4106,7 @@ End SysExecReload.
 (*  has to [c.j] to the epilogue while the first is already next to it.   *)
 (* ===================================================================== *)
 Section SysExecBadTail.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId}.
 
@@ -4321,7 +4322,7 @@ End SysExecBadTail.
 (*  coincide.                                                             *)
 (* ===================================================================== *)
 Section SysExecSuccTail.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId}.
 
@@ -4525,9 +4526,7 @@ End SysExecSuccTail.
 (*  written at [i] -- the vector kexec is handed.                          *)
 (* ===================================================================== *)
 Section SysExecBreak.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
-            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -4920,9 +4919,7 @@ End SysExecBreak.
 (*  true] contracts look unreachable.                                      *)
 (* ===================================================================== *)
 Section SysExecWhole.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
-            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).

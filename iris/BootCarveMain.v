@@ -51,6 +51,7 @@ Require Import DinodeEnc IcacheRef InodeInv InodeLock IcacheBoot.
 Require Import SleepLock BcacheInv SpecIinit.
 Require Import DiskInv SpecVirtioDiskInit.
 Require Import SpecMain.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 (* --- the alignment arithmetic the structured carves need, over plain [Z] --- *)
@@ -458,7 +459,7 @@ Qed.
 (* ---------------------------------------------------------------------- *)
 
 Section BootCarveMain.
-  Context `{!riscvGS Σ, !lockG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
 
   (* ------------------------------------------------------------------ *)
   (* The LOCK TRIPLE, out of a [struct spinlock]'s own 24 bytes.         *)

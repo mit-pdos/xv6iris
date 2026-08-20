@@ -130,6 +130,7 @@ Require Import CodeVirtioDiskInit.
 Require Import SpecInitlock SpecKalloc SpecMemset SpecVirtioDiskInit.
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -358,7 +359,7 @@ Ltac vcr :=
 (* ===================================================================== *)
 
 Section VdiLeaves.
-  Context `{!riscvGS Σ, !sieG Σ, !diskGhostG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* -- a CONFIG-ONLY store ------------------------------------------- *)
@@ -603,7 +604,7 @@ End VdiLeaves.
 (* ===================================================================== *)
 
 Section VdiLease.
-  Context `{!riscvGS Σ, !diskGhostG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
 
   Lemma vdi_page_static (p : mword 64) :
     page_valid p ->
@@ -707,7 +708,7 @@ End VdiLease.
 
 Module VirtioDiskInitProof (IL : INITLOCK) (AK : KALLOC) (MS : MEMSET) : VIRTIODISKINIT.
 Section ProofVirtioDiskInit.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !diskGhostG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 

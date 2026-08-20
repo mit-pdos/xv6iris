@@ -123,6 +123,7 @@ Require Import SpecKexec.
 Require Import SpecUsertrap.
 Require Import UsertrapRes.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -135,9 +136,7 @@ Definition first_addr : mword 64 := mword_of_int KernelSyms.first_1.
    leave this one behind. *)
 Notation K_forkret := ((6 + K_kexec)%nat) (only parsing).
 Section SpecForkret.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
-            !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-            !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* WHAT forkret'S TAIL HANDS THE TRAP LOOP.  [ut_trap_parked] is the
@@ -161,10 +160,7 @@ End SpecForkret.
    boot client's premise into every fresh process).  ONE statement rather
    than two so the axiom cannot drift from the theorem. *)
 Definition wp_forkret_gen_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
-      !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-      !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
-    `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (Pfirst : iProp Σ)
     (* the trap loop's kernel-side bundle, abstract exactly as
        [SpecUserretClosed] takes it *)
@@ -227,10 +223,7 @@ Definition wp_forkret_gen_body
 
 (* THE PROVEN READING: [first] is already 0.  [ProofForkret.v]. *)
 Definition wp_forkret_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
-      !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-      !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
-    `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (URes : CpuId -> uptd -> mword 64 -> iProp Σ)
     (pt : uptd) (j : nat)
     (γl γf : gname) (s : string) (Rlk : iProp Σ)
@@ -247,10 +240,7 @@ Definition wp_forkret_body
    against this reading, which is assumed in [LinkForkretNF.v] and will be
    discharged by the same proof the [if (first)] arm needs. *)
 Definition wp_forkret_nf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
-      !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-      !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
-    `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (URes : CpuId -> uptd -> mword 64 -> iProp Σ)
     (pt : uptd) (j : nat)
     (γl γf : gname) (s : string) (Rlk : iProp Σ)
@@ -264,10 +254,7 @@ Definition wp_forkret_nf_body
    take on faith that [LinkForkretNF.v]'s Axiom subsumes [ProofForkret.v]'s
    theorem rather than merely resembling it. *)
 Lemma wp_forkret_body_of_nf
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
-      !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-      !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
-    `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (URes : CpuId -> uptd -> mword 64 -> iProp Σ)
     (pt : uptd) (j : nat)
     (γl γf : gname) (s : string) (Rlk : iProp Σ)
@@ -290,10 +277,7 @@ Qed.
 Module Type FORKRET.
   Include SpecUsertrap.USERTRAP_RES.
   Parameter wp_forkret :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
-             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-             !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
-      `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (pt : uptd) (j : nat)
       (γl γf : gname) (s : string) (Rlk : iProp Σ)
       (pid : mword 32) (V : pprivate)
@@ -312,10 +296,7 @@ End FORKRET.
 Module Type FORKRET_NF.
   Include SpecUsertrap.USERTRAP_RES.
   Parameter wp_forkret_nf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
-             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-             !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
-      `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (pt : uptd) (j : nat)
       (γl γf : gname) (s : string) (Rlk : iProp Σ)
       (pid : mword 32) (V : pprivate)

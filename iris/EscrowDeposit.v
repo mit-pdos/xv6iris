@@ -43,10 +43,10 @@ Require Import DinodeEnc.
 Require Import InodeRegion.
 Require Import EscrowDefs.
 Require Import EscrowInode.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 Section EscrowDeposit.
-  Context `{!riscvGS Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ, !icacheG Σ,
-            !logG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{ICFG : icfg}.
 
   Lemma ireg_free_deposit_au (E : coPset) (γi : gname) (γfs : fs_names)

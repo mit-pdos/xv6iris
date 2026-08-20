@@ -51,6 +51,7 @@ Require Import WpGpr.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 From Kernel Require Import KernelInstrs.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -1056,7 +1057,7 @@ End ExecLoadGSwalk.
 (* the fill).  Fraction-generic: read-only clients instantiate any dq.    *)
 (* ===================================================================== *)
 Section WpInstrSConfig.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 
@@ -1088,7 +1089,7 @@ End WpInstrSConfig.
 (* Part C -- the kernelvec client WPs.                                    *)
 (* ===================================================================== *)
 Section SmodeGprClients.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ------------------------------------------------------------------- *)

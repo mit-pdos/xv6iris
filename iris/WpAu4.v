@@ -48,10 +48,11 @@ Require Import SmodeCore.
 Require Import HartTp WpNext.
 Require Import IntrDefs.
 Require Import WpSconfMem.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 Section Au4Leaves.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context {p : mword 64}.
 

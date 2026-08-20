@@ -34,6 +34,7 @@ Require Import WpMmodeLeafBase.
 Require Import HartSwp HartMFrame WpMmodeSwpBase.
 Require Import IntrDefs WpSmodeIntr WpSconfEngine.
 Require Import IntrDefs.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 
 (* THE EXEC-SIDE BRIDGES ARE GONE, and with them the [WpSmodePtCtl] import.
@@ -48,7 +49,7 @@ Import Defs.
 
 Section WpSconfCtl.
   Context `{!riscvGS Σ}.
-  Context `{!sieG Σ}.
+  Context `{!xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context {kt : ktier}.
   (* the value of [cpus[cid].proc]: a THREAD invariant, threaded through the

@@ -63,6 +63,7 @@ Require Import HartRunGen HartRunFull HartStepAny HartStepFull HartMCycle.
 Require Import HartSTrans WpSmodePtFetch.
 Require Import WpIntrInv WpIntrCore WpSmodeIntr.
 Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -853,7 +854,7 @@ End WfiRun.
 (* ===================================================================== *)
 Section WfiLeaf.
   Context `{!riscvGS Σ}.
-  Context `{!sieG Σ}.
+  Context `{!xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context {kt : ktier}.
   Context {p : mword 64}.

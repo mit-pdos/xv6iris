@@ -48,11 +48,12 @@ Require Import HartLift HartSpan HartSpanChar HartSwp HartSFrame HartSMem WpSmod
 Require Import KptShare KptGoodb.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import MemAccessGen.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
 Section WpSmodePtGprEngine.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ------------------------------------------------------------------- *)
@@ -138,7 +139,7 @@ End WpSmodePtGprEngine.
 (* [tlb_inv_pt] threaded).                                                *)
 (* ===================================================================== *)
 Section WpSmodePtItype.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 
@@ -332,7 +333,7 @@ End ExecLoadGSwalkPt.
 (* serves every arm (hit, fill, and the Svadu A/D write-back).           *)
 (* ===================================================================== *)
 Section WpSmodePtLoad.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ==================================================================== *)
@@ -841,7 +842,7 @@ Proof.
 Qed.
 
 Section WpSmodePtStore.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* THE TIER-INDEXED FORM -- see [wp_cld_s_r_t]'s note for the shape.  The
@@ -1129,7 +1130,7 @@ End WpSmodePtStore.
 
 (* the PC-reading 4-byte gpr-write engine (auipc), over [tlb_inv_pt] *)
 Section WpSmodePtGprEnginePc.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 
@@ -1138,7 +1139,7 @@ End WpSmodePtGprEnginePc.
 (* γ-form gpr-write leaves relocated from WpSmodeGpr.v (rvc engine,
    c.addi16sp, jal rd) over [tlb_inv_pt] via [wp_instr_s_tlbinv_pt]. *)
 Section WpSmodePtGprGamma.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* [hw_config] is [smode_config]'s first (persistent) conjunct; a leaf on

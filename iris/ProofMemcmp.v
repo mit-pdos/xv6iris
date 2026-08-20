@@ -56,6 +56,7 @@ Require Import CodeMemcmp.
 Require Import SpecMemcmp.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -67,7 +68,7 @@ Local Ltac rgne :=
 Module MemcmpProof : MEMCMP.
 
 Section ProofMemcmp.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).

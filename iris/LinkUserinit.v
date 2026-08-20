@@ -1,38 +1,29 @@
-(* LinkUserinit.v -- the one place userinit's contract is ASSUMED.
+(* LinkUserinit.v -- userinit's proof meets its four callees'.
 
-   userinit has no proof: its callee [namei] pulls in the whole file-system
-   cone.  So this link supplies the interface with an [Axiom] instead of
-   instantiating a functor over a proof, exactly as [LinkKerneltrap.v] does for
-   kerneltrap.  Isolating the assumption here is what keeps [ProofMain.v]
-   axiom-free -- main's proof is a functor over [USERINIT] -- and proving
-   userinit later replaces this file and nothing else.
+   IT IS A FUNCTOR APPLICATION NOW, not an [Axiom].  The axiom that used to
+   live here assumed userinit's whole body; what stands in its place is
+   [LinkNameiRootBoot]'s, one call further down and four persistent
+   inode-cache rows wide (see [SpecNameiRootBoot.v]'s header).
 
-   Written out with an explicit [Axiom] rather than a [Declare Module]: both
-   are visible to [Print Assumptions], but only the keyword is visible to
-   [tools/proof_coverage.py]'s textual axiom scan. *)
-From stdpp Require Import bitvector.definitions.
-From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import ghost_var.
-From iris.program_logic Require Import language lifting.
-Require Import SailStdpp.Values.
-Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvLang RiscvPtsto SmodeCore.
-Require Import RegFile.
-(* the classes the binder list generalizes over: [Require Import SpecUserinit]
-   does not put them in scope transitively, and backtick generalization then
-   silently invents fresh binders with those names. *)
-Require Import WpLock KallocInv FdSlots.
-Require Import SpecUserinit.
-Require Import IrefSlots.
-Require Import ProcAvail.
+   [Allocproc] is the COUNTED instance ([LinkAllocproc.v] exports both):
+   userinit does not test allocproc's result, so its caller's page budget
+   and [ProcAvail.procs_avail (Some (S k))] are what refute the two null
+   arms.  kfork, which has no budget, takes [AllocprocGen] instead.
 
-Module Userinit : USERINIT.
-  Axiom wp_userinit_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
-      `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (γs : list gname)
-      (m0 : regfile) (K : nat)
-      (eb : bool) (pj : mword 64)
-      (on : option nat) (v0 : mword 64) (b : bool) (lks : gset string),
-      wp_userinit_sconf_body γa γs m0 K eb pj on v0 b lks.
-End Userinit.
+   [NameiRootBoot] is namei at its ROOT CORNER and at the BOOT client's
+   premises -- not [LinkNameiRoot.NameiRoot], which is the same corner at
+   the four icache rows main cannot yet produce.  The proven corner stays in
+   the build; this link is what will be re-pointed at it when it can.
+
+   [ForkretPark] is the other assumption in the cone, and it is the one
+   [LinkKfork.v] already adds: turning a fresh process's raw saved context
+   into a member of the scheduler's swtch chain is a Loeb argument about
+   forkret ([SpecForkretPark.v]'s header, which names userinit as the other
+   place a process is parked at RUNNABLE from scratch -- this one). *)
+Require Import LinkAllocproc.
+Require Import LinkNameiRootBoot.
+Require Import LinkRelease.
+Require Import LinkForkretPark.
+Require Import ProofUserinit.
+
+Module Userinit := UserinitProof Allocproc NameiRootBoot Release ForkretPark.

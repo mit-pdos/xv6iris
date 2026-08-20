@@ -31,6 +31,7 @@ Require Import IntrDefs.
 Require Import SpecUart.
 Require Import WpSmodeUart.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -61,8 +62,7 @@ Qed.
 Module UartAccessProof (Uart : UART).
 Section WpSconfUartAccess.
   Context `{!riscvGS Σ}.
-  Context `{!sieG Σ}.
-  Context `{!uartGhostG Σ, !diskGhostG Σ}.
+  Context `{!xv6G Σ}.
   Context {kt : ktier}.
   (* ==================================================================== *)
   (* THE READ-SIDE SIDE CONDITION [SrcOk] ON EVERY LEAF IN THIS SECTION.   *)

@@ -32,10 +32,11 @@ Require Import PageFields.
 Require Import WpLock.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Export PipeInvDefs.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 Section PipeInv.
-  Context `{!riscvGS Σ, !lockG Σ, !pipeG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
 
   (* ------------------------------------------------------------------ *)
   (*  Carving kalloc's page into the cells [struct pipe] names            *)

@@ -22,6 +22,7 @@ Require Import WpMmodeLeafBase.
 Require Import WpUart WpSmodeUart.
 Require Import MemAccessGen.
 Require Import WpSmodeGpr.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -213,8 +214,7 @@ Import Defs.
   End ExecStoreGS1walkDevPt.
 
 Section WpSmodePtUart.
-Context `{!riscvGS Σ, !sieG Σ}.
-Context `{!uartGhostG Σ}.
+Context `{!riscvGS Σ, !xv6G Σ}.
 Context `{GEN : GenId} `{CID : CpuId}.
 Existing Instance riscv_memGS.
 

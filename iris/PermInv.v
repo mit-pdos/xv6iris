@@ -44,22 +44,8 @@ From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import ghost_map invariants saved_prop.
 Require Import VirtioModel.   (* [disk_wr]/[wr_apply]: the write identity *)
 Require Import RiscvPtsto.
+Require Export Xv6Cameras.  (* the cameras this file states its theory over *)
 
-(* The channel's typing.  Two pieces: the saved propositions that pin each
-   in-flight request's receipt, and the ghost map whose ELEMENTS are the
-   timeless tokens that ride the request slots.  The key is an opaque
-   [nat] chosen fresh at deposit -- deliberately NOT the queue position, so
-   nothing here has to know anything about the virtio protocol. *)
-Class permG (Σ : gFunctors) := PermG {
-  permG_saved :: savedPropG Σ;
-  permG_map :: ghost_mapG Σ nat (bool * gname * disk_wr);
-}.
-
-Definition permΣ : gFunctors :=
-  #[ savedPropΣ ; ghost_mapΣ nat (bool * gname * disk_wr) ].
-
-Global Instance subG_permΣ Σ : subG permΣ Σ -> permG Σ.
-Proof. solve_inG. Qed.
 
 Section perm.
   Context `{!riscvFixedGS Σ, !permG Σ}.

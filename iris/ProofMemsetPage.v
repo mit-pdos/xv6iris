@@ -24,13 +24,14 @@ From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 Require Import Riscv.rv64d.
 Require Import SpecMemsetPage.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 
 
 Module MemsetPageProof (MemsetArray : MEMSET) : MEMSETPAGE.
 
 Section ProofMemsetPage.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Context {kt : ktier}.

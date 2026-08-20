@@ -72,12 +72,13 @@ Require Import CpuOwn.
 Require Import SpecAcquire SpecRelease.
 Require Import SpecFilealloc.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 Module FileallocProof (Acquire : ACQUIRE) (Release : RELEASE) : FILEALLOC.
 
 Section ProofFilealloc.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 

@@ -37,14 +37,17 @@
       scheduler's swtch chain is a Löb argument about forkret, which
       belongs to the caller that parks the process, not here"
 
-   -- and [SpecUserinit.v], the ONE other place a process is parked at
-   RUNNABLE from scratch, sidesteps the question entirely by being a
-   wholesale [Axiom] (no [ProofUserinit.v] exists).  kfork cannot dodge it
-   the same way -- unlike userinit, kfork's own body (allocproc, uvmcopy,
-   the trapframe copy, the filedup scan, idup, safestrcpy, the two lock
-   crossings) is ordinary, provable code, and boxing all of THAT into one
-   Axiom just to avoid this one step would throw away everything real about
-   the proof.  So this file isolates exactly the missing step, in the same
+   -- and [ProofUserinit.v], the ONE other place a process is parked at
+   RUNNABLE from scratch, is now a REAL PROOF over this contract (2026-08-19;
+   it used to sidestep the question by being a wholesale [Axiom], which is
+   what an earlier revision of this paragraph described).  So both parkers
+   are ordinary provable code and both take this one step assumed: kfork's
+   body (allocproc, uvmcopy, the trapframe copy, the filedup scan, idup,
+   safestrcpy, the two lock crossings) and userinit's (allocproc, the
+   [initproc] store, namei, the state write, the release) are proved around
+   it.  Boxing either of THOSE into one Axiom to avoid this step would throw
+   away everything real about the proof.  So this file isolates exactly the
+   missing step, in the same
    [Module Type] + [Axiom]-in-the-Link shape [SpecIput.v] already uses,
    which is what lets [ProofKfork.v] be a functor over it: when kfork can
    pay [forkret_park_pkg], its [Axiom] is replaced by an application of
@@ -77,6 +80,7 @@ Require Import ProcInv.
 Require Import SchedCtx.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 (* the value [p->context.ra] holds for a fresh, never-yet-run process --
@@ -86,7 +90,7 @@ Local Open Scope Z_scope.
 Definition forkret_pc : mword 64 := mword_of_int KernelSyms.forkret.
 
 Definition forkret_park_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
     (γs : list gname)
     (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
     (pid : mword 32) (V : pprivate) : Prop :=
@@ -105,7 +109,7 @@ Definition forkret_park_body
 
 Module Type FORKRET_PARK.
   Parameter forkret_park :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname)
       (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
       (pid : mword 32) (V : pprivate),

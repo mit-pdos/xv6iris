@@ -173,9 +173,12 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   entry — for why the fs fabric was a NAMING problem, not a missing resource.
 - **[`main-boot.md`](projects/main-boot.md)** — `main()`, both arms proven: the
   `started` one-shot escrow, the deposit as a □-wand, the hart-generic init
-  chain. Remaining: the whole-system adequacy composition, and (§G2) retiring
-  `LinkPrintkGen.v`'s `Axiom` now that the two printk paths have merged —
-  the last open piece of the printk cone, whose wiring is main's.
+  chain. **§G3 is now `userinit`'s own record** — proven AND linked, with the
+  axiom moved down to `namei`'s root corner
+  (`SpecNameiRootBoot`/`LinkNameiRootBoot`), the row-by-row table of what
+  main can and cannot pay, and the ruling that the cache's configuration
+  must NOT be pinned by threading a premise. Remaining: that boot wiring,
+  and (§G2) retiring `LinkPrintkGen.v`'s `Axiom`.
 - **[`uservec.md`](projects/uservec.md)** — uservec, proven (trampoline.S is
   100 % covered): the boundary specs, the TVM/TSR mstatus-pin extension, the
   proof's file split, and the whole-trap-loop Löb theorem

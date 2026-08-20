@@ -24,6 +24,7 @@ Require Import SmodeCore WpMemsetS.
 Require Import WpLock.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -69,7 +70,7 @@ Proof. rewrite ms_pa_id. apply ms_addr_pa_add. Qed.
    the page users derive the [uint p + len < 2^64] bound from [page_valid]. *)
 
 Section WpMemsetPage.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* Choice: a big-sep of per-element existentials over a [seq] yields a single

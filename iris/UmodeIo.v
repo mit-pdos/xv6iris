@@ -55,6 +55,7 @@ Require Import RiscvLang RiscvPtsto.
 Require Import RegFile.
 Require Import UserPtTree UserExec.
 Require Import UmodeCap UmodeAbi UmodeSyscall.
+Require Import Xv6G.   (* [uioG] lives here now, as an [xv6G] member *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -97,13 +98,15 @@ Proof. intros (_ & Hoff & Hdom). split; [ exact Hdom | exact Hoff ]. Qed.
 (* §2 The ghost state: the input stream and the heap break.               *)
 (* ===================================================================== *)
 
-Class uioG (Σ : gFunctors) := {
-  uio_stdinG :: ghost_varG Σ (list (bv 8));
-  uio_brkG   :: ghost_varG Σ Z;
-}.
+(* [uioG] MOVED to [Xv6G.v] and is a member of [xv6G].  It is pure capacity
+   (two [ghost_varG]s), nothing else provided it, and all thirteen of its
+   consumers sit above the bundle -- so it met the membership test exactly.
+   It went DOWN rather than the bundle coming up: [Xv6G] requiring [UmodeIo]
+   would have grafted the Umode tier's 99-file cone onto every file in the
+   tree that binds [xv6G]. *)
 
 Section UmodeIoGhost.
-  Context `{!uioG Σ}.
+  Context `{!xv6G Σ}.
 
   (* the bytes fd 0 has yet to deliver.  Exclusive: only the process reads
      its own stdin, and the arm below is the only thing that moves it. *)
@@ -150,7 +153,7 @@ Inductive uio_sem : Type :=
   | IoUnused.
 
 Section UmodeIo.
-  Context `{!riscvGS Σ} `{!uioG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId}.
   Context (C : ucfg) (pt : uptd).
   Context (gin gbrk : gname).          (* stdin stream, program break *)
@@ -261,7 +264,7 @@ Definition xv6_io_sem (n : Z) : uio_sem :=
   else if bool_decide (n = SYS_exit)  then IoNoRet
   else IoUnused.
 
-Definition xv6_io_protocol `{!riscvGS Σ} `{!uioG Σ} `{GEN : GenId}
+Definition xv6_io_protocol `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId}
     (C : ucfg) (pt : uptd) (gin gbrk : gname) (hbase hlen : Z)
     (Q : list (bv 8) -> list (list (bv 8)) -> iProp Σ) : usys_protocol Σ :=
   fun n g va M => uio_arm C pt gin gbrk hbase hlen (xv6_io_sem n) g va M Q.

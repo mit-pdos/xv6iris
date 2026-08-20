@@ -49,6 +49,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 (* intermediate files use [Require Import], so nothing downstream inherits *)
 (* it.  See FastSetSolver.v.                                              *)
 Require Export FastSetSolver.
+Require Export Xv6Cameras.  (* the cameras this file states its theory over *)
 Local Open Scope Z_scope.
 
 (* ------------------------------------------------------------------ *)
@@ -176,22 +177,13 @@ Qed.
    NOTE THE RE-ASSOCIATION: [(nat * gset Z * nat)] is
    [((nat * gset Z) * nat)], so the budget is [e.1.1], the already-logged
    set is [e.1.2] and the birth epoch is [e.2]. *)
-Definition op_entry : Type := (nat * gset Z * nat)%type.
-
-(* THE EPOCH USES THE AMBIENT [mono_natG] FROM [riscvGS] (the power layer's
-   [riscvF_genGS], RiscvPtsto.v) -- NOT a new field here.  A second
-   [mono_natG] in the same context is the duplicate-class trap of
-   claude-notes/durable-notes.md: the two instances make propositions that
-   print character-for-character identically fail to unify.  Only the
-   [logged_at] registry needs a new functor. *)
-Class logG (Σ : gFunctors) := LogG {
-  logops_inG :: ghost_mapG Σ nat op_entry;
-  loglg_inG :: inG Σ (authR (gsetUR (nat * Z)));
-}.
-Definition logΣ : gFunctors :=
-  #[ghost_mapΣ nat op_entry; GFunctor (authR (gsetUR (nat * Z)))].
-Global Instance subG_logΣ {Σ} : subG logΣ Σ -> logG Σ.
-Proof. solve_inG. Qed.
+(* [op_entry] and [logG] are defined in Xv6Cameras.v; the argument for
+   both the SET and the EPOCH field is above.  The epoch reads the
+   AMBIENT [mono_natG] off [riscvGS] ([riscvF_genGS], RiscvPtsto.v)
+   rather than minting a second instance -- a second [mono_natG] in one
+   context is the duplicate-class trap of claude-notes/durable-notes.md:
+   the two make propositions that print character-for-character
+   identically fail to unify. *)
 
 (* the sum of all remaining budgets -- the SETS play no part in the tie *)
 Definition op_sum (om : gmap nat op_entry) : nat :=

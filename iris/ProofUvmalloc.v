@@ -70,6 +70,7 @@ Require Import SpecKalloc SpecMemsetPage SpecMappages SpecKfree SpecUvmdealloc.
 Require Import SpecUvmalloc.
 Require Import KernelRvcDecode.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -212,7 +213,7 @@ Local Notation URs6 := (mword_of_int 22 : mword 5).
 Local Notation URs7 := (mword_of_int 23 : mword 5).
 
 Section UvmallocDefs.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* SpecUvmalloc's post disjunction, at an abstract return value *)
@@ -272,7 +273,7 @@ Module UvmallocProof (Kalloc : KALLOC) (MemsetPage : MEMSETPAGE)
   : UVMALLOC.
 
 Section ProofUvmalloc.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation Rra := URra.

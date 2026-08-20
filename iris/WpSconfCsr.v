@@ -84,6 +84,7 @@ Require Import SRegime.
    translation slot's KPT arm.  [IntrDefs] already names [tlb_res_pt], so this
    adds no edge to the require graph -- only the import. *)
 Require Import KptShare.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 
 (* helper copy (Local in WpSmodePtCtl.v) *)
@@ -605,18 +606,18 @@ Proof. reflexivity. Qed.
    caller supplies instead is the PURE fact its own [cpu_own _ _ _ _ true]
    carries ([CpuOwn.cpu_own_on]) -- which is what pins the leaf's [k]/[eb]
    there, the arm having baked them in as 0 / true. *)
-Definition intr_count_pre `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition intr_count_pre `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
     (b : bool) (n : nat) (eb : bool) : iProp Σ :=
   (if b then ⌜ n = 0%nat /\ eb = true ⌝ else intr_count n eb)%I.
 
 (* the two index-instances, so a proof never has to reduce the [if] by
    hand inside the proofmode. *)
-Lemma intr_count_pre_on `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
+Lemma intr_count_pre_on `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
     (n : nat) (eb : bool) :
   intr_count_pre true n eb -∗ ⌜ n = 0%nat /\ eb = true ⌝.
 Proof. iIntros "H". iExact "H". Qed.
 
-Lemma intr_count_pre_off `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
+Lemma intr_count_pre_off `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
     (n : nat) (eb : bool) :
   intr_count_pre false n eb -∗ intr_count n eb.
 Proof. iIntros "H". iExact "H". Qed.
@@ -1446,7 +1447,7 @@ End SWrites.
 
 Section WpSconfCsr.
   Context `{!riscvGS Σ}.
-  Context `{!sieG Σ}.
+  Context `{!xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context {kt : ktier}.
   (* the value of [cpus[cid].proc]: a THREAD invariant, threaded through the

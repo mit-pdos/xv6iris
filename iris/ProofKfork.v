@@ -51,6 +51,7 @@ Require Import IntrDefs.
 Require Import ProofKforkParts.
 Require Import CodeKfork.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 (* A syscall-altitude goal carries [ProcInv.tf_page]'s 4096-conjunct big-op;
@@ -61,7 +62,7 @@ Set Printing Depth 40.
 Notation KF := KernelSyms.kfork (only parsing).
 
 Section ProofKfork.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).

@@ -14,10 +14,10 @@ Require Import RiscvPtsto.
 Require Import IcacheRef.
 Require Import EscrowDefs.
 Require Import InodeRegion.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 Section EscrowInode.
-  Context `{!riscvGS Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ, !icacheG Σ,
-            !logG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{ICFG : icfg}.
 
   (* the per-inum one-shot escrow body, over the REAL [InodeRegion.imark].

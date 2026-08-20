@@ -78,6 +78,7 @@ Require Import ProofKforkParts.
 Require Import CodeKfork.
 Require Import LogInv.  (* [logG]: [ireg_inv]'s own instance argument *)
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 (* A syscall-altitude goal can carry a large [proc_priv]/[proc_pt_at]
@@ -135,7 +136,7 @@ Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 (*  THE MISSING ACCESSOR: [p->name], built exactly like [proc_priv_cwd].  *)
 (* ===================================================================== *)
 Section KforkB4Res.
-  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
 
   (* Worth adding to ProcInv.v as [proc_priv_name], next to [proc_priv_cwd]:
      same shape (open [proc_fields], hand out the one field, take back a
@@ -187,7 +188,7 @@ End KforkB4Res.
 Module KforkB4 (ID : IDUP) (SS : SAFESTRCPY).
 
 Section KforkB4Proof.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ, !logG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).

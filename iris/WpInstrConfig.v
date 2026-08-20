@@ -348,6 +348,36 @@ Section WpInstrConfig.
     - iExists cy, ti, ip. by iFrame.
   Qed.
 
+  (* the READ-ONLY frame at the parametric tower: [mm_ro_open]'s mirror, and
+     what [mc_ro_acc]'s closure rebuilds.  Directed, so no caller rewrites
+     [mm_ro_split] against a goal that carries the tower (optimization.md,
+     "Directed entailments, not ⊣⊢ rewrites, for frame bridges"). *)
+  Lemma mc_ro_close (dq : dfrac) (priv1 : Privilege) (pc npc ms : mword 64)
+      (bmi : bool) (cy ti ip mst1 : mword 64)
+      (pcfg1 : type_of_register pmpcfg_n) (mc : mword 32)
+      (micfg misa0 mseccfg0 senv0 : mword 64)
+      (pmar0 : list PMA_Region) (elp0 : type_of_register elp) :
+    (reg_pointsto cur_privilege dq priv1 ∗
+     reg_pointsto mstatus dq mst1 ∗
+     reg_pointsto hart_state dq (HART_ACTIVE tt) ∗
+     reg_pointsto pmpcfg_n dq pcfg1 ∗
+     reg_pointsto (R_bitvector_32 mcountinhibit) DfracDiscarded mc ∗
+     reg_pointsto (R_bitvector_64 minstretcfg) DfracDiscarded micfg ∗
+     reg_pointsto misa DfracDiscarded misa0 ∗
+     reg_pointsto mseccfg DfracDiscarded mseccfg0 ∗
+     reg_pointsto pma_regions DfracDiscarded pmar0 ∗
+     reg_pointsto htif_tohost_base DfracDiscarded None ∗
+     reg_pointsto elp DfracDiscarded elp0 ∗
+     reg_pointsto senvcfg DfracDiscarded senv0 : iProp Σ) -∗
+    hreg_frame_ro (mm_Df dq)
+      (mc_rs priv1 pc npc ms bmi cy ti ip mst1 pcfg1 mc micfg misa0
+         mseccfg0 pmar0 elp0 senv0) mm_Dro.
+  Proof.
+    rewrite mm_ro_split mc_rs_priv mc_rs_mst mc_rs_hart mc_rs_pcfg mc_rs_mc
+      mc_rs_micfg mc_rs_misa mc_rs_sec mc_rs_pma mc_rs_htif mc_rs_elp
+      mc_rs_senv. iIntros "H". iExact "H".
+  Qed.
+
   (* ------------------------------------------------------------------ *)
   (* THE THREE WRITTEN CELLS, LENT AND TAKEN BACK.  One accessor rather   *)
   (* than an open/close pair, so the nine cells the leaf never sees       *)
@@ -369,19 +399,19 @@ Section WpInstrConfig.
          (mc_rs priv1 pc npc ms bmi cy ti ip mst1 pcfg1 mc micfg misa0
             mseccfg0 pmar0 elp0 senv0) mm_Dro).
   Proof.
+    (* BOTH BRIDGES ARE APPLIED, NOT REWRITTEN.  This goal carries the whole
+       [mc_rs] tower inside the ∀-closure, and a [rewrite mm_ro_split] fires
+       on the entire [envs_entails Δ Q] -- 24.9 s for the first of the two,
+       the most expensive statement in this file.  [mm_ro_open] /
+       [mc_ro_close] do the same twelve-cell split and its twelve lookups
+       where the goal is two lines long. *)
     iIntros "Hro".
-    rewrite mm_ro_split.
-    rewrite mm_rs_priv mm_rs_mst mm_rs_hart mm_rs_pcfg mm_rs_mc
-      mm_rs_micfg mm_rs_misa mm_rs_sec mm_rs_pma mm_rs_htif mm_rs_elp
-      mm_rs_senv.
-    iDestruct "Hro" as "(Hpriv & Hmst & Hhs & Hpcfg & #Hmc & #Hmicfg &
-      #Hmisa & #Hsec & #Hpma & #Hhtif & #Help & #Hsenv)".
+    iDestruct (mm_ro_open with "Hro") as
+      "(Hpriv & Hmst & Hhs & Hpcfg & #Hmc & #Hmicfg &
+        #Hmisa & #Hsec & #Hpma & #Hhtif & #Help & #Hsenv)".
     iFrame "Hpriv Hmst Hpcfg".
     iIntros (priv1 mst1 pcfg1) "Hpriv Hmst Hpcfg".
-    rewrite mm_ro_split.
-    rewrite mc_rs_priv mc_rs_mst mc_rs_hart mc_rs_pcfg mc_rs_mc
-      mc_rs_micfg mc_rs_misa mc_rs_sec mc_rs_pma mc_rs_htif mc_rs_elp
-      mc_rs_senv.
+    iApply mc_ro_close.
     iFrame "Hpriv Hmst Hhs Hpcfg".
     by iFrame "Hmc Hmicfg Hmisa Hsec Hpma Hhtif Help Hsenv".
   Qed.

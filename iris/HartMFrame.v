@@ -725,6 +725,39 @@ Section gpr.
       mm_rs_ti mm_rs_ip. iIntros "H". iExact "H".
   Qed.
 
+  (* The READ-ONLY twin of [mm_rw_open], and the same reason for it: the one
+     site that still reached for [mm_ro_split] with a [rewrite] --
+     [WpInstrConfig.mc_ro_acc], whose goal carries a whole [mc_rs] tower in
+     its closure -- paid 24.9 s for that one sentence, the fifth most
+     expensive in the tree.  Stated at the tower, so the twelve lookup
+     rewrites are absorbed here too and the caller neither splits nor
+     rewrites. *)
+  Lemma mm_ro_open (dq : dfrac) (pc npc ms : SailStdpp.Values.mword 64)
+      (bmi : bool) (cy ti ip mst0 : SailStdpp.Values.mword 64)
+      (pcfg : type_of_register pmpcfg_n) (mc : SailStdpp.Values.mword 32)
+      (micfg misa0 mseccfg0 senv0 : SailStdpp.Values.mword 64)
+      (pmar0 : type_of_register pma_regions) (elp0 : type_of_register elp) :
+    hreg_frame_ro (mm_Df dq)
+      (mm_rs pc npc ms bmi cy ti ip mst0 pcfg mc micfg misa0 mseccfg0
+         pmar0 elp0 senv0) mm_Dro -∗
+    (reg_pointsto cur_privilege dq Machine ∗
+     reg_pointsto mstatus dq mst0 ∗
+     reg_pointsto hart_state dq (HART_ACTIVE tt) ∗
+     reg_pointsto pmpcfg_n dq pcfg ∗
+     reg_pointsto (R_bitvector_32 mcountinhibit) DfracDiscarded mc ∗
+     reg_pointsto (R_bitvector_64 minstretcfg) DfracDiscarded micfg ∗
+     reg_pointsto misa DfracDiscarded misa0 ∗
+     reg_pointsto mseccfg DfracDiscarded mseccfg0 ∗
+     reg_pointsto pma_regions DfracDiscarded pmar0 ∗
+     reg_pointsto htif_tohost_base DfracDiscarded None ∗
+     reg_pointsto elp DfracDiscarded elp0 ∗
+     reg_pointsto senvcfg DfracDiscarded senv0 : iProp Σ).
+  Proof.
+    rewrite mm_ro_split mm_rs_priv mm_rs_mst mm_rs_hart mm_rs_pcfg mm_rs_mc
+      mm_rs_micfg mm_rs_misa mm_rs_sec mm_rs_pma mm_rs_htif mm_rs_elp
+      mm_rs_senv. iIntros "H". iExact "H".
+  Qed.
+
   Lemma mm_rw_close (pc npc ms : SailStdpp.Values.mword 64) (bmi : bool)
       (cy ti ip mst0 : SailStdpp.Values.mword 64)
       (pcfg : type_of_register pmpcfg_n) (mc : SailStdpp.Values.mword 32)

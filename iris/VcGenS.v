@@ -41,6 +41,7 @@ Require Import KptShare.
 Require Import WpSmodePtLeaves WpSmodePtAlu WpSmodePtBtype.
 Require Import WpSmodePtMem WpSmodePtMemWrap.
 From iris.base_logic.lib Require Import invariants.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 (* ====================================================================== *)
@@ -329,7 +330,7 @@ Proof.
 Qed.
 
 Section VcGenSIris.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   (* the block's heap cells are frame slots, so they ride the accessing
      hart's regime -- see VcGen.v's [vheap_own]. *)

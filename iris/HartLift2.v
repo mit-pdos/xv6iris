@@ -268,9 +268,34 @@ Section batch2.
                   hreg_frame_ro Df rs1 Dro)%I
       with "[Hri Hrf Hro]" as ">(Hri & Hrf & Hro)".
     { destruct m as [y|T oc k]; [by simpl in Hnode|].
-      destruct oc; simpl in Hnode; try discriminate Hnode;
+      (* SPLIT INTO ITS OWN SENTENCES so the per-sentence profile can say
+         which of the four steps over the node type's constructors costs what
+         -- as one sentence it read as a flat 16.1 s. *)
+      destruct oc.
+      all: simpl in Hnode.
+      all: try discriminate Hnode.
+      (* CHEAP-FAILING BRANCH FIRST (optimization.md, "Smaller traps"): the
+         cost of a branch that FAILS grows with what it did before failing,
+         and [first] re-tries from the top on every one of the node type's
+         constructors.  The RegWrite branch fails only after two
+         [case_decide]s, two [injection]s, a [set_solver] and an [iMod], so
+         leading with it charged every announce-class and RegRead goal that
+         whole prefix: 16.2 s for this one sentence.  Ordered
+         announce < RegRead < RegWrite, each still closing its own goal, so
+         [first] commits only on a branch that finishes. *)
+      all:
         first
-          [ (* RegWrite: [reg ∈ Drw], hence [reg ∉ Dro] *)
+          [ (* the announce class: the file does not move *)
+            injection Hnode as Hq1 Hq2; simpl in Hnode2;
+            injection Hnode2 as Hq3 Hq4; subst rs1 rs2;
+            iModIntro; by iFrame "Hri Hrf Hro"
+          | (* RegRead: the file does not move *)
+            case_decide as HrD; [|discriminate Hnode];
+            injection Hnode as Hq1 Hq2; simpl in Hnode2;
+            case_decide; [|discriminate Hnode2];
+            injection Hnode2 as Hq3 Hq4; subst rs1 rs2;
+            iModIntro; by iFrame "Hri Hrf Hro"
+          | (* RegWrite: [reg ∈ Drw], hence [reg ∉ Dro] *)
             case_decide as HrD; [|discriminate Hnode];
             injection Hnode as Hq1 Hq2; simpl in Hnode2;
             case_decide; [|discriminate Hnode2];
@@ -285,17 +310,7 @@ Section batch2.
                     with "Hri Hrf") as "[Hri Hrf]";
             iModIntro; iFrame "Hri Hrf";
             by iApply (hreg_frame_ro_ext_local Df rs
-                         (register_set reg regval rs) Dro HagO')
-          | (* RegRead: the file does not move *)
-            case_decide as HrD; [|discriminate Hnode];
-            injection Hnode as Hq1 Hq2; simpl in Hnode2;
-            case_decide; [|discriminate Hnode2];
-            injection Hnode2 as Hq3 Hq4; subst rs1 rs2;
-            iModIntro; by iFrame "Hri Hrf Hro"
-          | (* the announce class: the file does not move *)
-            injection Hnode as Hq1 Hq2; simpl in Hnode2;
-            injection Hnode2 as Hq3 Hq4; subst rs1 rs2;
-            iModIntro; by iFrame "Hri Hrf Hro" ]. }
+                         (register_set reg regval rs) Dro HagO') ]. }
     iMod "Hmask" as "_". iModIntro.
     iSplitR "H Hrf Hro"; [iFrame "Hri Hmem Hdev"|].
     iApply ("H" with "Hrf Hro").

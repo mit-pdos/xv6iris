@@ -88,6 +88,7 @@ Require Import RiscvLang RiscvPtsto.
 Require Import SmodeCore KallocInv WpLock.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -104,7 +105,7 @@ Import Defs.
 Notation K_kvmmake := (166%nat) (only parsing).
 
 Section KvmSpecs.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* kalloc's ambient resources, bundled so callers can invoke kalloc

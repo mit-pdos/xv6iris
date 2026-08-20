@@ -46,6 +46,7 @@ Require Import IntrDefs WpIntrInv WpSmodeIntr.
    [_intro] (KptShare), [tlb_ok_pt_empty] (PtTree), [tlb_hash_range]
    (SmodePte).  [WpIntrInv] already requires all three, so no edge moves. *)
 Require Import KptShare PtTree SmodePte.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -172,7 +173,7 @@ Section SfenceFrames.
 End SfenceFrames.
 
 Section SfenceLeaf.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context (kt : ktier) (p : mword 64).
 

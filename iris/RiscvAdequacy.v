@@ -74,6 +74,7 @@ Require Import PowerBoot.   (* the canonical reset machine + [boot_shape_boot_gs
 (* intermediate files use [Require Import], so nothing downstream inherits *)
 (* it.  See FastSetSolver.v.                                              *)
 Require Export FastSetSolver.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 (* ---------------------------------------------------------------------- *)
 (* 1. Ghost-state preconditions: what [Σ] must contain before allocation.  *)
@@ -88,11 +89,13 @@ Class riscvGpreS (Σ : gFunctors) := RiscvGpreS {
   riscv_pre_uartGS :: ghost_varG Σ uart_state;
   riscv_pre_plicGS :: ghost_varG Σ plic_state;
   riscv_pre_virtioGS :: ghost_varG Σ virtio_state;
-  (* the UART ghosts carried by [dev_inv_body] (WpUart.v) *)
-  riscv_pre_uartGhostGS :: uartGhostG Σ;
-  (* the disk-driver protocol ghosts carried by [dev_inv_body]'s
-     [virtio_proto] half (DiskPtsto.v / VirtioProto.v) *)
-  riscv_pre_diskGhostGS :: diskGhostG Σ;
+  (* [uartGhostG] and [diskGhostG] were fields here, "carried by
+     [dev_inv_body]".  They are pure capacity and now live in [Xv6G.xv6G],
+     the tree's ONE bundle: a class that carries them as well would give
+     every adequacy file two instance paths to the same [inG], which is the
+     failure this consolidation exists to remove.  [riscvΣ] still supplies
+     the functors, so [subG_riscvGpreS] is unchanged in strength -- what
+     moved is only who NAMES them. *)
   (* the kernel-mapping claim ghost (KMap.v, rwx-kmap): capacity only --
      the client mints the auth with [kmap_alloc] when establishing the
      Bare translation slot *)
@@ -406,7 +409,7 @@ Definition cpu_pool `{GEN : GenId} (cs : list CPU) : list (expr riscv_lang) :=
 (* 5. The adequacy theorem.                                                *)
 (* ---------------------------------------------------------------------- *)
 
-Theorem riscv_system_adequacy Σ `{!riscvGpreS Σ, !sieG Σ} `{GEN : GenId}
+Theorem riscv_system_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ} `{GEN : GenId}
     (cs : list CPU) (g : gstate) (D : CPU -> gset register)
     (* how many proc slots the kernel's proc[] array has: the boot client is
        handed one hart tag per slot ([ProcGeom.hart_own], minted at hart 0).
@@ -718,7 +721,7 @@ Qed.
 (*    same way, with a richer [D].                                          *)
 (* ---------------------------------------------------------------------- *)
 
-Corollary riscv_device_adequacy Σ `{!riscvGpreS Σ, !sieG Σ} `{GEN : GenId} (g : gstate)
+Corollary riscv_device_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ} `{GEN : GenId} (g : gstate)
     (Hram : forall a b, g.(gmem) !! a = Some b -> addr_is_ram a)
     (* NOTE: there is deliberately NO hypothesis about the power-on DLAB.
        [uart_ghosts_alloc] hands the caller its half of the DLAB agreement
@@ -834,7 +837,12 @@ Proof. rewrite elem_of_set_seq. lia. Qed.
 Section power.
   Context {Σ : gFunctors}.
   Context `{!riscvFixedGS Σ}.
-  Context `{!sieG Σ}.
+  (* [xv6G], and it is safe again.  This section used to bind [!sieG Σ]
+     deliberately, because the bundle reached [mono_natG] through
+     [diskGhostG] and shadowed [riscvFixedGS]'s generation counter.
+     [diskGhostG] no longer owns one, so there is a single path and the
+     carve-out is retired. *)
+  Context `{!xv6G Σ}.
 
   (* What a PowerOn hands the boot client, for era [HE] at generation
      [gen] over the reset state [g']: RAW, ERA-EXPLICIT ghost forms -- the
@@ -1121,7 +1129,7 @@ End power.
    run; if the client can boot ANY era from ANY reset state, every
    configuration reachable under any schedule of power-cycles, hart steps
    and device steps is reducible. *)
-Theorem riscv_power_adequacy Σ `{!riscvGpreS Σ, !sieG Σ}
+Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
     (D : CPU -> gset register) (nproc ndisk : nat) (g : gstate)
     (* the crash predicate (see [riscv_system_adequacy]): allocated ONCE, into
        the fixed layer, so the SAME [crash_inv] is handed to every boot --

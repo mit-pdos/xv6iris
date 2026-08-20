@@ -95,6 +95,7 @@ Require Import ProofKexecSeam.
 Require Import ProofKforkParts.
 Require Import CodeKexec.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 (* durable-notes' rule: a goal over [proc_priv] carries [tf_page]'s
@@ -125,7 +126,7 @@ Notation KXD := KernelSyms.kexec (only parsing).
 (*  hart the previous iteration ended on).                                 *)
 (* ===================================================================== *)
 Section KexecDName.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId}.
 
   Notation Rs0 := (mword_of_int 8 : mword 5).
@@ -577,9 +578,7 @@ End KexecDName.
 Module KexecDProof (PFP : PROC_FREEPAGETABLE) (SS : SAFESTRCPY).
 
 Section KexecDCommit.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
-            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !fsCrashG Σ, !irefslotG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -1785,9 +1784,7 @@ Section KexecDCommit.
 End KexecDCommit.
 
 Section KexecDMain.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
-            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !fsCrashG Σ, !irefslotG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).

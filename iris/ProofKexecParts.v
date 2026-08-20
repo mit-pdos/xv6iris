@@ -84,6 +84,7 @@ Require Import IntrDefs.
 Require Import ProcInv.
 Require Import CodeKexec.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 (* ------------------------------------------------------------------ *)
@@ -168,7 +169,7 @@ Lemma kxc_frame_back (K : nat) : (68 <= K)%nat -> ((K - 68) + 68)%nat = K.
 Proof. lia. Qed.
 
 Section ProofKexecParts.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).

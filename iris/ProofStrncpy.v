@@ -19,6 +19,7 @@ Require Import HartTp WpNext IntrDefs ByteCursor ByteBuf KstackArith.
 Require Import VcGen.
 Require Import CodeStrncpy SpecStrncpy.
 From Kernel Require KernelInstrs KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -35,7 +36,7 @@ Qed.
 Module StrncpyProof : STRNCPY.
 
 Section MachineProof.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).

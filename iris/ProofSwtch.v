@@ -54,12 +54,13 @@ Require Import WpSwtchVc.
 Require Import SpecSwtch.
 From Kernel Require KernelSyms.
 Require Import CodeSwtch.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
 Module SwtchProof : SWTCH.
 Section ProofSwtch.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Instance stack_own_timeless_local (sp : mword 64) (n : nat) :

@@ -87,6 +87,7 @@ Require Import SpecKfree.
 Require Import SpecFreewalk.
 Require Import KernelRvcDecode.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -252,7 +253,7 @@ Qed.
 Module FreewalkProof (Kfree : KFREE) : FREEWALK.
 
 Section ProofFreewalk.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId}.
   (* NOTE: no shared [Context `{CID : CpuId}] here -- fw_epilogue / fw_loop /
      fw_body apply each other at a hart a [wp_next] crossing may have

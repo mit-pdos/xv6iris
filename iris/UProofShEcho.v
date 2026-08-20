@@ -58,11 +58,12 @@ Require Import UmodeCap UmodeAbi UmodeIo.
 Require Import UCodeSh USpecSh.
 Require Import UProofShParse UProofShCmd UProofShMain.
 Require User.ShSyms User.ShInstrs.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
 Section UProofShEcho.
-  Context `{!riscvGS Σ} `{!uioG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId}.
   Context (C : ucfg) (pt : uptd).
   Context (gin gbrk : gname) (hbase hlen : Z).

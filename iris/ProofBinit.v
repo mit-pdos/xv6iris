@@ -64,6 +64,7 @@ Require Import CodeBinit.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecBinit.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -71,8 +72,7 @@ Module BinitProof (Initlock : INITLOCK) (Initsleeplock : INITSLEEPLOCK) : BINIT.
 
 Section ProofBinit.
   Context `{!riscvGS Σ}.
-  Context `{!sieG Σ}.
-  Context `{!lockG Σ}.
+  Context `{!xv6G Σ}.
   (* NOTE: no shared [Context `{GEN : GenId} `{CID : CpuId}] here -- [biepi] and the loop
      below apply each other (and are applied by [wp_binit_sconf]) at a hart a
      [wp_next] crossing may have migrated to, so each needs its OWN implicit

@@ -28,6 +28,7 @@ Require Import RegFile.
 Require Import CalleeSaved.
 Require Import IntrDefs.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 
 (* trapinithart(): install kernelvec as the S-mode trap vector.  See the
@@ -41,7 +42,7 @@ From Kernel Require KernelSyms.
    contract is stated at the literal index [false] rather than a generic
    [b], with no [wp_next] wrapper at all (it would collapse via
    [wp_next_off] anyway, since the hart cannot move). *)
-Definition wp_trapinithart_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (mm : regfile) (K : nat)
+Definition wp_trapinithart_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (mm : regfile) (K : nat)
     (tv0 : mword 64) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.trapinithart in
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
@@ -60,7 +61,7 @@ Definition wp_trapinithart_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{
 
 Module Type TRAPINITHART.
   Parameter wp_trapinithart_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (mm : regfile) (K : nat)
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (mm : regfile) (K : nat)
       (tv0 : mword 64) (p : mword 64),
       wp_trapinithart_sconf_body mm K tv0 p.
 End TRAPINITHART.

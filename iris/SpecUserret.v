@@ -43,6 +43,7 @@ Require Import SmodeCore.
 Require Import PtTree.
 Require Import TrampPt UptTree KptShare UserretDefs.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -58,7 +59,7 @@ Definition userret_gpr (m : regfile)
     : regfile :=
   <[Regidx (mword_of_int 10) := regval_into_reg va0f]> (<[Regidx (mword_of_int 31) := regval_into_reg vt6]> (<[Regidx (mword_of_int 30) := regval_into_reg vt5]> (<[Regidx (mword_of_int 29) := regval_into_reg vt4]> (<[Regidx (mword_of_int 28) := regval_into_reg vt3]> (<[Regidx (mword_of_int 27) := regval_into_reg vs11]> (<[Regidx (mword_of_int 26) := regval_into_reg vs10]> (<[Regidx (mword_of_int 25) := regval_into_reg vs9]> (<[Regidx (mword_of_int 24) := regval_into_reg vs8]> (<[Regidx (mword_of_int 23) := regval_into_reg vs7]> (<[Regidx (mword_of_int 22) := regval_into_reg vs6]> (<[Regidx (mword_of_int 21) := regval_into_reg vs5]> (<[Regidx (mword_of_int 20) := regval_into_reg vs4]> (<[Regidx (mword_of_int 19) := regval_into_reg vs3]> (<[Regidx (mword_of_int 18) := regval_into_reg vs2]> (<[Regidx (mword_of_int 17) := regval_into_reg va7]> (<[Regidx (mword_of_int 16) := regval_into_reg va6]> (<[Regidx (mword_of_int 15) := regval_into_reg va5]> (<[Regidx (mword_of_int 14) := regval_into_reg va4]> (<[Regidx (mword_of_int 13) := regval_into_reg va3]> (<[Regidx (mword_of_int 12) := regval_into_reg va2]> (<[Regidx (mword_of_int 11) := regval_into_reg va1]> (<[Regidx (mword_of_int 9) := regval_into_reg vs1]> (<[Regidx (mword_of_int 8) := regval_into_reg vs0]> (<[Regidx (mword_of_int 7) := regval_into_reg vt2]> (<[Regidx (mword_of_int 6) := regval_into_reg vt1]> (<[Regidx (mword_of_int 5) := regval_into_reg vt0]> (<[Regidx (mword_of_int 4) := regval_into_reg vtp]> (<[Regidx (mword_of_int 3) := regval_into_reg vgp]> (<[Regidx (mword_of_int 2) := regval_into_reg vsp]> (<[Regidx (mword_of_int 1) := regval_into_reg vra]> (<[Regidx (mword_of_int 10) := mword_of_int TRAPFRAME]> m))))))))))))))))))))))))))))))).
 
-Definition wp_userret_pt_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_userret_pt_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
     (kroot uroot tfp : mword 44)
     (um : gmap (mword 27) (mword 64))
     (m : regfile) (usatp : mword 64)
@@ -183,7 +184,7 @@ Definition wp_userret_pt_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : Cp
 
 Module Type USERRET.
   Parameter wp_userret_pt :
-    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
       (kroot uroot tfp : mword 44)
       (um : gmap (mword 27) (mword 64)) (m : regfile) (usatp : mword 64)
       (mstatus0 mie_v mdv0 menvcfg0 senvcfg0 sepc0 : mword 64)

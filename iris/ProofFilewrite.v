@@ -327,6 +327,7 @@ From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language weakestpre lifting.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 (* The Sail side, in [ProofFileread.v]'s exact spelling.  It is NOT
    decoration: the Sail [uint] the [bltu] range facts below are stated over
    lives in [SailStdpp.Operators_mwords], and neither [SailStdpp.Values]
@@ -721,7 +722,7 @@ Proof. apply dir_ok_not_dir. Qed.
    One [bslots_op] rewrite, named so the walk does not re-derive [3 = 1+2]
    inside a proofmode goal.  --------------------------------------------- *)
 Section FwSlots.
-  Context `{!riscvGS Σ, !bioG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
 
   Lemma fw_bslots3 (bn : bio_names) :
     bslots bn 3 ⊣⊢ bslot bn ∗ bslots bn 2.
@@ -758,7 +759,7 @@ Section FwWriteiSrc.
      context.  Qualifying rather than importing, because a new import here
      would also re-resolve every other unqualified name in the file -- see
      the header's [FW_MAX] warning. *)
-  Context `{!riscvGS Σ, !WpLock.lockG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   (* A BI-ENTAILMENT, so it covers both ends of the call at once: read left
      to right it is what the walk must SUPPLY at +0xa0, right to left what
@@ -784,7 +785,8 @@ End FwWriteiSrc.
 (*  seventeen lemmas above are compiled under the scope they were written *)
 (*  in and only the walk sees the wider one.  In particular [WpLock] is   *)
 (*  imported only from here down, which is why [fw_writei_src]'s context  *)
-(*  above says [WpLock.lockG] and the functor's says [lockG].             *)
+(*  above says [WpLock.lockG] and the functor's says [lockG].  (Both are  *)
+(*  now [Xv6Cameras.lockG]; the scoping point above still stands.)        *)
 (*  [WpSmodeHalf] is the [lh] at +0x5c: it is NOT one of the four         *)
 (*  [WpSconf*] files (S3o's leaf table), and ProofFilewriteParts does not *)
 (*  import it.                                                            *)
@@ -955,9 +957,7 @@ Module FilewriteProof (Pipewrite : PIPEWRITE) (Ilock : ILOCK) (Writei : WRITEI)
                       (Consolewrite : CONSOLEWRITE) (PN : PANIC) : FILEWRITE.
 
 Section ProofFilewrite.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
-            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).

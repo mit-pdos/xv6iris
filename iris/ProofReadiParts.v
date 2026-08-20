@@ -53,6 +53,7 @@ Require Import InodeInv.
 Require Import ProcInv.
 Require Import SpecReadi.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -385,7 +386,7 @@ Proof. vm_compute. reflexivity. Qed.
    with the same lemmas that split the bio block window (static, KT0), and
    a section variable can only be instantiated from OUTSIDE the section. *)
 Section ReadiBytes.
-  Context `{!riscvGS Σ, !lockG Σ, !diskGhostG Σ, !fsLogG Σ, !bioG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{KTR : !CurKtier}.
 
   (* --- conversion wands over ByteBuf's [⊣⊢]s.  Stated as wands so the call
@@ -445,7 +446,7 @@ Section ReadiBytes.
 End ReadiBytes.
 
 Section ReadiRes.
-  Context `{!riscvGS Σ, !lockG Σ, !diskGhostG Σ, !fsLogG Σ, !bioG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
 
   (* A [len]-byte WINDOW of a checked-out buffer's data area, borrowed at
      offset [o] and handed back UNCHANGED -- readi's copy reads it, so the

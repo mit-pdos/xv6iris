@@ -46,6 +46,7 @@ Require Import PtBuild.
 Require Import KMap.
 Require Import KallocInv.
 Require Import ProcPtOwn.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -288,7 +289,7 @@ Qed.
 (* ===================================================================== *)
 
 Section PtFreeIris.
-  Context `{!riscvGS Σ, !lockG Σ, !kallocG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
 
   (* the 512 slot doublewords of a node page, at ARBITRARY contents, are
      the page's 4096 loose physical bytes.  The inverse regrouping of

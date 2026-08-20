@@ -31,6 +31,7 @@ Require Import SpecPushOff.
 Require Import CodeRelease.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecRelease.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 
 
@@ -38,7 +39,7 @@ Import Defs.
 Module ReleaseGenProof (Holding : HOLDING) (PushOff : PUSHOFF) : RELEASE_GEN.
 
 Section ProofRelease.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Context {kt : ktier}.
@@ -501,7 +502,7 @@ End ReleaseGenProof.
 Module ReleaseOfGen (G : RELEASE_GEN) : RELEASE.
 
 Section OfGen.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Context {kt : ktier}.
@@ -537,7 +538,7 @@ End ReleaseOfGen.
 Module ReleaseCancelOfGen (G : RELEASE_GEN) : RELEASE_CANCEL.
 
 Section CancelOfGen.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Context {kt : ktier}.

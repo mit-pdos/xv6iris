@@ -93,6 +93,7 @@ Require Import WpUmodeLeaf WpUmodeBranch WpUmodeStore WpUmodeLoad.
 Require Import UmodeFrame.
 Require Import UCodeSh USpecSh.
 Require Import UProofShLib UProofShMem.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 (* re-imported LAST on purpose: WpUmodeStep.v's funnel names its optional
    gpr write [uv_wr], which otherwise shadows UmodeAbi's writable-window
    record of the same name. *)
@@ -209,7 +210,7 @@ Proof.
 Qed.
 
 Section UProofShHeap.
-  Context `{!riscvGS Σ} `{!uioG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId}.
   Context (C : ucfg) (pt : uptd).
   Context (gin gbrk : gname) (hbase hlen : Z).

@@ -85,6 +85,7 @@ Require Import CodeLogWrite.
 Require Import SpecAcquire SpecRelease SpecBpin.
 Require Import SpecLogWrite.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
@@ -302,7 +303,7 @@ Local Ltac regne := reg_ne_side.
 (*  register invariant, the output resources and the two closing wands.   *)
 (* ===================================================================== *)
 Section LogWriteDefs.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ, !diskGhostG Σ, !fsLogG Σ, !logG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
 
   (* [Fb] is THE CALLER'S RECEIPT for the logged view -- opaque here, and
      threaded through every block exactly like [Bud].  The whole-function
@@ -461,7 +462,7 @@ End LogWriteDefs.
 (*  the hart it actually starts on.                                      *)
 (* ===================================================================== *)
 Section LogWriteBlocks.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ, !diskGhostG Σ, !fsLogG Σ, !logG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
 
   (* ================================================================== *)
   (*  +0xae .. +0xc2 : release(&log.lock), the epilogue and the return.  *)
@@ -1750,7 +1751,7 @@ End LogWriteBlocks.
 (* ===================================================================== *)
 
 Section ProofLogWrite.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ, !diskGhostG Σ, !fsLogG Σ, !logG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* THE WHOLE-FUNCTION PROOF, at the most general (atomic-update) contract.

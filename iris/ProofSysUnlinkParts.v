@@ -77,6 +77,7 @@ Require Import SpecNameiparent.
 Require Import CodeSysUnlink.
 Require Import SpecSysUnlink.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -1065,7 +1066,7 @@ Local Ltac nz := vm_compute; discriminate.
 Local Ltac scidx := first [ vm_compute; reflexivity | vm_compute; discriminate ].
 
 Section ProofSysUnlinkEpilogue.
-  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
@@ -1285,7 +1286,7 @@ End ProofSysUnlinkEpilogue.
 (* ===================================================================== *)
 
 Section ProofSysUnlinkOrphan.
-  Context `{!icacheG Σ} `{ICFG : icfg}.
+  Context `{!xv6G Σ} `{ICFG : icfg}.
 
   (* record 0 is the SELF record, so its ticket is [emp] *)
   Lemma su_link_self (self : Z) (dn' : dinode) (data : nat -> list (bv 8)) :

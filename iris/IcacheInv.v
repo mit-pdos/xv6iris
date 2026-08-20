@@ -92,6 +92,7 @@ Require Import IgetLic.
 Require Import IrefSlots.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 Local Open Scope Z_scope.
 
@@ -329,7 +330,7 @@ Local Lemma seq_ninode_lookup (k : nat) :
 Proof. intros Hk. apply lookup_seq. split; [lia|exact Hk]. Qed.
 
 Section IcacheGhost.
-  Context `{!icacheG Σ, !lockG Σ}.
+  Context `{!xv6G Σ}.
   Context `{ICFG : icfg}.
 
   (* [itable_half], [iref_frag], [iref_tok] and [live_frac] are
@@ -1380,7 +1381,7 @@ End IcacheGhost.
 (* ===================================================================== *)
 
 Section IcacheRefInv.
-  Context `{!riscvGS Σ, !icacheG Σ, !lockG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{ICFG : icfg}.
   Context `{GEN : GenId}.
 
@@ -2044,8 +2045,7 @@ Section IcacheRefInvReg.
   (* [InodeRegion]'s own context plus [lockG] -- and every one of these
      classes has to be IN SCOPE (see the preamble's import note), or the
      backtick generalisation quietly invents a same-named variable instead. *)
-  Context `{!riscvGS Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ, !icacheG Σ,
-            !logG Σ, !lockG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{ICFG : icfg}.
   Context `{GEN : GenId}.
 
@@ -3486,7 +3486,7 @@ End IcacheRefInvReg.
 (* ===================================================================== *)
 
 Section IcacheTable.
-  Context `{!riscvGS Σ, !lockG Σ, !icacheG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !irefslotG Σ}.
   Context `{ICFG : icfg}.
   Context `{GEN : GenId}.
 

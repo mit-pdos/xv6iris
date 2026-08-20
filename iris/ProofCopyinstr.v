@@ -132,6 +132,7 @@ Require Import SpecWalkaddr SpecVmfault.
 Require Import SpecCopyinstr.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 Local Open Scope Z_scope.
 Set Printing Depth 40.
@@ -195,7 +196,7 @@ Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 Module CopyinstrProof (Walkaddr : WALKADDR) (Vmfault : VMFAULT) : COPYINSTR.
 
 Section ProofCopyinstr.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context {ktb : ktier}.
 

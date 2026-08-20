@@ -50,6 +50,7 @@ Local Open Scope Z_scope.
 (* [rget m k] back to [m !!! Regidx k] across the whole proofmode goal. *)
 Ltac rgall := repeat (rewrite rget_ne; [| vm_compute; discriminate]).
 Require Import VirtioDiskRwDefs.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 (* ===================================================================== *)
 (* §2  P3 -- +0x0c4 .. +0x176, the chain formatting.                      *)
@@ -62,7 +63,7 @@ Require Import VirtioDiskRwDefs.
 (* ===================================================================== *)
 
 Section ProofVirtioDiskRwC.
-  Context `{!riscvGS Σ, !sieG Σ, !diskGhostG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 

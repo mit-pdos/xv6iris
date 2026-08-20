@@ -212,6 +212,7 @@ Require Import SpecCreate.      (* [create_slots] *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -227,7 +228,7 @@ Notation K_sys_open := (148%nat) (only parsing).
 Definition sys_open_slots : nat := create_slots.
 
 Section SpecSysOpen.
-  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ}.
 
   (* sys_open's result, keyed by the returned a0, over the process state [W]
      the syscall ends with -- i.e. the incoming [V] with argstr's page-table
@@ -254,10 +255,8 @@ Section SpecSysOpen.
 End SpecSysOpen.
 
 Definition wp_sys_open_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
-      !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-      !irefslotG Σ, !pavG Σ, !iregG Σ}
-    `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (γfl γf : gname) (γa : gname) (γpr : gname)   (* ftable lock + ghost, kalloc, printk *)
     (gs : list gname) (j : nat) (gl : gname)            (* the running process *)
@@ -404,10 +403,7 @@ Definition wp_sys_open_sconf_body
 
 Module Type SYSOPEN.
   Parameter wp_sys_open_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
-             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-             !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
-      `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γfl γf : gname) (γa : gname) (γpr : gname)
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)

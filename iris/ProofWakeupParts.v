@@ -30,6 +30,7 @@ Require Import CodeWakeup.
 Require Import ProcGeom.
 Require Import SpecWakeupParts.
 From Kernel Require KernelSyms.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 (* [rget m k] at a NON-tp index is the plain map lookup ([rget_ne]) -- the
@@ -53,7 +54,7 @@ Local Ltac rgne :=
 Module WakeupPartsProof : WAKEUPPARTS.
 
 Section ProofWakeupPartsEpi.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 
@@ -240,7 +241,7 @@ Section ProofWakeupPartsEpi.
 End ProofWakeupPartsEpi.
 
 Section ProofWakeupPartsPro.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 

@@ -50,6 +50,7 @@ Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfCsr.
 Require Import ProofPushOff.
 Require Import CodeKerneltrap.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -71,7 +72,7 @@ Ltac ktne_ra :=
   rewrite He; vm_compute; discriminate.
 
 Section ProofKerneltrapParts.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context {p : mword 64}.
 

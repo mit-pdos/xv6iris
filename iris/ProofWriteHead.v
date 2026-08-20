@@ -91,6 +91,7 @@ Require Import FsCrash.
 Require Import SpecWriteHead.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
@@ -378,8 +379,7 @@ Local Ltac regne := reg_ne_side.
 Local Ltac whidx := first [ vm_compute; reflexivity | vm_compute; discriminate ].
 
 Section WriteHeadDefs.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   (* ---------------------------------------------------------------- *)
   (*  the payload-less handle, with its bytes in window form            *)
@@ -513,8 +513,7 @@ End WriteHeadDefs.
 (*  actually starts on.                                                   *)
 (* ===================================================================== *)
 Section WriteHeadBlocks.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   (* ================================================================== *)
   (*  +0x46 .. +0x5c : bwrite, the logged-view move, brelse, epilogue.   *)
@@ -1321,8 +1320,7 @@ End WriteHeadBlocks.
 (* ===================================================================== *)
 
 Section ProofWriteHead.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_write_head_sconf 

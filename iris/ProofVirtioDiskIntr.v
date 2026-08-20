@@ -54,6 +54,7 @@ Require Import CodeVirtioDiskIntr.
 Require Import SpecVirtioDiskIntr.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -93,8 +94,7 @@ Lemma vt_ldval (w : mword (8*4)) :
 Proof. exact (data2_ext_4 w). Qed.
 
 Section VtLeaves.
-  Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{!uartGhostG Σ, !diskGhostG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation ra_idx := (mword_of_int 1 : mword 5).
@@ -358,7 +358,7 @@ End VtLeaves.
 (* ===================================================================== *)
 Module VtPrologue (Acquire : ACQUIRE).
 Section VtPrologue.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !diskGhostG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation ra_idx := (mword_of_int 1 : mword 5).
@@ -629,7 +629,7 @@ End VtPrologue.
 (* ===================================================================== *)
 Module VtEpilogue (Release : RELEASE).
 Section VtEpilogue.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !diskGhostG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation ra_idx := (mword_of_int 1 : mword 5).
@@ -950,7 +950,7 @@ Lemma vt_aligned_off (p : Arch.pa) (k : nat) (d : Z) :
 Proof. exact (pa_add_aligned_in_page p k d). Qed.
 
 Section VtLoopSeam.
-  Context `{!riscvGS Σ, !diskGhostG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
 
   (* [DiskInv.disk_res]'s body with the six existentials named. *)
   Definition disk_res_at (γ : disk_names) (pd pav pu : SailStdpp.Values.mword 64)
@@ -1091,8 +1091,7 @@ Proof.
 Qed.
 
 Section VtDevRam.
-  Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{!uartGhostG Σ, !diskGhostG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* the used-ring INDEX read: [lhu a5,2(a5)] at +0x36 and [lhu a4,2(a4)]
@@ -1929,7 +1928,7 @@ Proof.
 Qed.
 
 Section VtSurgery.
-  Context `{!riscvGS Σ, !diskGhostG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
 
   (* the two avail-ring bytes come back OUT of the reclaimed pin: the pin
      pins them ([slot_pin_ok]'s [spo_ring]), so they are a sub-map of it and
@@ -1967,7 +1966,7 @@ End VtSurgery.
 (* ===================================================================== *)
 
 Section VtBody.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !uartGhostG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation ra_idx := (mword_of_int 1 : mword 5).
@@ -2712,7 +2711,7 @@ Definition vt_regs_ok (m MB : regfile) (sp0 : mword 64) : Prop :=
         MB !!! Regidx r = m !!! Regidx r).
 
 Section VtLoopDefs.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !uartGhostG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Definition vt_exit (γd : disk_names)
@@ -2775,7 +2774,7 @@ Qed.
 (* ===================================================================== *)
 Module VtLoopProof (Wakeup : WAKEUP).
 Section VtLoopProof.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !uartGhostG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation ra_idx := (mword_of_int 1 : mword 5).
@@ -3063,7 +3062,7 @@ Module Epi := VtEpilogue Release.
 Module Lp  := VtLoopProof Wakeup.
 
 Section ProofVirtioDiskIntr.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !uartGhostG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation ra_idx := (mword_of_int 1 : mword 5).

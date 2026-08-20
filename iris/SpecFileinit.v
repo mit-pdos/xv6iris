@@ -19,6 +19,7 @@ Require Import IntrDefs WpNext.
 Require Import WpLock.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 
 (* The address of the string literal "ftable" that fileinit passes as initlock's
@@ -34,7 +35,7 @@ Definition ftable_name_str : Z := 0x80007578%Z.
    lock then becomes an [is_lock] over the open-file table is the caller's ghost
    step, not fileinit's -- it need only add the invariant ([is_lock_intro]).
    The "ftable" literal itself is read out of [kernel_data]. *)
-Definition wp_fileinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (K : nat) (vlock : bv 32) (vname vcpu : bv 64) (b : bool) (p : mword 64) :=
+Definition wp_fileinit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (K : nat) (vlock : bv 32) (vname vcpu : bv 64) (b : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.fileinit in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   let lk : mword 64 := mword_of_int KernelSyms.ftable in
@@ -59,6 +60,6 @@ Definition wp_fileinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CI
 
 Module Type FILEINIT.
   Parameter wp_fileinit_sconf :
-    forall `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (K : nat) (vlock : bv 32) (vname vcpu : bv 64) (b : bool) (p : mword 64),
+    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (K : nat) (vlock : bv 32) (vname vcpu : bv 64) (b : bool) (p : mword 64),
       wp_fileinit_sconf_body m K vlock vname vcpu b p.
 End FILEINIT.

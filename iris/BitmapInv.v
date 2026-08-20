@@ -91,6 +91,7 @@ Require Import Riscv.rv64d_types.
 (* intermediate files use [Require Import], so nothing downstream inherits *)
 (* it.  See FastSetSolver.v.                                              *)
 Require Export FastSetSolver.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 Local Open Scope Z_scope.
 
@@ -176,7 +177,7 @@ Qed.
 (* ===================================================================== *)
 
 Section BitmapRes.
-  Context `{!riscvGS Σ, !diskGhostG Σ, !fsLogG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
 
   (* the bitmap block's content, as the IMAGE of the pure set [used] *)
   Definition bitmap_bytes (used : gset Z) : list (bv 8) := bm_bytes BSIZE used.
@@ -403,7 +404,7 @@ Record bm_alloc := MkBmAlloc {
 }.
 
 Section BitmapAllocRes.
-  Context `{!riscvGS Σ, !diskGhostG Σ, !fsLogG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ}.
 
   Definition bm_alloc_res (γfs : fs_names) (cov : gset Z) (logstart : Z)
       (a : bm_alloc) : iProp Σ :=

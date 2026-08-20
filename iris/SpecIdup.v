@@ -138,7 +138,7 @@
    precedent): the mover's up-count carries the ledger's [icnt] half, whose
    other half lives in [InodeRegion.ireg_slot], so this contract takes
    [ireg_inv γi γfs inodestart nib] and the [inodestart] binder that goes
-   with it -- and, because [ireg_inv]'s own type has [LogInv.logG] as a real
+   with it -- and, because [ireg_inv]'s own type has [Xv6Cameras.logG] as a real
    instance argument (its [ireg_ep] carries a [log_epoch_lb], §G.13/§G.17),
    the Context gains [!logG Σ].  The handle is PERSISTENT, so it costs a
    caller a frame and nothing else, and the region open is GHOST-ONLY: idup
@@ -181,14 +181,13 @@ Require Import IcacheEscrow.
 From Kernel Require KernelSyms.
 Require Import LogInv.  (* [logG]: the region's zero-receipt, fs-log.md G.17 *)
 Local Open Scope Z_scope.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 (* idup's own frame is 4 slots (addi sp,sp,-32); acquire/release want 10
    below that -- filedup's [K] budget exactly, and for the same frame. *)
 Notation K_idup := (14%nat) (only parsing).
 Definition wp_idup_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !logG Σ, !irefslotG Σ,
-      !diskGhostG Σ, !fsLogG Σ, !iregG Σ}
-    `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)
     (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
     (k : nat) (dev : mword 32)
@@ -270,9 +269,7 @@ Definition wp_idup_sconf_body
 
 Module Type IDUP.
   Parameter wp_idup_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !logG Σ, !irefslotG Σ,
-             !diskGhostG Σ, !fsLogG Σ, !iregG Σ}
-      `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
       (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
       (k : nat) (dev : mword 32)

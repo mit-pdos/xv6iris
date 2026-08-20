@@ -91,6 +91,7 @@ Require Import LogDefs.
 Require Import WpLock SleepLock.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Export Xv6Cameras.  (* the cameras this file states its theory over *)
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -187,6 +188,16 @@ Qed.
 (*  3.  THE REFERENCE-COUNT ALGEBRA                                       *)
 (* ===================================================================== *)
 
+(* EVERY RA NAMED IN THIS SECTION -- [icacheUR], [iliveUR], [ityR],
+   [frz]/[frzR]/[frzUR], [ctyR]/[ctyUR], [linkElemUR0/1]/[linkElemUR],
+   [linkUR], [icntUR], [frzoUR], [frzmUR], [ic_dep] -- AND THE CLASS
+   [icacheG] ITSELF ARE DEFINED IN Xv6Cameras.v, which this file
+   re-exports.  Only the TYPES moved: the constructors ([lelem*],
+   [lreg*]), the boot literals and every lemma stated over them are
+   still here, beside the design commentary that justifies them.
+   Xv6Cameras.v carries a one-paragraph digest of each; the full
+   argument is the prose below. *)
+
 (* RustBelt's Arc algebra, exactly as [FileInv.frefUR] uses it for
    [struct file]: [M !! k = Some (q, n)] means "itable slot [k] is live,
    with [n] outstanding references holding [q] of its identity fields
@@ -199,7 +210,6 @@ Qed.
    WHOLE outstanding share -- there is no other reference in the system.
    That is [IcacheInv.iref_lookup], and it is the algebraic half of the
    theorem xv6's comment above iput asserts.                             *)
-Definition icacheUR : ucmra := authUR (gmapUR nat (prodR fracR positiveR)).
 
 (* ---- THE LIVENESS POOL (design §14.6) --------------------------------
 
@@ -237,8 +247,6 @@ Definition icacheUR : ucmra := authUR (gmapUR nat (prodR fracR positiveR)).
    every Spec stated over them are TEXTUALLY UNCHANGED.  Two slices of one
    slot AGREE on the generation ([live_gen_agree]) -- which is the mechanism
    the whole §17' design runs on. *)
-Definition iliveUR : ucmra :=
-  gmapUR nat (prodR fracR (agreeR (leibnizO gname))).
 
 (* ---- THE PER-GENERATION TYPE ONE-SHOT (design §17.2 piece 2) ----------
 
@@ -261,7 +269,6 @@ Definition iliveUR : ucmra :=
    The RA is [KptGhost.kptR]'s, at [bv 16] ([DinodeEnc.di_type]'s width);
    the vocabulary below is [kpt_unset]/[kpt_shoot]/[kpt_lb]/[kpt_lb_agree]
    renamed, deliberately, so the shape is the one already proven here. *)
-Definition ityR : cmra := csumR (exclR unitO) (agreeR (leibnizO (bv 16))).
 
 (* ---- THE LINK LEDGER's ALGEBRA (design/fs-icache.md §20.2) -----------
 
@@ -342,19 +349,12 @@ Definition ityR : cmra := csumR (exclR unitO) (agreeR (leibnizO (bv 16))).
    SWAPS it for [ifreeze_pre].  The mint is then a fragment-in-hand step
    ([link_freeze_step]) and double-freeze is refuted by [Excl] alone.
    The boot ledger uses the [FrzOff] form throughout. *)
-Inductive frz := FrzOff | FrzPre (rg : bool) | FrzPost (rg : bool).
-
-Global Instance frz_eq_dec : EqDecision frz.
-Proof. solve_decision. Defined.
-Global Instance frz_inhabited : Inhabited frz := populate FrzOff.
 
 (* NAMED, and that is load-bearing rather than cosmetic: with the column
    written inline as [optionUR (exclR (leibnizO frz))] the f-cell's binders
    elaborate at the raw [option (excl frz)] and [apply prod_local_update']
    can no longer unify its [prodR ?A ?B] against [ucmra_cmraR linkElemUR]
    (verified both ways on the lane).  Every f binder below is at [frzUR]. *)
-Definition frzR  : cmra  := exclR (leibnizO frz).
-Definition frzUR : ucmra := optionUR frzR.
 
 (* RULING G' (iclaim-ledger.md §6''): "this phase is the window's FIRST half"
    as a decidable boolean, so that every clause that used to be stated as the
@@ -389,15 +389,8 @@ Definition frz_reg (ph : frz) : option bool :=
    claimed TYPE.  Spelled as a NAMED atom for the f column's reason (the
    comment above [frzR]): a raw [optionUR (exclR (leibnizO (bv 16)))] inside
    the nest makes [apply prod_local_update']'s unification diverge. *)
-Definition ctyR  : cmra  := exclR (leibnizO (bv 16)).
-Definition ctyUR : ucmra := optionUR ctyR.
 
-Definition linkElemUR0 : ucmra :=
-  prodUR (prodUR (prodUR (prodUR (prodUR natUR (prodUR natUR natUR)) natUR)
-                 ctyUR) natUR)
-         (optionUR (dfrac_agreeR (leibnizO Z))).
 
-Definition linkElemUR1 : ucmra := prodUR linkElemUR0 frzUR.
 
 (* ---- THE CLAIM-FLAVOURED REFERENCE COLUMN (iclaim-ledger.md §5', RULING R)
 
@@ -421,9 +414,7 @@ Definition linkElemUR1 : ucmra := prodUR linkElemUR0 frzUR.
    its plain unit collides [1 <= r_plain] against the pin and DERIVES
    [c = None], so the fifteen non-create ilock sites pay with the unit their
    reference already carries and nothing retires. *)
-Definition linkElemUR : ucmra := prodUR linkElemUR1 natUR.
 
-Definition linkUR : ucmra := gmapUR Z (authR linkElemUR).
 
 (* the ledger element, spelled so no proof below has to nest seven
    projections by hand.  [lelem] is named ONLY inside this file (verified
@@ -501,7 +492,6 @@ Definition lreg_half (pv : Z) : dfrac_agreeR (leibnizO Z) :=
    without holding a half, and dropping the auth is what keeps the update
    requirement honest -- exactly "both halves in hand", which is what
    forces every count move to reach the region's half (§2.2). *)
-Definition icntUR : ucmra := gmapUR Z (dfrac_agreeR (leibnizO nat)).
 
 (* ---- THE FREEZE RECEIPT's RA (iclaim-ledger.md §3.14, as built) --------
 
@@ -536,7 +526,6 @@ Definition icntUR : ucmra := gmapUR Z (dfrac_agreeR (leibnizO nat)).
    verbatim: one home is [InodeRegion.ireg_slot] (inside [ireg_inv], whose
    arity is fixed by thirty-odd fs contracts) and the other is a payload
    bundle. *)
-Definition frzoUR : ucmra := gmapUR Z (exclR unitO).
 
 (* ---- THE FREEZE MIRROR's RA (iclaim-ledger.md §3.16 = RULING A⁗) -------
 
@@ -571,7 +560,6 @@ Definition frzoUR : ucmra := gmapUR Z (exclR unitO).
    hand-vs-region exclusivity and the mirror the region-vs-lock BRANCH
    SELECTOR the payload disjunction needed.  Keyed by [Z] and ambient for
    [icfg_icnt]'s reason verbatim. *)
-Definition frzmUR : ucmra := gmapUR Z (dfrac_agreeR (leibnizO bool)).
 
 (* ---- THE TWO BOOT LITERALS (iclaim-ledger.md §2.2/§2.3, increment IIIa) ---
 
@@ -686,11 +674,6 @@ Qed.
    releasesleep returned at [q], and [iref_frag] cannot be split -- two
    fragments are a count of two).  An existentially-quantified fraction in
    the arm cannot be pinned by any resource, so the descriptor carries it. *)
-Inductive ic_dep : Type :=
-  | DepNone
-  | DepRef (q : Qp) (dev inum : mword 32) (g : gname)
-  | DepShr (s : Qp) (dev inum : mword 32) (g : gname)
-  | DepFrz (q : Qp) (dev inum : mword 32).
 
 (* the descriptor's generation, where it has one.  [DepNone] is the
    sleeplock's neutral value and names no slot state at all, which is why
@@ -713,45 +696,6 @@ Definition ic_dep_gname (d : ic_dep) : option gname :=
    [icacheG], rather than as an extra [!ghost_varG Σ bool] on every section
    that mentions the escrow -- nine spec and proof files already carry
    [icacheG], and this way they need no edit at all. *)
-Class icacheG (Σ : gFunctors) := IcacheG {
-  icache_inG :: inG Σ icacheUR;
-  icache_idG :: ghost_varG Σ (bool * mword 32 * mword 32);
-  icache_liveG :: inG Σ iliveUR;
-  icache_depG :: ghost_varG Σ ic_dep;
-  icache_ityG :: inG Σ ityR;
-  (* THE LINK LEDGER (design §20.2).  It rides in [icacheG] and not in a
-     class of its own for [icache_idG]'s reason -- the region parks the
-     authority, but the fragments have to be nameable wherever a directory
-     payload is ([IcacheEscrow]) and wherever a licence is checked
-     ([SpecIget]), and every one of those files already carries
-     [icacheG]. *)
-  icache_linkG :: inG Σ linkUR;
-  (* OPTION A escrow: the redemption ticket and the per-inum name registry. *)
-  icache_tickG :: inG Σ (exclR unitO);
-  icache_regG :: ghost_mapG Σ Z (gname * gname)%type;
-  (* THE COUNT COUPLING (iclaim-ledger.md §2.2), ported from ZZProbeIcnt.
-     Beside [icache_linkG] and for its reason: one half rides in
-     [InodeRegion.ireg_slot] and the other under the itable lock, so both
-     altitudes must be able to name it and both already carry [icacheG]. *)
-  icache_cntG :: inG Σ icntUR;
-  (* THE FREEZE RECEIPT (iclaim-ledger.md §3.14 as built), beside
-     [icache_cntG] and for its reason: one home is [InodeRegion.ireg_slot]
-     and the other [IcacheEscrow]'s parked payload bundle, and both
-     altitudes already carry [icacheG]. *)
-  icache_frzoG :: inG Σ frzoUR;
-  (* THE FREEZE MIRROR (iclaim-ledger.md §3.16 / RULING A⁗), beside
-     [icache_cntG] and for its reason verbatim: one half rides in
-     [InodeRegion.ireg_slot] and the other in [IcacheEscrow.islot2]'s live
-     arm / the free pool's bundle, so both altitudes must name it. *)
-  icache_frzmG :: inG Σ frzmUR;
-}.
-Definition icacheΣ : gFunctors :=
-  #[GFunctor icacheUR; ghost_varΣ (bool * mword 32 * mword 32);
-    GFunctor iliveUR; ghost_varΣ ic_dep; GFunctor ityR; GFunctor linkUR;
-    GFunctor (exclR unitO); ghost_mapΣ Z (gname * gname)%type;
-    GFunctor icntUR; GFunctor frzoUR; GFunctor frzmUR].
-Global Instance subG_icacheΣ {Σ} : subG icacheΣ Σ -> icacheG Σ.
-Proof. solve_inG. Qed.
 
 (* ===================================================================== *)
 (*  3b. THE CACHE'S THREE GLOBAL CONSTANTS                                *)

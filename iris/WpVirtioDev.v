@@ -59,6 +59,7 @@ Require Import WpVirtio.
 Require Import DiskPtsto VirtioProto WpUart.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import WpVirtioExec.
+Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -149,8 +150,7 @@ Lemma vd_wv32_collapse (x : mword 32) :
 Proof. rewrite vd_subrange32_31_0_id. apply autocast_id. Qed.
 
 Section WpVirtioDev.
-Context `{!riscvGS Σ, !sieG Σ}.
-Context `{!uartGhostG Σ, !diskGhostG Σ}.
+Context `{!riscvGS Σ, !xv6G Σ}.
 Context `{GEN : GenId} `{CID : CpuId}.
   Context {kt : ktier}.
 (* the value of [cpus[cid].proc]: a THREAD invariant, threaded through the
