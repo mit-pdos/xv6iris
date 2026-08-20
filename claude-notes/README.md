@@ -110,12 +110,6 @@ in `durable-notes.md` for what belongs where and what gets deleted.
 
 ## `projects/` — ongoing worklists & plans (one per effort)
 
-- **[`iput-acquiresleep.md`](projects/iput-acquiresleep.md)** — DONE: how
-  `iput_acquiresleep_order_ADMITTED`, the tree's one admitted (and FALSE)
-  statement, was discharged by making `acquiresleep` NON-BLOCKING on a
-  resource argument rather than by licensing the lock order. Read it for the
-  sleeplock DEPOSIT and why a purely pure held arm can never be refuted.
-  **The tree now has no admitted statements.**
 - **[`main-cycle-port.md`](projects/main-cycle-port.md)** — the expression-resident
   monad port (design in [`design/main-cycle-port.md`](design/main-cycle-port.md)).
 - **[`user-tier-port.md`](projects/user-tier-port.md)** — the user tier's port onto
@@ -127,8 +121,6 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   shells) and the `goodmb` discipline. The one scope decision it still records
   is §P8: the specific-binary Umode tier (`sync`/`echo`/`sh`/`init`) is
   descoped from the build.
-- **[`fs-sysfile.md`](projects/fs-sysfile.md)** — the syscall-layer campaign
-  (file.c's last 2 + sysfile.c's 11). **Live and actively appended to.**
 - **[`fs-fragments-campaign.md`](projects/fs-fragments-campaign.md)** — the
   fragment campaign's ledger (design in
   [`design/fs-fragments.md`](design/fs-fragments.md)): the staged slate, what
@@ -164,13 +156,6 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   address), why that forces no aliasing, and what is left to thread it into
   the kernel-side proofs. The CONSTRUCTION side is
   [`completed/proc-pagetable.md`](completed/proc-pagetable.md).
-- **[`kexec.md`](projects/kexec.md)** — `kexec()`, the largest function in the
-  tree, where the FS, the page-table builder and `struct proc` meet: PROVEN,
-  linked, and reaching `syscall()` through `sys_exec` at dispatch index 7.
-  Read it for how a four-phase function's seams compose (every seam hands the
-  caller's exit BACK), for **the copyout story**, the most transferable thing
-  this project produced, and — before wiring any other `ProofSyscall.v` GAP
-  entry — for why the fs fabric was a NAMING problem, not a missing resource.
 - **[`main-boot.md`](projects/main-boot.md)** — `main()`, both arms proven: the
   `started` one-shot escrow, the deposit as a □-wand, the hart-generic init
   chain. **§G3 is now `userinit`'s own record** — proven AND linked, with the
@@ -179,20 +164,6 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   main can and cannot pay, and the ruling that the cache's configuration
   must NOT be pinned by threading a premise. Remaining: that boot wiring,
   and (§G2) retiring `LinkPrintkGen.v`'s `Axiom`.
-- **[`uservec.md`](projects/uservec.md)** — uservec, proven (trampoline.S is
-  100 % covered): the boundary specs, the TVM/TSR mstatus-pin extension, the
-  proof's file split, and the whole-trap-loop Löb theorem
-  (`SpecUserretClosed`), which is now built.
-- **[`console.md`](projects/console.md)** — console.c, 5/5 functions proven
-  and linked: the `cons` module's own state in `ConsoleInv.v` and why its
-  resource is deliberately unconstrained, consoleintr's block decomposition,
-  and the `console_caps` credential + the boot `newlock`s that mint it.
-  **Read the `ct_cs_top` section before writing a mid-function register
-  premise.**
-- **[`uart-driver.md`](projects/uart-driver.md)** — the interrupt-driven UART
-  driver; uart.c is 4/4 functions and the cone is axiom-clean. Read it for the
-  transmit path's shape and for the rotated-loop / nested-iLöb /
-  `uart_sent_sub` techniques.
 - **[`user-verified.md`](projects/user-verified.md)** — VERIFIED user-mode
   execution (the Umode tier): the `uv_cap` capability, the concrete-image memory
   layer, the interrupt-absorbing step engine, and the sync program's proofs.
@@ -219,6 +190,14 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   (DESCOPED from the hart-node-port build — see the ruling in
   [`user-tier-port.md`](projects/user-tier-port.md).)
 
+- **[`iclaim-ledger.md`](projects/iclaim-ledger.md)** — the iclaim ledger
+  increment's own worklist (design in [`design/fs-icache.md`](design/fs-icache.md)):
+  the escrow's await arm, the freeze mirror, and the as-built record of what
+  each increment deviated on.
+- **[`iget-licence.md`](projects/iget-licence.md)** — the iget licence
+  increment (C′-lite), LANDED at `35bc973b`, with the three non-blocking
+  things it left: row 14's shape question, `IgetLic.v`'s fold-back into
+  `InodeRegion`/`DirLinks`, and the `SpanL`/`GreyL` deletes.
 ## `completed/` — finished projects, archived for reference
 
 Kept for their durable design notes, gotchas and reusable recipes; `ls` them.
@@ -247,4 +226,17 @@ in xv6 and the installed rank table. The one thing it left behind —
 `ProofIput.iput_acquiresleep_order_ADMITTED`, a FALSE axiom that made
 everything downstream of `iput` vacuous — is GONE; how, and why no ranking
 could ever have licensed that edge, is in
-[`projects/iput-acquiresleep.md`](projects/iput-acquiresleep.md).
+[`completed/iput-acquiresleep.md`](completed/iput-acquiresleep.md).
+
+Seven arrived on 2026-08-20, when their work finished: `kexec.md` (the largest
+function in the tree, and the home of **the copyout story** — the most
+transferable thing that project produced), `fs-sysfile.md` (the syscall-layer
+campaign that took `sysfile.c` to 16/16 and retired the tree's last stub
+`Axiom`), `uservec.md` (uservec proven and the whole-trap-loop Löb theorem
+built on top of it), `console.md` and `uart-driver.md` (console.c 5/5, uart.c
+4/4, both cones axiom-clean), `kvminithart-tlb-lane.md` (the TLB lane's root,
+closed), and `iput-acquiresleep.md`. The two cleanups those files were still
+carrying were lifted into
+[`design/code-organization.md`](design/code-organization.md) first, under
+"Cleanups inherited from finished projects", so they did not go into the
+archive with them.

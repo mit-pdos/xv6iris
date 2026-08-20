@@ -6,7 +6,7 @@ all 1094 files build. `LockRank.v` / `LockSet.v` / `CpuOwn.v` are the live
 description; read those first and this file for the reasoning behind them.
 
 ONE THING WAS ADMITTED, and it is now DISCHARGED — see
-[`projects/iput-acquiresleep.md`](../projects/iput-acquiresleep.md). The
+[`completed/iput-acquiresleep.md`](iput-acquiresleep.md). The
 paragraph below is kept as the record of what it was and why no ranking could
 license it; the axiom itself is gone and `iput`'s cone is no longer vacuous.
 `ProofIput.iput_acquiresleep_order_ADMITTED`, the `iput`-holds-`itable`-across-
@@ -67,7 +67,7 @@ One thing in the tree WAS assumed rather than proved:
 `iput_acquiresleep_order_ADMITTED` in `ProofIput.v`, the one lock-order edge
 no ranking can license.  It was FALSE, not merely unproven.  IT IS NOW GONE --
 `iput` takes a NON-BLOCKING `acquiresleep` and raises no order obligation at
-all; see [`projects/iput-acquiresleep.md`](../projects/iput-acquiresleep.md).
+all; see [`completed/iput-acquiresleep.md`](iput-acquiresleep.md).
 Nothing in the development is admitted.
 
 `Print Assumptions` is the way to check: on `LinkIput.Iput.wp_iput_sconf` it
@@ -291,7 +291,7 @@ and `sleep_prepare` only ever acquires the running process's own.
 **It WAS ADMITTED**, as `iput_acquiresleep_order_ADMITTED` at the top of
 `ProofIput.v`, so the sweep could proceed; it has since been discharged by the
 non-blocking `acquiresleep`
-([`projects/iput-acquiresleep.md`](../projects/iput-acquiresleep.md)).  Four
+([`completed/iput-acquiresleep.md`](iput-acquiresleep.md)).  Four
 things about how the axiom was set up, all deliberate, and all of which paid
 off when it came time to remove it:
 
@@ -560,7 +560,7 @@ genuinely a panic and should not be provable.
 **And as of the iput/acquiresleep work it is not provable**: `sched`'s noff ≥ 2
 contract was deleted once its last client went away, so the panic branch is
 refuted rather than permitted
-([`../projects/iput-acquiresleep.md`](../projects/iput-acquiresleep.md)).
+([`../completed/iput-acquiresleep.md`](iput-acquiresleep.md)).
 
 ## The audit: xv6 never holds two spinlocks of the same NAME
 

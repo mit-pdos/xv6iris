@@ -2806,7 +2806,7 @@ come from.
 **THE LANE IS CLOSED.**  The switch leaf (`WpSconfCsr.wp_csrw_satp_s_sconf`),
 the KPT-arm sfence (`WpSconfSfence.wp_sfence_vma_kpt_s_sconf`) and
 ProofKvminithart itself all landed; the state and the design decisions are in
-[`kvminithart-tlb-lane.md`](kvminithart-tlb-lane.md) §4c.  The one shape rule
+[`kvminithart-tlb-lane.md`](../completed/kvminithart-tlb-lane.md) §4c.  The one shape rule
 worth carrying to any other slot-moving leaf: **a leaf cannot hand the
 translation slot out and still be a leaf** — `sie_cap` holds `strans_inv`
 folded and `sconf_step_obl` demands it back inside the step, so an
@@ -2820,7 +2820,7 @@ swp's post).
 no longer owns the tlb cell, the pt tier's engine/leaf boundary is folded
 again, and `ProofMain` / `ProofMainSecondary` are green (8 red roots → 6).
 The state, the deletion inventory and the traps are in
-[`kvminithart-tlb-lane.md`](kvminithart-tlb-lane.md); what follows is the
+[`kvminithart-tlb-lane.md`](../completed/kvminithart-tlb-lane.md); what follows is the
 DESIGN and is unchanged.**
 
 **READ THIS BEFORE TOUCHING ANYTHING ABOUT THE `tlb` CELL.**  Three sessions

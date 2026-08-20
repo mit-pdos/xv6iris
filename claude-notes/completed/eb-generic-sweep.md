@@ -214,7 +214,7 @@ Then `usertrap` itself: its contract is the assumed-but-stated
 `SpecUsertrap.v` boundary layer, the decode layer is `CodeUsertrap.v` (90
 instructions), and `SpecSyscall.v` / `LinkSyscall.v` state syscall's
 contract as ASSUMED with one abstract `syscall_env γf pj`. See
-[`uservec.md`](../projects/uservec.md).
+[`uservec.md`](uservec.md).
 
 `prepare_return` is already index-generic (`WpIntrOff.v`), so usertrap's
 other blocker is gone.

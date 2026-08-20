@@ -108,7 +108,7 @@ they are why the whole route was worth taking rather than carrying a gate:
 
 * the bound is now a FACT OF THE CODE, so no premise has to thread it up to
   `wp_create_sconf_body` -- which is what the "no name for dp" objection made
-  impossible (`projects/fs-sysfile.md`, D₀-b's stop).  The declined C5
+  impossible (`completed/fs-sysfile.md`, D₀-b's stop).  The declined C5
   carrier (directory `nlink <= 1 + allocated count`, a COUNTING argument) is
   retired.
   **AMENDED (2026-08-14, the twelfth stop): "and no region invariant has to
@@ -125,7 +125,7 @@ they are why the whole route was worth taking rather than carrying a gate:
   the proof obligation stated".  Witness and the closing statement:
   `ProofCreateParts.cr_nlink_guard_leaves_the_wrap` /
   `cr_nlink_guard_closes_under_L4`; the priced four-file resolution is in
-  `projects/fs-sysfile.md`'s twelfth-stop entry.
+  `completed/fs-sysfile.md`'s twelfth-stop entry.
 * **the guard is still a real two-way branch**: it refuses at 32767 and does
   not rule the value out, so create's walk pays a case split (and its taken
   arm) whether or not any invariant is ever added.
@@ -154,7 +154,7 @@ What survives is a MODELING obligation, not a defect: the proof's ledger
 must be able to SAY this — the freeing-iput's iupdate is absorbed because
 "cached inode with nlink = 0" implies its inode block is in the group's
 logged set.  Recorded as the re-model direction in
-projects/fs-sysfile.md ("BLOCKER A, resolved").
+completed/fs-sysfile.md ("BLOCKER A, resolved").
 
 ## RULED REAL (user, 2026-08-15: "it looks like a real bug") — `sys_link`
 ## can append a link to an ORPHANED directory, and the link is then leaked

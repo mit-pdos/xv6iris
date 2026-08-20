@@ -724,7 +724,7 @@ QUESTION, NOT A PROOF TASK.** `SpecIlock.v`'s header records `ip->type == 0` as
 the tree's one live panic arm *because* "a caller premise 'this inum is
 allocated' would be undischargeable today" — so a bump converting it to
 `unreachable()` does not ask for a proof repair, it asks for the whole
-`projects/fs-sysfile.md` §20 ledger, which §20 itself calls "unproven, not
+`completed/fs-sysfile.md` §20 ledger, which §20 itself calls "unproven, not
 false". The cheap resolution is upstream: keep that one site as `panic()` until
 the ledger lands, and re-assert it then. Read the spec's own header before
 pricing the repair — if the spec says the arm is live BY DESIGN, the bump is

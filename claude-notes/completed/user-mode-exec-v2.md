@@ -262,5 +262,5 @@ execution work and has no owner in this project.
 2. (E-uservec) Prove uservec's spec to discharge the ASSUMED `stvec_handler_wp`
    — the role-swapped mirror of the userret path: trapframe STORE leaves over
    `wp_instr_u_pt`, the pt2 switch window, kernel-phase handoff.  NOW OWNED by
-   [`../projects/uservec.md`](../projects/uservec.md) (boundary specs landed;
+   [`../completed/uservec.md`](uservec.md) (boundary specs landed;
    proof in flight).

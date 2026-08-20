@@ -420,7 +420,7 @@ consumed lemmas as `Module Type` Parameters over `_body` Definitions in a
 `Spec<Phase><Phase>.v`, have the producing phase's functor ascribe to it, and
 have the consuming phase take the producer as an ABSTRACT functor argument of
 that type instead of applying the producer's functor itself — see
-`claude-notes/projects/kexec.md`'s entry on it for the two rules' dividing
+`claude-notes/completed/kexec.md`'s entry on it for the two rules' dividing
 line and why moving the whole vocabulary SECTION (not just its headline
 `Definition`) turned out to matter.
 

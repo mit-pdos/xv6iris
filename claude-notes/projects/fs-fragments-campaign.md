@@ -807,7 +807,7 @@ ABOVE the zeroing `writei`, so no exit arm holds an `ilink` at all.  The same
 is true of `dir_link_at_zeroed` and of the `dir_dots_ix` /
 `fdir_dots_index` / `dir_links_dotdot_out` trio: all three are spent inside
 the walk's W4/W5 blocks and nowhere else.  The full record is in
-[`fs-sysfile.md`](fs-sysfile.md), "S7-unlink"; what belongs here is what it
+[`fs-sysfile.md`](../completed/fs-sysfile.md), "S7-unlink"; what belongs here is what it
 asks of the campaign.
 
 ### What fitted, verbatim
@@ -857,7 +857,7 @@ back at `iunlockput(ip)`; `dir_link_at`'s only remaining route is the grey
 disjunct, whose HOME condition is `di_nlink ip = 0`, i.e. that an EMPTY
 directory's link count is 1.  The ledger states `w <= nlink` ((L1)) and
 nothing states the converse, so the fact has no carrier.  Full record:
-[`fs-sysfile.md`](fs-sysfile.md), S7-unlink FINDING 3.  It bears on the
+[`fs-sysfile.md`](../completed/fs-sysfile.md), S7-unlink FINDING 3.  It bears on the
 campaign only as a warning about what a payload conjunct can and cannot
 carry: **`dir_dots_ix` and `dir_orphan_clean` partition the directory case by
 the COUNT, so neither of them can ever say anything about the count itself.**

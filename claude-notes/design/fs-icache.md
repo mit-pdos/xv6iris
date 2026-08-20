@@ -1587,7 +1587,7 @@ panics are the precedent.
 > the same.
 >
 > **ROUTE B IS RETIRED — all three lemmas are DELETED**, see
-> [`../projects/iput-acquiresleep.md`](../projects/iput-acquiresleep.md).
+> [`../completed/iput-acquiresleep.md`](../completed/iput-acquiresleep.md).
 > "We do not prove REF-1 makes it unreachable, we permit it" became "we prove
 > it": iput presents an authoritative zero for the inode slot's
 > may-hold-the-sleeplock share, which `wp_acquiresleep_nb_sconf` turns into a
@@ -4281,7 +4281,7 @@ proof already splits on (`tot = 0` / `tot = 1` / `tot ≥ 2`,
 > constructor from `ilink`) and `dir_links_dirlink_nop` (the `tot = 0`
 > ride).  `1 ≤ tot ≤ 15` has no route; the repair is a `tot = 0 ∨ tot = 16`
 > strengthening of `SpecDirlink` resting on writei CHUNK ATOMICITY.  See
-> projects/fs-sysfile.md's S5i entry.
+> completed/fs-sysfile.md's S5i entry.
 
 ### 20.4 `SpecIget`'s PREMISE: the licence, and the six sources
 

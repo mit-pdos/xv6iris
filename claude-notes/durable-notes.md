@@ -1342,7 +1342,7 @@ BEFORE building on top of it.
 The register version above is about a pure premise.  The resource version is
 worse, because the two claims are spelled in different vocabularies and look
 unrelated on the page.  It cost a session at the uservec boundary
-(`claude-notes/projects/uservec.md`): `wp_uservec_pt` took the kernel-side
+(`claude-notes/completed/uservec.md`): `wp_uservec_pt` took the kernel-side
 residue `usertrap_res pt vksp` BESIDE the user-mode frame
 `user_trap_frame C pt Rut`, and those two share **the entire user address
 space** — four separate overlaps, none of them syntactically visible:

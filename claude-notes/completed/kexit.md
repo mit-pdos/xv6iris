@@ -57,7 +57,7 @@ What compiles today:
   bridges for the base-encoded stores kexit is the first to use.
 
 **kwait is a different matter, and its worklist is elsewhere:**
-[`proc-struct-resources.md`](proc-struct-resources.md) item **S10**.  Six of
+[`proc-struct-resources.md`](../projects/proc-struct-resources.md) item **S10**.  Six of
 `ProofKwait.v`'s seven blocks are green; `kw_round` (the outer `iLöb`), the
 prologue and `wp_kwait_sconf` are not, so there is no `LinkKwait.v` either —
 and that one is blocked on nothing external, all seven of kwait's callees

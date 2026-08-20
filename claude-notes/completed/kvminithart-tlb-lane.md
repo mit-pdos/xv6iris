@@ -31,7 +31,7 @@ Supervisor), and branch 3's two window engines were written before it, so
 they passed `Rl` into the new slot.  Fixed at both call sites with
 `Supervisor` (`c08bfc54`); no exported statement on either side moved.
 
-Read [`main-cycle-port.md`](main-cycle-port.md) — "THE KVMINITHART LANE: THE
+Read [`main-cycle-port.md`](../projects/main-cycle-port.md) — "THE KVMINITHART LANE: THE
 SETTLED ANSWER" and "THE FIFTEEN DATA-LEAF SITES" — before this file. This
 file is the *state*; that one is the *design*.
 

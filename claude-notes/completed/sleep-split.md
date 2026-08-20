@@ -94,7 +94,7 @@ At every real call site `eb = true`, so `trap_csrs_ext true = emp` and
 ### THE ONE THING THE SPLIT COSTS: Route B is no longer a divergence
 
 > **SUPERSEDED — Route B and `wp_sleep_nested` are DELETED**
-> ([`../projects/iput-acquiresleep.md`](../projects/iput-acquiresleep.md)).
+> ([`../completed/iput-acquiresleep.md`](iput-acquiresleep.md)).
 > iput's nested `acquiresleep` is now proved not to block, so nothing enters
 > `sleep` holding a spinlock, and the lemma below went with the
 > `SpecSched.wp_sched_locks` it stood on. The cost this section describes was
@@ -285,7 +285,7 @@ that file is DELETED. Its statement omitted the lock's storage —
 `SpecProcinit.lk_fresh`, which `WpLock.newlock` needs — so it was never
 provable as written, independently of the missing C; and it had no consumer.
 D2 itself was fixed upstream by `b7c25cf`/`d80e61c5`, and `uartwrite` is now
-proven. See `projects/uart-driver.md`.)* Deliberately a different file from `LinkUartwrite.v`, because the
+proven. See `completed/uart-driver.md`.)* Deliberately a different file from `LinkUartwrite.v`, because the
 two are different kinds of debt (a proof that is not written vs. a line of C
 that is not there) and they retire independently; keeping them apart stops
 either from hiding the other.

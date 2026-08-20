@@ -59,7 +59,7 @@ else (`ut_dup_hw` pulls `hw_config` + `minstret_inv` out of the ambient
 The trampoline dovetail — §"What is OWED to the trampoline halves". Composing
 uservec → usertrap → userret into the whole-trap-loop Löb theorem that
 discharges `UserExec.stvec_handler_wp` owes three conversions, all
-trampoline-side; `projects/uservec.md` is where that work lives.
+trampoline-side; `completed/uservec.md` is where that work lives.
 
 ## SIX FINDINGS FROM WRITING THE WALK
 

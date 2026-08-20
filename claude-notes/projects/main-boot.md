@@ -317,7 +317,7 @@ record a two-sided design problem: printk's general path needs transmit rights
 a SECONDARY hart can also pay, so `pr_res` held the transmitter
 (`∃ l, uart_tx_own γd l ∗ uart_sent γd l`) — while uartwrite's proof kept the
 same exclusive token in `tx_lock`'s invariant
-([`uart-driver.md`](uart-driver.md)). The two homes could not both link into
+([`uart-driver.md`](../completed/uart-driver.md)). The two homes could not both link into
 one system, and that clash is exactly what made `LinkTxLockInit.tx_lock_init`
 an axiom (that file is now deleted; see below). **xv6 `d80e61c5` settled it in the kernel**: `panicking`/`panicked`
 are deleted, printk always takes `pr.lock`, and uartputc_sync always takes
@@ -325,7 +325,7 @@ are deleted, printk always takes `pr.lock`, and uartputc_sync always takes
 `pr.lock` guards no C data and no ghost resource, and `pr_res` collapses to
 `emp` (chosen over `True` because it is the unit of `∗`: `newlock`'s resource
 argument is discharged by nothing at all). Same lesson as the copyout story in
-[`kexec.md`](kexec.md) — when a spec needs scaffolding to model a gap between
+[`kexec.md`](../completed/kexec.md) — when a spec needs scaffolding to model a gap between
 what the code does and what every caller wants, suspect the code.
 
 Two consequences for main's proof, both live:

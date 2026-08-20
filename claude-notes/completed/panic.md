@@ -18,7 +18,7 @@ per-site detail.
 **THE ONE PLACE THIS FILE IS STILL WANTED.** `forkret`'s `if (first)` arm is
 excluded by a premise rather than proven (`first_addr ↦₄{DfracDiscarded} 0`),
 and that arm contains `panic("exec")`. Whoever closes it — the open item at the
-foot of [`../projects/uservec.md`](../projects/uservec.md) — needs "THE RECIPE
+foot of [`../completed/uservec.md`](uservec.md) — needs "THE RECIPE
 FOR A PANIC ARM" below and the address-derivation rule beside it.
 
 ## The contract

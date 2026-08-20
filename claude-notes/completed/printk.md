@@ -811,6 +811,6 @@ retiring the `Axiom` is now a re-statement sweep, not a proof:
 
 The PANIC project's leftover is a different sweep with a similar shape —
 retiring `PanicStub.v`'s placeholder credential across 169 files, whose real
-cost is in `acquire` ([`projects/panic.md`](../projects/panic.md)). Neither
+cost is in `acquire` ([`projects/panic.md`](panic.md)). Neither
 subsumes the other: one is about which contract printk's ~15 assumed-callee
 consumers see, the other about which contract every panic arm sees.

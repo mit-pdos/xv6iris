@@ -528,7 +528,7 @@ Two consequences for `fileread`'s contract:
   anyway for piperead's and consoleread's `int` contracts. What is left is
   mechanical: restate `SpecFileread`'s premise as `0 <= n < 2^31` and
   re-thread the three uses in `ProofFileread.v` (one is readi's, two are
-  `fr_n_range`). See projects/fs-sysfile.md, "THE SYS_READ NUMERIC PREMISE".
+  `fr_n_range`). See completed/fs-sysfile.md, "THE SYS_READ NUMERIC PREMISE".
 
   The OTHER half of the S4 debt is untouched by this: **`0 <= n` is owed by
   sys_read AND sys_write**, because `SpecReadi`/`SpecWritei` type `n` as a

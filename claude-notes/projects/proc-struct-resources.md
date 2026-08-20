@@ -1151,7 +1151,7 @@ the evidence for every offset. This file is only the worklist.
 
       **THE SAME PARK IS A THEOREM in its PAID form** --
       `SpecForkretParkPaid.v` / `ProofForkretPark.v` over forkret's own
-      contract (projects/uservec.md has the correspondence table and the
+      contract (completed/uservec.md has the correspondence table and the
       inventory).  What kfork cannot supply is that form's extra
       precondition `forkret_park_pkg`, and **the residual gap is now exactly
       ONE resource**: the child's free kernel stack is available (K3a) and
@@ -1367,7 +1367,7 @@ the evidence for every offset. This file is only the worklist.
         its body is ordinary provable code, and axiomatising all of it to
         avoid one step would throw the proof away.  So the step is isolated
         as its own `Module Type` + `Axiom`, and `ProofKfork.v` is a functor
-        over it.  **Proving `forkret`/`usertrapret` (projects/uservec.md)
+        over it.  **Proving `forkret`/`usertrapret` (completed/uservec.md)
         retires this file and nothing else.**  USED→RUNNABLE is a
         guard-class crossing, so `proc_slots_recast` cannot help — that is
         exactly why the assumption is needed rather than merely convenient.
@@ -1480,7 +1480,7 @@ the evidence for every offset. This file is only the worklist.
 
 The park itself is no longer one of them — `SpecForkretParkPaid.v` /
 `ProofForkretPark.v` prove it over forkret's own contract
-([`uservec.md`](uservec.md) has the correspondence table). What is left is
+([`uservec.md`](../completed/uservec.md) has the correspondence table). What is left is
 kfork's side, and it is these four, checked against the tree rather than
 guessed. **Obstacle 2 is now SOLVED (sp-migration K3a) and obstacle 3 is the
 one that stops the retirement**: one of its three pieces, `fileclose_bm`, is

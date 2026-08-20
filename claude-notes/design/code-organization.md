@@ -192,6 +192,24 @@ Two invariants of `tools/gen_code.py` and its `tools/code_manifest.json`:
   `Code*Aux.v` files are hand-written and are legitimately in the sweep's
   scope.
 
+## Cleanups inherited from finished projects
+
+Two residuals outlived the projects that recorded them, and would have been
+archived with those files (nobody reads `completed/` for current guidance).
+Both are one-file edits; do them when the file is open for another reason.
+
+- **`W32Arith.v` is the home for the 32-bit ALU laws, and three files still
+  carry private copies** — `ProofFilewriteParts.v` (`fw_subw_moi`,
+  `fw_addw_moi`, `fw_sextw_moi`, `fw_bge_moi`), `ProofFilewrite.v` and
+  `ProofFilereadParts.v` (`fr_sext_moi32`). Retire them into `W32Arith.v`.
+  (From `completed/console.md`, which is where the shared home came from.)
+- **`SpecReadi.v`'s parenthetical about `SpecWritei.v` is STALE and says so
+  about the wrong file**: *"[SpecWritei.v] still has the same shape"* is no
+  longer true. A stale comment is how the next reader gets misled — that is
+  this tree's own rule — so delete the sentence next time `SpecReadi.v` is
+  open. (From `completed/fs-sysfile.md`, stage S3p, which deliberately did
+  not fix it in-flight.)
+
 ## Specific-vs-generic leaf lemmas
 
 - The generic gpr-write **engine** (`wp_gpr_write_s_config*`, in `WpSmodeLeafBase.v`) takes an arbitrary `instr` + an `exec (execute i)` obligation. It is *internal plumbing* — call it only from within family-file specific lemmas, never from a higher-level function proof.

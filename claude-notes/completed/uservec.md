@@ -876,9 +876,9 @@ kfork/sys_fork side:
   a process holds while parked in USER mode too, not only in a record.  The
   fix is to move `bitmap_res` behind the log lock, out of the per-process
   residue.  Accounting and cascade:
-  [`sp-migration.md`](sp-migration.md) §"K4 findings"; the layering wall
+  [`sp-migration.md`](../projects/sp-migration.md) §"K4 findings"; the layering wall
   that decides how the package reaches kfork is in
-  [`proc-struct-resources.md`](proc-struct-resources.md).
+  [`proc-struct-resources.md`](../projects/proc-struct-resources.md).
 - the persistent world (`kernel_text`, `wire_inv`, the trampoline `kmap_at`,
   `procs_inv`, `pslot_used_at`) -- free for any caller, but NAMED, because a
   closure captures what it uses.
