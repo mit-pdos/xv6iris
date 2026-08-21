@@ -213,12 +213,60 @@ disposition:
    ITS blockers recurse into cases 1/2.  No new kill class arises:
    case 3's stuck forms reduce to case 2's.
 
-TERMINATION is the open design item: descents of non-witness readers
-(case 3) do not reduce the violation count by themselves, so the
-measure must be lexicographic (violations, then the minimal violating
-write's position, then the descending entourage's displacement) or an
-inversion count against a canonical target — B2d's core question,
-probably worth a small worked example/probe before the spec.
+TERMINATION — RESOLVED (2026-08-21, the B2d design session; this
+SUPERSEDES the entourage/recursion framing above, which came from
+mis-reading the moves as relocating the blockers — the kit's swaps
+move ONLY the descending event past a stationary `z`):
+
+**THE PO-MINIMAL-WITNESS DISCIPLINE.**  Attack `w` = the gmo-MINIMAL
+violating write, `e*` = the PO-MINIMAL witness of `w` (all witnesses
+are same-hart as `w`, so po-minimal is well-defined).  Then:
+- every `¬gppo z e*` and `¬gpo z e*` side condition along the descent
+  is VACUOUS: such a `z` is same-hart, po-before `e*`, hence po-before
+  `w`, hence itself a witness in the interval — contradicting
+  po-minimality;
+- a SAME-HART rf-source of a read `e*` cannot sit in the interval
+  (it would be an earlier write-witness) — only CROSS-HART sources
+  block;
+- the FINAL swap `(w, e*)`: `e*` cannot read `w` (poloc would
+  contradict the violation), byte-disjointness for the write case is
+  DERIVABLE (a shared byte gives poloc `e* → w`, contradicting the
+  violation), and `(w, e*) ∉ gd_deps` is FREE from `gdeps_wf`
+  (source must be po-before target; `e* po< w`).
+So the descent needs NO entourage and NO recursion: each swap is
+B2a/B2c/B2b with vacuous-or-derivable side conditions, EXCEPT exactly
+three residual configurations (K3 found while finalizing the B2d
+spec):
+- **K1** (`e*` a read): its cross-hart source sits gmo-in `(w, e*)` —
+  S6's reader-of-the-early-write shape, entered from the witness side;
+- **K2** (`e*` a write): some interval event reads a byte of `e*` at
+  an index `< gwix e*` — the MP-STALE-READER shape.  Verified
+  genuinely un-normalizable when live: the mixed read (stale byte of
+  `e*`, and transitively a fresh read of `w`) cannot exist in ANY
+  rule-14 graph with the same rows (graph co-maximality refuses it),
+  so it MUST be killed, and its kill is the same inventory routed
+  through the STALE byte (the writer-fence case kills the violation
+  itself by rule 4; the φ/lock cases kill the stale read at the
+  realized prefix);
+- **K3** (`e*` a write): a CROSS-HART SAME-BYTE WRITE sits gmo-in the
+  interval — the kit's excluded (W,W) case, and correctly: pre-swap
+  consistency forces every same-byte reader above the pair to read
+  `e*` (the co-max), and the swap would make `z` the max, breaking
+  them.  The configuration is a write-write RACE interleaved with an
+  early-store window; for xv6's rows same-byte cross-hart writes are
+  protocol-governed (lock words, φ-owned bytes, single-writer
+  flags) — B2e's third obligation.
+Each completed descent strictly reduces |violations| (the interior
+swaps are viol-monotone with vacuous side conditions; the final swap
+is `gswap_resolves`/`gswapw_resolves`); the measure is |V| with an
+inner induction on the descent length.  **B2d is therefore
+delegate-ready as a KILL-PARAMETERIZED theorem**: `normalize` takes
+`kill_K1`/`kill_K2` as explicit hypotheses (discharged by B2e, the
+kill package, which needs B1's realized prefix); the capstone stays
+premise-free by discharging them there.  The rows correspondence is
+a write-index permutation `π` (the composition of the adjacent
+transpositions): same image, same row lengths, labels equal modulo
+`π`-renaming of ts entries.
 
 ### 3c. What is reused, by name
 
