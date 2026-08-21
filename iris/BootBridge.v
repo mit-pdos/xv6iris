@@ -97,6 +97,7 @@ Require Import WpMmodeLeafBase.
 Require Import MbootVocab.
 Require Import SRegime SmodeCore.
 Require Import IntrDefs.
+Require Import TimerCap.   (* [timer_cap]: minted in M-mode, rides [sie_cap] *)
 Require Import ProcGeom CpuOwn SchedCtx.
 Require Import SpecMain.
 From Kernel Require KernelSyms.
@@ -350,6 +351,14 @@ Section BootBridge.
     nv = noff_val 0 ->
     (* --- persistent ambient, kept from [mmode_config] --- *)
     hw_config -∗ minstret_inv -∗
+    (* THIS HART'S TIMER CAPABILITY.  [TimerCap.timer_cap] is per-hart and is
+       minted in M-MODE, out of the [mcounteren]/[stimecmp] cells timerinit
+       wrote -- i.e. strictly before this bridge runs.  It rides [sie_cap]
+       from here on (see the note at [IntrDefs.sie_cap]), which is what lets
+       the scheduler deliver the RIGHT hart's capability to a kernel thread
+       it resumes on a new hart.  Persistent, so the boot chain keeps its
+       own copy after handing it in. *)
+    timer_cap -∗
     (* --- entry's post-state cells --- *)
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ Supervisor -∗
@@ -412,7 +421,7 @@ Section BootBridge.
       main_hart_raw tlbvec0.
   Proof.
     iIntros (Hsp Htpf Hsie Hmsf Hmenv Hmiez Hmieval Hsatpm Hpmp Htp Hn Hlo Hhi Hnv)
-            "#Hhw #Hmin Hhs Hpriv Hmst Hpcf Hpad Hfile Hsatp Hmdl Hmie Hmenv
+            "#Hhw #Hmin #Htimc Hhs Hpriv Hmst Hpcf Hpad Hfile Hsatp Hmdl Hmie Hmenv
              Hstk Hbit Hbit2 Hg2 Hg4a Hg4b Htlb Hsepc Hscause Hstval
              Hspp1 Hspp2 Hstv Hnoff Hint Hproc Hlks Hssc Hmedl Hmse Hsse Hctx".
     (* --- the SIE ghost: 1/2 tied + 1/4 for main + 1/4 = two eighths --- *)
@@ -451,7 +460,7 @@ Section BootBridge.
        instantiated at the whole carve in hand -- [kv_frame_slots + K] -- and
        the capability comes out AT THAT INDEX.  Nothing is dropped. *)
     iDestruct (sie_cap_intro_bare Mf (kv_frame_slots + K)%nat stv0 (p := p0)
-                 with "Hstk Hbit Hbare Hstv He1") as "Hcap".
+                 with "Hstk Hbit Hbare Hstv He1 Htimc") as "Hcap".
     (* --- the configuration bundle --- *)
     iEval (rewrite Hmenv) in "Hmenv".
     iAssert (ghost_var sie_gname (1/2) (_get_Mstatus_SIE msf))

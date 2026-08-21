@@ -943,7 +943,7 @@ Section WpSconfLock.
       (* THE SLOT STAYS FOLDED -- the pre-port shape.  The frame comes out of
          [WpIntrInv.sda_slot_acc] below, which is the one place the two
          translation arms are told apart. *)
-      iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hwit)".
+      iDestruct "Hcap" as "(Hstk & Htr & Harm & #Htc & #Hwit)".
       iDestruct (hw_config_cert (CID := CID) with "Hhw") as "#Hcert".
       iPoseProof "Hhw" as "#Hhwc".
       iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
@@ -1166,7 +1166,7 @@ Section WpSconfLock.
                         !!! Regidx csp_rs1)
         by (symmetry; apply upd_ne; congruence).
       iSplitL "Htr Hstk Harm".
-      { rewrite /sie_cap -Hsp. iFrame "Hstk Htr Harm Hwit". }
+      { rewrite /sie_cap -Hsp. iFrame "Hstk Htr Harm Htc Hwit". }
       iSplitL "Hfile".
       { iEval (rewrite (tp_pin_upd m rd
                           (regval_into_reg (amoswap_loaded bytes))

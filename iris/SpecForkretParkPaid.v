@@ -179,6 +179,14 @@ Definition forkret_park_pkg
       ⌜ud_data pt' = ud_pas pt'⌝ -∗
       ⌜proc_pt_wf pt'⌝ -∗
       FirstTok.first_done -∗
+ (* THE RESUMING HART'S TIMER CAPABILITY.  It is a conjunct of
+    [IntrDefs.sie_cap] now (see the note there), so the residue cannot
+    assemble the kernel bundle at the trap without one -- and it must be
+    THIS hart's, which is why it is supplied PER APPLICATION rather than
+    owned by the closer: a record parked before that hart ever booted
+    could not hold it.  forkret has one, out of the very capability it
+    is about to hand back. *)
+      TimerCap.timer_cap (CID := h) -∗
       forkret_yield (CID := h) γf pa (add_vec ks (mword_of_int 4096)) pid av V' -∗
       fd_slots FDSPARE -∗
       iref_slots IREFSPARE -∗

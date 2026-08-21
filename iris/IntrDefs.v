@@ -70,6 +70,7 @@ Require Import ProcGeom.   (* a_cpu_noff / a_cpu_int / a_cpu_proc: the enabled a
 Require Export LockSet.
 Require Import MstatusBits WpIntrCore.
 Require Import MstatusFacts.
+Require Import TimerCap.   (* [timer_cap]: per-hart, M-mode-initialised, so it rides sie_cap *)
 (* have_nom_val: kept QUALIFIED (no Import) so the WpGprCsrwCommon
    namespace doesn't shadow anything here. *)
 Require WpGprCsrwCommon.
@@ -2015,6 +2016,7 @@ Section IntrDefsBase.
     (stack_own (KTR := kt) (m !!! Regidx csp_rs1) (trap_res b + avail) ∗
      strans_inv ∗
      sie_arm_of R b p ∗
+     timer_cap ∗
      sr_ktier_wit strans_regime kt)%I.
 
   Definition sie_cap_gpr_of (kt : ktier) (R : CPU -d> iPropO Σ)
@@ -2603,11 +2605,28 @@ Section IntrDefs.
      above for what the index means.  Written out verbatim rather than as
      [sie_cap_of kt (ires_of (ihs kt))] so that every [rewrite /sie_cap]
      site in the tree keeps opening the shape it opens today. *)
+  (* THIS HART'S TIMER CAPABILITY RIDES HERE, and the placement is the whole
+     point.  [TimerCap.timer_cap] is [mcounteren]/[stimecmp] -- PER HART, and
+     initialised in M-MODE, before any [sie_cap] exists.  It therefore cannot
+     be transported across a step that rebinds the hart, and it cannot live
+     in a hart-free bundle either ([UsertrapRes.devintr_caps_any] is the one
+     that used to try, as [□ ∀ h], which nobody could ever build: the eight
+     caps are minted in eight separate boot chains).
+
+     [sie_cap] is the bundle a step RE-DELIVERS at whatever hart the
+     continuation lands on rather than one the walk frames across -- which is
+     exactly why [sie_arm]'s own per-hart members ([kpt_on cpu_id],
+     [cpu_claim p]) survive a migration.  So a kernel thread resumed on a new
+     hart is handed that hart's capability with the rest of its arm, and the
+     scheduler -- which already passes these across swtch in both directions,
+     and which holds its own hart's cap from that hart's boot chain -- is the
+     party that delivers it. *)
   Definition sie_cap (kt : ktier) (m : regfile) (avail : nat) (b : bool)
       (p : mword 64) : iProp Σ :=
     (stack_own (KTR := kt) (m !!! Regidx csp_rs1) (trap_res b + avail) ∗
      strans_inv ∗
      sie_arm kt b p ∗
+     timer_cap ∗
      sr_ktier_wit strans_regime kt)%I.
 
   (* THE WRITE-SIDE PREMISE of every gpr-writing leaf.  Replaces the old
@@ -2636,9 +2655,9 @@ Section IntrDefs.
     ∃ root_ppn : mword 44,
       stack_own (KTR := kt) (m !!! Regidx csp_rs1) (trap_res true + avail) ∗
       strans_kpt ∗ tlb_res_pt root_ppn ∗ sie_arm kt true p ∗
-      sr_ktier_wit strans_regime kt.
+      timer_cap ∗ sr_ktier_wit strans_regime kt.
   Proof.
-    iIntros "(Hstk & Htr & Harm & #Hwit)".
+    iIntros "(Hstk & Htr & Harm & #Htc & #Hwit)".
     iDestruct "Htr" as "[(Hbit0 & Hbare & Hbstv) | (Hbit1 & Hkpt)]".
     { (* the arm's own KPT RECEIPT against the Bare arm's pending half: the
          one-shot conflict, no cell conflict needed (the receipt landed in
@@ -2647,7 +2666,7 @@ Section IntrDefs.
       iDestruct "Harm" as "(_ & _ & Hrcpt & _)".
       iDestruct (kpt_on_pending_False with "Hrcpt Hbit0") as %[]. }
     iDestruct "Hkpt" as (root_ppn) "Htlb".
-    iExists root_ppn. iFrame "Hstk Hbit1 Htlb Harm Hwit".
+    iExists root_ppn. iFrame "Hstk Hbit1 Htlb Harm Htc Hwit".
   Qed.
 
   (* =================================================================== *)
@@ -2693,7 +2712,8 @@ Section IntrDefs.
     sie_cap kt m avail b p -∗
     sie_cap kt m avail b p ∗ sr_ktier_wit strans_regime kt.
   Proof.
-    iIntros "(Hstk & Htr & Harm & #Hwit)". iFrame "Hstk Htr Harm Hwit".
+    iIntros "(Hstk & Htr & Harm & #Htc & #Hwit)".
+    iFrame "Hstk Htr Harm Htc Hwit".
   Qed.
 
   (* THERE IS DELIBERATELY NO "CONJURE THE WITNESS AT THE DEFAULT TIER"
@@ -2768,9 +2788,9 @@ Section IntrDefs.
     sie_cap kt m avail false p -∗ kpt_on cpu_id -∗
     sie_cap kt' m avail false p.
   Proof.
-    iIntros "(Hstk & Htr & Harm & _) #Hkpt".
+    iIntros "(Hstk & Htr & Harm & #Htc & _) #Hkpt".
     iSplitL "Hstk"; [ iApply (stack_ktier_mono kt kt' with "Hstk") |].
-    iFrame "Htr Harm".
+    iFrame "Htr Harm Htc".
     iApply (strans_ktier_wit_intro with "Hkpt").
   Qed.
 
@@ -3040,13 +3060,18 @@ Section IntrDefs.
     bare_inv -∗
     stvec ↦ᵣ v -∗
     ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1) -∗
+    (* THIS HART'S TIMER CAPABILITY, minted in M-mode by timerinit and handed
+       across the bridge -- see the note at [sie_cap].  Persistent, so the
+       boot chain keeps its copy. *)
+    timer_cap -∗
     sie_cap KT0 m avail false p.
   Proof.
-    iIntros "Hstk Hbit Hb Hstv Htok".
+    iIntros "Hstk Hbit Hb Hstv Htok #Htc".
     iFrame "Hstk".
     iSplitL "Hbit Hb Hstv".
     { iApply (strans_inv_intro_bare with "Hbit Hb Hstv"). }
     iSplitL "Htok"; [ rewrite /sie_arm; iExact "Htok" |].
+    iSplitR; [ iExact "Htc" |].
     iApply (sr_ktier_wit_KT0 strans_regime).
   Qed.
 
@@ -3173,6 +3198,28 @@ Section IntrDefs.
     iSplitL "Hsie"; [iExact "Hsie" | iExact "Hgpr"].
   Qed.
 
+  (* THE TIMER CAPABILITY OFF THE BUNDLE.  It is a conjunct of [sie_cap]
+     (see the note there) and persistent, so this is a read, not a spend --
+     and it is how a proof that is holding the kernel bundle reaches
+     [SpecDevintr.devintr_caps]' one hart-indexed member without taking the
+     capability apart. *)
+  Lemma sie_cap_timer_cap {kt : ktier} m avail b p :
+    sie_cap kt m avail b p -∗ timer_cap ∗ sie_cap kt m avail b p.
+  Proof.
+    iIntros "(Hstk & Htr & Harm & #Htc & #Hwit)".
+    iSplitR; [iExact "Htc"|]. iFrame "Hstk Htr Harm Htc Hwit".
+  Qed.
+
+  Lemma sie_cap_gpr_timer_cap {kt : ktier} m avail b p :
+    sie_cap_gpr kt m avail b p -∗ timer_cap ∗ sie_cap_gpr kt m avail b p.
+  Proof.
+    iIntros "Hcg".
+    iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hsie & Hgpr)".
+    iDestruct (sie_cap_timer_cap with "Hsie") as "[#Htc Hsie]".
+    iSplitR; [iExact "Htc"|].
+    iApply (sie_cap_gpr_join with "Hhs Hsc Hsie Hgpr").
+  Qed.
+
   (* [kmap_static_claims] at the sconf / sie_cap_gpr altitudes.  It rides in
      [hw_config], which rides at the head of [sconf], which rides inside
      [sie_cap_gpr]; these two extractions are how a DRIVER-level proof reaches
@@ -3235,7 +3282,7 @@ Section IntrDefs.
     m !!! Regidx csp_rs1 = m' !!! Regidx csp_rs1 ->
     sie_cap kt m avail b p -∗ sie_cap kt m' avail b p.
   Proof.
-    iIntros (Hsp) "(Hstk & Htr & Harm & #Hwit)". iFrame "Htr Harm Hwit".
+    iIntros (Hsp) "(Hstk & Htr & Harm & #Htc & #Hwit)". iFrame "Htr Harm Htc Hwit".
     rewrite Hsp. iExact "Hstk".
   Qed.
 
@@ -3252,7 +3299,7 @@ Section IntrDefs.
     sie_cap kt m' (avail - k) b p ∗
     stack_own (KTR := kt) (m !!! Regidx csp_rs1) k.
   Proof.
-    iIntros (Hk Hsp') "(Hstk & Htr & Harm & #Hwit)". iFrame "Htr Harm Hwit".
+    iIntros (Hk Hsp') "(Hstk & Htr & Harm & #Htc & #Hwit)". iFrame "Htr Harm Htc Hwit".
     (* [trap_res b] is an OPAQUE [nat] atom here -- [lia] carries it through
        untouched, which is why the premise [k <= avail] does not move. *)
     replace (trap_res b + avail)%nat
@@ -3278,7 +3325,7 @@ Section IntrDefs.
     sie_cap kt m avail b p -∗
     sie_cap kt m' (avail + k) b p.
   Proof.
-    iIntros (Hsp) "Hframe (Hstk & Htr & Harm & #Hwit)". iFrame "Htr Harm Hwit".
+    iIntros (Hsp) "Hframe (Hstk & Htr & Harm & #Htc & #Hwit)". iFrame "Htr Harm Htc Hwit".
     replace (trap_res b + (avail + k))%nat
       with (k + (trap_res b + avail))%nat by lia.
     iApply (stack_own_app (KTR := kt)). iFrame "Hframe". rewrite -Hsp.
@@ -3293,7 +3340,7 @@ Section IntrDefs.
     sie_cap kt m avail b p -∗
     sie_cap kt m (avail + k) b p.
   Proof.
-    iIntros "Hdeep (Hstk & Htr & Harm & #Hwit)". iFrame "Htr Harm Hwit".
+    iIntros "Hdeep (Hstk & Htr & Harm & #Htc & #Hwit)". iFrame "Htr Harm Htc Hwit".
     rewrite Nat.add_assoc. iApply (stack_own_app (KTR := kt)).
     iFrame "Hstk Hdeep".
   Qed.
@@ -3307,7 +3354,7 @@ Section IntrDefs.
     stack_own (KTR := kt)
       (pa_stk (m !!! Regidx csp_rs1) (trap_res b + (avail - k))) k.
   Proof.
-    iIntros (Hk) "(Hstk & Htr & Harm & #Hwit)". iFrame "Htr Harm Hwit".
+    iIntros (Hk) "(Hstk & Htr & Harm & #Htc & #Hwit)". iFrame "Htr Harm Htc Hwit".
     replace (trap_res b + avail)%nat
       with ((trap_res b + (avail - k)) + k)%nat by lia.
     iDestruct (stack_own_app (KTR := kt) with "Hstk") as "[Htop Hdeep]".

@@ -348,13 +348,13 @@ Section ProofKerneltrapParts.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi12").
     iApply wp_next_off_intro.
-    iIntros (ms0) "%Hms0f Hhs Hsc Htr Hpc Hfile (Hstk & %Hsie0' & Harm & #Hwit)".
+    iIntros (ms0) "%Hms0f Hhs Hsc Htr Hpc Hfile (Hstk & %Hsie0' & Harm & #Htc & #Hwit)".
     assert (Hsie0 : _get_Mstatus_SIE ms0 = ('b"0" : mword 1))
       by (cbn [sie_bit] in Hsie0'; exact Hsie0').
     iDestruct (sconf_at_sret ms0 ('b"1") ('b"1") with "Hsc Hmir") as %[Hspp0 Hspie0].
     iDestruct (sconf_at_close with "Hsc") as "Hsc".
     iDestruct (sie_cap_gpr_join with "Hhs Hsc [Hstk Htr Harm] Hfile") as "Hcg".
-    { rewrite /sie_cap. iFrame "Hstk Htr Harm Hwit". }
+    { rewrite /sie_cap. iFrame "Hstk Htr Harm Htc Hwit". }
     set (A3 := <[Regidx s1_idx := regval_into_reg (sstatus_read ms0)]> A2).
     change (<[Regidx s1_idx := regval_into_reg (sstatus_read ms0)]> A2) with A3.
     assert (HA3sp : A3 !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 6)

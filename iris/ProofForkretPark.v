@@ -196,13 +196,14 @@ Proof.
              ⌜ud_data pt' = ud_pas pt'⌝ -∗
              ⌜proc_pt_wf pt'⌝ -∗
              first_done -∗
+             TimerCap.timer_cap (CID := h) -∗
              forkret_yield (CID := h) γf (proc_addr j)
                (add_vec ks (mword_of_int 4096)) pid av V' -∗
              FR.usertrap_res_bare (CID := h) pt'
                (add_vec ks (mword_of_int 4096)))%I
     with "[Hclose Hfd Hirsp]" as "Hclose".
-  { iIntros (h pt' V') "%HV %Hnorm %Hptwf Hdone Hy".
-    iApply ("Hclose" with "[%] [%] [%] Hdone Hy Hfd Hirsp");
+  { iIntros (h pt' V') "%HV %Hnorm %Hptwf Hdone #Htc Hy".
+    iApply ("Hclose" with "[%] [%] [%] Hdone Htc Hy Hfd Hirsp");
       [exact HV | exact Hnorm | exact Hptwf]. }
   iIntros (h m eb') "%Hadm %Himg Hcg Hcpu Hpc Hcells Hpay".
   iDestruct "Hpay" as (A' cret backr) "[Hrec Hpay]".

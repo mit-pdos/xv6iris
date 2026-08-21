@@ -75,6 +75,9 @@ Require Import FsCfg.    (* [fsc_printk] etc -- the ambient names the ties point
 Require Import FirstTok.     (* [first_done] -- what the park's closer is handed *)
 Require Import SyscParkEnv.  (* [sysc_park_extra] -- the park's syscall-side rows *)
 Require Import FsReady.
+Require Import SpecConsoleintr.  (* [console_caps] -- devintr's console row *)
+Require Import TicksInv.         (* [is_tickslock] -- the tick keeper's real arm *)
+Require Import DiskInv.          (* [disk_geom] / [disk_res] *)
 Require Import SpecDevintr.
 Require Import SpecPrintk.
 Require Import SpecSyscall.
@@ -261,6 +264,11 @@ Section UsertrapRes.
     mideleg ↦ᵣ mdv0 -∗
     menvcfg ↦ᵣ menvcfg0 -∗
     gpr_file m -∗
+    (* THIS HART'S TIMER CAPABILITY, which is now a conjunct of [sie_cap]
+       (see the note there): the bundle this lemma ASSEMBLES cannot conjure
+       it, so it is handed in.  The caller has it -- [ut_res] carries it
+       beside the [ut_trap] half for exactly this. *)
+    timer_cap -∗
     ut_trap pj ksp av lks -∗
       sie_cap_gpr KT1 m av false pj ∗
       cpu_own 0%nat false pj false lks ∗
@@ -273,7 +281,7 @@ Section UsertrapRes.
     subst mie_v.
     apply mword1_zero_of_ne_one in Hsie.
     apply mword1_zero_of_ne_one in Hspp.
-    iIntros "#Hhw #Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Hgpr Ht".
+    iIntros "#Hhw #Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Hgpr #Htc Ht".
     (* THE RECEIPT IS PERSISTENT, and taking it intuitionistically is what
        lets this assembly supply the capability's tier witness for real
        ([strans_ktier_wit_intro] below) instead of re-conjuring a KT0 one:
@@ -304,7 +312,7 @@ Section UsertrapRes.
       iExists menvcfg0. iFrame "Hmenv". subst menvcfg0.
       iPureIntro. split; [| split; [| split; [| split]]]; vm_compute; reflexivity. }
     rewrite /sie_cap /ut_stack Hsp.
-    iFrame "Hstk Hstr Harm".
+    iFrame "Hstk Hstr Harm Htc".
     iSplitR; [ iApply (strans_ktier_wit_intro with "Hkpt") |].
     rewrite (tp_pin_id m Htp). iExact "Hgpr".
   Qed.
@@ -482,47 +490,72 @@ Section UsertrapRes.
     log_geom_ok (un_cov N) (un_logstart N).
 
   (* ------------------------------------------------------------------- *)
-  (* THE ONE MEMBER THAT IS PER-HART, IN ITS HART-GENERIC FORM.            *)
+  (* THE DEVICE COMPLEMENT, MINUS ITS ONE PER-HART MEMBER.                 *)
   (* ------------------------------------------------------------------- *)
-  (* [SpecDevintr.devintr_caps] is genuinely hart-indexed -- [TimerCap.
-     timer_cap] holds THIS hart's mcounteren and stimecmp, and
-     [SpecClockintr.tick_keeper]'s left disjunct is [tick_hart = false],
-     which is a statement about THIS hart.  usertrap cannot carry it in that
-     form: everything on the syscall arm from the [csrsi] at +0x9e onwards
-     runs at [b = true], where every step may resume on a different hart, and
-     the environment is FRAMED across those steps rather than re-delivered by
-     a leaf.  [IntrDefs]' three transport lemmas do not help -- they work
-     because their propositions are [emp] at [true], which this one is not.
+  (* [SpecDevintr.devintr_caps] has seven members and exactly one of them is
+     hart-indexed: [TimerCap.timer_cap], which is [sstc_enabled ∗
+     stimecmp_inv] over THIS hart's [mcounteren] and [stimecmp].  (The tick
+     keeper's LEFT disjunct is hart-indexed too, but its real arm is not, and
+     the real arm is the one the boot hart brings up.)
 
-     So the bundle carries the [∀ h] form, exactly as [SpecPanic.
-     panic_env] carries panic's credentials for the same reason (a function
-     that PARKS does not return on the hart it entered on).  It is
-     persistent, hence free to hand to devintr at whatever hart the call
-     happens on ([devintr_caps_any_at]), and it is satisfiable: of
-     [devintr_caps]' nine members seven are hart-free outright, [timer_cap] is
-     available at every hart because the boot chain mints one PER HART out of
-     timerinit's own [mcounteren] / [stimecmp] cells ([BootChain], via
-     [TimerCap.timer_cap_intro]), and [tick_keeper]'s REAL arm --
-     which the boot hart brings up -- is hart-free too.  What it rules out is
-     satisfying the tick keeper with the left disjunct, and that is right: a
-     process can migrate onto hart 0. *)
+     THIS BUNDLE IS THE OTHER SIX, and it is hart-FREE by construction --
+     invariants, locks and memory points-to, no register cell.  So it needs
+     no quantifier at all: a holder can use it at whatever hart it happens to
+     be on, which is what a resource that is FRAMED across steps at [b =
+     true] must be able to do (SpecSyscall.v's note on [syscall_env] gives
+     the same argument for the same reason).
+
+     IT USED TO BE [□ ∀ h, devintr_caps (CID := h)], and that was not
+     satisfiable by anybody.  [timer_cap] is minted PER HART, in that hart's
+     own [BootChain.boot_entry_bridge], out of the [mcounteren] value
+     timerinit wrote -- so the eight caps live in eight threads and there is
+     nowhere they meet.  It cannot be done earlier either:
+     [TimerCap.timer_cap_intro]'s first premise is that [mcounteren] ALREADY
+     holds a TM-set value, and at the adequacy seam every hart is still at
+     reset.
+
+     THE FIX IS THE OTHER DIRECTION: the hart that RESUMES a parked process
+     supplies its own [timer_cap], because it has one -- it came out of that
+     hart's boot chain into [main] / [main_secondary] (both of which take it,
+     and both of which join into [scheduler]).  So the capability travels
+     with the RESUMER rather than with the record, exactly as [cpu_own] and
+     [IntrDefs.hart_csrs] already do, and [devintr_caps_any_at] is where the
+     two halves meet. *)
   Definition devintr_caps_any (γu : uart_names) (γv : disk_names)
       (γdk γtl : gname) (γs : list gname)
       (pd pav pu : mword 64) : iProp Σ :=
-    (□ ∀ h : CPU,
-        devintr_caps (CID := h) γu γv γdk γtl γs pd pav pu)%I.
+    (dev_inv γu γv ∗
+     console_caps γu ∗
+     disk_geom γv pd pav pu ∗
+     is_lock γdk d_lock "virtio_disk"%string (disk_res γv pd pav pu) ∗
+     (* the tick keeper's REAL arm, spelled: the left disjunct is
+        [⌜tick_hart = false⌝], a statement about a particular hart, and this
+        bundle is not allowed to depend on one. *)
+     is_tickslock γtl ∗
+     procs_inv γs)%I.
 
   Global Instance devintr_caps_any_persistent γu γv γdk γtl γs pd pav pu :
     Persistent (devintr_caps_any γu γv γdk γtl γs pd pav pu).
   Proof. rewrite /devintr_caps_any. apply _. Qed.
 
+  (* ...and the join, at whatever hart the caller is on: the six hart-free
+     rows plus THAT hart's timer capability. *)
   Lemma devintr_caps_any_at (h : CPU) (γu : uart_names) (γv : disk_names)
       (γdk γtl : gname) (γs : list gname) (pd pav pu : mword 64) :
     devintr_caps_any γu γv γdk γtl γs pd pav pu -∗
+    timer_cap (CID := h) -∗
     devintr_caps (CID := h) γu γv γdk γtl γs pd pav pu.
   Proof.
-    iIntros "#H". rewrite /devintr_caps_any.
-    iPoseProof (bi.forall_elim h with "H") as "H2". iExact "H2".
+    iIntros "(#Hdev & #Hcons & #Hgeom & #Hdlk & #Htick & #Hprocs) #Htc".
+    rewrite /devintr_caps.
+    iSplitR; [iExact "Hdev"|].
+    iSplitR; [iExact "Hcons"|].
+    iSplitR; [iExact "Hgeom"|].
+    iSplitR; [iExact "Hdlk"|].
+    iSplitR; [iExact "Htc"|].
+    iSplitR; [| iExact "Hprocs"].
+    (* [tick_keeper]'s real arm *)
+    iRight. iSplitR; [iExact "Htick" | iExact "Hprocs"].
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -815,6 +848,16 @@ Section UsertrapRes.
        ⌜ (K_usertrap <= av)%nat ⌝ ∗
        (* the trampoline hands over a hart that holds NO kernel lock, so the
           held set here is the literal [∅] rather than an existential *)
+       (* THIS HART'S TIMER CAPABILITY.  It rides HERE, beside the
+          hart-indexed half, and not inside [ut_caps]: it is
+          [mcounteren]/[stimecmp], minted per hart in that hart's own
+          [BootChain.boot_entry_bridge], so it is the one member of
+          [SpecDevintr.devintr_caps] a hart-free bundle cannot carry (see
+          [devintr_caps_any]).  Whoever RESUMES the process supplies it --
+          it came out of that hart's boot chain into [main] /
+          [main_secondary], both of which join into [scheduler].
+          Persistent, so every accessor hands it straight back. *)
+       timer_cap ∗
        ut_trap (un_pj N) ksp av ∅ ∗
        ut_env Rsys N V)%I.
 
@@ -828,6 +871,16 @@ Section UsertrapRes.
        ⌜ add_vec (un_ks N) (mword_of_int 4096) = ksp ⌝ ∗
        ⌜ ut_wf N ⌝ ∗
        ⌜ (K_usertrap <= av)%nat ⌝ ∗
+       (* THIS HART'S TIMER CAPABILITY.  It rides HERE, beside the
+          hart-indexed half, and not inside [ut_caps]: it is
+          [mcounteren]/[stimecmp], minted per hart in that hart's own
+          [BootChain.boot_entry_bridge], so it is the one member of
+          [SpecDevintr.devintr_caps] a hart-free bundle cannot carry (see
+          [devintr_caps_any]).  Whoever RESUMES the process supplies it --
+          it came out of that hart's boot chain into [main] /
+          [main_secondary], both of which join into [scheduler].
+          Persistent, so every accessor hands it straight back. *)
+       timer_cap ∗
        ut_trap_parked (un_pj N) ksp av ∅ ∗
        ut_env Rsys N V)%I.
 
@@ -839,9 +892,9 @@ Section UsertrapRes.
     ut_res_parked Rsys pt ksp -∗ tlb_res_pt kroot -∗ ut_res Rsys pt ksp.
   Proof.
     iIntros "H Hkres".
-    iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & Htrap & Henv)".
+    iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htc & Htrap & Henv)".
     iDestruct (ut_trap_tlb_close with "Htrap Hkres") as "Htrap".
-    iExists N, V, av. iFrame "Htrap Henv".
+    iExists N, V, av. iFrame "Htc Htrap Henv".
     iPureIntro. split; [| split; [| split]]; assumption.
   Qed.
 
@@ -851,10 +904,10 @@ Section UsertrapRes.
     ∃ kroot : mword 44, tlb_res_pt kroot ∗ ut_res_parked Rsys pt ksp.
   Proof.
     iIntros "H".
-    iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & Htrap & Henv)".
+    iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htc & Htrap & Henv)".
     iDestruct (ut_trap_tlb_open with "Htrap") as (kroot) "[Hkres Htrap]".
     iExists kroot. iFrame "Hkres".
-    iExists N, V, av. iFrame "Htrap Henv".
+    iExists N, V, av. iFrame "Htc Htrap Henv".
     iPureIntro. split; [| split; [| split]]; assumption.
   Qed.
 
@@ -870,7 +923,7 @@ Section UsertrapRes.
       (∀ ws' : list (mword 64), tf_page (ud_tfp pt) ws' -∗ ut_res_parked Rsys pt ksp).
   Proof.
     iIntros (Hgap) "H".
-    iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & Htrap & Henv)".
+    iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htc & Htrap & Henv)".
     iDestruct "Henv" as "[Hcaps Hown]".
     iDestruct (ut_own_priv with "Hown") as "(Hpv & Hsy & Hownback)".
     iDestruct (proc_priv_tf_open with "Hpv") as (ws) "[Htf Hclose]".
@@ -881,7 +934,7 @@ Section UsertrapRes.
     iDestruct ("Hclose" $! ws' with "Htf'") as "Hpv'".
     iDestruct ("Hownback" $! (upd_tf V ws') with "Hpv' Hsy") as "Hown'".
     iExists N, (upd_tf V ws'), av.
-    iFrame "Htrap Hcaps Hown'".
+    iFrame "Htc Htrap Hcaps Hown'".
     iPureIntro. split; [| split; [| split]].
     - rewrite /upd_tf. exact Hupt.
     - exact Hksp.
@@ -944,35 +997,6 @@ Section UsertrapRes.
       (N : ut_names) (V : pprivate) : iProp Σ :=
     (ut_caps N ∗ ut_own_nopt Rsys N V)%I.
 
-  (* the mcounteren pin, read out of the caps bundle and the bundle handed
-     back whole.  Stated HERE, over one hypothesis, so [ut_res_bare_sstc]
-     below never has to take [ut_caps] apart inside the residue's body. *)
-  Lemma ut_env_nopt_sstc (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
-      (N : ut_names) (V : pprivate) :
-    ut_env_nopt Rsys N V -∗ sstc_enabled ∗ ut_env_nopt Rsys N V.
-  Proof.
-    iIntros "H". rewrite /ut_env_nopt /ut_caps.
-    iDestruct "H" as "((Hpi & Hkd & Hks & #Hdev & Hrest) & Hown)".
-    iDestruct (devintr_caps_any_at CID with "Hdev")
-      as "(_ & _ & _ & _ & [#Hsstc _] & _)".
-    (* [iExact], not a frame, for the capability conjunct: the [sstc_enabled]
-       the caps bundle yields is CONVERTIBLE-not-syntactic with the goal's, so
-       every match attempt a frame makes against the bundle's own conjuncts is
-       a conversion over a big resource (optimization.md, "A SHAPE MISMATCH
-       turns every match attempt into a CONVERSION"). *)
-    iSplitR; [iExact "Hsstc"|].
-    (* AND THE BUNDLE GOES BACK CONJUNCT BY CONJUNCT, not by a frame: even
-       named, a frame walks the goal for each of the six, and the goal here is
-       [ut_caps] unfolded -- whose tail conjuncts are [is_lock]s over
-       [disk_res] / [kmem_res] and an [is_ftable].  Every match attempt
-       against one of those is a conversion over a big resource: 7.5 s, and
-       the whole file is 14 s. *)
-    iSplitR "Hown"; [| iExact "Hown"].
-    iSplitL "Hpi"; [iExact "Hpi"|].
-    iSplitL "Hkd"; [iExact "Hkd"|].
-    iSplitL "Hks"; [iExact "Hks"|].
-    iSplitR "Hrest"; [iExact "Hdev" | iExact "Hrest"].
-  Qed.
 
   Lemma ut_own_pt_close (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
       (N : ut_names) (V : pprivate) :
@@ -1028,6 +1052,16 @@ Section UsertrapRes.
        ⌜ add_vec (un_ks N) (mword_of_int 4096) = ksp ⌝ ∗
        ⌜ ut_wf N ⌝ ∗
        ⌜ (K_usertrap <= av)%nat ⌝ ∗
+       (* THIS HART'S TIMER CAPABILITY.  It rides HERE, beside the
+          hart-indexed half, and not inside [ut_caps]: it is
+          [mcounteren]/[stimecmp], minted per hart in that hart's own
+          [BootChain.boot_entry_bridge], so it is the one member of
+          [SpecDevintr.devintr_caps] a hart-free bundle cannot carry (see
+          [devintr_caps_any]).  Whoever RESUMES the process supplies it --
+          it came out of that hart's boot chain into [main] /
+          [main_secondary], both of which join into [scheduler].
+          Persistent, so every accessor hands it straight back. *)
+       timer_cap ∗
        ut_trap_parked (un_pj N) ksp av ∅ ∗
        ut_env_nopt Rsys N V)%I.
 
@@ -1052,11 +1086,14 @@ Section UsertrapRes.
        proof then reads exactly like its cheap siblings ([ut_res_tlb_close]
        and friends): [Henv] goes back whole. *)
     iIntros "H".
-    iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & Htrap & Henv)".
-    iDestruct (ut_env_nopt_sstc with "Henv") as "[#Hsstc Henv]".
+    iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htc & Htrap & Henv)".
+    (* the pin, out of the capability, WITHOUT spending it: [iDestruct] on an
+       intuitionistic hypothesis removes it, and the residue's own body wants
+       it back one line down.  The [iAssert] destructs a copy instead. *)
+    iAssert (sstc_enabled) as "#Hsstc"; [iDestruct "Htc" as "[$ _]" |].
     (* same, and here the other conjunct is the residue's whole ∃ body. *)
     iSplitR; [iExact "Hsstc"|].
-    iExists N, V, av. iFrame "Htrap Henv".
+    iExists N, V, av. iFrame "Htc Htrap Henv".
     iPureIntro. split; [| split; [| split]]; assumption.
   Qed.
 
@@ -1065,10 +1102,10 @@ Section UsertrapRes.
     ut_res_bare Rsys pt ksp -∗ proc_pt pt -∗ ut_res_parked Rsys pt ksp.
   Proof.
     iIntros "H Hpt".
-    iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & Htrap & (Hcaps & Hown))".
+    iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htc & Htrap & (Hcaps & Hown))".
     subst pt.
     iDestruct (ut_own_pt_close with "Hown Hpt") as "Hown".
-    iExists N, V, av. rewrite /ut_env. iFrame "Htrap Hcaps Hown".
+    iExists N, V, av. rewrite /ut_env. iFrame "Htc Htrap Hcaps Hown".
     iPureIntro. split; [reflexivity | split; [| split]]; assumption.
   Qed.
 
@@ -1077,11 +1114,11 @@ Section UsertrapRes.
     ut_res_parked Rsys pt ksp -∗ proc_pt pt ∗ ut_res_bare Rsys pt ksp.
   Proof.
     iIntros "H".
-    iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & Htrap & (Hcaps & Hown))".
+    iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htc & Htrap & (Hcaps & Hown))".
     subst pt.
     iDestruct (ut_own_pt_open with "Hown") as "(Hown & Hpt)".
     iFrame "Hpt".
-    iExists N, V, av. rewrite /ut_env_nopt. iFrame "Htrap Hcaps Hown".
+    iExists N, V, av. rewrite /ut_env_nopt. iFrame "Htc Htrap Hcaps Hown".
     iPureIntro. split; [reflexivity | split; [| split]]; assumption.
   Qed.
 
@@ -1096,12 +1133,12 @@ Section UsertrapRes.
     ut_res_bare Rsys pt ksp -∗ ut_res_bare Rsys (ud_norm pt) ksp.
   Proof.
     iIntros "H".
-    iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & Htrap & (Hcaps & Hown))".
+    iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htc & Htrap & (Hcaps & Hown))".
     subst pt.
     rewrite (ut_own_nopt_upt_irrel Rsys N V (ud_norm (pv_upt V))
                eq_refl eq_refl eq_refl).
     iExists N, (upd_upt V (ud_norm (pv_upt V))), av.
-    rewrite /ut_env_nopt. iFrame "Htrap Hcaps Hown".
+    rewrite /ut_env_nopt. iFrame "Htc Htrap Hcaps Hown".
     iPureIntro. split; [reflexivity | split; [| split]]; assumption.
   Qed.
 
@@ -1117,7 +1154,7 @@ Section UsertrapRes.
       (∀ ws' : list (mword 64), tf_page (ud_tfp pt) ws' -∗ ut_res_bare Rsys pt ksp).
   Proof.
     iIntros (Hgap) "H".
-    iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & Htrap & (Hcaps & Hown))".
+    iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htc & Htrap & (Hcaps & Hown))".
     iDestruct (ut_own_nopt_priv with "Hown") as "(Hpv & Hsy & Hownback)".
     iDestruct (proc_priv_nopt_tf_open with "Hpv") as (ws) "[Htf Hclose]".
     rewrite Hupt.
@@ -1127,7 +1164,7 @@ Section UsertrapRes.
     iDestruct ("Hclose" $! ws' with "Htf'") as "Hpv'".
     iDestruct ("Hownback" $! (upd_tf V ws') with "Hpv' Hsy") as "Hown'".
     iExists N, (upd_tf V ws'), av.
-    rewrite /ut_env_nopt. iFrame "Htrap Hcaps Hown'".
+    rewrite /ut_env_nopt. iFrame "Htc Htrap Hcaps Hown'".
     iPureIntro. split; [| split; [| split]].
     - rewrite /upd_tf. exact Hupt.
     - exact Hksp.
@@ -1149,13 +1186,13 @@ Section UsertrapRes.
     hart_csrs ∗ (hart_csrs -∗ ut_res_bare Rsys pt ksp).
   Proof.
     iIntros "H".
-    iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & Htrap & Henv)".
+    iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htc & Htrap & Henv)".
     iDestruct "Htrap" as "(Hstk & Harm & Hb1 & Hb2 & Hgh & Hcpu & Hclm)".
     iDestruct (cpu_own_csrs_open with "Hcpu") as "[Hcsrs Hback]".
     iFrame "Hcsrs". iIntros "Hcsrs".
     iDestruct ("Hback" with "Hcsrs") as "Hcpu".
     iExists N, V, av. rewrite /ut_trap_parked.
-    iFrame "Hstk Harm Hb1 Hb2 Hgh Hcpu Hclm Henv".
+    iFrame "Htc Hstk Harm Hb1 Hb2 Hgh Hcpu Hclm Henv".
     iPureIntro. split; [| split; [| split]]; assumption.
   Qed.
 
@@ -1175,7 +1212,7 @@ Section UsertrapRes.
          tf_page (ud_tfp pt) ws' -∗ hart_csrs -∗ ut_res_bare Rsys pt ksp).
   Proof.
     iIntros (Hgap) "H".
-    iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & Htrap & (Hcaps & Hown))".
+    iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htc & Htrap & (Hcaps & Hown))".
     (* the CSRs, out of the trap bundle's own [cpu_own] *)
     iDestruct "Htrap" as "(Hstk & Harm & Hb1 & Hb2 & Hgh & Hcpu & Hclm)".
     iDestruct (cpu_own_csrs_open with "Hcpu") as "[Hcsrs Hcback]".
@@ -1192,7 +1229,7 @@ Section UsertrapRes.
     iDestruct ("Hcback" with "Hcsrs'") as "Hcpu".
     iExists N, (upd_tf V ws'), av.
     rewrite /ut_env_nopt /ut_trap_parked.
-    iFrame "Hstk Harm Hb1 Hb2 Hgh Hcpu Hclm Hcaps Hown'".
+    iFrame "Htc Hstk Harm Hb1 Hb2 Hgh Hcpu Hclm Hcaps Hown'".
     iPureIntro. split; [| split; [| split]].
     - rewrite /upd_tf. exact Hupt.
     - exact Hksp.
@@ -1440,6 +1477,12 @@ Definition ut_park_intro_body
     (∀ (h : CpuId) (pt' : uptd) (V' : pprivate),
        ⌜pv_upt V' = pt'⌝ -∗
        FirstTok.first_done -∗
+       (* THE RESUMING HART'S TIMER CAPABILITY, supplied per application and
+          not owned by the record: it is [mcounteren]/[stimecmp] at THAT
+          hart, minted in that hart's own boot chain (see
+          [devintr_caps_any]).  The party that resumes the process has one;
+          a record parked before any of that happened could not. *)
+       timer_cap (CID := h) -∗
        ut_trap_parked (CID := h) (un_pj N)
          (add_vec (un_ks N) (mword_of_int 4096)) av ∅ -∗
        proc_priv_nopt (un_f N) (un_pj N) (un_pid N) V' -∗
@@ -1460,6 +1503,12 @@ Lemma ut_res_bare_park
   (∀ (h : CpuId) (pt' : uptd) (V' : pprivate),
      ⌜pv_upt V' = pt'⌝ -∗
      FirstTok.first_done -∗
+     (* THE RESUMING HART'S TIMER CAPABILITY, supplied per application and
+        not owned by the record: it is [mcounteren]/[stimecmp] at THAT
+        hart, minted in that hart's own boot chain (see
+        [devintr_caps_any]).  The party that resumes the process has one;
+        a record parked before any of that happened could not. *)
+     timer_cap (CID := h) -∗
      ut_trap_parked (CID := h) (un_pj N)
        (add_vec (un_ks N) (mword_of_int 4096)) av ∅ -∗
      proc_priv_nopt (un_f N) (un_pj N) (un_pid N) V' -∗
@@ -1469,7 +1518,7 @@ Lemma ut_res_bare_park
        (add_vec (un_ks N) (mword_of_int 4096))).
 Proof.
   iIntros (Hwf Hav) "#Hpark Hderive Hown".
-  iIntros (h pt' V') "%Hupt #Hdone Htrap Hpriv Hfd Hiref".
+  iIntros (h pt' V') "%Hupt #Hdone #Htc Htrap Hpriv Hfd Hiref".
   iDestruct ("Hderive" with "Hdone") as "Hsys".
   iDestruct "Hdone" as "[_ #Hrdy]".
   iDestruct (ut_caps_of_park with "Hpark Hrdy") as "#Hcaps".
@@ -1480,7 +1529,7 @@ Proof.
   iSplitR; [iPureIntro; reflexivity|].
   iSplitR; [iPureIntro; exact Hwf|].
   iSplitR; [iPureIntro; exact Hav|].
-  iFrame "Htrap".
+  iFrame "Htc Htrap".
   rewrite /ut_env_nopt /ut_own_nopt.
   iFrame "Hcaps". iFrame "Hbs Hip Hfd Hiref Hpriv Hsys".
 Qed.

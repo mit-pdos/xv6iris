@@ -1946,7 +1946,7 @@ Section IntrEngine.
   Definition sie_cap_rest (kt : ktier) (m : regfile) (av : nat) (b : bool)
       (p : mword 64) : iProp Σ :=
     (stack_own (KTR := kt) (m !!! Regidx csp_rs1) (trap_res b + av) ∗
-     sie_arm kt b p ∗ sr_ktier_wit strans_regime kt)%I.
+     sie_arm kt b p ∗ TimerCap.timer_cap ∗ sr_ktier_wit strans_regime kt)%I.
 
   (* THE RECEIPT IS THE PRICE OF THE tlb CELL, post-flip.  [strans_inv]'s
      Bare arm no longer owns one ([SRegime.bare_inv] lost it with the flip),
@@ -1967,14 +1967,14 @@ Section IntrEngine.
       pmpcfg_n ↦ᵣ pcfg ∗ pmpaddr_n ↦ᵣ paddr ∗
       strans_res_at satp0 tlbv ∗ sie_cap_rest kt m av b p.
   Proof.
-    iIntros "#Hon (Hstk & Htr & Harm & #Hwit)".
+    iIntros "#Hon (Hstk & Htr & Harm & #Htc & #Hwit)".
     iDestruct (strans_swp_open with "Hon Htr") as (satp0 tlbv pcfg paddr)
       "(%Hsok & %Hpok & Hsatp & Htlb & Hpcfg & Hpaddr & Hres)".
     iExists satp0, tlbv, pcfg, paddr.
     iSplitR; [iPureIntro; exact Hsok |].
     iSplitR; [iPureIntro; exact Hpok |].
     rewrite /sie_cap_rest.
-    iFrame "Hsatp Htlb Hpcfg Hpaddr Hres Hstk Harm Hwit".
+    iFrame "Hsatp Htlb Hpcfg Hpaddr Hres Hstk Harm Htc Hwit".
   Qed.
 
   (* WHAT A HOLDER OF THE WRITE SET KNOWS ABOUT THE ARM.  Persistent, and it
@@ -2018,7 +2018,7 @@ Section IntrEngine.
          strans_res_at satp0 tv' -∗ sie_cap_rest kt m' av' b' p -∗
          sie_cap kt m' av' b' p).
   Proof.
-    iIntros "(Hstk & Htr & Harm & #Hwit)".
+    iIntros "(Hstk & Htr & Harm & #Htc & #Hwit)".
     iDestruct "Htr" as "[(Hpend & Hb & Hstv) | (Hkpt & Hk)]".
     - (* ---- Bare: the frame gets NO cell; the slot keeps it ---- *)
       iDestruct "Hb" as (satp0) "(Hsatp & %Hmode & Hpmp)".
@@ -2035,10 +2035,10 @@ Section IntrEngine.
       iSplitL "Hpend Hstv".
       { rewrite /strans_res_at. iLeft. iFrame "Hpend Hstv".
         iPureIntro. exact Hmode. }
-      iSplitL "Hstk Harm"; [ rewrite /sie_cap_rest; iFrame "Hstk Harm Hwit" |].
+      iSplitL "Hstk Harm"; [ rewrite /sie_cap_rest; iFrame "Hstk Harm Htc Hwit" |].
       iIntros (m' av' b' tv') "Hsatp _ Hpcfg Hpaddr Hres Hrest".
       rewrite /sie_cap. iDestruct "Hrest" as "(Hstk & Harm & _)".
-      iFrame "Hstk Harm Hwit".
+      iFrame "Hstk Harm Htc Hwit".
       rewrite /strans_res_at.
       iDestruct "Hres" as "[(Hpend & Hstv & _) | (Hkpt & %Hbad & _)]".
       2:{ rewrite /bare_satp_ok in Hmode. rewrite Hbad in Hmode.
@@ -2072,11 +2072,11 @@ Section IntrEngine.
         iSplitR; [iPureIntro; exact Hmode |].
         rewrite /kpt_res_at. unfold strans_root_of. rewrite Hppn.
         iFrame "Hsnap Hkinv". }
-      iSplitL "Hstk Harm"; [ rewrite /sie_cap_rest; iFrame "Hstk Harm Hwit" |].
+      iSplitL "Hstk Harm"; [ rewrite /sie_cap_rest; iFrame "Hstk Harm Htc Hwit" |].
       iIntros (m' av' b' tv') "Hsatp Htlb Hpcfg Hpaddr Hres Hrest".
       rewrite s_tlb_at_kpt.
       rewrite /sie_cap. iDestruct "Hrest" as "(Hstk & Harm & _)".
-      iFrame "Hstk Harm Hwit".
+      iFrame "Hstk Harm Htc Hwit".
       rewrite /strans_res_at.
       iDestruct "Hres" as "[(Hpend & _ & %Hbad) | (Hkpt & _ & Hres)]".
       { rewrite /bare_satp_ok in Hbad. rewrite Hmode in Hbad.
@@ -2129,7 +2129,7 @@ Section IntrEngine.
          sie_cap kt m' av' b' p).
   Proof.
     intros HSD.
-    iIntros "#Hwitk (Hstk & Htr & Harm & #Hwit)".
+    iIntros "#Hwitk (Hstk & Htr & Harm & #Htc & #Hwit)".
     iDestruct "Htr" as "[(Hpend & Hb & Hstv) | (Hkpt & Hk)]".
     - (* ---- Bare.  [SD] must be [s_Drwb]: at [s_Drw] the witness is
            [kpt_on], which this arm's [strans_pending] refutes. ---- *)
@@ -2153,10 +2153,10 @@ Section IntrEngine.
       iSplitL "Hpend Hstv".
       { rewrite /strans_res_at. iLeft. iFrame "Hpend Hstv".
         iPureIntro. exact Hmode. }
-      iSplitL "Hstk Harm"; [ rewrite /sie_cap_rest; iFrame "Hstk Harm Hwit" |].
+      iSplitL "Hstk Harm"; [ rewrite /sie_cap_rest; iFrame "Hstk Harm Htc Hwit" |].
       iIntros (m' av' b' tv') "_ Hsatp _ Hpcfg Hpaddr Hres Hrest".
       rewrite /sie_cap. iDestruct "Hrest" as "(Hstk & Harm & _)".
-      iFrame "Hstk Harm Hwit".
+      iFrame "Hstk Harm Htc Hwit".
       rewrite /strans_res_at.
       iDestruct "Hres" as "[(Hpend & Hstv & _) | (Hkpt & %Hbad & _)]".
       2:{ rewrite /bare_satp_ok in Hmode. rewrite Hbad in Hmode.
@@ -2188,11 +2188,11 @@ Section IntrEngine.
           iSplitR; [iPureIntro; exact Hmode |].
           rewrite /kpt_res_at. unfold strans_root_of. rewrite Hppn.
           iFrame "Hsnap Hkinv". }
-        iSplitL "Hstk Harm"; [ rewrite /sie_cap_rest; iFrame "Hstk Harm Hwit" |].
+        iSplitL "Hstk Harm"; [ rewrite /sie_cap_rest; iFrame "Hstk Harm Htc Hwit" |].
         iIntros (m' av' b' tv') "_ Hsatp Htlb Hpcfg Hpaddr Hres Hrest".
         rewrite s_tlb_at_kpt.
         rewrite /sie_cap. iDestruct "Hrest" as "(Hstk & Harm & _)".
-        iFrame "Hstk Harm Hwit".
+        iFrame "Hstk Harm Htc Hwit".
         rewrite /strans_res_at.
         iDestruct "Hres" as "[(Hpend & _ & %Hbad) | (Hkpt & _ & Hres)]".
         { rewrite /bare_satp_ok in Hbad. rewrite Hmode in Hbad.
@@ -2214,11 +2214,11 @@ Section IntrEngine.
           iSplitR; [iPureIntro; exact Hmode |].
           rewrite /kpt_res_at. unfold strans_root_of. rewrite Hppn.
           iFrame "Hsnap Hkinv". }
-        iSplitL "Hstk Harm"; [ rewrite /sie_cap_rest; iFrame "Hstk Harm Hwit" |].
+        iSplitL "Hstk Harm"; [ rewrite /sie_cap_rest; iFrame "Hstk Harm Htc Hwit" |].
         iIntros (m' av' b' tv') "%Hpin Hsatp _ Hpcfg Hpaddr Hres Hrest".
         rewrite (Hpin eq_refl).
         rewrite /sie_cap. iDestruct "Hrest" as "(Hstk & Harm & _)".
-        iFrame "Hstk Harm Hwit".
+        iFrame "Hstk Harm Htc Hwit".
         rewrite /strans_res_at.
         iDestruct "Hres" as "[(Hpend & _ & %Hbad) | (Hkpt & _ & Hres)]".
         { rewrite /bare_satp_ok in Hbad. rewrite Hmode in Hbad.
@@ -2248,8 +2248,8 @@ Section IntrEngine.
     sie_cap kt m av b p.
   Proof.
     intros Hsok Hpok.
-    iIntros "#Hon Hsatp Htlb Hpcfg Hpaddr Hres (Hstk & Harm & #Hwit)".
-    rewrite /sie_cap. iFrame "Hstk Harm Hwit".
+    iIntros "#Hon Hsatp Htlb Hpcfg Hpaddr Hres (Hstk & Harm & #Htc & #Hwit)".
+    rewrite /sie_cap. iFrame "Hstk Harm Htc Hwit".
     iApply (strans_swp_close satp0 tlbv pcfg paddr Hsok Hpok
               with "Hon Hsatp Htlb Hpcfg Hpaddr Hres").
   Qed.
@@ -2261,7 +2261,7 @@ Section IntrEngine.
   (* THIS IS THE ONE PLACE THE TWO TRANSLATION ARMS ARE TOLD APART on the  *)
   (* data side, and it exists so that no LEAF has to.  The pre-port proofs *)
   (* passed the translation slot FOLDED -- [iDestruct "Hcap" as "(Hstk &   *)
-  (* Htr & Harm & #Hwit)"] -- and handed [Htr] with the state              *)
+  (* Htr & Harm & #Htc & #Hwit)"] -- and handed [Htr] with the state              *)
   (* interpretation to [SRegime.sr_absorb], so no cell of the slot was     *)
   (* ever separately owned, at EITHER arm.  The swp port replaced that     *)
   (* with [sie_cap_to_cells], and once a leaf owns the slot's tlb cell the *)
@@ -2667,7 +2667,7 @@ Proof.
   (* ---- open the bundle: cells out, non-cell residue kept aside ---- *)
   iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
   iDestruct (sie_cap_on_kpt with "Hcap") as (root_ppn)
-    "(Hstk & Hbit1 & Htlbres & Harm & #Hwit)".
+    "(Hstk & Hbit1 & Htlbres & Harm & #Htc & #Hwit)".
   rewrite {1}/sie_arm.
   iDestruct "Harm" as
     "(Hq1 & Hires & #Hkpt & Hsepcx & Hscausex & Hstvalx & Hsppc & Hclm & Hcpu)".
@@ -2878,7 +2878,7 @@ Proof.
             rewrite Htie_eq trap_ms_SIE.
             iFrame "Hms Hhalf Htie Hmie Hmdl Hmenv Hsppc Hsepc Hscause Hstval".
             iSplitL "Hstk Hbit1 Hsatp Htlb Hpcfg Hpaddr Hsnap' Hq1".
-            { rewrite /sie_cap. iFrame "Hstk Hwit".
+            { rewrite /sie_cap. iFrame "Hstk Htc Hwit".
               iSplitL "Hbit1 Hsatp Htlb Hpcfg Hpaddr Hsnap'".
               { iApply (strans_inv_intro root_ppn with "Hbit1").
                 iApply (tlb_res_of_cells root_ppn satp0 _ pcfg paddr
@@ -2926,7 +2926,7 @@ Proof.
             iAssert (sie_cap kt m av true p)
               with "[Hstk Hbit1 Hsatp Htlb Hpcfg Hpaddr Hsnap' Hq1 Hq4 Hstv
                      Hsepcx Hscausex Hstvalx Hsppc Hclm Hcpu]" as "Hcap".
-            { rewrite /sie_cap. iFrame "Hstk Hwit".
+            { rewrite /sie_cap. iFrame "Hstk Htc Hwit".
               iSplitL "Hbit1 Hsatp Htlb Hpcfg Hpaddr Hsnap'".
               { iApply (strans_inv_intro root_ppn with "Hbit1").
                 iApply (tlb_res_of_cells root_ppn satp0 _ pcfg paddr

@@ -224,6 +224,14 @@ Lemma fkr_tail
      ⌜ud_data pt' = ud_pas pt'⌝ -∗
      ⌜proc_pt_wf pt'⌝ -∗
      FirstTok.first_done -∗
+     (* THE RESUMING HART'S TIMER CAPABILITY.  It is a conjunct of
+        [IntrDefs.sie_cap] now (see the note there), so the residue cannot
+        assemble the kernel bundle at the trap without one -- and it must be
+        THIS hart's, which is why it is supplied PER APPLICATION rather than
+        owned by the closer: a record parked before that hart ever booted
+        could not hold it.  forkret has one, out of the very capability it
+        is about to hand back. *)
+     TimerCap.timer_cap (CID := h) -∗
      forkret_yield (CID := h) γf p ksp pid av V' -∗
      usertrap_res_bare (CID := h) pt' ksp) -∗
   WP (Loop : expr riscv_lang).
@@ -596,7 +604,7 @@ Proof.
      which the closer would re-park. *)
   iDestruct "Hsc" as "(#Hhw & #Hmin & Hprivc & Hmsx & Hmiex & Hmenvx)".
   iDestruct "Hmsx" as (msg) "(Hms & Hhalf & Htie & %Hmsg)".
-  iDestruct "Hcap" as "(Hstk & Hstr & Harm & #Hwit)".
+  iDestruct "Hcap" as "(Hstk & Hstr & Harm & #Htc & #Hwit)".
   (* THE QUARTER'S VALUE IS NOT A DEGREE OF FREEDOM.  prepare_return leaves
      it existential because it never reads it; the arm it also hands back is
      at [false], and [sie_arm_half_agree] reads the live SIE off that index,
@@ -694,7 +702,7 @@ Proof.
   { rewrite /forkret_yield.
     iSplitL "Hparked"; [iExact "Hparked" | iExact "Hpnopt"]. }
   iDestruct ("Hyield" $! CIDf pt (upd_upt V' pt)
-               with "[%] [%] [%] Hdone Hyld")
+               with "[%] [%] [%] Hdone Htc Hyld")
     as "Hures"; [reflexivity | exact Hnorm | exact Hptwf |].
   (* ---- the config record for this round ---- *)
   destruct Hretms as (HSIE & HMPRV & HSXL & HTVM & HMXR & HTSR & HFS & HVS & Hsup).
@@ -829,6 +837,14 @@ Lemma fkr_boot
      ⌜ud_data pt' = ud_pas pt'⌝ -∗
      ⌜proc_pt_wf pt'⌝ -∗
      FirstTok.first_done -∗
+     (* THE RESUMING HART'S TIMER CAPABILITY.  It is a conjunct of
+        [IntrDefs.sie_cap] now (see the note there), so the residue cannot
+        assemble the kernel bundle at the trap without one -- and it must be
+        THIS hart's, which is why it is supplied PER APPLICATION rather than
+        owned by the closer: a record parked before that hart ever booted
+        could not hold it.  forkret has one, out of the very capability it
+        is about to hand back. *)
+     TimerCap.timer_cap (CID := h) -∗
      forkret_yield (CID := h) γf p ksp pid av V' -∗
      usertrap_res_bare (CID := h) pt' ksp) -∗
   WP (Loop : expr riscv_lang).

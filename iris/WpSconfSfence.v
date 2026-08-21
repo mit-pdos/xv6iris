@@ -385,7 +385,7 @@ Section SfenceLeaf.
     iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
     iSplitR "Hcont".
     - iIntros "Hsc Hcap Hfile HPC HnPC Hresv".
-      iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hwit)".
+      iDestruct "Hcap" as "(Hstk & Htr & Harm & #Htc & #Hwit)".
       iDestruct (strans_inv_acc_kpt with "Hkptr Htr")
         as (root) "(Hres & Htrback)".
       iDestruct (tlb_res_pt_open with "Hres") as (ksatp tlbv)
@@ -431,7 +431,7 @@ Section SfenceLeaf.
       { rewrite /sconf_at_priv. iExists mdv0.
         iFrame "Hhw Hminv Hpriv Hms Hhalf Hspp Hmie Hmdl Hmenv".
         iPureIntro. split; [exact Hmsf | exact Hmm]. }
-      iSplitL "Hstk Htr Harm". { iFrame "Hstk Htr Harm Hwit". }
+      iSplitL "Hstk Htr Harm". { iFrame "Hstk Htr Harm Htc Hwit". }
       iFrame "Hfile". iSplitR; [done|]. iSplitR; [done|]. done.
     - iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & ->)".
       iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".

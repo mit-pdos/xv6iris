@@ -1,26 +1,12 @@
 # forkret_park: the plan to retire the last assumed Link
 
-## CHECKPOINT — 2026-08-21, end of session
+## WHERE THIS STANDS
 
-**`main` is GREEN and clean at `63306e07`** (plus the notes commits after
-it). Everything below §0 is the standing plan; this section is where to
-start.
+**`main` is GREEN and clean.** The timer-capability refactor
+(`devintr_caps_any`, Step E below) is LANDED; what is left of E3 is the
+ftable and the two call sites.
 
-### The one piece of work in flight
-
-Branch **`wip/timer-cap-sie-cap`** (local, not pushed), one commit
-`f1f68c6d`, **NOT green**. Three files: `iris/IntrDefs.v`,
-`iris/UsertrapRes.v`, `iris/ProofUsertrapTail.v`. Its commit message is the
-inventory; the design and the execution order are in Step E's
-`devintr_caps_any` section below.
-
-To resume: `git checkout wip/timer-cap-sie-cap`, then execute step 1 of that
-section — fix `IntrDefs`' own lemmas that enumerate `sie_cap`'s conjuncts
-(first failure around `IntrDefs.v:2668`), then sweep the ~35 sites that
-destructure it (`grep -rn "rewrite /sie_cap"`). Everything else threads
-`sie_cap_gpr` opaquely and needs no change. **Anchor every edit** — §5.
-
-### What landed on main this session
+### What landed this session
 
 | commit | what |
 |---|---|
@@ -29,6 +15,7 @@ destructure it (`grep -rn "rewrite /sie_cap"`). Everything else threads
 | `7c078d09` | `syscall_env` gets a producer; the residue gets a channel for it |
 | `dd2af18e` | `wait_lock` gets a resource and an `is_lock`; fileinit's post kept |
 | `63306e07` | the slot ledger seals at userinit's park |
+| *(this one)* | **the timer capability rides `sie_cap`** — see Step E's `devintr_caps_any` section for the design and the full inventory |
 
 ### E3's four blockers
 
@@ -36,8 +23,11 @@ destructure it (`grep -rn "rewrite /sie_cap"`). Everything else threads
 |---|---|
 | `wait_lock` `is_lock` | **built** (`dd2af18e`) |
 | `procs_avail None` | **sealed** (`63306e07`) |
+| `devintr_caps_any` | **DONE** — `timer_cap` lives in `IntrDefs.sie_cap`; `ut_caps` is hart-free |
 | `is_ftable` | **staged** — main carries `lk_fresh ftable "ftable"`; needs the 100-slot BSS carve + `fileUR` allocation, then one `newlock` line |
-| `devintr_caps_any` | **design settled, execution in flight** on the branch above |
+
+Then E3's call-site work: build `N`, switch both callers to
+`FORKRET_PARK_PAID`, replace `LinkForkretPark.v`'s `Axiom`.
 
 ### Three things I got wrong, so they are not re-derived
 
@@ -380,7 +370,7 @@ cut in the wrong place; and the gather is an induction with an OFFSET,
 because `seq k (S n)` shifts the TABLE index while `parents_own`'s big-op is
 indexed by the LIST.
 
-**`devintr_caps_any`. — DESIGN SETTLED 2026-08-21, not yet executed.**
+**`devintr_caps_any`. — DONE 2026-08-21.**
 
 `devintr_caps` has seven members and exactly one is hart-indexed:
 `TimerCap.timer_cap` = `sstc_enabled ∗ stimecmp_inv`, over this hart's
@@ -427,28 +417,40 @@ the bundle "satisfiable" argues the predicate is not VACUOUS, not that the
 * **Minting the eight caps at the adequacy fan-out** — TM is not set yet;
   see above.
 
-##### Executing it
+##### What it actually cost, executed
 
-`sie_cap` is mentioned in 437 files but DESTRUCTURED in only ~35
-(`grep -rn "rewrite /sie_cap"`), plus `IntrDefs`' own lemmas that enumerate
-its four conjuncts (the first to break is around `IntrDefs.v:2668`). Most
-files thread `sie_cap_gpr` opaquely and need no change. Order:
+`sie_cap` is mentioned in 437 files but DESTRUCTURED in only ~35, and the
+sweep was almost entirely mechanical: the destructure patterns are spelled
+`(Hstk & Htr & Harm & #Hwit)` and the re-assemblies `iFrame "... Harm Hwit"`,
+so one anchored pass over those two shapes covered 17 files. `timer_cap` is
+PERSISTENT, so every re-assembly frames it out of the intuitionistic context
+and no site had to thread anything. Beyond the sweep, six places needed real
+thought:
 
-1. `IntrDefs.sie_cap` gains the conjunct; fix that file's own enumerating
-   lemmas.
-2. Sweep the ~35 destructure sites — ANCHOR each edit, do not regex
-   unanchored (see §5).
-3. `devintr_caps_any` / `devintr_caps_any_at` as above; `ut_caps` then
-   becomes hart-free and main can finally build it.
-4. `ut_res` / `ut_res_parked` / `ut_res_bare` each carry `timer_cap` beside
-   the `ut_trap*` half, and the park closer takes `timer_cap (CID := h)` per
-   application beside `first_done`.
-
-Steps 3 and 4 are WRITTEN AND WERE GREEN in `UsertrapRes.v` standalone
-before the `ut_hold` dead end; the tree came down to two failures
-(`ForkretParkClose` and `ProofUsertrapTail.ut_ret2`), both of which step 1
-removes the cause of — `ut_ret2` gets its capability from the `sie_cap_gpr`
-it already holds.
+1. **`sie_cap_of` gains it too**, not just `sie_cap` — `sie_cap_of_eq` says
+   they are the same thing, and `sie_cap_of` is what the interrupt engine's
+   handler contract (`ihs_entry_of` / `ihs_post_of`) is stated over. A
+   handler therefore gets the capability on entry and owes it back, which is
+   what clockintr wanted anyway.
+2. **`sie_cap_intro_bare` gains the matching premise**, so the BOOT chain has
+   to hold one at the bridge. `BootChain.boot_entry_bridge` mints it BEFORE
+   `boot_bridge` rather than after — the two cells were already in hand
+   there, this only moves the `iMod` up, and `boot_bridge` grows one
+   persistent premise beside `hw_config` / `minstret_inv`.
+3. **`WpIntrInv.sie_cap_rest`** — by definition "the conjuncts of `sie_cap`
+   the walk never touches", so the timer is one of them; without it
+   `sie_cap_of_cells` could not rebuild the capability.
+4. **`WpSconfCsr.wp_csrr_sstatus_s_sconf`'s give-back tuple** — the ONE leaf
+   that takes the capability apart across the σ-callback, and so the one
+   place it could be lost. Same argument the tier witness already had.
+5. **`IntrDefs.sie_cap_timer_cap` / `_gpr_timer_cap`** read it back off the
+   bundle. That is how `ProofUsertrap` reaches `devintr_caps`' hart-indexed
+   member: it is holding `sie_cap_gpr` already, so nothing is threaded.
+6. **`ut_trap_open` ASSEMBLES `sie_cap_gpr`**, so it takes the capability as
+   a premise, and `ut_res` / `ut_res_parked` / `ut_res_bare` carry it beside
+   the `ut_trap*` half to pay that. The park closer takes
+   `timer_cap (CID := h)` per application beside `first_done` — a record
+   parked before the resuming hart ever booted could not hold one.
 
 ##### The one that is a decision, not a gap
 

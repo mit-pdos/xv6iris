@@ -196,6 +196,10 @@ Section UtEntry.
     (* the trap enters from USERSPACE, which holds no kernel lock, so the
        held set here is the literal [∅] -- the same one the continuation
        below names. *)
+    (* THIS HART'S TIMER CAPABILITY, which [ut_trap_open] needs to assemble
+       [sie_cap_gpr] (it is a conjunct of [IntrDefs.sie_cap] now).  The
+       caller has it: [ut_res] carries it beside the [ut_trap] half. *)
+    TimerCap.timer_cap -∗
     ut_trap (un_pj N) ksp av ∅ -∗
     ut_env Rsys N V -∗
     (∀ (M : regfile) (V' : pprivate),
@@ -221,10 +225,10 @@ Section UtEntry.
       as Hks.
     
     iIntros "#Htext Hpc #Hhw #Hminv Hhs Hpriv Hms Hsc Hst Hep Hstv
-             Hmie Hmdl Hmenv Hgpr Htrap Henv Hcont".
+             Hmie Hmdl Hmenv Hgpr #Htc Htrap Henv Hcont".
     iDestruct (ut_trap_open (un_pj N) ksp av m ms_v mie_v mdv0 menvcfg0 ∅
                  Hmsf Hsie Hspp Hspie Hsp Htp Hmiev Hmask Hmenvv
-                 with "Hhw Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Hgpr Htrap")
+                 with "Hhw Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Hgpr Htc Htrap")
       as "(Hcg & Hcpu & Hclm & Hq & Hkpt & Hsret)".
     iPoseProof (uti_000 with "Htext") as "Hi00".
     iPoseProof (uti_002 with "Htext") as "Hi02".
@@ -353,7 +357,7 @@ Section UtEntry.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi0c [-]").
     iApply wp_next_off_intro.
-    iIntros (ms1) "%Hms1f Hhs Hscf Htr Hpc Hfile (Hstk & %Hsie1 & Harm & #Hwit)".
+    iIntros (ms1) "%Hms1f Hhs Hscf Htr Hpc Hfile (Hstk & %Hsie1 & Harm & #Htc1 & #Hwit)".
     (* the mstatus the read SAW has the boundary's SPP, off the travelling
        sret mirror's agreement with [sconf]'s stationary tie *)
     iDestruct (sconf_at_sret ms1 ('b"0") ('b"1") with "Hscf Hsret") as %[Hspp1 Hspie1].
@@ -361,7 +365,8 @@ Section UtEntry.
     iDestruct (sie_cap_gpr_join with "Hhs Hscf [Hstk Htr Harm] Hfile") as "Hcg".
     { rewrite /sie_cap. iSplitL "Hstk"; [iExact "Hstk" |].
       iSplitL "Htr"; [iExact "Htr" |].
-      iSplitL "Harm"; [iExact "Harm" |]. iExact "Hwit". }
+      iSplitL "Harm"; [iExact "Harm" |].
+      iSplitR; [iExact "Htc1" |]. iExact "Hwit". }
     set (M3 := <[Regidx Ra5 := regval_into_reg (sstatus_read ms1)]> M2).
     change (<[Regidx Ra5 := regval_into_reg (sstatus_read ms1)]> M2) with M3.
     assert (HM3sp : M3 !!! Regidx csp_rs1 = pa_stk ksp 4)
@@ -756,9 +761,14 @@ Section UtDispatch.
     iAssert (devintr_caps_any (un_u N) (un_v N) (un_k N) (un_tk N) (un_s N)
                (un_pd N) (un_pav N) (un_pu N)) with "[]" as "#Hdca".
     { iDestruct "Hcaps" as "(_ & _ & _ & $ & _)". }
+    (* THIS HART'S TIMER CAPABILITY, read off the kernel bundle rather than
+       threaded: it is a conjunct of [IntrDefs.sie_cap] now, and it is the
+       one member of [devintr_caps] the hart-free [devintr_caps_any] cannot
+       carry. *)
+    iDestruct (sie_cap_gpr_timer_cap with "Hcg") as "[#Htc Hcg]".
     iAssert (devintr_caps (un_u N) (un_v N) (un_k N) (un_tk N) (un_s N)
                (un_pd N) (un_pav N) (un_pu N)) with "[]" as "#Hdc".
-    { iApply (devintr_caps_any_at CID with "Hdca"). }
+    { iApply (devintr_caps_any_at CID with "Hdca Htc"). }
     (* THE KERNELVEC FUNCTOR ARGUMENT, cashed here and nowhere else *)
     iDestruct (ut_dup_hw with "Hcg") as "(#Hhw & #Hmin & Hcg)".
     iPoseProof (KV.kernelvec_handler_spec (un_u N) (un_v N) (un_k N) (un_tk N)
@@ -1227,7 +1237,7 @@ Section UtSeal.
     (* SCOPED: a bare [rewrite] would unfold [ut_res] inside the crossing's
        [usertrap_post] too, and the blocks state it folded. *)
     iEval (rewrite /usertrap_res /ut_res) in "HR".
-    iDestruct "HR" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & Htrap & Henv)".
+    iDestruct "HR" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htc & Htrap & Henv)".
     assert (Hpjnz : pj <> (zero_reg : mword 64))
       by exact (proc_addr_nonzero j Hj).
     iDestruct (wp_next_true_swap pj (un_pj N) _ Hpjnz with "Hcont") as "Hcont".
@@ -1235,7 +1245,7 @@ Section UtSeal.
               mie_v mdv0 menvcfg0
               Hms Hav Hsp Htp Hmiev Hmask Hmenvv
               with "Htext Hpc Hhw Hminv Hhs Hpriv Hms Hsc Hst Hep Hstv
-                    Hmie Hmdl Hmenv Hgpr Htrap Henv [Hcont]").
+                    Hmie Hmdl Hmenv Hgpr Htc Htrap Henv [Hcont]").
     iIntros (M V') "%HMsp %HMs1 %HMa0 %HcsM %HuptV Hpc Hcg Hcpu Hclm Hraw Henv Hfr".
     iApply (ut_dispatch N V' pt ksp m M av (av - 4)%nat sepc_v sc_v stval_v
               mie_v menvcfg0

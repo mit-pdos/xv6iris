@@ -541,6 +541,16 @@ Section BootRun.
                   <= ram_base + ram_size)
       by (rewrite (sp0_uint _ Hn); exact (sp_of_hi _ Hn)).
     iEval (rewrite Hmedv) in "Hmede".
+    (* THE TIMER CAPABILITY IS MINTED BEFORE THE BRIDGE, because the bridge
+       is what puts it inside [sie_cap] (see the note at [IntrDefs.sie_cap]).
+       The two cells it is made of -- [mcounteren], persisted into
+       [sstc_enabled], and [stimecmp], sealed into [stimecmp_inv] -- are
+       exactly what timerinit wrote and what this seam used to drop.  The
+       fupd goes in front of a [WP (Loop)] goal, so peel it with [fupd_wp]
+       first; the [iModIntro] goes back after the bridge. *)
+    iApply fupd_wp.
+    iMod (timer_cap_intro ⊤ (DfracOwn 1) mcounterenf stimecmpf HmcenTM
+            with "Hmcen Hstc") as "#Htimc".
     iMod (boot_bridge K_main boot_stack_depth Mf
               (mword_of_int (sp_of (fin_to_nat cpu_id)))
               msf satpf midelegf mief menvcfgf
@@ -553,18 +563,11 @@ Section BootRun.
               boot_stack_depth_bridge
               Hlo Hhi
               eq_refl
-              with "Hhw Hmin Hhs Hpriv Hmst Hpmpc Hpmpa Hfile Hsatp Hmdl Hmie
+              with "Hhw Hmin Htimc Hhs Hpriv Hmst Hpmpc Hpmpa Hfile Hsatp Hmdl Hmie
                     Hmenv Hstk Hbit Hbit2 Hg2 Hg4a Hg4b Htlb Hsepc Hscause
                     Hstval Hspp1 Hspp2 Hstvec Hnoff Hint Hproc Hlks
                     Hssc Hmede Hmse Hsse Hctx")
       as (mf) "(Hcap & Hctx & Hcpu & Hg & Hraw)".
-    (* the two cells this seam used to drop become the timer capability.  The
-       fupd goes in front of a [WP (Loop)] goal, so peel it with [fupd_wp]
-       first (and put the [iModIntro] back afterwards, or the next [iIntros]
-       fails with a message about the goal not being a wand). *)
-    iApply fupd_wp.
-    iMod (timer_cap_intro ⊤ (DfracOwn 1) mcounterenf stimecmpf HmcenTM
-            with "Hmcen Hstc") as "#Htimc".
     iModIntro.
     iApply ("Hcont" $! mf with "Hcap Hctx Hcpu Hg Hraw Htimc Hpc").
   Qed.

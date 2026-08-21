@@ -972,11 +972,11 @@ Section ProofSched.
     (* at the DISABLED index the leaf itself reports [SIE = sie_bit false];
        no ghost juggling with the counting token is needed any more. *)
     iIntros (ms2) "%Hmsf2 Hhs Hsc Htlbinv Hpc Hfile Hcapdisj".
-    iDestruct "Hcapdisj" as "(Hstk & %HSIE0 & Harm & #Hwit)".
+    iDestruct "Hcapdisj" as "(Hstk & %HSIE0 & Harm & #Htmr & #Hwit)".
     set (C10 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sstatus_read ms2)]> C9).
     iDestruct (sconf_at_close with "Hsc") as "Hsc".
     iDestruct (sie_cap_gpr_join C10 (av - 6)%nat false pj with "Hhs Hsc [Hstk Htlbinv Harm] Hfile") as "Hcg".
-    { rewrite /sie_cap. iFrame "Hstk Htlbinv Harm Hwit". }
+    { rewrite /sie_cap. iFrame "Hstk Htlbinv Harm Htmr Hwit". }
     assert (Hpc40 : add_vec_int (mword_of_int (KernelSyms.sched + 0x3c) : mword 64) 4 = mword_of_int (KernelSyms.sched + 0x40)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc40) in "Hpc".
     (* +0x40 c.andi a5,a5,2 *)

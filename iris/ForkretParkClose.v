@@ -113,6 +113,7 @@ Section ForkretParkClose.
        ⌜ud_data pt' = ud_pas pt'⌝ -∗
        ⌜proc_pt_wf pt'⌝ -∗
        first_done -∗
+       TimerCap.timer_cap (CID := h) -∗
        forkret_yield (CID := h) (un_f N) (un_pj N)
          (add_vec (un_ks N) (mword_of_int 4096)) (un_pid N) av V' -∗
        fd_slots FDSPARE -∗
@@ -121,7 +122,7 @@ Section ForkretParkClose.
          (add_vec (un_ks N) (mword_of_int 4096))).
   Proof.
     iIntros (Hwf Hav) "Hderive Hown".
-    iIntros (h pt' V') "%Hupt %Hnorm %Hptwf Hdone (Htrap & Hpriv) Hfd Hiref".
+    iIntros (h pt' V') "%Hupt %Hnorm %Hptwf Hdone #Htc (Htrap & Hpriv) Hfd Hiref".
     (* the two page-table facts are the loop's, not this wand's: they are
        handed in so forkret can prove them of the descriptor it actually
        ends on, and [ut_res_bare] does not restate them. *)
@@ -134,6 +135,7 @@ Section ForkretParkClose.
     iSplitR; [iPureIntro; reflexivity|].
     iSplitR; [iPureIntro; exact Hwf|].
     iSplitR; [iPureIntro; exact Hav|].
+    iSplitR; [iExact "Htc"|].
     iFrame "Htrap".
     rewrite /ut_env_nopt /ut_own_nopt.
     iFrame "Hcaps". iFrame "Hbs Hip Hfd Hiref Hpriv Hsys".

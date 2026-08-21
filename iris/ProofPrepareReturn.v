@@ -777,10 +777,10 @@ Section ProofPrepareReturn.
     iIntros (ms1) "%Hms1f Hhs Hsc Htr Hpc Hfile Harm".
     set (U12 := <[Regidx a5_idx := regval_into_reg (sstatus_read ms1)]> U11).
     change (<[Regidx a5_idx := regval_into_reg (sstatus_read ms1)]> U11) with U12.
-    iDestruct "Harm" as "(Hstk & %Hsie1 & Harm & #Hwit)".
+    iDestruct "Harm" as "(Hstk & %Hsie1 & Harm & #Htc & #Hwit)".
     iAssert (sie_cap KT1 U12 (trap_res b + (av - 2))%nat false p)
       with "[Hstk Htr Harm]" as "Hcap".
-    { rewrite /sie_cap. iFrame "Hstk Htr Harm Hwit". }
+    { rewrite /sie_cap. iFrame "Hstk Htr Harm Htc Hwit". }
     iDestruct (sconf_at_close with "Hsc") as "Hsc".
     iDestruct (sie_cap_gpr_join with "Hhs Hsc Hcap Hfile") as "Hcg".
     assert (Hsie1' : _get_Mstatus_SIE ms1 = ('b"0" : mword 1))

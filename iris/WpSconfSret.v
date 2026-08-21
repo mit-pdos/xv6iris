@@ -196,7 +196,7 @@ Section WpSconfSret.
       iDestruct (sret_frames_out (sret_ms5 ms0) Supervisor (ret_pc sepc0)
                    MENVCFG_S sepc0 with "[$Hrw $Hro]")
         as "(Hms & Hpriv & HnPC & _ & Hmenv & Hsepc)".
-      iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hwit)".
+      iDestruct "Hcap" as "(Hstk & Htr & Harm & #Htc & #Hwit)".
       iEval (rewrite /intr_res) in "Hhx".
       iDestruct "Hhx" as (handler vb) "(%Htvd & %Hsb & Hqi & Hstv & #Hspec)".
       iMod (sie_ghost_flip_on _ _ _ _ _ with "Hhalf Harm Htok Hqi")
@@ -230,7 +230,7 @@ Section WpSconfSret.
       iSplitL "Hqcap Hqcnt Hintr Hkptr Hsepcx Hscausex Hstvalx Hsppc Hclm
                Hstk Htr Hcells".
       { iSplitL "Hstk". { iExact "Hstk". }
-        iFrame "Htr Hwit".
+        iFrame "Htr Htc Hwit".
         iFrame "Hqcap Hintr Hkptr Hsepcx Hscausex Hstvalx Hsppc Hclm".
         iSplitL "Hcells"; [ iExact "Hcells" | iExact "Hqcnt" ]. }
       iSplitL "Hfile". { iExact "Hfile". }
