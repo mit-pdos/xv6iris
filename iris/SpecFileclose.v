@@ -331,11 +331,10 @@ Section SpecFileclose.
      ⌜fcn_procs fn !! fcn_j fn = Some (fcn_plock fn)⌝ ∗
      ⌜fclose_ties fn⌝ ∗
      procs_inv (fcn_procs fn) ∗
-     (* the disk fabric at the caller's OWN ring pages, as resources
-        (fs-cfg-boot.md R1): [fs_ready]'s own disk conjunct quantifies them *)
-     disk_geom (fcn_disk fn) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) ∗
-     is_lock (fcn_dlock fn) d_lock "virtio_disk"%string
-       (disk_res (fcn_disk fn) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)) ∗
+     (* NO disk-fabric rows: [fs_ready]'s own disk conjunct quantifies the
+        three ring pages, and the inode arm runs at THAT witness -- rows at
+        [fcn_pd]/[fcn_pav]/[fcn_pu] were dead weight every caller paid and
+        no callee read. *)
      FsReady.fs_ready ∗
      bslots (fcn_bio fn) 3)%I.
 
@@ -417,7 +416,7 @@ Section SpecFileclose.
     fileclose_fs_env fn n eb p -∗ fileclose_fs_out fn.
   Proof.
     rewrite /fileclose_fs_env /fileclose_fs_env_nopid /fileclose_fs_out.
-    iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & Hbs)".
+    iIntros "(_ & _ & _ & _ & _ & _ & _ & Hbs)".
     iExact "Hbs".
   Qed.
 
@@ -468,7 +467,7 @@ Section SpecFileclose.
     □ (fileclose_fs_out fn -∗ fileclose_fs_env fn n eb p).
   Proof.
     rewrite /fileclose_fs_env /fileclose_fs_env_nopid /fileclose_fs_out.
-    iIntros "(%H1 & %H2 & %H3 & %H4 & %H5 & #Hpr & #Hgeom & #Hdlk & #Hrdy & Hbs)".
+    iIntros "(%H1 & %H2 & %H3 & %H4 & %H5 & #Hpr & #Hrdy & Hbs)".
     iSplitL "Hbs".
     { do 5 (iSplitR; [iPureIntro; assumption|]).
       (* Split STRUCTURALLY before framing, front to back -- a named [iFrame]
@@ -476,15 +475,11 @@ Section SpecFileclose.
          here); [iSplitL]/[iExact] name both sides, so nothing is
          searched. *)
       iSplitL "Hpr"; [iExact "Hpr"|].
-      iSplitL "Hgeom"; [iExact "Hgeom"|].
-      iSplitL "Hdlk"; [iExact "Hdlk"|].
       iSplitL "Hrdy"; [iExact "Hrdy"|].
       iExact "Hbs". }
     iModIntro. iIntros "Hbs".
     do 5 (iSplitR; [iPureIntro; assumption|]).
     iSplitL "Hpr"; [iExact "Hpr"|].
-    iSplitL "Hgeom"; [iExact "Hgeom"|].
-    iSplitL "Hdlk"; [iExact "Hdlk"|].
     iSplitL "Hrdy"; [iExact "Hrdy"|].
     iExact "Hbs".
   Qed.

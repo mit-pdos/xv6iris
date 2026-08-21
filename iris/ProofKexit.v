@@ -2242,8 +2242,8 @@ Section ProofKexit.
            [fileclose_fs_env_reuse] in SpecFileclose.v); [iSplitL]/[iExact]
            name both sides, so nothing is searched. *)
         iSplitL "Hprocs"; [iExact "Hprocs"|].
-        iSplitL "Hgeo"; [iExact "Hgeo"|].
-        iSplitL "Hdlk"; [iExact "Hdlk"|].
+        (* NO disk-fabric rows: the bundle dropped them (fs_ready quantifies
+           the three ring pages and the inode arm runs at THAT witness). *)
         iSplitL "Hrdy"; [iExact "Hrdy"|].
         iExact "Hbsl". }
       iPoseProof (kx_loop (CID0 := CID8)  γft γf
@@ -2269,7 +2269,7 @@ Section ProofKexit.
         (* the bundle gives back the three slots and nothing else: the
            superblock cells are persistent and the bitmap is an invariant,
            so both are still in the intuitionistic context from the top. *)
-        iDestruct "Hfenv" as "(_ & _ & _ & _ & _ & _ & _ & _ & _ & Hbsl)".
+        iDestruct "Hfenv" as "(_ & _ & _ & _ & _ & _ & _ & Hbsl)".
         cbn [fcn_bio].
         (* "itable" (2) outranks "ftable" (1): weaken [Hfresh]'s bound. *)
         assert (Hfresh_it : locks_below lks "itable")

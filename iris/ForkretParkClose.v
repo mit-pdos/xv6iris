@@ -43,9 +43,9 @@
        unfolded through [fileclose_bm] and [bitmap_res] to [fsblock] and
        [free_pool], exclusive, one per file system, so every process holding
        a residue across user execution held the block bitmap.  It is now the
-       persistent [BitmapInv.bitmap_inv], carried inside
-       [SpecFileclose.fileclose_ic_env] and [FsReady.fs_ready], and the
-       residue no longer names it (design/fs-bitmap.md).
+       persistent [BitmapInv.bitmap_inv], a conjunct of
+       [FsReady.fs_ready], and the residue no longer names it
+       (design/fs-bitmap.md).
 
    NOTHING DEPENDS ON THIS FILE.  It is a leaf that states the reduction; the
    callers that will use it (kfork, userinit) still take the assumed park. *)

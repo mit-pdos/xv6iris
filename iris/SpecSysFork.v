@@ -113,9 +113,9 @@ Definition wp_sys_fork_sconf_body
   (* the inode region, and it travels with the fs fabric for the SAME reason
      the itable does -- kfork's [np->cwd = idup(p->cwd)], whose [ref++] is a
      ledger move since increment IVe (iclaim-ledger.md §3.19).  Persistent,
-     and every FS syscall's dispatch already holds it inside
-     [ProofSyscall.sysc_fs_env]'s [fileclose_ic_env], so a dispatcher pays
-     nothing extra.  sys_fork does no I/O and touches no log. *)
+     and every FS syscall's dispatch already holds it (a projection of the
+     [fs_ready] its bundle carries), so a dispatcher pays nothing
+     extra.  sys_fork does no I/O and touches no log. *)
   ireg_inv γic γfs inodestart nib -∗
   kalloc_env γa None -∗
   (* the proc table's sealed regime, threaded to kfork's allocproc

@@ -817,7 +817,7 @@ Section ItruncDLoop.
     destruct (decide (bv_unsigned (bm_dir bm !!! k) = 0)) as [Hzero|Hnzero].
     - (* ---------- SKIP: the slot is already empty ---------- *)
       (* nothing moves: put the cell back unchanged, and the state at k IS
-         the state at S k ([bm_dir_zeroed_skip], [bm_dir_freed_skip]) *)
+         the state at S k ([bm_dir_zeroed_skip]) *)
       iDestruct ("Hmapback" $! (bm_dir bm !!! k : mword 32) with "Hcell")
         as "Hmap".
       assert (Hidins : <[k := bm_dir bm !!! k]> (bm_dir (bm_dir_zeroed bm k))

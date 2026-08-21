@@ -946,6 +946,21 @@ Selecting files by NAME (`Spec*`/`Proof*`/`Link*`) is also wrong: select by
 dependency position (not in the bundle's own cone), or the `Wp*`/`User*`
 files above the boundary keep their own binders and fail.
 
+## A `Typeclasses Opaque` SEAL DOES NOT TRAVEL — IMPORT THE PREDICATE'S HOME FILE
+
+`Typeclasses Opaque P` at top level protects only files that `Require
+Import` P's home file DIRECTLY.  A file that reaches the predicate
+transitively (through a bundle another spec re-exports) gets the constant
+WITHOUT the seal, and the first `Persistent ?P`-shaped resolution — an
+`iIntros "#H"`, an `iFrame` near it — delta-unfolds the whole body per
+candidate.  For `FsReady.fs_ready` (21 invariant/lock conjuncts) that is
+13+ minutes of silence that looks like a hang, not an error; with the
+direct `Require Import FsCfg FsReady` the same file compiles in seconds.
+The rule: **any proof file that puts `fs_ready` (or another sealed
+bundle) in the intuitionistic context must import its home file
+directly.**  Found in ProofSysExit during the bitmap-invariant sweep;
+FsReady.v's own header predicts it but cannot enforce it.
+
 ## A CLASS USED AS AN INDEX NEEDS ITS INSTANCES DECLARED TWICE
 
 When a class is a *definitional* one used as an INDEX rather than as a

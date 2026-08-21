@@ -10,11 +10,10 @@ both with no caveat** (see below).  Stage 3 before it:
 
 **Stage 3 IS COMPLETE: `bmap`, `iupdate`, `writei` and `readi` are all
 proven and linked.** fs.c is **5/24, 910/3338 bytes (27.3%)**; tree totals
-124 proven / 13520 of 23342 bytes (58%). `bmap` and `writei` carry the `!`
-caveat for the still-assumed `balloc` (writei inherits it through bmap);
-`iinit`, `iupdate` and `readi` rest on nothing assumed — readi because it
-takes bmap through `BMAP_NOALLOC`, whose proof term never mentions
-`LinkBalloc`'s Axiom. `proof_coverage.py --check` rc=0, `lemma_diff.py`
+124 proven / 13520 of 23342 bytes (58%).  (`balloc` was still assumed at
+that date; it has since been proven against the bitmap invariant — see
+below — so the `!` caveats this paragraph recorded for bmap/writei are
+gone.) `proof_coverage.py --check` rc=0, `lemma_diff.py`
 clean, zero admits tree-wide.
 
 **writei required fixing a bug in the xv6 SOURCE** — see
@@ -511,15 +510,14 @@ how `iget` hands out references, how `ip->ref` is counted. `ilock` takes
 `i_ref` as a plain fraction and the on-disk agreement as a premise, which is
 the honest statement of what it guarantees until that layer exists.
 
-## Deferred: proving balloc
+## The bitmap invariant: DESIGNED AND LANDED
 
-`balloc` stays an assumed contract until someone designs the **bitmap
-invariant**: which agent holds a free block's `fsblock` half while it is
-free, and the tie between bit `b` of the bitmap block and that half being
-in the pool. `FsBoot.v` already mints one half per covered block at boot,
-so the material exists. Stating `balloc` needed none of this, which is why
-it was worth assuming first — the shape of bmap's proof does not depend on
-it.
+The question this file deferred — which agent holds a free block's
+`fsblock` half while it is free, and the tie between bit `b` and the pool
+— is settled: `BitmapInv.bitmap_inv`, a persistent Iris invariant at an
+existential set, with `wp_log_write_au` suppliers for balloc/bfree.
+`balloc` is proven against it and no contract anywhere names the bitmap's
+set.  Design of record: [`design/fs-bitmap.md`](../design/fs-bitmap.md).
 
 ## Follow-up found in passing (not this project's)
 

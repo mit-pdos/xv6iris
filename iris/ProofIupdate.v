@@ -76,6 +76,7 @@ Require Import ProcDefs.  (* [proc_priv_bare] *)
 Require Import WpUart.
 Require Import BufOwn BcacheInv BioInv.
 Require Import FsBlocks LogInv.
+Require Import BioFs.  (* [bio_held_fs_L] *)
 Require Import BlockWords.
 Require Import DinodeEnc.
 Require Import InodeInv.
@@ -363,33 +364,7 @@ Section IupdateDefs.
         (∃ e : nat, logged_at γ e (IBLOCK inum inodestart) ∗ ⌜(v <= e)%nat⌝) -∗
         WP (Loop : expr riscv_lang))%I.
 
-  (* THE MACHINERY HALF, out of the handle and back.  [ireg_read] needs the
-     block's OTHER [fs_L] half to pin the region's parked bytes to the ones
-     bread returned, and the handle's payload carries exactly that -- on
-     BOTH polarities ([fs_mclean] / [fs_mdirty] each open with it).  This
-     is [ProofLogWrite.lw_pay_split]'s job, restated as an extract/restore
-     pair because that one is sealed inside its own module. *)
-  Lemma iu_held_L (bn : bio_names) (γfs : fs_names) (γd : disk_names)
-      (dev : mword 32) (cov : gset Z) (k : nat) (pidv dv bno : mword 32)
-      (bs bsl bsd : list (bv 8)) (d : bool) :
-    bio_held bn (fs_view γfs γd dev cov) k pidv dv bno bs bsl bsd d -∗
-      (uint bno ↪[fs_L γfs]{#(1/2)} bsl) ∗
-      ((uint bno ↪[fs_L γfs]{#(1/2)} bsl) -∗
-       bio_held bn (fs_view γfs γd dev cov) k pidv dv bno bs bsl bsd d).
-  Proof.
-    rewrite /bio_held /bio_pay /fs_view /=.
-    iIntros "(%A & %B & %C & H1 & H3 & H4 & H5 & H6 & Hpay)".
-    destruct d.
-    - rewrite /fs_mdirty. iDestruct "Hpay" as "[[HL HD] Hq]".
-      iFrame "HL". iIntros "HL".
-      iSplitR; [done |]. iSplitR; [done |]. iSplitR; [done |].
-      iFrame "H1 H3 H4 H5 H6". iFrame "HL HD Hq".
-    - rewrite /fs_mclean. iDestruct "Hpay" as "[[HL HD] %He]".
-      iFrame "HL". iIntros "HL".
-      iSplitR; [done |]. iSplitR; [done |]. iSplitR; [done |].
-      iFrame "H1 H3 H4 H5 H6". iFrame "HL HD". done.
-  Qed.
-
+  
 End IupdateDefs.
 
 (* the register-threading invariant: the four registers the frame saves *)
@@ -1376,7 +1351,7 @@ Section ProofIupdateMain.
        (ProofInitlog.v:664). *)
     iEval (rewrite /bio_locked) in "Hheld".
     iDestruct (iu_held_k with "Hheld") as %Hkk.
-    iDestruct (iu_held_L with "Hheld") as "[HpL Hheldback0]".
+    iDestruct (bio_held_fs_L with "Hheld") as "[HpL Hheldback0]".
     iApply fupd_wp.
     iMod (ireg_read ⊤ γi γfs inodestart nib inum dn0 (uint bno) bs0
             ltac:(solve_ndisj) Hnib Hbno

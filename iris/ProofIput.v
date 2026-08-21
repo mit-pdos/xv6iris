@@ -2020,9 +2020,6 @@ Section IputFreePath.
   Lemma fl_notin_diff (P S : gset Z) (z : Z) : z ∈ S -> z ∉ P ∖ S.
   Proof. set_solver. Qed.
 
-  Lemma fl_diff_sub (X Y : gset Z) : X ∖ Y ⊆ X.
-  Proof. set_solver. Qed.
-
   Lemma fl_pool_set (P S : gset Z) (z : Z) :
     z ∈ P -> z ∈ S -> P ∖ (S ∖ {[z]}) = {[z]} ∪ (P ∖ S).
   Proof.

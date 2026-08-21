@@ -133,13 +133,17 @@ an Iris invariant at an EXISTENTIAL set:
   bitmap_inv  γfs bms cov ls size  := inv bitmapN (bitmap_body …)
 ```
 
-Persistent; a conjunct of `FsReady.fs_ready` (`fs_ready_bitmap`), of
-`FirstTok.first_boot_persist`, and of `SpecFileclose.fileclose_ic_env`
-(which also now carries `sb_bmapstart`/`sb_inodestart` at `□`, so the
-exclusive `fileclose_bm` bundle and its `us` index are gone, along with
-`ut_names.un_us`/`upd_us`). Boot allocates it once, in
+Persistent; a conjunct of `FsReady.fs_ready` (`fs_ready_bitmap`, beside
+the other duplicable superblock facts `fs_sb_cells`) and of
+`FirstTok.first_boot_persist`. The exclusive `fileclose_bm` bundle and
+its `us` index are gone — and so is `fileclose_ic_env` wholesale:
+fileclose/kexit/sys_exit take `⌜fclose_ties fn⌝` (the `fs_world` tie
+idiom at `fclose_names`' fields) beside the ambient `fs_ready` and read
+everything fs-shaped off its projections. `ut_names.un_us`/`upd_us` died
+with the index. Boot allocates the invariant once, in
 `FsCfgBoot.fs_cfg_alloc`'s era fupd, from `bitmap_res_of_image`
-(`bitmap_inv_alloc`); the set is forgotten there.
+(`bitmap_inv_alloc`, peel `fs_kit_fsinit_ghost_bitmap`); the set is
+forgotten there.
 
 **No contract names `used` any more.** `balloc`/`bfree`/`bmap`/`writei`/
 `itrunc`/`iput`/`dirlink`/`create`/the `sys_*` family/`kexec`/`fileclose`/

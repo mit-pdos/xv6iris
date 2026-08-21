@@ -53,7 +53,7 @@
    +0x42.  Two moments touch it, and both are inside [BitmapInv.v]:
 
      - [bitmap_read], right after the bread, holds the handle's MACHINERY
-       half ([ba_held_L]) against the parked client half for one
+       half ([BioFs.bio_held_fs_L]) against the parked client half for one
        mask-preserving opening.  Out come the two facts the scan needs --
        the bytes are [bitmap_bytes used] for SOME [used], and [bitmap_ok]
        holds at it -- and nothing else.  That existential is where [ba_scan]
@@ -112,6 +112,7 @@ Require Import ProcDefs.  (* [proc_priv_bare] *)
 Require Import WpUart.
 Require Import BufOwn BcacheInv BioInv.
 Require Import FsBlocks LogInv.
+Require Import BioFs.  (* [bio_held_fs_L] *)
 Require Import DinodeSlot.
 Require Import BitmapEnc BitmapInv.
 Require Import CodeBalloc.
@@ -265,33 +266,7 @@ Section BallocDefs.
                       (Sb ∪ {[bmapstart]} ∪ {[bv_unsigned blk]}))) -∗
         WP (Loop : expr riscv_lang))%I.
 
-  (* THE BLOCK'S MACHINERY HALF, out of the bio handle and back -- what
-     [BitmapInv.bitmap_read] needs to pin the invariant's parked bytes to
-     the ones bread returned.  A verbatim copy of [ProofIlock.il_held_L] /
-     [ProofIupdate.iu_held_L]; each of those lives inside its own module,
-     and importing a proof file from a proof file is exactly what the
-     spec-module discipline forbids. *)
-  Lemma ba_held_L (bn : bio_names) (γfs : fs_names) (γd : disk_names)
-      (dev : mword 32) (cov : gset Z) (kb : nat) (pidv dv bno : mword 32)
-      (bs bsl bsd : list (bv 8)) (d : bool) :
-    bio_held bn (fs_view γfs γd dev cov) kb pidv dv bno bs bsl bsd d -∗
-      (uint bno ↪[fs_L γfs]{#(1/2)} bsl) ∗
-      ((uint bno ↪[fs_L γfs]{#(1/2)} bsl) -∗
-       bio_held bn (fs_view γfs γd dev cov) kb pidv dv bno bs bsl bsd d).
-  Proof.
-    rewrite /bio_held /bio_pay /fs_view /=.
-    iIntros "(%A & %B & %C & H1 & H3 & H4 & H5 & H6 & Hpay)".
-    destruct d.
-    - rewrite /fs_mdirty. iDestruct "Hpay" as "[[HL HD] Hq]".
-      iFrame "HL". iIntros "HL".
-      iSplitR; [done |]. iSplitR; [done |]. iSplitR; [done |].
-      iFrame "H1 H3 H4 H5 H6". iFrame "HL HD Hq".
-    - rewrite /fs_mclean. iDestruct "Hpay" as "[[HL HD] %He]".
-      iFrame "HL". iIntros "HL".
-      iSplitR; [done |]. iSplitR; [done |]. iSplitR; [done |].
-      iFrame "H1 H3 H4 H5 H6". iFrame "HL HD". done.
-  Qed.
-
+  
   (* ONE BYTE of a buffer's data area, borrowed and given back at a new byte
      list -- [ByteBuf.bb_byte_acc] over [buf_own]'s list form. *)
   Lemma ba_buf_byte (pb : mword 64) (bno dsk : mword 32)
@@ -4232,7 +4207,7 @@ Section BallocMain.
        fresh existential that no contract above balloc ever names. *)
     iEval (rewrite /bio_locked) in "Hheld".
     iDestruct (iu_held_k with "Hheld") as %Hkk.
-    iDestruct (ba_held_L with "Hheld") as "[HL Hbackl]".
+    iDestruct (bio_held_fs_L with "Hheld") as "[HL Hbackl]".
     iApply fupd_wp.
     iMod (bitmap_read ⊤ γfs bmapstart cov logstart size bs0
             ltac:(solve_ndisj) with "Hbminv [HL]") as "(%Hex & HL)".

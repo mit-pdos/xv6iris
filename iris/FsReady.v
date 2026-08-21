@@ -220,8 +220,8 @@ Section FsReady.
 
   (* ...and the region-wide inum fact in the QUANTIFIED, split form the
      content-independent bundles ([SpecFileread.fileread_fs_env],
-     [SpecFilestat.filestat_fs_env], [SpecFileclose.fileclose_ic_env]) state
-     it in.  Same fact, two spellings; this is the bridge. *)
+     [SpecFilestat.filestat_fs_env]) state it in.  Same fact, two
+     spellings; this is the bridge. *)
   Lemma fgo_iblock_cov : fs_geom_ok ->
     forall inum : mword 32, bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
       DinodeEnc.IBLOCK inum icfg_ist ∈ fsc_cov.

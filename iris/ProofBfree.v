@@ -24,7 +24,7 @@
    names no set.  The proof touches the invariant exactly twice:
 
      - after bread, [BitmapInv.bitmap_read_own] against the handle's
-       MACHINERY half ([bf_held_L]) -- the client half never leaves --
+       MACHINERY half ([BioFs.bio_held_fs_L]) -- the client half never leaves --
        learns [bs0 = bitmap_bytes used] for some [used], [bitmap_ok] at it,
        and [bi ∈ used];
      - at log_write, [SpecLogWrite.wp_log_write_au] fired with
@@ -89,6 +89,7 @@ Require Import ProcDefs.  (* [proc_priv_bare] *)
 Require Import WpUart.
 Require Import BufOwn BcacheInv BioInv.
 Require Import FsBlocks LogInv.
+Require Import BioFs.  (* [bio_held_fs_L] *)
 Require Import DinodeSlot.
 Require Import BitmapEnc BitmapInv.
 Require Import CodeBfree.
@@ -503,32 +504,7 @@ Section BfreeDefs.
     iExact "Hby".
   Qed.
 
-  (* THE BLOCK'S MACHINERY HALF, out of the handle and back -- the shape
-     [BitmapInv.bitmap_read_own] and [InodeRegion]'s readers want.  A
-     verbatim copy of [ProofIlock.il_held_L] / [ProofIupdate.iu_held_L];
-     each lives in its own module, and importing a proof file from a proof
-     file is exactly what the spec-module discipline forbids. *)
-  Lemma bf_held_L (bn : bio_names) (γfs : fs_names) (γd : disk_names)
-      (dev : mword 32) (cov : gset Z) (kb : nat) (pidv dv bno : mword 32)
-      (bs bsl bsd : list (bv 8)) (d : bool) :
-    bio_held bn (fs_view γfs γd dev cov) kb pidv dv bno bs bsl bsd d -∗
-      (uint bno ↪[fs_L γfs]{#(1/2)} bsl) ∗
-      ((uint bno ↪[fs_L γfs]{#(1/2)} bsl) -∗
-       bio_held bn (fs_view γfs γd dev cov) kb pidv dv bno bs bsl bsd d).
-  Proof.
-    rewrite /bio_held /bio_pay /fs_view /=.
-    iIntros "(%A & %B & %C & H1 & H3 & H4 & H5 & H6 & Hpay)".
-    destruct d.
-    - rewrite /fs_mdirty. iDestruct "Hpay" as "[[HL HD] Hq]".
-      iFrame "HL". iIntros "HL".
-      iSplitR; [done |]. iSplitR; [done |]. iSplitR; [done |].
-      iFrame "H1 H3 H4 H5 H6". iFrame "HL HD Hq".
-    - rewrite /fs_mclean. iDestruct "Hpay" as "[[HL HD] %He]".
-      iFrame "HL". iIntros "HL".
-      iSplitR; [done |]. iSplitR; [done |]. iSplitR; [done |].
-      iFrame "H1 H3 H4 H5 H6". iFrame "HL HD". done.
-  Qed.
-
+  
   (* THE CONTINUATION, named so it is not re-traversed by every proofmode
      split (claude-notes/optimization.md). *)
   Definition bf_cont `{GEN : GenId} `{CID0 : CpuId}
@@ -1392,7 +1368,7 @@ Section ProofBfreeMain.
        goes back; only facts come out.  ([bitmap_read_own].) *)
     iEval (rewrite /bio_locked) in "Hheld".
     iDestruct (iu_held_k with "Hheld") as %Hkk.
-    iDestruct (bf_held_L with "Hheld") as "[HL Hbackl]".
+    iDestruct (bio_held_fs_L with "Hheld") as "[HL Hbackl]".
     iEval (rewrite HbnoB) in "HL".
     iApply fupd_wp.
     iMod (bitmap_read_own ⊤ γfs bmapstart cov logstart size bi bs0

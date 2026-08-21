@@ -43,6 +43,20 @@ fragment in a client's hand MEANS, who mints/spends it, and why it exists.
 | `fs_own` | third `ghost_map` (`Excl`-style per-block token) | the exclusive per-block ownership token behind the buffer sleep-lock discipline. |
 | `bio_ctx` / `fs_view` | the buffer-cache invariant | owns the physical buffer array and the `fs_L`/`fs_dirty` authorities; `fs_view γfs γd dev cov` is the fs-side lens on it. |
 
+## 1b. The block bitmap (`BitmapInv.v`, invariant `bitmapN`)
+
+| piece | type / home | meaning |
+|---|---|---|
+| `bitmap_inv γfs bms cov ls size` | `inv bitmapN (∃ used, bitmap_res …)` | THE OWNER of the free-space state: the pure `bitmap_ok`, the bitmap block's `fsblock` half at `bitmap_bytes used`, and the FREE POOL (one `fsblock`+`blk_own` per clear bit) — at an EXISTENTIAL set no contract names.  Persistent; a `fs_ready` conjunct (`fs_ready_bitmap`); allocated once in `fs_cfg_alloc`'s era fupd. |
+| `bitmap_read` / `bitmap_read_own` | mask-preserving openings | between `bread` and `brelse`, the handle's machinery half against the parked client half names `∃ used, bs = bitmap_bytes used ∧ bitmap_ok`; the `_own` form adds `b ∈ used` from the caller's `blk_own` — the "freeing free block" panic refutation. |
+| `bitmap_alloc_au` / `bitmap_free_au` | `wp_log_write_au` suppliers | the ONLY moments the client half leaves the invariant: balloc's sets a bit and takes `free_blk bi` (+ its cov/log facts) out of the pool; bfree's clears a bit and deposits the caller's `free_blk b`.  Stated at the CALLER's set, `bitmap_bytes_eq_*` bridge to the parked one. |
+| `blk_own γfs b` | full `ghost_map` element (`FsBlocks.v`) | unchanged: the exclusive per-block token balloc hands out and bfree consumes; its exclusivity against the pool is the alloc/free handshake. |
+
+Design: [`fs-bitmap.md`](fs-bitmap.md) §"Who owns `bitmap_res` between
+calls".  No fs contract mentions the bitmap's set; balloc/bfree (and the
+pre-seal ireclaim cone) take the constituent `bitmap_inv` row, everything
+post-seal reads it off `fs_ready`.
+
 ## 2. The log
 
 | piece | type / home | meaning |
@@ -238,12 +252,12 @@ step rather than a sentence:
 | piece | statement | why |
 |---|---|---|
 | `FsReady.fs_ready_seal` | `ireg_boot ==∗ ireg_open` | one `ity_shoot`, no invariant, no mask.  **The boot-freedom witness**: `ireg_boot` is exclusive, so after this step no second seal is possible and nothing boot-shaped survives — `ireg_open` is an existential over the one-shot's value and mentions nothing else. |
-| `FsReady.fs_ready_pre` | the NINETEEN non-regime conjuncts (two of them pure — `printk_gen_contract`, `fs_geom_ok`), as one persistent assertion | what a seal SITE must hold.  Every one of them is either persistent boot material the chain already carries or a bundle `SpecFsinit`'s post hands back, so the site can be checked constituent by constituent — the checked ledger is fs-cfg-boot.md's stage-(f) charter, table (f-3). |
+| `FsReady.fs_ready_pre` | the TWENTY non-regime conjuncts (two of them pure — `printk_gen_contract`, `fs_geom_ok`), as one persistent assertion | what a seal SITE must hold.  Every one of them is either persistent boot material the chain already carries or a bundle `SpecFsinit`'s post hands back, so the site can be checked constituent by constituent — the checked ledger is fs-cfg-boot.md's stage-(f) charter, table (f-3). |
 | `FsReady.fs_ready_establish` | `fs_ready_pre -∗ ireg_boot ==∗ fs_ready` | **the producer `fs_world` never had.**  Booting is over the instant the predicate exists. |
 
 ### 7b. `fs_ready` — the runtime file system as ONE persistent assertion
 
-`FsReady.fs_ready` is **PARAMETER-FREE**: 20 conjuncts (the two text/data
+`FsReady.fs_ready` is **PARAMETER-FREE**: 21 conjuncts (the two text/data
 certificates, the printk credential pair, the block/log/crash fabric,
 `gen_cert`, the disk fabric and its lock as ONE existentially-quantified
 conjunct — the three virtio ring pages left `fscfg` in fs-cfg-boot.md's R1,
@@ -252,7 +266,8 @@ recovered by `disk_geom_agree` — the icache's four, `ireg_inv` +
 `kalloc_env` (SpecFileclose's pipe arm names the pair, and a hidden `∃`
 admits no tie), `⌜fs_geom_ok⌝` — the nineteen pure premises every fs
 syscall used to state, as one record — and the four discarded superblock
-cells `fs_sb_cells`) and not one argument.  Every ghost name it used to
+cells `fs_sb_cells`, and the block bitmap's invariant `bitmap_inv` —
+§1b) and not one argument.  Every ghost name it used to
 take is ambient — the four the inode cache already owned (`icfg_log`,
 `icfg_ist`, `icfg_nib`, `icfg_dev`) and the SIXTEEN `FsCfg.fscfg` adds
 (nineteen before R1).

@@ -249,10 +249,9 @@ Section SpecFilestat.
 
   (* ---- the inode arm's environment: ilock's and iunlock's ----
 
-     CONTENT-INDEPENDENT, in [SpecFileclose.fileclose_fs_env]'s form: the
-     escrow FAMILY, the sleeplock FAMILY, the inode region, the block cache,
-     the disk fabric, and the region-WIDE inum geometry (quantified, exactly
-     as [fileclose_ic_env]'s is, because the inum is existential in the
+     CONTENT-INDEPENDENT: the escrow FAMILY, the sleeplock FAMILY, the
+     inode region, the block cache, the disk fabric, and the region-WIDE
+     inum geometry (quantified, because the inum is existential in the
      reference).  It mentions neither [Cf] nor any slot, so a syscall that has
      not yet borrowed its descriptor can own it -- which is the whole point.
      The per-inode pieces come out of the reference at the call

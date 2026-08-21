@@ -70,12 +70,14 @@
        ambient names and one at `fn`'s are the same bundle modulo the ties;
        nothing has to be existentially guessed.  `sysc_fs_env_all` applies
        the ties once, for the whole bundle, and hands the old
-       twenty-five-conjunct shape back -- which is why the arms that predate
-       this change did not move.  `sysc_ic_env` is the one row of that shape
-       with no spec-side name behind it any more: `SpecFileclose` retired
-       `fileclose_ic_env` (fileclose takes `⌜fclose_ties fn⌝` and `fs_ready`
-       instead), and the body is kept HERE because it is the shape eleven
-       arms' positional destructs are written against.
+       twenty-four-conjunct shape back -- which is why the arms that predate
+       this change did not move.  The ONE row it does not hand back is the
+       icache's: `SpecFileclose` retired `fileclose_ic_env` (fileclose takes
+       `⌜fclose_ties fn⌝` and `fs_ready` instead), and rather than keep a
+       copy of a deleted definition, the fifteen conjuncts are DERIVED from
+       the bundle's own `fs_ready` by `sysc_ic_env_of_ready` -- one lemma
+       application per arm, in the old body's order, so the arms' inner
+       destruct patterns are still verbatim.
    (2) FOUR ROWS THAT COULD NOT BE STATED AT ALL BEFORE now come for free:
        `sb_ninodes` and `sb_size` (there is no `fclose_names` field for the
        inode count, so the old closer bundle never carried them),
@@ -596,11 +598,12 @@ Section SyscallVocab.
      bundle at [fn] and carrying the ties makes both a rewrite away;
      spelling it at [icfg] would have made the second unreachable.
 
-     [sysc_ic_env fn] (below) IS PROJECTED WHOLE rather than unpacked, and it
-     is where [is_itable2]/[itable_inv] live -- they used to be conjuncts of
-     [syscall_env] in their own right, at fresh existentials.  Unpacking it
-     into [sysc_fs_env_all] would move eleven arms' positional destructs for
-     nothing.
+     THE ICACHE IS NOT A ROW OF THIS BUNDLE, nor of [sysc_fs_env_all].
+     [is_itable2]/[itable_inv]/[ic_escrows]/[ic_sleeplocks] used to be
+     conjuncts of [syscall_env] in their own right, at fresh existentials;
+     they are conjuncts of [FsReady.fs_ready] now, so an arm that wants them
+     derives them with [sysc_ic_env_of_ready] (below) out of the very
+     [fs_ready] this bundle already carries.
 
      [procs_inv (fcn_procs fn)] IS here, unlike in the first version of this
      bundle.  [sysc_arm_pre] already carries [procs_inv γs] at the DISPATCH's
@@ -684,14 +687,21 @@ Section SyscallVocab.
     - exact (sct_size _ _ _ T).
   Qed.
 
-  (* THE INODE CACHE, AS THE ARMS READ IT OFF THE BUNDLE.  This is the body
-     [SpecFileclose.fileclose_ic_env] used to have, kept HERE because it is
-     [sysc_fs_env_all]'s shape that the arms' positional destructs are
-     written against -- the spec-side name is gone (fileclose takes
-     [⌜fclose_ties fn⌝] and [FsReady.fs_ready] instead), but the nine pure
-     facts and six invariants are still exactly what the create/namei
-     entries spell one by one, at [fn]'s own fields. *)
-  Definition sysc_ic_env (fn : fclose_names) : iProp Σ :=
+  (* THE INODE CACHE, AS THE ARMS READ IT OFF THE BUNDLE.  It USED TO be a
+     [Definition] here -- a verbatim copy of the body the DELETED
+     [SpecFileclose.fileclose_ic_env] had -- carried as one row of
+     [sysc_fs_env_all] so that the eleven arms' positional destructs would
+     not have to move.  A copy of a deleted definition is still a copy: every
+     one of these fifteen conjuncts is a PROJECTION of the
+     [FsReady.fs_ready] the bundle already carries, re-spelled at [fn]'s own
+     fields by [sysc_ties].  So it is a LEMMA now, the row is gone from
+     [sysc_fs_env_all], and an arm that wants the cache asks for it ONCE --
+     one lemma application per arm, so the derivation is shared rather than
+     unfolded into each proof term.  The CONJUNCT ORDER is the old body's,
+     which is what keeps the arms' inner destruct patterns verbatim. *)
+  Lemma sysc_ic_env_of_ready (pj : mword 64) (bn : bio_names)
+      (fn : fclose_names) :
+    sysc_fs_env pj bn fn -∗
     (⌜fcn_dev fn = icfg_dev⌝ ∗
      ⌜fcn_nib fn = icfg_nib⌝ ∗
      ⌜0 < fcn_size fn <= BPB⌝ ∗
@@ -713,9 +723,53 @@ Section SyscallVocab.
      InodeRegion.ireg_inv (fcn_ireg fn) (fcn_fs fn) (fcn_inodestart fn) (fcn_nib fn) ∗
      ireg_open ∗
      IcacheEscrow.ic_sleeplocks (fcn_ic fn))%I.
-
-  Global Instance sysc_ic_env_persistent fn : Persistent (sysc_ic_env fn).
-  Proof. rewrite /sysc_ic_env. apply _. Qed.
+  Proof.
+    (* the three rows between the ties and [fs_ready] -- [procs_inv] and the
+       two disk rows -- are nothing this bundle is about. *)
+    iIntros "(%T & _ & _ & _ & #Hrdy)".
+    iDestruct (FsReady.fs_ready_geom with "Hrdy") as "%G".
+    iDestruct (FsReady.fs_ready_icache with "Hrdy")
+      as "(#Hit & #Hitinv & #Hesc & #Hsl)".
+    iDestruct (FsReady.fs_ready_region with "Hrdy") as "[#Hireg #Hropen]".
+    (* THE TIES, APPLIED TO THE WHOLE GOAL AT ONCE -- [sysc_fs_env_all]'s
+       idiom, and for its reason: the proofmode goal IS [envs_entails Δ _],
+       so an UNSCOPED rewrite re-spells the four hypotheses above at [fn]'s
+       fields and turns the two [icfg] rows of the conclusion into
+       [reflexivity] in the same step.  Only the nine ties whose ambient side
+       actually OCCURS are in the chain: [fsc_bmapstart]/[fsc_size] reach
+       this goal through no hypothesis (the pure rows below carry them out of
+       [G] instead), and a rewrite with no subterm to hit is an error. *)
+    rewrite -(sct_fs _ _ _ T) -(sct_cov _ _ _ T) -(sct_logstart _ _ _ T)
+            -(sct_ireg _ _ _ T) -(sct_ic _ _ _ T) -(sct_tlock _ _ _ T)
+            -(sct_inodestart _ _ _ T) -(sct_nib _ _ _ T) -(sct_dev _ _ _ T).
+    iSplit; [ iPureIntro; reflexivity |].
+    iSplit; [ iPureIntro; reflexivity |].
+    iSplit.
+    { iPureIntro. rewrite (sct_size _ _ _ T). exact (FsReady.fgo_size G). }
+    iSplit.
+    { iPureIntro. rewrite (sct_bmapstart _ _ _ T). exact (FsReady.fgo_bm_nn G). }
+    iSplit.
+    { iPureIntro. rewrite (sct_bmapstart _ _ _ T) (sct_cov _ _ _ T).
+      exact (FsReady.fgo_bm_cov G). }
+    iSplit.
+    { iPureIntro. rewrite (sct_bmapstart _ _ _ T) (sct_logstart _ _ _ T).
+      exact (FsReady.fgo_bm_out G). }
+    iSplit.
+    { iPureIntro. rewrite (sct_inodestart _ _ _ T). exact (FsReady.fgo_ist_nn G). }
+    iSplit.
+    { iPureIntro. rewrite (sct_inodestart _ _ _ T) (sct_cov _ _ _ T)
+                          (sct_logstart _ _ _ T) (sct_nib _ _ _ T).
+      exact (FsReady.fgo_iblocks G). }
+    iSplit.
+    { iPureIntro. rewrite (sct_cov _ _ _ T) (sct_size _ _ _ T).
+      exact (FsReady.fgo_covbelow G). }
+    iSplit; [ iExact "Hit"     |].
+    iSplit; [ iExact "Hitinv"  |].
+    iSplit; [ iExact "Hesc"    |].
+    iSplit; [ iExact "Hireg"   |].
+    iSplit; [ iExact "Hropen"  |].
+    iExact "Hsl".
+  Qed.
 
   (* THE UNPACK, AND WHY IT IS SHAPED LIKE THE OLD BUNDLE.
 
@@ -764,7 +818,10 @@ Section SyscallVocab.
     is_lock (fcn_kmem fn) (mword_of_int KernelSyms.kmem) "kmem"%string
       (kmem_res (fcn_kalloc fn) (mword_of_int (KernelSyms.kmem + 24))) ∗
     kalloc_avail (fcn_kalloc fn) None ∗
-    sysc_ic_env fn ∗
+    (* [sysc_ic_env fn] USED TO BE HERE, between the allocator and
+       [ireg_open].  It is [sysc_ic_env_of_ready] now: the icache rows are a
+       projection of this bundle's own [fs_ready], so an arm derives them
+       instead of unpacking a row that had to be rebuilt here first. *)
     ireg_open ∗
     (* ---- the four rows the old bundle could not state ---- *)
     ⌜bitmap_geom_ok (fcn_cov fn) (fcn_logstart fn) (fcn_bmapstart fn) (fcn_size fn)⌝ ∗
@@ -851,39 +908,11 @@ Section SyscallVocab.
     iSplit; [ iExact "Hdlock" |].
     iSplit; [ iExact "Hkm"    |].
     iSplit; [ iExact "Hav"    |].
-    (* the inode cache, as the one bundle [SpecFileclose] states *)
-    iSplit.
-    { rewrite /sysc_ic_env.
-      (* [rewrite /sysc_ic_env] re-introduces [icfg_dev]/[icfg_nib] from
-         the DEFINITION's body, behind the blanket rewrite above -- so these
-         two rows are the ties again rather than [reflexivity]. *)
-      iSplit; [ iPureIntro; exact (sct_dev _ _ _ T) |].
-      iSplit; [ iPureIntro; exact (sct_nib _ _ _ T) |].
-      iSplit.
-      { iPureIntro. rewrite (sct_size _ _ _ T). exact (FsReady.fgo_size G). }
-      iSplit.
-      { iPureIntro. rewrite (sct_bmapstart _ _ _ T). exact (FsReady.fgo_bm_nn G). }
-      iSplit.
-      { iPureIntro. rewrite (sct_bmapstart _ _ _ T) (sct_cov _ _ _ T).
-        exact (FsReady.fgo_bm_cov G). }
-      iSplit.
-      { iPureIntro. rewrite (sct_bmapstart _ _ _ T) (sct_logstart _ _ _ T).
-        exact (FsReady.fgo_bm_out G). }
-      iSplit.
-      { iPureIntro. rewrite (sct_inodestart _ _ _ T). exact (FsReady.fgo_ist_nn G). }
-      iSplit.
-      { iPureIntro. rewrite (sct_inodestart _ _ _ T) (sct_cov _ _ _ T)
-                            (sct_logstart _ _ _ T) (sct_nib _ _ _ T).
-        exact (FsReady.fgo_iblocks G). }
-      iSplit.
-      { iPureIntro. rewrite (sct_cov _ _ _ T) (sct_size _ _ _ T).
-        exact (FsReady.fgo_covbelow G). }
-      iSplit; [ iExact "Hit"     |].
-      iSplit; [ iExact "Hitinv"  |].
-      iSplit; [ iExact "Hesc"    |].
-      iSplit; [ iExact "Hireg"   |].
-      iSplit; [ iExact "Hropen"  |].
-      iExact "Hsl". }
+    (* the icache row is GONE from here -- [sysc_ic_env_of_ready] derives it
+       from [fs_ready] directly.  [Hit]/[Hitinv]/[Hesc]/[Hsl] stay
+       DESTRUCTED above rather than dropped: the blanket rewrite needs
+       [fsc_ic]/[fsc_itlock] to occur somewhere in [Δ], and those four rows
+       are the only place they do. *)
     iSplit; [ iExact "Hropen" |].
     iSplit.
     { iPureIntro. rewrite (sct_cov _ _ _ T) (sct_logstart _ _ _ T)
@@ -1004,8 +1033,8 @@ Section SyscallVocab.
     iDestruct (sysc_fs_env_all with "Hfs") as
       "(%Hdev & %Hnib & %Hlogn & _ & _ & _ & _ & _ & _ & _ & _ & _ &
         _ & #Hpanic & #Hbio & #Hlog & #Hseam & #Hgen & #Hdevi & #Hgeom &
-        #Hdlock & _ & _ & #Hic & _)".
-    iDestruct "Hic" as
+        #Hdlock & _ & _ & _)".
+    iDestruct (sysc_ic_env_of_ready with "Hfs") as
       "(_ & _ & _ & _ & _ & _ & _ & _ & _ & #Hit & #Hitinv & #Hesc & #Hireg &
         #Hropen & #Hsl)".
     (* assembled conjunct by conjunct rather than with [iFrame "#"]: the
@@ -2058,8 +2087,8 @@ Section SyscallVocab.
     iDestruct (sysc_fs_env_all with "Hfs") as
       "(%Hdev & %Hnib & _ & _ & _ & _ & _ & _ & _ & _ & _ & %Hlg &
         _ & _ & #Hbio & _ & _ & _ & #Hdevi & #Hgeom & #Hdlock & _ & _ &
-        #Hic & _)".
-    iDestruct "Hic" as
+        _)".
+    iDestruct (sysc_ic_env_of_ready with "Hfs") as
       "(_ & _ & _ & _ & _ & _ & %Hist0 & %Hib & _ & #Hit & #Hitinv & #Hesc &
         #Hireg & _ & #Hsl2)".
     iDestruct (sysc_bm_cells with "Hfs") as "(_ & #Hisp & _)".
@@ -2099,8 +2128,8 @@ Section SyscallVocab.
     iDestruct (sysc_fs_env_all with "Hfs") as
       "(%Hdev & %Hnib & _ & _ & _ & _ & _ & _ & _ & _ & _ & %Hlg &
         _ & _ & #Hbio & _ & _ & _ & #Hdevi & #Hgeom & #Hdlock & _ & _ &
-        #Hic & _)".
-    iDestruct "Hic" as
+        _)".
+    iDestruct (sysc_ic_env_of_ready with "Hfs") as
       "(_ & _ & _ & _ & _ & _ & %Hist0 & %Hib & _ & #Hit & #Hitinv & #Hesc &
         #Hireg & _ & #Hsl2)".
     iDestruct (sysc_bm_cells with "Hfs") as "(_ & #Hisp & _)".
@@ -2159,12 +2188,13 @@ Section SyscallVocab.
     iFrame "Hpi Hkm Hav".
   Qed.
 
-  (* THE BUNDLE IS FIVE ROWS SHORTER THAN THE OLD ONE, and every row it lost
-     it lost to [FsReady.fs_ready]: the block/log fabric, the crash seam, the
-     era certificate, the icache's own bundle and the bitmap are all
-     projections of the ONE predicate this carries, so what is left to
-     assemble here is the four process pures, the ties, [procs_inv], the two
-     disk rows [sysc_fs_env] holds at [fn]'s own ring pages, and the slots. *)
+  (* THE BUNDLE IS SEVEN ROWS SHORTER THAN THE OLD ONE, and every row it
+     lost it lost to [FsReady.fs_ready]: the block/log fabric, the crash
+     seam, the era certificate, the icache's own bundle, the bitmap and --
+     since the ring pages stopped being [fscfg] fields -- the two disk rows
+     as well are all projections of the ONE predicate this carries.  What is
+     left to assemble is the four process pures, the ties, [procs_inv],
+     [fs_ready] itself, and the slots. *)
   Lemma sysc_fclose_fs_env (pj : mword 64) (bn : bio_names) (fn : fclose_names)
       (eb : bool) :
     sysc_fs_env pj bn fn -∗ bslots bn 3 -∗
@@ -2172,7 +2202,7 @@ Section SyscallVocab.
   Proof.
     iIntros "#Hfs Hbs".
     iDestruct (sysc_fs_env_ties with "Hfs") as "%T".
-    iDestruct "Hfs" as "(_ & #Hpi & #Hgeom & #Hdlock & #Hrdy)".
+    iDestruct "Hfs" as "(_ & #Hpi & _ & _ & #Hrdy)".
     rewrite -(sct_bio _ _ _ T).
     rewrite /fileclose_fs_env_nopid.
     iSplit; [ iPureIntro; reflexivity |].
@@ -2184,8 +2214,6 @@ Section SyscallVocab.
        [bslots], both definition-valued, so a frame walks each name past them
        by CONVERSION -- 58.4 s, measured on this sentence's predecessor. *)
     iSplitR; [ iExact "Hpi"    |].
-    iSplitR; [ iExact "Hgeom"  |].
-    iSplitR; [ iExact "Hdlock" |].
     iSplitR; [ iExact "Hrdy"   |].
     iExact "Hbs".
   Qed.
@@ -2237,8 +2265,8 @@ Section SyscallVocab.
     iDestruct (sysc_fs_env_all with "Hfs") as
       "(%Hdev & %Hnib & _ & _ & _ & _ & _ & _ & _ & _ & _ & %Hlg &
         _ & _ & #Hbio & #Hlog & #Hseam & #Hgen & #Hdevi & #Hgeom & #Hdlock &
-        _ & _ & #Hic & _ & %Hbg & _ & _ & #Hsz & %Hpg & #Hpe)".
-    iDestruct "Hic" as
+        _ & _ & _ & %Hbg & _ & _ & #Hsz & %Hpg & #Hpe)".
+    iDestruct (sysc_ic_env_of_ready with "Hfs") as
       "(_ & _ & _ & _ & _ & _ & %Hist0 & %Hib & _ & #Hit & #Hitinv & #Hesc &
         #Hireg & _ & #Hsl2)".
     iDestruct (sysc_bm_cells with "Hfs") as "(#Hbmst & #Hisp & #Hbmr)".
@@ -2285,7 +2313,7 @@ Section SyscallVocab.
     fileclose_fs_env_nopid fn n eb pj -∗ bslots bn 3.
   Proof.
     intro Hb. rewrite /fileclose_fs_env_nopid Hb.
-    by iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & $)".
+    by iIntros "(_ & _ & _ & _ & _ & _ & _ & $)".
   Qed.
 
 End SyscallVocab.
@@ -2915,16 +2943,16 @@ Section SyscallArms.
     iPoseProof "Henv" as "#Henvc".
     iDestruct (syscall_env_all with "Henvc") as (γa γp γw γft γtk γpr γud γvd)
       "(#Hkalloc & #Hnextpid & #Hpav & #Hwaitlk & #Hftable & _ & _ & #Hfsenv)".
-    (* the itable's names are [fn]'s own now, and they reach this arm inside
-       [sysc_ic_env] rather than as [syscall_env] conjuncts of their own
-       (see [sysc_fs_env]).  [SpecSysFork] spells the device at the AMBIENT
-       [icfg_dev], so the tie is what bridges the two spellings. *)
+    (* the itable's names are [fn]'s own now, and they reach this arm through
+       [sysc_ic_env_of_ready] rather than as [syscall_env] conjuncts of their
+       own (see [sysc_fs_env]).  [SpecSysFork] spells the device at the
+       AMBIENT [icfg_dev], so the tie is what bridges the two spellings. *)
     iDestruct (sysc_fs_env_all with "Hfsenv") as "(%Hdev & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
-                            _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hic & _)".
+                            _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _)".
     (* the REGION handle comes out of the same bundle, one conjunct past
        [ic_escrows]: idup's [ref++] is a ledger move since increment IVe
        (iclaim-ledger.md §3.19), so [SpecSysFork] passes it down to kfork. *)
-    iDestruct "Hic" as
+    iDestruct (sysc_ic_env_of_ready with "Hfsenv") as
       "(_ & _ & _ & _ & _ & _ & _ & _ & _ & #Hitable & #Hitinv & _ & #Hireg & _)".
     iEval (rewrite Hdev) in "Hitable".
     (* ---- the call ---- *)
@@ -3046,8 +3074,8 @@ Section SyscallArms.
     (* the ties, then the icache bundle's own nine pure facts *)
     iDestruct (sysc_fs_env_all with "Hfsenv") as
       "(%Hdev & %Hnib & %Hlogn & %Hist & %Hroot & %Hnib0 & _ & _ & _ & _ & _ &
-        %Hlg & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hic & _)".
-    iDestruct "Hic" as
+        %Hlg & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _)".
+    iDestruct (sysc_ic_env_of_ready with "Hfsenv") as
       "(_ & _ & %Hsize & %Hbm0 & %Hbmc & %Hbml & %Hist0 & %Hireg & %Hcb & _)".
     (* ---- the three consumable families, carved to sys_exec's own shape ---- *)
     iDestruct (sysc_bm_cells with "Hfsenv") as "(#Hbmp & #Hisp & #Hbmr)".
@@ -3159,7 +3187,7 @@ Section SyscallArms.
     iDestruct (sysc_fs_env_all with "Hfsenv") as
       "(_ & _ & _ & _ & _ & _ & %Hdq & %Hbio & %Hpja & %Hjn & %Hlk & %Hlg &
         #Hpi & #Hpanic & #Hbio' & #Hlog & #Hseam & #Hgen & #Hdevi & #Hgeom &
-        #Hdlock & #Hkmem & #Hka & #Hic & _)".
+        #Hdlock & #Hkmem & #Hka & _)".
     (* THE TWO ROWS THAT REPLACED [fileclose_ic_env fn]: the eighteen-equation
        tie record and the ONE predicate every fs fact is a projection of.
        Both persistent, both already in hand -- the ties come off
@@ -3316,7 +3344,7 @@ Section SyscallArms.
     iDestruct (sysc_fs_env_all with "Hfsenv") as
       "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
         _ & #Hpanic & _ & _ & _ & _ & #Hdevi & _ & _ &
-        _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hpe)".
+        _ & _ & _ & _ & _ & _ & _ & _ & #Hpe)".
     (* filewrite's FD_INODE arm is the whole log cone, so it wants all THREE
        block slots -- unlike fstat/read, which take one and hand it back. *)
     (* filewrite's DEVICE arm wants the TX lock, not the cons lock --
@@ -3553,8 +3581,8 @@ Section SyscallArms.
     iDestruct (sysc_fs_env_all with "Hfsenv") as
       "(%Hdev & %Hnib & %Hlogn & %Hist & %Hroot & %Hnib0 & _ & _ & _ & _ & _ &
         %Hlg & _ & #Hpanic & #Hbio & #Hlog & #Hseam & #Hgen & #Hdevi & #Hgeom &
-        #Hdlock & _ & _ & #Hic & _)".
-    iDestruct "Hic" as
+        #Hdlock & _ & _ & _)".
+    iDestruct (sysc_ic_env_of_ready with "Hfsenv") as
       "(_ & _ & %Hsize & %Hbm0 & %Hbmc & %Hbml & %Hist0 & %Hib & %Hcb &
         #Hit & #Hitinv & #Hesc & #Hireg & #Hropen & #Hsl2)".
     iDestruct (sysc_bm_cells with "Hfsenv") as "(#Hbmp & #Hisp & #Hbmr)".
@@ -3655,8 +3683,8 @@ Section SyscallArms.
     iDestruct (sysc_fs_env_all with "Hfsenv") as
       "(%Hdev & %Hnib & %Hlogn & %Hist & %Hroot & %Hnib0 & _ & _ & _ & _ & _ &
         %Hlg & _ & _ & #Hbio & #Hlog & #Hseam & #Hgen & #Hdevi & #Hgeom &
-        #Hdlock & _ & _ & #Hic & _ & %Hbg & %Hnin & _ & #Hsbs & %Hprg & #Hpr)".
-    iDestruct "Hic" as
+        #Hdlock & _ & _ & _ & %Hbg & %Hnin & _ & #Hsbs & %Hprg & #Hpr)".
+    iDestruct (sysc_ic_env_of_ready with "Hfsenv") as
       "(_ & _ & %Hsize & %Hbm0 & %Hbmc & %Hbml & %Hist0 & %Hib & %Hcb &
         #Hit & #Hitinv & #Hesc & #Hireg & #Hropen & #Hsl2)".
     iDestruct (sysc_bm_cells with "Hfsenv") as "(#Hbmp & #Hisp & #Hbmr)".
@@ -3735,8 +3763,8 @@ Section SyscallArms.
     iDestruct (sysc_fs_env_all with "Hfsenv") as
       "(%Hdev & %Hnib & %Hlogn & %Hist & %Hroot & %Hnib0 & _ & _ & _ & _ & _ &
         %Hlg & _ & _ & #Hbio & #Hlog & #Hseam & #Hgen & #Hdevi & #Hgeom &
-        #Hdlock & _ & _ & #Hic & _ & %Hbg & %Hnin & _ & #Hsbs & %Hprg & #Hpr)".
-    iDestruct "Hic" as
+        #Hdlock & _ & _ & _ & %Hbg & %Hnin & _ & #Hsbs & %Hprg & #Hpr)".
+    iDestruct (sysc_ic_env_of_ready with "Hfsenv") as
       "(_ & _ & %Hsize & %Hbm0 & %Hbmc & %Hbml & %Hist0 & %Hib & %Hcb &
         #Hit & #Hitinv & #Hesc & #Hireg & #Hropen & #Hsl2)".
     iDestruct (sysc_bm_cells with "Hfsenv") as "(#Hbmp & #Hisp & #Hbmr)".
@@ -4047,9 +4075,9 @@ Section SyscallArms.
     iDestruct (sysc_fs_env_all with "Hfsenv") as
       "(%Hdev & %Hnib & %Hlogn & %Hist & %Hroot & %Hnib0 & _ & _ & _ & _ & _ &
         %Hlg & _ & _ & #Hbio & #Hlog & #Hseam & #Hgen & #Hdevi & #Hgeom &
-        #Hdlock & _ & _ & #Hic & _ & %Hbmgeo & %Hnin & #Hsbn & #Hsbs &
+        #Hdlock & _ & _ & _ & %Hbmgeo & %Hnin & #Hsbn & #Hsbs &
         %Hprg & #Hpr)".
-    iDestruct "Hic" as
+    iDestruct (sysc_ic_env_of_ready with "Hfsenv") as
       "(_ & _ & %Hsize & %Hbm0 & %Hbmc & %Hbml & %Hist0 & %Hib & %Hcb &
         #Hit & #Hitinv & #Hesc & #Hireg & #Hropen & #Hsl2)".
     destruct Hnin as (Hn1 & Hn2 & Hn3 & Hn4).
@@ -4141,9 +4169,9 @@ Section SyscallArms.
     iDestruct (sysc_fs_env_all with "Hfsenv") as
       "(%Hdev & %Hnib & %Hlogn & %Hist & %Hroot & %Hnib0 & _ & _ & _ & _ & _ &
         %Hlg & _ & _ & #Hbio & #Hlog & #Hseam & #Hgen & #Hdevi & #Hgeom &
-        #Hdlock & _ & _ & #Hic & _ & %Hbmgeo & %Hnin & #Hsbn & #Hsbs &
+        #Hdlock & _ & _ & _ & %Hbmgeo & %Hnin & #Hsbn & #Hsbs &
         %Hprg & #Hpr)".
-    iDestruct "Hic" as
+    iDestruct (sysc_ic_env_of_ready with "Hfsenv") as
       "(_ & _ & %Hsize & %Hbm0 & %Hbmc & %Hbml & %Hist0 & %Hib & %Hcb &
         #Hit & #Hitinv & #Hesc & #Hireg & #Hropen & #Hsl2)".
     destruct Hnin as (Hn1 & Hn2 & Hn3 & Hn4).
@@ -4246,9 +4274,9 @@ Section SyscallArms.
     iDestruct (sysc_fs_env_all with "Hfsenv") as
       "(%Hdev & %Hnib & %Hlogn & %Hist & %Hroot & %Hnib0 & _ & _ & _ & _ & _ &
         %Hlg & _ & _ & #Hbio & #Hlog & #Hseam & #Hgen & #Hdevi & #Hgeom &
-        #Hdlock & _ & _ & #Hic & _ & %Hbmgeo & %Hnin & #Hsbn & #Hsbs &
+        #Hdlock & _ & _ & _ & %Hbmgeo & %Hnin & #Hsbn & #Hsbs &
         %Hprg & #Hpr)".
-    iDestruct "Hic" as
+    iDestruct (sysc_ic_env_of_ready with "Hfsenv") as
       "(_ & _ & %Hsize & %Hbm0 & %Hbmc & %Hbml & %Hist0 & %Hib & %Hcb &
         #Hit & #Hitinv & #Hesc & #Hireg & #Hropen & #Hsl2)".
     destruct Hnin as (Hn1 & Hn2 & Hn3 & Hn4).

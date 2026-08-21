@@ -23,11 +23,11 @@
        [inode_blocks] bundle move.  That asymmetry is why the two loops get
        different invariants rather than one parameterised one.
 
-   THE FREED SET.  Both loops accumulate blocks into the pool, and the
-   postcondition names the total as [InodeInv.bm_blocks bm].  The two
-   partial sums here ([bm_dir_freed], [bm_ent_freed]) are what the loop
-   invariants carry, and [bm_blocks_split] is the arithmetic that puts them
-   back together with the indirect block itself at the end.
+   THE FREED SET IS NOBODY'S BOOKKEEPING ANY MORE.  Both loops free into
+   [BitmapInv.bitmap_inv], the persistent invariant, so no partial sum is
+   carried and no assembly arithmetic exists: the [bm_dir_freed]/
+   [bm_ent_freed]/[bm_blocks_split] vocabulary this file used to define
+   died with the threaded bitmap (design/fs-bitmap.md).
 
    THE POINTER WALKS.  Neither loop indexes; both bump a pointer by 4
    ([addi s1,s1,4]) and compare against a precomputed limit ([s2]).  The
@@ -137,8 +137,7 @@ Qed.
 (* THE SKIP BRANCH.  When [ip->addrs[k]] is already zero the C frees
    nothing and stores nothing, so the loop's whole state must be unchanged
    -- and it is, definitionally: zeroing a slot that is already zero leaves
-   the list alone, and adding 0 to the freed set adds nothing, since
-   [bm_dir_freed] quotients 0 out. *)
+   the list alone. *)
 Lemma bm_dir_zeroed_skip (bm : blkmap) (k : nat) :
   (k < length (bm_dir bm))%nat ->
   bv_unsigned (bm_dir bm !!! k) = 0 ->
@@ -204,163 +203,6 @@ Proof.
     + exact (Hinj i j Hi Hj Hnz Heq).
 Qed.
 
-(* ===================================================================== *)
-(*  THE FREED SETS                                                       *)
-(* ===================================================================== *)
-
-(* what the direct loop has returned to the pool after k iterations *)
-Definition bm_dir_freed (bm : blkmap) (k : nat) : gset Z :=
-  list_to_set (map (fun i => bv_unsigned (bm_dir bm !!! i)) (seq 0 k)) ∖ {[ 0 ]}.
-
-(* what the indirect loop has returned after j iterations *)
-Definition bm_ent_freed (bm : blkmap) (j : nat) : gset Z :=
-  list_to_set (map (fun q => bv_unsigned (bm_ent bm !!! q)) (seq 0 j)) ∖ {[ 0 ]}.
-
-Lemma bm_dir_freed_0 (bm : blkmap) : bm_dir_freed bm 0 = ∅.
-Proof. rewrite /bm_dir_freed /=. set_solver. Qed.
-
-Lemma bm_ent_freed_0 (bm : blkmap) : bm_ent_freed bm 0 = ∅.
-Proof. rewrite /bm_ent_freed /=. set_solver. Qed.
-
-Lemma bm_dir_freed_step (bm : blkmap) (k : nat) :
-  bm_dir_freed bm (S k)
-  = bm_dir_freed bm k ∪ ({[ bv_unsigned (bm_dir bm !!! k) ]} ∖ {[ 0 ]}).
-Proof.
-  rewrite /bm_dir_freed seq_S map_app list_to_set_app_L /=. set_solver.
-Qed.
-
-Lemma bm_dir_freed_skip (bm : blkmap) (k : nat) :
-  bv_unsigned (bm_dir bm !!! k) = 0 ->
-  bm_dir_freed bm (S k) = bm_dir_freed bm k.
-Proof.
-  intros Hz. rewrite bm_dir_freed_step Hz. set_solver.
-Qed.
-
-Lemma bm_ent_freed_step (bm : blkmap) (j : nat) :
-  bm_ent_freed bm (S j)
-  = bm_ent_freed bm j ∪ ({[ bv_unsigned (bm_ent bm !!! j) ]} ∖ {[ 0 ]}).
-Proof.
-  rewrite /bm_ent_freed seq_S map_app list_to_set_app_L /=. set_solver.
-Qed.
-
-Lemma bm_ent_freed_skip (bm : blkmap) (q : nat) :
-  bv_unsigned (bm_ent bm !!! q) = 0 ->
-  bm_ent_freed bm (S q) = bm_ent_freed bm q.
-Proof.
-  intros Hz. rewrite bm_ent_freed_step Hz. set_solver.
-Qed.
-
-(* The pure set algebra behind "the pool grew by exactly the block just
-   freed", common to both loops' step lemmas and to [bm_blocks_split]'s
-   assembly: adding a nonzero block [c] to whatever is already excluded
-   ([S]) is a plain set union.  Proved once, over abstract [used]/[S]/[c],
-   so the itrunc instruction-chain proof discharges it with [exact] instead
-   of paying [set_solver]'s [naive_solver] search over a whole-function
-   proof's huge hypothesis context (see optimization.md's "never set_solver
-   inside a whole-function proof" rule). *)
-Lemma freed_pool_grow (used S : gset Z) (c : Z) :
-  c <> 0 ->
-  used ∖ S ∖ {[c]} = used ∖ (S ∪ ({[c]} ∖ {[0]})).
-Proof. intros Hc. set_solver. Qed.
-
-(* Same fact, stated for the shape [bm_ent_freed_step] leaves when [S] is
-   itself already a two-piece union [A ∪ B] and the freed step lands on
-   [B]'s side: substituting [bm_ent_freed bm (S j)] regroups the new block
-   into [B], not onto the whole union, so the call site needs this
-   associativity spelled out rather than [freed_pool_grow]'s flat form. *)
-Lemma freed_pool_grow2 (used A B : gset Z) (c : Z) :
-  c <> 0 ->
-  used ∖ (A ∪ B) ∖ {[c]} = used ∖ (A ∪ (B ∪ ({[c]} ∖ {[0]}))).
-Proof. intros Hc. set_solver. Qed.
-
-(* THE TOTAL.  [bm_blocks] runs over [bm_slot] on [seq 0 (S MAXFILE)]; the
-   two partial sums run over the direct list and the entry list.  This is
-   the bridge -- the direct entries are slots [0, NDIRECT), the entries are
-   slots [NDIRECT, MAXFILE), and slot MAXFILE is the indirect block. *)
-(* the two membership characterisations, so the split below is set
-   reasoning rather than a rewrite chain through [list_to_set] *)
-Lemma bm_dir_freed_spec (bm : blkmap) (k : nat) (b : Z) :
-  b ∈ bm_dir_freed bm k <->
-  (b <> 0 /\ exists i : nat, (i < k)%nat /\ bv_unsigned (bm_dir bm !!! i) = b).
-Proof.
-  rewrite /bm_dir_freed elem_of_difference elem_of_singleton
-          elem_of_list_to_set.
-  split.
-  - intros [Hin Hnz]. split; [exact Hnz|].
-    apply elem_of_list_fmap in Hin as (i & -> & Hi).
-    apply elem_of_seq in Hi. exists i. split; [lia | reflexivity].
-  - intros (Hnz & i & Hi & <-). split; [|exact Hnz].
-    apply elem_of_list_fmap. exists i.
-    split; [reflexivity | apply elem_of_seq; lia].
-Qed.
-
-Lemma bm_ent_freed_spec (bm : blkmap) (j : nat) (b : Z) :
-  b ∈ bm_ent_freed bm j <->
-  (b <> 0 /\ exists q : nat, (q < j)%nat /\ bv_unsigned (bm_ent bm !!! q) = b).
-Proof.
-  rewrite /bm_ent_freed elem_of_difference elem_of_singleton
-          elem_of_list_to_set.
-  split.
-  - intros [Hin Hnz]. split; [exact Hnz|].
-    apply elem_of_list_fmap in Hin as (q & -> & Hq).
-    apply elem_of_seq in Hq. exists q. split; [lia | reflexivity].
-  - intros (Hnz & q & Hq & <-). split; [|exact Hnz].
-    apply elem_of_list_fmap. exists q.
-    split; [reflexivity | apply elem_of_seq; lia].
-Qed.
-
-(* THE TOTAL.  [bm_blocks] runs over [bm_slot] on [seq 0 (S MAXFILE)]; the
-   two partial sums run over the direct list and the entry list.  This is
-   the bridge -- the direct entries are slots [0, NDIRECT), the entries are
-   slots [NDIRECT, MAXFILE), and slot MAXFILE is the indirect block. *)
-Lemma bm_blocks_split (bm : blkmap) :
-  length (bm_dir bm) = NDIRECT -> length (bm_ent bm) = NINDIRECT ->
-  bm_blocks bm
-  = bm_dir_freed bm NDIRECT ∪ bm_ent_freed bm NINDIRECT
-    ∪ ({[ bv_unsigned (bm_ind bm) ]} ∖ {[ 0 ]}).
-Proof.
-  intros Hd He.
-  (* the slot readings, once, so both directions are index arithmetic *)
-  assert (Hlo : forall i : nat, (i < NDIRECT)%nat ->
-            bm_slot bm i = bm_dir bm !!! i).
-  { intros i Hi. rewrite (bm_slot_lt bm i ltac:(unfold MAXFILE, NDIRECT, NINDIRECT in *; lia)).
-    rewrite /blkmap_get. destruct (decide (i < NDIRECT)%nat); [reflexivity|lia]. }
-  assert (Hhi : forall q : nat, (q < NINDIRECT)%nat ->
-            bm_slot bm (NDIRECT + q)%nat = bm_ent bm !!! q).
-  { intros q Hq.
-    rewrite (bm_slot_lt bm (NDIRECT + q)%nat
-               ltac:(unfold MAXFILE, NDIRECT, NINDIRECT in *; lia)).
-    rewrite /blkmap_get.
-    destruct (decide ((NDIRECT + q) < NDIRECT)%nat); [lia|].
-    f_equal. lia. }
-  apply set_eq. intros b.
-  rewrite !elem_of_union bm_dir_freed_spec bm_ent_freed_spec
-          elem_of_difference !elem_of_singleton.
-  split.
-  - intros Hb. apply bm_blocks_spec in Hb as (Hnz & i & Hi & Heq).
-    destruct (decide (i = MAXFILE)) as [->|Hne].
-    { right. rewrite bm_slot_top in Heq.
-      split; [symmetry; exact Heq | exact Hnz]. }
-    destruct (decide (i < NDIRECT)%nat) as [Hlt|Hge].
-    + left; left. split; [exact Hnz|]. exists i.
-      split; [exact Hlt|]. rewrite -Heq (Hlo i Hlt). reflexivity.
-    + left; right. split; [exact Hnz|]. exists (i - NDIRECT)%nat.
-      split; [unfold MAXFILE, NDIRECT, NINDIRECT in *; lia|].
-      rewrite -Heq
-              -(Hhi (i - NDIRECT)%nat
-                  ltac:(unfold MAXFILE, NDIRECT, NINDIRECT in *; lia)).
-      do 2 f_equal. lia.
-  - intros [[(Hnz & i & Hi & Heq)|(Hnz & q & Hq & Heq)]|[Heq Hnz]];
-      apply bm_blocks_spec.
-    + split; [exact Hnz|]. exists i.
-      split; [unfold MAXFILE, NDIRECT, NINDIRECT in *; lia|].
-      rewrite (Hlo i Hi). exact Heq.
-    + split; [exact Hnz|]. exists (NDIRECT + q)%nat.
-      split; [unfold MAXFILE, NDIRECT, NINDIRECT in *; lia|].
-      rewrite (Hhi q Hq). exact Heq.
-    + split; [exact Hnz|]. exists MAXFILE.
-      split; [lia|]. rewrite bm_slot_top. symmetry. exact Heq.
-Qed.
 
 (* ===================================================================== *)
 (*  (2) THE INDIRECT LOOP'S ENTRIES                                       *)

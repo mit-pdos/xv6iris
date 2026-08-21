@@ -1220,6 +1220,24 @@ Section FsCfgBootEra.
     iFrame "Hireg Hlog Hboot Hb1 Hauths Hdty Hhdr Hslots Hbmres Hrem".
   Qed.
 
+  (* ...and the same peel for the equally-persistent BITMAP row, so a
+     boot client (ProofMain's [first_boot_persist] assembly) reads it off
+     the kit without knowing the kit's layout. *)
+  Lemma fs_kit_fsinit_ghost_bitmap (ICFG : icfg) (FSC : fscfg)
+      (P : Z -> list (bv 8)) (Rspent : gset Z) :
+    fs_kit_fsinit_ghost ICFG FSC P Rspent -∗
+      bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size ∗
+      fs_kit_fsinit_ghost ICFG FSC P Rspent.
+  Proof.
+    iIntros "H".
+    iDestruct (fs_kit_fsinit_ghost_open with "H")
+      as "(Hlog & Hboot & #Hireg & Hb1 & Hauths & Hdty & Hhdr & Hslots &
+           #Hbmres & Hrem)".
+    iSplitR; [iExact "Hbmres" |].
+    rewrite /fs_kit_fsinit_ghost.
+    iFrame "Hireg Hlog Hboot Hb1 Hauths Hdty Hhdr Hslots Hbmres Hrem".
+  Qed.
+
   (* ==================================================================== *)
   (*  THE ERA FUPD                                                        *)
   (* ==================================================================== *)

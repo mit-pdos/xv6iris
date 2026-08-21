@@ -108,9 +108,11 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   the REF-1 exclusivity theorem, the escrow/pool arms, and the share-generation
   algebra. Sections are §-numbered and cited from the live fs-sysfile worklist.
 - **[`fs-bitmap.md`](design/fs-bitmap.md)** — the block bitmap: the
-  bits-in-a-block vocabulary, the `bitmap_res` resource and the FREE POOL, why
-  the pool token's exclusivity makes the alloc/free handshake sound, `bfree`'s
-  contract, and the single-bitmap-block simplification.
+  bits-in-a-block vocabulary, the `bitmap_res` resource and the FREE POOL,
+  **`bitmap_inv`** (the persistent invariant that owns them, and the
+  `wp_log_write_au` suppliers balloc/bfree touch it through), why the pool
+  token's exclusivity makes the alloc/free handshake sound, and the
+  single-bitmap-block simplification.
 - **[`fs-friendly.md`](design/fs-friendly.md)** — the friendly, client-facing
   file-system layer above the syscall proofs: what a caller should be able to
   say, and the staging that gets there.
@@ -149,7 +151,7 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   each increment cost, where the landed tree diverged from the report's
   sketches, and the standing constraints.
 - **[`fs-cfg-boot.md`](projects/fs-cfg-boot.md)** — giving `IcacheRef.icfg` and
-- [`projects/forkret-park.md`](projects/forkret-park.md) — retiring the last assumed Link: what `forkret_park_pkg` still costs, after `ForkretParkClose.v` cut it to three resources.
+- [`projects/forkret-park.md`](projects/forkret-park.md) — retiring the last assumed Link: what `forkret_park_pkg` still costs, after `ForkretParkClose.v` cut it to two resources.
   `FsCfg.fscfg` VALUES: the era-fupd allocation, the `_at` constructor
   discipline that replaces every existential name, the stocked inode pool, the
   two boot kits and how each reaches its consumer, and the adequacy
@@ -160,8 +162,9 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   effort (design in [`design/fs-icache.md`](design/fs-icache.md)): the staged
   cycle plan, the branch-per-cycle strategy, the owed boot wiring.
 - **[`fs-inode.md`](projects/fs-inode.md)** — the inode layer above the block
-  layer, heading for `writei`/`readi`; keeps the deferred bitmap-invariant
-  question `balloc` waits on and the owed decode-word dedup sweep.
+  layer (landed through `writei`/`readi`); what is LEFT in it is the owed
+  decode-word dedup sweep — the bitmap-invariant question it used to keep
+  is settled in [`design/fs-bitmap.md`](design/fs-bitmap.md).
 - **[`fs-log.md`](projects/fs-log.md)** — the FS block layer, STAGE 4 (the crash
   instantiation) only. Left: initlog's real recovery spec, sys_sync, the boot
   composition, and the phase-D2 finding that caps what recovery can CLAIM.

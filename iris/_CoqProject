@@ -617,6 +617,7 @@ SpecBinit.v
 ProofBinit.v
 LinkBinit.v
 BioInv.v
+BioFs.v
 BioInitAt.v
 FsBlocks.v
 BlockWords.v

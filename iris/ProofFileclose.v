@@ -1346,7 +1346,7 @@ Section ProofFileclose.
              [eb = true], and this arm runs at a generic index.  [n] and [p]
              still are pinned, and both substitutions stay. *)
           iDestruct "Henv" as "(%Hn0 & %Hpj & %Hjlt & %Hgl & %Hties &
-                                #Hprocs & #Hgeo & #Hdlk & #Hrdy & Hbsl)".
+                                #Hprocs & #Hrdy & Hbsl)".
           subst n. subst p.
           (* ---- THE TIES, DESTRUCTED ONCE ----
              [fclose_ties] says [fn]'s own names ARE the ambient ones, so the
@@ -1376,8 +1376,8 @@ Section ProofFileclose.
           iDestruct (FsReady.fs_ready_disk with "Hrdy") as "[#Hdev Hdd]".
           (* the three ring pages are QUANTIFIED in [fs_ready] (fs-cfg-boot
              R1); the callees take them as parameters, so this arm simply
-             runs at the predicate's own witness and never needs
-             [disk_geom_agree] against [fn]'s [Hgeo]/[Hdlk]. *)
+             runs at the predicate's own witness -- the bundle no longer
+             carries disk-fabric rows at all. *)
           iDestruct "Hdd" as (pdd pavd pud) "[#Hgeod #Hdlkd]".
           iDestruct (FsReady.fs_ready_icache with "Hrdy")
             as "(#Hitab & #Hitinv & #Hescrows & #Hslks)".

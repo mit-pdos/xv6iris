@@ -16,8 +16,8 @@ resources for a process that has not run yet.
 
 ## What `forkret_park_pkg` costs, after `ForkretParkClose.v`
 
-`iris/ForkretParkClose.v` (added 2026-08-21) reduces the package to a short
-list.  `forkret_park_pkg_intro` proves it from:
+`iris/ForkretParkClose.v` reduces the package to a short list.
+`forkret_park_pkg_intro` proves it from:
 
 * `kernel_text`, `wire_inv`, `kmap_at tramp_vpn tramp_ppn KP_rx` -- persistent.
 * `pslot_used_at (un_pj N)` -- persistent, and ALREADY in allocproc's
@@ -27,14 +27,14 @@ list.  `forkret_park_pkg_intro` proves it from:
   is not a separate premise.
 * the syscall environment `Rsys` -- persistent.
 * `stack_own (KTR := KT1) (un_ks N + 4096) av` -- see below.
-* `park_own N` -- the three exclusive resources, below.
+* `park_own N` -- the TWO exclusive resources, below.
 
 `forkret_park_closer_intro` is the interesting half: the "residue closer" was
 always described as the hard part, a wand that builds the trap loop's whole
 kernel-side bundle for a fresh process.  It is not hard.  `forkret_yield` hands
 it `ut_trap_parked` and `proc_priv_nopt`, the closer's own arguments hand it
 `fd_slots FDSPARE` and `iref_slots IREFSPARE`, `ut_caps` and the syscall
-environment are persistent -- and what is left is three resources.
+environment are persistent -- and what is left is two resources.
 
 ## What is actually left
 
@@ -49,7 +49,7 @@ and allocproc, plus an allocproc postcondition that hands one out beside the
 ripples through its cone, so it is a project rather than an edit -- but it is
 plumbing, with no open question in it.
 
-### 2. `park_own` -- three exclusive resources, in increasing difficulty
+### 2. `park_own` -- two exclusive resources
 
 **`initproc ↦₈{un_dqi N} (un_ip N)` -- DONE on the producer side (2026-08-21).**
 Only userinit writes the cell.  Every consumer downstream (`SpecKexit.v:256`,
@@ -81,15 +81,13 @@ room (`BSLOTS = 1024`, `3 * NPROC = 192`), but the authority
 Minting three fragments is therefore a WP step in whoever allocates the child,
 not something a bystander can do from persistent facts.
 
-**`fileclose_bm (un_fn N) (un_us N)` -- THE DESIGN QUESTION.**  It unfolds
-through `SpecFileclose.fileclose_bm` and `bitmap_res` to `fsblock` and
-`free_pool`: exclusive, one per file system.  There is no second copy to give a
-child.  So as long as it sits in `UsertrapRes.ut_own_nopt`, every process
-holding a residue across user execution holds the block bitmap -- which
-serializes user mode across all harts.  Either that is accepted, or the bitmap
-moves behind the log's lock and leaves the residue.  This is an FS-cone
-decision and it should be settled before the plumbing above is built on top of
-it.
+**The block bitmap is GONE from the package -- the design question is
+SETTLED.**  `fileclose_bm` used to be the third resource, and exclusive: as
+long as it sat in `UsertrapRes.ut_own_nopt` every process holding a residue
+across user execution held the block bitmap, serializing user mode across
+all harts.  The bitmap now lives in the persistent `BitmapInv.bitmap_inv`
+(a `fs_ready` conjunct; design/fs-bitmap.md), the residue no longer names
+it, and `fclose_names` lost the fields that carried it.
 
 ## The two call sites
 

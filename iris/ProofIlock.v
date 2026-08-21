@@ -48,9 +48,8 @@
    AND which side of [ic_payload]'s [if v] is in hand.
 
    THE UNCACHED ARM's coupling is the REGION, not a caller-held block:
-   [il_held_L] pulls the block's machinery half out of the bio handle
-   ([ProofIupdate.iu_held_L] restated -- that one is sealed in its own
-   module) and [InodeRegion.ireg_read] fires it against the payload's
+   [BioFs.bio_held_fs_L] pulls the block's machinery half out of the bio
+   handle and [InodeRegion.ireg_read] fires it against the payload's
    [dinode_at], which pins the buffer's bytes to [diblk_bytes ds] AND names
    this inum's slot ([ds !!! islot inum = dn]).  That single move replaces
    v1's [fsblock] premise, its [diblk_wf] premise and its conditional
@@ -115,6 +114,7 @@ Require Import SleepLock.
 Require Import WpUart.
 Require Import BufOwn BcacheInv BioInv.
 Require Import FsBlocks LogInv.
+Require Import BioFs.  (* [bio_held_fs_L] *)
 Require Import BlockWords.
 Require Import DinodeEnc.
 Require Import InodeInv.
@@ -235,32 +235,7 @@ Section IlockParts.
     iExact "Hb".
   Qed.
 
-  (* THE MACHINERY HALF, out of the bio handle and back -- what [ireg_read]
-     needs to pin the region's parked bytes to the ones bread returned.
-     [ProofIupdate.iu_held_L] verbatim; that one is sealed inside its own
-     module, and importing a proof file from a proof file is exactly what
-     the spec-module discipline forbids. *)
-  Lemma il_held_L (bn : bio_names) (gfs : fs_names) (gd : disk_names)
-      (dev : mword 32) (cov : gset Z) (kb : nat) (pidv dv bno : mword 32)
-      (bs bsl bsd : list (bv 8)) (d : bool) :
-    bio_held bn (fs_view gfs gd dev cov) kb pidv dv bno bs bsl bsd d -∗
-      (uint bno ↪[fs_L gfs]{#(1/2)} bsl) ∗
-      ((uint bno ↪[fs_L gfs]{#(1/2)} bsl) -∗
-       bio_held bn (fs_view gfs gd dev cov) kb pidv dv bno bs bsl bsd d).
-  Proof.
-    rewrite /bio_held /bio_pay /fs_view /=.
-    iIntros "(%A & %B & %C & H1 & H3 & H4 & H5 & H6 & Hpay)".
-    destruct d.
-    - rewrite /fs_mdirty. iDestruct "Hpay" as "[[HL HD] Hq]".
-      iFrame "HL". iIntros "HL".
-      iSplitR; [done |]. iSplitR; [done |]. iSplitR; [done |].
-      iFrame "H1 H3 H4 H5 H6". iFrame "HL HD Hq".
-    - rewrite /fs_mclean. iDestruct "Hpay" as "[[HL HD] %He]".
-      iFrame "HL". iIntros "HL".
-      iSplitR; [done |]. iSplitR; [done |]. iSplitR; [done |].
-      iFrame "H1 H3 H4 H5 H6". iFrame "HL HD". done.
-  Qed.
-
+  
 End IlockParts.
 
 
@@ -1068,7 +1043,7 @@ Section IlockLoad.
        its conditional slot-agreement premise, all three (§11.3). *)
     iEval (rewrite /bio_locked) in "Hheld".
     iDestruct (iu_held_k with "Hheld") as %Hkk.
-    iDestruct (il_held_L with "Hheld") as "[HL Hbackl]".
+    iDestruct (bio_held_fs_L with "Hheld") as "[HL Hbackl]".
     iEval (rewrite Hbno) in "HL".
     iApply fupd_wp.
     (* THE BLOCK, FRAGMENT-FREE.  §16.4's fill does not know which record is

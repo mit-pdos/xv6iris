@@ -1464,20 +1464,8 @@ Section ProofMain.
     iDestruct (fs_kit_fsinit_ghost_ireg with "Hkit2") as "[#Hireg Hkit2]".
     (* ...and so is kit 2's row (D), the BLOCK BITMAP'S INVARIANT: since the
        bitmap became [BitmapInv.bitmap_inv] it is persistent too, and
-       [FirstTok.first_boot_persist] now names it beside [ireg_inv].  Peeled
-       the same way -- open the kit, keep a copy, put the kit back
-       unchanged.  (FsCfgBoot.v exports the [ireg_inv] peel as its own lemma
-       but not this one, so the open/repack is spelled here.) *)
-    iDestruct (fs_kit_fsinit_ghost_open with "Hkit2")
-      as "(Hkt2a & Hkt2b & _ & Hkt2d & Hkt2e & Hkt2f & Hkt2g & Hkt2h &
-           #Hbminv & Hkt2j)".
-    iAssert (fs_kit_fsinit_ghost _ _ (FsCrash.fs_blocks dk)
-               (fs_kit_spent (FsCrash.fs_blocks dk) sb nib
-                  (FsImg.fs_live_set (FsCrash.fs_blocks dk) sb)))
-      with "[Hkt2a Hkt2b Hkt2d Hkt2e Hkt2f Hkt2g Hkt2h Hkt2j]" as "Hkit2".
-    { rewrite /fs_kit_fsinit_ghost.
-      iFrame "Hkt2a Hkt2b Hireg Hkt2d Hkt2e Hkt2f Hkt2g Hkt2h Hbminv
-              Hkt2j". }
+       [FirstTok.first_boot_persist] now names it beside [ireg_inv]. *)
+    iDestruct (fs_kit_fsinit_ghost_bitmap with "Hkit2") as "[#Hbminv Hkit2]".
     (* iinit's fifty sleeplocks are at [SpecIinit.inode_lock]; the cache
        addresses them as [i_lock (ientry k)].  ONE conversion, and it is
        [IcacheBoot]'s own lemma. *)
