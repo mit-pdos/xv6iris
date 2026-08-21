@@ -2209,6 +2209,16 @@ the count alone) → seven on 2026-08-20.
 is gone: `panic()` is proven and every arm links against `SpecPanic`, so the
 placeholder was deleted outright (`claude-notes/projects/panic.md`).
 
+`LinkSyscall.v` used to carry one of its own, `PROCNAME_OK.procname_ok`
+(the sixteen bytes of `p->name` contain a NUL, which the dispatch
+fallback's `printk("%s", p->name)` needs).  It never appeared above --
+syscall dispatch is not in the boot cone yet -- but it is gone as of
+2026-08-21, so wiring dispatch into boot will not raise the count.  The
+fact was already proved at all four write sites and discarded; it now
+rides inside `ProcDefs.pname_cells` as `ProcGeom.pname_wf`.  Worth
+copying the move: before axiomatising a fact about a field, check
+whether the code that writes the field already establishes it.
+
 A NEW entry = an axiom leaked into the boot cone: stop and investigate.
 A MISSING assumed-Link = someone proved it: celebrate, then update this
 list in the same commit.  Remember the print's honest scope: cones not
