@@ -334,13 +334,18 @@ Definition wp_dirlookup_sconf_body
   m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
   (* a2 = poff, reflected into a ghost boolean the way readi's [user] is *)
   eq_vec (m !!! Regidx (mword_of_int 12 : mword 5)) zero_reg = negb hasp ->
-  (* PARKING PREMISE -- readi sleeps *)
-  eb = true ->
   (* the order premise, at the LOWEST rank this cone touches; every
      higher one follows by [locks_below_mono]. *)
   locks_below lks "bcache" ->
   sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
+  (* THE TRAP-CSR COMPLEMENT, in and out: dirlookup takes no lock, so what
+     readi's interior sleeps need comes from the caller.  [emp] at
+     [eb = true]; the real pair at [eb = false], which is where forkret's
+     [if (first)] arm reaches this cone through kexec's namei.
+     claude-notes/completed/eb-generic-sweep.md is the recipe. *)
+  trap_csrs_ext KT1 eb -∗
+  cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* THE SHORT READ arm calls [panic("dirlookup read")], and panic is an
      ordinary call: the literal comes out of [kernel_data] above and the
@@ -392,6 +397,8 @@ Definition wp_dirlookup_sconf_body
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
+      trap_csrs_ext KT1 eb -∗
+      cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       (* THE DIRECTORY COMES BACK UNTOUCHED *)
       i_dev ip ↦₄{dqd} dev -∗

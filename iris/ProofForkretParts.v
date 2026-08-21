@@ -30,12 +30,17 @@ Notation FR := KernelSyms.forkret.
 (* ---- +0x14 auipc a5,0x9 / +0x18 addi a5,a5,-1712 : &first ---- *)
 (* the immediate READS as 2384 and SIGN-EXTENDS to -1712; read as positive
    it lands 0x1000 too high, which is the usual confusing failure. *)
+(* SPELLED [KernelSyms.first_1], NOT [FirstTok.first_addr], and the two are
+   the SAME TERM -- [first_addr]'s body is this.  Naming it here would drag
+   [FirstTok]'s whole file-system cone into a file of closed [vm_compute]s,
+   for one constant; the walk that consumes this lemma has [first_addr] in
+   scope and conversion does the rest. *)
 Lemma fkr_first_addr :
   add_vec (add_vec (mword_of_int (FR + 0x14) : mword 64)
              (auipc_off (mword_of_int 9 : mword 20)))
     (sign_extend' 64 (mword_of_int 2384 : mword 12))
-  = first_addr.
-Proof. rewrite /first_addr. apply bv_eq. vm_compute. reflexivity. Qed.
+  = (mword_of_int KernelSyms.first_1 : mword 64).
+Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 
 (* ---- +0x24 c.beqz a5, +0x64 : the [first == 0] skip ---- *)
 Definition fkr_beqz_imm : mword 13 :=

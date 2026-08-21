@@ -158,7 +158,6 @@ Definition wp_initlog_sconf_body
   log_geom_ok cov logstart ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
-  eb = true ->
   (* THE STAGE-2 CLEAN-IMAGE PRECONDITION: the on-disk header says n = 0, so
      read_head's copy loop and install_trans's recovery pass are both dead.
      Real recovery is stage 4. *)
@@ -172,6 +171,18 @@ Definition wp_initlog_sconf_body
   locks_below lks "bcache" ->
   sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
+  (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR -- claude-notes/completed/
+     eb-generic-sweep.md's shape, and the reason initlog needs it is that it
+     holds no lock of its own: it CREATES the "log" spinlock rather than
+     taking one, so no [acquire] of its own mints [arm_pay 0 eb _] for the
+     three sleeping callees (bread at +0x36, install_trans at +0x64,
+     write_head at +0x70).  It threads the caller's pair instead.  At
+     [eb = true] both are [emp], so no existing caller changes; at
+     [eb = false] they are [trap_csrs] and [cpu_claim], and the caller holds
+     them because the trap -- or, for forkret's boot arm, the scheduler
+     hand-off -- put them there. *)
+  trap_csrs_ext KT1 eb -∗
+  cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
@@ -252,6 +263,9 @@ Definition wp_initlog_sconf_body
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
+      (* ...and back out, re-indexed at the returning hart *)
+      trap_csrs_ext KT1 eb -∗
+      cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       proc_priv_bare pj pidv Vpr -∗
       (* the superblock fraction, untouched *)

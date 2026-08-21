@@ -2352,17 +2352,21 @@ Section ProofSysUnlinkBody.
                   Hj Hgl HR12a0
                   ltac:(cbn [negb]; apply (proj2 (eq_vec_false_iff _ _));
                         exact Hoffnz)
-                  Heb (Hlb "bcache"%string)
-                  with "Hcg Hown Htext Hdata Hpc Hpenv2 Hbio Hkenv Hidev Hmeta
+                  (Hlb "bcache"%string)
+                  with "Hcg Hown [] [] Htext Hdata Hpc Hpenv2 Hbio Hkenv Hidev Hmeta
                         [Haddrs Hind] Hblocks [Hnm14] [H27hi] Hpidq Hprocs
                         Hdev Hgeo Hdlk Hbs1 Hitab Hitinv Hescrows Hireg Hislot
                         Hdlnk Hdiat").
+        (* dirlookup is eb-generic now; sys_unlink is still at [eb = true],
+           where the complement is [emp]. *)
+        { rewrite Heb /trap_csrs_ext. done. }
+        { rewrite Heb /cpu_claim_ext. done. }
         { rewrite /inode_map. iFrame "Haddrs Hind". }
         { iEval (rewrite HR12a1). iExact "Hnm14". }
         { cbn [negb]. iEval (rewrite HR12a2). iExact "H27hi". }
         (* ...and the borrow comes straight back, on both arms, verbatim *)
         iIntros (CID20 Hq20 mdl found kk kslot qs)
-          "%Hcsdl Hcg Hown Hpc Hidev Hmeta Hmap Hblocks Hnm14 Hpidq Hbs1
+          "%Hcsdl Hcg Hown _ _ Hpc Hidev Hmeta Hmap Hblocks Hnm14 Hpidq Hbs1
            Hdlnk Hdiat Hres".
         iEval (rewrite HR12a1) in "Hnm14".
         assert (Hpc6c : ret_pc (R12 !!! Regidx Rra : mword 64)

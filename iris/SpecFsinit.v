@@ -323,15 +323,20 @@ Definition wp_fsinit_sconf_body
   γs !! j = Some γl ->
   (* a0 = dev *)
   m !!! Regidx (mword_of_int 10 : mword 5) = (sign_extend' 64 dev : mword 64) ->
-  (* PARKING PREMISE -- bread sleeps, and so does everything under
-     initlog and ireclaim *)
-  eb = true ->
   (* fsinit's cone: its own bread/brelse ("bcache", 4), initlog
      ("bcache", 4) and ireclaim ("itable", 2) -- "itable" is the lowest,
      so one premise there covers the whole cone via [locks_below_mono]. *)
   locks_below lks "log" ->
   sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
+  (* THE TRAP-CSR COMPLEMENT, in and out.  fsinit takes no lock of its own,
+     so nothing here mints the pay its sleeping callees (bread, initlog,
+     ireclaim) need; it threads the caller's.  [emp] at [eb = true], the real
+     pair at [eb = false] -- which is the index forkret's [if (first)] arm
+     reaches it at, since this revision's scheduler leaves [intena = 0].
+     claude-notes/completed/eb-generic-sweep.md is the recipe. *)
+  trap_csrs_ext KT1 eb -∗
+  cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   printk_env γpr γu γd -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
@@ -412,6 +417,8 @@ Definition wp_fsinit_sconf_body
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
+      trap_csrs_ext KT1 eb -∗
+      cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       proc_priv_bare pj pidv Vpr -∗
       (* ================================================================ *)

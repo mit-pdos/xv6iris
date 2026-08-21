@@ -203,12 +203,14 @@ Section FsinitDefs.
       (v_magic v_size v_nblocks v_nlog : mword 32)
       (bs_sb : list (bv 8))
       (pidv : mword 32) (dq : dfrac) (j : nat)
-      (m : regfile) (K : nat) (b : bool) (lks : gset string) (Vpr : pprivate) : iProp Σ :=
+      (m : regfile) (K : nat) (eb b : bool) (lks : gset string) (Vpr : pprivate) : iProp Σ :=
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (mf : regfile),
         ⌜callee_saved m mf⌝ -∗
         sie_cap_gpr KT1 mf K b (proc_addr j) -∗
-        cpu_own 0 true (proc_addr j) b lks -∗
+        cpu_own 0 eb (proc_addr j) b lks -∗
+        trap_csrs_ext KT1 eb -∗
+        cpu_claim_ext eb (proc_addr j) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         proc_priv_bare (proc_addr j) pidv Vpr -∗
         sb_magic ↦₄ v_magic -∗
@@ -283,12 +285,14 @@ Section FsinitEpilogue.
       (v_magic v_size v_nblocks v_nlog : mword 32)
       (bs_sb : list (bv 8))
       (pidv : mword 32) (dq : dfrac)
-      (m M : regfile) (K : nat) (b : bool) (lks : gset string) (Vpr : pprivate) :
+      (m M : regfile) (K : nat) (eb b : bool) (lks : gset string) (Vpr : pprivate) :
     (K_fsinit <= K)%nat ->
     fsi_sp m M ->
     fsi_thr4 m M ->
     sie_cap_gpr KT1 M (K - 4)%nat b (proc_addr j) -∗
-    cpu_own 0 true (proc_addr j) b lks -∗
+    cpu_own 0 eb (proc_addr j) b lks -∗
+    trap_csrs_ext KT1 eb -∗
+    cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.fsinit + 0x58) : mword 64) -∗
     fsi_frame m -∗
@@ -308,13 +312,14 @@ Section FsinitEpilogue.
     ireg_boot -∗
     fsi_cont (CID0 := CID0) γfs bn cov logstart bmapstart inodestart ninodes
              size dev v_magic v_size v_nblocks v_nlog bs_sb pidv dq j
-             m K b lks Vpr -∗
+             m K eb b lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hsp Hthr.
     pose proof HK as HK'. 
-    iIntros "Hcg Hcnt #Htext Hpc Hframe Hppid Hmg Hsz Hnb Hni Hnl Hls Hist
+    iIntros "Hcg Hcnt Hextc Hclmc #Htext Hpc Hframe Hppid Hmg Hsz Hnb Hni Hnl Hls Hist
               Hbms Hfsb Hlctx Hsl Hiref Hboot Hcont".
+    iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hebb.
     iPoseProof (fsi_58 with "Htext") as "Hi58".
     iPoseProof (fsi_5a with "Htext") as "Hi5a".
     iPoseProof (fsi_5c with "Htext") as "Hi5c".
@@ -499,11 +504,15 @@ Section FsinitEpilogue.
       by (apply Hfin; fsiidx).
     assert (Hcs : callee_saved m P5)
       by (unfold callee_saved; split_and!; assumption).
-   iDestruct (cpu_own_transport CID0 CID6 0 true (proc_addr j) b 
-                 ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+   iDestruct (cpu_own_transport CID0 CID6 0 eb (proc_addr j) b
+                ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+   iDestruct (trap_csrs_ext_transport CID0 CID6 eb (proc_addr j)
+                ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+   iDestruct (cpu_claim_ext_transport CID0 CID6 eb (proc_addr j)
+                ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     rewrite /fsi_cont.
     iSpecialize ("Hcont" $! CID6 with "[%]"); [wp_next_chain |].
-    iApply ("Hcont" $! P5 with "[%] Hcg Hcnt Hpc Hppid Hmg Hsz Hnb Hni
+    iApply ("Hcont" $! P5 with "[%] Hcg Hcnt Hextc Hclmc Hpc Hppid Hmg Hsz Hnb Hni
                                   Hnl Hls Hist Hbms Hfsb Hlctx Hsl Hiref
                                   Hboot");
       [exact Hcs].
@@ -551,8 +560,8 @@ Section FsinitMain.
     cbv beta delta [wp_fsinit_sconf_body].
     intros pcE pj ret_tgt HK Hgeom H1cov H1log Himg Hmagic Hvni Hvis Hvbs Hvls
            Hn1 Hnnib Hn31 Hdevc Hnibc Hdevr Hnib0 Hist0 Hblk Hsize Hbm0 Hbmcov
-           Hbmlog Hcovb Hhdr0 Hpk Hj Hgl Ha0 Heb Hbelow.
-    subst eb. subst v_ninodes. subst v_inodestart. subst v_bmapstart.
+           Hbmlog Hcovb Hhdr0 Hpk Hj Hgl Ha0 Hbelow.
+    subst v_ninodes. subst v_inodestart. subst v_bmapstart.
     subst v_logstart.
     pose proof HK as HK'. 
     (* ---- the image, pointwise, below 32 ---- *)
@@ -569,15 +578,16 @@ Section FsinitMain.
     assert (Hbnolt : (uint bno < 2147483648)%Z) by (rewrite Hbnou; lia).
     assert (Hbnocov : uint bno ∈ bv_cov (fs_view γfs γd dev cov))
       by (rewrite Hbnou; exact H1cov).
-    iIntros "Hcg Hcnt #Htext #Hkdata Hpc #Hpenv #Hbio #Hseam #Hgen
+    iIntros "Hcg Hcnt Hextc Hclmc #Htext #Hkdata Hpc #Hpenv #Hbio #Hseam #Hgen
               Hmirror Hlfree Hfsb Hsbold #Hireg Hboot #Hitb2 #Hitbl #Hesc #Hslks #Hbm
               Hlock0 Hlname Hlcpu Hlstart Hldev Hlout Hlcmt Hlnc Hlhn Hlhblk
               HauthL HauthD Hdirty Hhdr Hlslots Hppid #Hprocs #Hdevi #Hdgeom
               #Hdlock Hsl Hiref Hcont".
+    iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hebb.
     iPoseProof (printk_env_panic with "Hpenv") as "#Hpanenv".
     iAssert (fsi_cont (CID0 := CID) γfs bn cov logstart bmapstart inodestart
                ninodes size dev v_magic v_size v_nblocks v_nlog bs_sb
-               pidv dq j m K b lks Vpr)%I with "[Hcont]" as "Hcont";
+               pidv dq j m K eb b lks Vpr)%I with "[Hcont]" as "Hcont";
       [rewrite /fsi_cont; iExact "Hcont" |].
     iPoseProof (fsi_00 with "Htext") as "Hi00".
     iPoseProof (fsi_02 with "Htext") as "Hi02".
@@ -783,24 +793,26 @@ Section FsinitMain.
       by (rewrite /M5; apply upd_eq).
     iDestruct (iu_slots_split bn ((LOGBLOCKS + 2) + 2)%nat 1%nat with "Hsl")
       as "[Hsl34 Hsl1]".
-    iDestruct (cpu_own_transport CID CID9 0 true (proc_addr j) b 
+    iDestruct (cpu_own_transport CID CID9 0 eb (proc_addr j) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+    iDestruct (trap_csrs_ext_transport CID CID9 eb (proc_addr j)
+                 ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+    iDestruct (cpu_claim_ext_transport CID CID9 eb (proc_addr j)
+                 ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID9) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev bno dq
-              M5 (K - 4)%nat true b lks Vpr
+              M5 (K - 4)%nat eb b lks Vpr
               ltac:(lia) Hbnolt eq_refl Hbnocov eq_refl Hj Hgl
               HM5a0 HM5a1
               (* bread's bound is "bcache"(4); fsinit's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
-              with "Hcg Hcnt [] [] Htext Hkdata Hpc Hpanenv Hbio Hppid Hprocs
+              with "Hcg Hcnt Hextc Hclmc Htext Hkdata Hpc Hpanenv Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hsl1").
     all: try lkbelow.
-    { rewrite /trap_csrs_ext. done. }
-    { rewrite /cpu_claim_ext. done. }
-    iIntros (CID10 Hq10 mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt _ _ Hpc Hppid Hheld".
+    iIntros (CID10 Hq10 mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hextc Hclmc Hpc Hppid Hheld".
     destruct Hfacts as [Hcsb HmBa0].
     assert (Hpc14 : ret_pc (M5 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.fsinit + 0x14))
@@ -1151,12 +1163,16 @@ Section FsinitMain.
     assert (HQ1thr : fsi_thr4 m Q1).
     { intros c Hcs N2' N8 N9 N18.
       rewrite /Q1 upd_ne; [| regne]. exact (HQ0thr c Hcs N2' N8 N9 N18). }
-    iDestruct (cpu_own_transport CID10 CID19 0 true (proc_addr j) b 
+    iDestruct (cpu_own_transport CID10 CID19 0 eb (proc_addr j) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+    iDestruct (trap_csrs_ext_transport CID10 CID19 eb (proc_addr j)
+                 ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+    iDestruct (cpu_claim_ext_transport CID10 CID19 eb (proc_addr j)
+                 ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iDestruct (wp_next_shift (b := true) (CIDa := CID9) (CIDb := CID19) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
-              pidv dev bno dq Q1 (K - 4)%nat true (proc_addr j)
+              pidv dev bno dq Q1 (K - 4)%nat eb (proc_addr j)
               bs_sb bsd0 d0 b lks Vpr
               ltac:(lia) Hkk HQ1a0
               (* brelse's bound is "bcache"(4); fsinit's own is
@@ -1373,26 +1389,30 @@ Section FsinitMain.
     assert (HQ9thr : fsi_thr4 m Q9).
     { intros c Hcs N2' N8 N9 N18.
       rewrite /Q9 upd_ne; [| regne]. exact (HQ8thr c Hcs N2' N8 N9 N18). }
-    iDestruct (cpu_own_transport CID20 CID29 0 true (proc_addr j) b
+    iDestruct (cpu_own_transport CID20 CID29 0 eb (proc_addr j) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+    iDestruct (trap_csrs_ext_transport CID19 CID29 eb (proc_addr j)
+                 ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+    iDestruct (cpu_claim_ext_transport CID19 CID29 eb (proc_addr j)
+                 ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iDestruct (wp_next_shift (b := true) (CIDa := CID19) (CIDb := CID29) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (IL.wp_initlog_sconf γs j γl γu γd γk pd pav pu bn icfg_log γfs
               cov logstart dev sb_base bs_hdr L D
               vlock vname vcpu v_start v_dev v_nc v_n
-              pidv dq (DfracOwn 1) Q9 (K - 4)%nat true b lks Vpr
-              ltac:(lia) Hgeom Hj Hgl eq_refl Hhdr0
+              pidv dq (DfracOwn 1) Q9 (K - 4)%nat eb b lks Vpr
+              ltac:(lia) Hgeom Hj Hgl Hhdr0
               HQ9a0 HQ9a1
               (* initlog's bound is "bcache"(4); fsinit's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
-              with "Hcg Hcnt Htext Hkdata Hpc Hpanenv Hbio Hseam Hgen Hmirror
+              with "Hcg Hcnt Hextc Hclmc Htext Hkdata Hpc Hpanenv Hbio Hseam Hgen Hmirror
                     Hlfree
                     Hppid Hprocs Hdevi Hdgeom Hdlock Hls Hlock0 Hlname Hlcpu
                     Hlstart Hldev Hlout Hlcmt Hlnc Hlhn Hlhblk HauthL HauthD
                     Hdirty Hhdr Hlslots Hsl34").
     all: try lkbelow.
-    iIntros (CID30 Hq30 mI) "%Hcsil Hcg Hcnt Hpc Hppid Hls Hsl2 Hlctx".
+    iIntros (CID30 Hq30 mI) "%Hcsil Hcg Hcnt Hextc Hclmc Hpc Hppid Hls Hsl2 Hlctx".
     assert (Hpc52 : ret_pc (Q9 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.fsinit + 0x52))
       by (rewrite HQ9ra; pcw).
@@ -1455,22 +1475,26 @@ Section FsinitMain.
        existential to open any more -- initlog built the layer at
        [icfg_log], the name the era fupd minted. *)
     iDestruct "Hlctx" as "#Hlctx".
-    iDestruct (cpu_own_transport CID30 CID32 0 true (proc_addr j) b
+    iDestruct (cpu_own_transport CID30 CID32 0 eb (proc_addr j) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+    iDestruct (trap_csrs_ext_transport CID30 CID32 eb (proc_addr j)
+                 ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+    iDestruct (cpu_claim_ext_transport CID30 CID32 eb (proc_addr j)
+                 ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iDestruct (wp_next_shift (b := true) (CIDa := CID29) (CIDb := CID32) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (IR.wp_ireclaim_sconf γs j γl γu γd γk pd pav pu bn
               icfg_log γfs γi cn gtl γpr cov logstart bmapstart inodestart
               ninodes nib size dev pidv dq (DfracOwn 1) (DfracOwn 1)
-              (DfracOwn 1) R1 (K - 4)%nat true b lks Vpr
+              (DfracOwn 1) R1 (K - 4)%nat eb b lks Vpr
               ltac:(lia) Hgeom Hist0 Hblk Hsize Hbm0
-              Hbmcov Hbmlog Hcovb Hn1 Hnnib Hn31 Hpk Hj Hgl HR1a0 eq_refl
+              Hbmcov Hbmlog Hcovb Hn1 Hnnib Hn31 Hpk Hj Hgl HR1a0
               Hbelow
-              with "Hcg Hcnt Htext Hpc Hkdata Hpenv Hbio Hlctx Hseam
+              with "Hcg Hcnt Hextc Hclmc Htext Hpc Hkdata Hpenv Hbio Hlctx Hseam
                     Hgen Hni Hist Hbms Hireg Hboot Hitb2 Hitbl Hesc Hslks Hbm Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hsl3 Hiref").
     all: try lkbelow.
-    iIntros (CID33 Hq33 mf) "%Hcsir Hcg Hcnt Hpc Hni Hist Hbms Hppid
+    iIntros (CID33 Hq33 mf) "%Hcsir Hcg Hcnt Hextc Hclmc Hpc Hni Hist Hbms Hppid
                              Hsl3 Hiref Hboot".
     assert (Hpc58 : ret_pc (R1 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.fsinit + 0x58))
@@ -1487,8 +1511,8 @@ Section FsinitMain.
       exact (HR1thr c Hcs N2' N8 N9 N18). }
     iApply (fsi_epilogue (CID0 := CID33) j bn γfs cov logstart bmapstart
               inodestart ninodes size dev v_magic v_size v_nblocks
-              v_nlog bs_sb pidv dq m mf K b lks Vpr HK Hmfsp Hmfthr
-              with "Hcg Hcnt Htext Hpc Hframe Hppid Hmg Hsz Hnb Hni Hnl Hls
+              v_nlog bs_sb pidv dq m mf K eb b lks Vpr HK Hmfsp Hmfthr
+              with "Hcg Hcnt Hextc Hclmc Htext Hpc Hframe Hppid Hmg Hsz Hnb Hni Hnl Hls
                     Hist Hbms Hfsb Hlctx Hsl3 Hiref Hboot [Hcont]").
     { iApply (wp_next_shift (b := true) (CIDa := CID32) (CIDb := CID33)
                 ltac:(wp_next_chain) with "Hcont"). }

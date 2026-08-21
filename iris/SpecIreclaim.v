@@ -237,9 +237,6 @@ Definition wp_ireclaim_sconf_body
   γs !! j = Some γl ->
   (* a0 = dev: the RV64 ABI's sign extension of an [int] *)
   m !!! Regidx (mword_of_int 10 : mword 5) = (sign_extend' 64 dev : mword 64) ->
-  (* PARKING PREMISE (hart-generic scheduler protocol) -- bread and
-     begin_op both sleep *)
-  eb = true ->
   (* ireclaim's cone is the union of its callees': bread/brelse ("bcache",
      4), printk ("pr", 14), iget/iput ("itable", 2), begin_op/end_op
      ("log", 3), ilock ("bcache", 4), iunlock ("sleep lock", 6) --
@@ -248,6 +245,14 @@ Definition wp_ireclaim_sconf_body
   locks_below lks "log" ->
   sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
+  (* THE TRAP-CSR COMPLEMENT, in and out.  ireclaim holds no lock across its
+     scan -- every acquire it makes (iget's "itable", begin_op's "log",
+     ilock's sleeplock) is released before the next iteration -- so it is
+     push/pop balanced and what its interior sleepers need is exactly this,
+     the caller's pair at [eb = false] and [emp] at [eb = true].
+     claude-notes/completed/eb-generic-sweep.md is the recipe. *)
+  trap_csrs_ext KT1 eb -∗
+  cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   (* the general printk path's two PERSISTENT credentials *)
   kernel_data -∗
@@ -310,6 +315,8 @@ Definition wp_ireclaim_sconf_body
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
+      trap_csrs_ext KT1 eb -∗
+      cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗

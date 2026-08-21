@@ -3933,16 +3933,20 @@ Section ProofNamexMain.
                                    Hj Hgs
                                    HGA4a0
                                    ltac:(rewrite HGA4a2; vm_compute;
-                                         reflexivity) Heb
-                                   with "Hcg Hcnt Htext Hkd Hpc Hpenv Hbio Hkenv
+                                         reflexivity)
+                                   with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hkenv
                                          Hidev Hmeta Hmap Hblocks [Hname] []
                                          Hppid Hprocs Hdev Hgeom Hdlk Hbs1
                                          Hitb2 Hitbl Hesc Hireg Hisl Hdlnk Hdiat").
                          all: try lkbelow.
+                         (* dirlookup is eb-generic now; namex is still at
+                            [eb = true], where the complement is [emp]. *)
+                         { rewrite Heb /trap_csrs_ext. done. }
+                         { rewrite Heb /cpu_claim_ext. done. }
                          { iEval (rewrite HGA4a1). iExact "Hname". }
                          { done. }
                          iIntros (CIDdl Hqdl mdl found kdir kslot qq)
-                           "%Hcsdl Hcg Hcnt Hpc Hidev Hmeta Hmap Hblocks
+                           "%Hcsdl Hcg Hcnt _ _ Hpc Hidev Hmeta Hmap Hblocks
                             Hname Hppid Hbs1 Hdlnk Hdiat Harm".
                          iEval (rewrite HGA4a1) in "Hname".
                          assert (Hpcd8 : ret_pc (GA4 !!! Regidx Rra)

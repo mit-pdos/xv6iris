@@ -1794,14 +1794,16 @@ Section ProofDirlinkMain.
               Hj Hgs
               HR7a0
               ltac:(cbn [negb]; rewrite HR7a2 dlk_zero_moi; exact (eq_vec_refl _))
-              Heb
-              with "Hcg Hcnt Htext Hkd Hpc Hpenv Hbio Hkenv Hidev Hmeta Hmap
+              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hkenv Hidev Hmeta Hmap
                     Hblocks Hnm [] Hppid Hprocs Hdev Hgeom Hdlk Hbs1
                     Hitb2 Hitbl Hesc Hiregi Hislot Hlinks Hdat").
     all: try lkbelow.
+    (* dirlookup is eb-generic now; dirlink is still at [eb = true]. *)
+    { rewrite Heb /trap_csrs_ext. done. }
+    { rewrite Heb /cpu_claim_ext. done. }
     { done. }
     iIntros (CIDdl Hsdl mdl found kk kslot qq)
-      "%Hcsdl Hcg Hcnt Hpc Hidev Hmeta Hmap Hblocks Hnm Hppid Hbs1
+      "%Hcsdl Hcg Hcnt _ _ Hpc Hidev Hmeta Hmap Hblocks Hnm Hppid Hbs1
        Hlinks Hdat Hres".
     iEval (rewrite HR7a1) in "Hnm".
     assert (Hpcdl : ret_pc (R7 !!! Regidx Rra : mword 64)

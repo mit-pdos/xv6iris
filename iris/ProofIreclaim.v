@@ -219,14 +219,16 @@ Section IreclaimDefs.
       (γfs : fs_names) (bn : bio_names)
       (cov : gset Z) (logstart bmapstart inodestart ninodes size : Z)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac) (j : nat)
-      (m : regfile) (K : nat) (b : bool) (lks : gset string) (Vpr : pprivate) : iProp Σ :=
+      (m : regfile) (K : nat) (eb b : bool) (lks : gset string) (Vpr : pprivate) : iProp Σ :=
     (* the LITERAL [true], matching the contract's crossing: this function
        can sleep, so its continuation is about an arbitrary hart. *)
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (mf : regfile),
         ⌜callee_saved m mf⌝ -∗
         sie_cap_gpr KT1 mf K b (proc_addr j) -∗
-        cpu_own 0 true (proc_addr j) b lks -∗
+        cpu_own 0 eb (proc_addr j) b lks -∗
+        trap_csrs_ext KT1 eb -∗
+        cpu_claim_ext eb (proc_addr j) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -246,7 +248,7 @@ Section IreclaimDefs.
       (cov : gset Z) (logstart bmapstart inodestart ninodes size : Z)
       (dev : mword 32)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac) (j : nat)
-      (m : regfile) (K : nat) (b : bool) (lks : gset string) (Vpr : pprivate) (fuel : nat) : iProp Σ :=
+      (m : regfile) (K : nat) (eb b : bool) (lks : gset string) (Vpr : pprivate) (fuel : nat) : iProp Σ :=
     (∀ (Mn : regfile) (inumn : mword 32) (CIDn : CpuId),
        ⌜(Z.to_nat (ninodes - bv_unsigned inumn) <= fuel)%nat⌝ -∗
        ⌜0 < bv_unsigned inumn < ninodes⌝ -∗
@@ -257,7 +259,9 @@ Section IreclaimDefs.
        ⌜Mn !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64)⌝ -∗
        ⌜Mn !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64)⌝ -∗
        sie_cap_gpr KT1 Mn (K - 8)%nat b (proc_addr j) -∗
-       cpu_own 0 true (proc_addr j) b lks -∗
+       cpu_own 0 eb (proc_addr j) b lks -∗
+       trap_csrs_ext KT1 eb -∗
+       cpu_claim_ext eb (proc_addr j) -∗
        pc_is (mword_of_int (KernelSyms.ireclaim + 0x7c) : mword 64) -∗
        irc_frame m -∗
        proc_priv_bare (proc_addr j) pidv Vpr -∗
@@ -269,7 +273,7 @@ Section IreclaimDefs.
        bitmap_inv γfs bmapstart cov logstart size -∗
        ireg_boot -∗
        irc_cont (CID0 := CIDn) γfs bn cov logstart bmapstart inodestart ninodes
-                size pidv dq dqb dqs dqn j m K b lks Vpr -∗
+                size pidv dq dqb dqs dqn j m K eb b lks Vpr -∗
        WP (Loop : expr riscv_lang))%I.
 
   (* the escrow family's projection -- ProofDirlink's [dl_esc_acc] restated,
@@ -298,12 +302,14 @@ Section IreclaimEpilogue.
       (j : nat) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart bmapstart inodestart ninodes size : Z)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac)
-      (m M : regfile) (K : nat) (b : bool) (lks : gset string) (Vpr : pprivate) :
+      (m M : regfile) (K : nat) (eb b : bool) (lks : gset string) (Vpr : pprivate) :
     (K_ireclaim <= K)%nat ->
     irc_sp m M ->
     irc_thr8 m M ->
     sie_cap_gpr KT1 M (K - 8)%nat b (proc_addr j) -∗
-    cpu_own 0 true (proc_addr j) b lks -∗
+    cpu_own 0 eb (proc_addr j) b lks -∗
+    trap_csrs_ext KT1 eb -∗
+    cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.ireclaim + 0xb2) : mword 64) -∗
     irc_frame m -∗
@@ -315,12 +321,13 @@ Section IreclaimEpilogue.
     iref_slot -∗
     ireg_boot -∗
     irc_cont (CID0 := CID0) γfs bn cov logstart bmapstart inodestart ninodes size
-             pidv dq dqb dqs dqn j m K b lks Vpr -∗
+             pidv dq dqb dqs dqn j m K eb b lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hsp Hthr.
     pose proof HK as HK'. 
-    iIntros "Hcg Hcnt #Htext Hpc Hframe Hppid Hsbn Hsbi Hsbb Hsl Hiref Hboot Hcont".
+    iIntros "Hcg Hcnt Hextc Hclmc #Htext Hpc Hframe Hppid Hsbn Hsbi Hsbb Hsl Hiref Hboot Hcont".
+    iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hebb.
     iPoseProof (irci_b2 with "Htext") as "Hib2".
     iPoseProof (irci_b4 with "Htext") as "Hib4".
     iPoseProof (irci_b6 with "Htext") as "Hib6".
@@ -641,11 +648,15 @@ Section IreclaimEpilogue.
       by (apply Hfin; ircidx).
     assert (Hcs : callee_saved m P9)
       by (unfold callee_saved; split_and!; assumption).
-   iDestruct (cpu_own_transport CID0 CID10 0 true (proc_addr j) b 
-                 ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+   iDestruct (cpu_own_transport CID0 CID10 0 eb (proc_addr j) b
+                ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+   iDestruct (trap_csrs_ext_transport CID0 CID10 eb (proc_addr j)
+                ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+   iDestruct (cpu_claim_ext_transport CID0 CID10 eb (proc_addr j)
+                ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     rewrite /irc_cont.
     iSpecialize ("Hcont" $! CID10 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! P9 with "[%] Hcg Hcnt Hpc Hsbn Hsbi Hsbb Hppid
+    iApply ("Hcont" $! P9 with "[%] Hcg Hcnt Hextc Hclmc Hpc Hsbn Hsbi Hsbb Hppid
                                   Hsl Hiref Hboot");
       [exact Hcs].
   Qed.
@@ -671,7 +682,7 @@ Section IreclaimStep.
       (cov : gset Z) (logstart bmapstart inodestart ninodes size : Z)
       (dev : mword 32) (inum : mword 32) (fuel : nat)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac)
-      (m Ml : regfile) (K : nat) (b : bool) (lks : gset string) (Vpr : pprivate) :
+      (m Ml : regfile) (K : nat) (eb b : bool) (lks : gset string) (Vpr : pprivate) :
     (K_ireclaim <= K)%nat ->
     ninodes < 2 ^ 31 ->
     (Z.to_nat (ninodes - bv_unsigned inum) <= S fuel)%nat ->
@@ -683,7 +694,9 @@ Section IreclaimStep.
     Ml !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64) ->
     Ml !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64) ->
     sie_cap_gpr KT1 Ml (K - 8)%nat b (proc_addr j) -∗
-    cpu_own 0 true (proc_addr j) b lks -∗
+    cpu_own 0 eb (proc_addr j) b lks -∗
+    trap_csrs_ext KT1 eb -∗
+    cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.ireclaim + 0x6e) : mword 64) -∗
     irc_frame m -∗
@@ -696,9 +709,9 @@ Section IreclaimStep.
     bitmap_inv γfs bmapstart cov logstart size -∗
     ireg_boot -∗
     irc_loop γfs bn cov logstart bmapstart inodestart ninodes size dev
-             pidv dq dqb dqs dqn j m K b lks Vpr fuel -∗
+             pidv dq dqb dqs dqn j m K eb b lks Vpr fuel -∗
     irc_cont (CID0 := CID0) γfs bn cov logstart bmapstart inodestart ninodes size
-             pidv dq dqb dqs dqn j m K b lks Vpr -∗
+             pidv dq dqb dqs dqn j m K eb b lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hn31 Hfuel Hinum Hsp Hthr Hs1 Hs4 Hs5 Hs6.
@@ -709,8 +722,9 @@ Section IreclaimStep.
     rewrite Hm32 in Hinum32.
     assert (Hinum31 : bv_unsigned inum < 2147483648)
       by (change (2^31)%Z with 2147483648%Z in Hn31; lia).
-    iIntros "Hcg Hcnt #Htext Hpc Hframe Hppid Hsbn Hsbi Hsbb Hsl Hiref #Hbm Hboot
+    iIntros "Hcg Hcnt Hextc Hclmc #Htext Hpc Hframe Hppid Hsbn Hsbi Hsbb Hsl Hiref #Hbm Hboot
               Hloop Hcont".
+    iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hebb.
     iPoseProof (irci_6e with "Htext") as "Hi6e".
     iPoseProof (irci_70 with "Htext") as "Hi70".
     iPoseProof (irci_74 with "Htext") as "Hi74".
@@ -841,12 +855,16 @@ Section IreclaimStep.
                       (sign_extend' 64 (mword_of_int 58 : mword 13))
                     = mword_of_int (KernelSyms.ireclaim + 0xb2)) by pcw.
       iEval (rewrite Hjt) in "Hpc".
-      iDestruct (cpu_own_transport CID0 CID4 0 true (proc_addr j) b 
+      iDestruct (cpu_own_transport CID0 CID4 0 eb (proc_addr j) b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+      iDestruct (trap_csrs_ext_transport CID0 CID4 eb (proc_addr j)
+                   ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+      iDestruct (cpu_claim_ext_transport CID0 CID4 eb (proc_addr j)
+                   ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
       iApply (irc_epilogue (CID0 := CID4) j bn γfs cov logstart bmapstart
                 inodestart ninodes size pidv dq dqb dqs dqn
-                m S3 K b lks Vpr HK HS3sp HS3thr
-                with "Hcg Hcnt Htext Hpc Hframe Hppid Hsbn Hsbi Hsbb Hsl
+                m S3 K eb b lks Vpr HK HS3sp HS3thr
+                with "Hcg Hcnt Hextc Hclmc Htext Hpc Hframe Hppid Hsbn Hsbi Hsbb Hsl
                       Hiref Hboot [Hcont]").
       { iApply (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID4)
                   ltac:(wp_next_chain) with "Hcont"). }
@@ -868,11 +886,15 @@ Section IreclaimStep.
       { destruct (Z.lt_ge_cases (bv_unsigned inum + 1) ninodes) as [Hok|Hc];
           [exact Hok |].
         exfalso. rewrite <- Z.geb_le in Hc. rewrite Hc in Hge. discriminate. }
-      iDestruct (cpu_own_transport CID0 CID4 0 true (proc_addr j) b 
+      iDestruct (cpu_own_transport CID0 CID4 0 eb (proc_addr j) b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+      iDestruct (trap_csrs_ext_transport CID0 CID4 eb (proc_addr j)
+                   ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+      iDestruct (cpu_claim_ext_transport CID0 CID4 eb (proc_addr j)
+                   ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
       rewrite /irc_loop.
       iApply ("Hloop" $! S3 inum1 CID4
-                with "[%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcnt Hpc Hframe
+                with "[%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcnt Hextc Hclmc Hpc Hframe
                       Hppid Hsbn Hsbi Hsbb Hsl Hiref Hbm Hboot [Hcont]").
       { rewrite Hinum1u. lia. }
       { rewrite Hinum1u. lia. }
@@ -916,7 +938,7 @@ Section IreclaimOrphan.
       (dev inum bno : mword 32) (kk : nat)
       (bs bsd0 : list (bv 8)) (ds : list dinode) (d0 : bool) (fuel : nat)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac)
-      (m Ml : regfile) (K : nat) (b : bool) (lks : gset string) (Vpr : pprivate) :
+      (m Ml : regfile) (K : nat) (eb b : bool) (lks : gset string) (Vpr : pprivate) :
     (K_ireclaim <= K)%nat ->
     log_geom_ok cov logstart ->
     0 <= inodestart ->
@@ -958,7 +980,9 @@ Section IreclaimOrphan.
        ("sleep lock", 6) -- "itable" is the lowest. *)
     locks_below lks "log" ->
     sie_cap_gpr KT1 Ml (K - 8)%nat b (proc_addr j) -∗
-    cpu_own 0 true (proc_addr j) b lks -∗
+    cpu_own 0 eb (proc_addr j) b lks -∗
+    trap_csrs_ext KT1 eb -∗
+    cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.ireclaim + 0x38) : mword 64) -∗
     printk_env γpr γu γd -∗
@@ -986,9 +1010,9 @@ Section IreclaimOrphan.
     ireg_boot -∗
     bio_locked bn (fs_view γfs γd dev cov) kk pidv dev bno bs bsd0 d0 -∗
     irc_loop γfs bn cov logstart bmapstart inodestart ninodes size dev
-             pidv dq dqb dqs dqn j m K b lks Vpr fuel -∗
+             pidv dq dqb dqs dqn j m K eb b lks Vpr fuel -∗
     irc_cont (CID0 := CID0) γfs bn cov logstart bmapstart inodestart ninodes size
-             pidv dq dqb dqs dqn j m K b lks Vpr -∗
+             pidv dq dqb dqs dqn j m K eb b lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hgeom Hst Hblk Hsize Hbm0 Hbmcov Hbmlog Hcovb Hnnib Hn31 Hpk
@@ -998,10 +1022,11 @@ Section IreclaimOrphan.
     pose proof irc_msg_fmt as (Hkmsg & Hnmsg & Hlmsg).
     assert (Hnibin : bv_unsigned inum < 16 * Z.of_nat nib) by lia.
     destruct (Hblk inum Hnibin) as [Hibcov Hiblog].
-    iIntros "Hcg Hcnt #Htext #Hkdata Hpc #Hpenv #Hbio #Hlctx
+    iIntros "Hcg Hcnt Hextc Hclmc #Htext #Hkdata Hpc #Hpenv #Hbio #Hlctx
               #Hseam #Hgen #Hireg #Hitb2 #Hitbl #Hesc #Hslks #Hprocs
               #Hdevi #Hdgeom #Hdlock Hframe Hppid Hsbn Hsbi Hsbb Hsl Hiref
               #Hbm Hboot Hlk Hloop Hcont".
+    iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hebb.
     iPoseProof (printk_env_panic with "Hpenv") as "#Hpanenv".
     iPoseProof (kernel_data_string irc_msg_addr irc_msg
                   (mword_of_int irc_msg_addr) eq_refl
@@ -1117,14 +1142,18 @@ Section IreclaimOrphan.
     { intros c Hcs N2 N8 N9 N18 N19 N20 N21 N22.
       rewrite /O3 upd_ne; [| regne].
       exact (HO2thr c Hcs N2 N8 N9 N18 N19 N20 N21 N22). }
-    iDestruct (cpu_own_transport CID0 CID3 0 true (proc_addr j) b 
+    iDestruct (cpu_own_transport CID0 CID3 0 eb (proc_addr j) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+    iDestruct (trap_csrs_ext_transport CID0 CID3 eb (proc_addr j)
+                 ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+    iDestruct (cpu_claim_ext_transport CID0 CID3 eb (proc_addr j)
+                 ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID3) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     (* the panic tail runs at depth 0, so the held set is forced empty and
        printk's order premise ("pr", 14) needs no hypothesis here. *)
     iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
-    iApply (Hpk CID3 O3 (K - 8)%nat true (proc_addr j)
+    iApply (Hpk CID3 O3 (K - 8)%nat eb (proc_addr j)
               DfracDiscarded irc_msg [PkANum] b _
               ltac:(lia) Hlmsg Hnmsg ltac:(rewrite Hkmsg; reflexivity)
               ltac:(cbn [length]; lia)
@@ -1258,8 +1287,16 @@ Section IreclaimOrphan.
     { intros c Hcs N2 N8 N9 N18 N19 N20 N21 N22.
       rewrite /O6 upd_ne; [| regne].
       exact (HO5thr c Hcs N2 N8 N9 N18 N19 N20 N21 N22). }
-    iDestruct (cpu_own_transport CID4 CID7 0 true (proc_addr j) b
+    iDestruct (cpu_own_transport CID4 CID7 0 eb (proc_addr j) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+    (* printk does not thread the complement, so its span is the wider one:
+       CID3 (where it was last put) rather than CID4 (where [cpu_own] came
+       back).  eb-generic-sweep.md, "A CALLEE THAT DOES NOT THREAD THE
+       COMPLEMENT STRANDS IT". *)
+    iDestruct (trap_csrs_ext_transport CID3 CID7 eb (proc_addr j)
+                 ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+    iDestruct (cpu_claim_ext_transport CID3 CID7 eb (proc_addr j)
+                 ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iDestruct (wp_next_shift (b := true) (CIDa := CID3) (CIDb := CID7) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     (* ================================================================== *)
@@ -1303,7 +1340,7 @@ Section IreclaimOrphan.
       split; [exact Hbnoeq | split; [exact Hdswf | exact Htnz]]. }
     iApply (IG.wp_iget_sconf gtl cn γfs γi cov logstart inodestart nib dev inum
               (BufL (uint bno) ds)
-              O6 0%nat true (proc_addr j) (K - 8)%nat b lks
+              O6 0%nat eb (proc_addr j) (K - 8)%nat b lks
               ltac:(lia) ltac:(cbn [Z.of_nat]; lia) Hnibin
               HO6a0 HO6a1
               ltac:(lkbelow)
@@ -1444,12 +1481,16 @@ Section IreclaimOrphan.
     { intros c Hcs N2 N8 N9 N18 N19 N20 N21 N22.
       rewrite /O9 upd_ne; [| regne].
       exact (HO8thr c Hcs N2 N8 N9 N18 N19 N20 N21 N22). }
-    iDestruct (cpu_own_transport CID8 CID11 0 true (proc_addr j) b
+    iDestruct (cpu_own_transport CID8 CID11 0 eb (proc_addr j) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+    iDestruct (trap_csrs_ext_transport CID7 CID11 eb (proc_addr j)
+                 ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+    iDestruct (cpu_claim_ext_transport CID7 CID11 eb (proc_addr j)
+                 ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iDestruct (wp_next_shift (b := true) (CIDa := CID7) (CIDb := CID11) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
-              pidv dev bno dq O9 (K - 8)%nat true (proc_addr j)
+              pidv dev bno dq O9 (K - 8)%nat eb (proc_addr j)
               bs bsd0 d0 b lks Vpr ltac:(lia) Hkk HO9a0
               (* brelse's bound is "bcache"(4); irc_orphan's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
@@ -1529,21 +1570,23 @@ Section IreclaimOrphan.
     { intros c Hcs N2 N8 N9 N18 N19 N20 N21 N22.
       rewrite /OA upd_ne; [| regne].
       exact (HmRthr c Hcs N2 N8 N9 N18 N19 N20 N21 N22). }
-    iDestruct (cpu_own_transport CID12 CID14 0 true (proc_addr j) b
+    iDestruct (cpu_own_transport CID12 CID14 0 eb (proc_addr j) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+    iDestruct (trap_csrs_ext_transport CID11 CID14 eb (proc_addr j)
+                 ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+    iDestruct (cpu_claim_ext_transport CID11 CID14 eb (proc_addr j)
+                 ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iDestruct (wp_next_shift (b := true) (CIDa := CID11) (CIDb := CID14) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (BO.wp_begin_op_sconf γs j γl bn γ γfs cov logstart dev pidv dq
-              OA (K - 8)%nat true b lks Vpr
+              OA (K - 8)%nat eb b lks Vpr
               ltac:(lia) Hj Hgl
               (* begin_op's bound is "log"(3); irc_orphan's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
-              with "Hcg Hcnt [] [] Htext Hpc Hlctx Hppid Hprocs").
+              with "Hcg Hcnt Hextc Hclmc Htext Hpc Hlctx Hppid Hprocs").
     all: try lkbelow.
-    { rewrite /trap_csrs_ext. done. }
-    { rewrite /cpu_claim_ext. done. }
-    iIntros (CID15 Hq15 mB) "%Hcsbo Hcg Hcnt _ _ Hpc Hppid Hop".
+    iIntros (CID15 Hq15 mB) "%Hcsbo Hcg Hcnt Hextc Hclmc Hpc Hppid Hop".
     assert (Hpc58 : ret_pc (OA !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ireclaim + 0x58))
       by (rewrite HOAra; pcw).
@@ -1635,8 +1678,12 @@ Section IreclaimOrphan.
     { intros c Hcs N2 N8 N9 N18 N19 N20 N21 N22.
       rewrite /OC upd_ne; [| regne].
       exact (HOBthr c Hcs N2 N8 N9 N18 N19 N20 N21 N22). }
-    iDestruct (cpu_own_transport CID15 CID17 0 true (proc_addr j) b
+    iDestruct (cpu_own_transport CID15 CID17 0 eb (proc_addr j) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+    iDestruct (trap_csrs_ext_transport CID15 CID17 eb (proc_addr j)
+                 ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+    iDestruct (cpu_claim_ext_transport CID15 CID17 eb (proc_addr j)
+                 ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iDestruct (wp_next_shift (b := true) (CIDa := CID14) (CIDb := CID17) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iDestruct (iu_slots_split bn 2 1 with "Hsl") as "[Hsl Hsl1]".
@@ -1645,19 +1692,17 @@ Section IreclaimOrphan.
     iDestruct "Hshr" as (gsh) "Hshr".
     iApply (IL.wp_ilock_sconf γs j γl γu γd γk pd pav pu bn γfs γi cn gil gisl
               cov logstart inodestart nib kslot (q/2)%Qp gsh PlainK dev inum
-              pidv dq dqs OC (K - 8)%nat true b lks Vpr
+              pidv dq dqs OC (K - 8)%nat eb b lks Vpr
               ltac:(lia) Hkslot Hgeom Hst Hibcov Hnibin Hj Hgl
               HOCa0
               (* ilock's bound is "bcache"(4); irc_orphan's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
-              with "Hcg Hcnt [] [] Htext Hkdata Hpc Hpanenv Hbio Hitbl Hescrow Hireg Hslk
+              with "Hcg Hcnt Hextc Hclmc Htext Hkdata Hpc Hpanenv Hbio Hitbl Hescrow Hireg Hslk
                     Hshr Hru Hsbi Hppid Hprocs Hdevi Hdgeom Hdlock Hsl1").
     all: try lkbelow.
-    { rewrite /trap_csrs_ext. done. }
-    { rewrite /cpu_claim_ext. done. }
     iIntros (CID18 Hq18 mL dnl bml fl_)
-      "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hsbi Hsl1 Hslkd Hdep Hidev Hiinum
+      "%Hcsil Hcg Hcnt Hextc Hclmc Hpc Hppid Hsbi Hsl1 Hslkd Hdep Hidev Hiinum
        Hvalid Hloaded #Hshot Hfrz %Hfr_ Hru %Hilkp".
     assert (Hpc5e : ret_pc (OC !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ireclaim + 0x5e))
@@ -1748,12 +1793,16 @@ Section IreclaimOrphan.
     { intros c Hcs N2 N8 N9 N18 N19 N20 N21 N22.
       rewrite /OE upd_ne; [| regne].
       exact (HODthr c Hcs N2 N8 N9 N18 N19 N20 N21 N22). }
-    iDestruct (cpu_own_transport CID18 CID20 0 true (proc_addr j) b
+    iDestruct (cpu_own_transport CID18 CID20 0 eb (proc_addr j) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+    iDestruct (trap_csrs_ext_transport CID18 CID20 eb (proc_addr j)
+                 ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+    iDestruct (cpu_claim_ext_transport CID18 CID20 eb (proc_addr j)
+                 ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iDestruct (wp_next_shift (b := true) (CIDa := CID17) (CIDb := CID20) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (IU.wp_iunlock_sconf γs γfs γi cn gil gisl cov logstart kslot
-              (q/2)%Qp gsh dev inum dnl bml pidv dq OE (K - 8)%nat true
+              (q/2)%Qp gsh dev inum dnl bml pidv dq OE (K - 8)%nat eb
               (proc_addr j) b lks Vpr
               ltac:(lia) Hkslot HOEa0
               (* iunlock's bound is "sleep lock"(6); irc_orphan's own is
@@ -1852,8 +1901,12 @@ Section IreclaimOrphan.
     { intros c Hcs N2 N8 N9 N18 N19 N20 N21 N22.
       rewrite /OG upd_ne; [| regne].
       exact (HOFthr c Hcs N2 N8 N9 N18 N19 N20 N21 N22). }
-    iDestruct (cpu_own_transport CID21 CID23 0 true (proc_addr j) b
+    iDestruct (cpu_own_transport CID21 CID23 0 eb (proc_addr j) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+    iDestruct (trap_csrs_ext_transport CID20 CID23 eb (proc_addr j)
+                 ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+    iDestruct (cpu_claim_ext_transport CID20 CID23 eb (proc_addr j)
+                 ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iDestruct (wp_next_shift (b := true) (CIDa := CID20) (CIDb := CID23) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     (* SIMP-1: the RUNTIME iput contracts are specialized to the sealed
@@ -1868,25 +1921,23 @@ Section IreclaimOrphan.
     iApply (IP.wp_iput_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
               gil gisl cov logstart bmapstart inodestart nib size dev
               kslot q inum MAXOPBLOCKS Sb0 false false false e00
-              pidv dq dqb dqs OG (K - 8)%nat true b lks Vpr false
+              pidv dq dqb dqs OG (K - 8)%nat eb b lks Vpr false
               ltac:(lia) Hkslot ltac:(discriminate) ltac:(discriminate)
               Hgeom Hsize Hbm0 Hbmcov Hbmlog
               Hst Hibcov Hiblog Hnibin Hcovb
               ltac:(unfold iput_units, MAXOPBLOCKS; lia) Hj Hgl HOGa0
               Hbelow
-              with "Hcg Hcnt [] [] Htext Hkdata Hpc Hpanenv Hbio Hlctx Hitb2 Hitbl Hescrow
+              with "Hcg Hcnt Hextc Hclmc Htext Hkdata Hpc Hpanenv Hbio Hlctx Hitb2 Hitbl Hescrow
                     Hireg Hboot Hslk [$Href $Hru] Hsbb Hsbi Hbm Hppid Hprocs Hdevi Hdgeom
                     Hdlock Hsl [] Hop").
     all: try lkbelow.
-    { rewrite /trap_csrs_ext. done. }
-    { rewrite /cpu_claim_ext. done. }
     { iEval (cbn beta iota). iEmpIntro. }
     (* RULING G' (iclaim-ledger.md §6''): ireclaim lends its EXCLUSIVE
        [ireg_boot] at [rg := false] and the indexed post gives it back as
        [ireg_regime false = ireg_boot] -- re-bound here under its own name, so
        the next loop iteration has it.  This is the round-trip §2.3 asked for
        and integration-2's un-indexed disjunction could not close. *)
-    iIntros (CID24 Hq24 mQ n' Sb' wf) "%Hcsip Hcg Hcnt _ _ Hpc Hppid Hsbb Hsbi
+    iIntros (CID24 Hq24 mQ n' Sb' wf) "%Hcsip Hcg Hcnt Hextc Hclmc Hpc Hppid Hsbb Hsbi
                                       Hsl %Hssub %Hwbm %Hwc %Hbnd
                                       Hop Hiref Hboot".
     iDestruct (log_opS_op with "Hop") as "Hop".
@@ -1944,22 +1995,24 @@ Section IreclaimOrphan.
     { intros c Hcs N2 N8 N9 N18 N19 N20 N21 N22.
       rewrite /OH upd_ne; [| regne].
       exact (HmQthr c Hcs N2 N8 N9 N18 N19 N20 N21 N22). }
-    iDestruct (cpu_own_transport CID24 CID25 0 true (proc_addr j) b
+    iDestruct (cpu_own_transport CID24 CID25 0 eb (proc_addr j) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+    iDestruct (trap_csrs_ext_transport CID24 CID25 eb (proc_addr j)
+                 ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+    iDestruct (cpu_claim_ext_transport CID24 CID25 eb (proc_addr j)
+                 ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iDestruct (wp_next_shift (b := true) (CIDa := CID23) (CIDb := CID25) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (EO.wp_end_op_sconf γs j γl γu γd γk pd pav pu bn γ γfs cov logstart
-              dev n' pidv dq OH (K - 8)%nat true b lks Vpr
+              dev n' pidv dq OH (K - 8)%nat eb b lks Vpr
               ltac:(lia) Hgeom Hj Hgl
               (* end_op's bound is "log"(3); irc_orphan's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
-              with "Hcg Hcnt [] [] Htext Hkdata Hpc Hpanenv Hbio Hlctx Hseam Hgen Hppid
+              with "Hcg Hcnt Hextc Hclmc Htext Hkdata Hpc Hpanenv Hbio Hlctx Hseam Hgen Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hop").
     all: try lkbelow.
-    { rewrite /trap_csrs_ext. done. }
-    { rewrite /cpu_claim_ext. done. }
-    iIntros (CID26 Hq26 mE) "%Hcseo Hcg Hcnt _ _ Hpc Hppid".
+    iIntros (CID26 Hq26 mE) "%Hcseo Hcg Hcnt Hextc Hclmc Hpc Hppid".
     assert (Hpc6e : ret_pc (OH !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ireclaim + 0x6e))
       by (rewrite HOHra; pcw).
@@ -1988,10 +2041,10 @@ Section IreclaimOrphan.
     (* ===== FALL into the step at +0x6e ===== *)
     iApply (irc_step (CID0 := CID26) j bn γfs cov logstart bmapstart inodestart
               ninodes size dev inum fuel pidv dq dqb dqs dqn
-              m mE K b lks Vpr HK Hn31
+              m mE K eb b lks Vpr HK Hn31
               Hfuel Hinum HmEsp HmEthr
               HmEs1 HmEs4 HmEs5 HmEs6
-              with "Hcg Hcnt Htext Hpc Hframe Hppid Hsbn Hsbi Hsbb Hsl Hiref
+              with "Hcg Hcnt Hextc Hclmc Htext Hpc Hframe Hppid Hsbn Hsbi Hsbb Hsl Hiref
                     Hbm Hboot [Hloop] [Hcont]").
     { iExact "Hloop". }
     { iApply (wp_next_shift (b := true) (CIDa := CID25) (CIDb := CID26)
@@ -2017,7 +2070,7 @@ Section IreclaimRelease.
       (dev inum bno : mword 32) (kk : nat)
       (bs bsd0 : list (bv 8)) (d0 : bool) (fuel : nat)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac)
-      (m Ml : regfile) (K : nat) (b : bool) (lks : gset string) (Vpr : pprivate) :
+      (m Ml : regfile) (K : nat) (eb b : bool) (lks : gset string) (Vpr : pprivate) :
     (K_ireclaim <= K)%nat ->
     ninodes < 2 ^ 31 ->
     (Z.to_nat (ninodes - bv_unsigned inum) <= S fuel)%nat ->
@@ -2033,7 +2086,9 @@ Section IreclaimRelease.
     (* irc_release's only lock-touching callee is brelse, at "bcache" (4). *)
     locks_below lks "log" ->
     sie_cap_gpr KT1 Ml (K - 8)%nat b (proc_addr j) -∗
-    cpu_own 0 true (proc_addr j) b lks -∗
+    cpu_own 0 eb (proc_addr j) b lks -∗
+    trap_csrs_ext KT1 eb -∗
+    cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.ireclaim + 0xaa) : mword 64) -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
@@ -2049,15 +2104,16 @@ Section IreclaimRelease.
     ireg_boot -∗
     bio_locked bn (fs_view γfs γd dev cov) kk pidv dev bno bs bsd0 d0 -∗
     irc_loop γfs bn cov logstart bmapstart inodestart ninodes size dev
-             pidv dq dqb dqs dqn j m K b lks Vpr fuel -∗
+             pidv dq dqb dqs dqn j m K eb b lks Vpr fuel -∗
     irc_cont (CID0 := CID0) γfs bn cov logstart bmapstart inodestart ninodes size
-             pidv dq dqb dqs dqn j m K b lks Vpr -∗
+             pidv dq dqb dqs dqn j m K eb b lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hn31 Hfuel Hinum Hkk Hsp Hthr Hs1 Hs2 Hs4 Hs5 Hs6 Hbelow.
     pose proof HK as HK'. 
-    iIntros "Hcg Hcnt #Htext Hpc #Hbio #Hprocs Hframe Hppid Hsbn Hsbi
+    iIntros "Hcg Hcnt Hextc Hclmc #Htext Hpc #Hbio #Hprocs Hframe Hppid Hsbn Hsbi
               Hsbb Hsl Hiref #Hbm Hboot Hlk Hloop Hcont".
+    iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hebb.
     iPoseProof (irci_aa with "Htext") as "Hiaa".
     iPoseProof (irci_ac with "Htext") as "Hiac".
     iPoseProof (irci_b0 with "Htext") as "Hib0".
@@ -2117,12 +2173,16 @@ Section IreclaimRelease.
     { intros c Hcs N2 N8 N9 N18 N19 N20 N21 N22.
       rewrite /V2 upd_ne; [| regne].
       exact (HV1thr c Hcs N2 N8 N9 N18 N19 N20 N21 N22). }
-    iDestruct (cpu_own_transport CID0 CID2 0 true (proc_addr j) b
+    iDestruct (cpu_own_transport CID0 CID2 0 eb (proc_addr j) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+    iDestruct (trap_csrs_ext_transport CID0 CID2 eb (proc_addr j)
+                 ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+    iDestruct (cpu_claim_ext_transport CID0 CID2 eb (proc_addr j)
+                 ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID2) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
-              pidv dev bno dq V2 (K - 8)%nat true (proc_addr j)
+              pidv dev bno dq V2 (K - 8)%nat eb (proc_addr j)
               bs bsd0 d0 b lks Vpr ltac:(lia) Hkk HV2a0
               ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hlk").
@@ -2165,13 +2225,17 @@ Section IreclaimRelease.
                        (sign_extend' 21 (concat_vec (mword_of_int 2015 : mword 11) ('b"0"))))
                   = mword_of_int (KernelSyms.ireclaim + 0x6e)) by pcw.
     iEval (rewrite Hjt) in "Hpc".
-    iDestruct (cpu_own_transport CID3 CID4 0 true (proc_addr j) b
+    iDestruct (cpu_own_transport CID3 CID4 0 eb (proc_addr j) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+    iDestruct (trap_csrs_ext_transport CID2 CID4 eb (proc_addr j)
+                 ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+    iDestruct (cpu_claim_ext_transport CID2 CID4 eb (proc_addr j)
+                 ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iApply (irc_step (CID0 := CID4) j bn γfs cov logstart bmapstart inodestart
               ninodes size dev inum fuel pidv dq dqb dqs dqn
-              m mR K b lks Vpr HK Hn31 Hfuel Hinum HmRsp HmRthr
+              m mR K eb b lks Vpr HK Hn31 Hfuel Hinum HmRsp HmRthr
               HmRs1 HmRs4 HmRs5 HmRs6
-              with "Hcg Hcnt Htext Hpc Hframe Hppid Hsbn Hsbi Hsbb Hsl Hiref
+              with "Hcg Hcnt Hextc Hclmc Htext Hpc Hframe Hppid Hsbn Hsbi Hsbb Hsl Hiref
                     Hbm Hboot [Hloop] [Hcont]").
     { iExact "Hloop". }
     { iApply (wp_next_shift (b := true) (CIDa := CID2) (CIDb := CID4)
@@ -2201,7 +2265,7 @@ Section IreclaimScan.
       (cov : gset Z) (logstart bmapstart inodestart ninodes size : Z)
       (nib : nat) (dev : mword 32)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac)
-      (m : regfile) (K : nat) (b : bool) (lks : gset string) (Vpr : pprivate) :
+      (m : regfile) (K : nat) (eb b : bool) (lks : gset string) (Vpr : pprivate) :
     (K_ireclaim <= K)%nat ->
     log_geom_ok cov logstart ->
     0 <= inodestart ->
@@ -2237,7 +2301,7 @@ Section IreclaimScan.
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     ∀ fuel : nat,
       irc_loop γfs bn cov logstart bmapstart inodestart ninodes size dev
-               pidv dq dqb dqs dqn j m K b lks Vpr fuel.
+               pidv dq dqb dqs dqn j m K eb b lks Vpr fuel.
   Proof.
     intros HK Hgeom Hst Hblk Hsize Hbm0 Hbmcov Hbmlog Hcovb Hn1 Hnnib Hn31
            Hpk Hj Hgl Hbelow.
@@ -2252,13 +2316,15 @@ Section IreclaimScan.
       rewrite /irc_loop.
       iIntros (Ml inum CIDn) "%Hfuel %Hinum %Hsp %Hthr %Hs1 %Hs4
                                     %Hs5 %Hs6".
-      iIntros "Hcg Hcnt Hpc Hframe Hppid Hsbn Hsbi Hsbb Hsl Hiref #Hbm Hboot Hcont".
+      iIntros "Hcg Hcnt Hextc Hclmc Hpc Hframe Hppid Hsbn Hsbi Hsbb Hsl Hiref #Hbm Hboot Hcont".
+    iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hebb.
       exfalso. lia.
     - (* ---- FUEL S: one turn of the loop ---- *)
       rewrite /irc_loop.
       iIntros (Ml inum CIDn) "%Hfuel %Hinum %Hsp %Hthr %Hs1 %Hs4
                                     %Hs5 %Hs6".
-      iIntros "Hcg Hcnt Hpc Hframe Hppid Hsbn Hsbi Hsbb Hsl Hiref #Hbm Hboot Hcont".
+      iIntros "Hcg Hcnt Hextc Hclmc Hpc Hframe Hppid Hsbn Hsbi Hsbb Hsl Hiref #Hbm Hboot Hcont".
+    iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hebb.
       pose proof (bv_unsigned_in_range _ inum) as [Hinum0 Hinum32].
       assert (Hm32 : bv_modulus (MachineWord.MachineWord.Z_idx 32) = 4294967296)
         by (vm_compute; reflexivity).
@@ -2492,25 +2558,27 @@ Section IreclaimScan.
       { intros c Hcs N2 N8 N9 N18 N19 N20 N21 N22.
         rewrite /W6 upd_ne; [| regne].
         exact (HW5thr c Hcs N2 N8 N9 N18 N19 N20 N21 N22). }
-      iDestruct (cpu_own_transport CIDn CID6 0 true (proc_addr j) b
+      iDestruct (cpu_own_transport CIDn CID6 0 eb (proc_addr j) b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+      iDestruct (trap_csrs_ext_transport CIDn CID6 eb (proc_addr j)
+                   ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+      iDestruct (cpu_claim_ext_transport CIDn CID6 eb (proc_addr j)
+                   ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
       iDestruct (wp_next_shift (b := true) (CIDa := CIDn) (CIDb := CID6) ltac:(wp_next_chain)
                    with "Hcont") as "Hcont".
       iDestruct (iu_slots_split bn 2 1 with "Hsl") as "[Hsl Hsl1]".
       iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
                 (fs_view γfs γd dev cov) pidv dev bno dq
-                W6 (K - 8)%nat true b lks Vpr
+                W6 (K - 8)%nat eb b lks Vpr
                 ltac:(lia) Hbnolt eq_refl Hbnocov eq_refl Hj Hgl
                 HW6a0 HW6a1
                 (* bread's bound is "bcache"(4); irc_scan's own is
                    "itable"(2), and [locks_below_mono] weakens it. *)
                 ltac:(lkbelow)
-                with "Hcg Hcnt [] [] Htext Hkdata Hpc Hpanenv Hbio Hppid Hprocs
+                with "Hcg Hcnt Hextc Hclmc Htext Hkdata Hpc Hpanenv Hbio Hppid Hprocs
                       Hdevi Hdgeom Hdlock Hsl1").
       all: try lkbelow.
-      { rewrite /trap_csrs_ext. done. }
-      { rewrite /cpu_claim_ext. done. }
-      iIntros (CID7 Hq7 mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt _ _ Hpc Hppid Hheld".
+      iIntros (CID7 Hq7 mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hextc Hclmc Hpc Hppid Hheld".
       destruct Hfacts as [Hcsb HmBa0].
       assert (Hpc90 : ret_pc (W6 !!! Regidx Rra : mword 64)
                       = mword_of_int (KernelSyms.ireclaim + 0x90))
@@ -2816,17 +2884,21 @@ Section IreclaimScan.
         iAssert (bio_locked bn (fs_view γfs γd dev cov) kk pidv dev bno
                    (diblk_bytes ds) bsd0 d0) with "[Hheld]" as "Hlk";
           [rewrite /bio_locked; iExact "Hheld" |].
-        iDestruct (cpu_own_transport CID7 CID14 0 true (proc_addr j) b
+        iDestruct (cpu_own_transport CID7 CID14 0 eb (proc_addr j) b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+        iDestruct (trap_csrs_ext_transport CID7 CID14 eb (proc_addr j)
+                     ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+        iDestruct (cpu_claim_ext_transport CID7 CID14 eb (proc_addr j)
+                     ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
         iApply (irc_release (CID0 := CID14) γs j γd bn γfs cov logstart bmapstart
                   inodestart ninodes size dev inum bno kk
                   (diblk_bytes ds) bsd0 d0 fuel pidv dq dqb dqs dqn
-                  m WC K b lks Vpr HK Hn31 Hfuel Hinum Hkk HWCsp HWCthr
+                  m WC K eb b lks Vpr HK Hn31 Hfuel Hinum Hkk HWCsp HWCthr
                   HWCs1 HWCs2 HWCs4 HWCs5 HWCs6
                   (* irc_release's bound is "bcache"(4); irc_scan's own is
                      "itable"(2), and [locks_below_mono] weakens it. *)
                   ltac:(lkbelow)
-                  with "Hcg Hcnt Htext Hpc Hbio Hprocs Hframe Hppid
+                  with "Hcg Hcnt Hextc Hclmc Htext Hpc Hbio Hprocs Hframe Hppid
                         Hsbn Hsbi Hsbb Hsl Hiref Hbm Hboot Hlk [] [Hcont]").
         { iApply "IH". }
         { iApply (wp_next_shift (b := true) (CIDa := CID6) (CIDb := CID14)
@@ -2911,13 +2983,17 @@ Section IreclaimScan.
                              (concat_vec (mword_of_int 200 : mword 8) ('b"0"))))
                         = mword_of_int (KernelSyms.ireclaim + 0x38)) by pcw.
           iEval (rewrite Hjt) in "Hpc".
-          iDestruct (cpu_own_transport CID7 CID16 0 true (proc_addr j) b
+          iDestruct (cpu_own_transport CID7 CID16 0 eb (proc_addr j) b
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+          iDestruct (trap_csrs_ext_transport CID7 CID16 eb (proc_addr j)
+                       ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+          iDestruct (cpu_claim_ext_transport CID7 CID16 eb (proc_addr j)
+                       ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
           iApply (irc_orphan (CID0 := CID16) γs j γl γu γd γk pd pav pu bn γ γfs
                     γi cn gtl γpr cov logstart bmapstart inodestart ninodes size
                     nib dev inum bno kk (diblk_bytes ds) bsd0 ds d0
                     fuel
-                    pidv dq dqb dqs dqn m WD K b lks
+                    pidv dq dqb dqs dqn m WD K eb b lks
                     Vpr HK Hgeom Hst Hblk Hsize Hbm0 Hbmcov Hbmlog Hcovb Hnnib Hn31
                     Hpk Hj Hgl Hfuel Hinum Hkk
                     (* LICENCE (e)'s four premises (§7.1): the block this
@@ -2926,7 +3002,7 @@ Section IreclaimScan.
                     eq_refl Hdswf Ht0 Hbno HWDsp HWDthr
                     HWDs1 HWDs2 HWDs3 HWDs4 HWDs5 HWDs6
                     Hbelow
-                    with "Hcg Hcnt Htext Hkdata Hpc Hpenv Hbio Hlctx
+                    with "Hcg Hcnt Hextc Hclmc Htext Hkdata Hpc Hpenv Hbio Hlctx
                           Hseam Hgen Hireg Hitb2 Hitbl Hesc Hslks Hprocs Hdevi
                           Hdgeom Hdlock Hframe Hppid Hsbn Hsbi Hsbb Hsl Hiref
                           Hbm Hboot Hlk [] [Hcont]").
@@ -2944,17 +3020,21 @@ Section IreclaimScan.
           assert (Hppaa : add_vec_int (mword_of_int (KernelSyms.ireclaim + 0xa8) : mword 64) 2
                           = mword_of_int (KernelSyms.ireclaim + 0xaa)) by pcw.
           iEval (rewrite Hppaa) in "Hpc".
-          iDestruct (cpu_own_transport CID7 CID16 0 true (proc_addr j) b
+          iDestruct (cpu_own_transport CID7 CID16 0 eb (proc_addr j) b
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+          iDestruct (trap_csrs_ext_transport CID7 CID16 eb (proc_addr j)
+                       ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+          iDestruct (cpu_claim_ext_transport CID7 CID16 eb (proc_addr j)
+                       ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
           iApply (irc_release (CID0 := CID16) γs j γd bn γfs cov logstart bmapstart
                     inodestart ninodes size dev inum bno kk
                     (diblk_bytes ds) bsd0 d0 fuel pidv dq dqb dqs dqn
-                    m WD K b lks Vpr HK Hn31 Hfuel Hinum Hkk HWDsp HWDthr
+                    m WD K eb b lks Vpr HK Hn31 Hfuel Hinum Hkk HWDsp HWDthr
                     HWDs1 HWDs2 HWDs4 HWDs5 HWDs6
                     (* irc_release's bound is "bcache"(4); irc_scan's own is
                        "itable"(2), and [locks_below_mono] weakens it. *)
                     ltac:(lkbelow)
-                    with "Hcg Hcnt Htext Hpc Hbio Hprocs Hframe Hppid
+                    with "Hcg Hcnt Hextc Hclmc Htext Hpc Hbio Hprocs Hframe Hppid
                           Hsbn Hsbi Hsbb Hsl Hiref Hbm Hboot Hlk [] [Hcont]").
           { iApply "IH". }
           { iApply (wp_next_shift (b := true) (CIDa := CID6) (CIDb := CID16)
@@ -2996,8 +3076,7 @@ Section IreclaimMain.
   Proof.
     cbv beta delta [wp_ireclaim_sconf_body].
     intros pcE pj ret_tgt HK Hgeom Hst Hblk Hsize Hbm0 Hbmcov Hbmlog Hcovb
-           Hn1 Hnnib Hn31 Hpk Hj Hgl Ha0 Heb Hbelow.
-    subst eb.
+           Hn1 Hnnib Hn31 Hpk Hj Hgl Ha0 Hbelow.
     pose proof HK as HK'. 
     assert (Hnsext : (sign_extend' 64 (mword_of_int ninodes : mword 32) : mword 64)
                      = mword_of_int ninodes)
@@ -3011,11 +3090,12 @@ Section IreclaimMain.
                  ltac:(lia)
                  ltac:(change (2^31)%Z with 2147483648%Z in Hn31; lia)).
       apply not_true_is_false. intro Hc. apply Z.geb_le in Hc. lia. }
-    iIntros "Hcg Hcnt #Htext Hpc #Hkdata #Hpenv #Hbio #Hlctx
+    iIntros "Hcg Hcnt Hextc Hclmc #Htext Hpc #Hkdata #Hpenv #Hbio #Hlctx
               #Hseam #Hgen Hsbn Hsbi Hsbb #Hireg Hboot #Hitb2 #Hitbl #Hesc #Hslks
               #Hbm Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hiref Hcont".
+    iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hebb.
     iAssert (irc_cont (CID0 := CID) γfs bn cov logstart bmapstart inodestart
-               ninodes size pidv dq dqb dqs dqn j m K b lks Vpr)%I
+               ninodes size pidv dq dqb dqs dqn j m K eb b lks Vpr)%I
       with "[Hcont]" as "Hcont"; [rewrite /irc_cont; iExact "Hcont" |].
     iPoseProof (irci_00 with "Htext") as "Hi00".
     iPoseProof (irci_04 with "Htext") as "Hi04".
@@ -3474,8 +3554,12 @@ Section IreclaimMain.
                        (sign_extend' 21 (concat_vec (mword_of_int 35 : mword 11) ('b"0"))))
                   = mword_of_int (KernelSyms.ireclaim + 0x7c)) by pcw.
     iEval (rewrite Hjt) in "Hpc".
-    iDestruct (cpu_own_transport CID CID21 0 true (proc_addr j) b
+    iDestruct (cpu_own_transport CID CID21 0 eb (proc_addr j) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+    iDestruct (trap_csrs_ext_transport CID CID21 eb (proc_addr j)
+                 ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+    iDestruct (cpu_claim_ext_transport CID CID21 eb (proc_addr j)
+                 ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID21) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (Hunit1 : bv_unsigned (mword_of_int 1 : mword 32) = 1).
@@ -3483,7 +3567,7 @@ Section IreclaimMain.
       change (2^32)%Z with 4294967296%Z. lia. }
     iPoseProof (irc_scan γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr
                   cov logstart bmapstart inodestart ninodes size nib dev
-                  pidv dq dqb dqs dqn m K b lks
+                  pidv dq dqb dqs dqn m K eb b lks
                   Vpr HK Hgeom Hst Hblk Hsize Hbm0 Hbmcov Hbmlog Hcovb Hn1 Hnnib
                   Hn31 Hpk Hj Hgl Hbelow
                   with "Htext Hkdata Hpenv Hbio Hlctx Hseam Hgen Hireg
@@ -3492,7 +3576,7 @@ Section IreclaimMain.
     iSpecialize ("Hscan" $! (Z.to_nat (ninodes - 1))).
     rewrite /irc_loop.
     iApply ("Hscan" $! RB (mword_of_int 1 : mword 32) CID21
-              with "[%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcnt Hpc Hframe
+              with "[%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcnt Hextc Hclmc Hpc Hframe
                     Hppid Hsbn Hsbi Hsbb Hsl Hiref Hbm Hboot Hcont").
     { rewrite Hunit1. lia. }
     { rewrite Hunit1. lia. }

@@ -707,13 +707,17 @@ Module FsLookupTree (DL : DIRLOOKUP).
               fn hasp pofv
               pidv dq dqd dqn m K eb b lks Vpr
               HK (node_rep_T_DIR ents dn data Hrep) Hlg Hbwf Hbcov Hszb
-              Hdio Hdisj Horph Htynz eq_refl Hj Hgs Ha0 Ha2 Heb Hlkb
-              with "Hcg Hcnt Htext Hkd Hpc Hpenv Hbio Hkenv
+              Hdio Hdisj Horph Htynz eq_refl Hj Hgs Ha0 Ha2 Hlkb
+              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hkenv
                     Hidev Hmeta Hmap Hblocks Hname Hpoff
                     Hppid Hprocs Hdev Hdgeom Hdlk Hbslot
                     Hitb2 Hitbl Hesc Hireg Hisl Hedges Hdiat").
+    (* dirlookup is eb-generic now; this layer is still at [eb = true],
+       where the complement is [emp]. *)
+    { rewrite Heb /trap_csrs_ext. done. }
+    { rewrite Heb /cpu_claim_ext. done. }
     iIntros (CIDd Hgd mf found k kslot q)
-      "%Hcs Hcg Hcnt Hpc Hidev Hmeta Hmap Hblocks Hname Hppid Hbslot
+      "%Hcs Hcg Hcnt _ _ Hpc Hidev Hmeta Hmap Hblocks Hname Hppid Hbslot
        Hedges Hdiat Harm".
     iAssert (fedges dpi dn data) with "[Hedges]" as "Hedges".
     { rewrite /fedges (inum_of_unsigned dpi Hdpi). iExact "Hedges". }

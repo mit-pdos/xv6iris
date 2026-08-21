@@ -14,35 +14,68 @@
        ((void ( * )(uint64))(TRAMPOLINE + (userret - trampoline)))(satp);
      }
 
-   @ KernelSyms.forkret, 166 bytes / 45 instructions (CodeForkret.v); 24 of
-   them are on the path this contract covers.
 
-   ==== WHAT IS EXPERIMENTAL, AND WHAT IT COSTS ==========================
+   @ KernelSyms.forkret, 166 bytes / 45 instructions (CodeForkret.v).
 
-   The [if (first)] arm calls fsinit and kexec -- the whole file system and
-   the largest function in the tree -- and it runs EXACTLY ONCE, on the
-   first process ever scheduled.  Proving it needs a one-shot ghost that
-   nothing carries yet.  So this contract takes, as a premise, a DISCARDED
-   points-to saying [first] is already 0:
+   ==== THE [first] BRANCH IS DECIDED BY A RESOURCE ======================
 
-       first_addr ↦₄{DfracDiscarded} 0
+   This contract takes NO premise about [first] at all.  The branch at
+   +0x24 is decided by [FirstTok.first_tok], which rides inside
+   [ProcInv.proc_priv] -- so the process that runs forkret carries, in its
+   own block, which arm of the [if] it is entitled to:
 
-   which is exactly what the second and every later caller of forkret
-   observes, and refutes the branch outright ([c.beqz] at +0x24 is taken).
+     - the BOOT arm ([first_addr ↦₄ 1] beside main's persistent rows, the
+       sealed page count and fsinit's whole premise pile) reads 1, falls
+       through, and runs fsinit / the release store / kexec("/init");
 
-   Discarded rather than owned deliberately: [first] is written once and
-   then read by every process forever, so the permanent form is the one a
-   caller can actually keep, and a fractional or owned cell would have to
-   be threaded through the trap loop.  The arm this hides is the boot
-   client's; NOTHING about forkret's steady-state behaviour depends on it.
+     - the STEADY arm ([first_addr ↦₄□ 0] beside [FsReady.fs_ready]) reads
+       0, takes the [c.beqz], and the boot arm is dead.
 
-   THE PREMISE IS A PARAMETER OF THE STATEMENT ([wp_forkret_gen_body]), and
-   the file exports two readings of it: [wp_forkret_body], which is what
-   this proof gives, and [wp_forkret_nf_body], which drops it entirely.  The
-   second is what a caller that PARKS a fresh process needs -- see
-   [SpecForkretPark.v] -- because such a caller holds no claim on the boot
-   client's one-shot; it is assumed in [LinkForkretNF.v] and discharged by
-   the same [if (first)] proof this contract is waiting on.
+   The two arms are incompatible at one address, so "at most one process
+   ever boots the file system" is a theorem about ownership rather than a
+   claim about scheduling.  [FirstTok.v]'s header is the design; nothing
+   about it is visible here beyond the fact that [proc_priv] is enough.
+
+   WHAT THE BOOT ARM COSTS THIS CONTRACT is [procs_inv γs] and
+   [γs !! j = Some γl] -- fsinit's and kexec's cones reach sleep/wakeup,
+   whose contracts take the process table.  Those two SUBSUME the
+   [is_lock γl p s Rlk] this contract used to take: the lock forkret
+   releases is the table's own slot [j], so [SchedCtx.procs_inv_lookup]
+   produces it and the string and the resource stop being parameters.
+
+   Everything else the boot arm spends -- the file system's whole premise
+   pile, the allocator, the log's raw cells -- rides inside the token, not
+   in this precondition.
+
+   ==== THE BOOT ARM RUNS WITH INTERRUPTS OFF ============================
+
+   AND THAT IS WHY IT IS NOT PROVED YET.  [eb] is NOT [true] here.  This
+   revision's scheduler is
+
+       intr_on();  intr_off();  ...  acquire(&p->lock);  swtch(...)
+
+   so [push_off] reads SIE = 0 at [noff = 0] and leaves [cpus[h].intena = 0]
+   -- and forkret's own [release] at +0x10 therefore does NOT re-enable
+   interrupts.  fsinit, kexec and everything under them run at [eb = false].
+   (Upstream xv6 has no [intr_off()] there and does boot with the base
+   enable on; the [intr_on(); intr_off()] pair is this revision's wfi-race
+   fix, and it moves forkret to the disabled index.)
+
+   The consequence is a callee-side one, and it is exactly the case
+   claude-notes/completed/eb-generic-sweep.md's last section anticipated:
+   fsinit, initlog, ireclaim, kexec, namei, namex and dirlookup all still
+   carry [eb = true ->], on the recorded grounds that every caller reaches
+   them "from a syscall or from boot with an enabled base".  forkret's boot
+   arm is the caller that does not.  Generalizing those seven -- drop the
+   premise, thread [trap_csrs_ext eb] / [cpu_claim_ext eb pj] in and out --
+   is the prerequisite, and that file is the recipe.
+
+   THIS CONTRACT IS ALREADY RIGHT FOR IT.  forkret holds the complement:
+   [arm_pay_ext_split] turns the caller's [trap_csrs ∗ cpu_claim] into
+   release's [arm_pay 0 eb p] and the [_ext] pair, and the pair is live
+   across exactly the stretch the boot arm occupies.  So nothing in this
+   precondition has to change when the sweep lands -- which is why it takes
+   no [eb] premise now.
 
    ==== forkret DOES NOT RETURN ==========================================
 
@@ -86,9 +119,18 @@
    The premise is therefore the WAND: hand back what forkret's tail can
    produce ([UsertrapRes.ut_trap_parked] and the process block minus its
    page table) and get the bundle.  It is quantified over the hart because
-   prepare_return parks, and over the process record because prepare_return
-   moves the trapframe.  When [SpecForkretPark]'s axiom is finally
-   discharged, the caller that parks the process is the one that proves it.
+   prepare_return parks, over the process record because prepare_return
+   moves the trapframe, and OVER THE DESCRIPTOR because the boot arm's
+   kexec REPLACES the address space -- the table userret runs on is not the
+   one forkret was entered with, so no [pt] fixed on entry can name both.
+   The two facts the switch inside userret needs of that descriptor
+   ([SpecUserretClosed.loop_ok]'s pt-side conjuncts) are HANDED to the
+   closer rather than taken as premises: [proc_pt_wf] is a conjunct of
+   [ProcPtOwn.proc_pt] and so already inside [proc_priv], and the
+   normalisation equation is discharged here with [ProcPtOwn.ud_norm], the
+   same renormalisation every round of the trap loop performs.  When
+   [SpecForkretPark]'s axiom is finally discharged, the caller that parks
+   the process is the one that proves this wand.
 
    The address space itself is NOT in the wand: forkret splits [proc_pt]
    off the block ([ProcInv.proc_priv_split_pt]) and hands it to the user
@@ -114,6 +156,7 @@ Require Import CpuOwn.
 Require Import ProcGeom.
 Require Import FdSlots FileInvDefs.
 Require Import ProcInv ProcPtOwn.
+Require Import SchedCtx.   (* [procs_inv] / [proc_lock_res] -- p->lock is the table's slot [j] *)
 Require Import IrefSlots ProcAvail.
 Require Import SpecPrepareReturn.
 Require Import SpecKexec.
@@ -124,13 +167,10 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
 
-(* the static [int first], at its identity-mapped kernel address *)
-Definition first_addr : mword 64 := mword_of_int KernelSyms.first_1.
-
 (* forkret's own 48-byte frame is 6 slots; below it the deepest callee is
-   prepare_return's 12 (myproc's and release's 10 are subsumed).  Written as
-   an expression so a change to prepare_return's budget cannot silently
-   leave this one behind. *)
+   kexec's (the boot arm's), which subsumes prepare_return's 12, myproc's
+   and release's 10.  Written as an expression so a change to a callee's
+   budget cannot silently leave this one behind. *)
 Notation K_forkret := ((6 + K_kexec)%nat) (only parsing).
 Section SpecForkret.
   Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
@@ -149,27 +189,25 @@ Section SpecForkret.
 
 End SpecForkret.
 
-(* THE CONTRACT, PARAMETRIC IN THE [first] PREMISE.  The two readings below
-   are this one at [Pfirst := first_addr ↦₄{DfracDiscarded} 0] (what
-   [ProofForkret.v] proves) and at [Pfirst := emp] (what the [first] arm's
-   proof would give, and what [LinkForkretNF.v] assumes so that the park
-   argument can be written against a hypothesis that does not smuggle the
-   boot client's premise into every fresh process).  ONE statement rather
-   than two so the axiom cannot drift from the theorem. *)
+(* THE CONTRACT.  One statement, no [first] premise and no [first] reading:
+   the branch is decided by [FirstTok.first_tok] inside [proc_priv].  See
+   the header for the three premises the boot arm costs and for why the
+   descriptor is not a parameter. *)
 Definition wp_forkret_gen_body
     `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Pfirst : iProp Σ)
     (* the trap loop's kernel-side bundle, abstract exactly as
        [SpecUserretClosed] takes it *)
     (URes : CpuId -> uptd -> mword 64 -> iProp Σ)
-    (pt : uptd) (j : nat)
-    (γl γf : gname) (s : string) (Rlk : iProp Σ)
+    (j : nat) (γs : list gname) (γl γf : gname)
     (pid : mword 32) (V : pprivate)
     (ks : mword 64) (m : regfile) (av av2 : nat) (eb : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.forkret in
   let p   : mword 64 := proc_addr j in
   let ksp : mword 64 := add_vec ks (mword_of_int 4096) in
   (j < NPROC)%nat ->
+  (* the slot this process's lock is, which is what makes [procs_inv] below
+     name p->lock rather than merely some lock *)
+  γs !! j = Some γl ->
   (* THE BUDGET.  The 6-slot frame comes off the top; what is left has to
      cover prepare_return, and what the whole function leaves behind (the
      frame merged back in, since forkret never runs its epilogue) has to
@@ -181,12 +219,6 @@ Definition wp_forkret_gen_body
   (K_usertrap <= av)%nat ->
   (* calling convention: swtch restored sp to the kernel stack TOP *)
   m !!! Regidx (mword_of_int 2 : mword 5) = ksp ->
-  (* the process whose kernel thread this is *)
-  pv_upt V = pt ->
-  (* the two descriptor facts the switch inside userret needs; both are
-     [SpecUserretClosed.loop_ok]'s pt-side conjuncts *)
-  ud_data pt = ud_pas pt ->
-  proc_pt_wf pt ->
   (* ---- SpecUservec's two gaps, passed through -- see the header on why
          the kernel root is quantified here ---- *)
   (forall ms_v : mword 64, trap_mstatus_ok ms_v ->
@@ -197,76 +229,28 @@ Definition wp_forkret_gen_body
   wire_inv -∗
   kmap_at tramp_vpn tramp_ppn KP_rx -∗
   pc_is pcE -∗
-  (* THE [first] PREMISE -- see the header, and the two readings above *)
-  Pfirst -∗
+  (* the process table: [is_lock] for the lock released at +0x10, and what
+     fsinit's and kexec's cones take for sleep/wakeup *)
+  procs_inv γs -∗
   (* ---- the running kernel thread, as swtch left it ---- *)
   sie_cap_gpr KT1 m av false p -∗
-  cpu_own 1%nat eb p false {[s]} -∗
+  cpu_own 1%nat eb p false {["proc"%string]} -∗
   trap_csrs KT1 -∗
   cpu_claim p -∗
   (* ---- p->lock, still held from scheduler() ---- *)
-  is_lock γl p s Rlk -∗
   locked γl cpu_id -∗
-  Rlk -∗
+  proc_lock_res γs γl p -∗
   (* ---- the process ---- *)
   is_kstack p ks -∗
   proc_priv γf p pid V -∗
   (* ---- the residue closer -- see the header ---- *)
-  (∀ (h : CpuId) (V' : pprivate),
-     ⌜pv_upt V' = pt⌝ -∗
+  (∀ (h : CpuId) (pt' : uptd) (V' : pprivate),
+     ⌜pv_upt V' = pt'⌝ -∗
+     ⌜ud_data pt' = ud_pas pt'⌝ -∗
+     ⌜proc_pt_wf pt'⌝ -∗
      forkret_yield (CID := h) γf p ksp pid av V' -∗
-     URes h pt ksp) -∗
+     URes h pt' ksp) -∗
   WP (Loop : expr riscv_lang).
-
-(* THE PROVEN READING: [first] is already 0.  [ProofForkret.v]. *)
-Definition wp_forkret_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-    (URes : CpuId -> uptd -> mword 64 -> iProp Σ)
-    (pt : uptd) (j : nat)
-    (γl γf : gname) (s : string) (Rlk : iProp Σ)
-    (pid : mword 32) (V : pprivate)
-    (ks : mword 64) (m : regfile) (av av2 : nat) (eb : bool) :=
-  wp_forkret_gen_body
-    (first_addr ↦₄{DfracDiscarded} (mword_of_int 0 : mword 32))
-    URes pt j γl γf s Rlk pid V ks m av av2 eb.
-
-(* THE READING WITH NO [first] PREMISE AT ALL.  A caller that PARKS a fresh
-   process cannot pay the discarded points-to: it is a fact about the boot
-   client's one-shot, and a process created by kfork or userinit inherits no
-   claim on it.  So the park argument ([ProofForkretPark.v]) is written
-   against this reading, which is assumed in [LinkForkretNF.v] and will be
-   discharged by the same proof the [if (first)] arm needs. *)
-Definition wp_forkret_nf_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-    (URes : CpuId -> uptd -> mword 64 -> iProp Σ)
-    (pt : uptd) (j : nat)
-    (γl γf : gname) (s : string) (Rlk : iProp Σ)
-    (pid : mword 32) (V : pprivate)
-    (ks : mword 64) (m : regfile) (av av2 : nat) (eb : bool) :=
-  wp_forkret_gen_body emp
-    URes pt j γl γf s Rlk pid V ks m av av2 eb.
-
-(* the no-[first] reading IS stronger, mechanically: the only difference is
-   a premise the weaker one may simply drop.  Stated so that nothing has to
-   take on faith that [LinkForkretNF.v]'s Axiom subsumes [ProofForkret.v]'s
-   theorem rather than merely resembling it. *)
-Lemma wp_forkret_body_of_nf
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-    (URes : CpuId -> uptd -> mword 64 -> iProp Σ)
-    (pt : uptd) (j : nat)
-    (γl γf : gname) (s : string) (Rlk : iProp Σ)
-    (pid : mword 32) (V : pprivate)
-    (ks : mword 64) (m : regfile) (av av2 : nat) (eb : bool) :
-  wp_forkret_nf_body URes pt j γl γf s Rlk pid V ks m av av2 eb ->
-  wp_forkret_body URes pt j γl γf s Rlk pid V ks m av av2 eb.
-Proof.
-  rewrite /wp_forkret_body /wp_forkret_nf_body /wp_forkret_gen_body.
-  intros Hnf Hj Hav2 Hpr Hut Hsp Hupt Hnorm Hptwf Hgap Hkw.
-  iIntros "#Htext #Hwire #Hmap Hpc _ Hcg Hcpu Htc Hclm #Hlk Hlocked HR #Hks Hpv Hyield".
-  iApply (Hnf Hj Hav2 Hpr Hut Hsp Hupt Hnorm Hptwf Hgap Hkw
-            with "Htext Hwire Hmap Hpc [] Hcg Hcpu Htc Hclm Hlk Hlocked HR Hks Hpv Hyield").
-  done.
-Qed.
 
 (* The residue is the module-type parameter it is everywhere else: forkret's
    tail runs [SpecUserretClosed]'s theorem, which is stated at
@@ -275,29 +259,9 @@ Module Type FORKRET.
   Include SpecUsertrap.USERTRAP_RES.
   Parameter wp_forkret :
     forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-      (pt : uptd) (j : nat)
-      (γl γf : gname) (s : string) (Rlk : iProp Σ)
+      (j : nat) (γs : list gname) (γl γf : gname)
       (pid : mword 32) (V : pprivate)
       (ks : mword 64) (m : regfile) (av av2 : nat) (eb : bool),
-      wp_forkret_body (fun h : CpuId => usertrap_res_bare (CID := h))
-        pt j γl γf s Rlk pid V ks m av av2 eb.
+      wp_forkret_gen_body (fun h : CpuId => usertrap_res_bare (CID := h))
+        j γs γl γf pid V ks m av av2 eb.
 End FORKRET.
-
-(* ... and the same interface at the no-[first] reading.  [ProofForkretPark.v]
-   is a functor over THIS one: a parked process is resumed by a scheduler
-   that knows nothing about the boot client's one-shot, so the park argument
-   has no [first] points-to to hand forkret and the [FORKRET] interface is
-   the wrong hypothesis to write it against.  Assumed in [LinkForkretNF.v]
-   (and only there); [wp_forkret_body_of_nf] above records that assuming it
-   is a strengthening of the proven contract, not a different one. *)
-Module Type FORKRET_NF.
-  Include SpecUsertrap.USERTRAP_RES.
-  Parameter wp_forkret_nf :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-      (pt : uptd) (j : nat)
-      (γl γf : gname) (s : string) (Rlk : iProp Σ)
-      (pid : mword 32) (V : pprivate)
-      (ks : mword 64) (m : regfile) (av av2 : nat) (eb : bool),
-      wp_forkret_nf_body (fun h : CpuId => usertrap_res_bare (CID := h))
-        pt j γl γf s Rlk pid V ks m av av2 eb.
-End FORKRET_NF.

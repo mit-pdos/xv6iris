@@ -3332,14 +3332,16 @@ Section ProofCreateMain.
                   Hj Hgs HD4a0
                   ltac:(cbn [negb]; rewrite HD4a2 dlk_zero_moi;
                         exact (eq_vec_refl _))
-                  Heb
-                  with "Hcg Hcnt Htext Hkd Hpc Hpenv Hbio Hkenv Hidev Hmeta Hmap
+                  with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hkenv Hidev Hmeta Hmap
                         Hblocks Hnb14 [] Hppid Hprocs Hdevi Hgeom Hdlk Hbs1
                         Hitb2 Hitbl Hesc Hiregi Hisl1 Hdlnk Hdiat").
         all: try lkbelow.
+        (* dirlookup is eb-generic now; create is still at [eb = true]. *)
+        { rewrite Heb /trap_csrs_ext. done. }
+        { rewrite Heb /cpu_claim_ext. done. }
         { done. }
         iIntros (CIDdl Hsdl mdl found kk kslot qq)
-          "%Hcsdl Hcg Hcnt Hpc Hidev Hmeta Hmap Hblocks Hnb14 Hppid Hbs1
+          "%Hcsdl Hcg Hcnt _ _ Hpc Hidev Hmeta Hmap Hblocks Hnb14 Hppid Hbs1
            Hdlnk Hdiat Hres2".
         iEval (rewrite HD4a1) in "Hnb14".
         assert (Hpcdl : ret_pc (D4 !!! Regidx Rra : mword 64)

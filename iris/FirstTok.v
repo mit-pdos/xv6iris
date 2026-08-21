@@ -433,6 +433,23 @@ Section FirstTok.
   Lemma first_tok_of_done : first_done -∗ first_tok.
   Proof. iIntros "[H F]". iRight. iFrame "H F". Qed.
 
+  (* THE DESTRUCTOR, so that forkret's walk never has to unfold the seal.
+     [first_tok] is [Typeclasses Opaque] for a correctness reason (see the
+     note at the bottom of this file), and a walk that opens it with
+     [rewrite /first_tok] loses that protection for the rest of the proof.
+     This hands the two arms out by name instead: the boot arm's four rows
+     in the order the seal site wants them, or [first_done]. *)
+  Lemma first_tok_open :
+    first_tok -∗
+      (first_addr ↦₄ (mword_of_int 1 : mword 32)
+         ∗ first_boot_persist ∗ kalloc_env fsc_kalloc None ∗ first_fsinit)
+      ∨ first_done.
+  Proof.
+    iIntros "H". rewrite /first_tok. iDestruct "H" as "[H | H]".
+    - iLeft. iExact "H".
+    - iRight. iExact "H".
+  Qed.
+
   Lemma first_tok_boot :
     first_addr ↦₄ (mword_of_int 1 : mword 32) -∗
     first_boot_persist -∗ kalloc_env fsc_kalloc None -∗ first_fsinit -∗

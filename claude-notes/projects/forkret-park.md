@@ -1,5 +1,27 @@
 # forkret_park: retiring the last assumed Link
 
+> **2026-08-21 — THE PARK PROOF WAS REMOVED FROM THE TREE, and this file is
+> now the record of what it was.** `SpecForkretParkPaid.v`,
+> `ProofForkretPark.v`, `ForkretParkClose.v` and `LinkForkretParkPaid.v` are
+> deleted (last green at `4bbc418f`; `git show 4bbc418f:iris/<f>` recovers
+> any of them). They were written against `SpecForkret`'s *assumed*
+> no-`first` reading (`LinkForkretNF.v`, also deleted), and forkret's real
+> contract has moved: no `first` premise at all, no `pt` parameter, a
+> `∀ pt'` residue closer, and `procs_inv γs` in place of the `is_lock γl p s
+> Rlk` triple. Everything below about the RESOURCES is still true and is
+> still the plan; only the four files are gone.
+>
+> **AND ONE THING IN THE PLAN IS NOW KNOWN WRONG.** `SwtchCtx.valid_context`'s
+> resume wand is `∀ eb'`, and the park's job is to prove forkret's WP at
+> every `eb'`. This revision's scheduler runs `intr_on(); intr_off();` before
+> `acquire(&p->lock)`, so the only `eb'` that ever occurs is **`false`** —
+> `push_off` records `intena = 0`. That is what forces forkret's boot arm
+> onto the disabled index (`projects/forkret-boot-arm.md`), and it means the
+> park must deliver the record at `eb' = false` too. Nothing in the old
+> proof depended on the other index, so this is a fact to know rather than a
+> repair — but do not re-derive the record on the assumption that a
+> dispatching scheduler hands over an enabled base. It does not.
+
 `LinkForkretPark.ForkretPark.forkret_park` is the one assumed-Link in the boot
 cone, and the one assumption every proven process-side function carries
 (`forkret`, `kfork`, `main`, `sys_fork`, `syscall`, `userinit`, `usertrap` --
