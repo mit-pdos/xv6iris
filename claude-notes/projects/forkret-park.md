@@ -293,30 +293,71 @@ nextpid lock, `procs_avail None`, `is_tickslock`, `console_ready`.
 
 **`is_ftable γft γf`.** Only ever consumed (`SpecFilealloc`,
 `SpecPipealloc`, `ProofSyscall`). `fileinit()` IS proved and IS called by
-main (`ProofMain.v:1518`), and `SpecFileinit.v`'s header says the rest
-outright: *"Whether the lock then becomes an `is_lock` over the open-file
-table is the caller's ghost step, not fileinit's"* — and main currently
-DROPS all three of its outputs (`iIntros (mfi) "Hcg Hpc %Hcsfi _ _ _"`).
-The ghost step needs `ftable_res γf`, which at `M = ∅` is NFILE copies of
-`a_fref k ↦₄ 0 ∗ file_fields k 1 C ∗ file_pay γ k 1 C` — i.e. the ftable's
-`file[NFILE]` array has to be CARVED OUT OF BSS (`BootCarveMain.v`) and its
-authority allocated. That is the real cost.
+main, and `SpecFileinit.v`'s header says the rest outright: *"Whether the
+lock then becomes an `is_lock` over the open-file table is the caller's
+ghost step, not fileinit's"*.
 
-**The `wait_lock` `is_lock`.** Same shape, and `BootCarveMain.v:1669` names
-the gap in passing: `wait_res` is `∃ ps, parents_own ps` =
-`⌜length ps = NPROC⌝ ∗ [∗ list] j ↦ v ∈ ps, p_parent (proc_addr j) ↦₈ v`,
-and of `p_parent` (+56) that file says *"claimed by no bundle and is dropped
-with the padding"*. So the cells exist in the image and the carve throws
-them away. Un-drop them, thread `parents_own` to main (which already holds
-`lk_raw wait_lock_addr`), `is_lock_intro`.
+**STAGED (`dd2af18e`).** main used to drop all three of fileinit's outputs
+(`iIntros (mfi) "Hcg Hpc %Hcsfi _ _ _"`); it now re-bundles them as
+`lk_fresh ftable "ftable"` and threads them out of `mn_grp_fs`. What is
+still missing is only the resource: `ftable_res γf` at `M = ∅` is NFILE
+copies of `a_fref k ↦₄ 0 ∗ file_fields k 1 C ∗ file_pay γ k 1 C`, so the
+ftable's `file[NFILE]` array has to be CARVED OUT OF BSS
+(`BootCarveMain.v`) and its authority allocated. Once it is, the `newlock`
+is one line — the wait_lock below is the same move, already taken.
 
-**`devintr_caps_any`.** The `□ ∀ h` form. Six of `devintr_caps`' seven
-members are hart-free and main has all six (`dev_inv`, `console_caps`,
-`disk_geom`, the virtio `is_lock`, `tick_keeper`'s real arm, `procs_inv`);
-the seventh is `timer_cap`, which is per-hart and which `BootChain.v:566`
-mints with `timer_cap_intro`. So this one is assembly, not construction —
-but the `∀ h` quantifier has to be discharged at every hart, which is what
-`UsertrapRes.v`'s note on `devintr_caps_any` explains the boot chain can do.
+**The `wait_lock` `is_lock`. — DONE (`dd2af18e`).** `wait_res` is
+`∃ ps, parents_own ps`, the NPROC `p_parent` cells, and of `p_parent` (+56)
+`BootCarveMain.v` said *"claimed by no bundle and is dropped with the
+padding"* — it is the one field of a `struct proc` belonging to a lock other
+than `p->lock`, so neither `proc_raw` nor `proc_pub` wanted it. The slot
+carve keeps it now, `WaitInv.wait_res_of_cells` gathers the
+one-existential-per-slot shape into `parents_own`'s single list,
+`main_globals_raw` carries the row, and `mn_grp_kvm` brings the lock up with
+the `newlock` it already performs for the nextpid lock (procinit was already
+handing back `lk_fresh wait_lock_addr "wait_lock"` and main was dropping
+it).
+
+TWO THINGS THAT BIT: `∗` is right-associative, so `proc_slot_raw`'s middle
+pair has to be parenthesised explicitly or the two `big_sepL_sep` rewrites
+cut in the wrong place; and the gather is an induction with an OFFSET,
+because `seq k (S n)` shifts the TABLE index while `parents_own`'s big-op is
+indexed by the LIST.
+
+**`devintr_caps_any`.** The `□ ∀ h` form, and it is the one that needs a
+DECISION rather than plumbing. Six of `devintr_caps`' seven members are
+hart-free and main has all six (`dev_inv`, `console_caps`, `disk_geom`, the
+virtio `is_lock`, `tick_keeper`'s real arm — its left arm is the hart-indexed
+one and we take the right — and `procs_inv`). The seventh is `timer_cap`,
+and it is genuinely per-hart: `timer_cap = sstc_enabled ∗ stimecmp_inv`,
+`sstc_enabled` is `mcounteren ↦ᵣ□ …`, and `RiscvPtsto.reg_pointsto` takes
+`{CpuId}`.
+
+`BootChain.v:566` mints one with `timer_cap_intro` — but INSIDE each hart's
+own chain, out of that hart's two register cells, so the boot hart's chain
+hands main a cap at hart 0 and the seven secondaries' caps are minted in
+their own threads and never come back. **`∀ h` cannot be assembled from
+anything main holds.**
+
+The cells for all eight ARE in one place, but that place is
+`SystemAdequacy.v:261`, *before* the fan-out: `Hh0` and the seven elements of
+`Hhrest` each carry a hart's reset residue. So the route is:
+
+> peel `mcounteren` / `stimecmp` out of each of the eight residues before the
+> fan-out, run `timer_cap_intro` eight times, gather `□ ∀ h, timer_cap`, hand
+> it into `boot_hart_primary` → `SpecMain` → main, and stop the per-hart
+> chains minting their own.
+
+That MOVES where the timer capability is minted — from "each hart, inside its
+own chain" to "all harts, before the fan-out" — and it touches the top-level
+adequacy theorem. It is what `UsertrapRes.v`'s own note on
+`devintr_caps_any` anticipates ("the boot chain mints one PER HART"), but it
+is an architecture call and should be made deliberately.
+
+WEAKENING IS NOT AN OPTION, and `UsertrapRes.v` says why at the definition:
+the residue parks across user execution and resumes on an arbitrary hart, so
+`devintr_caps` at the CURRENT hart would not survive the park. That is the
+whole reason the `∀ h` form exists.
 
 ##### The one that is a decision, not a gap
 
