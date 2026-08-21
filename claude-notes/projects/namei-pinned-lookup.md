@@ -681,3 +681,35 @@ DirViewPin.v now ends with the CLOSED instantiation
 `Module NameiPinnedI := NameiPinned LinkNameiTr.NameiTr` — a
 `wp_namei_pinned` with no module parameter, at the tree's standing
 assumption baseline.
+
+## 12. N-5.1 STAGED (2026-08-21; user-authorized to run when Phase B lands)
+
+Scope, chosen to avoid both the humans' forkret walk and a premature
+kexec re-walk:
+
+* **W5a — the boot mint.**  In `FsCfgBoot`, at the point the stocking
+  holds ROOTINO's whole `dv_hold` (before parking its bundle): fire
+  `dv_lend_mint` (post-Phase-B signature) — the bundle parks the ¾-ride
+  arm, and `fs_cfg_alloc`'s postcondition grows the pin conjunct for
+  root at the image contents (witnesses: FsImgCheck.v:399/:533,
+  `path_at … ROOTINO [fname_init] = Some 7`).  Callers of
+  `fs_cfg_alloc` that do not yet consume the pin DISCARD it (affine) —
+  no transport-payload change, no first_tok/forkret edit, no human
+  collision.  The transported form is M2/D1-D2 business.
+* **W5b — the concrete pinned theorem.**  A standalone corollary
+  `wp_namei_init_pinned`: `wp_namei_pinned` (the closed `NameiPinnedI`)
+  instantiated at `hops = [(fname_init, 7)]`, with the chain premise
+  discharged from W5a's pin and the image witness.  Statement: a caller
+  in the runtime fs environment holding root's pin, running
+  namei("/init"), receives `inode_held_at ipv 7` — or the receipt that
+  root was modified.  This IS the campaign's first prize as a theorem.
+* **DEFERRED (with N-5.2, deliberately): the kexec-contract adoption.**
+  kexec's proof modules are sealed (the namex lesson: a seal forces a
+  full-copy re-walk), so the walk should be re-done ONCE, when the
+  fview contents story lands — the inum pin and the byte pin thread the
+  same call sites.  Recorded so the deferral is a decision, not drift.
+
+Gates: tree green, Admitted 1, system audit at baseline, the
+`NameiPinnedI` audit at platform-externs-only, no forkret-cone or
+FsReady diffs, no Spec*.v diffs (the new corollary lives in a new leaf
+or DirViewPin.v — additive).
