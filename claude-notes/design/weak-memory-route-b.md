@@ -186,6 +186,40 @@ detailed design):**
   this (which violation to attack, closure maintenance) is B2's
   detailed design, together with the write-class inventory.
 
+### 3b′. The induction's obstruction landscape (2026-08-21, mapped
+### against the completed kit — B2d's design input)
+
+The uniform move: to resolve `(e, w)`, DESCEND `e` (read or write) to
+just below `w`, one adjacent swap at a time.  A swap of `e` past `z`
+(sitting below `e`) can be refused three ways, and each refusal has a
+disposition:
+
+1. **`gppo z e`** — by `gppo_same_hart`, `z` is same-hart and
+   po-before `e`, hence po-before `w`, hence ITSELF a violation
+   witness `(z, w)` sitting gmo-in `(w, e)`.  Disposition: descend the
+   witnesses of `w` in PO ORDER (earliest first); then no
+   gppo-blocker remains when `e` descends.  This is the sweep order,
+   now with its precise justification.
+2. **`e` a read blocked at its rf-SOURCE `w0`** gmo-in `(w, e)` — THE
+   KILL POINT: aq (rule 5), deps (`gdeps_gmo`), and fence (rule 4)
+   refute the configuration outright (consistency contradictions);
+   the residual — a genuinely unordered racy read of a
+   mid-window-sourced value — is where the φ/lock-protocol kills fire
+   at the realized prefix (§3a).
+3. **`e` a write blocked at an OLD-BYTE READER `z`** (the B2c co-max
+   side condition fails: `z` reads a byte of `e` at `t < gwix e`) — a
+   case the S6 inventory did not name (it is the co/fr-side twin of
+   case 2).  Disposition: descend `z` first (it is a read — B2a), and
+   ITS blockers recurse into cases 1/2.  No new kill class arises:
+   case 3's stuck forms reduce to case 2's.
+
+TERMINATION is the open design item: descents of non-witness readers
+(case 3) do not reduce the violation count by themselves, so the
+measure must be lexicographic (violations, then the minimal violating
+write's position, then the descending entourage's displacement) or an
+inversion count against a canonical target — B2d's core question,
+probably worth a small worked example/probe before the spec.
+
 ### 3c. What is reused, by name
 
 - T2-1c's construction and the six-obligation bootstrap (the worklist's
