@@ -745,3 +745,49 @@ files:
 * Movers: 15 `dv_set → dv_set_rt`; the boot stocking stays plain under
   `dv_ride_of_hold`.  The one Spec diff: SpecKexecB2's bracket (third
   authorized touch).
+
+## 13. N-5.2 STAGED (2026-08-21; user-authorized to run when N-5.1 lands)
+
+The contents half: pin what the pinned inode's bytes ARE, and re-walk
+kexec once against it.  Design decisions, taken now so the lanes don't
+re-litigate:
+
+* **D-52a — a SECOND independent ghost, not a value-pair rework.**
+  `fview` clones the dview pattern at its own UR (`fviewUR := gmapUR Z
+  (dfrac_agreeR (leibnizO (list (bv 8))))`, own icfg field per the W1
+  playbook) with `fv_of dn data := FsTree.file_bytes data (Z.to_nat
+  (bv_unsigned (di_size dn)))` — the function is LANDED (FsTree.v:613,
+  what `node_of`'s NFile case already reads).  Reworking dviewUR's value
+  type to a pair would re-sweep every landed dview site; the second
+  ghost's sweep is the same ~25 files but purely additive beside "Hdv".
+* **D-52b — every byte-write mover moves BOTH ghosts** (a dir write
+  changes fv_of's garbage, a file write changes dv_of's garbage — the
+  symmetry that made the definitional tie cheap).  One combined helper
+  (`dvw_set`-style, and the ride/`_rt` forms) keeps each site one line.
+* **D-52c — the lend column generalizes by MORE negative key families**
+  in icfg_reg (the -2z-1/-2z-2 pattern continues at -4z-3/-4z-4 or
+  equivalent); the slot-fraction ledger and the mint-licence discipline
+  are Phase B's verbatim.  fv_pin / fv_pin_redeem mirror dv_*'s.
+* **D-52d — NO readi re-walk.**  readi's callers hold the payload
+  (ic_loaded) across the call; the fv agreement fires ONCE against the
+  client's pin after kexec's ilock, and readi's landed post already
+  relates its output to the held `data`.  The ONLY re-walk is KEXEC's
+  own (sealed modules — the namex lesson), against a new parallel
+  contract `wp_kexec_pinned`.
+* **D-52e — the post's altitude, staged:**
+  - Stage B (this campaign): resource-level — the bytes kexec's readi
+    delivered into elf/ph and the loaded user pages are init's ELF
+    bytes at their file offsets (ties to the landed user-rocq
+    InitElfRaw consistency lemmas).  Premises: N-5.1's namei pin +
+    the fview pin for inum 7 (both minted at the stocking, riding
+    fs_cfg_alloc's post like N-5.1's).
+  - Stage C (DEFERRED, needs a ruling WITH NICKOLAI): the
+    contents-indexed proc_pt refinement SpecKexec's header sketches —
+    it overlaps his proc-pagetable-ownership uvm contracts.  Not this
+    campaign's to start unilaterally.
+
+Lane staging: N-5.2A (fview kit + custody + movers + boot mint + pin
+kit — the N-1+PhaseB pattern replayed) lands first; N-5.2B (the kexec
+re-walk) is its own lane after, since the walk is the tree's tallest.
+Gates as Phase B's, plus: no uvm/proc-pagetable file may change (stage
+C's boundary).
