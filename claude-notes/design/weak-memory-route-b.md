@@ -427,7 +427,48 @@ the normalization").
   gate.
 - **B3**: the capstone assembly (§1) + audits; retirement notes (§3d).
 
+## 4b. B1's shape (designed 2026-08-21, post-B2d)
+
+THE SIMPLIFICATION: no prefix variant of the linearization is needed.
+The kill interface's minimality clauses deliver the closure — for K1,
+the po-minimal witness `e`'s po-predecessors are ALL gmo-below `w`
+(a read-predecessor above `w` would be a po-smaller witness; a
+write-predecessor would violate `w`'s gmo-minimality), so the
+realized set is a genuine doubly-closed prefix and the LANDED
+`rule14_linearization` applies to the RESTRICTED graph as-is.  B1
+splits:
+- **B1a — the restriction slice** (pure order theory, delegate-ready
+  after B0b-1): `gx_restrict G cs n` (per-hart cut vector + a gmo
+  cut, with `restr_ok` tying them: the cuts' mem events are exactly
+  the gmo prefix, i.e. po-closure holds by prefixing), and the
+  consistency-restriction lemmas: `gwf`/`gppo_gmo` restrict
+  trivially; `gload_value`'s ∃-half lands inside by closure and its
+  ∀-half (co-max) only weakens; `gatomicity` likewise; `gd_deps`
+  restricts to in-cut pairs; `grule14` of the restriction ⟸ the
+  prefix is violation-free (the hypothesis the induction supplies by
+  minimality).
+- **B1b = B0b-2 — the supply derivation**: from `gdexec_conf`'s
+  per-hart emissions, derive `exec_prog_ok'` for the restricted
+  cand's trace (the T2-1c enumeration of the restriction), threading
+  the device witness.  Then T1 + `exec_wf_pf_run_prog'` (T1-D's)
+  realize the prefix as a pf run, and the exports hold at its
+  reachable configurations.
+
 ## 5. Honest residual risks — OPEN
+
+- **THE K2-KILL'S PRECISE MECHANISM (flagged 2026-08-21):** K2's
+  stale read is of a PREVIOUS message of the byte — which may be
+  published and φ-innocent (φ's `violation_hart` speaks of
+  owned-UNPUBLISHED messages; a stale read of an old published value
+  is not by itself a violation).  The kill's real content is the
+  MP-shape analysis: either the writer fence exists (rule-4 graph
+  arithmetic kills the violation), or the byte pair (stale byte,
+  the flag/lock byte whose fresh read pins `z` above `w`) falls to
+  the lock-protocol/CS-coverage cases — i.e. K2's φ/lock discharge
+  needs the SAME per-site classification as S6's kernel claim, routed
+  through
+  which byte `z`'s stale entry actually is.  This is B2e's core
+  design question; do not assume the K2 kill is a one-liner.
 
 To be priced during B1/B2 design: (i) the prefix variant of T2-1c (the
 full theorem assumes grule14 of the WHOLE graph; the prefix form needs
