@@ -304,6 +304,20 @@ worth 20× on individual files.
   entirely. Two tells that you are in this case rather than the split-one-off
   case above: the lemma's whole job is to REASSEMBLE a named bundle, and its
   own siblings in the file already spell out the chain.
+  **The three worst remaining instances were the top three statements in the
+  tree**, and all three are the same edit — the bundle's conjunct order, one
+  `iSplitR`/`iSplitL` per row, `iExact` at each:
+  | site | the bundle | file before → after |
+  |---|---|---|
+  | `ProofMain` `Hpersist` assert | `FirstTok.first_boot_persist`, 16 rows (one a 50-fold `ic_sleeplocks` big-op) | **108.8 s → 32.7 s** |
+  | `FsSyscalls.fs_world_all` | the 20-row unpack of `fs_world` | **30.7 s → 6.7 s** |
+  | `ForkretParkClose.forkret_park_pkg_intro` | `forkret_park_pkg`, whose 7th row is the residue closer | **31.2 s → 2.6 s** |
+  A persistent bundle asserted with `iAssert P as "#H"` has an EMPTY spatial
+  context in its goal, so every row there is `iSplitR; [iExact "H"|]`; mixed
+  bundles take `iSplitL "H"; [iExact "H"|]` for the spatial rows and bare
+  `iSplitR` (which sends all spatial hypotheses right) for the intuitionistic
+  ones. Pure rows are `iSplitR; [iPureIntro; exact H|]`, which is also what
+  retires the trailing `iFrame "%"`.
 - **A rebuild is a construction, so build it — do not frame it.** Even fully
   named, `iFrame` walks the goal once per name, and the goal is the abstraction
   UNFOLDED, so its tail conjuncts are whatever the abstraction ends in. Handing
@@ -452,9 +466,35 @@ worth 20× on individual files.
 - **`Qed` re-checks and therefore DOUBLES every `vm_compute`** — the kernel
   re-runs the reflexivity check at `Qed` time, so a lemma whose tactic is 50 s
   of `vm_compute` costs ~100 s of wall clock (measured: `FsImgCheck.fsimg_wf_ok`
-  52.5 s tactic + 53.7 s `Qed`). Budget 2× the `-time` figure for any
+  65.9 s tactic + 62.6 s `Qed`). Budget 2× the `-time` figure for any
   vm_compute-heavy lemma, and prefer one big boolean sweep with lookup spec
   lemmas over N per-item `vm_compute` lemmas — the sweep pays the 2× once.
+- **THE DOUBLING IS AVOIDABLE: build the cast, do not run the tactic.** The
+  kernel's re-check is the reduction that has to happen; the tactic's is the
+  one that does not. `vm_cast_no_check` puts the `vm_cast` straight in the
+  proof term and typechecks nothing at tactic time, so the reduction is paid
+  once. `ElfKernel.v` and `FsImgCheck.v` each carry it as a three-line local
+  tactic replacing `vm_compute. reflexivity.`:
+  ```coq
+  Local Ltac vm_eq :=
+    lazymatch goal with
+    | |- _ = ?r => vm_cast_no_check (@eq_refl _ r)
+    end.
+  ```
+  Measured, isolated `coqc`: **`FsImgCheck` 195.4 s → 99.5 s** (its
+  `fsimg_wf_ok` alone was 128.5 s of that), **`ElfKernel` 54.0 s → 28.9 s**.
+  The whole tactic column of those files drops to zero and only `Qed` pays.
+  - **IT MUST BE THE RIGHT-HAND SIDE.** `eq_refl r` casts `r = r` to `l = r`,
+    so the VM evaluates the heavy side once; the mirror spelling
+    `eq_refl l` makes it evaluate that side TWICE and is **worse than the
+    `vm_compute` it replaces** — `ElfKernel` 78.3 s against a 54.0 s
+    baseline. The two spellings read identically; only the A/B tells them
+    apart, so measure after writing one.
+  - The cost is diagnostic, which is why this is for the HEAVY sentences and
+    not a sweep (647 `vm_compute. reflexivity.` sites in the tree, nearly all
+    sub-second): a disagreement now surfaces at `Qed` as a kernel conversion
+    failure with no goal in view. Put `vm_compute. reflexivity.` back on the
+    one failing lemma to see it.
 - **AND MEASURE ON A QUIET VM.** Three of those five variants first read as
   regressions of 20–30 % (25 s → 31 s on the same file), purely because another
   tree was building; the same variants re-measured at load 9 were within 2 %.

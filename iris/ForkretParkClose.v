@@ -152,7 +152,20 @@ Section ForkretParkClose.
     iIntros (Hwf Hav) "#Htext #Hwire #Hkmap Hslot Hstack #Hcaps Hsys Hown".
     rewrite /forkret_park_pkg.
     iDestruct (ut_caps_procs with "Hcaps") as "#Hprocs".
-    iFrame "Htext Hwire Hkmap Hprocs Hslot Hstack".
+    (* SIX [iSplitR]/[iSplitL]s, NOT ONE [iFrame]: the package's LAST
+       conjunct is the residue closer, a whole forall-closure over
+       [forkret_yield] and [URes], so every (name x conjunct) attempt a
+       named [iFrame] makes has to walk past it.  That one [iFrame] was
+       29 s (claude-notes/optimization.md, "THE CHEAPEST FIX IS USUALLY TO
+       SPLIT THE BIG CONJUNCT OFF FIRST"); peeled row by row each step is
+       a syntactic check and the closer is reached with nothing left to
+       search. *)
+    iSplitR; [iExact "Htext"|].
+    iSplitR; [iExact "Hwire"|].
+    iSplitR; [iExact "Hkmap"|].
+    iSplitR; [iExact "Hprocs"|].
+    iSplitL "Hslot"; [iExact "Hslot"|].
+    iSplitL "Hstack"; [iExact "Hstack"|].
     iApply (forkret_park_closer_intro with "Hcaps Hsys Hown"); assumption.
   Qed.
 

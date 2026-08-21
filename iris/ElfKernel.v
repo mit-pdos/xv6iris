@@ -60,6 +60,29 @@ Local Open Scope Z_scope.
 Definition kernel_elf : elf_bytes := pstring_hex_bytes kernel_elf_hex.
 Global Typeclasses Opaque kernel_elf.
 
+(*  ONE REDUCTION, NOT TWO.  [vm_compute. reflexivity.] reduces the goal in
+    the tactic engine and then the KERNEL re-runs the same reduction at
+    [Qed] to check the [vm_cast] the tactic left behind, so every sentence
+    below costs its [vm_compute] twice ([elf_sections_wf] measured 11.6 s +
+    11.1 s; claude-notes/optimization.md, "[Qed] re-checks and therefore
+    DOUBLES every [vm_compute]").  [vm_eq] hands the kernel that cast
+    directly and typechecks nothing at tactic time: same proof term, same
+    VM, and this file goes 54.0 s -> 28.7 s.
+
+    IT MUST BE THE **RIGHT** SIDE: [eq_refl rhs] casts [rhs = rhs] to
+    [lhs = rhs] and the kernel reduces the heavy side once, where the
+    mirror spelling [eq_refl lhs] makes the VM evaluate it TWICE -- 78.3 s
+    on this file, WORSE than the [vm_compute] it replaces.
+
+    THE COST: a disagreement now surfaces at [Qed] as a kernel conversion
+    failure with no goal in view.  Put [vm_compute. reflexivity.] back on
+    the ONE failing lemma to see it -- and then fix the dump, never the
+    statement (see the note at the top of this file). *)
+Local Ltac vm_eq :=
+  lazymatch goal with
+  | |- _ = ?r => vm_cast_no_check (@eq_refl _ r)
+  end.
+
 (* The length, over [Z].  NEVER state a [nat]-vs-large-literal equality
    (see claude-notes/durable-notes.md): [285200 : nat] is a 285200-deep
    successor chain.  This one goes through [pstring_hex_bytes_length], so
@@ -74,34 +97,34 @@ Qed.
 (* ====================================================================== *)
 
 Lemma kernel_elf_wf : elf_wf kernel_elf = true.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 Lemma kernel_elf_sections_wf : elf_sections_wf kernel_elf = true.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 (* ====================================================================== *)
 (*  Geometry: the ELF's own numbers are the dump's constants              *)
 (* ====================================================================== *)
 
 Lemma kernel_elf_entry : elf_entry kernel_elf = Some KernelData.kernelEntry.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 Lemma kernel_elf_segments :
   elf_segments kernel_elf = Some KernelData.kernel_segments.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 Lemma kernel_elf_base : elf_mem_base kernel_elf = Some KernelData.kernelMemBase.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 Lemma kernel_elf_end : elf_mem_end kernel_elf = Some KernelData.kernelMemEnd.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 (* The read-only / writable split lives in the SECTION table -- the single
    RWX PT_LOAD cannot express it -- so this is the one geometry constant
    that depends on [elf_sections_wf] rather than [elf_wf]. *)
 Lemma kernel_elf_rodata_end :
   elf_rodata_end kernel_elf = Some KernelData.kernelRodataEnd.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 (* ====================================================================== *)
 (*  THE image theorem: the dump is exactly the ELF's file-backed image    *)
@@ -113,7 +136,7 @@ Proof. vm_compute. reflexivity. Qed.
 Lemma kernel_elf_file_image_bool :
   bool_decide (elf_file_image kernel_elf
                = KernelInstrs.kernel_bytes ∪ KernelData.kernel_data) = true.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 Lemma kernel_elf_file_image :
   elf_file_image kernel_elf = KernelInstrs.kernel_bytes ∪ KernelData.kernel_data.
@@ -138,7 +161,7 @@ Lemma kernel_elf_zero_image_bool :
   bool_decide (elf_zero_image kernel_elf
                = map_seqZ kernel_bss_lo
                    (replicate (Z.to_nat kernel_bss_size) elf_zero_byte)) = true.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 Lemma kernel_elf_zero_image :
   elf_zero_image kernel_elf

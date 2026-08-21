@@ -321,9 +321,35 @@ Section FsBundles.
     iDestruct (FsReady.fs_ready_all with "Hw") as
       "(H1 & H2 & H3 & %H4 & H5 & H6 & H7 & H8 & H9 & _ & H11 & H12 & H13
         & H14 & H15 & H16 & H17 & %H18 & #H19)".
-    iFrame "H1 H2 H3 H5 H6 H7 H8 H9 Hgeom Hdlock H11 H12 H13 H14 H15 H16 H17
-            H19".
-    iFrame "%".
+    (* TWENTY ROWS, ONE SPLIT EACH, NOT ONE EIGHTEEN-NAME [iFrame].  This
+       lemma's whole job is to REASSEMBLE a named bundle whose every row is
+       definition-valued ([printk_env], [bio_ctx], [log_ctx], an [is_lock]
+       over [disk_res], [is_itable2], [ic_escrows], the fifty-fold
+       [ic_sleeplocks] big-op, [fs_sb_cells]), so every (name x conjunct)
+       attempt is a conversion and no single [iSplit] helps -- the case
+       claude-notes/optimization.md calls "build the WHOLE bundle".  The
+       [iFrame] pair below cost 25 s of this file; the chain is one
+       syntactic check per row. *)
+    iSplitL "H1"; [iExact "H1"|].
+    iSplitL "H2"; [iExact "H2"|].
+    iSplitL "H3"; [iExact "H3"|].
+    iSplitR; [iPureIntro; exact H4|].
+    iSplitL "H5"; [iExact "H5"|].
+    iSplitL "H6"; [iExact "H6"|].
+    iSplitL "H7"; [iExact "H7"|].
+    iSplitL "H8"; [iExact "H8"|].
+    iSplitL "H9"; [iExact "H9"|].
+    iSplitR; [iExact "Hgeom"|].
+    iSplitR; [iExact "Hdlock"|].
+    iSplitL "H11"; [iExact "H11"|].
+    iSplitL "H12"; [iExact "H12"|].
+    iSplitL "H13"; [iExact "H13"|].
+    iSplitL "H14"; [iExact "H14"|].
+    iSplitL "H15"; [iExact "H15"|].
+    iSplitL "H16"; [iExact "H16"|].
+    iSplitL "H17"; [iExact "H17"|].
+    iSplitR; [iPureIntro; exact H18|].
+    iExact "H19".
   Qed.
 
   (* the alias, as a lemma, so a reader need not take the [Definition]'s

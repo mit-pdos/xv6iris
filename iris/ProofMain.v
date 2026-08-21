@@ -1663,9 +1663,32 @@ Section ProofMain.
     { rewrite Hdiskq. iExists pd, pav, pu. iFrame "Hgeom Hdlock". }
     iAssert first_boot_persist as "#Hpersist".
     { rewrite /first_boot_persist /ic_sleeplocks.
-      iFrame "Htext Hkdata Hpenv Hbioctx Hseam Hcert Hdevc Hdpair
-              Hitl Hitinv Hesc Hicsl Hireg Hkmem".
-      iSplitR; [iPureIntro; exact Hpkc | iPureIntro; exact Hgeomok]. }
+      (* SIXTEEN ROWS, ONE [iSplitR] EACH, NOT ONE [iFrame] -- and the
+         difference was 67 s of this file (claude-notes/optimization.md
+         "WHEN EVERY CONJUNCT IS DEFINITION-VALUED ... build the WHOLE
+         bundle").  Every row here is definition-valued -- [printk_env],
+         [bio_ctx], an [is_lock] over [disk_res], [is_itable2],
+         [ic_escrows], the fifty-fold [ic_sleeplocks] big-op, an [is_lock]
+         over [kmem_res] -- so a named [iFrame] pays a CONVERSION for each
+         (name x remaining conjunct) attempt, and there is no single big
+         conjunct to split off first.  Peeled in the bundle's own order
+         each row is one syntactic check. *)
+      iSplitR; [iExact "Htext"|].
+      iSplitR; [iExact "Hkdata"|].
+      iSplitR; [iExact "Hpenv"|].
+      iSplitR; [iPureIntro; exact Hpkc|].
+      iSplitR; [iExact "Hbioctx"|].
+      iSplitR; [iExact "Hseam"|].
+      iSplitR; [iExact "Hcert"|].
+      iSplitR; [iExact "Hdevc"|].
+      iSplitR; [iExact "Hdpair"|].
+      iSplitR; [iExact "Hitl"|].
+      iSplitR; [iExact "Hitinv"|].
+      iSplitR; [iExact "Hesc"|].
+      iSplitR; [iExact "Hicsl"|].
+      iSplitR; [iExact "Hireg"|].
+      iSplitR; [iExact "Hkmem"|].
+      iPureIntro; exact Hgeomok. }
     (* BOTH BUNDLES GO TO USERINIT (fs-cfg-boot.md (f-5)), beside the pinned
        `first` cell: userinit is the one function that PARKS, and forkret --
        the token's only consumer -- runs on the context that park saves.

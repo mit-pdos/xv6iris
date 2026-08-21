@@ -80,10 +80,14 @@ every literal-image theorem; `SystemAssumptions.v`'s audited
 - **`dir_view` is O(nrec²)** (`dir_wins` rescans). Path theorems go through
   **`FsImg.path_at_disk_dir`** (the `dir_first` single-scan form): ~900 vs
   ~28000 block reads on the root.
-- `fsimg_wf_ok` costs ~43 s (bitmap ⟺ over 2000 blocks × per-bit block
+- `fsimg_wf_ok` costs ~65 s (bitmap ⟺ over 2000 blocks × per-bit block
   rebuild, ~0.5 M list steps per indirect-block read × 24 inodes) — inside
   the 5-minute budget, and it never forces file CONTENTS (only addrs,
-  dirents, bitmap, sizes). Whole `FsImgCheck.v`: ~2¼ min.
+  dirents, bitmap, sizes). Whole `FsImgCheck.v`: ~100 s, which is ONE
+  reduction of everything in it: the file's `vm_eq` pays the VM at `Qed`
+  only (claude-notes/optimization.md §"THE DOUBLING IS AVOIDABLE"), where
+  `vm_compute. reflexivity.` would pay it in the tactic as well and put the
+  file back at ~195 s.
 - Everything else follows `design/elf.md`'s rules (descending fuel, no
   `List.rev`, Z-only interfaces, `Typeclasses Opaque` big constants).
 

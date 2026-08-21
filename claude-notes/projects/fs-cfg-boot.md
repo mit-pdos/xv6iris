@@ -377,8 +377,10 @@ in `fsimg_wf`'s own idiom** — standalone per-inum `vm_compute` is ~2 s × 208
 (every image fact arrives as a hypothesis per R3).
 
 Measured facts that supersede this file's earlier estimates:
-- `fsimg_wf_ok` is **106 s, not ~43 s** (52.5 s `vm_compute` + 53.7 s `Qed`) —
-  **`Qed` re-checks and therefore DOUBLES every `vm_compute`**; budget 2×.
+- `fsimg_wf_ok` is **~65 s, not ~43 s**, and was 128 s until the file stopped
+  paying its reductions twice (`vm_eq` / `vm_cast_no_check`, see
+  claude-notes/optimization.md); budget 1× the `-time` figure now, 2× for any
+  lemma still written `vm_compute. reflexivity.`
 - Live inums are exactly **[1..24]** (24 allocated, 184 free incl. 0); 22 of
   24 have an indirect block (inum 15 has nb = 199); `region_inums 13` = 208
   but `sb_ninodes` = 200, so 8 inums have NO W-clause coverage (all type 0,

@@ -79,6 +79,42 @@ From User Require Import
 Local Open Scope Z_scope.
 
 (* ====================================================================== *)
+(*  THE REDUCTION IS PAID ONCE, AT [Qed] -- NOT TWICE                      *)
+(* ====================================================================== *)
+
+(*  [vm_compute. reflexivity.] REDUCES THE GOAL TWICE: once in the tactic
+    engine, and again in the KERNEL, which re-checks the [vm_cast] the
+    tactic left in the proof term.  On this file's sentences that is the
+    whole cost -- [fsimg_wf_ok] measured 65.9 s of tactic and 62.6 s of
+    [Qed] for the same reduction, and the four [<p>_bytes_bool] sweeps
+    pay the same way (claude-notes/optimization.md, "[Qed] re-checks and
+    therefore DOUBLES every [vm_compute]").
+
+    [vm_eq] builds that cast DIRECTLY -- [vm_cast_no_check (eq_refl rhs)]
+    typechecks nothing at tactic time and hands the kernel the one
+    reduction it was always going to do.  Same proof term, same VM, half
+    the wall clock.
+
+    IT MUST BE THE **RIGHT** SIDE.  [eq_refl rhs] casts [rhs = rhs] to
+    [lhs = rhs], so the kernel reduces the heavy side ONCE; the mirror
+    spelling [eq_refl lhs] casts [lhs = lhs] and the VM evaluates that
+    heavy side TWICE -- measured WORSE than the [vm_compute. reflexivity.]
+    it replaces (ElfKernel 54.0 s baseline, 28.7 s right-side, 78.3 s
+    left-side).  The two spellings read identically; only the measurement
+    tells them apart.
+
+    WHAT IT COSTS, and the reason to reach for it only on the heavy
+    sentences: a disagreement now surfaces at [Qed] as the kernel's
+    conversion failure, without the goal in view.  When that happens put
+    [vm_compute. reflexivity.] back on that ONE lemma to see the
+    disagreeing byte -- and then fix the dumper or mkfs, never the
+    statement (this file's header). *)
+Local Ltac vm_eq :=
+  lazymatch goal with
+  | |- _ = ?r => vm_cast_no_check (@eq_refl _ r)
+  end.
+
+(* ====================================================================== *)
 (*  1.  THE SUPERBLOCK                                                     *)
 (* ====================================================================== *)
 
@@ -91,7 +127,7 @@ Definition fsimg_sb : fs_sb :=
   MkFsSb 0x10203040 2000 1953 200 31 2 33 46.
 
 Lemma fsimg_parse_sb : fs_parse_sb fsimg_P = Some fsimg_sb.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 (* THE TIE TO [FsImgDisk]: the [2] that file's [fsimg_log_clean] and
    [fsimg_D0] are stated at is the IMAGE'S OWN [logstart], not a guess. *)
@@ -109,7 +145,7 @@ Proof. reflexivity. Qed.
    and what W6/W7's [dir_first] readings cannot pin; measured cost of the
    added sweep, [Qed]'s re-check included, ~+20 s of this file's ~210 s). *)
 Lemma fsimg_wf_ok : fsimg_wf fsimg_P fsimg_sb = true.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 (* THE HEADLINE READING of the above: the tree this image denotes has a
    root directory whose [".."] is itself. *)
@@ -237,7 +273,7 @@ Proof. exact (fsimg_wf_slot_inj fsimg_P fsimg_sb i fsimg_wf_ok). Qed.
    records are inside the icache's inode region and outside every W sweep.
    They are all free, and the pool's FREE arm needs to say so. *)
 Lemma fsimg_region_free : fs_region_free fsimg_P fsimg_sb 13 = true.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 Lemma fsimg_region_tail_free (z : Z) :
   200 <= z < 208 -> bv_unsigned (di_type (fs_dinode fsimg_P fsimg_sb z)) = 0.
@@ -257,7 +293,7 @@ Qed.
    would be circular) and L4 is about arbitrary bytes.  Same thirteen
    inode blocks as [fsimg_region_free]; measured together below. *)
 Lemma fsimg_region_nlink : fs_region_nlink fsimg_P fsimg_sb 13 = true.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 (* THE ONE REGION-WIDE HYPOTHESIS [FsCfgBoot.fs_cfg_alloc] takes beside
    [fsimg_wf_ok]: the tail's type plus L3/L4 over the whole region. *)
@@ -291,7 +327,7 @@ Qed.
    up is free.  ONE sweep of the thirteen inode blocks. *)
 Lemma fsimg_live_set :
   fs_live_set fsimg_P fsimg_sb = list_to_set (Z.of_nat <$> seq 1 24).
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 (* ...and the membership law the split actually uses, off the computed set
    and [FsImg.fs_live_set_elem_of]: the live inums are exactly [1 .. 24],
@@ -340,7 +376,7 @@ Definition fsimg_root_nrec : nat :=
 
 Lemma fsimg_root_type :
   bv_unsigned (di_type (fs_dinode fsimg_P fsimg_sb ROOTINO)) = T_DIR_z.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 (* **THE FORM TO COMPUTE WITH.**  [FsImg.path_at_disk_dir]: one step out of
    the root is ONE [dir_first] scan of the root's 64 records -- no tree, no
@@ -357,19 +393,19 @@ Qed.
 
 Lemma fsimg_echo_path :
   path_at (tree_of_disk fsimg_P fsimg_sb) ROOTINO [fname_echo] = Some 4.
-Proof. rewrite fsimg_path_root. vm_compute. reflexivity. Qed.
+Proof. rewrite fsimg_path_root. vm_eq. Qed.
 
 Lemma fsimg_init_path :
   path_at (tree_of_disk fsimg_P fsimg_sb) ROOTINO [fname_init] = Some 7.
-Proof. rewrite fsimg_path_root. vm_compute. reflexivity. Qed.
+Proof. rewrite fsimg_path_root. vm_eq. Qed.
 
 Lemma fsimg_sh_path :
   path_at (tree_of_disk fsimg_P fsimg_sb) ROOTINO [fname_sh] = Some 13.
-Proof. rewrite fsimg_path_root. vm_compute. reflexivity. Qed.
+Proof. rewrite fsimg_path_root. vm_eq. Qed.
 
 Lemma fsimg_sync_path :
   path_at (tree_of_disk fsimg_P fsimg_sb) ROOTINO [fname_sync] = Some 22.
-Proof. rewrite fsimg_path_root. vm_compute. reflexivity. Qed.
+Proof. rewrite fsimg_path_root. vm_eq. Qed.
 
 (* ====================================================================== *)
 (*  4.  THE FILES' BYTES                                                   *)
@@ -397,7 +433,7 @@ Qed.
 
 Lemma fsimg_echo_type :
   bv_unsigned (di_type (fs_dinode fsimg_P fsimg_sb 4)) = T_FILE_z.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 (* [bool_decide] on a [list (bv 8)] equality, exactly as [ElfUser.v] states
    its image equalities: the decision procedure computes, so the proof term
@@ -406,7 +442,7 @@ Proof. vm_compute. reflexivity. Qed.
    is never forced. *)
 Lemma fsimg_echo_bytes_bool :
   bool_decide (fsimg_file_bytes 4 = ElfUser.echo_elf) = true.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 Lemma fsimg_echo_at :
   node_at fsimg_P fsimg_sb 4 = Some (NFile ElfUser.echo_elf).
@@ -419,11 +455,11 @@ Qed.
 
 Lemma fsimg_init_type :
   bv_unsigned (di_type (fs_dinode fsimg_P fsimg_sb 7)) = T_FILE_z.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 Lemma fsimg_init_bytes_bool :
   bool_decide (fsimg_file_bytes 7 = ElfUser.init_elf) = true.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 Lemma fsimg_init_at :
   node_at fsimg_P fsimg_sb 7 = Some (NFile ElfUser.init_elf).
@@ -436,7 +472,7 @@ Qed.
 
 Lemma fsimg_sh_type :
   bv_unsigned (di_type (fs_dinode fsimg_P fsimg_sb 13)) = T_FILE_z.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 (* The biggest of the four: 57 content blocks, so 45 of them are reached
    through the indirect block ([FsImg.fs_ind_ents] decodes it ONCE for the
@@ -444,7 +480,7 @@ Proof. vm_compute. reflexivity. Qed.
    what keeps this a 2 s sentence rather than a 256-fold rescan). *)
 Lemma fsimg_sh_bytes_bool :
   bool_decide (fsimg_file_bytes 13 = ElfUser.sh_elf) = true.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 Lemma fsimg_sh_at :
   node_at fsimg_P fsimg_sb 13 = Some (NFile ElfUser.sh_elf).
@@ -457,11 +493,11 @@ Qed.
 
 Lemma fsimg_sync_type :
   bv_unsigned (di_type (fs_dinode fsimg_P fsimg_sb 22)) = T_FILE_z.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 Lemma fsimg_sync_bytes_bool :
   bool_decide (fsimg_file_bytes 22 = ElfUser.sync_elf) = true.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 Lemma fsimg_sync_at :
   node_at fsimg_P fsimg_sb 22 = Some (NFile ElfUser.sync_elf).
