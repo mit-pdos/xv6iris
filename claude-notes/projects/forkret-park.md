@@ -342,59 +342,75 @@ cut in the wrong place; and the gather is an induction with an OFFSET,
 because `seq k (S n)` shifts the TABLE index while `parents_own`'s big-op is
 indexed by the LIST.
 
-**`devintr_caps_any`.** The `□ ∀ h` form, and it is the one that needs a
-DESIGN CHANGE rather than plumbing. Six of `devintr_caps`' seven members are
-hart-free and main has all six (`dev_inv`, `console_caps`, `disk_geom`, the
-virtio `is_lock`, `tick_keeper`'s real arm — its left arm is the hart-indexed
-one and we take the right — and `procs_inv`). The seventh is `timer_cap`,
-and it is genuinely per-hart: `timer_cap = sstc_enabled ∗ stimecmp_inv`,
-`sstc_enabled` is `mcounteren ↦ᵣ□ …`, `stimecmp_inv` is an invariant over
-`stimecmp ↦ᵣ`, and `RiscvPtsto.reg_pointsto` takes `{CpuId}`.
+**`devintr_caps_any`. — DESIGN SETTLED 2026-08-21, not yet executed.**
 
-> **CORRECTION (2026-08-21).** An earlier revision of this section proposed
-> minting the eight caps at the adequacy seam, before the hart fan-out.
-> **THAT CANNOT WORK.** `TimerCap.timer_cap_intro` requires `mcounteren` to
-> ALREADY HOLD a value with TM set — that is its first premise — and the
-> value is written by timerinit on that hart (`WpTimerinit.v:138`,
-> `ti_mcen1`). At `SystemAdequacy`'s fan-out every hart is at RESET and TM
-> is 0, so there is nothing there to freeze. The route was wrong, not merely
-> expensive.
+`devintr_caps` has seven members and exactly one is hart-indexed:
+`TimerCap.timer_cap` = `sstc_enabled ∗ stimecmp_inv`, over this hart's
+`mcounteren` and `stimecmp`. The other six are invariants, locks and memory
+points-to — hart-free outright. (`tick_keeper`'s left disjunct is
+hart-indexed too, but its real arm is not, and the real arm is the one the
+boot hart brings up.)
 
-WHAT IS ACTUALLY TRUE: every hart DOES mint its own cap.
-`BootChain.boot_entry_bridge` (§3) runs `timer_cap_intro` right after the
-M-mode start walk, and both `boot_hart_primary` and `boot_hart_secondary`
-receive one. But each lives in that hart's own thread, and eight caps in
-eight threads have nowhere to meet. `UsertrapRes.v`'s note calling the
-bundle "satisfiable" is arguing the predicate is not VACUOUS (each hart can
-have one), not that anyone can assemble the `∀ h`.
+**THE `□ ∀ h` FORM WAS NEVER BUILDABLE BY ANYBODY.** `timer_cap` is minted
+per hart, in that hart's own `BootChain.boot_entry_bridge`, out of the
+`mcounteren` value timerinit wrote — so the eight caps live in eight threads
+with nowhere to meet. Nor can it be done earlier: `timer_cap_intro`'s first
+premise is that `mcounteren` ALREADY holds a TM-set value, and at the
+adequacy fan-out every hart is still at reset. `UsertrapRes.v`'s note calling
+the bundle "satisfiable" argues the predicate is not VACUOUS, not that the
+`∀ h` can be assembled.
 
-DEPOSIT-AND-COLLECT DOES NOT RESCUE IT. Assembling `□ ∀ h, timer_cap` needs
-all eight at once, and no hart knows the others are done; the one barrier in
-the tree (`StartedInv`, the `started = 1` deposit) runs the other way —
-secondaries wait for the boot hart, not the reverse.
+##### The design
 
-**THE STRUCTURALLY RIGHT FIX IS THE OTHER DIRECTION: the RESUMING HART
-supplies its own `timer_cap`, not the parked record.** Hart h's capability
-belongs to hart h, and the thing that resumes a parked process on hart h is
-hart h's scheduler, which is holding it — it came out of that hart's own
-boot chain. So `devintr_caps_any` keeps its six hart-free members, and
-`timer_cap` arrives from the resume side (`SwtchCtx`/`SchedCtx`'s wand) the
-way the other genuinely per-hart pieces already do (`IntrDefs.hart_csrs`,
-`cpu_own`). Consumers to re-route: `ut_res_bare_sstc` /
-`ut_env_nopt_sstc`, which pull `sstc_enabled` out of the bundle for the U
-tier's `mcounteren ↦ᵣ□` pin, and devintr's own `devintr_caps` at the trapping
-hart.
+1. **`devintr_caps_any` loses the quantifier AND the timer** — it becomes the
+   six hart-free members, with `tick_keeper`'s real arm spelled out
+   (`is_tickslock ∗ procs_inv`) so nothing in it is hart-indexed. No `□ ∀ h`:
+   the bundle is hart-free by construction, which is what a resource framed
+   across `b = true` steps has to be anyway.
+2. **`devintr_caps_any_at h`** becomes the join: the six rows plus THAT
+   hart's `timer_cap` gives `devintr_caps (CID := h)`.
+3. **`timer_cap` goes inside `IntrDefs.sie_cap`.** THIS IS THE KEY, and the
+   reason is the one thing that took two wrong turns to find: `sie_cap` is
+   the bundle a step RE-DELIVERS at whatever hart the continuation lands on,
+   not one the walk frames across. That is exactly why `sie_arm`'s own
+   per-hart members (`kpt_on cpu_id`, `cpu_claim p`) survive a migration.
+   The scheduler already passes these across swtch in both directions and
+   holds its own hart's cap from that hart's boot chain, so a kernel thread
+   resumed on a new hart is handed that hart's capability with the rest of
+   its arm.
 
-NOTE IN PASSING that this revision's secondaries never schedule
-(`SpecMainSecondary` is "spins forever, never stuck", with nothing left
-over), so only hart 0 ever resumes anything in practice — but the proof is
-generic in the resuming hart, so the generality is still demanded by the
-shape even though it is unused.
+##### Two placements that DO NOT work, and why
 
-WEAKENING TO THE CURRENT HART IS NOT AN OPTION for the parked record, and
-`UsertrapRes.v` says why at the definition: the residue parks across user
-execution and resumes on an arbitrary hart. That is exactly why the fix has
-to move the capability to the resumer rather than drop the quantifier.
+* **`UsertrapRes.ut_hold`** — the bundle usertrap's walk FRAMES. Its
+  transport is `(b = false ∨ un_pj N = zero_reg → CID1 = CID0)`, and it works
+  only because every hart-indexed member is `emp` at `b = true`. `timer_cap`
+  is not, so the walk cannot carry it: usertrap can migrate between entry and
+  the point where it rebuilds the residue.
+* **Minting the eight caps at the adequacy fan-out** — TM is not set yet;
+  see above.
+
+##### Executing it
+
+`sie_cap` is mentioned in 437 files but DESTRUCTURED in only ~35
+(`grep -rn "rewrite /sie_cap"`), plus `IntrDefs`' own lemmas that enumerate
+its four conjuncts (the first to break is around `IntrDefs.v:2668`). Most
+files thread `sie_cap_gpr` opaquely and need no change. Order:
+
+1. `IntrDefs.sie_cap` gains the conjunct; fix that file's own enumerating
+   lemmas.
+2. Sweep the ~35 destructure sites — ANCHOR each edit, do not regex
+   unanchored (see §5).
+3. `devintr_caps_any` / `devintr_caps_any_at` as above; `ut_caps` then
+   becomes hart-free and main can finally build it.
+4. `ut_res` / `ut_res_parked` / `ut_res_bare` each carry `timer_cap` beside
+   the `ut_trap*` half, and the park closer takes `timer_cap (CID := h)` per
+   application beside `first_done`.
+
+Steps 3 and 4 are WRITTEN AND WERE GREEN in `UsertrapRes.v` standalone
+before the `ut_hold` dead end; the tree came down to two failures
+(`ForkretParkClose` and `ProofUsertrapTail.ut_ret2`), both of which step 1
+removes the cause of — `ut_ret2` gets its capability from the `sie_cap_gpr`
+it already holds.
 
 ##### The one that is a decision, not a gap
 
