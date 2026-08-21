@@ -982,6 +982,36 @@ Section BootCarve.
      shape a byte-ARRAY bundle takes, as opposed to a typed cell:
      [ProcInv.pname_cells] over [pv_name V] (16 bytes) and
      [SpecMain.main_globals_raw]'s [disk_free[8]]. *)
+  (* mapping a CONSTANT over a list is a [replicate] of its length; stdpp has
+     no such lemma and the [seq] instance below is the only user. *)
+  Lemma fmap_const_replicate {A B : Type} (x : B) (l : list A) :
+    (fun _ : A => x) <$> l = replicate (length l) x.
+  Proof. induction l as [| a l IH]; simpl; [reflexivity | by f_equal]. Qed.
+
+  (* ...and the same run when it is BSS, with the bytes PINNED to zero
+     rather than existentially quantified.  [boot_ran_bytes_list] hides them
+     behind an [∃], which is all most callers want; the proc NAME array wants
+     the values, because "there is a NUL in p->name" ([ProcGeom.pname_wf]) is
+     part of the proc invariant and the array boots zero. *)
+  Lemma boot_ran_bytes_zero (g : gstate) (A : Z) (n : nat) :
+    (forall x : Z, ram_lo <= x < ram_hi ->
+       g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
+    text_end <= A -> img_end <= A -> A + Z.of_nat n <= ram_hi ->
+    kmap_static_claims -∗ boot_raw_ran g A (A + Z.of_nat n)
+    -∗ ([∗ list] i ↦ b ∈ replicate n DevModel.byte0,
+          (pa_add (pa_of_z A) i) ↦ₘ b).
+  Proof.
+    intros Hmem Hlo Hbss Hhi. iIntros "#Hcl H".
+    iDestruct (boot_ran_mem_run g A n Hmem Hlo Hhi with "Hcl H") as "Hbs".
+    rewrite (_ : replicate n DevModel.byte0
+                 = (fun _ : nat => DevModel.byte0) <$> seq 0 n);
+      [| by rewrite fmap_const_replicate length_seq].
+    rewrite big_sepL_fmap.
+    iApply (big_sepL_mono with "Hbs"). iIntros (i x Hx) "Hb".
+    apply lookup_seq in Hx as [-> _].
+    rewrite (boot_byte_bss (A + Z.of_nat i) ltac:(lia)). iExact "Hb".
+  Qed.
+
   Lemma boot_ran_bytes_list (g : gstate) (A : Z) (n : nat) :
     (forall x : Z, ram_lo <= x < ram_hi ->
        g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->

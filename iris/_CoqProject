@@ -836,6 +836,7 @@ SpecConsputc.v
 ProofConsputc.v
 LinkConsputc.v
 PrintkFmt.v
+CstringInv.v
 SpecPrintint.v
 PrintkArgs.v
 SpecPrintk.v

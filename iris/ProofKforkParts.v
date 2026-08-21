@@ -76,6 +76,7 @@ Require Import FileInvDefs.
 Require Import SwtchCtx.
 Require Import ProcInv.
 Require Import TrampPt.
+Require Import SpecSafestrcpy.
 Require Import SpecFreeproc.
 Require Import CodeKfork.
 From Kernel Require KernelSyms.
@@ -586,13 +587,17 @@ Section KforkRes.
       rewrite (lookup_seq_ge 0 (length l) i ltac:(lia)). reflexivity.
   Qed.
 
+  (* Stated over [pname_bytes], the bare big-op, and NOT over [pname_cells]:
+     the latter now carries [pname_wf], and these two lemmas are the byte-
+     level plumbing on either side of safestrcpy -- the invariant is
+     re-established once, at the call's post, not shuffled through here. *)
   Lemma kfk_pname_bytes (pa : mword 64) (dq : dfrac) (bs : list (bv 8))
       (f : nat -> bv 8) :
     (forall i, (i < length bs)%nat -> bs !! i = Some (f i)) ->
-    pname_cells pa dq bs ⊣⊢
+    pname_bytes pa dq bs ⊣⊢
     ([∗ list] j ∈ seq 0 (length bs), pa_add (kfk_name_base pa) j ↦ₘ{dq} f j).
   Proof.
-    intro Hf. rewrite /pname_cells.
+    intro Hf. rewrite /pname_bytes.
     rewrite {1}(kfk_list_of_fn bs f Hf).
     rewrite big_sepL_fmap.
     apply big_sepL_proper. intros k x Hkx.
@@ -602,11 +607,33 @@ Section KforkRes.
 
   Lemma kfk_bytes_pname (pa : mword 64) (dq : dfrac) (n : nat) (h : nat -> bv 8) :
     ([∗ list] j ∈ seq 0 n, pa_add (kfk_name_base pa) j ↦ₘ{dq} h j) -∗
-    pname_cells pa dq (h <$> seq 0 n).
+    pname_bytes pa dq (h <$> seq 0 n).
   Proof.
-    iIntros "H". rewrite /pname_cells big_sepL_fmap.
+    iIntros "H". rewrite /pname_bytes big_sepL_fmap.
     iApply (big_sepL_impl with "H"). iIntros "!>" (k x Hkx) "Hc".
     apply lookup_seq in Hkx as [-> _]. by rewrite kfk_name_addr.
+  Qed.
+
+  (* THE NUL, OUT OF safestrcpy'S OWN POSTCONDITION.  [ssc_post] says the
+     destination holds a zero at the stop index and [ssc_stop] puts that
+     index inside the buffer, so "p->name is a C string"
+     ([ProcGeom.pname_wf]) is immediate.  Before the invariant existed this
+     disjunction was proved here and then DROPPED (see this file's kfork
+     sibling's header); it is the whole reason the fact never had to be an
+     axiom. *)
+  Lemma kfk_name_wf (n : nat) (f g h : nat -> bv 8) :
+    (0 < n)%nat ->
+    ((n = 0%nat /\ h = g) \/
+     (0 < n)%nat /\ exists k, SpecSafestrcpy.ssc_stop f n k
+                          /\ SpecSafestrcpy.ssc_post f g h n k) ->
+    pname_wf (h <$> seq 0 n).
+  Proof.
+    intros Hn [[H0 _] | (_ & k & Hstop & Hpost)]; [lia |].
+    assert (Hk : (k < n)%nat)
+      by (destruct Hstop as [[Hlt _] | [-> _]]; lia).
+    exists k. rewrite length_fmap length_seq. split; [exact Hk |].
+    rewrite list_lookup_fmap (lookup_seq_lt 0 n k Hk). cbn.
+    destruct Hpost as (_ & Hnul & _ & _). by rewrite Hnul.
   Qed.
 
   Lemma kfk_name_len (n : nat) (h : nat -> bv 8) :

@@ -325,6 +325,7 @@ Require Import FsCrash.
    imported, so nothing this file already says changes meaning. *)
 Require Import BitmapInv.
 Require Import ConsoleInv.
+Require Import CstringInv.
 Require Import IcacheRef.
 Require Import IrefSlots FdSlots.
 Require Import FileInvDefs FileInv.
@@ -362,21 +363,14 @@ Import Defs.
 Set Printing Depth 40.
 
 (* ======================================================================= *)
-(* THE p->name NUL-TERMINATION GAP.  [ProcInv.proc_priv]'s [pname_cells]
-   hands back sixteen raw bytes with no NUL-termination fact -- nothing in
-   the tree proves [allocproc]/[kfork]/[kexec] leave one -- so, exactly as
-   [SpecProcdump.proc_dump_slot] does (`nonul nm` there, same gap), the
-   fallback's printk("%s", p->name) call needs it as a small, HONEST, local
-   assumption rather than a derivation from nothing.  Scoped to the actual
-   sixteen bytes a caller holds (not a blanket claim over all byte lists),
-   discharged as its own tiny axiom in LinkSyscall.v, parallel to the two
-   syscall-entry axioms. *)
-Module Type PROCNAME_OK.
-  Parameter procname_ok :
-    forall (bs : list (bv 8)), length bs = PNAMELEN ->
-      exists nm : string, PrintkFmt.nonul nm = true /\
-        exists pad : list (bv 8), bs = List.app (cstring_bytes nm) pad.
-End PROCNAME_OK.
+(* p->name IS A C STRING, AND THAT IS NOW PROVED.  [ProcDefs.pname_cells]
+   carries [ProcGeom.pname_wf] -- "there is a NUL in the sixteen bytes" --
+   established at every write site (safestrcpy NUL-terminates, freeproc
+   stores a zero, the array boots zero), and [CstringInv.bytes_string_split]
+   turns that into the [cstring_bytes nm ++ pad] shape [printk("%s", ...)]
+   wants.  There used to be a [PROCNAME_OK] module type here, discharged as
+   an axiom in LinkSyscall.v; the fact was never missing from the tree, only
+   from the invariant, so nothing had to be assumed. *)
 
 Module SyscallProof
     (SysFork : SYSFORK) (SysExit : SYSEXIT) (SysWait : SYSWAIT)
@@ -387,7 +381,7 @@ Module SyscallProof
     (SysMknod : SYSMKNOD) (SysLink : SYSLINK) (SysMkdir : SYSMKDIR)
     (SysClose : SYSCLOSE) (SysSync : SYS_SYNC)
     (SysOpen : SYSOPEN) (SysUnlink : SYSUNLINK)
-    (Myproc : MYPROC) (Printk : PRINTK_GEN) (PName : PROCNAME_OK) : SYSCALL.
+    (Myproc : MYPROC) (Printk : PRINTK_GEN) : SYSCALL.
 
 (* ONE SECTION PER HART EPOCH.  Every piece below concludes in [WP Loop],
    which names [cpu_id], so a lemma is RIGID at the hart of the section that
@@ -1816,14 +1810,16 @@ Section SyscallVocab.
     rewrite avi_assoc. reflexivity.
   Qed.
 
-  (* the sixteen raw bytes, SPLIT at the NUL [PROCNAME_OK] promises is there:
-     a real C string in front, whatever gcc left behind it. *)
+  (* the sixteen raw bytes, SPLIT at the NUL: a real C string in front,
+     whatever gcc left behind it.  Over [pname_bytes], the bare big-op --
+     [pname_cells] now carries [ProcGeom.pname_wf] as well, and this lemma is
+     the byte-level half. *)
   Lemma sysc_pname_app (pa : mword 64) (dq : dfrac) (nm : string) (pad : list (bv 8)) :
-    pname_cells pa dq (List.app (cstring_bytes nm) pad) ⊣⊢
+    pname_bytes pa dq (List.app (cstring_bytes nm) pad) ⊣⊢
     (p_name pa 0 ↦ₛ{dq} nm ∗
      [∗ list] i ↦ b ∈ pad, p_name pa (length (cstring_bytes nm) + i) ↦ₘ{dq} b).
   Proof.
-    rewrite /pname_cells big_sepL_app /string_pointsto.
+    rewrite /pname_bytes big_sepL_app /string_pointsto.
     apply bi.sep_proper; [| reflexivity].
     apply big_sepL_proper. intros k x Hk. by rewrite sysc_name_addr.
   Qed.
@@ -4326,10 +4322,11 @@ Section SyscallArms.
      [PkANum]'s [pk_desc_res] is [True] and printk's contract constrains no
      vararg it is not told to walk.  (3) [p->name] is the one argument that
      does cost something: printk WALKS it, so it must be a real C string, and
-     [ProcInv.proc_priv]'s [pname_cells] hands back sixteen raw bytes with no
-     NUL in them -- [PName]'s [procname_ok] is where that gap is paid, and
-     [sysc_pname_app] is what turns the bytes it splits into the
-     [string_pointsto] printk's [PkAStr] wants.
+     [ProcDefs.pname_cells] carries exactly that ([ProcGeom.pname_wf], "there
+     is a NUL in the sixteen bytes", established at every write site).
+     [CstringInv.bytes_string_split] turns it into the C string plus padding,
+     and [sysc_pname_app] turns those bytes into the [string_pointsto]
+     printk's [PkAStr] wants.  None of it is assumed.
 
      The WEAK general corollary [wp_printk_gen_sconf] is what is called (the
      one procdump's own loop uses): syscall makes no claim about what reached
@@ -4484,9 +4481,17 @@ Section SyscallArms.
     assert (Hpc52 : ret_pc (F4 !!! Regidx Rra : mword 64)
                     = (mword_of_int (KernelSyms.syscall + 0x52) : mword 64))
       by (rewrite /F4 upd_eq; pcw).
-    (* ---- p->name as a C STRING: [PROCNAME_OK] is where the NUL comes from ---- *)
+    (* ---- p->name as a C STRING, derived not assumed: the invariant gives
+       the NUL, [CstringInv] gives the split ---- *)
     iDestruct (sysc_priv_name with "Hpriv") as "(%Hnlen & Hnm & Hnmback)".
-    destruct (PName.procname_ok (pv_name V) Hnlen) as (nm & Hnonul & pad & Hsplit).
+    (* [Hnwf] is the invariant [pname_cells] carries -- "there is a NUL in
+       p->name" -- and [CstringInv.bytes_string_split] turns it into the C
+       string plus padding that [printk("%s", ...)] wants. *)
+    iDestruct (pname_cells_open with "Hnm") as "(%Hnwf & Hnm)".
+    destruct (CstringInv.bytes_string_split (pv_name V) Hnwf) as (pad & Hsplit).
+    set (nm := CstringInv.bytes_string (pv_name V)).
+    assert (Hnonul : PrintkFmt.nonul nm = true)
+      by apply CstringInv.bytes_string_nonul.
     iEval (rewrite Hsplit) in "Hnm".
     iDestruct (sysc_pname_app (proc_addr j) (DfracOwn 1) nm pad with "Hnm") as "[Hstr Hpad]".
     iPoseProof (sysc_fmt_str with "Hdata") as "Hfmt".
@@ -4509,6 +4514,7 @@ Section SyscallArms.
     iDestruct (sysc_pname_app (proc_addr j) (DfracOwn 1) nm pad with "[Hstr Hpad]")
       as "Hnm"; [iFrame "Hstr Hpad"|].
     iEval (rewrite -Hsplit) in "Hnm".
+    iDestruct (pname_cells_intro _ _ _ Hnwf with "Hnm") as "Hnm".
     iDestruct ("Hnmback" with "Hnm") as "Hpriv".
     iEval (rewrite Hpc52) in "Hpc".
     (* what the printk call preserved of the registers the tail still reads *)

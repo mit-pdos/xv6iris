@@ -1587,19 +1587,22 @@ Section BootCarveMain.
   Qed.
 
   (* a byte ARRAY inside the record, contents existential: [p->name[16]]. *)
+  (* THE BYTES ARE PINNED TO ZERO, not existential: the caller is the proc
+     NAME array, and [pname_cells] now carries "there is a NUL"
+     ([ProcGeom.pname_wf]).  The array is BSS, so the fact is already in the
+     image -- it just has to stop being forgotten here. *)
   Lemma boot_name_cells (g : gstate) (C : Z) (n : nat) (off : Z) :
     (forall x : Z, ram_lo <= x < ram_hi ->
        g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
-    text_end <= C + off -> C + off + Z.of_nat n <= ram_hi ->
+    text_end <= C + off -> img_end <= C + off ->
+    C + off + Z.of_nat n <= ram_hi ->
     kmap_static_claims -∗ boot_raw_ran g (C + off) (C + off + Z.of_nat n)
-    -∗ (∃ bs : list (bv 8), ⌜length bs = n⌝ ∗
-          [∗ list] i ↦ b ∈ bs,
-            add_vec (pa_of_z C) (mword_of_int (off + Z.of_nat i)) ↦ₘ b).
+    -∗ ([∗ list] i ↦ b ∈ replicate n DevModel.byte0,
+          add_vec (pa_of_z C) (mword_of_int (off + Z.of_nat i)) ↦ₘ b).
   Proof.
-    intros Hmem Hlo Hhi. iIntros "#Hcl H".
-    iDestruct (boot_ran_bytes_list g (C + off) n Hmem Hlo Hhi with "Hcl H")
-      as (bs) "[%Hlen Hbs]".
-    iExists bs. iSplitR; [done |].
+    intros Hmem Hlo Hbss Hhi. iIntros "#Hcl H".
+    iDestruct (boot_ran_bytes_zero g (C + off) n Hmem Hlo Hbss Hhi with "Hcl H")
+      as "Hbs".
     iApply (big_sepL_mono with "Hbs"). iIntros (i b _) "Hb".
     rewrite off_of_z (_ : C + (off + Z.of_nat i) = C + off + Z.of_nat i); [| lia].
     iEval (rewrite pa_add_of_z) in "Hb". iExact "Hb".
@@ -1623,18 +1626,36 @@ Section BootCarveMain.
               ltac:(unfold NOFILE; lia) (z_mod_addo 8 A 208 Hal eq_refl)).
   Qed.
 
+  (* THE NAME ARRAY BOOTS ZERO, and that is now part of what this hands over:
+     [pname_cells] carries [ProcGeom.pname_wf], and sixteen zero bytes have a
+     NUL at index 0.  The [∃ bs] shape is kept so no consumer moves; the
+     witness is simply concrete now. *)
   Lemma boot_proc_name (g : gstate) (A : Z) :
     (forall x : Z, ram_lo <= x < ram_hi ->
        g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
-    text_end <= A -> A + 360 <= ram_hi ->
+    text_end <= A -> img_end <= A -> A + 360 <= ram_hi ->
     kmap_static_claims -∗
     boot_raw_ran g (A + 344) (A + 344 + Z.of_nat PNAMELEN)
     -∗ (∃ bs : list (bv 8), ⌜length bs = PNAMELEN⌝ ∗
           pname_cells (pa_of_z A) (DfracOwn 1) bs).
   Proof.
-    intros Hmem Hlo Hhi. rewrite /pname_cells.
-    iApply (boot_name_cells g A PNAMELEN 344 Hmem ltac:(lia)
-              ltac:(unfold PNAMELEN; lia)).
+    intros Hmem Hlo Hbss Hhi. iIntros "#Hcl H".
+    iExists (replicate PNAMELEN DevModel.byte0).
+    iSplitR; [iPureIntro; apply length_replicate |].
+    rewrite /pname_cells.
+    iSplitR.
+    { iPureIntro. apply (pname_wf_zero_at _ 0%nat).
+      - rewrite length_replicate. unfold PNAMELEN. lia.
+      - rewrite lookup_replicate. split; [reflexivity | unfold PNAMELEN; lia]. }
+    rewrite /pname_bytes.
+    (* the three bounds NAMED rather than [ltac:] in argument position: an
+       [ltac:] there is elaborated against whatever is still open, and a
+       failure surfaces as a stray pure goal much later. *)
+    assert (Hl1 : text_end <= A + 344) by lia.
+    assert (Hl2 : img_end <= A + 344) by lia.
+    assert (Hl3 : A + 344 + Z.of_nat PNAMELEN <= ram_hi)
+      by (unfold PNAMELEN; lia).
+    iApply (boot_name_cells g A PNAMELEN 344 Hmem Hl1 Hl2 Hl3 with "Hcl H").
   Qed.
 
   (* ---- ONE process slot: everything the image owes about [proc[i]] ----
@@ -1769,7 +1790,9 @@ Section BootCarveMain.
                  with "Hcl Hctx") as "Hctx".
     iDestruct (boot_ofile_cells g A Hmem Hbss ltac:(lia) Hal with "Hcl Hof")
       as "Hof".
-    iDestruct (boot_proc_name g A Hmem Hlo ltac:(lia) with "Hcl Hnm")
+    (* [Hbss] is the new premise: the name array is BSS, which is what makes
+       its sixteen bytes ZERO and hence [ProcGeom.pname_wf] provable. *)
+    iDestruct (boot_proc_name g A Hmem Hlo Hbss ltac:(lia) with "Hcl Hnm")
       as (bs) "[%Hbs Hnm]".
     (* the pid cell is owned by BOTH halves at a half each *)
     iAssert ((pa_of_z (A + 48)) ↦₄{DfracOwn (1/2)} vpid ∗

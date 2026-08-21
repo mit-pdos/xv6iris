@@ -124,6 +124,35 @@ Qed.
 
 (* p->name is a 16-byte char array, not a word; [p_name pa i] is byte [i]. *)
 Definition PNAMELEN : nat := 16%nat.
+
+(* p->name IS A C STRING: somewhere in its sixteen bytes there is a NUL.
+   Everything that writes the field establishes it -- safestrcpy NUL-
+   terminates ([SpecSafestrcpy.ssc_post]'s [s k = 0] with [ssc_stop]'s
+   [k < n]), freeproc stores a zero at index 0, and the BSS the array boots
+   in is zero throughout -- so this is a fact the tree already PROVES at
+   every write site and, until now, threw away on the way out
+   (ProofKforkB4.v's own header says so).  Carrying it is what lets
+   [printk("%s", p->name)] in syscall()'s unknown-number fallback have a
+   string to print without an axiom.
+
+   Stated as byte-existence, not in [PrintkFmt]'s cstring shape, so that the
+   proc invariant does not acquire a dependency on printk's vocabulary; the
+   restatement a [%s] caller wants is one lemma at the consumer. *)
+Definition pname_wf (bs : list (bv 8)) : Prop :=
+  exists k : nat, (k < length bs)%nat /\ bs !! k = Some (mword_of_int 0 : mword 8).
+
+(* the two shapes every write site actually produces *)
+Lemma pname_wf_zero_at (bs : list (bv 8)) (k : nat) :
+  (k < length bs)%nat -> bs !! k = Some (mword_of_int 0 : mword 8) -> pname_wf bs.
+Proof. intros Hk Hb. by exists k. Qed.
+
+Lemma pname_wf_insert0 (bs : list (bv 8)) :
+  (0 < length bs)%nat ->
+  pname_wf (<[0%nat := (mword_of_int 0 : mword 8)]> bs).
+Proof.
+  intro H. exists 0%nat. rewrite length_insert. split; [exact H |].
+  apply list_lookup_insert. exact H.
+Qed.
 Definition p_name (pa : mword 64) (i : nat) : mword 64 :=
   add_vec pa (mword_of_int (344 + Z.of_nat i)).
 

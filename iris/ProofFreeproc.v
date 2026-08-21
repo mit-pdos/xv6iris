@@ -430,7 +430,10 @@ Section ProofFreeproc.
       assert (Hnb0 : is_Some (pv_name V !! 0%nat)).
       { apply lookup_lt_is_Some_2. rewrite Hnmlen. unfold PNAMELEN. lia. }
       destruct Hnb0 as (nb0 & Hnb0).
-      iEval (rewrite /pname_cells) in "Hnm".
+      (* open past [pname_wf]: the store is about to make it true again at
+         index 0, so the incoming witness is discarded rather than threaded. *)
+      iDestruct (pname_cells_open with "Hnm") as "[_ Hnm]".
+      iEval (rewrite /pname_bytes) in "Hnm".
       iDestruct (big_sepL_insert_acc _ _ 0%nat nb0 Hnb0 with "Hnm") as "[Hnm0 Hnmback]".
       iDestruct (sie_cap_gpr_x0 me (K - 4)%nat false pme (mword_of_int 0 : mword 5)
                    ltac:(vm_compute; reflexivity) with "Hcg") as "[%Hx0 Hcg]".
@@ -443,6 +446,11 @@ Section ProofFreeproc.
       iIntros (CIDz4 Hsz4) "Hcg Hpc Hnm0".
       iEval (rgne; rewrite Hmes1 fr_off_344; rewrite Hsbv) in "Hnm0".
       iDestruct ("Hnmback" $! (mword_of_int 0 : mword 8) with "Hnm0") as "Hnm".
+      (* ...and re-established: [p->name[0] = 0] IS the NUL. *)
+      iDestruct (pname_cells_intro _ _ _
+                   (pname_wf_insert0 (pv_name V)
+                      ltac:(rewrite Hnmlen; unfold PNAMELEN; lia))
+                   with "Hnm") as "Hnm".
       assert (Hq32 : add_vec_int (mword_of_int (FR + 0x2e) : mword 64) 4 = mword_of_int (FR + 0x32))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hq32) in "Hpc".

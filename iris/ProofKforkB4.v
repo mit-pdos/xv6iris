@@ -27,12 +27,15 @@
    and cannot produce idup's argument -- see SpecKfork.v's header).  idup
    hands back TWO halves of [inode_ref ck (cq/2) cdev cinum]; this block
    keeps one and drops the other (the child's [cwd_ref] is [emp], so there
-   is nowhere to put it).  safestrcpy's precise characterisation of the
-   child's new name bytes ([ssc_stop]/[ssc_post]) is dropped on the way out:
-   kfork only needs the child's name array to be 16 bytes long again, not
-   to know which bytes it holds, so the child's final block is handed back
-   as an EXISTENTIAL [Vc'] agreeing with [Vc] on every field except [pv_cwd]
-   (now [ientry ck]) and [pv_name] (now some list of length [PNAMELEN]).
+   is nowhere to put it).  safestrcpy's characterisation of the child's
+   new name bytes ([ssc_stop]/[ssc_post]) USED TO BE dropped on the way out.
+   It is not any more: [ProcDefs.pname_cells] carries [ProcGeom.pname_wf]
+   ("there is a NUL in p->name") and [kfk_name_wf] reads it straight off that
+   disjunction -- [ssc_post]'s zero at the stop index, [ssc_stop]'s index
+   inside the buffer.  The child's final block is still handed back as an
+   EXISTENTIAL [Vc'] agreeing with [Vc] on every field except [pv_cwd] (now
+   [ientry ck]) and [pv_name] (now some list of length [PNAMELEN], and
+   NUL-terminated).
 
    [ProcInv.v] has an accessor for [p->cwd] ([proc_priv_cwd]) but none for
    [p->name]; [kfk_name_open] below is the missing one, built by hand
@@ -507,6 +510,11 @@ Section KforkB4Proof.
     (* open both name buffers *)
     iDestruct (kfk_name_open γf pme pid_p Vp with "Hparent2") as "(HnmP & %HnlP & HnmPback)".
     iDestruct (kfk_name_open γf npa pid_c Vc2 with "Hchild2") as "(HnmC & %HnlC & HnmCback)".
+    (* past [pname_wf]: the parent's is carried through untouched (safestrcpy
+       only READS it), the child's is re-derived below from the call's own
+       postcondition. *)
+    iDestruct (pname_cells_open with "HnmP") as "(%HwfP & HnmP)".
+    iDestruct (pname_cells_open with "HnmC") as "(_ & HnmC)".
     iDestruct (kfk_pname_bytes pme (DfracOwn 1) (pv_name Vp) (kfk_name_fn (pv_name Vp))
                  (kfk_name_fn_spec (pv_name Vp)) with "HnmP") as "HnmPseq".
     iDestruct (kfk_pname_bytes npa (DfracOwn 1) (pv_name Vc2) (kfk_name_fn (pv_name Vc2))
@@ -547,6 +555,7 @@ Section KforkB4Proof.
                     (kfk_name_fn_spec (pv_name Vp))) as Heq.
       rewrite HnlP in Heq. symmetry. exact Heq. }
     iEval (rewrite Hpname_eq) in "HnmPfold".
+    iDestruct (pname_cells_intro _ _ _ HwfP with "HnmPfold") as "HnmPfold".
     iDestruct ("HnmPback" $! (pv_name Vp) HnlP with "HnmPfold") as "Hparent3".
     iEval (rewrite pprivate_eta) in "Hparent3".
     (* fold the child's new name bytes and close, at the EXISTENTIAL [Vc'] *)
@@ -554,6 +563,13 @@ Section KforkB4Proof.
     iDestruct (kfk_bytes_pname npa (DfracOwn 1) 16%nat h with "HnmCseq'") as "HnmCfold".
     assert (Hlen_hn : length (h <$> seq 0 16%nat) = PNAMELEN)
       by (rewrite (kfk_name_len 16%nat h); reflexivity).
+    (* THE CHILD'S NUL, out of safestrcpy's own post.  This disjunction used
+       to be dropped here; carrying it is what retires the [p->name]
+       assumption at syscall()'s fallback. *)
+    iDestruct (pname_cells_intro _ _ _
+                 (kfk_name_wf 16%nat (kfk_name_fn (pv_name Vp))
+                    (kfk_name_fn (pv_name Vc2)) h ltac:(lia) Hpostdisj)
+                 with "HnmCfold") as "HnmCfold".
     iDestruct ("HnmCback" $! (h <$> seq 0 16%nat) Hlen_hn with "HnmCfold") as "Hchild3".
     set (Vc3 := MkPPriv (pv_sz Vc2) (pv_upt Vc2) (pv_tf Vc2) (pv_ofile Vc2)
                   (pv_cwd Vc2) (h <$> seq 0 16%nat)).

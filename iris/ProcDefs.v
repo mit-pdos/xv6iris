@@ -36,8 +36,28 @@ Proof. destruct V; reflexivity. Qed.
 Section ProcDefs.
   Context `{!riscvGS Σ}.
 
+  (* THE NUL LIVES HERE, not in [proc_fields], and that is deliberate: very
+     few places unpack [pname_cells], while [proc_fields] is threaded through
+     most of the kernel inside [proc_priv].  Folding the invariant in at this
+     level costs the eight files that open the big-op and NOTHING above them.
+
+     [ProcGeom.pname_wf] is proved at every write site already (safestrcpy
+     NUL-terminates, freeproc stores a zero, the BSS boots zero); before this
+     it was proved and then dropped. *)
   Definition pname_cells (pa : mword 64) (dq : dfrac) (bs : list (bv 8)) : iProp Σ :=
+    (⌜pname_wf bs⌝ ∗ [∗ list] i ↦ b ∈ bs, p_name pa i ↦ₘ{dq} b)%I.
+
+  (* the big-op alone, for the four proofs that walk it byte by byte *)
+  Definition pname_bytes (pa : mword 64) (dq : dfrac) (bs : list (bv 8)) : iProp Σ :=
     ([∗ list] i ↦ b ∈ bs, p_name pa i ↦ₘ{dq} b)%I.
+
+  Lemma pname_cells_open (pa : mword 64) (dq : dfrac) (bs : list (bv 8)) :
+    pname_cells pa dq bs -∗ ⌜pname_wf bs⌝ ∗ pname_bytes pa dq bs.
+  Proof. by iIntros "[$ $]". Qed.
+
+  Lemma pname_cells_intro (pa : mword 64) (dq : dfrac) (bs : list (bv 8)) :
+    pname_wf bs -> pname_bytes pa dq bs -∗ pname_cells pa dq bs.
+  Proof. intro H. iIntros "H". by iFrame. Qed.
 
   Definition proc_fields (pa : mword 64) (dq : dfrac) (V : pprivate) : iProp Σ :=
     (p_sz pa        ↦₈{dq} pv_sz V ∗

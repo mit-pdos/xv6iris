@@ -1092,6 +1092,9 @@ Section KexecDCommit.
     (* ---- the two buffers safestrcpy wants: [p->name]'s sixteen cells out
        of the process block, and the path RE-BASED at [last]. ---- *)
     iDestruct (proc_priv_name with "Hpriv") as "(%Hnl & Hnm & Hnmback)".
+    (* past [pname_wf]: exec OVERWRITES the name, so the incoming witness is
+       discarded and the outgoing one comes from safestrcpy's post below. *)
+    iDestruct (pname_cells_open with "Hnm") as "(_ & Hnm)".
     iDestruct (kfk_pname_bytes (proc_addr jp) (DfracOwn 1)
                  (pv_name (upd_tf V
                     (<[tf_arg_idx 1
@@ -1135,6 +1138,12 @@ Section KexecDCommit.
     iEval (rewrite HE4a0) in "Hnmseq".
     iDestruct (kfk_bytes_pname (proc_addr jp) (DfracOwn 1) PNAMELEN h
                  with "Hnmseq") as "Hnmfold".
+    (* THE NEW NAME'S NUL, out of safestrcpy's own post -- the same
+       disjunction kfork's B4 block uses, at exec's buffer. *)
+    iDestruct (pname_cells_intro _ _ _
+                 (kfk_name_wf PNAMELEN _ _ h
+                    ltac:(unfold PNAMELEN; lia) Hnpost)
+                 with "Hnmfold") as "Hnmfold".
     iSpecialize ("Hnmback" $! (h <$> seq 0 PNAMELEN)).
     iSpecialize ("Hnmback" with "[%]"); [apply kxd_name_fn_len |].
     iDestruct ("Hnmback" with "Hnmfold") as "Hpriv".
