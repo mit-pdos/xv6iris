@@ -474,6 +474,17 @@ Three stages, each smaller than the last is hard:
   order + rule 5 give `w0 gmo< ACQ_h gmo< w`, contradicting
   `w gmo< w0` — the export kill becomes pure arithmetic ONCE the
   pattern is in hand.
+  B2e-2's DERIVATION CHAIN (worked 2026-08-21): from `lock_pattern G b`
+  (every b-write is an acquire-RMW writing nonzero whose read entry at
+  b names a ZERO value, or writes zero), ATOMICITY makes each
+  acquire's co-PREDECESSOR the zero-write it read (no b-write between
+  source and RMW), so two acquires are never co-adjacent and the CS
+  windows are co-disjoint and totally ordered (`win_excl_of_pattern`;
+  co-order ⊆ gmo via `gwix_gpos_lt`).  The assembled `cs_kill`: given
+  CS-coverage facts (ACQ_h po-before {e, w}; w0 po-before REL_j with
+  the release FENCE between — rule 4), the window order gives
+  `w0 gmo< REL_j gmo< ACQ_h gmo< w` (last step rule 5), contradicting
+  `w gmo< w0`.  Pattern + coverage discharge = B2e-3.
 - **B2e-3 — the pattern + φ discharge** (the true L2′ content, needs
   B1): the value-pattern hypothesis discharged from conformance + the
   realized prefix's exports (`wlp_at` covers prefix messages; the
