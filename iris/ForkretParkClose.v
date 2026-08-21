@@ -10,21 +10,23 @@
    [UsertrapRes.ut_res_bare] is made of:
 
      - [ut_caps] and the syscall environment are DERIVED, not owned.  Both
-       are persistent, both are almost entirely [FsReady.fs_ready], and
-       [fs_ready] is now an ARGUMENT of the closer (SpecForkret.v's last
-       header section) -- so what a builder owes is the WAND
-       [fs_ready -∗ ut_caps N ∗ Rsys ...], i.e. only the rows [fs_ready]
-       does not itself supply: [is_ftable], the [wait_lock], the ticks
-       lock, [devintr_caps_any], [procs_avail], the nextpid lock,
-       [console_ready].  All seven are persistent and all seven exist
-       before either parker runs -- main creates them, and kfork's parent
-       carries them.
+       are persistent, both are almost entirely [FsReady.fs_ready], and the
+       syscall environment's fourth conjunct is [FirstTok.first_done] --
+       which is [first_addr ↦₄□ 0 ∗ fs_ready] and is now an ARGUMENT of the
+       closer (SpecForkret.v's last header section).  So what a builder owes
+       is the WAND [first_done -∗ ut_caps N ∗ Rsys ...], i.e. only the rows
+       neither half supplies: [is_ftable], the [wait_lock], the ticks lock,
+       [devintr_caps_any], [procs_avail], the nextpid lock,
+       [console_ready].  All seven are persistent and all seven exist before
+       either parker runs -- main creates them, and kfork's parent carries
+       them.
 
-       THAT INDIRECTION IS THE WHOLE POINT.  Owning [fs_ready] at park time
+       THAT INDIRECTION IS THE WHOLE POINT.  Owning either half at park time
        is impossible at the site that most needs it: userinit parks the
-       first process BEFORE forkret's boot arm establishes the file system.
-       Owning the wand is not, because the wand is about what happens
-       later.
+       first process BEFORE forkret's boot arm establishes the file system,
+       and the discarded [first] cell is minted by that same arm's release
+       store.  Owning the wand is not, because the wand is about what
+       happens later.
 
      - [ut_trap_parked] and [proc_priv_nopt] are what [forkret_yield]
        hands the closer, and the two allowances are its own arguments.
@@ -69,6 +71,7 @@ Require Import FdSlots IrefSlots FileInvDefs.
 Require Import BioDefs.
 Require Import SpecFileclose.
 Require Import FsReady.
+Require Import FirstTok.
 Require Import UsertrapRes.
 Require Import SpecUsertrap.
 Require Import SpecForkret.
@@ -103,13 +106,13 @@ Section ForkretParkClose.
       (N : ut_names) (av : nat) :
     ut_wf N ->
     (K_usertrap <= av)%nat ->
-    (fs_ready -∗ ut_caps N ∗ Rsys (un_f N) (un_pj N) (un_bn N) (un_fn N)) -∗
+    (first_done -∗ ut_caps N ∗ Rsys (un_f N) (un_pj N) (un_bn N) (un_fn N)) -∗
     park_own N -∗
     (∀ (h : CpuId) (pt' : uptd) (V' : pprivate),
        ⌜pv_upt V' = pt'⌝ -∗
        ⌜ud_data pt' = ud_pas pt'⌝ -∗
        ⌜proc_pt_wf pt'⌝ -∗
-       fs_ready -∗
+       first_done -∗
        forkret_yield (CID := h) (un_f N) (un_pj N)
          (add_vec (un_ks N) (mword_of_int 4096)) (un_pid N) av V' -∗
        fd_slots FDSPARE -∗
@@ -118,12 +121,12 @@ Section ForkretParkClose.
          (add_vec (un_ks N) (mword_of_int 4096))).
   Proof.
     iIntros (Hwf Hav) "Hderive Hown".
-    iIntros (h pt' V') "%Hupt %Hnorm %Hptwf Hfsr (Htrap & Hpriv) Hfd Hiref".
+    iIntros (h pt' V') "%Hupt %Hnorm %Hptwf Hdone (Htrap & Hpriv) Hfd Hiref".
     (* the two page-table facts are the loop's, not this wand's: they are
        handed in so forkret can prove them of the descriptor it actually
        ends on, and [ut_res_bare] does not restate them. *)
     clear Hnorm Hptwf.
-    iDestruct ("Hderive" with "Hfsr") as "[#Hcaps Hsys]".
+    iDestruct ("Hderive" with "Hdone") as "[#Hcaps Hsys]".
     iDestruct "Hown" as "(Hbs & Hip)".
     rewrite /ut_res_bare.
     iExists N, V', av.
@@ -151,7 +154,7 @@ Section ForkretParkClose.
     procs_inv (un_s N) -∗
     pslot_used_at (un_pj N) -∗
     stack_own (KTR := KT1) (add_vec (un_ks N) (mword_of_int 4096)) av -∗
-    (fs_ready -∗ ut_caps N ∗ Rsys (un_f N) (un_pj N) (un_bn N) (un_fn N)) -∗
+    (first_done -∗ ut_caps N ∗ Rsys (un_f N) (un_pj N) (un_bn N) (un_fn N)) -∗
     park_own N -∗
     forkret_park_pkg (fun h : CpuId => ut_res_bare (CID := h) Rsys)
       (un_s N) (un_f N) (un_pj N) (un_ks N) (un_pid N) av.

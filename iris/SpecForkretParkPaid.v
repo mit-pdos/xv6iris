@@ -123,6 +123,7 @@ Require Import ProcInv.
 Require Import SchedCtx.
 Require Import UsertrapRes.
 Require Import FsReady.
+Require Import FirstTok.
 Require Import SpecUsertrap.
 Require Import SpecForkret.
 Require Import SpecForkretPark.
@@ -162,20 +163,22 @@ Definition forkret_park_pkg
           the one forkret was entered with.  The two page-table facts are
           HANDED to this wand rather than taken as premises of the park --
           forkret proves them of the descriptor it actually ends on. *)
-   (* ...AND IT IS HANDED [fs_ready], which is the whole reason this
-          package is payable at all.  [UsertrapRes.ut_caps] carries
-          [fs_ready] as a conjunct and the syscall environment is derived
-          from it, so a closer that had to OWN it could not be built by
-          userinit -- forkret's own boot arm is what establishes it, and
-          that runs after userinit parks.  So forkret pays it instead
-          (SpecForkret.v, "...AND THE CLOSER IS HANDED [fs_ready]") and the
-          builder here owes only the seven persistent rows [fs_ready] does
-          not supply. *)
+   (* ...AND IT IS HANDED [FirstTok.first_done], which is the whole reason
+          this package is payable at all.  [UsertrapRes.ut_caps] carries
+          [fs_ready] as a conjunct, the syscall environment is derived from
+          it, and that environment's LAST conjunct is [first_done] -- whose
+          discarded [first_addr ↦₄□ 0] half is minted by exactly one
+          instruction in the kernel, the release store on forkret's own boot
+          arm.  So a closer that had to OWN either could not be built by
+          userinit, which parks the very process that runs that store.
+          forkret pays both instead (SpecForkret.v, "...AND THE CLOSER IS
+          HANDED [first_done]") and the builder here owes only the
+          persistent rows neither supplies. *)
    (∀ (h : CpuId) (pt' : uptd) (V' : pprivate),
       ⌜pv_upt V' = pt'⌝ -∗
       ⌜ud_data pt' = ud_pas pt'⌝ -∗
       ⌜proc_pt_wf pt'⌝ -∗
-      FsReady.fs_ready -∗
+      FirstTok.first_done -∗
       forkret_yield (CID := h) γf pa (add_vec ks (mword_of_int 4096)) pid av V' -∗
       fd_slots FDSPARE -∗
       iref_slots IREFSPARE -∗

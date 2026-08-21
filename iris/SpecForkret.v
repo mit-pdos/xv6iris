@@ -137,7 +137,7 @@
    tier the way uservec's tail does, which is why the bare residue is the
    right target.
 
-   ==== ...AND THE CLOSER IS HANDED [fs_ready] ===========================
+   ==== ...AND THE CLOSER IS HANDED [first_done] =========================
 
    THE CLOSER'S BODY NEEDS THE FILE SYSTEM AND ITS BUILDER CANNOT HAVE IT.
    [UsertrapRes.ut_caps] carries [FsReady.fs_ready] as a conjunct, and the
@@ -150,21 +150,32 @@
    obligation is unprovable at the site that owes it.
 
    That is an ordering fact, not a plumbing gap, and the fix is to move the
-   resource rather than the proof: the closer takes [fs_ready] as an
-   ARGUMENT.  forkret is exactly the place that can pay it, on both arms
-   and for the same reason the branch exists at all --
+   resource rather than the proof: the closer takes it as an ARGUMENT.
+   forkret is exactly the place that can pay, on both arms and for the same
+   reason the branch exists at all --
 
      - the STEADY arm reads it straight out of [FirstTok.first_tok]'s
-       steady disjunct ([first_addr ↦₄□ 0 ∗ fs_ready], persistent, so
-       putting the token back into the block costs nothing);
-     - the BOOT arm establishes it itself, at the release store, and holds
-       it from +0x38 to the [c.jalr].
+       steady disjunct, which IS this resource, persistent, so putting the
+       token back into the block costs nothing;
+     - the BOOT arm mints it itself -- [fs_ready_establish] at the release
+       store at +0x38, beside the [first_addr ↦₄□ 0] that same store
+       discards -- and holds it to the [c.jalr].
 
-   So the wand's builder owes only what it can have: the seven persistent
-   rows [fs_ready] does NOT supply ([is_ftable], the [wait_lock], the
-   ticks lock, [devintr_caps_any], [procs_avail], [console_ready], the
-   nextpid lock), all of which main creates before userinit runs and all of
-   which kfork's parent already holds. *)
+   THE ARGUMENT IS [FirstTok.first_done], NOT [fs_ready], and the extra
+   half is load-bearing rather than convenient.  [ProofSyscall.syscall_env]
+   has FOUR conjuncts and its last is [first_done] itself -- the steady arm
+   of proc.c's [static int first], which fork hands to every child.  Its
+   [first_addr ↦₄□ 0] half is minted by exactly one instruction in the
+   kernel, the release store on forkret's boot arm, so a closer given only
+   [fs_ready] would still be missing a row that userinit -- which parks the
+   very process that will run that store -- could not possibly supply.
+   [first_done] is what both arms hold and is what closes the environment.
+
+   So the wand's builder owes only what it can have: the persistent rows
+   [first_done] does NOT supply ([is_ftable], the [wait_lock], the ticks
+   lock, [devintr_caps_any], [procs_avail], [console_ready], the nextpid
+   lock), all of which main creates before userinit runs and all of which
+   kfork's parent already holds. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -191,7 +202,8 @@ Require Import SpecPrepareReturn.
 Require Import SpecKexec.
 Require Import SpecUsertrap.
 Require Import UsertrapRes.
-Require Import FsReady.   (* [fs_ready] -- the one thing the closer takes, see the header *)
+Require Import FsReady.    (* [fs_ready] -- [first_done]'s second half *)
+Require Import FirstTok.   (* [first_done] -- the one thing the closer takes, see the header *)
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
@@ -281,11 +293,11 @@ Definition wp_forkret_gen_body
      ⌜pv_upt V' = pt'⌝ -∗
      ⌜ud_data pt' = ud_pas pt'⌝ -∗
      ⌜proc_pt_wf pt'⌝ -∗
-     (* THE FILE SYSTEM, HANDED TO THE CLOSER RATHER THAN HELD BY IT.  See
-        the header's last section: forkret is where [fs_ready] first exists
-        on BOTH arms, so a closer built before forkret runs cannot have it
-        and a closer built by forkret's caller must be given it. *)
-     FsReady.fs_ready -∗
+     (* THE FILE SYSTEM AND THE SEALED [first] CELL, HANDED TO THE CLOSER
+        RATHER THAN HELD BY IT.  [FirstTok.first_done] is exactly
+        [first_addr ↦₄□ 0 ∗ fs_ready] -- see the header's last section for
+        why the closer's builder cannot own either half. *)
+     FirstTok.first_done -∗
      forkret_yield (CID := h) γf p ksp pid av V' -∗
      URes h pt' ksp) -∗
   WP (Loop : expr riscv_lang).
