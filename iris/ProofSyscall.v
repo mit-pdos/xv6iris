@@ -16,10 +16,16 @@
    22 sync.
    Count the `decide` branches in `sysc_arm_dispatch`, not this list.
 
-   The file's ONE remaining `Admitted` is `sysc_arm_placeholder`, standing
-   in for the TWO entries that are not wired: 5 read and 16 write.  What
-   blocks each is stated below, and none of it is a missing resource any
-   more -- see THE ENVIRONMENT, below.
+   ALL 22 ENTRIES ARE WIRED, and `sysc_arm_placeholder` is GONE with them:
+   `sysc_arm_dispatch`'s fall-through is now `exfalso; lia` against its own
+   `1 <= k <= 22`, which is why the 22 `decide` branches each name their
+   disequality instead of dropping it with `_`.  That retired the tree's
+   only `Admitted`.
+
+   Read (5) and write (16) were last, and what unblocked them was not the
+   dispatch: it was `31f115a` making `0 <= n` a fact of the code (so neither
+   contract asks its caller for anything about the count) and
+   `ConsoleInv.console_inv` giving the devsw column an owner.
 
    15 open came in once its iref ledger became an EQUALITY.  Its contract
    used to promise only `ns - sys_open_slots <= ns' <= ns`, and this
@@ -318,6 +324,7 @@ Require Import FsCrash.
    ([SpecKexec], [SpecPanic], [BioInv], [SpecDirlink], [InodeInv]) rather than
    imported, so nothing this file already says changes meaning. *)
 Require Import BitmapInv.
+Require Import ConsoleInv.
 Require Import IcacheRef.
 Require Import IrefSlots FdSlots.
 Require Import FileInvDefs FileInv.
@@ -340,6 +347,8 @@ Require Import SpecSysOpen SpecSysUnlink.
 Require Import SpecMyproc.
 (* the content-independent bundles the non-closer fs entries state their
    environments over -- [filestat_fs_env]/[fread_names] and friends. *)
+Require Import UartTxInv.
+Require Import SpecFileread SpecFilewrite.
 Require Import SpecFilestat.
 Require Import BioInv.
 Require Import FsReady FsCfg.
@@ -853,7 +862,24 @@ Section SyscallVocab.
         !irefslotG Σ, !pavG Σ} `{GEN : GenId}
       (γf : gname) (pj : mword 64) (bn : bio_names) (fn : fclose_names)
       : iProp Σ :=
-    (sysc_proc_env γf ∗ sysc_fs_env pj bn fn)%I.
+    (sysc_proc_env γf ∗ ConsoleInv.console_ready ∗ sysc_fs_env pj bn fn)%I.
+
+  (* THE CONSOLE, reached on its own rather than through [syscall_env_all].
+     Adding it to that projection's output would move eleven arms'
+     [iDestruct] patterns, and a mis-shifted pattern in one of eleven is a
+     silent change of which resource an arm thinks it holds
+     (completed/explicit-cpuid.md's failure mode).  The two arms that want
+     the console take it here instead.
+
+     It is NOT in [FsReady.fs_ready]: the console is not the file system, and
+     [fs_ready]'s establishment is already the boot chain's largest owed
+     row.  It is a SIBLING conjunct, so the only thing that grows is whatever
+     finally establishes [syscall_env] -- which [LinkSyscall.v] still stubs
+     as [emp]. *)
+  Lemma syscall_env_console (γf : gname) (pj : mword 64)
+      (bn : bio_names) (fn : fclose_names) :
+    syscall_env γf pj bn fn -∗ ConsoleInv.console_ready.
+  Proof. by iIntros "(_ & $ & _)". Qed.
 
   (* ...and the OLD shape, as a projection.  Same reason [sysc_fs_env_all]
      keeps its order: an arm's [iDestruct] pattern is an interface, and
@@ -873,7 +899,7 @@ Section SyscallVocab.
       printk_env γpr γud γvd ∗
       sysc_fs_env pj bn fn.
   Proof.
-    iIntros "[#Hproc #Hfs]".
+    iIntros "(#Hproc & _ & #Hfs)".
     iDestruct "Hproc" as (γp γw γft γtk)
       "(#Hnextpid & #Hpav & #Hwaitlk & #Hftable & #Htick)".
     iPoseProof "Hfs" as "#Hfsc".
@@ -1497,8 +1523,8 @@ Section SyscallVocab.
      final pop inside [sysc_epilogue_tail]) -- mirrors [ProofSysGetpid]/
      [ProofArgraw]'s own "(av-k)...+k=av" bookkeeping.  [sys_exit] (table
      index 2)'s own contract DIVERGES (no continuation at all --
-     SpecSysExit.v), so it does not fit this shape; it stays [Admitted]
-     with the rest of the GAP entries, at a bespoke type. *)
+     SpecSysExit.v), so it does not fit this shape and has its own arm at a
+     bespoke type. *)
   Definition sysc_arm_goal `{CIDh : CpuId} (k : nat) (γf : gname) (pj : mword 64)
       (γs : list gname) (j : nat) (γl : gname)
       (bn : bio_names) (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
@@ -1917,6 +1943,75 @@ Section SyscallVocab.
       (fcn_ireg fn) (fcn_ic fn) (fcn_cov fn) (fcn_logstart fn)
       (fcn_inodestart fn) (fcn_dqs fn).
 
+  (* =================================================================== *)
+  (*  ENTRY 5, [read].  [SpecFileread.fileread_fs_env] is FIELD FOR FIELD   *)
+  (*  [SpecFilestat.filestat_fs_env] -- same twelve conjuncts, same order,  *)
+  (*  only the record prefix differs -- so the carve below is                *)
+  (*  [sysc_filestat_env]'s, and the names record is [sysc_fstat_names]'s    *)
+  (*  plus the four fields fileread has and filestat does not: the running   *)
+  (*  process (readi copies into user memory), the cons lock, and the        *)
+  (*  device column's value/fraction functions.                              *)
+  (*                                                                        *)
+  (*  THE COLUMN IS PINNED TO THE CONSOLE TABLE, not left as a family this   *)
+  (*  arm would have to own: [frn_rp] IS [ConsoleInv.devsw_read_val] and     *)
+  (*  every cell is held at [DfracDiscarded], which is what                  *)
+  (*  [SpecFileread.fileread_devsw_of_console] needs and what makes both     *)
+  (*  equations [reflexivity] at the call.  [γc] comes from destructing      *)
+  (*  [ConsoleInv.console_ready] out of [syscall_env] ONCE -- which is why   *)
+  (*  the gname is existential there and not a field of [fclose_names].      *)
+  (* =================================================================== *)
+  Definition sysc_fread_names (γc : gname) (bn : bio_names) (fn : fclose_names)
+      : fread_names :=
+    MkFReadNames (fcn_procs fn) (fcn_j fn) (fcn_plock fn)
+      (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn) γc
+      (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn (fcn_fs fn)
+      (fcn_ireg fn) (fcn_ic fn) (fcn_cov fn) (fcn_logstart fn)
+      (fcn_inodestart fn) (fcn_dqs fn)
+      ConsoleInv.devsw_read_val (fun _ => DfracDiscarded).
+
+  Lemma sysc_fileread_env (γf : gname) (γc : gname) (pj : mword 64)
+      (bn : bio_names) (fn : fclose_names) (us : gset Z) :
+    sysc_fs_env pj bn fn -∗ bslot bn -∗ fileclose_bm fn us -∗
+    SpecFileread.fileread_fs_env γf (sysc_fread_names γc bn fn) ∗
+    (SpecFileread.fileread_fs_out (sysc_fread_names γc bn fn) -∗
+       bslot bn ∗ fileclose_bm fn us).
+  Proof.
+    iIntros "#Hfs Hsl Hbm".
+    iDestruct (sysc_fs_env_all with "Hfs") as
+      "(%Hdev & %Hnib & _ & _ & _ & _ & _ & _ & _ & _ & _ & %Hlg &
+        _ & _ & #Hbio & _ & _ & _ & #Hdevi & #Hgeom & #Hdlock & _ & _ &
+        #Hic & _)".
+    iDestruct "Hic" as
+      "(_ & _ & _ & _ & _ & _ & %Hist0 & %Hib & _ & #Hit & #Hitinv & #Hesc &
+        #Hireg & _ & #Hsl2)".
+    iDestruct (sysc_bm_split with "Hbm") as "(Hbmp & Hisp & Hbmr)".
+    iSplitR "Hbmp Hbmr".
+    { rewrite /SpecFileread.fileread_fs_env /sysc_fread_names; cbn.
+      rewrite -Hdev -Hnib.
+      (* conjunct by conjunct, not [iFrame]: the tail is [dev_inv] /
+         [disk_geom] / an [is_lock] over [disk_res], and a frame prices each
+         name against each of those as a CONVERSION (33.1 s, measured on
+         [sysc_filestat_env]).  Each line below is a syntactic check. *)
+      iSplit; [ iPureIntro; exact Hlg |].
+      iSplit; [ iPureIntro; exact Hist0 |].
+      iSplit.
+      { iPureIntro. intros inum Hi. exact (proj1 (Hib inum Hi)). }
+      iSplitR; [ iExact "Hbio"   |].
+      iSplitR; [ iExact "Hitinv" |].
+      iSplitR; [ iExact "Hesc"   |].
+      iSplitR; [ iExact "Hireg"  |].
+      iSplitR; [ iExact "Hsl2"   |].
+      iSplitL "Hisp"; [ iExact "Hisp" |].
+      iSplitR; [ iExact "Hdevi"  |].
+      iSplitR; [ iExact "Hgeom"  |].
+      iSplitR; [ iExact "Hdlock" |].
+      iExact "Hsl". }
+    iIntros "Hout".
+    rewrite /SpecFileread.fileread_fs_out /sysc_fread_names; cbn.
+    iDestruct "Hout" as "[Hisp' Hsl']".
+    iFrame "Hsl'". iApply (sysc_bm_join with "Hbmp Hisp' Hbmr").
+  Qed.
+
   Lemma sysc_filestat_env (pj : mword 64) (bn : bio_names) (fn : fclose_names)
       (us : gset Z) :
     sysc_fs_env pj bn fn -∗ bslot bn -∗ fileclose_bm fn us -∗
@@ -2022,6 +2117,91 @@ Section SyscallVocab.
     iSplitL "Hbs"; [ iExact "Hbs" |].
     iSplitR; [ iExact "Hic"    |].
     iExact "Hbm".
+  Qed.
+
+  (* =================================================================== *)
+  (*  ENTRY 16, [write].  Heavier than read's: filewrite's FD_INODE arm     *)
+  (*  runs writei under begin_op/end_op and through balloc, so on top of    *)
+  (*  read's twelve conjuncts it wants the log, the crash seam, the era      *)
+  (*  certificate, balloc's printk credentials, the bitmap and its two       *)
+  (*  superblock cells, and THREE block slots rather than one.  Every one    *)
+  (*  of those is already in [sysc_fs_env] -- they are what the create /     *)
+  (*  namei entries run on -- so this is assembly, not new resource.         *)
+  (*                                                                        *)
+  (*  TWO GNAMES ARE DESTRUCTED, not carried: [γpr] and the tx lock's [γl],  *)
+  (*  both out of [printk_env]'s own existential.  The tx lock is what       *)
+  (*  filewrite's DEVICE arm needs -- consolewrite drives the UART, so its   *)
+  (*  caps are [dev_inv] plus the tx lock and NOT the cons lock, which is    *)
+  (*  the one place the two syscalls' device arms differ.                    *)
+  (* =================================================================== *)
+  (* the process triple is a PARAMETER, not read off [fn]: [SpecSysWrite]
+     ties [fwn_j]/[fwn_procs] to the dispatch's own [j]/[γs] (its FD_INODE
+     arm's callees are all indexed by them), and taking them here makes both
+     equations [reflexivity] at the call instead of an injectivity argument
+     about [proc_addr]. *)
+  Definition sysc_fwrite_names (γpr γl : gname)
+      (γs : list gname) (j : nat) (γlp : gname) (bn : bio_names)
+      (fn : fclose_names) (us : gset Z) : fwrite_names :=
+    MkFWriteNames γs j γlp
+      (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn) γl
+      (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) bn (fcn_log fn) (fcn_fs fn)
+      (fcn_ireg fn) (fcn_ic fn) γpr (fcn_cov fn) (fcn_logstart fn)
+      (fcn_inodestart fn) (fcn_bmapstart fn) (fcn_size fn) us
+      (fcn_dqs fn) (fcn_dqb fn) DfracDiscarded
+      ConsoleInv.devsw_write_val (fun _ => DfracDiscarded).
+
+  (* [γpr] is [fsc_printk] and not an existential witness: the gen-contract
+     fact [filewrite_fs_env] wants exists only AT that name, and
+     [syscall_env_all]'s [∃ γpr] would hand out a name nothing says it of.
+     The tx lock's [γl] IS existential -- [printk_env] closes over it -- so
+     it stays a parameter and the arm destructs it once. *)
+  Lemma sysc_filewrite_env (γf γl : gname) (γs : list gname) (j : nat)
+      (γlp : gname) (pj : mword 64)
+      (bn : bio_names) (fn : fclose_names) (us : gset Z) :
+    kernel_data -∗ is_txlock γl (fcn_uart fn) -∗
+    sysc_fs_env pj bn fn -∗ bslots bn 3 -∗ fileclose_bm fn us -∗
+    SpecFilewrite.filewrite_fs_env γf (sysc_fwrite_names fsc_printk γl γs j γlp bn fn us).
+  Proof.
+    iIntros "#Hkd #Htx #Hfs Hbs Hbm".
+    iDestruct (sysc_fs_env_all with "Hfs") as
+      "(%Hdev & %Hnib & _ & _ & _ & _ & _ & _ & _ & _ & _ & %Hlg &
+        _ & _ & #Hbio & #Hlog & #Hseam & #Hgen & #Hdevi & #Hgeom & #Hdlock &
+        _ & _ & #Hic & _ & %Hbg & _ & _ & #Hsz & %Hpg & #Hpe)".
+    iDestruct "Hic" as
+      "(_ & _ & _ & _ & _ & _ & %Hist0 & %Hib & _ & #Hit & #Hitinv & #Hesc &
+        #Hireg & _ & #Hsl2)".
+    iDestruct "Hbm" as "(Hbmst & Hisp & Hbmr)".
+    rewrite /SpecFilewrite.filewrite_fs_env /sysc_fwrite_names; cbn.
+    rewrite -Hdev -Hnib.
+    iSplit; [ iPureIntro; exact Hlg |].
+    iSplit; [ iPureIntro; exact Hist0 |].
+    iSplit.
+    { iPureIntro. intros inum Hi. exact (proj1 (Hib inum Hi)). }
+    iSplit.
+    { iPureIntro. intros inum Hi. exact (proj2 (Hib inum Hi)). }
+    iSplit; [ iPureIntro; exact Hbg |].
+    iSplit; [ iPureIntro; exact Hpg |].
+    (* conjunct by conjunct, for [sysc_fclose_fs_env]'s measured reason: the
+       goal's tail is definition-valued, so a named [iFrame] prices every one
+       of these against each of those as a CONVERSION. *)
+    iSplitR; [ iExact "Hbio"   |].
+    iSplitR; [ iExact "Hlog"   |].
+    iSplitR; [ iExact "Hseam"  |].
+    iSplitR; [ iExact "Hgen"   |].
+    iSplitR; [ iExact "Hkd"    |].
+    iSplitR; [ iExact "Hpe"    |].
+    iSplitR; [ iExact "Hitinv" |].
+    iSplitR; [ iExact "Hesc"   |].
+    iSplitR; [ iExact "Hireg"  |].
+    iSplitR; [ iExact "Hsl2"   |].
+    iSplitL "Hisp";  [ iExact "Hisp"  |].
+    iSplitR; [ iExact "Hsz"    |].
+    iSplitL "Hbmst"; [ iExact "Hbmst" |].
+    iSplitL "Hbmr";  [ iExact "Hbmr"  |].
+    iSplitR; [ iExact "Hdevi"  |].
+    iSplitR; [ iExact "Hgeom"  |].
+    iSplitR; [ iExact "Hdlock" |].
+    iExact "Hbs".
   Qed.
 
   (* ...and the inverse, for the two entries' RETURN: the nopid bundle's own
@@ -2149,20 +2329,6 @@ Section SyscallArms.
             !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  (* PLACEHOLDER for a not-yet-specialized table entry: an honest
-     [Admitted] stand-in so the dispatch machinery below can be assembled
-     and validated end-to-end before every arm is filled in.  Real arms
-     are wired in one at a time by branching on [decide (k = <literal>)]
-     ahead of this generic fallback -- see [wp_syscall_sconf]'s own use;
-     each such branch shrinks what this placeholder is still standing in
-     for, without touching the branches already replaced. *)
-  Lemma sysc_arm_placeholder (k : nat) (γf : gname) (pj : mword 64)
-      (γs : list gname) (j : nat) (γl : gname) (bn : bio_names) (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
-      (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
-      (m M : regfile) (us : gset Z) :
-    (1 <= k <= 22)%nat ->
-    sysc_arm_goal k γf pj γs j γl bn fn dqi ip pid V lks av m M us.
-  Admitted.
 
   (* ------------------------------------------------------------------- *)
   (* THE FIRST REAL ARM: k = 11, [sys_getpid].  It is the entry that needs
@@ -2733,7 +2899,7 @@ Section SyscallArms.
      our line's b284fecb replaced the syscall-shaped placeholder with a
      REAL contract taking [(γf) (γa) (γpr) (gs) (j) (gl) (gu) (gd) (gk)
      (pd pav pu) ...].  Both are real, the shapes disagree, and index 18
-     falls through to [sysc_arm_placeholder] until that is settled --
+     was settled by giving index 18 its own arm at the real shape --
      see claude-notes/projects/fs-sysfile.md, "S7-unlink". *)
 
   (* ------------------------------------------------------------------- *)
@@ -3028,6 +3194,185 @@ Section SyscallArms.
      returns.  [sysc_filestat_env] is that carve-and-regather, and the
      "shape decision" the header warned about ([syscall_env] would stop
      being fully persistent) never arises. *)
+  Lemma sysc_arm_write (γf : gname) (pj : mword 64)
+      (γs : list gname) (j : nat) (γl : gname) (bn : bio_names)
+      (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
+      (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
+      (m M : regfile) (us : gset Z) :
+    sysc_arm_goal 16 γf pj γs j γl bn fn dqi ip pid V lks av m M us.
+  Proof.
+    rewrite /sysc_arm_goal /sysc_arm_pre.
+    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
+    subst pj.
+    iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
+    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
+    iDestruct "Hcont" as "[Hcont _]".
+    assert (Hpce : (mword_of_int (sysc_target 16) : mword 64)
+                   = mword_of_int KernelSyms.sys_write) by reflexivity.
+    iEval (rewrite Hpce) in "Hpc".
+    iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlks Hcpu]". subst lks.
+    iDestruct (procs_inv_len with "Hprocs") as "%Hlen".
+    (* the two trapframe argument words -- only their EXISTENCE is asked *)
+    iDestruct (proc_priv_tf with "Hpriv") as "(Htfc & Htfp & Hpvback)".
+    iDestruct (tf_page_length with "Htfp") as "%Htflen".
+    iDestruct ("Hpvback" with "Htfc Htfp") as "Hpriv".
+    destruct (lookup_lt_is_Some_2 (pv_tf V) (tf_arg_idx 0)
+                ltac:(rewrite Htflen; unfold TFWORDS, tf_arg_idx; lia)) as [v0 Hv0].
+    destruct (lookup_lt_is_Some_2 (pv_tf V) (tf_arg_idx 1)
+                ltac:(rewrite Htflen; unfold TFWORDS, tf_arg_idx; lia)) as [v1 Hv1].
+    (* the count, the third trapframe word.  [SpecSysWrite] takes no numeric
+       premise about it at all: 31f115a's guard in filewrite makes [0 <= n] a
+       fact of the code, so the syscall says nothing about what the user
+       wrote there. *)
+    destruct (lookup_lt_is_Some_2 (pv_tf V) (tf_arg_idx 2)
+                ltac:(rewrite Htflen; unfold TFWORDS, tf_arg_idx; lia)) as [v2 Hv2].
+    iPoseProof "Henv" as "#Henvc".
+    iDestruct (syscall_env_all with "Henvc") as (γa γp γw γft γtk γpr γud γvd)
+      "(#Hkalloc & _ & _ & _ & _ & _ & _ & #Hfsenv)".
+    (* [printk_env] is taken HERE and not out of [syscall_env_all]: that
+       projection closes over the uart/disk names existentially, so its
+       [is_txlock] would be at a gname nothing ties to [fcn_uart fn].  This
+       one states it at the record's own names. *)
+    iDestruct (sysc_fs_env_all with "Hfsenv") as
+      "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
+        _ & #Hpanic & _ & _ & _ & _ & #Hdevi & _ & _ &
+        _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hpe)".
+    (* filewrite's FD_INODE arm is the whole log cone, so it wants all THREE
+       block slots -- unlike fstat/read, which take one and hand it back. *)
+    (* filewrite's DEVICE arm wants the TX lock, not the cons lock --
+       consolewrite drives the UART -- so what is destructed here is
+       [printk_env]'s own existential.  The console table still comes from
+       [console_ready], but without its gname: the write column does not
+       mention it. *)
+    iDestruct (syscall_env_console with "Henvc") as "#Hcr".
+    iPoseProof (ConsoleInv.console_ready_devsw with "Hcr") as "#Htbl".
+    iDestruct "Hpe" as "(_ & _ & _ & Hxl & _)".
+    iDestruct "Hxl" as (γtxl) "#Htx".
+    iAssert (SpecFilewrite.filewrite_dev_caps
+               (sysc_fwrite_names fsc_printk γtxl γs j γl bn fn us)) as "#Hcaps".
+    { rewrite /SpecFilewrite.filewrite_dev_caps /sysc_fwrite_names; cbn.
+      iSplitR; [iExact "Hdevi" | iExact "Htx"]. }
+    iDestruct (sysc_filewrite_env γf γtxl γs j γl (proc_addr j) bn fn us
+                 with "Hdata Htx Hfsenv Hbs Hfc") as "Hfse".
+    iApply (SysWrite.wp_sys_write_sconf γa γf γs j γl
+              (sysc_fwrite_names fsc_printk γtxl γs j γl bn fn us)
+              pid V v0 v2 M (av - 4)%nat true true ∅
+              ltac:(lia) Hj Hgamma Hlen eq_refl eq_refl Hv0
+              (ex_intro _ v1 Hv1) Hv2 eq_refl eq_refl eq_refl
+              with "Hcg Hcpu Htext Hdata Hpc Hpanic Hpriv Hkalloc Hprocs
+                    Hfse Hcaps Htbl").
+    iIntros (CIDy Hsy mf r P' used') "%Hcs %Hext %Hret' %Hmfa0 Hcg Hcpu Hpc Hpriv _ Hout".
+    (* THE BITMAP COMES BACK AT A SET THAT ONLY GREW, so what the arm hands
+       on is [fileclose_bm] at [used'] and not at [us] -- filewrite's
+       FD_INODE arm ballocs, and how many times is not a function of anything
+       the dispatch holds.  [sb_size] is discarded, hence dropped here. *)
+    rewrite /SpecFilewrite.filewrite_fs_out /sysc_fwrite_names; cbn.
+    iDestruct "Hout" as "(_ & Hisp & _ & Hbmst & Hbmr & Hbs)".
+    iAssert (fileclose_bm fn used') with "[Hbmst Hisp Hbmr]" as "Hfc".
+    { rewrite /fileclose_bm.
+      iSplitL "Hbmst"; [iExact "Hbmst" |].
+      iSplitL "Hisp";  [iExact "Hisp"  | iExact "Hbmr"]. }
+    assert (Htfp' : ud_tfp (pv_upt (upd_upt V P')) = ud_tfp (pv_upt V)).
+    { destruct Hext as (_ & Htf & _). cbn [pv_upt upd_upt]. exact Htf. }
+    assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
+    { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
+    assert (Hmfs2 : mf !!! Regidx Rs2 = page_base (ud_tfp (pv_upt (upd_upt V P')))).
+    { rewrite (callee_saved_lookup Hcs Rs2 ltac:(vm_compute; reflexivity)).
+      rewrite Htfp'. exact HMs2. }
+    assert (Hmfrest : forall r' : mword 5, is_cs_idx r' = true ->
+              r' <> csp_rs1 -> r' <> Rs0 -> r' <> Rs1 -> r' <> Rs2 ->
+              mf !!! Regidx r' = m !!! Regidx r').
+    { intros r' Hr Ncsp N8 N9 N18.
+      rewrite (callee_saved_lookup Hcs r' Hr). exact (HMother r' Hr Ncsp N8 N9 N18). }
+    assert (Hret : ret_pc (M !!! Regidx Rra)
+                   = (mword_of_int (KernelSyms.syscall + 0x3a) : mword 64))
+      by (rewrite HMra; apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hret) in "Hpc".
+    assert (Hcry : true = false \/ proc_addr j = zero_reg -> (CIDy : CPU) = (CID : CPU))
+      by wp_next_chain.
+    iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
+    iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) bn fn dqi ip pid V
+              (upd_upt V P') ∅ av used' m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) Htfp'
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hfc Hip Hfd Hir Henv Hpriv Hpc Hcont").
+  Qed.
+
+  Lemma sysc_arm_read (γf : gname) (pj : mword 64)
+      (γs : list gname) (j : nat) (γl : gname) (bn : bio_names)
+      (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
+      (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
+      (m M : regfile) (us : gset Z) :
+    sysc_arm_goal 5 γf pj γs j γl bn fn dqi ip pid V lks av m M us.
+  Proof.
+    rewrite /sysc_arm_goal /sysc_arm_pre.
+    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hpidt.
+    subst pj.
+    iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
+    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
+    iDestruct "Hcont" as "[Hcont _]".
+    assert (Hpce : (mword_of_int (sysc_target 5) : mword 64)
+                   = mword_of_int KernelSyms.sys_read) by reflexivity.
+    iEval (rewrite Hpce) in "Hpc".
+    iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlks Hcpu]". subst lks.
+    iDestruct (procs_inv_len with "Hprocs") as "%Hlen".
+    (* the two trapframe argument words -- only their EXISTENCE is asked *)
+    iDestruct (proc_priv_tf with "Hpriv") as "(Htfc & Htfp & Hpvback)".
+    iDestruct (tf_page_length with "Htfp") as "%Htflen".
+    iDestruct ("Hpvback" with "Htfc Htfp") as "Hpriv".
+    destruct (lookup_lt_is_Some_2 (pv_tf V) (tf_arg_idx 0)
+                ltac:(rewrite Htflen; unfold TFWORDS, tf_arg_idx; lia)) as [v0 Hv0].
+    destruct (lookup_lt_is_Some_2 (pv_tf V) (tf_arg_idx 1)
+                ltac:(rewrite Htflen; unfold TFWORDS, tf_arg_idx; lia)) as [v1 Hv1].
+    (* sys_read reads a THIRD trapframe word -- the count -- and says nothing
+       about it: [SpecSysRead] takes no numeric premise at all, because the
+       guard 31f115a added to fileread makes [0 <= n] a fact of the code. *)
+    destruct (lookup_lt_is_Some_2 (pv_tf V) (tf_arg_idx 2)
+                ltac:(rewrite Htflen; unfold TFWORDS, tf_arg_idx; lia)) as [v2 Hv2].
+    iPoseProof "Henv" as "#Henvc".
+    iDestruct (syscall_env_all with "Henvc") as (γa γp γw γft γtk γpr γud γvd)
+      "(#Hkalloc & _ & _ & _ & _ & _ & _ & #Hfsenv)".
+    iDestruct (sysc_fs_env_all with "Hfsenv") as
+      "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
+        _ & #Hpanic & _)".
+    (* the environment, carved out of [fs_ready] plus one slot unit *)
+    iDestruct (sysc_bslot_split with "Hbs") as "[Hsl Hbs2]".
+    (* THE CONSOLE, destructed ONCE: the arm builds the names record around
+       the gname it gets, which is the whole reason [console_ready] hides it
+       rather than [fclose_names] carrying it. *)
+    iDestruct (syscall_env_console with "Henvc") as (γc) "#Hci".
+    iDestruct (sysc_fileread_env γf γc (proc_addr j) bn fn us with "Hfsenv Hsl Hfc")
+      as "[Hfse Hback]".
+    iApply (SysRead.wp_sys_read_sconf γa γf γs j γl (sysc_fread_names γc bn fn)
+              pid V v0 v2 M (av - 4)%nat true true ∅
+              ltac:(lia) Hj Hgamma Hlen Hv0 (ex_intro _ v1 Hv1) Hv2
+              eq_refl eq_refl eq_refl
+              with "Hcg Hcpu Htext Hdata Hpc Hpanic Hpriv Hkalloc Hprocs Hfse Hci").
+    iIntros (CIDy Hsy mf r P') "%Hcs %Hext %Hret' %Hmfa0 Hcg Hcpu Hpc Hpriv _ Hout".
+    iDestruct ("Hback" with "Hout") as "[Hsl Hfc]".
+    iDestruct (sysc_bslot_join with "Hsl Hbs2") as "Hbs".
+    assert (Htfp' : ud_tfp (pv_upt (upd_upt V P')) = ud_tfp (pv_upt V)).
+    { destruct Hext as (_ & Htf & _). cbn [pv_upt upd_upt]. exact Htf. }
+    assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
+    { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
+    assert (Hmfs2 : mf !!! Regidx Rs2 = page_base (ud_tfp (pv_upt (upd_upt V P')))).
+    { rewrite (callee_saved_lookup Hcs Rs2 ltac:(vm_compute; reflexivity)).
+      rewrite Htfp'. exact HMs2. }
+    assert (Hmfrest : forall r' : mword 5, is_cs_idx r' = true ->
+              r' <> csp_rs1 -> r' <> Rs0 -> r' <> Rs1 -> r' <> Rs2 ->
+              mf !!! Regidx r' = m !!! Regidx r').
+    { intros r' Hr Ncsp N8 N9 N18.
+      rewrite (callee_saved_lookup Hcs r' Hr). exact (HMother r' Hr Ncsp N8 N9 N18). }
+    assert (Hret : ret_pc (M !!! Regidx Rra)
+                   = (mword_of_int (KernelSyms.syscall + 0x3a) : mword 64))
+      by (rewrite HMra; apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hret) in "Hpc".
+    assert (Hcry : true = false \/ proc_addr j = zero_reg -> (CIDy : CPU) = (CID : CPU))
+      by wp_next_chain.
+    iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
+    iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) bn fn dqi ip pid V
+              (upd_upt V P') ∅ av us m mf Hmfsp Hmfs2 Hmfrest ltac:(lia) Htfp'
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hfc Hip Hfd Hir Henv Hpriv Hpc Hcont").
+  Qed.
+
   Lemma sysc_arm_fstat (γf : gname) (pj : mword 64)
       (γs : list gname) (j : nat) (γl : gname) (bn : bio_names)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
@@ -3915,47 +4260,53 @@ Section SyscallArms.
     sysc_arm_goal k γf pj γs j γl bn fn dqi ip pid V lks av m M us.
   Proof.
     intro Hk.
-    destruct (decide (k = 1%nat)) as [-> | _].
+    destruct (decide (k = 1%nat)) as [-> | Hne1].
     { exact (sysc_arm_fork γf pj γs j γl bn fn dqi ip pid V lks av m M us). }
-    destruct (decide (k = 2%nat)) as [-> | _].
+    destruct (decide (k = 2%nat)) as [-> | Hne2].
     { exact (sysc_arm_exit γf pj γs j γl bn fn dqi ip pid V lks av m M us). }
-    destruct (decide (k = 3%nat)) as [-> | _].
+    destruct (decide (k = 3%nat)) as [-> | Hne3].
     { exact (sysc_arm_wait γf pj γs j γl bn fn dqi ip pid V lks av m M us). }
-    destruct (decide (k = 6%nat)) as [-> | _].
+    destruct (decide (k = 6%nat)) as [-> | Hne4].
     { exact (sysc_arm_kill γf pj γs j γl bn fn dqi ip pid V lks av m M us). }
-    destruct (decide (k = 7%nat)) as [-> | _].
+    destruct (decide (k = 7%nat)) as [-> | Hne5].
     { exact (sysc_arm_exec γf pj γs j γl bn fn dqi ip pid V lks av m M us). }
-    destruct (decide (k = 10%nat)) as [-> | _].
+    destruct (decide (k = 10%nat)) as [-> | Hne6].
     { exact (sysc_arm_dup γf pj γs j γl bn fn dqi ip pid V lks av m M us). }
-    destruct (decide (k = 11%nat)) as [-> | _].
+    destruct (decide (k = 11%nat)) as [-> | Hne7].
     { exact (sysc_arm_getpid γf pj γs j γl bn fn dqi ip pid V lks av m M us). }
-    destruct (decide (k = 12%nat)) as [-> | _].
+    destruct (decide (k = 12%nat)) as [-> | Hne8].
     { exact (sysc_arm_sbrk γf pj γs j γl bn fn dqi ip pid V lks av m M us). }
-    destruct (decide (k = 13%nat)) as [-> | _].
+    destruct (decide (k = 13%nat)) as [-> | Hne9].
     { exact (sysc_arm_pause γf pj γs j γl bn fn dqi ip pid V lks av m M us). }
-    destruct (decide (k = 14%nat)) as [-> | _].
+    destruct (decide (k = 14%nat)) as [-> | Hne10].
     { exact (sysc_arm_uptime γf pj γs j γl bn fn dqi ip pid V lks av m M us). }
-    destruct (decide (k = 8%nat)) as [-> | _].
+    destruct (decide (k = 8%nat)) as [-> | Hne11].
     { exact (sysc_arm_fstat γf pj γs j γl bn fn dqi ip pid V lks av m M us). }
-    destruct (decide (k = 9%nat)) as [-> | _].
+    destruct (decide (k = 9%nat)) as [-> | Hne12].
     { exact (sysc_arm_chdir γf pj γs j γl bn fn dqi ip pid V lks av m M us). }
-    destruct (decide (k = 18%nat)) as [-> | _].
+    destruct (decide (k = 18%nat)) as [-> | Hne13].
     { exact (sysc_arm_unlink γf pj γs j γl bn fn dqi ip pid V lks av m M us). }
-    destruct (decide (k = 19%nat)) as [-> | _].
+    destruct (decide (k = 19%nat)) as [-> | Hne14].
     { exact (sysc_arm_link γf pj γs j γl bn fn dqi ip pid V lks av m M us). }
-    destruct (decide (k = 21%nat)) as [-> | _].
+    destruct (decide (k = 21%nat)) as [-> | Hne15].
     { exact (sysc_arm_close γf pj γs j γl bn fn dqi ip pid V lks av m M us). }
-    destruct (decide (k = 22%nat)) as [-> | _].
+    destruct (decide (k = 22%nat)) as [-> | Hne16].
     { exact (sysc_arm_sync γf pj γs j γl bn fn dqi ip pid V lks av m M us). }
-    destruct (decide (k = 4%nat)) as [-> | _].
+    destruct (decide (k = 4%nat)) as [-> | Hne17].
     { exact (sysc_arm_pipe γf pj γs j γl bn fn dqi ip pid V lks av m M us). }
-    destruct (decide (k = 20%nat)) as [-> | _].
+    destruct (decide (k = 20%nat)) as [-> | Hne18].
     { exact (sysc_arm_mkdir γf pj γs j γl bn fn dqi ip pid V lks av m M us). }
-    destruct (decide (k = 17%nat)) as [-> | _].
+    destruct (decide (k = 17%nat)) as [-> | Hne19].
     { exact (sysc_arm_mknod γf pj γs j γl bn fn dqi ip pid V lks av m M us). }
-    destruct (decide (k = 15%nat)) as [-> | _].
+    destruct (decide (k = 15%nat)) as [-> | Hne20].
     { exact (sysc_arm_open γf pj γs j γl bn fn dqi ip pid V lks av m M us). }
-    exact (sysc_arm_placeholder k γf pj γs j γl bn fn dqi ip pid V lks av m M us Hk).
+    destruct (decide (k = 5%nat)) as [-> | Hne21].
+    { exact (sysc_arm_read γf pj γs j γl bn fn dqi ip pid V lks av m M us). }
+    destruct (decide (k = 16%nat)) as [-> | Hne22].
+    { exact (sysc_arm_write γf pj γs j γl bn fn dqi ip pid V lks av m M us). }
+    (* EVERY ONE of the 22 is above, so with [Hk] this case is empty.  This
+       is what retires [sysc_arm_placeholder] -- the tree's only [Admitted]. *)
+    exfalso. lia.
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -4287,11 +4638,10 @@ Section SyscallMain.
      check driving the data-dependent `k`, the address computation, the
      table read, the redundant `beqz`, the `c.jalr`) into a full dispatch:
      every one of the 22 table entries reaches `sysc_arm_goal k` for its
-     own `k`, discharged by `sysc_arm_dispatch` -- twenty real arms (see the
-     file header's list) and, for the other two, the honest `Admitted`
-     `sysc_arm_placeholder`.  A new arm is one more `decide (k = <literal>)`
-     branch inside that combinator and NOTHING here moves; see the file
-     header for what each remaining entry is still waiting on. *)
+     own `k`, discharged by `sysc_arm_dispatch` -- twenty-two real arms, no
+     placeholder and no `Admitted`.  A new arm would be one more
+     `decide (k = <literal>)` branch inside that combinator and NOTHING here
+     would move. *)
   Lemma wp_syscall_sconf (γf : gname) (γs : list gname) (j : nat) (γl : gname)
       (bn : bio_names) (fn : fclose_names) (us : gset Z)
       (ip : mword 64) (dqi : dfrac)
@@ -4826,7 +5176,7 @@ Section SyscallMain.
         reflexivity. }
       iEval (rewrite HcspA0 -Hb1) in "Hr24". iEval (rewrite HcspA0 -Hb2) in "Hr16".
       iEval (rewrite HcspA0 -Hb3) in "Hr8".  iEval (rewrite HcspA0 -Hb4) in "Hr0".
-      (* the landing hart again -- see the note at [sysc_arm_placeholder]. *)
+      (* the landing hart again -- see the note at [sysc_arm_dispatch]. *)
       assert (Hcr15 : true = false \/ pj = zero_reg -> (CID15 : CPU) = (CID : CPU))
         by wp_next_chain.
       (* the fallback RETURNS, so it wants the bare continuation *)

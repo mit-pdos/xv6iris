@@ -165,6 +165,8 @@ Require Import BitmapInv.
 Require Import KernelDataInv.
 Require Import SpecPrintk.
 Require Import SpecWritei.
+Require Import ConsoleInv.  (* [a_devsw_write], [devsw_write_val] -- the
+                               devsw geometry lives with the console *)
 Require Import SpecFileread.
 Require Import UartTxInv.
 From Kernel Require KernelSyms.
@@ -193,9 +195,6 @@ Notation filewrite_stack := ((12 + K_writei)%nat) (only parsing).
    what the [slli a5,a5,4] / [ld a5,8(a5)] pair at +0x6c / +0x78 computes.
    The read side is [SpecFileread.a_devsw_read]; the two must not be
    confused, and S3a's decode note 2 exists because they were. *)
-Definition a_devsw_write (mj : Z) : mword 64 :=
-  mword_of_int (KernelSyms.devsw + 16 * mj + 8).
-
 (* THE CHUNK SIZE, as the two [lui]/[addi] pairs at +0x42..+0x4e materialise
    it: ((MAXOPBLOCKS-1-1-2)/2)*BSIZE with MAXOPBLOCKS = 10 and BSIZE = 1024. *)
 Definition FW_MAX : Z := 3072.
@@ -371,6 +370,28 @@ Section SpecFilewrite.
              = (mword_of_int KernelSyms.consolewrite : mword 64)⌝ ∗
        a_devsw_write (Z.of_nat i) ↦₈{fwn_dqv fn (Z.of_nat i)}
          fwn_wp fn (Z.of_nat i))%I.
+
+  (* ---- THE COLUMN, OUT OF THE CONSOLE INVARIANT ----------------------
+     [SpecFileread.fileread_devsw_of_console]'s twin.  The CAPS half differs
+     and is NOT here: consolewrite drives the UART, so [filewrite_dev_caps]
+     is [dev_inv] and the tx lock rather than [is_conslock], and both come
+     from [printk_env] -- which is why this lemma takes them rather than
+     producing them.  The CELLS are the same table.
+     -------------------------------------------------------------------- *)
+  Lemma filewrite_devsw_of_console (fn : fwrite_names) :
+    fwn_wp fn = ConsoleInv.devsw_write_val ->
+    fwn_dqv fn = (fun _ => DfracDiscarded) ->
+    filewrite_dev_caps fn -∗ ConsoleInv.devsw_table -∗ filewrite_devsw fn.
+  Proof.
+    intros Hwp Hdq. iIntros "#Hcaps #Htbl".
+    rewrite /filewrite_devsw Hwp Hdq.
+    iSplitR; [iExact "Hcaps" |].
+    rewrite /ConsoleInv.devsw_table.
+    iApply (big_sepL_impl with "Htbl").
+    iModIntro. iIntros (k i Hk) "[_ Hw]".
+    iSplitR; [iPureIntro; apply ConsoleInv.devsw_write_val_cases |].
+    iExact "Hw".
+  Qed.
 
   Lemma filewrite_devsw_acc (fn : fwrite_names) (Cf : fcontent) :
     filewrite_devsw fn -∗

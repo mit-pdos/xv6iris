@@ -320,7 +320,7 @@ Section ProofSysRead.
     : wp_sys_read_sconf_body γa γf γs j γlp fn pidv V v v2 m av eb b lks.
   Proof.
     cbv beta delta [wp_sys_read_sconf_body].
-    intros pcE pj ret_tgt Hav Hj Hgs Hlens Harg0 Harg1 Harg2 Heb.
+    intros pcE pj ret_tgt Hav Hj Hgs Hlens Harg0 Harg1 Harg2 Hrp Hdq Heb.
     (* every budget, or [lia] cannot see past [fileread_stack] -- it is an
        expression, not a literal, on purpose (SpecSysRead.v). *)
     
@@ -338,7 +338,12 @@ Section ProofSysRead.
     (* [KvmSpec.kalloc_env γa None] IS PERSISTENT (durable-notes.md): fileread
        consumes it and does not give it back, and this contract's post owes it
        -- so it must be introduced with [#], not threaded. *)
-    iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hpenv Hpriv #Hkenv #Hprocs Henv Hdev Hcont".
+    iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hpenv Hpriv #Hkenv #Hprocs Henv #Hci Hcont".
+    (* THE DEVICE COLUMN, PROJECTED.  What the contract holds is the console
+       invariant -- one persistent proposition out of [syscall_env]; what
+       fileread asks for is the read column, and this is the projection.  It
+       is persistent too, so nothing has to give it back. *)
+    iPoseProof (fileread_devsw_of_console fn Hrp Hdq with "Hci") as "#Hdev".
     (* depth 0 forces the held set empty, so this body needs no order
        premise of its own -- every [locks_below] its callees raise is
        [locks_below ∅ _], which [lkbelow] closes outright. *)
@@ -791,7 +796,7 @@ Section ProofSysRead.
       iSpecialize ("Hcont" $! CID21 with "[%]"); [wp_next_chain|].
       (* nothing ran, so the page table is its own extension *)
       iApply ("Hcont" $! mf (mword_of_int (-1) : mword 64) (pv_upt V)
-                with "[%] [%] [%] [%] Hcg Hcpu Hpc [Hpriv] Hkenv [Henv] Hdev").
+                with "[%] [%] [%] [%] Hcg Hcpu Hpc [Hpriv] Hkenv [Henv]").
       { exact Hcsf. }
       { apply uptd_ext_refl. }
       { left. split; [reflexivity | exact Hnone]. }
@@ -925,7 +930,7 @@ Section ProofSysRead.
       all: try lkbelow.
       iIntros (CID25 Hs25 mf rv P')
         "%Hcsf %Hupt %Hrvok %Hrva Hcg Hcpu Hpc Href Hcore Hfout".
-      iDestruct ("Hfback" with "Hfout") as "[Henv Hdev]".
+      iDestruct ("Hfback" with "Hfout") as "[Henv _]".
       (* SETTLE THE LOAN.  [pv_ofile (upd_upt V P') = pv_ofile V] by [cbn], so
          the deficit the lend opened is literally the one this closes. *)
       assert (Hlkk : pv_ofile V !! fd = Some (fnode kk))
@@ -969,7 +974,7 @@ Section ProofSysRead.
       iDestruct (cpu_own_transport CID25 CID26 0%nat eb pj b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID26 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont" $! mg rv P' with "[%] [%] [%] [%] Hcg Hcpu Hpc Hpriv Hkenv Henv Hdev").
+      iApply ("Hcont" $! mg rv P' with "[%] [%] [%] [%] Hcg Hcpu Hpc Hpriv Hkenv Henv").
       { exact Hcsg. }
       { exact Hupt. }
       { right. exists fd, fv. split; [exact Hsome | exact Hrvok]. }

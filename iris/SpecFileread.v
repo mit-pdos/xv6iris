@@ -201,8 +201,6 @@ Notation fileread_stack := ((6 + K_readi)%nat) (only parsing).
    negative [short] is caught by the zero extension rather than by a signed
    test.  (The C says [f->major < 0 || f->major >= NDEV]; gcc merged the two
    into one unsigned compare.) *)
-Definition NDEV_max : Z := 9.
-
 Definition dev_major (Cf : fcontent) : Z := bv_unsigned (fc_major Cf).
 
 (* THE COLUMN INDEX, over plain [Z].  Stated here, outside every section and
@@ -216,9 +214,6 @@ Proof. unfold NDEV_max. lia. Qed.
 (* &devsw[mj].read.  [struct devsw] is two function pointers, [read] first,
    so the entry is 16 bytes and the field is at offset 0 -- which is what the
    [slli a5,a5,4] / [ld a5,0(a5)] pair at +0x82 / +0x8e computes. *)
-Definition a_devsw_read (mj : Z) : mword 64 :=
-  mword_of_int (KernelSyms.devsw + 16 * mj).
-
 (* WHAT FILEREAD RETURNS.  [PipeInv.pipe_rw_ret]'s reading, and deliberately
    the same predicate: three of the four arms produce it verbatim and the
    fourth (readi) is strictly inside it. *)
@@ -387,6 +382,35 @@ Section SpecFileread.
              = (mword_of_int KernelSyms.consoleread : mword 64)⌝ ∗
        a_devsw_read (Z.of_nat i) ↦₈{frn_dqv fn (Z.of_nat i)}
          frn_rp fn (Z.of_nat i))%I.
+
+  (* ---- THE COLUMN, OUT OF THE CONSOLE INVARIANT ----------------------
+     [fileread_devsw] is [ConsoleInv.console_inv] read at the read column,
+     once the names record is instantiated at the table's own values and at
+     the discarded fraction the table holds them under.  So a caller does not
+     have to own a devsw family of its own: it holds the console invariant --
+     one persistent proposition, out of [syscall_env] -- and this projects
+     what fileread asks for.
+
+     The per-cell disjunction fileread's contract is stated over is READ OFF
+     the table ([ConsoleInv.devsw_read_val_cases]) rather than assumed of it,
+     which is the point of the table saying what each slot HOLDS.
+     -------------------------------------------------------------------- *)
+  Lemma fileread_devsw_of_console (fn : fread_names) :
+    frn_rp fn = ConsoleInv.devsw_read_val ->
+    frn_dqv fn = (fun _ => DfracDiscarded) ->
+    ConsoleInv.console_inv (frn_cons fn) -∗ fileread_devsw fn.
+  Proof.
+    intros Hrp Hdq. iIntros "#Hci".
+    iDestruct (ConsoleInv.console_inv_conslock with "Hci") as "#Hlk".
+    iDestruct (ConsoleInv.console_inv_devsw with "Hci") as "#Htbl".
+    rewrite /fileread_devsw /fileread_dev_caps Hrp Hdq.
+    iSplitR; [iExact "Hlk" |].
+    rewrite /ConsoleInv.devsw_table.
+    iApply (big_sepL_impl with "Htbl").
+    iModIntro. iIntros (k i Hk) "[Hr _]".
+    iSplitR; [iPureIntro; apply ConsoleInv.devsw_read_val_cases |].
+    iExact "Hr".
+  Qed.
 
   Lemma fileread_devsw_acc (fn : fread_names) (Cf : fcontent) :
     fileread_devsw fn -∗

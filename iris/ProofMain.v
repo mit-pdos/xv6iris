@@ -422,6 +422,7 @@ Section ProofMain.
        existential this group invents. *)
     fs_kit_printk _ _ -∗
     (∃ r w : mword 64, devsw_console_read ↦₈ r ∗ devsw_console_write ↦₈ w) -∗
+    ConsoleInv.devsw_rest -∗
     (* the console RING, which this group locks up behind cons.lock *)
     cons_res -∗
     uart_tx_own γd l0 -∗ uart_sent γd l0 -∗ uart_out_lb γd l0 -∗
@@ -438,12 +439,18 @@ Section ProofMain.
         cpu_own 0 false p0 false ∅ -∗
         printk_env fsc_printk γd γv -∗
         console_caps γd -∗
+        (* THE CONSOLE BUNDLE.  This group is where both halves exist at
+           once: consoleinit hands back the filled [devsw_table] and the
+           [newlock] below mints the [is_conslock].  [console_caps] closes
+           over its own gname existentially, so the pairing has to happen
+           HERE, while the name is still concrete. *)
+        ConsoleInv.console_ready -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hn.
     iIntros "Hcg #Htext #Hkdata #Hdev Hpc Hfree Hcpu Hlcons Hltx Hlpr".
-    iIntros "Hkprintk Hdevsw Hring Htx Hsent Hlb Hdlab Hcont".
+    iIntros "Hkprintk Hdevsw Hrest Hring Htx Hsent Hlb Hdlab Hcont".
     iPoseProof (dev_inv_uart with "Hdev") as "#Huinv".
     iPoseProof (mni_42 with "Htext") as "Hi42".
     iPoseProof (mni_46 with "Htext") as "Hi46".
@@ -497,8 +504,8 @@ Section ProofMain.
     iApply (Consoleinit.wp_consoleinit_sconf γd C0 n l0 b0
               vcl vcn vcc dr0 dw0 p0 ltac:(lia)
               with "Hcg Htext Hkdata Hpc Huinv Htx Hlb Hsent Hdlab
-                    Hcw Hcn Hcc Hltx Hdr Hdw").
-    iIntros (mc) "Hcg Hpc %Hcsci Htx Hsent #Hdoff Hclw #Hclnm Hclcpu Hlkfresh _ _".
+                    Hcw Hcn Hcc Hltx Hdr Hdw Hrest").
+    iIntros (mc) "Hcg Hpc %Hcsci Htx Hsent #Hdoff Hclw #Hclnm Hclcpu Hlkfresh #Htbl".
     assert (Hretci : ret_pc (C0 !!! Regidx (mword_of_int 1 : mword 5) : mword 64)
                      = (mword_of_int (KernelSyms.main + 0x46) : mword 64)).
     { rewrite /C0 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
@@ -574,6 +581,14 @@ Section ProofMain.
       iSplitR; [iExact "Htxl" |].
       iSplitR; [iExact "Hconslk" |].
       iExact "Hsub0". }
+    (* THE CONSOLE BUNDLE, and this is the only point at which it can be
+       built: [Hconslk] is [is_conslock γcl] with γcl still concrete, and
+       [Htbl] is the table consoleinit filled twenty instructions ago.
+       [console_caps] closes over γcl on the next line, so pairing them
+       afterwards would have nothing to pair. *)
+    iAssert (ConsoleInv.console_ready) as "#Hcready".
+    { iExists γcl. rewrite /ConsoleInv.console_inv.
+      iSplitR; [iExact "Hconslk" | iExact "Htbl"]. }
     iModIntro.
     (* ---- +0x4a auipc a0,0x6 / +0x4e addi a0,a0,476 : a0 := &"\n" ---- *)
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.main + 0x4a)) (mword_of_int 10 : mword 5)
@@ -750,7 +765,7 @@ Section ProofMain.
     { rewrite /D3 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hretpk3) in "Hpc".
     destruct Hcsk3 as (Hcsk3 & _).
-    iApply ("Hcont" $! mk3 with "Hcg Hpc Hfree Hcpu Hpenv Hccaps").
+    iApply ("Hcont" $! mk3 with "Hcg Hpc Hfree Hcpu Hpenv Hccaps Hcready").
   Qed.
 
   (* =================================================================== *)
@@ -1913,8 +1928,12 @@ Section ProofMain.
        (fs-cfg-boot.md stage (f)): it goes into [mn_grp_fs] and out again
        to userinit, which stages it at the park for forkret's [if (first)]
        arm.  Its twin [Hnpid] goes into [mn_grp_kvm], which spends it on
-       the [newlock] that builds the [nextpid] lock. *)
-    iDestruct "Hglobals" as "(Hdevsw & Hkmem24 & Hkpt & Hprocs & Hppub &
+       the [newlock] that builds the [nextpid] lock.
+       [Hdevrest] -- the eighteen devsw entries consoleinit never writes --
+       is the console_inv campaign's new second row of [main_globals_raw];
+       it rides into [mn_grp_printk] beside the CONSOLE pair and comes back
+       inside [ConsoleInv.console_ready]. *)
+    iDestruct "Hglobals" as "(Hdevsw & Hdevrest & Hkmem24 & Hkpt & Hprocs & Hppub &
                              Hfds & Hirs & Hinitproc & Hticks & Hbufl & Hbufn & Hbhead &
                              Hbpay & Hsbb & Hinl &
                              Hient & Hlogr & Hdiskptr & Hdiskfree & Hdusedidx &
@@ -1958,8 +1977,8 @@ Section ProofMain.
     (* --- 0x42 .. 0x6a : console / printk --- *)
     iApply (mn_grp_printk γd γv m1 (K - 2)%nat p0 l0 b0 Hn50
               with "Hcg Htext Hkdata Hdev Hpc Hfree Hcpu Hlcons Hltx Hlpr
-                    Hkprintk Hdevsw Hring Htx Hsent Hlb Hdlab").
-    iIntros (m2) "Hcg Hpc Hfree Hcpu #Hpenv #Hccaps".
+                    Hkprintk Hdevsw Hdevrest Hring Htx Hsent Hlb Hdlab").
+    iIntros (m2) "Hcg Hpc Hfree Hcpu #Hpenv #Hccaps #Hcready".
     (* ---- STAGE (f): the printk half of [FirstTok.first_boot_persist],
        re-spelled at the CONFIGURATION's device gnames.  The group produces
        it at [γd]/[γv]; the bundle is written at [fsc_uart]/[fsc_disk], and
