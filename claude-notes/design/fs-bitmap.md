@@ -118,12 +118,67 @@ The five load-bearing lemmas: `free_pool_take` (allocate),
 `free_pool_give` (free), `free_pool_own_used` (the panic refutation),
 `bitmap_ok_add` / `bitmap_ok_del`.
 
-### Who owns `bitmap_res` between calls
+### Who owns `bitmap_res` between calls: `bitmap_inv`
 
-DEFERRED, exactly as `inode_map` was for bmap: **pass it in and return it
-updated.** In xv6 the discipline is the buffer sleeplock on the bitmap
-block — `bread` gives exclusive access for the critical section — so a
-later free-space layer can seat it there. Do not design that layer here.
+**Nobody outside `BitmapInv.v`.** `bitmap_res` is exclusive and there is
+one per file system, so threading it through contracts serialized every
+allocator and freer — and, because `fileclose`'s environment rode in the
+trap residue (`UsertrapRes.ut_own`), it would have serialized user mode
+across all harts (projects/forkret-park.md's design question). It lives in
+an Iris invariant at an EXISTENTIAL set:
+
+```
+  bitmapN                          := nroot .@ "bitmap"
+  bitmap_body γfs bms cov ls size  := ∃ used, bitmap_res γfs bms cov ls size used
+  bitmap_inv  γfs bms cov ls size  := inv bitmapN (bitmap_body …)
+```
+
+Persistent; a conjunct of `FsReady.fs_ready` (`fs_ready_bitmap`), of
+`FirstTok.first_boot_persist`, and of `SpecFileclose.fileclose_ic_env`
+(which also now carries `sb_bmapstart`/`sb_inodestart` at `□`, so the
+exclusive `fileclose_bm` bundle and its `us` index are gone, along with
+`ut_names.un_us`/`upd_us`). Boot allocates it once, in
+`FsCfgBoot.fs_cfg_alloc`'s era fupd, from `bitmap_res_of_image`
+(`bitmap_inv_alloc`); the set is forgotten there.
+
+**No contract names `used` any more.** `balloc`/`bfree`/`bmap`/`writei`/
+`itrunc`/`iput`/`dirlink`/`create`/the `sys_*` family/`kexec`/`fileclose`/
+`kexit`/`syscall`/`fsinit`/`ireclaim` all take the persistent row (or a
+bundle carrying it) and return nothing about the bitmap. The
+`∃ used', used ⊆ used'` posts and the `used' ⊆ used` frees are deleted, not
+weakened: with the set existential inside the invariant there is nothing a
+caller could say.
+
+**The shape is `InodeRegion`'s, one layer over.** The block's client half
+never leaves the invariant except at `log_write`'s own ghost step, through
+`SpecLogWrite.wp_log_write_au`'s fupd (use `lw_au_lb0` for the anchored
+form). Four lemmas are the whole interface:
+
+| lemma | when | what |
+|---|---|---|
+| `bitmap_read` | between `bread` and `brelse` | the handle's machinery half `bms ↪{½} bsl` against the parked client half: `∃ used, bsl = bitmap_bytes used ∧ bitmap_ok … used`. Mask-preserving, everything goes back (`ireg_read`'s twin). |
+| `bitmap_read_own` | bfree, same window | `bitmap_read` plus the caller's `blk_own b` ⇒ `b ∈ used` (`free_pool_own_used`), which is the "freeing free block" panic refutation. |
+| `bitmap_alloc_au` | balloc's `log_write` of the bitmap block | premises `bi ∉ u0`, `0 <= bi < size`, `size <= BPB`; surrenders the half at whatever is parked, the wand takes it back at `bitmap_bytes (u0 ∪ {[bi]})` and pays out `free_blk γfs bi ∗ ⌜bi ∈ cov ∧ bi ∉ log_region⌝`. |
+| `bitmap_free_au` | bfree's `log_write` | takes the caller's `free_blk γfs b` up front; the wand re-parks at `bitmap_bytes (u0 ∖ {[b]})` and pays `emp`. |
+
+**The two sets need not agree, and the suppliers are stated at the
+CALLER's.** At its `bread` the caller learned `bsl = bitmap_bytes u0`; by
+its `log_write` the invariant parks some `u1` with `bitmap_bytes u1 = bsl`
+— the machinery half froze the BYTES, not the set (bits ≥ `BPB` are
+invisible to the block). Nothing needs `u0 = u1`: `bitmap_bytes_eq_bit`
+transfers the one bit the caller tested, `bitmap_bytes_ext` /
+`bitmap_bytes_eq_union` / `bitmap_bytes_eq_diff` transfer the written
+image, and for bfree the `blk_own` in hand refutes `b ∉ u1` directly. So
+the `u1`-side bookkeeping stays inside `BitmapInv.v` and a caller's proof
+reasons about the set it read, exactly as before the invariant existed.
+Do not add a `used ⊆ [0, BPB)` clause to the body to get injectivity — it
+is not needed, and it would be one more thing boot has to establish.
+
+**Masks.** The AU suppliers open `↑bitmapN` inside `wp_log_write_au`'s
+`Efs := ⊤ ∖ ↑bitmapN`; nothing else in the log_write cone opens an
+invariant, so the only rule is that a caller must not be holding
+`bitmapN` open itself — and nothing can be, since the two read lemmas are
+mask-preserving and close before returning.
 
 ## `bfree` (`ProofBfree.v` / `LinkBfree.v`)
 
@@ -165,40 +220,26 @@ the piece the design was built for.
 
 ## `bfree`'s contract (`SpecBfree.v`)
 
-Consumes `fsblock γfs b bs` (block-sized) and `blk_own γfs b`, takes
-`bitmap_res … used` and returns `bitmap_res … (used ∖ {[b]})`.
+Consumes `fsblock γfs b bs` (block-sized) and `blk_own γfs b`, and takes
+the persistent `bitmap_inv`; the block goes back into the pool at its
+`log_write` (`bitmap_free_au`), and nothing about the bitmap comes out.
 `K_bfree = 44` (4 slots + `bread`'s 40); `bslots bn 2` (bread's reference
 held across `log_write`); budget **spend-exactly** `log_op (S u)` →
 `log_op u` — bfree is straight-line and always runs its one `log_write`,
 so it needs none of bmap's spend-at-most weakening. It does NOT read
 `sb.size`, so no `sb_size` cell appears in it.
 
-## The caller side: how the bitmap threads through bmap and writei
+## The caller side: `bm_alloc`
 
-`balloc`'s contract gained the two superblock cells and `bitmap_res`, so
-every caller above it has to carry them. The naive shape — thread the
-current `used` set — would have put an existential in `bmap`'s three
-interior block lemmas and in `writei`'s LOOP INVARIANT. Two devices
-avoid that completely, and both are in `BitmapInv.v`:
-
-- **`bm_bitmap γfs cov logstart bms sz uu := ∃ uc, ⌜uu ⊆ uc⌝ ∗ bitmap_res … uc`.**
-  Indexed by the set on ENTRY, with the current set existential. Because
-  `uu ⊆ uc` is preserved by every allocation (`bm_used_grow`,
-  `bm_used_trans`), **the index never changes**, so no interior lemma and
-  no loop invariant mentions the bitmap's current state. `bmap`'s public
-  `∃ used', ⌜used ⊆ used'⌝` is this predicate unfolded once at the wrapper.
-- **`bm_alloc` / `bm_alloc_res`** — the geometry (as a `⌜⌝` conjunct, so it
-  is not a separate premise), the two cells and `bm_bitmap`, as ONE record
-  and ONE `iProp`. `ProofBmap`'s existing `bm_kit ak …` already quantified
-  over `ak : option log_names`; widening that to `option bm_alloc` and
-  putting the new resources inside cost **zero new binders and zero new
-  premises** on any of its six interior lemmas. `ProofWritei`'s five
-  lemmas each gained exactly one binder and one resource.
-
-The one place the two shapes meet is an ADAPTER at each public wrapper,
-written once: unpack `bm_alloc_res`, take the existential `used'` and its
-`⌜used ⊆ used'⌝`, and hand the caller's continuation the three resources.
-`ProofWritei`'s adapter replaces what used to be a bare `iExact "Hcont"`.
+`balloc`'s contract takes the two superblock cells and `bitmap_inv`, so
+every caller above it carries them. `bm_alloc`/`bm_alloc_res`
+(`BitmapInv.v`) bundle them with the geometry (`bitmap_geom_ok` as a `⌜⌝`
+conjunct) and balloc's printk gname as ONE record and ONE `iProp`, which is
+what `ProofBmap`'s `bm_kit ak …` and `ProofWritei`'s loop thread: one
+binder and one resource rather than five of each. Everything in the bundle
+is pure, a fraction that goes straight back out, or persistent, so it is
+invariant across the whole call and no interior lemma or loop invariant
+mentions the bitmap's state.
 
 `BMAP_NOALLOC` is untouched by all of this: with the three allocation sites
 dead there is no balloc, so `bm_kit None = emp` still carries nothing.
@@ -239,35 +280,35 @@ off the `bm_alloc` record's `ba_pr` field rather than a new binder.
 ## What `balloc`'s contract has to own, and why
 
 balloc reads BOTH superblock fields out of memory and rewrites the bitmap
-block, so its precondition carries the two cells and the bitmap resource:
+block, so its precondition carries the two cells and the bitmap's
+invariant:
 
 ```
-  (bmapstart size : Z) (used : gset Z) (dqb dqs : dfrac)
+  (bmapstart size : Z) (dqb dqs : dfrac)
   0 < size <= BPB ->  0 <= bmapstart ->
   bmapstart ∈ cov ->  ~ (bmapstart ∈ log_region_set logstart) ->
   sb_size      ↦₄{dqs} (mword_of_int size      : mword 32) -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-  bitmap_res γfs bmapstart cov logstart size used -∗
+  bitmap_inv γfs bmapstart cov logstart size -∗
     ... post: both cells back, and
-    FAILURE arm: bitmap_res γfs bmapstart cov logstart size used
-    SUCCESS arm: bitmap_res γfs bmapstart cov logstart size
-                            (used ∪ {[bv_unsigned blk]})
+    FAILURE arm: a0 = 0, the budget refunded
+    SUCCESS arm: fsblock blk (replicate BSIZE 0) ∗ blk_own blk ∗ ⌜blk ∈ cov …⌝
 ```
 
 `bslots bn 2` is the peak (bread + `log_write`'s bpin, twice,
 non-overlapping); the budget is `log_op (2+u)` in, with `2+u` refunded on
 failure and `u` on success; `K_balloc = 50`; and the success arm's
-`fsblock … (replicate BSIZE 0)` + `blk_own` come straight out of
-`free_pool_take` plus the inlined bzero.
+`fsblock … (replicate BSIZE 0)` + `blk_own` come out of `bitmap_alloc_au`
+(the pool's `free_pool_take`, at the log_write) plus the inlined bzero.
 
 **`0 < size` is load-bearing twice over**: it is what makes the single-bitmap-
 block simplification sound, and it is what kills balloc's own `beqz a5` arm at
 +0x12 (the `sb.size == 0` jump straight to `printk`), which is otherwise a live
 path with no s2–s8 restore.
 
-Because bmap has two balloc call sites, `SpecBmap.v` carries the same three
-resources with `∃ used', ⌜used ⊆ used'⌝` in its postcondition, and
-`SpecWritei.v` carries `used'` inside its LOOP INVARIANT.
+Because bmap has two balloc call sites, `SpecBmap.v` and `SpecWritei.v`
+carry the same three rows (through `bm_alloc_res`); since the invariant is
+persistent, neither says anything about the bitmap on the way out.
 
 ## The instruction map
 
@@ -308,7 +349,7 @@ resources with `∃ used', ⌜used ⊆ used'⌝` in its postcondition, and
 ```
 
 The inner scan is the only induction: invariant "every bit in `[0, bi)` is in
-`used`", carried against `bitmap_res`'s `bitmap_ok`, with the loop's `fsblock`
-half parked in the `bio_held`/`bio_locked` handle from `bread`.
+`used`", over the set `bitmap_read` named at the `bread`, with the loop's
+machinery half parked in the `bio_held`/`bio_locked` handle from `bread`.
 `ByteBuf.bb_byte_acc` is the single-byte accessor; `bb_word4_acc` is the
 word-granular twin bmap uses.

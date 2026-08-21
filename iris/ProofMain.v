@@ -1462,6 +1462,22 @@ Section ProofMain.
     iApply fupd_wp.
     (* [ireg_inv] is persistent, so taking it out does not spend kit 2 *)
     iDestruct (fs_kit_fsinit_ghost_ireg with "Hkit2") as "[#Hireg Hkit2]".
+    (* ...and so is kit 2's row (D), the BLOCK BITMAP'S INVARIANT: since the
+       bitmap became [BitmapInv.bitmap_inv] it is persistent too, and
+       [FirstTok.first_boot_persist] now names it beside [ireg_inv].  Peeled
+       the same way -- open the kit, keep a copy, put the kit back
+       unchanged.  (FsCfgBoot.v exports the [ireg_inv] peel as its own lemma
+       but not this one, so the open/repack is spelled here.) *)
+    iDestruct (fs_kit_fsinit_ghost_open with "Hkit2")
+      as "(Hkt2a & Hkt2b & _ & Hkt2d & Hkt2e & Hkt2f & Hkt2g & Hkt2h &
+           #Hbminv & Hkt2j)".
+    iAssert (fs_kit_fsinit_ghost _ _ (FsCrash.fs_blocks dk)
+               (fs_kit_spent (FsCrash.fs_blocks dk) sb nib
+                  (FsImg.fs_live_set (FsCrash.fs_blocks dk) sb)))
+      with "[Hkt2a Hkt2b Hkt2d Hkt2e Hkt2f Hkt2g Hkt2h Hkt2j]" as "Hkit2".
+    { rewrite /fs_kit_fsinit_ghost.
+      iFrame "Hkt2a Hkt2b Hireg Hkt2d Hkt2e Hkt2f Hkt2g Hkt2h Hbminv
+              Hkt2j". }
     (* iinit's fifty sleeplocks are at [SpecIinit.inode_lock]; the cache
        addresses them as [i_lock (ientry k)].  ONE conversion, and it is
        [IcacheBoot]'s own lemma. *)
@@ -1663,16 +1679,16 @@ Section ProofMain.
     { rewrite Hdiskq. iExists pd, pav, pu. iFrame "Hgeom Hdlock". }
     iAssert first_boot_persist as "#Hpersist".
     { rewrite /first_boot_persist /ic_sleeplocks.
-      (* SIXTEEN ROWS, ONE [iSplitR] EACH, NOT ONE [iFrame] -- and the
+      (* SEVENTEEN ROWS, ONE [iSplitR] EACH, NOT ONE [iFrame] -- and the
          difference was 67 s of this file (claude-notes/optimization.md
          "WHEN EVERY CONJUNCT IS DEFINITION-VALUED ... build the WHOLE
          bundle").  Every row here is definition-valued -- [printk_env],
          [bio_ctx], an [is_lock] over [disk_res], [is_itable2],
-         [ic_escrows], the fifty-fold [ic_sleeplocks] big-op, an [is_lock]
-         over [kmem_res] -- so a named [iFrame] pays a CONVERSION for each
-         (name x remaining conjunct) attempt, and there is no single big
-         conjunct to split off first.  Peeled in the bundle's own order
-         each row is one syntactic check. *)
+         [ic_escrows], the fifty-fold [ic_sleeplocks] big-op, [bitmap_inv],
+         an [is_lock] over [kmem_res] -- so a named [iFrame] pays a
+         CONVERSION for each (name x remaining conjunct) attempt, and there
+         is no single big conjunct to split off first.  Peeled in the
+         bundle's own order each row is one syntactic check. *)
       iSplitR; [iExact "Htext"|].
       iSplitR; [iExact "Hkdata"|].
       iSplitR; [iExact "Hpenv"|].
@@ -1687,6 +1703,7 @@ Section ProofMain.
       iSplitR; [iExact "Hesc"|].
       iSplitR; [iExact "Hicsl"|].
       iSplitR; [iExact "Hireg"|].
+      iSplitR; [iExact "Hbminv"|].
       iSplitR; [iExact "Hkmem"|].
       iPureIntro; exact Hgeomok. }
     (* BOTH BUNDLES GO TO USERINIT (fs-cfg-boot.md (f-5)), beside the pinned

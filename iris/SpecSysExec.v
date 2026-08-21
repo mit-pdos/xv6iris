@@ -189,7 +189,6 @@ Definition wp_sys_exec_sconf_body
     (cn : ic_names) (gtl : gname)                       (* the icache + itable *)
     (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
-    (used : gset Z)
     (dqb dqs : dfrac)
     (v0 v1 : mword 64)                        (* syscall arguments 0 and 1 *)
     (pid : mword 32) (V : pprivate)
@@ -243,7 +242,7 @@ Definition wp_sys_exec_sconf_body
             cov logstart inodestart nib dev -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-  bitmap_res gfs bmapstart cov logstart size used -∗
+  bitmap_inv gfs bmapstart cov logstart size -∗
   bslots bn 3 -∗
   (* the loop's own [kalloc]s, argstr's page faults, and kexec's page-table
      builder all run in the UNCOUNTED regime *)
@@ -254,7 +253,7 @@ Definition wp_sys_exec_sconf_body
   (* THE CROSSING IS THE LITERAL [true]: this function sleeps in kexec (and
      in argstr's page faults), so it can return on another hart. *)
   wp_next true pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (used' : gset Z) (P' : uptd),
+  ∀ (mf : regfile) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
       (* the page table may have GROWN before kexec ran: argstr's and each
          fetchstr's copy-in faults user pages in.  [uptd_ext] is their own
@@ -268,8 +267,6 @@ Definition wp_sys_exec_sconf_body
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       (* the free pool only SHRINKS -- kexec's cone is the only mover *)
-      ⌜used' ⊆ used⌝ -∗
-      bitmap_res gfs bmapstart cov logstart size used' -∗
       bslots bn 3 -∗
       kalloc_env γa None -∗
       (* the allowance, whole: kexec gives back what it took *)
@@ -291,7 +288,6 @@ Module Type SYSEXEC.
       (cn : ic_names) (gtl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
-      (used : gset Z)
       (dqb dqs : dfrac)
       (v0 v1 : mword 64)
       (pid : mword 32) (V : pprivate)
@@ -299,5 +295,5 @@ Module Type SYSEXEC.
       (b : bool) (lks : gset string),
       wp_sys_exec_sconf_body γf γa gs j gl gu gd gk pd pav pu bn g gfs gi
                              cn gtl cov logstart bmapstart inodestart nib
-                             size dev used dqb dqs v0 v1 pid V m K eb b lks.
+                             size dev dqb dqs v0 v1 pid V m K eb b lks.
 End SYSEXEC.

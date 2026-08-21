@@ -157,7 +157,7 @@ Definition wp_sys_pipe_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname)  (γfl γf : gname)
-    (fn : fclose_names) (on : option nat) (us : gset Z)
+    (fn : fclose_names) (on : option nat)
     (m : regfile) (av : nat) (eb : bool) (p : mword 64)
     (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string) :=
   (* [pipeG] is not a separate binder: [fileG] subsumes it (FileInv.v), and
@@ -241,7 +241,7 @@ Definition wp_sys_pipe_sconf_body
      descriptor names is going to be per-[ofile] ghost state, not something
      recoverable from the file table. *)
   fileclose_pipe_env fn on 0%nat -∗
-  fileclose_fs_env_nopid fn us 0%nat eb p -∗
+  fileclose_fs_env_nopid fn 0%nat eb p -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  sys_pipe calls pipealloc
      and fileclose, and both cross at [true] -- fileclose's FS arm parks -- so
      sys_pipe can return on another hart.  The cost is the CALLER's: it must
@@ -261,7 +261,7 @@ Definition wp_sys_pipe_sconf_body
       (* the environment back; the page count has moved if either close was
          the pipe's last end *)
       (∃ on', fileclose_pipe_env fn on' 0%nat) -∗
-      (∃ us', fileclose_fs_env_nopid fn us' 0%nat eb p) -∗
+      fileclose_fs_env_nopid fn 0%nat eb p -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -270,8 +270,8 @@ Module Type SYSPIPE.
     forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (γfl γf : gname)
-      (fn : fclose_names) (on : option nat) (us : gset Z)
+      (fn : fclose_names) (on : option nat)
       (m : regfile) (av : nat) (eb : bool) (p : mword 64)
       (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string),
-      wp_sys_pipe_sconf_body γa γfl γf fn on us m av eb p v pid V b lks.
+      wp_sys_pipe_sconf_body γa γfl γf fn on m av eb p v pid V b lks.
 End SYSPIPE.

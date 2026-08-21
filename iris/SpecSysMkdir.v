@@ -193,7 +193,6 @@ Definition wp_sys_mkdir_sconf_body
     (cn : ic_names) (gtl : gname)                       (* the icache + itable *)
     (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
     (ninodes : Z) (size : Z) (dev : mword 32)
-    (used : gset Z)
     (ns : nat)                                          (* the iref ledger     *)
     (dqb dqs dqbs dqn : dfrac)
     (v : mword 64)                                      (* syscall argument 0  *)
@@ -277,7 +276,7 @@ Definition wp_sys_mkdir_sconf_body
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-  bitmap_res gfs bmapstart cov logstart size used -∗
+  bitmap_inv gfs bmapstart cov logstart size -∗
   (* argstr's page-table side, and create's (iget's ipool arm allocates) *)
   kalloc_env γa None -∗
   (* the running-thread bundle *)
@@ -289,7 +288,7 @@ Definition wp_sys_mkdir_sconf_body
      argstr's fault path, create and end_op all park), so it can return on
      another hart whatever SIE was doing. *)
   wp_next true pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (used' : gset Z) (ns' : nat) (P' : uptd),
+  ∀ (mf : regfile) (ns' : nat) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
       (* the page table may have GROWN: argstr's fetchstr faults user pages
          in.  [uptd_ext] is argstr's own report, relayed. *)
@@ -307,7 +306,6 @@ Definition wp_sys_mkdir_sconf_body
       (* NO ORDERING on the free pool: create both ALLOCATES (balloc under
          dirlink) and FREES (itrunc under its fail arm's iunlockput of a
          link-count-zero inode), and the two do not cancel. *)
-      bitmap_res gfs bmapstart cov logstart size used' -∗
       (* the allowance, spend-at-most: see the header's reference ledger *)
       (* THE LEDGER CLOSES, EXACTLY.  This used to be create's interval
          passed through; create states its figure exactly now (every failure
@@ -335,7 +333,6 @@ Module Type SYSMKDIR.
       (cn : ic_names) (gtl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (ninodes : Z) (size : Z) (dev : mword 32)
-      (used : gset Z)
       (ns : nat)
       (dqb dqs dqbs dqn : dfrac)
       (v : mword 64)
@@ -344,6 +341,6 @@ Module Type SYSMKDIR.
       (b : bool) (lks : gset string),
       wp_sys_mkdir_sconf_body γf γa γpr gs j gl gu gd gk pd pav pu bn g gfs gi
                               cn gtl cov logstart bmapstart inodestart nib
-                              ninodes size dev used ns dqb dqs dqbs dqn v
+                              ninodes size dev ns dqb dqs dqbs dqn v
                               pid V m K eb b lks.
 End SYSMKDIR.

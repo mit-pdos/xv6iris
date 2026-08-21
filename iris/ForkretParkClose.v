@@ -8,11 +8,10 @@
    not run yet -- which sounds like it needs the world.
 
    IT DOES NOT.  This file discharges everything in that package that is
-   persistent or threadable, and what is left over is THREE resources,
+   persistent or threadable, and what is left over is TWO resources,
    named once as [park_own]:
 
      [bslots (un_bn N) 3]            a draw from the 1024-slot bio pool
-     [fileclose_bm (un_fn N) _]      the superblock cells and block bitmap
      [initproc ↦₈{un_dqi N} _]       a share of the initproc pointer
 
    Everything else the closer must produce it can produce for free:
@@ -22,7 +21,7 @@
    are what [forkret_yield] and the closer's own arguments hand it.
 
    So the remaining question is not "how does a fresh process get a trap
-   environment" but the much smaller "where do those three come from".  As
+   environment" but the much smaller "where do those two come from".  As
    surveyed when this file was written:
 
      [initproc ↦₈{dq}] -- CHEAPEST.  Only userinit writes the cell; every
@@ -40,14 +39,13 @@
        lock, so minting three fragments is a lock acquisition -- a WP step in
        whoever allocates the child, not a ghost update a bystander can do.
 
-     [fileclose_bm (un_fn N) _] -- THE DESIGN QUESTION.  It unfolds through
-       [bitmap_res] to [fsblock] and [free_pool]: exclusive, one per file
-       system.  No second copy exists to give a child, so as long as this sits
-       in [ut_own_nopt] every process holding a residue across user execution
-       holds the block bitmap.  Either that is accepted (and only one process
-       can be in the trap loop at a time) or the bitmap moves behind the log's
-       lock and leaves the residue.  That is an FS-cone decision, and isolating
-       it is the point of this file.
+     THE BLOCK BITMAP USED TO BE THE THIRD, and the design question: it
+       unfolded through [fileclose_bm] and [bitmap_res] to [fsblock] and
+       [free_pool], exclusive, one per file system, so every process holding
+       a residue across user execution held the block bitmap.  It is now the
+       persistent [BitmapInv.bitmap_inv], carried inside
+       [SpecFileclose.fileclose_ic_env] and [FsReady.fs_ready], and the
+       residue no longer names it (design/fs-bitmap.md).
 
    NOTHING DEPENDS ON THIS FILE.  It is a leaf that states the reduction; the
    callers that will use it (kfork, userinit) still take the assumed park. *)
@@ -85,11 +83,10 @@ Section ForkretParkClose.
   Lemma ut_caps_procs (N : ut_names) : ut_caps N -∗ procs_inv (un_s N).
   Proof. iIntros "(H & _)". iExact "H". Qed.
 
-  (* THE RESIDUAL.  One definition rather than three loose conjuncts so that
+  (* THE RESIDUAL.  One definition rather than two loose conjuncts so that
      what is still owed has a name a later file can state a producer for. *)
   Definition park_own (N : ut_names) : iProp Σ :=
     (bslots (un_bn N) 3 ∗
-     fileclose_bm (un_fn N) (un_us N) ∗
      (mword_of_int KernelSyms.initproc : mword 64) ↦₈{un_dqi N} (un_ip N))%I.
 
   (* THE CLOSER, BUILT.  [ut_caps] is persistent and [Rsys] is consumed once
@@ -115,7 +112,7 @@ Section ForkretParkClose.
   Proof.
     iIntros (Hwf Hav) "#Hcaps Hsys Hown".
     iIntros (h V') "%Hupt (Htrap & Hpriv) Hfd Hiref".
-    iDestruct "Hown" as "(Hbs & Hbm & Hip)".
+    iDestruct "Hown" as "(Hbs & Hip)".
     rewrite /ut_res_bare.
     iExists N, V', av.
     iSplitR; [iPureIntro; exact Hupt|].
@@ -124,7 +121,7 @@ Section ForkretParkClose.
     iSplitR; [iPureIntro; exact Hav|].
     iFrame "Htrap".
     rewrite /ut_env_nopt /ut_own_nopt.
-    iFrame "Hcaps". iFrame "Hbs Hbm Hip Hfd Hiref Hpriv Hsys".
+    iFrame "Hcaps". iFrame "Hbs Hip Hfd Hiref Hpriv Hsys".
   Qed.
 
   (* ...AND THE WHOLE PACKAGE.  [procs_inv] is not a premise: [ut_caps]
@@ -152,14 +149,15 @@ Section ForkretParkClose.
     iIntros (Hwf Hav) "#Htext #Hwire #Hkmap Hslot Hstack #Hcaps Hsys Hown".
     rewrite /forkret_park_pkg.
     iDestruct (ut_caps_procs with "Hcaps") as "#Hprocs".
-    (* SIX [iSplitR]/[iSplitL]s, NOT ONE [iFrame]: the package's LAST
-       conjunct is the residue closer, a whole forall-closure over
-       [forkret_yield] and [URes], so every (name x conjunct) attempt a
-       named [iFrame] makes has to walk past it.  That one [iFrame] was
-       29 s (claude-notes/optimization.md, "THE CHEAPEST FIX IS USUALLY TO
-       SPLIT THE BIG CONJUNCT OFF FIRST"); peeled row by row each step is
-       a syntactic check and the closer is reached with nothing left to
-       search. *)
+    (* SIX [iSplitR]/[iSplitL]s, NOT ONE [iFrame], for two reasons at once:
+       the package's LAST conjunct is the residue closer, a whole
+       forall-closure over [forkret_yield] and [URes], so every
+       (name x conjunct) attempt a named [iFrame] makes has to walk past it
+       (measured 29 s -- claude-notes/optimization.md, "THE CHEAPEST FIX IS
+       USUALLY TO SPLIT THE BIG CONJUNCT OFF FIRST"); and [fs_ready] now
+       rides inside [ut_caps], so a named [iFrame "Htext"] would also dive
+       into the closer's conclusion and frame the copy of [kernel_text] it
+       finds THERE, leaving a goal of the wrong shape. *)
     iSplitR; [iExact "Htext"|].
     iSplitR; [iExact "Hwire"|].
     iSplitR; [iExact "Hkmap"|].

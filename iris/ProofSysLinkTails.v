@@ -341,7 +341,7 @@ Section ProofSysLinkTails.
       (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
       (cn : ic_names) (gtl : gname) (gil gisl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
-      (size : Z) (dev : mword 32) (used : gset Z)
+      (size : Z) (dev : mword 32)
       (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
       (dn : dinode) (bm : blkmap)
       (u : nat) (pidv : mword 32) (dq dqb dqs : dfrac)
@@ -401,7 +401,7 @@ Section ProofSysLinkTails.
     runit_any (bv_unsigned inum) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-    bitmap_res gfs bmapstart cov logstart size used -∗
+    bitmap_inv gfs bmapstart cov logstart size -∗
     proc_priv_bare (proc_addr jx) pidv Vpr -∗
     procs_inv gs -∗
     dev_inv gu gd -∗
@@ -417,10 +417,9 @@ Section ProofSysLinkTails.
     ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ[KT1] bw jj) -∗
     ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 38) jj ↦ₘ[KT1] bo jj) -∗
     wp_next true (proc_addr jx) (fun (CIDx : CpuId) =>
-      ∀ (mf : regfile) (used' : gset Z),
+      ∀ (mf : regfile),
         ⌜callee_saved m mf⌝ -∗
         ⌜(mf !!! Regidx Ra0 : mword 64) = (mword_of_int (-1) : mword 64)⌝ -∗
-        ⌜used' ⊆ used⌝ -∗
         sie_cap_gpr KT1 mf K b (proc_addr jx) -∗
         cpu_own 0 eb (proc_addr jx) b lks -∗
         trap_csrs_ext KT1 eb -∗
@@ -429,7 +428,6 @@ Section ProofSysLinkTails.
         proc_priv_bare (proc_addr jx) pidv Vpr -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-        bitmap_res gfs bmapstart cov logstart size used' -∗
         bslots bn 3 -∗
         iref_slot -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -440,7 +438,7 @@ Section ProofSysLinkTails.
            HMs2 Hal.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
               #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd Hdep Hidev
-              Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpid #Hprocs
+              Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hru Hsbb Hsbi #Hbmres Hpid #Hprocs
               #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 HbN HbW HbO Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
     iPoseProof (slki_c6 with "Htext") as "Hi0".
@@ -500,7 +498,7 @@ Section ProofSysLinkTails.
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
     iApply (Iunlockput.wp_iunlockput_sconf (CID := CID2) gs jx gl gu gd gk
               pd pav pu bn g gfs gi cn gtl gil gisl cov logstart bmapstart
-              inodestart nib size dev used kk qi s gy inum dn bm u pidv dq
+              inodestart nib size dev kk qi s gy inum dn bm u pidv dq
               dqb dqs M2 (K - 38)%nat eb b lks
               Vpr HKup Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog
               Hinb Hcovb Hiu Hj Hgl HM2a0
@@ -509,8 +507,8 @@ Section ProofSysLinkTails.
                     Hesck Hireg Hropen Hslkk Hslkd Hdep Hidev Hiinum Hivalid
                     Hload Hshot Hfrz [$Hkeep $Hru] Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
                     Hdlk Hbsl Hop").
-    iIntros (CID3 Hq3 mup n2 used2)
-      "%Hcsup Hcg Hown Htce Hcce Hpc Hpid Hsbb Hsbi %Hused2 Hbmres Hbsl %Hn2
+    iIntros (CID3 Hq3 mup n2)
+      "%Hcsup Hcg Hown Htce Hcce Hpc Hpid Hsbb Hsbi Hbsl %Hn2
        Hop Hislot".
     assert (Hpc2 : ret_pc (M2 !!! Regidx Rra : mword 64)
                    = mword_of_int (SL + 0xcc)) by (rewrite HM2ra; pcw).
@@ -639,7 +637,7 @@ Section ProofSysLinkTails.
               (m !!! Regidx Rs1 : mword 64) w4 bnm bw bo
               HK38 Kpop Hsp0 HP2sp HP2thr HP2s1 HP2s2 Hal
               with "Hcg Htext Hpc Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
-                    [Hown Htce Hcce Hpid Hsbb Hsbi Hbmres Hbsl Hislot Hcont]").
+                    [Hown Htce Hcce Hpid Hsbb Hsbi Hbsl Hislot Hcont]").
     iEval (rewrite /wp_next).
     iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha5f Hcg Hpc".
     iDestruct (cpu_own_transport CID8 CIDy 0 eb (proc_addr jx) b
@@ -649,11 +647,10 @@ Section ProofSysLinkTails.
     iDestruct (cpu_claim_ext_transport CID8 CIDy eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
     iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
-    iApply ("Hcont" $! mf used2 with "[%] [%] [%] Hcg Hown Htce Hcce Hpc Hpid
-              Hsbb Hsbi Hbmres Hbsl Hislot").
+    iApply ("Hcont" $! mf with "[%] [%] Hcg Hown Htce Hcce Hpc Hpid
+              Hsbb Hsbi Hbsl Hislot").
     { exact Hcsf. }
     { rewrite Ha5f. exact HP2a5. }
-    { exact Hused2. }
   Qed.
 
 
@@ -666,7 +663,7 @@ Section ProofSysLinkTails.
       (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
       (cn : ic_names) (gtl : gname) (gil gisl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
-      (size : Z) (dev : mword 32) (used : gset Z)
+      (size : Z) (dev : mword 32)
       (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
       (dn : dinode) (bm : blkmap)
       (u : nat) (pidv : mword 32) (dq dqb dqs : dfrac)
@@ -726,7 +723,7 @@ Section ProofSysLinkTails.
     runit_any (bv_unsigned inum) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-    bitmap_res gfs bmapstart cov logstart size used -∗
+    bitmap_inv gfs bmapstart cov logstart size -∗
     proc_priv_bare (proc_addr jx) pidv Vpr -∗
     procs_inv gs -∗
     dev_inv gu gd -∗
@@ -742,10 +739,9 @@ Section ProofSysLinkTails.
     ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ[KT1] bw jj) -∗
     ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 38) jj ↦ₘ[KT1] bo jj) -∗
     wp_next true (proc_addr jx) (fun (CIDx : CpuId) =>
-      ∀ (mf : regfile) (used' : gset Z),
+      ∀ (mf : regfile),
         ⌜callee_saved m mf⌝ -∗
         ⌜(mf !!! Regidx Ra0 : mword 64) = (mword_of_int (-1) : mword 64)⌝ -∗
-        ⌜used' ⊆ used⌝ -∗
         sie_cap_gpr KT1 mf K b (proc_addr jx) -∗
         cpu_own 0 eb (proc_addr jx) b lks -∗
         trap_csrs_ext KT1 eb -∗
@@ -754,7 +750,6 @@ Section ProofSysLinkTails.
         proc_priv_bare (proc_addr jx) pidv Vpr -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-        bitmap_res gfs bmapstart cov logstart size used' -∗
         bslots bn 3 -∗
         iref_slot -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -765,7 +760,7 @@ Section ProofSysLinkTails.
            HMs2 Hal.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
               #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd Hdep Hidev
-              Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpid #Hprocs
+              Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hru Hsbb Hsbi #Hbmres Hpid #Hprocs
               #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 HbN HbW HbO Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
     iPoseProof (slki_d6 with "Htext") as "Hi0".
@@ -825,7 +820,7 @@ Section ProofSysLinkTails.
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
     iApply (Iunlockput.wp_iunlockput_sconf (CID := CID2) gs jx gl gu gd gk
               pd pav pu bn g gfs gi cn gtl gil gisl cov logstart bmapstart
-              inodestart nib size dev used kk qi s gy inum dn bm u pidv dq
+              inodestart nib size dev kk qi s gy inum dn bm u pidv dq
               dqb dqs M2 (K - 38)%nat eb b lks
               Vpr HKup Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog
               Hinb Hcovb Hiu Hj Hgl HM2a0
@@ -834,8 +829,8 @@ Section ProofSysLinkTails.
                     Hesck Hireg Hropen Hslkk Hslkd Hdep Hidev Hiinum Hivalid
                     Hload Hshot Hfrz [$Hkeep $Hru] Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
                     Hdlk Hbsl Hop").
-    iIntros (CID3 Hq3 mup n2 used2)
-      "%Hcsup Hcg Hown Htce Hcce Hpc Hpid Hsbb Hsbi %Hused2 Hbmres Hbsl %Hn2
+    iIntros (CID3 Hq3 mup n2)
+      "%Hcsup Hcg Hown Htce Hcce Hpc Hpid Hsbb Hsbi Hbsl %Hn2
        Hop Hislot".
     assert (Hpc2 : ret_pc (M2 !!! Regidx Rra : mword 64)
                    = mword_of_int (SL + 0xdc)) by (rewrite HM2ra; pcw).
@@ -964,7 +959,7 @@ Section ProofSysLinkTails.
               (m !!! Regidx Rs1 : mword 64) w4 bnm bw bo
               HK38 Kpop Hsp0 HP2sp HP2thr HP2s1 HP2s2 Hal
               with "Hcg Htext Hpc Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
-                    [Hown Htce Hcce Hpid Hsbb Hsbi Hbmres Hbsl Hislot Hcont]").
+                    [Hown Htce Hcce Hpid Hsbb Hsbi Hbsl Hislot Hcont]").
     iEval (rewrite /wp_next).
     iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha5f Hcg Hpc".
     iDestruct (cpu_own_transport CID8 CIDy 0 eb (proc_addr jx) b
@@ -974,11 +969,10 @@ Section ProofSysLinkTails.
     iDestruct (cpu_claim_ext_transport CID8 CIDy eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
     iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
-    iApply ("Hcont" $! mf used2 with "[%] [%] [%] Hcg Hown Htce Hcce Hpc Hpid
-              Hsbb Hsbi Hbmres Hbsl Hislot").
+    iApply ("Hcont" $! mf with "[%] [%] Hcg Hown Htce Hcce Hpc Hpid
+              Hsbb Hsbi Hbsl Hislot").
     { exact Hcsf. }
     { rewrite Ha5f. exact HP2a5. }
-    { exact Hused2. }
   Qed.
 
   (* ================================================================== *)
@@ -1020,7 +1014,7 @@ Section ProofSysLinkTails.
       (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
       (cn : ic_names) (gtl : gname) (gil gisl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
-      (size : Z) (dev : mword 32) (used : gset Z)
+      (size : Z) (dev : mword 32)
       (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
       (ty : mword 16)
       (u : nat) (Sb : gset Z)
@@ -1085,7 +1079,7 @@ Section ProofSysLinkTails.
     ilink (bv_unsigned inum) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-    bitmap_res gfs bmapstart cov logstart size used -∗
+    bitmap_inv gfs bmapstart cov logstart size -∗
     proc_priv_bare (proc_addr jx) pidv Vpr -∗
     procs_inv gs -∗
     dev_inv gu gd -∗
@@ -1101,10 +1095,9 @@ Section ProofSysLinkTails.
     ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ[KT1] bw jj) -∗
     ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 38) jj ↦ₘ[KT1] bo jj) -∗
     wp_next true (proc_addr jx) (fun (CIDx : CpuId) =>
-      ∀ (mf : regfile) (used' : gset Z),
+      ∀ (mf : regfile),
         ⌜callee_saved m mf⌝ -∗
         ⌜(mf !!! Regidx Ra0 : mword 64) = (mword_of_int (-1) : mword 64)⌝ -∗
-        ⌜used' ⊆ used⌝ -∗
         sie_cap_gpr KT1 mf K b (proc_addr jx) -∗
         cpu_own 0 eb (proc_addr jx) b lks -∗
         trap_csrs_ext KT1 eb -∗
@@ -1113,7 +1106,6 @@ Section ProofSysLinkTails.
         proc_priv_bare (proc_addr jx) pidv Vpr -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-        bitmap_res gfs bmapstart cov logstart size used' -∗
         bslots bn 3 -∗
         iref_slot -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -1123,7 +1115,7 @@ Section ProofSysLinkTails.
            Hbmcov Hbmlog Hist0 Hiblk Hiblog Hinb Hcovb Hmem Hiu Hj Hgl
            Hlkempty Heb Hsp0 HMsp HMthr HMs1 Hal Hncd.
     iIntros "Hcg Hown #Htext #Hdata Hpc #Hpe #Hbio #Hlog Hseam Hgen #Hitab #Hitinv
-              #Hesck #Hireg #Hropen #Hslkk Hkeep Hru Hshr #Hshotc Hilink Hsbb Hsbi Hbmres Hpid
+              #Hesck #Hireg #Hropen #Hslkk Hkeep Hru Hshr #Hshotc Hilink Hsbb Hsbi #Hbmres Hpid
               #Hprocs #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
               Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
@@ -1458,7 +1450,7 @@ Section ProofSysLinkTails.
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iApply (Iunlockput.wp_iunlockput_sconf (CID := CID11) gs jx gl gu gd gk
               pd pav pu bn g gfs gi cn gtl gil gisl cov logstart bmapstart
-              inodestart nib size dev used kk qi s gy inum dn' bm (S u) pidv dq
+              inodestart nib size dev kk qi s gy inum dn' bm (S u) pidv dq
               dqb dqs Q2 (K - 38)%nat eb b lks
               Vpr HKup Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog
               Hinb Hcovb Hiu Hj Hgl HQ2a0
@@ -1470,8 +1462,8 @@ Section ProofSysLinkTails.
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     { rewrite /log_op. iExists (Sb ∪ {[IBLOCK inum inodestart]}). iExact "Hop". }
-    iIntros (CID12 Hq12 mup n2 used2)
-      "%Hcsup Hcg Hown _ _ Hpc Hpid Hsbb Hsbi %Hused2 Hbmres Hbsl %Hn2
+    iIntros (CID12 Hq12 mup n2)
+      "%Hcsup Hcg Hown _ _ Hpc Hpid Hsbb Hsbi Hbsl %Hn2
        Hop Hislot".
     assert (Hpc110 : ret_pc (Q2 !!! Regidx Rra : mword 64)
                      = mword_of_int (SL + 0x110)) by (rewrite HQ2ra; pcw).
@@ -1598,17 +1590,16 @@ Section ProofSysLinkTails.
               bnm bw bo
               HK38 Kpop Hsp0 HR3sp HR3thr HR3s1 HR3s2 Hal
               with "Hcg Htext Hpc Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
-                    [Hown Hpid Hsbb Hsbi Hbmres Hbsl Hislot Hcont]").
+                    [Hown Hpid Hsbb Hsbi Hbsl Hislot Hcont]").
     iEval (rewrite /wp_next).
     iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha5f Hcg Hpc".
     iDestruct (cpu_own_transport CID14 CIDy 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
-    iApply ("Hcont" $! mf used2 with "[%] [%] [%] Hcg Hown [] [] Hpc Hpid
-              Hsbb Hsbi Hbmres Hbsl Hislot").
+    iApply ("Hcont" $! mf with "[%] [%] Hcg Hown [] [] Hpc Hpid
+              Hsbb Hsbi Hbsl Hislot").
     { exact Hcsf. }
     { rewrite Ha5f. exact HR3a5. }
-    { exact Hused2. }
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
   Qed.
@@ -1635,7 +1626,7 @@ Section ProofSysLinkTails.
       (cn : ic_names) (gtl : gname)
       (gil gisl : gname) (gild gisld : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
-      (size : Z) (dev : mword 32) (used : gset Z)
+      (size : Z) (dev : mword 32)
       (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
       (ty : mword 16)
       (kd : nat) (qd sd : Qp) (gyd : gname) (dinum : mword 32)
@@ -1727,7 +1718,7 @@ Section ProofSysLinkTails.
     runit_any (bv_unsigned dinum) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-    bitmap_res gfs bmapstart cov logstart size used -∗
+    bitmap_inv gfs bmapstart cov logstart size -∗
     proc_priv_bare (proc_addr jx) pidv Vpr -∗
     procs_inv gs -∗
     dev_inv gu gd -∗
@@ -1743,10 +1734,9 @@ Section ProofSysLinkTails.
     ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ[KT1] bw jj) -∗
     ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 38) jj ↦ₘ[KT1] bo jj) -∗
     wp_next true (proc_addr jx) (fun (CIDx : CpuId) =>
-      ∀ (mf : regfile) (used' : gset Z),
+      ∀ (mf : regfile),
         ⌜callee_saved m mf⌝ -∗
         ⌜(mf !!! Regidx Ra0 : mword 64) = (mword_of_int (-1) : mword 64)⌝ -∗
-        ⌜used' ⊆ used⌝ -∗
         sie_cap_gpr KT1 mf K b (proc_addr jx) -∗
         cpu_own 0 eb (proc_addr jx) b lks -∗
         trap_csrs_ext KT1 eb -∗
@@ -1755,7 +1745,6 @@ Section ProofSysLinkTails.
         proc_priv_bare (proc_addr jx) pidv Vpr -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-        bitmap_res gfs bmapstart cov logstart size used' -∗
         bslots bn 3 -∗
         iref_slots 2 -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -1768,7 +1757,7 @@ Section ProofSysLinkTails.
     iIntros "Hcg Hown #Htext #Hdata Hpc #Hpe #Hbio #Hlog Hseam Hgen #Hitab #Hitinv
               #Hesck #Hescd #Hireg #Hropen #Hslkk #Hslkd0 Hkeep Hru Hshr #Hshotc Hilink Hslkd
               Hdep Hidev Hiinum Hivalid Hload #Hshotd Hfrz Hkeepd Hrud Hsbb Hsbi
-              Hbmres Hpid #Hprocs #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4
+              #Hbmres Hpid #Hprocs #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4
               HbN HbW HbO Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
     iPoseProof (slki_ee with "Htext") as "Hj0".
@@ -1820,7 +1809,7 @@ Section ProofSysLinkTails.
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iApply (Iunlockput.wp_iunlockput_gen (CID := CID2) gs jx gl gu gd gk
               pd pav pu bn g gfs gi cn gtl gild gisld cov logstart bmapstart
-              inodestart nib size dev used kd qd sd gyd dinum dnd bmd
+              inodestart nib size dev kd qd sd gyd dinum dnd bmd
               n Sb crb cru false e0 pidv dq dqb dqs
               M2 (K - 38)%nat eb b lks
               Vpr HKup Hkd Hcrb Hcru Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
@@ -1833,8 +1822,8 @@ Section ProofSysLinkTails.
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     { done. }
-    iIntros (CID3 Hq3 mup n1 used1 Sb1 w)
-      "%Hcsup Hcg Hown _ _ Hpc Hpid Hsbb Hsbi %Hused1 Hbmres Hbsl %Hsb1 %Hwm
+    iIntros (CID3 Hq3 mup n1 Sb1 w)
+      "%Hcsup Hcg Hown _ _ Hpc Hpid Hsbb Hsbi Hbsl %Hsb1 %Hwm
        %Hcrbw %Hn1 Hop Hislot".
     assert (Hpcf4 : ret_pc (M2 !!! Regidx Rra : mword 64)
                     = mword_of_int (SL + 0xf4)) by (rewrite HM2ra; pcw).
@@ -1857,7 +1846,7 @@ Section ProofSysLinkTails.
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (sl_tail_bad (CID0 := CID3) gs jx gl gu gd gk pd pav pu bn g gfs gi
               cn gtl gil gisl cov logstart bmapstart inodestart nib size dev
-              used1 kk qi s gy inum ty u1 Sb1 pidv dq dqb dqs m mup sp0 K eb b
+              kk qi s gy inum ty u1 Sb1 pidv dq dqb dqs m mup sp0 K eb b
               lks bnm bw bo
               Vpr HKil HKiup HKup HKeo HK38 Kpop Hkk Hglog Hcist Hgeom Hsize Hbm0
               Hbmcov Hbmlog Hist0 Hiblk Hiblog Hinb Hcovb Hmem1 Hiu1 Hj Hgl
@@ -1867,16 +1856,15 @@ Section ProofSysLinkTails.
                     Hprocs Hdev Hgeo Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
                     [Hislot Hcont]").
     iEval (rewrite /wp_next).
-    iIntros (CIDy) "%Hqy". iIntros (mf used2)
-      "%Hcsf %Ha0f %Hused2 Hcg Hown Htce Hcce Hpc Hpid Hsbb Hsbi Hbmres Hbsl
+    iIntros (CIDy) "%Hqy". iIntros (mf)
+      "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc Hpid Hsbb Hsbi Hbsl
        Hislot2".
     iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
     iDestruct (iref_slots_combine 1 1 with "Hislot Hislot2") as "Hislots".
-    iApply ("Hcont" $! mf used2 with "[%] [%] [%] Hcg Hown Htce Hcce Hpc Hpid
-              Hsbb Hsbi Hbmres Hbsl Hislots").
+    iApply ("Hcont" $! mf with "[%] [%] Hcg Hown Htce Hcce Hpc Hpid
+              Hsbb Hsbi Hbsl Hislots").
     { exact Hcsf. }
     { exact Ha0f. }
-    { exact (transitivity Hused2 Hused1). }
   Qed.
 
   (* ================================================================== *)
@@ -1910,7 +1898,7 @@ Section ProofSysLinkTails.
       (cn : ic_names) (gtl : gname)
       (gil gisl : gname) (gild gisld : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
-      (size : Z) (dev : mword 32) (used : gset Z)
+      (size : Z) (dev : mword 32)
       (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
       (ty : mword 16)
       (kd : nat) (qd sd : Qp) (gyd : gname) (dinum : mword 32)
@@ -2001,7 +1989,7 @@ Section ProofSysLinkTails.
     runit_any (bv_unsigned dinum) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-    bitmap_res gfs bmapstart cov logstart size used -∗
+    bitmap_inv gfs bmapstart cov logstart size -∗
     proc_priv_bare (proc_addr jx) pidv Vpr -∗
     procs_inv gs -∗
     dev_inv gu gd -∗
@@ -2017,10 +2005,9 @@ Section ProofSysLinkTails.
     ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ[KT1] bw jj) -∗
     ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 38) jj ↦ₘ[KT1] bo jj) -∗
     wp_next true (proc_addr jx) (fun (CIDx : CpuId) =>
-      ∀ (mf : regfile) (used' : gset Z),
+      ∀ (mf : regfile),
         ⌜callee_saved m mf⌝ -∗
         ⌜(mf !!! Regidx Ra0 : mword 64) = (mword_of_int (-1) : mword 64)⌝ -∗
-        ⌜used' ⊆ used⌝ -∗
         sie_cap_gpr KT1 mf K b (proc_addr jx) -∗
         cpu_own 0 eb (proc_addr jx) b lks -∗
         trap_csrs_ext KT1 eb -∗
@@ -2029,7 +2016,6 @@ Section ProofSysLinkTails.
         proc_priv_bare (proc_addr jx) pidv Vpr -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-        bitmap_res gfs bmapstart cov logstart size used' -∗
         bslots bn 3 -∗
         iref_slots 2 -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -2042,7 +2028,7 @@ Section ProofSysLinkTails.
     iIntros "Hcg Hown #Htext #Hdata Hpc #Hpe #Hbio #Hlog Hseam Hgen #Hitab #Hitinv
               #Hesck #Hescd #Hireg #Hropen #Hslkk #Hslkd0 Hkeep Hru Hshr #Hshotc Hilink Hslkd
               Hdep Hidev Hiinum Hivalid Hload #Hshotd Hfrz Hkeepd Hrud Hsbb Hsbi
-              Hbmres Hpid #Hprocs #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4
+              #Hbmres Hpid #Hprocs #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4
               HbN HbW HbO Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
     iPoseProof (slki_e6 with "Htext") as "Hj0".
@@ -2095,7 +2081,7 @@ Section ProofSysLinkTails.
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iApply (Iunlockput.wp_iunlockput_gen (CID := CID2) gs jx gl gu gd gk
               pd pav pu bn g gfs gi cn gtl gild gisld cov logstart bmapstart
-              inodestart nib size dev used kd qd sd gyd dinum dnd bmd
+              inodestart nib size dev kd qd sd gyd dinum dnd bmd
               n Sb false false false e0 pidv dq dqb dqs
               M2 (K - 38)%nat eb b lks
               Vpr HKup Hkd ltac:(discriminate) ltac:(discriminate) Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
@@ -2108,8 +2094,8 @@ Section ProofSysLinkTails.
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     { done. }
-    iIntros (CID3 Hq3 mup n1 used1 Sb1 w)
-      "%Hcsup Hcg Hown _ _ Hpc Hpid Hsbb Hsbi %Hused1 Hbmres Hbsl %Hsb1 %Hwm
+    iIntros (CID3 Hq3 mup n1 Sb1 w)
+      "%Hcsup Hcg Hown _ _ Hpc Hpid Hsbb Hsbi Hbsl %Hsb1 %Hwm
        %Hcrbw %Hn1 Hop Hislot".
     assert (Hpcec : ret_pc (M2 !!! Regidx Rra : mword 64)
                     = mword_of_int (SL + 0xec)) by (rewrite HM2ra; pcw).
@@ -2151,7 +2137,7 @@ Section ProofSysLinkTails.
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (sl_tail_bad (CID0 := CID4) gs jx gl gu gd gk pd pav pu bn g gfs gi
               cn gtl gil gisl cov logstart bmapstart inodestart nib size dev
-              used1 kk qi s gy inum ty u1 Sb1 pidv dq dqb dqs m mup sp0 K eb b
+              kk qi s gy inum ty u1 Sb1 pidv dq dqb dqs m mup sp0 K eb b
               lks bnm bw bo
               Vpr HKil HKiup HKup HKeo HK38 Kpop Hkk Hglog Hcist Hgeom Hsize Hbm0
               Hbmcov Hbmlog Hist0 Hiblk Hiblog Hinb Hcovb Hmem1 Hiu1 Hj Hgl
@@ -2161,16 +2147,15 @@ Section ProofSysLinkTails.
                     Hprocs Hdev Hgeo Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
                     [Hislot Hcont]").
     iEval (rewrite /wp_next).
-    iIntros (CIDy) "%Hqy". iIntros (mf used2)
-      "%Hcsf %Ha0f %Hused2 Hcg Hown Htce Hcce Hpc Hpid Hsbb Hsbi Hbmres Hbsl
+    iIntros (CIDy) "%Hqy". iIntros (mf)
+      "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc Hpid Hsbb Hsbi Hbsl
        Hislot2".
     iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
     iDestruct (iref_slots_combine 1 1 with "Hislot Hislot2") as "Hislots".
-    iApply ("Hcont" $! mf used2 with "[%] [%] [%] Hcg Hown Htce Hcce Hpc Hpid
-              Hsbb Hsbi Hbmres Hbsl Hislots").
+    iApply ("Hcont" $! mf with "[%] [%] Hcg Hown Htce Hcce Hpc Hpid
+              Hsbb Hsbi Hbsl Hislots").
     { exact Hcsf. }
     { exact Ha0f. }
-    { exact (transitivity Hused2 Hused1). }
   Qed.
 
 End ProofSysLinkTails.

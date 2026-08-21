@@ -39,7 +39,7 @@
 
    THE CONTRACT.  itrunc empties the inode: [inode_map] comes back at
    [InodeInv.bm_empty], every block the map named goes back to the free pool
-   ([bitmap_res] loses exactly [bm_blocks bm]), the size is zeroed and the
+   (into [BitmapInv.bitmap_inv], via bfree), the size is zeroed and the
    whole thing is flushed by the tail call to iupdate.  The postcondition is
    stated at the CLOSED value [bm_empty] rather than at "some map whose
    slots are all zero" so that iput -- the only caller -- needs no reasoning
@@ -311,7 +311,6 @@ Definition wp_itrunc_sconf_body
     (γ : log_names) (γfs : fs_names) (γi : gname)
     (cov : gset Z) (logstart : Z) (bmapstart : Z) (inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
-    (used : gset Z)
     (ip : mword 64) (inum : mword 32)
     (dn dn0 : dinode) (bm : blkmap)
     (data : nat -> list (bv 8))
@@ -425,7 +424,7 @@ Definition wp_itrunc_sconf_body
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   (* the bitmap, with its free pool *)
-  bitmap_res γfs bmapstart cov logstart size used -∗
+  bitmap_inv γfs bmapstart cov logstart size -∗
   (* THE INODE REGION, and this inum's (stale) on-disk record: iupdate's
      resources, threaded through (design §11.3/§12) *)
   ireg_inv γi γfs inodestart nib -∗
@@ -474,7 +473,6 @@ Definition wp_itrunc_sconf_body
       inode_map γfs ip bm_empty -∗
       inode_blocks γfs bm_empty (fun _ => replicate BSIZE (bv_0 8)) -∗
       (* ...and every block it named is back in the pool *)
-      bitmap_res γfs bmapstart cov logstart size (used ∖ bm_blocks bm) -∗
       (* the flush landed: this inum's on-disk record is the truncated
          inode *)
       dinode_at γi inum (di_trunc dn) -∗
@@ -522,7 +520,6 @@ Definition wp_itrunc_gen_body
     (γ : log_names) (γfs : fs_names) (γi : gname)
     (cov : gset Z) (logstart : Z) (bmapstart : Z) (inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
-    (used : gset Z)
     (ip : mword 64) (inum : mword 32)
     (dn dn0 : dinode) (bm : blkmap)
     (data : nat -> list (bv 8))
@@ -579,7 +576,7 @@ Definition wp_itrunc_gen_body
   inode_blocks γfs bm data -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-  bitmap_res γfs bmapstart cov logstart size used -∗
+  bitmap_inv γfs bmapstart cov logstart size -∗
   ireg_inv γi γfs inodestart nib -∗
   dinode_at γi inum dn0 -∗
   proc_priv_bare pj pidv Vpr -∗
@@ -621,7 +618,6 @@ Definition wp_itrunc_gen_body
       inode_meta ip (di_trunc dn) -∗
       inode_map γfs ip bm_empty -∗
       inode_blocks γfs bm_empty (fun _ => replicate BSIZE (bv_0 8)) -∗
-      bitmap_res γfs bmapstart cov logstart size (used ∖ bm_blocks bm) -∗
       dinode_at γi inum (di_trunc dn) -∗
       bslots bn 3 -∗
       (* THE LEDGER, SET FORM.  The set only GROWS, it provably contains
@@ -660,7 +656,6 @@ Module Type ITRUNC.
       (γ : log_names) (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (bmapstart : Z) (inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
-      (used : gset Z)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
       (data : nat -> list (bv 8))
@@ -669,7 +664,7 @@ Module Type ITRUNC.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_itrunc_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi
-                           cov logstart bmapstart inodestart nib size dev used
+                           cov logstart bmapstart inodestart nib size dev
                            ip inum dn dn0 bm data u
                            pidv dq dqd dqn dqb dqs m K eb b lks Vpr.
   (* the credited set-form contract; [wp_itrunc_sconf] is this at
@@ -685,7 +680,6 @@ Module Type ITRUNC.
       (γ : log_names) (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (bmapstart : Z) (inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
-      (used : gset Z)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
       (data : nat -> list (bv 8))
@@ -694,7 +688,7 @@ Module Type ITRUNC.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_itrunc_gen_body γs j γl γu γd γk pd pav pu bn γ γfs γi
-                         cov logstart bmapstart inodestart nib size dev used
+                         cov logstart bmapstart inodestart nib size dev
                          ip inum dn dn0 bm data u Sb crb cru e0
                          pidv dq dqd dqn dqb dqs m K eb b lks Vpr.
 End ITRUNC.

@@ -102,7 +102,7 @@ Definition kxc_b2_body
     (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
     (cn : ic_names) (gtl : gname) (gilf gislf : gname) (ga gf : gname)
     (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
-    (size : Z) (dev : mword 32) (used used2 : gset Z)
+    (size : Z) (dev : mword 32) 
     (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
     (dnf : dinode) (bmf : blkmap) (n2 : nat)
     (plen : nat) (pfun : nat -> bv 8)
@@ -134,7 +134,7 @@ Definition kxc_b2_body
   fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
             cov logstart inodestart nib dev -∗
   kxc_at_12c jp bn g gfs gi cn ga gf cov logstart bmapstart inodestart nib
-             size dev used used2 kf qf sf gyf inumf dnf bmf gilf gislf n2
+             size dev kf qf sf gyf inumf dnf bmf gilf gislf n2
              plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas m M K
              sp0 ra0 s00 s10 s20 pv av
              (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
@@ -142,7 +142,7 @@ Definition kxc_b2_body
              (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
              w67 ef P i szv -∗
   wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-    ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
+    ∀ (mf : regfile) (V' : pprivate)
       (entry spv szv' : mword 64),
         ⌜callee_saved m mf⌝ -∗
         ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
@@ -151,8 +151,6 @@ Definition kxc_b2_body
         pc_is (ret_pc ra0) -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-        ⌜used' ⊆ used⌝ -∗
-        bitmap_res gfs bmapstart cov logstart size used' -∗
         kalloc_env ga None -∗
         proc_priv gf (proc_addr jp) pidv V' -∗
         ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1]{dqpv} pfun k) -∗
@@ -163,16 +161,16 @@ Definition kxc_b2_body
         iref_slots 2 -∗
         WP (Loop : expr riscv_lang)) -∗
   wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-    ∀ (M' : regfile) (used3 : gset Z) (P' : uptd) (szv' : mword 64),
+    ∀ (M' : regfile) (P' : uptd) (szv' : mword 64),
       kxc_at_1ae jp bn gfs ga gf cov logstart bmapstart inodestart size
-                 used used3 plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas
+                 plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas
                  M' K sp0 ra0 s00 s10 s20 pv av
                  (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
                  (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
                  (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
                  w67 ef P' szv' -∗
       wp_next (CID0 := CID) true (proc_addr jp) (fun (CIDy : CpuId) =>
-        ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
+        ∀ (mf : regfile) (V' : pprivate)
           (entry spv szv2 : mword 64),
             ⌜callee_saved m mf⌝ -∗
             ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv2 na alen⌝ -∗
@@ -181,8 +179,6 @@ Definition kxc_b2_body
             pc_is (ret_pc ra0) -∗
             sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
             sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-            ⌜used' ⊆ used⌝ -∗
-            bitmap_res gfs bmapstart cov logstart size used' -∗
             kalloc_env ga None -∗
             proc_priv gf (proc_addr jp) pidv V' -∗
             ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1]{dqpv} pfun k) -∗
@@ -206,7 +202,7 @@ Definition kxc_b2z_body
     (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
     (cn : ic_names) (gtl : gname) (gilf gislf : gname) (ga gf : gname)
     (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
-    (size : Z) (dev : mword 32) (used used2 : gset Z)
+    (size : Z) (dev : mword 32) 
     (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
     (dnf : dinode) (bmf : blkmap) (n2 : nat)
     (plen : nat) (pfun : nat -> bv 8)
@@ -232,7 +228,7 @@ Definition kxc_b2z_body
   fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
             cov logstart inodestart nib dev -∗
   kxc_at_1a2 jp bn g gfs gi cn ga gf cov logstart bmapstart inodestart nib
-             size dev used used2 kf qf sf gyf inumf dnf bmf gilf gislf n2
+             size dev kf qf sf gyf inumf dnf bmf gilf gislf n2
              plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas m M K
              sp0 ra0 s00 s10 s20 pv av
              (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
@@ -240,9 +236,9 @@ Definition kxc_b2z_body
              (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
              w67 ef P -∗
   wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-    ∀ (M' : regfile) (used3 : gset Z),
+    ∀ (M' : regfile),
       kxc_at_1ae jp bn gfs ga gf cov logstart bmapstart inodestart size
-                 used used3 plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas
+                 plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas
                  M' K sp0 ra0 s00 s10 s20 pv av
                  (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
                  (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
@@ -259,7 +255,7 @@ Module Type KEXECB3.
       (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
       (cn : ic_names) (gtl : gname) (gilf gislf : gname) (ga gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
-      (size : Z) (dev : mword 32) (used used2 : gset Z)
+      (size : Z) (dev : mword 32) 
       (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap) (n2 : nat)
       (plen : nat) (pfun : nat -> bv 8)
@@ -270,7 +266,7 @@ Module Type KEXECB3.
       (sp0 ra0 s00 s10 s20 pv av w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (i : nat) (szv : mword 64),
     kxc_b2_body gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl gilf gislf
-      ga gf cov logstart bmapstart inodestart nib size dev used used2
+      ga gf cov logstart bmapstart inodestart nib size dev
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
       pidv V dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av w67
       ef P i szv.
@@ -282,7 +278,7 @@ Module Type KEXECB3.
       (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
       (cn : ic_names) (gtl : gname) (gilf gislf : gname) (ga gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
-      (size : Z) (dev : mword 32) (used used2 : gset Z)
+      (size : Z) (dev : mword 32) 
       (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap) (n2 : nat)
       (plen : nat) (pfun : nat -> bv 8)
@@ -293,7 +289,7 @@ Module Type KEXECB3.
       (sp0 ra0 s00 s10 s20 pv av w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd),
     kxc_b2z_body gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl gilf gislf
-      ga gf cov logstart bmapstart inodestart nib size dev used used2
+      ga gf cov logstart bmapstart inodestart nib size dev
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
       pidv V dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av w67 ef P.
 End KEXECB3.

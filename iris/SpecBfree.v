@@ -23,9 +23,9 @@
    THE CONTRACT (claude-notes/design/fs-bitmap.md).  bfree consumes the
    freed block's logical content half AND its exclusive [blk_own] token and
    returns both to [BitmapInv]'s FREE POOL, clearing bit [b] of the bitmap
-   block.  The bitmap resource is PASSED IN AND RETURNED UPDATED, exactly
-   as [InodeInv.inode_map] is for bmap -- who owns it between calls is the
-   free-space layer's business and is deliberately not designed here.
+   block.  The pool and the bitmap block live in the persistent
+   [BitmapInv.bitmap_inv]; the block goes back in at log_write's own ghost
+   step ([BitmapInv.bitmap_free_au]), so the contract names no bitmap set.
 
    THE PANIC IS DEAD, and the bitmap invariant is what kills it.  The
    caller arrives holding [blk_own γfs b] -- a FULL-fraction ghost_map
@@ -108,7 +108,7 @@ Definition wp_bfree_gen_body
     (bn : bio_names)
     (γ : log_names) (γfs : fs_names)
     (cov : gset Z) (logstart : Z) (bmapstart : Z) (size : Z) (dev : mword 32)
-    (used : gset Z) (bno : mword 32) (bs : list (bv 8))
+    (bno : mword 32) (bs : list (bv 8))
     (u : nat) (cr : bool) (Sb : gset Z) (e0 : nat)
     (pidv : mword 32) (dq dqb : dfrac)
     (m : regfile) (K : nat) (eb : bool)
@@ -164,8 +164,8 @@ Definition wp_bfree_gen_body
   log_ctx γ bn γfs cov logstart dev -∗
   (* sb.bmapstart, read once at +0x12 *)
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-  (* THE BITMAP, with its free pool *)
-  bitmap_res γfs bmapstart cov logstart size used -∗
+  (* THE BITMAP'S INVARIANT (BitmapInv.v): persistent; the pool is inside *)
+  bitmap_inv γfs bmapstart cov logstart size -∗
   (* THE BLOCK BEING FREED: its logical content half and -- the load-bearing
      half of the handshake -- its EXCLUSIVE ownership token.  Holding the
      token is what makes the panic dead. *)
@@ -221,9 +221,6 @@ Definition wp_bfree_gen_body
       pc_is ret_tgt -∗
       proc_priv_bare pj pidv Vpr -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-      (* THE FREE: bit [bno] is clear, and the block's content half and its
-         token are back in the pool *)
-      bitmap_res γfs bmapstart cov logstart size (used ∖ {[ bv_unsigned bno ]}) -∗
       bslots bn 2 -∗
       log_opSe γ (if cr then S u else u) (Sb ∪ {[bmapstart]}) e0 -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -238,7 +235,7 @@ Definition wp_bfree_sconf_body
     (bn : bio_names)
     (γ : log_names) (γfs : fs_names)
     (cov : gset Z) (logstart : Z) (bmapstart : Z) (size : Z) (dev : mword 32)
-    (used : gset Z) (bno : mword 32) (bs : list (bv 8))
+    (bno : mword 32) (bs : list (bv 8))
     (u : nat)
     (pidv : mword 32) (dq dqb : dfrac)
     (m : regfile) (K : nat) (eb : bool)
@@ -294,8 +291,8 @@ Definition wp_bfree_sconf_body
   log_ctx γ bn γfs cov logstart dev -∗
   (* sb.bmapstart, read once at +0x12 *)
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-  (* THE BITMAP, with its free pool *)
-  bitmap_res γfs bmapstart cov logstart size used -∗
+  (* THE BITMAP'S INVARIANT (BitmapInv.v): persistent; the pool is inside *)
+  bitmap_inv γfs bmapstart cov logstart size -∗
   (* THE BLOCK BEING FREED: its logical content half and -- the load-bearing
      half of the handshake -- its EXCLUSIVE ownership token.  Holding the
      token is what makes the panic dead. *)
@@ -332,9 +329,6 @@ Definition wp_bfree_sconf_body
       pc_is ret_tgt -∗
       proc_priv_bare pj pidv Vpr -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-      (* THE FREE: bit [bno] is clear, and the block's content half and its
-         token are back in the pool *)
-      bitmap_res γfs bmapstart cov logstart size (used ∖ {[ bv_unsigned bno ]}) -∗
       bslots bn 2 -∗
       log_op γ u -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -353,13 +347,13 @@ Module Type BFREE.
       (bn : bio_names)
       (γ : log_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (bmapstart : Z) (size : Z) (dev : mword 32)
-      (used : gset Z) (bno : mword 32) (bs : list (bv 8))
+      (bno : mword 32) (bs : list (bv 8))
       (u : nat) (cr : bool) (Sb : gset Z) (e0 : nat)
       (pidv : mword 32) (dq dqb : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_bfree_gen_body γs j γl γu γd γk pd pav pu bn γ γfs
-                        cov logstart bmapstart size dev used bno bs u cr Sb e0
+                        cov logstart bmapstart size dev bno bs u cr Sb e0
                         pidv dq dqb m K eb b lks Vpr.
 
   Parameter wp_bfree_sconf :
@@ -371,12 +365,12 @@ Module Type BFREE.
       (bn : bio_names)
       (γ : log_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (bmapstart : Z) (size : Z) (dev : mword 32)
-      (used : gset Z) (bno : mword 32) (bs : list (bv 8))
+      (bno : mword 32) (bs : list (bv 8))
       (u : nat)
       (pidv : mword 32) (dq dqb : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_bfree_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs
-                          cov logstart bmapstart size dev used bno bs u
+                          cov logstart bmapstart size dev bno bs u
                           pidv dq dqb m K eb b lks Vpr.
 End BFREE.

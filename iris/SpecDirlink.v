@@ -456,7 +456,6 @@ Definition wp_dirlink_sconf_body
     (γa : gname) (γf : gname) (γpr : gname)
     (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
     (bmapstart : Z) (size : Z) (dev : mword 32)
-    (used : gset Z)
     (ip : mword 64) (dinum : mword 32)                (* the DIRECTORY       *)
     (bm : blkmap) (data : nat -> list (bv 8))
     (dn dn0 : dinode)
@@ -570,7 +569,7 @@ Definition wp_dirlink_sconf_body
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-  bitmap_res γfs bmapstart cov logstart size used -∗
+  bitmap_inv γfs bmapstart cov logstart size -∗
   (* ---- the inode region and the directory's own (stale) record ---- *)
   ireg_inv γi γfs inodestart nib -∗
   (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B; §6′ RULING G).
@@ -610,7 +609,7 @@ Definition wp_dirlink_sconf_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (found : bool)
     (bm' : blkmap) (data' : nat -> list (bv 8)) (dn' dn0' : dinode)
-    (n' : nat) (used' : gset Z)
+    (n' : nat)
     (tot : nat),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
@@ -626,7 +625,6 @@ Definition wp_dirlink_sconf_body
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-      bitmap_res γfs bmapstart cov logstart size used' -∗
       dinode_at γi dinum dn0' -∗
       proc_priv_bare pj pidv Vpr -∗
       bslots bn 3 -∗
@@ -669,11 +667,9 @@ Definition wp_dirlink_sconf_body
           /\ mf !!! Regidx (mword_of_int 10 : mword 5)
              = (mword_of_int (-1) : mword 64)
           /\ bm' = bm /\ data' = data /\ dn' = dn /\ dn0' = dn0
-          /\ used' ⊆ used
           /\ tot = 0%nat
         else (* the append, through writei at [16*k0] *)
           dir_first data nrec s = None
-          /\ used ⊆ used'
           /\ blkmap_wf cov logstart bm'
           /\ blk_holes_zero bm' data'
           /\ di_addrs dn' = bm_cells bm'
@@ -730,7 +726,6 @@ Definition wp_dirlink_gen_body
     (γa : gname) (γf : gname) (γpr : gname)
     (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
     (bmapstart : Z) (size : Z) (dev : mword 32)
-    (used : gset Z)
     (ip : mword 64) (dinum : mword 32)                (* the DIRECTORY       *)
     (bm : blkmap) (data : nat -> list (bv 8))
     (dn dn0 : dinode)
@@ -851,7 +846,7 @@ Definition wp_dirlink_gen_body
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-  bitmap_res γfs bmapstart cov logstart size used -∗
+  bitmap_inv γfs bmapstart cov logstart size -∗
   (* ---- the inode region and the directory's own (stale) record ---- *)
   ireg_inv γi γfs inodestart nib -∗
   (* ...AND THE SEALED REGIME (iclaim-ledger.md §3.2, RULING B; §6′ RULING G).
@@ -891,7 +886,7 @@ Definition wp_dirlink_gen_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (found : bool)
     (bm' : blkmap) (data' : nat -> list (bv 8)) (dn' dn0' : dinode)
-    (n' : nat) (used' : gset Z) (Sb' : gset Z)
+    (n' : nat) (Sb' : gset Z)
     (tot : nat),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
@@ -907,7 +902,6 @@ Definition wp_dirlink_gen_body
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-      bitmap_res γfs bmapstart cov logstart size used' -∗
       dinode_at γi dinum dn0' -∗
       proc_priv_bare pj pidv Vpr -∗
       bslots bn 3 -∗
@@ -972,11 +966,9 @@ Definition wp_dirlink_gen_body
           /\ mf !!! Regidx (mword_of_int 10 : mword 5)
              = (mword_of_int (-1) : mword 64)
           /\ bm' = bm /\ data' = data /\ dn' = dn /\ dn0' = dn0
-          /\ used' ⊆ used
           /\ tot = 0%nat
         else (* the append, through writei at [16*k0] *)
           dir_first data nrec s = None
-          /\ used ⊆ used'
           /\ blkmap_wf cov logstart bm'
           /\ blk_holes_zero bm' data'
           /\ di_addrs dn' = bm_cells bm'
@@ -1026,7 +1018,6 @@ Module Type DIRLINK.
       (γa : gname) (γf : gname) (γpr : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
       (bmapstart : Z) (size : Z) (dev : mword 32)
-      (used : gset Z)
       (ip : mword 64) (dinum : mword 32)
       (bm : blkmap) (data : nat -> list (bv 8))
       (dn dn0 : dinode)
@@ -1038,7 +1029,7 @@ Module Type DIRLINK.
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_dirlink_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
                             γa γf γpr cov logstart inodestart nib bmapstart
-                            size dev used ip dinum bm data dn dn0 fn inum
+                            size dev ip dinum bm data dn dn0 fn inum
                             ncount pidv dq dqd dqn dqs dqb dqbs dqf
                             m K eb b lks Vpr.
 
@@ -1057,7 +1048,6 @@ Module Type DIRLINK.
       (γa : gname) (γf : gname) (γpr : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
       (bmapstart : Z) (size : Z) (dev : mword 32)
-      (used : gset Z)
       (ip : mword 64) (dinum : mword 32)
       (bm : blkmap) (data : nat -> list (bv 8))
       (dn dn0 : dinode)
@@ -1069,7 +1059,7 @@ Module Type DIRLINK.
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_dirlink_gen_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
                           γa γf γpr cov logstart inodestart nib bmapstart
-                          size dev used ip dinum bm data dn dn0 fn inum
+                          size dev ip dinum bm data dn dn0 fn inum
                           ncount Sb pidv dq dqd dqn dqs dqb dqbs dqf
                           m K eb b lks Vpr.
 End DIRLINK.

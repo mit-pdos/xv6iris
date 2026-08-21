@@ -512,10 +512,13 @@ Section ItruncDefs.
   (*  THE DIRECT LOOP'S STATE, at cursor k                               *)
   (* ------------------------------------------------------------------ *)
 
-  (* Everything the loop owns and moves.  The map is [bm_dir_zeroed bm k];
-     the pool has grown by [bm_dir_freed bm k]; the [inode_blocks] bundle
-     has lost exactly the entries below the cursor -- which is why it is
-     indexed at the ZEROED map, whose [blk_res] at those indices is [True].
+  (* Everything the loop owns and moves.  The map is [bm_dir_zeroed bm k]
+     and the [inode_blocks] bundle has lost exactly the entries below the
+     cursor -- which is why it is indexed at the ZEROED map, whose
+     [blk_res] at those indices is [True].  THE POOL IS NOT HERE: it lives
+     in the persistent [BitmapInv.bitmap_inv], which the loop holds in the
+     intuitionistic context throughout, so bfree's frees leave no trace in
+     the invariant at all.
 
      The budget is [bm_paidS], NOT a unit count: that is the whole point of
      the credited arms.  It is idempotent under bfree, so this assertion is
@@ -528,12 +531,11 @@ Section ItruncDefs.
      [ProofIalloc]'s pattern. *)
   Definition it_dir_state (γ : log_names) (γfs : fs_names)
       (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8))
-      (cov : gset Z) (logstart bmapstart size : Z) (used : gset Z)
+      (cov : gset Z) (logstart bmapstart size : Z)
       (bn : bio_names) (crb : bool) (Sb : gset Z) (e0 : nat)
       (w : nat) (k : nat) : iProp Σ :=
     (inode_map γfs ip (bm_dir_zeroed bm k) ∗
      inode_blocks γfs (bm_dir_zeroed bm k) data ∗
-     bitmap_res γfs bmapstart cov logstart size (used ∖ bm_dir_freed bm k) ∗
      bm_paidS γ bmapstart crb w Sb e0)%I.
 
   (* Opened and closed by LEMMA, never by [rewrite /it_dir_state]: the Iris
@@ -542,35 +544,34 @@ Section ItruncDefs.
      no longer matches the bundle the loop carries. *)
   Lemma it_dir_state_open (γ : log_names) (γfs : fs_names)
       (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8))
-      (cov : gset Z) (logstart bmapstart size : Z) (used : gset Z)
+      (cov : gset Z) (logstart bmapstart size : Z)
       (bn : bio_names) (crb : bool) (Sb : gset Z) (e0 : nat)
       (w : nat) (k : nat) :
-    it_dir_state γ γfs ip bm data cov logstart bmapstart size used bn crb Sb e0 w k -∗
+    it_dir_state γ γfs ip bm data cov logstart bmapstart size bn crb Sb e0 w k -∗
       inode_map γfs ip (bm_dir_zeroed bm k) ∗
       inode_blocks γfs (bm_dir_zeroed bm k) data ∗
-      bitmap_res γfs bmapstart cov logstart size (used ∖ bm_dir_freed bm k) ∗
       bm_paidS γ bmapstart crb w Sb e0.
   Proof. iIntros "H". iExact "H". Qed.
 
   Lemma it_dir_state_close (γ : log_names) (γfs : fs_names)
       (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8))
-      (cov : gset Z) (logstart bmapstart size : Z) (used : gset Z)
+      (cov : gset Z) (logstart bmapstart size : Z)
       (bn : bio_names) (crb : bool) (Sb : gset Z) (e0 : nat)
       (w : nat) (k : nat) :
     inode_map γfs ip (bm_dir_zeroed bm k) -∗
     inode_blocks γfs (bm_dir_zeroed bm k) data -∗
-    bitmap_res γfs bmapstart cov logstart size (used ∖ bm_dir_freed bm k) -∗
     bm_paidS γ bmapstart crb w Sb e0 -∗
-    it_dir_state γ γfs ip bm data cov logstart bmapstart size used bn crb Sb e0 w k.
-  Proof. iIntros "A B C D". rewrite /it_dir_state. iFrame "A B C D". Qed.
+    it_dir_state γ γfs ip bm data cov logstart bmapstart size bn crb Sb e0 w k.
+  Proof. iIntros "A B D". rewrite /it_dir_state. iFrame "A B D". Qed.
 
   (* ------------------------------------------------------------------ *)
   (*  THE INDIRECT LOOP'S STATE, at cursor q                             *)
   (* ------------------------------------------------------------------ *)
 
   (* The map does NOT appear: the C never writes the entry list back, so
-     [bm_ent bm] is fixed and the only things moving are the pool and the
-     [inode_blocks] entries at indices [NDIRECT + q].  [it_ent_res] is what
+     [bm_ent bm] is fixed and the only things moving are the
+     [inode_blocks] entries at indices [NDIRECT + q] (the pool is inside
+     the persistent [BitmapInv.bitmap_inv]).  [it_ent_res] is what
      is LEFT of the bundle -- the entries at and above the cursor -- stated
      as a big-op over the remaining indices rather than as an [inode_blocks]
      at some doctored map, because there is no map here to doctor. *)
@@ -581,11 +582,9 @@ Section ItruncDefs.
 
   Definition it_ent_state (γ : log_names) (γfs : fs_names)
       (bm : blkmap) (data : nat -> list (bv 8))
-      (cov : gset Z) (logstart bmapstart size : Z) (used : gset Z)
+      (cov : gset Z) (logstart bmapstart size : Z)
       (crb : bool) (Sb : gset Z) (e0 : nat) (w : nat) (q : nat) : iProp Σ :=
     (it_ent_res γfs bm data q ∗
-     bitmap_res γfs bmapstart cov logstart size
-       (used ∖ (bm_dir_freed bm NDIRECT ∪ bm_ent_freed bm q)) ∗
      bm_paidS γ bmapstart crb w Sb e0)%I.
 
   (* THE ONE STEP bfree TAKES, and why the loops never case-split.
@@ -769,25 +768,21 @@ Section ItruncDefs.
      loop's state *)
   Lemma it_ent_state_open (γ : log_names) (γfs : fs_names) (bm : blkmap)
       (data : nat -> list (bv 8)) (cov : gset Z)
-      (logstart bmapstart size : Z) (used : gset Z)
+      (logstart bmapstart size : Z)
       (crb : bool) (Sb : gset Z) (e0 : nat) (w : nat) (q : nat) :
-    it_ent_state γ γfs bm data cov logstart bmapstart size used crb Sb e0 w q -∗
+    it_ent_state γ γfs bm data cov logstart bmapstart size crb Sb e0 w q -∗
       it_ent_res γfs bm data q ∗
-      bitmap_res γfs bmapstart cov logstart size
-        (used ∖ (bm_dir_freed bm NDIRECT ∪ bm_ent_freed bm q)) ∗
       bm_paidS γ bmapstart crb w Sb e0.
   Proof. iIntros "H". iExact "H". Qed.
 
   Lemma it_ent_state_close (γ : log_names) (γfs : fs_names) (bm : blkmap)
       (data : nat -> list (bv 8)) (cov : gset Z)
-      (logstart bmapstart size : Z) (used : gset Z)
+      (logstart bmapstart size : Z)
       (crb : bool) (Sb : gset Z) (e0 : nat) (w : nat) (q : nat) :
     it_ent_res γfs bm data q -∗
-    bitmap_res γfs bmapstart cov logstart size
-      (used ∖ (bm_dir_freed bm NDIRECT ∪ bm_ent_freed bm q)) -∗
     bm_paidS γ bmapstart crb w Sb e0 -∗
-    it_ent_state γ γfs bm data cov logstart bmapstart size used crb Sb e0 w q.
-  Proof. iIntros "A B C". rewrite /it_ent_state. iFrame "A B C". Qed.
+    it_ent_state γ γfs bm data cov logstart bmapstart size crb Sb e0 w q.
+  Proof. iIntros "A C". rewrite /it_ent_state. iFrame "A C". Qed.
 
   (* THE HANDOFF from the direct loop to the indirect one.  After the direct
      loop every direct slot of the map is zero, so [inode_blocks] at that

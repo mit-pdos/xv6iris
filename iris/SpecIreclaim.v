@@ -81,8 +81,9 @@
      and [IcacheRef.inode_ref_gather] restores the reference, which [iput]
      then spends.  Nothing about that crosses the boundary either.
 
-   So the only resources that genuinely FLOW are the bitmap (iput frees
-   blocks, so [used] shrinks) and the buffer slots (returned).
+   So the only resources that genuinely FLOW are the buffer slots
+   (returned); the bitmap iput frees into is the persistent
+   [BitmapInv.bitmap_inv].
 
    ---- THE ENTRY SLEEPLOCKS ARE A FAMILY, NOT A SINGLETON ---------------
 
@@ -197,7 +198,6 @@ Definition wp_ireclaim_sconf_body
     (γpr : gname)
     (cov : gset Z) (logstart bmapstart inodestart : Z)
     (ninodes : Z) (nib : nat) (size : Z)
-    (used : gset Z)
     (dev : mword 32)
     (pidv : mword 32) (dq dqb dqs dqn : dfrac)
     (m : regfile) (K : nat) (eb : bool)
@@ -281,7 +281,7 @@ Definition wp_ireclaim_sconf_body
      slot iget will pick.  [IcacheBoot.ic_sleeplocks_acc] projects it. *)
   ic_sleeplocks cn -∗
   (* itrunc's bitmap, through iput *)
-  bitmap_res γfs bmapstart cov logstart size used -∗
+  bitmap_inv γfs bmapstart cov logstart size -∗
   (* the caller's own pid cell (bread's / begin_op's acquiresleep records it) *)
   proc_priv_bare pj pidv Vpr -∗
   (* the running-thread bundle and the disk fabric *)
@@ -306,7 +306,7 @@ Definition wp_ireclaim_sconf_body
      [eb = false] is reachable the [b] form would promise the caller it
      comes back on the hart it called from, which a park makes false. *)
   wp_next true pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (used' : gset Z),
+  ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
@@ -317,13 +317,6 @@ Definition wp_ireclaim_sconf_body
       proc_priv_bare pj pidv Vpr -∗
       bslots bn 3 -∗
       iref_slot -∗
-      (* THE ONLY THING THAT ACTUALLY MOVED: every orphan iput freed its
-         file's blocks, so the bitmap's used set has SHRUNK.  Stated the way
-         SpecIput.v states it -- a subset, not a description -- because a
-         scan of unknown length cannot name the blocks it freed, and no
-         caller needs them named.  fsinit, the only caller, threads it on. *)
-      ⌜used' ⊆ used⌝ -∗
-      bitmap_res γfs bmapstart cov logstart size used' -∗
       (* the boot-shelter token, returned unspent (fs-fragments.md §7.12): the
          scan refutes claims AGAINST it, never consuming it *)
       ireg_boot -∗
@@ -346,12 +339,11 @@ Module Type IRECLAIM.
       (γpr : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z)
       (ninodes : Z) (nib : nat) (size : Z)
-      (used : gset Z)
       (dev : mword 32)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_ireclaim_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr
                              cov logstart bmapstart inodestart ninodes nib size
-                             used dev pidv dq dqb dqs dqn m K eb b lks Vpr.
+                             dev pidv dq dqb dqs dqn m K eb b lks Vpr.
 End IRECLAIM.

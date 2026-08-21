@@ -732,11 +732,11 @@ Section ProofPipealloc.
                      with "Hextc") as "Hextc".
         iDestruct (cpu_claim_ext_transport CIDt CIDt5 eb p ltac:(ext_chain Hbf)
                      with "Hextm") as "Hextm".
-        iApply (Fileclose.wp_fileclose_sconf γfl γf k1 1%Qp Cf1 inhabitant on (∅ : gset Z) U4 n eb p (K - 6)%nat b lks pidv Vpr
+        iApply (Fileclose.wp_fileclose_sconf γfl γf k1 1%Qp Cf1 inhabitant on U4 n eb p (K - 6)%nat b lks pidv Vpr
                   ltac:(lia) Hnoffpos HU4a0 Hbelow
                   with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hftab Hpe Href1 Hpbare Hiru []").
         all: try lkbelow.
-        { iApply (fileclose_env_none _ _ _ _ _ _ _ Hk1ty). }
+        { iApply (fileclose_env_none _ _ _ _ _ _ Hk1ty). }
         (* fileclose hands back the unit the reference was holding: it is
            the WRITE end's, and together with [Hunit0] it pays the two
            [pipealloc_post]'s failure arm promises. *)
@@ -810,14 +810,14 @@ Section ProofPipealloc.
                    with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CIDu CIDu1 eb p ltac:(ext_chain Hbf)
                    with "Hextm") as "Hextm".
-      iApply (Fileclose.wp_fileclose_sconf γfl γf k0 1%Qp Cf0 inhabitant on (∅ : gset Z) V1 n eb p (K - 6)%nat b lks pidv Vpr
+      iApply (Fileclose.wp_fileclose_sconf γfl γf k0 1%Qp Cf0 inhabitant on V1 n eb p (K - 6)%nat b lks pidv Vpr
                 ltac:(lia) Hnoffpos HV1a0 Hbelow
                 with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hftab Hpe Href0 Hpbare Hiru []").
       all: try lkbelow.
       (* an untyped file costs its closer nothing -- no pipe, no inode, so no
          file system.  [inhabitant] above is the ghost bundle the arms this
          file cannot take would have been indexed by. *)
-      { iApply (fileclose_env_none _ _ _ _ _ _ _ Hk0ty). }
+      { iApply (fileclose_env_none _ _ _ _ _ _ Hk0ty). }
       (* the READ end's unit, banked for T8 *)
       iIntros (CIDu2 Hsu2 mr) "Hcg Hcnt Hextc Hextm Hpc %Hfcpins Hunit0 Hiru _ Hpbare".
       assert (Hpca8 : ret_pc (V1 !!! Regidx Rra) = mword_of_int (KernelSyms.pipealloc + 0xa8))

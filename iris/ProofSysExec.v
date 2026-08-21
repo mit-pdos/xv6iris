@@ -4637,7 +4637,7 @@ Section SysExecBreak.
       (cn : ic_names) (gtl : gname)
       (γa γf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
-      (size : Z) (dev : mword 32) (used : gset Z)
+      (size : Z) (dev : mword 32)
       (dqb dqs : dfrac)
       (pid : mword 32) (V : pprivate)
       (K : nat) (eb b : bool) (lks : gset string)
@@ -4667,24 +4667,22 @@ Section SysExecBreak.
     kalloc_env γa None -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-    bitmap_res gfs bmapstart cov logstart size used -∗
+    bitmap_inv gfs bmapstart cov logstart size -∗
     bslots bn 3 -∗
     iref_slots 2 -∗
     sx_body γf jp pid V K eb b lks sp0 m plen pfun rest uav
             M P i pg alen afun (mword_of_int (SX + 0xb6) : mword 64) -∗
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
-      ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
+      ∀ (mf : regfile) (V' : pprivate)
         (entry spv szv' : mword 64),
         ⌜callee_saved m mf⌝ -∗
         ⌜kexec_ok (upd_upt V P) V' (mf !!! Regidx Ra0) entry spv szv' i alen⌝ -∗
-        ⌜used' ⊆ used⌝ -∗
         ⌜uptd_ext (pv_upt V) P⌝ -∗
         sie_cap_gpr KT1 mf K b (proc_addr jp) -∗
         cpu_own 0 eb (proc_addr jp) b lks -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-        bitmap_res gfs bmapstart cov logstart size used' -∗
         bslots bn 3 -∗
         iref_slots 2 -∗
         proc_priv γf (proc_addr jp) pid V' -∗
@@ -4694,7 +4692,7 @@ Section SysExecBreak.
     intros HK Hlb Hsp0 Hplen Hpcstr Halp Hdev Hnib Hg Hist Hroot Hnib0
            Hlg Hsize Hbm0 Hbmc Hbml Hist0 Hcb Hireg Hjp Hgl Hbt Hebt.
     destruct (sx_kb K HK) as (Kkx & Kar & Kaa & Kfa & Kfs & K14 & K2 & K60 & Kpop).
-    iIntros "#Htext #Hfab #Hka Hbmp Hisp Hbmr Hbs Hir Hst".
+    iIntros "#Htext #Hfab #Hka Hbmp Hisp #Hbmr Hbs Hir Hst".
     rewrite /sx_body.
     iDestruct "Hst" as "((%Hi32 & %Hext & %Hok & %HR) & Hpc & Hcg & Hcnt &
                          Hpriv & Hcarry & F59 & F60 & Harr & Hpgs)".
@@ -4844,7 +4842,7 @@ Section SysExecBreak.
     iDestruct (cpu_own_transport CID0 CID7 0%nat eb (proc_addr jp) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Kexec.wp_kexec_sconf gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
-              γa γf cov logstart bmapstart inodestart nib size dev used
+              γa γf cov logstart bmapstart inodestart nib size dev
               plen pfun i (sx_avf pg i) alen (fun _ => 4096%nat) afun
               pid (upd_upt V P) dqb dqs (DfracOwn 1) (DfracOwn 1) (DfracOwn 1)
               N6 (K - 60)%nat eb b lks
@@ -4860,8 +4858,8 @@ Section SysExecBreak.
               Hjp Hgl Hbt Hebt
               with "Hcg Hcnt Htext Hpc Hfab Hka Hbmp Hisp Hbmr Hpriv
                     Hpb Havf Hpgs Hbs Hir").
-    iIntros (CID8 Hq8 mf used' V' entry spv szv') "%Hcsf %Hkok Hcg Hcnt Hpc
-             Hbmp Hisp %Husub Hbmr Hka2 Hpriv Hpb Havf Hpgs Hbs Hir".
+    iIntros (CID8 Hq8 mf V' entry spv szv') "%Hcsf %Hkok Hcg Hcnt Hpc
+             Hbmp Hisp Hka2 Hpriv Hpb Havf Hpgs Hbs Hir".
     iEval (rewrite HN6ra) in "Hpc".
     iEval (rewrite HN6a0) in "Hpb".
     iEval (rewrite HN6a1) in "Havf".
@@ -4881,7 +4879,7 @@ Section SysExecBreak.
               (sxr_sp HRf) (sxr_thr HRf) (sxr_s0 HRf) (sxr_s1 HRf) (sxr_s4 HRf)
               eq_refl
               with "Htext Hka Hpc Hcg Hcnt Hpriv [Hf1 Hf2 Hspill F10 Hpb Hps]
-                    F59 F60 Harr Hpgs [Hout Hbmp Hisp Hbmr Hbs Hir]").
+                    F59 F60 Harr Hpgs [Hout Hbmp Hisp Hbs Hir]").
     { rewrite /sx_carry /sx_spill.
       iDestruct "Hspill" as "(P3 & P4 & P5 & P6 & P7 & P8 & P9)".
       iSplitL "Hf1"; [iExact "Hf1" |]. iSplitL "Hf2"; [iExact "Hf2" |].
@@ -4892,11 +4890,10 @@ Section SysExecBreak.
       iSplitL "Hpb"; [iExact "Hpb" | iExact "Hps"]. }
     iIntros (CID9) "%Hq9". iIntros (mg) "%Hcsg %Hga0 Hcg Hcnt Hpc Hpriv".
     iSpecialize ("Hout" $! CID9 with "[%]"); [wp_next_chain |].
-    iApply ("Hout" $! mg used' V' entry spv szv'
-             with "[%] [%] [%] [%] Hcg Hcnt Hpc Hbmp Hisp Hbmr Hbs Hir Hpriv").
+    iApply ("Hout" $! mg V' entry spv szv'
+             with "[%] [%] [%] Hcg Hcnt Hpc Hbmp Hisp Hbs Hir Hpriv").
     { exact Hcsg. }
     { rewrite Hga0. exact Hkok. }
-    { exact Husub. }
     { exact Hext. }
   Qed.
 
@@ -4960,7 +4957,6 @@ Section SysExecWhole.
       (cn : ic_names) (gtl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
-      (used : gset Z)
       (dqb dqs : dfrac)
       (v0 v1 : mword 64)
       (pid : mword 32) (V : pprivate)
@@ -4968,13 +4964,13 @@ Section SysExecWhole.
       (b : bool) (lks : gset string) :
       wp_sys_exec_sconf_body γf γa gs j gl gu gd gk pd pav pu bn g gfs gi
                              cn gtl cov logstart bmapstart inodestart nib
-                             size dev used dqb dqs v0 v1 pid V m K eb b lks.
+                             size dev dqb dqs v0 v1 pid V m K eb b lks.
   Proof.
     cbv beta zeta delta [wp_sys_exec_sconf_body].
     intros HK Hdev Hnib Hg Hist Hroot Hnib0 Hlg Hsize Hbm0 Hbmc Hbml Hist0
            Hcb Hireg Hjp Hgl Hebt Harg0 Harg1.
     subst eb.
-    iIntros "Hcg Hcnt Htcx Hccx #Htext #Hdata Hpc #Hfab Hbmp Hisp Hbmr
+    iIntros "Hcg Hcnt Htcx Hccx #Htext #Hdata Hpc #Hfab Hbmp Hisp #Hbmr
              Hbs #Hka Hir Hpriv Hcont".
     (* ---- the interrupt index, and the held-lock set ---- *)
     iDestruct (sie_b_agree m 0%nat K true b (proc_addr j) lks
@@ -4992,12 +4988,11 @@ Section SysExecWhole.
     { (* ---- argstr failed: -1, and the block never moved ---- *)
       iDestruct "Hm1" as "((%Hcs & %Hext & %Ha0) & Hcg & Hcnt & Hpc & Hpriv)".
       iSpecialize ("Hcont" $! CID1 with "[%]"); [wp_next_chain |].
-      iApply ("Hcont" $! M used P'
-               with "[%] [%] Hcg Hcnt Htcx Hccx Hpc Hbmp Hisp [%] Hbmr Hbs Hka
+      iApply ("Hcont" $! M P'
+               with "[%] [%] Hcg Hcnt Htcx Hccx Hpc Hbmp Hisp Hbs Hka
                      Hir [Hpriv]").
       { exact Hcs. }
       { exact Hext. }
-      { reflexivity. }
       { rewrite /sys_exec_post.
         iExists (upd_upt V P'), 0%nat, (fun _ => 0%nat),
                 (mword_of_int 0 : mword 64), (mword_of_int 0 : mword 64),
@@ -5058,20 +5053,19 @@ Section SysExecWhole.
     - (* ---- the break: argv[i] = 0, then kexec ---- *)
       iApply (sx_break (CID0 := CID3) gs j gl gu gd gk pd pav pu bn g gfs gi
                 cn gtl γa γf cov logstart bmapstart inodestart nib size dev
-                used dqb dqs pid V K true true ∅ sp0 m plen pfun rst v59
+                dqb dqs pid V K true true ∅ sp0 m plen pfun rst v59
                 M3 P3 i3 pg3 al3 af3
                 HK Hlb eq_refl Hplen Hpcstr Halp Hdev Hnib Hg Hist Hroot Hnib0
                 Hlg Hsize Hbm0 Hbmc Hbml Hist0 Hcb Hireg Hjp Hgl eq_refl eq_refl
                 with "Htext Hfab Hka Hbmp Hisp Hbmr Hbs Hir Hbrk").
-      iIntros (CID4 Hq4 mf used' V' entry spv szv')
-        "%Hcs %Hkok %Husub %Hext3 Hcg Hcnt Hpc Hbmp Hisp Hbmr Hbs Hir Hpriv".
+      iIntros (CID4 Hq4 mf V' entry spv szv')
+        "%Hcs %Hkok %Hext3 Hcg Hcnt Hpc Hbmp Hisp Hbs Hir Hpriv".
       iSpecialize ("Hcont" $! CID4 with "[%]"); [wp_next_chain |].
-      iApply ("Hcont" $! mf used' P3
-               with "[%] [%] Hcg Hcnt Htcx Hccx Hpc Hbmp Hisp [%] Hbmr Hbs Hka
+      iApply ("Hcont" $! mf P3
+               with "[%] [%] Hcg Hcnt Htcx Hccx Hpc Hbmp Hisp Hbs Hka
                      Hir [Hpriv]").
       { exact Hcs. }
       { exact Hext3. }
-      { exact Husub. }
       { rewrite /sys_exec_post.
         iExists V', i3, al3, entry, spv, szv'.
         iSplitR; [iPureIntro; exact Hkok |]. iExact "Hpriv". }
@@ -5081,12 +5075,11 @@ Section SysExecWhole.
                 HK Hlb eq_refl Hplen Halp with "Htext Hka Hbad").
       iIntros (CID4 Hq4 mf) "%Hcs %Ha0 %Hext3 Hcg Hcnt Hpc Hpriv".
       iSpecialize ("Hcont" $! CID4 with "[%]"); [wp_next_chain |].
-      iApply ("Hcont" $! mf used P3
-               with "[%] [%] Hcg Hcnt Htcx Hccx Hpc Hbmp Hisp [%] Hbmr Hbs Hka
+      iApply ("Hcont" $! mf P3
+               with "[%] [%] Hcg Hcnt Htcx Hccx Hpc Hbmp Hisp Hbs Hka
                      Hir [Hpriv]").
       { exact Hcs. }
       { exact Hext3. }
-      { reflexivity. }
       { rewrite /sys_exec_post.
         iExists (upd_upt V P3), 0%nat, (fun _ => 0%nat),
                 (mword_of_int 0 : mword 64), (mword_of_int 0 : mword 64),

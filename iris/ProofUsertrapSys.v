@@ -292,7 +292,7 @@ Section UtSysBlock.
          more of [ut_own]'s conjuncts than that accessor hands out --
          [SpecSyscall.v]'s header on why the five families ride through
          [syscall()] on this same channel rather than inside [Hsy]. *)
-      iDestruct "Hown" as "(Hbs & Hbm & Hip & Hfd & Hir & Hpv & Hsy)".
+      iDestruct "Hown" as "(Hbs & Hip & Hfd & Hir & Hpv & Hsy)".
       (* the epc word EXISTS -- read off the page's own length invariant while
          the block is still whole, because [ut_epc_exists] is a pure read and
          [proc_priv_tf_upd] below consumes the block. *)
@@ -451,10 +451,10 @@ Section UtSysBlock.
         apply ut_cs_insert; [vm_compute; reflexivity |].
         exact Hcsmf. }
       iApply (SY.wp_syscall_sconf (CID := CID1) (un_f N) (un_s N) (un_j N) (un_l N)
-                (un_bn N) (un_fn N) (un_us N) (un_ip N) (un_dqi N)
+                (un_bn N) (un_fn N) (un_ip N) (un_dqi N)
                 S4 n2 (un_pid N) V1 lks
                 Hj Hjl ltac:(rewrite Hn2; lia) eq_refl
-                with "Hcg [] Htext Hkd Hpc Hpi Hbs Hbm Hip Hfd Hir Hsy Hpv [-]").
+                with "Hcg [] Htext Hkd Hpc Hpi Hbs Hip Hfd Hir Hsy Hpv [-]").
       (* [cpu_own_on_intro] mints the bundle at the literal [∅]; [lks = ∅]
          at depth 0 makes that the set syscall's contract names.  It now
          takes no premise at all -- [cpu_own] carries no caller frame to
@@ -491,22 +491,23 @@ Section UtSysBlock.
           assert (Hdep : (trap_res true + n2)%nat = (av - 4)%nat)
             by (rewrite Hn2; unfold trap_res in *; lia).
           rewrite Hdep HS4sp. iExact "Hkcl4". }
-      iIntros (CID2 Hk2 mg V2 us2) "%Hcsg %Htfg Hcg Hcpu Hbs Hbm Hip Hfd Hir Hsy Hpv Hpc".
+      iIntros (CID2 Hk2 mg V2) "%Hcsg %Htfg Hcg Hcpu Hbs Hip Hfd Hir Hsy Hpv Hpc".
       assert (Hreta6 : ret_pc (S4 !!! Regidx Rra) = mword_of_int (UT + 0xa6))
         by (rewrite HS4ra; pcw).
       iEval (rewrite Hreta6) in "Hpc".
       iDestruct (wp_next_retarget CID CID2 true (un_pj N) _
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
-      (* [ut_own] rebuilt directly (mirroring the destructure above); [N]'s
-         [un_us] moves to [us2] via [upd_us], and [un_fn (upd_us N us2) =
-         un_fn N] ([UsertrapRes.un_fn_upd_us]) is what lets [Hbm] slot back
-         in unchanged. *)
-      pose (N2 := upd_us N us2).
-      (* rebuilt via the dedicated lemma, not an inline [rewrite; iFrame] --
-         see [UsertrapRes.ut_own_rebuild_us]'s header on why that inline
-         shape degenerates in a proof state this large. *)
-      iPoseProof (ut_own_rebuild_us SY.syscall_env N V2 us2
-                    with "Hbs Hbm Hip Hfd Hir Hpv Hsy") as "Hown".
+      (* [ut_own] rebuilt directly (mirroring the destructure above).  NO
+         NAME MOVES ACROSS THE CALL any more: the block bitmap used to ride
+         through here as an exclusive, set-indexed [fileclose_bm] and forced
+         [N] to be re-indexed to [upd_us N us2] on the way out; it is a
+         persistent invariant now ([BitmapInv.bitmap_inv], reached through
+         [ut_caps]'s [FsReady.fs_ready]), so the SAME [N] comes back out.
+         Rebuilt via the dedicated lemma, not an inline [rewrite; iFrame] --
+         see [UsertrapRes.ut_own_rebuild]'s header on why that inline shape
+         degenerates in a proof state this large. *)
+      iPoseProof (ut_own_rebuild SY.syscall_env N V2
+                    with "Hbs Hip Hfd Hir Hpv Hsy") as "Hown".
       assert (Hmgsp : mg !!! Regidx csp_rs1 = pa_stk ksp 4)
         by (rewrite (callee_saved_lookup Hcsg csp_rs1
                        ltac:(vm_compute; reflexivity)); exact HS4sp).
@@ -515,7 +516,7 @@ Section UtSysBlock.
                        ltac:(vm_compute; reflexivity)); exact HS4s1).
       assert (Hcsmg : ut_cs m0 mg)
         by exact (ut_cs_trans m0 S4 mg HcsS4 (ut_cs_of_callee_saved _ _ Hcsg)).
-      iApply (T.ut_a6 (CID := CID2) SY.syscall_env N2 V2 pt ksp m0 mg av
+      iApply (T.ut_a6 (CID := CID2) SY.syscall_env N V2 pt ksp m0 mg av
                 n2 true
                 mie_v menvcfg0 lks
                 Hwf' Hav ltac:(rewrite Hn2; unfold trap_res in *; lia)

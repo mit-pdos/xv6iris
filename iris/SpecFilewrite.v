@@ -89,8 +89,8 @@
    the arm carries the bitmap, [sb.size], [sb.bmapstart] and balloc's printk
    credentials; and it is bracketed by begin_op/end_op, so it carries
    [log_ctx], the crash seam and the generation certificate.  The bitmap
-   comes back at a set that only GREW: [used ⊆ used'] is the loop invariant,
-   inherited from writei's own postcondition one chunk at a time.
+   is a persistent invariant ([BitmapInv.bitmap_inv]), so nothing about
+   it comes back.
 
    ==== THE NUMERIC PREMISES, AND THE ONE FILEREAD HAD THAT THIS DOES NOT ==
 
@@ -275,7 +275,6 @@ Record fwrite_names := MkFWriteNames {
   fwn_inodestart : Z;
   fwn_bmapstart  : Z;             (* the bitmap, for bmap -> balloc          *)
   fwn_size       : Z;             (* sb.size                                *)
-  fwn_used       : gset Z;        (* the bitmap's marked set, going IN       *)
   fwn_dqs        : dfrac;         (* sb.inodestart                          *)
   fwn_dqb        : dfrac;         (* sb.bmapstart                           *)
   fwn_dqbs       : dfrac;         (* sb.size                                *)
@@ -307,7 +306,7 @@ Global Instance fwrite_names_inhabited : Inhabited fwrite_names :=
     1%positive (MkIcNames (fun _ => 1%positive) (fun _ => 1%positive)
                           (fun _ => 1%positive))
     1%positive
-    ∅ 0 0 0 0 ∅
+    ∅ 0 0 0 0
     (DfracOwn 1) (DfracOwn 1) (DfracOwn 1)
     (fun _ => mword_of_int 0) (fun _ => DfracOwn 1)).
 
@@ -500,9 +499,10 @@ Section SpecFilewrite.
        (mword_of_int (fwn_inodestart fn) : mword 32) ∗
      sb_size ↦₄{fwn_dqbs fn} (mword_of_int (fwn_size fn) : mword 32) ∗
      sb_bmapstart ↦₄{fwn_dqb fn} (mword_of_int (fwn_bmapstart fn) : mword 32) ∗
-     (* THE BITMAP itself *)
-     bitmap_res (fwn_fs fn) (fwn_bmapstart fn) (fwn_cov fn) (fwn_logstart fn)
-                (fwn_size fn) (fwn_used fn) ∗
+     (* THE BITMAP's invariant (BitmapInv.v): the pool bmap -> balloc draws
+        from; persistent, and it says nothing about which blocks are in use *)
+     bitmap_inv (fwn_fs fn) (fwn_bmapstart fn) (fwn_cov fn) (fwn_logstart fn)
+                (fwn_size fn) ∗
      (* the disk fabric *)
      dev_inv (fwn_uart fn) (fwn_disk fn) ∗
      disk_geom (fwn_disk fn) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn) ∗
@@ -513,22 +513,16 @@ Section SpecFilewrite.
         commit borrow from the same three, one transaction at a time. *)
      bslots (fwn_bio fn) 3)%I.
 
-  (* What comes back: the three superblock fields, the slot units, and the
-     bitmap AT A SET THAT ONLY GREW.  [used'] is existential because the
-     number of chunks -- hence of ballocs -- is not a function of anything
-     the caller holds.  NO SHARE: it never left the reference's payload, so
-     there is nothing here for it to be returned through, and hence no
-     generation to lose (which is what made a returned [inode_shr]
-     ungatherable in the first place). *)
-  Definition filewrite_fs_out (fn : fwrite_names)
-      (used' : gset Z) : iProp Σ :=
-    (⌜fwn_used fn ⊆ used'⌝ ∗
-     sb_inodestart ↦₄{fwn_dqs fn}
+  (* What comes back: the three superblock fields and the slot units.  NO
+     SHARE: it never left the reference's payload, so there is nothing here
+     for it to be returned through, and hence no generation to lose (which
+     is what made a returned [inode_shr] ungatherable in the first place).
+     And nothing about the bitmap: its invariant is persistent. *)
+  Definition filewrite_fs_out (fn : fwrite_names) : iProp Σ :=
+    (sb_inodestart ↦₄{fwn_dqs fn}
        (mword_of_int (fwn_inodestart fn) : mword 32) ∗
      sb_size ↦₄{fwn_dqbs fn} (mword_of_int (fwn_size fn) : mword 32) ∗
      sb_bmapstart ↦₄{fwn_dqb fn} (mword_of_int (fwn_bmapstart fn) : mword 32) ∗
-     bitmap_res (fwn_fs fn) (fwn_bmapstart fn) (fwn_cov fn) (fwn_logstart fn)
-                (fwn_size fn) used' ∗
      bslots (fwn_bio fn) 3)%I.
 
   (* ---- and the three, selected by the file's type ---- *)
@@ -541,29 +535,28 @@ Section SpecFilewrite.
      else emp)%I.
 
   Definition filewrite_env_out (fn : fwrite_names) (Cf : fcontent)
-      (used' : gset Z) : iProp Σ :=
+      : iProp Σ :=
     (if bool_decide (fc_type Cf = FD_PIPE) then emp
      else if bool_decide (fc_type Cf = FD_DEVICE) then filewrite_dev_out fn Cf
      else if bool_decide (fc_type Cf = FD_INODE)
-     then filewrite_fs_out fn used'
+     then filewrite_fs_out fn
      else emp)%I.
 
   (* THE EARLY RETURN'S OBLIGATION, checked here rather than discovered in
      the proof: [f->writable == 0] returns BEFORE THE PROLOGUE (decode note
      1) and before the type is ever tested, so the environment must already
-     contain everything the postcondition promises -- at [used' = fwn_used],
-     the set nothing has touched. *)
+     contain everything the postcondition promises. *)
   Lemma filewrite_fs_env_out γf fn :
-    filewrite_fs_env γf fn -∗ filewrite_fs_out fn (fwn_used fn).
+    filewrite_fs_env γf fn -∗ filewrite_fs_out fn.
   Proof.
     rewrite /filewrite_fs_env /filewrite_fs_out.
     iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
-              Hsbi & Hsbs & Hsbb & Hbits & _ & _ & _ & Hbsl)".
-    iFrame "Hsbi Hsbs Hsbb Hbits Hbsl". iPureIntro. reflexivity.
+              Hsbi & Hsbs & Hsbb & _ & _ & _ & _ & Hbsl)".
+    iFrame "Hsbi Hsbs Hsbb Hbsl".
   Qed.
 
   Lemma filewrite_env_out_of_env γf fn Cf :
-    filewrite_env γf fn Cf -∗ filewrite_env_out fn Cf (fwn_used fn).
+    filewrite_env γf fn Cf -∗ filewrite_env_out fn Cf.
   Proof.
     rewrite /filewrite_env /filewrite_env_out.
     case_bool_decide; [by iIntros "$"|].
@@ -653,7 +646,7 @@ Definition wp_filewrite_sconf_body
      [b = true] at the only constructible instance, so this is not a change of
      strength today; it is the spelling the eb-generic sweep needs. *)
   wp_next true pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (r : mword 64) (P' : uptd) (used' : gset Z),
+  ∀ (mf : regfile) (r : mword 64) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
       ⌜filewrite_ret n r⌝ -∗
@@ -663,7 +656,7 @@ Definition wp_filewrite_sconf_body
       pc_is ret_tgt -∗
       file_ref γf k q Cf -∗
       proc_priv_core pj pidv (upd_upt V P') -∗
-      filewrite_env_out fn Cf used' -∗
+      filewrite_env_out fn Cf -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

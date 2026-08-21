@@ -914,7 +914,6 @@ Section ProofSysChdirBody.
       (cn : ic_names) (gtl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
-      (used : gset Z)
       (dqb dqs : dfrac)
       (v : mword 64)
       (pid : mword 32) (V : pprivate)
@@ -922,7 +921,7 @@ Section ProofSysChdirBody.
       (b : bool) (lks : gset string) :
     wp_sys_chdir_sconf_body gf ga gs j gl gu gd gk pd pav pu bn g gfs gi
                             cn gtl cov logstart bmapstart inodestart nib
-                            size dev used dqb dqs v pid V m K eb b lks.
+                            size dev dqb dqs v pid V m K eb b lks.
   Proof.
     cbv beta delta [wp_sys_chdir_sconf_body].
     intros pcE pj ret_tgt HK Hcdev Hcnib Hclog Hcist HdevR Hnib0 Hgeom
@@ -932,7 +931,7 @@ Section ProofSysChdirBody.
     set (sp0 := m !!! Regidx csp_rs1).
     iIntros "Hcg Hown _ _ #Htext #Hdata Hpc #Hpe #Hbio #Hlog Hseam
              Hgen #Hdev #Hgeo #Hdlk Hbsl #Hitab #Hitinv #Hescrows #Hslks
-             #Hireg #Hropen Hsbb Hsbi Hbmres #Hkenv #Hprocs Hir Hpriv Hcont".
+             #Hireg #Hropen Hsbb Hsbi #Hbmres #Hkenv #Hprocs Hir Hpriv Hcont".
     iDestruct (cpu_own_zero_empty with "Hown") as "[%Hlkempty Hown]".
     assert (Hlb : forall r : string, locks_below lks r).
     { intro r. rewrite Hlkempty. apply locks_below_empty. }
@@ -1433,7 +1432,7 @@ Section ProofSysChdirBody.
                    ltac:(wp_next_chain) with "Hown") as "Hown".
       iApply (Namei.wp_namei_gen (CID := CID19) gs j gl gu gd gk pd pav pu bn
                 g gfs gi cn gtl ga gf cov logstart bmapstart inodestart nib
-                size dev used pk bf MAXOPBLOCKS Sb0
+                size dev pk bf MAXOPBLOCKS Sb0
                 pid (DfracOwn (1/4)) dqb dqs (DfracOwn 1)
                 N1 (K - 20)%nat eb b lks
                 (upd_upt V P') ltac:(lia) Hcdev Hcnib Hclog Hcist HdevR Hnib0 Hgeom Hsize
@@ -1443,8 +1442,8 @@ Section ProofSysChdirBody.
                       Hescrows Hslks Hireg Hropen Hprocs Hdev Hgeo Hdlk Hsbb Hsbi
                       Hbmres Hpbare Hcwdref [Hbufk] Hbsl Hir HopS").
       { iEval (rewrite HN1a0). iExact "Hbufk". }
-      iIntros (CID20 Hq20 mna n1 used1 Sb1 ok ipv w1)
-        "%Hcsna Hcg Hown Hpc Hsbb Hsbi %Hused1 Hbmres Hpbare Hcwdref
+      iIntros (CID20 Hq20 mna n1 Sb1 ok ipv w1)
+        "%Hcsna Hcg Hown Hpc Hsbb Hsbi Hpbare Hcwdref
          Hbufk Hbsl %HSb1 %Hw1 %Hn1 HopS Hres".
       iEval (rewrite HN1a0) in "Hbufk".
       assert (Hpc30 : ret_pc (N1 !!! Regidx Rra : mword 64)
@@ -1827,7 +1826,7 @@ Section ProofSysChdirBody.
                        ltac:(wp_next_chain) with "Hown") as "Hown".
           iApply (Iput.wp_iput_sconf (CID := CID32) gs j gl gu gd gk pd pav pu bn
                     g gfs gi cn gtl gilc gislc cov logstart bmapstart inodestart
-                    nib size dev used1 kc qc inumc n1 pid (DfracOwn (1/4)) dqb dqs
+                    nib size dev kc qc inumc n1 pid (DfracOwn (1/4)) dqb dqs
                     P6 (K - 20)%nat eb b lks
                     (upd_upt V P') ltac:(lia) Hkc Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
                     Hiblkc Hiblogc Hinbc Hcovb Hiu Hj Hgl
@@ -1838,8 +1837,8 @@ Section ProofSysChdirBody.
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }
           { rewrite /log_op. iExists Sb1. iExact "HopS". }
-          iIntros (CID33 Hq33 mip n2 used2)
-            "%Hcsip Hcg Hown _ _ Hpc Hpbare Hsbb Hsbi %Hused2 Hbmres Hbsl %Hn2
+          iIntros (CID33 Hq33 mip n2)
+            "%Hcsip Hcg Hown _ _ Hpc Hpbare Hsbb Hsbi Hbsl %Hn2
              Hop Hislot".
           assert (Hpc50 : ret_pc (P6 !!! Regidx Rra : mword 64)
                           = mword_of_int (SC + 0x50)) by (rewrite HP6ra; pcw).
@@ -1998,19 +1997,18 @@ Section ProofSysChdirBody.
                     (m !!! Regidx Rs1 : mword 64) bf1
                     ltac:(lia) Kpop ltac:(reflexivity) HP9sp HP9thr HP9s1 Hal
                     with "Hcg Htext Hpc Hf1 Hf2 Hf3 Hf4 Hbuf
-                          [Hown Hbsl Hsbb Hsbi Hbmres Hir Hpriv Hcont]").
+                          [Hown Hbsl Hsbb Hsbi Hir Hpriv Hcont]").
           iEval (rewrite /wp_next).
           iIntros (CIDz) "%Hqz". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
           iDestruct (cpu_own_transport CID35 CIDz 0 eb pj b
                        ltac:(wp_next_chain) with "Hown") as "Hown".
           iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
-          iApply ("Hcont" $! mf used2 P' with "[%] [%] Hcg Hown [] [] Hpc Hbsl
-                    Hsbb Hsbi [%] Hbmres Hir [Hpriv]").
+          iApply ("Hcont" $! mf P' with "[%] [%] Hcg Hown [] [] Hpc Hbsl
+                    Hsbb Hsbi Hir [Hpriv]").
           { exact Hcsf. }
           { exact Hupt. }
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }
-          { etransitivity; [exact Hused2 | exact Hused1]. }
           { rewrite /sys_chdir_post. iRight. iExists (ientry kk).
             iSplitR; [iPureIntro; rewrite Ha0f; exact HP9a0 |]. iExact "Hpriv". }
         * (* ======== ARM C: NOT a directory ======== *)
@@ -2088,7 +2086,7 @@ Section ProofSysChdirBody.
                        ltac:(wp_next_chain) with "Hown") as "Hown".
           iApply (Iunlockput.wp_iunlockput_sconf (CID := CID29) gs j gl gu gd gk
                     pd pav pu bn g gfs gi cn gtl gil gisl cov logstart bmapstart
-                    inodestart nib size dev used1 kk (qq/2)%Qp (qq/2)%Qp gsh inum
+                    inodestart nib size dev kk (qq/2)%Qp (qq/2)%Qp gsh inum
                     dn bm n1 pid (DfracOwn (1/4)) dqb dqs
                     Q1 (K - 20)%nat eb b lks
                     (upd_upt V P') ltac:(lia) Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
@@ -2100,8 +2098,8 @@ Section ProofSysChdirBody.
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }
           { rewrite /log_op. iExists Sb1. iExact "HopS". }
-          iIntros (CID30 Hq30 mup n2 used2)
-            "%Hcsup Hcg Hown _ _ Hpc Hpbare Hsbb Hsbi %Hused2 Hbmres Hbsl %Hn2
+          iIntros (CID30 Hq30 mup n2)
+            "%Hcsup Hcg Hown _ _ Hpc Hpbare Hsbb Hsbi Hbsl %Hn2
              Hop Hislot".
           assert (Hpc76 : ret_pc (Q1 !!! Regidx Rra : mword 64)
                           = mword_of_int (SC + 0x76)) by (rewrite HQ1ra; pcw).
@@ -2226,19 +2224,18 @@ Section ProofSysChdirBody.
                     (m !!! Regidx Rs1 : mword 64) bf1
                     ltac:(lia) Kpop ltac:(reflexivity) HQ4sp HQ4thr HQ4s1 Hal
                     with "Hcg Htext Hpc Hf1 Hf2 Hf3 Hf4 Hbuf
-                          [Hown Hbsl Hsbb Hsbi Hbmres Hir Hpriv Hcont]").
+                          [Hown Hbsl Hsbb Hsbi Hir Hpriv Hcont]").
           iEval (rewrite /wp_next).
           iIntros (CIDz) "%Hqz". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
           iDestruct (cpu_own_transport CID35 CIDz 0 eb pj b
                        ltac:(wp_next_chain) with "Hown") as "Hown".
           iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
-          iApply ("Hcont" $! mf used2 P' with "[%] [%] Hcg Hown [] [] Hpc Hbsl
-                    Hsbb Hsbi [%] Hbmres Hir [Hpriv]").
+          iApply ("Hcont" $! mf P' with "[%] [%] Hcg Hown [] [] Hpc Hbsl
+                    Hsbb Hsbi Hir [Hpriv]").
           { exact Hcsf. }
           { exact Hupt. }
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }
-          { etransitivity; [exact Hused2 | exact Hused1]. }
           { rewrite /sys_chdir_post. iLeft. iFrame "Hpriv". iPureIntro.
             rewrite Ha0f. exact HQ4a0. }
       + (* ================= ARM B: namei returned 0 =================
@@ -2292,7 +2289,7 @@ Section ProofSysChdirBody.
                   ltac:(reflexivity) HN3sp HN3thr HN3s1 Hal
                   with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                         Hpbare Hprocs Hdev Hgeo Hdlk [HopS] Hf1 Hf2 Hf3 Hf4 Hbuf
-                        [Hofiles Hcwdref Hbsl Hsbb Hsbi Hbmres Hir Hcont]").
+                        [Hofiles Hcwdref Hbsl Hsbb Hsbi Hir Hcont]").
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
         { rewrite /log_op. iExists Sb1. iExact "HopS". }
@@ -2307,13 +2304,12 @@ Section ProofSysChdirBody.
           - iSplitL "Hpbare"; [iExact "Hpbare" | iExact "Hofiles"].
           - iEval (cbn [upd_upt pv_cwd]). iExact "Href". }
         iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
-        iApply ("Hcont" $! mf used1 P' with "[%] [%] Hcg Hown [] [] Hpc Hbsl
-                  Hsbb Hsbi [%] Hbmres Hir [Hpriv]").
+        iApply ("Hcont" $! mf P' with "[%] [%] Hcg Hown [] [] Hpc Hbsl
+                  Hsbb Hsbi Hir [Hpriv]").
         { exact Hcsf. }
         { exact Hupt. }
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
-        { exact Hused1. }
         { rewrite /sys_chdir_post. iLeft. iFrame "Hpriv". iPureIntro. exact Ha0f. }
     - (* ================= ARM A: argstr returned -1 =================
          The [bltz] is TAKEN, straight to the shared "-1" tail at +0x68.
@@ -2340,20 +2336,19 @@ Section ProofSysChdirBody.
                 ltac:(reflexivity) Hassp Hasthr Hass1 Hal
                 with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                       Hpbare Hprocs Hdev Hgeo Hdlk Hop Hf1 Hf2 Hf3 Hf4 Hbuf
-                      [Hpback Hbsl Hsbb Hsbi Hbmres Hir Hcont]").
+                      [Hpback Hbsl Hsbb Hsbi Hir Hcont]").
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
       iEval (rewrite /wp_next).
       iIntros (CIDz) "%Hqz". iIntros (mf) "%Hcsf %Ha0f Hcg Hown _ _ Hpc Hpbare".
       iDestruct ("Hpback" with "Hpbare") as "Hpriv".
       iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
-      iApply ("Hcont" $! mf used P' with "[%] [%] Hcg Hown [] [] Hpc Hbsl
-                Hsbb Hsbi [%] Hbmres Hir [Hpriv]").
+      iApply ("Hcont" $! mf P' with "[%] [%] Hcg Hown [] [] Hpc Hbsl
+                Hsbb Hsbi Hir [Hpriv]").
       { exact Hcsf. }
       { exact Hupt. }
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
-      { reflexivity. }
       { rewrite /sys_chdir_post. iLeft. iFrame "Hpriv". iPureIntro. exact Ha0f. }
   Qed.
 

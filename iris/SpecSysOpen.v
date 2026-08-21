@@ -156,9 +156,9 @@
    namei, in ilock, in itrunc, in begin_op and in end_op, so it may return
    on a hart other than the one it was called on.
 
-   THE BITMAP IS NOT MONOTONE, in either direction: create's dirlink can
-   ALLOCATE (balloc) and both the failure arms' iunlockputs and the O_TRUNC
-   tail can FREE (itrunc), so no [used' ⊆ used] is claimed.
+   THE BITMAP IS AN INVARIANT ([BitmapInv.bitmap_inv], inside [fs_ready]):
+   create's dirlink can ALLOCATE and both the failure arms' iunlockputs and
+   the O_TRUNC tail can FREE, and the contract says nothing about either.
 
    DETERMINISM: none is claimed and none is available.  Which of the eight
    arms runs is a function of the FILE SYSTEM, of the user's path and of
@@ -266,7 +266,6 @@ Definition wp_sys_open_sconf_body
     (cn : ic_names) (gtl : gname)                       (* the icache + itable *)
     (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
     (ninodes : Z) (size : Z) (dev : mword 32)
-    (used : gset Z)
     (ns : nat)                                          (* the iref ledger     *)
     (dqb dqs dqbs dqn : dfrac)
     (v vom : mword 64)                       (* syscall arguments 0 and 1   *)
@@ -357,7 +356,7 @@ Definition wp_sys_open_sconf_body
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-  bitmap_res gfs bmapstart cov logstart size used -∗
+  bitmap_inv gfs bmapstart cov logstart size -∗
   (* argstr's page-table side, and create's / namei's (iget's ipool arm
      allocates) *)
   kalloc_env γa None -∗
@@ -372,7 +371,7 @@ Definition wp_sys_open_sconf_body
      return on another hart whatever SIE was doing.  Vacuous at [true], so
      consuming it costs the caller nothing. *)
   wp_next true pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (used' : gset Z) (ns' : nat) (P' : uptd),
+  ∀ (mf : regfile) (ns' : nat) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
       (* the page table may have GROWN: argstr's fetchstr faults user pages
          in.  [uptd_ext] is argstr's own report, relayed. *)
@@ -389,7 +388,6 @@ Definition wp_sys_open_sconf_body
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       (* NO ORDERING on the free pool: create ALLOCATES (balloc under
          dirlink) and both the failure arms and the O_TRUNC tail FREE. *)
-      bitmap_res gfs bmapstart cov logstart size used' -∗
       (* THE WHOLE ALLOWANCE, BACK.  The success arm parks a reference in
          [f->ip] and it is NOT spent for good: an untyped table entry's
          payload is itself one unit ([FileInvDefs.file_core_none]), and
@@ -418,7 +416,6 @@ Module Type SYSOPEN.
       (cn : ic_names) (gtl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (ninodes : Z) (size : Z) (dev : mword 32)
-      (used : gset Z)
       (ns : nat)
       (dqb dqs dqbs dqn : dfrac)
       (v vom : mword 64)
@@ -427,6 +424,6 @@ Module Type SYSOPEN.
       (b : bool) (lks : gset string),
       wp_sys_open_sconf_body γfl γf γa γpr gs j gl gu gd gk pd pav pu bn g gfs
                              gi cn gtl cov logstart bmapstart inodestart nib
-                             ninodes size dev used ns dqb dqs dqbs dqn v vom
+                             ninodes size dev ns dqb dqs dqbs dqn v vom
                              pid V m K eb b lks.
 End SYSOPEN.

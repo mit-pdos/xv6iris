@@ -44,12 +44,11 @@
      fileread's MAXFILE row is absent), and the upper half [n < 2^31] is free
      for a sign-extended 32-bit cell ([SpecSysRead.sys_rw_count_lt]).
 
-   ONE MORE ASYMMETRY, on the way out: [write_env_frame]'s wand answers
-   [∃ used''], because on the three arms that never reach the allocator
-   [filewrite_env_out] is [emp] or a device cell and NO constraint on the
-   caller's [used'] follows -- so the SYSCALL picks the witness for its own
-   continuation, which is why [wp_sys_write_sconf_body]'s [used'] is a
-   ∀-binder of the continuation and not a parameter of the contract. *)
+   NOTHING ABOUT THE BITMAP CROSSES EITHER WAY.  The block bitmap is a
+   persistent invariant ([BitmapInv.bitmap_inv], carried inside
+   [filewrite_fs_env]), so [write_env_frame]'s wand answers
+   [filewrite_fs_out fn] flat -- no set, no existential, and no witness for
+   this shell to pick on the three arms that never reach the allocator. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
@@ -818,10 +817,7 @@ Section ProofSysWrite.
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID21 with "[%]"); [wp_next_chain|].
       (* nothing ran, so the page table is its own extension *)
-      (* THE SET NOTHING TOUCHED.  Nothing below the branch ran, so the only
-         sound witness for the continuation's ∀-bound [used'] is the bitmap
-         set the environment came in at. *)
-      iApply ("Hcont" $! mf (mword_of_int (-1) : mword 64) (pv_upt V) (fwn_used fn)
+      iApply ("Hcont" $! mf (mword_of_int (-1) : mword 64) (pv_upt V)
                 with "[%] [%] [%] [%] Hcg Hcpu Hpc [Hpriv] Hkenv [Henv]").
       { exact Hcsf. }
       { apply uptd_ext_refl. }
@@ -954,13 +950,9 @@ Section ProofSysWrite.
                 Hfj Hfprocs HS4a0' HS4a2 Hnrange Heb
                 with "Hcg Hcpu Htext Hdata Hpc Hpenv Href Hcore Hkenv Hprocs Hfenv").
       all: try lkbelow.
-      iIntros (CID25 Hs25 mf rv P' used')
+      iIntros (CID25 Hs25 mf rv P')
         "%Hcsf %Hupt %Hrvok %Hrva Hcg Hcpu Hpc Href Hcore Hfout".
-      (* THE SET COMES BACK EXISTENTIALLY (SpecSysWrite.write_env_frame): on
-         the arms that never reach the allocator nothing constrains [used'],
-         so the frame answers at whatever set it can and the syscall passes
-         THAT to its own continuation. *)
-      iDestruct ("Hfback" $! used' with "Hfout") as (used'') "[Henv _]".
+      iDestruct ("Hfback" with "Hfout") as "[Henv _]".
       (* SETTLE THE LOAN.  [pv_ofile (upd_upt V P') = pv_ofile V] by [cbn], so
          the deficit the lend opened is literally the one this closes. *)
       assert (Hlkk : pv_ofile V !! fd = Some (fnode kk))
@@ -1004,7 +996,7 @@ Section ProofSysWrite.
       iDestruct (cpu_own_transport CID25 CID26 0%nat eb pj b 
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID26 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont" $! mg rv P' used''
+      iApply ("Hcont" $! mg rv P'
                 with "[%] [%] [%] [%] Hcg Hcpu Hpc Hpriv Hkenv Henv").
       { exact Hcsg. }
       { exact Hupt. }

@@ -179,7 +179,6 @@ Definition wp_sys_chdir_sconf_body
     (cn : ic_names) (gtl : gname)                       (* the icache + itable *)
     (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
-    (used : gset Z)
     (dqb dqs : dfrac)
     (v : mword 64)                                      (* syscall argument 0  *)
     (pid : mword 32) (V : pprivate)
@@ -256,7 +255,7 @@ Definition wp_sys_chdir_sconf_body
   ireg_open -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-  bitmap_res gfs bmapstart cov logstart size used -∗
+  bitmap_inv gfs bmapstart cov logstart size -∗
   (* argstr's page-table side, and namei's (iget's ipool arm allocates) *)
   kalloc_env γa None -∗
   (* the running-thread bundle *)
@@ -269,7 +268,7 @@ Definition wp_sys_chdir_sconf_body
      hart whatever SIE was doing.  Vacuous at [true], so consuming it costs
      the caller nothing. *)
   wp_next true pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (used' : gset Z) (P' : uptd),
+  ∀ (mf : regfile) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
       (* the page table may have GROWN: argstr's fetchstr faults user pages
          in.  [uptd_ext] is argstr's own report, relayed. *)
@@ -283,8 +282,6 @@ Definition wp_sys_chdir_sconf_body
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       (* the free pool only SHRINKS -- iput's truncate arm is the only mover *)
-      ⌜used' ⊆ used⌝ -∗
-      bitmap_res gfs bmapstart cov logstart size used' -∗
       (* the allowance, whole: see the header's ledger *)
       iref_slots 2 -∗
       sys_chdir_post γf pj pid (upd_upt V P')
@@ -304,7 +301,6 @@ Module Type SYSCHDIR.
       (cn : ic_names) (gtl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
-      (used : gset Z)
       (dqb dqs : dfrac)
       (v : mword 64)
       (pid : mword 32) (V : pprivate)
@@ -312,5 +308,5 @@ Module Type SYSCHDIR.
       (b : bool) (lks : gset string),
       wp_sys_chdir_sconf_body γf γa gs j gl gu gd gk pd pav pu bn g gfs gi
                               cn gtl cov logstart bmapstart inodestart nib
-                              size dev used dqb dqs v pid V m K eb b lks.
+                              size dev dqb dqs v pid V m K eb b lks.
 End SYSCHDIR.

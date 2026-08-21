@@ -75,15 +75,10 @@
    either restored or never written.  That is a fact about bmap's PROOF;
    the contract below just says [callee_saved m mf].
 
-   THE BITMAP RIDES THROUGH, because balloc's does.  bmap takes the two
-   superblock cells and [BitmapInv.bitmap_res] and hands them back; the
-   returned bitmap is at an EXISTENTIAL [used'] with [used ⊆ used'],
-   because bmap may allocate twice (the indirect block and the data block)
-   and a caller has no use for the exact set -- only for the fact that the
-   allocator never un-marks a block.  Who owns the bitmap between calls is
-   deliberately still open (claude-notes/design/fs-bitmap.md, "Who owns
-   bitmap_res between calls"); it is passed in and returned updated, as
-   [inode_map] is.
+   THE BITMAP IS AN INVARIANT, because balloc's is.  bmap takes the two
+   superblock cells and the persistent [BitmapInv.bitmap_inv] and says
+   nothing about the bitmap on the way out (claude-notes/design/fs-bitmap.md,
+   "Who owns bitmap_res between calls").
 
    [BMAP_NOALLOC] below is UNCHANGED by this: with all three allocation
    sites dead there is no balloc, hence no bitmap and no superblock cell.
@@ -269,7 +264,7 @@ Definition wp_bmap_sconf_body
     (bn : bio_names)
     (γ : log_names) (γfs : fs_names)
     (cov : gset Z) (logstart : Z) (bmapstart : Z) (size : Z) (dev : mword 32)
-    (used : gset Z) (γpr : gname)
+    (γpr : gname)
     (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8)) (fbn : nat)
     (n : nat)
     (pidv : mword 32) (dq dqd dqb dqs : dfrac)
@@ -345,7 +340,7 @@ Definition wp_bmap_sconf_body
   (* the two superblock fields and the bitmap, all three for balloc's sake *)
   sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-  bitmap_res γfs bmapstart cov logstart size used -∗
+  bitmap_inv γfs bmapstart cov logstart size -∗
   (* the running-thread bundle *)
   procs_inv γs -∗
   (* the disk fabric *)
@@ -377,12 +372,8 @@ Definition wp_bmap_sconf_body
      [eb = false] is reachable the [b] form would promise the caller it
      comes back on the hart it called from, which a park makes false. *)
   wp_next true pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (bm' : blkmap) (n' : nat) (data' : nat -> list (bv 8))
-    (used' : gset Z),
+  ∀ (mf : regfile) (bm' : blkmap) (n' : nat) (data' : nat -> list (bv 8)),
       ⌜callee_saved m mf⌝ -∗
-      (* THE ALLOCATOR NEVER UN-MARKS: [used] only grows.  The exact set is
-         existential because bmap may allocate twice. *)
-      ⌜used ⊆ used'⌝ -∗
       ⌜blkmap_wf cov logstart bm'⌝ -∗
       (* bm' agrees with bm at every file index except possibly bn *)
       ⌜forall i : nat, (i < MAXFILE)%nat -> i <> fbn ->
@@ -409,7 +400,6 @@ Definition wp_bmap_sconf_body
       proc_priv_bare pj pidv Vpr -∗
       sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-      bitmap_res γfs bmapstart cov logstart size used' -∗
       i_dev ip ↦₄{dqd} dev -∗
       inode_map γfs ip bm' -∗
       (* THE DEPOSIT.  [data'] is [data] except that a freshly allocated
@@ -455,7 +445,7 @@ Definition wp_bmap_gen_body
     (bn : bio_names)
     (γ : log_names) (γfs : fs_names)
     (cov : gset Z) (logstart : Z) (bmapstart : Z) (size : Z) (dev : mword 32)
-    (used : gset Z) (γpr : gname)
+    (γpr : gname)
     (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8)) (fbn : nat)
     (n : nat) (cr : bool) (Sb : gset Z)
     (pidv : mword 32) (dq dqd dqb dqs : dfrac)
@@ -515,7 +505,7 @@ Definition wp_bmap_gen_body
   proc_priv_bare pj pidv Vpr -∗
   sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-  bitmap_res γfs bmapstart cov logstart size used -∗
+  bitmap_inv γfs bmapstart cov logstart size -∗
   procs_inv γs -∗
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
@@ -526,9 +516,8 @@ Definition wp_bmap_gen_body
      park. *)
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (bm' : blkmap) (n' : nat) (data' : nat -> list (bv 8))
-    (used' : gset Z) (Sb' : gset Z),
+    (Sb' : gset Z),
       ⌜callee_saved m mf⌝ -∗
-      ⌜used ⊆ used'⌝ -∗
       ⌜blkmap_wf cov logstart bm'⌝ -∗
       ⌜forall i : nat, (i < MAXFILE)%nat -> i <> fbn ->
          blkmap_get bm' i = blkmap_get bm i⌝ -∗
@@ -547,7 +536,6 @@ Definition wp_bmap_gen_body
       proc_priv_bare pj pidv Vpr -∗
       sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-      bitmap_res γfs bmapstart cov logstart size used' -∗
       i_dev ip ↦₄{dqd} dev -∗
       inode_map γfs ip bm' -∗
       ⌜data' = data
@@ -603,14 +591,14 @@ Module Type BMAP.
       (bn : bio_names)
       (γ : log_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (bmapstart : Z) (size : Z) (dev : mword 32)
-      (used : gset Z) (γpr : gname)
+      (γpr : gname)
       (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8)) (fbn : nat)
       (n : nat)
       (pidv : mword 32) (dq dqd dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_bmap_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs
-                         cov logstart bmapstart size dev used γpr ip bm data fbn n
+                         cov logstart bmapstart size dev γpr ip bm data fbn n
                          pidv dq dqd dqb dqs m K eb b lks Vpr.
 
   (* the SET-FORM contract; [wp_bmap_sconf] above is its instance at
@@ -625,14 +613,14 @@ Module Type BMAP.
       (bn : bio_names)
       (γ : log_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (bmapstart : Z) (size : Z) (dev : mword 32)
-      (used : gset Z) (γpr : gname)
+      (γpr : gname)
       (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8)) (fbn : nat)
       (n : nat) (cr : bool) (Sb : gset Z)
       (pidv : mword 32) (dq dqd dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_bmap_gen_body γs j γl γu γd γk pd pav pu bn γ γfs
-                       cov logstart bmapstart size dev used γpr ip bm data fbn
+                       cov logstart bmapstart size dev γpr ip bm data fbn
                        n cr Sb
                        pidv dq dqd dqb dqs m K eb b lks Vpr.
 End BMAP.

@@ -133,10 +133,9 @@
    its eleven distinct callees, so it may return on a hart other than the
    one it was called on.
 
-   THE BITMAP IS NOT MONOTONE, in either direction: [dirlink]'s writei can
-   ALLOCATE (balloc, growing the directory) and the two walks' iunlockputs
-   can FREE (itrunc), so -- unlike sys_chdir -- no [used' ⊆ used] is
-   claimed.  create's contract is unordered for the same pair of reasons.
+   THE BITMAP IS AN INVARIANT ([BitmapInv.bitmap_inv], inside [fs_ready]):
+   [dirlink]'s writei can ALLOCATE and the two walks' iunlockputs can FREE,
+   and the contract says nothing about either.
 
    DETERMINISM: none is claimed, and none is available.  Which of the
    eight arms runs is a function of the FILE SYSTEM and of the user's two
@@ -220,7 +219,6 @@ Definition wp_sys_link_sconf_body
     (cn : ic_names) (gtl : gname)                      (* the icache + itable *)
     (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
-    (used : gset Z)
     (dqb dqs dqbs : dfrac)
     (v0 v1 : mword 64)                        (* syscall arguments 0 and 1  *)
     (pid : mword 32) (V : pprivate)
@@ -306,7 +304,7 @@ Definition wp_sys_link_sconf_body
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
-  bitmap_res gfs bmapstart cov logstart size used -∗
+  bitmap_inv gfs bmapstart cov logstart size -∗
   (* argstr's page-table side, and the two walks' (iget's ipool arm allocates) *)
   kalloc_env γa None -∗
   (* the running-thread bundle *)
@@ -319,7 +317,7 @@ Definition wp_sys_link_sconf_body
      whatever SIE was doing.
      Vacuous at [true], so consuming it costs the caller nothing. *)
   wp_next true pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (used' : gset Z) (P' : uptd),
+  ∀ (mf : regfile) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
       (* the page table may have GROWN: the two fetchstrs fault user pages
          in.  [uptd_ext] is argstr's own report, composed across the pair by
@@ -337,7 +335,6 @@ Definition wp_sys_link_sconf_body
       (* NO ORDERING on the free pool: dirlink both ALLOCATES (balloc, under
          its writei) and the two walks FREE (itrunc, under an iunlockput of
          a link-count-zero inode).  See the header. *)
-      bitmap_res gfs bmapstart cov logstart size used' -∗
       (* the allowance, whole: see the header's reference ledger *)
       iref_slots sys_link_slots -∗
       (* the process block, at the same everything but the page table *)
@@ -358,7 +355,6 @@ Module Type SYSLINK.
       (cn : ic_names) (gtl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
-      (used : gset Z)
       (dqb dqs dqbs : dfrac)
       (v0 v1 : mword 64)
       (pid : mword 32) (V : pprivate)
@@ -366,6 +362,6 @@ Module Type SYSLINK.
       (b : bool) (lks : gset string),
       wp_sys_link_sconf_body γf γa γpr gs j gl gu gd gk pd pav pu bn g gfs gi
                              cn gtl cov logstart bmapstart inodestart nib
-                             size dev used dqb dqs dqbs v0 v1 pid V
+                             size dev dqb dqs dqbs v0 v1 pid V
                              m K eb b lks.
 End SYSLINK.

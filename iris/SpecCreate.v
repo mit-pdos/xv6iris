@@ -524,7 +524,6 @@ Definition wp_create_sconf_body
     (γa : gname) (γf : gname) (γpr : gname)           (* kalloc, ftable, printk *)
     (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
     (ninodes : Z) (size : Z) (dev : mword 32)
-    (used : gset Z)
     (plen : nat) (pfun : nat -> bv 8)                 (* the PATH buffer     *)
     (ty major minor : mword 16)                       (* a1, a2, a3          *)
     (V : pprivate)                                    (* the running process *)
@@ -621,7 +620,7 @@ Definition wp_create_sconf_body
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-  bitmap_res γfs bmapstart cov logstart size used -∗
+  bitmap_inv γfs bmapstart cov logstart size -∗
   (* ---- THE RUNNING PROCESS, WHOLE ----
      create needs the pid quarter (every sleeplock records it), the p->cwd
      CELL and the cwd REFERENCE (namex's starting point) -- which is
@@ -649,7 +648,7 @@ Definition wp_create_sconf_body
   ∀ (mf : regfile) (ok made : bool)
     (k : nat) (qi s : Qp) (g : gname) (inum : mword 32)
     (dn : dinode) (bm : blkmap)
-    (u' : nat) (Sb' : gset Z) (ns' : nat) (used' : gset Z),
+    (u' : nat) (Sb' : gset Z) (ns' : nat),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
@@ -662,7 +661,6 @@ Definition wp_create_sconf_body
       (* NO ORDERING on the bitmap: create both ALLOCATES (balloc, under
          dirlink's writei) and FREES (itrunc, under the fail arm's
          iunlockput of a link-count-zero inode). *)
-      bitmap_res γfs bmapstart cov logstart size used' -∗
       proc_priv γf pj pidv V -∗
       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
       bslots bn 3 -∗
@@ -727,7 +725,6 @@ Module Type CREATE.
       (γa : gname) (γf : gname) (γpr : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (ninodes : Z) (size : Z) (dev : mword 32)
-      (used : gset Z)
       (plen : nat) (pfun : nat -> bv 8)
       (ty major minor : mword 16)
       (V : pprivate)
@@ -738,6 +735,6 @@ Module Type CREATE.
       (b : bool) (lks : gset string),
       wp_create_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
                            γa γf γpr cov logstart bmapstart inodestart nib
-                           ninodes size dev used plen pfun ty major minor
+                           ninodes size dev plen pfun ty major minor
                            V u Sb ns pidv dqb dqs dqbs dqn m K eb b lks.
 End CREATE.

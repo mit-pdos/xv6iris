@@ -822,7 +822,7 @@ Qed.
     [fs_kit_fsinit_ghost]'s coverage remainder is statable: block 1 (to
     fsinit), the log region (to initlog), the inode region (into
     [ireg_inv]), the bitmap block AND the whole free pool (into
-    [BitmapInv.bitmap_res], debt (D)), and every live inode's own blocks
+    [BitmapInv.bitmap_inv], debt (D)), and every live inode's own blocks
     (into the pool).  What is LEFT in the remainder is whatever [cov] holds
     that the file system's own geometry does not name -- at the literal
     image, nothing.                                                        *)
@@ -1054,12 +1054,13 @@ Section FsCfgBootEra.
             ([bslots bn BSLOTS] is produced at main+0x8e, not at the era) --
             so the [bslots] must be carried from kit 1's consumption site.
         (D) PAID, and it is a row below rather than an owed one:
+            [BitmapInv.bitmap_inv], allocated in the era fupd from
             [BitmapInv.bitmap_res] at [used := FsImg.fs_bmap_set BSIZE
             (P fsc_bmapstart)], the bitmap block's OWN bit set.  Built by
             [bitmap_res_of_image] out of the coverage remainder, which is
             why [fs_kit_spent] now names [fs_bitmap_spent] (the bitmap
             block plus the whole free pool) -- those leave the remainder
-            and enter the resource.  Taking [used] to be the block's own
+            and enter the invariant.  Taking [used] to be the block's own
             bits is what makes the byte-level equation
             [P bmapstart = bitmap_bytes used] a THEOREM
             ([FsImg.bm_bytes_fs_bmap_set]) rather than a new image sweep.
@@ -1089,11 +1090,13 @@ Section FsCfgBootEra.
      fsblock fsc_fs (log_hdr_bno fsc_logst) (P (log_hdr_bno fsc_logst)) ∗
      ([∗ list] i ∈ seq 0 LOGBLOCKS,
         ∃ bs : list (bv 8), fsblock fsc_fs (log_slot_bno fsc_logst i) bs) ∗
-     (* THE BITMAP, row (D): the block itself at its own bit set, plus the
-        free pool -- both carved out of the coverage remainder by
-        [bitmap_res_of_image] in the era fupd. *)
-     bitmap_res fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size
-       (FsImg.fs_bmap_set BSIZE (P fsc_bmapstart)) ∗
+     (* THE BITMAP, row (D): its INVARIANT.  The block itself at its own bit
+        set, plus the free pool, are carved out of the coverage remainder by
+        [bitmap_res_of_image] in the era fupd and go straight into
+        [BitmapInv.bitmap_inv] ([bitmap_inv_alloc]); the set is forgotten
+        there and nothing downstream ever names it.  Persistent, like
+        [ireg_inv] above. *)
+     bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size ∗
      (* THE COVERAGE REMAINDER, PAIRED: everything [cov] holds that the era
         did not spend.  At an image whose [cov] is exactly its own block
         range this is empty; it is kept because [cov] is a parameter. *)
@@ -1114,8 +1117,7 @@ Section FsCfgBootEra.
       fsblock fsc_fs (log_hdr_bno fsc_logst) (P (log_hdr_bno fsc_logst)) ∗
       ([∗ list] i ∈ seq 0 LOGBLOCKS,
          ∃ bs : list (bv 8), fsblock fsc_fs (log_slot_bno fsc_logst i) bs) ∗
-      bitmap_res fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size
-        (FsImg.fs_bmap_set BSIZE (P fsc_bmapstart)) ∗
+      bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size ∗
       ([∗ set] b ∈ fsc_cov ∖ Rspent,
          fsblock fsc_fs b (P b) ∗ blk_own fsc_fs b).
   Proof. iIntros "H". iExact "H". Qed.
@@ -1484,6 +1486,7 @@ Section FsCfgBootEra.
       as "[Hbmspent Hrem]".
     iDestruct (bitmap_res_of_image γfs (fs_blocks dk) sb cov Hwf Hfull
                  Hcovdata with "Hbmspent") as "Hbmres".
+    iMod (bitmap_inv_alloc E with "Hbmres") as "#Hbmres".
     (* ---- 8. the gname-only mints, and the record -------------------- *)
     iMod bio_names_ghost_alloc as (bn) "Hbio".
     iMod lock_ghost_alloc as (git) "Hitlk".

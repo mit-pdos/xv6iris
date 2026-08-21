@@ -68,18 +68,16 @@
    [SpecPanic]'s own credentials already have throughout this tree.  A reader who
    takes the six for "depends on nothing else" is misreading it.
 
-   THE BITMAP RIDES THROUGH THE CONTRACT.  balloc reads BOTH superblock
-   fields out of memory ([sb.size] at sb+4, [sb.bmapstart] at sb+28) and
-   rewrites the bitmap block, so the two cells and [BitmapInv.bitmap_res]
-   are premises -- there is no way to discharge the postcondition's
-   [fsblock] + [blk_own] without a resource they come out of, and
-   [BitmapInv.free_pool] is that resource.  Both cells ride as plain
-   FRACTIONAL cells, the way SpecInitlog.v takes [sb + 20] and
-   SpecIupdate.v takes [sb + 24]; the bitmap is PASSED IN AND RETURNED
-   UPDATED, exactly as InodeInv.inode_map is for bmap, because who owns it
-   between calls is the free-space layer's business and is deliberately
-   not designed here (claude-notes/design/fs-bitmap.md, "Who owns
-   bitmap_res between calls").
+   THE BITMAP IS AN INVARIANT, NOT A PREMISE.  balloc reads BOTH superblock
+   fields out of memory ([sb.size] at sb+4, [sb.bmapstart] at sb+28), so
+   the two cells are premises, as plain FRACTIONAL cells the way
+   SpecInitlog.v takes [sb + 20].  The bitmap block and its FREE POOL live
+   in [BitmapInv.bitmap_inv], a persistent Iris invariant at an
+   EXISTENTIAL set: the contract says nothing about which bits are set,
+   and the postcondition's [fsblock] + [blk_own] come out of the pool at
+   log_write's own ghost step ([BitmapInv.bitmap_alloc_au], the supplier
+   for [SpecLogWrite.wp_log_write_au]).  This is [InodeRegion]'s shape,
+   one layer over; claude-notes/design/fs-bitmap.md has the argument.
 
    ONE BITMAP BLOCK, AND A THIRD DEAD ARM.  [FSSIZE = 2000 < BPB = 8192],
    so [0 < size <= BPB] is a premise, BBLOCK collapses
@@ -151,7 +149,6 @@ Definition wp_balloc_sconf_body
     (bn : bio_names)
     (γ : log_names) (γfs : fs_names)
     (cov : gset Z) (logstart : Z) (bmapstart : Z) (size : Z) (dev : mword 32)
-    (used : gset Z)
     (γpr : gname)
     (u : nat)
     (pidv : mword 32) (dq dqb dqs : dfrac)
@@ -210,8 +207,8 @@ Definition wp_balloc_sconf_body
   (* the two superblock fields, read at +0x0a and +0xa0 and never written *)
   sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-  (* THE BITMAP, with its free pool: passed in, returned updated *)
-  bitmap_res γfs bmapstart cov logstart size used -∗
+  (* THE BITMAP'S INVARIANT (BitmapInv.v): persistent; the pool is inside *)
+  bitmap_inv γfs bmapstart cov logstart size -∗
   (* the running-thread bundle *)
   procs_inv γs -∗
   (* the disk fabric *)
@@ -247,7 +244,6 @@ Definition wp_balloc_sconf_body
       ((* FAILURE: a0 = 0, nothing allocated, nothing spent, the bitmap
           unchanged -- every bit below size was already set *)
        (⌜mf !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int 0 : mword 64)⌝ ∗
-        bitmap_res γfs bmapstart cov logstart size used ∗
         log_op γ (2 + u))
        ∨
        (* SUCCESS: a0 = a nonzero covered home block, zeroed, two units gone *)
@@ -267,9 +263,6 @@ Definition wp_balloc_sconf_body
              [InodeInv.blkmap_wf]'s injectivity at an insertion (see
              [InodeInv.inode_fresh]).  Without it bmap is unprovable. *)
           blk_own γfs (bv_unsigned blk) ∗
-          (* ...and the bitmap with exactly that bit newly set *)
-          bitmap_res γfs bmapstart cov logstart size
-                     (used ∪ {[ bv_unsigned blk ]}) ∗
           log_op γ u)) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -310,7 +303,6 @@ Definition wp_balloc_gen_body
     (bn : bio_names)
     (γ : log_names) (γfs : fs_names)
     (cov : gset Z) (logstart : Z) (bmapstart : Z) (size : Z) (dev : mword 32)
-    (used : gset Z)
     (γpr : gname)
     (u : nat) (cr : bool) (Sb : gset Z)
     (pidv : mword 32) (dq dqb dqs : dfrac)
@@ -355,7 +347,7 @@ Definition wp_balloc_gen_body
   proc_priv_bare pj pidv Vpr -∗
   sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-  bitmap_res γfs bmapstart cov logstart size used -∗
+  bitmap_inv γfs bmapstart cov logstart size -∗
   procs_inv γs -∗
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
@@ -381,7 +373,6 @@ Definition wp_balloc_gen_body
       ((* FAILURE: nothing allocated, NOTHING LOGGED -- budget and set both
           come back exactly as they went in *)
        (⌜mf !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int 0 : mword 64)⌝ ∗
-        bitmap_res γfs bmapstart cov logstart size used ∗
         log_opS γ (2 + u) Sb)
        ∨
        (* SUCCESS: the bitmap block was logged (absorbing if credited) and
@@ -394,8 +385,6 @@ Definition wp_balloc_gen_body
           ⌜~ (bv_unsigned blk ∈ log_region_set logstart)⌝ ∗
           fsblock γfs (bv_unsigned blk) (replicate BSIZE (bv_0 8)) ∗
           blk_own γfs (bv_unsigned blk) ∗
-          bitmap_res γfs bmapstart cov logstart size
-                     (used ∪ {[ bv_unsigned blk ]}) ∗
           log_opS γ (if cr then S u else u)
                     (Sb ∪ {[bmapstart]} ∪ {[bv_unsigned blk]}))) -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -414,14 +403,13 @@ Module Type BALLOC.
       (bn : bio_names)
       (γ : log_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (bmapstart : Z) (size : Z) (dev : mword 32)
-      (used : gset Z)
-      (γpr : gname)
+        (γpr : gname)
       (u : nat) (cr : bool) (Sb : gset Z)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_balloc_gen_body γs j γl γu γd γk pd pav pu bn γ γfs
-                         cov logstart bmapstart size dev used γpr u cr Sb
+                         cov logstart bmapstart size dev γpr u cr Sb
                          pidv dq dqb dqs m K eb b lks Vpr.
 
   Parameter wp_balloc_sconf :
@@ -433,13 +421,12 @@ Module Type BALLOC.
       (bn : bio_names)
       (γ : log_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (bmapstart : Z) (size : Z) (dev : mword 32)
-      (used : gset Z)
-      (γpr : gname)
+        (γpr : gname)
       (u : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_balloc_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs
-                           cov logstart bmapstart size dev used γpr u
+                           cov logstart bmapstart size dev γpr u
                            pidv dq dqb dqs m K eb b lks Vpr.
 End BALLOC.

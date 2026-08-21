@@ -340,7 +340,15 @@ Section FsReady.
         mkfs laid down, and the cells that hold it are read-only for the
         lifetime of the boot. *)
      ⌜fs_geom_ok⌝ ∗
-     fs_sb_cells)%I.
+     fs_sb_cells ∗
+     (* ...AND THE BLOCK BITMAP (BitmapInv.v).  The bitmap block and its
+        FREE POOL live in a persistent invariant at an existential set, so
+        balloc/bfree take this row and no contract anywhere names which
+        blocks are in use.  It is the last thing a syscall used to thread
+        EXCLUSIVELY beside this predicate ([fileclose_bm]), and the one that
+        would have serialized user mode had it stayed in the trap residue
+        (projects/forkret-park.md). *)
+     bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size)%I.
 
   Global Instance fs_ready_persistent : Persistent fs_ready.
   Proof. rewrite /fs_ready. apply _. Qed.
@@ -406,7 +414,8 @@ Section FsReady.
        (kmem_res fsc_kpages (mword_of_int (KernelSyms.kmem + 24))) ∗
      kalloc_avail fsc_kpages None ∗
      ⌜fs_geom_ok⌝ ∗
-     fs_sb_cells)%I.
+     fs_sb_cells ∗
+     bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size)%I.
 
   Global Instance fs_ready_pre_persistent : Persistent fs_ready_pre.
   Proof. rewrite /fs_ready_pre. apply _. Qed.
@@ -428,9 +437,9 @@ Section FsReady.
        existentially-quantified conjunct (R1). *)
     iDestruct "Hpre" as "(H1 & H2 & H3 & %H4 & H5 & H6 & H7 & H8 & H9 & H10
                           & H11 & H12 & H13 & H14 & H15 & H16 & H17
-                          & %H18 & #H19)".
+                          & %H18 & #H19 & #H20)".
     iFrame "H1 H2 H3 H5 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15".
-    iFrame "Hopen H16 H17 H19". iFrame "%".
+    iFrame "Hopen H16 H17 H19 H20". iFrame "%".
   Qed.
 
   (* ...and the converse half a seal site wants to READ BACK: the predicate
@@ -441,8 +450,8 @@ Section FsReady.
   Proof.
     rewrite /fs_ready /fs_ready_pre.
     iIntros "(H1 & H2 & H3 & %H4 & H5 & H6 & H7 & H8 & H9 & H10 & H11
-              & H12 & H13 & H14 & H15 & _ & H16 & H17 & %H18 & #H19)".
-    iFrame "H1 H2 H3 H5 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 H19".
+              & H12 & H13 & H14 & H15 & _ & H16 & H17 & %H18 & #H19 & #H20)".
+    iFrame "H1 H2 H3 H5 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 H19 H20".
     iFrame "%".
   Qed.
 
@@ -582,7 +591,14 @@ Section FsReady.
   Proof. rewrite /fs_ready. by iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & $ & _)". Qed.
 
   Lemma fs_ready_sb : fs_ready -∗ fs_sb_cells.
-  Proof. rewrite /fs_ready. by iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & $)". Qed.
+  Proof. rewrite /fs_ready. by iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & $ & _)". Qed.
+
+  (* ---- THE BITMAP --------------------------------------------------
+     The row balloc and bfree take, and the one [SpecFileclose]'s persistent
+     bundle carries in place of the exclusive [bitmap_res] it used to. *)
+  Lemma fs_ready_bitmap :
+    fs_ready -∗ bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size.
+  Proof. rewrite /fs_ready. by iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & $)". Qed.
 
   (* the same four cells, spelled one by one -- the form every existing fs
      contract states them in, at [dq := DfracDiscarded]. *)
@@ -622,14 +638,15 @@ Section FsReady.
     ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst ∗ ic_sleeplocks fsc_ic ∗
     ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib ∗ ireg_open ∗
     kalloc_env fsc_kalloc None ∗
-    ⌜fs_geom_ok⌝ ∗ fs_sb_cells.
+    ⌜fs_geom_ok⌝ ∗ fs_sb_cells ∗
+    bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size.
   Proof.
     iIntros "H". iDestruct (fs_ready_kalloc with "H") as "#Hka".
     rewrite /fs_ready.
     iDestruct "H" as "(H1 & H2 & H3 & %H4 & H5 & H6 & H7 & H8 & H9 & H10
                        & H11 & H12 & H13 & H14 & H15 & H16 & _ & _
-                       & %H19 & #H20)".
-    iFrame "H1 H2 H3 H5 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 Hka H20".
+                       & %H19 & #H20 & #H21)".
+    iFrame "H1 H2 H3 H5 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 Hka H20 H21".
     iFrame "%".
   Qed.
 

@@ -71,6 +71,7 @@ Require Import FsCrash.
 Require Import UserPtTree.
 Require Import SpecProcinit.
 Require Import SpecFileclose.
+Require Import FsCfg FsReady.
 Require Import SpecDevintr.
 Require Import SpecPrintk.
 Require Import SpecSyscall.
@@ -447,9 +448,6 @@ Section UsertrapRes.
     un_inodestart : Z;
     un_nib : nat;
     un_size : Z;
-    un_dqb : dfrac;
-    un_dqs : dfrac;
-    un_us  : gset Z;
     un_ks  : mword 64;                (* the kernel stack's BASE             *)
     un_pid : mword 32;
   }.
@@ -464,27 +462,12 @@ Section UsertrapRes.
       (un_bn N) (un_lg N) (un_fs N) (un_cov N) (un_logstart N) (un_dev N)
       (un_pid N) (DfracOwn (1/4))
       (un_i N) (un_cn N) (un_tl N) (un_bmapstart N) (un_inodestart N)
-      (un_nib N) (un_size N) (un_dqb N) (un_dqs N).
+      (un_nib N) (un_size N).
 
-  (* THE ONE FIELD A SYSCALL CALL CAN MOVE.  [SpecSyscall.wp_syscall_sconf_body]
-     hands [fileclose_bm (un_fn N) (un_us N)] to the dispatch table (see its
-     header) and gets back [fileclose_bm (un_fn N) us'] for a possibly SMALLER
-     [us'] -- [SYSCLOSE]'s own postcondition re-indexes it the same way.  No
-     other field of [ut_names] moves across that call, so this is the only
-     update function this record needs. *)
-  Definition upd_us (N : ut_names) (us : gset Z) : ut_names :=
-    MkUtNames (un_ft N) (un_f N) (un_w N) (un_s N) (un_j N) (un_l N)
-      (un_u N) (un_v N) (un_k N) (un_pd N) (un_pav N) (un_pu N)
-      (un_tk N) (un_pr N) (un_bn N) (un_lg N) (un_fs N) (un_cov N)
-      (un_logstart N) (un_dev N) (un_ip N) (un_dqi N) (un_kl N) (un_ka N)
-      (un_i N) (un_cn N) (un_tl N) (un_bmapstart N) (un_inodestart N)
-      (un_nib N) (un_size N) (un_dqb N) (un_dqs N) us (un_ks N) (un_pid N).
-
-  Lemma un_fn_upd_us (N : ut_names) (us : gset Z) : un_fn (upd_us N us) = un_fn N.
-  Proof. reflexivity. Qed.
-
-  Lemma upd_us_id (N : ut_names) : upd_us N (un_us N) = N.
-  Proof. destruct N; reflexivity. Qed.
+  (* NO FIELD OF [ut_names] MOVES ACROSS A SYSCALL.  The block bitmap used
+     to ride here as an exclusive, set-indexed [fileclose_bm], re-indexed by
+     every close; it is a persistent invariant now ([BitmapInv.bitmap_inv],
+     a conjunct of [FsReady.fs_ready]), so the record is constant. *)
 
   (* the pure side conditions every callee below usertrap shares.  Bundled
      for the same reason the names are: each block lemma needs all four and
@@ -572,7 +555,10 @@ Section UsertrapRes.
      dev_inv (un_u N) (un_v N) ∗
      disk_geom (un_v N) (un_pd N) (un_pav N) (un_pu N) ∗
      kalloc_avail (un_ka N) None ∗
-     fileclose_ic_env (un_fn N))%I.
+     (* the file system as fileclose/kexit see it: the ambient [fs_ready]
+        and the ties from [un_fn N]'s fields to the ambient names *)
+     ⌜fclose_ties (un_fn N)⌝ ∗
+     FsReady.fs_ready)%I.
 
   Global Instance ut_caps_persistent N : Persistent (ut_caps N).
   Proof. rewrite /ut_caps. apply _. Qed.
@@ -592,7 +578,6 @@ Section UsertrapRes.
   Definition ut_own (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
       (N : ut_names) (V : pprivate) : iProp Σ :=
     (bslots (un_bn N) 3 ∗
-     fileclose_bm (un_fn N) (un_us N) ∗
      (mword_of_int KernelSyms.initproc : mword 64) ↦₈{un_dqi N} (un_ip N) ∗
      fd_slots FDSPARE ∗
      iref_slots IREFSPARE ∗
@@ -619,42 +604,32 @@ Section UsertrapRes.
        proc_priv (un_f N) (un_pj N) (un_pid N) V' -∗
        Rsys (un_f N) (un_pj N) (un_bn N) (un_fn N) -∗ ut_own Rsys N V').
   Proof.
-    iIntros "(Hb & Hbm & Hip & Hfd & Hir & Hpv & Hsy)".
+    iIntros "(Hb & Hip & Hfd & Hir & Hpv & Hsy)".
     iFrame "Hpv Hsy". iIntros (V') "Hpv Hsy".
-    rewrite /ut_own. iFrame "Hb Hbm Hip Hfd Hir Hpv Hsy".
+    rewrite /ut_own. iFrame "Hb Hip Hfd Hir Hpv Hsy".
   Qed.
 
-  (* [ut_own]'s SEVEN raw conjuncts, straight back into [ut_own (upd_us N
-     us)] -- the rebuild [ProofUsertrapSys.v]'s syscall block needs after
-     [wp_syscall_sconf]'s crossing hands the six unmoved pieces back plus a
-     (possibly smaller) [fileclose_bm] set.  A DEDICATED lemma, proved here
-     against a SEVEN-hypothesis context, rather than an inline
-     [rewrite /ut_own /N2 ...; iFrame.] at the call site: the same shape
-     with the caller's own ~100-hypothesis proof state behind it makes
-     [iFrame]'s search degenerate (durable-notes.md's "failing tactic looks
-     like a hang" family -- this one is a slow, not a failing, tactic, but
-     the fix is the same: keep the reconstruction in a small lemma). *)
-  Lemma ut_own_rebuild_us (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ) (N : ut_names)
-      (V : pprivate) (us : gset Z) :
+  (* [ut_own]'s SIX raw conjuncts, straight back into [ut_own N] -- the
+     rebuild [ProofUsertrapSys.v]'s syscall block needs after
+     [wp_syscall_sconf]'s crossing hands the pieces back.  A DEDICATED
+     lemma, proved here against a small context, rather than an inline
+     [rewrite /ut_own; iFrame.] at the call site: the same shape with the
+     caller's own ~100-hypothesis proof state behind it makes [iFrame]'s
+     search degenerate (durable-notes.md's "failing tactic looks like a
+     hang" family). *)
+  Lemma ut_own_rebuild (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ) (N : ut_names)
+      (V : pprivate) :
     bslots (un_bn N) 3 -∗
-    fileclose_bm (un_fn N) us -∗
     (mword_of_int KernelSyms.initproc : mword 64) ↦₈{un_dqi N} (un_ip N) -∗
     fd_slots FDSPARE -∗
     iref_slots IREFSPARE -∗
     proc_priv (un_f N) (un_pj N) (un_pid N) V -∗
     Rsys (un_f N) (un_pj N) (un_bn N) (un_fn N) -∗
-    ut_own Rsys (upd_us N us) V.
+    ut_own Rsys N V.
   Proof.
     rewrite /ut_own.
-    assert (un_bn (upd_us N us) = un_bn N) as -> by reflexivity.
-    assert (un_fn (upd_us N us) = un_fn N) as -> by reflexivity.
-    assert (un_dqi (upd_us N us) = un_dqi N) as -> by reflexivity.
-    assert (un_ip (upd_us N us) = un_ip N) as -> by reflexivity.
-    assert (un_f (upd_us N us) = un_f N) as -> by reflexivity.
-    assert (un_pj (upd_us N us) = un_pj N) as -> by reflexivity.
-    assert (un_pid (upd_us N us) = un_pid N) as -> by reflexivity.
-    iIntros "Hb Hbm Hip Hfd Hir Hpv Hsy".
-    iFrame "Hb Hbm Hip Hfd Hir Hpv Hsy".
+    iIntros "Hb Hip Hfd Hir Hpv Hsy".
+    iFrame "Hb Hip Hfd Hir Hpv Hsy".
   Qed.
 
   (* THE TRAPFRAME BORROW, at the [proc_priv] level.  [proc_fields] /
@@ -830,7 +805,6 @@ Section UsertrapRes.
   Definition ut_own_nopt (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
       (N : ut_names) (V : pprivate) : iProp Σ :=
     (bslots (un_bn N) 3 ∗
-     fileclose_bm (un_fn N) (un_us N) ∗
      (mword_of_int KernelSyms.initproc : mword 64) ↦₈{un_dqi N} (un_ip N) ∗
      fd_slots FDSPARE ∗
      iref_slots IREFSPARE ∗
@@ -876,8 +850,8 @@ Section UsertrapRes.
     ut_own_nopt Rsys N V -∗ proc_pt (pv_upt V) -∗ ut_own Rsys N V.
   Proof.
     rewrite /ut_own /ut_own_nopt proc_priv_split_pt.
-    iIntros "(Hb & Hbm & Hip & Hfd & Hir & Hpv & Hsy) Hpt".
-    iFrame "Hb Hbm Hip Hfd Hir Hpv Hpt Hsy".
+    iIntros "(Hb & Hip & Hfd & Hir & Hpv & Hsy) Hpt".
+    iFrame "Hb Hip Hfd Hir Hpv Hpt Hsy".
   Qed.
 
   Lemma ut_own_pt_open (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
@@ -885,8 +859,8 @@ Section UsertrapRes.
     ut_own Rsys N V -∗ ut_own_nopt Rsys N V ∗ proc_pt (pv_upt V).
   Proof.
     rewrite /ut_own /ut_own_nopt proc_priv_split_pt.
-    iIntros "(Hb & Hbm & Hip & Hfd & Hir & (Hpv & Hpt) & Hsy)".
-    iFrame "Hb Hbm Hip Hfd Hir Hpv Hpt Hsy".
+    iIntros "(Hb & Hip & Hfd & Hir & (Hpv & Hpt) & Hsy)".
+    iFrame "Hb Hip Hfd Hir Hpv Hpt Hsy".
   Qed.
 
   (* the borrow accessor, at the reduced environment -- [ut_own_priv]'s twin *)
@@ -899,9 +873,9 @@ Section UsertrapRes.
        proc_priv_nopt (un_f N) (un_pj N) (un_pid N) V' -∗
        Rsys (un_f N) (un_pj N) (un_bn N) (un_fn N) -∗ ut_own_nopt Rsys N V').
   Proof.
-    iIntros "(Hb & Hbm & Hip & Hfd & Hir & Hpv & Hsy)".
+    iIntros "(Hb & Hip & Hfd & Hir & Hpv & Hsy)".
     iFrame "Hpv Hsy". iIntros (V') "Hpv Hsy".
-    rewrite /ut_own_nopt. iFrame "Hb Hbm Hip Hfd Hir Hpv Hsy".
+    rewrite /ut_own_nopt. iFrame "Hb Hip Hfd Hir Hpv Hsy".
   Qed.
 
   (* the descriptor's derived footprint field is invisible to the reduced

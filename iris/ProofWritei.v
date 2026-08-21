@@ -383,6 +383,11 @@ Section WriteiDefs.
      datum tier out loud (the blanket [(ktd := KT1)] below). *)
   Context {ktb : ktier}.
   Context `{!KtierLe ktb KT1}.
+
+  (* the allocation-side bundle, [BitmapInv.bm_alloc_res]: the geometry, the
+     two superblock cells and the PERSISTENT [bitmap_inv], as one record and
+     one iProp *)
+
   (* writei's 112-byte frame.  Slot k sits at [sp0 - 8k], i.e. at
      [sp_new + (112 - 8k)]:
        1 ra@104   2 s0@96   3 s1@88   4 s2@80   5 s3@72   6 s4@64
@@ -2228,10 +2233,9 @@ Section WriteiLoop.
                  with "Hcont") as "Hcont".
     assert (HKbm : (K_bmap <= K - 14)%nat) by (lia).
     (* the allocation bundle opens for exactly this call and closes again
-       right after: [bm_bitmap]'s index is [ba_used A] throughout, so the
-       loop invariant never mentions the bitmap's current set. *)
-    iDestruct "Hba" as "(%Hgok & Hszc & Hbmsc & Hbmg)".
-    iDestruct "Hbmg" as (uIn) "[%HuIn Hbmres]".
+       right after: the bitmap itself is a PERSISTENT invariant, so the loop
+       invariant never mentions the bitmap's current set. *)
+    iDestruct "Hba" as "(%Hgok & Hszc & Hbmsc & #Hbminv)".
     (* THE CREDIT writei PRESENTS: "this op has already logged the bitmap
        block".  It is a DECIDABLE READ of the loop's own set, not a case
        split -- [wi_bmap_need_ok] discharges bmap's reservation at either
@@ -2243,7 +2247,7 @@ Section WriteiLoop.
                  (m !!! Regidx Ra2 : mword 64) n src_bytes with "Hsrc")
       as "[Hppid Hsrcback]".
     iApply (BM.wp_bmap_gen γs j γl γu γd γk pd pav pu bn γ γfs
-              cov logstart (ba_bms A) (ba_size A) dev uIn (ba_pr A)
+              cov logstart (ba_bms A) (ba_size A) dev (ba_pr A)
               ip bmI dataI fbn nI (bool_decide (ba_bms A ∈ SI)) SI
               pidv (wi_q user dq) dqd (ba_dqb A) (ba_dqs A)
               A3 (K - 14)%nat eb b lks (if user then upd_upt V PI else V)
@@ -2255,20 +2259,19 @@ Section WriteiLoop.
               Hfbnlt HwfI Hj Hgl HA3a0 HA3a1
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hkdata Hprkenv Hpanenv Hbio Hlctx Hidev Hmap
                     Hblocks Hppid
-                    Hszc Hbmsc Hbmres
+                    Hszc Hbmsc Hbminv
                     Hprocs Hdevi Hdgeom Hdlock Hsl Hop").
     all: try lkbelow.
-    iIntros (CIDa4 Hqa4 mB bm2 nB data2 uMid Sb2)
-      "%Hcs1 %HuMid %Hwf2 %Hagr2 %Hnoun2 %Harm2 Hcg Hcnt Hextc Hextm Hpc Hppid
-       Hszc Hbmsc Hbmres Hidev Hmap %Hdep2 Hblocks Hsl %Hbud2 Hop".
+    iIntros (CIDa4 Hqa4 mB bm2 nB data2 Sb2)
+      "%Hcs1 %Hwf2 %Hagr2 %Hnoun2 %Harm2 Hcg Hcnt Hextc Hextm Hpc Hppid
+       Hszc Hbmsc Hidev Hmap %Hdep2 Hblocks Hsl %Hbud2 Hop".
     (* the pid borrow closes *)
     iDestruct ("Hsrcback" with "Hppid") as "Hsrc".
-    (* re-close the bundle at the SAME index -- [ba_used A ⊆ uIn ⊆ uMid] *)
-    iAssert (bm_alloc_res γfs cov logstart A) with "[Hszc Hbmsc Hbmres]" as "Hba".
+    (* re-close the bundle: the two cells came back, and the invariant never
+       left the intuitionistic context *)
+    iAssert (bm_alloc_res γfs cov logstart A) with "[Hszc Hbmsc]" as "Hba".
     { rewrite /bm_alloc_res. iSplitR; [iPureIntro; exact Hgok|].
-      iFrame "Hszc Hbmsc".
-      iApply (bm_bitmap_intro γfs cov logstart (ba_bms A) (ba_size A)
-                (ba_used A) uMid (bm_used_trans _ _ _ HuIn HuMid) with "Hbmres"). }
+      iFrame "Hszc Hbmsc". iExact "Hbminv". }
     (* the loop still has a unit for its own [log_write]: the invariant
        reserved two per remaining block plus the bitmap's potential, and no
        arm of bmap costs more than two plus that potential
@@ -4004,7 +4007,7 @@ Section WriteiMain.
       (γa : gname) (γf : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
       (bmapstart : Z) (size : Z) (dev : mword 32)
-      (used : gset Z) (γpr : gname)
+      (γpr : gname)
       (ip : mword 64) (inum : mword 32)
       (bm : blkmap) (data : nat -> list (bv 8))
       (dn dn0 : dinode)
@@ -4014,7 +4017,7 @@ Section WriteiMain.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
     : wp_writei_gen_body ktb γs j γl γu γd γk pd pav pu bn γ γfs γi γa γf
-                         cov logstart inodestart nib bmapstart size dev used γpr
+                         cov logstart inodestart nib bmapstart size dev γpr
                          ip inum bm data dn dn0
                          user off n src_bytes V ncount Sb
                          pidv dq dqd dqn dqs dqb dqbs m K eb b lks.
@@ -4023,7 +4026,7 @@ Section WriteiMain.
     intros pcE pj src ret_tgt HK Hcost Hgeom Hist Hicov Hilog Hnib Hadr Hdtnz Hstab Hnlk
            Hwf Hhz Hcovin Hsum Hszdn Hgok Hprkc Hj Hgl Ha0 Ha1 Ha3 Ha4 Hbelow.
     (* the whole allocation side travels as ONE record from here down *)
-    set (A := MkBmAlloc γ bmapstart size used dqb dqbs γpr).
+    set (A := MkBmAlloc γ bmapstart size dqb dqbs γpr).
     pose proof HK as HK'. 
     change (2 ^ 31)%Z with 2147483648%Z in Hsum, Hszdn.
     assert (Hofflt : (Z.of_nat off < 2147483648)%Z) by lia.
@@ -4031,18 +4034,15 @@ Section WriteiMain.
     assert (Hgeom0 : log_geom_ok cov logstart) by exact Hgeom.
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hkdata #Hprkenv #Hbio #Hlctx #Hkenv
               Hidev Hinum
-              Hmeta Hmap Hblocks Hsb Hszc Hbmsc Hbmres #Hireg Hdn Hsrc
+              Hmeta Hmap Hblocks Hsb Hszc Hbmsc #Hbminv #Hireg Hdn Hsrc
               #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hop Hcont".
     iPoseProof (SpecPrintk.printk_env_panic with "Hprkenv") as "#Hpanenv".
     iDestruct (CpuOwn.cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
-    iAssert (bm_alloc_res γfs cov logstart A) with "[Hszc Hbmsc Hbmres]" as "Hba".
+    iAssert (bm_alloc_res γfs cov logstart A) with "[Hszc Hbmsc]" as "Hba".
     { rewrite /bm_alloc_res /A. iSplitR; [iPureIntro; exact Hgok|].
-      iFrame "Hszc Hbmsc".
-      iApply (bm_bitmap_intro γfs cov logstart bmapstart size used used
-                (reflexivity used) with "Hbmres"). }
-    (* THE ADAPTER, and the only place the two shapes meet: the public
-       contract quantifies the bitmap's FINAL set with [used ⊆ used'], while
-       everything below carries the bundle at the fixed entry index.  Written
+      iFrame "Hszc Hbmsc". iExact "Hbminv". }
+    (* THE ADAPTER: the interior carries the two superblock cells inside the
+       bundle, the public contract hands them back on their own.  Written
        once here rather than at every interior continuation. *)
     iAssert (wi_cont (ktb := ktb) (CID0 := CID) γfs γi bn γ γf cov logstart inodestart nib dev
                ip inum bm data dn dn0 user off n src_bytes V ncount Sb
@@ -4054,15 +4054,14 @@ Section WriteiMain.
          %Cwi %Cwiany %Cwiat %C13
          Hcg Hcnt Hextc Hextm Hpc Hidev Hinum Hmeta Hmap Hblocks Hsb
          Hba Hdn Hsrc Hsl Hop".
-      iDestruct "Hba" as "(%Hgok2 & Hszc & Hbmsc & Hbmg)".
-      iDestruct "Hbmg" as (uOut) "[%HuOut Hbmres]".
+      iDestruct "Hba" as "(%Hgok2 & Hszc & Hbmsc & _)".
       iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
-      iApply ("Hcont" $! mf tot bm2 data2 dn2 dn02 n2 wrote dist dstb P2 uOut SbF
+      iApply ("Hcont" $! mf tot bm2 data2 dn2 dn02 n2 wrote dist dstb P2 SbF
                 with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
-                      [%] [%] [%] [%] [%] [%]
+                      [%] [%] [%] [%] [%]
                       Hcg Hcnt Hextc Hextm Hpc Hidev Hinum Hmeta Hmap
-                      Hblocks Hsb Hszc Hbmsc Hbmres Hdn Hsrc Hsl Hop").
-      { exact C1. } { exact HuOut. } { exact C2. } { exact C3. }
+                      Hblocks Hsb Hszc Hbmsc Hdn Hsrc Hsl Hop").
+      { exact C1. } { exact C2. } { exact C3. }
       { exact C4. } { exact C5. } { exact C6. }
       { exact Ccap. } { exact Csz. } { exact C7. } { exact C8. }
       { exact C8k. }
@@ -5011,7 +5010,7 @@ Section WriteiMain.
       (γa : gname) (γf : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
       (bmapstart : Z) (size : Z) (dev : mword 32)
-      (used : gset Z) (γpr : gname)
+      (γpr : gname)
       (ip : mword 64) (inum : mword 32)
       (bm : blkmap) (data : nat -> list (bv 8))
       (dn dn0 : dinode)
@@ -5021,7 +5020,7 @@ Section WriteiMain.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
     : wp_writei_sconf_body ktb γs j γl γu γd γk pd pav pu bn γ γfs γi γa γf
-                           cov logstart inodestart nib bmapstart size dev used γpr
+                           cov logstart inodestart nib bmapstart size dev γpr
                            ip inum bm data dn dn0
                            user off n src_bytes V ncount
                            pidv dq dqd dqn dqs dqb dqbs m K eb b lks.
@@ -5031,34 +5030,34 @@ Section WriteiMain.
            Hwf Hhz Hcovin Hsum Hszdn Hgok Hprkc Hj Hgl Ha0 Ha1 Ha3 Ha4 Hbelow.
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hkdata #Hprkenv #Hbio #Hlctx #Hkenv
               Hidev Hinum
-              Hmeta Hmap Hblocks Hsb Hszc Hbmsc Hbmres #Hireg Hdn Hsrc
+              Hmeta Hmap Hblocks Hsb Hszc Hbmsc #Hbminv #Hireg Hdn Hsrc
               #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hop Hcont".
     iDestruct "Hop" as (Sb0) "Hop".
     iApply (wp_writei_gen γs j γl γu γd γk pd pav pu bn γ γfs γi γa γf
-              cov logstart inodestart nib bmapstart size dev used γpr
+              cov logstart inodestart nib bmapstart size dev γpr
               ip inum bm data dn dn0 user off n src_bytes V ncount Sb0
               pidv dq dqd dqn dqs dqb dqbs m K eb b lks
               HK Hcost Hgeom Hist Hicov Hilog Hnib Hadr Hdtnz Hstab Hnlk
               Hwf Hhz Hcovin Hsum Hszdn Hgok Hprkc Hj Hgl Ha0 Ha1 Ha3 Ha4 Hbelow
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hkdata Hprkenv Hbio Hlctx Hkenv
                     Hidev Hinum
-                    Hmeta Hmap Hblocks Hsb Hszc Hbmsc Hbmres Hireg Hdn Hsrc
+                    Hmeta Hmap Hblocks Hsb Hszc Hbmsc Hbminv Hireg Hdn Hsrc
                     Hprocs Hdevi Hdgeom Hdlock Hsl Hop [Hcont]").
     all: try lkbelow.
     iEval (rewrite /wp_next).
     iIntros (CIDf) "%Hchain".
-    iIntros (mf tot bm' data' dn' dn0' n' wrote dist dstb P' used' Sb')
-      "%D1 %D2 %D3 %D4 %D5 %D6 %D7 %Dcap %Dsz %D8 %D9 %D9k %D10 %D11 %D12 %D13
+    iIntros (mf tot bm' data' dn' dn0' n' wrote dist dstb P' Sb')
+      "%D1 %D3 %D4 %D5 %D6 %D7 %Dcap %Dsz %D8 %D9 %D9k %D10 %D11 %D12 %D13
        %Dsb %Dwi %Dwiany %Dwiat %D14
        Hcg Hcnt Hextc Hextm Hpc Hidev Hinum Hmeta Hmap Hblocks Hsb
-       Hszc Hbmsc Hbmres Hdn Hsrc Hsl Hop".
+       Hszc Hbmsc Hdn Hsrc Hsl Hop".
     iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
-    iApply ("Hcont" $! mf tot bm' data' dn' dn0' n' wrote dist dstb P' used'
+    iApply ("Hcont" $! mf tot bm' data' dn' dn0' n' wrote dist dstb P'
               with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
-                    [%] [%]
+                    [%]
                     Hcg Hcnt Hextc Hextm Hpc Hidev Hinum Hmeta Hmap Hblocks Hsb
-                    Hszc Hbmsc Hbmres Hdn Hsrc Hsl [Hop]").
-    { exact D1. } { exact D2. } { exact D3. } { exact D4. } { exact D5. }
+                    Hszc Hbmsc Hdn Hsrc Hsl [Hop]").
+    { exact D1. } { exact D3. } { exact D4. } { exact D5. }
     { exact D6. } { exact D7. } { exact Dcap. } { exact Dsz. } { exact D8. }
     { exact D9. } { exact D9k. } { exact D10. } { exact D11. } { exact D12. }
     { exact D13. } { exact D14. }

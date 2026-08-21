@@ -259,7 +259,7 @@ Section KexecCSetup.
   Lemma kxc_c_setup
       (jp : nat) (bn : bio_names) (gfs : fs_names) (ga gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z)
-      (size : Z) (used used2 : gset Z)
+      (size : Z)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
@@ -286,11 +286,11 @@ Section KexecCSetup.
     avf na = (mword_of_int 0 : mword 64) ->
     kernel_text -∗
     kxc_at_1ae jp bn gfs ga gf cov logstart bmapstart inodestart size
-               used used2 plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas
+               plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas
                M K sp0 ra0 s00 s10 s20 pv av
                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P szv -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-    ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
+    ∀ (mf : regfile) (V' : pprivate)
        (entry spv szv' : mword 64),
         ⌜callee_saved m mf⌝ -∗
         ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
@@ -299,8 +299,6 @@ Section KexecCSetup.
         pc_is (ret_pc ra0) -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-        ⌜used' ⊆ used⌝ -∗
-        bitmap_res gfs bmapstart cov logstart size used' -∗
         kalloc_env ga None -∗
         proc_priv gf (proc_addr jp) pidv V' -∗
         ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
@@ -322,11 +320,11 @@ Section KexecCSetup.
            fresh variable phase D would then have nothing to tie down. *)
         ⌜(8192 <= uint sz1)%Z⌝ -∗
         ( kxc_at_21a jp bn gfs ga gf cov logstart bmapstart inodestart size
-                     used2 plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
+                     plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
                      M' K sp0 ra0 s00 s10 s20 pv av
                      w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P' (pv_sz V) sz1 0
           ∨ kxc_at_272 jp bn gfs ga gf cov logstart bmapstart inodestart size
-                       used2 plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
+                       plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
                        M' K sp0 ra0 s00 s10 s20 pv av
                        w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P' (pv_sz V) sz1 0 ) -∗
         (* THE EXIT, HANDED BACK.  A [wp_next] continuation is LINEAR, so a
@@ -334,7 +332,7 @@ Section KexecCSetup.
            one: the caller supplies exactly one and whichever path runs
            receives it.  durable-notes' "CHAINING TWO HALVES" shape. *)
         wp_next (CID0 := CID) true (proc_addr jp) (fun (CIDy : CpuId) =>
-          ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
+          ∀ (mf : regfile) (V' : pprivate)
              (entry spv szv' : mword 64),
               ⌜callee_saved m mf⌝ -∗
               ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
@@ -343,8 +341,6 @@ Section KexecCSetup.
               pc_is (ret_pc ra0) -∗
               sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
               sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-              ⌜used' ⊆ used⌝ -∗
-              bitmap_res gfs bmapstart cov logstart size used' -∗
               kalloc_env ga None -∗
               proc_priv gf (proc_addr jp) pidv V' -∗
               ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
@@ -364,7 +360,7 @@ Section KexecCSetup.
     iIntros "#Htext Hst Hcont Hout".
     rewrite /kxc_at_1ae.
     iDestruct "Hst" as "((%HMsp & %HMs0 & %HMs2 & %HMs6) &
-                         (%Hu2 & %Hal) &
+                         %Hal &
                          (%HPtfp & %Hbelow & %Hcov) &
                          Hpc & Hcg & Hcnt & Hirs & Hbm & Hins &
                          Hbits & Hbs & #Hka & Hpt & Hpriv & Hpath & Hargv &
@@ -934,13 +930,13 @@ Section KexecCSetup.
                        (CID18 : CPU) = (CID0 : CPU)) by wp_next_chain.
       iDestruct (wp_next_retarget CID0 CID18 true (proc_addr jp) _ Hcr18
                    with "Hcont") as "Hcont".
-      iApply (TC.kxc_bad_1d6 jp ga gf bn gfs cov logstart bmapstart inodestart
-                size used used2 plen pfun na avf alen aslen afun pidv V
+      iApply (TC.kxc_bad_1d6 jp ga gf bn bmapstart inodestart
+                plen pfun na avf alen aslen afun pidv V
                 dqb dqs dqa dqpv dqas m U0 K ∅ sp0 ra0 s00 s10 s20 pv av P (pgroundup szv)
-                ltac:(lia) Hu2
+                ltac:(lia)
                 Hmsp Hmra Hms0 Hms1 Hms2 HU0sp HU0s3 HU0s6
                 Hbelow_pground Hcov_pground
-                with "Hcg Hcnt Htext Hpc Hptback Hka Hbm Hins Hbits Hpriv
+                with "Hcg Hcnt Htext Hpc Hptback Hka Hbm Hins Hpriv
                       Hpath Hargv Hargs Hbs Hirs Hframeat Hcont").
     - (* ==================== SUCCESS: uvmalloc returned newsz ==================== *)
       iDestruct "Hsucc" as (P') "(%Hext & %Hdomeq & %Hleaf & %HMua0c & Hptnew)".
@@ -1843,7 +1839,7 @@ Section KexecCExitM1.
   Local Lemma kxc_c_res_intro
       (jp : nat) (bn : bio_names) (gfs : fs_names) (ga gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z)
-      (size : Z) (used2 : gset Z)
+      (size : Z)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
@@ -1855,7 +1851,7 @@ Section KexecCExitM1.
     iref_slots 2 -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-    bitmap_res gfs bmapstart cov logstart size used2 -∗
+    bitmap_inv gfs bmapstart cov logstart size -∗
     bslots bn 3 -∗
     kalloc_env ga None -∗
     proc_pt P -∗
@@ -1867,7 +1863,7 @@ Section KexecCExitM1.
     ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ[KT1] ef j) -∗
     kxc_frameC sp0 ra0 s00 s10 s20 pv av
                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 c sz1 alen -∗
-    kxc_c_res jp bn gfs ga gf cov logstart bmapstart inodestart size used2
+    kxc_c_res jp bn gfs ga gf cov logstart bmapstart inodestart size
               plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas
               sp0 ra0 s00 s10 s20 pv av
               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P c sz1 alen.
@@ -1891,7 +1887,7 @@ Section KexecCExitM1.
   Lemma kxc_c_exit_m1
       (jp : nat) (bn : bio_names) (gfs : fs_names) (ga gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z)
-      (size : Z) (used2 : gset Z)
+      (size : Z)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
@@ -1924,12 +1920,12 @@ Section KexecCExitM1.
     pc_is (mword_of_int (KXC + stub) : mword 64) -∗
     sie_cap_gpr KT1 M (K - 68)%nat true (proc_addr jp) -∗
     cpu_own 0 true (proc_addr jp) true ∅ -∗
-    kxc_c_res jp bn gfs ga gf cov logstart bmapstart inodestart size used2
+    kxc_c_res jp bn gfs ga gf cov logstart bmapstart inodestart size
               plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas
               sp0 ra0 s00 s10 s20 pv av
               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P c sz1 alen -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-    ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
+    ∀ (mf : regfile) (V' : pprivate)
        (entry spv szv' : mword 64),
         ⌜callee_saved m mf⌝ -∗
         ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
@@ -1938,8 +1934,6 @@ Section KexecCExitM1.
         pc_is (ret_pc ra0) -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-        ⌜used' ⊆ used2⌝ -∗
-        bitmap_res gfs bmapstart cov logstart size used' -∗
         kalloc_env ga None -∗
         proc_priv gf (proc_addr jp) pidv V' -∗
         ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
@@ -1994,12 +1988,12 @@ Section KexecCExitM1.
                      (CID2 : CPU) = (CID0 : CPU)) by wp_next_chain.
     iDestruct (wp_next_retarget CID0 CID2 true (proc_addr jp) _ Hcr2
                  with "Hcont") as "Hcont".
-    iApply (TC.kxc_bad_1d6 jp ga gf bn gfs cov logstart bmapstart inodestart
-              size used2 used2 plen pfun na avf alen aslen afun pidv V
+    iApply (TC.kxc_bad_1d6 jp ga gf bn bmapstart inodestart
+              plen pfun na avf alen aslen afun pidv V
               dqb dqs dqa dqpv dqas m Mt K ∅ sp0 ra0 s00 s10 s20 pv av P sz1
-              ltac:(lia) ltac:(reflexivity)
+              ltac:(lia)
               Hmsp Hmra Hms0 Hms1 Hms2 HMtsp HMts3 HMts6 Hbelow Hcov
-              with "Hcg Hcnt Htext Hpc Hpt Hka Hbm Hins Hbits Hpriv
+              with "Hcg Hcnt Htext Hpc Hpt Hka Hbm Hins Hpriv
                     Hpath Hargv Hargs Hbs Hirs Hframeat Hcont").
   Qed.
 
@@ -2160,7 +2154,7 @@ Section KexecCLoop.
   Lemma kxc_argv_step
       (jp : nat) (bn : bio_names) (gfs : fs_names) (ga gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z)
-      (size : Z) (used2 : gset Z)
+      (size : Z)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
@@ -2192,13 +2186,13 @@ Section KexecCLoop.
     m !!! Regidx Rs6 = w8 -> m !!! Regidx Rs7 = w9 -> m !!! Regidx Rs8 = w10 ->
     m !!! Regidx Rs9 = w11 -> m !!! Regidx Rs10 = w12 -> m !!! Regidx Rs11 = w13 ->
     kernel_text -∗
-    kxc_at_21a jp bn gfs ga gf cov logstart bmapstart inodestart size used2
+    kxc_at_21a jp bn gfs ga gf cov logstart bmapstart inodestart size
                plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
                M K sp0 ra0 s00 s10 s20 pv av
                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P oldsz sz1 c -∗
     (* ---- kexec's OWN continuation: the three early exits close it ---- *)
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-    ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
+    ∀ (mf : regfile) (V' : pprivate)
        (entry spv szv' : mword 64),
         ⌜callee_saved m mf⌝ -∗
         ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
@@ -2207,8 +2201,6 @@ Section KexecCLoop.
         pc_is (ret_pc ra0) -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-        ⌜used' ⊆ used2⌝ -∗
-        bitmap_res gfs bmapstart cov logstart size used' -∗
         kalloc_env ga None -∗
         proc_priv gf (proc_addr jp) pidv V' -∗
         ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
@@ -2221,16 +2213,16 @@ Section KexecCLoop.
     (* ---- THE ONE OUTPUT: continue, or the loop's own natural exit ---- *)
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (M' : regfile) (P' : uptd),
-        ( kxc_at_21a jp bn gfs ga gf cov logstart bmapstart inodestart size used2
+        ( kxc_at_21a jp bn gfs ga gf cov logstart bmapstart inodestart size
                      plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
                      M' K sp0 ra0 s00 s10 s20 pv av
                      w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P' oldsz sz1 (S c)
-          ∨ kxc_at_272 jp bn gfs ga gf cov logstart bmapstart inodestart size used2
+          ∨ kxc_at_272 jp bn gfs ga gf cov logstart bmapstart inodestart size
                        plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
                        M' K sp0 ra0 s00 s10 s20 pv av
                        w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P' oldsz sz1 (S c) ) -∗
         wp_next (CID0 := CID) true (proc_addr jp) (fun (CIDy : CpuId) =>
-          ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
+          ∀ (mf : regfile) (V' : pprivate)
              (entry spv szv' : mword 64),
               ⌜callee_saved m mf⌝ -∗
               ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
@@ -2239,8 +2231,6 @@ Section KexecCLoop.
               pc_is (ret_pc ra0) -∗
               sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
               sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-              ⌜used' ⊆ used2⌝ -∗
-              bitmap_res gfs bmapstart cov logstart size used' -∗
               kalloc_env ga None -∗
               proc_priv gf (proc_addr jp) pidv V' -∗
               ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
@@ -2561,7 +2551,7 @@ Section KexecCLoop.
                    with "Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hf8 Hf9 Hf10 Hf11 Hf12 Hf13
                          Hust Hwr Hph Hf64 Hf65 Hf66 Hf67 Hf68") as "Hframe".
       iDestruct (kxc_c_res_intro jp bn gfs ga gf cov logstart bmapstart inodestart
-                   size used2 plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas
+                   size plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas
                    sp0 ra0 s00 s10 s20 pv av
                    w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P c sz1 alen
                    with "Hirs Hbm Hins Hbits Hbs Hka Hpt Hpriv Hpath Hargv Hargs
@@ -2573,7 +2563,7 @@ Section KexecCLoop.
       iDestruct (wp_next_retarget CID0 CID6 true (proc_addr jp) _ Hcr6
                    with "Hcont") as "Hcont".
       iApply (kxc_c_exit_m1 (CID0 := CID6) jp bn gfs ga gf cov logstart
-                bmapstart inodestart size used2 plen pfun na avf alen aslen afun
+                bmapstart inodestart size plen pfun na avf alen aslen afun
                 pidv V dqb dqs dqa dqpv dqas m T3 K sp0 ra0 s00 s10 s20 pv av
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P sz1 c 0x358
                 (sign_extend' 21 (concat_vec (mword_of_int 1854 : mword 11) ('b"0")))
@@ -3421,7 +3411,7 @@ Section KexecCLoop.
                      with "Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hf8 Hf9 Hf10 Hf11 Hf12 Hf13
                            Hust1 Hwr Hph Hf64 Hf65 Hf66 Hf67 Hf68") as "Hframe".
         iDestruct (kxc_c_res_intro jp bn gfs ga gf cov logstart bmapstart inodestart
-                     size used2 plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas
+                     size plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas
                      sp0 ra0 s00 s10 s20 pv av
                      w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef Pfinal2 (S c) sz1 alen
                      with "Hirs Hbm Hins Hbits Hbs Hka Hpt Hpriv Hpath Hargv Hargs
@@ -3513,7 +3503,7 @@ Section KexecCLoop.
              iDestruct (wp_next_retarget CID0 CID30 true (proc_addr jp) _ Hcr30
                           with "Hcont") as "Hcont".
              iApply (kxc_c_exit_m1 (CID0 := CID30) jp bn gfs ga gf cov logstart
-                       bmapstart inodestart size used2 plen pfun na avf alen aslen
+                       bmapstart inodestart size plen pfun na avf alen aslen
                        afun pidv V dqb dqs dqa dqpv dqas m U4 K sp0 ra0 s00 s10 s20 pv av
                        w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef Pfinal2 sz1 (S c) 0x26e
                        (sign_extend' 21 (concat_vec (mword_of_int 1971 : mword 11) ('b"0")))
@@ -3586,7 +3576,7 @@ Section KexecCLoop.
                      with "Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hf8 Hf9 Hf10 Hf11 Hf12 Hf13
                            Hust Hwr Hph Hf64 Hf65 Hf66 Hf67 Hf68") as "Hframe".
         iDestruct (kxc_c_res_intro jp bn gfs ga gf cov logstart bmapstart inodestart
-                     size used2 plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas
+                     size plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas
                      sp0 ra0 s00 s10 s20 pv av
                      w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef Pfinal2 c sz1 alen
                      with "Hirs Hbm Hins Hbits Hbs Hka Hpt Hpriv Hpath Hargv Hargs
@@ -3598,7 +3588,7 @@ Section KexecCLoop.
         iDestruct (wp_next_retarget CID0 CID21 true (proc_addr jp) _ Hcr21
                      with "Hcont") as "Hcont".
         iApply (kxc_c_exit_m1 (CID0 := CID21) jp bn gfs ga gf cov logstart
-                  bmapstart inodestart size used2 plen pfun na avf alen aslen afun
+                  bmapstart inodestart size plen pfun na avf alen aslen afun
                   pidv V dqb dqs dqa dqpv dqas m T13 K sp0 ra0 s00 s10 s20 pv av
                   w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef Pfinal2 sz1 c 0x35c
                   (sign_extend' 21 (concat_vec (mword_of_int 1852 : mword 11) ('b"0")))
@@ -3651,7 +3641,7 @@ Section KexecCArgvLoop.
   Lemma kxc_argv_loop `{CID0 : CpuId}
       (jp : nat) (bn : bio_names) (gfs : fs_names) (ga gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z)
-      (size : Z) (used2 : gset Z)
+      (size : Z)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
@@ -3678,12 +3668,12 @@ Section KexecCArgvLoop.
     (c < na)%nat ->
     (na - c <= W)%nat ->
     kernel_text -∗
-    kxc_at_21a jp bn gfs ga gf cov logstart bmapstart inodestart size used2
+    kxc_at_21a jp bn gfs ga gf cov logstart bmapstart inodestart size
                plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
                M K sp0 ra0 s00 s10 s20 pv av
                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P oldsz sz1 c -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-    ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
+    ∀ (mf : regfile) (V' : pprivate)
        (entry spv szv' : mword 64),
         ⌜callee_saved m mf⌝ -∗
         ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
@@ -3692,8 +3682,6 @@ Section KexecCArgvLoop.
         pc_is (ret_pc ra0) -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-        ⌜used' ⊆ used2⌝ -∗
-        bitmap_res gfs bmapstart cov logstart size used' -∗
         kalloc_env ga None -∗
         proc_priv gf (proc_addr jp) pidv V' -∗
         ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
@@ -3705,12 +3693,12 @@ Section KexecCArgvLoop.
         WP (Loop : expr riscv_lang)) -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (M' : regfile) (P' : uptd) (c' : nat),
-        kxc_at_272 jp bn gfs ga gf cov logstart bmapstart inodestart size used2
+        kxc_at_272 jp bn gfs ga gf cov logstart bmapstart inodestart size
                    plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
                    M' K sp0 ra0 s00 s10 s20 pv av
                    w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P' oldsz sz1 c' -∗
         wp_next (CID0 := CID) true (proc_addr jp) (fun (CIDy : CpuId) =>
-          ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
+          ∀ (mf : regfile) (V' : pprivate)
              (entry spv szv' : mword 64),
               ⌜callee_saved m mf⌝ -∗
               ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
@@ -3719,8 +3707,6 @@ Section KexecCArgvLoop.
               pc_is (ret_pc ra0) -∗
               sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
               sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-              ⌜used' ⊆ used2⌝ -∗
-              bitmap_res gfs bmapstart cov logstart size used' -∗
               kalloc_env ga None -∗
               proc_priv gf (proc_addr jp) pidv V' -∗
               ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
@@ -3748,7 +3734,7 @@ Section KexecCArgvLoop.
       exfalso. lia. }
     iIntros "#Htext Hst Hcont Hout".
     iApply (kxc_argv_step (CID0 := CID0) jp bn gfs ga gf cov logstart
-              bmapstart inodestart size used2 plen pfun na avf alen aslen afun
+              bmapstart inodestart size plen pfun na avf alen aslen afun
               pidv V dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av
               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P oldsz sz1 c
               HK Hcna (Halen_bound c Hcna) (Halen_cstr c Hcna)
@@ -3980,7 +3966,7 @@ Section KexecCClose.
   Lemma kxc_c_close
       (jp : nat) (bn : bio_names) (gfs : fs_names) (ga gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z)
-      (size : Z) (used2 : gset Z)
+      (size : Z)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
@@ -3999,12 +3985,12 @@ Section KexecCClose.
     m !!! Regidx Rs6 = w8 -> m !!! Regidx Rs7 = w9 -> m !!! Regidx Rs8 = w10 ->
     m !!! Regidx Rs9 = w11 -> m !!! Regidx Rs10 = w12 -> m !!! Regidx Rs11 = w13 ->
     kernel_text -∗
-    kxc_at_272 jp bn gfs ga gf cov logstart bmapstart inodestart size used2
+    kxc_at_272 jp bn gfs ga gf cov logstart bmapstart inodestart size
                plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
                M K sp0 ra0 s00 s10 s20 pv av
                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P oldsz sz1 c -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-    ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
+    ∀ (mf : regfile) (V' : pprivate)
        (entry spv szv' : mword 64),
         ⌜callee_saved m mf⌝ -∗
         ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
@@ -4013,8 +3999,6 @@ Section KexecCClose.
         pc_is (ret_pc ra0) -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-        ⌜used' ⊆ used2⌝ -∗
-        bitmap_res gfs bmapstart cov logstart size used' -∗
         kalloc_env ga None -∗
         proc_priv gf (proc_addr jp) pidv V' -∗
         ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
@@ -4026,12 +4010,12 @@ Section KexecCClose.
         WP (Loop : expr riscv_lang)) -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (M' : regfile) (P' : uptd),
-        kxc_at_2a6 jp bn gfs ga gf cov logstart bmapstart inodestart size used2
+        kxc_at_2a6 jp bn gfs ga gf cov logstart bmapstart inodestart size
                    plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
                    M' K sp0 ra0 s00 s10 s20 pv av
                    w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P' oldsz sz1 c -∗
         wp_next (CID0 := CID) true (proc_addr jp) (fun (CIDy : CpuId) =>
-          ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
+          ∀ (mf : regfile) (V' : pprivate)
              (entry spv szv' : mword 64),
               ⌜callee_saved m mf⌝ -∗
               ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
@@ -4040,8 +4024,6 @@ Section KexecCClose.
               pc_is (ret_pc ra0) -∗
               sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
               sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-              ⌜used' ⊆ used2⌝ -∗
-              bitmap_res gfs bmapstart cov logstart size used' -∗
               kalloc_env ga None -∗
               proc_priv gf (proc_addr jp) pidv V' -∗
               ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
@@ -4540,12 +4522,12 @@ Section KexecCClose.
                        (CID10 : CPU) = (CID0 : CPU)) by wp_next_chain.
       iDestruct (wp_next_retarget CID0 CID10 true (proc_addr jp) _ Hcr10
                    with "Hcont") as "Hcont".
-      iApply (TC.kxc_bad_1d6 jp ga gf bn gfs cov logstart bmapstart inodestart
-                size used2 used2 plen pfun na avf alen aslen afun pidv V
+      iApply (TC.kxc_bad_1d6 jp ga gf bn bmapstart inodestart
+                plen pfun na avf alen aslen afun pidv V
                 dqb dqs dqa dqpv dqas m X7 K ∅ sp0 ra0 s00 s10 s20 pv av P sz1
-                ltac:(lia) ltac:(reflexivity)
+                ltac:(lia)
                 Hmsp Hmra Hms0 Hms1 Hms2 HX7sp HX7s3 HX7s6 Hbelow Hcov
-                with "Hcg Hcnt Htext Hpc Hpt Hka Hbm Hins Hbits Hpriv
+                with "Hcg Hcnt Htext Hpc Hpt Hka Hbm Hins Hpriv
                       Hpath Hargv Hargs Hbs Hirs Hframeat Hcont").
     - (* ==== FALL-THROUGH: it fits.  [kxc_stack_ok] is now complete. ==== *)
       assert (Hcmp290f : zopz0zI_u (X7 !!! Regidx Rs2) (X7 !!! Regidx Rs7) = false)
@@ -4933,12 +4915,12 @@ Section KexecCClose.
                          (CID17 : CPU) = (CID0 : CPU)) by wp_next_chain.
         iDestruct (wp_next_retarget CID0 CID17 true (proc_addr jp) _ Hcr17
                      with "Hcont") as "Hcont".
-        iApply (TC.kxc_bad_1d6 jp ga gf bn gfs cov logstart bmapstart inodestart
-                  size used2 used2 plen pfun na avf alen aslen afun pidv V
+        iApply (TC.kxc_bad_1d6 jp ga gf bn bmapstart inodestart
+                  plen pfun na avf alen aslen afun pidv V
                   dqb dqs dqa dqpv dqas m X13 K ∅ sp0 ra0 s00 s10 s20 pv av P2 sz1
-                  ltac:(lia) ltac:(reflexivity)
+                  ltac:(lia)
                   Hmsp Hmra Hms0 Hms1 Hms2 HX13sp HX13s3 HX13s6' Hbelow2 Hcov2
-                  with "Hcg Hcnt Htext Hpc Hpt Hka Hbm Hins Hbits Hpriv
+                  with "Hcg Hcnt Htext Hpc Hpt Hka Hbm Hins Hpriv
                         Hpath Hargv Hargs Hbs Hirs Hframeat Hcont").
   Qed.
 

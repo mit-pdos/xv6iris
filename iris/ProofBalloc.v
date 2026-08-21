@@ -46,6 +46,27 @@
      - +0x98's FALL-THROUGH (a second outer iteration).  [size <= BPB] makes
        [BPB >= size] unconditionally, so only the taken arm exists.
 
+   THE BITMAP IS AN INVARIANT, NOT A THREADED RESOURCE (BitmapInv.v,
+   claude-notes/design/fs-bitmap.md).  Nothing in this proof holds
+   [bitmap_res]: it lives in the persistent [bitmap_inv], and the [used]
+   binder exists only between the bread at +0xa8 and the log_write at
+   +0x42.  Two moments touch it, and both are inside [BitmapInv.v]:
+
+     - [bitmap_read], right after the bread, holds the handle's MACHINERY
+       half ([ba_held_L]) against the parked client half for one
+       mask-preserving opening.  Out come the two facts the scan needs --
+       the bytes are [bitmap_bytes used] for SOME [used], and [bitmap_ok]
+       holds at it -- and nothing else.  That existential is where [ba_scan]
+       and [ba_alloc]'s [used] comes from; every lemma outside that window
+       ([ba_bzero], [ba_restore], [ba_out], [ba_exhaust], [ba_epilogue],
+       [ba_cont], [ba_arms]) names no set at all.
+     - [bitmap_alloc_au], supplied to [SpecLogWrite.wp_log_write_au] through
+       [lw_au_lb0] at [Efs := ⊤ ∖ ↑bitmapN], IS the ghost step: it withdraws
+       the client half, re-parks it at the image of [used ∪ {bi}], and pays
+       out the allocated block's [free_blk] -- content half and token -- out
+       of the free pool.  That receipt replaces the [free_pool_take] this
+       proof used to do by hand before touching the buffer.
+
    THE OUT-OF-BLOCKS ARM IS LIVE and calls printk on its GENERAL path (at
    balloc time [panicking] is 0, so [SpecPrintk]'s panic-path contract does
    not apply).  Its contract arrives as the PURE hypothesis
@@ -196,11 +217,10 @@ Section BallocDefs.
   (* THE TWO ARMS, as ONE resource: what each of balloc's two exits carries
      into the shared epilogue.  [rv] is the value in s1 at +0x7e. *)
   Definition ba_arms (γfs : fs_names) (γ : log_names)
-      (cov : gset Z) (logstart bmapstart size : Z) (used : gset Z)
+      (cov : gset Z) (logstart bmapstart size : Z)
       (u : nat) (cr : bool) (Sb : gset Z)
       (rv : mword 32) : iProp Σ :=
     ((⌜bv_unsigned rv = 0⌝ ∗
-      bitmap_res γfs bmapstart cov logstart size used ∗
       log_opS γ (2 + u) Sb)
      ∨
      (⌜bv_unsigned rv <> 0⌝ ∗
@@ -208,7 +228,6 @@ Section BallocDefs.
       ⌜~ (bv_unsigned rv ∈ log_region_set logstart)⌝ ∗
       fsblock γfs (bv_unsigned rv) (replicate BSIZE (bv_0 8)) ∗
       blk_own γfs (bv_unsigned rv) ∗
-      bitmap_res γfs bmapstart cov logstart size (used ∪ {[ bv_unsigned rv ]}) ∗
       log_opS γ (if cr then S u else u)
                 (Sb ∪ {[bmapstart]} ∪ {[bv_unsigned rv]})))%I.
 
@@ -216,7 +235,7 @@ Section BallocDefs.
      split (claude-notes/optimization.md). *)
   Definition ba_cont `{GEN : GenId} `{CID0 : CpuId}
       (γfs : fs_names) (bn : bio_names) (γ : log_names)
-      (cov : gset Z) (logstart bmapstart size : Z) (used : gset Z)
+      (cov : gset Z) (logstart bmapstart size : Z)
       (u : nat) (cr : bool) (Sb : gset Z)
       (pidv : mword 32) (dq dqb dqs : dfrac) (j : nat)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate) : iProp Σ :=
@@ -233,7 +252,6 @@ Section BallocDefs.
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         bslots bn 2 -∗
         ((⌜mf !!! Regidx Ra0 = (mword_of_int 0 : mword 64)⌝ ∗
-          bitmap_res γfs bmapstart cov logstart size used ∗
           log_opS γ (2 + u) Sb)
          ∨
          (∃ blk : mword 32,
@@ -243,11 +261,36 @@ Section BallocDefs.
             ⌜~ (bv_unsigned blk ∈ log_region_set logstart)⌝ ∗
             fsblock γfs (bv_unsigned blk) (replicate BSIZE (bv_0 8)) ∗
             blk_own γfs (bv_unsigned blk) ∗
-            bitmap_res γfs bmapstart cov logstart size
-                       (used ∪ {[ bv_unsigned blk ]}) ∗
             log_opS γ (if cr then S u else u)
                       (Sb ∪ {[bmapstart]} ∪ {[bv_unsigned blk]}))) -∗
         WP (Loop : expr riscv_lang))%I.
+
+  (* THE BLOCK'S MACHINERY HALF, out of the bio handle and back -- what
+     [BitmapInv.bitmap_read] needs to pin the invariant's parked bytes to
+     the ones bread returned.  A verbatim copy of [ProofIlock.il_held_L] /
+     [ProofIupdate.iu_held_L]; each of those lives inside its own module,
+     and importing a proof file from a proof file is exactly what the
+     spec-module discipline forbids. *)
+  Lemma ba_held_L (bn : bio_names) (γfs : fs_names) (γd : disk_names)
+      (dev : mword 32) (cov : gset Z) (kb : nat) (pidv dv bno : mword 32)
+      (bs bsl bsd : list (bv 8)) (d : bool) :
+    bio_held bn (fs_view γfs γd dev cov) kb pidv dv bno bs bsl bsd d -∗
+      (uint bno ↪[fs_L γfs]{#(1/2)} bsl) ∗
+      ((uint bno ↪[fs_L γfs]{#(1/2)} bsl) -∗
+       bio_held bn (fs_view γfs γd dev cov) kb pidv dv bno bs bsl bsd d).
+  Proof.
+    rewrite /bio_held /bio_pay /fs_view /=.
+    iIntros "(%A & %B & %C & H1 & H3 & H4 & H5 & H6 & Hpay)".
+    destruct d.
+    - rewrite /fs_mdirty. iDestruct "Hpay" as "[[HL HD] Hq]".
+      iFrame "HL". iIntros "HL".
+      iSplitR; [done |]. iSplitR; [done |]. iSplitR; [done |].
+      iFrame "H1 H3 H4 H5 H6". iFrame "HL HD Hq".
+    - rewrite /fs_mclean. iDestruct "Hpay" as "[[HL HD] %He]".
+      iFrame "HL". iIntros "HL".
+      iSplitR; [done |]. iSplitR; [done |]. iSplitR; [done |].
+      iFrame "H1 H3 H4 H5 H6". iFrame "HL HD". done.
+  Qed.
 
   (* ONE BYTE of a buffer's data area, borrowed and given back at a new byte
      list -- [ByteBuf.bb_byte_acc] over [buf_own]'s list form. *)
@@ -333,7 +376,7 @@ Section BallocEpilogue.
 
   Local Lemma ba_epilogue `{GEN : GenId} `{CID0 : CpuId} 
       (j : nat) (γfs : fs_names) (bn : bio_names) (γ : log_names)
-      (cov : gset Z) (logstart bmapstart size : Z) (used : gset Z) (u : nat) (cr : bool) (Sb : gset Z)
+      (cov : gset Z) (logstart bmapstart size : Z) (u : nat) (cr : bool) (Sb : gset Z)
       (rv : mword 32)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m M : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate) :
@@ -352,8 +395,8 @@ Section BallocEpilogue.
     sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     bslots bn 2 -∗
-    ba_arms γfs γ cov logstart bmapstart size used u cr Sb rv -∗
-    ba_cont (CID0 := CID0) γfs bn γ cov logstart bmapstart size used u cr Sb
+    ba_arms γfs γ cov logstart bmapstart size u cr Sb rv -∗
+    ba_cont (CID0 := CID0) γfs bn γ cov logstart bmapstart size u cr Sb
             pidv dq dqb dqs j m K eb b lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -569,15 +612,15 @@ Section BallocEpilogue.
     rewrite /ba_cont.
     iSpecialize ("Hcont" $! CID6 with "[%]"); [wp_next_chain|].
     rewrite /ba_arms.
-    iDestruct "Harms" as "[(%Hz & Hbmr & Hop) | (%Hnz & %Hcv & %Hlg & Hfsb & Hown & Hbmr & Hop)]".
+    iDestruct "Harms" as "[(%Hz & Hop) | (%Hnz & %Hcv & %Hlg & Hfsb & Hown & Hop)]".
     - iApply ("Hcont" $! P4 with "[%] Hcg Hcnt Hextc Hextm Hpc Hppid Hsbsz Hsbbm
-                       Hsl [Hbmr Hop]").
+                       Hsl [Hop]").
       { unfold callee_saved. split_and!; assumption. }
       { iLeft. iSplitR.
         { iPureIntro. rewrite HP4a0. exact (ba_sext_zero rv Hz). }
-        iSplitL "Hbmr"; [iExact "Hbmr"|]. iExact "Hop". }
+        iExact "Hop". }
     - iApply ("Hcont" $! P4 with "[%] Hcg Hcnt Hextc Hextm Hpc Hppid Hsbsz Hsbbm
-                       Hsl [Hfsb Hown Hbmr Hop]").
+                       Hsl [Hfsb Hown Hop]").
       { unfold callee_saved. split_and!; assumption. }
       { iRight. iExists rv.
         iSplitR; [iPureIntro; exact HP4a0|].
@@ -585,8 +628,7 @@ Section BallocEpilogue.
         iSplitR; [iPureIntro; exact Hcv|].
         iSplitR; [iPureIntro; exact Hlg|].
         iSplitL "Hfsb"; [iExact "Hfsb"|].
-        iSplitL "Hown"; [iExact "Hown"|].
-        iSplitL "Hbmr"; [iExact "Hbmr"|]. iExact "Hop". }
+        iSplitL "Hown"; [iExact "Hown"|]. iExact "Hop". }
   Qed.
 
 End BallocEpilogue.
@@ -602,7 +644,7 @@ Section BallocOut.
   Local Lemma ba_out `{GEN : GenId} `{CID0 : CpuId} 
       (j : nat) (γfs : fs_names) (bn : bio_names) (γ : log_names)
       (γpr : gname) (γu : uart_names) (γd : disk_names)
-      (cov : gset Z) (logstart bmapstart size : Z) (used : gset Z) (u : nat) (cr : bool) (Sb : gset Z)
+      (cov : gset Z) (logstart bmapstart size : Z) (u : nat) (cr : bool) (Sb : gset Z)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m M : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate) :
     (K_balloc <= K)%nat ->
@@ -621,9 +663,8 @@ Section BallocOut.
     sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     bslots bn 2 -∗
-    bitmap_res γfs bmapstart cov logstart size used -∗
     log_opS γ (2 + u) Sb -∗
-    ba_cont (CID0 := CID0) γfs bn γ cov logstart bmapstart size used u cr Sb
+    ba_cont (CID0 := CID0) γfs bn γ cov logstart bmapstart size u cr Sb
             pidv dq dqb dqs j m K eb b lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -631,7 +672,7 @@ Section BallocOut.
     pose proof HK as HK'. 
     pose proof ba_msg_fmt as (Hkmsg & Hnmsg & Hlmsg).
     iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkdata Hpc #Hpenv Hframe Hppid
-              Hsbsz Hsbbm Hsl Hbmr Hop Hcont".
+              Hsbsz Hsbbm Hsl Hop Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm. cbn in Hbm.
     iPoseProof (kernel_data_string ba_msg_addr ba_msg
                   (mword_of_int ba_msg_addr) eq_refl
@@ -955,13 +996,12 @@ Section BallocOut.
     iDestruct (IntrDefs.cpu_claim_ext_transport CID0 CID13 eb (proc_addr j)
                  ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
     iApply (ba_epilogue (CID0 := CID13)  j γfs bn γ cov logstart bmapstart size
-              used u cr Sb (mword_of_int 0 : mword 32) pidv dq dqb dqs m QB K eb b lks
+              u cr Sb (mword_of_int 0 : mword 32) pidv dq dqb dqs m QB K eb b lks
               Vpr HK HQBsp HQBthr HQBs1
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hframe Hppid Hsbsz Hsbbm Hsl
-                    [Hbmr Hop] [Hcont]").
+                    [Hop] [Hcont]").
     { rewrite /ba_arms. iLeft.
-      iSplitR; [iPureIntro; vm_compute; reflexivity|].
-      iSplitL "Hbmr"; [iExact "Hbmr"|]. iExact "Hop". }
+      iSplitR; [iPureIntro; vm_compute; reflexivity|]. iExact "Hop". }
     { iApply (wp_next_shift (b := true) (CIDa := CID10) (CIDb := CID13) ltac:(wp_next_chain)
                 with "Hcont"). }
   Qed.
@@ -982,7 +1022,7 @@ Section BallocExhaust.
       (γfs : fs_names) (γd : disk_names) (bn : bio_names) (γ : log_names)
       (γpr : gname) (γu : uart_names)
       (cov : gset Z) (logstart bmapstart size : Z) (dev : mword 32)
-      (used : gset Z) (u : nat) (cr : bool) (Sb : gset Z)
+      (u : nat) (cr : bool) (Sb : gset Z)
       (kk : nat) (bnoB : mword 32) (bsX bsdX : list (bv 8)) (dX : bool)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m M : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate) :
@@ -1012,17 +1052,16 @@ Section BallocExhaust.
     sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     bslots bn 1 -∗
-    bitmap_res γfs bmapstart cov logstart size used -∗
     log_opS γ (2 + u) Sb -∗
     bio_locked bn (fs_view γfs γd dev cov) kk pidv dev bnoB bsX bsdX dX -∗
-    ba_cont (CID0 := CID0) γfs bn γ cov logstart bmapstart size used u cr Sb
+    ba_cont (CID0 := CID0) γfs bn γ cov logstart bmapstart size u cr Sb
             pidv dq dqb dqs j m K eb b lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hpk Hsize Hsp Hthr Hs2 Hs5 Hs6 Hs8 Hkk Hbelow.
     pose proof HK as HK'. 
     pose proof Hsize as Hsize'. rewrite BPB_value in Hsize'.
-    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkdata Hpc #Hpenv #Hbio #Hprocs Hframe Hppid Hsbsz Hsbbm Hsl Hbmr Hop Hlk Hcont".
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkdata Hpc #Hpenv #Hbio #Hprocs Hframe Hppid Hsbsz Hsbbm Hsl Hop Hlk Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm. cbn in Hbm.
     iPoseProof (bai_08a with "Htext") as "Hi8a".
     iPoseProof (bai_08c with "Htext") as "Hi8c".
@@ -1190,9 +1229,9 @@ Section BallocExhaust.
     iDestruct (IntrDefs.cpu_claim_ext_transport CID0 CID6 eb (proc_addr j)
                  ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
     iApply (ba_out (CID0 := CID6)  j γfs bn γ γpr γu γd cov logstart bmapstart
-              size used u cr Sb pidv dq dqb dqs m E3 K eb b lks Vpr HK Hpk HE3sp HE3thr
+              size u cr Sb pidv dq dqb dqs m E3 K eb b lks Vpr HK Hpk HE3sp HE3thr
               with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hpenv Hframe
-                    Hppid Hsbsz Hsbbm Hsl Hbmr Hop [Hcont]").
+                    Hppid Hsbsz Hsbbm Hsl Hop [Hcont]").
     { iApply (wp_next_shift (b := true) (CIDa := CID2) (CIDb := CID6) ltac:(wp_next_chain)
                 with "Hcont"). }
   Qed.
@@ -1208,7 +1247,7 @@ Section BallocRestore.
 
   Local Lemma ba_restore `{GEN : GenId} `{CID0 : CpuId} 
       (j : nat) (γfs : fs_names) (bn : bio_names) (γ : log_names)
-      (cov : gset Z) (logstart bmapstart size : Z) (used : gset Z) (bi : Z)
+      (cov : gset Z) (logstart bmapstart size : Z) (bi : Z)
       (u : nat) (cr : bool) (Sb : gset Z) (rv : mword 32)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m M : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate) :
@@ -1232,16 +1271,15 @@ Section BallocRestore.
     bslots bn 2 -∗
     fsblock γfs (bv_unsigned rv) (replicate BSIZE (bv_0 8)) -∗
     blk_own γfs (bv_unsigned rv) -∗
-    bitmap_res γfs bmapstart cov logstart size (used ∪ {[ bv_unsigned rv ]}) -∗
     log_opS γ (if cr then S u else u) (Sb ∪ {[bmapstart]} ∪ {[bv_unsigned rv]}) -∗
-    ba_cont (CID0 := CID0) γfs bn γ cov logstart bmapstart size used u cr Sb
+    ba_cont (CID0 := CID0) γfs bn γ cov logstart bmapstart size u cr Sb
             pidv dq dqb dqs j m K eb b lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hsp Hthr Hs1 Hnz Hcv Hlg.
     pose proof HK as HK'. 
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc Hframe Hppid Hsbsz Hsbbm Hsl
-              Hfsb Hown Hbmr Hop Hcont".
+              Hfsb Hown Hop Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm. cbn in Hbm.
     iPoseProof (bai_070 with "Htext") as "Hi70".
     iPoseProof (bai_072 with "Htext") as "Hi72".
@@ -1447,16 +1485,15 @@ Section BallocRestore.
     iDestruct (IntrDefs.cpu_claim_ext_transport CID0 CID7 eb (proc_addr j)
                  ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
     iApply (ba_epilogue (CID0 := CID7)  j γfs bn γ cov logstart bmapstart size
-              used u cr Sb rv pidv dq dqb dqs m R7 K eb b lks Vpr HK HR7sp HR7thr HR7s1
+              u cr Sb rv pidv dq dqb dqs m R7 K eb b lks Vpr HK HR7sp HR7thr HR7s1
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hframe Hppid Hsbsz Hsbbm Hsl
-                    [Hfsb Hown Hbmr Hop] [Hcont]").
+                    [Hfsb Hown Hop] [Hcont]").
     { rewrite /ba_arms. iRight.
       iSplitR; [iPureIntro; exact Hnz|].
       iSplitR; [iPureIntro; exact Hcv|].
       iSplitR; [iPureIntro; exact Hlg|].
       iSplitL "Hfsb"; [iExact "Hfsb"|].
-      iSplitL "Hown"; [iExact "Hown"|].
-      iSplitL "Hbmr"; [iExact "Hbmr"|]. iExact "Hop". }
+      iSplitL "Hown"; [iExact "Hown"|]. iExact "Hop". }
     { iApply (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID7) ltac:(wp_next_chain)
                 with "Hcont"). }
   Qed.
@@ -1477,7 +1514,7 @@ Section BallocBzero.
       (pd pav pu : mword 64)
       (γfs : fs_names) (bn : bio_names) (γ : log_names)
       (cov : gset Z) (logstart bmapstart size : Z) (dev : mword 32)
-      (used : gset Z) (bi : Z) (u : nat) (cr : bool) (Sb : gset Z) (bsD : list (bv 8))
+      (bi : Z) (u : nat) (cr : bool) (Sb : gset Z) (bsD : list (bv 8))
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m M : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) (Vpr : pprivate) :
     (K_balloc <= K)%nat ->
@@ -1515,10 +1552,9 @@ Section BallocBzero.
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     bslots bn 2 -∗
     log_opS γ (S (if cr then S u else u)) (Sb ∪ {[bmapstart]}) -∗
-    bitmap_res γfs bmapstart cov logstart size (used ∪ {[ bi ]}) -∗
     fsblock γfs bi bsD -∗
     blk_own γfs bi -∗
-    ba_cont (CID0 := CID0) γfs bn γ cov logstart bmapstart size used u cr Sb
+    ba_cont (CID0 := CID0) γfs bn γ cov logstart bmapstart size u cr Sb
             pidv dq dqb dqs j m K eb b lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1544,7 +1580,7 @@ Section BallocBzero.
     assert (Hlvl : (Z.of_nat 0 + 2 < 2 ^ 31)%Z)
       by (change (2^31)%Z with 2147483648%Z; lia).
     iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx #Hprocs Hframe Hppid Hsbsz Hsbbm #Hdevi #Hdgeom #Hdlock Hsl Hop
-              Hbmr HfsbD Hown Hcont".
+              HfsbD Hown Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm. cbn in Hbm.
     iPoseProof (bai_04c with "Htext") as "Hi4c".
     iPoseProof (bai_04e with "Htext") as "Hi4e".
@@ -2015,16 +2051,15 @@ Section BallocBzero.
     iDestruct (IntrDefs.cpu_claim_ext_transport CID4 CID16 eb (proc_addr j)
                  ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
     iApply (ba_restore (CID0 := CID16)  j γfs bn γ cov logstart bmapstart size
-              used bi u cr Sb bnoD pidv dq dqb dqs m mR2 K eb b lks
+              bi u cr Sb bnoD pidv dq dqb dqs m mR2 K eb b lks
               Vpr HK HmR2sp HmR2thr ltac:(rewrite HmR2s1 HbnoDsext; reflexivity)
               HbnoDnz
               ltac:(rewrite -bb_uint32 HbnoD; exact Hbicov)
               ltac:(rewrite -bb_uint32 HbnoD; exact Hbilog)
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hframe Hppid Hsbsz Hsbbm Hsl
-                    [HfsbD] [Hown] [Hbmr] Hop [Hcont]").
+                    [HfsbD] [Hown] Hop [Hcont]").
     { iEval (rewrite -bb_uint32 HbnoD). iExact "HfsbD". }
     { iEval (rewrite -bb_uint32 HbnoD). iExact "Hown". }
-    { iEval (rewrite -bb_uint32 HbnoD). iExact "Hbmr". }
     { iApply (wp_next_shift (b := true) (CIDa := CID15) (CIDb := CID16) ltac:(wp_next_chain)
                 with "Hcont"). }
   Qed.
@@ -2096,11 +2131,14 @@ Section BallocAlloc.
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     bslots bn 1 -∗
     log_opS γ (2 + u) Sb -∗
-    fsblock γfs bmapstart (bitmap_bytes used) -∗
-    free_pool γfs size used -∗
+    (* THE BITMAP'S INVARIANT (BitmapInv.v): persistent, and the pool is
+       inside it.  The block's client half comes out for exactly one ghost
+       step -- log_write's -- and the allocated block's own half and token
+       come back with it ([bitmap_alloc_au]). *)
+    bitmap_inv γfs bmapstart cov logstart size -∗
     bio_locked bn (fs_view γfs γd dev cov) kk pidv dev bnoB
        (bitmap_bytes used) bsdX dX -∗
-    ba_cont (CID0 := CID0) γfs bn γ cov logstart bmapstart size used u cr Sb
+    ba_cont (CID0 := CID0) γfs bn γ cov logstart bmapstart size u cr Sb
             pidv dq dqb dqs j m K eb b lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -2135,12 +2173,10 @@ Section BallocAlloc.
     assert (HbnoBlt : (Z.of_nat 0 + 2 < 2 ^ 31)%Z)
       by (change (2^31)%Z with 2147483648%Z; lia).
     iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx #Hprocs Hframe Hppid Hsbsz Hsbbm #Hdevi #Hdgeom #Hdlock Hsl Hop
-              Hfsbm Hpool Hlk Hcont".
+              #Hbminv Hlk Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm. cbn in Hbm.
-    (* ---- the block leaves the pool, with its content half and token ---- *)
-    iDestruct (free_pool_take γfs size used bi Hbirange Hbinu with "Hpool")
-      as "[Hblk Hpool]".
-    iDestruct "Hblk" as (bsD) "(%HbsDlen & HfsbD & Hown)".
+    (* the degenerate writer's anchor: nobody here owes a receipt *)
+    iApply fupd_wp. iMod (log_epoch_lb_0 γ) as "#Hlb0". iModIntro.
     (* ---- the bitmap buffer's byte ---- *)
     iEval (rewrite /bio_locked) in "Hlk".
     iDestruct (iu_held_swap with "Hlk") as "[Hbuf Hlkback]".
@@ -2326,22 +2362,50 @@ Section BallocAlloc.
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID5) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKlw : (K_log_write <= K - 10)%nat) by (lia).
-    iEval (rewrite -HbnoB) in "Hfsbm".
-    (* THE BITMAP BLOCK'S log_write, CREDITED: there is exactly ONE bitmap
-       block, so a caller that has already logged it in this batch pays
-       nothing here and the unit comes straight back. *)
-    iApply (LW.wp_log_write_gen bn γ γfs γd cov logstart dev kk pidv bnoB
-              (bitmap_bytes (used ∪ {[ bi ]})) (bitmap_bytes used) bsdX dX (1 + u)%nat
-              cr Sb
+    (* THE BITMAP BLOCK'S log_write, CREDITED AND THROUGH THE INVARIANT.
+       There is exactly ONE bitmap block, so a caller that has already
+       logged it in this batch pays nothing here and the unit comes
+       straight back.  The block's CLIENT half is not in our hands and
+       never was -- it is parked in [BitmapInv.bitmap_inv], and the one
+       moment it comes out is log_write's own ghost step.
+       [bitmap_alloc_au] IS that fupd: it surrenders the half at whatever
+       the invariant parks, and the closing wand -- handed the half back at
+       the image of [used ∪ {bi}] -- pays out the allocated block (content
+       half and token) together with the two facts bread and log_write
+       demand of its number.  [lw_au_lb0] parks the writer's epoch anchor
+       at zero, where nobody owes a receipt. *)
+    iDestruct (log_opS_named with "Hop") as (e0) "Hop".
+    iPoseProof (log_credit_own γ cr Sb e0 (uint bnoB)
+                  ltac:(rewrite HbnoB; exact Hcred)) as "#Hcredit".
+    iDestruct (bitmap_alloc_au ⊤ γfs bmapstart cov logstart size used bi
+                 ltac:(solve_ndisj) (proj2 Hsize) Hbirange Hbinu
+                 with "Hbminv") as "Hau0".
+    iDestruct (lw_au_lb0 γ γfs bmapstart (⊤ ∖ ↑bitmapN)
+                 (bitmap_bytes (used ∪ {[ bi ]})) (bitmap_bytes used)
+                 (free_blk γfs bi ∗
+                  ⌜bi ∈ cov /\ ~ (bi ∈ log_region_set logstart)⌝)%I e0
+                 with "Hau0") as "Hau".
+    iApply (LW.wp_log_write_au bn γ γfs γd cov logstart dev kk pidv bnoB
+              (bitmap_bytes (used ∪ {[ bi ]})) (bitmap_bytes used) bsdX dX
+              (1 + u)%nat cr Sb e0 0%nat (⊤ ∖ ↑bitmapN)
+              (free_blk γfs bi ∗
+               ⌜bi ∈ cov /\ ~ (bi ∈ log_region_set logstart)⌝)%I
               A3 0%nat eb (proc_addr j) (K - 10)%nat b lks
               HKlw HbnoBlt Hkk HA3a0
               ltac:(rewrite HbnoB; exact Hbmcov)
               ltac:(rewrite HbnoB; exact Hbmlog)
-              ltac:(rewrite HbnoB; exact Hcred)
               Hbelow
-              with "Hcg Hcnt Htext Hpc Hbio Hlctx Hsl Hop Hfsbm Hheld").
+              with "Hcg Hcnt Htext Hpc Hbio Hlctx Hsl Hlb0 Hcredit Hop [Hau] Hheld").
     all: try lkbelow.
-    iIntros (CID6 Hq6 mL) "Hcg Hcnt Hpc %Hcs1 Hop Hfsbm Hlk Hsl".
+    { iEval (rewrite HbnoB). iExact "Hau". }
+    iIntros (CID6 Hq6 mL) "Hcg Hcnt Hpc %Hcs1 Hop Hblk Hlk Hsl".
+    (* the registry row is dropped: balloc's caller threads the plain
+       ledger, and nothing below the bitmap needs a witness *)
+    iDestruct (log_opSwe_opSw with "Hop") as "Hop".
+    iDestruct (log_opSw_witness with "Hop") as "[Hop _]".
+    (* the receipt: the allocated block, out of the pool at last *)
+    iDestruct "Hblk" as "[Hblk _]".
+    iDestruct "Hblk" as (bsD) "(%HbsDlen & HfsbD & Hown)".
     assert (HbudgeB : (if cr then S (1 + u) else (1 + u))%nat
                       = S (if cr then S u else u))
       by (destruct cr; reflexivity).
@@ -2351,7 +2415,6 @@ Section BallocAlloc.
     assert (Hpc46 : ret_pc (A3 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.balloc + 0x46)) by (rewrite HA3ra; pcw).
     iEval (rewrite Hpc46) in "Hpc".
-    iEval (rewrite HbnoB) in "Hfsbm".
     pose proof Hcs1 as Hcs1_cs.
     assert (HmLs1 : mL !!! Regidx Rs1 = (mword_of_int bi : mword 64))
       by (rewrite (callee_saved_lookup Hcs1_cs Rs1 ltac:(vm_compute; reflexivity));
@@ -2450,11 +2513,6 @@ Section BallocAlloc.
       rewrite (callee_saved_lookup Hcs2_cs c Hcs).
       exact (HA5thr c Hcs N2 N8 N9 N18 N19 N20 N21 N22 N23 N24). }
     iDestruct (iu_slots_join bn 1 1 with "Hsl Hsl1") as "Hsl".
-    (* the bitmap is DONE: close the resource at the new used set *)
-    assert (Hokadd : bitmap_ok cov logstart size (used ∪ {[ bi ]}))
-      by (apply bitmap_ok_add; exact Hok).
-    iDestruct (bitmap_res_close γfs bmapstart cov logstart size
-                 (used ∪ {[ bi ]}) Hokadd with "Hfsbm Hpool") as "Hbmr".
     (* [log_write]/[brelse] do not thread the complement, so [Hextc]/[Hextm]
        are still at [CID0] -- one wide hop straight to [ba_bzero]'s entry
        hart. *)
@@ -2463,12 +2521,12 @@ Section BallocAlloc.
     iDestruct (IntrDefs.cpu_claim_ext_transport CID0 CID9 eb (proc_addr j)
                  ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
     iApply (ba_bzero (CID0 := CID9)  γs j γl γu γd γk pd pav pu γfs bn γ
-              cov logstart bmapstart size dev used bi u cr Sb bsD
+              cov logstart bmapstart size dev bi u cr Sb bsD
               pidv dq dqb dqs m mR K eb b lks
               Vpr HK Hsize Hbirange Hbicov Hbilog Hbinz HbsDlen Hj Hgl
               HmRsp HmRthr HmRs1 HmRs7 Hbelow
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hprocs Hframe Hppid Hsbsz Hsbbm Hdevi Hdgeom Hdlock Hsl Hop
-                    Hbmr HfsbD Hown [Hcont]").
+                    HfsbD Hown [Hcont]").
     { iApply (wp_next_shift (b := true) (CIDa := CID8) (CIDb := CID9) ltac:(wp_next_chain)
                 with "Hcont"). }
   Qed.
@@ -2552,11 +2610,10 @@ Section BallocScan.
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     bslots bn 1 -∗
     log_opS γ (2 + u) Sb -∗
-    fsblock γfs bmapstart (bitmap_bytes used) -∗
-    free_pool γfs size used -∗
+    bitmap_inv γfs bmapstart cov logstart size -∗
     bio_locked bn (fs_view γfs γd dev cov) kk pidv dev bnoB
        (bitmap_bytes used) bsdX dX -∗
-    ba_cont (CID0 := CIDx) γfs bn γ cov logstart bmapstart size used u cr Sb
+    ba_cont (CID0 := CIDx) γfs bn γ cov logstart bmapstart size u cr Sb
             pidv dq dqb dqs j m K eb b lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -2567,7 +2624,7 @@ Section BallocScan.
     induction fuel as [|fuel IH];
       intros CIDx bi M Hfuel Hbi Hsp Hthr Ha0 Ha4 Hs1 Hs2 Hs3 Hs4 Hs5 Hs6 Hs7 Hs8 Hbelow;
       iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkdata Hpc #Hpenv #Hbio #Hlctx #Hprocs Hframe Hppid Hsbsz Hsbbm #Hdevi #Hdgeom
-                #Hdlock Hsl Hop Hfsbm Hpool Hlk Hcont";
+                #Hdlock Hsl Hop #Hbminv Hlk Hcont";
       iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm; cbn in Hbm;
       pose proof Hbi as Hbi'; rewrite BPB_value in Hbi';
       iPoseProof (bai_0b6 with "Htext") as "Hib6";
@@ -2590,8 +2647,6 @@ Section BallocScan.
                       (sign_extend' 64 (mword_of_int 8148 : mword 13))
                     = mword_of_int (KernelSyms.balloc + 0x8a)) by pcw.
       iEval (rewrite Hjt) in "Hpc".
-      iDestruct (bitmap_res_close γfs bmapstart cov logstart size used Hok
-                   with "Hfsbm Hpool") as "Hbmr".
       iDestruct (cpu_own_transport CIDx CID1 0 eb (proc_addr j) b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (IntrDefs.trap_csrs_ext_transport CIDx CID1 eb (proc_addr j)
@@ -2599,9 +2654,9 @@ Section BallocScan.
       iDestruct (IntrDefs.cpu_claim_ext_transport CIDx CID1 eb (proc_addr j)
                    ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
       iApply (ba_exhaust (CID0 := CID1)  γs j γfs γd bn γ γpr γu cov logstart
-                bmapstart size dev used u cr Sb kk bnoB (bitmap_bytes used) bsdX dX
+                bmapstart size dev u cr Sb kk bnoB (bitmap_bytes used) bsdX dX
                 pidv dq dqb dqs m M K eb b lks Vpr HK Hpk Hsize Hsp Hthr Hs2 Hs5 Hs6 Hs8 Hkk Hbelow
-                with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hpenv Hbio Hprocs Hframe Hppid Hsbsz Hsbbm Hsl Hbmr Hop Hlk [Hcont]").
+                with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hpenv Hbio Hprocs Hframe Hppid Hsbsz Hsbbm Hsl Hop Hlk [Hcont]").
       { iApply (wp_next_shift (b := true) (CIDa := CIDx) (CIDb := CID1) ltac:(wp_next_chain)
                   with "Hcont"). }
     - (* ---- FUEL S: the full loop body ---- *)
@@ -2619,8 +2674,6 @@ Section BallocScan.
                         (sign_extend' 64 (mword_of_int 8148 : mword 13))
                       = mword_of_int (KernelSyms.balloc + 0x8a)) by pcw.
         iEval (rewrite Hjt) in "Hpc".
-        iDestruct (bitmap_res_close γfs bmapstart cov logstart size used Hok
-                     with "Hfsbm Hpool") as "Hbmr".
         iDestruct (cpu_own_transport CIDx CID1 0 eb (proc_addr j) b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         iDestruct (IntrDefs.trap_csrs_ext_transport CIDx CID1 eb (proc_addr j)
@@ -2628,9 +2681,9 @@ Section BallocScan.
         iDestruct (IntrDefs.cpu_claim_ext_transport CIDx CID1 eb (proc_addr j)
                      ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
         iApply (ba_exhaust (CID0 := CID1)  γs j γfs γd bn γ γpr γu cov logstart
-                  bmapstart size dev used u cr Sb kk bnoB (bitmap_bytes used) bsdX dX
+                  bmapstart size dev u cr Sb kk bnoB (bitmap_bytes used) bsdX dX
                   pidv dq dqb dqs m M K eb b lks Vpr HK Hpk Hsize Hsp Hthr Hs2 Hs5 Hs6 Hs8 Hkk Hbelow
-                  with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hpenv Hbio Hprocs Hframe Hppid Hsbsz Hsbbm Hsl Hbmr Hop Hlk [Hcont]").
+                  with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hpenv Hbio Hprocs Hframe Hppid Hsbsz Hsbbm Hsl Hop Hlk [Hcont]").
         { iApply (wp_next_shift (b := true) (CIDa := CIDx) (CIDb := CID1) ltac:(wp_next_chain)
                     with "Hcont"). }
       + (* +0xb6 FALL-THROUGH: bi < sb.size, so this bit is in range *)
@@ -3245,8 +3298,6 @@ Section BallocScan.
                                  (concat_vec (mword_of_int 2002 : mword 11) ('b"0"))))
                             = mword_of_int (KernelSyms.balloc + 0x8a)) by pcw.
              iEval (rewrite Hjt2) in "Hpc".
-             iDestruct (bitmap_res_close γfs bmapstart cov logstart size used Hok
-                          with "Hfsbm Hpool") as "Hbmr".
              iDestruct (cpu_own_transport CIDx CID15 0 eb (proc_addr j) b
                           ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
              iDestruct (IntrDefs.trap_csrs_ext_transport CIDx CID15 eb (proc_addr j)
@@ -3254,10 +3305,10 @@ Section BallocScan.
              iDestruct (IntrDefs.cpu_claim_ext_transport CIDx CID15 eb (proc_addr j)
                           ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
              iApply (ba_exhaust (CID0 := CID15)  γs j γfs γd bn γ γpr γu cov logstart
-                       bmapstart size dev used u cr Sb kk bnoB (bitmap_bytes used) bsdX dX
+                       bmapstart size dev u cr Sb kk bnoB (bitmap_bytes used) bsdX dX
                        pidv dq dqb dqs m SA K eb b lks Vpr HK Hpk Hsize HSAsp HSAthr HSAs2
                        HSAs5 HSAs6 HSAs8 Hkk Hbelow
-                       with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hpenv Hbio Hprocs Hframe Hppid Hsbsz Hsbbm Hsl Hbmr Hop Hlk [Hcont]").
+                       with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hpenv Hbio Hprocs Hframe Hppid Hsbsz Hsbbm Hsl Hop Hlk [Hcont]").
              { iApply (wp_next_shift (b := true) (CIDa := CIDx) (CIDb := CID15)
                          ltac:(wp_next_chain) with "Hcont"). }
           -- (* bi + 1 < BPB: branch back to +0xb6, one fuel unit down *)
@@ -3290,7 +3341,7 @@ Section BallocScan.
                        HSAsp HSAthr HSAa0 HSAa4 HSAs1
                        HSAs2 HSAs3 HSAs4 HSAs5 HSAs6 HSAs7 HSAs8 Hbelow
                        with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hpenv Hbio Hlctx Hprocs Hframe Hppid Hsbsz Hsbbm Hdevi Hdgeom
-                             Hdlock Hsl Hop Hfsbm Hpool Hlk [Hcont]").
+                             Hdlock Hsl Hop Hbminv Hlk [Hcont]").
              { iApply (wp_next_shift (b := true) (CIDa := CIDx) (CIDb := CID14)
                          ltac:(wp_next_chain) with "Hcont"). }
         * (* the bit is CLEAR: take the branch to +0x38 and allocate *)
@@ -3324,7 +3375,7 @@ Section BallocScan.
                     ltac:(rewrite HS8a3 Hreq; reflexivity)
                     HS8s1 HS8s2 HS8s7 Hcred Hbelow
                     with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hpanenv Hbio Hlctx Hprocs Hframe Hppid Hsbsz Hsbbm Hdevi Hdgeom Hdlock Hsl Hop
-                          Hfsbm Hpool Hlk [Hcont]").
+                          Hbminv Hlk [Hcont]").
           { iApply (wp_next_shift (b := true) (CIDa := CIDx) (CIDb := CID11)
                       ltac:(wp_next_chain) with "Hcont"). }
   Qed.
@@ -3366,7 +3417,6 @@ Section BallocMain.
       (bn : bio_names)
       (γ : log_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (bmapstart : Z) (size : Z) (dev : mword 32)
-      (used : gset Z)
       (γpr : gname)
       (u : nat) (cr : bool) (Sb : gset Z)
       (pidv : mword 32) (dq dqb dqs : dfrac)
@@ -3402,7 +3452,7 @@ Section BallocMain.
       proc_priv_bare pj pidv Vpr -∗
       sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-      bitmap_res γfs bmapstart cov logstart size used -∗
+      bitmap_inv γfs bmapstart cov logstart size -∗
       procs_inv γs -∗
       dev_inv γu γd -∗
       disk_geom γd pd pav pu -∗
@@ -3422,7 +3472,6 @@ Section BallocMain.
           sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
           bslots bn 2 -∗
           ((⌜mf !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int 0 : mword 64)⌝ ∗
-            bitmap_res γfs bmapstart cov logstart size used ∗
             log_opS γ (2 + u) Sb)
            ∨
            (∃ blk : mword 32,
@@ -3432,8 +3481,6 @@ Section BallocMain.
               ⌜~ (bv_unsigned blk ∈ log_region_set logstart)⌝ ∗
               fsblock γfs (bv_unsigned blk) (replicate BSIZE (bv_0 8)) ∗
               blk_own γfs (bv_unsigned blk) ∗
-              bitmap_res γfs bmapstart cov logstart size
-                         (used ∪ {[ bv_unsigned blk ]}) ∗
               log_opS γ (if cr then S u else u)
                         (Sb ∪ {[bmapstart]} ∪ {[bv_unsigned blk]}))) -∗
           WP (Loop : expr riscv_lang)) -∗
@@ -3460,14 +3507,13 @@ Section BallocMain.
                      = false)
       by (apply ba_moi64_nonzero; lia).
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hkdata #Hpenv #Hbio #Hlctx Hppid
-              Hsbsz Hsbbm Hbmr #Hprocs #Hdevi #Hdgeom
+              Hsbsz Hsbbm #Hbminv #Hprocs #Hdevi #Hdgeom
               #Hdlock Hsl Hop Hcont".
     iPoseProof (printk_env_panic with "Hpenv") as "#Hpanenv".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm. cbn in Hbm.
-    iAssert (ba_cont (CID0 := CID) γfs bn γ cov logstart bmapstart size used u cr Sb
+    iAssert (ba_cont (CID0 := CID) γfs bn γ cov logstart bmapstart size u cr Sb
                pidv dq dqb dqs j m K eb b lks Vpr)%I with "[Hcont]" as "Hcont";
       [rewrite /ba_cont; iExact "Hcont" |].
-    iDestruct (bitmap_res_open with "Hbmr") as "(%Hok & Hfsbm & Hpool)".
     iPoseProof (bai_000 with "Htext") as "Hi000".
     iPoseProof (bai_002 with "Htext") as "Hi002".
     iPoseProof (bai_004 with "Htext") as "Hi004".
@@ -4177,13 +4223,24 @@ Section BallocMain.
     { intros c Hcs N2 N8 N9 N18 N19 N20 N21 N22 N23 N24.
       rewrite (callee_saved_lookup Hcs1_cs c Hcs).
       exact (HRAthr c Hcs N2 N8 N9 N18 N19 N20 N21 N22 N23 N24). }
-    (* THE COUPLING: the buffer's bytes ARE the bitmap's image of [used] *)
+    (* THE COUPLING, THROUGH THE INVARIANT rather than a held half.  The
+       handle carries the bitmap block's MACHINERY half at the bytes bread
+       returned; [BitmapInv.bitmap_read] holds that half against the parked
+       client half for ONE mask-preserving opening and hands back the only
+       two things the scan needs: the bytes are the image of SOME set, and
+       [bitmap_ok] holds at that set.  Everything goes back; the set is a
+       fresh existential that no contract above balloc ever names. *)
     iEval (rewrite /bio_locked) in "Hheld".
     iDestruct (iu_held_k with "Hheld") as %Hkk.
-    iEval (rewrite -HbnoB) in "Hfsbm".
-    iDestruct (iu_held_content with "Hfsbm Hheld") as %Hbs0.
-    subst bs0.
-    iEval (rewrite HbnoB) in "Hfsbm".
+    iDestruct (ba_held_L with "Hheld") as "[HL Hbackl]".
+    iApply fupd_wp.
+    iMod (bitmap_read ⊤ γfs bmapstart cov logstart size bs0
+            ltac:(solve_ndisj) with "Hbminv [HL]") as "(%Hex & HL)".
+    { iEval (rewrite HbnoB) in "HL". iExact "HL". }
+    iDestruct ("Hbackl" with "[HL]") as "Hheld".
+    { iEval (rewrite -HbnoB) in "HL". iExact "HL". }
+    iModIntro.
+    destruct Hex as (used & Hbs0 & Hok). subst bs0.
     iAssert (bio_locked bn (fs_view γfs γd dev cov) kk pidv dev bnoB
                (bitmap_bytes used) bsd0 d0) with "[Hheld]" as "Hlk";
       [rewrite /bio_locked; iExact "Hheld" |].
@@ -4346,7 +4403,7 @@ Section BallocMain.
               CIDb33 0 W4 ba_fuel_full ba_bi_zero HW4sp HW4thr
               HW4a0 HW4a4 HW4s1 HW4s2 HW4s3 HW4s4 HW4s5 HW4s6 HW4s7 HW4s8 Hbelow
               with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hpenv Hbio Hlctx Hprocs Hframe Hppid Hsbsz Hsbbm Hdevi Hdgeom
-                    Hdlock Hsl Hop Hfsbm Hpool Hlk [Hcont]").
+                    Hdlock Hsl Hop Hbminv Hlk [Hcont]").
     { iApply (wp_next_shift (b := true) (CIDa := CIDb28) (CIDb := CIDb33)
                 ltac:(wp_next_chain) with "Hcont"). }
   Qed.
@@ -4363,18 +4420,17 @@ Section BallocMain.
       (bn : bio_names)
       (γ : log_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (bmapstart : Z) (size : Z) (dev : mword 32)
-      (used : gset Z)
       (γpr : gname)
       (u : nat) (cr : bool) (Sb : gset Z)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
     : wp_balloc_gen_body γs j γl γu γd γk pd pav pu bn γ γfs
-                         cov logstart bmapstart size dev used γpr u cr Sb
+                         cov logstart bmapstart size dev γpr u cr Sb
                          pidv dq dqb dqs m K eb b lks Vpr.
   Proof.
     exact (ba_main γs j γl γu γd γk pd pav pu bn γ γfs
-             cov logstart bmapstart size dev used γpr u cr Sb
+             cov logstart bmapstart size dev γpr u cr Sb
              pidv dq dqb dqs m K eb b lks Vpr).
   Qed.
 
@@ -4389,46 +4445,45 @@ Section BallocMain.
       (bn : bio_names)
       (γ : log_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (bmapstart : Z) (size : Z) (dev : mword 32)
-      (used : gset Z)
       (γpr : gname)
       (u : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
     : wp_balloc_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs
-                           cov logstart bmapstart size dev used γpr u
+                           cov logstart bmapstart size dev γpr u
                            pidv dq dqb dqs m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_balloc_sconf_body].
     intros pcE pj ret_tgt HK Hgeom Hpk Hsize Hbm0 Hbmcov Hbmlog Hj Hgl Ha0 Hbelow.
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hkdata #Hpenv #Hbio #Hlctx Hppid
-              Hsbsz Hsbbm Hbmr #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hop Hcont".
+              Hsbsz Hsbbm #Hbminv #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hop Hcont".
     rewrite /log_op. iDestruct "Hop" as (Sb) "Hop".
     (* [ba_main] is the eb-generic core both top-level lemmas share -- see
        its header comment -- so [wp_balloc_sconf], which genuinely needs
        [eb = false], applies it directly instead of routing through
        [wp_balloc_gen] (whose OWN statement stays pinned at [eb = true]). *)
     iApply (ba_main γs j γl γu γd γk pd pav pu bn γ γfs
-              cov logstart bmapstart size dev used γpr u false Sb
+              cov logstart bmapstart size dev γpr u false Sb
               pidv dq dqb dqs m K eb b lks
               Vpr HK Hgeom Hpk Hsize Hbm0 Hbmcov Hbmlog ltac:(discriminate)
               Hj Hgl Ha0 Hbelow
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hkdata Hpenv Hbio Hlctx Hppid
-                    Hsbsz Hsbbm Hbmr Hprocs Hdevi Hdgeom Hdlock Hsl Hop [Hcont]").
+                    Hsbsz Hsbbm Hbminv Hprocs Hdevi Hdgeom Hdlock Hsl Hop [Hcont]").
     iIntros (CIDx) "%Hchain". iSpecialize ("Hcont" $! CIDx with "[%]"); [exact Hchain|].
     iIntros (mf) "%Hcs Hsie Hcnt Htc Hclm Hpc Hppid Hsbsz Hsbbm Hsl Harms".
     iApply ("Hcont" $! mf with "[%] Hsie Hcnt Htc Hclm Hpc Hppid Hsbsz Hsbbm Hsl [Harms]");
       [exact Hcs|].
-    iDestruct "Harms" as "[(%Hz & Hbmr & Hop) | Hr]".
-    - iLeft. iSplitR; [iPureIntro; exact Hz|]. iFrame "Hbmr".
+    iDestruct "Harms" as "[(%Hz & Hop) | Hr]".
+    - iLeft. iSplitR; [iPureIntro; exact Hz|].
       iApply (log_opS_op with "Hop").
-    - iDestruct "Hr" as (blk) "(%Ha & %Hnz & %Hcv & %Hlg & Hfsb & Hown & Hbmr & Hop)".
+    - iDestruct "Hr" as (blk) "(%Ha & %Hnz & %Hcv & %Hlg & Hfsb & Hown & Hop)".
       iRight. iExists blk.
       iSplitR; [iPureIntro; exact Ha|].
       iSplitR; [iPureIntro; exact Hnz|].
       iSplitR; [iPureIntro; exact Hcv|].
       iSplitR; [iPureIntro; exact Hlg|].
-      iFrame "Hfsb Hown Hbmr".
+      iFrame "Hfsb Hown".
       iApply (log_opS_op with "Hop").
   Qed.
 

@@ -17,7 +17,7 @@
     (S1) NO SYSCALL SEAL CARRIES A TREE DELTA, AND sys_mkdir's CANNOT BE
          GIVEN ONE CALLER-SIDE.  [SpecSysMkdir.v]:280-304 is the whole
          postcondition: a register file, [proc_priv], the four superblock
-         cells, [bslots], [bitmap_res] at an UNORDERED [used'], the iref
+         cells, [bslots], the iref
          interval, and [sys_mkdir_ret] (0 or -1).  Nothing inode-shaped,
          nothing byte-shaped, nothing tree-shaped.  ProofSysMkdir.v:60 says
          so itself: *"Nothing inode-shaped survives the call, which is why
@@ -73,9 +73,8 @@
                   is free of it forever after.  This is the honest content
                   of "the ambient is absorbed": not that the seals hide it,
                   but that all of it is duplicable and none of it is spent.
-      [fs_res]    the 7 consumable resources that go in and come back:
-                  [bslots], the four superblock cells, [bitmap_res] and the
-                  iref ledger.  THIS is the part a client must account for,
+      [fs_res]    the 6 consumable resources that go in and come back:
+                  [bslots], the four superblock cells and the iref ledger.  THIS is the part a client must account for,
                   and (S3) is exactly a statement about it.
 
     and, dropped outright because they are [emp] at the [eb = true] both
@@ -259,11 +258,19 @@ Section FsBundles.
      ambient form gets it back by [FsReady.disk_geom_agree].  The two forms
      are interderivable, [fs_world_all]'s statement is unchanged, and so is
      every contract below that takes [pd]/[pav]/[pu] as parameters. *)
+  (* TWO MORE TIES THAN THE EIGHTEEN CONSTITUENTS NEED, and the block
+     bitmap is why.  [BitmapInv.bitmap_inv] is a conjunct of [fs_ready] at
+     the AMBIENT geometry ([fsc_bmapstart], [fsc_size]); every fs contract
+     that takes it -- [SpecSysMkdir], [SpecSysChdir] -- spells it at the
+     CALLER's [bmapstart]/[size], exactly as it spells [cov]/[logstart] at
+     the caller's.  Those two already ride here as equations, so the bitmap
+     row costs exactly what every other row costs: two more of the same. *)
   Definition fs_world (γpr γa : gname) (γs : list gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64) (bn : bio_names) (glog : log_names)
       (γfs : fs_names) (γi : gname) (cn : ic_names) (gtl : gname)
-      (cov : gset Z) (logstart inodestart : Z) (nib : nat) (dev : mword 32)
+      (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+      (size : Z) (dev : mword 32)
       : iProp Σ :=
     (⌜γpr = fsc_printk⌝ ∗ ⌜γa = fsc_kalloc⌝ ∗
      ⌜γu = fsc_uart⌝ ∗ ⌜γd = fsc_disk⌝ ∗ ⌜γk = fsc_dlock⌝ ∗
@@ -271,14 +278,15 @@ Section FsBundles.
      ⌜γi = fsc_ireg⌝ ∗ ⌜cn = fsc_ic⌝ ∗ ⌜gtl = fsc_itlock⌝ ∗
      ⌜cov = fsc_cov⌝ ∗ ⌜logstart = fsc_logst⌝ ∗ ⌜inodestart = icfg_ist⌝ ∗
      ⌜nib = icfg_nib⌝ ∗ ⌜dev = icfg_dev⌝ ∗
+     ⌜bmapstart = fsc_bmapstart⌝ ∗ ⌜size = fsc_size⌝ ∗
      disk_geom γd pd pav pu ∗
      is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) ∗
      FsReady.fs_ready)%I.
 
   Global Instance fs_world_persistent γpr γa γs γu γd γk pd pav pu bn glog
-      γfs γi cn gtl cov logstart inodestart nib dev :
+      γfs γi cn gtl cov logstart bmapstart inodestart nib size dev :
     Persistent (fs_world γpr γa γs γu γd γk pd pav pu bn glog γfs γi cn gtl
-                         cov logstart inodestart nib dev).
+                         cov logstart bmapstart inodestart nib size dev).
   Proof. rewrite /fs_world. apply _. Qed.
 
   (* THE UNPACK, at the caller's names.  This is what the [γs] parameter's
@@ -287,9 +295,9 @@ Section FsBundles.
      its callee spells them.  The substitution happens here, once, instead
      of in every consumer. *)
   Lemma fs_world_all γpr γa γs γu γd γk pd pav pu bn glog
-      γfs γi cn gtl cov logstart inodestart nib dev :
+      γfs γi cn gtl cov logstart bmapstart inodestart nib size dev :
     fs_world γpr γa γs γu γd γk pd pav pu bn glog γfs γi cn gtl
-             cov logstart inodestart nib dev -∗
+             cov logstart bmapstart inodestart nib size dev -∗
     kernel_text ∗ kernel_data ∗
     printk_env γpr γu γd ∗ ⌜printk_gen_contract (kt := KT1) γpr γu γd⌝ ∗
     bio_ctx bn (fs_view γfs γd dev cov) ∗
@@ -308,28 +316,33 @@ Section FsBundles.
        statement about the [fscfg]/[icfg] instance itself and the cells are
        named by its fields.  A caller that threads its own names rewrites by
        the tie equations it just destructed. *)
-    ⌜FsReady.fs_geom_ok⌝ ∗ FsReady.fs_sb_cells.
+    ⌜FsReady.fs_geom_ok⌝ ∗ FsReady.fs_sb_cells ∗
+    (* ...AND THE BLOCK BITMAP, at the caller's [bmapstart]/[size].  It is a
+       persistent conjunct of [fs_ready] now (BitmapInv.v), so it comes out
+       here like every other invariant and NOTHING about the free pool
+       crosses a call any more. *)
+    bitmap_inv γfs bmapstart cov logstart size.
   Proof.
     rewrite /fs_world.
-    (* SIXTEEN equations now, not nineteen, and the disk fabric arrives as
+    (* EIGHTEEN equations now, and the disk fabric arrives as
        two RESOURCES at the caller's own [pd]/[pav]/[pu] (R1).  So the two
        disk rows of the conclusion come from them rather than from
        [fs_ready], whose own disk conjunct is the existential this predicate
        replaced -- and it is dropped ([_] at slot 10). *)
     iIntros "(-> & -> & -> & -> & -> & -> & -> & -> & -> & -> & -> & -> & ->
-              & -> & -> & -> & #Hgeom & #Hdlock & Hw)".
+              & -> & -> & -> & -> & -> & #Hgeom & #Hdlock & Hw)".
     iDestruct (FsReady.fs_ready_all with "Hw") as
       "(H1 & H2 & H3 & %H4 & H5 & H6 & H7 & H8 & H9 & _ & H11 & H12 & H13
-        & H14 & H15 & H16 & H17 & %H18 & #H19)".
-    (* TWENTY ROWS, ONE SPLIT EACH, NOT ONE EIGHTEEN-NAME [iFrame].  This
-       lemma's whole job is to REASSEMBLE a named bundle whose every row is
+        & H14 & H15 & H16 & H17 & %H18 & #H19 & #H20)".
+    (* TWENTY-ONE ROWS, ONE SPLIT EACH, NOT ONE [iFrame].  This lemma's
+       whole job is to REASSEMBLE a named bundle whose every row is
        definition-valued ([printk_env], [bio_ctx], [log_ctx], an [is_lock]
        over [disk_res], [is_itable2], [ic_escrows], the fifty-fold
-       [ic_sleeplocks] big-op, [fs_sb_cells]), so every (name x conjunct)
-       attempt is a conversion and no single [iSplit] helps -- the case
-       claude-notes/optimization.md calls "build the WHOLE bundle".  The
-       [iFrame] pair below cost 25 s of this file; the chain is one
-       syntactic check per row. *)
+       [ic_sleeplocks] big-op, [fs_sb_cells], [bitmap_inv]), so every
+       (name x conjunct) attempt is a conversion and no single [iSplit]
+       helps -- the case claude-notes/optimization.md calls "build the WHOLE
+       bundle".  The [iFrame] pair below cost 25 s of this file; the chain
+       is one syntactic check per row. *)
     iSplitL "H1"; [iExact "H1"|].
     iSplitL "H2"; [iExact "H2"|].
     iSplitL "H3"; [iExact "H3"|].
@@ -349,7 +362,8 @@ Section FsBundles.
     iSplitL "H16"; [iExact "H16"|].
     iSplitL "H17"; [iExact "H17"|].
     iSplitR; [iPureIntro; exact H18|].
-    iExact "H19".
+    iSplitR; [iExact "H19"|].
+    iExact "H20".
   Qed.
 
   (* the alias, as a lemma, so a reader need not take the [Definition]'s
@@ -362,20 +376,21 @@ Section FsBundles.
   Lemma fs_world_ready γs pd pav pu :
     fs_world fsc_printk fsc_kalloc γs fsc_uart fsc_disk fsc_dlock
              pd pav pu fsc_bio icfg_log fsc_fs fsc_ireg
-             fsc_ic fsc_itlock fsc_cov fsc_logst icfg_ist icfg_nib icfg_dev
+             fsc_ic fsc_itlock fsc_cov fsc_logst fsc_bmapstart icfg_ist
+             icfg_nib fsc_size icfg_dev
     ⊢ FsReady.fs_ready.
   Proof.
     rewrite /fs_world.
     by iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _
-                 & _ & _ & _ & $)".
+                 & _ & _ & _ & _ & _ & $)".
   Qed.
 
   Lemma fs_ready_world γs :
     FsReady.fs_ready ⊢
     ∃ pd pav pu, fs_world fsc_printk fsc_kalloc γs fsc_uart fsc_disk fsc_dlock
                    pd pav pu fsc_bio icfg_log fsc_fs fsc_ireg
-                   fsc_ic fsc_itlock fsc_cov fsc_logst icfg_ist icfg_nib
-                   icfg_dev.
+                   fsc_ic fsc_itlock fsc_cov fsc_logst fsc_bmapstart icfg_ist
+                   icfg_nib fsc_size icfg_dev.
   Proof.
     iIntros "#H".
     iDestruct (FsReady.fs_ready_disk with "H") as "[_ Hd]".
@@ -385,19 +400,19 @@ Section FsBundles.
   Qed.
 
   (* THE CONSUMABLES.  What actually crosses the call and comes back: the
-     three block slots, the four superblock cells, the free-block ledger at
-     [used], and the reference ledger at [ns].  Everything F3 has to
-     ACCOUNT for is in here, which is why (S3) is a statement about this
-     bundle's [ns] and nothing else. *)
-  Definition fs_res (bn : bio_names) (γfs : fs_names)
-      (cov : gset Z) (logstart bmapstart inodestart ninodes size : Z)
-      (used : gset Z) (ns : nat) (dqb dqs dqbs dqn : dfrac) : iProp Σ :=
+     three block slots, the four superblock cells, and the reference ledger
+     at [ns].  Everything F3 has to ACCOUNT for is in here, which is why
+     (S3) is a statement about this bundle's [ns] and nothing else.  (The
+     block bitmap is NOT a consumable: [BitmapInv.bitmap_inv] is a
+     persistent conjunct of [fs_ready].) *)
+  Definition fs_res (bn : bio_names)
+      (bmapstart inodestart ninodes size : Z)
+      (ns : nat) (dqb dqs dqbs dqn : dfrac) : iProp Σ :=
     (bslots bn 3 ∗
      sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) ∗
      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) ∗
      sb_size ↦₄{dqbs} (mword_of_int size : mword 32) ∗
      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
-     bitmap_res γfs bmapstart cov logstart size used ∗
      iref_slots ns)%I.
 
 End FsBundles.
@@ -441,7 +456,7 @@ Definition wp_sys_mkdir_friendly_body
     (cn : ic_names) (gtl : gname)                        (* the icache + itable *)
     (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
     (ninodes size : Z) (dev : mword 32)
-    (used : gset Z) (ns : nat)
+    (ns : nat)
     (dqb dqs dqbs dqn : dfrac)
     (v : mword 64)                                       (* syscall argument 0 *)
     (pid : mword 32) (V : pprivate)
@@ -459,15 +474,15 @@ Definition wp_sys_mkdir_friendly_body
   cpu_own 0 true pj b lks -∗
   pc_is pcE -∗
   fs_world γpr γa γs γu γd γk pd pav pu bn glog γfs γi cn gtl
-           cov logstart inodestart nib dev -∗
+           cov logstart bmapstart inodestart nib size dev -∗
   (* [procs_inv] left [fs_ready] (FsCfg.v's header): a PROCESS resource,
      persistent, and every caller already holds it. *)
   procs_inv γs -∗
-  fs_res bn γfs cov logstart bmapstart inodestart ninodes size used ns
+  fs_res bn bmapstart inodestart ninodes size ns
          dqb dqs dqbs dqn -∗
   proc_priv γf pj pid V -∗
   wp_next true pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (used' : gset Z) (ns' : nat) (P' : uptd),
+  ∀ (mf : regfile) (ns' : nat) (P' : uptd),
       ⌜sys_mkdir_ret (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
@@ -475,7 +490,7 @@ Definition wp_sys_mkdir_friendly_body
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 true pj b lks -∗
       pc_is ret_tgt -∗
-      fs_res bn γfs cov logstart bmapstart inodestart ninodes size used' ns'
+      fs_res bn bmapstart inodestart ninodes size ns'
              dqb dqs dqbs dqn -∗
       proc_priv γf pj pid (upd_upt V P') -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -498,14 +513,14 @@ Module FsSysMkdir (M : SYSMKDIR).
       (cn : ic_names) (gtl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (ninodes size : Z) (dev : mword 32)
-      (used : gset Z) (ns : nat)
+      (ns : nat)
       (dqb dqs dqbs dqn : dfrac)
       (v : mword 64)
       (pid : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (b : bool) (lks : gset string) :
       wp_sys_mkdir_friendly_body γf γa γpr γs j γl γu γd γk pd pav pu bn
                                  glog γfs γi cn gtl cov logstart bmapstart
-                                 inodestart nib ninodes size dev used ns
+                                 inodestart nib ninodes size dev ns
                                  dqb dqs dqbs dqn v pid V m K b lks.
   Proof.
     unfold wp_sys_mkdir_friendly_body. cbv zeta.
@@ -528,30 +543,30 @@ Module FsSysMkdir (M : SYSMKDIR).
     iDestruct (fs_world_all with "Hw") as
       "(Htext & Hdata & Hpr & %Hprg & Hbio & Hlogc &
         Hseam & Hgc & Hdev & Hdgeom & Hdlk & Hitb2 & Hitbl &
-        Hesc & Hisl & Hireg & Hiopen & Hkenv & %Hgeo & #Hsbc)".
-    iDestruct "Hres" as "(Hbsl & Hsbn & Hsbi & Hsbs & Hsbb & Hbm & Hir)".
+        Hesc & Hisl & Hireg & Hiopen & Hkenv & %Hgeo & #Hsbc & #Hbmi)".
+    iDestruct "Hres" as "(Hbsl & Hsbn & Hsbi & Hsbs & Hsbb & Hir)".
     iApply (M.wp_sys_mkdir_sconf γf γa γpr γs j γl γu γd γk pd pav pu bn
               glog γfs γi cn gtl cov logstart bmapstart inodestart nib
-              ninodes size dev used ns dqb dqs dqbs dqn v pid V m K true
+              ninodes size dev ns dqb dqs dqbs dqn v pid V m K true
               b lks
               HK Hdev Hnib Hlog Hist Hroot Hnibp Hlg Hsz Hbnn Hbcov Hbout
               Histnn Hcb Hbg Hib Hn1 Hn2 Hn3 Hus Hprg Hns Hj Hgs
               eq_refl Htf
               with "Hcg Hown [] [] Htext Hdata Hpc Hpr Hbio Hlogc
                     Hseam Hgc Hdev Hdgeom Hdlk Hbsl Hitb2 Hitbl Hesc Hisl
-                    Hireg Hiopen Hsbn Hsbi Hsbs Hsbb Hbm Hkenv Hprocs Hir
+                    Hireg Hiopen Hsbn Hsbi Hsbs Hsbb Hbmi Hkenv Hprocs Hir
                     Hpriv").
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
     iIntros (CIDn) "%Hgd".
-    iIntros (mf used' ns' P')
-      "%Hcs %Hupt Hcg Hown _ _ Hpc Hbsl Hsbn Hsbi Hsbs Hsbb Hbm %Hns' Hir
+    iIntros (mf ns' P')
+      "%Hcs %Hupt Hcg Hown _ _ Hpc Hbsl Hsbn Hsbi Hsbs Hsbb %Hns' Hir
        Hpriv %Hret".
     iDestruct (wp_next_at (CID0 := CID) true (proc_addr j) _ CIDn Hgd
                  with "Hcont") as "Hcont".
-    iApply ("Hcont" $! mf used' ns' P'
+    iApply ("Hcont" $! mf ns' P'
               with "[%] [%] [%] [%] Hcg Hown Hpc
-                    [Hbsl Hsbn Hsbi Hsbs Hsbb Hbm Hir] Hpriv").
+                    [Hbsl Hsbn Hsbi Hsbs Hsbb Hir] Hpriv").
     - exact Hret.
     - exact Hcs.
     - exact Hupt.
@@ -569,21 +584,21 @@ End FsSysMkdir.
     contrast with mkdir is the point of building both:
 
     THE LEDGERS CLOSE.  [fs_res] goes in at [ns = 2] and comes back at
-    [ns = 2] -- [SpecSysChdir.v]:259, :283, all four arms -- and the free
-    block pool only SHRINKS ([used' ⊆ used], :280).  So a client's
-    precondition is RE-ESTABLISHED by the call, up to [used'], and chdir can
-    be called in a loop.  mkdir cannot (S3).  The friendly layer's first
-    real distinction between two syscalls is a LEDGER fact, not a tree fact.
+    [ns = 2], all four arms.  So a client's precondition is RE-ESTABLISHED
+    by the call EXACTLY -- the free pool says nothing at all now that it
+    lives in [bitmap_inv] -- and chdir can be called in a loop.  mkdir
+    cannot (S3).  The friendly layer's first real distinction between two
+    syscalls is a LEDGER fact, not a tree fact.
 
     THE TREE DELTA IS EMPTY -- BUT NOT FOR THE REASON THE F3 BRIEF EXPECTED.
     chdir was staged as "the NO-DELTA case: t' = t, a pure resolution plus a
     reference swap".  Two corrections, both from the landed text:
 
       (a) chdir's [iput(p->cwd)] can be the LAST reference to an unlinked
-          inode, in which case it truncates and FREES it -- the seal's own
-          [used' ⊆ used] is the visible half of that ([SpecSysChdir.v]:279
-          names iput's truncate arm as the only mover).  The node store
-          therefore CAN lose a node across a chdir.  What is untouched is
+          inode, in which case it truncates and FREES it -- iput's truncate
+          arm is the one mover, and since the free pool moved inside
+          [BitmapInv.bitmap_inv] it is no longer visible in the seal at all.
+          The node store therefore CAN lose a node across a chdir.  What is untouched is
           the reachable tree: a freed inode has [nlink = 0] and no live
           record names it.  "t' = t" is a statement about the LIVE tree
           only, and stating it would need exactly the ambient tree (S2)
@@ -613,7 +628,6 @@ Definition wp_sys_chdir_friendly_body
     (cn : ic_names) (gtl : gname)
     (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
     (ninodes size : Z) (dev : mword 32)
-    (used : gset Z)
     (dqb dqs dqbs dqn : dfrac)
     (v : mword 64)
     (pid : mword 32) (V : pprivate)
@@ -630,23 +644,22 @@ Definition wp_sys_chdir_friendly_body
   cpu_own 0 true pj b lks -∗
   pc_is pcE -∗
   fs_world γpr γa γs γu γd γk pd pav pu bn glog γfs γi cn gtl
-           cov logstart inodestart nib dev -∗
+           cov logstart bmapstart inodestart nib size dev -∗
   (* [procs_inv] left [fs_ready] (FsCfg.v's header): a PROCESS resource,
      persistent, and every caller already holds it. *)
   procs_inv γs -∗
-  fs_res bn γfs cov logstart bmapstart inodestart ninodes size used 2
+  fs_res bn bmapstart inodestart ninodes size 2
          dqb dqs dqbs dqn -∗
   proc_priv γf pj pid V -∗
   wp_next true pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (used' : gset Z) (P' : uptd),
+  ∀ (mf : regfile) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
-      ⌜used' ⊆ used⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 true pj b lks -∗
       pc_is ret_tgt -∗
       (* THE LEDGER IS RESTORED AT THE LITERAL 2 -- the composability half *)
-      fs_res bn γfs cov logstart bmapstart inodestart ninodes size used' 2
+      fs_res bn bmapstart inodestart ninodes size 2
              dqb dqs dqbs dqn -∗
       sys_chdir_post γf pj pid (upd_upt V P')
         (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
@@ -667,14 +680,13 @@ Module FsSysChdir (M : SYSCHDIR).
       (cn : ic_names) (gtl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (ninodes size : Z) (dev : mword 32)
-      (used : gset Z)
       (dqb dqs dqbs dqn : dfrac)
       (v : mword 64)
       (pid : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (b : bool) (lks : gset string) :
       wp_sys_chdir_friendly_body γf γa γpr γs j γl γu γd γk pd pav pu bn
                                  glog γfs γi cn gtl cov logstart bmapstart
-                                 inodestart nib ninodes size dev used
+                                 inodestart nib ninodes size dev
                                  dqb dqs dqbs dqn v pid V m K b lks.
   Proof.
     unfold wp_sys_chdir_friendly_body. cbv zeta.
@@ -697,30 +709,29 @@ Module FsSysChdir (M : SYSCHDIR).
     iDestruct (fs_world_all with "Hw") as
       "(Htext & Hdata & Hpr & %Hprg & Hbio & Hlogc &
         Hseam & Hgc & Hdev & Hdgeom & Hdlk & Hitb2 & Hitbl &
-        Hesc & Hisl & Hireg & Hiopen & Hkenv & %Hgeo & #Hsbc)".
-    iDestruct "Hres" as "(Hbsl & Hsbn & Hsbi & Hsbs & Hsbb & Hbm & Hir)".
+        Hesc & Hisl & Hireg & Hiopen & Hkenv & %Hgeo & #Hsbc & #Hbmi)".
+    iDestruct "Hres" as "(Hbsl & Hsbn & Hsbi & Hsbs & Hsbb & Hir)".
     iPoseProof (printk_env_panic with "Hpr") as "#Hpe".
     iApply (M.wp_sys_chdir_sconf γf γa γs j γl γu γd γk pd pav pu bn
               glog γfs γi cn gtl cov logstart bmapstart inodestart nib
-              size dev used dqb dqs v pid V m K true b lks
+              size dev dqb dqs v pid V m K true b lks
               HK Hdev Hnib Hlog Hist Hroot Hnibp Hlg Hsz Hbnn Hbcov Hbout
               Histnn Hcb Hib Hj Hgs eq_refl Htf
               with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlogc
                     Hseam Hgc Hdev Hdgeom Hdlk Hbsl Hitb2 Hitbl Hesc Hisl
-                    Hireg Hiopen Hsbb Hsbi Hbm Hkenv Hprocs Hir Hpriv").
+                    Hireg Hiopen Hsbb Hsbi Hbmi Hkenv Hprocs Hir Hpriv").
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
     iIntros (CIDn) "%Hgd".
-    iIntros (mf used' P')
-      "%Hcs %Hupt Hcg Hown _ _ Hpc Hbsl Hsbb Hsbi %Hsub Hbm Hir Hpost".
+    iIntros (mf P')
+      "%Hcs %Hupt Hcg Hown _ _ Hpc Hbsl Hsbb Hsbi Hir Hpost".
     iDestruct (wp_next_at (CID0 := CID) true (proc_addr j) _ CIDn Hgd
                  with "Hcont") as "Hcont".
-    iApply ("Hcont" $! mf used' P'
-              with "[%] [%] [%] Hcg Hown Hpc
-                    [Hbsl Hsbn Hsbi Hsbs Hsbb Hbm Hir] Hpost").
+    iApply ("Hcont" $! mf P'
+              with "[%] [%] Hcg Hown Hpc
+                    [Hbsl Hsbn Hsbi Hsbs Hsbb Hir] Hpost").
     - exact Hcs.
     - exact Hupt.
-    - exact Hsub.
     - rewrite /fs_res. iFrame.
   Qed.
 

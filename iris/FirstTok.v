@@ -240,6 +240,7 @@ Section FirstTok.
      ic_escrows fsc_ic fsc_fs fsc_ireg fsc_cov fsc_logst ∗
      ic_sleeplocks fsc_ic ∗
      ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib ∗
+     bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size ∗
      is_lock fsc_kalloc (mword_of_int KernelSyms.kmem) "kmem"%string
        (kmem_res fsc_kpages (mword_of_int (KernelSyms.kmem + 24))) ∗
      ⌜fs_geom_ok⌝)%I.
@@ -286,17 +287,17 @@ Section FirstTok.
 
      ROWS.  The pure block; kit 2 (TEN rows since (f0): the log free token,
      [ireg_boot], [ireg_inv], block 1's [fsblock], the [fs_L]/[fs_dirty]
-     auths, the dirty halves, the log header + slots, [bitmap_res], the
+     auths, the dirty halves, the log header + slots, [bitmap_inv], the
      coverage remainder); rows (A) -- the 32 raw [&sb] bytes and the whole
      [struct log], carved in [BootShared.boot_bss_carve]; row (B) --
      [LogDefs.log_mirror_full], the ERA's mirror variable; row (C) --
      [IrefSlots.iref_slot] and the 35 [bslots], neither of which the era
      fupd can mint ([bio_init_at] produces the slots at main+0x8e).
 
-     ROW (D) IS GONE.  (f0) landed [BitmapInv.bitmap_res] INSIDE kit 2
-     ([FsCfgBoot.fs_kit_fsinit_ghost]'s ninth row, at the bitmap block's own
-     bit set), so the standalone row the charter listed is deleted and the
-     kit's spelling governs.  [bslots] did NOT move inside the kit -- it is
+     ROW (D) IS GONE.  (f0) landed the bitmap INSIDE kit 2
+     ([FsCfgBoot.fs_kit_fsinit_ghost]'s ninth row, now the persistent
+     [BitmapInv.bitmap_inv]), so the standalone row the charter listed is
+     deleted and the kit's spelling governs.  [bslots] did NOT move inside the kit -- it is
      produced at WP time -- so row (C) stays. *)
   Definition first_fsinit : iProp Σ :=
     (∃ (dk : Z -> bv 8) (sb : FsImg.fs_sb)
@@ -333,8 +334,7 @@ Section FirstTok.
         ([∗ list] i ∈ seq 0 32, pa_add first_sb_base i ↦ₘ sb_old i) ∗
         ireg_inv fsc_ireg fsc_fs icfg_ist icfg_nib ∗
         ireg_boot ∗
-        bitmap_res fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size
-          (FsImg.fs_bmap_set BSIZE (FsCrash.fs_blocks dk fsc_bmapstart)) ∗
+        bitmap_inv fsc_fs fsc_bmapstart fsc_cov fsc_logst fsc_size ∗
         log_addr ↦₄ vlock ∗
         lock_name_field log_addr ↦₈ vname ∗ lock_cpu log_addr ↦₈ vcpu ∗
         l_start ↦₄ v_start ∗ l_dev ↦₄ v_dev ∗
@@ -403,8 +403,8 @@ Section FirstTok.
   Proof.
     iIntros "HP HK HL #HC". rewrite /fs_ready_pre /first_boot_persist.
     iDestruct "HP" as "(H1 & H2 & H3 & %H4 & H5 & H7 & H8 & H9 & H10 & H11 &
-                        H12 & H13 & H14 & H15 & H16 & %H18)".
-    iFrame "H1 H2 H3 H5 HL H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 HK HC".
+                        H12 & H13 & H14 & H15 & H16 & H17 & %H18)".
+    iFrame "H1 H2 H3 H5 HL H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 HK HC".
     iFrame "%".
   Qed.
 

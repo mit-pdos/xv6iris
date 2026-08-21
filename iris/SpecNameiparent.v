@@ -95,7 +95,6 @@ Definition wp_nameiparent_sconf_body
     (ga : gname) (gf : gname)                          (* kalloc, file table  *)
     (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
-    (used : gset Z)
     (plen : nat) (pfun : nat -> bv 8)                  (* the path buffer     *)
     (nfun : nat -> bv 8)                               (* the name buffer, in *)
     (n : nat)
@@ -163,7 +162,7 @@ Definition wp_nameiparent_sconf_body
   is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-  bitmap_res gfs bmapstart cov logstart size used -∗
+  bitmap_inv gfs bmapstart cov logstart size -∗
   proc_priv_bare pj pidv Vpr -∗
   inode_held (pv_cwd Vpr) -∗
   (* ---- THE PATH RIDES THE CALLER'S FRACTION [dqpv]; THE NAME BUFFER STAYS
@@ -188,7 +187,7 @@ Definition wp_nameiparent_sconf_body
      SIE.  Spelled [b] the two coincide at the only instance the [eb = true]
      premise admits, which is why this went unnoticed. *)
   wp_next true pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (n' : nat) (used' : gset Z)
+  ∀ (mf : regfile) (n' : nat)
     (ok : bool) (nf : nat -> bv 8) (ipv : mword 64),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
@@ -196,8 +195,6 @@ Definition wp_nameiparent_sconf_body
       pc_is ret_tgt -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-      ⌜used' ⊆ used⌝ -∗
-      bitmap_res gfs bmapstart cov logstart size used' -∗
       proc_priv_bare pj pidv Vpr -∗
       inode_held (pv_cwd Vpr) -∗
       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
@@ -235,7 +232,6 @@ Definition wp_nameiparent_gen_body
     (ga : gname) (gf : gname)                          (* kalloc, file table  *)
     (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
-    (used : gset Z)
     (plen : nat) (pfun : nat -> bv 8)                  (* the path buffer     *)
     (nfun : nat -> bv 8)                               (* the name buffer, in *)
     (n : nat) (Sb : gset Z)
@@ -305,7 +301,7 @@ Definition wp_nameiparent_gen_body
   is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-  bitmap_res gfs bmapstart cov logstart size used -∗
+  bitmap_inv gfs bmapstart cov logstart size -∗
   proc_priv_bare pj pidv Vpr -∗
   inode_held (pv_cwd Vpr) -∗
   ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
@@ -319,7 +315,7 @@ Definition wp_nameiparent_gen_body
      SIE.  Spelled [b] the two coincide at the only instance the [eb = true]
      premise admits, which is why this went unnoticed. *)
   wp_next true pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (n' : nat) (used' Sb' : gset Z)
+  ∀ (mf : regfile) (n' : nat) (Sb' : gset Z)
     (ok : bool) (nf : nat -> bv 8) (ipv : mword 64) (w : bool),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
@@ -327,8 +323,6 @@ Definition wp_nameiparent_gen_body
       pc_is ret_tgt -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-      ⌜used' ⊆ used⌝ -∗
-      bitmap_res gfs bmapstart cov logstart size used' -∗
       proc_priv_bare pj pidv Vpr -∗
       inode_held (pv_cwd Vpr) -∗
       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
@@ -373,7 +367,6 @@ Module Type NAMEIPARENT.
       (ga : gname) (gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
-      (used : gset Z)
       (plen : nat) (pfun : nat -> bv 8)
       (nfun : nat -> bv 8)
       (n : nat)
@@ -382,7 +375,7 @@ Module Type NAMEIPARENT.
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_nameiparent_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                                 ga gf cov logstart bmapstart inodestart nib
-                                size dev used plen pfun nfun n
+                                size dev plen pfun nfun n
                                 pidv dq dqb dqs dqpv m K eb b lks Vpr.
   (* the set-form contract; the counted one is this at the [log_op]
      existential's own witness. *)
@@ -398,7 +391,6 @@ Module Type NAMEIPARENT.
       (ga : gname) (gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
-      (used : gset Z)
       (plen : nat) (pfun : nat -> bv 8)
       (nfun : nat -> bv 8)
       (n : nat) (Sb : gset Z)
@@ -407,6 +399,6 @@ Module Type NAMEIPARENT.
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_nameiparent_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                                 ga gf cov logstart bmapstart inodestart nib
-                                size dev used plen pfun nfun n Sb
+                                size dev plen pfun nfun n Sb
                                 pidv dq dqb dqs dqpv m K eb b lks Vpr.
 End NAMEIPARENT.

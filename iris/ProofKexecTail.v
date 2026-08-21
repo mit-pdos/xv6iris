@@ -922,7 +922,7 @@ Section KexecASeam.
       (bn : bio_names) (g : log_names) (gfs : fs_names)
       (ga : gname) (gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z)
-      (size : Z) (used used1 : gset Z)
+      (size : Z)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
@@ -955,9 +955,11 @@ Section KexecASeam.
      (* ---- the inode namei returned, and the slot it came out of ---- *)
      inode_held ipv ∗
      iref_slots 1 ∗
-     (* ---- the fs environment kexec threads ---- *)
-     ⌜ used1 ⊆ used ⌝ ∗
-     bitmap_res gfs bmapstart cov logstart size used1 ∗
+     (* ---- the fs environment kexec threads.  The block bitmap is the
+            PERSISTENT [BitmapInv.bitmap_inv] now, so nothing about the free
+            pool crosses this seam -- the ledger that used to ride here
+            ([used1 ⊆ used]) has no statement left to make. ---- *)
+     bitmap_inv gfs bmapstart cov logstart size ∗
      bslots bn 3 ∗
      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) ∗
@@ -1119,9 +1121,8 @@ Section KexecAExit.
   (*  the commit block touched the process.                               *)
   (* =================================================================== *)
   Lemma kxc_exit_m1
-      (pj : mword 64) (bn : bio_names) (gfs : fs_names) (ga gf : gname)
-      (cov : gset Z) (logstart bmapstart inodestart : Z)
-      (size : Z) (used used' : gset Z)
+      (pj : mword 64) (bn : bio_names) (ga gf : gname)
+      (bmapstart inodestart : Z)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
@@ -1129,7 +1130,6 @@ Section KexecAExit.
       (m Mt : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
       (sp0 ra0 s00 s10 s20 pv av : mword 64) :
     (68 <= K)%nat ->
-    used' ⊆ used ->
     m !!! Regidx csp_rs1 = sp0 ->
     m !!! Regidx Rra = ra0 ->
     m !!! Regidx Rs0 = s00 ->
@@ -1146,7 +1146,6 @@ Section KexecAExit.
     kxc_frame sp0 ra0 s00 s10 s20 -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-    bitmap_res gfs bmapstart cov logstart size used' -∗
     kalloc_env ga None -∗
     proc_priv gf pj pidv V -∗
     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
@@ -1156,7 +1155,7 @@ Section KexecAExit.
     bslots bn 3 -∗
     iref_slots 2 -∗
     wp_next b pj (fun (CID : CpuId) =>
-      ∀ (mf : regfile) (used2 : gset Z) (V' : pprivate)
+      ∀ (mf : regfile) (V' : pprivate)
         (entry spv szv' : mword 64),
           ⌜callee_saved m mf⌝ -∗
           ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
@@ -1165,8 +1164,6 @@ Section KexecAExit.
           pc_is (ret_pc ra0) -∗
           sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
           sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-          ⌜used2 ⊆ used⌝ -∗
-          bitmap_res gfs bmapstart cov logstart size used2 -∗
           kalloc_env ga None -∗
           proc_priv gf pj pidv V' -∗
           ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
@@ -1178,8 +1175,8 @@ Section KexecAExit.
           WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hused Hsp Hra Hs0 Hs1 Hs2 Hmtsp Hmta0 Hthr.
-    iIntros "Hcg Hcnt #Htext Hpc Hframe Hbm Hins Hbits #Hka Hpriv Hpath Hargv
+    intros HK Hsp Hra Hs0 Hs1 Hs2 Hmtsp Hmta0 Hthr.
+    iIntros "Hcg Hcnt #Htext Hpc Hframe Hbm Hins #Hka Hpriv Hpath Hargv
              Hargs Hbs Hirs Hcont".
     iApply (kxc_epi_frame m Mt K sp0 ra0 s00 s10 s20 pj b
               HK Hsp Hra Hs0 Hs1 Hs2 Hmtsp Hthr
@@ -1188,15 +1185,14 @@ Section KexecAExit.
     iDestruct (cpu_own_transport CID0 CIDe 0%nat eb pj b Hse
                  with "Hcnt") as "Hcnt".
     iSpecialize ("Hcont" $! CIDe with "[%]"); [exact Hse |].
-    iApply ("Hcont" $! mf used' V (mword_of_int 0 : mword 64)
+    iApply ("Hcont" $! mf V (mword_of_int 0 : mword 64)
               (mword_of_int 0 : mword 64) (mword_of_int 0 : mword 64)
-              with "[%] [%] Hcg Hcnt Hpc Hbm Hins [%] Hbits Hka Hpriv Hpath
+              with "[%] [%] Hcg Hcnt Hpc Hbm Hins Hka Hpriv Hpath
                     Hargv Hargs Hbs Hirs").
     - exact Hcs.
     - left. split; [| reflexivity].
       rewrite (Hpres Ra0 ltac:(nz) ltac:(nz) ltac:(nz) ltac:(nz) ltac:(nz)).
       exact Hmta0.
-    - exact Hused.
   Qed.
 
 
@@ -1249,7 +1245,7 @@ Section KexecABad.
       (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
       (cn : ic_names) (gtl : gname) (gil gisl : gname) (ga gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
-      (size : Z) (dev : mword 32) (used used2 : gset Z)
+      (size : Z) (dev : mword 32)
       (* [gy]: the GENERATION the caller's share names (SpecIlock v5 /
          fs-icache 17.6 (5)).  It rides through the deposit and pins the
          [ity_shot] SpecIunlockput now demands. *)
@@ -1277,7 +1273,6 @@ Section KexecABad.
     (iput_units <= n2)%nat ->
     (jp < NPROC)%nat ->
     gs !! jp = Some gl ->
-    used2 ⊆ used ->
     m !!! Regidx csp_rs1 = sp0 ->
     m !!! Regidx Rra = ra0 ->
     m !!! Regidx Rs0 = s00 ->
@@ -1314,7 +1309,7 @@ Section KexecABad.
     (* ---- and the rest of kexec's state ---- *)
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-    bitmap_res gfs bmapstart cov logstart size used2 -∗
+    bitmap_inv gfs bmapstart cov logstart size -∗
     kalloc_env ga None -∗
     proc_priv gf (proc_addr jp) pidv V -∗
     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
@@ -1326,7 +1321,7 @@ Section KexecABad.
     log_op g n2 -∗
     kxc_frameA6 sp0 ra0 s00 s10 s20 pv av (m !!! Regidx Rs4) -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-      ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
+      ∀ (mf : regfile) (V' : pprivate)
         (entry spv szv' : mword 64),
           ⌜callee_saved m mf⌝ -∗
           ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
@@ -1335,8 +1330,6 @@ Section KexecABad.
           pc_is (ret_pc ra0) -∗
           sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
           sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-          ⌜used' ⊆ used⌝ -∗
-          bitmap_res gfs bmapstart cov logstart size used' -∗
           kalloc_env ga None -∗
           proc_priv gf (proc_addr jp) pidv V' -∗
           ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
@@ -1349,10 +1342,10 @@ Section KexecABad.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib Hcovb Hn2
-           Hjp Hgs Hu2 Hsp Hra Hs0 Hs1 Hs2 Hmtsp Hmts4 Hthr.
+           Hjp Hgs Hsp Hra Hs0 Hs1 Hs2 Hmtsp Hmts4 Hthr.
     
     iIntros "Hcg Hcnt #Htext Hpc #Hfab #Hslkk Hslkd Hdep Hidev
-             Hiinum Hivalid Hload Hity Hfrz Hkeep Hru Hbm Hins Hbits #Hka Hpriv Hpath Hargv
+             Hiinum Hivalid Hload Hity Hfrz Hkeep Hru Hbm Hins #Hbits #Hka Hpriv Hpath Hargv
              Hargs Hbs Hirs Hlog Hframe Hcont".
     (* depth 0 with interrupts on forces the held set empty, so iunlockput's
        order premise needs no hypothesis of this lemma's own. *)
@@ -1407,7 +1400,7 @@ Section KexecABad.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Iunlockput.wp_iunlockput_sconf gs jp gl gu gd gk pd pav pu bn g gfs
               gi cn gtl gil gisl cov logstart bmapstart inodestart nib size dev
-              used2 k qi sq gy inum dn bm n2 pidv (DfracOwn (1/4)) dqb dqs
+              k qi sq gy inum dn bm n2 pidv (DfracOwn (1/4)) dqb dqs
               B2 (K - 68)%nat true true lks V
               ltac:(lia) Hk Hlg Hsz Hbm0 Hbmc
               Hbml Hins0 Hibc Hibl Hib Hcovb Hn2 Hjp Hgs HB2a0
@@ -1418,8 +1411,8 @@ Section KexecABad.
     all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
-    iIntros (CIDu Hsu M1 n3 used3) "%Hcsu Hcg Hcnt _ _ Hpc Hppid Hbm Hins %Hu3
-             Hbits Hbs %Hn3 Hlog Hirs1".
+    iIntros (CIDu Hsu M1 n3) "%Hcsu Hcg Hcnt _ _ Hpc Hppid Hbm Hins
+             Hbs %Hn3 Hlog Hirs1".
     assert (Hpc6a : ret_pc (B2 !!! Regidx Rra) = mword_of_int (KXA + 0x6a))
       by (rewrite HB2ra; pcw).
     iEval (rewrite Hpc6a) in "Hpc".
@@ -1546,29 +1539,21 @@ Section KexecABad.
       change 55%nat with (50 + 5)%nat.
       rewrite (stack_own_app (KTR := KT1)) (pa_stk_assoc sp0 13 50).
       iSplitL "Hmid"; [iExact "Hmid" | iExact "Htop"]. }
-    (* [used3 ⊆ used]: [Hu3 : used3 ⊆ used2] (iunlockput's own shrink) chained
-       with [Hu2 : used2 ⊆ used] (kxc_bad64's premise).  A positional
-       [ltac:(set_solver)] here paid the RULE-ZERO tax (optimization.md's
-       "trap"): [naive_solver] scans every hypothesis in a whole-function
-       proof's context -- ~13.4 s of this one sentence, most of the file.
-       [used3]/[used]/[used2] are plain [gset Z]s, so two named [⊆] facts and
-       [transitivity] discharge it without touching the rest of Δ. *)
-    iApply (kxc_exit_m1 (proc_addr jp) bn gfs ga gf cov logstart bmapstart
-              inodestart size used used3 plen pfun na avf alen aslen afun pidv V
+    iApply (kxc_exit_m1 (proc_addr jp) bn ga gf bmapstart
+              inodestart plen pfun na avf alen aslen afun pidv V
               dqb dqs dqa dqpv dqas m B5 K true true lks sp0 ra0 s00 s10 s20 pv av
-              ltac:(lia) ltac:(transitivity used2; [exact Hu3 | exact Hu2])
+              ltac:(lia)
               Hsp Hra Hs0 Hs1 Hs2 HB5sp HB5a0 HB5thr
-              with "Hcg Hcnt Htext Hpc Hfr Hbm Hins Hbits Hka Hpriv Hpath Hargv
+              with "Hcg Hcnt Htext Hpc Hfr Hbm Hins Hka Hpriv Hpath Hargv
                     Hargs Hbs Hirs2").
-    iIntros (CIDf Hsf mf used4 V' entry spv szv') "%Hcs2 %Hok Hcg Hcnt Hpc
-             Hbm Hins %Hu4 Hbits Hka2 Hpriv Hpath Hargv Hargs Hbs Hirs".
+    iIntros (CIDf Hsf mf V' entry spv szv') "%Hcs2 %Hok Hcg Hcnt Hpc
+             Hbm Hins Hka2 Hpriv Hpath Hargv Hargs Hbs Hirs".
     iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain |].
-    iApply ("Hcont" $! mf used4 V' entry spv szv'
-              with "[%] [%] Hcg Hcnt Hpc Hbm Hins [%] Hbits Hka2 Hpriv Hpath
+    iApply ("Hcont" $! mf V' entry spv szv'
+              with "[%] [%] Hcg Hcnt Hpc Hbm Hins Hka2 Hpriv Hpath
                     Hargv Hargs Hbs Hirs").
     - exact Hcs2.
     - exact Hok.
-    - exact Hu4.
   Qed.
 
 End KexecABad.
@@ -1654,9 +1639,8 @@ Section KexecCBad.
   (* =================================================================== *)
   Lemma kxc_bad_1d6
       (jp : nat)
-      (ga gf : gname) (bn : bio_names) (gfs : fs_names)
-      (cov : gset Z) (logstart bmapstart inodestart : Z)
-      (size : Z) (used used' : gset Z)
+      (ga gf : gname) (bn : bio_names)
+      (bmapstart inodestart : Z)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
@@ -1665,7 +1649,6 @@ Section KexecCBad.
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (P : uptd) (szf : mword 64) :
     (K_kexec <= K)%nat ->
-    used' ⊆ used ->
     m !!! Regidx csp_rs1 = sp0 ->
     m !!! Regidx Rra = ra0 ->
     m !!! Regidx Rs0 = s00 ->
@@ -1684,7 +1667,6 @@ Section KexecCBad.
     kalloc_env ga None -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-    bitmap_res gfs bmapstart cov logstart size used' -∗
     proc_priv gf (proc_addr jp) pidv V -∗
     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
     ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
@@ -1697,7 +1679,7 @@ Section KexecCBad.
       (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
       (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11) -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-      ∀ (mf : regfile) (used2 : gset Z) (V' : pprivate)
+      ∀ (mf : regfile) (V' : pprivate)
         (entry spv szv' : mword 64),
           ⌜callee_saved m mf⌝ -∗
           ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
@@ -1706,8 +1688,6 @@ Section KexecCBad.
           pc_is (ret_pc ra0) -∗
           sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
           sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-          ⌜used2 ⊆ used⌝ -∗
-          bitmap_res gfs bmapstart cov logstart size used2 -∗
           kalloc_env ga None -∗
           proc_priv gf (proc_addr jp) pidv V' -∗
           ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
@@ -1719,9 +1699,9 @@ Section KexecCBad.
           WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hused Hsp Hra Hs0 Hs1 Hs2 Hmtsp Hmts3 Hmts6 Hbelow Hcov.
+    intros HK Hsp Hra Hs0 Hs1 Hs2 Hmtsp Hmts3 Hmts6 Hbelow Hcov.
     
-    iIntros "Hcg Hcnt #Htext Hpc Hpt #Hka Hbm Hins Hbits Hpriv Hpath Hargv
+    iIntros "Hcg Hcnt #Htext Hpc Hpt #Hka Hbm Hins Hpriv Hpath Hargv
              Hargs Hbs Hirs Hframe Hcont".
     (* depth 0 forces the held set empty, so proc_freepagetable's order
        premise needs no hypothesis of this lemma's own. *)
@@ -2049,11 +2029,11 @@ Section KexecCBad.
                  with "Hcont") as "Hcont".
     iDestruct (cpu_own_transport CID3 CIDj 0%nat true (proc_addr jp) true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (T.kxc_exit_m1 (proc_addr jp) bn gfs ga gf cov logstart bmapstart
-              inodestart size used used' plen pfun na avf alen aslen afun pidv V
+    iApply (T.kxc_exit_m1 (proc_addr jp) bn ga gf bmapstart
+              inodestart plen pfun na avf alen aslen afun pidv V
               dqb dqs dqa dqpv dqas m B13 K true true lks sp0 ra0 s00 s10 s20 pv av
-              ltac:(lia) Hused Hsp Hra Hs0 Hs1 Hs2 HB13sp HB13a0 HB13thr
-              with "Hcg Hcnt Htext Hpc Hfr Hbm Hins Hbits Hka Hpriv Hpath Hargv
+              ltac:(lia) Hsp Hra Hs0 Hs1 Hs2 HB13sp HB13a0 HB13thr
+              with "Hcg Hcnt Htext Hpc Hfr Hbm Hins Hka Hpriv Hpath Hargv
                     Hargs Hbs Hirs Hcont").
   Qed.
 

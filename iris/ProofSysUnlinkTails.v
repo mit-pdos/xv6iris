@@ -765,7 +765,7 @@ Section ProofSysUnlinkTails.
       (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
       (cn : ic_names) (gtl : gname) (gil gisl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
-      (size : Z) (dev : mword 32) (used : gset Z)
+      (size : Z) (dev : mword 32)
       (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
       (dn : dinode) (bm : blkmap)
       (u : nat) (pidv : mword 32) (dq dqb dqs : dfrac)
@@ -826,7 +826,7 @@ Section ProofSysUnlinkTails.
     runit_any (bv_unsigned inum) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-    bitmap_res gfs bmapstart cov logstart size used -∗
+    bitmap_inv gfs bmapstart cov logstart size -∗
     proc_priv_bare (proc_addr jx) pidv Vpr -∗
     procs_inv gs -∗
     dev_inv gu gd -∗
@@ -847,7 +847,7 @@ Section ProofSysUnlinkTails.
     ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 29) jj ↦ₘ[KT1] be jj) -∗
     (pa_stk sp0 30) ↦₈[KT1] w30 -∗
     wp_next true (proc_addr jx) (fun (CIDx : CpuId) =>
-      ∀ (mf : regfile) (used' : gset Z),
+      ∀ (mf : regfile),
         ⌜callee_saved m mf⌝ -∗
         ⌜(mf !!! Regidx Ra0 : mword 64) = (mword_of_int (-1) : mword 64)⌝ -∗
         sie_cap_gpr KT1 mf K b (proc_addr jx) -∗
@@ -858,7 +858,6 @@ Section ProofSysUnlinkTails.
         proc_priv_bare (proc_addr jx) pidv Vpr -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-        bitmap_res gfs bmapstart cov logstart size used' -∗
         bslots bn 3 -∗
         iref_slot -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -869,7 +868,7 @@ Section ProofSysUnlinkTails.
            HMs3 Hal.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
               #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd Hdep Hidev
-              Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpid #Hprocs
+              Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hru Hsbb Hsbi #Hbmres Hpid #Hprocs
               #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD HbN HbP
               H27 HbE H30 Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
@@ -933,7 +932,7 @@ Section ProofSysUnlinkTails.
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
     iApply (Iunlockput.wp_iunlockput_sconf (CID := CID2) gs jx gl gu gd gk
               pd pav pu bn g gfs gi cn gtl gil gisl cov logstart bmapstart
-              inodestart nib size dev used kk qi s gy inum dn bm u pidv dq
+              inodestart nib size dev kk qi s gy inum dn bm u pidv dq
               dqb dqs M2 (K - 30)%nat eb b lks
               Vpr HKup Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog
               Hinb Hcovb Hiu Hj Hgl HM2a0
@@ -942,8 +941,8 @@ Section ProofSysUnlinkTails.
                     Hesck Hireg Hropen Hslkk Hslkd Hdep Hidev Hiinum Hivalid
                     Hload Hshot Hfrz [$Hkeep $Hru] Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
                     Hdlk Hbsl Hop").
-    iIntros (CID3 Hq3 mup n2 used2)
-      "%Hcsup Hcg Hown Htce Hcce Hpc Hpid Hsbb Hsbi %Hused2 Hbmres Hbsl %Hn2
+    iIntros (CID3 Hq3 mup n2)
+      "%Hcsup Hcg Hown Htce Hcce Hpc Hpid Hsbb Hsbi Hbsl %Hn2
        Hop Hislot".
     assert (Hpc160 : ret_pc (M2 !!! Regidx Rra : mword 64)
                      = mword_of_int (SU + 0x160)) by (rewrite HM2ra; pcw).
@@ -1068,7 +1067,7 @@ Section ProofSysUnlinkTails.
               (m !!! Regidx Rs1 : mword 64) w4 w5 w6 w27 w30 bd bnm bp be
               HK30 Kpop Hsp0 HR2sp HR2thr HR2s1 HR2s2 HR2s3 Hal
               with "Hcg Htext Hpc Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD HbN HbP H27
-                    HbE H30 [Hown Htce Hcce Hpid Hsbb Hsbi Hbmres Hbsl
+                    HbE H30 [Hown Htce Hcce Hpid Hsbb Hsbi Hbsl
                              Hislot Hcont]").
     iEval (rewrite /wp_next).
     iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
@@ -1079,8 +1078,8 @@ Section ProofSysUnlinkTails.
     iDestruct (cpu_claim_ext_transport CID5 CIDy eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
     iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
-    iApply ("Hcont" $! mf used2 with "[%] [%] Hcg Hown Htce Hcce Hpc Hpid
-              Hsbb Hsbi Hbmres Hbsl Hislot").
+    iApply ("Hcont" $! mf with "[%] [%] Hcg Hown Htce Hcce Hpc Hpid
+              Hsbb Hsbi Hbsl Hislot").
     { exact Hcsf. }
     { rewrite Ha0f. exact HR2a0. }
   Qed.
@@ -1100,7 +1099,7 @@ Section ProofSysUnlinkTails.
       (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
       (cn : ic_names) (gtl : gname) (gil gisl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
-      (size : Z) (dev : mword 32) (used : gset Z)
+      (size : Z) (dev : mword 32)
       (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
       (dn : dinode) (bm : blkmap)
       (u : nat) (pidv : mword 32) (dq dqb dqs : dfrac)
@@ -1160,7 +1159,7 @@ Section ProofSysUnlinkTails.
     runit_any (bv_unsigned inum) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-    bitmap_res gfs bmapstart cov logstart size used -∗
+    bitmap_inv gfs bmapstart cov logstart size -∗
     proc_priv_bare (proc_addr jx) pidv Vpr -∗
     procs_inv gs -∗
     dev_inv gu gd -∗
@@ -1181,7 +1180,7 @@ Section ProofSysUnlinkTails.
     ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 29) jj ↦ₘ[KT1] be jj) -∗
     (pa_stk sp0 30) ↦₈[KT1] w30 -∗
     wp_next true (proc_addr jx) (fun (CIDx : CpuId) =>
-      ∀ (mf : regfile) (used' : gset Z),
+      ∀ (mf : regfile),
         ⌜callee_saved m mf⌝ -∗
         ⌜(mf !!! Regidx Ra0 : mword 64) = (mword_of_int (-1) : mword 64)⌝ -∗
         sie_cap_gpr KT1 mf K b (proc_addr jx) -∗
@@ -1192,7 +1191,6 @@ Section ProofSysUnlinkTails.
         proc_priv_bare (proc_addr jx) pidv Vpr -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-        bitmap_res gfs bmapstart cov logstart size used' -∗
         bslots bn 3 -∗
         iref_slot -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -1202,7 +1200,7 @@ Section ProofSysUnlinkTails.
            Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HMsp HMthr HMs1 HMs3 Hal.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
               #Hitab #Hitinv #Hesck #Hireg #Hropen #Hslkk Hslkd Hdep Hidev
-              Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hru Hsbb Hsbi Hbmres Hpid #Hprocs
+              Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hru Hsbb Hsbi #Hbmres Hpid #Hprocs
               #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD HbN HbP
               H27 HbE H30 Hcont".
     iPoseProof (suli_158 with "Htext") as "Hi0".
@@ -1244,7 +1242,7 @@ Section ProofSysUnlinkTails.
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
     iApply (su_tail_bad (CID0 := CID1) gs jx gl gu gd gk pd pav pu bn g gfs gi
               cn gtl gil gisl cov logstart bmapstart inodestart nib size dev
-              used kk qi s gy inum dn bm u pidv dq dqb dqs m M1 sp0 K eb b lks
+              kk qi s gy inum dn bm u pidv dq dqb dqs m M1 sp0 K eb b lks
               (m !!! Regidx Rs2 : mword 64) w5 w6 w27 w30 bd bnm bp be
               Vpr HKup HKeo HK30 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
               Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HM1sp HM1thr
@@ -1285,7 +1283,7 @@ Section ProofSysUnlinkTails.
       (cn : ic_names) (gtl : gname)
       (gil gisl : gname) (gili gisli : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
-      (size : Z) (dev : mword 32) (used : gset Z)
+      (size : Z) (dev : mword 32)
       (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
       (dn : dinode) (bm : blkmap)
       (ki : nat) (qip si : Qp) (gyi : gname) (inumi : mword 32)
@@ -1368,7 +1366,7 @@ Section ProofSysUnlinkTails.
     runit_any (bv_unsigned inumi) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-    bitmap_res gfs bmapstart cov logstart size used -∗
+    bitmap_inv gfs bmapstart cov logstart size -∗
     proc_priv_bare (proc_addr jx) pidv Vpr -∗
     procs_inv gs -∗
     dev_inv gu gd -∗
@@ -1389,7 +1387,7 @@ Section ProofSysUnlinkTails.
     ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 29) jj ↦ₘ[KT1] be jj) -∗
     (pa_stk sp0 30) ↦₈[KT1] w30 -∗
     wp_next true (proc_addr jx) (fun (CIDx : CpuId) =>
-      ∀ (mf : regfile) (used' : gset Z),
+      ∀ (mf : regfile),
         ⌜callee_saved m mf⌝ -∗
         ⌜(mf !!! Regidx Ra0 : mword 64) = (mword_of_int (-1) : mword 64)⌝ -∗
         sie_cap_gpr KT1 mf K b (proc_addr jx) -∗
@@ -1400,7 +1398,6 @@ Section ProofSysUnlinkTails.
         proc_priv_bare (proc_addr jx) pidv Vpr -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-        bitmap_res gfs bmapstart cov logstart size used' -∗
         bslots bn 3 -∗
         iref_slots 2 -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -1414,7 +1411,7 @@ Section ProofSysUnlinkTails.
               #Hslkk Hslkd Hdep Hidev Hiinum Hivalid Hload #Hshot Hfrz Hkeep Hru
               #Hslkki Hslkdi Hdepi Hidevi Hiinumi Hivalidi Hloadi
               #Hshoti Hfrzi Hkeepi Hrui
-              Hsbb Hsbi Hbmres Hpid #Hprocs #Hdev #Hgeo #Hdlk Hbsl Hop
+              Hsbb Hsbi #Hbmres Hpid #Hprocs #Hdev #Hgeo #Hdlk Hbsl Hop
               Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD HbN HbP H27 HbE H30 Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
     iPoseProof (suli_174 with "Htext") as "Hi0".
@@ -1473,7 +1470,7 @@ Section ProofSysUnlinkTails.
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
     iApply (Iunlockput.wp_iunlockput_sconf (CID := CID2) gs jx gl gu gd gk
               pd pav pu bn g gfs gi cn gtl gili gisli cov logstart bmapstart
-              inodestart nib size dev used ki qip si gyi inumi dni bmi u pidv
+              inodestart nib size dev ki qip si gyi inumi dni bmi u pidv
               dq dqb dqs M2 (K - 30)%nat eb b lks
               Vpr HKup Hki Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblki Hiblogi
               Hinbi Hcovb ltac:(unfold iput_units in *; lia) Hj Hgl HM2a0
@@ -1482,8 +1479,8 @@ Section ProofSysUnlinkTails.
                     Hescki Hireg Hropen Hslkki Hslkdi Hdepi Hidevi Hiinumi
                     Hivalidi Hloadi Hshoti Hfrzi [$Hkeepi $Hrui] Hsbb Hsbi Hbmres Hpid Hprocs
                     Hdev Hgeo Hdlk Hbsl Hop").
-    iIntros (CID3 Hq3 mup n2 used2)
-      "%Hcsup Hcg Hown Htce Hcce Hpc Hpid Hsbb Hsbi %Hused2 Hbmres Hbsl %Hn2
+    iIntros (CID3 Hq3 mup n2)
+      "%Hcsup Hcg Hown Htce Hcce Hpc Hpid Hsbb Hsbi Hbsl %Hn2
        Hop Hislot".
     assert (Hpc17a : ret_pc (M2 !!! Regidx Rra : mword 64)
                      = mword_of_int (SU + 0x17a)) by (rewrite HM2ra; pcw).
@@ -1570,7 +1567,7 @@ Section ProofSysUnlinkTails.
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (su_tail_bad (CID0 := CID6) gs jx gl gu gd gk pd pav pu bn g gfs gi
               cn gtl gil gisl cov logstart bmapstart inodestart nib size dev
-              used2 kk qi s gy inum dn bm n2 pidv dq dqb dqs m P2 sp0 K eb b
+              kk qi s gy inum dn bm n2 pidv dq dqb dqs m P2 sp0 K eb b
               lks (m !!! Regidx Rs2 : mword 64) (m !!! Regidx Rs3 : mword 64)
               w6 w27 w30 bd bnm bp be
               Vpr HKup HKeo HK30 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
@@ -1582,12 +1579,12 @@ Section ProofSysUnlinkTails.
                     Hprocs Hdev Hgeo Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
                     HbD HbN HbP H27 HbE H30 [Hislot Hcont]").
     iEval (rewrite /wp_next).
-    iIntros (CIDy) "%Hqy". iIntros (mf used3) "%Hcsf %Ha0f Hcg Hown Htce Hcce
-              Hpc Hpid Hsbb Hsbi Hbmres Hbsl Hislot2".
+    iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha0f Hcg Hown Htce Hcce
+              Hpc Hpid Hsbb Hsbi Hbsl Hislot2".
     iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
     iDestruct (iref_slots_combine 1 1 with "Hislot Hislot2") as "Hislots".
-    iApply ("Hcont" $! mf used3 with "[%] [%] Hcg Hown Htce Hcce Hpc Hpid
-              Hsbb Hsbi Hbmres Hbsl Hislots").
+    iApply ("Hcont" $! mf with "[%] [%] Hcg Hown Htce Hcce Hpc Hpid
+              Hsbb Hsbi Hbsl Hislots").
     { exact Hcsf. }
     { exact Ha0f. }
   Qed.

@@ -295,7 +295,6 @@ Section KexecABody.
       (ga : gname) (gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
-      (used : gset Z)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64)
       (alen : nat -> nat) (aslen : nat -> nat)
@@ -341,7 +340,7 @@ Section KexecABody.
     kalloc_env ga None -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-    bitmap_res gfs bmapstart cov logstart size used -∗
+    bitmap_inv gfs bmapstart cov logstart size -∗
     proc_priv gf (proc_addr jp) pidv V -∗
     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
     ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
@@ -351,7 +350,7 @@ Section KexecABody.
     iref_slots 2 -∗
     (* ---- kexec's OWN continuation: the +0x088 tail closes the -1 arm ---- *)
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
-      ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
+      ∀ (mf : regfile) (V' : pprivate)
         (entry spv szv' : mword 64),
           ⌜callee_saved m mf⌝ -∗
           ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
@@ -360,8 +359,6 @@ Section KexecABody.
           pc_is (ret_pc ra0) -∗
           sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
           sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-          ⌜used' ⊆ used⌝ -∗
-          bitmap_res gfs bmapstart cov logstart size used' -∗
           kalloc_env ga None -∗
           proc_priv gf (proc_addr jp) pidv V' -∗
           ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
@@ -382,12 +379,12 @@ Section KexecABody.
            innermost [CpuId] and the guard would degrade to a tautology
            (WpNext.v's note on [wp_next_at]). ---- *)
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
-      ∀ (M32 : regfile) (used1 : gset Z) (ipv : mword 64) (n1 : nat),
+      ∀ (M32 : regfile) (ipv : mword 64) (n1 : nat),
         kxc_at_a2 jp bn g gfs ga gf cov logstart bmapstart inodestart size
-                  used used1 plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas
+                  plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas
                   m M32 K eb b lks sp0 ra0 s00 s10 s20 pv av ipv n1 -∗
         wp_next (CID0 := CID) b (proc_addr jp) (fun (CIDx : CpuId) =>
-          ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
+          ∀ (mf : regfile) (V' : pprivate)
             (entry spv szv' : mword 64),
               ⌜callee_saved m mf⌝ -∗
               ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
@@ -396,8 +393,6 @@ Section KexecABody.
               pc_is (ret_pc ra0) -∗
               sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
               sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-              ⌜used' ⊆ used⌝ -∗
-              bitmap_res gfs bmapstart cov logstart size used' -∗
               kalloc_env ga None -∗
               proc_priv gf (proc_addr jp) pidv V' -∗
               ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
@@ -413,7 +408,7 @@ Section KexecABody.
     intros HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
            Hiregb Hcstr Hplen Hjp Hgs Heb Hsp Hra Hs0 Hs1 Hs2 Ha0 Ha1.
     
-    iIntros "Hcg Hcnt #Htext Hpc #Hfab #Hka Hbm Hins Hbits Hpriv
+    iIntros "Hcg Hcnt #Htext Hpc #Hfab #Hka Hbm Hins #Hbits Hpriv
              Hpath Hargv Hargs Hbs Hirs Hcont Hcont32".
     (* ---- b = eb = true (see the header) ---- *)
     iDestruct (kxc_sie_b_agree m 0%nat K eb b (proc_addr jp) lks with "Hcg Hcnt") as %Houtb.
@@ -564,7 +559,7 @@ Section KexecABody.
        (sys_chdir did this first -- SpecSysChdir.v's ledger section.) ---- *)
     iDestruct "Hlog" as (Sb0) "Hlog".
     iApply (Namei.wp_namei_gen gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
-              ga gf cov logstart bmapstart inodestart nib size dev used
+              ga gf cov logstart bmapstart inodestart nib size dev
               plen pfun MAXOPBLOCKS Sb0 pidv (DfracOwn (1/4)) dqb dqs dqpv
               N5 (K - 68)%nat true true lks
               V ltac:(lia) Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsz Hbm0
@@ -575,8 +570,8 @@ Section KexecABody.
               with "Hcg Hcnt Htext Hkd Hpc Hpenv Hbio Hlogc Hka Hitab Hitinv Hesc
                     Hslks Hireg Hropen Hprocs Hdevi Hdgeom Hdlock Hbm Hins Hbits Hppid
                     Hcref Hpath Hbs Hirs Hlog").
-    iIntros (CIDn Hsn M4 n1 used1 Sb1 ok ipv w) "%Hcsn Hcg Hcnt Hpc Hbm Hins %Hused1
-             Hbits Hppid Hcref Hpath Hbs %HSbsub %Hwbm %Hn1 Hlog Harm".
+    iIntros (CIDn Hsn M4 n1 Sb1 ok ipv w) "%Hcsn Hcg Hcnt Hpc Hbm Hins
+             Hppid Hcref Hpath Hbs %HSbsub %Hwbm %Hn1 Hlog Harm".
     iDestruct (log_opS_op with "Hlog") as "Hlog".
     (* what the seam actually carries: the closing iunlockput's three units.
        The walk spent at most two of the ten. *)
@@ -649,7 +644,7 @@ Section KexecABody.
                      (CIDz : CPU) = (CID0 : CPU)) by wp_next_chain.
       iDestruct (wp_next_retarget CID0 CIDz true (proc_addr jp) _ Hcrz
                    with "Hcont") as "Hcont".
-      iApply ("Hcont32" $! M4 used1 ipv n1 with "[-Hcont] Hcont").
+      iApply ("Hcont32" $! M4 ipv n1 with "[-Hcont] Hcont").
       (* NO [iFrame] HERE.  The goal mentions [proc_priv], and framing into
          it sends the search through sixteen [ofile_slot]s and a 4096-byte
          trapframe page (durable-notes.md); measured: it does not come back.
@@ -666,8 +661,7 @@ Section KexecABody.
       iSplitL "Hlog"; [iExact "Hlog" |].
       iSplitL "Hheld"; [iExact "Hheld" |].
       iSplitL "Hirs"; [iExact "Hirs" |].
-      iSplitR; [iPureIntro; exact Hused1 |].
-      iSplitL "Hbits"; [iExact "Hbits" |].
+      iSplitR; [iExact "Hbits" |].
       iSplitL "Hbs"; [iExact "Hbs" |].
       iSplitL "Hbm"; [iExact "Hbm" |].
       iSplitL "Hins"; [iExact "Hins" |].
@@ -772,22 +766,21 @@ Section KexecABody.
         rewrite (callee_saved_lookup Hcse r Hr).
         rewrite /P1 upd_ne; [| regne].
         exact (HM4thr r Hr Nsp Ns0 Ns1 Ns2). }
-      iApply (T.kxc_exit_m1 (proc_addr jp) bn gfs ga gf cov logstart bmapstart inodestart
-                size used used1 plen pfun na avf alen aslen afun pidv V
+      iApply (T.kxc_exit_m1 (proc_addr jp) bn ga gf bmapstart inodestart
+                plen pfun na avf alen aslen afun pidv V
                 dqb dqs dqa dqpv dqas m P2 K true true lks sp0 ra0 s00 s10 s20 pv av
-                ltac:(lia) Hused1 Hsp Hra Hs0 Hs1 Hs2 HP2sp HP2a0 HP2thr
-                with "Hcg Hcnt Htext Hpc [Hframe] Hbm Hins Hbits Hka Hpriv
+                ltac:(lia) Hsp Hra Hs0 Hs1 Hs2 HP2sp HP2a0 HP2thr
+                with "Hcg Hcnt Htext Hpc [Hframe] Hbm Hins Hka Hpriv
                       Hpath Hargv Hargs Hbs Hirs").
       { iApply (kxc_frameA_epi with "Hframe"). }
-      iIntros (CIDf Hsf mf used2 V' entry spv szv') "%Hcs2 %Hok Hcg Hcnt Hpc
-               Hbm Hins %Hu2 Hbits Hka2 Hpriv Hpath Hargv Hargs Hbs Hirs".
+      iIntros (CIDf Hsf mf V' entry spv szv') "%Hcs2 %Hok Hcg Hcnt Hpc
+               Hbm Hins Hka2 Hpriv Hpath Hargv Hargs Hbs Hirs".
       iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain |].
-      iApply ("Hcont" $! mf used2 V' entry spv szv'
-                with "[%] [%] Hcg Hcnt Hpc Hbm Hins [%] Hbits Hka2 Hpriv
+      iApply ("Hcont" $! mf V' entry spv szv'
+                with "[%] [%] Hcg Hcnt Hpc Hbm Hins Hka2 Hpriv
                       Hpath Hargv Hargs Hbs Hirs").
       + exact Hcs2.
       + exact Hok.
-      + exact Hu2.
   Qed.
 
   (* =================================================================== *)
@@ -816,7 +809,6 @@ Section KexecABody.
       (ga : gname) (gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
-      (used used1 : gset Z)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64)
       (alen : nat -> nat) (aslen : nat -> nat)
@@ -854,11 +846,11 @@ Section KexecABody.
     fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
               cov logstart inodestart nib dev -∗
     kxc_at_a2 jp bn g gfs ga gf cov logstart bmapstart inodestart size
-              used used1 plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas
+              plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas
               m M32 K eb b lks sp0 ra0 s00 s10 s20 pv av ipv n1 -∗
     (* ---- kexec's OWN continuation: the +0x064 tail closes the -1 arm ---- *)
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
-      ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
+      ∀ (mf : regfile) (V' : pprivate)
         (entry spv szv' : mword 64),
           ⌜callee_saved m mf⌝ -∗
           ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
@@ -867,8 +859,6 @@ Section KexecABody.
           pc_is (ret_pc ra0) -∗
           sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
           sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-          ⌜used' ⊆ used⌝ -∗
-          bitmap_res gfs bmapstart cov logstart size used' -∗
           kalloc_env ga None -∗
           proc_priv gf (proc_addr jp) pidv V' -∗
           ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
@@ -882,7 +872,7 @@ Section KexecABody.
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (M90 : regfile) (kf : nat) (qf sf : Qp) (inumf : mword 32)
         (dnf : dinode) (bmf : blkmap) (gilf gislf gyf : gname)
-        (n2 : nat) (used2 : gset Z),
+        (n2 : nat),
         ⌜ M90 !!! Regidx csp_rs1 = pa_stk sp0 68 /\
           M90 !!! Regidx Rs0 = sp0 /\
           M90 !!! Regidx Rs1 = proc_addr jp /\
@@ -893,7 +883,7 @@ Section KexecABody.
           (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
              r <> Rs0 -> r <> Rs1 -> r <> Rs2 -> r <> Rs4 ->
              M90 !!! Regidx r = m !!! Regidx r) ⌝ -∗
-        ⌜ (iput_units <= n2)%nat /\ used2 ⊆ used ⌝ -∗
+        ⌜ (iput_units <= n2)%nat ⌝ -∗
         pc_is (mword_of_int (KXA + 0x90) : mword 64) -∗
         sie_cap_gpr KT1 M90 (K - 68)%nat b (proc_addr jp) -∗
         cpu_own 0 eb (proc_addr jp) b lks -∗
@@ -917,7 +907,7 @@ Section KexecABody.
         iref_slots 1 -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-        bitmap_res gfs bmapstart cov logstart size used2 -∗
+        bitmap_inv gfs bmapstart cov logstart size -∗
         bslots bn 3 -∗
         kalloc_env ga None -∗
         proc_priv gf (proc_addr jp) pidv V -∗
@@ -928,7 +918,7 @@ Section KexecABody.
         kxc_frameA6 sp0 ra0 s00 s10 s20 pv av (m !!! Regidx Rs4) -∗
         (* THE EXIT, HANDED BACK -- see [kxc_phaseA]'s copy below. *)
         wp_next (CID0 := CID) b (proc_addr jp) (fun (CIDy : CpuId) =>
-          ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
+          ∀ (mf : regfile) (V' : pprivate)
             (entry spv szv' : mword 64),
               ⌜callee_saved m mf⌝ -∗
               ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
@@ -937,8 +927,6 @@ Section KexecABody.
               pc_is (ret_pc ra0) -∗
               sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
               sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-              ⌜used' ⊆ used⌝ -∗
-              bitmap_res gfs bmapstart cov logstart size used' -∗
               kalloc_env ga None -∗
               proc_priv gf (proc_addr jp) pidv V' -∗
               ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
@@ -957,7 +945,7 @@ Section KexecABody.
     iIntros "#Htext #Hfab Hseam Hcont Hcont90".
     rewrite /kxc_at_a2.
     iDestruct "Hseam" as "(%Hregs & Hpc & Hcg & Hcnt & %Hn1 & Hlog & Hheld &
-                           Hirs & %Hused1 & Hbits & Hbs & Hbm & Hins & #Hka &
+                           Hirs & #Hbits & Hbs & Hbm & Hins & #Hka &
                            Hpriv & Hpath & Hargv & Hargs & Hframe)".
     destruct Hregs as (HM32sp & HM32s0 & HM32s1 & HM32s2 & HM32a0 & Hipvnz &
                        HM32thr).
@@ -1462,12 +1450,12 @@ Section KexecABody.
         iDestruct (wp_next_retarget CID0 CID15 true (proc_addr jp) _
                      ltac:(wp_next_chain) with "Hcont") as "Hcont".
         iApply ("Hcont90" $! Q12 k (q/2)%Qp (q/2)%Qp inum dnl bml gilk gislk gy
-                  n1 used1 with "[%] [%] Hpc Hcg Hcnt Hslkk Hslkd Hdep
+                  n1 with "[%] [%] Hpc Hcg Hcnt Hslkk Hslkd Hdep
                   Hidev Hiinum Hivalid Hload Hity Hfrz Hkeep Hru Hlog Hirs Hbm Hins Hbits
                   Hbs Hka Hpriv Hpath Hargv Hargs [-Hcont] Hcont").
         * split_and!; [exact HQ12sp | exact HQ12s0 | exact HQ12s1 | exact HQ12s2
                       | exact HQ12s4 | exact Hk | exact Hib' | exact HQ12thr].
-        * split; [exact Hiu | exact Hused1].
+        * exact Hiu.
         * rewrite /kxc_frameA6.
           iDestruct (kxc_mid_join sp0 with "Hust Helf Hph") as "Hmid".
           iSplitL "Hf1"; [iExact "Hf1" |].
@@ -1527,11 +1515,11 @@ Section KexecABody.
                      with "Hcont") as "Hcont".
         iApply (T.kxc_bad64 gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
                   gilk gislk ga gf cov logstart bmapstart inodestart nib size
-                  dev used used1 k (q/2)%Qp (q/2)%Qp gy inum dnl bml n1
+                  dev k (q/2)%Qp (q/2)%Qp gy inum dnl bml n1
                   plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
                   m Q12 K lks sp0 ra0 s00 s10 s20 pv av
                   HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib' Hcovb Hiu
-                  Hjp Hgs Hused1 Hsp Hra Hs0 Hs1 Hs2 HQ12sp HQ12s4 HQ12thr
+                  Hjp Hgs Hsp Hra Hs0 Hs1 Hs2 HQ12sp HQ12s4 HQ12thr
                   with "Hcg Hcnt Htext Hpc [] Hslkk Hslkd Hdep
                         Hidev Hiinum Hivalid Hload Hity Hfrz Hkeep Hru Hbm Hins Hbits Hka
                         Hpriv Hpath Hargv Hargs Hbs Hirs Hlog [-Hcont] Hcont").
@@ -1599,11 +1587,11 @@ Section KexecABody.
                    with "Hcont") as "Hcont".
       iApply (T.kxc_bad64 gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
                 gilk gislk ga gf cov logstart bmapstart inodestart nib size
-                dev used used1 k (q/2)%Qp (q/2)%Qp gy inum dnl bml n1
+                dev k (q/2)%Qp (q/2)%Qp gy inum dnl bml n1
                 plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
                 m Q9 K lks sp0 ra0 s00 s10 s20 pv av
                 HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib' Hcovb Hiu
-                Hjp Hgs Hused1 Hsp Hra Hs0 Hs1 Hs2 HQ9sp HQ9s4 HQ9thr
+                Hjp Hgs Hsp Hra Hs0 Hs1 Hs2 HQ9sp HQ9s4 HQ9thr
                 with "Hcg Hcnt Htext Hpc [] Hslkk Hslkd Hdep
                       Hidev Hiinum Hivalid Hload Hity Hfrz Hkeep Hru Hbm Hins Hbits Hka
                       Hpriv Hpath Hargv Hargs Hbs Hirs Hlog [-Hcont] Hcont").
@@ -1679,7 +1667,6 @@ Section KexecAMain.
       (ga : gname) (gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
-      (used : gset Z)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64)
       (alen : nat -> nat) (aslen : nat -> nat)
@@ -1725,7 +1712,7 @@ Section KexecAMain.
     kalloc_env ga None -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-    bitmap_res gfs bmapstart cov logstart size used -∗
+    bitmap_inv gfs bmapstart cov logstart size -∗
     proc_priv gf (proc_addr jp) pidv V -∗
     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
     ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
@@ -1735,7 +1722,7 @@ Section KexecAMain.
     iref_slots 2 -∗
     (* ---- kexec's OWN continuation: BOTH [-1] tails close through it ---- *)
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
-      ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
+      ∀ (mf : regfile) (V' : pprivate)
         (entry spv szv' : mword 64),
           ⌜callee_saved m mf⌝ -∗
           ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
@@ -1744,8 +1731,6 @@ Section KexecAMain.
           pc_is (ret_pc ra0) -∗
           sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
           sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-          ⌜used' ⊆ used⌝ -∗
-          bitmap_res gfs bmapstart cov logstart size used' -∗
           kalloc_env ga None -∗
           proc_priv gf (proc_addr jp) pidv V' -∗
           ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
@@ -1759,7 +1744,7 @@ Section KexecAMain.
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (M90 : regfile) (kf : nat) (qf sf : Qp) (inumf : mword 32)
         (dnf : dinode) (bmf : blkmap) (gilf gislf gyf : gname)
-        (n2 : nat) (used2 : gset Z),
+        (n2 : nat),
         ⌜ M90 !!! Regidx csp_rs1 = pa_stk sp0 68 /\
           M90 !!! Regidx Rs0 = sp0 /\
           M90 !!! Regidx Rs1 = proc_addr jp /\
@@ -1770,7 +1755,7 @@ Section KexecAMain.
           (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
              r <> Rs0 -> r <> Rs1 -> r <> Rs2 -> r <> Rs4 ->
              M90 !!! Regidx r = m !!! Regidx r) ⌝ -∗
-        ⌜ (iput_units <= n2)%nat /\ used2 ⊆ used ⌝ -∗
+        ⌜ (iput_units <= n2)%nat ⌝ -∗
         pc_is (mword_of_int (KXA + 0x90) : mword 64) -∗
         sie_cap_gpr KT1 M90 (K - 68)%nat b (proc_addr jp) -∗
         cpu_own 0 eb (proc_addr jp) b lks -∗
@@ -1794,7 +1779,7 @@ Section KexecAMain.
         iref_slots 1 -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-        bitmap_res gfs bmapstart cov logstart size used2 -∗
+        bitmap_inv gfs bmapstart cov logstart size -∗
         bslots bn 3 -∗
         kalloc_env ga None -∗
         proc_priv gf (proc_addr jp) pidv V -∗
@@ -1809,7 +1794,7 @@ Section KexecAMain.
            TWO HALVES" -- the shape [kxc_a1] already uses internally, now on
            phase A's own interface, because [ProofKexec.v] composes across it. *)
         wp_next (CID0 := CID) b (proc_addr jp) (fun (CIDy : CpuId) =>
-          ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
+          ∀ (mf : regfile) (V' : pprivate)
             (entry spv szv' : mword 64),
               ⌜callee_saved m mf⌝ -∗
               ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
@@ -1818,8 +1803,6 @@ Section KexecAMain.
               pc_is (ret_pc ra0) -∗
               sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
               sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-              ⌜used' ⊆ used⌝ -∗
-              bitmap_res gfs bmapstart cov logstart size used' -∗
               kalloc_env ga None -∗
               proc_priv gf (proc_addr jp) pidv V' -∗
               ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
@@ -1834,10 +1817,10 @@ Section KexecAMain.
   Proof.
     intros HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
            Hiregb Hcstr Hplen Hjp Hgs Heb Hsp Hra Hs0 Hs1 Hs2 Ha0 Ha1.
-    iIntros "Hcg Hcnt #Htext Hpc #Hfab #Hka Hbm Hins Hbits Hpriv
+    iIntros "Hcg Hcnt #Htext Hpc #Hfab #Hka Hbm Hins #Hbits Hpriv
              Hpath Hargv Hargs Hbs Hirs Hcont Hcont90".
     iApply (kxc_a1 (CID0 := CID0) gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl ga gf
-              cov logstart bmapstart inodestart nib size dev used
+              cov logstart bmapstart inodestart nib size dev
               plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
               m K eb b lks sp0 ra0 s00 s10 s20 pv av
               HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
@@ -1846,11 +1829,11 @@ Section KexecAMain.
               with "Hcg Hcnt Htext Hpc Hfab Hka Hbm Hins Hbits Hpriv
                     Hpath Hargv Hargs Hbs Hirs Hcont [Hcont90]").
     (* ---- the seam at +0x032: [kxc_a2] takes it verbatim ---- *)
-    iIntros (CIDs Hss M32 used1 ipv n1) "Hseam Hexit".
+    iIntros (CIDs Hss M32 ipv n1) "Hseam Hexit".
     iDestruct (wp_next_retarget CID0 CIDs b (proc_addr jp) _ Hss
                  with "Hcont90") as "Hcont90".
     iApply (kxc_a2 (CID0 := CIDs) gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl ga gf
-              cov logstart bmapstart inodestart nib size dev used used1
+              cov logstart bmapstart inodestart nib size dev
               plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
               m M32 K eb b lks sp0 ra0 s00 s10 s20 pv av ipv n1
               HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb

@@ -78,6 +78,7 @@ Require Import FsCrash.
 Require Import SpecPanic.
 Require Import SpecProcinit.   (* [wait_lock_addr] *)
 Require Import SpecKexit.      (* [K_kexit] -- the budget this one is built on *)
+Require Import FsCfg FsReady.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
@@ -102,7 +103,6 @@ Definition wp_sys_exit_sconf_body
     (γkl : gname) (γka : gname * gname)               (* kmem.lock, kalloc   *)
     (γi : gname) (cn : ic_names) (γtl : gname)        (* the inode cache     *)
     (bmapstart inodestart : Z) (nib : nat) (size : Z)
-    (dqb dqs : dfrac) (us : gset Z)
     (on : option nat) (fn : fclose_names)
     (m : regfile) (av : nat) (eb : bool) (b : bool)
     (pid : mword 32) (V : pprivate) (v0 : mword 64) (lks : gset string) :=
@@ -110,7 +110,7 @@ Definition wp_sys_exit_sconf_body
   let pj := proc_addr j in
   fn = MkFCloseNames γs j γl γkl γka γu γd γk pd pav pu bn γ γfs
          cov logstart dev pid (DfracOwn (1/4))
-         γi cn γtl bmapstart inodestart nib size dqb dqs ->
+         γi cn γtl bmapstart inodestart nib size ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (* the syscall argument, out of the trapframe page [proc_priv] carries *)
@@ -166,8 +166,8 @@ Definition wp_sys_exit_sconf_body
   bslots bn 3 -∗
   (* the inode cache and the two regions iput's truncate arm frees into,
      kexit's verbatim *)
-  fileclose_ic_env fn -∗
-  fileclose_bm fn us -∗
+  ⌜fclose_ties fn⌝ -∗
+  FsReady.fs_ready -∗
   (* the initproc pointer, at any fraction *)
   (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
   (* the process itself: its private block (trapframe included) and its
@@ -194,12 +194,11 @@ Module Type SYSEXIT.
       (γkl : gname) (γka : gname * gname)
       (γi : gname) (cn : ic_names) (γtl : gname)
       (bmapstart inodestart : Z) (nib : nat) (size : Z)
-      (dqb dqs : dfrac) (us : gset Z)
-      (on : option nat) (fn : fclose_names)
+        (on : option nat) (fn : fclose_names)
       (m : regfile) (av : nat) (eb : bool) (b : bool)
       (pid : mword 32) (V : pprivate) (v0 : mword 64) (lks : gset string),
       wp_sys_exit_sconf_body γft γf γw γs j γl γu γd γk pd pav pu bn γ γfs
                              cov logstart dev ip dqi γkl γka
-                             γi cn γtl bmapstart inodestart nib size dqb dqs us
+                             γi cn γtl bmapstart inodestart nib size
                              on fn m av eb b pid V v0 lks.
 End SYSEXIT.

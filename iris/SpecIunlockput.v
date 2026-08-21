@@ -126,7 +126,6 @@ Definition wp_iunlockput_sconf_body
     (gil gisl : gname)                                 (* ip->lock            *)
     (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
-    (used : gset Z)
     (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
     (dn' : dinode) (bm' : blkmap)
     (n : nat)
@@ -216,7 +215,7 @@ Definition wp_iunlockput_sconf_body
   (* ---- iput's own resources ---- *)
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-  bitmap_res gfs bmapstart cov logstart size used -∗
+  bitmap_inv gfs bmapstart cov logstart size -∗
   proc_priv_bare pj pidv Vpr -∗
   procs_inv gs -∗
   dev_inv gu gd -∗
@@ -228,7 +227,7 @@ Definition wp_iunlockput_sconf_body
      down to sleep), so it can return on another hart whatever SIE was
      doing. *)
   wp_next true pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (n' : nat) (used' : gset Z),
+  ∀ (mf : regfile) (n' : nat),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
@@ -238,8 +237,6 @@ Definition wp_iunlockput_sconf_body
       proc_priv_bare pj pidv Vpr -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-      ⌜used' ⊆ used⌝ -∗
-      bitmap_res gfs bmapstart cov logstart size used' -∗
       bslots bn 3 -∗
       ⌜((n - iput_units)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
       log_op g n' -∗
@@ -269,7 +266,6 @@ Definition wp_iunlockput_gen_body
     (gil gisl : gname)                                 (* ip->lock            *)
     (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
-    (used : gset Z)
     (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
     (dn' : dinode) (bm' : blkmap)
     (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
@@ -362,7 +358,7 @@ Definition wp_iunlockput_gen_body
   (* ---- iput's own resources ---- *)
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-  bitmap_res gfs bmapstart cov logstart size used -∗
+  bitmap_inv gfs bmapstart cov logstart size -∗
   proc_priv_bare pj pidv Vpr -∗
   procs_inv gs -∗
   dev_inv gu gd -∗
@@ -381,7 +377,7 @@ Definition wp_iunlockput_gen_body
      down to sleep), so it can return on another hart whatever SIE was
      doing. *)
   wp_next true pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (n' : nat) (used' Sb' : gset Z) (w : bool),
+  ∀ (mf : regfile) (n' : nat) (Sb' : gset Z) (w : bool),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
@@ -391,8 +387,6 @@ Definition wp_iunlockput_gen_body
       proc_priv_bare pj pidv Vpr -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-      ⌜used' ⊆ used⌝ -∗
-      bitmap_res gfs bmapstart cov logstart size used' -∗
       bslots bn 3 -∗
       ⌜Sb ⊆ Sb'⌝ -∗
       (* THE PAID-BITMAP REPORT (G-4c): [w] is "this call spent the bitmap
@@ -420,7 +414,6 @@ Module Type IUNLOCKPUT.
       (cn : ic_names) (gtl : gname) (gil gisl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
-      (used : gset Z)
       (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
       (n : nat)
@@ -429,7 +422,7 @@ Module Type IUNLOCKPUT.
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_iunlockput_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                                gil gisl cov logstart bmapstart inodestart nib
-                               size dev used k qi s gy inum dn' bm' n
+                               size dev k qi s gy inum dn' bm' n
                                pidv dq dqb dqs m K eb b lks Vpr.
   (* the credited set-form contract; [wp_iunlockput_sconf] is this at
      [crb := cru := crz := false], derived at the [log_op] existential's own
@@ -444,7 +437,6 @@ Module Type IUNLOCKPUT.
       (cn : ic_names) (gtl : gname) (gil gisl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
-      (used : gset Z)
       (k : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
       (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
@@ -453,6 +445,6 @@ Module Type IUNLOCKPUT.
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_iunlockput_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                              gil gisl cov logstart bmapstart inodestart nib
-                             size dev used k qi s gy inum dn' bm' n Sb crb cru
+                             size dev k qi s gy inum dn' bm' n Sb crb cru
                              crz e0 pidv dq dqb dqs m K eb b lks Vpr.
 End IUNLOCKPUT.

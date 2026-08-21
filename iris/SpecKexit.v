@@ -131,6 +131,7 @@ Require Import FsCrash.
 Require Import KernelDataInv.
 Require Import SpecPanic.
 Require Import SpecProcinit.   (* [wait_lock_addr] -- procinit is what makes it *)
+Require Import FsCfg FsReady.  (* [fs_ready] and the ambient names it is at *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
@@ -156,7 +157,6 @@ Definition wp_kexit_sconf_body
     (γkl : gname) (γka : gname * gname)               (* kmem.lock, kalloc   *)
     (γi : gname) (cn : ic_names) (γtl : gname)        (* the inode cache     *)
     (bmapstart inodestart : Z) (nib : nat) (size : Z)
-    (dqb dqs : dfrac) (us : gset Z)
     (on : option nat) (fn : fclose_names)
     (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
     (pid : mword 32) (V : pprivate) :=
@@ -168,7 +168,7 @@ Definition wp_kexit_sconf_body
      pid fraction is the quarter [ProcInv.proc_priv_pid_ofile] lends. *)
   fn = MkFCloseNames γs j γl γkl γka γu γd γk pd pav pu bn γ γfs
          cov logstart dev pid (DfracOwn (1/4))
-         γi cn γtl bmapstart inodestart nib size dqb dqs ->
+         γi cn γtl bmapstart inodestart nib size ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (K_kexit <= av)%nat ->
@@ -245,13 +245,13 @@ Definition wp_kexit_sconf_body
   disk_geom γd pd pav pu -∗
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
   bslots bn 3 -∗
-  (* THE INODE CACHE, and the two regions iput's truncate arm frees into.
-     Both bundles are [SpecFileclose]'s, verbatim: kexit hands them to
-     fileclose once per descriptor and then spends them itself on
-     [iput(p->cwd)], so stating them twice would be stating them
-     differently. *)
-  fileclose_ic_env fn -∗
-  fileclose_bm fn us -∗
+  (* THE FILE SYSTEM, as [SpecFileclose] sees it: the ambient [fs_ready]
+     and the ties that make [fn]'s names the ambient ones.  kexit hands them
+     to fileclose once per descriptor and then spends them itself on
+     [iput(p->cwd)], so stating them differently would be stating them
+     twice. *)
+  ⌜fclose_ties fn⌝ -∗
+  FsReady.fs_ready -∗
   (* the initproc pointer, at any fraction (write-once; see the header) *)
   (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
   (* the process itself: its private block and its fd-slot allowance *)
@@ -318,12 +318,11 @@ Module Type KEXIT.
       (γkl : gname) (γka : gname * gname)
       (γi : gname) (cn : ic_names) (γtl : gname)
       (bmapstart inodestart : Z) (nib : nat) (size : Z)
-      (dqb dqs : dfrac) (us : gset Z)
-      (on : option nat) (fn : fclose_names)
+        (on : option nat) (fn : fclose_names)
       (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
       (pid : mword 32) (V : pprivate),
       wp_kexit_sconf_body γft γf γw γs j γl γu γd γk pd pav pu bn γ γfs
                           cov logstart dev ip dqi γkl γka
-                          γi cn γtl bmapstart inodestart nib size dqb dqs us
+                          γi cn γtl bmapstart inodestart nib size
                           on fn m av eb b lks pid V.
 End KEXIT.

@@ -70,6 +70,9 @@ Require Import SpecAcquire SpecRelease.
 Require Import SpecPipeclose SpecBeginOp SpecIput SpecEndOp.
 Require Import IrefSlots.
 Require Import IcacheEscrow.  (* [ic_sleeplocks], hoisted out of the two function specs *)
+Require Import IcacheRef.     (* [icfg_log] / [icfg_ist] / [icfg_nib] / [icfg_dev] *)
+Require Import FsCfg.         (* the ambient fs names the FS arm now runs at *)
+Require Import FsReady.       (* [fs_ready] and its projection family *)
 Require Import SpecFileclose.
 Require Import CodeFileclose ProofFilecloseParts.
 From Kernel Require KernelSyms.
@@ -143,10 +146,10 @@ Section ProofFileclose.
 
   Lemma wp_fileclose_sconf  (γfl γf : gname)
       (k : nat) (q : Qp) (Cf : fcontent)
-      (fn : fclose_names) (on : option nat) (us : gset Z)
+      (fn : fclose_names) (on : option nat)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string) (pidv : mword 32) (Vpr : pprivate)
-    : wp_fileclose_sconf_body γfl γf k q Cf fn on us m n eb p K b lks pidv Vpr.
+    : wp_fileclose_sconf_body γfl γf k q Cf fn on m n eb p K b lks pidv Vpr.
   Proof.
     cbv beta delta [wp_fileclose_sconf_body].
     intros pcE ret_tgt HK HnZ Ha0 Hbelow.
@@ -1315,7 +1318,7 @@ Section ProofFileclose.
                          || bool_decide (fc_type Cf = FD_DEVICE)) = true).
           { apply orb_true_intro. destruct Hinode as [H|H]; [left|right];
               by apply bool_decide_eq_true_2. }
-          iAssert (fileclose_fs_env fn us n eb p) with "[Henv]" as "Henv".
+          iAssert (fileclose_fs_env fn n eb p) with "[Henv]" as "Henv".
           { rewrite /fileclose_env bool_decide_eq_false_2; [|exact Hnpipe].
             rewrite Hib. iExact "Henv". }
           (* THE PAYLOAD IS THE REFERENCE, and this closer holds ALL of it:
@@ -1342,30 +1345,60 @@ Section ProofFileclose.
           (* FIVE pure conjuncts, not six: the bundle no longer pins
              [eb = true], and this arm runs at a generic index.  [n] and [p]
              still are pinned, and both substitutions stay. *)
-          iDestruct "Henv" as "(%Hn0 & %Hpj & %Hjlt & %Hgl & %Hgeom &
-                                #Hprocs & #Hbio & #Hlog & #Hseam &
-                                #Hgen & #Hdev & #Hgeo & #Hdlk & Hbsl &
-                                #Hicenv & Hbm)".
+          iDestruct "Henv" as "(%Hn0 & %Hpj & %Hjlt & %Hgl & %Hties &
+                                #Hprocs & #Hgeo & #Hdlk & #Hrdy & Hbsl)".
           subst n. subst p.
-          rewrite /fileclose_ic_env.
-          iDestruct "Hicenv" as "(%Hcdev & %Hcnib & %Hsz & %Hbm0 &
-                                  %Hbmcov & %Hbmlog & %Hist0 & %Hinumgeo &
-                                  %Hcovb & #Hitab & #Hitinv & #Hescrows &
-                                  #Hireg & #Hropen & #Hslks)".
-          rewrite /fileclose_bm.
-          iDestruct "Hbm" as "(Hsbb & Hsbi & Hbmres)".
+          (* ---- THE TIES, DESTRUCTED ONCE ----
+             [fclose_ties] says [fn]'s own names ARE the ambient ones, so the
+             whole FS arm below is spelled AMBIENTLY and the eighteen
+             equations are used only where a resource ARRIVES at [fn]'s
+             spelling ([Hbsl]) or has to LEAVE at it (the postcondition's
+             [fileclose_fs_out]).  That is [FsSyscalls.fs_world_all]'s idiom
+             with the substitution going the other way: there the ties are
+             [->]d into the ambient predicate, here the callees are
+             instantiated at the ambient names directly. *)
+          destruct Hties as [Ht_uart Ht_disk Ht_dlock Ht_kmem Ht_kalloc
+                             Ht_bio Ht_log Ht_fs Ht_cov Ht_logst Ht_dev
+                             Ht_ireg Ht_ic Ht_tlock Ht_bms Ht_ist Ht_nib
+                             Ht_size].
+          iEval (rewrite Ht_bio) in "Hbsl".
+          (* ---- AND THE FILE SYSTEM, OUT OF [fs_ready] ----
+             Each row is one projection.  What used to be [fileclose_ic_env]
+             (nine pure facts and six invariants) and [fileclose_bm] (the two
+             superblock cells and the threaded [bitmap_res]) is now this
+             block: the cells come back at [□], and the bitmap is the
+             persistent invariant, so nothing here is consumable. *)
+          iDestruct (FsReady.fs_ready_geom with "Hrdy") as "%Hgok".
+          iDestruct (FsReady.fs_ready_bio with "Hrdy") as "#Hbio".
+          iDestruct (FsReady.fs_ready_log with "Hrdy") as "#Hlog".
+          iDestruct (FsReady.fs_ready_seam with "Hrdy") as "#Hseam".
+          iDestruct (FsReady.fs_ready_gen with "Hrdy") as "#Hgen".
+          iDestruct (FsReady.fs_ready_disk with "Hrdy") as "[#Hdev Hdd]".
+          (* the three ring pages are QUANTIFIED in [fs_ready] (fs-cfg-boot
+             R1); the callees take them as parameters, so this arm simply
+             runs at the predicate's own witness and never needs
+             [disk_geom_agree] against [fn]'s [Hgeo]/[Hdlk]. *)
+          iDestruct "Hdd" as (pdd pavd pud) "[#Hgeod #Hdlkd]".
+          iDestruct (FsReady.fs_ready_icache with "Hrdy")
+            as "(#Hitab & #Hitinv & #Hescrows & #Hslks)".
+          iDestruct (FsReady.fs_ready_region with "Hrdy") as "[#Hireg #Hropen]".
+          iDestruct (FsReady.fs_ready_sb_four with "Hrdy")
+            as "(_ & #Hsbi & _ & #Hsbb)".
+          iDestruct (FsReady.fs_ready_bitmap with "Hrdy") as "#Hbmres".
+          pose proof (FsReady.fgo_loggeom Hgok) as Hgeom.
+          pose proof (FsReady.fgo_size Hgok) as Hsz.
+          pose proof (FsReady.fgo_bm_nn Hgok) as Hbm0.
+          pose proof (FsReady.fgo_bm_cov Hgok) as Hbmcov.
+          pose proof (FsReady.fgo_bm_out Hgok) as Hbmlog.
+          pose proof (FsReady.fgo_ist_nn Hgok) as Hist0.
+          pose proof (FsReady.fgo_covbelow Hgok) as Hcovb.
+          pose proof (FsReady.fgo_iblocks Hgok) as Hinumgeo.
           (* the entry's own escrow and sleeplock, out of the two families:
              a closer cannot name the slot in its contract, so it takes
              every slot's and picks the one the reference names *)
           iDestruct (ic_escrows_acc _ _ _ _ _ kk Hkk with "Hescrows") as "#Hescrow".
           iDestruct (ic_sleeplocks_acc _ kk Hkk with "Hslks") as (gil gisl) "#Hslk".
-          (* the reference is at the CACHE's authority and device; iput names
-             them through the [ic_names] its other premises are stated at.
-             The two pure ties in [fileclose_ic_env] are what bridge them. *)
-          iEval (rewrite -Hcdev) in "Href".
-          assert (Hinb : bv_unsigned inum < 16 * Z.of_nat (fcn_nib fn))
-            by (rewrite Hcnib; exact Hinumb).
-          destruct (Hinumgeo inum Hinb) as [Hiblk Hiblog].
+          destruct (Hinumgeo inum Hinumb) as [Hiblk Hiblog].
           (* NO [subst b] HERE.  [Houtb] does read [b = eb] at [noff = 0], but
              the arm is proved at the generic index: [cpu_own]'s slot stays
              [eb], a leaf instruction's index stays [b], and the three
@@ -1416,8 +1449,8 @@ Section ProofFileclose.
           iDestruct (cpu_claim_ext_transport CID CIDf2 eb (proc_addr (fcn_j fn))
                        ltac:(ext_chain Hebf b) with "Hextm") as "Hextm".
           iApply (BeginOp.wp_begin_op_sconf (CID := CIDf2)  (fcn_procs fn)
-                    (fcn_j fn) (fcn_plock fn) (fcn_bio fn) (fcn_log fn) (fcn_fs fn)
-                    (fcn_cov fn) (fcn_logstart fn) (fcn_dev fn)
+                    (fcn_j fn) (fcn_plock fn) fsc_bio icfg_log fsc_fs
+                    fsc_cov fsc_logst icfg_dev
                     pidv (fcn_dq fn) B1 (K - 8)%nat eb b lks Vpr
                     ltac:(lia) Hjlt Hgl
                     ltac:(lkbelow)
@@ -1478,26 +1511,29 @@ Section ProofFileclose.
           iDestruct (cpu_claim_ext_transport CIDf3 CIDf5 eb (proc_addr (fcn_j fn))
                        ltac:(ext_chain Hebf b) with "Hextm") as "Hextm".
           iApply (Iput.wp_iput_sconf (CID := CIDf5) (fcn_procs fn) (fcn_j fn)
-                    (fcn_plock fn) (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
-                    (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) (fcn_bio fn)
-                    (fcn_log fn) (fcn_fs fn) (fcn_ireg fn) (fcn_ic fn)
-                    (fcn_tlock fn) gil gisl
-                    (fcn_cov fn) (fcn_logstart fn) (fcn_bmapstart fn)
-                    (fcn_inodestart fn) (fcn_nib fn) (fcn_size fn)
-                    (fcn_dev fn) us kk qq inum MAXOPBLOCKS
-                    pidv (fcn_dq fn) (fcn_dqb fn) (fcn_dqs fn)
+                    (fcn_plock fn) fsc_uart fsc_disk fsc_dlock
+                    pdd pavd pud fsc_bio
+                    icfg_log fsc_fs fsc_ireg fsc_ic
+                    fsc_itlock gil gisl
+                    fsc_cov fsc_logst fsc_bmapstart
+                    icfg_ist icfg_nib fsc_size
+                    icfg_dev kk qq inum MAXOPBLOCKS
+                    pidv (fcn_dq fn) DfracDiscarded DfracDiscarded
                     B3 (K - 8)%nat eb b lks Vpr
                     ltac:(lia) Hkk Hgeom Hsz Hbm0 Hbmcov Hbmlog
-                    Hist0 Hiblk Hiblog Hinb Hcovb
+                    Hist0 Hiblk Hiblog Hinumb Hcovb
                     ltac:(unfold iput_units, MAXOPBLOCKS; lia) Hjlt Hgl
                     ltac:(rewrite HB3a0; exact Hipe)
                     ltac:(lkbelow)
                     with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlog Hitab Hitinv
                           Hescrow Hireg Hropen Hslk [$Href $Hru] Hsbb Hsbi Hbmres Hpbare Hprocs
-                          Hdev Hgeo Hdlk Hbsl Hop").
+                          Hdev Hgeod Hdlkd Hbsl Hop").
           all: try lkbelow.
-          iIntros (CIDf6 Hsf6 mi ni us') "%Hics Hcg Hcnt Hextc Hextm Hpc Hpbare Hsbb Hsbi
-                                          %Hussub Hbmres Hbsl %Hni Hop Hislot".
+          (* the two superblock cells come back at [□] and are dropped: they
+             are persistent conjuncts of [fs_ready], which this proof still
+             holds. *)
+          iIntros (CIDf6 Hsf6 mi ni) "%Hics Hcg Hcnt Hextc Hextm Hpc Hpbare _ _
+                                      Hbsl %Hni Hop Hislot".
           pose proof Hics as Hics_cs.
           assert (Hpcb4 : ret_pc (B3 !!! Regidx Rra) = mword_of_int (FC + 0xb4)).
           { rewrite HB3ra. apply bv_eq; vm_compute; reflexivity. }
@@ -1528,15 +1564,15 @@ Section ProofFileclose.
           iDestruct (cpu_claim_ext_transport CIDf6 CIDf7 eb (proc_addr (fcn_j fn))
                        ltac:(ext_chain Hebf b) with "Hextm") as "Hextm".
           iApply (EndOp.wp_end_op_sconf (CID := CIDf7)  (fcn_procs fn) (fcn_j fn)
-                    (fcn_plock fn) (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
-                    (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) (fcn_bio fn)
-                    (fcn_log fn) (fcn_fs fn) (fcn_cov fn) (fcn_logstart fn)
-                    (fcn_dev fn) ni pidv (fcn_dq fn)
+                    (fcn_plock fn) fsc_uart fsc_disk fsc_dlock
+                    pdd pavd pud fsc_bio
+                    icfg_log fsc_fs fsc_cov fsc_logst
+                    icfg_dev ni pidv (fcn_dq fn)
                     B4 (K - 8)%nat eb b lks Vpr
                     ltac:(lia) Hgeom Hjlt Hgl
                     ltac:(lkbelow)
                     with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen Hpbare
-                          Hprocs Hdev Hgeo Hdlk Hop").
+                          Hprocs Hdev Hgeod Hdlkd Hop").
           all: try lkbelow.
           iIntros (CIDf8 Hsf8 me) "%Hecs Hcg Hcnt Hextc Hextm Hpc Hpbare".
           pose proof Hecs as Hecs_cs.
@@ -1617,17 +1653,16 @@ Section ProofFileclose.
              -- SpecFileclose.v recorded that as a leak of one unit of the
              IrefSlots supply per inode file closed; it has a home now. *)
           iApply ("Hcont" $! mf with
-                    "Hcg Hcnt Hextc Hextm [Hpc] [%] Hfd Hislot [Hbsl Hsbb Hsbi Hbmres] Hpbare").
+                    "Hcg Hcnt Hextc Hextm [Hpc] [%] Hfd Hislot [Hbsl] Hpbare").
           { iEval (rewrite /ret_tgt). iExact "Hpc". }
           { exact Hcsf. }
+          (* THE WHOLE FS POSTCONDITION IS THE THREE SLOTS.  The bitmap said
+             [used' ⊆ used] here; it is an invariant now and says nothing,
+             and the two superblock cells are persistent.  (iput's
+             [iref_slot] is spent above rather than dropped -- see the note
+             on [Hislot].) *)
           { rewrite /fileclose_env_out bool_decide_eq_false_2; [|exact Hnpipe].
-            rewrite Hib /fileclose_fs_out.
-            iSplitL "Hbsl"; [iExact "Hbsl"|].
-            (* the bitmap comes back smaller iff the truncate arm ran; iput
-               states exactly that and no more.  (iput's [iref_slot] is
-               dropped here -- see [fileclose_fs_out]'s note.) *)
-            iExists us'. iSplitR; [iPureIntro; exact Hussub|].
-            rewrite /fileclose_bm. iFrame "Hsbb Hsbi Hbmres". }
+            rewrite Hib /fileclose_fs_out Ht_bio. iExact "Hbsl". }
         * (* ======== FD_NONE (or anything else): nothing to do ========== *)
           iApply (wp_bgeu_fall_s_sconf (mword_of_int (FC + 0x60))
                     (mword_of_int 74 : mword 13) Ra5 Ra4 Q2 (K - 8)%nat b

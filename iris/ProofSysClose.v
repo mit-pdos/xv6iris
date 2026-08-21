@@ -322,10 +322,10 @@ Section ProofSysClose.
   (*  THE CAPSTONE.                                                       *)
   (* =================================================================== *)
   Lemma wp_sys_close_sconf  (γl γf : gname)
-      (fn : fclose_names) (on : option nat) (us : gset Z)
+      (fn : fclose_names) (on : option nat)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
       (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string)
-    : wp_sys_close_sconf_body γl γf fn on us m av n eb p v pid V b lks.
+    : wp_sys_close_sconf_body γl γf fn on m av n eb p v pid V b lks.
   Proof.
     cbv beta delta [wp_sys_close_sconf_body].
     intros pcE ret_tgt Harg Hn Hav Hbelow Hfpid Hfdq.
@@ -634,13 +634,12 @@ Section ProofSysClose.
       iDestruct (cpu_claim_ext_transport CID CID12 eb p
                    ltac:(rewrite Hb; wp_next_chain) with "Hextm") as "Hextm".
       iSpecialize ("Hcont" $! CID12 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hextc Hextm Hpc [Hpriv] [Hpenv] [Hfenv] Hiru");
-        [exact Hcsf| | |].
+      iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hextc Hextm Hpc [Hpriv] [Hpenv] Hfenv Hiru");
+        [exact Hcsf| |].
       { rewrite /sys_close_post. iLeft. iFrame "Hpriv". iPureIntro.
         split; [exact Hmfa0 | exact Hnone]. }
       (* no fileclose ran on this path, so both bundles are as they came in *)
       { by iExists on. }
-      { by iExists us. }
     - (* ================= SUCCESS: fd names a live file ================= *)
       iDestruct "Hsucc" as (fd fv) "([%Hr %Hsome] & Hfdcell & Hfcell)".
       iDestruct (ofd_out_elim _ _ Hnzfd with "Hfdcell") as "Hfdcell".
@@ -853,9 +852,9 @@ Section ProofSysClose.
          keep the other ([fileclose_env_split]). *)
       (* the block, re-spelled at [fn]'s own names -- which is all the
          remaining tie premise is for *)
-      iDestruct (fileclose_loop_open fn on us n eb p Cf with "Hpenv Hfenv")
+      iDestruct (fileclose_loop_open fn on n eb p Cf with "Hpenv Hfenv")
         as "[Hfcenv Hfcback]".
-      iApply (Fileclose.wp_fileclose_sconf γl γf k q Cf fn on us D n eb p (av - 4)%nat b lks pid V
+      iApply (Fileclose.wp_fileclose_sconf γl γf k q Cf fn on D n eb p (av - 4)%nat b lks pid V
                 ltac:(lia) Hn HDa0
                 Hbelow
                 with "Hcg Hcpu Hextc Hextm Htext Hdata Hpc Hftab Hpe Href Hpbare Hiru Hfcenv").

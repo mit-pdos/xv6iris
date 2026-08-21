@@ -129,40 +129,28 @@ Section SpecSysWrite.
   (* THE ENVIRONMENT FILEWRITE'S [if] ACTUALLY ASKS FOR, out of the two
      content-independent bundles this contract owns.
      [SpecSysRead.read_env_frame]'s twin, and the whole of what the S4 opener
-     was trying to be.  The [used'] the exclusive half comes back at is
-     whatever filewrite reached -- the number of ballocs is not a function of
-     anything the caller holds -- which is why it is a binder of the wand and
-     not of the frame. *)
+     was trying to be. *)
   Lemma write_env_frame (γf : gname) (fn : fwrite_names) (Cf : fcontent) :
     filewrite_fs_env γf fn -∗ filewrite_devsw fn -∗
     filewrite_env γf fn Cf ∗
-    (∀ used' : gset Z, filewrite_env_out fn Cf used' -∗
-       ∃ used'' : gset Z,
-         filewrite_fs_out fn used'' ∗ filewrite_devsw fn).
+    (filewrite_env_out fn Cf -∗ filewrite_fs_out fn ∗ filewrite_devsw fn).
   Proof.
     iIntros "Hfs Hdev". rewrite /filewrite_env /filewrite_env_out.
-    (* THE SET IS EXISTENTIAL ON THE WAY OUT, and it has to be: on the three
-       arms that do not reach the allocator [filewrite_env_out] is [emp] or a
-       device cell, from which NO constraint on the caller's [used'] follows
-       -- so the only sound answer there is the set nothing touched.  The
-       syscall picks the witness and hands it to its own continuation, which
-       is why [wp_sys_write_sconf_body]'s [used'] is a ∀-binder of the
-       continuation rather than a parameter of the contract. *)
     case_bool_decide.
-    { iSplitR; [done|]. iIntros (used') "_". iExists (fwn_used fn).
+    { iSplitR; [done|]. iIntros "_".
       iDestruct (filewrite_fs_env_out with "Hfs") as "Hout".
       iSplitL "Hout"; [iExact "Hout" | iFrame "Hdev"]. }
     case_bool_decide.
     { iDestruct (filewrite_devsw_acc fn Cf with "Hdev") as "[Hone Hback]".
       iSplitL "Hone"; [iExact "Hone"|].
-      iIntros (used') "Hout". iExists (fwn_used fn).
+      iIntros "Hout".
       iDestruct ("Hback" with "Hout") as "Hdev".
       iDestruct (filewrite_fs_env_out with "Hfs") as "Hfo".
       iSplitL "Hfo"; [iExact "Hfo" | iFrame "Hdev"]. }
     case_bool_decide.
-    { iSplitL "Hfs"; [iExact "Hfs"|]. iIntros (used') "Hout".
-      iExists used'. iSplitL "Hout"; [iExact "Hout" | iFrame "Hdev"]. }
-    { iSplitR; [done|]. iIntros (used') "_". iExists (fwn_used fn).
+    { iSplitL "Hfs"; [iExact "Hfs"|]. iIntros "Hout".
+      iSplitL "Hout"; [iExact "Hout" | iFrame "Hdev"]. }
+    { iSplitR; [done|]. iIntros "_".
       iDestruct (filewrite_fs_env_out with "Hfs") as "Hout".
       iSplitL "Hout"; [iExact "Hout" | iFrame "Hdev"]. }
   Qed.
@@ -231,7 +219,7 @@ Definition wp_sys_write_sconf_body
   ConsoleInv.devsw_table -∗
   (* THE CROSSING IS THE LITERAL [true]: filewrite parks. *)
   wp_next true pj (fun (CID : CpuId) =>
-    ∀ (mf : regfile) (r : mword 64) (P' : uptd) (used' : gset Z),
+    ∀ (mf : regfile) (r : mword 64) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
       ⌜sys_write_ret V v (sys_rw_count v2) r⌝ -∗
@@ -241,8 +229,8 @@ Definition wp_sys_write_sconf_body
       pc_is ret_tgt -∗
       proc_priv γf pj pidv (upd_upt V P') -∗
       kalloc_env γa None -∗
-      (* the file system, back, at a bitmap set that only GREW *)
-      filewrite_fs_out fn used' -∗
+      (* the file system, back *)
+      filewrite_fs_out fn -∗
       (* the device column is NOT returned: it is persistent, and the caller
          still holds the table it was projected from. *)
       WP (Loop : expr riscv_lang)) -∗

@@ -252,7 +252,6 @@ Definition wp_fsinit_sconf_body
     (γpr : gname)
     (cov : gset Z) (logstart bmapstart inodestart : Z)
     (ninodes : Z) (nib : nat) (size : Z)
-    (used : gset Z)
     (dev : mword 32)
     (* ---- the image's block 1, field by field ---- *)
     (v_magic v_size v_nblocks v_ninodes v_nlog
@@ -368,7 +367,7 @@ Definition wp_fsinit_sconf_body
   ic_escrows cn γfs γi cov logstart -∗
   ic_sleeplocks cn -∗
   (* itrunc's bitmap, through ireclaim's iput *)
-  bitmap_res γfs bmapstart cov logstart size used -∗
+  bitmap_inv γfs bmapstart cov logstart size -∗
   (* ---- initlog's RAW struct log cells, threaded straight through ---- *)
   log_addr ↦₄ vlock -∗
   lock_name_field log_addr ↦₈ vname -∗
@@ -409,7 +408,7 @@ Definition wp_fsinit_sconf_body
      [eb = false] is reachable the [b] form would promise the caller it
      comes back on the hart it called from, which a park makes false. *)
   wp_next true pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (used' : gset Z),
+  ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
@@ -443,9 +442,6 @@ Definition wp_fsinit_sconf_body
       (* three, not two: see the header *)
       bslots bn 3 -∗
       iref_slot -∗
-      (* the bitmap, with every orphan's blocks freed *)
-      ⌜used' ⊆ used⌝ -∗
-      bitmap_res γfs bmapstart cov logstart size used' -∗
       (* the boot-shelter token, handed back for the seal (fs-fragments.md
          §7.12) *)
       ireg_boot -∗
@@ -465,7 +461,6 @@ Module Type FSINIT.
       (γpr : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z)
       (ninodes : Z) (nib : nat) (size : Z)
-      (used : gset Z)
       (dev : mword 32)
       (v_magic v_size v_nblocks v_ninodes v_nlog
        v_logstart v_inodestart v_bmapstart : mword 32)
@@ -480,7 +475,7 @@ Module Type FSINIT.
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_fsinit_sconf_body γs j γl γu γd γk pd pav pu bn γfs γi cn gtl γpr
                            cov logstart bmapstart inodestart ninodes nib size
-                           used dev
+                           dev
                            v_magic v_size v_nblocks v_ninodes v_nlog
                            v_logstart v_inodestart v_bmapstart bs_sb sb_old
                            bs_hdr L D vlock vname vcpu v_start v_dev v_nc v_n

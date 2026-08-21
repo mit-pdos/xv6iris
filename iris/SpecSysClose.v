@@ -94,7 +94,7 @@ End SpecSysClose.
 Definition wp_sys_close_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-     (γl γf : gname) (fn : fclose_names) (on : option nat) (us : gset Z)
+     (γl γf : gname) (fn : fclose_names) (on : option nat)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
     (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_close in
@@ -160,7 +160,7 @@ Definition wp_sys_close_sconf_body
      straight back out -- see SpecFileclose's own note. *)
   iref_slot -∗
   fileclose_pipe_env fn on n -∗
-  fileclose_fs_env_nopid fn us n eb p -∗
+  fileclose_fs_env_nopid fn n eb p -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  sys_close calls fileclose,
      whose FD_INODE / FD_DEVICE arm parks, so sys_close can return on another
      hart whatever SIE was doing.  The cost is the CALLER's: it must supply
@@ -179,7 +179,7 @@ Definition wp_sys_close_sconf_body
          descriptor may have held a pipe's last end), which is why the pipe
          bundle returns under an existential *)
       (∃ on', fileclose_pipe_env fn on' n) -∗
-      (∃ us', fileclose_fs_env_nopid fn us' n eb p) -∗
+      fileclose_fs_env_nopid fn n eb p -∗
       iref_slot -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -188,8 +188,8 @@ Module Type SYSCLOSE.
   Parameter wp_sys_close_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-       (γl γf : gname) (fn : fclose_names) (on : option nat) (us : gset Z)
+       (γl γf : gname) (fn : fclose_names) (on : option nat)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
       (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string),
-      wp_sys_close_sconf_body γl γf fn on us m av n eb p v pid V b lks.
+      wp_sys_close_sconf_body γl γf fn on m av n eb p v pid V b lks.
 End SYSCLOSE.

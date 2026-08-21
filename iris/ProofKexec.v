@@ -28,14 +28,14 @@
    an [iApply] below: the exit travels as [Hcont] through every step and is
    spent exactly once, by whichever block actually returns.
 
-   THREE PLUMBING FACTS ARE NOT FREE, and they are all this file has to
-   prove for itself:
+   TWO PLUMBING FACTS ARE NOT FREE, and they are all this file has to
+   prove for itself.  (There used to be a third: the free-pool set SHRANK
+   across the phases, each block stated its exit's bitmap clause against
+   the CURRENT set, and a local [kxc_exit_weaken] transported the exit from
+   one set to the next.  With the bitmap living in the persistent
+   [BitmapInv.bitmap_inv] no contract names a set at all, so the exit is
+   the SAME proposition everywhere and the transport is gone.)
 
-   - [used] SHRINKS ACROSS THE PHASES.  Phase A hands out a [used2] with
-     [used2 ⊆ used] and phase B a [used3 ⊆ used]; the later blocks state
-     their exit's bitmap clause against the CURRENT set, while the
-     contract's is against the entry one.  [kxc_exit_weaken] is that one
-     transport, applied once, at the point where [used3] first appears.
    - THE ARGV LOOP IS ENTERED ONLY AT [c < na].  Its own measure argument
      needs that, and the loop head cannot say it: what says it is the head's
      [avf c <> 0] against the contract's [avf na = 0].
@@ -178,78 +178,6 @@ Section KexecTail.
   Notation Ra1 := (mword_of_int 11 : mword 5).
 
   (* ------------------------------------------------------------------ *)
-  (*  THE EXIT, AT A NARROWER BITMAP SET.  Phases A/B/C-setup state the   *)
-  (*  contract's own [used' ⊆ used]; the argv loop, the closing copyout   *)
-  (*  and phase D state [used' ⊆ used3] against the set phase B left.     *)
-  (*  Since [used3 ⊆ used] the two are the same obligation one            *)
-  (*  transitivity apart -- but they are DIFFERENT propositions, so the   *)
-  (*  exit has to be transported rather than framed.                      *)
-  (* ------------------------------------------------------------------ *)
-  Local Lemma kxc_exit_weaken `{CID0 : CpuId}
-      (jp : nat) (bn : bio_names) (gfs : fs_names) (ga gf : gname)
-      (cov : gset Z) (logstart bmapstart inodestart : Z) (size : Z)
-      (used usedw : gset Z)
-      (plen : nat) (pfun : nat -> bv 8)
-      (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
-      (afun : nat -> nat -> bv 8)
-      (pidv : mword 32) (V : pprivate) (dqb dqs dqa dqpv dqas : dfrac)
-      (m : regfile) (K : nat) (ra0 pv av : mword 64) :
-    usedw ⊆ used ->
-    wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-      ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
-        (entry spv szv' : mword 64),
-          ⌜callee_saved m mf⌝ -∗
-          ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
-          sie_cap_gpr KT1 mf K true (proc_addr jp) -∗
-          cpu_own 0 true (proc_addr jp) true ∅ -∗
-          pc_is (ret_pc ra0) -∗
-          sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-          sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-          ⌜used' ⊆ used⌝ -∗
-          bitmap_res gfs bmapstart cov logstart size used' -∗
-          kalloc_env ga None -∗
-          proc_priv gf (proc_addr jp) pidv V' -∗
-          ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
-          ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
-          ([∗ list] i ∈ seq 0 na,
-             [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
-          bslots bn 3 -∗
-          iref_slots 2 -∗
-          WP (Loop : expr riscv_lang)) -∗
-    wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-      ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
-        (entry spv szv' : mword 64),
-          ⌜callee_saved m mf⌝ -∗
-          ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
-          sie_cap_gpr KT1 mf K true (proc_addr jp) -∗
-          cpu_own 0 true (proc_addr jp) true ∅ -∗
-          pc_is (ret_pc ra0) -∗
-          sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-          sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-          ⌜used' ⊆ usedw⌝ -∗
-          bitmap_res gfs bmapstart cov logstart size used' -∗
-          kalloc_env ga None -∗
-          proc_priv gf (proc_addr jp) pidv V' -∗
-          ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
-          ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
-          ([∗ list] i ∈ seq 0 na,
-             [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
-          bslots bn 3 -∗
-          iref_slots 2 -∗
-          WP (Loop : expr riscv_lang)).
-  Proof.
-    intros Hsub. iIntros "H" (CID) "%Hs".
-    iIntros (mf used' V' entry spv szv')
-            "%Hcs %Hok Hcg Hcnt Hpc Hbm Hins %Hu Hbits Hka Hpriv
-             Hpath Hargv Hargs Hbs Hirs".
-    iSpecialize ("H" $! CID with "[%]"); [exact Hs |].
-    iApply ("H" $! mf used' V' entry spv szv'
-              with "[%] [%] Hcg Hcnt Hpc Hbm Hins [%] Hbits Hka Hpriv
-                    Hpath Hargv Hargs Hbs Hirs");
-      [ exact Hcs | exact Hok | set_solver ].
-  Qed.
-
-  (* ------------------------------------------------------------------ *)
   (*  +0x272 .. ret -- the closing copyout and the commit.                *)
   (*  Both of the argv loop's entries land here (the loop's natural exit  *)
   (*  and the [argv[0] = NULL] skip), so it is a lemma rather than two    *)
@@ -258,7 +186,7 @@ Section KexecTail.
   Local Lemma kxc_d_tail `{CID0 : CpuId}
       (jp : nat) (bn : bio_names) (gfs : fs_names) (ga gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z)
-      (size : Z) (used3 : gset Z)
+      (size : Z)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
@@ -280,12 +208,12 @@ Section KexecTail.
     m !!! Regidx Rs6 = w8 -> m !!! Regidx Rs7 = w9 -> m !!! Regidx Rs8 = w10 ->
     m !!! Regidx Rs9 = w11 -> m !!! Regidx Rs10 = w12 -> m !!! Regidx Rs11 = w13 ->
     kernel_text -∗
-    kxc_at_272 jp bn gfs ga gf cov logstart bmapstart inodestart size used3
+    kxc_at_272 jp bn gfs ga gf cov logstart bmapstart inodestart size
                plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
                M K sp0 ra0 s00 s10 s20 pv av
                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P (pv_sz V) sz1 c -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-      ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
+      ∀ (mf : regfile) (V' : pprivate)
         (entry spv szv' : mword 64),
           ⌜callee_saved m mf⌝ -∗
           ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
@@ -294,8 +222,6 @@ Section KexecTail.
           pc_is (ret_pc ra0) -∗
           sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
           sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-          ⌜used' ⊆ used3⌝ -∗
-          bitmap_res gfs bmapstart cov logstart size used' -∗
           kalloc_env ga None -∗
           proc_priv gf (proc_addr jp) pidv V' -∗
           ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
@@ -311,7 +237,7 @@ Section KexecTail.
            Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12 Hmw13.
     iIntros "#Htext Hst Hcont".
     iApply (PC.kxc_c_close (CID0 := CID0) jp bn gfs ga gf cov logstart
-              bmapstart inodestart size used3 plen pfun na avf alen aslen afun
+              bmapstart inodestart size plen pfun na avf alen aslen afun
               pidv V dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av
               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P (pv_sz V) sz1 c
               HK Hsz1ge Hal Hmsp Hmra Hms0 Hms1 Hms2
@@ -319,7 +245,7 @@ Section KexecTail.
               with "Htext Hst Hcont []").
     iIntros (CIDd) "%Hsd". iIntros (Md Pd) "Hst2a6 Hcont".
     iApply (PD.kxd_phaseD (CID0 := CIDd) jp bn gfs ga gf cov logstart
-              bmapstart inodestart size used3 plen pfun na avf alen aslen afun
+              bmapstart inodestart size plen pfun na avf alen aslen afun
               pidv V dqb dqs dqa dqpv dqas m Md K sp0 ra0 s00 s10 s20 pv av
               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef Pd sz1 c
               HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
@@ -333,7 +259,7 @@ Section KexecTail.
   Local Lemma kxc_cd `{CID0 : CpuId}
       (jp : nat) (bn : bio_names) (gfs : fs_names) (ga gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z)
-      (size : Z) (used used3 : gset Z)
+      (size : Z)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
@@ -357,11 +283,11 @@ Section KexecTail.
     m !!! Regidx Rs9 = w11 -> m !!! Regidx Rs10 = w12 -> m !!! Regidx Rs11 = w13 ->
     kernel_text -∗
     kxc_at_1ae jp bn gfs ga gf cov logstart bmapstart inodestart size
-               used used3 plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas
+               plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas
                M K sp0 ra0 s00 s10 s20 pv av
                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P szv -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-      ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
+      ∀ (mf : regfile) (V' : pprivate)
         (entry spv szv' : mword 64),
           ⌜callee_saved m mf⌝ -∗
           ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
@@ -370,8 +296,6 @@ Section KexecTail.
           pc_is (ret_pc ra0) -∗
           sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
           sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-          ⌜used' ⊆ used⌝ -∗
-          bitmap_res gfs bmapstart cov logstart size used' -∗
           kalloc_env ga None -∗
           proc_priv gf (proc_addr jp) pidv V' -∗
           ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
@@ -393,20 +317,19 @@ Section KexecTail.
        back together.  No [iFrame]: at this altitude it does not terminate
        (projects/kexec.md). *)
     rewrite /kxc_at_1ae.
-    iDestruct "Hst" as "(%Hregs & %Hpure2 & %Hpure3 & Hrest)".
-    destruct Hpure2 as [Hu3 Hal].
+    iDestruct "Hst" as "(%Hregs & %Hal & %Hpure3 & Hrest)".
     iAssert (kxc_at_1ae jp bn gfs ga gf cov logstart bmapstart inodestart size
-               used used3 plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas
+               plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas
                M K sp0 ra0 s00 s10 s20 pv av
                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P szv)
       with "[Hrest]" as "Hst".
     { rewrite /kxc_at_1ae.
       iSplitR; [iPureIntro; exact Hregs |].
-      iSplitR; [iPureIntro; exact (conj Hu3 Hal) |].
+      iSplitR; [iPureIntro; exact Hal |].
       iSplitR; [iPureIntro; exact Hpure3 |].
       iExact "Hrest". }
     iApply (PC.kxc_c_setup (CID0 := CID0) jp bn gfs ga gf cov logstart
-              bmapstart inodestart size used used3 plen pfun na avf alen aslen
+              bmapstart inodestart size plen pfun na avf alen aslen
               afun pidv V dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av
               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P szv
               HK Hmsp Hmra Hms0 Hms1 Hms2
@@ -414,11 +337,6 @@ Section KexecTail.
               Halen_b Halen_c Halen_4 Havf_na
               with "Htext Hst Hcont []").
     iIntros (CID1) "%Hs1". iIntros (M1 P1 sz1) "%Hsz1ge Hdisj Hcont".
-    (* from here down the exit's bitmap clause is against [used3] *)
-    iDestruct (kxc_exit_weaken (CID0 := CID1) jp bn gfs ga gf cov logstart
-                 bmapstart inodestart size used used3 plen pfun na avf alen
-                 aslen afun pidv V dqb dqs dqa dqpv dqas m K ra0 pv av Hu3
-                 with "Hcont") as "Hcont".
     iDestruct "Hdisj" as "[Hloop | Hskip]".
     - (* argv[0] <> NULL: run the loop from c = 0 *)
       (* [0 < na] is not a conjunct of the head and cannot be: what says it
@@ -430,7 +348,7 @@ Section KexecTail.
         destruct (Nat.eq_dec 0 na) as [Heq | Hne];
           [ exfalso; apply Hnz; rewrite Heq; exact Havf_na | lia ]. }
       iAssert (kxc_at_21a jp bn gfs ga gf cov logstart bmapstart inodestart
-                 size used3 plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
+                 size plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
                  M1 K sp0 ra0 s00 s10 s20 pv av
                  w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P1 (pv_sz V) sz1 0)
         with "[Hrest2]" as "Hloop".
@@ -440,7 +358,7 @@ Section KexecTail.
         iSplitR; [iPureIntro; exact Hq3 |].
         iExact "Hrest2". }
       iApply (PC.kxc_argv_loop (CID0 := CID1) jp bn gfs ga gf cov logstart
-                bmapstart inodestart size used3 plen pfun na avf alen aslen
+                bmapstart inodestart size plen pfun na avf alen aslen
                 afun pidv V dqb dqs dqa dqpv dqas m K sp0 ra0 s00 s10 s20 pv av
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef (pv_sz V) sz1
                 HK Halen_b Halen_c Halen_4 Havf_na Hsz1ge Hnamax Hal
@@ -450,7 +368,7 @@ Section KexecTail.
                 with "Htext Hloop Hcont []").
       iIntros (CID2) "%Hs2". iIntros (M2 P2 c2) "Hst272 Hcont".
       iApply (kxc_d_tail (CID0 := CID2) jp bn gfs ga gf cov logstart bmapstart
-                inodestart size used3 plen pfun na avf alen aslen afun pidv V
+                inodestart size plen pfun na avf alen aslen afun pidv V
                 dqb dqs dqa dqpv dqas m M2 K sp0 ra0 s00 s10 s20 pv av
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P2 sz1 c2
                 HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
@@ -458,7 +376,7 @@ Section KexecTail.
                 with "Htext Hst272 Hcont").
     - (* argv[0] = NULL: the loop is skipped, and c = 0 *)
       iApply (kxc_d_tail (CID0 := CID1) jp bn gfs ga gf cov logstart bmapstart
-                inodestart size used3 plen pfun na avf alen aslen afun pidv V
+                inodestart size plen pfun na avf alen aslen afun pidv V
                 dqb dqs dqa dqpv dqas m M1 K sp0 ra0 s00 s10 s20 pv av
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P1 sz1 0
                 HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
@@ -501,7 +419,6 @@ Section KexecMain.
       (ga : gname) (gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
-      (used : gset Z)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64)
       (alen aslen : nat -> nat) (afun : nat -> nat -> bv 8)
@@ -511,7 +428,7 @@ Section KexecMain.
       (b : bool) (lks : gset string) :
     wp_kexec_sconf_body gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
                         ga gf cov logstart bmapstart inodestart nib
-                        size dev used plen pfun na avf alen aslen afun
+                        size dev plen pfun na avf alen aslen afun
                         pidv V dqb dqs dqa dqpv dqas m K eb b lks.
   Proof.
     rewrite /wp_kexec_sconf_body.
@@ -528,7 +445,7 @@ Section KexecMain.
     (* ---- PHASE A: +0x000 .. +0x090, and two of the eight [bad:] tails ---- *)
     iApply (PA.kxc_phaseA (CID0 := CID0) gs jp gl gu gd gk pd pav pu bn g gfs
               gi cn gtl ga gf cov logstart bmapstart inodestart nib size dev
-              used plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
+              plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
               m K true true ∅
               (m !!! Regidx csp_rs1) (m !!! Regidx Rra) (m !!! Regidx Rs0)
               (m !!! Regidx Rs1) (m !!! Regidx Rs2)
@@ -539,14 +456,13 @@ Section KexecMain.
               with "Hcg Hcnt Htext Hpc Hfab Hka Hbm Hins Hbits Hpriv
                     Hpath Hargv Hargs Hbs Hirs Hcont []").
     iIntros (CIDa) "%Hsa".
-    iIntros (M90 kf qf sf inumf dnf bmf gilf gislf gyf n2 used2)
-            "%Hregs90 %Hn2u Hpc Hcg Hcnt Hslk Hslked Hdep Hidev Hiinum
+    iIntros (M90 kf qf sf inumf dnf bmf gilf gislf gyf n2)
+            "%Hregs90 %Hn2 Hpc Hcg Hcnt Hslk Hslked Hdep Hidev Hiinum
              Hival Hloaded Hity Hfrz Hiref Hru Hlog Hirs Hbm Hins Hbits Hbs #Hka2
              Hpriv
              Hpath Hargv Hargs Hframe Hcont".
     destruct Hregs90 as (HM90sp & HM90s0 & HM90s1 & HM90s2 & HM90s4 & Hkf &
                          Hinumf & HM90thr).
-    destruct Hn2u as [Hn2 Hu2].
     (* the nine resources phase B threads whole and never looks inside *)
     iAssert (kxc_open gfs gi cn cov logstart dev pidv kf qf sf gyf inumf dnf
                       bmf gilf gislf)
@@ -568,14 +484,14 @@ Section KexecMain.
     (* ---- PHASE B1: +0x090 .. +0x0cc, plus the +0x31c tail ---- *)
     iApply (PB.kxc_b1 (CID0 := CIDa) gs jp gl gu gd gk pd pav pu bn g gfs gi cn
               gtl ga gf cov logstart bmapstart inodestart nib size dev
-              used used2 kf qf sf gyf inumf dnf bmf gilf gislf n2
+              kf qf sf gyf inumf dnf bmf gilf gislf n2
               plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
               m M90 K true true ∅
               (m !!! Regidx csp_rs1) (m !!! Regidx Rra) (m !!! Regidx Rs0)
               (m !!! Regidx Rs1) (m !!! Regidx Rs2)
               (m !!! Regidx Ra0) (m !!! Regidx Ra1)
               HK Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs eq_refl
-              Hu2 Hkf Hinumf Hn2 eq_refl eq_refl eq_refl eq_refl eq_refl
+              Hkf Hinumf Hn2 eq_refl eq_refl eq_refl eq_refl eq_refl
               HM90sp HM90s0 HM90s1 HM90s2 HM90s4 HM90thr
               with "Htext Hfab Hpc Hcg Hcnt Hopen Hlog Hirs Hbm Hins
                     Hbits Hbs Hka2 Hpriv Hpath Hargv Hargs Hframe Hcont [] []").
@@ -583,18 +499,18 @@ Section KexecMain.
       iIntros (CIDz) "%Hsz1". iIntros (Mz efz Pz w67z) "Hst1a2 Hcont".
       iApply (PB3.kxc_b2z (CID0 := CIDz) gs jp gl gu gd gk pd pav pu bn g gfs
                 gi cn gtl gilf gislf ga gf cov logstart bmapstart inodestart
-                nib size dev used used2 kf qf sf gyf inumf dnf bmf n2
+                nib size dev kf qf sf gyf inumf dnf bmf n2
                 plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
                 m Mz K (m !!! Regidx csp_rs1) (m !!! Regidx Rra)
                 (m !!! Regidx Rs0) (m !!! Regidx Rs1) (m !!! Regidx Rs2)
                 (m !!! Regidx Ra0) (m !!! Regidx Ra1) w67z efz Pz
                 HK Hkf Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs
                 with "Htext Hfab Hst1a2 [Hcont]").
-      iIntros (CIDy) "%Hsy". iIntros (My used3) "Hst1ae".
+      iIntros (CIDy) "%Hsy". iIntros (My) "Hst1ae".
       iDestruct (wp_next_retarget CIDz CIDy true (proc_addr jp) _
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (kxc_cd (CID0 := CIDy) jp bn gfs ga gf cov logstart bmapstart
-                inodestart size used used3 plen pfun na avf alen aslen afun
+                inodestart size plen pfun na avf alen aslen afun
                 pidv V dqb dqs dqa dqpv dqas m My K
                 (m !!! Regidx csp_rs1) (m !!! Regidx Rra) (m !!! Regidx Rs0)
                 (m !!! Regidx Rs1) (m !!! Regidx Rs2)
@@ -611,7 +527,7 @@ Section KexecMain.
       iIntros (CIDl) "%Hsl". iIntros (Ml efl Pl) "Hst12c Hcont".
       iApply (PB3.kxc_b2 (CID0 := CIDl) gs jp gl gu gd gk pd pav pu bn g gfs
                 gi cn gtl gilf gislf ga gf cov logstart bmapstart inodestart
-                nib size dev used used2 kf qf sf gyf inumf dnf bmf n2
+                nib size dev kf qf sf gyf inumf dnf bmf n2
                 plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
                 m Ml K (m !!! Regidx csp_rs1) (m !!! Regidx Rra)
                 (m !!! Regidx Rs0) (m !!! Regidx Rs1) (m !!! Regidx Rs2)
@@ -621,9 +537,9 @@ Section KexecMain.
                 HK Hkf Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs Hdev
                 eq_refl eq_refl eq_refl eq_refl eq_refl
                 with "Htext Hfab Hst12c Hcont []").
-      iIntros (CIDy) "%Hsy". iIntros (My used3 Py szvy) "Hst1ae Hcont".
+      iIntros (CIDy) "%Hsy". iIntros (My Py szvy) "Hst1ae Hcont".
       iApply (kxc_cd (CID0 := CIDy) jp bn gfs ga gf cov logstart bmapstart
-                inodestart size used used3 plen pfun na avf alen aslen afun
+                inodestart size plen pfun na avf alen aslen afun
                 pidv V dqb dqs dqa dqpv dqas m My K
                 (m !!! Regidx csp_rs1) (m !!! Regidx Rra) (m !!! Regidx Rs0)
                 (m !!! Regidx Rs1) (m !!! Regidx Rs2)

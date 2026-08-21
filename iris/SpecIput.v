@@ -31,8 +31,8 @@
    ledger unit that makes iget/iput a matched pair against the fixed
    IREFSLOTS supply.  On the last close of an unlinked inode it also
    TRUNCATES -- which is why the whole log/bitmap/inode-region environment
-   is here, why the [bitmap_res] comes back at a SMALLER [used'] (the
-   truncate arm freed blocks; the two close arms did not), and why the
+   is here (the bitmap itself is the persistent [BitmapInv.bitmap_inv]:
+   the truncate arm frees into it and says nothing), and why the
    budget clause is a spend-at-most interval: [log_op] moves only through
    [LogInv.log_spend_step] against the ledger authority inside log.lock,
    and iput never takes that lock, so it cannot hand a surplus back.
@@ -141,7 +141,6 @@ Definition wp_iput_sconf_body
     (gil gisl : gname)                                (* ip->lock            *)
     (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
-    (used : gset Z)
     (k : nat) (q : Qp) (inum : mword 32)
     (n : nat)
     (pidv : mword 32) (dq dqb dqs : dfrac)
@@ -244,7 +243,7 @@ Definition wp_iput_sconf_body
   (* ---- itrunc / iupdate's own resources ---- *)
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-  bitmap_res gfs bmapstart cov logstart size used -∗
+  bitmap_inv gfs bmapstart cov logstart size -∗
   (* the caller's own pid cell (acquiresleep records it) *)
   proc_priv_bare pj pidv Vpr -∗
   (* the running-thread bundle *)
@@ -260,7 +259,7 @@ Definition wp_iput_sconf_body
   (* THE CROSSING IS THE LITERAL [true]: iput sleeps (ilock/itrunc/begin_op),
      so it can return on another hart whatever SIE was doing. *)
   wp_next true pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (n' : nat) (used' : gset Z),
+  ∀ (mf : regfile) (n' : nat),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
@@ -274,12 +273,6 @@ Definition wp_iput_sconf_body
       proc_priv_bare pj pidv Vpr -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-      (* THE BITMAP IS TWO-ARMED (the C2 finding, predicted for exactly
-         this contract): the truncate arm returns [used minus bm_blocks bm]
-         at the ESCROW's existential [bm], the close arms return [used]
-         untouched.  An unconditional record would be unprovable. *)
-      ⌜used' ⊆ used⌝ -∗
-      bitmap_res gfs bmapstart cov logstart size used' -∗
       bslots bn 3 -∗
       (* at most [iput_units] gone, and none gained *)
       ⌜((n - iput_units)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
@@ -303,7 +296,7 @@ Definition wp_iput_sconf_body
 (*  WHAT [freed] TURNED OUT TO BE.  GR-2a left open whether iput's post    *)
 (*  must expose the [freed] boolean of [CreateBudget.ip_spend crb cru      *)
 (*  freed], either existentially or by two-arming the budget clause the    *)
-(*  way [used' ⊆ used] is two-armed.  IT MUST DO NEITHER, and the reason   *)
+(*  a bitmap set used to be two-armed.  IT MUST DO NEITHER, and the reason *)
 (*  is that an existential [freed] is VACUOUS: [ip_spend _ _ false = 0 <=  *)
 (*  ip_spend _ _ true], so [∃ freed, n - ip_spend crb cru freed <= n']     *)
 (*  is satisfied by [freed := true] whatever happened, i.e. it says        *)
@@ -365,7 +358,6 @@ Definition wp_iput_gen_body
     (gil gisl : gname)
     (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
-    (used : gset Z)
     (k : nat) (q : Qp) (inum : mword 32)
     (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
     (pidv : mword 32) (dq dqb dqs : dfrac)
@@ -433,7 +425,7 @@ Definition wp_iput_gen_body
   inode_refp k q dev inum -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-  bitmap_res gfs bmapstart cov logstart size used -∗
+  bitmap_inv gfs bmapstart cov logstart size -∗
   proc_priv_bare pj pidv Vpr -∗
   procs_inv gs -∗
   dev_inv gu gd -∗
@@ -459,7 +451,7 @@ Definition wp_iput_gen_body
      op's birth epoch, the one the credit above is ordered against. *)
   log_opSe g n Sb e0 -∗
   wp_next true pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (n' : nat) (used' : gset Z) (Sb' : gset Z) (w : bool),
+  ∀ (mf : regfile) (n' : nat) (Sb' : gset Z) (w : bool),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
@@ -469,8 +461,6 @@ Definition wp_iput_gen_body
       proc_priv_bare pj pidv Vpr -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-      ⌜used' ⊆ used⌝ -∗
-      bitmap_res gfs bmapstart cov logstart size used' -∗
       bslots bn 3 -∗
       (* the set only GROWS, and at most the credited worst case is gone *)
       ⌜Sb ⊆ Sb'⌝ -∗
@@ -501,14 +491,13 @@ Module Type IPUT.
       (cn : ic_names) (gtl : gname) (gil gisl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
-      (used : gset Z)
       (k : nat) (q : Qp) (inum : mword 32)
       (n : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_iput_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
-                          cov logstart bmapstart inodestart nib size dev used
+                          cov logstart bmapstart inodestart nib size dev
                           k q inum n pidv dq dqb dqs m K eb b lks Vpr.
   (* the credited set-form contract; [wp_iput_sconf] is this at
      [crb := cru := crz := false], derived at the [log_op] existential's own
@@ -525,13 +514,12 @@ Module Type IPUT.
       (cn : ic_names) (gtl : gname) (gil gisl : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
-      (used : gset Z)
       (k : nat) (q : Qp) (inum : mword 32)
       (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate) (rg : bool),
       wp_iput_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
-                       cov logstart bmapstart inodestart nib size dev used
+                       cov logstart bmapstart inodestart nib size dev
                        k q inum n Sb crb cru crz e0 pidv dq dqb dqs m K eb b lks Vpr rg.
 End IPUT.

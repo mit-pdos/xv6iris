@@ -47,16 +47,17 @@
    nothing below the [assert] mentions the arms again.
 
    WHAT THE INVARIANT TURNED OUT TO BE.  Three things are loop-carried
-   ([i], the page-table descriptor, the bitmap's marked set) and almost
+   ([i] and the page-table descriptor -- the bitmap's marked set is NOT,
+   since the bitmap now lives in a persistent invariant) and almost
    nothing else is.  The inode is PARKED in the escrow at the head of every
    iteration, so no [dinode], no [blkmap] and no [data] appears in the
    invariant; ilock mints them inside the iteration and iunlock parks them
    again.  [f->off] is likewise RESIDENT in [off_inv] at the head, borrowed
    and returned within one iteration.  The environment splits cleanly:
-   fourteen PERSISTENT invariants plus the ten pure fields, threaded free,
-   and an exclusive half that is exactly [filewrite_fs_out fn Cf SI], i.e.
-   the six resources the contract itself returns.  That is why the exit
-   needs no re-assembly.
+   fifteen PERSISTENT invariants (the bitmap's among them) plus the ten
+   pure fields, threaded free, and an exclusive half that is exactly
+   [filewrite_fs_out fn], i.e. the four resources the contract itself
+   returns.  That is why the exit needs no re-assembly.
 
    THE CROSSING CONVENTION (S3t).  [SpecFilewrite]'s and
    [SpecConsolewrite]'s crossings are the literal [true], not [b]: every
@@ -118,7 +119,7 @@
      - every writei RESOURCE other than the pid pair is in hand:
        [i_dev]/[i_inum] at [1/2] and [inode_meta]/[inode_map]/
        [inode_blocks]/[dinode_at] come out of ilock's [ic_loaded]
-       ([dn0 := dn]), the three superblock cells + [bitmap_res] +
+       ([dn0 := dn]), the three superblock cells + [bitmap_inv] +
        [ireg_inv] + [bslots _ 3] out of the environment, and
        [log_op γ MAXOPBLOCKS] out of begin_op;
      - THE RE-PARK CLOSES.  [fw_inode_ok_rebuild] below assembles
@@ -981,9 +982,9 @@ Section ProofFilewrite.
   Local Ltac regne := reg_ne_side.
 
   (* ---- the type-indexed environment, opened at the type the code read.
-     fileread's [fr_env_*] block, one arm at a time; the [used'] parameter is
-     the only difference, and on the device arm it is the set nothing
-     touched. ---------------------------------------------------------- *)
+     fileread's [fr_env_*] block, one arm at a time.  Nothing about the
+     bitmap crosses either way: it is a persistent invariant.
+     ------------------------------------------------------------------ *)
   Local Lemma fw_env_dev (γf' : gname)
       (fn' : fwrite_names) (Cf' : fcontent) :
     fc_type Cf' = FD_DEVICE ->
@@ -995,10 +996,9 @@ Section ProofFilewrite.
     by iIntros "$".
   Qed.
 
-  Local Lemma fw_env_out_dev (fn' : fwrite_names) (Cf' : fcontent)
-      (used' : gset Z) :
+  Local Lemma fw_env_out_dev (fn' : fwrite_names) (Cf' : fcontent) :
     fc_type Cf' = FD_DEVICE ->
-    filewrite_dev_env fn' Cf' -∗ filewrite_env_out fn' Cf' used'.
+    filewrite_dev_env fn' Cf' -∗ filewrite_env_out fn' Cf'.
   Proof.
     intro Ht. rewrite /filewrite_env_out /filewrite_dev_out Ht.
     rewrite bool_decide_eq_false_2; [| by vm_compute].
@@ -1040,8 +1040,7 @@ Section ProofFilewrite.
 
   (* ---- the FD_INODE arm's environment, opened and closed --------------
      [fw_env_fs] is [fw_env_dev]'s twin at the third arm; [fw_env_out_fs]
-     is the exit, and it is stated at an ARBITRARY [used'] because the
-     bitmap only grows.  Neither does anything but reduce three
+     is the exit.  Neither does anything but reduce three
      [bool_decide]s, and they exist so that no [vm_compute] on an
      [fcontent] runs at a call site. ------------------------------------ *)
   Local Lemma fw_env_fs (gf' : gname)
@@ -1056,10 +1055,9 @@ Section ProofFilewrite.
     by iIntros "$".
   Qed.
 
-  Local Lemma fw_env_out_fs (fn' : fwrite_names) (Cf' : fcontent)
-      (used' : gset Z) :
+  Local Lemma fw_env_out_fs (fn' : fwrite_names) (Cf' : fcontent) :
     fc_type Cf' = FD_INODE ->
-    filewrite_fs_out fn' used' -∗ filewrite_env_out fn' Cf' used'.
+    filewrite_fs_out fn' -∗ filewrite_env_out fn' Cf'.
   Proof.
     intro Ht. rewrite /filewrite_env_out Ht.
     rewrite bool_decide_eq_false_2; [| by vm_compute].
@@ -1420,8 +1418,9 @@ Section ProofFilewrite.
   (*  count would need [fw_chunk_cap]'s division and buys nothing.       *)
   (*                                                                     *)
   (*  WHAT IS LOOP-CARRIED, and it is remarkably little: the counter     *)
-  (*  [iz], the page-table descriptor [PI] (which writei's user arm      *)
-  (*  advances), and the bitmap's marked set [SI] (which balloc grows).  *)
+  (*  [iz] and the page-table descriptor [PI] (which writei's user arm   *)
+  (*  advances).  THE BITMAP IS NOT CARRIED: [BitmapInv.bitmap_inv] is   *)
+  (*  persistent, so balloc's marking is invisible to this loop.         *)
   (*  THE INODE IS NOT: at the head of every iteration it is PARKED in   *)
   (*  the escrow, so its record, block map and data are inside           *)
   (*  [ic_escrow] and ilock mints fresh ones -- which is why the         *)
@@ -1430,12 +1429,12 @@ Section ProofFilewrite.
   (*  returned inside a single iteration, so it too is absent here.      *)
   (*                                                                     *)
   (*  WHAT IS THREADED but not carried: the whole persistent half of     *)
-  (*  [filewrite_fs_env] (fourteen invariants and contexts) is passed as *)
-  (*  separate arguments rather than as the packed environment, because  *)
-  (*  the packed form is indexed by [fwn_used fn] and the loop's bitmap  *)
-  (*  set moves.  The EXCLUSIVE half is exactly [filewrite_fs_out fn Cf  *)
-  (*  SI] -- the same six resources the contract returns -- which is why *)
-  (*  the exit needs no re-assembly beyond [fw_env_out_fs].              *)
+  (*  [filewrite_fs_env] (fifteen invariants and contexts) is passed as *)
+  (*  separate arguments rather than as the packed environment, since    *)
+  (*  the induction has to name them one at a time anyway.  The          *)
+  (*  EXCLUSIVE half is exactly [filewrite_fs_out fn] -- the same four   *)
+  (*  resources the contract returns -- which is why the exit needs no   *)
+  (*  re-assembly beyond [fw_env_out_fs].                                *)
   (* =================================================================== *)
   Local Lemma fw_loop `{CID0 : CpuId}
       (ga gf : gname) (gs : list gname) (jx : nat) (glp : gname)
@@ -1474,7 +1473,7 @@ Section ProofFilewrite.
       (fwn_bmapstart fn) (fwn_size fn) ->
     SpecPrintk.printk_gen_contract (kt := KT1) (fwn_pr fn) (fwn_uart fn) (fwn_disk fn) ->
     (* ---- THE FUEL, and everything the loop carries under it ---- *)
-    forall (W : nat) (iz : Z) (PI : uptd) (SI : gset Z) (M : regfile),
+    forall (W : nat) (iz : Z) (PI : uptd) (M : regfile),
     (n - iz <= Z.of_nat W)%Z ->
     (0 <= iz < n)%Z ->
     uptd_ext (pv_upt V) PI ->
@@ -1538,13 +1537,17 @@ Section ProofFilewrite.
     DiskInv.disk_geom (fwn_disk fn) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn) -∗
     is_lock (fwn_dlock fn) DiskInv.d_lock "virtio_disk"%string
       (DiskInv.disk_res (fwn_disk fn) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn)) -∗
-    (* ---- the EXCLUSIVE half, at the set the loop has reached ---- *)
-    filewrite_fs_out fn SI -∗
+    (* THE BITMAP'S INVARIANT -- persistent, so it rides with the rest of
+       the persistent half rather than being loop-carried. *)
+    BitmapInv.bitmap_inv (fwn_fs fn) (fwn_bmapstart fn) (fwn_cov fn)
+      (fwn_logstart fn) (fwn_size fn) -∗
+    (* ---- the EXCLUSIVE half ---- *)
+    filewrite_fs_out fn -∗
     (* ---- and the contract's own continuation ---- *)
     (* [true], verbatim from [SpecFilewrite]: this IS the contract's crossing,
        forwarded, so the two must be spelled the same or [iExact] fails. *)
     wp_next true pj (fun (CID : CpuId) =>
-      ∀ (mf : regfile) (r : mword 64) (P' : uptd) (used' : gset Z),
+      ∀ (mf : regfile) (r : mword 64) (P' : uptd),
         ⌜callee_saved m mf⌝ -∗
         ⌜uptd_ext (pv_upt V) P'⌝ -∗
         ⌜filewrite_ret n r⌝ -∗
@@ -1554,7 +1557,7 @@ Section ProofFilewrite.
         InstrBytes.pc_is (ret_pc (m !!! Regidx Rra)) -∗
         file_ref gf kx qx Cf -∗
         proc_priv_core pj pidv (upd_upt V P') -∗
-        filewrite_env_out fn Cf used' -∗
+        filewrite_env_out fn Cf -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1567,7 +1570,7 @@ Section ProofFilewrite.
     subst pj.
     intro W. revert CID0.
     induction W as [| W IH];
-      intros CID0 iz PI SI M Hfuel Hiz Hext
+      intros CID0 iz PI M Hfuel Hiz Hext
              HMsp HMs2 HMs4 HMs5 HMs6 HMs7 HMs8 HMs9 HMthr Hbelow.
     { (* NO FUEL.  The loop is entered only at [i < n], so [n - i] is at
          least one and the zero case is vacuous. *)
@@ -1576,7 +1579,7 @@ Section ProofFilewrite.
              Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12
              Href Hpriv #Hkenv
              #Hbio #Hlog #Hcrash #Hgc #Hkd #Hpk #Hit #Hescs #Hireg
-             #Hslks #Hdev #Hgeo #Hdlk Hout Hcont".
+             #Hslks #Hdev #Hgeo #Hdlk #Hbm Hout Hcont".
     iPoseProof (SpecPrintk.printk_env_panic with "Hpk") as "#Hpenv".
     (* PIN THE INDEX.  Same one-liner as the contract's own proof below, and
        needed for the same reason: the body calls THREE [true]-crossing
@@ -1661,7 +1664,7 @@ Section ProofFilewrite.
        +0x84 .. +0xc8 -- THE LOOP BODY.  The state at entry is [B0] with
        s3 = c (the chunk), s4 = i, s5 = n, s2 = f, s6 = addr, s7 = s9 =
        FW_MAX, s8 = 1, sp pushed; the twelve frame slots; the persistent
-       half of the environment; [filewrite_fs_out fn Cf SI]; and the
+       half of the environment; [filewrite_fs_out fn]; and the
        contract's continuation.
 
        WHAT TRAVELS AND WHAT DOES NOT.  Only [is_cs_idx] registers are
@@ -1712,7 +1715,7 @@ Section ProofFilewrite.
     assert (Hclt31 : (0 <= c < 2 ^ 31)%Z) by (apply fw_chunk_lt31; lia).
     assert (Hizlt31 : (0 <= iz < 2 ^ 31)%Z) by (apply (fw_i_lt31 n iz); lia).
     (* ---- the iteration's own resources ---- *)
-    iDestruct "Hout" as "(%Hsub & Hsbi & Hsbsz & Hsbb & Hbmres & Hbsl)".
+    iDestruct "Hout" as "(Hsbi & Hsbsz & Hsbb & Hbsl)".
     iDestruct "Href" as "(Hrtok & Hrfields & Hrpay & Hrlv)".
     iEval (rewrite /file_fields) in "Hrfields".
     iDestruct "Hrfields" as "(Hcty & Hcrd & Hcwr & Hcpp & Hcip & Hcmaj)".
@@ -2063,7 +2066,7 @@ Section ProofFilewrite.
               (fwn_bio fn) (fwn_log fn) (fwn_fs fn) (fwn_ireg fn) ga gf
               (fwn_cov fn) (fwn_logstart fn) (fwn_inodestart fn) icfg_nib
               (fwn_bmapstart fn) (fwn_size fn) icfg_dev
-              SI (fwn_pr fn)
+              (fwn_pr fn)
               (ientry ik) inum
               bml datal dnl dnl
               true (Z.to_nat (bv_unsigned v)) (Z.to_nat c)
@@ -2090,7 +2093,7 @@ Section ProofFilewrite.
               ltac:(rewrite HQ6a1; vm_compute; reflexivity)
               HQ6a3 HQ6a4
               with "Hcg Hcnt [] [] Htext Hpc Hkd Hpk Hbio Hlog Hkenv
-                    Hidev Hinum Hmeta Hmap Hblocks Hsbi Hsbsz Hsbb Hbmres
+                    Hidev Hinum Hmeta Hmap Hblocks Hsbi Hsbsz Hsbb Hbm
                     Hireg Hdnat [Hpriv] Hprocs Hdev Hgeo Hdlk Hbsl Hlogop").
     all: try lkbelow.
     { rewrite Heb /trap_csrs_ext. done. }
@@ -2104,10 +2107,10 @@ Section ProofFilewrite.
        AS WRITTEN is what the walk holds -- it is what stops compiling if
        SpecWritei's bracket changes shape again. *)
     { iExact "Hpriv". }
-    iIntros (CIDwi Hswi mwi tot bm' data' dn' dn0' n' wrote dist dstb P' used')
-      "%Hcswi %Hsub2 %Hbmwf2 %Hholes2 %Hdaddr2 %Hsz2 %Hbmcov2 %Hcap2 %Hsized2
+    iIntros (CIDwi Hswi mwi tot bm' data' dn' dn0' n' wrote dist dstb P')
+      "%Hcswi %Hbmwf2 %Hholes2 %Hdaddr2 %Hsz2 %Hbmcov2 %Hcap2 %Hsized2
        %Hdist %Hdistn %Hdistk %Hrange %Hkbytes %Harms %Hbud %Hupt
-       Hcg Hcnt _ _ Hpc Hidev Hinum Hmeta Hmap Hblocks Hsbi Hsbsz Hsbb Hbmres
+       Hcg Hcnt _ _ Hpc Hidev Hinum Hmeta Hmap Hblocks Hsbi Hsbsz Hsbb
        Hdnat Hpriv Hbsl Hlogop".
     assert (Hpca4 : ret_pc (Q6 !!! Regidx Rra) = mword_of_int (FW + 0xac)).
     { rewrite HQ6ra. apply bv_eq; vm_compute; reflexivity. }
@@ -2393,11 +2396,10 @@ Section ProofFilewrite.
     { rewrite /file_ref /file_fields.
       iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
     (* THE EXCLUSIVE HALF, back at the set the chunk reached *)
-    iAssert (filewrite_fs_out fn used')
-      with "[Hsbi Hsbsz Hsbb Hbmres Hbsl]" as "Hout".
+    iAssert (filewrite_fs_out fn)
+      with "[Hsbi Hsbsz Hsbb Hbsl]" as "Hout".
     { rewrite /filewrite_fs_out.
-      iSplitR; [iPureIntro; exact (transitivity Hsub Hsub2) |].
-      iFrame "Hsbi Hsbsz Hsbb Hbmres Hbsl". }
+      iFrame "Hsbi Hsbsz Hsbb Hbsl". }
     (* the page-table descriptor, re-based on the contract's own [V] *)
     iEval (rewrite (fw_upd_upt_upd V PI P')) in "Hpriv".
     assert (Hupt2 : uptd_ext (pv_upt V) P').
@@ -2501,13 +2503,13 @@ Section ProofFilewrite.
         iDestruct (cpu_own_transport CIDeo CIDe 0%nat eb (proc_addr jx) b
                      ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
         iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
-        iApply ("Hcont" $! mfin rv P' used'
+        iApply ("Hcont" $! mfin rv P'
                   with "[%] [%] [%] [%] Hcg Hcnt Hpc Href Hpriv [Hout]").
         { exact Hcsf. }
         { exact Hupt2. }
         { exact (fw_ret_of_tail n n (iz + c)%Z rv (proj1 Hn) eq_refl Hdisj). }
         { exact Hrv. }
-        { iApply (fw_env_out_fs fn Cf used' Htyi). iExact "Hout". }
+        { iApply (fw_env_out_fs fn Cf Htyi). iExact "Hout". }
       + (* ---- NOT EXHAUSTED: the FALL is the back edge to +0xcc ---- *)
         assert (Hlt : (iz + c < n)%Z).
         { destruct (Z.le_gt_cases n (iz + c)) as [Hle | Hgt]; [| lia].
@@ -2524,7 +2526,7 @@ Section ProofFilewrite.
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Htgtcc2) in "Hpc".
         (* THE BACK EDGE.  [IH] at the fuel [fw_i_advance] decreases and at
-           the three carried components: [iz + c], [P'], [used']. *)
+           the two carried components: [iz + c] and [P']. *)
         iDestruct (cpu_own_transport CIDeo CIDc3 0%nat eb (proc_addr jx) b
                      ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
         (* [wp_next] IS HART-INDEXED TOO, and the back edge re-anchors the
@@ -2535,7 +2537,7 @@ Section ProofFilewrite.
            still refuses. *)
         iDestruct (wp_next_retarget CID0 CIDc3 true (proc_addr jx) _
                      ltac:(wp_next_chain) with "Hcont") as "Hcont".
-        iApply (IH CIDc3 (iz + c)%Z P' used' Y1
+        iApply (IH CIDc3 (iz + c)%Z P' Y1
                   ltac:(lia) ltac:(lia) Hupt2
                   HY1sp
                   ltac:(rewrite (HY1cs Rs2 ltac:(vm_compute; reflexivity)
@@ -2562,7 +2564,7 @@ Section ProofFilewrite.
                         Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12
                         Href Hpriv Hkenv
                         Hbio Hlog Hcrash Hgc Hkd Hpk Hit Hescs Hireg
-                        Hslks Hdev Hgeo Hdlk Hout Hcont").
+                        Hslks Hdev Hgeo Hdlk Hbm Hout Hcont").
     - (* ====== THE SHORT WRITE (and writei's -1): straight to +0xe2 ======
          Before 31f115a this arm ran its own five restores at +0xea first;
          gcc now sends both loop exits into the tail, which owns them. *)
@@ -2597,13 +2599,13 @@ Section ProofFilewrite.
       iDestruct (cpu_own_transport CIDeo CIDe 0%nat eb (proc_addr jx) b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
       iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
-      iApply ("Hcont" $! mfin rv P' used'
+      iApply ("Hcont" $! mfin rv P'
                 with "[%] [%] [%] [%] Hcg Hcnt Hpc Href Hpriv [Hout]").
       { exact Hcsf. }
       { exact Hupt2. }
       { exact (fw_ret_of_tail n n iz rv (proj1 Hn) eq_refl Hdisj). }
       { exact Hrv. }
-      { iApply (fw_env_out_fs fn Cf used' Htyi). iExact "Hout". }
+      { iApply (fw_env_out_fs fn Cf Htyi). iExact "Hout". }
   Qed.
 
   Lemma wp_filewrite_sconf
@@ -2720,7 +2722,7 @@ Section ProofFilewrite.
                    with "Hcnt") as "Hcnt".
       iSpecialize ("Hcont" $! CID4 with "[]"); [iPureIntro; wp_next_chain|].
       assert (HVid : upd_upt V (pv_upt V) = V) by apply fw_upd_upt_id.
-      iApply ("Hcont" $! A1 (mword_of_int (-1)) (pv_upt V) (fwn_used fn)
+      iApply ("Hcont" $! A1 (mword_of_int (-1)) (pv_upt V)
                 with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
                       [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                       [Hpriv] [Henv]").
@@ -2940,7 +2942,7 @@ Section ProofFilewrite.
                      ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
         iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
         assert (HVid : upd_upt V (pv_upt V) = V) by apply fw_upd_upt_id.
-        iApply ("Hcont" $! mfin (mword_of_int (-1)) (pv_upt V) (fwn_used fn)
+        iApply ("Hcont" $! mfin (mword_of_int (-1)) (pv_upt V)
                   with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
                         [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                         [Hpriv] [Henv]").
@@ -3152,7 +3154,7 @@ Section ProofFilewrite.
         iDestruct (cpu_own_transport CIDpw CIDe 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                      with "Hcnt") as "Hcnt".
         iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
-        iApply ("Hcont" $! mfin (mf !!! Regidx Ra0) P' (fwn_used fn)
+        iApply ("Hcont" $! mfin (mf !!! Regidx Ra0) P'
                   with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
                         [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hpn Hpref Hiru Hoh Hrlv]
                         Hpriv [Henv]").
@@ -3439,7 +3441,7 @@ Section ProofFilewrite.
                              with "Hcnt") as "Hcnt".
                 iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
                 assert (HVid : upd_upt V (pv_upt V) = V) by apply fw_upd_upt_id.
-                iApply ("Hcont" $! mfin (mword_of_int (-1)) (pv_upt V) (fwn_used fn)
+                iApply ("Hcont" $! mfin (mword_of_int (-1)) (pv_upt V)
                           with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
                                 [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                                 [Hpriv] [Hslot]").
@@ -3451,7 +3453,7 @@ Section ProofFilewrite.
                 { rewrite /file_ref /file_fields.
                   iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
                 { rewrite HVid. iExact "Hpriv". }
-                { iApply (fw_env_out_dev fn Cf (fwn_used fn) Htyd).
+                { iApply (fw_env_out_dev fn Cf Htyd).
                   iApply (fw_dev_in_back fn Cf Hin with "[%] Hslot Hdevinv Htxlk").
                   by left. }
              ** (* ---- consolewrite: the INDIRECT CALL at +0x7e ---- *)
@@ -3578,7 +3580,7 @@ Section ProofFilewrite.
                 iDestruct (cpu_own_transport CIDcw CIDe 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                              with "Hcnt") as "Hcnt".
                 iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
-                iApply ("Hcont" $! mfin (mword_of_int r) P' (fwn_used fn)
+                iApply ("Hcont" $! mfin (mword_of_int r) P'
                           with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
                                 [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                                 Hpriv [Hslot]").
@@ -3590,7 +3592,7 @@ Section ProofFilewrite.
                 { iEval (rewrite /ret_tgt). iExact "Hpc". }
                 { rewrite /file_ref /file_fields.
                   iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
-                { iApply (fw_env_out_dev fn Cf (fwn_used fn) Htyd).
+                { iApply (fw_env_out_dev fn Cf Htyd).
                   iApply (fw_dev_in_back fn Cf Hin with "[%] Hslot Hdevinv Htxlk").
                   by right. }
           ++ (* ---------- OUT OF RANGE: the [bltu] is taken to +0x126 ------- *)
@@ -3641,7 +3643,7 @@ Section ProofFilewrite.
                           with "Hcnt") as "Hcnt".
              iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
              assert (HVid : upd_upt V (pv_upt V) = V) by apply fw_upd_upt_id.
-             iApply ("Hcont" $! mfin (mword_of_int (-1)) (pv_upt V) (fwn_used fn)
+             iApply ("Hcont" $! mfin (mword_of_int (-1)) (pv_upt V)
                        with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
                              [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                              [Hpriv] [Henv]").
@@ -3653,7 +3655,7 @@ Section ProofFilewrite.
              { rewrite /file_ref /file_fields.
                iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
              { rewrite HVid. iExact "Hpriv". }
-             { by iApply (fw_env_out_dev fn Cf (fwn_used fn) Htyd). }
+             { by iApply (fw_env_out_dev fn Cf Htyd). }
         * (* ---- +0x2a c.li a4,2 ; +0x2c bne a5,a4 -> +0x10a (panic) ---- *)
           iApply (wp_beq_fall_s_sconf (mword_of_int (FW + 0x2e))
                     (mword_of_int 54 : mword 13) Ra4 Ra5 G6 (K - 12)%nat b
@@ -3823,7 +3825,7 @@ Section ProofFilewrite.
                               ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
                  iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
                  assert (HVid : upd_upt V (pv_upt V) = V) by apply fw_upd_upt_id.
-                 iApply ("Hcont" $! mfin (mword_of_int n) (pv_upt V) (fwn_used fn)
+                 iApply ("Hcont" $! mfin (mword_of_int n) (pv_upt V)
                            with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
                                  [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                                  [Hpriv] [Henv]").
@@ -4200,7 +4202,7 @@ Section ProofFilewrite.
                     environment (the cinv is minted per publication, so no
                     fixed persistent family can exist); the names below keep
                     their meanings and the seventh slot is simply gone. *)
-                 iDestruct "Henv" as "(%E1 & %E2 & %E3 & %E4 & %E5 & %E6 & #E8 & #E9 & #E10 & #E11 & #E12 & #E13 & #E14 & #E15 & #E16 & #E17 & E18 & E19 & E20 & E21 & #E22 & #E23 & #E24 & E25)".
+                 iDestruct "Henv" as "(%E1 & %E2 & %E3 & %E4 & %E5 & %E6 & #E8 & #E9 & #E10 & #E11 & #E12 & #E13 & #E14 & #E15 & #E16 & #E17 & E18 & E19 & E20 & #E21 & #E22 & #E23 & #E24 & E25)".
                  (* the loop still takes the ONE slot's off-borrow invariant;
                     the environment now carries the family, so it is selected
                     here rather than by the caller. *)
@@ -4215,7 +4217,7 @@ Section ProofFilewrite.
                            HK Hk Hj Hgs Hlens Hfnj Hfnps Hn01 Heb Htyi Hwb Hspm
                            ltac:(reflexivity)
                            E1 E2 E3 E4 E5 E6
-                           (Z.to_nat n) 0%Z (pv_upt V) (fwn_used fn) L7
+                           (Z.to_nat n) 0%Z (pv_upt V) L7
                            ltac:(rewrite (Z2Nat.id n Hn0); lia)
                            ltac:(lia)
                            ltac:(apply uptd_ext_refl)
@@ -4228,17 +4230,16 @@ Section ProofFilewrite.
                                  [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                                  [Hpriv] Hkenv
                                  E8 E9 E10 E11 E12 E13 E14 E15 E16 E17
-                                 E22 E23 E24 [E18 E19 E20 E21 E25]").
+                                 E22 E23 E24 E21 [E18 E19 E20 E25]").
                  { rewrite /file_ref /file_fields.
                    iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }
                  { rewrite HVid. iExact "Hpriv". }
                  { rewrite /filewrite_fs_out.
-                   iSplitR; [iPureIntro; reflexivity|].
-                   iFrame "E18 E19 E20 E21 E25". }
-                 iIntros (CIDx Hsx mf rv P' used')
+                   iFrame "E18 E19 E20 E25". }
+                 iIntros (CIDx Hsx mf rv P')
                    "%Hcs %Hup %Hret %Hra Hcg Hcnt Hpc Href Hpriv Henvo".
                  iSpecialize ("Hcont" $! CIDx with "[]"); [iPureIntro; wp_next_chain|].
-                 iApply ("Hcont" $! mf rv P' used'
+                 iApply ("Hcont" $! mf rv P'
                            with "[%] [%] [%] [%] Hcg Hcnt Hpc Href Hpriv Henvo").
                  { exact Hcs. }
                  { exact Hup. }

@@ -325,11 +325,10 @@ Definition namex_post
     (m : regfile) (K : nat) (b eb : bool) (lks : gset string)
     (g : log_names) (gfs : fs_names) (bn : bio_names)
     (cov : gset Z) (logstart bmapstart inodestart size : Z)
-    (used : gset Z)
     (plen : nat) (pfun : nat -> bv 8)
     (npar : bool) (n : nat) (pidv : mword 32)
     (dq dqb dqs dqpv : dfrac) (Vpr : pprivate) : iProp Σ :=
-  (∀ (mf : regfile) (n' : nat) (used' : gset Z)
+  (∀ (mf : regfile) (n' : nat)
      (ok : bool) (nf : nat -> bv 8) (ipv : mword 64),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
@@ -338,8 +337,6 @@ Definition namex_post
       (* EVERYTHING LOANED COMES BACK *)
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-      ⌜used' ⊆ used⌝ -∗
-      bitmap_res gfs bmapstart cov logstart size used' -∗
       proc_priv_bare pj pidv Vpr -∗
       inode_held (pv_cwd Vpr) -∗
       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
@@ -376,11 +373,10 @@ Definition namex_postS
     (m : regfile) (K : nat) (b eb : bool) (lks : gset string)
     (g : log_names) (gfs : fs_names) (bn : bio_names)
     (cov : gset Z) (logstart bmapstart inodestart size : Z)
-    (used : gset Z)
     (plen : nat) (pfun : nat -> bv 8)
     (npar : bool) (n : nat) (Sb : gset Z) (pidv : mword 32)
     (dq dqb dqs dqpv : dfrac) (Vpr : pprivate) : iProp Σ :=
-  (∀ (mf : regfile) (n' : nat) (used' Sb' : gset Z)
+  (∀ (mf : regfile) (n' : nat) (Sb' : gset Z)
      (ok : bool) (nf : nat -> bv 8) (ipv : mword 64) (w : bool),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
@@ -389,8 +385,6 @@ Definition namex_postS
       (* EVERYTHING LOANED COMES BACK *)
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-      ⌜used' ⊆ used⌝ -∗
-      bitmap_res gfs bmapstart cov logstart size used' -∗
       proc_priv_bare pj pidv Vpr -∗
       inode_held (pv_cwd Vpr) -∗
       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
@@ -442,7 +436,6 @@ Definition wp_namex_sconf_body
     (ga : gname) (gf : gname)                          (* kalloc, file table  *)
     (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
-    (used : gset Z)
     (plen : nat) (pfun : nat -> bv 8)                  (* the path buffer     *)
     (nfun : nat -> bv 8)                               (* the name buffer, in *)
     (npar : bool)                                      (* the a1 flag         *)
@@ -533,7 +526,7 @@ Definition wp_namex_sconf_body
   (* ---- iput's / itrunc's own resources ---- *)
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-  bitmap_res gfs bmapstart cov logstart size used -∗
+  bitmap_inv gfs bmapstart cov logstart size -∗
   (* ---- the caller's own pid cell (acquiresleep records it) ---- *)
   proc_priv_bare pj pidv Vpr -∗
   (* ---- THE WORKING DIRECTORY: cell and reference, both handed back ---- *)
@@ -568,7 +561,7 @@ Definition wp_namex_sconf_body
      comes back on the hart it called from, which a park makes false. *)
   wp_next true pj (fun (CIDc : CpuId) =>
     namex_post (CID := CIDc) pj pv nb ret_tgt pl m K b eb lks
-               g gfs bn cov logstart bmapstart inodestart size used
+               g gfs bn cov logstart bmapstart inodestart size
                plen pfun npar n pidv dq dqb dqs dqpv Vpr) -∗
   WP (Loop : expr riscv_lang).
 
@@ -602,7 +595,6 @@ Definition wp_namex_gen_body
     (ga : gname) (gf : gname)                          (* kalloc, file table  *)
     (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
-    (used : gset Z)
     (plen : nat) (pfun : nat -> bv 8)                  (* the path buffer     *)
     (nfun : nat -> bv 8)                               (* the name buffer, in *)
     (npar : bool)                                      (* the a1 flag         *)
@@ -699,7 +691,7 @@ Definition wp_namex_gen_body
   (* ---- iput's / itrunc's own resources ---- *)
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-  bitmap_res gfs bmapstart cov logstart size used -∗
+  bitmap_inv gfs bmapstart cov logstart size -∗
   (* ---- the caller's own pid cell (acquiresleep records it) ---- *)
   proc_priv_bare pj pidv Vpr -∗
   (* ---- THE WORKING DIRECTORY: cell and reference, both handed back ---- *)
@@ -734,7 +726,7 @@ Definition wp_namex_gen_body
      comes back on the hart it called from, which a park makes false. *)
   wp_next true pj (fun (CIDc : CpuId) =>
     namex_postS (CID := CIDc) pj pv nb ret_tgt pl m K b eb lks
-                g gfs bn cov logstart bmapstart inodestart size used
+                g gfs bn cov logstart bmapstart inodestart size
                 plen pfun npar n Sb pidv dq dqb dqs dqpv Vpr) -∗
   WP (Loop : expr riscv_lang).
 
@@ -751,7 +743,6 @@ Module Type NAMEX.
       (ga : gname) (gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
-      (used : gset Z)
       (plen : nat) (pfun : nat -> bv 8)
       (nfun : nat -> bv 8)
       (npar : bool)
@@ -761,7 +752,7 @@ Module Type NAMEX.
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_namex_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                           ga gf cov logstart bmapstart inodestart nib
-                          size dev used plen pfun nfun npar n
+                          size dev plen pfun nfun npar n
                           pidv dq dqb dqs dqpv m K eb b lks Vpr.
   (* the set-form contract; [wp_namex_sconf] is this at the [log_op]
      existential's own witness, with the grown set forgotten again. *)
@@ -777,7 +768,6 @@ Module Type NAMEX.
       (ga : gname) (gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
-      (used : gset Z)
       (plen : nat) (pfun : nat -> bv 8)
       (nfun : nat -> bv 8)
       (npar : bool)
@@ -787,7 +777,7 @@ Module Type NAMEX.
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_namex_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                         ga gf cov logstart bmapstart inodestart nib
-                        size dev used plen pfun nfun npar n Sb
+                        size dev plen pfun nfun npar n Sb
                         pidv dq dqb dqs dqpv m K eb b lks Vpr.
 End NAMEX.
 

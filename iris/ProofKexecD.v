@@ -738,7 +738,7 @@ Section KexecDCommit.
   Definition kxd_res
       (jp : nat) (bn : bio_names) (gfs : fs_names) (ga gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z)
-      (size : Z) (used2 : gset Z)
+      (size : Z)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
@@ -749,7 +749,7 @@ Section KexecDCommit.
     (iref_slots 2 ∗
      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) ∗
-     bitmap_res gfs bmapstart cov logstart size used2 ∗
+     bitmap_inv gfs bmapstart cov logstart size ∗
      bslots bn 3 ∗
      proc_pt P ∗
      proc_priv gf (proc_addr jp) pidv Vc ∗
@@ -861,7 +861,7 @@ Section KexecDCommit.
   Lemma kxd_commit
       (jp : nat) (bn : bio_names) (gfs : fs_names) (ga gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z)
-      (size : Z) (used2 : gset Z)
+      (size : Z)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
@@ -900,7 +900,7 @@ Section KexecDCommit.
     sie_cap_gpr KT1 M (K - 68)%nat true (proc_addr jp) -∗
     cpu_own 0 true (proc_addr jp) true ∅ -∗
     kalloc_env ga None -∗
-    kxd_res jp bn gfs ga gf cov logstart bmapstart inodestart size used2
+    kxd_res jp bn gfs ga gf cov logstart bmapstart inodestart size
             plen pfun na avf aslen afun pidv
             (upd_tf V (<[tf_arg_idx 1
                          := (mword_of_int (kxc_sp_final (uint sz1) alen c)
@@ -908,7 +908,7 @@ Section KexecDCommit.
             dqb dqs dqa dqpv dqas sp0 ra0 s00 s10 s20 pv av
             w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P c (pa_add pv q) -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-    ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
+    ∀ (mf : regfile) (V' : pprivate)
        (entry spv szv' : mword 64),
         ⌜callee_saved m mf⌝ -∗
         ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
@@ -917,8 +917,6 @@ Section KexecDCommit.
         pc_is (ret_pc ra0) -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-        ⌜used' ⊆ used2⌝ -∗
-        bitmap_res gfs bmapstart cov logstart size used' -∗
         kalloc_env ga None -∗
         proc_priv gf (proc_addr jp) pidv V' -∗
         ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
@@ -1759,7 +1757,7 @@ Section KexecDCommit.
     { rewrite uint_unsigned moi64_unsigned. unfold bv_wrap. apply Z.mod_small.
       change (bv_modulus 64) with 18446744073709551616%Z. exact Hspfin_range. }
     iSpecialize ("Hcont" $! CIDe with "[%]"); [wp_next_chain |].
-    iSpecialize ("Hcont" $! mf used2
+    iSpecialize ("Hcont" $! mf
               (upd_exec V sz1 P
                  (<[kxc_tf_sp_idx
                     := (mword_of_int (kxc_sp_final (uint sz1) alen c) : mword 64)]>
@@ -1770,7 +1768,7 @@ Section KexecDCommit.
                  (h <$> seq 0 PNAMELEN))
               (Z_to_bv 64 (le_at ef 24 8) : mword 64)
               (mword_of_int (kxc_sp_final (uint sz1) alen c)) sz1).
-    iApply ("Hcont" with "[%] [%] Hcg Hcnt Hpc Hbm Hins [%] Hbits Hka Hpriv Hpath
+    iApply ("Hcont" with "[%] [%] Hcg Hcnt Hpc Hbm Hins Hka Hpriv Hpath
                     Hargv Hargs Hbs Hirs").
     - exact Hcs.
     - apply kxd_kexec_ok; try assumption.
@@ -1779,7 +1777,6 @@ Section KexecDCommit.
       + apply kxd_name_fn_len.
       + rewrite Hspu. destruct Hstk as [_ Hlo]. lia.
       + rewrite Hspu. apply kxd_sp_final_le_top.
-    - reflexivity.
   Qed.
 
 (* [kxd_commit] closes its own section: [kxd_phaseD] applies it at the hart
@@ -1849,7 +1846,7 @@ Section KexecDMain.
   Lemma kxd_phaseD
       (jp : nat) (bn : bio_names) (gfs : fs_names) (ga gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z)
-      (size : Z) (used2 : gset Z)
+      (size : Z)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
@@ -1871,12 +1868,12 @@ Section KexecDMain.
     m !!! Regidx Rs6 = w8 -> m !!! Regidx Rs7 = w9 -> m !!! Regidx Rs8 = w10 ->
     m !!! Regidx Rs9 = w11 -> m !!! Regidx Rs10 = w12 -> m !!! Regidx Rs11 = w13 ->
     kernel_text -∗
-    kxc_at_2a6 jp bn gfs ga gf cov logstart bmapstart inodestart size used2
+    kxc_at_2a6 jp bn gfs ga gf cov logstart bmapstart inodestart size
                plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
                M K sp0 ra0 s00 s10 s20 pv av
                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P (pv_sz V) sz1 c -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-    ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
+    ∀ (mf : regfile) (V' : pprivate)
        (entry spv szv' : mword 64),
         ⌜callee_saved m mf⌝ -∗
         ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
@@ -1885,8 +1882,6 @@ Section KexecDMain.
         pc_is (ret_pc ra0) -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-        ⌜used' ⊆ used2⌝ -∗
-        bitmap_res gfs bmapstart cov logstart size used' -∗
         kalloc_env ga None -∗
         proc_priv gf (proc_addr jp) pidv V' -∗
         ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
@@ -2088,7 +2083,7 @@ Section KexecDMain.
                word_pointsto (KTR := KT1) (pa_stk sp0 66) (DfracOwn 1) last -∗
                ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1]{dqpv} pfun k) -∗
                kxd_res jp bn gfs ga gf cov logstart bmapstart inodestart size
-                       used2 plen pfun na avf aslen afun pidv
+                       plen pfun na avf aslen afun pidv
                        (upd_tf V (<[tf_arg_idx 1
                                     := (mword_of_int
                                           (kxc_sp_final (uint sz1) alen c)
@@ -2142,7 +2137,7 @@ Section KexecDMain.
       iDestruct (wp_next_retarget CID0 CID5 true (proc_addr jp) _ Hcr5
                    with "Hcont") as "Hcont".
       iApply (kxd_commit (CID0 := CID5) jp bn gfs ga gf cov logstart bmapstart
-                inodestart size used2 plen pfun na avf alen aslen afun pidv V
+                inodestart size plen pfun na avf alen aslen afun pidv V
                 dqb dqs dqa dqpv dqas m D3 K sp0 ra0 s00 s10 s20 pv av
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P sz1 c 0%nat
                 ltac:(lia) Hcstr ltac:(lia) Hnamax Hsz1ge Hceq
@@ -2275,7 +2270,7 @@ Section KexecDMain.
       iDestruct (wp_next_retarget CID0 CID9 true (proc_addr jp) _ Hcr9
                    with "Hcont") as "Hcont".
       iApply (kxd_commit (CID0 := CID9) jp bn gfs ga gf cov logstart bmapstart
-                inodestart size used2 plen pfun na avf alen aslen afun pidv V
+                inodestart size plen pfun na avf alen aslen afun pidv V
                 dqb dqs dqa dqpv dqas m Mf K sp0 ra0 s00 s10 s20 pv av
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P sz1 c q'
                 ltac:(lia) Hcstr Hq' Hnamax Hsz1ge Hceq

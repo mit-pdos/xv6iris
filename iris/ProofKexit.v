@@ -81,6 +81,7 @@ Require Import SpecMyproc SpecAcquire SpecRelease SpecSched.
 Require Import SpecIput.
 Require Import IrefSlots InodeRegion IcacheRef IcacheInv IcacheEscrow.
 Require Import BitmapInv DinodeEnc InodeInv.
+Require Import FsCfg FsReady.  (* [fs_ready] and the ambient names it is at *)
 Require Import SpecFileclose SpecReparent SpecWakeup.
 Require Import SpecBeginOp SpecEndOp SpecIput.
 Require Import KernelDataInv.
@@ -515,7 +516,7 @@ Section KexitLoop.
         pc_is (mword_of_int (KX + 0x4c)) -∗
         proc_priv γf pj pid Vx -∗
         (∃ on', fileclose_pipe_env fn on' 0%nat) -∗
-        (∃ usx : gset Z, fileclose_fs_env_nopid fn usx 0%nat eb pj) -∗
+        fileclose_fs_env_nopid fn 0%nat eb pj -∗
         iref_slot -∗
         WP (Loop : expr riscv_lang)) -∗
     ∀ (fd : nat) (M : regfile) (V : pprivate),
@@ -530,7 +531,7 @@ Section KexitLoop.
       pc_is (mword_of_int (KX + 0x3e)) -∗
       proc_priv γf pj pid V -∗
       (∃ on', fileclose_pipe_env fn on' 0%nat) -∗
-      (∃ usx : gset Z, fileclose_fs_env_nopid fn usx 0%nat eb pj) -∗
+      fileclose_fs_env_nopid fn 0%nat eb pj -∗
        iref_slot -∗
       WP (Loop : expr riscv_lang).
   Proof.
@@ -553,7 +554,7 @@ Section KexitLoop.
                        pc_is (mword_of_int (KX + 0x4c)) -∗
                        proc_priv γf pj pid Vx -∗
                        (∃ on', fileclose_pipe_env fn on' 0%nat) -∗
-                       (∃ usx : gset Z, fileclose_fs_env_nopid fn usx 0%nat eb pj) -∗
+                       fileclose_fs_env_nopid fn 0%nat eb pj -∗
                         iref_slot -∗
                        WP (Loop : expr riscv_lang)) -∗
                    sie_cap_gpr KT1 M av b pj -∗
@@ -563,7 +564,7 @@ Section KexitLoop.
                    pc_is (mword_of_int (KX + 0x3e)) -∗
                    proc_priv γf pj pid V -∗
                    (∃ on', fileclose_pipe_env fn on' 0%nat) -∗
-                   (∃ usx : gset Z, fileclose_fs_env_nopid fn usx 0%nat eb pj) -∗
+                   fileclose_fs_env_nopid fn 0%nat eb pj -∗
                     iref_slot -∗
                    WP (Loop : expr riscv_lang)))%I with "[]" as "Hloop".
     { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
@@ -588,7 +589,7 @@ Section KexitLoop.
                    pc_is (mword_of_int (KX + 0x38)) -∗
                    proc_priv γf pj pid Vt -∗
                    (∃ on', fileclose_pipe_env fn on' 0%nat) -∗
-                   (∃ usx : gset Z, fileclose_fs_env_nopid fn usx 0%nat eb pj) -∗
+                   fileclose_fs_env_nopid fn 0%nat eb pj -∗
                    iref_slot -∗
                    WP (Loop : expr riscv_lang)))%I
         with "[Hqx]" as "Htail".
@@ -814,10 +815,9 @@ Section KexitLoop.
         iDestruct (cpu_claim_ext_transport CIDk CIDn eb pj
                      ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
         iDestruct "Hpenv" as (onk) "Hpenv".
-        iDestruct "Hfenv" as (usk) "Hfenv".
-        iDestruct (fileclose_loop_open fn onk usk 0%nat eb pj Cf
+        iDestruct (fileclose_loop_open fn onk 0%nat eb pj Cf
                      with "Hpenv Hfenv") as "[Hfcenv Hfcback]".
-        iApply (Fileclose.wp_fileclose_sconf (CID := CIDn)  γft γf kf q Cf fn onk usk M42 0 eb pj av b lks pid V
+        iApply (Fileclose.wp_fileclose_sconf (CID := CIDn)  γft γf kf q Cf fn onk M42 0 eb pj av b lks pid V
                   ltac:(lia) ltac:(lia) HM42a0 Hfresh
                   with "Hcg Hown Htce Hcce Htext Hkd Hpc Hft Hpe Href [Hpbare] Hiru Hfcenv").
         all: try lkbelow.
@@ -1519,7 +1519,7 @@ Section KexitRest.
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (* the inode cache and the two regions iput's truncate arm frees into *)
       (γi : gname) (cn : ic_names) (γtl : gname)
-      (bmapstart inodestart : Z) (nib : nat) (size : Z) (us : gset Z)
+      (bmapstart inodestart : Z) (nib : nat) (size : Z)
       (dqb dqs : dfrac)
       (ip sv spF : mword 64) (dqi : dfrac)
       (M : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
@@ -1579,12 +1579,13 @@ Section KexitRest.
        G').  This tail reaches iput, whose free path FREEZES; the mint takes
        the regime the freezer is freezing under, and a runtime caller lends
        the persistent sealed arm ([rg := true]).  It rides the same channel
-       [ireg_inv] does, out of [SpecFileclose.fileclose_ic_env]. *)
+       [ireg_inv] does -- out of [FsReady.fs_ready_region] at the caller,
+       which is where [SpecFileclose.fileclose_ic_env] used to sit. *)
     ireg_open -∗
     ic_sleeplocks cn -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-    bitmap_res γfs bmapstart cov logstart size us -∗
+    bitmap_inv γfs bmapstart cov logstart size -∗
     (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
     fd_slots FDSPARE -∗
     iref_slots IREFSPARE -∗
@@ -1596,7 +1597,7 @@ Section KexitRest.
     destruct Hregs as (Hs3 & Hs4 & Hsp0 & Hdom).
     iIntros "Hcg Hcloser Hown Htce Hcce #Htext #Hkd Hpc #Hprocs #Hpanenv #Hwl".
     iIntros "#Hbio #Hlog Hseam Hgen #Hdev #Hgeo #Hdlk Hbsl".
-    iIntros "#Hitab #Hitinv #Hescrows #Hireg #Hropen #Hslks Hsbb Hsbi Hbmres".
+    iIntros "#Hitab #Hitinv #Hescrows #Hireg #Hropen #Hslks Hsbb Hsbi #Hbmres".
     iIntros "Hinit Hsp Hir Hpriv".
     (* [eb = b], for the complement's transport guards ONLY.  NOT [subst b]. *)
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
@@ -1731,7 +1732,7 @@ Section KexitRest.
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
     iApply (Iput.wp_iput_sconf (CID := CID4) γs j γl γu γd γk pd pav pu bn γ γfs
               γi cn γtl gil gisl cov logstart bmapstart inodestart nib size
-              dev us kk qq inum MAXOPBLOCKS pid (DfracOwn (1/4)) dqb dqs
+              dev kk qq inum MAXOPBLOCKS pid (DfracOwn (1/4)) dqb dqs
               Q2 av eb b lks
               V ltac:(lia) Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog
               Hist0 Hiblk Hiblog Hinb Hcovb
@@ -1742,8 +1743,8 @@ Section KexitRest.
                     Hireg Hropen Hslk [$Href $Hru] Hsbb Hsbi Hbmres Hpbare Hprocs
                     Hdev Hgeo Hdlk Hbsl Hop").
     all: try lkbelow.
-    iIntros (CID5 Hs5 mip n' us') "%Hcsip Hcg Hown Htce Hcce Hpc Hpbare Hsbb Hsbi
-                                   %Hussub Hbmres Hbsl %Hn' Hop Hislot".
+    iIntros (CID5 Hs5 mip n') "%Hcsip Hcg Hown Htce Hcce Hpc Hpbare Hsbb Hsbi
+                               Hbsl %Hn' Hop Hislot".
     assert (Hpc58 : ret_pc (Q2 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KX + 0x58))
       by (rewrite HQ2ra; apply bv_eq; vm_compute; reflexivity).
@@ -1874,13 +1875,12 @@ Section ProofKexit.
       (γkl : gname) (γka : gname * gname)
       (γi : gname) (cn : ic_names) (γtl : gname)
       (bmapstart inodestart : Z) (nib : nat) (size : Z)
-      (dqb dqs : dfrac) (us : gset Z)
       (on : option nat) (fn : fclose_names)
       (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
       (pid : mword 32) (V : pprivate)
     : wp_kexit_sconf_body γft γf γw γs j γl γu γd γk pd pav pu bn γ γfs
                           cov logstart dev ip dqi γkl γka
-                          γi cn γtl bmapstart inodestart nib size dqb dqs us
+                          γi cn γtl bmapstart inodestart nib size
                           on fn m av eb b lks pid V.
   Proof.
     cbv beta delta [wp_kexit_sconf_body].
@@ -1888,17 +1888,45 @@ Section ProofKexit.
     
     iIntros "Hcg Hcloser Hown Htce Hcce #Htext #Hkd Hpc #Hprocs #Hpanenv #Hwl #Hft".
     iIntros "#Hkmem Hav0".
-    iIntros "#Hbio #Hlog #Hseam #Hgen #Hdev #Hgeo #Hdlk Hbsl #Hicenv Hbm".
+    iIntros "#Hbio #Hlog #Hseam #Hgen #Hdev #Hgeo #Hdlk Hbsl %Hties #Hrdy".
     iIntros "Hinit Hsp Hir Hpriv".
-    (* the cache's persistent set and the pure geometry, out of the one
-       bundle fileclose's contract already indexes them by *)
-    rewrite /fileclose_ic_env.
-    cbn [fcn_ic fcn_dev fcn_nib fcn_size fcn_bmapstart fcn_inodestart
-         fcn_cov fcn_logstart fcn_fs fcn_ireg fcn_tlock] in *.
-    iDestruct "Hicenv" as "(%Hcdev & %Hcnib & %Hsize & %Hbm0 &
-                            %Hbmcov & %Hbmlog & %Hist0 & %Hinumgeo & %Hcovb &
-                            #Hitab & #Hitinv & #Hescrows & #Hireg & #Hropen &
-                            #Hslks)".
+    (* ---- THE TIES, AND THE FILE SYSTEM THEY POINT AT ----
+       [fclose_ties] says kexit's own eighteen threaded names ARE the ambient
+       ones, and every one of them is a BINDER of this lemma -- so the
+       equations are not rewritten, they are [subst]ed, and the whole body
+       below runs at [FsCfg]/[IcacheRef]'s fields.  What used to arrive as
+       [fileclose_ic_env] (nine pure facts and six invariants) and
+       [fileclose_bm] (two superblock cells and a threaded [bitmap_res]) is
+       then one projection each out of [fs_ready] -- the cells at [□], the
+       bitmap as its persistent invariant. *)
+    pose proof Hties as Hties'.
+    destruct Hties' as [Ht_uart Ht_disk Ht_dlock Ht_kmem Ht_kalloc Ht_bio
+                        Ht_log Ht_fs Ht_cov Ht_logst Ht_dev Ht_ireg Ht_ic
+                        Ht_tlock Ht_bms Ht_ist Ht_nib Ht_size].
+    cbn [fcn_uart fcn_disk fcn_dlock fcn_kmem fcn_kalloc fcn_bio fcn_log
+         fcn_fs fcn_cov fcn_logstart fcn_dev fcn_ireg fcn_ic fcn_tlock
+         fcn_bmapstart fcn_inodestart fcn_nib fcn_size]
+      in Ht_uart, Ht_disk, Ht_dlock, Ht_kmem, Ht_kalloc, Ht_bio, Ht_log,
+         Ht_fs, Ht_cov, Ht_logst, Ht_dev, Ht_ireg, Ht_ic, Ht_tlock, Ht_bms,
+         Ht_ist, Ht_nib, Ht_size.
+    subst γu γd γk γkl γka bn γ γfs cov logstart dev
+          γi cn γtl bmapstart inodestart nib size.
+    iDestruct (FsReady.fs_ready_geom with "Hrdy") as "%Hgok".
+    iDestruct (FsReady.fs_ready_icache with "Hrdy")
+      as "(#Hitab & #Hitinv & #Hescrows & #Hslks)".
+    iDestruct (FsReady.fs_ready_region with "Hrdy") as "[#Hireg #Hropen]".
+    iDestruct (FsReady.fs_ready_sb_four with "Hrdy")
+      as "(_ & #Hsbi & _ & #Hsbb)".
+    iDestruct (FsReady.fs_ready_bitmap with "Hrdy") as "#Hbmres".
+    pose proof (eq_refl : icfg_dev = icfg_dev) as Hcdev.
+    pose proof (eq_refl : icfg_nib = icfg_nib) as Hcnib.
+    pose proof (FsReady.fgo_size Hgok) as Hsize.
+    pose proof (FsReady.fgo_bm_nn Hgok) as Hbm0.
+    pose proof (FsReady.fgo_bm_cov Hgok) as Hbmcov.
+    pose proof (FsReady.fgo_bm_out Hgok) as Hbmlog.
+    pose proof (FsReady.fgo_ist_nn Hgok) as Hist0.
+    pose proof (FsReady.fgo_covbelow Hgok) as Hcovb.
+    pose proof (FsReady.fgo_iblocks Hgok) as Hinumgeo.
     assert (Hdom : forall r : regidx, r ∈ dom (rf_to_gmap m))
       by (intro r; apply rf_to_gmap_dom).
     (* [eb = b], for the complement's transport guard ONLY.  NOT [subst b]. *)
@@ -2179,9 +2207,11 @@ Section ProofKexit.
          The pid cell is NOT in it: it comes out of [proc_priv] one call at a
          time ([ProcInv.proc_priv_pid_ofile]), since the block is what the
          loop is walking. *)
-      iAssert (∃ on', fileclose_pipe_env (MkFCloseNames γs j γl γkl γka γu γd γk
-                        pd pav pu bn γ γfs cov logstart dev pid (DfracOwn (1/4))
-                        γi cn γtl bmapstart inodestart nib size dqb dqs)
+      iAssert (∃ on', fileclose_pipe_env (MkFCloseNames γs j γl fsc_kalloc fsc_kpages fsc_uart fsc_disk
+                        fsc_dlock pd pav pu fsc_bio icfg_log fsc_fs
+                        fsc_cov fsc_logst icfg_dev pid (DfracOwn (1/4))
+                        fsc_ireg fsc_ic fsc_itlock fsc_bmapstart icfg_ist
+                        icfg_nib fsc_size)
                         on' 0%nat)%I with "[Hav0]" as "Hpenv".
       { iExists on. rewrite /fileclose_pipe_env; cbn [fcn_procs fcn_kmem fcn_kalloc].
         iSplitR.
@@ -2189,48 +2219,39 @@ Section ProofKexit.
           assert (E : (2 ^ 31 = 2147483648)%Z) by (vm_compute; reflexivity).
           rewrite E. lia. }
         iFrame "Hprocs Hkmem Hav0". }
-      iAssert (∃ usx : gset Z,
-                 fileclose_fs_env_nopid (MkFCloseNames γs j γl γkl γka γu γd γk
-                   pd pav pu bn γ γfs cov logstart dev pid (DfracOwn (1/4))
-                   γi cn γtl bmapstart inodestart nib size dqb dqs)
-                   usx 0%nat eb pj)%I with "[Hbsl Hbm]" as "Hfenv".
-      { iExists us. rewrite /fileclose_fs_env_nopid.
-        cbn [fcn_procs fcn_j fcn_plock fcn_uart fcn_disk fcn_dlock fcn_pd fcn_pav
-             fcn_pu fcn_bio fcn_log fcn_fs fcn_cov fcn_logstart fcn_dev].
+      iAssert (fileclose_fs_env_nopid (MkFCloseNames γs j γl fsc_kalloc fsc_kpages fsc_uart fsc_disk
+                        fsc_dlock pd pav pu fsc_bio icfg_log fsc_fs
+                        fsc_cov fsc_logst icfg_dev pid (DfracOwn (1/4))
+                        fsc_ireg fsc_ic fsc_itlock fsc_bmapstart icfg_ist
+                        icfg_nib fsc_size)
+                 0%nat eb pj)%I with "[Hbsl]" as "Hfenv".
+      { rewrite /fileclose_fs_env_nopid.
+        cbn [fcn_procs fcn_j fcn_plock fcn_disk fcn_dlock fcn_pd fcn_pav
+             fcn_pu fcn_bio].
         (* two pure conjuncts, not three: [⌜eb = true⌝] left this bundle when
            the complement moved to the top level of fileclose's contract. *)
         iSplitR; [done|]. iSplitR; [done|].
         iSplitR; [iPureIntro; exact Hj|].
         iSplitR; [iPureIntro; exact Hgl|].
-        iSplitR; [iPureIntro; exact Hgeom|].
+        (* the TIES, verbatim -- the row that used to be [log_geom_ok], and
+           the one that replaces the whole [fileclose_ic_env]/[fileclose_bm]
+           pair below. *)
+        iSplitR; [iPureIntro; exact Hties|].
         (* Split STRUCTURALLY before framing: a named [iFrame] still walks
-           the whole 11-conjunct goal per hypothesis (the same cost measured
-           for [fileclose_fs_env_split_pid] in SpecFileclose.v); [iSplitL]/
-           [iExact] name both sides, so nothing is searched. *)
+           the whole goal per hypothesis (the same cost measured for
+           [fileclose_fs_env_reuse] in SpecFileclose.v); [iSplitL]/[iExact]
+           name both sides, so nothing is searched. *)
         iSplitL "Hprocs"; [iExact "Hprocs"|].
-        iSplitL "Hbio"; [iExact "Hbio"|].
-        iSplitL "Hlog"; [iExact "Hlog"|].
-        iSplitL "Hseam"; [iExact "Hseam"|].
-        iSplitL "Hgen"; [iExact "Hgen"|].
-        iSplitL "Hdev"; [iExact "Hdev"|].
         iSplitL "Hgeo"; [iExact "Hgeo"|].
         iSplitL "Hdlk"; [iExact "Hdlk"|].
-        iSplitL "Hbsl"; [iExact "Hbsl"|].
-        iSplitR.
-        { rewrite /fileclose_ic_env.
-          cbn [fcn_ic fcn_dev fcn_nib fcn_size fcn_bmapstart fcn_inodestart
-               fcn_cov fcn_logstart fcn_fs fcn_ireg fcn_tlock].
-          repeat (iSplitR; [iPureIntro; assumption|]).
-          iSplitR; [iExact "Hitab"|].
-          iSplitR; [iExact "Hitinv"|].
-          iSplitR; [iExact "Hescrows"|].
-          iSplitR; [iExact "Hireg"|].
-          iSplitR; [iExact "Hropen"|]. iExact "Hslks". }
-        iExact "Hbm". }
+        iSplitL "Hrdy"; [iExact "Hrdy"|].
+        iExact "Hbsl". }
       iPoseProof (kx_loop (CID0 := CID8)  γft γf
-                    (MkFCloseNames γs j γl γkl γka γu γd γk pd pav pu bn γ γfs
-                       cov logstart dev pid (DfracOwn (1/4))
-                       γi cn γtl bmapstart inodestart nib size dqb dqs) j pid
+                    (MkFCloseNames γs j γl fsc_kalloc fsc_kpages fsc_uart fsc_disk
+                        fsc_dlock pd pav pu fsc_bio icfg_log fsc_fs
+                        fsc_cov fsc_logst icfg_dev pid (DfracOwn (1/4))
+                        fsc_ireg fsc_ic fsc_itlock fsc_bmapstart icfg_ist
+                        icfg_nib fsc_size) j pid
                     (m !!! Regidx (mword_of_int 10 : mword 5)) (pv_cwd V)
                     (pa_stk (m !!! Regidx csp_rs1) 6)
                     (av - 6)%nat eb b lks Hj eq_refl eq_refl eq_refl
@@ -2245,19 +2266,20 @@ Section ProofKexit.
       iSpecialize ("Hloop" with "[Hinit Hsp Hir Hcloser]").
       { iIntros (CIDx Hsx Mx Vx) "%Hxregs %Hxof %Hxcwd Hcg Hown Htce Hcce Hpc Hpriv Hpenv Hfenv Hiru".
         iDestruct (iref_slots_combine 1 (IREFSPARE - 1) with "Hiru Hir") as "Hir".
-        iDestruct "Hfenv" as (usx) "Hfenv".
-        iDestruct "Hfenv" as "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
-                               _ & _ & Hbsl & _ & Hbm)".
-        rewrite /fileclose_bm.
-        cbn [fcn_dqb fcn_dqs fcn_bmapstart fcn_inodestart fcn_fs fcn_cov
-             fcn_logstart fcn_size].
-        iDestruct "Hbm" as "(Hsbb & Hsbi & Hbmres)".
+        (* the bundle gives back the three slots and nothing else: the
+           superblock cells are persistent and the bitmap is an invariant,
+           so both are still in the intuitionistic context from the top. *)
+        iDestruct "Hfenv" as "(_ & _ & _ & _ & _ & _ & _ & _ & _ & Hbsl)".
+        cbn [fcn_bio].
         (* "itable" (2) outranks "ftable" (1): weaken [Hfresh]'s bound. *)
         assert (Hfresh_it : locks_below lks "itable")
           by lkbelow.
-        iApply (kx_rest (CID0 := CIDx)  γf γw γs j γl γu γd γk pd pav pu bn γ γfs
-                  cov logstart dev γi cn γtl bmapstart inodestart nib size usx
-                  dqb dqs ip (m !!! Regidx (mword_of_int 10 : mword 5))
+        iApply (kx_rest (CID0 := CIDx)  γf γw γs j γl fsc_uart fsc_disk fsc_dlock
+                  pd pav pu fsc_bio icfg_log fsc_fs
+                  fsc_cov fsc_logst icfg_dev fsc_ireg fsc_ic fsc_itlock
+                  fsc_bmapstart icfg_ist icfg_nib fsc_size
+                  DfracDiscarded DfracDiscarded
+                  ip (m !!! Regidx (mword_of_int 10 : mword 5))
                   (pa_stk (m !!! Regidx csp_rs1) 6) dqi
                   Mx (av - 6)%nat eb b lks pid Vx
                   Hj Hgl ltac:(lia) Hgeom Hxregs Hxof

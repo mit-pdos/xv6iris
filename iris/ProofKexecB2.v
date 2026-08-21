@@ -291,7 +291,7 @@ Section KexecB2Body.
       (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
       (cn : ic_names) (gtl : gname) (gilf gislf : gname) (ga gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
-      (size : Z) (dev : mword 32) (used used2 : gset Z)
+      (size : Z) (dev : mword 32)
       (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap) (n2 : nat)
       (plen : nat) (pfun : nat -> bv 8)
@@ -302,13 +302,13 @@ Section KexecB2Body.
       (sp0 ra0 s00 s10 s20 pv av w63 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (szf : mword 64) (lks : gset string) :
     kxc_bad324_body gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl gilf gislf
-      ga gf cov logstart bmapstart inodestart nib size dev used used2
+      ga gf cov logstart bmapstart inodestart nib size dev
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
       pidv V dqb dqs dqa dqpv dqas m Mt K sp0 ra0 s00 s10 s20 pv av w63 w67
       ef P szf lks.
   Proof.
     cbv beta delta [kxc_bad324_body].
-    intros HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hib Hn2 Hjp Hgs Hu2
+    intros HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hib Hn2 Hjp Hgs
            Hsp Hra Hs0 Hs1 Hs2 HMtsp HMts0 HMts4 HMts6 Hal Hbelow Hcov.
     pose proof HK as HK'. 
     destruct (Hiregb inumf Hib) as [Hibc Hibl].
@@ -643,11 +643,11 @@ Section KexecB2Body.
                  with "Hcont") as "Hcont".
     iApply (A.kxc_bad64 gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
               gilf gislf ga gf cov logstart bmapstart inodestart nib size
-              dev used used2 kf qf sf gyf inumf dnf bmf n2
+              dev kf qf sf gyf inumf dnf bmf n2
               plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
               m U8 K lks sp0 ra0 s00 s10 s20 pv av
               HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib Hcovb Hn2
-              Hjp Hgs Hu2 Hsp Hra Hs0 Hs1 Hs2 HU8sp HU8s4 HU8thr
+              Hjp Hgs Hsp Hra Hs0 Hs1 Hs2 HU8sp HU8s4 HU8thr
               with "Hcg Hcnt Htext Hpc Hfab Hslkk Hslkd Hdep
                     Hidev Hiinum Hivalid Hload Hity Hfrz Hkeep Hru Hbm Hins Hbits
                     Hka Hpriv Hpath Hargv Hargs Hbs Hirs Hlog [-Hcont]
@@ -767,7 +767,7 @@ Section KexecB2Loops.
       (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
       (cn : ic_names) (gtl : gname) (gilf gislf : gname) (ga gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
-      (size : Z) (dev : mword 32) (used used2 : gset Z)
+      (size : Z) (dev : mword 32)
       (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap) (n2 : nat)
       (plen : nat) (pfun : nat -> bv 8)
@@ -779,13 +779,13 @@ Section KexecB2Loops.
       (ef : nat -> bv 8) (P : uptd)
       (ip : nat) (va : mword 64) (fz po : Z) (lks : gset string) :
     kxc_ls_body gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl gilf gislf
-      ga gf cov logstart bmapstart inodestart nib size dev used used2
+      ga gf cov logstart bmapstart inodestart nib size dev
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
       pidv V dqb dqs dqa dqpv dqas m K sp0 ra0 s00 s10 s20 pv av w63 w65 w67
       ef P ip va fz po lks.
   Proof.
     cbv beta delta [kxc_ls_body].
-    intros HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hib Hn2 Hjp Hgs Hu2
+    intros HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hib Hn2 Hjp Hgs
            Hdevc Hsp Hra Hs0 Hs1 Hs2 Hal Hbelow Hcovp Hfzr Hpor.
     pose proof HK as HK'. 
     assert (Hmb : (Z.of_nat MAXFILE * Z.of_nat BSIZE = 274432)%Z)
@@ -1607,11 +1607,11 @@ Section KexecB2Loops.
                      with "Hcont") as "Hcont".
         iApply (kxc_bad324 (CID0 := CIDb1) gs jp gl gu gd gk pd pav pu bn g gfs
                   gi cn gtl gilf gislf ga gf cov logstart bmapstart inodestart
-                  nib size dev used used2 kf qf sf gyf inumf dnf bmf n2 plen
+                  nib size dev kf qf sf gyf inumf dnf bmf n2 plen
                   pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas m M2 K
                   sp0 ra0 s00 s10 s20 pv av w63 w67 ef P w65 lks
                   HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hib Hn2 Hjp
-                  Hgs Hu2 Hsp Hra Hs0 Hs1 Hs2
+                  Hgs Hsp Hra Hs0 Hs1 Hs2
                   ltac:(rewrite (HM2get csp_rs1 ltac:(vm_compute; reflexivity)
                                   ltac:(lnz)); exact HMsp)
                   ltac:(rewrite (HM2get Rs0 ltac:(vm_compute; reflexivity)

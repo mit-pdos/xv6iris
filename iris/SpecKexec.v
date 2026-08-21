@@ -397,7 +397,6 @@ Definition wp_kexec_sconf_body
     (ga : gname) (gf : gname)                           (* kalloc, file table  *)
     (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
     (size : Z) (dev : mword 32)
-    (used : gset Z)
     (plen : nat) (pfun : nat -> bv 8)                   (* the path buffer     *)
     (na : nat) (avf : nat -> mword 64)                  (* argv[0 .. na]       *)
     (alen : nat -> nat) (aslen : nat -> nat)            (* strlen / owned len  *)
@@ -501,7 +500,10 @@ Definition wp_kexec_sconf_body
   kalloc_env ga None -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-  bitmap_res gfs bmapstart cov logstart size used -∗
+  (* THE BLOCK BITMAP'S INVARIANT (BitmapInv.v): persistent; namei's walk
+     and the O-arm's iput/iunlockput free into it, and the B2 stage bundle
+     [SpecKexecB2.kxc_res] carries it, so this is the row that funds them. *)
+  bitmap_inv gfs bmapstart cov logstart size -∗
   (* THE PROCESS'S PRIVATE BLOCK.  p->pid, p->cwd and the cwd reference namei
      needs are all inside it (ProcInv.proc_priv_cwd_pid); so are the p->name
      bytes safestrcpy writes and the trapframe words the commit block writes. *)
@@ -534,7 +536,7 @@ Definition wp_kexec_sconf_body
   bslots bn 3 -∗
   iref_slots 2 -∗
   wp_next b pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
+  ∀ (mf : regfile) (V' : pprivate)
     (entry spv szv' : mword 64),
       ⌜callee_saved m mf⌝ -∗
       ⌜kexec_ok V V' (mf !!! Regidx (mword_of_int 10 : mword 5))
@@ -544,8 +546,6 @@ Definition wp_kexec_sconf_body
       pc_is ret_tgt -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-      ⌜used' ⊆ used⌝ -∗
-      bitmap_res gfs bmapstart cov logstart size used' -∗
       kalloc_env ga None -∗
       proc_priv gf pj pidv V' -∗
       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
@@ -570,7 +570,6 @@ Module Type KEXEC.
       (ga : gname) (gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
-      (used : gset Z)
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64)
       (alen aslen : nat -> nat) (afun : nat -> nat -> bv 8)
@@ -580,6 +579,6 @@ Module Type KEXEC.
       (b : bool) (lks : gset string),
       wp_kexec_sconf_body gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
                           ga gf cov logstart bmapstart inodestart nib
-                          size dev used plen pfun na avf alen aslen afun
+                          size dev plen pfun na avf alen aslen afun
                           pidv V dqb dqs dqa dqpv dqas m K eb b lks.
 End KEXEC.

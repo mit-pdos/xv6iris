@@ -516,7 +516,7 @@ Definition wp_writei_sconf_body
     (γa : gname) (γf : gname)                         (* kalloc, file table  *)
     (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
     (bmapstart : Z) (size : Z) (dev : mword 32)
-    (used : gset Z) (γpr : gname)
+    (γpr : gname)
     (ip : mword 64) (inum : mword 32)
     (bm : blkmap) (data : nat -> list (bv 8))
     (dn dn0 : dinode)
@@ -654,7 +654,7 @@ Definition wp_writei_sconf_body
      all three, and writei calls bmap once per straddled block *)
   sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-  bitmap_res γfs bmapstart cov logstart size used -∗
+  bitmap_inv γfs bmapstart cov logstart size -∗
   (* THE INODE REGION, and this inum's (stale) on-disk record: iupdate's
      resources, threaded through (design §11.3/§12) *)
   ireg_inv γi γfs inodestart nib -∗
@@ -704,12 +704,10 @@ Definition wp_writei_sconf_body
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (tot : nat) (bm' : blkmap) (data' : nat -> list (bv 8))
     (dn' dn0' : dinode) (n' : nat)
-    (wrote : nat -> bv 8) (dist : nat) (dstb : nat -> bv 8) (P' : uptd)
-    (used' : gset Z),
+    (wrote : nat -> bv 8) (dist : nat) (dstb : nat -> bv 8) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
       (* THE ALLOCATOR NEVER UN-MARKS: [used] only grows, across every bmap
          the loop performs. *)
-      ⌜used ⊆ used'⌝ -∗
       ⌜blkmap_wf cov logstart bm'⌝ -∗
       ⌜blk_holes_zero bm' data'⌝ -∗
       ⌜di_addrs dn' = bm_cells bm'⌝ -∗
@@ -768,7 +766,6 @@ Definition wp_writei_sconf_body
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-      bitmap_res γfs bmapstart cov logstart size used' -∗
       dinode_at γi inum dn0' -∗
       (* the source goes back the way it came -- with the kernel arm's
          buffer, or inside the user arm's block *)
@@ -803,7 +800,7 @@ Definition wp_writei_gen_body
     (γa : gname) (γf : gname)                         (* kalloc, file table  *)
     (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
     (bmapstart : Z) (size : Z) (dev : mword 32)
-    (used : gset Z) (γpr : gname)
+    (γpr : gname)
     (ip : mword 64) (inum : mword 32)
     (bm : blkmap) (data : nat -> list (bv 8))
     (dn dn0 : dinode)
@@ -931,7 +928,7 @@ Definition wp_writei_gen_body
      all three, and writei calls bmap once per straddled block *)
   sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-  bitmap_res γfs bmapstart cov logstart size used -∗
+  bitmap_inv γfs bmapstart cov logstart size -∗
   (* THE INODE REGION, and this inum's (stale) on-disk record: iupdate's
      resources, threaded through (design §11.3/§12) *)
   ireg_inv γi γfs inodestart nib -∗
@@ -980,11 +977,10 @@ Definition wp_writei_gen_body
   ∀ (mf : regfile) (tot : nat) (bm' : blkmap) (data' : nat -> list (bv 8))
     (dn' dn0' : dinode) (n' : nat)
     (wrote : nat -> bv 8) (dist : nat) (dstb : nat -> bv 8) (P' : uptd)
-    (used' : gset Z) (Sb' : gset Z),
+    (Sb' : gset Z),
       ⌜callee_saved m mf⌝ -∗
       (* THE ALLOCATOR NEVER UN-MARKS: [used] only grows, across every bmap
          the loop performs. *)
-      ⌜used ⊆ used'⌝ -∗
       ⌜blkmap_wf cov logstart bm'⌝ -∗
       ⌜blk_holes_zero bm' data'⌝ -∗
       ⌜di_addrs dn' = bm_cells bm'⌝ -∗
@@ -1054,7 +1050,6 @@ Definition wp_writei_gen_body
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-      bitmap_res γfs bmapstart cov logstart size used' -∗
       dinode_at γi inum dn0' -∗
       (* the source goes back the way it came -- with the kernel arm's
          buffer, or inside the user arm's block *)
@@ -1079,7 +1074,7 @@ Module Type WRITEI.
       (γa : gname) (γf : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
       (bmapstart : Z) (size : Z) (dev : mword 32)
-      (used : gset Z) (γpr : gname)
+      (γpr : gname)
       (ip : mword 64) (inum : mword 32)
       (bm : blkmap) (data : nat -> list (bv 8))
       (dn dn0 : dinode)
@@ -1089,7 +1084,7 @@ Module Type WRITEI.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_writei_sconf_body ktb γs j γl γu γd γk pd pav pu bn γ γfs γi γa γf
-                           cov logstart inodestart nib bmapstart size dev used γpr
+                           cov logstart inodestart nib bmapstart size dev γpr
                            ip inum bm data dn dn0
                            user off n src_bytes V ncount
                            pidv dq dqd dqn dqs dqb dqbs m K eb b lks.
@@ -1108,7 +1103,7 @@ Module Type WRITEI.
       (γa : gname) (γf : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
       (bmapstart : Z) (size : Z) (dev : mword 32)
-      (used : gset Z) (γpr : gname)
+      (γpr : gname)
       (ip : mword 64) (inum : mword 32)
       (bm : blkmap) (data : nat -> list (bv 8))
       (dn dn0 : dinode)
@@ -1118,7 +1113,7 @@ Module Type WRITEI.
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_writei_gen_body ktb γs j γl γu γd γk pd pav pu bn γ γfs γi γa γf
-                         cov logstart inodestart nib bmapstart size dev used γpr
+                         cov logstart inodestart nib bmapstart size dev γpr
                          ip inum bm data dn dn0
                          user off n src_bytes V ncount Sb
                          pidv dq dqd dqn dqs dqb dqbs m K eb b lks.

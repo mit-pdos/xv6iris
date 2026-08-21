@@ -48,6 +48,10 @@ Require Import WpUart.
 Require Import DiskPtsto.
 Require Import BioDefs.
 Require Import FsBlocks LogInv.
+(* IMPORTED, not merely required: [FsReady]'s [Typeclasses Opaque fs_ready]
+   seal is what keeps [Persistent ?P] from delta-unfolding the predicate's
+   twenty conjuncts (that file's own header measures the cost). *)
+Require Import FsCfg FsReady.
 Require Import SpecArgint SpecKexit.
 Require Import SpecSysExit.
 From Kernel Require KernelInstrs KernelSyms.
@@ -126,13 +130,12 @@ Section ProofSysExit.
       (γkl : gname) (γka : gname * gname)
       (γi : gname) (cn : ic_names) (γtl : gname)
       (bmapstart inodestart : Z) (nib : nat) (size : Z)
-      (dqb dqs : dfrac) (us : gset Z)
       (on : option nat) (fn : fclose_names)
       (m : regfile) (av : nat) (eb : bool) (b : bool)
       (pid : mword 32) (V : pprivate) (v0 : mword 64) (lks : gset string)
     : wp_sys_exit_sconf_body γft γf γw γs j γl γu γd γk pd pav pu bn γ γfs
                              cov logstart dev ip dqi γkl γka
-                             γi cn γtl bmapstart inodestart nib size dqb dqs us
+                             γi cn γtl bmapstart inodestart nib size
                              on fn m av eb b pid V v0 lks.
   Proof.
     cbv beta delta [wp_sys_exit_sconf_body].
@@ -140,7 +143,7 @@ Section ProofSysExit.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcl Hcpu #Htext #Hdata Hpc #Hprocs #Hpenv
              #Hlk #Hft #Hkl Hkav #Hbio #Hlog #Hcrash #Hcert #Hdev #Hgeom
-             #Hdlk Hbs #Hicenv Hbm Hip Hfds Hirs Hpriv".
+             #Hdlk Hbs %Hties Hrdy Hip Hfds Hirs Hpriv".
     iPoseProof (se_00 with "Htext") as "Hi00".
     iPoseProof (se_02 with "Htext") as "Hi02".
     iPoseProof (se_04 with "Htext") as "Hi04".
@@ -338,15 +341,18 @@ Section ProofSysExit.
     iDestruct (cpu_own_transport CID8 CID10 0%nat eb pj b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iApply (Kexit.wp_kexit_sconf γft γf γw γs j γl γu γd γk pd pav pu bn γ γfs
               cov logstart dev ip dqi γkl γka
-              γi cn γtl bmapstart inodestart nib size dqb dqs us
+              γi cn γtl bmapstart inodestart nib size
               on fn B2 (av - 4)%nat eb b lks pid V
               Hfn Hj Hgl (sex_Kke av Hav) Hgeo Hbelow
               with "Hcg Hcl4 Hcpu [] [] Htext Hdata Hpc Hprocs Hpenv Hlk
                     Hft Hkl Hkav Hbio Hlog Hcrash Hcert Hdev Hgeom Hdlk Hbs
-                    Hicenv Hbm Hip Hfds Hirs Hpriv").
+                    [%] Hrdy Hip Hfds Hirs Hpriv").
     all: try lkbelow.
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
+    (* the ties, straight through: sys_exit threads kexit's names and kexit
+       threads fileclose's, so the one record travels unchanged. *)
+    { exact Hties. }
   Qed.
 
 End ProofSysExit.

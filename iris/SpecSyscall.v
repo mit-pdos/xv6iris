@@ -35,31 +35,31 @@
    NOT listed below, indexed by the ghost names the table's entries want)
    without churning usertrap's own proof.
 
-   FIVE FAMILIES ARE PULLED OUT AS EXPLICIT PARAMETERS INSTEAD, and this is
+   FOUR FAMILIES ARE PULLED OUT AS EXPLICIT PARAMETERS INSTEAD, and this is
    not an inconsistency with the paragraph above -- it is forced by a
    SHARING constraint [syscall_env] cannot express on its own.
-   [UsertrapRes.ut_own] already threads [bslots]/[fileclose_bm]/the
-   [initproc] cell/[fd_slots]/[iref_slots] to fund usertrap's OWN direct
-   [kexit] calls on the killed-before/killed-after arms (both of which run
-   OUTSIDE this call, never through [syscall_env]).  [SpecSysExit.v]'s own
-   contract needs exactly the same five families for the SAME physical
+   [UsertrapRes.ut_own] already threads [bslots]/the [initproc]
+   cell/[fd_slots]/[iref_slots] to fund usertrap's OWN direct [kexit]
+   calls on the killed-before/killed-after arms (both of which run OUTSIDE
+   this call, never through [syscall_env]).  [SpecSysExit.v]'s own
+   contract needs exactly the same four families for the SAME physical
    pool, reached only when the dispatch table selects [SYS_exit] -- so if
    [syscall_env] carried an independent copy of any of them, [ut_res]'s
    existential would be asking for TWO disjoint fundings of one pool, which
    no boot-time construction could discharge (durable-notes.md's "two
    owners of one address space" trap, in ghost-resource form: `own γ (◯ n)
    ∗ own γ (◯ n)` is not [False], but it silently doubles the authority a
-   real allocation would have to supply).  So these five ride through
+   real allocation would have to supply).  So these four ride through
    [syscall()] itself on the SAME channel [ut_own] already uses for them,
    in and out, exactly like [proc_priv] -- not through [syscall_env].
    Everything else in the union genuinely has no competing outer copy
    ([UsertrapRes.v] never mentions the icache/inode-region invariants, the
-   superblock cells, or [bitmap_res] at all), so it stays inside the
+   superblock cells, or the bitmap invariant at all), so it stays inside the
    still-abstract [syscall_env] -- but [syscall_env] is ALSO INDEXED BY
    [bn]/[fn], not just [γf]/[pj], for a second reason discovered writing
    [ProofSyscall.v]: eight entries (exit, pipe, close, chdir, mknod, link,
    mkdir, exec) need filesystem-fabric facts -- [bio_ctx], the kmem/itable
-   locks, the icache invariants -- keyed to the SAME [bn]/[fn] the five
+   locks, the icache invariants -- keyed to the SAME [bn]/[fn] the four
    explicit families above already carry.  Without the extra indices,
    [syscall_env]'s own internal existential witnesses for those facts could
    never be shown equal to the AMBIENT [bn]/[fn] a caller already fixed --
@@ -122,8 +122,7 @@ Require Import ProcInv.
 Require Import SchedCtx.
 Require Import IrefSlots.
 Require Import BioInv.        (* [bio_names], for [bslots] *)
-Require Import SpecFileclose. (* [fclose_names], [fileclose_bm] -- the five
-                                  shared families, see the header *)
+Require Import SpecFileclose. (* [fclose_names] -- see the header *)
 (* The classes the widened binder list now generalizes over
    ([kallocG]/[bioG]/[diskGhostG]/[uartGhostG]/[fsLogG]/[logG]/[fsCrashG]/
    [iregG]) -- [Require Import SpecFileclose]/[SpecSysExit] does not put
@@ -150,7 +149,7 @@ Definition wp_syscall_sconf_body
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (R : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
     (γf : gname) (γs : list gname) (j : nat) (γl : gname)
-    (bn : bio_names) (fn : fclose_names) (us : gset Z)
+    (bn : bio_names) (fn : fclose_names)
     (ip : mword 64) (dqi : dfrac)
     (m : regfile) (av : nat)
     (pid : mword 32) (V : pprivate) (lks : gset string) :=
@@ -186,14 +185,13 @@ Definition wp_syscall_sconf_body
      table) is the only entry that draws on them; the other twenty-one
      simply frame them across their own call. *)
   bslots bn 3 -∗
-  fileclose_bm fn us -∗
   (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
   fd_slots FDSPARE -∗
   iref_slots IREFSPARE -∗
   (* everything else the twenty-two entries consume, abstractly -- header.
      Indexed by [bn]/[fn] too, not just [γf]/[pj]: eight of the entries need
      filesystem-fabric facts (bio_ctx, the kmem/itable locks, icache
-     invariants) keyed to the SAME [bn]/[fn] the five explicit families
+     invariants) keyed to the SAME [bn]/[fn] the four explicit families
      above already carry, and an [R] that could not reference them would
      have no way to prove its own internal witnesses equal the ambient
      ones -- the "two owners" trap in reverse: not a competing copy, but an
@@ -231,7 +229,7 @@ Definition wp_syscall_sconf_body
      out of the PERSISTENT [is_kstack] alone -- which is why this change
      stops here and reaches neither [SpecUsertrap] nor [SpecUservec]. *)
   (wp_next true pj (fun (CID : CpuId) =>
-    ∀ (mf : regfile) (V' : pprivate) (us' : gset Z),
+    ∀ (mf : regfile) (V' : pprivate),
       ⌜ callee_saved m mf ⌝ -∗
       (* THE TRAPFRAME PAGE IS THE ONE THING THAT CANNOT MOVE.  Everything
          else in the record may: [pv_tf] always does (the a0 slot is the
@@ -240,10 +238,6 @@ Definition wp_syscall_sconf_body
       sie_cap_gpr KT1 mf av true pj -∗
       cpu_own 0%nat true pj true lks -∗
       bslots bn 3 -∗
-      (* [us] may shrink -- [SYSCLOSE]'s own postcondition re-indexes it the
-         same way ([fileclose_fs_env]'s [∃ us', ...]), and this call is the
-         one place that arm's [us'] has to be threaded back out to. *)
-      fileclose_bm fn us' -∗
       (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
       fd_slots FDSPARE -∗
       iref_slots IREFSPARE -∗
@@ -281,9 +275,9 @@ Module Type SYSCALL.
     forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γf : gname) (γs : list gname) (j : nat) (γl : gname)
-      (bn : bio_names) (fn : fclose_names) (us : gset Z)
+      (bn : bio_names) (fn : fclose_names)
       (ip : mword 64) (dqi : dfrac)
       (m : regfile) (av : nat)
       (pid : mword 32) (V : pprivate) (lks : gset string),
-      wp_syscall_sconf_body (syscall_env) γf γs j γl bn fn us ip dqi m av pid V lks.
+      wp_syscall_sconf_body (syscall_env) γf γs j γl bn fn ip dqi m av pid V lks.
 End SYSCALL.

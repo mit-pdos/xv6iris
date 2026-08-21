@@ -199,13 +199,13 @@ Section FsinitDefs.
   Definition fsi_cont `{GEN : GenId} `{CID0 : CpuId}
       (γfs : fs_names) (bn : bio_names)
       (cov : gset Z) (logstart bmapstart inodestart ninodes size : Z)
-      (used : gset Z) (dev : mword 32)
+      (dev : mword 32)
       (v_magic v_size v_nblocks v_nlog : mword 32)
       (bs_sb : list (bv 8))
       (pidv : mword 32) (dq : dfrac) (j : nat)
       (m : regfile) (K : nat) (b : bool) (lks : gset string) (Vpr : pprivate) : iProp Σ :=
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
-      ∀ (mf : regfile) (used' : gset Z),
+      ∀ (mf : regfile),
         ⌜callee_saved m mf⌝ -∗
         sie_cap_gpr KT1 mf K b (proc_addr j) -∗
         cpu_own 0 true (proc_addr j) b lks -∗
@@ -223,8 +223,6 @@ Section FsinitDefs.
         log_ctx icfg_log bn γfs cov logstart dev -∗
         bslots bn 3 -∗
         iref_slot -∗
-        ⌜used' ⊆ used⌝ -∗
-        bitmap_res γfs bmapstart cov logstart size used' -∗
         ireg_boot -∗
         WP (Loop : expr riscv_lang))%I.
 
@@ -281,13 +279,12 @@ Section FsinitEpilogue.
   Local Lemma fsi_epilogue `{GEN : GenId} `{CID0 : CpuId}
       (j : nat) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart bmapstart inodestart ninodes size : Z)
-      (used used' : gset Z) (dev : mword 32)
+      (dev : mword 32)
       (v_magic v_size v_nblocks v_nlog : mword 32)
       (bs_sb : list (bv 8))
       (pidv : mword 32) (dq : dfrac)
       (m M : regfile) (K : nat) (b : bool) (lks : gset string) (Vpr : pprivate) :
     (K_fsinit <= K)%nat ->
-    used' ⊆ used ->
     fsi_sp m M ->
     fsi_thr4 m M ->
     sie_cap_gpr KT1 M (K - 4)%nat b (proc_addr j) -∗
@@ -308,17 +305,16 @@ Section FsinitEpilogue.
     log_ctx icfg_log bn γfs cov logstart dev -∗
     bslots bn 3 -∗
     iref_slot -∗
-    bitmap_res γfs bmapstart cov logstart size used' -∗
     ireg_boot -∗
     fsi_cont (CID0 := CID0) γfs bn cov logstart bmapstart inodestart ninodes
-             size used dev v_magic v_size v_nblocks v_nlog bs_sb pidv dq j
+             size dev v_magic v_size v_nblocks v_nlog bs_sb pidv dq j
              m K b lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hsub Hsp Hthr.
+    intros HK Hsp Hthr.
     pose proof HK as HK'. 
     iIntros "Hcg Hcnt #Htext Hpc Hframe Hppid Hmg Hsz Hnb Hni Hnl Hls Hist
-              Hbms Hfsb Hlctx Hsl Hiref Hbm Hboot Hcont".
+              Hbms Hfsb Hlctx Hsl Hiref Hboot Hcont".
     iPoseProof (fsi_58 with "Htext") as "Hi58".
     iPoseProof (fsi_5a with "Htext") as "Hi5a".
     iPoseProof (fsi_5c with "Htext") as "Hi5c".
@@ -507,10 +503,10 @@ Section FsinitEpilogue.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     rewrite /fsi_cont.
     iSpecialize ("Hcont" $! CID6 with "[%]"); [wp_next_chain |].
-    iApply ("Hcont" $! P5 used' with "[%] Hcg Hcnt Hpc Hppid Hmg Hsz Hnb Hni
-                                       Hnl Hls Hist Hbms Hfsb Hlctx Hsl Hiref
-                                       [%] Hbm Hboot");
-      [exact Hcs | exact Hsub].
+    iApply ("Hcont" $! P5 with "[%] Hcg Hcnt Hpc Hppid Hmg Hsz Hnb Hni
+                                  Hnl Hls Hist Hbms Hfsb Hlctx Hsl Hiref
+                                  Hboot");
+      [exact Hcs].
   Qed.
 
 End FsinitEpilogue.
@@ -532,7 +528,6 @@ Section FsinitMain.
       (γpr : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z)
       (ninodes : Z) (nib : nat) (size : Z)
-      (used : gset Z)
       (dev : mword 32)
       (v_magic v_size v_nblocks v_ninodes v_nlog
        v_logstart v_inodestart v_bmapstart : mword 32)
@@ -547,7 +542,7 @@ Section FsinitMain.
       (b : bool) (lks : gset string) (Vpr : pprivate) :
       wp_fsinit_sconf_body γs j γl γu γd γk pd pav pu bn γfs γi cn gtl γpr
                            cov logstart bmapstart inodestart ninodes nib size
-                           used dev
+                           dev
                            v_magic v_size v_nblocks v_ninodes v_nlog
                            v_logstart v_inodestart v_bmapstart bs_sb sb_old
                            bs_hdr L D vlock vname vcpu v_start v_dev v_nc v_n
@@ -575,13 +570,13 @@ Section FsinitMain.
     assert (Hbnocov : uint bno ∈ bv_cov (fs_view γfs γd dev cov))
       by (rewrite Hbnou; exact H1cov).
     iIntros "Hcg Hcnt #Htext #Hkdata Hpc #Hpenv #Hbio #Hseam #Hgen
-              Hmirror Hlfree Hfsb Hsbold #Hireg Hboot #Hitb2 #Hitbl #Hesc #Hslks Hbm
+              Hmirror Hlfree Hfsb Hsbold #Hireg Hboot #Hitb2 #Hitbl #Hesc #Hslks #Hbm
               Hlock0 Hlname Hlcpu Hlstart Hldev Hlout Hlcmt Hlnc Hlhn Hlhblk
               HauthL HauthD Hdirty Hhdr Hlslots Hppid #Hprocs #Hdevi #Hdgeom
               #Hdlock Hsl Hiref Hcont".
     iPoseProof (printk_env_panic with "Hpenv") as "#Hpanenv".
     iAssert (fsi_cont (CID0 := CID) γfs bn cov logstart bmapstart inodestart
-               ninodes size used dev v_magic v_size v_nblocks v_nlog bs_sb
+               ninodes size dev v_magic v_size v_nblocks v_nlog bs_sb
                pidv dq j m K b lks Vpr)%I with "[Hcont]" as "Hcont";
       [rewrite /fsi_cont; iExact "Hcont" |].
     iPoseProof (fsi_00 with "Htext") as "Hi00".
@@ -1466,7 +1461,7 @@ Section FsinitMain.
                  with "Hcont") as "Hcont".
     iApply (IR.wp_ireclaim_sconf γs j γl γu γd γk pd pav pu bn
               icfg_log γfs γi cn gtl γpr cov logstart bmapstart inodestart
-              ninodes nib size used dev pidv dq (DfracOwn 1) (DfracOwn 1)
+              ninodes nib size dev pidv dq (DfracOwn 1) (DfracOwn 1)
               (DfracOwn 1) R1 (K - 4)%nat true b lks Vpr
               ltac:(lia) Hgeom Hist0 Hblk Hsize Hbm0
               Hbmcov Hbmlog Hcovb Hn1 Hnnib Hn31 Hpk Hj Hgl HR1a0 eq_refl
@@ -1475,8 +1470,8 @@ Section FsinitMain.
                     Hgen Hni Hist Hbms Hireg Hboot Hitb2 Hitbl Hesc Hslks Hbm Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hsl3 Hiref").
     all: try lkbelow.
-    iIntros (CID33 Hq33 mf used') "%Hcsir Hcg Hcnt Hpc Hni Hist Hbms Hppid
-                                   Hsl3 Hiref %Hsub Hbm Hboot".
+    iIntros (CID33 Hq33 mf) "%Hcsir Hcg Hcnt Hpc Hni Hist Hbms Hppid
+                             Hsl3 Hiref Hboot".
     assert (Hpc58 : ret_pc (R1 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.fsinit + 0x58))
       by (rewrite HR1ra; pcw).
@@ -1491,10 +1486,10 @@ Section FsinitMain.
       rewrite (callee_saved_lookup Hcsir_cs c Hcs).
       exact (HR1thr c Hcs N2' N8 N9 N18). }
     iApply (fsi_epilogue (CID0 := CID33) j bn γfs cov logstart bmapstart
-              inodestart ninodes size used used' dev v_magic v_size v_nblocks
-              v_nlog bs_sb pidv dq m mf K b lks Vpr HK Hsub Hmfsp Hmfthr
+              inodestart ninodes size dev v_magic v_size v_nblocks
+              v_nlog bs_sb pidv dq m mf K b lks Vpr HK Hmfsp Hmfthr
               with "Hcg Hcnt Htext Hpc Hframe Hppid Hmg Hsz Hnb Hni Hnl Hls
-                    Hist Hbms Hfsb Hlctx Hsl3 Hiref Hbm Hboot [Hcont]").
+                    Hist Hbms Hfsb Hlctx Hsl3 Hiref Hboot [Hcont]").
     { iApply (wp_next_shift (b := true) (CIDa := CID32) (CIDb := CID33)
                 ltac:(wp_next_chain) with "Hcont"). }
   Qed.

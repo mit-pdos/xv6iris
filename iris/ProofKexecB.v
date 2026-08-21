@@ -217,7 +217,6 @@ Section KexecBBody.
       (ga : gname) (gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32)
-      (used used2 : gset Z)
       (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap)
       (gilf gislf : gname) (n2 : nat)
@@ -242,7 +241,6 @@ Section KexecBBody.
     (jp < NPROC)%nat ->
     gs !! jp = Some gl ->
     eb = true ->
-    used2 ⊆ used ->
     (kf < NINODE)%nat ->
     bv_unsigned inumf < 16 * Z.of_nat nib ->
     (iput_units <= n2)%nat ->
@@ -272,7 +270,7 @@ Section KexecBBody.
     iref_slots 1 -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-    bitmap_res gfs bmapstart cov logstart size used2 -∗
+    bitmap_inv gfs bmapstart cov logstart size -∗
     bslots bn 3 -∗
     kalloc_env ga None -∗
     proc_priv gf (proc_addr jp) pidv V -∗
@@ -283,7 +281,7 @@ Section KexecBBody.
     kxc_frameA6 sp0 ra0 s00 s10 s20 pv av (m !!! Regidx Rs4) -∗
     (* ---- kexec's OWN continuation: the +0x31c tail closes the -1 arm ---- *)
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
-      ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
+      ∀ (mf : regfile) (V' : pprivate)
         (entry spv szv' : mword 64),
           ⌜callee_saved m mf⌝ -∗
           ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
@@ -292,8 +290,6 @@ Section KexecBBody.
           pc_is (ret_pc ra0) -∗
           sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
           sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-          ⌜used' ⊆ used⌝ -∗
-          bitmap_res gfs bmapstart cov logstart size used' -∗
           kalloc_env ga None -∗
           proc_priv gf (proc_addr jp) pidv V' -∗
           ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
@@ -307,7 +303,7 @@ Section KexecBBody.
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (M : regfile) (ef : nat -> bv 8) (P : uptd) (w67 : mword 64),
         kxc_at_1a2 jp bn g gfs gi cn ga gf cov logstart bmapstart inodestart
-                   nib size dev used used2 kf qf sf gyf inumf dnf bmf
+                   nib size dev kf qf sf gyf inumf dnf bmf
                    gilf gislf n2
                    plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas
                    m M K sp0 ra0 s00 s10 s20 pv av
@@ -319,7 +315,7 @@ Section KexecBBody.
            +0x31c tail above already owns one copy, so the successor cannot
            be left without one.  durable-notes' "CHAINING TWO HALVES". *)
         wp_next (CID0 := CID) b (proc_addr jp) (fun (CIDy : CpuId) =>
-          ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
+          ∀ (mf : regfile) (V' : pprivate)
             (entry spv szv' : mword 64),
               ⌜callee_saved m mf⌝ -∗
               ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
@@ -328,8 +324,6 @@ Section KexecBBody.
               pc_is (ret_pc ra0) -∗
               sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
               sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-              ⌜used' ⊆ used⌝ -∗
-              bitmap_res gfs bmapstart cov logstart size used' -∗
               kalloc_env ga None -∗
               proc_priv gf (proc_addr jp) pidv V' -∗
               ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
@@ -344,7 +338,7 @@ Section KexecBBody.
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (M : regfile) (ef : nat -> bv 8) (P : uptd),
         kxc_at_12c jp bn g gfs gi cn ga gf cov logstart bmapstart inodestart
-                   nib size dev used used2 kf qf sf gyf inumf dnf bmf
+                   nib size dev kf qf sf gyf inumf dnf bmf
                    gilf gislf n2
                    plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas
                    m M K sp0 ra0 s00 s10 s20 pv av
@@ -357,7 +351,7 @@ Section KexecBBody.
            +0x31c tail above already owns one copy, so the successor cannot
            be left without one.  durable-notes' "CHAINING TWO HALVES". *)
         wp_next (CID0 := CID) b (proc_addr jp) (fun (CIDy : CpuId) =>
-          ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
+          ∀ (mf : regfile) (V' : pprivate)
             (entry spv szv' : mword 64),
               ⌜callee_saved m mf⌝ -∗
               ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
@@ -366,8 +360,6 @@ Section KexecBBody.
               pc_is (ret_pc ra0) -∗
               sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
               sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-              ⌜used' ⊆ used⌝ -∗
-              bitmap_res gfs bmapstart cov logstart size used' -∗
               kalloc_env ga None -∗
               proc_priv gf (proc_addr jp) pidv V' -∗
               ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
@@ -380,12 +372,12 @@ Section KexecBBody.
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs Heb Hu2
+    intros HK Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs Heb
            Hk Hib Hn2 Hsp Hra Hs0 Hs1 Hs2
            HM90sp HM90s0 HM90s1 HM90s2 HM90s4 HM90thr.
     pose proof HK as HK'. 
     destruct (Hiregb inumf Hib) as [Hibc Hibl].
-    iIntros "#Htext #Hfab Hpc Hcg Hcnt Hopen Hlog Hirs Hbm Hins Hbits
+    iIntros "#Htext #Hfab Hpc Hcg Hcnt Hopen Hlog Hirs Hbm Hins #Hbits
              Hbs #Hka Hpriv Hpath Hargv Hargs Hframe Hcont Hcont1a2 Hcont12c".
     (* ---- convention 4: pin [b = eb = true] FIRST ---- *)
     iDestruct (kxc_sie_b_agree M90 0%nat (K - 68)%nat eb b (proc_addr jp)
@@ -851,7 +843,7 @@ Section KexecBBody.
             | exact HG4s6 | exact HG4thr]. }
         iSplitR.
         { iPureIntro. split_and!;
-            [exact Hk | exact Hib | exact Hn2 | exact Hu2 | exact Hal]. }
+            [exact Hk | exact Hib | exact Hn2 | exact Hal]. }
         iSplitR.
         { iPureIntro. split_and!;
             [exact HPtfp
@@ -873,7 +865,7 @@ Section KexecBBody.
         iSplitL "Hirs"; [iExact "Hirs" |].
         iSplitL "Hbm"; [iExact "Hbm" |].
         iSplitL "Hins"; [iExact "Hins" |].
-        iSplitL "Hbits"; [iExact "Hbits" |].
+        iSplitR; [iExact "Hbits" |].
         iSplitL "Hbs"; [iExact "Hbs" |].
         iSplitR; [iExact "Hka" |].
         iSplitL "Hpt"; [iExact "Hpt" |].
@@ -1120,7 +1112,7 @@ Section KexecBBody.
             | exact HG11s10 | exact HG11s11 | exact HG11a3]. }
         iSplitR.
         { iPureIntro. split_and!;
-            [exact Hk | exact Hib | exact Hn2 | exact Hu2 | exact Hal]. }
+            [exact Hk | exact Hib | exact Hn2 | exact Hal]. }
         iSplitR.
         { iPureIntro. split_and!;
             [ pose proof (eh_phnum_bound ef); lia
@@ -1142,7 +1134,7 @@ Section KexecBBody.
         iSplitL "Hirs"; [iExact "Hirs" |].
         iSplitL "Hbm"; [iExact "Hbm" |].
         iSplitL "Hins"; [iExact "Hins" |].
-        iSplitL "Hbits"; [iExact "Hbits" |].
+        iSplitR; [iExact "Hbits" |].
         iSplitL "Hbs"; [iExact "Hbs" |].
         iSplitR; [iExact "Hka" |].
         iSplitL "Hpt"; [iExact "Hpt" |].
@@ -1245,11 +1237,11 @@ Section KexecBBody.
                    with "Hcont") as "Hcont".
       iApply (A.kxc_bad64 gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
                 gilf gislf ga gf cov logstart bmapstart inodestart nib size
-                dev used used2 kf qf sf gyf inumf dnf bmf n2
+                dev kf qf sf gyf inumf dnf bmf n2
                 plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
                 m B1 K lks sp0 ra0 s00 s10 s20 pv av
                 HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib Hcovb Hn2
-                Hjp Hgs Hu2 Hsp Hra Hs0 Hs1 Hs2 HB1sp HB1s4 HB1thr
+                Hjp Hgs Hsp Hra Hs0 Hs1 Hs2 HB1sp HB1s4 HB1thr
                 with "Hcg Hcnt Htext Hpc Hfab Hslkk Hslkd Hdep
                       Hidev Hiinum Hivalid Hload Hity Hfrz Hkeep Hru Hbm Hins Hbits
                       Hka Hpriv Hpath Hargv Hargs Hbs Hirs Hlog [-Hcont]
