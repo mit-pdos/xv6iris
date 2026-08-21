@@ -663,3 +663,33 @@ Proof.
   split_and!; [exact lb_graph_consistent| |];
     by intros rw Hrw%elem_of_nil.
 Qed.
+
+(* ====================================================================== *)
+(** * 8. ADDITIVE HELPERS for the exchange kit (route B, stage B2)
+
+    Label-level bookkeeping the exchange lemmas ([WeakRvwmoXchg.v]) need:
+    the two "this event is a write / a read" bridges between the byte
+    footprints, the classifiers and [gis_w], and — the one that makes the
+    exchange lemmas' ppo⁻ side condition FREE for cross-hart pairs —
+    ppo⁻ IS SAME-HART.  Nothing above this line changes. *)
+
+Lemma glbl_is_w_gis_w G e : glbl_is G e lb_is_w → gis_w G e = true.
+Proof. intros (l & Hl & Hw). by rewrite /gis_w Hl. Qed.
+
+(** (Named [_gis_w], not [_is_w]: [WeakRvwmoLin.v] has a SECTION-LOCAL
+    [gwrites_byte_is_w] whose conclusion is the [glbl_is] form.) *)
+Lemma gwrites_byte_gis_w G e a v : gwrites_byte G e a v → gis_w G e = true.
+Proof.
+  intros (l & base & vs & j & Hl & Hwr & _ & _).
+  rewrite /gis_w Hl. by eapply lb_wr_is_w.
+Qed.
+
+(** EVERY ppo⁻ ARM IS SAME-HART — each of the four disjuncts carries
+    either [gpo] or [gfence_between], both of which pin the agent.  So a
+    CROSS-HART pair discharges any "no ppo⁻ edge" side condition for
+    free. *)
+Lemma gppo_same_hart G e1 e2 : gppo G e1 e2 → e1.1 = e2.1.
+Proof.
+  intros [[[Hag _] _]|[(pr & pw & sr & sw & (Hag & _) & _ & _)
+                       |[[[Hag _] _]|[[Hag _] _]]]]; exact Hag.
+Qed.

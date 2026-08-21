@@ -240,6 +240,28 @@ the normalization").
   ts and the fabric order (which is preserved).
 - **B1**: the prefix-realization statement (§3a/§3c) — T2-1c's prefix
   variant + T1, packaged as the induction invariant.
+- **B2a — LANDED (2026-08-21): the exchange kit's first lemma,
+  `iris/WeakRvwmoXchg.v`** — `gswap` (adjacent gmo swap via the `sidx`
+  involution: ONE lookup equation, the "except the swapped pair"
+  clause lives in `sidx_mono`/`sidx_mono_inv` once),
+  `gswap_read_down` (consistency preserved when the UPPER event is a
+  non-write, the lower is not its rf-source, and `¬ gppo lower upper`
+  — with `gppo_same_hart` making that free cross-hart), the `gdexec`
+  corollary (the no-dep side condition DERIVED from `gdeps_wf`, not
+  hypothesized), `gviol`/`gviol_grule14`, `gswap_viol_mono`
+  (violations only shrink under a read-down move) and
+  `gswap_resolves` (the swapped pair's violation dies — the measure
+  step).  All Closed, no axioms, ZERO hypotheses beyond the spec (one
+  spec hypothesis removed as derivable).  KEY SCOPE FACT: the lemma's
+  only label hypothesis is "the upper event is not a write", so it
+  covers BOTH `(W,R)` and `(R,R)` adjacencies — and `(W,R)` IS
+  write-moves-up-past-a-read viewed from the other end.  B2b's new
+  work is only `(R,W)` (write down past a read: the read's visible
+  set GROWS, so co-maximality needs a `ts ≥ gwix w`-or-byte-disjoint
+  side condition) and `(W,W)` (the real work: `gwrites` itself swaps,
+  readers' `ts` entries renumber; the §1 `lswap` kit self-applies at
+  the `gwrites` level).  The RMW-read case (upper event a fused
+  RMW) is deliberately out of B2a's scope.
 - **B2**: the exchange lemma's case trichotomy (§3b) with the kills
   wired per S6 §3; the induction + measure.  NOTE from the B0 pass
   (2026-08-21): several S6 kills flip from reader-refutation to

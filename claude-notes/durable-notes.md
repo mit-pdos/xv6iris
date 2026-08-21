@@ -117,9 +117,14 @@ change that produced it.
   stdpp ones (`list_basics.filter_app`, `list_relations.NoDup_app`/`_filter`/
   `_Permutation`), use `NoDup_cons_1_1`/`_1_2` and `Forall_lookup_1`/`_2`.
   `filter_cons`, `elem_of_list_filter`, `list_filter_filter`, `list_filter_iff`,
-  `NoDup_alt`, `NoDup_lookup` are stdpp-only and safe.  Related paper cut:
+  `NoDup_alt`, `NoDup_lookup` are stdpp-only and safe.  Related paper cuts:
   `StronglySorted`-family lemmas hand back un-beta-reduced `R x y`, so `lia`
-  fails with "Cannot find witness" until `cbn in H`.
+  fails with "Cannot find witness" until `cbn in H`; in the same import
+  context `if decide P then _ else _` does NOT elaborate (the scrutinee is
+  forced to `bool`) — use `bool_decide` + `case_bool_decide` in definitions;
+  and `lia` consumes the propositional structure of arithmetic hypotheses
+  (e.g. `¬ (p1 = n ∧ p2 = S n)`) on its own, so a following
+  `exfalso; apply Hne` fails with "No such goal".
 
 ## Changing the kernel SOURCE: what an image shift breaks, and how to find it
 
