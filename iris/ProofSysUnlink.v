@@ -1054,8 +1054,10 @@ Section ProofSysUnlinkBody.
                       = mword_of_int (SU + 0x1c)) by pcw.
       iEval (rewrite Hpp1c) in "Hpc".
       (* THE PROCESS BLOCK, OPENED for the walk. *)
+      (* three-way now: [FirstTok.first_tok] parks beside the reference and
+         is handed straight back at the rejoins below. *)
       iDestruct (proc_priv_split_cwd gf (proc_addr jx) pid (upd_upt V P1) with "Hpriv")
-        as "[Hpnc Href]".
+        as "[Hpnc [Href Hftok]]".
       iEval (rewrite proc_priv_nocwd_bare) in "Hpnc".
       iDestruct "Hpnc" as "[Hpidq Hofiles]".
       iDestruct (cwd_ref_held with "Href") as "Hcwdref".
@@ -1241,8 +1243,8 @@ Section ProofSysUnlinkBody.
         iCombine "Hpidq Hofiles" as "Hpnc".
         iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
         iDestruct (proc_priv_split_cwd gf (proc_addr jx) pid (upd_upt V P1)
-                     with "[Hpnc Href]") as "Hpriv";
-          [iSplitL "Hpnc"; [iExact "Hpnc" | iExact "Href"] |].
+                     with "[Hpnc Href Hftok]") as "Hpriv";
+          [iSplitL "Hpnc"; [iExact "Hpnc" | iFrame "Href Hftok"] |].
         (* the path buffer, rejoined and renamed *)
         iDestruct (su_buf_join (pa_stk sp0 26) bp1 pk1 Hpk1
                      with "Hbufp Hbufpr") as "HbPj".
@@ -1306,7 +1308,7 @@ Section ProofSysUnlinkBody.
                         Hpidq Hprocs Hdev Hgeo Hdlk [HopS] Hf1 Hf2 Hf3 Hf4
                         Hf5 Hf6 HbD HbNj HbPj H27 HbE H30
                         [Hcont Hbsl Hsbb Hsbi Hsbs Hir2 Hofiles
-                         Hcwdref]").
+                         Hcwdref Hftok]").
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
         { rewrite /log_op. iExists Sb1. iExact "HopS". }
@@ -1317,8 +1319,8 @@ Section ProofSysUnlinkBody.
         iCombine "Hpidq Hofiles" as "Hpnc".
         iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
         iDestruct (proc_priv_split_cwd gf (proc_addr jx) pid (upd_upt V P1)
-                     with "[Hpnc Href]") as "Hpriv";
-          [iSplitL "Hpnc"; [iExact "Hpnc" | iExact "Href"] |].
+                     with "[Hpnc Href Hftok]") as "Hpriv";
+          [iSplitL "Hpnc"; [iExact "Hpnc" | iFrame "Href Hftok"] |].
         iEval (rewrite -su_slots2) in "Hir2".
         iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
         iApply ("Hcont" $! mf P1 with "[%] [%] Hcg Hown Htce Hcce Hpc

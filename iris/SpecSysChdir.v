@@ -151,6 +151,10 @@ Notation K_sys_chdir := (136%nat) (only parsing).
 Section SpecSysChdir.
   Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
+  (* [GenId], for [ProcInv.proc_priv]'s own index: the private block now
+     carries [FirstTok.first_tok], whose boot arm names [gen_cert].  The
+     definitions below mention the block, so the section has to bind it. *)
+  Context `{GEN : GenId}.
 
   (* sys_chdir's result, keyed by the returned a0.  The -1 arm gives the
      process block back at the working directory it came in with; the 0 arm

@@ -69,6 +69,7 @@ Require Import FdSlots.
 Require Import FileInvDefs.
 Require Import WpLock.
 Require Import ProcInv.
+Require Import FirstTok.  (* [first_done] / [first_tok_of_done] *)
 Require Import FsBlocks.
 Require Import InodeRegion.
 Require Import IrefSlots.
@@ -139,6 +140,9 @@ Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 (* ===================================================================== *)
 Section KforkB4Res.
   Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
+  (* [ProcInv.proc_priv]'s new index -- the block carries
+     [FirstTok.first_tok] and its boot arm names [gen_cert]. *)
+  Context `{GEN : GenId}.
 
   (* Worth adding to ProcInv.v as [proc_priv_name], next to [proc_priv_cwd]:
      same shape (open [proc_fields], hand out the one field, take back a
@@ -151,7 +155,7 @@ Section KforkB4Res.
     (∀ ns : list (bv 8), ⌜length ns = PNAMELEN⌝ -∗ pname_cells pa (DfracOwn 1) ns -∗
        proc_priv γf pa pid (MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) (pv_cwd V) ns)).
   Proof.
-    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc) Ho]".
+    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft) Ho]".
     rewrite /proc_fields. iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
     iSplitL "Hnm"; [iExact "Hnm" |].
     iSplitR; [done |].
@@ -164,7 +168,7 @@ Section KforkB4Res.
     { iFrame "Hsz Hcwd Hnm'". iPureIntro. exact Hnl'. }
     iSplitL "Hpt"; [iExact "Hpt"|].
     iSplitL "Htfp"; [iExact "Htfp"|].
-    iExact "Hc".
+    iSplitL "Hc"; [iExact "Hc"|]. iExact "Hft".
   Qed.
 
   (* THE CHILD'S OWN cwd REFERENCE, out of the reference idup MINTS.
@@ -248,6 +252,11 @@ Section KforkB4Proof.
        [IREFSPARE] rides through to the park. *)
     iref_slots (1 + IREFSPARE) -∗
     proc_priv γf pme pid_p Vp -∗
+    (* THE CHILD'S TOKEN'S SOURCE.  The parent's [FirstTok.first_tok] is
+       inside its own block and may be the EXCLUSIVE boot arm, so it cannot
+       be copied; [first_done] is the steady arm alone, persistent, and
+       [first_tok_of_done] is what mints the child's at the store below. *)
+    first_done -∗
     (* THE CHILD IS STILL IN THE CONSTRUCTION WINDOW: allocproc left
        [np->cwd] at 0 and nothing has set it, so there is no [proc_priv] at
        this [Vc].  The [sd a0,336(s4)] below is what closes the window. *)
@@ -271,7 +280,8 @@ Section KforkB4Proof.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hlvl Hms5 Hms4 Hfresh.
-    iIntros "Hcg Hown #Htext Hpc #Hitb #Hitinv #Hireg Hir Hparent Hchild Hcont".
+    iIntros "Hcg Hown #Htext Hpc #Hitb #Hitinv #Hireg Hir Hparent #Hfdone
+             Hchild Hcont".
     iDestruct (iref_slots_split 1 IREFSPARE with "Hir") as "[Hirs Hirsp]".
     iPoseProof (kfk_0a4 with "Htext") as "Hi0a4".
     iPoseProof (kfk_0a8 with "Htext") as "Hi0a8".
@@ -410,7 +420,10 @@ Section KforkB4Proof.
     iAssert (proc_priv γf npa pid_c (upd_cwd Vc (ientry ck))) with "[Hchild2 Hccref2]"
       as "Hchild2".
     { iApply proc_priv_split_cwd. iFrame "Hchild2".
-      by cbn [upd_cwd pv_cwd]. }
+      iSplitL "Hccref2"; [by cbn [upd_cwd pv_cwd] |].
+      (* THE MINT.  The child's token is the steady arm of the disjunction,
+         built from the persistent [first_done] the caller threaded in. *)
+      iApply (first_tok_of_done with "Hfdone"). }
     set (Vc2 := upd_cwd Vc (ientry ck)).
     (* the store touches no register *)
     set (M2 := mr).

@@ -94,6 +94,9 @@ Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import LockRank.
 Require Import KallocInv.
+Require Import KvmSpec.   (* [kalloc_env], [kalloc_env_seal] *)
+Require Import FsCfg.     (* [fsc_kalloc] *)
+Require Import FirstTok.  (* [first_tok_boot] -- the deposit *)
 Require Import FdSlots.
 Require Import IrefSlots.
 Require Import WpUart.
@@ -224,21 +227,24 @@ Section ProofUserinit.
 
   Local Ltac regne := reg_ne_side.
 
-  (* THE FTABLE'S GNAME IS PICKED HERE, and [γa] is as good as any: it
+  (* THE FTABLE'S GNAME IS PICKED HERE, and [γp] is as good as any: it
      appears in allocproc's post ([ProcInv.proc_priv_nocwd γf]) and in
      [FORKRET_PARK]'s premise, both universally quantified over it, and in
      nothing this contract states -- the block userinit hands over has every
-     descriptor null.  See [SpecUserinit]'s last paragraph. *)
+     descriptor null.  See [SpecUserinit]'s last paragraph.  (It used to be
+     the allocator's [γa]; that parameter is gone -- the contract states the
+     allocator at the ambient [fsc_kalloc] so that the seal below can build
+     the boot token's own row.) *)
   Lemma wp_userinit_sconf
-      (γa γp : gname) (γs : list gname)
+      (γp : gname) (γs : list gname)
       (m : regfile) (K : nat) (eb : bool) (pj : mword 64)
       (on : option nat) (np : nat) (v0 : mword 64)
       (b : bool) (lks : gset string)
-    : wp_userinit_sconf_body γa γp γs m K eb pj on np v0 b lks.
+    : wp_userinit_sconf_body γp γs m K eb pj on np v0 b lks.
   Proof.
     cbv beta delta [wp_userinit_sconf_body].
     intros pcE ret_tgt HK Hnb Hdev Hnib Hbelow.
-    pose (γf := γa).
+    pose (γf := γp).
     destruct (uin_kb K HK) as (Kap & Knm & Krl & K4 & Kpop).
     (* the four inode-cache rows are PERSISTENT and are relayed unchanged to
        namei's root corner at +0x20 (fs-cfg-boot.md stage (e)); nothing else
@@ -398,7 +404,7 @@ Section ProofUserinit.
                  ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iDestruct (wp_next_shift (b := b) (CIDa := CID) (CIDb := CID6)
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
-    iApply (AP.wp_allocproc_sconf γa γp γf γs R3 0%nat (K - 4)%nat b pj
+    iApply (AP.wp_allocproc_sconf fsc_kalloc γp γf γs R3 0%nat (K - 4)%nat b pj
               on (Some (S np)) b lks
               Kap ltac:(lia) Hnb Hbelow
               with "Hcg Hcpu Htext Hpc Hpinv Hlpid Hkenv Hpav").
@@ -567,13 +573,14 @@ Section ProofUserinit.
     { assert (Hr : rget mr2 Ra0 = mr2 !!! Regidx Ra0) by (rgne; reflexivity).
       rewrite Hr. exact Hnma0. }
     iEval (rewrite Hstored_cwd Hcwdaddr) in "Hcwd".
-    iDestruct ("Hback" $! ipv with "Hcwd Hpid4") as "Hpriv".
-    (* ...and the block is complete again, at the cwd namei just installed *)
+    iDestruct ("Hback" $! ipv with "Hcwd Hpid4") as "Hpnc".
+    (* the reference namei's [iget] returned, in the shape the block wants *)
     iDestruct (cwd_ref_of_held ipv with "Hip") as "Hcref".
-    iAssert (proc_priv γf (proc_addr j) pid (upd_cwd V ipv)) with "[Hpriv Hcref]"
-      as "Hpriv".
-    { rewrite proc_priv_split_cwd. iFrame "Hpriv".
-      cbn [upd_cwd pv_cwd]. iExact "Hcref". }
+    (* THE BLOCK IS *NOT* CLOSED HERE any more.  Since [FirstTok.first_tok]
+       became a conjunct of [proc_priv], closing it needs the token too, and
+       the token's allocator row is minted by a ghost step -- so the three
+       pieces meet at the park below, which is the first point in this proof
+       where an [iMod] is available. *)
     assert (Hpp28 : add_vec_int (mword_of_int (UI + 0x24) : mword 64) 4
                     = mword_of_int (UI + 0x28)) by pcw.
     iEval (rewrite Hpp28) in "Hpc".
@@ -619,41 +626,43 @@ Section ProofUserinit.
     iEval (rewrite (_ : SpecAllocproc.forkret_pc = SpecForkretPark.forkret_pc);
            [| reflexivity]) in "Hctx".
     (* ================================================================= *)
-    (* STAGE (f)'S DEPOSIT SITE -- D1, THE HUMANS' SEAM.                  *)
-    (*                                                                   *)
-    (* THIS is where [FirstTok.first_tok] belongs: forkret runs on the    *)
-    (* context this park saves, and forkret's [if (first)] arm is the     *)
-    (* token's only consumer.  Three of the token's four rows are in hand *)
-    (* RIGHT HERE and have been carried across allocproc and namei        *)
-    (* untouched -- [Hfirst] (the pinned [first_addr ↦₄ 1] cell),         *)
-    (* [Hpersist] ([first_boot_persist], sixteen persistent rows) and     *)
-    (* [Hfsinit] ([first_fsinit], SpecFsinit's whole exclusive premise    *)
-    (* pile).  They are DROPPED, and the reason is precise:               *)
-    (*                                                                   *)
-    (*   (1) [SpecForkretPark.forkret_park_body] does not take a          *)
-    (*       [first_tok] row yet.  That row is D1 and the humans own the  *)
-    (*       statement (LinkForkretNF.v's header records their plan):     *)
-    (*       [SpecForkret.wp_forkret_gen_body] at [Pfirst := first_tok],  *)
-    (*       and one tier up [forkret_park_body] + [forkret_park_pkg].    *)
-    (*       When it lands, this call gains ONE argument and the drop     *)
-    (*       below becomes [FirstTok.first_tok_boot ...].                 *)
-    (*                                                                   *)
-    (*   (2) The token's FOURTH row -- [kalloc_avail fsc_kpages None] --  *)
-    (*       has no producer yet, so the token cannot be FORMED even if   *)
-    (*       the seam existed.  Debt (F): allocproc's post returns        *)
-    (*       [KvmSpec.kalloc_env γa _], whose [∃ γk] is re-introduced by  *)
-    (*       [SpecProcPagetable]'s own post, and [WpLock.is_lock] has no  *)
-    (*       resource-agreement lemma, so the sealed count cannot be tied *)
-    (*       back to [fsc_kpages].  fs-cfg-boot.md (f-4) records the two  *)
-    (*       ways out.                                                    *)
-    (*                                                                   *)
-    (* Until BOTH land, staging is the honest thing: the three rows reach *)
-    (* the one site that can deposit them, and the drop is a one-line     *)
-    (* edit away from being the deposit.                                  *)
+    (* THE DEPOSIT SITE -- and it is a DEPOSIT now, not a drop.            *)
+    (*                                                                    *)
+    (* [FirstTok.first_tok] is a conjunct of [ProcInv.proc_priv], so the   *)
+    (* token goes into the FIRST PROCESS'S BLOCK, which this park hands to *)
+    (* the scheduler.  That is the whole route: forkret runs on the        *)
+    (* context this park saves, forkret's [if (first)] arm is the token's  *)
+    (* only consumer, and the block is what a parked process still owns.   *)
+    (* No premise of [SpecForkretPark.forkret_park_body] had to grow --    *)
+    (* the row rides inside the [proc_priv] that contract already takes.   *)
+    (*                                                                    *)
+    (* Three of the four rows were carried here across allocproc and namei *)
+    (* untouched ([Hfirst], [Hpersist], [Hfsinit]); the fourth is minted   *)
+    (* by the seal below.  See [FirstTok.first_tok]'s own note for why the *)
+    (* allocator row is the BUNDLE and not the spelled pair.               *)
     (* ================================================================= *)
-    iClear "Hpersist".
-    iDestruct "Hfirst" as "_".
-    iDestruct "Hfsinit" as "_".
+    (* ================================================================= *)
+    (* THE SEAL.  allocproc's draw at +0x0a was the LAST counted kalloc in
+       the whole boot -- nothing between here and the scheduler allocates --
+       so the allocator's regime leaves the counted world for good here.
+       [KallocInv.kalloc_avail_seal] is a one-shot and the result is
+       PERSISTENT, which is why it can ride a token that a process carries
+       and (at its steady arm) every later process copies. *)
+    iMod (kalloc_env_seal fsc_kalloc (avail_sub on nc) with "Hkenv")
+      as "#Hkenv".
+    (* ...AND THE DEPOSIT.  All four rows of [FirstTok.first_tok]'s boot arm
+       are in hand at this instant and nowhere else: the pinned
+       [first_addr ↦₄ 1] cell, [first_boot_persist] (main's sixteen
+       persistent rows) and [first_fsinit] (SpecFsinit's whole exclusive
+       premise pile) were carried across allocproc and namei untouched, and
+       the allocator row is what the [iMod] above just minted. *)
+    iDestruct (first_tok_boot with "Hfirst Hpersist Hkenv Hfsinit")
+      as "Hftok".
+    iAssert (proc_priv γf (proc_addr j) pid (upd_cwd V ipv))
+      with "[Hpnc Hcref Hftok]" as "Hpriv".
+    { rewrite proc_priv_split_cwd. iFrame "Hpnc".
+      iSplitL "Hcref"; [cbn [upd_cwd pv_cwd]; iExact "Hcref" |].
+      iExact "Hftok". }
     iMod (FP.forkret_park γs γf (proc_addr j) ks rest pid (upd_cwd V ipv) Hrest
             with "Hks Hctx Hpriv Hfd Hirs") as "Hpctx".
     iMod (pstate_whole_update (proc_addr j) USED RUNNABLE with "Hpwhole")
@@ -885,10 +894,10 @@ Section ProofUserinit.
     iDestruct (cpu_own_transport CID20 CID25 0%nat b pj b
                  ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iSpecialize ("Hcont" $! CID25 with "[%]"); [wp_next_chain |].
-    iApply ("Hcont" $! P4 with "Hcg Hpc [%] Hcpu [Hkenv] Hpav [Hinitproc]").
+    iApply ("Hcont" $! P4 with "Hcg Hpc [%] Hcpu [] Hpav [Hinitproc]").
     - split; [| exact HP4ra].
       unfold callee_saved. split_and!; assumption.
-    - iExists nc. iSplitR; [iPureIntro; exact Hnc |]. iExact "Hkenv".
+    - iExact "Hkenv".
     - iExists _. iExact "Hinitproc".
   Qed.
 

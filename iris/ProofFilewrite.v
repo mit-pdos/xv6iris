@@ -762,6 +762,10 @@ Section FwWriteiSrc.
      would also re-resolve every other unqualified name in the file -- see
      the header's [FW_MAX] warning. *)
   Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  (* ...and [GenId], which [ProcInv.proc_priv_core] acquired with
+     [FirstTok.first_tok].  [RiscvLang] IS imported (line ~339), so unlike
+     [pavG] above this one binds the real class. *)
+  Context `{GEN : GenId}.
 
   (* A BI-ENTAILMENT, so it covers both ends of the call at once: read left
      to right it is what the walk must SUPPLY at +0xa0, right to left what

@@ -376,6 +376,9 @@ Qed.
 (* ===================================================================== *)
 Section WriteiDefs.
   Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, ICFG : icfg}.
+  (* [GenId]: [ProcInv.proc_priv]'s index since the block carries
+     [FirstTok.first_tok] (whose boot arm names [gen_cert]). *)
+  Context `{GEN : GenId}.
 
   (* the CALLER's buffer tier -- see this function's spec for why it is not
      [KT1].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at
@@ -503,7 +506,7 @@ Section WriteiDefs.
 
   (* THE CONTINUATION, named so it is not re-traversed by every proofmode
      split (claude-notes/optimization.md). *)
-  Definition wi_cont `{GEN : GenId} `{CID0 : CpuId}
+  Definition wi_cont `{CID0 : CpuId}
       (γfs : fs_names) (γi : gname) (bn : bio_names) (γ : log_names)
       (γf : gname)
       (cov : gset Z) (logstart inodestart : Z) (nib : nat) (dev : mword 32)
@@ -592,6 +595,9 @@ Definition wi_sp (m M : regfile) : Prop :=
 (* ===================================================================== *)
 Section WriteiRet.
   Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, ICFG : icfg}.
+  (* [GenId]: [ProcInv.proc_priv]'s index since the block carries
+     [FirstTok.first_tok] (whose boot arm names [gen_cert]). *)
+  Context `{GEN : GenId}.
 
   (* the CALLER's buffer tier -- see this function's spec for why it is not
      [KT1].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at
@@ -599,7 +605,7 @@ Section WriteiRet.
      datum tier out loud (the blanket [(ktd := KT1)] below). *)
   Context {ktb : ktier}.
   Context `{!KtierLe ktb KT1}.
-  Local Lemma wi_ret `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma wi_ret `{CID0 : CpuId} 
       (γfs : fs_names) (γi : gname) (bn : bio_names) (γ : log_names)
       (γf : gname)
       (cov : gset Z) (logstart inodestart : Z) (nib : nat) (dev : mword 32)
@@ -977,6 +983,9 @@ End WriteiRet.
 (* ===================================================================== *)
 Section WriteiJoin.
   Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, ICFG : icfg}.
+  (* [GenId]: [ProcInv.proc_priv]'s index since the block carries
+     [FirstTok.first_tok] (whose boot arm names [gen_cert]). *)
+  Context `{GEN : GenId}.
 
   (* the CALLER's buffer tier -- see this function's spec for why it is not
      [KT1].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at
@@ -984,7 +993,7 @@ Section WriteiJoin.
      datum tier out loud (the blanket [(ktd := KT1)] below). *)
   Context {ktb : ktier}.
   Context `{!KtierLe ktb KT1}.
-  Local Lemma wi_join `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma wi_join `{CID0 : CpuId} 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -1371,6 +1380,9 @@ End WriteiJoin.
 (* ===================================================================== *)
 Section WriteiSize.
   Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, ICFG : icfg}.
+  (* [GenId]: [ProcInv.proc_priv]'s index since the block carries
+     [FirstTok.first_tok] (whose boot arm names [gen_cert]). *)
+  Context `{GEN : GenId}.
 
   (* the CALLER's buffer tier -- see this function's spec for why it is not
      [KT1].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at
@@ -1378,7 +1390,7 @@ Section WriteiSize.
      datum tier out loud (the blanket [(ktd := KT1)] below). *)
   Context {ktb : ktier}.
   Context `{!KtierLe ktb KT1}.
-  Local Lemma wi_size `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma wi_size `{CID0 : CpuId} 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -1972,6 +1984,9 @@ End WriteiSize.
 (* ===================================================================== *)
 Section WriteiLoop.
   Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, ICFG : icfg}.
+  (* [GenId]: [ProcInv.proc_priv]'s index since the block carries
+     [FirstTok.first_tok] (whose boot arm names [gen_cert]). *)
+  Context `{GEN : GenId}.
 
   (* the CALLER's buffer tier -- see this function's spec for why it is not
      [KT1].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at
@@ -1993,7 +2008,7 @@ Section WriteiLoop.
     repeat rewrite add_vec_zero_l;
     first [ reflexivity | assumption ].
 
-  Local Lemma wi_loop `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma wi_loop `{CID0 : CpuId} 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)

@@ -151,6 +151,9 @@ Local Ltac nz := vm_compute; discriminate.
 (* ===================================================================== *)
 Section ReadiDefs.
   Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
+  (* [GenId]: [ProcInv.proc_priv]'s index since the block carries
+     [FirstTok.first_tok] (whose boot arm names [gen_cert]). *)
+  Context `{GEN : GenId}.
 
   (* the CALLER's buffer tier -- see this function's spec for why it is not
      [KT1].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at
@@ -268,7 +271,7 @@ Section ReadiDefs.
 
   (* THE CONTINUATION, named so it is not re-traversed by every proofmode
      split (claude-notes/optimization.md). *)
-  Definition rd_cont `{GEN : GenId} `{CID0 : CpuId}
+  Definition rd_cont `{CID0 : CpuId}
       (γfs : fs_names) (bn : bio_names) (γf : gname) (dev : mword 32)
       (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8)) (dn : dinode)
       (user : bool) (off n : nat) (dst_olds : nat -> bv 8)
@@ -311,6 +314,9 @@ Definition rd_sp (m M : regfile) : Prop :=
 (* ===================================================================== *)
 Section ReadiRet.
   Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
+  (* [GenId]: [ProcInv.proc_priv]'s index since the block carries
+     [FirstTok.first_tok] (whose boot arm names [gen_cert]). *)
+  Context `{GEN : GenId}.
 
   (* the CALLER's buffer tier -- see this function's spec for why it is not
      [KT1].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at
@@ -318,7 +324,7 @@ Section ReadiRet.
      datum tier out loud (the blanket [(ktd := KT1)] below). *)
   Context {ktb : ktier}.
   Context `{!KtierLe ktb KT1}.
-  Local Lemma rd_ret `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma rd_ret `{CID0 : CpuId} 
       (γfs : fs_names) (bn : bio_names) (γf : gname) (dev : mword 32)
       (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8)) (dn : dinode)
       (user : bool) (off n tot : nat) (dst_olds : nat -> bv 8)
@@ -631,6 +637,9 @@ End ReadiRet.
 (* ===================================================================== *)
 Section ReadiJoin.
   Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
+  (* [GenId]: [ProcInv.proc_priv]'s index since the block carries
+     [FirstTok.first_tok] (whose boot arm names [gen_cert]). *)
+  Context `{GEN : GenId}.
 
   (* the CALLER's buffer tier -- see this function's spec for why it is not
      [KT1].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at
@@ -638,7 +647,7 @@ Section ReadiJoin.
      datum tier out loud (the blanket [(ktd := KT1)] below). *)
   Context {ktb : ktier}.
   Context `{!KtierLe ktb KT1}.
-  Local Lemma rd_join `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma rd_join `{CID0 : CpuId} 
       (γfs : fs_names) (bn : bio_names) (γf : gname) (dev : mword 32)
       (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8)) (dn : dinode)
       (user : bool) (off n tot : nat) (dst_olds : nat -> bv 8)
@@ -775,6 +784,9 @@ End ReadiJoin.
 (* ===================================================================== *)
 Section ReadiExit.
   Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
+  (* [GenId]: [ProcInv.proc_priv]'s index since the block carries
+     [FirstTok.first_tok] (whose boot arm names [gen_cert]). *)
+  Context `{GEN : GenId}.
 
   (* the CALLER's buffer tier -- see this function's spec for why it is not
      [KT1].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at
@@ -782,7 +794,7 @@ Section ReadiExit.
      datum tier out loud (the blanket [(ktd := KT1)] below). *)
   Context {ktb : ktier}.
   Context `{!KtierLe ktb KT1}.
-  Local Lemma rd_exit `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma rd_exit `{CID0 : CpuId} 
       (γfs : fs_names) (bn : bio_names) (γf : gname) (dev : mword 32)
       (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8)) (dn : dinode)
       (user : bool) (off n tot : nat) (dst_olds : nat -> bv 8)
@@ -1018,6 +1030,9 @@ End ReadiExit.
 (* ===================================================================== *)
 Section ReadiLoop.
   Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
+  (* [GenId]: [ProcInv.proc_priv]'s index since the block carries
+     [FirstTok.first_tok] (whose boot arm names [gen_cert]). *)
+  Context `{GEN : GenId}.
 
   (* the CALLER's buffer tier -- see this function's spec for why it is not
      [KT1].  A KtierLe HYPOTHESIS in the section beats [ktier_le_refl] at
@@ -1044,7 +1059,7 @@ Section ReadiLoop.
      re-embedding ~20 lines of ∀/wands per step.  The ∀ binders stay
      visible at the [iAssert] below; only what they quantify over is
      folded here. *)
-  Definition rd_chunk_body `{GEN : GenId}
+  Definition rd_chunk_body
       (j : nat) (b : bool) (K : nat) (m : regfile) (nc tot o : nat)
       (kkb : nat) (usv ip : mword 64) (off : nat) (CIDa14 : CpuId)
       (CIDb : CpuId) (Mb : regfile) (mm : nat) : iProp Σ :=
@@ -1066,7 +1081,7 @@ Section ReadiLoop.
      pc_is (mword_of_int (RI + 0x4c) : mword 64) -∗
      WP (Loop : expr riscv_lang))%I.
 
-  Local Lemma rd_loop `{GEN : GenId} `{CID0 : CpuId}
+  Local Lemma rd_loop `{CID0 : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)

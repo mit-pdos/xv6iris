@@ -79,6 +79,10 @@ Local Open Scope Z_scope.
 Notation sys_dup_stack := (30%nat) (only parsing).
 Section SpecSysDup.
   Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
+  (* [GenId], for [ProcInv.proc_priv]'s own index: the private block now
+     carries [FirstTok.first_tok], whose boot arm names [gen_cert].  The
+     definitions below mention the block, so the section has to bind it. *)
+  Context `{GEN : GenId}.
 
   (* sys_dup's result, keyed by the returned a0.  THREE arms, because there are
      two ways to fail and they are distinguishable: no such descriptor, or no

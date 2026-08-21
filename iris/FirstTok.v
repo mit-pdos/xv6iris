@@ -375,9 +375,33 @@ Section FirstTok.
   (*  4.  THE TOKEN                                                       *)
   (* ================================================================== *)
 
+  (* THE ALLOCATOR ROW IS THE *BUNDLE*, NOT THE SPELLED PAIR, and the
+     spelling is forced by WHO CAN PRODUCE IT (fs-cfg-boot.md (f-4), debt F,
+     and its successor decision point D4).
+
+     [fs_ready_pre] row 17 wants [kalloc_avail fsc_kpages None] -- the pair
+     NAMED.  Nobody can hand that over.  The seal is
+     [KallocInv.kalloc_avail_seal], which consumes the EXCLUSIVE counted
+     token; the last counted draw in the whole boot is allocproc's, inside
+     userinit; and what allocproc gives back is [KvmSpec.kalloc_env], whose
+     [∃ γk] has already swallowed the name ([WpLock.is_lock] has no
+     resource-agreement lemma, so no equation recovers it).  So the earliest
+     moment the sealed regime EXISTS, it exists only in bundled form -- and
+     the token has to carry what its one producer can produce, or userinit's
+     park cannot be typed at all.
+
+     WHAT THIS LEAVES OPEN, precisely: [first_persist_pre] below still takes
+     [kalloc_avail fsc_kpages None] as its own argument, because
+     [FsReady.fs_ready_pre] still spells it.  Bridging the two is exactly
+     debt F / D4 (spell the pair through allocproc, or relax [fs_ready]'s
+     rows 16+17 to this same bundle) and it is a separate, chartered change:
+     [fs_ready]'s spelled pair is re-exported by
+     [ProofSyscall.sysc_fs_env], so relaxing it moves the fileclose cone.
+     Nothing here is hedged -- the token says what it has, and the residual
+     is one named row at a seal site that does not exist yet. *)
   Definition first_tok : iProp Σ :=
     ((first_addr ↦₄ (mword_of_int 1 : mword 32)
-        ∗ first_boot_persist ∗ kalloc_avail fsc_kpages None ∗ first_fsinit)
+        ∗ first_boot_persist ∗ kalloc_env fsc_kalloc None ∗ first_fsinit)
      ∨ (first_addr ↦₄□ (mword_of_int 0 : mword 32) ∗ fs_ready))%I.
 
   (* the steady-state arm is persistent, so a process that has booted can
@@ -386,11 +410,34 @@ Section FirstTok.
   Lemma first_tok_done : first_addr ↦₄□ (mword_of_int 0 : mword 32) -∗ fs_ready -∗ first_tok.
   Proof. iIntros "H #F". iRight. iFrame "H F". Qed.
 
+  (* ...AND THAT ARM AS A NAME OF ITS OWN.  [first_tok] now rides inside
+     [ProcInv.proc_priv], and the parent's copy is NOT duplicable -- its boot
+     arm is exclusive -- so fork, which has to build a SECOND block, cannot
+     pay the child out of its own.  What it can carry is this: the steady
+     arm alone, persistent, hence free to hand to every child forever.
+
+     WHERE IT COMES FROM.  It is a conjunct of [ProofSyscall.syscall_env],
+     the ambient bundle usertrap hands the dispatcher, and it is threaded
+     [SpecSysFork] -> [SpecKfork] -> [kfork_arm3] -> [kfk_b4], where
+     [first_tok_of_done] mints the child's token.  Nothing in the tree
+     CONSTRUCTS [syscall_env] today (it arrives abstractly as usertrap's
+     [Rsys]), so the obligation to produce this row lands exactly where
+     forkret will discharge it: forkret's boot arm persists the store and
+     seals the file system, and its steady arm already holds both halves. *)
+  Definition first_done : iProp Σ :=
+    (first_addr ↦₄□ (mword_of_int 0 : mword 32) ∗ fs_ready)%I.
+
+  Global Instance first_done_persistent : Persistent first_done.
+  Proof. rewrite /first_done. apply _. Qed.
+
+  Lemma first_tok_of_done : first_done -∗ first_tok.
+  Proof. iIntros "[H F]". iRight. iFrame "H F". Qed.
+
   Lemma first_tok_boot :
     first_addr ↦₄ (mword_of_int 1 : mword 32) -∗
-    first_boot_persist -∗ kalloc_avail fsc_kpages None -∗ first_fsinit -∗
+    first_boot_persist -∗ kalloc_env fsc_kalloc None -∗ first_fsinit -∗
     first_tok.
-  Proof. iIntros "H #P K F". iLeft. iFrame "H P K F". Qed.
+  Proof. iIntros "H #P #K F". iLeft. iFrame "H P K F". Qed.
 
   (* THE SEAL SITE'S WHOLE fs ASSEMBLY, one wand: the sixteen persistent
      rows main built, the count userinit sealed, and the two things fsinit
@@ -569,5 +616,16 @@ Section FirstTok.
 End FirstTok.
 
 (* ...AND THE SAME SEAL AT TOP LEVEL, for [FsReady.v]'s reason: a
-   [Typeclasses Opaque] inside a Section does not survive it. *)
+   [Typeclasses Opaque] inside a Section does not survive it.
+
+   [first_tok] IS SEALED TOO, AND IT IS NOT A PERFORMANCE MEASURE -- IT IS
+   CORRECTNESS.  The token is a conjunct of [ProcInv.proc_priv], so a broad
+   [iFrame] at a process-layer goal meets it; [Frame]'s [∨]/[∗] instances
+   will happily descend into the boot arm and CONSUME a [kernel_text] or a
+   [kernel_data] the caller meant for somewhere else, silently forcing the
+   disjunction's left arm and leaving an unprovable residue several lines
+   later (observed at [ForkretParkClose.forkret_park_pkg_intro], where
+   [iFrame "Htext …"] ate the first row of [first_boot_persist]).  Sealed,
+   the framing stops at the head symbol and the token travels by name. *)
 Typeclasses Opaque first_boot_persist.
+Typeclasses Opaque first_tok.

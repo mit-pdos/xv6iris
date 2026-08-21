@@ -820,13 +820,18 @@ Section ProofMain.
     iref_slots (NPROC * (1 + IREFSPARE)) -∗
     ([∗ list] i ∈ seq 0 NPROC, hart_full i (0%fin : CPU)) -∗
     ([∗ list] i ∈ seq 0 NPROC, pstate_full i UNUSED) -∗
-    ( ∀ (γa γp : gname) (γs : list gname) (m' : regfile)
+    (* NO [∀ γa]: the allocator's lock gname is the AMBIENT [fsc_kalloc]
+       from [kinit] on (debt (E)), and userinit's contract now states its
+       kalloc regime there so that its post-allocproc SEAL can be the boot
+       token's own allocator row.  A quantified [γa] could never be shown
+       equal to the ambient one. *)
+    ( ∀ (γp : gname) (γs : list gname) (m' : regfile)
         (root : mword 44) (pas : nat -> mword 44),
         sie_cap_gpr KT1 m' n false p0 -∗
         pc_is (mword_of_int (KernelSyms.main + 0x7e) : mword 64) -∗
         cpu_ctx_free -∗
         cpu_own 0 false p0 false ∅ -∗
-        kalloc_env γa (avail_sub (Some (length ps)) K_kvmmake) -∗
+        kalloc_env fsc_kalloc (avail_sub (Some (length ps)) K_kvmmake) -∗
         (* ...AND THE SAME LOCK, SPELLED (fs-cfg-boot.md (f-3), row 16 of
            [FirstTok.first_boot_persist]).  [kalloc_env] hides the page
            gname behind an [∃ γk], and a consumer that names the pair
@@ -1032,7 +1037,7 @@ Section ProofMain.
             with "Hpnm Hpw Hpc0 [Hnpid]") as (γp) "#Hpidlock".
     { rewrite /nextpid_res. iExact "Hnpid". }
     iModIntro.
-    iApply ("Hcont" $! fsc_kalloc γp γs mpr (pt_base t) pas
+    iApply ("Hcont" $! γp γs mpr (pt_base t) pas
               with "Hcg Hpc Hfree Hcpu Hkenv Hkmem Hpinv Hpidlock Hkptr Hstvec
                     Hkinv Hkptp Htramp Hkstx").
   Qed.
@@ -1199,7 +1204,7 @@ Section ProofMain.
   (* userinit(), plus [DiskBoot.disk_res_boot] and the vdisk [newlock].    *)
   (* =================================================================== *)
   Local Lemma mn_grp_fs 
-      (γa γp : gname) (γs : list gname) (γv : disk_names) (γd : uart_names)
+      (γp : gname) (γs : list gname) (γv : disk_names) (γd : uart_names)
       (m : regfile) (n : nat) (p0 : mword 64)
       (ps : list (mword 64)) (c0 : virtio_cfg) (free0 : nat -> bv 8)
       (* kit 2's era data.  It used to be carried as two OPAQUE parameters
@@ -1274,7 +1279,7 @@ Section ProofMain.
        userinit's real contract takes it (allocproc's own premise), the weak
        one does not.  Persistent, so carrying it costs a frame. *)
     is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
-    kalloc_env γa (avail_sub (Some (length ps)) K_kvmmake) -∗
+    kalloc_env fsc_kalloc (avail_sub (Some (length ps)) K_kvmmake) -∗
     lk_raw bcache_addr -∗
     ([∗ list] k ∈ seq 0 NBUF, sl_raw (buf_lock (bnode k))) -∗
     ([∗ list] k ∈ seq 0 NBUF, blink_raw (bnode k)) -∗
@@ -1524,7 +1529,7 @@ Section ProofMain.
     (* the pinned-map re-point [mn_pin_sie_cap_gpr] exists for: virtio_disk_init
        is the ONE callee left demanding a raw-map tp fact. *)
     iDestruct (mn_pin_sie_cap_gpr with "Hcg") as "Hcg".
-    iApply (VirtioDiskInit.wp_virtio_disk_init_sconf γv γa (tp_pin F4) n false p0
+    iApply (VirtioDiskInit.wp_virtio_disk_init_sconf γv fsc_kalloc (tp_pin F4) n false p0
               (avail_sub (Some (length ps)) K_kvmmake) c0
               vdl vdn vdc pd0 pav0 pu0 free0 ∅ ltac:(lia)
               Hnb3 (rget_tp F4) Hlive
@@ -1700,7 +1705,7 @@ Section ProofMain.
        They are not spent there either; the staging site is the
        [forkret_park] call, and [ProofUserinit]'s loud D1 block is the
        handoff.  What main no longer does is DROP them. *)
-    iApply (Userinit.wp_userinit_sconf γa γp γs F5 n false p0
+    iApply (Userinit.wp_userinit_sconf γp γs F5 n false p0
               (avail_sub (avail_sub (Some (length ps)) K_kvmmake) 3)
               0%nat iv0 false ∅
               ltac:(lia) Hnb8 Hdevq Hnibq
@@ -2030,7 +2035,7 @@ Section ProofMain.
               with "Hcg Htext Hkdata Hpc Hfree Hcpu Hlkmem Hkkalloc Hkmem24 Hpages Hkpt
                     Hsbit Htlb Hunset Hkauth Hlpid Hlwait Hnpid Hprocs Hppub Hfds Hirs
                     Hparks Hpst").
-    iIntros (γa γp γs m3 root pas)
+    iIntros (γp γs m3 root pas)
       "Hcg Hpc Hfree Hcpu Hkenv #Hkmem #Hpinv #Hpidlock Hkpt Hstvec #Hkinv #Hkptp
        #Htramp #Hkstx".
     (* --- 0x7e .. 0x8a : trap / plic, and the interrupt invariant --- *)
@@ -2039,7 +2044,7 @@ Section ProofMain.
     iIntros (m4 γtl) "Hcg Hpc #Htl Hstvec Hq".
     (* --- 0x8e .. 0x9e : binit / iinit / fileinit / virtio_disk_init /
            userinit, and the disk lock --- *)
-    iApply (mn_grp_fs γa γp γs γv γd m4 (K - 2)%nat p0 ps c0 free0 dk sb nib
+    iApply (mn_grp_fs γp γs γv γd m4 (K - 2)%nat p0 ps c0 free0 dk sb nib
               Hn50 Hlen Hlive Hdevq Hnibpos Hcovpos Hnibq Hpures
               Huartq Hdiskq Hgeomok Hpkc
               with "Hcg Htext Hkdata Hdev Hpenvc Hkmem Hcert Hseamc Hfirst
@@ -2075,7 +2080,7 @@ Section ProofMain.
       as "Hintr".
     { iApply bi.later_intro. iExact "Hkvs". }
     (* --- 0xa2 .. the join : the deposit and the scheduler --- *)
-    iApply (mn_grp_started fsc_printk γk γa γs γd γv m5 (K - 2)%nat p0 pd pav pu
+    iApply (mn_grp_started fsc_printk γk fsc_kalloc γs γd γv m5 (K - 2)%nat p0 pd pav pu
               root pas P ltac:(lia) Hp0
               with "Hcg Htext Hpc Hfree Hcpu [Htcsr Hintr Hkpt] Hsinv Hwand Hpenv
                     Hpinv Hccaps Hdlock Hgeom Hkinv Hkptp Htramp Hkstx").

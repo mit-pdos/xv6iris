@@ -127,7 +127,7 @@ Notation K_userinit := ((4 + K_namei_root_boot)%nat) (only parsing).
 Definition wp_userinit_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (γa γp : gname) (γs : list gname)
+    (γp : gname) (γs : list gname)
     (m : regfile) (K : nat) (eb : bool) (pj : mword 64)
     (on : option nat) (np : nat) (v0 : mword 64)
     (b : bool) (lks : gset string) :=
@@ -191,8 +191,17 @@ Definition wp_userinit_sconf_body
      back the slot userinit found.  Persistent, so threading it is free. *)
   procs_inv γs -∗
   is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
-  (* ---- the two counted regimes ---- *)
-  kalloc_env γa on -∗
+  (* ---- the two counted regimes ----
+     AT THE AMBIENT [fsc_kalloc], not at a threaded [γa], and that is what
+     makes the deposit possible.  The token's allocator row is
+     [KvmSpec.kalloc_env fsc_kalloc None] ([FirstTok]'s note says why the
+     BUNDLE and not the pair), and userinit mints it by sealing THIS
+     regime once allocproc's last counted draw is done.  A [γa] the caller
+     chose could never be shown equal to [fsc_kalloc], so the seal's result
+     could not be the token's row.  main already applies this contract at
+     [fsc_kalloc] -- [ProofMain] builds the bundle out of [kinit]'s own
+     post at exactly that name -- so nothing upstream loses generality. *)
+  kalloc_env fsc_kalloc on -∗
   procs_avail (Some (S np)) -∗
   (* the one global cell userinit writes *)
   (mword_of_int KernelSyms.initproc : mword 64) ↦₈ v0 -∗
@@ -204,8 +213,13 @@ Definition wp_userinit_sconf_body
         /\ mf !!! Regidx (mword_of_int 1 : mword 5)
            = (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) ⌝ -∗
       cpu_own 0%nat eb pj b lks -∗
-      (∃ nc : nat, ⌜(nc <= K_allocproc)%nat⌝ ∗
-                   kalloc_env γa (avail_sub on nc)) -∗
+      (* SEALED, not counted, and irreversibly so: the token userinit
+         deposits carries [kalloc_env fsc_kalloc None], and
+         [KallocInv.kalloc_avail_seal] is a one-shot.  main discards this
+         row anyway -- the boot chain has no further kalloc client on this
+         hart -- so the strengthening from "counted" to "sealed" costs its
+         one caller nothing. *)
+      kalloc_env fsc_kalloc None -∗
       procs_avail (Some np) -∗
       (* PERSISTED, not handed back exclusive.  Nothing writes this cell
          after userinit's one store, and every later reader
@@ -224,9 +238,9 @@ Module Type USERINIT.
   Parameter wp_userinit_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (γa γp : gname) (γs : list gname)
+      (γp : gname) (γs : list gname)
       (m : regfile) (K : nat) (eb : bool) (pj : mword 64)
       (on : option nat) (np : nat) (v0 : mword 64)
       (b : bool) (lks : gset string),
-      wp_userinit_sconf_body γa γp γs m K eb pj on np v0 b lks.
+      wp_userinit_sconf_body γp γs m K eb pj on np v0 b lks.
 End USERINIT.

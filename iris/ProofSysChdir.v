@@ -1414,8 +1414,10 @@ Section ProofSysChdirBody.
       (* THE RESOURCE PLAN'S STEP 3: the reference comes off the block, then
          the cell and the pid quarter, and all three stay out until the
          [sd s1,336(s2)] (or, on the failure arms, until the tail returns). *)
+      (* three-way now: [FirstTok.first_tok] comes off with the reference and
+         goes straight back on at each rebuilding arm. *)
       iDestruct (proc_priv_split_cwd gf pj pid (upd_upt V P') with "Hpriv")
-        as "[Hpnc Href]".
+        as "[Hpnc [Href Hftok]]".
       (* THE BLOCK, NOT THE CELL BESIDE A QUARTER.  namei/ilock/iunlock/iput
          all take [proc_priv_bare] now, and [p->cwd] is one of its own cells,
          so the cell is borrowed for the two instructions that touch it (the
@@ -1940,10 +1942,10 @@ Section ProofSysChdirBody.
             iSplitL "Hpbare"; [iExact "Hpbare" | iExact "Hofiles"]. }
           iDestruct (cwd_ref_of_held with "Hheldnew") as "Hrefcwd".
           iAssert (proc_priv gf pj pid (upd_cwd (upd_upt V P') (ientry kk)))
-            with "[Hpnc Hrefcwd]" as "Hpriv".
+            with "[Hpnc Hrefcwd Hftok]" as "Hpriv".
           { rewrite (proc_priv_split_cwd gf pj pid (upd_cwd (upd_upt V P') (ientry kk))).
             iSplitL "Hpnc"; [iExact "Hpnc" |].
-            iEval (cbn [upd_cwd pv_cwd]). iExact "Hrefcwd". }
+            iEval (cbn [upd_cwd pv_cwd]). iFrame "Hrefcwd Hftok". }
           iDestruct (iref_slots_combine 1 1 with "Hislot Hir") as "Hir".
           (* ============ +0x58 c.li a0,0 ============ *)
           iApply (wp_cli_s_sconf (CID := CID36) (mword_of_int (SC + 0x58)) Ra0
@@ -2207,12 +2209,12 @@ Section ProofSysChdirBody.
           (* the block goes back UNCHANGED: [p->cwd] never moved *)
           iDestruct (cwd_ref_of_held with "Hcwdref") as "Href".
           iAssert (proc_priv gf pj pid (upd_upt V P'))
-            with "[Hpbare Hofiles Href]" as "Hpriv".
+            with "[Hpbare Hofiles Href Hftok]" as "Hpriv".
           { rewrite (proc_priv_split_cwd gf pj pid (upd_upt V P'))
                     proc_priv_nocwd_bare.
-            iSplitR "Href".
+            iSplitR "Href Hftok".
             - iSplitL "Hpbare"; [iExact "Hpbare" | iExact "Hofiles"].
-            - iEval (cbn [upd_upt pv_cwd]). iExact "Href". }
+            - iEval (cbn [upd_upt pv_cwd]). iFrame "Href Hftok". }
           iDestruct (iref_slots_combine 1 1 with "Hislot Hir") as "Hir".
           (* the buffer, whole again *)
           iDestruct (sc_buf_join (pa_stk sp0 20) bf pk Hpk with "Hbufk Hbufrest")
@@ -2289,7 +2291,7 @@ Section ProofSysChdirBody.
                   ltac:(reflexivity) HN3sp HN3thr HN3s1 Hal
                   with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                         Hpbare Hprocs Hdev Hgeo Hdlk [HopS] Hf1 Hf2 Hf3 Hf4 Hbuf
-                        [Hofiles Hcwdref Hbsl Hsbb Hsbi Hir Hcont]").
+                        [Hofiles Hcwdref Hbsl Hsbb Hsbi Hir Hftok Hcont]").
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
         { rewrite /log_op. iExists Sb1. iExact "HopS". }
@@ -2297,12 +2299,12 @@ Section ProofSysChdirBody.
         iIntros (CIDz) "%Hqz". iIntros (mf) "%Hcsf %Ha0f Hcg Hown _ _ Hpc Hpbare".
         iDestruct (cwd_ref_of_held with "Hcwdref") as "Href".
         iAssert (proc_priv gf pj pid (upd_upt V P'))
-          with "[Hpbare Hofiles Href]" as "Hpriv".
+          with "[Hpbare Hofiles Href Hftok]" as "Hpriv".
         { rewrite (proc_priv_split_cwd gf pj pid (upd_upt V P'))
                   proc_priv_nocwd_bare.
-          iSplitR "Href".
+          iSplitR "Href Hftok".
           - iSplitL "Hpbare"; [iExact "Hpbare" | iExact "Hofiles"].
-          - iEval (cbn [upd_upt pv_cwd]). iExact "Href". }
+          - iEval (cbn [upd_upt pv_cwd]). iFrame "Href Hftok". }
         iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
         iApply ("Hcont" $! mf P' with "[%] [%] Hcg Hown [] [] Hpc Hbsl
                   Hsbb Hsbi Hir [Hpriv]").

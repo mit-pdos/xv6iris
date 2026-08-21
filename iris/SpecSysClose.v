@@ -77,6 +77,10 @@ Local Open Scope Z_scope.
 Notation sys_close_stack := (88%nat) (only parsing).
 Section SpecSysClose.
   Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  (* [GenId], for [ProcInv.proc_priv]'s own index: the private block now
+     carries [FirstTok.first_tok], whose boot arm names [gen_cert].  The
+     definitions below mention the block, so the section has to bind it. *)
+  Context `{GEN : GenId}.
 
   (* sys_close's result, keyed by the returned a0.  In the success case the
      descriptor named by the argument is null and one file reference is

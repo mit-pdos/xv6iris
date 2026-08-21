@@ -1122,8 +1122,10 @@ Section ProofSysLinkBody.
         (* THE PROCESS BLOCK, OPENED for the two walks: the cwd reference
            comes off, then the cell and the pid quarter, and all three stay
            out until whichever arm rebuilds the block. *)
+        (* three-way now: [FirstTok.first_tok] parks beside the reference and
+           every rebuilding arm below hands it straight back. *)
         iDestruct (proc_priv_split_cwd γf pj pid (upd_upt V P2) with "Hpriv")
-          as "[Hpnc Href]".
+          as "[Hpnc [Href Hftok]]".
         iEval (rewrite proc_priv_nocwd_bare) in "Hpnc".
         iDestruct "Hpnc" as "[Hpidq Hofiles]".
         iDestruct (cwd_ref_held with "Href") as "Hcwdref".
@@ -1470,7 +1472,7 @@ Section ProofSysLinkBody.
                              Hsbi
                              Hbmres Hpidq Hprocs Hdev Hgeo Hdlk Hbsl [HopS]
                              Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
-                             [Hsbs Hir1 Hir1b Hcwdref Hofiles Hcont]").
+                             [Hsbs Hir1 Hir1b Hcwdref Hofiles Hftok Hcont]").
              { rewrite Heb /trap_csrs_ext. done. }
              { rewrite Heb /cpu_claim_ext. done. }
              { rewrite /log_op. iExists Sb1. iExact "HopS". }
@@ -1483,8 +1485,8 @@ Section ProofSysLinkBody.
              iCombine "Hpidq Hofiles" as "Hpnc".
              iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
              iDestruct (proc_priv_split_cwd γf pj pid (upd_upt V P2)
-                          with "[Hpnc Href]") as "Hpriv";
-               [iSplitL "Hpnc"; [iExact "Hpnc" | iExact "Href"] |].
+                          with "[Hpnc Href Hftok]") as "Hpriv";
+               [iSplitL "Hpnc"; [iExact "Hpnc" | iFrame "Href Hftok"] |].
              iDestruct (iref_slots_combine 1 1 with "Hir1 Hir1b") as "Hir2c".
              iDestruct (iref_slots_combine 2 1 with "Hir2c Hislot") as "Hir".
              iApply ("Hcont" $! mf P2 with "[%] [%] Hcg Hown Htce Hcce Hpc
@@ -1623,7 +1625,7 @@ Section ProofSysLinkBody.
                                 Hsbb
                                 Hsbi Hbmres Hpidq Hprocs Hdev Hgeo Hdlk Hbsl
                                 [HopS] Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
-                                [Hsbs Hir1 Hir1b Hcwdref Hofiles Hcont]").
+                                [Hsbs Hir1 Hir1b Hcwdref Hofiles Hftok Hcont]").
                 { rewrite Heb /trap_csrs_ext. done. }
                 { rewrite Heb /cpu_claim_ext. done. }
                 { rewrite /log_op. iExists Sb1. iExact "HopS". }
@@ -1636,8 +1638,8 @@ Section ProofSysLinkBody.
                 iCombine "Hpidq Hofiles" as "Hpnc".
                 iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
                 iDestruct (proc_priv_split_cwd γf pj pid (upd_upt V P2)
-                             with "[Hpnc Href]") as "Hpriv";
-                  [iSplitL "Hpnc"; [iExact "Hpnc" | iExact "Href"] |].
+                             with "[Hpnc Href Hftok]") as "Hpriv";
+                  [iSplitL "Hpnc"; [iExact "Hpnc" | iFrame "Href Hftok"] |].
                 iDestruct (iref_slots_combine 1 1 with "Hir1 Hir1b") as "Hir2c".
                 iDestruct (iref_slots_combine 2 1 with "Hir2c Hislot") as "Hir".
                 iApply ("Hcont" $! mf P2 with "[%] [%] Hcg Hown Htce Hcce
@@ -2326,7 +2328,7 @@ Section ProofSysLinkBody.
                                      Hfrzd Hkeepd Hrud Hsbb Hsbi Hbmres Hpidq Hprocs Hdev
                                      Hgeo Hdlk Hbsl HopE Hf1 Hf2 Hf3 Hf4
                                      HbN HbW HbO
-                                     [Hsbs Hir1c Hcwdref Hofiles Hcont]").
+                                     [Hsbs Hir1c Hcwdref Hofiles Hftok Hcont]").
                      iEval (rewrite /wp_next).
                      iIntros (CIDy) "%Hqy". iIntros (mf)
                        "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc Hpidq Hsbb
@@ -2336,8 +2338,8 @@ Section ProofSysLinkBody.
                      iCombine "Hpidq Hofiles" as "Hpnc".
                      iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
                      iDestruct (proc_priv_split_cwd γf pj pid (upd_upt V P2)
-                                  with "[Hpnc Href]") as "Hpriv";
-                       [iSplitL "Hpnc"; [iExact "Hpnc" | iExact "Href"] |].
+                                  with "[Hpnc Href Hftok]") as "Hpriv";
+                       [iSplitL "Hpnc"; [iExact "Hpnc" | iFrame "Href Hftok"] |].
                      iDestruct (iref_slots_combine 1 2 with "Hir1c Hislots") as "Hir".
                      iApply ("Hcont" $! mf P2 with "[%] [%] Hcg Hown Htce
                                Hcce Hpc Hbsl Hsbb Hsbi Hsbs Hir Hpriv [%]").
@@ -2695,7 +2697,7 @@ Section ProofSysLinkBody.
                                        Hfrzd Hkeepd Hrud Hsbb Hsbi Hbmres Hpidq Hprocs Hdev
                                        Hgeo Hdlk Hbsl HopE Hf1 Hf2 Hf3 Hf4
                                        HbN HbW HbO
-                                       [Hsbs Hir1c Hcwdref Hofiles Hcont]").
+                                       [Hsbs Hir1c Hcwdref Hofiles Hftok Hcont]").
                        iEval (rewrite /wp_next).
                        iIntros (CIDy) "%Hqy". iIntros (mf)
                          "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc Hpidq Hsbb
@@ -2705,8 +2707,8 @@ Section ProofSysLinkBody.
                        iCombine "Hpidq Hofiles" as "Hpnc".
                        iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
                        iDestruct (proc_priv_split_cwd γf pj pid (upd_upt V P2)
-                                    with "[Hpnc Href]") as "Hpriv";
-                         [iSplitL "Hpnc"; [iExact "Hpnc" | iExact "Href"] |].
+                                    with "[Hpnc Href Hftok]") as "Hpriv";
+                         [iSplitL "Hpnc"; [iExact "Hpnc" | iFrame "Href Hftok"] |].
                        iDestruct (iref_slots_combine 1 2 with "Hir1c Hislots") as "Hir".
                        iApply ("Hcont" $! mf P2 with "[%] [%] Hcg Hown Htce
                                  Hcce Hpc Hbsl Hsbb Hsbi Hsbs Hir Hpriv [%]").
@@ -3199,7 +3201,7 @@ Section ProofSysLinkBody.
                                       with "Hcg Htext Hpc Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
                                             [Hown Hbsl Hsbb Hsbi Hsbs Hir1c
                                              Hislotd Hisloti Hcwdref Hofiles
-                                             Hpidq Hcont]").
+                                             Hpidq Hftok Hcont]").
                             iEval (rewrite /wp_next).
                             iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
                             sl_own_transport CID73 CIDy eb pj b.
@@ -3209,8 +3211,8 @@ Section ProofSysLinkBody.
                             iCombine "Hpidq Hofiles" as "Hpnc".
                             iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
                             iDestruct (proc_priv_split_cwd γf pj pid (upd_upt V P2)
-                                         with "[Hpnc Href]") as "Hpriv";
-                              [iSplitL "Hpnc"; [iExact "Hpnc" | iExact "Href"] |].
+                                         with "[Hpnc Href Hftok]") as "Hpriv";
+                              [iSplitL "Hpnc"; [iExact "Hpnc" | iFrame "Href Hftok"] |].
                             iDestruct (iref_slots_combine 1 1
                                          with "Hir1c Hislotd") as "Hir2e".
                             iDestruct (iref_slots_combine 2 1
@@ -3319,7 +3321,7 @@ Section ProofSysLinkBody.
                                             Hsbi Hbmres Hpidq Hprocs Hdev Hgeo
                                             Hdlk Hbsl HopE Hf1 Hf2 Hf3 Hf4
                                             HbN HbW HbO
-                                            [Hsbs Hir1c Hcwdref Hofiles Hcont]").
+                                            [Hsbs Hir1c Hcwdref Hofiles Hftok Hcont]").
                             iEval (rewrite /wp_next).
                             iIntros (CIDy) "%Hqy". iIntros (mf)
                               "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc Hpidq
@@ -3330,8 +3332,8 @@ Section ProofSysLinkBody.
                             iCombine "Hpidq Hofiles" as "Hpnc".
                             iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
                             iDestruct (proc_priv_split_cwd γf pj pid (upd_upt V P2)
-                                         with "[Hpnc Href]") as "Hpriv";
-                              [iSplitL "Hpnc"; [iExact "Hpnc" | iExact "Href"] |].
+                                         with "[Hpnc Href Hftok]") as "Hpriv";
+                              [iSplitL "Hpnc"; [iExact "Hpnc" | iFrame "Href Hftok"] |].
                             iDestruct (iref_slots_combine 1 2 with "Hir1c Hislots")
                               as "Hir".
                             iApply ("Hcont" $! mf P2 with "[%] [%] Hcg Hown
@@ -3398,7 +3400,7 @@ Section ProofSysLinkBody.
                                    Hshot2 Hilink Hsbb Hsbi Hbmres Hpidq Hprocs
                                    Hdev Hgeo
                                    Hdlk Hbsl HopS Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
-                                   [Hsbs Hir2d Hcwdref Hofiles Hcont]").
+                                   [Hsbs Hir2d Hcwdref Hofiles Hftok Hcont]").
                    iEval (rewrite /wp_next).
                    iIntros (CIDy) "%Hqy". iIntros (mf)
                      "%Hcsf %Ha0f Hcg Hown Htce Hcce Hpc Hpidq Hsbb Hsbi
@@ -3408,8 +3410,8 @@ Section ProofSysLinkBody.
                    iCombine "Hpidq Hofiles" as "Hpnc".
                    iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
                    iDestruct (proc_priv_split_cwd γf pj pid (upd_upt V P2)
-                                with "[Hpnc Href]") as "Hpriv";
-                     [iSplitL "Hpnc"; [iExact "Hpnc" | iExact "Href"] |].
+                                with "[Hpnc Href Hftok]") as "Hpriv";
+                     [iSplitL "Hpnc"; [iExact "Hpnc" | iFrame "Href Hftok"] |].
                    iDestruct (iref_slots_combine 2 1 with "Hir2d Hislot") as "Hir".
                    iApply ("Hcont" $! mf P2 with "[%] [%] Hcg Hown Htce Hcce
                              Hpc Hbsl Hsbb Hsbi Hsbs Hir Hpriv [%]").
@@ -3445,7 +3447,7 @@ Section ProofSysLinkBody.
                           Hpidq Hprocs Hdev Hgeo Hdlk [HopS] Hf1 Hf2 Hf3 Hf4
                           HbN HbW HbO
                           [Hbsl Hsbb Hsbi Hsbs Hir1 Hir2b Hcwdref
-                           Hofiles Hcont]").
+                           Hofiles Hftok Hcont]").
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }
           { rewrite /log_op. iExists Sb1. iExact "HopS". }
@@ -3457,8 +3459,8 @@ Section ProofSysLinkBody.
           iCombine "Hpidq Hofiles" as "Hpnc".
           iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
           iDestruct (proc_priv_split_cwd γf pj pid (upd_upt V P2)
-                       with "[Hpnc Href]") as "Hpriv";
-            [iSplitL "Hpnc"; [iExact "Hpnc" | iExact "Href"] |].
+                       with "[Hpnc Href Hftok]") as "Hpriv";
+            [iSplitL "Hpnc"; [iExact "Hpnc" | iFrame "Href Hftok"] |].
           iDestruct (iref_slots_combine 1 2 with "Hir1 Hir2b") as "Hir".
           iApply ("Hcont" $! mf P2 with "[%] [%] Hcg Hown Htce Hcce Hpc
                     Hbsl Hsbb Hsbi Hsbs Hir Hpriv [%]").

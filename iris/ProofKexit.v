@@ -1608,7 +1608,15 @@ Section KexitRest.
        through [proc_priv] is what lets the premise
        [pv_cwd V <> 0] disappear: it is now a projection
        ([proc_priv_cwd_nonzero]) and nothing downstream needs it stated. *)
-    iDestruct (proc_priv_split_cwd γf pj pid V with "Hpriv") as "[Hpriv Href]".
+    (* THREE-WAY since [FirstTok.first_tok] joined the block.  The exiting
+       process's token is DROPPED here, and that is the honest reading: a
+       zombie parks the DEFICIT block, which carries no token, and a process
+       that dies holding the exclusive boot arm has simply consumed the one
+       chance to run it (the logic is affine, so the leak is sound and the
+       kernel's own "at most one" is unaffected). *)
+    iDestruct (proc_priv_split_cwd γf pj pid V with "Hpriv")
+      as "[Hpriv [Href Hfdone]]".
+    iClear "Hfdone".
     (* THE BLOCK, NOT A QUARTER OF [p->pid].  begin_op, iput and end_op all
        take [proc_priv_bare] now, and [p->cwd] lives INSIDE it -- so the cell
        is borrowed for the two instructions that touch it (+0x50's load and

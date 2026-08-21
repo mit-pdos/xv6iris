@@ -228,6 +228,10 @@ Definition sys_open_slots : nat := create_slots.
 
 Section SpecSysOpen.
   Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
+  (* [GenId], for [ProcInv.proc_priv]'s own index: the private block now
+     carries [FirstTok.first_tok], whose boot arm names [gen_cert].  The
+     definitions below mention the block, so the section has to bind it. *)
+  Context `{GEN : GenId}.
 
   (* sys_open's result, keyed by the returned a0, over the process state [W]
      the syscall ends with -- i.e. the incoming [V] with argstr's page-table

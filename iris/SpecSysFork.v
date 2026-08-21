@@ -55,6 +55,7 @@ From iris.base_logic.lib Require Import ghost_var invariants gen_heap.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
+Require Import FirstTok.  (* [first_done] -- the child's token's source *)
 Require Import InstrBytes.
 Require Import RegFile.
 Require Import RiscvExtras.
@@ -121,6 +122,13 @@ Definition wp_sys_fork_sconf_body
   (* the proc table's sealed regime, threaded to kfork's allocproc
      ([ProcAvail.v]); persistent, so it costs nothing to carry *)
   procs_avail None -∗
+  (* THE STEADY ARM OF [FirstTok.first_tok], and the ONE thing fork cannot
+     take out of the parent's block: the parent's token may be the EXCLUSIVE
+     boot arm, and the child needs a token of its own.  [first_done] is
+     persistent, so a copy is free -- and it is what
+     [FirstTok.first_tok_of_done] mints the child's token from, at the
+     [sd a0,336(s4)] that closes the child's construction window. *)
+  first_done -∗
   proc_priv γf p pid V -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,

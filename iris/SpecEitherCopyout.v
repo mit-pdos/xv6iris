@@ -95,6 +95,10 @@ Local Open Scope Z_scope.
 Notation either_copyout_stack := (58%nat) (only parsing).
 Section SpecEitherCopyout.
   Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
+  (* [GenId], for [ProcInv.proc_priv]'s own index: the private block now
+     carries [FirstTok.first_tok], whose boot arm names [gen_cert].  The
+     definitions below mention the block, so the section has to bind it. *)
+  Context `{GEN : GenId}.
   (* the kernel arm's destination is the CALLER's buffer; the body supplies
      its tier ([ktb]) at the use below. *)
 

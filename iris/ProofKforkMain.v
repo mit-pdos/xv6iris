@@ -122,6 +122,7 @@ Require Import FdSlots FileInv.
 Require Import WpLock.
 Require Import SwtchCtx.
 Require Import ProcInv.
+Require Import FirstTok.  (* [first_done] / [first_tok_of_done] *)
 Require Import KvmSpec.
 Require Import SchedCtx.
 Require Import IrefSlots.
@@ -488,6 +489,8 @@ Section KforkArms.
        (iclaim-ledger.md §3.19); persistent, and this arm reads no dinode *)
     ireg_inv γic γfs inodestart nib -∗
     iref_slots (1 + IREFSPARE) -∗
+    (* the child's token's source, straight through to [B4.kfk_b4] *)
+    first_done -∗
     wp_next b pme (fun (CID : CpuId) =>
       ∀ mr : regfile,
         ⌜ callee_saved m mr ⌝ -∗
@@ -503,7 +506,7 @@ Section KforkArms.
     subst tfsrc tfdst.
     iIntros "#Htext #Hprocs Hcg Hcpu Hpc Hframe Hpv HCpriv #Hmk
              Hheld Hhart Hfd Hctxex Hpay Hkalloc Hwlock Hft
-             Hitb Hitinv #Hireg Hirs Hcont".
+             Hitb Hitinv #Hireg Hirs #Hfdone Hcont".
     iDestruct "Hctxex" as (ks rest) "(%Hrestlen & Hks & Hkctx)".
     rewrite /kfk_frame_at.
     iDestruct "Hframe" as "(Hb1 & Hb2 & Hb3 & Hb4 & Hb5 & Hb6 & Hb7 & Hb8)".
@@ -598,7 +601,8 @@ Section KforkArms.
                 (kfk_childV V2 (pv_ofile Vp) NOFILE) pme npa
                 Mx2 (trap_res b) K (S lvl) eb ({["proc"]} ∪ lks)
                 ltac:(lia) ltac:(lia) Hd4 Hd3
-                with "Hsc Hown Htext Hpcx Hitb Hitinv Hireg Hirs Hpvx Hpvcx").
+                with "Hsc Hown Htext Hpcx Hitb Hitinv Hireg Hirs Hpvx Hfdone
+                      Hpvcx").
       all: try lkbelow.
       iApply wp_next_off_intro.
       iIntros (mf4) "%Hp4 Hsc4 Hown4 Hpc4 Hpvx4 Hpvcx4 Hirsp".
@@ -708,7 +712,7 @@ Section KforkMain.
     cbv beta delta [wp_kfork_sconf_body]. cbn zeta.
     intros HK Hlvl Hbelow.
     iIntros "Hcg Hcpu #Htext Hpc #Hprocs #Hplock #Hwlock #Hftbl
-             #Hitbl #Hitinv #Hireg Henv #Hpav Hpv Hcont".
+             #Hitbl #Hitinv #Hireg Henv #Hpav #Hfdone Hpv Hcont".
     (* the SIE index the two lock-holding exits come back at *)
     iDestruct (cpu_own_eb_agree with "Hcg Hcpu") as %Hbeq.
     (* [B6.kfk_prologue] is still generic in the allocator's count; kfork
@@ -782,7 +786,8 @@ Section KforkMain.
                 HMtsp HMts4 HMts5 HMta5 HMta4 HMta3 Htfsrc Htfdst HMtthr
                 Hnpa HjN Hgamma Hofn Hcwdn ltac:(lkbelow)
                 with "Ht Hprocs Hcg Hcpu Hpc Hframe Hpv HCp Hmk Hheld Hhart
-                      Hfd Hctx Hpay Hke Hwl Hft Hit Hiti Hireg Hirs [HR]").
+                      Hfd Hctx Hpay Hke Hwl Hft Hit Hiti Hireg Hirs Hfdone
+                      [HR]").
       (* the crossing fact by NAME, never as an inline [ltac:] in argument
          position: the hole's expected type is still an evar there, which is
          durable-notes' diverging-ltac trap. *)

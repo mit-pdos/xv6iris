@@ -61,6 +61,21 @@ Typeclasses Opaque tf_words tf_tail tf_page.
    of the two files it came from. *)
 Require Export InodeRef.
 Require Import KallocInv PageFields ByteBuf.
+(* [FirstTok.first_tok], which is a CONJUNCT of the private block below.  It
+   is a leaf import for this file's purposes: [FirstTok] sits entirely in the
+   fs/kalloc layers and its cone does not reach any process file, so the edge
+   runs one way only.  See the note at [proc_priv_core]. *)
+(* ...and [RiscvLang], for the CLASS [GenId] alone: without the name in
+   scope the backtick binder below generalizes a fresh [GenId : Type] and
+   [first_tok]'s own [GEN] is then unresolvable (durable-notes.md's
+   "missing/late imports auto-generalize silently"). *)
+Require Import RiscvLang.
+Require Import FirstTok.
+(* [Typeclasses Opaque] is compilation-local (same note as [tf_page]'s above),
+   and for [first_tok] it is CORRECTNESS, not speed: the token is a conjunct
+   of [proc_priv], and an unsealed disjunction lets a broad [iFrame] frame a
+   [kernel_text] into its boot arm.  See [FirstTok.v]'s note at the seal. *)
+Typeclasses Opaque first_tok first_boot_persist.
 From Kernel Require KernelSyms.
 Require Import RiscvExtras.
 (* The [set_solver] override.  EXPORT, not Import: this import is         *)
@@ -198,6 +213,16 @@ Section ProcInv.
      spells out the argument.  What propagates is the CLASS -- capacity, no
      resource, no change to any statement's shape. *)
   Context `{ !fileG Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ}.
+  (* [FirstTok.first_tok] rides inside the private block (see
+     [proc_priv_core]), and its boot arm names [RiscvPtsto.gen_cert]; that
+     is the ONLY new index the block acquires.  The file-system's own two
+     configuration classes are NOT new binders here: [fileG] already carries
+     [IcacheRef.icfg] and [FsCfg.fscfg] as superclass fields
+     ([FileInvDefs.file_icfg] / [file_fscfg]), so every mention of the token
+     below -- and hence [proc_priv]'s own elaboration -- is at exactly the
+     instance the whole process layer already shares.  Nothing downstream
+     grows a binder for the file system. *)
+  Context `{GEN : GenId}.
 
   (* A LIVE fd slot: the cell, and -- when non-null -- an actual reference on
      the [struct file] it points at.  [file_ref] is deliberately neither
@@ -884,7 +909,27 @@ Section ProcInv.
      [proc_priv_core] and the caller keeps its own fd-table term.  [fdalloc] is
      the single exception, and it takes the deficit set explicitly.
 
-     No [γf]: the core is exactly the part with no file-layer content. *)
+     No [γf]: the core is exactly the part with no file-layer content.
+
+     ---- THE LAST CONJUNCT IS [FirstTok.first_tok] ---------------------
+     proc.c's [static int first], as a resource the PROCESS carries: either
+     the exclusive boot arm (the pinned [first_addr ↦₄ 1] cell, main's
+     sixteen persistent rows, the sealed page count and fsinit's whole
+     premise pile) or the persistent steady arm ([first_addr ↦₄□ 0] beside
+     [FsReady.fs_ready]).  It lives HERE, in the block, because forkret --
+     the branch's only reader -- runs on a context a park saved, and the
+     block is the only thing a parked process still owns.  "At most one
+     process ever runs the boot arm" is then a theorem about ownership: the
+     two arms are incompatible at one address, so no second block can hold
+     the exclusive one.
+
+     WHY IT IS NOT IN [proc_priv_nocwd].  allocproc does not return a
+     process in a RUNNABLE or SLEEPING state -- kfork holds its result for
+     150 bytes before the [sd a0,336(s4)] that installs the cwd -- so a
+     contract at the deficit block must not have to PRODUCE a token.  The
+     deficit block is exactly the pre-park shape, and the token joins at the
+     same seam the working directory does ([proc_priv_split_cwd] is
+     three-way for that reason). *)
   Definition proc_priv_core (pa : mword 64) (pid : mword 32) (V : pprivate) : iProp Σ :=
     (⌜uint (pv_sz V) <= uvm_maxsz⌝ ∗
      ⌜um_below (pv_sz V) (ud_um (pv_upt V))⌝ ∗
@@ -892,7 +937,8 @@ Section ProcInv.
      proc_fields pa (DfracOwn 1) V ∗
      proc_pt_at pa (pv_upt V) ∗
      tf_page (ud_tfp (pv_upt V)) (pv_tf V) ∗
-     cwd_ref (pv_cwd V))%I.
+     cwd_ref (pv_cwd V) ∗
+     first_tok)%I.
 
   (* ...AND ITS FILE-LAYER-FREE PART, WHICH IS WHAT THE BLOCK LAYER TAKES.
      [ProcDefs.proc_priv_bare] is this minus [cwd_ref]; the note at its
@@ -900,13 +946,14 @@ Section ProcInv.
      anything that mentions an inode reference.  An [⊣⊢], so a caller splits
      and rejoins with a rewrite -- no borrow and no closer to carry. *)
   Lemma proc_priv_core_bare (pa : mword 64) (pid : mword 32) (V : pprivate) :
-    proc_priv_core pa pid V ⊣⊢ proc_priv_bare pa pid V ∗ cwd_ref (pv_cwd V).
+    proc_priv_core pa pid V ⊣⊢
+    proc_priv_bare pa pid V ∗ cwd_ref (pv_cwd V) ∗ first_tok.
   Proof.
     rewrite /proc_priv_core /proc_priv_bare. iSplit.
-    - iIntros "(%A & %B & Hpid & Hf & Hpt & Htfp & Hc)".
-      iFrame "Hc Hpid Hf Hpt Htfp". iSplitR; [done|]. done.
-    - iIntros "[(%A & %B & Hpid & Hf & Hpt & Htfp) Hc]".
-      iFrame "Hpid Hf Hpt Htfp Hc". iSplitR; [done|]. done.
+    - iIntros "(%A & %B & Hpid & Hf & Hpt & Htfp & Hc & Hft)".
+      iFrame "Hc Hft Hpid Hf Hpt Htfp". iSplitR; [done|]. done.
+    - iIntros "[(%A & %B & Hpid & Hf & Hpt & Htfp) [Hc Hft]]".
+      iFrame "Hpid Hf Hpt Htfp Hc Hft". iSplitR; [done|]. done.
   Qed.
 
   (* THE BORROW FORM.  Every fs callee below the file layer -- bread, bmap,
@@ -918,7 +965,7 @@ Section ProcInv.
     proc_priv_core pa pid V -∗
     proc_priv_bare pa pid V ∗ (proc_priv_bare pa pid V -∗ proc_priv_core pa pid V).
   Proof.
-    rewrite proc_priv_core_bare. iIntros "[Hb Hc]".
+    rewrite proc_priv_core_bare. iIntros "[Hb [Hc Hft]]".
     iSplitL "Hb"; [iExact "Hb"|]. iIntros "Hb". iFrame.
   Qed.
 
@@ -948,15 +995,20 @@ Section ProcInv.
      tf_page (ud_tfp (pv_upt V)) (pv_tf V) ∗
      proc_ofiles γf pa (pv_ofile V))%I.
 
+  (* THREE-WAY since the token joined the block.  The deficit block is the
+     PRE-PARK shape -- what allocproc returns -- and neither the working
+     directory nor [FirstTok.first_tok] is installed yet, so both split off
+     at the same seam and rejoin at the same store. *)
   Lemma proc_priv_split_cwd (γf : gname) (pa : mword 64) (pid : mword 32)
       (V : pprivate) :
-    proc_priv γf pa pid V ⊣⊢ proc_priv_nocwd γf pa pid V ∗ cwd_ref (pv_cwd V).
+    proc_priv γf pa pid V ⊣⊢
+    proc_priv_nocwd γf pa pid V ∗ cwd_ref (pv_cwd V) ∗ first_tok.
   Proof.
     rewrite /proc_priv /proc_priv_core /proc_priv_nocwd.
     iSplit.
-    - iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc) Ho]".
-      iFrame "Hc". iSplitR; [done|]. iSplitR; [done|]. iFrame.
-    - iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Ho) Hc]".
+    - iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft) Ho]".
+      iFrame "Hc Hft". iSplitR; [done|]. iSplitR; [done|]. iFrame.
+    - iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Ho) [Hc Hft]]".
       iSplitR "Ho"; [|iExact "Ho"].
       iSplitR; [done|]. iSplitR; [done|]. iFrame.
   Qed.
@@ -969,7 +1021,7 @@ Section ProcInv.
     proc_priv γf pa pid V -∗
     proc_priv_bare pa pid V ∗ (proc_priv_bare pa pid V -∗ proc_priv γf pa pid V).
   Proof.
-    rewrite /proc_priv proc_priv_core_bare. iIntros "[[Hb Hc] Ho]".
+    rewrite /proc_priv proc_priv_core_bare. iIntros "[[Hb [Hc Hft]] Ho]".
     iSplitL "Hb"; [iExact "Hb"|]. iIntros "Hb". iFrame.
   Qed.
 
@@ -1016,7 +1068,8 @@ Section ProcInv.
      proc_pt_cells pa (pv_upt V) ∗
      tf_page (ud_tfp (pv_upt V)) (pv_tf V) ∗
      cwd_ref (pv_cwd V) ∗
-     proc_ofiles γf pa (pv_ofile V))%I.
+     proc_ofiles γf pa (pv_ofile V) ∗
+     first_tok)%I.
 
   Lemma proc_priv_split_pt (γf : gname) (pa : mword 64) (pid : mword 32)
       (V : pprivate) :
@@ -1025,11 +1078,12 @@ Section ProcInv.
     rewrite /proc_priv /proc_priv_core /proc_priv_nopt proc_pt_at_split
             /proc_pt_cells.
     iSplit.
-    - iIntros "[(%Hszb & %Hbel & Hpid & Hf & ((Hc1 & Hc2) & Hpt) & Htfp & Hc) Ho]".
-      iFrame "Hpt". iSplitR; [done|]. iSplitR; [done|]. iFrame "Hpid Hf Hc1 Hc2 Htfp Hc Ho".
-    - iIntros "[(%Hszb & %Hbel & Hpid & Hf & (Hc1 & Hc2) & Htfp & Hc & Ho) Hpt]".
+    - iIntros "[(%Hszb & %Hbel & Hpid & Hf & ((Hc1 & Hc2) & Hpt) & Htfp & Hc & Hft) Ho]".
+      iFrame "Hpt". iSplitR; [done|]. iSplitR; [done|].
+      iFrame "Hpid Hf Hc1 Hc2 Htfp Hc Ho Hft".
+    - iIntros "[(%Hszb & %Hbel & Hpid & Hf & (Hc1 & Hc2) & Htfp & Hc & Ho & Hft) Hpt]".
       iFrame "Ho". iSplitR; [done|]. iSplitR; [done|].
-      iFrame "Hpid Hf Hc1 Hc2 Hpt Htfp Hc".
+      iFrame "Hpid Hf Hc1 Hc2 Hpt Htfp Hc Hft".
   Qed.
 
   (* THE TRAPFRAME BORROW at the reduced block -- same statement as
@@ -1043,7 +1097,7 @@ Section ProcInv.
       (∀ ws' : list (mword 64), tf_page (ud_tfp (pv_upt V)) ws' -∗
          proc_priv_nopt γf pa pid (upd_tf V ws')).
   Proof.
-    iIntros "(%Hszb & %Hbel & Hpid & Hf & Hc & Htfp & Hcwd & Ho)".
+    iIntros "(%Hszb & %Hbel & Hpid & Hf & Hc & Htfp & Hcwd & Ho & Hft)".
     iExists (pv_tf V). iFrame "Htfp".
     iIntros (ws') "Htfp".
     (* every field [upd_tf] does not touch is equal by a single iota step;
@@ -1059,7 +1113,7 @@ Section ProcInv.
                    = proc_fields pa (DfracOwn 1) V) by reflexivity.
     rewrite /proc_priv_nopt Heq1 Heq2 Heq3 Heq4 Heq6 Heq7.
     iSplitR; [done|]. iSplitR; [done|].
-    iFrame "Hpid Hf Hc Htfp Hcwd Ho".
+    iFrame "Hpid Hf Hc Htfp Hcwd Ho Hft".
   Qed.
 
   (* THE FOOTPRINT FIELD IS INVISIBLE HERE.  The reduced block reads
@@ -1250,12 +1304,16 @@ Section ProcInv.
     tf_page (ud_tfp P) ws -∗
     proc_ofiles γf pa (pv_ofile V) -∗
     cwd_ref (pv_cwd V) -∗
+    (* ...AND THE TOKEN.  [proc_priv_nocwd_intro] above has NO such premise
+       and must not: allocproc produces the deficit block, and allocproc
+       does not park a RUNNABLE or SLEEPING process. *)
+    first_tok -∗
     proc_priv γf pa pid (upd_pt V P ws).
   Proof.
-    iIntros (Hsz Hbel) "Hpid Hf Hpt Htf Ho Hc".
+    iIntros (Hsz Hbel) "Hpid Hf Hpt Htf Ho Hc Hft".
     iDestruct (proc_priv_nocwd_intro γf pa pid V P ws Hsz Hbel
                  with "Hpid Hf Hpt Htf Ho") as "H".
-    iApply proc_priv_split_cwd. iFrame "H".
+    iApply proc_priv_split_cwd. iFrame "H Hft".
     by cbn [upd_pt pv_cwd].
   Qed.
 
@@ -1275,7 +1333,7 @@ Section ProcInv.
     p_pid pa ↦₄{DfracOwn (1/4)} pid ∗
     (p_pid pa ↦₄{DfracOwn (1/4)} pid -∗ proc_priv γf pa pid V).
   Proof.
-    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc) Ho]".
+    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft) Ho]".
     assert (Hq : (1/2)%Qp = (1/4 + 1/4)%Qp) by compute_done.
     rewrite Hq word4_pointsto_frac_split.
     iDestruct "Hpid" as "[Hq1 Hq2]". iFrame "Hq1".
@@ -1311,7 +1369,7 @@ Section ProcInv.
     (p_trapframe pa ↦₈{DfracOwn (1/4)} page_base (ud_tfp (pv_upt V)) -∗
        proc_priv γf pa pid V).
   Proof.
-    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc) Ho]".
+    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft) Ho]".
     rewrite /proc_pt_at. iDestruct "Hpt" as "(Hpg & Htfc & Hptt)".
     iDestruct (word_split14 with "Htfc") as "[Hq1 Hq2]".
     iSplitL "Hq1"; [iExact "Hq1"|].
@@ -1333,7 +1391,7 @@ Section ProcInv.
     (∀ v' : mword 64,
        p_cwd pa ↦₈ v' -∗ cwd_ref v' -∗ proc_priv γf pa pid (upd_cwd V v')).
   Proof.
-    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc) Ho]".
+    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft) Ho]".
     rewrite /proc_fields. iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
     iSplitL "Hcwd"; [iExact "Hcwd"|].
     (* [iExact], not [iFrame]: the hypothesis and the goal are the same
@@ -1350,7 +1408,7 @@ Section ProcInv.
     { iFrame "Hsz Hcwd Hnm". iPureIntro; exact Hnl. }
     iSplitL "Hpt"; [iExact "Hpt"|].
     iSplitL "Htfp"; [iExact "Htfp"|].
-    iExact "Hc".
+    iSplitL "Hc"; [iExact "Hc"|]. iExact "Hft".
   Qed.
 
   (* THE WORKING DIRECTORY AND THE PID QUARTER TOGETHER, because kexit needs
@@ -1380,7 +1438,7 @@ Section ProcInv.
   Proof.
     (* one [rewrite] does both occurrences -- the hypothesis AND the one
        under the wand -- so the give-back needs no second one. *)
-    rewrite /proc_priv proc_priv_core_bare. iIntros "[[Hb Hc] Ho]".
+    rewrite /proc_priv proc_priv_core_bare. iIntros "[[Hb [Hc Hft]] Ho]".
     iSplitL "Hb"; [iExact "Hb"|]. iSplitL "Hc"; [iExact "Hc"|].
     iIntros "Hb Hc". iFrame.
   Qed.
@@ -1393,7 +1451,7 @@ Section ProcInv.
        p_cwd pa ↦₈ v' -∗ cwd_ref v' -∗ p_pid pa ↦₄{DfracOwn (1/4)} pid -∗
        proc_priv γf pa pid (upd_cwd V v')).
   Proof.
-    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc) Ho]".
+    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft) Ho]".
     rewrite /proc_fields. iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
     assert (Hq : (1/2)%Qp = (1/4 + 1/4)%Qp) by compute_done.
     rewrite Hq word4_pointsto_frac_split.
@@ -1412,7 +1470,7 @@ Section ProcInv.
     { iFrame "Hsz Hcwd Hnm". iPureIntro; exact Hnl. }
     iSplitL "Hpt"; [iExact "Hpt"|].
     iSplitL "Htfp"; [iExact "Htfp"|].
-    iExact "Hc".
+    iSplitL "Hc"; [iExact "Hc"|]. iExact "Hft".
   Qed.
 
   (* The array's length, which a caller needs BEFORE it knows which
@@ -1426,7 +1484,7 @@ Section ProcInv.
       (V : pprivate) :
     proc_priv γf pa pid V -∗ ⌜pv_cwd V <> (zero_reg : mword 64)⌝.
   Proof.
-    iIntros "[(_ & _ & _ & _ & _ & _ & Hc) _]".
+    iIntros "[(_ & _ & _ & _ & _ & _ & Hc & _) _]".
     by iApply (cwd_ref_nonzero with "Hc").
   Qed.
 
@@ -1469,7 +1527,7 @@ Section ProcInv.
     (p_trapframe pa ↦₈{DfracOwn (1/4)} page_base (ud_tfp (pv_upt V)) -∗
      tf_page (ud_tfp (pv_upt V)) (pv_tf V) -∗ proc_priv γf pa pid V).
   Proof.
-    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc) Ho]".
+    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft) Ho]".
     rewrite /proc_pt_at. iDestruct "Hpt" as "(Hpg & Htfc & Hptt)".
     iDestruct (word_split14 with "Htfc") as "[Hq1 Hq2]".
     iFrame "Hq1 Htfp".
@@ -1499,7 +1557,7 @@ Section ProcInv.
        tf_page (ud_tfp (pv_upt V)) ws' -∗
        proc_priv γf pa pid (upd_tf V ws')).
   Proof.
-    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc) Ho]".
+    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft) Ho]".
     rewrite /proc_pt_at. iDestruct "Hpt" as "(Hpg & Htfc & Hptt)".
     iFrame "Htfc Htfp".
     iIntros (ws') "Htfc Htfp".
@@ -1508,7 +1566,7 @@ Section ProcInv.
     iSplitR "Ho"; [| iFrame "Ho"].
     iSplitR; [iPureIntro; exact Hszb|].
     iSplitR; [iPureIntro; exact Hbel|].
-    iFrame "Hpid Hf Hpg Htfc Hptt Htfp Hc".
+    iFrame "Hpid Hf Hpg Htfc Hptt Htfp Hc Hft".
   Qed.
 
   (* [upd_tf] at the contents it lent out is the identity -- the record eta a
@@ -1549,7 +1607,7 @@ Section ProcInv.
        proc_pt P' -∗
        proc_priv γf pa pid (upd_sz (upd_upt V P') szv)).
   Proof.
-    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc) Ho]".
+    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft) Ho]".
     rewrite /proc_fields /proc_pt_at.
     iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
     iDestruct "Hpt" as "(Hpg & Htfc & Hptt)".
@@ -1564,7 +1622,7 @@ Section ProcInv.
     iFrame "Hpid".
     iSplitL "Hsz Hcwd Hnm".
     { iFrame "Hsz Hcwd Hnm". iPureIntro. exact Hnl. }
-    iFrame "Hpg Htfc Hptt Htfp Hc".
+    iFrame "Hpg Htfc Hptt Htfp Hc Hft".
   Qed.
 
   (* THE COPY INSTANCE: the size stays put and the descriptor only GREW --
@@ -1626,7 +1684,7 @@ Section ProcInv.
     p_pid pa ↦₄{DfracOwn (1/4)} pid ∗
     (p_pid pa ↦₄{DfracOwn (1/4)} pid -∗ proc_priv_core pa pid V).
   Proof.
-    iIntros "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc)".
+    iIntros "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft)".
     assert (Hq : (1/2)%Qp = (1/4 + 1/4)%Qp) by compute_done.
     rewrite Hq word4_pointsto_frac_split.
     iDestruct "Hpid" as "[Hq1 Hq2]". iFrame "Hq1".
@@ -1656,7 +1714,7 @@ Section ProcInv.
     (p_trapframe pa ↦₈{DfracOwn (1/4)} page_base (ud_tfp (pv_upt V)) -∗
      tf_page (ud_tfp (pv_upt V)) (pv_tf V) -∗ proc_priv_core pa pid V).
   Proof.
-    iIntros "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc)".
+    iIntros "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft)".
     rewrite /proc_pt_at. iDestruct "Hpt" as "(Hpg & Htfc & Hptt)".
     iDestruct (word_split14 with "Htfc") as "[Hq1 Hq2]".
     iFrame "Hq1 Htfp".
@@ -1680,7 +1738,7 @@ Section ProcInv.
        proc_pt P' -∗
        proc_priv_core pa pid (upd_sz (upd_upt V P') szv)).
   Proof.
-    iIntros "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc)".
+    iIntros "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft)".
     rewrite /proc_fields /proc_pt_at.
     iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
     iDestruct "Hpt" as "(Hpg & Htfc & Hptt)".
@@ -1694,7 +1752,7 @@ Section ProcInv.
     iFrame "Hpid".
     iSplitL "Hsz Hcwd Hnm".
     { iFrame "Hsz Hcwd Hnm". iPureIntro. exact Hnl. }
-    iFrame "Hpg Htfc Hptt Htfp Hc".
+    iFrame "Hpg Htfc Hptt Htfp Hc Hft".
   Qed.
 
   Lemma proc_priv_core_copy (pa : mword 64) (pid : mword 32) (V : pprivate) :
@@ -1763,7 +1821,7 @@ Section ProcInv.
        tf_page (ud_tfp P') ws' -∗
        proc_priv γf pa pid (upd_sz (upd_pt V P' ws') szv)).
   Proof.
-    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc) Ho]".
+    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft) Ho]".
     rewrite /proc_fields /proc_pt_at.
     iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
     iDestruct "Hpt" as "(Hpg & Htfc & Hptt)".
@@ -1776,7 +1834,7 @@ Section ProcInv.
     iSplitR "Ho"; [|iFrame "Ho"].
     iSplitR; [iPureIntro; exact Hszb'|].
     iSplitR; [iPureIntro; exact Hbel'|].
-    iFrame "Hpid Hpg Htfc Hptt Htfp Hc".
+    iFrame "Hpid Hpg Htfc Hptt Htfp Hc Hft".
     iFrame "Hsz Hcwd Hnm". iPureIntro. exact Hnl.
   Qed.
 
@@ -1791,7 +1849,7 @@ Section ProcInv.
        pname_cells pa (DfracOwn 1) ns -∗
        proc_priv γf pa pid (upd_name V ns)).
   Proof.
-    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc) Ho]".
+    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft) Ho]".
     rewrite /proc_fields.
     iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
     iSplitR; [iPureIntro; exact Hnl|].
@@ -1802,7 +1860,7 @@ Section ProcInv.
     iSplitR "Ho"; [|iFrame "Ho"].
     iSplitR; [iPureIntro; exact Hszb|].
     iSplitR; [iPureIntro; exact Hbel|].
-    iFrame "Hpid Hpt Htfp Hc Hsz Hcwd Hnm".
+    iFrame "Hpid Hpt Htfp Hc Hft Hsz Hcwd Hnm".
     iPureIntro. exact Hnl'.
   Qed.
 
@@ -1814,7 +1872,7 @@ Section ProcInv.
     ofile_slot γf pa fd v ∗
     (∀ v', ofile_slot γf pa fd v' -∗ proc_priv γf pa pid (upd_ofile V fd v')).
   Proof.
-    iIntros (Hfd) "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc) [%Hlen Ho]]".
+    iIntros (Hfd) "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft) [%Hlen Ho]]".
     iDestruct (big_sepL_insert_acc with "Ho") as "[$ Hback]"; first exact Hfd.
     iIntros (v') "Hslot". iDestruct ("Hback" $! v' with "Hslot") as "Ho".
     rewrite /proc_priv /proc_priv_core /proc_ofiles.
@@ -1822,7 +1880,7 @@ Section ProcInv.
     iSplitR "Ho".
     { iSplitR; [iPureIntro; exact Hszb|].
       iSplitR; [iPureIntro; exact Hbel|].
-      iFrame "Hpid Hf Hpt Htfp Hc". }
+      iFrame "Hpid Hf Hpt Htfp Hc Hft". }
     iFrame "Ho". iPureIntro. rewrite length_insert. exact Hlen.
   Qed.
 
@@ -1840,7 +1898,7 @@ Section ProcInv.
     (∀ v', p_pid pa ↦₄{DfracOwn (1/4)} pid -∗ ofile_slot γf pa fd v' -∗
            proc_priv γf pa pid (upd_ofile V fd v')).
   Proof.
-    iIntros (Hfd) "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc) [%Hlen Ho]]".
+    iIntros (Hfd) "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft) [%Hlen Ho]]".
     assert (Hq : (1/2)%Qp = (1/4 + 1/4)%Qp) by compute_done.
     rewrite Hq word4_pointsto_frac_split.
     iDestruct "Hpid" as "[Hq1 Hq2]". iFrame "Hq1".
@@ -1852,7 +1910,7 @@ Section ProcInv.
     { iSplitR; [iPureIntro; exact Hszb|].
       iSplitR; [iPureIntro; exact Hbel|].
       rewrite Hq word4_pointsto_frac_split.
-      iFrame "Hq1 Hq2 Hf Hpt Htfp Hc". }
+      iFrame "Hq1 Hq2 Hf Hpt Htfp Hc Hft". }
     iFrame "Ho". iPureIntro. rewrite length_insert. exact Hlen.
   Qed.
 

@@ -2948,8 +2948,9 @@ Section ProofSysOpenBody.
        and the two-slot allowance the walk takes EXACTLY.  [p->cwd] is one of
        the block's own cells now, so namei borrows it for its own load and
        nothing here carries it. ---- *)
+    (* three-way now: [FirstTok.first_tok] parks beside the reference. *)
     iDestruct (proc_priv_split_cwd gf (proc_addr jx) pidv V with "Hpriv")
-      as "[Hpnc Href]".
+      as "[Hpnc [Href Hftok]]".
     iEval (rewrite proc_priv_nocwd_bare) in "Hpnc".
     iDestruct "Hpnc" as "[Hpbare Hofiles]".
     iDestruct (cwd_ref_held with "Href") as "Hcwdref".
@@ -3043,8 +3044,8 @@ Section ProofSysOpenBody.
       iCombine "Hpbare Hofiles" as "Hpnc".
     iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
       iDestruct (proc_priv_split_cwd gf (proc_addr jx) pidv V
-                   with "[Hpnc Href]") as "Hpriv";
-        [iSplitL "Hpnc"; [iExact "Hpnc" | iExact "Href"] |].
+                   with "[Hpnc Href Hftok]") as "Hpriv";
+        [iSplitL "Hpnc"; [iExact "Hpnc" | iFrame "Href Hftok"] |].
       iDestruct (proc_priv_bare_acc with "Hpriv") as "[Hpbare Hpback2]".
       iDestruct (iref_slots_combine 2 (ns - 2) with "Hir2b Hirr") as "Hisl".
       assert (Hnsb2 : (2 + (ns - 2))%nat = ns) by lia.
@@ -3168,8 +3169,8 @@ Section ProofSysOpenBody.
     iCombine "Hpbare Hofiles" as "Hpnc".
     iEval (rewrite -proc_priv_nocwd_bare) in "Hpnc".
     iDestruct (proc_priv_split_cwd gf (proc_addr jx) pidv V
-                 with "[Hpnc Href]") as "Hpriv";
-      [iSplitL "Hpnc"; [iExact "Hpnc" | iExact "Href"] |].
+                 with "[Hpnc Href Hftok]") as "Hpriv";
+      [iSplitL "Hpnc"; [iExact "Hpnc" | iFrame "Href Hftok"] |].
     assert (Hilsp : so_sp sp0 mil).
     { rewrite /so_sp (callee_saved_lookup Hcsil csp_rs1 ltac:(vm_compute; reflexivity)).
       exact HP2sp. }

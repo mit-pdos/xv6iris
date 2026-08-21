@@ -366,6 +366,7 @@ Require Import SpecFileread SpecFilewrite.
 Require Import SpecFilestat.
 Require Import BioInv.
 Require Import FsReady FsCfg.
+Require Import FirstTok.  (* [first_done] -- syscall_env's last conjunct *)
 Require Import SpecSyscall.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -960,7 +961,23 @@ Section SyscallVocab.
         !irefslotG Σ, !pavG Σ} `{GEN : GenId}
       (γf : gname) (pj : mword 64) (bn : bio_names) (fn : fclose_names)
       : iProp Σ :=
-    (sysc_proc_env γf ∗ ConsoleInv.console_ready ∗ sysc_fs_env pj bn fn)%I.
+    (sysc_proc_env γf ∗ ConsoleInv.console_ready ∗ sysc_fs_env pj bn fn ∗
+     (* THE STEADY ARM OF proc.c's [static int first]
+        ([FirstTok.first_done]).  It is here, and LAST, for two reasons.
+        HERE: fork is the one syscall that BUILDS a second process block,
+        and a block carries [FirstTok.first_tok] -- which the parent cannot
+        share, its boot arm being exclusive.  The persistent steady arm is
+        what a running process can hand to every child forever, and
+        [FirstTok.first_tok_of_done] mints the child's from it.
+        LAST: every arm's [iDestruct] pattern is positional, so a conjunct
+        added anywhere else silently re-binds someone's hypothesis; the
+        patterns that end in [& _] absorb this one for free.
+        NOBODY CONSTRUCTS THIS BUNDLE YET (it arrives abstractly as
+        usertrap's [Rsys]), which is deliberate: the obligation lands
+        exactly where forkret will discharge it -- its boot arm persists the
+        store and seals the file system, its steady arm already holds
+        both halves. *)
+     FirstTok.first_done)%I.
 
   (* THE CONSOLE, reached on its own rather than through [syscall_env_all].
      Adding it to that projection's output would move eleven arms'
@@ -983,6 +1000,14 @@ Section SyscallVocab.
     syscall_env γf pj bn fn -∗ ConsoleInv.console_ready.
   Proof. by iIntros "(_ & $ & _)". Qed.
 
+  (* ...and the fork row, on its own for the same reason the console is:
+     ONE arm wants it, and adding it to [syscall_env_all]'s output would
+     move eleven [iDestruct] patterns. *)
+  Lemma syscall_env_first (γf : gname) (pj : mword 64)
+      (bn : bio_names) (fn : fclose_names) :
+    syscall_env γf pj bn fn -∗ FirstTok.first_done.
+  Proof. by iIntros "(_ & _ & _ & $)". Qed.
+
   (* ...and the OLD shape, as a projection.  Same reason [sysc_fs_env_all]
      keeps its order: an arm's [iDestruct] pattern is an interface, and
      re-shuffling eleven of them by hand is the kind of edit that compiles
@@ -1001,7 +1026,7 @@ Section SyscallVocab.
       printk_env γpr γud γvd ∗
       sysc_fs_env pj bn fn.
   Proof.
-    iIntros "(#Hproc & _ & #Hfs)".
+    iIntros "(#Hproc & _ & #Hfs & _)".
     iDestruct "Hproc" as (γp γw γft γtk)
       "(#Hnextpid & #Hpav & #Hwaitlk & #Hftable & #Htick)".
     iPoseProof "Hfs" as "#Hfsc".
@@ -2955,6 +2980,8 @@ Section SyscallArms.
     iDestruct (sysc_ic_env_of_ready with "Hfsenv") as
       "(_ & _ & _ & _ & _ & _ & _ & _ & _ & #Hitable & #Hitinv & _ & #Hireg & _)".
     iEval (rewrite Hdev) in "Hitable".
+    (* the child's token's source *)
+    iDestruct (syscall_env_first with "Henvc") as "#Hfdone".
     (* ---- the call ---- *)
     iApply (SysFork.wp_sys_fork_sconf γa γp γw γft γf (fcn_tlock fn) (fcn_ireg fn)
               γs (fcn_ic fn) (fcn_fs fn) (fcn_cov fn) (fcn_logstart fn)
@@ -2962,7 +2989,7 @@ Section SyscallArms.
               M 0%nat (av - 4)%nat true pj true pid V ∅
               ltac:(lia) sysc_noff0b
               (locks_below_empty "wait_lock")
-              with "Hcg Hcpu Htext Hpc Hprocs Hnextpid Hwaitlk Hftable Hitable Hitinv Hireg Hkalloc Hpav Hpriv").
+              with "Hcg Hcpu Htext Hpc Hprocs Hnextpid Hwaitlk Hftable Hitable Hitinv Hireg Hkalloc Hpav Hfdone Hpriv").
     iIntros (CIDy Hsy mf) "%Hcs Hcg Hcpu Hpc Hpriv Hka %Hrv".
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }

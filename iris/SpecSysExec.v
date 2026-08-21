@@ -162,6 +162,10 @@ Notation K_sys_exec := (244%nat) (only parsing).
 Section SpecSysExec.
   Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
+  (* [GenId], for [ProcInv.proc_priv]'s own index: the private block now
+     carries [FirstTok.first_tok], whose boot arm names [gen_cert].  The
+     definitions below mention the block, so the section has to bind it. *)
+  Context `{GEN : GenId}.
 
   (* sys_exec's result, and it is [kexec_ok] verbatim: every path that never
      reaches kexec returns -1 with the block unchanged, which is that
