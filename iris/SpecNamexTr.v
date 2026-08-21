@@ -105,7 +105,7 @@ Local Open Scope Z_scope.
    seal it; [iApply ("Hcont" $! mf ...)] unifies through a transparent
    constant and not through an opaque one. *)
 Definition namex_tr_post
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (pj pv nb ret_tgt : mword 64) (pl : list (bv 8))
     (m : regfile) (K : nat) (b eb : bool) (lks : gset string)
@@ -131,7 +131,7 @@ Definition namex_tr_post
       inode_held (pv_cwd Vpr) -∗
       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
       ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1] nf i) -∗
-      bslots bn 3 -∗
+      bslots 3 -∗
       ⌜Sb ⊆ Sb'⌝ -∗
       ⌜w = true -> bmapstart ∈ Sb'⌝ -∗
       ⌜((n - (walk_spend w + (if ok then 0%nat else 1%nat)))%nat <= n')%nat
@@ -166,7 +166,7 @@ Definition namex_tr_post
 (* ===================================================================== *)
 
 Definition wp_namex_tr_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
@@ -247,7 +247,7 @@ Definition wp_namex_tr_body
   inode_held (pv_cwd Vpr) -∗
   ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
   ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1] nfun i) -∗
-  bslots bn 3 -∗
+  bslots 3 -∗
   iref_slots 2 -∗
   log_opS g n Sb -∗
   (* ---- THE TRACE (the two new resource premises) ---- *)
@@ -263,7 +263,7 @@ Definition wp_namex_tr_body
 
 Module Type NAMEX_TR.
   Parameter wp_namex_tr :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
              ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)

@@ -106,7 +106,7 @@ Set Printing Depth 40.
 (* ===================================================================== *)
 
 Section NamexTrHops.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
   (* PEEL THE HEAD HOP.  [nx_hops_from .. k] is the big-op over
@@ -201,7 +201,7 @@ Notation Rs9  := (mword_of_int 25 : mword 5).
 Notation Rs10 := (mword_of_int 26 : mword 5).
 
 Section ProofNamexTrMain.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             ICFG : icfg, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
@@ -243,14 +243,14 @@ Section ProofNamexTrMain.
      inside an [iAssert] body makes ssreflect complain
      "_pattern_value_ is used in conclusion". *)
   Lemma nx_bs3_split (bn : bio_names) :
-    (bslots bn 3 : iProp Σ) -∗ bslot bn ∗ bslots bn 2.
+    (bslots 3 : iProp Σ) -∗ bslot ∗ bslots 2.
   Proof.
     rewrite /bslot. change 3%nat with (1 + 2)%nat. rewrite bslots_op.
     iIntros "$".
   Qed.
 
   Lemma nx_bs3_join (bn : bio_names) :
-    (bslot bn : iProp Σ) -∗ bslots bn 2 -∗ bslots bn 3.
+    (bslot : iProp Σ) -∗ bslots 2 -∗ bslots 3.
   Proof.
     iIntros "A B". rewrite /bslot. change 3%nat with (1 + 2)%nat.
     rewrite bslots_op. iFrame.
@@ -699,7 +699,7 @@ Section ProofNamexTrMain.
      inode_held (pv_cwd Vpr) -∗
      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
      ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1] nf i) -∗
-     bslots bn 3 -∗
+     bslots 3 -∗
      log_opS g ncur Scur -∗
      P (length es0) dcur -∗
      nx_hops_from P Pmiss pl (length es0) -∗
@@ -756,7 +756,7 @@ Section ProofNamexTrMain.
      inode_held (pv_cwd Vpr) -∗
      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
      ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1] nf' i) -∗
-     bslots bn 3 -∗
+     bslots 3 -∗
      log_opS g ncur Scur -∗
      P kk dcur -∗
      nx_hops_from P Pmiss pl kk -∗

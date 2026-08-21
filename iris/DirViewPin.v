@@ -82,7 +82,7 @@ Local Open Scope Z_scope.
 (* ===================================================================== *)
 
 Section PinChain.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
   (* THE EXPECTED CHAIN.  [hops] is the caller's claim about the path:
@@ -246,7 +246,7 @@ End PinChain.
     replaces.                                                             *)
 
 Definition wp_namei_pinned_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (gs : list gname) (j : nat) (gl : gname)
@@ -320,7 +320,7 @@ Definition wp_namei_pinned_body
   proc_priv_bare pj pidv Vpr -∗
   inode_held (pv_cwd Vpr) -∗
   ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
-  bslots bn 3 -∗
+  bslots 3 -∗
   iref_slots 2 -∗
   log_opS g n Sb -∗
   (* ---- THE ONE NEW RESOURCE PREMISE: the pins along the chain ---- *)
@@ -339,7 +339,7 @@ Definition wp_namei_pinned_body
       proc_priv_bare pj pidv Vpr -∗
       inode_held (pv_cwd Vpr) -∗
       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
-      bslots bn 3 -∗
+      bslots 3 -∗
       ⌜Sb ⊆ Sb'⌝ -∗
       ⌜w = true -> bmapstart ∈ Sb'⌝ -∗
       ⌜((n - (walk_spend w + (if ok then 0%nat else 1%nat)))%nat <= n')%nat
@@ -363,7 +363,7 @@ Definition wp_namei_pinned_body
 Module NameiPinned (NT : NAMEI_TR).
 
   Lemma wp_namei_pinned
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (gs : list gname) (j : nat) (gl : gname)
     (gu : uart_names) (gd : disk_names) (gk : gname)

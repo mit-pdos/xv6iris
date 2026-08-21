@@ -107,7 +107,7 @@ Local Open Scope Z_scope.
 (* ===================================================================== *)
 
 Section NameiTrDefs.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
   (* ONE caller-supplied atomic step.  The walk applies it at hop [k]'s
@@ -164,7 +164,7 @@ End NameiTrDefs.
 (* ===================================================================== *)
 
 Definition wp_namei_tr_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
@@ -238,7 +238,7 @@ Definition wp_namei_tr_body
   proc_priv_bare pj pidv Vpr -∗
   inode_held (pv_cwd Vpr) -∗
   ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
-  bslots bn 3 -∗
+  bslots 3 -∗
   iref_slots 2 -∗
   log_opS g n Sb -∗
   (* ---- THE TRACE (the two new resource premises) ---- *)
@@ -258,7 +258,7 @@ Definition wp_namei_tr_body
       proc_priv_bare pj pidv Vpr -∗
       inode_held (pv_cwd Vpr) -∗
       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
-      bslots bn 3 -∗
+      bslots 3 -∗
       ⌜Sb ⊆ Sb'⌝ -∗
       ⌜w = true -> bmapstart ∈ Sb'⌝ -∗
       ⌜((n - (walk_spend w + (if ok then 0%nat else 1%nat)))%nat <= n')%nat
@@ -292,7 +292,7 @@ Definition wp_namei_tr_body
 
 Module Type NAMEI_TR.
   Parameter wp_namei_tr :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
              ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
@@ -321,7 +321,7 @@ End NAMEI_TR.
 (* ===================================================================== *)
 
 Section NameiTrCursor.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             ICFG : icfg, !irefslotG Σ, !pavG Σ}.
   Context `{!ghost_varG Σ (nat * Z)}.
 
