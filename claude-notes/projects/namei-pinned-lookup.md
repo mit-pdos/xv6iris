@@ -911,3 +911,20 @@ fv_pin** — the pure arm keeps the exit closure resource-free, and it
 mirrors wp_namei_init_pinned's dv treatment (the pin is spent into the
 pinned outcome).  This is the campaign's own uncommitted-consumer
 contract; the adjustment is coordinator-authorized.
+
+### 13.5 N-5.2B COMPLETE (2026-08-21, commit 3dae8bb2) — stage B's sentence stands
+
+`LinkKexecPinned.KexecPinned.wp_kexec_pinned`: a boot-environment
+caller holding both pins, running kexec on the literal "/init", gets
+the landed result relation PLUS `entry = init_entry` on success — the
+process kexec builds will start at /init's first instruction — or the
+landed relation beside the unforgeable persistent receipt.  Audit: 5
+platform externs + funext + the documented 11 image primitives
+(FsImgCheck's structural vm_compute set); NO forkret entry.  The
+opaque-exit branch point is +0x090 (verdict known); kxc_a2's oracle is
+□(⌜hdr_ok⌝ ∨ XCH) with XCH per instantiation; SpecKexecPinned's
+duplicated kexec_ok_q block moved to the KexecOkQ leaf (flagged).  The
+non-terminating abstract-tail wand lesson is recorded in two headers.
+Owed forward: magic-check determination, szv' pinning (separate
+ruling), phdr/pages = stage C.  REMAINING CAMPAIGN WORK: stage C
+design (§13.1's guard), M2 on the D1/D2 trigger (§11.7).
