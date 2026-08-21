@@ -262,6 +262,20 @@ the normalization").
   readers' `ts` entries renumber; the §1 `lswap` kit self-applies at
   the `gwrites` level).  The RMW-read case (upper event a fused
   RMW) is deliberately out of B2a's scope.
+  POST-LANDING SCOPING (orchestrator, 2026-08-21): the induction only
+  ever moves READS DOWN (B2a) and VIOLATING WRITES UP — so `(R,W)` (a
+  write moving down past a read = a read moving up) is likely NEVER
+  NEEDED, and B2b reduces to the `(W,W)` BYTE-DISJOINT case: the
+  transformation is `gswap` PLUS the ts-transposition rewrite in
+  `gx_prog`'s labels (the two writes' `gwix` values exchange, so every
+  reader's `ts` entry naming either renumbers by the transposition —
+  values unchanged, so value facts survive); adjacency means no reader
+  sits between, per-byte co is untouched under byte disjointness, and
+  dep edges survive because targets only move up or swap with a
+  non-mate.  Same-byte cross-hart `(W,W)` is EXCLUDED until the
+  write-class inventory shows a need (it flips co).  The write-write
+  violation class (two independent same-hart stores reordered — real
+  under RVWMO, no fence between) is what makes `(W,W)` unavoidable.
 - **B2**: the exchange lemma's case trichotomy (§3b) with the kills
   wired per S6 §3; the induction + measure.  NOTE from the B0 pass
   (2026-08-21): several S6 kills flip from reader-refutation to
