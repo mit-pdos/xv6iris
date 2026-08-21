@@ -845,3 +845,42 @@ tree's ONE fv_lend_mint fires at inum 7 in FsCfgBoot beside root's dv
 mint; both pins ride fs_cfg_alloc's post and are dropped at BootShared.
 (v) `dvw_ride_size` defined but unused (kept for B).  Non-root/7
 licences dropped, as chartered.
+
+### 13.3 N-5.2B's finding, and the exit-generic ruling (2026-08-21)
+
+**The finding (lane, machine-checked): the pinned kexec walk cannot be
+built client-side.**  The landed cone relays kexec's exit continuation
+at the full `kexec_ok` shape in 37 places across 11 files; `entry`
+occurs ONLY inside that pure relation, is universally bound at every
+relay, and no resource ties it to the machine — so a strengthened
+continuation cannot be weakened into any landed relay's shape, and the
+ELF buffer's bytes are deliberately folded away at the phase-A seam
+(ProofKexecA's own header says so).  A parallel walk is a ~14k-line
+permanent duplicate of the tallest cone.  What IS landed
+(`SpecKexecPinned.v`, commit a9efe0e2): the contract, `init_bytes_elf`
+(boot mint bytes = ElfUser.init_elf, through the image in one lemma),
+`kxp_fv_read`, and the readi-window bridges — readi's contracts
+untouched.
+
+**RULED (coordinator, 2026-08-21): the exit-generic sweep — the
+eb-generic precedent, replayed on the exit relation.**  Thread
+`Q : mword 64 -> Prop` through the cone (`kexec_ok → kexec_ok_q Q` at
+the 37 sites + the chaining argument lists); the eight failure tails
+change no proof (the -1 arm never mentions entry); the ONE discharge
+site is kxd_commit's entry load; `SpecKexec.v` stays byte-identical
+(the landed contract is the `Q := fun _ => True` instantiation via the
+already-proven `kexec_ok_q_True`).  Authorized Spec surface: the
+SpecKexecB2/B3 SEAM BODIES only (B2's fifth touch, B3's first) — the
+same kexec-internal self-canceling pattern as the bracket.  Then
+`wp_kexec_pinned` assembles from the now-generic phase lemmas at
+`Q := kxp_entry_ok`, with a pinned kxc_a1 variant (the namei call via
+wp_namei_init_pinned + the fv redeem after ilock) as the one new phase
+proof.
+
+**Owed items recorded:** the magic-check determination (free inside a
+pinned kxc_a2, buys nothing while later bad: arms keep -1 reachable —
+recorded, not taken); pinning `szv'` (a different strengthening of the
+phdr fold — rule separately if wanted); program headers and loaded
+pages have no landing place below stage C (proc_pt at existential
+contents), so `entry = init_entry` is the whole of stage B's sentence:
+the process kexec builds will start at /init's first instruction.
