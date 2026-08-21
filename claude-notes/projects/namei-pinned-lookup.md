@@ -791,3 +791,17 @@ kit — the N-1+PhaseB pattern replayed) lands first; N-5.2B (the kexec
 re-walk) is its own lane after, since the walk is the tree's tallest.
 Gates as Phase B's, plus: no uvm/proc-pagetable file may change (stage
 C's boundary).
+
+### 12.1 N-5.1 LANDED (2026-08-21, commit 8681e379)
+
+Both items green, audits unchanged (system 7; the theorem at 5 externs
++ funext).  Execution notes: the ordering fight §12 predicted was real
+and resolved by MOVING THE RIDE, not the mint — the boot dv sweep stops
+at the whole hold, `dv_ride_of_hold` runs after `ireg_alloc`, root
+parks on the ¾ arm.  `fs_cfg_alloc` gained one pure premise
+(`↑iregN ⊆ E`; sole caller at ⊤).  The image bridge is the one lemma
+`dv_of_path_at` (dir_view_lookup + path_at_disk_dir — both sides are
+dir_first's scan).  The pin is dropped at BootShared with the M2/D1-D2
+comment.  `wp_namei_init_pinned`'s post: `inode_held_at ipv 7` ∨ an
+unforgeable `dv_cancelled ROOTZ`; failure hands the pin back unspent.
+N-5.2 (§13) is next.
