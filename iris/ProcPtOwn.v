@@ -3524,7 +3524,11 @@ Section ProcPt.
     uva_dom (uptd_delete P vpn) = uva_dom P ∖ upage_dom vpn.
   Proof.
     apply set_eq. intros va.
-    rewrite elem_of_difference !elem_of_uva_dom.
+    (* NOT [!elem_of_uva_dom]: there are exactly two occurrences, and the
+       repeat's third, failing attempt re-runs setoid rewriting over the
+       whole goal -- measured 4.3 s against 0.33 s for the two named
+       rewrites (optimization.md, "a repeat that cannot fire is not free"). *)
+    rewrite elem_of_difference elem_of_uva_dom elem_of_uva_dom.
     apply uva_mapped_delete.
   Qed.
 

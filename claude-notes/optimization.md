@@ -888,6 +888,22 @@ in what every rule in this file is fighting.
   (`E mod 32 = 0 → E/32 mod 4 = 0 → … → E = 0` comes back "cannot find witness").
   It has no theory of iterated division; stage it with `Z_div_exact_2` +
   `Z.div_div`.
+- **A `!` in `rewrite` always pays one FULL failing pass, and it is not free
+  when the lemma is expensive to MATCH.** `rewrite !H` fires until failure, so
+  it runs one more match attempt than the goal has occurrences — and that
+  attempt is a complete setoid traversal of the goal, instance search included.
+  Measured (`ProcPtOwn.uva_dom_delete`, 2026-08-21): `rewrite
+  elem_of_difference !elem_of_uva_dom` over a goal with exactly TWO
+  `va ∈ uva_dom _` occurrences cost **3.3 s in the file / 4.3 s isolated**;
+  naming the two rewrites (`… elem_of_uva_dom elem_of_uva_dom`) cost **0.33 s**,
+  a ~10× cut with an identical proof term, and it was the slowest sentence in a
+  5 000-line file by 4×. What makes the failing pass expensive is the LHS:
+  `uva_dom` is a `list_to_set (mjoin (… <$> map_to_list _))`, so every candidate
+  subterm drags the `elem_of` instance chain behind it. The rule is NOT "avoid
+  `!`" — 261 files use it, nearly all harmlessly. It is that a `!` over a
+  set-membership lemma with a COMPUTED carrier, in a goal big enough to
+  traverse, should be spelled out at the occurrence count the goal actually has.
+  (Same family as the two bullets below: what costs is the tactic that fails.)
 - **In a `first [ … ]` alternation, put the CHEAP-FAILING branch first.** The
   cost of a tactic that FAILS grows with the proof term, so an alternation
   leading with an expensive-to-fail branch pays that cost at every use — 42 s
