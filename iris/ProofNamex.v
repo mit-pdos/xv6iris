@@ -565,7 +565,7 @@ Notation Rs9  := (mword_of_int 25 : mword 5).
 Notation Rs10 := (mword_of_int 26 : mword 5).
 
 Section ProofNamexMain.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             ICFG : icfg, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
@@ -606,15 +606,15 @@ Section ProofNamexMain.
      Stated as a WAND PAIR, not as an [⊣⊢]: rewriting with the equivalence
      inside an [iAssert] body makes ssreflect complain
      "_pattern_value_ is used in conclusion". *)
-  Lemma nx_bs3_split (bn : bio_names) :
-    (bslots bn 3 : iProp Σ) -∗ bslot bn ∗ bslots bn 2.
+  Lemma nx_bs3_split :
+    (bslots 3 : iProp Σ) -∗ bslot ∗ bslots 2.
   Proof.
     rewrite /bslot. change 3%nat with (1 + 2)%nat. rewrite bslots_op.
     iIntros "$".
   Qed.
 
-  Lemma nx_bs3_join (bn : bio_names) :
-    (bslot bn : iProp Σ) -∗ bslots bn 2 -∗ bslots bn 3.
+  Lemma nx_bs3_join :
+    (bslot : iProp Σ) -∗ bslots 2 -∗ bslots 3.
   Proof.
     iIntros "A B". rewrite /bslot. change 3%nat with (1 + 2)%nat.
     rewrite bslots_op. iFrame.
@@ -1055,7 +1055,7 @@ Section ProofNamexMain.
      inode_held (pv_cwd Vpr) -∗
      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
      ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1] nf i) -∗
-     bslots bn 3 -∗
+     bslots 3 -∗
      log_opS g ncur Scur -∗
      (* ---- THE CONTRACT'S OWN CONTINUATION, at the loop's hart.  Kept
         SEALED as [SpecNamex.namex_post]: spelled out here it would be
@@ -1109,7 +1109,7 @@ Section ProofNamexMain.
      inode_held (pv_cwd Vpr) -∗
      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
      ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1] nf' i) -∗
-     bslots bn 3 -∗
+     bslots 3 -∗
      log_opS g ncur Scur -∗
      WP (Loop : expr riscv_lang))%I.
 
@@ -3056,7 +3056,7 @@ Section ProofNamexMain.
                                 with "Hesc") as "#Hesck".
                    iDestruct (ic_sleeplocks_lookup cn ik Hik with "Hslks")
                      as (gilk gislk) "#Hslkk".
-                   iDestruct (nx_bs3_split bn with "Hbslot")
+                   iDestruct (nx_bs3_split with "Hbslot")
                      as "[Hbs1 Hbs2]".
                    (* +0xc0 c.mv a0,s4 *)
                    iApply (wp_cmv_s_sconf (mword_of_int (NX + 0xc0)) Ra0 Rs4
@@ -3288,7 +3288,7 @@ Section ProofNamexMain.
                        iSplitL "Hity Himaj Himin Hinl Hisz".
                        - rewrite /inode_meta /i_type. iFrame.
                        - iFrame. }
-                     iDestruct (nx_bs3_join bn with "Hbs1 Hbs2") as "Hbslot".
+                     iDestruct (nx_bs3_join with "Hbs1 Hbs2") as "Hbslot".
                      (* +0x54 c.mv a0,s4 *)
                      iApply (wp_cmv_s_sconf (mword_of_int (NX + 0x7a)) Ra0 Rs4
                                W0 (K - 12)%nat b ltac:(nz) ltac:(rdok)
@@ -3689,7 +3689,7 @@ Section ProofNamexMain.
                        assert (Hmiutr : nx_tregs m sp0 miu)
                          by exact (nx_tregs_of_regs m sp0 _ _ _ _ miu
                                      Hmiuregs).
-                       iDestruct (nx_bs3_join bn with "Hbs1 Hbs2") as "Hbslot".
+                       iDestruct (nx_bs3_join with "Hbs1 Hbs2") as "Hbslot".
                        (* +0x8a c.j +0x5c *)
                        assert (Htj5cP : add_vec
                                  (mword_of_int (NX + 0x8a) : mword 64)
@@ -4016,7 +4016,7 @@ Section ProofNamexMain.
                            iSplitR; [iPureIntro; exact Hduq |].
                            iSplitL "Hdlnk"; [iExact "Hdlnk" |].
                            iFrame "Hdiat Hmeta Haddrs Hind Hblocks Hdview". }
-                         iDestruct (nx_bs3_join bn with "Hbs1 Hbs2") as "Hbslot".
+                         iDestruct (nx_bs3_join with "Hbs1 Hbs2") as "Hbslot".
                          destruct found.
                          - (* ============ FOUND: recurse on the child ==== *)
                            iDestruct "Harm"
@@ -4630,7 +4630,7 @@ Section ProofNamexMain.
                        iSplitL "Hity Himaj Himin Hinl Hisz".
                        - rewrite /inode_meta /i_type. iFrame.
                        - iFrame. }
-                     iDestruct (nx_bs3_join bn with "Hbs1 Hbs2") as "Hbslot".
+                     iDestruct (nx_bs3_join with "Hbs1 Hbs2") as "Hbslot".
                      (* +0x54 c.mv a0,s4 *)
                      iApply (wp_cmv_s_sconf (mword_of_int (NX + 0x54)) Ra0 Rs4
                                V3 (K - 12)%nat b ltac:(nz) ltac:(rdok)

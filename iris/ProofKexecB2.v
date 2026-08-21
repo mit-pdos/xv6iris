@@ -234,7 +234,7 @@ Module A := ProofKexecTail.KexecTailProof Myproc BeginOp Namei Ilock Readi
                                           Iunlockput EndOp.
 
 Section KexecB2Body.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -689,7 +689,7 @@ End KexecB2Body.
    above sits in the section just closed, so it can be aimed; the loops here
    bind their own hart and are aimed by their callers in turn. *)
 Section KexecB2Loops.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -1342,7 +1342,7 @@ Section KexecB2Loops.
       destruct Hiok' as (Hbmwf & Hbmcov & Hdaddr & Hdty & Hszb & Hholes & Hsized).
       iDestruct (proc_priv_bare_acc gf (proc_addr jp) pidv V with "Hpriv")
         as "[Hppid Hpvbk]".
-      iDestruct (A.kxa_bs3_split bn with "Hbs") as "[Hbs1 Hbs2]".
+      iDestruct (A.kxa_bs3_split with "Hbs") as "[Hbs1 Hbs2]".
       iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhwc Hcg]".
       iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
         "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
@@ -1386,7 +1386,7 @@ Section KexecB2Loops.
       iDestruct (kxc_load_seal gfs gi cov logstart kf inumf dnf bmf datl
                    Hiok Hdok Hddix Hdoc Hduq
                    with "Hdlk Hdiat Hmeta Hmap Hblocks Hdview") as "Hload".
-      iDestruct (A.kxa_bs3_join bn with "Hbs1 Hbs2") as "Hbs".
+      iDestruct (A.kxa_bs3_join with "Hbs1 Hbs2") as "Hbs".
       iDestruct (kxc_open_intro gfs gi cn cov logstart dev pidv kf qf sf gyf
                    inumf dnf bmf gilf gislf
                    with "Hslkk Hslkd Hdep Hidev Hiinum Hivalid Hload

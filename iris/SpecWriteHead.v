@@ -86,7 +86,7 @@ Import Defs.
    deepest callee is bread (40).  bwrite/brelse want less. *)
 Notation K_write_head := (62%nat) (only parsing).
 Definition wp_write_head_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
@@ -138,7 +138,7 @@ Definition wp_write_head_sconf_body
   (* the header block's client half, at whatever it currently holds *)
   (∃ bsh : list (bv 8), fsblock γfs (log_hdr_bno logstart) bsh) -∗
   (* the slot unit for its bread *)
-  bslot bn -∗
+  bslot -∗
   (* THE CRASH PERMIT for the header write (phase C2b/D1 stage 3).  The
      caller does not know the header IMAGE this function will assemble -- it
      is built from [n] and [W] by the copy loop -- so the permit is supplied
@@ -178,7 +178,7 @@ Definition wp_write_head_sconf_body
          the full (n, W) encoding the copy loop laid down *)
       ⌜hdr_n bs' = Z.of_nat n⌝ -∗
       ⌜hdr_dec bs' = (n, map uint W)⌝ -∗
-      bslot bn -∗
+      bslot -∗
       (* the permit's RECEIPT, back from the DMA completion *)
       ▷ Q -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -186,7 +186,7 @@ Definition wp_write_head_sconf_body
 
 Module Type WRITE_HEAD.
   Parameter wp_write_head_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)

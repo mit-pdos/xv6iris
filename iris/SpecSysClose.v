@@ -76,7 +76,7 @@ Local Open Scope Z_scope.
    iput -- argfd 24 and myproc 10. *)
 Notation sys_close_stack := (88%nat) (only parsing).
 Section SpecSysClose.
-  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   (* [GenId], for [ProcInv.proc_priv]'s own index: the private block now
      carries [FirstTok.first_tok], whose boot arm names [gen_cert].  The
      definitions below mention the block, so the section has to bind it. *)
@@ -96,7 +96,7 @@ Section SpecSysClose.
 End SpecSysClose.
 
 Definition wp_sys_close_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
      (γl γf : gname) (fn : fclose_names) (on : option nat)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
@@ -190,7 +190,7 @@ Definition wp_sys_close_sconf_body
 
 Module Type SYSCLOSE.
   Parameter wp_sys_close_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
        (γl γf : gname) (fn : fclose_names) (on : option nat)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)

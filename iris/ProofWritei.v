@@ -375,7 +375,7 @@ Qed.
 (*  Vocabulary: the frame in three strengths, and the continuation.       *)
 (* ===================================================================== *)
 Section WriteiDefs.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, ICFG : icfg}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, ICFG : icfg}.
   (* [GenId]: [ProcInv.proc_priv]'s index since the block carries
      [FirstTok.first_tok] (whose boot arm names [gen_cert]). *)
   Context `{GEN : GenId}.
@@ -578,7 +578,7 @@ Section WriteiDefs.
          else ([∗ list] i ∈ seq 0 n,
                  pa_add (m !!! Regidx Ra2 : mword 64) i ↦ₘ[ktb] (src_bytes i)) ∗
               proc_priv_bare (proc_addr j) pidv V) -∗
-        bslots bn 3 -∗
+        bslots 3 -∗
         log_opS γ n' Sb' -∗
         WP (Loop : expr riscv_lang))%I.
 
@@ -594,7 +594,7 @@ Definition wi_sp (m M : regfile) : Prop :=
 (*  +0xd6 .. +0xe6 : THE RETURN.                                          *)
 (* ===================================================================== *)
 Section WriteiRet.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, ICFG : icfg}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, ICFG : icfg}.
   (* [GenId]: [ProcInv.proc_priv]'s index since the block carries
      [FirstTok.first_tok] (whose boot arm names [gen_cert]). *)
   Context `{GEN : GenId}.
@@ -682,7 +682,7 @@ Section WriteiRet.
      else ([∗ list] i ∈ seq 0 n,
              pa_add (m !!! Regidx Ra2 : mword 64) i ↦ₘ[ktb] (src_bytes i)) ∗
           proc_priv_bare (proc_addr j) pidv V) -∗
-    bslots bn 3 -∗
+    bslots 3 -∗
     log_opS γ n' Sb' -∗
     wi_cont (ktb := ktb) (CID0 := CID0) γfs γi bn γ γf cov logstart inodestart nib dev ip inum
             bm data dn dn0 user off n src_bytes V ncount Sb
@@ -982,7 +982,7 @@ End WriteiRet.
 (*  +0xcc .. +0xd4 : iupdate, a0 := tot, restore s3.  THREE PATHS JOIN.   *)
 (* ===================================================================== *)
 Section WriteiJoin.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, ICFG : icfg}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, ICFG : icfg}.
   (* [GenId]: [ProcInv.proc_priv]'s index since the block carries
      [FirstTok.first_tok] (whose boot arm names [gen_cert]). *)
   Context `{GEN : GenId}.
@@ -1093,7 +1093,7 @@ Section WriteiJoin.
      else ([∗ list] i ∈ seq 0 n,
              pa_add (m !!! Regidx Ra2 : mword 64) i ↦ₘ[ktb] (src_bytes i)) ∗
           proc_priv_bare (proc_addr j) pidv V) -∗
-    bslots bn 3 -∗
+    bslots 3 -∗
     log_opS γ (S u) SbC -∗
     wi_cont (ktb := ktb) (CID0 := CID0) γfs γi bn γ γf cov logstart inodestart nib dev ip inum
             bm data dn dn0 user off n src_bytes V ncount Sb
@@ -1179,7 +1179,7 @@ Section WriteiJoin.
     assert (HKiu : (K_iupdate <= K - 14)%nat) by (lia).
     assert (Hdirlen : length (bm_dir bm') = NDIRECT)
       by exact (blkmap_wf_dir_len cov logstart bm' Hwf').
-    iDestruct (wi_slots_split bn 2 1 with "Hsl") as "[Hsl2 Hsl1]".
+    iDestruct (wi_slots_split 2 1 with "Hsl") as "[Hsl2 Hsl1]".
     (* THE SET-FORM iupdate: the flush is the last thing writei logs, and
        the set it grows by is exactly this inum's inode block.  Threading it
        (rather than taking the counted form, which re-hides the set behind
@@ -1238,7 +1238,7 @@ Section WriteiJoin.
     assert (Hpcd2 : ret_pc (T1 !!! Regidx Rra : mword 64)
                     = mword_of_int (WI + 0xd8)) by (rewrite HT1ra; pcw).
     iEval (rewrite Hpcd2) in "Hpc".
-    iDestruct (wi_slots_join bn 2 1 with "Hsl2 Hsl1") as "Hsl".
+    iDestruct (wi_slots_join 2 1 with "Hsl2 Hsl1") as "Hsl".
     pose proof Hcs1 as Hcs1_cs.
     assert (HmIsp : wi_sp m mI).
     { rewrite /wi_sp
@@ -1379,7 +1379,7 @@ End WriteiJoin.
 (*  bmap's s4 lesson at five registers instead of one.                    *)
 (* ===================================================================== *)
 Section WriteiSize.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, ICFG : icfg}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, ICFG : icfg}.
   (* [GenId]: [ProcInv.proc_priv]'s index since the block carries
      [FirstTok.first_tok] (whose boot arm names [gen_cert]). *)
   Context `{GEN : GenId}.
@@ -1483,7 +1483,7 @@ Section WriteiSize.
      else ([∗ list] i ∈ seq 0 n,
              pa_add (m !!! Regidx Ra2 : mword 64) i ↦ₘ[ktb] (src_bytes i)) ∗
           proc_priv_bare (proc_addr j) pidv V) -∗
-    bslots bn 3 -∗
+    bslots 3 -∗
     log_opS γ (S u) SbC -∗
     wi_cont (ktb := ktb) (CID0 := CID0) γfs γi bn γ γf cov logstart inodestart nib dev ip inum
             bm data dn dn0 user off n src_bytes V ncount Sb
@@ -1983,7 +1983,7 @@ End WriteiSize.
 (*  [wi_blocks_step] is exactly the decrease that pays for it.            *)
 (* ===================================================================== *)
 Section WriteiLoop.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, ICFG : icfg}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, ICFG : icfg}.
   (* [GenId]: [ProcInv.proc_priv]'s index since the block carries
      [FirstTok.first_tok] (whose boot arm names [gen_cert]). *)
   Context `{GEN : GenId}.
@@ -2138,7 +2138,7 @@ Section WriteiLoop.
      else ([∗ list] i ∈ seq 0 n,
              pa_add (m !!! Regidx Ra2 : mword 64) i ↦ₘ[ktb] (src_bytes i)) ∗
           proc_priv_bare (proc_addr j) pidv V) -∗
-    bslots bn 3 -∗
+    bslots 3 -∗
     log_opS γ nI SI -∗
     wi_cont (ktb := ktb) (CID0 := CID0) γfs γi bn γ γf cov logstart inodestart nib dev ip inum
             bm data dn dn0 user off n src_bytes V ncount Sb
@@ -2558,7 +2558,7 @@ Section WriteiLoop.
       iDestruct (IntrDefs.cpu_claim_ext_transport CIDa4 CIDa8 eb (proc_addr j)
                    ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
       assert (HKbr : (K_bread <= K - 14)%nat) by (lia).
-      iDestruct (wi_slots_split bn 2 1 with "Hsl") as "[Hsl2 Hsl1]".
+      iDestruct (wi_slots_split 2 1 with "Hsl") as "[Hsl2 Hsl1]".
       (* BORROW the pid share for bread, and close it again at once: the
          body below hands the source bracket WHOLE to either_copyin. *)
       iDestruct (wi_src_bare γf j pidv dq user (upd_upt V PI) V
@@ -3111,7 +3111,7 @@ Section WriteiLoop.
           iDestruct (cpu_own_transport CIDb9 CIDc3 0 eb (proc_addr j) b
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
           assert (HKlw : (K_log_write <= K - 14)%nat) by (lia).
-          iDestruct (wi_slots_split bn 1 1 with "Hsl2") as "[Hsla Hslb]".
+          iDestruct (wi_slots_split 1 1 with "Hsl2") as "[Hsla Hslb]".
           (* THE ABSORPTION, claimed as a decidable read of the op's set: if
              bmap just allocated this data block then balloc's [bzero]
              already logged it and this write is FREE.  The premise is
@@ -3179,7 +3179,7 @@ Section WriteiLoop.
           assert (Hpc6e : ret_pc (F2 !!! Regidx Rra : mword 64)
                           = mword_of_int (WI + 0x6e)) by (rewrite HF2ra; pcw).
           iEval (rewrite Hpc6e) in "Hpc".
-          iDestruct (wi_slots_join bn 1 1 with "Hsla Hslb") as "Hsl2".
+          iDestruct (wi_slots_join 1 1 with "Hsla Hslb") as "Hsl2".
           pose proof HcsL as HcsLc.
           assert (HF2s1 : F2 !!! Regidx Rs1 = bnode kkb) by lkp.
           assert (HLsp : wi_sp m mL).
@@ -3269,7 +3269,7 @@ Section WriteiLoop.
           assert (Hpc74 : ret_pc (F4 !!! Regidx Rra : mword 64)
                           = mword_of_int (WI + 0x74)) by (rewrite HF4ra; pcw).
           iEval (rewrite Hpc74) in "Hpc".
-          iDestruct (wi_slots_join bn 2 1 with "Hsl2 Hsl1") as "Hsl".
+          iDestruct (wi_slots_join 2 1 with "Hsl2 Hsl1") as "Hsl".
           iEval (rewrite Hubno) in "Hfsb1".
           iDestruct ("Hblback" $! (wi_splice (data2 fbn) o mm g)
                        with "Hfsb1 Htok1") as "Hblocks".
@@ -3637,7 +3637,7 @@ Section WriteiLoop.
           iDestruct (cpu_own_transport CIDb9 CIDd3 0 eb (proc_addr j) b
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
           assert (HKlw : (K_log_write <= K - 14)%nat) by (lia).
-          iDestruct (wi_slots_split bn 1 1 with "Hsl2") as "[Hsla Hslb]".
+          iDestruct (wi_slots_split 1 1 with "Hsl2") as "[Hsla Hslb]".
           (* THE ABSORPTION, claimed as a decidable read of the op's set: if
              bmap just allocated this data block then balloc's [bzero]
              already logged it and this write is FREE.  The premise is
@@ -3705,7 +3705,7 @@ Section WriteiLoop.
           assert (Hpcb6 : ret_pc (J2 !!! Regidx Rra : mword 64)
                           = mword_of_int (WI + 0xb6)) by (rewrite HJ2ra; pcw).
           iEval (rewrite Hpcb6) in "Hpc".
-          iDestruct (wi_slots_join bn 1 1 with "Hsla Hslb") as "Hsl2".
+          iDestruct (wi_slots_join 1 1 with "Hsla Hslb") as "Hsl2".
           pose proof HcsL as HcsLc.
           assert (HLsp : wi_sp m mL).
           { rewrite /wi_sp
@@ -3776,7 +3776,7 @@ Section WriteiLoop.
           assert (Hpcbc : ret_pc (J4 !!! Regidx Rra : mword 64)
                           = mword_of_int (WI + 0xbc)) by (rewrite HJ4ra; pcw).
           iEval (rewrite Hpcbc) in "Hpc".
-          iDestruct (wi_slots_join bn 2 1 with "Hsl2 Hsl1") as "Hsl".
+          iDestruct (wi_slots_join 2 1 with "Hsl2 Hsl1") as "Hsl".
           iEval (rewrite Hubno) in "Hfsb1".
           iDestruct ("Hblback" $! (wi_splice (data2 fbn) o mm g)
                        with "Hfsb1 Htok1") as "Hblocks".
@@ -3992,7 +3992,7 @@ End WriteiLoop.
 (*  +0x00 .. +0x4a : the prologue, the three -1 exits and the n = 0 arm.  *)
 (* ===================================================================== *)
 Section WriteiMain.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, ICFG : icfg}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, ICFG : icfg}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* the CALLER's buffer tier -- see this function's spec for why it is not

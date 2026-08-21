@@ -73,7 +73,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 
 
-Definition wp_uvmalloc_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_uvmalloc_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (mm : regfile)
     (P : uptd) (xperm : Z) (K : nat) (eb : bool) (p : mword 64)
     (b : bool) (lks : gset string) :=
@@ -193,7 +193,7 @@ Definition wp_uvmalloc_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID 
 
    The size is [rsz], the value uvmalloc RETURNS, for the same reason
    uvmdealloc's is: that is the size the caller will store in [p->sz]. *)
-Definition wp_uvmalloc_mem_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_uvmalloc_mem_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (mm : regfile)
     (P : uptd) (M : gmap Z (bv 8)) (xperm : Z) (K : nat) (eb : bool)
     (p : mword 64) (b : bool) (lks : gset string) :=
@@ -245,13 +245,13 @@ Definition wp_uvmalloc_mem_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{
 
 Module Type UVMALLOC.
   Parameter wp_uvmalloc_mem_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (mm : regfile)
       (P : uptd) (M : gmap Z (bv 8)) (xperm : Z) (K : nat) (eb : bool)
       (p : mword 64) (b : bool) (lks : gset string),
       wp_uvmalloc_mem_sconf_body γa mm P M xperm K eb p b lks.
   Parameter wp_uvmalloc_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (mm : regfile)
       (P : uptd) (xperm : Z) (K : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string),

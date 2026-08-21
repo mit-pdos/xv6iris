@@ -111,7 +111,7 @@ Module MainSecondaryProof
   : MAIN_SECONDARY.
 
 Section ProofMainSecondary.
-  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Ltac reg_neq :=

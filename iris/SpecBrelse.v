@@ -53,7 +53,7 @@ Import Defs.
    releasesleep (22). *)
 Notation K_brelse := (26%nat) (only parsing).
 Definition wp_brelse_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     
     (γs : list gname)
     (bn : bio_names) (V : bio_view Σ) (k : nat)
@@ -93,13 +93,13 @@ Definition wp_brelse_sconf_body
       pc_is ret_tgt -∗
       proc_priv_bare p pidv Vpr -∗
       (* the reference's slot unit comes back *)
-      bslot bn -∗
+      bslot -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type BRELSE.
   Parameter wp_brelse_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       
       (γs : list gname)
       (bn : bio_names) (V : bio_view Σ) (k : nat)

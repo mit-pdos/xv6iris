@@ -212,7 +212,7 @@ Section ProcInv.
      [FdSlots] and [IrefSlots] already do this and [IrefSlots.v]'s header
      spells out the argument.  What propagates is the CLASS -- capacity, no
      resource, no change to any statement's shape. *)
-  Context `{ !fileG Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{ !fileG Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ}.
   (* [FirstTok.first_tok] rides inside the private block (see
      [proc_priv_core]), and its boot arm names [RiscvPtsto.gen_cert]; that
      is the ONLY new index the block acquires.  The file-system's own two

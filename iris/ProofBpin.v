@@ -95,7 +95,7 @@ Proof. intro Htie. rewrite -Qp.add_assoc Qp.div_2. exact Htie. Qed.
 Module BpinProof (Acquire : ACQUIRE) (Release : RELEASE) : BPIN.
 
 Section ProofBpin.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 

@@ -54,7 +54,7 @@
         [bref] falls out of the dirty arm, and the payload re-forms CLEAN
         (its ⌜bsd = bsl⌝ tie now holds -- disk = bytes = Lw tail).
      6. bunpin spends the [bref] and returns the slot unit: THAT is the
-        [+1] per entry in the postcondition's [bslots bn (2 + length W)].
+        [+1] per entry in the postcondition's [bslots (2 + length W)].
      7. brelse, brelse -- both handles are [bio_locked].
 
    A functor over BREAD / BWRITE / BUNPIN / BRELSE / MEMMOVE. *)
@@ -564,7 +564,7 @@ Local Ltac rgne :=
 (*  invariant and the two big-op splits the loop carries.                 *)
 (* ===================================================================== *)
 Section InstallTransDefs.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   (* install_trans's own [wp_next] obligation, NAMED and anchored at an
      explicit hart (durable-notes: a whole-function post must not be
@@ -592,7 +592,7 @@ Section InstallTransDefs.
         ([∗ list] i ↦ w ∈ W,
            fsblock γfs (log_slot_bno logstart i) (Lw i) ∗
            (uint w) ↪[fs_dirty γfs]{#(1/2)} false) -∗
-        bslots bn (2 + length W) -∗
+        bslots (2 + length W) -∗
         ▷ R -∗
         WP (Loop : expr riscv_lang))%I.
 
@@ -638,7 +638,7 @@ Section InstallTransDefs.
      ([∗ list] i ↦ w ∈ W,
         fsblock γfs (log_slot_bno logstart i) (Lw i) ∗
         (uint w) ↪[fs_dirty γfs]{#(1/2)} false) ∗
-     bslots bn (2 + length W))%I.
+     bslots (2 + length W))%I.
 
   (* the payload's two agreements, both with a PURE conclusion so the
      [iDestruct] keeps the payload itself (durable-notes) *)
@@ -766,7 +766,7 @@ End InstallTransDefs.
 (*  The blocks.                                                          *)
 (* ===================================================================== *)
 Section InstallTransBlocks.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   (* ================================================================== *)
   (*  +0xb2 .. +0xc8 : restore ra/s0..s8, pop the 80-byte frame, return. *)
@@ -1245,7 +1245,7 @@ Section InstallTransBlocks.
     ([∗ list] i ↦ w ∈ drop t W,
        fsblock γfs (log_slot_bno logstart ((t + i)%nat)) (Lw ((t + i)%nat)) ∗
        (uint w) ↪[fs_dirty γfs]{#(1/2)} true) -∗
-    bslots bn (2 + t) -∗
+    bslots (2 + t) -∗
     (* the per-entry crash permits, and the resource they thread *)
     □ (∀ (i : nat) (w : mword 32) (bs' : list (bv 8)),
          ⌜W !! i = Some w⌝ -∗ ⌜length bs' = 1024%nat⌝ -∗ ▷ R -∗
@@ -1319,9 +1319,9 @@ Section InstallTransBlocks.
     iEval (rewrite -Hubnol) in "Hfblog".
     (* the two slot units the two breads spend *)
     assert (Hsl1 : (2 + t)%nat = (1 + (1 + t))%nat) by reflexivity.
-    iEval (rewrite Hsl1 (bslots_op bn 1 (1 + t))) in "Hslots".
+    iEval (rewrite Hsl1 (bslots_op 1 (1 + t))) in "Hslots".
     iDestruct "Hslots" as "[Hu1 Hslots]".
-    iEval (rewrite (bslots_op bn 1 t)) in "Hslots".
+    iEval (rewrite (bslots_op 1 t)) in "Hslots".
     iDestruct "Hslots" as "[Hu2 Hslots]".
     (* ===== +0x6c bnez s6 : NOT taken (recovering = 0) ===== *)
     assert (Hnz6c : neq_vec (rget M Rs6) (zero_reg : mword 64) = false).
@@ -2028,7 +2028,7 @@ Section InstallTransBlocks.
       rewrite big_sepL_singleton Nat.add_0_r.
       iEval (rewrite Hubnol) in "Hfblog". iFrame "Hfblog Hdn2". }
     iDestruct (it_rest_shift γfs logstart Lw t (drop (S t) W) with "Hrest") as "Hrest".
-    iAssert (bslots bn (2 + S t)) with "[Hslots Hu3 Hu4 Hu5]" as "Hslots".
+    iAssert (bslots (2 + S t)) with "[Hslots Hu3 Hu4 Hu5]" as "Hslots".
     { assert (Hq : (2 + S t)%nat = (1 + (1 + (1 + t)))%nat) by reflexivity.
       rewrite Hq !bslots_op. iFrame "Hu3 Hu4 Hu5 Hslots". }
     (* ===== +0x60 c.addiw s3,s3,1 ; +0x62 c.addi s5,s5,4 ===== *)
@@ -2175,7 +2175,7 @@ End InstallTransBlocks.
 (* ===================================================================== *)
 
 Section ProofInstallTrans.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_install_trans_sconf 

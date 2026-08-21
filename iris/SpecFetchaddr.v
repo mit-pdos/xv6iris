@@ -105,7 +105,7 @@ Section SpecFetchaddr.
 
 End SpecFetchaddr.
 
-Definition wp_fetchaddr_sconf_body `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_fetchaddr_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (γf : gname)
     (m : regfile) (av : nat) (eb : bool) (p : mword 64)
     (pid : mword 32) (V : pprivate) (oldv : mword 64) (b : bool) (lks : gset string) :=
@@ -137,7 +137,7 @@ Definition wp_fetchaddr_sconf_body `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefsl
 
 Module Type FETCHADDR.
   Parameter wp_fetchaddr_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (γf : gname) (m : regfile) (av : nat) (eb : bool) (p : mword 64)
       (pid : mword 32) (V : pprivate) (oldv : mword 64) (b : bool) (lks : gset string),
       wp_fetchaddr_sconf_body γa γf m av eb p pid V oldv b lks.

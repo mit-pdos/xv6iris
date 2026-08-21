@@ -153,10 +153,34 @@ Definition bioslotUR : ucmra := authUR natUR.
 
 Class bioG (Σ : gFunctors) := BioG {
   bio_inG :: inG Σ bioUR;
-  bioslot_inG :: inG Σ bioslotUR;
 }.
 Definition bioΣ : gFunctors := #[GFunctor bioUR; GFunctor bioslotUR].
 Global Instance subG_bioΣ {Σ} : subG bioΣ Σ -> bioG Σ.
+Proof. solve_inG. Qed.
+
+(* THE BSLOT SUPPLY'S GHOST NAME LIVES IN THE CLASS, not in [bio_names],
+   exactly as [FdSlots.fdslotG] and [IrefSlots.irefslotG] do -- and for the
+   reason IrefSlots.v records verbatim: there is exactly ONE such supply per
+   system, and threading a [γ] for it "would drag a filesystem ghost name
+   through [ProcInv.proc_dormant] and every scheduler spec".  That is not
+   hypothetical here: the per-process bslot allowance has to be resident at
+   EVERY proc state, so it lives in [proc_dormant] beside [fd_slots FDSPARE]
+   and [iref_slots (1 + IREFSPARE)] -- and [ProcDefs] sits below the file
+   system, with no [bio_names] anywhere in scope.  With the name canonical
+   it needs none.
+     [bio_names] keeps the per-BUFFER families ([bn_slk]/[bn_own]/[bn_mid])
+   and the two bcache-wide ghosts, all of which only the bio layer names. *)
+Class bioslotGpreS (Σ : gFunctors) := { bioslot_pre_inG :: inG Σ bioslotUR }.
+Class bioslotG (Σ : gFunctors) := BioSlotG {
+  bioslot_inG :: inG Σ bioslotUR;
+  bioslot_name : gname;
+}.
+Global Instance bioslotG_preS `{!bioslotG Σ} : bioslotGpreS Σ :=
+  {| bioslot_pre_inG := bioslot_inG |}.
+Definition bioslotΣ : gFunctors := #[GFunctor bioslotUR].
+Global Instance subG_bioslotΣ {Σ} : subG bioslotΣ Σ -> bioslotGpreS Σ.
+Proof. solve_inG. Qed.
+Global Instance subG_bioΣ_slot {Σ} : subG bioΣ Σ -> bioslotGpreS Σ.
 Proof. solve_inG. Qed.
 
 (* ===================================================================== *)

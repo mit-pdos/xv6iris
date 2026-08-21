@@ -149,7 +149,7 @@ Local Open Scope Z_scope.
    44, begin_op 26, iunlock 26, myproc 10. *)
 Notation K_sys_chdir := (136%nat) (only parsing).
 Section SpecSysChdir.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
   (* [GenId], for [ProcInv.proc_priv]'s own index: the private block now
      carries [FirstTok.first_tok], whose boot arm names [gen_cert].  The
@@ -171,7 +171,7 @@ Section SpecSysChdir.
 End SpecSysChdir.
 
 Definition wp_sys_chdir_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (γf : gname) (γa : gname)                          (* ftable, kalloc      *)
@@ -241,7 +241,7 @@ Definition wp_sys_chdir_sconf_body
   dev_inv gu gd -∗
   disk_geom gd pd pav pu -∗
   is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
-  bslots bn 3 -∗
+  bslots 3 -∗
   (* ---- the inode cache, and the region iput's truncate arm frees into ---- *)
   is_itable2 gtl cn gfs gi cov logstart nib dev -∗
   itable_inv -∗
@@ -282,7 +282,7 @@ Definition wp_sys_chdir_sconf_body
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
-      bslots bn 3 -∗
+      bslots 3 -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       (* the free pool only SHRINKS -- iput's truncate arm is the only mover *)
@@ -295,7 +295,7 @@ Definition wp_sys_chdir_sconf_body
 
 Module Type SYSCHDIR.
   Parameter wp_sys_chdir_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γf : gname) (γa : gname)
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)

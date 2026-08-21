@@ -153,7 +153,7 @@ Definition nc_sp (m M : regfile) : Prop :=
       (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))).
 
 Section ProofNamecmpMain.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context {ktf ktg : ktier}.
 

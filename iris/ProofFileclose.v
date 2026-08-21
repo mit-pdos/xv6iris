@@ -87,7 +87,7 @@ Module FilecloseProof (Acquire : ACQUIRE) (Release : RELEASE)
                       (Iput : IPUT) (EndOp : END_OP) : FILECLOSE.
 
 Section ProofFileclose.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -1361,7 +1361,9 @@ Section ProofFileclose.
                              Ht_bio Ht_log Ht_fs Ht_cov Ht_logst Ht_dev
                              Ht_ireg Ht_ic Ht_tlock Ht_bms Ht_ist Ht_nib
                              Ht_size].
-          iEval (rewrite Ht_bio) in "Hbsl".
+          (* the [fcn_bio] tie has nothing to rewrite in a [bslots] any
+             more: the slot supply is at the CANONICAL ghost name, so the
+             count no longer mentions the bio record at all. *)
           (* ---- AND THE FILE SYSTEM, OUT OF [fs_ready] ----
              Each row is one projection.  What used to be [fileclose_ic_env]
              (nine pure facts and six invariants) and [fileclose_bm] (the two
@@ -1662,7 +1664,7 @@ Section ProofFileclose.
              [iref_slot] is spent above rather than dropped -- see the note
              on [Hislot].) *)
           { rewrite /fileclose_env_out bool_decide_eq_false_2; [|exact Hnpipe].
-            rewrite Hib /fileclose_fs_out Ht_bio. iExact "Hbsl". }
+            rewrite Hib /fileclose_fs_out. iExact "Hbsl". }
         * (* ======== FD_NONE (or anything else): nothing to do ========== *)
           iApply (wp_bgeu_fall_s_sconf (mword_of_int (FC + 0x60))
                     (mword_of_int 74 : mword 13) Ra5 Ra4 Q2 (K - 8)%nat b

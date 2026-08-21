@@ -319,7 +319,7 @@ Notation ROOTINO := InodeInv.ROOTINO.
    8:38).  Contrast [SpecUservec.uservec_post], which IS sealed -- that one is
    unfolded once, at the return, and never applied under a wand. *)
 Definition namex_post
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (pj pv nb ret_tgt : mword 64) (pl : list (bv 8))
     (m : regfile) (K : nat) (b eb : bool) (lks : gset string)
@@ -345,7 +345,7 @@ Definition namex_post
       (* the name buffer, at an UNSPECIFIED naming function -- the short
          branch leaves the bytes above [len] alone *)
       ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1] nf i) -∗
-      bslots bn 3 -∗
+      bslots 3 -∗
       ⌜((n - (length (path_elems pl) + 1) * iput_units)%nat <= n')%nat
        /\ (n' <= n)%nat⌝ -∗
       log_op g n' -∗
@@ -369,7 +369,7 @@ Definition namex_post
    is byte-identical.  The counted form is recovered from this one by
    [LogInv.log_opS_op] at the seal, never the other way round. *)
 Definition namex_postS
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (pj pv nb ret_tgt : mword 64) (pl : list (bv 8))
     (m : regfile) (K : nat) (b eb : bool) (lks : gset string)
@@ -395,7 +395,7 @@ Definition namex_postS
       (* the name buffer, at an UNSPECIFIED naming function -- the short
          branch leaves the bytes above [len] alone *)
       ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1] nf i) -∗
-      bslots bn 3 -∗
+      bslots 3 -∗
       (* THE SET ONLY GROWS.  What the walk MUST do is not LOSE the
          caller's set across the loop, which against the counted contract
          is impossible (GR-2a finding 1). *)
@@ -428,7 +428,7 @@ Definition namex_postS
       WP (Loop : expr riscv_lang))%I.
 
 Definition wp_namex_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
@@ -556,7 +556,7 @@ Definition wp_namex_sconf_body
      that is not an over-ask: namex's memmove stores each path element here. *)
   ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1] nfun i) -∗
   (* ---- three buffer slots (iput's itrunc arm forces three) ---- *)
-  bslots bn 3 -∗
+  bslots 3 -∗
   (* ---- the ledger: see (5) in the header ---- *)
   iref_slots 2 -∗
   (* ---- this operation's reservation ---- *)
@@ -594,7 +594,7 @@ Definition wp_namex_sconf_body
 (*  and iupdate ones, not namex's.                                        *)
 (* ===================================================================== *)
 Definition wp_namex_gen_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
@@ -728,7 +728,7 @@ Definition wp_namex_gen_body
      that is not an over-ask: namex's memmove stores each path element here. *)
   ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1] nfun i) -∗
   (* ---- three buffer slots (iput's itrunc arm forces three) ---- *)
-  bslots bn 3 -∗
+  bslots 3 -∗
   (* ---- the ledger: see (5) in the header ---- *)
   iref_slots 2 -∗
   (* ---- this operation's reservation, SET FORM ---- *)
@@ -750,7 +750,7 @@ Definition wp_namex_gen_body
 
 Module Type NAMEX.
   Parameter wp_namex_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
              ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
@@ -775,7 +775,7 @@ Module Type NAMEX.
   (* the set-form contract; [wp_namex_sconf] is this at the [log_op]
      existential's own witness, with the grown set forgotten again. *)
   Parameter wp_namex_gen :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
              ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
@@ -851,7 +851,7 @@ End NAMEX.
 (* 12 slots for namex's own frame, over iget's 16. *)
 Notation K_namex_root := (70%nat) (only parsing).
 Definition wp_namex_root_body
-    `{!riscvGS Σ, !xv6G Σ, ICFG : icfg,
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, ICFG : icfg,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (gtl : gname) (cn : ic_names) (gfs : fs_names) (gi : gname)
     (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
@@ -919,7 +919,7 @@ Definition wp_namex_root_body
 
 Module Type NAMEX_ROOT.
   Parameter wp_namex_root :
-    forall `{!riscvGS Σ, !xv6G Σ, ICFG : icfg,
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, ICFG : icfg,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (gtl : gname) (cn : ic_names) (gfs : fs_names) (gi : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)

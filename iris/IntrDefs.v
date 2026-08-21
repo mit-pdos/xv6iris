@@ -283,7 +283,7 @@ Notation kv_frame_slots := (90%nat) (only parsing).
 
 Section IntrDefsBase.
   Context `{!riscvGS Σ}.
-  Context `{!xv6G Σ}.
+  Context `{!xv6G Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* =================================================================== *)
@@ -2101,7 +2101,7 @@ End IntrDefsBase.
 (* ===================================================================== *)
 Section IntrDefs.
   Context `{!riscvGS Σ}.
-  Context `{!xv6G Σ}.
+  Context `{!xv6G Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 
@@ -3440,7 +3440,7 @@ End IntrDefs.
 (* conditional equality pins the hart.  Chain the per-step equalities     *)
 (* with [wp_next_chain] and apply this once, exactly as for [cpu_own].    *)
 (* ===================================================================== *)
-Lemma trap_csrs_ext_transport `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId}
+Lemma trap_csrs_ext_transport `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId}
     {kt : ktier} (CID0 CID1 : CpuId) (eb : bool) (p : mword 64) :
   (eb = false \/ p = zero_reg -> (CID1 : CPU) = (CID0 : CPU)) ->
   trap_csrs_ext (CID := CID0) kt eb -∗ trap_csrs_ext (CID := CID1) kt eb.

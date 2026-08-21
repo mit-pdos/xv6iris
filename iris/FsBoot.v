@@ -233,7 +233,7 @@ Qed.
 (* ====================================================================== *)
 
 Section FsBoot.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
 
   (* the append/split law the whole carve rests on *)
   Lemma disk_bytes_app (γ : disk_names) (o : Z) (bs1 bs2 : list (bv 8)) :
@@ -473,9 +473,14 @@ Section FsBoot.
        (∃ bs : list (bv 8), ⌜length bs = 1024%nat⌝ ∗
           [∗ list] j ↦ byte ∈ bs, pa_add (b_data (bpa k)) j ↦ₘ byte)) -∗
     bcache_lru bhead (blist 0 NBUF) -∗
-    disk_bytes γv 0 (disk_read dk 0 ndisk) ={E}=∗
+    disk_bytes γv 0 (disk_read dk 0 ndisk) -∗
+    (* THE SLOT SUPPLY, THREADED RATHER THAN MINTED HERE.  Its ghost name is
+       canonical ([Xv6Cameras.bioslot_name]), so it is fixed before this
+       bundle runs: [BioDefs.bslots_alloc] mints authority and fragments
+       together at the era, and the fragments come straight back out below. *)
+    bslots_auth -∗ bslots BSLOTS ={E}=∗
     ∃ (bn : bio_names) (γfs : fs_names),
-      bio_ctx bn (fs_view γfs γv dev cov) ∗ bslots bn BSLOTS ∗
+      bio_ctx bn (fs_view γfs γv dev cov) ∗ bslots BSLOTS ∗
       ghost_map_auth (fs_L γfs) 1 (fs_L0 dk cov) ∗
       ghost_map_auth (fs_dirty γfs) 1 (fs_D0 dk cov) ∗
       ([∗ set] b ∈ cov, b ↪[fs_dirty γfs]{#(1/2)} false) ∗
@@ -491,13 +496,13 @@ Section FsBoot.
          additive -- a consumer that ignores it is unaffected. *)
       ([∗ set] b ∈ cov, blk_own γfs b).
   Proof.
-    iIntros (Hcov Hgeom) "Hlkw #Hnm Hcpu Hfresh Hbufs Hlru Hm".
+    iIntros (Hcov Hgeom) "Hlkw #Hnm Hcpu Hfresh Hbufs Hlru Hm Hsa Hsf".
     assert (Hnc0 : (0 : Z) ∉ cov) by (exact (fs_cov_in_0 cov ndisk Hcov)).
     destruct Hgeom as [Hcovok Hsub].
     iMod (fs_boot_ghosts γv dk ndisk cov dev E Hcov with "Hm")
       as (γfs) "(Hpool & HaL & HaD & Hdty & Hfsb & Hown)".
     iMod (bio_init (fs_view γfs γv dev cov) E Hnc0
-            with "Hlkw Hnm Hcpu Hfresh Hbufs Hlru Hpool") as (bn) "[Hctx Hsl]".
+            with "Hlkw Hnm Hcpu Hfresh Hbufs Hlru Hpool Hsa Hsf") as (bn) "[Hctx Hsl]".
     iModIntro. iExists bn, γfs.
     iDestruct (big_sepS_split_sub _ cov (log_region_set logstart) Hsub
                  with "Hfsb") as "[Hlog Hrest]".

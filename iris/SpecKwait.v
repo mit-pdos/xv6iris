@@ -139,7 +139,7 @@ Import Defs.
    [psz] has to outlive walkaddr / vmfault / memmove, so gcc gave it a
    callee-saved home in s11 and the frame grew to 14 slots (SpecCopyout.v). *)
 Notation K_kwait := (62%nat) (only parsing).
-Definition wp_kwait_sconf_body `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_kwait_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa γf γw : gname)  (γs : list gname) (j : nat) (γl : gname)
     (m : regfile) (av : nat) (eb : bool) (b : bool)
     (pid : mword 32) (V : pprivate) (lks : gset string) :=
@@ -182,7 +182,7 @@ Definition wp_kwait_sconf_body `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG 
 
 Module Type KWAIT.
   Parameter wp_kwait_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa γf γw : gname) (γs : list gname) (j : nat) (γl : gname)
       (m : regfile) (av : nat) (eb : bool) (b : bool)
       (pid : mword 32) (V : pprivate) (lks : gset string),

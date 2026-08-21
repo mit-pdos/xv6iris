@@ -196,7 +196,7 @@ Global Instance fclose_names_inhabited : Inhabited fclose_names :=
                1%positive 1%positive)
     1%positive
     (mword_of_int 0) (mword_of_int 0) (mword_of_int 0)
-    (MkBioNames 1%positive 1%positive 1%positive
+    (MkBioNames 1%positive 1%positive
        (fun _ => (1%positive, 1%positive)) (fun _ => 1%positive)
        (fun _ => 1%positive))
     (MkLogNames 1%positive 1%positive 1%positive 1%positive)
@@ -211,7 +211,7 @@ Section SpecFileclose.
   (* NOTE [icacheG] is NOT here: [fileG] carries it (FileInv.v's header --
      two instance paths print identically and do not unify), and iput's
      contract is applied at the one that comes with the file table. *)
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ---- the FD_PIPE arm's environment: pipeclose's ---- *)
@@ -317,7 +317,7 @@ Section SpecFileclose.
         [fcn_pd]/[fcn_pav]/[fcn_pu] were dead weight every caller paid and
         no callee read. *)
      FsReady.fs_ready ∗
-     bslots (fcn_bio fn) 3)%I.
+     bslots 3)%I.
 
   (* THE PID CELL IS GONE FROM THIS BUNDLE, and with it the whole
      nopid/withpid pair.  It was here because iput reaches acquiresleep,
@@ -348,7 +348,7 @@ Section SpecFileclose.
        and fileclose's postcondition cannot see which did.  Dropping it
        leaks one unit of the [IrefSlots] supply per inode file closed --
        recorded as owed in claude-notes/projects/fs-icache.md.) *)
-    bslots (fcn_bio fn) 3.
+    bslots 3.
 
   (* ---- and the two, selected by the file's type ---- *)
   Definition fileclose_env (fn : fclose_names)
@@ -537,7 +537,7 @@ Section SpecFileclose.
 End SpecFileclose.
 
 Definition wp_fileclose_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (γfl γf : gname)            (* ftable.lock, ftable  *)
     (k : nat) (q : Qp) (Cf : fcontent)                (* the reference        *)
@@ -626,7 +626,7 @@ Definition wp_fileclose_sconf_body
 
 Module Type FILECLOSE.
   Parameter wp_fileclose_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γfl γf : gname)
       (k : nat) (q : Qp) (Cf : fcontent)
       (fn : fclose_names) (on : option nat)

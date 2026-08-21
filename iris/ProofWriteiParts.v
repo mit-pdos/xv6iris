@@ -377,7 +377,7 @@ Qed.
    twin): writei splits its SOURCE (a caller buffer at [ktb]) with the same
    lemmas that split the bio block window (static, KT0). *)
 Section WriteiBytes.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
   Context `{KTR : !CurKtier}.
 
   (* --- three conversion wands over ByteBuf's [⊣⊢]s.  Stated as wands so
@@ -428,7 +428,7 @@ Section WriteiBytes.
 End WriteiBytes.
 
 Section WriteiRes.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
 
   (* A [len]-byte WINDOW of a checked-out buffer's data area, borrowed at
      offset [o] and taken back at whatever the copy left there.  The window
@@ -479,12 +479,12 @@ Section WriteiRes.
 
   (* ---- the handle, exactly as in ProofBmapParts.v ---- *)
 
-  Lemma wi_slots_split (bn : bio_names) (a c : nat) :
-    bslots bn (a + c) -∗ bslots bn a ∗ bslots bn c.
+  Lemma wi_slots_split (a c : nat) :
+    bslots (a + c) -∗ bslots a ∗ bslots c.
   Proof. rewrite bslots_op. iIntros "$". Qed.
 
-  Lemma wi_slots_join (bn : bio_names) (a c : nat) :
-    bslots bn a -∗ bslots bn c -∗ bslots bn (a + c).
+  Lemma wi_slots_join (a c : nat) :
+    bslots a -∗ bslots c -∗ bslots (a + c).
   Proof.
     iIntros "H1 H2". rewrite bslots_op. iSplitL "H1"; [iExact "H1"|iExact "H2"].
   Qed.

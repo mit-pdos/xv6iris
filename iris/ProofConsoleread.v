@@ -176,7 +176,7 @@ Notation Rs10 := (mword_of_int 26 : mword 5).
 Notation Rs11 := (mword_of_int 27 : mword 5).
 
 Section CrBodies.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
   Context `{GEN : RiscvLang.GenId}.
 
   Local Ltac rgne :=
@@ -644,7 +644,7 @@ Module ConsolereadProof (Myproc : MYPROC) (Acquire : ACQUIRE) (Killed : KILLED)
                         : CONSOLEREAD.
 
 Section ProofConsoleread.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* Normalise every [rget m k] the leaves produce back to [m !!! Regidx k]

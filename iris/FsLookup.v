@@ -400,7 +400,7 @@ Qed.
 (* ====================================================================== *)
 
 Section FsLookup.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
   Context `{ICFG : icfg}.
 
   (* [FsRep.fnode] AT A NAMED RECORD AND NAMED BYTES.  [fnode] hides
@@ -529,7 +529,7 @@ End FsLookup.
    fragment to THIS directory is that [dn] and [data] are shared between
    [fdir] and the byte-level bundle. *)
 Definition wp_dirlookup_tree_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
@@ -600,7 +600,7 @@ Definition wp_dirlookup_tree_body
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-  bslot bn -∗
+  bslot -∗
   (* ---- THE ICACHE, exactly as iget takes it ---- *)
   is_itable2 gtl cn γfs γi cov logstart nib dev -∗
   itable_inv -∗
@@ -629,7 +629,7 @@ Definition wp_dirlookup_tree_body
       fdir γi γfs dpi ents dn bm data -∗
       ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1]{dqn} fn i) -∗
       proc_priv_bare pj pidv Vpr -∗
-      bslot bn -∗
+      bslot -∗
       fedges dpi dn data -∗
       (* THE TWO ARMS, EACH AT BOTH ALTITUDES.  The record index [k]
          survives because a caller needs it: sys_unlink names the offset
@@ -663,7 +663,7 @@ Definition wp_dirlookup_tree_body
 Module FsLookupTree (DL : DIRLOOKUP).
 
   Lemma wp_dirlookup_tree
-      `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+      `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
         ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
@@ -750,7 +750,7 @@ End FsLookupTree.
 (* ====================================================================== *)
 
 Section FsLookupAu.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
   Context `{ICFG : icfg}.
 
   (* the tree the caller's locked node completes.  FRAGMENTS-WITH-HOLES is
@@ -986,7 +986,7 @@ Qed.
    itself (the root), and "the parent is not the child" is a statement the
    tree can make and the bytes cannot. *)
 Section FsLookupDots.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
   Context `{ICFG : icfg}.
 
   Lemma fdir_dots_index (γi : gname) (γfs : fs_names) (self dp : Z)

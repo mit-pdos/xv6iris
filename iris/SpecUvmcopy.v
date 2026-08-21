@@ -95,7 +95,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.
 
 
-Definition wp_uvmcopy_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_uvmcopy_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (mm : regfile)
     (Pold Pnew : uptd) (K : nat) (eb : bool) (p : mword 64)
     (ilvl : nat) (b : bool) (lks : gset string) :=
@@ -184,7 +184,7 @@ Definition wp_uvmcopy_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID :
    is what they read before the copy put anything there.  That is
    [SpecUvmunmap.wp_uvmunmap_live_sconf], and it is why uvmunmap needs
    two memory-indexed contracts rather than one. *)
-Definition wp_uvmcopy_mem_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_uvmcopy_mem_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (mm : regfile)
     (Pold Pnew : uptd) (szold sznew : Z) (Mold Mnew : gmap Z (bv 8))
     (K : nat) (eb : bool) (p : mword 64)
@@ -243,7 +243,7 @@ Definition wp_uvmcopy_mem_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{C
 
 Module Type UVMCOPY.
   Parameter wp_uvmcopy_mem_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (mm : regfile)
       (Pold Pnew : uptd) (szold sznew : Z) (Mold Mnew : gmap Z (bv 8))
       (K : nat) (eb : bool) (p : mword 64)
@@ -251,7 +251,7 @@ Module Type UVMCOPY.
       wp_uvmcopy_mem_sconf_body γa mm Pold Pnew szold sznew Mold Mnew
         K eb p ilvl b lks.
   Parameter wp_uvmcopy_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (mm : regfile)
       (Pold Pnew : uptd) (K : nat) (eb : bool) (p : mword 64)
       (ilvl : nat) (b : bool) (lks : gset string),

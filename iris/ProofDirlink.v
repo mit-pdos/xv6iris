@@ -601,7 +601,7 @@ Proof.
 Qed.
 
 Section DlBuf.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             ICFG : icfg, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
@@ -662,8 +662,8 @@ Section DlBuf.
           [reflexivity | cbn; lia | cbn; lia].
   Qed.
 
-  Lemma dl_bs3 (bn : bio_names) :
-    (bslots bn 3 : iProp Σ) ⊣⊢ bslot bn ∗ bslots bn 2.
+  Lemma dl_bs3 :
+    (bslots 3 : iProp Σ) ⊣⊢ bslot ∗ bslots 2.
   Proof. rewrite /bslot. change 3%nat with (1 + 2)%nat. apply bslots_op. Qed.
 
     Lemma dl_esc_acc (cn : ic_names) (γfs : fs_names) (γi : gname)
@@ -982,7 +982,7 @@ Qed.
 (* ===================================================================== *)
 
 Section ProofDirlinkMain.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             ICFG : icfg, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
@@ -1086,7 +1086,7 @@ Section ProofDirlinkMain.
        sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
        dinode_at gi dinum dn0 -∗
        proc_priv_bare (proc_addr j) pidv Vpr -∗
-       bslots bn 3 -∗
+       bslots 3 -∗
        iref_slot -∗
        log_opS g ncount Sb -∗
        (* the borrowed ticket list, riding to the continuation (§7.1) *)
@@ -1111,7 +1111,7 @@ Section ProofDirlinkMain.
              sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
              dinode_at gi dinum dn0' -∗
              proc_priv_bare (proc_addr j) pidv Vpr -∗
-             bslots bn 3 -∗
+             bslots 3 -∗
              iref_slot -∗
              dir_links (bv_unsigned dinum) dn data -∗
              ⌜((ncount - dirlink_units)%nat <= n')%nat
@@ -1197,8 +1197,8 @@ Section ProofDirlinkMain.
        sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
        dinode_at gi dinum dn0 -∗
        proc_priv_bare (proc_addr j) pidv Vpr -∗
-       bslot bn -∗
-       bslots bn 2 -∗
+       bslot -∗
+       bslots 2 -∗
        iref_slot -∗
        log_opS g ncount Sb -∗
        (* the borrowed ticket list, riding to the continuation (§7.1) *)
@@ -1223,7 +1223,7 @@ Section ProofDirlinkMain.
              sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
              dinode_at gi dinum dn0' -∗
              proc_priv_bare (proc_addr j) pidv Vpr -∗
-             bslots bn 3 -∗
+             bslots 3 -∗
              iref_slot -∗
              dir_links (bv_unsigned dinum) dn data -∗
              ⌜((ncount - dirlink_units)%nat <= n')%nat
@@ -1761,7 +1761,7 @@ Section ProofDirlinkMain.
                     = add_vec_int (mword_of_int (DK + 0x16) : mword 64) 4)
       by (rewrite /R7; apply upd_eq).
     iEval (rewrite -HR7a1) in "Hnm".
-    iDestruct (dl_bs3 bn with "Hbsl") as "[Hbs1 Hbs2]".
+    iDestruct (dl_bs3 with "Hbsl") as "[Hbs1 Hbs2]".
    iDestruct (cpu_own_transport CID CID12 0%nat eb (proc_addr j) b 
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (DL.wp_dirlookup_sconf gs j gl gu gd gk pd pav pu bn gfs gi cn gtl
@@ -1852,7 +1852,7 @@ Section ProofDirlinkMain.
       iDestruct (dl_esc_acc cn gfs gi cov logstart kslot Hkslot with "Hesc")
         as "#Hesck".
       iDestruct (ic_sleeplocks_lookup cn kslot Hkslot with "Hslks") as (gil gisl) "#Hslk".
-      iDestruct (dl_bs3 bn with "[Hbs1 Hbs2]") as "Hbsl";
+      iDestruct (dl_bs3 with "[Hbs1 Hbs2]") as "Hbsl";
         [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
       iDestruct (cpu_own_transport CIDdl CID14 0%nat eb (proc_addr j) b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
@@ -2653,7 +2653,7 @@ Section ProofDirlinkMain.
                          (mword_of_int (Z.of_nat (16 * k0)%nat) : mword 64) Q1).
         { rewrite Hk00. rewrite -(dl_sz_zero_val (di_size dn) Hsz31 Hsz0).
           exact HQ1p. }
-        iDestruct (dl_bs3 bn with "[Hbs1 Hbs2]") as "Hbsl";
+        iDestruct (dl_bs3 with "[Hbs1 Hbs2]") as "Hbsl";
           [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
         iDestruct (cpu_own_transport CIDdl CID16 0%nat eb (proc_addr j) b
                      ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
@@ -3221,7 +3221,7 @@ Section ProofDirlinkMain.
             assert (Hbb70 : add_vec_int (mword_of_int (DK + 0x6e) : mword 64) 2
                             = mword_of_int (DK + 0x70)) by pcw.
             iEval (rewrite Hbb70) in "Hpc".
-            iDestruct (dl_bs3 bn with "[Hbs1 Hbs2]") as "Hbsl";
+            iDestruct (dl_bs3 with "[Hbs1 Hbs2]") as "Hbsl";
               [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
             iDestruct (cpu_own_transport CIDrd CIDB11 0%nat eb (proc_addr j) b
                          ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
@@ -3448,7 +3448,7 @@ Section ProofDirlinkMain.
                          with "Hcg Hpc Hj56").
                iIntros (CIDB15 HqB15). iApply bi.later_intro. iIntros "Hcg Hpc".
                iEval (rewrite Htgt70b) in "Hpc".
-               iDestruct (dl_bs3 bn with "[Hbs1 Hbs2]") as "Hbsl";
+               iDestruct (dl_bs3 with "[Hbs1 Hbs2]") as "Hbsl";
                  [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
                iDestruct (cpu_own_transport CIDrd CIDB15 0%nat eb (proc_addr j) b
                             ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".

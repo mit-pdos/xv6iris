@@ -198,7 +198,7 @@ Local Open Scope Z_scope.
    memmove 2. *)
 Notation K_ilock := (62%nat) (only parsing).
 Definition wp_ilock_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
     (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock  *)
@@ -321,7 +321,7 @@ Definition wp_ilock_sconf_body
   disk_geom gd pd pav pu -∗
   is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
   (* ONE slot unit: bread's reference, which brelse gives back *)
-  bslot bn -∗
+  bslot -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function PARKS (its
      acquiresleep sleeps), and a park moves the hart with interrupts off, so
      the crossing has nothing to do with SIE -- the porting guide's "a
@@ -339,7 +339,7 @@ Definition wp_ilock_sconf_body
       pc_is ret_tgt -∗
       proc_priv_bare pj pidv Vpr -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-      bslot bn -∗
+      bslot -∗
       (* THE LOCK IS HELD ... *)
       sleeplocked_q gisl s (i_lock ip) pidv -∗
       (* ... and the entry is CHECKED OUT and LOADED: the checkout
@@ -407,7 +407,7 @@ Definition wp_ilock_sconf_body
 
 Module Type ILOCK.
   Parameter wp_ilock_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)

@@ -286,7 +286,7 @@ Qed.
 (* and every resource there resolves at it automatically.                  *)
 (* ===================================================================== *)
 Section SpProps.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   (* the scratch slots: 3/4/5 (only spilled on the loop path), 6 and 8 (never
      touched at all).  Slot 7 is the [int n] local and rides separately. *)
@@ -421,7 +421,7 @@ Local Ltac pcstep := apply bv_eq; vm_compute; reflexivity.
 (*  [wp_next]-shaped joins at its own hart.                                *)
 (* ===================================================================== *)
 Section SpBodies.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
 
   (* ---- the shared epilogue: +0x7e .. +0x84 (c.ret) ---- *)
   Lemma sp_tail_body `{GEN : GenId} `{CID : CpuId} (CID0 : CPU) (j : nat)
@@ -1841,7 +1841,7 @@ End SpBodies.
 (* ===================================================================== *)
 
 Section ProofSysPause.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_sys_pause_sconf  (γs : list gname)

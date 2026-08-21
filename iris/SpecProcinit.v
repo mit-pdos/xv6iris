@@ -116,7 +116,7 @@ Lemma proc_end_is_tickslock : pacur NPROC = mword_of_int KernelSyms.tickslock.
 Proof. unfold pacur, acur, proc_size, NPROC. apply bv_eq; vm_compute; reflexivity. Qed.
 
 Section SpecProcinit.
-  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   (* ---- what a lock looks like before and after initlock ---- *)
   Definition lk_raw (lk : mword 64) : iProp Σ :=
@@ -174,7 +174,7 @@ End SpecProcinit.
    this composition check takes them; nothing in procinit's own contract
    does. *)
 Section ProcinitSeals.
-  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context (γ : gname)  (γs : list gname).
 
@@ -230,7 +230,7 @@ End ProcinitSeals.
 (*  [WpLock.newlock_delayed] and the two passes below.                  *)
 (* ------------------------------------------------------------------ *)
 Section ProcinitProcsInv.
-  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context (γ : gname) .
 
@@ -378,7 +378,7 @@ Section ProcinitProcsInv.
 
 End ProcinitProcsInv.
 
-Definition wp_procinit_sconf_body `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (K : nat) (b : bool) (p : mword 64) :=
+Definition wp_procinit_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (K : nat) (b : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.procinit in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   (* procinit's own frame is 8 slots (addi sp,sp,-64: ra, s0..s6); initlock
@@ -413,6 +413,6 @@ Definition wp_procinit_sconf_body `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG �
 
 Module Type PROCINIT.
   Parameter wp_procinit_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (K : nat) (b : bool) (p : mword 64),
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (K : nat) (b : bool) (p : mword 64),
       wp_procinit_sconf_body m K b p.
 End PROCINIT.

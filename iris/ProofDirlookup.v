@@ -238,7 +238,7 @@ Proof.
 Qed.
 
 Section ProofDirlookupMain.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             ICFG : icfg, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
@@ -345,7 +345,7 @@ Section ProofDirlookupMain.
        inode_blocks gfs bm data -∗
        ([∗ list] ii ∈ seq 0 14, pa_add nb ii ↦ₘ[KT1]{dqn} fn ii) -∗
        proc_priv_bare pj pidv Vpr -∗
-       bslot bn -∗
+       bslot -∗
        (* the borrow, back verbatim on both arms (fs-fragments.md §7.1) *)
        dir_links (bv_unsigned dinum) dn data -∗
        dinode_at gi dinum dr -∗
@@ -403,7 +403,7 @@ Section ProofDirlookupMain.
        ([∗ list] ii ∈ seq 0 14, pa_add nb ii ↦ₘ[KT1]{dqn} fn ii) -∗
        (if hasp then pf ↦₄[KT1] pofv else emp) -∗
        proc_priv_bare pj pidv Vpr -∗
-       bslot bn -∗
+       bslot -∗
        iref_slot -∗
        dir_links (bv_unsigned dinum) dn data -∗
        dinode_at gi dinum dr -∗
@@ -445,7 +445,7 @@ Section ProofDirlookupMain.
        ([∗ list] ii ∈ seq 0 14, pa_add nb ii ↦ₘ[KT1]{dqn} fn ii) -∗
        (if hasp then pf ↦₄[KT1] pofv else emp) -∗
        proc_priv_bare pj pidv Vpr -∗
-       bslot bn -∗
+       bslot -∗
        iref_slot -∗
        dir_links (bv_unsigned dinum) dn data -∗
        dinode_at gi dinum dr -∗

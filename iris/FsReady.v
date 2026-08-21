@@ -152,7 +152,7 @@ Local Open Scope Z_scope.
 
 Section FsReady.
   (* FsSyscalls' own [Section FsBundles] context, verbatim... *)
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId}.
   (* ...AND THE CACHE'S INDEX, EXPLICIT AND DECLARED LAST (the header's
      last section).  Last, because instance resolution prefers the most
@@ -160,7 +160,7 @@ Section FsReady.
      below is at [ICFG]/[icacheG0] rather than at [fileG]'s baked fields,
      and the whole projection family is stated at the same index a
      consumer's own section would carry. *)
-  Context `{!xv6G Σ} `{ICFG : icfg}.
+  Context `{!xv6G Σ, !bioslotG Σ} `{ICFG : icfg}.
 
   (* ================================================================== *)
   (*  0.  THE IMAGE'S GEOMETRY, AS ONE PROPOSITION                        *)

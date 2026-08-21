@@ -105,7 +105,7 @@ Local Ltac regne :=
         | congruence ].
 
 Section ProofNameiRoot.
-  Context `{!riscvGS Σ, !xv6G Σ, ICFG : icfg,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, ICFG : icfg,
             !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 

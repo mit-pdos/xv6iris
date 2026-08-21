@@ -208,7 +208,7 @@ Local Ltac regne := reg_ne_side.
 Local Ltac ilidx := first [ vm_compute; reflexivity | vm_compute; discriminate ].
 
 Section InitlogDefs.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   (* BORROW the block's first word out of its byte list, and give it back.
      The window vocabulary is ByteBuf's ([bb_bytes_of_list] to trade the
@@ -273,7 +273,7 @@ End InitlogDefs.
 (* ===================================================================== *)
 
 Section ProofInitlog.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_initlog_sconf 
@@ -1063,7 +1063,7 @@ Section ProofInitlog.
     assert (Hsplit2 : 33%nat = (1 + 32)%nat) by lia.
     iEval (rewrite Hsplit2 bslots_op) in "Hslots".
     iDestruct "Hslots" as "[Hs2u Hpool]".
-    iAssert (bslots bn 2) with "[Hs1u Hs2u]" as "Hs2".
+    iAssert (bslots 2) with "[Hs1u Hs2u]" as "Hs2".
     { rewrite (_ : 2%nat = (1 + 1)%nat); [| lia]. rewrite bslots_op.
       iSplitL "Hs1u"; [iExact "Hs1u" | iExact "Hs2u"]. }
     iAssert (lh_n_pa ↦₄ (mword_of_int (Z.of_nat 0%nat) : mword 32))%I
@@ -1142,7 +1142,7 @@ Section ProofInitlog.
       exact (HC2cs c Hcs N2 N8 N9 N18 N19). }
     iAssert (ghost_map_auth (fs_dirty γfs) 1 D) with "[HDauth]" as "HDauth";
       [iExact "HDauth"|].
-    iAssert (bslots bn 2) with "[Hs2]" as "Hs2"; [iExact "Hs2"|].
+    iAssert (bslots 2) with "[Hs2]" as "Hs2"; [iExact "Hs2"|].
     (* ===== +0x68 auipc a5,0x1e / +0x6c sw zero,1924(a5) : log.lh.n := 0 ===== *)
     iPoseProof (ili_68 with "Htext") as "Hi68".
     iPoseProof (ili_6c with "Htext") as "Hi6c".
@@ -1523,7 +1523,7 @@ Section ProofInitlog.
       iSplitR; [iExact "Hstp" | iExact "Hswlb"]. }
     iModIntro.
     (* the two units the caller gets back *)
-    iAssert (bslots bn 2) with "[Hs1u Hs1v]" as "Hs2".
+    iAssert (bslots 2) with "[Hs1u Hs1v]" as "Hs2".
     { rewrite (_ : 2%nat = (1 + 1)%nat); [| lia]. rewrite bslots_op.
       iSplitL "Hs1u"; [iExact "Hs1u" | iExact "Hs1v"]. }
     iDestruct (cpu_own_transport CID34 CID41 0 eb pj b ltac:(wp_next_chain)

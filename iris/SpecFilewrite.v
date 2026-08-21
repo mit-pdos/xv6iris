@@ -295,7 +295,7 @@ Global Instance fwrite_names_inhabited : Inhabited fwrite_names :=
                1%positive 1%positive)
     1%positive 1%positive
     (mword_of_int 0) (mword_of_int 0) (mword_of_int 0)
-    (MkBioNames 1%positive 1%positive 1%positive
+    (MkBioNames 1%positive 1%positive
        (fun _ => (1%positive, 1%positive)) (fun _ => 1%positive)
        (fun _ => 1%positive))
     (MkLogNames 1%positive 1%positive 1%positive 1%positive)
@@ -313,7 +313,7 @@ Global Instance fwrite_names_inhabited : Inhabited fwrite_names :=
    nothing here mixed the two; the carve does -- the payload's share is at
    [fileG]'s [icfg_dev].  Same edit as SpecFilestat's and SpecFileread's. *)
 Section SpecFilewrite.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ---- the FD_DEVICE arm's environment ---- *)
@@ -508,7 +508,7 @@ Section SpecFilewrite.
      (* THREE slot units: writei's peak (bmap's, and its own bread held
         across either_copyin and log_write).  ilock's bread and end_op's
         commit borrow from the same three, one transaction at a time. *)
-     bslots (fwn_bio fn) 3)%I.
+     bslots 3)%I.
 
   (* What comes back: the three superblock fields and the slot units.  NO
      SHARE: it never left the reference's payload, so there is nothing here
@@ -520,7 +520,7 @@ Section SpecFilewrite.
        (mword_of_int (fwn_inodestart fn) : mword 32) ∗
      sb_size ↦₄{fwn_dqbs fn} (mword_of_int (fwn_size fn) : mword 32) ∗
      sb_bmapstart ↦₄{fwn_dqb fn} (mword_of_int (fwn_bmapstart fn) : mword 32) ∗
-     bslots (fwn_bio fn) 3)%I.
+     bslots 3)%I.
 
   (* ---- and the three, selected by the file's type ---- *)
   Definition filewrite_env (γf : gname)
@@ -578,7 +578,7 @@ Section SpecFilewrite.
 End SpecFilewrite.
 
 Definition wp_filewrite_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (γa : gname) (γf : gname)                    (* kalloc, the file table  *)
     (γs : list gname) (j : nat) (γlp : gname)    (* the running process     *)
@@ -659,7 +659,7 @@ Definition wp_filewrite_sconf_body
 
 Module Type FILEWRITE.
   Parameter wp_filewrite_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
       (γa : gname) (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)

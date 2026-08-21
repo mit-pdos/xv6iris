@@ -434,7 +434,7 @@ Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
 Local Ltac nz  := vm_compute; discriminate.
 
 Section IputCommon.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
   Notation Rra  := (mword_of_int 1 : mword 5).
   Notation Rs0  := (mword_of_int 8 : mword 5).
@@ -509,7 +509,7 @@ End IputCommon.
 (* ===================================================================== *)
 
 Section IputTail.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
   Notation Rra  := (mword_of_int 1 : mword 5).
   Notation Rs0  := (mword_of_int 8 : mword 5).
@@ -753,7 +753,7 @@ Section IputTail.
     proc_priv_bare pj pidv Vpr -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-    bslots bn 3 -∗
+    bslots 3 -∗
     log_opS g n' Sb' -∗
     wp_next (CID0 := CID0) true pj (fun (CID : CpuId) =>
       ∀ (mf : regfile) (n'' : nat) (Sb'' : gset Z) (w : bool),
@@ -766,7 +766,7 @@ Section IputTail.
         proc_priv_bare pj pidv Vpr -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-        bslots bn 3 -∗
+        bslots 3 -∗
         ⌜Sb ⊆ Sb''⌝ -∗
         ⌜w = true -> bmapstart ∈ Sb''⌝ -∗
         ⌜crb0 = true -> w = false⌝ -∗
@@ -978,7 +978,7 @@ Section IputTail.
     proc_priv_bare pj pidv Vpr -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-    bslots bn 3 -∗
+    bslots 3 -∗
     log_opS g n' Sb' -∗
     wp_next (CID0 := CID0) true pj (fun (CID : CpuId) =>
       ∀ (mf : regfile) (n'' : nat) (Sb'' : gset Z) (w : bool),
@@ -991,7 +991,7 @@ Section IputTail.
         proc_priv_bare pj pidv Vpr -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-        bslots bn 3 -∗
+        bslots 3 -∗
         ⌜Sb ⊆ Sb''⌝ -∗
         ⌜w = true -> bmapstart ∈ Sb''⌝ -∗
         ⌜crb0 = true -> w = false⌝ -∗
@@ -1320,7 +1320,7 @@ End IputTail.
 (* ===================================================================== *)
 
 Section IputFreePath.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
   Notation Rra  := (mword_of_int 1 : mword 5).
   Notation Rs0  := (mword_of_int 8 : mword 5).
@@ -1475,7 +1475,7 @@ Section IputFreePath.
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-    bslots bn 2 -∗
+    bslots 2 -∗
     log_epoch_lb γ v -∗
     log_credit γ cru Sb e0 (IBLOCK inum inodestart) -∗
     log_opSe γ (S u) Sb e0 -∗
@@ -1501,7 +1501,7 @@ Section IputFreePath.
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
         (* no pool entry: [ip_free_locked] parked it at the +0x94 release,
            on the AWAIT arm -- see the entry note above *)
-        bslots bn 2 -∗
+        bslots 2 -∗
         log_opS γ (if cru then S u else u) (Sb ∪ {[IBLOCK inum inodestart]}) -∗
         (∃ e : nat, logged_at γ e (IBLOCK inum inodestart) ∗ ⌜(v <= e)%nat⌝) -∗
         (* RULING G's RETURN LEG (iclaim-ledger.md §6′).  The +0xba deposit
@@ -1551,7 +1551,7 @@ Section IputFreePath.
              #Hesc Hdep Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hsb Hsl #Hvlb #Hcrd0 Hop
              Hra Hs0f Hs1f Hs2f Hs3f Hs4f Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
-    iDestruct (iu_slots_split bn 1 1 with "Hsl") as "[Hsl Hsl1]".
+    iDestruct (iu_slots_split 1 1 with "Hsl") as "[Hsl Hsl1]".
     (* ===== +0xa8 jal ra,bread ===== *)
     iPoseProof (ipi_a8 with "Htext") as "Hia8".
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.iput + 0xa8)) Rra
@@ -1877,7 +1877,7 @@ Section IputFreePath.
     iEval (rewrite Hpcc4) in "Hpc".
     assert (HmRsp : mR !!! Regidx csp_rs1 = sp0).
     { rewrite (callee_saved_lookup Hcs3_cs csp_rs1 ltac:(vm_compute; reflexivity)). exact HT1sp. }
-    iDestruct (iu_slots_join bn 1 1 with "Hsl Hsl1") as "Hsl".
+    iDestruct (iu_slots_join 1 1 with "Hsl Hsl1") as "Hsl".
     iEval (change (1 + 1)%nat with 2%nat) in "Hsl".
     (* ===== +0xc4/c6/c8 c.ldsp s2/s3/s4 : restore ===== *)
     iPoseProof (ipi_c4 with "Htext") as "Hic4".
@@ -2278,7 +2278,7 @@ Section IputFreePath.
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-    bslots bn 3 -∗
+    bslots 3 -∗
     (* THE GROUP CREDIT (fs-log.md §G.18's chain, §G.21's tier; [SpecIput]'s
        [wp_iput_gen_body] premise verbatim).  At [crz = false] this is [emp]
        and every landed caller passes nothing.  At [crz = true] it is the
@@ -2328,7 +2328,7 @@ Section IputFreePath.
            off-lock deposit").  There is only one [icnt_half .. 0] and one
            [frzm_h .. false] in existence, so nothing pool-shaped can leave
            this lemma. *)
-        bslots bn 3 -∗
+        bslots 3 -∗
         ⌜Sb ⊆ Sb''⌝ -∗
         ⌜w = true -> bmapstart ∈ Sb''⌝ -∗
         ⌜crb = true -> w = false⌝ -∗
@@ -3430,7 +3430,7 @@ Section IputFreePath.
     { iApply log_credit_own. intros _. exact Hibin'. }
     (* the off-lock tail runs on two of our three bio slots *)
     iEval (rewrite (_ : 3%nat = (1 + 2)%nat); [| reflexivity]) in "Hbslots".
-    iDestruct (bslots_op bn 1 2 with "Hbslots") as "[Hbs1 Hbs2]".
+    iDestruct (bslots_op 1 2 with "Hbslots") as "[Hbs1 Hbs2]".
     (* the cpu bundle, transported to the call site *)
     iDestruct (cpu_own_transport CIDrl2 CIDp5 0%nat eb pj eb
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -3467,7 +3467,7 @@ Section IputFreePath.
     assert (Hthrm : ipo_thr m mf).
     { intros c Hcs N1 N2 N3 N4 N5.
       rewrite (Hthr5 c Hcs N1 N2 N3 N4 N5). exact (HP5m c Hcs). }
-    iDestruct (bslots_op bn 1 2 with "[Hbs1 Hbs2]") as "Hbslots";
+    iDestruct (bslots_op 1 2 with "[Hbs1 Hbs2]") as "Hbslots";
       [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
     iEval (rewrite (_ : (1 + 2)%nat = 3%nat); [| reflexivity]) in "Hbslots".
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CIDf)
@@ -3638,7 +3638,7 @@ Section IputFreePath.
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-    bslots bn 3 -∗
+    bslots 3 -∗
     log_epoch_lb γ v -∗
     log_credit γ cru Sb e0 (IBLOCK inum inodestart) -∗
     log_opSe γ u Sb e0 -∗
@@ -3682,7 +3682,7 @@ Section IputFreePath.
        sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
        sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
        proc_priv_bare pj pidv Vpr -∗
-       bslots bn 3 -∗
+       bslots 3 -∗
        log_epoch_lb γ v -∗
        log_credit γ cru Sb e0 (IBLOCK inum inodestart) -∗
        log_opSe γ u Sb e0 -∗
@@ -3803,7 +3803,7 @@ Section IputFreePath.
        sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
        sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
        proc_priv_bare pj pidv Vpr -∗
-       bslots bn 3 -∗
+       bslots 3 -∗
        log_epoch_lb γ v -∗
        log_credit γ cru Sb e0 (IBLOCK inum inodestart) -∗
        log_opSe γ u Sb e0 -∗
@@ -4588,7 +4588,7 @@ End IputFreePath.
 (* ===================================================================== *)
 
 Section ProofIput.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation Rra  := (mword_of_int 1 : mword 5).

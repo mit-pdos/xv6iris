@@ -46,7 +46,7 @@
    and [bio_ctx]; it enters and returns at noff 0.
 
    SLOT ACCOUNTING, AND WHY IT CLOSES.  The interior install_trans hands
-   back [bslots bn (2 + length W)] having taken 2 -- one surplus unit per
+   back [bslots (2 + length W)] having taken 2 -- one surplus unit per
    installed block, the units log_write's bpin absorbed.  They are not
    dropped: end_op deposits them into [log_batch]'s POOL when it re-forms
    the batch at n = 0.  The arithmetic is exact -- length W = n, and the
@@ -92,7 +92,7 @@ Import Defs.
    acquire/release 10. *)
 Notation K_end_op := (76%nat) (only parsing).
 Definition wp_end_op_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
@@ -176,7 +176,7 @@ Definition wp_end_op_sconf_body
 
 Module Type END_OP.
   Parameter wp_end_op_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)

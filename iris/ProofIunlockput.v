@@ -85,7 +85,7 @@ Definition iulp_sp (m M : regfile) : Prop :=
       (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))).
 
 Section ProofIunlockputMain.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, ICFG : icfg,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg,
             !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 

@@ -264,7 +264,7 @@ End KexecB3Ph.
    run (for [elf.phnum]).  [s2] carries whatever size that path settled on,
    which is the loop variable. *)
 Section KexecB3Seam.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Notation Rs0 := (mword_of_int 8 : mword 5).
@@ -360,7 +360,7 @@ Module A := ProofKexecTail.KexecTailProof Myproc BeginOp Namei Ilock Readi
 (*  wands could not both be constructed by the caller.                      *)
 (* ===================================================================== *)
 Section KexecB3Incr.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -720,7 +720,7 @@ End KexecB3Incr.
 (*  program header table at all.                                          *)
 (* ===================================================================== *)
 Section KexecB3Body.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -813,7 +813,7 @@ Section KexecB3Body.
           ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈[KT1]{dqa} avf k) -∗
           ([∗ list] k ∈ seq 0 na,
              [∗ list] j ∈ seq 0 (aslen k), pa_add (avf k) j ↦ₘ{dqas} afun k j) -∗
-          bslots bn 3 -∗
+          bslots 3 -∗
           iref_slots 2 -∗
           WP (Loop : expr riscv_lang)) -∗
     (* ---- THE ONE OUTPUT: the back edge's verdict, and the exit back ---- *)
@@ -853,7 +853,7 @@ Section KexecB3Body.
               ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈[KT1]{dqa} avf k) -∗
               ([∗ list] k ∈ seq 0 na,
                  [∗ list] j ∈ seq 0 (aslen k), pa_add (avf k) j ↦ₘ{dqas} afun k j) -∗
-              bslots bn 3 -∗
+              bslots 3 -∗
               iref_slots 2 -∗
               WP (Loop : expr riscv_lang)) -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -1097,7 +1097,7 @@ Section KexecB3Body.
     destruct Hiok' as (Hbmwf & Hbmcov & Hdaddr & Hdty & Hszb & Hholes & Hsized).
     iDestruct (proc_priv_bare_acc gf (proc_addr jp) pidv V with "Hpriv")
       as "[Hppid Hpvbk]".
-    iDestruct (A.kxa_bs3_split bn with "Hbs") as "[Hbs1 Hbs2]".
+    iDestruct (A.kxa_bs3_split with "Hbs") as "[Hbs1 Hbs2]".
     iDestruct (cpu_own_transport CID0 CIDf 0%nat eb (proc_addr jp) eb
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (trap_csrs_ext_transport CID0 CIDf eb (proc_addr jp)
@@ -1130,7 +1130,7 @@ Section KexecB3Body.
     iDestruct (kxc_load_seal gfs gi cov logstart kf inumf dnf bmf datl
                  Hiok Hdok Hddix Hdoc Hduq
                  with "Hdlk Hdiat Hmeta Hmap Hblocks Hdview") as "Hload".
-    iDestruct (A.kxa_bs3_join bn with "Hbs1 Hbs2") as "Hbs".
+    iDestruct (A.kxa_bs3_join with "Hbs1 Hbs2") as "Hbs".
     iDestruct (kxc_open_intro gfs gi cn cov logstart dev pidv kf qf sf gyf
                  inumf dnf bmf gilf gislf
                  with "Hslkk Hslkd Hdep Hidev Hiinum Hivalid Hload
@@ -2890,7 +2890,7 @@ End KexecB3Body.
    [W = 0] case is not vacuous by arithmetic: the back-edge disjunct carries
    [S i <= eh_phnum ef], which is what contradicts the exhausted fuel. *)
 Section KexecB3Loop.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -2973,7 +2973,7 @@ Section KexecB3Loop.
           ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈[KT1]{dqa} avf k) -∗
           ([∗ list] k ∈ seq 0 na,
              [∗ list] j ∈ seq 0 (aslen k), pa_add (avf k) j ↦ₘ{dqas} afun k j) -∗
-          bslots bn 3 -∗
+          bslots 3 -∗
           iref_slots 2 -∗
           WP (Loop : expr riscv_lang)) -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
@@ -3004,7 +3004,7 @@ Section KexecB3Loop.
               ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈[KT1]{dqa} avf k) -∗
               ([∗ list] k ∈ seq 0 na,
                  [∗ list] j ∈ seq 0 (aslen k), pa_add (avf k) j ↦ₘ{dqas} afun k j) -∗
-              bslots bn 3 -∗
+              bslots 3 -∗
               iref_slots 2 -∗
               WP (Loop : expr riscv_lang)) -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -3060,7 +3060,7 @@ End KexecB3Loop.
 (*  +0x1a2 .. +0x1ae -- CLOSING THE INODE, AND PHASE B AS ONE LEMMA.      *)
 (* ===================================================================== *)
 Section KexecB3Close.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -3420,7 +3420,7 @@ End KexecB3Close.
    the loop nor the inode close owns a [-1] tail that the caller does not
    already know about ([kxc_bad324] closes all five inside the loop). *)
 Section KexecB3Main.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).

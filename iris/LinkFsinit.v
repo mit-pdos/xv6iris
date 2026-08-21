@@ -41,12 +41,12 @@
    the six for "depends on nothing else" is misreading it.
 
    THE BOOT CLIENT'S SIDE OF THE BARGAIN, in one place: fsinit needs
-   [bslots bn 35] ((LOGBLOCKS + 2) + 2 + 1), the raw 32 bytes of .bss at
+   [bslots 35] ((LOGBLOCKS + 2) + 2 + 1), the raw 32 bytes of .bss at
    [&sb], block 1's client half at the mkfs image, initlog's whole raw
    [struct log] bundle and FsBlocks material, the icache's four persistent
    things out of [IcacheBoot.icache_boot], and the image premises SpecFsinit.v
    names.  It gets back the eight typed superblock cells, the log context and
-   [bslots bn 3]. *)
+   [bslots 3]. *)
 Require Import LinkBread LinkMemmove LinkBrelse LinkInitlog LinkIreclaim
                 ProofFsinit.
 

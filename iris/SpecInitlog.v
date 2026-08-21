@@ -72,7 +72,7 @@
        CLIENT halves -- the header block at [bs_hdr] and the thirty slots at
        arbitrary content.  The log is its own client for exactly those
        blocks.
-     - the SLOT POOL to stock, plus a working pair: [bslots bn 34].  Thirty
+     - the SLOT POOL to stock, plus a working pair: [bslots 34].  Thirty
        two of them ([(LOGBLOCKS - 0) + 2]) go into [log_batch]'s pool and
        stay sealed inside the lock; the pair comes back.  (initlog itself
        only ever holds one buffer, but the [install_trans] contract asks for
@@ -130,7 +130,7 @@ Notation K_initlog := (74%nat) (only parsing).
 Definition log_name_str : Z := 0x80007518.
 
 Definition wp_initlog_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
@@ -244,12 +244,12 @@ Definition wp_initlog_sconf_body
   ([∗ list] i ∈ seq 0 LOGBLOCKS,
      ∃ bs : list (bv 8), fsblock γfs (log_slot_bno logstart i) bs) -∗
   (* THE SLOT POOL, STOCKED.  initlog is where [log_batch]'s pool comes
-     from: at n = 0 the batch wants [bslots bn ((LOGBLOCKS - 0) + 2)] =
+     from: at n = 0 the batch wants [bslots ((LOGBLOCKS - 0) + 2)] =
      32 units, and initlog needs a working pair of its own on top (its
      bread/brelse, and install_trans's contract asks for two even on the
      dead n = 0 path).  The pair comes back; the 32 stay sealed in the
      lock. *)
-  bslots bn ((LOGBLOCKS + 2) + 2)%nat -∗
+  bslots ((LOGBLOCKS + 2) + 2)%nat -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP
      (its bread / ilock / bwrite does), and a park moves the hart with
      interrupts off, so the crossing has nothing to do with SIE -- the
@@ -271,7 +271,7 @@ Definition wp_initlog_sconf_body
       (* the superblock fraction, untouched *)
       pa_add sb 20 ↦₄{dqs} (mword_of_int logstart : mword 32) -∗
       (* only initlog's own working pair: the other 32 are the batch's pool *)
-      bslots bn 2 -∗
+      bslots 2 -∗
       (* THE LOG LAYER, BUILT -- AT THE CALLER'S OWN [γ].  Everything else
          initlog was handed is now sealed inside the "log" spinlock's
          resource.  No existential: the names came in, so the boot client
@@ -283,7 +283,7 @@ Definition wp_initlog_sconf_body
 
 Module Type INITLOG.
   Parameter wp_initlog_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)

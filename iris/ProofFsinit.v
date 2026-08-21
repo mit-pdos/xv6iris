@@ -43,7 +43,7 @@
    is instantiated here or in LinkFsinit.v.
 
    THIRTY-FIVE BUFFER SLOTS, AND THE ONE HELD BACK.  The contract enters with
-   [bslots bn ((LOGBLOCKS + 2) + 2 + 1)] = 35.  ONE is split off for the
+   [bslots ((LOGBLOCKS + 2) + 2 + 1)] = 35.  ONE is split off for the
    bread at +0x10 and returned by the brelse at +0x2c; the other 34 go to
    initlog, which seals 32 into [log_batch]'s pool and returns 2; the held
    one rejoins them to make the 3 ireclaim wants.  See SpecFsinit.v's header
@@ -183,7 +183,7 @@ Definition fsi_thr4 (m M : regfile) : Prop :=
     M !!! Regidx c = (m !!! Regidx c : mword 64).
 
 Section FsinitDefs.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
   (* ra@24 s0@16 s1@8 s2@0 off the pushed sp, i.e. slots 1..4 off the entry *)
@@ -223,7 +223,7 @@ Section FsinitDefs.
         BitmapInv.sb_bmapstart ↦₄ (mword_of_int bmapstart : mword 32) -∗
         fsblock γfs 1 bs_sb -∗
         log_ctx icfg_log bn γfs cov logstart dev -∗
-        bslots bn 3 -∗
+        bslots 3 -∗
         iref_slot -∗
         ireg_boot -∗
         WP (Loop : expr riscv_lang))%I.
@@ -275,7 +275,7 @@ End FsinitDefs.
 (*  +0x58 .. +0x62 : THE ONLY EXIT.  restore the four, pop, return.       *)
 (* ===================================================================== *)
 Section FsinitEpilogue.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
   Local Lemma fsi_epilogue `{GEN : GenId} `{CID0 : CpuId}
@@ -307,7 +307,7 @@ Section FsinitEpilogue.
     BitmapInv.sb_bmapstart ↦₄ (mword_of_int bmapstart : mword 32) -∗
     fsblock γfs 1 bs_sb -∗
     log_ctx icfg_log bn γfs cov logstart dev -∗
-    bslots bn 3 -∗
+    bslots 3 -∗
     iref_slot -∗
     ireg_boot -∗
     fsi_cont (CID0 := CID0) γfs bn cov logstart bmapstart inodestart ninodes
@@ -524,7 +524,7 @@ End FsinitEpilogue.
 (*  +0x00 .. +0x54 : the push, the four calls, and the magic test.        *)
 (* ===================================================================== *)
 Section FsinitMain.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
   Lemma wp_fsinit_sconf `{GEN : GenId} `{CID : CpuId}
@@ -791,7 +791,7 @@ Section FsinitMain.
     assert (HM5ra : M5 !!! Regidx Rra
                     = add_vec_int (mword_of_int (KernelSyms.fsinit + 0x10) : mword 64) 4)
       by (rewrite /M5; apply upd_eq).
-    iDestruct (iu_slots_split bn ((LOGBLOCKS + 2) + 2)%nat 1%nat with "Hsl")
+    iDestruct (iu_slots_split ((LOGBLOCKS + 2) + 2)%nat 1%nat with "Hsl")
       as "[Hsl34 Hsl1]".
     iDestruct (cpu_own_transport CID CID9 0 eb (proc_addr j) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -1430,7 +1430,7 @@ Section FsinitMain.
       rewrite (callee_saved_lookup Hcsil_cs c Hcs).
       exact (HQ9thr c Hcs N2' N8 N9 N18). }
     (* the held-back slot rejoins initlog's two: THREE for ireclaim *)
-    iDestruct (iu_slots_join bn 2%nat 1%nat with "Hsl2 Hslot") as "Hsl3".
+    iDestruct (iu_slots_join 2%nat 1%nat with "Hsl2 Hslot") as "Hsl3".
     iEval (change (2 + 1)%nat with 3%nat) in "Hsl3".
     (* ===== +0x52 c.mv a0,s2 : a0 := dev ===== *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.fsinit + 0x52)) Ra0 Rs2

@@ -173,7 +173,7 @@ Import Defs.
    budget cannot silently leave this one behind. *)
 Notation K_forkret := ((6 + K_kexec)%nat) (only parsing).
 Section SpecForkret.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* WHAT forkret'S TAIL HANDS THE TRAP LOOP.  [ut_trap_parked] is the
@@ -194,7 +194,7 @@ End SpecForkret.
    the header for the three premises the boot arm costs and for why the
    descriptor is not a parameter. *)
 Definition wp_forkret_gen_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (* the trap loop's kernel-side bundle, abstract exactly as
        [SpecUserretClosed] takes it *)
     (URes : CpuId -> uptd -> mword 64 -> iProp Σ)
@@ -261,7 +261,7 @@ Definition wp_forkret_gen_body
 Module Type FORKRET.
   Include SpecUsertrap.USERTRAP_RES.
   Parameter wp_forkret :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (j : nat) (γs : list gname) (γl γf : gname)
       (pid : mword 32) (V : pprivate)
       (ks : mword 64) (m : regfile) (av av2 : nat) (eb : bool),

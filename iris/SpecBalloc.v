@@ -141,7 +141,7 @@ Local Open Scope Z_scope.
    printk_stack).  bread wants 40, log_write 18 and brelse less. *)
 Notation K_balloc := (68%nat) (only parsing).
 Definition wp_balloc_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
@@ -218,7 +218,7 @@ Definition wp_balloc_sconf_body
   (* TWO slot units: the bitmap buffer is bread and log_written (log_write
      wants a free unit for its bpin) before it is brelsed, and bzero then
      does the same for the data block. *)
-  bslots bn 2 -∗
+  bslots 2 -∗
   (* this operation's reservation, at least the two units a success costs *)
   log_op γ (2 + u) -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP
@@ -240,7 +240,7 @@ Definition wp_balloc_sconf_body
       proc_priv_bare pj pidv Vpr -∗
       sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-      bslots bn 2 -∗
+      bslots 2 -∗
       ((* FAILURE: a0 = 0, nothing allocated, nothing spent, the bitmap
           unchanged -- every bit below size was already set *)
        (⌜mf !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int 0 : mword 64)⌝ ∗
@@ -295,7 +295,7 @@ Definition wp_balloc_sconf_body
    forgotten, and is unchanged: every existing caller keeps threading
    [log_op]. *)
 Definition wp_balloc_gen_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
@@ -352,7 +352,7 @@ Definition wp_balloc_gen_body
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-  bslots bn 2 -∗
+  bslots 2 -∗
   (* THE RESERVATION.  Two units must be in hand either way -- log_write's
      own "a unit in hand" requirement holds on the absorbing arm too. *)
   log_opS γ (2 + u) Sb -∗
@@ -369,7 +369,7 @@ Definition wp_balloc_gen_body
       proc_priv_bare pj pidv Vpr -∗
       sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-      bslots bn 2 -∗
+      bslots 2 -∗
       ((* FAILURE: nothing allocated, NOTHING LOGGED -- budget and set both
           come back exactly as they went in *)
        (⌜mf !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int 0 : mword 64)⌝ ∗
@@ -395,7 +395,7 @@ Module Type BALLOC.
      set-forgetting instance at [cr = false], kept as its own parameter so
      that every existing caller is unchanged. *)
   Parameter wp_balloc_gen :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
@@ -413,7 +413,7 @@ Module Type BALLOC.
                          pidv dq dqb dqs m K eb b lks Vpr.
 
   Parameter wp_balloc_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)

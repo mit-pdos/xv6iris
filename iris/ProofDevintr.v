@@ -74,7 +74,7 @@ Module DevintrProof (PlicClaim : PLIC_CLAIM) (PlicComplete : PLIC_COMPLETE)
                     (Clockintr : CLOCKINTR) : DEVINTR.
 
 Section ProofDevintr.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation ra_idx := (mword_of_int 1 : mword 5).

@@ -43,7 +43,7 @@ Require Import Xv6G.
 Local Open Scope Z_scope.
 
 Section BioInitAt.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
 
   (* ------------------------------------------------------------------ *)
   (*  The free state of a [bio_names] record                              *)
@@ -55,8 +55,8 @@ Section BioInitAt.
   Definition bio_free_tok (bn : bio_names) : iProp Σ :=
     (lock_free_tok (bn_lk bn) ∗
      own (bn_auth bn) (● (∅ : gmap nat (Qp * positive)) : bioUR) ∗
-     bslots_auth bn ∗
-     bslots bn BSLOTS ∗
+     bslots_auth ∗
+     bslots BSLOTS ∗
      ([∗ list] k ∈ seq 0 NBUF,
         sl_free_pair (bn_slk bn k) ∗
         lock_tok_excl (bn_own bn k) ∗
@@ -90,19 +90,23 @@ Section BioInitAt.
     case_decide as Hd; [exfalso; lia | done].
   Qed.
 
-  Lemma bio_names_ghost_alloc : ⊢ |==> ∃ bn : bio_names, bio_free_tok bn.
+  (* THE SLOT SUPPLY IS THREADED IN, not minted here: its ghost name is
+     canonical ([Xv6Cameras.bioslot_name]) and therefore fixed before this
+     record is picked, so [BioDefs.bslots_alloc] mints authority and
+     fragments together and this lemma parks them in the free-state row. *)
+  Lemma bio_names_ghost_alloc :
+    bslots_auth -∗ bslots BSLOTS -∗ |==> ∃ bn : bio_names, bio_free_tok bn.
   Proof.
+    iIntros "Hsa Hsf".
     iMod lock_ghost_alloc as (γlk) "Hlk".
     iMod (own_alloc (● (∅ : gmap nat (Qp * positive)) : bioUR)) as (γb) "Hauth".
     { apply auth_auth_valid. intros i. rewrite lookup_empty. done. }
-    iMod (own_alloc ((● BSLOTS ⋅ ◯ BSLOTS) : bioslotUR)) as (γs) "[Hsa Hsf]".
-    { apply auth_both_valid_discrete. split; [done | done]. }
     iMod (bio_buf_ghost_alloc NBUF 0) as (f) "Hbufs".
     iModIntro.
-    iExists (MkBioNames γlk γb γs (fun k => (f k).1.1) (fun k => (f k).1.2)
+    iExists (MkBioNames γlk γb (fun k => (f k).1.1) (fun k => (f k).1.2)
                         (fun k => (f k).2)).
     rewrite /bio_free_tok /bslots_auth /bslots.
-    cbn [bn_lk bn_auth bn_slot bn_slk bn_own bn_mid].
+    cbn [bn_lk bn_auth bn_slk bn_own bn_mid].
     iFrame "Hlk Hauth Hsa Hsf Hbufs".
   Qed.
 
@@ -154,7 +158,7 @@ Section BioInitAt.
     ([∗ list] k ∈ seq 0 NBUF, buf_raw k) -∗
     bcache_lru bhead (blist 0 NBUF) -∗
     ([∗ set] b ∈ bv_cov V, pool_blk V b) ={E}=∗
-    bio_ctx bn V ∗ bslots bn BSLOTS.
+    bio_ctx bn V ∗ bslots BSLOTS.
   Proof.
     iIntros (Hnc0) "(Hlkg & Hauth & Hsa & Hsf & Hbg) Hlkw #Hnm Hcpu Hfresh Hbufs Hlru Hpool".
     assert (Hu0 : uint (mword_of_int 0 : mword 32) = 0)

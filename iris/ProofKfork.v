@@ -62,7 +62,7 @@ Set Printing Depth 40.
 Notation KF := KernelSyms.kfork (only parsing).
 
 Section ProofKfork.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).

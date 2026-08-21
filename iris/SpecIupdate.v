@@ -119,7 +119,7 @@ Notation K_iupdate := (62%nat) (only parsing).
    lives in InodeInv.v, where ilock's contract can also name it. *)
 
 Definition wp_iupdate_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
@@ -247,7 +247,7 @@ Definition wp_iupdate_sconf_body
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
   (* TWO slot units: bread's reference is held across log_write, which wants
      one of its own; brelse gives it back *)
-  bslots bn 2 -∗
+  bslots 2 -∗
   (* THE RESERVATION, SPEND-EXACTLY: the one log_write always runs *)
   log_op γ (S u) -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP
@@ -281,7 +281,7 @@ Definition wp_iupdate_sconf_body
          marker the free pool arm now carries.  One contract, because the
          two cases differ only in the payout. *)
       ireg_out γi inum dn -∗
-      bslots bn 2 -∗
+      bslots 2 -∗
       log_op γ u -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -301,7 +301,7 @@ Definition wp_iupdate_sconf_body
 (*  the four files S3j sized.                                             *)
 (* ===================================================================== *)
 Definition wp_iupdate_gen_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
@@ -424,7 +424,7 @@ Definition wp_iupdate_gen_body
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
   (* TWO slot units: bread's reference is held across log_write, which wants
      one of its own; brelse gives it back *)
-  bslots bn 2 -∗
+  bslots 2 -∗
   (* THE RESERVATION, SPEND-EXACTLY: the one log_write always runs *)
   (* THE RESERVATION, SET FORM: spend-exactly on the counter, and the set
      grows by exactly the one block iupdate logs -- this inum's inode
@@ -457,7 +457,7 @@ Definition wp_iupdate_gen_body
          marker the free pool arm now carries.  One contract, because the
          two cases differ only in the payout. *)
       ireg_out γi inum dn -∗
-      bslots bn 2 -∗
+      bslots 2 -∗
       log_opS γ u (Sb ∪ {[IBLOCK inum inodestart]}) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -477,7 +477,7 @@ Definition wp_iupdate_gen_body
 (*  [cru := false], so no existing caller moves.                          *)
 (* ===================================================================== *)
 Definition wp_iupdate_cred_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
@@ -603,7 +603,7 @@ Definition wp_iupdate_cred_body
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
   (* TWO slot units: bread's reference is held across log_write, which wants
      one of its own; brelse gives it back *)
-  bslots bn 2 -∗
+  bslots 2 -∗
   (* THE RESERVATION, SPEND-EXACTLY: the one log_write always runs *)
   (* THE RESERVATION, SET FORM: spend-exactly on the counter, and the set
      grows by exactly the one block iupdate logs -- this inum's inode
@@ -636,7 +636,7 @@ Definition wp_iupdate_cred_body
          marker the free pool arm now carries.  One contract, because the
          two cases differ only in the payout. *)
       ireg_out γi inum dn -∗
-      bslots bn 2 -∗
+      bslots 2 -∗
       (* THE CREDITED SPEND ([CreateBudget.iu_spend cru]): the unit comes
          BACK when the block was already in the op's set, and is spent
          otherwise.  The NEED does not move -- [log_write] takes
@@ -672,7 +672,7 @@ Definition wp_iupdate_cred_body
 (*  [wp_iupdate_gen] positionally).                                        *)
 (* ===================================================================== *)
 Definition wp_iupdate_credgen_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
@@ -759,7 +759,7 @@ Definition wp_iupdate_credgen_body
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-  bslots bn 2 -∗
+  bslots 2 -∗
   (* THE DEPOSIT'S IN-HALF (fs-log.md §G.3/§G.16).  [v] is the caller's own
      epoch anchor -- in the one caller that matters, the value its escrow
      slot's observation counter currently holds ([IcacheEscrow.ic_ep_open]
@@ -784,7 +784,7 @@ Definition wp_iupdate_credgen_body
       inode_map γfs ip bm -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       ireg_out γi inum dn -∗
-      bslots bn 2 -∗
+      bslots 2 -∗
       (* EPOCH-CLOSED ON THE WAY OUT.  The credit above is an ENTRY-side
          premise -- it is spent by the flush -- and [log_write]'s own post
          re-closes the birth-epoch existential ([LogInv.log_opSw]), so the
@@ -864,7 +864,7 @@ Definition wp_iupdate_credgen_body
 (*  choice reduces away.                                                  *)
 (* ===================================================================== *)
 Definition wp_iupdate_link_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
@@ -984,7 +984,7 @@ Definition wp_iupdate_link_body
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-  bslots bn 2 -∗
+  bslots 2 -∗
   log_opS γ (S u) Sb -∗
   wp_next true pj (fun (CID : CpuId) =>
   ∀ mf : regfile,
@@ -1012,7 +1012,7 @@ Definition wp_iupdate_link_body
          the pure arm back and ignores it; a caller that paid the token gets
          the token back and re-parks with it at its iunlock. *)
       InodeRegion.ireg_link_pin pin (bv_unsigned inum) dn0 -∗
-      bslots bn 2 -∗
+      bslots 2 -∗
       log_opS γ (if cru then S u else u) (Sb ∪ {[IBLOCK inum inodestart]}) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -1077,7 +1077,7 @@ Definition wp_iupdate_link_body
 (*  pattern is unchanged.                                                 *)
 (* ===================================================================== *)
 Definition wp_iupdate_unlink_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
@@ -1157,7 +1157,7 @@ Definition wp_iupdate_unlink_body
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-  bslots bn 2 -∗
+  bslots 2 -∗
   log_opS γ (S u) Sb -∗
   wp_next true pj (fun (CID : CpuId) =>
   ∀ mf : regfile,
@@ -1175,14 +1175,14 @@ Definition wp_iupdate_unlink_body
          alone -- the type is nonzero, so this is [ireg_out] here -- and
          the [ilink] that went in is GONE, spent by the count it paid. *)
       dinode_at γi inum dn -∗
-      bslots bn 2 -∗
+      bslots 2 -∗
       log_opS γ (if cru then S u else u) (Sb ∪ {[IBLOCK inum inodestart]}) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type IUPDATE.
   Parameter wp_iupdate_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
@@ -1204,7 +1204,7 @@ Module Type IUPDATE.
      set forgotten, kept as its own parameter so that every existing caller
      is unchanged (wp_bmap_gen / wp_balloc_gen's pattern) *)
   Parameter wp_iupdate_gen :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
@@ -1225,7 +1225,7 @@ Module Type IUPDATE.
      unit returned when the op has already logged this inode's block.
      [wp_iupdate_gen] is its [cru := false] instance. *)
   Parameter wp_iupdate_cred :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
@@ -1250,7 +1250,7 @@ Module Type IUPDATE.
      are derived from it through [LogInv.log_credit_own]; it is stated
      separately so neither of their arities moves. *)
   Parameter wp_iupdate_credgen :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
@@ -1274,7 +1274,7 @@ Module Type IUPDATE.
      any of the four would move a landed caller's arity, and this one's
      postcondition differs, not just its premises. *)
   Parameter wp_iupdate_link :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
@@ -1298,7 +1298,7 @@ Module Type IUPDATE.
      costs and carrying the zero-record receipt through log_write's own
      ghost step.  A sixth parameter for the fifth's reason. *)
   Parameter wp_iupdate_unlink :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)

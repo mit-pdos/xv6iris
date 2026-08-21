@@ -125,7 +125,7 @@ Local Open Scope Z_scope.
 Notation K_userinit := ((4 + K_namei_root_boot)%nat) (only parsing).
 
 Definition wp_userinit_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (γp : gname) (γs : list gname)
     (m : regfile) (K : nat) (eb : bool) (pj : mword 64)
@@ -236,7 +236,7 @@ Definition wp_userinit_sconf_body
 
 Module Type USERINIT.
   Parameter wp_userinit_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γp : gname) (γs : list gname)
       (m : regfile) (K : nat) (eb : bool) (pj : mword 64)

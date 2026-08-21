@@ -109,7 +109,7 @@ Module SysLinkTails (Ilock : ILOCK) (Iupdate : IUPDATE)
                     (Iunlockput : IUNLOCKPUT) (EndOp : END_OP).
 
 Section ProofSysLinkTails.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
@@ -119,8 +119,8 @@ Section ProofSysLinkTails.
   Notation Ra5 := (mword_of_int 15 : mword 5).
 
   (* the three-slot pool, split for ilock's / iupdate's needs and rejoined *)
-  Lemma sl_bs3 (bn : bio_names) :
-    (bslots bn 3 : iProp Σ) ⊣⊢ bslot bn ∗ bslots bn 2.
+  Lemma sl_bs3 :
+    (bslots 3 : iProp Σ) ⊣⊢ bslot ∗ bslots 2.
   Proof. rewrite /bslot. change 3%nat with (1 + 2)%nat. apply bslots_op. Qed.
 
   (* ================================================================== *)
@@ -407,7 +407,7 @@ Section ProofSysLinkTails.
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
-    bslots bn 3 -∗
+    bslots 3 -∗
     log_op g u -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
@@ -428,7 +428,7 @@ Section ProofSysLinkTails.
         proc_priv_bare (proc_addr jx) pidv Vpr -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-        bslots bn 3 -∗
+        bslots 3 -∗
         iref_slot -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -729,7 +729,7 @@ Section ProofSysLinkTails.
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
-    bslots bn 3 -∗
+    bslots 3 -∗
     log_op g u -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
@@ -750,7 +750,7 @@ Section ProofSysLinkTails.
         proc_priv_bare (proc_addr jx) pidv Vpr -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-        bslots bn 3 -∗
+        bslots 3 -∗
         iref_slot -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1085,7 +1085,7 @@ Section ProofSysLinkTails.
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
-    bslots bn 3 -∗
+    bslots 3 -∗
     log_opS g (S u) Sb -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
@@ -1106,7 +1106,7 @@ Section ProofSysLinkTails.
         proc_priv_bare (proc_addr jx) pidv Vpr -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-        bslots bn 3 -∗
+        bslots 3 -∗
         iref_slot -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1177,7 +1177,7 @@ Section ProofSysLinkTails.
       exact (HM1thr c Hc N2 N8 N9 N18). }
     iDestruct (cpu_own_transport CID0 CID2 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
-    iDestruct (sl_bs3 bn with "Hbsl") as "[Hbs1 Hbs2]".
+    iDestruct (sl_bs3 with "Hbsl") as "[Hbs1 Hbs2]".
     iApply (Ilock.wp_ilock_sconf (CID := CID2) gs jx gl gu gd gk pd pav pu bn
               gfs gi cn gil gisl cov logstart inodestart nib kk s gy PlainK
               dev inum
@@ -1410,7 +1410,7 @@ Section ProofSysLinkTails.
       iSplitL "Hdlnk"; [iExact "Hdlnk" |].
       iFrame "Hdiat Hmeta". rewrite /inode_map.
       iDestruct "Hmap" as "[Ha Hi]". iFrame "Ha Hi Hblocks Hdview". }
-    iDestruct (sl_bs3 bn with "[Hbs1 Hbs2]") as "Hbsl";
+    iDestruct (sl_bs3 with "[Hbs1 Hbs2]") as "Hbsl";
       [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
     (* ===== +0x10a c.mv a0,s1 ===== *)
     iApply (wp_cmv_s_sconf (CID := CID9) (mword_of_int (SL + 0x10a)) Ra0 Rs1
@@ -1729,7 +1729,7 @@ Section ProofSysLinkTails.
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
-    bslots bn 3 -∗
+    bslots 3 -∗
     log_opSe g n Sb e0 -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
@@ -1750,7 +1750,7 @@ Section ProofSysLinkTails.
         proc_priv_bare (proc_addr jx) pidv Vpr -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-        bslots bn 3 -∗
+        bslots 3 -∗
         iref_slots 2 -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -2000,7 +2000,7 @@ Section ProofSysLinkTails.
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
-    bslots bn 3 -∗
+    bslots 3 -∗
     log_opSe g n Sb e0 -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
     (pa_stk sp0 2) ↦₈[KT1] (m !!! Regidx Rs0 : mword 64) -∗
@@ -2021,7 +2021,7 @@ Section ProofSysLinkTails.
         proc_priv_bare (proc_addr jx) pidv Vpr -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-        bslots bn 3 -∗
+        bslots 3 -∗
         iref_slots 2 -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).

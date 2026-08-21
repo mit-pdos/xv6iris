@@ -122,7 +122,7 @@ Notation KXD := KernelSyms.kexec (only parsing).
 (*  hart the previous iteration ended on).                                 *)
 (* ===================================================================== *)
 Section KexecDName.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
   Context `{GEN : GenId}.
 
   Notation Rs0 := (mword_of_int 8 : mword 5).
@@ -574,7 +574,7 @@ End KexecDName.
 Module KexecDProof (PFP : PROC_FREEPAGETABLE) (SS : SAFESTRCPY).
 
 Section KexecDCommit.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -750,7 +750,7 @@ Section KexecDCommit.
      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) ∗
      bitmap_inv gfs bmapstart cov logstart size ∗
-     bslots bn 3 ∗
+     bslots 3 ∗
      proc_pt P ∗
      proc_priv gf (proc_addr jp) pidv Vc ∗
      ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1]{dqpv} pfun k) ∗
@@ -927,7 +927,7 @@ Section KexecDCommit.
         ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
         ([∗ list] i ∈ seq 0 na,
            [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
-        bslots bn 3 -∗
+        bslots 3 -∗
         iref_slots 2 -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1803,7 +1803,7 @@ Section KexecDCommit.
 End KexecDCommit.
 
 Section KexecDMain.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -1907,7 +1907,7 @@ Section KexecDMain.
         ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
         ([∗ list] i ∈ seq 0 na,
            [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
-        bslots bn 3 -∗
+        bslots 3 -∗
         iref_slots 2 -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).

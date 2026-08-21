@@ -92,15 +92,15 @@
 
    ---- ONE SLOT MORE THAN initlog GIVES BACK (a real composition fact) --
 
-   [SpecInitlog] takes [bslots bn ((LOGBLOCKS + 2) + 2)] = 34 and returns
+   [SpecInitlog] takes [bslots ((LOGBLOCKS + 2) + 2)] = 34 and returns
    only TWO: the other 32 are sealed into [log_batch]'s pool inside the log
    spinlock, forever.  But [SpecIreclaim] needs THREE (iput's indirect arm,
    [iput_units]).  So fsinit cannot simply pass initlog's leftovers on, and
    it enters with [((LOGBLOCKS + 2) + 2 + 1)] = 35: one is held back across
    the [jal initlog] at +0x4e and rejoins initlog's two to make ireclaim's
    three.  fsinit's own bread at +0x10 borrows and returns one before any of
-   that.  The postcondition therefore hands the caller [bslots bn 3], not
-   [bslots bn 2].
+   that.  The postcondition therefore hands the caller [bslots 3], not
+   [bslots 2].
 
    ---- WHAT COMPOSES, AND IN WHICH ORDER ------------------------------
 
@@ -240,7 +240,7 @@ Proof.
 Qed.
 
 Definition wp_fsinit_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
       ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
@@ -401,7 +401,7 @@ Definition wp_fsinit_sconf_body
   (* THIRTY-FIVE slot units.  initlog seals 32 of them into [log_batch]'s
      pool and returns two; ireclaim needs three; so ONE is held back across
      the [jal initlog] at +0x4e.  See the header. *)
-  bslots bn ((LOGBLOCKS + 2) + 2 + 1)%nat -∗
+  bslots ((LOGBLOCKS + 2) + 2 + 1)%nat -∗
   (* ONE ledger unit for ireclaim's iget/iput pair; it comes back *)
   iref_slot -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP
@@ -447,7 +447,7 @@ Definition wp_fsinit_sconf_body
          [dev = icfg_dev], which premise (e) above already gives. *)
       log_ctx icfg_log bn γfs cov logstart dev -∗
       (* three, not two: see the header *)
-      bslots bn 3 -∗
+      bslots 3 -∗
       iref_slot -∗
       (* the boot-shelter token, handed back for the seal (fs-fragments.md
          §7.12) *)
@@ -457,7 +457,7 @@ Definition wp_fsinit_sconf_body
 
 Module Type FSINIT.
   Parameter wp_fsinit_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
              ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)

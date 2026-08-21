@@ -151,7 +151,7 @@ Module FilestatProof (Myproc : MYPROC) (Ilock : ILOCK) (Stati : STATI)
                      (Iunlock : IUNLOCK) (Copyout : COPYOUT) : FILESTAT.
 
 Section ProofFilestat.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 

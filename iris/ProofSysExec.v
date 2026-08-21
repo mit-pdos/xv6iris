@@ -646,7 +646,7 @@ End SysExecFrame.
 (*  they arrive as premises rather than as loads. *)
 (* ===================================================================== *)
 Section SysExecEpilogue.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
@@ -908,7 +908,7 @@ Module SysExecProof (Argaddr : ARGADDR) (Argstr : ARGSTR) (Memset : MEMSET)
 (*  its entry value.                                                      *)
 (* ===================================================================== *)
 Section SysExecHead.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
@@ -1460,7 +1460,7 @@ End SysExecHead.
 (*  weaker will do.                                                       *)
 (* ===================================================================== *)
 Section SysExecSetup.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -1972,7 +1972,7 @@ End SysExecSetup.
 (*  the fall-through at [k = t = 32], where every slot has been freed.     *)
 (* ===================================================================== *)
 Section SysExecFree.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
   Context `{GEN : GenId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -2533,7 +2533,7 @@ End SysExecFree.
 (*  three calls would otherwise be ~250 near-identical [upd_ne] lines.     *)
 (* ===================================================================== *)
 Section SysExecLoop.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId}.
 
@@ -2842,7 +2842,7 @@ End SysExecLoop.
 (*  [(CID0 := ...)].                                                      *)
 (* ===================================================================== *)
 Section SysExecState.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
@@ -2964,7 +2964,7 @@ End SysExecState.
 (*  whichever hart the previous one ended on.                             *)
 (* ===================================================================== *)
 Section SysExecStep.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId}.
 
@@ -3742,7 +3742,7 @@ End SysExecStep.
 (*  and each tail is three lines around it.                               *)
 (* ===================================================================== *)
 Section SysExecReload.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
   Context `{GEN : GenId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -4105,7 +4105,7 @@ End SysExecReload.
 (*  has to [c.j] to the epilogue while the first is already next to it.   *)
 (* ===================================================================== *)
 Section SysExecBadTail.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId}.
 
@@ -4321,7 +4321,7 @@ End SysExecBadTail.
 (*  coincide.                                                             *)
 (* ===================================================================== *)
 Section SysExecSuccTail.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId}.
 
@@ -4525,7 +4525,7 @@ End SysExecSuccTail.
 (*  written at [i] -- the vector kexec is handed.                          *)
 (* ===================================================================== *)
 Section SysExecBreak.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -4668,7 +4668,7 @@ Section SysExecBreak.
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bitmap_inv gfs bmapstart cov logstart size -∗
-    bslots bn 3 -∗
+    bslots 3 -∗
     iref_slots 2 -∗
     sx_body γf jp pid V K eb b lks sp0 m plen pfun rest uav
             M P i pg alen afun (mword_of_int (SX + 0xb6) : mword 64) -∗
@@ -4683,7 +4683,7 @@ Section SysExecBreak.
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-        bslots bn 3 -∗
+        bslots 3 -∗
         iref_slots 2 -∗
         proc_priv γf (proc_addr jp) pid V' -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -4925,7 +4925,7 @@ End SysExecBreak.
 (*  true] contracts look unreachable.                                      *)
 (* ===================================================================== *)
 Section SysExecWhole.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).

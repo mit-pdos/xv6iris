@@ -440,7 +440,7 @@ Proof. rewrite /dinode_wf /create_made /=. reflexivity. Qed.
    because a sealer must supply the statement at INDEPENDENT instances.
    [SpecKexec] already binds it this way for the same reason; keep it. *)
 Section CreateSpec.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId}.
 
@@ -512,7 +512,7 @@ Section CreateSpec.
 End CreateSpec.
 
 Definition wp_create_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
@@ -637,7 +637,7 @@ Definition wp_create_sconf_body
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-  bslots bn 3 -∗
+  bslots 3 -∗
   iref_slots ns -∗
   (* ---- THE OP-WIDE RESERVATION, IN SET FORM (section 18 clause 1) ---- *)
   log_opS γ u Sb -∗
@@ -663,7 +663,7 @@ Definition wp_create_sconf_body
          iunlockput of a link-count-zero inode). *)
       proc_priv γf pj pidv V -∗
       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
-      bslots bn 3 -∗
+      bslots 3 -∗
       (* THE LEDGER, EXACTLY.  This used to be the interval
          [ns - create_slots <= ns' <= ns] with an [ok = true -> S ns' <= ns]
          floor bolted on, and the header's ARM-G note recorded what was
@@ -714,7 +714,7 @@ Definition wp_create_sconf_body
 
 Module Type CREATE.
   Parameter wp_create_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)

@@ -121,7 +121,7 @@ Local Ltac regne := reg_ne_side.
 Local Ltac bwidx := first [ vm_compute; reflexivity | vm_compute; discriminate ].
 
 Section ProofBwrite.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_bwrite_sconf 

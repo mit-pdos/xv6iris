@@ -647,7 +647,7 @@ Module SysLinkProof (Argstr : ARGSTR) (BeginOp : BEGIN_OP) (Namei : NAMEI)
 Module Tails := SysLinkTails Ilock Iupdate Iunlockput EndOp.
 
 Section ProofSysLinkBody.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
 
   (* the escrow-family projection out of the boot families, at the copy
      THIS contract names ([ic_escrows] is IcacheEscrow's).  The sleeplock
@@ -663,8 +663,8 @@ Section ProofSysLinkBody.
     iDestruct (big_sepL_lookup _ _ k k Hl with "H") as "$".
   Qed.
 
-    Lemma sl_bs3 (bn : bio_names) :
-    (bslots bn 3 : iProp Σ) ⊣⊢ bslot bn ∗ bslots bn 2.
+    Lemma sl_bs3 :
+    (bslots 3 : iProp Σ) ⊣⊢ bslot ∗ bslots 2.
   Proof. rewrite /bslot. change 3%nat with (1 + 2)%nat. apply bslots_op. Qed.
 
   (* the reference allowance, split for the FIRST walk: namei takes two and
@@ -1295,7 +1295,7 @@ Section ProofSysLinkBody.
           iDestruct (sl_esc_acc cn gfs gi cov logstart kk Hkk with "Hescrows")
             as "#Hesck".
           iDestruct (ic_sleeplocks_lookup cn kk Hkk with "Hslks") as (gil gisl) "#Hslkk".
-          iDestruct (sl_bs3 bn with "Hbsl") as "[Hbs1 Hbs2]".
+          iDestruct (sl_bs3 with "Hbsl") as "[Hbs1 Hbs2]".
           rewrite Hnaip Hipe in HQ3regs.
           assert (HQ3s1 : (Q3 !!! Regidx Rs1 : mword 64) = ientry kk)
             by exact (sl_regs_s1 _ _ _ _ _ HQ3regs).
@@ -1436,7 +1436,7 @@ Section ProofSysLinkBody.
                iSplitL "Hity Himaj Himin Hinl Hisz".
                - rewrite /inode_meta /i_type /i_nlink. iFrame.
                - iFrame. }
-             iDestruct (sl_bs3 bn with "[Hbs1 Hbs2]") as "Hbsl";
+             iDestruct (sl_bs3 with "[Hbs1 Hbs2]") as "Hbsl";
                [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
              iDestruct (sl_buf_join (pa_stk sp0 38) bo1 pk1 Hpk1
                           with "Hbufk Hbufrest") as "HbO".
@@ -1586,7 +1586,7 @@ Section ProofSysLinkBody.
                   iSplitL "Hity Himaj Himin Hinl Hisz".
                   - rewrite /inode_meta /i_type /i_nlink. iFrame.
                   - iFrame. }
-                iDestruct (sl_bs3 bn with "[Hbs1 Hbs2]") as "Hbsl";
+                iDestruct (sl_bs3 with "[Hbs1 Hbs2]") as "Hbsl";
                   [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
                 iDestruct (sl_buf_join (pa_stk sp0 38) bo1 pk1 Hpk1
                              with "Hbufk Hbufrest") as "HbO".
@@ -2006,7 +2006,7 @@ Section ProofSysLinkBody.
                 iDestruct (sl_buf_split (pa_stk sp0 22) bw1 pk2 Hpk2 with "HbW")
                   as "[Hbufw Hbufwr]".
                 iDestruct (iref_slots_combine 1 1 with "Hir1b Hir1") as "Hir2".
-                iDestruct (sl_bs3 bn with "[Hbs1 Hbs2]") as "Hbsl";
+                iDestruct (sl_bs3 with "[Hbs1 Hbs2]") as "Hbsl";
                   [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
                 sl_own_transport CID44 CID47 eb pj b.
                 iApply (Nameiparent.wp_nameiparent_gen (CID := CID47) gs j gl gu
@@ -2105,7 +2105,7 @@ Section ProofSysLinkBody.
                                 with "Hescrows") as "#Hescd".
                    iDestruct (ic_sleeplocks_lookup cn kd Hkd with "Hslks")
                      as (gild gisld) "#Hslkd0".
-                   iDestruct (sl_bs3 bn with "Hbsl") as "[Hbs1d Hbs2d]".
+                   iDestruct (sl_bs3 with "Hbsl") as "[Hbs1d Hbs2d]".
                    iClear "Hi5c Hi5e Hi60 Hi64 Hi66 Hi6a Hi6c Hi70 Hi74 Hi78
                            Hi7c Hi7e".
                    iPoseProof (slki_80 with "Htext") as "Hi80".
@@ -2275,7 +2275,7 @@ Section ProofSysLinkBody.
                                   with "Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd
                                         Hdviewd")
                        as "Hloadd".
-                     iDestruct (sl_bs3 bn with "[Hbs1d Hbs2d]") as "Hbsl";
+                     iDestruct (sl_bs3 with "[Hbs1d Hbs2d]") as "Hbsl";
                        [iSplitL "Hbs1d"; [iExact "Hbs1d" | iExact "Hbs2d"] |].
                      (* the three buffers, rejoined for the epilogue *)
                      iDestruct (sl_buf_join (pa_stk sp0 22) bw1 pk2 Hpk2
@@ -2514,7 +2514,7 @@ Section ProofSysLinkBody.
                    assert (HU6regs : sl_regs m sp0 (ientry kk) (ientry kd) U6)
                      by (rewrite /U6; apply sl_regs_caller;
                          [exact Hcsra | exact HU5regs]).
-                   iDestruct (sl_bs3 bn with "[Hbs1d Hbs2d]") as "Hbsl";
+                   iDestruct (sl_bs3 with "[Hbs1d Hbs2d]") as "Hbsl";
                      [iSplitL "Hbs1d"; [iExact "Hbs1d" | iExact "Hbs2d"] |].
                    iAssert (inode_map gfs (ientry kd) bmd)
                      with "[Haddrsd Hindd]" as "Hmapd".

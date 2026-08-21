@@ -101,7 +101,7 @@ Local Open Scope Z_scope.
    releasesleep (22), holdingsleep wanting 16. *)
 Notation K_iunlock := (26%nat) (only parsing).
 Definition wp_iunlock_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (gs : list gname)
     (gfs : fs_names) (gi : gname)
@@ -184,7 +184,7 @@ Definition wp_iunlock_sconf_body
 
 Module Type IUNLOCK.
   Parameter wp_iunlock_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
       (gs : list gname)
       (gfs : fs_names) (gi : gname)

@@ -79,10 +79,10 @@
    [dirty_clear D (map uint W)].
 
    SLOT ACCOUNTING.  install_trans holds two buffers at a time, so it takes
-   [bslots bn 2]; it returns [bslots bn (2 + length W)].  The surplus is
+   [bslots 2]; it returns [bslots (2 + length W)].  The surplus is
    real: each entry's [bunpin] frees the pin unit that log_write's [bpin]
    absorbed, and this is where it re-enters circulation.  Its home is the
-   POOL parked in [log_batch] ([bslots bn ((LOGBLOCKS - n) + 2)]) -- the
+   POOL parked in [log_batch] ([bslots ((LOGBLOCKS - n) + 2)]) -- the
    caller (end_op, or initlog with an empty log) deposits the surplus there
    when it re-forms the batch at n = 0, and the arithmetic is exact because
    length W = n.  Nothing of that shows here: this contract is stated in
@@ -130,7 +130,7 @@ Import Defs.
    deepest callee is bread (40).  memmove/bwrite/bunpin/brelse want less. *)
 Notation K_install_trans := (68%nat) (only parsing).
 Definition wp_install_trans_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
@@ -215,7 +215,7 @@ Definition wp_install_trans_sconf_body
      fsblock γfs (log_slot_bno logstart i) (Lw i) ∗
      (uint w) ↪[fs_dirty γfs]{#(1/2)} true) -∗
   (* two slot units: it holds lbuf and dbuf at the same time *)
-  bslots bn 2 -∗
+  bslots 2 -∗
   (* THE CRASH PERMITS for the home writes (phase C2b/D1 stage 4).  One per
      entry -- but the entries' fupds are SEQUENTIAL, each consuming the
      era-side resource the previous one returned (for the FS client that is
@@ -261,7 +261,7 @@ Definition wp_install_trans_sconf_body
          (uint w) ↪[fs_dirty γfs]{#(1/2)} false) -∗
       (* the two units back, PLUS one per entry: each bunpin frees the pin
          unit log_write's bpin absorbed.  See the header note. *)
-      bslots bn (2 + length W) -∗
+      bslots (2 + length W) -∗
       (* the threaded resource, back from the last entry's DMA completion *)
       ▷ R -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -269,7 +269,7 @@ Definition wp_install_trans_sconf_body
 
 Module Type INSTALL_TRANS.
   Parameter wp_install_trans_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)

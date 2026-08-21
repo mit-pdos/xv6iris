@@ -201,9 +201,9 @@ Proof.
 Qed.
 
 Section FirstTok.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId}.
-  Context `{!xv6G Σ} `{ICFG : icfg}.
+  Context `{!xv6G Σ, !bioslotG Σ} `{ICFG : icfg}.
 
   (* ================================================================== *)
   (*  1.  THE PERSISTENT HALF -- what main has built by +0x9e             *)
@@ -318,7 +318,7 @@ Section FirstTok.
        ([∗ list] i ∈ seq 0 LOGBLOCKS, ∃ w : mword 32, lh_block i ↦₄ w) ∗
        (* row (B) *) log_mirror_full ∗
        (* row (C) *) iref_slots 2 ∗
-       bslots fsc_bio ((LOGBLOCKS + 2) + 2 + 1)%nat)%I.
+       bslots ((LOGBLOCKS + 2) + 2 + 1)%nat)%I.
 
   (* ONE [iDestruct], in [SpecFsinit]'s own premise order (kit 2 opened
      inside), so the seal site never has to know either bundle's layout. *)
@@ -350,7 +350,7 @@ Section FirstTok.
                 (FsCrash.fs_blocks dk (log_hdr_bno fsc_logst)) ∗
         ([∗ list] i ∈ seq 0 LOGBLOCKS,
            ∃ bs : list (bv 8), fsblock fsc_fs (log_slot_bno fsc_logst i) bs) ∗
-        bslots fsc_bio ((LOGBLOCKS + 2) + 2 + 1)%nat ∗
+        bslots ((LOGBLOCKS + 2) + 2 + 1)%nat ∗
         iref_slots 2 ∗
         (* the coverage remainder, which fsinit does not take: it is the
            first process's, R3 *)

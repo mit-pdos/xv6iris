@@ -190,7 +190,7 @@ Module VirtioDiskRwRestE (Acquire : ACQUIRE) (Release : RELEASE)
 Module P4 := VirtioDiskRwRestD Acquire Release SleepPrepare Sleep FreeDesc.
 
 Section ProofVirtioDiskRwE.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 

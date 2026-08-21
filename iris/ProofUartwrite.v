@@ -313,7 +313,7 @@ Proof. rewrite /uw_bytes seq_S fmap_app. reflexivity. Qed.
 (* ===================================================================== *)
 
 Section UwProps.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : RiscvLang.GenId}.
 
   (* THE EMPTY SUBLIST CLAIM, out of the device invariant alone.  The [n = 0]
@@ -467,7 +467,7 @@ Local Ltac nz := vm_compute; discriminate.
 Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
 
 Section UwBodies.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   (* [rget m k] at a NON-tp index is the plain map lookup ([rget_ne]). *)
   Local Ltac rgne :=
@@ -1320,7 +1320,7 @@ End UwBodies.
 (* ===================================================================== *)
 
 Section ProofUartwrite.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Ltac rgne :=

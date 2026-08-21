@@ -219,7 +219,7 @@ Proof. unfold neq_vec. by rewrite bd_sext_eqv. Qed.
 (* ==================================================================== *)
 
 Section BreadSlots.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
 
   (* THE FORWARD SCAN's borrow.  The scan reads [b->dev] and [b->blockno] of
      a buffer it knows nothing about, so the two arms of [bio_slot_res] are

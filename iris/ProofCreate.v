@@ -1396,7 +1396,7 @@ Proof. unfold create_slots. lia. Qed.
 (* ===================================================================== *)
 
 Section ProofCreateMain.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
@@ -1510,8 +1510,8 @@ Section ProofCreateMain.
     iDestruct (big_sepL_lookup _ _ k k Hl with "H") as "$".
   Qed.
 
-  Lemma cr_bs3 (bn : bio_names) :
-    (bslots bn 3 : iProp Σ) ⊣⊢ bslot bn ∗ bslots bn 2.
+  Lemma cr_bs3 :
+    (bslots 3 : iProp Σ) ⊣⊢ bslot ∗ bslots 2.
   Proof. rewrite /bslot. change 3%nat with (1 + 2)%nat. apply bslots_op. Qed.
 
   (* the p->cwd the walk lends and gets back untouched *)
@@ -1552,7 +1552,7 @@ Section ProofCreateMain.
        sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
        proc_priv γf (proc_addr j) pidv V -∗
        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
-       bslots bn 3 -∗
+       bslots 3 -∗
        ⌜if ok then (S ns' = ns)%nat else ns' = ns⌝ -∗
        iref_slots ns' -∗
        ⌜Sb ⊆ Sb' /\ (u' <= u)%nat
@@ -1987,7 +1987,7 @@ Section ProofCreateMain.
        bitmap_inv γfs bmapstart cov logstart size -∗
        proc_priv γf (proc_addr j) pidv V -∗
        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
-       bslots bn 3 -∗
+       bslots 3 -∗
        iref_slots (ns - 1) -∗
        log_opS γ n1 Sb1 -∗
        (* and the contract's own continuation, ANCHORED AT THE ENTRY HART
@@ -2174,7 +2174,7 @@ Section ProofCreateMain.
        (proc_priv_bare (proc_addr j) pidv V -∗
           proc_priv γf (proc_addr j) pidv V) -∗
        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
-       bslots bn 3 -∗
+       bslots 3 -∗
        iref_slots (ns - 2) -∗
        log_opS γ n3 Sb3 -∗
        wp_next (CID0 := CID) true (proc_addr j)
@@ -2360,7 +2360,7 @@ Section ProofCreateMain.
        (proc_priv_bare (proc_addr j) pidv V -∗
           proc_priv γf (proc_addr j) pidv V) -∗
        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
-       bslots bn 3 -∗
+       bslots 3 -∗
        iref_slots (ns - 2) -∗
        log_opS γ n4 Sb4 -∗
        wp_next (CID0 := CID) true (proc_addr j)
@@ -2451,7 +2451,7 @@ Section ProofCreateMain.
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-    bslots bn 3 -∗
+    bslots 3 -∗
     iref_slots ns -∗
     log_opS γ u Sb -∗
     (* ---- THE PARKED ALLOCATE HALF, as a HYPOTHESIS ---- *)
@@ -2876,7 +2876,7 @@ Section ProofCreateMain.
       iDestruct "Href" as "[Hkeep Hshr]".
       iDestruct (cr_esc_acc cn γfs γi cov logstart kd Hkd with "Hesc") as "#Hescd".
       iDestruct (ic_sleeplocks_lookup cn kd Hkd with "Hslks") as (gild gisld) "#Hslkd".
-      iDestruct (cr_bs3 bn with "Hbsl") as "[Hbs1 Hbs2]".
+      iDestruct (cr_bs3 with "Hbsl") as "[Hbs1 Hbs2]".
       iDestruct (proc_priv_bare_acc γf (proc_addr j) pidv V with "Hpriv")
         as "[Hppid Hppback]".
       iPoseProof (cri_026 with "Htext") as "Hi026".
@@ -2990,7 +2990,7 @@ Section ProofCreateMain.
                      Hiok Hdok Hddix Hdoc Hduq
                      with "Hdlnk Hdiat Hmetal Haddrs Hind Hblocks Hdview")
           as "Hload".
-        iDestruct (cr_bs3 bn with "[Hbs1 Hbs2]") as "Hbsl";
+        iDestruct (cr_bs3 with "[Hbs1 Hbs2]") as "Hbsl";
           [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
         (* +0x84 c.mv a0,s1 *)
         iApply (wp_cmv_s_sconf (mword_of_int (CK + 0x84)) Ra0 Rs1 Q3
@@ -3465,7 +3465,7 @@ Section ProofCreateMain.
                        Hiok Hdok Hddix Hdoc Hduq
                        with "Hdlnk Hdiat Hmeta Haddrs Hind Hblocks Hdview")
             as "Hload".
-          iDestruct (cr_bs3 bn with "[Hbs1 Hbs2]") as "Hbsl";
+          iDestruct (cr_bs3 with "[Hbs1 Hbs2]") as "Hbsl";
             [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
           iDestruct (cpu_own_transport CIDdl CID27 0%nat eb (proc_addr j) b
                        ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
@@ -3551,7 +3551,7 @@ Section ProofCreateMain.
             as "#Hescc".
           iDestruct (ic_sleeplocks_lookup cn kslot Hkslot with "Hslks")
             as (gilc gislc) "#Hslkc".
-          iDestruct (cr_bs3 bn with "Hbsl") as "[Hbs1 Hbs2]".
+          iDestruct (cr_bs3 with "Hbsl") as "[Hbs1 Hbs2]".
           iDestruct (cpu_own_transport CIDu1 CID29 0%nat eb (proc_addr j) b
                        ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
           iApply (IL.wp_ilock_sconf γs j γl γu γd γk pd pav pu bn γfs γi cn
@@ -3575,7 +3575,7 @@ Section ProofCreateMain.
             by exact (cr_regs_cs m sp0 _ _ ty major minor F5 mic Hcsic HF5regs).
           pose proof Hmicregs as HmicR.
           destruct HmicR as (Z2 & Z8 & Z9 & Z18 & Z20 & Z21 & Z22 & Zthr).
-          iDestruct (cr_bs3 bn with "[Hbs1 Hbs2]") as "Hbsl";
+          iDestruct (cr_bs3 with "[Hbs1 Hbs2]") as "Hbsl";
             [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
           (* ============================================================ *)
           (*  ARM F-BAD (+0x98), reached from BOTH type tests -- so it is  *)
@@ -3626,7 +3626,7 @@ Section ProofCreateMain.
                           proc_priv γf (proc_addr j) pidv V) -∗
                        ([∗ list] i ∈ seq 0 (S plen),
                           pa_add (m !!! Regidx Ra0 : mword 64) i ↦ₘ[KT1] pfun i) -∗
-                       bslots bn 3 -∗
+                       bslots 3 -∗
                        iref_slots 1 -∗ iref_slots (ns - 2) -∗
                        log_opS γ n2 Sb2 -∗
                        wp_next (CID0 := CID) true (proc_addr j)
@@ -4111,7 +4111,7 @@ Section ProofCreateMain.
           iIntros (CID25 Hq25). iApply bi.later_intro. iIntros "Hcg Hpc".
           iEval (rewrite Htg0a2) in "Hpc".
           iDestruct ("Hppback" with "Hppid") as "Hpriv".
-          iDestruct (cr_bs3 bn with "[Hbs1 Hbs2]") as "Hbsl";
+          iDestruct (cr_bs3 with "[Hbs1 Hbs2]") as "Hbsl";
             [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
           iDestruct (iref_slots_combine with "Hisl1 Hislr") as "Hisl".
           assert (Hns1 : (1 + (ns - 2))%nat = (ns - 1)%nat)
@@ -4169,7 +4169,7 @@ Section ProofCreateMain.
                      Hiok Hdok Hddix Hdoc Hduq
                      with "Hdlnk Hdiat Hmetal Haddrs Hind Hblocks Hdview")
           as "Hload".
-        iDestruct (cr_bs3 bn with "[Hbs1 Hbs2]") as "Hbsl";
+        iDestruct (cr_bs3 with "[Hbs1 Hbs2]") as "Hbsl";
           [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
         (* +0x8e c.mv a0,s1 *)
         iApply (wp_cmv_s_sconf (mword_of_int (CK + 0x8e)) Ra0 Rs1 Mg
@@ -4939,7 +4939,7 @@ Section ProofCreateMain.
       assert (Hcdirlen : length (bm_dir bmc) = NDIRECT)
         by exact (blkmap_wf_dir_len cov logstart bmc (proj1 Hciok)).
       destruct q1 as [| q2]; [exfalso; lia |].
-      iDestruct (cr_bs3 bn with "Hbsl") as "[Hbs1 Hbs2]".
+      iDestruct (cr_bs3 with "Hbsl") as "[Hbs1 Hbs2]".
       iDestruct (cpu_own_transport CIDo CIDB6 0%nat eb (proc_addr j) b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
       iApply (IU.wp_iupdate_link γs j γl γu γd γk pd pav pu bn γ γfs γi
@@ -5000,7 +5000,7 @@ Section ProofCreateMain.
                     (ientry kslot) ty major minor W3 miu Hcsiu HW3regs).
       pose proof Hmiuregs as HmiuR.
       destruct HmiuR as (N2 & N8 & N9 & N18 & N19 & N20 & N21 & N22 & Nthr).
-      iDestruct (cr_bs3 bn with "[Hbs1 Hbs2]") as "Hbsl";
+      iDestruct (cr_bs3 with "[Hbs1 Hbs2]") as "Hbsl";
         [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
       (* ===== +0xc8 c.li a4,1 ====================================== *)
       iApply (wp_cli_s_sconf (mword_of_int (CK + 0xc8)) Ra4
@@ -6220,7 +6220,7 @@ Section ProofCreateMain.
                                  (mword_of_int 0 : mword 16)) = bm_cells bmc)
       by (rewrite cr_setf_addrs; exact Hcadd).
     destruct n4 as [| u0]; [exfalso; unfold iput_units in Hn4; lia |].
-    iDestruct (cr_bs3 bn with "Hbsl") as "[Hbs1 Hbs2]".
+    iDestruct (cr_bs3 with "Hbsl") as "[Hbs1 Hbs2]".
     iDestruct (cpu_own_transport CIDf CIDG3 0%nat eb (proc_addr j) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (IU.wp_iupdate_unlink γs j γl γu γd γk pd pav pu bn γ γfs γi
@@ -6251,7 +6251,7 @@ Section ProofCreateMain.
                   (ientry kslot) ty major minor G2 mfl Hcsfl HG2regs).
     pose proof Hmflregs as HFr.
     destruct HFr as (F2 & F8 & F9 & F18 & F19 & F20 & F21 & F22 & Fthr).
-    iDestruct (cr_bs3 bn with "[Hbs1 Hbs2]") as "Hbsl";
+    iDestruct (cr_bs3 with "[Hbs1 Hbs2]") as "Hbsl";
       [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
     (* ===== +0x150 c.mv a0,s3 ========================================= *)
     iApply (wp_cmv_s_sconf (mword_of_int (CK + 0x150)) Ra0 Rs3 mfl
@@ -6831,7 +6831,7 @@ Section ProofCreateMain.
        (proc_priv_bare (proc_addr j) pidv V -∗
           proc_priv γf (proc_addr j) pidv V) -∗
        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
-       bslots bn 3 -∗
+       bslots 3 -∗
        iref_slots (ns - 2) -∗
        log_opS γ n4 Sb4 -∗
        wp_next (CID0 := CID) true (proc_addr j)
@@ -7044,7 +7044,7 @@ Section ProofCreateMain.
                       (mword_of_int 0 : mword 16))) <> 0)
       by (rewrite cr_setf_type; exact Htyz).
     destruct n4 as [| u0]; [exfalso; unfold iput_units in Hn4; lia |].
-    iDestruct (cr_bs3 bn with "Hbsl") as "[Hbs1 Hbs2]".
+    iDestruct (cr_bs3 with "Hbsl") as "[Hbs1 Hbs2]".
     iDestruct (cpu_own_transport CIDf CIDG3 0%nat eb (proc_addr j) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (IU.wp_iupdate_unlink γs j γl γu γd γk pd pav pu bn γ γfs γi
@@ -7073,7 +7073,7 @@ Section ProofCreateMain.
                   (ientry kslot) ty major minor G2 mfl Hcsfl HG2regs).
     pose proof Hmflregs as HFr.
     destruct HFr as (F2 & F8 & F9 & F18 & F19 & F20 & F21 & F22 & Fthr).
-    iDestruct (cr_bs3 bn with "[Hbs1 Hbs2]") as "Hbsl";
+    iDestruct (cr_bs3 with "[Hbs1 Hbs2]") as "Hbsl";
       [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
     (* ===== +0x150 c.mv a0,s3 ========================================= *)
     iApply (wp_cmv_s_sconf (mword_of_int (CK + 0x150)) Ra0 Rs3 mfl
@@ -8814,7 +8814,7 @@ Section ProofCreateMain.
           assert (Hmtdirlen : length (bm_dir bm3) = NDIRECT)
             by exact (blkmap_wf_dir_len cov logstart bm3 Hwf3).
           destruct n6 as [| u6]; [exfalso; lia |].
-          iDestruct (cr_bs3 bn with "Hbsl") as "[Hbs1 Hbs2]".
+          iDestruct (cr_bs3 with "Hbsl") as "[Hbs1 Hbs2]".
           iDestruct (cpu_own_transport CIDd3 CIDh6 0%nat eb (proc_addr j) b
                        ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
           iApply (IU.wp_iupdate_link γs j γl γu γd γk pd pav pu bn γ γfs γi
@@ -8894,7 +8894,7 @@ Section ProofCreateMain.
                                ty major minor mmt)
             by exact (cr_regs3_cs m sp0 (ientry kd) (mword_of_int 0 : mword 64)
                         (ientry kslot) ty major minor V4 mmt Hcsmt HV4regs).
-          iDestruct (cr_bs3 bn with "[Hbs1 Hbs2]") as "Hbsl";
+          iDestruct (cr_bs3 with "[Hbs1 Hbs2]") as "Hbsl";
             [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
           (* THE CHILD'S DEFERRED RE-PARK COMPLETES: the [".."] record's
              ticket is the [ilinkd dind] the flush above has just minted

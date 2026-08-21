@@ -40,10 +40,10 @@
      d = true  -- log ABSORPTION: the block is already in lh.block[] (its
                   dirty payload carries the earlier bpin's reference), so no
                   bpin runs at all.
-   NEITHER PATH COSTS THE CALLER A SLOT UNIT: [bslot bn] goes in and comes
+   NEITHER PATH COSTS THE CALLER A SLOT UNIT: [bslot] goes in and comes
    back out, unconditionally.  On the absorb path it is simply never spent;
    on the append path [bpin] absorbs it and the n++ releases one unit of the
-   POOL parked in [log_batch] ([bslots bn ((LOGBLOCKS - n) + 2)]) to replace
+   POOL parked in [log_batch] ([bslots ((LOGBLOCKS - n) + 2)]) to replace
    it -- pool + n is invariant, and install_trans's bunpins refill it.  A
    conditional refund would poison every caller proof, which is exactly the
    argument the design doc's decision record makes about the budget unit.
@@ -88,7 +88,7 @@ Local Open Scope Z_scope.
    10).  acquire/release directly want only 10. *)
 Notation K_log_write := (18%nat) (only parsing).
 Definition wp_log_write_gen_body
-    `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (bn : bio_names)
     (γ : log_names) (γfs : fs_names) (γd : disk_names)
     (cov : gset Z) (logstart : Z) (dev : mword 32)
@@ -135,7 +135,7 @@ Definition wp_log_write_gen_body
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   log_ctx γ bn γfs cov logstart dev -∗
   (* the slot unit backing the (possible) bpin *)
-  bslot bn -∗
+  bslot -∗
   (* THE RESERVATION.  A unit must be IN HAND either way -- that is what
      bounds lh.n below LOGBLOCKS and so keeps the header's next slot
      writable ([nl <= 29]); a caller with an exhausted budget has no
@@ -165,7 +165,7 @@ Definition wp_log_write_gen_body
     (* the handle re-indexed at those bytes and now DIRTY: brelse-able *)
     bio_locked bn (fs_view γfs γd dev cov) k pidv dev bno bs bsd true -∗
     (* the slot unit comes back UNCONDITIONALLY -- see the header note *)
-    bslot bn -∗
+    bslot -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -197,7 +197,7 @@ Definition wp_log_write_gen_body
    that is [wp_log_write_gen] below, derived, so no existing caller
    moves. *)
 Definition wp_log_write_au_body
-    `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (bn : bio_names)
     (γ : log_names) (γfs : fs_names) (γd : disk_names)
     (cov : gset Z) (logstart : Z) (dev : mword 32)
@@ -225,7 +225,7 @@ Definition wp_log_write_au_body
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   log_ctx γ bn γfs cov logstart dev -∗
   (* the slot unit backing the (possible) bpin *)
-  bslot bn -∗
+  bslot -∗
   (* THE CALLER'S EPOCH ANCHOR (fs-log.md §G.17, blocker 4).  Persistent and
      free at [vlb := 0], so it costs a caller that wants no receipt nothing;
      what it buys is the one comparison the whole group-absorption design
@@ -303,7 +303,7 @@ Definition wp_log_write_au_body
     (* the handle re-indexed at the written bytes and now DIRTY *)
     bio_locked bn (fs_view γfs γd dev cov) k pidv dev bno bs bsd true -∗
     (* the slot unit comes back UNCONDITIONALLY *)
-    bslot bn -∗
+    bslot -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -315,7 +315,7 @@ Definition wp_log_write_au_body
    [LogInv.log_epoch_lb_0] mints it for free, and drop both inputs on the
    way back in.  One line at each site, so the atomic-update premise can
    carry the writer's anchor without any of them moving. *)
-Lemma lw_au_lb0 `{!riscvGS Σ, !xv6G Σ}
+Lemma lw_au_lb0 `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}
     (γ : log_names) (γfs : fs_names) (bno : Z) (Efs : coPset)
     (bs bsl : list (bv 8)) (Φfsb : iProp Σ) (e0 : nat) :
   (|={⊤, Efs}=> ∃ bsl' : list (bv 8),
@@ -358,7 +358,7 @@ Qed.
    applies [LogInv.log_opSe_opS] and is [wp_log_write_gen] again -- which is
    how that contract is derived, so no landed caller moves. *)
 Definition wp_log_write_gene_body
-    `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (bn : bio_names)
     (γ : log_names) (γfs : fs_names) (γd : disk_names)
     (cov : gset Z) (logstart : Z) (dev : mword 32)
@@ -385,7 +385,7 @@ Definition wp_log_write_gene_body
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   log_ctx γ bn γfs cov logstart dev -∗
   (* the slot unit backing the (possible) bpin *)
-  bslot bn -∗
+  bslot -∗
   (* THE CREDIT, AS A RESOURCE (fs-log.md §G.19): either this op logged the
      block itself ([uint bno ∈ Sb], which [LogInv.log_credit_own] builds from
      the pure claim every counted caller already has) or SOMEBODY did, this
@@ -412,12 +412,12 @@ Definition wp_log_write_gene_body
     (* the handle re-indexed at those bytes and now DIRTY: brelse-able *)
     bio_locked bn (fs_view γfs γd dev cov) k pidv dev bno bs bsd true -∗
     (* the slot unit comes back UNCONDITIONALLY *)
-    bslot bn -∗
+    bslot -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
 Definition wp_log_write_sconf_body
-    `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (bn : bio_names)
     (γ : log_names) (γfs : fs_names) (γd : disk_names)
     (cov : gset Z) (logstart : Z) (dev : mword 32)
@@ -451,7 +451,7 @@ Definition wp_log_write_sconf_body
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   log_ctx γ bn γfs cov logstart dev -∗
   (* the slot unit backing the (possible) bpin *)
-  bslot bn -∗
+  bslot -∗
   (* one unit of this operation's reservation, spent unconditionally *)
   log_op γ (S u) -∗
   (* the caller's own view of the block, at its OLD content *)
@@ -473,7 +473,7 @@ Definition wp_log_write_sconf_body
     (* the handle re-indexed at those bytes and now DIRTY: brelse-able *)
     bio_locked bn (fs_view γfs γd dev cov) k pidv dev bno bs bsd true -∗
     (* the slot unit comes back UNCONDITIONALLY -- see the header note *)
-    bslot bn -∗
+    bslot -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -483,7 +483,7 @@ Module Type LOG_WRITE.
      [wp_log_write_sconf] forgets the credit set on top of that; both are
      kept as their own parameters so no existing caller moves. *)
   Parameter wp_log_write_au :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (bn : bio_names)
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} (bn : bio_names)
       (γ : log_names) (γfs : fs_names) (γd : disk_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (k : nat) (pidv bno : mword 32)
@@ -499,7 +499,7 @@ Module Type LOG_WRITE.
      atomic-update one at a held [fsblock] and the trivial anchor, and it is
      [wp_log_write_gen] that is derived from THIS, by closing the epoch. *)
   Parameter wp_log_write_gene :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (bn : bio_names)
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} (bn : bio_names)
       (γ : log_names) (γfs : fs_names) (γd : disk_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (k : nat) (pidv bno : mword 32)
@@ -515,7 +515,7 @@ Module Type LOG_WRITE.
      parameter so that every existing caller -- which threads [log_op] and
      neither knows nor cares which blocks this op has logged -- is unchanged. *)
   Parameter wp_log_write_gen :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (bn : bio_names)
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} (bn : bio_names)
       (γ : log_names) (γfs : fs_names) (γd : disk_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (k : nat) (pidv bno : mword 32)
@@ -527,7 +527,7 @@ Module Type LOG_WRITE.
                             bs bsl bsd d u cr Sb m n eb p K b lks.
 
   Parameter wp_log_write_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (bn : bio_names)
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} (bn : bio_names)
       (γ : log_names) (γfs : fs_names) (γd : disk_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (k : nat) (pidv bno : mword 32)

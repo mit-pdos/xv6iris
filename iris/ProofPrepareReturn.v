@@ -89,7 +89,7 @@ Proof. vm_compute. reflexivity. Qed.
 Module PrepareReturnProof (Myproc : MYPROC) : PREPARE_RETURN.
 
 Section ProofPrepareReturn.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Ltac reg_neq :=

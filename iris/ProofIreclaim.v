@@ -196,7 +196,7 @@ Definition irc_thr8 (m M : regfile) : Prop :=
 (*  Vocabulary: the frame, the continuation, the loop wand.               *)
 (* ===================================================================== *)
 Section IreclaimDefs.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
   (* ireclaim's 64-byte frame: ra@56 s0@48 s1@40 s2@32 s3@24 s4@16 s5@8 s6@0 *)
@@ -233,7 +233,7 @@ Section IreclaimDefs.
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         proc_priv_bare (proc_addr j) pidv Vpr -∗
-        bslots bn 3 -∗
+        bslots 3 -∗
         iref_slot -∗
         ireg_boot -∗
         WP (Loop : expr riscv_lang))%I.
@@ -267,7 +267,7 @@ Section IreclaimDefs.
        sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
        sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
        sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-       bslots bn 3 -∗
+       bslots 3 -∗
        iref_slot -∗
        bitmap_inv γfs bmapstart cov logstart size -∗
        ireg_boot -∗
@@ -294,7 +294,7 @@ End IreclaimDefs.
 (*  +0xb2 .. +0xc4 : THE ONLY EXIT.  restore all eight, pop, return.      *)
 (* ===================================================================== *)
 Section IreclaimEpilogue.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
   Local Lemma irc_epilogue `{GEN : GenId} `{CID0 : CpuId}
@@ -316,7 +316,7 @@ Section IreclaimEpilogue.
     sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-    bslots bn 3 -∗
+    bslots 3 -∗
     iref_slot -∗
     ireg_boot -∗
     irc_cont (CID0 := CID0) γfs bn cov logstart bmapstart inodestart ninodes size
@@ -673,7 +673,7 @@ End IreclaimEpilogue.
 (*  itself being inside it.                                               *)
 (* ===================================================================== *)
 Section IreclaimStep.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
   Local Lemma irc_step `{GEN : GenId} `{CID0 : CpuId}
@@ -703,7 +703,7 @@ Section IreclaimStep.
     sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-    bslots bn 3 -∗
+    bslots 3 -∗
     iref_slot -∗
     bitmap_inv γfs bmapstart cov logstart size -∗
     ireg_boot -∗
@@ -923,7 +923,7 @@ End IreclaimStep.
 (*  anything about it.                                                    *)
 (* ===================================================================== *)
 Section IreclaimOrphan.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
   Local Lemma irc_orphan `{GEN : GenId} `{CID0 : CpuId}
@@ -1003,7 +1003,7 @@ Section IreclaimOrphan.
     sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-    bslots bn 2 -∗
+    bslots 2 -∗
     iref_slot -∗
     bitmap_inv γfs bmapstart cov logstart size -∗
     ireg_boot -∗
@@ -1501,7 +1501,7 @@ Section IreclaimOrphan.
                     = mword_of_int (KernelSyms.ireclaim + 0x50))
       by (rewrite HO9ra; pcw).
     iEval (rewrite Hpc50) in "Hpc".
-    iDestruct (iu_slots_join bn 2 1 with "Hsl Hsl1") as "Hsl".
+    iDestruct (iu_slots_join 2 1 with "Hsl Hsl1") as "Hsl".
     pose proof Hcsr as Hcsr_cs.
     assert (HmRs1 : mR !!! Regidx Rs1 = (sign_extend' 64 inum : mword 64))
       by (rewrite (callee_saved_lookup Hcsr_cs Rs1 ltac:(vm_compute; reflexivity));
@@ -1685,7 +1685,7 @@ Section IreclaimOrphan.
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iDestruct (wp_next_shift (b := true) (CIDa := CID14) (CIDb := CID17) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    iDestruct (iu_slots_split bn 2 1 with "Hsl") as "[Hsl Hsl1]".
+    iDestruct (iu_slots_split 2 1 with "Hsl") as "[Hsl Hsl1]".
     (* SpecIlock v4 names the share's GENERATION (design 17.3 (A)) *)
     iEval (rewrite inode_shr_gen_intro) in "Hshr".
     iDestruct "Hshr" as (gsh) "Hshr".
@@ -1707,7 +1707,7 @@ Section IreclaimOrphan.
                     = mword_of_int (KernelSyms.ireclaim + 0x5e))
       by (rewrite HOCra; pcw).
     iEval (rewrite Hpc5e) in "Hpc".
-    iDestruct (iu_slots_join bn 2 1 with "Hsl Hsl1") as "Hsl".
+    iDestruct (iu_slots_join 2 1 with "Hsl Hsl1") as "Hsl".
     pose proof Hcsil as Hcsil_cs.
     assert (HmLs1 : mL !!! Regidx Rs1 = (sign_extend' 64 inum : mword 64))
       by (rewrite (callee_saved_lookup Hcsil_cs Rs1 ltac:(vm_compute; reflexivity));
@@ -2058,7 +2058,7 @@ End IreclaimOrphan.
 (*  zero type at +0xa2 and a nonzero nlink at +0xa8.                      *)
 (* ===================================================================== *)
 Section IreclaimRelease.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
   Local Lemma irc_release `{GEN : GenId} `{CID0 : CpuId}
@@ -2097,7 +2097,7 @@ Section IreclaimRelease.
     sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-    bslots bn 2 -∗
+    bslots 2 -∗
     iref_slot -∗
     bitmap_inv γfs bmapstart cov logstart size -∗
     ireg_boot -∗
@@ -2191,7 +2191,7 @@ Section IreclaimRelease.
                     = mword_of_int (KernelSyms.ireclaim + 0xb0))
       by (rewrite HV2ra; pcw).
     iEval (rewrite Hppb0) in "Hpc".
-    iDestruct (iu_slots_join bn 2 1 with "Hsl Hsl1") as "Hsl".
+    iDestruct (iu_slots_join 2 1 with "Hsl Hsl1") as "Hsl".
     pose proof Hcsr as Hcsr_cs.
     assert (HmRs1 : mR !!! Regidx Rs1 = (sign_extend' 64 inum : mword 64))
       by (rewrite (callee_saved_lookup Hcsr_cs Rs1 ltac:(vm_compute; reflexivity));
@@ -2252,7 +2252,7 @@ End IreclaimRelease.
 (*  resources over at the hart they were produced at.                     *)
 (* ===================================================================== *)
 Section IreclaimScan.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
   Local Lemma irc_scan `{GEN : GenId}
@@ -2565,7 +2565,7 @@ Section IreclaimScan.
                    ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
       iDestruct (wp_next_shift (b := true) (CIDa := CIDn) (CIDb := CID6) ltac:(wp_next_chain)
                    with "Hcont") as "Hcont".
-      iDestruct (iu_slots_split bn 2 1 with "Hsl") as "[Hsl Hsl1]".
+      iDestruct (iu_slots_split 2 1 with "Hsl") as "[Hsl Hsl1]".
       iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
                 (fs_view γfs γd dev cov) pidv dev bno dq
                 W6 (K - 8)%nat eb b lks Vpr
@@ -3052,7 +3052,7 @@ End IreclaimScan.
 (*  skipping the step block, which is why [irc_scan] is stated there.      *)
 (* ===================================================================== *)
 Section IreclaimMain.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
   Lemma wp_ireclaim_sconf `{GEN : GenId} `{CID : CpuId}

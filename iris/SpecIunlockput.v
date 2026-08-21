@@ -114,7 +114,7 @@ Local Open Scope Z_scope.
    tightest is ProofCreate/ProofSysUnlink at K - 10 / K - 30, i.e. 114). *)
 Notation K_iunlockput := (78%nat) (only parsing).
 Definition wp_iunlockput_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
     (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock  *)
@@ -221,7 +221,7 @@ Definition wp_iunlockput_sconf_body
   dev_inv gu gd -∗
   disk_geom gd pd pav pu -∗
   is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
-  bslots bn 3 -∗
+  bslots 3 -∗
   log_op g n -∗
   (* THE CROSSING IS THE LITERAL [true]: iunlockput parks (through iput,
      down to sleep), so it can return on another hart whatever SIE was
@@ -237,7 +237,7 @@ Definition wp_iunlockput_sconf_body
       proc_priv_bare pj pidv Vpr -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-      bslots bn 3 -∗
+      bslots 3 -∗
       ⌜((n - iput_units)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
       log_op g n' -∗
       iref_slot -∗
@@ -254,7 +254,7 @@ Definition wp_iunlockput_sconf_body
 (*  [n' = n] -- the FAIL arm's freeing [iunlockput] spends nothing.        *)
 (* ===================================================================== *)
 Definition wp_iunlockput_gen_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
     (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock  *)
@@ -364,7 +364,7 @@ Definition wp_iunlockput_gen_body
   dev_inv gu gd -∗
   disk_geom gd pd pav pu -∗
   is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
-  bslots bn 3 -∗
+  bslots 3 -∗
   (* THE GROUP CREDIT, threaded verbatim to iput (SpecIput.v's [crz]):
      [emp] at [crz = false], the walker's [nlz_obs] plus the region's two
      ambient ties at [crz = true]. *)
@@ -387,7 +387,7 @@ Definition wp_iunlockput_gen_body
       proc_priv_bare pj pidv Vpr -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-      bslots bn 3 -∗
+      bslots 3 -∗
       ⌜Sb ⊆ Sb'⌝ -∗
       (* THE PAID-BITMAP REPORT (G-4c): [w] is "this call spent the bitmap
          unit", and it comes with the membership that makes a walker's next
@@ -405,7 +405,7 @@ Definition wp_iunlockput_gen_body
 
 Module Type IUNLOCKPUT.
   Parameter wp_iunlockput_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
@@ -428,7 +428,7 @@ Module Type IUNLOCKPUT.
      [crb := cru := crz := false], derived at the [log_op] existential's own
      witness and at the birth epoch [LogInv.log_opS_named] opens. *)
   Parameter wp_iunlockput_gen :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)

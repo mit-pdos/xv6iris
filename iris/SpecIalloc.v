@@ -177,7 +177,7 @@ Lemma ialloc_fresh_wf (ty : mword 16) : dinode_wf (ialloc_fresh ty).
 Proof. rewrite /dinode_wf /ialloc_fresh /=. reflexivity. Qed.
 
 Definition wp_ialloc_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
       ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
@@ -265,7 +265,7 @@ Definition wp_ialloc_sconf_body
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
   (* TWO slot units: bread's reference is held across log_write, which wants
      one of its own; brelse gives it back *)
-  bslots bn 2 -∗
+  bslots 2 -∗
   (* ---- THE ICACHE, exactly as iget takes it ---- *)
   is_itable2 gtl cn γfs γi cov logstart nib dev -∗
   itable_inv -∗
@@ -292,7 +292,7 @@ Definition wp_ialloc_sconf_body
       sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       proc_priv_bare pj pidv Vpr -∗
-      bslots bn 2 -∗
+      bslots 2 -∗
       (if alloc
        then (* SUCCESS: iget's postcondition verbatim, at the claimed inum *)
          ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = ientry kslot
@@ -355,7 +355,7 @@ Definition wp_ialloc_sconf_body
    MEMBERSHIP afterwards, to credit its own [iupdate(ip)] and the iupdate
    inside every [dirlink] on [ip].                                        *)
 Definition wp_ialloc_gen_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
       ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
@@ -443,7 +443,7 @@ Definition wp_ialloc_gen_body
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
   (* TWO slot units: bread's reference is held across log_write, which wants
      one of its own; brelse gives it back *)
-  bslots bn 2 -∗
+  bslots 2 -∗
   (* ---- THE ICACHE, exactly as iget takes it ---- *)
   is_itable2 gtl cn γfs γi cov logstart nib dev -∗
   itable_inv -∗
@@ -474,7 +474,7 @@ Definition wp_ialloc_gen_body
       sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       proc_priv_bare pj pidv Vpr -∗
-      bslots bn 2 -∗
+      bslots 2 -∗
       (if alloc
        then (* SUCCESS: iget's postcondition verbatim, at the claimed inum *)
          ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = ientry kslot
@@ -505,7 +505,7 @@ Module Type IALLOC.
      it inside [ProofIalloc], so this is a strengthening and no consumer of
      the sconf form moves. *)
   Parameter wp_ialloc_gen :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
              ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
@@ -525,7 +525,7 @@ Module Type IALLOC.
                          pidv dq dqs dqn m K eb b lks Vpr.
 
   Parameter wp_ialloc_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
              ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)

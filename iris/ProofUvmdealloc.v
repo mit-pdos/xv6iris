@@ -82,7 +82,7 @@ Import Defs.
 Module UvmdeallocProof (Uvmunmap : UVMUNMAP) : UVMDEALLOC.
 
 Section ProofUvmdealloc.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).

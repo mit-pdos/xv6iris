@@ -299,7 +299,7 @@ Local Ltac regne := reg_ne_side.
 (*  move the hart forwards it as the IDENTITY.                            *)
 (* ===================================================================== *)
 Section BreadDefs.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   Definition bd_cont `{GEN : GenId} `{CID0 : CpuId}
       (j : nat) (bn : bio_names) (V : bio_view Σ)
@@ -372,7 +372,7 @@ End BreadDefs.
 (*  applied at the hart it actually starts on.                            *)
 (* ===================================================================== *)
 Section BreadBlocks.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   (* ================================================================== *)
   (*  THE EPILOGUE (0xb8 .. 0xc6), reached from both arms of the tail.   *)
@@ -1029,7 +1029,7 @@ Section BreadBlocks.
     cpu_claim_ext eb (proc_addr j) -∗
     locked (bn_lk bn) cpu_id -∗
     bcache_scan bn V Mg ord devs bnos -∗
-    bslot bn -∗
+    bslot -∗
     procs_inv γs -∗
     proc_priv_bare (proc_addr j) pidv Vpr -∗
     dev_inv γu γd -∗
@@ -1323,7 +1323,7 @@ Section BreadBlocks.
     cpu_claim_ext eb (proc_addr j) -∗
     locked (bn_lk bn) cpu_id -∗
     bcache_scan bn V Mg ord devs bnos -∗
-    bslot bn -∗
+    bslot -∗
     procs_inv γs -∗
     proc_priv_bare (proc_addr j) pidv Vpr -∗
     dev_inv γu γd -∗
@@ -1711,7 +1711,7 @@ Section BreadBlocks.
     cpu_claim_ext eb (proc_addr j) -∗
     locked (bn_lk bn) cpu_id -∗
     bcache_scan bn V Mg ord devs bnos -∗
-    bslot bn -∗
+    bslot -∗
     procs_inv γs -∗
     proc_priv_bare (proc_addr j) pidv Vpr -∗
     dev_inv γu γd -∗
@@ -2010,7 +2010,7 @@ Section BreadBlocks.
     cpu_claim_ext eb (proc_addr j) -∗
     locked (bn_lk bn) cpu_id -∗
     bcache_scan bn V Mg ord devs bnos -∗
-    bslot bn -∗
+    bslot -∗
     procs_inv γs -∗
     proc_priv_bare (proc_addr j) pidv Vpr -∗
     dev_inv γu γd -∗
@@ -2230,7 +2230,7 @@ Section BreadBlocks.
     cpu_claim_ext eb (proc_addr j) -∗
     locked (bn_lk bn) cpu_id -∗
     bcache_scan bn V Mg ord devs bnos -∗
-    bslot bn -∗
+    bslot -∗
     procs_inv γs -∗
     proc_priv_bare (proc_addr j) pidv Vpr -∗
     dev_inv γu γd -∗
@@ -2269,7 +2269,7 @@ Section BreadBlocks.
                cpu_claim_ext eb (proc_addr j) -∗
                locked (bn_lk bn) cpu_id -∗
                bcache_scan bn V Mg ord devs bnos -∗
-               bslot bn -∗
+               bslot -∗
                proc_priv_bare (proc_addr j) pidv Vpr -∗
                bd_cont (CID0 := CID0)  j bn V pidv dev bno dq m K eb (proc_addr j) lks Vpr -∗
                WP (Loop : expr riscv_lang))%I as "HADV".
@@ -2558,7 +2558,7 @@ End BreadBlocks.
 (* ===================================================================== *)
 
 Section ProofBread.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_bread_sconf

@@ -250,7 +250,7 @@ Qed.
    by importing DirView.  The premise below is unchanged. *)
 
 Definition wp_dirlookup_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
@@ -370,7 +370,7 @@ Definition wp_dirlookup_sconf_body
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-  bslot bn -∗
+  bslot -∗
   (* ---- THE ICACHE, exactly as iget takes it ---- *)
   is_itable2 gtl cn γfs γi cov logstart nib dev -∗
   itable_inv -∗
@@ -407,7 +407,7 @@ Definition wp_dirlookup_sconf_body
       inode_blocks γfs bm data -∗
       ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1]{dqn} fn i) -∗
       proc_priv_bare pj pidv Vpr -∗
-      bslot bn -∗
+      bslot -∗
       (* ...AND THE BORROW, BACK VERBATIM ON BOTH ARMS *)
       dir_links (bv_unsigned dinum) dn data -∗
       dinode_at γi dinum dr -∗
@@ -440,7 +440,7 @@ Definition wp_dirlookup_sconf_body
 
 Module Type DIRLOOKUP.
   Parameter wp_dirlookup_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
              ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)

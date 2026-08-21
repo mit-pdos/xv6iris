@@ -43,7 +43,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 Definition wp_bpin_sconf_body
-    `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (bn : bio_names) (V : bio_view Σ) (k : nat)
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} (bn : bio_names) (V : bio_view Σ) (k : nat)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64) (K : nat) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.bpin in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
@@ -60,7 +60,7 @@ Definition wp_bpin_sconf_body
   kernel_text -∗ pc_is pcE -∗
   bio_ctx bn V -∗
   (* THE premise that makes the unchecked [refcnt++] safe *)
-  bslot bn -∗
+  bslot -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr,
     sie_cap_gpr KT1 mr K b p -∗
@@ -73,7 +73,7 @@ Definition wp_bpin_sconf_body
 
 Module Type BPIN.
   Parameter wp_bpin_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (bn : bio_names) (V : bio_view Σ) (k : nat)
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} (bn : bio_names) (V : bio_view Σ) (k : nat)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (K : nat) (b : bool) (lks : gset string),
       wp_bpin_sconf_body bn V k m n eb p K b lks.
 End BPIN.

@@ -134,7 +134,7 @@ Module ProcPagetableCore (UV : UVMCREATE) (MP : MAPPAGES)
                          (UF : UVMFREE) (UUF : UVMUNMAP_FIXED) : PROC_PAGETABLE_GEN.
 
 Section ProofProcPagetable.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 
@@ -1315,7 +1315,7 @@ Module ProcPagetableProof (UV : UVMCREATE) (MP : MAPPAGES)
 Module Core := ProcPagetableCore UV MP UF UUF.
 
 Section SealProcPagetable.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_proc_pagetable_sconf (γa : gname) (γk : gname * gname)

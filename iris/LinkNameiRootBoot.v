@@ -40,7 +40,7 @@ Require Import LinkNameiRoot.
 
 Module NameiRootBoot : NAMEI_ROOT_BOOT.
   Lemma wp_namei_root_boot :
-    forall `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (dqp : dfrac)
       (m : regfile) (n K : nat) (eb : bool) (p : mword 64)

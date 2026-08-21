@@ -160,7 +160,7 @@ Local Open Scope Z_scope.
    memset and kalloc and kfree less. *)
 Notation K_sys_exec := (244%nat) (only parsing).
 Section SpecSysExec.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
   (* [GenId], for [ProcInv.proc_priv]'s own index: the private block now
      carries [FirstTok.first_tok], whose boot arm names [gen_cert].  The
@@ -181,7 +181,7 @@ Section SpecSysExec.
 End SpecSysExec.
 
 Definition wp_sys_exec_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (γf : gname) (γa : gname)                           (* ftable, kalloc      *)
@@ -247,7 +247,7 @@ Definition wp_sys_exec_sconf_body
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   bitmap_inv gfs bmapstart cov logstart size -∗
-  bslots bn 3 -∗
+  bslots 3 -∗
   (* the loop's own [kalloc]s, argstr's page faults, and kexec's page-table
      builder all run in the UNCOUNTED regime *)
   kalloc_env γa None -∗
@@ -271,7 +271,7 @@ Definition wp_sys_exec_sconf_body
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       (* the free pool only SHRINKS -- kexec's cone is the only mover *)
-      bslots bn 3 -∗
+      bslots 3 -∗
       kalloc_env γa None -∗
       (* the allowance, whole: kexec gives back what it took *)
       iref_slots 2 -∗
@@ -282,7 +282,7 @@ Definition wp_sys_exec_sconf_body
 
 Module Type SYSEXEC.
   Parameter wp_sys_exec_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γf : gname) (γa : gname)
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)

@@ -149,7 +149,7 @@ Section ProcdumpView.
 
 End ProcdumpView.
 
-Definition wp_procdump_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_procdump_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (γpr : gname) (γd : uart_names) (γv : disk_names)
     (m : regfile) (K : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string) :=
   let ra_idx : mword 5 := mword_of_int 1 in
@@ -183,7 +183,7 @@ Definition wp_procdump_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID 
 
 Module Type PROCDUMP.
   Parameter wp_procdump_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
       (γpr : gname) (γd : uart_names) (γv : disk_names)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string),
       wp_procdump_sconf_body γpr γd γv m K eb p b lks.

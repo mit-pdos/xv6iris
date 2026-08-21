@@ -152,7 +152,7 @@ Definition fs_boot_image_eras (sb : fs_sb) (nib : nat) (cov : gset Z)
 
 Section SystemBoot.
   Context `{!riscvGS Σ, !xv6G Σ}.
-  Context `{!fileGpreS Σ, !fdslotGpreS Σ, !irefslotGpreS Σ, !pavGpreS Σ}.
+  Context `{!fileGpreS Σ, !fdslotGpreS Σ, !irefslotGpreS Σ, !pavGpreS Σ, !bioslotGpreS Σ}.
   Context `{GEN : GenId}.
 
   (* NO [fileG] AND NO [icacheG] BINDER ANY MORE (fs-cfg-boot.md stage
@@ -200,7 +200,7 @@ Section SystemBoot.
     { rewrite /fs_crash_seam. iIntros "!>" (dk).
       rewrite (Hcp dk). iSplitL; iIntros "H"; iExact "H". }
     iMod (boot_shared_alloc g XV6_DISK_BYTES sb nib cov Hbf Himg with "Hres")
-      as (Hfd Hir Hpav HF γd γv)
+      as (Hfd Hir Hpav Hbs HF γd γv)
       "(%Hdimg & #Htext & #Hdata & #Hstarted & #Hdev & #Hwinv &
         #Hcinv & #Hcert & Hharts & Hlk & Hgl & Hmdata & Hpark & Hpst & Hpavail & Huart &
         Hdlab & Hcfg & Hclaim & #Hdone & Hkpt & Hkmap & Hmir & Hpages & Hirauth &
@@ -289,7 +289,7 @@ End SystemBoot.
 
 Theorem xv6_power_adequacy Σ
     `{!xv6G Σ, !riscvGpreS Σ, !fileGpreS Σ, !pavGpreS Σ, !fdslotGpreS Σ,
-      !irefslotGpreS Σ}
+      !irefslotGpreS Σ, !bioslotGpreS Σ}
     (g : gstate) (sb : fs_sb) (nib : nat) (cov : gset Z)
     (* the hypotheses about the machine: it is off, and nothing has ever
        run.  Everything else a boot needs -- RAM total and holding the loaded
@@ -351,7 +351,7 @@ Proof.
      argument for why an equation about [riscv_crash_pred] alone would not
      do (the ghost CLASS instances have to agree too). *)
   destruct Hshape as (Hi & Gg & Gs & Gr & Gt & Gsw & ->).
-  refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ _ _ _ _ gen g' sb nib cov Hbf
+  refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ _ _ _ _ _ gen g' sb nib cov Hbf
             (Himg g' Hbf) _).
   intros dk. reflexivity.
 Qed.
@@ -392,7 +392,7 @@ Qed.
 
 Theorem xv6_fs_adequacy Σ
     `{!xv6G Σ, !riscvGpreS Σ, !fileGpreS Σ, !pavGpreS Σ, !fdslotGpreS Σ,
-      !irefslotGpreS Σ}
+      !irefslotGpreS Σ, !bioslotGpreS Σ}
     (g : gstate) (cov : gset Z)
     (D0 : gmap Z (list (bv 8)))
     (sb : fs_sb) (nib : nat)
@@ -434,7 +434,7 @@ Proof.
      argument for why an equation about [riscv_crash_pred] alone would not
      do (the ghost CLASS instances have to agree too). *)
   destruct Hshape as (Hi & Gg & Gs & Gr & Gt & Gsw & ->).
-  refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ _ _ _ _ gen g' sb nib cov Hbf
+  refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ _ _ _ _ _ gen g' sb nib cov Hbf
             (Himg g' Hbf) _).
   intros dk. reflexivity.
 Qed.

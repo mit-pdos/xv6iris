@@ -140,7 +140,7 @@ Definition uservec_gpr (g : regfile) (vksp vkhart vktr vksat : bv 64) : regfile 
    [usertrap_res] itself needs are for its holder ([Module Type USERVEC]'s
    [wp_uservec_pt], via [Include USERTRAP_RES]) to supply, not for this
    definition to re-demand. *)
-Definition uservec_post `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+Definition uservec_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (URes : uptd -> mword 64 -> iProp Σ)
     (C : ucfg) (pt : uptd) (vksp : mword 64) : iProp Σ :=
   ( ∀ (pt' : uptd) (mf : regfile) (ms' usatp uepc sc' stval' mdv0 : mword 64),
@@ -222,7 +222,7 @@ Global Typeclasses Opaque uservec_post.
 
 (* Same as [uservec_post]: only [riscvGS]/[sieG] -- [usertrap_res] is held
    opaquely through [URes], never opened. *)
-Definition wp_uservec_pt_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_uservec_pt_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (* A FAMILY, not one predicate: uservec calls usertrap, usertrap PARKS
        (SpecUsertrap.v's own [wp_next true pj] crossing), so everything
        after that call -- the residue included -- is a resource AT WHATEVER
@@ -326,7 +326,7 @@ Definition wp_uservec_pt_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : Cp
 Module Type USERVEC.
   Include SpecUsertrap.USERTRAP_RES.
   Parameter wp_uservec_pt :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
       (kroot : mword 44) (j : nat) (vksp : mword 64),
       (* THE BARE RESIDUE, not [usertrap_res] and not even the parked form.

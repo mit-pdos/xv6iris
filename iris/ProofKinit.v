@@ -47,7 +47,7 @@ Import Defs.
 Module KinitProof (Freerange : FREERANGE) (Initlock : INITLOCK) : KINIT.
 
 Section ProofKinit.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 

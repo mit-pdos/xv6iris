@@ -40,8 +40,8 @@
    THE REFUND.  The caller's [bslot] goes in and comes back out
    unconditionally.  On the absorb path it is simply never spent; on the
    append path bpin absorbs it and the [lh.n++] store is where the batch's
-   POOL gives one back -- [bslots bn ((LOGBLOCKS - nl) + 2)] splits as
-   [bslot ∗ bslots bn ((LOGBLOCKS - S nl) + 2)], which is exactly the
+   POOL gives one back -- [bslots ((LOGBLOCKS - nl) + 2)] splits as
+   [bslot ∗ bslots ((LOGBLOCKS - S nl) + 2)], which is exactly the
    pool's invariant re-established at nl+1.  That split needs nl <= 29,
    which is the same fact that kills the "too big a transaction" panic.
 
@@ -303,7 +303,7 @@ Local Ltac regne := reg_ne_side.
 (*  register invariant, the output resources and the two closing wands.   *)
 (* ===================================================================== *)
 Section LogWriteDefs.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
 
   (* [Fb] is THE CALLER'S RECEIPT for the logged view -- opaque here, and
      threaded through every block exactly like [Bud].  The whole-function
@@ -325,7 +325,7 @@ Section LogWriteDefs.
       Bud -∗
       Fb -∗
       bio_locked bn (fs_view γfs γd dev cov) k pidv dev bno bs bsd true -∗
-      bslot bn -∗
+      bslot -∗
       WP (Loop : expr riscv_lang))%I.
 
   (* re-anchor the continuation from the hart a block was entered at to the
@@ -368,7 +368,7 @@ Section LogWriteDefs.
       (pidv bno : mword 32) (bs bsd : list (bv 8)) (Fb Bud : iProp Σ) : iProp Σ :=
     (Bud ∗ Fb ∗
      bio_locked bn (fs_view γfs γd dev cov) k pidv dev bno bs bsd true ∗
-     bslot bn)%I.
+     bslot)%I.
 
   (* ---- the two closing wands, and the two post-store remainders ---- *)
 
@@ -384,7 +384,7 @@ Section LogWriteDefs.
      ([∗ list] j ↦ w ∈ W, lh_block j ↦₄ w) -∗
      b_blockno (bpa k) ↦₄{DfracOwn (1/2)} bno -∗
      lh_n_pa ↦₄ (mword_of_int (Z.of_nat nl) : mword 32) -∗
-     bslot bn ==∗
+     bslot ==∗
      log_res γ bn γfs cov logstart ∗
      lw_res bn γ γfs γd cov dev k pidv bno bs bsd Fb Bud)%I.
 
@@ -422,7 +422,7 @@ Section LogWriteDefs.
       (nl : nat) : iProp Σ :=
     (b_blockno (bpa k) ↦₄{DfracOwn (1/2)} bno -∗
      lh_n_pa ↦₄ (mword_of_int (Z.of_nat nl) : mword 32) -∗
-     bslot bn ==∗
+     bslot ==∗
      log_res γ bn γfs cov logstart ∗
      lw_res bn γ γfs γd cov dev k pidv bno bs bsd Fb Bud)%I.
 
@@ -462,7 +462,7 @@ End LogWriteDefs.
 (*  the hart it actually starts on.                                      *)
 (* ===================================================================== *)
 Section LogWriteBlocks.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
 
   (* ================================================================== *)
   (*  +0xae .. +0xc2 : release(&log.lock), the epilogue and the return.  *)
@@ -773,7 +773,7 @@ Section LogWriteBlocks.
     arm_pay KT1 n eb p -∗
     locked (ln_lk γ) cpu_id -∗
     lw_frame m -∗
-    bslot bn -∗
+    bslot -∗
     b_blockno (bpa k) ↦₄{DfracOwn (1/2)} bno -∗
     lh_n_pa ↦₄ (mword_of_int (Z.of_nat nl) : mword 32) -∗
     lw_closeP γ bn γfs γd cov logstart dev k pidv bno bs bsd Fb Bud nl -∗
@@ -1016,7 +1016,7 @@ Section LogWriteBlocks.
     arm_pay KT1 n eb p -∗
     locked (ln_lk γ) cpu_id -∗
     lw_frame m -∗
-    bslot bn -∗
+    bslot -∗
     b_blockno (bpa k) ↦₄{DfracOwn (1/2)} bno -∗
     lh_block i ↦₄ wold -∗
     lh_n_pa ↦₄ (mword_of_int (Z.of_nat nl) : mword 32) -∗
@@ -1287,7 +1287,7 @@ Section LogWriteBlocks.
     arm_pay KT1 n eb p -∗
     locked (ln_lk γ) cpu_id -∗
     lw_frame m -∗
-    bslot bn -∗
+    bslot -∗
     b_blockno (bpa k) ↦₄{DfracOwn (1/2)} bno -∗
     lh_block nl ↦₄ jk -∗
     lh_n_pa ↦₄ (mword_of_int (Z.of_nat nl) : mword 32) -∗
@@ -1513,7 +1513,7 @@ Section LogWriteBlocks.
     arm_pay KT1 n eb p -∗
     locked (ln_lk γ) cpu_id -∗
     lw_frame m -∗
-    bslot bn -∗
+    bslot -∗
     b_blockno (bpa k) ↦₄{DfracOwn (1/2)} bno -∗
     ([∗ list] j ↦ w ∈ W, lh_block j ↦₄ w) -∗
     (∃ jk : mword 32, lh_block nl ↦₄ jk) -∗
@@ -1751,7 +1751,7 @@ End LogWriteBlocks.
 (* ===================================================================== *)
 
 Section ProofLogWrite.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* THE WHOLE-FUNCTION PROOF, at the most general (atomic-update) contract.

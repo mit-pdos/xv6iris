@@ -34,7 +34,7 @@
    postcondition, and the child's free kernel stack is too
    ([ProcDefs.kstack_free], a conjunct of [proc_dormant], handed back beside
    the [is_kstack] this contract takes).  What has no source is
-   [bslots (un_bn N) 3], the first conjunct of [UsertrapRes.ut_own_nopt];
+   [bslots 3], the first conjunct of [UsertrapRes.ut_own_nopt];
    see [SpecForkretParkPaid.v] for why the fix is a carve at procinit rather
    than a WP step.
 
@@ -104,7 +104,7 @@ Local Open Scope Z_scope.
 Definition forkret_pc : mword 64 := mword_of_int KernelSyms.forkret.
 
 Definition forkret_park_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
     (γs : list gname)
     (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
     (pid : mword 32) (V : pprivate) : Prop :=
@@ -123,7 +123,7 @@ Definition forkret_park_body
 
 Module Type FORKRET_PARK.
   Parameter forkret_park :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname)
       (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
       (pid : mword 32) (V : pprivate),

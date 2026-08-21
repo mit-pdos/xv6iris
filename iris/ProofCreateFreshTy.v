@@ -120,7 +120,7 @@ Definition cr_cs_but_s3 (m mf : regfile) : Prop :=
     mf !!! Regidx c = (m !!! Regidx c : mword 64).
 
 Definition create_fresh_ty_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
       ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)
@@ -223,7 +223,7 @@ Definition create_fresh_ty_body
   sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   proc_priv_bare pj pidv Vpr -∗
-  bslots bn 3 -∗
+  bslots 3 -∗
   iref_slot -∗
   (* THE PARENT'S OWN [dev] CELL: the [lw a0,0(s1)] at +0xa6 reads it, and
      it comes straight back.  It is the only piece of the locked parent the
@@ -240,7 +240,7 @@ Definition create_fresh_ty_body
       sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       proc_priv_bare pj pidv Vpr -∗
-      bslots bn 3 -∗
+      bslots 3 -∗
       i_dev (ientry kd) ↦₄{dqp} dev -∗
       (if alloc
        then
@@ -326,7 +326,7 @@ Proof.
 Qed.
 
 Section CftHelpers.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId}.
 
@@ -343,8 +343,8 @@ Section CftHelpers.
     iDestruct (big_sepL_lookup _ _ k k Hl with "H") as "$".
   Qed.
 
-  Lemma cft_bs3 (bn : bio_names) :
-    (bslots bn 3 : iProp Σ) ⊣⊢ bslot bn ∗ bslots bn 2.
+  Lemma cft_bs3 :
+    (bslots 3 : iProp Σ) ⊣⊢ bslot ∗ bslots 2.
   Proof. rewrite /bslot. change 3%nat with (1 + 2)%nat. apply bslots_op. Qed.
 End CftHelpers.
 
@@ -362,7 +362,7 @@ Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
 Local Ltac nz := vm_compute; discriminate.
 
 Lemma create_fresh_ty :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
              ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
@@ -468,7 +468,7 @@ Proof.
     reflexivity. }
   assert (Hpcac : ret_pc (A3 !!! Regidx Rra : mword 64)
                   = mword_of_int (CK + 0xac)) by (rewrite HA3ra; pcw).
-  iDestruct (cft_bs3 bn with "Hbsl") as "[Hbs1 Hbs2]".
+  iDestruct (cft_bs3 with "Hbsl") as "[Hbs1 Hbs2]".
   iDestruct (cpu_own_transport CID CID3 0%nat eb (proc_addr j) b
                ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
   iApply (Hia CID3 γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr cov logstart
@@ -584,7 +584,7 @@ Proof.
     assert (HMos3 : Mo !!! Regidx Rs3 = ientry kslot).
     { rewrite (callee_saved_lookup Hcso Rs3 Hcss3). exact HB1s3. }
     iEval (rewrite Hpcb4) in "Hpc".
-    iDestruct (cft_bs3 bn with "[Hbs1 Hbs2]") as "Hbsl";
+    iDestruct (cft_bs3 with "[Hbs1 Hbs2]") as "Hbsl";
       [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
     iSpecialize ("Hcont" $! CID8 with "[%]"); [wp_next_chain |].
     iApply ("Hcont" $! Mo true kslot q gsh inum gilc gislc dnc bmc
@@ -633,7 +633,7 @@ Proof.
     iApply bi.later_intro.
     iIntros (CID6 Hq6) "Hcg Hpc".
     iEval (rewrite Htk) in "Hpc".
-    iDestruct (cft_bs3 bn with "[Hbs1 Hbs2]") as "Hbsl";
+    iDestruct (cft_bs3 with "[Hbs1 Hbs2]") as "Hbsl";
       [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
     iDestruct (cpu_own_transport CID4 CID6 0%nat eb (proc_addr j) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".

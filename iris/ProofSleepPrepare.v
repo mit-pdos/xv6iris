@@ -67,7 +67,7 @@ Module SleepPrepareProof (Myproc : MYPROC) (Acquire : ACQUIRE) (Release : RELEAS
   : SLEEP_PREPARE.
 
 Section ProofSleepPrepare.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation spr_ra := (mword_of_int 1 : mword 5).

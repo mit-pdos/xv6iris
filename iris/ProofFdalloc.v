@@ -219,7 +219,7 @@ Proof. exact id. Qed.
 Module FdallocProof (Myproc : MYPROC) : FDALLOC.
 
 Section ProofFdalloc.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Ltac reg_neq :=

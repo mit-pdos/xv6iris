@@ -145,7 +145,7 @@ Local Ltac nz := vm_compute; discriminate.
 Local Ltac namidx := first [ vm_compute; reflexivity | vm_compute; discriminate ].
 
 Section ProofNameiMain.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             ICFG : icfg, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 

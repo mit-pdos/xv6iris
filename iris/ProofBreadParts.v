@@ -46,7 +46,7 @@ Set Printing Depth 40.
 (* ===================================================================== *)
 
 Section BreadEscrowLeaves.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* the escrow, in the raw [inv] shape [iInv] recognizes *)
@@ -98,7 +98,7 @@ Proof. intro Htie. rewrite -Qp.add_assoc Qp.div_2. exact Htie. Qed.
 (* ===================================================================== *)
 
 Section BreadScan.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
 
   (* the one-slot update of the scan's [devs] / [bnos] functions.  Named (not
      an inline [fun j => if decide (j = k) then v else f j]) because the
@@ -236,7 +236,7 @@ Section BreadScan.
 
   Lemma bcache_scan_incr (bn : bio_names) (V : bio_view Σ) M ord devs bnos (k : nat) :
     (k < NBUF)%nat ->
-    bcache_scan bn V M ord devs bnos -∗ bslot bn -∗
+    bcache_scan bn V M ord devs bnos -∗ bslot -∗
     ∃ cw : mword 32,
       brefcnt k ↦₄ cw ∗
       (brefcnt k ↦₄ (incr32 cw) ==∗
@@ -377,7 +377,7 @@ Section BreadScan.
     (* the forward scan's exit tie, at EVERY slot (the negation of the
        code's [b->dev == dev && b->blockno == blockno]) *)
     (forall i, (i < NBUF)%nat -> ¬ (devs i = D /\ bnos i = B)) ->
-    bcache_scan bn V M ord devs bnos -∗ bslot bn -∗
+    bcache_scan bn V M ord devs bnos -∗ bslot -∗
     (* the two pure facts the escrow's blockno store needs, read off the
        scan's own conjuncts: the block really is uncached, and the evicted
        block is claimed by no other slot *)

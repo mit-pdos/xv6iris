@@ -83,7 +83,7 @@ Notation IT := KernelSyms.itrunc.
 (*  The continuation: itrunc's postcondition, as a resource               *)
 (* ===================================================================== *)
 Section ItruncCont.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg}.
 
   Definition it_cont `{GEN : GenId} `{CID0 : CpuId}
       (γ : log_names) (γfs : fs_names) (γi : gname) (bn : bio_names)
@@ -110,7 +110,7 @@ Section ItruncCont.
         inode_map γfs ip bm_empty -∗
         inode_blocks γfs bm_empty (fun _ => replicate BSIZE (bv_0 8)) -∗
         dinode_at γi inum (di_trunc dn) -∗
-        bslots bn 3 -∗
+        bslots 3 -∗
         (* EXACTLY u, AT EXACTLY [Sbf]: iupdate always runs, so the tail
            always spends [it_iu cru] and always logs this inode's block.
            The contract's RANGE is about the bitmap unit, which the tail
@@ -187,7 +187,7 @@ Proof. apply elem_of_union_r, elem_of_singleton_2. reflexivity. Qed.
 (*  budget still owed is iupdate's one unit.                              *)
 (* ===================================================================== *)
 Section ItruncTail.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg}.
 
   Local Lemma it_tail `{GEN : GenId} `{CID0 : CpuId} 
       (γs : list gname) (j : nat) (γl : gname)
@@ -243,7 +243,7 @@ Section ItruncTail.
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-    bslots bn 3 -∗
+    bslots 3 -∗
     (* the tail flush's absorption credit, travelling to iupdate unchanged --
        a RESOURCE at the walk's own birth epoch (fs-log.md §G.20) *)
     log_credit γ cru Sb0 e0 (IBLOCK inum inodestart) -∗
@@ -669,7 +669,7 @@ End ItruncTail.
 (*  Fuel induction over NDIRECT - k, the lw_scan idiom.                    *)
 (* ===================================================================== *)
 Section ItruncDLoop.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg}.
 
   (* what the loop hands on at +0x32, once every direct entry is gone *)
   Definition it_dexit `{GEN : GenId} `{CID0 : CpuId} 
@@ -691,7 +691,7 @@ Section ItruncDLoop.
         proc_priv_bare (proc_addr j) pidv Vpr -∗
         i_dev ip ↦₄{dqd} dev -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-        bslots bn 2 -∗
+        bslots 2 -∗
         it_dir_state γ γfs ip bm data cov logstart bmapstart size bn
                      crb Sb e0 w NDIRECT -∗
         WP (Loop : expr riscv_lang))%I.
@@ -749,7 +749,7 @@ Section ItruncDLoop.
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-    bslots bn 2 -∗
+    bslots 2 -∗
     it_dir_state γ γfs ip bm data cov logstart bmapstart size bn crb Sb e0 w k -∗
     it_dexit (CID0 := CID0) γ γfs bn cov logstart bmapstart size dev
              ip bm data pidv dq dqd dqb jx crb Sb e0 w m K b eb lks Vpr -∗
@@ -1242,7 +1242,7 @@ End ItruncDLoop.
 (*  store, no map, and no [inode_map] traffic at all.                      *)
 (* ===================================================================== *)
 Section ItruncELoop.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg}.
 
   Definition it_eexit `{GEN : GenId} `{CID0 : CpuId} 
       (γ : log_names) (γfs : fs_names) (bn : bio_names) (γd : disk_names)
@@ -1264,7 +1264,7 @@ Section ItruncELoop.
         proc_priv_bare (proc_addr j) pidv Vpr -∗
         i_dev ip ↦₄{dqd} dev -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-        bslots bn 2 -∗
+        bslots 2 -∗
         buf_own (bpa kk) (bm_ind bm) dsk (ind_bytes (bm_ent bm)) -∗
         it_ent_state γ γfs bm data cov logstart bmapstart size
                      crb Sb e0 w NINDIRECT -∗
@@ -1324,7 +1324,7 @@ Section ItruncELoop.
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-    bslots bn 2 -∗
+    bslots 2 -∗
     buf_own (bpa kk) (bm_ind bm) dsk (ind_bytes (bm_ent bm)) -∗
     it_ent_state γ γfs bm data cov logstart bmapstart size crb Sb e0 w q -∗
     it_eexit (CID0 := CID0) γ γfs bn γd cov logstart bmapstart size dev
@@ -1771,7 +1771,7 @@ End ItruncELoop.
 (*  clears the cell, restores s4 and rejoins the tail at +0x38.            *)
 (* ===================================================================== *)
 Section ItruncIArm.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg}.
 
   (* what the arm hands to the tail: the inode names nothing at all *)
   Definition it_armexit `{GEN : GenId} `{CID0 : CpuId}
@@ -1795,7 +1795,7 @@ Section ItruncIArm.
         (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈[KT1] v) -∗
         inode_map γfs ip bm_empty -∗
         inode_blocks γfs bm_empty (fun _ => replicate BSIZE (bv_0 8)) -∗
-        bslots bn 3 -∗
+        bslots 3 -∗
         bm_paidS γ bmapstart crb w Sb e0 -∗
         WP (Loop : expr riscv_lang))%I.
 
@@ -1852,7 +1852,7 @@ Section ItruncIArm.
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     (* the sixth frame slot -- this arm is the only writer *)
     (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈[KT1] v) -∗
-    bslots bn 3 -∗
+    bslots 3 -∗
     inode_map γfs ip (bm_dir_zeroed bm NDIRECT) -∗
     it_ent_res γfs bm data 0 -∗
     bm_paidS γ bmapstart crb w Sb e0 -∗
@@ -2475,7 +2475,7 @@ Section ItruncIArm.
     iDestruct (wp_next_shift (b := true) (CIDa := CID15) (CIDb := CID19)
                  ltac:(wp_next_chain) with "Hexit") as "Hexit".
     iSpecialize ("Hexit" $! CID19 with "[%]"); [wp_next_chain|].
-    iAssert (bslots bn 3) with "[Hsl Hsl1]" as "Hsl3".
+    iAssert (bslots 3) with "[Hsl Hsl1]" as "Hsl3".
     { assert (H3 : (3 = 2 + 1)%nat) by lia.
       rewrite H3 bslots_op. iSplitL "Hsl"; [iExact "Hsl" | iExact "Hsl1"]. }
     iApply ("Hexit" $! D0 with "[%] [%] [%] Hcg Hcnt Hextc Hextm Hpc Hppid Hidev Hsbb
@@ -2492,7 +2492,7 @@ End ItruncIArm.
 (*  and the shared tail.                                                  *)
 (* ===================================================================== *)
 Section ItruncMain.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg}.
 
   (* THE WALK IS THE GEN FORM (GR-2a finding 1).  [log_opS] is an exclusive
      ghost_map element with no auth-monotone shadow, so a counted post hands

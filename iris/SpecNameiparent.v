@@ -83,7 +83,7 @@ Local Open Scope Z_scope.
 (* nameiparent's own frame is 16 bytes (2 slots) over namex's 102. *)
 Notation K_nameiparent := (114%nat) (only parsing).
 Definition wp_nameiparent_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
@@ -182,7 +182,7 @@ Definition wp_nameiparent_sconf_body
      [DfracOwn 1] and see no change. ---- *)
   ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
   ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1] nfun i) -∗
-  bslots bn 3 -∗
+  bslots 3 -∗
   iref_slots 2 -∗
   log_op g n -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP
@@ -205,7 +205,7 @@ Definition wp_nameiparent_sconf_body
       inode_held (pv_cwd Vpr) -∗
       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
       ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1] nf i) -∗
-      bslots bn 3 -∗
+      bslots 3 -∗
       ⌜((n - (L + 1) * iput_units)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
       log_op g n' -∗
       (if ok
@@ -226,7 +226,7 @@ Definition wp_nameiparent_sconf_body
 (*  verbatim and it takes no credit of its own.                           *)
 (* ===================================================================== *)
 Definition wp_nameiparent_gen_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
@@ -316,7 +316,7 @@ Definition wp_nameiparent_gen_body
   inode_held (pv_cwd Vpr) -∗
   ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
   ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1] nfun i) -∗
-  bslots bn 3 -∗
+  bslots 3 -∗
   iref_slots 2 -∗
   log_opS g n Sb -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP
@@ -339,7 +339,7 @@ Definition wp_nameiparent_gen_body
       inode_held (pv_cwd Vpr) -∗
       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
       ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1] nf i) -∗
-      bslots bn 3 -∗
+      bslots 3 -∗
       (* the set only GROWS; namex takes no credit and neither does
          this wrapper, so the counter clause is untouched *)
       ⌜Sb ⊆ Sb'⌝ -∗
@@ -368,7 +368,7 @@ Definition wp_nameiparent_gen_body
 
 Module Type NAMEIPARENT.
   Parameter wp_nameiparent_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
              ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
@@ -392,7 +392,7 @@ Module Type NAMEIPARENT.
   (* the set-form contract; the counted one is this at the [log_op]
      existential's own witness. *)
   Parameter wp_nameiparent_gen :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
              ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)

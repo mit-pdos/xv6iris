@@ -134,7 +134,7 @@ Definition uu_thr1 (mm m : regfile) : Prop :=
 Module UvmunmapCore (WalkNoalloc : WALK_NOALLOC) (Kfree : KFREE).
 
 Section ProofUvmunmap.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -1869,7 +1869,7 @@ Module UvmunmapProof (WalkNoalloc : WALK_NOALLOC) (Kfree : KFREE) : UVMUNMAP.
 Module Core := UvmunmapCore WalkNoalloc Kfree.
 
 Section SealUvmunmap.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ------------------------------------------------------------------ *)
@@ -2169,7 +2169,7 @@ Module UvmunmapBareProof (WalkNoalloc : WALK_NOALLOC) (Kfree : KFREE)
 Module Core := UvmunmapCore WalkNoalloc Kfree.
 
 Section SealUvmunmapBare.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* [bare_pt] IS the [∅] instance, definitionally -- there is nothing
@@ -2226,7 +2226,7 @@ Module UvmunmapFixedProof (WalkNoalloc : WALK_NOALLOC) (Kfree : KFREE)
 Module Core := UvmunmapCore WalkNoalloc Kfree.
 
 Section SealUvmunmapFixed.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_uvmunmap_fixed_sconf

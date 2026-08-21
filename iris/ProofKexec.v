@@ -159,7 +159,7 @@ Module PD := ProofKexecD.KexecDProof PFP SS.
 (*  statement (projects/kexec.md's note at [kxc_c_exit_m1]).               *)
 (* ===================================================================== *)
 Section KexecTail.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -231,7 +231,7 @@ Section KexecTail.
           ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
           ([∗ list] i ∈ seq 0 na,
              [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
-          bslots bn 3 -∗
+          bslots 3 -∗
           iref_slots 2 -∗
           WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -307,7 +307,7 @@ Section KexecTail.
           ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
           ([∗ list] i ∈ seq 0 na,
              [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
-          bslots bn 3 -∗
+          bslots 3 -∗
           iref_slots 2 -∗
           WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -395,7 +395,7 @@ End KexecTail.
 (*  THE CONTRACT.                                                         *)
 (* ===================================================================== *)
 Section KexecMain.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).

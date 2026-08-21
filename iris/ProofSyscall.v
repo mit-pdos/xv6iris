@@ -549,7 +549,7 @@ Record sysc_ties `{ICFG : icfg} `{FSC : fscfg}
 }.
 
 Section SyscallVocab.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
@@ -622,7 +622,7 @@ Section SyscallVocab.
      the Section's variables would be fixed at the Section's [Σ], and
      [syscall_env] -- which binds its own -- could not then mention it. *)
   Definition sysc_fs_env
-      `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+      `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
         !irefslotG Σ, !pavG Σ} `{GEN : GenId}
       (pj : mword 64) (bn : bio_names) (fn : fclose_names) : iProp Σ :=
     (⌜sysc_ties pj bn fn⌝ ∗
@@ -946,7 +946,7 @@ Section SyscallVocab.
      come out of [fs_ready], where there is exactly one of each, and
      [syscall_env_all] hands them to the arms in the old shape. *)
   Definition sysc_proc_env
-      `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+      `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
         !irefslotG Σ, !pavG Σ} `{GEN : GenId}
       (γf : gname) : iProp Σ :=
     (∃ (γp γw γft γtk : gname),
@@ -957,7 +957,7 @@ Section SyscallVocab.
        is_tickslock γtk)%I.
 
   Definition syscall_env
-      `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+      `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
         !irefslotG Σ, !pavG Σ} `{GEN : GenId}
       (γf : gname) (pj : mword 64) (bn : bio_names) (fn : fclose_names)
       : iProp Σ :=
@@ -1522,7 +1522,7 @@ Section SyscallVocab.
         and between them what most table entries need beyond [proc_priv] *)
      procs_inv γs ∗
      syscall_env γf pj bn fn ∗
-     bslots bn 3 ∗
+     bslots 3 ∗
      (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip ∗
      fd_slots FDSPARE ∗
      iref_slots IREFSPARE ∗
@@ -1543,7 +1543,7 @@ Section SyscallVocab.
     kernel_text -∗
     procs_inv γs -∗
     syscall_env γf pj bn fn -∗
-    bslots bn 3 -∗
+    bslots 3 -∗
     (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
     fd_slots FDSPARE -∗
     iref_slots IREFSPARE -∗
@@ -1579,7 +1579,7 @@ Section SyscallVocab.
         ⌜ ud_tfp (pv_upt V') = ud_tfp (pv_upt V) ⌝ -∗
         sie_cap_gpr KT1 mf av true pj -∗
         cpu_own 0%nat true pj true lks -∗
-        bslots bn 3 -∗
+        bslots 3 -∗
         (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
         fd_slots FDSPARE -∗
         iref_slots IREFSPARE -∗
@@ -1722,7 +1722,7 @@ Section SyscallVocab.
     word_pointsto (KTR := KT1) (pa_stk (m !!! Regidx csp_rs1) 2) (DfracOwn 1) (m !!! Regidx Rs0) -∗
     word_pointsto (KTR := KT1) (pa_stk (m !!! Regidx csp_rs1) 3) (DfracOwn 1) (m !!! Regidx Rs1) -∗
     word_pointsto (KTR := KT1) (pa_stk (m !!! Regidx csp_rs1) 4) (DfracOwn 1) (m !!! Regidx Rs2) -∗
-    bslots bn 3 -∗
+    bslots 3 -∗
     (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
     fd_slots FDSPARE -∗ iref_slots IREFSPARE -∗
     syscall_env γf pj bn fn -∗ proc_priv γf pj pid V' -∗
@@ -2044,13 +2044,13 @@ Section SyscallVocab.
      ask for ONE ([filestat]'s and [fileread]'s bundles each carry a single
      [bslot], because ilock's bread takes it and brelse gives it back) take
      it out of the three and put it back. *)
-  Lemma sysc_bslot_split (bn : bio_names) : bslots bn 3 -∗ bslot bn ∗ bslots bn 2.
+  Lemma sysc_bslot_split : bslots 3 -∗ bslot ∗ bslots 2.
   Proof.
     assert (H3 : 3%nat = (1 + 2)%nat) by lia.
     rewrite /bslot H3 bslots_op. iIntros "$".
   Qed.
 
-  Lemma sysc_bslot_join (bn : bio_names) : bslot bn -∗ bslots bn 2 -∗ bslots bn 3.
+  Lemma sysc_bslot_join : bslot -∗ bslots 2 -∗ bslots 3.
   Proof.
     assert (H3 : 3%nat = (1 + 2)%nat) by lia.
     rewrite /bslot H3 bslots_op. iIntros "H1 H2". iFrame "H1 H2".
@@ -2104,9 +2104,9 @@ Section SyscallVocab.
 
   Lemma sysc_fileread_env (γf : gname) (γc : gname) (pj : mword 64)
       (bn : bio_names) (fn : fclose_names) :
-    sysc_fs_env pj bn fn -∗ bslot bn -∗
+    sysc_fs_env pj bn fn -∗ bslot -∗
     SpecFileread.fileread_fs_env γf (sysc_fread_names γc bn fn) ∗
-    (SpecFileread.fileread_fs_out (sysc_fread_names γc bn fn) -∗ bslot bn).
+    (SpecFileread.fileread_fs_out (sysc_fread_names γc bn fn) -∗ bslot).
   Proof.
     iIntros "#Hfs Hsl".
     iDestruct (sysc_fs_env_all with "Hfs") as
@@ -2145,9 +2145,9 @@ Section SyscallVocab.
 
   Lemma sysc_filestat_env (pj : mword 64) (bn : bio_names) (fn : fclose_names)
       :
-    sysc_fs_env pj bn fn -∗ bslot bn -∗
+    sysc_fs_env pj bn fn -∗ bslot -∗
     SpecFilestat.filestat_fs_env (sysc_fstat_names bn fn) ∗
-    (SpecFilestat.filestat_fs_out (sysc_fstat_names bn fn) -∗ bslot bn).
+    (SpecFilestat.filestat_fs_out (sysc_fstat_names bn fn) -∗ bslot).
   Proof.
     iIntros "#Hfs Hsl".
     iDestruct (sysc_fs_env_all with "Hfs") as
@@ -2222,13 +2222,15 @@ Section SyscallVocab.
      [fs_ready] itself, and the slots. *)
   Lemma sysc_fclose_fs_env (pj : mword 64) (bn : bio_names) (fn : fclose_names)
       (eb : bool) :
-    sysc_fs_env pj bn fn -∗ bslots bn 3 -∗
+    sysc_fs_env pj bn fn -∗ bslots 3 -∗
     fileclose_fs_env_nopid fn 0%nat eb pj.
   Proof.
     iIntros "#Hfs Hbs".
     iDestruct (sysc_fs_env_ties with "Hfs") as "%T".
     iDestruct "Hfs" as "(_ & #Hpi & _ & _ & #Hrdy)".
-    rewrite -(sct_bio _ _ _ T).
+    (* the [fcn_bio] tie has nothing left to rewrite: the slot supply is at
+       the canonical ghost name, so [bslots] does not mention the bio record
+       and this goal never names [bn]. *)
     rewrite /fileclose_fs_env_nopid.
     iSplit; [ iPureIntro; reflexivity |].
     iSplit; [ iPureIntro; exact (sct_pj _ _ _ T) |].
@@ -2283,7 +2285,7 @@ Section SyscallVocab.
       (γlp : gname) (pj : mword 64)
       (bn : bio_names) (fn : fclose_names) :
     kernel_data -∗ is_txlock γl (fcn_uart fn) -∗
-    sysc_fs_env pj bn fn -∗ bslots bn 3 -∗
+    sysc_fs_env pj bn fn -∗ bslots 3 -∗
     SpecFilewrite.filewrite_fs_env γf (sysc_fwrite_names fsc_printk γl γs j γlp bn fn).
   Proof.
     iIntros "#Hkd #Htx #Hfs Hbs".
@@ -2335,9 +2337,11 @@ Section SyscallVocab.
   Lemma sysc_fclose_fs_out (bn : bio_names) (fn : fclose_names)
       (n : nat) (eb : bool) (pj : mword 64) :
     fcn_bio fn = bn ->
-    fileclose_fs_env_nopid fn n eb pj -∗ bslots bn 3.
+    fileclose_fs_env_nopid fn n eb pj -∗ bslots 3.
   Proof.
-    intro Hb. rewrite /fileclose_fs_env_nopid Hb.
+    (* [Hb] is vestigial now: the slot supply is at the canonical ghost
+       name, so the count on either side names no bio record. *)
+    intro Hb. rewrite /fileclose_fs_env_nopid.
     by iIntros "(_ & _ & _ & _ & _ & _ & _ & $)".
   Qed.
 
@@ -2355,7 +2359,7 @@ End SyscallVocab.
    serves all 22 entries.  [V'] is the callee's own outgoing private block,
    which the store then advances to [upd_tf V' _]. *)
 Section SyscallRet.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
@@ -2378,7 +2382,7 @@ Section SyscallRet.
     word_pointsto (KTR := KT1) (pa_stk (m !!! Regidx csp_rs1) 2) (DfracOwn 1) (m !!! Regidx Rs0) -∗
     word_pointsto (KTR := KT1) (pa_stk (m !!! Regidx csp_rs1) 3) (DfracOwn 1) (m !!! Regidx Rs1) -∗
     word_pointsto (KTR := KT1) (pa_stk (m !!! Regidx csp_rs1) 4) (DfracOwn 1) (m !!! Regidx Rs2) -∗
-    bslots bn 3 -∗
+    bslots 3 -∗
     (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
     fd_slots FDSPARE -∗ iref_slots IREFSPARE -∗
     syscall_env γf pj bn fn -∗ proc_priv γf pj pid V' -∗
@@ -2450,7 +2454,7 @@ End SyscallRet.
    delivered at a REBOUND hart, the tail has to come from an earlier
    section. *)
 Section SyscallArms.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
@@ -4762,7 +4766,7 @@ End SyscallArms.
 (* ===================================================================== *)
 (* S4 -- THE CAPSTONE. *)
 Section SyscallMain.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 

@@ -85,7 +85,7 @@ Proof. unfold NARG. lia. Qed.
 Module SysWaitProof (Argaddr : ARGADDR) (Kwait : KWAIT) : SYSWAIT.
 
 Section ProofSysWait.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Ltac pcstep := apply bv_eq; vm_compute; reflexivity.

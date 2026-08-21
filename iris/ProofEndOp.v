@@ -61,7 +61,7 @@
    conjunct says no entry of W is in the log region.
 
    SLOT ACCOUNTING, EXACT.  The pool parked in [log_batch] is
-   [bslots bn ((LOGBLOCKS - n) + 2)].  The copy loop peels 2 per iteration
+   [bslots ((LOGBLOCKS - n) + 2)].  The copy loop peels 2 per iteration
    and its two brelses give them back; write_head peels 1 and returns 1;
    install_trans takes 2 and returns [2 + length W]; the second write_head
    peels 1 and returns 1.  Re-forming the batch at n = 0 needs
@@ -600,7 +600,7 @@ Local Ltac eoidx := first [ vm_compute; reflexivity | vm_compute; discriminate ]
 (*  invariants and the batch in its OPENED form.                          *)
 (* ===================================================================== *)
 Section EndOpDefs.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   (* end_op's own [wp_next] obligation, NAMED and anchored at an explicit
      hart (durable-notes: a whole-function post must not be spelled inline). *)
@@ -680,7 +680,7 @@ Section EndOpDefs.
      ([∗ list] i ∈ seq 0 t, fsblock γfs (log_slot_bno logstart i) (Lw i)) ∗
      ([∗ list] i ∈ seq t (LOGBLOCKS - t),
         ∃ bs, fsblock γfs (log_slot_bno logstart i) bs) ∗
-     bslots bn ((LOGBLOCKS - n) + 2)%nat)%I.
+     bslots ((LOGBLOCKS - n) + 2)%nat)%I.
 
   Lemma eo_open_of_batch (bn : bio_names) (γfs : fs_names) (cov : gset Z)
       (logstart : Z) (n : nat) (LB : gset Z) :
@@ -884,7 +884,7 @@ End EndOpDefs.
 (*  the hart it actually starts on.                                       *)
 (* ===================================================================== *)
 Section EndOpBlocks.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   (* ================================================================== *)
   (*  +0x92 .. +0x9c : the four-register epilogue and the return.        *)
@@ -1744,7 +1744,7 @@ Section EndOpBlocks.
     (* ---- the pool: one unit for the first write_head ---- *)
     assert (Hp1 : ((LOGBLOCKS - n) + 2)%nat = (1 + ((LOGBLOCKS - n) + 1))%nat)
       by (unfold LOGBLOCKS in *; lia).
-    iEval (rewrite Hp1 (bslots_op bn 1 ((LOGBLOCKS - n) + 1))) in "Hpool".
+    iEval (rewrite Hp1 (bslots_op 1 ((LOGBLOCKS - n) + 1))) in "Hpool".
     iDestruct "Hpool" as "[Hu1 Hpool]".
     (* ===== +0x104 jal ra,write_head ===== *)
     iPoseProof (eoi_104 with "Htext") as "Hi104".
@@ -1864,10 +1864,10 @@ Section EndOpBlocks.
     (* ---- the pool: two units for install's two in-flight buffers ---- *)
     assert (Hp2 : ((LOGBLOCKS - n) + 2)%nat = (2 + (LOGBLOCKS - n))%nat)
       by (unfold LOGBLOCKS in *; lia).
-    iAssert (bslots bn ((LOGBLOCKS - n) + 2)%nat) with "[Hu1 Hpool]" as "Hpool".
-    { rewrite Hp1 (bslots_op bn 1 ((LOGBLOCKS - n) + 1)).
+    iAssert (bslots ((LOGBLOCKS - n) + 2)%nat) with "[Hu1 Hpool]" as "Hpool".
+    { rewrite Hp1 (bslots_op 1 ((LOGBLOCKS - n) + 1)).
       iSplitL "Hu1"; [iExact "Hu1"|iExact "Hpool"]. }
-    iEval (rewrite Hp2 (bslots_op bn 2 (LOGBLOCKS - n))) in "Hpool".
+    iEval (rewrite Hp2 (bslots_op 2 (LOGBLOCKS - n))) in "Hpool".
     clear Hp2.
     iDestruct "Hpool" as "[Hu2 Hpool]".
     (* ---- the per-entry bundle install takes ---- *)
@@ -1992,7 +1992,7 @@ Section EndOpBlocks.
         exact (proj2 HA4regs c Hcs N2 N8 N9 N18 N19 N20 N21). }
     (* ---- one unit out of install's return for the second write_head ---- *)
     assert (Hp3 : (2 + length W)%nat = (1 + (1 + length W))%nat) by lia.
-    iEval (rewrite Hp3 (bslots_op bn 1 (1 + length W))) in "Hu2".
+    iEval (rewrite Hp3 (bslots_op 1 (1 + length W))) in "Hu2".
     clear Hp3.
     iDestruct "Hu2" as "[Hu3 Hu2]".
     iDestruct (cpu_own_transport CIDb2 CIDa6 0 eb (proc_addr j) eb
@@ -2142,10 +2142,10 @@ Section EndOpBlocks.
                 n (LOGBLOCKS - n)%nat with "Hdone Hrest"). }
     assert (Hp4 : ((LOGBLOCKS - 0) + 2)%nat = ((LOGBLOCKS - n) + (1 + (1 + length W)))%nat)
       by (unfold LOGBLOCKS in *; lia).
-    iAssert (bslots bn ((LOGBLOCKS - 0) + 2)%nat) with "[Hpool Hu3 Hu2]" as "Hpool".
-    { rewrite Hp4 (bslots_op bn (LOGBLOCKS - n) (1 + (1 + length W))).
+    iAssert (bslots ((LOGBLOCKS - 0) + 2)%nat) with "[Hpool Hu3 Hu2]" as "Hpool".
+    { rewrite Hp4 (bslots_op (LOGBLOCKS - n) (1 + (1 + length W))).
       iSplitL "Hpool"; [iExact "Hpool"|].
-      rewrite (bslots_op bn 1 (1 + length W)).
+      rewrite (bslots_op 1 (1 + length W)).
       iSplitL "Hu3"; [iExact "Hu3"|iExact "Hu2"]. }
     iAssert (log_batch bn γfs cov logstart 0 ∅)
       with "[Hncell HauthL HauthD Hcov Hhdr Hjunk Hlogr Hpool Hmirc]" as "Hbatch".
@@ -2309,9 +2309,9 @@ Section EndOpBlocks.
     (* the two slot units the two breads spend *)
     assert (Hp1 : ((LOGBLOCKS - n) + 2)%nat = (1 + (1 + (LOGBLOCKS - n)))%nat)
       by (unfold LOGBLOCKS in *; lia).
-    iEval (rewrite Hp1 (bslots_op bn 1 (1 + (LOGBLOCKS - n)))) in "Hpool".
+    iEval (rewrite Hp1 (bslots_op 1 (1 + (LOGBLOCKS - n)))) in "Hpool".
     iDestruct "Hpool" as "[Hu1 Hpool]".
-    iEval (rewrite (bslots_op bn 1 (LOGBLOCKS - n))) in "Hpool".
+    iEval (rewrite (bslots_op 1 (LOGBLOCKS - n))) in "Hpool".
     iDestruct "Hpool" as "[Hu2 Hpool]".
     (* ===== +0xb4 lw a1,24(s4) : a1 := log.start ===== *)
     assert (Hastart : add_vec (rget M Rs4) (sign_extend' 64 (mword_of_int 24 : mword 12))
@@ -3361,10 +3361,10 @@ Section EndOpBlocks.
         rewrite Nat.add_0_l /Lw' (eo_ext_lt Lw t bs2 i Hlt). done.
       - rewrite big_sepL_singleton /Lw' eo_ext_eq.
         iEval (rewrite Hubnol) in "Hslotfb". iExact "Hslotfb". }
-    iAssert (bslots bn ((LOGBLOCKS - n) + 2)%nat) with "[Hu1 Hu2 Hpool]" as "Hpool".
-    { rewrite Hp1 (bslots_op bn 1 (1 + (LOGBLOCKS - n))).
+    iAssert (bslots ((LOGBLOCKS - n) + 2)%nat) with "[Hu1 Hu2 Hpool]" as "Hpool".
+    { rewrite Hp1 (bslots_op 1 (1 + (LOGBLOCKS - n))).
       iSplitL "Hu1"; [iExact "Hu1"|].
-      rewrite (bslots_op bn 1 (LOGBLOCKS - n)).
+      rewrite (bslots_op 1 (LOGBLOCKS - n)).
       iSplitL "Hu2"; [iExact "Hu2"|iExact "Hpool"]. }
     iAssert (eo_open bn γfs cov logstart n W (<[uint bnol := bs2]> L) D Lw' (S t))
       with "[Hncell HW Hjunk HauthL HauthD Hcov Hhdr Hdone Hrest Hpool]" as "Hopen".
@@ -3691,7 +3691,7 @@ End EndOpBlocks.
 (* ===================================================================== *)
 
 Section ProofEndOp.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_end_op_sconf 

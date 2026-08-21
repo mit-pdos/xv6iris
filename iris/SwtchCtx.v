@@ -91,7 +91,7 @@ Proof. intro H; exact H. Qed.
 
 Section SwtchCtx.
   Context `{!riscvGS Σ}.
-  Context `{!xv6G Σ}.
+  Context `{!xv6G Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ================================================================== *)
@@ -271,7 +271,7 @@ Section SwtchCtx.
 End SwtchCtx.
 
 Section Swconf.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ------------------------------------------------------------------ *)

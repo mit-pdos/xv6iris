@@ -170,7 +170,7 @@ Module ProcinitProof (Initlock : INITLOCK) : PROCINIT.
 
 Section ProofProcinit.
   Context `{!riscvGS Σ}.
-  Context `{!xv6G Σ}.
+  Context `{!xv6G Σ, !bioslotG Σ}.
   Context `{!fileG Σ}.
   Context `{!fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   (* NOTE: no shared [Context `{GEN : GenId} `{CID : CpuId}] here -- the epilogue/loop

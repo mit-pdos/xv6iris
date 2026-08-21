@@ -85,7 +85,7 @@ Notation Rs7 := (mword_of_int 23 : mword 5).
 Notation Rs8 := (mword_of_int 24 : mword 5).
 
 Section VdrwbFreeAt.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   Local Ltac reg_neq :=
     lazymatch goal with
@@ -194,7 +194,7 @@ Section VdrwbFreeAt.
 End VdrwbFreeAt.
 
 Section ProofVirtioDiskRwB.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 

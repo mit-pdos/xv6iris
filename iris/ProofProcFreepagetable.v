@@ -173,7 +173,7 @@ Module ProcFreepagetableProof (UvmunmapFixed : UVMUNMAP_FIXED) (Uvmfree : UVMFRE
   : PROC_FREEPAGETABLE.
 
 Section ProofProcFreepagetable.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).

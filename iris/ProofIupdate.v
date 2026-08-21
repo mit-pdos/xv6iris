@@ -121,7 +121,7 @@ Local Ltac iuidx := first [ vm_compute; reflexivity | vm_compute; discriminate ]
 (*  continuation.                                                         *)
 (* ===================================================================== *)
 Section IupdateDefs.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg}.
 
   (* iupdate's 32-byte frame: ra@24 s0@16 s1@8 s2@0 *)
   Definition iu_frame (m : regfile) : iProp Σ :=
@@ -342,7 +342,7 @@ Section IupdateDefs.
         (* the flush's payout, a PARAMETER since §20.18's C2 -- see the
            banner above [iu_region_au] *)
         Pout -∗
-        bslots bn 2 -∗
+        bslots 2 -∗
         (* SET FORM throughout the interior: the OUT set is a parameter, so
            the counted seal instantiates it at the caller's own witness
            unioned with the inode block, and forgets it again on the way
@@ -382,7 +382,7 @@ Definition iu_sp (m M : regfile) : Prop :=
 (*  +0x66 .. +0x7c : log_write, brelse, and the epilogue.                 *)
 (* ===================================================================== *)
 Section IupdateTail.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg}.
 
   Local Lemma iu_tail `{GEN : GenId} `{CID0 : CpuId}
       (γs : list gname) (j : nat)
@@ -428,7 +428,7 @@ Section IupdateTail.
     inode_meta ip dn -∗
     inode_map γfs ip bm -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-    bslots bn 1 -∗
+    bslots 1 -∗
     log_epoch_lb γ v -∗
     (* THE ABSORPTION CREDIT (S5a finding 3, RESOURCE-FORM since fs-log.md
        §G.4): passed straight through to log_write's own [cr], where it is
@@ -633,7 +633,7 @@ Section IupdateTail.
     { intros c Hcs N2 N8 N9 N18.
       rewrite (callee_saved_lookup Hcs2_cs c Hcs).
       exact (HT3thr c Hcs N2 N8 N9 N18). }
-    iDestruct (iu_slots_join bn 1 1 with "Hsl Hsl1") as "Hsl".
+    iDestruct (iu_slots_join 1 1 with "Hsl Hsl1") as "Hsl".
     (* ===== +0x72 .. +0x78 : the four restores ===== *)
     rewrite /iu_frame.
     iDestruct "Hframe" as "(Hf1 & Hf2 & Hf3 & Hf4)".
@@ -852,7 +852,7 @@ End IupdateTail.
 (*  memmove.                                                              *)
 (* ===================================================================== *)
 Section ProofIupdateMain.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* THE GENERIC CREDITED CORE: [eb] and its complement [trap_csrs_ext]/
@@ -922,7 +922,7 @@ Section ProofIupdateMain.
       dev_inv γu γd -∗
       disk_geom γd pd pav pu -∗
       is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-      bslots bn 2 -∗
+      bslots 2 -∗
       log_epoch_lb γ v -∗
       log_credit γ cru Sb e0 (IBLOCK inum inodestart) -∗
       log_opSe γ (S u) Sb e0 -∗
@@ -941,7 +941,7 @@ Section ProofIupdateMain.
           inode_map γfs ip bm -∗
           sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
           Pout -∗
-          bslots bn 2 -∗
+          bslots 2 -∗
           log_opS γ (if cru then S u else u) (Sb ∪ {[IBLOCK inum inodestart]}) -∗
           (∃ e : nat, logged_at γ e (IBLOCK inum inodestart) ∗ ⌜(v <= e)%nat⌝) -∗
           WP (Loop : expr riscv_lang)) -∗
@@ -1313,7 +1313,7 @@ Section ProofIupdateMain.
     iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID14) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbr : (K_bread <= K - 4)%nat) by (lia).
-    iDestruct (iu_slots_split bn 1 1 with "Hsl") as "[Hsl Hsl1]".
+    iDestruct (iu_slots_split 1 1 with "Hsl") as "[Hsl Hsl1]".
     iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev bno dq
               RA (K - 4)%nat eb b

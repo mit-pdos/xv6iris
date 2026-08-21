@@ -40,7 +40,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
    [BioInitAt.bio_init_at] and [IcacheBoot.icache_boot_at] do.  The three
    premises below are what the era fupd hands over
    ([FsCfgBoot.fs_kit_icache]'s last three rows). *)
-Definition wp_kinit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (γk : gname * gname) (m : regfile) (ps : list (mword 64)) (K ncnt : nat) (eb : bool) (pcur : mword 64) (vlock : bv 32) (vname vcpu : bv 64) (b : bool) (lks : gset string) :=
+Definition wp_kinit_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (γk : gname * gname) (m : regfile) (ps : list (mword 64)) (K ncnt : nat) (eb : bool) (pcur : mword 64) (vlock : bv 32) (vname vcpu : bv 64) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kinit in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   let lk : mword 64 := mword_of_int KernelSyms.kmem in
@@ -86,6 +86,6 @@ Definition wp_kinit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : C
 
 Module Type KINIT.
   Parameter wp_kinit_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (γk : gname * gname) (m : regfile) (ps : list (mword 64)) (K ncnt : nat) (eb : bool) (pcur : mword 64) (vlock : bv 32) (vname vcpu : bv 64) (b : bool) (lks : gset string),
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (γk : gname * gname) (m : regfile) (ps : list (mword 64)) (K ncnt : nat) (eb : bool) (pcur : mword 64) (vlock : bv 32) (vname vcpu : bv 64) (b : bool) (lks : gset string),
       wp_kinit_sconf_body γl γk m ps K ncnt eb pcur vlock vname vcpu b lks.
 End KINIT.

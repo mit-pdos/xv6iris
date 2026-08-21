@@ -150,7 +150,7 @@ Local Ltac nz := vm_compute; discriminate.
 (*  Vocabulary: the frame in three strengths, and the continuation.       *)
 (* ===================================================================== *)
 Section ReadiDefs.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
   (* [GenId]: [ProcInv.proc_priv]'s index since the block carries
      [FirstTok.first_tok] (whose boot arm names [gen_cert]). *)
   Context `{GEN : GenId}.
@@ -298,7 +298,7 @@ Section ReadiDefs.
         rd_dst γf j pidv dq user (upd_upt V P') V
                (m !!! Regidx Ra2 : mword 64) n
                (rd_delivered data dst_olds off tot) -∗
-        bslot bn -∗
+        bslot -∗
         WP (Loop : expr riscv_lang))%I.
 
 End ReadiDefs.
@@ -313,7 +313,7 @@ Definition rd_sp (m M : regfile) : Prop :=
 (*  +0xdc .. +0xec : THE RETURN.                                          *)
 (* ===================================================================== *)
 Section ReadiRet.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
   (* [GenId]: [ProcInv.proc_priv]'s index since the block carries
      [FirstTok.first_tok] (whose boot arm names [gen_cert]). *)
   Context `{GEN : GenId}.
@@ -359,7 +359,7 @@ Section ReadiRet.
     rd_dst (ktb := ktb) γf j pidv dq user (upd_upt V P') V
            (m !!! Regidx Ra2 : mword 64) n
            (rd_delivered data dst_olds off tot) -∗
-    bslot bn -∗
+    bslot -∗
     rd_cont (ktb := ktb) (CID0 := CID0) γfs bn γf dev ip bm data dn user off n dst_olds V
             pidv dq dqd j m K eb b lks -∗
     WP (Loop : expr riscv_lang).
@@ -636,7 +636,7 @@ End ReadiRet.
 (*  +0xd8 .. +0xda : a0 := s3, restore s3.  THREE PATHS JOIN HERE.        *)
 (* ===================================================================== *)
 Section ReadiJoin.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
   (* [GenId]: [ProcInv.proc_priv]'s index since the block carries
      [FirstTok.first_tok] (whose boot arm names [gen_cert]). *)
   Context `{GEN : GenId}.
@@ -681,7 +681,7 @@ Section ReadiJoin.
     rd_dst (ktb := ktb) γf j pidv dq user (upd_upt V P') V
            (m !!! Regidx Ra2 : mword 64) n
            (rd_delivered data dst_olds off tot) -∗
-    bslot bn -∗
+    bslot -∗
     rd_cont (ktb := ktb) (CID0 := CID0) γfs bn γf dev ip bm data dn user off n dst_olds V
             pidv dq dqd j m K eb b lks -∗
     WP (Loop : expr riscv_lang).
@@ -783,7 +783,7 @@ End ReadiJoin.
 (*  plus arithmetic (claude-notes/durable-notes.md).                      *)
 (* ===================================================================== *)
 Section ReadiExit.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
   (* [GenId]: [ProcInv.proc_priv]'s index since the block carries
      [FirstTok.first_tok] (whose boot arm names [gen_cert]). *)
   Context `{GEN : GenId}.
@@ -851,7 +851,7 @@ Section ReadiExit.
     rd_dst (ktb := ktb) γf j pidv dq user (upd_upt V P') V
            (m !!! Regidx Ra2 : mword 64) n
            (rd_delivered data dst_olds off tot) -∗
-    bslot bn -∗
+    bslot -∗
     rd_cont (ktb := ktb) (CID0 := CID0) γfs bn γf dev ip bm data dn user off n dst_olds V
             pidv dq dqd j m K eb b lks -∗
     WP (Loop : expr riscv_lang).
@@ -1029,7 +1029,7 @@ End ReadiExit.
 (*  [rd_blocks_step] is exactly the decrease that pays for it.            *)
 (* ===================================================================== *)
 Section ReadiLoop.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
   (* [GenId]: [ProcInv.proc_priv]'s index since the block carries
      [FirstTok.first_tok] (whose boot arm names [gen_cert]). *)
   Context `{GEN : GenId}.
@@ -1141,7 +1141,7 @@ Section ReadiLoop.
     rd_dst (ktb := ktb) γf j pidv dq user (upd_upt V PI) V
            (m !!! Regidx Ra2 : mword 64) n
            (rd_delivered data dst_olds off tot) -∗
-    bslot bn -∗
+    bslot -∗
     rd_cont (ktb := ktb) (CID0 := CID0) γfs bn γf dev ip bm data dn user off n dst_olds V
             pidv dq dqd j m K eb b lks -∗
     WP (Loop : expr riscv_lang).
@@ -2391,7 +2391,7 @@ End ReadiLoop.
 (*  test, the clamp and the n = 0 arm.                                    *)
 (* ===================================================================== *)
 Section ReadiMain.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* the CALLER's buffer tier -- see this function's spec for why it is not

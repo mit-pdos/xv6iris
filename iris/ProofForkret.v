@@ -119,7 +119,7 @@ Ltac reg_neq :=
 Ltac pcw := apply bv_eq; vm_compute; reflexivity.
 
 Section Res.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* the residue is the closed loop's, re-exported unchanged *)
@@ -169,7 +169,7 @@ End Res.
    arm never spent it, and the boot arm rebuilt it from
    [FirstTok.first_tok_of_done] after persisting the store. *)
 Lemma fkr_tail
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (j : nat) (γf : gname)
     (pid : mword 32) (V : pprivate)
     (ks : mword 64) (mt : regfile) (av av2 : nat) (eb : bool) :
@@ -732,7 +732,7 @@ Qed.
        ([ProofSyscall.sysc_tfp_valid] is the same lemma; restated here so the
        forkret cone does not depend on the syscall proof.) ---- *)
 Lemma fkr_tfp_valid
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivate) :
   proc_priv γf pa pid V -∗ ⌜page_valid (page_base (ud_tfp (pv_upt V)))⌝.
 Proof.
@@ -757,7 +757,7 @@ Proof.
 Qed.
 
 Lemma fkr_boot
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (j : nat) (γs : list gname) (γl γf : gname)
     (pid : mword 32) (V : pprivate)
     (ks : mword 64) (mr : regfile) (av av2 : nat) (eb : bool) :
@@ -1576,7 +1576,7 @@ Proof.
 Qed.
 
 Theorem wp_forkret
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (j : nat) (γs : list gname) (γl γf : gname)
     (pid : mword 32) (V : pprivate)
     (ks : mword 64) (m : regfile) (av av2 : nat) (eb : bool) :

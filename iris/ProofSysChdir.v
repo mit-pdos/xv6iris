@@ -465,7 +465,7 @@ Local Ltac nz := vm_compute; discriminate.
 Local Ltac scidx := first [ vm_compute; reflexivity | vm_compute; discriminate ].
 
 Section ProofSysChdirEpilogue.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
@@ -683,7 +683,7 @@ Module SysChdirProof (Myproc : MYPROC) (BeginOp : BEGIN_OP) (Argstr : ARGSTR)
   : SYSCHDIR.
 
 Section ProofSysChdirM1Tail.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
@@ -860,7 +860,7 @@ End ProofSysChdirM1Tail.
 (* ===================================================================== *)
 
 Section ProofSysChdirBody.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
@@ -899,8 +899,8 @@ Section ProofSysChdirBody.
   Qed.
 
   (* the three-slot pool, split for ilock's single [bslot] and rejoined *)
-  Lemma sc_bs3 (bn : bio_names) :
-    (bslots bn 3 : iProp Σ) ⊣⊢ bslot bn ∗ bslots bn 2.
+  Lemma sc_bs3 :
+    (bslots 3 : iProp Σ) ⊣⊢ bslot ∗ bslots 2.
   Proof. rewrite /bslot. change 3%nat with (1 + 2)%nat. apply bslots_op. Qed.
 
   Lemma wp_sys_chdir_sconf `{GEN : GenId} `{CID0 : CpuId}
@@ -1523,7 +1523,7 @@ Section ProofSysChdirBody.
         iDestruct (sc_esc_acc cn gfs gi cov logstart kk Hkk with "Hescrows")
           as "#Hesck".
         iDestruct (sc_slk_acc cn kk Hkk with "Hslks") as (gil gisl) "#Hslkk".
-        iDestruct (sc_bs3 bn with "Hbsl") as "[Hbs1 Hbs2]".
+        iDestruct (sc_bs3 with "Hbsl") as "[Hbs1 Hbs2]".
         (* ============ +0x34 jal ra,ilock ============ *)
         iApply (wp_jal_s_sconf (CID := CID22) (mword_of_int (SC + 0x34)) Rra
                   (mword_of_int 2088628 : mword 21) N2 (K - 20)%nat b
@@ -1824,7 +1824,7 @@ Section ProofSysChdirBody.
           iDestruct (sc_esc_acc cn gfs gi cov logstart kc Hkc with "Hescrows")
             as "#Hescc".
           iDestruct (sc_slk_acc cn kc Hkc with "Hslks") as (gilc gislc) "#Hslkc".
-          iDestruct (sc_bs3 bn with "[Hbs1 Hbs2]") as "Hbsl";
+          iDestruct (sc_bs3 with "[Hbs1 Hbs2]") as "Hbsl";
             [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
           iDestruct (cpu_own_transport CID30 CID32 0 eb pj b
                        ltac:(wp_next_chain) with "Hown") as "Hown".
@@ -2084,7 +2084,7 @@ Section ProofSysChdirBody.
             iSplitL "Hity Himaj Himin Hinl Hisz".
             - rewrite /inode_meta /i_type. iFrame.
             - iFrame. }
-          iDestruct (sc_bs3 bn with "[Hbs1 Hbs2]") as "Hbsl";
+          iDestruct (sc_bs3 with "[Hbs1 Hbs2]") as "Hbsl";
             [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
           iDestruct (cpu_own_transport CID24 CID29 0 eb pj b
                        ltac:(wp_next_chain) with "Hown") as "Hown".

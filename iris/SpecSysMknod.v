@@ -159,7 +159,7 @@ Section SpecSysMknod.
 End SpecSysMknod.
 
 Definition wp_sys_mknod_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (γf : gname) (γa : gname) (γpr : gname)             (* ftable, kalloc, printk *)
@@ -239,7 +239,7 @@ Definition wp_sys_mknod_sconf_body
   dev_inv gu gd -∗
   disk_geom gd pd pav pu -∗
   is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
-  bslots bn 3 -∗
+  bslots 3 -∗
   (* ---- the inode cache, and the region ialloc claims out of ---- *)
   is_itable2 gtl cn gfs gi cov logstart nib dev -∗
   itable_inv -∗
@@ -281,7 +281,7 @@ Definition wp_sys_mknod_sconf_body
       trap_csrs_ext KT1 eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
-      bslots bn 3 -∗
+      bslots 3 -∗
       sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
@@ -304,7 +304,7 @@ Definition wp_sys_mknod_sconf_body
 
 Module Type SYSMKNOD.
   Parameter wp_sys_mknod_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γf : gname) (γa : gname) (γpr : gname)
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)

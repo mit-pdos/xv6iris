@@ -65,7 +65,7 @@ Module VirtioDiskRwPhases (Acquire : ACQUIRE) (Release : RELEASE)
                           (Sleep : SLEEP) (FreeDesc : FREEDESC).
 
 Section ProofVirtioDiskRw.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 

@@ -444,7 +444,7 @@ Definition ireg_blocks_ok (inodestart : Z) (nib : nat)
    [IcacheEscrow.ic_sleeplocks]. *)
 
 Definition wp_dirlink_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
@@ -589,7 +589,7 @@ Definition wp_dirlink_sconf_body
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-  bslots bn 3 -∗
+  bslots 3 -∗
   (* ---- THE ICACHE ---- *)
   is_itable2 gtl cn γfs γi cov logstart nib dev -∗
   itable_inv -∗
@@ -627,7 +627,7 @@ Definition wp_dirlink_sconf_body
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       dinode_at γi dinum dn0' -∗
       proc_priv_bare pj pidv Vpr -∗
-      bslots bn 3 -∗
+      bslots 3 -∗
       (* NET ZERO on the ledger: dirlookup's iget spends one and iput
          returns one on the found arm; nothing is spent on the other. *)
       iref_slot -∗
@@ -714,7 +714,7 @@ Definition wp_dirlink_sconf_body
 (*  existential was hiding, so no existing caller moves.                  *)
 (* ===================================================================== *)
 Definition wp_dirlink_gen_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
@@ -866,7 +866,7 @@ Definition wp_dirlink_gen_body
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-  bslots bn 3 -∗
+  bslots 3 -∗
   (* ---- THE ICACHE ---- *)
   is_itable2 gtl cn γfs γi cov logstart nib dev -∗
   itable_inv -∗
@@ -904,7 +904,7 @@ Definition wp_dirlink_gen_body
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       dinode_at γi dinum dn0' -∗
       proc_priv_bare pj pidv Vpr -∗
-      bslots bn 3 -∗
+      bslots 3 -∗
       (* NET ZERO on the ledger: dirlookup's iget spends one and iput
          returns one on the found arm; nothing is spent on the other. *)
       iref_slot -∗
@@ -1007,7 +1007,7 @@ Definition wp_dirlink_gen_body
 
 Module Type DIRLINK.
   Parameter wp_dirlink_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
              ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
@@ -1037,7 +1037,7 @@ Module Type DIRLINK.
      the set forgotten, kept as its own parameter so that every existing
      caller is unchanged (wp_writei_gen / wp_bmap_gen's pattern) *)
   Parameter wp_dirlink_gen :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
              ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)

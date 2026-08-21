@@ -243,7 +243,7 @@ Proof.
 Qed.
 
 Section FsCfgBootPool.
-  Context `{!riscvGS Σ, !xv6G Σ, ICFG : icfg, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, ICFG : icfg, !irefslotG Σ}.
   Context `{GEN : GenId}.
 
   (* the carve indexes by [elements A]; the pool by [A] *)
@@ -851,7 +851,7 @@ Definition fs_kit_spent (P : Z -> list (bv 8)) (sb : fs_sb) (nib : nat)
   ∪ fs_live_blocks P sb A.
 
 Section FsCfgBootBitmap.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
 
   (*  DEBT (D) PAID.  The whole of [BitmapInv.bitmap_res], out of the paired
       remainder the stocking carve leaves and nothing else: no new image
@@ -922,7 +922,7 @@ End FsCfgBootBitmap.
 (* ====================================================================== *)
 
 Section FsCfgBootEra.
-  Context `{!riscvGS Σ, !xv6G Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !irefslotG Σ}.
   Context `{GEN : GenId}.
 
   (* ---- two list/set conversions the era fupd needs -------------------- *)
@@ -1066,9 +1066,9 @@ Section FsCfgBootEra.
             through [power_boot_res] at BootShared.v:874/1020), so this fupd
             cannot mint it and must not try to.
         (C) [IrefSlots.iref_slot] (one unit, for ireclaim's iget/iput pair)
-            and [BioDefs.bslots fsc_bio 35].  Producers: the boot-shared
+            and [BioDefs.bslots 35].  Producers: the boot-shared
             [iref_slots IREFSLOTS] row, and [bio_init_at]'s POSTCONDITION
-            ([bslots bn BSLOTS] is produced at main+0x8e, not at the era) --
+            ([bslots BSLOTS] is produced at main+0x8e, not at the era) --
             so the [bslots] must be carried from kit 1's consumption site.
         (D) PAID, and it is a row below rather than an owed one:
             [BitmapInv.bitmap_inv], allocated in the era fupd from
@@ -1307,7 +1307,13 @@ Section FsCfgBootEra.
     fs_cov_in cov ndisk ->
     (forall b : Z, 1 <= b < fs_data_start sb -> b ∈ cov) ->
     (forall b : Z, fs_data_start sb <= b < sb_size sb -> b ∈ cov) ->
-    disk_bytes γv 0 (disk_read dk 0 ndisk) ={E}=∗
+    disk_bytes γv 0 (disk_read dk 0 ndisk) -∗
+    (* THE BIO SLOT SUPPLY, THREADED IN.  Its ghost name is canonical
+       ([Xv6Cameras.bioslot_name]), so it exists before this era fupd runs
+       and [BioDefs.bslots_alloc] is what mints it -- one layer up, beside
+       the other name-carrying classes.  Both halves come in because
+       [BioInitAt.bio_free_tok] carries both. *)
+    bslots_auth -∗ bslots BSLOTS ={E}=∗
     ∃ (ICFG : icfg) (FSC : fscfg),
       ⌜icfg_dev = ROOTDEV⌝ ∗ ⌜icfg_nib = nib⌝ ∗
       ⌜icfg_ist = FsImg.sb_inodestart sb⌝ ∗
@@ -1320,7 +1326,7 @@ Section FsCfgBootEra.
         (fs_kit_spent (fs_blocks dk) sb nib (fs_live_set (fs_blocks dk) sb)).
   Proof.
     intros Hwf Hrw Hnin Hnib32 Hnib0 Hnibeq Hcovin Hcovmeta Hcovdata.
-    iIntros "Hdisk".
+    iIntros "Hdisk Hsa Hsf".
     (* ---- 1. the log's four gnames, at their genesis values ---------- *)
     iMod log_ghost_alloc as (γlog) "Hlogtok".
     (* ---- 2. THE INODE CACHE'S RECORD -------------------------------- *)
@@ -1544,7 +1550,7 @@ Section FsCfgBootEra.
                  Hcovdata with "Hbmspent") as "Hbmres".
     iMod (bitmap_inv_alloc E with "Hbmres") as "#Hbmres".
     (* ---- 8. the gname-only mints, and the record -------------------- *)
-    iMod bio_names_ghost_alloc as (bn) "Hbio".
+    iMod (bio_names_ghost_alloc with "Hsa Hsf") as (bn) "Hbio".
     iMod lock_ghost_alloc as (git) "Hitlk".
     iMod lock_ghost_alloc as (gkm) "Hkmlk".
     iMod lock_ghost_alloc as (gdl) "Hdllk".
@@ -1686,7 +1692,7 @@ Definition fs_boot_image_wf (dk : Z -> bv 8) (ndisk : nat)
 (*  both of those files sit BELOW [BootShared].  [BootShared] imports this *)
 (*  file already.                                                          *)
 (* ====================================================================== *)
-Definition fs_boot_supply `{!riscvGS Σ, !xv6G Σ}
+Definition fs_boot_supply `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}
     (ICFG : icfg) (FSC : fscfg) (dk : Z -> bv 8)
     (sb : fs_sb) (nib : nat) (cov : gset Z)
     (γd : uart_names) (γv : disk_names) : iProp Σ :=

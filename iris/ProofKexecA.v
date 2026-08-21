@@ -272,7 +272,7 @@ Module T := ProofKexecTail.KexecTailProof Myproc BeginOp Namei Ilock Readi
    SECTION, not on the file, so it is recorded here where the application is:
    moving either lemma back beside its caller would reintroduce it. *)
 Section KexecABody.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.  (* NB: icacheG + icfg come from
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.  (* NB: icacheG + icfg come from
               [fileG] -- see the header.  A standalone [!icacheG Σ] beside
               [!fileG Σ] is a SECOND instance and [ProcInv.cwd_ref] then does
               not match [SpecNamei]'s [inode_held]. *)
@@ -359,7 +359,7 @@ Section KexecABody.
     ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
     ([∗ list] i ∈ seq 0 na,
        [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
-    bslots bn 3 -∗
+    bslots 3 -∗
     iref_slots 2 -∗
     (* ---- kexec's OWN continuation: the +0x088 tail closes the -1 arm ---- *)
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
@@ -380,7 +380,7 @@ Section KexecABody.
           ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
           ([∗ list] i ∈ seq 0 na,
              [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
-          bslots bn 3 -∗
+          bslots 3 -∗
           iref_slots 2 -∗
           WP (Loop : expr riscv_lang)) -∗
     (* ---- and the FALL-THROUGH: the state at +0x032.
@@ -416,7 +416,7 @@ Section KexecABody.
               ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
               ([∗ list] i ∈ seq 0 na,
                  [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
-              bslots bn 3 -∗
+              bslots 3 -∗
               iref_slots 2 -∗
               WP (Loop : expr riscv_lang)) -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -907,7 +907,7 @@ Section KexecABody.
           ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
           ([∗ list] i ∈ seq 0 na,
              [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
-          bslots bn 3 -∗
+          bslots 3 -∗
           iref_slots 2 -∗
           WP (Loop : expr riscv_lang)) -∗
     (* ---- and the FALL-THROUGH: the state at +0x090, phase B's entry ---- *)
@@ -952,7 +952,7 @@ Section KexecABody.
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
         bitmap_inv gfs bmapstart cov logstart size -∗
-        bslots bn 3 -∗
+        bslots 3 -∗
         kalloc_env ga None -∗
         proc_priv gf (proc_addr jp) pidv V -∗
         ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
@@ -979,7 +979,7 @@ Section KexecABody.
               ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
               ([∗ list] i ∈ seq 0 na,
                  [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
-              bslots bn 3 -∗
+              bslots 3 -∗
               iref_slots 2 -∗
               WP (Loop : expr riscv_lang)) -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -1018,7 +1018,7 @@ Section KexecABody.
     destruct (Hiregb inum Hib') as [Hibc Hibl].
     iDestruct (T.kxa_esc_acc cn gfs gi cov logstart k Hk with "Hesc") as "#Hesck".
     iDestruct (ic_sleeplocks_lookup cn k Hk with "Hslks") as (gilk gislk) "#Hslkk".
-    iDestruct (T.kxa_bs3_split bn with "Hbs") as "[Hbs1 Hbs2]".
+    iDestruct (T.kxa_bs3_split with "Hbs") as "[Hbs1 Hbs2]".
     (* ---- open the process for the pid quarter ---- *)
     (* the BLOCK and the cwd reference: [p->cwd] is one of the block's own
        cells now, so namei borrows it for its own load and nothing here has
@@ -1498,7 +1498,7 @@ Section KexecABody.
           iSplitL "Haddrs"; [iExact "Haddrs" |].
           iSplitL "Hindres"; [iExact "Hindres" |].
           iSplitL "Hblocks"; [iExact "Hblocks" | iExact "Hdview"]. }
-        iDestruct (T.kxa_bs3_join bn with "Hbs1 Hbs2") as "Hbs".
+        iDestruct (T.kxa_bs3_join with "Hbs1 Hbs2") as "Hbs".
         iSpecialize ("Hcont90" $! CID15 with "[%]"); [wp_next_chain |].
         (* [b] is gone by here -- [kxc_sie_b_agree] pinned it and the proof
            [subst]ed it, so the retarget names the literal. *)
@@ -1563,7 +1563,7 @@ Section KexecABody.
           iSplitL "Haddrs"; [iExact "Haddrs" |].
           iSplitL "Hindres"; [iExact "Hindres" |].
           iSplitL "Hblocks"; [iExact "Hblocks" | iExact "Hdview"]. }
-        iDestruct (T.kxa_bs3_join bn with "Hbs1 Hbs2") as "Hbs".
+        iDestruct (T.kxa_bs3_join with "Hbs1 Hbs2") as "Hbs".
         (* [T.kxc_bad64] is applied AT [CID15] (its [sie_cap_gpr] premise pins
            its own [CID0] from "Hcg"), so kexec's exit -- which we still hold
            anchored at the section's [CID0] -- has to be re-anchored there.
@@ -1641,7 +1641,7 @@ Section KexecABody.
         iSplitL "Haddrs"; [iExact "Haddrs" |].
         iSplitL "Hindres"; [iExact "Hindres" |].
         iSplitL "Hblocks"; [iExact "Hblocks" | iExact "Hdview"]. }
-      iDestruct (T.kxa_bs3_join bn with "Hbs1 Hbs2") as "Hbs".
+      iDestruct (T.kxa_bs3_join with "Hbs1 Hbs2") as "Hbs".
       iAssert (stack_own (KTR := KT1) (pa_stk sp0 46) 8) with "[Helfb]" as "Helf".
       { iApply kxc_stack_of_elf_slots. iApply (kxc_bytes_elf sp0 Hal).
         rewrite /bytes_own. iApply (bb_named_any with "Helfb"). }
@@ -1696,7 +1696,7 @@ End KexecABody.
 (*  which prints as the same term twice (durable-notes).                  *)
 (* ===================================================================== *)
 Section KexecAMain.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -1784,7 +1784,7 @@ Section KexecAMain.
     ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
     ([∗ list] i ∈ seq 0 na,
        [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
-    bslots bn 3 -∗
+    bslots 3 -∗
     iref_slots 2 -∗
     (* ---- kexec's OWN continuation: BOTH [-1] tails close through it ---- *)
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
@@ -1805,7 +1805,7 @@ Section KexecAMain.
           ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
           ([∗ list] i ∈ seq 0 na,
              [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
-          bslots bn 3 -∗
+          bslots 3 -∗
           iref_slots 2 -∗
           WP (Loop : expr riscv_lang)) -∗
     (* ---- and the FALL-THROUGH: phase B's entry at +0x090 ---- *)
@@ -1850,7 +1850,7 @@ Section KexecAMain.
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
         bitmap_inv gfs bmapstart cov logstart size -∗
-        bslots bn 3 -∗
+        bslots 3 -∗
         kalloc_env ga None -∗
         proc_priv gf (proc_addr jp) pidv V -∗
         ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
@@ -1881,7 +1881,7 @@ Section KexecAMain.
               ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
               ([∗ list] i ∈ seq 0 na,
                  [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
-              bslots bn 3 -∗
+              bslots 3 -∗
               iref_slots 2 -∗
               WP (Loop : expr riscv_lang)) -∗
         WP (Loop : expr riscv_lang)) -∗

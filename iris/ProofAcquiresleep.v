@@ -228,7 +228,7 @@ Proof.
 Qed.
 
 Section AslProps.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   (* The shared exit-path continuation (control at +0x36), and the wait-loop
      invariant (control at +0x1c).  Both are [wp_next]s ANCHORED at the
@@ -382,7 +382,7 @@ Local Ltac reg_neq :=
 (*  [wp_next]-shaped [asl_loop] / [asl_exit] / [Hcont] at its own hart.    *)
 (* ===================================================================== *)
 Section AslBodies.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   (* ---- the exit path: +0x36 (locked:=1) .. +0x52 (c.ret) ---- *)
   Lemma asl_exit_body `{GEN : GenId} `{CID : CpuId} (CID0 : CPU) (γs : list gname) (j : nat)
@@ -1119,7 +1119,7 @@ End AslBodies.
 (* ===================================================================== *)
 
 Section ProofAcquiresleep.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_acquiresleep_gen_sconf

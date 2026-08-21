@@ -182,7 +182,7 @@ Local Open Scope Z_scope.
    begin_op 26, brelse 26, iget 16. *)
 Notation K_ireclaim := (84%nat) (only parsing).
 Definition wp_ireclaim_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
       ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
@@ -294,7 +294,7 @@ Definition wp_ireclaim_sconf_body
      own bread holds one of them ACROSS iget (+0x8c .. +0x4c), but that
      reference is given back before [begin_op] at +0x54, so the three never
      have to stretch to four. *)
-  bslots bn 3 -∗
+  bslots 3 -∗
   (* ONE ledger unit: iget spends it at +0x44 and iput returns it at +0x66,
      every iteration.  It comes back. *)
   iref_slot -∗
@@ -318,7 +318,7 @@ Definition wp_ireclaim_sconf_body
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       proc_priv_bare pj pidv Vpr -∗
-      bslots bn 3 -∗
+      bslots 3 -∗
       iref_slot -∗
       (* the boot-shelter token, returned unspent (fs-fragments.md §7.12): the
          scan refutes claims AGAINST it, never consuming it *)
@@ -331,7 +331,7 @@ Definition wp_ireclaim_sconf_body
 
 Module Type IRECLAIM.
   Parameter wp_ireclaim_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
              ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)

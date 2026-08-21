@@ -228,7 +228,7 @@ Definition sys_read_ret (V : pprivate) (v : mword 64) (n : Z) (r : mword 64) : P
         arg_fd v (pv_ofile V) = Some (fd, fv) /\ fileread_ret n r).
 
 Section SpecSysRead.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
@@ -267,7 +267,7 @@ Section SpecSysRead.
 End SpecSysRead.
 
 Definition wp_sys_read_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (γa : gname) (γf : gname)                    (* kalloc, the file table  *)
@@ -354,7 +354,7 @@ Definition wp_sys_read_sconf_body
 
 Module Type SYSREAD.
   Parameter wp_sys_read_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
       (γa : gname) (γf : gname)

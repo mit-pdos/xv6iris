@@ -141,7 +141,7 @@ Set Printing Depth 40.
 (*                                                                        *)
 (*  1. THE RESOURCES.  [bm_kit ak ...] is [log_ctx * bslots 2 * log_op]   *)
 (*     when [ak = Some γ] and [emp] when it is [None].  bread's own slot  *)
-(*     unit is threaded SEPARATELY ([bslots bn 1]), because it is the one *)
+(*     unit is threaded SEPARATELY ([bslots 1]), because it is the one *)
 (*     the allocating contract's three also contain: 3 = 1 + 2.           *)
 (*  2. THE CALLEE CONTRACTS.  balloc's and log_write's specs arrive as    *)
 (*     [ak <> None -> _] HYPOTHESES rather than as functor arguments, so  *)
@@ -161,7 +161,7 @@ Set Printing Depth 40.
 (*  about the code.                                                       *)
 (* ===================================================================== *)
 Section BmapKit.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId}.   (* [log_ctx] carries the swap receipt's gen id *)
 
   (* balloc's out-of-blocks arm calls the GENERAL printk path.  Everything it
@@ -216,7 +216,7 @@ Section BmapKit.
         (* the geometry rides INSIDE the kit rather than as a premise, so no
            interior lemma gains a hypothesis either *)
         (⌜bitmap_geom_ok cov logstart (ba_bms a) (ba_size a)⌝ ∗
-         log_ctx (ba_log a) bn γfs cov logstart dev ∗ bslots bn 2 ∗
+         log_ctx (ba_log a) bn γfs cov logstart dev ∗ bslots 2 ∗
          log_opS (ba_log a) n Sb ∗
          sb_size ↦₄{ba_dqs a} (mword_of_int (ba_size a) : mword 32) ∗
          sb_bmapstart ↦₄{ba_dqb a} (mword_of_int (ba_bms a) : mword 32) ∗
@@ -231,7 +231,7 @@ Section BmapKit.
     ak = Some (MkBmAlloc γ bms sz dqb dqs γpr) ->
     bm_kit ak bn γfs cov logstart dev n Sb -∗
       ⌜bitmap_geom_ok cov logstart bms sz⌝ ∗
-      log_ctx γ bn γfs cov logstart dev ∗ bslots bn 2 ∗ log_opS γ n Sb ∗
+      log_ctx γ bn γfs cov logstart dev ∗ bslots 2 ∗ log_opS γ n Sb ∗
       sb_size ↦₄{dqs} (mword_of_int sz : mword 32) ∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bms : mword 32) ∗
       bitmap_inv γfs bms cov logstart sz.
@@ -243,7 +243,7 @@ Section BmapKit.
       (Sb : gset Z) :
     ak = Some (MkBmAlloc γ bms sz dqb dqs γpr) ->
     bitmap_geom_ok cov logstart bms sz ->
-    log_ctx γ bn γfs cov logstart dev -∗ bslots bn 2 -∗ log_opS γ n Sb -∗
+    log_ctx γ bn γfs cov logstart dev -∗ bslots 2 -∗ log_opS γ n Sb -∗
     sb_size ↦₄{dqs} (mword_of_int sz : mword 32) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bms : mword 32) -∗
     bitmap_inv γfs bms cov logstart sz -∗
@@ -426,7 +426,7 @@ End BmapKit.
    report keys off that suffix and this is an internal statement, not one of
    bmap's two public interfaces (tools/proof_coverage.py). *)
 Definition bm_gen_stmt
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     
     (γs : list gname) (j : nat) (γl : gname)
     (γu : uart_names) (γd : disk_names) (γk : gname)
@@ -475,7 +475,7 @@ Definition bm_gen_stmt
   disk_geom γd pd pav pu -∗
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
   (* bread's own unit, held across everything and returned by brelse *)
-  bslots bn 1 -∗
+  bslots 1 -∗
   bm_kit ak bn γfs cov logstart dev n Sb -∗
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (bm' : blkmap) (n' : nat) (data' : nat -> list (bv 8))
@@ -506,7 +506,7 @@ Definition bm_gen_stmt
        \/ (bv_unsigned (blkmap_get bm fbn) = 0
            /\ data' = <[fbn := replicate BSIZE (bv_0 8)]> data)⌝ -∗
       inode_blocks γfs bm' data' -∗
-      bslots bn 1 -∗
+      bslots 1 -∗
       ⌜bm_ledger_ok ak cr bm bm' fbn n n' Sb Sb'⌝ -∗
       bm_kit ak bn γfs cov logstart dev n' Sb' -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -537,7 +537,7 @@ Local Ltac bmidx := first [ vm_compute; reflexivity | vm_compute; discriminate ]
 (*  continuation.                                                         *)
 (* ===================================================================== *)
 Section BmapDefs.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   (* bmap's 48-byte frame: ra@40 s0@32 s1@24 s2@16 s3@8, and slot 0 --
      s4's home -- held ANONYMOUSLY, because the direct arm never writes it
@@ -605,7 +605,7 @@ Section BmapDefs.
          \/ (bv_unsigned (blkmap_get bm fbn) = 0
              /\ data' = <[fbn := replicate BSIZE (bv_0 8)]> data)⌝ -∗
         inode_blocks γfs bm' data' -∗
-        bslots bn 1 -∗
+        bslots 1 -∗
         ⌜bm_ledger_ok ak cr bm bm' fbn n n' Sb Sb'⌝ -∗
         bm_kit ak bn γfs cov logstart dev n' Sb' -∗
         WP (Loop : expr riscv_lang))%I.
@@ -634,7 +634,7 @@ Definition bm_sp (m M : regfile) : Prop :=
 (*  +0x8a .. +0x98 : THE JOIN.                                            *)
 (* ===================================================================== *)
 Section BmapEpilogue.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   Local Lemma bm_epilogue `{GEN : GenId} `{CID0 : CpuId} 
       (j : nat) (γfs : fs_names) (bn : bio_names) (ak : option bm_alloc)
@@ -670,7 +670,7 @@ Section BmapEpilogue.
     i_dev ip ↦₄{dqd} dev -∗
     inode_map γfs ip bm' -∗
     inode_blocks γfs bm' data' -∗
-    bslots bn 1 -∗
+    bslots 1 -∗
     bm_kit ak bn γfs cov logstart dev n' Sb' -∗
     bm_cont (CID0 := CID0) γfs bn ak cov logstart dev ip bm data fbn n cr Sb
             pidv dq dqd j m K eb b lks Vpr -∗
@@ -968,7 +968,7 @@ End BmapEpilogue.
 (*  Reached by THREE of the five arms.                                    *)
 (* ===================================================================== *)
 Section BmapRelease.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   Local Lemma bm_release `{GEN : GenId} `{CID0 : CpuId} 
       (γs : list gname) (j : nat)
@@ -1158,7 +1158,7 @@ End BmapRelease.
 (*  entry bn-NDIRECT, and (if it is empty) allocate one and log it.       *)
 (* ===================================================================== *)
 Section BmapTail.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   Local Lemma bm_indirect_tail `{GEN : GenId} `{CID0 : CpuId} 
       (γs : list gname) (j : nat) (γl : gname)
@@ -1247,7 +1247,7 @@ Section BmapTail.
     ind_blk γfs bmI -∗
     ind_tok γfs bmI -∗
     inode_blocks γfs bmI data -∗
-    bslots bn 1 -∗
+    bslots 1 -∗
     bm_kit ak bn γfs cov logstart dev nI SbI -∗
     bm_cont (CID0 := CID0) γfs bn ak cov logstart dev ip bm data fbn n cr Sb
             pidv dq dqd j m K eb b lks Vpr -∗
@@ -1938,7 +1938,7 @@ Section BmapTail.
         iDestruct (cpu_own_transport CID15 CID20 0 eb (proc_addr j) b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         assert (HKlw : (K_log_write <= K - 6)%nat) by (lia).
-        iDestruct (bm_slots_split bn 1 1 with "Hsl") as "[Hsl1 Hslr]".
+        iDestruct (bm_slots_split 1 1 with "Hsl") as "[Hsl1 Hslr]".
         iApply (Hlogwrite _ _ bn γ γfs γd cov logstart dev kk pidv
                   (bm_ind bmI) (ind_bytes (<[q := blk]> (bm_ent bmI)))
                   (ind_bytes (bm_ent bmI)) bsd0 d0 w cri S1
@@ -2023,7 +2023,7 @@ Section BmapTail.
                      (replicate BSIZE (bv_0 8)) Hfbnlt
                      ltac:(rewrite Hgetq; exact Hentz) HgetJf HgetJ
                      with "Hblocks Hfsb Htok") as "Hblocks".
-        iDestruct (bm_slots_join bn 1 1 with "Hslr Hsl1") as "Hsl".
+        iDestruct (bm_slots_join 1 1 with "Hslr Hsl1") as "Hsl".
         iDestruct (cpu_own_transport CID21 CID22 0 eb (proc_addr j) b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         (* balloc DOES thread it (fresh at its own return hart [CID15]), but
@@ -2144,7 +2144,7 @@ End BmapTail.
 (*  +0x00 .. +0x60 : the prologue, the DIRECT arm, and the indirect head. *)
 (* ===================================================================== *)
 Section ProofBmapMain.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_bmap_gen 
@@ -3532,7 +3532,7 @@ Module BmapProof (BA : BALLOC) (BR : BREAD) (BL : BRELSE) (LW : LOG_WRITE) : BMA
 Module Core := BmapCore BR BL.
 
 Section BmapSeal.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_bmap_sconf 
@@ -3558,7 +3558,7 @@ Section BmapSeal.
               Hidev Hmap Hblocks Hppid
               Hsbsz Hsbbm #Hbminv
               #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hop Hcont".
-    iDestruct (bm_slots_split bn 1 2 with "Hsl") as "[Hsl1 Hsl2]".
+    iDestruct (bm_slots_split 1 2 with "Hsl") as "[Hsl1 Hsl2]".
     (* THE COUNTED FORM'S SET is whatever the [log_op] existential is hiding:
        nothing is claimed about it, and [cr := false] claims no credit -- this
        is fs-icache.md section 18's "derived counted form", taken at the
@@ -3595,7 +3595,7 @@ Section BmapSeal.
     iDestruct (bm_kit_elim γ bmapstart size dqb dqs γpr _ bn γfs cov logstart
                  dev n' Sb' eq_refl with "Hkit")
       as "(_ & _ & Hsl2 & Hop & Hsbsz & Hsbbm & _)".
-    iDestruct (bm_slots_join bn 1 2 with "Hsl1 Hsl2") as "Hsl".
+    iDestruct (bm_slots_join 1 2 with "Hsl1 Hsl2") as "Hsl".
     iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
     iApply ("Hcont" $! mf bm' n' data'
               with "[%] [%] [%] [%] [%] Hcg Hcnt Hextc Hextm Hpc Hppid Hsbsz Hsbbm Hidev Hmap [%] Hblocks [Hsl] [%] [Hop]").
@@ -3640,7 +3640,7 @@ Section BmapSeal.
               Hidev Hmap Hblocks Hppid
               Hsbsz Hsbbm #Hbminv
               #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hop Hcont".
-    iDestruct (bm_slots_split bn 1 2 with "Hsl") as "[Hsl1 Hsl2]".
+    iDestruct (bm_slots_split 1 2 with "Hsl") as "[Hsl1 Hsl2]".
     iDestruct (bm_kit_intro γ bmapstart size dqb dqs γpr _ bn γfs cov logstart
                  dev n Sb eq_refl Hbgok
                  with "Hlctx Hsl2 Hop Hsbsz Hsbbm Hbminv") as "Hkit".
@@ -3671,7 +3671,7 @@ Section BmapSeal.
     iDestruct (bm_kit_elim γ bmapstart size dqb dqs γpr _ bn γfs cov logstart
                  dev n' Sb' eq_refl with "Hkit")
       as "(_ & _ & Hsl2 & Hop & Hsbsz & Hsbbm & _)".
-    iDestruct (bm_slots_join bn 1 2 with "Hsl1 Hsl2") as "Hsl".
+    iDestruct (bm_slots_join 1 2 with "Hsl1 Hsl2") as "Hsl".
     iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
     iApply ("Hcont" $! mf bm' n' data' Sb'
               with "[%] [%] [%] [%] [%] Hcg Hcnt Hextc Hextm Hpc Hppid Hsbsz Hsbbm Hidev Hmap [%] Hblocks [Hsl] [%] Hop").
@@ -3697,7 +3697,7 @@ Module BmapNoallocProof (BR : BREAD) (BL : BRELSE) : BMAP_NOALLOC.
 Module Core := BmapCore BR BL.
 
 Section BmapNoallocSeal.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_bmap_noalloc_sconf 

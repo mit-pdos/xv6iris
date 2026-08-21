@@ -210,7 +210,7 @@ Proof.
 Qed.
 
 Section IlockParts.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
 
   (* THE WRITE-DIRECTION TWIN of [InodeInv.inode_addrs_buf].  memmove's
      DESTINATION is the thirteen [i_addr] cells viewed as 52 contiguous
@@ -331,7 +331,7 @@ Definition il_sp (m M : regfile) : Prop :=
       (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))).
 
 Section IlockDefs.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
   (* ilock's 32-byte frame: ra@24 s0@16 s1@8, and slot 4 (s2's) held
      ANONYMOUSLY -- the cached arm never writes it. *)
@@ -365,7 +365,7 @@ Section IlockDefs.
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         proc_priv_bare (proc_addr j) pidv Vpr -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-        bslot bn -∗
+        bslot -∗
         sleeplocked_q gisl s (i_lock ip) pidv -∗
         ic_deposit cn k (DepShr s dev inum g) -∗
         i_dev ip ↦₄{DfracOwn (1/2)} dev -∗
@@ -396,7 +396,7 @@ End IlockDefs.
 (*  +0x1e .. +0x26 : THE JOIN -- pop ra/s0/s1, ret, and the contract.     *)
 (* ===================================================================== *)
 Section IlockEpilogue.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
   Local Lemma il_epilogue `{GEN : GenId} `{CID0 : CpuId} 
       (j : nat) (gfs : fs_names) (gi : gname) (gisl : gname) (bn : bio_names)
@@ -420,7 +420,7 @@ Section IlockEpilogue.
     il_frame m -∗
     proc_priv_bare (proc_addr j) pidv Vpr -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-    bslot bn -∗
+    bslot -∗
     sleeplocked_q gisl s (i_lock ip) pidv -∗
     ic_deposit cn k (DepShr s dev inum g) -∗
     i_dev ip ↦₄{DfracOwn (1/2)} dev -∗
@@ -648,7 +648,7 @@ End IlockEpilogue.
 (*  +0x36 .. +0xa0 : THE UNCACHED ARM.                                    *)
 (* ===================================================================== *)
 Section IlockLoad.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
   (* ------------------------------------------------------------------ *)
   (*  A CLAIMED INODE'S BUNDLE, OUT OF NOTHING (§16.4's fill sub-arm)     *)
@@ -730,7 +730,7 @@ Section IlockLoad.
     i_dev ip ↦₄{DfracOwn (1/2)} dev -∗
     i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-    bslot bn -∗
+    bslot -∗
     sleeplocked_q gisl s (i_lock ip) pidv -∗
     ic_deposit cn k (DepShr s dev inum g) -∗
     i_valid ip ↦₄ (mword_of_int 0 : mword 32) -∗
@@ -2098,7 +2098,7 @@ Section IlockLoad.
 End IlockLoad.
 
 Section ProofIlockMain.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, ICFG : icfg, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_ilock_sconf 

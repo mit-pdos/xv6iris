@@ -81,7 +81,7 @@ Definition kt_clobbered : gset regidx :=
      Regidx (mword_of_int 28 : mword 5); Regidx (mword_of_int 29 : mword 5);
      Regidx (mword_of_int 30 : mword 5); Regidx (mword_of_int 31 : mword 5) ]}.
 
-Definition wp_kerneltrap_returns_body `{!riscvGS Σ, !xv6G Σ} `{GenId} `{CpuId}
+Definition wp_kerneltrap_returns_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GenId} `{CpuId}
     (γ : gname) (dq : dfrac)
     (m : regfile) (spv rava : mword 64)
     (satp0 : mword 64)
@@ -117,7 +117,7 @@ Definition wp_kerneltrap_returns_body `{!riscvGS Σ, !xv6G Σ} `{GenId} `{CpuId}
 
 Module Type KERNELTRAP_RETURNS.
   Parameter kerneltrap_returns :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GenId} `{CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GenId} `{CpuId}
       (γ : gname) (dq : dfrac)
       (m : regfile) (spv rava : mword 64)
       (satp0 : mword 64)
@@ -239,7 +239,7 @@ Lemma kt_carve_fits : (32 + kerneltrap_stack <= kv_frame_slots)%nat.
 Proof. lia. Qed.
 
 Definition wp_kerneltrap_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (γu : uart_names) (γv : disk_names) (γdk γtl : gname)
     (γs : list gname) (pd pav pu : mword 64)
     (m : regfile) (av : nat) (p : mword 64)
@@ -325,7 +325,7 @@ Definition wp_kerneltrap_sconf_body
 
 Module Type KERNELTRAP.
   Parameter wp_kerneltrap_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γu : uart_names) (γv : disk_names) (γdk γtl : gname)
       (γs : list gname) (pd pav pu : mword 64)
       (m : regfile) (av : nat) (p : mword 64)

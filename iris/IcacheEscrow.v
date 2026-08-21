@@ -197,7 +197,7 @@ Record ic_names := MkIcNames {
 }.
 
 Section IcacheEscrow.
-  Context `{!riscvGS Σ, !xv6G Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !irefslotG Σ}.
   Context `{GEN : GenId}.
   Context `{ICFG : icfg}.
 
@@ -3357,7 +3357,7 @@ End IcacheEscrow.
 (* ===================================================================== *)
 
 Section IcacheEscrowAlloc.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
 
   Local Lemma ic_seq_cons (j n : nat) : seq j (S n) = j :: seq (S j) n.
   Proof. reflexivity. Qed.

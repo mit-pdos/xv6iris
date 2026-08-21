@@ -317,7 +317,7 @@ Module KexitProof (Myproc : MYPROC) (Fileclose : FILECLOSE)
 (* The prologue.  No call in it, so [CID] can be a section variable.      *)
 (* ===================================================================== *)
 Section KexitPro.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* +0x00 .. +0x10: carve the 6-slot frame, save ra/s0..s4, set s0, and
@@ -472,7 +472,7 @@ End KexitPro.
 (* carries its own [CID0] binder.                                          *)
 (* ===================================================================== *)
 Section KexitLoop.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
 
   Lemma kx_loop `{GEN : GenId} `{CID0 : CpuId}
        (γft γf : gname) (fn : fclose_names)
@@ -905,7 +905,7 @@ End KexitLoop.
 (* every leaf and callee collapses through [wp_next_off].                  *)
 (* ===================================================================== *)
 Section KexitPark.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
 
   Lemma kx_park `{GEN : GenId} `{CID0 : CpuId}
        (γf γw : gname) (γs : list gname)
@@ -1507,7 +1507,7 @@ End KexitPark.
 (* and nothing log-shaped survives them.                                   *)
 (* ===================================================================== *)
 Section KexitRest.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
 
   Lemma kx_rest `{GEN : GenId} `{CID0 : CpuId}
@@ -1569,7 +1569,7 @@ Section KexitRest.
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-    bslots bn 3 -∗
+    bslots 3 -∗
     (* ---- the inode cache's persistent set, and the two regions ---- *)
     is_itable2 γtl cn γfs γi cov logstart nib dev -∗
     itable_inv -∗
@@ -1869,7 +1869,7 @@ End KexitRest.
 (* The whole function.                                                    *)
 (* ===================================================================== *)
 Section ProofKexit.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
 
   Lemma wp_kexit_sconf `{GEN : GenId} `{CID0 : CpuId}
       (γft γf γw : gname)

@@ -95,7 +95,7 @@ Qed.
 Module BunpinProof (Acquire : ACQUIRE) (Release : RELEASE) : BUNPIN.
 
 Section ProofBunpin.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 
@@ -338,7 +338,7 @@ Section ProofBunpin.
       by (apply bv_eq; vm_compute; reflexivity).
     iAssert (∃ cw : mword 32,
                brefcnt k ↦₄ cw ∗
-               (brefcnt k ↦₄ (decr32 cw) ==∗ bcache_res bn V ∗ bslot bn))%I
+               (brefcnt k ↦₄ (decr32 cw) ==∗ bcache_res bn V ∗ bslot))%I
       with "[HRres Href]" as (cw) "[Hcell Hclose]".
     { iDestruct "HRres" as (Mg ord devs bnos)
         "(Hauth & Hsauth & %Hdom & %Hord & %Hinj & %Hdev & Hlru & Hpool & Hslots)".

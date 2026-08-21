@@ -254,7 +254,7 @@ Proof.
 Qed.
 
 Section ProofKforkParts.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
@@ -491,7 +491,7 @@ End ProofKforkParts.
 (*  THE RESOURCE-LEVEL BRIDGES.                                         *)
 (* =================================================================== *)
 Section KforkRes.
-  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
   Context `{GEN : GenId}.
 
   (* [ProcInv.tf_page_word_upd] and [ProcInv.proc_priv_tf_upd] -- the WRITE
@@ -659,7 +659,7 @@ End KforkRes.
 (*  [proc_pt_wf]'s last conjunct -- see [proc_priv_tfp_valid].            *)
 (* =================================================================== *)
 Section KforkFreeproc.
-  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* IT TAKES THE DEFICIT BLOCK, and that is forced: the premise

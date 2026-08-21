@@ -467,7 +467,7 @@ Module SysUnlinkProof (Argstr : ARGSTR) (BeginOp : BEGIN_OP)
 Module Tails := SysUnlinkTails Iunlockput EndOp PN.
 
 Section ProofSysUnlinkBody.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
@@ -512,8 +512,8 @@ Section ProofSysUnlinkBody.
     iDestruct (big_sepL_lookup _ _ k k Hl with "H") as "$".
   Qed.
 
-  Lemma su_bs3 (bn : bio_names) :
-    (bslots bn 3 : iProp Σ) ⊣⊢ bslot bn ∗ bslots bn 2.
+  Lemma su_bs3 :
+    (bslots 3 : iProp Σ) ⊣⊢ bslot ∗ bslots 2.
   Proof. rewrite /bslot. change 3%nat with (1 + 2)%nat. apply bslots_op. Qed.
 
   (* THE GENERATION-NAMED SHED.  [IcacheRef.inode_ref_shed] loses the
@@ -697,7 +697,7 @@ Section ProofSysUnlinkBody.
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
-    bslots bn 3 -∗
+    bslots 3 -∗
     is_itable2 gtl cn gfs gi cov logstart nib dev -∗
     itable_inv -∗
     ic_escrows cn gfs gi cov logstart -∗
@@ -735,7 +735,7 @@ Section ProofSysUnlinkBody.
        pc_is (mword_of_int (SU + 0x30)) -∗
        fs_crash_seam cov logstart -∗
        gen_cert -∗
-       bslots bn 3 -∗
+       bslots 3 -∗
        sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
        sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
        sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
@@ -772,7 +772,7 @@ Section ProofSysUnlinkBody.
              trap_csrs_ext KT1 eb -∗
              cpu_claim_ext eb (proc_addr jx) -∗
              pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-             bslots bn 3 -∗
+             bslots 3 -∗
              sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
              sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
              sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
@@ -790,7 +790,7 @@ Section ProofSysUnlinkBody.
           trap_csrs_ext KT1 eb -∗
           cpu_claim_ext eb (proc_addr jx) -∗
           pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-          bslots bn 3 -∗
+          bslots 3 -∗
           sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
           sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
           sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
@@ -1481,7 +1481,7 @@ Section ProofSysUnlinkBody.
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
-    bslots bn 3 -∗
+    bslots 3 -∗
     iref_slots 1 -∗
     log_op g u -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
@@ -1507,7 +1507,7 @@ Section ProofSysUnlinkBody.
           trap_csrs_ext KT1 eb -∗
           cpu_claim_ext eb (proc_addr jx) -∗
           pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-          bslots bn 3 -∗
+          bslots 3 -∗
           sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
           sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
           sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
@@ -1637,7 +1637,7 @@ Section ProofSysUnlinkBody.
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
-    bslots bn 3 -∗
+    bslots 3 -∗
     is_itable2 gtl cn gfs gi cov logstart nib dev -∗
     itable_inv -∗
     ic_escrows cn gfs gi cov logstart -∗
@@ -1698,7 +1698,7 @@ Section ProofSysUnlinkBody.
        pc_is (mword_of_int (SU + 0x72)) -∗
        fs_crash_seam cov logstart -∗
        gen_cert -∗
-       bslots bn 3 -∗
+       bslots 3 -∗
        sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
        sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
        sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
@@ -1760,7 +1760,7 @@ Section ProofSysUnlinkBody.
              trap_csrs_ext KT1 eb -∗
              cpu_claim_ext eb (proc_addr jx) -∗
              pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-             bslots bn 3 -∗
+             bslots 3 -∗
              sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
              sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
              sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
@@ -1778,7 +1778,7 @@ Section ProofSysUnlinkBody.
           trap_csrs_ext KT1 eb -∗
           cpu_claim_ext eb (proc_addr jx) -∗
           pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-          bslots bn 3 -∗
+          bslots 3 -∗
           sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
           sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
           sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
@@ -1822,7 +1822,7 @@ Section ProofSysUnlinkBody.
     iDestruct (su_esc_acc cn gfs gi cov logstart kd Hkd with "Hescrows")
       as "#Hescd".
     iDestruct (su_slk_acc cn kd Hkd with "Hslks") as (gild gisld) "#Hslkd0".
-    iDestruct (su_bs3 bn with "Hbsl") as "[Hbs1 Hbs2]".
+    iDestruct (su_bs3 with "Hbsl") as "[Hbs1 Hbs2]".
     (* the process block, opened for the callees' pid fraction *)
     iDestruct (proc_priv_split_cwd gf (proc_addr jx) pid (upd_upt V P1)
                  with "Hpriv") as "[Hpnc Href]".
@@ -2596,7 +2596,7 @@ Section ProofSysUnlinkBody.
        inode_blocks gfs bmi dati -∗
        ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 29) jj ↦ₘ[KT1] bex jj) -∗
        proc_priv_bare (proc_addr jx) pidv Vpr -∗
-       bslot bn -∗
+       bslot -∗
        X -∗
        WP (Loop : expr riscv_lang))%I.
 
@@ -2625,7 +2625,7 @@ Section ProofSysUnlinkBody.
        inode_blocks gfs bmi dati -∗
        ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 29) jj ↦ₘ[KT1] bex jj) -∗
        proc_priv_bare (proc_addr jx) pidv Vpr -∗
-       bslot bn -∗
+       bslot -∗
        X -∗
        WP (Loop : expr riscv_lang))%I.
 
@@ -2679,7 +2679,7 @@ Section ProofSysUnlinkBody.
     inode_blocks gfs bmi dati -∗
     ([∗ list] jj0 ∈ seq 0 16, pa_add (pa_stk sp0 29) jj0 ↦ₘ[KT1] bcur jj0) -∗
     proc_priv_bare (proc_addr jx) pidv Vpr -∗
-    bslot bn -∗
+    bslot -∗
     su_w4_exitE gfs jx ki dev dni bmi dati pidv dq bn
                 m sp0 dpv ipv K eb b lks X Vpr -∗
     su_w4_exitD gfs jx ki dev dni bmi dati pidv dq bn
@@ -3227,7 +3227,7 @@ Section ProofSysUnlinkBody.
     inode_blocks gfs bmi dati -∗
     ([∗ list] jj0 ∈ seq 0 16, pa_add (pa_stk sp0 29) jj0 ↦ₘ[KT1] be jj0) -∗
     proc_priv_bare (proc_addr jx) pidv Vpr -∗
-    bslot bn -∗
+    bslot -∗
     su_w4_exitE gfs jx ki dev dni bmi dati pidv dq bn
                 m sp0 dpv ipv K eb b lks X Vpr -∗
     su_w4_exitD gfs jx ki dev dni bmi dati pidv dq bn
@@ -3470,7 +3470,7 @@ Section ProofSysUnlinkBody.
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
-    bslots bn 3 -∗
+    bslots 3 -∗
     is_itable2 gtl cn gfs gi cov logstart nib dev -∗
     itable_inv -∗
     ic_escrows cn gfs gi cov logstart -∗
@@ -3560,7 +3560,7 @@ Section ProofSysUnlinkBody.
        pc_is (mword_of_int (SU + 0x8a)) -∗
        fs_crash_seam cov logstart -∗
        gen_cert -∗
-       bslots bn 3 -∗
+       bslots 3 -∗
        sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
        sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
        sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
@@ -3646,7 +3646,7 @@ Section ProofSysUnlinkBody.
              trap_csrs_ext KT1 eb -∗
              cpu_claim_ext eb (proc_addr jx) -∗
              pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-             bslots bn 3 -∗
+             bslots 3 -∗
              sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
              sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
              sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
@@ -3664,7 +3664,7 @@ Section ProofSysUnlinkBody.
           trap_csrs_ext KT1 eb -∗
           cpu_claim_ext eb (proc_addr jx) -∗
           pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-          bslots bn 3 -∗
+          bslots 3 -∗
           sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
           sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
           sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
@@ -3738,7 +3738,7 @@ Section ProofSysUnlinkBody.
     iDestruct (su_esc_acc cn gfs gi cov logstart ks Hks with "Hescrows")
       as "#Hesci".
     iDestruct (su_slk_acc cn ks Hks with "Hslks") as (gili gisli) "#Hslki".
-    iDestruct (su_bs3 bn with "Hbsl") as "[Hbs1 Hbs2]".
+    iDestruct (su_bs3 with "Hbsl") as "[Hbs1 Hbs2]".
     iPoseProof (suli_072 with "Htext") as "Hi72".
     iPoseProof (suli_074 with "Htext") as "Hi74".
     iPoseProof (suli_078 with "Htext") as "Hi78".
@@ -4211,7 +4211,7 @@ Section ProofSysUnlinkBody.
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
-    bslots bn 3 -∗
+    bslots 3 -∗
     is_itable2 gtl cn gfs gi cov logstart nib dev -∗
     itable_inv -∗
     ic_escrows cn gfs gi cov logstart -∗
@@ -4304,7 +4304,7 @@ Section ProofSysUnlinkBody.
           trap_csrs_ext KT1 eb -∗
           cpu_claim_ext eb (proc_addr jx) -∗
           pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-          bslots bn 3 -∗
+          bslots 3 -∗
           sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
           sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
           sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
@@ -5196,7 +5196,7 @@ Section ProofSysUnlinkBody.
     assert (Hdirleni : length (bm_dir bmi) = NDIRECT).
     { destruct Hioki as (Hc & _). exact (blkmap_wf_dir_len cov logstart bmi Hc). }
     destruct n2 as [| c2]; [exfalso; lia |].
-    iDestruct (su_bs3 bn with "Hbsl") as "[Hbs1 Hbs2]".
+    iDestruct (su_bs3 with "Hbsl") as "[Hbs1 Hbs2]".
     iDestruct (cpu_own_transport D21 D26 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     (* the spent ticket, at the region's own index spelling *)
@@ -5684,7 +5684,7 @@ Section ProofSysUnlinkBody.
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
-    bslots bn 3 -∗
+    bslots 3 -∗
     is_itable2 gtl cn gfs gi cov logstart nib dev -∗
     itable_inv -∗
     ic_escrows cn gfs gi cov logstart -∗
@@ -5777,7 +5777,7 @@ Section ProofSysUnlinkBody.
           trap_csrs_ext KT1 eb -∗
           cpu_claim_ext eb (proc_addr jx) -∗
           pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-          bslots bn 3 -∗
+          bslots 3 -∗
           sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
           sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
           sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
@@ -6760,7 +6760,7 @@ Section ProofSysUnlinkBody.
     assert (Hmoidin : (mword_of_int (bv_unsigned dinum) : mword 32) = dinum)
       by (exact (su_moi32_id dinum)).
     destruct nw as [| c1]; [exfalso; lia |].
-    iDestruct (su_bs3 bn with "Hbsl") as "[Hbs1 Hbs2]".
+    iDestruct (su_bs3 with "Hbsl") as "[Hbs1 Hbs2]".
     iDestruct (cpu_own_transport D13 T6 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iApply (Iupdate.wp_iupdate_unlink (CID := T6) gs jx gl gu gd gk pd pav pu
@@ -7046,7 +7046,7 @@ Section ProofSysUnlinkBody.
     assert (Hdirleni : length (bm_dir bmi) = NDIRECT).
     { destruct Hioki as (Hc & _). exact (blkmap_wf_dir_len cov logstart bmi Hc). }
     destruct n2 as [| c2]; [exfalso; lia |].
-    iDestruct (su_bs3 bn with "Hbsl") as "[Hbs1 Hbs2]".
+    iDestruct (su_bs3 with "Hbsl") as "[Hbs1 Hbs2]".
     iDestruct (cpu_own_transport D21 D26 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     (* THE TAGGED SPEND (V5' increment W).  Both halves of [ip]'s parent

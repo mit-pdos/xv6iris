@@ -84,7 +84,7 @@
 (*     did not take them would leave the park holding two resources with   *)
 (*     nowhere to put them and its supplier owing two it does not have.    *)
 (*                                                                        *)
-(* SO EXACTLY ONE ROW HAS NO SOURCE: [bslots (un_bn N) 3], the first       *)
+(* SO EXACTLY ONE ROW HAS NO SOURCE: [bslots 3], the first       *)
 (* conjunct of [UsertrapRes.ut_own_nopt].  (The [initproc] share that used *)
 (* to sit beside it is DONE: userint discards the cell right after its     *)
 (* store, so every later reader takes it persistently.)  The pool has room *)
@@ -131,7 +131,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
 Definition forkret_park_pkg
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId}
     (* the trap loop's kernel-side bundle, abstract exactly as [SpecForkret]
        takes it *)
     (URes : CpuId -> uptd -> mword 64 -> iProp Σ)
@@ -171,7 +171,7 @@ Definition forkret_park_pkg
       URes h pt' (add_vec ks (mword_of_int 4096))))%I.
 
 Definition forkret_park_paid_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (URes : CpuId -> uptd -> mword 64 -> iProp Σ)
     (γs : list gname) (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
     (pid : mword 32) (V : pprivate) (av : nat) : Prop :=
@@ -210,7 +210,7 @@ Module Type FORKRET_PARK_PAID.
   (* the residue is the module-type parameter it is everywhere else *)
   Include SpecUsertrap.USERTRAP_RES.
   Parameter forkret_park_paid :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
       (pid : mword 32) (V : pprivate) (av : nat),
       forkret_park_paid_body (fun h : CpuId => usertrap_res_bare (CID := h))

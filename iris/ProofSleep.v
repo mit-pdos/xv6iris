@@ -130,7 +130,7 @@ Module SleepProof (Myproc : MYPROC) (Acquire : ACQUIRE) (Sched : SCHED) (Release
 (* only thing that differs, and it is existential in the lock invariant.   *)
 (* ===================================================================== *)
 Section SleepJoin.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   (* extract the opaque context-slot payload, leaving the bundle at slot
      [emp] (what the sched call-site hands across the swtch).  It carries its
@@ -492,7 +492,7 @@ Section SleepJoin.
 End SleepJoin.
 
 Section ProofSleepBody.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_sleep_sconf

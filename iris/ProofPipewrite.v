@@ -494,7 +494,7 @@ Lemma pw_upd_upt_upd (V : pprivate) (P Q : uptd) : upd_upt (upd_upt V P) Q = upd
 Proof. destruct V; reflexivity. Qed.
 
 Section PwPieces.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* copyin CONSUMES [kalloc_env] and hands nothing back, and the loop calls it
@@ -659,7 +659,7 @@ End PwPieces.
 (*  The shared continuations, as named iProps.                            *)
 (* ===================================================================== *)
 Section PwConts.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
 
   (* +0x58: the common epilogue (mv a0,s2; reload ra/s0..s5; pop; ret). *)
   Definition pw_epi `{GEN : GenId} (CID0 : CPU) (γf : gname)  (γs : list gname) (j : nat)
@@ -780,7 +780,7 @@ End PwConts.
 (*  that saved them: +0x4e, +0xfe, +0xe4 and +0xf2.                              *)
 (* ===================================================================== *)
 Section PwRestore.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Ltac reg_neq :=
@@ -913,7 +913,7 @@ End PwRestore.
 (*  premise instead of being folded into the iLöb.                        *)
 (* ===================================================================== *)
 Section PwGuard.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma pw_stack7_of (m : regfile) (sp0 : mword 64) :
@@ -1048,7 +1048,7 @@ Module PipewriteProof (Myproc : MYPROC) (AcquireGen : ACQUIRE_GEN) (Killed : KIL
                       (Copyin : COPYIN) (ReleaseGen : RELEASE_GEN) : PIPEWRITE.
 
 Section ProofPipewrite.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Ltac reg_neq :=

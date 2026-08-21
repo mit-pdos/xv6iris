@@ -102,7 +102,7 @@ Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
 Local Ltac nz := vm_compute; discriminate.
 
 Section ProofNamexRoot.
-  Context `{!riscvGS Σ, !xv6G Σ, ICFG : icfg,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, ICFG : icfg,
             !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 

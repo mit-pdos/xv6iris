@@ -356,7 +356,7 @@ Proof.
 Qed.
 
 Section BmapRes.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
 
   (* ONE 4-byte cell of a checked-out buffer's data area, borrowed and put
      back at whatever value the store left there. *)
@@ -387,12 +387,12 @@ Section BmapRes.
 
   (* slot-unit bookkeeping: bmap holds three and hands two to balloc, one
      to bread and one to log_write *)
-  Lemma bm_slots_split (bn : bio_names) (a c : nat) :
-    bslots bn (a + c) -∗ bslots bn a ∗ bslots bn c.
+  Lemma bm_slots_split (a c : nat) :
+    bslots (a + c) -∗ bslots a ∗ bslots c.
   Proof. rewrite bslots_op. iIntros "$". Qed.
 
-  Lemma bm_slots_join (bn : bio_names) (a c : nat) :
-    bslots bn a -∗ bslots bn c -∗ bslots bn (a + c).
+  Lemma bm_slots_join (a c : nat) :
+    bslots a -∗ bslots c -∗ bslots (a + c).
   Proof.
     iIntros "H1 H2". rewrite bslots_op. iSplitL "H1"; [iExact "H1"|iExact "H2"].
   Qed.

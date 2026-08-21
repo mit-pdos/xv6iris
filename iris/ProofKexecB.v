@@ -183,7 +183,7 @@ Module A := ProofKexecTail.KexecTailProof Myproc BeginOp Namei Ilock Readi
                                           Iunlockput EndOp.
 
 Section KexecBBody.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -275,7 +275,7 @@ Section KexecBBody.
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bitmap_inv gfs bmapstart cov logstart size -∗
-    bslots bn 3 -∗
+    bslots 3 -∗
     kalloc_env ga None -∗
     proc_priv gf (proc_addr jp) pidv V -∗
     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
@@ -302,7 +302,7 @@ Section KexecBBody.
           ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
           ([∗ list] i ∈ seq 0 na,
              [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
-          bslots bn 3 -∗
+          bslots 3 -∗
           iref_slots 2 -∗
           WP (Loop : expr riscv_lang)) -∗
     (* ---- OUTPUT 1: [elf.phnum = 0], the loop is skipped ---- *)
@@ -338,7 +338,7 @@ Section KexecBBody.
               ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
               ([∗ list] i ∈ seq 0 na,
                  [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
-              bslots bn 3 -∗
+              bslots 3 -∗
               iref_slots 2 -∗
               WP (Loop : expr riscv_lang)) -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -376,7 +376,7 @@ Section KexecBBody.
               ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
               ([∗ list] i ∈ seq 0 na,
                  [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
-              bslots bn 3 -∗
+              bslots 3 -∗
               iref_slots 2 -∗
               WP (Loop : expr riscv_lang)) -∗
         WP (Loop : expr riscv_lang)) -∗

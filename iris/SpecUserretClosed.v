@@ -122,7 +122,7 @@ Proof.
     split; [reflexivity | split; [exact H1 | exact H2]]]]].
 Qed.
 
-Definition wp_userret_closed_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_userret_closed_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (* the kernel-side residue, abstract exactly as [SpecUservec] takes it *)
     (URes : CpuId -> uptd -> mword 64 -> iProp Σ)
     (C : ucfg) (pt : uptd)
@@ -184,7 +184,7 @@ Module Type USERRET_CLOSED.
   (* the residue is the module-type parameter it is everywhere else *)
   Include SpecUsertrap.USERTRAP_RES.
   Parameter wp_userret_closed :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (C : ucfg) (pt : uptd)
       (kroot : mword 44) (j : nat) (ksp : mword 64)
       (m : regfile) (usatp mstatus0 sepc0 sc_v stval_v : mword 64),

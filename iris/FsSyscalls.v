@@ -200,7 +200,7 @@ Record fs_geom `{ICFG : icfg}
 (* ====================================================================== *)
 
 Section FsBundles.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId}.
   (* the ambient fs names [FsReady.fs_ready] is stated at.  It rides in on
      [fileG] exactly as [icfg] does (see the note on [FileInvDefs.fileG]),
@@ -408,7 +408,7 @@ Section FsBundles.
   Definition fs_res (bn : bio_names)
       (bmapstart inodestart ninodes size : Z)
       (ns : nat) (dqb dqs dqbs dqn : dfrac) : iProp Σ :=
-    (bslots bn 3 ∗
+    (bslots 3 ∗
      sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) ∗
      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) ∗
      sb_size ↦₄{dqbs} (mword_of_int size : mword 32) ∗
@@ -444,7 +444,7 @@ End FsBundles.
     -1 arm.  Every syscall in sysfile.c is in the same position; see the
     file header. *)
 Definition wp_sys_mkdir_friendly_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (γf γa γpr : gname)                                 (* ftable, kalloc, printk *)
@@ -502,7 +502,7 @@ Definition wp_sys_mkdir_friendly_body
 Module FsSysMkdir (M : SYSMKDIR).
 
   Lemma wp_sys_mkdir_friendly
-      `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+      `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
         !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γf γa γpr : gname)
       (γs : list gname) (j : nat) (γl : gname)
@@ -616,7 +616,7 @@ End FsSysMkdir.
     the friendly shape: a two-armed disjunction over the process block, with
     nothing machine-level in it. *)
 Definition wp_sys_chdir_friendly_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (γf γa γpr : gname)
@@ -669,7 +669,7 @@ Definition wp_sys_chdir_friendly_body
 Module FsSysChdir (M : SYSCHDIR).
 
   Lemma wp_sys_chdir_friendly
-      `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+      `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
         !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γf γa γpr : gname)
       (γs : list gname) (j : nat) (γl : gname)

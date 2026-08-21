@@ -145,7 +145,7 @@ Import Defs.
    failed somewhere far away. *)
 Notation K_syscall := ((4 + K_sys_exec)%nat) (only parsing).
 Definition wp_syscall_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (R : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
     (γf : gname) (γs : list gname) (j : nat) (γl : gname)
@@ -184,7 +184,7 @@ Definition wp_syscall_sconf_body
      ride here rather than inside [R].  [sys_exit] (reached through the
      table) is the only entry that draws on them; the other twenty-one
      simply frame them across their own call. *)
-  bslots bn 3 -∗
+  bslots 3 -∗
   (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
   fd_slots FDSPARE -∗
   iref_slots IREFSPARE -∗
@@ -237,7 +237,7 @@ Definition wp_syscall_sconf_body
       ⌜ ud_tfp (pv_upt V') = ud_tfp (pv_upt V) ⌝ -∗
       sie_cap_gpr KT1 mf av true pj -∗
       cpu_own 0%nat true pj true lks -∗
-      bslots bn 3 -∗
+      bslots 3 -∗
       (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
       fd_slots FDSPARE -∗
       iref_slots IREFSPARE -∗
@@ -268,11 +268,11 @@ Module Type SYSCALL.
      mcounteren/stimecmp -- and which usertrap therefore carries in the
      hart-generic [UsertrapRes.devintr_caps_any] form instead.) *)
   Parameter syscall_env :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId},
       gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ.
   Parameter wp_syscall_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γf : gname) (γs : list gname) (j : nat) (γl : gname)
       (bn : bio_names) (fn : fclose_names)

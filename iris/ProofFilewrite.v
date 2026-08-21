@@ -120,7 +120,7 @@
        [i_dev]/[i_inum] at [1/2] and [inode_meta]/[inode_map]/
        [inode_blocks]/[dinode_at] come out of ilock's [ic_loaded]
        ([dn0 := dn]), the three superblock cells + [bitmap_inv] +
-       [ireg_inv] + [bslots _ 3] out of the environment, and
+       [ireg_inv] + [bslots 3] out of the environment, and
        [log_op γ MAXOPBLOCKS] out of begin_op;
      - THE RE-PARK CLOSES.  [fw_inode_ok_rebuild] below assembles
        [inode_ok] from writei's post verbatim -- conjuncts 5 and 7 are
@@ -724,10 +724,10 @@ Proof. apply dir_ok_not_dir. Qed.
    One [bslots_op] rewrite, named so the walk does not re-derive [3 = 1+2]
    inside a proofmode goal.  --------------------------------------------- *)
 Section FwSlots.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
 
-  Lemma fw_bslots3 (bn : bio_names) :
-    bslots bn 3 ⊣⊢ bslot bn ∗ bslots bn 2.
+  Lemma fw_bslots3 :
+    bslots 3 ⊣⊢ bslot ∗ bslots 2.
   Proof.
     rewrite /bslot. change 3%nat with (1 + 2)%nat. apply bslots_op.
   Qed.
@@ -761,7 +761,7 @@ Section FwWriteiSrc.
      context.  Qualifying rather than importing, because a new import here
      would also re-resolve every other unqualified name in the file -- see
      the header's [FW_MAX] warning. *)
-  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   (* ...and [GenId], which [ProcInv.proc_priv_core] acquired with
      [FirstTok.first_tok].  [RiscvLang] IS imported (line ~339), so unlike
      [pavG] above this one binds the real class. *)
@@ -960,7 +960,7 @@ Module FilewriteProof (Pipewrite : PIPEWRITE) (Ilock : ILOCK) (Writei : WRITEI)
                       (Consolewrite : CONSOLEWRITE) (PN : PANIC) : FILEWRITE.
 
 Section ProofFilewrite.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -2059,7 +2059,7 @@ Section ProofFilewrite.
       rewrite /Q4 upd_ne; [| regne]. rewrite /Q3 upd_ne; [| regne].
       rewrite /Q2 upd_ne; [| regne]. rewrite /Q1 upd_ne; [| regne].
       exact (Hilcs r Hr). }
-    iAssert (bslots (fwn_bio fn) 3) with "[Hbsl1 Hbsl2]" as "Hbsl".
+    iAssert (bslots 3) with "[Hbsl1 Hbsl2]" as "Hbsl".
     { rewrite fw_bslots3. iFrame "Hbsl1 Hbsl2". }
     iDestruct (cpu_own_transport CIDil CIDa9 0%nat eb (proc_addr jx) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".

@@ -189,7 +189,7 @@ Lemma devsw_write_val_other (mj : Z) :
 Proof. intro H. rewrite /devsw_write_val. by case_decide. Qed.
 
 Section ConsoleInv.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
 
   (* the ring, byte by byte -- [PipeInvDefs.pipe_data]'s shape.  The contents
      are a list rather than a function so that a single-byte update is a

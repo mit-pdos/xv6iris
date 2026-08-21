@@ -123,7 +123,7 @@ Module SysReadProof (Argaddr : ARGADDR) (Argint : ARGINT) (Argfd : ARGFD)
 
 Section ProofSysRead.
   (* NO [!icacheG Σ]: [fileG] bundles it (SpecFileread.v's note). *)
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 

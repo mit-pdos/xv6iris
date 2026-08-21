@@ -463,7 +463,7 @@ Local Ltac bfidx := first [ vm_compute; reflexivity | vm_compute; discriminate ]
 (*  Vocabulary: the frame, the byte accessor, the continuation.           *)
 (* ===================================================================== *)
 Section BfreeDefs.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   (* bfree's 32-byte frame: ra@24 s0@16 s1@8 s2@0 *)
   Definition bf_frame (m : regfile) : iProp Σ :=
@@ -526,7 +526,7 @@ Section BfreeDefs.
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         proc_priv_bare (proc_addr j) pidv Vpr -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-        bslots bn 2 -∗
+        bslots 2 -∗
         Bud -∗
         WP (Loop : expr riscv_lang))%I.
 
@@ -547,7 +547,7 @@ Definition bf_sp (m M : regfile) : Prop :=
 (*  +0x4a .. +0x5e : log_write, brelse and the epilogue.                  *)
 (* ===================================================================== *)
 Section BfreeTail.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   Local Lemma bf_tail `{GEN : GenId} `{CID0 : CpuId} 
       (γs : list gname) (j : nat)
@@ -583,7 +583,7 @@ Section BfreeTail.
     bf_frame m -∗
     proc_priv_bare (proc_addr j) pidv Vpr -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-    bslots bn 1 -∗
+    bslots 1 -∗
     log_credit γ cr Sb e0 bmapstart -∗
     log_opSe γ (S u) Sb e0 -∗
     bitmap_inv γfs bmapstart cov logstart size -∗
@@ -762,7 +762,7 @@ Section BfreeTail.
     { intros c Hcs N2 N8 N9 N18.
       rewrite (callee_saved_lookup Hcs2_cs c Hcs).
       exact (HT2thr c Hcs N2 N8 N9 N18). }
-    iDestruct (iu_slots_join bn 1 1 with "Hsl Hsl1") as "Hsl".
+    iDestruct (iu_slots_join 1 1 with "Hsl Hsl1") as "Hsl".
     (* ===== +0x54 .. +0x5a : the four restores ===== *)
     rewrite /bf_frame.
     iDestruct "Hframe" as "(Hf1 & Hf2 & Hf3 & Hf4)".
@@ -985,7 +985,7 @@ End BfreeTail.
 (*  +0x00 .. +0x46 : the prologue, bread, the bit test and the clear.     *)
 (* ===================================================================== *)
 Section ProofBfreeMain.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_bfree_gen 
@@ -1333,7 +1333,7 @@ Section ProofBfreeMain.
     iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID12) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbr : (K_bread <= K - 4)%nat) by (lia).
-    iDestruct (iu_slots_split bn 1 1 with "Hsl") as "[Hsl Hsl1]".
+    iDestruct (iu_slots_split 1 1 with "Hsl") as "[Hsl Hsl1]".
     iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev bnoB dq
               RA (K - 4)%nat b b lks Vpr

@@ -145,7 +145,7 @@ Notation Ra0 := (mword_of_int 10 : mword 5).
    included [sieG Σ], which the body never uses, and ProofKexecB3.v's
    [Section KexecB3Ph] calls it with only [riscvGS Σ] in scope.) *)
 Section KexecB2Frame.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   (* slots 55..62 are [ph]'s seven words and the unused one; slot 63 is [off],
@@ -276,7 +276,7 @@ End KexecB2Frame.
 (*  [KexecB2Res] section. *)
 (* ===================================================================== *)
 Section KexecB2Res.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId}.
 
   Definition kxc_res
@@ -300,7 +300,7 @@ Section KexecB2Res.
      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) ∗
      bitmap_inv gfs bmapstart cov logstart size ∗
-     bslots bn 3 ∗
+     bslots 3 ∗
      proc_pt P ∗
      proc_priv gf (proc_addr jp) pidv V ∗
      ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1]{dqpv} pfun k) ∗
@@ -564,7 +564,7 @@ End KexecB2Res.
 (*  design (which size is freed, why no threading clause is needed). *)
 (* ===================================================================== *)
 Definition kxc_bad324_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId}
     (gs : list gname) (jp : nat) (gl : gname)
     (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
     (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
@@ -632,7 +632,7 @@ Definition kxc_bad324_body
   ([∗ list] i ∈ seq 0 na,
      [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
   ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ[KT1] ef j) -∗
-  bslots bn 3 -∗
+  bslots 3 -∗
   iref_slots 1 -∗
   log_op g n2 -∗
   kxc_frameBpin sp0 ra0 s00 s10 s20 pv av
@@ -659,7 +659,7 @@ Definition kxc_bad324_body
         ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
         ([∗ list] i ∈ seq 0 na,
            [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
-        bslots bn 3 -∗
+        bslots 3 -∗
         iref_slots 2 -∗
         WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -671,7 +671,7 @@ Definition kxc_bad324_body
 (*  carry). *)
 (* ===================================================================== *)
 Definition kxc_ls_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId}
     (gs : list gname) (jp : nat) (gl : gname)
     (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
     (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
@@ -770,7 +770,7 @@ Definition kxc_ls_body
         ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
         ([∗ list] i ∈ seq 0 na,
            [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
-        bslots bn 3 -∗
+        bslots 3 -∗
         iref_slots 2 -∗
         WP (Loop : expr riscv_lang)) -∗
   (* ---- THE ONE OUTPUT: +0x116, the segment is in memory.  s1 and s2
@@ -817,7 +817,7 @@ Definition kxc_ls_body
             ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
             ([∗ list] i ∈ seq 0 na,
                [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
-            bslots bn 3 -∗
+            bslots 3 -∗
             iref_slots 2 -∗
             WP (Loop : expr riscv_lang)) -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -825,7 +825,7 @@ Definition kxc_ls_body
 
 Module Type KEXECB2.
   Parameter kxc_bad324 :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId}
       (gs : list gname) (jp : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
@@ -848,7 +848,7 @@ Module Type KEXECB2.
       ef P szf eb lks.
 
   Parameter kxc_ls :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId}
       (gs : list gname) (jp : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)

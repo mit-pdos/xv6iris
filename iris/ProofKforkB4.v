@@ -139,7 +139,7 @@ Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 (*  THE MISSING ACCESSOR: [p->name], built exactly like [proc_priv_cwd].  *)
 (* ===================================================================== *)
 Section KforkB4Res.
-  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
   (* [ProcInv.proc_priv]'s new index -- the block carries
      [FirstTok.first_tok] and its boot arm names [gen_cert]. *)
   Context `{GEN : GenId}.
@@ -194,7 +194,7 @@ End KforkB4Res.
 Module KforkB4 (ID : IDUP) (SS : SAFESTRCPY).
 
 Section KforkB4Proof.
-  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).

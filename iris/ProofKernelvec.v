@@ -274,7 +274,7 @@ Lemma kv_load_run :
 Proof. vm_compute. reflexivity. Qed.
 
 Section KernelvecCore.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   (* the trap frame kernelvec carves is STACK memory, so its cells ride the
      hart's regime like every other frame slot. *)
@@ -1414,7 +1414,7 @@ Qed.
 (* through [kv_cfg_split], and comes back out for the sret.                  *)
 (* ===================================================================== *)
 Section KernelvecHandler.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma kernelvec_handler_spec (γu : uart_names) (γv : disk_names)

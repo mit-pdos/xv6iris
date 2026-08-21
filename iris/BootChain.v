@@ -391,7 +391,7 @@ End BootChain.
 (* ====================================================================== *)
 
 Section BootRun.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ONE BUNDLE for what one hart's boot chain runs on, so §3 and §4 state it
@@ -588,7 +588,7 @@ End BootRun.
 (* ====================================================================== *)
 
 Section BootSecondary.
-  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma boot_hart_secondary (rs : regstate)
@@ -637,7 +637,7 @@ End BootSecondary.
 (* ====================================================================== *)
 
 Section BootPrimary.
-  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma boot_hart_primary (rs : regstate)

@@ -479,7 +479,7 @@ End KexecBFrame.
 (*  THE FRAME FROM +0x0cc ONWARD.                                         *)
 (* ===================================================================== *)
 Section KexecBFrameB.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   (* [ProofKexecA.kxc_frameA6] with (a) the ELF slots (47..54) taken OUT --
@@ -518,7 +518,7 @@ End KexecBFrameB.
 (*  THE TWO OUTPUT STATES.                                                *)
 (* ===================================================================== *)
 Section KexecBSeam.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}.  (* NB: icacheG + icfg come
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}.  (* NB: icacheG + icfg come
               from [fileG] -- ProofKexecA.v's header records why a standalone
               [!icacheG Σ] beside [!fileG Σ] is a SECOND instance. *)
   Context `{GEN : GenId} `{CID0 : CpuId}.
@@ -622,7 +622,7 @@ Section KexecBSeam.
      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) ∗
      bitmap_inv gfs bmapstart cov logstart size ∗
-     bslots bn 3 ∗
+     bslots 3 ∗
      kalloc_env ga None ∗
      proc_pt P ∗
      proc_priv gf (proc_addr jp) pidv V ∗
@@ -707,7 +707,7 @@ Section KexecBSeam.
      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) ∗
      bitmap_inv gfs bmapstart cov logstart size ∗
-     bslots bn 3 ∗
+     bslots 3 ∗
      kalloc_env ga None ∗
      proc_pt P ∗
      proc_priv gf (proc_addr jp) pidv V ∗
@@ -773,7 +773,7 @@ Section KexecBSeam.
      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) ∗
      bitmap_inv gfs bmapstart cov logstart size ∗
-     bslots bn 3 ∗
+     bslots 3 ∗
      kalloc_env ga None ∗
      proc_pt P ∗
      proc_priv gf (proc_addr jp) pidv V ∗
@@ -823,7 +823,7 @@ Section KexecBSeam.
      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) ∗
      bitmap_inv gfs bmapstart cov logstart size ∗
-     bslots bn 3 ∗
+     bslots 3 ∗
      kalloc_env ga None ∗
      proc_pt P ∗
      proc_priv gf (proc_addr jp) pidv V ∗
@@ -889,7 +889,7 @@ Section KexecBSeam.
      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) ∗
      bitmap_inv gfs bmapstart cov logstart size ∗
-     bslots bn 3 ∗
+     bslots 3 ∗
      kalloc_env ga None ∗
      proc_pt P ∗
      proc_priv gf (proc_addr jp) pidv V ∗
@@ -1023,7 +1023,7 @@ Section KexecBSeam.
      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) ∗
      bitmap_inv gfs bmapstart cov logstart size ∗
-     bslots bn 3 ∗
+     bslots 3 ∗
      kalloc_env ga None ∗
      proc_pt P ∗
      proc_priv gf (proc_addr jp) pidv V ∗

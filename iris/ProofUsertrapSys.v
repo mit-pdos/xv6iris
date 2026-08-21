@@ -93,7 +93,7 @@ Ltac reg_neq :=
 Ltac pcw := apply bv_eq; vm_compute; reflexivity.
 
 Section UtSysBlock.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* the trapframe page's own [page_valid], read off [proc_priv] without

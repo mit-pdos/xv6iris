@@ -400,7 +400,7 @@ Proof. rgne. reflexivity. Qed.
    This is the arm-generic-helper convention: a helper that is generic in the
    arm but applied at a pinned arm from a reserved window takes the reserve as
    a parameter rather than deriving it (see claude-notes). *)
-Definition ap_tail `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId}
+Definition ap_tail `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId}
      (m : regfile) (spd pme ret_tgt : mword 64) (K : nat) : iProp Σ :=
   (∀ (rsv : nat) (xb : bool) (CIDt : CpuId) (Mt : regfile) (rv : mword 64),
      ⌜ Mt !!! Regidx csp_rs1 = spd /\
@@ -427,7 +427,7 @@ Module AllocprocCore (Acquire : ACQUIRE) (Release : RELEASE) (Allocpid : ALLOCPI
                      (FP : FREEPROC) : ALLOCPROC_GEN.
 
 Section ProofAllocproc.
-  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   (* The section's hart is called [CID0], NOT [CID]: the loop invariant, the
      epilogue and every leaf continuation bind a fresh [CID], and a section
      variable of that name would be shadowed by them -- while the lemma's own
@@ -2306,7 +2306,7 @@ End AllocprocCore.
 Module AllocprocSeal (Core : ALLOCPROC_GEN) : ALLOCPROC.
 
 Section SealAllocproc.
-  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Lemma wp_allocproc_sconf

@@ -494,7 +494,7 @@ Lemma kxc_s0_of_sp (X : mword 64) :
 Proof. apply stk_pop. apply bv_eq; vm_compute; reflexivity. Qed.
 
 Section KexecA.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -905,7 +905,7 @@ End KexecA.
    so the fraction goes straight through.  What this bundle still holds WHOLE
    is what kexec WRITES: the frame slots, the new table, and [proc_priv]. *)
 Section KexecASeam.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.  (* NB: icacheG + icfg come from
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.  (* NB: icacheG + icfg come from
               [fileG] -- see the header.  A standalone [!icacheG Σ] beside
               [!fileG Σ] is a SECOND instance and [ProcInv.cwd_ref] then does
               not match [SpecNamei]'s [inode_held]. *)
@@ -962,7 +962,7 @@ Section KexecASeam.
             pool crosses this seam -- the ledger that used to ride here
             ([used1 ⊆ used]) has no statement left to make. ---- *)
      bitmap_inv gfs bmapstart cov logstart size ∗
-     bslots bn 3 ∗
+     bslots 3 ∗
      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) ∗
      kalloc_env ga None ∗
@@ -987,7 +987,7 @@ Module KexecTailProof (Myproc : MYPROC) (BeginOp : BEGIN_OP) (Namei : NAMEI)
                       (Ilock : ILOCK) (Readi : READI) (Iunlockput : IUNLOCKPUT)
                       (EndOp : END_OP).
 Section KexecAExit.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.  (* NB: icacheG + icfg come from
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.  (* NB: icacheG + icfg come from
               [fileG] -- see the header.  A standalone [!icacheG Σ] beside
               [!fileG Σ] is a SECOND instance and [ProcInv.cwd_ref] then does
               not match [SpecNamei]'s [inode_held]. *)
@@ -1024,15 +1024,15 @@ Section KexecAExit.
     iDestruct (big_sepL_lookup _ _ k k Hl with "H") as "$".
   Qed.
 
-  Lemma kxa_bs3_split (bn : bio_names) :
-    (bslots bn 3 : iProp Σ) -∗ bslot bn ∗ bslots bn 2.
+  Lemma kxa_bs3_split :
+    (bslots 3 : iProp Σ) -∗ bslot ∗ bslots 2.
   Proof.
     rewrite /bslot. change 3%nat with (1 + 2)%nat. rewrite bslots_op.
     iIntros "$".
   Qed.
 
-  Lemma kxa_bs3_join (bn : bio_names) :
-    (bslot bn : iProp Σ) -∗ bslots bn 2 -∗ bslots bn 3.
+  Lemma kxa_bs3_join :
+    (bslot : iProp Σ) -∗ bslots 2 -∗ bslots 3.
   Proof.
     iIntros "A B". rewrite /bslot. change 3%nat with (1 + 2)%nat.
     rewrite bslots_op. iFrame.
@@ -1145,7 +1145,7 @@ Section KexecAExit.
     ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
     ([∗ list] i ∈ seq 0 na,
        [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
-    bslots bn 3 -∗
+    bslots 3 -∗
     iref_slots 2 -∗
     wp_next true pj (fun (CID : CpuId) =>
       ∀ (mf : regfile) (V' : pprivate)
@@ -1165,7 +1165,7 @@ Section KexecAExit.
           ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
           ([∗ list] i ∈ seq 0 na,
              [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
-          bslots bn 3 -∗
+          bslots 3 -∗
           iref_slots 2 -∗
           WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1203,7 +1203,7 @@ End KexecAExit.
    same-Section sibling would resolve its [CpuId] through the section
    variable by name. *)
 Section KexecABad.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.  (* NB: icacheG + icfg come from
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.  (* NB: icacheG + icfg come from
               [fileG] -- see the header.  A standalone [!icacheG Σ] beside
               [!fileG Σ] is a SECOND instance and [ProcInv.cwd_ref] then does
               not match [SpecNamei]'s [inode_held]. *)
@@ -1318,7 +1318,7 @@ Section KexecABad.
     ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
     ([∗ list] i ∈ seq 0 na,
        [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
-    bslots bn 3 -∗
+    bslots 3 -∗
     iref_slots 1 -∗
     log_op g n2 -∗
     kxc_frameA6 sp0 ra0 s00 s10 s20 pv av (m !!! Regidx Rs4) -∗
@@ -1340,7 +1340,7 @@ Section KexecABad.
           ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
           ([∗ list] i ∈ seq 0 na,
              [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
-          bslots bn 3 -∗
+          bslots 3 -∗
           iref_slots 2 -∗
           WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1590,7 +1590,7 @@ Module KexecTailProofC (Myproc : MYPROC) (BeginOp : BEGIN_OP) (Namei : NAMEI)
 Module T := KexecTailProof Myproc BeginOp Namei Ilock Readi Iunlockput EndOp.
 
 Section KexecCBad.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -1687,7 +1687,7 @@ Section KexecCBad.
     ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
     ([∗ list] i ∈ seq 0 na,
        [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
-    bslots bn 3 -∗
+    bslots 3 -∗
     iref_slots 2 -∗
     kxc_frame_at sp0 ra0 s00 s10 s20
       (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
@@ -1711,7 +1711,7 @@ Section KexecCBad.
           ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
           ([∗ list] i ∈ seq 0 na,
              [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
-          bslots bn 3 -∗
+          bslots 3 -∗
           iref_slots 2 -∗
           WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).

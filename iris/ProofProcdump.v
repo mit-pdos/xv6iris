@@ -58,7 +58,7 @@ Proof. unfold NPROC. lia. Qed.
 
 Module ProcdumpProof : PROCDUMP.
 Section ProofProcdumpMain.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.

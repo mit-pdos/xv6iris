@@ -149,7 +149,7 @@ Proof.
 Qed.
 
 Section ItruncSpec.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   (* "THE BITMAP BLOCK'S LOG SLOT IS PAID FOR, and u units remain for
      everything else."
@@ -302,7 +302,7 @@ Section ItruncSpec.
 End ItruncSpec.
 
 Definition wp_itrunc_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
@@ -443,7 +443,7 @@ Definition wp_itrunc_sconf_body
      bread/log_write pair needs.  brelse gives the held one back at +0x7c.
      The direct loop never has a bread outstanding, so two would do there;
      the arm is what forces three. *)
-  bslots bn 3 -∗
+  bslots 3 -∗
   (* THE RESERVATION: two units.  One buys the bitmap block's log slot --
      ONCE, however many blocks are freed -- and one is iupdate's. *)
   log_op γ (S (S u)) -∗
@@ -476,7 +476,7 @@ Definition wp_itrunc_sconf_body
       (* the flush landed: this inum's on-disk record is the truncated
          inode *)
       dinode_at γi inum (di_trunc dn) -∗
-      bslots bn 3 -∗
+      bslots 3 -∗
       (* SPEND AT MOST TWO, AT LEAST ONE: iupdate always runs; the bitmap
          unit is spent only if the inode named a block at all *)
       (∃ u' : nat, ⌜(u <= u' <= S u)%nat⌝ ∗ log_op γ u') -∗
@@ -511,7 +511,7 @@ Definition wp_itrunc_sconf_body
 (*  every counted caller unmoved.                                         *)
 (* ===================================================================== *)
 Definition wp_itrunc_gen_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
@@ -584,7 +584,7 @@ Definition wp_itrunc_gen_body
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-  bslots bn 3 -∗
+  bslots 3 -∗
   (* THE TAIL FLUSH'S CREDIT, AS A RESOURCE AT A NAMED EPOCH (fs-log.md
      §G.20).  [cru] says "this inode's block is already in lh.block[]", and
      the claim goes straight through both loops to the closing iupdate.  It
@@ -619,7 +619,7 @@ Definition wp_itrunc_gen_body
       inode_map γfs ip bm_empty -∗
       inode_blocks γfs bm_empty (fun _ => replicate BSIZE (bv_0 8)) -∗
       dinode_at γi inum (di_trunc dn) -∗
-      bslots bn 3 -∗
+      bslots 3 -∗
       (* THE LEDGER, SET FORM.  The set only GROWS, it provably contains
          this inode's block, and the counter is bracketed by the two
          [CreateBudget] figures: at most [it_bm w + it_iu cru] is gone, and
@@ -647,7 +647,7 @@ Definition wp_itrunc_gen_body
 
 Module Type ITRUNC.
   Parameter wp_itrunc_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
       
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
@@ -671,7 +671,7 @@ Module Type ITRUNC.
      [crb := cru := false], derived at the [log_op] existential's own
      witness. *)
   Parameter wp_itrunc_gen :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, ICFG : icfg} `{GEN : GenId} `{CID : CpuId}
 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)

@@ -258,7 +258,7 @@ Local Notation URs6 := (mword_of_int 22 : mword 5).
 Local Notation URs7 := (mword_of_int 23 : mword 5).
 
 Section UvmallocDefs.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* SpecUvmalloc's post disjunction, at an abstract return value *)
@@ -320,7 +320,7 @@ Module UvmallocProof (Kalloc : KALLOC) (MemsetPage : MEMSETPAGE)
   : UVMALLOC.
 
 Section ProofUvmalloc.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation Rra := URra.

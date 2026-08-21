@@ -336,7 +336,7 @@ Definition kexec_ok (V V' : pprivate) (r : mword 64)
    (as [ProcInv.proc_priv_name] and [InodeInv.ireg_blocks_ok] both were).
    Promote it then. *)
 Definition fs_fabric
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (gs : list gname) (gu : uart_names) (gd : disk_names) (gk : gname)
     (pd pav pu : mword 64) (bn : bio_names)
@@ -374,7 +374,7 @@ Definition fs_fabric
    is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu))%I.
 
 Global Instance fs_fabric_persistent
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     gs gu gd gk pd pav pu bn g gfs gi cn gtl cov logstart inodestart nib dev :
   Persistent (fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
@@ -385,7 +385,7 @@ Proof. apply _. Qed.
 (*  The contract.                                                         *)
 (* ===================================================================== *)
 Definition wp_kexec_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (gs : list gname) (jp : nat) (gl : gname)           (* the running process *)
@@ -540,7 +540,7 @@ Definition wp_kexec_sconf_body
   ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
   ([∗ list] i ∈ seq 0 na,
      [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
-  bslots bn 3 -∗
+  bslots 3 -∗
   iref_slots 2 -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  kexec PARKS -- through
      begin_op, namei, ilock, readi, iunlockput and end_op -- so the crossing
@@ -565,14 +565,14 @@ Definition wp_kexec_sconf_body
       ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
       ([∗ list] i ∈ seq 0 na,
          [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
-      bslots bn 3 -∗
+      bslots 3 -∗
       iref_slots 2 -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type KEXEC.
   Parameter wp_kexec_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (gs : list gname) (jp : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)

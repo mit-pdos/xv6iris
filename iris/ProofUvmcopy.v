@@ -308,7 +308,7 @@ Local Notation URs6 := (mword_of_int 22 : mword 5).
 Local Notation URs7 := (mword_of_int 23 : mword 5).
 
 Section UvmcopyDefs.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* SpecUvmcopy's post disjunction, at an abstract return value *)
@@ -359,7 +359,7 @@ Module UvmcopyProof (WalkNoalloc : WALK_NOALLOC) (Kalloc : KALLOC)
   : UVMCOPY.
 
 Section ProofUvmcopy.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation Rra := URra.

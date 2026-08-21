@@ -72,7 +72,7 @@ Qed.
 Module SysGetpidProof (Myproc : MYPROC) : SYSGETPID.
 
 Section ProofSysGetpid.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 

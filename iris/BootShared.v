@@ -254,7 +254,7 @@ Section BootBss.
   (* NO [fileG] BINDER: nothing in this file's carve mentions the file table
      or either configuration record, and after stage (d2b) the only [fileG]
      in the file is the one [boot_shared_alloc] BUILDS (see §5). *)
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             !irefslotG Σ}.
   Context `{GEN : GenId}.
 
@@ -381,7 +381,7 @@ Qed.
 
 Section BootBssChain.
   (* NO [fileG] BINDER -- see [BootBss]. *)
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             !irefslotG Σ}.
   Context `{GEN : GenId}.
 
@@ -910,9 +910,10 @@ End BootBssChain.
 (*     [SpecMainSecondary.main_deposit γd γv Φ], because a secondary hart   *)
 (*     may reach its first [lw started] before hart 0 has run at all.      *)
 (*                                                                        *)
-(* FOUR CLIENT CLASSES CARRY PER-BOOT VALUES, so all four are allocated    *)
-(* here and appear under the existential: [fdslotG] and [irefslotG] carry a *)
-(* ghost name, [pavG] carries one, and [fileG] carries the file table's     *)
+(* FIVE CLIENT CLASSES CARRY PER-BOOT VALUES, so all five are allocated    *)
+(* here and appear under the existential: [fdslotG], [irefslotG] and        *)
+(* [bioslotG] carry a ghost name, [pavG] carries one, and [fileG] carries   *)
+(* the file table's                                                         *)
 (* camera TOGETHER WITH the two configuration records                       *)
 (* ([IcacheRef.icfg], [FsCfg.fscfg]) -- which is why it could not be a      *)
 (* functor constraint either (fs-cfg-boot.md stage 3/(d2b)).  Everything    *)
@@ -1009,7 +1010,7 @@ Section BootAlloc.
      [SystemAdequacy.adequacy_fscfg] existed to block).  [fileGpreS] has no
      such cycle: its only instance is [subG] on the functor list. *)
   Context `{FGP : fileGpreS Σ}.
-  Context `{!fdslotGpreS Σ, !irefslotGpreS Σ, !pavGpreS Σ}.
+  Context `{!fdslotGpreS Σ, !irefslotGpreS Σ, !pavGpreS Σ, !bioslotGpreS Σ}.
   Context `{GEN : GenId}.
 
   (* The two PER-HART GHOST BUNDLES, NAMED -- and the naming is load-bearing:
@@ -1193,6 +1194,7 @@ Section BootAlloc.
     fs_boot_image_wf (v_disk (g.(gdev).(dvirtio))) ndisk sb nib cov ->
     power_boot_res riscv_eraGS gen_id boot_D NPROC ndisk g
     ={⊤}=∗ ∃ (HFd : fdslotG Σ) (HIr : irefslotG Σ) (HPav : pavG Σ)
+             (HBs : bioslotG Σ)
              (HF : fileG Σ) (γd : uart_names) (γv : disk_names),
       ⌜dn_img γv = disk_img_name⌝ ∗
       (* --- the shared persistents --- *)
@@ -1348,6 +1350,13 @@ Section BootAlloc.
            [FsCfgBoot.fs_kit_icache]'s header) and nothing else can make
            it. ---- *)
     iMod iref_slots_alloc as (Hir) "[Hirauth Hirslots]".
+    (* ---- and the BIO slot supply, on the same footing.  Its ghost name is
+           canonical ([Xv6Cameras.bioslot_name]), so it is minted HERE with
+           the other name-carrying classes rather than inside [bio_init]:
+           the name has to exist before the bcache invariant that owns the
+           authority does.  [FsCfgBoot.fs_cfg_alloc] takes both halves and
+           parks them in [BioInitAt.bio_free_tok]. ---- *)
+    iMod bslots_alloc as (Hbs) "[Hbsauth Hbslots]".
     (* ### THE FILE TABLE'S NFILE UNITS ARE DROPPED HERE. ###
        [IREFSLOTS = NPROC*(1 + IREFSPARE) + NFILE]; the proc layer's share
        is routed through [main_globals_raw], and the [NFILE] units belong to
@@ -1413,7 +1422,7 @@ Section BootAlloc.
       rewrite /disk_bytes. iEval (rewrite -Himg) in "Hdimg". iExact "Hdimg". }
     iMod (fs_cfg_alloc γd γv (v_disk (g.(gdev).(dvirtio))) ndisk sb cov nib ⊤
             Hwf Hrw Hnin Hnib32 Hnib0 Hnibeq Hcovin Hcovmeta Hcovdata
-            with "Hdimg") as (ICFG FSC) "Hfs".
+            with "Hdimg Hbsauth Hbslots") as (ICFG FSC) "Hfs".
     (* [fileG_of]'s two projections ARE the two minted records, by iota.
        Named, so the postcondition's row needs no conversion step inside the
        proofmode. *)
@@ -1460,7 +1469,7 @@ Section BootAlloc.
     (* [Hprocsavail] -- [procs_avail (Some NPROC)] -- now leaves in the
        postcondition: userinit is proven and its contract
        ([SpecUserinit.v]) takes exactly this. *)
-    iModIntro. iExists Hfd, Hir, Hpav, (fileG_of FGP ICFG FSC), γd, γv.
+    iModIntro. iExists Hfd, Hir, Hpav, Hbs, (fileG_of FGP ICFG FSC), γd, γv.
     iSplitR; [iPureIntro; exact Himg |].
     iSplitR; [iExact "Hktext" |].
     iSplitR; [iExact "Hkdata" |].

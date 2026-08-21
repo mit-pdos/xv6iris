@@ -83,7 +83,7 @@ Module PipecloseProof (Acquire : ACQUIRE_GEN) (Wakeup : WAKEUP)
                       (Kfree : KFREE) : PIPECLOSE.
 
 Section ProofPipeclose.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* [b] (from [sie_cap_gpr]'s arm) and [n],[eb] (from [cpu_own]'s count) are

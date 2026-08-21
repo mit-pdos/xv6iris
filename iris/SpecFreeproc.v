@@ -85,7 +85,7 @@ Local Open Scope Z_scope.
 Notation FRP := KernelSyms.freeproc.
 
 Section SpecFreeproc.
-  Context `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* p->pagetable, and what comes with it.  The [Some] arm's two pure facts
@@ -277,7 +277,7 @@ Module Type FREEPROC.
     (* NO [!fileG Σ]: the contract reaches [ProcInv.proc_dormant], which uses
        only the fd-SLOT ghost, so Rocq prunes [fileG] from the body and the
        Parameter must not re-introduce it. *)
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (mm : regfile)
       (j : nat) (γl : gname) (V : pprivate) (pid st : mword 32) (ch : mword 64)
       (opt : option uptd) (otf : option (mword 44 * list (mword 64)))

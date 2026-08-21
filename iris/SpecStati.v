@@ -133,7 +133,7 @@ End StatBuf.
 (* stati's own frame is 16 bytes (2 slots); it calls nothing. *)
 Notation K_stati := (2%nat) (only parsing).
 Definition wp_stati_sconf_body
-    `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (mm : regfile)
     (ip st : mword 64)
     (dev inum : mword 32) (dn : dinode)
@@ -172,7 +172,7 @@ Definition wp_stati_sconf_body
 
 Module Type STATI.
   Parameter wp_stati_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
       (mm : regfile)
       (ip st : mword 64)
       (dev inum : mword 32) (dn : dinode)

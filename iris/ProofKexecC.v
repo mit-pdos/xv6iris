@@ -115,7 +115,7 @@ Module TC := ProofKexecTail.KexecTailProofC Myproc BeginOp Namei Ilock Readi
                                             Iunlockput EndOp PFP.
 
 Section KexecCSetup.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -307,7 +307,7 @@ Section KexecCSetup.
         ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
         ([∗ list] i ∈ seq 0 na,
            [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
-        bslots bn 3 -∗
+        bslots 3 -∗
         iref_slots 2 -∗
         WP (Loop : expr riscv_lang)) -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
@@ -351,7 +351,7 @@ Section KexecCSetup.
               ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
               ([∗ list] i ∈ seq 0 na,
                  [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
-              bslots bn 3 -∗
+              bslots 3 -∗
               iref_slots 2 -∗
               WP (Loop : expr riscv_lang)) -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -1690,7 +1690,7 @@ End KexecCSetup.
 (*  print identically.  (kexec.md records the round that cost.)           *)
 (* =================================================================== *)
 Section KexecCExitM1.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -1888,7 +1888,7 @@ Section KexecCExitM1.
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bitmap_inv gfs bmapstart cov logstart size -∗
-    bslots bn 3 -∗
+    bslots 3 -∗
     kalloc_env ga None -∗
     proc_pt P -∗
     proc_priv gf (proc_addr jp) pidv V -∗
@@ -1980,7 +1980,7 @@ Section KexecCExitM1.
         ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
         ([∗ list] i ∈ seq 0 na,
            [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
-        bslots bn 3 -∗
+        bslots 3 -∗
         iref_slots 2 -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -2055,7 +2055,7 @@ End KexecCExitM1.
 (*  copy of [Hcont]'s shape from the caller.                             *)
 (* =================================================================== *)
 Section KexecCLoop.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -2253,7 +2253,7 @@ Section KexecCLoop.
         ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
         ([∗ list] i ∈ seq 0 na,
            [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
-        bslots bn 3 -∗
+        bslots 3 -∗
         iref_slots 2 -∗
         WP (Loop : expr riscv_lang)) -∗
     (* ---- THE ONE OUTPUT: continue, or the loop's own natural exit ---- *)
@@ -2285,7 +2285,7 @@ Section KexecCLoop.
               ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
               ([∗ list] i ∈ seq 0 na,
                  [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
-              bslots bn 3 -∗
+              bslots 3 -∗
               iref_slots 2 -∗
               WP (Loop : expr riscv_lang)) -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -3694,7 +3694,7 @@ End KexecCLoop.
    from the two liveness facts together: the head has [avf c <> 0] and the
    contract has [avf na = 0], so [c <> na], and [c <= na] closes it.       *)
 Section KexecCArgvLoop.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}.
   Context `{GEN : GenId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -3764,7 +3764,7 @@ Section KexecCArgvLoop.
         ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
         ([∗ list] i ∈ seq 0 na,
            [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
-        bslots bn 3 -∗
+        bslots 3 -∗
         iref_slots 2 -∗
         WP (Loop : expr riscv_lang)) -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
@@ -3791,7 +3791,7 @@ Section KexecCArgvLoop.
               ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
               ([∗ list] i ∈ seq 0 na,
                  [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
-              bslots bn 3 -∗
+              bslots 3 -∗
               iref_slots 2 -∗
               WP (Loop : expr riscv_lang)) -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -3874,7 +3874,7 @@ End KexecCArgvLoop.
 (*  rest of the function wants it.                                        *)
 (* ===================================================================== *)
 Section KexecCClose.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -4085,7 +4085,7 @@ Section KexecCClose.
         ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
         ([∗ list] i ∈ seq 0 na,
            [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
-        bslots bn 3 -∗
+        bslots 3 -∗
         iref_slots 2 -∗
         WP (Loop : expr riscv_lang)) -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
@@ -4112,7 +4112,7 @@ Section KexecCClose.
               ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
               ([∗ list] i ∈ seq 0 na,
                  [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
-              bslots bn 3 -∗
+              bslots 3 -∗
               iref_slots 2 -∗
               WP (Loop : expr riscv_lang)) -∗
         WP (Loop : expr riscv_lang)) -∗

@@ -256,7 +256,7 @@ Lemma bmap_ai_true (bm bm' : blkmap) :
 Proof. intros H1 H2. apply bool_decide_eq_true_2. exact (conj H1 H2). Qed.
 
 Definition wp_bmap_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
@@ -350,7 +350,7 @@ Definition wp_bmap_sconf_body
   (* THREE slot units: bmap's own bread of the indirect block holds one
      across the interior balloc (which needs two of its own) and across
      log_write; brelse hands it back at the end. *)
-  bslots bn 3 -∗
+  bslots 3 -∗
   (* THE RESERVATION, as a SPEND-AT-MOST clause.  bmap costs at most five
      units -- two per balloc x 2, plus its own log_write -- but it cannot
      hand back a surplus: [log_op] moves only through [LogInv.log_spend_step]
@@ -423,7 +423,7 @@ Definition wp_bmap_sconf_body
        \/ (bv_unsigned (blkmap_get bm fbn) = 0
            /\ data' = <[fbn := replicate BSIZE (bv_0 8)]> data)⌝ -∗
       inode_blocks γfs bm' data' -∗
-      bslots bn 3 -∗
+      bslots 3 -∗
       (* at most five units gone, and none gained *)
       ⌜((n - 5)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
       log_op γ n' -∗
@@ -437,7 +437,7 @@ Definition wp_bmap_sconf_body
 (*  at [cr := false] with the set forgotten, so no existing caller moves. *)
 (* ===================================================================== *)
 Definition wp_bmap_gen_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
@@ -510,7 +510,7 @@ Definition wp_bmap_gen_body
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-  bslots bn 3 -∗
+  bslots 3 -∗
   log_opS γ n Sb -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b] -- bmap's bread/balloc
      park. *)
@@ -542,7 +542,7 @@ Definition wp_bmap_gen_body
        \/ (bv_unsigned (blkmap_get bm fbn) = 0
            /\ data' = <[fbn := replicate BSIZE (bv_0 8)]> data)⌝ -∗
       inode_blocks γfs bm' data' -∗
-      bslots bn 3 -∗
+      bslots 3 -∗
       (* THE LEDGER, ARM-WISE.  Four clauses, and a caller needs all four:
          the cost (what it may charge itself), the two set bounds (what it
          may still absorb, and what it must own up to when IT has a caller),
@@ -583,7 +583,7 @@ Definition wp_bmap_gen_body
 
 Module Type BMAP.
   Parameter wp_bmap_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
@@ -605,7 +605,7 @@ Module Type BMAP.
      [cr := false] with the set forgotten, kept as its own parameter so
      that every existing caller is unchanged (wp_balloc_gen's pattern) *)
   Parameter wp_bmap_gen :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
@@ -652,7 +652,7 @@ End BMAP.
    - no [log_op] and no budget premise -- bmap performs no [log_write], so
      there is no reservation to spend and none to hand back;
    - no [log_ctx], and hence no [γ : log_names] at all;
-   - [bslot bn] rather than [bslots bn 3].  The three were bread's one held
+   - [bslot] rather than [bslots 3].  The three were bread's one held
      across balloc's two; with balloc dead only bread's own unit remains,
      and brelse returns it.
 
@@ -664,7 +664,7 @@ End BMAP.
    from.  Precedent for two contracts over one function: SpecWalk.v's
    [WALK] / [WALK_NOALLOC]. *)
 Definition wp_bmap_noalloc_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
@@ -715,7 +715,7 @@ Definition wp_bmap_noalloc_sconf_body
   disk_geom γd pd pav pu -∗
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
   (* ONE slot unit: the interior bread's, handed back by brelse *)
-  bslot bn -∗
+  bslot -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP
      (its bread / ilock / bwrite does), and a park moves the hart with
      interrupts off, so the crossing has nothing to do with SIE -- the
@@ -739,13 +739,13 @@ Definition wp_bmap_noalloc_sconf_body
       i_dev ip ↦₄{dqd} dev -∗
       inode_map γfs ip bm -∗
       inode_blocks γfs bm data -∗
-      bslot bn -∗
+      bslot -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type BMAP_NOALLOC.
   Parameter wp_bmap_noalloc_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)

@@ -469,7 +469,7 @@ Module KwaitProof (Acquire : ACQUIRE) (Release : RELEASE) (Myproc : MYPROC)
                   (Copyout : COPYOUT) (Freeproc : FREEPROC) : KWAIT.
 
 Section ProofKwait.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
   (* NO section [CpuId]: every block lemma is applied at the hart the block
      before it handed back, which a section variable could not express. *)
 
@@ -3017,7 +3017,7 @@ End ProofKwait.
 (*  THE WHOLE FUNCTION: the prologue, then the outer loop's Löb.          *)
 (* ===================================================================== *)
 Section ProofKwaitMain.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
 
   Local Ltac reg_neq :=
     lazymatch goal with

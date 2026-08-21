@@ -88,7 +88,7 @@ Local Open Scope Z_scope.
 (* kfork's budget plus this function's own two slots. *)
 Notation K_sys_fork := ((K_kfork + 2)%nat) (only parsing).
 Definition wp_sys_fork_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ,
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa γp γw γl γf γil γic : gname) (γs : list gname)
     (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z)
@@ -149,7 +149,7 @@ Definition wp_sys_fork_sconf_body
 
 Module Type SYSFORK.
   Parameter wp_sys_fork_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ,
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa γp γw γl γf γil γic : gname) (γs : list gname)
       (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z)

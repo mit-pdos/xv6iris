@@ -64,7 +64,7 @@ Local Open Scope Z_scope.
 (* namecmp's own frame is 16 bytes (2 slots); its only callee is strncmp,
    which wants 2. *)
 Notation K_namecmp := (4%nat) (only parsing).
-Definition wp_namecmp_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_namecmp_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (ktf ktg : ktier) (mm : regfile) (f g : nat -> bv 8) (K : nat) (dq1 dq2 : dfrac)
     (b : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.namecmp in
@@ -92,7 +92,7 @@ Definition wp_namecmp_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID :
 
 Module Type NAMECMP.
   Parameter wp_namecmp_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : GenId} `{CID : CpuId}
       (ktf ktg : ktier) (mm : regfile) (f g : nat -> bv 8) (K : nat) (dq1 dq2 : dfrac)
       (b : bool) (p : mword 64),
       wp_namecmp_sconf_body ktf ktg mm f g K dq1 dq2 b p.

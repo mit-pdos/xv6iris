@@ -216,7 +216,7 @@ Proof.
 Qed.
 
 Section BioInv.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
 
   (* full ownership of a 4-byte cell is exclusive: the escrow's park swap
      refutes the parked arm with the full valid cell in hand. *)
@@ -231,43 +231,11 @@ Section BioInv.
     iDestruct (mem_pointsto_ne with "Hb1 Hb2") as %Hne. done.
   Qed.
 
-  (* ---- the slot supply ---- *)
-  Definition bslot (bn : bio_names) : iProp Σ := bslots bn 1.
-  Definition bslots_auth (bn : bio_names) : iProp Σ :=
-    own (bn_slot bn) (● BSLOTS).
-
-  Lemma bslots_op (bn : bio_names) a b :
-    bslots bn (a + b) ⊣⊢ bslots bn a ∗ bslots bn b.
-  Proof.
-    rewrite /bslots.
-    assert (Hop : (◯ (a + b)%nat : bioslotUR) = ◯ a ⋅ ◯ b)
-      by (rewrite -auth_frag_op; reflexivity).
-    rewrite Hop own_op. reflexivity.
-  Qed.
-
-  Lemma bslots_bound (bn : bio_names) n :
-    bslots_auth bn -∗ bslots bn n -∗ ⌜(n <= BSLOTS)%nat⌝.
-  Proof.
-    rewrite /bslots_auth /bslots. iIntros "Ha Hf".
-    iDestruct (own_valid_2 with "Ha Hf") as %[Hincl _]%auth_both_valid_discrete.
-    iPureIntro. by apply nat_included in Hincl.
-  Qed.
-
-  (* the consequence every increment needs: a slot-backed count is far below
-     what an int can hold (fd_slots_no_overflow's mirror). *)
-  Lemma bslots_no_overflow (bn : bio_names) (n : positive) :
-    bslots_auth bn -∗ bslots bn (Pos.to_nat n) -∗
-    ⌜(Z.pos n < 2 ^ 31)%Z /\ (Z.pos (Pos.succ n) < 2 ^ 31)%Z⌝.
-  Proof.
-    iIntros "Ha Hf".
-    iDestruct (bslots_bound with "Ha Hf") as %Hle.
-    iPureIntro.
-    assert (E31 : (2 ^ 31 = 2147483648)%Z) by (vm_compute; reflexivity).
-    assert (EB : BSLOTS = 1024%nat) by (vm_compute; reflexivity).
-    rewrite EB in Hle.
-    assert (Hz : (Z.pos n <= 1024)%Z) by (rewrite -positive_nat_Z; lia).
-    rewrite E31. lia.
-  Qed.
+  (* ---- the slot supply lives in [BioDefs] now, at the CANONICAL ghost
+     name: it has to be nameable from [ProcDefs.proc_dormant], which is
+     below the file system.  This file re-exports BioDefs, so [bslot],
+     [bslots_auth], [bslots_op], [bslots_bound] and [bslots_no_overflow]
+     are still in scope for every consumer, minus their [bn] argument. ---- *)
 
   (* ---- one reference ----
 
@@ -806,7 +774,7 @@ Section BioInv.
     | Some (q, n) =>
         (⌜(Z.pos n < 2 ^ 31)%Z⌝ ∗
          brefcnt k ↦₄ (mword_of_int (Z.pos n) : mword 32) ∗
-         bslots bn (Pos.to_nat n) ∗
+         bslots (Pos.to_nat n) ∗
          ∃ qr : Qp, ⌜(q + qr)%Qp = (1/2)%Qp⌝ ∗
            b_dev (bpa k) ↦₄{DfracOwn qr} dev ∗
            b_blockno (bpa k) ↦₄{DfracOwn qr} bno)%I
@@ -951,7 +919,7 @@ Section BioInv.
       (M : gmap nat (Qp * positive))
       (ord : list nat) (devs bnos : nat -> mword 32) : iProp Σ :=
     (own (bn_auth bn) (● M) ∗
-     bslots_auth bn ∗
+     bslots_auth ∗
      ⌜∀ k, is_Some (M !! k) -> (k < NBUF)%nat⌝ ∗
      ⌜ord ≡ₚ seq 0 NBUF⌝ ∗
      ⌜∀ k1 k2, (k1 < NBUF)%nat -> (k2 < NBUF)%nat ->
@@ -1187,10 +1155,16 @@ Section BioInv.
        (∃ bs : list (bv 8), ⌜length bs = 1024%nat⌝ ∗
           [∗ list] j ↦ byte ∈ bs, pa_add (b_data (bpa k)) j ↦ₘ byte)) -∗
     bcache_lru bhead (blist 0 NBUF) -∗
-    ([∗ set] b ∈ bv_cov V, pool_blk V b) ={E}=∗
-    ∃ bn : bio_names, bio_ctx bn V ∗ bslots bn BSLOTS.
+    ([∗ set] b ∈ bv_cov V, pool_blk V b) -∗
+    (* THE SLOT SUPPLY IS NO LONGER MINTED HERE.  Its ghost name is
+       canonical ([Xv6Cameras.bioslot_name]) and therefore fixed before this
+       invariant exists, so [BioDefs.bslots_alloc] mints it at boot and this
+       function takes the authority in and hands the fragments straight back
+       out -- the same total, one step earlier. *)
+    bslots_auth -∗ bslots BSLOTS ={E}=∗
+    ∃ bn : bio_names, bio_ctx bn V ∗ bslots BSLOTS.
   Proof.
-    iIntros (Hnc0) "Hlkw #Hnm Hcpu Hfresh Hbufs Hlru Hpool".
+    iIntros (Hnc0) "Hlkw #Hnm Hcpu Hfresh Hbufs Hlru Hpool Hsa Hsf".
     assert (Hu0 : uint (mword_of_int 0 : mword 32) = 0)
       by (vm_compute; reflexivity).
     (* the NBUF checkout tokens and the NBUF recycle tokens, as functions *)
@@ -1199,8 +1173,6 @@ Section BioInv.
     (* the count authority (no buffer has a reference) and the slot supply *)
     iMod (own_alloc (● (∅ : gmap nat (Qp * positive)) : bioUR)) as (γb) "Hauth".
     { apply auth_auth_valid. intros i. rewrite lookup_empty. done. }
-    iMod (own_alloc ((● BSLOTS ⋅ ◯ BSLOTS) : bioslotUR)) as (γs) "[Hsa Hsf]".
-    { apply auth_both_valid_discrete. split; [done | done]. }
     (* the bcache spinlock's gname, BEFORE its resource can be stated *)
     iMod (newlock_delayed E bcache_addr "bcache"%string with "Hnm Hlkw Hcpu")
       as (γlk) "Hmk".
@@ -1219,7 +1191,7 @@ Section BioInv.
             (fun k p => is_sleeplock (fst p) (snd p) (buf_lock (bnode k))
                           "buffer"%string (lock_tok_excl (fown k)))
             NBUF 0 with "Hsl") as (fslk) "#Hsls".
-    set (bn := MkBioNames γlk γb γs fslk fown fmid).
+    set (bn := MkBioNames γlk γb fslk fown fmid).
     (* every initial payload is empty: blockno 0 is uncovered *)
     assert (Hpay0 : forall k bs,
         buf_pay bn V k false (mword_of_int 0 : mword 32)

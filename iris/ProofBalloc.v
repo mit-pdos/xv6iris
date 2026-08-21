@@ -198,7 +198,7 @@ Local Ltac baidx := first [ vm_compute; reflexivity | vm_compute; discriminate ]
 (*  continuation.                                                         *)
 (* ===================================================================== *)
 Section BallocDefs.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   (* balloc's 80-byte frame: ra@72 s0@64 s1@56 s2@48 s3@40 s4@32 s5@24
      s6@16 s7@8 s8@0.  [pa_stk sp j] counts DOWN from the entry sp, so slot
@@ -251,7 +251,7 @@ Section BallocDefs.
         proc_priv_bare (proc_addr j) pidv Vpr -∗
         sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-        bslots bn 2 -∗
+        bslots 2 -∗
         ((⌜mf !!! Regidx Ra0 = (mword_of_int 0 : mword 64)⌝ ∗
           log_opS γ (2 + u) Sb)
          ∨
@@ -347,7 +347,7 @@ Definition ba_sp (m M : regfile) : Prop :=
 (*  +0x7e .. +0x88 : THE JOIN.  a0 := s1, restore ra/s0/s1, pop, return.  *)
 (* ===================================================================== *)
 Section BallocEpilogue.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   Local Lemma ba_epilogue `{GEN : GenId} `{CID0 : CpuId} 
       (j : nat) (γfs : fs_names) (bn : bio_names) (γ : log_names)
@@ -369,7 +369,7 @@ Section BallocEpilogue.
     proc_priv_bare (proc_addr j) pidv Vpr -∗
     sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-    bslots bn 2 -∗
+    bslots 2 -∗
     ba_arms γfs γ cov logstart bmapstart size u cr Sb rv -∗
     ba_cont (CID0 := CID0) γfs bn γ cov logstart bmapstart size u cr Sb
             pidv dq dqb dqs j m K eb b lks Vpr -∗
@@ -614,7 +614,7 @@ End BallocEpilogue.
 (*  bitmap and the whole reservation go back untouched.                   *)
 (* ===================================================================== *)
 Section BallocOut.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   Local Lemma ba_out `{GEN : GenId} `{CID0 : CpuId} 
       (j : nat) (γfs : fs_names) (bn : bio_names) (γ : log_names)
@@ -637,7 +637,7 @@ Section BallocOut.
     proc_priv_bare (proc_addr j) pidv Vpr -∗
     sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-    bslots bn 2 -∗
+    bslots 2 -∗
     log_opS γ (2 + u) Sb -∗
     ba_cont (CID0 := CID0) γfs bn γ cov logstart bmapstart size u cr Sb
             pidv dq dqb dqs j m K eb b lks Vpr -∗
@@ -990,7 +990,7 @@ End BallocOut.
 (*  outer iteration) is the function's OTHER dead arm.                    *)
 (* ===================================================================== *)
 Section BallocExhaust.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   Local Lemma ba_exhaust `{GEN : GenId} `{CID0 : CpuId} 
       (γs : list gname) (j : nat)
@@ -1026,7 +1026,7 @@ Section BallocExhaust.
     proc_priv_bare (proc_addr j) pidv Vpr -∗
     sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-    bslots bn 1 -∗
+    bslots 1 -∗
     log_opS γ (2 + u) Sb -∗
     bio_locked bn (fs_view γfs γd dev cov) kk pidv dev bnoB bsX bsdX dX -∗
     ba_cont (CID0 := CID0) γfs bn γ cov logstart bmapstart size u cr Sb
@@ -1129,7 +1129,7 @@ Section BallocExhaust.
     { intros c Hcs N2 N8 N9 N18 N19 N20 N21 N22 N23 N24.
       rewrite (callee_saved_lookup Hcs1_cs c Hcs).
       exact (HE1thr c Hcs N2 N8 N9 N18 N19 N20 N21 N22 N23 N24). }
-    iDestruct (iu_slots_join bn 1 1 with "Hsl Hsl1") as "Hsl".
+    iDestruct (iu_slots_join 1 1 with "Hsl Hsl1") as "Hsl".
     (* ===== +0x90 addw s5,s8,s5 : b += BPB ===== *)
     iApply (wp_addw4_s_sconf (mword_of_int (KernelSyms.balloc + 0x90)) Rs5 Rs8 Rs5
               mR (K - 10)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi90").
@@ -1218,7 +1218,7 @@ End BallocExhaust.
 (*  shared epilogue carrying the allocated block.                         *)
 (* ===================================================================== *)
 Section BallocRestore.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   Local Lemma ba_restore `{GEN : GenId} `{CID0 : CpuId} 
       (j : nat) (γfs : fs_names) (bn : bio_names) (γ : log_names)
@@ -1243,7 +1243,7 @@ Section BallocRestore.
     proc_priv_bare (proc_addr j) pidv Vpr -∗
     sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-    bslots bn 2 -∗
+    bslots 2 -∗
     fsblock γfs (bv_unsigned rv) (replicate BSIZE (bv_0 8)) -∗
     blk_own γfs (bv_unsigned rv) -∗
     log_opS γ (if cr then S u else u) (Sb ∪ {[bmapstart]} ∪ {[bv_unsigned rv]}) -∗
@@ -1481,7 +1481,7 @@ End BallocRestore.
 (*  pop s2..s8 and fall into the epilogue with s1 = b + bi.               *)
 (* ===================================================================== *)
 Section BallocBzero.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   Local Lemma ba_bzero `{GEN : GenId} `{CID0 : CpuId} 
       (γs : list gname) (j : nat) (γl : gname)
@@ -1525,7 +1525,7 @@ Section BallocBzero.
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-    bslots bn 2 -∗
+    bslots 2 -∗
     log_opS γ (S (if cr then S u else u)) (Sb ∪ {[bmapstart]}) -∗
     fsblock γfs bi bsD -∗
     blk_own γfs bi -∗
@@ -1654,7 +1654,7 @@ Section BallocBzero.
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID3) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbr : (K_bread <= K - 10)%nat) by (lia).
-    iDestruct (iu_slots_split bn 1 1 with "Hsl") as "[Hsl Hsl1]".
+    iDestruct (iu_slots_split 1 1 with "Hsl") as "[Hsl Hsl1]".
     iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev bnoD dq
               Z2 (K - 10)%nat eb b lks Vpr
@@ -2017,7 +2017,7 @@ Section BallocBzero.
     { intros c Hcs N2 N8 N9 N18 N19 N20 N21 N22 N23 N24.
       rewrite (callee_saved_lookup Hcs4_cs c Hcs).
       exact (HZBthr c Hcs N2 N8 N9 N18 N19 N20 N21 N22 N23 N24). }
-    iDestruct (iu_slots_join bn 1 1 with "Hsl Hsl1") as "Hsl".
+    iDestruct (iu_slots_join 1 1 with "Hsl Hsl1") as "Hsl".
     (* [log_write]/[brelse] do not thread the complement, so [Hextc]/[Hextm]
        are still at [CID4] (bread's own delivery hart) -- one wide hop
        straight to [ba_restore]'s entry hart. *)
@@ -2048,7 +2048,7 @@ End BallocBzero.
 (*  epilogue with s1 = b + bi.                                           *)
 (* ===================================================================== *)
 Section BallocAlloc.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   Local Lemma ba_alloc `{GEN : GenId} `{CID0 : CpuId} 
       (γs : list gname) (j : nat) (γl : gname)
@@ -2104,7 +2104,7 @@ Section BallocAlloc.
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-    bslots bn 1 -∗
+    bslots 1 -∗
     log_opS γ (2 + u) Sb -∗
     (* THE BITMAP'S INVARIANT (BitmapInv.v): persistent, and the pool is
        inside it.  The block's client half comes out for exactly one ghost
@@ -2487,7 +2487,7 @@ Section BallocAlloc.
     { intros c Hcs N2 N8 N9 N18 N19 N20 N21 N22 N23 N24.
       rewrite (callee_saved_lookup Hcs2_cs c Hcs).
       exact (HA5thr c Hcs N2 N8 N9 N18 N19 N20 N21 N22 N23 N24). }
-    iDestruct (iu_slots_join bn 1 1 with "Hsl Hsl1") as "Hsl".
+    iDestruct (iu_slots_join 1 1 with "Hsl Hsl1") as "Hsl".
     (* [log_write]/[brelse] do not thread the complement, so [Hextc]/[Hextm]
        are still at [CID0] -- one wide hop straight to [ba_bzero]'s entry
        hart. *)
@@ -2522,7 +2522,7 @@ End BallocAlloc.
 (*  (bi reached BPB -- exit through +0xe6 to +0x8a).                       *)
 (* ===================================================================== *)
 Section BallocScan.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   Local Lemma ba_scan `{GEN : GenId} 
       (γs : list gname) (j : nat) (γl : gname)
@@ -2583,7 +2583,7 @@ Section BallocScan.
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-    bslots bn 1 -∗
+    bslots 1 -∗
     log_opS γ (2 + u) Sb -∗
     bitmap_inv γfs bmapstart cov logstart size -∗
     bio_locked bn (fs_view γfs γd dev cov) kk pidv dev bnoB
@@ -3373,7 +3373,7 @@ End BallocScan.
 (*  once, at [bi = 0], with the full [Z.to_nat BPB] of fuel.               *)
 (* ===================================================================== *)
 Section BallocMain.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* [ba_main] IS THE ONE CORE both top-level lemmas below build on: the
@@ -3432,7 +3432,7 @@ Section BallocMain.
       dev_inv γu γd -∗
       disk_geom γd pd pav pu -∗
       is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-      bslots bn 2 -∗
+      bslots 2 -∗
       log_opS γ (2 + u) Sb -∗
       wp_next true pj (fun (CID : CpuId) =>
       ∀ (mf : regfile),
@@ -3445,7 +3445,7 @@ Section BallocMain.
           proc_priv_bare pj pidv Vpr -∗
           sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
           sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-          bslots bn 2 -∗
+          bslots 2 -∗
           ((⌜mf !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int 0 : mword 64)⌝ ∗
             log_opS γ (2 + u) Sb)
            ∨
@@ -4156,7 +4156,7 @@ Section BallocMain.
     iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CIDb28) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbr : (K_bread <= K - 10)%nat) by (lia).
-    iDestruct (iu_slots_split bn 1 1 with "Hsl") as "[Hsl Hsl1]".
+    iDestruct (iu_slots_split 1 1 with "Hsl") as "[Hsl Hsl1]".
     iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev bnoB dq
               RA (K - 10)%nat eb b lks Vpr

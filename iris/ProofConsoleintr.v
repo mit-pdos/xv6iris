@@ -138,7 +138,7 @@ Notation Rs10 := (mword_of_int 26 : mword 5).
 Notation Rs11 := (mword_of_int 27 : mword 5).
 
 Section CtBodies.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : RiscvLang.GenId}.
 
   Local Ltac rgall := repeat (rewrite rget_ne; [| vm_compute; discriminate]).
@@ -519,7 +519,7 @@ Module ConsoleintrProof (Acquire : ACQUIRE) (Consputc : CONSPUTC)
                         : CONSOLEINTR.
 
 Section ProofConsoleintr.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Ltac rgall := repeat (rewrite rget_ne; [| vm_compute; discriminate]).

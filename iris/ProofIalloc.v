@@ -320,7 +320,7 @@ Lemma ia_fresh_of_zero (ty : mword 16) :
 Proof. reflexivity. Qed.
 
 Section IallocBytes.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
 
   (* THE RAW 64-BYTE WINDOW of slot [k], borrowed out of the block's byte
      image and given back AT A NEW RECORD.  [DinodeSlot.diblk_slot_acc] is
@@ -425,7 +425,7 @@ Local Ltac iaidx := first [ vm_compute; reflexivity | vm_compute; discriminate ]
 (*  continuation.                                                         *)
 (* ===================================================================== *)
 Section IallocDefs.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
   (* ialloc's 64-byte frame: ra@56 s0@48 s1@40 s2@32 s3@24 s4@16 s5@8 s6@0.
@@ -492,7 +492,7 @@ Section IallocDefs.
         sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
         proc_priv_bare (proc_addr j) pidv Vpr -∗
-        bslots bn 2 -∗
+        bslots 2 -∗
         (if alloc
          then ⌜mf !!! Regidx Ra0 = ientry kslot
                /\ (kslot < NINODE)%nat
@@ -538,7 +538,7 @@ Definition ia_sp (m M : regfile) : Prop :=
 (*  a0 already carries the arm's return value.                            *)
 (* ===================================================================== *)
 Section IallocEpilogue.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
   Local Lemma ia_epilogue `{GEN : GenId} `{CID0 : CpuId}
@@ -563,7 +563,7 @@ Section IallocEpilogue.
     proc_priv_bare (proc_addr j) pidv Vpr -∗
     sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-    bslots bn 2 -∗
+    bslots 2 -∗
     ia_arms γ dev inodestart ninodes nib ty u Sb (M !!! Regidx Ra0 : mword 64) -∗
     ia_cont (CID0 := CID0) γ bn inodestart ninodes nib dev ty u Sb
             pidv dq dqs dqn j m K b lks Vpr -∗
@@ -762,7 +762,7 @@ End IallocEpilogue.
 (*  stays at the standing six.                                           *)
 (* ===================================================================== *)
 Section IallocOut.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
   Local Lemma ia_out `{GEN : GenId} `{CID0 : CpuId}
@@ -786,7 +786,7 @@ Section IallocOut.
     proc_priv_bare (proc_addr j) pidv Vpr -∗
     sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-    bslots bn 2 -∗
+    bslots 2 -∗
     iref_slot -∗
     log_opS γ (S u) Sb -∗
     ia_cont (CID0 := CID0) γ bn inodestart ninodes nib dev ty u Sb
@@ -1096,7 +1096,7 @@ End IallocOut.
 (*  (ialloc_fresh ty) ds] -- no resource in, [True] out.                  *)
 (* ===================================================================== *)
 Section IallocClaim.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
   Local Lemma ia_claim `{GEN : GenId} `{CID0 : CpuId}
@@ -1161,7 +1161,7 @@ Section IallocClaim.
     proc_priv_bare (proc_addr j) pidv Vpr -∗
     sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-    bslots bn 1 -∗
+    bslots 1 -∗
     log_opS γ (S u) Sb -∗
     bio_held bn (fs_view γfs γd dev cov) kk pidv dev bno
        (diblk_bytes ds) (diblk_bytes ds) bsd d0 -∗
@@ -1599,7 +1599,7 @@ Section IallocClaim.
     assert (Hpca4 : ret_pc (W7 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ialloc + 0xa4)) by (rewrite HW7ra; pcw).
     iEval (rewrite Hpca4) in "Hpc".
-    iDestruct (iu_slots_join bn 1 1 with "Hsl Hsl1") as "Hsl".
+    iDestruct (iu_slots_join 1 1 with "Hsl Hsl1") as "Hsl".
     pose proof Hcsr as Hcsr_cs.
     assert (HmRs2 : mR !!! Regidx Rs2 = (sign_extend' 64 inum : mword 64))
       by (rewrite (callee_saved_lookup Hcsr_cs Rs2 ltac:(vm_compute; reflexivity));
@@ -1937,7 +1937,7 @@ End IallocClaim.
 (*  fresh [CpuId] and the whole bundle.                                   *)
 (* ===================================================================== *)
 Section IallocScan.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
   Local Lemma ia_scan `{GEN : GenId} `{CIDe : CpuId}
@@ -2001,7 +2001,7 @@ Section IallocScan.
          proc_priv_bare (proc_addr j) pidv Vpr -∗
          sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
          sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-         bslots bn 2 -∗
+         bslots 2 -∗
          iref_slot -∗
          log_opS γ (S u) Sb -∗
          ia_cont (CID0 := CIDc) γ bn inodestart ninodes nib dev ty u Sb
@@ -2223,7 +2223,7 @@ Section IallocScan.
       iDestruct (wp_next_shift (b := true) (CIDa := CIDc) (CIDb := CID5) ltac:(wp_next_chain)
                    with "Hcont") as "Hcont".
       assert (HKbr : (K_bread <= K - 8)%nat) by (lia).
-      iDestruct (iu_slots_split bn 1 1 with "Hsl") as "[Hsl Hsl1]".
+      iDestruct (iu_slots_split 1 1 with "Hsl") as "[Hsl Hsl1]".
       iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
                 (fs_view γfs γd dev cov) pidv dev bno dq
                 G4 (K - 8)%nat true b lks Vpr
@@ -2602,7 +2602,7 @@ Section IallocScan.
         assert (Hpc58 : ret_pc (GB !!! Regidx Rra : mword 64)
                         = mword_of_int (KernelSyms.ialloc + 0x58)) by (rewrite HGBra; pcw).
         iEval (rewrite Hpc58) in "Hpc".
-        iDestruct (iu_slots_join bn 1 1 with "Hsl Hsl1") as "Hsl".
+        iDestruct (iu_slots_join 1 1 with "Hsl Hsl1") as "Hsl".
         pose proof Hcsr as Hcsr_cs.
         assert (HmRs2 : mR !!! Regidx Rs2 = (sign_extend' 64 inum : mword 64))
           by (rewrite (callee_saved_lookup Hcsr_cs Rs2 ltac:(vm_compute; reflexivity));
@@ -2799,7 +2799,7 @@ End IallocScan.
 (*  +0x00 .. +0x2e : THE PROLOGUE, and the contract.                      *)
 (* ===================================================================== *)
 Section IallocMain.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ,
             ICFG : icfg, !irefslotG Σ, !pavG Σ}.
 
   Lemma wp_ialloc_gen `{GEN : GenId} `{CID : CpuId}

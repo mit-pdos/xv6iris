@@ -305,7 +305,7 @@ Global Instance fread_names_inhabited : Inhabited fread_names :=
                1%positive 1%positive)
     1%positive 1%positive
     (mword_of_int 0) (mword_of_int 0) (mword_of_int 0)
-    (MkBioNames 1%positive 1%positive 1%positive
+    (MkBioNames 1%positive 1%positive
        (fun _ => (1%positive, 1%positive)) (fun _ => 1%positive)
        (fun _ => 1%positive))
     (MkFsNames 1%positive 1%positive 1%positive)
@@ -323,7 +323,7 @@ Global Instance fread_names_inhabited : Inhabited fread_names :=
    [icfg_dev], and a freshly written [icfg_dev] here would be the standalone
    instance's.  Same edit as SpecFilestat's. *)
 Section SpecFileread.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
@@ -486,7 +486,7 @@ Section SpecFileread.
        (disk_res (frn_disk fn) (frn_pd fn) (frn_pav fn) (frn_pu fn)) ∗
      (* ONE slot unit: ilock's bread takes it and brelse gives it back;
         readi's does the same, one after the other *)
-     bslot (frn_bio fn))%I.
+     bslot)%I.
 
   (* What comes back: the superblock fraction and the slot unit.  NO SHARE --
      the share never left the reference's payload, so there is nothing here
@@ -495,7 +495,7 @@ Section SpecFileread.
   Definition fileread_fs_out (fn : fread_names) : iProp Σ :=
     (sb_inodestart ↦₄{frn_dqs fn}
        (mword_of_int (frn_inodestart fn) : mword 32) ∗
-     bslot (frn_bio fn))%I.
+     bslot)%I.
 
   (* ---- and the three, selected by the file's type ---- *)
   Definition fileread_env (γf : gname)
@@ -679,7 +679,7 @@ Section SpecFileread.
 End SpecFileread.
 
 Definition wp_fileread_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (γa : gname) (γf : gname)                    (* kalloc, the file table  *)
@@ -757,7 +757,7 @@ Definition wp_fileread_sconf_body
 
 Module Type FILEREAD.
   Parameter wp_fileread_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
       (γa : gname) (γf : gname)

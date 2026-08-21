@@ -440,7 +440,7 @@ Qed.
 (* ===================================================================== *)
 
 Section IupdateRes.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
 
   (* the 64 bytes at [a], read as [dinode_bytes d]: the six pieces the four
      [sh]s, the [sw] and the [memmove] touch, at the offsets those
@@ -729,12 +729,12 @@ Section IupdateRes.
   Qed.
 
   (* slot-unit bookkeeping *)
-  Lemma iu_slots_split (bn : bio_names) (a c : nat) :
-    bslots bn (a + c) -∗ bslots bn a ∗ bslots bn c.
+  Lemma iu_slots_split (a c : nat) :
+    bslots (a + c) -∗ bslots a ∗ bslots c.
   Proof. rewrite bslots_op. iIntros "$". Qed.
 
-  Lemma iu_slots_join (bn : bio_names) (a c : nat) :
-    bslots bn a -∗ bslots bn c -∗ bslots bn (a + c).
+  Lemma iu_slots_join (a c : nat) :
+    bslots a -∗ bslots c -∗ bslots (a + c).
   Proof.
     iIntros "H1 H2". rewrite bslots_op. iSplitL "H1"; [iExact "H1" | iExact "H2"].
   Qed.

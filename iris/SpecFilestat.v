@@ -229,7 +229,7 @@ Global Instance fstat_names_inhabited : Inhabited fstat_names :=
                1%positive 1%positive)
     1%positive
     (mword_of_int 0) (mword_of_int 0) (mword_of_int 0)
-    (MkBioNames 1%positive 1%positive 1%positive
+    (MkBioNames 1%positive 1%positive
        (fun _ => (1%positive, 1%positive)) (fun _ => 1%positive)
        (fun _ => 1%positive))
     (MkFsNames 1%positive 1%positive 1%positive)
@@ -238,7 +238,7 @@ Global Instance fstat_names_inhabited : Inhabited fstat_names :=
     ∅ 0 0 (DfracOwn 1)).
 
 Section SpecFilestat.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
@@ -277,7 +277,7 @@ Section SpecFilestat.
      is_lock (fsn_dlock fn) d_lock "virtio_disk"%string
        (disk_res (fsn_disk fn) (fsn_pd fn) (fsn_pav fn) (fsn_pu fn)) ∗
      (* ONE slot unit: ilock's bread takes it and brelse gives it back *)
-     bslot (fsn_bio fn))%I.
+     bslot)%I.
 
   (* What comes back: the superblock fraction and the slot unit.  NO SHARE --
      the share never left the reference's payload, so there is nothing here
@@ -286,7 +286,7 @@ Section SpecFilestat.
   Definition filestat_fs_out (fn : fstat_names) : iProp Σ :=
     (sb_inodestart ↦₄{fsn_dqs fn}
        (mword_of_int (fsn_inodestart fn) : mword 32) ∗
-     bslot (fsn_bio fn))%I.
+     bslot)%I.
 
   (* ---- and the two, selected by the file's type ---- *)
   Definition filestat_env (fn : fstat_names) (Cf : fcontent) : iProp Σ :=
@@ -452,7 +452,7 @@ Section SpecFilestat.
 End SpecFilestat.
 
 Definition wp_filestat_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
       !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
     (γa : gname) (γf : gname)                    (* kalloc, the file table  *)
@@ -515,7 +515,7 @@ Definition wp_filestat_sconf_body
 
 Module Type FILESTAT.
   Parameter wp_filestat_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ,
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
       (γa : gname) (γf : gname)

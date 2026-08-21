@@ -146,7 +146,7 @@ Module SysOpenProof (Argint : ARGINT) (Argstr : ARGSTR) (BeginOp : BEGIN_OP)
 Module Tails := SysOpenTails Iunlock Iunlockput EndOp Fileclose.
 
 Section ProofSysOpenBody.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
@@ -220,7 +220,7 @@ Section ProofSysOpenBody.
          pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
          sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
          sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-         bslots bn 3 -∗
+         bslots 3 -∗
          iref_slots ns' -∗
          sys_open_post gf pj pidv V (mf !!! Regidx Ra0 : mword 64) -∗
          WP (Loop : expr riscv_lang))%I.
@@ -326,7 +326,7 @@ Section ProofSysOpenBody.
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bitmap_inv gfs bmapstart cov logstart size -∗
-    bslots bn 3 -∗
+    bslots 3 -∗
     iref_slots nsj -∗
     fd_slot -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
@@ -552,7 +552,7 @@ Section ProofSysOpenBody.
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bitmap_inv gfs bmapstart cov logstart size -∗
-    bslots bn 3 -∗
+    bslots 3 -∗
     iref_slots nsj -∗
     fd_slot -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
@@ -1165,7 +1165,7 @@ Section ProofSysOpenBody.
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bitmap_inv gfs bmapstart cov logstart size -∗
-    bslots bn 3 -∗
+    bslots 3 -∗
     (* ONE OF THESE IS [fileclose]'s LOAN.  The D-FAIL tail closes the file
        it just allocated, and [SpecFileclose] borrows an iref unit across
        the call -- see the note on its [iref_slot] row.  The block takes it
@@ -1947,7 +1947,7 @@ Section ProofSysOpenBody.
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bitmap_inv gfs bmapstart cov logstart size -∗
-    bslots bn 3 -∗
+    bslots 3 -∗
     (* THE ALLOWANCE, PASSED STRAIGHT DOWN.  This block spends nothing of
        its own; [so_alloc] below is what takes [fileclose]'s loan off the
        top, which is where the [1 <= nsj] premise goes. *)
@@ -2257,8 +2257,8 @@ Section ProofSysOpenBody.
   Qed.
 
   (* ilock's ONE bread reference, carved out of the syscall's three. *)
-  Local Lemma so_bs3 (bn : bio_names) :
-    (bslots bn 3 : iProp Σ) ⊣⊢ bslot bn ∗ bslots bn 2.
+  Local Lemma so_bs3 :
+    (bslots 3 : iProp Σ) ⊣⊢ bslot ∗ bslots 2.
   Proof. rewrite /bslot. change 3%nat with (1 + 2)%nat. apply bslots_op. Qed.
 
   (* the cwd goes out to namei and comes back UNCHANGED, so
@@ -2297,7 +2297,7 @@ Section ProofSysOpenBody.
          sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
          sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
          sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-         bslots bn 3 -∗
+         bslots 3 -∗
          iref_slots ns' -∗
          sys_open_post gf pj pidv V (mf !!! Regidx Ra0 : mword 64) -∗
          WP (Loop : expr riscv_lang))%I.
@@ -2396,7 +2396,7 @@ Section ProofSysOpenBody.
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
     log_opS g MAXOPBLOCKS Sb -∗
-    bslots bn 3 -∗
+    bslots 3 -∗
     iref_slots ns -∗
     fd_slot -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
@@ -2853,7 +2853,7 @@ Section ProofSysOpenBody.
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
     log_opS g MAXOPBLOCKS Sb -∗
-    bslots bn 3 -∗
+    bslots 3 -∗
     iref_slots ns -∗
     fd_slot -∗
     (pa_stk sp0 1) ↦₈[KT1] (m !!! Regidx Rra : mword 64) -∗
@@ -3115,7 +3115,7 @@ Section ProofSysOpenBody.
     iDestruct (so_esc_acc cn gfs gi cov logstart kk Hkk with "Hescrows")
       as "#Hesck".
     iDestruct (so_slk_acc cn kk Hkk with "Hslks") as (gil gisl) "#Hslkk".
-    iDestruct (so_bs3 bn with "Hbsl") as "[Hbs1 Hbs2]".
+    iDestruct (so_bs3 with "Hbsl") as "[Hbs1 Hbs2]".
     (* the reference ledger at the join: namei took two and gave one back *)
     iDestruct (iref_slots_combine 1 (ns - 2) with "Hir1 Hirr") as "Hisl".
     assert (Hnsj : (1 + (ns - 2))%nat = (ns - 1)%nat) by lia.
@@ -3172,7 +3172,7 @@ Section ProofSysOpenBody.
     assert (Hpcil : ret_pc (P2 !!! Regidx Rra : mword 64)
                     = mword_of_int (SO + 0xec)) by (rewrite HP2ra; pcw).
     iEval (rewrite Hpcil) in "Hpc".
-    iDestruct (so_bs3 bn with "[Hbs1 Hbs2]") as "Hbsl";
+    iDestruct (so_bs3 with "[Hbs1 Hbs2]") as "Hbsl";
       [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
     (* the process, put back whole: everything below wants [proc_priv] *)
     iDestruct (cwd_ref_of_held with "Hcwdref") as "Href".

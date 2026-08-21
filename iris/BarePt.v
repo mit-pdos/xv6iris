@@ -430,7 +430,7 @@ Proof.
 Qed.
 
 Section BarePt.
-  Context `{!riscvGS Σ, !xv6G Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ}.
 
   (* THE PREDICATE, at any [fx].  Compare [ProcPtOwn.proc_pt]: same three
      conjuncts, with the fixed-leaf map exposed and its [fx_wf] carried

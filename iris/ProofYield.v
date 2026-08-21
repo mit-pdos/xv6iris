@@ -105,7 +105,7 @@ Module YieldProof (Myproc : MYPROC) (Acquire : ACQUIRE) (Sched : SCHED) (Release
 (* its last instruction, so even the epilogue is hart-generic.             *)
 (* ===================================================================== *)
 Section YieldPostSched.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   (* generic register-map peel over the proof's [set]-chain (hit-first). *)
   Local Ltac yd_peel :=
@@ -463,7 +463,7 @@ Section YieldPostSched.
 End YieldPostSched.
 
 Section ProofYield.
-  Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_yield_sconf 

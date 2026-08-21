@@ -100,7 +100,7 @@ Local Open Scope Z_scope.
    and log_write 18. *)
 Notation K_bfree := (62%nat) (only parsing).
 Definition wp_bfree_gen_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
@@ -181,7 +181,7 @@ Definition wp_bfree_gen_body
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
   (* TWO slot units: bread's reference is held across log_write, which wants
      one of its own; brelse gives it back *)
-  bslots bn 2 -∗
+  bslots 2 -∗
   (* THE CREDIT, AS A RESOURCE AT A NAMED EPOCH (fs-log.md §G.19/§G.20).
      Claiming the free arm means claiming THE BITMAP BLOCK is already in
      lh.block[] -- there is only one, FSSIZE = 2000 < BPB = 8192, which is
@@ -221,13 +221,13 @@ Definition wp_bfree_gen_body
       pc_is ret_tgt -∗
       proc_priv_bare pj pidv Vpr -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-      bslots bn 2 -∗
+      bslots 2 -∗
       log_opSe γ (if cr then S u else u) (Sb ∪ {[bmapstart]}) e0 -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
 Definition wp_bfree_sconf_body
-    `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
@@ -308,7 +308,7 @@ Definition wp_bfree_sconf_body
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
   (* TWO slot units: bread's reference is held across log_write, which wants
      one of its own; brelse gives it back *)
-  bslots bn 2 -∗
+  bslots 2 -∗
   (* THE RESERVATION, SPEND-EXACTLY: the one log_write always runs *)
   log_op γ (S u) -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP
@@ -329,7 +329,7 @@ Definition wp_bfree_sconf_body
       pc_is ret_tgt -∗
       proc_priv_bare pj pidv Vpr -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
-      bslots bn 2 -∗
+      bslots 2 -∗
       log_op γ u -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -339,7 +339,7 @@ Module Type BFREE.
      set-forgetting instance at [cr = false], kept as its own parameter so
      that balloc and every other caller is unchanged. *)
   Parameter wp_bfree_gen :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
@@ -357,7 +357,7 @@ Module Type BFREE.
                         pidv dq dqb m K eb b lks Vpr.
 
   Parameter wp_bfree_sconf :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
