@@ -697,6 +697,30 @@ Proof.
   pose proof (Z.mod_pos_bound (sz + 1023) 1024 ltac:(lia)) as Hm. lia.
 Qed.
 
+(* ...AND THE SAME COVER AT [nat], which is the shape
+   [file_bytes_take_blocks]' second premise wants.  IT IS PROVED
+   SYMBOLICALLY, THROUGH [Nat2Z.inj_le], AND THAT IS THE WHOLE POINT.  The
+   goal is [Z.to_nat sz <= Z.to_nat (fs_nblk sz) * BSIZE] at [nat], and for
+   a REAL file [sz] is tens of thousands: a [vm_compute] on it normalises
+   both sides to unary successor chains that deep and overflows an 8 MB
+   stack outright and deterministically -- it does not look like memory
+   pressure, it looks like a broken proof in a file nobody touched.  (That
+   is durable-notes' "a [nat] equality whose RHS is a large literal needs
+   [Z], not a bigger stack", one inequality over.)  Through [Nat2Z.inj_le]
+   the whole thing is [fs_nblk_cover] and costs nothing at all, at any
+   size.  Every caller with a concrete image wants THIS, never the
+   [vm_compute]. *)
+Lemma fs_nblocks_cover_nat (sz : Z) :
+  0 <= sz -> (Z.to_nat sz <= fs_nblocks sz * BSIZE)%nat.
+Proof.
+  intros Hsz. unfold fs_nblocks.
+  assert (Hnn : 0 <= fs_nblk sz)
+    by (unfold fs_nblk, BSIZE_z; apply Z.div_pos; lia).
+  apply Nat2Z.inj_le. rewrite Nat2Z.inj_mul.
+  rewrite (Z2Nat.id sz Hsz), (Z2Nat.id (fs_nblk sz) Hnn), BSIZE_z_nat.
+  exact (fs_nblk_cover sz Hsz).
+Qed.
+
 (* ...and the SIZE CAP read as a block-count cap: a file no bigger than
    MAXFILE blocks has at most MAXFILE of them.  This is what bounds the
    indirect-entry INDEX in [fs_inode_blocks] (an entry list is only 256
@@ -740,12 +764,7 @@ Proof.
   assert (Hsz : 0 <= sz) by exact (proj1 (bv_unsigned_in_range _ _)).
   apply file_bytes_take_blocks.
   - intros q. apply fs_data_of_sized. exact HP.
-  - unfold fs_nblocks.
-    assert (Hnn : 0 <= fs_nblk sz)
-      by (unfold fs_nblk, BSIZE_z; apply Z.div_pos; lia).
-    apply Nat2Z.inj_le. rewrite Nat2Z.inj_mul.
-    rewrite (Z2Nat.id sz Hsz), (Z2Nat.id (fs_nblk sz) Hnn), BSIZE_z_nat.
-    exact (fs_nblk_cover sz Hsz).
+  - exact (fs_nblocks_cover_nat sz Hsz).
 Qed.
 
 (* [FsTree.fsnode] carries no decidable equality of its own; a consumer's

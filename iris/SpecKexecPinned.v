@@ -160,9 +160,13 @@ Lemma init_bytes_elf : init_bytes = ElfUser.init_elf.
 Proof.
   assert (Hb : init_bytes = fsimg_file_bytes 7).
   { rewrite /init_bytes /fv_of /fsimg_file_bytes /init_data /init_dn.
+    (* the block-count cover, SYMBOLICALLY.  A [vm_compute] here normalises
+       a ~36000-byte size to a unary successor chain on BOTH sides and
+       overflows an 8 MB stack outright; [FsImg.fs_nblocks_cover_nat] goes
+       through [Nat2Z.inj_le] and costs nothing.  See its header. *)
     apply file_bytes_take_blocks;
       [ intro q; apply (fs_data_of_sized fsimg_P _ fsimg_blocks_full)
-      | unfold fs_nblocks, fs_nblk, BSIZE, BSIZE_z; vm_compute; lia ]. }
+      | apply fs_nblocks_cover_nat, (proj1 (bv_unsigned_in_range _ _)) ]. }
   rewrite Hb.
   pose proof fsimg_init_bytes_bool as H. by apply bool_decide_eq_true_1 in H.
 Qed.
@@ -266,8 +270,15 @@ Qed.
 
 (*  THE ONE THE WALK QUOTES: /init's file is 35976 bytes, so a 64-byte
     read at offset 0 is entirely inside it and lands on [init_ef].        *)
+(*  THE LENGTH IS READ AT [Z], not computed at [nat]: [vm_compute] on
+    [length init_elf] materialises 35976 nested [S]s, which is the same
+    stack trap the cover above avoids.  [ElfUser.init_elf_length] already
+    states the fact in the shape that costs nothing.                      *)
 Lemma init_hdr_len : (64 <= length init_bytes)%nat.
-Proof. rewrite init_bytes_elf. vm_compute. lia. Qed.
+Proof.
+  rewrite init_bytes_elf. apply Nat2Z.inj_le.
+  rewrite ElfUser.init_elf_length. vm_compute. discriminate.
+Qed.
 
 Lemma rd_delivered_init (data : nat -> list (bv 8)) (dst_olds : nat -> bv 8)
     (dn : dinode) (i : nat) :
