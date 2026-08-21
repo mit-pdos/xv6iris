@@ -390,6 +390,30 @@ the normalization").
   bytes), byte-disjointness for (W,W), and the `∉ gd_deps` pair.
   Two unused hypotheses (`gis_w e` in `gswap_write_down` and
   `gswapw_resolves`) kept for statement fidelity, droppable.
+- **B2d — LANDED (2026-08-21): `iris/WeakRvwmoNorm.v`,
+  `normalize` — the kill-parameterized exchange normalization, Closed,
+  no axioms.**  Consistency + `kill_K1/K2/K3` ⇒ a rule-14 graph with
+  `rows_rel π` (rows equal modulo the write-index renaming `lbl_ren π`,
+  values/bases/classes untouched), `wperm π` (write messages preserved
+  under the bijection), and the SAME dep set.  The po-minimal-witness
+  discipline worked exactly as designed: every side condition is one
+  application of `po_min_no_blocker` (via the new
+  `gppo_po_lt` — all four ppo⁻ arms pin the offset, not just the
+  hart), the final swap's conditions are all derivable, and no fourth
+  kill was needed.  THE ONE DESIGN DELTA: the kills quantify over the
+  ROWS-EQUIVALENT ORBIT (`∀ GD', gd_equiv GD GD' → …configuration at
+  GD'…`), forced twice over — the minimality clauses are
+  backward-unstable (violations only shrink along the chain), and
+  K2's `t < gwix e` does not transport under a non-monotone
+  transposition — and `gd_equiv` is exactly the invariant the
+  induction maintains (`normalize`'s own conclusion shape).  **B2e
+  must discharge the kills for an ARBITRARY rows-equivalent
+  consistent graph** — cheap in kind, since the realized-prefix
+  argument depends on the rows and the write messages, both
+  orbit-invariant.  THE NON-VACUITY CHECK, machine-checked:
+  `lbgd_kill_K1_false` — the LB witness REFUTES K1, so the kill
+  interface is not vacuously true and the normalization correctly
+  sticks on LB (the design's sanity check in its strongest form).
 - **B2**: the exchange lemma's case trichotomy (§3b) with the kills
   wired per S6 §3; the induction + measure.  NOTE from the B0 pass
   (2026-08-21): several S6 kills flip from reader-refutation to

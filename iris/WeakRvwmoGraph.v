@@ -694,6 +694,17 @@ Proof.
                        |[[[Hag _] _]|[[Hag _] _]]]]; exact Hag.
 Qed.
 
+(** ... AND PO-EARLIER.  The same four disjuncts also pin the OFFSET: [gpo]
+    and [gfence_between] both carry [e1.2 < e2.2].  This is the shape the
+    exchange induction's vacuity argument consumes — a ppo⁻ blocker of a
+    po-minimal witness is a same-hart po-EARLIER event, hence an earlier
+    witness. *)
+Lemma gppo_po_lt G e1 e2 : gppo G e1 e2 → e1.1 = e2.1 ∧ (e1.2 < e2.2)%nat.
+Proof.
+  intros [[[Hag [Hlt _]] _]|[(pr & pw & sr & sw & (Hag & Hlt & _) & _ & _)
+                             |[[[Hag [Hlt _]] _]|[[Hag [Hlt _]] _]]]]; done.
+Qed.
+
 (** ** 8.1 [gwix]'s junk value, and its contrapositive
 
     [gwix] is [0] off the write sub-order (the [list_find] fallback), so a

@@ -904,6 +904,7 @@ WeakSrvwmoCapstone.v
 WeakRvwmoGraph.v
 WeakRvwmoLin.v
 WeakRvwmoXchg.v
+WeakRvwmoNorm.v
 WeakAxRealize.v
 WeakInterp.v
 WeakInterpProj.v
