@@ -951,6 +951,13 @@ Section KexitPark.
     (* the cwd's unit REJOINED with the allowance: [iput] handed the [1]
        back when it destroyed the reference. *)
     iref_slots (1 + IREFSPARE) -∗
+    (* THE BIO ALLOWANCE, ON ITS WAY BACK TO THE SLOT.  kexit still holds the
+       three units allocproc handed the process -- everything it spent them
+       on is a round trip ([SpecBread] in, [SpecBrelse] out) -- and the ZOMBIE
+       park is the only place they are ever returned.  See
+       [ProcInv.proc_priv_to_dormant_zombie] for why dropping them here would
+       drain the supply. *)
+    bslots 3 -∗
     (* THE DEFICIT BLOCK: by the time kexit parks, [p->cwd] is 0 and the
        reference it named is gone, so there is no [proc_priv] at this [V]
        and there should not be. *)
@@ -959,7 +966,7 @@ Section KexitPark.
   Proof.
     intros pj Hj Hgl Hav Hregs Hof Hcwd Hfresh.
     destruct Hregs as (Hs3 & Hs4 & Hsp0 & Hdom).
-    iIntros "Hcg Hcloser Hown Htce Hcce #Htext Hpc #Hprocs #Hwl Hinit Hsp Hir Hpriv".
+    iIntros "Hcg Hcloser Hown Htce Hcce #Htext Hpc #Hprocs #Hwl Hinit Hsp Hir Hbs Hpriv".
     (* THE SCHED CROSSING NEEDS THE EXACT SINGLETON: swtch is contracted at
        [{["proc"]}] on both sides (SpecSwtch.v), xv6's own
        [panic("sched locks")] discipline.  [kx_park] enters at depth 0, so the
@@ -1473,7 +1480,7 @@ Section KexitPark.
     iApply (Sched.wp_sched_sconf (CID := CIDa)  γs j γl ZOMBIE ch0 PD (trap_res b + av)%nat eb
               Hj Hgl park_ok_ZOMBIE ltac:(lia)
               with "Hcg Htext Hpc Hprocs [Hlkp Hstate Hpg Hchan Hkilled Hxstate Hpidh]
-                    [Hpriv Hsp Hir Hcloser] Hpay Hcpuemp Hoc Htag Hvc").
+                    [Hpriv Hsp Hir Hbs Hcloser] Hpay Hcpuemp Hoc Htag Hvc").
     { rewrite /proc_held. iFrame "Hlkp Hstate Hpg Hchan".
       iExists kl, (trunc32 (rget (CID := CIDa) mlk (mword_of_int 20 : mword 5))), pidv.
       iFrame "Hkilled Hxstate Hpidh". }
@@ -1489,7 +1496,7 @@ Section KexitPark.
       iIntros "Hstk".
       iEval (rewrite HPDsp) in "Hstk".
       iDestruct ("Hcloser" with "Hstk") as "Hkst".
-      iApply (kexit_park_pay γf j pid V Hof Hcwd with "Hpriv Hsp Hir Hkst"). }
+      iApply (kexit_park_pay γf j pid V Hof Hcwd with "Hpriv Hsp Hir Hbs Hkst"). }
     (* NO POST-RESUME ARM.  [needs_ctx ZOMBIE] is false, so sched's contract
        owes the caller nothing after the crossing: the swtch a dying thread
        makes does not come back, and THAT is the proof that the
@@ -1860,7 +1867,7 @@ Section KexitRest.
               ltac:(cbn [upd_cwd pv_ofile]; exact Hof)
               ltac:(cbn [upd_cwd pv_cwd]; reflexivity)
               Hfresh_wl
-              with "Hcg Hcloser Hown Htce Hcce Htext Hpc Hprocs Hwl Hinit Hsp Hir Hpriv").
+              with "Hcg Hcloser Hown Htce Hcce Htext Hpc Hprocs Hwl Hinit Hsp Hir Hbsl Hpriv").
   Qed.
 
 End KexitRest.

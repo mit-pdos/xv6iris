@@ -478,9 +478,9 @@ Section FsBoot.
        canonical ([Xv6Cameras.bioslot_name]), so it is fixed before this
        bundle runs: [BioDefs.bslots_alloc] mints authority and fragments
        together at the era, and the fragments come straight back out below. *)
-    bslots_auth -∗ bslots BSLOTS ={E}=∗
+    bslots_auth -∗ bslots BSLOTS_FS ={E}=∗
     ∃ (bn : bio_names) (γfs : fs_names),
-      bio_ctx bn (fs_view γfs γv dev cov) ∗ bslots BSLOTS ∗
+      bio_ctx bn (fs_view γfs γv dev cov) ∗ bslots BSLOTS_FS ∗
       ghost_map_auth (fs_L γfs) 1 (fs_L0 dk cov) ∗
       ghost_map_auth (fs_dirty γfs) 1 (fs_D0 dk cov) ∗
       ([∗ set] b ∈ cov, b ↪[fs_dirty γfs]{#(1/2)} false) ∗

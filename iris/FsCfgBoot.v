@@ -1068,7 +1068,7 @@ Section FsCfgBootEra.
         (C) [IrefSlots.iref_slot] (one unit, for ireclaim's iget/iput pair)
             and [BioDefs.bslots 35].  Producers: the boot-shared
             [iref_slots IREFSLOTS] row, and [bio_init_at]'s POSTCONDITION
-            ([bslots BSLOTS] is produced at main+0x8e, not at the era) --
+            ([bslots BSLOTS_FS] is produced at main+0x8e, not at the era) --
             so the [bslots] must be carried from kit 1's consumption site.
         (D) PAID, and it is a row below rather than an owed one:
             [BitmapInv.bitmap_inv], allocated in the era fupd from
@@ -1320,7 +1320,7 @@ Section FsCfgBootEra.
        and [BioDefs.bslots_alloc] is what mints it -- one layer up, beside
        the other name-carrying classes.  Both halves come in because
        [BioInitAt.bio_free_tok] carries both. *)
-    bslots_auth -∗ bslots BSLOTS ={E}=∗
+    bslots_auth -∗ bslots BSLOTS_FS ={E}=∗
     ∃ (ICFG : icfg) (FSC : fscfg),
       (* ---- N-5.1 (W5a): ROOT'S PIN, THE ONE NEW CONJUNCT ----
          The stocking spends [ROOTINO]'s mint licence while it still holds

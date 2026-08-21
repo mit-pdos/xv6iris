@@ -2101,13 +2101,19 @@ Section ProcInv.
      only party that ever mints one ([KstackOwn.kstack_bank], out of
      kvminit's 64 pages and kvminithart's 64 claims): every later producer
      of a dormant slot (freeproc, kexit) passes on the one it was given. *)
+  (* ...AND SO DOES THE BIO ALLOWANCE, for the same reason and by the same
+     route: three units per slot, minted once at boot out of [BSLOTS] and
+     passed on by every later producer of a dormant slot.  See
+     [ProcDefs.proc_dormant]'s note for why the slot rather than the process
+     owns them while it is dormant. *)
   Lemma proc_dormant_seal (pa : mword 64) :
     proc_dormant_nofd pa -∗ fd_slots (NOFILE + FDSPARE) -∗
-    iref_slots (1 + IREFSPARE) -∗ kstack_free pa -∗ proc_dormant pa UNUSED.
+    iref_slots (1 + IREFSPARE) -∗ bslots 3 -∗ kstack_free pa -∗
+    proc_dormant pa UNUSED.
   Proof.
-    iIntros "(%V & %pid & [%Hof [%Hcwd %Hsz]] & Hpid & Hf & Ho & Hctx & Hpg & Htf) Hs Hir Hkst".
+    iIntros "(%V & %pid & [%Hof [%Hcwd %Hsz]] & Hpid & Hf & Ho & Hctx & Hpg & Htf) Hs Hir Hbs Hkst".
     iDestruct (fd_slots_split with "Hs") as "[Hs Hsp]".
-    iExists V, pid. iFrame "Hpid Hf Ho Hsp Hir Hkst Hctx". iSplit; [done|].
+    iExists V, pid. iFrame "Hpid Hf Ho Hsp Hir Hbs Hkst Hctx". iSplit; [done|].
     rewrite bool_decide_eq_false_2; [| vm_compute; discriminate].
     iSplitL "Hs".
     { iApply fd_slots_to_any. by rewrite Hof length_replicate. }
@@ -2124,18 +2130,18 @@ Section ProcInv.
      ([SpecProcinit.procs_inv_alloc]'s pass 3). *)
   Definition proc_dormant_prestk (pa : mword 64) : iProp Σ :=
     (proc_dormant_nofd pa ∗ fd_slots (NOFILE + FDSPARE) ∗
-     iref_slots (1 + IREFSPARE))%I.
+     iref_slots (1 + IREFSPARE) ∗ bslots 3)%I.
 
   Lemma proc_dormant_prestk_intro (pa : mword 64) :
     proc_dormant_nofd pa -∗ fd_slots (NOFILE + FDSPARE) -∗
-    iref_slots (1 + IREFSPARE) -∗ proc_dormant_prestk pa.
-  Proof. iIntros "H Hs Hir". iFrame "H Hs Hir". Qed.
+    iref_slots (1 + IREFSPARE) -∗ bslots 3 -∗ proc_dormant_prestk pa.
+  Proof. iIntros "H Hs Hir Hbs". iFrame "H Hs Hir Hbs". Qed.
 
   Lemma proc_dormant_prestk_seal (pa : mword 64) :
     proc_dormant_prestk pa -∗ kstack_free pa -∗ proc_dormant pa UNUSED.
   Proof.
-    iIntros "(Hd & Hs & Hir) Hkst".
-    iApply (proc_dormant_seal with "Hd Hs Hir Hkst").
+    iIntros "(Hd & Hs & Hir & Hbs) Hkst".
+    iApply (proc_dormant_seal with "Hd Hs Hir Hbs Hkst").
   Qed.
 
   (* allocproc's move: it finds an UNUSED slot, so the two address-space
@@ -2158,6 +2164,12 @@ Section ProcInv.
        syscall holding its allowance inside could not then pass the block to
        a callee.  The [1] is what kfork spends on [idup]. *)
     iref_slots (1 + IREFSPARE) ∗
+    (* ...AND THE BIO ALLOWANCE, out with them and for the same reason.  This
+       is the hand-over: the slot owned three units while it was dormant,
+       and from here they are the RUNNING THREAD's, beside [proc_priv] --
+       which is where [UsertrapRes.ut_own_nopt] already carries them.  kexit
+       is what puts them back ([SchedCtx.park_pay ZOMBIE]). *)
+    bslots 3 ∗
     (* THE SLOT'S KERNEL STACK, out with the block: it is what the caller
        eventually parks in the fresh process's context record
        ([SpecForkretParkPaid.forkret_park_pkg]), and the reason a slot owns
@@ -2170,9 +2182,9 @@ Section ProcInv.
       p_pid pa ↦₄{DfracOwn (1/2)} pid ∗
       proc_fields pa (DfracOwn 1) V ∗ proc_ofiles γf pa (pv_ofile V).
   Proof.
-    iIntros "(%V & %pid & [%Hof [%Hcwd %Hsz]] & Hpid & Hf & Ho & Hs & Hsp & Hir & Hkst & Hctx & Haddr)".
+    iIntros "(%V & %pid & [%Hof [%Hcwd %Hsz]] & Hpid & Hf & Ho & Hs & Hsp & Hir & Hbs & Hkst & Hctx & Haddr)".
     rewrite bool_decide_eq_false_2; [| vm_compute; discriminate].
-    iDestruct "Haddr" as "[Hpg Htf]". iFrame "Hctx Hpg Htf Hsp Hir Hkst".
+    iDestruct "Haddr" as "[Hpg Htf]". iFrame "Hctx Hpg Htf Hsp Hir Hbs Hkst".
     iExists V, pid. iSplit; [done|]. iFrame "Hpid Hf".
     rewrite /proc_ofiles /ofile_cells Hof length_replicate. iSplit; [done|].
     iAssert ([∗ list] fd ↦ v ∈ replicate NOFILE (zero_reg : mword 64),
@@ -2225,15 +2237,24 @@ Section ProcInv.
     pv_cwd V = (zero_reg : mword 64) ->
     proc_priv_nocwd γf pa pid V -∗ fd_slots FDSPARE -∗
     iref_slots (1 + IREFSPARE) -∗
+    (* AND THE BIO ALLOWANCE BACK.  THIS IS THE RECLAIM, and without it the
+       supply would drain: a dormant slot owns three units, allocproc hands
+       them to the process, and nothing but this reassembly ever returns
+       them.  Three per slot against [BSLOTS = 1024] leaves no slack for
+       leaking one set per exit -- after BSLOTS/3 exits no recycled slot
+       could be allocated again.  kexit still holds its three here (every
+       borrow below it is stated to give one back: [SpecBread] in,
+       [SpecBrelse] out), so the donation costs it nothing. *)
+    bslots 3 -∗
     (* AND THE STACK BACK.  A zombie owns its kernel stack exactly as an
        unused slot does -- that is what makes freeproc's ZOMBIE -> UNUSED
        step a pass-through, and it is the whole reason the exit path has to
        reassemble the page (SpecKexit.v's park). *)
     kstack_free pa -∗ proc_dormant_noctx pa ZOMBIE.
   Proof.
-    iIntros (Hof Hcwd) "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Ho) Hsp Hir Hkst".
+    iIntros (Hof Hcwd) "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Ho) Hsp Hir Hbs Hkst".
     iDestruct (proc_ofiles_null_split γf pa (pv_ofile V) Hof with "Ho") as "[Ho Hs]".
-    iExists V, pid. iSplit; [by iPureIntro|]. iFrame "Hpid Hf Ho Hs Hsp Hir Hkst".
+    iExists V, pid. iSplit; [by iPureIntro|]. iFrame "Hpid Hf Ho Hs Hsp Hir Hbs Hkst".
     rewrite bool_decide_eq_true_2; [| reflexivity].
     iSplitR; [iPureIntro; exact Hbel|]. iFrame "Hpt Htfp".
   Qed.

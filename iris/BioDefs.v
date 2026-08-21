@@ -22,6 +22,20 @@ Local Open Scope Z_scope.
 Definition BSIZE : nat := 1024%nat.
 Definition BSLOTS : nat := 1024%nat.
 
+(* THE SUPPLY SPLITS ONCE, AT BOOT, AND THE TWO SHARES NEVER MIX.
+   [BSLOTS_PROC] is the proc layer's: three units per process slot, parked in
+   [ProcDefs.proc_dormant] so that a slot which has never run still owns what
+   its first syscall will need.  [BSLOTS_FS] is everything else -- the file
+   system's own working supply, which is what [bio_init] hands back.
+   Spelled as literals here because [BioDefs] sits below [ProcGeom] and must
+   not name [NPROC]; [SpecProcinit] carries the equation [BSLOTS_PROC =
+   NPROC * 3] where both are in scope. *)
+Definition BSLOTS_PROC : nat := 192%nat.
+Definition BSLOTS_FS : nat := 832%nat.
+
+Lemma bslots_shares : BSLOTS = (BSLOTS_PROC + BSLOTS_FS)%nat.
+Proof. reflexivity. Qed.
+
 Record bio_names := MkBioNames {
   bn_lk   : gname;                (* the "bcache" spinlock               *)
   bn_auth : gname;                (* ● (gmap nat (frac * positive))      *)
@@ -92,11 +106,15 @@ End BioSlots.
    it (it cannot: the name is fixed before the invariant exists), so it takes
    the authority as a premise and the caller keeps the fragments. *)
 Lemma bslots_alloc `{!bioslotGpreS Σ} :
-  ⊢ |==> ∃ _ : bioslotG Σ, bslots_auth ∗ bslots BSLOTS.
+  ⊢ |==> ∃ _ : bioslotG Σ, bslots_auth ∗ bslots BSLOTS_PROC ∗ bslots BSLOTS_FS.
 Proof.
   iMod (own_alloc ((● BSLOTS ⋅ ◯ BSLOTS) : bioslotUR)) as (γ) "[Ha Hf]".
   { apply auth_both_valid_discrete. split; [done | done]. }
-  iModIntro. iExists (BioSlotG Σ _ γ). by iFrame.
+  iModIntro. iExists (BioSlotG Σ _ γ). iFrame "Ha".
+  rewrite /bslots.
+  assert (Hsh : (◯ BSLOTS : bioslotUR) = ◯ BSLOTS_PROC ⋅ ◯ BSLOTS_FS)
+    by (rewrite -auth_frag_op; reflexivity).
+  rewrite Hsh own_op. by iFrame.
 Qed.
 
 (* THE CLIENT VIEW the whole bio layer is parametric over: the disk ghost the

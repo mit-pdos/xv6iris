@@ -819,6 +819,11 @@ Section ProofMain.
        (∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗ proc_pub (proc_addr i)) -∗
     fd_slots (NPROC * (NOFILE + FDSPARE)) -∗
     iref_slots (NPROC * (1 + IREFSPARE)) -∗
+    (* the bio allowance for every slot, three units each, routed to procinit
+       with the other two supplies.  [3 * NPROC = 192] out of
+       [BioDefs.BSLOTS = 1024]; the rest stays with main for the file
+       system's own boot ([FirstTok.first_fsinit]'s 35). *)
+    bslots (NPROC * 3) -∗
     ([∗ list] i ∈ seq 0 NPROC, hart_full i (0%fin : CPU)) -∗
     ([∗ list] i ∈ seq 0 NPROC, pstate_full i UNUSED) -∗
     (* NO [∀ γa]: the allocator's lock gname is the AMBIENT [fsc_kalloc]
@@ -865,7 +870,7 @@ Section ProofMain.
     intros Hn Hphystop Hs1 Hprun Hlen.
     subst phystop s1entry.
     iIntros "Hcg #Htext #Hkdata Hpc Hfree Hcpu Hlkmem Hkkalloc Hkmem24 Hpages Hkpt".
-    iIntros "Hsbit Htlb Hunset Hkauth Hlpid Hlwait Hnpid Hprocs Hppub Hfds Hirs Hparks Hpst Hcont".
+    iIntros "Hsbit Htlb Hunset Hkauth Hlpid Hlwait Hnpid Hprocs Hppub Hfds Hirs Hbss Hparks Hpst Hcont".
     iPoseProof (mni_6e with "Htext") as "Hi6e".
     iPoseProof (mni_72 with "Htext") as "Hi72".
     iPoseProof (mni_76 with "Htext") as "Hi76".
@@ -1004,7 +1009,7 @@ Section ProofMain.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtpr) in "Hpc".
     iApply (Procinit.wp_procinit_sconf V4 n false p0 ltac:(lia)
-              with "Hcg Htext Hkdata Hpc Hlpid Hlwait Hprocs Hfds Hirs").
+              with "Hcg Htext Hkdata Hpc Hlpid Hlwait Hprocs Hfds Hirs Hbss").
     iApply wp_next_off_intro.
     iIntros (mpr) "Hcg Hpc %Hcspr Hlpidf _ Hready".
     assert (Hretpr : ret_pc (V4 !!! Regidx (mword_of_int 1 : mword 5) : mword 64)
@@ -1644,10 +1649,13 @@ Section ProofMain.
       iDestruct "Hsbb" as (sb_old) "Hsbb".
       iDestruct "Hlogr" as (vlock v_start v_dev v_nc v_n vname vcpu)
         "(Hlw & Hln & Hlc & Hlst & Hldv & Hlout & Hlcmt & Hlnc & Hln2 & Hlblk)".
-      (* 35 of the 1024 slots [bio_init_at] returned; the rest are the
-         first process's, R3. *)
-      assert (Hsl : BSLOTS = (((LOGBLOCKS + 2) + 2 + 1) + (BSLOTS - 35))%nat)
-        by (unfold BSLOTS, LOGBLOCKS; lia).
+      (* 35 of the [BSLOTS_FS] slots [bio_init_at] returned.  The proc
+         layer's [BSLOTS_PROC] never passed through here at all: it was split
+         off at the mint ([BioDefs.bslots_alloc]) and routed to procinit
+         through [main_globals_raw], because a slot has to own its three
+         before allocproc can hand them to a process. *)
+      assert (Hsl : BSLOTS_FS = (((LOGBLOCKS + 2) + 2 + 1) + (BSLOTS_FS - 35))%nat)
+        by (unfold BSLOTS_FS, LOGBLOCKS; lia).
       iEval (rewrite Hsl bslots_op) in "Hbslots".
       iDestruct "Hbslots" as "[Hbsl _]".
       iExists dk, sb, vlock, v_start, v_dev, v_nc, v_n, vname, vcpu, sb_old.
@@ -1973,7 +1981,7 @@ Section ProofMain.
        it rides into [mn_grp_printk] beside the CONSOLE pair and comes back
        inside [ConsoleInv.console_ready]. *)
     iDestruct "Hglobals" as "(Hdevsw & Hdevrest & Hkmem24 & Hkpt & Hprocs & Hppub &
-                             Hfds & Hirs & Hinitproc & Hticks & Hbufl & Hbufn & Hbhead &
+                             Hfds & Hirs & Hbss & Hinitproc & Hticks & Hbufl & Hbufn & Hbhead &
                              Hbpay & Hsbb & Hinl &
                              Hient & Hlogr & Hdiskptr & Hdiskfree & Hdusedidx &
                              Hdslots & Hring)".
@@ -2040,7 +2048,7 @@ Section ProofMain.
               Hn50 Hphystop Hs1 Hprun Hlen
               with "Hcg Htext Hkdata Hpc Hfree Hcpu Hlkmem Hkkalloc Hkmem24 Hpages Hkpt
                     Hsbit Htlb Hunset Hkauth Hlpid Hlwait Hnpid Hprocs Hppub Hfds Hirs
-                    Hparks Hpst").
+                    Hbss Hparks Hpst").
     iIntros (γp γs m3 root pas)
       "Hcg Hpc Hfree Hcpu Hkenv #Hkmem #Hpinv #Hpidlock Hkpt Hstvec #Hkinv #Hkptp
        #Htramp #Hkstx".

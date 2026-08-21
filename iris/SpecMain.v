@@ -309,6 +309,14 @@ Section SpecMain.
         process, the [1] being its cwd unit.  The remaining [NFILE] units of
         [IrefSlots.IREFSLOTS] are the file table's. *)
      iref_slots (NPROC * (1 + IREFSPARE)) ∗
+     (* ... and the bio supply's proc-layer share: THREE units per process,
+        what the trap loop's residue carries for a live process's next
+        syscall.  procinit routes them so that a DORMANT slot owns three --
+        allocproc has to have something to hand a process that has not run
+        yet, and kexit gives them back at the ZOMBIE park.  Unlike the two
+        supplies above this is not the whole pool: [3 * NPROC = 192] of
+        [BioDefs.BSLOTS = 1024], the rest being the file system's. *)
+     bslots (NPROC * 3) ∗
      (∃ v0 : mword 64, (mword_of_int KernelSyms.initproc : mword 64) ↦₈ v0) ∗
      (* [ticks], the tick counter tickslock protects.  It is here for the same
         reason [lk_raw tickslock] is: a static global the init sequence brings

@@ -429,6 +429,12 @@ Section BootBssChain.
        placeholder), so boot mints the whole supply and routes this part;
        the file share is dropped at the mint site, marked there. *)
     iref_slots (NPROC * (1 + IREFSPARE)) -∗
+    (* ...and the bio supply's PROC-LAYER SHARE, three units per process.
+       Unlike the two above this is a genuine slice: [3 * NPROC = 192] of
+       [BioDefs.BSLOTS = 1024], the remainder staying with the file system.
+       procinit routes it so a DORMANT slot owns three -- see
+       [ProcDefs.proc_dormant]'s note for the ledger it opens. *)
+    bslots (NPROC * 3) -∗
     boot_raw_ran g img_end ram_hi -∗
       started_addr ↦₄ started_clear ∗
       main_locks_raw ∗
@@ -440,7 +446,7 @@ Section BootBssChain.
          ([∗ list] p ∈ ps, page_own p)).
   Proof.
     intro Hbf. pose proof (boot_mem_of_facts g Hbf) as Hmem.
-    iIntros "#Hcl Hfd Hir H".
+    iIntros "#Hcl Hfd Hir Hbss H".
     (* THE FLAG CELLS ARE GONE.  This chain used to open with two 4-byte cuts
        for [panicked] and [panicking]; upstream d80e61c5 deleted both globals
        from printk.c, so there is no such symbol and nothing to carve.  .bss
@@ -821,7 +827,7 @@ Section BootBssChain.
     iSplitL "Hlk1 Hlk2 Hlk3 Hlk4 Hlk5 Hlk6 Hlk7 Hlk8 Hlk9 Hlk10 Hlk11".
     { iApply (boot_main_locks_raw g Hmem with
                 "Hcl Hlk1 Hlk2 Hlk3 Hlk4 Hlk5 Hlk6 Hlk7 Hlk8 Hlk9 Hlk10 Hlk11"). }
-    iSplitL "Hdr Hdw Hdevrest Hkm Hkpt Hpr1 Hpr2 Hfd Hir Hip Htk Hbsl Hbln Hhd
+    iSplitL "Hdr Hdw Hdevrest Hkm Hkpt Hpr1 Hpr2 Hfd Hir Hbss Hip Htk Hbsl Hbln Hhd
              Hbpay Hsbb Hino Hient Hlog Hdd Hda Hdu Hdf Hdi Hslots Hring".
     { rewrite /main_globals_raw.
       iSplitL "Hdr Hdw".
@@ -834,6 +840,7 @@ Section BootBssChain.
       iSplitL "Hpr2"; [iExact "Hpr2" |].
       iSplitL "Hfd"; [iExact "Hfd" |].
       iSplitL "Hir"; [iExact "Hir" |].
+      iSplitL "Hbss"; [iExact "Hbss" |].
       iSplitL "Hip"; [iExists vip; iExact "Hip" |].
       iSplitL "Htk"; [iExists vtk; rewrite /a_ticks; iExact "Htk" |].
       iSplitL "Hbsl"; [iExact "Hbsl" |].
@@ -1356,7 +1363,7 @@ Section BootAlloc.
            the name has to exist before the bcache invariant that owns the
            authority does.  [FsCfgBoot.fs_cfg_alloc] takes both halves and
            parks them in [BioInitAt.bio_free_tok]. ---- *)
-    iMod bslots_alloc as (Hbs) "[Hbsauth Hbslots]".
+    iMod bslots_alloc as (Hbs) "(Hbsauth & Hbsproc & Hbslots)".
     (* ### THE FILE TABLE'S NFILE UNITS ARE DROPPED HERE. ###
        [IREFSLOTS = NPROC*(1 + IREFSPARE) + NFILE]; the proc layer's share
        is routed through [main_globals_raw], and the [NFILE] units belong to
@@ -1379,7 +1386,7 @@ Section BootAlloc.
     iDestruct (iref_slots_split 2 (NFILE - 2) with "Hirfile")
       as "[Hirslot _]".
     (* ---- the .bss, in address order ---- *)
-    iDestruct (boot_bss_carve g Hbf with "Hcl Hfdslots Hirslots Hbss") as
+    iDestruct (boot_bss_carve g Hbf with "Hcl Hfdslots Hirslots Hbsproc Hbss") as
       "(Hstartcell & Hlocks & Hglobals & Hharts & Hpages)".
     (* ---- the device fabric ---- *)
     iMod (uart_ghosts_alloc (g.(gdev).(duart))) as (γd)

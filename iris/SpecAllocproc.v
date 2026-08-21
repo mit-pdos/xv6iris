@@ -197,6 +197,14 @@ Definition allocproc_post
           [idup] -- allocproc is the function that took the slot out of
           [procs_inv], so it is where the unit has to come from. *)
        iref_slots (1 + IREFSPARE) ∗
+       (* ...AND THE BIO ALLOWANCE, out of the same dormant block and on the
+          same footing: allocproc never spends these, it only carries them
+          across.  They are the process's from here -- the caller hands them
+          to [SpecForkretPark]'s park, which is what puts them in the child's
+          residue for the first syscall it makes.  A FAILURE TAIL gives them
+          straight back instead ([SpecFreeproc.fp_rest] carries the row), so
+          no path through allocproc can drop a slot's three. *)
+       bslots 3 ∗
        is_kstack (proc_addr j) ks ∗
        (* THE SLOT'S KERNEL STACK, out of the dormant block with everything
           else the slot owned.  SEALED ([ProcDefs.kstack_free]) rather than

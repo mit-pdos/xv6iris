@@ -12,6 +12,9 @@ Require Import UserPtTree ProcPtOwn.
 Require Import SwtchCtx.
 Require Import StackOwn.
 Require Import FdSlots IrefSlots.
+(* EXPORTED, not merely imported: [proc_dormant] mentions [bslots], so every
+   file that unfolds the dormant block needs the vocabulary in scope. *)
+Require Export BioDefs.
 
 Local Open Scope Z_scope.
 
@@ -80,7 +83,7 @@ Section ProcDefs.
 
   Typeclasses Opaque tf_words tf_tail tf_page.
 
-  Context `{!fdslotG Σ, !irefslotG Σ}.
+  Context `{!fdslotG Σ, !irefslotG Σ, !bioslotG Σ}.
 
   Definition is_kstack (pa : mword 64) (ks : mword 64) : iProp Σ :=
     p_kstack pa ↦₈□ ks.
@@ -305,6 +308,27 @@ Section ProcDefs.
        ([∗ list] _ ∈ pv_ofile V, fd_slot) ∗
        fd_slots FDSPARE ∗
        iref_slots (1 + IREFSPARE) ∗
+       (* ...AND THE BIO ALLOWANCE, on exactly the same footing as those two.
+          A [bslot] is the right to hold one buffer-cache reference ([bread]
+          spends one, [brelse] returns it), and the trap loop's residue
+          ([UsertrapRes.ut_own_nopt]) carries three for the syscall a live
+          process is about to make.  A process that has not run yet has them
+          nowhere, so the SLOT owns them while it is dormant and allocproc
+          hands them over with everything else.
+            THE STATE COVERAGE IS THE POINT.  Between them this row and the
+          residue's put three units against a proc slot at every state:
+          UNUSED/ZOMBIE here, USED in allocproc's caller, RUNNING in the
+          running thread's residue, RUNNABLE/SLEEPING inside the parked
+          context's closure.  Nothing can be recycled without them, which is
+          what makes the boot-time distribution ([SpecProcinit]'s carve, 3 *
+          NPROC out of BSLOTS = 1024) an invariant rather than a one-off.
+            AND THEY COME BACK.  kexit donates its three into [park_pay
+          ZOMBIE] beside the kernel stack below, freeproc passes ZOMBIE ->
+          UNUSED through, and every callee that borrows a unit is already
+          stated to return it ([SpecBread] in, [SpecBrelse] out).  Without
+          the donation the pool would drain after BSLOTS/3 exits and no
+          recycled slot could be re-allocated. *)
+       bslots 3 ∗
        (* THE SLOT'S KERNEL STACK -- see [kstack_free] above.  On BOTH arms:
           a zombie owns its stack exactly as an unused slot does, which is
           what makes freeproc's ZOMBIE -> UNUSED step a pass-through and
@@ -328,6 +352,8 @@ Section ProcDefs.
        ([∗ list] _ ∈ pv_ofile V, fd_slot) ∗
        fd_slots FDSPARE ∗
        iref_slots (1 + IREFSPARE) ∗
+       (* the bio allowance, as in [proc_dormant] -- see its note *)
+       bslots 3 ∗
        kstack_free pa ∗
        (if bool_decide (st = ZOMBIE)
         then ⌜um_below (pv_sz V) (ud_um (pv_upt V))⌝ ∗
@@ -339,11 +365,11 @@ Section ProcDefs.
     proc_dormant pa st ⊣⊢ proc_dormant_noctx pa st ∗ own_ctx (p_context pa).
   Proof.
     iSplit.
-    - iIntros "(%V & %pid & %Hfacts & Hpid & Hf & Ho & Hs & Hsp & Hir & Hkst & Hctx & Haddr)".
-      iFrame "Hctx". iExists V, pid. iFrame "Hpid Hf Ho Hs Hsp Hir Hkst Haddr".
+    - iIntros "(%V & %pid & %Hfacts & Hpid & Hf & Ho & Hs & Hsp & Hir & Hbs & Hkst & Hctx & Haddr)".
+      iFrame "Hctx". iExists V, pid. iFrame "Hpid Hf Ho Hs Hsp Hir Hbs Hkst Haddr".
       iPureIntro; exact Hfacts.
-    - iIntros "[(%V & %pid & %Hfacts & Hpid & Hf & Ho & Hs & Hsp & Hir & Hkst & Haddr) Hctx]".
-      iExists V, pid. iFrame "Hpid Hf Ho Hs Hsp Hir Hkst Hctx Haddr".
+    - iIntros "[(%V & %pid & %Hfacts & Hpid & Hf & Ho & Hs & Hsp & Hir & Hbs & Hkst & Haddr) Hctx]".
+      iExists V, pid. iFrame "Hpid Hf Ho Hs Hsp Hir Hbs Hkst Hctx Haddr".
       iPureIntro; exact Hfacts.
   Qed.
 

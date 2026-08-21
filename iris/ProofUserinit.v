@@ -423,7 +423,7 @@ Section ProofUserinit.
         rewrite avail_sub_Some in Hz0. unfold avail_zero in Hz0.
         exfalso. lia. }
     iDestruct "Hgot" as (j γl ch pid V root tfp ks rest nc)
-      "(%Hfacts & Hheld & Hhart & Hpriv & #Hmk & Hfd & Hirs & Hks & Hkfree
+      "(%Hfacts & Hheld & Hhart & Hpriv & #Hmk & Hfd & Hirs & Hbsl & Hks & Hkfree
         & Hctx & Hcg & Hcpu & Hpay & Hkenv & Hpav)".
     destruct Hfacts as (Hrv & Hj & Hgl & _ & _ & Hcwd0 & Hrest & Hnc).
     iClear "Hkfree".

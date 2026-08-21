@@ -1161,8 +1161,8 @@ Section BioInv.
        invariant exists, so [BioDefs.bslots_alloc] mints it at boot and this
        function takes the authority in and hands the fragments straight back
        out -- the same total, one step earlier. *)
-    bslots_auth -∗ bslots BSLOTS ={E}=∗
-    ∃ bn : bio_names, bio_ctx bn V ∗ bslots BSLOTS.
+    bslots_auth -∗ bslots BSLOTS_FS ={E}=∗
+    ∃ bn : bio_names, bio_ctx bn V ∗ bslots BSLOTS_FS.
   Proof.
     iIntros (Hnc0) "Hlkw #Hnm Hcpu Hfresh Hbufs Hlru Hpool Hsa Hsf".
     assert (Hu0 : uint (mword_of_int 0 : mword 32) = 0)

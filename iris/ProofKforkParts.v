@@ -674,6 +674,10 @@ Section KforkFreeproc.
     proc_priv_nocwd γf pa pid V -∗
     fd_slots FDSPARE -∗
     iref_slots (1 + IREFSPARE) -∗
+    (* ...and the bio allowance, back on the same argument as the stack: a
+       dormant slot owns three units ([ProcDefs.proc_dormant]), so a kfork
+       failure tail returns the child's with everything else it was given. *)
+    bslots 3 -∗
     own_ctx (p_context pa) -∗
     (* the child's kernel stack, back: allocproc handed it out with the slot
        and freeproc's block is where it goes when the slot is given up *)
@@ -683,7 +687,7 @@ Section KforkFreeproc.
     SpecFreeproc.fp_tf pa (Some (ud_tfp (pv_upt V), pv_tf V)).
   Proof.
     intros Hof Hcwd.
-    iIntros "Hpv Hsp Hir Hctx Hkst".
+    iIntros "Hpv Hsp Hir Hbs Hctx Hkst".
     iDestruct (proc_priv_nocwd_tfp_valid with "Hpv") as "%Hpv".
     iDestruct "Hpv" as "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Ho)".
     iDestruct (proc_ofiles_null_split γf pa (pv_ofile V) Hof with "Ho")
@@ -693,7 +697,7 @@ Section KforkFreeproc.
     cbn [fst snd].
     iSplitR "Hpg Hptt Htfc Htfp".
     { iSplitR; [iPureIntro; split_and!; [exact Hof | exact Hcwd | exact Hszb]|].
-      iFrame "Hpid Hf Hcells Hunits Hsp Hir Hkst Hctx". }
+      iFrame "Hpid Hf Hcells Hunits Hsp Hir Hbs Hkst Hctx". }
     iSplitL "Hpg Hptt".
     { iFrame "Hpg Hptt". iPureIntro. split; [exact Hbel | exact Hszb]. }
     iFrame "Htfc Htfp". iPureIntro. exact Hpv.

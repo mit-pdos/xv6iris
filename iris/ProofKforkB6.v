@@ -349,6 +349,10 @@ Section KforkPrologue.
         ProcGeom.hart_at_any npa -∗
         FdSlots.fd_slots FDSPARE -∗
         IrefSlots.iref_slots (1 + IREFSPARE) -∗
+        (* the child's bio allowance, on the same argument as the stack: this
+           exit frees the slot, so the three units go back into freeproc's
+           block ([ProcDefs.proc_dormant] owns three at every state). *)
+        bslots 3 -∗
         SwtchCtx.own_ctx (p_context npa) -∗
         (* the child's kernel stack, exactly as allocproc handed it out: this
            exit frees the slot, so the page goes straight back into
@@ -721,7 +725,7 @@ Section KforkPrologue.
          arm 2 -- FOUND.  Destructure the found-arm's whole bundle.
          =================================================================== *)
       iDestruct "Hp2" as (j γl2 ch pid_c Vc root tfp ks rest nc)
-        "(%Hpures & Hheld & Hhart & Hcpriv & #Hmk & Hfdsp & Hirsp & Hks & Hkstk & Hctx & Hcg & Hcpu & Harmpay & Henv' & _)".
+        "(%Hpures & Hheld & Hhart & Hcpriv & #Hmk & Hfdsp & Hirsp & Hbslp & Hks & Hkstk & Hctx & Hcg & Hcpu & Harmpay & Henv' & _)".
       destruct Hpures as (Hrv & HjN & Hgamma & HVcupt & HVcof & HVccwd & Hrestlen & Hncle).
       assert (HBa0 : mf6 !!! Regidx Ra0 = proc_addr j) by exact Hrv.
       set (npa := proc_addr j).
@@ -1039,6 +1043,7 @@ Section KforkPrologue.
         iSpecialize ("Hcont7c" with "Hhart").
         iSpecialize ("Hcont7c" with "Hfdsp").
         iSpecialize ("Hcont7c" with "Hirsp").
+        iSpecialize ("Hcont7c" with "Hbslp").
         iSpecialize ("Hcont7c" with "[Hctx]").
         { iExists (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest).
           iSplitR; [iPureIntro; rewrite -Hrestlen; reflexivity | iExact "Hctx"]. }

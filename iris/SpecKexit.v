@@ -288,6 +288,14 @@ Section KexitSeals.
     pv_cwd V = (zero_reg : mword 64) ->
     proc_priv_nocwd γf (proc_addr j) pid V -∗ fd_slots FDSPARE -∗
     iref_slots (1 + IREFSPARE) -∗
+    (* AND THE BIO ALLOWANCE, on exactly the same argument as the stack
+       below: a dormant slot owns three units, allocproc hands them to the
+       new process, and the ZOMBIE park is where a dying one gives them
+       back.  This is the only return path there is -- see
+       [ProcInv.proc_priv_to_dormant_zombie]'s note on why the supply drains
+       without it.  kexit still holds its three at the park: everything it
+       spends them on below ([SpecBread] / [SpecBrelse]) is a round trip. *)
+    bslots 3 -∗
     (* AND THE KERNEL STACK, WHOLE.  A dormant slot owns its page
        ([ProcDefs.kstack_free]) -- that is what lets the next allocproc give
        it to a new process -- and the ZOMBIE park is where a dying thread
@@ -297,9 +305,9 @@ Section KexitSeals.
     park_pay (proc_addr j) ZOMBIE.
   Proof.
     intros Hof Hcwd. rewrite /park_pay inv_dormant_ZOMBIE.
-    iIntros "Hpriv Hsp Hir Hkst".
+    iIntros "Hpriv Hsp Hir Hbs Hkst".
     iApply (proc_priv_to_dormant_zombie γf (proc_addr j) pid V Hof Hcwd
-              with "Hpriv Hsp Hir Hkst").
+              with "Hpriv Hsp Hir Hbs Hkst").
   Qed.
 
 End KexitSeals.

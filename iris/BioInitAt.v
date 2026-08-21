@@ -56,7 +56,7 @@ Section BioInitAt.
     (lock_free_tok (bn_lk bn) ∗
      own (bn_auth bn) (● (∅ : gmap nat (Qp * positive)) : bioUR) ∗
      bslots_auth ∗
-     bslots BSLOTS ∗
+     bslots BSLOTS_FS ∗
      ([∗ list] k ∈ seq 0 NBUF,
         sl_free_pair (bn_slk bn k) ∗
         lock_tok_excl (bn_own bn k) ∗
@@ -95,7 +95,7 @@ Section BioInitAt.
      record is picked, so [BioDefs.bslots_alloc] mints authority and
      fragments together and this lemma parks them in the free-state row. *)
   Lemma bio_names_ghost_alloc :
-    bslots_auth -∗ bslots BSLOTS -∗ |==> ∃ bn : bio_names, bio_free_tok bn.
+    bslots_auth -∗ bslots BSLOTS_FS -∗ |==> ∃ bn : bio_names, bio_free_tok bn.
   Proof.
     iIntros "Hsa Hsf".
     iMod lock_ghost_alloc as (γlk) "Hlk".
@@ -158,7 +158,7 @@ Section BioInitAt.
     ([∗ list] k ∈ seq 0 NBUF, buf_raw k) -∗
     bcache_lru bhead (blist 0 NBUF) -∗
     ([∗ set] b ∈ bv_cov V, pool_blk V b) ={E}=∗
-    bio_ctx bn V ∗ bslots BSLOTS.
+    bio_ctx bn V ∗ bslots BSLOTS_FS.
   Proof.
     iIntros (Hnc0) "(Hlkg & Hauth & Hsa & Hsf & Hbg) Hlkw #Hnm Hcpu Hfresh Hbufs Hlru Hpool".
     assert (Hu0 : uint (mword_of_int 0 : mword 32) = 0)

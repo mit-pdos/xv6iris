@@ -400,6 +400,15 @@ Definition wp_procinit_sconf_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG 
      [NFILE] units the file table holds -- see [IrefSlots.v]'s header for
      why the supply is exactly NPROC*(1 + IREFSPARE) + NFILE. *)
   iref_slots (NPROC * (1 + IREFSPARE)) -∗
+  (* ... and the SAME for buffer-cache references: THREE per process, which
+     is what the trap loop's residue carries for the syscall a live process
+     is about to make ([UsertrapRes.ut_own_nopt]).  Routing them here is what
+     lets a slot own three while it is dormant, so allocproc has something to
+     hand a process that has not run yet; kexit gives them back at the ZOMBIE
+     park.  [3 * NPROC = 192] out of [BioDefs.BSLOTS = 1024], so unlike the
+     two supplies above this one does NOT exhaust its pool -- the remainder
+     is the file system's, which main keeps. *)
+  bslots (NPROC * 3) -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr,
     sie_cap_gpr KT1 mr K b p -∗

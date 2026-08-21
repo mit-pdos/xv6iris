@@ -228,26 +228,34 @@ Section ProofProcinit.
 
   (* Stated over an arbitrary LIST so the induction is a plain cons peel --
      the list's elements never matter, only how many there are. *)
+  (* THE BIO ALLOWANCE IS DISTRIBUTED HERE, three units per slot, by the
+     same cons peel as the other two.  This is the whole boot-time
+     distribution: [BSLOTS = 1024] against [3 * NPROC = 192], so the carve
+     fits with room to spare, and from here on every slot owns three at
+     every state ([ProcDefs.proc_dormant]'s note has the ledger). *)
   Lemma proc_seal_list (l : list nat) :
     ([∗ list] i ∈ l, proc_raw (proc_addr i)) -∗
     fd_slots (length l * (NOFILE + FDSPARE)) -∗
     iref_slots (length l * (1 + IREFSPARE)) -∗
+    bslots (length l * 3) -∗
     [∗ list] i ∈ l, proc_seal (proc_addr i).
   Proof.
-    induction l as [|x l IH]; iIntros "Hraw Hsl Hir"; [done|].
+    induction l as [|x l IH]; iIntros "Hraw Hsl Hir Hbs"; [done|].
     iDestruct "Hraw" as "[Hx Hraw]".
     cbn [length].
     replace (S (length l) * (NOFILE + FDSPARE))%nat
       with ((NOFILE + FDSPARE) + length l * (NOFILE + FDSPARE))%nat by lia.
     replace (S (length l) * (1 + IREFSPARE))%nat
       with ((1 + IREFSPARE) + length l * (1 + IREFSPARE))%nat by lia.
+    replace (S (length l) * 3)%nat with (3 + length l * 3)%nat by lia.
     iDestruct (fd_slots_split with "Hsl") as "[Hs1 Hsl]".
     iDestruct (iref_slots_split with "Hir") as "[Hi1 Hir]".
-    iSplitL "Hx Hs1 Hi1".
+    iDestruct (bslots_split with "Hbs") as "[Hb1 Hbs]".
+    iSplitL "Hx Hs1 Hi1 Hb1".
     - iDestruct "Hx" as (vst vks) "(Hlk & Hst & Hks & Hdorm)".
       iExists vst, vks. iFrame "Hlk Hst Hks".
-      iApply (proc_dormant_prestk_intro with "Hdorm Hs1 Hi1").
-    - iApply (IH with "Hraw Hsl Hir").
+      iApply (proc_dormant_prestk_intro with "Hdorm Hs1 Hi1 Hb1").
+    - iApply (IH with "Hraw Hsl Hir Hbs").
   Qed.
 
   (* ================================================================= *)
@@ -937,7 +945,7 @@ Section ProofProcinit.
     pose (name_nextpid := (mword_of_int nextpid_str : mword 64)).
     pose (name_waitlock := (mword_of_int waitlock_str : mword 64)).
     pose (name_proc := (mword_of_int proc_str : mword 64)).
-    iIntros "Hcg #Htext #Hkdata Hpc Hpid Hwait Hraws Hslots Hirslots Hcont".
+    iIntros "Hcg #Htext #Hkdata Hpc Hpid Hwait Hraws Hslots Hirslots Hbslots Hcont".
     (* ---- the three string literals, read out of the data image ---- *)
     assert (Hnextpid : forall j bt, cstring_bytes "nextpid"%string !! j = Some bt ->
                         KernelData.kernel_data !! (nextpid_str + Z.of_nat j)%Z = Some bt).
@@ -967,9 +975,11 @@ Section ProofProcinit.
                                                                             ltac:(vm_compute; discriminate) Hprocstr
                   with "Hkdata") as "#Hstr_proc".
     (* ---- route both supplies, once ---- *)
-    iDestruct (proc_seal_list (seq 0 NPROC) with "Hraws [Hslots] [Hirslots]") as "Hseals".
+    iDestruct (proc_seal_list (seq 0 NPROC) with "Hraws [Hslots] [Hirslots] [Hbslots]")
+      as "Hseals".
     { rewrite length_seq. iExact "Hslots". }
     { rewrite length_seq. iExact "Hirslots". }
+    { rewrite length_seq. iExact "Hbslots". }
     (* ---- the frame geometry ---- *)
     assert (Hspr8 : spr = pa_stk sp0 8).
     { unfold spr, pa_stk, add_vec_int. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
