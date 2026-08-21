@@ -4855,10 +4855,16 @@ Section SysExecBreak.
               ltac:(intros j Hj; exact (proj2 (proj2 (proj2 (Hok j Hj)))))
               ltac:(intros j Hj; pose proof (proj1 (proj2 (proj2 (Hok j Hj))));
                     lia)
-              Hjp Hgl Hbt Hebt
-              with "Hcg Hcnt Htext Hpc Hfab Hka Hbmp Hisp Hbmr Hpriv
+              Hjp Hgl
+              with "Hcg Hcnt [] [] Htext Hpc Hfab Hka Hbmp Hisp Hbmr Hpriv
                     Hpb Havf Hpgs Hbs Hir").
-    iIntros (CID8 Hq8 mf V' entry spv szv') "%Hcsf %Hkok Hcg Hcnt Hpc
+    (* kexec is eb-generic now; sys_exec is still at [eb = true], where the
+       complement is [emp].  Its crossing also moved from [b] to the literal
+       [true] -- free here, since [b = true] makes the two coincide, and
+       everything sys_exec frames across the call is hart-free. *)
+    { rewrite Hebt /trap_csrs_ext. done. }
+    { rewrite Hebt /cpu_claim_ext. done. }
+    iIntros (CID8 Hq8 mf V' entry spv szv') "%Hcsf %Hkok Hcg Hcnt _ _ Hpc
              Hbmp Hisp Hka2 Hpriv Hpb Havf Hpgs Hbs Hir".
     iEval (rewrite HN6ra) in "Hpc".
     iEval (rewrite HN6a0) in "Hpb".
@@ -4889,7 +4895,10 @@ Section SysExecBreak.
       iSplitL "P9"; [iExact "P9" |]. iSplitL "F10"; [iExact "F10" |].
       iSplitL "Hpb"; [iExact "Hpb" | iExact "Hps"]. }
     iIntros (CID9) "%Hq9". iIntros (mg) "%Hcsg %Hga0 Hcg Hcnt Hpc Hpriv".
-    iSpecialize ("Hout" $! CID9 with "[%]"); [wp_next_chain |].
+    (* kexec's crossing is the literal [true] now, so the chain back to this
+       block's own [b]-indexed continuation goes through [Hbt] -- sys_exec is
+       still an [eb = true] caller and that is exactly what pins it. *)
+    iSpecialize ("Hout" $! CID9 with "[%]"); [rewrite Hbt; wp_next_chain |].
     iApply ("Hout" $! mg V' entry spv szv'
              with "[%] [%] [%] Hcg Hcnt Hpc Hbmp Hisp Hbs Hir Hpriv").
     { exact Hcsg. }

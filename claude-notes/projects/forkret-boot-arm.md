@@ -131,54 +131,83 @@ Two things inside it that are not plumbing:
    | `dirlookup` | **done** |
    | `namex` (+ its `_gen` form) | **done** |
    | `namei` / `nameiparent` | **done** |
-   | `kexec` (also its `b = true ->`, and its crossing) | **NOT mechanical — see below** |
+   | `kexec` (its `b = true ->` and its crossing too) | **done** |
 
-2. Then `fkr_boot`'s walk, which is then the only thing left.
+   **THE ROUND IS COMPLETE.** No contract on forkret's boot path carries
+   `eb = true ->` or `b = true ->` any more, and the tree is green.
 
-## kexec IS A DIFFERENT KIND OF JOB, and this is why
+2. Then `fkr_boot`'s walk, which is now the only thing left. **It is no
+   longer blocked** — every callee the arm reaches is callable at
+   `eb = false`, and forkret already holds the complement (`Hext` / `Hcx`,
+   the `_ext` halves `IntrDefs.arm_pay_ext_split` produces at the release).
 
-Six of the seven ported by the recipe. `kexec` does not, and the reason is
-structural rather than a matter of volume.
+### What the ports cost, beyond the recipe
 
-**`kexec` is the one contract in the tree that pinned `b = true` as well as
-`eb = true`, and at `b = true` `CpuOwn.cpu_own` is not a resource at all:**
+- **The complement's span is not `cpu_own`'s.** A callee that threads
+  `cpu_own` but not the pair (`printk`, `iget`, `idup`, `iunlock`, `brelse`,
+  `namecmp`, `myproc`, `copyout`, `uvmalloc`, `uvmclear`, `strlen`,
+  `safestrcpy`, `proc_pagetable`, `proc_freepagetable`) leaves the pair at
+  the hart it was last put at while `cpu_own` comes back re-indexed. Every
+  such site needs two transports with *different* sources. This is Round
+  14's "A CALLEE THAT DOES NOT THREAD THE COMPLEMENT STRANDS IT", and it was
+  the single most common error in all seven ports.
+- **`Hb : b = true` was doing more work than it looked like.** Where a proof
+  derived it and rewrote it into a transport guard, the goal became
+  `true`-indexed — whose hypothesis reduces to `p = zero_reg` and therefore
+  fires *every* chain fact regardless of index. Dropping it means each chain
+  must genuinely compose at `b`, and one `true`-indexed link anywhere in the
+  span breaks it.
+- **Local continuation bundles must TAKE the pair**, never let a caller frame
+  it: `dirlookup`'s `dl_tail_body`, `namex`'s `nx_tail_body`, kexec's
+  `AT0DA` / `Hc116` / `kxc_at_11a`.
+- **Latent `wp_next true` crossings on runs that cannot park.** Three
+  independent instances turned up — `dirlookup`'s `Hpoffst`, kexec phase D's
+  `kxd_scan_out` / `kxd_name_loop`, and (the mirror image) all nine crossings
+  in kexec phase A, which said `b` where they genuinely span a park. Both
+  spellings were unfalsifiable while the premise pinned the literal. **When
+  you drop an index premise, audit every crossing in the file**: a stale `b`
+  on a parking run becomes false, and a stale `true` on a straight-line run
+  strands whatever the caller frames across it.
+
+## kexec: what made it the hard one, for the record
+
+Six of the seven ported by the recipe alone. `kexec` did not, and the reason
+is structural:
 
 ```coq
   cpu_own n eb p b lks := if b then ⌜n = 0 ∧ eb = true ∧ lks = ∅⌝ else cpu_hart n eb p lks
 ```
 
-so at `b = true` it is a PURE proposition, carrying no hart index. Its
-nine-file proof (~19k lines) therefore FRAMES it across every phase
-boundary, every branch and every callee return, and the `cpu_own_transport`
-calls that do appear have vestigial source harts — they were no-ops. The
-moment `b` is free, every one of those becomes a real hart-indexed
-obligation with a real span to get right, in a proof whose phases are sealed
-behind `Qed` so `wp_next_chain` cannot see across them.
+At `b = true` `cpu_own` is a PURE proposition with no hart index. `kexec` was
+the tree's only contract that pinned `b = true` as well as `eb = true`, so
+its nine-file, 19k-line proof FRAMED `cpu_own` everywhere and the
+`cpu_own_transport` sources it did carry were vestigial — several named a
+hart bound only in a sibling branch, and one was an identity transport.
+Nothing could detect that while the proposition was pure. Freeing `b` turned
+every one of those into a real span.
 
-Concretely, the port needs, per phase file: an `eb` binder on each phase
-body and on `SpecKexecB2`/`SpecKexecB3`'s `Module Type` parameters; ~90
-`cpu_own 0 true (proc_addr jp) true` occurrences re-indexed; ~220 hardcoded
-`true` SIE indices on leaf rules; the complement threaded as a **passthrough
-on every phase** (the sweep's own warning for `virtio_disk_rw`); and a
-correct transport span computed at every one of the sites that used to be
-free. `wp_next_retarget` sites must stay at the literal `true` (they
-re-anchor kexec's own continuation) while the transports beside them move to
-`eb` — the two look identical and are not.
+The conversion that landed: `ProofKexecA`'s `subst eb. cbn in Houtb. subst b.`
+became `cbn in Houtb. subst b.` — `b := eb`, not both := `true` — and
+everything downstream followed from that one line. Then ~90 `cpu_own` index
+sites, ~220 hardcoded leaf SIE indices, an `(eb : bool)` binder on every
+phase body and on `SpecKexecB2`/`SpecKexecB3`'s `Module Type` parameters, the
+complement threaded as a passthrough on every phase, and a correct transport
+span computed at each site that used to be free.
 
-An attempt at it (2026-08-21) got `SpecKexec`, `SpecKexecB2`/`B3`,
-`ProofKexecTail` and `ProofKexecSeam` through and was reverted rather than
-landed half-done. **Budget it as its own increment, and do it phase file by
-phase file bottom-up (Tail, Seam, B2, B3, C, D, A, B, ProofKexec), keeping
-the tree green after each** — the same discipline the six used. Do not try
-to drive it from the top: `ProofKexecA`'s `subst eb. cbn in Houtb. subst b.`
-becomes `cbn in Houtb. subst b.` (b := eb, not both := true), and everything
-downstream follows from that one line.
+It was done as six parallel lanes (`A`, `B`, `B2`, `B3`, `C`, `D`) over one
+frozen base (`SpecKexec`, `SpecKexecB2/B3`, `ProofKexecTail`,
+`ProofKexecSeam`), each lane checking its own file with a local single-file
+`coqc` against pulled `.vo`. The dependency graph makes exactly those six
+independent; only `C` waits on `B3`. That shape is worth reusing for any
+sweep across a multi-file proof.
 
-One more thing that MOVES when kexec lands: its crossing. `SpecKexec`'s
-`wp_next b pj` has to become `wp_next true pj` (kexec parks, through
-begin_op / namei / ilock / readi / iunlockput / end_op), and that costs the
-CALLER — `sys_exec` must build its continuation hart-generically. Round 14's
-"a crossing move weakens nothing for the callee and costs the caller".
+**The crossing move costs the caller, and here it was free.** `SpecKexec`'s
+`wp_next b pj` is now `wp_next true pj`. `sys_exec` is kexec's only other
+caller; at its own `b = true` the two crossings coincide, and everything it
+frames across the call is hart-free stack cells, so it pays one
+`rewrite Hbt` in the chain and nothing else.
+
+
 
 ### What the four ports actually cost, beyond the recipe
 

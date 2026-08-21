@@ -588,7 +588,7 @@ Section KexecBSeam.
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
-      (pidv : mword 32) (V : pprivate) (dqb dqs dqa dqpv dqas : dfrac)
+      (pidv : mword 32) (V : pprivate) (eb : bool) (dqb dqs dqa dqpv dqas : dfrac)
       (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
@@ -611,8 +611,10 @@ Section KexecBSeam.
        um_below (mword_of_int 0 : mword 64) P.(ud_um) /\
        um_covered (mword_of_int 0 : mword 64) P.(ud_um) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x1a2) : mword 64) ∗
-     sie_cap_gpr KT1 M (K - 68)%nat true (proc_addr jp) ∗
-     cpu_own 0 true (proc_addr jp) true ∅ ∗
+     sie_cap_gpr KT1 M (K - 68)%nat eb (proc_addr jp) ∗
+     cpu_own 0 eb (proc_addr jp) eb ∅ ∗
+     trap_csrs_ext KT1 eb ∗
+     cpu_claim_ext eb (proc_addr jp) ∗
      kxc_open gfs gi cn cov logstart dev pidv kf qf sf gyf inumf dnf bmf
               gilf gislf ∗
      log_op g n2 ∗
@@ -668,7 +670,7 @@ Section KexecBSeam.
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
-      (pidv : mword 32) (V : pprivate) (dqb dqs dqa dqpv dqas : dfrac)
+      (pidv : mword 32) (V : pprivate) (eb : bool) (dqb dqs dqa dqpv dqas : dfrac)
       (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
@@ -694,8 +696,10 @@ Section KexecBSeam.
        um_below szv P.(ud_um) /\
        um_covered szv P.(ud_um) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x12c) : mword 64) ∗
-     sie_cap_gpr KT1 M (K - 68)%nat true (proc_addr jp) ∗
-     cpu_own 0 true (proc_addr jp) true ∅ ∗
+     sie_cap_gpr KT1 M (K - 68)%nat eb (proc_addr jp) ∗
+     cpu_own 0 eb (proc_addr jp) eb ∅ ∗
+     trap_csrs_ext KT1 eb ∗
+     cpu_claim_ext eb (proc_addr jp) ∗
      kxc_open gfs gi cn cov logstart dev pidv kf qf sf gyf inumf dnf bmf
               gilf gislf ∗
      log_op g n2 ∗
@@ -739,7 +743,7 @@ Section KexecBSeam.
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
-      (pidv : mword 32) (V : pprivate) (dqb dqs dqa dqpv dqas : dfrac)
+      (pidv : mword 32) (V : pprivate) (eb : bool) (dqb dqs dqa dqpv dqas : dfrac)
       (M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
@@ -758,8 +762,10 @@ Section KexecBSeam.
        um_below szv P.(ud_um) /\
        um_covered szv P.(ud_um) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x1a4) : mword 64) ∗
-     sie_cap_gpr KT1 M (K - 68)%nat true (proc_addr jp) ∗
-     cpu_own 0 true (proc_addr jp) true ∅ ∗
+     sie_cap_gpr KT1 M (K - 68)%nat eb (proc_addr jp) ∗
+     cpu_own 0 eb (proc_addr jp) eb ∅ ∗
+     trap_csrs_ext KT1 eb ∗
+     cpu_claim_ext eb (proc_addr jp) ∗
      kxc_open gfs gi cn cov logstart dev pidv kf qf sf gyf inumf dnf bmf
               gilf gislf ∗
      log_op g n2 ∗
@@ -794,7 +800,7 @@ Section KexecBSeam.
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
-      (pidv : mword 32) (V : pprivate) (dqb dqs dqa dqpv dqas : dfrac)
+      (pidv : mword 32) (V : pprivate) (eb : bool) (dqb dqs dqa dqpv dqas : dfrac)
       (M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
@@ -809,8 +815,10 @@ Section KexecBSeam.
        um_below szv P.(ud_um) /\
        um_covered szv P.(ud_um) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x1ae) : mword 64) ∗
-     sie_cap_gpr KT1 M (K - 68)%nat true (proc_addr jp) ∗
-     cpu_own 0 true (proc_addr jp) true ∅ ∗
+     sie_cap_gpr KT1 M (K - 68)%nat eb (proc_addr jp) ∗
+     cpu_own 0 eb (proc_addr jp) eb ∅ ∗
+     trap_csrs_ext KT1 eb ∗
+     cpu_claim_ext eb (proc_addr jp) ∗
      iref_slots 2 ∗
      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) ∗
@@ -905,7 +913,7 @@ Section KexecBSeam.
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
-      (pidv : mword 32) (V : pprivate) (dqb dqs dqa dqpv dqas : dfrac)
+      (pidv : mword 32) (V : pprivate) (eb : bool) (dqb dqs dqa dqpv dqas : dfrac)
       (M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
@@ -927,8 +935,10 @@ Section KexecBSeam.
      ⌜ ud_tfp P = ud_tfp (pv_upt V) /\
        um_below sz1 P.(ud_um) /\ um_covered sz1 P.(ud_um) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x21a) : mword 64) ∗
-     sie_cap_gpr KT1 M (K - 68)%nat true (proc_addr jp) ∗
-     cpu_own 0 true (proc_addr jp) true ∅ ∗
+     sie_cap_gpr KT1 M (K - 68)%nat eb (proc_addr jp) ∗
+     cpu_own 0 eb (proc_addr jp) eb ∅ ∗
+     trap_csrs_ext KT1 eb ∗
+     cpu_claim_ext eb (proc_addr jp) ∗
      kxc_c_res jp bn gfs ga gf cov logstart bmapstart inodestart size
                plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas
                sp0 ra0 s00 s10 s20 pv av
@@ -960,7 +970,7 @@ Section KexecBSeam.
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
-      (pidv : mword 32) (V : pprivate) (dqb dqs dqa dqpv dqas : dfrac)
+      (pidv : mword 32) (V : pprivate) (eb : bool) (dqb dqs dqa dqpv dqas : dfrac)
       (M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
@@ -981,8 +991,10 @@ Section KexecBSeam.
      ⌜ ud_tfp P = ud_tfp (pv_upt V) /\
        um_below sz1 P.(ud_um) /\ um_covered sz1 P.(ud_um) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x272) : mword 64) ∗
-     sie_cap_gpr KT1 M (K - 68)%nat true (proc_addr jp) ∗
-     cpu_own 0 true (proc_addr jp) true ∅ ∗
+     sie_cap_gpr KT1 M (K - 68)%nat eb (proc_addr jp) ∗
+     cpu_own 0 eb (proc_addr jp) eb ∅ ∗
+     trap_csrs_ext KT1 eb ∗
+     cpu_claim_ext eb (proc_addr jp) ∗
      kxc_c_res jp bn gfs ga gf cov logstart bmapstart inodestart size
                plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas
                sp0 ra0 s00 s10 s20 pv av
@@ -1039,7 +1051,7 @@ Section KexecBSeam.
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
-      (pidv : mword 32) (V : pprivate) (dqb dqs dqa dqpv dqas : dfrac)
+      (pidv : mword 32) (V : pprivate) (eb : bool) (dqb dqs dqa dqpv dqas : dfrac)
       (M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
@@ -1059,8 +1071,10 @@ Section KexecBSeam.
      ⌜ ud_tfp P = ud_tfp (pv_upt V) /\
        um_below sz1 P.(ud_um) /\ um_covered sz1 P.(ud_um) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x2a6) : mword 64) ∗
-     sie_cap_gpr KT1 M (K - 68)%nat true (proc_addr jp) ∗
-     cpu_own 0 true (proc_addr jp) true ∅ ∗
+     sie_cap_gpr KT1 M (K - 68)%nat eb (proc_addr jp) ∗
+     cpu_own 0 eb (proc_addr jp) eb ∅ ∗
+     trap_csrs_ext KT1 eb ∗
+     cpu_claim_ext eb (proc_addr jp) ∗
      kxc_d_res jp bn gfs ga gf cov logstart bmapstart inodestart size
                plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas
                sp0 ra0 s00 s10 s20 pv av

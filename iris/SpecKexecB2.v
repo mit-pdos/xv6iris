@@ -569,7 +569,7 @@ Definition kxc_bad324_body
     (pidv : mword 32) (V : pprivate) (dqb dqs dqa dqpv dqas : dfrac)
     (m Mt : regfile) (K : nat)
     (sp0 ra0 s00 s10 s20 pv av w63 w67 : mword 64)
-    (ef : nat -> bv 8) (P : uptd) (szf : mword 64) (lks : gset string) :=
+    (ef : nat -> bv 8) (P : uptd) (szf : mword 64) (eb : bool) (lks : gset string) :=
   (K_kexec <= K)%nat ->
   (kf < NINODE)%nat ->
   log_geom_ok cov logstart ->
@@ -599,8 +599,10 @@ Definition kxc_bad324_body
      is_aligned_paddr (Physaddr (pa_stk sp0 (54 - j))) 8 = true) ->
   um_below szf P.(ud_um) ->
   um_covered szf P.(ud_um) ->
-  sie_cap_gpr KT1 Mt (K - 68)%nat true (proc_addr jp) -∗
-  cpu_own 0 true (proc_addr jp) true lks -∗
+  sie_cap_gpr KT1 Mt (K - 68)%nat eb (proc_addr jp) -∗
+  cpu_own 0 eb (proc_addr jp) eb lks -∗
+  trap_csrs_ext KT1 eb -∗
+  cpu_claim_ext eb (proc_addr jp) -∗
   kernel_text -∗
   pc_is (mword_of_int (KXB + 0x324) : mword 64) -∗
   fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
@@ -634,8 +636,10 @@ Definition kxc_bad324_body
       (entry spv szv' : mword 64),
         ⌜callee_saved m mf⌝ -∗
         ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
-        sie_cap_gpr KT1 mf K true (proc_addr jp) -∗
-        cpu_own 0 true (proc_addr jp) true lks -∗
+        sie_cap_gpr KT1 mf K eb (proc_addr jp) -∗
+        cpu_own 0 eb (proc_addr jp) eb lks -∗
+        trap_csrs_ext KT1 eb -∗
+        cpu_claim_ext eb (proc_addr jp) -∗
         pc_is (ret_pc ra0) -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -673,7 +677,7 @@ Definition kxc_ls_body
     (m : regfile) (K : nat)
     (sp0 ra0 s00 s10 s20 pv av w63 w65 w67 : mword 64)
     (ef : nat -> bv 8) (P : uptd)
-    (ip : nat) (va : mword 64) (fz po : Z) (lks : gset string) :=
+    (ip : nat) (va : mword 64) (fz po : Z) (eb : bool) (lks : gset string) :=
   (K_kexec <= K)%nat ->
   (kf < NINODE)%nat ->
   log_geom_ok cov logstart ->
@@ -717,8 +721,10 @@ Definition kxc_ls_body
   Ml !!! Regidx Rs9 = (mword_of_int 4096 : mword 64) ->
   Ml !!! Regidx Rs10 = (mword_of_int (Z.of_nat ip) : mword 64) ->
   Ml !!! Regidx Rs11 = (mword_of_int 56 : mword 64) ->
-  sie_cap_gpr KT1 Ml (K - 68)%nat true (proc_addr jp) -∗
-  cpu_own 0 true (proc_addr jp) true lks -∗
+  sie_cap_gpr KT1 Ml (K - 68)%nat eb (proc_addr jp) -∗
+  cpu_own 0 eb (proc_addr jp) eb lks -∗
+  trap_csrs_ext KT1 eb -∗
+  cpu_claim_ext eb (proc_addr jp) -∗
   kernel_text -∗
   pc_is (mword_of_int (KXB + 0xf6) : mword 64) -∗
   fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
@@ -741,8 +747,10 @@ Definition kxc_ls_body
       (entry spv szv' : mword 64),
         ⌜callee_saved m mf⌝ -∗
         ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
-        sie_cap_gpr KT1 mf K true (proc_addr jp) -∗
-        cpu_own 0 true (proc_addr jp) true lks -∗
+        sie_cap_gpr KT1 mf K eb (proc_addr jp) -∗
+        cpu_own 0 eb (proc_addr jp) eb lks -∗
+        trap_csrs_ext KT1 eb -∗
+        cpu_claim_ext eb (proc_addr jp) -∗
         pc_is (ret_pc ra0) -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -769,8 +777,10 @@ Definition kxc_ls_body
         Mx !!! Regidx Rs9 = (mword_of_int 4096 : mword 64) /\
         Mx !!! Regidx Rs10 = (mword_of_int (Z.of_nat ip) : mword 64) /\
         Mx !!! Regidx Rs11 = (mword_of_int 56 : mword 64)⌝ -∗
-      sie_cap_gpr KT1 Mx (K - 68)%nat true (proc_addr jp) -∗
-      cpu_own 0 true (proc_addr jp) true lks -∗
+      sie_cap_gpr KT1 Mx (K - 68)%nat eb (proc_addr jp) -∗
+      cpu_own 0 eb (proc_addr jp) eb lks -∗
+      trap_csrs_ext KT1 eb -∗
+      cpu_claim_ext eb (proc_addr jp) -∗
       pc_is (mword_of_int (KXB + 0x116) : mword 64) -∗
       kxc_res jp bn g gfs gi cn gf cov logstart bmapstart inodestart size dev
               kf qf sf gyf inumf dnf bmf gilf gislf n2 plen pfun na avf
@@ -784,8 +794,10 @@ Definition kxc_ls_body
           (entry spv szv' : mword 64),
             ⌜callee_saved m mf⌝ -∗
             ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
-            sie_cap_gpr KT1 mf K true (proc_addr jp) -∗
-            cpu_own 0 true (proc_addr jp) true lks -∗
+            sie_cap_gpr KT1 mf K eb (proc_addr jp) -∗
+            cpu_own 0 eb (proc_addr jp) eb lks -∗
+            trap_csrs_ext KT1 eb -∗
+            cpu_claim_ext eb (proc_addr jp) -∗
             pc_is (ret_pc ra0) -∗
             sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
             sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -818,12 +830,12 @@ Module Type KEXECB2.
       (pidv : mword 32) (V : pprivate) (dqb dqs dqa dqpv dqas : dfrac)
       (m Mt : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w63 w67 : mword 64)
-      (ef : nat -> bv 8) (P : uptd) (szf : mword 64) (lks : gset string),
+      (ef : nat -> bv 8) (P : uptd) (szf : mword 64) (eb : bool) (lks : gset string),
     kxc_bad324_body gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl gilf gislf
       ga gf cov logstart bmapstart inodestart nib size dev
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
       pidv V dqb dqs dqa dqpv dqas m Mt K sp0 ra0 s00 s10 s20 pv av w63 w67
-      ef P szf lks.
+      ef P szf eb lks.
 
   Parameter kxc_ls :
     forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId}
@@ -842,10 +854,10 @@ Module Type KEXECB2.
       (m : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w63 w65 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd)
-      (ip : nat) (va : mword 64) (fz po : Z) (lks : gset string),
+      (ip : nat) (va : mword 64) (fz po : Z) (eb : bool) (lks : gset string),
     kxc_ls_body gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl gilf gislf
       ga gf cov logstart bmapstart inodestart nib size dev
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
       pidv V dqb dqs dqa dqpv dqas m K sp0 ra0 s00 s10 s20 pv av w63 w65 w67
-      ef P ip va fz po lks.
+      ef P ip va fz po eb lks.
 End KEXECB2.

@@ -490,10 +490,17 @@ Definition wp_kexec_sconf_body
      supplies them by supplying the bundle, and every seam in the proof can
      read them back off it.  [eb = true] below is therefore redundant with
      [b = true]; it is kept because it is what the callee contracts quote. *)
-  b = true ->
-  eb = true ->
   sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
+  (* THE TRAP-CSR COMPLEMENT, in and out.  kexec holds no lock across a
+     phase boundary, so what its interior sleeps (begin_op, namei, ilock,
+     readi, iunlockput, end_op) need is the caller's pair: [emp] at
+     [eb = true], the real [trap_csrs] / [cpu_claim] at [eb = false] --
+     which is the index forkret's [if (first)] arm calls kexec at, since
+     this revision's scheduler leaves [intena = 0].
+     claude-notes/completed/eb-generic-sweep.md is the recipe. *)
+  trap_csrs_ext KT1 eb -∗
+  cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
             cov logstart inodestart nib dev -∗
@@ -535,7 +542,11 @@ Definition wp_kexec_sconf_body
      [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
   bslots bn 3 -∗
   iref_slots 2 -∗
-  wp_next b pj (fun (CID : CpuId) =>
+  (* THE CROSSING IS THE LITERAL [true], NOT [b].  kexec PARKS -- through
+     begin_op, namei, ilock, readi, iunlockput and end_op -- so the crossing
+     has nothing to do with SIE.  Spelled [b] the two coincided at the only
+     instance the deleted [b = true] premise admitted. *)
+  wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (V' : pprivate)
     (entry spv szv' : mword 64),
       ⌜callee_saved m mf⌝ -∗
@@ -543,6 +554,8 @@ Definition wp_kexec_sconf_body
                 entry spv szv' na alen⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
+      trap_csrs_ext KT1 eb -∗
+      cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗

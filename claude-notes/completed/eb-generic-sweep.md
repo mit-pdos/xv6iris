@@ -432,6 +432,46 @@ followed: the generic credited core exists, and `wp_iupdate_cred` is it at
 `eb := true`, kept as its own parameter so create's positional applications
 do not move). Do not "fix" it.
 
+## ROUND N+1 (2026-08-21): forkret's boot cone, and the sentence below that was wrong
+
+The closing paragraph below says the ~25 remaining contracts are each
+"reached from a syscall or from boot with an enabled base". **That is false
+for the boot path of this xv6 revision**, whose scheduler runs
+
+    intr_on();  intr_off();          <-- the wfi-race fix
+    ...  acquire(&p->lock);  swtch(&c->context, &p->context);
+
+so `push_off` records `intena = 0` and forkret's own `release` does not
+re-enable. forkret's `if (first)` arm therefore reaches fsinit and kexec at
+`eb = false`. Seven of the listed contracts were generalized for it:
+`initlog`, `ireclaim`, `fsinit`, `dirlookup`, `namex` (both forms), `namei` /
+`nameiparent`, and `kexec` (which also carried the tree's only
+`b = true ->`, and whose crossing moved to the literal `true`).
+
+Three things that round added to the recipe, all of them about what a
+DROPPED INDEX PREMISE STOPS HIDING:
+
+1. **Audit every crossing in a file when you drop its index premise.** A
+   stale `wp_next b` on a run that parks becomes false; a stale `wp_next true`
+   on a straight-line run strands whatever the caller frames across it.
+   Both directions turned up — kexec phase A had nine of the first,
+   `dirlookup`'s `Hpoffst` and kexec phase D's scan loop had the second.
+2. **`Hb : b = true` rewritten into a transport guard was load-bearing.** It
+   made the goal `true`-indexed, whose hypothesis reduces to `p = zero_reg`
+   and so fires every chain fact regardless of index. Without it each chain
+   must genuinely compose at `b`, and one `true` link anywhere breaks it.
+3. **At `b = true`, `cpu_own` is a PURE proposition** (`cpu_own_on`), so a
+   proof written under that premise frames it freely and its
+   `cpu_own_transport` sources are vestigial — in `kexec` two of them named a
+   hart bound only in a sibling branch and one was an identity transport.
+   Expect to recompute every span, not to inherit one.
+
+`kexec`'s nine proof files were converted as six parallel lanes over a frozen
+base (`SpecKexec`, `SpecKexecB2/B3`, `ProofKexecTail`, `ProofKexecSeam`),
+each lane checking its own file with a single-file `coqc` against pulled
+`.vo`. `ProofKexecA/B/B2/B3/D` are mutually independent; only `C` waits on
+`B3`. See claude-notes/projects/forkret-boot-arm.md.
+
 **What is still pinned above the cone, and why that is not this project.**
 ~25 contracts outside the kexit dependency chain still carry `eb = true ->`:
 `namei` / `nameiparent` / `namex`, `dirlookup` / `dirlink`, `create`,
