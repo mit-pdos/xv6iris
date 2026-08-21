@@ -475,6 +475,42 @@ sentence, and that is the only cheap way to tell this apart from a slow
 proof.
 
 ## A CONTRACT CAN ASK FOR MORE OF A CELL THAN EXISTS, AND THE FRACTION IS
+## A BYTE RUN THE CALLEE ONLY READS TAKES THE CALLER'S FRACTION
+
+**A byte run that a function only READS takes a caller-supplied `dfrac`; a
+run it WRITES stays at `DfracOwn 1`.** State every contract that way from the
+start. A full-ownership over-ask on a read-only buffer costs nothing until
+one caller has to hand the SAME run in twice — and then the contract is not
+callable at all, because one byte run cannot be owned twice outright.
+
+The instance that forces it: forkret's `if (first)` arm is
+
+    kexec("/init", (char *[]){"/init", 0})
+
+so one `.rodata` literal arrives as kexec's PATH and as its `argv[0]`. Every
+contract on that path had to become fractional on its source — `SpecKexec`
+(path `dqpv`, argument strings `dqas`), `SpecNamei`/`SpecNamex`/
+`SpecNameiparent` (`dqpv`), `SpecCopyout` (`dqsrc`), `SpecMemmove` (`dqs`),
+`ByteBuf.bb_cut`/`bb_split3`. What deliberately stayed whole is exactly what
+those functions WRITE: namex's `name[DIRSIZ]`, safestrcpy's destination,
+copyout's destination page table, memmove's destination.
+
+Two consequences worth knowing before you write the contract:
+
+- **The relaxation is nearly free at the call sites.** Every caller that
+  genuinely owns its buffer passes `(DfracOwn 1)` and is otherwise unchanged;
+  the fraction threads through the interior helper predicates as one more
+  binder. Retrofitting it across the kexec cone touched 49 files and produced
+  exactly one real proof obligation (below).
+- **AN ALIASING REFUTATION BUILT ON THE RUN'S EXCLUSIVITY BREAKS, AND THE
+  REPAIR IS TO SWAP WHICH SIDE IS WHOLE.** `ProofMemmove` refutes
+  source/destination overlap from `RiscvPtsto.mem_bytes_notin`, which needs
+  the RUN exclusive. With a fractional source that argument is gone — but the
+  destination byte is still whole, so `mem_bytes_notin_r` (same induction,
+  `mem_pointsto_ne` applied with the byte FIRST and the disequality flipped)
+  says the same thing from the other side. Separation still carries the
+  disjointness; only the whole side moved.
+
 ## THE LAST THING ANYONE COUNTS
 
 `SpecSysClose.v` took `ProcInv.proc_priv γf p pid V` **and**

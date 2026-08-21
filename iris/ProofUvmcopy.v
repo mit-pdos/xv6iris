@@ -1467,7 +1467,7 @@ Section ProofUvmcopy.
     pose (fsrc := fun j0 : nat =>
                     Mold !!! (4096 * Z.of_nat j + Z.of_nat j0)%Z).
     iDestruct (bb_page_named r with "Hpage") as (fdst) "Hdst".
-    iApply (Memmove.wp_memmove_sconf KT1 KT0 KT0 C5 (K - 10)%nat 4096%nat fsrc fdst b p
+    iApply (Memmove.wp_memmove_sconf KT1 KT0 KT0 C5 (K - 10)%nat 4096%nat fsrc fdst (DfracOwn 1) b p
               HKmm ltac:(vm_compute; reflexivity) Hmmlen
               with "Hcg Htext Hpc [Hsrc] [Hdst]").
     { iEval (rewrite HC5a1). iExact "Hsrc". }

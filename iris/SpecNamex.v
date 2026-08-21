@@ -328,7 +328,7 @@ Definition namex_post
     (used : gset Z)
     (plen : nat) (pfun : nat -> bv 8)
     (npar : bool) (n : nat) (pidv : mword 32)
-    (dq dqb dqs : dfrac) (Vpr : pprivate) : iProp Σ :=
+    (dq dqb dqs dqpv : dfrac) (Vpr : pprivate) : iProp Σ :=
   (∀ (mf : regfile) (n' : nat) (used' : gset Z)
      (ok : bool) (nf : nat -> bv 8) (ipv : mword 64),
       ⌜callee_saved m mf⌝ -∗
@@ -342,7 +342,7 @@ Definition namex_post
       bitmap_res gfs bmapstart cov logstart size used' -∗
       proc_priv_bare pj pidv Vpr -∗
       inode_held (pv_cwd Vpr) -∗
-      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
+      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
       (* the name buffer, at an UNSPECIFIED naming function -- the short
          branch leaves the bytes above [len] alone *)
       ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1] nf i) -∗
@@ -379,7 +379,7 @@ Definition namex_postS
     (used : gset Z)
     (plen : nat) (pfun : nat -> bv 8)
     (npar : bool) (n : nat) (Sb : gset Z) (pidv : mword 32)
-    (dq dqb dqs : dfrac) (Vpr : pprivate) : iProp Σ :=
+    (dq dqb dqs dqpv : dfrac) (Vpr : pprivate) : iProp Σ :=
   (∀ (mf : regfile) (n' : nat) (used' Sb' : gset Z)
      (ok : bool) (nf : nat -> bv 8) (ipv : mword 64) (w : bool),
       ⌜callee_saved m mf⌝ -∗
@@ -393,7 +393,7 @@ Definition namex_postS
       bitmap_res gfs bmapstart cov logstart size used' -∗
       proc_priv_bare pj pidv Vpr -∗
       inode_held (pv_cwd Vpr) -∗
-      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
+      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
       (* the name buffer, at an UNSPECIFIED naming function -- the short
          branch leaves the bytes above [len] alone *)
       ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1] nf i) -∗
@@ -447,7 +447,7 @@ Definition wp_namex_sconf_body
     (nfun : nat -> bv 8)                               (* the name buffer, in *)
     (npar : bool)                                      (* the a1 flag         *)
     (n : nat)
-    (pidv : mword 32) (dq dqb dqs : dfrac)
+    (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) (Vpr : pprivate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.namex in
@@ -538,9 +538,18 @@ Definition wp_namex_sconf_body
   proc_priv_bare pj pidv Vpr -∗
   (* ---- THE WORKING DIRECTORY: cell and reference, both handed back ---- *)
   inode_held (pv_cwd Vpr) -∗
-  (* ---- THE PATH: [plen] content bytes and the terminator ---- *)
-  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
-  (* ---- THE NAME BUFFER: fourteen bytes, WRITTEN ---- *)
+  (* ---- THE PATH: [plen] content bytes and the terminator, AT THE CALLER'S
+     FRACTION [dqpv].  The rule the tree follows: a byte run the callee only
+     READS takes the caller's dfrac, a run it WRITES stays whole.  namex only
+     LOADS from the path -- skipelem's two scans and the memmove's SOURCE --
+     so it takes [dqpv]; the name buffer one line down is the run it WRITES,
+     and that one cannot be fractional.  The consumer is kexec by way of
+     namei: forkret calls [kexec("/init", (char *[]){"/init", 0})], so one
+     .rodata literal arrives as the path AND as argv[0] and cannot be owned
+     twice outright. ---- *)
+  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
+  (* ---- THE NAME BUFFER: fourteen bytes, WRITTEN -- so FULL ownership, and
+     that is not an over-ask: namex's memmove stores each path element here. *)
   ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1] nfun i) -∗
   (* ---- three buffer slots (iput's itrunc arm forces three) ---- *)
   bslots bn 3 -∗
@@ -560,7 +569,7 @@ Definition wp_namex_sconf_body
   wp_next true pj (fun (CIDc : CpuId) =>
     namex_post (CID := CIDc) pj pv nb ret_tgt pl m K b eb lks
                g gfs bn cov logstart bmapstart inodestart size used
-               plen pfun npar n pidv dq dqb dqs Vpr) -∗
+               plen pfun npar n pidv dq dqb dqs dqpv Vpr) -∗
   WP (Loop : expr riscv_lang).
 
 (* =====================================================================  *)
@@ -598,7 +607,7 @@ Definition wp_namex_gen_body
     (nfun : nat -> bv 8)                               (* the name buffer, in *)
     (npar : bool)                                      (* the a1 flag         *)
     (n : nat) (Sb : gset Z)
-    (pidv : mword 32) (dq dqb dqs : dfrac)
+    (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) (Vpr : pprivate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.namex in
@@ -695,9 +704,18 @@ Definition wp_namex_gen_body
   proc_priv_bare pj pidv Vpr -∗
   (* ---- THE WORKING DIRECTORY: cell and reference, both handed back ---- *)
   inode_held (pv_cwd Vpr) -∗
-  (* ---- THE PATH: [plen] content bytes and the terminator ---- *)
-  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
-  (* ---- THE NAME BUFFER: fourteen bytes, WRITTEN ---- *)
+  (* ---- THE PATH: [plen] content bytes and the terminator, AT THE CALLER'S
+     FRACTION [dqpv].  The rule the tree follows: a byte run the callee only
+     READS takes the caller's dfrac, a run it WRITES stays whole.  namex only
+     LOADS from the path -- skipelem's two scans and the memmove's SOURCE --
+     so it takes [dqpv]; the name buffer one line down is the run it WRITES,
+     and that one cannot be fractional.  The consumer is kexec by way of
+     namei: forkret calls [kexec("/init", (char *[]){"/init", 0})], so one
+     .rodata literal arrives as the path AND as argv[0] and cannot be owned
+     twice outright. ---- *)
+  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
+  (* ---- THE NAME BUFFER: fourteen bytes, WRITTEN -- so FULL ownership, and
+     that is not an over-ask: namex's memmove stores each path element here. *)
   ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ[KT1] nfun i) -∗
   (* ---- three buffer slots (iput's itrunc arm forces three) ---- *)
   bslots bn 3 -∗
@@ -717,7 +735,7 @@ Definition wp_namex_gen_body
   wp_next true pj (fun (CIDc : CpuId) =>
     namex_postS (CID := CIDc) pj pv nb ret_tgt pl m K b eb lks
                 g gfs bn cov logstart bmapstart inodestart size used
-                plen pfun npar n Sb pidv dq dqb dqs Vpr) -∗
+                plen pfun npar n Sb pidv dq dqb dqs dqpv Vpr) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type NAMEX.
@@ -738,13 +756,13 @@ Module Type NAMEX.
       (nfun : nat -> bv 8)
       (npar : bool)
       (n : nat)
-      (pidv : mword 32) (dq dqb dqs : dfrac)
+      (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_namex_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                           ga gf cov logstart bmapstart inodestart nib
                           size dev used plen pfun nfun npar n
-                          pidv dq dqb dqs m K eb b lks Vpr.
+                          pidv dq dqb dqs dqpv m K eb b lks Vpr.
   (* the set-form contract; [wp_namex_sconf] is this at the [log_op]
      existential's own witness, with the grown set forgotten again. *)
   Parameter wp_namex_gen :
@@ -764,13 +782,13 @@ Module Type NAMEX.
       (nfun : nat -> bv 8)
       (npar : bool)
       (n : nat) (Sb : gset Z)
-      (pidv : mword 32) (dq dqb dqs : dfrac)
+      (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_namex_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                         ga gf cov logstart bmapstart inodestart nib
                         size dev used plen pfun nfun npar n Sb
-                        pidv dq dqb dqs m K eb b lks Vpr.
+                        pidv dq dqb dqs dqpv m K eb b lks Vpr.
 End NAMEX.
 
 (* ===================================================================== *)

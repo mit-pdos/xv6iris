@@ -2301,7 +2301,7 @@ Section ProofSysPipe.
               (pv_upt (upd_ofile (upd_ofile V fd0 (fnode k0)) fd1 (fnode k1)))
               (pv_sz (upd_ofile (upd_ofile V fd0 (fnode k0)) fd1 (fnode k1))) 4%nat
               (fun j => nth_byte (trunc32 (mword_of_int (Z.of_nat fd0) : mword 64)) j)
-              (av - 8)%nat 0%nat eb p b lks
+              (DfracOwn 1) (av - 8)%nat 0%nat eb p b lks
               Hav52 HA6a0 HA6a1 HA6a4 sp_len4 Hszb sp_n0
               with "Hcg Hcpu Htext Hpc Hpt Henva Hbufhi").
     all: try lkbelow.
@@ -2748,7 +2748,7 @@ Section ProofSysPipe.
     iApply (Copyout.wp_copyout_sconf KT1 γa C7 Pa
               (pv_sz (upd_ofile (upd_ofile V fd0 (fnode k0)) fd1 (fnode k1))) 4%nat
               (fun j => nth_byte (trunc32 (mword_of_int (Z.of_nat fd1) : mword 64)) j)
-              (av - 8)%nat 0%nat eb p b lks
+              (DfracOwn 1) (av - 8)%nat 0%nat eb p b lks
               Hav52 HC7a0 HC7a1 HC7a4 sp_len4 Hszb sp_n0
               with "Hcg Hcpu Htext Hpc Hpt Henvb Hbuflo").
     all: try lkbelow.

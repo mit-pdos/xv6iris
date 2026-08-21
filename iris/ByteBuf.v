@@ -303,13 +303,20 @@ Section ByteBuf.
   (* SPLIT / JOIN.  The two-way CUT is the induction step; everything     *)
   (* callers use is the three-way form below it.                          *)
   (* ------------------------------------------------------------------ *)
-  Local Lemma bb_cut (p : mword 64) (k n : nat) (f : nat -> bv 8) :
-    ([∗ list] j ∈ seq 0 (k + n), pa_add p j ↦ₘ f j)
-    ⊣⊢ ([∗ list] j ∈ seq 0 k, pa_add p j ↦ₘ f j) ∗
-       ([∗ list] j ∈ seq 0 n, pa_add (pa_add p k) j ↦ₘ f (k + j)%nat).
+  (* AT THE CALLER'S FRACTION.  A window is only ever RE-ANCHORED here --
+     nothing in the split writes a byte -- so the fraction is a parameter and
+     the rule the tree follows applies: a run that is only READ takes the
+     caller's dfrac, a run the callee WRITES stays whole.  Every full-ownership
+     caller passes [DfracOwn 1] and is unchanged; kexec's path buffer, which
+     arrives at [dqpv] because the same .rodata literal is also argv[0], is the
+     consumer that made it a parameter. *)
+  Local Lemma bb_cut (p : mword 64) (k n : nat) (f : nat -> bv 8) (dq : dfrac) :
+    ([∗ list] j ∈ seq 0 (k + n), pa_add p j ↦ₘ{dq} f j)
+    ⊣⊢ ([∗ list] j ∈ seq 0 k, pa_add p j ↦ₘ{dq} f j) ∗
+       ([∗ list] j ∈ seq 0 n, pa_add (pa_add p k) j ↦ₘ{dq} f (k + j)%nat).
   Proof.
     rewrite seq_app big_sepL_app.
-    rewrite (bb_seq_shift (fun j => pa_add p j ↦ₘ f j)%I (0 + k)%nat n).
+    rewrite (bb_seq_shift (fun j => pa_add p j ↦ₘ{dq} f j)%I (0 + k)%nat n).
     apply bi.sep_proper; [reflexivity |].
     apply big_sepL_proper. intros i j Hj.
     rewrite Nat.add_0_l. rewrite pa_add_add. reflexivity.
@@ -318,18 +325,18 @@ Section ByteBuf.
   (* PREFIX / CHUNK / SUFFIX, with every window, base and naming function
      spelled out and the total length given as a premise.  This is what a
      page-at-a-time copy loop calls, once per buffer per iteration. *)
-  Lemma bb_split3 (p : mword 64) (a b c L : nat) (f : nat -> bv 8) :
+  Lemma bb_split3 (p : mword 64) (a b c L : nat) (f : nat -> bv 8) (dq : dfrac) :
     (a + b + c = L)%nat ->
-    ([∗ list] j ∈ seq 0 L, pa_add p j ↦ₘ f j)
-    ⊣⊢ ([∗ list] j ∈ seq 0 a, pa_add p j ↦ₘ f j)
-      ∗ ([∗ list] j ∈ seq 0 b, pa_add (pa_add p a) j ↦ₘ f (a + j)%nat)
-      ∗ ([∗ list] j ∈ seq 0 c, pa_add (pa_add (pa_add p a) b) j ↦ₘ f (a + (b + j))%nat).
+    ([∗ list] j ∈ seq 0 L, pa_add p j ↦ₘ{dq} f j)
+    ⊣⊢ ([∗ list] j ∈ seq 0 a, pa_add p j ↦ₘ{dq} f j)
+      ∗ ([∗ list] j ∈ seq 0 b, pa_add (pa_add p a) j ↦ₘ{dq} f (a + j)%nat)
+      ∗ ([∗ list] j ∈ seq 0 c, pa_add (pa_add (pa_add p a) b) j ↦ₘ{dq} f (a + (b + j))%nat).
   Proof.
     intros <-.
     replace (a + b + c)%nat with (a + (b + c))%nat by lia.
-    rewrite (bb_cut p a (b + c) f).
+    rewrite (bb_cut p a (b + c) f dq).
     apply bi.sep_proper; [reflexivity |].
-    rewrite (bb_cut (pa_add p a) b c (fun j => f (a + j)%nat)).
+    rewrite (bb_cut (pa_add p a) b c (fun j => f (a + j)%nat) dq).
     reflexivity.
   Qed.
 
@@ -339,7 +346,7 @@ Section ByteBuf.
     ⊣⊢ ([∗ list] j ∈ seq 0 k, pa_add p j ↦ₘ f j) ∗
        ([∗ list] j ∈ seq 0 n, pa_add (pa_add p k) j ↦ₘ f (k + j)%nat).
   Proof.
-    rewrite (bb_split3 p k n 0 (k + n) f ltac:(lia)).
+    rewrite (bb_split3 p k n 0 (k + n) f (DfracOwn 1) ltac:(lia)).
     rewrite big_sepL_nil bi.sep_emp. reflexivity.
   Qed.
 
@@ -448,7 +455,7 @@ Section ByteBuf.
     [∗ list] j ∈ seq 0 L, pa_add p j ↦ₘ u j.
   Proof.
     intros <- Hf Hg Hh. iIntros "HA HB HC".
-    rewrite (bb_split3 p a b c (a + b + c) u ltac:(lia)).
+    rewrite (bb_split3 p a b c (a + b + c) u (DfracOwn 1) ltac:(lia)).
     iSplitL "HA"; [| iSplitL "HB"].
     - iApply (big_sepL_mono with "HA"). intros i j Hj.
       apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l Hf; [reflexivity | lia].
@@ -469,7 +476,7 @@ Section ByteBuf.
     iExists (fun j => if decide (j < a)%nat then f j
                       else if decide (j < a + b)%nat then g (j - a)%nat
                       else h (j - a - b)%nat).
-    rewrite (bb_split3 p a b c (a + b + c) _ ltac:(lia)).
+    rewrite (bb_split3 p a b c (a + b + c) _ (DfracOwn 1) ltac:(lia)).
     iSplitL "HA"; [| iSplitL "HB"].
     - iApply (big_sepL_mono with "HA"). intros i j Hj.
       apply lookup_seq in Hj as [Heq Hlt].
@@ -619,7 +626,7 @@ Section ByteBuf.
        pa_add a o ↦₄ w -∗ bb_bytes a n (bb_set f o w)).
   Proof.
     intros Hn Hal.
-    rewrite /bb_bytes (bb_split3 a o 4 r n f Hn).
+    rewrite /bb_bytes (bb_split3 a o 4 r n f (DfracOwn 1) Hn).
     iIntros "(Hpre & Hmid & Hsuf)".
     iSplitL "Hmid".
     { iApply (word4_pointsto_intro _ _ _ Hal).
@@ -627,7 +634,7 @@ Section ByteBuf.
       apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
       rewrite (bb_mk_byte f o i Hlt). reflexivity. }
     iIntros (w) "Hw".
-    rewrite (bb_split3 a o 4 r n (bb_set f o w) Hn).
+    rewrite (bb_split3 a o 4 r n (bb_set f o w) (DfracOwn 1) Hn).
     iDestruct (word4_pointsto_bytes with "Hw") as "Hw".
     iSplitL "Hpre".
     { iApply (big_sepL_mono with "Hpre"). intros i jj Hj.

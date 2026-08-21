@@ -1237,7 +1237,7 @@ Section ProofSysLinkBody.
         iApply (Namei.wp_namei_gen (CID := CID23) gs j gl gu gd gk pd pav pu bn
                   g gfs gi cn gtl γa γf cov logstart bmapstart inodestart nib
                   size dev used pk1 bo1 MAXOPBLOCKS Sb0
-                  pid (DfracOwn (1/4)) dqb dqs
+                  pid (DfracOwn (1/4)) dqb dqs (DfracOwn 1)
                   Q2 (K - 38)%nat eb b lks (upd_upt V P2)
                   ltac:(exact Kna) Hcdev Hcnib Hclog Hcist HdevR Hnib0 Hgeom
                   Hsize Hbm0 Hbmcov Hbmlog Hist0 Hcovb Hiregb Hpcstr1
@@ -2018,7 +2018,7 @@ Section ProofSysLinkBody.
                           gd gk pd pav pu bn g gfs gi cn gtl γa γf cov logstart
                           bmapstart inodestart nib size dev used1
                           pk2 bw1 bn0 c1 (Sb1 ∪ {[IBLOCK inum inodestart]})
-                          pid (DfracOwn (1/4)) dqb dqs
+                          pid (DfracOwn (1/4)) dqb dqs (DfracOwn 1)
                           T2 (K - 38)%nat eb b lks (upd_upt V P2)
                           ltac:(exact Knp) Hcdev Hcnib Hclog Hcist HdevR Hnib0
                           Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hcovb Hiregb

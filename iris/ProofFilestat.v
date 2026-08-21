@@ -1170,7 +1170,7 @@ Section ProofFilestat.
       iEval (rewrite -HU6a3) in "Hbuf".
       iDestruct (cpu_own_transport CIDiu CID31 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iApply (Copyout.wp_copyout_sconf KT1 γa U6 (pv_upt V) (pv_sz V) 24%nat fbytes
+      iApply (Copyout.wp_copyout_sconf KT1 γa U6 (pv_upt V) (pv_sz V) 24%nat fbytes (DfracOwn 1)
                 (K - 10)%nat 0%nat eb pj b lks
                 (fst_av_copyout K HK) HU6a0 HU6a1 HU6a4 fst_len24 Hszb fst_noff0
                 with "Hcg Hcnt Htext Hpc Hpt Hkenv Hbuf").

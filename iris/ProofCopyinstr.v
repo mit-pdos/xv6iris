@@ -1255,7 +1255,7 @@ Section ProofCopyinstr.
         iDestruct (bb_page_named (pa0) with "Hpg") as (fpg) "Hpg".
         assert (Hsplitp : (off + n + (4096 - off - n) = 4096)%nat) by lia.
         iEval (rewrite (bb_split3 (pa0) off n (4096 - off - n) 4096
-                          fpg Hsplitp)) in "Hpg".
+                          fpg (DfracOwn 1) Hsplitp)) in "Hpg".
         iDestruct "Hpg" as "(Hpg0 & Hsrc & Hpg2)".
         assert (Hdn : (done + n <= maxn)%nat) by lia.
         (* ---- the inner loop ---- *)

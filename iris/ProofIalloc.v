@@ -341,7 +341,7 @@ Section IallocBytes.
     assert (Hklen : (k < length ds)%nat) by (rewrite Hlen; exact Hk).
     iIntros "H". rewrite /bb_bytes.
     rewrite (bb_split3 a (64 * k)%nat 64 (1024 - (64 * k + 64))%nat 1024
-               (fun j => diblk_bytes ds !!! j) ltac:(lia)).
+               (fun j => diblk_bytes ds !!! j) (DfracOwn 1) ltac:(lia)).
     iDestruct "H" as "(Hpre & Hmid & Hsuf)".
     iSplitL "Hmid".
     { iApply (big_sepL_mono with "Hmid"). intros i jj Hj.
@@ -350,7 +350,7 @@ Section IallocBytes.
       reflexivity. }
     iIntros (d) "%Hd Hmid".
     rewrite (bb_split3 a (64 * k)%nat 64 (1024 - (64 * k + 64))%nat 1024
-               (fun j => diblk_bytes (<[k := d]> ds) !!! j) ltac:(lia)).
+               (fun j => diblk_bytes (<[k := d]> ds) !!! j) (DfracOwn 1) ltac:(lia)).
     iSplitL "Hpre".
     { iApply (big_sepL_mono with "Hpre"). intros i jj Hj.
       apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.

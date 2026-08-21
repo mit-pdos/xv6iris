@@ -297,14 +297,14 @@ Section KexecB2Body.
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
-      (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
+      (pidv : mword 32) (V : pprivate) (dqb dqs dqa dqpv dqas : dfrac)
       (m Mt : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w63 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (szf : mword 64) (lks : gset string) :
     kxc_bad324_body gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl gilf gislf
       ga gf cov logstart bmapstart inodestart nib size dev used used2
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
-      pidv V dqb dqs dqa m Mt K sp0 ra0 s00 s10 s20 pv av w63 w67
+      pidv V dqb dqs dqa dqpv dqas m Mt K sp0 ra0 s00 s10 s20 pv av w63 w67
       ef P szf lks.
   Proof.
     cbv beta delta [kxc_bad324_body].
@@ -644,7 +644,7 @@ Section KexecB2Body.
     iApply (A.kxc_bad64 gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
               gilf gislf ga gf cov logstart bmapstart inodestart nib size
               dev used used2 kf qf sf gyf inumf dnf bmf n2
-              plen pfun na avf alen aslen afun pidv V dqb dqs dqa
+              plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
               m U8 K lks sp0 ra0 s00 s10 s20 pv av
               HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib Hcovb Hn2
               Hjp Hgs Hu2 Hsp Hra Hs0 Hs1 Hs2 HU8sp HU8s4 HU8thr
@@ -773,7 +773,7 @@ Section KexecB2Loops.
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
-      (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
+      (pidv : mword 32) (V : pprivate) (dqb dqs dqa dqpv dqas : dfrac)
       (m : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w63 w65 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd)
@@ -781,7 +781,7 @@ Section KexecB2Loops.
     kxc_ls_body gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl gilf gislf
       ga gf cov logstart bmapstart inodestart nib size dev used used2
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
-      pidv V dqb dqs dqa m K sp0 ra0 s00 s10 s20 pv av w63 w65 w67
+      pidv V dqb dqs dqa dqpv dqas m K sp0 ra0 s00 s10 s20 pv av w63 w65 w67
       ef P ip va fz po lks.
   Proof.
     cbv beta delta [kxc_ls_body].
@@ -1608,7 +1608,7 @@ Section KexecB2Loops.
         iApply (kxc_bad324 (CID0 := CIDb1) gs jp gl gu gd gk pd pav pu bn g gfs
                   gi cn gtl gilf gislf ga gf cov logstart bmapstart inodestart
                   nib size dev used used2 kf qf sf gyf inumf dnf bmf n2 plen
-                  pfun na avf alen aslen afun pidv V dqb dqs dqa m M2 K
+                  pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas m M2 K
                   sp0 ra0 s00 s10 s20 pv av w63 w67 ef P w65 lks
                   HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hib Hn2 Hjp
                   Hgs Hu2 Hsp Hra Hs0 Hs1 Hs2

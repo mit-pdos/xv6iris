@@ -4846,7 +4846,8 @@ Section SysExecBreak.
     iApply (Kexec.wp_kexec_sconf gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
               γa γf cov logstart bmapstart inodestart nib size dev used
               plen pfun i (sx_avf pg i) alen (fun _ => 4096%nat) afun
-              pid (upd_upt V P) dqb dqs (DfracOwn 1) N6 (K - 60)%nat eb b lks
+              pid (upd_upt V P) dqb dqs (DfracOwn 1) (DfracOwn 1) (DfracOwn 1)
+              N6 (K - 60)%nat eb b lks
               Kkx Hdev Hnib Hg Hist Hroot Hnib0 Hlg Hsize Hbm0 Hbmc Hbml Hist0
               Hcb Hireg Hpcstr ltac:(lia)
               ltac:(intros j Hj; rewrite (sx_avf_lt pg i j Hj);

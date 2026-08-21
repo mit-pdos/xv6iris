@@ -482,7 +482,7 @@ Section IupdateRes.
       ∗ ([∗ list] j ∈ seq 0 52, pa_add (pa_add a 12) j ↦ₘ f (12 + j)%nat).
   Proof.
     (* type@0 and major@2 *)
-    rewrite (bb_split3 a 2 2 60 64 f ltac:(lia)).
+    rewrite (bb_split3 a 2 2 60 64 f (DfracOwn 1) ltac:(lia)).
     apply bi.sep_proper; [reflexivity |].
     apply bi.sep_proper; [reflexivity |].
     (* the remaining 60 bytes, re-anchored at a+4 *)
@@ -491,7 +491,7 @@ Section IupdateRes.
                ltac:(rewrite pa_add_add; reflexivity)
                ltac:(intros j _; f_equal; lia)).
     (* minor@4 and nlink@6 *)
-    rewrite (bb_split3 (pa_add a 4) 2 2 56 60 (fun j => f (4 + j)%nat) ltac:(lia)).
+    rewrite (bb_split3 (pa_add a 4) 2 2 56 60 (fun j => f (4 + j)%nat) (DfracOwn 1) ltac:(lia)).
     apply bi.sep_proper; [reflexivity |].
     apply bi.sep_proper.
     { apply bb_reanchor;
@@ -502,7 +502,7 @@ Section IupdateRes.
                ltac:(rewrite !pa_add_add; reflexivity)
                ltac:(intros j _; f_equal; lia)).
     (* size@8 and addrs@12 *)
-    rewrite (bb_split3 (pa_add a 8) 4 52 0 56 (fun j => f (8 + j)%nat) ltac:(lia)).
+    rewrite (bb_split3 (pa_add a 8) 4 52 0 56 (fun j => f (8 + j)%nat) (DfracOwn 1) ltac:(lia)).
     rewrite big_sepL_nil bi.sep_emp.
     apply bi.sep_proper; [reflexivity |].
     apply bb_reanchor;
@@ -628,7 +628,7 @@ Section IupdateRes.
     assert (Hklen : (k < length ds)%nat) by (rewrite Hlen; exact Hk).
     iIntros "H". rewrite /bb_bytes.
     rewrite (bb_split3 a (64 * k)%nat 64 (1024 - (64 * k + 64))%nat 1024
-               (fun j => diblk_bytes ds !!! j) ltac:(lia)).
+               (fun j => diblk_bytes ds !!! j) (DfracOwn 1) ltac:(lia)).
     iDestruct "H" as "(Hpre & Hmid & Hsuf)".
     iDestruct (dislot_acc_gen (pa_add a (64 * k)%nat)
                  (fun j => diblk_bytes ds !!! (64 * k + j)%nat) (ds !!! k)
@@ -643,7 +643,7 @@ Section IupdateRes.
     { intros j Hj. apply diblk_bytes_insert_same_t;
         [exact Hall | exact Hd | exact Hklen | exact Hj]. }
     rewrite (bb_split3 a (64 * k)%nat 64 (1024 - (64 * k + 64))%nat 1024
-               (fun j => diblk_bytes (<[k := d]> ds) !!! j) ltac:(lia)).
+               (fun j => diblk_bytes (<[k := d]> ds) !!! j) (DfracOwn 1) ltac:(lia)).
     iSplitL "Hpre".
     { iApply (big_sepL_mono with "Hpre"). intros i jj Hj.
       apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.

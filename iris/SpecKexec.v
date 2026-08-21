@@ -403,7 +403,7 @@ Definition wp_kexec_sconf_body
     (alen : nat -> nat) (aslen : nat -> nat)            (* strlen / owned len  *)
     (afun : nat -> nat -> bv 8)                         (* the argument bytes  *)
     (pidv : mword 32) (V : pprivate)
-    (dqb dqs dqa : dfrac)
+    (dqb dqs dqa dqpv dqas : dfrac)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kexec in
@@ -506,22 +506,31 @@ Definition wp_kexec_sconf_body
      needs are all inside it (ProcInv.proc_priv_cwd_pid); so are the p->name
      bytes safestrcpy writes and the trapframe words the commit block writes. *)
   proc_priv gf pj pidv V -∗
-  (* THE PATH AND THE ARGUMENT STRINGS ARE OWNED OUTRIGHT; only the argv
-     POINTER VECTOR is fractional.  Not a preference -- namei demands the whole
-     path buffer (SpecNamei.v:162) and copyout demands the whole source
-     (SpecCopyout.v:174), and kexec hands its path straight to the first and
-     each argument straight to the second.  Both callees only READ what they
-     are given, so both over-ask; but unlike safestrcpy's and copyout's
-     destination-table over-asks, THIS ONE COSTS KEXEC NOTHING -- sys_exec has
-     [char path[MAXPATH]] on its own stack and kalloc's a page per argument, so
-     it owns both outright.  Relaxing namei/namex/nameiparent and copyout's
-     source to a fraction is the "right" shape and has no consumer; recorded in
-     projects/kexec.md, not done.
-       The pointer vector stays at [dqa] because kexec only loads from it. *)
-  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
+  (* EVERY BYTE RUN KEXEC IS HANDED IS FRACTIONAL, because kexec only READS
+     all three of them.  That is the tree's rule -- a byte run the callee only
+     READS takes the caller's fraction, a run it WRITES stays whole -- and here
+     it is not a nicety but a requirement.  forkret's [if (first)] arm calls
+
+         kexec("/init", (char *[]){"/init", 0})
+
+     so the SAME .rodata literal arrives as the PATH and as argv[0], and one
+     byte run cannot be owned twice at full ownership.  A contract taking both
+     at [DfracOwn 1] is simply not callable from there.
+       So: the path at [dqpv], the argument strings at [dqas], the argv POINTER
+     VECTOR at [dqa] (it always was).  Each is passed straight down at the
+     caller's fraction -- the path to namei (SpecNamei) and to safestrcpy,
+     each argument to strlen and to copyout (SpecCopyout) -- all of which are
+     dfrac-generic on their source for the same reason.
+       WHAT STAYS WHOLE, and deliberately: everything kexec WRITES.  The new
+     page table and its pages, [proc_priv]'s p->name bytes (safestrcpy's
+     DESTINATION), the trapframe words, namex's [name[DIRSIZ]] buffer, and
+     copyout's destination table.  None of those is an over-ask.
+       sys_exec, which owns [char path[MAXPATH]] on its own stack and kalloc's
+     a page per argument, simply passes [DfracOwn 1] and sees no change. *)
+  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
   ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
   ([∗ list] i ∈ seq 0 na,
-     [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
+     [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
   bslots bn 3 -∗
   iref_slots 2 -∗
   wp_next b pj (fun (CID : CpuId) =>
@@ -539,10 +548,10 @@ Definition wp_kexec_sconf_body
       bitmap_res gfs bmapstart cov logstart size used' -∗
       kalloc_env ga None -∗
       proc_priv gf pj pidv V' -∗
-      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
+      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
       ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
       ([∗ list] i ∈ seq 0 na,
-         [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
+         [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
       bslots bn 3 -∗
       iref_slots 2 -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -566,11 +575,11 @@ Module Type KEXEC.
       (na : nat) (avf : nat -> mword 64)
       (alen aslen : nat -> nat) (afun : nat -> nat -> bv 8)
       (pidv : mword 32) (V : pprivate)
-      (dqb dqs dqa : dfrac)
+      (dqb dqs dqa dqpv dqas : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_kexec_sconf_body gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
                           ga gf cov logstart bmapstart inodestart nib
                           size dev used plen pfun na avf alen aslen afun
-                          pidv V dqb dqs dqa m K eb b lks.
+                          pidv V dqb dqs dqa dqpv dqas m K eb b lks.
 End KEXEC.

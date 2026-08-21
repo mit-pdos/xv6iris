@@ -22,7 +22,8 @@
    The descending loop is reached only when [src <u dst] and [dst <u src + n],
    which pins dst strictly inside the source range ([mm_overlap_index]).  The
    precondition owns the source and destination bytes SEPARATELY, and separation
-   refutes exactly that ([mem_bytes_notin]), so the +0x3a fall-through arm closes
+   refutes exactly that ([mem_bytes_notin_r] -- the DESTINATION is the exclusive
+   side, since the source rides the caller's dfrac), so the +0x3a arm closes
    by contradiction before it steps -- the descending loop's instructions are
    never fetched and CodeMemmove does not even decode them.
 
@@ -327,7 +328,7 @@ Section ProofMemmove.
   (* =================================================================== *)
   Local Lemma mm_loop 
       (p_src p_dst : mword 64) (len : nat) (src_bytes dst_olds : nat -> bv 8) (n : nat)
-      (b : bool) (pcur : mword 64) (CIDh : CpuId) :
+      (dqs : dfrac) (b : bool) (pcur : mword 64) (CIDh : CpuId) :
     (Z.of_nat len < 2 ^ 64)%Z ->
     forall (rem off : nat) (m : regfile) (CID0 : CpuId),
     (b = false \/ pcur = zero_reg -> (CID0 : CPU) = (CIDh : CPU)) ->
@@ -339,13 +340,13 @@ Section ProofMemmove.
     sie_cap_gpr kt (CID := CID0) m n b pcur -∗
     kernel_text -∗
     pc_is (CID := CID0) (mword_of_int (KernelSyms.memmove + 0x18)) -∗
-    ([∗ list] j ∈ seq off rem, (pa_add p_src j) ↦ₘ[kts] src_bytes j) -∗
+    ([∗ list] j ∈ seq off rem, (pa_add p_src j) ↦ₘ[kts]{dqs} src_bytes j) -∗
     ([∗ list] j ∈ seq off rem, (pa_add p_dst j) ↦ₘ[ktw] dst_olds j) -∗
     wp_next (CID0 := CIDh) b pcur (fun (CID : CpuId) =>
       ∀ mf,
       sie_cap_gpr kt mf n b pcur -∗
       pc_is (mword_of_int (KernelSyms.memmove + 0x28)) -∗
-      ([∗ list] j ∈ seq off rem, (pa_add p_src j) ↦ₘ[kts] src_bytes j) -∗
+      ([∗ list] j ∈ seq off rem, (pa_add p_src j) ↦ₘ[kts]{dqs} src_bytes j) -∗
       ([∗ list] j ∈ seq off rem, (pa_add p_dst j) ↦ₘ[ktw] src_bytes j) -∗
       ⌜ mf !!! Regidx (mword_of_int 10 : mword 5)
         = m !!! Regidx (mword_of_int 10 : mword 5) ⌝ -∗
@@ -534,7 +535,8 @@ Section ProofMemmove.
   (*  leading (shadowing) hart [CID0] suffices, as for [mm_epilogue].        *)
   (* =================================================================== *)
   Local Lemma mm_fwd `{CID0 : CpuId} 
-      (m0 M : regfile) (n len : nat) (src_bytes dst_olds : nat -> bv 8) (b : bool) (pcur : mword 64) :
+      (m0 M : regfile) (n len : nat) (src_bytes dst_olds : nat -> bv 8)
+      (dqs : dfrac) (b : bool) (pcur : mword 64) :
     let sp0 := (m0 !!! Regidx csp_rs1 : mword 64) in
     let ra0 := (m0 !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
     let s00 := (m0 !!! Regidx (mword_of_int 8 : mword 5) : mword 64) in
@@ -552,13 +554,13 @@ Section ProofMemmove.
     pc_is (CID := CID0) (mword_of_int (KernelSyms.memmove + 0x0e)) -∗
     (pa_stk sp0 1) ↦₈[kt] ra0 -∗
     (pa_stk sp0 2) ↦₈[kt] s00 -∗
-    ([∗ list] j ∈ seq 0 len, (pa_add p_src j) ↦ₘ[kts] src_bytes j) -∗
+    ([∗ list] j ∈ seq 0 len, (pa_add p_src j) ↦ₘ[kts]{dqs} src_bytes j) -∗
     ([∗ list] j ∈ seq 0 len, (pa_add p_dst j) ↦ₘ[ktw] dst_olds j) -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ mfin,
       sie_cap_gpr kt mfin n b pcur -∗
       pc_is (ret_pc ra0) -∗
-      ([∗ list] j ∈ seq 0 len, (pa_add p_src j) ↦ₘ[kts] src_bytes j) -∗
+      ([∗ list] j ∈ seq 0 len, (pa_add p_src j) ↦ₘ[kts]{dqs} src_bytes j) -∗
       ([∗ list] j ∈ seq 0 len, (pa_add p_dst j) ↦ₘ[ktw] src_bytes j) -∗
       ⌜ mfin !!! Regidx (mword_of_int 10 : mword 5) = p_dst ⌝ -∗
       ⌜ callee_saved m0 mfin ⌝ -∗
@@ -671,7 +673,7 @@ Section ProofMemmove.
     { unfold M4. rewrite upd_ne; [| vm_compute; discriminate].
       unfold M3. rewrite upd_eq. unfold regval_into_reg. apply add_vec64_comm. }
     (* ---- +0x18..+0x24: the copy loop ---- *)
-    iApply (mm_loop p_src p_dst len src_bytes dst_olds (n - 2) b pcur CID4 Hlen64
+    iApply (mm_loop p_src p_dst len src_bytes dst_olds (n - 2) dqs b pcur CID4 Hlen64
               len 0%nat M4 CID4 ltac:(intros _; reflexivity) ltac:(lia) ltac:(lia)
               HM4a1 HM4a4 HM4a5
               with "Hcg Htext Hpc Hsrc Hdst").
@@ -704,8 +706,9 @@ Section ProofMemmove.
   (*  THE WHOLE FUNCTION.                                                  *)
   (* =================================================================== *)
   Lemma wp_memmove_sconf
-      (m0 : regfile) (n : nat) (len : nat) (src_bytes dst_olds : nat -> bv 8) (b : bool) (pcur : mword 64)
-    : wp_memmove_sconf_body kt kts ktw m0 n len src_bytes dst_olds b pcur.
+      (m0 : regfile) (n : nat) (len : nat) (src_bytes dst_olds : nat -> bv 8)
+      (dqs : dfrac) (b : bool) (pcur : mword 64)
+    : wp_memmove_sconf_body kt kts ktw m0 n len src_bytes dst_olds dqs b pcur.
   Proof.
     cbv beta delta [wp_memmove_sconf_body].
     intros a0_idx a1_idx a2_idx pcE ra0 p_dst p_src ret_tgt Hn Hlen32 Ha2.
@@ -962,7 +965,7 @@ Section ProofMemmove.
                          = mword_of_int (KernelSyms.memmove + 0x0e))
             by (apply bv_eq; vm_compute; reflexivity).
           iEval (rewrite Hp0e) in "Hpc".
-          iApply (mm_fwd m0 m5 n (S len') src_bytes dst_olds b pcur Hn Hlen0 Hlen32
+          iApply (mm_fwd m0 m5 n (S len') src_bytes dst_olds dqs b pcur Hn Hlen0 Hlen32
                     Hm5a0 ltac:(unfold m5, m4, m3;
                                 repeat (rewrite upd_ne; [| vm_compute; discriminate]);
                                 exact Hm2a1)
@@ -995,13 +998,17 @@ Section ProofMemmove.
             rewrite Z.geb_leb in Hbgeu. apply Z.leb_gt in Hbgeu. exact Hbgeu. }
           destruct (mm_overlap_index p_src p_dst (S len') Hlen0 Hlen32 Hsrc_lt Hdst_in)
             as (j & Hjlt & Hjeq).
-          (* peel byte 0 off the DESTINATION only: [mem_bytes_notin] has to see
-             the source buffer still indexed by [seq 0 len], so the [seq_cons]
-             unfolding must not leak into it. *)
+          (* peel byte 0 off the DESTINATION only: [mem_bytes_notin_r] has to
+             see the source buffer still indexed by [seq 0 len], so the
+             [seq_cons] unfolding must not leak into it.
+               IT IS THE [_r] FORM because the source now rides the caller's
+             [dqs] and only the DESTINATION byte is exclusive -- the whole side
+             of the refutation moved when the source went fractional, but the
+             refutation itself is the same one. *)
           iEval (rewrite (seq_cons 0 len')) in "Hdst".
           iDestruct "Hdst" as "[Hd0 _]".
           iEval (rewrite pa_add_0) in "Hd0".
-          iDestruct (mem_bytes_notin with "Hsrc Hd0") as %Hnotin.
+          iDestruct (mem_bytes_notin_r with "Hsrc Hd0") as %Hnotin.
           destruct (Hnotin j ltac:(lia) Hjeq).
       + (* src >=u dst: no overlap is possible, the ascending copy runs directly *)
         assert (Hp0e : add_vec_int (mword_of_int (KernelSyms.memmove + 0x0a) : mword 64) 4
@@ -1012,7 +1019,7 @@ Section ProofMemmove.
                   with "Hcg Hpc Hi0a").
         iIntros (CID6 Hs6) "Hcg Hpc".
         iEval (rewrite Hp0e) in "Hpc".
-        iApply (mm_fwd m0 m2 n (S len') src_bytes dst_olds b pcur Hn Hlen0 Hlen32
+        iApply (mm_fwd m0 m2 n (S len') src_bytes dst_olds dqs b pcur Hn Hlen0 Hlen32
                   Hm2a0 Hm2a1 Hm2a2 Hm2sp Hm2cs
                   with "Htext Hcg Hpc Hb1 Hb2 Hsrc Hdst").
         iIntros (CID7 Hs7 mfin) "Hcg Hpc Hsrc Hdst %Ha0fin %Hcsfin".

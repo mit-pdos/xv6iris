@@ -2974,7 +2974,7 @@ Section ProofSysOpenBody.
     iApply (Namei.wp_namei_gen (CID := CID2) gs jx gl gu gd gk pd pav pu bn
               g gfs gi cn gtl ga gf cov logstart bmapstart inodestart nib
               size dev used plen bp MAXOPBLOCKS Sb
-              pidv (DfracOwn (1/4)) dqb dqs
+              pidv (DfracOwn (1/4)) dqb dqs (DfracOwn 1)
               N2 (K - 24)%nat eb b lks V
               HKna Hdevc Hnibc Hlogc Histc HdevR Hnib0 Hgeom Hsize Hbm0 Hbmcov
               Hbmlog Hist0 Hcovb Hiregb Hpcstr

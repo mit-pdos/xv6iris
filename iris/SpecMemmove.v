@@ -4,8 +4,9 @@
    NON-OVERLAPPING ranges only, and that restriction is carried by SEPARATION,
    not by a pure side condition: the precondition owns the source bytes and the
    destination bytes as two separate conjuncts, which already says the two
-   ranges are disjoint (a byte owned outright cannot also be owned as part of
-   the other buffer).  The proof turns that ownership back into the pure
+   ranges are disjoint (a byte owned OUTRIGHT cannot also be owned at any dfrac
+   as part of the other buffer -- and the DESTINATION is the whole side, since
+   memmove writes it).  The proof turns that ownership back into the pure
    non-aliasing fact where it is needed, so a caller never has to state an
    address-arithmetic disjointness hypothesis -- it just hands over the two
    buffers it owns.
@@ -55,9 +56,24 @@ Import Defs.
    [kt].  One shared datum tier cannot state any of those.  Both tiers are
    EXPLICIT: eager [KtierLe] refl would otherwise silently re-derive them as
    [kt] and every page caller would fail at its give-back. *) 
+(* THE SOURCE RIDES THE CALLER'S FRACTION [dqs]; THE DESTINATION STAYS WHOLE.
+   That is the tree-wide rule -- a byte run the callee only READS takes the
+   caller's dfrac, a run it WRITES stays at [DfracOwn 1] -- and memmove is the
+   place it is most visibly right: the forward copy loads from the source and
+   stores to the destination, and nothing in the body needs the source to be
+   exclusive.  The consumer is kexec by way of copyout: forkret's
+   [kexec("/init", (char *[]){"/init", 0})] hands the SAME .rodata literal in
+   as the path and as argv[0], and one byte run cannot be owned twice at full
+   ownership.
+     The non-aliasing argument the header above describes survives the
+   relaxation, but it changes hands: it used to come from the SOURCE run's
+   exclusivity ([RiscvPtsto.mem_bytes_notin]), and now comes from the
+   DESTINATION byte's ([RiscvPtsto.mem_bytes_notin_r], the mirror image).
+   Separation still carries the disjointness; only the whole side moved. *)
 Definition wp_memmove_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
     (kt kts ktw : ktier) `{!KtierLe kts kt} `{!KtierLe ktw kt}
-    (m0 : regfile) (n : nat) (len : nat) (src_bytes dst_olds : nat -> bv 8) (b : bool) (p : mword 64) :=
+    (m0 : regfile) (n : nat) (len : nat) (src_bytes dst_olds : nat -> bv 8)
+    (dqs : dfrac) (b : bool) (p : mword 64) :=
   let a0_idx : mword 5 := mword_of_int 10 in
   let a1_idx : mword 5 := mword_of_int 11 in
   let a2_idx : mword 5 := mword_of_int 12 in
@@ -71,13 +87,13 @@ Definition wp_memmove_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID :
   m0 !!! Regidx a2_idx = (mword_of_int (Z.of_nat len) : mword 64) ->
   sie_cap_gpr kt m0 n b p -∗
   kernel_text -∗ pc_is pcE -∗
-  ([∗ list] j ∈ seq 0 len, (pa_add p_src j) ↦ₘ[kts] src_bytes j) -∗
+  ([∗ list] j ∈ seq 0 len, (pa_add p_src j) ↦ₘ[kts]{dqs} src_bytes j) -∗
   ([∗ list] j ∈ seq 0 len, (pa_add p_dst j) ↦ₘ[ktw] dst_olds j) -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mfin,
     sie_cap_gpr kt mfin n b p -∗
     pc_is ret_tgt -∗
-    ([∗ list] j ∈ seq 0 len, (pa_add p_src j) ↦ₘ[kts] src_bytes j) -∗
+    ([∗ list] j ∈ seq 0 len, (pa_add p_src j) ↦ₘ[kts]{dqs} src_bytes j) -∗
     ([∗ list] j ∈ seq 0 len, (pa_add p_dst j) ↦ₘ[ktw] src_bytes j) -∗
     ⌜ mfin !!! Regidx a0_idx = p_dst ⌝ -∗
     ⌜ callee_saved m0 mfin ⌝ -∗
@@ -88,6 +104,7 @@ Module Type MEMMOVE.
   Parameter wp_memmove_sconf :
     forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
       (kt kts ktw : ktier) `{!KtierLe kts kt} `{!KtierLe ktw kt}
-      (m0 : regfile) (n : nat) (len : nat) (src_bytes dst_olds : nat -> bv 8) (b : bool) (p : mword 64),
-      wp_memmove_sconf_body kt kts ktw m0 n len src_bytes dst_olds b p.
+      (m0 : regfile) (n : nat) (len : nat) (src_bytes dst_olds : nat -> bv 8)
+      (dqs : dfrac) (b : bool) (p : mword 64),
+      wp_memmove_sconf_body kt kts ktw m0 n len src_bytes dst_olds dqs b p.
 End MEMMOVE.

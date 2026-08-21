@@ -352,7 +352,7 @@ Section ProofMemcpy.
     assert (HKmm : (2 <= n - 2)%nat) by lia.
     iEval (rewrite -HR3a1) in "Hsrc".
     iEval (rewrite -HR3a0) in "Hdst".
-    iApply (MM.wp_memmove_sconf kt kts ktw R3 (n - 2)%nat len src_bytes dst_olds b p
+    iApply (MM.wp_memmove_sconf kt kts ktw R3 (n - 2)%nat len src_bytes dst_olds (DfracOwn 1) b p
               HKmm Hlen32 HR3a2
               with "Hcg Htext Hpc Hsrc Hdst").
     iIntros (CID6 Hs6 mM) "Hcg Hpc Hsrc Hdst %HmMa0 %HcsM".

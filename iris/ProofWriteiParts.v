@@ -410,7 +410,7 @@ Section WriteiBytes.
     ∗ ([∗ list] j ∈ seq 0 c, pa_add (pa_add (pa_add pp a) bb) j ↦ₘ (f (a + (bb + j))%nat)).
   Proof.
     intros H. iIntros "Hb".
-    iApply (bi.equiv_entails_1_1 _ _ (bb_split3 pp a bb c L f H)). iExact "Hb".
+    iApply (bi.equiv_entails_1_1 _ _ (bb_split3 pp a bb c L f (DfracOwn 1) H)). iExact "Hb".
   Qed.
 
   Local Lemma wi_join3 (pp : mword 64) (a bb c L : nat) (f : nat -> bv 8) :
@@ -421,7 +421,7 @@ Section WriteiBytes.
     ([∗ list] j ∈ seq 0 L, pa_add pp j ↦ₘ (f j)).
   Proof.
     intros H. iIntros "H1 H2 H3".
-    iApply (bi.equiv_entails_1_2 _ _ (bb_split3 pp a bb c L f H)).
+    iApply (bi.equiv_entails_1_2 _ _ (bb_split3 pp a bb c L f (DfracOwn 1) H)).
     iSplitL "H1"; [iExact "H1"|]. iSplitL "H2"; [iExact "H2"|]. iExact "H3".
   Qed.
 

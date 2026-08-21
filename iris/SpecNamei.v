@@ -99,7 +99,7 @@ Definition wp_namei_sconf_body
     (used : gset Z)
     (plen : nat) (pfun : nat -> bv 8)                  (* the path buffer     *)
     (n : nat)
-    (pidv : mword 32) (dq dqb dqs : dfrac)
+    (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) (Vpr : pprivate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.namei in
@@ -165,7 +165,18 @@ Definition wp_namei_sconf_body
   bitmap_res gfs bmapstart cov logstart size used -∗
   proc_priv_bare pj pidv Vpr -∗
   inode_held (pv_cwd Vpr) -∗
-  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
+  (* ---- THE PATH RIDES THE CALLER'S FRACTION [dqpv]; THE NAME BUFFER STAYS
+     WHOLE.  The rule the tree follows: a byte run the callee only READS takes
+     the caller's dfrac, a run it WRITES stays at [DfracOwn 1].  The walk only
+     LOADS from the path (skipslash, the element scan, the memmove's source),
+     so [dqpv]; namex STORES each path element into [name[DIRSIZ]], so that run
+     cannot be fractional.  The consumer is kexec: forkret calls
+     [kexec("/init", (char *[]){"/init", 0})], so the one .rodata literal is
+     both the path and argv[0] and cannot be owned twice outright.  Callers
+     that own their path buffer (sys_open, sys_link, sys_unlink, sys_chdir,
+     create -- each with [char path[MAXPATH]] on its own stack) pass
+     [DfracOwn 1] and see no change. ---- *)
+  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
   bslots bn 3 -∗
   iref_slots 2 -∗
   log_op g n -∗
@@ -187,7 +198,7 @@ Definition wp_namei_sconf_body
       bitmap_res gfs bmapstart cov logstart size used' -∗
       proc_priv_bare pj pidv Vpr -∗
       inode_held (pv_cwd Vpr) -∗
-      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
+      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
       bslots bn 3 -∗
       ⌜((n - (L + 1) * iput_units)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
       log_op g n' -∗
@@ -223,7 +234,7 @@ Definition wp_namei_gen_body
     (used : gset Z)
     (plen : nat) (pfun : nat -> bv 8)                  (* the path buffer     *)
     (n : nat) (Sb : gset Z)
-    (pidv : mword 32) (dq dqb dqs : dfrac)
+    (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) (Vpr : pprivate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.namei in
@@ -291,7 +302,7 @@ Definition wp_namei_gen_body
   bitmap_res gfs bmapstart cov logstart size used -∗
   proc_priv_bare pj pidv Vpr -∗
   inode_held (pv_cwd Vpr) -∗
-  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
+  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
   bslots bn 3 -∗
   iref_slots 2 -∗
   log_opS g n Sb -∗
@@ -313,7 +324,7 @@ Definition wp_namei_gen_body
       bitmap_res gfs bmapstart cov logstart size used' -∗
       proc_priv_bare pj pidv Vpr -∗
       inode_held (pv_cwd Vpr) -∗
-      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
+      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
       bslots bn 3 -∗
       (* the set only GROWS; namex takes no credit and neither does
          this wrapper, so the counter clause is untouched *)
@@ -350,13 +361,13 @@ Module Type NAMEI.
       (used : gset Z)
       (plen : nat) (pfun : nat -> bv 8)
       (n : nat)
-      (pidv : mword 32) (dq dqb dqs : dfrac)
+      (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_namei_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                           ga gf cov logstart bmapstart inodestart nib
                           size dev used plen pfun n
-                          pidv dq dqb dqs m K eb b lks Vpr.
+                          pidv dq dqb dqs dqpv m K eb b lks Vpr.
   (* the set-form contract; the counted one is this at the [log_op]
      existential's own witness. *)
   Parameter wp_namei_gen :
@@ -374,13 +385,13 @@ Module Type NAMEI.
       (used : gset Z)
       (plen : nat) (pfun : nat -> bv 8)
       (n : nat) (Sb : gset Z)
-      (pidv : mword 32) (dq dqb dqs : dfrac)
+      (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
       wp_namei_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                           ga gf cov logstart bmapstart inodestart nib
                           size dev used plen pfun n Sb
-                          pidv dq dqb dqs m K eb b lks Vpr.
+                          pidv dq dqb dqs dqpv m K eb b lks Vpr.
 End NAMEI.
 
 (* ===================================================================== *)

@@ -997,7 +997,7 @@ Section FsinitMain.
     iEval (rewrite -HN6a1) in "Hsrc".
     iEval (rewrite -HN6a0) in "Hsbold".
     iApply (MM.wp_memmove_sconf KT1 KT0 KT0 N6 (K - 4)%nat 32%nat
-              (fun jj => bs_sb !!! jj) sb_old b (proc_addr j)
+              (fun jj => bs_sb !!! jj) sb_old (DfracOwn 1) b (proc_addr j)
               ltac:(lia) ltac:(vm_compute; reflexivity) HN6a2
               with "Hcg Htext Hpc Hsrc Hsbold").
     iIntros (CID17 Hq17 mM) "Hcg Hpc Hsrc Hdst %Hmma0 %Hcsmm".

@@ -114,6 +114,17 @@ Import Defs.
 
 (* THE ONE CONTRACT.  Every caller -- either_copyout, piperead, kwait, readi,
    sys_pipe, and now kexec -- speaks this one; see ProofCopyout.v. *)
+(* THE SOURCE RIDES THE CALLER'S FRACTION [dqsrc]; THE DESTINATION PAGE TABLE
+   STAYS WHOLE.  The rule is the tree's: a byte run the callee only READS takes
+   the caller's dfrac, a run it WRITES stays at full ownership.  copyout loads
+   from [src] and stores through the user table, so the source is read-only to
+   it and [proc_pt P] -- which the walk may extend and the memmove does write
+   through -- is not.  The consumer is kexec: forkret calls
+   [kexec("/init", (char *[]){"/init", 0})], so the same .rodata literal is
+   both the path and argv[0], and kexec cannot hand copyout full ownership of
+   an argument string it holds only fractionally.  Callers that do own their
+   buffer outright (sys_pipe, piperead, kwait, filestat, either_copyout) pass
+   [DfracOwn 1] and see no change. *)
 (* THE BUFFER CARRIES ITS OWN TIER [ktb], below the hart's regime [KT1].
    It is FORCED and it is the same two-tier shape [WpSconfMem]'s merged
    leaves have: this function's kernel buffer is a FRAME local at [KT1] for
@@ -122,6 +133,7 @@ Import Defs.
 Definition wp_copyout_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
     (ktb : ktier) `{!KtierLe ktb KT1} (γa : gname) (mm : regfile)
     (P : uptd) (szv : mword 64) (len : nat) (src_bytes : nat -> bv 8)
+    (dqsrc : dfrac)
     (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.copyout in
   (* a0 = pagetable, a1 = psz, a2 = dstva, a3 = src, a4 = len *)
@@ -158,14 +170,14 @@ Definition wp_copyout_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID :
   pc_is pcE -∗
   proc_pt P -∗
   kalloc_env γa None -∗
-  ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb] src_bytes j) -∗
+  ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb]{dqsrc} src_bytes j) -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (P' : uptd),
     sie_cap_gpr KT1 mr K b p -∗
     cpu_own lvl eb p b lks -∗
     pc_is ret_tgt -∗
     proc_pt P' -∗
-    ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb] src_bytes j) -∗
+    ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb]{dqsrc} src_bytes j) -∗
     ⌜callee_saved mm mr⌝ -∗
     ⌜uptd_ext_sz szv P P'⌝ -∗
     ⌜ mr !!! Regidx (mword_of_int 10) = mword_of_int 0
@@ -203,7 +215,7 @@ Definition copyout_wrote (M : gmap Z (bv 8)) (dstva : mword 64) (len : nat)
 Definition wp_copyout_sconf_mem_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
     (ktb : ktier) `{!KtierLe ktb KT1} (γa : gname) (mm : regfile)
     (P : uptd) (M : gmap Z (bv 8)) (szv : mword 64) (len : nat)
-    (src_bytes : nat -> bv 8)
+    (src_bytes : nat -> bv 8) (dqsrc : dfrac)
     (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.copyout in
   let dstva := mm !!! Regidx (mword_of_int 12) in
@@ -223,14 +235,14 @@ Definition wp_copyout_sconf_mem_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{C
   pc_is pcE -∗
   proc_ptm P (uint szv) M -∗
   kalloc_env γa None -∗
-  ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb] src_bytes j) -∗
+  ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb]{dqsrc} src_bytes j) -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (P' : uptd) (M' : gmap Z (bv 8)),
     sie_cap_gpr KT1 mr K b p -∗
     cpu_own lvl eb p b lks -∗
     pc_is ret_tgt -∗
     proc_ptm P' (uint szv) M' -∗
-    ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb] src_bytes j) -∗
+    ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb]{dqsrc} src_bytes j) -∗
     ⌜callee_saved mm mr⌝ -∗
     ⌜uptd_ext_sz szv P P'⌝ -∗
     ⌜ copyout_wrote M dstva len src_bytes
@@ -243,13 +255,14 @@ Module Type COPYOUT.
     forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
       (ktb : ktier) `{!KtierLe ktb KT1} (γa : gname) (mm : regfile)
       (P : uptd) (M : gmap Z (bv 8)) (szv : mword 64) (len : nat)
-      (src_bytes : nat -> bv 8)
+      (src_bytes : nat -> bv 8) (dqsrc : dfrac)
       (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string),
-      wp_copyout_sconf_mem_body ktb γa mm P M szv len src_bytes K lvl eb p b lks.
+      wp_copyout_sconf_mem_body ktb γa mm P M szv len src_bytes dqsrc K lvl eb p b lks.
   Parameter wp_copyout_sconf :
     forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
       (ktb : ktier) `{!KtierLe ktb KT1} (γa : gname) (mm : regfile)
       (P : uptd) (szv : mword 64) (len : nat) (src_bytes : nat -> bv 8)
+      (dqsrc : dfrac)
       (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string),
-      wp_copyout_sconf_body ktb γa mm P szv len src_bytes K lvl eb p b lks.
+      wp_copyout_sconf_body ktb γa mm P szv len src_bytes dqsrc K lvl eb p b lks.
 End COPYOUT.

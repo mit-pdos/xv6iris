@@ -880,13 +880,14 @@ Section ProofCopyin.
            already NAMED -- by [M]'s bytes, which is the whole point -- so
            there is no [bb_page_named] existential to introduce. *)
         assert (Hsplitp : (off + n + (4096 - off - n) = 4096)%nat) by lia.
-        iEval (rewrite (bb_split3 pa0 off n (4096 - off - n) 4096 fpg Hsplitp)) in "Hpg".
+        iEval (rewrite (bb_split3 pa0 off n (4096 - off - n) 4096 fpg (DfracOwn 1) Hsplitp)) in "Hpg".
         iDestruct "Hpg" as "(Hpg0 & Hsrc & Hpg2)".
         assert (Hsplitd : (done + n + (rem - n) = len)%nat) by lia.
-        iEval (rewrite (bb_split3 dst done n (rem - n) len fd Hsplitd)) in "Hdst".
+        iEval (rewrite (bb_split3 dst done n (rem - n) len fd (DfracOwn 1) Hsplitd)) in "Hdst".
         iDestruct "Hdst" as "(Hd0 & Hdc & Hd2)".
         iApply (Memmove.wp_memmove_sconf KT1 KT0 ktb D5 (K - 12) n
-                  (fun j => fpg (off + j)%nat) (fun j => fd (done + j)%nat) b p
+                  (fun j => fpg (off + j)%nat) (fun j => fd (done + j)%nat)
+                  (DfracOwn 1) b p
                   ltac:(lia) ltac:(change (2 ^ 32)%Z with 4294967296%Z; lia) HD5a2
                   with "Hcg Htext Hpc [Hsrc] [Hdc]").
         { iEval (rewrite HD5a1). iExact "Hsrc". }

@@ -226,7 +226,7 @@ Section KexecBBody.
       (alen : nat -> nat) (aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
       (pidv : mword 32) (V : pprivate)
-      (dqb dqs dqa : dfrac)
+      (dqb dqs dqa dqpv dqas : dfrac)
       (m M90 : regfile) (K : nat) (eb : bool) (b : bool)
       (lks : gset string)
       (sp0 ra0 s00 s10 s20 pv av : mword 64) :
@@ -276,10 +276,10 @@ Section KexecBBody.
     bslots bn 3 -∗
     kalloc_env ga None -∗
     proc_priv gf (proc_addr jp) pidv V -∗
-    ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
+    ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
     ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
     ([∗ list] i ∈ seq 0 na,
-       [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
+       [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
     kxc_frameA6 sp0 ra0 s00 s10 s20 pv av (m !!! Regidx Rs4) -∗
     (* ---- kexec's OWN continuation: the +0x31c tail closes the -1 arm ---- *)
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
@@ -296,10 +296,10 @@ Section KexecBBody.
           bitmap_res gfs bmapstart cov logstart size used' -∗
           kalloc_env ga None -∗
           proc_priv gf (proc_addr jp) pidv V' -∗
-          ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
+          ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
           ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
           ([∗ list] i ∈ seq 0 na,
-             [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
+             [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
           bslots bn 3 -∗
           iref_slots 2 -∗
           WP (Loop : expr riscv_lang)) -∗
@@ -309,7 +309,7 @@ Section KexecBBody.
         kxc_at_1a2 jp bn g gfs gi cn ga gf cov logstart bmapstart inodestart
                    nib size dev used used2 kf qf sf gyf inumf dnf bmf
                    gilf gislf n2
-                   plen pfun na avf aslen afun pidv V dqb dqs dqa
+                   plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas
                    m M K sp0 ra0 s00 s10 s20 pv av
                    (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
                    (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
@@ -332,10 +332,10 @@ Section KexecBBody.
               bitmap_res gfs bmapstart cov logstart size used' -∗
               kalloc_env ga None -∗
               proc_priv gf (proc_addr jp) pidv V' -∗
-              ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
+              ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
               ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
               ([∗ list] i ∈ seq 0 na,
-                 [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
+                 [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
               bslots bn 3 -∗
               iref_slots 2 -∗
               WP (Loop : expr riscv_lang)) -∗
@@ -346,7 +346,7 @@ Section KexecBBody.
         kxc_at_12c jp bn g gfs gi cn ga gf cov logstart bmapstart inodestart
                    nib size dev used used2 kf qf sf gyf inumf dnf bmf
                    gilf gislf n2
-                   plen pfun na avf aslen afun pidv V dqb dqs dqa
+                   plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas
                    m M K sp0 ra0 s00 s10 s20 pv av
                    (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
                    (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
@@ -370,10 +370,10 @@ Section KexecBBody.
               bitmap_res gfs bmapstart cov logstart size used' -∗
               kalloc_env ga None -∗
               proc_priv gf (proc_addr jp) pidv V' -∗
-              ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
+              ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
               ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
               ([∗ list] i ∈ seq 0 na,
-                 [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
+                 [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
               bslots bn 3 -∗
               iref_slots 2 -∗
               WP (Loop : expr riscv_lang)) -∗
@@ -1246,7 +1246,7 @@ Section KexecBBody.
       iApply (A.kxc_bad64 gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
                 gilf gislf ga gf cov logstart bmapstart inodestart nib size
                 dev used used2 kf qf sf gyf inumf dnf bmf n2
-                plen pfun na avf alen aslen afun pidv V dqb dqs dqa
+                plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
                 m B1 K lks sp0 ra0 s00 s10 s20 pv av
                 HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib Hcovb Hn2
                 Hjp Hgs Hu2 Hsp Hra Hs0 Hs1 Hs2 HB1sp HB1s4 HB1thr

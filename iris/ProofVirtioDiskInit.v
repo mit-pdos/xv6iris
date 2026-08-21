@@ -638,7 +638,7 @@ Section VdiLease.
   Proof.
     iIntros "H".
     iEval (rewrite (bb_split3 pav 2 2 4092 4096 (fun _ : nat => byte_zero)
-                      ltac:(lia))) in "H".
+                      (DfracOwn 1) ltac:(lia))) in "H".
     iDestruct "H" as "(_ & Hidx & Hrest)".
     iSplitL "Hidx".
     { iApply (big_sepL_impl with "Hidx"). iIntros "!>" (k j Hk) "Hb".

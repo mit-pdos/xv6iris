@@ -288,7 +288,7 @@ Section KexecB3Seam.
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
-      (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
+      (pidv : mword 32) (V : pprivate) (dqb dqs dqa dqpv dqas : dfrac)
       (M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w65 w67 : mword 64)
@@ -317,7 +317,7 @@ Section KexecB3Seam.
      kalloc_env ga None ∗
      kxc_res jp bn g gfs gi cn gf cov logstart bmapstart inodestart size dev
              used2 kf qf sf gyf inumf dnf bmf gilf gislf n2 plen pfun na avf
-             aslen afun pidv V dqb dqs dqa sp0 ra0 s00 s10 s20 pv av
+             aslen afun pidv V dqb dqs dqa dqpv dqas sp0 ra0 s00 s10 s20 pv av
              w5 w6 w7 w8 w9 w10 w11 w12 w13 (kxc_off ef i) w65 w67 ef P)%I.
 
 End KexecB3Seam.
@@ -395,7 +395,7 @@ Section KexecB3Incr.
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
-      (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
+      (pidv : mword 32) (V : pprivate) (dqb dqs dqa dqpv dqas : dfrac)
       (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w65 w67 : mword 64)
@@ -403,7 +403,7 @@ Section KexecB3Incr.
     kernel_text -∗
     kxc_at_11a jp bn g gfs gi cn ga gf cov logstart bmapstart inodestart nib
                size dev used used2 kf qf sf gyf inumf dnf bmf gilf gislf n2
-               plen pfun na avf aslen afun pidv V dqb dqs dqa M K
+               plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas M K
                sp0 ra0 s00 s10 s20 pv av
                w5 w6 w7 w8 w9 w10 w11 w12 w13 w65 w67 ef P i szv -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
@@ -411,12 +411,12 @@ Section KexecB3Incr.
         ( kxc_at_12c jp bn g gfs gi cn ga gf cov logstart bmapstart inodestart
                      nib size dev used used2 kf qf sf gyf inumf dnf bmf
                      gilf gislf n2 plen pfun na avf aslen afun pidv V
-                     dqb dqs dqa m M' K sp0 ra0 s00 s10 s20 pv av
+                     dqb dqs dqa dqpv dqas m M' K sp0 ra0 s00 s10 s20 pv av
                      w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P (S i) szv
           ∨ kxc_at_1a4 jp bn g gfs gi cn ga gf cov logstart bmapstart inodestart
                        nib size dev used used2 kf qf sf gyf inumf dnf bmf
                        gilf gislf n2 plen pfun na avf aslen afun pidv V
-                       dqb dqs dqa M' K sp0 ra0 s00 s10 s20 pv av
+                       dqb dqs dqa dqpv dqas M' K sp0 ra0 s00 s10 s20 pv av
                        w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P szv ) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -749,7 +749,7 @@ Section KexecB3Body.
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
-      (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
+      (pidv : mword 32) (V : pprivate) (dqb dqs dqa dqpv dqas : dfrac)
       (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (i : nat) (szv : mword 64) :
@@ -776,7 +776,7 @@ Section KexecB3Body.
               cov logstart inodestart nib dev -∗
     kxc_at_12c jp bn g gfs gi cn ga gf cov logstart bmapstart inodestart nib
                size dev used used2 kf qf sf gyf inumf dnf bmf gilf gislf n2
-               plen pfun na avf aslen afun pidv V dqb dqs dqa m M K
+               plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas m M K
                sp0 ra0 s00 s10 s20 pv av
                (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
                (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
@@ -797,10 +797,10 @@ Section KexecB3Body.
           bitmap_res gfs bmapstart cov logstart size used' -∗
           kalloc_env ga None -∗
           proc_priv gf (proc_addr jp) pidv V' -∗
-          ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1] pfun k) -∗
+          ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1]{dqpv} pfun k) -∗
           ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈[KT1]{dqa} avf k) -∗
           ([∗ list] k ∈ seq 0 na,
-             [∗ list] j ∈ seq 0 (aslen k), pa_add (avf k) j ↦ₘ afun k j) -∗
+             [∗ list] j ∈ seq 0 (aslen k), pa_add (avf k) j ↦ₘ{dqas} afun k j) -∗
           bslots bn 3 -∗
           iref_slots 2 -∗
           WP (Loop : expr riscv_lang)) -∗
@@ -810,7 +810,7 @@ Section KexecB3Body.
         ( kxc_at_12c jp bn g gfs gi cn ga gf cov logstart bmapstart inodestart
                      nib size dev used used2 kf qf sf gyf inumf dnf bmf
                      gilf gislf n2 plen pfun na avf aslen afun pidv V
-                     dqb dqs dqa m M' K sp0 ra0 s00 s10 s20 pv av
+                     dqb dqs dqa dqpv dqas m M' K sp0 ra0 s00 s10 s20 pv av
                      (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
                      (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
                      (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
@@ -818,7 +818,7 @@ Section KexecB3Body.
           ∨ kxc_at_1a4 jp bn g gfs gi cn ga gf cov logstart bmapstart inodestart
                        nib size dev used used2 kf qf sf gyf inumf dnf bmf
                        gilf gislf n2 plen pfun na avf aslen afun pidv V
-                       dqb dqs dqa M' K sp0 ra0 s00 s10 s20 pv av
+                       dqb dqs dqa dqpv dqas M' K sp0 ra0 s00 s10 s20 pv av
                        (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
                        (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
                        (m !!! Regidx Rs9) (m !!! Regidx Rs10)
@@ -837,10 +837,10 @@ Section KexecB3Body.
               bitmap_res gfs bmapstart cov logstart size used' -∗
               kalloc_env ga None -∗
               proc_priv gf (proc_addr jp) pidv V' -∗
-              ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1] pfun k) -∗
+              ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1]{dqpv} pfun k) -∗
               ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈[KT1]{dqa} avf k) -∗
               ([∗ list] k ∈ seq 0 na,
-                 [∗ list] j ∈ seq 0 (aslen k), pa_add (avf k) j ↦ₘ afun k j) -∗
+                 [∗ list] j ∈ seq 0 (aslen k), pa_add (avf k) j ↦ₘ{dqas} afun k j) -∗
               bslots bn 3 -∗
               iref_slots 2 -∗
               WP (Loop : expr riscv_lang)) -∗
@@ -1258,7 +1258,7 @@ Section KexecB3Body.
         iApply (kxc_incr (CID0 := CIDg4) jp bn g gfs gi cn ga gf cov logstart
                   bmapstart inodestart nib size dev used used2 kf qf sf gyf
                   inumf dnf bmf gilf gislf n2 plen pfun na avf aslen afun
-                  pidv V dqb dqs dqa m U7 K sp0 ra0 s00 s10 s20 pv av
+                  pidv V dqb dqs dqa dqpv dqas m U7 K sp0 ra0 s00 s10 s20 pv av
                   (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
                   (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
                   (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
@@ -1426,7 +1426,7 @@ Section KexecB3Body.
           iApply (B2.kxc_bad324 (CID0 := CIDy2) gs jp gl gu gd gk pd pav pu bn g
                     gfs gi cn gtl gilf gislf ga gf cov logstart bmapstart
                     inodestart nib size dev used used2 kf qf sf gyf inumf dnf bmf
-                    n2 plen pfun na avf alen aslen afun pidv V dqb dqs dqa m U9
+                    n2 plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas m U9
                     K sp0 ra0 s00 s10 s20 pv av (kxc_off ef i) w67 ef P szv ∅
                     HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hib Hn2 Hjp
                     Hgs Hu2 Hsp Hra Hs0 Hs1 Hs2 Hbsp Hbs0 Hbs4 Hbs6
@@ -1559,7 +1559,7 @@ Section KexecB3Body.
              iApply (B2.kxc_bad324 (CID0 := CIDy2) gs jp gl gu gd gk pd pav pu bn g
                        gfs gi cn gtl gilf gislf ga gf cov logstart bmapstart
                        inodestart nib size dev used used2 kf qf sf gyf inumf dnf bmf
-                       n2 plen pfun na avf alen aslen afun pidv V dqb dqs dqa m U11
+                       n2 plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas m U11
                        K sp0 ra0 s00 s10 s20 pv av (kxc_off ef i) w67 ef P szv ∅
                        HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hib Hn2 Hjp
                        Hgs Hu2 Hsp Hra Hs0 Hs1 Hs2 Hbsp Hbs0 Hbs4 Hbs6
@@ -1692,7 +1692,7 @@ Section KexecB3Body.
                 iApply (B2.kxc_bad324 (CID0 := CIDy2) gs jp gl gu gd gk pd pav pu bn g
                           gfs gi cn gtl gilf gislf ga gf cov logstart bmapstart
                           inodestart nib size dev used used2 kf qf sf gyf inumf dnf bmf
-                          n2 plen pfun na avf alen aslen afun pidv V dqb dqs dqa m U13
+                          n2 plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas m U13
                           K sp0 ra0 s00 s10 s20 pv av (kxc_off ef i) w67 ef P szv ∅
                           HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hib Hn2 Hjp
                           Hgs Hu2 Hsp Hra Hs0 Hs1 Hs2 Hbsp Hbs0 Hbs4 Hbs6
@@ -2167,7 +2167,7 @@ Section KexecB3Body.
                              pav pu bn g gfs gi cn gtl gilf gislf ga gf cov
                              logstart bmapstart inodestart nib size dev used
                              used2 kf qf sf gyf inumf dnf bmf n2 plen pfun na
-                             avf alen aslen afun pidv V dqb dqs dqa m M4 K
+                             avf alen aslen afun pidv V dqb dqs dqa dqpv dqas m M4 K
                              sp0 ra0 s00 s10 s20 pv av (kxc_off ef i) w67 ef
                              P4 szv ∅
                              HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb
@@ -2362,7 +2362,7 @@ Section KexecB3Body.
                                  cov logstart bmapstart inodestart nib size dev
                                  used used2 kf qf sf gyf inumf dnf bmf gilf
                                  gislf n2 plen pfun na avf aslen afun pidv V
-                                 dqb dqs dqa m U21 K sp0 ra0 s00 s10 s20 pv av
+                                 dqb dqs dqa dqpv dqas m U21 K sp0 ra0 s00 s10 s20 pv av
                                  (m !!! Regidx Rs3) (m !!! Regidx Rs4)
                                  (m !!! Regidx Rs5) (m !!! Regidx Rs6)
                                  (m !!! Regidx Rs7) (m !!! Regidx Rs8)
@@ -2602,7 +2602,7 @@ Section KexecB3Body.
                                  pu bn g gfs gi cn gtl gilf gislf ga gf cov
                                  logstart bmapstart inodestart nib size dev used
                                  used2 kf qf sf gyf inumf dnf bmf n2 plen pfun na
-                                 avf alen aslen afun pidv V dqb dqs dqa m K
+                                 avf alen aslen afun pidv V dqb dqs dqa dqpv dqas m K
                                  sp0 ra0 s00 s10 s20 pv av (kxc_off ef i)
                                  (M4 !!! Regidx Ra0) w67 ef P4 i
                                  (Z_to_bv 64 (le_at pf 16 8) : mword 64)
@@ -2715,7 +2715,7 @@ Section KexecB3Body.
                                  cov logstart bmapstart inodestart nib size dev
                                  used used2 kf qf sf gyf inumf dnf bmf gilf
                                  gislf n2 plen pfun na avf aslen afun pidv V
-                                 dqb dqs dqa m U25 K sp0 ra0 s00 s10 s20 pv av
+                                 dqb dqs dqa dqpv dqas m U25 K sp0 ra0 s00 s10 s20 pv av
                                  (m !!! Regidx Rs3) (m !!! Regidx Rs4)
                                  (m !!! Regidx Rs5) (m !!! Regidx Rs6)
                                  (m !!! Regidx Rs7) (m !!! Regidx Rs8)
@@ -2812,7 +2812,7 @@ Section KexecB3Body.
       iApply (B2.kxc_bad324 (CID0 := CIDb2) gs jp gl gu gd gk pd pav pu bn g
                 gfs gi cn gtl gilf gislf ga gf cov logstart bmapstart
                 inodestart nib size dev used used2 kf qf sf gyf inumf dnf bmf
-                n2 plen pfun na avf alen aslen afun pidv V dqb dqs dqa m M2
+                n2 plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas m M2
                 K sp0 ra0 s00 s10 s20 pv av (kxc_off ef i) w67 ef P szv ∅
                 HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hib Hn2 Hjp
                 Hgs Hu2 Hsp Hra Hs0 Hs1 Hs2 HM2sp HM2s0 HM2s4 HM2s6
@@ -2864,7 +2864,7 @@ Section KexecB3Loop.
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
-      (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
+      (pidv : mword 32) (V : pprivate) (dqb dqs dqa dqpv dqas : dfrac)
       (m : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w67 : mword 64)
       (ef : nat -> bv 8) :
@@ -2893,7 +2893,7 @@ Section KexecB3Loop.
               cov logstart inodestart nib dev -∗
     kxc_at_12c jp bn g gfs gi cn ga gf cov logstart bmapstart inodestart nib
                size dev used used2 kf qf sf gyf inumf dnf bmf gilf gislf n2
-               plen pfun na avf aslen afun pidv V dqb dqs dqa m M K
+               plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas m M K
                sp0 ra0 s00 s10 s20 pv av
                (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
                (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
@@ -2913,10 +2913,10 @@ Section KexecB3Loop.
           bitmap_res gfs bmapstart cov logstart size used' -∗
           kalloc_env ga None -∗
           proc_priv gf (proc_addr jp) pidv V' -∗
-          ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1] pfun k) -∗
+          ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1]{dqpv} pfun k) -∗
           ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈[KT1]{dqa} avf k) -∗
           ([∗ list] k ∈ seq 0 na,
-             [∗ list] j ∈ seq 0 (aslen k), pa_add (avf k) j ↦ₘ afun k j) -∗
+             [∗ list] j ∈ seq 0 (aslen k), pa_add (avf k) j ↦ₘ{dqas} afun k j) -∗
           bslots bn 3 -∗
           iref_slots 2 -∗
           WP (Loop : expr riscv_lang)) -∗
@@ -2925,7 +2925,7 @@ Section KexecB3Loop.
         kxc_at_1a4 jp bn g gfs gi cn ga gf cov logstart bmapstart inodestart
                    nib size dev used used2 kf qf sf gyf inumf dnf bmf
                    gilf gislf n2 plen pfun na avf aslen afun pidv V
-                   dqb dqs dqa M' K sp0 ra0 s00 s10 s20 pv av
+                   dqb dqs dqa dqpv dqas M' K sp0 ra0 s00 s10 s20 pv av
                    (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
                    (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
                    (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
@@ -2944,10 +2944,10 @@ Section KexecB3Loop.
               bitmap_res gfs bmapstart cov logstart size used' -∗
               kalloc_env ga None -∗
               proc_priv gf (proc_addr jp) pidv V' -∗
-              ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1] pfun k) -∗
+              ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1]{dqpv} pfun k) -∗
               ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈[KT1]{dqa} avf k) -∗
               ([∗ list] k ∈ seq 0 na,
-                 [∗ list] j ∈ seq 0 (aslen k), pa_add (avf k) j ↦ₘ afun k j) -∗
+                 [∗ list] j ∈ seq 0 (aslen k), pa_add (avf k) j ↦ₘ{dqas} afun k j) -∗
               bslots bn 3 -∗
               iref_slots 2 -∗
               WP (Loop : expr riscv_lang)) -∗
@@ -2962,7 +2962,7 @@ Section KexecB3Loop.
       iApply (kxc_ph_step (CID0 := CID0) gs jp gl gu gd gk pd pav pu bn g gfs
                 gi cn gtl gilf gislf ga gf cov logstart bmapstart inodestart
                 nib size dev used used2 kf qf sf gyf inumf dnf bmf n2 plen
-                pfun na avf alen aslen afun pidv V dqb dqs dqa m M K
+                pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas m M K
                 sp0 ra0 s00 s10 s20 pv av w67 ef P i szv
                 HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs Hdevc
                 Hsp Hra Hs0 Hs1 Hs2
@@ -3036,7 +3036,7 @@ Section KexecB3Close.
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
-      (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
+      (pidv : mword 32) (V : pprivate) (dqb dqs dqa dqpv dqas : dfrac)
       (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
@@ -3044,7 +3044,7 @@ Section KexecB3Close.
     kernel_text -∗
     kxc_at_1a2 jp bn g gfs gi cn ga gf cov logstart bmapstart inodestart nib
                size dev used used2 kf qf sf gyf inumf dnf bmf gilf gislf n2
-               plen pfun na avf aslen afun pidv V dqb dqs dqa m M K
+               plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas m M K
                sp0 ra0 s00 s10 s20 pv av
                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
@@ -3052,7 +3052,7 @@ Section KexecB3Close.
         kxc_at_1a4 jp bn g gfs gi cn ga gf cov logstart bmapstart inodestart
                    nib size dev used used2 kf qf sf gyf inumf dnf bmf
                    gilf gislf n2 plen pfun na avf aslen afun pidv V
-                   dqb dqs dqa M' K sp0 ra0 s00 s10 s20 pv av
+                   dqb dqs dqa dqpv dqas M' K sp0 ra0 s00 s10 s20 pv av
                    w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P
                    (mword_of_int 0 : mword 64) -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -3127,7 +3127,7 @@ Section KexecB3Close.
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
-      (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
+      (pidv : mword 32) (V : pprivate) (dqb dqs dqa dqpv dqas : dfrac)
       (M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
@@ -3148,13 +3148,13 @@ Section KexecB3Close.
               cov logstart inodestart nib dev -∗
     kxc_at_1a4 jp bn g gfs gi cn ga gf cov logstart bmapstart inodestart nib
                size dev used used2 kf qf sf gyf inumf dnf bmf gilf gislf n2
-               plen pfun na avf aslen afun pidv V dqb dqs dqa M K
+               plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas M K
                sp0 ra0 s00 s10 s20 pv av
                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P szv -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (M' : regfile) (used3 : gset Z),
         kxc_at_1ae jp bn gfs ga gf cov logstart bmapstart inodestart size
-                   used used3 plen pfun na avf aslen afun pidv V dqb dqs dqa
+                   used used3 plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas
                    M' K sp0 ra0 s00 s10 s20 pv av
                    w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P szv -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -3380,14 +3380,14 @@ Section KexecB3Main.
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
-      (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
+      (pidv : mword 32) (V : pprivate) (dqb dqs dqa dqpv dqas : dfrac)
       (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (i : nat) (szv : mword 64) :
     kxc_b2_body gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl gilf gislf
       ga gf cov logstart bmapstart inodestart nib size dev used used2
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
-      pidv V dqb dqs dqa m M K sp0 ra0 s00 s10 s20 pv av w67
+      pidv V dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av w67
       ef P i szv.
   Proof.
     cbv beta delta [kxc_b2_body].
@@ -3397,7 +3397,7 @@ Section KexecB3Main.
     iApply (kxc_phdr (CID0 := CID0) gs jp gl gu gd gk pd pav pu bn g gfs gi cn
               gtl gilf gislf ga gf cov logstart bmapstart inodestart nib size
               dev used used2 kf qf sf gyf inumf dnf bmf n2 plen pfun na avf
-              alen aslen afun pidv V dqb dqs dqa m K sp0 ra0 s00 s10 s20
+              alen aslen afun pidv V dqb dqs dqa dqpv dqas m K sp0 ra0 s00 s10 s20
               pv av w67 ef
               HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs Hdevc
               Hsp Hra Hs0 Hs1 Hs2
@@ -3414,7 +3414,7 @@ Section KexecB3Main.
     iApply (kxc_close (CID0 := CIDn) gs jp gl gu gd gk pd pav pu bn g gfs gi cn
               gtl gilf gislf ga gf cov logstart bmapstart inodestart nib size
               dev used used2 kf qf sf gyf inumf dnf bmf n2 plen pfun na avf
-              aslen afun pidv V dqb dqs dqa M' K sp0 ra0 s00 s10 s20 pv av
+              aslen afun pidv V dqb dqs dqa dqpv dqas M' K sp0 ra0 s00 s10 s20 pv av
               (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
               (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
               (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
@@ -3442,14 +3442,14 @@ Section KexecB3Main.
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
-      (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
+      (pidv : mword 32) (V : pprivate) (dqb dqs dqa dqpv dqas : dfrac)
       (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) :
     kxc_b2z_body gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl gilf gislf
       ga gf cov logstart bmapstart inodestart nib size dev used used2
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
-      pidv V dqb dqs dqa m M K sp0 ra0 s00 s10 s20 pv av w67 ef P.
+      pidv V dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av w67 ef P.
   Proof.
     cbv beta delta [kxc_b2z_body].
     intros HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs.
@@ -3457,7 +3457,7 @@ Section KexecB3Main.
     iApply (kxc_seam1a2 (CID0 := CID0) jp bn g gfs gi cn ga gf cov logstart
               bmapstart inodestart nib size dev used used2 kf qf sf gyf inumf
               dnf bmf gilf gislf n2 plen pfun na avf aslen afun pidv V
-              dqb dqs dqa m M K sp0 ra0 s00 s10 s20 pv av
+              dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av
               (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
               (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
               (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
@@ -3470,7 +3470,7 @@ Section KexecB3Main.
     iApply (kxc_close (CID0 := CIDn) gs jp gl gu gd gk pd pav pu bn g gfs gi cn
               gtl gilf gislf ga gf cov logstart bmapstart inodestart nib size
               dev used used2 kf qf sf gyf inumf dnf bmf n2 plen pfun na avf
-              aslen afun pidv V dqb dqs dqa M' K sp0 ra0 s00 s10 s20 pv av
+              aslen afun pidv V dqb dqs dqa dqpv dqas M' K sp0 ra0 s00 s10 s20 pv av
               (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
               (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
               (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)

@@ -451,7 +451,7 @@ Section ProofCopyout.
       (b : bool) (p : mword 64) (K lvl : nat) (eb : bool) (lks : gset string)
       (szv : mword 64) (P : uptd) (Mu : gmap Z (bv 8)) (dstva0 : mword 64)
       (spr va0 dstva src : mword 64)
-      (rem done navail len : nat) (src_bytes : nat -> bv 8)
+      (rem done navail len : nat) (src_bytes : nat -> bv 8) (dqsrc : dfrac)
       (CIDh : CpuId) (Pd : uptd) (Md : regfile) (pa0 : mword 64)
       (fpg : nat -> bv 8) : iProp Σ :=
     (⌜ uptd_ext_sz szv P Pd
@@ -484,7 +484,7 @@ Section ProofCopyout.
         proc_ptm Pd (uint szv)
           (umem_write (umem_wr Mu dstva0 done src_bytes)
              (uint va0) 4096 g)) -∗
-     ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb] src_bytes j) -∗
+     ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb]{dqsrc} src_bytes j) -∗
      wp_next (CID0:=CIDh) b p (fun (CID : CpuId) =>
        ∀ (mj : regfile) (res : mword 64) (P' : uptd) (Mu' : gmap Z (bv 8)),
          ⌜ mj !!! Regidx csp_rs1 = spr
@@ -495,7 +495,7 @@ Section ProofCopyout.
          cpu_own lvl eb p b lks -∗
          pc_is (mword_of_int (KernelSyms.copyout + 0xa0) : mword 64) -∗
          proc_ptm P' (uint szv) Mu' -∗
-         ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb] src_bytes j) -∗
+         ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb]{dqsrc} src_bytes j) -∗
          WP (Loop : expr riscv_lang)) -∗
      WP (Loop : expr riscv_lang))%I.
 
@@ -503,7 +503,7 @@ Section ProofCopyout.
       (b : bool) (p : mword 64) (K lvl : nat) (eb : bool) (lks : gset string)
       (szv : mword 64) (P : uptd) (Mu : gmap Z (bv 8)) (dstva0 : mword 64)
       (spr va0 dstva src : mword 64)
-      (rem done navail len : nat) (src_bytes : nat -> bv 8)
+      (rem done navail len : nat) (src_bytes : nat -> bv 8) (dqsrc : dfrac)
       (Pd : uptd) (pa0 : mword 64) (fpg : nat -> bv 8)
       (CIDc : CpuId) (Mn : regfile) (nn : nat) : iProp Σ :=
     (⌜ (1 <= nn)%nat /\ (nn <= rem)%nat /\ (nn <= navail)%nat
@@ -537,7 +537,7 @@ Section ProofCopyout.
         proc_ptm Pd (uint szv)
           (umem_write (umem_wr Mu dstva0 done src_bytes)
              (uint va0) 4096 g)) -∗
-     ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb] src_bytes j) -∗
+     ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb]{dqsrc} src_bytes j) -∗
      wp_next (CID0:=CIDc) b p (fun (CID : CpuId) =>
        ∀ (mj : regfile) (res : mword 64) (P' : uptd) (Mu' : gmap Z (bv 8)),
          ⌜ mj !!! Regidx csp_rs1 = spr
@@ -548,7 +548,7 @@ Section ProofCopyout.
          cpu_own lvl eb p b lks -∗
          pc_is (mword_of_int (KernelSyms.copyout + 0xa0) : mword 64) -∗
          proc_ptm P' (uint szv) Mu' -∗
-         ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb] src_bytes j) -∗
+         ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb]{dqsrc} src_bytes j) -∗
          WP (Loop : expr riscv_lang)) -∗
      WP (Loop : expr riscv_lang))%I.
 
@@ -557,7 +557,7 @@ Section ProofCopyout.
   (* ------------------------------------------------------------------ *)
   Local Lemma co_loop (γa : gname) (mm : regfile)
       (P : uptd) (Mu : gmap Z (bv 8)) (szv : mword 64) (len : nat)
-      (src_bytes : nat -> bv 8)
+      (src_bytes : nat -> bv 8) (dqsrc : dfrac)
       (K lvl : nat) (eb : bool) (p : mword 64)
       (src spr dstva0 : mword 64) (b : bool) (lks : gset string) :
     (* the 14-slot frame + vmfault's 38 *)
@@ -589,7 +589,7 @@ Section ProofCopyout.
     pc_is (CID:=CID0) (mword_of_int (KernelSyms.copyout + 0x54) : mword 64) -∗
     proc_ptm Pc (uint szv) (umem_wr Mu dstva0 done src_bytes) -∗
     kalloc_env γa None -∗
-    ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb] src_bytes j) -∗
+    ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb]{dqsrc} src_bytes j) -∗
     wp_next (CID0:=CID0) b p (fun (CID : CpuId) =>
       ∀ (mj : regfile) (res : mword 64) (P' : uptd) (Mu' : gmap Z (bv 8)),
         ⌜ mj !!! Regidx csp_rs1 = spr
@@ -600,7 +600,7 @@ Section ProofCopyout.
         cpu_own lvl eb p b lks -∗
         pc_is (mword_of_int (KernelSyms.copyout + 0xa0) : mword 64) -∗
         proc_ptm P' (uint szv) Mu' -∗
-        ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb] src_bytes j) -∗
+        ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb]{dqsrc} src_bytes j) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -743,7 +743,7 @@ Section ProofCopyout.
     iAssert (∀ (CIDh : CpuId) (Pd : uptd) (Md : regfile) (pa0 : mword 64)
                (fpg : nat -> bv 8),
         co_tail_body b p K lvl eb lks szv P Mu dstva0 spr va0 dstva src
-          rem done navail len src_bytes CIDh Pd Md pa0 fpg)%I
+          rem done navail len src_bytes dqsrc CIDh Pd Md pa0 fpg)%I
       as "Htail".
     { iIntros (CIDh Pd Md pa0 fpg)
         "(%HText & %HTfpg & %HTlin & %HTsp & %HTs11 & %HTs1 & %HTs3 & %HTs4 & %HTs5 &
@@ -791,7 +791,7 @@ Section ProofCopyout.
       (* both arms reach +0x36 with s2 = n; factor the rest over [nn] *)
       iAssert (∀ (CIDc : CpuId) (Mn : regfile) (nn : nat),
           co_copy_body b p K lvl eb lks szv P Mu dstva0 spr va0 dstva src
-            rem done navail len src_bytes Pd pa0 fpg CIDc Mn nn)%I
+            rem done navail len src_bytes dqsrc Pd pa0 fpg CIDc Mn nn)%I
         as "Hcopy".
       { iIntros (CIDc Mn nn)
           "(%Hnn1 & %Hnnr & %Hnna & %Hfpg & %Hnshape & %HNlin &
@@ -908,17 +908,18 @@ Section ProofCopyout.
           apply callee_saved_refl. }
         (* carve the source chunk out of the caller's buffer *)
         assert (Hsplit : (done + nn + (rem - nn))%nat = len) by lia.
-        iEval (rewrite (bb_split3 src done nn (rem - nn) len src_bytes Hsplit)) in "Hsrc".
+        iEval (rewrite (bb_split3 src done nn (rem - nn) len src_bytes dqsrc Hsplit)) in "Hsrc".
         iDestruct "Hsrc" as "(HsA & HsB & HsC)".
         (* and the destination chunk out of the borrowed page -- which is
            already NAMED by [fpg], so there is nothing to choose here *)
         assert (Hpsplit : (off + nn + (navail - nn))%nat = 4096%nat)
           by (unfold navail in *; lia).
-        iEval (rewrite (bb_split3 pa0 off nn (navail - nn) 4096 fpg Hpsplit))
+        iEval (rewrite (bb_split3 pa0 off nn (navail - nn) 4096 fpg (DfracOwn 1) Hpsplit))
           in "Hpage".
         iDestruct "Hpage" as "(HpA & HpB & HpC)".
         iApply (Memmove.wp_memmove_sconf KT1 ktb KT0 U5 (K - 14)%nat nn
-                  (fun j => src_bytes (done + j)%nat) (fun j => fpg (off + j)%nat) b p
+                  (fun j => src_bytes (done + j)%nat) (fun j => fpg (off + j)%nat)
+                  dqsrc b p
                   ltac:(lia) ltac:(change (2 ^ 32)%Z with 4294967296%Z; lia)
                   HU5a2
                   with "Hcg Htext Hpc [HsB] [HpB]").
@@ -968,9 +969,9 @@ Section ProofCopyout.
           exact (umem_wr_step Mu dstva0 done nn src_bytes (uint dstva)
                    ltac:(intros i Hi; apply HNlin; lia)). }
         iEval (rewrite Hmove) in "Hpt".
-        iAssert ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb] src_bytes j)%I
+        iAssert ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb]{dqsrc} src_bytes j)%I
           with "[HsA HsB HsC]" as "Hsrc".
-        { rewrite (bb_split3 src done nn (rem - nn) len src_bytes Hsplit).
+        { rewrite (bb_split3 src done nn (rem - nn) len src_bytes dqsrc Hsplit).
           iFrame "HsA HsB HsC". }
         (* ---- the cursor bumps ---- *)
         assert (Hmvsp : mv !!! Regidx csp_rs1 = spr).
@@ -1842,9 +1843,9 @@ Section ProofCopyout.
   Lemma wp_copyout_sconf_mem
       (γa : gname) (mm : regfile)
       (P : uptd) (Mu : gmap Z (bv 8)) (szv : mword 64) (len : nat)
-      (src_bytes : nat -> bv 8)
+      (src_bytes : nat -> bv 8) (dqsrc : dfrac)
       (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string)
-    : wp_copyout_sconf_mem_body ktb γa mm P Mu szv len src_bytes K lvl eb p b lks.
+    : wp_copyout_sconf_mem_body ktb γa mm P Mu szv len src_bytes dqsrc K lvl eb p b lks.
   Proof.
     cbv beta delta [wp_copyout_sconf_mem_body].
     intros pcE dstva src ret_tgt HK Hroot Hsza1 Hlenr Hlen64 Hszb Hlvl Hlkbelow.
@@ -2366,7 +2367,7 @@ Section ProofCopyout.
         cpu_own lvl eb p b lks -∗
         pc_is (mword_of_int (KernelSyms.copyout + 0xa0) : mword 64) -∗
         proc_ptm P' (uint szv) Mu' -∗
-        ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb] src_bytes j) -∗
+        ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[ktb]{dqsrc} src_bytes j) -∗
         WP (Loop : expr riscv_lang)))%I
       with "[Hcont Hk1 Hk2 Hk3 Hk4 Hk5 Hk6 Hk7 Hk8 Hk9 Hk10 Hk11 Hk12 Hk13 Hk14]" as "Hepi".
     { iIntros (CIDe0 Hse0 mj res P' Mu')
@@ -2730,7 +2731,7 @@ Section ProofCopyout.
     assert (Hcur0 : (mm !!! Regidx Ra2 : mword 64)
                     = add_vec_int (mm !!! Regidx Ra2) (Z.of_nat 0)).
     { change (Z.of_nat 0) with 0%Z. symmetry. apply avi0. }
-    iApply (co_loop γa mm P Mu szv len src_bytes K lvl eb p src spr
+    iApply (co_loop γa mm P Mu szv len src_bytes dqsrc K lvl eb p src spr
               (mm !!! Regidx Ra2) b lks
               HK Hlen64 Hszb Hlvl len len 0%nat P Q10 (mm !!! Regidx Ra2) CIDpr25
               ltac:(lia) ltac:(lia) ltac:(lia) (uptd_ext_sz_refl szv P) Hcur0
@@ -2748,15 +2749,16 @@ Section ProofCopyout.
   Lemma wp_copyout_sconf
       (γa : gname) (mm : regfile)
       (P : uptd) (szv : mword 64) (len : nat) (src_bytes : nat -> bv 8)
+      (dqsrc : dfrac)
       (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string)
-    : wp_copyout_sconf_body ktb γa mm P szv len src_bytes K lvl eb p b lks.
+    : wp_copyout_sconf_body ktb γa mm P szv len src_bytes dqsrc K lvl eb p b lks.
   Proof.
     cbv beta delta [wp_copyout_sconf_body].
     intros pcE src ret_tgt HK Hroot Hsza1 Hlenr Hlen64 Hszb Hlvl Hlkbelow.
     iIntros "Hcg Hcnt #Htext Hpc Hpt #Henv Hsrc Hcont".
     iEval (rewrite (proc_pt_ptm P (uint szv))) in "Hpt".
     iDestruct "Hpt" as (Mu) "Hpt".
-    iApply (wp_copyout_sconf_mem γa mm P Mu szv len src_bytes K lvl eb p b lks
+    iApply (wp_copyout_sconf_mem γa mm P Mu szv len src_bytes dqsrc K lvl eb p b lks
               HK Hroot Hsza1 Hlenr Hlen64 Hszb Hlvl Hlkbelow
               with "Hcg Hcnt Htext Hpc Hpt Henv Hsrc").
     rewrite /wp_next. iIntros (CIDx) "%Hsx".

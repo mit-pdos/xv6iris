@@ -1890,7 +1890,7 @@ Section ProofIupdateMain.
     iApply (MM.wp_memmove_sconf KT1 KT0 KT0 G3 (K - 4)%nat 52%nat
               (fun jj => ind_bytes (bm_cells bm) !!! jj)
               (fun jj => ind_bytes (di_addrs (ds !!! islot inum)) !!! jj)
-              b (proc_addr j) HKmm Hlen32 HG3a2
+              (DfracOwn 1) b (proc_addr j) HKmm Hlen32 HG3a2
               with "Hcg Htext Hpc Hsrc Hda").
     iIntros (CID36 Hq36 mM) "Hcg Hpc Hsrc Hdst %Hmma0 %Hcsmm".
     assert (Hpc66 : ret_pc (G3 !!! Regidx Rra : mword 64)

@@ -1709,7 +1709,8 @@ Section InstallTransBlocks.
     iEval (rewrite -HB5a1) in "Hdata1".
     iEval (rewrite -HB5a0) in "Hdata2".
     iApply (Mm.wp_memmove_sconf KT1 KT0 KT0 B5 (K - 10)%nat 1024%nat
-              (fun i => (Lw t) !!! i) (fun i => (Lw t) !!! i) eb (proc_addr j)
+              (fun i => (Lw t) !!! i) (fun i => (Lw t) !!! i)
+              (DfracOwn 1) eb (proc_addr j)
               (it_Kmm K HK)
               ltac:(vm_compute; reflexivity) HB5a2
               with "Hcg Htext Hpc Hdata1 Hdata2").

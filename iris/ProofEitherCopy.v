@@ -894,7 +894,7 @@ Section ProofEitherCopyout.
       (* [Hcpu] rode through untouched since myproc handed it back at [CID14];
          re-anchor it at [CID20] before crossing into copyout. *)
       iDestruct (cpu_own_transport CID14 CID20 lvl eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-      iApply (Copyout.wp_copyout_sconf kts γa U5 (pv_upt V) (pv_sz V) len src_bytes
+      iApply (Copyout.wp_copyout_sconf kts γa U5 (pv_upt V) (pv_sz V) len src_bytes (DfracOwn 1)
                 (av - 6)%nat lvl eb p b
                 _ HK52 HU5a0 HU5a1 HU5a4 Hlen Hszb Hlvl
                 with "Hcg Hcpu Htext Hpc Hpt Henv Hsrc").
@@ -1038,7 +1038,7 @@ Section ProofEitherCopyout.
         rewrite /K1 upd_ne; [| congruence]. apply HthrA; assumption. }
       iEval (rewrite -HK4a1) in "Hsrc".
       iEval (rewrite -HK4a0) in "Hres".
-      iApply (Memmove.wp_memmove_sconf KT1 kts ktb K4 (av - 6)%nat len src_bytes dst_olds b p
+      iApply (Memmove.wp_memmove_sconf KT1 kts ktb K4 (av - 6)%nat len src_bytes dst_olds (DfracOwn 1) b p
                 ltac:(lia) (ec_len32 len Hlen) HK4a2
                 with "Hcg Htext Hpc Hsrc Hres").
       iIntros (CID20 Hs20 mfin) "Hcg Hpc Hsrc Hdst %Hmma0 %Hcsmm".
@@ -1757,7 +1757,7 @@ Section ProofEitherCopyin.
         rewrite /K1 upd_ne; [| congruence]. apply HthrA; assumption. }
       iEval (rewrite -HK4a1) in "Hres".
       iEval (rewrite -HK4a0) in "Hdst".
-      iApply (Memmove.wp_memmove_sconf KT1 kts ktb K4 (av - 6)%nat len src_bytes dst_olds b p
+      iApply (Memmove.wp_memmove_sconf KT1 kts ktb K4 (av - 6)%nat len src_bytes dst_olds (DfracOwn 1) b p
                 ltac:(lia) (ec_len32 len Hlen) HK4a2
                 with "Hcg Htext Hpc Hres Hdst").
       iIntros (CID20 Hs20 mfin) "Hcg Hpc Hsrc Hdst %Hmma0 %Hcsmm".

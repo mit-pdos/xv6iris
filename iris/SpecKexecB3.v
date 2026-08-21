@@ -108,7 +108,7 @@ Definition kxc_b2_body
     (plen : nat) (pfun : nat -> bv 8)
     (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
     (afun : nat -> nat -> bv 8)
-    (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
+    (pidv : mword 32) (V : pprivate) (dqb dqs dqa dqpv dqas : dfrac)
     (m M : regfile) (K : nat)
     (sp0 ra0 s00 s10 s20 pv av w67 : mword 64)
     (ef : nat -> bv 8) (P : uptd) (i : nat) (szv : mword 64) :=
@@ -135,7 +135,7 @@ Definition kxc_b2_body
             cov logstart inodestart nib dev -∗
   kxc_at_12c jp bn g gfs gi cn ga gf cov logstart bmapstart inodestart nib
              size dev used used2 kf qf sf gyf inumf dnf bmf gilf gislf n2
-             plen pfun na avf aslen afun pidv V dqb dqs dqa m M K
+             plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas m M K
              sp0 ra0 s00 s10 s20 pv av
              (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
              (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
@@ -155,17 +155,17 @@ Definition kxc_b2_body
         bitmap_res gfs bmapstart cov logstart size used' -∗
         kalloc_env ga None -∗
         proc_priv gf (proc_addr jp) pidv V' -∗
-        ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1] pfun k) -∗
+        ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1]{dqpv} pfun k) -∗
         ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈[KT1]{dqa} avf k) -∗
         ([∗ list] k ∈ seq 0 na,
-           [∗ list] j ∈ seq 0 (aslen k), pa_add (avf k) j ↦ₘ afun k j) -∗
+           [∗ list] j ∈ seq 0 (aslen k), pa_add (avf k) j ↦ₘ{dqas} afun k j) -∗
         bslots bn 3 -∗
         iref_slots 2 -∗
         WP (Loop : expr riscv_lang)) -∗
   wp_next true (proc_addr jp) (fun (CID : CpuId) =>
     ∀ (M' : regfile) (used3 : gset Z) (P' : uptd) (szv' : mword 64),
       kxc_at_1ae jp bn gfs ga gf cov logstart bmapstart inodestart size
-                 used used3 plen pfun na avf aslen afun pidv V dqb dqs dqa
+                 used used3 plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas
                  M' K sp0 ra0 s00 s10 s20 pv av
                  (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
                  (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
@@ -185,10 +185,10 @@ Definition kxc_b2_body
             bitmap_res gfs bmapstart cov logstart size used' -∗
             kalloc_env ga None -∗
             proc_priv gf (proc_addr jp) pidv V' -∗
-            ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1] pfun k) -∗
+            ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1]{dqpv} pfun k) -∗
             ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈[KT1]{dqa} avf k) -∗
             ([∗ list] k ∈ seq 0 na,
-               [∗ list] j ∈ seq 0 (aslen k), pa_add (avf k) j ↦ₘ afun k j) -∗
+               [∗ list] j ∈ seq 0 (aslen k), pa_add (avf k) j ↦ₘ{dqas} afun k j) -∗
             bslots bn 3 -∗
             iref_slots 2 -∗
             WP (Loop : expr riscv_lang)) -∗
@@ -212,7 +212,7 @@ Definition kxc_b2z_body
     (plen : nat) (pfun : nat -> bv 8)
     (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
     (afun : nat -> nat -> bv 8)
-    (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
+    (pidv : mword 32) (V : pprivate) (dqb dqs dqa dqpv dqas : dfrac)
     (m M : regfile) (K : nat)
     (sp0 ra0 s00 s10 s20 pv av w67 : mword 64)
     (ef : nat -> bv 8) (P : uptd) :=
@@ -233,7 +233,7 @@ Definition kxc_b2z_body
             cov logstart inodestart nib dev -∗
   kxc_at_1a2 jp bn g gfs gi cn ga gf cov logstart bmapstart inodestart nib
              size dev used used2 kf qf sf gyf inumf dnf bmf gilf gislf n2
-             plen pfun na avf aslen afun pidv V dqb dqs dqa m M K
+             plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas m M K
              sp0 ra0 s00 s10 s20 pv av
              (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
              (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
@@ -242,7 +242,7 @@ Definition kxc_b2z_body
   wp_next true (proc_addr jp) (fun (CID : CpuId) =>
     ∀ (M' : regfile) (used3 : gset Z),
       kxc_at_1ae jp bn gfs ga gf cov logstart bmapstart inodestart size
-                 used used3 plen pfun na avf aslen afun pidv V dqb dqs dqa
+                 used used3 plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas
                  M' K sp0 ra0 s00 s10 s20 pv av
                  (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
                  (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
@@ -265,14 +265,14 @@ Module Type KEXECB3.
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
-      (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
+      (pidv : mword 32) (V : pprivate) (dqb dqs dqa dqpv dqas : dfrac)
       (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (i : nat) (szv : mword 64),
     kxc_b2_body gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl gilf gislf
       ga gf cov logstart bmapstart inodestart nib size dev used used2
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
-      pidv V dqb dqs dqa m M K sp0 ra0 s00 s10 s20 pv av w67
+      pidv V dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av w67
       ef P i szv.
 
   Parameter kxc_b2z :
@@ -288,12 +288,12 @@ Module Type KEXECB3.
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
-      (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
+      (pidv : mword 32) (V : pprivate) (dqb dqs dqa dqpv dqas : dfrac)
       (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd),
     kxc_b2z_body gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl gilf gislf
       ga gf cov logstart bmapstart inodestart nib size dev used used2
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
-      pidv V dqb dqs dqa m M K sp0 ra0 s00 s10 s20 pv av w67 ef P.
+      pidv V dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av w67 ef P.
 End KEXECB3.

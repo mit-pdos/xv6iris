@@ -1434,7 +1434,7 @@ Section ProofSysChdirBody.
       iApply (Namei.wp_namei_gen (CID := CID19) gs j gl gu gd gk pd pav pu bn
                 g gfs gi cn gtl ga gf cov logstart bmapstart inodestart nib
                 size dev used pk bf MAXOPBLOCKS Sb0
-                pid (DfracOwn (1/4)) dqb dqs
+                pid (DfracOwn (1/4)) dqb dqs (DfracOwn 1)
                 N1 (K - 20)%nat eb b lks
                 (upd_upt V P') ltac:(lia) Hcdev Hcnib Hclog Hcist HdevR Hnib0 Hgeom Hsize
                 Hbm0 Hbmcov Hbmlog Hist0 Hcovb Hiregb Hpcstr

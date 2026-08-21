@@ -1183,6 +1183,29 @@ Section mem_pointsto_share.
       apply Hrest. lia.
   Qed.
 
+  (* THE MIRROR IMAGE, for a buffer that is only READ and therefore rides the
+     caller's fraction.  [mem_bytes_notin] refutes aliasing from the RUN's
+     exclusivity; once the run is fractional that argument is gone, and the
+     single byte on the other side is the exclusive one.  Same induction, with
+     [mem_pointsto_ne] applied the other way round -- the exclusive byte FIRST
+     -- and the disequality flipped back.  [ProofMemmove] needs exactly this:
+     its source is now at the caller's dfrac while every destination byte is
+     still owned outright. *)
+  Lemma mem_bytes_notin_r {kt1 kt2 : ktier} (a c : Arch.pa) (k n : nat) (dq : dfrac) (f : nat -> bv 8) (v : bv 8) :
+    ([∗ list] j ∈ seq k n, (pa_add a j) ↦ₘ[kt1]{dq} f j) -∗
+    c ↦ₘ[kt2] v -∗
+    ⌜forall j, (k <= j < k + n)%nat -> pa_add a j <> c⌝.
+  Proof.
+    revert k. induction n as [|n IH]; intros k; simpl.
+    - iIntros "_ _". iPureIntro. intros j Hj. lia.
+    - iIntros "[Hh Ht] Hc".
+      iDestruct (mem_pointsto_ne with "Hc Hh") as %Hne0.
+      iDestruct (IH (S k) with "Ht Hc") as %Hrest.
+      iPureIntro. intros j Hj.
+      destruct (decide (j = k)) as [->|Hjk]; [exact (fun H => Hne0 (eq_sym H))|].
+      apply Hrest. lia.
+  Qed.
+
   Lemma mem_bytes_frac_split {m : N} (a : Arch.pa) (k n : nat) (q1 q2 : Qp) (w : bv m) :
     ([∗ list] j ∈ seq k n, (pa_add a j) ↦ₘ{DfracOwn (q1 + q2)} nth_byte w j) ⊣⊢
     ([∗ list] j ∈ seq k n, (pa_add a j) ↦ₘ{DfracOwn q1} nth_byte w j) ∗

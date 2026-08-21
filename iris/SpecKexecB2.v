@@ -289,7 +289,7 @@ Section KexecB2Res.
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
-      (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
+      (pidv : mword 32) (V : pprivate) (dqb dqs dqa dqpv dqas : dfrac)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w63 w65 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) : iProp Σ :=
@@ -303,10 +303,10 @@ Section KexecB2Res.
      bslots bn 3 ∗
      proc_pt P ∗
      proc_priv gf (proc_addr jp) pidv V ∗
-     ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1] pfun k) ∗
+     ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[KT1]{dqpv} pfun k) ∗
      ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈[KT1]{dqa} avf k) ∗
      ([∗ list] k ∈ seq 0 na,
-        [∗ list] j ∈ seq 0 (aslen k), pa_add (avf k) j ↦ₘ afun k j) ∗
+        [∗ list] j ∈ seq 0 (aslen k), pa_add (avf k) j ↦ₘ{dqas} afun k j) ∗
      ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ[KT1] ef j) ∗
      kxc_frameBpin sp0 ra0 s00 s10 s20 pv av
                   w5 w6 w7 w8 w9 w10 w11 w12 w13 w63 w65 w67)%I.
@@ -391,7 +391,7 @@ Section KexecB2Res.
   Proof.
     intro Hn. rewrite /page_own.
     iIntros "H". iDestruct (bb_any_named q 4096 with "H") as (f) "H".
-    iExists f. rewrite (bb_split3 q nn (4096 - nn) 0 4096 f ltac:(lia)).
+    iExists f. rewrite (bb_split3 q nn (4096 - nn) 0 4096 f (DfracOwn 1) ltac:(lia)).
     iDestruct "H" as "(A & B & _)". iSplitL "A"; [iExact "A" | iExact "B"].
   Qed.
 
@@ -405,7 +405,7 @@ Section KexecB2Res.
     iApply (bb_named_any q 4096 (fun j => if decide (j < nn)%nat then h j
                                           else f j)).
     rewrite (bb_split3 q nn (4096 - nn) 0 4096
-               (fun j => if decide (j < nn)%nat then h j else f j) ltac:(lia)).
+               (fun j => if decide (j < nn)%nat then h j else f j) (DfracOwn 1) ltac:(lia)).
     iSplitL "A".
     { iApply (big_sepL_mono with "A"). intros ii jj Hj.
       apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
@@ -531,7 +531,7 @@ Section KexecB2Res.
        [∗ list] j ∈ seq 0 n, pa_add a j ↦ₘ[KT1] f j).
   Proof.
     intros Hn Hal.
-    rewrite (bb_split3 (KTR := KT1) a o 8 r n f Hn).
+    rewrite (bb_split3 (KTR := KT1) a o 8 r n f (DfracOwn 1) Hn).
     iIntros "(Hpre & Hmid & Hsuf)".
     iSplitL "Hmid".
     { iApply (word_pointsto_intro (KTR := KT1) _ _ _ Hal).
@@ -566,7 +566,7 @@ Definition kxc_bad324_body
     (plen : nat) (pfun : nat -> bv 8)
     (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
     (afun : nat -> nat -> bv 8)
-    (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
+    (pidv : mword 32) (V : pprivate) (dqb dqs dqa dqpv dqas : dfrac)
     (m Mt : regfile) (K : nat)
     (sp0 ra0 s00 s10 s20 pv av w63 w67 : mword 64)
     (ef : nat -> bv 8) (P : uptd) (szf : mword 64) (lks : gset string) :=
@@ -614,10 +614,10 @@ Definition kxc_bad324_body
   kalloc_env ga None -∗
   proc_pt P -∗
   proc_priv gf (proc_addr jp) pidv V -∗
-  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
+  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
   ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
   ([∗ list] i ∈ seq 0 na,
-     [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
+     [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
   ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ[KT1] ef j) -∗
   bslots bn 3 -∗
   iref_slots 1 -∗
@@ -642,10 +642,10 @@ Definition kxc_bad324_body
         bitmap_res gfs bmapstart cov logstart size used' -∗
         kalloc_env ga None -∗
         proc_priv gf (proc_addr jp) pidv V' -∗
-        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
+        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
         ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
         ([∗ list] i ∈ seq 0 na,
-           [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
+           [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
         bslots bn 3 -∗
         iref_slots 2 -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -670,7 +670,7 @@ Definition kxc_ls_body
     (plen : nat) (pfun : nat -> bv 8)
     (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
     (afun : nat -> nat -> bv 8)
-    (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
+    (pidv : mword 32) (V : pprivate) (dqb dqs dqa dqpv dqas : dfrac)
     (m : regfile) (K : nat)
     (sp0 ra0 s00 s10 s20 pv av w63 w65 w67 : mword 64)
     (ef : nat -> bv 8) (P : uptd)
@@ -728,7 +728,7 @@ Definition kxc_ls_body
   kalloc_env ga None -∗
   kxc_res jp bn g gfs gi cn gf cov logstart bmapstart inodestart size dev
           used2 kf qf sf gyf inumf dnf bmf gilf gislf n2 plen pfun na avf
-          aslen afun pidv V dqb dqs dqa sp0 ra0 s00 s10 s20 pv av
+          aslen afun pidv V dqb dqs dqa dqpv dqas sp0 ra0 s00 s10 s20 pv av
           (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
           (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
           (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
@@ -752,10 +752,10 @@ Definition kxc_ls_body
         bitmap_res gfs bmapstart cov logstart size used' -∗
         kalloc_env ga None -∗
         proc_priv gf (proc_addr jp) pidv V' -∗
-        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
+        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
         ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
         ([∗ list] i ∈ seq 0 na,
-           [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
+           [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
         bslots bn 3 -∗
         iref_slots 2 -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -778,7 +778,7 @@ Definition kxc_ls_body
       pc_is (mword_of_int (KXB + 0x116) : mword 64) -∗
       kxc_res jp bn g gfs gi cn gf cov logstart bmapstart inodestart size dev
               used2 kf qf sf gyf inumf dnf bmf gilf gislf n2 plen pfun na avf
-              aslen afun pidv V dqb dqs dqa sp0 ra0 s00 s10 s20 pv av
+              aslen afun pidv V dqb dqs dqa dqpv dqas sp0 ra0 s00 s10 s20 pv av
               (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
               (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
               (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
@@ -797,10 +797,10 @@ Definition kxc_ls_body
             bitmap_res gfs bmapstart cov logstart size used' -∗
             kalloc_env ga None -∗
             proc_priv gf (proc_addr jp) pidv V' -∗
-            ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
+            ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
             ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
             ([∗ list] i ∈ seq 0 na,
-               [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
+               [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
             bslots bn 3 -∗
             iref_slots 2 -∗
             WP (Loop : expr riscv_lang)) -∗
@@ -821,14 +821,14 @@ Module Type KEXECB2.
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
-      (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
+      (pidv : mword 32) (V : pprivate) (dqb dqs dqa dqpv dqas : dfrac)
       (m Mt : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w63 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (szf : mword 64) (lks : gset string),
     kxc_bad324_body gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl gilf gislf
       ga gf cov logstart bmapstart inodestart nib size dev used used2
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
-      pidv V dqb dqs dqa m Mt K sp0 ra0 s00 s10 s20 pv av w63 w67
+      pidv V dqb dqs dqa dqpv dqas m Mt K sp0 ra0 s00 s10 s20 pv av w63 w67
       ef P szf lks.
 
   Parameter kxc_ls :
@@ -844,7 +844,7 @@ Module Type KEXECB2.
       (plen : nat) (pfun : nat -> bv 8)
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
-      (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
+      (pidv : mword 32) (V : pprivate) (dqb dqs dqa dqpv dqas : dfrac)
       (m : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w63 w65 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd)
@@ -852,6 +852,6 @@ Module Type KEXECB2.
     kxc_ls_body gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl gilf gislf
       ga gf cov logstart bmapstart inodestart nib size dev used used2
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
-      pidv V dqb dqs dqa m K sp0 ra0 s00 s10 s20 pv av w63 w65 w67
+      pidv V dqb dqs dqa dqpv dqas m K sp0 ra0 s00 s10 s20 pv av w63 w65 w67
       ef P ip va fz po lks.
 End KEXECB2.

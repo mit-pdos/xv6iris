@@ -167,13 +167,13 @@ Section ProofNameiparentMain.
       (plen : nat) (pfun : nat -> bv 8)
       (nfun : nat -> bv 8)
       (n : nat) (Sb : gset Z)
-      (pidv : mword 32) (dq dqb dqs : dfrac)
+      (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
     : wp_nameiparent_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                                 ga gf cov logstart bmapstart inodestart nib
                                 size dev used plen pfun nfun n Sb
-                                pidv dq dqb dqs m K eb b lks Vpr.
+                                pidv dq dqb dqs dqpv m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_nameiparent_gen_body].
     intros pcE pjv pv nb ret_tgt pl L
@@ -356,7 +356,7 @@ Section ProofNameiparentMain.
                  with "Hcont") as "Hcont".
     iApply (NX.wp_namex_gen gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
               ga gf cov logstart bmapstart inodestart nib size dev used
-              plen pfun nfun true n Sb pidv dq dqb dqs R5 (K - 2)%nat eb b
+              plen pfun nfun true n Sb pidv dq dqb dqs dqpv R5 (K - 2)%nat eb b
               _ Vpr Knx Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov
               Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen Hbud Hj Hgs
               ltac:(rewrite HR5a1; exact npi_a1_true) Heb
@@ -558,13 +558,13 @@ Section ProofNameiparentMain.
       (plen : nat) (pfun : nat -> bv 8)
       (nfun : nat -> bv 8)
       (n : nat)
-      (pidv : mword 32) (dq dqb dqs : dfrac)
+      (pidv : mword 32) (dq dqb dqs dqpv : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
     : wp_nameiparent_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                           ga gf cov logstart bmapstart inodestart nib
                           size dev used plen pfun nfun n
-                          pidv dq dqb dqs m K eb b lks Vpr.
+                          pidv dq dqb dqs dqpv m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_nameiparent_sconf_body].
     intros pcE pjv pv nb ret_tgt pl L
@@ -580,7 +580,7 @@ Section ProofNameiparentMain.
     iApply (wp_nameiparent_gen gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
               ga gf cov logstart bmapstart inodestart nib
               size dev used plen pfun nfun n Sb0
-              pidv dq dqb dqs m K eb b
+              pidv dq dqb dqs dqpv m K eb b
               _ Vpr HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen (walk_need_counted L n Hbud) Hj Hgs Heb
               with "Hcg Hcnt Htext Hkd Hpc Hpenv Hbio Hlogc Hkenv Hitb2 Hitbl Hesc Hslks Hireg Hropen Hprocs Hdev Hgeom Hdlk Hbmap Hinos Hbits Hppid Hcwdr Hpath Hname Hbslot Hislot Hlog [Hcont]").
     iEval (rewrite /wp_next).

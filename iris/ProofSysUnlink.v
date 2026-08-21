@@ -1171,7 +1171,7 @@ Section ProofSysUnlinkBody.
       iApply (Nameiparent.wp_nameiparent_gen (CID := CID16) gs jx gl gu gd gk
                 pd pav pu bn g gfs gi cn gtl ga gf cov logstart bmapstart
                 inodestart nib size dev used pk1 bp1 bnm0
-                MAXOPBLOCKS Sb0 pid (DfracOwn (1/4)) dqb dqs
+                MAXOPBLOCKS Sb0 pid (DfracOwn (1/4)) dqb dqs (DfracOwn 1)
                 N3 (K - 30)%nat eb b lks
                 (upd_upt V P1) ltac:(exact Knp) Hcdev Hcnib Hclog Hcist HdevR Hnib0 Hgeom
                 Hsize Hbm0 Hbmcov Hbmlog Hist0 Hcovb Hiregb Hpcstr1
