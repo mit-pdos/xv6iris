@@ -54,7 +54,6 @@ Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import WpAu4.
 Require Import FdSlots.
-Require Import ProcGeom.
 Require Import FsBlocks.
 Require Import DinodeEnc.
 Require Import InodeInv.

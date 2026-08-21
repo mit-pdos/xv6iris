@@ -71,7 +71,7 @@ Require Import FsCrash.
 Require Import UserPtTree.
 Require Import SpecProcinit.
 Require Import SpecFileclose.
-Require Import FsCfg FsReady.
+Require Import FsReady.
 Require Import SpecDevintr.
 Require Import SpecPrintk.
 Require Import SpecSyscall.

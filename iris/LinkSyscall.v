@@ -32,8 +32,6 @@ From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 Require Import SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvLang RiscvPtsto.
-Require Import SpecSyscall.
 Require Import ProofSyscall.
 (* the twenty-two table entries, each already linked against its own callees *)
 Require Import LinkSysFork LinkSysExit LinkSysWait LinkSysPipe LinkSysRead

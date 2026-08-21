@@ -52,7 +52,7 @@ Require Import SleepLock BcacheInv SpecIinit.
 (* the bcache's PAYLOAD rows: [BufOwn]'s field addresses, [BioInv]'s [bpa] /
    [brefcnt], and [BioInitAt.buf_raw] -- the named row [bio_init_at] takes and
    [SpecMain.main_globals_raw] carries across binit (stage (f)). *)
-Require Import BufOwn BioInv BioInitAt.
+Require Import BufOwn BioInitAt.
 Require Import DiskInv SpecVirtioDiskInit.
 (* the [struct log]'s cell names, for rows (A) of the fsinit bundle
    (fs-cfg-boot.md (f-2)) *)

@@ -37,7 +37,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base.
 Require Import RiscvLang RiscvPtsto.
 Require Import ProcGeom.
-Require Import IcacheRef FdSlots.
+Require Import FdSlots.
 Require Import FileInvDefs.
 Require Import WpUart.
 Require Import BootConfig.
@@ -56,8 +56,6 @@ Require Import FsCrash.
    before this import, 3.51 s after -- the generated image is one compact
    [PrimString] literal, so loading it costs nothing worth naming.  Keep it
    that way: this file sits on the strictly serial build tail. *)
-Require Import FsImgDisk.
-Require Import IcacheRef.
 (* [ROOTDEV], for the two config ties the boot arm now carries *)
 Require Import IrefSlots.
 Require Import LogDefs.   (* [log_mirror_full] -- row (B) of the fsinit bundle *)

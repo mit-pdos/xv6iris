@@ -24,7 +24,7 @@ From iris.algebra.lib Require Import excl_auth.
 From iris.base_logic.lib Require Import invariants own.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d.
-Require Import RiscvPtsto RiscvLang.
+Require Import RiscvPtsto.
 Require Export WpLock.
 Local Open Scope Z_scope.
 

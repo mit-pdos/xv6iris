@@ -107,7 +107,8 @@ Require Import LogDefs LogInv.
 Require Import FsReady FirstTok.
 Require Import WpLockAt.   (* [newlock_at] / [lock_free_tok] *)
 Require Import BioInitAt.  (* [bio_init_at] / [bio_free_tok] / [buf_raw] *)
-Require Import IcacheBoot IcacheInv IcacheEscrow InodeRegion InodeInv.
+Require Import IcacheBoot IcacheEscrow InodeInv.
+Require Import IcacheRef.
 Require Import IrefSlots FsCfg FsBlocks.
 Require Import SpecBinit SpecIinit SpecFileinit SpecVirtioDiskInit.
 Require Import SpecUserinit SpecScheduler SpecKernelvec SpecFreerange.

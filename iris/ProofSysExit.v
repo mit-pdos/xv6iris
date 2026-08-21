@@ -51,7 +51,6 @@ Require Import FsBlocks LogInv.
 (* IMPORTED, not merely required: [FsReady]'s [Typeclasses Opaque fs_ready]
    seal is what keeps [Persistent ?P] from delta-unfolding the predicate's
    twenty conjuncts (that file's own header measures the cost). *)
-Require Import FsCfg FsReady.
 Require Import SpecArgint SpecKexit.
 Require Import SpecSysExit.
 From Kernel Require KernelInstrs KernelSyms.

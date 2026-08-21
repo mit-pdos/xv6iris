@@ -36,7 +36,6 @@ Require Import IrefSlots IcacheRef ProcAvail FileInvDefs FsCfg.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import SpecNameiRootBoot.
 Require Import ProcDefs UserPtTree ProcGeom.  (* the dead-binder dummy: MkPPriv/UPTD/NOFILE *)
-Require Import SpecNamei.
 Require Import LinkNameiRoot.
 
 Module NameiRootBoot : NAMEI_ROOT_BOOT.

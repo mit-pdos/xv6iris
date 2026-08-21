@@ -155,10 +155,8 @@ Require Export SwtchCtx.
 Require Import CpuOwn.
 Require Import SchedCtx.
 Require Import WpUart.
-Require Import BioDefs.
 Require Import LogInv.
 Require Import FsCrash.        (* [BSIZE] -- the numeric premise mentions it *)
-Require Import InodeInv.
 Require Import IrefSlots.
 Require Import UserPtTree.
 Require Import KvmSpec.

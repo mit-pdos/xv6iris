@@ -35,7 +35,6 @@ Require Import SleepLock.
 Require Import WpLockAt.
 Require Import SleepLockAt.
 Require Import BufOwn.
-Require Import DiskPtsto.
 Require Import BcacheInv.
 Require Export BioInv.
 From Kernel Require KernelSyms.

@@ -39,7 +39,6 @@ Require Import IntrDefs.
 Require Import WpNext.
 Require Import LockRank.
 Require Import FdSlots.
-Require Import ProcGeom.
 Require Import CpuOwn.
 Require Import SchedCtx.
 Require Import ProcDefs.  (* [proc_priv_bare] *)

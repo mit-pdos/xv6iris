@@ -78,7 +78,7 @@ Require Import FsCrash.
 Require Import SpecPanic.
 Require Import SpecProcinit.   (* [wait_lock_addr] *)
 Require Import SpecKexit.      (* [K_kexit] -- the budget this one is built on *)
-Require Import FsCfg FsReady.
+Require Import FsReady.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.

@@ -91,7 +91,7 @@ Require Import FileInvDefs.
 Require Import SpecPanic.
 Require Import FdSlots.
 Require Import SchedCtx.
-Require Import KallocInv KvmSpec.
+Require Import KvmSpec.
 Require Import ProcAvail.
 Require Import SpecAllocpid.
 (* the two callee contracts whose budgets this one is the sum of.  Neither
@@ -104,7 +104,7 @@ Require Import SpecNameiRootBoot.
    transitive, so naming them here needs their own files even though
    [SpecNameiRootBoot] already states them. *)
 Require Import IcacheInv IcacheEscrow InodeRegion InodeInv.
-Require Import FsBlocks FsCfg.
+Require Import FsCfg.
 (* THE BOOT TOKEN'S TWO PAYLOAD BUNDLES (fs-cfg-boot.md stage (f)).  Named
    here rather than spelled out: [FirstTok] is where they are DEFINED, main
    assembles both at +0x9e, and this contract is the courier that carries

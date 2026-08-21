@@ -34,12 +34,9 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list list_numbers.
 From iris.program_logic Require Import language.
-Require Import RiscvLang RiscvPtsto.
+Require Import RiscvLang.
 Require Import VirtioModel.
-Require Import FsCrash.
-Require Import FsBoot.
 Require Import FsImg.
-Require Import BootShared.
 Require Import FsCfgBoot.       (* [fs_boot_image_wf], moved down at stage (f) *)
 Require Import SystemAdequacy.  (* the two generic theorems, and [xv6Σ] *)
 Require Import FsImgDisk.       (* [fsimg_dk] / [fsimg_D0] / [fsimg_recovery] *)

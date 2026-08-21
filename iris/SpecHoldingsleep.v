@@ -30,7 +30,6 @@ Require Import RiscvExtras.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import LockRank.
-Require Import ProcGeom.
 Require Import CpuOwn.
 Require Import ProcDefs.  (* [proc_priv_bare] -- file-layer free *)
 Require Import SleepLock.

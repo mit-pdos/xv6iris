@@ -112,7 +112,7 @@ Require Import IcacheRef.
    [SpecNamei]'s -- the log, the bio cache and the bitmap stay out, which is
    what this file exists for. *)
 Require Import IcacheInv IcacheEscrow InodeRegion InodeInv.
-Require Import FsBlocks FsCfg FileInvDefs.
+Require Import FsCfg FileInvDefs.
 Require Import ProcAvail.   (* [pavG], a binder of the proven corner *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

@@ -120,16 +120,12 @@ Require Import ProcGeom.
 Require Import SchedCtx.
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
-Require Import BioInv.
+Require Import BioDefs.
 Require Import FsBlocks LogInv.
-Require Import FsCrash.
 Require Import BitmapInv.
-Require Import DinodeEnc.
-Require Import InodeInv.
-Require Import InodeRegion.
+Require Import IcacheRef.
 Require Import IrefSlots.
 Require Import IcacheRef.
-Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import SleepLock.
 Require Import SpecEndOp.

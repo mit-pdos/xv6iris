@@ -46,11 +46,9 @@ Require Import VirtioModel.    (* [disk_read]    *)
 Require Import DiskPtsto.      (* [disk_names]  *)
 Require Import BioDefs.        (* [bio_names]   *)
 Require Import FsBlocks.
-Require Import BlockWords.
 Require Import DinodeEnc.
 Require Import DirView.
 Require Import DirLinks.
-Require Import FsTree.
 Require Import FsCrash.
 Require Import LogDefs.
 Require Import LogInv.
@@ -61,10 +59,8 @@ Require Import SleepLock.      (* [sl_free_tok] / [slh_auth]: [icfg_isl]'s pair 
 Require Import BioInitAt.
 Require Import KallocInv.
 Require Import InodeInv.
-Require Import InodeLock.
 Require Import InodeRegion.
 Require Import IrefSlots.
-Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import IcacheBoot.
 Require Import FsBoot.
