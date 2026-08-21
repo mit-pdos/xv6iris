@@ -607,3 +607,77 @@ mid-boot" — already far past `inode_held`.
 * D-N4c: lend granularity stays per-directory (per the standing Q-a
   ruling); the ¼/¾ split constants are conventional and hidden behind
   `dv_lend`/`dv_pin`.
+
+### 11.5 Phase A landed; the Timeless obstruction and the Phase B ruling
+
+**Phase A (2026-08-21): DirViewLend.v + DirViewPin.v, compiled closed,
+no contract amendment needed.**  The kit's receipts are dviewUR cells at
+fresh dynamic gnames (a cancellation receipt NAMES the directory and the
+contents it was cancelled at); no new inG, no icfg field.  The pinned
+corollary is a functor over NAMEI_TR: `dvp_P` tracks "on the expected
+chain, unspent pins in hand" ∨ "diverged, receipt in hand", and the
+ok-post delivers `⌜iL = chain's end⌝ ∨ dvp_lost`.  A miss on an intact
+chain is refuted by agreement; the ok=false left arm stays reachable
+because pins pin CONTENTS, not types.  See the two file headers.
+
+**THE OBSTRUCTION (Phase A's headline): `dv_ride`'s ¾ arm cannot be
+Timeless as drafted.**  The writer must find the client's ¼ unpremised
+⇒ the ¼ sits behind a shared handle carried by the ride arm ⇒ the arm
+carries an `inv`, and `inv` is never Timeless.  That collides with
+`ic_loaded_timeless` → `ic_escrow_body_timeless` → every
+`iInv .. as ">"` in the tree.  General law: any ride arm granting an
+unpremised fupd capability is non-Timeless.
+
+**RULED (user, 2026-08-21) — E1-region: host the lend BODY in
+`ireg_slot`** (a per-inum, all-`own`, Timeless lend column beside the
+link ledger: NONE ∨ INTACT(¼ + ctick) ∨ CANCELLED(cshot + mtok)),
+keyed the way every other per-inum fact is.  Why the region and not the
+alternatives:
+  * the home must be per-INUM (a slot escrow's identity shifts across
+    cache cycles; the pool is state behind the itable lock, unreachable
+    by a writer of a CACHED dir);
+  * `ireg_inv` is ambient in every fs contract and openable at every
+    needed instant — dv_set_rt and dv_pin_redeem gain an `ireg_inv`
+    argument, which is a persistent handle every calling context
+    already holds: no spec text changes anywhere;
+  * all-`own` content keeps every Timeless instance in the tree intact;
+    `dv_ride` collapses back to a Timeless two-arm disjunct whose ¾ arm
+    carries only tokens;
+  * precedent: the freeze column f was added to the same ledger by the
+    iclaim campaign.
+Rejected: dropping `ic_loaded_timeless` (breaks the ">"-discipline
+tree-wide); a global lend-registry invariant (its handle must ride the
+arm — same non-Timeless trap — or become a new spec premise).
+
+**Also settled by Phase A's scout:** the mint site for N-5.1 is the
+boot stocking (`FsCfgBoot` holds `dv_hold` whole before parking —
+`dv_lend_mint` fires there for ROOTINO; no lend can exist pre-fs_ready
+so the stocking's own `dv_set` stays plain).  A RUNTIME mint window
+(an ilock-bracket AU) is future work, not this campaign's.  Phase B's
+full swap-site list (5 custody definition sites, ~25 bracket/peel
+statements, 16 mover call sites, the `dv_ride_size` analogue) is in the
+Phase A lane report; the two `pool_await`/`pool_pending` arms already
+host an `escA_inv` and take the ride for free.
+
+### 9.3 N-3 LANDED; the closed pinned walk (2026-08-21)
+
+The N-3 lane delivered the full ghost-trace walk, gated green: FsTree.v
+absorbed the probe lemmas (additive §3bis), SpecNamexTr.v states
+`wp_namex_tr` (npar fixed false), ProofNamexTr.v re-walks namex reusing
+every top-level ProofNamex/Parts lemma (the sealed-module boundary, not
+choice, is why section-internal lemmas were restated), ProofNameiTr.v +
+LinkNamexTr.v + LinkNameiTr.v close the chain.  `Print Assumptions
+LinkNameiTr.NameiTr.wp_namei_tr` = the five platform externs + funext.
+THE RULED CONTRACT HELD AS WRITTEN — no arm unstatable, no premise
+missing, the single ={⊤}=∗ eliminated at the fire point (the same move
+the nlink guard's obs-mint makes).  The dir_first↔ents bridge is
+`dv_lookup_found/none` at the definitional `dv_of` tie — no uniqueness
+anywhere.  The five exits: success (∃ dcur, inode_held_at ∗ P L dcur);
+notdir + nlink-guard = LEFT receipt with the whole suffix; miss = RIGHT
+receipt with the suffix from S k; relative-start refuted by the
+absolute-path premise.
+
+DirViewPin.v now ends with the CLOSED instantiation
+`Module NameiPinnedI := NameiPinned LinkNameiTr.NameiTr` — a
+`wp_namei_pinned` with no module parameter, at the tree's standing
+assumption baseline.

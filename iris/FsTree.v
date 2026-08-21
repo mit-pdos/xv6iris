@@ -315,6 +315,131 @@ Proof.
 Qed.
 
 (* ====================================================================== *)
+(*  3bis.  THE LOOKUP FACTS AT A BARE VIEW EQUATION                        *)
+(*         (namei-pinned-lookup.md §9.2, the N-2 probe verdict)            *)
+(* ====================================================================== *)
+
+(*  WHY THESE EXIST BESIDE [FsLookup]'s [node_lookup_*].  Those five facts
+    take [node_rep (NDir ents) dn data] -- a THREE-way bundle whose second
+    conjunct is [dir_names_unique] -- and every one of their proofs opens
+    with [intros (_ & _ & ->)], discarding the type tag and the uniqueness
+    invariant UNREAD.  The pinned-lookup campaign's carrier
+    ([DirViewG.dv_hold z (dv_of dn data)]) holds only the THIRD conjunct:
+    the abstract map IS the byte view, with no well-formedness attached.
+
+    So the family below is the same five statements with the hypothesis
+    weakened to the bare equation [ents = dir_view data nrec] and [nrec]
+    generalised from a record's own count to an arbitrary one.  Nothing is
+    lost: [dir_view_lookup] above is itself uniqueness-free and total on
+    every byte state, and it is the only thing any of these consult.  The
+    ONE reading that genuinely needs uniqueness is the ANY-match VALUE
+    reading [dir_view_live] below -- see [dv_lookup_live_is_Some] for the
+    strongest uniqueness-free residue of it, and [dv_live_value_shadowed]
+    for the failure itself.                                                *)
+
+(* **THE MASTER EQUATION** -- [dir_view_lookup] read through the caller's
+   own name for the map. *)
+Lemma dv_lookup_first (ents : gmap fname Z)
+    (data : nat -> list (bv 8)) (nrec : nat) (s : fname) :
+  ents = dir_view data nrec ->
+  ents !! s
+  = (fun k => bv_unsigned (dir_inum data k)) <$> dir_first data nrec s.
+Proof. intros ->. apply dir_view_lookup. Qed.
+
+(* THE FOUND ARM.  The scan stopped at record [k]; the map answers with
+   that record's inum. *)
+Lemma dv_lookup_found (ents : gmap fname Z)
+    (data : nat -> list (bv 8)) (nrec : nat) (s : fname) (k : nat) :
+  ents = dir_view data nrec ->
+  dir_first data nrec s = Some k ->
+  ents !! s = Some (bv_unsigned (dir_inum data k)).
+Proof.
+  intros Hv Hf. rewrite (dv_lookup_first ents data nrec s Hv).
+  rewrite Hf. reflexivity.
+Qed.
+
+(* THE MISS ARM.  The scan ran off the end; the name is not in the map. *)
+Lemma dv_lookup_none (ents : gmap fname Z)
+    (data : nat -> list (bv 8)) (nrec : nat) (s : fname) :
+  ents = dir_view data nrec ->
+  dir_first data nrec s = None ->
+  ents !! s = None.
+Proof.
+  intros Hv Hf. rewrite (dv_lookup_first ents data nrec s Hv).
+  rewrite Hf. reflexivity.
+Qed.
+
+(* ---- and BOTH converses, which is the point: the reading is an
+   EQUIVALENCE even with uniqueness gone.  A caller that knows the map can
+   predict the scan.  (Bytes -> tree remains the only DEFINITIONAL
+   direction; these are theorems about a map that is already a view.) ---- *)
+
+Lemma dv_lookup_none_inv (ents : gmap fname Z)
+    (data : nat -> list (bv 8)) (nrec : nat) (s : fname) :
+  ents = dir_view data nrec ->
+  ents !! s = None ->
+  dir_first data nrec s = None.
+Proof.
+  intros Hv H. rewrite (dv_lookup_first ents data nrec s Hv) in H.
+  destruct (dir_first data nrec s) as [k |];
+    cbn [fmap option_fmap option_map] in H; [discriminate | reflexivity].
+Qed.
+
+Lemma dv_lookup_some_inv (ents : gmap fname Z)
+    (data : nat -> list (bv 8)) (nrec : nat) (s : fname) (z : Z) :
+  ents = dir_view data nrec ->
+  ents !! s = Some z ->
+  exists k : nat,
+    dir_first data nrec s = Some k
+    /\ (k < nrec)%nat /\ dir_live data k /\ dir_bname data k = s
+    /\ bv_unsigned (dir_inum data k) = z.
+Proof.
+  intros Hv H. rewrite (dv_lookup_first ents data nrec s Hv) in H.
+  destruct (dir_first data nrec s) as [k |] eqn:Hf;
+    cbn [fmap option_fmap option_map] in H; [| discriminate].
+  exists k.
+  split; [reflexivity |].
+  split; [exact (dir_first_lt _ _ _ _ Hf) |].
+  split; [exact (dir_first_live _ _ _ _ Hf) |].
+  split; [exact (dir_first_name _ _ _ _ Hf) | congruence].
+Qed.
+
+(* THE UNIQUENESS-FREE RESIDUE OF [dir_view_live]: MEMBERSHIP SURVIVES.
+   A live record inside the count always puts its name in the view's
+   domain -- what it cannot promise, without uniqueness, is that the value
+   found there is ITS inum. *)
+Lemma dv_lookup_live_is_Some (ents : gmap fname Z)
+    (data : nat -> list (bv 8)) (nrec k : nat) (s : fname) :
+  ents = dir_view data nrec ->
+  (k < nrec)%nat -> dir_live data k -> dir_bname data k = s ->
+  is_Some (ents !! s).
+Proof.
+  intros -> Hk Hl Hn.
+  destruct (dir_view data nrec !! s) as [z |] eqn:Hlk; [by eexists |].
+  exfalso.
+  pose proof (proj1 (dir_view_lookup_None_match data nrec s) Hlk) as Hno.
+  apply (Hno k Hk). split; [exact Hl | exact Hn].
+Qed.
+
+(* ...and THE FAILURE ITSELF.  If the scan's first hit is [k0] but the
+   record in hand is [k1] with a different inum, the view does NOT answer
+   with the latter -- so [dir_view_live] is unprovable without a hypothesis
+   ruling this configuration out, and [dir_names_unique] is that
+   hypothesis.  ([k0 <> k1] is a consequence, not an assumption.) *)
+Lemma dv_live_value_shadowed (ents : gmap fname Z)
+    (data : nat -> list (bv 8)) (nrec k0 k1 : nat) (s : fname) :
+  ents = dir_view data nrec ->
+  dir_first data nrec s = Some k0 ->
+  (k1 < nrec)%nat -> dir_live data k1 -> dir_bname data k1 = s ->
+  bv_unsigned (dir_inum data k1) <> bv_unsigned (dir_inum data k0) ->
+  ents !! s <> Some (bv_unsigned (dir_inum data k1)).
+Proof.
+  intros Hv Hf _ _ _ Hne Habs.
+  rewrite (dv_lookup_found ents data nrec s k0 Hv Hf) in Habs.
+  apply Hne. injection Habs. intros H. exact (eq_sym H).
+Qed.
+
+(* ====================================================================== *)
 (*  4.  THE NAME-UNIQUENESS INVARIANT (R2)                                 *)
 (* ====================================================================== *)
 

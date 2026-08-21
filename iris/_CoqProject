@@ -694,6 +694,7 @@ DirView.v
 DirLinks.v
 FsTree.v
 DirViewG.v
+DirViewLend.v
 SpecBalloc.v
 SpecBmap.v
 CodeBmap.v
@@ -1149,13 +1150,20 @@ LinkDirlink.v
 SpecNamex.v
 ProofNamexParts.v
 SpecNamei.v
+SpecNameiTr.v
+SpecNamexTr.v
 SpecNameiparent.v
 ProofNamex.v
 LinkNamex.v
+ProofNamexTr.v
+LinkNamexTr.v
 ProofNamexRoot.v
 LinkNamexRoot.v
 ProofNamei.v
 LinkNamei.v
+ProofNameiTr.v
+LinkNameiTr.v
+DirViewPin.v
 ProofNameiRoot.v
 LinkNameiRoot.v
 # namei's root corner at the BOOT client's premises (the tree's one assumed
