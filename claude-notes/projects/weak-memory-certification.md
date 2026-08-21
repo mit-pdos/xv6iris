@@ -1,7 +1,61 @@
-# The certification route (D8 / E1 / L2′) — worklist
+# The tier-2 containment worklist (was: the certification route)
 
-## CHECKPOINT (2026-08-20, end of the tier-1-closure + tier-2-opening
-## session) — READ THIS FIRST WHEN RESUMING
+## CHECKPOINT (2026-08-21, end of the D-track + route-decision session)
+## — READ THIS FIRST WHEN RESUMING; the 2026-08-20 checkpoint below is
+## SUPERSEDED and kept only for its design pointers
+
+**Where things stand.**  Landed this session, in commit order: **D-i**
+(`4717bcf6`, W-TV consumption, option α — `_0` equations became
+conversions, `cfg_match` untouched, the erasure dropped its vcap
+conjunct via `ws_le_nc`, `lcfg_match` weakened to `ws_ctrl_up`),
+**D-ii** (`e7678e40`, the walker gate: `ad_shaped` in `WPExStore`'s EXT
++ the TOP fact — the machine's first log-reading fulfil side condition,
+now in both log-stability audits), **T2-1c** (`573e9fee`,
+`WeakRvwmoLin.rule14_linearization`, Closed, no axioms; the
+six-obligation BOOTSTRAP is the standard construct-a-candidate route),
+the **R3-staleness correction** (`5dfc85cb` — the split producers/retry
+arm were already in-tree; only R6 remains of the S-track), the **D-iii
+probe pass** (`c8ce013a` — G-i/G-iii confirmed, G-0/G-ii refuted-by-a-
+bug), and **W2b-c1** (`31c7ce42`, the reset-point fix: the boundary
+emits `LInstr`/`instr_post` before the fetch, the blanket
+load→later-store edge is dead, LB admissible at the instance; the
+announce KEEPS its reset — the two-reset rationale is at all three
+sites).  Both capstones at EXACTLY the five rv64d axioms after every
+landing; re-verify after any change.
+
+**THE ROUTE DECISION: B (the exchange normalization), user-adopted
+2026-08-21** on the probe evidence — see the D-iii entry below for the
+full story and `../design/weak-memory-route-b.md` for the plan of
+record.  D8-2/D8-3 and the quarantine retrofit are OFF the plan;
+`WeakCertify` (D8-1) is archive (mark its header at R6).
+
+**RESUMPTION ORDER:**
+1. **B0 design pass** (the route's hardest open item): the
+   `gx_deps`/conformance question — bare RVWMO⁻ admits thin-air, so
+   the capstone hypothesis needs the dep fragment plus a conformance
+   clause the fused alphabet cannot state; working favorite is (α)
+   conformance via `WeakDeps.deps_of_bits` (pure decoder front-end).
+   Decide, then build B0 (the `gdexec` wrapper + model).
+2. **B1**: the prefix-realization invariant (T2-1c's prefix variant +
+   T1, packaged); design then build.
+3. **B2**: the exchange lemma's trichotomy + the induction (the kills:
+   deps/fence/aq are graph arithmetic post-B0; φ and the lock protocol
+   enter through the realized prefix).
+4. **B3**: the capstone assembly + audits; then R6 (cleanup contract:
+   fused-machinery deletion, `ak_excl` rename, the `ewg_ib` residue
+   flagged at W2b-c1, `WeakCertify` archival header).
+5. Still-parked: T2-1b (off critical path), D-iv (T2-5 export-seam
+   options), D-vi (`lb_ok` clauses before any `lts_enabled` consumer).
+
+**Working discipline unchanged**: orchestrator (Fable) does recon +
+design + spec; Opus subagents execute from precise specs with the
+durable-notes build discipline quoted; every landing independently
+verified (full `-k` + both capstone audits + diff assumption-grep)
+before commit; findings recorded same-day.  No premises, ever — a
+premise that resists machine-checked discharge is a stop-the-line
+event.
+
+## SUPERSEDED CHECKPOINT (2026-08-20) — kept for its design pointers
 
 **Where things stand.**  TIER 1 IS CLOSED (`xv6_srvwmo_safe` + `t2_ev` +
 the litmus suite, all on the five rv64d axioms — see the sRVWMO worklist).
