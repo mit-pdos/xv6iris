@@ -77,6 +77,7 @@ Some high-level ideas that might be interesting for some eventual paper:
 - Sail model concrete evaluator [hfrun] that takes partial knowledge of HART registers
 + kernel proc exit requires owning entire stack, so callers must pass THEIR stack frame ownership down into functions that never return (usertrap -> syscall -> sys_exit -> kexit)
 + kernel memory points-to is generation-indexed (bare or KPT), monotonic fact about current CPU's mapping regime (still bare, or installed KPT), needed because one HART could have already constructed KSTACK pointers, but another HART is still before kvminithart.
+- should consistently use a partial-bundle pattern: sie_cap is a good example with stack locations and lockset, proc_priv is a bad example where we take it apart into smaller bundles like proc_priv_nocwd, proc_priv without files, proc_priv without bslots, etc; should be proc_priv with FD exclusions and slot exclusions as explicit arguments.
 
 Big things that still need to be done/explored:
 
