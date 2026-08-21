@@ -29,10 +29,27 @@ Closed outright.  Also landed earlier in the session (see the
 2026-08-21a checkpoint below): D-i, D-ii, T2-1c, W2b-c1, the D-iii
 probes, the R3 correction.
 
-**RESUMPTION ORDER (B2d IS LANDED, `5ba52f7a` —
-`WeakRvwmoNorm.normalize`, kill-parameterized, Closed; the kills
-quantify over the `gd_equiv` ORBIT and `lbgd_kill_K1_false` is the
-machine-checked non-vacuity/LB-stick check):**
+**PROGRESS SINCE THE ORDER BELOW WAS WRITTEN (all landed, in commit
+order): B2d** (`5ba52f7a`, `WeakRvwmoNorm.normalize` — see the note
+below), **B0b-1** (`7389d6f2`, `WeakRvwmoConf.v`: `row_deps` over
+tagged items + `hart_conf` + the no-side-condition orbit transport
+`hart_conf_ren` + `gdexec_conf`), **B1a** (`3606f340`,
+`WeakRvwmoRestr.v`: `gx_restrict`/`restr_ok` + `restrict_linearizes`
+through the landed linearization), **B2e-1** (`221a225b`,
+`WeakRvwmoKill.v`: the `gviol_no_*` family over all four ppo⁻ arms +
+the racy reductions with fidelity certificates + the K2 cross-hart
+shrink — K2's residual is uniformly the MP shape).  **B2e-2 in
+flight** (`WeakRvwmoLock.v`: `lock_pattern` → `win_excl_of_pattern`
+→ `cs_kill`).  REMAINING: B2e-2 verify+commit; then the **B2e-3
+design session** (the per-site classification — the pattern +
+CS-coverage + φ discharges at the realized prefix; the kernel-facing
+L2′ content and the route's last big item); **B1b** (the supply
+derivation `gdexec_conf` → `exec_prog_ok'` for restricted-cand
+traces, threading the device witness); **B3** (capstone assembly);
+**R6**.
+
+**RESUMPTION ORDER (as of B2d's landing — kept for the design
+pointers in items 1–4):**
 1. **B0b design+build**: the per-hart emission conformance against
    `exec_prog_ok'`'s administrative star (the two `LInstr`s per
    instruction land in `adm_star true`; the pair's interior in
