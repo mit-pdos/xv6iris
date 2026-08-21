@@ -1,12 +1,14 @@
 # forkret_park: the plan to retire the last assumed Link
 
-## WHERE THIS STANDS
+## CHECKPOINT — 2026-08-21
 
-**`main` is GREEN and clean.** The timer-capability refactor
-(`devintr_caps_any`, Step E below) is LANDED; what is left of E3 is the
-ftable and the two call sites.
+**`main` is GREEN, clean and pushed, at `a2381924`.** Every resource E3 was
+missing now has a producer. What is left is NOT plumbing: see
+[§4](#4-the-blocker) — closing the Link as things stand would replace a
+visible `Axiom` with a vacuous hypothesis, and that is the decision to take
+before any more code is written.
 
-### What landed this session
+### What landed
 
 | commit | what |
 |---|---|
@@ -15,23 +17,25 @@ ftable and the two call sites.
 | `7c078d09` | `syscall_env` gets a producer; the residue gets a channel for it |
 | `dd2af18e` | `wait_lock` gets a resource and an `is_lock`; fileinit's post kept |
 | `63306e07` | the slot ledger seals at userinit's park |
-| `8d825c62` | **the timer capability rides `sie_cap`** — see Step E's `devintr_caps_any` section |
-| `d94ee33f` | **`is_ftable` is BUILT** — see Step E's `is_ftable` section |
+| `8d825c62` | **the timer capability rides `sie_cap`** — §3 E3, `devintr_caps_any` |
+| `d94ee33f` | **`is_ftable` is BUILT** — §3 E3, `is_ftable` |
+| `a2381924` | a drive-by: `SpecKexecPinned`'s block-count cover proved at `Z` (it was overflowing the stack; not this project's, but it was blocking whole-tree builds) |
 
-### E3's four blockers
+### E3's four blockers — ALL DONE
 
 | | |
 |---|---|
 | `wait_lock` `is_lock` | **built** (`dd2af18e`) |
 | `procs_avail None` | **sealed** (`63306e07`) |
 | `devintr_caps_any` | **DONE** — `timer_cap` lives in `IntrDefs.sie_cap`; `ut_caps` is hart-free |
-| `is_ftable` | **DONE** — the entries are carved, `ftable_res_boot` mints the table, `mn_grp_fs` allocates the lock right after fileinit |
+| `is_ftable` | **DONE** — entries carved, `ftable_res_boot` mints the table, `mn_grp_fs` allocates the lock right after fileinit |
 
-**Every row of `ut_park_caps` now has a producer.** What is left of E3 is
-purely call-site work: build `N`, thread the rows main already holds down to
-userinit's park (`is_ftable` is built inside `mn_grp_fs`, which is the group
-that CALLS userinit, so nothing has to leave it), switch both callers to
-`FORKRET_PARK_PAID`, and replace `LinkForkretPark.v`'s `Axiom`.
+Both builders are proved and green: `ForkretParkClose.forkret_park_pkg_intro`
+(the package out of six persistent rows + the derivation wand + `park_own`)
+and `UsertrapRes.ut_res_bare_park` (the closer out of `ut_park_caps` +
+`sysc_park_extra` + `park_own`, the module-type route the functor call sites
+must use). `ProofForkretPark.forkret_park_paid` is proved over the real
+`LinkForkret.Forkret`.
 
 ### Three things I got wrong, so they are not re-derived
 
@@ -309,12 +313,17 @@ Three lemmas, and between them they say what parking a process costs:
 and `UtResFits.usertrap_res_bare_park` instantiates it at
 `SY.syscall_env` with `SY.syscall_env_park` as the wand.
 
-#### E3 — WHAT IS LEFT, and it is BOOT-CHAIN work, not park work
+#### E3 — the BOOT-CHAIN work, and it is ALL DONE
 
-The machinery is in place. What remains is that neither parker HOLDS
+> **DONE 2026-08-21.** Everything below is the record of how the three
+> missing rows were built; all three landed. The remaining call-site work is
+> at the end of this section, and it does NOT retire the Axiom on its own —
+> read [§4](#4-the-blocker) first.
+
+The machinery was in place. What remained was that neither parker HELD
 `park_env N`, and — surveyed 2026-08-21, after E2 landed — **three of its
-rows have no producer anywhere in the tree.** They are not missing plumbing;
-they are resources nobody has ever built.
+rows had no producer anywhere in the tree.** They were not missing plumbing;
+they were resources nobody had ever built.
 
 `park_env N = ut_park_caps N ∗ sysc_park_extra (un_tk N)`, eleven rows:
 `fclose_ties`, `un_pr = fsc_printk`, `procs_inv`, `is_kstack`,
@@ -483,41 +492,135 @@ userinit already performs three lines earlier — but it changes userinit's
 postcondition, so check `ProofMain` discards the row (the kalloc analogue's
 comment says main does, "the boot chain has no further kalloc client").
 
-##### And then the easy part
+##### And then the call-site work — MECHANICAL, and inventoried
 
-**kfork (`ProofKforkB5.v:204`)** needs none of the above: its parent holds
+Every row below has a producer now; this is threading, not proof. **But read
+[§4](#4-the-blocker) before doing any of it** — on its own this does not
+close the Link, and done blind it makes the tree worse.
+
+**`SpecUserinit` grows six persistent premises**, none of which userinit
+reads: `devintr_caps_any`, `is_lock … wait_lock`, `is_ftable γft γf`,
+`disk_geom`, `is_tickslock`, `console_ready`. Note it currently picks the
+ftable's gname out of thin air — *"THE FTABLE'S GNAME IS PICKED HERE, and
+`γp` is as good as any"* — which stops being true once `is_ftable γft γf` is
+a premise: `wp_userinit_sconf_body` grows a real `γf`. What it already has:
+`procs_inv`, the nextpid lock, `printk_env`, `procs_avail`, and `is_kstack`
+from allocproc.
+
+**`ProofMain.mn_grp_fs` grows four**: `console_caps`, `is_tickslock`,
+`wire_inv`, `kmap_at tramp_vpn tramp_ppn KP_rx`. It already PRODUCES
+`disk_geom`, the virtio `is_lock` and `is_ftable` at +0x96/+0x9a, i.e. before
+the userinit call at +0x9e, so `devintr_caps_any` is assembled inside the
+group and never has to leave it. `wp_main_sconf` holds all four at the call
+(`mn_grp_printk`'s `console_caps`, `mn_grp_trap`'s tickslock, `mn_grp_kvm`'s
+`Htramp`).
+
+**`wire_inv` HAS NO ROUTE TO MAIN AT ALL.** `BootShared.v:1514` allocates it
+and `:1243` puts it in the shared bundle, but `BootChain` does not carry it
+per-hart and neither `SpecMain` nor `ProofMain` mentions it. Same shape as the
+`fd_slots_auth` drop the ftable work fixed: one premise on `wp_main_sconf`,
+one thread through the boot chain. `forkret_park_pkg` needs it.
+
+**Then build `N`** — 33 fields, mostly the ambient `fsc_*`/`icfg_*`, which is
+what makes `fclose_ties` hold — apply `usertrap_res_bare_park`, assemble the
+package (the other six rows are `forkret_park_pkg_intro`'s), and switch the
+caller from `FORKRET_PARK` to `FORKRET_PARK_PAID`.
+
+**kfork (`ProofKforkB5.v:204`)** needs none of the six: its parent holds
 `syscall_env`, and `syscall_env_all` / `_console` / `_first` project out ten
 of the eleven rows, with `is_kstack` already a premise at the site. The one
 exception is `devintr_caps_any` — a `ut_caps` conjunct usertrap holds and
 does not pass down — so it wants threading usertrap → syscall → sys_fork →
 kfork. Persistent, so four contract widenings and no proof obligations.
 
-**userinit (`ProofUserinit.v:674`)** has `procs_inv`, the nextpid lock,
-`printk_env` and `procs_avail` in scope, and `is_kstack` from allocproc. It
-needs the three built rows plus `disk_geom` and `is_tickslock` and
-`console_ready` threaded from main, which holds all three
-(`ProofMain.v:1579`, `:1084`, `:590`). Note it currently picks the ftable's
-gname out of thin air — *"THE FTABLE'S GNAME IS PICKED HERE, and `γp` is as
-good as any"* — which stops being true once `is_ftable γft γf` is a premise:
-`wp_userinit_sconf_body` grows a real `γf`.
-
-Then: build `N` (mostly the ambient `fsc_*`/`icfg_*` fields, which is what
-makes `fclose_ties` hold), reshape the park closer into
-`forkret_park_pkg`'s (mechanical — `forkret_yield` IS `ut_trap_parked ∗
-proc_priv_nopt`, and the two pure page-table arguments are unused), switch
-both callers from `FORKRET_PARK` to `FORKRET_PARK_PAID`, and replace
-`LinkForkretPark.v`'s `Axiom` with an application of `ProofForkretPark`.
-
 **Suggested order:** the two BSS carves first (they are independent of
 everything else and each is one file plus threading), then
 `devintr_caps_any`, then userinit, then kfork, then the Link.
-
 **STATUS: the first three are DONE** (`dd2af18e`, `d94ee33f`, `8d825c62`).
-What is left is userinit, kfork, and the Link — all call-site work, no
-missing resources. Note that `is_ftable` is built inside `mn_grp_fs`, which
-is the group that CALLS userinit, so it never has to leave that lemma.
 
-## 4. How to build
+## 4. THE BLOCKER {#4-the-blocker}
+
+### SpecUservec's two premises are FALSE, not merely undischarged
+
+`SpecForkretParkPaid.forkret_park_paid_body` carries, and
+`ProofForkretPark.forkret_park_paid` threads unchanged:
+
+```coq
+(forall ms_v, trap_mstatus_ok ms_v ->
+   sconf_ms_facts ms_v /\ _get_Mstatus_SPIE ms_v = 'b"1") ->
+(forall h kr ksp' ws, length ws = TFWORDS ->
+   tf_kernel_words_ok (CID := h) kr ksp' ws) ->
+```
+
+`SpecUservec.v`'s header introduces both as *"a bare, EXPLICIT, undischarged
+premise ... a real proof obligation for whoever eventually closes the loop,
+not a hole"*. That description is too kind. **As stated they are
+unsatisfiable**, so they are not obligations anyone can discharge — only
+inherit.
+
+* **The kernel-words one.** `ProcGeom.TFWORDS = 36` and `tf_ksp_idx = 1`, and
+  `tf_kernel_words_ok kr ksp' ws` demands `ws !! 1 = Some ksp'`. Take
+  `ws := replicate 36 (ksp' + 1)`: length 36, and index 1 is not `ksp'`.
+  Refuted. This is already false at `SpecUservec.v:288`, where `kroot`/`vksp`
+  are the lemma's own fixed parameters and only `ws` is quantified; the park's
+  version quantifies `kr` and `ksp'` too, so it is false twice over.
+* **The mstatus one.** `UserExec.trap_mstatus_ok` pins SXL / MPRV / MXR / SPP
+  / SIE / TVM / TSR and says NOTHING about SPIE, nor about the XS/FS/VS/SD/MPP
+  bits `sconf_ms_facts` wants. An mstatus with those seven conjuncts and
+  SPIE = 0 refutes it.
+
+Traced: both are threaded and never produced, through `ProofUservec` (121,
+1509) → `ProofUsertrap` (1177, 1205) → `ProofUserretClosed` (106, 141–142,
+246, 254, 273) → `ProofForkret` (197, 239, 717, 807, 852, 1617, 2016) →
+`ProofForkretPark` (173, 261). `grep` for them in `SystemAdequacy.v`,
+`BootChain.v`, `SpecMain.v`, `ProofMain.v`, `SpecUserinit.v`, `SpecKfork.v`
+returns NOTHING.
+
+### Why that makes the Link a decision and not a chore
+
+**`LinkForkretPark.v`'s `Axiom` is currently what keeps `main`'s theorem out
+of this.** `SpecForkretPark.forkret_park_body` — the ASSUMED form — carries
+neither premise, so main's cone is genuinely free of them today; the vacuity
+is confined to the trap-loop specs, which nothing above the loop applies.
+
+Swap in `FORKRET_PARK_PAID` and userinit must supply both, so they propagate
+userinit → main → boot chain → `SystemAdequacy`. That trades a VISIBLE
+`Axiom` — seen by `Print Assumptions` *and* by `tools/proof_coverage.py`'s
+textual scan, which is exactly why `LinkForkretPark.v` uses the `Axiom`
+keyword rather than a `Declare Module` — for a false hypothesis on the
+top-level theorem, which neither tool reports. That is strictly worse than
+the state we are in.
+
+### What closing it properly needs
+
+Reshape both premises into something satisfiable, which is the "full-loop
+ghost tracking" `SpecUservec.v`'s header already names as future work. The
+shape the headers point at is the same for both: **carry the fact IN THE
+RESIDUE instead of quantifying over it.**
+
+* The kernel-words tie IS established — at `prepare_return`'s own exit
+  (`SpecPrepareReturn.v`), one round before uservec next opens
+  `usertrap_res`. So `ut_trap` grows `⌜tf_kernel_words_ok kroot ksp ws⌝` for
+  the `ws` it actually holds, prepare_return pays it, uservec reads it, and
+  the ∀-premise disappears.
+* SPIE = 1 is the cross-round historical fact "userret's `sret` set it, so it
+  survived to this trap"; it rides the residue the same way.
+* **At the PARK the initial instance is not inherited but ESTABLISHED**: a
+  never-run process's trapframe kernel words are what allocproc/kfork
+  actually wrote, so userinit and kfork can prove their own instance rather
+  than assume it. That is the one part of this that is new work rather than
+  re-plumbing, and it is bounded.
+
+Only after that does the call-site work in §3 E3 actually retire the Axiom.
+
+### If you want progress without touching this
+
+Items 1–3 of §3 E3's call-site list (the six premises on `SpecUserinit`, the
+four on `mn_grp_fs`, and the `wire_inv` route to main) are useful regardless,
+land independently, and do not touch `LinkForkretPark.v`. Do those and stop
+at the switch to `FORKRET_PARK_PAID`.
+
+## 5. How to build
 
     cd /shared/xv6iris-5 && QUIET=1 ./gcp-rocq/run-on-gcp make -k -j 36
 
@@ -528,7 +631,7 @@ Single file (list dependencies ahead of it if they changed):
 `opam exec --switch=…` is required — `coqc` is not on the VM's PATH. Local
 `coqc` fails on stale `.vo`. **Rebase before any whole-tree rebuild.**
 
-## 5. Two process lessons from the session that produced this
+## 6. Two process lessons from the session that produced this
 
 * **Never regex proof scripts on an unanchored pattern.** A `bslot <ident>` →
   `bslot` rule silently ate a `rewrite /bslot H3` tactic argument and two
