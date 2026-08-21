@@ -600,3 +600,66 @@ Proof.
   apply (gwf_mem_gmo G e Hwf). exists l. split; [done|].
   rewrite /gis_w Hl in Hw. by rewrite /lb_is_mem Hw orb_true_r.
 Qed.
+
+(* ====================================================================== *)
+(** * 7. The dependency fragment (route B, stage B0)
+
+    Design: [claude-notes/design/weak-memory-route-b.md] §2.
+
+    Bare RVWMO⁻ admits thin-air (dropping ppo rules 9–13 is what admits
+    it), and a thin-air execution of the xv6 image could fabricate values
+    into protected bytes — so the tier-2 capstone's hypothesis must carry
+    the STORE-DEP FRAGMENT.  It rides as graph DATA: a list of
+    (read, store) event pairs — RVWMO's syntactic address/data deps into
+    stores (rules 9/10's store halves), control deps into stores (rule
+    11), and the W-TV translation edge (the adopted boundary sentence;
+    rule 13's rationale) — with the ordering axiom [gdeps_gmo].  Sources
+    are always READS: branch events are not in the fused alphabet, so a
+    control dep names the branched-on read; a translation dep names the
+    walk read.  Loads gain nothing as TARGETS (deviation D-8 stands;
+    matches both Arm models per the W3 audit).
+
+    Direction check: adding constraints SHRINKS the declared model toward
+    RVWMO, and every added edge class is ⊆ RVWMO's own ppo, so the final
+    theorem still covers RVWMO-conformant hardware.
+
+    The CONFORMANCE clause ("[gd_deps] contains the deps the xv6 programs
+    actually induce") is deliberately NOT part of consistency: it is a
+    capstone-level hypothesis, stated through the per-hart row-emission
+    interface (route-b design §2a, resolution (α) realized through
+    [WeakAxRealize.exec_prog_ok]'s vocabulary) — stage B0b. *)
+
+Record gdexec := GDExec {
+  gd_g    : gexec;
+  gd_deps : list (geid * geid);
+}.
+
+(** Well-formedness: each edge runs from a READ to a po-LATER WRITE of
+    the same hart. *)
+Definition gdeps_wf (G : gexec) (deps : list (geid * geid)) : Prop :=
+  ∀ rw : geid * geid, rw ∈ deps →
+    rw.1.1 = rw.2.1 ∧ (rw.1.2 < rw.2.2)%nat ∧
+    glbl_is G rw.1 lb_is_r ∧ glbl_is G rw.2 lb_is_w.
+
+(** THE ORDERING AXIOM — the ppo 9–13 store fragment: a dep-source read
+    is globally ordered before its dependent store. *)
+Definition gdeps_gmo (G : gexec) (deps : list (geid * geid)) : Prop :=
+  ∀ rw : geid * geid, rw ∈ deps → gmo_lt G rw.1 rw.2.
+
+Definition rvwmo_minus_deps_consistent (GD : gdexec) : Prop :=
+  rvwmo_minus_consistent (gd_g GD) ∧
+  gdeps_wf (gd_g GD) (gd_deps GD) ∧
+  gdeps_gmo (gd_g GD) (gd_deps GD).
+
+(** NON-COLLAPSE, re-checked for the extended model: LB's load;store
+    pairs are syntactically independent (no address, data, control or
+    translation dependency — the loads' values feed nothing), so the LB
+    witness carries the EMPTY dep set and stays consistent.  The tier-2
+    gap survives the model extension. *)
+Definition lbgd : gdexec := GDExec lbg [].
+
+Theorem lb_graph_deps_consistent : rvwmo_minus_deps_consistent lbgd.
+Proof.
+  split_and!; [exact lb_graph_consistent| |];
+    by intros rw Hrw%elem_of_nil.
+Qed.

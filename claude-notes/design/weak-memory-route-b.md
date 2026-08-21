@@ -174,15 +174,49 @@ analysis and the exports — survives as §3b's kills; their carrier
 changes from "extended pf runs of the full machine" to "the frontier of
 the normalization").
 
-## 4. Staging — OPEN, first cut
+## 4. Staging
 
-- **B0**: `gx_deps` (§2) + the RVWMO⁻+deps model + the non-collapse
-  witness re-checked (LB must still be admissible — LB has no
-  dep-into-store edges).
+- **B0a — LANDED (2026-08-21, orchestrator-built, definitional):**
+  `WeakRvwmoGraph.v` §7 — `gdexec` (the additive wrapper), `gdeps_wf`
+  (read → po-later same-hart write), `gdeps_gmo` (the ppo 9–13 store
+  fragment as the ordering axiom), `rvwmo_minus_deps_consistent`, and
+  the re-checked non-collapse witness `lb_graph_deps_consistent`
+  (`lbgd := GDExec lbg []` — LB's pairs are syntactically independent,
+  so the empty dep set is the honest one; Closed under the global
+  context).  Nothing landed moved; `WeakRvwmoLin` recompiles untouched.
+- **B0b — the conformance interface (design SETTLED 2026-08-21; build
+  owed):** the capstone-level clause is stated through TIER-1'S OWN
+  conformance vocabulary, not a new bits-level statement.
+  `WeakAxRealize.exec_prog_ok` is trace-order-indexed with the fabric
+  threaded through, so the tier-2 form factors it: (i) PER-HART ROW
+  EMITTABILITY — the hart's event program emits its label row in po
+  order, via `lbl_realizes` with timestamps abstracted
+  (`ts_oblivious` is exactly the insensitivity this needs) and the
+  fabric threaded only at dev-touching events (the M5 fence discipline
+  pins those, so the exchange never reorders them — §3b case note);
+  (ii) `row_deps` — a PURE register-dataflow relation over the emitted
+  INSTANCE label sequence (`LRegW rd [DLdRes]` after loads, `asrc`/
+  `vsrc`/`deps_ctrl` at stores, last-writer chains), with the
+  conformance clause `gd_deps ⊇ row_deps(emission)`;
+  `WeakDeps.deps_of_bits` enters only through the emission's own
+  announce nodes — machinery that exists.  (iii) the FINAL realization
+  (of the normalized cand) is discharged by showing normalization
+  preserves per-hart emittability — the rows are unchanged, only the
+  interleaving moves, and per-hart emission is row-determined modulo
+  ts and the fabric order (which is preserved).
 - **B1**: the prefix-realization statement (§3a/§3c) — T2-1c's prefix
   variant + T1, packaged as the induction invariant.
 - **B2**: the exchange lemma's case trichotomy (§3b) with the kills
-  wired per S6 §3; the induction + measure.
+  wired per S6 §3; the induction + measure.  NOTE from the B0 pass
+  (2026-08-21): several S6 kills flip from reader-refutation to
+  WRITE-SIDE PINNING on graphs — e.g. `s:=1` (#2) is fence-pinned
+  (rule 4) and can never be rule-14-early, so its "harmless early
+  read" case never obstructs; a same-hart same-byte future-read is
+  killed by poloc (rules 1–3) with no deps; the CS store `x:=v` is
+  acquire-pinned (rule 5) below and release-fence-pinned above, and
+  its cross-hart reader is window-ordered by `win_excl`.  The
+  systematic write-class inventory (the "B-S6" table) is B2's design
+  gate.
 - **B3**: the capstone assembly (§1) + audits; retirement notes (§3d).
 
 ## 5. Honest residual risks — OPEN
