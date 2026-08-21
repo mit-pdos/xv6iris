@@ -220,7 +220,16 @@ Definition wp_userinit_sconf_body
          hart -- so the strengthening from "counted" to "sealed" costs its
          one caller nothing. *)
       kalloc_env_at fsc_kalloc fsc_kpages None -∗
-      procs_avail (Some np) -∗
+      (* SEALED TOO, and for the same reason and at the same instant.  The
+         slot ledger leaves the COUNTED regime at userinit's park, because
+         that is where the last boot-era allocation has happened and where
+         the first process's trap-loop environment is assembled:
+         [ProofSyscall.syscall_env]'s [sysc_proc_env] wants
+         [procs_avail None], and [ProcAvail.procs_avail_seal] is one-way.
+         main discards this row -- nothing in the boot chain allocates a
+         proc after userinit -- so the change costs its one caller nothing,
+         exactly as the [kalloc_env_at] strengthening one line up does. *)
+      procs_avail None -∗
       (* PERSISTED, not handed back exclusive.  Nothing writes this cell
          after userinit's one store, and every later reader
          ([SpecKexit.v], [SpecReparent.v], [SpecSyscall.v]) already takes it

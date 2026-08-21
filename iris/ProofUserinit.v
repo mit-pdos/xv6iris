@@ -671,6 +671,17 @@ Section ProofUserinit.
     { rewrite proc_priv_split_cwd. iFrame "Hpnc".
       iSplitL "Hcref"; [cbn [upd_cwd pv_cwd]; iExact "Hcref" |].
       iExact "Hftok". }
+    (* ...AND THE SLOT LEDGER'S SEAL, beside the allocator's.  allocproc's
+       draw at +0x0a was the last counted proc allocation in the boot, and
+       the environment the parked process will run on wants the sealed form
+       ([ProofSyscall.sysc_proc_env]'s [procs_avail None]).  One-way, and
+       persistent afterwards. *)
+    (* [procs_avail_seal] allocates an invariant, so it is a FUPD and not a
+       basic update -- unlike [kalloc_env_at_seal] two lines up, which [iMod]
+       eliminates against a bare [WP] on its own. *)
+    iApply fupd_wp.
+    iMod (procs_avail_seal ⊤ np with "Hpav") as "#Hpav".
+    iModIntro.
     iMod (FP.forkret_park γs γf (proc_addr j) ks rest pid (upd_cwd V ipv) Hrest
             with "Hks Hctx Hpriv Hfd Hirs") as "Hpctx".
     iMod (pstate_whole_update (proc_addr j) USED RUNNABLE with "Hpwhole")
