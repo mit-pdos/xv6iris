@@ -1422,7 +1422,16 @@ Section BootAlloc.
       rewrite /disk_bytes. iEval (rewrite -Himg) in "Hdimg". iExact "Hdimg". }
     iMod (fs_cfg_alloc γd γv (v_disk (g.(gdev).(dvirtio))) ndisk sb cov nib ⊤
             Hwf Hrw Hnin Hnib32 Hnib0 Hnibeq Hcovin Hcovmeta Hcovdata
-            with "Hdimg Hbsauth Hbslots") as (ICFG FSC) "Hfs".
+            ltac:(solve_ndisj)
+            with "Hdimg Hbsauth Hbslots") as (ICFG FSC) "[Hpinr Hfs]".
+    (* N-5.1 (W5a): ROOT'S PIN IS DROPPED HERE, deliberately.  It is affine,
+       and nothing on this side of the boot chain consumes it: transporting
+       it would mean widening [fs_boot_supply] and, past it, the (f)-payload
+       and the forkret cone -- which is M2 / decisions D1-D2's business, not
+       this stage's (namei-pinned-lookup.md §11.3, §12).  The pin's proved
+       consumer is [NameiInitPinned.wp_namei_init_pinned], stated against
+       [fs_cfg_alloc]'s conjunct directly. *)
+    iClear "Hpinr".
     (* [fileG_of]'s two projections ARE the two minted records, by iota.
        Named, so the postcondition's row needs no conversion step inside the
        proofmode. *)

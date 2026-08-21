@@ -1164,6 +1164,7 @@ LinkNamei.v
 ProofNameiTr.v
 LinkNameiTr.v
 DirViewPin.v
+NameiInitPinned.v
 ProofNameiRoot.v
 LinkNameiRoot.v
 # namei's root corner at the BOOT client's premises (the tree's one assumed
