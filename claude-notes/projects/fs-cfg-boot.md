@@ -1194,7 +1194,15 @@ when SpecForkret starts importing FirstTok.
   drop block becomes `iApply (first_tok_boot with "Hfirst Hpersist Hkav
   Hfsinit")` and the park call gains one argument.
 
-## MERGE DONE (2026-08-21, commits `7f516435` + `f400c883` + fixup `5bdd8c55`)
+## MERGE DONE (2026-08-21, three waves: `7f516435` + `f400c883` + fixup `5bdd8c55` + `54cbdf58`)
+
+Wave 3 (console_inv + entries 5/16 — ALL 22 dispatch arms real, the tree's
+last Admitted gone): two conflict files, resolved by the ruled plan — the
+carve interleaves at the exact `log+168 = devsw` boundary (one cursor
+rebase); upstream's `console_ready` content absorbed while OUR
+γpr-free `fsc_printk` spelling won (console_ready is gname-free and
+persistent, so no new fscfg field was needed). Audit SEVEN at the final
+tree.
 
 Both fetch waves merged; lane rebuilt at the new pin 31f115a; whole tree
 green; audit EXACTLY SEVEN (textual match to the baseline). Round facts
