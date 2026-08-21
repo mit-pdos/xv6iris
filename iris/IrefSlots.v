@@ -52,8 +52,19 @@ Local Open Scope Z_scope.
 (* references a single syscall may hold in locals at once; see the header *)
 Definition IREFSPARE : nat := 4%nat.
 
-(* one cwd per process, one per open file, plus the per-process allowance *)
-Definition IREFSLOTS : nat := (NPROC * (1 + IREFSPARE) + NFILE)%nat.
+(* THE BOOT CHAIN'S OWN TWO UNITS, and they are NOT part of the table's
+   provisioning.  [SpecFsinit] takes one for ireclaim's iget/iput pair and
+   [SpecKexec] -- which forkret's boot arm calls next off the same token --
+   takes two; both run before any file is opened and neither hands anything
+   back to the ftable.  If they were carved out of the [NFILE] units the
+   table could not start with all [NFILE] slots FREE, and a free slot owns
+   one whole unit ([FileInvDefs.file_core]'s untyped arm).  So they are their
+   own row. *)
+Definition IREFBOOT : nat := 2%nat.
+
+(* one cwd per process, one per open file, plus the per-process allowance,
+   plus the boot chain's two *)
+Definition IREFSLOTS : nat := (NPROC * (1 + IREFSPARE) + NFILE + IREFBOOT)%nat.
 
 (* THE CMRA IS FRACTIONAL, and it has to be.  A unit is evidence that the
    system has somewhere to put a reference, and for the [NFILE] units that
@@ -213,9 +224,9 @@ Section IrefSlots.
     iDestruct (iref_slots_bound with "Ha Hf") as %Hle.
     iPureIntro.
     assert (E31 : (2 ^ 31 = 2147483648)%Z) by (vm_compute; reflexivity).
-    assert (EI : IREFSLOTS = 420%nat) by (vm_compute; reflexivity).
+    assert (EI : IREFSLOTS = 422%nat) by (vm_compute; reflexivity).
     rewrite EI in Hle.
-    assert (Hz : (Z.pos n <= 420)%Z).
+    assert (Hz : (Z.pos n <= 422)%Z).
     { rewrite -positive_nat_Z. lia. }
     rewrite E31. lia.
   Qed.

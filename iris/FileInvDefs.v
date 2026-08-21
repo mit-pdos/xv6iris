@@ -583,6 +583,34 @@ Section FileInv.
      a_fip k       ↦₈{DfracOwn (q/2)} fc_ip C ∗
      a_fmajor k    ↦₂{DfracOwn q} fc_major C)%I.
 
+  (* ---- ONE FREE ENTRY, AS THE IMAGE LEAVES IT ----
+
+     40 bytes of .bss, and what the carve has to say about them splits three
+     ways.  THREE WORDS COME OUT AT A LITERAL VALUE, because the table's own
+     predicates read them: [type] is [FD_NONE] (that is what makes the slot
+     free), [ref] is zero (filealloc's scan tests it with a [c.beqz] --
+     [fref_word_zero]), and [off] is zero, which is the base case of
+     [off_wf]'s inductive bound.  THE OTHER FIVE FIELDS are
+     contents-existential: nothing reads them until the slot is published,
+     and a free [fslot] quantifies its [fcontent] anyway.  THE [f->ip] CELL
+     COMES OUT WHOLE, because it is the one field that is split in two --
+     [file_fields] keeps half at half the nominal fraction and the off-borrow
+     invariant keeps the other ([off_body]'s header says why).
+
+     [BootCarveMain] carves this out of the image and [FileInv.ftable_res_boot]
+     turns [NFILE] of them into the ftable lock's resource.  Nothing else in
+     the tree ever mentions it: past boot a slot is only ever reached through
+     [fslot]. *)
+  Definition fentry_raw (k : nat) : iProp Σ :=
+    (a_ftype k ↦₄ FD_NONE ∗
+     a_fref k ↦₄ (mword_of_int 0 : mword 32) ∗
+     (∃ r : bv 8, a_freadable k ↦ₘ r) ∗
+     (∃ w : bv 8, a_fwritable k ↦ₘ w) ∗
+     (∃ pp : mword 64, a_fpipe k ↦₈ pp) ∗
+     (∃ ip : mword 64, a_fip k ↦₈ ip) ∗
+     a_foff k ↦₄ (mword_of_int 0 : mword 32) ∗
+     (∃ mj : bv 16, a_fmajor k ↦₂ mj))%I.
+
   (* ---- the two components of the table's ghost ----
 
      [fref_own] is "own this much of the reference-count component and none of

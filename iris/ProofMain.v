@@ -77,6 +77,7 @@ Require Import PtreeType.
 Require Import WpKvminithart.
 Require Import ProcGeom CpuOwn SchedCtx FdSlots.
 Require Import FileInvDefs.
+Require Import FileInv.   (* [ftable_res_boot]: the open-file table, minted *)
 Require Import BcacheInv SleepLock.
 Require Import DevModel VirtioModel DiskPtsto WpUart.
 Require Import VirtioQueue VirtioProto DiskInv DiskBoot.
@@ -1359,6 +1360,13 @@ Section ProofMain.
     iref_slots_auth -∗
     ([∗ list] k ∈ seq 0 NINODE, ientry_raw k) -∗
     lk_raw (mword_of_int KernelSyms.ftable) -∗
+    (* THE OPEN-FILE TABLE'S HUNDRED ENTRIES, and the two ghost rows a FREE
+       table costs beside them -- [SpecMain.main_globals_raw]'s three new
+       rows.  They become [FileInv.ftable_res] at the [newlock] right after
+       fileinit; see there. *)
+    ([∗ list] k ∈ seq 0 NFILE, fentry_raw k) -∗
+    iref_slots NFILE -∗
+    fd_slots_auth -∗
     lk_raw disk_lock -∗
     (∃ pd pav pu : mword 64,
        disk_desc ↦₈ pd ∗ disk_avail ↦₈ pav ∗ disk_used ↦₈ pu) -∗
@@ -1376,10 +1384,10 @@ Section ProofMain.
         cpu_own 0 false p0 false ∅ -∗
         is_lock γk d_lock "virtio_disk"%string (disk_res γv pd pav pu) -∗
         disk_geom γv pd pav pu -∗
-        (* ...AND FILEINIT'S OUTPUT, kept rather than dropped -- see the
-           block at the [jal fileinit] below for why it cannot become an
-           [is_ftable] yet. *)
-        lk_fresh (mword_of_int KernelSyms.ftable : mword 64) "ftable"%string -∗
+        (* ...AND THE OPEN-FILE TABLE'S LOCK, which is fileinit's output plus
+           the resource the carve now hands over.  The two gnames are this
+           group's own choice and nothing above it constrains them. *)
+        (∃ γft γf : gname, is_ftable γft γf) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1388,7 +1396,8 @@ Section ProofMain.
     iIntros "Hcg #Htext #Hkdata #Hdev #Hpenv #Hkmem #Hcert #Hseam Hfirst
              #Hpanic Hpc Hfree Hcpu #Hpinv Hpavail #Hlpidlk Hkenv".
     iIntros "Hlbc Hbufl Hbufn Hbhead Hbpay Hlit Hinl Hkit1 Hkit2
-             Hsbb Hlogr Hmir Hirslot Hirauth Hient Hlft Hldisk".
+             Hsbb Hlogr Hmir Hirslot Hirauth Hient Hlft Hfents Hirfile Hfdauth
+             Hldisk".
     iIntros "Hdiskptr Hdiskfree Hdusedidx Hdslots Hclaim #Hdone Hcfg Hinitproc Hcont".
     iPoseProof (dev_inv_disk with "Hdev") as "#Hdinv".
     iPoseProof (mni_8e with "Htext") as "Hi8e".
@@ -1543,22 +1552,27 @@ Section ProofMain.
     iApply (Fileinit.wp_fileinit_sconf F3 n vfl vfn vfc false p0 ltac:(lia)
               with "Hcg Htext Hkdata Hpc Hfw Hfn Hfc").
     iApply wp_next_off_intro.
-    (* FILEINIT'S THREE OUTPUTS ARE KEPT, and used to be dropped here.  They
-       ARE [SpecProcinit.lk_fresh (ftable) "ftable"], i.e. exactly
-       [WpLock.newlock]'s premise list minus the resource -- and
-       [SpecFileinit.v]'s header says as much: "Whether the lock then becomes
-       an [is_lock] over the open-file table is the caller's ghost step, not
-       fileinit's".  main cannot take that step YET: [FileInv.ftable_res]
-       wants the ftable's own [file[NFILE]] array, which the boot carve does
-       not hand out.  So they are re-bundled and threaded OUT rather than
-       dropped, and the day that carve lands the [newlock] is one line --
-       the wait_lock two groups up is the same move, already taken.  See
-       projects/forkret-park.md E3. *)
+    (* ---- FILEINIT'S THREE OUTPUTS BECOME THE ftable LOCK, and this is the
+       last of the eleven spinlocks to get one.  They ARE [WpLock.newlock]'s
+       premise list minus the resource, and [SpecFileinit.v]'s header says
+       as much: "Whether the lock then becomes an [is_lock] over the open-file
+       table is the caller's ghost step, not fileinit's".  main could not take
+       that step until now for one reason: [FileInv.ftable_res] wants the
+       ftable's own [file[NFILE]] array, and the .bss walk cut straight from
+       [ftable+24] to <disk> and dropped all 4000 bytes of it -- exactly as it
+       used to drop the [p_parent] cells the wait_lock needed.  With
+       [BootCarveMain.boot_file_entries] carving them the mint is one lemma
+       and the lock is one line, and [is_ftable] -- which the syscall
+       environment, kfork, kexit and every sys_open path take, and which
+       nothing in the tree could build -- exists. ---- *)
     iIntros (mfi) "Hcg Hpc %Hcsfi Hftw Hftnm Hftc".
-    iAssert (lk_fresh (mword_of_int KernelSyms.ftable : mword 64) "ftable"%string)
-      with "[Hftw Hftnm Hftc]" as "Hftfresh".
-    { rewrite /lk_fresh. iSplitL "Hftw"; [iExact "Hftw" |].
-      iSplitR "Hftc"; [iExact "Hftnm" | iExact "Hftc"]. }
+    iApply fupd_wp.
+    iMod (ftable_res_boot ⊤ with "Hfents Hfdauth Hirfile") as (γf) "Hfres".
+    iMod (newlock ⊤ (mword_of_int KernelSyms.ftable : mword 64) "ftable"%string
+            (ftable_res γf) with "Hftnm Hftw Hftc Hfres") as (γft) "#Hftable".
+    iModIntro.
+    iAssert (∃ γft' γf' : gname, is_ftable γft' γf')%I as "Hftfresh".
+    { iExists γft, γf. rewrite /is_ftable /ftable_addr. iExact "Hftable". }
     assert (Hretfi : ret_pc (F3 !!! Regidx (mword_of_int 1 : mword 5) : mword 64)
                      = (mword_of_int (KernelSyms.main + 0x9a) : mword 64)).
     { rewrite /F3 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
@@ -2022,7 +2036,8 @@ Section ProofMain.
        inside [ConsoleInv.console_ready]. *)
     iDestruct "Hglobals" as "(Hdevsw & Hdevrest & Hkmem24 & Hkpt & Hprocs & Hppub &
                              Hwres &
-                             Hfds & Hirs & Hbss & Hinitproc & Hticks & Hbufl & Hbufn & Hbhead &
+                             Hfds & Hirs & Hfents & Hirfile & Hfdauth &
+                             Hbss & Hinitproc & Hticks & Hbufl & Hbufn & Hbhead &
                              Hbpay & Hsbb & Hinl &
                              Hient & Hlogr & Hdiskptr & Hdiskfree & Hdusedidx &
                              Hdslots & Hring)".
@@ -2107,7 +2122,7 @@ Section ProofMain.
                     Hpidlock Hkenv Hlbc Hbufl
                     Hbufn Hbhead Hbpay Hlit Hinl Hkit1 Hkit2
                     Hsbb Hlogr Hmir Hirslot Hirauth Hient
-                    Hlft Hldisk Hdiskptr Hdiskfree
+                    Hlft Hfents Hirfile Hfdauth Hldisk Hdiskptr Hdiskfree
                     Hdusedidx Hdslots Hclaim Hdone Hcfg Hinitproc").
     { iApply (printk_env_panic with "Hpenv"). }
     iIntros (γk pd pav pu m5) "Hcg Hpc Hfree Hcpu #Hdlock #Hgeom Hftfresh".

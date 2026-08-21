@@ -430,6 +430,19 @@ Section BootBssChain.
        placeholder), so boot mints the whole supply and routes this part;
        the file share is dropped at the mint site, marked there. *)
     iref_slots (NPROC * (1 + IREFSPARE)) -∗
+    (* ...and the OPEN-FILE TABLE'S share: one whole unit per free slot.  A
+       free slot's payload is untyped and an untyped payload IS its iref unit
+       ([FileInvDefs.file_core_none]); sys_open spends it retyping to
+       FD_INODE and fileclose puts it back.  These are the [NFILE] units
+       [IrefSlots.IREFSLOTS] is sized for, and they used to be dropped at the
+       mint below because nothing could hold them: the table's entries were
+       not carved. *)
+    iref_slots NFILE -∗
+    (* ...and the fd-slot AUTHORITY, which [FileInv.ftable_res] holds because
+       the table is where the one-unit-per-reference conservation law is
+       checked.  Minted once, at the fan-out below, and dropped there before
+       the table had a producer. *)
+    fd_slots_auth -∗
     (* ...and the bio supply's PROC-LAYER SHARE, three units per process.
        Unlike the two above this is a genuine slice: [3 * NPROC = 192] of
        [BioDefs.BSLOTS = 1024], the remainder staying with the file system.
@@ -447,7 +460,7 @@ Section BootBssChain.
          ([∗ list] p ∈ ps, page_own p)).
   Proof.
     intro Hbf. pose proof (boot_mem_of_facts g Hbf) as Hmem.
-    iIntros "#Hcl Hfd Hir Hbss H".
+    iIntros "#Hcl Hfd Hir Hirf Hfda Hbss H".
     (* THE FLAG CELLS ARE GONE.  This chain used to open with two 4-byte cuts
        for [panicked] and [panicking]; upstream d80e61c5 deleted both globals
        from printk.c, so there is no such symbol and nothing to carve.  .bss
@@ -762,9 +775,19 @@ Section BootBssChain.
     iDestruct (bss_cut g (KernelSyms.devsw + 160) KernelSyms.ftable
                  (KernelSyms.ftable + 24) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hlk10 H]".
+    (* ---- the ftable's HUNDRED ENTRIES.  The array starts just past the
+           table's own spinlock and ends EXACTLY at the next symbol (<disk>),
+           so this cut consumes the whole gap that used to be dropped between
+           [ftable+24] and <disk> -- 4000 bytes, and with them every hope of
+           ever building [FileInv.ftable_res].  See
+           [BootCarveMain.boot_file_entries]. ---- *)
+    iDestruct (bss_cut g (KernelSyms.ftable + 24) file_base
+                 (file_base + file_stride * Z.of_nat NFILE) ram_hi
+                 ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hfent H]".
+    iDestruct (boot_file_entries g Hmem with "Hcl Hfent") as "Hfent".
     (* ---- the static [struct disk] ---- *)
-    iDestruct (bss_cut g (KernelSyms.ftable + 24) KernelSyms.disk
-                 (KernelSyms.disk + 8) ram_hi
+    iDestruct (bss_cut g (file_base + file_stride * Z.of_nat NFILE)
+                 KernelSyms.disk (KernelSyms.disk + 8) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hdd H]".
     iDestruct (boot_ran_cell8 g KernelSyms.disk Hmem ltac:(zlit) ltac:(zlit)
                  ltac:(zeq) with "Hcl Hdd") as (vdd) "Hdd".
@@ -832,7 +855,8 @@ Section BootBssChain.
     iSplitL "Hlk1 Hlk2 Hlk3 Hlk4 Hlk5 Hlk6 Hlk7 Hlk8 Hlk9 Hlk10 Hlk11".
     { iApply (boot_main_locks_raw g Hmem with
                 "Hcl Hlk1 Hlk2 Hlk3 Hlk4 Hlk5 Hlk6 Hlk7 Hlk8 Hlk9 Hlk10 Hlk11"). }
-    iSplitL "Hdr Hdw Hdevrest Hkm Hkpt Hpr1 Hpr2 Hwres Hfd Hir Hbss Hip Htk Hbsl Hbln Hhd
+    iSplitL "Hdr Hdw Hdevrest Hkm Hkpt Hpr1 Hpr2 Hwres Hfd Hir Hfent Hirf Hfda
+             Hbss Hip Htk Hbsl Hbln Hhd
              Hbpay Hsbb Hino Hient Hlog Hdd Hda Hdu Hdf Hdi Hslots Hring".
     { rewrite /main_globals_raw.
       iSplitL "Hdr Hdw".
@@ -846,6 +870,9 @@ Section BootBssChain.
       iSplitL "Hwres"; [iExact "Hwres" |].
       iSplitL "Hfd"; [iExact "Hfd" |].
       iSplitL "Hir"; [iExact "Hir" |].
+      iSplitL "Hfent"; [iExact "Hfent" |].
+      iSplitL "Hirf"; [iExact "Hirf" |].
+      iSplitL "Hfda"; [iExact "Hfda" |].
       iSplitL "Hbss"; [iExact "Hbss" |].
       iSplitL "Hip"; [iExists vip; iExact "Hip" |].
       iSplitL "Htk"; [iExists vtk; rewrite /a_ticks; iExact "Htk" |].
@@ -1357,7 +1384,10 @@ Section BootAlloc.
        existentially, for [InodeRef.iref_name_alloc]'s reason: a class that
        carries a gname cannot be a functor constraint adequacy assumes. *)
     iMod procs_avail_alloc as (Hpav) "Hprocsavail".
-    iMod fd_slots_alloc as (Hfd) "[_ Hfdslots]".
+    (* THE AUTHORITY IS KEPT NOW.  [FileInv.ftable_res] holds it -- the
+       table is where the one-unit-per-reference conservation law is checked
+       -- and nothing else in the tree can make it. *)
+    iMod fd_slots_alloc as (Hfd) "[Hfdauth Hfdslots]".
     (* ---- the iref-slot supply, likewise a pure ghost.  THE AUTHORITY IS
            KEPT NOW: [icache_boot_at] takes it (row (P4) of
            [FsCfgBoot.fs_kit_icache]'s header) and nothing else can make
@@ -1370,29 +1400,28 @@ Section BootAlloc.
            authority does.  [FsCfgBoot.fs_cfg_alloc] takes both halves and
            parks them in [BioInitAt.bio_free_tok]. ---- *)
     iMod bslots_alloc as (Hbs) "(Hbsauth & Hbsproc & Hbslots)".
-    (* ### THE FILE TABLE'S NFILE UNITS ARE DROPPED HERE. ###
-       [IREFSLOTS = NPROC*(1 + IREFSPARE) + NFILE]; the proc layer's share
-       is routed through [main_globals_raw], and the [NFILE] units belong to
-       the ftable, one per FD_INODE file's inode reference.  Nothing holds
-       them yet because [FileInv.file_payload]'s inode arm is still a
-       placeholder, so they go nowhere.  When that arm becomes real, split
-       them out here and hand them to [SpecFileinit] the way [fd_slots] are
-       handed to procinit.  claude-notes/projects/cwd-ref.md, "STILL TO DO
-       -- the consumers". *)
+    (* THE SUPPLY, IN ITS THREE SHARES, AND NOTHING IS DROPPED ANY MORE.
+       [IREFSLOTS = NPROC*(1 + IREFSPARE) + NFILE + IREFBOOT]: the proc
+       layer's share and the FILE TABLE'S both go through
+       [main_globals_raw], the table's one unit per free slot; the boot
+       chain's own [IREFBOOT] are row (C) of [FirstTok.first_fsinit]
+       ([SpecFsinit] takes one for ireclaim's iget/iput pair and hands it
+       back -- fs-cfg-boot.md (f-2) -- and [SpecKexec], which forkret's boot
+       arm calls next off the same token, takes two).
+
+       Those last two are their OWN row and not a slice of the table's:
+       neither is handed back to the ftable, so carving them out of [NFILE]
+       would leave the table unable to start with all [NFILE] slots free.
+       See [IrefSlots.IREFBOOT]. *)
     iEval (rewrite /IREFSLOTS) in "Hirslots".
+    iDestruct (iref_slots_split (NPROC * (1 + IREFSPARE) + NFILE) IREFBOOT
+                 with "Hirslots") as "[Hirslots Hirslot]".
     iDestruct (iref_slots_split (NPROC * (1 + IREFSPARE)) NFILE with "Hirslots")
       as "[Hirslots Hirfile]".
-    (* TWO of the file table's units are kept and threaded to main: they
-       are row (C) of [FirstTok.first_fsinit].  [SpecFsinit] takes one for
-       ireclaim's iget/iput pair and hands it back (fs-cfg-boot.md (f-2));
-       [SpecKexec], which forkret's boot arm calls next off the same token,
-       takes two.  The rest still go nowhere. *)
-    assert (Hnf : NFILE = (2 + (NFILE - 2))%nat) by (unfold NFILE; lia).
-    iEval (rewrite Hnf) in "Hirfile".
-    iDestruct (iref_slots_split 2 (NFILE - 2) with "Hirfile")
-      as "[Hirslot _]".
+    iEval (rewrite /IREFBOOT) in "Hirslot".
     (* ---- the .bss, in address order ---- *)
-    iDestruct (boot_bss_carve g Hbf with "Hcl Hfdslots Hirslots Hbsproc Hbss") as
+    iDestruct (boot_bss_carve g Hbf
+                 with "Hcl Hfdslots Hirslots Hirfile Hfdauth Hbsproc Hbss") as
       "(Hstartcell & Hlocks & Hglobals & Hharts & Hpages)".
     (* ---- the device fabric ---- *)
     iMod (uart_ghosts_alloc (g.(gdev).(duart))) as (γd)

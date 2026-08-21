@@ -58,6 +58,7 @@ Require Import DiskInv SpecVirtioDiskInit.
    (fs-cfg-boot.md (f-2)) *)
 Require Import LogDefs LogInv.
 Require Import SpecMain.
+Require Import FileInvDefs.   (* the open-file table's geometry and [fentry_raw] *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 
@@ -1251,6 +1252,174 @@ Section BootCarveMain.
       rewrite (i_lock_of_entry k). iExact "Hk".
     - iApply (big_sepL_mono with "H2"). iIntros (n k _) "Hk".
       rewrite /ientry_raw -(ientry_of_z k). iExact "Hk".
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* THE OPEN-FILE TABLE'S HUNDRED ENTRIES.                               *)
+  (*                                                                    *)
+  (* [struct file] is 40 bytes and the array starts at [ftable+24], just  *)
+  (* past the table's own spinlock, so the family runs from              *)
+  (* [FileInvDefs.file_base] at [file_stride] and ends EXACTLY at the     *)
+  (* next symbol (<disk>) -- which is also the literal end pointer        *)
+  (* filealloc's scan compares its cursor against.  Layout (file.h):      *)
+  (*                                                                    *)
+  (*   +0  type   +4  ref   +8 readable  +9 writable  [+10..15 pad]      *)
+  (*   +16 pipe   +24 ip    +32 off      +36 major    [+38..39 pad]      *)
+  (*                                                                    *)
+  (* THREE WORDS ARE PINNED TO THE LOADER'S ZERO and the rest are         *)
+  (* contents-existential; [FileInvDefs.fentry_raw]'s header says which   *)
+  (* and why.  Like the itable's entries this is [img_end] rather than    *)
+  (* [text_end]: the pins are FACTS about .bss, not assumptions.          *)
+  (*                                                                    *)
+  (* THE WHOLE RANGE WAS DROPPED BY THE .bss WALK before this: the cut at *)
+  (* [BootShared.v]'s ftable step went straight from [ftable+24] to       *)
+  (* <disk>, exactly as the [p_parent] cells were dropped with the proc   *)
+  (* slot's padding.  Nothing could build [FileInv.ftable_res] without    *)
+  (* them, which is why [is_ftable] had no producer anywhere in the tree. *)
+  (* ------------------------------------------------------------------ *)
+  Local Definition file_node_raw (a : Arch.pa) : iProp Σ :=
+    (a ↦₄ FD_NONE ∗
+     foff_of a 4 ↦₄ (mword_of_int 0 : mword 32) ∗
+     (∃ r : bv 8, foff_of a 8 ↦ₘ r) ∗
+     (∃ w : bv 8, foff_of a 9 ↦ₘ w) ∗
+     (∃ pp : mword 64, foff_of a 16 ↦₈ pp) ∗
+     (∃ ip : mword 64, foff_of a 24 ↦₈ ip) ∗
+     foff_of a 32 ↦₄ (mword_of_int 0 : mword 32) ∗
+     (∃ mj : bv 16, foff_of a 36 ↦₂ mj))%I.
+
+  Lemma boot_file_entry (g : gstate) (A : Z) :
+    (forall x : Z, ram_lo <= x < ram_hi ->
+       g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
+    img_end <= A -> A + 40 <= ram_hi -> A mod 8 = 0 ->
+    kmap_static_claims -∗ boot_raw_ran g A (A + 40)
+    -∗ file_node_raw (pa_of_z A).
+  Proof.
+    intros Hmem Hbss Hhi Hal. iIntros "#Hcl H".
+    assert (Hlo : text_end <= A)
+      by exact (z_lo_trans text_end img_end A ltac:(vm_compute; discriminate) Hbss).
+    assert (Hal4 : A mod 4 = 0) by exact (z_mod8_mod4 A Hal).
+    assert (Hal2 : A mod 2 = 0) by exact (z_mod8_mod2 A Hal).
+    (* the sign-extended 12-bit field displacements, once each *)
+    assert (E4 : (sign_extend' 64 (mword_of_int 4 : mword 12) : mword 64)
+                 = mword_of_int 4) by (apply bv_eq; vm_compute; reflexivity).
+    assert (E8 : (sign_extend' 64 (mword_of_int 8 : mword 12) : mword 64)
+                 = mword_of_int 8) by (apply bv_eq; vm_compute; reflexivity).
+    assert (E9 : (sign_extend' 64 (mword_of_int 9 : mword 12) : mword 64)
+                 = mword_of_int 9) by (apply bv_eq; vm_compute; reflexivity).
+    assert (E16 : (sign_extend' 64 (mword_of_int 16 : mword 12) : mword 64)
+                  = mword_of_int 16) by (apply bv_eq; vm_compute; reflexivity).
+    assert (E24 : (sign_extend' 64 (mword_of_int 24 : mword 12) : mword 64)
+                  = mword_of_int 24) by (apply bv_eq; vm_compute; reflexivity).
+    assert (E32 : (sign_extend' 64 (mword_of_int 32 : mword 12) : mword 64)
+                  = mword_of_int 32) by (apply bv_eq; vm_compute; reflexivity).
+    assert (E36 : (sign_extend' 64 (mword_of_int 36 : mword 12) : mword 64)
+                  = mword_of_int 36) by (apply bv_eq; vm_compute; reflexivity).
+    (* ---- +0: type, PINNED to the loader's zero (that IS [FD_NONE]) ---- *)
+    iDestruct (boot_ran_split g A (A + 4) (A + 40) ltac:(lia) ltac:(lia)
+                 with "H") as "[H0 H]".
+    iDestruct (boot_ran_cell4_bss g A (mword_of_int 0 : mword 32) Hmem
+                 Hlo Hbss ltac:(lia) Hal4
+                 ltac:(intros j _; apply nth_byte_zero; vm_compute; reflexivity)
+                 with "Hcl H0") as "H0".
+    (* ---- +4: ref, likewise -- filealloc's scan tests it ---- *)
+    iDestruct (boot_ran_split g (A + 4) (A + 4 + 4) (A + 40) ltac:(lia)
+                 ltac:(lia) with "H") as "[H1 H]".
+    iDestruct (boot_ran_cell4_bss g (A + 4) (mword_of_int 0 : mword 32) Hmem
+                 ltac:(lia) ltac:(lia) ltac:(lia)
+                 ltac:(exact (z_mod_addo 4 A 4 Hal4 eq_refl))
+                 ltac:(intros j _; apply nth_byte_zero; vm_compute; reflexivity)
+                 with "Hcl H1") as "H1".
+    (* ---- +8, +9: readable / writable, one byte each ---- *)
+    iDestruct (boot_ran_split g (A + 4 + 4) (A + 8) (A + 40) ltac:(lia)
+                 ltac:(lia) with "H") as "[_ H]".
+    iDestruct (boot_ran_split g (A + 8) (A + 8 + 1) (A + 40) ltac:(lia)
+                 ltac:(lia) with "H") as "[H2 H]".
+    iDestruct (boot_ran_byte g (A + 8) Hmem ltac:(lia) ltac:(lia)
+                 with "Hcl H2") as "H2".
+    iDestruct (boot_ran_split g (A + 8 + 1) (A + 9) (A + 40) ltac:(lia)
+                 ltac:(lia) with "H") as "[_ H]".
+    iDestruct (boot_ran_split g (A + 9) (A + 9 + 1) (A + 40) ltac:(lia)
+                 ltac:(lia) with "H") as "[H3 H]".
+    iDestruct (boot_ran_byte g (A + 9) Hmem ltac:(lia) ltac:(lia)
+                 with "Hcl H3") as "H3".
+    (* ---- +16: pipe ---- *)
+    iDestruct (boot_ran_split g (A + 9 + 1) (A + 16) (A + 40) ltac:(lia)
+                 ltac:(lia) with "H") as "[_ H]".
+    iDestruct (boot_ran_split g (A + 16) (A + 16 + 8) (A + 40) ltac:(lia)
+                 ltac:(lia) with "H") as "[H4 H]".
+    iDestruct (boot_ran_cell8 g (A + 16) Hmem ltac:(lia) ltac:(lia)
+                 ltac:(exact (z_mod_addo 8 A 16 Hal eq_refl)) with "Hcl H4")
+      as (vpipe) "H4".
+    (* ---- +24: ip.  It comes out WHOLE and is halved by the mint ---- *)
+    iDestruct (boot_ran_split g (A + 16 + 8) (A + 24) (A + 40) ltac:(lia)
+                 ltac:(lia) with "H") as "[_ H]".
+    iDestruct (boot_ran_split g (A + 24) (A + 24 + 8) (A + 40) ltac:(lia)
+                 ltac:(lia) with "H") as "[H5 H]".
+    iDestruct (boot_ran_cell8 g (A + 24) Hmem ltac:(lia) ltac:(lia)
+                 ltac:(exact (z_mod_addo 8 A 24 Hal eq_refl)) with "Hcl H5")
+      as (vip) "H5".
+    (* ---- +32: off, PINNED -- zero is [FileInvDefs.off_wf]'s base case ---- *)
+    iDestruct (boot_ran_split g (A + 24 + 8) (A + 32) (A + 40) ltac:(lia)
+                 ltac:(lia) with "H") as "[_ H]".
+    iDestruct (boot_ran_split g (A + 32) (A + 32 + 4) (A + 40) ltac:(lia)
+                 ltac:(lia) with "H") as "[H6 H]".
+    iDestruct (boot_ran_cell4_bss g (A + 32) (mword_of_int 0 : mword 32) Hmem
+                 ltac:(lia) ltac:(lia) ltac:(lia)
+                 ltac:(exact (z_mod_addo 4 A 32 Hal4 eq_refl))
+                 ltac:(intros j _; apply nth_byte_zero; vm_compute; reflexivity)
+                 with "Hcl H6") as "H6".
+    (* ---- +36: major ---- *)
+    iDestruct (boot_ran_split g (A + 32 + 4) (A + 36) (A + 40) ltac:(lia)
+                 ltac:(lia) with "H") as "[_ H]".
+    iDestruct (boot_ran_split g (A + 36) (A + 36 + 2) (A + 40) ltac:(lia)
+                 ltac:(lia) with "H") as "[H7 _]".
+    iDestruct (boot_ran_cell2 g (A + 36) Hmem ltac:(lia) ltac:(lia)
+                 ltac:(exact (z_mod_addo 2 A 36 Hal2 eq_refl)) with "Hcl H7")
+      as (vmaj) "H7".
+    (* ---- assemble ---- *)
+    rewrite /file_node_raw /foff_of.
+    rewrite E4 E8 E9 E16 E24 E32 E36 !off_of_z.
+    iSplitL "H0"; [iExact "H0" |].
+    iSplitL "H1"; [iExact "H1" |].
+    iSplitL "H2"; [iExists (boot_byte (A + 8)); iExact "H2" |].
+    iSplitL "H3"; [iExists (boot_byte (A + 9)); iExact "H3" |].
+    iSplitL "H4"; [iExists vpipe; iExact "H4" |].
+    iSplitL "H5"; [iExists vip; iExact "H5" |].
+    iSplitL "H6"; [iExact "H6" |].
+    iExists vmaj. iExact "H7".
+  Qed.
+
+  (* the NFILE entries, as [FileInv.ftable_res_boot] takes them. *)
+  Lemma boot_file_entries (g : gstate) :
+    (forall x : Z, ram_lo <= x < ram_hi ->
+       g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
+    kmap_static_claims -∗
+    boot_raw_ran g file_base (file_base + file_stride * Z.of_nat NFILE)
+    -∗ ([∗ list] k ∈ seq 0 NFILE, fentry_raw k).
+  Proof.
+    intro Hmem. iIntros "#Hcl H".
+    iDestruct (boot_stride_family_seq g file_node_raw
+                 file_base file_stride NFILE
+                 ltac:(unfold file_stride; lia)
+                 ltac:(intros i A Hi HA _ _;
+                       destruct (z_stride_side file_base file_stride NFILE
+                                   40 img_end ram_hi i A Hi HA
+                                   ltac:(unfold file_stride; lia)
+                                   ltac:(vm_compute; discriminate)
+                                   ltac:(vm_compute; discriminate)
+                                   ltac:(vm_compute; reflexivity)
+                                   ltac:(vm_compute; reflexivity))
+                         as (Q1 & Q2 & Q3);
+                       assert (T1 : A <= A + 40) by lia;
+                       assert (T2 : A + 40 <= A + file_stride)
+                         by (unfold file_stride; lia);
+                       iIntros "#Hcl H";
+                       iDestruct (boot_ran_split g A (A + 40) (A + file_stride)
+                                    T1 T2 with "H") as "[H _]";
+                       iApply (boot_file_entry g A Hmem Q1 Q2 Q3 with "Hcl H"))
+                 with "Hcl H") as "H".
+    iApply (big_sepL_mono with "H"). iIntros (n k _) "Hk".
+    rewrite /fentry_raw. iExact "Hk".
   Qed.
 
   (* ------------------------------------------------------------------ *)

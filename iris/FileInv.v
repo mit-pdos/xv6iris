@@ -674,4 +674,94 @@ Section FileGhostAlloc.
     iExists inhabitant. iExact "H".
   Qed.
 
+  (* ================================================================== *)
+  (* THE TABLE, MINTED: [NFILE] raw entries become the lock's resource.   *)
+  (*                                                                    *)
+  (* This is the other half of [ftable_ghosts_alloc] -- the physical one  *)
+  (* -- and together they are what [main] runs the moment fileinit hands  *)
+  (* back the zeroed lock word.  Everything comes from the image except   *)
+  (* three ghost rows, and each of the three is exactly one thing:        *)
+  (*                                                                    *)
+  (*   [fd_slots_auth]  the fd-slot AUTHORITY.  [ftable_res] holds it     *)
+  (*                    because the table is where the conservation law   *)
+  (*                    is checked -- one unit per outstanding reference. *)
+  (*                    It is minted once, at the boot fan-out, and was   *)
+  (*                    DROPPED there before this lemma existed.          *)
+  (*   [iref_slots NFILE]  one whole unit per FREE slot.  A free slot's   *)
+  (*                    payload is untyped, and an untyped payload IS its  *)
+  (*                    iref unit ([file_core_none]); sys_open spends it   *)
+  (*                    retyping to FD_INODE and fileclose puts it back.   *)
+  (*                    These are the [NFILE] units [IREFSLOTS] is sized   *)
+  (*                    for -- NOT the boot chain's two ([IREFBOOT]).      *)
+  (*   [ftable_ghosts_alloc]  the authority at the EMPTY map, plus one     *)
+  (*                    names ghost per slot.                             *)
+  (*                                                                    *)
+  (* THE PER-SLOT fupd IS THE OFF-BORROW cinv, one per entry: a slot       *)
+  (* carries an off-invariant for its whole life and it is UNARMED while   *)
+  (* the slot is untyped, so what goes in is the two raw cells and there   *)
+  (* is no disjunction to establish ([off_hold]'s header).  Its name then  *)
+  (* has to be recorded in the slot's [fpnames], which is the one thing    *)
+  (* [ftable_ghosts_alloc] could not know: it hands out [inhabitant] and   *)
+  (* this lemma overwrites the [fp_ocv] field with [fpay_tok_update].      *)
+  (* ================================================================== *)
+  Lemma ftable_res_boot (E : coPset) :
+    ([∗ list] k ∈ seq 0 NFILE, fentry_raw k) -∗
+    fd_slots_auth -∗
+    iref_slots NFILE ={E}=∗
+    ∃ γ : gname, ftable_res γ.
+  Proof.
+    iIntros "Hraw Hfda Hir".
+    iMod ftable_ghosts_alloc as (γ) "[Hauth Htoks]".
+    iDestruct (iref_slots_to_any (seq 0 NFILE) with "[Hir]") as "Hunits".
+    { rewrite length_seq. iExact "Hir". }
+    (* the three families, zipped into one so the per-slot work is a single
+       [big_sepL_mono] under [big_sepL_fupd] rather than three walks. *)
+    iAssert ([∗ list] k ∈ seq 0 NFILE,
+               (fentry_raw k ∗ (∃ pn, fpay_tok γ k 1 pn) ∗ iref_slot))%I
+      with "[Hraw Htoks Hunits]" as "Hall".
+    { rewrite !big_sepL_sep. iFrame "Hraw Htoks Hunits". }
+    iAssert (|={E}=> [∗ list] k ∈ seq 0 NFILE, fslot γ ∅ k)%I
+      with "[Hall]" as ">Hslots".
+    { iApply big_sepL_fupd. iApply (big_sepL_mono with "Hall").
+      intros i k _. iIntros "(Hraw & (%pn & Htok) & Hu)".
+      rewrite /fentry_raw.
+      iDestruct "Hraw" as "(Hty & Href & (%r & Hrd) & (%w & Hwr) &
+                            (%pp & Hpp) & (%ip & Hip) & Hoff & (%mj & Hmj))".
+      (* [f->ip] in half: the reference's half and the invariant's. *)
+      iDestruct (bi.equiv_entails_1_1 _ _
+                   (word_pointsto_frac_split (a_fip k) (1/2) (1/2) ip)
+                   with "[Hip]") as "[Hip1 Hip2]".
+      { iEval (rewrite Qp.div_2). iExact "Hip". }
+      iMod (off_hold_alloc E γ k false with "[Hip2 Hoff]") as (γx) "Hoffhold".
+      { rewrite /off_raw. iExists ip, (mword_of_int 0 : mword 32).
+        iFrame "Hip2 Hoff". iPureIntro. exact off_wf_zero. }
+      iMod (fpay_tok_update γ k pn
+              (MkFPNames (fp_lock pn) (fp_pipe pn) (fp_icv pn) (fp_iq pn)
+                 (fp_ig pn) γx) with "Htok") as "Htok".
+      iModIntro.
+      rewrite /fslot lookup_empty.
+      iSplitL "Href"; [iExact "Href"|].
+      iExists (MkFContent FD_NONE r w pp ip mj).
+      iSplitR; [iPureIntro; reflexivity|].
+      iSplitL "Hty Hrd Hwr Hpp Hip1 Hmj".
+      { rewrite /file_fields.
+        cbn [fc_type fc_readable fc_writable fc_pipe fc_ip fc_major].
+        iFrame "Hty Hrd Hwr Hpp Hmj". iExact "Hip1". }
+      rewrite /file_pay /file_payload.
+      iExists (MkFPNames (fp_lock pn) (fp_pipe pn) (fp_icv pn) (fp_iq pn)
+                 (fp_ig pn) γx).
+      iSplitL "Htok"; [iExact "Htok"|].
+      iSplitL "Hu".
+      { rewrite (file_core_none 1 _ (MkFContent FD_NONE r w pp ip mj) eq_refl).
+        rewrite -iref_slot_frac. iExact "Hu". }
+      rewrite (file_armed_none (MkFContent FD_NONE r w pp ip mj) eq_refl).
+      cbn [fp_ocv]. iExact "Hoffhold". }
+    iModIntro. iExists γ. rewrite /ftable_res.
+    iExists ∅. iFrame "Hauth Hfda".
+    iSplitR.
+    { iPureIntro. intros k Hk. rewrite lookup_empty in Hk.
+      by destruct Hk as [? ?]. }
+    iExact "Hslots".
+  Qed.
+
 End FileGhostAlloc.

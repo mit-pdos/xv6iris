@@ -320,6 +320,25 @@ Section SpecMain.
         process, the [1] being its cwd unit.  The remaining [NFILE] units of
         [IrefSlots.IREFSLOTS] are the file table's. *)
      iref_slots (NPROC * (1 + IREFSPARE)) ∗
+     (* ... AND THE OPEN-FILE TABLE, in the three rows [FileInv.ftable_res_boot]
+        takes.  [ftable] is the LAST of the eleven locks whose resource main
+        had no way to build: the hundred [struct file] entries were dropped
+        by the .bss walk with the padding around them (exactly as the
+        [p_parent] cells were), so [FileInv.ftable_res] had no producer and
+        [is_ftable] -- which the syscall environment, kfork, kexit and every
+        sys_open path take -- had none either.  The carve is
+        [BootCarveMain.boot_file_entries].
+
+        The two ghost rows are what a free table costs beside its cells: the
+        fd-slot AUTHORITY, which lives in [ftable_res] because the table is
+        where the one-unit-per-reference conservation law is checked, and one
+        iref unit per FREE slot, because an untyped payload IS its iref unit
+        ([FileInvDefs.file_core_none]).  These are the [NFILE] units
+        [IrefSlots.IREFSLOTS] is sized for; the boot chain's own two are
+        [IREFBOOT] and are a separate row above. *)
+     ([∗ list] k ∈ seq 0 NFILE, fentry_raw k) ∗
+     iref_slots NFILE ∗
+     fd_slots_auth ∗
      (* ... and the bio supply's proc-layer share: THREE units per process,
         what the trap loop's residue carries for a live process's next
         syscall.  procinit routes them so that a DORMANT slot owns three --
