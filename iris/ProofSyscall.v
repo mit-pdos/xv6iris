@@ -868,8 +868,12 @@ Section SyscallVocab.
      It is NOT in [FsReady.fs_ready]: the console is not the file system, and
      [fs_ready]'s establishment is already the boot chain's largest owed
      row.  It is a SIBLING conjunct, so the only thing that grows is whatever
-     finally establishes [syscall_env] -- which [LinkSyscall.v] still stubs
-     as [emp]. *)
+     finally establishes [syscall_env].  Nobody does yet: [LinkSyscall.v]
+     LINKS the dispatch (all twenty-two arms, no axiom), but establishing
+     the environment is the trap loop's entry problem, owed by whoever pays
+     [SpecForkretParkPaid.forkret_park_pkg]'s residue closer.  Cheaply, as
+     that file notes: [syscall_env] is entirely persistent, so a second
+     process's copy costs nothing. *)
   Lemma syscall_env_console (γf : gname) (pj : mword 64)
       (bn : bio_names) (fn : fclose_names) :
     syscall_env γf pj bn fn -∗ ConsoleInv.console_ready.
