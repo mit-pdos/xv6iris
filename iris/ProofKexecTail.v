@@ -1146,6 +1146,21 @@ Section KexecExitQ.
       [exact Hcs | exact (kexec_ok_q_weaken _ _ _ _ _ _ _ _ _ Hok)].
   Qed.
 
+
+  (* ...and the way the opaque exit is OPENED (N-5.2B §13.4).  The unfolding
+     wand is persistent, so a block with two [-1] tails can spend it twice;
+     [KEX] itself is linear and whichever tail runs consumes it.  Stated at
+     [fun _ => _] because the exit body names no hart. *)
+  Lemma kxc_exit_open `{CIDx : CpuId} (pj : mword 64)
+      (KEX E : CpuId -> iProp Σ) :
+    □ (∀ CX : CpuId, KEX CX -∗ E CX) -∗
+    wp_next (CID0 := CIDx) true pj KEX -∗
+    wp_next (CID0 := CIDx) true pj E.
+  Proof.
+    rewrite /wp_next. iIntros "#Hw H" (CID Hcr).
+    iSpecialize ("H" $! CID with "[%]"); [exact Hcr |]. by iApply "Hw".
+  Qed.
+
 End KexecExitQ.
 
 

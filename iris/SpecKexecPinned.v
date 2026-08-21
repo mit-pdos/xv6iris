@@ -123,6 +123,7 @@ Require Import SpecReadi.        (* [rd_delivered] -- the readi window bridge *)
 Require Import SpecDirlink.
 Require Import SpecNamex.        (* [ROOTDEV]                                 *)
 Require Import SpecKexec.        (* the landed contract this parallels        *)
+Require Import KexecOkQ.         (* [kexec_ok_q] / [kxq_entry] / [kxq_hdr_ok] *)
 Require Import FsImg.            (* [fs_dinode], [fs_data_of], the reductions *)
 Require Import FsImgDisk.        (* [fsimg_P]: the literal xv6 disk image     *)
 Require Import FsImgCheck.       (* [fname_init], inode 7, [ElfUser.init_elf] *)
@@ -281,66 +282,15 @@ Qed.
 
 
 (* ===================================================================== *)
-(*  3bis.  THE RESULT RELATION, PARAMETERISED ON THE ENTRY POINT          *)
+(*  3bis.  THE ENTRY-POINT PLUG                                           *)
 (* ===================================================================== *)
 
-(*  [SpecKexec.kexec_ok] with ONE hole punched in its SUCCESS arm: a
-    predicate the caller may impose on the entry PC.  The failure arm is
-    untouched -- it does not mention [entry] at all, which is exactly why
-    every one of the eight [bad:] tails of the landed walk proves this
-    form with the SAME proof term as the landed one.
-
-    ITS PURPOSE IS THE UNBLOCK, and it is stated here so the sweep has a
-    vocabulary rather than an idea.  The landed kexec cone spells
-    [kexec_ok] in 37 places across 11 files (about twenty lemma and seam
-    statements); each one RELAYS kexec's exit continuation, so a client
-    that wants to say anything about [entry] cannot weaken its own
-    continuation into that shape -- the missing side is a pure fact about
-    a universally quantified [entry] and no resource in the exit
-    determines it.  Threading [Q] through those 37 sites (and the [Q]
-    argument through the [iApply]s that chain them) makes every one of
-    them generic, exactly as the eb-generic sweep made the whole tree
-    generic in [eb]; [kexec_ok_q_True] below is the row that keeps
-    [SpecKexec.wp_kexec_sconf] the theorem it is today.                    *)
-Definition kexec_ok_q (Q : mword 64 -> Prop) (V V' : pprivate) (r : mword 64)
-    (entry spv szv' : mword 64) (na : nat) (alen : nat -> nat) : Prop :=
-  (r = (mword_of_int (-1) : mword 64) /\ V' = V)
-  \/
-  (Q entry /\
-   r = (mword_of_int (Z.of_nat na) : mword 64) /\
-   (na <= MAXARG)%nat /\
-   kxc_stack_ok (uint szv') (uint szv' - 4096) alen na /\
-   pv_sz V' = szv' /\
-   spv = (mword_of_int (kxc_sp_final (uint szv') alen na) : mword 64) /\
-   ud_tfp (pv_upt V') = ud_tfp (pv_upt V) /\
-   kxc_tf (pv_tf V) (pv_tf V') entry spv /\
-   pv_ofile V' = pv_ofile V /\
-   pv_cwd V' = pv_cwd V /\
-   length (pv_name V') = PNAMELEN /\
-   (uint szv' - 4096 <= uint spv)%Z /\
-   (uint spv <= uint szv')%Z).
-
-(* the landed relation IS the vacuous instance *)
-Lemma kexec_ok_q_True (V V' : pprivate) (r entry spv szv' : mword 64)
-    (na : nat) (alen : nat -> nat) :
-  kexec_ok_q (fun _ => True) V V' r entry spv szv' na alen
-  <-> kexec_ok V V' r entry spv szv' na alen.
-Proof.
-  rewrite /kexec_ok_q /kexec_ok. split.
-  - intros [Hl | (_ & H)]; [by left | by right].
-  - intros [Hl | H]; [by left | right; split; [exact I | exact H]].
-Qed.
-
-Lemma kexec_ok_q_weaken (Q : mword 64 -> Prop)
-    (V V' : pprivate) (r entry spv szv' : mword 64)
-    (na : nat) (alen : nat -> nat) :
-  kexec_ok_q Q V V' r entry spv szv' na alen ->
-  kexec_ok V V' r entry spv szv' na alen.
-Proof.
-  intros [Hl | (_ & H)]; rewrite /kexec_ok; [by left | by right].
-Qed.
-
-(*  ...and THE instance this contract takes: the entry PC is /init's own. *)
+(*  The hole itself -- [KexecOkQ.kexec_ok_q], [kxq_entry], [kxq_hdr_ok] --
+    now lives in its own leaf, because the LANDED kexec cone imports it:
+    §13.3's sweep threads [Q] through all thirty-one sites and
+    [kexec_ok_q_True] is the row that keeps [SpecKexec.wp_kexec_sconf] the
+    theorem it always was.  What is pinned-specific is only the value the
+    hole is plugged with.                                                  *)
 Definition kxp_entry_ok (e : mword 64) : Prop := e = init_entry.
 
 (* ===================================================================== *)
@@ -550,9 +500,19 @@ Definition wp_kexec_pinned_body
            The dv pin is NOT handed back: namei's pinned contract spends
          it at the hop, and a kexec that fails AFTER namei succeeded has
          genuinely spent it.  Only the fv pin is a read. ==== *)
-      ((⌜kexec_ok_q kxp_entry_ok V V'
+      (* THE INTACT ARM IS PURE, AND DELIBERATELY SO (§13.4, RULING 2).
+         It used to hand [fv_pin] back as well.  It cannot: the exit
+         continuation is built ONCE, before the walk knows whether the
+         contents lend survived, and a linear resource in that closure is
+         exactly what stops the two branches from sharing it.  Dropping it
+         costs the caller nothing it had -- boot drops the pin anyway --
+         and it mirrors [NameiInitPinned.wp_namei_init_pinned], whose ok
+         arm does not return the dv pin either.  The receipt arm keeps
+         [kxp_lost], which is PERSISTENT and therefore free to duplicate
+         into the closure. *)
+      (⌜kexec_ok_q kxp_entry_ok V V'
            (mf !!! Regidx (mword_of_int 10 : mword 5))
-           entry spv szv' na alen⌝ ∗ fv_pin 7 init_bytes)
+           entry spv szv' na alen⌝
        ∨ (⌜kexec_ok V V' (mf !!! Regidx (mword_of_int 10 : mword 5))
                     entry spv szv' na alen⌝ ∗ kxp_lost)) -∗
       sie_cap_gpr KT1 mf K b pj -∗

@@ -1,3 +1,24 @@
+(* ===================================================================== *)
+(*  ProofKexecPinned.v -- kexec("/init") AT THE IMAGE'S BYTES              *)
+(*  (claude-notes/projects/namei-pinned-lookup.md §13, stage N-5.2B)       *)
+(* ===================================================================== *)
+
+(*  [SpecKexecPinned.wp_kexec_pinned], assembled.  Almost nothing here is
+    new: §13.3 made the whole cone generic in the exit relation and §13.4
+    made phase A's exit opaque and its header claim conditional, so this
+    file is [ProofKexec.v]'s plumbing with phase A swapped for the pinned
+    one and ONE case split added -- on the verdict phase A publishes.
+
+    THE CASE SPLIT IS THE CONTRACT.  On the arm where both lends survived,
+    the walk ran at [Q := kxp_entry_ok] and the commit block's
+    [ld a4,-408(s0)] is discharged from the header claim by
+    [KexecOkQ.kxq_entry_of_hdr] -- so the caller learns that
+    [trapframe->epc] holds /init's own ELF entry point.  On the arm where
+    either lend was cancelled the walk runs at [Q := fun _ => True], which
+    is the landed relation, and the caller gets the persistent receipt
+    instead.  Nothing else differs between the two: the SAME landed blocks
+    run below +0x090 on both.                                             *)
+
 (* ProofKexec.v -- kexec() WHOLE: the four phases composed into
    SpecKexec.wp_kexec_sconf_body, and the only place they meet.
 
@@ -128,16 +149,134 @@ Set Printing Depth 40.
 
 Notation KX := KernelSyms.kexec (only parsing).
 
-Module KexecProof (Myproc : MYPROC) (BeginOp : BEGIN_OP) (Namei : NAMEI)
+Require Import ProofKexecPinnedA.
+Require Import SpecKexecPinned.
+Require Import KexecOkQ.
+Require Import DirViewG.
+Require Import DirViewLend.
+Require Import DirViewPin.
+Require Import NameiInitPinned.
+Require Import InodeRegion.
+Require Import FsTree.
+Require Import PathElems.
+Require Import FsImgCheck.
+
+
+(* ===================================================================== *)
+(*  THE UNFOLDING WAND (N-5.2B §13.4).                                    *)
+(*                                                                        *)
+(*  The pinned continuation, opened into the landed-shaped exit the cone   *)
+(*  relays.  ONE lemma, because the only thing that varies between the     *)
+(*  walk's two arms is which disjunct of the pinned post the opener can    *)
+(*  pay: on the intact arm the LEFT one, purely, at [Q := kxp_entry_ok];   *)
+(*  on the receipt arm the RIGHT one, at [Q := fun _ => True], funded by   *)
+(*  the persistent [kxp_lost].  That choice is the [□] premise.            *)
+(*                                                                        *)
+(*  Both bodies are SPELLED OUT rather than abstracted behind a            *)
+(*  [T : regfile -> pprivate -> iProp]: the tail contains [proc_priv],     *)
+(*  and higher-order unification against its 4096-conjunct trapframe       *)
+(*  big-op is durable-notes' measured non-terminating case (§13.3).        *)
+(* ===================================================================== *)
+Section KexecPinnedWand.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+            ICFG : icfg, !irefslotG Σ, !pavG Σ}.
+  Context `{GEN : GenId}.
+
+  Notation Ra0 := (mword_of_int 10 : mword 5).
+
+  Lemma kxp_body_wand (Q : mword 64 -> Prop)
+      (jp : nat) (ga gf : gname) (bmapstart inodestart : Z)
+      (plen : nat) (pfun : nat -> bv 8)
+      (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
+      (afun : nat -> nat -> bv 8)
+      (pidv : mword 32) (V : pprivate) (dqb dqs dqa dqpv dqas : dfrac)
+      (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
+      (ra0 pv av : mword 64) :
+    □ (∀ (V' : pprivate) (r entry spv szv' : mword 64),
+         ⌜kexec_ok_q Q V V' r entry spv szv' na alen⌝ -∗
+         (⌜kexec_ok_q kxp_entry_ok V V' r entry spv szv' na alen⌝
+          ∨ (⌜kexec_ok V V' r entry spv szv' na alen⌝ ∗ kxp_lost))) -∗
+    □ (∀ CX : CpuId,
+      (
+    ∀ (mf : regfile) (V' : pprivate)
+      (entry spv szv' : mword 64),
+        ⌜callee_saved m mf⌝ -∗
+        (* THE INTACT ARM IS PURE, AND DELIBERATELY SO (§13.4, RULING 2).
+           It used to hand [fv_pin] back as well.  It cannot: the exit
+           continuation is built ONCE, before the walk knows whether the
+           contents lend survived, and a linear resource in that closure is
+           exactly what stops the two branches from sharing it.  Dropping it
+           costs the caller nothing it had -- boot drops the pin anyway --
+           and it mirrors [NameiInitPinned.wp_namei_init_pinned], whose ok
+           arm does not return the dv pin either.  The receipt arm keeps
+           [kxp_lost], which is PERSISTENT and therefore free to duplicate
+           into the closure. *)
+        (⌜kexec_ok_q kxp_entry_ok V V'
+             (mf !!! Regidx (mword_of_int 10 : mword 5))
+             entry spv szv' na alen⌝
+         ∨ (⌜kexec_ok V V' (mf !!! Regidx (mword_of_int 10 : mword 5))
+                      entry spv szv' na alen⌝ ∗ kxp_lost)) -∗
+        sie_cap_gpr KT1 mf K b (proc_addr jp) -∗
+        cpu_own 0 eb (proc_addr jp) b lks -∗
+        trap_csrs_ext KT1 eb -∗
+        cpu_claim_ext eb (proc_addr jp) -∗
+        pc_is (ret_pc ra0) -∗
+        BitmapInv.sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+        InodeInv.sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+        kalloc_env ga None -∗
+        proc_priv gf (proc_addr jp) pidv V' -∗
+        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
+        ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
+        ([∗ list] i ∈ seq 0 na,
+           [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
+        bslots 3 -∗
+        iref_slots 2 -∗
+        WP (Loop : expr riscv_lang)
+      )
+       -∗
+      (
+    ∀ (mf : regfile) (V' : pprivate) (entry spv szv' : mword 64),
+        ⌜callee_saved m mf⌝ -∗
+        ⌜kexec_ok_q Q V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
+        sie_cap_gpr KT1 mf K b (proc_addr jp) -∗
+        cpu_own 0 eb (proc_addr jp) b lks -∗
+        trap_csrs_ext KT1 eb -∗
+        cpu_claim_ext eb (proc_addr jp) -∗
+        pc_is (ret_pc ra0) -∗
+        BitmapInv.sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+        InodeInv.sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+        kalloc_env ga None -∗
+        proc_priv gf (proc_addr jp) pidv V' -∗
+        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
+        ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
+        ([∗ list] i ∈ seq 0 na,
+           [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
+        bslots 3 -∗
+        iref_slots 2 -∗
+        WP (Loop : expr riscv_lang)
+      )).
+  Proof.
+    iIntros "#Hrel". iModIntro. iIntros (CX) "Hk".
+    iIntros (mf V' entry spv szv') "%Hcs %Hok Hsie Hcnt Htc Hcl Hpc Hbm Hin
+             Hka Hpriv Hpath Hargv Hargs Hbs Hirs".
+    iApply ("Hk" $! mf V' entry spv szv' with
+             "[%] [Hrel] Hsie Hcnt Htc Hcl Hpc Hbm Hin Hka Hpriv Hpath Hargv
+              Hargs Hbs Hirs"); [exact Hcs |].
+    iApply ("Hrel" $! V' (mf !!! Regidx Ra0) entry spv szv'). by iPureIntro.
+  Qed.
+
+End KexecPinnedWand.
+
+Module KexecPinnedProof (Myproc : MYPROC) (BeginOp : BEGIN_OP) (Namei : NAMEI)
                   (Ilock : ILOCK) (Readi : READI) (Iunlockput : IUNLOCKPUT)
                   (EndOp : END_OP) (PPT : PROC_PAGETABLE_GEN)
                   (PFP : PROC_FREEPAGETABLE) (Walkaddr : WALKADDR)
                   (Flags2perm : FLAGS2PERM) (Uvmalloc : UVMALLOC)
                   (Uvmclear : UVMCLEAR) (Strlen : STRLEN) (Copyout : COPYOUT)
-                  (SS : SAFESTRCPY) (PN : PANIC) : KEXEC.
+                  (SS : SAFESTRCPY) (PN : PANIC) : KEXEC_PINNED.
 
-Module PA := ProofKexecA.KexecAProof Myproc BeginOp Namei Ilock Readi
-                                     Iunlockput EndOp.
+Module PA := ProofKexecPinnedA.KexecPinnedAProof Myproc BeginOp Namei Ilock
+                                                 Readi Iunlockput EndOp.
 Module PB := ProofKexecB.KexecBProof Myproc BeginOp Namei Ilock Readi
                                      Iunlockput EndOp PPT.
 Module PB2 := ProofKexecB2.KexecB2Proof Myproc BeginOp Namei Ilock Readi
@@ -405,12 +544,7 @@ Section KexecTail.
   Qed.
 
 End KexecTail.
-
-
-(* ===================================================================== *)
-(*  THE CONTRACT.                                                         *)
-(* ===================================================================== *)
-Section KexecMain.
+Section KexecPinnedMain.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
@@ -433,7 +567,7 @@ Section KexecMain.
   (* the vacuous plug: the landed contract IS the cone at this [Q]. *)
   Notation QT := (fun _ : mword 64 => True) (only parsing).
 
-  Lemma wp_kexec_sconf
+  Lemma wp_kexec_pinned
       (gs : list gname) (jp : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
@@ -450,17 +584,17 @@ Section KexecMain.
       (dqb dqs dqa dqpv dqas : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) :
-    wp_kexec_sconf_body gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
+    wp_kexec_pinned_body gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
                         ga gf cov logstart bmapstart inodestart nib
                         size dev plen pfun na avf alen aslen afun
                         pidv V dqb dqs dqa dqpv dqas m K eb b lks.
   Proof.
-    rewrite /wp_kexec_sconf_body.
+    rewrite /wp_kexec_pinned_body.
     intros HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0
-           Hcovb Hiregb Hcstr Hplen Havf_nz Havf_na Hnamax
+           Hcovb Hiregb Hcstr Hplen Hslash Hpelem Havf_nz Havf_na Hnamax
            Halen_b Halen_c Halen_4 Hjp Hgs.
     iIntros "Hcg Hcnt Hextc Hclmc #Htext Hpc #Hfab #Hka Hbm Hins Hbits Hpriv
-             Hpath Hargv Hargs Hbs Hirs Hcont".
+             Hpath Hargv Hargs Hbs Hirs Hdvpin Hfvpin Hcont".
     (* THE INDEX IS NO LONGER PINNED BY A PREMISE.  The deleted [b = true ->]
        used to make [b] and [eb] both the literal; what is honest instead is
        that at level 0 they AGREE ([kxc_sie_b_agree]), so [b] is substituted
@@ -472,42 +606,181 @@ Section KexecMain.
     (* depth 0 pins the held-lock set empty, which is what every seam past
        phase A spells as the literal [∅]. *)
     iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlk Hcnt]". subst lks.
-    (* ---- THE EXIT, MOVED TO THE GENERIC RELATION.  The cone below relays
-       [kexec_ok_q Q]; this contract's caller handed us a [kexec_ok]-shaped
-       continuation, and at [Q := QT] the two differ by a [True] that sits
-       to the LEFT of a wand.  One [iApply]. ---- *)
-    iDestruct (kxc_exit_qgen (CIDx := CID0) QT (proc_addr jp) ga gf bmapstart
-                 inodestart plen pfun na avf alen aslen afun pidv V
-                 dqb dqs dqa dqpv dqas m K eb eb ∅
-                 (m !!! Regidx Rra) (m !!! Regidx Ra0) (m !!! Regidx Ra1)
-                 with "Hcont") as "Hcont".
     (* ---- PHASE A: +0x000 .. +0x090, and two of the eight [bad:] tails ---- *)
-    iApply (PA.kxc_phaseA (CID0 := CID0) QT gs jp gl gu gd gk pd pav pu bn g gfs
+    (* the relation-weakening for the INTACT plug: at [Q := kxp_entry_ok]
+       the pinned post's LEFT disjunct is exactly the hypothesis, and it is
+       pure -- no resource enters the closure, which is what lets phase A
+       hand the exit back unspent. *)
+    iAssert (□ (∀ (V' : pprivate) (r entry spv szv' : mword 64),
+                  ⌜kexec_ok_q kxp_entry_ok V V' r entry spv szv' na alen⌝ -∗
+                  (⌜kexec_ok_q kxp_entry_ok V V' r entry spv szv' na alen⌝
+                   ∨ (⌜kexec_ok V V' r entry spv szv' na alen⌝ ∗ kxp_lost))))%I
+      as "#Hrelp".
+    { iModIntro. iIntros (V' r entry spv szv') "%Hok". by iLeft. }
+    iApply (PA.kxc_phaseAp (CID0 := CID0) kxp_entry_ok gs jp gl gu gd gk pd pav pu bn g gfs
               gi cn gtl ga gf cov logstart bmapstart inodestart nib size dev
               plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
               m K eb eb ∅
               (m !!! Regidx csp_rs1) (m !!! Regidx Rra) (m !!! Regidx Rs0)
               (m !!! Regidx Rs1) (m !!! Regidx Rs2)
-              (m !!! Regidx Ra0) (m !!! Regidx Ra1) None emp%I _
+              (m !!! Regidx Ra0) (m !!! Regidx Ra1)
+              (Some init_ef) (fv_cancelled 7 init_bytes) _
               HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml
-              Hins0 Hcovb Hiregb Hcstr Hplen Hjp Hgs
+              Hins0 Hcovb Hiregb Hcstr Hplen Hslash Hpelem Hjp Hgs
               eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
-              with "Hcg Hcnt Hextc Hclmc Htext Hpc Hfab [] Hka Hbm Hins Hbits Hpriv
-                    Hpath Hargv Hargs Hbs Hirs Hcont [] []").
-    (* the landed contract claims nothing about the header, so the oracle
-       gives the ride straight back ([HD := None]). *)
-    { iIntros (zi dn data) "Hride". iModIntro.
-      iSplitL "Hride"; [iExact "Hride" |].
-      iModIntro. iLeft. by iPureIntro. }
-    (* ...and it wants no specialisation of the exit either: [KEX] IS the
-       landed continuation and the unfolding wand is the identity. *)
-    { iModIntro. iIntros (CX) "H". iExact "H". }
+              with "Hcg Hcnt Hextc Hclmc Htext Hpc Hfab [Hfvpin] Hka Hbm Hins Hbits Hpriv
+                    Hpath Hargv Hargs Hbs Hirs Hdvpin Hcont [] []").
+    (* ---- THE CONTENTS ORACLE, at inode 7 ([SpecKexecPinned.kxp_fv_read]):
+       the pin is redeemed against the ride the payload carries, the ride
+       goes back untouched, and what comes out is either the file's bytes
+       (hence the header) or the unforgeable contents receipt. ---- *)
+    { iIntros (dn data) "Hride".
+      iDestruct "Hfab" as "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hireg & _)".
+      iMod (kxp_fv_read ⊤ gi gfs inodestart nib 7 init_bytes dn data
+              ltac:(solve_ndisj) with "Hireg Hfvpin Hride") as "[Hride Hout]".
+      iModIntro. iSplitL "Hride"; [iExact "Hride" |].
+      iDestruct "Hout" as "[[%Heq _] | #Hc]".
+      - iModIntro. iLeft. iPureIntro. cbn. intros j Hj.
+        rewrite (fv_of_file_byte dn data init_bytes j Heq
+                   ltac:(pose proof init_hdr_len; lia)).
+        reflexivity.
+      - iModIntro. iRight. iExact "Hc". }
+    (* ...and the unfolding wand at the same [Q]. *)
+    { iApply (kxp_body_wand kxp_entry_ok jp ga gf bmapstart inodestart plen pfun
+                na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas m K eb eb ∅
+                (m !!! Regidx Rra) (m !!! Regidx Ra0) (m !!! Regidx Ra1)
+                with "Hrelp"). }
     iIntros (CIDa) "%Hsa".
-    iIntros (M90 kf qf sf inumf dnf bmf gilf gislf gyf n2 ef)
+    iIntros (M90 kf qf sf inumf dnf bmf gilf gislf gyf n2 ef intact)
             "%Hregs90 %Hn2 Hpc Hcg Hcnt Hextc Hclmc Hslk Hslked Hdep Hidev Hiinum
              Hival Hloaded Hity Hfrz Hiref Hru Hlog Hirs Hbm Hins Hbits Hbs #Hka2
              Hpriv
-             Hpath Hargv Hargs #Hhdr Hframe Hcont".
+             Hpath Hargv Hargs #Hverd Hframe Hcont".
+    (* ---- THE VERDICT, NORMALISED.  Three ways in, two ways on. ---- *)
+    iAssert (⌜kxq_hdr_ok (Some init_ef) ef⌝ ∨ kxp_lost)%I as "#Hv".
+    { destruct intact.
+      - iDestruct "Hverd" as "[%Hh | Hc]";
+          [by iLeft | iRight; iRight; iExact "Hc"].
+      - iRight. iLeft. iExact "Hverd". }
+    iDestruct "Hv" as "[%Hhdrok | #Hlost]".
+    { (* ---- BOTH LENDS SURVIVED.  The header the walk read is /init's, so
+         the commit block's entry load is [init_entry] and the cone runs at
+         [Q := kxp_entry_ok]. ---- *)
+      iDestruct (kxc_exit_open (proc_addr jp) _ _
+                   with "[] Hcont") as "Hcont".
+      { iApply (kxp_body_wand kxp_entry_ok jp ga gf bmapstart inodestart plen pfun
+                  na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas m K eb eb ∅
+                  (m !!! Regidx Rra) (m !!! Regidx Ra0) (m !!! Regidx Ra1)
+                  with "Hrelp"). }
+    destruct Hregs90 as (HM90sp & HM90s0 & HM90s1 & HM90s2 & HM90s4 & Hkf &
+                         Hinumf & HM90thr).
+    (* the nine resources phase B threads whole and never looks inside *)
+    iAssert (kxc_open gfs gi cn cov logstart dev pidv kf qf sf gyf inumf dnf
+                      bmf gilf gislf)
+      with "[Hslk Hslked Hdep Hidev Hiinum Hival Hloaded Hity Hfrz
+             Hiref Hru]"
+      as "Hopen".
+    { rewrite /kxc_open.
+      iSplitL "Hslk"; [iExact "Hslk" |].
+      iSplitL "Hslked"; [iExact "Hslked" |].
+
+      iSplitL "Hdep"; [iExact "Hdep" |].
+      iSplitL "Hidev"; [iExact "Hidev" |].
+      iSplitL "Hiinum"; [iExact "Hiinum" |].
+      iSplitL "Hival"; [iExact "Hival" |].
+      iSplitL "Hloaded"; [iExact "Hloaded" |].
+      iSplitL "Hity"; [iExact "Hity" |].
+      iSplitL "Hfrz"; [iExact "Hfrz" |].
+      iSplitL "Hiref"; [iExact "Hiref" | iExact "Hru"]. }
+    (* ---- PHASE B1: +0x090 .. +0x0cc, plus the +0x31c tail ---- *)
+    iApply (PB.kxc_b1 (CID0 := CIDa) kxp_entry_ok gs jp gl gu gd gk pd pav pu bn g gfs gi cn
+              gtl ga gf cov logstart bmapstart inodestart nib size dev
+              kf qf sf gyf inumf dnf bmf gilf gislf n2
+              plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
+              m M90 K eb eb ∅
+              (m !!! Regidx csp_rs1) (m !!! Regidx Rra) (m !!! Regidx Rs0)
+              (m !!! Regidx Rs1) (m !!! Regidx Rs2)
+              (m !!! Regidx Ra0) (m !!! Regidx Ra1) ef
+              HK Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs
+              Hkf Hinumf Hn2 eq_refl eq_refl eq_refl eq_refl eq_refl
+              HM90sp HM90s0 HM90s1 HM90s2 HM90s4 HM90thr
+              with "Htext Hfab Hpc Hcg Hcnt Hextc Hclmc Hopen Hlog Hirs Hbm Hins
+                    Hbits Hbs Hka2 Hpriv Hpath Hargv Hargs Hframe Hcont [] []").
+    - (* ---- OUTPUT 1: elf.phnum = 0, the phdr loop is skipped ---- *)
+      iIntros (CIDz) "%Hsz1". iIntros (Mz Pz w67z) "Hst1a2 Hcont".
+      iApply (PB3.kxc_b2z (CID0 := CIDz) gs jp gl gu gd gk pd pav pu bn g gfs
+                gi cn gtl gilf gislf ga gf cov logstart bmapstart inodestart
+                nib size dev kf qf sf gyf inumf dnf bmf n2
+                plen pfun na avf alen aslen afun pidv V eb dqb dqs dqa dqpv dqas
+                m Mz K (m !!! Regidx csp_rs1) (m !!! Regidx Rra)
+                (m !!! Regidx Rs0) (m !!! Regidx Rs1) (m !!! Regidx Rs2)
+                (m !!! Regidx Ra0) (m !!! Regidx Ra1) w67z ef Pz
+                HK Hkf Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs
+                with "Htext Hfab Hst1a2 [Hcont]").
+      iIntros (CIDy) "%Hsy". iIntros (My) "Hst1ae".
+      iDestruct (wp_next_retarget CIDz CIDy true (proc_addr jp) _
+                   ltac:(wp_next_chain) with "Hcont") as "Hcont".
+      iApply (kxc_cd (CID0 := CIDy) kxp_entry_ok jp bn gfs ga gf cov logstart bmapstart
+                inodestart size plen pfun na avf alen aslen afun
+                pidv V eb dqb dqs dqa dqpv dqas m My K
+                (m !!! Regidx csp_rs1) (m !!! Regidx Rra) (m !!! Regidx Rs0)
+                (m !!! Regidx Rs1) (m !!! Regidx Rs2)
+                (m !!! Regidx Ra0) (m !!! Regidx Ra1)
+                (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
+                (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
+                (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
+                w67z ef Pz (mword_of_int 0 : mword 64)
+                (kxq_entry_of_hdr init_ef ef Hhdrok : kxp_entry_ok (kxq_entry ef)) HK Hcstr Hnamax Havf_nz Havf_na Halen_b Halen_c Halen_4
+                eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
+                eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
+                with "Htext Hst1ae Hcont").
+    - (* ---- OUTPUT 2: the phdr loop's body, entered at i = 0, sz = 0 ---- *)
+      iIntros (CIDl) "%Hsl". iIntros (Ml Pl) "Hst12c Hcont".
+      iApply (PB3.kxc_b2 (CID0 := CIDl) kxp_entry_ok gs jp gl gu gd gk pd pav pu bn g gfs
+                gi cn gtl gilf gislf ga gf cov logstart bmapstart inodestart
+                nib size dev kf qf sf gyf inumf dnf bmf n2
+                plen pfun na avf alen aslen afun pidv V eb dqb dqs dqa dqpv dqas
+                m Ml K (m !!! Regidx csp_rs1) (m !!! Regidx Rra)
+                (m !!! Regidx Rs0) (m !!! Regidx Rs1) (m !!! Regidx Rs2)
+                (m !!! Regidx Ra0) (m !!! Regidx Ra1)
+                (mword_of_int 4095 : mword 64) ef Pl 0%nat
+                (mword_of_int 0 : mword 64)
+                HK Hkf Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs Hdev
+                eq_refl eq_refl eq_refl eq_refl eq_refl
+                with "Htext Hfab Hst12c Hcont []").
+      iIntros (CIDy) "%Hsy". iIntros (My Py szvy) "Hst1ae Hcont".
+      iApply (kxc_cd (CID0 := CIDy) kxp_entry_ok jp bn gfs ga gf cov logstart bmapstart
+                inodestart size plen pfun na avf alen aslen afun
+                pidv V eb dqb dqs dqa dqpv dqas m My K
+                (m !!! Regidx csp_rs1) (m !!! Regidx Rra) (m !!! Regidx Rs0)
+                (m !!! Regidx Rs1) (m !!! Regidx Rs2)
+                (m !!! Regidx Ra0) (m !!! Regidx Ra1)
+                (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
+                (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
+                (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
+                (mword_of_int 4095 : mword 64) ef Py szvy
+                (kxq_entry_of_hdr init_ef ef Hhdrok : kxp_entry_ok (kxq_entry ef)) HK Hcstr Hnamax Havf_nz Havf_na Halen_b Halen_c Halen_4
+                eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
+                eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
+                with "Htext Hst1ae Hcont").
+    }
+    { (* ---- A LEND WAS CANCELLED.  Nothing is claimed about the contents;
+         the cone runs at the LANDED relation and the caller gets the
+         persistent receipt. ---- *)
+      iAssert (□ (∀ (V' : pprivate) (r entry spv szv' : mword 64),
+                    ⌜kexec_ok_q QT V V' r entry spv szv' na alen⌝ -∗
+                    (⌜kexec_ok_q kxp_entry_ok V V' r entry spv szv' na alen⌝
+                     ∨ (⌜kexec_ok V V' r entry spv szv' na alen⌝ ∗ kxp_lost))))%I
+        as "#Hrell".
+      { iModIntro. iIntros (V' r entry spv szv') "%Hok". iRight.
+        iSplitR; [iPureIntro; exact (kexec_ok_q_weaken _ _ _ _ _ _ _ _ _ Hok) |].
+        iExact "Hlost". }
+      iDestruct (kxc_exit_open (proc_addr jp) _ _
+                   with "[] Hcont") as "Hcont".
+      { iApply (kxp_body_wand QT jp ga gf bmapstart inodestart plen pfun
+                  na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas m K eb eb ∅
+                  (m !!! Regidx Rra) (m !!! Regidx Ra0) (m !!! Regidx Ra1)
+                  with "Hrell"). }
     destruct Hregs90 as (HM90sp & HM90s0 & HM90s1 & HM90s2 & HM90s4 & Hkf &
                          Hinumf & HM90thr).
     (* the nine resources phase B threads whole and never looks inside *)
@@ -599,8 +872,8 @@ Section KexecMain.
                 eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
                 eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
                 with "Htext Hst1ae Hcont").
+    }
   Qed.
 
-End KexecMain.
-
-End KexecProof.
+End KexecPinnedMain.
+End KexecPinnedProof.

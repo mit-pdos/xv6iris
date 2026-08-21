@@ -1243,6 +1243,8 @@ ProofKexecParts.v
 ProofKexecTail.v
 ProofKexecSeam.v
 ProofKexecA.v
+ProofKexecPinnedA.v
+ProofKexecPinned.v
 ProofKexecB.v
 SpecKexecB2.v
 ProofKexecB2.v
@@ -1252,6 +1254,7 @@ ProofKexecC.v
 ProofKexecD.v
 ProofKexec.v
 LinkKexec.v
+LinkKexecPinned.v
 SpecSysExec.v
 ProofSysExec.v
 LinkSysExec.v
