@@ -309,6 +309,27 @@ smaller than feared, and NO model change):**
   supply.  Sequencing: T1-D is the next BUILD priority (it un-blocks
   B1/B3 and repairs the landed tier-1 claim); the B2 kit continues in
   parallel (its lemmas are supply-independent).
+- **CORRECTION to the sketch (2026-08-21, same day — the "saving
+  machine fact" was INCOMPLETE):** there is exactly ONE place dep
+  views reach pf-fragment admissibility — THE FORWARD BANK.  D-7's
+  `store_post_d` banks `(t, V(asrc) ⊔ V(vsrc))`, so a later own-
+  forward load's `vpost` carries the dep views into `w_vrOld`, and a
+  higher `vrOld` widens `readable`'s no-write window — the machine
+  can REFUSE a stale read the cand's axioms admit.  This is RVWMO
+  rule 12's pipeline shape returning, exactly as the sRVWMO residue
+  table predicted ("the `dep_dom` domination argument is what the D2
+  dependency track will need for the register views rule 12 will
+  then bank").  So T1-D's step (iii) splits: (iii-a) the pure dep
+  components (`regv`/`vcap`/`ldv`/`tbank`) are side-condition-free —
+  unrelated in the weakened `cfg_match`, as sketched; (iii-b) the
+  FWD component needs the `dep_dom` domination — show the cand's
+  existing axioms bound the banked dep views enough that the raised
+  floors never refuse a cand-admissible read (or the model grows a
+  rule-12-shaped axiom, re-raising the dep-data alphabet question).
+  (iii-b) is the real content of T1-D and needs its own design pass
+  (the A1a `dep_dom` probe machinery is the recorded starting
+  point).  The interface repairs (i)/(ii) and (iii-a) stand as
+  sketched.
 
 ## Items
 
