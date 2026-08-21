@@ -152,6 +152,40 @@ each refused exchange comes with a kill (contradiction with
 consistency + the exports) — so a consistent xv6-image execution
 normalizes fully.
 
+**STRESS-TEST FINDINGS (2026-08-21, orchestrator; they reshape §3b's
+detailed design):**
+
+- **Read-down-moves are nearly free.**  A violation `(e, w)` with `e`
+  a READ resolves by moving `e` gmo-EARLIER (below `w`), not `w`
+  later: swapping a read past adjacent events breaks nothing (no
+  write positions move, visibility sets only grow) — EXCEPT past the
+  read's own rf-SOURCE.  So the read-violation residue is exactly:
+  `e` reads some `w0` sitting gmo-BETWEEN `w` and `e`.  That is S6's
+  segment-entry shape, and the kill split is: rule 5 (`e` acquire) /
+  `gx_deps` (`e` feeds `w`) / rule 4 (fence between) make the
+  violation INCONSISTENT outright — pure graph arithmetic; otherwise
+  `e` is a genuinely unordered racy read and the φ/lock-protocol
+  kills must refute `w0`'s readability at the realized prefix.
+- **The LB sanity check.**  On the LB graph the induction gets STUCK
+  (both harts' reads are pinned against their sources, both writes
+  against their readers) — CORRECTLY: LB is a genuine RVWMO⁻ behavior
+  outside sRVWMO, and if the induction succeeded unconditionally the
+  models would collapse against our own non-collapse witness.  The
+  induction's success for the xv6 image IS the kernel-level
+  exhaustiveness claim (S6 §3's classes a–e): classes (a)–(c) give
+  graph edges making the LB shape inconsistent; (d)/(e) fire the
+  export kills.  This is the honest restatement of "route B = the
+  same C1–C5 tree".
+- **The prefix-closure subtlety.**  The gmo-prefix below the minimal
+  violating write is po-closed at WRITES (by minimality) but NOT at
+  reads — a prefix read may have po-predecessor reads still above the
+  frontier — so the realized set must be the largest doubly-closed
+  subset, and the induction likely wants to eliminate READ-violations
+  first (the free moves) so the frontier's po-closure holds when the
+  export kills need realization.  Organizing the induction around
+  this (which violation to attack, closure maintenance) is B2's
+  detailed design, together with the write-class inventory.
+
 ### 3c. What is reused, by name
 
 - T2-1c's construction and the six-obligation bootstrap (the worklist's
