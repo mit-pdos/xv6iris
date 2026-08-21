@@ -928,3 +928,55 @@ non-terminating abstract-tail wand lesson is recorded in two headers.
 Owed forward: magic-check determination, szv' pinning (separate
 ruling), phdr/pages = stage C.  REMAINING CAMPAIGN WORK: stage C
 design (§13.1's guard), M2 on the D1/D2 trigger (§11.7).
+
+## 14. Stage C design proposal (2026-08-21, coordinator) — FOR THE HUMANS' SYNC
+
+### 14.1 The discovery that reshapes the stage
+
+**The contents-indexed refinement already exists, and it is Nickolai's
+own in-flight campaign.**  `ProcPtOwn.proc_ptm P sz M` (ProcPtOwn.v:3330)
+carries the user memory as `M : gmap Z (bv 8)` via `umem_lazy`, with
+`proc_pt_ptm : proc_pt P ⊣⊢ ∃ M, proc_ptm P sz M`; his Aug 19-21
+commit sequence (1d683414 → 1f7837d6) built `_mem_` contract twins for
+vmfault, uvmalloc, uvmdealloc, uvmunmap, uvmcopy, copyin and copyout —
+the campaign is visibly converging on exactly stage C's target.
+SpecKexec's "noted, not built" header predates it.  Stage C is
+therefore THREADING, not invention.
+
+### 14.2 The seam inventory (scout-verified, file:line in the scout log)
+
+The chain to close: kexec's loadseg → `proc_ptm P' szv' M` with
+`⌜UCodeInit.init_img_sub M⌝` → an M-carrying commit into proc_priv →
+userret at `umem_own pt M` (today `umem_any`, SpecUserretClosed.v:178)
+→ USpecInit's `init_text_sub M` premise DISCHARGED instead of assumed
+— i.e. the verified /init user program runs on provably ITS OWN text.
+The breaks today: (i) kexec's loadseg reseal (ProofKexecB2.v:1387)
+discards the delivered bytes ONE LINE after N-5.2B's `datl` names them;
+(ii) `proc_priv`/`proc_priv_newspace` are contents-blind (no M twin);
+(iii) four cone-relevant uvm specs lack `_mem_` twins (Uvmclear,
+ProcPagetable, ProcFreepagetable, BarePt's axis); (iv) userret's
+`umem_any` — which sits inside his OTHER live campaign (forkret-park).
+
+### 14.3 The ownership split, per the §13.1 guard
+
+**Campaign-side (ours, well-defined, no foreign files):** in the kexec
+cone only — swap `proc_pt_page_acc` → `proc_ptm_page_acc` at the
+loadseg drop point, take the existing `_mem_` twins at the uvmalloc /
+copyout call sites, thread M through `kxc_grow_inv`
+(ProofKexecSeam.v:201), and state `wp_kexec_ptm` with the post
+`proc_ptm P' szv' M ∗ ⌜init_img_sub M⌝`-shaped commit — UP TO the
+proc_priv boundary.
+**Nickolai's (asks for the sync, NOT ours to move):** an M-carrying
+`proc_priv_newspace` twin (ProcInv.v:1804); `_mem_` twins for the four
+missing specs; userret at `umem_own` (inside forkret-park's own churn).
+
+### 14.4 Recommendation
+
+Do NOT launch stage C proving lanes now.  His M-campaign is mid-flight
+and headed here; the cheap and collision-free move is: bring this seam
+map to the user+Nickolai sync (with M2/D1-D2, which touches the same
+usertrap/userret seam), agree the four asks and the commit-boundary
+interface, and sequence our kexec-cone threading BEHIND his
+`proc_priv`-M landing — at which point our half is a bounded lane in
+our own files.  The szv'-pinning owed item (§13.5) naturally rides the
+same future lane (the phdr fold lands in the M commit).
