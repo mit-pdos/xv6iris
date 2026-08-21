@@ -550,8 +550,30 @@ to the design file / durable-notes, not narrative)
     NORMALIZED prefix, pf-tier), so even the reset-point defect stops
     gating the capstone; its cost is the exchange induction itself
     (M6-W2-permutation-genre, on the banked tower) + the same exports.
-  * STATUS: awaiting the route decision (user input).  Do not build
-    D8-2, E1, or L2′ until it is made.
+  * **ROUTE B ADOPTED (the user, 2026-08-21)**, on the probe evidence
+    and the orchestrator's recommendation; the reset-point fix is also
+    user-approved and building (slice W2b-c1, spec in the session
+    scratchpad: the boundary Ret arm emits `LInstr`/`instr_post`, the
+    announce KEEPS its `LInstr` — two resets per instruction, the
+    minimal-semantics form; the `w_ldv`-scoping rationale is in the
+    spec and must not be "simplified" away).  D8-2/D8-3 and the
+    route-A-specific quarantine retrofit are OFF the plan; `WeakCertify`
+    (D8-1) becomes archive.  The route-B design pass is the next
+    orchestrator task: its plan-of-record document is
+    [`../design/weak-memory-route-b.md`](../design/weak-memory-route-b.md)
+    (in progress).  FIRST DESIGN FACTS, from re-reading S6 §3 against
+    the route: the dependency-based kills (#2/#3/#6 control+data, #7/#8
+    W-TV) are NOT expressible in bare RVWMO⁻ (rules 9–13 dropped), so
+    route B's declared model needs the STORE-DEP FRAGMENT as graph data
+    — D-v's `gx_deps`, promoted from the realizability direction to the
+    route's core; adding it SHRINKS the declared model toward RVWMO and
+    the final theorem still covers RVWMO (the added edges are ⊆ RVWMO's
+    ppo).  The φ/lock-protocol kills (#4/#5) enter through the
+    induction invariant "the normalized gmo-prefix is pf-realizable
+    (T1)" — only rule-14-respecting prefixes are ever realized, which
+    is why none of the quarantine work is needed.  The open vocabulary
+    decision (trace-graph vs `gexec` for the obstruction analysis) is
+    the design pass's first question.
 - **D-ii REALIZATION SITE PICKED (2026-08-20, design pass; build queued
   behind D-i).**  The discriminator lives in `WPExStore`'s `fulfil_ok_d`
   view argument: when the written `data` is the A/D update of the values

@@ -166,6 +166,14 @@ are working on that effort — the relevant `projects/` file.
   express rule-14 violations — machine-checked by A5), the one new export
   (F3, the lock protocol as a state-interp ghost), the route-B fallback
   trigger, and the tier-2 staging T2-0…T2-6.
+- **[`weak-memory-route-b.md`](design/weak-memory-route-b.md)** — ROUTE B
+  (the exchange normalization), ADOPTED by the user 2026-08-21 over the
+  certification route on the D-iii probe evidence: the chain (normalize →
+  T2-1c → T1 → adequacy, the machine never realizes a weak execution),
+  the `gx_deps` model extension, the trace-world frontier decision (the
+  C-tree kills apply verbatim at a pf-realized prefix), the exchange
+  lemma's case trichotomy, staging B0–B3.  IN PROGRESS — sections marked
+  OPEN are not yet buildable.
 - **[`weak-memory-layer2.md`](design/weak-memory-layer2.md)** — LAYER 2 as a
   DIRECT acyclicity theorem (2026-08-18): why per-edge premises are the
   wrong interface (walker A/D traffic violates any per-edge form
