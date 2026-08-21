@@ -1215,6 +1215,7 @@ CodeSysChdir.v
 CodeSysExec.v
 CodeKexec.v
 SpecKexec.v
+SpecKexecPinned.v
 SpecFlags2perm.v
 ProofFlags2perm.v
 LinkFlags2perm.v
