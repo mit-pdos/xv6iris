@@ -603,8 +603,7 @@ Section lift.
       have Hkk : kk = lbl_class (WeakPromise.LRmw aq rl base tvs data asrc vsrc)
                         (pa_ws ag)
         by exact (Hcls ag (WMsg base data (Some i) kk) Hlk eq_refl).
-      have Hr' : read_ok_d (pc_img c) (pc_log c) (pa_ws agx) aq false base tvs
-                   (srcs_view (pa_ws agx) asrc)
+      have Hr' : read_ok (pc_img c) (pc_log c) (pa_ws agx) aq false base tvs
         by rewrite Himg Hlog Hws.
       have He' : excl_ok (pc_log c) i base tvs (S (length (pc_log c)))
         by rewrite Hlog.
@@ -712,8 +711,7 @@ Section lift.
       + intros j Hj. simpl. by apply lookup_insert_other.
     (* THE RMW SPLIT (S2): the exclusive read follows the load's arm, the
        conditional write the store's *)
-    - have Hr' : read_ok_d (pc_img c) (pc_log c) (pa_ws agx) aq false base tvs
-                   (srcs_view (pa_ws agx) asrc)
+    - have Hr' : read_ok (pc_img c) (pc_log c) (pa_ws agx) aq false base tvs
         by rewrite Himg Hlog Hws.
       exists (WPCfgU (pc_img c) (pc_log c)
                (<[i := WPAgent (PHart st')
@@ -1507,7 +1505,7 @@ Proof.
     |cfg ag0 rl0 base0 data0 asrc0 vsrc0 kk R st' dd
          Hlk0 Hps Hne Hres Hrb Hrlen He Hkc]; try exact I.
   simpl. intros ag Hlk. rewrite Hlk0 in Hlk. injection Hlk as <-.
-  have Hlat := pf_rmw_latest cfg i ag0 aq0 base0 tvs0 (srcs_view (pa_ws ag0) asrc0) Hoc Hlk0 Hr He.
+  have Hlat := pf_rmw_latest cfg i ag0 aq0 base0 tvs0 0%nat Hoc Hlk0 Hr He.
   intros j t v Htv. destruct (Hr j t v Htv) as (H1 & H2 & _).
   split_and!;
     [exact H1

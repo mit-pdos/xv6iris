@@ -200,10 +200,12 @@ Definition lb_depfree (l : wlabel) : Prop :=
     THE EXCLUSIVE READ IS **NOT** PINNED (RMW split S3).  [LExLoad] is the
     read half of what used to be [LRmw], and [LRmw] was never pinned: an
     exclusive access is unambiguous at the node, so its address operands
-    are the instruction's own and the arm is admissible at ITS OWN address
-    view (PARM's [Local.read]).  Pinning it — as the additive slice's
-    copy-from-[LLoad] did — would silently delete deviation D-2 from every
-    AMO and from the walker's A/D update. *)
+    are the instruction's own and the label carries them.  What they no
+    longer do is FLOOR the read: since D-2r both exclusive read halves are
+    admissible at the plain floor and fold there, the operands surviving in
+    [w_vcap] only (see [WeakMem.exload_post_run_d]).  The pin stays off
+    because the operand lists are real data the [w_vcap]/[w_regv] chains
+    consume, not because the read floor needs them. *)
 Definition lb_ldepfree (l : wlabel) : Prop :=
   match l with
   | LLoad _ _ _ _ asrc => asrc = []
@@ -885,8 +887,9 @@ Section machine.
       length tvs = length data →
       ts ∈ pa_prom ag →
       pc_log cfg !! (ts - 1)%nat = Some (WMsg base data (Some i) k) →
-      read_ok_d (pc_img cfg) (pc_log cfg) (pa_ws ag) aq false base tvs
-                (srcs_view (pa_ws ag) asrc) →
+      (* D-2r: the fused read half is at the 0 floor too, for uniformity
+         with the split [WPExLoad] (this arm dies at R6). *)
+      read_ok (pc_img cfg) (pc_log cfg) (pa_ws ag) aq false base tvs →
       excl_ok (pc_log cfg) i base tvs ts →
       fulfil_ok_d (load_post_run_d (pa_ws ag) aq (srcs_view (pa_ws ag) asrc)
                      base (tvs.*1))
@@ -958,8 +961,11 @@ Section machine.
   | WPExLoad cfg i ag aq base tvs asrc st' d' :
       pc_ags cfg !! i = Some ag →
       pstep (pa_st ag) (pc_dev cfg) (LExLoad aq base tvs asrc) st' d' →
-      read_ok_d (pc_img cfg) (pc_log cfg) (pa_ws ag) aq false base tvs
-                (srcs_view (pa_ws ag) asrc) →
+      (* D-2r: the ADDRESS VIEW IS NOT AN ADMISSIBILITY FLOOR HERE — the
+         exclusive read is admissible at the 0 floor, exactly as its byte
+         fold now runs at the plain pre-view ([WeakMem.exload_post_run_d]).
+         [asrc] still reaches [w_vcap] through the post-state. *)
+      read_ok (pc_img cfg) (pc_log cfg) (pa_ws ag) aq false base tvs →
       wpstep cfg
         (WPCfg (pc_img cfg) (pc_log cfg) d'
                (<[i := WPAgent st'
@@ -1306,8 +1312,8 @@ Section machine.
     length tvs = length data →
     ws_bounded (pa_ws ag) (length (pc_log cfg)) →
     S (length (pc_log cfg)) ∉ pa_prom ag →
-    read_ok_d (pc_img cfg) (pc_log cfg) (pa_ws ag) aq false base tvs
-              (srcs_view (pa_ws ag) asrc) →
+    (* D-2r: the read half's premise is at the 0 floor, like the arm's *)
+    read_ok (pc_img cfg) (pc_log cfg) (pa_ws ag) aq false base tvs →
     excl_ok (pc_log cfg) i base tvs (S (length (pc_log cfg))) →
     rtc wpstep cfg
       (WPCfg (pc_img cfg) (pc_log cfg ++ [WMsg base data (Some i) k])
@@ -1343,9 +1349,8 @@ Section machine.
                 = Some (WMsg base data (Some i) k).
     { rewrite /mid /=. apply list_lookup_middle. rewrite /ts. lia. }
     (* the read half survives the append: it is a plain (lat-free) read *)
-    have Hr' : read_ok_d (pc_img mid) (pc_log mid) (pa_ws ag) aq false base tvs
-                 (srcs_view (pa_ws ag) asrc).
-    { rewrite /mid /=. by eapply read_ok_d_app. }
+    have Hr' : read_ok (pc_img mid) (pc_log mid) (pa_ws ag) aq false base tvs.
+    { rewrite /mid /=. by eapply read_ok_app. }
     have He' : excl_ok (pc_log mid) i base tvs ts.
     { rewrite /mid /=. eapply excl_ok_app; [rewrite /ts; lia|done]. }
     (* the fulfil conditions, by construction at the fresh top *)

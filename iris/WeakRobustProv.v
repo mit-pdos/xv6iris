@@ -696,6 +696,18 @@ Definition lload_post_run (S : lstate) (aq : bool) (base : Z) (ts : list nat)
        (zip_with (λ j t, (base + Z.of_nat j, t)) (seq 0 (length ts)) ts))
     (l_tbank S).
 
+(** D-2r, MIRRORED ([WeakMem.exload_post_run_d]): the EXCLUSIVE read's
+    address leaves reach the CONTROL view only — its byte fold is the PLAIN
+    one, where the [_d] load's mirror threads [vaddrL] into [lload_vpre_d]
+    as well.  Everything else (the appended bank, the leaf analysis) is
+    [lload_post_run_d]'s verbatim. *)
+Definition lexload_post_run_d (S : lstate) (aq : bool) (vaddrL : list nat)
+    (base : Z) (ts : list nat) : lstate :=
+  lctrl_post
+    (lload_post_bytes S aq
+       (zip_with (λ j t, (base + Z.of_nat j, t)) (seq 0 (length ts)) ts))
+    (vaddrL ++ l_tbank S).
+
 Definition lstore_post_run_d (S : lstate) (rl : bool)
     (vaddrL vdataL : list nat) (base : Z) (n : nat) (t : nat) : lstate :=
   lctrl_post
@@ -743,9 +755,10 @@ Definition laev_post {D : Type} (ev : aev D) (S : lstate) : lstate :=
      the [LExStore], which [astep_ok] reads off the BEHAVIOR's state, not
      the replayed one; S4 relates the reservation COLUMNS through
      [res_cols] instead).  [l_tbank] IS mirrored — W-TV's bank feeds
-     [w_vcap], which [lrel] does constrain. *)
+     [w_vcap], which [lrel] does constrain.  D-2r: the read half's fold is
+     the PLAIN one ([lexload_post_run_d]). *)
   | LExLoad aq base tvs asrc =>
-      lload_post_run_d S aq (lsrcs_view S asrc) base tvs.*1
+      lexload_post_run_d S aq (lsrcs_view S asrc) base tvs.*1
   | LExStore rl base data asrc vsrc =>
       match ae_ts ev with
       | Some ts =>
@@ -1050,6 +1063,25 @@ Qed.
 Lemma lrel_ws_res_set σ S w r : lrel σ S w → lrel σ S (ws_res_set w r).
 Proof. by rewrite /lrel /ws_res_set /coh /regv /=. Qed.
 
+(** D-2r: the exclusive read's mirror.  The address leaves enter the
+    CONTROL view exactly as above; the FOLD is the plain one, so its
+    pre-view obligation is [lrel_load_vpre], not [lrel_load_vpre_d] —
+    that difference IS the deviation's removal. *)
+Lemma lrel_lexload_post_run_d σ S w aq vaddr vaddrL base ts :
+  Inj eq eq σ → lrel σ S w → vaddr = lval σ vaddrL →
+  lrel σ (lexload_post_run_d S aq vaddrL base ts)
+         (exload_post_run_d w aq vaddr base (σ <$> ts)).
+Proof.
+  intros Hinj Hrel Hva.
+  rewrite /lexload_post_run_d /exload_post_run_d.
+  apply lrel_ws_res_set.
+  rewrite /lload_post_bytes /load_post_bytes -tats_run.
+  apply lrel_ctrl_post;
+    [|by rewrite lval_app -Hva -(lrel_tbank _ _ _ Hrel)].
+  apply lrel_load_fold; [done|done|by apply lrel_load_vpre].
+Qed.
+
+
 Lemma lrel_store_post_run σ S w rl base n t :
   lrel σ S w →
   lrel σ (lstore_post_run S rl base n t) (store_post_run w rl base n (σ t)).
@@ -1101,9 +1133,7 @@ Proof.
   - by apply lrel_instr_post.
   (* THE RMW SPLIT (S2): the exclusive read is the load's arm through
      [lrel_ws_res_set] — [lrel] does not constrain [w_res]. *)
-  - rewrite /exload_post_run_d.
-    apply lrel_ws_res_set, lrel_load_post_run_d;
-      [done|done|by apply lrel_srcs_view].
+  - apply lrel_lexload_post_run_d; [done|done|by apply lrel_srcs_view].
   - destruct ts as [t|]; [|exact Hrel].
     apply lrel_store_post_run_d; [done|by apply lrel_srcs_view].
 Qed.
@@ -1443,6 +1473,20 @@ Proof.
   right; right. exact (run_ats_ts base ts p Hp).
 Qed.
 
+(** D-2r: the SAME three cases for the exclusive read — the address leaves
+    still reach [l_vcap], they just no longer reach the fold. *)
+Lemma lexload_post_run_d_leaf S aq vaddrL base ts u :
+  lstate_leaf (lexload_post_run_d S aq vaddrL base ts) u →
+  lstate_leaf S u ∨ u ∈ vaddrL ∨ ∃ j, ts !! j = Some u.
+Proof.
+  rewrite /lexload_post_run_d.
+  intros [Hu|Hu]%lctrl_post_leaf; last first.
+  { apply elem_of_app in Hu as [Hu|Hu];
+      [by right; left|left; rewrite /lstate_leaf; naive_solver]. }
+  apply lload_post_bytes_leaf in Hu as [Hu|(p & Hp & ->)]; [by left|].
+  right; right. exact (run_ats_ts base ts p Hp).
+Qed.
+
 (** A timestamp read by byte [j] of a load/rmw label IS one of the
     label's reads. *)
 Lemma tvs_fst_reads base (tvs : list (nat * bv 8)) j u :
@@ -1481,8 +1525,9 @@ Proof.
   - intros Hu%linstr_post_leaf. by left.
   (* THE RMW SPLIT (S2): [LLoad]'s / [LStore]'s arm verbatim — the
      reservation is on the [wstate] side only, so the [lstate] leaf
-     analysis is unchanged *)
-  - intros [Hu|[Hu|(j & Hj)]]%lload_post_run_d_leaf;
+     analysis is unchanged (D-2r moved the address leaves out of the read
+     half's FOLD, not out of its control view) *)
+  - intros [Hu|[Hu|(j & Hj)]]%lexload_post_run_d_leaf;
       [by left|by left; eapply lsrcs_view_leaf|].
     right; left. by eapply tvs_fst_reads.
   - destruct ts as [t|]; [|by left].

@@ -542,15 +542,15 @@ Definition elab_ok (σ : wgstate) (c : CPU) (l : wlabel) : Prop :=
   | LLoad aq lat base tvs asrc =>
       asrc = [] /\
       read_ok (img_z (wgimg σ)) (wglog σ) (wgws σ c) aq lat base tvs
-  (* D3-2: the operand lists are REAL now, so the pins are gone and the
-     RMW's read half is admissible at ITS OWN address view (PARM's
-     [Local.read]: [view_pre ⊒ view(addr)]).  The LOAD arm keeps its pin —
-     that IS deviation D-8. *)
+  (* D3-2: the operand lists are REAL now, so the pins are gone.  D-2r: the
+     exclusive read halves (fused and split alike) are admissible at the
+     PLAIN read floor — the address view is no longer a read-side floor
+     anywhere (see [WeakMem.exload_post_run_d]).  The LOAD arm keeps its
+     pin — that IS deviation D-8. *)
   | LStore _ _ data asrc vsrc => data <> []
   | LRmw aq rl base tvs data asrc vsrc =>
       data <> [] /\ length tvs = length data /\
-      read_ok_d (img_z (wgimg σ)) (wglog σ) (wgws σ c) aq false base tvs
-        (srcs_view (wgws σ c) asrc) /\
+      read_ok (img_z (wgimg σ)) (wglog σ) (wgws σ c) aq false base tvs /\
       excl_ok (wglog σ) (fin_to_nat c) base tvs (S (length (wglog σ)))
   | LFence _ _ _ _ => True
   | LDev => True                (* the fabric marker: [LSilent]'s twin *)
@@ -558,12 +558,12 @@ Definition elab_ok (σ : wgstate) (c : CPU) (l : wlabel) : Prop :=
   (* THE RMW SPLIT (S3): the side conditions of [WeakPromise.WPExLoad] /
      [WeakPromiseBridge.PFExLoad] and of [WPExStore]/[PFExStore], at this
      hart's own log and view.  The read half is [LLoad]'s at [lat := false]
-     and at its OWN address view (deviation D-2, unpinned — see
-     [WeakPromise.lb_ldepfree]); the write half is [LStore]'s plus §4's
+     and at the PLAIN read floor (D-2r; [asrc] is still UNPINNED — see
+     [WeakPromise.lb_ldepfree] — it just no longer floors the read);
+     the write half is [LStore]'s plus §4's
      window, spelled once as [WeakPromise.exwin_ok]. *)
   | LExLoad aq base tvs asrc =>
-      read_ok_d (img_z (wgimg σ)) (wglog σ) (wgws σ c) aq false base tvs
-        (srcs_view (wgws σ c) asrc)
+      read_ok (img_z (wgimg σ)) (wglog σ) (wgws σ c) aq false base tvs
   | LExStore _ base data _ _ =>
       data <> [] /\
       exwin_ok (wglog σ) (fin_to_nat c) (wgws σ c) base (length data)

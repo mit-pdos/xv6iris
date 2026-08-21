@@ -130,6 +130,21 @@ Definition lb_asrc (l : wlabel) : list dsrc :=
   | LSilent | LFence _ _ _ _ | LDev | LRegW _ _ | LCtrl _ | LInstr => []
   end.
 
+(** D-2r: THE READ-FLOOR OPERAND LIST — the operands whose view floors the
+    label's READ.  Only a PLAIN load has one: since D-2r the exclusive read
+    (and, for uniformity, the fused rmw's read half) is admissible at the
+    plain floor, so its address operands do NOT enter [load_vpre_d] (see
+    [WeakMem.exload_post_run_d]'s header).  [lb_asrc] above is unchanged —
+    it is the label's real address operand list, which the STORE side's
+    dependency edges and [w_vcap] still consume. *)
+Definition lb_rasrc (l : wlabel) : list dsrc :=
+  match l with
+  | LLoad _ _ _ _ asrc => asrc
+  | LStore _ _ _ _ _ | LRmw _ _ _ _ _ _ _ | LExLoad _ _ _ _
+  | LExStore _ _ _ _ _
+  | LSilent | LFence _ _ _ _ | LDev | LRegW _ _ | LCtrl _ | LInstr => []
+  end.
+
 Lemma elem_of_tvs_reads base tvs a ts :
   (a, ts) ∈ tvs_reads base tvs ↔
   ∃ (j : nat) (v : bv 8), tvs !! j = Some (ts, v) ∧ a = base + Z.of_nat j.

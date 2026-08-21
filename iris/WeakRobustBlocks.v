@@ -662,9 +662,10 @@ Section complete.
       destruct (le_rmw Hen (pa_st ag) (pc_dev c) aq rl base tvs data tvs'
                   asrc vsrc p' dd (eq_sym Hlen') Hps)
         as (data' & p'' & dd' & Hlend' & Hps').
-      have Hro : read_ok_d (pc_img c) (pc_log c) (pa_ws ag) aq false base tvs'
-                   (srcs_view (pa_ws ag) asrc).
-      { apply read_latest_read_ok_d; [done|by apply srcs_view_bounded|done]. }
+      (* D-2r: the read half is at the plain floor, so the operand bound is
+         no longer needed *)
+      have Hro : read_ok (pc_img c) (pc_log c) (pa_ws ag) aq false base tvs'.
+      { apply read_latest_read_ok; [done|done]. }
       have Hex : excl_ok (pc_log c) i base tvs' (S (length (pc_log c)))
         by apply (read_latest_excl_ok (pc_img c) (pc_log c) i base tvs').
       have Hne' : data' ≠ [].

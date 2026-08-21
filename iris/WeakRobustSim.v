@@ -927,10 +927,10 @@ Section sim.
     end →
     lb_reads l = tvs_reads base tvs →
     read_ok_d (pt_img TS) (pt_log TS) (pa_ws ag) (lb_aq l) lat base tvs
-              (srcs_view (pa_ws ag) (lb_asrc l)) →
+              (srcs_view (pa_ws ag) (lb_rasrc l)) →
     ws = aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init →
     read_ok_d img (pf_log TS done) ws (lb_aq l) false base
-      (tlabel_ts (pi TS done) tvs) (srcs_view ws (lb_asrc l)).
+      (tlabel_ts (pi TS done) tvs) (srcs_view ws (lb_rasrc l)).
   Proof.
     intros Hq Hpre Hnp HT Hev Hag Hlbe Hrdl Hreads Hro Hws.
     have Hgev : gev_ev TS e = Some ev by rewrite /gev_ev HT /=.
@@ -939,16 +939,16 @@ Section sim.
     { rewrite Hws (pre_lstate_tr TS e T HT).
       apply lrel_aevs_post_init, pi_sigma_ok. }
     have Hleaves : ∀ a, rd_leaves TS e a
-                        = lsrcs_view (pre_lstate TS e) (lb_asrc l)
+                        = lsrcs_view (pre_lstate TS e) (lb_rasrc l)
                           ++ lfloor (pre_lstate TS e) (lb_aq l) a.
     { intros a. rewrite /rd_leaves Hlb. by destruct l. }
     have Hfpf : ∀ a, Nat.max (load_vpre_d ws (lb_aq l)
-                                (srcs_view ws (lb_asrc l))) (coh ws a)
+                                (srcs_view ws (lb_rasrc l))) (coh ws a)
                      = lval (pi TS done) (rd_leaves TS e a).
     { intros a. rewrite (Hleaves a). by apply lrel_floor_d. }
     have Hfbeh : ∀ a, rd_floor TS e a
                  = Nat.max (load_vpre_d (pa_ws ag) (lb_aq l)
-                              (srcs_view (pa_ws ag) (lb_asrc l)))
+                              (srcs_view (pa_ws ag) (lb_rasrc l)))
                            (coh (pa_ws ag) a).
     { intros a. by eapply (rd_floor_ws pstep). }
     intros jb t' v Hjb.
@@ -973,7 +973,7 @@ Section sim.
     (* ---- READABILITY ---- *)
     have Hnw : ¬ writes_in (pf_log TS done) (base + Z.of_nat jb) (pi TS done t)
                  (Nat.max (load_vpre_d ws (lb_aq l)
-                             (srcs_view ws (lb_asrc l)))
+                             (srcs_view ws (lb_rasrc l)))
                           (coh ws (base + Z.of_nat jb))).
     { rewrite (Hfpf (base + Z.of_nat jb)). intros Hw.
       destruct (pf_writes_in_inv done (base + Z.of_nat jb) _ _ Hq Hw)

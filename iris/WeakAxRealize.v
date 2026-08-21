@@ -360,8 +360,9 @@ Section realize.
                  kc p' dn);
           [done|exact Hps|done| | | |].
         * rewrite length_zip_with. lia.
-        * rewrite srcs_view_nil read_ok_d_0 -(Hf i ag Hlk).
-          by apply rd_ok_read_ok.
+        * (* D-2r: the read half is at the plain floor — no [srcs_view_nil]
+             peel is needed any more *)
+          rewrite -(Hf i ag Hlk). by apply rd_ok_read_ok.
         * by apply (rmw_latest_excl_ok (pc_img c) _ i base ts rvs).
         * rewrite -(Hf i ag Hlk). exact Hck.
       + rewrite !srcs_view_nil load_post_run_d_0 store_post_run_d_0 fst_zip;
@@ -415,8 +416,8 @@ Section realize.
     split_and!.
     - apply (PFExLoad pstep pcls i c ag aq base tvs [] pm dm Hlk).
       + exact Hps1.
-      + rewrite srcs_view_nil read_ok_d_0 -Hfi.
-        rewrite -{1}(zip_fst_snd tvs). by apply rd_ok_read_ok.
+      + (* D-2r: the plain floor — no [srcs_view_nil] peel *)
+        rewrite -Hfi. rewrite -{1}(zip_fst_snd tvs). by apply rd_ok_read_ok.
     - apply (PFExStore pstep pcls i _
                (WPAgent pm (exload_post_run_d (pa_ws ag) aq 0%nat base tvs.*1)
                   (pa_prom ag))

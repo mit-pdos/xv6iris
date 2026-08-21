@@ -289,8 +289,10 @@ Proof.
       lia.
   - by rewrite /fence_post /=.
   (* THE RMW SPLIT (S2): [LLoad]'s / [LStore]'s arm verbatim — [w_pub]
-     does not see the reservation *)
-  - by rewrite w_pub_load_post_run_d.
+     does not see the reservation (D-2r: nor the address view, which the
+     exclusive read now keeps out of its fold) *)
+  - change (w_pub (load_post_run_d w xaq 0%nat xbase (σ <$> xtvs.*1)) < N)%nat.
+    by rewrite w_pub_load_post_run_d.
   - destruct (ae_ts ev) as [ts|] eqn:Hts; [|done].
     destruct (decide (w_relp w = true ∨ yrl = true)) as [Hr|Hr].
     + have Hσ : (σ ts < N)%nat.

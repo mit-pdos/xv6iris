@@ -530,11 +530,15 @@ Section hart.
                 \/
                 (* THE EXCLUSIVE READ (RMW split §2/§6).  ONE step, and its
                    read semantics are the plain arm's with [lat := false]
-                   hardwired — at ITS OWN address view, as the fused arm's
-                   read half was (deviation D-2, PARM's [Local.read]).  The
+                   hardwired — at the PLAIN read floor since D-2r: the
+                   address view is no longer an admissibility condition nor
+                   a byte-fold floor (see [WeakMem.exload_post_run_d]'s
+                   header for the rationale and the re-upgrade coupling); it
+                   is still PASSED to the σ-effect, where it survives in
+                   [w_vcap] (the [ctrl_post] join) and nowhere else.  The
                    RESERVATION is machine-side state: the language only names
-                   the σ-effect [exload_post_run_d], which is
-                   [load_post_run_d] plus [w_res := Some (base, tvs.*1,
+                   the σ-effect [exload_post_run_d], which is the plain
+                   run-level read plus [w_res := Some (base, tvs.*1,
                    ldv_of …)], SUPERSEDING whatever [w_res] held.
 
                    THE F6 GUARD IS GONE with the fusion: a bare exclusive
@@ -547,10 +551,9 @@ Section hart.
                    length tvs = N.to_nat n /\
                    (forall j : nat, (j < N.to_nat n)%nat ->
                       tvs.*2 !! j = Some (nth_byte w j)) /\
-                   read_ok_d (img_z (wgimg σ)) lg0 ws0
+                   read_ok (img_z (wgimg σ)) lg0 ws0
                      (ak_sync (classify (Interface.ReadReq.access_kind req)))
-                     false (pa_z (Interface.ReadReq.pa req)) tvs
-                     (srcs_view ws0 (deps_asrc (edeps σ c))) /\
+                     false (pa_z (Interface.ReadReq.pa req)) tvs /\
                    e' = ECycle gen c (k (inl (w, None))) None /\
                    σ' = ewg_ws σ c
                           (exload_post_run_d ws0

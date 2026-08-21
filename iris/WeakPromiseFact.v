@@ -143,8 +143,7 @@ Section fact.
     | LRmw aq rl base tvs data asrc vsrc =>
         ∃ ts k, length tvs = length data ∧ ts ∈ pa_prom ag ∧
           log !! (ts - 1)%nat = Some (WMsg base data (Some i) k) ∧
-          read_ok_d img log (pa_ws ag) aq false base tvs
-                    (srcs_view (pa_ws ag) asrc) ∧
+          read_ok img log (pa_ws ag) aq false base tvs ∧
           excl_ok log i base tvs ts ∧
           fulfil_ok_d (load_post_run_d (pa_ws ag) aq
                          (srcs_view (pa_ws ag) asrc) base (tvs.*1))
@@ -167,8 +166,8 @@ Section fact.
        ARM — [wp_astep_wpstep] turns it back into a [wpstep] — so these two
        are [WPExLoad]'s and [WPExStore]'s premises, verbatim. *)
     | LExLoad aq base tvs asrc =>
-        read_ok_d img log (pa_ws ag) aq false base tvs
-                  (srcs_view (pa_ws ag) asrc) ∧
+        (* D-2r: the 0 floor, as in [WPExLoad]. *)
+        read_ok img log (pa_ws ag) aq false base tvs ∧
         f = (λ w, exload_post_run_d w aq (srcs_view w asrc) base (tvs.*1)) ∧
         Dl = None
     | LExStore rl base data asrc vsrc =>
@@ -442,7 +441,7 @@ Section fact.
       pose proof (lookup_lt_Some _ _ _ Hlog) as Hlt.
       exists ts, k. split_and!; [done|done| | | |done|done|done].
       + rewrite lookup_app_l; [done|done].
-      + eapply read_ok_d_app; [done|by apply srcs_view_bounded|done].
+      + eapply read_ok_app; [done|done].
       + eapply excl_ok_app; [lia|done].
     - done.
     - done.
@@ -453,7 +452,7 @@ Section fact.
        [lat = false]; the conditional write follows [LStore]'s, with the
        window carried by [excl_ok_ts_app] instead of [excl_ok_app]. *)
     - intros (Hr & -> & ->). split_and!; [|done|done].
-      eapply read_ok_d_app; [done|by apply srcs_view_bounded|done].
+      eapply read_ok_app; [done|done].
     - intros (ts & k & R & Hin & Hlog & Hres & Hrb & Hrlen & He & Hful & -> & ->).
       pose proof (lookup_lt_Some _ _ _ Hlog) as Hlt.
       (* THE WALKER GATE (layer2 §13) transfers VERBATIM: the classifier

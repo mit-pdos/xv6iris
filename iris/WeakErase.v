@@ -472,22 +472,27 @@ Proof.
   apply er_ws_load_vpre_d; [by apply instr_post_er|done].
 Qed.
 
+(** D-2r: THE OPERAND-VIEW PREMISE IS GONE.  The exclusive read's address
+    view no longer reaches the fold or the reservation — only [w_vcap],
+    which [er_ws] does not relate — so the two sides erase at ARBITRARY
+    (unrelated) address views. *)
 Lemma exload_post_run_d_er we wi aq vae vai base ts :
-  er_ws we wi → (vae ≤ vai)%nat →
+  er_ws we wi →
   er_ws (exload_post_run_d we aq vae base ts)
         (exload_post_run_d wi aq vai base ts).
 Proof.
-  intros Her Hv.
-  pose proof (load_post_run_d_er we wi aq vae vai base ts Her Hv) as Hl.
+  intros Her.
+  pose proof (load_post_run_d_er we wi aq 0%nat 0%nat base ts Her
+                (Nat.le_refl 0%nat)) as Hl.
   destruct Hl as (Hle & Hrp & Hfw & _).
   rewrite /exload_post_run_d. split_and!.
   - exact Hle.
   - exact Hrp.
   - exact Hfw.
   - intros Ri HR. rewrite ws_res_set_res in HR. simplify_eq.
-    exists (WResv base ts (ldv_of we aq vae base ts)).
+    exists (WResv base ts (ldv_of we aq 0%nat base ts)).
     split_and!; [by rewrite ws_res_set_res|done|done|].
-    by apply ldv_of_er.
+    apply ldv_of_er; [exact Her|done].
 Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -519,7 +524,7 @@ Lemma exload_post_run_d_er0 we wi aq vai base ts :
   er_ws we wi →
   er_ws (exload_post_run_d we aq 0%nat base ts)
         (exload_post_run_d wi aq vai base ts).
-Proof. intros Her. apply exload_post_run_d_er; [done|apply Nat.le_0_l]. Qed.
+Proof. intros Her. by apply exload_post_run_d_er. Qed.
 
 (* ====================================================================== *)
 (** ** 3. The erased machine and the configuration relation *)

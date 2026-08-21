@@ -126,8 +126,7 @@ Section pf_uniform.
     | LStore _ _ data asrc vsrc => data <> []
     | LRmw aq rl base tvs data asrc vsrc =>
         data <> [] /\ length tvs = length data /\
-        read_ok_d (pc_img cfg) (pc_log cfg) (pa_ws ag) aq false base tvs
-          (srcs_view (pa_ws ag) asrc) /\
+        read_ok (pc_img cfg) (pc_log cfg) (pa_ws ag) aq false base tvs /\
         excl_ok (pc_log cfg) i base tvs (S (length (pc_log cfg)))
     | LRegW _ _ | LCtrl _ | LInstr => True
     (* THE RMW SPLIT (S3): the side conditions of [PFExLoad]/[PFExStore].
@@ -135,9 +134,9 @@ Section pf_uniform.
        [LRmw] never was — see [WeakPromise.lb_ldepfree]); the conditional
        write's is [WeakPromise.exwin_ok], the machine arm's reservation and
        window premises under one name. *)
+    (* D-2r: the exclusive read is admissible at the PLAIN floor. *)
     | LExLoad aq base tvs asrc =>
-        read_ok_d (pc_img cfg) (pc_log cfg) (pa_ws ag) aq false base tvs
-          (srcs_view (pa_ws ag) asrc)
+        read_ok (pc_img cfg) (pc_log cfg) (pa_ws ag) aq false base tvs
     | LExStore _ base data _ _ =>
         data <> [] /\
         exwin_ok (pc_log cfg) i (pa_ws ag) base (length data)

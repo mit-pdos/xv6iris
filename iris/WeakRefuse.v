@@ -283,10 +283,13 @@ Proof.
   by rewrite store_post_fold_res ctrl_post_res_set.
 Qed.
 
+(** D-2r: the exclusive read's fold is the PLAIN one, so forgetting the
+    reservation leaves the plain load run under ONE [ctrl_post] (the
+    address view's only remaining home). *)
 Lemma exload_post_run_d_resN ws aq vaddr base ts :
   ws_res_set (exload_post_run_d ws aq vaddr base ts) None
-  = ws_res_set (load_post_run_d ws aq vaddr base ts) None.
-Proof. done. Qed.
+  = ctrl_post (ws_res_set (load_post_run_d ws aq 0%nat base ts) None) vaddr.
+Proof. by rewrite exload_post_run_d_ctrl -ctrl_post_res_set. Qed.
 
 (* ====================================================================== *)
 (** ** 2. [rf_ws]: stage 1's ≤-relation, with the reservation forgotten *)
@@ -338,7 +341,8 @@ Qed.
 Lemma rf_ws_exload_r wF wS aq vaddr base ts :
   rf_ws wF wS → rf_ws wF (exload_post_run_d wS aq vaddr base ts).
 Proof.
-  intros H. rewrite /rf_ws exload_post_run_d_resN. by apply rf_ws_load_r.
+  intros H. rewrite /rf_ws exload_post_run_d_resN.
+  apply er_ws_ctrl_r. exact (rf_ws_load_r wF wS aq 0%nat base ts H).
 Qed.
 
 (** The two-sided steps.  The fused side always runs at operand view [0] —
@@ -359,7 +363,8 @@ Lemma rf_ws_load_exload wF wS aq vaddr base ts :
   rf_ws (load_post_run_d wF aq 0%nat base ts)
         (exload_post_run_d wS aq vaddr base ts).
 Proof.
-  intros H. rewrite /rf_ws exload_post_run_d_resN -load_post_run_d_res.
+  intros H. rewrite /rf_ws exload_post_run_d_resN.
+  apply er_ws_ctrl_r. rewrite -load_post_run_d_res.
   by apply load_post_run_d_er0.
 Qed.
 

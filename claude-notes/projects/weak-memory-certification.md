@@ -403,6 +403,25 @@ smaller than feared, and NO model change):**
     full-machine-only, invisible to route B.  Align the fused
     `WPRmw`/`PFRmw` arms identically for uniformity (they die at R6
     anyway).
+    **D-2r LANDED (2026-08-21).**  THE VETO DID NOT FIRE: no landed
+    kill or capstone consumed the exload's address-view admissibility
+    or fold — every repair was mechanical and several got SHORTER
+    (`WeakErase.exload_post_run_d_er` lost its `vae ≤ vai` premise
+    outright; `WeakRobustAcyc`'s two exclusive-read bullets lost their
+    `load_post_bytes_d_mono` bridge; the `srcs_view_nil read_ok_d_0`
+    peels at the bridge/realizer rmw arms are gone).  W-TV's consumers
+    are untouched (`ctrl_post (vaddr ⊔ w_tbank)` and
+    `exload_post_run_d_vcap` are textually unchanged).  New in-tree
+    names: `WeakMem.exload_post_run_d_ctrl` (the collapse lemma, the
+    twin of `store_post_d_vf`), `WeakRobustGraph.lb_rasrc` (the
+    READ-FLOOR operand list — a plain load's `asrc`, `[]` for the
+    exclusives and the fused rmw — used by `rd_leaves`/`rd_floor_ws`/
+    `WeakRobustSim.read_ok_pf`), and `WeakRobustProv`'s mirror trio
+    `lexload_post_run_d` / `lrel_lexload_post_run_d` /
+    `lexload_post_run_d_leaf`.  Rationale + the RE-UPGRADE COUPLING are
+    at `WeakMem.exload_post_run_d` and in `design/weak-memory-deps.md`
+    (entry D-2r).  Both capstones stayed at exactly the five rv64d
+    axioms.
   * (iii-a)'s relation `ws_eqr`: EQUAL on `coh`/`vrOld`/`vwOld`/
     `vrNew`/`vwNew`/`vRel`/`fwd`/`pub`/`relp`; UNRELATED
     `regv`/`vcap`/`ldv`/`tbank`/`res` (`res` handled inside the

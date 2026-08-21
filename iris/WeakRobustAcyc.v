@@ -316,13 +316,15 @@ Section astep.
     - intros _ _ Hin%elem_of_nil. done.
     - intros _ _ Hin%elem_of_nil. done.
     (* THE RMW SPLIT (S2): the exclusive read is [LLoad]'s arm, through
-       the reservation wrapper (transparent to every view). *)
+       the reservation wrapper (transparent to every view).  D-2r: its byte
+       fold IS the plain one now, so the [load_post_bytes_d] monotonicity
+       step that used to bridge the address view is gone — the two sides
+       are the same fold. *)
     - intros (_ & -> & _) -> [j [v [Hj ->]]]%elem_of_tvs_reads. simpl.
       have Hts : ((xtvs.*1)) !! j = Some ts by rewrite list_lookup_fmap Hj.
       etrans;
         [by apply (load_post_run_vwNew_aq (pa_ws ag) xbase (xtvs.*1) j ts Hts)|].
-      rewrite /load_post_run ctrl_post_vwNew.
-      apply ws_le_vwNew, load_post_bytes_d_mono.
+      apply Nat.le_refl.
     - intros _ _ Hin%elem_of_nil. done.
   Qed.
 
@@ -356,10 +358,10 @@ Section astep.
     - intros _ _ Hin%elem_of_nil. done.
     - intros _ _ Hin%elem_of_nil. done.
     - intros _ _ Hin%elem_of_nil. done.
-    (* THE RMW SPLIT (S2) *)
+    (* THE RMW SPLIT (S2).  D-2r: the exclusive read's fold IS the plain
+       one, so the [load_post_bytes_d] monotonicity bridge is gone. *)
     - intros (_ & -> & _) Hfv [j [v [Hj ->]]]%elem_of_tvs_reads. simpl.
       have Hts : ((xtvs.*1)) !! j = Some ts by rewrite list_lookup_fmap Hj.
-      etrans; [|apply ws_le_vrOld, load_post_bytes_d_mono].
       apply (load_post_run_vrOld' (pa_ws ag) xaq xbase (xtvs.*1) j ts Hts).
       rewrite /acc_addr. exact Hfv.
     - intros _ _ Hin%elem_of_nil. done.

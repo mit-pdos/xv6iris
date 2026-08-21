@@ -340,9 +340,9 @@ Qed.
     [rv_base] (byte [j] at [rv_base + j]) — the vocabulary
     [WeakPromise.excl_ok_ts] consumes; values are NOT carried (the log at
     [(b, ts)] has them).  [rv_view] is the read half's banked post-view
-    ([ldv_of ws aq (srcs_view ws asrc) base tvs.*1]), which the write
-    half's [fulfil_vpre] must dominate (deviation D-2, PARM's exbank-view
-    contribution). *)
+    ([ldv_of ws aq 0 base tvs.*1] — the PLAIN one since D-2r; see
+    [exload_post_run_d]), which the write half's [fulfil_vpre] must
+    dominate (deviation D-2, PARM's exbank-view contribution). *)
 Record wresv := WResv {
   rv_base : Z;
   rv_ts   : list nat;
@@ -1262,17 +1262,75 @@ Proof. by destruct ws. Qed.
     does — the reservation banks only timestamps, which is all
     [WeakPromise.excl_ok_ts] consumes, and taking the column keeps the
     function usable by a replay that remaps timestamps
-    ([WeakRobustProv.aev_post]).  [rv_view] is the read half's own banked
-    post-view [ldv_of], which the conditional write's [fulfil_vpre] must
-    dominate (deviation D-2). *)
+    ([WeakRobustProv.aev_post]).
+
+    D-2r (2026-08-21) — THE ADDRESS VIEW LEAVES THE BYTE FOLD.  The fold
+    runs at the PLAIN pre-view [load_vpre] (i.e. [load_post_bytes], not
+    [load_post_bytes_d … vaddr]); [vaddr] survives ONLY in the control
+    view, through the same [ctrl_post (vaddr ⊔ w_tbank)] wrapper the plain
+    run-level read has.  The RESERVATION's banked view follows the fold, so
+    [rv_view] is now the PLAIN [ldv_of … 0] — a weakening, deliberately.
+
+    WHY (the D-7r species, in RVWMO ppo rule 9's exclusive-read flavor).
+    Deviation D-2 gave the exclusive read PARM's [Local.read] shape, whose
+    [view_pre] joins [view(addr)]; under route B the DECLARED model is
+    RVWMO⁻ + store-deps, which has NO read-targeted dependency rule, so a
+    dep-carrying read floor made the machine STRICTLY STRONGER than its own
+    declared model at exactly this point — the realization-direction bug
+    pattern.  The PAIRED exclusive read is harmless (it reads LATEST, so
+    [rmw_latest] + [latest_readable] admit it at any floor, and the write
+    half's fresh-top timestamp absorbs the fold's [coh] raise), but a
+    DANGLING exload — the walker's A/D re-read race, an amocas miss, both
+    real xv6 shapes that project as plain loads — has no absorbing write:
+    its address view leaked into its bytes' [coh] and could refuse a later
+    stale re-read the model admits.  Folding at the plain [vpre] WEAKENS
+    the machine (more behaviours — the containment-SAFE direction) and
+    aligns it with the declared model.
+
+    RE-UPGRADE COUPLING — DO NOT "FIX" THIS BACK CASUALLY (the twin of
+    [store_post_d]'s).  Re-admitting the address view into the exclusive
+    read's admissibility ([WeakPromise]'s [WPExLoad]/[PFExLoad] arms) and
+    into this fold goes TOGETHER with growing the completeness model by
+    rule 9's exclusive flavor (read-targeted dep ordering + dep-carrying
+    labels).  One without the other reopens the gap this change closed.
+
+    [vaddr] is therefore LIVE only in [w_vcap] here; the parameter stays in
+    place for signature stability across the [_d] tower (D-7r's pattern),
+    and [exload_post_run_d_ctrl] below is the collapse lemma every repair
+    goes through. *)
 Definition exload_post_run_d (ws : wstate) (aq : bool) (vaddr : nat)
     (base : Z) (ts : list nat) : wstate :=
-  ws_res_set (load_post_run_d ws aq vaddr base ts)
-    (Some (WResv base ts (ldv_of ws aq vaddr base ts))).
+  ws_res_set
+    (ctrl_post
+       (load_post_bytes ws aq
+          (zip_with (λ j t, (base + Z.of_nat j, t)) (seq 0 (length ts)) ts))
+       (Nat.max vaddr (w_tbank ws)))
+    (Some (WResv base ts (ldv_of ws aq 0%nat base ts))).
+
+(** THE D-2r COLLAPSE.  [vaddr] reaches nothing but the control view, so the
+    dependency-carrying exclusive read IS the dependency-free one under one
+    extra [ctrl_post] — at EVERY address view, not merely at [0].  This is
+    the lemma the [_d] tower's repairs go through (the twin of
+    [store_post_d_vf]); [ctrl_post] is transparent to every other field, so
+    each such repair is one peel. *)
+Lemma exload_post_run_d_ctrl ws aq vaddr base ts :
+  exload_post_run_d ws aq vaddr base ts
+  = ctrl_post (exload_post_run_d ws aq 0%nat base ts) vaddr.
+Proof.
+  rewrite /exload_post_run_d /ws_res_set /ctrl_post /=. f_equal. lia.
+Qed.
+
+(** The load half at the plain fold, named: the exclusive read is the
+    ordinary run-level read under [ws_res_set] and one [ctrl_post]. *)
+Lemma exload_post_run_d_0 ws aq base ts :
+  exload_post_run_d ws aq 0%nat base ts
+  = ws_res_set (load_post_run ws aq base ts)
+      (Some (WResv base ts (ldv_of ws aq 0%nat base ts))).
+Proof. done. Qed.
 
 Lemma exload_post_run_d_res ws aq vaddr base ts :
   w_res (exload_post_run_d ws aq vaddr base ts)
-  = Some (WResv base ts (ldv_of ws aq vaddr base ts)).
+  = Some (WResv base ts (ldv_of ws aq 0%nat base ts)).
 Proof. done. Qed.
 
 (** *** WHAT EACH ACCESS DOES TO [w_res], AS AN EQUATION
@@ -2615,43 +2673,46 @@ Proof.
   by destruct (ws_bounded_res _ _ Hb R HR) as [_ ?].
 Qed.
 
+(** D-2r: every one of these is the PLAIN read's fact, by conversion —
+    [vaddr] reaches only [w_vcap] (the last lemma, which is the one the
+    W-TV/vcap consumers use and which is UNCHANGED). *)
 Lemma exload_post_run_d_le ws aq vaddr base ts :
   ws_le ws (exload_post_run_d ws aq vaddr base ts).
-Proof. apply ws_res_set_le, load_post_run_d_le. Qed.
+Proof.
+  rewrite /exload_post_run_d. apply ws_res_set_le.
+  etrans; [apply load_post_bytes_le|apply ctrl_post_le].
+Qed.
 
 Lemma exload_post_run_d_bounded ws aq vaddr base ts n :
   ws_bounded ws n → (vaddr ≤ n)%nat →
   Forall (λ t, (t ≤ n)%nat) ts →
   ws_bounded (exload_post_run_d ws aq vaddr base ts) n.
 Proof.
-  intros Hb Hva Hall. apply ws_res_set_bounded.
-  - by apply load_post_run_d_bounded.
+  intros Hb Hva Hall. rewrite /exload_post_run_d. apply ws_res_set_bounded.
+  - apply ctrl_post_bounded;
+      [|apply Nat.max_lub; [exact Hva|by apply ws_bounded_tbank]].
+    apply load_post_bytes_bounded; [exact Hb|by apply Forall_zip_seq].
   - intros R [= <-]. simpl. split.
     + intros j t Ht. rewrite Forall_lookup in Hall. by eapply Hall.
-    + by apply ldv_of_bounded.
+    + apply ldv_of_bounded; [exact Hb|lia|exact Hall].
 Qed.
 
 Lemma exload_post_run_d_fwd ws aq vaddr base ts :
   w_fwd (exload_post_run_d ws aq vaddr base ts) = w_fwd ws.
-Proof. rewrite /exload_post_run_d ws_res_set_fwd load_post_run_d_fwd //. Qed.
+Proof. exact (load_post_run_d_fwd ws aq 0%nat base ts). Qed.
 
 Lemma exload_post_run_d_relp ws aq vaddr base ts :
   w_relp (exload_post_run_d ws aq vaddr base ts) = w_relp ws.
-Proof. rewrite /exload_post_run_d ws_res_set_relp load_post_run_d_relp //. Qed.
+Proof. exact (load_post_run_d_relp ws aq 0%nat base ts). Qed.
 
 Lemma exload_post_run_d_coh ws aq vaddr base ts (j : nat) t :
   ts !! j = Some t →
   (t ≤ coh (exload_post_run_d ws aq vaddr base ts) (base + Z.of_nat j))%nat.
-Proof.
-  intros Ht. rewrite /exload_post_run_d ws_res_set_coh.
-  by apply load_post_run_d_coh.
-Qed.
+Proof. exact (load_post_run_d_coh ws aq 0%nat base ts j t). Qed.
 
 Lemma exload_post_run_d_vcap ws aq vaddr base ts :
   (vaddr ≤ w_vcap (exload_post_run_d ws aq vaddr base ts))%nat.
-Proof.
-  rewrite /exload_post_run_d ws_res_set_vcap. apply load_post_run_d_vcap.
-Qed.
+Proof. rewrite /exload_post_run_d /ws_res_set /ctrl_post /=. lia. Qed.
 
 (** *** The store run *)
 

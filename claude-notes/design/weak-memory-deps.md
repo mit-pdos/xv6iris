@@ -150,6 +150,10 @@ needs the containment argument, "WEAKER" = adds behaviors, free):
   PARM.  PARM's SC-result register view (`res = ts` for `ex ∧ riscv`) has no
   counterpart (an AMO's `rd` is the READ's `res`, view = the read's
   `view_post`; xv6 has no `sc`) — WEAKER (free); note it in the ledger.
+  **STATUS: the exbank JOIN stands; the exclusive read's own ADDRESS-VIEW
+  floor does NOT — see D-2r below before reading anything here as current.**
+  In particular the exclusive read is admissible at the PLAIN read floor and
+  its byte fold runs there, so `rv_view` is the plain `ldv_of … 0`.
 - **D-3 (`jalr` control).** As above: STRONGER than PARM's language, inside
   RVWMO ppo 11.
 - **D-4 (CSR / non-GPR registers).** `w_regv` tracks GPRs only; CSR-mediated
@@ -282,6 +286,61 @@ needs the containment argument, "WEAKER" = adds behaviors, free):
     case, and `WeakAxiomatic3`'s `bankdom`/`fwd_view_cases` "a consulted bank
     contributes `0`" invariants — which the dep-free tier always assumed — are
     now true of the `_d` tier too.
+- **D-2r (THE ROUTE-B ALIGNMENT OF THE EXCLUSIVE READ'S ADDRESS VIEW,
+  2026-08-21).  The address view LEAVES the exclusive read's admissibility
+  and its byte fold; it survives in `w_vcap` and (via the fold) nowhere
+  else.**  `WeakMem.exload_post_run_d` folds `load_post_bytes` at the PLAIN
+  `load_vpre` and banks `rv_view := ldv_of … 0`, keeping the
+  `ctrl_post (vaddr ⊔ w_tbank)` wrapper unchanged; `WPExLoad`/`PFExLoad`
+  (and, for uniformity, the fused `WPRmw`/`PFRmw` read halves — they die at
+  R6) ask for `read_ok`, the 0 floor, instead of
+  `read_ok_d … (srcs_view … asrc)`.  `vaddr` is a parameter kept for
+  signature stability, and `exload_post_run_d_ctrl :
+  exload_post_run_d ws aq vaddr base ts
+  = ctrl_post (exload_post_run_d ws aq 0 base ts) vaddr` is the collapse
+  lemma the repairs go through (D-7r's `store_post_d_vf` pattern).
+  - **Why.**  D-2 gave the exclusive read PARM's `Local.read` shape, whose
+    `view_pre` joins `view(addr)` — RVWMO ppo rule 9 in its exclusive-read
+    flavor.  Route B's DECLARED model is RVWMO⁻ + store-deps, which has NO
+    read-targeted dependency rule, so the machine was STRICTLY STRONGER than
+    its own declared model at exactly this point: the realization-direction
+    bug pattern, D-7r's species.  The PAIRED exclusive read is harmless (it
+    reads LATEST — `rmw_latest` + `latest_readable` admit at any floor — and
+    the write half's fresh-top timestamp absorbs the fold's `coh` raise),
+    but a DANGLING exload (the walker's A/D re-read race, an amocas miss;
+    both real xv6 shapes, both projecting as plain loads) has no absorbing
+    write: its address view leaked into its bytes' `coh` and could refuse a
+    later stale re-read the model admits.  Folding at the plain `vpre`
+    WEAKENS the machine (more behaviours — the containment-SAFE direction)
+    and aligns it with the declared model.
+  - **What survives.**  `w_vcap`: the `ctrl_post (vaddr ⊔ w_tbank)` join is
+    untouched, so every W-TV consumer (the bank's consumption at the access
+    node, `exload_post_run_d_vcap`, L2′'s walker kills) is unaffected — that
+    was an explicit veto condition of the slice and it did not fire.  The
+    reservation still exists and still banks a view; only its VALUE weakens
+    to the plain fold's, which the robustness tower does not relate anyway
+    (S4 leaves `rv_view` deliberately unrelated).  D-2's exbank JOIN at the
+    conditional write (`fulfil_vpre ⊒ rv_view`) is unchanged.
+  - **RE-UPGRADE COUPLING — do not "fix" this back casually** (the twin of
+    D-7r's).  Re-admitting the address view into the exclusive read's
+    admissibility and fold goes TOGETHER with growing the completeness model
+    by rule 9's exclusive flavor (read-targeted dep ordering + dep-carrying
+    labels in the conformance alphabet).  One without the other reopens the
+    gap this closed.
+  - **Where the mirrors are.**  `WeakRobustProv.lexload_post_run_d` (the
+    `lstate` twin: plain fold, address leaves in `lctrl_post` only) with
+    `lrel_lexload_post_run_d` / `lexload_post_run_d_leaf`;
+    `WeakRobustGraph.lb_rasrc` — the READ-FLOOR operand list (a plain load's
+    `asrc`, `[]` for the exclusives and the fused rmw), which is what
+    `rd_leaves`/`rd_floor`/`WeakRobustSim.read_ok_pf` now use.  `lb_asrc` is
+    unchanged: it is still the label's real address operand list, consumed
+    by the store side's dependency edges and by `w_vcap`.
+  - Premises that DIED with the move (the alignment evidence):
+    `WeakErase.exload_post_run_d_er` lost its `vae ≤ vai` premise outright
+    (the two sides now erase at unrelated address views), the tower's
+    `read_latest_read_ok_d`/`read_ok_d_app` uses at exclusive reads became
+    the shorter `read_latest_read_ok`/`read_ok_app`, and the bridge's
+    `srcs_view_nil read_ok_d_0` peel at the rmw arm is gone.
 - **D-6 (the disk agent).** `virtio_prog`'s events carry empty `srcs`; its
   ordering is aq/fence-based — WEAKER than a hart with the same accesses
   (free), and exact for what the driver relies on.
@@ -334,6 +393,10 @@ closing D-7) because the bank entry is written per byte.
 `ldv_of ws aq vaddr base ts := w_ldv (load_post_run_d (ws_ldv0 ws) aq vaddr base ts)`
 is the RMW's exbank view (D-2): computed from a ZEROED `w_ldv` so that it is
 exactly this access's `view_post` and not a join with a previous load's.
+The EXCLUSIVE read (`exload_post_run_d`) is the one exception to the first
+sentence of this paragraph: since D-2r its address view enters `w_vcap`
+ONLY — its byte fold runs at the plain `load_vpre` and its reservation banks
+`ldv_of … 0`.
 
 **Labels.**  `LLoad aq lat base tvs asrc`, `LStore rl base data asrc vsrc`,
 `LRmw aq rl base tvs data asrc vsrc`, and `LRegW rd srcs | LCtrl srcs |

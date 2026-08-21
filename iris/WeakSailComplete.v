@@ -1585,8 +1585,7 @@ Proof.
     rewrite -Himg -Hlog.
     exact (PFStore pstep pcls i d ag rl base data asrc vsrc kk st' tt
              Hlkd Hps Hne Hkc).
-  - have Hr' : read_ok_d (pc_img d) (pc_log d) (pa_ws ag) aq false base tvs
-                 (srcs_view (pa_ws ag) asrc)
+  - have Hr' : read_ok (pc_img d) (pc_log d) (pa_ws ag) aq false base tvs
       by rewrite Himg Hlog.
     have He' : excl_ok (pc_log d) i base tvs (S (length (pc_log d)))
       by rewrite Hlog.
@@ -1608,8 +1607,7 @@ Proof.
   - eexists. split_and!; [reflexivity|reflexivity|]. simpl.
     rewrite -Himg -Hlog. exact (PFInstr pstep pcls i d ag st' tt Hlkd Hps).
   (* THE RMW SPLIT (S2) *)
-  - have Hr' : read_ok_d (pc_img d) (pc_log d) (pa_ws ag) aq false base tvs
-                 (srcs_view (pa_ws ag) asrc)
+  - have Hr' : read_ok (pc_img d) (pc_log d) (pa_ws ag) aq false base tvs
       by rewrite Himg Hlog.
     eexists. split_and!; [reflexivity|reflexivity|]. simpl.
     rewrite -Himg -Hlog.
@@ -2441,8 +2439,7 @@ Proof.
   - exists st', [WMsg base data (Some i) kk]. split_and!;
       [exact Hps|reflexivity|reflexivity|reflexivity|].
     intros d agd stD Hlkd Hws Hprom Himg Hlog Hpsd Hkcls.
-    have Hr' : read_ok_d (pc_img d) (pc_log d) (pa_ws agd) aq false base tvs
-                 (srcs_view (pa_ws agd) asrc)
+    have Hr' : read_ok (pc_img d) (pc_log d) (pa_ws agd) aq false base tvs
       by rewrite Himg Hlog Hws.
     have He' : excl_ok (pc_log d) i base tvs (S (length (pc_log d)))
       by rewrite Hlog.
@@ -2482,8 +2479,7 @@ Proof.
   - exists st', []. split_and!;
       [exact Hps|reflexivity|by rewrite app_nil_r|reflexivity|].
     intros d agd stD Hlkd Hws Hprom Himg Hlog Hpsd Hkcls.
-    have Hr' : read_ok_d (pc_img d) (pc_log d) (pa_ws agd) aq false base tvs
-                 (srcs_view (pa_ws agd) asrc)
+    have Hr' : read_ok (pc_img d) (pc_log d) (pa_ws agd) aq false base tvs
       by rewrite Himg Hlog Hws.
     rewrite app_nil_r -Himg -Hlog -Hws -Hprom.
     exact (PFExLoad pstep pcls i d agd aq base tvs asrc stD tt

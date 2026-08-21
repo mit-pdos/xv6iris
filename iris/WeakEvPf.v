@@ -265,8 +265,7 @@ Definition elabel_ok (σ : wgstate) (c : CPU) (l : wlabel) (σ' : wgstate)
                     (S (length (wglog σ)))
   | LRmw aq rl base tvs data asrc vsrc =>
       data <> [] /\ length tvs = length data /\
-      read_ok_d (img_z (wgimg σ)) (wglog σ) (wgws σ c) aq false base tvs
-        (srcs_view (wgws σ c) asrc) /\
+      read_ok (img_z (wgimg σ)) (wglog σ) (wgws σ c) aq false base tvs /\
       excl_ok (wglog σ) (fin_to_nat c) base tvs (S (length (wglog σ))) /\
       (exists k, wglog σ' = wglog σ ++ [WMsg base data (Some (fin_to_nat c)) k]) /\
       wgws σ' c = store_post_run_d
@@ -293,14 +292,15 @@ Definition elabel_ok (σ : wgstate) (c : CPU) (l : wlabel) (σ' : wgstate)
       wgws σ' c = ctrl_post (wgws σ c) (srcs_view (wgws σ c) srcs)
   | LInstr => wglog σ' = wglog σ /\ wgws σ' c = instr_post (wgws σ c)
   (* THE RMW SPLIT (S3): the two halves.  [LExLoad] is [LLoad]'s clause at
-     [lat := false], with the read admissible at its OWN address view
-     (deviation D-2 — the fused [LRmw]'s read half had exactly this) and the
-     RESERVATION written into the post-state by [exload_post_run_d].
-     [LExStore] is [LStore]'s clause plus §4's window: a matching
-     reservation of the right width, still clean at the fresh top. *)
+     [lat := false], with the read admissible at the PLAIN floor (D-2r —
+     the address view no longer floors an exclusive read on either the
+     fused or the split path) and the RESERVATION written into the
+     post-state by [exload_post_run_d], which still CONSUMES the address
+     view (in [w_vcap]).  [LExStore] is [LStore]'s clause plus §4's window:
+     a matching reservation of the right width, still clean at the fresh
+     top. *)
   | LExLoad aq base tvs asrc =>
-      read_ok_d (img_z (wgimg σ)) (wglog σ) (wgws σ c) aq false base tvs
-        (srcs_view (wgws σ c) asrc) /\
+      read_ok (img_z (wgimg σ)) (wglog σ) (wgws σ c) aq false base tvs /\
       wglog σ' = wglog σ /\
       wgws σ' c = exload_post_run_d (wgws σ c) aq
                     (srcs_view (wgws σ c) asrc) base tvs.*1

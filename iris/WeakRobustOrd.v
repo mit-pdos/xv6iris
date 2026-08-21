@@ -220,7 +220,7 @@ Section ord.
     | Some l =>
         match l with
         | LLoad _ _ _ _ _ | LRmw _ _ _ _ _ _ _ | LExLoad _ _ _ _ =>
-            lsrcs_view (pre_lstate TS r) (lb_asrc l)
+            lsrcs_view (pre_lstate TS r) (lb_rasrc l)
             ++ lfloor (pre_lstate TS r) (lb_aq l) a
         | LSilent | LStore _ _ _ _ _ | LFence _ _ _ _ | LDev | LRegW _ _
         | LCtrl _ | LInstr | LExStore _ _ _ _ _ => []
@@ -1262,13 +1262,13 @@ Section ordwf.
     end →
     rd_floor TS r a
     = Nat.max (load_vpre_d (pa_ws ag) (lb_aq l)
-                 (srcs_view (pa_ws ag) (lb_asrc l)))
+                 (srcs_view (pa_ws ag) (lb_rasrc l)))
               (coh (pa_ws ag) a).
   Proof.
     intros Hwf Hinit HT Hag Hl Hrd.
     have Hrel : lrel id (pre_lstate TS r) (pa_ws ag) by eapply pre_lstate_lrel.
     rewrite (lrel_floor_d id (pre_lstate TS r) (pa_ws ag) (lb_aq l) a
-               (lb_asrc l) Hrel).
+               (lb_rasrc l) Hrel).
     rewrite /rd_floor /rd_leaves Hl.
     by destruct l.
   Qed.

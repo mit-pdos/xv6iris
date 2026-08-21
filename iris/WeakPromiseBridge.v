@@ -197,8 +197,8 @@ Section bridge.
             (WeakPromise.LRmw aq rl base tvs data asrc vsrc) st' d' →
       data ≠ [] →
       length tvs = length data →
-      read_ok_d (pc_img cfg) (pc_log cfg) (pa_ws ag) aq false base tvs
-                (srcs_view (pa_ws ag) asrc) →
+      (* D-2r: the 0 floor, mirroring [WeakPromise.WPRmw]. *)
+      read_ok (pc_img cfg) (pc_log cfg) (pa_ws ag) aq false base tvs →
       excl_ok (pc_log cfg) i base tvs (S (length (pc_log cfg))) →
       k = pcls (pa_st ag) (WeakPromise.LRmw aq rl base tvs data asrc vsrc)
                (pa_ws ag) →
@@ -264,8 +264,8 @@ Section bridge.
       pc_ags cfg !! i = Some ag →
       pstep (pa_st ag) (pc_dev cfg)
             (WeakPromise.LExLoad aq base tvs asrc) st' d' →
-      read_ok_d (pc_img cfg) (pc_log cfg) (pa_ws ag) aq false base tvs
-                (srcs_view (pa_ws ag) asrc) →
+      (* D-2r: the 0 floor, mirroring [WeakPromise.WPExLoad]. *)
+      read_ok (pc_img cfg) (pc_log cfg) (pa_ws ag) aq false base tvs →
       wp_pf_step i (WeakPromise.LExLoad aq base tvs asrc) cfg
         (WPCfg (pc_img cfg) (pc_log cfg) d'
                (<[i := WPAgent st'
@@ -962,8 +962,9 @@ Section bridge.
                  (pc_dev c));
           [done|apply Hpf|done| | | |].
         * rewrite length_zip_with. lia.
-        * rewrite srcs_view_nil read_ok_d_0 -(Hf i ag Hlk).
-          by apply rd_ok_read_ok.
+        * (* D-2r: the read half is at the plain floor — no [srcs_view_nil]
+             peel is needed any more *)
+          rewrite -(Hf i ag Hlk). by apply rd_ok_read_ok.
         * by apply (rmw_latest_excl_ok (pc_img c) _ i base ts rvs).
         * rewrite -(Hf i ag Hlk). exact Hck.
       + rewrite !srcs_view_nil load_post_run_d_0 store_post_run_d_0 fst_zip;

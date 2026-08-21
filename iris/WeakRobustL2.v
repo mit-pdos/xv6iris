@@ -120,9 +120,10 @@ Qed.
 
 (** THE RMW SPLIT (S2): the exclusive read is the load through a [w_res]
     write, which none of these three components sees. *)
+(** D-2r: all three are the PLAIN read's facts, by conversion. *)
 Lemma exload_post_run_d_regv ws aq vaddr base ts :
   w_regv (exload_post_run_d ws aq vaddr base ts) = w_regv ws.
-Proof. rewrite /exload_post_run_d /ws_res_set /=. apply load_post_run_d_regv. Qed.
+Proof. exact (load_post_run_d_regv ws aq 0%nat base ts). Qed.
 
 Lemma store_post_d_regv ws rl vf a t :
   w_regv (store_post_d ws rl vf a t) = w_regv ws.
@@ -192,9 +193,7 @@ Qed.
 
 Lemma exload_post_run_d_ldv_ge ws aq vaddr base ts :
   (w_ldv ws ≤ w_ldv (exload_post_run_d ws aq vaddr base ts))%nat.
-Proof.
-  rewrite /exload_post_run_d /ws_res_set /=. apply load_post_run_d_ldv_ge.
-Qed.
+Proof. exact (load_post_run_d_ldv_ge ws aq 0%nat base ts). Qed.
 
 Lemma load_post_run_d_ldv ws aq vaddr base ts (j : nat) t :
   ts !! j = Some t → fwd_view ws aq (base + Z.of_nat j) t = t →
@@ -211,10 +210,7 @@ Qed.
 Lemma exload_post_run_d_ldv ws aq vaddr base ts (j : nat) t :
   ts !! j = Some t → fwd_view ws aq (base + Z.of_nat j) t = t →
   (t ≤ w_ldv (exload_post_run_d ws aq vaddr base ts))%nat.
-Proof.
-  intros Ht Hfv. rewrite /exload_post_run_d /ws_res_set /=.
-  exact (load_post_run_d_ldv ws aq vaddr base ts j t Ht Hfv).
-Qed.
+Proof. exact (load_post_run_d_ldv ws aq 0%nat base ts j t). Qed.
 
 Lemma store_post_d_ldv ws rl vf a t :
   w_ldv (store_post_d ws rl vf a t) = w_ldv ws.

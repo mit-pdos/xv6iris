@@ -1738,11 +1738,10 @@ End ram.
     WHAT REPLACES IT, one rule per half:
 
       - [ewp_ev_exload] is [ewp_ev_load]'s rule at an EXCLUSIVE access kind.
-        Same callback, same φ payment; the only differences are that the
-        read is admissible at its OWN address view (deviation D-2, PARM's
-        [Local.read] — the fused arm's read half had exactly this, which is
-        why the [_ok] payload is σ-indexed) and that the post-state banks
-        the RESERVATION ([WeakMem.exload_post_run_d]).  Nothing is owed at
+        Same callback, same φ payment; the only difference is that the
+        post-state banks the RESERVATION ([WeakMem.exload_post_run_d]) —
+        since D-2r the read is admissible at the PLAIN floor, exactly like
+        a plain load's (the [_ok] payload stays σ-indexed).  Nothing is owed at
         the read: a DANGLING exclusive read is a legal trace now.
 
       - [ewp_ev_exstore] is [ewp_ev_store]'s rule at an exclusive access
@@ -1767,10 +1766,11 @@ Definition eexl_ok (σ : wgstate) (c : CPU) (n : N) (req : Interface.ReadReq.t n
     (w : bv (8 * n)) (tvs : list (nat * bv 8)) : Prop :=
   length tvs = N.to_nat n /\
   (forall j : nat, (j < N.to_nat n)%nat -> tvs.*2 !! j = Some (nth_byte w j)) /\
-  read_ok_d (img_z (wgimg σ)) (wglog σ) (wgws σ c)
+  (* D-2r: the PLAIN read floor — the address view no longer floors an
+     exclusive read (it survives in the post-state's [w_vcap]). *)
+  read_ok (img_z (wgimg σ)) (wglog σ) (wgws σ c)
     (ak_sync (classify (Interface.ReadReq.access_kind req))) false
-    (pa_z (Interface.ReadReq.pa req)) tvs
-    (srcs_view (wgws σ c) (deps_asrc (edeps σ c))).
+    (pa_z (Interface.ReadReq.pa req)) tvs.
 
 (** The successor's view: the load's post-state PLUS the reservation. *)
 Definition eexl_ws (σ : wgstate) (c : CPU) (n : N) (req : Interface.ReadReq.t n)
