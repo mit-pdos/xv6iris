@@ -29,22 +29,33 @@ Closed outright.  Also landed earlier in the session (see the
 2026-08-21a checkpoint below): D-i, D-ii, T2-1c, W2b-c1, the D-iii
 probes, the R3 correction.
 
-**RESUMPTION ORDER:**
-1. **B2d design session** (the next centerpiece): the exchange
-   induction's TERMINATION MEASURE and organization, against the
-   completed kit and the recorded obstruction landscape (route-b §3b′
-   — the three refusal forms; the same-byte write-passing question;
-   the window-clearing recursion).  Work the miniature end-to-end on
-   paper first; a probe of the measure is budgeted.
-2. **B0b build**: the per-hart emission conformance, designed against
+**RESUMPTION ORDER (B2d IS LANDED, `5ba52f7a` —
+`WeakRvwmoNorm.normalize`, kill-parameterized, Closed; the kills
+quantify over the `gd_equiv` ORBIT and `lbgd_kill_K1_false` is the
+machine-checked non-vacuity/LB-stick check):**
+1. **B0b design+build**: the per-hart emission conformance against
    `exec_prog_ok'`'s administrative star (the two `LInstr`s per
    instruction land in `adm_star true`; the pair's interior in
    `adm_star false`) + `row_deps` (the pure register-dataflow
-   relation over emitted instance labels).
-3. **B1**: the prefix realization (T2-1c's prefix variant + T1 via
-   the REPAIRED interface), shaped by B2d's closure discipline.
-4. **B2** (the induction build), **B3** (capstone assembly), then
-   **R6** (deletion contract — now also: `lb_rfoldfree` →
+   relation over emitted instance labels) + the ts-genericity via
+   the `ts_oblivious` family (normalization renames ts entries, so
+   the emission must be ts-generic — state at the graph's own ts,
+   derive the renamed).
+2. **B1**: the prefix realization (T2-1c's prefix variant + T1 via
+   the REPAIRED interface at `cfg_matchd`), consumed by B2e; note
+   B2e discharges the kills for an ARBITRARY `gd_equiv`-orbit
+   member (rows + write messages are orbit-invariant, which is what
+   the realization argument reads).
+3. **B2e**: the kill package — K1 (reader-of-early-write; the
+   aq/deps/fence sub-cases are pure graph arithmetic and could land
+   FIRST as a partial discharge), K2 (MP-stale-reader), K3
+   (cross-hart same-byte write race) — the φ/lock residues via B1's
+   realized prefix + the exports; this is L2′'s content in route-B
+   clothing and the route's largest remaining item (the kernel-level
+   read/write-class exhaustiveness lives here).
+4. **B3** (capstone assembly: normalize ∘ T2-1c ∘ T1 ∘ adequacy,
+   with the conformance hypotheses; zero kernel premises), then
+   **R6** (deletion contract — also: `lb_rfoldfree` →
    `lb_ldepfree`, the fused arms' fold residue, `ewg_ib`,
    `WeakCertify` archival, `ak_excl` rename).
 5. Parked: T2-1b, D-iv, D-vi.
