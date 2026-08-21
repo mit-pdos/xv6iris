@@ -598,8 +598,10 @@ Definition lload_post_at (S : lstate) (aq : bool) (vpreL : list nat) (a : Z)
         [Nat.max (w_tbank ws) (fwd_view ws aq a t)]. *)
      l_tbank := l_tbank S ++ lfwd_view S aq a t |}.
 
-(** [vfL] is the banked forward view — the EMPTY leaf list before D2
-    (deviation D-7), now [V(asrc) ⊔ V(dsrc)]'s leaves. *)
+(** [vfL] MIRRORS [WeakMem.store_post_d]'s dead [vf] parameter: since D-7r
+    the machine banks the view column [0], so the mirror banks the EMPTY leaf
+    list, and [vfL] feeds nothing.  Both parameters are kept for signature
+    stability (see the D-7r rationale at [WeakMem.store_post_d]). *)
 Definition lstore_post_d (S : lstate) (rl : bool) (vfL : list nat) (a : Z)
     (t : nat) : lstate :=
   {| l_coh   := <[a := lcoh S a ++ [t]]> (l_coh S);
@@ -608,7 +610,7 @@ Definition lstore_post_d (S : lstate) (rl : bool) (vfL : list nat) (a : Z)
      l_vrNew := l_vrNew S;
      l_vwNew := l_vwNew S;
      l_vRel  := if rl then l_vRel S ++ [t] else l_vRel S;
-     l_fwd   := <[a := (t, vfL)]> (l_fwd S);
+     l_fwd   := <[a := (t, [])]> (l_fwd S);
      l_regv  := l_regv S;
      l_vcap  := l_vcap S;
      l_ldv   := l_ldv S;
@@ -616,6 +618,11 @@ Definition lstore_post_d (S : lstate) (rl : bool) (vfL : list nat) (a : Z)
 
 Definition lstore_post (S : lstate) (rl : bool) (a : Z) (t : nat) : lstate :=
   lstore_post_d S rl [] a t.
+
+(** The D-7r collapse, mirrored ([WeakMem.store_post_d_vf]'s twin). *)
+Lemma lstore_post_d_vfL S rl vfL a t :
+  lstore_post_d S rl vfL a t = lstore_post S rl a t.
+Proof. done. Qed.
 
 Definition lfence_post (S : lstate) (pr pw sr sw : bool) : lstate :=
   let v1L := (if pr then l_vrOld S else []) ++ (if pw then l_vwOld S else []) in
@@ -874,11 +881,13 @@ Proof.
     rewrite lval_app Hfv Htb. lia.
 Qed.
 
+(** D-7r: the two banked view columns are [0] and [[]] — the premise
+    [vf = lval σ vfL] the dependency-carrying bank needed is GONE. *)
 Lemma lrel_store_post_d σ S w rl vf vfL a t :
-  lrel σ S w → vf = lval σ vfL →
+  lrel σ S w →
   lrel σ (lstore_post_d S rl vfL a t) (store_post_d w rl vf a (σ t)).
 Proof.
-  intros (Hcoh & HrO & HwO & HrN & HwN & HR & Hfwd & Hrg & Hvc & Hld & Htb) ->.
+  intros (Hcoh & HrO & HwO & HrN & HwN & HR & Hfwd & Hrg & Hvc & Hld & Htb).
   rewrite /lrel /store_post_d /lstore_post_d /=. split_and!.
   - intros a'. destruct (decide (a' = a)) as [->|Hne].
     + rewrite coh_upd_eq lcoh_ins_eq lval_app lval_singleton -(Hcoh a). lia.
@@ -1028,12 +1037,11 @@ Proof.
 Qed.
 
 Lemma lrel_store_fold_d σ rl vf vfL t as_ :
-  vf = lval σ vfL →
   ∀ S w, lrel σ S w →
     lrel σ (foldl (λ S' a, lstore_post_d S' rl vfL a t) S as_)
            (foldl (λ w' a, store_post_d w' rl vf a (σ t)) w as_).
 Proof.
-  intros Hvf. induction as_ as [|a as_ IH]; intros S w Hrel; [done|].
+  induction as_ as [|a as_ IH]; intros S w Hrel; [done|].
   rewrite /=. apply IH. by apply lrel_store_post_d.
 Qed.
 
@@ -1052,17 +1060,20 @@ Proof.
   by apply lrel_store_fold.
 Qed.
 
+(** D-7r: the DATA view's transport premise ([vd = lval σ vdL]) is gone with
+    the bank it fed; only the ADDRESS view, which still moves [w_vcap]
+    through [ctrl_post], has to transport. *)
 Lemma lrel_store_post_run_d σ S w rl va vaL vd vdL base n t :
-  lrel σ S w → va = lval σ vaL → vd = lval σ vdL →
+  lrel σ S w → va = lval σ vaL →
   lrel σ (lstore_post_run_d S rl vaL vdL base n t)
          (store_post_run_d w rl va vd base n (σ t)).
 Proof.
-  intros Hrel Hva Hvd.
+  intros Hrel Hva.
   rewrite /lstore_post_run_d /store_post_run_d /lstore_post_bytes_d
           /store_post_bytes_d /store_run_as.
   apply lrel_ctrl_post;
     [|by rewrite lval_app -Hva -(lrel_tbank _ _ _ Hrel)].
-  apply lrel_store_fold_d; [by rewrite lval_app -Hva -Hvd|exact Hrel].
+  by apply lrel_store_fold_d.
 Qed.
 
 (** *** THE TRANSPORT THEOREMS *)
@@ -1078,12 +1089,11 @@ Proof.
   - exact Hrel.
   - apply lrel_load_post_run_d; [done|done|by apply lrel_srcs_view].
   - destruct ts as [t|]; [|exact Hrel].
-    apply lrel_store_post_run_d; [done|by apply lrel_srcs_view
-                                 |by apply lrel_srcs_view].
+    apply lrel_store_post_run_d; [done|by apply lrel_srcs_view].
   - destruct ts as [t|]; [|exact Hrel].
     apply lrel_store_post_run_d;
       [ apply lrel_load_post_run_d; [done|done|by apply lrel_srcs_view]
-      | by apply lrel_srcs_view | by apply lrel_srcs_view ].
+      | by apply lrel_srcs_view ].
   - by apply lrel_fence_post.
   - exact Hrel.
   - apply lrel_regw_post; [done|by apply lrel_srcs_view].
@@ -1095,8 +1105,7 @@ Proof.
     apply lrel_ws_res_set, lrel_load_post_run_d;
       [done|done|by apply lrel_srcs_view].
   - destruct ts as [t|]; [|exact Hrel].
-    apply lrel_store_post_run_d; [done|by apply lrel_srcs_view
-                                 |by apply lrel_srcs_view].
+    apply lrel_store_post_run_d; [done|by apply lrel_srcs_view].
 Qed.
 
 Theorem lrel_aevs_post {D : Type} σ (evs : list (aev D)) S w :
@@ -1244,36 +1253,35 @@ Proof.
         [by left|by right; right].
 Qed.
 
+(** D-7r: a store adds NO leaf beyond its own timestamp — the [u ∈ vfL]
+    disjunct the dependency-carrying bank forced is gone. *)
 Lemma lstore_post_d_leaf S rl vfL a t u :
   lstate_leaf (lstore_post_d S rl vfL a t) u →
-  lstate_leaf S u ∨ u ∈ vfL ∨ u = t.
+  lstate_leaf S u ∨ u = t.
 Proof.
   rewrite {1}/lstate_leaf /lstore_post_d /=.
   intros [H|[H|[H|[H|[H|[(a' & L & HL & H)|[(a' & tf & V & HL & H)
                         |[(r' & L & HL & H)|[H|[H|H]]]]]]]]]];
     try (left; rewrite /lstate_leaf; naive_solver).
   - apply elem_of_app in H as [H|H]; [left; rewrite /lstate_leaf; naive_solver|].
-    apply elem_of_list_singleton in H. by right; right.
+    apply elem_of_list_singleton in H. by right.
   - destruct rl; [|left; rewrite /lstate_leaf; naive_solver].
     apply elem_of_app in H as [H|H]; [left; rewrite /lstate_leaf; naive_solver|].
-    apply elem_of_list_singleton in H. by right; right.
+    apply elem_of_list_singleton in H. by right.
   - apply lookup_insert_Some in HL as [[-> <-]|[Hne HL]].
     + apply elem_of_app in H as [H|H]; [by left; eapply lcoh_leaf|].
-      apply elem_of_list_singleton in H. by right; right.
+      apply elem_of_list_singleton in H. by right.
     + left. rewrite /lstate_leaf. naive_solver.
   - apply lookup_insert_Some in HL as [[-> [= <- <-]]|[Hne HL]].
-    (* The banked view is [V(asrc) ⊔ V(dsrc)]'s leaves (D-7 as fixed by D2);
-       before D2 it was the EMPTY list. *)
-    + destruct H as [->|H]; [by right; right|by right; left].
+    (* D-7r: the banked leaf list is EMPTY, so the timestamp column is the
+       only leaf this arm can produce. *)
+    + destruct H as [->|H%elem_of_nil]; [by right|done].
     + left. rewrite /lstate_leaf. naive_solver.
 Qed.
 
 Lemma lstore_post_leaf S rl a t u :
   lstate_leaf (lstore_post S rl a t) u → lstate_leaf S u ∨ u = t.
-Proof.
-  rewrite /lstore_post. intros [H|[H%elem_of_nil|H]]%lstore_post_d_leaf;
-    [by left|done|by right].
-Qed.
+Proof. apply lstore_post_d_leaf. Qed.
 
 (** The three dependency-only effects add no leaf beyond the operand
     list they are handed. *)
@@ -1372,11 +1380,10 @@ Qed.
 Lemma lstore_fold_d_leaf rl vfL t as_ :
   ∀ S u,
     lstate_leaf (foldl (λ S' a, lstore_post_d S' rl vfL a t) S as_) u →
-    lstate_leaf S u ∨ u ∈ vfL ∨ u = t.
+    lstate_leaf S u ∨ u = t.
 Proof.
   induction as_ as [|a as_ IH]; intros S u Hu; [by left|].
-  rewrite /= in Hu. apply IH in Hu as [Hu|[Hu|Heq]];
-    [|by right; left|by right; right].
+  rewrite /= in Hu. apply IH in Hu as [Hu|Heq]; [|by right].
   by apply lstore_post_d_leaf in Hu.
 Qed.
 
@@ -1397,9 +1404,8 @@ Proof.
   intros [Hu|Hu]%lctrl_post_leaf; last first.
   { apply elem_of_app in Hu as [Hu|Hu];
       [by right; left|left; rewrite /lstate_leaf; naive_solver]. }
-  apply lstore_fold_d_leaf in Hu as [Hu|[Hu|Heq]];
-    [by left| |by right; right; right].
-  apply elem_of_app in Hu as [Hu|Hu]; [by right; left|by right; right; left].
+  apply lstore_fold_d_leaf in Hu as [Hu|Heq];
+    [by left|by right; right; right].
 Qed.
 
 (** The contiguous-run access list only ever carries timestamps that are

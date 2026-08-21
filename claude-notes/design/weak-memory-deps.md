@@ -213,9 +213,12 @@ needs the containment argument, "WEAKER" = adds behaviors, free):
     follow-up, noted here so it is not rediscovered.
 - **D-7 (THE FORWARD BANK — was a genuine STRENGTHENING; FIXED 2026-08-17,
   found the same day while auditing containment).**
-  **STATUS: FIXED.** `WeakMem.store_post` now records `w_fwd[a] := (t, 0)` —
-  PARM's dependency-free `FwdItem` view; D2 will replace the `0` by
-  `V(asrc) ⊔ V(dsrc)`.  `WeakRobustProv.lstore_post` mirrors it (`(t, [])`),
+  **STATUS: FIXED, then D2-UPGRADED, then REVERSED — the view column is `0`
+  again.  See the D-7r addendum immediately below before touching this.**
+  `WeakMem.store_post` records `w_fwd[a] := (t, 0)` —
+  PARM's dependency-free `FwdItem` view; D2 replaced the `0` by
+  `V(asrc) ⊔ V(dsrc)` and **D-7r (2026-08-21) put it back**.
+  `WeakRobustProv.lstore_post` mirrors it (`(t, [])`),
   `WeakCompose` §6(5) and `weak-memory.md` Decision 3 are corrected, and
   `WeakAxiomatic3`'s argued counterexample (b) (the forward-bank leak, §14(1))
   is DEAD as a result — its premise `cand_pub_clean` is now only a proof-side
@@ -239,6 +242,46 @@ needs the containment argument, "WEAKER" = adds behaviors, free):
   dependency-free PARM value; a one-line change to `store_post` plus the
   `fwd_view` lemma family — check that no leaf DERIVES a view lower bound
   from a forwarded read; none should).
+- **D-7r (THE ROUTE-B REVERSAL OF D-7's D2 UPGRADE, 2026-08-21).  The bank's
+  VIEW COLUMN IS `0` AGAIN, on purpose, and the machine is deliberately
+  WEAKER for it.**  `WeakMem.store_post_d` banks `(t, 0)` — PARM's
+  dependency-FREE `FwdItem` — at every operand view; `vf` is a DEAD parameter
+  kept only for signature stability, and `store_post_d_vf :
+  store_post_d ws rl vf a t = store_post ws rl a t` is the collapse lemma the
+  `_d` tower's repairs go through (`store_post_bytes_d_vf` at the byte fold,
+  `WeakRobustProv.lstore_post_d_vfL` on the mirror).
+  - **Why.**  Under route B the DECLARED model is RVWMO⁻ + store-deps, which
+    has **no ppo rule 12**.  A dep-carrying bank therefore made the machine
+    STRICTLY STRONGER than its own declared model on exactly this axis — the
+    realization-direction bug pattern: a dep-banked forward raises a later
+    same-byte read's `coh`/`vrOld` floor, so the machine REFUSES stale reads
+    the model admits, and T1's completeness at real (dep-carrying) labels
+    would then force the model to GROW rule 12, i.e. dep data in the fused
+    alphabet — the big surgery.  This is the T1-D CORRECTION's channel
+    (`projects/weak-memory-certification.md`), closed by weakening the machine
+    rather than by growing the model.
+  - **What survives.**  Every DIRECT dependency floor: the fulfil's
+    `vd = srcs_view asrc ⊔ srcs_view vsrc`, the exclusive `rv_view`, and the
+    `w_vcap`/`w_regv` chains (including `store_post_run_d`'s `ctrl_post`
+    raise at the ADDRESS view).  Only THROUGH-FORWARD dep inheritance dies,
+    and no landed kill or capstone consumed it — the audit that landed D-7r
+    found the whole tree's repair set to be the mirror plus statement-level
+    `(t, vf)` → `(t, 0)`, with several proofs getting SHORTER.
+  - **RE-UPGRADE COUPLING — do not "fix" this back casually.**  If rule-12
+    enforcement is ever wanted, the bank AND the completeness model move
+    TOGETHER: re-bank `vf` in `store_post_d` *and* pay the model growth
+    (rule 12 + dep-carrying labels in the conformance alphabet).  One without
+    the other reopens the gap D-7r closed.
+  - Nothing else moved: `store_post_run_d`'s `vdata` argument is likewise dead
+    (it fed only the bank — `vaddr` is still live through the `ctrl_post`
+    raise, which is why `store_post_run_d_bounded` keeps `vaddr ≤ n'`; its
+    `vdata ≤ n'` premise is now VACUOUS and was deliberately left in place,
+    since deleting it would touch eight call sites in `WeakPromise`,
+    `WeakEvLift` and `WeakRobustBlocks` for no proof content),
+    `WeakErase`'s `fwd_le` arm is now the reflexive
+    case, and `WeakAxiomatic3`'s `bankdom`/`fwd_view_cases` "a consulted bank
+    contributes `0`" invariants — which the dep-free tier always assumed — are
+    now true of the `_d` tier too.
 - **D-6 (the disk agent).** `virtio_prog`'s events carry empty `srcs`; its
   ordering is aq/fence-based — WEAKER than a hart with the same accesses
   (free), and exact for what the driver relies on.

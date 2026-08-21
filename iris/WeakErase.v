@@ -60,14 +60,15 @@
       two sides to take the same branch, and the MESSAGE CLASS is a function
       of it (see [pcls_erasable]).
     - [fwd_le] (the forward bank, semantically): [fwd_view we ≤ fwd_view wi]
-      pointwise.  Post-D-7 [store_post_d] banks [(t, V(asrc) ⊔ V(vsrc))], so
-      the erased side banks [(t, 0)] where the instance banks [(t, vf)] —
-      the TIMESTAMP column agrees (both sides store at the same fresh top),
-      only the view column drops, and it drops in the sound direction.  This
-      is why the A1a probe's [dep_dom] invariant is NOT needed here: the
-      ≤-simulation absorbs the bank residue directly, whereas [dep_dom] was
-      the machinery for the abandoned route that had to prove the residue
-      ZERO.
+      pointwise.  Since D-7r [store_post_d] banks [(t, 0)] at EVERY operand
+      view, both sides bank [(t, 0)] and this component is the reflexive
+      case — the [vfe ≤ vfi] premises the dependency-carrying bank forced are
+      deleted from [store_post_d_er]/[store_post_fold_er]/
+      [store_post_run_d_er].  (Before D-7r the erased side banked [(t, 0)]
+      where the instance banked [(t, vf)] and the ≤-simulation absorbed the
+      residue; that is also why the A1a probe's [dep_dom] invariant — the
+      machinery of the abandoned route, which had to prove the residue ZERO —
+      was never needed here.)
     - [res_rel] (the reservation): instance [Some R] ⟹ erased [Some R'] with
       the SAME [rv_base] and [rv_ts] (both are label data, which the erasure
       preserves) and [rv_view R' ≤ rv_view R].  The implication is ONE-WAY on
@@ -299,11 +300,14 @@ Proof.
   simpl. apply IH; [by apply load_post_at_er|done|by apply load_post_at_ldv_er].
 Qed.
 
+(** D-7r: the two sides bank the SAME view column ([0]), so the premise
+    [vfe ≤ vfi] this lemma used to need is gone — the bank is now a
+    reflexive-case obligation rather than a residue to absorb. *)
 Lemma store_post_d_er we wi rl vfe vfi a t :
-  er_ws we wi → (vfe ≤ vfi)%nat →
+  er_ws we wi →
   er_ws (store_post_d we rl vfe a t) (store_post_d wi rl vfi a t).
 Proof.
-  intros Her Hv.
+  intros Her.
   pose proof (er_ws_ws_le_nc _ _ Her) as Hle.
   pose proof (er_ws_relp _ _ Her) as Hrp.
   destruct Hle as (Hcoh & HrO & HwO & HrN & HwN & HrL & Hpub).
@@ -332,12 +336,12 @@ Proof.
 Qed.
 
 Lemma store_post_fold_er rl vfe vfi t as_ we wi :
-  er_ws we wi → (vfe ≤ vfi)%nat →
+  er_ws we wi →
   er_ws (foldl (λ w a, store_post_d w rl vfe a t) we as_)
         (foldl (λ w a, store_post_d w rl vfi a t) wi as_).
 Proof.
-  revert we wi. induction as_ as [|a l IH]; intros we wi Her Hv; [done|].
-  simpl. apply IH; [by apply store_post_d_er|done].
+  revert we wi. induction as_ as [|a l IH]; intros we wi Her; [done|].
+  simpl. by apply IH, store_post_d_er.
 Qed.
 
 (** NO relation between the two control views is asked for, or available:
@@ -441,14 +445,17 @@ Proof.
   apply load_post_fold_er; [done|by apply er_ws_load_vpre_d].
 Qed.
 
+(** D-7r: BOTH operand-view premises are gone.  The banked column no longer
+    carries them, and [ctrl_post_er] relates the two control views not at all
+    (the erasure stopped constraining [w_vcap] at W-TV). *)
 Lemma store_post_run_d_er we wi rl vae vai vde vdi base n t :
-  er_ws we wi → (vae ≤ vai)%nat → (vde ≤ vdi)%nat →
+  er_ws we wi →
   er_ws (store_post_run_d we rl vae vde base n t)
         (store_post_run_d wi rl vai vdi base n t).
 Proof.
-  intros Her Ha Hd. rewrite /store_post_run_d.
+  intros Her. rewrite /store_post_run_d.
   apply ctrl_post_er.
-  rewrite /store_post_bytes_d. apply store_post_fold_er; [done|lia].
+  rewrite /store_post_bytes_d. by apply store_post_fold_er.
 Qed.
 
 (** The reservation's banked view.  [ldv_of] is computed from a ZEROED
@@ -506,9 +513,7 @@ Lemma store_post_run_d_er0 we wi rl vai vdi base n t :
   er_ws we wi →
   er_ws (store_post_run_d we rl 0%nat 0%nat base n t)
         (store_post_run_d wi rl vai vdi base n t).
-Proof.
-  intros Her. apply store_post_run_d_er; [done|apply Nat.le_0_l|apply Nat.le_0_l].
-Qed.
+Proof. intros Her. by apply store_post_run_d_er. Qed.
 
 Lemma exload_post_run_d_er0 we wi aq vai base ts :
   er_ws we wi →

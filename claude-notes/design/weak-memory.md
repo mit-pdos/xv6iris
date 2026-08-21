@@ -325,8 +325,16 @@ also sound) — over-weak is safe, over-strong is not.
 **CORRECTION (2026-08-17, deps design §2.3′ D-7): that parenthesis had the
 polarity backwards — `w_vwNew` is LARGER than PARM's `FwdItem` view
 (`V(asrc) ⊔ V(dsrc)`, RVWMO ppo 12), so it removed hardware behaviours;
-`WeakMem.store_post` now banks `0`, the dependency-free PARM value, and D2
-will replace it by `V(asrc) ⊔ V(dsrc)`.**
+`WeakMem.store_post` banks `0`, the dependency-free PARM value.**
+**CURRENT (2026-08-21, deps design D-7r): D2 did replace the `0` by
+`V(asrc) ⊔ V(dsrc)` and that upgrade has been REVERSED — the bank's view
+column is `0` on BOTH the `store_post` and the dependency-carrying
+`store_post_d` side.  Route B's declared model (RVWMO⁻ + store-deps) has no
+ppo rule 12, so a dep-carrying bank made the machine strictly STRONGER than
+its declared model; banking `0` weakens the machine, which is the
+containment-safe direction.  `vf` survives as a dead parameter.  Re-upgrading
+the bank and growing the model with rule 12 are COUPLED — see D-7r in
+[`weak-memory-deps.md`](weak-memory-deps.md) before changing it back.**
 DECIDED after M0: the
 bank gets **wired into the load rule at M1** (a load reading the hart's own
 latest store takes the banked view instead of the timestamp). M0 left it

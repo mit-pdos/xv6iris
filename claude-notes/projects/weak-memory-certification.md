@@ -330,6 +330,24 @@ smaller than feared, and NO model change):**
   (the A1a `dep_dom` probe machinery is the recorded starting
   point).  The interface repairs (i)/(ii) and (iii-a) stand as
   sketched.
+- **(iii-b) RESOLVED (2026-08-21) BY WEAKENING THE MACHINE — slice
+  D-7r, the β move.**  The forward bank's VIEW COLUMN IS `0` again
+  (`WeakMem.store_post_d` banks `(t, 0)`; `vf` is a dead parameter kept
+  for signature stability, collapsed by `store_post_d_vf`).  No
+  `dep_dom` domination argument is needed and no model growth: the one
+  channel by which dep views reached pf-fragment admissibility is
+  simply gone, so `cfg_match`'s `fwd` component can stay EQUAL and
+  (iii) is entirely (iii-a).  The reversal is D-7r in
+  `design/weak-memory-deps.md`, which also records the RE-UPGRADE
+  COUPLING (re-banking `vf` requires the model to grow rule 12 and the
+  alphabet to carry dep data — the two move together).  The audit that
+  landed it found NO landed lemma consuming the dep-carrying bank: the
+  entire tree-wide repair set was `WeakRobustProv`'s mirror
+  (`lstore_post_d` banks `(t, [])`, and three transport/leaf premises
+  and disjuncts became vacuous and were deleted) plus two statement
+  updates in `WeakMem` (`store_post_fold_d_fwd`,
+  `store_post_run_d_fwd_inv`: `vfd = vf`/`Nat.max vaddr vdata` →
+  `vfd = 0`).  Both capstones stayed at exactly the five rv64d axioms.
 - **(iii-b) RESOLVED (2026-08-21, the β move — slice D-7r, build in
   flight): the forward bank's view column returns to 0.**  The
   design pass sharpened to a fork: (α) keep the machine's rule-12

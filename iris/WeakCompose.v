@@ -887,6 +887,16 @@ Qed.
     ([0], RVWMO ppo 12) instead of M1's [w_vwNew] (the store's fence floor),
     which was the one component where our view arithmetic was LARGER than
     PARM's and therefore removed hardware behaviours.
+    D-7r ADDENDUM (2026-08-21) — AND IT HOLDS ON THE DEPENDENCY-CARRYING TIER
+    TOO: D2 had upgraded the bank to [V(asrc) ⊔ V(dsrc)] (PARM's dep-carrying
+    [FwdItem], RVWMO ppo rule 12) and that upgrade is REVERSED —
+    [WeakMem.store_post_d] banks [(t, 0)] at every operand view, so the
+    machine enforces no rule 12 and is weaker than PARM on this axis on BOTH
+    tiers.  The reason is route B's declared model (RVWMO⁻ + store-deps has no
+    rule 12, so a dep-carrying bank made the machine STRONGER than the model
+    it is checked against); re-banking [vf] and growing the model with rule 12
+    are COUPLED — see deviation D-7r in the deps design before changing it
+    back.
 
     Independently machine-checked in this tree, which is what makes the note
     auditable rather than a leap: [WeakAxiomatic.promise_free_sound]

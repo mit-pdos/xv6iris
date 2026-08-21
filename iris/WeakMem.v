@@ -831,12 +831,15 @@ Definition load_post (ws : wstate) (aq : bool) (a : Z) (t : nat) : wstate :=
     [w_pub] alone.  With [rl] the later bytes redo [Nat.max _ t], which is
     idempotent.  Net effect over a whole access: exactly one raise to [t] iff
     the access publishes — which is what [published p := S p ≤ w_pub] needs. *)
-(** THE PER-BYTE WRITE UPDATE, dependency-carrying.  [vf] is the view the
+(** THE PER-BYTE WRITE UPDATE, dependency-carrying.  [vf] WAS the view the
     FORWARD BANK records — PARM's [FwdItem.mk ts (join view_loc view_val) ex]
-    (Promising.v:909), i.e. [V(asrc) ⊔ V(dsrc)]; deviation D-7 fixed the [0]
-    that stood here while the machine had no register views.  [w_vcap] is NOT
-    raised here: PARM raises it once per access ([vcap ⊔= view_loc]), which is
-    what the run-level wrapper [store_post_run_d] does. *)
+    (Promising.v:909), i.e. [V(asrc) ⊔ V(dsrc)] — and is DEAD since D-7r: the
+    bank's view column is [0] again (PARM's dependency-FREE [FwdItem]), so
+    that the machine does not enforce RVWMO ppo rule 12, which route B's
+    declared model does not have.  See the field comment below for the full
+    rationale and the re-upgrade coupling.  [w_vcap] is NOT raised here: PARM
+    raises it once per access ([vcap ⊔= view_loc]), which is what the
+    run-level wrapper [store_post_run_d] does. *)
 Definition store_post_d (ws : wstate) (rl : bool) (vf : nat)
     (a : Z) (t : nat) : wstate :=
   {| w_coh   := <[a := Nat.max (coh ws a) t]> (w_coh ws);
@@ -845,14 +848,39 @@ Definition store_post_d (ws : wstate) (rl : bool) (vf : nat)
      w_vrNew := w_vrNew ws;
      w_vwNew := w_vwNew ws;
      w_vRel  := if rl then Nat.max (w_vRel ws) t else w_vRel ws;
-     (* THE FORWARD BANK.  The recorded view is PARM's [FwdItem] view, i.e.
-        the store's ADDRESS/DATA dependency views [V(asrc) ⊔ V(dsrc)] (RVWMO
-        ppo 12); today's machine has no register views, so that is [0].  D2
-        (the dependency track) replaces the [0] by [V(asrc) ⊔ V(dsrc)].
-        It is deliberately NOT [w_vwNew ws] (the store's fence floor): that
+     (* THE FORWARD BANK — PARM's DEPENDENCY-FREE [FwdItem], view column [0]
+        (D-7r, 2026-08-21; this REVERSES D2's upgrade of deviation D-7, which
+        banked [vf = V(asrc) ⊔ V(vsrc)], PARM's dependency-carrying [FwdItem]
+        rendering RVWMO ppo rule 12).
+
+        WHY IT WENT BACK TO [0].  Under route B the DECLARED model is
+        RVWMO⁻ + store-deps, which has NO rule 12, so a dep-carrying bank made
+        the machine STRICTLY STRONGER than its own declared model on exactly
+        this axis — the realization-direction bug pattern: a dep-banked
+        forward raises a later same-byte read's [coh]/[vrOld] floor, so the
+        machine REFUSES stale reads the model admits, and T1's completeness at
+        real (dep-carrying) labels would then force the model to GROW rule 12,
+        i.e. dep data in the fused alphabet.  Banking [(t, 0)] WEAKENS the
+        machine (more behaviours — the containment-SAFE direction) and aligns
+        it with the declared model.  Every DIRECT dependency floor survives
+        untouched: the fulfil's [vd = srcs_view asrc ⊔ srcs_view vsrc], the
+        exclusive [rv_view], and the [w_vcap]/[w_regv] chains.  Only
+        THROUGH-FORWARD dep inheritance dies, and no landed kill uses it.
+
+        RE-UPGRADE COUPLING — DO NOT "FIX" THIS BACK CASUALLY.  If rule-12
+        enforcement is ever wanted, the bank AND the completeness model move
+        TOGETHER: re-bank [vf] here and pay the model growth (rule 12 +
+        dep-carrying labels).  One without the other reopens the gap this
+        change closed.
+
+        [vf] IS THEREFORE DEAD in this function; the parameter is kept for
+        signature stability across the [_d] tower ([store_post_d_vf] below is
+        the collapse lemma every repair goes through).
+
+        Still deliberately NOT [w_vwNew ws] (the store's fence floor): that
         was the M1 choice and it is LARGER than PARM's, i.e. it REMOVES
         hardware behaviours (design doc deps §2.3′ D-7, fixed 2026-08-17). *)
-     w_fwd   := <[a := (t, vf)]> (w_fwd ws);
+     w_fwd   := <[a := (t, 0%nat)]> (w_fwd ws);
      w_pub   := if (w_relp ws || rl)%bool then Nat.max (w_pub ws) t
                 else w_pub ws;
      w_relp  := false;
@@ -890,9 +918,16 @@ Definition store_post (ws : wstate) (rl : bool) (a : Z) (t : nat) : wstate :=
      w_res   := None;
      w_tbank := w_tbank ws |}.
 
+(** THE D-7r COLLAPSE.  [vf] feeds nothing, so the dependency-carrying write
+    IS the dependency-free one at EVERY operand view — not merely at [0].
+    This is the lemma the [_d] tower's repairs go through. *)
+Lemma store_post_d_vf ws rl vf a t :
+  store_post_d ws rl vf a t = store_post ws rl a t.
+Proof. done. Qed.
+
 Lemma store_post_d_0 ws rl a t :
   store_post_d ws rl 0%nat a t = store_post ws rl a t.
-Proof. done. Qed.
+Proof. apply store_post_d_vf. Qed.
 
 (** FENCE pred,succ.  [pr]/[pw] are R/W ∈ pred; [sr]/[sw] are R/W ∈ succ.
     [fence.tso] = [fence r,r ; fence rw,w]. *)
@@ -1052,9 +1087,15 @@ Definition store_post_bytes (ws : wstate) (rl : bool) (as_ : list Z) (t : nat)
     : wstate :=
   foldl (λ w a, store_post w rl a t) ws as_.
 
+(** The D-7r collapse at the BYTE FOLD: [vf] is dead per byte, so the two
+    folds are the same fold (by conversion) at every operand view. *)
+Lemma store_post_bytes_d_vf ws rl vf as_ t :
+  store_post_bytes_d ws rl vf as_ t = store_post_bytes ws rl as_ t.
+Proof. done. Qed.
+
 Lemma store_post_bytes_d_0 ws rl as_ t :
   store_post_bytes_d ws rl 0%nat as_ t = store_post_bytes ws rl as_ t.
-Proof. done. Qed.
+Proof. apply store_post_bytes_d_vf. Qed.
 
 (** The CONTIGUOUS instances the interpreter uses: byte [j] of an access whose
     base byte address is [base] lives at [base + j] (see [WeakInterp.acc_addr]
@@ -2720,9 +2761,10 @@ Proof.
   apply store_post_fold_d_relp. rewrite /store_run_as. by destruct n; [lia|].
 Qed.
 
+(** D-7r: the banked view column is [0], not [vf]. *)
 Local Lemma store_post_fold_d_fwd rl vf t as_ ws a tf vfd :
   w_fwd (foldl (λ w a, store_post_d w rl vf a t) ws as_) !! a = Some (tf, vfd) →
-  (tf = t ∧ vfd = vf) ∨ w_fwd ws !! a = Some (tf, vfd).
+  (tf = t ∧ vfd = 0%nat) ∨ w_fwd ws !! a = Some (tf, vfd).
 Proof.
   revert ws. induction as_ as [|b l IH]; intros ws Hlk; [by right|].
   destruct (IH _ Hlk) as [Heq|Hlk']; [by left|].
@@ -2734,7 +2776,7 @@ Qed.
 
 Lemma store_post_run_d_fwd_inv ws rl vaddr vdata base n t a tf vfd :
   w_fwd (store_post_run_d ws rl vaddr vdata base n t) !! a = Some (tf, vfd) →
-  (tf = t ∧ vfd = Nat.max vaddr vdata) ∨ w_fwd ws !! a = Some (tf, vfd).
+  (tf = t ∧ vfd = 0%nat) ∨ w_fwd ws !! a = Some (tf, vfd).
 Proof.
   rewrite /store_post_run_d ctrl_post_fwd /store_post_bytes_d.
   apply store_post_fold_d_fwd.
