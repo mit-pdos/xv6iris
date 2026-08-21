@@ -1363,7 +1363,7 @@ Section ProofSysLinkBody.
             by exact (sl_regs_s1 _ _ _ _ _ Hilregs).
           iDestruct "Hload" as (dat)
             "(%Hiok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlnk & Hdiat & Hmeta & Haddrs & Hind &
-              Hblocks)".
+              Hblocks & Hdview)".
           iDestruct "Hmeta" as "(Hity & Himaj & Himin & Hinl & Hisz)".
           iEval (rewrite /i_type) in "Hity".
           iEval (rewrite /i_nlink) in "Hinl".
@@ -1423,7 +1423,7 @@ Section ProofSysLinkBody.
              iIntros (CID31 Hq31). iApply bi.later_intro. iIntros "Hcg Hpc".
              iEval (rewrite Htgc6) in "Hpc".
              iAssert (ic_loaded gfs gi cov logstart kk inum dn bm)
-               with "[Hdiat Hity Himaj Himin Hinl Hisz Haddrs Hind Hblocks Hdlnk]"
+               with "[Hdiat Hity Himaj Himin Hinl Hisz Haddrs Hind Hblocks Hdlnk Hdview]"
                as "Hload".
              { rewrite /ic_loaded. iExists dat.
                iSplitR; [iPureIntro; exact Hiok |].
@@ -1574,7 +1574,7 @@ Section ProofSysLinkBody.
                 iEval (rewrite Htgd6) in "Hpc".
                 iAssert (ic_loaded gfs gi cov logstart kk inum dn bm)
                   with "[Hdiat Hity Himaj Himin Hinl Hisz Haddrs Hind Hblocks
-                         Hdlnk]" as "Hload".
+                         Hdlnk Hdview]" as "Hload".
                 { rewrite /ic_loaded. iExists dat.
                   iSplitR; [iPureIntro; exact Hiok |].
                   iSplitR; [iPureIntro; exact Hdok |].
@@ -1851,8 +1851,13 @@ Section ProofSysLinkBody.
                 assert (Hncd : bv_unsigned (di_type (sl_incnl dn)) <> T_DIR_z)
                   by (rewrite /sl_incnl sl_setnl_type;
                       exact (sl_tdir_zne _ Hty)).
+                (* [sl_incnl] moves [di_nlink] only, and [dv_of] reads
+                   [di_size] -- so the contents value is literally unmoved
+                   and the hold needs no update (§9 W3, [dv_of_size]). *)
+                iEval (rewrite (dv_of_size dn (sl_incnl dn) dat
+                                  (eq_sym (sl_setnl_size dn _)))) in "Hdview".
                 iAssert (ic_loaded gfs gi cov logstart kk inum (sl_incnl dn) bm)
-                  with "[Hdlnk2 Hdiat Hmeta Hmap Hblocks]" as "Hload".
+                  with "[Hdlnk2 Hdiat Hmeta Hmap Hblocks Hdview]" as "Hload".
                 { rewrite /ic_loaded. iExists dat.
                   iSplitR;
                     [iPureIntro; exact (sl_setnl_inode_ok cov logstart dn bm dat _ Hiok) |].
@@ -1872,7 +1877,7 @@ Section ProofSysLinkBody.
                      exact (sl_tdir_zne _ Hty) |].
                   iSplitL "Hdlnk2"; [iExact "Hdlnk2" |].
                   iFrame "Hdiat Hmeta". rewrite /inode_map.
-                  iDestruct "Hmap" as "[Ha Hi]". iFrame "Ha Hi Hblocks". }
+                  iDestruct "Hmap" as "[Ha Hi]". iFrame "Ha Hi Hblocks Hdview". }
                 iClear "Hdlnk".
                 (* ===== +0x6a c.mv a0,s1 ===== *)
                 iApply (wp_cmv_s_sconf (CID := CID41) (mword_of_int (SL + 0x6a))
@@ -2195,7 +2200,7 @@ Section ProofSysLinkBody.
                      by (symmetry; exact Htyd0).
                    iDestruct "Hloadd" as (datd)
                      "(%Hdiok & %Hddok & %Hddixd & %Hdocd & %Hduqd & Hdlnkd & Hdiatd &
-                       Hmetad & Haddrsd & Hindd & Hblocksd)".
+                       Hmetad & Haddrsd & Hindd & Hblocksd & Hdviewd)".
                    (* ============================================================ *)
                    (*  THE ORPHAN GUARD, +0x84 .. +0x88 (xv6 f60ff58).              *)
                    (*                                                              *)
@@ -2267,7 +2272,8 @@ Section ProofSysLinkBody.
                         the halfword and wrote nothing. *)
                      iDestruct (ic_mk_loaded gfs gi cov logstart kd dinum dnd bmd
                                   datd Hdiok Hddok Hddixd Hdocd Hduqd
-                                  with "Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd")
+                                  with "Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd
+                                        Hdviewd")
                        as "Hloadd".
                      iDestruct (sl_bs3 bn with "[Hbs1d Hbs2d]") as "Hbsl";
                        [iSplitL "Hbs1d"; [iExact "Hbs1d" | iExact "Hbs2d"] |].
@@ -2628,7 +2634,7 @@ Section ProofSysLinkBody.
                        iEval (rewrite Htgee_a0) in "Hpc".
                        subst bmd' datd' dnd' dnd0'.
                        iAssert (ic_loaded gfs gi cov logstart kd dinum dnd bmd)
-                         with "[Hdlnkd Hdiatd Hmetad Hmapd Hblocksd]" as "Hloadd".
+                         with "[Hdlnkd Hdiatd Hmetad Hmapd Hblocksd Hdviewd]" as "Hloadd".
                        { rewrite /ic_loaded. iExists datd.
                          iSplitR; [iPureIntro; exact Hdiok |].
                          iSplitR; [iPureIntro; exact Hddok |].
@@ -2637,7 +2643,8 @@ Section ProofSysLinkBody.
                          iSplitR; [iPureIntro; exact Hduqd |].
                          iSplitL "Hdlnkd"; [iExact "Hdlnkd" |].
                          iFrame "Hdiatd Hmetad". rewrite /inode_map.
-                         iDestruct "Hmapd" as "[Ha Hi]". iFrame "Ha Hi Hblocksd". }
+                         iDestruct "Hmapd" as "[Ha Hi]".
+                         iFrame "Ha Hi Hblocksd Hdviewd". }
                        (* the generation is ALREADY in hand: [iunlock] hands [gsh] back
                           (SpecIunlock's amended post), so the tail re-[ilock]s under the
                           very generation the [ity_shot] above names. *)
@@ -2852,8 +2859,21 @@ Section ProofSysLinkBody.
                                          tot eq_refl eq_refl Htotle Hslot1
                                          Htyeq Hnleq
                                          Hszmax Hrng with "Hk0 Hdlnkd") as "Hdlnkd'".
+                            (* THE MOVER (namei-pinned-lookup.md §9 W3,
+                               dirlink's row): the record and the bytes both
+                               moved, so the hold moves with them.  The
+                               fragment is WHOLE, so this is one free
+                               own-update and no delta is proved -- the
+                               [dir_view_write] statement of the delta is the
+                               CLIENT's business (N-3/N-4), not the
+                               carrier's. *)
+                            iApply fupd_wp.
+                            iMod (dv_set (bv_unsigned dinum)
+                                    (dv_of dnd datd) (dv_of dnd' datd')
+                                   with "Hdviewd") as "Hdviewd".
+                            iModIntro.
                             iAssert (ic_loaded gfs gi cov logstart kd dinum dnd' bmd')
-                              with "[Hdlnkd' Hdiatd Hmetad Hmapd Hblocksd]"
+                              with "[Hdlnkd' Hdiatd Hmetad Hmapd Hblocksd Hdviewd]"
                               as "Hloadd".
                             { rewrite /ic_loaded. iExists datd'.
                               iSplitR; [iPureIntro; exact Hdiok' |].
@@ -2865,7 +2885,7 @@ Section ProofSysLinkBody.
                               rewrite Hdn0e. iFrame "Hdiatd Hmetad".
                               rewrite /inode_map.
                               iDestruct "Hmapd" as "[Ha Hi]".
-                              iFrame "Ha Hi Hblocksd". }
+                              iFrame "Ha Hi Hblocksd Hdviewd". }
                             iAssert (ity_shot gyd (di_type dnd')) as "#Hshotd3".
                             { rewrite Htyeq. iExact "Hshotd2". }
                             destruct (Hmemtrio Htotpos)
@@ -3239,8 +3259,21 @@ Section ProofSysLinkBody.
                                          ltac:(rewrite Hszmax Htot0; reflexivity)
                                          ltac:(rewrite Htot0 in Hrng; exact Hrng)
                                          with "Hdlnkd") as "Hdlnkd'".
+                            (* THE MOVER (namei-pinned-lookup.md §9 W3,
+                               dirlink's row): the record and the bytes both
+                               moved, so the hold moves with them.  The
+                               fragment is WHOLE, so this is one free
+                               own-update and no delta is proved -- the
+                               [dir_view_write] statement of the delta is the
+                               CLIENT's business (N-3/N-4), not the
+                               carrier's. *)
+                            iApply fupd_wp.
+                            iMod (dv_set (bv_unsigned dinum)
+                                    (dv_of dnd datd) (dv_of dnd' datd')
+                                   with "Hdviewd") as "Hdviewd".
+                            iModIntro.
                             iAssert (ic_loaded gfs gi cov logstart kd dinum dnd' bmd')
-                              with "[Hdlnkd' Hdiatd Hmetad Hmapd Hblocksd]"
+                              with "[Hdlnkd' Hdiatd Hmetad Hmapd Hblocksd Hdviewd]"
                               as "Hloadd".
                             { rewrite /ic_loaded. iExists datd'.
                               iSplitR; [iPureIntro; exact Hdiok' |].
@@ -3252,7 +3285,7 @@ Section ProofSysLinkBody.
                               rewrite Hdn0e. iFrame "Hdiatd Hmetad".
                               rewrite /inode_map.
                               iDestruct "Hmapd" as "[Ha Hi]".
-                              iFrame "Ha Hi Hblocksd". }
+                              iFrame "Ha Hi Hblocksd Hdviewd". }
                             iAssert (ity_shot gyd (di_type dnd')) as "#Hshotd3".
                             { rewrite Htyeq. iExact "Hshotd2". }
                             assert (Hiu3 : (iput_units <= n3)%nat)

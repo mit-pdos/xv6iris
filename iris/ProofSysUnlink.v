@@ -1717,6 +1717,8 @@ Section ProofSysUnlinkBody.
        inode_addrs (ientry kd) (bm_cells bmd) -∗
        ind_res gfs bmd -∗
        inode_blocks gfs bmd datd -∗
+       (* the payload's contents hold (namei-pinned-lookup.md §9 W2) *)
+       dv_hold (bv_unsigned dinum) (dv_of dnd datd) -∗
        ity_shot gyd (di_type dnd) -∗
        (* the payload's freeze token (§3.9, RULING A-prime) *)
        ifreeze_off (bv_unsigned dinum) -∗
@@ -2319,7 +2321,7 @@ Section ProofSysUnlinkBody.
         (* the locked directory, opened for readi's bundle *)
         iDestruct "Hload" as (datd)
           "(%Hiok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlnk & Hdiat & Hmeta & Haddrs &
-            Hind & Hblocks)".
+            Hind & Hblocks & Hdview)".
         pose proof Hiok as Hiok0.
         destruct Hiok as (Hbmwf & Hbmcv & Hbmc & Htynz & Hszcap & Hiokrest).
         assert (Hinums : dir_inums_ok datd
@@ -2429,7 +2431,7 @@ Section ProofSysUnlinkBody.
                     [%]
                     Hcg Hown Hpc Hseam Hgen [Hbs1 Hbs2] Hsbb Hsbi Hsbs
                     Hpriv Hslkd0 Hslkdd Hdep Hidev Hiinum Hivalid
-                    Hdlnk Hdiat Hmeta Haddrs Hind Hblocks Hshotl Hfrz Hkeepd Hrud
+                    Hdlnk Hdiat Hmeta Haddrs Hind Hblocks Hdview Hshotl Hfrz Hkeepd Hrud
                     Hchild Hruc HopS Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP
                     H27lo H27hi HbE H30 [Hcont]").
           { exact HR13regs. }
@@ -2496,9 +2498,9 @@ Section ProofSysUnlinkBody.
           iDestruct (su_off_join sp0 (word_lo w27) (word_hi w27) Hal27
                        with "H27lo H27hi") as "H27".
           iAssert (ic_loaded gfs gi cov logstart kd dinum dnd bmd)
-            with "[Hdlnk Hdiat Hmeta Haddrs Hind Hblocks]" as "Hload".
+            with "[Hdlnk Hdiat Hmeta Haddrs Hind Hblocks Hdview]" as "Hload".
           { rewrite /ic_loaded. iExists datd. iFrame "Hdlnk Hdiat Hmeta
-              Haddrs Hind Hblocks". iPureIntro. split_and!;
+              Haddrs Hind Hblocks Hdview". iPureIntro. split_and!;
               [ exact Hiok0 | exact Hdok | exact Hddix | exact Hdoc
               | exact Hduq ]. }
           iDestruct (cpu_own_transport CID20 CID22 0 eb (proc_addr jx) b
@@ -3496,6 +3498,8 @@ Section ProofSysUnlinkBody.
     inode_addrs (ientry kd) (bm_cells bmd) -∗
     ind_res gfs bmd -∗
     inode_blocks gfs bmd datd -∗
+    (* the payload's contents hold (namei-pinned-lookup.md §9 W2) *)
+    dv_hold (bv_unsigned dinum) (dv_of dnd datd) -∗
     ity_shot gyd (di_type dnd) -∗
     (* the payload's freeze token (§3.9, RULING A-prime) *)
     ifreeze_off (bv_unsigned dinum) -∗
@@ -3575,6 +3579,8 @@ Section ProofSysUnlinkBody.
        inode_addrs (ientry kd) (bm_cells bmd) -∗
        ind_res gfs bmd -∗
        inode_blocks gfs bmd datd -∗
+       (* the payload's contents hold (namei-pinned-lookup.md §9 W2) *)
+       dv_hold (bv_unsigned dinum) (dv_of dnd datd) -∗
        ity_shot gyd (di_type dnd) -∗
        (* the payload's freeze token (§3.9, RULING A-prime) *)
        ifreeze_off (bv_unsigned dinum) -∗
@@ -3599,6 +3605,9 @@ Section ProofSysUnlinkBody.
        inode_addrs (ientry ks) (bm_cells bmi) -∗
        ind_res gfs bmi -∗
        inode_blocks gfs bmi dati -∗
+       (* the payload's contents hold (namei-pinned-lookup.md §9 W2) *)
+       dv_hold (bv_unsigned (zero_extend' 32
+           (dir_inum datd kk : mword 16) : mword 32)) (dv_of dni dati) -∗
        ity_shot gyi (di_type dni) -∗
        (* the payload's freeze token (§3.9, RULING A-prime) *)
        ifreeze_off (bv_unsigned
@@ -3674,7 +3683,7 @@ Section ProofSysUnlinkBody.
              #Hdlk Hbsl #Hitab #Hitinv #Hescrows #Hslks #Hireg #Hropen Hsbb Hsbi Hsbs
              #Hbmres #Hkenv #Hprocs Hpriv #Hslkd Hslkdq Hdepd Hidevd
              Hiinumd Hivalidd Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd
-             #Hshotd Hfrz Hkeepd Hrud Hchild Hrui HopS
+             Hdviewd #Hshotd Hfrz Hkeepd Hrud Hchild Hrui HopS
              Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi HbE H30
              Hseamk Hcont".
     iDestruct (cpu_own_zero_empty with "Hown") as "[%Hlkempty Hown]".
@@ -3798,7 +3807,7 @@ Section ProofSysUnlinkBody.
        the [lh]s below read two of its meta cells *)
     iDestruct "Hloadi" as (dati)
       "(%Hioki & %Hdoki & %Hddixi & %Hdoci & %Hduqi & Hdlnki & Hdiati & Hmetai &
-        Haddrsi & Hindi & Hblocksi)".
+        Haddrsi & Hindi & Hblocksi & Hdviewi)".
     (* ===== +0x78 lh a5,74(s2) -- ip->nlink ===== *)
     iEval (rewrite /inode_meta) in "Hmetai".
     iDestruct "Hmetai" as "(Hityi & Himai & Himii & Hinli & Hiszi)".
@@ -3923,9 +3932,9 @@ Section ProofSysUnlinkBody.
          continuations, combined so [su_w4]'s exits can hand them back *)
       iCombine "Hseam Hgen Hbs2 Hsbb Hsbi Hsbs Hpre Hslkdq
                 Hdepd Hidevd Hiinumd Hivalidd Hdlnkd Hdiatd Hmetad Haddrsd
-                Hindd Hblocksd Hfrz Hkeepd Hrud Hslkiq Hdepi Hiinumi
+                Hindd Hblocksd Hdviewd Hfrz Hkeepd Hrud Hslkiq Hdepi Hiinumi
                 Hivalidi
-                Hdlnki Hdiati Hfrzi Hkeepi Hrui HopS Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14
+                Hdlnki Hdiati Hdviewi Hfrzi Hkeepi Hrui HopS Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14
                 Hnm2 HbP H27lo H27hi H30 Hseamk Hcont" as "HX".
       iApply (su_w4 (CID0 := CID8) gs jx gl gu gd gk pd pav pu bn gfs ga gf
                 cov logstart dev ks
@@ -3945,26 +3954,26 @@ Section ProofSysUnlinkBody.
         iDestruct "HX" as "(Hseam & Hgen & Hbs2 & Hsbb & Hsbi & Hsbs
                             & Hpre & Hslkdq & Hdepd & Hidevd &
                             Hiinumd & Hivalidd & Hdlnkd & Hdiatd & Hmetad &
-                            Haddrsd & Hindd & Hblocksd & Hfrz & Hkeepd & Hrud &
+                            Haddrsd & Hindd & Hblocksd & Hdviewd & Hfrz & Hkeepd & Hrud &
                             Hslkiq &
                              Hdepi & Hiinumi & Hivalidi & Hdlnki &
-                            Hdiati & Hfrzi & Hkeepi & Hrui & HopS & Hf1 & Hf2 & Hf3 & Hf4 &
+                            Hdiati & Hdviewi & Hfrzi & Hkeepi & Hrui & HopS & Hf1 & Hf2 & Hf3 & Hf4 &
                             Hf5 & Hf6 & HbD & Hnm14 & Hnm2 & HbP & H27lo &
                             H27hi & H30 & Hseamk & Hcont)".
         iDestruct "Hmapi" as "[Haddrsi Hindi]".
         (* both bundles repacked: neither release below opens them *)
         iAssert (ic_loaded gfs gi cov logstart kd dinum dnd bmd)
-          with "[Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd]" as "Hloadd".
+          with "[Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd Hdviewd]" as "Hloadd".
         { rewrite /ic_loaded. iExists datd.
-          iFrame "Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd".
+          iFrame "Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd Hdviewd".
           iPureIntro. split_and!;
             [exact Hiok | exact Hdok | exact Hddix | exact Hdoc | exact Hduq]. }
         iAssert (ic_loaded gfs gi cov logstart ks
                    (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)
                    dni bmi)
-          with "[Hdlnki Hdiati Hmetai Haddrsi Hindi Hblocksi]" as "Hloadi".
+          with "[Hdlnki Hdiati Hmetai Haddrsi Hindi Hblocksi Hdviewi]" as "Hloadi".
         { rewrite /ic_loaded. iExists dati.
-          iFrame "Hdlnki Hdiati Hmetai Haddrsi Hindi Hblocksi".
+          iFrame "Hdlnki Hdiati Hmetai Haddrsi Hindi Hblocksi Hdviewi".
           iPureIntro. split_and!;
             [exact Hioki | exact Hdoki | exact Hddixi | exact Hdoci
             | exact Hduqi]. }
@@ -4032,10 +4041,10 @@ Section ProofSysUnlinkBody.
         iDestruct "HX" as "(Hseam & Hgen & Hbs2 & Hsbb & Hsbi & Hsbs
                             & Hpre & Hslkdq & Hdepd & Hidevd &
                             Hiinumd & Hivalidd & Hdlnkd & Hdiatd & Hmetad &
-                            Haddrsd & Hindd & Hblocksd & Hfrz & Hkeepd & Hrud &
+                            Haddrsd & Hindd & Hblocksd & Hdviewd & Hfrz & Hkeepd & Hrud &
                             Hslkiq &
                              Hdepi & Hiinumi & Hivalidi & Hdlnki &
-                            Hdiati & Hfrzi & Hkeepi & Hrui & HopS & Hf1 & Hf2 & Hf3 & Hf4 &
+                            Hdiati & Hdviewi & Hfrzi & Hkeepi & Hrui & HopS & Hf1 & Hf2 & Hf3 & Hf4 &
                             Hf5 & Hf6 & HbD & Hnm14 & Hnm2 & HbP & H27lo &
                             H27hi & H30 & Hseamk & Hcont)".
         iDestruct "Hmapi" as "[Haddrsi Hindi]".
@@ -4050,9 +4059,9 @@ Section ProofSysUnlinkBody.
                   with "[%] [%] [%] [%] [%] [%] [%] [%] Hcg Hown Hpc Hseam Hgen
                         [Hbslot Hbs2] Hsbb Hsbi Hsbs Hpriv Hslkd
                         Hslkdq Hdepd Hidevd Hiinumd Hivalidd Hdlnkd
-                        Hdiatd Hmetad Haddrsd Hindd Hblocksd Hshotd Hfrz Hkeepd Hrud
+                        Hdiatd Hmetad Haddrsd Hindd Hblocksd Hdviewd Hshotd Hfrz Hkeepd Hrud
                         Hslki Hslkiq Hdepi Hidevi Hiinumi Hivalidi
-                        Hdlnki Hdiati Hmetai Haddrsi Hindi Hblocksi Hshoti
+                        Hdlnki Hdiati Hmetai Haddrsi Hindi Hblocksi Hdviewi Hshoti
                         Hfrzi Hkeepi Hrui HopS Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2
                         HbP H27lo H27hi Hbuf H30 [Hcont]").
         { exact Hxregs. }
@@ -4089,9 +4098,9 @@ Section ProofSysUnlinkBody.
                 with "[%] [%] [%] [%] [%] [%] [%] [%] Hcg Hown Hpc Hseam Hgen
                       [Hbs1 Hbs2] Hsbb Hsbi Hsbs Hpriv Hslkd Hslkdq
                       Hdepd Hidevd Hiinumd Hivalidd Hdlnkd Hdiatd
-                      Hmetad Haddrsd Hindd Hblocksd Hshotd Hfrz Hkeepd Hrud Hslki
+                      Hmetad Haddrsd Hindd Hblocksd Hdviewd Hshotd Hfrz Hkeepd Hrud Hslki
                       Hslkiq Hdepi Hidevi Hiinumi Hivalidi Hdlnki
-                      Hdiati Hmetai Haddrsi Hindi Hblocksi Hshoti Hfrzi Hkeepi Hrui HopS
+                      Hdiati Hmetai Haddrsi Hindi Hblocksi Hdviewi Hshoti Hfrzi Hkeepi Hrui HopS
                       Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi
                       HbE H30 [Hcont]").
       { exact HM5regs. }
@@ -4229,6 +4238,8 @@ Section ProofSysUnlinkBody.
     inode_addrs (ientry kd) (bm_cells bmd) -∗
     ind_res gfs bmd -∗
     inode_blocks gfs bmd datd -∗
+    (* the payload's contents hold (namei-pinned-lookup.md §9 W2) *)
+    dv_hold (bv_unsigned dinum) (dv_of dnd datd) -∗
     ity_shot gyd (di_type dnd) -∗
     (* the payload's freeze token (§3.9, RULING A-prime) *)
     ifreeze_off (bv_unsigned dinum) -∗
@@ -4253,6 +4264,9 @@ Section ProofSysUnlinkBody.
     inode_addrs (ientry ks) (bm_cells bmi) -∗
     ind_res gfs bmi -∗
     inode_blocks gfs bmi dati -∗
+    (* the payload's contents hold (namei-pinned-lookup.md §9 W2) *)
+    dv_hold (bv_unsigned (zero_extend' 32
+        (dir_inum datd kk : mword 16) : mword 32)) (dv_of dni dati) -∗
     ity_shot gyi (di_type dni) -∗
     (* the payload's freeze token (§3.9, RULING A-prime) *)
     ifreeze_off (bv_unsigned
@@ -4310,9 +4324,9 @@ Section ProofSysUnlinkBody.
              #Hdev #Hgeo #Hdlk Hbsl #Hitab #Hitinv #Hescrows #Hireg #Hropen
              Hsbb Hsbi Hsbs #Hbmres #Hkenv #Hprocs Hpriv
              #Hslkd Hslkdq Hdepd Hidevd Hiinumd Hivalidd Hdlnkd
-             Hdiatd Hmetad Haddrsd Hindd Hblocksd #Hshotd Hfrz Hkeepd Hrud
+             Hdiatd Hmetad Haddrsd Hindd Hblocksd Hdviewd #Hshotd Hfrz Hkeepd Hrud
              #Hslki Hslkiq Hdepi Hidevi Hiinumi Hivalidi Hdlnki
-             Hdiati Hmetai Haddrsi Hindi Hblocksi #Hshoti Hfrzi Hkeepi Hrui HopS
+             Hdiati Hmetai Haddrsi Hindi Hblocksi Hdviewi #Hshoti Hfrzi Hkeepi Hrui HopS
              Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi HbE H30
              Hcont".
     iPoseProof (printk_env_panic with "Hprenv") as "#Hpanenv".
@@ -4915,11 +4929,20 @@ Section ProofSysUnlinkBody.
     { cbn. rewrite Hnl'v. lia. }
     (* [dp]'s bundle, repacked at the flushed record *)
     iDestruct "Hmapd" as "[Haddrsd Hindd]".
+    (* THE MOVER (namei-pinned-lookup.md §9 W3, sys_unlink's row): the
+       memset+writei zeroed this directory's record, so the hold moves with
+       the bytes.  The fragment is WHOLE, so this is one free own-update --
+       [dir_view_zero] states the DELTA and is the client's business
+       (N-3/N-4), not the carrier's. *)
+    iApply fupd_wp.
+    iMod (dv_set (bv_unsigned dinum) (dv_of dnd datd) (dv_of dnW data')
+           with "Hdviewd") as "Hdviewd".
+    iModIntro.
     iAssert (ic_loaded gfs gi cov logstart kd dinum dnW bm')
-      with "[Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd]" as "Hloadd".
+      with "[Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd Hdviewd]" as "Hloadd".
     { rewrite /ic_loaded. iExists data'.
       rewrite Hdn0W.
-      iFrame "Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd".
+      iFrame "Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd Hdviewd".
       iPureIntro. split_and!;
         [exact Hiok' | exact Hdok' | exact Hddix' | exact Hdoc'
         | exact Hduq']. }
@@ -5268,7 +5291,7 @@ Section ProofSysUnlinkBody.
                      (sign_extend' 64
                         (sign_extend' 12 (mword_of_int 63 : mword 6))
                       : mword 64)) 31 0)))) bmi)
-      with "[Hdlnki2 Hdiati Hmetai Haddrsi Hindi Hblocksi]" as "Hloadi".
+      with "[Hdlnki2 Hdiati Hmetai Haddrsi Hindi Hblocksi Hdviewi]" as "Hloadi".
     { rewrite /ic_loaded. iExists dati.
       iSplit; [iPureIntro; exact (su_setnl_inode_ok cov logstart dni bmi dati _ Hioki) |].
       iSplit; [iPureIntro; exact (su_setnl_dir_ok icfg_nib dni dati _ Hdoki) |].
@@ -5282,7 +5305,12 @@ Section ProofSysUnlinkBody.
       iSplitL "Hdiati"; [iExact "Hdiati" |].
       iSplitL "Hmetai"; [iExact "Hmetai" |].
       iSplitL "Haddrsi"; [iExact "Haddrsi" |].
-      iSplitL "Hindi"; [iExact "Hindi" | iExact "Hblocksi"]. }
+      iSplitL "Hindi"; [iExact "Hindi" |].
+      iSplitL "Hblocksi"; [iExact "Hblocksi" |].
+      (* [su_setnl] moves [di_nlink] only and [dv_of] reads [di_size], so the
+         contents value is unmoved (§9 W3). *)
+      iApply (dv_hold_size _ dni _ dati (eq_sym (su_setnl_size dni _))
+               with "Hdviewi"). }
     iAssert (ity_shot gyi (di_type (su_setnl dni (trunc16 (sign_extend' 64
                (subrange_vec_dec
                   (add_vec (zero_extend' 64 (di_nlink dni : mword 16)
@@ -5683,6 +5711,8 @@ Section ProofSysUnlinkBody.
     inode_addrs (ientry kd) (bm_cells bmd) -∗
     ind_res gfs bmd -∗
     inode_blocks gfs bmd datd -∗
+    (* the payload's contents hold (namei-pinned-lookup.md §9 W2) *)
+    dv_hold (bv_unsigned dinum) (dv_of dnd datd) -∗
     ity_shot gyd (di_type dnd) -∗
     (* the payload's freeze token (§3.9, RULING A-prime) *)
     ifreeze_off (bv_unsigned dinum) -∗
@@ -5707,6 +5737,9 @@ Section ProofSysUnlinkBody.
     inode_addrs (ientry ks) (bm_cells bmi) -∗
     ind_res gfs bmi -∗
     inode_blocks gfs bmi dati -∗
+    (* the payload's contents hold (namei-pinned-lookup.md §9 W2) *)
+    dv_hold (bv_unsigned (zero_extend' 32
+        (dir_inum datd kk : mword 16) : mword 32)) (dv_of dni dati) -∗
     ity_shot gyi (di_type dni) -∗
     (* the payload's freeze token (§3.9, RULING A-prime) *)
     ifreeze_off (bv_unsigned
@@ -5764,9 +5797,9 @@ Section ProofSysUnlinkBody.
              #Hdev #Hgeo #Hdlk Hbsl #Hitab #Hitinv #Hescrows #Hireg #Hropen
              Hsbb Hsbi Hsbs #Hbmres #Hkenv #Hprocs Hpriv
              #Hslkd Hslkdq Hdepd Hidevd Hiinumd Hivalidd Hdlnkd
-             Hdiatd Hmetad Haddrsd Hindd Hblocksd #Hshotd Hfrz Hkeepd Hrud
+             Hdiatd Hmetad Haddrsd Hindd Hblocksd Hdviewd #Hshotd Hfrz Hkeepd Hrud
              #Hslki Hslkiq Hdepi Hidevi Hiinumi Hivalidi Hdlnki
-             Hdiati Hmetai Haddrsi Hindi Hblocksi #Hshoti Hfrzi Hkeepi Hrui HopS
+             Hdiati Hmetai Haddrsi Hindi Hblocksi Hdviewi #Hshoti Hfrzi Hkeepi Hrui HopS
              Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi HbE H30
              Hcont".
     iPoseProof (printk_env_panic with "Hprenv") as "#Hpanenv".
@@ -6777,18 +6810,31 @@ Section ProofSysUnlinkBody.
     iEval (rewrite Htgb8) in "Hpc".
     (* [dp]'s bundle, repacked at the decremented record *)
     iDestruct "Hmapd" as "[Haddrsd Hindd]".
+    (* THE MOVER (namei-pinned-lookup.md §9 W3, sys_unlink's row): the
+       memset+writei zeroed this directory's record.  One free own-update;
+       the [su_setnl] that follows moves [di_nlink] only. *)
+    iApply fupd_wp.
+    iMod (dv_set (bv_unsigned dinum) (dv_of dnd datd) (dv_of dnW data')
+           with "Hdviewd") as "Hdviewd".
+    iModIntro.
     iAssert (ic_loaded gfs gi cov logstart kd dinum (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
                   (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
                             : mword 64)
                      (sign_extend' 64
                         (sign_extend' 12 (mword_of_int 63 : mword 6))
                       : mword 64)) 31 0)))) bm')
-      with "[Hdlnkd2 Hdiatd Hmetad Haddrsd Hindd Hblocksd]" as "Hloadd".
+      with "[Hdlnkd2 Hdiatd Hmetad Haddrsd Hindd Hblocksd Hdviewd]" as "Hloadd".
     { rewrite /ic_loaded. iExists data'.
+      iSplitR; [iPureIntro; exact HiokF2 |].
+      iSplitR; [iPureIntro; exact HdokF2 |].
+      iSplitR; [iPureIntro; exact HddixF2 |].
+      iSplitR; [iPureIntro; exact HdocF2 |].
+      iSplitR; [iPureIntro; exact HduqF2 |].
       iFrame "Hdlnkd2 Hdiatd Hmetad Haddrsd Hindd Hblocksd".
-      iPureIntro. split_and!;
-        [exact HiokF2 | exact HdokF2 | exact HddixF2 | exact HdocF2
-        | exact HduqF2]. }
+      (* [su_setnl] moves [di_nlink] only and [dv_of] reads [di_size], so the
+         contents value is unmoved (§9 W3). *)
+      iApply (dv_hold_size _ dnW _ data' (eq_sym (su_setnl_size dnW _))
+               with "Hdviewd"). }
     iAssert (ity_shot gyd (di_type (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
                   (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
                             : mword 64)
@@ -7167,9 +7213,9 @@ Section ProofSysUnlinkBody.
                      (sign_extend' 64
                         (sign_extend' 12 (mword_of_int 63 : mword 6))
                       : mword 64)) 31 0)))) bmi)
-      with "[Hdlnki2 Hdiati Hmetai Haddrsi Hindi Hblocksi]" as "Hloadi".
+      with "[Hdlnki2 Hdiati Hmetai Haddrsi Hindi Hblocksi Hdviewi]" as "Hloadi".
     { rewrite /ic_loaded. iExists dati.
-      iFrame "Hdlnki2 Hdiati Hmetai Haddrsi Hindi Hblocksi".
+      iFrame "Hdlnki2 Hdiati Hmetai Haddrsi Hindi Hblocksi Hdviewi".
       iPureIntro. split_and!.
       - exact (su_setnl_inode_ok cov logstart dni bmi dati _ Hioki).
       - exact (su_setnl_dir_ok icfg_nib dni dati _ Hdoki).
@@ -7508,7 +7554,7 @@ Section ProofSysUnlinkBody.
              %Hnotdot %Hnotdd %Hfst %Hma02 %Hal27
              Hcg Hown Hpc Hseam Hgen Hbsl Hsbb Hsbi Hsbs Hpriv
              Hslkd Hslkdq Hdepd Hidevd Hiinumd Hivalidd Hdlnkd
-             Hdiatd Hmetad Haddrsd Hindd Hblocksd Hshotd Hfrz Hkeepd Hrud Hchild Hruc HopS
+             Hdiatd Hmetad Haddrsd Hindd Hblocksd Hdviewd Hshotd Hfrz Hkeepd Hrud Hchild Hruc HopS
              Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi HbE H30
              Hcont".
     (* ---- W3, +0x72..+0x88: ilock(ip), the nlink panic, the T_DIR test
@@ -7527,16 +7573,16 @@ Section ProofSysUnlinkBody.
                     Hdlk Hbsl Hitab Hitinv Hescrows Hslks Hireg Hropen Hsbb Hsbi
                     Hsbs Hbmres Hkenv Hprocs Hpriv Hslkd Hslkdq
                     Hdepd Hidevd Hiinumd Hivalidd Hdlnkd Hdiatd Hmetad
-                    Haddrsd Hindd Hblocksd Hshotd Hfrz Hkeepd Hrud Hchild Hruc HopS
+                    Haddrsd Hindd Hblocksd Hdviewd Hshotd Hfrz Hkeepd Hrud Hchild Hruc HopS
                     Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi
                     HbE H30 [] Hcont").
     iIntros (CIDc M3 s3x bex isdir gili gisli gyi si qsi dni bmi dati).
     iIntros "%Hregs3 %Hnlzi %Hioki %Hdoki %Hddixi %Hdoci %Hduqi %Hisd
              Hcg Hown Hpc Hseam Hgen Hbsl Hsbb Hsbi Hsbs Hpriv
              Hslkd Hslkdq Hdepd Hidevd Hiinumd Hivalidd Hdlnkd
-             Hdiatd Hmetad Haddrsd Hindd Hblocksd Hshotd Hfrz Hkeepd Hrud
+             Hdiatd Hmetad Haddrsd Hindd Hblocksd Hdviewd Hshotd Hfrz Hkeepd Hrud
              Hslki Hslkiq Hdepi Hidevi Hiinumi Hivalidi Hdlnki
-             Hdiati Hmetai Haddrsi Hindi Hblocksi Hshoti Hfrzi Hkeepi Hrui HopS
+             Hdiati Hmetai Haddrsi Hindi Hblocksi Hdviewi Hshoti Hfrzi Hkeepi Hrui HopS
              Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi HbE H30
              Hcont".
     (* ---- W5, +0x8a..: the zeroing and the two tails, split on the seam's
@@ -7560,10 +7606,10 @@ Section ProofSysUnlinkBody.
                       Hgen Hdev Hgeo Hdlk Hbsl Hitab Hitinv Hescrows Hireg Hropen
                       Hsbb Hsbi Hsbs Hbmres Hkenv Hprocs Hpriv
                       Hslkd Hslkdq Hdepd Hidevd Hiinumd Hivalidd
-                      Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd Hshotd
+                      Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd Hdviewd Hshotd
                       Hfrz Hkeepd Hrud Hslki Hslkiq Hdepi Hidevi Hiinumi
                       Hivalidi Hdlnki Hdiati Hmetai Haddrsi Hindi Hblocksi
-                      Hshoti Hfrzi Hkeepi Hrui HopS
+                      Hdviewi Hshoti Hfrzi Hkeepi Hrui HopS
                       Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi
                       HbE H30 Hcont").
     - iApply (su_w5_file gf ga gs jx gl gu gd gk pd pav pu bn g gfs gi cn gtl
@@ -7581,10 +7627,10 @@ Section ProofSysUnlinkBody.
                       Hgen Hdev Hgeo Hdlk Hbsl Hitab Hitinv Hescrows Hireg Hropen
                       Hsbb Hsbi Hsbs Hbmres Hkenv Hprocs Hpriv
                       Hslkd Hslkdq Hdepd Hidevd Hiinumd Hivalidd
-                      Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd Hshotd
+                      Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd Hdviewd Hshotd
                       Hfrz Hkeepd Hrud Hslki Hslkiq Hdepi Hidevi Hiinumi
                       Hivalidi Hdlnki Hdiati Hmetai Haddrsi Hindi Hblocksi
-                      Hshoti Hfrzi Hkeepi Hrui HopS
+                      Hdviewi Hshoti Hfrzi Hkeepi Hrui HopS
                       Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi
                       HbE H30 Hcont").
   Qed.

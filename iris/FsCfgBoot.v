@@ -315,6 +315,15 @@ Section FsCfgBootPool.
     ([∗ set] z ∈ region_inums icfg_nib, icnt_half z 0%nat) -∗
     ([∗ set] z ∈ region_inums icfg_nib, frzm_h z false) -∗
     ([∗ set] z ∈ region_inums icfg_nib, ifreeze_off z) -∗
+    (* ...and the CONTENTS HOLDS, ALREADY AT THE IMAGE'S TRUTH
+       (namei-pinned-lookup.md §9 W3).  The caller mints them at [∅] and
+       [dv_set]s each one here's value before calling -- whole ownership
+       makes that a free own-update, so this lemma stays an entailment and
+       no boot modality moves.  The value is uniform over the whole region:
+       at a LIVE inum it is the tie the allocated arm carries, and at a free
+       one it is determined garbage the marker arm forgets. *)
+    ([∗ set] z ∈ region_inums icfg_nib,
+       dv_hold z (dv_of (fs_dinode P sb z) (fs_data_of P (fs_dinode P sb z)))) -∗
     (* [ireg_alloc]'s payout, verbatim: the fragment at a live inum, the
        marker at a free one *)
     ([∗ set] z ∈ region_inums icfg_nib,
@@ -330,7 +339,7 @@ Section FsCfgBootPool.
            fsblock γfs b (P b) ∗ blk_own γfs b).
   Proof.
     iIntros (Hwf Hrf Hfull Hnin Hnib HA Hcov HcovC)
-            "Hcnt Hmir Hoff Hout Hdlk Hfsb Hown".
+            "Hcnt Hmir Hoff Hdv Hout Hdlk Hfsb Hown".
     (* ---- the pure preliminaries, all from the sweeps' lookup specs --- *)
     pose proof (fsimg_wf_sb P sb Hwf) as Hsb.
     destruct (fsimg_wf_used P sb Hwf) as (u & _ & Hnd & _).
@@ -406,16 +415,27 @@ Section FsCfgBootPool.
       apply elem_of_difference in Hz as [Hz1 Hz2]. iIntros "H".
       iApply (ireg_out_free_inv γi (mword_of_int z : mword 32)
                 (fs_dinode P sb z) (Hfree z Hz1 Hz2) with "H"). }
+    (* ---- the contents holds, split along the same subset -------------- *)
+    iDestruct (big_sepS_split_sub _ (region_inums icfg_nib) A HARs
+                 with "Hdv") as "[HdvA HdvF]".
+    iAssert ([∗ set] z ∈ region_inums icfg_nib ∖ A,
+               ∃ e, dv_hold (bv_unsigned (mword_of_int z : mword 32)) e)%I
+      with "[HdvF]" as "HdvF".
+    { iApply (big_sepS_mono with "HdvF"). intros z Hz.
+      apply elem_of_difference in Hz as [Hz1 _].
+      rewrite (region_inum_faithful icfg_nib z Hnib Hz1).
+      iIntros "H". iExists _. iExact "H". }
     (* ---- the allocated arm, one named application per inum ----------- *)
     iDestruct (big_sepS_sep_2 with "HoutA Hdlk") as "Ha".
     iDestruct (big_sepS_sep_2 with "Ha Hpc") as "Ha".
+    iDestruct (big_sepS_sep_2 with "Ha HdvA") as "Ha".
     iApply (ipool_alloc γfs γi cov (sb_logstart sb)
               (region_inums icfg_nib) A HARs
-              with "Hcnt Hmir Hoff [Ha] Hmk").
+              with "Hcnt Hmir Hoff [Ha] Hmk HdvF").
     iApply (big_sepS_mono with "Ha"). intros z Hz.
     rewrite (region_inum_faithful icfg_nib z Hnib (HAR z Hz)).
     rewrite /fs_inode_blocks_set.
-    iIntros "[[Hreg Hdl] Hblks]".
+    iIntros "[[[Hreg Hdl] Hblks] Hdv]".
     iExists (fs_dinode P sb z), (img_blkmap P (fs_dinode P sb z)),
             (fs_data_of P (fs_dinode P sb z)).
     iSplitR.
@@ -443,7 +463,8 @@ Section FsCfgBootPool.
     iSplitL "Hreg".
     { iApply (ireg_out_alloc_inv γi (mword_of_int z : mword 32)
                 (fs_dinode P sb z) (Hty z Hz) with "Hreg"). }
-    iSplitL "Hind"; [iExact "Hind" | iExact "Hblks"].
+    iSplitL "Hind"; [iExact "Hind" |].
+    iSplitL "Hblks"; [iExact "Hblks" | iExact "Hdv"].
   Qed.
 
   (* ==================================================================== *)
@@ -1308,11 +1329,13 @@ Section FsCfgBootEra.
             (icnt_boot_map (region_inums nib))
             (frzo_boot_map (region_inums nib))
             (frzm_boot_map (region_inums nib))
+            (dview_boot_map (region_inums nib))
             γlog (FsImg.sb_inodestart sb)
             (link_boot_map_valid _) (icnt_boot_map_valid _)
-            (frzo_boot_map_valid _) (frzm_boot_map_valid _))
+            (frzo_boot_map_valid _) (frzm_boot_map_valid _)
+            (dview_boot_map_valid _))
       as (ICFG g0) "(%Hdev & %Hnibq & %Hlogq & %Histq & Hiref & Hlive &
-                     Hlk & Hcnt & Hfrzo & Hfrzm & Hboot & Hep & Hisl &
+                     Hlk & Hcnt & Hfrzo & Hfrzm & Hdv & Hboot & Hep & Hisl &
                      Hrauth)".
     (* every ambient form below is stated at [icfg_nib]; make the caller's
        [nib] BE it, so no lemma has to be re-instantiated *)
@@ -1381,6 +1404,25 @@ Section FsCfgBootEra.
       as "Hmir".
     iEval (rewrite big_sepS_sep) in "Hmir".
     iDestruct "Hmir" as "[HmirR HmirP]".
+    (* THE CONTENTS GHOST, MINTED AT [∅] AND SET TO THE IMAGE'S TRUTH
+       (namei-pinned-lookup.md §9 W3).  [icfg_alloc] cannot mint the values
+       -- it knows nothing about the image -- and it does not have to:
+       [dv_hold] is the WHOLE element, so each inum's move is a free
+       own-update with no ordering constraint against the region, the pool
+       or anything else. *)
+    iDestruct (dv_boot_split (region_inums icfg_nib) with "Hdv") as "Hdv".
+    iAssert (|==> [∗ set] z ∈ region_inums icfg_nib,
+                    dv_hold z (dv_of (fs_dinode (fs_blocks dk) sb z)
+                                 (fs_data_of (fs_blocks dk)
+                                    (fs_dinode (fs_blocks dk) sb z))))%I
+      with "[Hdv]" as ">Hdv".
+    { iApply big_sepS_bupd. iApply (big_sepS_mono with "Hdv").
+      intros z _. iIntros "H".
+      iApply (dv_set z ∅
+                (dv_of (fs_dinode (fs_blocks dk) sb z)
+                       (fs_data_of (fs_blocks dk)
+                          (fs_dinode (fs_blocks dk) sb z)))
+               with "H"). }
     iDestruct (region_of_seq (fun z => mono_nat_auth_own (icfg_iep z) 1 0)
                  icfg_nib with "Hep") as "Hep".
     iDestruct (live_boot_split g0 with "Hlive") as "Hlive".
@@ -1445,7 +1487,7 @@ Section FsCfgBootEra.
                  (fs_live_set (fs_blocks dk) sb)
                  Hwf (fs_region_wf_free _ _ _ Hrw) Hfull Hnin Hnib32
                  (fs_live_set_elem_of (fs_blocks dk) sb) Hcovdata HcovC
-                 with "HcntP HmirP Hoff Hout Hdlk HfsbC HownC")
+                 with "HcntP HmirP Hoff Hdv Hout Hdlk HfsbC HownC")
       as "[Hipool Hrem]".
     (* ---- 7b. DEBT (D): the bitmap block and the free pool ------------ *)
     (* every member of [fs_bitmap_spent] survives all four peels: it is

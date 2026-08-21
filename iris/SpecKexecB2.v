@@ -331,11 +331,17 @@ Section KexecB2Res.
       dinode_at gi inumf dnf ∗
       inode_meta (ientry kf) dnf ∗
       inode_map gfs (ientry kf) bmf ∗
-      inode_blocks gfs bmf datl.
+      inode_blocks gfs bmf datl ∗
+      (* ...and the CONTENTS HOLD (namei-pinned-lookup.md §9 W2).  It rides
+         the bracket rather than being dropped here because the peel and the
+         SEAL below are a self-cancelling pair inside one proof: the seal has
+         no other source for it, and readi -- the one callee this bracket is
+         opened for -- moves no byte, so the value comes back unchanged. *)
+      dv_hold (bv_unsigned inumf) (dv_of dnf datl).
   Proof.
     rewrite /ic_loaded /inode_map.
     iIntros "(%datl & %Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdiat & Hmeta &
-              Haddrs & Hind & Hbl)".
+              Haddrs & Hind & Hbl & Hdv)".
     iExists datl.
     iSplitR; [iPureIntro; exact Hok |].
     iSplitR; [iPureIntro; exact Hdok |].
@@ -344,7 +350,7 @@ Section KexecB2Res.
     iSplitR; [iPureIntro; exact Hduq |].
     iSplitL "Hdlk"; [iExact "Hdlk" |]. iSplitL "Hdiat"; [iExact "Hdiat" |].
     iSplitL "Hmeta"; [iExact "Hmeta" |].
-    iSplitR "Hbl"; [| iExact "Hbl"].
+    iSplitR "Hbl Hdv"; [| iSplitL "Hbl"; [iExact "Hbl" | iExact "Hdv"]].
     iSplitL "Haddrs"; [iExact "Haddrs" | iExact "Hind"].
   Qed.
 
@@ -361,10 +367,13 @@ Section KexecB2Res.
     inode_meta (ientry kf) dnf -∗
     inode_map gfs (ientry kf) bmf -∗
     inode_blocks gfs bmf datl -∗
+    (* the bracket's other half: exactly what [kxc_load_peel] handed out, and
+       there is no other source for it (§9 W2). *)
+    dv_hold (bv_unsigned inumf) (dv_of dnf datl) -∗
     ic_loaded gfs gi cov logstart kf inumf dnf bmf.
   Proof.
     intros Hok Hdok Hddix Hdoc Hduq. rewrite /ic_loaded /inode_map.
-    iIntros "Hdlk Hdiat Hmeta [Haddrs Hind] Hbl". iExists datl.
+    iIntros "Hdlk Hdiat Hmeta [Haddrs Hind] Hbl Hdv". iExists datl.
     iSplitR; [iPureIntro; exact Hok |].
     iSplitR; [iPureIntro; exact Hdok |].
     iSplitR; [iPureIntro; exact Hddix |].
@@ -373,7 +382,8 @@ Section KexecB2Res.
     iSplitL "Hdlk"; [iExact "Hdlk" |]. iSplitL "Hdiat"; [iExact "Hdiat" |].
     iSplitL "Hmeta"; [iExact "Hmeta" |].
     iSplitL "Haddrs"; [iExact "Haddrs" |].
-    iSplitL "Hind"; [iExact "Hind" | iExact "Hbl"].
+    iSplitL "Hind"; [iExact "Hind" |].
+    iSplitL "Hbl"; [iExact "Hbl" | iExact "Hdv"].
   Qed.
 
   (* ------------------------------------------------------------------ *)

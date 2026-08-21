@@ -431,6 +431,19 @@ Definition frzoUR : ucmra := gmapUR Z (exclR unitO).
    region-vs-lock BRANCH SELECTOR the payload disjunction needed. *)
 Definition frzmUR : ucmra := gmapUR Z (dfrac_agreeR (leibnizO bool)).
 
+(* THE PER-DIRECTORY CONTENTS GHOST (namei-pinned-lookup.md §9 W1).  [icntUR]
+   at the ABSTRACT ENTRY MAP: a per-inum agreement on what a directory's bytes
+   say, tied definitionally to those bytes ([DirViewG.dv_of]) everywhere the
+   bytes rest.  Carried WHOLE on the custody chain -- which is what keeps
+   every mover a free own-update and keeps every landed contract's arity
+   fixed; the fraction split belongs to the pinned form, not to the carrier.
+
+   THE KEY TYPE IS SPELLED [list (bv 8)], NOT [FsTree.fname]: this file sits
+   below [FsTree] (and below its [InodeDefs]/[BioDefs] cone), the two are the
+   same definition, and [DirViewG] states the whole theory at [fname]. *)
+Definition dviewUR : ucmra :=
+  gmapUR Z (dfrac_agreeR (leibnizO (gmap (list (bv 8)) Z))).
+
 (* THE ENTRY SLEEPLOCK'S DESCRIPTOR (design §14.8): what a checked-out
    entry's escrow arm is holding for the thread inside.  The fraction is a
    FIELD because an existentially-quantified one in the arm cannot be
@@ -460,12 +473,13 @@ Class icacheG (Σ : gFunctors) := IcacheG {
   icache_cntG :: inG Σ icntUR;
   icache_frzoG :: inG Σ frzoUR;
   icache_frzmG :: inG Σ frzmUR;
+  icache_dviewG :: inG Σ dviewUR;
 }.
 Definition icacheΣ : gFunctors :=
   #[GFunctor icacheUR; ghost_varΣ (bool * SailStdpp.Values.mword 32 * SailStdpp.Values.mword 32);
     GFunctor iliveUR; ghost_varΣ ic_dep; GFunctor ityR; GFunctor linkUR;
     GFunctor (exclR unitO); ghost_mapΣ Z (gname * gname)%type;
-    GFunctor icntUR; GFunctor frzoUR; GFunctor frzmUR].
+    GFunctor icntUR; GFunctor frzoUR; GFunctor frzmUR; GFunctor dviewUR].
 Global Instance subG_icacheΣ {Σ} : subG icacheΣ Σ -> icacheG Σ.
 Proof. solve_inG. Qed.
 

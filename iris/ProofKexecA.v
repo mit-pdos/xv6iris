@@ -1154,7 +1154,7 @@ Section KexecABody.
     (* ---- peel the loaded content for readi ---- *)
     iDestruct "Hload" as (datl)
       "(%Hiok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdiat & Hmeta & Haddrs & Hindres
-       & Hblocks)".
+       & Hblocks & Hdview)".
     destruct Hiok as (Hbmwf & Hbmcov & Hdaddr & Hdty & Hszb & Hholes & Hsized).
     iAssert (inode_map gfs (ientry k) bml) with "[Haddrs Hindres]" as "Hmap".
     { rewrite /inode_map. iSplitL "Haddrs"; [iExact "Haddrs" | iExact "Hindres"]. }
@@ -1482,7 +1482,7 @@ Section KexecABody.
         iDestruct (cpu_claim_ext_transport CIDrd CID15 eb (proc_addr jp)
                      ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
         iAssert (ic_loaded gfs gi cov logstart k inum dnl bml)
-          with "[Hdiat Hmeta Hmap Hblocks Hdlk]" as "Hload".
+          with "[Hdiat Hmeta Hmap Hblocks Hdlk Hdview]" as "Hload".
         { rewrite /ic_loaded /inode_map. iExists datl.
           iSplitR; [iPureIntro; split_and!;
             [exact Hbmwf | exact Hbmcov | exact Hdaddr | exact Hdty
@@ -1496,7 +1496,8 @@ Section KexecABody.
           iSplitL "Hdiat"; [iExact "Hdiat" |].
           iSplitL "Hmeta"; [iExact "Hmeta" |].
           iSplitL "Haddrs"; [iExact "Haddrs" |].
-          iSplitL "Hindres"; [iExact "Hindres" | iExact "Hblocks"]. }
+          iSplitL "Hindres"; [iExact "Hindres" |].
+          iSplitL "Hblocks"; [iExact "Hblocks" | iExact "Hdview"]. }
         iDestruct (T.kxa_bs3_join bn with "Hbs1 Hbs2") as "Hbs".
         iSpecialize ("Hcont90" $! CID15 with "[%]"); [wp_next_chain |].
         (* [b] is gone by here -- [kxc_sie_b_agree] pinned it and the proof
@@ -1546,7 +1547,7 @@ Section KexecABody.
         iDestruct (cpu_claim_ext_transport CIDrd CID15 eb (proc_addr jp)
                      ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
         iAssert (ic_loaded gfs gi cov logstart k inum dnl bml)
-          with "[Hdiat Hmeta Hmap Hblocks Hdlk]" as "Hload".
+          with "[Hdiat Hmeta Hmap Hblocks Hdlk Hdview]" as "Hload".
         { rewrite /ic_loaded /inode_map. iExists datl.
           iSplitR; [iPureIntro; split_and!;
             [exact Hbmwf | exact Hbmcov | exact Hdaddr | exact Hdty
@@ -1560,7 +1561,8 @@ Section KexecABody.
           iSplitL "Hdiat"; [iExact "Hdiat" |].
           iSplitL "Hmeta"; [iExact "Hmeta" |].
           iSplitL "Haddrs"; [iExact "Haddrs" |].
-          iSplitL "Hindres"; [iExact "Hindres" | iExact "Hblocks"]. }
+          iSplitL "Hindres"; [iExact "Hindres" |].
+          iSplitL "Hblocks"; [iExact "Hblocks" | iExact "Hdview"]. }
         iDestruct (T.kxa_bs3_join bn with "Hbs1 Hbs2") as "Hbs".
         (* [T.kxc_bad64] is applied AT [CID15] (its [sie_cap_gpr] premise pins
            its own [CID0] from "Hcg"), so kexec's exit -- which we still hold
@@ -1623,7 +1625,7 @@ Section KexecABody.
       iDestruct (cpu_claim_ext_transport CIDrd CID11 eb (proc_addr jp)
                    ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
       iAssert (ic_loaded gfs gi cov logstart k inum dnl bml)
-        with "[Hdiat Hmeta Hmap Hblocks Hdlk]" as "Hload".
+        with "[Hdiat Hmeta Hmap Hblocks Hdlk Hdview]" as "Hload".
       { rewrite /ic_loaded /inode_map. iExists datl.
         iSplitR; [iPureIntro; split_and!;
           [exact Hbmwf | exact Hbmcov | exact Hdaddr | exact Hdty
@@ -1637,7 +1639,8 @@ Section KexecABody.
         iSplitL "Hdiat"; [iExact "Hdiat" |].
         iSplitL "Hmeta"; [iExact "Hmeta" |].
         iSplitL "Haddrs"; [iExact "Haddrs" |].
-        iSplitL "Hindres"; [iExact "Hindres" | iExact "Hblocks"]. }
+        iSplitL "Hindres"; [iExact "Hindres" |].
+        iSplitL "Hblocks"; [iExact "Hblocks" | iExact "Hdview"]. }
       iDestruct (T.kxa_bs3_join bn with "Hbs1 Hbs2") as "Hbs".
       iAssert (stack_own (KTR := KT1) (pa_stk sp0 46) 8) with "[Helfb]" as "Helf".
       { iApply kxc_stack_of_elf_slots. iApply (kxc_bytes_elf sp0 Hal).

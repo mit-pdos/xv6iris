@@ -1083,7 +1083,13 @@ Section IlockLoad.
                     ⌜dir_orphan_clean dn data⌝ ∗
                     ⌜dir_uniq dn data⌝ ∗
                     dir_links (bv_unsigned inum) dn data ∗
-                    ind_res gfs bm ∗ inode_blocks gfs bm data))
+                    ind_res gfs bm ∗ inode_blocks gfs bm data ∗
+                    (* the CONTENTS HOLD, TIED to the record the fill just
+                       decoded (namei-pinned-lookup.md §9 W3).  The pool arm
+                       carries it tied already and transfers it; the CLAIM-BOX
+                       arm carries it untied and [dv_set]s it to the fresh
+                       record's own (empty) contents here. *)
+                    dv_hold (bv_unsigned inum) (dv_of dn data)))
                 ∨ ⌜bv_unsigned (di_type dn) = 0⌝))%I
       with "[Hpool HL Hcl]" as ">[HL Hrest]".
     { (* NO PEEL HERE ANY MORE (iclaim-ledger.md §3.5 item 7).  OPTION A
@@ -1095,7 +1101,7 @@ Section IlockLoad.
          [icnt_half z 0] for an inum whose count is 1. *)
       rewrite /ipool_shape_np. iDestruct "Hpool" as "[Hal | Hmk]".
       - iDestruct "Hal" as (dn0 bm0 data0)
-          "(%Hok0 & %Hdok0 & %Hddix0 & %Hdoc0 & %Hduq0 & Hdlk0 & Hdn & Hind & Hblk)".
+          "(%Hok0 & %Hdok0 & %Hddix0 & %Hdoc0 & %Hduq0 & Hdlk0 & Hdn & Hind & Hblk & Hdv)".
         iMod (ireg_read ⊤ gi gfs inodestart nib inum dn0
                 (IBLOCK inum inodestart) (diblk_bytes ds)
                 ltac:(solve_ndisj) Hinlt eq_refl with "Hireg Hdn HL")
@@ -1137,7 +1143,8 @@ Section IlockLoad.
         iSplitR; [iPureIntro; exact Hdoc0 |].
         iSplitR; [iPureIntro; exact Hduq0 |].
         iSplitL "Hdlk0"; [iExact "Hdlk0" |]. iFrame.
-      - destruct (decide (bv_unsigned (di_type dn) = 0)) as [Ht0 | Htnz].
+      - iDestruct "Hmk" as "[Hmk Hdv]".
+        destruct (decide (bv_unsigned (di_type dn) = 0)) as [Ht0 | Htnz].
         + iModIntro. iFrame "HL". iRight. iPureIntro. exact Ht0.
         + iMod (ireg_withdraw ⊤ gi gfs inodestart nib inum ds
                   (IBLOCK inum inodestart) (diblk_bytes ds) o g
@@ -1148,6 +1155,13 @@ Section IlockLoad.
           iEval (rewrite Hagr) in "Hdn".
           pose proof Hfresh as Hfr0.
           destruct Hfresh as (Hfty & Hfsz & Hfad & _).
+          (* §16.4's CLAIM BOX: the marker arm's hold is untied, and the
+             record the withdraw just handed over has size 0, so its
+             contents are [∅] -- one free own-update (§9 Revision 2). *)
+          iDestruct "Hdv" as (e0) "Hdv".
+          iMod (dv_set (bv_unsigned inum) e0
+                  (dv_of dn (fun _ => replicate BSIZE (bv_0 8)))
+                 with "Hdv") as "Hdv".
           iModIntro. iFrame "HL". iLeft. iFrame "Hdn Hwb".
           (* §16.4's CLAIM BOX: [ireg_withdraw] just PAID [fresh_shape], and
              this is where it now leaves the function instead of being spent
@@ -1194,7 +1208,8 @@ Section IlockLoad.
              [0 <= 1]. *)
           iSplitR; [iApply (dir_links_size_zero (bv_unsigned inum) dn _ Hfsz
                               ltac:(rewrite (fresh_shape_nlink dn Hfr0); lia)) |].
-          iSplitL; [iApply il_ind_res_empty | iApply il_blocks_empty]. }
+          iSplitR "Hdv"; [iApply il_ind_res_empty |].
+          iSplitR "Hdv"; [iApply il_blocks_empty | iExact "Hdv"]. }
     (* THE FILL SPENDS THE GENERATION'S ONE-SHOT (design §17.6 (3)), at the
        only instruction in this kernel that knows [di_type]: the record has
        just been decoded off the buffer, and [dn] is fixed for the rest of
@@ -1985,7 +2000,8 @@ Section IlockLoad.
     (* ===== ALLOCATED INODE: the type is nonzero and the branch falls
        through, exactly as v1's dead arm did ===== *)
     iDestruct "Hal" as (fl bm data)
-      "(%Hfr & %Hpost & %Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hindres & Hblocks)".
+      "(%Hfr & %Hpost & %Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hindres & Hblocks
+        & Hdview)".
     destruct Hok as (Hwf & Hcovers & Hda & Htynz & Hszcap & Hholes & Hsized).
     pose proof (blkmap_wf_dir_len _ _ _ Hwf) as Hdirlen.
     assert (Hcelllen : length (bm_cells bm) = 13%nat)
@@ -2053,7 +2069,8 @@ Section IlockLoad.
               HK HZ0sp HZ0thr Hfr Hpost
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hframe Hppid Hsb Hsl Hstok
                     Hdep Hidev Hinumc Hvalid
-                    [Hmty Hmmaj Hmmin Hmnl Hmsz Haddrs Hindres Hblocks Hdn Hdlk]
+                    [Hmty Hmmaj Hmmin Hmnl Hmsz Haddrs Hindres Hblocks Hdn Hdlk
+                     Hdview]
                     Hshot Hfoff Hwb [Hcont]").
     { rewrite /ic_loaded -Hip. iExists data.
       iSplitR.
@@ -2072,7 +2089,8 @@ Section IlockLoad.
         iSplitL "Hmmin"; [iExact "Hmmin" |]. iSplitL "Hmnl"; [iExact "Hmnl" |].
         iExact "Hmsz". }
       iSplitL "Haddrs"; [iExact "Haddrs" |].
-      iSplitL "Hindres"; [iExact "Hindres" | iExact "Hblocks"]. }
+      iSplitL "Hindres"; [iExact "Hindres" |].
+      iSplitL "Hblocks"; [iExact "Hblocks" | iExact "Hdview"]. }
     { iApply (wp_next_shift (b := true) (CIDa := CID32) (CIDb := CID39) ltac:(wp_next_chain)
                 with "Hcont"). }
   Qed.

@@ -2610,7 +2610,8 @@ Section IputFreePath.
     iEval (rewrite /ic_payload_at) in "Hpayl".
     iDestruct "Hpayl" as "[Hlk2 _]".
     iDestruct "Hlk2" as (data2)
-      "(%Hok2 & %Hdok2 & %Hddix2 & %Hdoc2 & %Hduq2 & Hdlk2 & Hdat & Hmeta & Haddrs & Hind & Hblks)".
+      "(%Hok2 & %Hdok2 & %Hddix2 & %Hdoc2 & %Hduq2 & Hdlk2 & Hdat & Hmeta & Haddrs & Hind & Hblks
+        & Hdv2)".
     pose proof Hok2 as Hok2'.
     destruct Hok2' as (Hbmwf2 & Hcovers2 & Hdiaddrs2 & Htyne2 & Hszcap2 & Hholes2 & Hsized2).
     (* ---- transport the cpu bundle to the itrunc call site (CIDm2) ---- *)
@@ -3163,8 +3164,13 @@ Section IputFreePath.
     iMod (escA_alloc ⊤ γi (bv_unsigned inum) rg with "Hfzpost")
       as (ge gr gd) "(#Hescr & Htkr & Htkd)".
     iModIntro.
+    (* THE CONTENTS HOLD GOES BACK UNTIED (namei-pinned-lookup.md §9 W2/W3).
+       itrunc has zeroed this record's bytes, but the AWAIT arm is byte-less
+       and forgets the value; the next fill of this inum re-ties it off the
+       record it reads.  So the freer parks what it has and proves nothing. *)
     iDestruct (ipool_shape_await γfs γi cov logstart inum ge gr gd rg
-                 with "Hcnt0 Hfzp Hescr Htkr") as "Hgap".
+                 with "Hcnt0 Hfzp Hescr Htkr [Hdv2]") as "Hgap";
+      [by iExists (dv_of dn data2) |].
     iDestruct (ipool_insert γfs γi cov logstart
                  (region_inums nib ∖ ci_inums ci2) (bv_unsigned inum)
                  ltac:(apply fl_notin_diff; exact Hincid) with "[Hgap] Hpool") as "Hpool".

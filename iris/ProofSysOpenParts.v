@@ -790,10 +790,14 @@ Section ProofSysOpenPublish.
       dinode_at gi inum dn ∗
       inode_meta (ientry k) dn ∗
       inode_map gfs (ientry k) bm ∗
-      inode_blocks gfs bm data.
+      inode_blocks gfs bm data ∗
+      (* ...and the CONTENTS HOLD (namei-pinned-lookup.md §9 W2): unlike the
+         three clauses this peel discards, the hold is a RESOURCE and the
+         re-seal below cannot conjure it, so it must come out here. *)
+      dv_hold (bv_unsigned inum) (dv_of dn data).
   Proof.
     iIntros "(%data & %Hok & %Hdir & %Hddix & %Hdoc & %Hduq & Hlnk & Hat & Hmeta &
-              Haddr & Hind & Hblk)".
+              Haddr & Hind & Hblk & Hdv)".
     (* Keep this structural: even [iFrame "%"] searches the whole goal, whose
        [inode_blocks] tail is large (171 s at this site).  The arity sweep's
        third, fourth and fifth pure conjuncts [Hddix]/[Hdoc]/[Hduq] are bound
@@ -808,7 +812,7 @@ Section ProofSysOpenPublish.
     iSplitL "Hmeta"; [iExact "Hmeta" |].
     iSplitL "Haddr Hind".
     { rewrite /inode_map. iSplitL "Haddr"; [iExact "Haddr" | iExact "Hind"]. }
-    iExact "Hblk".
+    iSplitL "Hblk"; [iExact "Hblk" | iExact "Hdv"].
   Qed.
 
   (* ...and the close direction at itrunc's outputs. *)
@@ -820,9 +824,15 @@ Section ProofSysOpenPublish.
     inode_meta (ientry k) (di_trunc dn) -∗
     inode_map gfs (ientry k) bm_empty -∗
     inode_blocks gfs bm_empty (fun _ => replicate BSIZE (bv_0 8)) -∗
+    (* THE MOVER (namei-pinned-lookup.md §9 W3, itrunc's row): itrunc zeroed
+       the bytes and truncated the record, so the caller [dv_set]s the hold
+       it peeled to the truncated record's own value and hands it in here.
+       No delta is proved: the fragment is WHOLE, so the move is free. *)
+    dv_hold (bv_unsigned inum)
+            (dv_of (di_trunc dn) (fun _ => replicate BSIZE (bv_0 8))) -∗
     ic_loaded gfs gi cov logstart k inum (di_trunc dn) bm_empty.
   Proof.
-    intros Hnz Hnd. iIntros "Hat Hmeta [Haddr Hind] Hblk".
+    intros Hnz Hnd. iIntros "Hat Hmeta [Haddr Hind] Hblk Hdv".
     assert (Hty : di_type (di_trunc dn) = di_type dn) by reflexivity.
     iApply (ic_mk_loaded gfs gi cov logstart k inum (di_trunc dn) bm_empty
               (fun _ => replicate BSIZE (bv_0 8))
@@ -835,7 +845,7 @@ Section ProofSysOpenPublish.
                  ltac:(rewrite Hty; exact Hnd))
               (dir_uniq_not_dir (di_trunc dn) _
                  ltac:(rewrite Hty; exact Hnd))
-              with "[] Hat Hmeta Haddr Hind Hblk").
+              with "[] Hat Hmeta Haddr Hind Hblk Hdv").
     iApply (dir_links_not_dir (bv_unsigned inum) (di_trunc dn)).
     rewrite Hty. exact Hnd.
   Qed.

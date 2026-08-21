@@ -12,6 +12,7 @@ From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import invariants ghost_map mono_nat own.
 Require Import RiscvPtsto.
 Require Import IcacheRef.
+Require Import DirViewG.   (* [dv_hold] -- the pending arm's untied contents hold *)
 Require Import EscrowDefs.
 Require Import InodeRegion.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -188,9 +189,16 @@ Section EscrowInode.
      [ireg_inv]).  It deliberately does NOT hold a [reg_half]: the registry
      half stays on the region side / in [ireg_body], so a recycle/fill of a
      genuine pending entry leaves nothing to dispose.  Walk-stable. *)
+  (* ...AND THE CONTENTS HOLD, UNTIED (namei-pinned-lookup.md §9 W2).  Every
+     arm an UNCACHED inum's pool bundle can stand on carries the inum's
+     [dv_hold]: the tie to the bytes exists only where the bytes do
+     ([ipool_alloc], [ic_loaded]), so a byte-less arm holds the element at a
+     forgotten value and the next fill sets it.  Without it this arm's redeem
+     to an [imark] would have to conjure the hold. *)
   Definition pool_pending (γi : gname) (z : Z) : iProp Σ :=
     (∃ ge gr gd (rg : bool),
-       escA_inv ge gr gd γi z rg ∗ committedA ge ∗ redeem_ticketA gr)%I.
+       escA_inv ge gr gd γi z rg ∗ committedA ge ∗ redeem_ticketA gr ∗
+       (∃ e, dv_hold z e))%I.
   (* NOT Timeless: [escA_inv] is an [inv].  Wherever [ipool_shape] must stay
      Timeless, its pending arm is opened without the [>] later-strip. *)
 

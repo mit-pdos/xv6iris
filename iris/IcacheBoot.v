@@ -107,6 +107,7 @@ Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheInv.
 Require Import FsTree.
+Require Import DirViewG.   (* [dv_hold]/[dv_of] -- the pool's contents holds *)
 Require Import IcacheEscrow.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -907,12 +908,17 @@ Section IcacheBootPool.
        and boot's bit is DOWN everywhere because boot's phase is [FrzOff]. *)
     frzm_h (bv_unsigned inum) false -∗
     ifreeze_off (bv_unsigned inum) -∗
+    (* ...and the CONTENTS HOLD, UNTIED (namei-pinned-lookup.md §9 W2): the
+       marker arm carries no bytes, so boot's own [∅] is as good a value as
+       any and the first fill sets it. *)
+    (∃ e, dv_hold (bv_unsigned inum) e) -∗
     imark γi (bv_unsigned inum) -∗ ipool_shape γfs γi cov logstart inum.
   Proof.
-    iIntros "Hcnt Hmir Hoff Hmk". rewrite /ipool_shape /ipool_shape_np.
+    iIntros "Hcnt Hmir Hoff Hdv Hmk". rewrite /ipool_shape /ipool_shape_np.
     iSplitL "Hcnt"; [iExact "Hcnt" |].
     iSplitL "Hmir"; [iExact "Hmir" |].
-    iLeft. iSplitR "Hoff"; [iRight; iExact "Hmk" | iExact "Hoff"].
+    iLeft. iSplitR "Hoff"; [| iExact "Hoff"].
+    iRight. iSplitL "Hmk"; [iExact "Hmk" | iExact "Hdv"].
   Qed.
 
   (* THE SECOND PREMISE IS §15(a)'S DIRECTORY-WF CLAUSE, and it joins the
@@ -949,9 +955,14 @@ Section IcacheBootPool.
     ifreeze_off (bv_unsigned inum) -∗
     dir_links (bv_unsigned inum) dn data -∗
     dinode_at γi inum dn -∗ ind_res γfs bm -∗ inode_blocks γfs bm data -∗
+    (* ...and the CONTENTS HOLD, TIED to the image's own record and bytes
+       (namei-pinned-lookup.md §9 W2/W3): the boot client sets the value with
+       a free [dv_set] before it gets here, so nothing in this file has to
+       compute it. *)
+    dv_hold (bv_unsigned inum) (dv_of dn data) -∗
     ipool_shape γfs γi cov logstart inum.
   Proof.
-    iIntros (Hok Hdok Hddix Hdoc Hduq) "Hcnt Hmir Hoff Hdlk Hdn Hind Hblk".
+    iIntros (Hok Hdok Hddix Hdoc Hduq) "Hcnt Hmir Hoff Hdlk Hdn Hind Hblk Hdv".
     rewrite /ipool_shape /ipool_shape_np.
     iSplitL "Hcnt"; [iExact "Hcnt" |].
     iSplitL "Hmir"; [iExact "Hmir" |].
@@ -963,7 +974,7 @@ Section IcacheBootPool.
     iSplitR; [iPureIntro; exact Hdoc |].
     iSplitR; [iPureIntro; exact Hduq |].
     iSplitL "Hdlk"; [iExact "Hdlk" |].
-    iFrame "Hdn Hind Hblk".
+    iFrame "Hdn Hind Hblk Hdv".
   Qed.
 
   (* the pool is a [∗ set], so it splits and rejoins along any subset *)
@@ -1001,12 +1012,20 @@ Section IcacheBootPool.
          ⌜dir_uniq dn data⌝ ∗
          dir_links (bv_unsigned (mword_of_int z : mword 32)) dn data ∗
          dinode_at γi (mword_of_int z : mword 32) dn ∗
-         ind_res γfs bm ∗ inode_blocks γfs bm data) -∗
+         ind_res γfs bm ∗ inode_blocks γfs bm data ∗
+         (* the CONTENTS HOLD rides INSIDE the allocated bundle, because the
+            value it is tied to is this bundle's own [dn]/[data] and nothing
+            outside the existential can name them (§9 W2). *)
+         dv_hold (bv_unsigned (mword_of_int z : mword 32)) (dv_of dn data)) -∗
     ([∗ set] z ∈ R ∖ A,
        imark γi (bv_unsigned (mword_of_int z : mword 32))) -∗
+    (* ...and the FREE inums' holds, untied and therefore outside any
+       existential *)
+    ([∗ set] z ∈ R ∖ A,
+       ∃ e, dv_hold (bv_unsigned (mword_of_int z : mword 32)) e) -∗
     ipool γfs γi cov logstart R.
   Proof.
-    iIntros (Hsub) "Hcnts Hmirs Hoffs Ha Hf".
+    iIntros (Hsub) "Hcnts Hmirs Hoffs Ha Hf Hfv".
     (* the ledger pair splits along the same subset the pool does *)
     rewrite (union_difference_L A R Hsub) !big_sepS_union; [| set_solver ..].
     iDestruct "Hcnts" as "[HcA HcF]". iDestruct "Hoffs" as "[HoA HoF]".
@@ -1020,16 +1039,17 @@ Section IcacheBootPool.
       iDestruct (big_sepS_sep_2 with "Hlg Ha") as "Ha".
       iApply (big_sepS_mono with "Ha"). intros z _.
       iIntros "[[[Hcnt Hmir] Hoff] (%dn & %bm & %data & %Hok & %Hdok & %Hddix & %Hdoc & %Hduq
-                & Hdlk & Hdn & Hind & Hblk)]".
+                & Hdlk & Hdn & Hind & Hblk & Hdv)]".
       iApply (ipool_shape_alloc _ _ _ _ _ dn bm data Hok Hdok Hddix Hdoc Hduq
-                with "Hcnt Hmir Hoff Hdlk Hdn Hind Hblk").
+                with "Hcnt Hmir Hoff Hdlk Hdn Hind Hblk Hdv").
     - rewrite /ipool.
       iDestruct (big_sepS_sep_2 with "HcF HmF") as "Hlg0".
       iDestruct (big_sepS_sep_2 with "Hlg0 HoF") as "Hlg".
+      iDestruct (big_sepS_sep_2 with "Hlg Hfv") as "Hlg".
       iDestruct (big_sepS_sep_2 with "Hlg Hf") as "Hf".
       iApply (big_sepS_mono with "Hf"). intros z _.
-      iIntros "[[[Hcnt Hmir] Hoff] Hmk]".
-      iApply (ipool_shape_free with "Hcnt Hmir Hoff Hmk").
+      iIntros "[[[[Hcnt Hmir] Hoff] Hdv] Hmk]".
+      iApply (ipool_shape_free with "Hcnt Hmir Hoff Hdv Hmk").
   Qed.
 
   (* ...and the case that needs no image theory at all: an image whose inodes
@@ -1051,23 +1071,28 @@ Section IcacheBootPool.
     ([∗ set] z ∈ region_inums nib, icnt_half z 0%nat) -∗
     ([∗ set] z ∈ region_inums nib, frzm_h z false) -∗
     ([∗ set] z ∈ region_inums nib, ifreeze_off z) -∗
+    ([∗ set] z ∈ region_inums nib, dv_hold z ∅) -∗
     ([∗ set] z ∈ region_inums nib,
        ireg_out γi (mword_of_int z : mword 32) (image_dinode dss z)) -∗
     ipool γfs γi cov logstart (region_inums nib).
   Proof.
-    iIntros (Hnib H0) "Hcnts Hmirs Hoffs H". rewrite /ipool.
+    iIntros (Hnib H0) "Hcnts Hmirs Hoffs Hdvs H". rewrite /ipool.
     iDestruct (region_key_shift nib (fun z => icnt_half z 0%nat) Hnib
                 with "Hcnts") as "Hcnts".
     iDestruct (region_key_shift nib (fun z => frzm_h z false) Hnib
                 with "Hmirs") as "Hmirs".
     iDestruct (region_key_shift nib (fun z => ifreeze_off z) Hnib
                 with "Hoffs") as "Hoffs".
+    iDestruct (region_key_shift nib (fun z => dv_hold z ∅) Hnib
+                with "Hdvs") as "Hdvs".
     iDestruct (big_sepS_sep_2 with "Hcnts Hmirs") as "Hlg0".
-    iDestruct (big_sepS_sep_2 with "Hlg0 Hoffs") as "Hlg".
+    iDestruct (big_sepS_sep_2 with "Hlg0 Hoffs") as "Hlg1".
+    iDestruct (big_sepS_sep_2 with "Hlg1 Hdvs") as "Hlg".
     iDestruct (big_sepS_sep_2 with "Hlg H") as "H".
     iApply (big_sepS_mono with "H"). intros z Hz.
-    iIntros "[[[Hcnt Hmir] Hoff] Hout]".
-    iApply (ipool_shape_free with "Hcnt Hmir Hoff").
+    iIntros "[[[[Hcnt Hmir] Hoff] Hdv] Hout]".
+    iApply (ipool_shape_free with "Hcnt Hmir Hoff [Hdv]");
+      [by iExists ∅ |].
     iApply (ireg_out_free_inv γi (mword_of_int z : mword 32)
               (image_dinode dss z) (H0 z Hz) with "Hout").
   Qed.

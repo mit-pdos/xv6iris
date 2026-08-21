@@ -1907,7 +1907,7 @@ Section ProofFilewrite.
     rewrite /ic_loaded.
     iDestruct "Hlk" as (datal)
       "(%Hiok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlnk & Hdnat & Hmeta & Haddrs & Hindres
-       & Hblocks)".
+       & Hblocks & Hdview)".
     destruct Hiok as (Hbmwf & Hbmcov & Hdaddr & Hdty & Hszb & Hholes & Hsized).
     iAssert (inode_map (fwn_fs fn) (ientry ik) bml)
       with "[Haddrs Hindres]" as "Hmap".
@@ -2230,13 +2230,20 @@ Section ProofFilewrite.
     iMod (off_checkin gf γox kx qx (DfracOwn (qx/2)) (fc_ip Cf) v2 ⊤
             ltac:(solve_ndisj) Hwf2 with "Hoh Hcip Hcell")
       as "(Hoh & Hcip & Hmark & Hrlv)".
+    (* THE MOVER (namei-pinned-lookup.md §9 W3, the file-write row): writei
+       moved this inode's bytes, so the hold moves with them.  The value is
+       determined garbage -- the fd is provably not a directory here -- and
+       the fragment is WHOLE, so the move is one free own-update and no delta
+       is proved. *)
+    iMod (dv_set (bv_unsigned inum) (dv_of dnl datal) (dv_of dn' data')
+           with "Hdview") as "Hdview".
     iModIntro.
     iAssert (i_valid (ientry ik) ↦₄ valid_word true)%I
       with "[Hmark]" as "Hvalid".
     { rewrite -P8. iExact "Hmark". }
     iAssert (ic_loaded (fwn_fs fn) (fwn_ireg fn) (fwn_cov fn)
                (fwn_logstart fn) ik inum dn' bm')
-      with "[Hdnat Hmeta Hmap Hblocks]" as "Hlk".
+      with "[Hdnat Hmeta Hmap Hblocks Hdview]" as "Hlk".
     { rewrite /ic_loaded /inode_map. iExists data'.
       iSplitR; [iPureIntro; exact Hiok2 |].
       iSplitR; [iPureIntro; exact Hdok2 |].
@@ -2247,7 +2254,7 @@ Section ProofFilewrite.
       iSplitR; [iPureIntro; exact (dir_uniq_not_dir dn' data' Hnodir') |].
       iSplitR; [iApply (dir_links_not_dir (bv_unsigned inum) dn' data' Hnodir') |].
       iDestruct "Hmap" as "[Haddrs Hindres]".
-      rewrite Hdn0q. iFrame "Hdnat Hmeta Haddrs Hindres Hblocks". }
+      rewrite Hdn0q. iFrame "Hdnat Hmeta Haddrs Hindres Hblocks Hdview". }
     (* ---- +0xb4 ld a0,24(s2) ; +0xb8 jal ra,iunlock ---- *)
     assert (Hpip3 : add_vec (rget X0 Rs2)
                       (sign_extend' 64 (mword_of_int 24 : mword 12)) = a_fip kx).

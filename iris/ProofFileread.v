@@ -2059,7 +2059,7 @@ Section ProofFileread.
              rewrite /ic_loaded.
              iDestruct "Hlk" as (data)
                "(%Hiok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdnat & Hmeta & Haddrs & Hindres
-                 & Hblocks)".
+                 & Hblocks & Hdview)".
              destruct Hiok as (Hbmwf & Hbmcov & Hdaddr & Hdty & Hszb & Hholes
                                & Hsized).
              iEval (rewrite -Hipk) in "Hmeta".
@@ -2357,7 +2357,7 @@ Section ProofFileread.
                 (* re-assemble the checked-out bundle, back at the SLOT *)
                 iAssert (ic_loaded (frn_fs fn) (frn_ireg fn) (frn_cov fn)
                            (frn_logstart fn) ikk inm dnl bml)
-                  with "[Hdnat Hmeta Hmap Hblocks Hdlk]" as "Hlk".
+                  with "[Hdnat Hmeta Hmap Hblocks Hdlk Hdview]" as "Hlk".
                 { rewrite /ic_loaded /inode_map -Hipk. iExists data.
                   iSplitR; [iPureIntro; split_and!;
                     [exact Hbmwf | exact Hbmcov | exact Hdaddr | exact Hdty
@@ -2370,7 +2370,7 @@ Section ProofFileread.
                   iSplitR; [iPureIntro; exact Hduq |].
                   iSplitL "Hdlk"; [iExact "Hdlk" |].
                   iDestruct "Hmap" as "[Haddrs Hindres]".
-                  iFrame "Hdnat Hmeta Haddrs Hindres Hblocks". }
+                  iFrame "Hdnat Hmeta Haddrs Hindres Hblocks Hdview". }
                 iAssert (i_valid (ientry ikk) ↦₄ valid_word true)%I
                   with "[Hvalid]" as "Hvalid"; [rewrite -Hipk; iExact "Hvalid" |].
                 iEval (rewrite Hipk) in "Hidev".
@@ -2635,7 +2635,7 @@ Section ProofFileread.
                 (* re-assemble the checked-out bundle, back at the SLOT *)
                 iAssert (ic_loaded (frn_fs fn) (frn_ireg fn) (frn_cov fn)
                            (frn_logstart fn) ikk inm dnl bml)
-                  with "[Hdnat Hmeta Hmap Hblocks Hdlk]" as "Hlk".
+                  with "[Hdnat Hmeta Hmap Hblocks Hdlk Hdview]" as "Hlk".
                 { rewrite /ic_loaded /inode_map -Hipk. iExists data.
                   iSplitR; [iPureIntro; split_and!;
                     [exact Hbmwf | exact Hbmcov | exact Hdaddr | exact Hdty
@@ -2648,7 +2648,7 @@ Section ProofFileread.
                   iSplitR; [iPureIntro; exact Hduq |].
                   iSplitL "Hdlk"; [iExact "Hdlk" |].
                   iDestruct "Hmap" as "[Haddrs Hindres]".
-                  iFrame "Hdnat Hmeta Haddrs Hindres Hblocks". }
+                  iFrame "Hdnat Hmeta Haddrs Hindres Hblocks Hdview". }
                 iAssert (i_valid (ientry ikk) ↦₄ valid_word true)%I
                   with "[Hvalid]" as "Hvalid"; [rewrite -Hipk; iExact "Hvalid" |].
                 iEval (rewrite Hipk) in "Hidev".

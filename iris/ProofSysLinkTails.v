@@ -1205,7 +1205,7 @@ Section ProofSysLinkTails.
       exact (HM2thr c Hc N2 N8 N9 N18). }
     iDestruct "Hload" as (dat)
       "(%Hiok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlnk & Hdiat & Hmeta & Haddrs & Hind
-        & Hblocks)".
+        & Hblocks & Hdview)".
     iDestruct "Hmeta" as "(Hity & Himaj & Himin & Hinl & Hisz)".
     iEval (rewrite /i_nlink) in "Hinl".
     (* THE TYPE, ACROSS THE CALLER'S OWN [iunlock].  [ilock] hands back a
@@ -1392,8 +1392,13 @@ Section ProofSysLinkTails.
                  with "Hdlnk") as "Hdlnk".
     iAssert (ity_shot gy (di_type dn')) as "#Hshot'".
     { rewrite /dn' sl_setnl_type. iExact "Hshot". }
+    (* [dn'] is [sl_setnl dn ..]: one halfword of the record, no byte, and
+       [dv_of] reads only [di_size] -- so the contents value is unmoved
+       (§9 W3, [dv_of_size]). *)
+    iEval (rewrite (dv_of_size dn dn' dat (eq_sym (sl_setnl_size dn _))))
+      in "Hdview".
     iAssert (ic_loaded gfs gi cov logstart kk inum dn' bm)
-      with "[Hdlnk Hdiat Hmeta Hmap Hblocks]" as "Hload".
+      with "[Hdlnk Hdiat Hmeta Hmap Hblocks Hdview]" as "Hload".
     { rewrite /ic_loaded. iExists dat.
       iSplitR; [iPureIntro; exact (sl_setnl_inode_ok cov logstart dn bm dat _ Hiok) |].
       iSplitR; [iPureIntro; exact (sl_setnl_dir_ok icfg_nib dn dat _ Hdok) |].
@@ -1404,7 +1409,7 @@ Section ProofSysLinkTails.
                 rewrite /dn' sl_setnl_type; exact Hnotdir |].
       iSplitL "Hdlnk"; [iExact "Hdlnk" |].
       iFrame "Hdiat Hmeta". rewrite /inode_map.
-      iDestruct "Hmap" as "[Ha Hi]". iFrame "Ha Hi Hblocks". }
+      iDestruct "Hmap" as "[Ha Hi]". iFrame "Ha Hi Hblocks Hdview". }
     iDestruct (sl_bs3 bn with "[Hbs1 Hbs2]") as "Hbsl";
       [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
     (* ===== +0x10a c.mv a0,s1 ===== *)

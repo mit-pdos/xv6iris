@@ -693,6 +693,7 @@ InodeInv.v
 DirView.v
 DirLinks.v
 FsTree.v
+DirViewG.v
 SpecBalloc.v
 SpecBmap.v
 CodeBmap.v
