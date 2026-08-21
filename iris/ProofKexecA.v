@@ -219,6 +219,7 @@ Require Import ProcInv.
 Require Import FileInvDefs.
 Require Import SpecIput.
 Require Import SpecKexec.
+Require Import KexecOkQ.
 Require Import SpecMyproc.
 Require Import SpecBeginOp.
 Require Import SpecEndOp.
@@ -291,6 +292,21 @@ Section KexecABody.
   Notation Ra5 := (mword_of_int 15 : mword 5).
 
   Local Ltac regne := reg_ne_side.
+
+  (* [ProofSysExec.sx_moi_nat_inj]'s twin at 64: what turns the +0x050
+     [bne a0,a5] fall-through into [tot = 64], and hence readi's window
+     into the whole 64-byte header (N-5.2B). *)
+  Lemma kxc_moi_nat64_inj (a c : nat) : (a <= 64)%nat -> (c <= 64)%nat ->
+    (mword_of_int (Z.of_nat a) : mword 64)
+      = (mword_of_int (Z.of_nat c) : mword 64) -> a = c.
+  Proof.
+    intros Ha Hc Heq. apply (f_equal bv_unsigned) in Heq.
+    rewrite !moi64_unsigned in Heq.
+    rewrite !bvw64_small in Heq;
+      [ lia
+      | change (2 ^ 64)%Z with 18446744073709551616%Z; lia
+      | change (2 ^ 64)%Z with 18446744073709551616%Z; lia ].
+  Qed.
   Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
   Local Ltac nz := vm_compute; discriminate.
 
@@ -298,6 +314,7 @@ Section KexecABody.
   (*  +0x000 .. +0x030, PLUS the namei-null tail at +0x088.               *)
   (* =================================================================== *)
   Lemma kxc_a1
+      (Q : mword 64 -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
@@ -366,7 +383,7 @@ Section KexecABody.
       ∀ (mf : regfile) (V' : pprivate)
         (entry spv szv' : mword 64),
           ⌜callee_saved m mf⌝ -∗
-          ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
+          ⌜kexec_ok_q Q V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
           sie_cap_gpr KT1 mf K b (proc_addr jp) -∗
           cpu_own 0 eb (proc_addr jp) b lks -∗
           trap_csrs_ext KT1 eb -∗
@@ -394,15 +411,15 @@ Section KexecABody.
            innermost [CpuId] and the guard would degrade to a tautology
            (WpNext.v's note on [wp_next_at]). ---- *)
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-      ∀ (M32 : regfile) (ipv : mword 64) (n1 : nat),
+      ∀ (M32 : regfile) (ipv : mword 64) (zi : Z) (n1 : nat),
         kxc_at_a2 jp bn g gfs ga gf cov logstart bmapstart inodestart size
                   plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas
-                  m M32 K eb b lks sp0 ra0 s00 s10 s20 pv av ipv n1 -∗
+                  m M32 K eb b lks sp0 ra0 s00 s10 s20 pv av ipv zi n1 -∗
         wp_next (CID0 := CID) true (proc_addr jp) (fun (CIDx : CpuId) =>
           ∀ (mf : regfile) (V' : pprivate)
             (entry spv szv' : mword 64),
               ⌜callee_saved m mf⌝ -∗
-              ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
+              ⌜kexec_ok_q Q V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
               sie_cap_gpr KT1 mf K b (proc_addr jp) -∗
               cpu_own 0 eb (proc_addr jp) b lks -∗
               trap_csrs_ext KT1 eb -∗
@@ -648,6 +665,9 @@ Section KexecABody.
     - (* ============ namei SUCCEEDED: fall through to +0x032 ============ *)
       iDestruct "Harm" as "(%HM4a0 & Hheld & Hirs)".
       iDestruct (inode_held_ne_zero with "Hheld") as %Hipvnz.
+      (* the inum the walk landed on, published rather than forgotten
+         (N-5.2B): [T.inode_held_zi] is the ∃-introduction. *)
+      iDestruct (inode_held_zi with "Hheld") as (zi) "Hheld".
       assert (Hcmp : eq_vec (rget M4 Ra0) (zero_reg : mword 64) = false).
       { rewrite (rget_ne M4 Ra0 ltac:(nz)) HM4a0.
         destruct (eq_vec ipv (zero_reg : mword 64)) eqn:E; [| reflexivity].
@@ -677,7 +697,7 @@ Section KexecABody.
                      (CIDz : CPU) = (CID0 : CPU)) by wp_next_chain.
       iDestruct (wp_next_retarget CID0 CIDz true (proc_addr jp) _ Hcrz
                    with "Hcont") as "Hcont".
-      iApply ("Hcont32" $! M4 ipv n1 with "[-Hcont] Hcont").
+      iApply ("Hcont32" $! M4 ipv zi n1 with "[-Hcont] Hcont").
       (* NO [iFrame] HERE.  The goal mentions [proc_priv], and framing into
          it sends the search through sixteen [ofile_slot]s and a 4096-byte
          trapframe page (durable-notes.md); measured: it does not come back.
@@ -807,7 +827,7 @@ Section KexecABody.
         rewrite (callee_saved_lookup Hcse r Hr).
         rewrite /P1 upd_ne; [| regne].
         exact (HM4thr r Hr Nsp Ns0 Ns1 Ns2). }
-      iApply (T.kxc_exit_m1 (proc_addr jp) bn ga gf bmapstart inodestart
+      iApply (T.kxc_exit_m1 Q (proc_addr jp) bn ga gf bmapstart inodestart
                 plen pfun na avf alen aslen afun pidv V
                 dqb dqs dqa dqpv dqas m P2 K eb eb lks sp0 ra0 s00 s10 s20 pv av
                 ltac:(lia) Hsp Hra Hs0 Hs1 Hs2 HP2sp HP2a0 HP2thr
@@ -841,6 +861,7 @@ Section KexecABody.
   (*  existential either way -- and would cost a third frame shape.        *)
   (* =================================================================== *)
   Lemma kxc_a2
+      (Q : mword 64 -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
@@ -857,7 +878,13 @@ Section KexecABody.
       (pidv : mword 32) (V : pprivate)
       (dqb dqs dqa dqpv dqas : dfrac)
       (m M32 : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
-      (sp0 ra0 s00 s10 s20 pv av ipv : mword 64) (n1 : nat) :
+      (sp0 ra0 s00 s10 s20 pv av ipv : mword 64) (zi : Z) (n1 : nat)
+      (* WHAT THE CALLER WANTS SAID ABOUT THE HEADER (N-5.2B).  [None] for
+         every landed caller -- the oracle below is then [True] and the
+         +0x090 seam publishes nothing.  [Some h] for a caller holding a
+         CONTENTS pin at [zi]: the oracle redeems it against the payload
+         and the seam publishes "the header this walk read is [h]". *)
+      (HD : option (nat -> bv 8)) :
     (K_kexec <= K)%nat ->
     dev = icfg_dev ->
     nib = icfg_nib ->
@@ -885,15 +912,31 @@ Section KexecABody.
     kernel_text -∗
     fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
               cov logstart inodestart nib dev -∗
+    (* ---- THE HEADER ORACLE (N-5.2B) ------------------------------------
+       ONE ghost step, fired at the instant ilock's payload is open and
+       before readi runs on it: the client is handed the locked inode's
+       CONTENTS RIDE ([IcacheEscrow.ic_loaded]'s [fv_ride] conjunct, at the
+       inum the +0x032 seam named) and must give it back unchanged together
+       with whatever it wanted to claim about the file's bytes.  This is
+       [DirViewLend]'s redeem seen from the walk's side: an intact redeem is
+       a READ, so the ride is returned identical and the payload re-packs at
+       the very same [data] -- which is why readi's landed post still relates
+       its output to it and readi's contract does not move (D-52d).
+         A landed caller instantiates [HD := None] and discharges this with
+       [iIntros; iModIntro; iFrame]. ---- *)
+    (∀ (dn : dinode) (data : nat -> list (bv 8)),
+        fv_ride zi (fv_of dn data) ={⊤}=∗
+          fv_ride zi (fv_of dn data) ∗
+          ⌜kxq_hdr_ok HD (fun j => file_byte data j)⌝) -∗
     kxc_at_a2 jp bn g gfs ga gf cov logstart bmapstart inodestart size
               plen pfun na avf aslen afun pidv V dqb dqs dqa dqpv dqas
-              m M32 K eb b lks sp0 ra0 s00 s10 s20 pv av ipv n1 -∗
+              m M32 K eb b lks sp0 ra0 s00 s10 s20 pv av ipv zi n1 -∗
     (* ---- kexec's OWN continuation: the +0x064 tail closes the -1 arm ---- *)
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (mf : regfile) (V' : pprivate)
         (entry spv szv' : mword 64),
           ⌜callee_saved m mf⌝ -∗
-          ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
+          ⌜kexec_ok_q Q V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
           sie_cap_gpr KT1 mf K b (proc_addr jp) -∗
           cpu_own 0 eb (proc_addr jp) b lks -∗
           trap_csrs_ext KT1 eb -∗
@@ -914,7 +957,7 @@ Section KexecABody.
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (M90 : regfile) (kf : nat) (qf sf : Qp) (inumf : mword 32)
         (dnf : dinode) (bmf : blkmap) (gilf gislf gyf : gname)
-        (n2 : nat),
+        (n2 : nat) (ef : nat -> bv 8),
         ⌜ M90 !!! Regidx csp_rs1 = pa_stk sp0 68 /\
           M90 !!! Regidx Rs0 = sp0 /\
           M90 !!! Regidx Rs1 = proc_addr jp /\
@@ -959,13 +1002,17 @@ Section KexecABody.
         ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
         ([∗ list] i ∈ seq 0 na,
            [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
-        kxc_frameA6 sp0 ra0 s00 s10 s20 pv av (m !!! Regidx Rs4) -∗
+        (* the ELF HEADER, NAMED (N-5.2B): the eight slots readi just wrote
+           cross the seam carrying their bytes instead of being re-carved
+           out of an existential [stack_own] by phase B. *)
+        ⌜kxq_hdr_ok HD ef⌝ -∗
+        kxc_frameA6x sp0 ra0 s00 s10 s20 pv av (m !!! Regidx Rs4) ef -∗
         (* THE EXIT, HANDED BACK -- see [kxc_phaseA]'s copy below. *)
         wp_next (CID0 := CID) true (proc_addr jp) (fun (CIDy : CpuId) =>
           ∀ (mf : regfile) (V' : pprivate)
             (entry spv szv' : mword 64),
               ⌜callee_saved m mf⌝ -∗
-              ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
+              ⌜kexec_ok_q Q V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
               sie_cap_gpr KT1 mf K b (proc_addr jp) -∗
               cpu_own 0 eb (proc_addr jp) b lks -∗
               trap_csrs_ext KT1 eb -∗
@@ -988,7 +1035,7 @@ Section KexecABody.
     intros HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
            Hiregb Hjp Hgs Hsp Hra Hs0 Hs1 Hs2.
     pose proof HK as HK'. 
-    iIntros "#Htext #Hfab Hseam Hcont Hcont90".
+    iIntros "#Htext #Hfab Horacle Hseam Hcont Hcont90".
     rewrite /kxc_at_a2.
     iDestruct "Hseam" as "(%Hregs & Hpc & Hcg & Hcnt & Hextc & Hclmc & %Hn1 & Hlog & Hheld &
                            Hirs & #Hbits & Hbs & Hbm & Hins & #Hka &
@@ -1005,7 +1052,7 @@ Section KexecABody.
                           #Hesc & #Hslks & #Hireg & #Hropen & #Hprocs & #Hdevi & #Hdgeom &
                           #Hdlock)".
     (* ---- the inode: slot, share, and the region facts ---- *)
-    iDestruct "Hheld" as (k q inum) "(%Hie & %Hk & %Hib & Href & Hru)".
+    iDestruct "Hheld" as (k q inum) "(%Hie & %Hk & %Hib & %Hz & Href & Hru)".
     iEval (rewrite -Hdev) in "Href".
     rewrite inode_ref_shed. iDestruct "Href" as "[Hkeep Hshr]".
     (* SpecIlock v5 takes the share at a NAMED generation
@@ -1156,6 +1203,15 @@ Section KexecABody.
       "(%Hiok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdiat & Hmeta & Haddrs & Hindres
        & Hblocks & Hdview & Hfview)".
     destruct Hiok as (Hbmwf & Hbmcov & Hdaddr & Hdty & Hszb & Hholes & Hsized).
+    (* ---- THE HEADER ORACLE'S ONE INSTANT (N-5.2B) ----------------------
+       The payload is open and readi has not run yet; the client redeems
+       its contents pin against THIS inode's ride and hands the ride back
+       untouched, so the re-pack below is at the very same [datl]. *)
+    iApply fupd_wp.
+    iEval (rewrite Hz) in "Hfview".
+    iMod ("Horacle" $! dnl datl with "Hfview") as "[Hfview %Hhdr]".
+    iEval (rewrite -Hz) in "Hfview".
+    iModIntro.
     iAssert (inode_map gfs (ientry k) bml) with "[Haddrs Hindres]" as "Hmap".
     { rewrite /inode_map. iSplitL "Haddrs"; [iExact "Haddrs" | iExact "Hindres"]. }
     (* ---- the elf buffer, as 64 NAMED bytes ---- *)
@@ -1458,9 +1514,10 @@ Section KexecABody.
         with "[Helf4 Helfr]" as "Helfb".
       { iApply (kxc_named_join4 (pa_stk sp0 54) gb 64 ltac:(lia)
                   with "Helf4 Helfr"). }
-      iAssert (stack_own (KTR := KT1) (pa_stk sp0 46) 8) with "[Helfb]" as "Helf".
-      { iApply kxc_stack_of_elf_slots. iApply (kxc_bytes_elf sp0 Hal).
-        rewrite /bytes_own. iApply (bb_named_any with "Helfb"). }
+      (* THE BUFFER STAYS NAMED ACROSS THE SPLIT (N-5.2B).  It used to be
+         folded straight back into [stack_own] here, which is where the
+         landed walk forgot what readi had just written; the fall-through
+         now carries [gb] to phase B and only the [bad:] arm folds. *)
       (* ---- +0x060: beq a4,a5 -- the second BLIND split ---- *)
       destruct (eq_vec (rget Q12 Ra4) (rget Q12 Ra5)) eqn:Emag.
       + (* the magic matched: on to PHASE B at +0x090 *)
@@ -1505,15 +1562,43 @@ Section KexecABody.
            [subst]ed it, so the retarget names the literal. *)
         iDestruct (wp_next_retarget CID0 CID15 true (proc_addr jp) _
                      ltac:(wp_next_chain) with "Hcont") as "Hcont".
+        (* ---- THE READ WAS THE WHOLE HEADER, so readi's window covers all
+           sixty-four bytes and the oracle's claim about the payload IS a
+           claim about the buffer (N-5.2B). ---- *)
+        assert (Htot64 : tot = 64%nat).
+        { (* the two reads, at WHATEVER hart [Ecmp] was taken on: [rget]'s
+             [CpuId] is instance-implicit, so it has to be unified FROM the
+             hypothesis rather than resolved afresh (durable-notes' "the
+             same term twice" trap, in its [rget] guise). *)
+          assert (Hget0 : forall CX : CpuId,
+                    rget (CID := CX) Q9 Ra0 = M2 !!! Regidx Ra0).
+          { intro CX. rewrite (rget_ne (CID := CX) Q9 Ra0 ltac:(nz)).
+            rewrite /Q9 upd_ne; [reflexivity | nz]. }
+          assert (Hget5 : forall CX : CpuId,
+                    rget (CID := CX) Q9 Ra5
+                    = (mword_of_int (Z.of_nat 64) : mword 64)).
+          { intro CX. rewrite (rget_ne (CID := CX) Q9 Ra5 ltac:(nz)).
+            rewrite /Q9. apply upd_eq. }
+          apply eq_vec_true_iff in Ecmp.
+          rewrite Hget0 Hget5 in Ecmp.
+          destruct Hret as [[_ Huser] | [Ha0 _]]; [discriminate Huser |].
+          rewrite Ha0 in Ecmp.
+          apply kxc_moi_nat64_inj in Ecmp; [exact Ecmp | | lia].
+          unfold rd_clamp in Htotb. destruct (decide _); lia. }
+        assert (Hgb : forall j : nat, (j < 64)%nat -> gb j = file_byte datl j).
+        { intros j Hj. rewrite /gb /rd_delivered.
+          destruct (decide (j < tot)%nat) as [_ | Hno]; [| lia].
+          by rewrite Nat.add_0_l. }
         iApply ("Hcont90" $! Q12 k (q/2)%Qp (q/2)%Qp inum dnl bml gilk gislk gy
-                  n1 with "[%] [%] Hpc Hcg Hcnt Hextc Hclmc Hslkk Hslkd Hdep
+                  n1 gb with "[%] [%] Hpc Hcg Hcnt Hextc Hclmc Hslkk Hslkd Hdep
                   Hidev Hiinum Hivalid Hload Hity Hfrz Hkeep Hru Hlog Hirs Hbm Hins Hbits
-                  Hbs Hka Hpriv Hpath Hargv Hargs [-Hcont] Hcont").
+                  Hbs Hka Hpriv Hpath Hargv Hargs [%] [-Hcont] Hcont").
         * split_and!; [exact HQ12sp | exact HQ12s0 | exact HQ12s1 | exact HQ12s2
                       | exact HQ12s4 | exact Hk | exact Hib' | exact HQ12thr].
         * exact Hiu.
-        * rewrite /kxc_frameA6.
-          iDestruct (kxc_mid_join sp0 with "Hust Helf Hph") as "Hmid".
+        * exact (kxq_hdr_ok_ext HD gb (fun j => file_byte datl j) Hgb Hhdr).
+        * rewrite /kxc_frameA6x.
+          iSplitR; [iPureIntro; exact Hal |].
           iSplitL "Hf1"; [iExact "Hf1" |].
           iSplitL "Hf2"; [iExact "Hf2" |].
           iSplitL "Hf3"; [iExact "Hf3" |].
@@ -1527,12 +1612,18 @@ Section KexecABody.
           iSplitL "Hf11"; [iExact "Hf11" |].
           iSplitL "Hf12"; [iExact "Hf12" |].
           iSplitL "Hf13"; [iExact "Hf13" |].
-          iSplitL "Hmid"; [iExact "Hmid" |].
+          iSplitL "Hust"; [iExact "Hust" |].
+          iSplitL "Helfb"; [iExact "Helfb" |].
+          iSplitL "Hph"; [iExact "Hph" |].
           iSplitL "Hf64"; [iExact "Hf64" |].
           iSplitL "Hf65"; [iExact "Hf65" |].
           iSplitL "Hf66"; [iExact "Hf66" |].
           iSplitL "Hf67"; [iExact "Hf67" | iExact "Hf68"].
-      + (* bad magic: the +0x064 tail *)
+      + (* bad magic: the +0x064 tail -- which wants the LANDED frame, so
+           this is where the named buffer goes back into [stack_own] *)
+        iAssert (stack_own (KTR := KT1) (pa_stk sp0 46) 8) with "[Helfb]" as "Helf".
+        { iApply kxc_stack_of_elf_slots. iApply (kxc_bytes_elf sp0 Hal).
+          rewrite /bytes_own. iApply (bb_named_any with "Helfb"). }
         iApply (wp_beq_fall_s_sconf (mword_of_int (KXA + 0x60))
                   (mword_of_int 48 : mword 13) Ra5 Ra4 Q12 (K - 68)%nat eb
                   ltac:(nz) ltac:(nz) Emag with "Hcg Hpc Hi060").
@@ -1575,7 +1666,7 @@ Section KexecABody.
                         (CID15 : CPU) = (CID0 : CPU)) by wp_next_chain.
         iDestruct (wp_next_retarget CID0 CID15 true (proc_addr jp) _ Hcr15
                      with "Hcont") as "Hcont".
-        iApply (T.kxc_bad64 gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
+        iApply (T.kxc_bad64 Q gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
                   gilk gislk ga gf cov logstart bmapstart inodestart nib size
                   dev k (q/2)%Qp (q/2)%Qp gy inum dnl bml n1
                   plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
@@ -1653,7 +1744,7 @@ Section KexecABody.
                       (CID11 : CPU) = (CID0 : CPU)) by wp_next_chain.
       iDestruct (wp_next_retarget CID0 CID11 true (proc_addr jp) _ Hcr11
                    with "Hcont") as "Hcont".
-      iApply (T.kxc_bad64 gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
+      iApply (T.kxc_bad64 Q gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
                 gilk gislk ga gf cov logstart bmapstart inodestart nib size
                 dev k (q/2)%Qp (q/2)%Qp gy inum dnl bml n1
                 plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
@@ -1726,6 +1817,7 @@ Section KexecAMain.
   (*  binder's own crossing fact ([WpNext.wp_next_retarget]).              *)
   (* =================================================================== *)
   Lemma kxc_phaseA
+      (Q : mword 64 -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
@@ -1742,7 +1834,9 @@ Section KexecAMain.
       (pidv : mword 32) (V : pprivate)
       (dqb dqs dqa dqpv dqas : dfrac)
       (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
-      (sp0 ra0 s00 s10 s20 pv av : mword 64) :
+      (sp0 ra0 s00 s10 s20 pv av : mword 64)
+      (* the header claim phase A carries across +0x090 -- see [kxc_a2] *)
+      (HD : option (nat -> bv 8)) :
     (K_kexec <= K)%nat ->
     dev = icfg_dev ->
     nib = icfg_nib ->
@@ -1778,6 +1872,13 @@ Section KexecAMain.
     kernel_text -∗ pc_is (mword_of_int KXA : mword 64) -∗
     fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
               cov logstart inodestart nib dev -∗
+    (* THE HEADER ORACLE, relayed to [kxc_a2] -- see its statement.  Phase A
+       is the block that FINDS the inum, so the oracle is quantified over it
+       here and instantiated at [kxc_a2]'s [zi]. *)
+    (∀ (zi : Z) (dn : dinode) (data : nat -> list (bv 8)),
+        fv_ride zi (fv_of dn data) ={⊤}=∗
+          fv_ride zi (fv_of dn data) ∗
+          ⌜kxq_hdr_ok HD (fun j => file_byte data j)⌝) -∗
     kalloc_env ga None -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -1794,7 +1895,7 @@ Section KexecAMain.
       ∀ (mf : regfile) (V' : pprivate)
         (entry spv szv' : mword 64),
           ⌜callee_saved m mf⌝ -∗
-          ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
+          ⌜kexec_ok_q Q V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
           sie_cap_gpr KT1 mf K b (proc_addr jp) -∗
           cpu_own 0 eb (proc_addr jp) b lks -∗
           trap_csrs_ext KT1 eb -∗
@@ -1815,7 +1916,7 @@ Section KexecAMain.
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (M90 : regfile) (kf : nat) (qf sf : Qp) (inumf : mword 32)
         (dnf : dinode) (bmf : blkmap) (gilf gislf gyf : gname)
-        (n2 : nat),
+        (n2 : nat) (ef : nat -> bv 8),
         ⌜ M90 !!! Regidx csp_rs1 = pa_stk sp0 68 /\
           M90 !!! Regidx Rs0 = sp0 /\
           M90 !!! Regidx Rs1 = proc_addr jp /\
@@ -1860,7 +1961,11 @@ Section KexecAMain.
         ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
         ([∗ list] i ∈ seq 0 na,
            [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
-        kxc_frameA6 sp0 ra0 s00 s10 s20 pv av (m !!! Regidx Rs4) -∗
+        (* the ELF HEADER, NAMED (N-5.2B): the eight slots readi just wrote
+           cross the seam carrying their bytes instead of being re-carved
+           out of an existential [stack_own] by phase B. *)
+        ⌜kxq_hdr_ok HD ef⌝ -∗
+        kxc_frameA6x sp0 ra0 s00 s10 s20 pv av (m !!! Regidx Rs4) ef -∗
         (* THE EXIT, HANDED BACK.  Phase A's two [-1] tails own one copy of
            the caller's exit and a [wp_next] continuation is LINEAR, so
            without this phase B would have none.  durable-notes' "CHAINING
@@ -1870,7 +1975,7 @@ Section KexecAMain.
           ∀ (mf : regfile) (V' : pprivate)
             (entry spv szv' : mword 64),
               ⌜callee_saved m mf⌝ -∗
-              ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
+              ⌜kexec_ok_q Q V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
               sie_cap_gpr KT1 mf K b (proc_addr jp) -∗
               cpu_own 0 eb (proc_addr jp) b lks -∗
               trap_csrs_ext KT1 eb -∗
@@ -1892,10 +1997,10 @@ Section KexecAMain.
   Proof.
     intros HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
            Hiregb Hcstr Hplen Hjp Hgs Hsp Hra Hs0 Hs1 Hs2 Ha0 Ha1.
-    iIntros "Hcg Hcnt Hextc Hclmc #Htext Hpc #Hfab #Hka Hbm Hins #Hbits Hpriv
+    iIntros "Hcg Hcnt Hextc Hclmc #Htext Hpc #Hfab Horacle #Hka Hbm Hins #Hbits Hpriv
              Hpath Hargv Hargs Hbs Hirs Hcont Hcont90".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hebb.
-    iApply (kxc_a1 (CID0 := CID0) gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl ga gf
+    iApply (kxc_a1 (CID0 := CID0) Q gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl ga gf
               cov logstart bmapstart inodestart nib size dev
               plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
               m K eb b lks sp0 ra0 s00 s10 s20 pv av
@@ -1903,18 +2008,21 @@ Section KexecAMain.
               Hiregb Hcstr Hplen Hjp Hgs Hsp Hra Hs0 Hs1 Hs2
               Ha0 Ha1
               with "Hcg Hcnt Hextc Hclmc Htext Hpc Hfab Hka Hbm Hins Hbits Hpriv
-                    Hpath Hargv Hargs Hbs Hirs Hcont [Hcont90]").
+                    Hpath Hargv Hargs Hbs Hirs Hcont [Horacle Hcont90]").
     (* ---- the seam at +0x032: [kxc_a2] takes it verbatim ---- *)
-    iIntros (CIDs Hss M32 ipv n1) "Hseam Hexit".
+    iIntros (CIDs Hss M32 ipv zi n1) "Hseam Hexit".
     iDestruct (wp_next_retarget CID0 CIDs true (proc_addr jp) _ Hss
                  with "Hcont90") as "Hcont90".
-    iApply (kxc_a2 (CID0 := CIDs) gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl ga gf
+    iApply (kxc_a2 (CID0 := CIDs) Q gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl ga gf
               cov logstart bmapstart inodestart nib size dev
               plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
-              m M32 K eb b lks sp0 ra0 s00 s10 s20 pv av ipv n1
+              m M32 K eb b lks sp0 ra0 s00 s10 s20 pv av ipv zi n1 HD
               HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
               Hiregb Hjp Hgs Hsp Hra Hs0 Hs1 Hs2
-              with "Htext Hfab Hseam Hexit Hcont90").
+              with "Htext Hfab [Horacle] Hseam Hexit Hcont90").
+    (* the oracle is quantified over the inum HERE; [kxc_a2] wants it at the
+       one the walk actually landed on. *)
+    { iIntros (dn data) "Hride". iApply ("Horacle" $! zi dn data with "Hride"). }
   Qed.
 
 End KexecAMain.

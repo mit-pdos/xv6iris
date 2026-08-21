@@ -111,6 +111,7 @@ Require Import UmCovered.
 Require Import FileInvDefs.
 Require Import SpecIput.
 Require Import SpecKexec.
+Require Import KexecOkQ.
 Require Import SpecMyproc.
 Require Import SpecBeginOp.
 Require Import SpecEndOp.
@@ -118,6 +119,7 @@ Require Import SpecIlock.
 Require Import SpecReadi.
 Require Import SpecIunlockput.
 Require Import SpecNamei.
+Require Import SpecNameiTr.   (* [inode_held_at]: the +0x032 seam's inum *)
 Require Import SpecProcFreepagetable.
 Require Import ProofKexecParts.
 Require Import CodeKexec.
@@ -576,6 +578,65 @@ Section KexecA.
     by iExists w6.
   Qed.
 
+  (* ------------------------------------------------------------------ *)
+  (*  ...AND THE SAME FRAME WITH THE ELF BUFFER NAMED (N-5.2B).           *)
+  (*                                                                      *)
+  (*  [kxc_frameA6] hands slots 14..63 across the +0x090 seam as ONE       *)
+  (*  [stack_own] chunk, which FORGETS what readi just wrote into          *)
+  (*  [struct elfhdr elf] -- phase A's own header says so ("the buffer's   *)
+  (*  contents are existential at every seam anyway"), and phase B then    *)
+  (*  re-carves the same eight slots and names them itself.  That is       *)
+  (*  exactly one byte-run too many for a client that wants to say WHICH   *)
+  (*  header the walk read, so this variant carves them ONCE, in phase A,  *)
+  (*  and carries the name across.  Nothing else moves: the two halves     *)
+  (*  around it are [kxc_mid_split]'s own, and the alignment facts a byte  *)
+  (*  run cannot carry ride as a pure conjunct (the same data              *)
+  (*  [ProofKexecSeam.kxc_elf_take] used to produce).                      *)
+  (*                                                                      *)
+  (*  [kxc_frameA6x_fold] is the way back, and it is what phase A's own    *)
+  (*  [bad:] tail takes: [T.kxc_bad64] wants the landed frame.             *)
+  (* ------------------------------------------------------------------ *)
+  Definition kxc_frameA6x (sp0 ra0 s00 s10 s20 pv av w6 : mword 64)
+      (ef : nat -> bv 8) : iProp Σ :=
+    (⌜forall i, (i < 8)%nat ->
+       is_aligned_paddr (Physaddr (pa_stk sp0 (54 - i))) 8 = true⌝ ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 1) (DfracOwn 1) ra0 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 2) (DfracOwn 1) s00 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 3) (DfracOwn 1) s10 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 4) (DfracOwn 1) s20 ∗
+     (∃ w5, word_pointsto (KTR := KT1) (pa_stk sp0 5) (DfracOwn 1) w5) ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 6) (DfracOwn 1) w6 ∗
+     (∃ w7, word_pointsto (KTR := KT1) (pa_stk sp0 7) (DfracOwn 1) w7) ∗
+     (∃ w8, word_pointsto (KTR := KT1) (pa_stk sp0 8) (DfracOwn 1) w8) ∗
+     (∃ w9, word_pointsto (KTR := KT1) (pa_stk sp0 9) (DfracOwn 1) w9) ∗
+     (∃ w10, word_pointsto (KTR := KT1) (pa_stk sp0 10) (DfracOwn 1) w10) ∗
+     (∃ w11, word_pointsto (KTR := KT1) (pa_stk sp0 11) (DfracOwn 1) w11) ∗
+     (∃ w12, word_pointsto (KTR := KT1) (pa_stk sp0 12) (DfracOwn 1) w12) ∗
+     (∃ w13, word_pointsto (KTR := KT1) (pa_stk sp0 13) (DfracOwn 1) w13) ∗
+     stack_own (KTR := KT1) (pa_stk sp0 13) 33 ∗
+     ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ[KT1] ef j) ∗
+     stack_own (KTR := KT1) (pa_stk sp0 54) 9 ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 64) (DfracOwn 1) av ∗
+     (∃ w65, word_pointsto (KTR := KT1) (pa_stk sp0 65) (DfracOwn 1) w65) ∗
+     word_pointsto (KTR := KT1) (pa_stk sp0 66) (DfracOwn 1) pv ∗
+     (∃ w67, word_pointsto (KTR := KT1) (pa_stk sp0 67) (DfracOwn 1) w67) ∗
+     (∃ w68, word_pointsto (KTR := KT1) (pa_stk sp0 68) (DfracOwn 1) w68))%I.
+
+  Lemma kxc_frameA6x_fold (sp0 ra0 s00 s10 s20 pv av w6 : mword 64)
+      (ef : nat -> bv 8) :
+    kxc_frameA6x sp0 ra0 s00 s10 s20 pv av w6 ef -∗
+    kxc_frameA6 sp0 ra0 s00 s10 s20 pv av w6.
+  Proof.
+    rewrite /kxc_frameA6x /kxc_frameA6.
+    iIntros "(%Hal & A1 & A2 & A3 & A4 & A5 & A6 & A7 & A8 & A9 & A10 & A11 &
+              A12 & A13 & Aust & Aelf & Aph & A64 & A65 & A66 & A67 & A68)".
+    iAssert (stack_own (KTR := KT1) (pa_stk sp0 46) 8) with "[Aelf]" as "Aelf".
+    { iApply kxc_stack_of_elf_slots. iApply (kxc_bytes_elf sp0 Hal).
+      rewrite /bytes_own. iApply (bb_named_any with "Aelf"). }
+    iDestruct (kxc_mid_join sp0 with "Aust Aelf Aph") as "Amid".
+    iFrame "A1 A2 A3 A4 A5 A6 A7 A8 A9 A10 A11 A12 A13 Amid A64 A65 A66 A67 A68".
+  Qed.
+
   (* THE EXIT MOVE: phase A's frame is [ProofKexecParts.kxc_frame], which is
      what [kxc_epi_frame] consumes.  The five top slots go back into the
      [stack_own] chunk ([50 + 5 = 55]) and the two pinned ones lose their
@@ -917,6 +978,19 @@ Section KexecASeam.
   Notation Rs2 := (mword_of_int 18 : mword 5).
   Notation Ra0 := (mword_of_int 10 : mword 5).
 
+  (* [inode_held] IS [inode_held_at] with the inum forgotten, so the walk
+     publishes the sharper form by ∃-introduction and no landed contract
+     grows a premise.  N-5.2B's whole cost at this seam. *)
+  Lemma inode_held_zi (v : mword 64) :
+    inode_held v ⊢ ∃ z : Z, inode_held_at v z.
+  Proof.
+    rewrite /inode_held /inode_held_at. iIntros "H".
+    iDestruct "H" as (k q inum) "(%Hv & %Hk & %Hlt & Hr)".
+    iExists (bv_unsigned inum), k, q, inum.
+    iSplit; [done |]. iSplit; [done |]. iSplit; [done |]. iSplit; [done |].
+    iExact "Hr".
+  Qed.
+
   Definition kxc_at_a2
       (jp : nat)
       (bn : bio_names) (g : log_names) (gfs : fs_names)
@@ -929,6 +1003,14 @@ Section KexecASeam.
       (pidv : mword 32) (V : pprivate) (dqb dqs dqa dqpv dqas : dfrac)
       (m M32 : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
       (sp0 ra0 s00 s10 s20 pv av ipv : mword 64)
+      (* THE INUM THE WALK RETURNED (N-5.2B).  [inode_held] hides it behind
+         an existential, which is enough for a client that only means to
+         [ilock] the thing -- but not for one that holds a CONTENTS pin at a
+         named inum and has to redeem it against this very inode's payload.
+         [SpecNameiTr.inode_held_at] is [inode_held] with that one equation
+         exposed, and the landed walk publishes it by [∃]-introduction
+         ([inode_held_zi] below), so no landed contract asks for more. *)
+      (zi : Z)
       (n1 : nat) : iProp Σ :=
     let pj := proc_addr jp in
     (* ---- the register state at [pc_is (kexec + 0x32)] ---- *)
@@ -955,7 +1037,7 @@ Section KexecASeam.
      ⌜ (iput_units <= n1)%nat ⌝ ∗
      log_op g n1 ∗
      (* ---- the inode namei returned, and the slot it came out of ---- *)
-     inode_held ipv ∗
+     inode_held_at ipv zi ∗
      iref_slots 1 ∗
      (* ---- the fs environment kexec threads.  The block bitmap is the
             PERSISTENT [BitmapInv.bitmap_inv] now, so nothing about the free
@@ -978,6 +1060,94 @@ Section KexecASeam.
      kxc_frameA sp0 ra0 s00 s10 s20 pv av)%I.
 
 End KexecASeam.
+
+(* ===================================================================== *)
+(*  THE EXIT, FROM THE LANDED RELATION TO THE GENERIC ONE (N-5.2B §13.3)  *)
+(*                                                                        *)
+(*  Every phase lemma of this cone relays kexec's exit at [kexec_ok_q Q].  *)
+(*  A caller holding the LANDED, [kexec_ok]-shaped continuation converts   *)
+(*  with this one wand: the generic relation implies the landed one        *)
+(*  ([KexecOkQ.kexec_ok_q_weaken]) and the hypothesis sits to the LEFT of  *)
+(*  a wand, so implication runs the right way.                            *)
+(*                                                                        *)
+(*  STATED AT THE FULL SHAPE, NOT OVER AN ABSTRACTED TAIL.  A version      *)
+(*  with the sixteen wands packed into a [T : regfile -> pprivate ->       *)
+(*  iProp] is prettier and does not terminate: [iSpecialize] then has to   *)
+(*  solve [?T mf V'] against a tail containing [proc_priv], i.e. against a *)
+(*  4096-conjunct trapframe big-op, which is durable-notes' measured       *)
+(*  non-terminating case.  Spelling the tail keeps the unification         *)
+(*  first-order.                                                          *)
+(* ===================================================================== *)
+Section KexecExitQ.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+            !irefslotG Σ, !pavG Σ}.
+  Context `{GEN : GenId}.
+
+  Notation Ra0 := (mword_of_int 10 : mword 5).
+
+  Lemma kxc_exit_qgen `{CIDx : CpuId}
+      (Q : mword 64 -> Prop)
+      (pj : mword 64) (ga gf : gname) (bmapstart inodestart : Z)
+      (plen : nat) (pfun : nat -> bv 8)
+      (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
+      (afun : nat -> nat -> bv 8)
+      (pidv : mword 32) (V : pprivate) (dqb dqs dqa dqpv dqas : dfrac)
+      (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
+      (ra0 pv av : mword 64) :
+    wp_next (CID0 := CIDx) true pj (fun (CID : CpuId) =>
+      ∀ (mf : regfile) (V' : pprivate) (entry spv szv' : mword 64),
+          ⌜callee_saved m mf⌝ -∗
+          ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
+          sie_cap_gpr KT1 mf K b pj -∗
+          cpu_own 0 eb pj b lks -∗
+          trap_csrs_ext KT1 eb -∗
+          cpu_claim_ext eb pj -∗
+          pc_is (ret_pc ra0) -∗
+          sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+          sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+          kalloc_env ga None -∗
+          proc_priv gf pj pidv V' -∗
+          ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
+          ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
+          ([∗ list] i ∈ seq 0 na,
+             [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
+          bslots 3 -∗
+          iref_slots 2 -∗
+          WP (Loop : expr riscv_lang)) -∗
+    wp_next (CID0 := CIDx) true pj (fun (CID : CpuId) =>
+      ∀ (mf : regfile) (V' : pprivate) (entry spv szv' : mword 64),
+          ⌜callee_saved m mf⌝ -∗
+          ⌜kexec_ok_q Q V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
+          sie_cap_gpr KT1 mf K b pj -∗
+          cpu_own 0 eb pj b lks -∗
+          trap_csrs_ext KT1 eb -∗
+          cpu_claim_ext eb pj -∗
+          pc_is (ret_pc ra0) -∗
+          sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+          sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+          kalloc_env ga None -∗
+          proc_priv gf pj pidv V' -∗
+          ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1]{dqpv} pfun i) -∗
+          ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
+          ([∗ list] i ∈ seq 0 na,
+             [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
+          bslots 3 -∗
+          iref_slots 2 -∗
+          WP (Loop : expr riscv_lang)).
+  Proof.
+    rewrite /wp_next. iIntros "H" (CID Hcr).
+    iSpecialize ("H" $! CID with "[%]"); [exact Hcr |].
+    iIntros (mf V' entry spv szv')
+            "%Hcs %Hok Hsie Hcnt Htc Hcl Hpc Hbm Hin Hka Hpriv Hpath Hargv
+             Hargs Hbs Hirs".
+    iApply ("H" $! mf V' entry spv szv' with
+             "[%] [%] Hsie Hcnt Htc Hcl Hpc Hbm Hin Hka Hpriv Hpath Hargv
+              Hargs Hbs Hirs");
+      [exact Hcs | exact (kexec_ok_q_weaken _ _ _ _ _ _ _ _ _ Hok)].
+  Qed.
+
+End KexecExitQ.
+
 
 (* ===================================================================== *)
 (*  THE BLOCKS AT THE BOTTOM, SHARED BY PHASE A AND PHASE B.              *)
@@ -1112,6 +1282,7 @@ Section KexecAExit.
   (*  the commit block touched the process.                               *)
   (* =================================================================== *)
   Lemma kxc_exit_m1
+      (Q : mword 64 -> Prop)
       (pj : mword 64) (bn : bio_names) (ga gf : gname)
       (bmapstart inodestart : Z)
       (plen : nat) (pfun : nat -> bv 8)
@@ -1151,7 +1322,7 @@ Section KexecAExit.
       ∀ (mf : regfile) (V' : pprivate)
         (entry spv szv' : mword 64),
           ⌜callee_saved m mf⌝ -∗
-          ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
+          ⌜kexec_ok_q Q V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
           sie_cap_gpr KT1 mf K b pj -∗
           cpu_own 0 eb pj b lks -∗
           trap_csrs_ext KT1 eb -∗
@@ -1240,6 +1411,7 @@ Section KexecABad.
   (*  makes [callee_saved]'s s4 conjunct hold at the return.              *)
   (* =================================================================== *)
   Lemma kxc_bad64
+      (Q : mword 64 -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
@@ -1326,7 +1498,7 @@ Section KexecABad.
       ∀ (mf : regfile) (V' : pprivate)
         (entry spv szv' : mword 64),
           ⌜callee_saved m mf⌝ -∗
-          ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
+          ⌜kexec_ok_q Q V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
           sie_cap_gpr KT1 mf K eb (proc_addr jp) -∗
           cpu_own 0 eb (proc_addr jp) eb lks -∗
           trap_csrs_ext KT1 eb -∗
@@ -1552,7 +1724,7 @@ Section KexecABad.
       change 55%nat with (50 + 5)%nat.
       rewrite (stack_own_app (KTR := KT1)) (pa_stk_assoc sp0 13 50).
       iSplitL "Hmid"; [iExact "Hmid" | iExact "Htop"]. }
-    iApply (kxc_exit_m1 (proc_addr jp) bn ga gf bmapstart
+    iApply (kxc_exit_m1 Q (proc_addr jp) bn ga gf bmapstart
               inodestart plen pfun na avf alen aslen afun pidv V
               dqb dqs dqa dqpv dqas m B5 K eb eb lks sp0 ra0 s00 s10 s20 pv av
               ltac:(lia)
@@ -1651,6 +1823,7 @@ Section KexecCBad.
   (*  end_op to do first -- this reaches [T.kxc_exit_m1] directly. *)
   (* =================================================================== *)
   Lemma kxc_bad_1d6
+      (Q : mword 64 -> Prop)
       (jp : nat)
       (ga gf : gname) (bn : bio_names)
       (bmapstart inodestart : Z)
@@ -1697,7 +1870,7 @@ Section KexecCBad.
       ∀ (mf : regfile) (V' : pprivate)
         (entry spv szv' : mword 64),
           ⌜callee_saved m mf⌝ -∗
-          ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
+          ⌜kexec_ok_q Q V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
           sie_cap_gpr KT1 mf K eb (proc_addr jp) -∗
           cpu_own 0 eb (proc_addr jp) eb lks -∗
           trap_csrs_ext KT1 eb -∗
@@ -2055,7 +2228,7 @@ Section KexecCBad.
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID3 CIDj eb (proc_addr jp)
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
-    iApply (T.kxc_exit_m1 (proc_addr jp) bn ga gf bmapstart
+    iApply (T.kxc_exit_m1 Q (proc_addr jp) bn ga gf bmapstart
               inodestart plen pfun na avf alen aslen afun pidv V
               dqb dqs dqa dqpv dqas m B13 K eb eb lks sp0 ra0 s00 s10 s20 pv av
               ltac:(lia) Hsp Hra Hs0 Hs1 Hs2 HB13sp HB13a0 HB13thr

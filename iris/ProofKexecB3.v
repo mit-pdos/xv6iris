@@ -103,6 +103,7 @@ Require Import UmCovered.
 Require Import FileInvDefs.
 Require Import SpecIput.
 Require Import SpecKexec.
+Require Import KexecOkQ.
 Require Import SpecMyproc.
 Require Import SpecBeginOp.
 Require Import SpecEndOp.
@@ -750,6 +751,7 @@ Section KexecB3Body.
 
 
   Lemma kxc_ph_step `{CID0 : CpuId}
+      (Q : mword 64 -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
@@ -799,7 +801,7 @@ Section KexecB3Body.
       ∀ (mf : regfile) (V' : pprivate)
         (entry spv szv' : mword 64),
           ⌜callee_saved m mf⌝ -∗
-          ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
+          ⌜kexec_ok_q Q V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
           sie_cap_gpr KT1 mf K eb (proc_addr jp) -∗
           cpu_own 0 eb (proc_addr jp) eb ∅ -∗
           trap_csrs_ext KT1 eb -∗
@@ -839,7 +841,7 @@ Section KexecB3Body.
           ∀ (mf : regfile) (V' : pprivate)
             (entry spv szv2 : mword 64),
               ⌜callee_saved m mf⌝ -∗
-              ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv2 na alen⌝ -∗
+              ⌜kexec_ok_q Q V V' (mf !!! Regidx Ra0) entry spv szv2 na alen⌝ -∗
               sie_cap_gpr KT1 mf K eb (proc_addr jp) -∗
               cpu_own 0 eb (proc_addr jp) eb ∅ -∗
               trap_csrs_ext KT1 eb -∗
@@ -1446,7 +1448,7 @@ Section KexecB3Body.
                     (CIDy2 : CPU) = (CID0 : CPU)) by wp_next_chain.
           iDestruct (wp_next_retarget CID0 CIDy2 true (proc_addr jp) _ Hbcr
                        with "Hcont") as "Hcont".
-          iApply (B2.kxc_bad324 (CID0 := CIDy2) gs jp gl gu gd gk pd pav pu bn g
+          iApply (B2.kxc_bad324 (CID0 := CIDy2) Q gs jp gl gu gd gk pd pav pu bn g
                     gfs gi cn gtl gilf gislf ga gf cov logstart bmapstart
                     inodestart nib size dev kf qf sf gyf inumf dnf bmf
                     n2 plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas m U9
@@ -1583,7 +1585,7 @@ Section KexecB3Body.
                        (CIDy2 : CPU) = (CID0 : CPU)) by wp_next_chain.
              iDestruct (wp_next_retarget CID0 CIDy2 true (proc_addr jp) _ Hbcr
                           with "Hcont") as "Hcont".
-             iApply (B2.kxc_bad324 (CID0 := CIDy2) gs jp gl gu gd gk pd pav pu bn g
+             iApply (B2.kxc_bad324 (CID0 := CIDy2) Q gs jp gl gu gd gk pd pav pu bn g
                        gfs gi cn gtl gilf gislf ga gf cov logstart bmapstart
                        inodestart nib size dev kf qf sf gyf inumf dnf bmf
                        n2 plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas m U11
@@ -1720,7 +1722,7 @@ Section KexecB3Body.
                           (CIDy2 : CPU) = (CID0 : CPU)) by wp_next_chain.
                 iDestruct (wp_next_retarget CID0 CIDy2 true (proc_addr jp) _ Hbcr
                              with "Hcont") as "Hcont".
-                iApply (B2.kxc_bad324 (CID0 := CIDy2) gs jp gl gu gd gk pd pav pu bn g
+                iApply (B2.kxc_bad324 (CID0 := CIDy2) Q gs jp gl gu gd gk pd pav pu bn g
                           gfs gi cn gtl gilf gislf ga gf cov logstart bmapstart
                           inodestart nib size dev kf qf sf gyf inumf dnf bmf
                           n2 plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas m U13
@@ -2198,7 +2200,7 @@ Section KexecB3Body.
                                 Hbcr2 with "Hcont") as "Hcont".
                    assert (HM4s6' : M4 !!! Regidx Rs6 = page_base P4.(ud_root))
                      by (rewrite HM4s6 HP4rt; reflexivity).
-                   iApply (B2.kxc_bad324 (CID0 := CIDw3) gs jp gl gu gd gk pd
+                   iApply (B2.kxc_bad324 (CID0 := CIDw3) Q gs jp gl gu gd gk pd
                              pav pu bn g gfs gi cn gtl gilf gislf ga gf cov
                              logstart bmapstart inodestart nib size dev
                              kf qf sf gyf inumf dnf bmf n2 plen pfun na
@@ -2642,7 +2644,7 @@ Section KexecB3Body.
                                  (CIDv5 : CPU) = (CID0 : CPU)) by wp_next_chain.
                        iDestruct (wp_next_retarget CID0 CIDv5 true (proc_addr jp)
                                     _ Hcrl with "Hcont") as "Hcont".
-                       iApply (B2.kxc_ls (CID0 := CIDv5) gs jp gl gu gd gk pd pav
+                       iApply (B2.kxc_ls (CID0 := CIDv5) Q gs jp gl gu gd gk pd pav
                                  pu bn g gfs gi cn gtl gilf gislf ga gf cov
                                  logstart bmapstart inodestart nib size dev
                                  kf qf sf gyf inumf dnf bmf n2 plen pfun na
@@ -2865,7 +2867,7 @@ Section KexecB3Body.
                 (CIDb2 : CPU) = (CID0 : CPU)) by wp_next_chain.
       iDestruct (wp_next_retarget CID0 CIDb2 true (proc_addr jp) _ Hcrb
                    with "Hcont") as "Hcont".
-      iApply (B2.kxc_bad324 (CID0 := CIDb2) gs jp gl gu gd gk pd pav pu bn g
+      iApply (B2.kxc_bad324 (CID0 := CIDb2) Q gs jp gl gu gd gk pd pav pu bn g
                 gfs gi cn gtl gilf gislf ga gf cov logstart bmapstart
                 inodestart nib size dev kf qf sf gyf inumf dnf bmf
                 n2 plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas m M2
@@ -2909,6 +2911,7 @@ Section KexecB3Loop.
   Notation Ra0 := (mword_of_int 10 : mword 5).
 
   Lemma kxc_phdr `{CID0 : CpuId}
+      (Q : mword 64 -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
@@ -2959,7 +2962,7 @@ Section KexecB3Loop.
       ∀ (mf : regfile) (V' : pprivate)
         (entry spv szv' : mword 64),
           ⌜callee_saved m mf⌝ -∗
-          ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
+          ⌜kexec_ok_q Q V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
           sie_cap_gpr KT1 mf K eb (proc_addr jp) -∗
           cpu_own 0 eb (proc_addr jp) eb ∅ -∗
           trap_csrs_ext KT1 eb -∗
@@ -2990,7 +2993,7 @@ Section KexecB3Loop.
           ∀ (mf : regfile) (V' : pprivate)
             (entry spv szv2 : mword 64),
               ⌜callee_saved m mf⌝ -∗
-              ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv2 na alen⌝ -∗
+              ⌜kexec_ok_q Q V V' (mf !!! Regidx Ra0) entry spv szv2 na alen⌝ -∗
               sie_cap_gpr KT1 mf K eb (proc_addr jp) -∗
               cpu_own 0 eb (proc_addr jp) eb ∅ -∗
               trap_csrs_ext KT1 eb -∗
@@ -3015,7 +3018,7 @@ Section KexecB3Loop.
     intro W. revert CID0.
     induction W as [| W IH]; intros CID0 M P i szv Hfuel;
       iIntros "#Htext #Hfab Hst Hcont Hc1a4";
-      iApply (kxc_ph_step (CID0 := CID0) gs jp gl gu gd gk pd pav pu bn g gfs
+      iApply (kxc_ph_step (CID0 := CID0) Q gs jp gl gu gd gk pd pav pu bn g gfs
                 gi cn gtl gilf gislf ga gf cov logstart bmapstart inodestart
                 nib size dev kf qf sf gyf inumf dnf bmf n2 plen
                 pfun na avf alen aslen afun pidv V eb dqb dqs dqa dqpv dqas m M K
@@ -3439,6 +3442,7 @@ Section KexecB3Main.
   Notation Ra0 := (mword_of_int 10 : mword 5).
 
   Lemma kxc_b2
+      (Q : mword 64 -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
@@ -3454,7 +3458,7 @@ Section KexecB3Main.
       (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (i : nat) (szv : mword 64) :
-    kxc_b2_body gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl gilf gislf
+    kxc_b2_body Q gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl gilf gislf
       ga gf cov logstart bmapstart inodestart nib size dev
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
       pidv V eb dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av w67
@@ -3464,7 +3468,7 @@ Section KexecB3Main.
     intros HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs Hdevc
            Hsp Hra Hs0 Hs1 Hs2.
     iIntros "#Htext #Hfab Hst Hcont Hc1ae".
-    iApply (kxc_phdr (CID0 := CID0) gs jp gl gu gd gk pd pav pu bn g gfs gi cn
+    iApply (kxc_phdr (CID0 := CID0) Q gs jp gl gu gd gk pd pav pu bn g gfs gi cn
               gtl gilf gislf ga gf cov logstart bmapstart inodestart nib size
               dev kf qf sf gyf inumf dnf bmf n2 plen pfun na avf
               alen aslen afun pidv V eb dqb dqs dqa dqpv dqas m K sp0 ra0 s00 s10 s20

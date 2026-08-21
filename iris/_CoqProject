@@ -1214,6 +1214,7 @@ CodeSysMknod.v
 CodeSysChdir.v
 CodeSysExec.v
 CodeKexec.v
+KexecOkQ.v
 SpecKexec.v
 SpecKexecPinned.v
 SpecFlags2perm.v

@@ -90,6 +90,7 @@ Require Import ProcAvail.
 Require Import UserPtTree.
 Require Import FileInvDefs.
 Require Import SpecKexec.
+Require Import KexecOkQ.
 Require Import SpecMyproc.
 Require Import SpecBeginOp.
 Require Import SpecEndOp.
@@ -185,6 +186,7 @@ Section KexecTail.
   (*  copies of the same two [iApply]s.                                   *)
   (* ------------------------------------------------------------------ *)
   Local Lemma kxc_d_tail `{CID0 : CpuId}
+      (Q : mword 64 -> Prop)
       (jp : nat) (bn : bio_names) (gfs : fs_names) (ga gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z)
       (size : Z)
@@ -196,6 +198,12 @@ Section KexecTail.
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (sz1 : mword 64) (c : nat) :
+    (* the ENTRY-POINT OBLIGATION, and the only site in the cone that
+       pays it: the commit block's [ld a4,-408(s0)] loads exactly
+       [kxq_entry ef], so what [kexec_ok_q Q]'s success arm asks for is a
+       fact about the ELF HEADER THIS WALK READ.  Every [bad:] tail is
+       generic for free and takes no such premise. *)
+    Q (kxq_entry ef) ->
     (K_kexec <= K)%nat ->
     bb_cstr pfun plen ->
     (na < MAXARG)%nat ->
@@ -217,7 +225,7 @@ Section KexecTail.
       ∀ (mf : regfile) (V' : pprivate)
         (entry spv szv' : mword 64),
           ⌜callee_saved m mf⌝ -∗
-          ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
+          ⌜kexec_ok_q Q V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
           sie_cap_gpr KT1 mf K eb (proc_addr jp) -∗
           cpu_own 0 eb (proc_addr jp) eb ∅ -∗
           trap_csrs_ext KT1 eb -∗
@@ -236,10 +244,10 @@ Section KexecTail.
           WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
+    intros HQe HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
            Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12 Hmw13.
     iIntros "#Htext Hst Hcont".
-    iApply (PC.kxc_c_close (CID0 := CID0) jp bn gfs ga gf cov logstart
+    iApply (PC.kxc_c_close (CID0 := CID0) Q jp bn gfs ga gf cov logstart
               bmapstart inodestart size plen pfun na avf alen aslen afun
               pidv V eb dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av
               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P (pv_sz V) sz1 c
@@ -247,11 +255,11 @@ Section KexecTail.
               Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12 Hmw13
               with "Htext Hst Hcont []").
     iIntros (CIDd) "%Hsd". iIntros (Md Pd) "Hst2a6 Hcont".
-    iApply (PD.kxd_phaseD (CID0 := CIDd) jp bn gfs ga gf cov logstart
+    iApply (PD.kxd_phaseD (CID0 := CIDd) Q jp bn gfs ga gf cov logstart
               bmapstart inodestart size plen pfun na avf alen aslen afun
               pidv V eb dqb dqs dqa dqpv dqas m Md K sp0 ra0 s00 s10 s20 pv av
               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef Pd sz1 c
-              HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
+              HQe HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
               Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12 Hmw13
               with "Htext Hst2a6 Hcont").
   Qed.
@@ -260,6 +268,7 @@ Section KexecTail.
   (*  +0x1ae .. ret -- PHASES C AND D, over phase B's output state.       *)
   (* ------------------------------------------------------------------ *)
   Local Lemma kxc_cd `{CID0 : CpuId}
+      (Q : mword 64 -> Prop)
       (jp : nat) (bn : bio_names) (gfs : fs_names) (ga gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z)
       (size : Z)
@@ -271,6 +280,12 @@ Section KexecTail.
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (szv : mword 64) :
+    (* the ENTRY-POINT OBLIGATION, and the only site in the cone that
+       pays it: the commit block's [ld a4,-408(s0)] loads exactly
+       [kxq_entry ef], so what [kexec_ok_q Q]'s success arm asks for is a
+       fact about the ELF HEADER THIS WALK READ.  Every [bad:] tail is
+       generic for free and takes no such premise. *)
+    Q (kxq_entry ef) ->
     (K_kexec <= K)%nat ->
     bb_cstr pfun plen ->
     (na < MAXARG)%nat ->
@@ -293,7 +308,7 @@ Section KexecTail.
       ∀ (mf : regfile) (V' : pprivate)
         (entry spv szv' : mword 64),
           ⌜callee_saved m mf⌝ -∗
-          ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
+          ⌜kexec_ok_q Q V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
           sie_cap_gpr KT1 mf K eb (proc_addr jp) -∗
           cpu_own 0 eb (proc_addr jp) eb ∅ -∗
           trap_csrs_ext KT1 eb -∗
@@ -312,7 +327,7 @@ Section KexecTail.
           WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hcstr Hnamax Havf_nz Havf_na Halen_b Halen_c Halen_4
+    intros HQe HK Hcstr Hnamax Havf_nz Havf_na Halen_b Halen_c Halen_4
            Hmsp Hmra Hms0 Hms1 Hms2
            Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12 Hmw13.
     iIntros "#Htext Hst Hcont".
@@ -333,7 +348,7 @@ Section KexecTail.
       iSplitR; [iPureIntro; exact Hal |].
       iSplitR; [iPureIntro; exact Hpure3 |].
       iExact "Hrest". }
-    iApply (PC.kxc_c_setup (CID0 := CID0) jp bn gfs ga gf cov logstart
+    iApply (PC.kxc_c_setup (CID0 := CID0) Q jp bn gfs ga gf cov logstart
               bmapstart inodestart size plen pfun na avf alen aslen
               afun pidv V eb dqb dqs dqa dqpv dqas m M K sp0 ra0 s00 s10 s20 pv av
               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P szv
@@ -362,7 +377,7 @@ Section KexecTail.
         iSplitR; [iPureIntro; exact Hq2 |].
         iSplitR; [iPureIntro; exact Hq3 |].
         iExact "Hrest2". }
-      iApply (PC.kxc_argv_loop (CID0 := CID1) jp bn gfs ga gf cov logstart
+      iApply (PC.kxc_argv_loop (CID0 := CID1) Q jp bn gfs ga gf cov logstart
                 bmapstart inodestart size plen pfun na avf alen aslen
                 afun pidv V eb dqb dqs dqa dqpv dqas m K sp0 ra0 s00 s10 s20 pv av
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef (pv_sz V) sz1
@@ -372,24 +387,25 @@ Section KexecTail.
                 na M1 P1 0%nat H0na ltac:(lia)
                 with "Htext Hloop Hcont []").
       iIntros (CID2) "%Hs2". iIntros (M2 P2 c2) "Hst272 Hcont".
-      iApply (kxc_d_tail (CID0 := CID2) jp bn gfs ga gf cov logstart bmapstart
+      iApply (kxc_d_tail (CID0 := CID2) Q jp bn gfs ga gf cov logstart bmapstart
                 inodestart size plen pfun na avf alen aslen afun pidv V eb
                 dqb dqs dqa dqpv dqas m M2 K sp0 ra0 s00 s10 s20 pv av
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P2 sz1 c2
-                HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
+                HQe HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
                 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12 Hmw13
                 with "Htext Hst272 Hcont").
     - (* argv[0] = NULL: the loop is skipped, and c = 0 *)
-      iApply (kxc_d_tail (CID0 := CID1) jp bn gfs ga gf cov logstart bmapstart
+      iApply (kxc_d_tail (CID0 := CID1) Q jp bn gfs ga gf cov logstart bmapstart
                 inodestart size plen pfun na avf alen aslen afun pidv V eb
                 dqb dqs dqa dqpv dqas m M1 K sp0 ra0 s00 s10 s20 pv av
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P1 sz1 0
-                HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
+                HQe HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
                 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12 Hmw13
                 with "Htext Hskip Hcont").
   Qed.
 
 End KexecTail.
+
 
 (* ===================================================================== *)
 (*  THE CONTRACT.                                                         *)
@@ -413,6 +429,9 @@ Section KexecMain.
   Notation Rs11 := (mword_of_int 27 : mword 5).
   Notation Ra0 := (mword_of_int 10 : mword 5).
   Notation Ra1 := (mword_of_int 11 : mword 5).
+
+  (* the vacuous plug: the landed contract IS the cone at this [Q]. *)
+  Notation QT := (fun _ : mword 64 => True) (only parsing).
 
   Lemma wp_kexec_sconf
       (gs : list gname) (jp : nat) (gl : gname)
@@ -453,25 +472,38 @@ Section KexecMain.
     (* depth 0 pins the held-lock set empty, which is what every seam past
        phase A spells as the literal [∅]. *)
     iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlk Hcnt]". subst lks.
+    (* ---- THE EXIT, MOVED TO THE GENERIC RELATION.  The cone below relays
+       [kexec_ok_q Q]; this contract's caller handed us a [kexec_ok]-shaped
+       continuation, and at [Q := QT] the two differ by a [True] that sits
+       to the LEFT of a wand.  One [iApply]. ---- *)
+    iDestruct (kxc_exit_qgen (CIDx := CID0) QT (proc_addr jp) ga gf bmapstart
+                 inodestart plen pfun na avf alen aslen afun pidv V
+                 dqb dqs dqa dqpv dqas m K eb eb ∅
+                 (m !!! Regidx Rra) (m !!! Regidx Ra0) (m !!! Regidx Ra1)
+                 with "Hcont") as "Hcont".
     (* ---- PHASE A: +0x000 .. +0x090, and two of the eight [bad:] tails ---- *)
-    iApply (PA.kxc_phaseA (CID0 := CID0) gs jp gl gu gd gk pd pav pu bn g gfs
+    iApply (PA.kxc_phaseA (CID0 := CID0) QT gs jp gl gu gd gk pd pav pu bn g gfs
               gi cn gtl ga gf cov logstart bmapstart inodestart nib size dev
               plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
               m K eb eb ∅
               (m !!! Regidx csp_rs1) (m !!! Regidx Rra) (m !!! Regidx Rs0)
               (m !!! Regidx Rs1) (m !!! Regidx Rs2)
-              (m !!! Regidx Ra0) (m !!! Regidx Ra1)
+              (m !!! Regidx Ra0) (m !!! Regidx Ra1) None
               HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml
               Hins0 Hcovb Hiregb Hcstr Hplen Hjp Hgs
               eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
-              with "Hcg Hcnt Hextc Hclmc Htext Hpc Hfab Hka Hbm Hins Hbits Hpriv
+              with "Hcg Hcnt Hextc Hclmc Htext Hpc Hfab [] Hka Hbm Hins Hbits Hpriv
                     Hpath Hargv Hargs Hbs Hirs Hcont []").
+    (* the landed contract claims nothing about the header, so the oracle
+       gives the ride straight back ([HD := None]). *)
+    { iIntros (zi dn data) "Hride". iModIntro.
+      iSplitL "Hride"; [iExact "Hride" | by iPureIntro]. }
     iIntros (CIDa) "%Hsa".
-    iIntros (M90 kf qf sf inumf dnf bmf gilf gislf gyf n2)
+    iIntros (M90 kf qf sf inumf dnf bmf gilf gislf gyf n2 ef)
             "%Hregs90 %Hn2 Hpc Hcg Hcnt Hextc Hclmc Hslk Hslked Hdep Hidev Hiinum
              Hival Hloaded Hity Hfrz Hiref Hru Hlog Hirs Hbm Hins Hbits Hbs #Hka2
              Hpriv
-             Hpath Hargv Hargs Hframe Hcont".
+             Hpath Hargv Hargs %Hhdr Hframe Hcont".
     destruct Hregs90 as (HM90sp & HM90s0 & HM90s1 & HM90s2 & HM90s4 & Hkf &
                          Hinumf & HM90thr).
     (* the nine resources phase B threads whole and never looks inside *)
@@ -493,34 +525,34 @@ Section KexecMain.
       iSplitL "Hfrz"; [iExact "Hfrz" |].
       iSplitL "Hiref"; [iExact "Hiref" | iExact "Hru"]. }
     (* ---- PHASE B1: +0x090 .. +0x0cc, plus the +0x31c tail ---- *)
-    iApply (PB.kxc_b1 (CID0 := CIDa) gs jp gl gu gd gk pd pav pu bn g gfs gi cn
+    iApply (PB.kxc_b1 (CID0 := CIDa) QT gs jp gl gu gd gk pd pav pu bn g gfs gi cn
               gtl ga gf cov logstart bmapstart inodestart nib size dev
               kf qf sf gyf inumf dnf bmf gilf gislf n2
               plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
               m M90 K eb eb ∅
               (m !!! Regidx csp_rs1) (m !!! Regidx Rra) (m !!! Regidx Rs0)
               (m !!! Regidx Rs1) (m !!! Regidx Rs2)
-              (m !!! Regidx Ra0) (m !!! Regidx Ra1)
+              (m !!! Regidx Ra0) (m !!! Regidx Ra1) ef
               HK Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs
               Hkf Hinumf Hn2 eq_refl eq_refl eq_refl eq_refl eq_refl
               HM90sp HM90s0 HM90s1 HM90s2 HM90s4 HM90thr
               with "Htext Hfab Hpc Hcg Hcnt Hextc Hclmc Hopen Hlog Hirs Hbm Hins
                     Hbits Hbs Hka2 Hpriv Hpath Hargv Hargs Hframe Hcont [] []").
     - (* ---- OUTPUT 1: elf.phnum = 0, the phdr loop is skipped ---- *)
-      iIntros (CIDz) "%Hsz1". iIntros (Mz efz Pz w67z) "Hst1a2 Hcont".
+      iIntros (CIDz) "%Hsz1". iIntros (Mz Pz w67z) "Hst1a2 Hcont".
       iApply (PB3.kxc_b2z (CID0 := CIDz) gs jp gl gu gd gk pd pav pu bn g gfs
                 gi cn gtl gilf gislf ga gf cov logstart bmapstart inodestart
                 nib size dev kf qf sf gyf inumf dnf bmf n2
                 plen pfun na avf alen aslen afun pidv V eb dqb dqs dqa dqpv dqas
                 m Mz K (m !!! Regidx csp_rs1) (m !!! Regidx Rra)
                 (m !!! Regidx Rs0) (m !!! Regidx Rs1) (m !!! Regidx Rs2)
-                (m !!! Regidx Ra0) (m !!! Regidx Ra1) w67z efz Pz
+                (m !!! Regidx Ra0) (m !!! Regidx Ra1) w67z ef Pz
                 HK Hkf Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs
                 with "Htext Hfab Hst1a2 [Hcont]").
       iIntros (CIDy) "%Hsy". iIntros (My) "Hst1ae".
       iDestruct (wp_next_retarget CIDz CIDy true (proc_addr jp) _
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
-      iApply (kxc_cd (CID0 := CIDy) jp bn gfs ga gf cov logstart bmapstart
+      iApply (kxc_cd (CID0 := CIDy) QT jp bn gfs ga gf cov logstart bmapstart
                 inodestart size plen pfun na avf alen aslen afun
                 pidv V eb dqb dqs dqa dqpv dqas m My K
                 (m !!! Regidx csp_rs1) (m !!! Regidx Rra) (m !!! Regidx Rs0)
@@ -529,27 +561,27 @@ Section KexecMain.
                 (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
                 (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
                 (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
-                w67z efz Pz (mword_of_int 0 : mword 64)
-                HK Hcstr Hnamax Havf_nz Havf_na Halen_b Halen_c Halen_4
+                w67z ef Pz (mword_of_int 0 : mword 64)
+                I HK Hcstr Hnamax Havf_nz Havf_na Halen_b Halen_c Halen_4
                 eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
                 eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
                 with "Htext Hst1ae Hcont").
     - (* ---- OUTPUT 2: the phdr loop's body, entered at i = 0, sz = 0 ---- *)
-      iIntros (CIDl) "%Hsl". iIntros (Ml efl Pl) "Hst12c Hcont".
-      iApply (PB3.kxc_b2 (CID0 := CIDl) gs jp gl gu gd gk pd pav pu bn g gfs
+      iIntros (CIDl) "%Hsl". iIntros (Ml Pl) "Hst12c Hcont".
+      iApply (PB3.kxc_b2 (CID0 := CIDl) QT gs jp gl gu gd gk pd pav pu bn g gfs
                 gi cn gtl gilf gislf ga gf cov logstart bmapstart inodestart
                 nib size dev kf qf sf gyf inumf dnf bmf n2
                 plen pfun na avf alen aslen afun pidv V eb dqb dqs dqa dqpv dqas
                 m Ml K (m !!! Regidx csp_rs1) (m !!! Regidx Rra)
                 (m !!! Regidx Rs0) (m !!! Regidx Rs1) (m !!! Regidx Rs2)
                 (m !!! Regidx Ra0) (m !!! Regidx Ra1)
-                (mword_of_int 4095 : mword 64) efl Pl 0%nat
+                (mword_of_int 4095 : mword 64) ef Pl 0%nat
                 (mword_of_int 0 : mword 64)
                 HK Hkf Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs Hdev
                 eq_refl eq_refl eq_refl eq_refl eq_refl
                 with "Htext Hfab Hst12c Hcont []").
       iIntros (CIDy) "%Hsy". iIntros (My Py szvy) "Hst1ae Hcont".
-      iApply (kxc_cd (CID0 := CIDy) jp bn gfs ga gf cov logstart bmapstart
+      iApply (kxc_cd (CID0 := CIDy) QT jp bn gfs ga gf cov logstart bmapstart
                 inodestart size plen pfun na avf alen aslen afun
                 pidv V eb dqb dqs dqa dqpv dqas m My K
                 (m !!! Regidx csp_rs1) (m !!! Regidx Rra) (m !!! Regidx Rs0)
@@ -558,8 +590,8 @@ Section KexecMain.
                 (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
                 (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
                 (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
-                (mword_of_int 4095 : mword 64) efl Py szvy
-                HK Hcstr Hnamax Havf_nz Havf_na Halen_b Halen_c Halen_4
+                (mword_of_int 4095 : mword 64) ef Py szvy
+                I HK Hcstr Hnamax Havf_nz Havf_na Halen_b Halen_c Halen_4
                 eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
                 eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
                 with "Htext Hst1ae Hcont").

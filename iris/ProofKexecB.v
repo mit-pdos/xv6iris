@@ -141,6 +141,7 @@ Require Import ProcPtOwn.
 Require Import FileInvDefs.
 Require Import SpecIput.
 Require Import SpecKexec.
+Require Import KexecOkQ.
 Require Import SpecMyproc.
 Require Import SpecBeginOp.
 Require Import SpecEndOp.
@@ -211,6 +212,7 @@ Section KexecBBody.
   (*  +0x090 .. +0x0cc, PLUS the [bad:] tail at +0x31c.                   *)
   (* =================================================================== *)
   Lemma kxc_b1
+      (Q : mword 64 -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
@@ -231,7 +233,15 @@ Section KexecBBody.
       (dqb dqs dqa dqpv dqas : dfrac)
       (m M90 : regfile) (K : nat) (eb : bool) (b : bool)
       (lks : gset string)
-      (sp0 ra0 s00 s10 s20 pv av : mword 64) :
+      (sp0 ra0 s00 s10 s20 pv av : mword 64)
+      (* THE ELF HEADER, ALREADY NAMED (N-5.2B).  Phase A used to hand the
+         eight slots across as existential [stack_own] and this block
+         re-carved and re-named them itself; it now receives them named, so
+         the bytes readi delivered survive the +0x090 seam and the two
+         output states below publish THIS [ef] rather than one of their own.
+         Nothing else about the block moves -- it reads [elf.phnum] and
+         [elf.phoff] out of exactly the same run. *)
+      (ef : nat -> bv 8) :
     (K_kexec <= K)%nat ->
     log_geom_ok cov logstart ->
     0 < size <= BPB ->
@@ -282,13 +292,13 @@ Section KexecBBody.
     ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈[KT1]{dqa} avf i) -∗
     ([∗ list] i ∈ seq 0 na,
        [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ{dqas} afun i j) -∗
-    kxc_frameA6 sp0 ra0 s00 s10 s20 pv av (m !!! Regidx Rs4) -∗
+    kxc_frameA6x sp0 ra0 s00 s10 s20 pv av (m !!! Regidx Rs4) ef -∗
     (* ---- kexec's OWN continuation: the +0x31c tail closes the -1 arm ---- *)
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (mf : regfile) (V' : pprivate)
         (entry spv szv' : mword 64),
           ⌜callee_saved m mf⌝ -∗
-          ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
+          ⌜kexec_ok_q Q V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
           sie_cap_gpr KT1 mf K b (proc_addr jp) -∗
           cpu_own 0 eb (proc_addr jp) b lks -∗
           trap_csrs_ext KT1 eb -∗
@@ -307,7 +317,7 @@ Section KexecBBody.
           WP (Loop : expr riscv_lang)) -∗
     (* ---- OUTPUT 1: [elf.phnum = 0], the loop is skipped ---- *)
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
-      ∀ (M : regfile) (ef : nat -> bv 8) (P : uptd) (w67 : mword 64),
+      ∀ (M : regfile) (P : uptd) (w67 : mword 64),
         kxc_at_1a2 jp bn g gfs gi cn ga gf cov logstart bmapstart inodestart
                    nib size dev kf qf sf gyf inumf dnf bmf
                    gilf gislf n2
@@ -324,7 +334,7 @@ Section KexecBBody.
           ∀ (mf : regfile) (V' : pprivate)
             (entry spv szv' : mword 64),
               ⌜callee_saved m mf⌝ -∗
-              ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
+              ⌜kexec_ok_q Q V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
               sie_cap_gpr KT1 mf K b (proc_addr jp) -∗
               cpu_own 0 eb (proc_addr jp) b lks -∗
               trap_csrs_ext KT1 eb -∗
@@ -344,7 +354,7 @@ Section KexecBBody.
         WP (Loop : expr riscv_lang)) -∗
     (* ---- OUTPUT 2: the phdr loop's body entry, at [i = 0], [sz = 0] ---- *)
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
-      ∀ (M : regfile) (ef : nat -> bv 8) (P : uptd),
+      ∀ (M : regfile) (P : uptd),
         kxc_at_12c jp bn g gfs gi cn ga gf cov logstart bmapstart inodestart
                    nib size dev kf qf sf gyf inumf dnf bmf
                    gilf gislf n2
@@ -362,7 +372,7 @@ Section KexecBBody.
           ∀ (mf : regfile) (V' : pprivate)
             (entry spv szv' : mword 64),
               ⌜callee_saved m mf⌝ -∗
-              ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
+              ⌜kexec_ok_q Q V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
               sie_cap_gpr KT1 mf K b (proc_addr jp) -∗
               cpu_own 0 eb (proc_addr jp) b lks -∗
               trap_csrs_ext KT1 eb -∗
@@ -397,13 +407,12 @@ Section KexecBBody.
        needs no hypothesis of this lemma's own. *)
     iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
     (* ---- the frame, opened ---- *)
-    rewrite /kxc_frameA6.
-    iDestruct "Hframe" as "(Hf1 & Hf2 & Hf3 & Hf4 & (%v5 & Hf5) & Hf6 &
+    rewrite /kxc_frameA6x.
+    iDestruct "Hframe" as "(%Hal & Hf1 & Hf2 & Hf3 & Hf4 & (%v5 & Hf5) & Hf6 &
                             (%v7 & Hf7) & (%v8 & Hf8) & (%v9 & Hf9) &
                             (%v10 & Hf10) & (%v11 & Hf11) & (%v12 & Hf12) &
-                            (%v13 & Hf13) & Hmid & Hf64 & Hf65 & Hf66 &
-                            (%v67 & Hf67) & Hf68)".
-    iDestruct (kxc_mid_split sp0 with "Hmid") as "(Hust & Helf & Hph)".
+                            (%v13 & Hf13) & Hust & Helfb & Hph & Hf64 & Hf65 &
+                            Hf66 & (%v67 & Hf67) & Hf68)".
     iPoseProof (kxc_090 with "Htext") as "Hi090".
     iPoseProof (kxc_092 with "Htext") as "Hi092".
     iPoseProof (kxc_094 with "Htext") as "Hi094".
@@ -786,9 +795,7 @@ Section KexecBBody.
       assert (Hpp0ac : add_vec_int (mword_of_int (KXB + 0xaa) : mword 64) 2
                        = mword_of_int (KXB + 0xac)) by pcw.
       iEval (rewrite Hpp0ac) in "Hpc".
-      (* ---- the elf carve: 64 NAMED bytes, kept named from here on ---- *)
-      iDestruct (kxc_elf_take sp0 with "Helf") as "[%Hal Helfb]".
-      iDestruct "Helfb" as (ef) "Helfb".
+      (* ---- the elf buffer arrives NAMED now (N-5.2B): no carve here ---- *)
       assert (Hal47 : is_aligned_paddr (Physaddr (pa_stk sp0 47)) 8 = true)
         by (pose proof (Hal 7%nat ltac:(lia)) as Hx; cbn in Hx; exact Hx).
       assert (Hal50 : is_aligned_paddr (Physaddr (pa_stk sp0 50)) 8 = true)
@@ -861,7 +868,7 @@ Section KexecBBody.
         iSpecialize ("Hcont1a2" $! CID15 with "[%]"); [wp_next_chain |].
         iDestruct (wp_next_retarget CID0 CID15 true (proc_addr jp) _
                      ltac:(wp_next_chain) with "Hcont") as "Hcont".
-        iApply ("Hcont1a2" $! G4 ef P v67 with "[-Hcont] Hcont").
+        iApply ("Hcont1a2" $! G4 P v67 with "[-Hcont] Hcont").
         rewrite /kxc_at_1a2.
         iSplitR.
         { iPureIntro. split_and!;
@@ -1131,7 +1138,7 @@ Section KexecBBody.
         iSpecialize ("Hcont12c" $! CID24 with "[%]"); [wp_next_chain |].
         iDestruct (wp_next_retarget CID0 CID24 true (proc_addr jp) _
                      ltac:(wp_next_chain) with "Hcont") as "Hcont".
-        iApply ("Hcont12c" $! G11 ef P with "[-Hcont] Hcont").
+        iApply ("Hcont12c" $! G11 P with "[-Hcont] Hcont").
         rewrite /kxc_at_12c.
         (* [kxc_at_12c] has NO threading conjunct -- see its header: by +0x12c
            no callee-saved register still holds kexec's entry value, so the
@@ -1273,7 +1280,7 @@ Section KexecBBody.
                      (CID8 : CPU) = (CID0 : CPU)) by wp_next_chain.
       iDestruct (wp_next_retarget CID0 CID8 true (proc_addr jp) _ Hcr8
                    with "Hcont") as "Hcont".
-      iApply (A.kxc_bad64 gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
+      iApply (A.kxc_bad64 Q gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
                 gilf gislf ga gf cov logstart bmapstart inodestart nib size
                 dev kf qf sf gyf inumf dnf bmf n2
                 plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
@@ -1285,6 +1292,7 @@ Section KexecBBody.
                       Hka Hpriv Hpath Hargv Hargs Hbs Hirs Hlog [-Hcont]
                       Hcont").
       rewrite /kxc_frameA6.
+      iDestruct (kxc_elf_give sp0 ef Hal with "Helfb") as "Helf".
       iDestruct (kxc_mid_join sp0 with "Hust Helf Hph") as "Hmid".
       iSplitL "Hf1"; [iExact "Hf1" |].
       iSplitL "Hf2"; [iExact "Hf2" |].

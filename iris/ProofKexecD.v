@@ -79,6 +79,7 @@ Require Import ProcPtOwn.
 Require Import UmCovered.
 Require Import FileInvDefs.
 Require Import SpecKexec.
+Require Import KexecOkQ.
 Require Import SpecProcFreepagetable.
 Require Import SpecSafestrcpy.
 Require Import ProofKexecParts.
@@ -699,8 +700,10 @@ Section KexecDCommit.
      commit block reaches it from a register file it has just reloaded nine
      registers into, and mixing the arithmetic in there is what makes such a
      block unreadable. *)
-  Lemma kxd_kexec_ok (V : pprivate) (na : nat) (alen : nat -> nat)
+  Lemma kxd_kexec_ok (Q : mword 64 -> Prop)
+      (V : pprivate) (na : nat) (alen : nat -> nat)
       (P : uptd) (entry sz1 : mword 64) (ns : list (bv 8)) (r : mword 64) :
+    Q entry ->
     r = (mword_of_int (Z.of_nat na) : mword 64) ->
     (na < MAXARG)%nat ->
     kxc_stack_ok (uint sz1) (uint sz1 - 4096) alen na ->
@@ -710,7 +713,7 @@ Section KexecDCommit.
        <= uint (mword_of_int (kxc_sp_final (uint sz1) alen na) : mword 64))%Z ->
     (uint (mword_of_int (kxc_sp_final (uint sz1) alen na) : mword 64)
        <= uint sz1)%Z ->
-    kexec_ok V
+    kexec_ok_q Q V
       (upd_exec V sz1 P
          (<[kxc_tf_sp_idx
             := (mword_of_int (kxc_sp_final (uint sz1) alen na) : mword 64)]>
@@ -721,7 +724,7 @@ Section KexecDCommit.
          ns)
       r entry (mword_of_int (kxc_sp_final (uint sz1) alen na)) sz1 na alen.
   Proof.
-    intros Hr Hna Hstk Htfp Hns Hlo Hhi. right.
+    intros HQ Hr Hna Hstk Htfp Hns Hlo Hhi. right.
     rewrite kxd_tf_swap.
     split_and!; try reflexivity; try assumption; try (unfold MAXARG in *; lia).
   Qed.
@@ -859,6 +862,7 @@ Section KexecDCommit.
   (*  rest of the way to the contract's [upd_exec].                        *)
   (* ------------------------------------------------------------------- *)
   Lemma kxd_commit
+      (Q : mword 64 -> Prop)
       (jp : nat) (bn : bio_names) (gfs : fs_names) (ga gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z)
       (size : Z)
@@ -870,6 +874,12 @@ Section KexecDCommit.
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (sz1 : mword 64) (c q : nat) :
+    (* the ENTRY-POINT OBLIGATION, and the only site in the cone that
+       pays it: the commit block's [ld a4,-408(s0)] loads exactly
+       [kxq_entry ef], so what [kexec_ok_q Q]'s success arm asks for is a
+       fact about the ELF HEADER THIS WALK READ.  Every [bad:] tail is
+       generic for free and takes no such premise. *)
+    Q (kxq_entry ef) ->
     (K_kexec <= K)%nat ->
     bb_cstr pfun plen ->
     (q <= plen)%nat ->
@@ -913,7 +923,7 @@ Section KexecDCommit.
     ∀ (mf : regfile) (V' : pprivate)
        (entry spv szv' : mword 64),
         ⌜callee_saved m mf⌝ -∗
-        ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
+        ⌜kexec_ok_q Q V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
         sie_cap_gpr KT1 mf K eb (proc_addr jp) -∗
         cpu_own 0 eb (proc_addr jp) eb ∅ -∗
         trap_csrs_ext KT1 eb -∗
@@ -932,7 +942,7 @@ Section KexecDCommit.
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hcstr Hq Hnamax Hsz1ge Hceq Hstk HPtfp Hbelow Hcov Hal
+    intros HQe HK Hcstr Hq Hnamax Hsz1ge Hceq Hstk HPtfp Hbelow Hcov Hal
            Hmsp Hmra Hms0 Hms1 Hms2
            Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12 Hmw13
            HMsp HMs0 HMs1 HMs2 HMs4 HMs5 HMs6 HMs10.
@@ -1861,6 +1871,7 @@ Section KexecDMain.
   (*  is what lets the exit quote [alen na] where the state says [alen c]. *)
   (* =================================================================== *)
   Lemma kxd_phaseD
+      (Q : mword 64 -> Prop)
       (jp : nat) (bn : bio_names) (gfs : fs_names) (ga gf : gname)
       (cov : gset Z) (logstart bmapstart inodestart : Z)
       (size : Z)
@@ -1872,6 +1883,12 @@ Section KexecDMain.
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (sz1 : mword 64) (c : nat) :
+    (* the ENTRY-POINT OBLIGATION, and the only site in the cone that
+       pays it: the commit block's [ld a4,-408(s0)] loads exactly
+       [kxq_entry ef], so what [kexec_ok_q Q]'s success arm asks for is a
+       fact about the ELF HEADER THIS WALK READ.  Every [bad:] tail is
+       generic for free and takes no such premise. *)
+    Q (kxq_entry ef) ->
     (K_kexec <= K)%nat ->
     bb_cstr pfun plen ->
     (na < MAXARG)%nat ->
@@ -1893,7 +1910,7 @@ Section KexecDMain.
     ∀ (mf : regfile) (V' : pprivate)
        (entry spv szv' : mword 64),
         ⌜callee_saved m mf⌝ -∗
-        ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
+        ⌜kexec_ok_q Q V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
         sie_cap_gpr KT1 mf K eb (proc_addr jp) -∗
         cpu_own 0 eb (proc_addr jp) eb ∅ -∗
         trap_csrs_ext KT1 eb -∗
@@ -1912,7 +1929,7 @@ Section KexecDMain.
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
+    intros HQe HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
            Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12 Hmw13.
     
     iIntros "#Htext Hst Hcont".
@@ -2159,11 +2176,11 @@ Section KexecDMain.
                       (CID5 : CPU) = (CID0 : CPU)) by wp_next_chain.
       iDestruct (wp_next_retarget CID0 CID5 true (proc_addr jp) _ Hcr5
                    with "Hcont") as "Hcont".
-      iApply (kxd_commit (CID0 := CID5) jp bn gfs ga gf cov logstart bmapstart
+      iApply (kxd_commit (CID0 := CID5) Q jp bn gfs ga gf cov logstart bmapstart
                 inodestart size plen pfun na avf alen aslen afun pidv V eb
                 dqb dqs dqa dqpv dqas m D3 K sp0 ra0 s00 s10 s20 pv av
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P sz1 c 0%nat
-                ltac:(lia) Hcstr ltac:(lia) Hnamax Hsz1ge Hceq
+                HQe ltac:(lia) Hcstr ltac:(lia) Hnamax Hsz1ge Hceq
                 ltac:(rewrite -Hceq; exact Hstackok) HPtfp Hbelow Hcov Hal
                 Hmsp Hmra Hms0 Hms1 Hms2
                 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12 Hmw13
@@ -2296,11 +2313,11 @@ Section KexecDMain.
                       (CID9 : CPU) = (CID0 : CPU)) by wp_next_chain.
       iDestruct (wp_next_retarget CID0 CID9 true (proc_addr jp) _ Hcr9
                    with "Hcont") as "Hcont".
-      iApply (kxd_commit (CID0 := CID9) jp bn gfs ga gf cov logstart bmapstart
+      iApply (kxd_commit (CID0 := CID9) Q jp bn gfs ga gf cov logstart bmapstart
                 inodestart size plen pfun na avf alen aslen afun pidv V eb
                 dqb dqs dqa dqpv dqas m Mf K sp0 ra0 s00 s10 s20 pv av
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P sz1 c q'
-                ltac:(lia) Hcstr Hq' Hnamax Hsz1ge Hceq
+                HQe ltac:(lia) Hcstr Hq' Hnamax Hsz1ge Hceq
                 ltac:(rewrite -Hceq; exact Hstackok) HPtfp Hbelow Hcov Hal
                 Hmsp Hmra Hms0 Hms1 Hms2
                 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12 Hmw13

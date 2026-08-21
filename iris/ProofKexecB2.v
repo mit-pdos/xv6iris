@@ -286,6 +286,7 @@ Section KexecB2Body.
   (*  ([UmCovered.proc_pt_covered_maxsz]), so that is what this asks for.  *)
   (* =================================================================== *)
   Lemma kxc_bad324
+      (Q : mword 64 -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
@@ -301,7 +302,7 @@ Section KexecB2Body.
       (m Mt : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w63 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (szf : mword 64) (eb : bool) (lks : gset string) :
-    kxc_bad324_body gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl gilf gislf
+    kxc_bad324_body Q gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl gilf gislf
       ga gf cov logstart bmapstart inodestart nib size dev
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
       pidv V dqb dqs dqa dqpv dqas m Mt K sp0 ra0 s00 s10 s20 pv av w63 w67
@@ -650,7 +651,7 @@ Section KexecB2Body.
                   (CID13 : CPU) = (CID0 : CPU)) by wp_next_chain.
     iDestruct (wp_next_retarget CID0 CID13 true (proc_addr jp) _ Hcr
                  with "Hcont") as "Hcont".
-    iApply (A.kxc_bad64 gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
+    iApply (A.kxc_bad64 Q gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
               gilf gislf ga gf cov logstart bmapstart inodestart nib size
               dev kf qf sf gyf inumf dnf bmf n2
               plen pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas
@@ -771,6 +772,7 @@ Section KexecB2Loops.
   (*  head can always supply.                                              *)
   (* =================================================================== *)
   Lemma kxc_ls `{CID0 : CpuId}
+      (Q : mword 64 -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
@@ -787,7 +789,7 @@ Section KexecB2Loops.
       (sp0 ra0 s00 s10 s20 pv av w63 w65 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd)
       (ip : nat) (va : mword 64) (fz po : Z) (eb : bool) (lks : gset string) :
-    kxc_ls_body gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl gilf gislf
+    kxc_ls_body Q gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl gilf gislf
       ga gf cov logstart bmapstart inodestart nib size dev
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
       pidv V dqb dqs dqa dqpv dqas m K sp0 ra0 s00 s10 s20 pv av w63 w65 w67
@@ -1635,7 +1637,7 @@ Section KexecB2Loops.
                   (CIDb1 : CPU) = (CID0 : CPU)) by wp_next_chain.
         iDestruct (wp_next_retarget CID0 CIDb1 true (proc_addr jp) _ Hcr3
                      with "Hcont") as "Hcont".
-        iApply (kxc_bad324 (CID0 := CIDb1) gs jp gl gu gd gk pd pav pu bn g gfs
+        iApply (kxc_bad324 (CID0 := CIDb1) Q gs jp gl gu gd gk pd pav pu bn g gfs
                   gi cn gtl gilf gislf ga gf cov logstart bmapstart inodestart
                   nib size dev kf qf sf gyf inumf dnf bmf n2 plen
                   pfun na avf alen aslen afun pidv V dqb dqs dqa dqpv dqas m M2 K

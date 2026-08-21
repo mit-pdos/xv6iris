@@ -96,6 +96,7 @@ Require Import UmCovered.
 Require Import FileInvDefs.
 Require Import SpecIput.
 Require Import SpecKexec.
+Require Import KexecOkQ.
 Require Import SpecDirlink.
 Require Import ProofKexecParts.
 Require Import ProofKexecTail.
@@ -574,6 +575,7 @@ End KexecB2Res.
 (*  design (which size is freed, why no threading clause is needed). *)
 (* ===================================================================== *)
 Definition kxc_bad324_body
+      (Q : mword 64 -> Prop)
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId}
     (gs : list gname) (jp : nat) (gl : gname)
     (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
@@ -655,7 +657,7 @@ Definition kxc_bad324_body
     ∀ (mf : regfile) (V' : pprivate)
       (entry spv szv' : mword 64),
         ⌜callee_saved m mf⌝ -∗
-        ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
+        ⌜kexec_ok_q Q V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
         sie_cap_gpr KT1 mf K eb (proc_addr jp) -∗
         cpu_own 0 eb (proc_addr jp) eb lks -∗
         trap_csrs_ext KT1 eb -∗
@@ -681,6 +683,7 @@ Definition kxc_bad324_body
 (*  carry). *)
 (* ===================================================================== *)
 Definition kxc_ls_body
+      (Q : mword 64 -> Prop)
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId}
     (gs : list gname) (jp : nat) (gl : gname)
     (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
@@ -766,7 +769,7 @@ Definition kxc_ls_body
     ∀ (mf : regfile) (V' : pprivate)
       (entry spv szv' : mword 64),
         ⌜callee_saved m mf⌝ -∗
-        ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
+        ⌜kexec_ok_q Q V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
         sie_cap_gpr KT1 mf K eb (proc_addr jp) -∗
         cpu_own 0 eb (proc_addr jp) eb lks -∗
         trap_csrs_ext KT1 eb -∗
@@ -813,7 +816,7 @@ Definition kxc_ls_body
         ∀ (mf : regfile) (V' : pprivate)
           (entry spv szv' : mword 64),
             ⌜callee_saved m mf⌝ -∗
-            ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
+            ⌜kexec_ok_q Q V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
             sie_cap_gpr KT1 mf K eb (proc_addr jp) -∗
             cpu_own 0 eb (proc_addr jp) eb lks -∗
             trap_csrs_ext KT1 eb -∗
@@ -836,6 +839,7 @@ Definition kxc_ls_body
 Module Type KEXECB2.
   Parameter kxc_bad324 :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId}
+      (Q : mword 64 -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
@@ -851,7 +855,7 @@ Module Type KEXECB2.
       (m Mt : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w63 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (szf : mword 64) (eb : bool) (lks : gset string),
-    kxc_bad324_body gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl gilf gislf
+    kxc_bad324_body Q gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl gilf gislf
       ga gf cov logstart bmapstart inodestart nib size dev
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
       pidv V dqb dqs dqa dqpv dqas m Mt K sp0 ra0 s00 s10 s20 pv av w63 w67
@@ -859,6 +863,7 @@ Module Type KEXECB2.
 
   Parameter kxc_ls :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID0 : CpuId}
+      (Q : mword 64 -> Prop)
       (gs : list gname) (jp : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
@@ -875,7 +880,7 @@ Module Type KEXECB2.
       (sp0 ra0 s00 s10 s20 pv av w63 w65 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd)
       (ip : nat) (va : mword 64) (fz po : Z) (eb : bool) (lks : gset string),
-    kxc_ls_body gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl gilf gislf
+    kxc_ls_body Q gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl gilf gislf
       ga gf cov logstart bmapstart inodestart nib size dev
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
       pidv V dqb dqs dqa dqpv dqas m K sp0 ra0 s00 s10 s20 pv av w63 w65 w67
