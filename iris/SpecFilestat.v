@@ -141,11 +141,6 @@ Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
-Require Import IcacheBoot.   (* [ic_sleeplocks]: the canonical entry-sleeplock
-                                family -- IcacheBoot.v's header names itself the
-                                home for it, and a contract that cannot know
-                                WHICH entry its descriptor points at takes the
-                                family. *)
 Require Import UserPtTree.
 Require Import KvmSpec.
 Require Import ProcPtOwn.

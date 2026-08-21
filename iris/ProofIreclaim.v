@@ -60,9 +60,9 @@
    the three buffer slots (returned).
 
    THE ENTRY SLEEPLOCK IS PROJECTED, NOT SUPPLIED.  The scan cannot name the
-   slot iget picks, so the contract takes [IcacheBoot.ic_sleeplocks] and the
+   slot iget picks, so the contract takes [IcacheEscrow.ic_sleeplocks] and the
    orphan block projects the one the run picks with
-   [IcacheBoot.ic_sleeplocks_acc]; the escrow family is projected the same
+   [IcacheEscrow.ic_sleeplocks_lookup]; the escrow family is projected the same
    way ([irc_esc_acc] below, ProofDirlink's [dl_esc_acc] restated).       *)
 From Stdlib Require Import Eqdep_dec ZArith Bool Lia List String Ascii.
 From stdpp Require Import gmap list list_numbers functions bitvector.definitions.
@@ -112,7 +112,6 @@ Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
-Require Import IcacheBoot.
 Require Import CodeIreclaim.
 Require Import SpecPrintk.
 Require Import SpecBread SpecBrelse SpecIget.
@@ -1392,7 +1391,7 @@ Section IreclaimOrphan.
     (* the two singletons the run's slot needs, projected out of the families *)
     iDestruct (irc_esc_acc cn γfs γi cov logstart kslot Hkslot with "Hesc")
       as "#Hescrow".
-    iDestruct (ic_sleeplocks_acc cn kslot Hkslot with "Hslks")
+    iDestruct (ic_sleeplocks_lookup cn kslot Hkslot with "Hslks")
       as (gil gisl) "#Hslk".
     (* ===== +0x48 c.mv s3,a0 : s3 := ip (the register is REUSED) ===== *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.ireclaim + 0x48)) Rs3 Ra0

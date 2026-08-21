@@ -832,8 +832,6 @@ Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import FsTree.
 Require Import IcacheEscrow.
-Require Import IcacheBoot.   (* [ic_sleeplocks_acc]: the entry sleeplock the
-                                carve's slot selects out of the family. *)
 (* RE-IMPORT, fileread's line for line: [IcacheInv.islot] shadows
    [DinodeEnc.islot] and [IcacheRef.inode_ref] shadows [FileInv]'s
    placeholder; neither icache name is meant here except through the two
@@ -1741,7 +1739,7 @@ Section ProofFilewrite.
       by (apply P4q; exact P5).
     iDestruct (ic_escrows_acc2 (fwn_ic fn) (fwn_fs fn) (fwn_ireg fn)
                  (fwn_cov fn) (fwn_logstart fn) ik P9 with "Hescs") as "#Hesc".
-    iDestruct (ic_sleeplocks_acc (fwn_ic fn) ik P9 with "Hslks")
+    iDestruct (ic_sleeplocks_lookup (fwn_ic fn) ik P9 with "Hslks")
       as (gil gisl) "#Hslk2".
     iPoseProof (fwri_08c with "Htext") as "Hi8c".
     iPoseProof (fwri_090 with "Htext") as "Hi90".

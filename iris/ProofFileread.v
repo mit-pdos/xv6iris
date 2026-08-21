@@ -86,8 +86,6 @@ Require Import DinodeEnc InodeInv InodeLock.
 Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheEscrow.
-Require Import IcacheBoot.   (* [ic_sleeplocks_acc]: the entry sleeplock the
-                                carve's slot selects out of the family. *)
 (* RE-IMPORT: [IcacheInv.islot] shadows [DinodeEnc.islot] and
    [IcacheRef.inode_ref] shadows [FileInv]'s placeholder; neither icache
    name is meant here except through the two contracts. *)
@@ -1884,7 +1882,7 @@ Section ProofFileread.
              iDestruct (ic_escrows_acc2 (frn_ic fn) (frn_fs fn) (frn_ireg fn)
                           (frn_cov fn) (frn_logstart fn) ikk Hik with "Hescs")
                as "#Hesc".
-             iDestruct (ic_sleeplocks_acc (frn_ic fn) ikk Hik with "Hslks")
+             iDestruct (ic_sleeplocks_lookup (frn_ic fn) ikk Hik with "Hslks")
                as (gil gisl) "#Hslk".
              (* LEND HALF, KEEP HALF.  iunlock returns the arity-preserving
                 [inode_shr], so the generation the payload names has to be

@@ -90,13 +90,9 @@
    ilock, iunlock and iput each take [is_sleeplock] for THEIR OWN entry, and
    a caller that knows its slot hands over exactly one.  ireclaim does not
    know its slot: [iget] chooses it at run time and the scan cannot name it in
-   advance.  So this contract takes [IcacheBoot.ic_sleeplocks cn] -- the fifty
-   -fold persistent family, with [IcacheBoot.ic_sleeplocks_acc] to project the
-   one the run picks.  That name is deliberate: N5a's ledger and IcacheBoot's
-   own header both say new contracts should name THAT copy rather than
-   [ic_sleeplocks] or [ic_sleeplocks], which are
-   character-identical earlier copies kept only to spare their consumers a
-   recompile.
+   advance.  So this contract takes [IcacheEscrow.ic_sleeplocks cn] -- the
+   fifty-fold persistent family -- with [IcacheEscrow.ic_sleeplocks_lookup]
+   to project the one the run picks.  There is one copy of each.
 
    ---- THE BOOT MINT FITS THIS CONTRACT UNCHANGED (C7's flag, resolved) --
 
@@ -283,7 +279,7 @@ Definition wp_ireclaim_sconf_body
   itable_inv -∗
   ic_escrows cn γfs γi cov logstart -∗
   (* THE FIFTY ENTRY SLEEPLOCKS, as a family: the scan does not know which
-     slot iget will pick.  [IcacheBoot.ic_sleeplocks_acc] projects it. *)
+     slot iget will pick.  [IcacheEscrow.ic_sleeplocks_lookup] projects it. *)
   ic_sleeplocks cn -∗
   (* itrunc's bitmap, through iput *)
   bitmap_inv γfs bmapstart cov logstart size -∗

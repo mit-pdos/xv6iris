@@ -106,7 +106,6 @@ Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import FsTree.
 Require Import IcacheEscrow.
-Require Import IcacheBoot.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import FileInvDefs.

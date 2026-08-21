@@ -3299,10 +3299,10 @@ Section IcacheEscrow.
   Global Instance ic_sleeplocks_persistent cn : Persistent (ic_sleeplocks cn).
   Proof. apply _. Qed.
 
-  (* ...AND ITS ACCESSOR.  Every consumer projects the family through THIS
-     lemma; do not restate it in a caller's own file.  ([IcacheBoot.v] has a
-     second, character-identical [ic_sleeplocks] with its own
-     [ic_sleeplocks_acc] -- a rival copy, not a client of this one.) *)
+  (* ...AND ITS ACCESSOR.  This is the ONLY copy of either; every consumer
+     projects the family through this lemma.  Do not restate it in a
+     caller's own file -- seven files did, and retiring the seven is what
+     made [IcacheBoot.v] stop being a second home for the family. *)
   Lemma ic_sleeplocks_lookup (cn : ic_names) (k : nat) :
     (k < NINODE)%nat ->
     ic_sleeplocks cn -∗

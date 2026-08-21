@@ -12,9 +12,7 @@
        is_itable2   (IcacheEscrow)  -- the itable spinlock's resource
 
    ...plus the fifty inode sleeplocks sealed over [ic_tok cn k], which is
-   [ic_sleeplocks] verbatim (that name lives up in the file-
-   close spec, which this file must not depend on, so the family is spelled
-   out here and unifies with it by unfolding).
+   [IcacheEscrow.ic_sleeplocks] verbatim.
 
    THE FUNCTION PROOF IS ALREADY DONE.  iinit -- [initlock] plus a loop of
    [initsleeplock] over the fifty entries -- is proven ([ProofIinit.v]) and
@@ -1202,47 +1200,13 @@ Section IcacheBootTable.
     rewrite /iref_word lookup_empty //.
   Qed.
 
-  (* ------------------------------------------------------------------ *)
-  (*  THE ENTRY SLEEPLOCK FAMILY -- the canonical home                   *)
-  (* ------------------------------------------------------------------ *)
-
-  (* Every entry's inode sleeplock, in the shape [icache_boot] hands it
-     out below.  A contract that cannot know WHICH slot an iget will
-     return takes the family rather than one lock -- exactly as iget takes
-     [ic_escrows] rather than [ic_escrow].  Persistent, so it costs a
-     caller nothing.
-
-     THIS IS THE LOWEST FILE THAT CAN STATE IT (it needs [SleepLock] and
-     [IcacheEscrow.ic_tok], and it is where the family is produced).
-
-     THERE IS A SECOND, CHARACTER-IDENTICAL [IcacheEscrow.ic_sleeplocks],
-     with its own accessor [IcacheEscrow.ic_sleeplocks_lookup], and a file
-     that requires both gets whichever it imported last.  Every other copy
-     is retired; these two are not, because merging them means agreeing on
-     ONE home and re-pointing this file's four consumers (ProofFileread /
-     ProofFilestat / ProofFilewrite / ProofIreclaim, all through
-     [ic_sleeplocks_acc]).  Do not add a third. *)
-  Definition ic_sleeplocks (cn : ic_names) : iProp Σ :=
-    ([∗ list] kk ∈ seq 0 NINODE,
-       ∃ γil γisl : gname,
-         is_sleeplock_gen γil γisl (i_lock (ientry kk)) "inode"%string
-                          (ic_tok cn kk) (slh_tok (icfg_isl kk)))%I.
-
-  Global Instance ic_sleeplocks_persistent cn : Persistent (ic_sleeplocks cn).
-  Proof. apply _. Qed.
-
-  Lemma ic_sleeplocks_acc (cn : ic_names) (k : nat) :
-    (k < NINODE)%nat ->
-    (ic_sleeplocks cn -∗
-     ∃ γil γisl : gname,
-       is_sleeplock_gen γil γisl (i_lock (ientry k)) "inode"%string
-                        (ic_tok cn k) (slh_tok (icfg_isl k))
-     : iProp Σ).
-  Proof.
-    iIntros (Hk) "H". rewrite /ic_sleeplocks.
-    assert (Hl : seq 0 NINODE !! k = Some k) by (rewrite lookup_seq; lia).
-    iDestruct (big_sepL_lookup _ _ k k Hl with "H") as "$".
-  Qed.
+  (* THE ENTRY SLEEPLOCK FAMILY is [IcacheEscrow.ic_sleeplocks], with its
+     accessor [IcacheEscrow.ic_sleeplocks_lookup].  It is stated there
+     rather than here even though this is where [icache_boot] PRODUCES it:
+     [IcacheEscrow.v] is strictly lower (it already requires [SleepLock] and
+     owns [ic_tok]), so putting the family there is what keeps every
+     consumer off this file.  There is exactly one copy; do not restate it
+     in a caller. *)
 
   (* ------------------------------------------------------------------ *)
   (*  THE BOOT STEP                                                      *)

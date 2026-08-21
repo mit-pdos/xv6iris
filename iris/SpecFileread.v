@@ -77,7 +77,7 @@
    the slot, the device and the inum and IS the share ilock wants.
    [fileread_pay_carve] below hands them out and takes the share back; the
    per-slot escrow and sleeplock then come out of the two FAMILIES
-   ([ic_escrows], [IcacheBoot.ic_sleeplocks]) at the slot the payload named,
+   ([ic_escrows], [IcacheEscrow.ic_sleeplocks]) at the slot the payload named,
    and the off-borrow CINV comes out of the SAME carve, since it too rides
    the payload ([FileInvDefs.off_hold]).  The postcondition carries no share at all, so nothing is
    left for the generation to be lost through
@@ -170,10 +170,6 @@ Require Import DirView.      (* [T_DIR_z]: the carve's non-directory witness,
 Require Import IrefSlots.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
-Require Import IcacheBoot.   (* [ic_sleeplocks]: the canonical entry-sleeplock
-                                family -- a contract that cannot know WHICH
-                                entry its descriptor points at takes the
-                                family, exactly as SpecFilestat does. *)
 Require Import UserPtTree.
 Require Import KvmSpec.
 Require Import ProcPtOwn.
