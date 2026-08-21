@@ -15,7 +15,8 @@ ftable and the two call sites.
 | `7c078d09` | `syscall_env` gets a producer; the residue gets a channel for it |
 | `dd2af18e` | `wait_lock` gets a resource and an `is_lock`; fileinit's post kept |
 | `63306e07` | the slot ledger seals at userinit's park |
-| *(this one)* | **the timer capability rides `sie_cap`** — see Step E's `devintr_caps_any` section for the design and the full inventory |
+| `8d825c62` | **the timer capability rides `sie_cap`** — see Step E's `devintr_caps_any` section |
+| `d94ee33f` | **`is_ftable` is BUILT** — see Step E's `is_ftable` section |
 
 ### E3's four blockers
 
@@ -24,10 +25,13 @@ ftable and the two call sites.
 | `wait_lock` `is_lock` | **built** (`dd2af18e`) |
 | `procs_avail None` | **sealed** (`63306e07`) |
 | `devintr_caps_any` | **DONE** — `timer_cap` lives in `IntrDefs.sie_cap`; `ut_caps` is hart-free |
-| `is_ftable` | **staged** — main carries `lk_fresh ftable "ftable"`; needs the 100-slot BSS carve + `fileUR` allocation, then one `newlock` line |
+| `is_ftable` | **DONE** — the entries are carved, `ftable_res_boot` mints the table, `mn_grp_fs` allocates the lock right after fileinit |
 
-Then E3's call-site work: build `N`, switch both callers to
-`FORKRET_PARK_PAID`, replace `LinkForkretPark.v`'s `Axiom`.
+**Every row of `ut_park_caps` now has a producer.** What is left of E3 is
+purely call-site work: build `N`, thread the rows main already holds down to
+userinit's park (`is_ftable` is built inside `mn_grp_fs`, which is the group
+that CALLS userinit, so nothing has to leave it), switch both callers to
+`FORKRET_PARK_PAID`, and replace `LinkForkretPark.v`'s `Axiom`.
 
 ### Three things I got wrong, so they are not re-derived
 
@@ -325,32 +329,49 @@ main, and `SpecFileinit.v`'s header says the rest outright: *"Whether the
 lock then becomes an `is_lock` over the open-file table is the caller's
 ghost step, not fileinit's"*.
 
-**STAGED (`dd2af18e`).** main used to drop all three of fileinit's outputs
-(`iIntros (mfi) "Hcg Hpc %Hcsfi _ _ _"`); it now re-bundles them as
-`lk_fresh ftable "ftable"` and threads them out of `mn_grp_fs`. What is
-still missing is only the resource, and it is the biggest single item left
-in E3. `ftable_res γf` at `M = ∅` is NFILE = 100 copies of
-`a_fref k ↦₄ 0 ∗ ∃ C, ⌜fc_type C = FD_NONE⌝ ∗ file_fields k 1 C ∗
-file_pay γ k 1 C`, where `file_fields` is SIX cells (`type`/`readable`/
-`writable`/`pipe`/`ip`/`major`) and `file_pay` at `FD_NONE` unfolds through
-`file_core_none` to `iref_frac 1` beside `fpay_tok` and `off_hold`.
+**DONE (`d94ee33f`).** It was two things, a BSS carve and a mint, and the
+mint's ghost half already existed.
 
-So it is (a) a BSS carve and (b) a ghost allocation:
+* **the carve.** `BootShared.v`'s ftable step cut `ftable .. ftable+24` for
+  the lock and then jumped straight from `ftable+24` to `<disk>` — all 4000
+  bytes of `file[100]` were in the dropped span, exactly the shape of the
+  `p_parent` cells the wait_lock needed. `BootCarveMain.boot_file_entry` /
+  `boot_file_entries` carve them as a stride family at `file_stride`
+  anchored at `file_base`, modelled on `boot_inode_entries`. The array ends
+  EXACTLY at the next symbol, which is also the end pointer filealloc's scan
+  compares its cursor against. `FileInvDefs.fentry_raw` is what one entry
+  yields: three words at a LITERAL value (`type` = `FD_NONE`, `ref` = 0 for
+  the `c.beqz` scan, `off` = 0 for `off_wf`'s base case), five
+  contents-existential, and `f->ip` WHOLE because it is the one field split
+  in two.
+* **the mint.** `FileInv.ftable_ghosts_alloc` was already written and had
+  never been called — its own header said "a resource nobody can MINT is a
+  design hole that only surfaces when the wiring is written".
+  `FileInv.ftable_res_boot` is the other half: the carve's entries plus
+  `fd_slots_auth` plus `iref_slots NFILE`, with one fupd per slot for the
+  off-borrow cinv (UNARMED while the slot is untyped, so its body is the two
+  raw cells and there is nothing to establish) whose name is then written
+  into the slot's `fpnames` with `fpay_tok_update`.
 
-* **the carve.** `BootShared.v:762` cuts `ftable .. ftable+24` for the lock
-  and then jumps straight from `ftable+24` to `disk` — the whole
-  `file[100]` array is in the dropped span. Needs a `bss_cut` for it and a
-  stride family in the shape of `BootCarveMain.boot_procs_raw` /
-  `boot_bcache_nodes`, which are the precedents.
-* **the ghost.** `ftable_auth γ ∅`, `fd_slots_auth`, and per slot
-  `fpay_tok` / `off_hold` / `flive_tok` plus one `iref_frac` — the NFILE
-  iref units `IrefSlots` already reserves for the file table
-  (`SpecMain.main_globals_raw`'s note says so: "The remaining [NFILE] units
-  of [IrefSlots.IREFSLOTS] are the file table's").
+THREE THINGS THAT BIT:
 
-There is no existing `ftable_boot`-style lemma to build on; `IcacheBoot`'s
-is the nearest model. Once it lands the `newlock` is one line — the
-wait_lock above is the same move, already taken.
+1. **The boot chain's two iref units had to become their own row.**
+   `SpecFsinit` takes one for ireclaim's iget/iput and `SpecKexec` takes
+   two; neither is handed back to the ftable. They were being carved out of
+   the table's `NFILE`, which would leave the table unable to start with all
+   `NFILE` slots FREE — and a free slot owns one whole unit
+   (`file_core_none`). Hence `IrefSlots.IREFBOOT`, and `IREFSLOTS` grew by 2.
+2. **`fd_slots_auth` had no holder.** It is minted at the boot fan-out and
+   was dropped there (`iMod fd_slots_alloc as (Hfd) "[_ Hfdslots]"`).
+   `ftable_res` is where it belongs: the table is where the
+   one-unit-per-reference conservation law is checked.
+3. **`boot_ran_split` needs an empty RE-ANCHORING split at every field
+   boundary** — `A + 4 + 4` and `A + 8` are not convertible in `Z`, so a cut
+   chain that lands on the first spelling cannot feed a cell carve stated at
+   the second. The inode template does this and it is not decoration.
+
+The `newlock` is then one line, in `mn_grp_fs` right after fileinit — which
+is also the group that CALLS userinit, so the lock never has to leave it.
 
 **The `wait_lock` `is_lock`. — DONE (`dd2af18e`).** `wait_res` is
 `∃ ps, parents_own ps`, the NPROC `p_parent` cells, and of `p_parent` (+56)
