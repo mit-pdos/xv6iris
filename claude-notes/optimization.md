@@ -482,8 +482,9 @@ worth 20× on individual files.
     end.
   ```
   Measured, isolated `coqc`: **`FsImgCheck` 195.4 s → 99.5 s** (its
-  `fsimg_wf_ok` alone was 128.5 s of that), **`ElfKernel` 54.0 s → 28.9 s**.
-  The whole tactic column of those files drops to zero and only `Qed` pays.
+  `fsimg_wf_ok` alone was 128.5 s of that), **`ElfKernel` 54.0 s → 28.9 s**,
+  **`ElfUser` 25.1 s → 14.0 s**. The whole tactic column of those files drops
+  to zero and only `Qed` pays.
   - **IT MUST BE THE RIGHT-HAND SIDE.** `eq_refl r` casts `r = r` to `l = r`,
     so the VM evaluates the heavy side once; the mirror spelling
     `eq_refl l` makes it evaluate that side TWICE and is **worse than the

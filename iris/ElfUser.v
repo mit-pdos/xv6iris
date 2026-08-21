@@ -72,6 +72,30 @@ From User Require Import
 
 Local Open Scope Z_scope.
 
+(*  ONE REDUCTION, NOT TWO -- the same [vm_eq] [ElfKernel.v] carries, and
+    its header is where the reasoning lives.  In short:
+    [vm_compute. reflexivity.] reduces the goal in the tactic engine and
+    the KERNEL then re-runs the same reduction at [Qed] to check the
+    [vm_cast] the tactic left behind, so every sentence below pays its
+    [vm_compute] twice; [vm_cast_no_check] hands the kernel that cast
+    directly and typechecks nothing at tactic time.  Same proof term, same
+    VM, this file 25.1 s -> 14.0 s.
+
+    IT MUST BE THE **RIGHT** SIDE: [eq_refl rhs] casts [rhs = rhs] to
+    [lhs = rhs] and the VM evaluates the heavy side once, where [eq_refl
+    lhs] evaluates it TWICE and lands worse than the [vm_compute] it
+    replaces (measured on [ElfKernel.v]: 54.0 s baseline, 28.7 s right,
+    78.3 s left).
+
+    THE COST: a disagreement now surfaces at [Qed] as a kernel conversion
+    failure with no goal in view.  Put [vm_compute. reflexivity.] back on
+    the ONE failing lemma to see it -- and then fix the dump, never the
+    statement (the note at the top of this file). *)
+Local Ltac vm_eq :=
+  lazymatch goal with
+  | |- _ = ?r => vm_cast_no_check (@eq_refl _ r)
+  end.
+
 (* ====================================================================== *)
 (* ====================================================================== *)
 (*  sync                                                                  *)
@@ -100,10 +124,10 @@ Qed.
 (* ---------------------------------------------------------------------- *)
 
 Lemma sync_elf_wf : elf_wf sync_elf = true.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 Lemma sync_elf_sections_wf : elf_sections_wf sync_elf = true.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 (* ---------------------------------------------------------------------- *)
 (*  Geometry: the ELF's own numbers are the dump's constants               *)
@@ -111,19 +135,19 @@ Proof. vm_compute. reflexivity. Qed.
 
 (* 0x12, NOT [syncMemBase] = 0x0: `start` is linked ahead of `main`. *)
 Lemma sync_elf_entry : elf_entry sync_elf = Some SyncData.syncEntry.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 (* Two entries, in program-header order -- and the PT_RISCV_ATTRIBUTES and
    PT_GNU_STACK headers that sit alongside them are filtered out. *)
 Lemma sync_elf_segments :
   elf_segments sync_elf = Some SyncData.sync_segments.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 Lemma sync_elf_base : elf_mem_base sync_elf = Some SyncData.syncMemBase.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 Lemma sync_elf_end : elf_mem_end sync_elf = Some SyncData.syncMemEnd.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 (* The read-only / writable split lives in the SECTION table, so this is
    the one geometry constant that depends on [elf_sections_wf] rather than
@@ -131,7 +155,7 @@ Proof. vm_compute. reflexivity. Qed.
    semantics reads the sections, exactly as the dumper does.) *)
 Lemma sync_elf_rodata_end :
   elf_rodata_end sync_elf = Some SyncData.syncRodataEnd.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 (* ---------------------------------------------------------------------- *)
 (*  THE image theorem: the dump is exactly the ELF's file-backed image     *)
@@ -144,7 +168,7 @@ Proof. vm_compute. reflexivity. Qed.
 Lemma sync_elf_file_image_bool :
   bool_decide (elf_file_image sync_elf
                = SyncInstrs.sync_bytes ∪ SyncData.sync_data) = true.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 Lemma sync_elf_file_image :
   elf_file_image sync_elf = SyncInstrs.sync_bytes ∪ SyncData.sync_data.
@@ -170,7 +194,7 @@ Lemma sync_elf_zero_image_bool :
   bool_decide (elf_zero_image sync_elf
                = map_seqZ sync_bss_lo
                    (replicate (Z.to_nat sync_bss_size) elf_zero_byte)) = true.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 Lemma sync_elf_zero_image :
   elf_zero_image sync_elf
@@ -186,7 +210,7 @@ Qed.
    load segment, so its bottom is that segment's [vaddr + filesz], not the
    image base -- [sync_elf_segments] is what pins it.) *)
 Lemma sync_bss_top : sync_bss_lo + sync_bss_size = SyncData.syncMemEnd.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 (* The FULL loaded image.  Not a third giant [vm_compute]: [elf_image_split]
    is the general fact that a well-formed file's image is the disjoint
@@ -225,32 +249,32 @@ Proof.
 Qed.
 
 Lemma echo_elf_wf : elf_wf echo_elf = true.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 Lemma echo_elf_sections_wf : elf_sections_wf echo_elf = true.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 Lemma echo_elf_entry : elf_entry echo_elf = Some EchoData.echoEntry.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 Lemma echo_elf_segments :
   elf_segments echo_elf = Some EchoData.echo_segments.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 Lemma echo_elf_base : elf_mem_base echo_elf = Some EchoData.echoMemBase.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 Lemma echo_elf_end : elf_mem_end echo_elf = Some EchoData.echoMemEnd.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 Lemma echo_elf_rodata_end :
   elf_rodata_end echo_elf = Some EchoData.echoRodataEnd.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 Lemma echo_elf_file_image_bool :
   bool_decide (elf_file_image echo_elf
                = EchoInstrs.echo_bytes ∪ EchoData.echo_data) = true.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 Lemma echo_elf_file_image :
   elf_file_image echo_elf = EchoInstrs.echo_bytes ∪ EchoData.echo_data.
@@ -268,7 +292,7 @@ Lemma echo_elf_zero_image_bool :
   bool_decide (elf_zero_image echo_elf
                = map_seqZ echo_bss_lo
                    (replicate (Z.to_nat echo_bss_size) elf_zero_byte)) = true.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 Lemma echo_elf_zero_image :
   elf_zero_image echo_elf
@@ -279,7 +303,7 @@ Proof.
 Qed.
 
 Lemma echo_bss_top : echo_bss_lo + echo_bss_size = EchoData.echoMemEnd.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 Lemma echo_elf_image :
   elf_image echo_elf
@@ -316,27 +340,27 @@ Proof.
 Qed.
 
 Lemma sh_elf_wf : elf_wf sh_elf = true.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 Lemma sh_elf_sections_wf : elf_sections_wf sh_elf = true.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 Lemma sh_elf_entry : elf_entry sh_elf = Some ShData.shEntry.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 Lemma sh_elf_segments :
   elf_segments sh_elf = Some ShData.sh_segments.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 Lemma sh_elf_base : elf_mem_base sh_elf = Some ShData.shMemBase.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 Lemma sh_elf_end : elf_mem_end sh_elf = Some ShData.shMemEnd.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 Lemma sh_elf_rodata_end :
   elf_rodata_end sh_elf = Some ShData.shRodataEnd.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 (* Here the fold really is over two nonempty file windows: [0x0, 0x1c54)
    from the text segment and [0x2000, 0x2010) from the writable one.  The
@@ -345,7 +369,7 @@ Proof. vm_compute. reflexivity. Qed.
 Lemma sh_elf_file_image_bool :
   bool_decide (elf_file_image sh_elf
                = ShInstrs.sh_bytes ∪ ShData.sh_data) = true.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 Lemma sh_elf_file_image :
   elf_file_image sh_elf = ShInstrs.sh_bytes ∪ ShData.sh_data.
@@ -364,7 +388,7 @@ Lemma sh_elf_zero_image_bool :
   bool_decide (elf_zero_image sh_elf
                = map_seqZ sh_bss_lo
                    (replicate (Z.to_nat sh_bss_size) elf_zero_byte)) = true.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 Lemma sh_elf_zero_image :
   elf_zero_image sh_elf
@@ -375,7 +399,7 @@ Proof.
 Qed.
 
 Lemma sh_bss_top : sh_bss_lo + sh_bss_size = ShData.shMemEnd.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 Lemma sh_elf_image :
   elf_image sh_elf
@@ -409,32 +433,32 @@ Proof.
 Qed.
 
 Lemma init_elf_wf : elf_wf init_elf = true.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 Lemma init_elf_sections_wf : elf_sections_wf init_elf = true.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 Lemma init_elf_entry : elf_entry init_elf = Some InitData.initEntry.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 Lemma init_elf_segments :
   elf_segments init_elf = Some InitData.init_segments.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 Lemma init_elf_base : elf_mem_base init_elf = Some InitData.initMemBase.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 Lemma init_elf_end : elf_mem_end init_elf = Some InitData.initMemEnd.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 Lemma init_elf_rodata_end :
   elf_rodata_end init_elf = Some InitData.initRodataEnd.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 Lemma init_elf_file_image_bool :
   bool_decide (elf_file_image init_elf
                = InitInstrs.init_bytes ∪ InitData.init_data) = true.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 Lemma init_elf_file_image :
   elf_file_image init_elf = InitInstrs.init_bytes ∪ InitData.init_data.
@@ -452,7 +476,7 @@ Lemma init_elf_zero_image_bool :
   bool_decide (elf_zero_image init_elf
                = map_seqZ init_bss_lo
                    (replicate (Z.to_nat init_bss_size) elf_zero_byte)) = true.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 Lemma init_elf_zero_image :
   elf_zero_image init_elf
@@ -463,7 +487,7 @@ Proof.
 Qed.
 
 Lemma init_bss_top : init_bss_lo + init_bss_size = InitData.initMemEnd.
-Proof. vm_compute. reflexivity. Qed.
+Proof. vm_eq. Qed.
 
 Lemma init_elf_image :
   elf_image init_elf
