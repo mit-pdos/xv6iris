@@ -149,6 +149,7 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   each increment cost, where the landed tree diverged from the report's
   sketches, and the standing constraints.
 - **[`fs-cfg-boot.md`](projects/fs-cfg-boot.md)** — giving `IcacheRef.icfg` and
+- [`projects/forkret-park.md`](projects/forkret-park.md) — retiring the last assumed Link: what `forkret_park_pkg` still costs, after `ForkretParkClose.v` cut it to three resources.
   `FsCfg.fscfg` VALUES: the era-fupd allocation, the `_at` constructor
   discipline that replaces every existential name, the stocked inode pool, the
   two boot kits and how each reaches its consumer, and the adequacy
