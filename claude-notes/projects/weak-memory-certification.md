@@ -375,6 +375,40 @@ smaller than feared, and NO model change):**
   `LCtrl`/`LInstr`/`LDev` between realizing steps, star also inside
   the exclusive pair); (iii-a) the weakened `cfg_match`; the
   capstone re-composed.  Spec after D-7r's report.
+- **T1-D INTERFACE DESIGN COMPLETED (2026-08-21), with two spec
+  refinements and ONE MORE ALIGNMENT SLICE (D-2r) found:**
+  * (i) is a WEAKENING, not a deletion: `lb_depfree` →
+    `lb_ldepfree` (D3-2's existing gate — plain loads keep
+    `asrc = []`, stores/exclusives free).  Plain-load realization
+    stays at the 0 floor; store arms have no admissibility; the
+    PAIRED exclusive read is admissible at ANY floor via
+    `rmw_latest` + `latest_readable` (the A3 note's own
+    observation).
+  * THE RMW's post-state: the address view entering the exload's
+    byte fold raises `coh`/`vrOld` — `vrOld` is join-absorbed
+    (machine regv views ≤ `vrOld`, same argument as D-7r's), and
+    the PAIRED case's `coh` is absorbed by the write half's
+    fresh-top timestamp.  THE DANGLING exload (walker races,
+    amocas-miss — real, projects as a plain load) has NO absorbing
+    write: its address view leaks into its bytes' `coh` and can
+    refuse a later stale re-read the model admits — the same
+    machine-stronger-than-declared-model species as D-7r, in
+    rule 9's exclusive-read flavor.  **D-2r** (slice, before the
+    interface build): the exclusive read's address view leaves its
+    ADMISSIBILITY (`read_ok_d` → the 0 floor at the exload arms)
+    and its BYTE FOLD (fold at plain `vpre`); it SURVIVES in
+    `w_vcap` (`ctrl_post`, W-TV's consumer) and the reservation;
+    `rv_view` weakens naturally (the tower already leaves it
+    unrelated — S4's own note).  D-2's original EXT purpose is
+    full-machine-only, invisible to route B.  Align the fused
+    `WPRmw`/`PFRmw` arms identically for uniformity (they die at R6
+    anyway).
+  * (iii-a)'s relation `ws_eqr`: EQUAL on `coh`/`vrOld`/`vwOld`/
+    `vrNew`/`vwNew`/`vRel`/`fwd`/`pub`/`relp`; UNRELATED
+    `regv`/`vcap`/`ldv`/`tbank`/`res` (`res` handled inside the
+    pair arm; the intra-pair admin star excludes `LInstr`, which
+    the instance discharges trivially — no `LInstr` within an
+    instruction).
 
 ## Items
 
