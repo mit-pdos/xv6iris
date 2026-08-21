@@ -2660,7 +2660,7 @@ Section ProofNamexTrMain.
                                       & Y23 & Y24 & Y25 & Ythr).
                    iDestruct "Hload" as (datl)
                      "(%Hiok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlnk & Hdiat & Hmeta & Haddrs & Hind &
-                       Hblocks & Hdview)".
+                       Hblocks & Hdview & Hfview)".
                    iDestruct "Hmeta" as "(Hity & Himaj & Himin & Hinl & Hisz)".
                    iEval (rewrite /i_type) in "Hity".
                    (* +0xc6 lh a5,68(s4) : ip->type *)
@@ -2788,7 +2788,7 @@ Section ProofNamexTrMain.
                      iPoseProof (nxi_080 with "Htext") as "Hj5a".
                      iAssert (ic_loaded gfs gi cov logstart ik iinum dnl bml)
                        with "[Hdiat Hity Himaj Himin Hinl Hisz Haddrs Hind
-                              Hblocks Hdlnk Hdview]" as "Hload".
+                              Hblocks Hdlnk Hdview Hfview]" as "Hload".
                      { rewrite /ic_loaded. iExists datl.
                        iSplitR; [iPureIntro; exact Hiok |].
                        iSplitR; [iPureIntro; exact Hdok |].
@@ -3081,7 +3081,7 @@ Section ProofNamexTrMain.
                                 Hcwdr Hname Hbs1 Hbs2 Hlog Hkeep Hru Hslkd
                                 Hdep Hidev Hiinum Hivalid Hfrz Hdiat Hity
                                 Himaj Himin Hinl Hisz Haddrs Hind Hblocks
-                               Hdlnk Hdview HP Hhops]"
+                               Hdlnk Hdview Hfview HP Hhops]"
                          as "Hdlblk".
                        { iIntros (CIDz Hsz Mz) "%Hregz Hcg Hcnt Hextc Hclmc Hpc Hpath".
                          pose proof Hregz as Hrz.
@@ -3315,7 +3315,7 @@ Section ProofNamexTrMain.
                            iEval (rewrite -Hlen1) in "Hhops".
                            iAssert (ic_loaded gfs gi cov logstart ik iinum dnl
                                       bml)
-                             with "[Hdiat Hmeta Haddrs Hind Hblocks Hdlnk Hdview]"
+                             with "[Hdiat Hmeta Haddrs Hind Hblocks Hdlnk Hdview Hfview]"
                              as "Hload".
                            { rewrite /ic_loaded. iExists datl.
                              iSplitR; [iPureIntro; exact Hiok |].
@@ -3324,7 +3324,7 @@ Section ProofNamexTrMain.
                              iSplitR; [iPureIntro; exact Hdoc |].
                              iSplitR; [iPureIntro; exact Hduq |].
                              iSplitL "Hdlnk"; [iExact "Hdlnk" |].
-                             iFrame "Hdiat Hmeta Haddrs Hind Hblocks Hdview". }
+                             iFrame "Hdiat Hmeta Haddrs Hind Hblocks Hdview Hfview". }
                            iDestruct (nx_bs3_join bn with "Hbs1 Hbs2")
                              as "Hbslot".
                            assert (Hklt : (kdir < dir_nrec
@@ -3592,7 +3592,7 @@ Section ProofNamexTrMain.
                            iModIntro.
                            iAssert (ic_loaded gfs gi cov logstart ik iinum dnl
                                       bml)
-                             with "[Hdiat Hmeta Haddrs Hind Hblocks Hdlnk Hdview]"
+                             with "[Hdiat Hmeta Haddrs Hind Hblocks Hdlnk Hdview Hfview]"
                              as "Hload".
                            { rewrite /ic_loaded. iExists datl.
                              iSplitR; [iPureIntro; exact Hiok |].
@@ -3601,7 +3601,7 @@ Section ProofNamexTrMain.
                              iSplitR; [iPureIntro; exact Hdoc |].
                              iSplitR; [iPureIntro; exact Hduq |].
                              iSplitL "Hdlnk"; [iExact "Hdlnk" |].
-                             iFrame "Hdiat Hmeta Haddrs Hind Hblocks Hdview". }
+                             iFrame "Hdiat Hmeta Haddrs Hind Hblocks Hdview Hfview". }
                            iDestruct (nx_bs3_join bn with "Hbs1 Hbs2")
                              as "Hbslot".
                            (* +0xe8 c.mv s2,a0 *)
@@ -3891,7 +3891,7 @@ Section ProofNamexTrMain.
                      iPoseProof (nxi_05a with "Htext") as "Hj5a".
                      iAssert (ic_loaded gfs gi cov logstart ik iinum dnl bml)
                        with "[Hdiat Hity Himaj Himin Hinl Hisz Haddrs Hind
-                              Hblocks Hdlnk Hdview]" as "Hload".
+                              Hblocks Hdlnk Hdview Hfview]" as "Hload".
                      { rewrite /ic_loaded. iExists datl.
                        iSplitR; [iPureIntro; exact Hiok |].
                        iSplitR; [iPureIntro; exact Hdok |].

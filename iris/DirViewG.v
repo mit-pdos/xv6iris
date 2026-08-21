@@ -1,6 +1,7 @@
 (* ===================================================================== *)
 (*  DirViewG.v -- THE PER-DIRECTORY CONTENTS GHOST [dview]                *)
-(*  (claude-notes/projects/namei-pinned-lookup.md, N-1 / §9 W1)           *)
+(*                ...AND ITS PER-FILE TWIN [fview] (§5, N-5.2A)           *)
+(*  (claude-notes/projects/namei-pinned-lookup.md, N-1 / §9 W1; §13)      *)
 (* ===================================================================== *)
 
 (*  WHAT IT IS.  A per-inum agreement on a directory's ABSTRACT CONTENTS --
@@ -176,6 +177,111 @@ Section DirViewG.
     rewrite big_opS_own_1. iIntros "H".
     iApply (big_sepS_mono with "H"). intros z _.
     iIntros "H". rewrite /dv_hold /dv_half. iExact "H".
+  Qed.
+
+  (* ===================================================================== *)
+  (*  5.  THE PER-FILE CONTENTS GHOST [fview]                               *)
+  (*      (namei-pinned-lookup.md §13, D-52a -- N-5.2A)                     *)
+  (* ===================================================================== *)
+
+  (*  THE TWIN, one layer down.  Everything above, at [FsTree.file_bytes]
+      instead of [FsTree.dir_view]: a per-inum agreement on what a FILE's
+      bytes say, tied definitionally to those bytes everywhere the bytes
+      rest, carried on the same custody chain and moved by the same
+      re-packs.  It is a SECOND ghost and not a pair value inside [dviewUR]
+      (D-52a): re-typing the landed one would re-sweep every dview site in
+      the tree, whereas a twin's sweep is purely additive beside it.
+
+      AND THE SYMMETRY IS THE POINT.  Of a DIRECTORY [fv_of] is determined
+      garbage exactly as [dv_of] is of a file, so neither ghost needs a type
+      guard and every byte-write mover steps BOTH by one combined line
+      (D-52b, [InodeRegion.dvw_set_rt]).  Its consumer is the kexec walk
+      (N-5.2B), which pins /init's ELF bytes the way N-5.1 pinned its
+      inum.                                                                *)
+
+  Definition fv_half (z : Z) (dq : dfrac) (b : list (bv 8)) : iProp Σ :=
+    own icfg_fview
+        ({[ z := to_dfrac_agree dq (b : leibnizO (list (bv 8))) ]} : fviewUR).
+
+  Definition fv_hold (z : Z) (b : list (bv 8)) : iProp Σ :=
+    fv_half z (DfracOwn 1) b.
+
+  Global Instance fv_half_timeless z dq b : Timeless (fv_half z dq b).
+  Proof. apply _. Qed.
+  Global Instance fv_hold_timeless z b : Timeless (fv_hold z b).
+  Proof. apply _. Qed.
+
+  (* THE TIE.  [FsTree.file_bytes] IS what [node_of]'s NFile case reads off
+     the payload -- the landed function, not a new one. *)
+  Definition fv_of (dn : dinode) (data : nat -> list (bv 8)) : list (bv 8) :=
+    file_bytes data (Z.to_nat (bv_unsigned (di_size dn))).
+
+  Lemma fv_of_size (dn1 dn2 : dinode) (data : nat -> list (bv 8)) :
+    di_size dn1 = di_size dn2 -> fv_of dn1 data = fv_of dn2 data.
+  Proof. intros Hs. by rewrite /fv_of Hs. Qed.
+
+  Lemma fv_hold_size (z : Z) (dn1 dn2 : dinode) (data : nat -> list (bv 8)) :
+    di_size dn1 = di_size dn2 ->
+    fv_hold z (fv_of dn1 data) -∗ fv_hold z (fv_of dn2 data).
+  Proof.
+    intros Hs. rewrite (fv_of_size dn1 dn2 data Hs).
+    iIntros "H". iExact "H".
+  Qed.
+
+  Lemma fv_of_data (dn : dinode) (data1 data2 : nat -> list (bv 8)) :
+    (forall k, data1 k = data2 k) -> fv_of dn data1 = fv_of dn data2.
+  Proof.
+    intros Hd. rewrite /fv_of.
+    f_equal. apply functional_extensionality. exact Hd.
+  Qed.
+
+  Lemma fv_agree (z : Z) (dq1 dq2 : dfrac) (b1 b2 : list (bv 8)) :
+    fv_half z dq1 b1 -∗ fv_half z dq2 b2 -∗ ⌜b1 = b2⌝.
+  Proof.
+    rewrite /fv_half. iIntros "H1 H2".
+    iDestruct (own_valid_2 with "H1 H2") as %Hv.
+    rewrite singleton_op singleton_valid in Hv.
+    iPureIntro. by apply dfrac_agree_op_valid_L in Hv as [_ ->].
+  Qed.
+
+  Lemma fv_set (z : Z) (b b' : list (bv 8)) :
+    fv_hold z b ==∗ fv_hold z b'.
+  Proof.
+    rewrite /fv_hold /fv_half. iIntros "H".
+    iApply (own_update with "H").
+    apply singleton_update, cmra_update_exclusive.
+    split; done.
+  Qed.
+
+  Lemma fv_split (z : Z) (dq1 dq2 : dfrac) (b : list (bv 8)) :
+    fv_half z (dq1 ⋅ dq2) b ⊣⊢ fv_half z dq1 b ∗ fv_half z dq2 b.
+  Proof.
+    rewrite /fv_half -own_op singleton_op.
+    by rewrite -dfrac_agree_op.
+  Qed.
+
+  Lemma fv_join (z : Z) (dq1 dq2 : dfrac) (b : list (bv 8)) :
+    fv_half z dq1 b -∗ fv_half z dq2 b -∗ fv_half z (dq1 ⋅ dq2) b.
+  Proof. iIntros "H1 H2". rewrite fv_split. iFrame. Qed.
+
+  Lemma fv_hold_excl (z : Z) (b1 b2 : list (bv 8)) :
+    fv_hold z b1 -∗ fv_hold z b2 -∗ False.
+  Proof.
+    rewrite /fv_hold /fv_half. iIntros "H1 H2".
+    iDestruct (own_valid_2 with "H1 H2") as %Hv.
+    rewrite singleton_op singleton_valid in Hv.
+    by apply exclusive_l in Hv; [| apply to_dfrac_agree_exclusive].
+  Qed.
+
+  (* [dv_boot_split]'s twin: [icfg_alloc]'s [VM] argument, taken apart. *)
+  Lemma fv_boot_split (P : gset Z) :
+    own icfg_fview (fview_boot_map P) ⊢ [∗ set] z ∈ P, fv_hold z [].
+  Proof.
+    rewrite /fview_boot_map
+            (gset_to_gmap_singletons (A := dfrac_agreeR (leibnizO (list (bv 8))))).
+    rewrite big_opS_own_1. iIntros "H".
+    iApply (big_sepS_mono with "H"). intros z _.
+    iIntros "H". rewrite /fv_hold /fv_half. iExact "H".
   Qed.
 
 End DirViewG.

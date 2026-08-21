@@ -324,6 +324,10 @@ Section FsCfgBootPool.
        one it is determined garbage the marker arm forgets. *)
     ([∗ set] z ∈ region_inums icfg_nib,
        dv_ride z (dv_of (fs_dinode P sb z) (fs_data_of P (fs_dinode P sb z)))) -∗
+    (* ...and the PER-FILE contents holds beside them (N-5.2A), at the same
+       keys, from the same sweep and with the same uniformity *)
+    ([∗ set] z ∈ region_inums icfg_nib,
+       fv_ride z (fv_of (fs_dinode P sb z) (fs_data_of P (fs_dinode P sb z)))) -∗
     (* [ireg_alloc]'s payout, verbatim: the fragment at a live inum, the
        marker at a free one *)
     ([∗ set] z ∈ region_inums icfg_nib,
@@ -339,7 +343,7 @@ Section FsCfgBootPool.
            fsblock γfs b (P b) ∗ blk_own γfs b).
   Proof.
     iIntros (Hwf Hrf Hfull Hnin Hnib HA Hcov HcovC)
-            "Hcnt Hmir Hoff Hdv Hout Hdlk Hfsb Hown".
+            "Hcnt Hmir Hoff Hdv Hfv Hout Hdlk Hfsb Hown".
     (* ---- the pure preliminaries, all from the sweeps' lookup specs --- *)
     pose proof (fsimg_wf_sb P sb Hwf) as Hsb.
     destruct (fsimg_wf_used P sb Hwf) as (u & _ & Hnd & _).
@@ -425,17 +429,27 @@ Section FsCfgBootPool.
       apply elem_of_difference in Hz as [Hz1 _].
       rewrite (region_inum_faithful icfg_nib z Hnib Hz1).
       iIntros "H". iExists _. iExact "H". }
+    iDestruct (big_sepS_split_sub _ (region_inums icfg_nib) A HARs
+                 with "Hfv") as "[HfvA HfvF]".
+    iAssert ([∗ set] z ∈ region_inums icfg_nib ∖ A,
+               ∃ b, fv_ride (bv_unsigned (mword_of_int z : mword 32)) b)%I
+      with "[HfvF]" as "HfvF".
+    { iApply (big_sepS_mono with "HfvF"). intros z Hz.
+      apply elem_of_difference in Hz as [Hz1 _].
+      rewrite (region_inum_faithful icfg_nib z Hnib Hz1).
+      iIntros "H". iExists _. iExact "H". }
     (* ---- the allocated arm, one named application per inum ----------- *)
     iDestruct (big_sepS_sep_2 with "HoutA Hdlk") as "Ha".
     iDestruct (big_sepS_sep_2 with "Ha Hpc") as "Ha".
     iDestruct (big_sepS_sep_2 with "Ha HdvA") as "Ha".
+    iDestruct (big_sepS_sep_2 with "Ha HfvA") as "Ha".
     iApply (ipool_alloc γfs γi cov (sb_logstart sb)
               (region_inums icfg_nib) A HARs
-              with "Hcnt Hmir Hoff [Ha] Hmk HdvF").
+              with "Hcnt Hmir Hoff [Ha] Hmk HdvF HfvF").
     iApply (big_sepS_mono with "Ha"). intros z Hz.
     rewrite (region_inum_faithful icfg_nib z Hnib (HAR z Hz)).
     rewrite /fs_inode_blocks_set.
-    iIntros "[[[Hreg Hdl] Hblks] Hdv]".
+    iIntros "[[[[Hreg Hdl] Hblks] Hdv] Hfv]".
     iExists (fs_dinode P sb z), (img_blkmap P (fs_dinode P sb z)),
             (fs_data_of P (fs_dinode P sb z)).
     iSplitR.
@@ -464,7 +478,8 @@ Section FsCfgBootPool.
     { iApply (ireg_out_alloc_inv γi (mword_of_int z : mword 32)
                 (fs_dinode P sb z) (Hty z Hz) with "Hreg"). }
     iSplitL "Hind"; [iExact "Hind" |].
-    iSplitL "Hblks"; [iExact "Hblks" | iExact "Hdv"].
+    iSplitL "Hblks"; [iExact "Hblks" |].
+    iSplitL "Hdv"; [iExact "Hdv" | iExact "Hfv"].
   Qed.
 
   (* ==================================================================== *)
@@ -1335,6 +1350,18 @@ Section FsCfgBootEra.
                (fs_data_of (fs_blocks dk)
                   (fs_dinode (fs_blocks dk) sb
                      (bv_unsigned InodeInv.ROOTINO)))) ∗
+      (* ---- N-5.2A: /init's CONTENTS PIN, the second new conjunct ----
+         The same move one level down: the stocking spends inum 7's fview
+         mint licence while it still holds that file's contents element
+         WHOLE, so the pin leaves boot naming the IMAGE's bytes of /init.
+         SEVEN is the image's own witness ([FsImgCheck.v:399],
+         [path_at .. ROOTINO [fname_init] = Some 7]) -- the very inum
+         N-5.1's theorem proves namei("/init") returns -- so the two pins
+         are about the same file and compose at the kexec walk (N-5.2B).
+         Its consumer discards it until then, exactly as root's does. *)
+      fv_pin 7
+        (fv_of (fs_dinode (fs_blocks dk) sb 7)
+               (fs_data_of (fs_blocks dk) (fs_dinode (fs_blocks dk) sb 7))) ∗
       ⌜icfg_dev = ROOTDEV⌝ ∗ ⌜icfg_nib = nib⌝ ∗
       ⌜icfg_ist = FsImg.sb_inodestart sb⌝ ∗
       ⌜fsc_uart = γd⌝ ∗ ⌜fsc_disk = γv⌝ ∗ ⌜fsc_cov = cov⌝ ∗
@@ -1356,13 +1383,14 @@ Section FsCfgBootEra.
             (frzo_boot_map (region_inums nib))
             (frzm_boot_map (region_inums nib))
             (dview_boot_map (region_inums nib))
+            (fview_boot_map (region_inums nib))
             γlog (FsImg.sb_inodestart sb)
             (link_boot_map_valid _) (icnt_boot_map_valid _)
             (frzo_boot_map_valid _) (frzm_boot_map_valid _)
-            (dview_boot_map_valid _))
+            (dview_boot_map_valid _) (fview_boot_map_valid _))
       as (ICFG g0) "(%Hdev & %Hnibq & %Hlogq & %Histq & Hiref & Hlive &
-                     Hlk & Hcnt & Hfrzo & Hfrzm & Hdv & Hboot & Hep & Hisl &
-                     Hrauth)".
+                     Hlk & Hcnt & Hfrzo & Hfrzm & Hdv & Hfv & Hboot & Hep &
+                     Hisl & Hrauth)".
     (* every ambient form below is stated at [icfg_nib]; make the caller's
        [nib] BE it, so no lemma has to be re-instantiated *)
     symmetry in Hnibq. subst nib.
@@ -1458,6 +1486,22 @@ Section FsCfgBootEra.
                        (fs_data_of (fs_blocks dk)
                           (fs_dinode (fs_blocks dk) sb z)))
                with "H"). }
+    (* ...AND THE PER-FILE CONTENTS GHOST, THE SAME SWEEP (N-5.2A, D-52b).
+       Same [∅]-to-image move, same whole ownership, same stop at the WHOLE
+       [fv_hold] so that inum 7's lend can be cut after [ireg_alloc]. *)
+    iDestruct (fv_boot_split (region_inums icfg_nib) with "Hfv") as "Hfv".
+    iAssert (|==> [∗ set] z ∈ region_inums icfg_nib,
+                    fv_hold z (fv_of (fs_dinode (fs_blocks dk) sb z)
+                                 (fs_data_of (fs_blocks dk)
+                                    (fs_dinode (fs_blocks dk) sb z))))%I
+      with "[Hfv]" as ">Hfv".
+    { iApply big_sepS_bupd. iApply (big_sepS_mono with "Hfv").
+      intros z _. iIntros "H".
+      iApply (fv_set z []
+                (fv_of (fs_dinode (fs_blocks dk) sb z)
+                       (fs_data_of (fs_blocks dk)
+                          (fs_dinode (fs_blocks dk) sb z)))
+               with "H"). }
     iDestruct (region_of_seq (fun z => mono_nat_auth_own (icfg_iep z) 1 0)
                  icfg_nib with "Hep") as "Hep".
     iDestruct (live_boot_split g0 with "Hlive") as "Hlive".
@@ -1498,7 +1542,8 @@ Section FsCfgBootEra.
                   exact (image_ireg_premises (fs_blocks dk) sb dss icfg_nib
                            Hwf Hrw Hdl Hdwf Hde Hnib32))
             with "Hla HcntR Hrcpt HmirR Hep Hbireg Hboot Hrauth")
-      as (γi dss) "(%Hdl & %Hdwf & %Hde & Hireginv & Hboot & Hlics & Hout)".
+      as (γi dss) "(%Hdl & %Hdwf & %Hde & Hireginv & Hboot & Hlics & Hflics &
+                    Hout)".
     iDestruct "Hireginv" as "#Hireginv".
     (* ================================================================== *)
     (* ---- N-5.1 (W5a): THE BOOT MINT -------------------------------- *)
@@ -1532,6 +1577,25 @@ Section FsCfgBootEra.
                          (bv_unsigned InodeInv.ROOTINO))))
             HiregE Hrootdom
             with "Hireginv Hlicr Hdvr") as "[Hrider Hpinr]".
+    (* ---- N-5.2A: /INIT'S CONTENTS MINT, at the same instant --------
+       The fview sweep also stopped at the WHOLE [fv_hold], and
+       [ireg_alloc] paid out one fview licence per inum beside the dview
+       ones, so inum 7's lend is cut here and nowhere else: the ONLY
+       [fv_lend_mint] call site in the tree.  Every other inum's fview
+       licence is dropped, for root's licence's reason verbatim. *)
+    assert (Hinitin : (7 : Z) ∈ region_inums icfg_nib)
+      by (apply region_inums_spec; lia).
+    assert (Hinitdom : dvl_dom (7 : Z))
+      by (rewrite /dvl_dom; lia).
+    iDestruct (big_sepS_delete _ _ _ Hinitin with "Hflics") as "[Hflicr Hflics]".
+    iClear "Hflics".
+    iDestruct (big_sepS_delete _ _ _ Hinitin with "Hfv") as "[Hfvr Hfv]".
+    iMod (fv_lend_mint E γi γfs (FsImg.sb_inodestart sb) icfg_nib (7 : Z)
+            (fv_of (fs_dinode (fs_blocks dk) sb 7)
+                   (fs_data_of (fs_blocks dk)
+                      (fs_dinode (fs_blocks dk) sb 7)))
+            HiregE Hinitdom
+            with "Hireginv Hflicr Hfvr") as "[Hfrider Hfpinr]".
     (* the custody chain, back as ONE big-op: the ¾ arm at root, the whole
        arm everywhere else *)
     iAssert ([∗ set] z ∈ region_inums icfg_nib,
@@ -1544,6 +1608,17 @@ Section FsCfgBootEra.
       iSplitL "Hrider"; [rewrite /dv_ride; iRight; iExact "Hrider" |].
       iApply (big_sepS_mono with "Hdv"). intros z _. iIntros "H".
       iApply (dv_ride_of_hold with "H"). }
+    (* ...and the fview chain the same way: the ¾ arm at inum 7, the whole
+       arm everywhere else *)
+    iAssert ([∗ set] z ∈ region_inums icfg_nib,
+               fv_ride z (fv_of (fs_dinode (fs_blocks dk) sb z)
+                            (fs_data_of (fs_blocks dk)
+                               (fs_dinode (fs_blocks dk) sb z))))%I
+      with "[Hfv Hfrider]" as "Hfv".
+    { rewrite (big_sepS_delete _ (region_inums icfg_nib) (7 : Z) Hinitin).
+      iSplitL "Hfrider"; [rewrite /fv_ride; iRight; iExact "Hfrider" |].
+      iApply (big_sepS_mono with "Hfv"). intros z _. iIntros "H".
+      iApply (fv_ride_of_hold with "H"). }
     (* the payout is at the DECODED record; restate it at [FsImg]'s own *)
     iAssert ([∗ set] z ∈ region_inums icfg_nib,
                ireg_out γi (mword_of_int z : mword 32)
@@ -1567,7 +1642,7 @@ Section FsCfgBootEra.
                  (fs_live_set (fs_blocks dk) sb)
                  Hwf (fs_region_wf_free _ _ _ Hrw) Hfull Hnin Hnib32
                  (fs_live_set_elem_of (fs_blocks dk) sb) Hcovdata HcovC
-                 with "HcntP HmirP Hoff Hdv Hout Hdlk HfsbC HownC")
+                 with "HcntP HmirP Hoff Hdv Hfv Hout Hdlk HfsbC HownC")
       as "[Hipool Hrem]".
     (* ---- 7b. DEBT (D): the bitmap block and the free pool ------------ *)
     (* every member of [fs_bitmap_spent] survives all four peels: it is
@@ -1663,6 +1738,7 @@ Section FsCfgBootEra.
     rewrite Hset.
     (* ---- N-5.1 (W5a): root's pin, the post's first conjunct ---- *)
     iSplitL "Hpinr"; [iExact "Hpinr" |].
+    iSplitL "Hfpinr"; [iExact "Hfpinr" |].
     (* ---- the ten ties ---- *)
     iSplitR; [iPureIntro; reflexivity |].
     iSplitR; [iPureIntro; reflexivity |].

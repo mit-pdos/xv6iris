@@ -406,10 +406,10 @@ Section ProofSysOpenBody.
     (inode_meta (ientry k) dn -∗ ic_loaded gfs gi cov logstart k inum dn bm).
   Proof.
     iIntros "(%data & %Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hl & Hd & Hm & Ha & Hr &
-             Hb & Hv)".
+             Hb & Hv & Hw)".
     iFrame "Hm". iIntros "Hm".
     iApply (ic_mk_loaded gfs gi cov logstart k inum dn bm data Hok Hdok Hddix
-              Hdoc Hduq with "Hl Hd Hm Ha Hr Hb Hv").
+              Hdoc Hduq with "Hl Hd Hm Ha Hr Hb Hv Hw").
   Qed.
 
   Local Lemma so_type_acc (ip : mword 64) (dn : dinode) :
@@ -976,7 +976,7 @@ Section ProofSysOpenBody.
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
     (* the locked record, opened whole for the one callee that rewrites it *)
     iDestruct (so_loaded_open with "Hload")
-      as (data) "(%Hok & %Hdok & Hlnk & Hat & Hmeta & Hmap & Hblk & Hdv)".
+      as (data) "(%Hok & %Hdok & Hlnk & Hat & Hmeta & Hmap & Hblk & Hdv & Hfv)".
     destruct Hok as (Hbwf & Hbcov & Haddrs & Htynz & Hszcap & Hholes & Hsized).
     iDestruct (proc_priv_core_bare_acc with "Hcore") as "[Hpbare Hcback]".
     iApply (Itrunc.wp_itrunc_sconf (CID := CID15) gs jx gl gu gd gk pd pav pu
@@ -1018,12 +1018,14 @@ Section ProofSysOpenBody.
        this inode's bytes and truncated its record, so the hold moves with
        them.  The fragment is WHOLE, so this is one free own-update. *)
     iApply fupd_wp.
-    iMod (dv_set_rt ⊤ _ _ _ _ (bv_unsigned inum) (dv_of dn data)
+    iMod (dvw_set_rt ⊤ _ _ _ _ (bv_unsigned inum) (dv_of dn data)
             (dv_of (di_trunc dn) (fun _ => replicate BSIZE (bv_0 8)))
-            ltac:(solve_ndisj) with "Hireg Hdv") as "Hdv".
+            (fv_of dn data)
+            (fv_of (di_trunc dn) (fun _ => replicate BSIZE (bv_0 8)))
+            ltac:(solve_ndisj) with "Hireg Hdv Hfv") as "[Hdv Hfv]".
     iModIntro.
     iDestruct (so_trunc_loaded gfs gi cov logstart kk inum dn Htynz Htynd
-                 with "Hat Hmeta Hmap Hblk Hdv") as "Hload".
+                 with "Hat Hmeta Hmap Hblk Hdv Hfv") as "Hload".
     (* ===== +0x154 c.j +0xb8 ===== *)
     iApply (wp_cj_s_sconf (CID := CID16) (mword_of_int (SO + 0x154))
               (sign_extend' 21 (concat_vec (mword_of_int 1970 : mword 11) ('b"0")))

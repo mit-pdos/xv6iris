@@ -2289,8 +2289,22 @@ Section InodeRegion.
      that is never tied to [icfg_nib] by their contract, so a premise
      [nib = icfg_nib] would have been unpayable there.  Boot builds the
      family at [icfg_nib] because [ireg_alloc] is called at it. *)
+  (* N-5.2A (§13 D-52c): the column is now a PAIR -- the directory-contents
+     lend and the file-contents lend of the same inum, side by side.  Bundling
+     them here rather than adding a second conjunct to [ireg_registry] is what
+     keeps [ireg_registry]'s text, [ireg_registry_from_map]'s arity and
+     [EscrowDeposit]'s rebind byte-identical: the two ghosts are independent
+     (their four registry key families are disjoint by residue,
+     [DirViewLend] §0), so nothing relates the two halves and the pair is
+     purely a packaging choice. *)
+  Definition ireg_lcols (z : Z) : iProp Σ :=
+    (dv_lcol z ∗ fv_lcol z)%I.
+
   Definition ireg_lends : iProp Σ :=
-    ([∗ list] k ∈ seq 0 (16 * icfg_nib), dv_lcol (Z.of_nat k))%I.
+    ([∗ list] k ∈ seq 0 (16 * icfg_nib), ireg_lcols (Z.of_nat k))%I.
+
+  Global Instance ireg_lcols_timeless z : Timeless (ireg_lcols z).
+  Proof. rewrite /ireg_lcols. apply _. Qed.
 
   Definition ireg_registry (nib : nat) : iProp Σ :=
     (∃ mr : gmap Z (gname * gname),
@@ -2322,7 +2336,7 @@ Section InodeRegion.
      [seq]-indexing meets the lend's [Z] keying. *)
   Lemma ireg_lends_acc (z : Z) :
     dvl_dom z ->
-    ireg_lends -∗ dv_lcol z ∗ (dv_lcol z -∗ ireg_lends).
+    ireg_lends -∗ ireg_lcols z ∗ (ireg_lcols z -∗ ireg_lends).
   Proof.
     rewrite /dvl_dom. intros Hz. rewrite /ireg_lends. iIntros "Hs".
     assert (Hi : seq 0 (16 * icfg_nib) !! Z.to_nat z = Some (Z.to_nat z)).
@@ -5010,12 +5024,12 @@ Section InodeRegion.
   (* the shared plumbing: open the region, hand the caller this inum's
      column, take it back, close.  Stated as a bupd-transformer so the three
      operations below are one line each. *)
-  Lemma ireg_lcol_use (E : coPset) (γi : gname) (γfs : fs_names)
+  Lemma ireg_lcols_use (E : coPset) (γi : gname) (γfs : fs_names)
       (inodestart : Z) (nib : nat) (z : Z) (Q : iProp Σ) :
     ↑iregN ⊆ E ->
     dvl_dom z ->
     ireg_inv γi γfs inodestart nib -∗
-    (dv_lcol z ==∗ dv_lcol z ∗ Q) ={E}=∗ Q.
+    (ireg_lcols z ==∗ ireg_lcols z ∗ Q) ={E}=∗ Q.
   Proof.
     iIntros (HE Hz) "#Hinv Hmove".
     iMod (inv_acc E iregN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
@@ -5028,6 +5042,37 @@ Section InodeRegion.
     { iNext. iExists m. iFrame "Ha Hblks".
       iExists mr. iSplitR; [done |]. iFrame. }
     iModIntro. iExact "HQ".
+  Qed.
+
+  (* ...and the two single-column forms the operations below actually use.
+     Each frames the OTHER ghost's column straight through, which is the
+     whole content of "the two lends are independent". *)
+  Lemma ireg_lcol_use (E : coPset) (γi : gname) (γfs : fs_names)
+      (inodestart : Z) (nib : nat) (z : Z) (Q : iProp Σ) :
+    ↑iregN ⊆ E ->
+    dvl_dom z ->
+    ireg_inv γi γfs inodestart nib -∗
+    (dv_lcol z ==∗ dv_lcol z ∗ Q) ={E}=∗ Q.
+  Proof.
+    iIntros (HE Hz) "#Hinv Hmove".
+    iApply (ireg_lcols_use E γi γfs inodestart nib z with "Hinv");
+      [exact HE | exact Hz |].
+    iIntros "[Hd Hf]". iMod ("Hmove" with "Hd") as "[Hd $]".
+    iModIntro. rewrite /ireg_lcols. iFrame.
+  Qed.
+
+  Lemma ireg_fcol_use (E : coPset) (γi : gname) (γfs : fs_names)
+      (inodestart : Z) (nib : nat) (z : Z) (Q : iProp Σ) :
+    ↑iregN ⊆ E ->
+    dvl_dom z ->
+    ireg_inv γi γfs inodestart nib -∗
+    (fv_lcol z ==∗ fv_lcol z ∗ Q) ={E}=∗ Q.
+  Proof.
+    iIntros (HE Hz) "#Hinv Hmove".
+    iApply (ireg_lcols_use E γi γfs inodestart nib z with "Hinv");
+      [exact HE | exact Hz |].
+    iIntros "[Hd Hf]". iMod ("Hmove" with "Hf") as "[Hf $]".
+    iModIntro. rewrite /ireg_lcols. iFrame.
   Qed.
 
   (* THE MINT.  Whoever holds a directory's whole contents element and this
@@ -5099,6 +5144,107 @@ Section InodeRegion.
     iIntros "Hcol".
     iMod (dv_col_redeem z e ents dqv with "Hpin Hdv Hcol") as "[$ $]".
     by iModIntro.
+  Qed.
+
+  (* ==================================================================== *)
+  (*  §LF.  THE fview LEND'S THREE OPERATIONS (N-5.2A, §13 D-52c)          *)
+  (* ==================================================================== *)
+
+  (*  §L's three, at the file-contents column.  Same signatures, same
+      [ireg_inv] argument, same absence of an inum-range premise (the bound
+      is [DirViewLend.dvl_dom], carried by the fview tokens too), same
+      totality of the writer's move.  The fview lend's consumer is the kexec
+      walk (N-5.2B); the mint's is [FsCfgBoot]'s stocking, at inum 7.       *)
+
+  Lemma fv_lend_mint (E : coPset) (γi : gname) (γfs : fs_names)
+      (inodestart : Z) (nib : nat) (z : Z) (b : list (bv 8)) :
+    ↑iregN ⊆ E ->
+    dvl_dom z ->
+    ireg_inv γi γfs inodestart nib -∗ fv_lic z -∗ fv_hold z b ={E}=∗
+      (fv_half z (DfracOwn (3/4)) b ∗ fv_lentm z b) ∗ fv_pin z b.
+  Proof.
+    iIntros (HE Hdom) "#Hinv Hlic Hw".
+    iApply (ireg_fcol_use E γi γfs inodestart nib z with "Hinv");
+      [exact HE | exact Hdom |].
+    iIntros "Hcol".
+    iMod (fv_col_mint z b Hdom with "Hlic Hw Hcol") as "[$ $]".
+    by iModIntro.
+  Qed.
+
+  Lemma fv_set_rt (E : coPset) (γi : gname) (γfs : fs_names)
+      (inodestart : Z) (nib : nat) (z : Z) (b b' : list (bv 8)) :
+    ↑iregN ⊆ E ->
+    ireg_inv γi γfs inodestart nib -∗ fv_ride z b ={E}=∗ fv_ride z b'.
+  Proof.
+    iIntros (HE) "#Hinv H". rewrite {1}/fv_ride.
+    iDestruct "H" as "[Hw|[H34 Hm]]".
+    - iMod (fv_set with "Hw") as "Hw". iModIntro. by iApply fv_ride_of_hold.
+    - iDestruct "Hm" as "[%Hdom Hm']".
+      iAssert (fv_lentm z b)%I with "[Hm']" as "Hm".
+      { rewrite /fv_lentm. iSplitR; [by iPureIntro |]. iExact "Hm'". }
+      iApply (ireg_fcol_use E γi γfs inodestart nib z with "Hinv");
+        [exact HE | exact Hdom |].
+      iIntros "Hcol".
+      iMod (fv_col_set z b b' with "H34 Hm Hcol") as "[$ Hw]".
+      iModIntro. by iApply fv_ride_of_hold.
+  Qed.
+
+  Lemma fv_pin_redeem (E : coPset) (γi : gname) (γfs : fs_names)
+      (inodestart : Z) (nib : nat) (z : Z) (b : list (bv 8))
+      (dqv : dfrac) (bs : list (bv 8)) :
+    ↑iregN ⊆ E ->
+    ireg_inv γi γfs inodestart nib -∗
+    fv_pin z b -∗ fv_half z dqv bs ={E}=∗
+      fv_half z dqv bs ∗
+      ((⌜bs = b⌝ ∗ fv_pin_spent z b) ∨ fv_cancelled z b).
+  Proof.
+    iIntros (HE) "#Hinv Hpin Hfv".
+    iDestruct "Hpin" as "[%Hdom Hpin']".
+    iAssert (fv_pin z b)%I with "[Hpin']" as "Hpin".
+    { rewrite /fv_pin. iSplitR; [by iPureIntro |]. iExact "Hpin'". }
+    iApply (ireg_fcol_use E γi γfs inodestart nib z with "Hinv");
+      [exact HE | exact Hdom |].
+    iIntros "Hcol".
+    iMod (fv_col_redeem z b bs dqv with "Hpin Hfv Hcol") as "[$ $]".
+    by iModIntro.
+  Qed.
+
+  (* ==================================================================== *)
+  (*  §LW.  THE COMBINED MOVERS (N-5.2A, §13 D-52b)                        *)
+  (* ==================================================================== *)
+
+  (*  EVERY BYTE-WRITE RE-PACK MOVES BOTH GHOSTS.  A directory write changes
+      the garbage [fv_of] reads off the same bytes, and a file write changes
+      the garbage [dv_of] reads off them; neither ghost is type-guarded, so
+      the honest statement at every mover site is "both, at the new record's
+      own readings".  These two wrappers are what keep such a site ONE line
+      after the sweep -- the dv-only forms stay for Phase B's byte-stability
+      and are what these are built out of.                                 *)
+
+  Lemma dvw_set_rt (E : coPset) (γi : gname) (γfs : fs_names)
+      (inodestart : Z) (nib : nat) (z : Z)
+      (e e' : gmap fname Z) (b b' : list (bv 8)) :
+    ↑iregN ⊆ E ->
+    ireg_inv γi γfs inodestart nib -∗
+    dv_ride z e -∗ fv_ride z b ={E}=∗ dv_ride z e' ∗ fv_ride z b'.
+  Proof.
+    iIntros (HE) "#Hinv Hd Hf".
+    iMod (dv_set_rt E γi γfs inodestart nib z e e' HE with "Hinv Hd") as "$".
+    by iMod (fv_set_rt E γi γfs inodestart nib z b b' HE with "Hinv Hf") as "$".
+  Qed.
+
+  (* ...and the size-preserving form, for the re-packs whose record move
+     leaves [di_size] alone ([DirViewLend.dv_ride_size] and its twin, taken
+     together): there BOTH readings are unchanged and no fupd is needed at
+     all -- the resource is simply re-typed. *)
+  Lemma dvw_ride_size (z : Z) (dn1 dn2 : dinode) (data : nat -> list (bv 8)) :
+    di_size dn1 = di_size dn2 ->
+    dv_ride z (dv_of dn1 data) -∗ fv_ride z (fv_of dn1 data) -∗
+    dv_ride z (dv_of dn2 data) ∗ fv_ride z (fv_of dn2 data).
+  Proof.
+    intros Hs. iIntros "Hd Hf".
+    iSplitL "Hd"; [iApply (dv_ride_size z dn1 dn2 data Hs with "Hd")
+                  | iApply (fv_ride_size z dn1 dn2 data Hs with "Hf")].
   Qed.
 
 End InodeRegion.

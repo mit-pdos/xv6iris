@@ -195,11 +195,13 @@ Section EscrowInode.
      [dv_hold]: the tie to the bytes exists only where the bytes do
      ([ipool_alloc], [ic_loaded]), so a byte-less arm holds the element at a
      forgotten value and the next fill sets it.  Without it this arm's redeem
-     to an [imark] would have to conjure the hold. *)
+     to an [imark] would have to conjure the hold.
+     N-5.2A: and the per-FILE contents hold beside it, untied for the same
+     reason and carried the same way (namei-pinned-lookup.md §13). *)
   Definition pool_pending (γi : gname) (z : Z) : iProp Σ :=
     (∃ ge gr gd (rg : bool),
        escA_inv ge gr gd γi z rg ∗ committedA ge ∗ redeem_ticketA gr ∗
-       (∃ e, dv_ride z e))%I.
+       (∃ e, dv_ride z e) ∗ (∃ b, fv_ride z b))%I.
   (* NOT Timeless: [escA_inv] is an [inv].  Wherever [ipool_shape] must stay
      Timeless, its pending arm is opened without the [>] later-strip. *)
 

@@ -1363,7 +1363,7 @@ Section ProofSysLinkBody.
             by exact (sl_regs_s1 _ _ _ _ _ Hilregs).
           iDestruct "Hload" as (dat)
             "(%Hiok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlnk & Hdiat & Hmeta & Haddrs & Hind &
-              Hblocks & Hdview)".
+              Hblocks & Hdview & Hfview)".
           iDestruct "Hmeta" as "(Hity & Himaj & Himin & Hinl & Hisz)".
           iEval (rewrite /i_type) in "Hity".
           iEval (rewrite /i_nlink) in "Hinl".
@@ -1423,7 +1423,8 @@ Section ProofSysLinkBody.
              iIntros (CID31 Hq31). iApply bi.later_intro. iIntros "Hcg Hpc".
              iEval (rewrite Htgc6) in "Hpc".
              iAssert (ic_loaded gfs gi cov logstart kk inum dn bm)
-               with "[Hdiat Hity Himaj Himin Hinl Hisz Haddrs Hind Hblocks Hdlnk Hdview]"
+               with "[Hdiat Hity Himaj Himin Hinl Hisz Haddrs Hind Hblocks Hdlnk Hdview
+                      Hfview]"
                as "Hload".
              { rewrite /ic_loaded. iExists dat.
                iSplitR; [iPureIntro; exact Hiok |].
@@ -1574,7 +1575,7 @@ Section ProofSysLinkBody.
                 iEval (rewrite Htgd6) in "Hpc".
                 iAssert (ic_loaded gfs gi cov logstart kk inum dn bm)
                   with "[Hdiat Hity Himaj Himin Hinl Hisz Haddrs Hind Hblocks
-                         Hdlnk Hdview]" as "Hload".
+                         Hdlnk Hdview Hfview]" as "Hload".
                 { rewrite /ic_loaded. iExists dat.
                   iSplitR; [iPureIntro; exact Hiok |].
                   iSplitR; [iPureIntro; exact Hdok |].
@@ -1856,8 +1857,10 @@ Section ProofSysLinkBody.
                    and the hold needs no update (§9 W3, [dv_of_size]). *)
                 iEval (rewrite (dv_of_size dn (sl_incnl dn) dat
                                   (eq_sym (sl_setnl_size dn _)))) in "Hdview".
+                iEval (rewrite (fv_of_size dn (sl_incnl dn) dat
+                                  (eq_sym (sl_setnl_size dn _)))) in "Hfview".
                 iAssert (ic_loaded gfs gi cov logstart kk inum (sl_incnl dn) bm)
-                  with "[Hdlnk2 Hdiat Hmeta Hmap Hblocks Hdview]" as "Hload".
+                  with "[Hdlnk2 Hdiat Hmeta Hmap Hblocks Hdview Hfview]" as "Hload".
                 { rewrite /ic_loaded. iExists dat.
                   iSplitR;
                     [iPureIntro; exact (sl_setnl_inode_ok cov logstart dn bm dat _ Hiok) |].
@@ -1877,7 +1880,8 @@ Section ProofSysLinkBody.
                      exact (sl_tdir_zne _ Hty) |].
                   iSplitL "Hdlnk2"; [iExact "Hdlnk2" |].
                   iFrame "Hdiat Hmeta". rewrite /inode_map.
-                  iDestruct "Hmap" as "[Ha Hi]". iFrame "Ha Hi Hblocks Hdview". }
+                  iDestruct "Hmap" as "[Ha Hi]".
+                  iFrame "Ha Hi Hblocks Hdview Hfview". }
                 iClear "Hdlnk".
                 (* ===== +0x6a c.mv a0,s1 ===== *)
                 iApply (wp_cmv_s_sconf (CID := CID41) (mword_of_int (SL + 0x6a))
@@ -2200,7 +2204,7 @@ Section ProofSysLinkBody.
                      by (symmetry; exact Htyd0).
                    iDestruct "Hloadd" as (datd)
                      "(%Hdiok & %Hddok & %Hddixd & %Hdocd & %Hduqd & Hdlnkd & Hdiatd &
-                       Hmetad & Haddrsd & Hindd & Hblocksd & Hdviewd)".
+                       Hmetad & Haddrsd & Hindd & Hblocksd & Hdviewd & Hfviewd)".
                    (* ============================================================ *)
                    (*  THE ORPHAN GUARD, +0x84 .. +0x88 (xv6 f60ff58).              *)
                    (*                                                              *)
@@ -2273,7 +2277,7 @@ Section ProofSysLinkBody.
                      iDestruct (ic_mk_loaded gfs gi cov logstart kd dinum dnd bmd
                                   datd Hdiok Hddok Hddixd Hdocd Hduqd
                                   with "Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd
-                                        Hdviewd")
+                                        Hdviewd Hfviewd")
                        as "Hloadd".
                      iDestruct (sl_bs3 with "[Hbs1d Hbs2d]") as "Hbsl";
                        [iSplitL "Hbs1d"; [iExact "Hbs1d" | iExact "Hbs2d"] |].
@@ -2634,7 +2638,8 @@ Section ProofSysLinkBody.
                        iEval (rewrite Htgee_a0) in "Hpc".
                        subst bmd' datd' dnd' dnd0'.
                        iAssert (ic_loaded gfs gi cov logstart kd dinum dnd bmd)
-                         with "[Hdlnkd Hdiatd Hmetad Hmapd Hblocksd Hdviewd]" as "Hloadd".
+                         with "[Hdlnkd Hdiatd Hmetad Hmapd Hblocksd Hdviewd Hfviewd]"
+                           as "Hloadd".
                        { rewrite /ic_loaded. iExists datd.
                          iSplitR; [iPureIntro; exact Hdiok |].
                          iSplitR; [iPureIntro; exact Hddok |].
@@ -2644,7 +2649,7 @@ Section ProofSysLinkBody.
                          iSplitL "Hdlnkd"; [iExact "Hdlnkd" |].
                          iFrame "Hdiatd Hmetad". rewrite /inode_map.
                          iDestruct "Hmapd" as "[Ha Hi]".
-                         iFrame "Ha Hi Hblocksd Hdviewd". }
+                         iFrame "Ha Hi Hblocksd Hdviewd Hfviewd". }
                        (* the generation is ALREADY in hand: [iunlock] hands [gsh] back
                           (SpecIunlock's amended post), so the tail re-[ilock]s under the
                           very generation the [ity_shot] above names. *)
@@ -2868,13 +2873,16 @@ Section ProofSysLinkBody.
                                CLIENT's business (N-3/N-4), not the
                                carrier's. *)
                             iApply fupd_wp.
-                            iMod (dv_set_rt ⊤ _ _ _ _ (bv_unsigned dinum)
+                            iMod (dvw_set_rt ⊤ _ _ _ _ (bv_unsigned dinum)
                                     (dv_of dnd datd) (dv_of dnd' datd')
+                                    (fv_of dnd datd) (fv_of dnd' datd')
                                     ltac:(solve_ndisj)
-                                   with "Hireg Hdviewd") as "Hdviewd".
+                                   with "Hireg Hdviewd Hfviewd")
+                              as "[Hdviewd Hfviewd]".
                             iModIntro.
                             iAssert (ic_loaded gfs gi cov logstart kd dinum dnd' bmd')
-                              with "[Hdlnkd' Hdiatd Hmetad Hmapd Hblocksd Hdviewd]"
+                              with "[Hdlnkd' Hdiatd Hmetad Hmapd Hblocksd Hdviewd
+                                     Hfviewd]"
                               as "Hloadd".
                             { rewrite /ic_loaded. iExists datd'.
                               iSplitR; [iPureIntro; exact Hdiok' |].
@@ -2886,7 +2894,7 @@ Section ProofSysLinkBody.
                               rewrite Hdn0e. iFrame "Hdiatd Hmetad".
                               rewrite /inode_map.
                               iDestruct "Hmapd" as "[Ha Hi]".
-                              iFrame "Ha Hi Hblocksd Hdviewd". }
+                              iFrame "Ha Hi Hblocksd Hdviewd Hfviewd". }
                             iAssert (ity_shot gyd (di_type dnd')) as "#Hshotd3".
                             { rewrite Htyeq. iExact "Hshotd2". }
                             destruct (Hmemtrio Htotpos)
@@ -3269,13 +3277,16 @@ Section ProofSysLinkBody.
                                CLIENT's business (N-3/N-4), not the
                                carrier's. *)
                             iApply fupd_wp.
-                            iMod (dv_set_rt ⊤ _ _ _ _ (bv_unsigned dinum)
+                            iMod (dvw_set_rt ⊤ _ _ _ _ (bv_unsigned dinum)
                                     (dv_of dnd datd) (dv_of dnd' datd')
+                                    (fv_of dnd datd) (fv_of dnd' datd')
                                     ltac:(solve_ndisj)
-                                   with "Hireg Hdviewd") as "Hdviewd".
+                                   with "Hireg Hdviewd Hfviewd")
+                              as "[Hdviewd Hfviewd]".
                             iModIntro.
                             iAssert (ic_loaded gfs gi cov logstart kd dinum dnd' bmd')
-                              with "[Hdlnkd' Hdiatd Hmetad Hmapd Hblocksd Hdviewd]"
+                              with "[Hdlnkd' Hdiatd Hmetad Hmapd Hblocksd Hdviewd
+                                     Hfviewd]"
                               as "Hloadd".
                             { rewrite /ic_loaded. iExists datd'.
                               iSplitR; [iPureIntro; exact Hdiok' |].
@@ -3287,7 +3298,7 @@ Section ProofSysLinkBody.
                               rewrite Hdn0e. iFrame "Hdiatd Hmetad".
                               rewrite /inode_map.
                               iDestruct "Hmapd" as "[Ha Hi]".
-                              iFrame "Ha Hi Hblocksd Hdviewd". }
+                              iFrame "Ha Hi Hblocksd Hdviewd Hfviewd". }
                             iAssert (ity_shot gyd (di_type dnd')) as "#Hshotd3".
                             { rewrite Htyeq. iExact "Hshotd2". }
                             assert (Hiu3 : (iput_units <= n3)%nat)

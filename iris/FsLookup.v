@@ -1060,7 +1060,7 @@ Section FsLookupDots.
     intros Hty. rewrite /ic_loaded.
     iIntros "H". iDestruct "H" as (data)
       "(%Hiok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlnk & Hdiat & Hmeta &
-        Haddrs & Hind & Hblocks & Hdv)".
+        Haddrs & Hind & Hblocks & Hdv & Hfv)".
     assert (Hrep : node_rep (NDir (dir_view data (dnrec dn))) dn data).
     { unfold node_rep, dnrec. split_and!;
         [exact Hty | exact (Hduq Hty) | reflexivity]. }
@@ -1078,7 +1078,7 @@ Section FsLookupDots.
     iSplitR; [iPureIntro; exact Hddix |].
     iSplitR; [iPureIntro; exact Hdoc |].
     iSplitR; [iPureIntro; exact Hduq |].
-    iFrame "Hdlnk Hdiat Hmeta Haddrs Hind Hblocks Hdv".
+    iFrame "Hdlnk Hdiat Hmeta Haddrs Hind Hblocks Hdv Hfv".
   Qed.
 
   (* ...and the [fnode] form, which is what a client of F1b asks for. *)

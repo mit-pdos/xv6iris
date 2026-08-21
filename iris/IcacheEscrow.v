@@ -489,7 +489,13 @@ Section IcacheEscrow.
           conjunct is a value and not a guarded claim.  Of a FILE the value is
           determined garbage; no client reads it and no site proves anything
           about it. *)
-       dv_ride (bv_unsigned inum) (dv_of dn0 data0))%I.
+       dv_ride (bv_unsigned inum) (dv_of dn0 data0) ∗
+       (* ...AND ITS PER-FILE TWIN (namei-pinned-lookup.md §13, N-5.2A),
+          beside it and tied the same way.  Of a DIRECTORY this value is
+          determined garbage exactly as [dv_of] is of a file: neither ghost
+          is type-guarded, and every byte-write re-pack moves BOTH by one
+          [InodeRegion.dvw_set_rt] (D-52b). *)
+       fv_ride (bv_unsigned inum) (fv_of dn0 data0))%I.
 
   (* OPTION A: the NON-PENDING (Timeless) pool shape -- the ORIGINAL two-arm
      shape, unchanged.  It is what the escrow's parked bundle [ic_unloaded]
@@ -504,7 +510,8 @@ Section IcacheEscrow.
            (namei-pinned-lookup.md §9 W2): a tied->untied peel forgets the
            value, and the fill that re-ties it [dv_set]s to the fresh
            record's own [dv_of]. *)
-        ∃ e, dv_ride (bv_unsigned inum) e))%I.
+        (∃ e, dv_ride (bv_unsigned inum) e) ∗
+        (∃ b, fv_ride (bv_unsigned inum) b)))%I.
 
   (* THE AWAIT ARM (iclaim-ledger.md §1.2/§1.3): the entry a FREER has parked
      on its way to the off-lock deposit.  It is the whole point of B2's
@@ -553,7 +560,8 @@ Section IcacheEscrow.
      find the inum's [dv_ride] somewhere. *)
   Definition pool_await (γi : gname) (z : Z) : iProp Σ :=
     (∃ ge gr gd (rg : bool),
-       escA_inv ge gr gd γi z rg ∗ redeem_ticketA gr ∗ (∃ e, dv_ride z e))%I.
+       escA_inv ge gr gd γi z rg ∗ redeem_ticketA gr ∗
+       (∃ e, dv_ride z e) ∗ (∃ b, fv_ride z b))%I.
 
   (* the PENDING-capable pool shape -- lives ONLY at the itable free pool,
      which is LOCK-HELD (never [iInv .. as ">"], verified), so the non-Timeless
@@ -705,7 +713,7 @@ Section IcacheEscrow.
     iIntros (HE HER HERE Hin) "#Hrinv Hl H". rewrite /ipool_shape.
     iDestruct "H" as "[Hcnt [Hmir [[Hnp Hoff] | [Hpp | Haw]]]]".
     - iModIntro. iFrame "Hl Hnp Hcnt Hmir Hoff".
-    - iDestruct "Hpp" as (ge gr gd rg) "(#Hesc & #Hcom & Htk & Hdv)".
+    - iDestruct "Hpp" as (ge gr gd rg) "(#Hesc & #Hcom & Htk & Hdv & Hfv)".
       iMod (escA_redeem E ge gr gd γi (bv_unsigned inum) rg HE with "Hesc Htk Hcom")
         as "[Hmk Hoff]".
       (* DISPATCH THE [ipool_shape_np] CONJUNCT BEFORE FRAMING ANYTHING
@@ -720,7 +728,8 @@ Section IcacheEscrow.
       iModIntro. iSplitL "Hl"; [iExact "Hl"|].
       iSplitR "Hcnt Hmir Hoff".
       { rewrite /ipool_shape_np. iRight.
-        iSplitL "Hmk"; [iExact "Hmk" | iExact "Hdv"]. }
+        iSplitL "Hmk"; [iExact "Hmk" |].
+        iSplitL "Hdv"; [iExact "Hdv" | iExact "Hfv"]. }
       iFrame "Hcnt Hmir Hoff".
     - (* THE AWAIT ARM (§1.3, as A⁗ rebuilt it).  There is no [committedA]
          until the off-lock deposit runs, so the peel cannot redeem -- and
@@ -728,7 +737,7 @@ Section IcacheEscrow.
          freeze, and the caller's LICENCE refutes it at the region.  After the
          deposit the escrow hands back the marker AND the re-armed
          [ifreeze_off], which is exactly the ordinary arm's token. *)
-      iDestruct "Haw" as (ge gr gd rg) "(#Hesc & Htk & Hdv)".
+      iDestruct "Haw" as (ge gr gd rg) "(#Hesc & Htk & Hdv & Hfv)".
       iMod (escA_await_peel E ge gr gd γi (bv_unsigned inum) rg
               (iname γi γfs inodestart inum l) HE with "Hesc Htk Hl []")
         as "(Hl & Hmk & Hoff)".
@@ -741,7 +750,8 @@ Section IcacheEscrow.
       iModIntro. iSplitL "Hl"; [iExact "Hl"|].
       iSplitR "Hcnt Hmir Hoff".
       { rewrite /ipool_shape_np. iRight.
-        iSplitL "Hmk"; [iExact "Hmk" | iExact "Hdv"]. }
+        iSplitL "Hmk"; [iExact "Hmk" |].
+        iSplitL "Hdv"; [iExact "Hdv" | iExact "Hfv"]. }
       iFrame "Hcnt Hmir Hoff".
   Qed.
 
@@ -817,7 +827,9 @@ Section IcacheEscrow.
           there.  A checked-out holder therefore owns the abstract contents
           outright while it owns the bytes, which is what makes every write
           mover a free [dv_set] and what N-3 lends at a walk's hop instants. *)
-       dv_ride (bv_unsigned inum) (dv_of dn data))%I.
+       dv_ride (bv_unsigned inum) (dv_of dn data) ∗
+       (* ...AND ITS PER-FILE TWIN, the twin of [ipool_alloc]'s: see there. *)
+       fv_ride (bv_unsigned inum) (fv_of dn data))%I.
 
   (* An UNLOADED entry's parked content: the cells at no particular value
      (iget minted the entry and nobody has read the dinode yet) plus the
@@ -1627,16 +1639,18 @@ Section IcacheEscrow.
     ind_res γfs bm -∗
     inode_blocks γfs bm data -∗
     dv_ride (bv_unsigned inum) (dv_of dn data) -∗
+    fv_ride (bv_unsigned inum) (fv_of dn data) -∗
     ic_loaded γfs γi cov logstart k inum dn bm.
   Proof.
-    intros Hok Hdok Hddix Hdoc Hduq. iIntros "Hl Hd Hm Ha Hr Hb Hv".
+    intros Hok Hdok Hddix Hdoc Hduq. iIntros "Hl Hd Hm Ha Hr Hb Hv Hw".
     rewrite /ic_loaded.
     iExists data. iSplitR; [done |]. iSplitR; [done |]. iSplitR; [done |].
     iSplitR; [done |]. iSplitR; [done |].
     iSplitL "Hl"; [iExact "Hl" |]. iSplitL "Hd"; [iExact "Hd" |].
     iSplitL "Hm"; [iExact "Hm" |]. iSplitL "Ha"; [iExact "Ha" |].
     iSplitL "Hr"; [iExact "Hr" |].
-    iSplitL "Hb"; [iExact "Hb" | iExact "Hv"].
+    iSplitL "Hb"; [iExact "Hb" |].
+    iSplitL "Hv"; [iExact "Hv" | iExact "Hw"].
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -2309,7 +2323,7 @@ Section IcacheEscrow.
       iDestruct "Hpay" as (dn bm) "[Hlk _]".
       iDestruct "Hlk" as (data)
         "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdat & Hmeta & Haddrs & Hind &
-          Hblks & Hdv)".
+          Hblks & Hdv & Hfv)".
       pose proof Hok as Hok'.
       destruct Hok' as (Hwf & _ & Hda & _ & _ & _ & _).
       assert (Hcelllen : length (bm_cells bm) = 13%nat).
@@ -2475,14 +2489,16 @@ Section IcacheEscrow.
     (* the freer's own contents hold, which came out of the payload it
        evicted and which the AWAIT arm parks untied (§9 W2) *)
     (∃ e, dv_ride (bv_unsigned inum) e) -∗
+    (∃ b, fv_ride (bv_unsigned inum) b) -∗
     ipool_shape γfs γi cov logstart inum.
   Proof.
-    iIntros "Hcnt Hmir #Hesc Htk Hdv". rewrite /ipool_shape.
+    iIntros "Hcnt Hmir #Hesc Htk Hdv Hfv". rewrite /ipool_shape.
     iSplitL "Hcnt"; [iExact "Hcnt" |].
     iSplitL "Hmir"; [iExact "Hmir" |].
     iRight. iRight. rewrite /pool_await. iExists ge, gr, gd, rg.
     iSplitR; [iExact "Hesc" |].
-    iSplitL "Htk"; [iExact "Htk" | iExact "Hdv"].
+    iSplitL "Htk"; [iExact "Htk" |].
+    iSplitL "Hdv"; [iExact "Hdv" | iExact "Hfv"].
   Qed.
 
   Lemma ic_close_to_empty_await cn γfs γi cov logstart k (v : bool)
@@ -2502,16 +2518,17 @@ Section IcacheEscrow.
     escA_inv ge gr gd γi (bv_unsigned inum) rg -∗
     redeem_ticketA gr -∗
     (∃ e, dv_ride (bv_unsigned inum) e) -∗
+    (∃ b, fv_ride (bv_unsigned inum) b) -∗
     |==> ic_escrow_body cn γfs γi cov logstart k ∗
          ic_id cn k (1/2) false dev inum ∗
          ipool_shape γfs γi cov logstart inum.
   Proof.
-    iIntros "Hg1 Hg2 Hd1 Hd2 Hin Hvld Hraw Hmt Hcnt Hmir #Hesc Htk Hdv".
+    iIntros "Hg1 Hg2 Hd1 Hd2 Hin Hvld Hraw Hmt Hcnt Hmir #Hesc Htk Hdv Hfv".
     iMod (ic_id_flip cn k true false dev inum dev inum with "Hg1 Hg2")
       as "[Hgf1 Hgf2]".
     iDestruct (word4_pointsto_half_join with "Hd1 Hd2") as "Hd".
     iModIntro.
-    iSplitR "Hgf2 Hcnt Hmir Htk Hdv";
+    iSplitR "Hgf2 Hcnt Hmir Htk Hdv Hfv";
       [| iSplitL "Hgf2"; [iExact "Hgf2" |]].
     { iApply ic_close_empty. rewrite /ic_empty_arm.
       iExists dev, inum, (valid_word v). iFrame. }
@@ -2519,7 +2536,8 @@ Section IcacheEscrow.
     iSplitL "Hmir"; [iExact "Hmir" |].
     iRight. iRight. rewrite /pool_await. iExists ge, gr, gd, rg.
     iSplitR; [iExact "Hesc" |].
-    iSplitL "Htk"; [iExact "Htk" | iExact "Hdv"].
+    iSplitL "Htk"; [iExact "Htk" |].
+    iSplitL "Hdv"; [iExact "Hdv" | iExact "Hfv"].
   Qed.
 
   (* ------------------------------------------------------------------ *)

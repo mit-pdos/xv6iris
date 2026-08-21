@@ -734,7 +734,7 @@ Section ProofFilestat.
       rewrite /ic_loaded.
       iDestruct "Hlk" as (data)
         "(%Hiok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdnat & Hmeta & Haddrs & Hindres
-          & Hblocks & Hdview)".
+          & Hblocks & Hdview & Hfview)".
       iEval (rewrite -Hipk) in "Hmeta".
       iEval (rewrite -Hipk) in "Hidev".
       iEval (rewrite -Hipk) in "Hinum".
@@ -901,7 +901,7 @@ Section ProofFilestat.
       iEval (rewrite Hipk) in "Hinum".
       iAssert (ic_loaded (fsn_fs fn) (fsn_ireg fn) (fsn_cov fn) (fsn_logstart fn)
                  ikk inm dnl bml)
-        with "[Hdnat Hmeta Haddrs Hindres Hblocks Hdlk Hdview]" as "Hlk".
+        with "[Hdnat Hmeta Haddrs Hindres Hblocks Hdlk Hdview Hfview]" as "Hlk".
       { rewrite /ic_loaded. iExists data.
         iSplitR; [iPureIntro; exact Hiok |].
         iSplitR; [iPureIntro; exact Hdok |].

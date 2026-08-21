@@ -468,6 +468,18 @@ Definition frzmUR : ucmra := gmapUR Z (dfrac_agreeR (leibnizO bool)).
 Definition dviewUR : ucmra :=
   gmapUR Z (dfrac_agreeR (leibnizO (gmap (list (bv 8)) Z))).
 
+(* THE PER-FILE CONTENTS GHOST (namei-pinned-lookup.md §13, D-52a).  [dviewUR]
+   one layer down: a per-inum agreement on what a FILE's bytes say, tied
+   definitionally to those bytes ([DirViewG.fv_of], i.e. [FsTree.file_bytes])
+   everywhere the bytes rest.  A SECOND, INDEPENDENT ghost rather than a pair
+   value inside [dviewUR]: re-typing the landed one would re-sweep every dview
+   site in the tree, whereas a twin's sweep is purely additive beside it.
+
+   The value type needs no [FsTree] name at all -- a file's contents ARE a
+   [list (bv 8)] -- so this one costs not even [dviewUR]'s spelling note. *)
+Definition fviewUR : ucmra :=
+  gmapUR Z (dfrac_agreeR (leibnizO (list (bv 8)))).
+
 (* THE ENTRY SLEEPLOCK'S DESCRIPTOR (design §14.8): what a checked-out
    entry's escrow arm is holding for the thread inside.  The fraction is a
    FIELD because an existentially-quantified one in the arm cannot be
@@ -498,12 +510,14 @@ Class icacheG (Σ : gFunctors) := IcacheG {
   icache_frzoG :: inG Σ frzoUR;
   icache_frzmG :: inG Σ frzmUR;
   icache_dviewG :: inG Σ dviewUR;
+  icache_fviewG :: inG Σ fviewUR;
 }.
 Definition icacheΣ : gFunctors :=
   #[GFunctor icacheUR; ghost_varΣ (bool * SailStdpp.Values.mword 32 * SailStdpp.Values.mword 32);
     GFunctor iliveUR; ghost_varΣ ic_dep; GFunctor ityR; GFunctor linkUR;
     GFunctor (exclR unitO); ghost_mapΣ Z (gname * gname)%type;
-    GFunctor icntUR; GFunctor frzoUR; GFunctor frzmUR; GFunctor dviewUR].
+    GFunctor icntUR; GFunctor frzoUR; GFunctor frzmUR; GFunctor dviewUR;
+    GFunctor fviewUR].
 Global Instance subG_icacheΣ {Σ} : subG icacheΣ Σ -> icacheG Σ.
 Proof. solve_inG. Qed.
 

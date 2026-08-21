@@ -337,11 +337,17 @@ Section KexecB2Res.
          SEAL below are a self-cancelling pair inside one proof: the seal has
          no other source for it, and readi -- the one callee this bracket is
          opened for -- moves no byte, so the value comes back unchanged. *)
-      dv_ride (bv_unsigned inumf) (dv_of dnf datl).
+      dv_ride (bv_unsigned inumf) (dv_of dnf datl) ∗
+      (* N-5.2A: and the PER-FILE contents hold, riding the same bracket for
+         the same reason -- this is the fourth (and, by the same
+         self-cancelling argument, equally caller-invisible) touch of the
+         pair.  For KEXEC in particular it is the load-bearing one: the
+         file whose bytes this bracket is opened over IS /init. *)
+      fv_ride (bv_unsigned inumf) (fv_of dnf datl).
   Proof.
     rewrite /ic_loaded /inode_map.
     iIntros "(%datl & %Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdiat & Hmeta &
-              Haddrs & Hind & Hbl & Hdv)".
+              Haddrs & Hind & Hbl & Hdv & Hfv)".
     iExists datl.
     iSplitR; [iPureIntro; exact Hok |].
     iSplitR; [iPureIntro; exact Hdok |].
@@ -350,7 +356,9 @@ Section KexecB2Res.
     iSplitR; [iPureIntro; exact Hduq |].
     iSplitL "Hdlk"; [iExact "Hdlk" |]. iSplitL "Hdiat"; [iExact "Hdiat" |].
     iSplitL "Hmeta"; [iExact "Hmeta" |].
-    iSplitR "Hbl Hdv"; [| iSplitL "Hbl"; [iExact "Hbl" | iExact "Hdv"]].
+    iSplitR "Hbl Hdv Hfv";
+      [| iSplitL "Hbl"; [iExact "Hbl" |];
+         iSplitL "Hdv"; [iExact "Hdv" | iExact "Hfv"]].
     iSplitL "Haddrs"; [iExact "Haddrs" | iExact "Hind"].
   Qed.
 
@@ -370,10 +378,11 @@ Section KexecB2Res.
     (* the bracket's other half: exactly what [kxc_load_peel] handed out, and
        there is no other source for it (§9 W2). *)
     dv_ride (bv_unsigned inumf) (dv_of dnf datl) -∗
+    fv_ride (bv_unsigned inumf) (fv_of dnf datl) -∗
     ic_loaded gfs gi cov logstart kf inumf dnf bmf.
   Proof.
     intros Hok Hdok Hddix Hdoc Hduq. rewrite /ic_loaded /inode_map.
-    iIntros "Hdlk Hdiat Hmeta [Haddrs Hind] Hbl Hdv". iExists datl.
+    iIntros "Hdlk Hdiat Hmeta [Haddrs Hind] Hbl Hdv Hfv". iExists datl.
     iSplitR; [iPureIntro; exact Hok |].
     iSplitR; [iPureIntro; exact Hdok |].
     iSplitR; [iPureIntro; exact Hddix |].
@@ -383,7 +392,8 @@ Section KexecB2Res.
     iSplitL "Hmeta"; [iExact "Hmeta" |].
     iSplitL "Haddrs"; [iExact "Haddrs" |].
     iSplitL "Hind"; [iExact "Hind" |].
-    iSplitL "Hbl"; [iExact "Hbl" | iExact "Hdv"].
+    iSplitL "Hbl"; [iExact "Hbl" |].
+    iSplitL "Hdv"; [iExact "Hdv" | iExact "Hfv"].
   Qed.
 
   (* ------------------------------------------------------------------ *)

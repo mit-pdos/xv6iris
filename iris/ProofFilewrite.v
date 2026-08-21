@@ -1907,7 +1907,7 @@ Section ProofFilewrite.
     rewrite /ic_loaded.
     iDestruct "Hlk" as (datal)
       "(%Hiok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlnk & Hdnat & Hmeta & Haddrs & Hindres
-       & Hblocks & Hdview)".
+       & Hblocks & Hdview & Hfview)".
     destruct Hiok as (Hbmwf & Hbmcov & Hdaddr & Hdty & Hszb & Hholes & Hsized).
     iAssert (inode_map (fwn_fs fn) (ientry ik) bml)
       with "[Haddrs Hindres]" as "Hmap".
@@ -2235,16 +2235,18 @@ Section ProofFilewrite.
        determined garbage -- the fd is provably not a directory here -- and
        the fragment is WHOLE, so the move is one free own-update and no delta
        is proved. *)
-    iMod (dv_set_rt ⊤ (fwn_ireg fn) (fwn_fs fn) (fwn_inodestart fn) icfg_nib
+    iMod (dvw_set_rt ⊤ (fwn_ireg fn) (fwn_fs fn) (fwn_inodestart fn) icfg_nib
             (bv_unsigned inum) (dv_of dnl datal) (dv_of dn' data')
-            ltac:(solve_ndisj) with "Hireg Hdview") as "Hdview".
+            (fv_of dnl datal) (fv_of dn' data')
+            ltac:(solve_ndisj) with "Hireg Hdview Hfview")
+      as "[Hdview Hfview]".
     iModIntro.
     iAssert (i_valid (ientry ik) ↦₄ valid_word true)%I
       with "[Hmark]" as "Hvalid".
     { rewrite -P8. iExact "Hmark". }
     iAssert (ic_loaded (fwn_fs fn) (fwn_ireg fn) (fwn_cov fn)
                (fwn_logstart fn) ik inum dn' bm')
-      with "[Hdnat Hmeta Hmap Hblocks Hdview]" as "Hlk".
+      with "[Hdnat Hmeta Hmap Hblocks Hdview Hfview]" as "Hlk".
     { rewrite /ic_loaded /inode_map. iExists data'.
       iSplitR; [iPureIntro; exact Hiok2 |].
       iSplitR; [iPureIntro; exact Hdok2 |].
@@ -2255,7 +2257,7 @@ Section ProofFilewrite.
       iSplitR; [iPureIntro; exact (dir_uniq_not_dir dn' data' Hnodir') |].
       iSplitR; [iApply (dir_links_not_dir (bv_unsigned inum) dn' data' Hnodir') |].
       iDestruct "Hmap" as "[Haddrs Hindres]".
-      rewrite Hdn0q. iFrame "Hdnat Hmeta Haddrs Hindres Hblocks Hdview". }
+      rewrite Hdn0q. iFrame "Hdnat Hmeta Haddrs Hindres Hblocks Hdview Hfview". }
     (* ---- +0xb4 ld a0,24(s2) ; +0xb8 jal ra,iunlock ---- *)
     assert (Hpip3 : add_vec (rget X0 Rs2)
                       (sign_extend' 64 (mword_of_int 24 : mword 12)) = a_fip kx).

@@ -54,8 +54,19 @@
     is why NO boot map and no [icfg] field had to change).  The lend rides
     the SAME registry at a DISJOINT key space:
 
-      dvl_k z = -2z-1   the LEND SLOT    (odd negatives)
-      dvl_l z = -2z-2   the MINT LICENCE (even negatives)
+      dvl_k z = -4z-1   the dview LEND SLOT     (negatives = 3 mod 4)
+      dvl_l z = -4z-2   the dview MINT LICENCE  (negatives = 2 mod 4)
+      fvl_k z = -4z-3   the fview LEND SLOT     (negatives = 1 mod 4)
+      fvl_l z = -4z-4   the fview MINT LICENCE  (negatives = 0 mod 4)
+
+    N-5.2A RE-SPELLED THE TWO dview KEYS (from -2z-1 / -2z-2, D-52c).  Phase
+    B's pair already covered EVERY negative integer between them -- odd and
+    even -- so the fview column had no free key at all: the residues had to
+    widen from 2 to 4 before a second ghost could ride the same registry.
+    The change is value-only (the four families are still affine in z, still
+    negative, still pairwise disjoint by residue and injective), it is
+    internal to this file and [IcacheBoot], and nothing anywhere depends on
+    the numeric value of a key.
 
     Region inums are non-negative, so no landed registry key can collide,
     and the coverage clause [ireg_registry] carries ("every inum in range is
@@ -126,19 +137,46 @@ Local Open Scope Z_scope.
 (* The lend's two registry keys for inum [z].  Both are NEGATIVE (region
    inums are not) and they never collide with each other ([dvl_k] is odd,
    [dvl_l] is even), so the three key spaces partition their union. *)
-Definition dvl_k (z : Z) : Z := -(2 * z) - 1.
-Definition dvl_l (z : Z) : Z := -(2 * z) - 2.
+Definition dvl_k (z : Z) : Z := -(4 * z) - 1.
+Definition dvl_l (z : Z) : Z := -(4 * z) - 2.
+(* N-5.2A: the fview column's two families, at the two residues the widening
+   above freed. *)
+Definition fvl_k (z : Z) : Z := -(4 * z) - 3.
+Definition fvl_l (z : Z) : Z := -(4 * z) - 4.
 
 Lemma dvl_k_neg (z : Z) : 0 <= z -> dvl_k z < 0.
 Proof. rewrite /dvl_k. lia. Qed.
 Lemma dvl_l_neg (z : Z) : 0 <= z -> dvl_l z < 0.
 Proof. rewrite /dvl_l. lia. Qed.
+Lemma fvl_k_neg (z : Z) : 0 <= z -> fvl_k z < 0.
+Proof. rewrite /fvl_k. lia. Qed.
+Lemma fvl_l_neg (z : Z) : 0 <= z -> fvl_l z < 0.
+Proof. rewrite /fvl_l. lia. Qed.
+
+(* THE SIX PAIRWISE DISJOINTNESSES.  Each one is a residue argument [lia]
+   discharges outright, and together they are what says the four key spaces
+   partition their union. *)
 Lemma dvl_k_l_ne (z1 z2 : Z) : dvl_k z1 <> dvl_l z2.
 Proof. rewrite /dvl_k /dvl_l. lia. Qed.
+Lemma dvl_k_fvl_k_ne (z1 z2 : Z) : dvl_k z1 <> fvl_k z2.
+Proof. rewrite /dvl_k /fvl_k. lia. Qed.
+Lemma dvl_k_fvl_l_ne (z1 z2 : Z) : dvl_k z1 <> fvl_l z2.
+Proof. rewrite /dvl_k /fvl_l. lia. Qed.
+Lemma dvl_l_fvl_k_ne (z1 z2 : Z) : dvl_l z1 <> fvl_k z2.
+Proof. rewrite /dvl_l /fvl_k. lia. Qed.
+Lemma dvl_l_fvl_l_ne (z1 z2 : Z) : dvl_l z1 <> fvl_l z2.
+Proof. rewrite /dvl_l /fvl_l. lia. Qed.
+Lemma fvl_k_l_ne (z1 z2 : Z) : fvl_k z1 <> fvl_l z2.
+Proof. rewrite /fvl_k /fvl_l. lia. Qed.
+
 Global Instance dvl_k_inj : Inj eq eq dvl_k.
 Proof. intros z1 z2. rewrite /dvl_k. lia. Qed.
 Global Instance dvl_l_inj : Inj eq eq dvl_l.
 Proof. intros z1 z2. rewrite /dvl_l. lia. Qed.
+Global Instance fvl_k_inj : Inj eq eq fvl_k.
+Proof. intros z1 z2. rewrite /fvl_k. lia. Qed.
+Global Instance fvl_l_inj : Inj eq eq fvl_l.
+Proof. intros z1 z2. rewrite /fvl_l. lia. Qed.
 
 (* the Qp cuts the ledger above is spelled at *)
 Lemma dfrac_1_hh : DfracOwn 1 = DfracOwn (1/2) ⋅ DfracOwn (1/2).
@@ -641,6 +679,389 @@ Section DirViewLendDefs.
     dv_lcol z.
   Proof.
     iIntros "Hsl Hct Hvw". rewrite /dv_lcol. iLeft.
+    iExists γc, γv. iFrame.
+  Qed.
+
+  (* ===================================================================== *)
+  (*  8.  THE fview COLUMN (N-5.2A, namei-pinned-lookup.md §13 D-52c)        *)
+  (* ===================================================================== *)
+
+  (*  EVERYTHING ABOVE, AT [DirViewG.fv_half].  The ledger, the three states,
+      the ¾/¼ cut, the licence discipline and the three column moves are
+      Phase B's verbatim -- only the cell algebra changes ([fviewUR] instead
+      of [dviewUR], a byte list instead of an entry map) and the two registry
+      key families ([fvl_k]/[fvl_l] instead of [dvl_k]/[dvl_l]).  D-52c ruled
+      exactly this: a second column at more negative key families, not a
+      generalisation of the first.
+
+      The two columns are INDEPENDENT.  A directory's lend and a file's lend
+      of the same inum could both stand (nothing forbids it and nothing needs
+      it); a writer cancels whichever of the two its own ride tells it to,
+      and [InodeRegion.dvw_set_rt] is just the two moves in sequence.       *)
+
+  Definition fvl_slot (z : Z) (dq : dfrac) (g : gname * gname) : iProp Σ :=
+    (fvl_k z ↪[icfg_reg]{dq} g)%I.
+
+  Definition fv_lic (z : Z) : iProp Σ :=
+    (∃ g : gname * gname, fvl_l z ↪[icfg_reg] g)%I.
+
+  Definition fvl_cell (γ : gname) (z : Z) (dq : dfrac) (b : list (bv 8))
+    : iProp Σ :=
+    own γ ({[ z := to_dfrac_agree dq (b : leibnizO (list (bv 8))) ]} : fviewUR).
+
+  Definition fv_ctick (γc : gname) (z : Z) (b : list (bv 8)) : iProp Σ :=
+    fvl_cell γc z (DfracOwn 1) b.
+
+  Definition fv_cshot (γc : gname) (z : Z) (b : list (bv 8)) : iProp Σ :=
+    fvl_cell γc z DfracDiscarded b.
+
+  Definition fv_vwit (γv : gname) (z : Z) (b : list (bv 8)) : iProp Σ :=
+    fvl_cell γv z (DfracOwn (1/2)) b.
+
+  (* ONE INUM'S fview LEND COLUMN -- what [InodeRegion.ireg_flends] parks,
+     beside [dv_lcol]'s family and with the same three arms. *)
+  Definition fv_lcol (z : Z) : iProp Σ :=
+    ( (∃ γc γv : gname,
+         fvl_slot z (DfracOwn 1) (γc, γv)
+         ∗ fvl_cell γc z (DfracOwn 1) [] ∗ fvl_cell γv z (DfracOwn 1) [])
+    ∨ (∃ (γc γv : gname) (b : list (bv 8)),
+         fvl_slot z (DfracOwn (1/4)) (γc, γv) ∗ fv_lic z
+         ∗ fv_half z (DfracOwn (1/4)) b ∗ fv_ctick γc z b ∗ fv_vwit γv z b)
+    ∨ (∃ (γc γv : gname) (b : list (bv 8)),
+         fvl_slot z (DfracOwn (3/4)) (γc, γv) ∗ fv_lic z
+         ∗ fv_cshot γc z b ∗ fv_vwit γv z b) )%I.
+
+  Definition fv_lentm (z : Z) (b : list (bv 8)) : iProp Σ :=
+    (⌜dvl_dom z⌝ ∗ ∃ g : gname * gname, fvl_slot z (DfracOwn (1/2)) g)%I.
+
+  Definition fv_ride (z : Z) (b : list (bv 8)) : iProp Σ :=
+    (fv_hold z b ∨ (fv_half z (DfracOwn (3/4)) b ∗ fv_lentm z b))%I.
+
+  Definition fv_pin (z : Z) (b : list (bv 8)) : iProp Σ :=
+    (⌜dvl_dom z⌝ ∗ ∃ γc γv : gname,
+       fvl_slot z (DfracOwn (1/4)) (γc, γv) ∗ fv_vwit γv z b)%I.
+
+  Definition fv_pin_spent (z : Z) (b : list (bv 8)) : iProp Σ :=
+    fv_pin z b.
+
+  Definition fv_cancelled (z : Z) (b : list (bv 8)) : iProp Σ :=
+    (∃ γc γv : gname,
+       fvl_slot z DfracDiscarded (γc, γv) ∗ fv_cshot γc z b)%I.
+
+  (* ------------------------------------------------------------------- *)
+  (*  instances -- all-[own], for E1's reason verbatim                     *)
+  (* ------------------------------------------------------------------- *)
+
+  Global Instance fvl_slot_timeless z dq g : Timeless (fvl_slot z dq g).
+  Proof. rewrite /fvl_slot. apply _. Qed.
+  Global Instance fv_lic_timeless z : Timeless (fv_lic z).
+  Proof. rewrite /fv_lic. apply _. Qed.
+  Global Instance fvl_cell_timeless γ z dq b : Timeless (fvl_cell γ z dq b).
+  Proof. apply _. Qed.
+  Global Instance fv_ctick_timeless γc z b : Timeless (fv_ctick γc z b).
+  Proof. apply _. Qed.
+  Global Instance fv_cshot_timeless γc z b : Timeless (fv_cshot γc z b).
+  Proof. apply _. Qed.
+  Global Instance fv_vwit_timeless γv z b : Timeless (fv_vwit γv z b).
+  Proof. apply _. Qed.
+
+  Global Instance fv_cshot_persistent γc z b : Persistent (fv_cshot γc z b).
+  Proof.
+    rewrite /fv_cshot /fvl_cell /to_dfrac_agree.
+    apply own_core_persistent, _.
+  Qed.
+
+  Global Instance fv_lcol_timeless z : Timeless (fv_lcol z).
+  Proof. rewrite /fv_lcol. apply _. Qed.
+  Global Instance fv_lentm_timeless z b : Timeless (fv_lentm z b).
+  Proof. rewrite /fv_lentm. apply _. Qed.
+  Global Instance fv_ride_timeless z b : Timeless (fv_ride z b).
+  Proof. rewrite /fv_ride. apply _. Qed.
+  Global Instance fv_pin_timeless z b : Timeless (fv_pin z b).
+  Proof. rewrite /fv_pin. apply _. Qed.
+  Global Instance fv_cancelled_timeless z b : Timeless (fv_cancelled z b).
+  Proof. rewrite /fv_cancelled. apply _. Qed.
+
+  Global Instance fv_cancelled_persistent z b : Persistent (fv_cancelled z b).
+  Proof. rewrite /fv_cancelled. apply _. Qed.
+
+  (* ---- the slot's fraction arithmetic -------------------------------- *)
+
+  Lemma fvl_slot_split (z : Z) (p q : Qp) (g : gname * gname) :
+    fvl_slot z (DfracOwn (p + q)) g ⊣⊢
+      fvl_slot z (DfracOwn p) g ∗ fvl_slot z (DfracOwn q) g.
+  Proof.
+    rewrite /fvl_slot.
+    apply (fractional (Φ := fun q => (fvl_k z ↪[icfg_reg]{#q} g)%I)).
+  Qed.
+
+  Lemma fvl_slot_join (z : Z) (p q : Qp) (g1 g2 : gname * gname) :
+    fvl_slot z (DfracOwn p) g1 -∗ fvl_slot z (DfracOwn q) g2 -∗
+    ⌜g1 = g2⌝ ∗ fvl_slot z (DfracOwn (p + q)) g1.
+  Proof.
+    rewrite /fvl_slot. iIntros "H1 H2".
+    iDestruct (ghost_map_elem_agree with "H1 H2") as %Heq.
+    iSplitR; [done |]. subst g2.
+    iDestruct (ghost_map_elem_combine with "H1 H2") as "[H _]".
+    rewrite dfrac_op_own. iExact "H".
+  Qed.
+
+  Lemma fvl_slot_cut (z : Z) (g : gname * gname) :
+    fvl_slot z (DfracOwn 1) g ⊣⊢
+      fvl_slot z (DfracOwn (1/4)) g ∗ fvl_slot z (DfracOwn (1/2)) g
+      ∗ fvl_slot z (DfracOwn (1/4)) g.
+  Proof.
+    rewrite -(fvl_slot_split z (1/2) (1/4) g).
+    rewrite -(fvl_slot_split z (1/4) (1/2 + 1/4) g).
+    by assert ((1/4 + (1/2 + 1/4))%Qp = 1%Qp) as -> by compute_done.
+  Qed.
+
+  Lemma fvl_slot_join34 (z : Z) (g1 g2 : gname * gname) :
+    fvl_slot z (DfracOwn (1/4)) g1 -∗ fvl_slot z (DfracOwn (1/2)) g2 -∗
+    ⌜g1 = g2⌝ ∗ fvl_slot z (DfracOwn (3/4)) g1.
+  Proof.
+    iIntros "H1 H2".
+    iDestruct (fvl_slot_join with "H1 H2") as "[%Hg H]".
+    iSplitR; [done |].
+    by assert ((3/4)%Qp = (1/4 + 1/2)%Qp) as -> by compute_done.
+  Qed.
+
+  Lemma fvl_slot_agree (z : Z) (dq1 dq2 : dfrac) (g1 g2 : gname * gname) :
+    fvl_slot z dq1 g1 -∗ fvl_slot z dq2 g2 -∗ ⌜g1 = g2⌝.
+  Proof.
+    rewrite /fvl_slot. iIntros "H1 H2".
+    by iDestruct (ghost_map_elem_agree with "H1 H2") as %->.
+  Qed.
+
+  Lemma fvl_slot_over (z : Z) (p q : Qp) (g1 g2 : gname * gname) :
+    (1 < p + q)%Qp ->
+    fvl_slot z (DfracOwn p) g1 -∗ fvl_slot z (DfracOwn q) g2 -∗ False.
+  Proof.
+    intros Hlt. rewrite /fvl_slot. iIntros "H1 H2".
+    iDestruct (ghost_map_elem_valid_2 with "H1 H2") as %[Hv _].
+    exfalso. rewrite dfrac_op_own dfrac_valid_own in Hv.
+    exact (proj1 (Qp.lt_nge _ _) Hlt Hv).
+  Qed.
+
+  Lemma fv_lic_excl (z : Z) : fv_lic z -∗ fv_lic z -∗ False.
+  Proof.
+    rewrite /fv_lic. iIntros "[%g1 H1] [%g2 H2]".
+    iDestruct (ghost_map_elem_valid_2 with "H1 H2") as %[Hv _].
+    exfalso. rewrite dfrac_op_own dfrac_valid_own in Hv.
+    exact (Qp.not_add_le_l 1 1 Hv).
+  Qed.
+
+  (* ---- the contents' fraction arithmetic ----------------------------- *)
+
+  Lemma fv_hold_split34 (z : Z) (b : list (bv 8)) :
+    fv_hold z b ⊣⊢ fv_half z (DfracOwn (3/4)) b ∗ fv_half z (DfracOwn (1/4)) b.
+  Proof. rewrite /fv_hold {1}dfrac_1_34. apply fv_split. Qed.
+
+  Lemma fv_join34 (z : Z) (b : list (bv 8)) :
+    fv_half z (DfracOwn (3/4)) b -∗ fv_half z (DfracOwn (1/4)) b -∗
+    fv_hold z b.
+  Proof. iIntros "H1 H2". rewrite fv_hold_split34. iFrame. Qed.
+
+  Lemma fv_hold_half_excl (z : Z) (dq : dfrac) (b1 b2 : list (bv 8)) :
+    fv_hold z b1 -∗ fv_half z dq b2 -∗ False.
+  Proof.
+    rewrite /fv_hold /fv_half. iIntros "H1 H2".
+    iDestruct (own_valid_2 with "H1 H2") as %Hv.
+    rewrite singleton_op singleton_valid in Hv.
+    by apply exclusive_l in Hv; [| apply to_dfrac_agree_exclusive].
+  Qed.
+
+  Lemma fv_half34_excl (z : Z) (b1 b2 : list (bv 8)) :
+    fv_half z (DfracOwn (3/4)) b1 -∗ fv_half z (DfracOwn (3/4)) b2 -∗ False.
+  Proof.
+    rewrite /fv_half. iIntros "H1 H2".
+    iDestruct (own_valid_2 with "H1 H2") as %Hv.
+    rewrite singleton_op singleton_valid in Hv.
+    apply dfrac_agree_op_valid_L in Hv as [Hd _].
+    rewrite dfrac_op_own dfrac_valid_own in Hd.
+    assert (Hq : (3/4 + 3/4)%Qp = (1 + 1/2)%Qp) by compute_done.
+    rewrite Hq in Hd. by apply (Qp.not_add_le_l 1 (1/2)) in Hd.
+  Qed.
+
+  Lemma fv_ride_excl (z : Z) (b1 b2 : list (bv 8)) :
+    fv_ride z b1 -∗ fv_ride z b2 -∗ False.
+  Proof.
+    rewrite /fv_ride. iIntros "[H1|[H1 _]] [H2|[H2 _]]".
+    - iApply (fv_hold_excl with "H1 H2").
+    - iApply (fv_hold_half_excl with "H1 H2").
+    - iApply (fv_hold_half_excl with "H2 H1").
+    - iApply (fv_half34_excl with "H1 H2").
+  Qed.
+
+  Lemma fv_ride_of_hold (z : Z) (b : list (bv 8)) :
+    fv_hold z b -∗ fv_ride z b.
+  Proof. iIntros "H". rewrite /fv_ride. by iLeft. Qed.
+
+  Lemma fv_ride_size (z : Z) (dn1 dn2 : dinode) (data : nat -> list (bv 8)) :
+    di_size dn1 = di_size dn2 ->
+    fv_ride z (fv_of dn1 data) -∗ fv_ride z (fv_of dn2 data).
+  Proof.
+    intros Hs. rewrite (fv_of_size dn1 dn2 data Hs). iIntros "H". iExact "H".
+  Qed.
+
+  Lemma fv_lend_no_second_mint (z : Z) (b1 b2 : list (bv 8)) :
+    fv_half z (DfracOwn (3/4)) b1 -∗ fv_lentm z b1 -∗ fv_hold z b2 -∗ False.
+  Proof.
+    iIntros "H34 _ Hw". iApply (fv_hold_half_excl with "Hw H34").
+  Qed.
+
+  (* ---- the cells' moves ---------------------------------------------- *)
+
+  Lemma fvl_cell_agree (γ : gname) (z : Z) (dq1 dq2 : dfrac)
+      (b1 b2 : list (bv 8)) :
+    fvl_cell γ z dq1 b1 -∗ fvl_cell γ z dq2 b2 -∗ ⌜b1 = b2⌝.
+  Proof.
+    rewrite /fvl_cell. iIntros "H1 H2".
+    iDestruct (own_valid_2 with "H1 H2") as %Hv.
+    rewrite singleton_op singleton_valid in Hv.
+    iPureIntro. by apply dfrac_agree_op_valid_L in Hv as [_ ->].
+  Qed.
+
+  Lemma fv_vwit_agree (γv : gname) (z : Z) (b1 b2 : list (bv 8)) :
+    fv_vwit γv z b1 -∗ fv_vwit γv z b2 -∗ ⌜b1 = b2⌝.
+  Proof. rewrite /fv_vwit. apply fvl_cell_agree. Qed.
+
+  Lemma fvl_cell_split (γ : gname) (z : Z) (dq1 dq2 : dfrac)
+      (b : list (bv 8)) :
+    fvl_cell γ z (dq1 ⋅ dq2) b ⊣⊢ fvl_cell γ z dq1 b ∗ fvl_cell γ z dq2 b.
+  Proof.
+    rewrite /fvl_cell -own_op singleton_op.
+    by rewrite -dfrac_agree_op.
+  Qed.
+
+  Lemma fvl_cell_cut (γ : gname) (z : Z) (b : list (bv 8)) :
+    fvl_cell γ z (DfracOwn 1) b ⊣⊢
+      fvl_cell γ z (DfracOwn (1/2)) b ∗ fvl_cell γ z (DfracOwn (1/2)) b.
+  Proof. rewrite -fvl_cell_split -dfrac_1_hh. done. Qed.
+
+  Lemma fvl_cell_set (γ : gname) (z : Z) (b b' : list (bv 8)) :
+    fvl_cell γ z (DfracOwn 1) b ==∗ fvl_cell γ z (DfracOwn 1) b'.
+  Proof.
+    rewrite /fvl_cell. iIntros "H".
+    iApply (own_update with "H").
+    apply singleton_update, cmra_update_exclusive.
+    split; done.
+  Qed.
+
+  Lemma fv_cshoot (γc : gname) (z : Z) (b : list (bv 8)) :
+    fv_ctick γc z b ==∗ fv_cshot γc z b.
+  Proof.
+    rewrite /fv_ctick /fv_cshot /fvl_cell. iIntros "H".
+    iApply (own_update with "H").
+    apply singleton_update, dfrac_agree_persist.
+  Qed.
+
+  (* ---- the three column moves ---------------------------------------- *)
+
+  Lemma fv_col_mint (z : Z) (b : list (bv 8)) :
+    dvl_dom z ->
+    fv_lic z -∗ fv_hold z b -∗ fv_lcol z ==∗
+      fv_lcol z ∗ (fv_half z (DfracOwn (3/4)) b ∗ fv_lentm z b) ∗ fv_pin z b.
+  Proof.
+    iIntros (Hdom) "Hlic Hw Hcol".
+    rewrite {1}/fv_lcol.
+    iDestruct "Hcol"
+      as "[(%γc & %γv & Hsl & Hct & Hvw)
+          |[(%γc & %γv & %b0 & _ & Hlic' & _)|(%γc & %γv & %b0 & _ & Hlic' & _)]]";
+      [| iDestruct (fv_lic_excl with "Hlic Hlic'") as %[]
+       | iDestruct (fv_lic_excl with "Hlic Hlic'") as %[]].
+    iMod (fvl_cell_set γc z [] b with "Hct") as "Hct".
+    iMod (fvl_cell_set γv z [] b with "Hvw") as "Hvw".
+    iEval (rewrite fvl_cell_cut) in "Hvw".
+    iDestruct "Hvw" as "[Hvw1 Hvw2]".
+    iEval (rewrite fvl_slot_cut) in "Hsl".
+    iDestruct "Hsl" as "(Hsl14 & Hsl12 & Hslp)".
+    rewrite fv_hold_split34. iDestruct "Hw" as "[Hw34 Hw14]".
+    iModIntro. iSplitL "Hsl14 Hlic Hw14 Hct Hvw1".
+    { rewrite /fv_lcol. iRight. iLeft. iExists γc, γv, b. iFrame. }
+    iSplitL "Hw34 Hsl12".
+    { iFrame "Hw34". rewrite /fv_lentm. iSplitR; [by iPureIntro |].
+      iExists (γc, γv). iExact "Hsl12". }
+    rewrite /fv_pin. iSplitR; [by iPureIntro |]. iExists γc, γv. iFrame.
+  Qed.
+
+  Lemma fv_col_set (z : Z) (b b' : list (bv 8)) :
+    fv_half z (DfracOwn (3/4)) b -∗ fv_lentm z b -∗ fv_lcol z ==∗
+      fv_lcol z ∗ fv_hold z b'.
+  Proof.
+    iIntros "H34 Hm Hcol".
+    iDestruct "Hm" as "[_ (%g & Hsl12)]".
+    rewrite {1}/fv_lcol.
+    iDestruct "Hcol"
+      as "[(%γc & %γv & Hsl & _ & _)
+          |[(%γc & %γv & %b0 & Hsl & Hlic & Hfv14 & Hct & Hvw)
+           |(%γc & %γv & %b0 & Hsl & _ & _ & _)]]".
+    - iDestruct (fvl_slot_over z 1 (1/2) _ _ dvl_q_over_1_12 with "Hsl Hsl12")
+        as %[].
+    - iDestruct (fvl_slot_join34 with "Hsl Hsl12") as "[%Hg Hsl34]".
+      iDestruct (fv_agree with "H34 Hfv14") as %<-.
+      iDestruct (fv_join34 with "H34 Hfv14") as "Hw".
+      iMod (fv_set z b b' with "Hw") as "Hw".
+      iMod (fv_cshoot with "Hct") as "#Hcs".
+      iModIntro. iFrame "Hw".
+      rewrite /fv_lcol. iRight. iRight. iExists γc, γv, b.
+      iFrame "Hsl34 Hlic Hvw". iExact "Hcs".
+    - iDestruct (fvl_slot_over z (3/4) (1/2) _ _ dvl_q_over_34_12
+                   with "Hsl Hsl12") as %[].
+  Qed.
+
+  Lemma fv_col_redeem (z : Z) (b bs : list (bv 8)) (dqv : dfrac) :
+    fv_pin z b -∗ fv_half z dqv bs -∗ fv_lcol z ==∗
+      fv_lcol z ∗ fv_half z dqv bs ∗
+      ((⌜bs = b⌝ ∗ fv_pin z b) ∨ fv_cancelled z b).
+  Proof.
+    iIntros "Hpin Hfv Hcol".
+    iDestruct "Hpin" as "[%Hdom (%γc & %γv & Hslp & Hvwp)]".
+    rewrite {1}/fv_lcol.
+    iDestruct "Hcol"
+      as "[(%γc0 & %γv0 & Hsl & Hct & Hvw)
+          |[(%γc0 & %γv0 & %b0 & Hsl & Hlic & Hfv14 & Hct & Hvw)
+           |(%γc0 & %γv0 & %b0 & Hsl & Hlic & #Hcs & Hvw)]]".
+    - iDestruct (fvl_slot_over z 1 (1/4) _ _ dvl_q_over_1_14 with "Hsl Hslp")
+        as %[].
+    - iDestruct (fvl_slot_agree with "Hsl Hslp") as %Heq.
+      injection Heq as -> ->.
+      iDestruct (fv_vwit_agree with "Hvw Hvwp") as %->.
+      iDestruct (fv_agree with "Hfv14 Hfv") as %<-.
+      iModIntro. iSplitL "Hsl Hlic Hfv14 Hct Hvw".
+      { rewrite /fv_lcol. iRight. iLeft. iExists γc, γv, b. iFrame. }
+      iFrame "Hfv". iLeft. iSplitR; [done |].
+      rewrite /fv_pin. iSplitR; [done |]. iExists γc, γv. iFrame.
+    - iDestruct (fvl_slot_agree with "Hsl Hslp") as %Heq.
+      injection Heq as -> ->.
+      iDestruct (fv_vwit_agree with "Hvw Hvwp") as %->.
+      rewrite /fvl_slot.
+      iMod (ghost_map_elem_persist with "Hslp") as "#Hslp".
+      iModIntro. iSplitL "Hsl Hlic Hvw".
+      { rewrite /fv_lcol. iRight. iRight. iExists γc, γv, b.
+        iFrame "Hsl Hlic Hvw". iExact "Hcs". }
+      iFrame "Hfv". iRight. rewrite /fv_cancelled.
+      iExists γc, γv. iSplitR; [iExact "Hslp" | iExact "Hcs"].
+  Qed.
+
+  (* ---- the boot shape ------------------------------------------------- *)
+
+  Lemma fvl_boot_split (γ : gname) (P : gset Z) :
+    own γ (fview_boot_map P) ⊢ [∗ set] z ∈ P, fvl_cell γ z (DfracOwn 1) [].
+  Proof.
+    rewrite /fview_boot_map
+            (gset_to_gmap_singletons (A := dfrac_agreeR (leibnizO (list (bv 8))))).
+    rewrite big_opS_own_1. iIntros "H".
+    iApply (big_sepS_mono with "H"). intros z _.
+    iIntros "H". rewrite /fvl_cell. iExact "H".
+  Qed.
+
+  Lemma fv_lcol_boot (z : Z) (γc γv : gname) :
+    fvl_slot z (DfracOwn 1) (γc, γv) -∗
+    fvl_cell γc z (DfracOwn 1) [] -∗ fvl_cell γv z (DfracOwn 1) [] -∗
+    fv_lcol z.
+  Proof.
+    iIntros "Hsl Hct Hvw". rewrite /fv_lcol. iLeft.
     iExists γc, γv. iFrame.
   Qed.
 

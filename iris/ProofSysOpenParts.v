@@ -794,10 +794,11 @@ Section ProofSysOpenPublish.
       (* ...and the CONTENTS HOLD (namei-pinned-lookup.md §9 W2): unlike the
          three clauses this peel discards, the hold is a RESOURCE and the
          re-seal below cannot conjure it, so it must come out here. *)
-      dv_ride (bv_unsigned inum) (dv_of dn data).
+      dv_ride (bv_unsigned inum) (dv_of dn data) ∗
+      fv_ride (bv_unsigned inum) (fv_of dn data).
   Proof.
     iIntros "(%data & %Hok & %Hdir & %Hddix & %Hdoc & %Hduq & Hlnk & Hat & Hmeta &
-              Haddr & Hind & Hblk & Hdv)".
+              Haddr & Hind & Hblk & Hdv & Hfv)".
     (* Keep this structural: even [iFrame "%"] searches the whole goal, whose
        [inode_blocks] tail is large (171 s at this site).  The arity sweep's
        third, fourth and fifth pure conjuncts [Hddix]/[Hdoc]/[Hduq] are bound
@@ -812,7 +813,8 @@ Section ProofSysOpenPublish.
     iSplitL "Hmeta"; [iExact "Hmeta" |].
     iSplitL "Haddr Hind".
     { rewrite /inode_map. iSplitL "Haddr"; [iExact "Haddr" | iExact "Hind"]. }
-    iSplitL "Hblk"; [iExact "Hblk" | iExact "Hdv"].
+    iSplitL "Hblk"; [iExact "Hblk" |].
+    iSplitL "Hdv"; [iExact "Hdv" | iExact "Hfv"].
   Qed.
 
   (* ...and the close direction at itrunc's outputs. *)
@@ -830,9 +832,11 @@ Section ProofSysOpenPublish.
        No delta is proved: the fragment is WHOLE, so the move is free. *)
     dv_ride (bv_unsigned inum)
             (dv_of (di_trunc dn) (fun _ => replicate BSIZE (bv_0 8))) -∗
+    fv_ride (bv_unsigned inum)
+            (fv_of (di_trunc dn) (fun _ => replicate BSIZE (bv_0 8))) -∗
     ic_loaded gfs gi cov logstart k inum (di_trunc dn) bm_empty.
   Proof.
-    intros Hnz Hnd. iIntros "Hat Hmeta [Haddr Hind] Hblk Hdv".
+    intros Hnz Hnd. iIntros "Hat Hmeta [Haddr Hind] Hblk Hdv Hfv".
     assert (Hty : di_type (di_trunc dn) = di_type dn) by reflexivity.
     iApply (ic_mk_loaded gfs gi cov logstart k inum (di_trunc dn) bm_empty
               (fun _ => replicate BSIZE (bv_0 8))
@@ -845,7 +849,7 @@ Section ProofSysOpenPublish.
                  ltac:(rewrite Hty; exact Hnd))
               (dir_uniq_not_dir (di_trunc dn) _
                  ltac:(rewrite Hty; exact Hnd))
-              with "[] Hat Hmeta Haddr Hind Hblk Hdv").
+              with "[] Hat Hmeta Haddr Hind Hblk Hdv Hfv").
     iApply (dir_links_not_dir (bv_unsigned inum) (di_trunc dn)).
     rewrite Hty. exact Hnd.
   Qed.

@@ -1436,15 +1436,17 @@ Section BootAlloc.
     iMod (fs_cfg_alloc γd γv (v_disk (g.(gdev).(dvirtio))) ndisk sb cov nib ⊤
             Hwf Hrw Hnin Hnib32 Hnib0 Hnibeq Hcovin Hcovmeta Hcovdata
             ltac:(solve_ndisj)
-            with "Hdimg Hbsauth Hbslots") as (ICFG FSC) "[Hpinr Hfs]".
-    (* N-5.1 (W5a): ROOT'S PIN IS DROPPED HERE, deliberately.  It is affine,
-       and nothing on this side of the boot chain consumes it: transporting
-       it would mean widening [fs_boot_supply] and, past it, the (f)-payload
-       and the forkret cone -- which is M2 / decisions D1-D2's business, not
-       this stage's (namei-pinned-lookup.md §11.3, §12).  The pin's proved
-       consumer is [NameiInitPinned.wp_namei_init_pinned], stated against
-       [fs_cfg_alloc]'s conjunct directly. *)
-    iClear "Hpinr".
+            with "Hdimg Hbsauth Hbslots") as (ICFG FSC) "[Hpinr [Hfpinr Hfs]]".
+    (* N-5.1 (W5a) / N-5.2A: ROOT'S PIN AND /INIT'S CONTENTS PIN ARE BOTH
+       DROPPED HERE, deliberately.  They are affine, and nothing on this side
+       of the boot chain consumes them: transporting either would mean
+       widening [fs_boot_supply] and, past it, the (f)-payload and the
+       forkret cone -- which is M2 / decisions D1-D2's business, not this
+       stage's (namei-pinned-lookup.md §11.3, §12, §13).  Their proved
+       consumers are [NameiInitPinned.wp_namei_init_pinned] and, for the
+       fview pin, N-5.2B's kexec re-walk; both are stated against
+       [fs_cfg_alloc]'s conjuncts directly. *)
+    iClear "Hpinr". iClear "Hfpinr".
     (* [fileG_of]'s two projections ARE the two minted records, by iota.
        Named, so the postcondition's row needs no conversion step inside the
        proofmode. *)
