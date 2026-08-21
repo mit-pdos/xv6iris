@@ -29,8 +29,34 @@ Closed outright.  Also landed earlier in the session (see the
 2026-08-21a checkpoint below): D-i, D-ii, T2-1c, W2b-c1, the D-iii
 probes, the R3 correction.
 
-**PROGRESS SINCE THE ORDER BELOW WAS WRITTEN (all landed, in commit
-order): B2d** (`5ba52f7a`, `WeakRvwmoNorm.normalize` — see the note
+**FURTHER PROGRESS (2026-08-21, latest first): B2e-2 witness slice**
+(`548820ef` — CAUGHT A VACUITY: `gacq_po`'s unconstrained successor
+made `cs_kill`'s hypotheses unsatisfiable for every graph; fixed by
+riscv.cat's `ppo ⊆ M × M` typing (`gppo_gmem` now a theorem, model
+WEAKENED — safe direction), all leaves repaired, the satisfiability
+witness `WeakRvwmoLockWit.cs_kill_hyps_sat` landed;
+`WeakAxiomatic.acq_po` flagged with the same shape, R6-adjacent),
+**B2e-2** (`45003fda` — the lock kit, with the `lock_paired`
+correction: pattern alone does NOT give exclusion, machine-found
+counterexample recorded), **B2e-1** (`221a225b`), **B1a**
+(`3606f340`), **B0b-1** (`7389d6f2`).  **THE NEXT SESSION'S
+CENTERPIECE: the B2e-3 design session** — route-b §4d carries the
+precise problem statement: the architecture is settled
+(`xv6_row_ok` / kill discharges / the row_ok discharge), and THE CRUX
+is the WILD-VALUE OBSTRUCTION (emittability does not ground values;
+realization reaches only the violation-free prefix; the kills need
+site facts above it — route A's E1 in route-B clothing).  Three
+candidate resolutions recorded (R1 extended realization with
+strengthened minimality — note the recorded po-closure-climbing
+obstruction to the naive extension cut; R2 groundedness as an
+induction invariant / top-level strong induction on |V|; R3 the
+static-checker component for value-independent fragments).  Run it
+S6-style: the miniature end-to-end per candidate, probes for the
+checkable claims (the closure-climbing shape is constructible; R2's
+subsequence-restriction consistency is probe-able).  After B2e-3:
+B1b (the supply derivation), B3 (assembly), R6.
+
+**EARLIER PROGRESS (in commit order): B2d** (`5ba52f7a`, `WeakRvwmoNorm.normalize` — see the note
 below), **B0b-1** (`7389d6f2`, `WeakRvwmoConf.v`: `row_deps` over
 tagged items + `hart_conf` + the no-side-condition orbit transport
 `hart_conf_ren` + `gdexec_conf`), **B1a** (`3606f340`,
