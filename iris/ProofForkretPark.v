@@ -87,6 +87,7 @@ Require Import WpUart LogInv.
 Require Import ProcAvail.
 Require Import ProcInv.
 Require Import SchedCtx.
+Require Import UsertrapRes.  (* [ut_park_intro_body] -- the park's producer entry *)
 Require Import SpecPrepareReturn.
 Require Import SpecKexec.   (* [K_kexec] -- forkret's deepest callee, on the boot arm *)
 Require Import SpecForkret.
@@ -118,6 +119,17 @@ Section Res.
   Definition usertrap_res_sstc := FR.usertrap_res_sstc.
   Definition usertrap_res_tf_csrs_open := FR.usertrap_res_tf_csrs_open.
   Definition usertrap_res_tf_open := FR.usertrap_res_tf_open.
+  (* ...and the park's one producer-side entry, threaded like the rest.
+     A file that merely passes the residue through has nothing to say about
+     it; the entry exists so that whoever PARKS a never-run process can
+     build one (UsertrapRes.v, "THE PARK'S CHANNEL THROUGH THE MODULE
+     TYPES"). *)
+  Definition usertrap_res_bare_park
+      `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+      (N : ut_names) (av : nat)
+    : ut_park_intro_body
+        (fun h : CpuId => FR.usertrap_res_bare (CID := h)) N av
+    := FR.usertrap_res_bare_park N av.
 End Res.
 
 (* the two register slots of the saved image the park has to read: field 0

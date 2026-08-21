@@ -71,6 +71,9 @@ Require Import FsCrash.
 Require Import UserPtTree.
 Require Import SpecProcinit.
 Require Import SpecFileclose.
+Require Import FsCfg.    (* [fsc_printk] etc -- the ambient names the ties point at *)
+Require Import FirstTok.     (* [first_done] -- what the park's closer is handed *)
+Require Import SyscParkEnv.  (* [sysc_park_extra] -- the park's syscall-side rows *)
 Require Import FsReady.
 Require Import SpecDevintr.
 Require Import SpecPrintk.
@@ -562,6 +565,115 @@ Section UsertrapRes.
 
   Global Instance ut_caps_persistent N : Persistent (ut_caps N).
   Proof. rewrite /ut_caps. apply _. Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* THE PARKER'S HALF OF THE BUNDLE.                                      *)
+  (* ------------------------------------------------------------------- *)
+  (* [ut_caps] is what a process holds while it TRAPS.  A process that has
+     never trapped has to be given one by whoever parks it -- userinit for
+     the first process, kfork for every one after -- and neither of them can
+     hold it: eleven of its eighteen conjuncts are the file system, and at
+     userinit's park the file system DOES NOT EXIST YET (forkret's boot arm
+     is what establishes it, and that runs after userinit parks).  See
+     SpecForkret.v's last header section.
+
+     So the bundle splits a second way, on a different axis from persistence:
+     what [FsReady.fs_ready] supplies, and what it does not.  THIS is the
+     second half -- every [ut_caps] conjunct a parker must hold OUTRIGHT --
+     and it is seven rows, all persistent, all in existence before either
+     parker runs:
+
+       [procs_inv]     the process table, which main builds at procinit
+       [is_kstack]     the child's -- [forkret_park_body] takes it anyway
+       [devintr_caps_any], the [wait_lock], [is_ftable]   main's, persistent
+       [disk_geom] AT THE RECORD'S OWN THREE PAGES -- see below
+       [fclose_ties]   pure: this record's names ARE the ambient ones
+
+     THE DISK ROW IS THE ONLY ONE THAT IS NOT A COPY.  [fs_ready] QUANTIFIES
+     the three ring pages (R1: [virtio_disk_init] [kalloc]s them at WP time,
+     so no boot-era [fupd] could give [fscfg] a value for them), while
+     [ut_caps] names them at the record's [un_pd]/[un_pav]/[un_pu].  A parker
+     cannot choose its record to match a witness that does not exist yet, so
+     it carries [disk_geom] at its OWN pages and [FsReady.disk_geom_agree]
+     identifies the two -- which is exactly the recovery that lemma exists
+     for, and what [ProofSyscall.sysc_fs_env] already does with it.
+
+     [un_pr] IS THE ONE FIELD [fclose_ties] DOES NOT REACH.  The tie record
+     is [SpecFileclose]'s, so it says nothing about the printk gname; the
+     equation is stated here beside it. *)
+  Definition ut_park_caps (N : ut_names) : iProp Σ :=
+    (⌜fclose_ties (un_fn N)⌝ ∗
+     ⌜un_pr N = fsc_printk⌝ ∗
+     procs_inv (un_s N) ∗
+     is_kstack (un_pj N) (un_ks N) ∗
+     devintr_caps_any (un_u N) (un_v N) (un_k N) (un_tk N) (un_s N)
+       (un_pd N) (un_pav N) (un_pu N) ∗
+     is_lock (un_w N) wait_lock_addr "wait_lock"%string wait_res ∗
+     is_ftable (un_ft N) (un_f N) ∗
+     disk_geom (un_v N) (un_pd N) (un_pav N) (un_pu N))%I.
+
+  Global Instance ut_park_caps_persistent N : Persistent (ut_park_caps N).
+  Proof. rewrite /ut_park_caps. apply _. Qed.
+
+  (* ...AND THE JOIN.  The whole point of the split: a parker owes the seven
+     rows above ONCE, at the park, and the eleven file-system ones are owed
+     LATER -- by forkret, which is the first code the parked process runs and
+     the only party that has [FirstTok.first_done] on both arms of its
+     [if (first)].  So this is a wand rather than a conjunction, and the
+     wand is what a park package carries. *)
+  Lemma ut_caps_of_park (N : ut_names) :
+    ut_park_caps N -∗ FsReady.fs_ready -∗ ut_caps N.
+  Proof.
+    iIntros "(%Hties & %Hpr & #Hprocs & #Hkst & #Hdev & #Hwl & #Hft & #Hdg) #Hfs".
+    (* the eighteen field equations, spelled at the RECORD's fields rather
+       than at [un_fn]'s projections of them, so every [rewrite] below is
+       syntactic.  [Hties] itself is kept whole: it is conjunct 17. *)
+    pose proof Hties as Ht.
+    destruct Ht as [Huart Hdisk Hdlock Hkmem Hkalloc Hbio Hlog Hfsn Hcov
+                    Hlogst Hdevn Hireg Hic Htlock Hbms Hist Hnib Hsize].
+    cbn [un_fn fcn_uart fcn_disk fcn_dlock fcn_kmem fcn_kalloc fcn_bio
+         fcn_log fcn_fs fcn_cov fcn_logstart fcn_dev fcn_ireg fcn_ic
+         fcn_tlock fcn_bmapstart fcn_inodestart fcn_nib fcn_size]
+      in Huart, Hdisk, Hdlock, Hkmem, Hkalloc, Hbio, Hlog, Hfsn, Hcov,
+         Hlogst, Hdevn, Hireg, Hic, Htlock, Hbms, Hist, Hnib, Hsize.
+    (* THE DISK FABRIC, and it is the only row that is not a copy: the
+       record's three pages are identified with [fs_ready]'s witness by the
+       persistent cells both [disk_geom]s read. *)
+    iDestruct (fs_ready_disk with "Hfs") as "[#Hdinv Hdex]".
+    iDestruct "Hdex" as (pd pav pu) "[#Hdg2 #Hdlk]".
+    iDestruct (disk_geom_agree (fsc_disk) (un_pd N) (un_pav N) (un_pu N)
+                 pd pav pu with "[] []") as %(Hpd & Hpav & Hpu);
+      [ rewrite -Hdisk; iExact "Hdg" | iExact "Hdg2" |].
+    iDestruct (fs_ready_kmem with "Hfs") as "[#Hkml #Hkav]".
+    iDestruct (fs_ready_printk with "Hfs") as "[#Hpe _]".
+    (* SEVENTEEN [iSplitR]s, NOT one [iFrame]: the goal's tail conjuncts are
+       [is_lock]s over [disk_res]/[kmem_res], an [is_ftable] and [fs_ready]
+       itself, and every match attempt a named frame makes against one of
+       those is a conversion over a big resource (optimization.md, and
+       [ut_env_nopt_sstc] below measures the same shape at 7.5 s). *)
+    rewrite /ut_caps.
+    iSplitR; [iExact "Hprocs"|].
+    iSplitR; [iApply (fs_ready_data with "Hfs")|].
+    iSplitR; [iExact "Hkst"|].
+    iSplitR; [iExact "Hdev"|].
+    iSplitR; [rewrite Hpr Huart Hdisk; iExact "Hpe"|].
+    iSplitR; [iExact "Hwl"|].
+    iSplitR; [iExact "Hft"|].
+    iSplitR; [rewrite Hkmem Hkalloc; iExact "Hkml"|].
+    iSplitR; [rewrite Hdlock Hdisk Hpd Hpav Hpu; iExact "Hdlk"|].
+    iSplitR; [rewrite Hbio Hfsn Hdisk Hdevn Hcov;
+              iApply (fs_ready_bio with "Hfs")|].
+    iSplitR.
+    { rewrite Hlog Hbio Hfsn Hcov Hlogst Hdevn.
+      iApply (fs_ready_log with "Hfs"). }
+    iSplitR; [rewrite Hcov Hlogst; iApply (fs_ready_seam with "Hfs")|].
+    iSplitR; [iApply (fs_ready_gen with "Hfs")|].
+    iSplitR; [rewrite Huart Hdisk; iExact "Hdinv"|].
+    iSplitR; [iExact "Hdg"|].
+    iSplitR; [rewrite Hkalloc; iExact "Hkav"|].
+    iSplitR; [iPureIntro; exact Hties|].
+    iExact "Hfs".
+  Qed.
 
   (* vmfault's and the kalloc cone's bundle, assembled out of three
      persistent members of [ut_caps] rather than carried separately. *)
@@ -1279,6 +1391,101 @@ Section UsertrapRes.
 
 End UsertrapRes.
 
+(* ====================================================================== *)
+(* THE PARK'S ONE MOVE, GENERIC IN THE SYSCALL ENVIRONMENT.                *)
+(* ====================================================================== *)
+(* OUTSIDE THE SECTION, for the reason the transports above are: the closer
+   is quantified over the hart the record may resume on, so [CID] has to be
+   a free argument rather than a section variable.
+
+   WHAT THIS IS.  Everything a party that has never trapped hands over so
+   that the process it is parking can enter the trap loop.  The environment
+   [Rsys] is abstract for the usual reason -- [ProofSyscall] is a proof file
+   and this is not -- so it arrives as a WAND out of [FirstTok.first_done],
+   and that indirection is the whole design: at userinit's park the file
+   system does not exist yet, so nothing owned outright could stand in for
+   it.  See SpecForkret.v's last header section.
+
+   Applying the closer consumes the closer, so the wand and [park_own] are
+   spent exactly when the record is resumed, which is exactly once.
+
+   [ut_park_caps] and the [Rsys] wand are separate premises on purpose: the
+   caps half is process/device plumbing every parker already has, and the
+   [Rsys] half is the syscall table's, which only [SpecSyscall.SYSCALL] can
+   produce ([syscall_env_park]). *)
+Definition park_env `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+                      !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+    (N : ut_names) : iProp Σ :=
+  (ut_park_caps N ∗ sysc_park_extra (un_tk N))%I.
+
+Global Instance park_env_persistent
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId} (N : ut_names) :
+  Persistent (park_env N).
+Proof. rewrite /park_env. apply _. Qed.
+
+(* THE STATEMENT, ONCE, as a [_body] -- the idiom every contract in the tree
+   uses so that a Module Type and its implementation cannot drift apart.
+   [URB] is the bare residue, which is a [Parameter] wherever this is stated
+   abstractly; here it is whatever the instantiation's is. *)
+Definition ut_park_intro_body
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+    (URB : CpuId -> uptd -> mword 64 -> iProp Σ)
+    (N : ut_names) (av : nat) : Prop :=
+  ut_wf N ->
+  (K_usertrap <= av)%nat ->
+  ⊢ park_env N -∗
+    park_own N -∗
+    (∀ (h : CpuId) (pt' : uptd) (V' : pprivate),
+       ⌜pv_upt V' = pt'⌝ -∗
+       FirstTok.first_done -∗
+       ut_trap_parked (CID := h) (un_pj N)
+         (add_vec (un_ks N) (mword_of_int 4096)) av ∅ -∗
+       proc_priv_nopt (un_f N) (un_pj N) (un_pid N) V' -∗
+       fd_slots FDSPARE -∗
+       iref_slots IREFSPARE -∗
+       URB h pt' (add_vec (un_ks N) (mword_of_int 4096))).
+
+Lemma ut_res_bare_park
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+      !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+    (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
+    (N : ut_names) (av : nat) :
+  ut_wf N ->
+  (K_usertrap <= av)%nat ->
+  ut_park_caps N -∗
+  (FirstTok.first_done -∗ Rsys (un_f N) (un_pj N) (un_bn N) (un_fn N)) -∗
+  park_own N -∗
+  (∀ (h : CpuId) (pt' : uptd) (V' : pprivate),
+     ⌜pv_upt V' = pt'⌝ -∗
+     FirstTok.first_done -∗
+     ut_trap_parked (CID := h) (un_pj N)
+       (add_vec (un_ks N) (mword_of_int 4096)) av ∅ -∗
+     proc_priv_nopt (un_f N) (un_pj N) (un_pid N) V' -∗
+     fd_slots FDSPARE -∗
+     iref_slots IREFSPARE -∗
+     ut_res_bare (CID := h) Rsys pt'
+       (add_vec (un_ks N) (mword_of_int 4096))).
+Proof.
+  iIntros (Hwf Hav) "#Hpark Hderive Hown".
+  iIntros (h pt' V') "%Hupt #Hdone Htrap Hpriv Hfd Hiref".
+  iDestruct ("Hderive" with "Hdone") as "Hsys".
+  iDestruct "Hdone" as "[_ #Hrdy]".
+  iDestruct (ut_caps_of_park with "Hpark Hrdy") as "#Hcaps".
+  iDestruct "Hown" as "(Hbs & Hip)".
+  rewrite /ut_res_bare.
+  iExists N, V', av.
+  iSplitR; [iPureIntro; exact Hupt|].
+  iSplitR; [iPureIntro; reflexivity|].
+  iSplitR; [iPureIntro; exact Hwf|].
+  iSplitR; [iPureIntro; exact Hav|].
+  iFrame "Htrap".
+  rewrite /ut_env_nopt /ut_own_nopt.
+  iFrame "Hcaps". iFrame "Hbs Hip Hfd Hiref Hpriv Hsys".
+Qed.
+
+
 (* ---------------------------------------------------------------------- *)
 (* THE TRANSPORT, outside the section so both harts are free arguments --   *)
 (* [IntrDefs]' three transports' idiom exactly.                            *)
@@ -1355,7 +1562,49 @@ Qed.
 (* itself still abstract (SpecSyscall's contract is ASSUMED), so the        *)
 (* definition can only be written under a SYSCALL.                         *)
 (* ---------------------------------------------------------------------- *)
-Module UtResFits (SY : SYSCALL) <: USERTRAP_RES.
+(* ---------------------------------------------------------------------- *)
+(* THE PARK'S CHANNEL THROUGH THE MODULE TYPES.                             *)
+(* ---------------------------------------------------------------------- *)
+(* [usertrap_res_bare] is a [Parameter] of [SpecUsertrap.USERTRAP_RES], and *)
+(* that is right for every CONSUMER of the residue: the trap loop threads    *)
+(* it opaquely and nothing outside [ProofUsertrap] should know its shape.    *)
+(* A PARK IS NOT A CONSUMER.  It has to PRODUCE one, for a process that has  *)
+(* never trapped, and no amount of threading gets you a resource you do not  *)
+(* have -- which is why parking a fresh process has been assumed since kfork *)
+(* was written.                                                             *)
+(*                                                                          *)
+(* So the residue gets exactly ONE producer-side entry, stated at            *)
+(* [ut_park_intro_body] above and proved by [UtResFits] below (and by        *)
+(* [ProofUsertrap], which is the sealed one).  The syscall environment stays *)
+(* abstract throughout: what crosses the boundary is a closer, not a bundle. *)
+(*                                                                          *)
+(* THIS CANNOT LIVE IN [SpecUsertrap.v].  That file is REQUIRED BY this one  *)
+(* (its foot is the [<: USERTRAP_RES] fit check), so it cannot name          *)
+(* [ut_names], [ut_caps], [park_own] or [ut_res_bare] -- the whole           *)
+(* vocabulary such a parameter needs.  Hence the two module types here.      *)
+(* ---------------------------------------------------------------------- *)
+Module Type USERTRAP_RES_PARK.
+  Include SpecUsertrap.USERTRAP_RES.
+  Parameter usertrap_res_bare_park :
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+             !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+      (N : ut_names) (av : nat),
+      ut_park_intro_body (fun h : CpuId => usertrap_res_bare (CID := h)) N av.
+End USERTRAP_RES_PARK.
+
+(* ...and the same entry beside the boundary theorem, which is what
+   [ProofUsertrap] is sealed at.  Module subtyping is structural, so a
+   module of this type serves anywhere [USERTRAP_RES_PARK] is wanted. *)
+Module Type USERTRAP_PARK.
+  Include SpecUsertrap.USERTRAP.
+  Parameter usertrap_res_bare_park :
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+             !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+      (N : ut_names) (av : nat),
+      ut_park_intro_body (fun h : CpuId => usertrap_res_bare (CID := h)) N av.
+End USERTRAP_PARK.
+
+Module UtResFits (SY : SYSCALL) <: USERTRAP_RES_PARK.
 
   Definition usertrap_res
       `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} : uptd -> mword 64 -> iProp Σ :=
@@ -1423,5 +1672,33 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES.
         (∀ ws' : list (mword 64),
            tf_page (ud_tfp pt) ws' -∗ hart_csrs -∗ usertrap_res_bare pt ksp).
   Proof. exact (ut_res_bare_tf_csrs_open (SY.syscall_env) pt ksp kroot). Qed.
+
+  (* THE PRODUCER, ASSEMBLED.  Two halves, and the seam between them is the
+     whole reason this is provable at all: [ut_res_bare_park] turns
+     [ut_park_caps] plus [FirstTok.first_done] into [ut_caps]
+     ([ut_caps_of_park]) and takes the environment as a WAND, and
+     [SY.syscall_env_park] is that wand.  Neither half owns the file system;
+     both are handed it at the moment the record resumes, which is the only
+     moment anybody has it. *)
+  Lemma usertrap_res_bare_park
+      `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+        !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+      (N : ut_names) (av : nat) :
+      ut_park_intro_body (fun h : CpuId => usertrap_res_bare (CID := h)) N av.
+  Proof.
+    rewrite /ut_park_intro_body /usertrap_res_bare.
+    intros Hwf Hav.
+    pose proof Hwf as Hwf2.
+    destruct Hwf2 as (Hj & Hplock & _ & _).
+    iIntros "#Henv Hown".
+    iDestruct "Henv" as "[#Hcaps #Hextra]".
+    iApply (ut_res_bare_park (SY.syscall_env) N av Hwf Hav
+            with "Hcaps [] Hown").
+    iIntros "#Hdone".
+    iDestruct "Hcaps" as "(%Hties & _ & #Hprocs & _ & _ & #Hwl & #Hft & #Hdg)".
+    iApply (SY.syscall_env_park (un_f N) (un_w N) (un_ft N) (un_tk N)
+              (un_fn N) Hties Hj Hplock eq_refl
+            with "Hextra Hwl Hft Hprocs Hdg Hdone").
+  Qed.
 
 End UtResFits.

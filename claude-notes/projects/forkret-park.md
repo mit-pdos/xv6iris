@@ -1,11 +1,12 @@
 # forkret_park: the plan to retire the last assumed Link
 
-> **STATUS 2026-08-21.** Steps A–D have landed: the park is PROVED again, as
-> a functor over the real `SpecForkret.FORKRET` at `LinkForkret.Forkret`, so
-> its cone carries no first-related axiom. What is left is Step E, and Step E
-> is bigger than this file used to say — it is the syscall environment's
-> missing producer, not two `iMod`s. Read §2 and Step E before touching
-> anything; both record designs that were tried and do not type.
+> **STATUS 2026-08-21.** Steps A–D and E1–E2 have landed. The park is PROVED
+> (over the real `SpecForkret.FORKRET` at `LinkForkret.Forkret`, so its cone
+> carries no first-related axiom), and `syscall_env` finally has a producer
+> — the one `LinkSyscall.v` has been owing since the dispatch was linked.
+> What is left is E3: neither parker HOLDS `park_env` yet, and one persistent
+> row is missing at each. Read §2 and Step E before touching anything; both
+> record designs that were tried and do not type.
 
 `LinkForkretPark.ForkretPark.forkret_park` is the one assumed Link in the boot
 cone, and the assumption every proven process-side function carries
@@ -205,7 +206,7 @@ the register/pc bookkeeping, and **the `eb'` handling** — `eb'` is introduced 
 a variable, never case-split, and passed straight through as forkret's `eb`.
 No value of `eb'` is ever fixed and no enabled base is assumed anywhere.
 
-### Step E — the syscall environment's producer, and it is NOT "pay at two sites"
+### Step E — the syscall environment's producer
 
 **THE OLD PLAN WAS WRONG ABOUT THIS STEP'S SIZE.** Writing Step D exposed a
 second abstraction wall, and it is the one that actually blocks the Axiom.
@@ -214,114 +215,103 @@ second abstraction wall, and it is the one that actually blocks the Axiom.
 whose CONCLUSION is `usertrap_res_bare` — a `Parameter` of
 `SpecUsertrap.USERTRAP_RES`, hence opaque to userinit and kfork.
 `ForkretParkClose.forkret_park_pkg_intro` produces
-`forkret_park_pkg (fun h => ut_res_bare Rsys) …`, which is not convertible
-with the opaque one. So the callers cannot use the very lemma written for
-them.
+`forkret_park_pkg (fun h => ut_res_bare Rsys) …`, not convertible with the
+opaque one. And underneath that, `syscall_env` had no producer anywhere —
+`LinkSyscall.v` has said so all along.
 
-The concrete definition is `ProofUsertrap.v:1138`,
-`usertrap_res_bare := ut_res_bare SY.syscall_env`, inside
-`UsertrapProof … : USERTRAP` — sealed. Every re-export up the chain
-(`ProofUserretClosed`, `ProofForkret`, `ProofForkretPark`) is
-`Definition usertrap_res_bare := UC.usertrap_res_bare`, opaque all the way.
+#### E1 — the channel — **LANDED**
 
-So Step E is two pieces:
-
-#### E1 — a channel for the residue's SHAPE (small, but NOT in SpecUsertrap)
-
-The channel is two names:
+`ut_park_intro_body` (`UsertrapRes.v`, outside the section so the hart is a
+free argument) states the producer once, `_body`-style, over an abstract
+bare residue `URB`. Two module types beside `UtResFits` carry it:
 
 ```coq
-  Parameter usertrap_syscall_env :
-    forall `{…} `{GEN : GenId},
-      gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ.
-  Parameter usertrap_res_bare_eq :
-    forall `{…} `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64),
-      usertrap_res_bare pt ksp ⊣⊢ ut_res_bare usertrap_syscall_env pt ksp.
+  Module Type USERTRAP_RES_PARK.  Include SpecUsertrap.USERTRAP_RES.
+    Parameter usertrap_res_bare_park : … ut_park_intro_body … .  End
+  Module Type USERTRAP_PARK.      Include SpecUsertrap.USERTRAP.
+    Parameter usertrap_res_bare_park : … ut_park_intro_body … .  End
 ```
 
-`ProofUsertrap` discharges the equation by `reflexivity` — it IS the
-definition (`ProofUsertrap.v:1138`). Each re-export block (three of them)
-gains two lines. The syscall ENVIRONMENT stays abstract; only the residue's
-shape stops being, which was never the secret.
+It could NOT go in `SpecUsertrap.v`: `UsertrapRes.v` requires *it* (its foot
+is the `<: USERTRAP_RES` fit check), so `SpecUsertrap` cannot name
+`ut_names`, `ut_caps`, `park_own` or `ut_res_bare`.
 
-**CHECK THE DEPENDENCY DIRECTION BEFORE WRITING IT.** These do NOT go in
-`SpecUsertrap.USERTRAP_RES`: `_CoqProject` has `SpecUsertrap.v` at 146 and
-`UsertrapRes.v` at 147, and `UsertrapRes.v` requires `SpecUsertrap` (its
-foot is `UtResFits <: USERTRAP_RES`, the fit check). So `SpecUsertrap`
-cannot name `ut_res_bare` — nor `ut_names`, `ut_caps` or `park_own`, which
-is the whole vocabulary such a parameter would need.
+Threaded through the four module types that include the residue —
+`SpecUservec.USERVEC`, `SpecUserretClosed.USERRET_CLOSED`,
+`SpecForkret.FORKRET`, `SpecForkretParkPaid.FORKRET_PARK_PAID` — and
+re-exported one line each in `ProofUservec`, `ProofUserretClosed`,
+`ProofForkret`, `ProofForkretPark`. `ProofUsertrap` is sealed at
+`USERTRAP_PARK` now and gets the proof by `Module Fits := UtResFits SY` —
+the fit check has always been a functor over `SYSCALL` for exactly this
+reason, so the entry is proved there and renamed here.
 
-The home is a NEW module type at the foot of `UsertrapRes.v`, beside
-`UtResFits`:
+#### E2 — the producer — **LANDED**
 
-```coq
-  Module Type USERTRAP_PARK.
-    Include SpecUsertrap.USERTRAP.
-    Parameter usertrap_syscall_env : … .
-    Parameter usertrap_res_bare_eq : … .
-  End USERTRAP_PARK.
-```
+Three lemmas, and between them they say what parking a process costs:
 
-and `ProofUsertrap` is ascribed to it instead of to `USERTRAP` (it already
-requires `UsertrapRes`). Everything downstream that threads the residue
-re-exports the two extra names the same way it re-exports the twelve.
+* `UsertrapRes.ut_park_caps N` / `ut_caps_of_park` — `ut_caps` splits on a
+  second axis, orthogonal to persistence: what `FsReady.fs_ready` supplies
+  (eleven conjuncts) and what it does not (seven, all persistent, all in
+  existence before either parker runs). `ut_caps_of_park` is the join, and
+  it is a WAND because the file system is owed later, by forkret.
+  The disk row is the only one that is not a copy: `fs_ready` quantifies the
+  three ring pages (R1) while `ut_caps` names them at the record's fields,
+  so `FsReady.disk_geom_agree` identifies them. `un_pr` is the one field
+  `fclose_ties` does not reach, so its equation rides beside it.
+* `SyscParkEnv.sysc_park_extra γtk` — the four rows the file system does not
+  carry: the nextpid lock, `procs_avail None`, the ticks lock,
+  `console_ready`. A new leaf file, because `SpecSyscall` has to name it and
+  cannot see `UsertrapRes`.
+* `ProofSyscall.syscall_env_park` — **the producer `LinkSyscall.v` has been
+  owing since the dispatch was linked.** From `first_done` plus
+  `sysc_park_extra` plus four rows the caller holds anyway for `ut_caps`
+  (`wait_lock`, `is_ftable`, `procs_inv`, `disk_geom`) it builds
+  `syscall_env γf (proc_addr (fcn_j fn)) (fcn_bio fn) fn`.
+  `sysc_ties` is DERIVED, not taken (`sysc_ties_of_fclose`): fourteen of its
+  equations are `fclose_ties`' verbatim, two are that record's `fcn_bio` row
+  read twice, and four are pure premises the caller owes anyway.
 
-#### E2 — a PRODUCER for the syscall environment (the real work)
+`UsertrapRes.ut_res_bare_park` ties the two together at an abstract `Rsys`,
+and `UtResFits.usertrap_res_bare_park` instantiates it at
+`SY.syscall_env` with `SY.syscall_env_park` as the wand.
 
-Even with E1 the caller still owes
-`first_done -∗ ut_caps N ∗ usertrap_syscall_env (un_f N) (un_pj N) (un_bn N) (un_fn N)`
-and `usertrap_syscall_env` is abstract, so it must come from the module:
+#### E3 — the two call sites — WHAT IS LEFT, and what it costs
 
-```coq
-  (* SpecSyscall.SYSCALL *)
-  Parameter syscall_env_intro : … -> <the persistent rows> -∗ first_done -∗
-    syscall_env γf pj bn fn.
-```
+The machinery is in place; what remains is that neither parker currently
+HOLDS `park_env N`, and one row is genuinely missing at each.
 
-proved in `ProofSyscall.v` and threaded through `USERTRAP_RES` the same way.
-**This is exactly the gap `LinkSyscall.v` already records** — "Establishing
-the environment is the boot chain's job and is still owed", and
-`ProofSyscall.v:975` says the same at the definition. It is not new debt;
-Step D is what made it the *next* thing rather than a distant one.
+`park_env N = ut_park_caps N ∗ sysc_park_extra (un_tk N)`, i.e. eleven rows:
+`fclose_ties`, `un_pr = fsc_printk`, `procs_inv`, `is_kstack`,
+`devintr_caps_any`, the `wait_lock`, `is_ftable`, `disk_geom`, the nextpid
+lock, `procs_avail None`, `is_tickslock`, `console_ready`.
 
-Sizing it — `syscall_env γf pj bn fn` is four conjuncts:
+**kfork (`ProofKforkB5.v:204`).** Its parent holds `syscall_env`, and
+`ProofSyscall.syscall_env_all` projects out ten of the eleven — the nextpid
+lock, `procs_avail`, the `wait_lock`, `is_ftable`, `is_tickslock`,
+`printk_env`, and (through `sysc_fs_env`) `procs_inv`, `disk_geom` and the
+ties; `syscall_env_console` and `syscall_env_first` give the last two of
+those and `first_done` itself. `is_kstack` is already a premise at the site.
+**The one row `syscall_env` does not carry is `devintr_caps_any`** — it is a
+`ut_caps` conjunct that usertrap holds and does not pass to syscall. So it
+has to be threaded usertrap → syscall → sys_fork → kfork. Persistent, so
+four contract widenings and no proof obligations.
 
-| conjunct | producer |
-|---|---|
-| `sysc_proc_env γf` = nextpid `is_lock`, `procs_avail None`, `wait_lock`, `is_ftable`, `is_tickslock` | all persistent, all created by main before userinit runs |
-| `ConsoleInv.console_ready` | persistent, main |
-| `sysc_fs_env pj bn fn` = `⌜sysc_ties⌝ ∗ procs_inv ∗ disk_geom ∗ virtio_disk `is_lock` ∗ fs_ready` | `fs_ready` is `first_done`'s second half; `procs_inv` is a park premise already |
-| `FirstTok.first_done` | the argument itself |
+**userinit (`ProofUserinit.v:674`).** In scope at the site today: `#Hpinv`
+(`procs_inv`), `#Hlpid` (the nextpid lock), `#Hpenv` (`printk_env`), `Hpav`,
+and `is_kstack` from allocproc. Missing and to be threaded from main, which
+creates every one of them before it calls userinit: `devintr_caps_any`,
+`is_ftable`, the `wait_lock`, `is_tickslock`, `console_ready`, `disk_geom`.
+All persistent; the cost is widening `SpecUserinit.wp_userinit_sconf_body`,
+`SpecMain`/`ProofMain` and the boot chain's threading.
 
-ONE WRINKLE, and `sysc_fs_env`'s own header anticipates it: `fs_ready`
-QUANTIFIES the three disk ring pages (`∃ pd pav pu`, since R1 took them out
-of `fscfg`), while `sysc_fs_env` names them at `fn`'s fields. A producer
-that holds `fs_ready` "unpacks the existential and builds `fn` with `fcn_pd`
-at the witness" — but the park fixes `N` (hence `un_fn N`, hence the pages)
-BEFORE `fs_ready` exists, so it cannot choose the witness. The escape is
-`FsReady.disk_geom_agree`, which identifies any two: the park supplies its
-own `disk_geom` (persistent, from main's `virtio_disk_init`) and the
-equation transports the lock. Mechanical, but it is a premise
-`syscall_env_intro` must take.
-
-#### E3 — then, and only then, the two call sites
-
-`forkret_park` is invoked in exactly two places, both
-`iMod (FP.forkret_park γs γf (proc_addr j) ks rest pid V Hrest with "Hks Hctx Hpriv Hfd Hirsp")`:
-
-* `ProofUserinit.v:674` — the first process. Its comment block already calls
-  itself "THE DEPOSIT SITE", and `Hbsl` (the three bslots) is in scope.
-* `ProofKforkB5.v:204` — every process after. `Hbslp` is in scope. One
-  caveat: `ut_caps` is persistent but UNPACKED here — its members arrive as
-  separate premises (`#Htext`, `#Hpinv`, `#Hwl`, …), so reassembling the
-  bundle is mechanical but not free.
-
-Widen `SpecForkretPark.forkret_park_body` to carry the package (or switch
-both callers to `FORKRET_PARK_PAID`), pay at those two `iMod`s, and replace
+Then: build `N` (mostly the ambient `fsc_*`/`icfg_*` fields, which is what
+makes `fclose_ties` hold), reshape the park closer into
+`forkret_park_pkg`'s (mechanical — `forkret_yield` IS `ut_trap_parked ∗
+proc_priv_nopt`, and the two pure page-table arguments are unused), switch
+both callers from `FORKRET_PARK` to `FORKRET_PARK_PAID`, and replace
 `LinkForkretPark.v`'s `Axiom` with an application of `ProofForkretPark`.
 
-Do **userinit first** — it is the harder site (no `fs_ready` yet, which is
-what this whole plan is about) and proves the design.
+Do **userinit first** — it is the harder site and proves the design.
 
 ## 4. How to build
 

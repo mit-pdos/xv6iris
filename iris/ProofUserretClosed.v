@@ -68,6 +68,7 @@ Require Import TimerCap.   (* [sstc_enabled]: the residue's mcounteren pin *)
 Require Import UserFrame.  (* [u_regs_pc_is]: the pc_is bundle in u_regs *)
 Local Open Scope Z_scope.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import UsertrapRes.  (* [ut_park_intro_body] -- the park's producer entry *)
 Import Defs.
 
 (* ===================================================================== *)
@@ -219,6 +220,17 @@ Section Res.
   Definition usertrap_res_sstc := UV.usertrap_res_sstc.
   Definition usertrap_res_tf_csrs_open := UV.usertrap_res_tf_csrs_open.
   Definition usertrap_res_tf_open := UV.usertrap_res_tf_open.
+  (* ...and the park's one producer-side entry, threaded like the rest.
+     A file that merely passes the residue through has nothing to say about
+     it; the entry exists so that whoever PARKS a never-run process can
+     build one (UsertrapRes.v, "THE PARK'S CHANNEL THROUGH THE MODULE
+     TYPES"). *)
+  Definition usertrap_res_bare_park
+      `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+      (N : ut_names) (av : nat)
+    : ut_park_intro_body
+        (fun h : CpuId => UV.usertrap_res_bare (CID := h)) N av
+    := UV.usertrap_res_bare_park N av.
 
 End Res.
 

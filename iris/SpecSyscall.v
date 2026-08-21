@@ -134,6 +134,13 @@ Require Import SpecSysExec.   (* [K_sys_exec]: the deepest entry in the table *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
+Require Import WpLock.       (* [is_lock] *)
+Require Import SpecProcinit. (* [wait_lock_addr] *)
+Require Import WaitInv.      (* [wait_res] *)
+Require Import FileInv.      (* [is_ftable] *)
+Require Import DiskInv.      (* [disk_geom] *)
+Require Import FirstTok.     (* [first_done] -- what the environment's producer takes *)
+Require Import SyscParkEnv. (* [sysc_park_extra] -- and the four rows it does not *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
 Import Defs.
@@ -271,6 +278,56 @@ Module Type SYSCALL.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId},
       gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ.
+  (* ===================================================================== *)
+  (* THE ENVIRONMENT'S PRODUCER -- the one thing about [syscall_env] that   *)
+  (* has never had one.                                                     *)
+  (* ===================================================================== *)
+  (* [LinkSyscall.v] has said all along that establishing the environment is
+     the boot chain's job and is still owed: the dispatch is LINKED, all
+     twenty-two arms, no axiom, but nothing anywhere BUILDS a
+     [syscall_env].  It only ever arrives abstractly, as usertrap's [Rsys].
+     That is fine for a process already in the trap loop and impossible for
+     a process being put INTO it, which is why parking a fresh process has
+     been assumed since kfork was written.
+
+     THIS IS THAT PRODUCER, and its premise list is the point.  Everything
+     the environment needs about the FILE SYSTEM comes from [first_done]
+     ([first_addr |->4[] 0 and FsReady.fs_ready]) -- including the
+     environment's own fourth conjunct, which IS [first_done].  What is left
+     is four persistent rows the file system does not carry
+     ([SyscParkEnv.v] names them) and four the caller is holding anyway for
+     [UsertrapRes.ut_caps] (the [wait_lock], [is_ftable], [procs_inv],
+     [disk_geom]).  Nothing here is exclusive and nothing here is boot
+     state.
+
+     WHY [first_done] AND NOT [fs_ready]: the environment's fourth conjunct
+     is the steady arm of proc.c's [static int first], whose discarded cell
+     is written by exactly one instruction in the kernel -- the release
+     store on forkret's boot arm.  A producer given only [fs_ready] would
+     be short a row that userinit, which parks the very process that runs
+     that store, could not possibly supply.  See SpecForkret.v's last
+     header section for the whole ordering argument.
+
+     THE INDICES ARE READ OFF [fn] rather than taken as parameters, because
+     [sysc_ties] pins them: [pj] must be [proc_addr (fcn_j fn)] and [bn]
+     must be [fcn_bio fn].  The four pure premises are the rest of that
+     record -- everything it says that is not already [fclose_ties]. *)
+  Parameter syscall_env_park :
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+             !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+      (γf γw γft γtk : gname) (fn : fclose_names),
+      fclose_ties fn ->
+      (fcn_j fn < NPROC)%nat ->
+      fcn_procs fn !! fcn_j fn = Some (fcn_plock fn) ->
+      fcn_dq fn = DfracOwn (1/4) ->
+      sysc_park_extra γtk -∗
+      is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
+      is_ftable γft γf -∗
+      procs_inv (fcn_procs fn) -∗
+      disk_geom (fcn_disk fn) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) -∗
+      first_done -∗
+      syscall_env γf (proc_addr (fcn_j fn)) (fcn_bio fn) fn.
+
   Parameter wp_syscall_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
              !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}

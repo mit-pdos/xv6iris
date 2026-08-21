@@ -367,6 +367,7 @@ Require Import SpecFilestat.
 Require Import BioInv.
 Require Import FsReady FsCfg.
 Require Import FirstTok.  (* [first_done] -- syscall_env's last conjunct *)
+Require Import SyscParkEnv.  (* [sysc_park_extra] -- what the producer below takes *)
 Require Import SpecSyscall.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -978,6 +979,88 @@ Section SyscallVocab.
         store and seals the file system, its steady arm already holds
         both halves. *)
      FirstTok.first_done)%I.
+
+  (* ===================================================================== *)
+  (* ...AND ITS PRODUCER.  [SpecSyscall.SYSCALL]'s [syscall_env_park].       *)
+  (* ===================================================================== *)
+  (* The paragraph above says nobody constructs this bundle yet.  THIS IS
+     THE CONSTRUCTOR, and the reason it can exist is the reason the comment
+     said the obligation would land at forkret: [FirstTok.first_done] is
+     [first_addr |->4[] 0] beside [FsReady.fs_ready], forkret holds it on
+     BOTH arms of its [if (first)], and it carries three of this bundle's
+     four conjuncts outright.
+
+     WHAT IS ACTUALLY OWED, then, is only what [fs_ready] does not carry:
+     [SyscParkEnv.sysc_park_extra]'s four (the nextpid lock, the slot
+     ledger, the ticks lock, the console) plus four the caller is holding
+     anyway for [UsertrapRes.ut_caps] (the [wait_lock], [is_ftable],
+     [procs_inv], [disk_geom]).  All eight are persistent and all eight
+     exist before either parker runs.
+
+     THE DISK LOCK IS THE ONE ROW THAT IS NOT A COPY, for the reason
+     [sysc_fs_env]'s own header gives: [fs_ready] QUANTIFIES the three ring
+     pages (R1) while this bundle names them at [fn]'s fields, so the
+     witness is opened here and [FsReady.disk_geom_agree] identifies it with
+     the caller's [disk_geom].  That is exactly what that lemma exists for.
+
+     [sysc_ties] IS DERIVED, NOT TAKEN.  Fourteen of its equations are
+     [fclose_ties]' verbatim, [sct_bn]/[sct_bio] are that record's [fcn_bio]
+     row read twice, and the remaining four are the pure premises above --
+     so a caller that already owes [fclose_ties fn] for [ut_caps] owes
+     nothing new here. *)
+  Lemma sysc_ties_of_fclose (fn : fclose_names) :
+    fclose_ties fn ->
+    (fcn_j fn < NPROC)%nat ->
+    fcn_procs fn !! fcn_j fn = Some (fcn_plock fn) ->
+    fcn_dq fn = DfracOwn (1/4) ->
+    sysc_ties (proc_addr (fcn_j fn)) (fcn_bio fn) fn.
+  Proof.
+    intros [Huart Hdisk Hdlock Hkmem Hkalloc Hbio Hlog Hfs Hcov Hlogst Hdev
+            Hireg Hic Htlock Hbms Hist Hnib Hsize] Hj Hplock Hdq.
+    (* [sct_bio] and [sct_pj] are [reflexivity] because the indices were
+       READ OFF [fn]; everything else is one of the twenty-two hypotheses. *)
+    constructor; try assumption; try reflexivity.
+  Qed.
+
+  Lemma syscall_env_park (γf γw γft γtk : gname) (fn : fclose_names) :
+    fclose_ties fn ->
+    (fcn_j fn < NPROC)%nat ->
+    fcn_procs fn !! fcn_j fn = Some (fcn_plock fn) ->
+    fcn_dq fn = DfracOwn (1/4) ->
+    sysc_park_extra γtk -∗
+    is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
+    is_ftable γft γf -∗
+    procs_inv (fcn_procs fn) -∗
+    disk_geom (fcn_disk fn) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) -∗
+    first_done -∗
+    syscall_env γf (proc_addr (fcn_j fn)) (fcn_bio fn) fn.
+  Proof.
+    iIntros (Hties Hj Hplock Hdq) "#Hextra #Hwl #Hft #Hprocs #Hdg #Hdone".
+    iDestruct "Hextra" as "(#Hnextpid & #Hpav & #Htick & #Hcons)".
+    iDestruct "Hdone" as "[#Hcell #Hrdy]".
+    pose proof Hties as Ht.
+    destruct Ht as [Huart Hdisk Hdlock _ _ _ _ _ _ _ _ _ _ _ _ _ _ _].
+    (* the disk fabric, at [fn]'s pages rather than at [fs_ready]'s witness *)
+    iDestruct (FsReady.fs_ready_disk with "Hrdy") as "[_ Hdex]".
+    iDestruct "Hdex" as (pd pav pu) "[#Hdg2 #Hdlk]".
+    iDestruct (FsReady.disk_geom_agree fsc_disk (fcn_pd fn) (fcn_pav fn)
+                 (fcn_pu fn) pd pav pu with "[] []") as %(Hpd & Hpav & Hpu);
+      [ rewrite -Hdisk; iExact "Hdg" | iExact "Hdg2" |].
+    rewrite /syscall_env.
+    iSplitR.
+    { rewrite /sysc_proc_env.
+      iDestruct "Hnextpid" as (γp) "#Hnp".
+      iExists γp, γw, γft, γtk. iFrame "Hnp Hpav Hwl Hft Htick". }
+    iSplitR; [iExact "Hcons"|].
+    iSplitR.
+    { rewrite /sysc_fs_env.
+      iSplitR;
+        [iPureIntro; exact (sysc_ties_of_fclose fn Hties Hj Hplock Hdq)|].
+      iFrame "Hprocs Hdg".
+      iSplitR; [rewrite Hdlock Hdisk Hpd Hpav Hpu; iExact "Hdlk"|].
+      iExact "Hrdy". }
+    rewrite /first_done. iFrame "Hcell Hrdy".
+  Qed.
 
   (* THE CONSOLE, reached on its own rather than through [syscall_env_all].
      Adding it to that projection's output would move eleven arms'

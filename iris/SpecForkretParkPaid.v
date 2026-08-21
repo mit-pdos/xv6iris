@@ -222,7 +222,13 @@ Definition forkret_park_paid_body
 
 Module Type FORKRET_PARK_PAID.
   (* the residue is the module-type parameter it is everywhere else *)
-  Include SpecUsertrap.USERTRAP_RES.
+  (* ...AND THE PARK'S ONE PRODUCER-SIDE ENTRY, threaded with the rest.
+     [UsertrapRes.USERTRAP_RES_PARK] is [USERTRAP_RES] plus
+     [usertrap_res_bare_park]: the residue stays opaque to every CONSUMER,
+     and the one party that has to BUILD one -- whoever parks a process that
+     has never trapped -- gets a closer instead.  See that file's "THE
+     PARK'S CHANNEL THROUGH THE MODULE TYPES". *)
+  Include UsertrapRes.USERTRAP_RES_PARK.
   Parameter forkret_park_paid :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (γf : gname) (pa ks : mword 64) (rest : list (mword 64))

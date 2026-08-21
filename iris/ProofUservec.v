@@ -57,9 +57,10 @@ Require Import ProcAvail.
 Require Import TfPage36.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
+Require Import UsertrapRes.  (* [ut_park_intro_body] -- the park's producer entry *)
 Import Defs.
 
-Module UservecProof (UT : SpecUsertrap.USERTRAP) (UR : SpecUserret.USERRET) : USERVEC.
+Module UservecProof (UT : UsertrapRes.USERTRAP_PARK) (UR : SpecUserret.USERRET) : USERVEC.
 
 Section UservecAllPt.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
@@ -69,6 +70,17 @@ Section UservecAllPt.
   Definition usertrap_res_parked := UT.usertrap_res_parked.
   Definition usertrap_res_bare := UT.usertrap_res_bare.
   Definition usertrap_res_tf_open := UT.usertrap_res_tf_open.
+  (* ...and the park's one producer-side entry, threaded like the rest.
+     A file that merely passes the residue through has nothing to say about
+     it; the entry exists so that whoever PARKS a never-run process can
+     build one (UsertrapRes.v, "THE PARK'S CHANNEL THROUGH THE MODULE
+     TYPES"). *)
+  Definition usertrap_res_bare_park
+      `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+      (N : ut_names) (av : nat)
+    : ut_park_intro_body
+        (fun h : CpuId => UT.usertrap_res_bare (CID := h)) N av
+    := UT.usertrap_res_bare_park N av.
   Definition usertrap_res_csrs_open := UT.usertrap_res_csrs_open.
   Definition usertrap_res_sstc := UT.usertrap_res_sstc.
   Definition usertrap_res_tf_csrs_open := UT.usertrap_res_tf_csrs_open.

@@ -111,7 +111,15 @@ Set Printing Depth 40.
 Module UsertrapProof (SY : SYSCALL) (PK : PRINTK_GEN) (MP : MYPROC)
                      (KI : KILLED) (SK : SETKILLED) (DE : DEVINTR)
                      (VM : VMFAULT) (YI : YIELD) (PR : PREPARE_RETURN)
-                     (KE : KEXIT) (KV : KERNELVEC) : USERTRAP.
+                     (KE : KEXIT) (KV : KERNELVEC) : UsertrapRes.USERTRAP_PARK.
+
+(* THE PARK'S PRODUCER, at this file's [SY].  [UsertrapRes.UtResFits] is the
+   fit check that has always been written under a [SYSCALL] for exactly this
+   reason -- it can name [SY.syscall_env] -- so the entry is proved there and
+   re-exported here rather than restated.  Its [usertrap_res_bare] is
+   [ut_res_bare SY.syscall_env], which is this file's verbatim, so the
+   re-export typechecks by conversion. *)
+Module Fits := UtResFits SY.
 
 (* the four proven blocks, at this file's callee instances *)
 Module A := UtArms PR KI KE YI SK VM.
@@ -1161,6 +1169,15 @@ Lemma usertrap_res_tf_open
   ∃ ws : list (mword 64), ⌜tf_kernel_words_ok kroot ksp ws⌝ ∗ tf_page (ud_tfp pt) ws ∗
     (∀ ws' : list (mword 64), tf_page (ud_tfp pt) ws' -∗ usertrap_res_bare pt ksp).
 Proof. exact (ut_res_bare_tf_open SY.syscall_env pt ksp kroot). Qed.
+
+(* THE PARK'S PRODUCER, re-exported off the fit check.  See [Module Fits]
+   above: it is proved under the same [SY], so this is a rename. *)
+Definition usertrap_res_bare_park
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+    (N : ut_names) (av : nat)
+  : ut_park_intro_body
+      (fun h : CpuId => Fits.usertrap_res_bare (CID := h)) N av
+  := Fits.usertrap_res_bare_park N av.
 
 Lemma usertrap_res_csrs_open
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
