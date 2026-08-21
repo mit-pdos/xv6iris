@@ -1,26 +1,42 @@
 (* SpecForkretPark.v -- turning a freshly-allocated process's raw saved
    context (ra = forkret, sp = kstack + PGSIZE, twelve don't-care
    callee-saved slots) into a member of the scheduler's swtch chain, i.e.
-   [SchedCtx.proc_ctx] -- so that [kfork] (and, eventually, [userinit]) can
-   release the process at RUNNABLE.
+   [SchedCtx.proc_ctx] -- so that [kfork] and [userinit], the two places a
+   process is parked at RUNNABLE from scratch, can release it.
 
-   THERE ARE TWO FORMS OF THIS PARK, and the difference between them is the
-   only thing still missing:
+   THERE ARE TWO FORMS OF THIS PARK, and the difference between them is
+   the only thing still missing:
 
      [FORKRET_PARK] / [forkret_park_body] -- HERE, and ASSUMED
-       ([LinkForkretPark.v]).  What [ProofKfork.v] is a functor over; it
-       takes exactly what kfork has in hand.
+       ([LinkForkretPark.v]).  What [ProofKfork.v] and [ProofUserinit.v] are
+       functors over; it takes exactly what those two have in hand.
 
-     [FORKRET_PARK_PAID] -- [SpecForkretParkPaid.v], PROVED
-       ([ProofForkretPark.v]) over forkret's own contract, at the cost of
-       one further precondition ([forkret_park_pkg]): the child's free
-       kernel stack and the closer that turns forkret's yield into the trap
-       loop's kernel-side bundle.  That file's comment block is the
-       inventory, and the reason the two cannot simply be joined.
+     [SpecForkretParkPaid.FORKRET_PARK_PAID] -- the same park at the
+       premises a caller must PAY ([forkret_park_pkg]: the persistent world
+       the parked closure captures, the child's free kernel stack, and the
+       residue closer that turns forkret's yield into the trap loop's
+       kernel-side bundle).  That file's header is the inventory.
 
-   So parking a fresh process is no longer an open question about forkret;
-   it is an open question about where a NEW process's half of the kernel
-   environment comes from, which is kfork's (and sys_fork's) to answer.
+   NO PROOF OF EITHER IS IN THE TREE RIGHT NOW.  One used to be -- a functor
+   over [FORKRET_NF], forkret MINUS a [first] premise, itself assumed -- and
+   it was deleted (last green at 4bbc418f) when forkret's real contract
+   moved out from under it.  Forkret is now PROVED outright, boot arm
+   included, so a revived park is a functor over [SpecForkret.FORKRET]
+   instantiated at [LinkForkret.Forkret], and carries no first-related axiom
+   at all.  [SpecForkretParkPaid.v] has been rewritten against that contract
+   and states what such a proof proves.
+
+   SO PARKING A FRESH PROCESS IS NOT AN OPEN QUESTION ABOUT FORKRET ANY
+   MORE.  It is a question about where a NEW process's half of the kernel
+   environment comes from, which is kfork's and userinit's to answer -- and
+   it is down to ONE ROW.  Of everything [forkret_park_pkg] asks: the
+   persistent world is free, [pslot_used_at] is already in allocproc's
+   postcondition, and the child's free kernel stack is too
+   ([ProcDefs.kstack_free], a conjunct of [proc_dormant], handed back beside
+   the [is_kstack] this contract takes).  What has no source is
+   [bslots (un_bn N) 3], the first conjunct of [UsertrapRes.ut_own_nopt];
+   see [SpecForkretParkPaid.v] for why the fix is a carve at procinit rather
+   than a WP step.
 
    THE ASSUMED FORM IS NOT A DESIGN SHORTCUT; IT IS A REAL, PRE-EXISTING GAP
    THAT KFORK IS THE FIRST FUNCTION TO NEED CLOSED.  [SchedCtx.proc_ctx pa]

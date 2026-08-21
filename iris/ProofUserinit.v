@@ -638,8 +638,11 @@ Section ProofUserinit.
     (*                                                                    *)
     (* Three of the four rows were carried here across allocproc and namei *)
     (* untouched ([Hfirst], [Hpersist], [Hfsinit]); the fourth is minted   *)
-    (* by the seal below.  See [FirstTok.first_tok]'s own note for why the *)
-    (* allocator row is the BUNDLE and not the spelled pair.               *)
+    (* by the seal below.  That row is the NAMED half                      *)
+    (* [kalloc_avail fsc_kpages None], not [kalloc_env]'s bundle: the seal *)
+    (* is what [FsReady.fs_ready_pre] consumes and it spells the pair, so  *)
+    (* the counted chain carries the name down to here                     *)
+    (* ([KvmSpec.kalloc_env_at]; fs-cfg-boot.md debt F).                   *)
     (* ================================================================= *)
     (* ================================================================= *)
     (* THE SEAL.  allocproc's draw at +0x0a was the LAST counted kalloc in
