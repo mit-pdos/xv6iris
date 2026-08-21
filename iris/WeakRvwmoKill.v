@@ -83,7 +83,8 @@ Lemma gviol_no_aq (G : gexec) (e w : geid) :
 Proof.
   intros (_ & Hppo & _ & _) Hv [Hr Haq].
   apply (gviol_no_gppo G e w Hppo Hv). right. right. left.
-  pose proof Hv as (Hpo & _ & _ & _). by split_and!.
+  pose proof Hv as (Hpo & _ & Hw & _). split_and!; [done|done|done|].
+  by apply glbl_is_w_gmem.
 Qed.
 
 (** RULE 4 — a covering fence between them. *)

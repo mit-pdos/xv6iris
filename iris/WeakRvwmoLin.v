@@ -1487,12 +1487,16 @@ Proof.
       by rewrite Heq (lin_lbl kf qf Hqf) Hlf.
 Qed.
 
+(** [acq_po] (like the graph's own rule-5 arm before it was narrowed) does
+    not pin its SUCCESSOR to a memory access, so the [gmem] side condition is
+    a premise here; both call sites have it, the successor being the read the
+    [fr] edge starts at. *)
 Lemma lin_acq_po_gmo k1 k2 g1 g2 :
-  glin_eids G !! k1 = Some g1 → glin_eids G !! k2 = Some g2 →
+  glin_eids G !! k1 = Some g1 → glin_eids G !! k2 = Some g2 → gmem G g2 →
   acq_po (cand_exec (lin_cand G)) (ev_at k1) (ev_at k2) → gmo_lt G g1 g2.
 Proof.
-  intros H1 H2 (n1 & n2 & s1 & s2 & Ha & Hb & Hlt & Hs1 & Hs2 & Hag & Hisr
-                & Haq).
+  intros H1 H2 Hmem2 (n1 & n2 & s1 & s2 & Ha & Hb & Hlt & Hs1 & Hs2 & Hag
+                      & Hisr & Haq).
   simplify_eq.
   destruct (lin_tr_lookup_inv n1 s1 Hs1) as (q1 & Hq1 & ->).
   destruct (lin_tr_lookup_inv n2 s2 Hs2) as (q2 & Hq2 & ->).
@@ -1505,6 +1509,7 @@ Proof.
     by apply (glin_po_iff n1 n2 g1 g2 H1 H2 Hag).
   - exists (glbl G g1). split; [exact (lin_lbl n1 g1 H1)|exact Hisr].
   - exists (glbl G g1). split; [exact (lin_lbl n1 g1 H1)|exact Haq].
+  - exact Hmem2.
 Qed.
 
 Lemma lin_rel_acq_gmo k1 k2 g1 g2 :
@@ -1640,14 +1645,15 @@ Proof.
         + by eapply lin_fence_between.
         + by left.
         + by left.
-      - by apply (lin_acq_po_gmo k1 k2 e1 e2 Hk1 Hk2). }
+      - apply (lin_acq_po_gmo k1 k2 e1 e2 Hk1 Hk2); [|done].
+        by apply glbl_is_r_gmem. }
     by apply (lin_ord_core k1 k2 e1 e2 a w t Hk1 Hk2 Hmo (or_intror Hpub)).
 Qed.
 
 Lemma lin_rel_ord : ax_rel_ord (cand_exec (lin_cand G)).
 Proof.
   intros e1 k2 s2 a w t Hs2 Hrel Hpub Hfr.
-  destruct (lin_read_at_2 k2 s2 a w Hs2 Hfr) as (e2 & Hk2 & _).
+  destruct (lin_read_at_2 k2 s2 a w Hs2 Hfr) as (e2 & Hk2 & Hr2).
   pose proof Hpub as (HW & [k1 Hk1eq] & Hts). subst e1.
   assert (Hex : ∃ s1, ex_tr (cand_exec (lin_cand G)) !! k1 = Some s1)
     by (destruct HW as (s1 & Hs1 & _); by exists s1).
@@ -1661,7 +1667,8 @@ Proof.
       destruct (lin_tr_lookup_inv n1 sm Hsm) as (em & Hkm & _).
       apply (gmo_lt_trans G e1 em e2).
       + by apply (lin_rel_acq_gmo k1 n1 e1 em Hk1 Hkm).
-      + by apply (lin_acq_po_gmo n1 k2 em e2 Hkm Hk2). }
+      + apply (lin_acq_po_gmo n1 k2 em e2 Hkm Hk2); [|done].
+        by apply glbl_is_r_gmem. }
   by apply (lin_ord_core k1 k2 e1 e2 a w t Hk1 Hk2 Hmo (or_introl Hpub)).
 Qed.
 

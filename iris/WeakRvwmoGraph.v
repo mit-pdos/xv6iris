@@ -158,6 +158,19 @@ Definition gfence_between (G : gexec) (e1 e2 : geid)
 Definition glbl_is (G : gexec) (e : geid) (P : lbl → bool) : Prop :=
   ∃ l, gx_lbl G e = Some l ∧ P l = true.
 
+(** A read or a write IS a memory event — the two one-liners that discharge
+    the memory-event side of an ordering edge. *)
+Lemma glbl_is_r_gmem (G : gexec) (e : geid) : glbl_is G e lb_is_r → gmem G e.
+Proof.
+  intros (l & Hl & Hr). exists l. split; [done|]. by rewrite /lb_is_mem Hr.
+Qed.
+
+Lemma glbl_is_w_gmem (G : gexec) (e : geid) : glbl_is G e lb_is_w → gmem G e.
+Proof.
+  intros (l & Hl & Hw). exists l. split; [done|].
+  by rewrite /lb_is_mem Hw orb_true_r.
+Qed.
+
 (** ppo⁻, the kept arms:
     - rules 1–3 as same-byte program order (the coherence-facing fragment);
     - rule 4, in the two covering renderings [WeakAxiomatic] uses
@@ -173,8 +186,18 @@ Definition gfence_covers (G : gexec) (e1 e2 : geid) : Prop :=
     ((glbl_is G e1 lb_is_r ∧ pr = true) ∨ (glbl_is G e1 lb_is_w ∧ pw = true)) ∧
     ((glbl_is G e2 lb_is_r ∧ sr = true) ∨ (glbl_is G e2 lb_is_w ∧ sw = true)).
 
+(** RULE 5.  The [gmem G e2] conjunct is NOT decoration: riscv.cat's ppo is
+    a relation on MEMORY ACCESSES ([ppo ⊆ M × M]), and [gmo] here holds
+    exactly the memory events ([gwf]'s second clause), so an arm whose
+    successor may be a FENCE is unsatisfiable rather than strong — [gppo_gmo]
+    would demand a fence's gmo position.  The other three arms pin both
+    endpoints already ([gpoloc] by [gaccesses], [gfence_covers] and
+    [grel_acq] by their r/w classifiers); this one pinned only [e1].
+    Without the conjunct NO graph in which an acquire is po-before a fence is
+    [rvwmo_minus_consistent] — which is every lock client, and made §4's
+    [cs_kill] vacuous (see [WeakRvwmoLockWit.v]'s header). *)
 Definition gacq_po (G : gexec) (e1 e2 : geid) : Prop :=
-  gpo G e1 e2 ∧ glbl_is G e1 lb_is_r ∧ glbl_is G e1 lb_aq.
+  gpo G e1 e2 ∧ glbl_is G e1 lb_is_r ∧ glbl_is G e1 lb_aq ∧ gmem G e2.
 
 Definition grel_acq (G : gexec) (e1 e2 : geid) : Prop :=
   gpo G e1 e2 ∧ glbl_is G e1 lb_is_w ∧ glbl_is G e1 lb_rl ∧
@@ -322,7 +345,7 @@ Proof.
       rewrite /gx_lbl /= in Hlf.
       destruct i1 as [|[|i1]]; simpl in Hlf; [| |done];
         destruct kf as [|[|kf]]; simplify_eq/=; lia.
-    + destruct Ha as (Hpo & (l & Hl & Hr') & (l' & Hl' & Haq)).
+    + destruct Ha as (Hpo & (l & Hl & Hr') & (l' & Hl' & Haq) & _).
       destruct e1 as [i1 k1]. rewrite Hl in Hl'. simplify_eq.
       rewrite /gx_lbl /= in Hl.
       destruct i1 as [|[|i1]]; simpl in Hl; [| |done];
@@ -692,6 +715,36 @@ Lemma gppo_same_hart G e1 e2 : gppo G e1 e2 → e1.1 = e2.1.
 Proof.
   intros [[[Hag _] _]|[(pr & pw & sr & sw & (Hag & _) & _ & _)
                        |[[[Hag _] _]|[[Hag _] _]]]]; exact Hag.
+Qed.
+
+(** EVERY ppo⁻ ARM IS MEMORY-TO-MEMORY ([ppo ⊆ M × M], riscv.cat's own
+    typing).  [gpoloc] pins both ends through [gaccesses], [gfence_covers]
+    and [grel_acq] through their r/w classifiers, and [gacq_po] through its
+    [gmem] conjunct.  This is what makes [gppo_gmo] a statement about [gmo]'s
+    actual members rather than an unsatisfiable demand. *)
+Lemma gaccesses_gmem G e a : gaccesses G e a → gmem G e.
+Proof.
+  intros [(v & Hw)|(t & v & Hr)].
+  - apply glbl_is_w_gmem. destruct Hw as (l & base & vs & j & Hl & Hwr & _).
+    exists l. split; [done|]. by eapply lb_wr_is_w.
+  - apply glbl_is_r_gmem.
+    destruct Hr as (l & base & ts & vs & j & Hl & Hrd & _).
+    exists l. split; [done|]. by eapply lb_rd_is_r.
+Qed.
+
+Lemma gppo_gmem G e1 e2 : gppo G e1 e2 → gmem G e1 ∧ gmem G e2.
+Proof.
+  intros [(_ & a & H1 & H2)
+         |[(pr & pw & sr & sw & _ & H1 & H2)
+          |[(_ & H1 & _ & H2)|(_ & H1 & _ & H2 & _)]]].
+  - split; by eapply gaccesses_gmem.
+  - split.
+    + destruct H1 as [[H _]|[H _]];
+        [by apply glbl_is_r_gmem|by apply glbl_is_w_gmem].
+    + destruct H2 as [[H _]|[H _]];
+        [by apply glbl_is_r_gmem|by apply glbl_is_w_gmem].
+  - split; [by apply glbl_is_r_gmem|done].
+  - split; [by apply glbl_is_w_gmem|by apply glbl_is_r_gmem].
 Qed.
 
 (** ... AND PO-EARLIER.  The same four disjuncts also pin the OFFSET: [gpo]

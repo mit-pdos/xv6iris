@@ -293,8 +293,10 @@ Proof.
     + destruct Hk2 as [[H%gxr_glbl_is ?]|[H%gxr_glbl_is ?]];
         [left|right]; (split; [by destruct H|done]).
   - right; right; left.
-    destruct Ha as (Hpo%gxr_gpo & H1%gxr_glbl_is & H2%gxr_glbl_is).
-    split_and!; [by destruct Hpo|by destruct H1|by destruct H2].
+    destruct Ha as (Hpo%gxr_gpo & H1%gxr_glbl_is & H2%gxr_glbl_is
+                    & H3%gxr_gmem).
+    split_and!; [by destruct Hpo|by destruct H1|by destruct H2
+                |by destruct H3].
   - right; right; right.
     destruct Hr as (Hpo%gxr_gpo & H1%gxr_glbl_is & H2%gxr_glbl_is
                     & H3%gxr_glbl_is & H4%gxr_glbl_is).

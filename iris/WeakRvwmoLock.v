@@ -126,11 +126,15 @@ Proof. intros. by split_and!. Qed.
 
 (** THE PPO ARMS, as one-liners.
 
-    RULE 5 — an acquiring read is gmo-before every po-later event. *)
+    RULE 5 — an acquiring read is gmo-before every po-later MEMORY event.
+    (The [gmem] side condition is [gacq_po]'s: [gmo] holds memory events
+    only, so the arm cannot speak about a po-later fence.) *)
 Lemma acq_gmo_after (G : gexec) (a x : geid) :
   gppo_gmo G → gpo G a x → glbl_is G a lb_is_r → glbl_is G a lb_aq →
-  gmo_lt G a x.
-Proof. intros Hppo Hpo Hr Haq. apply Hppo. right; right; left. by split_and!. Qed.
+  gmem G x → gmo_lt G a x.
+Proof.
+  intros Hppo Hpo Hr Haq Hm. apply Hppo. right; right; left. by split_and!.
+Qed.
 
 (** RULE 4 — a covering fence orders. *)
 Lemma fence_gmo_after (G : gexec) (x y : geid) :
@@ -473,10 +477,12 @@ Proof.
   { destruct Hpoh as (Ha1 & Ho1 & Hs1 & _).
     destruct Hpo_ew as (Ha2 & Ho2 & _ & Hs2).
     split_and!; [congruence|lia|done|done]. }
-  assert (Hmo_hw : gmo_lt G ACQh w)
-    by (by eapply acq_gmo_after).
-  assert (Hmo_jw0 : gmo_lt G ACQj w0)
-    by (by eapply acq_gmo_after).
+  assert (Hmo_hw : gmo_lt G ACQh w).
+  { eapply acq_gmo_after; [done|done|done|done|].
+    apply glbl_is_w_gmem. by destruct Hv as (_ & _ & ? & _). }
+  assert (Hmo_jw0 : gmo_lt G ACQj w0).
+  { eapply acq_gmo_after; [done|done|done|done|].
+    apply (gwf_gmo_mem G w0 Hwf). by destruct Hmo_ww0 as (_ & ? & _). }
   (* rule 4, twice *)
   assert (Hmo_erh : gmo_lt G e RELh) by (by eapply fence_gmo_after).
   assert (Hmo_w0rj : gmo_lt G w0 RELj) by (by eapply fence_gmo_after).

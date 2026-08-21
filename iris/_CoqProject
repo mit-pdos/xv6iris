@@ -1094,3 +1094,4 @@ WeakRvwmoConf.v
 WeakRvwmoRestr.v
 WeakRvwmoKill.v
 WeakRvwmoLock.v
+WeakRvwmoLockWit.v

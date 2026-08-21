@@ -532,3 +532,29 @@ co swaps); (iii) the exhaustiveness of the kernel-level read classes
 (S6 §3's kernel claim) when expressed at the frontier — this is L2′'s
 old obligation in new clothes and remains the route's largest single
 item.
+
+## 6. Model correction at the witness slice (2026-08-21)
+
+**`cs_kill` as first landed was VACUOUS, and the model was the
+reason** — the non-vacuity witness discipline caught it one slice
+after the flag: `gacq_po` (ppo⁻ rule 5) left its SUCCESSOR
+unconstrained, and `gwf`'s membership clause then made any
+fence-po-after-an-acquire graph inconsistent — `cs_kill`'s coverage
+hypotheses were jointly unsatisfiable for EVERY graph.  The fix is
+riscv.cat's own typing, `ppo ⊆ M × M`: `gacq_po` gains `gmem G e2`
+(the only leaky arm — the other three pin both endpoints via their
+classifiers), `gppo_gmem` is now the exported theorem, and the change
+WEAKENS `rvwmo_minus_consistent` (more graphs consistent — the safe
+direction for the safety theorem).  Every landed leaf repaired
+mechanically (five sites); `WeakRvwmoLockWit.v` carries the
+satisfiability witness `cs_kill_hyps_sat` (a real two-hart
+acquire/release graph, windows genuinely ordered, rule-14 clean so
+the kill is silent rather than firing).  THE GENERAL RULE, added to
+the durable pattern family: for every arm of a ⊆-axiom into a
+data-carried order, check BOTH endpoints are in the order's domain —
+a one-endpoint arm is a silent strengthening that becomes outright
+unsatisfiability when the order carries a membership clause.
+FLAGGED, NOT FIXED: `WeakAxiomatic.acq_po` has the identical
+unconstrained-successor shape on the cand side — harmless today
+(`ax_ord`/`ax_rel_ord` consume it only at reads), narrow it the next
+time that file is touched (R6-adjacent debt).

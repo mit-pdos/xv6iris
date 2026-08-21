@@ -967,14 +967,16 @@ Qed.
 Lemma gswapw_acq_po G n k1 e1 e2 : gacq_po (gswapw G n k1) e1 e2 ↔ gacq_po G e1 e2.
 Proof.
   rewrite /gacq_po. split.
-  - intros (Hp & H1 & H2). split_and!.
+  - intros (Hp & H1 & H2 & H3). split_and!.
     + by apply (proj1 (gswapw_po G n k1 e1 e2)).
     + by apply (proj1 (gswapw_glbl_is G n k1 e1 lb_is_r (lbl_tswap_is_r k1))).
     + by apply (proj1 (gswapw_glbl_is G n k1 e1 lb_aq (lbl_tswap_aq k1))).
-  - intros (Hp & H1 & H2). split_and!.
+    + by apply (proj1 (gswapw_mem G n k1 e2)).
+  - intros (Hp & H1 & H2 & H3). split_and!.
     + by apply (proj2 (gswapw_po G n k1 e1 e2)).
     + by apply (proj2 (gswapw_glbl_is G n k1 e1 lb_is_r (lbl_tswap_is_r k1))).
     + by apply (proj2 (gswapw_glbl_is G n k1 e1 lb_aq (lbl_tswap_aq k1))).
+    + by apply (proj2 (gswapw_mem G n k1 e2)).
 Qed.
 
 Lemma gswapw_rel_acq G n k1 e1 e2 :
