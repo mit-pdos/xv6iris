@@ -512,6 +512,11 @@ both callers from `FORKRET_PARK` to `FORKRET_PARK_PAID`, and replace
 everything else and each is one file plus threading), then
 `devintr_caps_any`, then userinit, then kfork, then the Link.
 
+**STATUS: the first three are DONE** (`dd2af18e`, `d94ee33f`, `8d825c62`).
+What is left is userinit, kfork, and the Link — all call-site work, no
+missing resources. Note that `is_ftable` is built inside `mn_grp_fs`, which
+is the group that CALLS userinit, so it never has to leave that lemma.
+
 ## 4. How to build
 
     cd /shared/xv6iris-5 && QUIET=1 ./gcp-rocq/run-on-gcp make -k -j 36
