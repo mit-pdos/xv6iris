@@ -805,3 +805,43 @@ dir_first's scan).  The pin is dropped at BootShared with the M2/D1-D2
 comment.  `wp_namei_init_pinned`'s post: `inode_held_at ipv 7` ∨ an
 unforgeable `dv_cancelled ROOTZ`; failure hands the pin back unspent.
 N-5.2 (§13) is next.
+
+### 13.1 Stage C AUTHORIZED (user, 2026-08-21) — with the coordination guard
+
+The user has authorized stage C (the contents-indexed proc_pt
+refinement SpecKexec's header sketches) to proceed once N-5.2B lands.
+Execution discipline, set now: DESIGN-FIRST — the refinement's contract
+statement lands as a proposal (a §14 of this document) before any lane
+edits a uvm/proc-pagetable file; at launch, check upstream for
+Nickolai's in-flight uvm activity and treat his files as
+foreign-owned until the design names exactly what must move; any
+interface decision inside his contracts goes to the user+Nickolai sync
+rather than a lane.  Pipeline: N-5.2A (in flight) → N-5.2B (kexec
+re-walk) → stage C design → stage C lanes.
+
+### 11.7 M2 AUTHORIZED, TRIGGER-GATED (user, 2026-08-21)
+
+M2 (the seam witness `dvrt` — §11.3: pending half rides the transported
+boot payload through kexec's hop, shot after; one persistent row
+through usertrap_res / forkret_yield / fork's deposit; write-side
+cancellation gated on the shot; kexec's proof kills the cancelled arm
+by pending ∗ shot ⊢ False) is authorized to proceed **once the user
+reports D1/D2 settled with Nickolai** — it rides the same seam their
+decisions walk.  The trigger is the user's word (or their D1/D2
+commits landing upstream, at which point ASK before launching).  Until
+then the conditional (M1) forms are the campaign's deliverables.
+
+### 13.2 N-5.2A LANDED (2026-08-21, commit b6205ce6)
+
+One pass, all gates green.  Execution findings: (i) dview's negative
+key families were re-spelled -2z-1/-2z-2 → -4z-1/-4z-2 — the charter's
+suggested fview keys collided with the landed residue classes;
+disjointness = six lia one-liners + boot-map lemmas.  (ii) The column
+family is a PAIR `ireg_lcols z := dv_lcol z ∗ fv_lcol z` inside the
+existing `ireg_lends` big-op — ireg_registry / EscrowDeposit stayed
+byte-identical.  (iii) SpecKexecB2's bracket took the pre-authorized
+fourth touch (ic_loaded's fv conjunct reaches the seal).  (iv) The
+tree's ONE fv_lend_mint fires at inum 7 in FsCfgBoot beside root's dv
+mint; both pins ride fs_cfg_alloc's post and are dropped at BootShared.
+(v) `dvw_ride_size` defined but unused (kept for B).  Non-root/7
+licences dropped, as chartered.
