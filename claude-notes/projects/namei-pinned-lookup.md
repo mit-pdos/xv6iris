@@ -713,3 +713,35 @@ Gates: tree green, Admitted 1, system audit at baseline, the
 `NameiPinnedI` audit at platform-externs-only, no forkret-cone or
 FsReady diffs, no Spec*.v diffs (the new corollary lives in a new leaf
 or DirViewPin.v — additive).
+
+### 11.6 Phase B LANDED (2026-08-21, commit aee9cf10) — E1-region, executed
+
+All gates green; deviations, each deliberate and recorded in the lane's
+files:
+* **The lend column's home is `ireg_registry`, not `ireg_slot`** — the
+  conjunct of `ireg_body` every accessor threads opaquely.  Same
+  properties (per-inum, all-own, Timeless, behind ↑iregN); ~70
+  mechanical `ireg_slot` edits avoided; zero landed region lemmas moved.
+* **Keying**: two NEGATIVE key families (`-2z-1` lend slot, `-2z-2` mint
+  licence) inside the EXISTING `icfg_reg` ghost_map — no boot map, no
+  icfg field, no functor row.  γc/γv are region-global cell families
+  bound once at boot, so a mint writes no registry entry.
+* **The slot-fraction ledger is the whole discipline** (NONE 1 · INTACT
+  ¼/½/¼ · CANCELLED ¾/–/¼): every refutation each op needs is a dfrac
+  overflow.  `dv_set_rt` is total with no premise beyond the ride +
+  `ireg_inv`.
+* **`dv_lend_mint` takes a mint licence `dv_lic z`** (minted per inum by
+  `ireg_alloc`, delivered through FsCfgBoot, currently dropped —
+  N-5.1's stocking mint spends root's in place).  One-lend-per-inum-
+  EVER is inherent to lazy retire + a persistent receipt: a cancelled
+  directory's slot stays occupied.  Acceptable for this campaign; a
+  re-arm design is future work if a consumer appears.
+* **An INTACT redeem is a READ**: the pin returns unspent
+  (`dv_pin_spent := dv_pin`); a cancelled receipt is UNFORGEABLE (no
+  client ever holds a share of the one-shot).
+* The walk's fire now cases on the ride and lends ¾ or 1 at nx_hop's
+  exposed dqv — the contract generality consumed exactly as intended;
+  SpecNameiTr/SpecNamexTr byte-identical.
+* Movers: 15 `dv_set → dv_set_rt`; the boot stocking stays plain under
+  `dv_ride_of_hold`.  The one Spec diff: SpecKexecB2's bracket (third
+  authorized touch).
