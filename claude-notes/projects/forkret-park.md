@@ -343,39 +343,58 @@ because `seq k (S n)` shifts the TABLE index while `parents_own`'s big-op is
 indexed by the LIST.
 
 **`devintr_caps_any`.** The `□ ∀ h` form, and it is the one that needs a
-DECISION rather than plumbing. Six of `devintr_caps`' seven members are
+DESIGN CHANGE rather than plumbing. Six of `devintr_caps`' seven members are
 hart-free and main has all six (`dev_inv`, `console_caps`, `disk_geom`, the
 virtio `is_lock`, `tick_keeper`'s real arm — its left arm is the hart-indexed
 one and we take the right — and `procs_inv`). The seventh is `timer_cap`,
 and it is genuinely per-hart: `timer_cap = sstc_enabled ∗ stimecmp_inv`,
-`sstc_enabled` is `mcounteren ↦ᵣ□ …`, and `RiscvPtsto.reg_pointsto` takes
-`{CpuId}`.
+`sstc_enabled` is `mcounteren ↦ᵣ□ …`, `stimecmp_inv` is an invariant over
+`stimecmp ↦ᵣ`, and `RiscvPtsto.reg_pointsto` takes `{CpuId}`.
 
-`BootChain.v:566` mints one with `timer_cap_intro` — but INSIDE each hart's
-own chain, out of that hart's two register cells, so the boot hart's chain
-hands main a cap at hart 0 and the seven secondaries' caps are minted in
-their own threads and never come back. **`∀ h` cannot be assembled from
-anything main holds.**
+> **CORRECTION (2026-08-21).** An earlier revision of this section proposed
+> minting the eight caps at the adequacy seam, before the hart fan-out.
+> **THAT CANNOT WORK.** `TimerCap.timer_cap_intro` requires `mcounteren` to
+> ALREADY HOLD a value with TM set — that is its first premise — and the
+> value is written by timerinit on that hart (`WpTimerinit.v:138`,
+> `ti_mcen1`). At `SystemAdequacy`'s fan-out every hart is at RESET and TM
+> is 0, so there is nothing there to freeze. The route was wrong, not merely
+> expensive.
 
-The cells for all eight ARE in one place, but that place is
-`SystemAdequacy.v:261`, *before* the fan-out: `Hh0` and the seven elements of
-`Hhrest` each carry a hart's reset residue. So the route is:
+WHAT IS ACTUALLY TRUE: every hart DOES mint its own cap.
+`BootChain.boot_entry_bridge` (§3) runs `timer_cap_intro` right after the
+M-mode start walk, and both `boot_hart_primary` and `boot_hart_secondary`
+receive one. But each lives in that hart's own thread, and eight caps in
+eight threads have nowhere to meet. `UsertrapRes.v`'s note calling the
+bundle "satisfiable" is arguing the predicate is not VACUOUS (each hart can
+have one), not that anyone can assemble the `∀ h`.
 
-> peel `mcounteren` / `stimecmp` out of each of the eight residues before the
-> fan-out, run `timer_cap_intro` eight times, gather `□ ∀ h, timer_cap`, hand
-> it into `boot_hart_primary` → `SpecMain` → main, and stop the per-hart
-> chains minting their own.
+DEPOSIT-AND-COLLECT DOES NOT RESCUE IT. Assembling `□ ∀ h, timer_cap` needs
+all eight at once, and no hart knows the others are done; the one barrier in
+the tree (`StartedInv`, the `started = 1` deposit) runs the other way —
+secondaries wait for the boot hart, not the reverse.
 
-That MOVES where the timer capability is minted — from "each hart, inside its
-own chain" to "all harts, before the fan-out" — and it touches the top-level
-adequacy theorem. It is what `UsertrapRes.v`'s own note on
-`devintr_caps_any` anticipates ("the boot chain mints one PER HART"), but it
-is an architecture call and should be made deliberately.
+**THE STRUCTURALLY RIGHT FIX IS THE OTHER DIRECTION: the RESUMING HART
+supplies its own `timer_cap`, not the parked record.** Hart h's capability
+belongs to hart h, and the thing that resumes a parked process on hart h is
+hart h's scheduler, which is holding it — it came out of that hart's own
+boot chain. So `devintr_caps_any` keeps its six hart-free members, and
+`timer_cap` arrives from the resume side (`SwtchCtx`/`SchedCtx`'s wand) the
+way the other genuinely per-hart pieces already do (`IntrDefs.hart_csrs`,
+`cpu_own`). Consumers to re-route: `ut_res_bare_sstc` /
+`ut_env_nopt_sstc`, which pull `sstc_enabled` out of the bundle for the U
+tier's `mcounteren ↦ᵣ□` pin, and devintr's own `devintr_caps` at the trapping
+hart.
 
-WEAKENING IS NOT AN OPTION, and `UsertrapRes.v` says why at the definition:
-the residue parks across user execution and resumes on an arbitrary hart, so
-`devintr_caps` at the CURRENT hart would not survive the park. That is the
-whole reason the `∀ h` form exists.
+NOTE IN PASSING that this revision's secondaries never schedule
+(`SpecMainSecondary` is "spins forever, never stuck", with nothing left
+over), so only hart 0 ever resumes anything in practice — but the proof is
+generic in the resuming hart, so the generality is still demanded by the
+shape even though it is unused.
+
+WEAKENING TO THE CURRENT HART IS NOT AN OPTION for the parked record, and
+`UsertrapRes.v` says why at the definition: the residue parks across user
+execution and resumes on an arbitrary hart. That is exactly why the fix has
+to move the capability to the resumer rather than drop the quantifier.
 
 ##### The one that is a decision, not a gap
 
