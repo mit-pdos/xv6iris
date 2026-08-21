@@ -693,3 +693,79 @@ Proof.
   intros [[[Hag _] _]|[(pr & pw & sr & sw & (Hag & _) & _ & _)
                        |[[[Hag _] _]|[[Hag _] _]]]]; exact Hag.
 Qed.
+
+(** ** 8.1 [gwix]'s junk value, and its contrapositive
+
+    [gwix] is [0] off the write sub-order (the [list_find] fallback), so a
+    NONZERO write index is itself a membership certificate — the shape the
+    (W,W) exchange's atomicity case analysis needs, where the only handle on
+    an event is an equation between write indices. *)
+
+Lemma gwix_zero G w : w ∉ gwrites G → gwix G w = 0%nat.
+Proof.
+  intros Hnin. rewrite /gwix.
+  destruct (list_find (λ e', e' = w) (gwrites G)) as [[i z]|] eqn:Hf; [|done].
+  exfalso. apply list_find_Some in Hf as (Hi & -> & _).
+  apply Hnin. by eapply elem_of_list_lookup_2.
+Qed.
+
+Lemma gwix_elem G w : (0 < gwix G w)%nat → w ∈ gwrites G.
+Proof.
+  intros Hpos. destruct (decide (w ∈ gwrites G)) as [?|Hnin]; [done|].
+  rewrite (gwix_zero G w Hnin) in Hpos. lia.
+Qed.
+
+(** ** 8.2 [gwf]'s shape clause, at an EVENT
+
+    [gwf]'s third conjunct is indexed by (row, offset); every consumer holds
+    a [gx_lbl] fact instead.  This is the one-line bridge. *)
+
+Lemma gwf_lbl_shape G e l :
+  gwf G → gx_lbl G e = Some l →
+  match l with
+  | LLoad _ _ ts vs => length vs = length ts
+  | LStore _ _ vs _ => vs ≠ []
+  | LFence _ _ _ _ => True
+  | LRmw _ _ _ ts rvs wvs _ =>
+      wvs ≠ [] ∧ length wvs = length ts ∧ length rvs = length ts
+  end.
+Proof.
+  intros (_ & _ & Hsh) Hl. rewrite /gx_lbl in Hl.
+  destruct (gx_prog G !! e.1) as [p|] eqn:Hp; simpl in Hl; [|done].
+  by eapply Hsh.
+Qed.
+
+(** ** 8.3 A FUSED RMW'S READ FOOTPRINT IS ITS WRITE FOOTPRINT
+
+    [LRmw] carries ONE base and [length rvs = length ts = length wvs], so an
+    event that both reads and writes touches exactly the same bytes on both
+    halves.  This is what makes a BYTE-DISJOINTNESS hypothesis between two
+    writes cover their read halves too — the (W,W) exchange's load-bearing
+    step. *)
+
+Lemma gread_byte_write_byte G e a t v :
+  gwf G → gis_w G e = true → greads_byte G e a t v →
+  ∃ v', gwrites_byte G e a v'.
+Proof.
+  intros Hwf Hw (l & base & ts & vs & j & Hl & Hrd & Ht & Hv & Ha).
+  pose proof (gwf_lbl_shape G e l Hwf Hl) as Hsh.
+  rewrite /gis_w Hl in Hw.
+  assert (Hwr : ∃ wvs, lb_wr l = Some (base, wvs) ∧ length wvs = length ts).
+  { destruct l; simpl in *; simplify_eq/=; naive_solver. }
+  destruct Hwr as (wvs & Hwr & Hlen).
+  assert (Hj : (j < length wvs)%nat) by (rewrite Hlen; by eapply lookup_lt_Some).
+  apply lookup_lt_is_Some_2 in Hj as [v' Hv'].
+  exists v'. by exists l, base, wvs, j.
+Qed.
+
+(** ** 8.4 A read's NAMED SOURCE covers the byte with the read value *)
+
+Lemma gread_source_byte G e a t v w :
+  gload_value G → greads_byte G e a t v → gwrite_at G t = Some w →
+  gwrites_byte G w a v.
+Proof.
+  intros Hlv Hrd Hwat. destruct (Hlv e a t v Hrd) as [Hsrc _].
+  destruct t as [|t]; [done|].
+  destruct Hsrc as (w0 & Hwat0 & Hwb & _).
+  rewrite Hwat in Hwat0. by simplify_eq.
+Qed.

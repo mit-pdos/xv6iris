@@ -287,6 +287,27 @@ the normalization").
   the descent — correctly: the violation is then dep-killed
   (`gdeps_gmo` contradiction).  The full kit is THREE lemmas: B2a
   (landed), B2c `(R,W)`, B2b `(W,W)`-byte-disjoint.
+- **B2bc — LANDED (2026-08-21): THE EXCHANGE KIT IS COMPLETE.**
+  `gswap_write_down` (+deps corollary, viol-mono) and `gswapw_ww`
+  (+deps corollary, viol-mono, `gswapw_resolves`, `gwix_adjacent`),
+  all Closed, no axioms; the LB witness smoke-tests the (W,W) move
+  (both loads' `ts` entries renumber).  `tswap` IS `sidx` at another
+  argument — the arithmetic re-exports, and
+  `gx_gmo (gswapw …) ≡ gx_gmo (gswap …)` definitionally, so B2a's §2
+  position kit applied verbatim.  THE DESIGN FINDING (a spec claim
+  REFUTED by counterexample): the fused alphabet means "dep sources
+  are reads" NEVER excludes a write — an `LRmw` is both — so EVERY
+  exchange lemma whose moved-up event may be an RMW carries a
+  `(x, e) ∉ gd_deps` side condition (B2a's free derivation was free
+  only because its moved event was a non-write).  The induction
+  discharges these by the dep-kill (edge present ⇒ `gdeps_gmo`
+  contradiction ⇒ the violation is dead anyway).  Induction side
+  conditions to discharge, now enumerated: `¬ gppo lower upper`
+  (cross-hart free via `gppo_same_hart`), `¬ gpo lower upper` (the
+  sweep order), the `(R,W)` co-max condition (`gwix e ≤ t` on shared
+  bytes), byte-disjointness for (W,W), and the `∉ gd_deps` pair.
+  Two unused hypotheses (`gis_w e` in `gswap_write_down` and
+  `gswapw_resolves`) kept for statement fidelity, droppable.
 - **B2**: the exchange lemma's case trichotomy (§3b) with the kills
   wired per S6 §3; the induction + measure.  NOTE from the B0 pass
   (2026-08-21): several S6 kills flip from reader-refutation to
