@@ -254,12 +254,30 @@ Definition pnode_step (m : M unit) (rs : regstate) (ib : oib32) (d : dev_state)
   match m with
   | Interface.Ret _ =>
       (* THE BOUNDARY: the hart is at the monad's terminal value and fetches
-         a fresh instruction. *)
+         a fresh instruction.
+
+         W2b CONDITION 1: THE BOUNDARY IS THE RESET POINT, so the label is
+         [LInstr] and the σ-effect is [instr_post] ([WeakEvLang]'s
+         [ewg_ibws σ c None (instr_post ws0)]).  There are therefore TWO
+         [LInstr]s per instruction — this one and the [InstrAnnounce]
+         node's — and BOTH are needed:
+           - the boundary's, because the Sail model announces AFTER the
+             fetch, so a reset that rides the announce alone lets the fetch
+             consume the previous instruction's data-read bank through
+             [w_tbank] (a blanket load → later-store edge RVWMO has not);
+           - the announce's, because moving the reset earlier would leave
+             the FETCH's own read view in [w_ldv] for the whole
+             instruction, leaking into every [DLdRes]-carrying register
+             write.
+         Between the two the only nodes are the fetch's walk reads and the
+         fetch itself: none consumes [w_ldv], and the fetch's plain load
+         clears [w_res] anyway, so the second reset is observably
+         idempotent except for the intended [w_tbank = 0] at the fetch. *)
       exists tick : bool,
-        l = LSilent /\ m' = riscv_step tick /\ ors = None /\ fn' = None /\
+        l = LInstr /\ m' = riscv_step tick /\ ors = None /\ fn' = None /\
         d' = d /\
-        (* D3: THE BOUNDARY CLEARS THE ANNOUNCED BITS ([WeakEvLang]'s
-           [ewg_ib σ c None]) — a hart between instructions has no roles. *)
+        (* D3: THE BOUNDARY CLEARS THE ANNOUNCED BITS — a hart between
+           instructions has no roles. *)
         oib = Some None
   | Interface.Next oc k =>
       (match oc in Interface.outcome _ T return (T -> M unit) -> Prop with
@@ -748,17 +766,15 @@ Lemma elab_apply_rw σ c k rs' (w : erw_kind) :
   = ewg_rw σ c rs' w.
 Proof. by destruct w. Qed.
 
-(** ... and the announce: [LInstr]'s view effect plus the bits. *)
+(** ... and the announce AND the boundary: [LInstr]'s view effect plus the
+    bits.  Both instruction-start nodes take this one shape (W2b condition
+    1) — the announce at [Some (ib_of_bvn ob)], the boundary at [None].
+    [WeakGhost.weak_state_interp] does not mention [wgib], so the bits half
+    is invisible to every WP rule (the D3 acceptance test); the view half
+    is the ordinary [LInstr] view move. *)
 Lemma elab_apply_instr σ c k v :
   elab_apply σ c LInstr k None (Some v) (wgdev σ)
   = ewg_ibws σ c v (instr_post (wgws σ c)).
-Proof. reflexivity. Qed.
-
-(** D3: THE ANNOUNCE AND THE BOUNDARY — a σ-write of [wgib] and nothing
-    else.  [WeakGhost.weak_state_interp] does not mention [wgib], so this
-    shape is invisible to every WP rule (the acceptance test). *)
-Lemma elab_apply_ib σ c k v :
-  elab_apply σ c LSilent k None (Some v) (wgdev σ) = ewg_ib σ c v.
 Proof. reflexivity. Qed.
 
 (** The barrier arm: the label of (D2) reproduces [efence_apply] exactly. *)
@@ -845,13 +861,16 @@ Proof.
       split; [reflexivity|by rewrite elab_apply_fence]. }
   rewrite /emonad_step /pnode_step.
   destruct m as [y|T oc k].
-  { (* THE BOUNDARY: the terminal value fetches a fresh instruction *)
+  { (* THE BOUNDARY: the terminal value fetches a fresh instruction, and
+       (W2b condition 1) IT IS THE RESET POINT — the arm pairs [LInstr]
+       with [instr_post], which is the machine's existing [LInstr] arm
+       ([elab_apply_instr]). *)
     split.
     - intros (tick & -> & ->). do 6 eexists. efac4;
-        [reflexivity|by exists tick|exact I|by rewrite elab_apply_ib].
+        [reflexivity|by exists tick|exact I|by rewrite elab_apply_instr].
     - intros (l & m' & ors & fn' & d' & oib & He
               & (tick & -> & -> & -> & -> & -> & ->) & _ & Hs); subst.
-      exists tick. split; [reflexivity|by rewrite elab_apply_ib]. }
+      exists tick. split; [reflexivity|by rewrite elab_apply_instr]. }
   destruct oc; simpl; try esil_case; try estuck_case.
   - (* RegWrite — D3-2: the label is the classification's, and [elab_ok] of
        all three kinds is [True] *)

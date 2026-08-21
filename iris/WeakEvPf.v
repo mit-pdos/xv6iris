@@ -365,9 +365,13 @@ Inductive epf_step :
     nat -> wlabel -> (epool * wgstate) -> (epool * wgstate) -> Prop :=
 | EPFBoundary (c : CPU) (P : epool) (σ : wgstate) (tick : bool) :
     ethread_live σ (ep_gen P) -> ep_h P c = None ->
-    (* D3: the RESTART clears the hart's announced bits *)
-    epf_step (fin_to_nat c) LSilent (P, σ)
-      (ep_hset P c (Some (riscv_step tick, None)), ewg_ib σ c None)
+    (* D3: the RESTART clears the hart's announced bits, and (W2b condition
+       1) IT IS THE RESET POINT: the boundary emits [LInstr] and applies
+       [instr_post], so the fetch that follows sees an empty translation
+       bank. *)
+    epf_step (fin_to_nat c) LInstr (P, σ)
+      (ep_hset P c (Some (riscv_step tick, None)),
+       ewg_ibws σ c None (instr_post (wgws σ c)))
 | EPFCycle (c : CPU) (l : wlabel) (P : epool) (σ : wgstate)
            (m : M unit) (fn : option (bool * bool * bool * bool))
            (h' : ehst) (σ' : wgstate) :
@@ -583,7 +587,9 @@ Proof.
   { intros (_ & ->). exists (LFence pr pw sr sw).
     split; [reflexivity|apply gws_insert_eq]. }
   destruct m as [y|T oc k].
-  { intros (? & _ & ->). exists LSilent. by split. }
+  { (* THE BOUNDARY — [LInstr], the reset point (W2b condition 1) *)
+    intros (? & _ & ->). exists LInstr.
+    split; [reflexivity|apply gws_insert_eq]. }
   destruct oc; simpl;
     try (intros (_ & ->); exists LSilent; by split);
     try (by intros []).

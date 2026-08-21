@@ -551,11 +551,12 @@ Proof.
   { apply ecycle_step_factor. by exists l, m', ors, fn', d', oib. }
   destruct (ep_h P c) as [[m fn]|] eqn:Hh.
   - by apply (EPFCycle c l P σ m fn (Some (m', fn'))).
-  - (* the boundary: the monad is [Ret tt], the program half emits [LSilent]
-       and nothing else, and (D3) it CLEARS the announced bits *)
+  - (* the boundary: the monad is [Ret tt], the program half emits [LInstr]
+       (W2b condition 1 — the boundary IS the reset point) and (D3) it
+       CLEARS the announced bits *)
     rewrite /pstep_node /ehart_m /ehart_fn /pnode_step /= in Hps.
     destruct Hps as (tick & -> & -> & -> & -> & -> & ->).
-    rewrite (elab_apply_ib σ c k None).
+    rewrite (elab_apply_instr σ c k None).
     by apply (EPFBoundary c P σ tick).
 Qed.
 
@@ -691,17 +692,18 @@ Proof.
                 |l0 P σ dp' dws' σ' Hlive Hst Hl
                 |P σ σ' Hlive Hu
                 |c P σ Hlive]; simpl.
-  - (* the boundary — D3: it CLEARS the announced bits, which is the
-       [elab_apply] shape [elab_apply_ib] names *)
-    exists LSilent.
-    have Hstep := wp_pf_step_intro pstep_ev pcls_ev (fin_to_nat c) LSilent
+  - (* the boundary — D3: it CLEARS the announced bits and (W2b condition 1)
+       APPLIES [instr_post], which together are the [elab_apply] shape
+       [elab_apply_instr] names *)
+    exists LInstr.
+    have Hstep := wp_pf_step_intro pstep_ev pcls_ev (fin_to_nat c) LInstr
                     (ecfg_of P σ) (ehart_ag P σ c)
                     (PHart c (riscv_step tick) (wgregs σ c) None None)
                     (wgdev σ) (eags_hart P σ c).
-    rewrite -(elab_apply_ib σ c
-                (pcls_ev (pa_st (ehart_ag P σ c)) LSilent (wgws σ c)) None)
+    rewrite -(elab_apply_instr σ c
+                (pcls_ev (pa_st (ehart_ag P σ c)) LInstr (wgws σ c)) None)
             ecfg_of_hart_upd.
-    rewrite /pf_cfg /pf_log /pf_ws /= in Hstep.
+    rewrite /pf_cfg pf_log_hart pf_ws_hart in Hstep.
     apply Hstep; [|exact I].
     rewrite /pstep_ev /= /ehart_ag /= Hh /=.
     split; [reflexivity|]. exists None, (Some None). split_and!;

@@ -516,14 +516,18 @@ Section wrun.
     EWP (ELoop gen c) @ ⊤.
   Proof.
     intros Hgen Hsub Hq Hdisj Hcert Hw Hcoh Hlat.
-    iIntros "#Ht Hrf Hws H". iApply (ewp_eloop gen c Hgen).
-    iNext. iIntros (tick).
+    iIntros "#Ht Hrf Hws H". iApply (ewp_eloop gen c ws Hgen with "Hws").
+    (* W2b condition 1: the boundary IS the reset point, so the fetch that
+       follows runs at [instr_post ws]. *)
+    iNext. iIntros (tick) "Hws".
     iApply (ewp_ewrun_fetch gen c Dr Dw wireregs q (riscv_step tick)
-              (Interface.Ret tt) t (tp tick) [WEread ak pa n] ak pa n w ws
+              (Interface.Ret tt) t (tp tick) [WEread ak pa n] ak pa n w
+              (instr_post ws)
               Hgen Hsub Hq Hdisj eq_refl Hcoh Hlat (Hcert tick) Hw
               with "Ht Hrf Hws").
     iIntros (ws') "%Hle Hrf Hws". iApply (ewp_ev_ret gen c tt Hgen).
-    by iApply ("H" $! tick ws' with "[//] Hrf Hws").
+    iApply ("H" $! tick ws' with "[%] Hrf Hws").
+    etrans; [apply instr_post_le|exact Hle].
   Qed.
 
 End wrun.

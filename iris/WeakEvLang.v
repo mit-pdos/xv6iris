@@ -478,8 +478,18 @@ Section hart.
           (* D3: THE INSTRUCTION BOUNDARY CLEARS THE ANNOUNCED BITS.  A hart
              sitting at [Ret tt] is between instructions, so it has no
              current instruction and no dependency roles — which is exactly
-             [WeakDeps.deps_of_ib None = ORnone]. *)
-          σ' = ewg_ib σ c None
+             [WeakDeps.deps_of_ib None = ORnone].
+
+             W2b CONDITION 1: IT IS ALSO THE RESET POINT, i.e. the boundary
+             emits [LInstr] and applies [instr_post].  It must be HERE and
+             not only at [InstrAnnounce], because the Sail model announces
+             AFTER the fetch: with the reset riding the announce alone the
+             fetch would consume the PREVIOUS instruction's data-read bank
+             through [w_tbank], which is a blanket load → later-store edge
+             RVWMO does not have (it forbids LB).  The announce KEEPS its
+             own [LInstr] — see [WeakEvInst.pnode_step]'s boundary arm for
+             why both resets stay. *)
+          σ' = ewg_ibws σ c None (instr_post ws0)
     | Interface.Next oc k =>
         (match oc in Interface.outcome _ T return (T -> M unit) -> Prop with
          | Interface.RegRead r _ => fun k =>
@@ -886,7 +896,8 @@ Definition weak_ev_lang : language := Language weak_ev_lang_mixin.
 Lemma eprim_step_loop_inv gen cpu σ κ e' σ' efs :
   eprim_step (ELoop gen cpu) σ κ e' σ' efs ->
   κ = [] /\ efs = [] /\
-  ((ethread_live σ gen /\ σ' = ewg_ib σ cpu None /\
+  ((ethread_live σ gen /\
+    σ' = ewg_ibws σ cpu None (instr_post (wgws σ cpu)) /\
     exists tick : bool, e' = ECycle gen cpu (riscv_step tick) None)
    \/ (~ ethread_live σ gen /\ e' = ELoop gen cpu /\ σ' = σ)).
 Proof.
@@ -1066,7 +1077,8 @@ Proof.
   intros H Hne. revert H. rewrite /ecycle_step.
   destruct fn as [[[[pr pw] sr] sw]|].
   { intros (_ & ->). by rewrite /ewg_ws /= gws_insert_ne. }
-  destruct m as [y|T oc k]; [by intros (? & _ & ->)|].
+  destruct m as [y|T oc k];
+    [intros (? & _ & ->); rewrite /ewg_ibws /=; by rewrite gws_insert_ne|].
   destruct oc; simpl;
     try (by intros (_ & ->));
     try (intros (_ & ->); by apply ewg_rw_ws_ne);
@@ -1093,7 +1105,9 @@ Lemma ecycle_step_ws_le gen σ c m fn e' σ' :
 Proof.
   rewrite /ecycle_step. destruct fn as [[[[pr pw] sr] sw]|].
   { intros (_ & ->). rewrite /ewg_ws /= gws_insert_eq. apply fence_post_le. }
-  destruct m as [y|T oc k]; [intros (? & _ & ->); reflexivity|].
+  destruct m as [y|T oc k];
+    [intros (? & _ & ->); rewrite /ewg_ibws /= gws_insert_eq;
+     by apply instr_post_le|].
   destruct oc; simpl; try (by intros (_ & ->));
     try (intros (_ & ->); rewrite ewg_rw_ws;
          by apply ws_depmove_le, erw_ws_depmove);
@@ -1154,7 +1168,7 @@ Qed.
 Lemma eprim_step_loop_live gen cpu σ (tick : bool) :
   ethread_live σ gen ->
   eprim_step (ELoop gen cpu) σ [] (ECycle gen cpu (riscv_step tick) None)
-    (ewg_ib σ cpu None) [].
+    (ewg_ibws σ cpu None (instr_post (wgws σ cpu))) [].
 Proof.
   intros Hl. left. exists gen, cpu, (Interface.Ret tt), None.
   split_and!; try reflexivity. left. split; [exact Hl|].

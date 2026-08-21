@@ -783,12 +783,15 @@ Section rule.
     EWP (ELoop gen c) @ ⊤.
   Proof.
     intros Hgen Hsub Hq Hcert Hw Hcoh Hlat.
-    iIntros "#Ht Hrf Hws H". iApply (ewp_eloop gen c Hgen).
-    iNext. iIntros (tick).
+    iIntros "#Ht Hrf Hws H". iApply (ewp_eloop gen c ws Hgen with "Hws").
+    (* W2b condition 1: the boundary IS the reset point, so the fetch that
+       follows runs at [instr_post ws]. *)
+    iNext. iIntros (tick) "Hws".
     iApply (ewp_ev_one_fetch gen c Dr Dw q (riscv_step tick) t (tp tick) tt
-              ak pa n w ws Hgen Hsub Hq (Hcert tick) Hw Hcoh Hlat
+              ak pa n w (instr_post ws) Hgen Hsub Hq (Hcert tick) Hw Hcoh Hlat
               with "Ht Hrf Hws").
-    iIntros (ws') "%Hle Hrf Hws". by iApply ("H" $! tick ws' with "[//] Hrf Hws").
+    iIntros (ws') "%Hle Hrf Hws". iApply ("H" $! tick ws' with "[%] Hrf Hws").
+    etrans; [apply instr_post_le|exact Hle].
   Qed.
 
 End rule.

@@ -658,17 +658,22 @@ Section wait_seq.
     iNext. iIntros (ws' w) "%Hle Harm Hws Hrf". rewrite -Hx3.
     iDestruct "Harm" as "[->|[%Hne #Hrcpt]]".
     { by iApply ("Hclear" $! ws' with "[//] Hws Hrf"). }
-    (* ---- the boundary: the tick is the language's, not the caller's ---- *)
-    iApply (ewp_eloop 0%nat c eq_refl). iNext. iIntros (tick).
+    (* ---- the boundary: the tick is the language's, not the caller's, and
+       (W2b condition 1) the boundary IS the reset point ---- *)
+    iApply (ewp_eloop 0%nat c ws' eq_refl with "Hws").
+    iNext. iIntros (tick) "Hws".
+    iDestruct (ev_rcpt_mono P ws' (instr_post ws') (instr_post_le ws')
+                 with "Hrcpt") as "#Hrcpt'". iClear "Hrcpt".
     (* ---- INSTRUCTION 2: the fence cashes the receipt ---- *)
-    iApply (ewp_ev_started_fence P c D (riscv_step tick) ws' (x3 w).1
+    iApply (ewp_ev_started_fence P c D (riscv_step tick) (instr_post ws')
+              (x3 w).1
               k1 k2 k3 (y1 w tick) (y2 w tick) (y3 w tick) gf reqg wg b
               (Hy1 w tick) (Hy2 w tick) (Hy3 w tick)
               (Hgf w tick) (Hgb w tick) (Hgtag w tick) Hpark Hacq
-              Hdevg Hcohg Hlatg with "Htg Hws Hrf Hrcpt").
+              Hdevg Hcohg Hlatg with "Htg Hws Hrf Hrcpt'").
     iNext. iIntros (ws'') "%Hle' HP Hws Hrf".
     iApply ("Hexit" $! ws'' w tick with "[%] [//] HP Hws Hrf").
-    by etrans.
+    etrans; [exact Hle|]. etrans; [apply instr_post_le|exact Hle'].
   Qed.
 
 End wait_seq.

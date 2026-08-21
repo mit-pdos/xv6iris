@@ -491,6 +491,15 @@ Section core.
     weak_state_interp (ewg_ib σ c v) = weak_state_interp σ.
   Proof. reflexivity. Qed.
 
+  (** ... and the same at the COMBINED shape the two instruction-start nodes
+      write ([WeakEvLang.ewg_ibws]): only the VIEW half is visible, so the
+      interpretation is the plain view move's, at an unchanged log. *)
+  Lemma weak_state_interp_ibws (σ : wgstate) (c : CPU) (v : oib32)
+      (ws : wstate) :
+    weak_state_interp (ewg_ibws σ c v ws)
+    = weak_state_interp (ewg_store σ c ws (wglog σ)).
+  Proof. reflexivity. Qed.
+
   Lemma ewp_ecycle (gen : nat) (c : CPU) (m : M unit)
       (fn : option (bool * bool * bool * bool)) :
     gen = 0%nat ->
@@ -552,36 +561,62 @@ Section core.
     by iModIntro.
   Qed.
 
-  (** THE BOUNDARY: [ELoop] fetches a fresh instruction.  σ does not move — the
-      FETCH itself is an event of the cycle that follows, which is exactly the
-      granularity claim. *)
-  Lemma ewp_eloop (gen : nat) (c : CPU) :
+  (** THE BOUNDARY: [ELoop] fetches a fresh instruction.  IT IS THE RESET
+      POINT (W2b condition 1): the step emits [LInstr], so the hart's view
+      moves by [instr_post] — the load-result bank, the reservation and the
+      TRANSLATION bank are all cleared BEFORE the fetch.  That last one is
+      the whole content of the fix: the Sail model announces the
+      instruction AFTER the fetch, so a reset that rode the announce alone
+      let every fetch consume the previous instruction's data-read bank
+      through [w_tbank], i.e. a blanket load → later-store edge RVWMO does
+      not have.
+
+      THE ANNOUNCE KEEPS ITS OWN [LInstr] (see [ewp_ev_sil_node]'s
+      [esil_sigma] middle shape): moving the reset here does NOT make that
+      one redundant, because a boundary-only reset would leave the FETCH's
+      own read view sitting in [w_ldv] for the rest of the instruction, to
+      be inherited by every [DLdRes]-carrying register write.  Between the
+      two resets nothing consumes [w_ldv] and the fetch's plain load clears
+      [w_res] by itself, so the double reset is observably idempotent —
+      apart from the one intended change at the fetch.
+
+      What that costs the rule: the hart's view fragment, which every
+      caller of this rule already holds at the boundary. *)
+  Lemma ewp_eloop (gen : nat) (c : CPU) (ws : wstate) :
     gen = 0%nat ->
-    ▷ (∀ tick : bool, EWP (ECycle gen c (riscv_step tick) None) @ ⊤) -∗
+    hart_ws c ws -∗
+    ▷ (∀ tick : bool, hart_ws c (instr_post ws) -∗
+         EWP (ECycle gen c (riscv_step tick) None) @ ⊤) -∗
     EWP (ELoop gen c) @ ⊤.
   Proof.
-    iIntros (Hgen) "H".
-    iApply (wp_lift_step (Λ := weak_ev_lang)); first done.
-    iIntros (σ ns κ κs nt) "Hσ".
-    iDestruct (weak_state_interp_pin σ with "Hσ") as %[Hpow Hgen0].
-    have Hlive : ethread_live σ gen
-      by rewrite /ethread_live Hgen Hgen0; split.
-    iApply fupd_mask_intro; [set_solver|]. iIntros "Hcl".
-    iSplitR.
-    { iPureIntro. exists [], (ECycle gen c (riscv_step false) None),
-        (ewg_ib σ c None), [].
-      by apply eprim_step_loop_live. }
-    iIntros (e2 σ2 efs Hstep) "!>".
-    apply eprim_step_loop_inv in Hstep as (-> & -> & Harm).
-    destruct Harm as [(_ & -> & (tick & ->))|(Hnl & _)];
-      [|by destruct (Hnl Hlive)].
-    iIntros "_". iMod "Hcl" as "_". iModIntro.
-    (* D3: the RESTART clears [wgib], which the state interpretation cannot
-       see ([weak_state_interp_ib] — a CONVERSION, so [iFrame] closes it
-       with no rewriting at all).  That is the whole point of putting the
-       announced bits in σ and not in a ghost. *)
-    iFrame "Hσ".
-    iSplitL; [|done]. iApply "H".
+    iIntros (Hgen) "Hws H".
+    iApply (ewp_ecycle gen c (Interface.Ret tt) None Hgen).
+    iIntros (σ) "Hσ".
+    iDestruct (weak_state_interp_mem σ c with "Hσ") as
+      "(%Hbnd & %Hnv & %Hwf & Hlog & Hlat & Hwsa & Hcl)".
+    iDestruct (hart_ws_agree with "Hwsa Hws") as %->.
+    iApply fupd_mask_intro; [set_solver|]. iIntros "Hmask".
+    iSplitR; [iPureIntro; do 2 eexists; by exists false|].
+    iNext. iIntros (e' σ') "%Hcy". simpl in Hcy.
+    destruct Hcy as (tick & -> & ->).
+    iMod "Hmask" as "_".
+    iMod (hart_ws_update c (wgws σ c) (wgws σ c) (instr_post (wgws σ c))
+            with "Hwsa Hws") as "[Hwsa Hws]".
+    iModIntro. iSplitR "Hws H".
+    - iDestruct ("Hcl" $! (instr_post (wgws σ c)) (wglog σ)
+                   with "[%] [%] [%] [%] [%] Hlog Hlat Hwsa") as "Hσ".
+      + reflexivity.
+      + by apply instr_post_bounded, (Hbnd c).
+      + apply (nv_hart_coh_step (wglog σ) c (wgws σ c));
+          [exact (no_violation_hart _ _ c Hnv)|].
+        intros a Hlt. exfalso.
+        rewrite (ws_depmove_coh _ _ a (instr_post_depmove (wgws σ c))) in Hlt.
+        lia.
+      + exists []. rewrite app_nil_r. split; [reflexivity|].
+        intros mm Hmm. by apply elem_of_nil in Hmm.
+      + exact Hwf.
+      + rewrite weak_state_interp_ibws. iExact "Hσ".
+    - by iApply ("H" $! tick with "Hws").
   Qed.
 
   (** THE INSTRUCTION END, AFTER THE G5 CONSTRUCTOR MERGE.  [Ret u] at
