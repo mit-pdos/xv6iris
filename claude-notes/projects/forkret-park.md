@@ -300,11 +300,29 @@ ghost step, not fileinit's"*.
 **STAGED (`dd2af18e`).** main used to drop all three of fileinit's outputs
 (`iIntros (mfi) "Hcg Hpc %Hcsfi _ _ _"`); it now re-bundles them as
 `lk_fresh ftable "ftable"` and threads them out of `mn_grp_fs`. What is
-still missing is only the resource: `ftable_res γf` at `M = ∅` is NFILE
-copies of `a_fref k ↦₄ 0 ∗ file_fields k 1 C ∗ file_pay γ k 1 C`, so the
-ftable's `file[NFILE]` array has to be CARVED OUT OF BSS
-(`BootCarveMain.v`) and its authority allocated. Once it is, the `newlock`
-is one line — the wait_lock below is the same move, already taken.
+still missing is only the resource, and it is the biggest single item left
+in E3. `ftable_res γf` at `M = ∅` is NFILE = 100 copies of
+`a_fref k ↦₄ 0 ∗ ∃ C, ⌜fc_type C = FD_NONE⌝ ∗ file_fields k 1 C ∗
+file_pay γ k 1 C`, where `file_fields` is SIX cells (`type`/`readable`/
+`writable`/`pipe`/`ip`/`major`) and `file_pay` at `FD_NONE` unfolds through
+`file_core_none` to `iref_frac 1` beside `fpay_tok` and `off_hold`.
+
+So it is (a) a BSS carve and (b) a ghost allocation:
+
+* **the carve.** `BootShared.v:762` cuts `ftable .. ftable+24` for the lock
+  and then jumps straight from `ftable+24` to `disk` — the whole
+  `file[100]` array is in the dropped span. Needs a `bss_cut` for it and a
+  stride family in the shape of `BootCarveMain.boot_procs_raw` /
+  `boot_bcache_nodes`, which are the precedents.
+* **the ghost.** `ftable_auth γ ∅`, `fd_slots_auth`, and per slot
+  `fpay_tok` / `off_hold` / `flive_tok` plus one `iref_frac` — the NFILE
+  iref units `IrefSlots` already reserves for the file table
+  (`SpecMain.main_globals_raw`'s note says so: "The remaining [NFILE] units
+  of [IrefSlots.IREFSLOTS] are the file table's").
+
+There is no existing `ftable_boot`-style lemma to build on; `IcacheBoot`'s
+is the nearest model. Once it lands the `newlock` is one line — the
+wait_lock above is the same move, already taken.
 
 **The `wait_lock` `is_lock`. — DONE (`dd2af18e`).** `wait_res` is
 `∃ ps, parents_own ps`, the NPROC `p_parent` cells, and of `p_parent` (+56)
