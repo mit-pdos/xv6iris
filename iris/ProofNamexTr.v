@@ -130,20 +130,30 @@ Section NamexTrHops.
     replace (k + S i)%nat with (S k + i)%nat by lia. done.
   Qed.
 
-  (* FIRE A HOP THAT HITS.  The walk lends its WHOLE [dv_hold] -- the
-     custody chain's fraction, [DfracOwn 1] at this stage -- through the
-     caller's single [={⊤}=∗], and gets it back at the same dfrac.  The
-     caller's cursor steps to the inum the map answers with, which is the
-     one dirlookup returned ([FsTree.dv_lookup_found] supplies [He]). *)
+  (* FIRE A HOP THAT HITS.  The walk lends the fraction ITS OWN CUSTODY
+     CARRIES -- [DfracOwn 1] on the ride's whole arm, [DfracOwn (3/4)] once
+     a lend has been cut out of this directory (N-4 PHASE B) -- through the
+     caller's single [={⊤}=∗], and gets it back at the same dfrac.  This is
+     precisely what [SpecNameiTr.nx_hop]'s EXPOSED [dqv] exists for: the
+     contract is unchanged, and the two arms differ only in what is passed
+     at that argument.  The caller's cursor steps to the inum the map
+     answers with, which is the one dirlookup returned
+     ([FsTree.dv_lookup_found] supplies [He]). *)
   Lemma nxt_hop_hit (P Pmiss : nat -> Z -> iProp Σ) (k : nat) (s : fname)
       (d : Z) (ents : gmap fname Z) (c : Z) :
     ents !! s = Some c ->
-    nx_hop P Pmiss k s -∗ P k d -∗ dv_hold d ents ={⊤}=∗
-    dv_hold d ents ∗ P (S k) c.
+    nx_hop P Pmiss k s -∗ P k d -∗ dv_ride d ents ={⊤}=∗
+    dv_ride d ents ∗ P (S k) c.
   Proof.
-    iIntros (He) "Hh HP Hdv". rewrite /dv_hold.
-    iMod ("Hh" $! d ents (DfracOwn 1) with "HP Hdv") as "[Hdv HR]".
-    iModIntro. iFrame "Hdv". rewrite He. iExact "HR".
+    iIntros (He) "Hh HP Hdv". rewrite {1}/dv_ride.
+    iDestruct "Hdv" as "[Hdv|[Hdv Hm]]".
+    - rewrite /dv_hold.
+      iMod ("Hh" $! d ents (DfracOwn 1) with "HP Hdv") as "[Hdv HR]".
+      iModIntro. iSplitL "Hdv"; [by iApply dv_ride_of_hold |].
+      rewrite He. iExact "HR".
+    - iMod ("Hh" $! d ents (DfracOwn (3/4)) with "HP Hdv") as "[Hdv HR]".
+      iModIntro. iSplitL "Hdv Hm"; [rewrite /dv_ride; iRight; iFrame |].
+      rewrite He. iExact "HR".
   Qed.
 
   (* ...AND ONE THAT MISSES: same lend, and the caller's own [Pmiss]
@@ -151,12 +161,18 @@ Section NamexTrHops.
   Lemma nxt_hop_miss (P Pmiss : nat -> Z -> iProp Σ) (k : nat) (s : fname)
       (d : Z) (ents : gmap fname Z) :
     ents !! s = None ->
-    nx_hop P Pmiss k s -∗ P k d -∗ dv_hold d ents ={⊤}=∗
-    dv_hold d ents ∗ Pmiss k d.
+    nx_hop P Pmiss k s -∗ P k d -∗ dv_ride d ents ={⊤}=∗
+    dv_ride d ents ∗ Pmiss k d.
   Proof.
-    iIntros (He) "Hh HP Hdv". rewrite /dv_hold.
-    iMod ("Hh" $! d ents (DfracOwn 1) with "HP Hdv") as "[Hdv HR]".
-    iModIntro. iFrame "Hdv". rewrite He. iExact "HR".
+    iIntros (He) "Hh HP Hdv". rewrite {1}/dv_ride.
+    iDestruct "Hdv" as "[Hdv|[Hdv Hm]]".
+    - rewrite /dv_hold.
+      iMod ("Hh" $! d ents (DfracOwn 1) with "HP Hdv") as "[Hdv HR]".
+      iModIntro. iSplitL "Hdv"; [by iApply dv_ride_of_hold |].
+      rewrite He. iExact "HR".
+    - iMod ("Hh" $! d ents (DfracOwn (3/4)) with "HP Hdv") as "[Hdv HR]".
+      iModIntro. iSplitL "Hdv Hm"; [rewrite /dv_ride; iRight; iFrame |].
+      rewrite He. iExact "HR".
   Qed.
 
 End NamexTrHops.
@@ -3259,8 +3275,9 @@ Section ProofNamexTrMain.
                          (* ================== THE FIRE POINT ==================
                             dirlookup has returned and the walk still holds the
                             locked directory's payload, so [Hdview] --
-                            [ic_loaded]'s [dv_hold], the N-1 carrier -- is in
-                            hand at the FULL fraction.  Peel hop [length es0]
+                            [ic_loaded]'s [dv_ride], the N-1 carrier -- is in
+                            hand at the custody fraction (whole, or ¾ under
+                            a live lend).  Peel hop [length es0]
                             off the family and lend that fragment through the
                             caller's single [={⊤}=∗]; the mask is eliminated by
                             [fupd_wp] at this instruction boundary, which is

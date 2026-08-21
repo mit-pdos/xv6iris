@@ -1018,9 +1018,9 @@ Section ProofSysOpenBody.
        this inode's bytes and truncated its record, so the hold moves with
        them.  The fragment is WHOLE, so this is one free own-update. *)
     iApply fupd_wp.
-    iMod (dv_set (bv_unsigned inum) (dv_of dn data)
+    iMod (dv_set_rt ⊤ _ _ _ _ (bv_unsigned inum) (dv_of dn data)
             (dv_of (di_trunc dn) (fun _ => replicate BSIZE (bv_0 8)))
-           with "Hdv") as "Hdv".
+            ltac:(solve_ndisj) with "Hireg Hdv") as "Hdv".
     iModIntro.
     iDestruct (so_trunc_loaded gfs gi cov logstart kk inum dn Htynz Htynd
                  with "Hat Hmeta Hmap Hblk Hdv") as "Hload".

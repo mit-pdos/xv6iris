@@ -13,6 +13,7 @@ From iris.base_logic.lib Require Import invariants ghost_map mono_nat own.
 Require Import RiscvPtsto.
 Require Import IcacheRef.
 Require Import DirViewG.   (* [dv_hold] -- the pending arm's untied contents hold *)
+Require Import DirViewLend. (* N-4 PHASE B: the arm rides [dv_ride], not [dv_hold] *)
 Require Import EscrowDefs.
 Require Import InodeRegion.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
@@ -198,7 +199,7 @@ Section EscrowInode.
   Definition pool_pending (γi : gname) (z : Z) : iProp Σ :=
     (∃ ge gr gd (rg : bool),
        escA_inv ge gr gd γi z rg ∗ committedA ge ∗ redeem_ticketA gr ∗
-       (∃ e, dv_hold z e))%I.
+       (∃ e, dv_ride z e))%I.
   (* NOT Timeless: [escA_inv] is an [inv].  Wherever [ipool_shape] must stay
      Timeless, its pending arm is opened without the [>] later-strip. *)
 

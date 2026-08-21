@@ -2868,9 +2868,10 @@ Section ProofSysLinkBody.
                                CLIENT's business (N-3/N-4), not the
                                carrier's. *)
                             iApply fupd_wp.
-                            iMod (dv_set (bv_unsigned dinum)
+                            iMod (dv_set_rt ⊤ _ _ _ _ (bv_unsigned dinum)
                                     (dv_of dnd datd) (dv_of dnd' datd')
-                                   with "Hdviewd") as "Hdviewd".
+                                    ltac:(solve_ndisj)
+                                   with "Hireg Hdviewd") as "Hdviewd".
                             iModIntro.
                             iAssert (ic_loaded gfs gi cov logstart kd dinum dnd' bmd')
                               with "[Hdlnkd' Hdiatd Hmetad Hmapd Hblocksd Hdviewd]"
@@ -3268,9 +3269,10 @@ Section ProofSysLinkBody.
                                CLIENT's business (N-3/N-4), not the
                                carrier's. *)
                             iApply fupd_wp.
-                            iMod (dv_set (bv_unsigned dinum)
+                            iMod (dv_set_rt ⊤ _ _ _ _ (bv_unsigned dinum)
                                     (dv_of dnd datd) (dv_of dnd' datd')
-                                   with "Hdviewd") as "Hdviewd".
+                                    ltac:(solve_ndisj)
+                                   with "Hireg Hdviewd") as "Hdviewd".
                             iModIntro.
                             iAssert (ic_loaded gfs gi cov logstart kd dinum dnd' bmd')
                               with "[Hdlnkd' Hdiatd Hmetad Hmapd Hblocksd Hdviewd]"

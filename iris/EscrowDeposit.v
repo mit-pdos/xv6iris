@@ -218,13 +218,15 @@ Section EscrowDeposit.
     (* ===== THE DEPOSIT: rebind + escA_deposit + split + park PENDING ===== *)
     iDestruct "Hrf" as (ge0 gr0) "Hrf".
     iEval (rewrite /reg_full) in "Hrf".
-    iDestruct "Hreg" as (mr) "[%Hcovr Hauthr]".
+    iDestruct "Hreg" as (mr) "(%Hcovr & Hauthr & Hlends)".
     iMod (ghost_map_update (ge, gr) with "Hauthr Hrf") as "[Hauthr Hrf]".
     iMod ("Hescl" with "Hmk Hoff") as "#Hcom".
     iDestruct (reg_split (bv_unsigned inum) ge gr with "[Hrf]") as "[Hrh1 Hrh2]".
     { rewrite /reg_full. iExact "Hrf". }
-    iAssert (ireg_registry nib) with "[Hauthr]" as "Hreg".
-    { iExists (<[bv_unsigned inum := (ge, gr)]> mr). iSplitR; [| iExact "Hauthr"].
+    (* N-4 PHASE B: the lend column rides through this rebind untouched --
+       the deposit moves key [inum], and every lend key is negative. *)
+    iAssert (ireg_registry nib) with "[Hauthr Hlends]" as "Hreg".
+    { iExists (<[bv_unsigned inum := (ge, gr)]> mr). iSplitR; [| iFrame].
       iPureIntro. intros w Hw. destruct (decide (w = bv_unsigned inum)) as [->|Hne].
       - rewrite lookup_insert. done.
       - rewrite lookup_insert_ne; [exact (Hcovr w Hw) | congruence]. }

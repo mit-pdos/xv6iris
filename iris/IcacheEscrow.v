@@ -162,9 +162,11 @@ Require Import DinodeEnc.
 Require Import DirView.
 Require Import DirLinks.
 Require Import FsTree.        (* [dir_uniq] -- the name-uniqueness payload clause *)
-(* EXPORTED, not merely imported: [dv_hold] is a conjunct of [ipool_alloc] and
-   [ic_loaded], so every file that destructs either one names it. *)
+(* EXPORTED, not merely imported: [dv_ride] is a conjunct of [ipool_alloc] and
+   [ic_loaded], so every file that destructs either one names it -- and its
+   whole arm is [DirViewG]'s [dv_hold], so both leaves are exported. *)
 Require Export DirViewG.
+Require Export DirViewLend.  (* N-4 PHASE B: the custody chain rides the lend *)
 Require Import InodeInv.
 Require Import InodeLock.
 Require Import SleepLock.  (* [is_sleeplock_gen] / [slh_tok] -- see [ic_sleeplocks] below *)
@@ -487,7 +489,7 @@ Section IcacheEscrow.
           conjunct is a value and not a guarded claim.  Of a FILE the value is
           determined garbage; no client reads it and no site proves anything
           about it. *)
-       dv_hold (bv_unsigned inum) (dv_of dn0 data0))%I.
+       dv_ride (bv_unsigned inum) (dv_of dn0 data0))%I.
 
   (* OPTION A: the NON-PENDING (Timeless) pool shape -- the ORIGINAL two-arm
      shape, unchanged.  It is what the escrow's parked bundle [ic_unloaded]
@@ -502,7 +504,7 @@ Section IcacheEscrow.
            (namei-pinned-lookup.md §9 W2): a tied->untied peel forgets the
            value, and the fill that re-ties it [dv_set]s to the fresh
            record's own [dv_of]. *)
-        ∃ e, dv_hold (bv_unsigned inum) e))%I.
+        ∃ e, dv_ride (bv_unsigned inum) e))%I.
 
   (* THE AWAIT ARM (iclaim-ledger.md §1.2/§1.3): the entry a FREER has parked
      on its way to the off-lock deposit.  It is the whole point of B2's
@@ -548,10 +550,10 @@ Section IcacheEscrow.
      One exclusive ledger cell cannot be in two places. *)
   (* ...AND THE CONTENTS HOLD, UNTIED, for [pool_pending]'s reason verbatim:
      this arm is byte-less, and the peel that turns it into an [imark] must
-     find the inum's [dv_hold] somewhere. *)
+     find the inum's [dv_ride] somewhere. *)
   Definition pool_await (γi : gname) (z : Z) : iProp Σ :=
     (∃ ge gr gd (rg : bool),
-       escA_inv ge gr gd γi z rg ∗ redeem_ticketA gr ∗ (∃ e, dv_hold z e))%I.
+       escA_inv ge gr gd γi z rg ∗ redeem_ticketA gr ∗ (∃ e, dv_ride z e))%I.
 
   (* the PENDING-capable pool shape -- lives ONLY at the itable free pool,
      which is LOCK-HELD (never [iInv .. as ">"], verified), so the non-Timeless
@@ -815,7 +817,7 @@ Section IcacheEscrow.
           there.  A checked-out holder therefore owns the abstract contents
           outright while it owns the bytes, which is what makes every write
           mover a free [dv_set] and what N-3 lends at a walk's hop instants. *)
-       dv_hold (bv_unsigned inum) (dv_of dn data))%I.
+       dv_ride (bv_unsigned inum) (dv_of dn data))%I.
 
   (* An UNLOADED entry's parked content: the cells at no particular value
      (iget minted the entry and nobody has read the dinode yet) plus the
@@ -1624,7 +1626,7 @@ Section IcacheEscrow.
     inode_addrs (ientry k) (bm_cells bm) -∗
     ind_res γfs bm -∗
     inode_blocks γfs bm data -∗
-    dv_hold (bv_unsigned inum) (dv_of dn data) -∗
+    dv_ride (bv_unsigned inum) (dv_of dn data) -∗
     ic_loaded γfs γi cov logstart k inum dn bm.
   Proof.
     intros Hok Hdok Hddix Hdoc Hduq. iIntros "Hl Hd Hm Ha Hr Hb Hv".
@@ -2472,7 +2474,7 @@ Section IcacheEscrow.
     redeem_ticketA gr -∗
     (* the freer's own contents hold, which came out of the payload it
        evicted and which the AWAIT arm parks untied (§9 W2) *)
-    (∃ e, dv_hold (bv_unsigned inum) e) -∗
+    (∃ e, dv_ride (bv_unsigned inum) e) -∗
     ipool_shape γfs γi cov logstart inum.
   Proof.
     iIntros "Hcnt Hmir #Hesc Htk Hdv". rewrite /ipool_shape.
@@ -2499,7 +2501,7 @@ Section IcacheEscrow.
     frzm_h (bv_unsigned inum) false -∗
     escA_inv ge gr gd γi (bv_unsigned inum) rg -∗
     redeem_ticketA gr -∗
-    (∃ e, dv_hold (bv_unsigned inum) e) -∗
+    (∃ e, dv_ride (bv_unsigned inum) e) -∗
     |==> ic_escrow_body cn γfs γi cov logstart k ∗
          ic_id cn k (1/2) false dev inum ∗
          ipool_shape γfs γi cov logstart inum.

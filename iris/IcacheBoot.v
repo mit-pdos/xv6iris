@@ -108,6 +108,7 @@ Require Import IrefSlots.
 Require Import IcacheInv.
 Require Import FsTree.
 Require Import DirViewG.   (* [dv_hold]/[dv_of] -- the pool's contents holds *)
+Require Import DirViewLend. (* N-4 PHASE B: [dv_lcol] / [dv_lic], boot-stocked *)
 Require Import IcacheEscrow.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -671,9 +672,130 @@ Section IcacheBootRegion.
     apply lookup_gset_to_gmap_Some. split; [apply region_inums_spec; lia | reflexivity].
   Qed.
 
+  Lemma dummy_reg_key (nib : nat) (k : Z) (v : gname * gname) :
+    dummy_reg nib !! k = Some v -> (0 <= k)%Z.
+  Proof.
+    rewrite /dummy_reg. intros Hk.
+    apply lookup_gset_to_gmap_Some in Hk as [Hin _].
+    apply region_inums_spec in Hin. lia.
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (*  N-4 PHASE B (E1-region): the LEND COLUMN's boot state              *)
+  (* ------------------------------------------------------------------ *)
+
+  (*  The region's per-inum lend column ([DirViewLend.dv_lcol], parked in
+      [InodeRegion.ireg_registry]) is stocked here, in the NONE state at
+      every inum, and it costs no boot map and no [icfg] field: the two
+      [dviewUR] cell families are minted by two [own_alloc]s at the SAME
+      [dview_boot_map] the contents ghost uses, and the two registry key
+      families ride the [icfg_reg] AUTHORITY this lemma is already handed
+      -- a ghost_map can grow a key, which is exactly why the lend's names
+      live there and not in a bare [own] map.  The mint LICENCES leave with
+      the caller (FsCfgBoot), where N-5.1's stocking mint will spend them.  *)
+
+  (* the region-set / [seq] bridge: [ireg_lends] is indexed flat *)
+  Lemma region_set_to_seq (nib : nat) (Phi : Z -> iProp Σ) :
+    ([∗ set] z ∈ region_inums nib, Phi z) ⊣⊢
+    ([∗ list] k ∈ seq 0 (16 * nib), Phi (Z.of_nat k)).
+  Proof.
+    rewrite /region_inums (big_sepS_list_to_set _ _ (region_list_nodup nib)).
+    by rewrite big_sepL_fmap.
+  Qed.
+
+  Definition lend_slots (γc γv : gname) (nib : nat) : gmap Z (gname * gname) :=
+    gset_to_gmap (γc, γv) (set_map dvl_k (region_inums nib)).
+  Definition lend_lics (nib : nat) : gmap Z (gname * gname) :=
+    gset_to_gmap (1%positive, 1%positive) (set_map dvl_l (region_inums nib)).
+  Definition lend_reg (γc γv : gname) (nib : nat) : gmap Z (gname * gname) :=
+    lend_slots γc γv nib ∪ lend_lics nib.
+
+  Lemma lend_slots_key (γc γv : gname) (nib : nat) (k : Z) (v : gname * gname) :
+    lend_slots γc γv nib !! k = Some v -> exists z, k = dvl_k z /\ (0 <= z)%Z.
+  Proof.
+    rewrite /lend_slots. intros Hk.
+    apply lookup_gset_to_gmap_Some in Hk as [Hin _].
+    apply elem_of_map in Hin as (z & -> & Hz).
+    apply region_inums_spec in Hz. exists z. split; [reflexivity | lia].
+  Qed.
+
+  Lemma lend_lics_key (nib : nat) (k : Z) (v : gname * gname) :
+    lend_lics nib !! k = Some v -> exists z, k = dvl_l z /\ (0 <= z)%Z.
+  Proof.
+    rewrite /lend_lics. intros Hk.
+    apply lookup_gset_to_gmap_Some in Hk as [Hin _].
+    apply elem_of_map in Hin as (z & -> & Hz).
+    apply region_inums_spec in Hz. exists z. split; [reflexivity | lia].
+  Qed.
+
+  Lemma lend_slots_lics_disj (γc γv : gname) (nib : nat) :
+    lend_slots γc γv nib ##ₘ lend_lics nib.
+  Proof.
+    apply map_disjoint_spec. intros k x y H1 H2.
+    apply lend_slots_key in H1 as (z & -> & _).
+    apply lend_lics_key in H2 as (w & Hw & _).
+    exact (dvl_k_l_ne z w Hw).
+  Qed.
+
+  Lemma lend_reg_dummy_disj (γc γv : gname) (nib : nat) :
+    lend_reg γc γv nib ##ₘ dummy_reg nib.
+  Proof.
+    apply map_disjoint_spec. intros k x y H1 H2.
+    apply dummy_reg_key in H2.
+    apply lookup_union_Some_raw in H1 as [H1|[_ H1]].
+    - apply lend_slots_key in H1 as (z & -> & Hz).
+      pose proof (dvl_k_neg z Hz). lia.
+    - apply lend_lics_key in H1 as (z & -> & Hz).
+      pose proof (dvl_l_neg z Hz). lia.
+  Qed.
+
+  Lemma lend_reg_cov (γc γv : gname) (nib : nat) (z : Z) :
+    (0 <= z < 16 * Z.of_nat nib)%Z ->
+    is_Some ((lend_reg γc γv nib ∪ dummy_reg nib) !! z).
+  Proof.
+    intros Hz. destruct (dummy_reg_cov nib z Hz) as [v Hv].
+    exists v. apply lookup_union_Some_raw. right. split; [| exact Hv].
+    destruct (lend_reg γc γv nib !! z) as [u|] eqn:Hl; [exfalso | reflexivity].
+    apply lookup_union_Some_raw in Hl as [Hl|[_ Hl]].
+    - apply lend_slots_key in Hl as (w & Hw & Hw0).
+      pose proof (dvl_k_neg w Hw0). lia.
+    - apply lend_lics_key in Hl as (w & Hw & Hw0).
+      pose proof (dvl_l_neg w Hw0). lia.
+  Qed.
+
+  Lemma lend_slots_out (γc γv : gname) (nib : nat) :
+    ([∗ map] k ↦ v ∈ lend_slots γc γv nib, k ↪[icfg_reg] v)
+    ⊢ [∗ set] z ∈ region_inums nib, dvl_slot z (DfracOwn 1) (γc, γv).
+  Proof.
+    rewrite /lend_slots big_sepM_gset_to_gmap.
+    rewrite (big_opS_set_map dvl_k (region_inums nib)
+               (fun k => (k ↪[icfg_reg] ((γc, γv) : gname * gname))%I)
+               dvl_k_inj).
+    done.
+  Qed.
+
+  Lemma lend_lics_out (nib : nat) :
+    ([∗ map] k ↦ v ∈ lend_lics nib, k ↪[icfg_reg] v)
+    ⊢ [∗ set] z ∈ region_inums nib, dv_lic z.
+  Proof.
+    rewrite /lend_lics big_sepM_gset_to_gmap.
+    rewrite (big_opS_set_map dvl_l (region_inums nib)
+               (fun k => (k ↪[icfg_reg]
+                            ((1%positive, 1%positive) : gname * gname))%I)
+               dvl_l_inj).
+    iIntros "H". iApply (big_sepS_mono with "H"). intros z _.
+    iIntros "H". rewrite /dv_lic.
+    iExists ((1%positive, 1%positive) : gname * gname). iExact "H".
+  Qed.
+
   Lemma ireg_alloc (E : coPset) (γfs : fs_names) (inodestart : Z) (nib : nat)
       (bss : nat -> list (bv 8)) (W : Z -> nat) :
     16 * Z.of_nat nib <= 2 ^ 32 ->
+    (* N-4 PHASE B: the lend column family is indexed at [icfg_nib] (see
+       [InodeRegion.ireg_lends] for why), and boot is the one place that has
+       to know the two agree.  The caller is [FsCfgBoot], which calls this
+       at [icfg_nib] literally. *)
+    nib = icfg_nib ->
     (forall bi : nat, (bi < nib)%nat -> length (bss bi) = 1024%nat) ->
     (forall dss : list (list dinode),
        length dss = nib -> Forall diblk_wf dss ->
@@ -731,10 +853,13 @@ Section IcacheBootRegion.
       ⌜forall bi : nat, (bi < nib)%nat -> bss bi = diblk_bytes (dss !!! bi)⌝ ∗
       ireg_inv γi γfs inodestart nib ∗
       ireg_boot ∗
+      (* N-4 PHASE B: one MINT LICENCE per inum, out with the caller.  The
+         column itself stays inside the region, in its NONE state. *)
+      ([∗ set] z ∈ region_inums nib, dv_lic z) ∗
       ([∗ set] z ∈ region_inums nib,
          ireg_out γi (mword_of_int z : mword 32) (image_dinode dss z)).
   Proof.
-    intros Hnib Hlen Himg.
+    intros Hnib Hnibc Hlen Himg.
     destruct (image_decode nib bss Hlen) as (dss & Hl & Hwf & He).
     destruct (Himg dss Hl Hwf He) as (Hl3 & Hl4 & Hrt0 & Hl1 & Hdw0).
     iIntros "Hlk Hcnts Hrcpts Hmirs Hepa Hblks Hboot Hrauth".
@@ -743,8 +868,32 @@ Section IcacheBootRegion.
     iMod (ghost_map_insert_big (dummy_reg nib) with "Hrauth") as "[Hrauth Hfulls]".
     { apply map_disjoint_empty_r. }
     rewrite right_id_L.
-    iDestruct (ireg_registry_from_map (dummy_reg nib) nib (dummy_reg_cov nib)
-                with "Hrauth") as "Hreg".
+    (* N-4 PHASE B (E1-region): stock the lend column, NONE at every inum.
+       Two cell families at fresh gnames, two key families in the registry
+       auth this lemma already holds -- no boot map and no [icfg] field. *)
+    iMod (own_alloc (dview_boot_map (region_inums nib))) as (γlc) "Hlc";
+      [apply dview_boot_map_valid |].
+    iMod (own_alloc (dview_boot_map (region_inums nib))) as (γlv) "Hlv";
+      [apply dview_boot_map_valid |].
+    iMod (ghost_map_insert_big (lend_reg γlc γlv nib) with "Hrauth")
+      as "[Hrauth Hlend0]".
+    { apply lend_reg_dummy_disj. }
+    iDestruct (big_sepM_union with "Hlend0") as "[Hslots0 Hlics0]";
+      [apply lend_slots_lics_disj |].
+    iDestruct (lend_slots_out γlc γlv nib with "Hslots0") as "Hslots0".
+    iDestruct (lend_lics_out nib with "Hlics0") as "Hlics".
+    iDestruct (dvl_boot_split γlc (region_inums nib) with "Hlc") as "Hlc".
+    iDestruct (dvl_boot_split γlv (region_inums nib) with "Hlv") as "Hlv".
+    iAssert ([∗ set] z ∈ region_inums nib, dv_lcol z)%I
+      with "[Hslots0 Hlc Hlv]" as "Hcols".
+    { iDestruct (big_sepS_sep_2 with "Hslots0 Hlc") as "H".
+      iDestruct (big_sepS_sep_2 with "H Hlv") as "H".
+      iApply (big_sepS_mono with "H"). intros z _.
+      iIntros "[[Hsl Hc] Hv]".
+      iApply (dv_lcol_boot z γlc γlv with "Hsl Hc Hv"). }
+    iDestruct (ireg_registry_from_map (lend_reg γlc γlv nib ∪ dummy_reg nib) nib
+                 (lend_reg_cov γlc γlv nib) with "Hrauth [Hcols]") as "Hreg".
+    { rewrite /ireg_lends -Hnibc -region_set_to_seq. iExact "Hcols". }
     (* OPTION A (walk reg-fold): the reg_full fragments no longer form a
        standalone big-op; distribute them into the per-inum slots below. *)
     iEval (rewrite /dummy_reg big_sepM_gset_to_gmap) in "Hfulls".
@@ -856,7 +1005,7 @@ Section IcacheBootRegion.
       as "#Hinv"; [by iNext |].
     iModIntro. iExists γi, dss.
     iSplitR; [done |]. iSplitR; [done |]. iSplitR; [iPureIntro; exact He |].
-    iFrame "Hinv Hboot". iExact "Hout".
+    iFrame "Hinv Hboot Hlics". iExact "Hout".
   Qed.
 
 End IcacheBootRegion.
@@ -911,7 +1060,7 @@ Section IcacheBootPool.
     (* ...and the CONTENTS HOLD, UNTIED (namei-pinned-lookup.md §9 W2): the
        marker arm carries no bytes, so boot's own [∅] is as good a value as
        any and the first fill sets it. *)
-    (∃ e, dv_hold (bv_unsigned inum) e) -∗
+    (∃ e, dv_ride (bv_unsigned inum) e) -∗
     imark γi (bv_unsigned inum) -∗ ipool_shape γfs γi cov logstart inum.
   Proof.
     iIntros "Hcnt Hmir Hoff Hdv Hmk". rewrite /ipool_shape /ipool_shape_np.
@@ -959,7 +1108,7 @@ Section IcacheBootPool.
        (namei-pinned-lookup.md §9 W2/W3): the boot client sets the value with
        a free [dv_set] before it gets here, so nothing in this file has to
        compute it. *)
-    dv_hold (bv_unsigned inum) (dv_of dn data) -∗
+    dv_ride (bv_unsigned inum) (dv_of dn data) -∗
     ipool_shape γfs γi cov logstart inum.
   Proof.
     iIntros (Hok Hdok Hddix Hdoc Hduq) "Hcnt Hmir Hoff Hdlk Hdn Hind Hblk Hdv".
@@ -1016,13 +1165,13 @@ Section IcacheBootPool.
          (* the CONTENTS HOLD rides INSIDE the allocated bundle, because the
             value it is tied to is this bundle's own [dn]/[data] and nothing
             outside the existential can name them (§9 W2). *)
-         dv_hold (bv_unsigned (mword_of_int z : mword 32)) (dv_of dn data)) -∗
+         dv_ride (bv_unsigned (mword_of_int z : mword 32)) (dv_of dn data)) -∗
     ([∗ set] z ∈ R ∖ A,
        imark γi (bv_unsigned (mword_of_int z : mword 32))) -∗
     (* ...and the FREE inums' holds, untied and therefore outside any
        existential *)
     ([∗ set] z ∈ R ∖ A,
-       ∃ e, dv_hold (bv_unsigned (mword_of_int z : mword 32)) e) -∗
+       ∃ e, dv_ride (bv_unsigned (mword_of_int z : mword 32)) e) -∗
     ipool γfs γi cov logstart R.
   Proof.
     iIntros (Hsub) "Hcnts Hmirs Hoffs Ha Hf Hfv".
@@ -1071,7 +1220,7 @@ Section IcacheBootPool.
     ([∗ set] z ∈ region_inums nib, icnt_half z 0%nat) -∗
     ([∗ set] z ∈ region_inums nib, frzm_h z false) -∗
     ([∗ set] z ∈ region_inums nib, ifreeze_off z) -∗
-    ([∗ set] z ∈ region_inums nib, dv_hold z ∅) -∗
+    ([∗ set] z ∈ region_inums nib, dv_ride z ∅) -∗
     ([∗ set] z ∈ region_inums nib,
        ireg_out γi (mword_of_int z : mword 32) (image_dinode dss z)) -∗
     ipool γfs γi cov logstart (region_inums nib).
@@ -1083,7 +1232,7 @@ Section IcacheBootPool.
                 with "Hmirs") as "Hmirs".
     iDestruct (region_key_shift nib (fun z => ifreeze_off z) Hnib
                 with "Hoffs") as "Hoffs".
-    iDestruct (region_key_shift nib (fun z => dv_hold z ∅) Hnib
+    iDestruct (region_key_shift nib (fun z => dv_ride z ∅) Hnib
                 with "Hdvs") as "Hdvs".
     iDestruct (big_sepS_sep_2 with "Hcnts Hmirs") as "Hlg0".
     iDestruct (big_sepS_sep_2 with "Hlg0 Hoffs") as "Hlg1".

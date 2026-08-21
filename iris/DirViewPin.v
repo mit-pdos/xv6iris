@@ -150,19 +150,31 @@ Section PinChain.
      INTACT forces [ents = e], hence [ents !! s = Some c], hence the hit and
      the cursor's step; CANCELLED yields the receipt and the cursor falls
      into its diverged arm for good. *)
-  Lemma dvp_nx_hop (root : Z) (hops : list (fname * Z))
+  (*  THE [ireg_inv] ARGUMENT (N-4 PHASE B, E1-region).  The lend body now
+      lives in the region's per-inum column, so the redeem opens [↑iregN]
+      and needs the region's PERSISTENT handle.  It is threaded here rather
+      than being a new premise of anything: [wp_namei_tr]'s own premise list
+      already carries [ireg_inv] (the pinned corollary holds it before it
+      calls the walk), and [nx_hop]'s shape -- which [SpecNameiTr] fixes and
+      this file may not touch -- is unchanged.  The hop fires between
+      instructions with nothing of the walk's open, which is what makes the
+      [⊤] mask legal.                                                      *)
+  Lemma dvp_nx_hop (gi : gname) (gfs : fs_names) (inodestart : Z) (nib : nat)
+      (root : Z) (hops : list (fname * Z))
       (k : nat) (s : fname) (c : Z) :
     hops !! k = Some (s, c) ->
-    ⊢ nx_hop (dvp_P root hops) (dvp_Pmiss root hops) k s.
+    ireg_inv gi gfs inodestart nib -∗
+    nx_hop (dvp_P root hops) (dvp_Pmiss root hops) k s.
   Proof.
     intros Hk. rewrite /nx_hop /dvp_P /dvp_Pmiss /dvp_pins /dv_pin_ent.
-    iIntros (d ents dqv) "HP Hdv".
+    iIntros "#Hireg" (d ents dqv) "HP Hdv".
     iDestruct "HP" as "[[-> Hpins]|#Hlost]".
     - rewrite (drop_S _ _ _ Hk) big_sepL_cons Nat.add_0_r.
       cbn [fst snd].
       iDestruct "Hpins" as "[Hp Htl]".
       iDestruct "Hp" as (e) "[Hpin %He]".
-      iMod (dv_pin_redeem ⊤ with "Hpin Hdv") as "[Hdv Hres]"; [solve_ndisj|].
+      iMod (dv_pin_redeem ⊤ gi gfs inodestart nib _ _ dqv ents
+              ltac:(solve_ndisj) with "Hireg Hpin Hdv") as "[Hdv Hres]".
       iDestruct "Hres" as "[[%Heq _]|#Hc]".
       + subst ents. rewrite He. iModIntro. iFrame "Hdv". iLeft. iSplit.
         { iPureIntro. symmetry. by eapply dvp_at_S. }
@@ -181,15 +193,19 @@ Section PinChain.
 
   (* the whole family, from a pure agreement between the path buffer's
      elements and the caller's chain *)
-  Lemma dvp_nx_hops (root : Z) (hops : list (fname * Z)) (pl : list (bv 8)) :
+  Lemma dvp_nx_hops (gi : gname) (gfs : fs_names) (inodestart : Z) (nib : nat)
+      (root : Z) (hops : list (fname * Z)) (pl : list (bv 8)) :
     path_elems pl = hops.*1 ->
-    ⊢ nx_hops_from (dvp_P root hops) (dvp_Pmiss root hops) pl 0%nat.
+    ireg_inv gi gfs inodestart nib -∗
+    nx_hops_from (dvp_P root hops) (dvp_Pmiss root hops) pl 0%nat.
   Proof.
     intros Hpe. rewrite /nx_hops_from drop_0 Hpe.
+    iIntros "#Hireg".
     iApply big_sepL_intro. iIntros "!>" (jj s Hj).
     rewrite list_lookup_fmap in Hj.
     destruct (hops !! jj) as [[s' c]|] eqn:Hh; simplify_eq/=.
-    by iApply (dvp_nx_hop root hops jj _ c Hh).
+    by iApply (dvp_nx_hop gi gfs inodestart nib root hops jj _ c Hh
+                 with "Hireg").
   Qed.
 
   (* what the cursor says, at any index *)
@@ -373,7 +389,7 @@ Module NameiPinned (NT : NAMEI_TR).
     intros HK Hdev Hnib Hg His Hrd Hnib0 Hlg Hsz Hbm0 Hbmc Hbml His0 Hcb
            Hireg Hcstr Hplen Hslash Hwalk Hjn Hgl Hpe.
     iIntros "Hsie Hcpu Htcsr Hclm Hkt Hkd Hpc Hpanic Hbio Hlog Hkal Hitab
-             Hitinv Hesc Hslk Hiri Hiop Hprocs Hdinv Hgeom Hlock Hbmp Hinp
+             Hitinv Hesc Hslk #Hiri Hiop Hprocs Hdinv Hgeom Hlock Hbmp Hinp
              Hbinv Hpriv Hcwd Hpath Hbsl Hiref Hlogop Hpins Hcont".
     iApply (NT.wp_namei_tr gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
               ga gf cov logstart bmapstart inodestart nib size dev plen pfun
@@ -392,8 +408,9 @@ Module NameiPinned (NT : NAMEI_TR).
       rewrite /dvp_P. iLeft. iSplit.
       { iPureIntro. by rewrite dvp_at_0. }
       iFrame "Hpins".
-    - (* the hop family *)
-      by iApply dvp_nx_hops.
+    - (* the hop family, with the region's persistent handle for the
+         redeem's [↑iregN] open (N-4 PHASE B) *)
+      by iApply (dvp_nx_hops gi gfs inodestart nib with "Hiri").
     - (* the continuation: read the pinned post out of the cursor *)
       assert (length (path_elems (bview plen pfun)) = length hops) as HL.
       { by rewrite Hpe length_fmap. }

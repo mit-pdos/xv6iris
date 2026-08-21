@@ -2235,8 +2235,9 @@ Section ProofFilewrite.
        determined garbage -- the fd is provably not a directory here -- and
        the fragment is WHOLE, so the move is one free own-update and no delta
        is proved. *)
-    iMod (dv_set (bv_unsigned inum) (dv_of dnl datal) (dv_of dn' data')
-           with "Hdview") as "Hdview".
+    iMod (dv_set_rt ⊤ (fwn_ireg fn) (fwn_fs fn) (fwn_inodestart fn) icfg_nib
+            (bv_unsigned inum) (dv_of dnl datal) (dv_of dn' data')
+            ltac:(solve_ndisj) with "Hireg Hdview") as "Hdview".
     iModIntro.
     iAssert (i_valid (ientry ik) ↦₄ valid_word true)%I
       with "[Hmark]" as "Hvalid".

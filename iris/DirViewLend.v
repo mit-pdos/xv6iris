@@ -1,8 +1,9 @@
 (* ===================================================================== *)
-(*  DirViewLend.v -- M1, THE CANCELLABLE LEND [dv_lend / dv_pin]          *)
-(*  (the pinned namei corollary that consumes it: DirViewPin.v)           *)
+(*  DirViewLend.v -- M1, THE CANCELLABLE LEND [dv_ride / dv_pin]          *)
+(*  (the three OPERATIONS, which open the region: InodeRegion.v §L;       *)
+(*   the pinned namei corollary that consumes them: DirViewPin.v)         *)
 (*  (claude-notes/projects/namei-pinned-lookup.md §11.2, ruled D-N4a;     *)
-(*   stage N-4, PHASE A: the kit, on a NEW leaf, no existing file moved)  *)
+(*   stage N-4, PHASE B: E1-region, the Timeless re-spelling)             *)
 (* ===================================================================== *)
 
 (*  WHAT IT IS.  N-1's [DirViewG.dv_hold] rides the custody chain WHOLE,
@@ -17,148 +18,182 @@
     directory that was modified under you".  A concurrent unlink can race
     namei; M1's receipt is that race, named.
 
-    THE FOUR PIECES, and the one discipline that makes them total:
+    ---------------------------------------------------------------------
+    PHASE B, E1-region (RULED): WHERE THE LEND BODY LIVES.
 
-      dv_ride z e  =  dv_hold z e                       the WHOLE arm
-                    ∨ dv_half z (3/4) e ∗ dv_lentm z e  the LENT arm
+    Phase A hosted the escrowed ¼ in an [inv] of its own and reported the
+    obstruction that follows from that choice: the ride arm has to carry the
+    handle, [inv] is never Timeless, and [ic_loaded_timeless] -- hence every
+    [iInv "Hesc" as ">"] in the tree -- dies.  The ruling was E1: put the
+    body in a per-inum column of the INODE REGION, which is ambient in every
+    fs contract, openable at every instant the lend is touched, and whose
+    ledgers are all-[own].  So:
 
-      dv_lentm     =  the ¾-arm's marker: the lend invariant (persistent,
-                      so a writer finds the lend WITHOUT a registry and
-                      WITHOUT a new premise) plus ONE exclusive re-park
-                      token [dv_tok γm].
-
-      lend body    =  (dv_half z (1/4) e ∗ ctick)   INTACT
-                    ∨ (cshot ∗ dv_tok γm)           CANCELLED
-
-    THE mtok DISCIPLINE.  The re-park token is minted ONCE and lives on the
-    ¾ arm while the lend is INTACT; the writer DEPOSITS it into the body at
-    the same instant it shoots [cshot].  So "the ¾ arm meets a CANCELLED
-    body" would exhibit two copies of one [Excl ()] -- [dv_set_rt]'s only
-    impossible case is refuted by [dv_tok_excl] and nothing else.  This is
-    what buys totality: the writer never has to prove that its directory is
-    unlent, and never has to look one up.
-
-    RETIREMENT IS LAZY (charter).  An INTACT redeem puts the ¼ straight
-    back; the lend is retired only by the next writer's cancel.  There is
-    deliberately no retire operation: a retire would need the ¾ arm in hand,
-    which the redeeming client does not have.
+      * the COLUMN [dv_lcol z] (below) is one per inum and all [own]:
+        NONE ∨ INTACT(¼ + the pending one-shot) ∨ CANCELLED(the shot one).
+        It is parked in [InodeRegion.ireg_registry] -- the region's per-inum
+        SIDE ledger, the conjunct of [ireg_body] that every accessor already
+        threads opaquely -- so not one [ireg_slot] lemma moves.
+      * the three operations ([dv_lend_mint], [dv_set_rt], [dv_pin_redeem])
+        live in [InodeRegion.v] §L, take an [ireg_inv] argument (a
+        PERSISTENT handle every calling context already holds) and open
+        [↑iregN].  No spec text changes anywhere.
+      * everything a client or a writer carries -- the ride's marker, the
+        pin, the receipt -- is an [own] plus a pure bound, so [dv_ride] is
+        Timeless and the [">"]-discipline is untouched.
 
     ---------------------------------------------------------------------
-    THE RA CHOICES, AND WHY NO FUNCTOR ROW IS NEEDED (finding, Phase A).
+    THE γ-AGREEMENT SCHEME: the ESCROW-NAME REGISTRY, at negative keys.
 
-    Every ghost cell here rides an inG the landed [Xv6Cameras.icacheG]
-    already carries, at FRESH DYNAMIC gnames allocated at the mint:
+    The client and the region must agree on WHICH cells carry this inum's
+    lend.  That is exactly the problem [icfg_reg] -- the per-inum
+    escrow-name registry, a [ghost_map Z (gname * gname)] whose authority
+    already lives inside [ireg_body] -- was built to solve, and its
+    authority is also what makes a lend slot ALLOCATABLE at all (a bare
+    [own] map cannot grow a key; a ghost_map under its own auth can, which
+    is why NO boot map and no [icfg] field had to change).  The lend rides
+    the SAME registry at a DISJOINT key space:
 
-      * [dv_tok] (mtok, rtick) = [own γ (Excl ())] at [icache_tickG],
-        the escrow's own redemption-ticket RA.
-      * [ctick]/[cshot] = a SECOND [dviewUR] cell at a fresh gname
-        ([dvl_cell]).  This is the house one-shot ([IcacheRef.ity_pending]
-        / [ity_shot]) at a different RA, and the swap is deliberate:
-        [ityR]'s agreement payload is [bv 16], which cannot NAME the lend,
-        whereas a [dviewUR] cell at key [z] and value [e] gives a
-        cancellation receipt that is persistent, Timeless, AND says which
-        directory at which contents was cancelled.  PENDING is the whole
-        element ([DfracOwn 1], exclusive); SHOT is [DfracDiscarded]
-        (persistent), and [dfrac_agree_persist] is the one-line shoot.
-        [ctick] and [cshot] collide, so the two arms are exclusive without
-        any extra token.
+      dvl_k z = -2z-1   the LEND SLOT    (odd negatives)
+      dvl_l z = -2z-2   the MINT LICENCE (even negatives)
 
-    NO new [inG], NO [icfg] field, NO functor row.  Every gname is dynamic.
+    Region inums are non-negative, so no landed registry key can collide,
+    and the coverage clause [ireg_registry] carries ("every inum in range is
+    bound") is preserved by insertions outside its range.  [EscrowDeposit]'s
+    rebind touches key [inum] only.
 
-    ---------------------------------------------------------------------
-    [dv_ride] IS NOT Timeless, AND THAT IS FORCED (finding, Phase A -- the
-    headline for Phase B's charter).
+    THE FRACTION LEDGER OF ONE LEND SLOT, which is the whole discipline:
 
-    The charter asked for a Timeless ride.  It is not achievable with the
-    lend hosted in an invariant of its own, and the obstruction is not an
-    accident of this file's spelling:
+      state       region     ¾-arm marker    client pin     licence
+      NONE          1             --             --         out (whole)
+      INTACT        ¼             ½              ¼          in the arm
+      CANCELLED     ¾             --             ¼          in the arm
 
-      (1) The writer must be able to reassemble [DfracOwn 1] at key [z]
-          with no premise and no cooperation.  [dviewUR] is a landed
-          [gmap Z (dfrac_agree _)]: neither [dv_set]'s exclusive update
-          nor [dfrac_agree_update_2] can move the value while ANY frame
-          fraction stands.  So the client's ¼ must be reachable by the
-          writer, i.e. it must sit in a SHARED region.
-      (2) A shared region a writer may open unpremised is an [inv], and the
-          only place the ride can put its handle is the ride itself.
-      (3) [inv N P] is Persistent but never Timeless (iris/base_logic/lib/
-          invariants.v has no such instance, and cannot: its [ownI] carries
-          an [agree (later (iProp))], which is not discrete).
+    Every refutation the three operations need is one fraction overflow:
 
-    Generally: ANY ride arm that grants an unpremised fupd capability is
-    non-Timeless.  This matters because the custody positions Phase B would
-    swap ([IcacheEscrow.ipool_alloc], [ipool_shape_np]'s [imark] arm,
-    [ic_loaded]) are all Timeless-by-instance, and [ic_loaded_timeless] is
-    what [ic_escrow_body_timeless] -- hence every [iInv "Hesc" as ">"] in
-    the tree -- is built out of.  IcacheEscrow.v:529-538 records the same
-    trade for [escA_inv] and resolves it by RELOCATION, not by a stand-in.
+      * a writer at the ¾ arm holds ½, so it refutes NONE (1+½) and
+        CANCELLED (¾+½).  It therefore ALWAYS finds INTACT -- which is
+        what makes [dv_set_rt] TOTAL with no premise beyond the ride.
+      * a client holds ¼, so it refutes NONE (1+¼); INTACT and CANCELLED
+        are its two honest answers.
+      * a minter holds the LICENCE, which the mint DEPOSITS into the
+        column, so it refutes INTACT and CANCELLED: one lend per inum,
+        enforced by a token rather than by a side condition.
 
-    The two exits, for the coordinator to rule on (Phase A does not choose):
+    THE TWO CELLS a slot's value names.  Both are [dviewUR] maps at gnames
+    allocated ONCE, at region boot, and KEYED BY INUM -- so the pair bound
+    at every lend slot is the same, and nothing has to be re-bound at a
+    mint (the registry auth therefore never appears in a lend operation):
 
-      (E1) HOST THE LEND IN THE ESCROW THAT IS ALREADY OPEN.  Put the ¼ and
-           the two tokens in the escrow's own per-inum body, beside the
-           conjunct the ride would have replaced.  Both parties already
-           hold [ic_escrows] (the writer opens it to reach the payload; the
-           pinned client holds it as a premise of [wp_namei_tr_body], and
-           the hop fires between instructions with nothing open), so the
-           lend needs NO new invariant and NO new premise -- and every
-           resource it adds is an [own], so every Timeless instance
-           survives.  Cost: IcacheEscrow's arms grow a disjunct, i.e. real
-           surgery on a landed file.
-      (E2) KEEP THIS FILE'S SHAPE and pay for it: [ic_loaded] and the pool
-           shapes lose Timeless, or the dv conjunct is relocated off the
-           [">"]-opened path.
+      γc  the CANCELLATION one-shot.  WHOLE ([DfracOwn 1]) in the column at
+          every unlent and intact instant, and DISCARDED by the writer that
+          cancels.  Nobody outside the column ever holds a share of it, so
+          the persistent receipt [dv_cshot] CANNOT be forged by a client --
+          which is what makes the pinned spec's right arm mean something.
+      γv  the VALUE WITNESS.  Cut in half at the mint: one half in the
+          column, one in the pin.  Agreement on it is what says "the lend
+          the column is holding is MY lend, at MY contents", with the client
+          owning no fraction of the directory itself.
 
-    Everything below is written so that (E2) is a no-op and (E1) is a
-    re-spelling of [dv_lend]/[dv_lentm] alone: the four operations'
-    statements, the redeem's disjunction and the pinned functor of
-    [DirViewPin.v] do not mention where the body lives.                    *)
+    NO new [inG] ([icache_regG] and [icache_dviewG] are both landed), NO new
+    [icfg] field, NO functor row, NO boot map widened.
 
-From Stdlib Require Import ZArith.
+    RETIREMENT IS LAZY (charter).  An INTACT redeem is a pure read: the pin
+    comes back unspent and the ¼ stays lent.  A CANCELLED redeem spends the
+    pin into the persistent receipt.  There is deliberately no retire
+    operation.                                                             *)
+
+From Stdlib Require Import ZArith Lia.
 From stdpp Require Import gmap list namespaces bitvector.definitions.
 From iris.algebra Require Import gmap dfrac excl updates.
 From iris.algebra.lib Require Import dfrac_agree.
+From iris.bi.lib Require Import fractional.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import own invariants.
+From iris.base_logic.lib Require Import own ghost_map.
 Require Import SailStdpp.Values.
-Require Import DinodeEnc.   (* [dinode] -- [DirViewG]'s own cone            *)
+Require Import DinodeEnc.   (* [dinode], [di_size]                          *)
 Require Import DirView.     (* [dir_nrec]                                   *)
 Require Import FsTree.      (* [fname], [dir_view]                          *)
-Require Import IcacheRef.   (* [icfg], [icfg_dview], [dviewUR]              *)
+Require Import IcacheRef.   (* [icfg], [icfg_dview], [icfg_reg], [dviewUR]  *)
 Require Import DirViewG.    (* [dv_half], [dv_hold], [dv_set], [dv_agree]   *)
 
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
-(*  1.  THE CELLS                                                         *)
+(*  0.  THE KEY SPACE                                                     *)
 (* ===================================================================== *)
 
-(*  ALTITUDE.  This file sits DIRECTLY ABOVE [DirViewG] -- [icacheG] for the
-    cells, [invGS] for the lend, nothing else -- and that is load-bearing
-    rather than tidy: every consumer of [dv_set_rt] is a byte-write mover
-    (ProofCreate, ProofFilewrite, ProofSysOpen, ProofSysLink) or an escrow
-    arm (IcacheEscrow, EscrowInode, IcacheBoot, FsCfgBoot), all of which are
-    BELOW the namei cone.  The pinned corollary, which is not, lives in the
-    companion leaf [DirViewPin.v].                                          *)
+(* The lend's two registry keys for inum [z].  Both are NEGATIVE (region
+   inums are not) and they never collide with each other ([dvl_k] is odd,
+   [dvl_l] is even), so the three key spaces partition their union. *)
+Definition dvl_k (z : Z) : Z := -(2 * z) - 1.
+Definition dvl_l (z : Z) : Z := -(2 * z) - 2.
+
+Lemma dvl_k_neg (z : Z) : 0 <= z -> dvl_k z < 0.
+Proof. rewrite /dvl_k. lia. Qed.
+Lemma dvl_l_neg (z : Z) : 0 <= z -> dvl_l z < 0.
+Proof. rewrite /dvl_l. lia. Qed.
+Lemma dvl_k_l_ne (z1 z2 : Z) : dvl_k z1 <> dvl_l z2.
+Proof. rewrite /dvl_k /dvl_l. lia. Qed.
+Global Instance dvl_k_inj : Inj eq eq dvl_k.
+Proof. intros z1 z2. rewrite /dvl_k. lia. Qed.
+Global Instance dvl_l_inj : Inj eq eq dvl_l.
+Proof. intros z1 z2. rewrite /dvl_l. lia. Qed.
+
+(* the Qp cuts the ledger above is spelled at *)
+Lemma dfrac_1_hh : DfracOwn 1 = DfracOwn (1/2) ⋅ DfracOwn (1/2).
+Proof. rewrite dfrac_op_own. by rewrite Qp.half_half. Qed.
+Lemma dvl_q_over_1_12 : (1 < 1 + 1/2)%Qp.
+Proof. apply Qp.lt_add_l. Qed.
+Lemma dvl_q_over_34_12 : (1 < 3/4 + 1/2)%Qp.
+Proof.
+  assert (H : (3/4 + 1/2)%Qp = (1 + 1/4)%Qp) by compute_done.
+  rewrite H. apply Qp.lt_add_l.
+Qed.
+Lemma dvl_q_over_1_14 : (1 < 1 + 1/4)%Qp.
+Proof. apply Qp.lt_add_l. Qed.
 
 Section DirViewLendDefs.
-  Context `{!icacheG Σ, !invGS Σ}.
+  Context `{!icacheG Σ}.
   Context `{ICFG : icfg}.
 
-  (* ONE namespace for every lend.  Per-lend indexing ([lendN .@ z]) would
-     buy nothing here: no operation ever opens two lends at once -- the
-     writer opens the one on its own directory, the client one hop at a
-     time -- and a flat namespace keeps every mask side-condition a
-     [solve_ndisj] one-liner. *)
-  Definition lendN : namespace := nroot .@ "dvlend".
+  (* ===================================================================== *)
+  (*  1.  THE CELLS                                                         *)
+  (* ===================================================================== *)
 
-  (* A [dviewUR] cell at a FRESH gname: the one-shot's carrier.  Same RA as
-     [DirViewG.dv_half], different (dynamic) name -- see the header. *)
+  (*  ALTITUDE.  This file sits DIRECTLY ABOVE [DirViewG] -- [icacheG] for
+      the cells, nothing else -- and that is load-bearing rather than tidy:
+      [InodeRegion] must be able to NAME [dv_lcol] in order to park it, and
+      every consumer of [dv_ride] (IcacheEscrow, EscrowInode, IcacheBoot,
+      FsCfgBoot, and the byte-write movers above them) sits above the
+      region.  So the three OPERATIONS, which open [↑iregN], are in
+      [InodeRegion.v] §L rather than here, and the pinned corollary, which
+      is above the namei cone, is in [DirViewPin.v].                       *)
+
+  (* THE REGION'S ADDRESS SPACE, as a pure clause the lend's own tokens
+     carry: an operation on a ride or a pin then needs no bound premise. *)
+  Definition dvl_dom (z : Z) : Prop := 0 <= z < 16 * Z.of_nat icfg_nib.
+
+  (* ---- the registry element, at the lend's key space ---------------- *)
+
+  Definition dvl_slot (z : Z) (dq : dfrac) (g : gname * gname) : iProp Σ :=
+    (dvl_k z ↪[icfg_reg]{dq} g)%I.
+
+  (* THE MINT LICENCE: the whole element at the licence key.  Exclusive, so
+     depositing it into the column is what forbids a second mint. *)
+  Definition dv_lic (z : Z) : iProp Σ :=
+    (∃ g : gname * gname, dvl_l z ↪[icfg_reg] g)%I.
+
+  (* ---- the two boot-allocated cells, both at [dviewUR] --------------- *)
+
+  (* A [dviewUR] cell at a given gname, keyed by inum.  Same RA as
+     [DirViewG.dv_half], different name -- see the header. *)
   Definition dvl_cell (γ : gname) (z : Z) (dq : dfrac) (e : gmap fname Z)
     : iProp Σ :=
     own γ ({[ z := to_dfrac_agree dq (e : leibnizO (gmap fname Z)) ]} : dviewUR).
 
-  (* PENDING: the lend has not been cancelled.  Exclusive. *)
+  (* PENDING: the lend has not been cancelled.  WHOLE, and only ever in the
+     column: no client can produce it, hence none can forge the shot. *)
   Definition dv_ctick (γc : gname) (z : Z) (e : gmap fname Z) : iProp Σ :=
     dvl_cell γc z (DfracOwn 1) e.
 
@@ -167,52 +202,82 @@ Section DirViewLendDefs.
   Definition dv_cshot (γc : gname) (z : Z) (e : gmap fname Z) : iProp Σ :=
     dvl_cell γc z DfracDiscarded e.
 
-  (* the plain exclusive token, at [icache_tickG]: mtok and rtick both *)
-  Definition dv_tok (γ : gname) : iProp Σ := own γ (Excl () : exclR unitO).
+  (* THE VALUE WITNESS' HALF: one in the column, one in the pin. *)
+  Definition dv_vwit (γv : gname) (z : Z) (e : gmap fname Z) : iProp Σ :=
+    dvl_cell γv z (DfracOwn (1/2)) e.
 
-  Definition dv_lend_body (γc γm : gname) (z : Z) (e : gmap fname Z)
-    : iProp Σ :=
-    ( (dv_half z (DfracOwn (1/4)) e ∗ dv_ctick γc z e)
-    ∨ (dv_cshot γc z e ∗ dv_tok γm) )%I.
+  (* ===================================================================== *)
+  (*  2.  THE COLUMN, THE RIDE, THE PIN, THE RECEIPT                        *)
+  (* ===================================================================== *)
 
-  Definition dv_lend (γc γm : gname) (z : Z) (e : gmap fname Z) : iProp Σ :=
-    inv lendN (dv_lend_body γc γm z e).
+  (* ONE INUM'S LEND COLUMN -- what [InodeRegion.ireg_registry] parks.  Every
+     arm is [own], so the column, the region body and everything the region
+     is a conjunct of stay Timeless. *)
+  Definition dv_lcol (z : Z) : iProp Σ :=
+    ( (* NONE: nothing was ever lent at this inum.  The region holds the
+         whole slot element and both cells un-armed; the licence is out. *)
+      (∃ γc γv : gname,
+         dvl_slot z (DfracOwn 1) (γc, γv)
+         ∗ dvl_cell γc z (DfracOwn 1) ∅ ∗ dvl_cell γv z (DfracOwn 1) ∅)
+    ∨ (* INTACT: the escrowed ¼ of the contents, the pending one-shot, the
+         column's half of the value witness, the deposited licence. *)
+      (∃ (γc γv : gname) (e : gmap fname Z),
+         dvl_slot z (DfracOwn (1/4)) (γc, γv) ∗ dv_lic z
+         ∗ dv_half z (DfracOwn (1/4)) e ∗ dv_ctick γc z e ∗ dv_vwit γv z e)
+    ∨ (* CANCELLED: the ¼ was gathered by a writer, the one-shot is shot,
+         and the ¾-arm's ½ of the slot came back with it. *)
+      (∃ (γc γv : gname) (e : gmap fname Z),
+         dvl_slot z (DfracOwn (3/4)) (γc, γv) ∗ dv_lic z
+         ∗ dv_cshot γc z e ∗ dv_vwit γv z e) )%I.
 
-  (* THE ¾ ARM'S MARKER.  Carries the lend (persistent: the writer finds it
-     without a registry) and the re-park token (exclusive: the writer's
-     deposit, and the refuter of the impossible arm). *)
+  (* THE ¾ ARM'S MARKER: half the slot element (which refutes both unlent
+     arms by fraction overflow) plus the region bound (which is why no
+     operation on the ride needs an inum-range premise).  The contents
+     index is carried for the ride's shape only. *)
   Definition dv_lentm (z : Z) (e : gmap fname Z) : iProp Σ :=
-    (∃ γc γm, dv_lend γc γm z e ∗ dv_tok γm)%I.
+    (⌜dvl_dom z⌝ ∗ ∃ g : gname * gname, dvl_slot z (DfracOwn (1/2)) g)%I.
 
-  (* THE CUSTODY-CHAIN SHAPE (Phase B swaps this in for [dv_hold]). *)
+  (* THE CUSTODY-CHAIN SHAPE: what replaces [dv_hold] on every arm of the
+     chain.  Timeless, exclusive at an inum, and free from a hold. *)
   Definition dv_ride (z : Z) (e : gmap fname Z) : iProp Σ :=
     (dv_hold z e ∨ (dv_half z (DfracOwn (3/4)) e ∗ dv_lentm z e))%I.
 
-  (* THE CLIENT PACKAGE: knowledge of the lend + the exclusive redemption
-     ticket.  One redemption per pin; the ticket is spent on BOTH arms. *)
+  (* THE CLIENT PACKAGE: a quarter of the slot (which names the lend's two
+     cells) and half the value witness (which names its contents). *)
   Definition dv_pin (z : Z) (e : gmap fname Z) : iProp Σ :=
-    (∃ γc γm γr, dv_lend γc γm z e ∗ dv_tok γr)%I.
+    (⌜dvl_dom z⌝ ∗ ∃ γc γv : gname,
+       dvl_slot z (DfracOwn (1/4)) (γc, γv) ∗ dv_vwit γv z e)%I.
 
-  (* what a spent-but-intact pin leaves behind: the lend, minus the ticket *)
+  (* WHAT AN INTACT REDEEM RETURNS.  In the E1 spelling redemption is a
+     READ, so the pin comes back whole.  (Phase A's version burned a ticket
+     because its redeem had to close a private invariant; the column's does
+     not.) *)
   Definition dv_pin_spent (z : Z) (e : gmap fname Z) : iProp Σ :=
-    (∃ γc γm, dv_lend γc γm z e)%I.
+    dv_pin z e.
 
   (* THE RECEIPT: "the lend taken on directory [z] at contents [e] was
-     cancelled", i.e. some writer moved [z]'s contents since the pin. *)
+     cancelled", i.e. some writer moved [z]'s contents since the pin.  The
+     persisted slot element ties [z] to the lend's cells; the shot one-shot
+     is the cancellation itself, and only a writer can produce it. *)
   Definition dv_cancelled (z : Z) (e : gmap fname Z) : iProp Σ :=
-    (∃ γc γm, dv_lend γc γm z e ∗ dv_cshot γc z e)%I.
+    (∃ γc γv : gname,
+       dvl_slot z DfracDiscarded (γc, γv) ∗ dv_cshot γc z e)%I.
 
   (* ------------------------------------------------------------------- *)
-  (*  instances                                                           *)
+  (*  instances -- EVERYTHING here is Timeless, which is E1's whole point  *)
   (* ------------------------------------------------------------------- *)
 
+  Global Instance dvl_slot_timeless z dq g : Timeless (dvl_slot z dq g).
+  Proof. rewrite /dvl_slot. apply _. Qed.
+  Global Instance dv_lic_timeless z : Timeless (dv_lic z).
+  Proof. rewrite /dv_lic. apply _. Qed.
   Global Instance dvl_cell_timeless γ z dq e : Timeless (dvl_cell γ z dq e).
   Proof. apply _. Qed.
   Global Instance dv_ctick_timeless γc z e : Timeless (dv_ctick γc z e).
   Proof. apply _. Qed.
   Global Instance dv_cshot_timeless γc z e : Timeless (dv_cshot γc z e).
   Proof. apply _. Qed.
-  Global Instance dv_tok_timeless γ : Timeless (dv_tok γ).
+  Global Instance dv_vwit_timeless γv z e : Timeless (dv_vwit γv z e).
   Proof. apply _. Qed.
 
   Global Instance dv_cshot_persistent γc z e : Persistent (dv_cshot γc z e).
@@ -221,30 +286,94 @@ Section DirViewLendDefs.
     apply own_core_persistent, _.
   Qed.
 
-  Global Instance dv_lend_persistent γc γm z e : Persistent (dv_lend γc γm z e).
-  Proof. rewrite /dv_lend. apply _. Qed.
+  Global Instance dv_lcol_timeless z : Timeless (dv_lcol z).
+  Proof. rewrite /dv_lcol. apply _. Qed.
+  Global Instance dv_lentm_timeless z e : Timeless (dv_lentm z e).
+  Proof. rewrite /dv_lentm. apply _. Qed.
+  Global Instance dv_ride_timeless z e : Timeless (dv_ride z e).
+  Proof. rewrite /dv_ride. apply _. Qed.
+  Global Instance dv_pin_timeless z e : Timeless (dv_pin z e).
+  Proof. rewrite /dv_pin. apply _. Qed.
+  Global Instance dv_cancelled_timeless z e : Timeless (dv_cancelled z e).
+  Proof. rewrite /dv_cancelled. apply _. Qed.
 
-  (* THE BODY IS Timeless -- which is what lets every open below strip the
-     ▷ with a plain [">"] pattern.  (The HANDLE is not; see the header.) *)
-  Global Instance dv_lend_body_timeless γc γm z e :
-    Timeless (dv_lend_body γc γm z e).
-  Proof. rewrite /dv_lend_body. apply _. Qed.
-
-  Global Instance dv_pin_spent_persistent z e : Persistent (dv_pin_spent z e).
-  Proof. rewrite /dv_pin_spent. apply _. Qed.
   Global Instance dv_cancelled_persistent z e : Persistent (dv_cancelled z e).
   Proof. rewrite /dv_cancelled. apply _. Qed.
 
-  (* the body's two arms, as an entailment the proofmode can destruct
-     without unfolding anything in the goal *)
-  Lemma dv_lend_body_cases (γc γm : gname) (z : Z) (e : gmap fname Z) :
-    dv_lend_body γc γm z e ⊢
-      (dv_half z (DfracOwn (1/4)) e ∗ dv_ctick γc z e)
-      ∨ (dv_cshot γc z e ∗ dv_tok γm).
-  Proof. by rewrite /dv_lend_body. Qed.
+  (* ===================================================================== *)
+  (*  3.  THE SLOT'S FRACTION ARITHMETIC                                    *)
+  (* ===================================================================== *)
+
+  Lemma dvl_slot_split (z : Z) (p q : Qp) (g : gname * gname) :
+    dvl_slot z (DfracOwn (p + q)) g ⊣⊢
+      dvl_slot z (DfracOwn p) g ∗ dvl_slot z (DfracOwn q) g.
+  Proof.
+    rewrite /dvl_slot.
+    apply (fractional (Φ := fun q => (dvl_k z ↪[icfg_reg]{#q} g)%I)).
+  Qed.
+
+  Lemma dvl_slot_join (z : Z) (p q : Qp) (g1 g2 : gname * gname) :
+    dvl_slot z (DfracOwn p) g1 -∗ dvl_slot z (DfracOwn q) g2 -∗
+    ⌜g1 = g2⌝ ∗ dvl_slot z (DfracOwn (p + q)) g1.
+  Proof.
+    rewrite /dvl_slot. iIntros "H1 H2".
+    iDestruct (ghost_map_elem_agree with "H1 H2") as %Heq.
+    iSplitR; [done |]. subst g2.
+    iDestruct (ghost_map_elem_combine with "H1 H2") as "[H _]".
+    rewrite dfrac_op_own. iExact "H".
+  Qed.
+
+  (* THE THREE-WAY CUT the mint performs, and the two-way one the writer
+     re-assembles: ¼ (region) + ½ (arm) + ¼ (pin) = 1. *)
+  Lemma dvl_slot_cut (z : Z) (g : gname * gname) :
+    dvl_slot z (DfracOwn 1) g ⊣⊢
+      dvl_slot z (DfracOwn (1/4)) g ∗ dvl_slot z (DfracOwn (1/2)) g
+      ∗ dvl_slot z (DfracOwn (1/4)) g.
+  Proof.
+    rewrite -(dvl_slot_split z (1/2) (1/4) g).
+    rewrite -(dvl_slot_split z (1/4) (1/2 + 1/4) g).
+    by assert ((1/4 + (1/2 + 1/4))%Qp = 1%Qp) as -> by compute_done.
+  Qed.
+
+  Lemma dvl_slot_join34 (z : Z) (g1 g2 : gname * gname) :
+    dvl_slot z (DfracOwn (1/4)) g1 -∗ dvl_slot z (DfracOwn (1/2)) g2 -∗
+    ⌜g1 = g2⌝ ∗ dvl_slot z (DfracOwn (3/4)) g1.
+  Proof.
+    iIntros "H1 H2".
+    iDestruct (dvl_slot_join with "H1 H2") as "[%Hg H]".
+    iSplitR; [done |].
+    by assert ((3/4)%Qp = (1/4 + 1/2)%Qp) as -> by compute_done.
+  Qed.
+
+  Lemma dvl_slot_agree (z : Z) (dq1 dq2 : dfrac) (g1 g2 : gname * gname) :
+    dvl_slot z dq1 g1 -∗ dvl_slot z dq2 g2 -∗ ⌜g1 = g2⌝.
+  Proof.
+    rewrite /dvl_slot. iIntros "H1 H2".
+    by iDestruct (ghost_map_elem_agree with "H1 H2") as %->.
+  Qed.
+
+  (* THE OVERFLOW: "these two shares add to more than one", which is every
+     refutation the three operations need. *)
+  Lemma dvl_slot_over (z : Z) (p q : Qp) (g1 g2 : gname * gname) :
+    (1 < p + q)%Qp ->
+    dvl_slot z (DfracOwn p) g1 -∗ dvl_slot z (DfracOwn q) g2 -∗ False.
+  Proof.
+    intros Hlt. rewrite /dvl_slot. iIntros "H1 H2".
+    iDestruct (ghost_map_elem_valid_2 with "H1 H2") as %[Hv _].
+    exfalso. rewrite dfrac_op_own dfrac_valid_own in Hv.
+    exact (proj1 (Qp.lt_nge _ _) Hlt Hv).
+  Qed.
+
+  Lemma dv_lic_excl (z : Z) : dv_lic z -∗ dv_lic z -∗ False.
+  Proof.
+    rewrite /dv_lic. iIntros "[%g1 H1] [%g2 H2]".
+    iDestruct (ghost_map_elem_valid_2 with "H1 H2") as %[Hv _].
+    exfalso. rewrite dfrac_op_own dfrac_valid_own in Hv.
+    exact (Qp.not_add_le_l 1 1 Hv).
+  Qed.
 
   (* ===================================================================== *)
-  (*  2.  THE FRACTION ARITHMETIC AND THE EXCLUSIVITY LAWS                  *)
+  (*  4.  THE CONTENTS' FRACTION ARITHMETIC (the ¾ / ¼ cut)                 *)
   (* ===================================================================== *)
 
   Lemma dfrac_1_34 : DfracOwn 1 = DfracOwn (3/4) ⋅ DfracOwn (1/4).
@@ -282,14 +411,8 @@ Section DirViewLendDefs.
     rewrite singleton_op singleton_valid in Hv.
     apply dfrac_agree_op_valid_L in Hv as [Hd _].
     rewrite dfrac_op_own dfrac_valid_own in Hd.
-    assert ((3/4 + 3/4)%Qp = (1 + 1/2)%Qp) as Hq by compute_done.
+    assert (Hq : (3/4 + 3/4)%Qp = (1 + 1/2)%Qp) by compute_done.
     rewrite Hq in Hd. by apply (Qp.not_add_le_l 1 (1/2)) in Hd.
-  Qed.
-
-  Lemma dv_tok_excl (γ : gname) : dv_tok γ -∗ dv_tok γ -∗ False.
-  Proof.
-    rewrite /dv_tok. iIntros "H1 H2".
-    by iDestruct (own_valid_2 with "H1 H2") as %[].
   Qed.
 
   (* THE RIDE IS A CUSTODY TOKEN: two of them at one inum is a refutation,
@@ -308,10 +431,18 @@ Section DirViewLendDefs.
     dv_hold z e -∗ dv_ride z e.
   Proof. iIntros "H". rewrite /dv_ride. by iLeft. Qed.
 
+  (* [DirViewG.dv_hold_size]'s analogue, for the re-pack sites whose record
+     move leaves [di_size] alone: the ride carries the same rewriting. *)
+  Lemma dv_ride_size (z : Z) (dn1 dn2 : dinode) (data : nat -> list (bv 8)) :
+    di_size dn1 = di_size dn2 ->
+    dv_ride z (dv_of dn1 data) -∗ dv_ride z (dv_of dn2 data).
+  Proof.
+    intros Hs. rewrite (dv_of_size dn1 dn2 data Hs). iIntros "H". iExact "H".
+  Qed.
+
   (* NO SECOND MINT ON ONE DIRECTORY, and this is the whole discipline: a
      mint demands [dv_hold], and a directory that already rides a lend has
-     only ¾ on the chain, so no [dv_hold] for it can exist anywhere.  The
-     ¾ constraint does the work; there is no registry to consult. *)
+     only ¾ on the chain, so no [dv_hold] for it can exist anywhere. *)
   Lemma dv_lend_no_second_mint (z : Z) (e1 e2 : gmap fname Z) :
     dv_half z (DfracOwn (3/4)) e1 -∗ dv_lentm z e1 -∗ dv_hold z e2 -∗ False.
   Proof.
@@ -319,8 +450,45 @@ Section DirViewLendDefs.
   Qed.
 
   (* ===================================================================== *)
-  (*  3.  THE ONE-SHOT'S SHOOT                                              *)
+  (*  5.  THE CELLS' MOVES                                                  *)
   (* ===================================================================== *)
+
+  Lemma dvl_cell_agree (γ : gname) (z : Z) (dq1 dq2 : dfrac)
+      (e1 e2 : gmap fname Z) :
+    dvl_cell γ z dq1 e1 -∗ dvl_cell γ z dq2 e2 -∗ ⌜e1 = e2⌝.
+  Proof.
+    rewrite /dvl_cell. iIntros "H1 H2".
+    iDestruct (own_valid_2 with "H1 H2") as %Hv.
+    rewrite singleton_op singleton_valid in Hv.
+    iPureIntro. by apply dfrac_agree_op_valid_L in Hv as [_ ->].
+  Qed.
+
+  Lemma dv_vwit_agree (γv : gname) (z : Z) (e1 e2 : gmap fname Z) :
+    dv_vwit γv z e1 -∗ dv_vwit γv z e2 -∗ ⌜e1 = e2⌝.
+  Proof. rewrite /dv_vwit. apply dvl_cell_agree. Qed.
+
+  Lemma dvl_cell_split (γ : gname) (z : Z) (dq1 dq2 : dfrac)
+      (e : gmap fname Z) :
+    dvl_cell γ z (dq1 ⋅ dq2) e ⊣⊢ dvl_cell γ z dq1 e ∗ dvl_cell γ z dq2 e.
+  Proof.
+    rewrite /dvl_cell -own_op singleton_op.
+    by rewrite -dfrac_agree_op.
+  Qed.
+
+  Lemma dvl_cell_cut (γ : gname) (z : Z) (e : gmap fname Z) :
+    dvl_cell γ z (DfracOwn 1) e ⊣⊢
+      dvl_cell γ z (DfracOwn (1/2)) e ∗ dvl_cell γ z (DfracOwn (1/2)) e.
+  Proof. rewrite -dvl_cell_split -dfrac_1_hh. done. Qed.
+
+  (* the whole cell moves freely -- [DirViewG.dv_set]'s line *)
+  Lemma dvl_cell_set (γ : gname) (z : Z) (e e' : gmap fname Z) :
+    dvl_cell γ z (DfracOwn 1) e ==∗ dvl_cell γ z (DfracOwn 1) e'.
+  Proof.
+    rewrite /dvl_cell. iIntros "H".
+    iApply (own_update with "H").
+    apply singleton_update, cmra_update_exclusive.
+    split; done.
+  Qed.
 
   Lemma dv_cshoot (γc : gname) (z : Z) (e : gmap fname Z) :
     dv_ctick γc z e ==∗ dv_cshot γc z e.
@@ -330,97 +498,150 @@ Section DirViewLendDefs.
     apply singleton_update, dfrac_agree_persist.
   Qed.
 
-  Lemma dv_ctick_cshot_excl (γc : gname) (z : Z) (e1 e2 : gmap fname Z) :
-    dv_ctick γc z e1 -∗ dv_cshot γc z e2 -∗ False.
-  Proof.
-    rewrite /dv_ctick /dv_cshot /dvl_cell. iIntros "H1 H2".
-    iDestruct (own_valid_2 with "H1 H2") as %Hv.
-    rewrite singleton_op singleton_valid in Hv.
-    by apply dfrac_agree_op_valid_L in Hv as [Hd _].
-  Qed.
-
   (* ===================================================================== *)
-  (*  4.  THE THREE OPERATIONS                                              *)
+  (*  6.  THE THREE COLUMN MOVES                                            *)
   (* ===================================================================== *)
 
-  (* MINT.  Whoever holds the whole element splits ¼ off into a fresh lend
-     and keeps ¾ on the chain.  The client walks away with the pin; the
-     chain walks away with the ¾ arm.  All three gnames are dynamic. *)
-  Lemma dv_lend_mint (E : coPset) (z : Z) (e : gmap fname Z) :
-    ↑lendN ⊆ E ->
-    dv_hold z e ={E}=∗
-      (dv_half z (DfracOwn (3/4)) e ∗ dv_lentm z e) ∗ dv_pin z e.
+  (*  These are the operations' whole content, stated OFF the region: a
+      caller that already holds [dv_lcol z] moves it with a plain [==∗].
+      [InodeRegion] §L wraps each one in an [↑iregN] open and nothing else.
+      Keeping them here keeps every fraction argument beside the ledger it
+      is about -- and it is what makes the operations' proofs three lines
+      of invariant plumbing each.                                          *)
+
+  (* THE MINT.  Whoever holds the whole element and this inum's licence
+     splits ¼ off into the column and keeps ¾ on the chain.  Total: the two
+     lent arms are refuted by the licence the mint is itself holding. *)
+  Lemma dv_col_mint (z : Z) (e : gmap fname Z) :
+    dvl_dom z ->
+    dv_lic z -∗ dv_hold z e -∗ dv_lcol z ==∗
+      dv_lcol z ∗ (dv_half z (DfracOwn (3/4)) e ∗ dv_lentm z e) ∗ dv_pin z e.
   Proof.
-    iIntros (HE) "H". rewrite dv_hold_split34.
-    iDestruct "H" as "[H34 H14]".
-    iMod (own_alloc ({[ z := to_dfrac_agree (DfracOwn 1)
-                              (e : leibnizO (gmap fname Z)) ]} : dviewUR))
-      as (γc) "Hct".
-    { by rewrite singleton_valid. }
-    iMod (own_alloc (Excl () : exclR unitO)) as (γm) "Hm"; [done|].
-    iMod (own_alloc (Excl () : exclR unitO)) as (γr) "Hr"; [done|].
-    iMod (inv_alloc lendN E (dv_lend_body γc γm z e) with "[H14 Hct]")
-      as "#Hinv".
-    { iNext. rewrite /dv_lend_body. iLeft. iFrame. }
-    iModIntro. iFrame "H34".
-    iSplitL "Hm".
-    - rewrite /dv_lentm. iExists γc, γm. by iFrame "Hinv Hm".
-    - rewrite /dv_pin. iExists γc, γm, γr. by iFrame "Hinv Hr".
+    iIntros (Hdom) "Hlic Hw Hcol".
+    rewrite {1}/dv_lcol.
+    iDestruct "Hcol"
+      as "[(%γc & %γv & Hsl & Hct & Hvw)
+          |[(%γc & %γv & %e0 & _ & Hlic' & _)|(%γc & %γv & %e0 & _ & Hlic' & _)]]";
+      [| iDestruct (dv_lic_excl with "Hlic Hlic'") as %[]
+       | iDestruct (dv_lic_excl with "Hlic Hlic'") as %[]].
+    (* the one live arm: NONE.  Arm both cells at [e], cut the slot three
+       ways and the contents two, and deposit the licence. *)
+    iMod (dvl_cell_set γc z ∅ e with "Hct") as "Hct".
+    iMod (dvl_cell_set γv z ∅ e with "Hvw") as "Hvw".
+    iEval (rewrite dvl_cell_cut) in "Hvw".
+    iDestruct "Hvw" as "[Hvw1 Hvw2]".
+    iEval (rewrite dvl_slot_cut) in "Hsl".
+    iDestruct "Hsl" as "(Hsl14 & Hsl12 & Hslp)".
+    rewrite dv_hold_split34. iDestruct "Hw" as "[Hw34 Hw14]".
+    iModIntro. iSplitL "Hsl14 Hlic Hw14 Hct Hvw1".
+    { rewrite /dv_lcol. iRight. iLeft. iExists γc, γv, e. iFrame. }
+    iSplitL "Hw34 Hsl12".
+    { iFrame "Hw34". rewrite /dv_lentm. iSplitR; [by iPureIntro |].
+      iExists (γc, γv). iExact "Hsl12". }
+    rewrite /dv_pin. iSplitR; [by iPureIntro |]. iExists γc, γv. iFrame.
   Qed.
 
-  (* THE WRITER'S TOTAL MOVER.  Replaces [DirViewG.dv_set] at the W3 sites.
-     It takes NO premise beyond the ride and it is total: the whole arm is
-     [dv_set] verbatim, the ¾ arm gathers the escrowed ¼ and CANCELS on the
-     way out, and the one arm that would be a problem -- a ¾ ride meeting an
-     already-CANCELLED body -- is refuted by the mtok it is itself holding.
-     The mask is the only cost, and it is [↑lendN] alone. *)
-  Lemma dv_set_rt (E : coPset) (z : Z) (e e' : gmap fname Z) :
-    ↑lendN ⊆ E ->
-    dv_ride z e ={E}=∗ dv_ride z e'.
+  (* THE WRITER'S TOTAL MOVE.  Replaces [DirViewG.dv_set] at the mover
+     sites.  It takes NO premise beyond the ride: the whole arm is [dv_set]
+     verbatim (and never touches the column), and the ¾ arm gathers the
+     escrowed ¼ and CANCELS on the way out, its two impossible arms refuted
+     by the half-slot it is itself holding. *)
+  Lemma dv_col_set (z : Z) (e e' : gmap fname Z) :
+    dv_half z (DfracOwn (3/4)) e -∗ dv_lentm z e -∗ dv_lcol z ==∗
+      dv_lcol z ∗ dv_hold z e'.
   Proof.
-    iIntros (HE) "H". rewrite {1}/dv_ride.
-    iDestruct "H" as "[Hw|[H34 Hm]]".
-    - iMod (dv_set with "Hw") as "Hw". iModIntro. by iApply dv_ride_of_hold.
-    - rewrite /dv_lentm. iDestruct "Hm" as (γc γm) "[#Hinv Hm]".
-      iInv "Hinv" as ">Hbody" "Hclose".
-      iDestruct (dv_lend_body_cases with "Hbody") as "[[H14 Hct]|[#Hcs Hm']]".
-      + iDestruct (dv_join34 with "H34 H14") as "Hw".
-        iMod (dv_set with "Hw") as "Hw".
-        iMod (dv_cshoot with "Hct") as "#Hcs".
-        iMod ("Hclose" with "[Hm]") as "_".
-        { iNext. rewrite /dv_lend_body. iRight. by iFrame "Hcs Hm". }
-        iModIntro. by iApply dv_ride_of_hold.
-      + iDestruct (dv_tok_excl with "Hm Hm'") as %[].
+    iIntros "H34 Hm Hcol".
+    iDestruct "Hm" as "[_ (%g & Hsl12)]".
+    rewrite {1}/dv_lcol.
+    iDestruct "Hcol"
+      as "[(%γc & %γv & Hsl & _ & _)
+          |[(%γc & %γv & %e0 & Hsl & Hlic & Hdv14 & Hct & Hvw)
+           |(%γc & %γv & %e0 & Hsl & _ & _ & _)]]".
+    - iDestruct (dvl_slot_over z 1 (1/2) _ _ dvl_q_over_1_12 with "Hsl Hsl12")
+        as %[].
+    - (* INTACT: gather, set, shoot, re-park CANCELLED *)
+      iDestruct (dvl_slot_join34 with "Hsl Hsl12") as "[%Hg Hsl34]".
+      iDestruct (dv_agree with "H34 Hdv14") as %<-.
+      iDestruct (dv_join34 with "H34 Hdv14") as "Hw".
+      iMod (dv_set z e e' with "Hw") as "Hw".
+      iMod (dv_cshoot with "Hct") as "#Hcs".
+      iModIntro. iFrame "Hw".
+      rewrite /dv_lcol. iRight. iRight. iExists γc, γv, e.
+      iFrame "Hsl34 Hlic Hvw". iExact "Hcs".
+    - iDestruct (dvl_slot_over z (3/4) (1/2) _ _ dvl_q_over_34_12
+                   with "Hsl Hsl12") as %[].
   Qed.
 
   (* THE CLIENT'S MOVE, fired INSIDE an [SpecNameiTr.nx_hop] fupd: the hop
      lends [dv_half z dqv ents] at whatever fraction its custody carries,
      and agreement against the ESCROWED ¼ is what forces [ents = e].  On the
      cancelled arm there is nothing to agree with and the client takes the
-     receipt instead.  The ticket is spent either way -- one redemption per
-     pin -- and the ¼ STAYS LENT (lazy retirement, charter). *)
-  Lemma dv_pin_redeem (E : coPset) (z : Z) (e : gmap fname Z)
-      (dqv : dfrac) (ents : gmap fname Z) :
-    ↑lendN ⊆ E ->
-    dv_pin z e -∗ dv_half z dqv ents ={E}=∗
-      dv_half z dqv ents ∗
-      ((⌜ents = e⌝ ∗ dv_pin_spent z e) ∨ dv_cancelled z e).
+     receipt instead, spending the pin into it. *)
+  Lemma dv_col_redeem (z : Z) (e ents : gmap fname Z) (dqv : dfrac) :
+    dv_pin z e -∗ dv_half z dqv ents -∗ dv_lcol z ==∗
+      dv_lcol z ∗ dv_half z dqv ents ∗
+      ((⌜ents = e⌝ ∗ dv_pin z e) ∨ dv_cancelled z e).
   Proof.
-    iIntros (HE) "Hpin Hdv". rewrite /dv_pin.
-    iDestruct "Hpin" as (γc γm γr) "[#Hinv Hr]".
-    iInv "Hinv" as ">Hbody" "Hclose".
-    iDestruct (dv_lend_body_cases with "Hbody") as "[[H14 Hct]|[#Hcs Hm]]".
-    - iDestruct (dv_agree with "H14 Hdv") as %Heq.
-      iMod ("Hclose" with "[H14 Hct]") as "_".
-      { iNext. rewrite /dv_lend_body. iLeft. iFrame. }
-      iModIntro. iFrame "Hdv". iLeft. iSplit.
-      { iPureIntro. by rewrite Heq. }
-      rewrite /dv_pin_spent. iExists γc, γm. by iFrame "Hinv".
-    - iMod ("Hclose" with "[Hm]") as "_".
-      { iNext. rewrite /dv_lend_body. iRight. by iFrame "Hcs Hm". }
-      iModIntro. iFrame "Hdv". iRight.
-      rewrite /dv_cancelled. iExists γc, γm. by iFrame "Hinv Hcs".
+    iIntros "Hpin Hdv Hcol".
+    iDestruct "Hpin" as "[%Hdom (%γc & %γv & Hslp & Hvwp)]".
+    rewrite {1}/dv_lcol.
+    iDestruct "Hcol"
+      as "[(%γc0 & %γv0 & Hsl & Hct & Hvw)
+          |[(%γc0 & %γv0 & %e0 & Hsl & Hlic & Hdv14 & Hct & Hvw)
+           |(%γc0 & %γv0 & %e0 & Hsl & Hlic & #Hcs & Hvw)]]".
+    - iDestruct (dvl_slot_over z 1 (1/4) _ _ dvl_q_over_1_14 with "Hsl Hslp")
+        as %[].
+    - (* INTACT: the names agree, the witness forces [e0 = e], and the
+         escrowed ¼ forces the lent value *)
+      iDestruct (dvl_slot_agree with "Hsl Hslp") as %Heq.
+      injection Heq as -> ->.
+      iDestruct (dv_vwit_agree with "Hvw Hvwp") as %->.
+      iDestruct (dv_agree with "Hdv14 Hdv") as %<-.
+      iModIntro. iSplitL "Hsl Hlic Hdv14 Hct Hvw".
+      { rewrite /dv_lcol. iRight. iLeft. iExists γc, γv, e. iFrame. }
+      iFrame "Hdv". iLeft. iSplitR; [done |].
+      rewrite /dv_pin. iSplitR; [done |]. iExists γc, γv. iFrame.
+    - (* CANCELLED: the pin is spent into the persistent receipt *)
+      iDestruct (dvl_slot_agree with "Hsl Hslp") as %Heq.
+      injection Heq as -> ->.
+      iDestruct (dv_vwit_agree with "Hvw Hvwp") as %->.
+      rewrite /dvl_slot.
+      iMod (ghost_map_elem_persist with "Hslp") as "#Hslp".
+      iModIntro. iSplitL "Hsl Hlic Hvw".
+      { rewrite /dv_lcol. iRight. iRight. iExists γc, γv, e.
+        iFrame "Hsl Hlic Hvw". iExact "Hcs". }
+      iFrame "Hdv". iRight. rewrite /dv_cancelled.
+      iExists γc, γv. iSplitR; [iExact "Hslp" | iExact "Hcs"].
+  Qed.
+
+  (* ===================================================================== *)
+  (*  7.  THE BOOT SHAPE                                                    *)
+  (* ===================================================================== *)
+
+  (* What [IcacheBoot.ireg_alloc] assembles per inum: the two un-armed cells
+     (cut out of two whole [dview_boot_map]s at fresh gnames) and the whole
+     slot element (inserted into the registry auth).  The licence is the
+     other key's element, and goes to the caller. *)
+  (* [DirViewG.dv_boot_split] at an ARBITRARY gname: the two cell families
+     are minted by [IcacheBoot.ireg_alloc]'s own [own_alloc]s, at the same
+     boot map the contents ghost uses. *)
+  Lemma dvl_boot_split (γ : gname) (P : gset Z) :
+    own γ (dview_boot_map P) ⊢ [∗ set] z ∈ P, dvl_cell γ z (DfracOwn 1) ∅.
+  Proof.
+    rewrite /dview_boot_map
+            (gset_to_gmap_singletons (A := dfrac_agreeR (leibnizO (gmap fname Z)))).
+    rewrite big_opS_own_1. iIntros "H".
+    iApply (big_sepS_mono with "H"). intros z _.
+    iIntros "H". rewrite /dvl_cell. iExact "H".
+  Qed.
+
+  Lemma dv_lcol_boot (z : Z) (γc γv : gname) :
+    dvl_slot z (DfracOwn 1) (γc, γv) -∗
+    dvl_cell γc z (DfracOwn 1) ∅ -∗ dvl_cell γv z (DfracOwn 1) ∅ -∗
+    dv_lcol z.
+  Proof.
+    iIntros "Hsl Hct Hvw". rewrite /dv_lcol. iLeft.
+    iExists γc, γv. iFrame.
   Qed.
 
 End DirViewLendDefs.
-

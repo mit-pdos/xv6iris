@@ -323,7 +323,7 @@ Section FsCfgBootPool.
        at a LIVE inum it is the tie the allocated arm carries, and at a free
        one it is determined garbage the marker arm forgets. *)
     ([∗ set] z ∈ region_inums icfg_nib,
-       dv_hold z (dv_of (fs_dinode P sb z) (fs_data_of P (fs_dinode P sb z)))) -∗
+       dv_ride z (dv_of (fs_dinode P sb z) (fs_data_of P (fs_dinode P sb z)))) -∗
     (* [ireg_alloc]'s payout, verbatim: the fragment at a live inum, the
        marker at a free one *)
     ([∗ set] z ∈ region_inums icfg_nib,
@@ -419,7 +419,7 @@ Section FsCfgBootPool.
     iDestruct (big_sepS_split_sub _ (region_inums icfg_nib) A HARs
                  with "Hdv") as "[HdvA HdvF]".
     iAssert ([∗ set] z ∈ region_inums icfg_nib ∖ A,
-               ∃ e, dv_hold (bv_unsigned (mword_of_int z : mword 32)) e)%I
+               ∃ e, dv_ride (bv_unsigned (mword_of_int z : mword 32)) e)%I
       with "[HdvF]" as "HdvF".
     { iApply (big_sepS_mono with "HdvF"). intros z Hz.
       apply elem_of_difference in Hz as [Hz1 _].
@@ -1416,19 +1416,26 @@ Section FsCfgBootEra.
        [dv_hold] is the WHOLE element, so each inum's move is a free
        own-update with no ordering constraint against the region, the pool
        or anything else. *)
+    (* N-4 PHASE B: the stocking's mover STAYS the plain [dv_set] and the
+       ride is taken by [dv_ride_of_hold] on the whole arm.  No lend can
+       exist here -- the column is stocked NONE at every inum a few lines
+       above ([IcacheBoot.ireg_alloc]) and the licences have not been spent
+       -- so the ¾ arm is unreachable and the mask-carrying [dv_set_rt]
+       would buy nothing. *)
     iDestruct (dv_boot_split (region_inums icfg_nib) with "Hdv") as "Hdv".
     iAssert (|==> [∗ set] z ∈ region_inums icfg_nib,
-                    dv_hold z (dv_of (fs_dinode (fs_blocks dk) sb z)
+                    dv_ride z (dv_of (fs_dinode (fs_blocks dk) sb z)
                                  (fs_data_of (fs_blocks dk)
                                     (fs_dinode (fs_blocks dk) sb z))))%I
       with "[Hdv]" as ">Hdv".
     { iApply big_sepS_bupd. iApply (big_sepS_mono with "Hdv").
       intros z _. iIntros "H".
-      iApply (dv_set z ∅
+      iMod (dv_set z ∅
                 (dv_of (fs_dinode (fs_blocks dk) sb z)
                        (fs_data_of (fs_blocks dk)
                           (fs_dinode (fs_blocks dk) sb z)))
-               with "H"). }
+               with "H") as "H".
+      iModIntro. iApply (dv_ride_of_hold with "H"). }
     iDestruct (region_of_seq (fun z => mono_nat_auth_own (icfg_iep z) 1 0)
                  icfg_nib with "Hep") as "Hep".
     iDestruct (live_boot_split g0 with "Hlive") as "Hlive".
@@ -1463,13 +1470,17 @@ Section FsCfgBootEra.
     iMod (ireg_alloc E γfs (FsImg.sb_inodestart sb) icfg_nib
             (fun bi : nat =>
                fs_blocks dk (FsImg.sb_inodestart sb + Z.of_nat bi))
-            (fs_link_count (fs_blocks dk) sb) Hnib32
+            (fs_link_count (fs_blocks dk) sb) Hnib32 eq_refl
             ltac:(intros bi _; rewrite fs_blocks_length; reflexivity)
             ltac:(intros dss Hdl Hdwf Hde;
                   exact (image_ireg_premises (fs_blocks dk) sb dss icfg_nib
                            Hwf Hrw Hdl Hdwf Hde Hnib32))
             with "Hla HcntR Hrcpt HmirR Hep Hbireg Hboot Hrauth")
-      as (γi dss) "(%Hdl & %Hdwf & %Hde & Hireginv & Hboot & Hout)".
+      as (γi dss) "(%Hdl & %Hdwf & %Hde & Hireginv & Hboot & Hlics & Hout)".
+    (* N-4 PHASE B: the per-inum MINT LICENCES come out of the region's
+       stocking.  Nothing spends one at this stage -- the mint's consumer is
+       N-5.1's stocking mint -- so they are dropped here. *)
+    iClear "Hlics".
     (* the payout is at the DECODED record; restate it at [FsImg]'s own *)
     iAssert ([∗ set] z ∈ region_inums icfg_nib,
                ireg_out γi (mword_of_int z : mword 32)

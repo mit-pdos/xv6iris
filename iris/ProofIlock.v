@@ -1089,7 +1089,7 @@ Section IlockLoad.
                        carries it tied already and transfers it; the CLAIM-BOX
                        arm carries it untied and [dv_set]s it to the fresh
                        record's own (empty) contents here. *)
-                    dv_hold (bv_unsigned inum) (dv_of dn data)))
+                    dv_ride (bv_unsigned inum) (dv_of dn data)))
                 ∨ ⌜bv_unsigned (di_type dn) = 0⌝))%I
       with "[Hpool HL Hcl]" as ">[HL Hrest]".
     { (* NO PEEL HERE ANY MORE (iclaim-ledger.md §3.5 item 7).  OPTION A
@@ -1159,9 +1159,9 @@ Section IlockLoad.
              record the withdraw just handed over has size 0, so its
              contents are [∅] -- one free own-update (§9 Revision 2). *)
           iDestruct "Hdv" as (e0) "Hdv".
-          iMod (dv_set (bv_unsigned inum) e0
+          iMod (dv_set_rt ⊤ gi gfs inodestart nib (bv_unsigned inum) e0
                   (dv_of dn (fun _ => replicate BSIZE (bv_0 8)))
-                 with "Hdv") as "Hdv".
+                  ltac:(solve_ndisj) with "Hireg Hdv") as "Hdv".
           iModIntro. iFrame "HL". iLeft. iFrame "Hdn Hwb".
           (* §16.4's CLAIM BOX: [ireg_withdraw] just PAID [fresh_shape], and
              this is where it now leaves the function instead of being spent

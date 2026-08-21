@@ -1718,7 +1718,7 @@ Section ProofSysUnlinkBody.
        ind_res gfs bmd -∗
        inode_blocks gfs bmd datd -∗
        (* the payload's contents hold (namei-pinned-lookup.md §9 W2) *)
-       dv_hold (bv_unsigned dinum) (dv_of dnd datd) -∗
+       dv_ride (bv_unsigned dinum) (dv_of dnd datd) -∗
        ity_shot gyd (di_type dnd) -∗
        (* the payload's freeze token (§3.9, RULING A-prime) *)
        ifreeze_off (bv_unsigned dinum) -∗
@@ -3499,7 +3499,7 @@ Section ProofSysUnlinkBody.
     ind_res gfs bmd -∗
     inode_blocks gfs bmd datd -∗
     (* the payload's contents hold (namei-pinned-lookup.md §9 W2) *)
-    dv_hold (bv_unsigned dinum) (dv_of dnd datd) -∗
+    dv_ride (bv_unsigned dinum) (dv_of dnd datd) -∗
     ity_shot gyd (di_type dnd) -∗
     (* the payload's freeze token (§3.9, RULING A-prime) *)
     ifreeze_off (bv_unsigned dinum) -∗
@@ -3580,7 +3580,7 @@ Section ProofSysUnlinkBody.
        ind_res gfs bmd -∗
        inode_blocks gfs bmd datd -∗
        (* the payload's contents hold (namei-pinned-lookup.md §9 W2) *)
-       dv_hold (bv_unsigned dinum) (dv_of dnd datd) -∗
+       dv_ride (bv_unsigned dinum) (dv_of dnd datd) -∗
        ity_shot gyd (di_type dnd) -∗
        (* the payload's freeze token (§3.9, RULING A-prime) *)
        ifreeze_off (bv_unsigned dinum) -∗
@@ -3606,7 +3606,7 @@ Section ProofSysUnlinkBody.
        ind_res gfs bmi -∗
        inode_blocks gfs bmi dati -∗
        (* the payload's contents hold (namei-pinned-lookup.md §9 W2) *)
-       dv_hold (bv_unsigned (zero_extend' 32
+       dv_ride (bv_unsigned (zero_extend' 32
            (dir_inum datd kk : mword 16) : mword 32)) (dv_of dni dati) -∗
        ity_shot gyi (di_type dni) -∗
        (* the payload's freeze token (§3.9, RULING A-prime) *)
@@ -4239,7 +4239,7 @@ Section ProofSysUnlinkBody.
     ind_res gfs bmd -∗
     inode_blocks gfs bmd datd -∗
     (* the payload's contents hold (namei-pinned-lookup.md §9 W2) *)
-    dv_hold (bv_unsigned dinum) (dv_of dnd datd) -∗
+    dv_ride (bv_unsigned dinum) (dv_of dnd datd) -∗
     ity_shot gyd (di_type dnd) -∗
     (* the payload's freeze token (§3.9, RULING A-prime) *)
     ifreeze_off (bv_unsigned dinum) -∗
@@ -4265,7 +4265,7 @@ Section ProofSysUnlinkBody.
     ind_res gfs bmi -∗
     inode_blocks gfs bmi dati -∗
     (* the payload's contents hold (namei-pinned-lookup.md §9 W2) *)
-    dv_hold (bv_unsigned (zero_extend' 32
+    dv_ride (bv_unsigned (zero_extend' 32
         (dir_inum datd kk : mword 16) : mword 32)) (dv_of dni dati) -∗
     ity_shot gyi (di_type dni) -∗
     (* the payload's freeze token (§3.9, RULING A-prime) *)
@@ -4935,8 +4935,10 @@ Section ProofSysUnlinkBody.
        [dir_view_zero] states the DELTA and is the client's business
        (N-3/N-4), not the carrier's. *)
     iApply fupd_wp.
-    iMod (dv_set (bv_unsigned dinum) (dv_of dnd datd) (dv_of dnW data')
-           with "Hdviewd") as "Hdviewd".
+    iMod (dv_set_rt ⊤ gi gfs inodestart nib
+            (bv_unsigned dinum) (dv_of dnd datd) (dv_of dnW data')
+            ltac:(solve_ndisj)
+           with "Hireg Hdviewd") as "Hdviewd".
     iModIntro.
     iAssert (ic_loaded gfs gi cov logstart kd dinum dnW bm')
       with "[Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd Hdviewd]" as "Hloadd".
@@ -5309,7 +5311,7 @@ Section ProofSysUnlinkBody.
       iSplitL "Hblocksi"; [iExact "Hblocksi" |].
       (* [su_setnl] moves [di_nlink] only and [dv_of] reads [di_size], so the
          contents value is unmoved (§9 W3). *)
-      iApply (dv_hold_size _ dni _ dati (eq_sym (su_setnl_size dni _))
+      iApply (dv_ride_size _ dni _ dati (eq_sym (su_setnl_size dni _))
                with "Hdviewi"). }
     iAssert (ity_shot gyi (di_type (su_setnl dni (trunc16 (sign_extend' 64
                (subrange_vec_dec
@@ -5712,7 +5714,7 @@ Section ProofSysUnlinkBody.
     ind_res gfs bmd -∗
     inode_blocks gfs bmd datd -∗
     (* the payload's contents hold (namei-pinned-lookup.md §9 W2) *)
-    dv_hold (bv_unsigned dinum) (dv_of dnd datd) -∗
+    dv_ride (bv_unsigned dinum) (dv_of dnd datd) -∗
     ity_shot gyd (di_type dnd) -∗
     (* the payload's freeze token (§3.9, RULING A-prime) *)
     ifreeze_off (bv_unsigned dinum) -∗
@@ -5738,7 +5740,7 @@ Section ProofSysUnlinkBody.
     ind_res gfs bmi -∗
     inode_blocks gfs bmi dati -∗
     (* the payload's contents hold (namei-pinned-lookup.md §9 W2) *)
-    dv_hold (bv_unsigned (zero_extend' 32
+    dv_ride (bv_unsigned (zero_extend' 32
         (dir_inum datd kk : mword 16) : mword 32)) (dv_of dni dati) -∗
     ity_shot gyi (di_type dni) -∗
     (* the payload's freeze token (§3.9, RULING A-prime) *)
@@ -6814,8 +6816,10 @@ Section ProofSysUnlinkBody.
        memset+writei zeroed this directory's record.  One free own-update;
        the [su_setnl] that follows moves [di_nlink] only. *)
     iApply fupd_wp.
-    iMod (dv_set (bv_unsigned dinum) (dv_of dnd datd) (dv_of dnW data')
-           with "Hdviewd") as "Hdviewd".
+    iMod (dv_set_rt ⊤ gi gfs inodestart nib
+            (bv_unsigned dinum) (dv_of dnd datd) (dv_of dnW data')
+            ltac:(solve_ndisj)
+           with "Hireg Hdviewd") as "Hdviewd".
     iModIntro.
     iAssert (ic_loaded gfs gi cov logstart kd dinum (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
                   (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
@@ -6833,7 +6837,7 @@ Section ProofSysUnlinkBody.
       iFrame "Hdlnkd2 Hdiatd Hmetad Haddrsd Hindd Hblocksd".
       (* [su_setnl] moves [di_nlink] only and [dv_of] reads [di_size], so the
          contents value is unmoved (§9 W3). *)
-      iApply (dv_hold_size _ dnW _ data' (eq_sym (su_setnl_size dnW _))
+      iApply (dv_ride_size _ dnW _ data' (eq_sym (su_setnl_size dnW _))
                with "Hdviewd"). }
     iAssert (ity_shot gyd (di_type (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
                   (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)

@@ -794,7 +794,7 @@ Section ProofSysOpenPublish.
       (* ...and the CONTENTS HOLD (namei-pinned-lookup.md §9 W2): unlike the
          three clauses this peel discards, the hold is a RESOURCE and the
          re-seal below cannot conjure it, so it must come out here. *)
-      dv_hold (bv_unsigned inum) (dv_of dn data).
+      dv_ride (bv_unsigned inum) (dv_of dn data).
   Proof.
     iIntros "(%data & %Hok & %Hdir & %Hddix & %Hdoc & %Hduq & Hlnk & Hat & Hmeta &
               Haddr & Hind & Hblk & Hdv)".
@@ -828,7 +828,7 @@ Section ProofSysOpenPublish.
        the bytes and truncated the record, so the caller [dv_set]s the hold
        it peeled to the truncated record's own value and hands it in here.
        No delta is proved: the fragment is WHOLE, so the move is free. *)
-    dv_hold (bv_unsigned inum)
+    dv_ride (bv_unsigned inum)
             (dv_of (di_trunc dn) (fun _ => replicate BSIZE (bv_0 8))) -∗
     ic_loaded gfs gi cov logstart k inum (di_trunc dn) bm_empty.
   Proof.

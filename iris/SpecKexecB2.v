@@ -337,7 +337,7 @@ Section KexecB2Res.
          SEAL below are a self-cancelling pair inside one proof: the seal has
          no other source for it, and readi -- the one callee this bracket is
          opened for -- moves no byte, so the value comes back unchanged. *)
-      dv_hold (bv_unsigned inumf) (dv_of dnf datl).
+      dv_ride (bv_unsigned inumf) (dv_of dnf datl).
   Proof.
     rewrite /ic_loaded /inode_map.
     iIntros "(%datl & %Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdiat & Hmeta &
@@ -369,7 +369,7 @@ Section KexecB2Res.
     inode_blocks gfs bmf datl -∗
     (* the bracket's other half: exactly what [kxc_load_peel] handed out, and
        there is no other source for it (§9 W2). *)
-    dv_hold (bv_unsigned inumf) (dv_of dnf datl) -∗
+    dv_ride (bv_unsigned inumf) (dv_of dnf datl) -∗
     ic_loaded gfs gi cov logstart kf inumf dnf bmf.
   Proof.
     intros Hok Hdok Hddix Hdoc Hduq. rewrite /ic_loaded /inode_map.

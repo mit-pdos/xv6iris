@@ -1968,7 +1968,7 @@ Section ProofCreateMain.
        inode_map γfs (ientry kd) bm -∗
        inode_blocks γfs bm data -∗
        (* the payload's contents hold (namei-pinned-lookup.md §9 W2) *)
-       dv_hold (bv_unsigned dind) (dv_of dn data) -∗
+       dv_ride (bv_unsigned dind) (dv_of dn data) -∗
        ity_shot gd (di_type dn) -∗
        (* ...AND THE PARENT'S FREEZE TOKEN (iclaim-ledger.md §3.9): the half
           takes the payload UNPACKED, so it takes [ic_payload]'s A-custody
@@ -2128,7 +2128,7 @@ Section ProofCreateMain.
        inode_map γfs (ientry kd) bm -∗
        inode_blocks γfs bm data -∗
        (* the payload's contents hold (namei-pinned-lookup.md §9 W2) *)
-       dv_hold (bv_unsigned dind) (dv_of dn data) -∗
+       dv_ride (bv_unsigned dind) (dv_of dn data) -∗
        ity_shot gd (di_type dn) -∗
        (* ...AND THE PARENT'S FREEZE TOKEN (iclaim-ledger.md §3.9): the half
           takes the payload UNPACKED, so it takes [ic_payload]'s A-custody
@@ -2154,7 +2154,7 @@ Section ProofCreateMain.
        inode_map γfs (ientry kslot) bmc -∗
        inode_blocks γfs bmc datc -∗
        (* the payload's contents hold (namei-pinned-lookup.md §9 W2) *)
-       dv_hold (bv_unsigned cinum)
+       dv_ride (bv_unsigned cinum)
                (dv_of (cr_setf dnc major minor (mword_of_int 1 : mword 16)) datc) -∗
        ity_shot g (di_type dnc) -∗
        (* ...and the CHILD's, for the same reason (§3.9). *)
@@ -2313,7 +2313,7 @@ Section ProofCreateMain.
        inode_map γfs (ientry kd) bm' -∗
        inode_blocks γfs bm' data' -∗
        (* the payload's contents hold (namei-pinned-lookup.md §9 W2) *)
-       dv_hold (bv_unsigned dind) (dv_of dn' data') -∗
+       dv_ride (bv_unsigned dind) (dv_of dn' data') -∗
        ity_shot gd (di_type dn) -∗
        (* ...AND THE PARENT'S FREEZE TOKEN (iclaim-ledger.md §3.9): the half
           takes the payload UNPACKED, so it takes [ic_payload]'s A-custody
@@ -2339,7 +2339,7 @@ Section ProofCreateMain.
        inode_map γfs (ientry kslot) bmc -∗
        inode_blocks γfs bmc datc -∗
        (* the payload's contents hold (namei-pinned-lookup.md §9 W2) *)
-       dv_hold (bv_unsigned cinum)
+       dv_ride (bv_unsigned cinum)
                (dv_of (cr_setf dnc major minor (mword_of_int 1 : mword 16)) datc) -∗
        ity_shot g (di_type dnc) -∗
        (* ...and the CHILD's, for the same reason (§3.9). *)
@@ -4771,7 +4771,7 @@ Section ProofCreateMain.
       (* the child's record acquires [cr_setf]'s four fields below and NONE
          of them is [di_size], so its contents value never moves; convert the
          hold once, here (namei-pinned-lookup.md §9 W3). *)
-      iDestruct (dv_hold_size (bv_unsigned cinum) dnc
+      iDestruct (dv_ride_size (bv_unsigned cinum) dnc
                    (cr_setf dnc major minor (mword_of_int 1 : mword 16)) datc
                    (eq_sym (cr_setf_size dnc major minor
                               (mword_of_int 1 : mword 16)))
@@ -5454,8 +5454,9 @@ Section ProofCreateMain.
                 instead of [iFrame]. *)
              (* THE MOVER (namei-pinned-lookup.md §9 W3, dirlink's row) *)
              iApply fupd_wp.
-             iMod (dv_set (bv_unsigned dind) (dv_of dn data) (dv_of dn' data')
-                    with "Hdview") as "Hdview".
+             iMod (dv_set_rt ⊤ γi γfs inodestart nib
+                     (bv_unsigned dind) (dv_of dn data) (dv_of dn' data')
+                     ltac:(solve_ndisj) with "Hiregi Hdview") as "Hdview".
              iModIntro.
              iAssert (ic_loaded γfs γi cov logstart kd dind dn' bm')
                with "[Hdlnk Hdiat Hmeta Hmap Hblocks Hdview]" as "Hload".
@@ -5745,8 +5746,9 @@ Section ProofCreateMain.
                 append moved the parent's bytes even on the failing return,
                 and [cr_fail_body] is stated at the POST record. *)
              iApply fupd_wp.
-             iMod (dv_set (bv_unsigned dind) (dv_of dn data) (dv_of dn' data')
-                    with "Hdview") as "Hdview".
+             iMod (dv_set_rt ⊤ γi γfs inodestart nib
+                     (bv_unsigned dind) (dv_of dn data) (dv_of dn' data')
+                     ltac:(solve_ndisj) with "Hiregi Hdview") as "Hdview".
              iModIntro.
              iSpecialize ("Hfl" $! kd qd gd γil γisl dind dn bm data nf nsl).
              iPoseProof ("Hfl" $! CIDE1) as "Hf".
@@ -6306,7 +6308,7 @@ Section ProofCreateMain.
         exact Hchd.
       - done. }
     iDestruct "Hcmap" as "[Hca Hci]".
-    iDestruct (dv_hold_size (bv_unsigned cinum)
+    iDestruct (dv_ride_size (bv_unsigned cinum)
                  (cr_setf dnc major minor (mword_of_int 1 : mword 16))
                  (cr_setf dnc major minor (mword_of_int 0 : mword 16)) datc
                  (eq_trans (cr_setf_size dnc major minor
@@ -6789,7 +6791,7 @@ Section ProofCreateMain.
        inode_map γfs (ientry kd) bmp -∗
        inode_blocks γfs bmp datap -∗
        (* the payload's contents hold (namei-pinned-lookup.md §9 W2) *)
-       dv_hold (bv_unsigned dind) (dv_of dp datap) -∗
+       dv_ride (bv_unsigned dind) (dv_of dp datap) -∗
        ity_shot gd (di_type dp) -∗
        (* ...AND THE PARENT'S FREEZE TOKEN (iclaim-ledger.md §3.9): the half
           takes the payload UNPACKED, so it takes [ic_payload]'s A-custody
@@ -6813,7 +6815,7 @@ Section ProofCreateMain.
        inode_map γfs (ientry kslot) bmc -∗
        inode_blocks γfs bmc datc -∗
        (* the payload's contents hold (namei-pinned-lookup.md §9 W2) *)
-       dv_hold (bv_unsigned cinum) (dv_of dc datc) -∗
+       dv_ride (bv_unsigned cinum) (dv_of dc datc) -∗
        ity_shot g (di_type dc) -∗
        (* ...and the CHILD's, for the same reason (§3.9). *)
        ifreeze_off (bv_unsigned cinum) -∗
@@ -7113,7 +7115,7 @@ Section ProofCreateMain.
     assert (HG4regs : cr_regs3 m sp0 (ientry kd) (mword_of_int 0 : mword 64)
                         (ientry kslot) ty major minor G4)
       by (rewrite /G4; apply cr_regs3_caller; [exact Hcsra | exact HG3regs]).
-    iDestruct (dv_hold_size (bv_unsigned cinum) dc
+    iDestruct (dv_ride_size (bv_unsigned cinum) dc
                  (cr_setf dc major minor (mword_of_int 0 : mword 16)) datc
                  (eq_sym (cr_setf_size dc major minor
                             (mword_of_int 0 : mword 16)))
@@ -8940,10 +8942,11 @@ Section ProofCreateMain.
              parent's bytes moved, so its hold moves with them.  One free
              own-update; no delta is proved. *)
           iApply fupd_wp.
-          iMod (dv_set _ _ (dv_of (cr_setf dp3 (di_major dp3) (di_minor dp3)
+          iMod (dv_set_rt ⊤ γi γfs inodestart nib _ _
+                  (dv_of (cr_setf dp3 (di_major dp3) (di_minor dp3)
                                      (add_vec (di_nlink dp3 : mword 16)
                                         (mword_of_int 1 : mword 16))) dat3)
-                 with "Hdview") as "Hdview".
+                  ltac:(solve_ndisj) with "Hiregi Hdview") as "Hdview".
           iModIntro.
           assert (Hpfty : di_type (cr_setf dp3 (di_major dp3) (di_minor dp3)
                             (add_vec (di_nlink dp3 : mword 16)
@@ -9162,7 +9165,8 @@ Section ProofCreateMain.
           (* THE MOVER (§9 W3): the child's own ["."] and [".."] links moved
              its bytes. *)
           iApply fupd_wp.
-          iMod (dv_set _ _ (dv_of dc2 dat2) with "Hcdview") as "Hcdview".
+          iMod (dv_set_rt ⊤ γi γfs inodestart nib _ _ (dv_of dc2 dat2)
+                  ltac:(solve_ndisj) with "Hiregi Hcdview") as "Hcdview".
           iModIntro.
           iSpecialize ("Hcont" $! CIDfm with "[%]"); [wp_next_chain |].
           iApply ("Hcont" $! mf true true kslot (q/2)%Qp (q/2)%Qp g cinum
@@ -9244,8 +9248,10 @@ Section ProofCreateMain.
           (* THE MOVERS (namei-pinned-lookup.md §9 W3): the parent's append
              and the child's two interior links both moved bytes. *)
           iApply fupd_wp.
-          iMod (dv_set _ _ (dv_of dp3 dat3) with "Hdview") as "Hdview".
-          iMod (dv_set _ _ (dv_of dc2 dat2) with "Hcdview") as "Hcdview".
+          iMod (dv_set_rt ⊤ γi γfs inodestart nib _ _ (dv_of dp3 dat3)
+                  ltac:(solve_ndisj) with "Hiregi Hdview") as "Hdview".
+          iMod (dv_set_rt ⊤ γi γfs inodestart nib _ _ (dv_of dc2 dat2)
+                  ltac:(solve_ndisj) with "Hiregi Hcdview") as "Hcdview".
           iModIntro.
           iPoseProof (cr_fail_mkdir_half γs j γl γu γd γk pd pav pu bn γ γfs γi
                         cn gtl γa γf γpr cov logstart bmapstart inodestart nib
@@ -9319,7 +9325,8 @@ Section ProofCreateMain.
         (* THE MOVER (§9 W3): the child's two interior links moved its bytes;
            the parent's own append has not run on this entry. *)
         iApply fupd_wp.
-        iMod (dv_set _ _ (dv_of dc2 dat2) with "Hcdview") as "Hcdview".
+        iMod (dv_set_rt ⊤ γi γfs inodestart nib _ _ (dv_of dc2 dat2)
+                  ltac:(solve_ndisj) with "Hiregi Hcdview") as "Hcdview".
         iModIntro.
         iPoseProof (cr_fail_mkdir_half γs j γl γu γd γk pd pav pu bn γ γfs γi cn
                       gtl γa γf γpr cov logstart bmapstart inodestart nib ninodes
@@ -9393,7 +9400,8 @@ Section ProofCreateMain.
       destruct (cr_mkdir_fail1 n3 n4 _ _ _ Hn3lo Hspend1) as [Hipf1 HipfS1].
       (* THE MOVER (§9 W3): the child's first interior link moved its bytes. *)
       iApply fupd_wp.
-      iMod (dv_set _ _ (dv_of dc1 dat1) with "Hcdview") as "Hcdview".
+      iMod (dv_set_rt ⊤ γi γfs inodestart nib _ _ (dv_of dc1 dat1)
+                  ltac:(solve_ndisj) with "Hiregi Hcdview") as "Hcdview".
       iModIntro.
       iPoseProof (cr_fail_mkdir_half γs j γl γu γd γk pd pav pu bn γ γfs γi cn
                     gtl γa γf γpr cov logstart bmapstart inodestart nib ninodes
