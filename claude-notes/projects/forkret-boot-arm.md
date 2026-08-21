@@ -129,11 +129,56 @@ Two things inside it that are not plumbing:
    | `ireclaim` | **done** |
    | `fsinit` | **done** |
    | `dirlookup` | **done** |
-   | `namex` (+ its `_gen` form) | todo |
-   | `namei` / `nameiparent` | todo |
-   | `kexec` (also its `b = true ->`, and its crossing) | todo |
+   | `namex` (+ its `_gen` form) | **done** |
+   | `namei` / `nameiparent` | **done** |
+   | `kexec` (also its `b = true ->`, and its crossing) | **NOT mechanical — see below** |
 
 2. Then `fkr_boot`'s walk, which is then the only thing left.
+
+## kexec IS A DIFFERENT KIND OF JOB, and this is why
+
+Six of the seven ported by the recipe. `kexec` does not, and the reason is
+structural rather than a matter of volume.
+
+**`kexec` is the one contract in the tree that pinned `b = true` as well as
+`eb = true`, and at `b = true` `CpuOwn.cpu_own` is not a resource at all:**
+
+```coq
+  cpu_own n eb p b lks := if b then ⌜n = 0 ∧ eb = true ∧ lks = ∅⌝ else cpu_hart n eb p lks
+```
+
+so at `b = true` it is a PURE proposition, carrying no hart index. Its
+nine-file proof (~19k lines) therefore FRAMES it across every phase
+boundary, every branch and every callee return, and the `cpu_own_transport`
+calls that do appear have vestigial source harts — they were no-ops. The
+moment `b` is free, every one of those becomes a real hart-indexed
+obligation with a real span to get right, in a proof whose phases are sealed
+behind `Qed` so `wp_next_chain` cannot see across them.
+
+Concretely, the port needs, per phase file: an `eb` binder on each phase
+body and on `SpecKexecB2`/`SpecKexecB3`'s `Module Type` parameters; ~90
+`cpu_own 0 true (proc_addr jp) true` occurrences re-indexed; ~220 hardcoded
+`true` SIE indices on leaf rules; the complement threaded as a **passthrough
+on every phase** (the sweep's own warning for `virtio_disk_rw`); and a
+correct transport span computed at every one of the sites that used to be
+free. `wp_next_retarget` sites must stay at the literal `true` (they
+re-anchor kexec's own continuation) while the transports beside them move to
+`eb` — the two look identical and are not.
+
+An attempt at it (2026-08-21) got `SpecKexec`, `SpecKexecB2`/`B3`,
+`ProofKexecTail` and `ProofKexecSeam` through and was reverted rather than
+landed half-done. **Budget it as its own increment, and do it phase file by
+phase file bottom-up (Tail, Seam, B2, B3, C, D, A, B, ProofKexec), keeping
+the tree green after each** — the same discipline the six used. Do not try
+to drive it from the top: `ProofKexecA`'s `subst eb. cbn in Houtb. subst b.`
+becomes `cbn in Houtb. subst b.` (b := eb, not both := true), and everything
+downstream follows from that one line.
+
+One more thing that MOVES when kexec lands: its crossing. `SpecKexec`'s
+`wp_next b pj` has to become `wp_next true pj` (kexec parks, through
+begin_op / namei / ilock / readi / iunlockput / end_op), and that costs the
+CALLER — `sys_exec` must build its continuation hart-generically. Round 14's
+"a crossing move weakens nothing for the callee and costs the caller".
 
 ### What the four ports actually cost, beyond the recipe
 

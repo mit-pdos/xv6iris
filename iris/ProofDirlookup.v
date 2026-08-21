@@ -1178,9 +1178,9 @@ Section ProofDirlookupMain.
       iDestruct (cpu_own_transport CIDt CIDT11 0%nat eb pj b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (trap_csrs_ext_transport CIDt CIDT11 eb pj
-                   ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+                   ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CIDt CIDT11 eb pj
-                   ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
+                   ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
       iSpecialize ("Hqc" $! CIDT11 with "[%]"); [wp_next_chain |].
       iApply ("Hqc" $! P10 with "[%] [%] Hcg Hcnt Hextc Hclmc Hpc").
       - unfold callee_saved. split_and!;
@@ -1241,9 +1241,9 @@ Section ProofDirlookupMain.
       iDestruct (cpu_own_transport CID CID25 0%nat eb pj b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (trap_csrs_ext_transport CID CID25 eb pj
-                   ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+                   ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CID CID25 eb pj
-                   ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
+                   ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
       iPoseProof ("Htail" $! CID25) as "Ht".
       iSpecialize ("Ht" with "[%]"); [wp_next_chain |].
       iApply ("Ht" $! R13 u10 dolds0 with
@@ -1417,9 +1417,9 @@ Section ProofDirlookupMain.
             iDestruct (cpu_own_transport CIDp CIDP4 0%nat eb pj b
                          ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
             iDestruct (trap_csrs_ext_transport CIDp CIDP4 eb pj
-                         ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+                         ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
             iDestruct (cpu_claim_ext_transport CIDp CIDP4 eb pj
-                         ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
+                         ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
             iPoseProof ("Htail" $! CIDP4) as "Ht".
             iSpecialize ("Ht" with "[%]"); [wp_next_chain |].
             iApply ("Ht" $! Q3 mt10' dol' with
@@ -1455,9 +1455,9 @@ Section ProofDirlookupMain.
             iDestruct (cpu_own_transport CIDp CIDP3 0%nat eb pj b
                          ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
             iDestruct (trap_csrs_ext_transport CIDp CIDP3 eb pj
-                         ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+                         ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
             iDestruct (cpu_claim_ext_transport CIDp CIDP3 eb pj
-                         ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
+                         ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
             iSpecialize ("IHf" $! CIDP3 with "[%]"); [wp_next_chain |].
             iApply ("IHf" $! (S i) Q2 dol' mt10' with
                       "[%] [%] [%] [%] Hcg Hcnt Hextc Hclmc Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7
@@ -1628,9 +1628,9 @@ Section ProofDirlookupMain.
         iDestruct (cpu_own_transport CIDl CIDB6 0%nat eb pj b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         iDestruct (trap_csrs_ext_transport CIDl CIDB6 eb pj
-                     ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+                     ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
         iDestruct (cpu_claim_ext_transport CIDl CIDB6 eb pj
-                     ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
+                     ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
         iApply (RD.wp_readi_sconf KT1 gs j gl gu gd gk pd pav pu bn gfs ga gf
                   cov logstart dev ip bm data dn
                   false (16 * i)%nat 16%nat dol Vpr
@@ -1736,9 +1736,9 @@ Section ProofDirlookupMain.
           iDestruct (cpu_own_transport CIDrd CIDpa4 0%nat eb pj b
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
           iDestruct (trap_csrs_ext_transport CIDrd CIDpa4 eb pj
-                       ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+                       ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
           iDestruct (cpu_claim_ext_transport CIDrd CIDpa4 eb pj
-                       ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
+                       ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
           (* THE REGFILE THE SPEC WANTS IS THE POST-JAL ONE. *)
           pose (PA3 := <[Regidx Rra := regval_into_reg
                           (add_vec_int (mword_of_int (DL + 0x4e) : mword 64) 4)]> PA2).
@@ -1823,9 +1823,9 @@ Section ProofDirlookupMain.
           iDestruct (cpu_own_transport CIDrd CIDB9 0%nat eb pj b
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
           iDestruct (trap_csrs_ext_transport CIDrd CIDB9 eb pj
-                       ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+                       ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
           iDestruct (cpu_claim_ext_transport CIDrd CIDB9 eb pj
-                       ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
+                       ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
           iSpecialize ("Hlatch" $! CIDB9 with "[%]"); [wp_next_chain |].
           iApply ("Hlatch" $! N1 (fun jj => file_byte data (16 * i + jj)%nat)
                     mt10 with
@@ -2075,15 +2075,15 @@ Section ProofDirlookupMain.
             iDestruct (cpu_own_transport CIDrd CIDB13 0%nat eb pj b
                          ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
             iDestruct (trap_csrs_ext_transport CIDrd CIDB13 eb pj
-                         ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+                         ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
             iDestruct (cpu_claim_ext_transport CIDrd CIDB13 eb pj
-                         ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
+                         ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
             iDestruct (cpu_own_transport CIDB13 CIDB17 0%nat eb pj b
                          ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
             iDestruct (trap_csrs_ext_transport CIDB13 CIDB17 eb pj
-                         ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+                         ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
             iDestruct (cpu_claim_ext_transport CIDB13 CIDB17 eb pj
-                         ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
+                         ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
             (* ================================================================ *)
             (*  THE LICENCE (increment C'-lite, fs-fragments.md §7.1/§7.5.6)    *)
             (* ================================================================ *)
@@ -2212,9 +2212,9 @@ Section ProofDirlookupMain.
             iDestruct (cpu_own_transport CIDig CIDB18 0%nat eb pj b
                          ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
             iDestruct (trap_csrs_ext_transport CIDB17 CIDB18 eb pj
-                         ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+                         ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
             iDestruct (cpu_claim_ext_transport CIDB17 CIDB18 eb pj
-                         ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
+                         ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
             iPoseProof ("Htail" $! CIDB18) as "Ht".
             iSpecialize ("Ht" with "[%]"); [wp_next_chain |].
             iApply ("Ht" $! mig mt10 (fun jj => file_byte data (16 * i + jj)%nat)
@@ -2256,9 +2256,9 @@ Section ProofDirlookupMain.
             iDestruct (cpu_own_transport CIDrd CIDB13 0%nat eb pj b
                          ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
             iDestruct (trap_csrs_ext_transport CIDrd CIDB13 eb pj
-                         ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+                         ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
             iDestruct (cpu_claim_ext_transport CIDrd CIDB13 eb pj
-                         ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
+                         ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
             iSpecialize ("Hlatch" $! CIDB13 with "[%]"); [wp_next_chain |].
             iApply ("Hlatch" $! mnc (fun jj => file_byte data (16 * i + jj)%nat)
                       mt10 with
@@ -2280,9 +2280,9 @@ Section ProofDirlookupMain.
       iDestruct (cpu_own_transport CID CID24 0%nat eb pj b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (trap_csrs_ext_transport CID CID24 eb pj
-                   ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+                   ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CID CID24 eb pj
-                   ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
+                   ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
       iSpecialize ("Hloop" $! (S nrec) CID24 with "[%]"); [wp_next_chain |].
       iApply ("Hloop" $! 0%nat R13 dolds0 u10 with
                 "[%] [%] [%] [%] Hcg Hcnt Hextc Hclmc Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8

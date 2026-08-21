@@ -651,9 +651,9 @@ Section IreclaimEpilogue.
    iDestruct (cpu_own_transport CID0 CID10 0 eb (proc_addr j) b
                 ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
    iDestruct (trap_csrs_ext_transport CID0 CID10 eb (proc_addr j)
-                ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+                ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
    iDestruct (cpu_claim_ext_transport CID0 CID10 eb (proc_addr j)
-                ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
+                ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     rewrite /irc_cont.
     iSpecialize ("Hcont" $! CID10 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! P9 with "[%] Hcg Hcnt Hextc Hclmc Hpc Hsbn Hsbi Hsbb Hppid
@@ -858,9 +858,9 @@ Section IreclaimStep.
       iDestruct (cpu_own_transport CID0 CID4 0 eb (proc_addr j) b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (trap_csrs_ext_transport CID0 CID4 eb (proc_addr j)
-                   ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+                   ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CID0 CID4 eb (proc_addr j)
-                   ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
+                   ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
       iApply (irc_epilogue (CID0 := CID4) j bn γfs cov logstart bmapstart
                 inodestart ninodes size pidv dq dqb dqs dqn
                 m S3 K eb b lks Vpr HK HS3sp HS3thr
@@ -889,9 +889,9 @@ Section IreclaimStep.
       iDestruct (cpu_own_transport CID0 CID4 0 eb (proc_addr j) b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (trap_csrs_ext_transport CID0 CID4 eb (proc_addr j)
-                   ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+                   ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CID0 CID4 eb (proc_addr j)
-                   ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
+                   ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
       rewrite /irc_loop.
       iApply ("Hloop" $! S3 inum1 CID4
                 with "[%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcnt Hextc Hclmc Hpc Hframe
@@ -1145,9 +1145,9 @@ Section IreclaimOrphan.
     iDestruct (cpu_own_transport CID0 CID3 0 eb (proc_addr j) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (trap_csrs_ext_transport CID0 CID3 eb (proc_addr j)
-                 ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+                 ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID0 CID3 eb (proc_addr j)
-                 ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
+                 ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID3) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     (* the panic tail runs at depth 0, so the held set is forced empty and
@@ -1294,9 +1294,9 @@ Section IreclaimOrphan.
        back).  eb-generic-sweep.md, "A CALLEE THAT DOES NOT THREAD THE
        COMPLEMENT STRANDS IT". *)
     iDestruct (trap_csrs_ext_transport CID3 CID7 eb (proc_addr j)
-                 ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+                 ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID3 CID7 eb (proc_addr j)
-                 ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
+                 ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iDestruct (wp_next_shift (b := true) (CIDa := CID3) (CIDb := CID7) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     (* ================================================================== *)
@@ -1484,9 +1484,9 @@ Section IreclaimOrphan.
     iDestruct (cpu_own_transport CID8 CID11 0 eb (proc_addr j) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (trap_csrs_ext_transport CID7 CID11 eb (proc_addr j)
-                 ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+                 ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID7 CID11 eb (proc_addr j)
-                 ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
+                 ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iDestruct (wp_next_shift (b := true) (CIDa := CID7) (CIDb := CID11) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
@@ -1573,9 +1573,9 @@ Section IreclaimOrphan.
     iDestruct (cpu_own_transport CID12 CID14 0 eb (proc_addr j) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (trap_csrs_ext_transport CID11 CID14 eb (proc_addr j)
-                 ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+                 ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID11 CID14 eb (proc_addr j)
-                 ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
+                 ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iDestruct (wp_next_shift (b := true) (CIDa := CID11) (CIDb := CID14) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (BO.wp_begin_op_sconf γs j γl bn γ γfs cov logstart dev pidv dq
@@ -1681,9 +1681,9 @@ Section IreclaimOrphan.
     iDestruct (cpu_own_transport CID15 CID17 0 eb (proc_addr j) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (trap_csrs_ext_transport CID15 CID17 eb (proc_addr j)
-                 ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+                 ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID15 CID17 eb (proc_addr j)
-                 ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
+                 ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iDestruct (wp_next_shift (b := true) (CIDa := CID14) (CIDb := CID17) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iDestruct (iu_slots_split bn 2 1 with "Hsl") as "[Hsl Hsl1]".
@@ -1796,9 +1796,9 @@ Section IreclaimOrphan.
     iDestruct (cpu_own_transport CID18 CID20 0 eb (proc_addr j) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (trap_csrs_ext_transport CID18 CID20 eb (proc_addr j)
-                 ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+                 ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID18 CID20 eb (proc_addr j)
-                 ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
+                 ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iDestruct (wp_next_shift (b := true) (CIDa := CID17) (CIDb := CID20) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (IU.wp_iunlock_sconf γs γfs γi cn gil gisl cov logstart kslot
@@ -1904,9 +1904,9 @@ Section IreclaimOrphan.
     iDestruct (cpu_own_transport CID21 CID23 0 eb (proc_addr j) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (trap_csrs_ext_transport CID20 CID23 eb (proc_addr j)
-                 ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+                 ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID20 CID23 eb (proc_addr j)
-                 ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
+                 ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iDestruct (wp_next_shift (b := true) (CIDa := CID20) (CIDb := CID23) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     (* SIMP-1: the RUNTIME iput contracts are specialized to the sealed
@@ -1998,9 +1998,9 @@ Section IreclaimOrphan.
     iDestruct (cpu_own_transport CID24 CID25 0 eb (proc_addr j) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (trap_csrs_ext_transport CID24 CID25 eb (proc_addr j)
-                 ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+                 ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID24 CID25 eb (proc_addr j)
-                 ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
+                 ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iDestruct (wp_next_shift (b := true) (CIDa := CID23) (CIDb := CID25) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (EO.wp_end_op_sconf γs j γl γu γd γk pd pav pu bn γ γfs cov logstart
@@ -2176,9 +2176,9 @@ Section IreclaimRelease.
     iDestruct (cpu_own_transport CID0 CID2 0 eb (proc_addr j) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (trap_csrs_ext_transport CID0 CID2 eb (proc_addr j)
-                 ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+                 ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID0 CID2 eb (proc_addr j)
-                 ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
+                 ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID2) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
@@ -2228,9 +2228,9 @@ Section IreclaimRelease.
     iDestruct (cpu_own_transport CID3 CID4 0 eb (proc_addr j) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (trap_csrs_ext_transport CID2 CID4 eb (proc_addr j)
-                 ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+                 ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID2 CID4 eb (proc_addr j)
-                 ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
+                 ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iApply (irc_step (CID0 := CID4) j bn γfs cov logstart bmapstart inodestart
               ninodes size dev inum fuel pidv dq dqb dqs dqn
               m mR K eb b lks Vpr HK Hn31 Hfuel Hinum HmRsp HmRthr
@@ -2561,9 +2561,9 @@ Section IreclaimScan.
       iDestruct (cpu_own_transport CIDn CID6 0 eb (proc_addr j) b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (trap_csrs_ext_transport CIDn CID6 eb (proc_addr j)
-                   ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+                   ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CIDn CID6 eb (proc_addr j)
-                   ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
+                   ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
       iDestruct (wp_next_shift (b := true) (CIDa := CIDn) (CIDb := CID6) ltac:(wp_next_chain)
                    with "Hcont") as "Hcont".
       iDestruct (iu_slots_split bn 2 1 with "Hsl") as "[Hsl Hsl1]".
@@ -2887,9 +2887,9 @@ Section IreclaimScan.
         iDestruct (cpu_own_transport CID7 CID14 0 eb (proc_addr j) b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         iDestruct (trap_csrs_ext_transport CID7 CID14 eb (proc_addr j)
-                     ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+                     ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
         iDestruct (cpu_claim_ext_transport CID7 CID14 eb (proc_addr j)
-                     ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
+                     ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
         iApply (irc_release (CID0 := CID14) γs j γd bn γfs cov logstart bmapstart
                   inodestart ninodes size dev inum bno kk
                   (diblk_bytes ds) bsd0 d0 fuel pidv dq dqb dqs dqn
@@ -2986,9 +2986,9 @@ Section IreclaimScan.
           iDestruct (cpu_own_transport CID7 CID16 0 eb (proc_addr j) b
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
           iDestruct (trap_csrs_ext_transport CID7 CID16 eb (proc_addr j)
-                       ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+                       ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
           iDestruct (cpu_claim_ext_transport CID7 CID16 eb (proc_addr j)
-                       ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
+                       ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
           iApply (irc_orphan (CID0 := CID16) γs j γl γu γd γk pd pav pu bn γ γfs
                     γi cn gtl γpr cov logstart bmapstart inodestart ninodes size
                     nib dev inum bno kk (diblk_bytes ds) bsd0 ds d0
@@ -3023,9 +3023,9 @@ Section IreclaimScan.
           iDestruct (cpu_own_transport CID7 CID16 0 eb (proc_addr j) b
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
           iDestruct (trap_csrs_ext_transport CID7 CID16 eb (proc_addr j)
-                       ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+                       ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
           iDestruct (cpu_claim_ext_transport CID7 CID16 eb (proc_addr j)
-                       ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
+                       ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
           iApply (irc_release (CID0 := CID16) γs j γd bn γfs cov logstart bmapstart
                     inodestart ninodes size dev inum bno kk
                     (diblk_bytes ds) bsd0 d0 fuel pidv dq dqb dqs dqn
@@ -3557,9 +3557,9 @@ Section IreclaimMain.
     iDestruct (cpu_own_transport CID CID21 0 eb (proc_addr j) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (trap_csrs_ext_transport CID CID21 eb (proc_addr j)
-                 ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+                 ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID CID21 eb (proc_addr j)
-                 ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
+                 ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID21) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (Hunit1 : bv_unsigned (mword_of_int 1 : mword 32) = 1).

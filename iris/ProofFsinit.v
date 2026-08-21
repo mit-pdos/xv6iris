@@ -507,9 +507,9 @@ Section FsinitEpilogue.
    iDestruct (cpu_own_transport CID0 CID6 0 eb (proc_addr j) b
                 ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
    iDestruct (trap_csrs_ext_transport CID0 CID6 eb (proc_addr j)
-                ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+                ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
    iDestruct (cpu_claim_ext_transport CID0 CID6 eb (proc_addr j)
-                ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
+                ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     rewrite /fsi_cont.
     iSpecialize ("Hcont" $! CID6 with "[%]"); [wp_next_chain |].
     iApply ("Hcont" $! P5 with "[%] Hcg Hcnt Hextc Hclmc Hpc Hppid Hmg Hsz Hnb Hni
@@ -796,9 +796,9 @@ Section FsinitMain.
     iDestruct (cpu_own_transport CID CID9 0 eb (proc_addr j) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (trap_csrs_ext_transport CID CID9 eb (proc_addr j)
-                 ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+                 ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID CID9 eb (proc_addr j)
-                 ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
+                 ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID9) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
@@ -1166,9 +1166,9 @@ Section FsinitMain.
     iDestruct (cpu_own_transport CID10 CID19 0 eb (proc_addr j) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (trap_csrs_ext_transport CID10 CID19 eb (proc_addr j)
-                 ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+                 ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID10 CID19 eb (proc_addr j)
-                 ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
+                 ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iDestruct (wp_next_shift (b := true) (CIDa := CID9) (CIDb := CID19) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
@@ -1392,9 +1392,9 @@ Section FsinitMain.
     iDestruct (cpu_own_transport CID20 CID29 0 eb (proc_addr j) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (trap_csrs_ext_transport CID19 CID29 eb (proc_addr j)
-                 ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+                 ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID19 CID29 eb (proc_addr j)
-                 ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
+                 ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iDestruct (wp_next_shift (b := true) (CIDa := CID19) (CIDb := CID29) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (IL.wp_initlog_sconf γs j γl γu γd γk pd pav pu bn icfg_log γfs
@@ -1478,9 +1478,9 @@ Section FsinitMain.
     iDestruct (cpu_own_transport CID30 CID32 0 eb (proc_addr j) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (trap_csrs_ext_transport CID30 CID32 eb (proc_addr j)
-                 ltac:(rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
+                 ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID30 CID32 eb (proc_addr j)
-                 ltac:(rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
+                 ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iDestruct (wp_next_shift (b := true) (CIDa := CID29) (CIDb := CID32) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (IR.wp_ireclaim_sconf γs j γl γu γd γk pd pav pu bn
