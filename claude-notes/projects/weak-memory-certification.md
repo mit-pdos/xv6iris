@@ -330,6 +330,33 @@ smaller than feared, and NO model change):**
   (the A1a `dep_dom` probe machinery is the recorded starting
   point).  The interface repairs (i)/(ii) and (iii-a) stand as
   sketched.
+- **(iii-b) RESOLVED (2026-08-21, the β move — slice D-7r, build in
+  flight): the forward bank's view column returns to 0.**  The
+  design pass sharpened to a fork: (α) keep the machine's rule-12
+  fidelity (D2's D-7 upgrade banks `V(asrc) ⊔ V(vsrc)` — PARM's
+  dep-carrying `FwdItem`) and grow the completeness model by rule 12
+  (dep data in the fused alphabet — big); or (β) bank `(t, 0)` —
+  PARM's dependency-FREE `FwdItem`, exactly D-7's original fix and
+  the deps design's own recorded fallback.  β wins under route B:
+  the DECLARED model (RVWMO⁻+deps) has no rule 12, so the
+  dep-carrying bank made the machine STRICTLY STRONGER than its
+  declared model — the realization-direction bug pattern — while β
+  aligns them, is a machine WEAKENING (more behaviors, the
+  containment-safe direction), keeps every DIRECT dep floor (fulfil
+  `vd`, `rv_view`, `vcap`/`regv` chains — only through-forward
+  inheritance dies, which no landed kill uses), and restores
+  REALIZATION EQUALITY on all read-relevant components: the
+  join-absorption argument shows `vrOld` never diverged, and with
+  the bank equal, `coh`/`vpost` equalize too, so the weakened
+  `cfg_match` needs only {`regv`,`vcap`,`ldv`,`tbank`} unrelated
+  plus a res-None-between-events invariant.  `dep_dom` is not
+  needed at all.  Re-upgrade coupling recorded at the code site.
+  REMAINING T1-D BUILD (after D-7r): the interface slice — (i)
+  delete `lb_depfree` from `lbl_realizes`; (ii) the
+  administrative-star supply (admin labels `LSilent`/`LRegW`/
+  `LCtrl`/`LInstr`/`LDev` between realizing steps, star also inside
+  the exclusive pair); (iii-a) the weakened `cfg_match`; the
+  capstone re-composed.  Spec after D-7r's report.
 
 ## Items
 
