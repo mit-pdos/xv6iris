@@ -4,8 +4,10 @@
 > (over the real `SpecForkret.FORKRET` at `LinkForkret.Forkret`, so its cone
 > carries no first-related axiom), and `syscall_env` finally has a producer
 > — the one `LinkSyscall.v` has been owing since the dispatch was linked.
-> What is left is E3: neither parker HOLDS `park_env` yet, and one persistent
-> row is missing at each. Read §2 and Step E before touching anything; both
+> What is left is E3, and it is BOOT-CHAIN work: three rows of `park_env`
+> have no producer anywhere in the tree (`is_ftable`, the `wait_lock`
+> invariant, `devintr_caps_any`), and two of those need cells carved out of
+> BSS that `BootCarveMain.v` currently drops. Read §2 and Step E before touching anything; both
 > record designs that were tried and do not type.
 
 `LinkForkretPark.ForkretPark.forkret_park` is the one assumed Link in the boot
@@ -275,34 +277,74 @@ Three lemmas, and between them they say what parking a process costs:
 and `UtResFits.usertrap_res_bare_park` instantiates it at
 `SY.syscall_env` with `SY.syscall_env_park` as the wand.
 
-#### E3 — the two call sites — WHAT IS LEFT, and what it costs
+#### E3 — WHAT IS LEFT, and it is BOOT-CHAIN work, not park work
 
-The machinery is in place; what remains is that neither parker currently
-HOLDS `park_env N`, and one row is genuinely missing at each.
+The machinery is in place. What remains is that neither parker HOLDS
+`park_env N`, and — surveyed 2026-08-21, after E2 landed — **three of its
+rows have no producer anywhere in the tree.** They are not missing plumbing;
+they are resources nobody has ever built.
 
-`park_env N = ut_park_caps N ∗ sysc_park_extra (un_tk N)`, i.e. eleven rows:
+`park_env N = ut_park_caps N ∗ sysc_park_extra (un_tk N)`, eleven rows:
 `fclose_ties`, `un_pr = fsc_printk`, `procs_inv`, `is_kstack`,
-`devintr_caps_any`, the `wait_lock`, `is_ftable`, `disk_geom`, the nextpid
-lock, `procs_avail None`, `is_tickslock`, `console_ready`.
+`devintr_caps_any`, the `wait_lock` `is_lock`, `is_ftable`, `disk_geom`, the
+nextpid lock, `procs_avail None`, `is_tickslock`, `console_ready`.
 
-**kfork (`ProofKforkB5.v:204`).** Its parent holds `syscall_env`, and
-`ProofSyscall.syscall_env_all` projects out ten of the eleven — the nextpid
-lock, `procs_avail`, the `wait_lock`, `is_ftable`, `is_tickslock`,
-`printk_env`, and (through `sysc_fs_env`) `procs_inv`, `disk_geom` and the
-ties; `syscall_env_console` and `syscall_env_first` give the last two of
-those and `first_done` itself. `is_kstack` is already a premise at the site.
-**The one row `syscall_env` does not carry is `devintr_caps_any`** — it is a
-`ut_caps` conjunct that usertrap holds and does not pass to syscall. So it
-has to be threaded usertrap → syscall → sys_fork → kfork. Persistent, so
-four contract widenings and no proof obligations.
+##### The three with no producer
 
-**userinit (`ProofUserinit.v:674`).** In scope at the site today: `#Hpinv`
-(`procs_inv`), `#Hlpid` (the nextpid lock), `#Hpenv` (`printk_env`), `Hpav`,
-and `is_kstack` from allocproc. Missing and to be threaded from main, which
-creates every one of them before it calls userinit: `devintr_caps_any`,
-`is_ftable`, the `wait_lock`, `is_tickslock`, `console_ready`, `disk_geom`.
-All persistent; the cost is widening `SpecUserinit.wp_userinit_sconf_body`,
-`SpecMain`/`ProofMain` and the boot chain's threading.
+**`is_ftable γft γf`.** Only ever consumed (`SpecFilealloc`,
+`SpecPipealloc`, `ProofSyscall`). `fileinit()` IS proved and IS called by
+main (`ProofMain.v:1518`), and `SpecFileinit.v`'s header says the rest
+outright: *"Whether the lock then becomes an `is_lock` over the open-file
+table is the caller's ghost step, not fileinit's"* — and main currently
+DROPS all three of its outputs (`iIntros (mfi) "Hcg Hpc %Hcsfi _ _ _"`).
+The ghost step needs `ftable_res γf`, which at `M = ∅` is NFILE copies of
+`a_fref k ↦₄ 0 ∗ file_fields k 1 C ∗ file_pay γ k 1 C` — i.e. the ftable's
+`file[NFILE]` array has to be CARVED OUT OF BSS (`BootCarveMain.v`) and its
+authority allocated. That is the real cost.
+
+**The `wait_lock` `is_lock`.** Same shape, and `BootCarveMain.v:1669` names
+the gap in passing: `wait_res` is `∃ ps, parents_own ps` =
+`⌜length ps = NPROC⌝ ∗ [∗ list] j ↦ v ∈ ps, p_parent (proc_addr j) ↦₈ v`,
+and of `p_parent` (+56) that file says *"claimed by no bundle and is dropped
+with the padding"*. So the cells exist in the image and the carve throws
+them away. Un-drop them, thread `parents_own` to main (which already holds
+`lk_raw wait_lock_addr`), `is_lock_intro`.
+
+**`devintr_caps_any`.** The `□ ∀ h` form. Six of `devintr_caps`' seven
+members are hart-free and main has all six (`dev_inv`, `console_caps`,
+`disk_geom`, the virtio `is_lock`, `tick_keeper`'s real arm, `procs_inv`);
+the seventh is `timer_cap`, which is per-hart and which `BootChain.v:566`
+mints with `timer_cap_intro`. So this one is assembly, not construction —
+but the `∀ h` quantifier has to be discharged at every hart, which is what
+`UsertrapRes.v`'s note on `devintr_caps_any` explains the boot chain can do.
+
+##### The one that is a decision, not a gap
+
+**`procs_avail None`.** userinit is handed `procs_avail (Some (S np))` and
+returns `Some np`. `sysc_park_extra` wants the SEALED form, and
+`ProcAvail.procs_avail_seal` is a one-way fupd. Sealing it at the park is
+the right move and is exactly symmetric with the `kalloc_env_at_seal`
+userinit already performs three lines earlier — but it changes userinit's
+postcondition, so check `ProofMain` discards the row (the kalloc analogue's
+comment says main does, "the boot chain has no further kalloc client").
+
+##### And then the easy part
+
+**kfork (`ProofKforkB5.v:204`)** needs none of the above: its parent holds
+`syscall_env`, and `syscall_env_all` / `_console` / `_first` project out ten
+of the eleven rows, with `is_kstack` already a premise at the site. The one
+exception is `devintr_caps_any` — a `ut_caps` conjunct usertrap holds and
+does not pass down — so it wants threading usertrap → syscall → sys_fork →
+kfork. Persistent, so four contract widenings and no proof obligations.
+
+**userinit (`ProofUserinit.v:674`)** has `procs_inv`, the nextpid lock,
+`printk_env` and `procs_avail` in scope, and `is_kstack` from allocproc. It
+needs the three built rows plus `disk_geom` and `is_tickslock` and
+`console_ready` threaded from main, which holds all three
+(`ProofMain.v:1579`, `:1084`, `:590`). Note it currently picks the ftable's
+gname out of thin air — *"THE FTABLE'S GNAME IS PICKED HERE, and `γp` is as
+good as any"* — which stops being true once `is_ftable γft γf` is a premise:
+`wp_userinit_sconf_body` grows a real `γf`.
 
 Then: build `N` (mostly the ambient `fsc_*`/`icfg_*` fields, which is what
 makes `fclose_ties` hold), reshape the park closer into
@@ -311,7 +353,9 @@ proc_priv_nopt`, and the two pure page-table arguments are unused), switch
 both callers from `FORKRET_PARK` to `FORKRET_PARK_PAID`, and replace
 `LinkForkretPark.v`'s `Axiom` with an application of `ProofForkretPark`.
 
-Do **userinit first** — it is the harder site and proves the design.
+**Suggested order:** the two BSS carves first (they are independent of
+everything else and each is one file plus threading), then
+`devintr_caps_any`, then userinit, then kfork, then the Link.
 
 ## 4. How to build
 
