@@ -200,16 +200,24 @@ Lemma fkr_tail
      takes the run rather than the four words. *)
   stack_own (KTR := KT1) ksp 6 -∗
   proc_priv γf p pid V -∗
+  (* THE FILE SYSTEM, ON EITHER ARM.  +0x64 is where the two arms meet and
+     it is the first point at which [fs_ready] is available on BOTH: the
+     steady arm read it out of [first_tok]'s persistent steady disjunct at
+     +0x24, the boot arm established it at the release store at +0x38.  The
+     tail does not use it -- it hands it straight to the closer, which is
+     the party that cannot have it (SpecForkret.v's last header section). *)
+  FsReady.fs_ready -∗
   (∀ (h : CpuId) (pt' : uptd) (V' : pprivate),
      ⌜pv_upt V' = pt'⌝ -∗
      ⌜ud_data pt' = ud_pas pt'⌝ -∗
      ⌜proc_pt_wf pt'⌝ -∗
+     FsReady.fs_ready -∗
      forkret_yield (CID := h) γf p ksp pid av V' -∗
      usertrap_res_bare (CID := h) pt' ksp) -∗
   WP (Loop : expr riscv_lang).
 Proof.
   intros p ksp Hjlt Hpr Havsum Hmtsp Hmts1 Hgap Hkw.
-  iIntros "#Htext #Hwire #Hclaimmap Hpc Hcg Hcpu Hext Hcx #Hks Hf16 Hpv Hyield".
+  iIntros "#Htext #Hwire #Hclaimmap Hpc Hcg Hcpu Hext Hcx #Hks Hf16 Hpv #Hfsready Hyield".
   iPoseProof (fkr_64 with "Htext") as "Hi64".
   iPoseProof (fkr_68 with "Htext") as "Hi68".
   iPoseProof (fkr_6a with "Htext") as "Hi6a".
@@ -673,7 +681,8 @@ Proof.
     with "[Hparked Hpnopt]" as "Hyld".
   { rewrite /forkret_yield.
     iSplitL "Hparked"; [iExact "Hparked" | iExact "Hpnopt"]. }
-  iDestruct ("Hyield" $! CIDf pt (upd_upt V' pt) with "[%] [%] [%] Hyld")
+  iDestruct ("Hyield" $! CIDf pt (upd_upt V' pt)
+               with "[%] [%] [%] Hfsready Hyld")
     as "Hures"; [reflexivity | exact Hnorm | exact Hptwf |].
   (* ---- the config record for this round ---- *)
   destruct Hretms as (HSIE & HMPRV & HSXL & HTVM & HMXR & HTSR & HFS & HVS & Hsup).
@@ -798,10 +807,14 @@ Lemma fkr_boot
   first_boot_persist -∗
   kalloc_avail fsc_kpages None -∗
   first_fsinit -∗
+  (* the closer takes [fs_ready] and THIS ARM MINTS IT: [fs_ready_establish]
+     at the release store at +0x38.  So unlike [fkr_tail], the boot arm does
+     not take it as a premise -- it produces the thing it owes. *)
   (∀ (h : CpuId) (pt' : uptd) (V' : pprivate),
      ⌜pv_upt V' = pt'⌝ -∗
      ⌜ud_data pt' = ud_pas pt'⌝ -∗
      ⌜proc_pt_wf pt'⌝ -∗
+     FsReady.fs_ready -∗
      forkret_yield (CID := h) γf p ksp pid av V' -∗
      usertrap_res_bare (CID := h) pt' ksp) -∗
   WP (Loop : expr riscv_lang).
@@ -1572,7 +1585,7 @@ Proof.
               (upd_tf V' (<[tf_arg_idx 0 := rget E1 Ra0]> (pv_tf V')))
               ks E4 av av2 eb Hjlt ltac:(kxarith) Havsum HE4sp HE4s1 Hgap Hkw
               with "Htext Hwire Hclaimmap Hpc Hcg Hcpu Hextc Hclmc Hks Hf16
-                    Hpriv Hyield").
+                    Hpriv Hfsr Hyield").
 Qed.
 
 Theorem wp_forkret
@@ -1963,9 +1976,12 @@ Proof.
                ltac:(wp_next_chain) with "Hext") as "Hext".
   iDestruct (cpu_claim_ext_transport CID CID6 eb p
                ltac:(wp_next_chain) with "Hcx") as "Hcx".
+  (* the steady arm's [fs_ready] came out of [first_tok]'s persistent
+     steady disjunct at +0x24 ([Hdone]); it goes straight to the tail. *)
   iApply (fkr_tail (CID := CID6) j γf pid V ks T4 av av2 eb
             Hjlt Hpr Havsum HT4sp HT4s1 Hgap Hkw
-          with "Htext Hwire Hclaimmap Hpc Hcg Hcpu Hext Hcx Hks Hf16 Hpv Hyield").
+          with "Htext Hwire Hclaimmap Hpc Hcg Hcpu Hext Hcx Hks Hf16 Hpv
+                Hfsready Hyield").
 Qed.
 
 End ForkretProof.

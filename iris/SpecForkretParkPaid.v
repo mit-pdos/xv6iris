@@ -122,6 +122,7 @@ Require Import ProcAvail.
 Require Import ProcInv.
 Require Import SchedCtx.
 Require Import UsertrapRes.
+Require Import FsReady.
 Require Import SpecUsertrap.
 Require Import SpecForkret.
 Require Import SpecForkretPark.
@@ -161,10 +162,20 @@ Definition forkret_park_pkg
           the one forkret was entered with.  The two page-table facts are
           HANDED to this wand rather than taken as premises of the park --
           forkret proves them of the descriptor it actually ends on. *)
+   (* ...AND IT IS HANDED [fs_ready], which is the whole reason this
+          package is payable at all.  [UsertrapRes.ut_caps] carries
+          [fs_ready] as a conjunct and the syscall environment is derived
+          from it, so a closer that had to OWN it could not be built by
+          userinit -- forkret's own boot arm is what establishes it, and
+          that runs after userinit parks.  So forkret pays it instead
+          (SpecForkret.v, "...AND THE CLOSER IS HANDED [fs_ready]") and the
+          builder here owes only the seven persistent rows [fs_ready] does
+          not supply. *)
    (∀ (h : CpuId) (pt' : uptd) (V' : pprivate),
       ⌜pv_upt V' = pt'⌝ -∗
       ⌜ud_data pt' = ud_pas pt'⌝ -∗
       ⌜proc_pt_wf pt'⌝ -∗
+      FsReady.fs_ready -∗
       forkret_yield (CID := h) γf pa (add_vec ks (mword_of_int 4096)) pid av V' -∗
       fd_slots FDSPARE -∗
       iref_slots IREFSPARE -∗

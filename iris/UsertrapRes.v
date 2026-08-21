@@ -802,6 +802,23 @@ Section UsertrapRes.
   (* userret's entry switch consumes both.  See                           *)
   (* claude-notes/projects/uservec.md.                                    *)
   (* =================================================================== *)
+  (* =================================================================== *)
+  (* WHAT A NEVER-RUN PROCESS IS STILL OWED, as one row.                   *)
+  (* =================================================================== *)
+  (* Of everything [ut_own_nopt] carries, a process that has not run yet
+     gets all but two from the block it is built out of: [proc_priv_nopt]
+     comes with the block, and [fd_slots FDSPARE] / [iref_slots IREFSPARE]
+     travel beside it (allocproc hands all three out of the dormant slot).
+     These are the two that do not, so they are named once and paid once --
+     by whoever parks the process.
+       [bslots 3] is the slot's bio allowance, which [ProcDefs.proc_dormant]
+     owns while the slot is dormant and allocproc hands over.  The [initproc]
+     share is persistent (userinit discards the cell right after its store),
+     so it costs a parker nothing. *)
+  Definition park_own (N : ut_names) : iProp Σ :=
+    (bslots 3 ∗
+     (mword_of_int KernelSyms.initproc : mword 64) ↦₈{un_dqi N} (un_ip N))%I.
+
   Definition ut_own_nopt (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
       (N : ut_names) (V : pprivate) : iProp Σ :=
     (bslots 3 ∗

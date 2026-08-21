@@ -1,164 +1,248 @@
-# forkret_park: retiring the last assumed Link
+# forkret_park: the plan to retire the last assumed Link
 
-> **2026-08-21 — THE PARK PROOF WAS REMOVED FROM THE TREE, and this file is
-> now the record of what it was.** `SpecForkretParkPaid.v`,
-> `ProofForkretPark.v`, `ForkretParkClose.v` and `LinkForkretParkPaid.v` are
-> deleted (last green at `4bbc418f`; `git show 4bbc418f:iris/<f>` recovers
-> any of them). They were written against `SpecForkret`'s *assumed*
-> no-`first` reading (`LinkForkretNF.v`, also deleted), and forkret's real
-> contract has moved: no `first` premise at all, no `pt` parameter, a
-> `∀ pt'` residue closer, and `procs_inv γs` in place of the `is_lock γl p s
-> Rlk` triple. Everything below about the RESOURCES is still true and is
-> still the plan; only the four files are gone.
->
-> **AND ONE THING IN THE PLAN IS NOW KNOWN WRONG.** `SwtchCtx.valid_context`'s
-> resume wand is `∀ eb'`, and the park's job is to prove forkret's WP at
-> every `eb'`. This revision's scheduler runs `intr_on(); intr_off();` before
-> `acquire(&p->lock)`, so the only `eb'` that ever occurs is **`false`** —
-> `push_off` records `intena = 0`. That is what forces forkret's boot arm
-> onto the disabled index (`projects/forkret-boot-arm.md`), and it means the
-> park must deliver the record at `eb' = false` too. Nothing in the old
-> proof depended on the other index, so this is a fact to know rather than a
-> repair — but do not re-derive the record on the assumption that a
-> dispatching scheduler hands over an enabled base. It does not.
+> **STATUS 2026-08-21.** The RESOURCE problem is finished, and so is the
+> ORDERING problem (§2). Steps A, B and C have landed. What is left is Step D
+> (retype `ProofForkretPark.v`) and Step E (pay at the two call sites, delete
+> the Axiom). Read §2 before touching anything — it records a design that was
+> tried on paper and does not type.
 
-`LinkForkretPark.ForkretPark.forkret_park` is the one assumed-Link in the boot
-cone, and the one assumption every proven process-side function carries
-(`forkret`, `kfork`, `main`, `sys_fork`, `syscall`, `userinit`, `usertrap` --
-see any `proof_coverage.py` run).  This file is the worklist for retiring it.
+`LinkForkretPark.ForkretPark.forkret_park` is the one assumed Link in the boot
+cone, and the assumption every proven process-side function carries
+(`forkret`, `kfork`, `main`, `sys_fork`, `syscall`, `userinit`, `usertrap`).
 
-## The WP is already proved -- this is a resource problem, not a proof problem
+## 0. What has landed
 
-`ProofForkretPark.v` proves the park (0 admits, 6 `Qed`) at one extra
-precondition, `SpecForkretParkPaid.forkret_park_pkg`, and
-`LinkForkretParkPaid.v` instantiates it against forkret's real contract.  What
-has never existed is a CALLER that can pay that precondition.  So nothing here
-is about discharging a weakest precondition; it is entirely about producing
-resources for a process that has not run yet.
+| commit | what |
+|---|---|
+| `f2646655` | **forkret is PROVED** — `ProofForkret.fkr_boot`, `Qed`, both arms of the `== -1` test, no admits anywhere in the cone |
+| `48baeac0` | `SpecForkretParkPaid.v` restored, restated against forkret's real contract |
+| `d6bb1464` | the bio slot supply has a CANONICAL ghost name (`Xv6Cameras.bioslotG`, `bioslot_name`) |
+| `bbcd2687` | three bslots per proc slot, resident at every state, returned on every path |
+| *(this commit)* | `UsertrapRes.park_own`; the closer takes `fs_ready`; `ForkretParkClose.v` restored |
 
-## What `forkret_park_pkg` costs, after `ForkretParkClose.v`
+## 1. Resource inventory — EVERY row now has a source
 
-`iris/ForkretParkClose.v` reduces the package to a short list.
-`forkret_park_pkg_intro` proves it from:
+`SpecForkretParkPaid.forkret_park_pkg`'s seven conjuncts:
 
-* `kernel_text`, `wire_inv`, `kmap_at tramp_vpn tramp_ppn KP_rx` -- persistent.
-* `pslot_used_at (un_pj N)` -- persistent, and ALREADY in allocproc's
-  postcondition (`SpecAllocproc.v:192`).
-* `ut_caps N` -- persistent (proved instance), and it already carries both
-  `procs_inv` and the `is_kstack` the park takes as an argument.  So `procs_inv`
-  is not a separate premise.
-* the syscall environment `Rsys` -- persistent.
-* `stack_own (KTR := KT1) (un_ks N + 4096) av` -- see below.
-* `park_own N` -- the TWO exclusive resources, below.
+| conjunct | status |
+|---|---|
+| `kernel_text`, `wire_inv`, `kmap_at tramp_vpn tramp_ppn KP_rx` | persistent, free |
+| `procs_inv γs` | persistent; also inside `ut_caps` (`ut_caps_procs`) |
+| `pslot_used_at pa` | persistent, already in `SpecAllocproc`'s post |
+| `stack_own (ks+4096) av` | **AVAILABLE.** `ProcDefs.kstack_free` is a `proc_dormant` conjunct and `SpecAllocproc:208` returns it; `ProcDefs.kstack_free_at` recovers the words at the concrete `ks`. The old header calling this "a real hole in the chain" is WRONG. |
+| the residue closer | the subject of this plan — see §2 |
 
-`forkret_park_closer_intro` is the interesting half: the "residue closer" was
-always described as the hard part, a wand that builds the trap loop's whole
-kernel-side bundle for a fresh process.  It is not hard.  `forkret_yield` hands
-it `ut_trap_parked` and `proc_priv_nopt`, the closer's own arguments hand it
-`fd_slots FDSPARE` and `iref_slots IREFSPARE`, `ut_caps` and the syscall
-environment are persistent -- and what is left is two resources.
+Budget, and it is exact: `KSTACK_AV = 342 = K_usertrap = 4 + kv_frame_slots(90)
++ K_syscall(248)`. So `av := KSTACK_AV` meets `K_usertrap <= av` on the nose,
+and `(trap_res eb + av2) = av - 6 = 336` gives `av2 = 336` at `eb = false`,
+`246` at `eb = true` — both ≥ `K_kexec = 184`. The park works at EITHER `eb'`,
+though this revision's scheduler only ever produces `false`.
 
-## What is actually left
+`ForkretParkClose`'s residual `park_own` is now fully sourced: the `initproc`
+share is persistent (userinit discards the cell right after its store at
++0x14), and `bslots 3` landed in `bbcd2687` — **both park call sites already
+hold their three units at the `iMod`** (`ProofUserinit.v:671`,
+`ProofKforkB5.v:204`), where before there was no source at all. They are
+dropped there today, which is sound and is exactly the right staging.
 
-### 1. `stack_own (un_ks N + 4096) av` -- THREADING, not minting
+## 2. THE ONE REAL PROBLEM, and how it was solved
 
-`SpecForkretParkPaid.v`'s header calls this "a real hole in the chain".  It is
-better than that: `SpecProcinit.v:260` ALREADY produces
-`stack_own (kstack_va i + 4096) KSTACK_AV` for every slot.  The words exist
-from boot.  What is missing is a home for the NPROC regions between procinit
-and allocproc, plus an allocproc postcondition that hands one out beside the
-`is_kstack` it already gives.  This is a contract change to allocproc and it
-ripples through its cone, so it is a project rather than an edit -- but it is
-plumbing, with no open question in it.
+`ForkretParkClose.forkret_park_closer_intro` has to produce
+`UsertrapRes.ut_res_bare`, whose two halves are `ut_caps` (which carries
+`FsReady.fs_ready` as a conjunct) and the syscall environment `Rsys`
+(concretely `ProofSyscall.syscall_env`, itself derived from `fs_ready`).
 
-### 2. `park_own` -- two exclusive resources
+**AT USERINIT'S PARK, `fs_ready` DOES NOT EXIST YET.** forkret's boot arm is
+what establishes it (`fs_ready_establish`), and that runs *after* userinit
+parks. So a closer that had to OWN the file system is unbuildable at that
+site. This is not a plumbing gap; it is an ordering fact.
 
-**`initproc ↦₈{un_dqi N} (un_ip N)` -- DONE on the producer side (2026-08-21).**
-Only userinit writes the cell.  Every consumer downstream (`SpecKexit.v:256`,
-`SpecReparent.v:93`, `SpecSyscall.v:190`) already takes it at an ARBITRARY
-`dfrac` and hands it back, and `un_dqi` is a field the record's builder picks
--- so discarding costs no caller anything.  `ProofUserinit.v` now runs
-`word_pointsto_persist` immediately after the `sd a0,1796(a5)` at `+0x14`, and
-`SpecUserinit.v`'s continuation returns `∃ v, initproc ↦₈□ v`.  `ProofMain.v`
-and `LinkUserinit.v` needed no change at all.
+(Note also: `syscall_env` has no producer anywhere. `LinkSyscall.v` says so —
+"Establishing the environment is the boot chain's job and is still owed". An
+earlier revision of this file called it "on the free list" because it is
+persistent. That was wrong: persistent means duplicable once you have it, not
+conjurable.)
 
-PERSIST EARLY, NOT ON THE WAY OUT.  The first attempt discarded at the end of
-the proof, which satisfies "return it persistently" but is useless where it is
-wanted: userinit's OWN `forkret_park` call is at line 649 and the store is at
-462, so persisting right after the store puts the fact in scope at the deposit
-site for free.  An exclusive cell could not be shared with the parked process
-at all.
+**THE FIX (2026-08-21): move the RESOURCE, not the proof.** The residue
+closer takes `fs_ready` as an ARGUMENT. forkret is the party that can pay it,
+on both arms and for the same reason the `if (first)` exists at all:
 
-STILL OWED FOR KFORK.  `SpecKfork.v` and `SpecSysFork.v` mention `initproc`
-nowhere, and `ProofKforkB5.v:204` has only `#Htext`, `#Hpinv`, `#Hwl` in scope.
-It has to be threaded from `SpecSyscall.v:190` through sys_fork to kfork --
-premises, not resources, since the discarded cell duplicates freely.
-WORTH CONSIDERING INSTEAD: now that it is persistent, move it INTO
-`syscall_env` (also persistent).  That DELETES the `dqi`/`ip` parameters from
-syscall's, kexit's and reparent's contracts rather than ADDING one to kfork's.
+* steady arm — `first_tok`'s steady disjunct IS `first_addr ↦₄□ 0 ∗ fs_ready`,
+  persistent, so putting the token back into the block costs nothing;
+* boot arm — forkret establishes it itself, at the release store at +0x38,
+  and holds it (persistent) to the `c.jalr`.
 
-**`bslots (un_bn N) 3` -- needs a lock, not a ghost update.**  The pool has
-room (`BSLOTS = 1024`, `3 * NPROC = 192`), but the authority
-`BioInv.bslots_auth` lives inside `bcache_res`, i.e. behind the bcache lock.
-Minting three fragments is therefore a WP step in whoever allocates the child,
-not something a bystander can do from persistent facts.
+`+0x64` is where the two arms meet, which is `fkr_tail`, which is where the
+closer is applied. So one premise on `fkr_tail` and one extra argument at the
+application is the whole proof-side cost.
 
-**The block bitmap is GONE from the package -- the design question is
-SETTLED.**  `fileclose_bm` used to be the third resource, and exclusive: as
-long as it sat in `UsertrapRes.ut_own_nopt` every process holding a residue
-across user execution held the block bitmap, serializing user mode across
-all harts.  The bitmap now lives in the persistent `BitmapInv.bitmap_inv`
-(a `fs_ready` conjunct; design/fs-bitmap.md), the residue no longer names
-it, and `fclose_names` lost the fields that carried it.
+### WHY NOT INVERT THE DEPENDENCY (the earlier plan, and why it is wrong)
 
-## WHAT THE PARK NOW OWES THAT IT DID NOT BEFORE (2026-08-21)
+An earlier revision of this file proposed building the residue inside
+forkret's own proof: give forkret a wand `□ (fs_ready -∗ ut_caps N ∗ Rsys …)`
+and have it call `forkret_park_closer_intro` at its tail.
 
-forkret's boot arm is the first consumer of `FirstTok.first_tok`'s boot
-disjunct, and proving it changed two of that disjunct's rows. Both are
-STRICTLY STRONGER asks, and both land on whoever finally mints the token —
-which is this project.
+**THAT CANNOT TYPE.** `ProofForkret` is a functor over `USERRET_CLOSED`, and
+`usertrap_res_bare` is a `Parameter` of that module type — abstract inside the
+functor, and re-exported by `ProofForkret` as `UC.usertrap_res_bare`. forkret's
+conclusion feeds it to `UC.wp_userret_closed`. `ut_res_bare Rsys pt' ksp` is
+not convertible with an opaque module parameter, so forkret cannot BUILD the
+residue at all — only receive it and pass it on. Inverting would have meant
+adding an intro rule to `USERTRAP_RES` and threading an abstract syscall
+environment through the module type, i.e. de-abstracting the residue for
+every consumer, to fix an ordering problem that one extra wand argument
+fixes.
 
-* **`kalloc_avail fsc_kpages None`, not `kalloc_env fsc_kalloc None`.** The
-  bundle's `∃ γk` swallows the free-list name and `WpLock.is_lock` is an
-  `inv`, so nothing recovers `γk = fsc_kpages` — and the seal
-  (`FsReady.fs_ready_pre` row 17) spells the pair named. The old row could
-  never have been sealed. Note the bundle's own `is_lock` duplicated the one
-  `first_boot_persist` already carries at the real name, so the row was
-  paying for a fact it had and hiding the one it needed. **allocproc's
-  postcondition bundles**, so the mint must take the named pair from the boot
-  chain (`FsCfgBoot`'s era allocation has it) instead. This is debt F / D4,
-  now discharged on the consumer side and owed here.
-* **`iref_slots 2`, not `iref_slot`.** fsinit borrows one and gives it back;
-  kexec demands two.
+Keep the closer premise. Hand it `fs_ready`.
 
-Neither costs anything today — nothing constructs the boot arm, because its
-producer is the axiom this file is about. They are recorded so the mint does
-not discover them.
+## 3. Steps, in order
 
-## The two call sites
+### Step A — `ForkretParkClose.v`, restored and restated — **LANDED**
+
+Recovered from `git show 4bbc418f:iris/ForkretParkClose.v`. It is a LEAF —
+nothing requires it — so it sits after `SpecForkretParkPaid.v` in
+`_CoqProject` (line 1320). `park_own` moved out to `UsertrapRes.v`.
+
+`forkret_park_closer_intro` now takes the DERIVATION rather than the
+environment, and the `V` parameter is gone (the shape is `∀ pt'`):
+
+```coq
+  Lemma forkret_park_closer_intro Rsys N av :
+    ut_wf N -> (K_usertrap <= av)%nat ->
+    (fs_ready -∗ ut_caps N ∗ Rsys (un_f N) (un_pj N) (un_bn N) (un_fn N)) -∗
+    park_own N -∗
+    (∀ (h : CpuId) (pt' : uptd) (V' : pprivate),
+       ⌜pv_upt V' = pt'⌝ -∗ ⌜ud_data pt' = ud_pas pt'⌝ -∗ ⌜proc_pt_wf pt'⌝ -∗
+       fs_ready -∗
+       forkret_yield (CID := h) (un_f N) (un_pj N)
+         (add_vec (un_ks N) (mword_of_int 4096)) (un_pid N) av V' -∗
+       fd_slots FDSPARE -∗ iref_slots IREFSPARE -∗
+       ut_res_bare (CID := h) Rsys pt'
+         (add_vec (un_ks N) (mword_of_int 4096))).
+```
+
+The wand is NOT `□`: it is applied once, so the weaker premise is the right
+one. The two page-table facts are `clear`ed — `ut_res_bare` does not restate
+them; they are handed in so forkret can prove them of the descriptor it
+actually ends on.
+
+`forkret_park_pkg_intro` takes `procs_inv (un_s N)` as its own premise now
+(it used to read it off `ut_caps` via `ut_caps_procs`, and `ut_caps` is behind
+the wand). That premise is free: it is persistent and both parkers hold it.
+`ut_caps_procs` is kept as the fact that makes it free rather than new.
+
+Requires that had to be added: `FsReady`, `UserPtTree` (`uptd`),
+`ProcPtOwn` (`proc_pt_wf`/`ud_data`/`ud_pas`), and `!bioslotG Σ` in the
+section context (`park_own` names `bslots`).
+
+### Step B — the contract change — **LANDED, and it is one line**
+
+`SpecForkret.wp_forkret_gen_body`'s residue closer gains `FsReady.fs_ready -∗`
+between the three pure premises and `forkret_yield`. `URes` stays abstract;
+`Rsys` never appears; `FORKRET` still includes `USERTRAP_RES` and is still
+stated at `usertrap_res_bare`. Nothing else in the contract moves.
+
+`SpecForkretParkPaid.forkret_park_pkg`'s closer gains the same argument in the
+same position, so the park can still partially apply it with the two
+allowances.
+
+### Step C — `ProofForkret.v` — **LANDED, four sites**
+
+* `fkr_tail` gains a `FsReady.fs_ready -∗` premise (introduced `#Hfsready`)
+  and passes it at the `iDestruct ("Hyield" …)`;
+* `fkr_boot`'s closer premise gains the argument, and its call into
+  `fkr_tail` hands over `Hfsr` — the one `fs_ready_establish` minted;
+* `wp_forkret`'s steady arm hands over `Hfsready`, destructured out of
+  `first_tok`'s `Hdone` at +0x24;
+* the boot arm needs no change: `fkr_boot` produces what it owes.
+
+`ProofForkret.v` rebuilds green in 2m26s.
+
+### Step D — `ProofForkretPark.v`, restored
+
+Recover with `git show 4bbc418f:iris/ProofForkretPark.v` (222 lines, 5 helper
+lemmas + 1 theorem, 0 admits). It is NOT a Löb argument — the header says so:
+"Nothing here recurses: the NEXT park is inside the trap loop's own theorem".
+The retype, itemised:
+
+* functor over `SpecForkret.FORKRET` (instantiated at `LinkForkret.Forkret`),
+  NOT the deleted `FORKRET_NF`. This makes the park cone carry **no
+  first-related axiom at all**, which the deleted version could not say.
+* delete the `iDestruct (procs_inv_lookup …) as "#Hlk"` line and `"Hlk"` from
+  the `with` string; insert `"Hpinv"` after `"Hpc"`; drop the `s`/`Rlk`
+  explicit arguments; add `Hgl : γs !! j = Some γl` as the second pure
+  argument (it already comes out of `p_sched_at_proc`).
+* drop `pt`, the `eq_refl`, `Hnorm`, `Hptwf`, the `[]` for the lock string
+  and the trailing `done.` (`Hnorm`/`Hptwf` left the park's premises: they are
+  handed to the closer by forkret instead.)
+* rename `Hpr` → `Hkx` and prove `(K_kexec <= av - 6 - trap_res eb')%nat`
+  instead of the `K_prepare_return` one. `6 + trap_res true + K_kexec = 280 <=
+  342 = K_usertrap`, so it follows from `Hut` by `lia` — no new premise. NOTE
+  `trap_res` is a `Definition` (`IntrDefs.v:570`), not a `Notation`: `lia`
+  will not see `trap_res true = 90` on its own. Keep `fkp_trap_res_le` and add
+  an explicit `trap_res true` fact, or `rewrite /trap_res` first.
+* the closer conjunct STAYS in `forkret_park_pkg` (see §2 — the inversion
+  does not type), but its wand now takes `fs_ready`, so the `iAssert` that
+  partially applies it with `Hfd`/`Hirsp` grows three pure binders and one
+  resource binder:
+
+  ```coq
+    iAssert (∀ (h : CpuId) (pt' : uptd) (V' : pprivate),
+               ⌜pv_upt V' = pt'⌝ -∗ ⌜ud_data pt' = ud_pas pt'⌝ -∗
+               ⌜proc_pt_wf pt'⌝ -∗ fs_ready -∗
+               forkret_yield (CID := h) γf (proc_addr j) … -∗
+               FR.usertrap_res_bare (CID := h) pt' …)%I
+      with "[Hclose Hfd Hirsp]" as "Hclose".
+    { iIntros (h pt' V') "%HV %Hnrm %Hwf Hfsr Hy".
+      iApply ("Hclose" with "[%] [%] [%] Hfsr Hy Hfd Hirsp"); done. }
+  ```
+
+UNCHANGED and worth knowing: the 5 helper lemmas (`fkp_img_nth0/1`,
+`fkp_ret_pc`, `fkp_trap_res_le`, `fkp_pstate_split`), the `valid_context`
+unfold, the `p_sched_at_proc` payload read, the `proc_lock_res` reconstruction,
+the register/pc bookkeeping, and **the `eb'` handling** — `eb'` is introduced as
+a variable, never case-split, and passed straight through as forkret's `eb`.
+No value of `eb'` is ever fixed and no enabled base is assumed anywhere.
+
+### Step E — pay at the two call sites, and delete the Axiom
 
 `forkret_park` is invoked in exactly two places, both
-`iMod (FP.forkret_park γs γf (proc_addr j) ks rest pid V Hrest with
-"Hks Hctx Hpriv Hfd Hirsp")`:
+`iMod (FP.forkret_park γs γf (proc_addr j) ks rest pid V Hrest with "Hks Hctx Hpriv Hfd Hirsp")`:
 
-* `ProofUserinit.v:649` -- the first process, at boot.
-* `ProofKforkB5.v:204` -- every process after that.
+* `ProofUserinit.v:671` — the first process. Its comment block already calls
+  itself "STAGE (f)'S DEPOSIT SITE — D1, THE HUMANS' SEAM", and `Hbsl` (the
+  three bslots) is already in scope there.
+* `ProofKforkB5.v:204` — every process after. `Hbslp` is in scope. One caveat:
+  `ut_caps` is persistent but UNPACKED here — its members arrive as separate
+  premises (`#Htext`, `#Hpinv`, `#Hwl`, …), so reassembling the bundle is
+  mechanical but not free.
 
-Both proofs are functors over `FORKRET_PARK`, and `LinkForkretPark.v` is the
-single place the `Axiom` is supplied.  So widening `forkret_park_body` to carry
-`forkret_park_pkg` means paying at exactly those two `iMod`s and nowhere else.
+Widen `SpecForkretPark.forkret_park_body` to carry the package (or switch both
+callers to `FORKRET_PARK_PAID`), pay at those two `iMod`s, and replace
+`LinkForkretPark.v`'s `Axiom` with an application of `ProofForkretPark`.
 
-userinit's site is ALREADY the documented staging point -- its comment block
-reads "STAGE (f)'S DEPOSIT SITE -- D1, THE HUMANS' SEAM", and three rows
-(`Hfirst`, `Hpersist`, `Hfsinit`) are dropped there awaiting the same widening.
-Anything new we deliver joins a queue that already exists.
+Do **userinit first** — it is the harder site (no `fs_ready` yet, which is what
+this whole plan is about) and proves the design.
 
-One caveat for kfork's site: `ut_caps` is persistent but UNPACKED there.  Its
-members arrive as separate premises (`#Htext`, `#Hpinv`, `#Hwl`, ...), so
-reassembling the bundle is mechanical but not free.
+## 4. How to build
 
-## Relationship to `syscall_env`
+    cd /shared/xv6iris-5 && QUIET=1 ./gcp-rocq/run-on-gcp make -k -j 36
 
-They are the same work.  `ProofSyscall.syscall_env` has no producer either, and
-it is owed by exactly this closer.  The good news is that it is entirely
-persistent, so it is on the free list above rather than the owed one.
+Single file (list dependencies ahead of it if they changed):
+
+    QUIET=1 ./gcp-rocq/run-on-gcp bash -lc "cd iris && opam exec --switch=/shared/xv6rocq -- coqc -R . xv6iris -R ../model-xv6iris Riscv -R ../kernel-rocq Kernel -R ../user-rocq User -w -notation-overridden FILE.v"
+
+`opam exec --switch=…` is required — `coqc` is not on the VM's PATH. Local
+`coqc` fails on stale `.vo`. **Rebase before any whole-tree rebuild.**
+
+## 5. Two process lessons from the session that produced this
+
+* **Never regex proof scripts on an unanchored pattern.** A `bslot <ident>` →
+  `bslot` rule silently ate a `rewrite /bslot H3` tactic argument and two
+  comment words. Anchor to the exact form (`bslots bn`, `bslot bn`).
+* **Never compute match offsets on a snapshot you then mutate.** A
+  parameter-dropping script did, and spliced six lemma headers into each other
+  (`Lemma iu_slots` / `Lemma iu_slots_join  bslots a -∗ …`). Re-scan the
+  mutated text each pass. Verify with a structural scan afterwards, not just
+  the build: `Lemma <name>` followed immediately by another `Lemma` line is the
+  signature.
