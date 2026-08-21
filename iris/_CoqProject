@@ -1093,3 +1093,4 @@ WeakEvCapstone.v
 WeakRvwmoConf.v
 WeakRvwmoRestr.v
 WeakRvwmoKill.v
+WeakRvwmoLock.v

@@ -474,13 +474,22 @@ Three stages, each smaller than the last is hard:
   order + rule 5 give `w0 gmo< ACQ_h gmo< w`, contradicting
   `w gmo< w0` — the export kill becomes pure arithmetic ONCE the
   pattern is in hand.
-  B2e-2's DERIVATION CHAIN (worked 2026-08-21): from `lock_pattern G b`
-  (every b-write is an acquire-RMW writing nonzero whose read entry at
-  b names a ZERO value, or writes zero), ATOMICITY makes each
-  acquire's co-PREDECESSOR the zero-write it read (no b-write between
-  source and RMW), so two acquires are never co-adjacent and the CS
-  windows are co-disjoint and totally ordered (`win_excl_of_pattern`;
-  co-order ⊆ gmo via `gwix_gpos_lt`).  The assembled `cs_kill`: given
+  B2e-2's DERIVATION CHAIN (worked 2026-08-21; CORRECTED at the
+  landing — the chain as first recorded was ONE STEP SHORT): from
+  `lock_pattern G b` (every b-write is an acquire-RMW writing nonzero
+  whose read entry at b names a ZERO value, or writes zero),
+  ATOMICITY makes each acquire's co-PREDECESSOR the zero-write it
+  read — but that alone does NOT give window exclusion: the
+  machine-found COUNTEREXAMPLE `ACQ_h · REL_x · ACQ_j · REL_h ·
+  REL_j` (a THIRD hart's release separating overlapping sections) is
+  pattern-legal.  The missing piece is **`lock_paired`** — every
+  release closes a critical section of ITS OWN hart — taken in the
+  SYNTACTIC per-site form (`lock_cs_intro` reduces it to "between my
+  acquire and my release my hart writes b nowhere else", po-local,
+  with same-hart co-order = po-order free from poloc), so B2e-3's
+  obligation is site classification, never the conclusion.  With
+  pairing, `acq_no_overlap`'s strong induction gives the total window
+  order (`win_excl_of_pattern`).  The assembled `cs_kill`: given
   CS-coverage facts (ACQ_h po-before {e, w}; w0 po-before REL_j with
   the release FENCE between — rule 4), the window order gives
   `w0 gmo< REL_j gmo< ACQ_h gmo< w` (last step rule 5), contradicting
