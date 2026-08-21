@@ -589,26 +589,15 @@ Section ProofNamexMain.
     iFrame "Hb Hback".
   Qed.
 
-  (* the two FAMILY accessors -- ProofDirlink's [dl_esc_acc] / [dl_slk_acc]
-     restated locally, since the walk's slots are dirlookup's outputs *)
+  (* the escrow-family accessor, restated locally since the walk's slots are
+     dirlookup's outputs.  The sleeplock family's accessor is
+     [IcacheEscrow.ic_sleeplocks_lookup]. *)
   Lemma nx_esc_acc (cn : ic_names) (gfs : fs_names) (gi : gname)
       (cov : gset Z) (logstart : Z) (k : nat) : (k < NINODE)%nat ->
     (ic_escrows cn gfs gi cov logstart -∗ ic_escrow cn gfs gi cov logstart k
      : iProp Σ).
   Proof.
     iIntros (Hk) "H". rewrite /ic_escrows.
-    assert (Hl : seq 0 NINODE !! k = Some k) by (rewrite lookup_seq; lia).
-    iDestruct (big_sepL_lookup _ _ k k Hl with "H") as "$".
-  Qed.
-
-  Lemma nx_slk_acc (cn : ic_names) (k : nat) : (k < NINODE)%nat ->
-    (ic_sleeplocks cn -∗
-     ∃ gil gisl : gname,
-       is_sleeplock_gen gil gisl (i_lock (ientry k)) "inode"%string
-                        (ic_tok cn k) (slh_tok (icfg_isl k))
-     : iProp Σ).
-  Proof.
-    iIntros (Hk) "H". rewrite /ic_sleeplocks.
     assert (Hl : seq 0 NINODE !! k = Some k) by (rewrite lookup_seq; lia).
     iDestruct (big_sepL_lookup _ _ k k Hl with "H") as "$".
   Qed.
@@ -2675,7 +2664,7 @@ Section ProofNamexMain.
                destruct (Hiregb pinum Hpb') as [Hibc Hibl].
                iDestruct (nx_esc_acc cn gfs gi cov logstart pk Hpk with "Hesc")
                  as "#Hescp".
-               iDestruct (nx_slk_acc cn pk Hpk with "Hslks")
+               iDestruct (ic_sleeplocks_lookup cn pk Hpk with "Hslks")
                  as (gilp gislp) "#Hslkp".
                iDestruct (cpu_own_transport CIDl CIDA3 0%nat eb (proc_addr j) b
                             ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -3065,7 +3054,7 @@ Section ProofNamexMain.
                    destruct (Hiregb iinum Hib') as [Hibc Hibl].
                    iDestruct (nx_esc_acc cn gfs gi cov logstart ik Hik
                                 with "Hesc") as "#Hesck".
-                   iDestruct (nx_slk_acc cn ik Hik with "Hslks")
+                   iDestruct (ic_sleeplocks_lookup cn ik Hik with "Hslks")
                      as (gilk gislk) "#Hslkk".
                    iDestruct (nx_bs3_split bn with "Hbslot")
                      as "[Hbs1 Hbs2]".

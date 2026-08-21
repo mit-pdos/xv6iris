@@ -3,7 +3,7 @@
 
    sys_mkdir is the FIRST syscall-level consumer of the sealed create
    contract, so this is also the first Link file whose cone contains
-   [LinkCreateFreshTy.v]'s [Lemma create_fresh_ty] (an AXIOM until item 7).  Nothing else new
+   [ProofCreateFreshTy.v]'s [Lemma create_fresh_ty].  Nothing else new
    enters: begin_op / argstr / iunlockput / end_op are all already in
    LinkSysChdir.v's cone.
 
@@ -24,11 +24,8 @@
    callee; the [kernel_data] / [panic_env] the contract takes are threaded
    down to the callees' own arms.
 
-   So this cone's assumption count is the five platform axioms plus funext.
-   (It carried [create_fresh_ty] too until item 7 proved the span, and it
-   also used to carry
-   [ProofIput.iput_acquiresleep_order_ADMITTED] in through iunlockput; that
-   axiom is gone -- claude-notes/projects/iput-acquiresleep.md.) *)
+   So this cone's assumption count is the five platform axioms plus
+   funext, and nothing else. *)
 Require Import LinkBeginOp LinkArgstr LinkCreate LinkIunlockput LinkEndOp
         ProofSysMkdir.
 

@@ -5,10 +5,7 @@
    begin_op, iunlockput and end_op by LinkSysChdir.v; namei, ilock, iunlock
    and iput likewise; nameiparent, iupdate and dirlink by LinkCreate.v.  So
    the assumption set is exactly LinkSysChdir.v's -- the standing platform
-   five plus funext -- and NOT [create_fresh_ty]: sys_link allocates no inode
-   and never reaches create.  (iunlockput and iput used to carry
-   [ProofIput.iput_acquiresleep_order_ADMITTED] in; that axiom is gone --
-   claude-notes/projects/iput-acquiresleep.md.)
+   five plus funext.
 
    THE TWO THINGS THE COMPOSITION RESTS ON, both recorded at the point of
    use in SpecSysLink.v's header and machine-checked in SysLinkBudget.v:

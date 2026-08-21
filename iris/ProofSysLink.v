@@ -650,9 +650,9 @@ Module Tails := SysLinkTails Ilock Iupdate Iunlockput EndOp.
 Section ProofSysLinkBody.
   Context `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
 
-  (* the two per-slot projections out of the boot families, at the copies
-     THIS contract names ([ic_escrows] is IcacheEscrow's, [ic_sleeplocks]
-     SpecDirlink's -- see fs-sysfile's sys_chdir trap 3). *)
+  (* the escrow-family projection out of the boot families, at the copy
+     THIS contract names ([ic_escrows] is IcacheEscrow's).  The sleeplock
+     family's projection is [IcacheEscrow.ic_sleeplocks_lookup]. *)
   Lemma sl_esc_acc (cn : ic_names) (gfs : fs_names) (gi : gname)
       (cov : gset Z) (logstart : Z) (k : nat) :
     (k < NINODE)%nat ->
@@ -664,20 +664,7 @@ Section ProofSysLinkBody.
     iDestruct (big_sepL_lookup _ _ k k Hl with "H") as "$".
   Qed.
 
-  Lemma sl_slk_acc (cn : ic_names) (k : nat) :
-    (k < NINODE)%nat ->
-    (ic_sleeplocks cn -∗
-     ∃ gil gisl : gname,
-       is_sleeplock_gen gil gisl (i_lock (ientry k)) "inode"%string
-                        (ic_tok cn k) (slh_tok (icfg_isl k))
-     : iProp Σ).
-  Proof.
-    iIntros (Hk) "H". rewrite /ic_sleeplocks.
-    assert (Hl : seq 0 NINODE !! k = Some k) by (rewrite lookup_seq; lia).
-    iDestruct (big_sepL_lookup _ _ k k Hl with "H") as "$".
-  Qed.
-
-  Lemma sl_bs3 (bn : bio_names) :
+    Lemma sl_bs3 (bn : bio_names) :
     (bslots bn 3 : iProp Σ) ⊣⊢ bslot bn ∗ bslots bn 2.
   Proof. rewrite /bslot. change 3%nat with (1 + 2)%nat. apply bslots_op. Qed.
 
@@ -1308,7 +1295,7 @@ Section ProofSysLinkBody.
           iDestruct "Hshr" as (gsh) "Hshr".
           iDestruct (sl_esc_acc cn gfs gi cov logstart kk Hkk with "Hescrows")
             as "#Hesck".
-          iDestruct (sl_slk_acc cn kk Hkk with "Hslks") as (gil gisl) "#Hslkk".
+          iDestruct (ic_sleeplocks_lookup cn kk Hkk with "Hslks") as (gil gisl) "#Hslkk".
           iDestruct (sl_bs3 bn with "Hbsl") as "[Hbs1 Hbs2]".
           rewrite Hnaip Hipe in HQ3regs.
           assert (HQ3s1 : (Q3 !!! Regidx Rs1 : mword 64) = ientry kk)
@@ -2112,7 +2099,7 @@ Section ProofSysLinkBody.
                    destruct (Hiregb dinum Hdinb) as [Hdiblk Hdiblog].
                    iDestruct (sl_esc_acc cn gfs gi cov logstart kd Hkd
                                 with "Hescrows") as "#Hescd".
-                   iDestruct (sl_slk_acc cn kd Hkd with "Hslks")
+                   iDestruct (ic_sleeplocks_lookup cn kd Hkd with "Hslks")
                      as (gild gisld) "#Hslkd0".
                    iDestruct (sl_bs3 bn with "Hbsl") as "[Hbs1d Hbs2d]".
                    iClear "Hi5c Hi5e Hi60 Hi64 Hi66 Hi6a Hi6c Hi70 Hi74 Hi78

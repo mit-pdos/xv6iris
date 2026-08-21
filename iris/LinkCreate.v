@@ -1,6 +1,6 @@
 (* LinkCreate.v -- the only file where create's proof meets its callees'.
 
-   Eight functor arguments, seven of them real proofs:
+   Seven functor arguments, every one of them a real proof:
 
    - nameiparent arrives through LinkNameiparent.v (namex, and under it
      dirlookup / iget / iput / ilock / iunlock);
@@ -17,10 +17,10 @@
    - dirlink arrives through LinkDirlink.v, whose writei CAN allocate --
      balloc is itself proven (LinkBalloc.v), so nothing new is assumed.
 
-   The eighth is [CreateFreshTy], and since item 7 it is PROVEN like the
-   other seven: [LinkCreateFreshTy.v]'s [Lemma create_fresh_ty], the four-instruction
-   span across create's own [jal ialloc] / [ilock].  Read that file's header
-   and [SpecCreateFreshTy.v]'s before this one -- both retired at item 7.
+   The fresh-type span across create's own [jal ialloc] / [ilock] is NOT a
+   ninth argument: it is a stretch of create's own body rather than a
+   callee, so [ProofCreate] applies [ProofCreateFreshTy.create_fresh_ty]
+   directly.  Read that file's header for what the span is.
 
    panic is NOT a module here.  create's own panics are all inside callees
    (ialloc's no-inodes arm printks rather than panics, which is why the
@@ -28,13 +28,11 @@
    the [kernel_data] / [panic_env] the contract takes are threaded to the
    callees, whose own panic arms are discharged against [Panic].
 
-   So this cone's assumption count is the five platform axioms plus funext,
-   plus the TRANSIENT [iput_acquiresleep_order_ADMITTED] that iput carries
-   in from upstream.  ([create_fresh_ty] was a member until item 7 proved
-   the span -- LinkCreateFreshTy.v.) *)
+   So this cone's assumption count is the five platform axioms plus
+   funext, and nothing else. *)
 Require Import LinkNameiparent LinkIlock LinkIunlockput LinkDirlookup
-        LinkIalloc LinkIupdate LinkDirlink LinkCreateFreshTy
+        LinkIalloc LinkIupdate LinkDirlink
         ProofCreate.
 
 Module Create := CreateProof Nameiparent Ilock Iunlockput Dirlookup
-                             Ialloc Iupdate Dirlink CreateFreshTy.
+                             Ialloc Iupdate Dirlink.

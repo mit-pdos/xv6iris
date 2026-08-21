@@ -666,22 +666,7 @@ Section DlBuf.
     (bslots bn 3 : iProp Σ) ⊣⊢ bslot bn ∗ bslots bn 2.
   Proof. rewrite /bslot. change 3%nat with (1 + 2)%nat. apply bslots_op. Qed.
 
-  (* SpecDirlink's [ic_sleeplocks] is a private copy of SpecFileclose's, so
-     it needs its own accessor rather than that file's. *)
-  Lemma dl_slk_acc (cn : ic_names) (k : nat) :
-    (k < NINODE)%nat ->
-    (ic_sleeplocks cn -∗
-     ∃ γil γisl : gname,
-       is_sleeplock_gen γil γisl (i_lock (ientry k)) "inode"%string
-                        (ic_tok cn k) (slh_tok (icfg_isl k))
-     : iProp Σ).
-  Proof.
-    iIntros (Hk) "H". rewrite /ic_sleeplocks.
-    assert (Hl : seq 0 NINODE !! k = Some k) by (rewrite lookup_seq; lia).
-    iDestruct (big_sepL_lookup _ _ k k Hl with "H") as "$".
-  Qed.
-
-  Lemma dl_esc_acc (cn : ic_names) (γfs : fs_names) (γi : gname)
+    Lemma dl_esc_acc (cn : ic_names) (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (k : nat) :
     (k < NINODE)%nat ->
     (ic_escrows cn γfs γi cov logstart -∗ ic_escrow cn γfs γi cov logstart k
@@ -1866,7 +1851,7 @@ Section ProofDirlinkMain.
                   Hinb) as [Hcblk Hcblog].
       iDestruct (dl_esc_acc cn gfs gi cov logstart kslot Hkslot with "Hesc")
         as "#Hesck".
-      iDestruct (dl_slk_acc cn kslot Hkslot with "Hslks") as (gil gisl) "#Hslk".
+      iDestruct (ic_sleeplocks_lookup cn kslot Hkslot with "Hslks") as (gil gisl) "#Hslk".
       iDestruct (dl_bs3 bn with "[Hbs1 Hbs2]") as "Hbsl";
         [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
       iDestruct (cpu_own_transport CIDdl CID14 0%nat eb (proc_addr j) b

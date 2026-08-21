@@ -42,7 +42,7 @@
     §7.1.6's death certificate stands verbatim: the licence is BORROWED at
     the iget and RETURNED before the call ends, so [iput] holds none, and
     "the reference that outlives its licence" (§20.7) is untouched.
-    [create_fresh_ty] stands.  This increment retires §20.17.5's PARAGRAPH,
+    The fresh-type span stands (see [ProofCreateFreshTy.v]).  This increment retires §20.17.5's PARAGRAPH,
     not §20.7's WALL.                                                      *)
 
 From Stdlib Require Import ZArith Lia List.
@@ -374,7 +374,7 @@ Section IgetLic.
   (*  THE READINGS, AND THE SHAPE THEY MUST TAKE                          *)
   (* ------------------------------------------------------------------ *)
 
-  (*  STANDING CONSTRAINT (§7.1.4, the [LinkCreateFreshTy.v] header's test).
+  (*  STANDING CONSTRAINT (§7.1.4, the [ProofCreateFreshTy.v] header's test).
       Every reading below is an ACCESSOR OVER [ireg_inv], in
       [IregLinkNz.ireg_link_nz]'s shape: it opens the region, reads the
       ledger's own clauses at the slot the caller's [dinode_at] names, and

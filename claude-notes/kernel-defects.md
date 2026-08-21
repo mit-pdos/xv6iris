@@ -393,24 +393,16 @@ ireclaim recovers.  Same begin_op/end_op, same MAXOPBLOCKS budget.
 
 WHAT IT BUYS: fixes this leak; makes "allocatable(inum) => no in-core
 iref" TRUE and preservable (today false of the running kernel); demarks
-incarnation boundaries in machine state.  Kills the create_fresh_ty
-residue's CASE 1 (the pre-existing / stale-reference leg, fs-icache
-§17.6.1).
+incarnation boundaries in machine state.
 
-WHAT IT DOES NOT BUY: it does NOT retire create_fresh_ty.  The axiom's
-load-bearing attacker is CASE 2 -- a FRESH iget of the claimed inum
-inside ialloc's own brelse->iget window -- which lives inside ialloc,
-not iput.  The claim slot c and refcount r are decoupled ledger
-components (IcacheRef.v:290-296,731-734); an outstanding iclaim carries
-r=0 by definition, so a free reasoning through r never meets a c.  The
-reorder relocates the wall from Case 1 to Case 2; only K-F2 (currency
-into ialloc's window) or weakening SpecCreate reach Case 2.  After
-C'-lite + boot-shelter + this reorder, the SOLE surviving model-
-admissible attacker on the claim box is the fresh iget at the SpanL /
-currency-gap site = exactly K-F2's territory.  GO as a kernel fix;
-NO-GO as an axiom retirement.  Proof cost if taken: ProofIput cone
+IT IS NOT WEIGHED AS AN AXIOM RETIREMENT.  `create_fresh_ty` is proven
+(`iris/ProofCreateFreshTy.v`), off the TYPED claim rather than off any
+argument about iput's free, so nothing in this defect's ledger turns on
+it: the claim slot `c` and the refcount `r` are decoupled components
+(`IcacheRef.v`), and an outstanding `iclaim` carries `r=0` by
+definition, so a free reasoning through `r` never meets a `c`.  GO as a
+kernel fix, on its own merits.  Proof cost if taken: ProofIput cone
 re-walk (the free fires post-ref--, REF-1 derivations move before it),
 a new type=0 => iref-empty coupling in InodeRegion/IcacheRef, SpecItrunc
-re-spec to disk-addr form; SpecIalloc/SpecIget/SpecCreate DO NOT move
-(which is exactly why the axiom is untouched).  Pin bump + re-dump
-(post-sys_link addresses relayout).
+re-spec to disk-addr form; SpecIalloc/SpecIget/SpecCreate DO NOT move.
+Pin bump + re-dump (post-sys_link addresses relayout).

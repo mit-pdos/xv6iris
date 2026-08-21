@@ -1,15 +1,5 @@
-(* LinkCreateFreshTy.v -- create's FRESH-TYPE SPAN, PROVEN.
+(* ProofCreateFreshTy.v -- create's FRESH-TYPE SPAN.
    ==================================================================
-
-   THE FILE THAT USED TO HOLD THE AXIOM NOW HOLDS THE THEOREM.  Until
-   item 7 this file said
-
-       Axiom create_fresh_ty : ... create_fresh_ty_body ...
-
-   and [SpecCreateFreshTy.v] carried the statement together with a long
-   argument for why the statement could not be derived.  Both are retired
-   here: the statement moved in (VERBATIM, so [ProofCreate] splices to it
-   unchanged) and the [Axiom] became a [Lemma] with a [Qed].
 
    WHAT THE STATEMENT IS.  A SPAN, not a fact: the four instructions
    create+0xa4 .. +0xb0
@@ -25,12 +15,11 @@
    [di_type dn = ty] on the first.  It has to be a span and not a fact
    because [ty] is a MACHINE WORD -- the halfword in s4 -- and a bare
    entailment over free [ty] and [dn] is INCONSISTENT (two instantiations
-   at different types derive False).  That argument is unchanged; what
-   changed is that the span is now DERIVED rather than assumed.
+   at different types derive False).
 
-   WHAT RETIRED IT (iclaim-ledger.md item 7, RULING C-prime).
-   fs-icache.md 20.7 asked for "a carrier for: no free-and-reclaim since my
-   claim".  The c column IS that carrier, once it is TYPED:
+   WHERE THE TYPE EQUATION COMES FROM.  fs-icache.md 20.7 asks for "a
+   carrier for: no free-and-reclaim since my claim".  The c column IS that
+   carrier, once it is TYPED:
 
      * [IcacheRef.iclaim z ty] is minted by [InodeRegion.ireg_claim_au] at
        the type ialloc wrote, and the region's claim pin says a claimed
@@ -48,16 +37,18 @@
    [filled = true /\ di_type dn = ty] as a THEOREM, and this span is that
    theorem plus four instructions of register bookkeeping.
 
-   IT STILL HIDES NEITHER CALLEE.  [wp_ialloc_gen] and [wp_ilock_sconf] are
-   HYPOTHESES of the lemma, supplied by [ProofCreate] out of its own
+   IT HIDES NEITHER CALLEE.  [wp_ialloc_gen] and [wp_ilock_sconf] are
+   HYPOTHESES of [create_fresh_ty], supplied by [ProofCreate] out of its own
    [IA]/[IL] functor arguments, so a wrong ialloc or a wrong ilock is not
-   covered -- exactly as when this was an axiom.
+   covered.
 
-   THE MODULE SEAL STAYS.  [ProofCreate] takes [CFT : CREATE_FRESH_TY] as a
-   functor argument and [LinkCreate] instantiates it with the module below;
-   sealing a module does not hide a proof from [Print Assumptions], so the
-   create cone's audit now reports the standing platform axioms alone where
-   it used to report [create_fresh_ty]. *)
+   IT IS A PROOF FILE, NOT A LINK FILE.  The span is a stretch of create's
+   OWN body, not a callee, so it is neither a module type nor a functor
+   argument of [CreateProof]: [ProofCreate] requires this file and applies
+   [create_fresh_ty] directly (design/spec-modules.md's shape is for
+   callees).  Statement and proof sit in their own file only to keep
+   [ProofCreate.v] from carrying another 600 lines; [create_fresh_ty_body]
+   is therefore stated here and spliced from there VERBATIM. *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -307,27 +298,6 @@ Definition create_fresh_ty_body
   WP (Loop : expr riscv_lang).
 
 
-Module Type CREATE_FRESH_TY.
-  Parameter create_fresh_ty :
-    forall `{!riscvGS Σ, !xv6G Σ, !fdslotG Σ,
-             ICFG : icfg, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γs : list gname) (j : nat) (γl : gname)
-      (γu : uart_names) (γd : disk_names) (γk : gname)
-      (pd pav pu : mword 64)
-      (bn : bio_names)
-      (γ : log_names) (γfs : fs_names) (γi : gname)
-      (cn : ic_names) (gtl : gname) (γpr : gname)
-      (cov : gset Z) (logstart inodestart : Z) (ninodes : Z) (nib : nat)
-      (dev : mword 32) (ty : mword 16)
-      (kd : nat) (dqp : dfrac)
-      (u : nat) (Sb : gset Z)
-      (pidv : mword 32) (dq dqs dqn : dfrac)
-      (Ma : regfile) (K : nat) (eb : bool)
-      (b : bool) (lks : gset string) (Vpr : pprivate),
-      create_fresh_ty_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr
-                           cov logstart inodestart ninodes nib dev ty kd dqp
-                           u Sb pidv dq dqs dqn Ma K eb b lks Vpr.
-End CREATE_FRESH_TY.
 
 (* ===================================================================== *)
 (*  THE PROOF                                                            *)
@@ -360,22 +330,8 @@ Section CftHelpers.
             ICFG : icfg, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId}.
 
-  (* the two family accessors and the slot split, restated here so that this
-     file depends on no [Proof*] (ProofCreate's [cr_slk_acc] / [cr_esc_acc] /
-     [cr_bs3] are the same four lines, and ProofCreate requires THIS file). *)
-  Lemma cft_slk_acc (cn : ic_names) (k : nat) :
-    (k < NINODE)%nat ->
-    (ic_sleeplocks cn -∗
-     ∃ γil γisl : gname,
-       is_sleeplock_gen γil γisl (i_lock (ientry k)) "inode"%string
-                        (ic_tok cn k) (slh_tok (icfg_isl k))
-     : iProp Σ).
-  Proof.
-    iIntros (Hk) "H". rewrite /ic_sleeplocks.
-    assert (Hl : seq 0 NINODE !! k = Some k) by (rewrite lookup_seq; lia).
-    iDestruct (big_sepL_lookup _ _ k k Hl with "H") as "$".
-  Qed.
-
+  (* the escrow-family accessor and the slot split.  The sleeplock family's
+     accessor is [IcacheEscrow.ic_sleeplocks_lookup], beside the definition. *)
   Lemma cft_esc_acc (cn : ic_names) (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (k : nat) :
     (k < NINODE)%nat ->
@@ -392,19 +348,7 @@ Section CftHelpers.
   Proof. rewrite /bslot. change 3%nat with (1 + 2)%nat. apply bslots_op. Qed.
 End CftHelpers.
 
-(* the span's register contract, assembled from the two callees' own
-   [callee_saved] facts and the one [c.mv s3,a0] between them *)
-Lemma cft_cs_but_s3_step (Ma Mi Mo : regfile) :
-  callee_saved Ma Mi ->
-  (forall c : mword 5, is_cs_idx c = true ->
-     c <> (mword_of_int 19 : mword 5) -> Mo !!! Regidx c = (Mi !!! Regidx c : mword 64)) ->
-  cr_cs_but_s3 Ma Mo.
-Proof.
-  intros Hcs Hstep c Hc Hne.
-  rewrite (Hstep c Hc Hne). exact (callee_saved_lookup Hcs c Hc).
-Qed.
-
-Module CreateFreshTy : CREATE_FRESH_TY.
+Section CreateFreshTySpan.
 
 
 Notation Rra := (mword_of_int 1 : mword 5).
@@ -602,12 +546,12 @@ Proof.
                     = mword_of_int (CK + 0xb4)) by (rewrite HB1ra; pcw).
     iDestruct (cft_esc_acc cn γfs γi cov logstart kslot Hkslt with "Hesc")
       as "#Hescc".
-    iDestruct (cft_slk_acc cn kslot Hkslt with "Hslks") as (gilc gislc) "#Hslkc".
+    iDestruct (ic_sleeplocks_lookup cn kslot Hkslt with "Hslks") as (gilc gislc) "#Hslkc".
     (* THE RECEIPT UNPACKS IN ONE STEP (SIMP-2), and what comes out beside
        the reference IS the licence ilock's claim arm asks for:
        [InodeRegion.inode_claimed_to_ClaimK] is exactly
-       [ireg_wd_lic (ClaimK ty)], so the pair that used to be assembled by
-       hand at the call below is handed over as it stands.  ([ireg_wd_lic]'s
+       [ireg_wd_lic (ClaimK ty)], so the pair the call below wants is
+       handed over as it stands.  ([ireg_wd_lic]'s
        ClaimK arm does not mention its gname, so the [γi] here is any gname
        in scope and the [gsh] the call wants is convertible with it.) *)
     iDestruct (inode_claimed_to_ClaimK ty kslot q dev inum γi with "Hpkg")
@@ -704,4 +648,4 @@ Proof.
     iSplitL "Hisl"; [iExact "Hisl" | iExact "Hop"].
 Qed.
 
-End CreateFreshTy.
+End CreateFreshTySpan.

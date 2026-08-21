@@ -1213,17 +1213,15 @@ Section IcacheBootTable.
      caller nothing.
 
      THIS IS THE LOWEST FILE THAT CAN STATE IT (it needs [SleepLock] and
-     [IcacheEscrow.ic_tok], and it is where the family is produced), and
-     it is stated here so that no further contract has to write a fifth
-     copy.  [ic_sleeplocks] and [ic_sleeplocks]
-     are two earlier, character-identical copies, each with its own
-     consumers that [rewrite /] the QUALIFIED name
-     ([ProofDirlink.dl_slk_acc], [ProofNamex.nx_slk_acc],
-     [ic_sleeplocks_acc]); retiring them is a four-line
-     alias change that costs a recompile of ProofDirlink / ProofNamex /
-     ProofFileclose / ProofKexit, and is deliberately NOT bundled with
-     this stage.  New contracts (fs-namei N5's ireclaim and fsinit) name
-     THIS one. *)
+     [IcacheEscrow.ic_tok], and it is where the family is produced).
+
+     THERE IS A SECOND, CHARACTER-IDENTICAL [IcacheEscrow.ic_sleeplocks],
+     with its own accessor [IcacheEscrow.ic_sleeplocks_lookup], and a file
+     that requires both gets whichever it imported last.  Every other copy
+     is retired; these two are not, because merging them means agreeing on
+     ONE home and re-pointing this file's four consumers (ProofFileread /
+     ProofFilestat / ProofFilewrite / ProofIreclaim, all through
+     [ic_sleeplocks_acc]).  Do not add a third. *)
   Definition ic_sleeplocks (cn : ic_names) : iProp Σ :=
     ([∗ list] kk ∈ seq 0 NINODE,
        ∃ γil γisl : gname,

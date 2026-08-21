@@ -1250,7 +1250,7 @@ SpecCreate.v
 CreateBudget.v
 ProofCreateParts.v
 ProofCreate.v
-LinkCreateFreshTy.v
+ProofCreateFreshTy.v
 LinkCreate.v
 ProofSysFstat.v
 ProofSysRead.v

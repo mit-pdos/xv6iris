@@ -1397,7 +1397,7 @@ Section ProofFileclose.
              a closer cannot name the slot in its contract, so it takes
              every slot's and picks the one the reference names *)
           iDestruct (ic_escrows_acc _ _ _ _ _ kk Hkk with "Hescrows") as "#Hescrow".
-          iDestruct (ic_sleeplocks_acc _ kk Hkk with "Hslks") as (gil gisl) "#Hslk".
+          iDestruct (ic_sleeplocks_lookup _ kk Hkk with "Hslks") as (gil gisl) "#Hslk".
           destruct (Hinumgeo inum Hinumb) as [Hiblk Hiblog].
           (* NO [subst b] HERE.  [Houtb] does read [b = eb] at [noff = 0], but
              the arm is proved at the generic index: [cpu_own]'s slot stays

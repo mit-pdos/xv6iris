@@ -1017,7 +1017,7 @@ Section KexecABody.
       by (rewrite Hnib; exact Hib).
     destruct (Hiregb inum Hib') as [Hibc Hibl].
     iDestruct (T.kxa_esc_acc cn gfs gi cov logstart k Hk with "Hesc") as "#Hesck".
-    iDestruct (T.kxa_slk_acc cn k Hk with "Hslks") as (gilk gislk) "#Hslkk".
+    iDestruct (ic_sleeplocks_lookup cn k Hk with "Hslks") as (gilk gislk) "#Hslkk".
     iDestruct (T.kxa_bs3_split bn with "Hbs") as "[Hbs1 Hbs2]".
     (* ---- open the process for the pid quarter ---- *)
     (* the BLOCK and the cwd reference: [p->cwd] is one of the block's own

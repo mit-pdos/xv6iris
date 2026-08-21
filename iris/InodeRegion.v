@@ -3863,8 +3863,8 @@ Section InodeRegion.
      first two both hand the caller an [ic_loaded] / a pool bundle built
      around a [dinode_at], so this lemma kills them and the claimant's fill
      is FORCED.  That is exactly the "no free-and-reclaim since my claim"
-     carrier fs-icache.md §20.7 asked for -- supplied by the c column, which
-     is why it retires [create_fresh_ty]. *)
+     carrier fs-icache.md §20.7 asked for -- supplied by the c column, and
+     it is what sources [create_fresh_ty]'s type equation. *)
   Lemma ireg_claim_no_out (E : coPset) (γi : gname) (γfs : fs_names)
       (inodestart : Z) (nib : nat) (inum : bv 32) (dn : dinode)
       (ty : bv 16) :

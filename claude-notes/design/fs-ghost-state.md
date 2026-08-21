@@ -6,8 +6,8 @@ fs predicate) on top of SIMP-1 (regime specialization, the BufL block-tie
 fold, the dead-weight sweep) on top of the pushed FINAL-GATE tree
 `bc96776a`.  Whole tree green at fixpoint, staleness 0.  The iclaim-ledger
 campaign is COMPLETE: the reordered `iput` (kernel pin 4398009) is proven
-end-to-end, and `create_fresh_ty` is a THEOREM (`LinkCreateFreshTy.v:443`;
-`SpecCreateFreshTy.v` is deleted).  Nothing here is in flight; the three
+end-to-end, and `create_fresh_ty` is a THEOREM
+(`iris/ProofCreateFreshTy.v`).  Nothing here is in flight; the three
 syscall tops rest on the five Sail platform axioms + funext alone.
 
 WHAT SIMP-2 CHANGED, in one line each — the two halves interact at

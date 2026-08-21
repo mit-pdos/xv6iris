@@ -27,7 +27,7 @@
    [KexecTailProof]; phase A opens it as [T] and phase B as [A], and each names
    the same seven modules it named before.  [kxc_bad64] drags in with it
    [kxc_exit_m1] (the [-1] return it ends on) and the three single-slot icache
-   accessors [kxa_esc_acc] / [kxa_slk_acc] / [kxa_bs3_split] / [kxa_bs3_join]
+   accessors [kxa_esc_acc] / [kxa_bs3_split] / [kxa_bs3_join]
    that it and phase A's body share -- those are the only other residents of
    the functor part, and phase A reaches them as [T.kxa_*] now.
 
@@ -1010,9 +1010,9 @@ Section KexecAExit.
   Local Ltac nz := vm_compute; discriminate.
 
   (* =================================================================== *)
-  (*  The three single-slot accessors out of the icache's persistent        *)
-  (*  families -- ProofNamex's [nx_esc_acc] / [nx_slk_acc] / [nx_bs3_split] *)
-  (*  restated (they are [Local]-scoped to a whole-function proof file).    *)
+  (*  The single-slot accessors out of the icache's persistent families    *)
+  (*  that are not already shared -- the sleeplock family's is             *)
+  (*  [IcacheEscrow.ic_sleeplocks_lookup].                                 *)
   (* =================================================================== *)
   Lemma kxa_esc_acc (cn : ic_names) (gfs : fs_names) (gi : gname)
       (cov : gset Z) (logstart : Z) (k : nat) : (k < NINODE)%nat ->
@@ -1020,17 +1020,6 @@ Section KexecAExit.
      : iProp Σ).
   Proof.
     iIntros (Hk) "H". rewrite /ic_escrows.
-    assert (Hl : seq 0 NINODE !! k = Some k) by (rewrite lookup_seq; lia).
-    iDestruct (big_sepL_lookup _ _ k k Hl with "H") as "$".
-  Qed.
-
-  Lemma kxa_slk_acc (cn : ic_names) (k : nat) : (k < NINODE)%nat ->
-    (ic_sleeplocks cn -∗
-     ∃ gil gisl : gname,
-       is_sleeplock_gen gil gisl (i_lock (ientry k)) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k))
-     : iProp Σ).
-  Proof.
-    iIntros (Hk) "H". rewrite /ic_sleeplocks.
     assert (Hl : seq 0 NINODE !! k = Some k) by (rewrite lookup_seq; lia).
     iDestruct (big_sepL_lookup _ _ k k Hl with "H") as "$".
   Qed.

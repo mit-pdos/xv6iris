@@ -27,14 +27,13 @@
 
    [cr_alloc_half] is the OTHER half, and it discharges [cr_alloc_body]:
    the eighth save at +0xa2, the fresh-type gate span (+0xa4..+0xb0,
-   [LinkCreateFreshTy]), ARM A-FAIL (+0xec), the three metadata [sh]s, the
+   [ProofCreateFreshTy]), ARM A-FAIL (+0xec), the three metadata [sh]s, the
    LINK MINT at +0xc4 ([SpecIupdate.wp_iupdate_link]), the T_DIR branch at
    +0xca, the [dirlink(dp,name)] at +0xd8 and ARM C-OK-FILE (+0xe0..+0xea).
    Two of its branches leave through a PREMISE of their own -- the whole
    T_DIR sub-branch through [cr_mkdir_body] and the failing [dirlink]
    through [cr_fail_body] -- so its [Print Assumptions] is the standing six
-   and nothing else (it was the standing six PLUS [create_fresh_ty] until
-   item 7 proved the span).  Its conclusion is
+   and nothing else.  Its conclusion is
    [wp_next]-wrapped for the reason stated at the lemma: the parked bodies
    and the contract's own continuation are anchored at the SECTION hart,
    and the allocate half runs at whatever hart the +0x4c [c.beqz] rebound
@@ -142,17 +141,14 @@ Require Import SpecIlock SpecIunlockput.
 Require Import SpecDirlookup SpecDirlink.
 Require Import SpecNamex SpecNameiparent.
 Require Import SpecCreate.
-(* THE EIGHTH CALLEE, AND IT IS NO LONGER ASSUMED (iclaim-ledger.md item
-   7): the four-instruction span +0xa4..+0xb0 that pins [di_type dn = ty]
-   across [ialloc]/[ilock].  Still taken as a FUNCTOR ARGUMENT beside the
-   seven real callees -- this file names no [Axiom] and no [Lemma] of the
-   span, exactly as before -- but what [LinkCreate] instantiates the functor
-   with is now a PROVEN module ([LinkCreateFreshTy.CreateFreshTy]), so
-   [Print Assumptions] on the create cone reports the platform axioms alone.
-   [SpecCreateFreshTy.v] is DELETED; the statement ([create_fresh_ty_body],
-   byte-identical) and the span's register contract ([cr_cs_but_s3]) live in
-   [LinkCreateFreshTy.v] beside the proof. *)
-Require Import LinkCreateFreshTy.
+(* THE FRESH-TYPE SPAN: the four instructions +0xa4..+0xb0 that pin
+   [di_type dn = ty] across [ialloc]/[ilock].  It is a stretch of create's
+   OWN body rather than a callee, so it is NOT a functor argument -- the
+   statement ([create_fresh_ty_body], spliced verbatim below), the span's
+   register contract ([cr_cs_but_s3]) and the proof all live in
+   [ProofCreateFreshTy.v], and this file applies [create_fresh_ty] directly,
+   handing it [IA]/[IL] for its two callee hypotheses. *)
+Require Import ProofCreateFreshTy.
 Require Import CodeCreate.
 Require Import ProofDirlookupParts ProofNamexParts ProofCreateParts.
 From Kernel Require KernelSyms.
@@ -182,7 +178,7 @@ Set Printing Depth 40.
 
 Module CreateProof (NP : NAMEIPARENT) (IL : ILOCK) (IUP : IUNLOCKPUT)
                    (DL : DIRLOOKUP) (IA : IALLOC) (IU : IUPDATE)
-                   (DLK : DIRLINK) (CFT : CREATE_FRESH_TY) : CREATE.
+                   (DLK : DIRLINK) : CREATE.
 
 Notation CK := KernelSyms.create (only parsing).
 Notation Rra := (mword_of_int 1 : mword 5).
@@ -340,7 +336,7 @@ Proof. intros (H2 & _ & _ & _ & _ & _ & _ & Hthr). split; assumption. Qed.
 
    Two lemmas bracket the s3 epoch and nothing else needs to know about it:
    [cr_regs3_of_span] is the ENTRY (the span's own register contract is
-   [LinkCreateFreshTy.cr_cs_but_s3], i.e. "callee-saved everywhere but s3",
+   [ProofCreateFreshTy.cr_cs_but_s3], i.e. "callee-saved everywhere but s3",
    and the [c.mv] gives its value), and [cr_tregs_of_regs3] is the EXIT
    (the reload restores [m]'s own s3, which is exactly what [cr_thr] was
    missing).  The three propagation lemmas beside them mirror
@@ -844,7 +840,7 @@ Qed.
 
    NO NEW GATE.  The contract's premise at [Some tt] is the flushed
    record's TYPE, and create has it from the fresh-type fact it already
-   carries ([di_type dnc = ty], LinkCreateFreshTy's PROVEN span) -- the same
+   carries ([di_type dnc = ty], ProofCreateFreshTy's span) -- the same
    fact ARM C-OK-DIR's existing [Htyc] is. *)
 (* TAGGED SINCE V5' INCREMENT P.  The child's mint at +0xc4 now carries the
    PARENT's inum: [Some (Some dpv)] pays out [IcacheRef.ilinkdp ip dpv] --
@@ -1501,20 +1497,9 @@ Section ProofCreateMain.
       case_decide as Hd; [lia | iExact "H"].
   Qed.
 
-  (* the two family accessors, at create's own persistent bundles *)
-  Lemma cr_slk_acc (cn : ic_names) (k : nat) :
-    (k < NINODE)%nat ->
-    (ic_sleeplocks cn -∗
-     ∃ γil γisl : gname,
-       is_sleeplock_gen γil γisl (i_lock (ientry k)) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k))
-     : iProp Σ).
-  Proof.
-    iIntros (Hk) "H". rewrite /ic_sleeplocks.
-    assert (Hl : seq 0 NINODE !! k = Some k) by (rewrite lookup_seq; lia).
-    iDestruct (big_sepL_lookup _ _ k k Hl with "H") as "$".
-  Qed.
-
-  Lemma cr_esc_acc (cn : ic_names) (γfs : fs_names) (γi : gname)
+  (* the escrow-family accessor, at create's own persistent bundles.  The
+     sleeplock family's is [IcacheEscrow.ic_sleeplocks_lookup]. *)
+    Lemma cr_esc_acc (cn : ic_names) (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (k : nat) :
     (k < NINODE)%nat ->
     (ic_escrows cn γfs γi cov logstart -∗ ic_escrow cn γfs γi cov logstart k
@@ -2878,7 +2863,7 @@ Section ProofCreateMain.
       iEval (rewrite cr_shed_gen) in "Href".
       iDestruct "Href" as "[Hkeep Hshr]".
       iDestruct (cr_esc_acc cn γfs γi cov logstart kd Hkd with "Hesc") as "#Hescd".
-      iDestruct (cr_slk_acc cn kd Hkd with "Hslks") as (gild gisld) "#Hslkd".
+      iDestruct (ic_sleeplocks_lookup cn kd Hkd with "Hslks") as (gild gisld) "#Hslkd".
       iDestruct (cr_bs3 bn with "Hbsl") as "[Hbs1 Hbs2]".
       iDestruct (proc_priv_bare_acc γf (proc_addr j) pidv V with "Hpriv")
         as "[Hppid Hppback]".
@@ -3552,7 +3537,7 @@ Section ProofCreateMain.
           iDestruct (inode_ref_short_shr_gen_agree with "Hckeep Hcshr") as %->.
           iDestruct (cr_esc_acc cn γfs γi cov logstart kslot Hkslot with "Hesc")
             as "#Hescc".
-          iDestruct (cr_slk_acc cn kslot Hkslot with "Hslks")
+          iDestruct (ic_sleeplocks_lookup cn kslot Hkslot with "Hslks")
             as (gilc gislc) "#Hslkc".
           iDestruct (cr_bs3 bn with "Hbsl") as "[Hbs1 Hbs2]".
           iDestruct (cpu_own_transport CIDu1 CID29 0%nat eb (proc_addr j) b
@@ -4555,8 +4540,7 @@ Section ProofCreateMain.
   (*  MINT at +0xc4, the T_DIR branch and ARM C-OK-FILE.  Two branches     *)
   (*  leave through a PREMISE -- the T_DIR sub-branch through              *)
   (*  [cr_mkdir_body] and the failing [dirlink] through [cr_fail_body] --  *)
-  (*  so [Print Assumptions] sees the standing six and nothing else       *)
-  (*  ([create_fresh_ty] was the seventh until item 7 proved the span).    *)
+  (*  so [Print Assumptions] sees the standing six and nothing else.      *)
   (*                                                                      *)
   (*  THE LEDGER, in one place: the walk enters at [n1 >= 9], the gate     *)
   (*  spends ialloc's ONE unit (so it runs at [u := q1] where              *)
@@ -4735,7 +4719,7 @@ Section ProofCreateMain.
     iDestruct (cpu_own_transport CIDa CIDA1 0%nat eb (proc_addr j) b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
     (* ===== +0xa4 .. +0xb0 : THE FRESH-TYPE GATE SPAN ================= *)
-    iApply (CFT.create_fresh_ty γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
+    iApply (create_fresh_ty γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
               γpr cov logstart inodestart ninodes nib dev ty kd (DfracOwn (1/2))
               q1 Sb1 pidv (DfracOwn (1/4)) dqs dqn Ma (K - 10)%nat eb b lks V
               ltac:(exact HKia) ltac:(exact HKil) Hlg Hist0 Hiregb Hni1 Hni2

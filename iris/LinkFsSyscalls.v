@@ -10,8 +10,7 @@
 
      Print Assumptions FsMkdir.wp_sys_mkdir_friendly.
        -> the five platform axioms + funext (LinkSysMkdir.v's own set,
-          unchanged; it carried [create_fresh_ty] as well until item 7
-          proved the span -- iclaim-ledger.md)
+          unchanged)
      Print Assumptions FsChdir.wp_sys_chdir_friendly.
        -> the five platform axioms + funext (LinkSysChdir.v's set, unchanged)
 

@@ -383,12 +383,12 @@ Definition frz_reg (ph : frz) : option bool :=
    With [linkElemUR0] an atom the same chains are ~1s. *)
 (* ---- THE TYPED CLAIM COLUMN (iclaim-ledger.md §5.2(a), item 7b) -------
 
-   The c column carried [excl unit] -- "this box is claimed" and nothing
-   more, so the fill could not learn WHICH type [ialloc] claimed and
-   [create_fresh_ty]'s [di_type dnc = ty] had no source.  It now carries the
-   claimed TYPE.  Spelled as a NAMED atom for the f column's reason (the
-   comment above [frzR]): a raw [optionUR (exclR (leibnizO (bv 16)))] inside
-   the nest makes [apply prod_local_update']'s unification diverge. *)
+   The c column carries the claimed TYPE, not a bare "this box is claimed":
+   the fill has to learn WHICH type [ialloc] claimed, since that is the
+   source of [create_fresh_ty]'s [di_type dnc = ty].  Spelled as a NAMED
+   atom for the f column's reason (the comment above [frzR]): a raw
+   [optionUR (exclR (leibnizO (bv 16)))] inside the nest makes [apply
+   prod_local_update']'s unification diverge. *)
 
 
 

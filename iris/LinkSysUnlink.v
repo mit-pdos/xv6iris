@@ -14,9 +14,7 @@
    argstr, begin_op, iunlockput and end_op by LinkSysChdir.v; ilock and
    nameiparent likewise; namecmp, dirlookup, readi, writei, memset and
    iupdate by LinkCreate.v and LinkSysOpen.v.  So the assumption set is the
-   standing platform five plus [functional_extensionality_dep], and NOT
-   [create_fresh_ty]: sys_unlink allocates no inode and never reaches
-   create.
+   standing platform five plus [functional_extensionality_dep].
 
    WHAT THE COMPOSITION RESTS ON, recorded at the point of use in
    SpecSysUnlink.v's header and machine-checked in SysUnlinkBudget.v:

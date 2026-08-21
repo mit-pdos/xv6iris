@@ -140,9 +140,9 @@
    cr_made_setf]'s [create_made] identity and for [dirlink(ip,".")]'s
    "the append fits" premise, neither of which [InodeLock.inode_ok]'s
    loose size cap can give -- and [fresh_shape] is exactly those two facts.
-   That leaves [di_type dn = ty] as the ONLY underivable half of create's
-   fresh-record obligation, which is what [LinkCreateFreshTy.v] used to
-   ASSUME and now PROVES, off the [ClaimK] index below and nothing more.
+   That leaves [di_type dn = ty] as the half of create's fresh-record
+   obligation that [ProofCreateFreshTy.v] proves off the [ClaimK] index
+   below and nothing more.
    Every other caller ignores the pair.
 
    ilock SLEEPS (acquiresleep, and bread inside the uncached arm), so it
@@ -289,8 +289,8 @@ Definition wp_ilock_sconf_body
                     reference carries, the withdraw CONVERTS the pair into
                     the plain unit, and the post below pins BOTH
                     [filled = true] and [di_type dn = ty] -- which is
-                    exactly [LinkCreateFreshTy]'s span conjunct, now
-                    proven.  The other two shapes the entry could be in
+                    exactly [ProofCreateFreshTy]'s span conjunct.  The
+                    other two shapes the entry could be in
                     (cached, or a pool bundle) are refuted by
                     [InodeRegion.ireg_claim_no_out]: a claimed inum's record
                     is INSIDE the region, so nobody holds its [dinode_at].

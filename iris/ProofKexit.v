@@ -1625,7 +1625,7 @@ Section KexitRest.
     iDestruct (cwd_ref_held (pv_cwd V) with "Href") as "Href".
     iDestruct "Href" as (kk qq inum) "(%Hipe & %Hkk & %Hinumb & Href & Hru)".
     iDestruct (ic_escrows_acc _ _ _ _ _ kk Hkk with "Hescrows") as "#Hescrow".
-    iDestruct (ic_sleeplocks_acc _ kk Hkk with "Hslks") as (gil gisl) "#Hslk".
+    iDestruct (ic_sleeplocks_lookup _ kk Hkk with "Hslks") as (gil gisl) "#Hslk".
     iEval (rewrite -Hcdev) in "Href".
     assert (Hinb : bv_unsigned inum < 16 * Z.of_nat nib)
       by (rewrite Hcnib; exact Hinumb).

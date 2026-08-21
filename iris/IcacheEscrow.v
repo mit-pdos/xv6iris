@@ -3299,9 +3299,10 @@ Section IcacheEscrow.
   Global Instance ic_sleeplocks_persistent cn : Persistent (ic_sleeplocks cn).
   Proof. apply _. Qed.
 
-  (* ...AND ITS ACCESSOR, which was copied out four times ([ProofDirlink]'s
-     [dl_slk_acc], [LinkCreateFreshTy]'s [cft_slk_acc], [ProofSysLink]'s and
-     [ProofCreate]'s) because the definition sat above them.  One copy. *)
+  (* ...AND ITS ACCESSOR.  Every consumer projects the family through THIS
+     lemma; do not restate it in a caller's own file.  ([IcacheBoot.v] has a
+     second, character-identical [ic_sleeplocks] with its own
+     [ic_sleeplocks_acc] -- a rival copy, not a client of this one.) *)
   Lemma ic_sleeplocks_lookup (cn : ic_names) (k : nat) :
     (k < NINODE)%nat ->
     ic_sleeplocks cn -∗
