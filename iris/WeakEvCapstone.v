@@ -904,6 +904,23 @@ Proof.
     + rewrite /ddev_class. by apply wm_class_of_relp.
 Qed.
 
+(** [pcls_eqr] (T1-D): the SAME fact against the realization's state
+    relation.  [WeakPromiseBridge.ws_eqr] relates [w_relp], which is the
+    only [wstate] field [WeakInterp.wm_class_of] reads, so every arm is a
+    [wm_class_of_relp] or a constant — the two store arms are
+    [pcls_ev_obl]'s first bullet verbatim and everything else is
+    [WCplain]. *)
+Lemma pcls_ev_eqr : pcls_eqr pcls_ev.
+Proof.
+  intros p l w1 w2 He.
+  have Hrel : w_relp w1 = w_relp w2 by apply (ws_eqr_relp _ _ He).
+  destruct l; try reflexivity;
+    destruct p as [cpu m rs fn ib|dp]; simpl;
+    try (rewrite /pnode_wclass; destruct m as [y|T oc k]; [reflexivity|];
+         destruct oc; try reflexivity; by apply wm_class_of_relp);
+    rewrite /ddev_class; by apply wm_class_of_relp.
+Qed.
+
 (** THE TRANSPORT (B3.2, item 4): the event machine's violation-freedom IS
     Layer 1's, because every pf run of the projected initial configuration
     is the projection of an [epf_run]. *)

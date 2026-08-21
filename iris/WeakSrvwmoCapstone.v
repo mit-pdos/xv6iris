@@ -11,13 +11,32 @@
     THE READING.  A machine implementing sRVWMO produces only
     sRVWMO-consistent executions of the program it runs.
     [xv6_srvwmo_safe] below says: EVERY sRVWMO-consistent execution whose
-    trace the xv6 event programs can emit ([exec_prog_ok] — T1's
-    conformance interface, with the exclusive PAIR arm of A3(iv)) is
-    REALIZED by a run of the promise-free event language from the booted
-    initial state, ending at the same log; and — the adequacy half,
-    candidate-independent — every reachable configuration of that language
-    is violation-free and every thread of it is reducible.  Nothing the
-    hardware class can produce escapes the WP proofs' reach.
+    trace the xv6 event programs can emit ([exec_prog_ok'] — T1's
+    conformance interface, with the administrative STAR and the exclusive
+    PAIR arm of A3(iv)) is REALIZED by a run of the promise-free event
+    language from the booted initial state, ending at the same log; and —
+    the adequacy half, candidate-independent — every reachable
+    configuration of that language is violation-free and every thread of it
+    is reducible.  Nothing the hardware class can produce escapes the WP
+    proofs' reach.
+
+    THE COVERAGE IS HONEST FOR DEP-CARRYING PROGRAMS SINCE T1-D
+    (2026-08-21).  Before that slice hypothesis (c) was the one-pstep-per-
+    trace-event [exec_prog_ok] over [WeakAxRealize.lbl_realizes]'s
+    [lb_depfree] gate, and it was UNSATISFIABLE for the real xv6 image —
+    the theorem was true and covered nothing (worklist "THE TIER-1
+    CONFORMANCE GAP").  Two independent reasons: [pnode_step] pins a
+    store's label to the instruction's real operand lists (D3-2), which
+    [lb_depfree] refutes; and the instance's node stream is mostly
+    ADMINISTRATIVE steps ([LInstr] at the announce and the boundary,
+    [LRegW], [LCtrl], [LSilent], [LDev]) that have no trace event at all.
+    [exec_prog_ok'] supplies an administrative STAR before each realizing
+    step (and a second, [LInstr]-free one inside the exclusive pair), and
+    the realization runs at [WeakPromiseBridge.cfg_matchd] — image and LOG
+    still EQUAL, per-agent [wstate]s related by [ws_eqr].  No model change
+    was needed: in the promise-free fragment the dependency machinery feeds
+    no side condition (D-7r and D-2r closed the last two channels by which
+    it did).
 
     THE OTHER HALF of the characterization is T2 ([WeakEvInst.t2_ev]):
     every promise-free run of the event instance projects BACK to an
@@ -31,8 +50,11 @@
       (b) THE WP PACKAGE — the only Iris-side obligation, verbatim
           [WeakEvAdequacy.weak_ev_pf_violation_free]'s;
       (c) the sRVWMO-side hypotheses: [srvwmo_consistent], the boot image,
-          and the conformance supply [exec_prog_ok].
-    And that is all.  In particular NO [main_premises], NO robustness
+          and the conformance supply [exec_prog_ok'].
+    And that is all.  ([WeakPromiseBridge.pcls_eqr pcls_ev] is NOT a
+    premise: like [pcls_obl] it is an obligation on the class function
+    alone, discharged in [WeakEvCapstone.pcls_ev_eqr] and applied inside
+    the proof.)  In particular NO [main_premises], NO robustness
     package, NO retag: the whole [robust_main] tower — the tier-2 route —
     is off this path.  [Print Assumptions] (recorded at the
     bottom): exactly the five generated-model reservation axioms.
@@ -100,7 +122,7 @@ Theorem xv6_srvwmo_safe Σ `{!riscvGpreS Σ, !weakGpreS Σ}
   cd_img cd = img_z (wgimg σ0) ->
   pst 0%nat = eps_init σ0 ->
   dv 0%nat = wgdev σ0 ->
-  exec_prog_ok pstep_ev pcls_ev pst dv (cand_exec cd) ->
+  exec_prog_ok' pstep_ev pcls_ev pst dv (cand_exec cd) ->
   (* T1 ∘ the language lift: the execution is REALIZED by a pf run of the
      event language, ending at the candidate's own log ... *)
   (exists P' σ',
@@ -124,7 +146,7 @@ Proof.
   - (* T1: realizability, program-carried, then lifted to the language *)
     destruct (srvwmo_realizable cd Hcons) as (Hwf & Htr & Heximg).
     destruct (exec_wf_pf_run_prog pstep_ev pcls_ev pst dv (cand_exec cd)
-                Hwf Hprog) as (c & Hrun & Hpg & Hdev & Hm).
+                pcls_ev_eqr Hwf Hprog) as (c & Hrun & Hpg & Hdev & Hm).
     rewrite Heximg Himg Hpst0 Hdv0 in Hrun.
     rewrite -(ecfg_of_init gen σ0 Hlog Hws) in Hrun.
     destruct (wp_pf_rtc_epf_rtc (ep_init gen) σ0 c Hlive Hrun)

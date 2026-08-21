@@ -374,6 +374,15 @@ Proof.
     by rewrite /lbl_class_p /lbl_class Hrel.
 Qed.
 
+(** THE REALIZATION-SIDE OBLIGATION (T1-D), the same fact against
+    [WeakPromiseBridge.ws_eqr]: [lbl_class] reads [w_relp] and nothing else
+    of the [wstate], and [ws_eqr] relates [w_relp]. *)
+Lemma lbl_class_eqr {P : Type} : pcls_eqr (P := P) lbl_class_p.
+Proof.
+  intros p l w1 w2 He.
+  rewrite /lbl_class_p /lbl_class (ws_eqr_relp _ _ He) //.
+Qed.
+
 (** (a) the class the step appends is the computed one. *)
 Definition cls_canon (i : agent) (l : wlabel) (c c' : wpcfg psail unit) : Prop :=
   ∀ ag msg, pc_ags c !! i = Some ag → pc_log c' = pc_log c ++ [msg] →

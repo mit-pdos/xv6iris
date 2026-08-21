@@ -84,6 +84,300 @@ Local Open Scope Z_scope.
     [read_ok_ts_bounded] is gone) to [WeakPromise.v].  They are used
     verbatim below. *)
 
+(* ------------------------------------------------------------------ *)
+(** ** [ws_eqr] — THE T1-D COMPLETENESS RELATION ON [wstate]s
+
+    [cfg_match] relates a machine configuration to an [mstate] by per-agent
+    [wstate] EQUALITY.  That is exactly right as long as the machine steps
+    at OPERAND-FREE labels, and hopeless once it steps at the real ones: a
+    dependency-carrying store raises [w_vcap] through [ctrl_post], an
+    [LRegW] assigns [w_regv], an [LInstr] resets [w_ldv]/[w_tbank]/[w_res],
+    and [WeakAxiomatic.mstep] — which has no program component at all — can
+    mirror none of it.
+
+    [ws_eqr] is the componentwise weakening the T1-D interface runs on
+    (worklist entry (iii-a)): EQUAL on every component any [WeakPromise]
+    side condition or any [mstep] post-state reads, and SILENT about the
+    five the dependency machinery owns.
+
+      EQUAL      [coh] (pointwise), [w_vrOld], [w_vwOld], [w_vrNew],
+                 [w_vwNew], [w_vRel], [w_fwd], [w_pub], [w_relp]
+      UNRELATED  [w_regv], [w_vcap], [w_ldv], [w_tbank], [w_res]
+
+    WHY THE FIVE ARE SAFE TO DROP, in the PROMISE-FREE fragment.  There is
+    no [fulfil_ok] there at all (every appending arm appends at the fresh
+    top), so [w_vcap]/[w_vwNew]'s fulfil pre-view never enters a side
+    condition; [w_regv]/[w_ldv]/[w_tbank] reach a step function ONLY as the
+    [srcs_view]/[ctrl_post] arguments, which land in [w_vcap]; and [w_res]
+    is read by [PFExStore] alone, inside the exclusive pair, where the
+    reservation is created and consumed by the pair's own two steps.  The
+    two channels by which a dependency view used to reach ADMISSIBILITY are
+    both closed: the forward bank's view column is [0] (D-7r,
+    [WeakMem.store_post_d]) and the exclusive read folds at the plain
+    pre-view (D-2r, [WeakMem.exload_post_run_d]).
+
+    WHY THE NINE MUST STAY EQUAL: [readable] reads [coh]; [load_vpre] reads
+    [w_vrNew]/[w_vRel]; [fwd_view] reads [w_fwd]; [fence_post] reads
+    [w_vrOld]/[w_vwOld]/[w_relp]; [store_post] reads [w_relp]/[w_pub]; and
+    the class function may read [w_relp] ([pcls_eqr] below).
+
+    [coh] is related POINTWISE rather than by [w_coh] map equality on
+    purpose: a fold that inserts the same value into two pointwise-equal
+    maps stays pointwise equal, which is all any consumer wants, and the
+    weaker relation costs the congruence proofs one [decide] each. *)
+Definition ws_eqr (w1 w2 : wstate) : Prop :=
+  (∀ a, coh w1 a = coh w2 a) ∧
+  w_vrOld w1 = w_vrOld w2 ∧ w_vwOld w1 = w_vwOld w2 ∧
+  w_vrNew w1 = w_vrNew w2 ∧ w_vwNew w1 = w_vwNew w2 ∧
+  w_vRel  w1 = w_vRel  w2 ∧ w_fwd   w1 = w_fwd   w2 ∧
+  w_pub   w1 = w_pub   w2 ∧ w_relp  w1 = w_relp  w2.
+
+Global Instance ws_eqr_refl : Reflexive ws_eqr.
+Proof. intros w. rewrite /ws_eqr. by split_and!. Qed.
+
+Global Instance ws_eqr_sym : Symmetric ws_eqr.
+Proof.
+  intros w1 w2 (Hc & ?&?&?&?&?&?&?&?). rewrite /ws_eqr.
+  split_and!; [intros a; by rewrite (Hc a)|by symmetry..].
+Qed.
+
+Global Instance ws_eqr_trans : Transitive ws_eqr.
+Proof.
+  intros w1 w2 w3 (Hc & ?&?&?&?&?&?&?&?) (Hc' & ?&?&?&?&?&?&?&?).
+  rewrite /ws_eqr.
+  split_and!; [intros a; by rewrite (Hc a) (Hc' a)|by congruence..].
+Qed.
+
+(** The projections. *)
+Lemma ws_eqr_coh w1 w2 a : ws_eqr w1 w2 → coh w1 a = coh w2 a.
+Proof. by intros (H & _). Qed.
+Lemma ws_eqr_vrOld w1 w2 : ws_eqr w1 w2 → w_vrOld w1 = w_vrOld w2.
+Proof. by intros (_ & ? & _). Qed.
+Lemma ws_eqr_vwOld w1 w2 : ws_eqr w1 w2 → w_vwOld w1 = w_vwOld w2.
+Proof. by intros (_ & _ & ? & _). Qed.
+Lemma ws_eqr_vrNew w1 w2 : ws_eqr w1 w2 → w_vrNew w1 = w_vrNew w2.
+Proof. by intros (_ & _ & _ & ? & _). Qed.
+Lemma ws_eqr_vwNew w1 w2 : ws_eqr w1 w2 → w_vwNew w1 = w_vwNew w2.
+Proof. by intros (_ & _ & _ & _ & ? & _). Qed.
+Lemma ws_eqr_vRel w1 w2 : ws_eqr w1 w2 → w_vRel w1 = w_vRel w2.
+Proof. by intros (_ & _ & _ & _ & _ & ? & _). Qed.
+Lemma ws_eqr_fwd w1 w2 : ws_eqr w1 w2 → w_fwd w1 = w_fwd w2.
+Proof. by intros (_ & _ & _ & _ & _ & _ & ? & _). Qed.
+Lemma ws_eqr_pub w1 w2 : ws_eqr w1 w2 → w_pub w1 = w_pub w2.
+Proof. by intros (_ & _ & _ & _ & _ & _ & _ & ? & _). Qed.
+Lemma ws_eqr_relp w1 w2 : ws_eqr w1 w2 → w_relp w1 = w_relp w2.
+Proof. by intros (_ & _ & _ & _ & _ & _ & _ & _ & ?). Qed.
+
+(** [ws_depmove] — [WeakMem]'s "the three dependency-only labels moved the
+    state" relation — IS [ws_eqr] plus a [w_vcap] bound, so every
+    dependency-only effect is [ws_eqr]-inert for free. *)
+Lemma ws_depmove_ws_eqr w1 w2 : ws_depmove w1 w2 → ws_eqr w1 w2.
+Proof.
+  intros (Hc & H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & _).
+  rewrite /ws_eqr /coh Hc. split_and!; auto.
+Qed.
+
+Lemma ws_eqr_regw_post ws rd v : ws_eqr ws (regw_post ws rd v).
+Proof. apply ws_depmove_ws_eqr, regw_post_depmove. Qed.
+Lemma ws_eqr_ctrl_post ws v : ws_eqr ws (ctrl_post ws v).
+Proof. apply ws_depmove_ws_eqr, ctrl_post_depmove. Qed.
+Lemma ws_eqr_instr_post ws : ws_eqr ws (instr_post ws).
+Proof. apply ws_depmove_ws_eqr, instr_post_depmove. Qed.
+Lemma ws_eqr_res_set ws r : ws_eqr ws (ws_res_set ws r).
+Proof. rewrite /ws_eqr. by split_and!. Qed.
+
+(** ... hence the two wrappers every run-level access ends in are
+    congruences AT UNRELATED ARGUMENTS: [ctrl_post] moves only [w_vcap] and
+    [ws_res_set] only [w_res]. *)
+Lemma ws_eqr_ctrl_cong w1 w2 v1 v2 :
+  ws_eqr w1 w2 → ws_eqr (ctrl_post w1 v1) (ctrl_post w2 v2).
+Proof.
+  intros He. etrans; [by symmetry; apply ws_eqr_ctrl_post|].
+  etrans; [exact He|apply ws_eqr_ctrl_post].
+Qed.
+
+Lemma ws_eqr_res_set_cong w1 w2 r1 r2 :
+  ws_eqr w1 w2 → ws_eqr (ws_res_set w1 r1) (ws_res_set w2 r2).
+Proof.
+  intros He. etrans; [by symmetry; apply ws_eqr_res_set|].
+  etrans; [exact He|apply ws_eqr_res_set].
+Qed.
+
+(** *** The per-byte updates are congruences *)
+
+Lemma ws_eqr_load_post_at w1 w2 aq vpre a t :
+  ws_eqr w1 w2 →
+  ws_eqr (load_post_at w1 aq vpre a t) (load_post_at w2 aq vpre a t).
+Proof.
+  intros He.
+  have Hfv : fwd_view w1 aq a t = fwd_view w2 aq a t.
+  { rewrite /fwd_view (ws_eqr_fwd _ _ He) //. }
+  rewrite /ws_eqr. split_and!.
+  - intros b. destruct (decide (b = a)) as [->|Hne].
+    + rewrite !coh_load_post_at_eq (ws_eqr_coh _ _ a He) Hfv //.
+    + rewrite !coh_load_post_at_ne //. by apply ws_eqr_coh.
+  - rewrite /load_post_at /=. rewrite (ws_eqr_vrOld _ _ He) Hfv //.
+  - rewrite /load_post_at /=. by apply ws_eqr_vwOld.
+  - rewrite /load_post_at /=. destruct aq;
+      [rewrite (ws_eqr_vrNew _ _ He) Hfv //|by apply ws_eqr_vrNew].
+  - rewrite /load_post_at /=. destruct aq;
+      [rewrite (ws_eqr_vwNew _ _ He) Hfv //|by apply ws_eqr_vwNew].
+  - rewrite /load_post_at /=. by apply ws_eqr_vRel.
+  - rewrite /load_post_at /=. by apply ws_eqr_fwd.
+  - rewrite /load_post_at /=. by apply ws_eqr_pub.
+  - rewrite /load_post_at /=. by apply ws_eqr_relp.
+Qed.
+
+Lemma ws_eqr_store_post w1 w2 rl a t :
+  ws_eqr w1 w2 → ws_eqr (store_post w1 rl a t) (store_post w2 rl a t).
+Proof.
+  intros He. rewrite /ws_eqr. split_and!.
+  - intros b. destruct (decide (b = a)) as [->|Hne].
+    + rewrite !coh_store_post_eq (ws_eqr_coh _ _ a He) //.
+    + rewrite !coh_store_post_ne //. by apply ws_eqr_coh.
+  - rewrite /store_post /=. by apply ws_eqr_vrOld.
+  - rewrite /store_post /=. rewrite (ws_eqr_vwOld _ _ He) //.
+  - rewrite /store_post /=. by apply ws_eqr_vrNew.
+  - rewrite /store_post /=. by apply ws_eqr_vwNew.
+  - rewrite /store_post /=. destruct rl;
+      [rewrite (ws_eqr_vRel _ _ He) //|by apply ws_eqr_vRel].
+  - rewrite /store_post /=. rewrite (ws_eqr_fwd _ _ He) //.
+  - rewrite /store_post /=.
+    rewrite (ws_eqr_relp _ _ He) (ws_eqr_pub _ _ He) //.
+  - rewrite /store_post /=. done.
+Qed.
+
+Lemma ws_eqr_fence_post w1 w2 pr pw sr sw :
+  ws_eqr w1 w2 →
+  ws_eqr (fence_post w1 pr pw sr sw) (fence_post w2 pr pw sr sw).
+Proof.
+  intros He.
+  have Hv1 : Nat.max (if pr then w_vrOld w1 else 0%nat)
+                     (if pw then w_vwOld w1 else 0%nat)
+           = Nat.max (if pr then w_vrOld w2 else 0%nat)
+                     (if pw then w_vwOld w2 else 0%nat).
+  { destruct pr, pw;
+      rewrite ?(ws_eqr_vrOld _ _ He) ?(ws_eqr_vwOld _ _ He) //. }
+  rewrite /ws_eqr. split_and!.
+  - intros b. rewrite /fence_post /coh /=. by apply ws_eqr_coh.
+  - rewrite /fence_post /=. by apply ws_eqr_vrOld.
+  - rewrite /fence_post /=. by apply ws_eqr_vwOld.
+  - rewrite /fence_post /=. destruct sr;
+      [rewrite (ws_eqr_vrNew _ _ He) Hv1 //|by apply ws_eqr_vrNew].
+  - rewrite /fence_post /=. destruct sw;
+      [rewrite (ws_eqr_vwNew _ _ He) Hv1 //|by apply ws_eqr_vwNew].
+  - rewrite /fence_post /=. by apply ws_eqr_vRel.
+  - rewrite /fence_post /=. by apply ws_eqr_fwd.
+  - rewrite /fence_post /=. by apply ws_eqr_pub.
+  - rewrite /fence_post /=. destruct (pw && sw)%bool;
+      [done|by apply ws_eqr_relp].
+Qed.
+
+(** *** ... hence so are the byte folds and the run-level wrappers *)
+
+Lemma ws_eqr_load_fold aq vpre ats w1 w2 :
+  ws_eqr w1 w2 →
+  ws_eqr (foldl (λ w at_, load_post_at w aq vpre at_.1 at_.2) w1 ats)
+         (foldl (λ w at_, load_post_at w aq vpre at_.1 at_.2) w2 ats).
+Proof.
+  revert w1 w2. induction ats as [|x ats IH]; intros w1 w2 He; [done|].
+  simpl. apply IH. by apply ws_eqr_load_post_at.
+Qed.
+
+Lemma ws_eqr_load_post_bytes w1 w2 aq ats :
+  ws_eqr w1 w2 →
+  ws_eqr (load_post_bytes w1 aq ats) (load_post_bytes w2 aq ats).
+Proof.
+  intros He.
+  have Hv : load_vpre w1 aq = load_vpre w2 aq.
+  { rewrite /load_vpre (ws_eqr_vrNew _ _ He) (ws_eqr_vRel _ _ He) //. }
+  rewrite /load_post_bytes Hv. by apply ws_eqr_load_fold.
+Qed.
+
+Lemma ws_eqr_store_fold rl t as_ w1 w2 :
+  ws_eqr w1 w2 →
+  ws_eqr (foldl (λ w a, store_post w rl a t) w1 as_)
+         (foldl (λ w a, store_post w rl a t) w2 as_).
+Proof.
+  revert w1 w2. induction as_ as [|x as_ IH]; intros w1 w2 He; [done|].
+  simpl. apply IH. by apply ws_eqr_store_post.
+Qed.
+
+Lemma ws_eqr_store_post_bytes w1 w2 rl as_ t :
+  ws_eqr w1 w2 →
+  ws_eqr (store_post_bytes w1 rl as_ t) (store_post_bytes w2 rl as_ t).
+Proof. intros He. rewrite /store_post_bytes. by apply ws_eqr_store_fold. Qed.
+
+(** THE THREE RUN-LEVEL SHAPES THE REALIZATION USES.  Each relates the
+    AXIOMATIC (dependency-free) post-state on the left to the MACHINE
+    (dependency-carrying) one on the right, at ARBITRARY operand views: the
+    operands survive only in [w_vcap] (and, for the exclusive read, in
+    [w_res]), which [ws_eqr] does not relate.  There is deliberately no such
+    lemma for the FUSED [LRmw]: [wp_pf_step]'s [PFRmw] post-state still
+    folds its read half at [load_vpre_d … vaddr] (D-2r's recorded residue,
+    dying with the fused arms at R6), so a fused rmw at a non-empty [asrc]
+    has no [ws_eqr]-related [mstep] image — see [WeakAxRealize.lb_rfoldfree]. *)
+Lemma ws_eqr_load_post_run w1 w2 aq base ts :
+  ws_eqr w1 w2 →
+  ws_eqr (load_post_run w1 aq base ts) (load_post_run w2 aq base ts).
+Proof.
+  intros He. rewrite /load_post_run. apply ws_eqr_ctrl_cong.
+  by apply ws_eqr_load_post_bytes.
+Qed.
+
+Lemma ws_eqr_store_post_run_d w1 w2 rl vaddr vdata base n t :
+  ws_eqr w1 w2 →
+  ws_eqr (store_post_run w1 rl base n t)
+         (store_post_run_d w2 rl vaddr vdata base n t).
+Proof.
+  intros He.
+  rewrite /store_post_run /store_post_run_d store_post_bytes_d_vf /store_run_as.
+  apply ws_eqr_ctrl_cong. by apply ws_eqr_store_post_bytes.
+Qed.
+
+Lemma ws_eqr_exload_post_run_d w1 w2 aq vaddr base ts :
+  ws_eqr w1 w2 →
+  ws_eqr (load_post_run w1 aq base ts)
+         (exload_post_run_d w2 aq vaddr base ts).
+Proof.
+  intros He. rewrite /exload_post_run_d.
+  etrans; [|by apply ws_eqr_res_set].
+  rewrite /load_post_run. apply ws_eqr_ctrl_cong.
+  by apply ws_eqr_load_post_bytes.
+Qed.
+
+(** *** ADMISSIBILITY TRANSFERS, because [readable] reads only [coh] and
+    [load_vpre] only [w_vrNew]/[w_vRel]. *)
+
+Lemma ws_eqr_readable img log w1 w2 vpre a t :
+  ws_eqr w1 w2 → readable img log w1 vpre a t → readable img log w2 vpre a t.
+Proof.
+  intros He [Hs Hn]. split; [done|]. by rewrite -(ws_eqr_coh _ _ a He).
+Qed.
+
+Lemma ws_eqr_read_ok img log w1 w2 aq lat base tvs :
+  ws_eqr w1 w2 →
+  read_ok img log w1 aq lat base tvs → read_ok img log w2 aq lat base tvs.
+Proof.
+  intros He Hr j t v Hj. destruct (Hr j t v Hj) as (H1 & H2 & H3).
+  split_and!; [done| |done].
+  have Hv : load_vpre_d w1 aq 0%nat = load_vpre_d w2 aq 0%nat.
+  { rewrite /load_vpre_d /load_vpre
+            (ws_eqr_vrNew _ _ He) (ws_eqr_vRel _ _ He) //. }
+  rewrite -Hv. by eapply ws_eqr_readable.
+Qed.
+
+(** THE CLASS FUNCTION'S T1-D OBLIGATION, the analogue of
+    [WeakRobustTrace.pcls_obl] (the timestamp-obliviousness half) at this
+    interface: a class function may not read a component [ws_eqr] leaves
+    unrelated.  Every concrete class function in this tree reads exactly
+    [w_relp] of the [wstate] ([WeakInterp.wm_class_of]), so every instance
+    discharges it in one line — it is an INSTANCE-DISCHARGED OBLIGATION,
+    not a carried premise. *)
+Definition pcls_eqr {P : Type} (clsf : P → wlabel → wstate → wm_class)
+    : Prop :=
+  ∀ p l w1 w2, ws_eqr w1 w2 → clsf p l w1 = clsf p l w2.
+
 (* ================================================================== *)
 Section bridge.
   Context {P D : Type}.
@@ -424,6 +718,77 @@ Section bridge.
   Definition cfg_match c (σ : mstate) : Prop :=
     ms_img σ = pc_img c ∧ ms_log σ = pc_log c ∧
     (∀ i ag, pc_ags c !! i = Some ag → ms_ws σ i = pa_ws ag).
+
+  (** THE T1-D WEAKENING OF [cfg_match] (worklist entry (iii-a)): same image,
+      same log — those two are what the capstone's conclusion rides on — and
+      per-agent [ws_eqr] instead of [wstate] equality.  It is exactly what a
+      machine stepping at the instance's REAL labels can maintain against an
+      [mstate], and it is what [WeakAxRealize]'s realization runs on. *)
+  Definition cfg_matchd c (σ : mstate) : Prop :=
+    ms_img σ = pc_img c ∧ ms_log σ = pc_log c ∧
+    (∀ i ag, pc_ags c !! i = Some ag → ws_eqr (ms_ws σ i) (pa_ws ag)).
+
+  Lemma cfg_match_cfg_matchd c σ : cfg_match c σ → cfg_matchd c σ.
+  Proof.
+    intros (? & ? & Hf). split_and!; [done|done|].
+    intros i ag Hlk. rewrite (Hf i ag Hlk). reflexivity.
+  Qed.
+
+  Lemma cfg_matchd_img c σ : cfg_matchd c σ → ms_img σ = pc_img c.
+  Proof. by intros (? & _). Qed.
+
+  Lemma cfg_matchd_log c σ : cfg_matchd c σ → ms_log σ = pc_log c.
+  Proof. by intros (_ & ? & _). Qed.
+
+  Lemma cfg_matchd_ws c σ i ag :
+    cfg_matchd c σ → pc_ags c !! i = Some ag → ws_eqr (ms_ws σ i) (pa_ws ag).
+  Proof. intros (_ & _ & H). exact (H i ag). Qed.
+
+  (** [cfg_match_upd_gen]'s analogue. *)
+  Lemma cfg_matchd_upd_gen (img : image) (lg : list wmsg) (dv : D)
+      (ags : list (wpagent P)) i ag st' w pr (f g : agent → wstate) :
+    (∀ j agj, ags !! j = Some agj → ws_eqr (f j) (pa_ws agj)) →
+    ags !! i = Some ag →
+    ws_eqr (g i) w →
+    (∀ j, j ≠ i → g j = f j) →
+    cfg_matchd (WPCfg img lg dv (<[i := WPAgent st' w pr]> ags)) (MSt img lg g).
+  Proof.
+    intros Hf Hlk Hgi Hgne. split_and!; [done|done|].
+    intros j agj Hj. simpl in *.
+    destruct (decide (j = i)) as [->|Hne].
+    - rewrite list_lookup_insert in Hj;
+        [by eapply lookup_lt_Some|by simplify_eq/=].
+    - rewrite list_lookup_insert_ne // in Hj. rewrite Hgne //. by apply Hf.
+  Qed.
+
+  (** THE CONFIGURATION-SIDE MOVE THE ADMINISTRATIVE STAR MAKES: same image,
+      same log, and every agent's [wstate] moved only within [ws_eqr].  It
+      is what carries [cfg_matchd] across a stretch of dependency-only
+      steps without naming the [mstate] at all. *)
+  Definition cfg_eqr (c c' : wpcfg P D) : Prop :=
+    pc_img c' = pc_img c ∧ pc_log c' = pc_log c ∧
+    (∀ j agj', pc_ags c' !! j = Some agj' →
+       ∃ agj, pc_ags c !! j = Some agj ∧ ws_eqr (pa_ws agj) (pa_ws agj')).
+
+  Lemma cfg_eqr_refl c : cfg_eqr c c.
+  Proof.
+    split_and!; [done|done|]. intros j agj' Hj. exists agj'. by split.
+  Qed.
+
+  Lemma cfg_eqr_trans c1 c2 c3 : cfg_eqr c1 c2 → cfg_eqr c2 c3 → cfg_eqr c1 c3.
+  Proof.
+    intros (Hi & Hl & Ha) (Hi' & Hl' & Ha'). split_and!; [congruence|congruence|].
+    intros j agj3 Hj. destruct (Ha' j agj3 Hj) as (agj2 & Hj2 & He2).
+    destruct (Ha j agj2 Hj2) as (agj1 & Hj1 & He1).
+    exists agj1. split; [done|by etrans].
+  Qed.
+
+  Lemma cfg_eqr_matchd c c' σ : cfg_eqr c c' → cfg_matchd c σ → cfg_matchd c' σ.
+  Proof.
+    intros (Hi & Hl & Ha) (Hmi & Hml & Hmw). split_and!; [congruence|congruence|].
+    intros j agj' Hj. destruct (Ha j agj' Hj) as (agj & Hj0 & He).
+    etrans; [by apply Hmw|exact He].
+  Qed.
 
   (** The functional projection, for consumers who want one: it matches. *)
   Definition proj_ws c : agent → wstate :=
@@ -1027,6 +1392,8 @@ End bridge.
 Global Arguments wp_pf_step {P D} _ _ _ _ _ _.
 Global Arguments wp_pf_run {P D} _ _ _ _.
 Global Arguments cfg_match {P D} _ _.
+Global Arguments cfg_matchd {P D} _ _.
+Global Arguments cfg_eqr {P D} _ _.
 Global Arguments own_coh {P D} _.
 Global Arguments proj_ws {P D} _ _.
 Global Arguments proj_st {P D} _.
