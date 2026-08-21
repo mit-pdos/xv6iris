@@ -904,6 +904,28 @@ in what every rule in this file is fighting.
   set-membership lemma with a COMPUTED carrier, in a goal big enough to
   traverse, should be spelled out at the occurrence count the goal actually has.
   (Same family as the two bullets below: what costs is the tactic that fails.)
+- **`rewrite` ABSTRACTS, `exact` only UNIFIES — and a `nat` NUMERAL makes the
+  gap enormous.** `rewrite H` must locate the occurrence, abstract it and build
+  a motive that conversion then carries; `exact`/`apply` of the same equation
+  only unifies two terms. Where the rewritten subterm holds a `nat` numeral the
+  difference explodes, because `nat` numerals are UNARY: `4096%nat` is a
+  4096-constructor term, so `umem_write _ _ 4096 _` drags all 4096 through
+  every conversion the motive forces. Measured on one goal
+  (`ProofUvmcopy.v:1695`, 2026-08-21) — all three close the SAME goal with the
+  same proof term:
+
+  | | |
+  |---|---|
+  | `rewrite <- (umem_write_app … 4096 …)` | 13.7 s |
+  | the same, run length a VARIABLE not a literal | 5.1 s |
+  | `transitivity <middle>` + `apply`/`exact` | 0.09 s |
+
+  So ~2.7× of it is the literal and the rest is the motive; killing both is
+  ~150×. The shape to reach for is `transitivity <the middle term>` and then
+  `apply`/`exact` on each side — it names the intermediate explicitly, which
+  reads better than a backwards rewrite anyway. This is the PURE-GOAL cousin of
+  "Directed entailments, not `⊣⊢` rewrites" above; that section is the same
+  trade inside a proofmode goal, where RULE ONE supplies the blow-up instead.
 - **In a `first [ … ]` alternation, put the CHEAP-FAILING branch first.** The
   cost of a tactic that FAILS grows with the proof term, so an alternation
   leading with an expensive-to-fail branch pays that cost at every use — 42 s

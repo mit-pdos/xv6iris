@@ -1698,11 +1698,24 @@ Section ProofUvmcopy.
         replace (4096 * Z.of_nat j)%Z with (0 + Z.of_nat (4096 * j))%Z
           by (rewrite Nat2Z.inj_mul; clear; lia).
         replace (4096 * S j)%nat with (4096 * j + 4096)%nat by lia.
-        rewrite <- (umem_write_app Mnew 0%Z (4096 * j)%nat 4096
-                      (fun a => Mold !!! Z.of_nat a)).
-        apply umem_write_ext. intros jz Hjz. rewrite /fsrc.
-        rewrite (Nat2Z.inj_add (4096 * j) jz). rewrite Nat2Z.inj_mul.
-        change (Z.of_nat 4096) with 4096%Z. reflexivity. }
+        (* [transitivity] + [exact], NOT [rewrite <- umem_write_app].  The
+           rewrite has to abstract the occurrence and build a motive over a
+           [umem_write _ _ 4096 _], and [4096 : nat] is UNARY, so the run
+           length alone is a 4096-constructor term the motive carries through
+           conversion.  Measured on this very goal: [rewrite <-] 13.7 s with
+           the literal and 5.1 s with the length abstract, against 0.09 s for
+           the [transitivity] below, which only ever UNIFIES.  Same proof
+           term (optimization.md, "rewrite abstracts, exact only unifies"). *)
+        transitivity (umem_write
+                        (umem_write Mnew 0%Z (4096 * j)%nat
+                           (fun a => Mold !!! Z.of_nat a))
+                        (0 + Z.of_nat (4096 * j))%Z 4096
+                        (fun i : nat => Mold !!! Z.of_nat ((4096 * j) + i)%nat)).
+        - apply umem_write_ext. intros jz Hjz. rewrite /fsrc.
+          rewrite (Nat2Z.inj_add (4096 * j) jz). rewrite Nat2Z.inj_mul.
+          change (Z.of_nat 4096) with 4096%Z. reflexivity.
+        - exact (umem_write_app Mnew 0%Z (4096 * j)%nat 4096
+                   (fun a => Mold !!! Z.of_nat a)). }
       iEval (rewrite Hfillstep) in "Hpt".
       set (Pk := uptd_insert_perm Pj (pte_flags10 w0) (vpn_at vpn0 j) r).
       assert (Hextk : uptd_ext Pnew Pk)
