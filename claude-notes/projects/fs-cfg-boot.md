@@ -1194,7 +1194,21 @@ when SpecForkret starts importing FirstTok.
   drop block becomes `iApply (first_tok_boot with "Hfirst Hpersist Hkav
   Hfsinit")` and the park call gains one argument.
 
-## PENDING MERGE (fetched 2026-08-20 late, NOT yet merged)
+## MERGE DONE (2026-08-21, commits `7f516435` + `f400c883` + fixup `5bdd8c55`)
+
+Both fetch waves merged; lane rebuilt at the new pin 31f115a; whole tree
+green; audit EXACTLY SEVEN (textual match to the baseline). Round facts
+worth keeping: only TWO conflicts total (SpecInitlog/ProofInitlog — our
+`log_free_tok γ` beside upstream's `proc_priv_bare` block swap; keep-both);
+all campaign address facts were KernelSyms-symbolic so the uniform −0x10
+data shift cost nothing; the one real fixup was `wp_namei_root`'s new DEAD
+`Vpr : pprivate` binder (family-shape uniformity from the proc_priv_bare
+sweep) — the boot corner passes the zero-record inhabitant. Upstream state
+absorbed: dispatcher at 20/22 (open wired via ftable-provisioned iref
+units = debt A paid; read/write premises gone at the new pin = debt C
+paid), uvmcopy contracts, fileread/filewrite re-proved.
+
+## The original pending-merge record (historical)
 
 origin/main moved past the merge-base `15f597b2` (our side = this campaign's
 commits): upstream wired dispatcher entries 4/17/20 (pipe/mknod/mkdir),
