@@ -1,8 +1,65 @@
 # The tier-2 containment worklist (was: the certification route)
 
-## CHECKPOINT (2026-08-21, end of the D-track + route-decision session)
-## — READ THIS FIRST WHEN RESUMING; the 2026-08-20 checkpoint below is
-## SUPERSEDED and kept only for its design pointers
+## CHECKPOINT (2026-08-21b, end of the route-B-opening + T1-D session)
+## — READ THIS FIRST WHEN RESUMING; both earlier checkpoints below are
+## SUPERSEDED and kept only for their design pointers
+
+**Where things stand.**  ROUTE B is the plan of record
+(`../design/weak-memory-route-b.md`); this session landed, in commit
+order: **B0a** (`f360a96f`, `gdexec`/`gdeps_wf`/`gdeps_gmo` + the LB
+witness re-checked with empty deps), **B2a** (`d319ec9e`,
+`WeakRvwmoXchg.gswap_read_down` + viol bookkeeping — the read-down
+free-move claim machine-validated), **B2bc** (`19313efd`, the exchange
+kit COMPLETE: `gswap_write_down` (R,W) + `gswapw_ww` (W,W)-byte-disjoint
+with the ts-transposition rewrite; the RMW-dep-source finding — every
+moved-up-may-be-RMW lemma carries `∉ gd_deps`), and THE T1-D ARC — the
+discovered-and-closed TIER-1 CONFORMANCE GAP (`fe9b78fa` the finding:
+`xv6_srvwmo_safe`'s old hypothesis was UNSATISFIABLE for the real
+image; then three machine-model ALIGNMENT slices, all the same species
+"the machine drifted stronger than its declared model": **D-7r**
+`2d9dc660` the forward bank's view column returns to 0, **D-2r**
+`3880cbbc` the exclusive read's address view leaves
+admissibility/fold, and **T1-D** `493547b8` the interface repair —
+`lb_nobarex`/`lat_free`/`lb_rfoldfree` gates, `cfg_matchd`/`ws_eqr`,
+the administrative-star supply `exec_prog_ok'`, the recomposed
+capstone, and the SATISFIABILITY WITNESS `T1dWitness.v` proving the
+new hypothesis dischargeable at a real dep-carrying store).  Every
+landing at exactly the five rv64d axioms; every route-B lemma
+Closed outright.  Also landed earlier in the session (see the
+2026-08-21a checkpoint below): D-i, D-ii, T2-1c, W2b-c1, the D-iii
+probes, the R3 correction.
+
+**RESUMPTION ORDER:**
+1. **B2d design session** (the next centerpiece): the exchange
+   induction's TERMINATION MEASURE and organization, against the
+   completed kit and the recorded obstruction landscape (route-b §3b′
+   — the three refusal forms; the same-byte write-passing question;
+   the window-clearing recursion).  Work the miniature end-to-end on
+   paper first; a probe of the measure is budgeted.
+2. **B0b build**: the per-hart emission conformance, designed against
+   `exec_prog_ok'`'s administrative star (the two `LInstr`s per
+   instruction land in `adm_star true`; the pair's interior in
+   `adm_star false`) + `row_deps` (the pure register-dataflow
+   relation over emitted instance labels).
+3. **B1**: the prefix realization (T2-1c's prefix variant + T1 via
+   the REPAIRED interface), shaped by B2d's closure discipline.
+4. **B2** (the induction build), **B3** (capstone assembly), then
+   **R6** (deletion contract — now also: `lb_rfoldfree` →
+   `lb_ldepfree`, the fused arms' fold residue, `ewg_ib`,
+   `WeakCertify` archival, `ak_excl` rename).
+5. Parked: T2-1b, D-iv, D-vi.
+
+**Working discipline unchanged** (orchestrator designs/specs, Opus
+executes, independent verification before every commit, no premises
+ever).  New standing rules from this session: machine-model
+alignment slices carry a VETO condition ("if a landed proof consumed
+the removed strength load-bearing-ly, stop"); relations between
+dep-carrying and dep-free tiers are COMPONENTWISE, never equality
+(`ws_ctrl_up`, `ws_le_nc`, `ws_eqr` — the third instance made it a
+pattern); batch comment edits with code in the WeakMem band (a
+comment-only edit costs a full rebuild).
+
+## SUPERSEDED CHECKPOINT (2026-08-21a, mid-session)
 
 **Where things stand.**  Landed this session, in commit order: **D-i**
 (`4717bcf6`, W-TV consumption, option α — `_0` equations became
