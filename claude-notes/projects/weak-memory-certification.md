@@ -274,6 +274,42 @@ JOINTLY with B0b (they are the same problem: the conformance interface
 must speak dep-carrying labels end to end).  Do not build B1/B3
 against the current capstone statement.
 
+**T1-D REMEDY SKETCH (2026-08-21, orchestrator design pass — much
+smaller than feared, and NO model change):**
+- THE GAP IS WIDER THAN THE DEPFREE CONJUNCT: `exec_prog_ok`'s
+  one-pstep-per-trace-event shape cannot thread the instance's node
+  stream AT ALL — every instruction also takes dep-only/administrative
+  steps (`LInstr` at the announce and now the boundary, `LRegW`,
+  `LCtrl`, `LSilent` nodes), which have no trace event; even a
+  dep-free program's announce is `LInstr`, where `lb_depfree` is
+  `False`.  The landed emission shape was always a fiction.
+- THE SAVING MACHINE FACT: in the PF FRAGMENT the dep machinery
+  (`w_regv`/`w_vcap`/`w_ldv`/`w_tbank`) NEVER FEEDS A SIDE CONDITION —
+  loads carry `asrc = []` (D-8, pinned by `elab_ok`), so `load_vpre`'s
+  floors are dep-free, and the pf store arms append at the fresh top
+  with no `fulfil_ok`.  So realizing at REAL dep-carrying labels
+  changes only post-state view BOOKKEEPING, never admissibility:
+  **sRVWMO needs NO new axioms for realizability** — the deps design's
+  "gains ppo 9–11" deferral was about the forward projection's
+  equality, not this direction.
+- THE REMEDY, three interface repairs and no alphabet/model change:
+  (i) delete `lb_depfree` from `lbl_realizes` (the recorded
+  one-conjunct deletion) and let `l` carry the instance's real
+  operand lists; (ii) generalize the supply from one-pstep-per-event
+  (+ the pair arm) to ADMINISTRATIVE-STAR + memory step per event — a
+  finite run of non-memory-labeled psteps (whose machine arms are the
+  dep-only/silent ones) followed by the realizing step; (iii) weaken
+  the bridge's `cfg_match` componentwise: EQUAL on the
+  read-admissibility components (`coh`, `vrOld`, `vrNew`, `vwOld`,
+  `vwNew`, `vRel`, `fwd`, `relp`, `pub`, `res`), machine-≥ (or
+  unrelated) on the dep components — the D-i `ws_ctrl_up`/`ws_le_nc`
+  component discipline is the exact precedent.  The capstone's
+  program-state conclusion adapts to the starred supply.
+- B0b's per-hart emission must be designed on the SAME generalized
+  supply.  Sequencing: T1-D is the next BUILD priority (it un-blocks
+  B1/B3 and repairs the landed tier-1 claim); the B2 kit continues in
+  parallel (its lemmas are supply-independent).
+
 ## Items
 
 - **W1 — walker-naming spike**: **DONE (2026-08-18) — GO** on the
