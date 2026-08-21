@@ -121,6 +121,46 @@ Section WaitInv.
      place. *)
   Definition wait_res : iProp Σ := (∃ ps, parents_own ps)%I.
 
+  (* THE BOOT CARVE'S SHAPE, GATHERED.  [BootCarveMain.boot_procs_raw] hands
+     the parent cells out one existential per slot; [parents_own] wants ONE
+     list.  The conversion is an induction with an OFFSET, because
+     [seq k (S n)] is [k :: seq (S k) n] -- the tail's table indices shift by
+     one while the [j] in [parents_own]'s big-op is an index into the LIST.
+     Stated here rather than at the carve so that [wait_res]'s shape stays
+     this file's business. *)
+  Lemma parents_cells_gather (n k : nat) :
+    ([∗ list] i ∈ seq k n, ∃ pv : mword 64, p_parent (proc_addr i) ↦₈ pv)
+    -∗ ∃ ps : list (mword 64), ⌜length ps = n⌝ ∗
+         ([∗ list] j ↦ v ∈ ps, p_parent (proc_addr (k + j)) ↦₈ v).
+  Proof.
+    revert k. induction n as [|n IH]; intros k.
+    - iIntros "_". iExists []. iSplit; [done | done].
+    - cbn [seq]. rewrite big_sepL_cons.
+      iIntros "[Hhd Htl]". iDestruct "Hhd" as (v0) "Hhd".
+      iDestruct (IH (S k) with "Htl") as (ps) "[%Hlen Htl]".
+      iExists (v0 :: ps).
+      iSplit; [iPureIntro; cbn [length]; lia |].
+      rewrite big_sepL_cons.
+      iSplitL "Hhd"; [rewrite Nat.add_0_r; iExact "Hhd" |].
+      iApply (big_sepL_mono with "Htl").
+      iIntros (j v _) "Hv".
+      replace (k + S j)%nat with (S k + j)%nat by lia.
+      iExact "Hv".
+  Qed.
+
+  (* ...and what the boot chain actually hands main: wait_lock's resource,
+     out of the NPROC parent cells the image owns and nothing else claims. *)
+  Lemma wait_res_of_cells :
+    ([∗ list] i ∈ seq 0 NPROC, ∃ pv : mword 64, p_parent (proc_addr i) ↦₈ pv)
+    -∗ wait_res.
+  Proof.
+    iIntros "H".
+    iDestruct (parents_cells_gather NPROC 0 with "H") as (ps) "[%Hlen H]".
+    iExists ps. rewrite /parents_own.
+    iSplit; [iPureIntro; exact Hlen |].
+    iApply (big_sepL_mono with "H"). iIntros (j v _) "Hv". iExact "Hv".
+  Qed.
+
   Lemma parents_own_length ps : parents_own ps -∗ ⌜length ps = NPROC⌝.
   Proof. iIntros "[% _]". done. Qed.
 

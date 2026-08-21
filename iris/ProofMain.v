@@ -120,6 +120,7 @@ Require Import SpecMain.
 Require Import CodeMain.
 Require Import KernelRvcDecode.
 From Kernel Require KernelSyms.
+Require Import WaitInv.   (* [wait_res] -- what main finally brings wait_lock up over *)
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.
@@ -809,6 +810,13 @@ Section ProofMain.
     strans_pending -∗ tlb ↦ᵣ tlbvec0 -∗ kpt_unset -∗
     kmap_auth kmap_M0 -∗
     lk_raw pid_lock_addr -∗ lk_raw wait_lock_addr -∗
+    (* ...AND WHAT wait_lock IS OVER, so that this group can bring it UP the
+       way it brings the nextpid lock up two assemblies below.  procinit
+       already hands back [lk_fresh wait_lock_addr "wait_lock"] and main
+       used to drop it for want of a resource; [WaitInv.wait_res] is the
+       NPROC [p_parent] cells, carved by [BootCarveMain]'s slot family and
+       routed here through [main_globals_raw]. *)
+    WaitInv.wait_res -∗
     (* [SpecAllocpid.nextpid_res] itself: the .data word procinit's
        [initlock(&pid_lock,"nextpid")] brings under its lock.  It is NOT
        .bss and it is not [kernel_data]'s -- see [SpecMain]'s own row and
@@ -831,7 +839,7 @@ Section ProofMain.
        kalloc regime there so that its post-allocproc SEAL can be the boot
        token's own allocator row.  A quantified [γa] could never be shown
        equal to the ambient one. *)
-    ( ∀ (γp : gname) (γs : list gname) (m' : regfile)
+    ( ∀ (γp γw : gname) (γs : list gname) (m' : regfile)
         (root : mword 44) (pas : nat -> mword 44),
         sie_cap_gpr KT1 m' n false p0 -∗
         pc_is (mword_of_int (KernelSyms.main + 0x7e) : mword 64) -∗
@@ -854,6 +862,11 @@ Section ProofMain.
            cell above.  Persistent.  allocproc takes it, so kfork, sys_fork
            and -- at its real contract -- userinit all do. *)
         is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
+        (* THE wait_lock, built the same way and for the first time.  Every
+           consumer in the tree takes it -- kexit, kwait, reparent, the
+           syscall environment -- and nothing has ever built one; see
+           projects/forkret-park.md E3. *)
+        is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
         (* the KPT receipt kvminithart minted, on its way to [trap_csrs] *)
         kpt_on cpu_id -∗
         (∃ v : mword 64, stvec ↦ᵣ v) -∗
@@ -870,7 +883,7 @@ Section ProofMain.
     intros Hn Hphystop Hs1 Hprun Hlen.
     subst phystop s1entry.
     iIntros "Hcg #Htext #Hkdata Hpc Hfree Hcpu Hlkmem Hkkalloc Hkmem24 Hpages Hkpt".
-    iIntros "Hsbit Htlb Hunset Hkauth Hlpid Hlwait Hnpid Hprocs Hppub Hfds Hirs Hbss Hparks Hpst Hcont".
+    iIntros "Hsbit Htlb Hunset Hkauth Hlpid Hlwait Hwres Hnpid Hprocs Hppub Hfds Hirs Hbss Hparks Hpst Hcont".
     iPoseProof (mni_6e with "Htext") as "Hi6e".
     iPoseProof (mni_72 with "Htext") as "Hi72".
     iPoseProof (mni_76 with "Htext") as "Hi76".
@@ -1011,7 +1024,7 @@ Section ProofMain.
     iApply (Procinit.wp_procinit_sconf V4 n false p0 ltac:(lia)
               with "Hcg Htext Hkdata Hpc Hlpid Hlwait Hprocs Hfds Hirs Hbss").
     iApply wp_next_off_intro.
-    iIntros (mpr) "Hcg Hpc %Hcspr Hlpidf _ Hready".
+    iIntros (mpr) "Hcg Hpc %Hcspr Hlpidf Hlwaitf Hready".
     assert (Hretpr : ret_pc (V4 !!! Regidx (mword_of_int 1 : mword 5) : mword 64)
                      = (mword_of_int (KernelSyms.main + 0x7e) : mword 64)).
     { rewrite /V4 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
@@ -1047,10 +1060,18 @@ Section ProofMain.
     iMod (newlock ⊤ alp_pid_lock "nextpid"%string nextpid_res
             with "Hpnm Hpw Hpc0 [Hnpid]") as (γp) "#Hpidlock".
     { rewrite /nextpid_res. iExact "Hnpid". }
+    (* ---- ASSEMBLY 2c: the wait_lock, and it is the SAME move.  procinit
+           initialises the lock's three words exactly as it does pid_lock's;
+           what was missing until [BootCarveMain] stopped dropping the
+           [p_parent] cells was a resource for it to be over. ---- *)
+    iDestruct (lk_fresh_pieces wait_lock_addr "wait_lock"%string with "Hlwaitf")
+      as "(#Hwnm & Hww & Hwc0)".
+    iMod (newlock ⊤ wait_lock_addr "wait_lock"%string wait_res
+            with "Hwnm Hww Hwc0 Hwres") as (γw) "#Hwaitlock".
     iModIntro.
-    iApply ("Hcont" $! γp γs mpr (pt_base t) pas
-              with "Hcg Hpc Hfree Hcpu Hkenv Hkmem Hpinv Hpidlock Hkptr Hstvec
-                    Hkinv Hkptp Htramp Hkstx").
+    iApply ("Hcont" $! γp γw γs mpr (pt_base t) pas
+              with "Hcg Hpc Hfree Hcpu Hkenv Hkmem Hpinv Hpidlock Hwaitlock
+                    Hkptr Hstvec Hkinv Hkptp Htramp Hkstx").
   Qed.
 
   (* =================================================================== *)
@@ -1355,6 +1376,10 @@ Section ProofMain.
         cpu_own 0 false p0 false ∅ -∗
         is_lock γk d_lock "virtio_disk"%string (disk_res γv pd pav pu) -∗
         disk_geom γv pd pav pu -∗
+        (* ...AND FILEINIT'S OUTPUT, kept rather than dropped -- see the
+           block at the [jal fileinit] below for why it cannot become an
+           [is_ftable] yet. *)
+        lk_fresh (mword_of_int KernelSyms.ftable : mword 64) "ftable"%string -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1518,7 +1543,22 @@ Section ProofMain.
     iApply (Fileinit.wp_fileinit_sconf F3 n vfl vfn vfc false p0 ltac:(lia)
               with "Hcg Htext Hkdata Hpc Hfw Hfn Hfc").
     iApply wp_next_off_intro.
-    iIntros (mfi) "Hcg Hpc %Hcsfi _ _ _".
+    (* FILEINIT'S THREE OUTPUTS ARE KEPT, and used to be dropped here.  They
+       ARE [SpecProcinit.lk_fresh (ftable) "ftable"], i.e. exactly
+       [WpLock.newlock]'s premise list minus the resource -- and
+       [SpecFileinit.v]'s header says as much: "Whether the lock then becomes
+       an [is_lock] over the open-file table is the caller's ghost step, not
+       fileinit's".  main cannot take that step YET: [FileInv.ftable_res]
+       wants the ftable's own [file[NFILE]] array, which the boot carve does
+       not hand out.  So they are re-bundled and threaded OUT rather than
+       dropped, and the day that carve lands the [newlock] is one line --
+       the wait_lock two groups up is the same move, already taken.  See
+       projects/forkret-park.md E3. *)
+    iIntros (mfi) "Hcg Hpc %Hcsfi Hftw Hftnm Hftc".
+    iAssert (lk_fresh (mword_of_int KernelSyms.ftable : mword 64) "ftable"%string)
+      with "[Hftw Hftnm Hftc]" as "Hftfresh".
+    { rewrite /lk_fresh. iSplitL "Hftw"; [iExact "Hftw" |].
+      iSplitR "Hftc"; [iExact "Hftnm" | iExact "Hftc"]. }
     assert (Hretfi : ret_pc (F3 !!! Regidx (mword_of_int 1 : mword 5) : mword 64)
                      = (mword_of_int (KernelSyms.main + 0x9a) : mword 64)).
     { rewrite /F3 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
@@ -1736,7 +1776,7 @@ Section ProofMain.
     { rewrite /F5 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hretui) in "Hpc".
     iApply ("Hcont" $! fsc_dlock pd pav pu mui
-              with "Hcg Hpc Hfree Hcpu Hdlock Hgeom").
+              with "Hcg Hpc Hfree Hcpu Hdlock Hgeom Hftfresh").
   Qed.
 
   (* =================================================================== *)
@@ -1981,6 +2021,7 @@ Section ProofMain.
        it rides into [mn_grp_printk] beside the CONSOLE pair and comes back
        inside [ConsoleInv.console_ready]. *)
     iDestruct "Hglobals" as "(Hdevsw & Hdevrest & Hkmem24 & Hkpt & Hprocs & Hppub &
+                             Hwres &
                              Hfds & Hirs & Hbss & Hinitproc & Hticks & Hbufl & Hbufn & Hbhead &
                              Hbpay & Hsbb & Hinl &
                              Hient & Hlogr & Hdiskptr & Hdiskfree & Hdusedidx &
@@ -2047,11 +2088,11 @@ Section ProofMain.
     iApply (mn_grp_kvm m2 (K - 2)%nat p0 ps s1entry phystop tlbvec0
               Hn50 Hphystop Hs1 Hprun Hlen
               with "Hcg Htext Hkdata Hpc Hfree Hcpu Hlkmem Hkkalloc Hkmem24 Hpages Hkpt
-                    Hsbit Htlb Hunset Hkauth Hlpid Hlwait Hnpid Hprocs Hppub Hfds Hirs
+                    Hsbit Htlb Hunset Hkauth Hlpid Hlwait Hwres Hnpid Hprocs Hppub Hfds Hirs
                     Hbss Hparks Hpst").
-    iIntros (γp γs m3 root pas)
-      "Hcg Hpc Hfree Hcpu Hkenv #Hkmem #Hpinv #Hpidlock Hkpt Hstvec #Hkinv #Hkptp
-       #Htramp #Hkstx".
+    iIntros (γp γw γs m3 root pas)
+      "Hcg Hpc Hfree Hcpu Hkenv #Hkmem #Hpinv #Hpidlock #Hwaitlock Hkpt Hstvec
+       #Hkinv #Hkptp #Htramp #Hkstx".
     (* --- 0x7e .. 0x8a : trap / plic, and the interrupt invariant --- *)
     iApply (mn_grp_trap γd γv m3 (K - 2)%nat p0 Hn50 Hcid
               with "Hcg Htext Hkdata Hdev Hpc Hltick Hticks Hstvec Hq").
@@ -2069,7 +2110,7 @@ Section ProofMain.
                     Hlft Hldisk Hdiskptr Hdiskfree
                     Hdusedidx Hdslots Hclaim Hdone Hcfg Hinitproc").
     { iApply (printk_env_panic with "Hpenv"). }
-    iIntros (γk pd pav pu m5) "Hcg Hpc Hfree Hcpu #Hdlock #Hgeom".
+    iIntros (γk pd pav pu m5) "Hcg Hpc Hfree Hcpu #Hdlock #Hgeom Hftfresh".
     (* ---- THE INSTALLED-HANDLER RESOURCE, folded HERE and not earlier: the
            handler contract closes over [devintr_caps], and its disk lock and
            geometry are exactly what the group above just produced.  ALL SEVEN

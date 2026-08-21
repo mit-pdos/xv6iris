@@ -178,6 +178,7 @@ Require Import BioInitAt.
 Require Import IrefSlots.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 From Kernel Require KernelSyms.
+Require Import WaitInv.   (* [wait_res] -- what wait_lock is over *)
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
@@ -304,6 +305,16 @@ Section SpecMain.
      ([∗ list] i ∈ seq 0 NPROC,
         (∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗
         proc_pub (proc_addr i)) ∗
+     (* ...AND WHAT wait_lock IS OVER.  [WaitInv.wait_res] is [∃ ps,
+        parents_own ps], the NPROC [p_parent] cells -- the one part of a
+        [struct proc] that belongs to a lock OTHER than p->lock, which is
+        why it is not in either big-op above.  The image owns the cells and
+        [BootCarveMain]'s slot carve used to drop them with the padding; it
+        carves them now, and main pairs them with the [lk_raw
+        wait_lock_addr] it already holds to make the [is_lock] every
+        consumer of wait_lock (kexit, kwait, reparent, the syscall
+        environment) has always taken and nobody has ever built. *)
+     WaitInv.wait_res ∗
      fd_slots (NPROC * (NOFILE + FDSPARE)) ∗
      (* ... and the iref supply's proc-layer share: 1 + IREFSPARE per
         process, the [1] being its cwd unit.  The remaining [NFILE] units of

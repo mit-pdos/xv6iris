@@ -47,6 +47,7 @@ From Kernel Require KernelSyms.
 Require Import IcacheRef.
 Require Import IrefSlots.
 Require Import TicksInv.
+Require Import WaitInv.        (* [wait_res_of_cells] -- the parent cells, gathered *)
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 (* THE FILE SYSTEM'S BOOT-ERA MINT (claude-notes/projects/fs-cfg-boot.md
    stage (d2b)).  [FsCfgBoot.fs_cfg_alloc] is what finally gives
@@ -556,7 +557,11 @@ Section BootBssChain.
     iDestruct (bss_cut g (KernelSyms.cpus + 128 * Z.of_nat NCPU) KernelSyms.proc
                  (KernelSyms.proc + proc_size * Z.of_nat NPROC) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hprocs H]".
-    iDestruct (boot_procs_raw g Hmem with "Hcl Hprocs") as "[Hpr1 Hpr2]".
+    iDestruct (boot_procs_raw g Hmem with "Hcl Hprocs")
+      as "[Hpr1 [Hpr2 Hpar]]".
+    (* the parent cells, gathered into wait_lock's resource.  The carve hands
+       one existential per slot; [WaitInv.wait_res] is one list. *)
+    iDestruct (WaitInv.wait_res_of_cells with "Hpar") as "Hwres".
     (* ---- tickslock, bcache.lock, the 30 buffers, the list sentinel ---- *)
     iDestruct (bss_cut g (KernelSyms.proc + proc_size * Z.of_nat NPROC)
                  KernelSyms.tickslock (KernelSyms.tickslock + 24) ram_hi
@@ -827,7 +832,7 @@ Section BootBssChain.
     iSplitL "Hlk1 Hlk2 Hlk3 Hlk4 Hlk5 Hlk6 Hlk7 Hlk8 Hlk9 Hlk10 Hlk11".
     { iApply (boot_main_locks_raw g Hmem with
                 "Hcl Hlk1 Hlk2 Hlk3 Hlk4 Hlk5 Hlk6 Hlk7 Hlk8 Hlk9 Hlk10 Hlk11"). }
-    iSplitL "Hdr Hdw Hdevrest Hkm Hkpt Hpr1 Hpr2 Hfd Hir Hbss Hip Htk Hbsl Hbln Hhd
+    iSplitL "Hdr Hdw Hdevrest Hkm Hkpt Hpr1 Hpr2 Hwres Hfd Hir Hbss Hip Htk Hbsl Hbln Hhd
              Hbpay Hsbb Hino Hient Hlog Hdd Hda Hdu Hdf Hdi Hslots Hring".
     { rewrite /main_globals_raw.
       iSplitL "Hdr Hdw".
@@ -838,6 +843,7 @@ Section BootBssChain.
       iSplitL "Hkpt"; [iExists vkpt; iExact "Hkpt" |].
       iSplitL "Hpr1"; [iExact "Hpr1" |].
       iSplitL "Hpr2"; [iExact "Hpr2" |].
+      iSplitL "Hwres"; [iExact "Hwres" |].
       iSplitL "Hfd"; [iExact "Hfd" |].
       iSplitL "Hir"; [iExact "Hir" |].
       iSplitL "Hbss"; [iExact "Hbss" |].

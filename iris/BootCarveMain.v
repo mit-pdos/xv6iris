@@ -1666,11 +1666,21 @@ Section BootCarveMain.
      hand out the cell ONCE: it is carved in full at +48 and SPLIT.
      The four PINNED zeros ([sz] at +72, [pagetable] at +80, [trapframe] at
      +88, [cwd] at +336) come from [boot_ran_cell8_bss]; the [pv_sz] bound
-     [uint (pv_sz V) <= uvm_maxsz] is then free.  [p_parent] (+56) is claimed
-     by no bundle and is dropped with the padding. *)
+     [uint (pv_sz V) <= uvm_maxsz] is then free.  [p_parent] (+56) is the
+     FOURTH conjunct: it is claimed by no proc bundle because it belongs to
+     wait_lock rather than to p->lock, and it used to be dropped with the
+     padding for want of anywhere to put it. *)
+  (* THE MIDDLE PAIR IS PARENTHESISED, and that is not cosmetic: [∗] is
+     right-associative, so without it the two [big_sepL_sep] rewrites below
+     would cut this in the wrong place and [boot_procs_raw] would hand its
+     caller [chan] and [proc_pub ∗ parent] instead of the pair and the
+     parent. *)
   Local Definition proc_slot_raw (a : Arch.pa) : iProp Σ :=
-    (proc_raw a ∗ (∃ ch : SailStdpp.Values.mword 64, p_chan a ↦₈ ch) ∗
-     proc_pub a)%I.
+    (proc_raw a ∗
+     ((∃ ch : SailStdpp.Values.mword 64, p_chan a ↦₈ ch) ∗ proc_pub a) ∗
+     (* the parent cell, which belongs to wait_lock rather than to p->lock --
+        see the split at +56 below *)
+     (∃ pv : SailStdpp.Values.mword 64, p_parent a ↦₈ pv))%I.
 
   Lemma boot_proc_slot (g : gstate) (A : Z) :
     (forall x : Z, ram_lo <= x < ram_hi ->
@@ -1699,6 +1709,7 @@ Section BootCarveMain.
     assert (M40 : (A + 40) mod 4 = 0) by exact (z_mod_addo 4 A 40 Hal4 eq_refl).
     assert (M44 : (A + 44) mod 4 = 0) by exact (z_mod_addo 4 A 44 Hal4 eq_refl).
     assert (M48 : (A + 48) mod 4 = 0) by exact (z_mod_addo 4 A 48 Hal4 eq_refl).
+    assert (M56 : (A + 56) mod 8 = 0) by exact (z_mod_addo 8 A 56 Hal eq_refl).
     assert (M64 : (A + 64) mod 8 = 0) by exact (z_mod_addo 8 A 64 Hal eq_refl).
     assert (M72 : (A + 72) mod 8 = 0) by exact (z_mod_addo 8 A 72 Hal eq_refl).
     assert (M80 : (A + 80) mod 8 = 0) by exact (z_mod_addo 8 A 80 Hal eq_refl).
@@ -1728,7 +1739,18 @@ Section BootCarveMain.
                  ltac:(lia) ltac:(lia) with "H") as "[_ H]".
     iDestruct (boot_ran_split g (A + 48) (A + 48 + 4) (A + 360)
                  ltac:(lia) ltac:(lia) with "H") as "[Hpid H]".
-    iDestruct (boot_ran_split g (A + 48 + 4) (A + 64) (A + 360)
+    iDestruct (boot_ran_split g (A + 48 + 4) (A + 56) (A + 360)
+                 ltac:(lia) ltac:(lia) with "H") as "[_ H]".
+    (* +56 IS [p_parent], and it used to be dropped with the padding.  It is
+       the only cell of the slot that belongs to a lock OTHER than p->lock:
+       [WaitInv.wait_res] is [∃ ps, parents_own ps], the NPROC parent cells,
+       and wait_lock is what kexit and kwait take to touch them.  Carving it
+       here is what finally gives that lock a resource to be over. *)
+    iDestruct (boot_ran_split g (A + 56) (A + 56 + 8) (A + 360)
+                 ltac:(lia) ltac:(lia) with "H") as "[Hpar H]".
+    (* the empty re-anchoring cut, so the next window's [lo] is literally
+       [A + 64] -- the header's rule, and [A + 56 + 8] is not it *)
+    iDestruct (boot_ran_split g (A + 56 + 8) (A + 64) (A + 360)
                  ltac:(lia) ltac:(lia) with "H") as "[_ H]".
     iDestruct (boot_ran_split g (A + 64) (A + 64 + 8) (A + 360)
                  ltac:(lia) ltac:(lia) with "H") as "[Hks H]".
@@ -1772,6 +1794,8 @@ Section BootCarveMain.
                  with "Hcl Hxs") as (vxs) "Hxs".
     iDestruct (boot_ran_cell4 g (A + 48) Hmem ltac:(lia) ltac:(lia) M48
                  with "Hcl Hpid") as (vpid) "Hpid".
+    iDestruct (boot_ran_cell8 g (A + 56) Hmem ltac:(lia) ltac:(lia) M56
+                 with "Hcl Hpar") as (vpar) "Hpar".
     iDestruct (boot_ran_cell8 g (A + 64) Hmem ltac:(lia) ltac:(lia) M64
                  with "Hcl Hks") as (vks) "Hks".
     iDestruct (boot_ran_cell8_bss g (A + 72) (zero_reg : mword 64) Hmem
@@ -1800,7 +1824,7 @@ Section BootCarveMain.
       as "[Hpid1 Hpid2]".
     { rewrite -word4_pointsto_frac_split Qp.div_2. iExact "Hpid". }
     rewrite /proc_slot_raw /proc_raw /proc_pub /proc_dormant_nofd /proc_fields
-            /p_state /p_chan /p_killed /p_xstate /p_pid /p_kstack /p_sz
+            /p_state /p_chan /p_parent /p_killed /p_xstate /p_pid /p_kstack /p_sz
             /p_pagetable /p_trapframe /p_context /p_cwd
             E48 E72 E80 E88 !off_of_z.
     iSplitL "Hlk Hst Hks Hpid1 Hsz Hcwd Hnm Hof Hctx Hpg Htf".
@@ -1820,6 +1844,7 @@ Section BootCarveMain.
         iSplitR; [iPureIntro; exact Hbs |]. iExact "Hnm". }
       iSplitL "Hof"; [iExact "Hof" |]. iSplitL "Hctx"; [iExact "Hctx" |].
       iSplitL "Hpg"; [iExact "Hpg" |]. iExact "Htf". }
+    iSplitR "Hpar"; [| iExists vpar; iExact "Hpar"].
     iSplitL "Hch"; [iExists vch; iExact "Hch" |].
     iExists vkl, vxs, vpid.
     iSplitL "Hkl"; [iExact "Hkl" |]. iSplitL "Hxs"; [iExact "Hxs" |].
@@ -1837,7 +1862,10 @@ Section BootCarveMain.
     -∗ ([∗ list] i ∈ seq 0 NPROC, proc_raw (proc_addr i)) ∗
        ([∗ list] i ∈ seq 0 NPROC,
           (∃ ch : SailStdpp.Values.mword 64, p_chan (proc_addr i) ↦₈ ch) ∗
-          proc_pub (proc_addr i)).
+          proc_pub (proc_addr i)) ∗
+       (* ...and the parent cells, which are wait_lock's, not p->lock's *)
+       ([∗ list] i ∈ seq 0 NPROC,
+          ∃ pv : SailStdpp.Values.mword 64, p_parent (proc_addr i) ↦₈ pv).
   Proof.
     intro Hmem. iIntros "#Hcl H".
     iDestruct (boot_stride_family_seq g proc_slot_raw
@@ -1860,12 +1888,16 @@ Section BootCarveMain.
                                     T1 T2 with "H") as "[H _]";
                        iApply (boot_proc_slot g A Hmem Q1 Q2 Q3 with "Hcl H"))
                  with "Hcl H") as "H".
-    rewrite /proc_slot_raw big_sepL_sep. iDestruct "H" as "[H1 H2]".
+    rewrite /proc_slot_raw big_sepL_sep. iDestruct "H" as "[H1 H23]".
+    rewrite big_sepL_sep. iDestruct "H23" as "[H2 H3]".
     iSplitL "H1".
     - iApply (big_sepL_mono with "H1"). iIntros (n i _) "Hi".
       rewrite (proc_addr_of_z i). iExact "Hi".
-    - iApply (big_sepL_mono with "H2"). iIntros (n i _) "Hi".
-      rewrite (proc_addr_of_z i). iExact "Hi".
+    - iSplitL "H2".
+      + iApply (big_sepL_mono with "H2"). iIntros (n i _) "Hi".
+        rewrite (proc_addr_of_z i). iExact "Hi".
+      + iApply (big_sepL_mono with "H3"). iIntros (n i _) "Hi".
+        rewrite (proc_addr_of_z i). iExact "Hi".
   Qed.
 
   (* one page, out of its own 4096-byte range: [BootCarve.boot_ran_mem_run]
