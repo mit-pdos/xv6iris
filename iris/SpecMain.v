@@ -535,11 +535,14 @@ Section SpecMain.
        dead-ended there; stage (f) threads it to main, which parks it in
        [FirstTok.first_fsinit] for initlog. ---- *)
     log_mirror_full -∗
-    (* ---- ROW (C), first half: ONE iref-slot unit, for ireclaim's
-       iget/iput pair inside fsinit.  Split off the file table's share in
-       [boot_shared_alloc]; the second half ([BioDefs.bslots]) is produced
-       at WP time by [bio_init_at] and never crosses this boundary. ---- *)
-    iref_slot -∗
+    (* ---- ROW (C), first half: TWO iref-slot units.  One is for
+       ireclaim's iget/iput pair inside fsinit, which hands it back; the
+       pair is what [SpecKexec] takes, and forkret's [if (first)] arm calls
+       kexec off this same token straight after fsinit.  Split off the file
+       table's share in [boot_shared_alloc]; the second half
+       ([BioDefs.bslots]) is produced at WP time by [bio_init_at] and never
+       crosses this boundary. ---- *)
+    iref_slots 2 -∗
     (* [IrefSlots.iref_slots_auth] -- row (P4) of [fs_kit_icache]'s header.
        Minted by [IrefSlots.iref_slots_alloc] inside [boot_shared_alloc]
        beside the [irefslotG] instance, NOT by the era fupd, so it travels

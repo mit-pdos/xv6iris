@@ -62,18 +62,18 @@ Section KvminitBody.
      apply its OWN lemmas at a migrated hart, and then make CID an implicit
      per-lemma binder" -- exactly this situation. *)
   Hypothesis wp_kvmmake :
-    forall `{CID : CpuId} (γa : gname) (mm : regfile) (lvl K : nat)
+    forall `{CID : CpuId} (γa : gname) (γk : gname * gname) (mm : regfile) (lvl K : nat)
       (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string),
-      wp_kvmmake_sconf_body γa mm lvl K eb p on b lks.
+      wp_kvmmake_sconf_body γa γk mm lvl K eb p on b lks.
 
   Ltac reg_neq :=
     lazymatch goal with
     | |- ?a <> ?b => tryif unify a b then fail else (vm_compute; discriminate)
     end.
 
-  Lemma wp_kvminit_sconf_gen (γa : gname) (mm : regfile)
+  Lemma wp_kvminit_sconf_gen (γa : gname) (γk : gname * gname) (mm : regfile)
       (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (kpt0 : mword 64) (b : bool) (lks : gset string) :
-    wp_kvminit_sconf_body γa mm lvl K eb p on kpt0 b lks.
+    wp_kvminit_sconf_body γa γk mm lvl K eb p on kpt0 b lks.
   Proof.
     unfold wp_kvminit_sconf_body.
     intros Hlvl HK Hex Hlkbelow.
@@ -163,7 +163,7 @@ Section KvminitBody.
        two uses of the same lemma. ---- *)
     iDestruct (cpu_own_transport CID CID5 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (wp_kvmmake γa J 0%nat (K - 2)%nat eb p (Some nb) b lks
+    iApply (wp_kvmmake γa γk J 0%nat (K - 2)%nat eb p (Some nb) b lks
               eq_refl HKmk
               ltac:(exists nb; split; [reflexivity | exact Hnbk])
               with "Hcg Hcnt Htext Hpc Henv").
@@ -280,11 +280,11 @@ End KvminitBody.
 (* ===================================================================== *)
 Module KvminitProof (KMK : KVMMAKE) : KVMINIT.
   Definition wp_kvminit_sconf `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (kpt0 : mword 64) (b : bool) (lks : gset string)
-      : wp_kvminit_sconf_body γa mm lvl K eb p on kpt0 b lks :=
+      (γa : gname) (γk : gname * gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (kpt0 : mword 64) (b : bool) (lks : gset string)
+      : wp_kvminit_sconf_body γa γk mm lvl K eb p on kpt0 b lks :=
     (* eta-expand the module argument: passed bare, implicit-argument
        insertion would silently resolve [KMK.wp_kvmmake_sconf]'s [CID] at
        THIS definition's own ambient hart, defeating [wp_kvminit_sconf_gen]'s
        hypothesis (which needs it callable at ANY hart). *)
-    wp_kvminit_sconf_gen (fun (CID' : CpuId) => KMK.wp_kvmmake_sconf (CID:=CID')) γa mm lvl K eb p on kpt0 b lks.
+    wp_kvminit_sconf_gen (fun (CID' : CpuId) => KMK.wp_kvmmake_sconf (CID:=CID')) γa γk mm lvl K eb p on kpt0 b lks.
 End KvminitProof.

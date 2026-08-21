@@ -1251,10 +1251,12 @@ Section BootAlloc.
          -- run here, beside the [irefslotG] instance it returns -- can
          produce.  It used to be dropped on the floor at that call. *)
       iref_slots_auth ∗
-      (* ...and ONE iref-slot UNIT, row (C) of [FirstTok.first_fsinit]:
-         fsinit's ireclaim borrows it for its iget/iput pair.  It is split
+      (* ...and TWO iref-slot UNITS, row (C) of [FirstTok.first_fsinit]:
+         fsinit's ireclaim borrows ONE for its iget/iput pair and hands it
+         back, and [SpecKexec] -- which forkret's [if (first)] arm reaches
+         next, on the same token -- takes [iref_slots 2].  Both are split
          off the file table's [NFILE] share, which nothing holds yet. *)
-      iref_slot ∗
+      iref_slots 2 ∗
       (* the ten config ties and the two boot kits, AT THE INSTANCE the
          chain arms above are applied at.  Stage (e) is the consumer:
          kit 1 in [ProofMain.mn_grp_fs], kit 2 through [SpecUserinit] to
@@ -1358,13 +1360,14 @@ Section BootAlloc.
     iEval (rewrite /IREFSLOTS) in "Hirslots".
     iDestruct (iref_slots_split (NPROC * (1 + IREFSPARE)) NFILE with "Hirslots")
       as "[Hirslots Hirfile]".
-    (* ONE of the file table's units is kept and threaded to main: it is
-       row (C) of [FirstTok.first_fsinit] -- [SpecFsinit] takes exactly one
-       [iref_slot] for ireclaim's iget/iput pair and hands it back
-       (fs-cfg-boot.md (f-2)).  The rest still go nowhere. *)
-    assert (Hnf : NFILE = (1 + (NFILE - 1))%nat) by (unfold NFILE; lia).
+    (* TWO of the file table's units are kept and threaded to main: they
+       are row (C) of [FirstTok.first_fsinit].  [SpecFsinit] takes one for
+       ireclaim's iget/iput pair and hands it back (fs-cfg-boot.md (f-2));
+       [SpecKexec], which forkret's boot arm calls next off the same token,
+       takes two.  The rest still go nowhere. *)
+    assert (Hnf : NFILE = (2 + (NFILE - 2))%nat) by (unfold NFILE; lia).
     iEval (rewrite Hnf) in "Hirfile".
-    iDestruct (iref_slots_split 1 (NFILE - 1) with "Hirfile")
+    iDestruct (iref_slots_split 2 (NFILE - 2) with "Hirfile")
       as "[Hirslot _]".
     (* ---- the .bss, in address order ---- *)
     iDestruct (boot_bss_carve g Hbf with "Hcl Hfdslots Hirslots Hbss") as

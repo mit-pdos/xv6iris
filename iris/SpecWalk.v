@@ -30,7 +30,7 @@ Import Defs.
 
 
 Definition wp_walk_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
-    (kt : ktier) (γa : gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (K : nat) (lvl : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string) :=
+    (kt : ktier) (γa : gname) (γk : gname * gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (K : nat) (lvl : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string) :=
   let va := mm !!! Regidx (mword_of_int 11) in
   let vpn := svpn_of va in
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
@@ -56,14 +56,14 @@ Definition wp_walk_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : Cp
   kernel_text -∗
   pc_is (mword_of_int KernelSyms.walk) -∗
   ptree_own 2 (DfracOwn 1) t -∗
-  kalloc_env γa on -∗
+  kalloc_env_at γa γk on -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t' : ptree) (g : nat),
     sie_cap_gpr kt mr K b p -∗ cpu_own lvl eb p b lks -∗
     pc_is ret_tgt -∗
     ptree_own 2 (DfracOwn 1) t' -∗
     ⌜pt_nodes t' = (pt_nodes t + g)%nat⌝ -∗
-    kalloc_env γa (avail_sub on g) -∗
+    kalloc_env_at γa γk (avail_sub on g) -∗
     ⌜callee_saved mm mr⌝ -∗
     ⌜ptree_same_rep0 t t'⌝ -∗
     ⌜ptree_offpath_eq vpn t t'⌝ -∗
@@ -80,8 +80,8 @@ Definition wp_walk_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : Cp
 Module Type WALK.
   Parameter wp_walk_sconf :
     forall `{!riscvGS Σ, !xv6G Σ} (kt : ktier) `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (K : nat) (lvl : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string),
-      wp_walk_sconf_body kt γa mm t m K lvl eb p on b lks.
+      (γa : gname) (γk : gname * gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (K : nat) (lvl : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string),
+      wp_walk_sconf_body kt γa γk mm t m K lvl eb p on b lks.
 End WALK.
 
 (* --------------------------------------------------------------------- *)

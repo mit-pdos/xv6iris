@@ -832,7 +832,7 @@ Section ProofMain.
         pc_is (mword_of_int (KernelSyms.main + 0x7e) : mword 64) -∗
         cpu_ctx_free -∗
         cpu_own 0 false p0 false ∅ -∗
-        kalloc_env fsc_kalloc (avail_sub (Some (length ps)) K_kvmmake) -∗
+        kalloc_env_at fsc_kalloc fsc_kpages (avail_sub (Some (length ps)) K_kvmmake) -∗
         (* ...AND THE SAME LOCK, SPELLED (fs-cfg-boot.md (f-3), row 16 of
            [FirstTok.first_boot_persist]).  [kalloc_env] hides the page
            gname behind an [∃ γk], and a consumer that names the pair
@@ -900,10 +900,15 @@ Section ProofMain.
                      = (mword_of_int (KernelSyms.main + 0x72) : mword 64)).
     { rewrite /V1 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hretki) in "Hpc".
-    (* ---- ASSEMBLY 1: kalloc_env out of + kalloc_avail ---- *)
-    iAssert (kalloc_env fsc_kalloc (Some (length ps))) with "[Havail]" as "Hkenv".
-    { rewrite /kalloc_env. iExists fsc_kpages. iSplitR; [iExact "Hkmem"|].
-      iExact "Havail". }
+    (* ---- ASSEMBLY 1: the allocator bundle, WITH THE PAIR NAMED ----
+       [KvmSpec.kalloc_env_at] rather than [kalloc_env]: main is the only
+       place the free-list pair has a name, and the counted chain below --
+       kvminit, procinit, userinit, allocproc -- has to carry it as far as
+       userinit's seal, which is what mints [FirstTok.first_tok]'s allocator
+       row.  The [∃ γk] version loses it here and nothing recovers it. *)
+    iAssert (kalloc_env_at fsc_kalloc fsc_kpages (Some (length ps)))
+      with "[Havail]" as "Hkenv".
+    { iApply (kalloc_env_at_intro with "Hkmem Havail"). }
     (* ---- +0x72 jal kvminit ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x72)) (mword_of_int 1 : mword 5)
               (mword_of_int 718 : mword 21) mki n false
@@ -918,7 +923,7 @@ Section ProofMain.
               = (mword_of_int KernelSyms.kvminit : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtkv) in "Hpc".
-    iApply (Kvminit.wp_kvminit_sconf fsc_kalloc V2 0%nat n false p0
+    iApply (Kvminit.wp_kvminit_sconf fsc_kalloc fsc_kpages V2 0%nat n false p0
               (Some (length ps)) kpt0 false ∅ eq_refl ltac:(lia)
               ltac:(exists (length ps); split; [reflexivity | lia])
               with "Hcg Hcpu Htext Hpc Hkpt Hkenv").
@@ -1280,7 +1285,7 @@ Section ProofMain.
        userinit's real contract takes it (allocproc's own premise), the weak
        one does not.  Persistent, so carrying it costs a frame. *)
     is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
-    kalloc_env fsc_kalloc (avail_sub (Some (length ps)) K_kvmmake) -∗
+    kalloc_env_at fsc_kalloc fsc_kpages (avail_sub (Some (length ps)) K_kvmmake) -∗
     lk_raw bcache_addr -∗
     ([∗ list] k ∈ seq 0 NBUF, sl_raw (buf_lock (bnode k))) -∗
     ([∗ list] k ∈ seq 0 NBUF, blink_raw (bnode k)) -∗
@@ -1324,7 +1329,7 @@ Section ProofMain.
     main_sb_raw -∗
     main_log_raw -∗
     log_mirror_full -∗
-    iref_slot -∗
+    iref_slots 2 -∗
     iref_slots_auth -∗
     ([∗ list] k ∈ seq 0 NINODE, ientry_raw k) -∗
     lk_raw (mword_of_int KernelSyms.ftable) -∗
@@ -1530,7 +1535,7 @@ Section ProofMain.
     (* the pinned-map re-point [mn_pin_sie_cap_gpr] exists for: virtio_disk_init
        is the ONE callee left demanding a raw-map tp fact. *)
     iDestruct (mn_pin_sie_cap_gpr with "Hcg") as "Hcg".
-    iApply (VirtioDiskInit.wp_virtio_disk_init_sconf γv fsc_kalloc (tp_pin F4) n false p0
+    iApply (VirtioDiskInit.wp_virtio_disk_init_sconf γv fsc_kalloc fsc_kpages (tp_pin F4) n false p0
               (avail_sub (Some (length ps)) K_kvmmake) c0
               vdl vdn vdc pd0 pav0 pu0 free0 ∅ ltac:(lia)
               Hnb3 (rget_tp F4) Hlive

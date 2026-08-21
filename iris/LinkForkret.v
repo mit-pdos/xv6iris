@@ -13,6 +13,8 @@
    whatever the trap loop already carries ([LinkSyscall]'s and
    [LinkPrintk]'s, through usertrap). *)
 Require Import LinkMyproc LinkRelease LinkPrepareReturn LinkUserretClosed.
+Require Import LinkFsinit LinkKexec LinkPanic.
 Require Import ProofForkret.
 
-Module Forkret := ForkretProof Myproc Release PrepareReturn UserretClosedD.
+Module Forkret := ForkretProof Myproc Release PrepareReturn
+                              Fsinit Kexec Panic UserretClosedD.

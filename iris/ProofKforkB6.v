@@ -10,7 +10,7 @@
      - [Hcont10a] -- allocproc found no free slot (+0x016 taken).  Reaches
        exactly [ProofKfork.kfk_exit_alloc]'s precondition, plus the ghost
        resources (the parent's [proc_priv], the cwd [inode_ref], and
-       allocproc's own "no slot" disjunction on [kalloc_env]) that
+       allocproc's own "no slot" disjunction on [kalloc_env_at]) that
        [kfork_post]'s first disjunct needs.
 
      - [Hcont7c] -- uvmcopy failed (+0x02c taken).  Reaches the
@@ -227,8 +227,13 @@ Section KforkPrologue.
   (* =================================================================== *)
   (*  THE BLOCK.                                                          *)
   (* =================================================================== *)
+  (* [γk] IS A PARAMETER.  The allocator arrives as the NAMED bundle
+     [KvmSpec.kalloc_env_at γa γk on] (that is what allocproc's contract
+     takes), but kfork is uncounted and reached only from [sys_fork], which
+     holds a generic allocator gname -- so the count/seal pair is universally
+     quantified, never [fsc_kpages]. *)
   Lemma kfk_prologue
-      (γa γp γw γl γf γil γic : gname) (γs : list gname)
+      (γa : gname) (γk : gname * gname) (γp γw γl γf γil γic : gname) (γs : list gname)
       (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z) (nib : nat)
       (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
       (on : option nat) (b : bool) (pid_p : mword 32) (Vp : pprivate)
@@ -255,7 +260,7 @@ Section KforkPrologue.
     is_ftable γl γf -∗
     is_itable2 γil cn γfs γic cov logstart nib icfg_dev -∗
     itable_inv -∗
-    kalloc_env γa on -∗
+    kalloc_env_at γa γk on -∗
     (* the proc table's sealed regime -- what allocproc mints the new slot's
        marker out of.  Persistent, so it costs the three continuations
        nothing. *)
@@ -287,9 +292,9 @@ Section KforkPrologue.
         pc_is (mword_of_int (KF + 0x10a) : mword 64) -∗
         kfk_frame sp0 ra0 s00 s10 s50 -∗
         proc_priv γf pme pid_p Vp -∗
-        ( kalloc_env γa on
+        ( kalloc_env_at γa γk on
           ∨ (∃ n : nat, ⌜(n <= K_allocproc)%nat /\ avail_zero (avail_sub on n)⌝ ∗
-             kalloc_env γa None) ) -∗
+             kalloc_env_at γa γk None) ) -∗
         R -∗
         WP (Loop : expr riscv_lang)) -∗
     (* ---- Hcont7c : uvmcopy failed ---- *)
@@ -351,7 +356,7 @@ Section KforkPrologue.
         ProcDefs.kstack_free npa -∗
         IntrDefs.arm_pay KT1 lvl eb pme -∗
         cpu_own (S lvl) eb pme false ({["proc"]} ∪ lks) -∗
-        kalloc_env γa None -∗
+        kalloc_env_at γa γk None -∗
         R -∗
         WP (Loop : expr riscv_lang))) -∗
     (* ---- Hcont4a : uvmcopy succeeded -- the trapframe copy loop's head --- *)
@@ -426,7 +431,7 @@ Section KforkPrologue.
              (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest)) -∗
         IntrDefs.arm_pay KT1 lvl eb pme -∗
         cpu_own (S lvl) eb pme false ({["proc"]} ∪ lks) -∗
-        kalloc_env γa None -∗
+        kalloc_env_at γa γk None -∗
         is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
         is_ftable γl γf -∗
         is_itable2 γil cn γfs γic cov logstart nib icfg_dev -∗
@@ -655,7 +660,7 @@ Section KforkPrologue.
     assert (HM5ra : M5 !!! Regidx Rra = add_vec_int (mword_of_int (KF + 0x12) : mword 64) 4)
       by (rewrite /M5 upd_eq; reflexivity).
     iDestruct (cpu_own_transport CID8 CID10 lvl eb pme b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Allocproc.wp_allocproc_core γa γp γf γs M5 lvl K1 eb pme on None b lks
+    iApply (Allocproc.wp_allocproc_core γa γk γp γf γs M5 lvl K1 eb pme on None b lks
               ltac:(lia) ltac:(lia) Hbelow
               with "Hcg Hcpu Htext Hpc Hprocs Hplock Henv Hpav").
     all: try lkbelow.
@@ -938,14 +943,18 @@ Section KforkPrologue.
       assert (HCempty : ud_um (pv_upt Vc) = ∅) by (rewrite HVcupt; reflexivity).
       iDestruct (cpu_own_transport CID11 CID18 (S lvl) eb pme false ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iApply fupd_wp.
-      iMod (kalloc_env_seal with "Henv'") as "Henv'".
+      iMod (kalloc_env_at_seal with "Henv'") as "Henv'".
       iModIntro.
       iDestruct "Henv'" as "#Henv'".
+      (* uvmcopy takes the ANONYMOUS bundle ([kalloc_env]); project into it
+         for the call and keep the named [kalloc_env_at] -- both are
+         persistent at [None] -- for the continuations below. *)
+      iDestruct (KvmSpec.kalloc_env_at_env with "Henv'") as "#Henvb".
       iApply (Uvmcopy.wp_uvmcopy_sconf γa N5p (pv_upt Vp) (pv_upt Vc) (trap_res b + K1)%nat eb pme (S lvl) false
                 ({["proc"]} ∪ lks)
                 ltac:(lia) ltac:(lia) HN5ptp HN5pa0 HN5pa1 HszbP
                 ltac:(intros i _; rewrite HCempty; apply lookup_empty)
-                with "Hcg Hcpu Htext Hpc HPpt HCpt Henv'").
+                with "Hcg Hcpu Htext Hpc HPpt HCpt Henvb").
       all: try lkbelow.
       iIntros (CID19 Hs19 mf9) "Hcg Hcpu Hpc %HcsD HPpt Hpost9".
       assert (Hpc2c : ret_pc (N5p !!! Regidx Rra) = mword_of_int (KF + 0x2c))

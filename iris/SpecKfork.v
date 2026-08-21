@@ -53,7 +53,7 @@
 
    THERE IS NO PAGE COUNT.  kfork is reached from [sys_fork] and from
    nowhere else, so it never runs in the allocator's COUNTED regime: the
-   precondition is [kalloc_env γa None] outright, not a generic
+   precondition is [kalloc_env_at γa γk None] outright, not a generic
    [on : option nat].  Two things follow and both simplify the contract.
 
    First, allocproc is called with no budget, so both of its own [freeproc]
@@ -62,13 +62,13 @@
 
    Second, and this is what shrinks [kfork_post]: at [None] every arm
    reports the SAME thing.  [uvmcopy] and [freeproc] are stated only at
-   [kalloc_env γa None], so the two arms past "found a slot" were always
+   [kalloc_env_at γa γk None], so the two arms past "found a slot" were always
    going to report it; and the "no free slot" arm, which used to be able to
    hand the caller's own [on] back untouched, now hands back [None] too --
    while [allocproc_post]'s third disjunct degenerates, since
    [avail_sub None n] is [None] and [avail_zero None] is [True], so its
    "the allocator ran dry after n pages" witness says nothing.  So
-   [kalloc_env γa None] is hoisted OUT of the disjunction, beside
+   [kalloc_env_at γa γk None] is hoisted OUT of the disjunction, beside
    [proc_priv], and the three arms collapse to TWO: the return value is
    either -1 or the child's pid, and that is the whole of what the arms
    still distinguish.
@@ -161,6 +161,7 @@ Require Import CpuOwn.
 Require Import FdSlots FileInv.
 Require Import ProcInv.
 Require Import SchedCtx.
+Require Import FsCfg.
 Require Import KvmSpec.
 Require Import FsBlocks.
 Require Import InodeRegion.
@@ -185,7 +186,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Notation K_kfork := (56%nat) (only parsing).
 Definition kfork_post
     `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa γf : gname) (cn : ic_names) (lvl : nat) (eb : bool)
+    (γa : gname) (γk : gname * gname) (γf : gname) (cn : ic_names) (lvl : nat) (eb : bool)
     (pme : mword 64)
     (b : bool) (pid_p : mword 32) (Vp : pprivate)
     (K : nat) (mr : regfile) (rv : mword 64) (lks : gset string) : iProp Σ :=
@@ -200,7 +201,7 @@ Definition kfork_post
     (* THE ALLOCATOR'S STATE IS THE SAME ON EVERY ARM, so it is stated ONCE
        here rather than per-disjunct.  See the header: with no page count
        there is nothing left for the arms to disagree about. *)
-    kalloc_env γa None ∗
+    kalloc_env_at γa γk None ∗
     (* ... and what IS left is only the return value.  Nothing about the
        CHILD appears: on the failure arm freeproc returned it to
        [procs_inv], on the success arm the RUNNABLE park swallowed it. *)
@@ -211,7 +212,7 @@ Definition kfork_post
 
 Definition wp_kfork_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa γp γw γl γf γil γic : gname)  (γs : list gname)
+    (γa : gname) (γk : gname * gname) (γp γw γl γf γil γic : gname)  (γs : list gname)
     (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z)
     (inodestart : Z) (nib : nat)
     (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
@@ -250,7 +251,7 @@ Definition wp_kfork_sconf_body
      (the dispatch's [sysc_fs_env]), so it costs a caller a frame and
      nothing else.  kfork reads no dinode and touches no log. *)
   ireg_inv γic γfs inodestart nib -∗
-  kalloc_env γa None -∗
+  kalloc_env_at γa γk None -∗
   (* THE PROC TABLE'S SEALED REGIME.  kfork allocates a proc, so it needs
      [ProcAvail]'s authority to mint the new slot's allocation marker -- and
      it takes the count-free arm, which is persistent and says nothing, so
@@ -269,7 +270,7 @@ Definition wp_kfork_sconf_body
     ∀ (mr : regfile),
       ⌜ callee_saved m mr ⌝ -∗
       pc_is ret_tgt -∗
-      kfork_post γa γf cn lvl eb pme b pid_p Vp K mr
+      kfork_post γa γk γf cn lvl eb pme b pid_p Vp K mr
         (mr !!! Regidx (mword_of_int 10 : mword 5)) lks -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -277,11 +278,11 @@ Definition wp_kfork_sconf_body
 Module Type KFORK.
   Parameter wp_kfork_sconf :
     forall `{!riscvGS Σ, !xv6G Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa γp γw γl γf γil γic : gname) (γs : list gname)
+      (γa : gname) (γk : gname * gname) (γp γw γl γf γil γic : gname) (γs : list gname)
       (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z)
       (inodestart : Z) (nib : nat)
       (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
       (b : bool) (pid_p : mword 32) (Vp : pprivate) (lks : gset string),
-      wp_kfork_sconf_body γa γp γw γl γf γil γic γs cn γfs cov logstart
+      wp_kfork_sconf_body γa γk γp γw γl γf γil γic γs cn γfs cov logstart
         inodestart nib m lvl K eb pme b pid_p Vp lks.
 End KFORK.

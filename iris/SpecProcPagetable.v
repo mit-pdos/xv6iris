@@ -53,16 +53,16 @@ Notation K_proc_pagetable := (3%nat) (only parsing).
    so what lets one proof serve both the counted contract below and the
    uncounted one allocproc's failure tails need. *)
 Definition ppt_post `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (on : option nat) (tfp : mword 44) (rv : mword 64) : iProp Σ :=
+    (γa : gname) (γk : gname * gname) (on : option nat) (tfp : mword 44) (rv : mword 64) : iProp Σ :=
   ((∃ t : ptree,
       ⌜rv = zero_extend' 64 (concat_vec (pt_base t) (zeros' 12 : mword 12))⌝ ∗
       ptree_own 2 (DfracOwn 1) t ∗
       ⌜pt_rep0 t (ppt_map tfp)⌝ ∗
       ⌜(pt_nodes t <= K_proc_pagetable)%nat⌝ ∗
-      kalloc_env γa (avail_sub on (pt_nodes t)))
+      kalloc_env_at γa γk (avail_sub on (pt_nodes t)))
    ∨ (⌜rv = (mword_of_int 0 : mword 64)⌝ ∗
       ⌜exists n : nat, (n <= K_proc_pagetable)%nat /\ avail_zero (avail_sub on n)⌝ ∗
-      kalloc_env γa None))%I.
+      kalloc_env_at γa γk None))%I.
 
 (* proc_pagetable(p): build a user page table with no user memory --
    uvmcreate() an empty root, then map TRAMPOLINE (R|X, at the kernel's
@@ -95,7 +95,7 @@ Definition ppt_post `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
    charged anyway: a stack budget is a property of the code, not of the path
    a particular caller proves it takes. *)
 Definition wp_proc_pagetable_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string) :=
+    (γa : gname) (γk : gname * gname) (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string) :=
   let pp := mm !!! Regidx (mword_of_int 10) in
   let tfp := (autocast (T := mword) (subrange_vec_dec tf 55 12) : mword 44) in
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
@@ -110,7 +110,7 @@ Definition wp_proc_pagetable_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} 
   cpu_own lvl eb p b lks -∗ kernel_text -∗
   pc_is (mword_of_int KernelSyms.proc_pagetable) -∗
   p_trapframe pp ↦₈{dqtf} tf -∗
-  kalloc_env γa on -∗
+  kalloc_env_at γa γk on -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t : ptree),
     sie_cap_gpr KT1 mr K b p -∗
@@ -122,7 +122,7 @@ Definition wp_proc_pagetable_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} 
        = zero_extend' 64 (concat_vec (pt_base t) (zeros' 12 : mword 12))⌝ -∗
     ⌜pt_rep0 t (ppt_map tfp)⌝ -∗
     ⌜(pt_nodes t <= K_proc_pagetable)%nat⌝ -∗
-    kalloc_env γa (avail_sub on (pt_nodes t)) -∗
+    kalloc_env_at γa γk (avail_sub on (pt_nodes t)) -∗
     ⌜callee_saved mm mr⌝ -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -134,7 +134,7 @@ Definition wp_proc_pagetable_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} 
    allocproc's own failure tails (and anything else outside the counted
    regime) have to call it. *)
 Definition wp_proc_pagetable_core_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string) :=
+    (γa : gname) (γk : gname * gname) (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string) :=
   let pp := mm !!! Regidx (mword_of_int 10) in
   let tfp := (autocast (T := mword) (subrange_vec_dec tf 55 12) : mword 44) in
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
@@ -148,14 +148,14 @@ Definition wp_proc_pagetable_core_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `
   cpu_own lvl eb p b lks -∗ kernel_text -∗
   pc_is (mword_of_int KernelSyms.proc_pagetable) -∗
   p_trapframe pp ↦₈{dqtf} tf -∗
-  kalloc_env γa on -∗
+  kalloc_env_at γa γk on -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),
     sie_cap_gpr KT1 mr K b p -∗
     cpu_own lvl eb p b lks -∗
     pc_is ret_tgt -∗
     p_trapframe pp ↦₈{dqtf} tf -∗
-    ppt_post γa on tfp (mr !!! Regidx (mword_of_int 10)) -∗
+    ppt_post γa γk on tfp (mr !!! Regidx (mword_of_int 10)) -∗
     ⌜callee_saved mm mr⌝ -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -163,13 +163,13 @@ Definition wp_proc_pagetable_core_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `
 Module Type PROC_PAGETABLE_GEN.
   Parameter wp_proc_pagetable_core :
     forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string),
-      wp_proc_pagetable_core_body γa mm tf dqtf lvl K eb p on b lks.
+      (γa : gname) (γk : gname * gname) (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string),
+      wp_proc_pagetable_core_body γa γk mm tf dqtf lvl K eb p on b lks.
 End PROC_PAGETABLE_GEN.
 
 Module Type PROC_PAGETABLE.
   Parameter wp_proc_pagetable_sconf :
     forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string),
-      wp_proc_pagetable_sconf_body γa mm tf dqtf lvl K eb p on b lks.
+      (γa : gname) (γk : gname * gname) (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string),
+      wp_proc_pagetable_sconf_body γa γk mm tf dqtf lvl K eb p on b lks.
 End PROC_PAGETABLE.

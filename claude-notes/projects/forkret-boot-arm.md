@@ -1,6 +1,7 @@
-# forkret's `if (first)` arm — and the interrupt index that gates it
+# forkret's `if (first)` arm — DONE
 
-`forkret()` is proved (`ProofForkret.v`, `LinkForkret.v`) except for one arm:
+`forkret()` is proved end to end: `ProofForkret.v` has no `Admitted`, and
+neither does anything it depends on.
 
 ```c
   if (__atomic_load_n(&first, __ATOMIC_ACQUIRE)) {
@@ -11,35 +12,60 @@
   }
 ```
 
-+0x14 .. +0x62, plus the panic tail at +0x9a. It is `ProofForkret.fkr_boot`,
-the tree's only `Admitted`, and `tools/proof_coverage.py` flags `forkret`
-with `!` because of it.
++0x14 .. +0x62 plus the panic tail at +0x9a is `ProofForkret.fkr_boot`; both
+arms of the `-1` test are proved, and both meet `fkr_tail` / `panic`.
 
-## The branch itself is DONE, and it cost the contract nothing
+This file is kept as the record of what the arm cost. The remaining open
+work on forkret is `forkret_park` — who may HAND forkret its precondition
+— which is a separate note (`claude-notes/projects/forkret-park.md`) and
+never gated this.
 
-`SpecForkret.wp_forkret_gen_body` takes **no `first` premise at all** any
-more. The branch is decided by `FirstTok.first_tok`, which rides inside
+## The branch itself cost the contract nothing
+
+`SpecForkret.wp_forkret_gen_body` takes **no `first` premise at all**. The
+branch is decided by `FirstTok.first_tok`, which rides inside
 `ProcInv.proc_priv` — a resource the contract already took. `first_tok_open`
 hands out the two arms; the steady one (`first_addr ↦₄□ 0 ∗ fs_ready`,
 persistent) rejoins the block immediately and the walk below +0x14 is
 unchanged. "At most one process ever boots the file system" is a theorem
 about ownership (`FirstTok.first_tok_boot_excl`), not a scheduling claim.
 
-Everything the boot arm SPENDS is already lined up, and none of it is in
+Everything the boot arm SPENDS came from the token, and none of it is in
 forkret's precondition:
 
 | what | where it comes from |
 |---|---|
 | fsinit's whole premise pile | `FirstTok.first_fsinit_open` — in `SpecFsinit`'s own premise order |
 | main's sixteen persistent rows | `FirstTok.first_boot_persist` |
-| the allocator | `kalloc_env fsc_kalloc None`, the token's third row |
+| the allocator | `kalloc_avail fsc_kpages None`, the token's third row |
 | the seal after fsinit | `FirstTok.first_persist_pre` + `FsReady.fs_ready_establish` |
-| kexec's `fs_fabric` | `FsReady`'s accessors (`fs_ready_panic`, `fs_ready_log`, …) + `procs_inv` |
-| the steady token to rebuild | `FirstTok.first_tok_of_done`, after `word_pointsto_persist` on the store at +0x38 |
+| kexec's `fs_fabric` | `FsReady`'s accessors (`fs_ready_panic`, `fs_ready_region`, `fs_ready_kalloc`) + `procs_inv` + the caller's own `disk_geom` / `d_lock` |
+| the steady token to rebuild | `FirstTok.first_tok_of_done`, after `word4_pointsto_persist` on the store at +0x38 |
 
-## THE GATE: the arm runs with interrupts OFF
+Three interface gaps turned up while writing the walk and were closed in the
+token rather than in the contract, because the token's producer is unwritten
+and can simply be asked for more:
 
-**`eb` is `false` here, and that is the whole obstruction.** This revision's
+- **the budget.** `SpecForkret` now carries `(K_kexec <= av2)%nat`;
+  `prepare_return`'s 12 is subsumed by kexec's 184, which is what
+  `K_forkret = 6 + K_kexec` always said.
+- **the allocator row.** `first_tok`'s boot arm stores `kalloc_avail
+  fsc_kpages None` by NAME, because that is the half `FsReady.fs_ready_pre`
+  spells out and `fs_ready_establish` is what this arm fires. The bundled
+  `KvmSpec.kalloc_env` could never have satisfied it — its `∃ γk` is a
+  one-way valve (`is_lock` is an `inv`; Iris invariants do not agree) — so
+  the counted allocator chain from `main` to userinit's seal now carries the
+  pair named, via `KvmSpec.kalloc_env_at`. That is `fs-cfg-boot.md`'s Debt F,
+  discharged; see its (f-4) for who names it how and where the cascade
+  stops.
+- **the iref slots.** `first_fsinit` / `first_fsinit_open` carry
+  `iref_slots 2`, not `iref_slot`: fsinit spends one and kexec spends two,
+  and kexec's contract asks for the pair.
+
+## THE GATE THAT WAS: the arm runs with interrupts OFF
+
+**`eb` is `false` here**, and clearing that was most of the work. This
+revision's
 scheduler is
 
 ```c
@@ -91,7 +117,7 @@ the release produces exactly `trap_csrs_ext KT1 eb ∗ cpu_claim_ext eb p`, and
 `fkr_boot` takes both. Nothing in `SpecForkret.v` or in this file's structure
 changes when the sweep lands.
 
-## What `fkr_boot`'s statement already fixes
+## What `fkr_boot`'s statement fixes
 
 It is the goal at +0x14 on the arm the token selects, written out: the two
 callee-saved words the `if` cannot touch (`sp` at the frame, `s1 = p`), the
@@ -111,12 +137,11 @@ Two things inside it that are not plumbing:
   as `argv[0]` — which is why every byte run in that cone is dfrac-generic
   (durable-notes.md, "A BYTE RUN THE CALLEE ONLY READS TAKES THE CALLER'S
   FRACTION"); it comes out of `kernel_data` at `DfracDiscarded`.
-- **The panic arm is live and must be PROVED, not refuted.** `kexec` may
+- **The panic arm is live and is PROVED, not refuted.** `kexec` may
   return −1 (`SpecKexec.kexec_ok`'s failure disjunct is a real arm), so
   `beq a4,a5` at +0x60 is taken on it and +0x9a `jal panic` runs.
-  `claude-notes/completed/panic.md` is the recipe — this is the last arm in
-  the tree that ends in one, and the rule for deriving the `.rodata` message
-  address instead of copying one is there.
+  `claude-notes/completed/panic.md` is the recipe. The message resource is
+  `ProofForkretParts.fkr_exec_msg_res`, read straight out of `kernel_data`.
 
 ## Order of work, and where it stands
 
@@ -136,10 +161,33 @@ Two things inside it that are not plumbing:
    **THE ROUND IS COMPLETE.** No contract on forkret's boot path carries
    `eb = true ->` or `b = true ->` any more, and the tree is green.
 
-2. Then `fkr_boot`'s walk, which is now the only thing left. **It is no
-   longer blocked** — every callee the arm reaches is callable at
-   `eb = false`, and forkret already holds the complement (`Hext` / `Hcx`,
-   the `_ext` halves `IntrDefs.arm_pay_ext_split` produces at the release).
+2. Then `fkr_boot`'s walk. **Done.** Every callee the arm reaches is
+   callable at `eb = false`, and forkret holds the complement (`Hext` /
+   `Hcx`, the `_ext` halves `IntrDefs.arm_pay_ext_split` produces at the
+   release).
+
+### What the walk itself cost
+
+- **Two tiers of the same `.rodata` literal.** `SpecKexec`'s path premise is
+  written `↦ₘ[KT1]`; the argument-strings premise one line below it carries
+  no bracket at all and so resolves to `Ktier.curktier_default = KT0`.
+  `"/init"` is BOTH, so `ProofForkretParts` exports
+  `fkr_init_path_run0` (KT0, the real fact off `kernel_data_bytes`) and
+  `fkr_init_path_run` (KT1, a byte-wise `mem_ktier_mono` weakening of it).
+  The trapframe cells (`p_trapframe`, `tf_pa`) are at KT0 too — `ktd := KT0`,
+  not `KT1`, on all four `wp_cld`/`wp_csd` at +0x56..+0x5c.
+- **The transport source is not `CID`.** `fsinit`'s crossing is
+  `wp_next true`, which cuts the chain: after it returns, `cpu_own` /
+  `trap_csrs_ext` / `cpu_claim_ext` sit at `CIDf1`, and the eleven
+  non-parking crossings from +0x2c to +0x52 chain from THERE. Same again
+  after kexec, from `CIDk`. `wp_next_chain` reports this as
+  "Cannot find witness", not as a type error.
+- **The frame comes apart and goes back together.** `stack_own_split_1
+  (KTR := KT1) ksp 4 6` then `stack_own_2_elim` before the call;
+  `stack_own_2_intro` then `stack_own_split_2` on the success arm, out of
+  the argv row kexec hands back at the fraction it took. The `(KTR := KT1)`
+  is required — without it the section variable defaults to KT0 and
+  `iDestruct` reports the familiar "cannot instantiate (A -∗ B) with (A)".
 
 ### What the ports cost, beyond the recipe
 

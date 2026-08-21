@@ -26,7 +26,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 
 
 Definition wp_kvmmap_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string) :=
+    (γa : gname) (γk : gname * gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string) :=
   let va := mm !!! Regidx (mword_of_int 11) in
   let pa := mm !!! Regidx (mword_of_int 12) in
   let vpn0 := svpn_of va in
@@ -64,7 +64,7 @@ Definition wp_kvmmap_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : 
   cpu_own lvl eb p b lks -∗ kernel_text -∗
   pc_is (mword_of_int KernelSyms.kvmmap) -∗
   ptree_own 2 (DfracOwn 1) t -∗
-  kalloc_env γa on -∗
+  kalloc_env_at γa γk on -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t' : ptree) (g : nat),
     sie_cap_gpr KT0 mr K b p -∗
@@ -72,7 +72,7 @@ Definition wp_kvmmap_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : 
     pc_is ret_tgt -∗
     ptree_own 2 (DfracOwn 1) t' -∗
     ⌜pt_nodes t' = (pt_nodes t + g)%nat⌝ -∗
-    kalloc_env γa (avail_sub on g) -∗
+    kalloc_env_at γa γk (avail_sub on g) -∗
     ⌜callee_saved mm mr⌝ -∗
     ⌜pt_base t' = pt_base t⌝ -∗
     ⌜pt_rep0 t' (pt_insert_run m vpn0 ppn0 perm npages)⌝ -∗
@@ -84,6 +84,6 @@ Definition wp_kvmmap_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : 
 Module Type KVMMAP.
   Parameter wp_kvmmap_sconf :
     forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string),
-      wp_kvmmap_sconf_body γa mm t m npages perm lvl K eb p on b lks.
+      (γa : gname) (γk : gname * gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string),
+      wp_kvmmap_sconf_body γa γk mm t m npages perm lvl K eb p on b lks.
 End KVMMAP.

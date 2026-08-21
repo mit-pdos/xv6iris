@@ -125,6 +125,67 @@ Section KvmSpecs.
         (kmem_res γk (mword_of_int (KernelSyms.kmem + 24))) ∗
       kalloc_avail γk on)%I.
 
+  (* ---- THE SAME BUNDLE WITH THE FREE-LIST PAIR NAMED ------------------
+     [kalloc_env]'s [∃ γk] is a one-way valve: [WpLock.is_lock] is an [inv]
+     and Iris invariants do not agree, so a holder can go named -> hidden
+     and never back.  That is fine for the dozens of mid-level contracts
+     that only pass the allocator through -- and it is fatal for the boot
+     chain, which must hand [FsReady.fs_ready_pre] the pair SPELLED (its
+     consumers, [ProofSyscall.sysc_fs_env] and [SpecFileclose]'s pipe arm,
+     name it themselves).  [SpecKalloc] already threads the pair
+     transparently, so the valve is [kalloc_env]'s alone.
+       So: the same two resources with [γk] a PARAMETER, for the contracts
+     on that chain (allocproc, userinit).  Everything else keeps
+     [kalloc_env] and sees no change; [kalloc_env_at_env] is the one-way
+     bridge for a callee that wants the bundle.
+     claude-notes/projects/fs-cfg-boot.md, debt F. *)
+  Definition kalloc_env_at (γ : gname) (γk : gname * gname)
+      (on : option nat) : iProp Σ :=
+    (is_lock γ (mword_of_int KernelSyms.kmem) "kmem"%string
+       (kmem_res γk (mword_of_int (KernelSyms.kmem + 24))) ∗
+     kalloc_avail γk on)%I.
+
+  (* Sealed for the reason [WpLock.is_lock] is: without it every
+     [iIntros "#H"] of one of these re-derives persistence by unfolding
+     into the lock's resource.  The instance below is the whole interface
+     typeclass resolution needs. *)
+  Global Instance kalloc_env_at_None_persistent (γ : gname) (γk : gname * gname) :
+    Persistent (kalloc_env_at γ γk None).
+  Proof. rewrite /kalloc_env_at. apply _. Qed.
+  Global Typeclasses Opaque kalloc_env_at.
+
+  Lemma kalloc_env_at_env (γ : gname) (γk : gname * gname) (on : option nat) :
+    kalloc_env_at γ γk on -∗ kalloc_env γ on.
+  Proof.
+    rewrite /kalloc_env_at /kalloc_env. iIntros "[#Hlk Hav]".
+    iExists γk. iFrame "Hlk Hav".
+  Qed.
+
+  Lemma kalloc_env_at_lock (γ : gname) (γk : gname * gname) (on : option nat) :
+    kalloc_env_at γ γk on -∗
+    is_lock γ (mword_of_int KernelSyms.kmem) "kmem"%string
+      (kmem_res γk (mword_of_int (KernelSyms.kmem + 24))).
+  Proof. rewrite /kalloc_env_at. by iIntros "[#$ _]". Qed.
+
+  Lemma kalloc_env_at_avail (γ : gname) (γk : gname * gname) (on : option nat) :
+    kalloc_env_at γ γk on -∗ kalloc_avail γk on.
+  Proof. rewrite /kalloc_env_at. by iIntros "[_ $]". Qed.
+
+  Lemma kalloc_env_at_intro (γ : gname) (γk : gname * gname) (on : option nat) :
+    is_lock γ (mword_of_int KernelSyms.kmem) "kmem"%string
+      (kmem_res γk (mword_of_int (KernelSyms.kmem + 24))) -∗
+    kalloc_avail γk on -∗ kalloc_env_at γ γk on.
+  Proof. rewrite /kalloc_env_at. iIntros "#Hlk Hav". iFrame "Hlk Hav". Qed.
+
+  Lemma kalloc_env_at_seal (γ : gname) (γk : gname * gname) (on : option nat) :
+    kalloc_env_at γ γk on ==∗ kalloc_env_at γ γk None.
+  Proof.
+    rewrite /kalloc_env_at. iIntros "[#Hlk Hav]".
+    destruct on as [n|].
+    - iMod (kalloc_avail_seal with "Hav") as "Hav". iModIntro. iFrame "Hlk Hav".
+    - iModIntro. iFrame "Hlk Hav".
+  Qed.
+
   (* The panic contract now lives in SpecPanic.v (Require Export above), so
      the spinlock layer and the kvm chain share one statement. *)
 

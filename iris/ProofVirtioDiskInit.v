@@ -746,11 +746,11 @@ Section ProofVirtioDiskInit.
      abstraction is the point ([sp0], [spr], [dk], [pd], [pav], [pu] — values
      that really do occur all over the goal). *)
 
-  Lemma wp_virtio_disk_init_sconf (γv : disk_names) (γa : gname) (m : regfile) (K : nat)
+  Lemma wp_virtio_disk_init_sconf (γv : disk_names) (γa : gname) (γk : gname * gname) (m : regfile) (K : nat)
       (eb : bool) (pp : mword 64) (on : option nat)
       (c0 : virtio_cfg) (vlock : bv 32) (vname vcpu : bv 64)
       (pd0 pav0 pu0 : mword 64) (free0 : nat -> bv 8) (lks : gset string)
-    : wp_virtio_disk_init_sconf_body γv γa m K eb pp on c0 vlock vname vcpu
+    : wp_virtio_disk_init_sconf_body γv γa γk m K eb pp on c0 vlock vname vcpu
                                      pd0 pav0 pu0 free0 lks.
   Proof.
     cbv beta delta [wp_virtio_disk_init_sconf_body].
@@ -1564,7 +1564,11 @@ Section ProofVirtioDiskInit.
     assert (Hp0be : add_vec_int (mword_of_int (KernelSyms.virtio_disk_init + 0x0ba) : mword 64) 4 = mword_of_int (KernelSyms.virtio_disk_init + 0x0be)) by pcs.
     iEval (rewrite Hp0be) in "Hpc".
     (* ===== disk.desc/avail/used = kalloc() x3 (0x0be..0x0d8) ===== *)
-    iDestruct "Henv" as (γk) "(#Hklock & Havl)".
+    (* the allocator's free-list pair is a PARAMETER of the contract now, not
+       an existential inside the bundle: unfold [kalloc_env_at] and split the
+       plain [∗] rather than destructing an [iExists]. *)
+    iEval (rewrite /kalloc_env_at) in "Henv".
+    iDestruct "Henv" as "(#Hklock & Havl)".
     (* +0x0be jal kalloc *)
     iPoseProof (vdi_0be with "Htext") as "Hi".
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.virtio_disk_init + 0x0be)) (mword_of_int 1 : mword 5)
@@ -2524,8 +2528,8 @@ Section ProofVirtioDiskInit.
     (* ===== hand the caller the post ===== *)
     assert (Havs : avail_sub (Some nb) 3 = Some (nb - 3)%nat)
       by (rewrite avail_sub_Some; reflexivity).
-    iAssert (kalloc_env γa (avail_sub (Some nb) 3)) with "[Havl]" as "Henv".
-    { rewrite Havs. iExists γk. iFrame "Hklock Havl". }
+    iAssert (kalloc_env_at γa γk (avail_sub (Some nb) 3)) with "[Havl]" as "Henv".
+    { rewrite Havs. iApply (kalloc_env_at_intro with "Hklock Havl"). }
     assert (Hthread : forall c : mword 5, is_cs_idx c = true ->
               c <> (mword_of_int 1 : mword 5) -> c <> csp_rs1 ->
               c <> (mword_of_int 8 : mword 5) -> c <> (mword_of_int 9 : mword 5) ->

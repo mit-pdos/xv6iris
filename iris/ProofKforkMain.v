@@ -225,7 +225,7 @@ Section KforkArms.
   (*  a complete, hypothesis-free match for [Hcont7c]'s own type.           *)
   (* =================================================================== *)
   Lemma kfork_arm2
-      (γa γf γl2 : gname) (γs : list gname) (cn : ic_names)
+      (γa : gname) (γk : gname * gname) (γf γl2 : gname) (γs : list gname) (cn : ic_names)
       (m : regfile) (K lvl : nat) (eb b : bool) (pme : mword 64)
       (pid_p : mword 32) (Vp : pprivate)
       (sp0 ra0 s00 s10 s50 : mword 64) (npa : mword 64) (j : nat)
@@ -270,12 +270,12 @@ Section KforkArms.
     (* the child's kernel stack, as allocproc handed it out: this arm frees
        the slot, so it goes straight back into freeproc's block. *)
     ProcDefs.kstack_free npa -∗
-    kalloc_env γa None -∗
+    kalloc_env_at γa γk None -∗
     wp_next b pme (fun (CID : CpuId) =>
       ∀ mr : regfile,
         ⌜ callee_saved m mr ⌝ -∗
         pc_is (ret_pc ra0) -∗
-        kfork_post γa γf cn lvl eb pme b pid_p Vp K mr
+        kfork_post γa γk γf cn lvl eb pme b pid_p Vp K mr
           (mr !!! Regidx Ra0) lks -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -295,7 +295,7 @@ Section KforkArms.
     iDestruct (SchedCtx.procs_inv_lookup γs j γl2 Hgamma with "Hprocs") as "#Hislock".
     iDestruct (ProofKforkParts.kfk_of_priv γf (proc_addr j) pid_c Vc Hofnull Hcwdnull
                  with "HCpriv Hfd Hir Hctx Hkst") as "(Hfprest & Hfppt & Hfptf)".
-    iApply (B1.kfk_exit_uvmcopy γs γa γl2 j ch Vc pid_c (pv_upt Vc) (pv_tf Vc)
+    iApply (B1.kfk_exit_uvmcopy γs γa γk γl2 j ch Vc pid_c (pv_upt Vc) (pv_tf Vc)
               m Mt K sp0 ra0 s00 s10 s50 pme eb b lvl lks
               HK Hlvl Hbeq Hmsp Hmra Hms0 Hms1 Hms5 HMtsp HMts4 HMtthr
               with "Hcg Hcpu Hpay Htext Hpc Hb1 Hb2 Hb3 Hb4x Hb5x Hb6 Hb7 Hb8
@@ -334,7 +334,7 @@ Section KforkArms.
   (*  crosses a lock, so "b" never moves from the caller's own). *)
   (* =================================================================== *)
   Lemma kfork_arm1
-      (γa γf : gname) (cn : ic_names)
+      (γa : gname) (γk : gname * gname) (γf : gname) (cn : ic_names)
       (m : regfile) (K lvl : nat) (eb b : bool) (pme : mword 64)
       (pid_p : mword 32) (Vp : pprivate)
       (sp0 ra0 s00 s10 s50 : mword 64) (Mt : regfile) (lks : gset string) :
@@ -354,12 +354,12 @@ Section KforkArms.
        resource -- [avail_sub None n] is [None] and [avail_zero None] is
        [True], so its "ran dry after n pages" witness says nothing -- and
        the caller has already collapsed them. *)
-    kalloc_env γa None -∗
+    kalloc_env_at γa γk None -∗
     wp_next b pme (fun (CID : CpuId) =>
       ∀ mr : regfile,
         ⌜ callee_saved m mr ⌝ -∗
         pc_is (ret_pc ra0) -∗
-        kfork_post γa γf cn lvl eb pme b pid_p Vp K mr
+        kfork_post γa γk γf cn lvl eb pme b pid_p Vp K mr
           (mr !!! Regidx Ra0) lks -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -421,7 +421,7 @@ Section KforkArms.
   (*  (p_context npa)]).  Everything else in this lemma is hypothesis-free.  *)
   (* =================================================================== *)
   Lemma kfork_arm3
-      (γa γf γil γic γw γl : gname) (γs : list gname)
+      (γa : gname) (γk : gname * gname) (γf γil γic γw γl : gname) (γs : list gname)
       (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z)
       (inodestart : Z) (nib : nat)
       (m : regfile) (K lvl : nat) (eb b : bool) (pme : mword 64)
@@ -480,7 +480,7 @@ Section KforkArms.
        SwtchCtx.ctx_cells (p_context npa)
          (SpecAllocproc.forkret_pc :: add_vec ks (mword_of_int 4096) :: rest)) -∗
     IntrDefs.arm_pay KT1 lvl eb pme -∗
-    kalloc_env γa None -∗
+    kalloc_env_at γa γk None -∗
     is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
     is_ftable γl γf -∗
     is_itable2 γil cn γfs γic cov logstart nib icfg_dev -∗
@@ -495,7 +495,7 @@ Section KforkArms.
       ∀ mr : regfile,
         ⌜ callee_saved m mr ⌝ -∗
         pc_is (ret_pc ra0) -∗
-        kfork_post γa γf cn lvl eb pme b pid_p Vp K mr
+        kfork_post γa γk γf cn lvl eb pme b pid_p Vp K mr
           (mr !!! Regidx Ra0) lks -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -699,14 +699,17 @@ Section KforkMain.
   Notation Ra0 := (mword_of_int 10 : mword 5).
   Notation Rs5 := (mword_of_int 21 : mword 5).
 
+  (* [γk], the allocator's count/seal pair, is threaded universally: kfork
+     runs UNCOUNTED and its only caller ([sys_fork]) holds a generic
+     allocator gname, so nothing here may pin the pair at [fsc_kpages]. *)
   Lemma wp_kfork_sconf
-      (γa γp γw γl γf γil γic : gname) (γs : list gname)
+      (γa : gname) (γk : gname * gname) (γp γw γl γf γil γic : gname) (γs : list gname)
       (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z)
       (inodestart : Z) (nib : nat)
       (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
       (b : bool) (pid_p : mword 32) (Vp : pprivate) (lks : gset string)
  :
-    wp_kfork_sconf_body γa γp γw γl γf γil γic γs cn γfs cov logstart
+    wp_kfork_sconf_body γa γk γp γw γl γf γil γic γs cn γfs cov logstart
       inodestart nib m lvl K eb pme b pid_p Vp lks.
   Proof.
     cbv beta delta [wp_kfork_sconf_body]. cbn zeta.
@@ -718,14 +721,14 @@ Section KforkMain.
     (* [B6.kfk_prologue] is still generic in the allocator's count; kfork
        pins it at [None] here, which is what collapses its Hcont10a
        disjunction and, with it, two of [kfork_post]'s three arms. *)
-    iApply (B6.kfk_prologue γa γp γw γl γf γil γic γs cn γfs cov logstart nib
+    iApply (B6.kfk_prologue γa γk γp γw γl γf γil γic γs cn γfs cov logstart nib
               m lvl K eb pme None b
               pid_p Vp
               (wp_next b pme (fun (CID : CpuId) =>
                  (∀ mr : regfile,
                     ⌜ callee_saved m mr ⌝ -∗
                     pc_is (ret_pc (m !!! Regidx Rra)) -∗
-                    kfork_post γa γf cn lvl eb pme b pid_p Vp
+                    kfork_post γa γk γf cn lvl eb pme b pid_p Vp
                       K mr (mr !!! Regidx Ra0) lks -∗
                     WP (Loop : expr riscv_lang))%I)) lks
               HK Hlvl
@@ -738,10 +741,10 @@ Section KforkMain.
          resource at [None]: [avail_sub None n] is [None] and
          [avail_zero None] is [True], so the second arm's "ran dry after n
          pages" witness carries no information.  This is what lets
-         [kfork_post] state [kalloc_env] once instead of per-arm. *)
-      iAssert (kalloc_env γa None) with "[Hke]" as "Hke".
+         [kfork_post] state [kalloc_env_at] once instead of per-arm. *)
+      iAssert (kalloc_env_at γa γk None) with "[Hke]" as "Hke".
       { iDestruct "Hke" as "[$ | (% & _ & $)]". }
-      iApply (kfork_arm1 (CID0 := CID1) γa γf cn m K lvl eb b pme pid_p Vp
+      iApply (kfork_arm1 (CID0 := CID1) γa γk γf cn m K lvl eb b pme pid_p Vp
                 (m !!! Regidx csp_rs1) (m !!! Regidx Rra)
                 (m !!! Regidx Rs0) (m !!! Regidx Rs1) (m !!! Regidx Rs5) Mt lks
                 (wpk_K_ge8 K HK) eq_refl eq_refl eq_refl eq_refl eq_refl
@@ -753,7 +756,7 @@ Section KforkMain.
       iIntros "%HMtsp %HMts4 %HMts5 %HMta0 %HMtthr %Hpures".
       iIntros "Hcg #Ht Hpc Hframe Hpv HCp Hheld Hhart Hfd Hir Hctx Hkstk Hpay Hcpu Hke HR".
       destruct Hpures as (Hnpa & HjN & Hgamma & Hofn & Hcwdn).
-      iApply (kfork_arm2 (CID0 := CID2) γa γf γl2 γs cn m K lvl eb b pme
+      iApply (kfork_arm2 (CID0 := CID2) γa γk γf γl2 γs cn m K lvl eb b pme
                 pid_p Vp (m !!! Regidx csp_rs1) (m !!! Regidx Rra)
                 (m !!! Regidx Rs0) (m !!! Regidx Rs1) (m !!! Regidx Rs5)
                 npa j pid_c ch Vc Mt lks
@@ -776,7 +779,7 @@ Section KforkMain.
                Hke #Hwl #Hft #Hit #Hiti HR".
       destruct Hpures as (Hnpa & HjN & Hgamma & Hofn & Hcwdn).
       destruct Htfs as (Htfsrc & Htfdst).
-      iApply (kfork_arm3 (CID0 := CID3) γa γf γil γic γw γl γs
+      iApply (kfork_arm3 (CID0 := CID3) γa γk γf γil γic γw γl γs
                 cn γfs cov logstart inodestart nib m K lvl eb b pme
                 pid_p Vp (m !!! Regidx csp_rs1) (m !!! Regidx Rra)
                 (m !!! Regidx Rs0) (m !!! Regidx Rs1) (m !!! Regidx Rs5)

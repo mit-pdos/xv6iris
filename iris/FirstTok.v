@@ -291,7 +291,7 @@ Section FirstTok.
      coverage remainder); rows (A) -- the 32 raw [&sb] bytes and the whole
      [struct log], carved in [BootShared.boot_bss_carve]; row (B) --
      [LogDefs.log_mirror_full], the ERA's mirror variable; row (C) --
-     [IrefSlots.iref_slot] and the 35 [bslots], neither of which the era
+     [IrefSlots.iref_slots 2] and the 35 [bslots], neither of which the era
      fupd can mint ([bio_init_at] produces the slots at main+0x8e).
 
      ROW (D) IS GONE.  (f0) landed the bitmap INSIDE kit 2
@@ -317,7 +317,7 @@ Section FirstTok.
        l_ncommit ↦₄ v_nc ∗ lh_n_pa ↦₄ v_n ∗
        ([∗ list] i ∈ seq 0 LOGBLOCKS, ∃ w : mword 32, lh_block i ↦₄ w) ∗
        (* row (B) *) log_mirror_full ∗
-       (* row (C) *) iref_slot ∗
+       (* row (C) *) iref_slots 2 ∗
        bslots fsc_bio ((LOGBLOCKS + 2) + 2 + 1)%nat)%I.
 
   (* ONE [iDestruct], in [SpecFsinit]'s own premise order (kit 2 opened
@@ -351,7 +351,7 @@ Section FirstTok.
         ([∗ list] i ∈ seq 0 LOGBLOCKS,
            ∃ bs : list (bv 8), fsblock fsc_fs (log_slot_bno fsc_logst i) bs) ∗
         bslots fsc_bio ((LOGBLOCKS + 2) + 2 + 1)%nat ∗
-        iref_slot ∗
+        iref_slots 2 ∗
         (* the coverage remainder, which fsinit does not take: it is the
            first process's, R3 *)
         ([∗ set] b ∈ fsc_cov ∖ fs_kit_spent (FsCrash.fs_blocks dk) sb icfg_nib
@@ -397,11 +397,39 @@ Section FirstTok.
      rows 16+17 to this same bundle) and it is a separate, chartered change:
      [fs_ready]'s spelled pair is re-exported by
      [ProofSyscall.sysc_fs_env], so relaxing it moves the fileclose cone.
-     Nothing here is hedged -- the token says what it has, and the residual
-     is one named row at a seal site that does not exist yet. *)
+
+     THAT RESIDUAL IS GONE, and the row below is how.  What used to stand
+     here said the token carries the bundle and that one named row was still
+     owed at a seal site that did not exist yet.  The seal site exists now
+     (forkret's boot arm), and the fix was not to bridge the two forms but
+     to store the right one.
+
+     THE ALLOCATOR ROW IS THE NAMED HALF, NOT [KvmSpec.kalloc_env], and the
+     bundle was never the right thing to store.  [kalloc_env]'s [∃ γk]
+     swallows the free-list name, and [WpLock.is_lock] is an [inv] -- Iris
+     invariants do not agree -- so nothing recovers [γk = fsc_kpages].  The
+     boot arm's whole point is the SEAL, and [FsReady.fs_ready_pre]'s row 17
+     spells the pair named; a hidden name can never satisfy it.  Worse, the
+     bundle's own [is_lock] duplicated the one [first_boot_persist] already
+     carries at the real name, so the row was paying for a copy of a fact it
+     had and hiding the one fact it needed.
+
+     Nothing derives the BUNDLE from this, because nothing has to: the only
+     consumer of the bundled form on this arm is kexec, which runs after the
+     seal and takes it from [FsReady.fs_ready_kalloc].
+
+     THE PRODUCER PAYS FOR IT WITH ONE [iDestruct].  [KvmSpec.kalloc_env]
+     no longer quantifies the free-list pair -- it names [fsc_kpages], which
+     is what [FsCfg]'s own note on that field says it should do and what
+     makes the bundle "recovered as a projection" true in both directions.
+     So [ProofUserinit], which holds the bundle when it deposits the token,
+     projects this row straight out of it.  Before that change the row was
+     unreachable from a bundle at all ([WpLock.is_lock] is an [inv], and
+     Iris invariants do not agree), which is the whole reason the pinning
+     happened. *)
   Definition first_tok : iProp Σ :=
     ((first_addr ↦₄ (mword_of_int 1 : mword 32)
-        ∗ first_boot_persist ∗ kalloc_env fsc_kalloc None ∗ first_fsinit)
+        ∗ first_boot_persist ∗ kalloc_avail fsc_kpages None ∗ first_fsinit)
      ∨ (first_addr ↦₄□ (mword_of_int 0 : mword 32) ∗ fs_ready))%I.
 
   (* the steady-state arm is persistent, so a process that has booted can
@@ -442,7 +470,7 @@ Section FirstTok.
   Lemma first_tok_open :
     first_tok -∗
       (first_addr ↦₄ (mword_of_int 1 : mword 32)
-         ∗ first_boot_persist ∗ kalloc_env fsc_kalloc None ∗ first_fsinit)
+         ∗ first_boot_persist ∗ kalloc_avail fsc_kpages None ∗ first_fsinit)
       ∨ first_done.
   Proof.
     iIntros "H". rewrite /first_tok. iDestruct "H" as "[H | H]".
@@ -452,7 +480,7 @@ Section FirstTok.
 
   Lemma first_tok_boot :
     first_addr ↦₄ (mword_of_int 1 : mword 32) -∗
-    first_boot_persist -∗ kalloc_env fsc_kalloc None -∗ first_fsinit -∗
+    first_boot_persist -∗ kalloc_avail fsc_kpages None -∗ first_fsinit -∗
     first_tok.
   Proof. iIntros "H #P #K F". iLeft. iFrame "H P K F". Qed.
 

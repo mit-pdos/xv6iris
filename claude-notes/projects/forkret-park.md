@@ -111,6 +111,30 @@ all harts.  The bitmap now lives in the persistent `BitmapInv.bitmap_inv`
 (a `fs_ready` conjunct; design/fs-bitmap.md), the residue no longer names
 it, and `fclose_names` lost the fields that carried it.
 
+## WHAT THE PARK NOW OWES THAT IT DID NOT BEFORE (2026-08-21)
+
+forkret's boot arm is the first consumer of `FirstTok.first_tok`'s boot
+disjunct, and proving it changed two of that disjunct's rows. Both are
+STRICTLY STRONGER asks, and both land on whoever finally mints the token —
+which is this project.
+
+* **`kalloc_avail fsc_kpages None`, not `kalloc_env fsc_kalloc None`.** The
+  bundle's `∃ γk` swallows the free-list name and `WpLock.is_lock` is an
+  `inv`, so nothing recovers `γk = fsc_kpages` — and the seal
+  (`FsReady.fs_ready_pre` row 17) spells the pair named. The old row could
+  never have been sealed. Note the bundle's own `is_lock` duplicated the one
+  `first_boot_persist` already carries at the real name, so the row was
+  paying for a fact it had and hiding the one it needed. **allocproc's
+  postcondition bundles**, so the mint must take the named pair from the boot
+  chain (`FsCfgBoot`'s era allocation has it) instead. This is debt F / D4,
+  now discharged on the consumer side and owed here.
+* **`iref_slots 2`, not `iref_slot`.** fsinit borrows one and gives it back;
+  kexec demands two.
+
+Neither costs anything today — nothing constructs the boot arm, because its
+producer is the axiom this file is about. They are recorded so the mint does
+not discover them.
+
 ## The two call sites
 
 `forkret_park` is invoked in exactly two places, both

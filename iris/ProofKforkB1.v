@@ -14,7 +14,7 @@
    thread holds exactly freeproc's precondition ([fp_rest] /
    [fp_pt _ _ (Some P)] / [fp_tf _ (Some (ud_tfp P, ws))]), plus
    [proc_held cpu_id j γl USED ch], [hart_at_any (proc_addr
-   j)], [kalloc_env γa None], the interrupt/lock-nesting bundle
+   j)], [kalloc_env_at γa γk None], the interrupt/lock-nesting bundle
    ([cpu_own (S lvl) eb pme C false], [sie_cap_gpr Mt (K-8) false
    pme], [arm_pay lvl eb pme]), and the 8 frame slots -- slot 6
    (16(sp)) holds the CALLER's saved s4 ([m !!! Regidx Rs4]: nothing between
@@ -109,8 +109,15 @@ Section KforkB1Proof.
   (* =================================================================== *)
   (*  +0x7c .. +0x8c: freeproc, release, -1, reaching the epilogue.       *)
   (* =================================================================== *)
+  (* THE FREE-LIST PAIR IS A PARAMETER, NOT [fsc_kpages].  This tail threads
+     the allocator as [KvmSpec.kalloc_env_at γa γk None] -- the bundle with
+     the count/seal pair NAMED -- because its caller (kfork, SpecKfork.v)
+     does; but kfork is reached from [sys_fork], which only ever holds a
+     GENERIC allocator gname, so the pair stays universally quantified here
+     and this file depends on no file-system configuration. *)
   Lemma kfk_exit_uvmcopy
-      (γs : list gname) (γa γl : gname) (j : nat) (ch : mword 64)
+      (γs : list gname) (γa : gname) (γk : gname * gname) (γl : gname)
+      (j : nat) (ch : mword 64)
       (V : pprivate) (pid : mword 32) (P : uptd) (ws : list (mword 64))
       (m Mt : regfile) (K : nat)
       (sp0 ra0 s00 s10 s50 : mword 64)
@@ -166,7 +173,7 @@ Section KforkB1Proof.
     proc_held cpu_id j γl USED ch -∗
     hart_at_any (proc_addr j) -∗
     is_lock γl (proc_addr j) "proc"%string (proc_lock_res γs γl (proc_addr j)) -∗
-    kalloc_env γa None -∗
+    kalloc_env_at γa γk None -∗
     fp_rest (proc_addr j) V pid -∗
     fp_pt (proc_addr j) (pv_sz V) (Some P) -∗
     fp_tf (proc_addr j) (Some (ud_tfp P, ws)) -∗
@@ -176,13 +183,17 @@ Section KforkB1Proof.
         sie_cap_gpr KT1 mf K (match lvl with O => eb | S _ => false end) pme -∗
         pc_is (ret_pc ra0) -∗
         cpu_own lvl eb pme (match lvl with O => eb | S _ => false end) lks -∗
-        kalloc_env γa None -∗
+        kalloc_env_at γa γk None -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hlvl Hb Hsp0 Hra0 Hs00 Hs10 Hs50 Hmtsp Hmts4 Hthr Hfresh.
     iIntros "Hcg Hcpu Hpay #Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8
               Hheld Hhaa #Hislock #Henv Hfprest Hfppt Hfptf Hcont".
+    (* freeproc is stated at the ANONYMOUS bundle ([kalloc_env], count
+       existentially quantified), so hand it the projection; both forms are
+       persistent at [None], so "Henv" survives for our own postcondition. *)
+    iDestruct (KvmSpec.kalloc_env_at_env with "Henv") as "#Henvb".
     iPoseProof (kfk_07c with "Htext") as "Hi7c".
     iPoseProof (kfk_07e with "Htext") as "Hi7e".
     iPoseProof (kfk_082 with "Htext") as "Hi82".
@@ -224,7 +235,7 @@ Section KforkB1Proof.
     iApply (FP.wp_freeproc_sconf γa T1 j γl V pid USED ch (Some P) (Some (ud_tfp P, ws))
               (trap_res b + (K - 8))%nat eb pme (S lvl) ({["proc"]} ∪ lks)
               ltac:(pose proof (kfkb1_K44 K HK); lia) (kfkb1_lvlS lvl Hlvl) HT1a0
-              with "Hcg Hcpu Htext Hpc Hheld Hfprest Hfppt Hfptf Henv").
+              with "Hcg Hcpu Htext Hpc Hheld Hfprest Hfppt Hfptf Henvb").
     all: try lkbelow.
     iApply wp_next_off_intro.
     iIntros (mfp) "Hcg Hcpu Hpc %Hcsfp Hheld Hdorm".

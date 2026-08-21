@@ -194,14 +194,14 @@ Definition wp_userinit_sconf_body
   (* ---- the two counted regimes ----
      AT THE AMBIENT [fsc_kalloc], not at a threaded [γa], and that is what
      makes the deposit possible.  The token's allocator row is
-     [KvmSpec.kalloc_env fsc_kalloc None] ([FirstTok]'s note says why the
+     [KvmSpec.kalloc_env_at fsc_kalloc fsc_kpages None] ([FirstTok]'s note says why the
      BUNDLE and not the pair), and userinit mints it by sealing THIS
      regime once allocproc's last counted draw is done.  A [γa] the caller
      chose could never be shown equal to [fsc_kalloc], so the seal's result
      could not be the token's row.  main already applies this contract at
      [fsc_kalloc] -- [ProofMain] builds the bundle out of [kinit]'s own
      post at exactly that name -- so nothing upstream loses generality. *)
-  kalloc_env fsc_kalloc on -∗
+  kalloc_env_at fsc_kalloc fsc_kpages on -∗
   procs_avail (Some (S np)) -∗
   (* the one global cell userinit writes *)
   (mword_of_int KernelSyms.initproc : mword 64) ↦₈ v0 -∗
@@ -214,12 +214,12 @@ Definition wp_userinit_sconf_body
            = (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) ⌝ -∗
       cpu_own 0%nat eb pj b lks -∗
       (* SEALED, not counted, and irreversibly so: the token userinit
-         deposits carries [kalloc_env fsc_kalloc None], and
+         deposits carries [kalloc_env_at fsc_kalloc fsc_kpages None], and
          [KallocInv.kalloc_avail_seal] is a one-shot.  main discards this
          row anyway -- the boot chain has no further kalloc client on this
          hart -- so the strengthening from "counted" to "sealed" costs its
          one caller nothing. *)
-      kalloc_env fsc_kalloc None -∗
+      kalloc_env_at fsc_kalloc fsc_kpages None -∗
       procs_avail (Some np) -∗
       (* PERSISTED, not handed back exclusive.  Nothing writes this cell
          after userinit's one store, and every later reader

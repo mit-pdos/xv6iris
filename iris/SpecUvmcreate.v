@@ -49,18 +49,18 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
    premise and an uncounted one (the fork path) handles it.  That is why
    this spec has no [0 < nb] premise any more. *)
 Definition uvmcreate_post `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (on : option nat) (tp : mword 64) (rv : mword 64) : iProp Σ :=
+    (γa : gname) (γk : gname * gname) (on : option nat) (tp : mword 64) (rv : mword 64) : iProp Σ :=
   ( (* out of memory: nothing allocated, the budget untouched *)
-    (⌜rv = (zero_reg : mword 64)⌝ ∗ ⌜avail_zero on⌝ ∗ kalloc_env γa on)
+    (⌜rv = (zero_reg : mword 64)⌝ ∗ ⌜avail_zero on⌝ ∗ kalloc_env_at γa γk on)
   ∨ (* an empty root node, one page spent *)
     (∃ b : mword 44,
        ⌜rv = zero_extend' 64 (concat_vec b (zeros' 12 : mword 12))⌝ ∗
        ⌜page_valid rv⌝ ∗
        ptree_own 2 (DfracOwn 1) (pt_empty_node b) ∗
-       kalloc_env γa (avail_sub on 1)))%I.
+       kalloc_env_at γa γk (avail_sub on 1)))%I.
 
 Definition wp_uvmcreate_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string) :=
+    (γa : gname) (γk : gname * gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string) :=
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
   (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
   (18 <= K)%nat ->
@@ -72,14 +72,14 @@ Definition wp_uvmcreate_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID
   sie_cap_gpr KT1 mm K b p -∗
   cpu_own lvl eb p b lks -∗ kernel_text -∗
   pc_is (mword_of_int KernelSyms.uvmcreate) -∗
-  kalloc_env γa on -∗
+  kalloc_env_at γa γk on -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),
     sie_cap_gpr KT1 mr K b p -∗
     cpu_own lvl eb p b lks -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
-    uvmcreate_post γa on (mm !!! Regidx (mword_of_int 4))
+    uvmcreate_post γa γk on (mm !!! Regidx (mword_of_int 4))
       (mr !!! Regidx (mword_of_int 10)) -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -87,6 +87,6 @@ Definition wp_uvmcreate_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID
 Module Type UVMCREATE.
   Parameter wp_uvmcreate_sconf :
     forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string),
-      wp_uvmcreate_sconf_body γa mm lvl K eb p on b lks.
+      (γa : gname) (γk : gname * gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string),
+      wp_uvmcreate_sconf_body γa γk mm lvl K eb p on b lks.
 End UVMCREATE.

@@ -507,8 +507,14 @@ Section ProofUvmalloc.
       [ exfalso; clear -Hrem; lia |].
     iIntros "Hcg Hcnt #Htext Hpc Hpt #Henv Hk3 Hk5 Hk8 Hexit".
     iDestruct "Henv" as (γk) "(#Hlock & #Havail)".
+    (* mappages names the free-list pair now ([KvmSpec.kalloc_env_at]); this
+       caller is at [None] and needs no PARTICULAR name, only one, which its
+       own bundle supplies.  Both forms are kept: the callees stated at the
+       bundle (uvmdealloc, kfree) still take that one. *)
     iAssert (kalloc_env γa None) as "#Henv".
     { iExists γk. iSplitR; [iExact "Hlock" |]. iExact "Havail". }
+    iAssert (kalloc_env_at γa γk None) as "#Henvn".
+    { iApply (kalloc_env_at_intro with "Hlock Havail"). }
     (* ---- the arithmetic of THIS iteration, all up front ---- *)
     assert (Hin : (i < n)%nat) by (clear -Hsum Hrem; lia).
     pose proof (proj2 (Hnchar i) Hin) as Hain.
@@ -1204,11 +1210,11 @@ Section ProofUvmalloc.
               m_ad !! vpn_at (svpn_of (B11 !!! Regidx Ra1)) j = None).
     { intros j Hj. assert (Hj0 : j = 0%nat) by (clear -Hj; lia). subst j.
       rewrite vpn_at_0 HB11a1. exact Hmadnone. }
-    iApply (Mappages.wp_mappages_sconf KT1 γa B11 t m_ad 1%nat (Z.lor xperm 18) 0%nat
+    iApply (Mappages.wp_mappages_sconf KT1 γa γk B11 t m_ad 1%nat (Z.lor xperm 18) 0%nat
               (K - 10)%nat eb p None b _
               ltac:(reflexivity) HKmp HB11root Hmpva Hmppa Hmpsz ltac:(clear; lia)
               HB11a4 (proj1 Hperm) Hmpvab Hmppab Hrep Hmpfresh
-              with "Hcg Hcnt Htext Hpc Hptree Henv").
+              with "Hcg Hcnt Htext Hpc Hptree Henvn").
     all: try lkbelow.
     iIntros (CIDu25 Hsu25 mg t' k g) "Hcg Hcnt Hpc Hptree %Hnodes _ %Hgcs %Hbase' %Hrep' %Hmono %Hmiss %Hmpay".
     rewrite HB11a1 in Hrep'. rewrite HB11a3 in Hrep'.

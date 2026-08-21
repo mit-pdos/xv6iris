@@ -34,7 +34,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
    [kvm_bridge].
    stack_own bound 50 = own 2-slot frame + kvmmake's 48 (PROVISIONAL). *)
 Definition wp_kvminit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (kpt0 : mword 64) (b : bool) (lks : gset string) :=
+    (γa : gname) (γk : gname * gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (kpt0 : mword 64) (b : bool) (lks : gset string) :=
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
   lvl = 0%nat ->
   (50 <= K)%nat ->
@@ -45,7 +45,7 @@ Definition wp_kvminit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID :
   cpu_own lvl eb p b lks -∗ kernel_text -∗
   pc_is (mword_of_int KernelSyms.kvminit) -∗
   (mword_of_int KernelSyms.kernel_pagetable : mword 64) ↦₈ kpt0 -∗
-  kalloc_env γa on -∗
+  kalloc_env_at γa γk on -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t : ptree) (pas : nat -> mword 44),
     sie_cap_gpr KT0 mr K b p -∗
@@ -56,7 +56,7 @@ Definition wp_kvminit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID :
       ↦₈ zero_extend' 64 (concat_vec (pt_base t) (zeros' 12 : mword 12)) -∗
     ⌜pt_rep0 t (kvm_map_full pas)⌝ -∗
     ⌜pt_nodes t = 102%nat⌝ -∗
-    kalloc_env γa (avail_sub on K_kvmmake) -∗
+    kalloc_env_at γa γk (avail_sub on K_kvmmake) -∗
     ⌜callee_saved mm mr⌝ -∗
     ⌜kvm_pas_ok pas⌝ -∗
     ([∗ list] i ∈ seq 0 64,
@@ -67,6 +67,6 @@ Definition wp_kvminit_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID :
 Module Type KVMINIT.
   Parameter wp_kvminit_sconf :
     forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (kpt0 : mword 64) (b : bool) (lks : gset string),
-      wp_kvminit_sconf_body γa mm lvl K eb p on kpt0 b lks.
+      (γa : gname) (γk : gname * gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (kpt0 : mword 64) (b : bool) (lks : gset string),
+      wp_kvminit_sconf_body γa γk mm lvl K eb p on kpt0 b lks.
 End KVMINIT.

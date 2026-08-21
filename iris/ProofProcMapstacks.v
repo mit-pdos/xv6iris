@@ -116,7 +116,7 @@ Section ProofPMS.
   (* THE SEALED EPILOGUE (+0x80..+0x96): restore the 10-slot frame and  *)
   (* ret, producing the success-only proc_mapstacks post.               *)
   (* ================================================================= *)
-  Lemma wp_proc_mapstacks_epilogue_sconf `{GEN : GenId} `{CID : CpuId} (γa : gname)
+  Lemma wp_proc_mapstacks_epilogue_sconf `{GEN : GenId} `{CID : CpuId} (γa : gname) (γk : gname * gname)
       (mm Mf : regfile) (t tf : ptree)
       (m : gmap (mword 27) (mword 64)) (K lvl : nat)
       (eb : bool) (p : mword 64) (on : option nat) (g : nat)
@@ -150,7 +150,7 @@ Section ProofPMS.
     pa_stk sp0 9 ↦₈[KT0] (mm !!! Regidx (mword_of_int 23)) -∗
     pa_stk sp0 10 ↦₈[KT0] (mm !!! Regidx (mword_of_int 24)) -∗
     ptree_own 2 (DfracOwn 1) tf -∗
-    kalloc_env γa (avail_sub on (64 + g)) -∗
+    kalloc_env_at γa γk (avail_sub on (64 + g)) -∗
     ([∗ list] i ∈ seq 0 64,
        page_own (zero_extend' 64 (concat_vec (pas i) (zeros' 12 : mword 12)))) -∗
     wp_next b p (fun (CID : CpuId) =>
@@ -158,7 +158,7 @@ Section ProofPMS.
       sie_cap_gpr KT0 mr K b p -∗ cpu_own lvl eb p b lks -∗ pc_is ret_tgt -∗
       ptree_own 2 (DfracOwn 1) t' -∗
       ⌜pt_nodes t' = (pt_nodes t + g')%nat⌝ -∗
-      kalloc_env γa (avail_sub on (64 + g')) -∗
+      kalloc_env_at γa γk (avail_sub on (64 + g')) -∗
       ⌜callee_saved mm mr⌝ -∗
       ⌜pt_base t' = pt_base t⌝ -∗
       ⌜kvm_pas_ok pas'⌝ -∗
@@ -424,7 +424,7 @@ Section ProofPMS.
   (* ================================================================= *)
   (* THE LOOP (+0x52 entry): fuel induction on [rem], [i + rem = 64].    *)
   (* ================================================================= *)
-  Lemma wp_proc_mapstacks_loop_sconf `{GEN : GenId} `{CID : CpuId} (γa : gname)
+  Lemma wp_proc_mapstacks_loop_sconf `{GEN : GenId} `{CID : CpuId} (γa : gname) (γk : gname * gname)
       (mm : regfile) (t : ptree)
       (m0 : gmap (mword 27) (mword 64)) (K lvl : nat)
       (eb : bool) (p : mword 64) (nb : nat) (rem : nat) (b : bool) (lks : gset string) :
@@ -475,7 +475,7 @@ Section ProofPMS.
     pa_stk sp0 9 ↦₈[KT0] (mm !!! Regidx (mword_of_int 23)) -∗
     pa_stk sp0 10 ↦₈[KT0] (mm !!! Regidx (mword_of_int 24)) -∗
     ptree_own 2 (DfracOwn 1) tk -∗
-    kalloc_env γa (avail_sub (Some nb) (i + gk)) -∗
+    kalloc_env_at γa γk (avail_sub (Some nb) (i + gk)) -∗
     ([∗ list] j ∈ seq 0 i,
        page_own (zero_extend' 64 (concat_vec (pas j) (zeros' 12 : mword 12)))) -∗
     wp_next b p (fun (CID : CpuId) =>
@@ -483,7 +483,7 @@ Section ProofPMS.
       sie_cap_gpr KT0 mr K b p -∗ cpu_own lvl eb p b lks -∗ pc_is ret_tgt -∗
       ptree_own 2 (DfracOwn 1) t' -∗
       ⌜pt_nodes t' = (pt_nodes t + g')%nat⌝ -∗
-      kalloc_env γa (avail_sub (Some nb) (64 + g')) -∗
+      kalloc_env_at γa γk (avail_sub (Some nb) (64 + g')) -∗
       ⌜callee_saved mm mr⌝ -∗
       ⌜pt_base t' = pt_base t⌝ -∗
       ⌜kvm_pas_ok pas'⌝ -∗
@@ -527,7 +527,11 @@ Section ProofPMS.
     set (J := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.proc_mapstacks + 0x52) : mword 64) 4)]> Mk).
     assert (Htgtk : add_vec (mword_of_int (KernelSyms.proc_mapstacks + 0x52) : mword 64) (sign_extend' 64 (mword_of_int 2093890 : mword 21)) = mword_of_int KernelSyms.kalloc) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtk) in "Hpc".
-    iDestruct "Henv" as (γk) "(#Hlock & Havail)".
+    (* [kalloc_env_at] NAMES the free-list pair, so there is no [∃ γk] to
+       open: [γk] is a parameter of this lemma, and the two halves come out
+       of the (sealed) bundle by unfolding it. *)
+    iEval (rewrite /kalloc_env_at) in "Henv".
+    iDestruct "Henv" as "(#Hlock & Havail)".
     assert (HJsp : J !!! Regidx csp_rs1 = spr).
     { rewrite /J. rewrite upd_ne; [| reg_neq]. exact Hsp. }
     assert (HJ1 : J !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.proc_mapstacks + 0x52) : mword 64) 4)
@@ -559,10 +563,10 @@ Section ProofPMS.
     assert (Hav1 : Some (nb - (i + gk) - 1)%nat = avail_sub (Some nb) (i + gk + 1)).
     { rewrite avail_sub_Some. f_equal. lia. }
     iEval (rewrite Hav1) in "Havail2".
-    (* rebuild kalloc_env at avail_sub (i+gk+1) *)
-    iAssert (kalloc_env γa (avail_sub (Some nb) (i + gk + 1)))
+    (* rebuild the NAMED bundle at avail_sub (i+gk+1) -- no existential *)
+    iAssert (kalloc_env_at γa γk (avail_sub (Some nb) (i + gk + 1)))
       with "[Havail2]" as "Henv".
-    { iExists γk. iFrame "Hlock Havail2". }
+    { iApply (kalloc_env_at_intro with "Hlock Havail2"). }
     (* a0 = page, page_valid, nonzero *)
     set (page := mr0 !!! Regidx (mword_of_int 10 : mword 5)).
     assert (Hpanz : page <> mword_of_int 0).
@@ -804,7 +808,7 @@ Section ProofPMS.
        [CIDl15] -- transport it there once, rather than per instruction. *)
     assert (HcntC1 : b = false \/ p = zero_reg -> (CIDl15 : CPU) = (CIDl2 : CPU)) by wp_next_chain.
     iDestruct (cpu_own_transport CIDl2 CIDl15 lvl eb p b HcntC1 with "Hcnt") as "Hcnt".
-    iApply (KM.wp_kvmmap_sconf γa Wk tk (kvm_stacks pas i m0) 1 6 lvl (K - 10)%nat eb p (Some ((nb - (i + gk + 1))%nat)) b lks
+    iApply (KM.wp_kvmmap_sconf γa γk Wk tk (kvm_stacks pas i m0) 1 6 lvl (K - 10)%nat eb p (Some ((nb - (i + gk + 1))%nat)) b lks
               Hlvl ltac:(lia)
               HWka0
               ltac:(rewrite HWka1; unfold VA; apply va_i_align; exact Hilt)
@@ -973,7 +977,7 @@ Section ProofPMS.
          [+0x78 addi] and this branch's own crossing moved on to [CIDb1]. *)
       assert (HcntC2 : b = false \/ p = zero_reg -> (CIDb1 : CPU) = (CIDl16 : CPU)) by wp_next_chain.
       iDestruct (cpu_own_transport CIDl16 CIDb1 lvl eb p b HcntC2 with "Hcnt") as "Hcnt".
-      iApply (wp_proc_mapstacks_epilogue_sconf γa mm F1 t t' m0 K lvl eb p (Some nb) (gk + g')%nat pas' b lks
+      iApply (wp_proc_mapstacks_epilogue_sconf γa γk mm F1 t t' m0 K lvl eb p (Some nb) (gk + g')%nat pas' b lks
                 Hlvl HK
                 ltac:(rewrite /F1; rewrite upd_ne; [| reg_neq]; exact Hmr1sp)
                 ltac:(rewrite /F1; rewrite upd_ne; [| reg_neq]; exact Hmr1_25)
@@ -1029,10 +1033,10 @@ Section ProofPMS.
   (* THE PROLOGUE (+0x00..+0x4e) + loop entry: the whole-function spec. *)
   (* ================================================================= *)
   Lemma wp_proc_mapstacks_sconf
-      `{GEN : GenId} `{CID : CpuId} (γa : gname)
+      `{GEN : GenId} `{CID : CpuId} (γa : gname) (γk : gname * gname)
       (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (lvl K : nat)
       (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string)
-    : wp_proc_mapstacks_sconf_body γa mm t m lvl K eb p on b lks.
+    : wp_proc_mapstacks_sconf_body γa γk mm t m lvl K eb p on b lks.
   Proof.
     cbv beta delta [wp_proc_mapstacks_sconf_body].
     intros ret_tgt Hlvl HK Hroot Hrep Hres Hnb Hbelow.
@@ -1369,7 +1373,7 @@ Section ProofPMS.
        that default printing cannot show. *)
     iDestruct (wp_next_shift HcntCP with "Hcont") as "Hcont".
     (* enter the loop at i = 0 *)
-    iApply (wp_proc_mapstacks_loop_sconf γa mm t m K lvl eb p nb 64 b lks 0%nat P21 t 0%nat (fun _ => (mword_of_int 0 : mword 44))
+    iApply (wp_proc_mapstacks_loop_sconf γa γk mm t m K lvl eb p nb 64 b lks 0%nat P21 t 0%nat (fun _ => (mword_of_int 0 : mword 44))
               Hlvl HK ltac:(lia) ltac:(lia) Hnbig Hroot Hres
               HE_sp HE_s1 HE_s8 HE_s2 HE_s3 HE_s5 HE_s6 HE_s7
               ltac:(rewrite HE_s4; exact HE_a0)

@@ -1289,14 +1289,14 @@ Section ProofVmfault.
                 m_ad !! vpn_at (svpn_of (G6 !!! Regidx Ra1)) i = None).
       { intros i Hi. assert (Hi0 : i = 0%nat) by lia. subst i.
         rewrite vpn_at_0. rewrite HG6a1. exact Hnone. }
-      iAssert (kalloc_env γa None) as "#Henv2".
-      { iExists γk. iFrame "Hlock Havail". }
+      iAssert (kalloc_env_at γa γk None) as "#Henv2".
+      { iApply (kalloc_env_at_intro with "Hlock Havail"). }
       (* ---- mappages(pagetable, va0, PGSIZE, mem, PTE_R|W|U) ----
          at the ambient [lvl]: mappages/walk are level-generic, and [Hlvl] is
          exactly the int-range fact their kalloc needs. *)
       iDestruct (cpu_own_transport Ckr Cmg lvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iApply (Mappages.wp_mappages_sconf KT1 γa G6 t m_ad 1%nat 22 lvl (K - 6)%nat
+      iApply (Mappages.wp_mappages_sconf KT1 γa γk G6 t m_ad 1%nat 22 lvl (K - 6)%nat
                 eb p None b _
                 Hlvl ltac:(lia) HG6a0 Hmpva Hmppa Hmpsz ltac:(lia)
                 HG6a4 vmf_perm_ok22 Hmpvab Hmppab Hrep Hmpfresh

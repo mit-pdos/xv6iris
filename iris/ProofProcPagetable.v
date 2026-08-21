@@ -226,10 +226,10 @@ Section ProofProcPagetable.
       | apply ppt_thr_ins;
         [ intros c Hc H2 H8 H9 H18; thr_side Hc H2 H8 H9 H18 |] ].
 
-  Lemma wp_proc_pagetable_core (γa : gname)
+  Lemma wp_proc_pagetable_core (γa : gname) (γk : gname * gname)
       (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool)
       (p : mword 64) (on : option nat) (b : bool) (lks : gset string)
-    : wp_proc_pagetable_core_body γa mm tf dqtf lvl K eb p on b lks.
+    : wp_proc_pagetable_core_body γa γk mm tf dqtf lvl K eb p on b lks.
   Proof.
     cbv beta delta [wp_proc_pagetable_core_body].
     intros pp tfp ret_tgt Hlvl HK Htfal Htfb Hlkbelow.
@@ -359,7 +359,7 @@ Section ProofProcPagetable.
         cpu_own lvl eb p b lks -∗
         pc_is (mword_of_int (KernelSyms.proc_pagetable + 0x4c) : mword 64) -∗
         p_trapframe pp ↦₈{dqtf} tf -∗
-        ppt_post γa on tfp rv -∗
+        ppt_post γa γk on tfp rv -∗
         WP (Loop : expr riscv_lang)))%I
       with "[Hcont Hc1 Hc2 Hc3 Hc4]" as "EPI".
     { iIntros (CIDe Hse me rv).
@@ -553,7 +553,7 @@ Section ProofProcPagetable.
        so uvmcreate wants [Hcnt] at CID8. *)
     iDestruct (cpu_own_transport CID CID8 lvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (UV.wp_uvmcreate_sconf γa Jp lvl (K - 4)%nat eb p on b
+    iApply (UV.wp_uvmcreate_sconf γa γk Jp lvl (K - 4)%nat eb p on b
               _ Hlvl Hc18 HcidJp
               with "Hcg Hcnt Htext Hpc Henv").
     all: try lkbelow.
@@ -616,7 +616,9 @@ Section ProofProcPagetable.
                          (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 28 : mword 8) ('b"0"))))
                        = mword_of_int (KernelSyms.proc_pagetable + 0x4c)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htg4c0) in "Hpc".
-      iMod (kalloc_env_seal with "Henv") as "#Henv0".
+      (* the seal keeps the pair NAMED ([kalloc_env_at_seal]): [ppt_post]'s
+         failure arm is stated at [kalloc_env_at _ _ None]. *)
+      iMod (kalloc_env_at_seal with "Henv") as "#Henv0".
       iDestruct (cpu_own_transport CIDuv CIDd1 lvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iSpecialize ("EPI" $! CIDd1 with "[%]"); [wp_next_chain|].
@@ -729,7 +731,7 @@ Section ProofProcPagetable.
        to a fresh hart, so mappages wants [Hcnt] at CID18. *)
     iDestruct (cpu_own_transport CIDuv CID18 lvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (MP.wp_mappages_sconf KT1 γa M9 (pt_empty_node b0) ∅ 1 10 lvl (K - 4)%nat eb p (avail_sub on 1) b
+    iApply (MP.wp_mappages_sconf KT1 γa γk M9 (pt_empty_node b0) ∅ 1 10 lvl (K - 4)%nat eb p (avail_sub on 1) b
               _ Hlvl Hc32
               ltac:(rewrite HM9a0; exact Hroot0r)
               ltac:(rewrite HM9a1; apply bv_eq; vm_compute; reflexivity)
@@ -829,8 +831,13 @@ Section ProofProcPagetable.
           by (rewrite /T3 upd_eq; reflexivity).
         (* the tree, at uvmfree's altitude: no leaves at all *)
         iDestruct (uptg_of_rep0_empty b0 t1 Hrep1 Hbase1 with "Hptree") as "Hbare".
-        (* uvmfree is a [None]-only callee, so the count goes here for good *)
-        iMod (kalloc_env_seal with "Henv") as "#Henv0".
+        (* uvmfree is a [None]-only callee, so the count goes here for good.
+           The seal keeps the pair NAMED ([ppt_post]'s failure arm wants
+           [kalloc_env_at _ _ None]); [kalloc_env_at_env] is the one-way
+           bridge to the BUNDLE uvmfree's own contract still takes.  Both
+           are persistent at [None], so one seal serves both uses. *)
+        iMod (kalloc_env_at_seal with "Henv") as "#Henv0".
+        iDestruct (kalloc_env_at_env with "Henv0") as "#Henv0b".
         iDestruct (cpu_own_transport CIDmp1 CIDa4 lvl eb p b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
         iApply (UF.wp_uvmfree_sconf γa T3 b0 ∅ (K - 4)%nat eb p lvl b
@@ -838,7 +845,7 @@ Section ProofProcPagetable.
                   ltac:(rewrite HT3a1; unfold uvm_maxsz;
                         rewrite uint_unsigned; apply (proj1 (Z.leb_le _ _)); vm_compute; reflexivity)
                   ltac:(rewrite dom_empty_L; apply empty_subseteq)
-                  with "Hcg Hcnt Htext Hpc Hbare Henv0").
+                  with "Hcg Hcnt Htext Hpc Hbare Henv0b").
         all: try lkbelow.
         iIntros (CIDa5 Hsa5 mr3) "Hcg Hcnt Hpc %Hcsuf".
         assert (Hret62 : ret_pc (T3 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.proc_pagetable + 0x62)).
@@ -984,7 +991,7 @@ Section ProofProcPagetable.
        to a fresh hart, so mappages#2 wants [Hcnt] at CID27. *)
     iDestruct (cpu_own_transport CIDmp1 CID27 lvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (MP.wp_mappages_sconf KT1 γa N8 t1 ppt_m1 1 6 lvl (K - 4)%nat eb p (avail_sub (avail_sub on 1) g1) b
+    iApply (MP.wp_mappages_sconf KT1 γa γk N8 t1 ppt_m1 1 6 lvl (K - 4)%nat eb p (avail_sub (avail_sub on 1) g1) b
               _ Hlvl Hc32
               ltac:(rewrite HN8a0; rewrite Hbase1; exact Hroot0r)
               ltac:(rewrite HN8a1; apply bv_eq; vm_compute; reflexivity)
@@ -1136,7 +1143,10 @@ Section ProofProcPagetable.
           by (rewrite /V7 upd_eq; reflexivity).
         (* the tree at the fixed-leaf altitude: one leaf, the trampoline *)
         iDestruct (uptg_of_rep0_tramp b0 t2 Hrept1 Hbase2b with "Hptree") as "Hupt".
-        iMod (kalloc_env_seal with "Henv") as "#Henv0".
+        (* as in the first tail: seal NAMED, then bridge to the bundle the
+           [None]-only callees (uvmunmap_fixed, uvmfree) still take. *)
+        iMod (kalloc_env_at_seal with "Henv") as "#Henv0".
+        iDestruct (kalloc_env_at_env with "Henv0") as "#Henv0b".
         iDestruct (cpu_own_transport CIDmp2 CIDb8 lvl eb p b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
         iApply (UUF.wp_uvmunmap_fixed_sconf γa V7 upt_fixed_tramp b0 ∅ tramp_vpn
@@ -1148,7 +1158,7 @@ Section ProofProcPagetable.
                   (or_introl eq_refl)
                   ltac:(rewrite HV7a1; rewrite uint_unsigned;
                         apply (proj1 (Z.leb_le _ _)); vm_compute; reflexivity)
-                  with "Hcg Hcnt Htext Hpc Hupt Henv0").
+                  with "Hcg Hcnt Htext Hpc Hupt Henv0b").
         iIntros (CIDb9 Hsb9 mr3) "Hcg Hcnt Hpc %Hcsuu Hupt".
         (* dropping the only fixed leaf leaves a BARE table -- uvmfree's *)
         iEval (rewrite upt_fixed_tramp_del_tramp) in "Hupt".
@@ -1210,7 +1220,7 @@ Section ProofProcPagetable.
                   ltac:(rewrite HW6a1; unfold uvm_maxsz;
                         rewrite uint_unsigned; apply (proj1 (Z.leb_le _ _)); vm_compute; reflexivity)
                   ltac:(rewrite dom_empty_L; apply empty_subseteq)
-                  with "Hcg Hcnt Htext Hpc Hupt Henv0").
+                  with "Hcg Hcnt Htext Hpc Hupt Henv0b").
         all: try lkbelow.
         iIntros (CIDc4 Hsc4 mr4) "Hcg Hcnt Hpc %Hcsuf2".
         assert (Hret80 : ret_pc (W6 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.proc_pagetable + 0x80)).
@@ -1308,16 +1318,16 @@ Section SealProcPagetable.
   Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Lemma wp_proc_pagetable_sconf (γa : gname)
+  Lemma wp_proc_pagetable_sconf (γa : gname) (γk : gname * gname)
       (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool)
       (p : mword 64) (on : option nat) (b : bool) (lks : gset string)
-    : wp_proc_pagetable_sconf_body γa mm tf dqtf lvl K eb p on b lks.
+    : wp_proc_pagetable_sconf_body γa γk mm tf dqtf lvl K eb p on b lks.
   Proof.
     cbv beta delta [wp_proc_pagetable_sconf_body].
     intros pp tfp ret_tgt Hlvl HK Hex Htfal Htfb Hlkbelow.
     destruct Hex as (nb & Hon & Hnb). subst on.
     iIntros "Hcg Hcnt #Htext Hpc Htfcell Henv Hcont".
-    iApply (Core.wp_proc_pagetable_core γa mm tf dqtf lvl K eb p (Some nb) b lks
+    iApply (Core.wp_proc_pagetable_core γa γk mm tf dqtf lvl K eb p (Some nb) b lks
               Hlvl HK Htfal Htfb with "Hcg Hcnt Htext Hpc Htfcell Henv [Hcont]").
     all: try lkbelow.
     iIntros (CIDr Hsr mr) "Hcg Hcnt Hpc Htfcell Hpost %Hcs".

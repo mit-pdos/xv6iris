@@ -3,7 +3,7 @@
    that maps [npages] pages by calling walk() once per page (allocating missing
    interior page-table nodes).  Threads sconf + hart_state + sie_cap +
    intr_count (net-zero, via the walk->kalloc call) + tlb + deep custody +
-   ptree_own + kalloc_env. *)
+   ptree_own + kalloc_env_at (the free-list pair named). *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
@@ -91,7 +91,7 @@ Section ProofMappages.
   (* ================================================================= *)
   (* THE SHARED EPILOGUE (+0x9c..+0xb0) -- sconf mirror.                 *)
   (* ================================================================= *)
-  Lemma wp_mappages_epilogue_sconf `{CID0 : CpuId} (γa : gname)
+  Lemma wp_mappages_epilogue_sconf `{CID0 : CpuId} (γa : gname) (γk : gname * gname)
       (mm Mf : regfile) (t tf : ptree)
       (m : gmap (mword 27) (mword 64)) (npages k : nat) (perm : Z) (K lvl : nat)
       (eb : bool) (p : mword 64) (on : option nat) (q : nat) (b : bool)
@@ -130,14 +130,14 @@ Section ProofMappages.
     pa_stk sp0 9 ↦₈[kt] (mm !!! Regidx (mword_of_int 23)) -∗
     (∃ v00 : bv 64, pa_stk sp0 10 ↦₈[kt] v00) -∗
     ptree_own 2 (DfracOwn 1) tf -∗
-    kalloc_env γa (avail_sub on q) -∗
+    kalloc_env_at γa γk (avail_sub on q) -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ (mr : regfile) (t' : ptree) (k' : nat) (g : nat),
       sie_cap_gpr kt mr K b p -∗ cpu_own lvl eb p b lks -∗
       pc_is ret_tgt -∗
       ptree_own 2 (DfracOwn 1) t' -∗
       ⌜pt_nodes t' = (pt_nodes t + g)%nat⌝ -∗
-      kalloc_env γa (avail_sub on g) -∗
+      kalloc_env_at γa γk (avail_sub on g) -∗
       ⌜callee_saved mm mr⌝ -∗
       ⌜pt_base t' = pt_base t⌝ -∗
       ⌜pt_rep0 t' (pt_insert_run m vpn0 ppn0 perm k')⌝ -∗
@@ -409,7 +409,7 @@ Section ProofMappages.
   (* ================================================================= *)
   (* THE LOOP (+0x3e..+0x68): induction on the REMAINING page count.    *)
   (* ================================================================= *)
-  Lemma wp_mappages_loop_sconf `{CID0 : CpuId} (γa : gname)
+  Lemma wp_mappages_loop_sconf `{CID0 : CpuId} (γa : gname) (γk : gname * gname)
       (mm : regfile) (t : ptree)
       (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (K lvl : nat)
       (eb : bool) (p : mword 64) (on : option nat)
@@ -469,14 +469,14 @@ Section ProofMappages.
     pa_stk sp0 9 ↦₈[kt] (mm !!! Regidx (mword_of_int 23)) -∗
     (∃ v00 : bv 64, pa_stk sp0 10 ↦₈[kt] v00) -∗
     ptree_own 2 (DfracOwn 1) tk -∗
-    kalloc_env γa (avail_sub on consumed) -∗
+    kalloc_env_at γa γk (avail_sub on consumed) -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ (mr : regfile) (t' : ptree) (k' : nat) (g : nat),
       sie_cap_gpr kt mr K b p -∗ cpu_own lvl eb p b lks -∗
       pc_is ret_tgt -∗
       ptree_own 2 (DfracOwn 1) t' -∗
       ⌜pt_nodes t' = (pt_nodes t + g)%nat⌝ -∗
-      kalloc_env γa (avail_sub on g) -∗
+      kalloc_env_at γa γk (avail_sub on g) -∗
       ⌜callee_saved mm mr⌝ -∗
       ⌜pt_base t' = pt_base t⌝ -∗
       ⌜pt_rep0 t' (pt_insert_run m vpn0 ppn0 perm k')⌝ -∗
@@ -618,7 +618,7 @@ Section ProofMappages.
     iDestruct (cpu_own_transport CID0 CIDa4 lvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     (* the walk call *)
-    iApply (Walk.wp_walk_sconf kt γa W4' tk (pt_insert_run m vpn0 ppn0 perm k) (K - 10)%nat lvl eb p (avail_sub on consumed) b
+    iApply (Walk.wp_walk_sconf kt γa γk W4' tk (pt_insert_run m vpn0 ppn0 perm k) (K - 10)%nat lvl eb p (avail_sub on consumed) b
               _ Hlvl ltac:(lia)
               HW4'a0 HW4'a2
               ltac:(rewrite HW4'a1; rewrite uint_unsigned; rewrite Hvak_u; lia)
@@ -757,7 +757,7 @@ Section ProofMappages.
       iDestruct (cpu_own_transport CIDw CIDn2 lvl eb p b Hcrossnw
                    with "Hcnt") as "Hcnt".
       iDestruct (wp_next_shift Hcrossn0 with "Hcont") as "Hcont".
-      iApply (wp_mappages_epilogue_sconf γa mm F1 t t' m npages k perm K lvl eb p on (consumed + g)%nat b lks HK
+      iApply (wp_mappages_epilogue_sconf γa γk mm F1 t t' m npages k perm K lvl eb p on (consumed + g)%nat b lks HK
                 ltac:(rewrite /F1; rewrite upd_ne; [| reg_neq]; exact Hmrsp)
                 ltac:(rewrite /F1; rewrite upd_ne; [| reg_neq]; exact Hmr24)
                 ltac:(rewrite /F1; rewrite upd_ne; [| reg_neq]; exact Hmr25)
@@ -1019,7 +1019,7 @@ Section ProofMappages.
       iDestruct (cpu_own_transport CIDw CIDl3 lvl eb p b Hcrosslw
                    with "Hcnt") as "Hcnt".
       iDestruct (wp_next_shift Hcrossl0 with "Hcont") as "Hcont".
-      iApply (wp_mappages_epilogue_sconf γa mm F1 t tS m npages (S k) perm K lvl eb p on (consumed + g)%nat b lks HK
+      iApply (wp_mappages_epilogue_sconf γa γk mm F1 t tS m npages (S k) perm K lvl eb p on (consumed + g)%nat b lks HK
                 (eq_trans Hfsp Hmrsp)
                 (eq_trans Hf24 Hmr24)
                 (eq_trans Hf25 Hmr25)
@@ -1158,11 +1158,11 @@ Section ProofMappages.
   Qed.
 
   Lemma wp_mappages_sconf
-      (γa : gname)
+      (γa : gname) (γk : gname * gname)
       (mm : regfile) (t : ptree)
       (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat)
       (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string)
-    : wp_mappages_sconf_body kt γa mm t m npages perm lvl K eb p on b lks.
+    : wp_mappages_sconf_body kt γa γk mm t m npages perm lvl K eb p on b lks.
   Proof.
     cbv beta delta [wp_mappages_sconf_body].
     intros va pa vpn0 ppn0 ret_tgt
@@ -1575,7 +1575,7 @@ Section ProofMappages.
        of them mention [cpu_own]); the loop is entered at [CID25]. *)
     iDestruct (cpu_own_transport CID CID25 lvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (wp_mappages_loop_sconf γa mm t m npages perm K lvl eb p on npages b lks 0%nat P13 t 0%nat
+    iApply (wp_mappages_loop_sconf γa γk mm t m npages perm K lvl eb p on npages b lks 0%nat P13 t 0%nat
               Hlvl HK ltac:(lia) Hnp Hroot Hvaal Hpaal Hpermreg Hpok
               ltac:(rewrite uint_unsigned; exact Hvab)
               ltac:(rewrite uint_unsigned; exact Hpab) Hnone

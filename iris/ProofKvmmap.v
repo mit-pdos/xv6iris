@@ -1,7 +1,7 @@
 (* ProofKvmmap.v -- kvmmap() over the SIE-agnostic sconf world.
    Mirror of the smode wp_kvmmap_r (CodeKvmmap.v): a thin 2-slot-frame wrapper
    that calls mappages() once (panicking on failure).  Threads the same sconf
-   bundle + ptree_own + kalloc_env as mappages.
+   bundle + ptree_own + kalloc_env_at (the free-list pair named) as mappages.
 
    NOTE (WIP): the SPEC below is walk-independent and typechecks now; the PROOF
    composes Mappages.wp_mappages_sconf (ProofMappages.v) is filled once the walk +
@@ -42,11 +42,11 @@ Section ProofKvmmap.
 
 
   Lemma wp_kvmmap_sconf
-      (γa : gname)
+      (γa : gname) (γk : gname * gname)
       (mm : regfile) (t : ptree)
       (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat)
       (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string)
-    : wp_kvmmap_sconf_body γa mm t m npages perm lvl K eb p on b lks.
+    : wp_kvmmap_sconf_body γa γk mm t m npages perm lvl K eb p on b lks.
   Proof.
     cbv beta delta [wp_kvmmap_sconf_body].
     intros va pa vpn0 ppn0 ret_tgt
@@ -220,7 +220,7 @@ Section ProofKvmmap.
        them.  ONE line, no case split on [b]. ---- *)
     iDestruct (cpu_own_transport CID CID8 lvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Mappages.wp_mappages_sconf KT0 γa P6 t m npages perm lvl (K - 2)%nat eb p (Some nb) b lks
+    iApply (Mappages.wp_mappages_sconf KT0 γa γk P6 t m npages perm lvl (K - 2)%nat eb p (Some nb) b lks
               Hlvl ltac:(lia)
               HP6a0
               ltac:(rewrite HP6a1; exact Hvaal)

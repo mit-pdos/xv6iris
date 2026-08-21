@@ -436,11 +436,11 @@ Section ProofAllocproc.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Lemma wp_allocproc_core
-      (γa : gname) (γp : gname) (γf : gname)
+      (γa : gname) (γk : gname * gname) (γp : gname) (γf : gname)
       (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
       (pme : mword 64) (on : option nat) (op : option nat)
       (b : bool) (lks : gset string)
-    : wp_allocproc_core_body γa γp γf γs m lvl K eb pme on op b lks.
+    : wp_allocproc_core_body γa γk γp γf γs m lvl K eb pme on op b lks.
   Proof.
     cbv beta delta [wp_allocproc_core_body].
     intros pcE ret_tgt HK Hlvl Hbelow.
@@ -784,12 +784,12 @@ Section ProofAllocproc.
                      ∀ (mr : regfile),
                        ⌜ callee_saved m mr ⌝ -∗
                        pc_is ret_tgt -∗
-                       allocproc_post γa γf γs lvl eb pme on op b lks mr K
+                       allocproc_post γa γk γf γs lvl eb pme on op b lks mr K
                          (mr !!! Regidx ap_a0) -∗
                        WP (Loop : expr riscv_lang)) -∗
                    sie_cap_gpr KT1 Mk (K - 4)%nat b pme -∗
                    cpu_own lvl eb pme b lks -∗
-                   kalloc_env γa on -∗
+                   kalloc_env_at γa γk on -∗
                    (* the proc table's regime, and the record of every slot
                       the scan has already passed.  The record is PERSISTENT
                       ([ProcAvail.pslot_used]), which is the only reason it
@@ -1058,7 +1058,11 @@ Section ProofAllocproc.
           rewrite /F3 upd_ne; [| congruence].
           rewrite /F2 upd_ne; [| congruence].
           exact (Hfa_rest r Hr Ncsp N8 N9 N18). }
-        iDestruct "Henv" as (γk) "(#Hkmem & Havail)".
+        (* the pair is NAMED in the contract now ([KvmSpec.kalloc_env_at]),
+           so this is a plain split rather than an [∃]-elimination -- and the
+           name survives the callees below, which is the whole point. *)
+        iEval (rewrite /kalloc_env_at) in "Henv".
+        iDestruct "Henv" as "(#Hkmem & Havail)".
         (* p->lock is still held: kalloc's own held set is
            [{["proc"]} ∪ lks], and its "kmem" freshness premise
            needs [ap_below_kmem]. *)
@@ -1198,9 +1202,13 @@ Section ProofAllocproc.
              [None]; the seal is irreversible and that is exactly what the
              third arm of [allocproc_post] records.  The sealed bundle is
              persistent, so the post still gets one. *)
-          iAssert (kalloc_env γa on) with "[Havail]" as "Henv".
-          { iExists γk. iFrame "Hkmem Havail". }
-          iMod (kalloc_env_seal γa on with "Henv") as "#Henv".
+          iAssert (kalloc_env_at γa γk on) with "[Havail]" as "Henv".
+          { iApply (kalloc_env_at_intro with "Hkmem Havail"). }
+          iMod (kalloc_env_at_seal with "Henv") as "#Henv".
+          (* freeproc is stated only at the BUNDLE (it never needs the name),
+             so it takes the one-way projection; the named copy stays, which
+             is what the post's third arm reports. *)
+          iDestruct (kalloc_env_at_env with "Henv") as "#Henvb".
           iDestruct (p_pid_split (proc_addr k) pidn with "Hpidfull") as "[Hpidinv Hpidown]".
           iDestruct (proc_ofiles_null_split γf (proc_addr k) (pv_ofile V) Hof with "Hofiles")
             as "[Hofc Hofs]".
@@ -1210,7 +1218,7 @@ Section ProofAllocproc.
           iApply (FP.wp_freeproc_sconf (CID := CIDf) γa T2 k γl V pidn USED ch None None
                     (trap_res b + (K - 4))%nat eb pme (S lvl) ({["proc"]} ∪ lks)
                     ltac:(pose proof (ap_K44 K HK); lia) (ap_lvlS lvl Hlvl) HT2a0
-                    with "Hcg Hcpu Htext Hpc [Hlocked Hstate Hpg Hchan Hkilled Hxstate Hpidinv] [Hpidown Hfields Hofc Hofs Hspare Hirsp Hkst Hctx] [Hpgcell] [Htfcell] Henv").
+                    with "Hcg Hcpu Htext Hpc [Hlocked Hstate Hpg Hchan Hkilled Hxstate Hpidinv] [Hpidown Hfields Hofc Hofs Hspare Hirsp Hkst Hctx] [Hpgcell] [Htfcell] Henvb").
           all: try lkbelow.
           { rewrite /proc_held. iFrame "Hlocked Hstate Hpg Hchan".
             iExists kl, xs, pidn. iFrame "Hkilled Hxstate Hpidinv". }
@@ -1414,8 +1422,8 @@ Section ProofAllocproc.
           rewrite /F5 upd_ne; [| congruence].
           rewrite /F4 upd_ne; [| congruence].
           exact (Hka_rest r Hr Ncsp N8 N9 N18). }
-        iAssert (kalloc_env γa (avail_dec on)) with "[Havail]" as "Henv".
-        { iExists γk. iFrame "Hkmem Havail". }
+        iAssert (kalloc_env_at γa γk (avail_dec on)) with "[Havail]" as "Henv".
+        { iApply (kalloc_env_at_intro with "Hkmem Havail"). }
         (* the GENERAL contract: at an arbitrary budget proc_pagetable can
            fail, and its failure is allocproc's second tail.  p->lock is
            still held here, so the actual held set is
@@ -1426,7 +1434,7 @@ Section ProofAllocproc.
            scope, so this call supplies no order proof for it -- left as-is
            rather than guessed at; flagging for whoever owns
            SpecProcPagetable.v. *)
-        iApply (PPT.wp_proc_pagetable_core (CID := CIDf) γa F6 tfr (DfracOwn 1) (S lvl) (trap_res b + (K - 4))%nat eb pme (avail_dec on) false
+        iApply (PPT.wp_proc_pagetable_core (CID := CIDf) γa γk F6 tfr (DfracOwn 1) (S lvl) (trap_res b + (K - 4))%nat eb pme (avail_dec on) false
                   ({["proc"]} ∪ lks)
                   (ap_lvlS lvl Hlvl) ltac:(pose proof (ap_K36 K HK); lia)
                   (ap_tf_align tfr Hpvtf) (ap_tf_bound tfr Hpvtf)
@@ -1563,6 +1571,9 @@ Section ProofAllocproc.
             exact (HF7rest r Hr Ncsp N8 N9 N18). }
           (* proc_pagetable already resealed the budget on its way out, so
              there is nothing left to seal here -- [Henv] arrives at [None]. *)
+          (* ...and freeproc, stated only at the BUNDLE, takes the one-way
+             projection; the named copy is what this arm reports. *)
+          iDestruct (kalloc_env_at_env with "Henv") as "#Henvb".
           iDestruct (p_pid_split (proc_addr k) pidn with "Hpidfull") as "[Hpidinv Hpidown]".
           iDestruct (proc_ofiles_null_split γf (proc_addr k) (pv_ofile V) Hof with "Hofiles")
             as "[Hofc Hofs]".
@@ -1580,7 +1591,7 @@ Section ProofAllocproc.
           iApply (FP.wp_freeproc_sconf (CID := CIDf) γa U2 k γl V pidn USED ch None (Some (tfp, tfws))
                     (trap_res b + (K - 4))%nat eb pme (S lvl) ({["proc"]} ∪ lks)
                     ltac:(pose proof (ap_K44 K HK); lia) (ap_lvlS lvl Hlvl) HU2a0
-                    with "Hcg Hcpu Htext Hpc [Hlocked Hstate Hpg Hchan Hkilled Hxstate Hpidinv] [Hpidown Hfields Hofc Hofs Hspare Hirsp Hkst Hctx] [Hpgcell] [Htfcell Htfpage] Henv").
+                    with "Hcg Hcpu Htext Hpc [Hlocked Hstate Hpg Hchan Hkilled Hxstate Hpidinv] [Hpidown Hfields Hofc Hofs Hspare Hirsp Hkst Hctx] [Hpgcell] [Htfcell Htfpage] Henvb").
           all: try lkbelow.
           { rewrite /proc_held. iFrame "Hlocked Hstate Hpg Hchan".
             iExists kl, xs, pidn. iFrame "Hkilled Hxstate Hpidinv". }
@@ -2299,17 +2310,17 @@ Section SealAllocproc.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Lemma wp_allocproc_sconf
-      (γa : gname) (γp : gname) (γf : gname)
+      (γa : gname) (γk : gname * gname) (γp : gname) (γf : gname)
       (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
       (pme : mword 64) (on : option nat) (op : option nat)
       (b : bool) (lks : gset string)
-    : wp_allocproc_sconf_body γa γp γf γs m lvl K eb pme on op b lks.
+    : wp_allocproc_sconf_body γa γk γp γf γs m lvl K eb pme on op b lks.
   Proof.
     cbv beta delta [wp_allocproc_sconf_body].
     intros pcE ret_tgt HK Hlvl Hex Hbelow.
     destruct Hex as (nb & Hon & Hnb). subst on.
     iIntros "Hcg Hcpu #Htext Hpc #Hprocs #Hpidlk Henv Hpav Hcont".
-    iApply (Core.wp_allocproc_core γa γp γf γs m lvl K eb pme (Some nb) op b lks HK Hlvl Hbelow
+    iApply (Core.wp_allocproc_core γa γk γp γf γs m lvl K eb pme (Some nb) op b lks HK Hlvl Hbelow
               with "Hcg Hcpu Htext Hpc Hprocs Hpidlk Henv Hpav").
     all: try lkbelow.
     iIntros (CIDx Hsx mr) "%Hcs Hpc Hpost".

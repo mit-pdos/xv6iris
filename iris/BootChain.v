@@ -693,7 +693,7 @@ Section BootPrimary.
     fs_boot_supply _ _ dk sb nib cov γd γv -∗
     (* rows (B) and (C) of the fsinit bundle -- see [SpecMain]'s own rows *)
     log_mirror_full -∗
-    iref_slot -∗
+    iref_slots 2 -∗
     iref_slots_auth -∗
     (* ---- STAGE (f): ROWS 7 AND 8 OF [FirstTok.first_boot_persist] ----
        [gen_cert] is [BootShared.boot_shared_alloc]'s own persistent output

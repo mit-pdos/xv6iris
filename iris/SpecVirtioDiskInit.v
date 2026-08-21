@@ -138,7 +138,7 @@ Notation K_virtio_disk_init := (18%nat) (only parsing).
    while [rewrite /vdi_post] at the return still does. *)
 Definition vdi_post
     `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
-    (γv : disk_names) (γa : gname)
+    (γv : disk_names) (γa : gname) (γk : gname * gname)
     (m : regfile) (K : nat)
     (eb : bool) (pp : mword 64) (on : option nat)
     (ret_tgt c_cpu : mword 64) (lks : gset string) : iProp Σ :=
@@ -148,7 +148,7 @@ Definition vdi_post
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     ⌜ page_valid pd ⌝ -∗ ⌜ page_valid pav ⌝ -∗ ⌜ page_valid pu ⌝ -∗
-    kalloc_env γa (avail_sub on 3) -∗
+    kalloc_env_at γa γk (avail_sub on 3) -∗
     (* The device is LIVE and its queue is the three pages just allocated: the
        DMA lease has been paid into [disk_inv]'s [virtio_proto] at the final
        STATUS write, and what comes out is the publisher token at 0 -- nothing
@@ -186,7 +186,7 @@ Global Typeclasses Opaque vdi_post.
    its own [b] parameter for the same reason. *)
 Definition wp_virtio_disk_init_sconf_body
     `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
-    (γv : disk_names) (γa : gname)
+    (γv : disk_names) (γa : gname) (γk : gname * gname)
     (m : regfile) (K : nat)
     (eb : bool) (pp : mword 64) (on : option nat)
     (c0 : virtio_cfg) (vlock : bv 32) (vname vcpu : bv 64)
@@ -214,7 +214,7 @@ Definition wp_virtio_disk_init_sconf_body
   (* [kernel_data] supplies the "virtio_disk" string literal the auipc/addi
      pair points at -- the name handed to initlock. *)
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  kalloc_env γa on -∗
+  kalloc_env_at γa γk on -∗
   (* the disk fabric, borrowed from the invariant around each MMIO access,
      plus the caller's half of the config tracker: the pair is what keeps the
      configuration this function programs deterministic while the state lives
@@ -228,16 +228,16 @@ Definition wp_virtio_disk_init_sconf_body
   disk_avail ↦₈ pav0 -∗
   disk_used ↦₈ pu0 -∗
   ([∗ list] j ∈ seq 0 8, (pa_add disk_free j) ↦ₘ free0 j) -∗
-  vdi_post γv γa m K eb pp on ret_tgt c_cpu lks -∗
+  vdi_post γv γa γk m K eb pp on ret_tgt c_cpu lks -∗
   WP (Loop : expr riscv_lang).
 
 Module Type VIRTIODISKINIT.
   Parameter wp_virtio_disk_init_sconf :
     forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
-      (γv : disk_names) (γa : gname) (m : regfile) (K : nat)
+      (γv : disk_names) (γa : gname) (γk : gname * gname) (m : regfile) (K : nat)
       (eb : bool) (pp : mword 64) (on : option nat)
       (c0 : virtio_cfg) (vlock : bv 32) (vname vcpu : bv 64)
       (pd0 pav0 pu0 : mword 64) (free0 : nat -> bv 8) (lks : gset string),
-      wp_virtio_disk_init_sconf_body γv γa m K eb pp on c0 vlock vname vcpu
+      wp_virtio_disk_init_sconf_body γv γa γk m K eb pp on c0 vlock vname vcpu
                                      pd0 pav0 pu0 free0 lks.
 End VIRTIODISKINIT.

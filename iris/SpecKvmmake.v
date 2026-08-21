@@ -40,7 +40,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
    stack_own bound 48 = own 4-slot frame + proc_mapstacks' 44 (PROVISIONAL,
    pending the decode pass). *)
 Definition wp_kvmmake_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string) :=
+    (γa : gname) (γk : gname * gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string) :=
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
   lvl = 0%nat ->
   (48 <= K)%nat ->
@@ -50,7 +50,7 @@ Definition wp_kvmmake_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID :
   sie_cap_gpr KT0 mm K b p -∗
   cpu_own lvl eb p b lks -∗ kernel_text -∗
   pc_is (mword_of_int KernelSyms.kvmmake) -∗
-  kalloc_env γa on -∗
+  kalloc_env_at γa γk on -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t : ptree) (pas : nat -> mword 44),
     sie_cap_gpr KT0 mr K b p -∗
@@ -61,7 +61,7 @@ Definition wp_kvmmake_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID :
        = zero_extend' 64 (concat_vec (pt_base t) (zeros' 12 : mword 12))⌝ -∗
     ⌜pt_rep0 t (kvm_map_full pas)⌝ -∗
     ⌜pt_nodes t = 102%nat⌝ -∗
-    kalloc_env γa (avail_sub on K_kvmmake) -∗
+    kalloc_env_at γa γk (avail_sub on K_kvmmake) -∗
     ⌜callee_saved mm mr⌝ -∗
     ⌜kvm_pas_ok pas⌝ -∗
     ([∗ list] i ∈ seq 0 64,
@@ -72,6 +72,6 @@ Definition wp_kvmmake_sconf_body `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID :
 Module Type KVMMAKE.
   Parameter wp_kvmmake_sconf :
     forall `{!riscvGS Σ, !xv6G Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string),
-      wp_kvmmake_sconf_body γa mm lvl K eb p on b lks.
+      (γa : gname) (γk : gname * gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string),
+      wp_kvmmake_sconf_body γa γk mm lvl K eb p on b lks.
 End KVMMAKE.

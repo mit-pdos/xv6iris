@@ -724,7 +724,7 @@ Measured facts that supersede this file's earlier estimates:
     `bitmap_res` is INSIDE it, so the charter's standalone row (D) is
     DELETED); rows (A) = the 32 `&sb` bytes + `log_addr`/name/cpu +
     `l_start`/`l_dev`/`l_out`(0)/`l_cmt`(0)/`l_ncommit`/`lh_n_pa` + the 30
-    `lh_block`s; row (B) = `log_mirror_full`; row (C) = `iref_slot` and
+    `lh_block`s; row (B) = `log_mirror_full`; row (C) = `iref_slots 2` and
     `bslots fsc_bio 35`.  `bslots` did NOT move inside the kit (it is a
     WP-time product), so row (C) stays.
   - **THREE DEVIATIONS FROM THE CHARTER, all forced.**  (i) The two pure
@@ -762,7 +762,7 @@ Measured facts that supersede this file's earlier estimates:
     what initlog's contract asks for.  `SpecMain.main_sb_raw` /
     `main_log_raw` are the two new `main_globals_raw` conjuncts.  Row (B)
     (`boot_shared_alloc`'s mirror `ghost_var`, which dead-ended) and row (C)
-    (ONE `iref_slot`, split off the file table's dropped `NFILE` share) are
+    (TWO `iref_slots`, split off the file table's dropped `NFILE` share) are
     threaded `boot_shared_alloc` -> `SystemAdequacy` -> `boot_hart_primary`
     -> `SpecMain` -> `mn_grp_fs`.
   - **(f3), the half that landed.**  `SpecMain` takes `(ndisk : nat)` and
@@ -917,7 +917,7 @@ Definition first_fsinit : iProp Σ :=
      l_ncommit ↦₄ v_nc ∗ lh_n_pa ↦₄ v_n ∗
      ([∗ list] i ∈ seq 0 LOGBLOCKS, ∃ w : mword 32, lh_block i ↦₄ w) ∗
      (* row (B) *) log_mirror_full ∗
-     (* row (C) *) iref_slot ∗
+     (* row (C) *) iref_slots 2 ∗
      bslots fsc_bio ((LOGBLOCKS + 2) + 2 + 1)%nat ∗
      (* row (D) -- IF the (f0) agent lands bitmap_res/bslots INSIDE the
         kit, delete the standalone rows; the (f0) spelling governs. *)
@@ -1070,27 +1070,57 @@ two-column ledger, every `fs_ready_pre` conjunct → source at the seal site:
 Sources = {first_tok payload, fsinit's own post, ambient} — `main_deposit`
 appears ZERO times.
 
-### (f-4) Debt F — the kalloc pair must be SPELLED through allocproc/userinit
+### (f-4) Debt F — the kalloc pair must be SPELLED through allocproc/userinit — **DISCHARGED**
 
-`fs_ready` spells the kmem pair at `fsc_kpages` precisely because "a
-consumer that names the pair itself could never tie its own name to a
-hidden one" (FsReady.v) — and `KvmSpec.kalloc_env` is that hidden `∃ γk`.
-Today `SpecAllocproc`/`SpecUserinit` thread `kalloc_env γa on`, so the
-token that comes back from allocproc has LOST the `fsc_kpages` name and no
-agreement lemma can recover it (the auth lives inside the lock).  Sealing
-before userinit is impossible (the `Some nb` premise is what refutes
-allocproc's untested null arm).  Fix = stage (e)'s debt-E discipline, one
-layer up: `SpecAllocproc` takes the pair as a parameter — premise
-`is_lock γa … (kmem_res γk …) ∗ kalloc_avail γk on`, post at `γk`, no
-existential — and `SpecUserinit` likewise (`γk := fsc_kpages` at main's
-application).  `ProofUserinit` then seals post-allocproc
-(`kalloc_avail_seal : Some n ==∗ None`, persistent result) and both parks
-the row and returns it (its post's `∃ nc, kalloc_env …` row becomes
-`kalloc_avail fsc_kpages None`; ProofMain already discards the old row with
-`_`, so the consumer change is free).  Ripple: ProofAllocproc (statement
-only), ProofKfork (IMPROVES — `fs_ready_kmem` already hands kfork the
-spelled pair).  **D3 (sequencing, humans may veto timing): this touches the
-proven kfork cone; land it as its own commit before the deposit commit.**
+`fs_ready` spells the kmem pair at `fsc_kpages` precisely because "a consumer
+that names the pair itself could never tie its own name to a hidden one"
+(FsReady.v) — and `KvmSpec.kalloc_env`'s `∃ γk` is that hidden name. It is a
+one-way valve: `WpLock.is_lock` is an `inv`, Iris invariants do not agree, so
+nothing recovers `γk` from a bundle. Sealing before userinit is impossible
+(the `Some nb` premise is what refutes allocproc's untested null arm), so the
+counted chain from `main` down to userinit's seal had to carry the name.
+
+**What landed.** `KvmSpec` gained a second, NAMED form beside the bundle:
+
+```coq
+  Definition kalloc_env_at (γ : gname) (γk : gname * gname) (on : option nat) : iProp Σ :=
+    (is_lock γ (mword_of_int KernelSyms.kmem) "kmem"%string
+       (kmem_res γk (mword_of_int (KernelSyms.kmem + 24))) ∗
+     kalloc_avail γk on)%I.
+```
+
+sealed with `Typeclasses Opaque` and an explicit `Persistent … None` instance,
+exactly the way `WpLock.is_lock` is sealed and for the same reason (without
+the seal every `iIntros "#H"` re-derives persistence by descending into the
+lock's resource). Projections `_lock` / `_avail` / `_intro` / `_seal`, plus
+the ONE-WAY bridge `kalloc_env_at_env : kalloc_env_at γ γk on -∗ kalloc_env γ on`.
+
+`kalloc_env` itself is UNCHANGED, which is what keeps this small: the ~110
+files that only pass the allocator through still use it and were not touched.
+
+**Who names it how.** `γk` is an explicit PARAMETER on every contract in the
+counted chain that has no `fscfg` of its own — walk, mappages, kvmmap,
+uvmcreate, proc_pagetable, proc_mapstacks, kvmmake, kvminit,
+virtio_disk_init — and also on allocproc and kfork, which are uncounted and
+must stay callable from `sys_fork` (whose allocator gname is generic). Only
+`main` and `userinit`, which genuinely carry `fileG` (hence `fscfg`),
+instantiate it at the ambient `fsc_kpages`. `SpecKalloc` needed nothing: it
+was already pair-transparent, which is what showed the valve was
+`kalloc_env`'s alone.
+
+**Where the cascade stops.** A caller sitting at `None` does not need a
+PARTICULAR name, only some name — and `kalloc_env_at γ γk None` is
+persistent. So uvmalloc, uvmcopy, vmfault, kexec's phase B and sys_fork open
+their own bundle for a local `γk`, call the named contract, and keep the
+bundle for their own postcondition. Nothing propagates past them, and no
+`Spec` outside the counted chain changed.
+
+**What NOT to do**, recorded because it was tried first: pinning
+`kalloc_env`'s witness to `fsc_kpages` outright. That drags `fscfg` into
+`KvmSpec` and therefore into ~50 files of the vm cone, and — because
+`kalloc_env` is not `Typeclasses Opaque` — it made instance resolution
+diverge (`SpecFreeproc` stopped terminating). The parameter is both smaller
+and safer: it changes no typeclass surface at all.
 
 ### (f-5) Residual at the seal, i.e. what stage (f) does NOT close
 

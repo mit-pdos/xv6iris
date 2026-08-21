@@ -550,11 +550,19 @@ Section KexecBBody.
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CID0 CID3 eb (proc_addr jp)
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
-    iApply (PPT.wp_proc_pagetable_core ga G2 tfr (DfracOwn (1/4)) 0%nat
+    (* proc_pagetable NAMES the free-list pair now ([KvmSpec.kalloc_env_at]).
+       kexec is at [None] and drops the copy proc_pagetable hands back, so it
+       needs no PARTICULAR name -- only some name, which its own bundle
+       supplies.  [Hka] is persistent, so opening it costs nothing. *)
+    iPoseProof "Hka" as "Hkadup".
+    iDestruct "Hkadup" as (γkx) "[#Hkalk #Hkaav]".
+    iAssert (kalloc_env_at ga γkx None) as "#Hkan".
+    { iApply (kalloc_env_at_intro with "Hkalk Hkaav"). }
+    iApply (PPT.wp_proc_pagetable_core ga γkx G2 tfr (DfracOwn (1/4)) 0%nat
               (K - 68)%nat eb (proc_addr jp) None eb lks
               kxc_lvl0 ltac:(lia)
               (kxc_tf_align tfr Hpvtf) (kxc_tf_bound tfr Hpvtf)
-              with "Hcg Hcnt Htext Hpc [Htfc] Hka").
+              with "Hcg Hcnt Htext Hpc [Htfc] Hkan").
     all: try lkbelow.
     { iEval (rewrite HG2a0). iExact "Htfc". }
     iIntros (CID4 Hsq4 mr) "Hcg Hcnt Hpc Htfc Hppt %Hcspt".

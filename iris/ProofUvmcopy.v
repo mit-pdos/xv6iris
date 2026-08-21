@@ -760,8 +760,14 @@ Section ProofUvmcopy.
       [ exfalso; clear -Hrem; lia |].
     iIntros "Hcg Hcnt #Htext Hpc Hpo Hpt #Henv Hexit".
     iDestruct "Henv" as (γk) "(#Hlock & #Havail)".
+    (* mappages names the free-list pair now ([KvmSpec.kalloc_env_at]); this
+       caller is at [None] and needs no PARTICULAR name, only one, which its
+       own bundle supplies.  Both forms are kept: the callees stated at the
+       bundle (uvmdealloc, kfree) still take that one. *)
     iAssert (kalloc_env γa None) as "#Henv2".
     { iExists γk. iSplitR; [iExact "Hlock" |]. iExact "Havail". }
+    iAssert (kalloc_env_at γa γk None) as "#Henvn".
+    { iApply (kalloc_env_at_intro with "Hlock Havail"). }
     iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhwc Hcg]".
     iDestruct "Hhwc" as (hwmisa0 hwmseccfg0 hwpmar0 hwelp0)
       "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hkmapb & _)".
@@ -1637,11 +1643,11 @@ Section ProofUvmcopy.
       rewrite vpn_at_0 HD6a1 Hvj. exact Hmcnone. }
     iDestruct (cpu_own_transport CIDl12 CIDl25 ilvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Mappages.wp_mappages_sconf KT1 γa D6 tc m_c 1%nat (pte_flags10 w0) ilvl
+    iApply (Mappages.wp_mappages_sconf KT1 γa γk D6 tc m_c 1%nat (pte_flags10 w0) ilvl
               (K - 10)%nat eb p None b
               _ Hilvl HKmp HD6root Hmpva Hmppa Hmpsz ltac:(clear; lia)
               HD6a4 (proj1 Hperm) Hmpvab Hmppab Hrepc Hmpfresh
-              with "Hcg Hcnt Htext Hpc Hptreec Henv2").
+              with "Hcg Hcnt Htext Hpc Hptreec Henvn").
     all: try lkbelow.
     iIntros (CIDl26 Hsl26 mg tc' k g) "Hcg Hcnt Hpc Hptreec %Hnodes _ %Hgcs %Hbase' %Hrep' %Hmono %Hmiss %Hmpay".
     rewrite HD6a1 in Hrep'. rewrite HD6a3 in Hrep'. rewrite Hvj in Hrep'.

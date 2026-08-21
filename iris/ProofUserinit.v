@@ -404,7 +404,7 @@ Section ProofUserinit.
                  ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iDestruct (wp_next_shift (b := b) (CIDa := CID) (CIDb := CID6)
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
-    iApply (AP.wp_allocproc_sconf fsc_kalloc γp γf γs R3 0%nat (K - 4)%nat b pj
+    iApply (AP.wp_allocproc_sconf fsc_kalloc fsc_kpages γp γf γs R3 0%nat (K - 4)%nat b pj
               on (Some (S np)) b lks
               Kap ltac:(lia) Hnb Hbelow
               with "Hcg Hcpu Htext Hpc Hpinv Hlpid Hkenv Hpav").
@@ -648,15 +648,20 @@ Section ProofUserinit.
        [KallocInv.kalloc_avail_seal] is a one-shot and the result is
        PERSISTENT, which is why it can ride a token that a process carries
        and (at its steady arm) every later process copies. *)
-    iMod (kalloc_env_seal fsc_kalloc (avail_sub on nc) with "Hkenv")
-      as "#Hkenv".
+    iMod (kalloc_env_at_seal with "Hkenv") as "#Hkenv".
     (* ...AND THE DEPOSIT.  All four rows of [FirstTok.first_tok]'s boot arm
        are in hand at this instant and nowhere else: the pinned
        [first_addr ↦₄ 1] cell, [first_boot_persist] (main's sixteen
        persistent rows) and [first_fsinit] (SpecFsinit's whole exclusive
        premise pile) were carried across allocproc and namei untouched, and
        the allocator row is what the [iMod] above just minted. *)
-    iDestruct (first_tok_boot with "Hfirst Hpersist Hkenv Hfsinit")
+    (* [KvmSpec.kalloc_env_at] names the free-list pair, so the token's
+       allocator row -- [kalloc_avail fsc_kpages None], the half
+       [FsReady.fs_ready_pre] spells out -- is a projection off what
+       allocproc handed back.  The bundle's [∃ γk] could never have been
+       tied to [fsc_kpages] here; that is why the counted chain names it. *)
+    iDestruct (kalloc_env_at_avail with "Hkenv") as "#Hkav".
+    iDestruct (first_tok_boot with "Hfirst Hpersist Hkav Hfsinit")
       as "Hftok".
     iAssert (proc_priv γf (proc_addr j) pid (upd_cwd V ipv))
       with "[Hpnc Hcref Hftok]" as "Hpriv".

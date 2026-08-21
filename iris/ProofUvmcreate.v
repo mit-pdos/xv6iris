@@ -97,7 +97,7 @@ Section ProofUvmcreate.
   (*  it unifies automatically from whichever [sie_cap_gpr]-typed hypothesis*)
   (*  the "with" clause supplies at each call site. *)
   Local Lemma uvc_htail `{CID0 : CpuId}
-      (γa : gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64)
+      (γa : gname) (γk : gname * gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64)
       (on : option nat) (b : bool) (lks : gset string)
       (Mt : regfile) (rv sp0 : mword 64) (v4 : bv 64) :
     (4 <= K)%nat ->
@@ -115,14 +115,14 @@ Section ProofUvmcreate.
     pa_stk sp0 2 ↦₈[KT1] (mm !!! Regidx (mword_of_int 8 : mword 5)) -∗
     pa_stk sp0 3 ↦₈[KT1] (mm !!! Regidx (mword_of_int 9 : mword 5)) -∗
     pa_stk sp0 4 ↦₈[KT1] v4 -∗
-    uvmcreate_post γa on (mm !!! Regidx (mword_of_int 4)) rv -∗
+    uvmcreate_post γa γk on (mm !!! Regidx (mword_of_int 4)) rv -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mr : regfile,
       sie_cap_gpr KT1 mr K b p -∗
       cpu_own lvl eb p b lks -∗
       pc_is (ret_pc (mm !!! Regidx (mword_of_int 1 : mword 5))) -∗
       ⌜ callee_saved mm mr ⌝ -∗
-      uvmcreate_post γa on (mm !!! Regidx (mword_of_int 4)) (mr !!! Regidx (mword_of_int 10)) -∗
+      uvmcreate_post γa γk on (mm !!! Regidx (mword_of_int 4)) (mr !!! Regidx (mword_of_int 10)) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -273,10 +273,10 @@ Section ProofUvmcreate.
     - iEval (rewrite HE4a0). iExact "Hpost".
   Qed.
 
-  Lemma wp_uvmcreate_sconf (γa : gname)
+  Lemma wp_uvmcreate_sconf (γa : gname) (γk : gname * gname)
       (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64)
       (on : option nat) (b : bool) (lks : gset string)
-    : wp_uvmcreate_sconf_body γa mm lvl K eb p on b lks.
+    : wp_uvmcreate_sconf_body γa γk mm lvl K eb p on b lks.
   Proof.
     cbv beta delta [wp_uvmcreate_sconf_body].
     intros ret_tgt Hlvl HK Hcid Hbelow.
@@ -394,7 +394,11 @@ Section ProofUvmcreate.
     set (J := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.uvmcreate + 0x0a) : mword 64) 4)]> W2).
     assert (Htgtk : add_vec (mword_of_int (KernelSyms.uvmcreate + 0x0a) : mword 64) (sign_extend' 64 (mword_of_int 2095434 : mword 21)) = mword_of_int KernelSyms.kalloc) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtk) in "Hpc".
-    iDestruct "Henv" as (γk) "(#Hlock & Havail)".
+    (* [kalloc_env_at] NAMES the free-list pair, so there is no [∃ γk] left
+       to open: [γk] is a parameter here, and the two halves come out of the
+       (sealed) bundle by unfolding it. *)
+    iEval (rewrite /kalloc_env_at) in "Henv".
+    iDestruct "Henv" as "(#Hlock & Havail)".
     assert (HJ4 : J !!! Regidx (mword_of_int 4 : mword 5) = mm !!! Regidx (mword_of_int 4)).
     { rewrite /J /W2 /W1. repeat (rewrite upd_ne; [| reg_neq]). reflexivity. }
     assert (HJsp : J !!! Regidx csp_rs1 = spr).
@@ -483,13 +487,14 @@ Section ProofUvmcreate.
          either mentioning [cpu_own] -- transport it across both hops. *)
       iDestruct (cpu_own_transport CID7 CID9 lvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iApply (uvc_htail γa mm lvl K eb p on b lks M1 root0 sp0 v4
+      iApply (uvc_htail γa γk mm lvl K eb p on b lks M1 root0 sp0 v4
                 Hc4 HM1sp HM1s1 HM1rest ltac:(reflexivity)
                 with "Hcg Hcnt Htext Hpc Hc1 Hc2 Hc3 Hc4 [Havail2]").
       { rewrite /uvmcreate_post. iLeft.
         iSplit; [iPureIntro; rewrite Hnull; symmetry; exact Hnz|].
         iSplit; [iPureIntro; exact Hz|].
-        iExists γk. iFrame "Hlock Havail2". }
+        (* rebuild the NAMED bundle -- no existential to introduce *)
+        iApply (kalloc_env_at_intro with "Hlock Havail2"). }
       (* [uvc_htail]'s OWN [wp_next b K] obligation (the [-]-framed slot
          above) is at ITS ambient hart (CID9 here), which is NOT [Hcont]'s
          hart -- [Hcont]'s [wp_next] is fixed at the OUTER entry hart
@@ -500,9 +505,10 @@ Section ProofUvmcreate.
       iSpecialize ("Hcont" $! CIDx with "[%]"); [wp_next_chain|].
       iExact "Hcont".
     }
-    iAssert (kalloc_env γa (avail_sub on 1))
+    iAssert (kalloc_env_at γa γk (avail_sub on 1))
       with "[Havail2]" as "Henv".
-    { iExists γk. rewrite avail_sub_S avail_sub_0. iFrame "Hlock Havail2". }
+    { rewrite avail_sub_S avail_sub_0.
+      iApply (kalloc_env_at_intro with "Hlock Havail2"). }
     iApply (wp_cbeqz_fall_s_sconf (mword_of_int (KernelSyms.uvmcreate + 0x10)) (mword_of_int 5 : mword 8) (Cregidx (mword_of_int 2)) (mword_of_int 10 : mword 5)
               M1 (K - 4)%nat b
               ltac:(vm_compute; reflexivity)
@@ -617,7 +623,7 @@ Section ProofUvmcreate.
        hart memset's own [wp_next] resumed on. *)
     iDestruct (cpu_own_transport CID7 CID13 lvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (uvc_htail γa mm lvl K eb p on b lks mfin (zero_extend' 64 (concat_vec bppn (zeros' 12 : mword 12))) sp0 v4
+    iApply (uvc_htail γa γk mm lvl K eb p on b lks mfin (zero_extend' 64 (concat_vec bppn (zeros' 12 : mword 12))) sp0 v4
               Hc4 Hfsp Hfs1 Hfrest ltac:(reflexivity)
               with "Hcg Hcnt Htext Hpc Hc1 Hc2 Hc3 Hc4 [Hptree Henv]").
     { rewrite /uvmcreate_post. iRight. iExists bppn.

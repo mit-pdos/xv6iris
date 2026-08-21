@@ -51,6 +51,7 @@ Require Import ProcAvail.
 Require Import LogInv.  (* [logG]: [ireg_inv]'s own instance argument *)
 Import Defs.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
+Require Import KvmSpec.   (* [kalloc_env_at] -- kfork names the pair *)
 Local Open Scope Z_scope.
 
 (* sys_fork's balanced 16-byte frame: entry [addi sp,-16] and exit
@@ -176,14 +177,22 @@ Section ProofSysFork.
        anchored at the ENTRY hart -- re-anchor it before crossing. *)
     iDestruct (cpu_own_transport CID CID5 lvl eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     (* ---- kfork(): a0 = -1 or the child's pid; the parent's block back ---- *)
-    iApply (Kfork.wp_kfork_sconf γa γp γw γl γf γil γic γs cn γfs cov logstart
+    (* kfork NAMES the free-list pair now ([KvmSpec.kalloc_env_at]) rather
+       than hiding it behind [kalloc_env]'s [∃ γk].  sys_fork is at [None]
+       and needs no PARTICULAR name -- only some name, which its own bundle
+       supplies -- so the pair is opened here and re-bundled on the way out. *)
+    iDestruct "Henv" as (γk) "[#Hkalk #Hkaav]".
+    iDestruct (kalloc_env_at_intro with "Hkalk Hkaav") as "#Henvn".
+    iApply (Kfork.wp_kfork_sconf γa γk γp γw γl γf γil γic γs cn γfs cov logstart
               inodestart nib
               Bj lvl (av - 2)%nat eb p b pid V lks
               ltac:(lia) Hlvl ltac:(lkbelow)
               with "Hcg Hcpu Htext Hpc Hprocs Hplock Hwlock Hftbl
-                    Hitbl Hitinv Hireg Henv Hpav Hfdone Hpriv").
+                    Hitbl Hitinv Hireg Henvn Hpav Hfdone Hpriv").
     iIntros (CID6 Hs6 MF) "%HcsMF Hpc Hpost".
-    iDestruct "Hpost" as "(Hcg & Hcpu & Hpriv & Henv & %Hrv)".
+    iDestruct "Hpost" as "(Hcg & Hcpu & Hpriv & Henvr & %Hrv)".
+    (* ...and back to the bundle sys_fork's own contract hands on. *)
+    iDestruct (kalloc_env_at_env with "Henvr") as "#Henv".
     assert (Hpc0c : ret_pc (Bj !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.sys_fork + 0x0c))
       by (rewrite HBjra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc0c) in "Hpc".

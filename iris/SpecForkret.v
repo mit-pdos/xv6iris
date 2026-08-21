@@ -215,7 +215,10 @@ Definition wp_forkret_gen_body
      forkret's.  Stated as an equation on [av2] rather than a subtraction so
      the index arithmetic below is syntactic. *)
   (trap_res eb + av2)%nat = (av - 6)%nat ->
-  (K_prepare_return <= av2)%nat ->
+  (* THE DEEPEST CALLEE IS kexec'S, on the boot arm -- which is what
+     [K_forkret = 6 + K_kexec] above has always said.  prepare_return's 12 is
+     subsumed. *)
+  (K_kexec <= av2)%nat ->
   (K_usertrap <= av)%nat ->
   (* calling convention: swtch restored sp to the kernel stack TOP *)
   m !!! Regidx (mword_of_int 2 : mword 5) = ksp ->
