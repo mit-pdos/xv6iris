@@ -52,7 +52,8 @@
    [initproc], and the process userinit made is reached by the scheduler
    through [procs_inv], which is persistent and rides in unchanged.  The
    RUNNABLE park swallows the private block, the fd allowance and the saved
-   context; the [initproc] cell comes back at an unspecified value and the
+   context; the [initproc] cell comes back at an unspecified value and
+   PERSISTENT (userinit's store is the last write it ever gets), and the
    two counted regimes come back one unit down.
 
    THE PAGE COUNT COMES BACK EXISTENTIALLY ([nc <= K_allocproc]) rather than
@@ -206,7 +207,16 @@ Definition wp_userinit_sconf_body
       (∃ nc : nat, ⌜(nc <= K_allocproc)%nat⌝ ∗
                    kalloc_env γa (avail_sub on nc)) -∗
       procs_avail (Some np) -∗
-      (∃ v : mword 64, (mword_of_int KernelSyms.initproc : mword 64) ↦₈ v) -∗
+      (* PERSISTED, not handed back exclusive.  Nothing writes this cell
+         after userinit's one store, and every later reader
+         ([SpecKexit.v], [SpecReparent.v], [SpecSyscall.v]) already takes it
+         at an arbitrary [dfrac] -- so discarding here costs no caller
+         anything and makes every later copy free.  That is what lets a
+         fresh process's trap-loop residue carry its own share:
+         [UsertrapRes.ut_own_nopt] wants [initproc ↦₈{un_dqi N} (un_ip N)],
+         and [un_dqi] is the record builder's choice
+         ([iris/ForkretParkClose.v], [claude-notes/projects/forkret-park.md]). *)
+      (∃ v : mword 64, (mword_of_int KernelSyms.initproc : mword 64) ↦₈□ v) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

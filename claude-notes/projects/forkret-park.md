@@ -51,14 +51,29 @@ plumbing, with no open question in it.
 
 ### 2. `park_own` -- three exclusive resources, in increasing difficulty
 
-**`initproc ↦₈{un_dqi N} (un_ip N)` -- cheapest.**  Only userinit writes the
-cell.  Every consumer downstream (`SpecKexit.v:256`, `SpecReparent.v:93`,
-`SpecSyscall.v:190`) already takes it at an ARBITRARY `dfrac` and hands it
-back, and `un_dqi` is a field the record's builder picks.  So persisting it
-once after userinit (`DfracDiscarded`) makes every later copy free, and needs
-NO downstream contract change -- only a producer-side change in userinit's
-postcondition and in main's threading, since main currently carries the
-exclusive BSS cell (`ProofMain.v`'s `Hinitproc`).  Do this one first.
+**`initproc ↦₈{un_dqi N} (un_ip N)` -- DONE on the producer side (2026-08-21).**
+Only userinit writes the cell.  Every consumer downstream (`SpecKexit.v:256`,
+`SpecReparent.v:93`, `SpecSyscall.v:190`) already takes it at an ARBITRARY
+`dfrac` and hands it back, and `un_dqi` is a field the record's builder picks
+-- so discarding costs no caller anything.  `ProofUserinit.v` now runs
+`word_pointsto_persist` immediately after the `sd a0,1796(a5)` at `+0x14`, and
+`SpecUserinit.v`'s continuation returns `∃ v, initproc ↦₈□ v`.  `ProofMain.v`
+and `LinkUserinit.v` needed no change at all.
+
+PERSIST EARLY, NOT ON THE WAY OUT.  The first attempt discarded at the end of
+the proof, which satisfies "return it persistently" but is useless where it is
+wanted: userinit's OWN `forkret_park` call is at line 649 and the store is at
+462, so persisting right after the store puts the fact in scope at the deposit
+site for free.  An exclusive cell could not be shared with the parked process
+at all.
+
+STILL OWED FOR KFORK.  `SpecKfork.v` and `SpecSysFork.v` mention `initproc`
+nowhere, and `ProofKforkB5.v:204` has only `#Htext`, `#Hpinv`, `#Hwl` in scope.
+It has to be threaded from `SpecSyscall.v:190` through sys_fork to kfork --
+premises, not resources, since the discarded cell duplicates freely.
+WORTH CONSIDERING INSTEAD: now that it is persistent, move it INTO
+`syscall_env` (also persistent).  That DELETES the `dqi`/`ip` parameters from
+syscall's, kexit's and reparent's contracts rather than ADDING one to kfork's.
 
 **`bslots (un_bn N) 3` -- needs a lock, not a ghost update.**  The pool has
 room (`BSLOTS = 1024`, `3 * NPROC = 192`), but the authority
@@ -75,6 +90,28 @@ serializes user mode across all harts.  Either that is accepted, or the bitmap
 moves behind the log's lock and leaves the residue.  This is an FS-cone
 decision and it should be settled before the plumbing above is built on top of
 it.
+
+## The two call sites
+
+`forkret_park` is invoked in exactly two places, both
+`iMod (FP.forkret_park γs γf (proc_addr j) ks rest pid V Hrest with
+"Hks Hctx Hpriv Hfd Hirsp")`:
+
+* `ProofUserinit.v:649` -- the first process, at boot.
+* `ProofKforkB5.v:204` -- every process after that.
+
+Both proofs are functors over `FORKRET_PARK`, and `LinkForkretPark.v` is the
+single place the `Axiom` is supplied.  So widening `forkret_park_body` to carry
+`forkret_park_pkg` means paying at exactly those two `iMod`s and nowhere else.
+
+userinit's site is ALREADY the documented staging point -- its comment block
+reads "STAGE (f)'S DEPOSIT SITE -- D1, THE HUMANS' SEAM", and three rows
+(`Hfirst`, `Hpersist`, `Hfsinit`) are dropped there awaiting the same widening.
+Anything new we deliver joins a queue that already exists.
+
+One caveat for kfork's site: `ut_caps` is persistent but UNPACKED there.  Its
+members arrive as separate premises (`#Htext`, `#Hpinv`, `#Hwl`, ...), so
+reassembling the bundle is mechanical but not free.
 
 ## Relationship to `syscall_env`
 

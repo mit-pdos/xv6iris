@@ -463,6 +463,14 @@ Section ProofUserinit.
     { iEval (rewrite Hinitaddr). iExact "Hinitproc". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hinitproc".
     iEval (rewrite Hinitaddr) in "Hinitproc".
+    (* THE ONLY STORE THIS CELL EVER GETS HAS NOW HAPPENED, so discard the
+       fraction immediately.  Not on the way out: the [forkret_park] deposit
+       site below (D1) is where a fresh process's trap-loop residue will need
+       [initproc ↦₈{un_dqi N} (un_ip N)], and a persistent fact is in scope
+       there for free, whereas an exclusive one would have to be carried past
+       the park and could not be shared with the parked process at all.
+       See [iris/ForkretParkClose.v] and projects/forkret-park.md. *)
+    iMod (word_pointsto_persist with "Hinitproc") as "#Hinitproc".
     assert (Hpp18 : add_vec_int (mword_of_int (UI + 0x14) : mword 64) 4
                     = mword_of_int (UI + 0x18)) by pcw.
     iEval (rewrite Hpp18) in "Hpc".
