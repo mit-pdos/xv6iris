@@ -454,6 +454,40 @@ splits:
   realize the prefix as a pf run, and the exports hold at its
   reachable configurations.
 
+## 4c. B2e's decomposition (designed 2026-08-21, post-B0b-1)
+
+Three stages, each smaller than the last is hard:
+- **B2e-1 — the arithmetic sub-kills** (pure order theory, buildable
+  once B1a lands): reduce each kill to its RACY RESIDUAL.  For K1:
+  `e` an acquire (rule 5 arm of `gppo` + `gviol` = contradiction),
+  `(e, w) ∈ gd_deps` (`gdeps_gmo` contradiction), or a covering fence
+  (rule 4 contradiction) — so K1 reduces to `e` plain/non-aq/undepped/
+  unfenced.  K2's writer-fence case likewise (rule 4 between the
+  stale byte's writer `e` and `w` kills the violation).  Deliverable:
+  `kill_K1_of_racy`-style reduction lemmas.
+- **B2e-2 — the graph-side protocol kit**: `win_excl` as ORDER THEORY
+  over the rows' lock-word messages, from the VALUE PATTERN hypothesis
+  (each L-write is an acquire-RMW writing nonzero whose read names its
+  co-predecessor, or a release writing zero): load-value + atomicity
+  chain the windows totally.  THE KILL SHAPE THAT FALLS OUT (worked
+  for K1's CS case): if `e`'s read of `w0` is CS-covered, the window
+  order + rule 5 give `w0 gmo< ACQ_h gmo< w`, contradicting
+  `w gmo< w0` — the export kill becomes pure arithmetic ONCE the
+  pattern is in hand.
+- **B2e-3 — the pattern + φ discharge** (the true L2′ content, needs
+  B1): the value-pattern hypothesis discharged from conformance + the
+  realized prefix's exports (`wlp_at` covers prefix messages; the
+  beyond-prefix messages' pattern comes from the per-site analysis of
+  xv6's L-writers — acquire/release only), and the φ kill for
+  non-lock bytes (owned-unpublished CS bytes) via
+  `weak_ev_pf_violation_free` at the realized prefix.  K2's
+  routing-by-byte-class and K3's write-write-race classification live
+  here.  NOTE the E1-shape difference from route A: `w0` is OUTSIDE
+  the realizable prefix (no promises exist to supply it), so the
+  φ/protocol kills must run on `w0`'s MESSAGE DATA (base/values/
+  class — orbit-invariant graph data) against the prefix's protocol
+  state, not on a replayed read step.
+
 ## 5. Honest residual risks — OPEN
 
 - **THE K2-KILL'S PRECISE MECHANISM (flagged 2026-08-21):** K2's
