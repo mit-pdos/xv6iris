@@ -508,6 +508,60 @@ Three stages, each smaller than the last is hard:
   class — orbit-invariant graph data) against the prefix's protocol
   state, not on a replayed read step.
 
+## 4d. B2e-3 — the problem statement (2026-08-21; THE ROUTE'S LAST
+## HARD DESIGN PROBLEM, identified precisely; design session owed)
+
+THE ARCHITECTURE (settled): (A) `xv6_row_ok` — a row-syntactic site
+bundle parameterized by the byte classification (the `wcds` map's
+concept: lock bytes, CS-protected-by-which-lock, classified racy
+bytes), carrying `lock_pattern`/`lock_paired` at row level + the
+CS-coverage shapes + the racy classification; (B) the kill discharges
+from consistency + conformance + `xv6_row_ok` (+ the realized-prefix
+φ export): the CS cases via `cs_kill` (the owned-byte K1 residual
+REDUCES to `cs_kill` with `b` = the protecting lock — same lemma),
+the branched/data-fed cases via the dep arithmetic (rule-11 edges
+from spin-loop branches taint every later store, so class-(b) reads
+are `gd_deps`-killed); (C) the discharge of `xv6_row_ok` itself for
+conformant rows.
+
+THE CRUX (the wild-value obstruction): (C) is NOT derivable from
+emittability alone.  `pstep_ev` accepts ANY read value (the
+continuation is applied to the row's value), so a conformant row with
+FICTIONAL values can drive computed store addresses anywhere — a
+wild-pointer store into a lock byte, plain-classed, is
+emittable-consistent.  Value-groundedness comes only from
+REALIZATION (a realized run's `read_ok` pins values to the log), and
+realization reaches exactly the violation-free prefix below `w` —
+while the kill configurations need site facts at `w0`/`z` ABOVE it
+(hart j's row-prefix through `w0` is not known realizable: its reads
+may source inside the unrealized interval).  This is route A's E1
+("the extended exhibit") in route-B clothing, and it is the
+one place the route still owes a genuinely new mechanism.
+
+CANDIDATE RESOLUTIONS (to weigh in the design session, none chosen):
+  (R1) EXTENDED REALIZATION, E1-style: strengthen the kill
+  configurations (further minimality — e.g. also minimalize `w0`)
+  until hart j's row-prefix through `w0` has all its read sources
+  below `w`, then realize prefix + j's extension as one run and
+  apply the machine exports (`wlp_at`, φ) to it directly.  The open
+  question is whether the needed extension property is derivable
+  from the configuration's minimality or needs its own induction.
+  (R2) VALUE-GROUNDEDNESS AS AN INVARIANT OF `normalize`'s induction:
+  process violations bottom-up carrying "the region below the
+  frontier is realized"; derive groundedness of frontier-adjacent
+  values incrementally.  Heavier restructuring of B2d's landed
+  theorem (or a wrapper induction above it).
+  (R3) `xv6_row_ok` AS A CAPSTONE CONFORMANCE CLAUSE discharged by a
+  static checker — blocked as pure statics by the wild-pointer issue
+  unless the checker itself consumes groundedness, which circles back
+  to (R1)/(R2).  Viable only for the fragments that ARE
+  value-independent (e.g. "code stores to lock words only via the
+  acquire/release instructions" IF lock addresses are only ever
+  taken from the image's static lock-table... they are not — xv6 has
+  dynamically-allocated locks).  Likely a COMPONENT, not the answer.
+The next session should run this like S6: the miniature end-to-end
+against each candidate, probes where claims are checkable.
+
 ## 5. Honest residual risks — OPEN
 
 - **THE K2-KILL'S PRECISE MECHANISM (flagged 2026-08-21):** K2's
