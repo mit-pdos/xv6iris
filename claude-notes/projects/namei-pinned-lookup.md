@@ -884,3 +884,30 @@ phdr fold — rule separately if wanted); program headers and loaded
 pages have no landing place below stage C (proc_pt at existential
 contents), so `entry = init_entry` is the whole of stage B's sentence:
 the process kexec builds will start at /init's first instruction.
+
+### 13.4 The sweep landed; the two-Q finding and its rulings (2026-08-21)
+
+**Landed (commit 5ec140e2):** the exit-generic sweep (31 sites, landed
+contract = Q:=True, failure tails proof-free exactly as ruled, one
+paying site) and the elf-generic seam (frameA6x names the 64 header
+bytes; the header oracle at the post-ilock instant is where
+kxp_fv_read fires; ef rides named to the commit).  Recorded lesson:
+the abstract-tail exit wand does not terminate against proc_priv's
+big-op (durable-notes' case) — the tail is spelled first-order.
+
+**The second finding (lane, direction-algebra-checked): one Q cannot
+serve both redeem verdicts.**  The CANCELLED arm is discovered after
+ilock; Q is fixed before phase A; intact wants kxp_entry_ok, cancelled
+can offer only True, and Exit is antitone in Q so the only common Q is
+True — which the pinned post cannot use.  **RULED: the opaque-exit
+form** — phase A's exit becomes (KEX : iProp) + a persistent unfolding
+wand (~10 sites in the already-authorized files), the oracle's result
+becomes verdict-disjunctive (⌜hdr_ok⌝ ∨ kxp_lost), and the composition
+branches at +0x090 where the verdict is known: intact → Q :=
+kxp_entry_ok, cancelled → Q := True + the persistent receipt.
+
+**RULED with it: SpecKexecPinned's intact arm drops the returned
+fv_pin** — the pure arm keeps the exit closure resource-free, and it
+mirrors wp_namei_init_pinned's dv treatment (the pin is spent into the
+pinned outcome).  This is the campaign's own uncommitted-consumer
+contract; the adjustment is coordinator-authorized.
