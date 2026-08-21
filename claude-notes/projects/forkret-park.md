@@ -1,18 +1,56 @@
 # forkret_park: the plan to retire the last assumed Link
 
-> **STATUS 2026-08-21.** Steps A–D and E1–E2 have landed. The park is PROVED
-> (over the real `SpecForkret.FORKRET` at `LinkForkret.Forkret`, so its cone
-> carries no first-related axiom), and `syscall_env` finally has a producer
-> — the one `LinkSyscall.v` has been owing since the dispatch was linked.
-> What is left is E3, and it is BOOT-CHAIN work: three rows of `park_env`
-> have no producer anywhere in the tree (`is_ftable`, the `wait_lock`
-> invariant, `devintr_caps_any`), and two of those need cells carved out of
-> BSS that `BootCarveMain.v` currently drops. Read §2 and Step E before touching anything; both
-> record designs that were tried and do not type.
+## CHECKPOINT — 2026-08-21, end of session
 
-`LinkForkretPark.ForkretPark.forkret_park` is the one assumed Link in the boot
-cone, and the assumption every proven process-side function carries
-(`forkret`, `kfork`, `main`, `sys_fork`, `syscall`, `userinit`, `usertrap`).
+**`main` is GREEN and clean at `63306e07`** (plus the notes commits after
+it). Everything below §0 is the standing plan; this section is where to
+start.
+
+### The one piece of work in flight
+
+Branch **`wip/timer-cap-sie-cap`** (local, not pushed), one commit
+`f1f68c6d`, **NOT green**. Three files: `iris/IntrDefs.v`,
+`iris/UsertrapRes.v`, `iris/ProofUsertrapTail.v`. Its commit message is the
+inventory; the design and the execution order are in Step E's
+`devintr_caps_any` section below.
+
+To resume: `git checkout wip/timer-cap-sie-cap`, then execute step 1 of that
+section — fix `IntrDefs`' own lemmas that enumerate `sie_cap`'s conjuncts
+(first failure around `IntrDefs.v:2668`), then sweep the ~35 sites that
+destructure it (`grep -rn "rewrite /sie_cap"`). Everything else threads
+`sie_cap_gpr` opaquely and needs no change. **Anchor every edit** — §5.
+
+### What landed on main this session
+
+| commit | what |
+|---|---|
+| `873f09d4` | forkret's residue closer is HANDED `first_done` |
+| `6ed3a575` | `forkret_park` PROVED again, over the real `SpecForkret.FORKRET` |
+| `7c078d09` | `syscall_env` gets a producer; the residue gets a channel for it |
+| `dd2af18e` | `wait_lock` gets a resource and an `is_lock`; fileinit's post kept |
+| `63306e07` | the slot ledger seals at userinit's park |
+
+### E3's four blockers
+
+| | |
+|---|---|
+| `wait_lock` `is_lock` | **built** (`dd2af18e`) |
+| `procs_avail None` | **sealed** (`63306e07`) |
+| `is_ftable` | **staged** — main carries `lk_fresh ftable "ftable"`; needs the 100-slot BSS carve + `fileUR` allocation, then one `newlock` line |
+| `devintr_caps_any` | **design settled, execution in flight** on the branch above |
+
+### Three things I got wrong, so they are not re-derived
+
+1. **The secondaries DO schedule.** `BootChain`'s "spins forever, never
+   stuck" describes the theorem's diverging shape, not the hart sitting in
+   the `started` spin; `SpecMainSecondary`'s header spells out the join into
+   `scheduler()`. So a parked process really can resume on any hart.
+2. **The timer caps cannot be minted at the adequacy fan-out.**
+   `timer_cap_intro`'s first premise is that `mcounteren` ALREADY holds a
+   TM-set value; at the fan-out every hart is at reset.
+3. **`timer_cap` cannot ride `UsertrapRes.ut_hold`.** That is the bundle the
+   walk FRAMES, and its transport is sound only because every hart-indexed
+   member is `emp` at `b = true`.
 
 ## 0. What has landed
 
