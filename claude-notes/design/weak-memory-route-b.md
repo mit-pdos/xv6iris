@@ -262,20 +262,31 @@ the normalization").
   readers' `ts` entries renumber; the §1 `lswap` kit self-applies at
   the `gwrites` level).  The RMW-read case (upper event a fused
   RMW) is deliberately out of B2a's scope.
-  POST-LANDING SCOPING (orchestrator, 2026-08-21): the induction only
-  ever moves READS DOWN (B2a) and VIOLATING WRITES UP — so `(R,W)` (a
-  write moving down past a read = a read moving up) is likely NEVER
-  NEEDED, and B2b reduces to the `(W,W)` BYTE-DISJOINT case: the
-  transformation is `gswap` PLUS the ts-transposition rewrite in
-  `gx_prog`'s labels (the two writes' `gwix` values exchange, so every
-  reader's `ts` entry naming either renumbers by the transposition —
-  values unchanged, so value facts survive); adjacency means no reader
-  sits between, per-byte co is untouched under byte disjointness, and
-  dep edges survive because targets only move up or swap with a
-  non-mate.  Same-byte cross-hart `(W,W)` is EXCLUDED until the
-  write-class inventory shows a need (it flips co).  The write-write
-  violation class (two independent same-hart stores reordered — real
-  under RVWMO, no fence between) is what makes `(W,W)` unavoidable.
+  POST-LANDING SCOPING — CORRECTED (orchestrator, 2026-08-21, second
+  pass; the first version of this note claimed "(R,W) likely never
+  needed", which a deeper pass refuted).  Resolving a WRITE-WRITE
+  violation `(e, d)` (write `e` po-before `d`, `d` gmo-early) cannot
+  move `d` up past its own READERS — but a write's readers never
+  block its DOWNWARD moves (the source only gets earlier), so the
+  induction moves `e` DOWN below `d` instead.  The descent needs:
+  `(R,W)` — a write descending past a read, side condition per shared
+  byte `gwix e ≤ t` (the read already reads at-or-after `e`; a
+  same-hart forwarded read of `e` satisfies it with equality) — and
+  `(W,W)` byte-disjoint with the ts-transposition label rewrite (the
+  two writes' `gwix` values exchange, so every reader's `ts` entry
+  naming either renumbers; values unchanged.  Same-byte same-hart is
+  poloc-inconsistent; same-byte cross-hart stays excluded until the
+  inventory shows a need).  THE MOVE STRATEGY that keeps rule-14
+  bookkeeping monotone: sweep the reads sitting gmo-between `d` and
+  `e` down below `d` FIRST (B2a; each is itself a read-violation
+  witness or free), so when `e` descends no same-hart-po-earlier read
+  remains between — the viol-mono lemmas hypothesize
+  `¬ gpo lower upper` accordingly, discharged by the sweep order; in
+  the RESOLVING orientation (lower = `d`, upper = `e`, `e po< d`) it
+  is automatic.  A dep edge `(x, e)` into a descending write blocks
+  the descent — correctly: the violation is then dep-killed
+  (`gdeps_gmo` contradiction).  The full kit is THREE lemmas: B2a
+  (landed), B2c `(R,W)`, B2b `(W,W)`-byte-disjoint.
 - **B2**: the exchange lemma's case trichotomy (§3b) with the kills
   wired per S6 §3; the induction + measure.  NOTE from the B0 pass
   (2026-08-21): several S6 kills flip from reader-refutation to

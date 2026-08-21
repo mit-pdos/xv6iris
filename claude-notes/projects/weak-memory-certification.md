@@ -238,6 +238,42 @@ residue, `win_excl`) with theorems, by making every read of the full machine a
 read of some pf run (the promise author's certifying run), so φ and the
 WP-exported invariants apply to it.  No kernel side conditions anywhere.
 
+## THE TIER-1 CONFORMANCE GAP (found 2026-08-21 during the B0b recon —
+## a latent vacuity in the LANDED tier-1 capstone's end-to-end reading)
+
+`xv6_srvwmo_safe`'s hypothesis (c) `exec_prog_ok pstep_ev …` is
+UNSATISFIABLE for the real xv6 image: `lbl_realizes` forces the machine
+label to the depfree `unproj_lbl` (its `lb_depfree` conjunct +
+`lbl_realizes_unproj`), while `pnode_step`'s store arm PINS
+`l = LStore … (deps_asrc (deps_of_ib ib)) (deps_vsrc …)` — nonempty for
+every register-addressed store, i.e. essentially every real store — so
+no `pstep_ev` step exists at the label the realization emits.  The
+theorem is TRUE but covers only dep-free programs; the coverage
+narrowed silently when D3-2 made the instance emit real operand lists
+(the deps design recorded the FORWARD projection's residue going
+non-vacuous, but not this reverse-direction consequence; A3(iii)'s
+named-conjunct design anticipated the relaxation, and A4 composed the
+capstone without noticing the emptiness).  There is no in-tree escape:
+`ib` is necessarily `Some bits` at a store node (set at the announce,
+cleared only at the boundary), and realizing into
+`erase_pstep pstep_ev` would land outside `epf_run`, where adequacy
+does not apply.
+
+CONSEQUENCE FOR ROUTE B: the tier-2 chain ends at this capstone, so
+the gap must be closed for EITHER tier's end-to-end claim.  The
+recorded remedy direction (deps design §3's deliberate deferral,
+"`WeakAxiomatic*` gains ppo 9–11") now has a concrete shape thanks to
+the B-track: the declared model grows dep data + ordering axioms (the
+`gdeps` pattern landed at B0a), the realization becomes dep-aware
+(either the fused alphabet gains operand data, or the bridge's
+`cfg_match` equality gives way with the model's new dep axioms
+excluding exactly the cands whose reads the dep-raised machine floors
+refuse — the D-i α precedent says which invariants tolerate what).
+This is now a MANDATORY stage (call it **T1-D**), to be designed
+JOINTLY with B0b (they are the same problem: the conformance interface
+must speak dep-carrying labels end to end).  Do not build B1/B3
+against the current capstone statement.
+
 ## Items
 
 - **W1 — walker-naming spike**: **DONE (2026-08-18) — GO** on the
