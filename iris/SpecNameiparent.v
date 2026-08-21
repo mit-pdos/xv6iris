@@ -134,9 +134,13 @@ Definition wp_nameiparent_sconf_body
   ((L + 1) * iput_units <= n)%nat ->
   (j < NPROC)%nat ->
   gs !! j = Some gl ->
-  eb = true ->
   sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
+  (* THE TRAP-CSR COMPLEMENT, in and out -- namex's, threaded straight
+     through.  [emp] at [eb = true]; the real pair at [eb = false].
+     claude-notes/completed/eb-generic-sweep.md. *)
+  trap_csrs_ext KT1 eb -∗
+  cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
   bio_ctx bn (fs_view gfs gd dev cov) -∗
@@ -192,6 +196,8 @@ Definition wp_nameiparent_sconf_body
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
+      trap_csrs_ext KT1 eb -∗
+      cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -273,9 +279,13 @@ Definition wp_nameiparent_gen_body
   (walk_need L <= n)%nat ->
   (j < NPROC)%nat ->
   gs !! j = Some gl ->
-  eb = true ->
   sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
+  (* THE TRAP-CSR COMPLEMENT, in and out -- namex's, threaded straight
+     through.  [emp] at [eb = true]; the real pair at [eb = false].
+     claude-notes/completed/eb-generic-sweep.md. *)
+  trap_csrs_ext KT1 eb -∗
+  cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
   bio_ctx bn (fs_view gfs gd dev cov) -∗
@@ -320,6 +330,8 @@ Definition wp_nameiparent_gen_body
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr KT1 mf K b pj -∗
       cpu_own 0 eb pj b lks -∗
+      trap_csrs_ext KT1 eb -∗
+      cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗

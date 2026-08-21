@@ -566,11 +566,14 @@ Section KexecABody.
               Hbmc Hbml Hins0 Hcovb Hiregb Hcstr Hplen
               ltac:(unfold walk_need, iput_units, MAXOPBLOCKS;
                     destruct (length (path_elems (bview plen pfun))); lia)
-              Hjp Hgs eq_refl
-              with "Hcg Hcnt Htext Hkd Hpc Hpenv Hbio Hlogc Hka Hitab Hitinv Hesc
+              Hjp Hgs
+              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hka Hitab Hitinv Hesc
                     Hslks Hireg Hropen Hprocs Hdevi Hdgeom Hdlock Hbm Hins Hbits Hppid
                     Hcref Hpath Hbs Hirs Hlog").
-    iIntros (CIDn Hsn M4 n1 Sb1 ok ipv w) "%Hcsn Hcg Hcnt Hpc Hbm Hins
+    (* namei is eb-generic now; kexec is still at [eb = true]. *)
+    { rewrite /trap_csrs_ext. done. }
+    { rewrite /cpu_claim_ext. done. }
+    iIntros (CIDn Hsn M4 n1 Sb1 ok ipv w) "%Hcsn Hcg Hcnt _ _ Hpc Hbm Hins
              Hppid Hcref Hpath Hbs %HSbsub %Hwbm %Hn1 Hlog Harm".
     iDestruct (log_opS_op with "Hlog") as "Hlog".
     (* what the seam actually carries: the closing iunlockput's three units.

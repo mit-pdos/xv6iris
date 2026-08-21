@@ -1439,13 +1439,16 @@ Section ProofSysChdirBody.
                 N1 (K - 20)%nat eb b lks
                 (upd_upt V P') ltac:(lia) Hcdev Hcnib Hclog Hcist HdevR Hnib0 Hgeom Hsize
                 Hbm0 Hbmcov Hbmlog Hist0 Hcovb Hiregb Hpcstr
-                (sc_plen_lt pk Hpk) (sc_bud_walk _) Hj Hgl Heb
-                with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog Hkenv Hitab Hitinv
+                (sc_plen_lt pk Hpk) (sc_bud_walk _) Hj Hgl
+                with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hkenv Hitab Hitinv
                       Hescrows Hslks Hireg Hropen Hprocs Hdev Hgeo Hdlk Hsbb Hsbi
                       Hbmres Hpbare Hcwdref [Hbufk] Hbsl Hir HopS").
+      (* namei is eb-generic now; sys_chdir is still at [eb = true]. *)
+      { rewrite Heb /trap_csrs_ext. done. }
+      { rewrite Heb /cpu_claim_ext. done. }
       { iEval (rewrite HN1a0). iExact "Hbufk". }
       iIntros (CID20 Hq20 mna n1 Sb1 ok ipv w1)
-        "%Hcsna Hcg Hown Hpc Hsbb Hsbi Hpbare Hcwdref
+        "%Hcsna Hcg Hown _ _ Hpc Hsbb Hsbi Hpbare Hcwdref
          Hbufk Hbsl %HSb1 %Hw1 %Hn1 HopS Hres".
       iEval (rewrite HN1a0) in "Hbufk".
       assert (Hpc30 : ret_pc (N1 !!! Regidx Rra : mword 64)

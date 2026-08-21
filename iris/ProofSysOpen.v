@@ -2968,13 +2968,16 @@ Section ProofSysOpenBody.
               HKna Hdevc Hnibc Hlogc Histc HdevR Hnib0 Hgeom Hsize Hbm0 Hbmcov
               Hbmlog Hist0 Hcovb Hiregb Hpcstr
               ltac:(exact (proj2 (so_len_range plen Hplen)))
-              ltac:(apply so_namei_need) Hj Hgl Heb
-              with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog Hkenv Hitab Hitinv
+              ltac:(apply so_namei_need) Hj Hgl
+              with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hkenv Hitab Hitinv
                     Hescrows Hslks Hireg Hropen Hprocs Hdev Hgeo Hdlk Hsbb Hsbi
                     Hbmres Hpbare Hcwdref [Hbufk] Hbsl Hir2 HopS").
+    (* namei is eb-generic now; sys_open is still at [eb = true]. *)
+    { rewrite Heb /trap_csrs_ext. done. }
+    { rewrite Heb /cpu_claim_ext. done. }
     { iEval (rewrite HN2a0). iExact "Hbufk". }
     iIntros (CID3 Hq3 mna n1 Sb1 ok ipv w1)
-      "%Hcsna Hcg Hown Hpc Hsbb Hsbi Hpbare Hcwdref
+      "%Hcsna Hcg Hown _ _ Hpc Hsbb Hsbi Hpbare Hcwdref
        Hbufk Hbsl %HSb1 %Hw1 %Hn1 HopS Hres".
     iEval (rewrite HN2a0) in "Hbufk".
     assert (Hpcna : ret_pc (N2 !!! Regidx Rra : mword 64)

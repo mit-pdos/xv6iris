@@ -2786,12 +2786,15 @@ Section ProofCreateMain.
               R7 (K - 10)%nat eb b lks V
               ltac:(exact HKnp) Hdev Hnib Hglog Hist Hroot Hnib0 Hlg Hsize
               Hbms0 Hbmsc Hbmsl Hist0 Hcovb Hiregb Hcstr Hplen31
-              ltac:(exact (cr_walk_need _ u Hu)) Hj Hgs Heb
-              with "Hcg Hcnt Htext Hkd Hpc Hpenv Hbio Hlogc Hkenv Hitb2 Hitbl
+              ltac:(exact (cr_walk_need _ u Hu)) Hj Hgs
+              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hkenv Hitb2 Hitbl
                     Hesc Hslks Hiregi Hiopen Hprocs Hdevi Hgeom Hdlk Hsbb Hsbi Hbmr
                     Hppid Hcref Hpath Hnb14 Hbsl Hisl2 Hop").
+    (* nameiparent is eb-generic now; create is still at [eb = true]. *)
+    { rewrite Heb /trap_csrs_ext. done. }
+    { rewrite Heb /cpu_claim_ext. done. }
     iIntros (CIDnp Hsnp mnp n1 Sb1 okp nfp ipv w)
-      "%Hcsnp Hcg Hcnt Hpc Hsbb Hsbi Hppid Hcref Hpath Hnb14
+      "%Hcsnp Hcg Hcnt _ _ Hpc Hsbb Hsbi Hppid Hcref Hpath Hnb14
        Hbsl %Hsb1 %Hwmem %Hnp1 Hop Hres".
     iEval (rewrite HR7a0) in "Hpath".
     iEval (rewrite HR7a1) in "Hnb14".

@@ -1174,15 +1174,18 @@ Section ProofSysUnlinkBody.
                 (upd_upt V P1) ltac:(exact Knp) Hcdev Hcnib Hclog Hcist HdevR Hnib0 Hgeom
                 Hsize Hbm0 Hbmcov Hbmlog Hist0 Hcovb Hiregb Hpcstr1
                 (proj2 (su_len_range pk1 Hpk1))
-                ltac:(exact (su_walk_need_closes _)) Hj Hgl Heb
-                with "Hcg Hown Htext Hdata Hpc Hpenv2 Hbio Hlog Hkenv Hitab Hitinv
+                ltac:(exact (su_walk_need_closes _)) Hj Hgl
+                with "Hcg Hown [] [] Htext Hdata Hpc Hpenv2 Hbio Hlog Hkenv Hitab Hitinv
                       Hescrows Hslks Hireg Hropen Hprocs Hdev Hgeo Hdlk Hsbb Hsbi
                       Hbmres Hpidq Hcwdref [Hbufp] [Hnm14] Hbsl Hir
                       HopS").
+      (* nameiparent is eb-generic now; sys_unlink is at [eb = true]. *)
+      { rewrite Heb /trap_csrs_ext. done. }
+      { rewrite Heb /cpu_claim_ext. done. }
       { iEval (rewrite HN3a0). iExact "Hbufp". }
       { iEval (rewrite HN3a1). iExact "Hnm14". }
       iIntros (CID17 Hq17 mnp n1 Sb1 ok1 nf dpv w1)
-        "%Hcsnp Hcg Hown Hpc Hsbb Hsbi Hpidq Hcwdref
+        "%Hcsnp Hcg Hown _ _ Hpc Hsbb Hsbi Hpidq Hcwdref
          Hbufp Hnm14 Hbsl %HSb1 %Hw1 %Hn1 HopS Hres1".
       iEval (rewrite HN3a0) in "Hbufp".
       iEval (rewrite HN3a1) in "Hnm14".

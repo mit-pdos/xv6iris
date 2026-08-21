@@ -1242,13 +1242,16 @@ Section ProofSysLinkBody.
                   Q2 (K - 38)%nat eb b lks (upd_upt V P2)
                   ltac:(exact Kna) Hcdev Hcnib Hclog Hcist HdevR Hnib0 Hgeom
                   Hsize Hbm0 Hbmcov Hbmlog Hist0 Hcovb Hiregb Hpcstr1
-                  (sl_plen_lt pk1 Hpk1) (sl_bud_walk _) Hj Hgl Heb
-                  with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog Hkenv Hitab Hitinv
+                  (sl_plen_lt pk1 Hpk1) (sl_bud_walk _) Hj Hgl
+                  with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hkenv Hitab Hitinv
                         Hescrows Hslks Hireg Hropen Hprocs Hdev Hgeo Hdlk Hsbb Hsbi
                         Hbmres Hpidq Hcwdref [Hbufk] Hbsl Hir2 HopS").
+        (* namei is eb-generic now; sys_link is still at [eb = true]. *)
+        { rewrite Heb /trap_csrs_ext. done. }
+        { rewrite Heb /cpu_claim_ext. done. }
         { iEval (rewrite HQ2a0). iExact "Hbufk". }
         iIntros (CID24 Hq24 mna n1 Sb1 ok ipv w1)
-          "%Hcsna Hcg Hown Hpc Hsbb Hsbi Hpidq Hcwdref
+          "%Hcsna Hcg Hown _ _ Hpc Hsbb Hsbi Hpidq Hcwdref
            Hbufk Hbsl %HSb1 %Hw1 %Hn1 HopS Hres".
         iEval (rewrite HQ2a0) in "Hbufk".
         assert (Hpc3e : ret_pc (Q2 !!! Regidx Rra : mword 64)
@@ -2024,15 +2027,18 @@ Section ProofSysLinkBody.
                           ltac:(exact Knp) Hcdev Hcnib Hclog Hcist HdevR Hnib0
                           Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hcovb Hiregb
                           Hpcstr2 (sl_plen_lt pk2 Hpk2)
-                          ltac:(exact (sl_walk2_need _ w1 c1 Hu2)) Hj Hgl Heb
-                          with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog Hkenv Hitab
+                          ltac:(exact (sl_walk2_need _ w1 c1 Hu2)) Hj Hgl
+                          with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hkenv Hitab
                                 Hitinv Hescrows Hslks Hireg Hropen Hprocs Hdev Hgeo Hdlk
                                 Hsbb Hsbi Hbmres Hpidq Hcwdref [Hbufw]
                                 [Hnm14] Hbsl Hir2 HopS").
+                (* nameiparent is eb-generic now; sys_link is at [eb = true]. *)
+                { rewrite Heb /trap_csrs_ext. done. }
+                { rewrite Heb /cpu_claim_ext. done. }
                 { iEval (rewrite HT2a0). iExact "Hbufw". }
                 { iEval (rewrite HT2a1). iExact "Hnm14". }
                 iIntros (CID48 Hq48 mnp n2 Sb2 ok2 nf dpv w2)
-                  "%Hcsnp Hcg Hown Hpc Hsbb Hsbi Hpidq
+                  "%Hcsnp Hcg Hown _ _ Hpc Hsbb Hsbi Hpidq
                    Hcwdref Hbufw Hnm14 Hbsl %HSb2 %Hw2 %Hn2 HopS Hres2".
                 iEval (rewrite HT2a0) in "Hbufw".
                 iEval (rewrite HT2a1) in "Hnm14".
