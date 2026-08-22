@@ -131,7 +131,15 @@ change that produced it.
   `WeakInterp.acc_addr : Arch.pa → nat → Z` shadows
   `WeakAxiomatic.acc_addr : Z → nat → Z` when both are imported — the error
   surfaces at an IMAGE definition ("pa_z … has type Z while expected
-  Arch.pa"), not where the graph is built.  Related paper cuts:
+  Arch.pa"), not where the graph is built.  `||` in an intro pattern
+  fails the same way (`[|tgt|tgt||]` → write `[ | tgt | tgt | | ]`).
+- **NEVER `simpl`/`/=`/`done` A GOAL MENTIONING `krole pc`/`kw pc` AT A
+  VARIABLE `pc`** (2026-08-23, the pin bridge): `kw` bottoms out in
+  `KernelInstrs.kernel_bytes !! a` and reduction tries to unfold the whole
+  image literal — `rewrite /taint_step /=` hung >10 min with no error, a
+  `done` that tried `reflexivity` cost 54 s.  State an unfolding lemma and
+  close by `reflexivity`; step with `cbv beta iota zeta` (no delta); end
+  branches with `exact H`, never `by`/`done`.  9.6 s after the fix.  Related paper cuts:
   `StronglySorted`-family lemmas hand back un-beta-reduced `R x y`, so `lia`
   fails with "Cannot find witness" until `cbn in H`; in the same import
   context `if decide P then _ else _` does NOT elaborate (the scrutinee is
