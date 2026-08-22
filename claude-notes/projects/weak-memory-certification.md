@@ -1,5 +1,42 @@
 # The tier-2 containment worklist (was: the certification route)
 
+## CHECKPOINT (2026-08-23, FOURTH PASS) — READ THIS FIRST
+
+**Landed since the third pass:** B1b-2's residue + the T2-1c/dev-order
+finding (`WeakRvwmoFabInd.v`) — `d912e8cf`; slice 3a cand extension
+(`WeakRvwmoCert.v`: `srvwmo_consistent = exec_wf`, stepwise
+`snoc_consistent`, older-source reads admissible under `cd_floor`) —
+`ebd1ffbd`; slice 3b SEGMENT CERTIFICATION (`WeakRvwmoCert2.v`:
+`cert_segment` proved, `seg_exit_write` verbatim) — `2931df6d`; THE
+FLOOR DISCHARGE (`WeakRvwmoFloor.v`: `floor_of_graph` — the machine's
+coherence floor is five agent-local watermarks each bounded by one
+ppo⁻ arm, NO message views; `gtrace_snoc_read/write_consistent`, the
+induction steps of T2-1c′ — all Closed) — this commit.
+
+**THE REMAINING CHAIN, in order:**
+1. **Wire `floor_of_graph` into `cert_segment`'s `floor_ok`** (its
+   hypothesis is exactly `WeakRvwmoFloor`'s conclusion once the
+   certified cand is a `gtrace_prefix` of the graph with witnesses
+   re-sourced — define that correspondence) and discharge 3b's O-1
+   (the `HEpair`/RMW block twin) and O-2 (re-convergence after a
+   witness at the next `Ret`: the EWPs' progress).
+2. **Slice 3c** — the cycle-order iteration of `cert_segment` from a
+   backward step, producing the certified configuration (route-b §4e
+   "SLICE 3's SHAPE"), and the log/`prot_read` facts the kill reads.
+3. **B2e-3c — discharge `cycle_kill`** (route-b §4d.2(3)): the three
+   arms at the certified configuration; consumes `wlp_alt_two_acq`/
+   `wlp_alt_open` (F3′), `wprot_writer_cs` (F3″), φ.  The CS-chained
+   arm's window order is row data when the acquire's `ts` names the
+   other section's release.  L2′ proper.
+4. **T2-1c′** — `gtrace_linearization` (WeakRvwmoFloor §10: O1 list
+   arithmetic, O2 the rf arm, O6 `rmw_latest` via `gatomicity`), which
+   also gives B1b-2 its dev-respecting trace (axiom revised to
+   acyclicity of `po ∪ rf ∪ gmo|W ∪ dev`).
+5. **B3** assembly at the device-quiet milestone; **R6**; `wprot_store`
+   width lift; `WeakRvwmoLock`'s failed-swap arm.
+
+**Tree:** never `make proofs` from the root here (stale `xv6-riscv`).
+
 ## CHECKPOINT (2026-08-22, THIRD PASS — end of the session) — READ THIS
 ## FIRST; the two checkpoints below it are the design record and the
 ## mid-session landing record
