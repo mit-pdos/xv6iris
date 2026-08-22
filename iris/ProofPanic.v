@@ -159,11 +159,11 @@ Section PanicSpin.
     iIntros "#Ht".
     iLöb as "IH".
     iIntros (h m K b p) "Hcg Hpc".
-    iPoseProof (pni_26 with "Ht") as "Hi26".
     iApply (wp_cj_s_sconf (CID := h) (mword_of_int (PA + 0x26))
               (sign_extend' 21 (concat_vec (mword_of_int 0 : mword 11) ('b"0")))
               m K b ltac:(rewrite Htgt; vm_compute; reflexivity)
-              with "Hcg Hpc Hi26").
+              with "Hcg Hpc []").
+    { iApply (pni_26 with "Ht"). }
     iApply wp_next_intro. iIntros (CIDx). iNext.
     iIntros "Hcg Hpc".
     iEval (rewrite Htgt) in "Hpc".
@@ -213,19 +213,6 @@ Section ProofPanic.
     iApply fupd_wp.
     iMod (uart_sent_sub_nil_free γd) as "#Hsub".
     iModIntro.
-    iPoseProof (pni_00 with "Htext") as "Hi00".
-    iPoseProof (pni_02 with "Htext") as "Hi02".
-    iPoseProof (pni_04 with "Htext") as "Hi04".
-    iPoseProof (pni_06 with "Htext") as "Hi06".
-    iPoseProof (pni_08 with "Htext") as "Hi08".
-    iPoseProof (pni_0a with "Htext") as "Hi0a".
-    iPoseProof (pni_0c with "Htext") as "Hi0c".
-    iPoseProof (pni_10 with "Htext") as "Hi10".
-    iPoseProof (pni_14 with "Htext") as "Hi14".
-    iPoseProof (pni_18 with "Htext") as "Hi18".
-    iPoseProof (pni_1a with "Htext") as "Hi1a".
-    iPoseProof (pni_1e with "Htext") as "Hi1e".
-    iPoseProof (pni_22 with "Htext") as "Hi22".
     iPoseProof (pn_hdr_str with "Hkdata") as "#Hhdr".
     iPoseProof (pn_fmt_str with "Hkdata") as "#Hfmt".
     (* ================================================================== *)
@@ -234,7 +221,8 @@ Section ProofPanic.
     iApply (wp_caddi_sp_push_s_sconf (mword_of_int PA : mword 64)
               (mword_of_int 32 : mword 6) m K 4%nat b
               (pn_K4 K HK) (stk_push_32 (m !!! Regidx csp_rs1))
-              with "Hcg Hpc Hi00").
+              with "Hcg Hpc []").
+    { iApply (pni_00 with "Htext"). }
     iIntros (CID1 Hs1) "Hcg Hframe Hpc".
     set (P0 := <[Regidx csp_rs1 := regval_into_reg
                   (add_vec (m !!! Regidx csp_rs1)
@@ -269,7 +257,8 @@ Section ProofPanic.
     iEval (rewrite Hp02) in "Hpc".
     iApply (wp_csdsp_s_sconf (CID := CID1) (mword_of_int (PA + 0x2))
               (mword_of_int 3 : mword 6) Rra P0 (K - 4)%nat v1 b
-              with "Hcg Hpc Hi02 [H1]").
+              with "Hcg Hpc [] [H1]").
+    { iApply (pni_02 with "Htext"). }
     { iEval (rewrite Hb1). iExact "H1". }
     iIntros (CID2 Hs2) "Hcg Hpc H1".
     assert (Hp04 : add_vec_int (mword_of_int (PA + 0x2) : mword 64) 2
@@ -277,7 +266,8 @@ Section ProofPanic.
     iEval (rewrite Hp04) in "Hpc".
     iApply (wp_csdsp_s_sconf (CID := CID2) (mword_of_int (PA + 0x4))
               (mword_of_int 2 : mword 6) Rs0 P0 (K - 4)%nat v2 b
-              with "Hcg Hpc Hi04 [H2]").
+              with "Hcg Hpc [] [H2]").
+    { iApply (pni_04 with "Htext"). }
     { iEval (rewrite Hb2). iExact "H2". }
     iIntros (CID3 Hs3) "Hcg Hpc H2".
     assert (Hp06 : add_vec_int (mword_of_int (PA + 0x4) : mword 64) 2
@@ -285,7 +275,8 @@ Section ProofPanic.
     iEval (rewrite Hp06) in "Hpc".
     iApply (wp_csdsp_s_sconf (CID := CID3) (mword_of_int (PA + 0x6))
               (mword_of_int 1 : mword 6) Rs1 P0 (K - 4)%nat v3 b
-              with "Hcg Hpc Hi06 [H3]").
+              with "Hcg Hpc [] [H3]").
+    { iApply (pni_06 with "Htext"). }
     { iEval (rewrite Hb3). iExact "H3". }
     iIntros (CID4 Hs4) "Hcg Hpc H3".
     (* ================================================================== *)
@@ -298,7 +289,8 @@ Section ProofPanic.
               (Cregidx (mword_of_int 0)) (mword_of_int 8 : mword 8) Rs0
               P0 (K - 4)%nat b
               ltac:(vm_compute; reflexivity) ltac:(nz) ltac:(rdok)
-              with "Hcg Hpc Hi08").
+              with "Hcg Hpc []").
+    { iApply (pni_08 with "Htext"). }
     iIntros (CID5 Hs5) "Hcg Hpc".
     set (P1 := <[Regidx Rs0 := regval_into_reg
                   (add_vec (P0 !!! Regidx csp_rs1)
@@ -312,7 +304,8 @@ Section ProofPanic.
                    = mword_of_int (PA + 0xa)) by pcw.
     iEval (rewrite Hp0a) in "Hpc".
     iApply (wp_cmv_s_sconf (CID := CID5) (mword_of_int (PA + 0xa)) Rs1 Ra0
-              P1 (K - 4)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi0a").
+              P1 (K - 4)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (pni_0a with "Htext"). }
     iIntros (CID6 Hs6) "Hcg Hpc".
     iEval (rewrite Hrg0a) in "Hcg".
     set (P2 := <[Regidx Rs1 := regval_into_reg
@@ -328,7 +321,8 @@ Section ProofPanic.
     iEval (rewrite Hp0c) in "Hpc".
     iApply (wp_auipc_s_sconf (CID := CID6) (mword_of_int (PA + 0xc)) Ra0
               (mword_of_int 6 : mword 20) P2 (K - 4)%nat b
-              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi0c").
+              ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (pni_0c with "Htext"). }
     iIntros (CID7 Hs7) "Hcg Hpc".
     set (P3 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (mword_of_int (PA + 0xc) : mword 64)
@@ -340,7 +334,8 @@ Section ProofPanic.
     iEval (rewrite Hp10) in "Hpc".
     iApply (wp_addi4_s_sconf (CID := CID7) (mword_of_int (PA + 0x10)) Ra0 Ra0
               (mword_of_int 2040 : mword 12) P3 (K - 4)%nat b
-              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi10").
+              ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (pni_10 with "Htext"). }
     iIntros (CID8 Hs8) "Hcg Hpc".
     iEval (rewrite Hrg10) in "Hcg".
     set (P4 := <[Regidx Ra0 := regval_into_reg
@@ -360,7 +355,8 @@ Section ProofPanic.
     iApply (wp_jal_s_sconf (CID := CID8) (mword_of_int (PA + 0x14)) Rra
               (mword_of_int 2096346 : mword 21) P4 (K - 4)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
-              with "Hcg Hpc Hi14").
+              with "Hcg Hpc []").
+    { iApply (pni_14 with "Htext"). }
     iIntros (CID9 Hs9) "Hcg Hpc".
     set (P5 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (PA + 0x14) : mword 64) 4)]> P4).
@@ -402,7 +398,8 @@ Section ProofPanic.
     assert (Hrg18 : rget (CID := CID10) mf Rs1 = mf !!! Regidx Rs1)
       by (rgne; reflexivity).
     iApply (wp_cmv_s_sconf (CID := CID10) (mword_of_int (PA + 0x18)) Ra1 Rs1
-              mf (K - 4)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi18").
+              mf (K - 4)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (pni_18 with "Htext"). }
     iIntros (CID11 Hs11) "Hcg Hpc".
     iEval (rewrite Hrg18) in "Hcg".
     set (Q0 := <[Regidx Ra1 := regval_into_reg
@@ -417,7 +414,8 @@ Section ProofPanic.
     iEval (rewrite Hp1a) in "Hpc".
     iApply (wp_auipc_s_sconf (CID := CID11) (mword_of_int (PA + 0x1a)) Ra0
               (mword_of_int 6 : mword 20) Q0 (K - 4)%nat b
-              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi1a").
+              ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (pni_1a with "Htext"). }
     iIntros (CID12 Hs12) "Hcg Hpc".
     set (Q1 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (mword_of_int (PA + 0x1a) : mword 64)
@@ -429,7 +427,8 @@ Section ProofPanic.
     iEval (rewrite Hp1e) in "Hpc".
     iApply (wp_addi4_s_sconf (CID := CID12) (mword_of_int (PA + 0x1e)) Ra0 Ra0
               (mword_of_int 2034 : mword 12) Q1 (K - 4)%nat b
-              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi1e").
+              ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (pni_1e with "Htext"). }
     iIntros (CID13 Hs13) "Hcg Hpc".
     iEval (rewrite Hrg1e) in "Hcg".
     set (Q2 := <[Regidx Ra0 := regval_into_reg
@@ -449,7 +448,8 @@ Section ProofPanic.
     iApply (wp_jal_s_sconf (CID := CID13) (mword_of_int (PA + 0x22)) Rra
               (mword_of_int 2096332 : mword 21) Q2 (K - 4)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
-              with "Hcg Hpc Hi22").
+              with "Hcg Hpc []").
+    { iApply (pni_22 with "Htext"). }
     iIntros (CID14 Hs14) "Hcg Hpc".
     set (Q3 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (PA + 0x22) : mword 64) 4)]> Q2).
@@ -483,8 +483,7 @@ Section ProofPanic.
     (* ================================================================== *)
     (* +0x26  and here it stays.                                          *)
     (* ================================================================== *)
-    iPoseProof (pn_spin with "Htext") as "Hspin".
-    iApply ("Hspin" $! CID15 mg (K - 4)%nat b p with "Hcg Hpc").
+    iApply (pn_spin with "Htext Hcg Hpc").
   Qed.
 
 End ProofPanic.
