@@ -23,10 +23,14 @@ axioms), no Admitted.  THE CHAIN IS NOW: T2-LIN ⇒ `RacyD` acyclic ⇒
 `topo_linearizes` ⇒ T2-1c ⇒ T1; `normalize` is demoted to analysis.
 
 **WHAT REMAINS (in order):**
-1. **B1b** — the supply derivation for a hull's linearized cand, WITH
-   the device-order arm (`Rdev` as a sixth `R` arm; route-b §4d.4 B1b
-   note) and the conformance transport for hulls (`gdexec_conf_hull`:
-   `hart_conf_prefix` + `hart_conf_ren` over `hull_rows_rel`).
+1. **B1b-1 DONE** (`WeakRvwmoSupply.v`: `gdexec_qconf` the QUIESCENT
+   bundle, `gdexec_qconf_hull`/`_ren`, `cand_ws_relp` (the machine's
+   per-agent relp at a trace position = the row fold — Closed),
+   `supply_of_qconf` the interleaving theorem, `hull_supply`,
+   `topo_supply` (pair it with `WeakRvwmoDec.racyD_dec`)).  REMAINING:
+   **B1b-2** the fabric order as bundle data (route-b §4d.4 B1b entry),
+   and a one-instruction `hemit` non-vacuity witness (B0b-1's open
+   question, inherited).
 2. **B2e-3b slice 2 — DEPENDENCY SOUNDNESS** (route-b §4e, read its
    "two shapes" block): decide dynamic provenance (ii) vs decoded-role
    coverage (i) — probe the instance's `RegRead` capture first; then

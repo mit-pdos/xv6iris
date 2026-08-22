@@ -1102,3 +1102,4 @@ WeakRvwmoProbeSwap.v
 WeakRvwmoTopo.v
 WeakRvwmoDec.v
 WeakRvwmoHull.v
+WeakRvwmoSupply.v
