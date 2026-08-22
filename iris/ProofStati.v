@@ -124,31 +124,14 @@ Section ProofStatiMain.
     iEval (rewrite /st_type) in "Hsty".
     iEval (rewrite /st_nlink) in "Hsnl".
     iEval (rewrite /st_size) in "Hssz".
-    iPoseProof (sti_00 with "Htext") as "Hi00".
-    iPoseProof (sti_02 with "Htext") as "Hi02".
-    iPoseProof (sti_04 with "Htext") as "Hi04".
-    iPoseProof (sti_06 with "Htext") as "Hi06".
-    iPoseProof (sti_08 with "Htext") as "Hi08".
-    iPoseProof (sti_0a with "Htext") as "Hi0a".
-    iPoseProof (sti_0c with "Htext") as "Hi0c".
-    iPoseProof (sti_0e with "Htext") as "Hi0e".
-    iPoseProof (sti_10 with "Htext") as "Hi10".
-    iPoseProof (sti_14 with "Htext") as "Hi14".
-    iPoseProof (sti_18 with "Htext") as "Hi18".
-    iPoseProof (sti_1c with "Htext") as "Hi1c".
-    iPoseProof (sti_20 with "Htext") as "Hi20".
-    iPoseProof (sti_24 with "Htext") as "Hi24".
-    iPoseProof (sti_26 with "Htext") as "Hi26".
-    iPoseProof (sti_28 with "Htext") as "Hi28".
-    iPoseProof (sti_2a with "Htext") as "Hi2a".
-    iPoseProof (sti_2c with "Htext") as "Hi2c".
     (* ===== +0x00 c.addi sp,sp,-16 ===== *)
     assert (Hpush : add_vec (mm !!! Regidx csp_rs1 : mword 64)
                       (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))
                     = pa_stk (mm !!! Regidx csp_rs1 : mword 64) 2).
     { unfold pa_stk, add_vec_int. apply f_equal. pcw. }
     iApply (wp_caddi_sp_push_s_sconf pcE (mword_of_int 48 : mword 6) mm K 2 b
-              ltac:(lia) Hpush with "Hcg Hpc Hi00").
+              ltac:(lia) Hpush with "Hcg Hpc []").
+    { iApply (sti_00 with "Htext"). }
     iIntros (CID1 Hq1) "Hcg Hframe Hpc".
     set (R1 := <[Regidx csp_rs1 := regval_into_reg
                   (add_vec (mm !!! Regidx csp_rs1 : mword 64)
@@ -174,14 +157,16 @@ Section ProofStatiMain.
     (* ===== +0x02 / +0x04 : the two saves ===== *)
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.stati + 0x02))
               (mword_of_int 1 : mword 6) Rra R1 (K - 2)%nat v1 b
-              with "Hcg Hpc Hi02 Hf1").
+              with "Hcg Hpc [] Hf1").
+    { iApply (sti_02 with "Htext"). }
     iIntros (CID2 Hq2) "Hcg Hpc Hf1".
     assert (Hpp04 : add_vec_int (mword_of_int (KernelSyms.stati + 0x02) : mword 64) 2
                     = mword_of_int (KernelSyms.stati + 0x04)) by pcw.
     iEval (rewrite Hpp04) in "Hpc".
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.stati + 0x04))
               (mword_of_int 0 : mword 6) Rs0 R1 (K - 2)%nat v2 b
-              with "Hcg Hpc Hi04 Hf2").
+              with "Hcg Hpc [] Hf2").
+    { iApply (sti_04 with "Htext"). }
     iIntros (CID3 Hq3) "Hcg Hpc Hf2".
     assert (Hpp06 : add_vec_int (mword_of_int (KernelSyms.stati + 0x04) : mword 64) 2
                     = mword_of_int (KernelSyms.stati + 0x06)) by pcw.
@@ -197,7 +182,8 @@ Section ProofStatiMain.
               (Cregidx (mword_of_int 0)) (mword_of_int 4 : mword 8) Rs0
               R1 (K - 2)%nat b
               ltac:(vm_compute; reflexivity) ltac:(nz) ltac:(rdok)
-              with "Hcg Hpc Hi06").
+              with "Hcg Hpc []").
+    { iApply (sti_06 with "Htext"). }
     iIntros (CID4 Hq4) "Hcg Hpc".
     set (R2 := <[Regidx Rs0 := regval_into_reg
                   (add_vec (R1 !!! Regidx csp_rs1)
@@ -217,7 +203,8 @@ Section ProofStatiMain.
     (* ===== +0x08 c.lw a5,0(a0) : ip->dev ===== *)
     iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.stati + 0x08)) Ra5 Ra0
               (mword_of_int 0 : mword 12) R2 (K - 2)%nat dev b
-              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi08 [Hidev]").
+              ltac:(nz) ltac:(rdok) with "Hcg Hpc [] [Hidev]").
+    { iApply (sti_08 with "Htext"). }
     { iEval (rgne; rewrite HR2a0). iExact "Hidev". }
     iIntros (CID5 Hq5) "Hcg Hpc Hidev".
     iEval (rgne; rewrite HR2a0) in "Hidev".
@@ -239,7 +226,8 @@ Section ProofStatiMain.
     (* ===== +0x0a c.sw a5,0(a1) : st->dev ===== *)
     iApply (wp_csw_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (KernelSyms.stati + 0x0a)) Ra5 Ra1
               (mword_of_int 0 : mword 12) R3 (K - 2)%nat dev0 b
-              with "Hcg Hpc Hi0a [Hsdev]").
+              with "Hcg Hpc [] [Hsdev]").
+    { iApply (sti_0a with "Htext"). }
     { iEval (rgne; rewrite HR3a1). iExact "Hsdev". }
     iIntros (CID6 Hq6) "Hcg Hpc Hsdev".
     iEval (rgne; rgne; rewrite HR3a1 HR3a5 trunc32_sext64) in "Hsdev".
@@ -249,7 +237,8 @@ Section ProofStatiMain.
     (* ===== +0x0c c.lw a5,4(a0) : ip->inum ===== *)
     iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.stati + 0x0c)) Ra5 Ra0
               (mword_of_int 4 : mword 12) R3 (K - 2)%nat inum b
-              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi0c [Hinum]").
+              ltac:(nz) ltac:(rdok) with "Hcg Hpc [] [Hinum]").
+    { iApply (sti_0c with "Htext"). }
     { iEval (rgne; rewrite HR3a0). iExact "Hinum". }
     iIntros (CID7 Hq7) "Hcg Hpc Hinum".
     iEval (rgne; rewrite HR3a0) in "Hinum".
@@ -271,7 +260,8 @@ Section ProofStatiMain.
     (* ===== +0x0e c.sw a5,4(a1) : st->ino ===== *)
     iApply (wp_csw_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (KernelSyms.stati + 0x0e)) Ra5 Ra1
               (mword_of_int 4 : mword 12) R4 (K - 2)%nat ino0 b
-              with "Hcg Hpc Hi0e [Hsino]").
+              with "Hcg Hpc [] [Hsino]").
+    { iApply (sti_0e with "Htext"). }
     { iEval (rgne; rewrite HR4a1). iExact "Hsino". }
     iIntros (CID8 Hq8) "Hcg Hpc Hsino".
     iEval (rgne; rgne; rewrite HR4a1 HR4a5 trunc32_sext64) in "Hsino".
@@ -281,7 +271,8 @@ Section ProofStatiMain.
     (* ===== +0x10 lh a5,68(a0) : ip->type ===== *)
     iApply (wp_lh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.stati + 0x10)) Ra5 Ra0
               (mword_of_int 68 : mword 12) R4 (K - 2)%nat (di_type dn : mword 16) b
-              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi10 [Hity]").
+              ltac:(nz) ltac:(rdok) with "Hcg Hpc [] [Hity]").
+    { iApply (sti_10 with "Htext"). }
     { iEval (rgne; rewrite HR4a0). iExact "Hity". }
     iIntros (CID9 Hq9) "Hcg Hpc Hity".
     iEval (rgne; rewrite HR4a0) in "Hity".
@@ -305,7 +296,8 @@ Section ProofStatiMain.
     (* ===== +0x14 sh a5,8(a1) : st->type ===== *)
     iApply (wp_sh_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (KernelSyms.stati + 0x14)) Ra5 Ra1
               (mword_of_int 8 : mword 12) R5 (K - 2)%nat ty0 b
-              with "Hcg Hpc Hi14 [Hsty]").
+              with "Hcg Hpc [] [Hsty]").
+    { iApply (sti_14 with "Htext"). }
     { iEval (rgne; rewrite HR5a1). iExact "Hsty". }
     iIntros (CID10 Hq10) "Hcg Hpc Hsty".
     iEval (rgne; rgne; rewrite HR5a1 HR5a5 trunc16_sext64) in "Hsty".
@@ -315,7 +307,8 @@ Section ProofStatiMain.
     (* ===== +0x18 lh a5,74(a0) : ip->nlink ===== *)
     iApply (wp_lh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.stati + 0x18)) Ra5 Ra0
               (mword_of_int 74 : mword 12) R5 (K - 2)%nat (di_nlink dn : mword 16) b
-              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi18 [Hinl]").
+              ltac:(nz) ltac:(rdok) with "Hcg Hpc [] [Hinl]").
+    { iApply (sti_18 with "Htext"). }
     { iEval (rgne; rewrite HR5a0). iExact "Hinl". }
     iIntros (CID11 Hq11) "Hcg Hpc Hinl".
     iEval (rgne; rewrite HR5a0) in "Hinl".
@@ -339,7 +332,8 @@ Section ProofStatiMain.
     (* ===== +0x1c sh a5,10(a1) : st->nlink ===== *)
     iApply (wp_sh_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (KernelSyms.stati + 0x1c)) Ra5 Ra1
               (mword_of_int 10 : mword 12) R6 (K - 2)%nat nl0 b
-              with "Hcg Hpc Hi1c [Hsnl]").
+              with "Hcg Hpc [] [Hsnl]").
+    { iApply (sti_1c with "Htext"). }
     { iEval (rgne; rewrite HR6a1). iExact "Hsnl". }
     iIntros (CID12 Hq12) "Hcg Hpc Hsnl".
     iEval (rgne; rgne; rewrite HR6a1 HR6a5 trunc16_sext64) in "Hsnl".
@@ -349,7 +343,8 @@ Section ProofStatiMain.
     (* ===== +0x20 lwu a5,76(a0) : ip->size, ZERO-extended ===== *)
     iApply (wp_lwu_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.stati + 0x20)) Ra5 Ra0
               (mword_of_int 76 : mword 12) R6 (K - 2)%nat (di_size dn : mword 32) b
-              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi20 [Hisz]").
+              ltac:(nz) ltac:(rdok) with "Hcg Hpc [] [Hisz]").
+    { iApply (sti_20 with "Htext"). }
     { iEval (rgne; rewrite HR6a0). iExact "Hisz". }
     iIntros (CID13 Hq13) "Hcg Hpc Hisz".
     iEval (rgne; rewrite HR6a0) in "Hisz".
@@ -371,7 +366,8 @@ Section ProofStatiMain.
     (* ===== +0x24 c.sd a5,16(a1) : st->size (8 bytes) ===== *)
     iApply (wp_csd_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (KernelSyms.stati + 0x24)) Ra5 Ra1
               (mword_of_int 16 : mword 12) R7 (K - 2)%nat sz0 b
-              with "Hcg Hpc Hi24 [Hssz]").
+              with "Hcg Hpc [] [Hssz]").
+    { iApply (sti_24 with "Htext"). }
     { iEval (rgne; rewrite HR7a1). iExact "Hssz". }
     iIntros (CID14 Hq14) "Hcg Hpc Hssz".
     iEval (rgne; rgne; rewrite HR7a1 HR7a5) in "Hssz".
@@ -392,7 +388,8 @@ Section ProofStatiMain.
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.stati + 0x26))
               (mword_of_int 1 : mword 6) Rra R7 (K - 2)%nat
               (mm !!! Regidx Rra : mword 64) b ltac:(nz) ltac:(rdok)
-              with "Hcg Hpc Hi26 [Hf1]").
+              with "Hcg Hpc [] [Hf1]").
+    { iApply (sti_26 with "Htext"). }
     { iEval (rewrite Hc1). iExact "Hf1". }
     iIntros (CID15 Hq15) "Hcg Hpc Hf1".
     iEval (rewrite Hc1) in "Hf1".
@@ -410,7 +407,8 @@ Section ProofStatiMain.
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.stati + 0x28))
               (mword_of_int 0 : mword 6) Rs0 P1 (K - 2)%nat
               (mm !!! Regidx Rs0 : mword 64) b ltac:(nz) ltac:(rdok)
-              with "Hcg Hpc Hi28 [Hf2]").
+              with "Hcg Hpc [] [Hf2]").
+    { iApply (sti_28 with "Htext"). }
     { iEval (rewrite HP1sp -HR7sp Hc2). iExact "Hf2". }
     iIntros (CID16 Hq16) "Hcg Hpc Hf2".
     iEval (rewrite HP1sp -HR7sp Hc2) in "Hf2".
@@ -461,7 +459,8 @@ Section ProofStatiMain.
     iEval (rewrite -Hwv) in "Hstk".
     iApply (wp_caddi_sp_pop_s_sconf (mword_of_int (KernelSyms.stati + 0x2a))
               (mword_of_int 16 : mword 6) P2 (K - 2)%nat 2 b Hpop
-              with "Hcg Hpc Hi2a Hstk").
+              with "Hcg Hpc [] Hstk").
+    { iApply (sti_2a with "Htext"). }
     iIntros (CID17 Hq17) "Hcg Hpc".
     set (P3 := <[Regidx csp_rs1 := regval_into_reg
                   (add_vec (P2 !!! Regidx csp_rs1 : mword 64)
@@ -475,7 +474,8 @@ Section ProofStatiMain.
     assert (HP3ra : P3 !!! Regidx Rra = (mm !!! Regidx Rra : mword 64))
       by (rewrite /P3 upd_ne; [exact HP2ra | nz]).
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.stati + 0x2c)) Rra P3 K b
-              ltac:(nz) with "Hcg Hpc Hi2c").
+              ltac:(nz) with "Hcg Hpc []").
+    { iApply (sti_2c with "Htext"). }
     iIntros (CID18 Hq18) "Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretf : ret_pc (P3 !!! Regidx Rra : mword 64)
