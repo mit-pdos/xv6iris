@@ -292,6 +292,11 @@ list.
       such orphans persist across a crash. NOTE the ghost ledger keeps
       only `w <= nlink` (L1) — the EQUALITY is a new pure invariant,
       maintained by G1's abstract view, not read off the ledger.
+      Formalization notes: `tree_of_disk` is the ALL-LIVE store, not a
+      walk — reachability is its own Prop (`∃ p, path_at … ROOTINO p =
+      Some z`), and the predicate is a PROP, not a bool: the base case
+      needs no computable reachability, because under `fsimg_wf` the
+      only directory is root, so reachable-dirs = {ROOTINO} by proof.
 - [ ] **F2.** The five update lemmas, one per written-block kind:
       bitmap set/clear (`bitmap_bytes`), dinode-at-slot
       (`diblk_bytes` insert, alloc/update/free arms), dirent
@@ -339,6 +344,12 @@ sys_mknod, sys_chdir, filewrite, fileclose, kexec ×2, kexit, ireclaim).
       read out of `P_fs` in the era fupd (open `crashN` at ⊤); the
       raw-disk premises become `fs_durable_wf D` + geometry from `P_fs`.
       `BootShared.boot_shared_alloc` loses the image premise.
+      ORPHANS AT THE MINT: the ledger's boot count must be the
+      REACHABLE-ticket count (F1's supply) — counting all-live tickets
+      would violate L1 at any parent of a committed orphan dir (the
+      orphan's ".." ticket has no `nlink` paying for it). Orphan dirs
+      (live, unreachable, empty-but-dots) are excluded from the normal
+      pool stocking and routed to the `ireclaim` path's resources.
 - [ ] **H2.** Blocks where physical ≠ `D` (the committed log's homes)
       are minted dirty-at-boot: logged = slot content, bio holds them
       out of the clean pool; `initlog`/`install_trans` recovering arms
