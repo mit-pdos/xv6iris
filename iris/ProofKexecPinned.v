@@ -114,6 +114,7 @@ Require Import SpecIlock.
 Require Import SpecReadi.
 Require Import SpecIunlockput.
 Require Import SpecNamei.
+Require Import SpecNameiTr.
 Require Import SpecProcFreepagetable.
 Require Import SpecProcPagetable.
 Require Import SpecWalkaddr.
@@ -261,10 +262,13 @@ Module KexecPinnedProof (Myproc : MYPROC) (BeginOp : BEGIN_OP) (Namei : NAMEI)
                   (PFP : PROC_FREEPAGETABLE) (Walkaddr : WALKADDR)
                   (Flags2perm : FLAGS2PERM) (Uvmalloc : UVMALLOC)
                   (Uvmclear : UVMCLEAR) (Strlen : STRLEN) (Copyout : COPYOUT)
-                  (SS : SAFESTRCPY) (PN : PANIC) : KEXEC_PINNED.
+                  (SS : SAFESTRCPY) (PN : PANIC) (NT : NAMEI_TR)
+                  : KEXEC_PINNED.
 
+(* [NT] is threaded straight through to phase A, the only phase that uses the
+   pinned walk.  See [ProofKexecPinnedA.v] for why it is a parameter. *)
 Module PA := ProofKexecPinnedA.KexecPinnedAProof Myproc BeginOp Namei Ilock
-                                                 Readi Iunlockput EndOp.
+                                                 Readi Iunlockput EndOp NT.
 Module PB := ProofKexecB.KexecBProof Myproc BeginOp Namei Ilock Readi
                                      Iunlockput EndOp PPT.
 Module PB2 := ProofKexecB2.KexecB2Proof Myproc BeginOp Namei Ilock Readi

@@ -440,6 +440,37 @@ the real callee proofs, a callee-side spec/proof mismatch stays invisible, and
 `tools/proof_coverage.py` does not count the function as proven. `LinkBinit.v`
 and `LinkIinit.v` were both in that shape and were repaired.
 
+**`Require Import Link*` MAY APPEAR ONLY IN A `Link*.v`, AND THE COST OF
+BREAKING THAT IS PAID BY FILES THAT NEVER USE THE CLOSED FORM.** Applying a
+functor to a proven module at the bottom of the functor's *own* file is the
+tempting shortcut — it saves a second file and gives you a closed theorem
+right where you proved the general one. It also welds the callee's entire link
+cone onto every client of that file, transitively and invisibly: `DirViewPin.v`
+ended with `Module NameiPinnedI := NameiPinned LinkNameiTr.NameiTr`, and that
+one line took its dependency set from 173 files to 509 (57 of them `Link*`) and
+`SpecKexecPinned.v` from 184 to 518 — a `Spec*.v` carrying the whole namex link
+cone down through the lock, disk and uart primitives, for a module it does not
+reference. The rebuild cone and the `Print Assumptions` walk both scale with
+that set, so the shortcut is not free even before the layering argument.
+
+The rule has a corollary for *closed theorems*, which is where it usually gets
+broken: a theorem that consumes an already-linked module is a link-time object
+no matter what it is named. Either it functors over the callee's `Module Type`
+and its application lives in a `Link*.v`, or the file itself is named
+`Link<something>.v`. `NameiInitPinned.v` was the second kind wearing the first
+kind's name; the repair was to functor its one walk-dependent theorem over
+`NAMEI_TR`, leave its pure chain arithmetic at section level, and put both
+applications in `LinkNameiPinned.v`. Likewise a `Proof*.v` that needs a closed
+theorem takes it as a functor argument — `ProofKexecPinnedA.v` takes `NT :
+NAMEI_TR` as an eighth parameter rather than importing the linked walk.
+
+The check is one grep, and it should come back with nothing but `BootChain.v`
+(the top-level boot chain, which is a link file by another name):
+
+```sh
+grep -l '^Require.*\bLink[A-Z]' iris/*.v | grep -v '^iris/Link'
+```
+
 Before writing a straight-line body, check whether `F` is an instance of a shape
 that is already proved — a body that is just `initlock(&L, "name")` is a member
 of the thin-wrapper family above and needs no proof of its own.

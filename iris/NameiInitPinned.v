@@ -3,7 +3,7 @@
 (*  (claude-notes/projects/namei-pinned-lookup.md §12, stage N-5.1 W5b)   *)
 (* ===================================================================== *)
 
-(*  WHAT IT IS.  [DirViewPin.NameiPinnedI.wp_namei_pinned] is the closed
+(*  WHAT IT IS.  [DirViewPin.NameiPinnedProof]'s [wp_namei_pinned] is the
     pinned walk over an ARBITRARY expected chain.  This file instantiates
     it at the ONE chain boot cares about -- the single hop ("init", 7) out
     of the root -- and discharges that chain's premise from the pin
@@ -81,7 +81,7 @@ Require Import SpecDirlink.
 Require Import SpecNamex.
 Require Import SpecNamei.
 Require Import SpecNameiTr.
-Require Import DirViewPin.     (* the closed pinned walk, [NameiPinnedI]    *)
+Require Import DirViewPin.     (* the pinned walk functor, [NameiPinnedProof] *)
 Require Import FsImg.          (* [path_at_disk_dir]: the one-step walk     *)
 Require Import FsImgDisk.      (* [fsimg_P]: the literal xv6 disk image      *)
 Require Import FsImgCheck.     (* [fname_init], [fsimg_init_path], the root *)
@@ -224,6 +224,51 @@ Section NameiInitPinned.
               Hran fsimg_root_type fsimg_init_path).
   Qed.
 
+(* ===================================================================== *)
+(*  3.  ...AND WHAT "INODE 7" MEANS, UNFOLDED                             *)
+(* ===================================================================== *)
+
+  (*  [SpecNameiTr.inode_held_at] already carries the inum as a pure
+      conjunct, so the success arm's content is one destructuring away: the
+      returned register is the [k]th itable entry, and THAT entry's inum is
+      literally 7.  Stated so a client (kexec) can quote it without
+      unfolding anything.                                                 *)
+  Lemma inode_held_at_inum (v : mword 64) (z : Z) :
+    inode_held_at v z -∗
+    ∃ (k : nat) (q : Qp) (inum : mword 32),
+      ⌜v = ientry k⌝ ∗ ⌜(k < NINODE)%nat⌝ ∗ ⌜bv_unsigned inum = z⌝ ∗
+      inode_refp k q icfg_dev inum.
+  Proof.
+    rewrite /inode_held_at. iIntros "H".
+    iDestruct "H" as (k q inum) "(%Hv & %Hk & %Hlt & %Hz & H)".
+    iExists k, q, inum.
+    iSplit; [done |]. iSplit; [done |]. iSplit; [done |]. iExact "H".
+  Qed.
+
+  Corollary inode_held_at_init (v : mword 64) :
+    inode_held_at v 7 -∗
+    ∃ (k : nat) (q : Qp) (inum : mword 32),
+      ⌜v = ientry k⌝ ∗ ⌜(k < NINODE)%nat⌝ ∗ ⌜bv_unsigned inum = 7⌝ ∗
+      inode_refp k q icfg_dev inum.
+  Proof. exact (inode_held_at_inum v 7). Qed.
+
+End NameiInitPinned.
+
+(* ===================================================================== *)
+(*  THE ONE NT-DEPENDENT PIECE, PARAMETRIC.  Everything above is pure     *)
+(*  chain arithmetic over [init_hops] and needs no walk; only the theorem *)
+(*  below does, so it -- and nothing else -- functors over [NAMEI_TR].    *)
+(*  The CLOSED [wp_namei_init_pinned] is in [LinkNameiPinned.v].          *)
+(* ===================================================================== *)
+Module NameiInitPinnedProof (NT : NAMEI_TR).
+
+  Module NP := DirViewPin.NameiPinnedProof NT.
+
+Section NameiInitPinnedBody.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
+            ICFG : icfg, !irefslotG Σ, !pavG Σ}.
+
+  Local Notation ROOTZ := (bv_unsigned InodeInv.ROOTINO).
 (* ===================================================================== *)
 (*  2.  THE THEOREM                                                       *)
 (* ===================================================================== *)
@@ -372,7 +417,7 @@ Section NameiInitPinned.
     (* the chain IS the path: [init_hops.*1] is [[fname_init]] by iota *)
     assert (Hpe' : path_elems (bview plen pfun) = init_hops.*1)
       by (rewrite Hpe; reflexivity).
-    iApply (NameiPinnedI.wp_namei_pinned gs j gl gu gd gk pd pav pu bn g gfs
+    iApply (NP.wp_namei_pinned gs j gl gu gd gk pd pav pu bn g gfs
               gi cn gtl ga gf cov logstart bmapstart inodestart nib size dev
               plen pfun n Sb init_hops pidv dq dqb dqs dqpv m K eb b lks Vpr
               HK Hdev Hnib Hg His Hrd Hnib0 Hlg Hsz Hbm0 Hbmc Hbml His0 Hcb
@@ -409,32 +454,6 @@ Section NameiInitPinned.
       + iRight. by iApply dvp_lost_init_out.
   Qed.
 
-(* ===================================================================== *)
-(*  3.  ...AND WHAT "INODE 7" MEANS, UNFOLDED                             *)
-(* ===================================================================== *)
+End NameiInitPinnedBody.
 
-  (*  [SpecNameiTr.inode_held_at] already carries the inum as a pure
-      conjunct, so the success arm's content is one destructuring away: the
-      returned register is the [k]th itable entry, and THAT entry's inum is
-      literally 7.  Stated so a client (kexec) can quote it without
-      unfolding anything.                                                 *)
-  Lemma inode_held_at_inum (v : mword 64) (z : Z) :
-    inode_held_at v z -∗
-    ∃ (k : nat) (q : Qp) (inum : mword 32),
-      ⌜v = ientry k⌝ ∗ ⌜(k < NINODE)%nat⌝ ∗ ⌜bv_unsigned inum = z⌝ ∗
-      inode_refp k q icfg_dev inum.
-  Proof.
-    rewrite /inode_held_at. iIntros "H".
-    iDestruct "H" as (k q inum) "(%Hv & %Hk & %Hlt & %Hz & H)".
-    iExists k, q, inum.
-    iSplit; [done |]. iSplit; [done |]. iSplit; [done |]. iExact "H".
-  Qed.
-
-  Corollary inode_held_at_init (v : mword 64) :
-    inode_held_at v 7 -∗
-    ∃ (k : nat) (q : Qp) (inum : mword 32),
-      ⌜v = ientry k⌝ ∗ ⌜(k < NINODE)%nat⌝ ∗ ⌜bv_unsigned inum = 7⌝ ∗
-      inode_refp k q icfg_dev inum.
-  Proof. exact (inode_held_at_inum v 7). Qed.
-
-End NameiInitPinned.
+End NameiInitPinnedProof.

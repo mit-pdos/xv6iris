@@ -17,7 +17,14 @@
     path gets back either the inode that path names, or a RECEIPT saying
     which of those directories was modified under it.  There are no visible
     fupds: the hops N-3 exposes are discharged here, once and for all, from
-    the pins.                                                              *)
+    the pins.
+
+    THIS FILE STAYS PARAMETRIC.  [NameiPinnedProof] is a functor and nothing
+    here Requires a [Link*.v].  The CLOSED walk -- the functor applied to
+    [LinkNameiTr.NameiTr] -- lives in [LinkNameiPinned.v], where every other
+    functor-at-a-proven-module instantiation in this tree lives.  Keep it
+    that way: a [Require Import Link*] here drags the whole namex link cone
+    (336 files) into every client, including the [Spec*.v] ones.           *)
 
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
@@ -358,7 +365,7 @@ Definition wp_namei_pinned_body
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
-Module NameiPinned (NT : NAMEI_TR).
+Module NameiPinnedProof (NT : NAMEI_TR).
 
   Lemma wp_namei_pinned
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
@@ -439,15 +446,5 @@ Module NameiPinned (NT : NAMEI_TR).
           rewrite /dvp_Pmiss. iFrame "Hmiss".
   Qed.
 
-End NameiPinned.
+End NameiPinnedProof.
 
-(* ===================================================================== *)
-(*  THE CLOSED PINNED WALK: the functor at the PROVEN module.  With N-3  *)
-(*  landed ([LinkNameiTr.NameiTr] : NAMEI_TR, no axiom of its own),      *)
-(*  [wp_namei_pinned] holds with no module parameter left: its           *)
-(*  [Print Assumptions] is the tree's standing baseline -- the five      *)
-(*  platform reservation externs and functional extensionality.          *)
-(* ===================================================================== *)
-Require Import LinkNameiTr.
-
-Module NameiPinnedI := NameiPinned LinkNameiTr.NameiTr.

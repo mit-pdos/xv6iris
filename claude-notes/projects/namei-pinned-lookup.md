@@ -686,10 +686,14 @@ notdir + nlink-guard = LEFT receipt with the whole suffix; miss = RIGHT
 receipt with the suffix from S k; relative-start refuted by the
 absolute-path premise.
 
-DirViewPin.v now ends with the CLOSED instantiation
-`Module NameiPinnedI := NameiPinned LinkNameiTr.NameiTr` — a
-`wp_namei_pinned` with no module parameter, at the tree's standing
-assumption baseline.
+DirViewPin.v stays PARAMETRIC: it defines the functor
+`NameiPinnedProof (NT : NAMEI_TR)` and Requires no `Link*.v`.  The closed
+`wp_namei_pinned` — no module parameter, at the tree's standing assumption
+baseline — is `LinkNameiPinned.NameiPinned`, the functor applied to
+`LinkNameiTr.NameiTr`.  Same for `NameiInitPinned`: its walk-dependent
+theorem functors over `NAMEI_TR` and the application is
+`LinkNameiPinned.InitPinned`.  See `design/spec-modules.md` for why the
+application may not live in the functor's own file.
 
 ## 12. N-5.1 STAGED (2026-08-21; user-authorized to run when Phase B lands)
 
@@ -706,7 +710,8 @@ kexec re-walk:
   no transport-payload change, no first_tok/forkret edit, no human
   collision.  The transported form is M2/D1-D2 business.
 * **W5b — the concrete pinned theorem.**  A standalone corollary
-  `wp_namei_init_pinned`: `wp_namei_pinned` (the closed `NameiPinnedI`)
+  `wp_namei_init_pinned`: `wp_namei_pinned` (closed as
+  `LinkNameiPinned.NameiPinned`)
   instantiated at `hops = [(fname_init, 7)]`, with the chain premise
   discharged from W5a's pin and the image witness.  Statement: a caller
   in the runtime fs environment holding root's pin, running
@@ -719,7 +724,7 @@ kexec re-walk:
   same call sites.  Recorded so the deferral is a decision, not drift.
 
 Gates: tree green, Admitted 1, system audit at baseline, the
-`NameiPinnedI` audit at platform-externs-only, no forkret-cone or
+`LinkNameiPinned` audit at platform-externs-only, no forkret-cone or
 FsReady diffs, no Spec*.v diffs (the new corollary lives in a new leaf
 or DirViewPin.v — additive).
 

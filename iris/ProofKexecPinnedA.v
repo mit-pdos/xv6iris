@@ -280,7 +280,14 @@ Require Import FsImgCheck.
 
 Module KexecPinnedAProof (Myproc : MYPROC) (BeginOp : BEGIN_OP) (Namei : NAMEI)
                    (Ilock : ILOCK) (Readi : READI) (Iunlockput : IUNLOCKPUT)
-                   (EndOp : END_OP).
+                   (EndOp : END_OP) (NT : NAMEI_TR).
+
+(* THE PINNED WALK ARRIVES AS A PARAMETER, NOT AS AN IMPORT.  [NT] is the
+   eighth module argument for one reason: [wp_namei_init_pinned] is a
+   THEOREM ABOUT namei, so importing its closed form would put the namex
+   link cone inside a [Proof*.v].  [LinkKexecPinned.v] supplies
+   [LinkNameiTr.NameiTr] here, exactly as it supplies the other seven. *)
+Module NIP := NameiInitPinned.NameiInitPinnedProof NT.
 
 
 (* The shared bottom blocks, at phase A's own seven modules.  [T.kxc_bad64] is
@@ -660,7 +667,7 @@ Section KexecPinnedABody.
        premise list IS [wp_namei_gen]'s plus the two "/init" facts, and its
        post is the same telescope with the opaque [inode_held] replaced by
        "inum 7, or a receipt".  That is the whole of N-5.1 arriving. ---- *)
-    iApply (wp_namei_init_pinned gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
+    iApply (NIP.wp_namei_init_pinned gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
               ga gf cov logstart bmapstart inodestart nib size dev
               plen pfun MAXOPBLOCKS Sb0 pidv (DfracOwn (1/4)) dqb dqs dqpv
               N5 (K - 68)%nat eb eb lks
