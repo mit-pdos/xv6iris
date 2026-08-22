@@ -1,5 +1,53 @@
 # The tier-2 containment worklist (was: the certification route)
 
+## CHECKPOINT (2026-08-23, SEVENTH PASS — the session's closing state)
+## READ THIS FIRST
+
+**THE MILESTONE: T2-LIN MODULO THE PER-SITE CLAIM.**  `WeakRvwmoGlue.v`
+(`t2lin_of_l2`) derives `cycle_kill` — hence `RacyD`-acyclicity of
+every conformant graph, hence (via `t2lin_supply`/`topo`/T2-1c/T1) its
+realization — from `l2_claim boot d0 P Bad`: "at every certified
+configuration of every `R`-cycle's segment list, each segment is
+graph-PINNED (`gacq_po ∨ gfence_covers ∨ gd_deps`), CS-CHAINED
+(`cs_hyps`: the reader's section + the exported `wprot_at`/`wlp_at`/
+`wlp_alt` at the certified log, two honest side conditions), or BAD
+(φ refutes)".  `l2_claim` is a HYPOTHESIS, never an axiom; the
+adequacy composition (`run_erased`, `prot_reg_of_run`, `no_bad_run`)
+is proved; `weak_ev_adequacy_lockalt` turned out subsumed by `_prot`.
+Three residual premises besides the claim, all named in the file's
+§9: (G-2) `cut_supply` — the SCC's causal past as a `cut_ok` cut
+(rf-closed, proper, and WRITE-CLOSED, Cert4's (O-B)); (G-3)
+`cert_supply` — slice 3's solo-run certification delivered as a
+`run_data` (Cert4's `cert_cycle` + (O-C)/(O-A)); (G-4) `boot_tie` —
+`gdexec_qconf` has no image/hart-count clause tying it to the booted
+σ0 (FIX: add one to `gdexec_qconf`, free at every producer).  Whole
+tree green.
+
+**Everything landed this session, in files:** Acyc, ProbeK1/Restr/Swap,
+Topo, Hull, Dec, Supply, LinInd, ConfWit, Fab, FabInd, Cert, Cert2,
+Cert3, Cert4, Floor, Lin2, KillArms, Glue (route-B leaves); the
+exports F3′/F3″ in WeakGhost/WeakStore/WeakLock/WeakEvAdequacy; DEC-4..7
+in WeakDeps/WeakEvLang/WeakEvInst/WeakLang + WeakEvProv (the soundness
+spine).
+
+**WHAT REMAINS:**
+1. Discharge (G-2)/(G-3)/(G-4): add the image clause to `gdexec_qconf`;
+   build `cut_supply` (the write-closed causal past of an SCC) and
+   `cert_supply` (compose `cert_cycle` with the `cpol_ctx` instance and
+   Cert3's `Hpres`).  Mechanical, all leaf-level.
+2. **L2′ proper — prove `l2_claim` for xv6's image**: per site class
+   (S6 §3's inventory: aq/fenced/branched/data-fed/CS-covered/bad),
+   from the emission (site records, `row_deps`) and the certified
+   configuration.  This is the kernel claim and the project's remaining
+   content; it needs a 2-hart emitted cycle witness first (the second
+   emitted block) to keep it non-vacuous.
+3. **B3**: compose `t2lin_of_l2` + `t2lin_supply` + T1 + adequacy into
+   `xv6_rvwmo_safe` modulo `l2_claim` (device-quiet; then the full
+   bundle via `fconf_trace_realize`); **R6**; `wprot_store` width lift;
+   `WeakRvwmoLock`'s failed-swap arm.
+
+**Tree:** never `make proofs` from the root here (stale `xv6-riscv`).
+
 ## CHECKPOINT (2026-08-23, SIXTH PASS) — READ THIS FIRST
 
 **Landed since the fifth pass:** slice 3c the CYCLE CERTIFICATION
