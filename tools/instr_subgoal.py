@@ -40,6 +40,11 @@ POSE_LINE = re.compile(r'^[ \t]*(?:iPoseProof \(\w+ with "Htext"\) as "\w+"\. ?)
 # a conforming call site: the instr hypothesis is the third thing handed to a
 # leaf, and the sentence ends on this line
 SITE = re.compile(r'^([ \t]*)(.*with "Hcg Hpc )(\w+)([^"]*")\)\.$', re.M)
+# [iClear "Ha Hb Hc".] -- the names may span a line break (ProofSysLink)
+CLEAR = re.compile(r'([ \t]*)iClear "([^"]*)"\s*\.')
+# every double-quoted string; an Iris hypothesis name only ever appears inside
+# one, which is how a Coq hypothesis of the SAME name is told apart (see scan)
+QUOTED = re.compile(r'"([^"]*)"', re.S)
 
 
 def scan(src):
@@ -71,18 +76,40 @@ def scan(src):
     accounted = {}
     for m in sites:
         accounted[m.group(3)] = accounted.get(m.group(3), 0) + 1
+
+    # [iClear "Hi"] of a fact we are about to stop posing is DEAD once the pose
+    # goes, so it is accounted for here and deleted by convert().  Files written
+    # in the "pose late, clear early" style are made almost entirely of this
+    # shape -- ProofVirtioDiskInit poses [Hi], uses it, clears it, 127 times.
+    cleared = {}
+    for m in CLEAR.finditer(src):
+        for name in m.group(2).split():
+            if name in poses:
+                cleared[name] = cleared.get(name, 0) + 1
+
+    # Count references only INSIDE double-quoted strings.  An Iris hypothesis is
+    # always named in one; a Coq hypothesis that happens to share the name is
+    # not (ProofVirtioDiskInit has [apply pa_range_elim in Hx as (i & Hi & ->)]
+    # beside 127 Iris [Hi]s), and counting bare occurrences reported it as a
+    # stray reference and refused the whole file.
+    quoted = {}
+    for m in QUOTED.finditer(src):
+        for name in m.group(1).split():
+            quoted[name] = quoted.get(name, 0) + 1
+
     stray = dict(unposed)
     for h in poses:
-        n = len(re.findall(r'(?<![\w])' + re.escape(h) + r'(?![\w])', src))
-        n -= len(poses[h])                        # the poses themselves
-        n -= accounted.get(h, 0)
-        if n:
+        n = quoted.get(h, 0)
+        n -= len(poses[h])                        # the [as "h"] of each pose
+        n -= accounted.get(h, 0)                  # the call sites
+        n -= cleared.get(h, 0)                    # the iClears we will delete
+        if n > 0:
             stray[h] = stray.get(h, 0) + n
-    return resolved, sites, stray, poses
+    return resolved, sites, stray, poses, cleared
 
 
 def convert(src):
-    resolved, _, stray, _ = scan(src)
+    resolved, _, stray, poses, _ = scan(src)
     if stray:
         raise ValueError('non-conforming references: '
                          + ', '.join('%s x%d' % kv for kv in sorted(stray.items())))
@@ -103,6 +130,38 @@ def convert(src):
     out = SITE.sub(repl, src)
     out, npose = POSE_LINE.subn('', out)
 
+    # Drop the now-dead [iClear "Hi"]s.  A clear may name several hypotheses,
+    # only some of them ours, so the list is filtered rather than the sentence
+    # deleted; a sentence whose list empties is replaced by a sentinel, and a
+    # line left holding nothing but the sentinel goes away with it.  Only lines
+    # the sentinel touches are rewritten -- an earlier version stripped trailing
+    # whitespace file-wide and silently edited 39 untouched files.
+    nclear = [0]
+    SENTINEL = '\x00'
+
+    def declear(m):
+        lead, names = m.group(1), m.group(2).split()
+        keep = [n for n in names if n not in poses]
+        if len(keep) == len(names):
+            return m.group(0)
+        nclear[0] += len(names) - len(keep)
+        if not keep:
+            return SENTINEL
+        return lead + 'iClear "' + ' '.join(keep) + '".'
+
+    out = CLEAR.sub(declear, out)
+    if SENTINEL in out:
+        kept = []
+        for line in out.split('\n'):
+            if SENTINEL not in line:
+                kept.append(line)
+                continue
+            line = line.replace(SENTINEL, '')
+            if line.strip():
+                kept.append(line.rstrip())
+            # else: the line held only the dead iClear -- drop it
+        out = '\n'.join(kept)
+
     # The site regex sees the indent of the line the [with "..."] sits on, which
     # for a multi-line iApply is the continuation indent.  Re-indent each brace
     # to the indent of the iApply that opened the sentence.
@@ -120,7 +179,7 @@ def convert(src):
 
     assert not POSE.search(out), 'poses survived'
 
-    return out, npose, nsite[0]
+    return out, npose, nsite[0], nclear[0]
 
 
 def main():
@@ -133,7 +192,7 @@ def main():
     rc = 0
     for f in args.files:
         src = open(f).read()
-        resolved, sites, stray, poses = scan(src)
+        resolved, sites, stray, poses, _ = scan(src)
         if args.check:
             print('%-28s posed %3d/%3d  sites %3d  %s'
                   % (f, len(poses), sum(len(v) for v in poses.values()),
@@ -144,14 +203,14 @@ def main():
                 rc = 1
             continue
         try:
-            out, npose, nsite = convert(src)
+            out, npose, nsite, nclear = convert(src)
         except ValueError as e:
             print('%-28s SKIPPED -- %s' % (f, e), file=sys.stderr)
             rc = 1
             continue
         open(f, 'w').write(out)
         print('%-28s pose lines removed %3d  call sites rewritten %3d'
-              % (f, npose, nsite))
+              '  dead iClears dropped %3d' % (f, npose, nsite, nclear))
     return rc
 
 
