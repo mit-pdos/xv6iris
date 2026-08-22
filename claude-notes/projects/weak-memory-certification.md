@@ -1,5 +1,36 @@
 # The tier-2 containment worklist (was: the certification route)
 
+## CHECKPOINT (2026-08-23, FIFTH PASS) — READ THIS FIRST
+
+**Landed since the fourth pass:** the certification WIRING
+(`WeakRvwmoCert3.v`: `floor_ok` discharged, `witness_not_aq` proved,
+the RMW block closed, re-convergence at `Ret tt`; the honest
+`wit_fence_ub` hook) — `afb588df`; **T2-1c′** (`WeakRvwmoLin2.v`:
+`gtrace_linearization` — ANY linear extension of `po ∪ rf ∪ gmo|W`
+with reads at their G-sources is an `srvwmo_consistent` cand with the
+same image/rows/log, NO renaming and `grule14` NOT needed once the
+trace is given; T2-1c's rank trace is one such extension
+(`glin_ptrace_ext`, `rule14_linearization'`); the dev-order version
+in full — `gfexec_consistent'` (acyclicity of `po ∪ rf ∪ gmo|W ∪ dev`),
+`ptrace_exists_F`, `tr_dev_ordered_of_ptrace`, **`fconf_trace_realize`**:
+from the revised bundle axiom + `gfexec_conf`, a realized cand with an
+`exec_prog_ok'` supply at the MOVING fabric) — this commit.  Whole
+tree green (`make -k`, EXIT=0) with every new leaf registered.
+
+**WHAT REMAINS:**
+1. **Slice 3c** — the cycle-order iteration of `cert_segment'` from a
+   backward step (route-b §4e), with P-1..P-4's bookkeeping
+   (`Hpres`; `src_in_log` as data from the gmo-order processing;
+   `wit_fence_ub`; progress as the EWPs' content), producing the
+   certified configuration and its log/`prot_read` facts.
+2. **B2e-3c — discharge `cycle_kill`** (the three arms; L2′ proper).
+3. **B3** at the device-quiet milestone (and, with `fconf_trace_realize`,
+   at the full bundle: switch `cycle_kill_F`'s realization to it and
+   retire the `tr_dev_ordered` guard), **R6**, `wprot_store` width
+   lift, `WeakRvwmoLock`'s failed-swap arm.
+
+**Tree:** never `make proofs` from the root here (stale `xv6-riscv`).
+
 ## CHECKPOINT (2026-08-23, FOURTH PASS) — READ THIS FIRST
 
 **Landed since the third pass:** B1b-2's residue + the T2-1c/dev-order

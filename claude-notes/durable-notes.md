@@ -123,7 +123,10 @@ change that produced it.
   `by split_and!` fails on a `True` conjunct in this import context — write
   `split_and!; [exact I|…]`; and `apply lem in H` on an `iff` lemma picks the
   BACKWARD direction (`apply elem_of_remove_dups in H` yields
-  `x ∈ remove_dups (remove_dups l)`) — use `apply (proj1 lem) in H`.  Related paper cuts:
+  `x ∈ remove_dups (remove_dups l)`) — use `apply (proj1 lem) in H`.  An
+  intro pattern `(j & <- & …)` on `x = f y` rewrites the WRONG way (use
+  `->`); ssreflect's `.1` on an `iff` is pair-`fst`, not `proj1` — write
+  `proj1 (proj1 lem H)`.  Related paper cuts:
   `StronglySorted`-family lemmas hand back un-beta-reduced `R x y`, so `lia`
   fails with "Cannot find witness" until `cbn in H`; in the same import
   context `if decide P then _ else _` does NOT elaborate (the scrutinee is
