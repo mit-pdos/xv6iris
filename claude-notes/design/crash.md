@@ -171,7 +171,64 @@ per-milestone record):
 - Adequacy shrinks to: allocate the fixed layer, hand the pool
   `wp_power_loop`. The era-0-vs-era-k distinction does not exist.
 
-## The disk image ghost: PER-ERA, re-minted at every boot
+## The durable disk: ONE fixed gname, owned by the crash predicate (ruled 2026-08-22)
+
+**Ruling (owner, 2026-08-22), replacing the per-era re-minted image below.**
+Three principles, in order of force:
+
+1. **No thread that can die ever owns a durable resource.** A kernel thread,
+   a sleeper, an era invariant — all of them die at a crash, and an Iris
+   resource inside a dead owner is gone forever. So fragments of the durable
+   disk are never handed out: not to `bread`'s buffer, not to the bio/log
+   ghost maps (`fs_L`, `fsblock`), not to `power_boot_res`. Those sites are
+   rewritten in a **logically-atomic / fupd style**: they open the crash
+   invariant at the instant they actually touch durable state (a DMA
+   completion, a commit point) and close it again in the same step.
+2. **One fixed-layer gname `γdisk` for the durable bytes.** The machine layer
+   (`state_interp`) holds `● v_disk` at it; PowerOn preserves `v_disk`, so
+   the auth is simply still right in the new era — nothing is re-minted and
+   nothing is re-associated. The crash predicate `P_fs` owns the `◯`
+   fragments (all of them, forever). Auth/frag agreement IS the tie:
+   `disk_tie`, `fs_tie_interp` and the `dk`-indexing of `riscv_crash_pred`
+   go away; whoever opens `crashN` with the auth in scope learns
+   `dk = v_disk`. `P_fs` is then a proposition about THE disk, meaningful in
+   every era, carrying whatever durable ghost state the FS keeps (history,
+   committed view, eventually the tree and file contents).
+3. **The adequacy theorem assumes exactly one thing about the disk: era 0's
+   `v_disk g = fsimg_dk`.** The proof establishes `P_fs` from `fs.img` once
+   (`HPc`), and `P_fs` is the loop invariant across eras: every PowerOn
+   boots into a disk `P_fs` describes, including a disk with a committed,
+   uninstalled transaction. The (d2b) hypothesis `fs_boot_image_eras` — a ∀
+   over all `boot_facts` states, which is REFUTABLE (a zero disk satisfies
+   `boot_facts`) — is deleted; `Himg` never returns in any form.
+
+**What the per-era image ghost becomes.** The bio layer keeps an IN-MEMORY
+picture (its own per-era ghost map of what each cached buffer holds); the
+statement "buffer `b` holds the durable block `b`'s bytes" is established at
+the DMA read completion by opening `crashN` (both auths — `γdisk`'s and the
+cache's — are in `state_interp` there) and is maintained by the write permit,
+which already is the client's view shift over `P_fs` at the completion
+instant (`disk_write_permit`). Reads get the symmetric **read permit**
+(the phase-D2 "read-data-indexed" shape): at completion the client learns,
+as a consequence of `P_fs`'s own fragments, what the bytes it just read are.
+That is how `fsinit`/`initlog` learn the superblock and the log header from
+the disk; `fs_cfg_alloc` mints `fscfg`/`icfg` off `P_fs`'s pure content in
+the boot fupd (mkfs's geometry is immutable, so `P_fs` can carry it), with
+no bytes read and no hypothesis about `g'`.
+
+**Consequences for the FS proofs.** `P_fs` allows `hdr_n > 0`, so the boot
+cone must handle a dirty log: `initlog`'s real recovery and
+`install_trans`'s recovering arm (`projects/fs-log.md` items (1)/(3)) are on
+the critical path to a true theorem, not optional. Until they land, the
+boot obligation cannot be discharged on the dirty-log arm and the theorem
+stays open — honestly open, not vacuously closed.
+
+### The previous shape (superseded 2026-08-22): per-era, re-minted at every boot
+
+Kept for the reasoning it records — the stranded-fragment problem is real and
+is exactly principle 1's motivation; the per-era mint was the wrong answer to
+it (it made the durable view die with the era instead of forbidding mortal
+owners).
 
 The disk itself is the one machine component a power cycle preserves; its
 GHOST mirror deliberately is not.

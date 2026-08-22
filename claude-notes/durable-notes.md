@@ -2269,11 +2269,11 @@ satisfies it and fails conjunct (10) of `fs_boot_image_wf`
 cov`, and so is `FsAdequacyImg.fsimg_at_every_era`. `Print Assumptions`
 cannot see this; it is the §"GAP PREMISE" trap above, at the top-level
 theorem, since stage (d2b) (2026-08-20) replaced the era-0 equation with
-the ∀. The fix is in `projects/fs-log.md`'s banner: `Hboot` LENDS the era
-`▷ Pc (v_disk g')` for the boot fupd (the generic proof owns both
-`disk_tie` halves at the PowerOn step), the FS boot consumes the crash
-predicate's own ghost state instead of a hypothesis about bytes, and
-the dirty-log arm then needs initlog's real recovery.
+the ∀. The fix is RULED: `projects/durable-disk.md` / `design/crash.md` "The
+durable disk" — one fixed gname for the disk, `P_fs` owns its fragments,
+no mortal owner ever holds durable state, the theorem assumes only
+`v_disk g = fsimg_dk` at era 0 and `P_fs` is the cross-era loop
+invariant. The dirty-log boot arm then needs initlog's real recovery.
 
 **There is no assumed Link any more.** The last one,
 `LinkForkretPark.ForkretPark.forkret_park` (the runnable park — "where does a

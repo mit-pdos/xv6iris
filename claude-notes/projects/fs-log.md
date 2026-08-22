@@ -33,31 +33,11 @@
 > discharge `fs_log_clean` from the previous era's `P_fs` instead of
 > assuming it.
 >
-> **AND THE CURRENT HYPOTHESIS IS REFUTABLE, NOT MERELY UNPROVED** (found
-> 2026-08-22, the user's question). `Himg` is quantified over ALL `g'` with
-> `boot_facts g'`, and `boot_facts` leaves the disk free; a zero-disk `g'`
-> satisfies it and fails `fs_parse_sb … = Some sb` (magic 0), so
-> `fs_boot_image_eras` is False and `xv6_power_adequacy` (and both
-> `FsAdequacyImg` corollaries) prove their conclusion from False.
->
-> THE HONEST SHAPE IS AN iProp LEND, NOT A PURE HOOK — the crash predicate
-> is an iProp so that durable ghost state crosses eras as OWNERSHIP. Today
-> `Hboot` (`RiscvAdequacy.v:1164`) gives an era `crash_inv` but nothing
-> tying the body's `dk` to `v_disk g'` (the two `disk_tie` halves are in
-> the body and in `state_interp`; only a DMA completion holds both), which
-> is the gap (d2b) papered over with `Himg`. So: (i) strengthen `Hboot` to
-> `power_boot_res g' -∗ ▷ Pc (v_disk g') ={⊤∖↑crashN}=∗ ▷ Pc (v_disk g') ∗
-> WPs` — the generic proof opens `crashN` at the PowerOn step (it owns
-> `state_interp`'s tie half there), agrees `dk = v_disk g'`, lends the body,
-> closes after; era 0 from `HPc`. (ii) `boot_shared_alloc`/`fs_cfg_alloc`
-> consume the lend: take history snapshots, read `fs_rec_wf` and the
-> superblock parse as consequences of `P_fs`'s own ghosts (add the parse to
-> `fs_rec_wf` if it is not there), mint `fscfg`/`icfg`, give `P_fs` back;
-> `Himg` disappears from the theorem. (iii) `P_fs` allows `hdr_n > 0`, so
-> the lend is consumable only once `fsinit`/`initlog` are proved at a dirty
-> log — items (1)/(3) above; until then the only closed form carries an
-> explicit premise over the REACHABLE traces ("every crash has a clean
-> log"). Owner's call whether (i)+(ii) go first or (iii).
+> **THE HYPOTHESIS IS REFUTABLE, and the fix is ruled** (2026-08-22): see
+> [`durable-disk.md`](durable-disk.md) and `design/crash.md` "The durable
+> disk". Items (1)/(3) above are that project's stage D; this file stays
+> for item (2) (`sys_sync`'s postcondition) and item (4) (the D2 decision,
+> which the ruling settles as the read permit).
 
 Design: [`../design/fs-log.md`](../design/fs-log.md) — read its "stage-4
 architecture" section first; every durable finding of this effort has been
