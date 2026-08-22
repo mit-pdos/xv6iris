@@ -124,25 +124,21 @@ awk '{for(i=1;i<=NF;i++) if($i=="secs") s+=$(i-1)} END{print s}' F.time.log
 - **Multi-pose lines.** Some files put two `iPoseProof`s on one line; the
   converter handles them. `--check`'s `posed a/b` prints distinct hypothesis
   NAMES over pose LINES, and the two differ whenever a file reposts a name.
-- **A hypothesis name bound to two DIFFERENT lemmas is refused, and this is the
-  trap that actually bit.** Proof-local scopes legitimately reuse a name for a
-  different instruction — `ProofIput` binds `Hi3a` to `ipi_38` early (an
-  off-by-one in the file's own naming) and to `ipi_3a` at line 3822;
-  `ProofKwait` binds `Hie0` to both `kwi_e0` and `kwi_ee`. The first version of
-  the converter resolved these globally, last-pose-wins, and emitted a
-  wrong-but-plausible lemma at the early sites; `--check` called both files
-  CLEAN. It fails LOUD (`iApply: cannot apply (instr …)`, because a mismatched
-  fact cannot unify with the leaf's pc), so nothing false can be proved this
-  way — but two agents lost a compile round to it. `--check` now reports such a
-  name as HAND WORK and the converter refuses the file. **Fourteen files carry
-  the shape**, worst first: `ProofVirtioDiskInit` (one name, `Hi`, bound to 127
-  lemmas), `ProofEitherCopy` (34 names), `ProofPushOff` (16), `ProofSysLinkTails`
-  (8), `ProofSysOpenTails` (7 names, one of them 7 lemmas deep),
-  `ProofSysUnlinkTails` (5), `ProofPipewrite` (5), `ProofNamex` and
-  `ProofNamexTr` (4 each), `ProofAcquiresleep` (3), `ProofWritei` (3),
-  `ProofSysPause` (2), plus `ProofIput` and `ProofKwait`, now converted by hand.
-  Converting those means resolving each site against the NEAREST PRECEDING pose
-  — scope-aware resolution is the obvious next improvement to the tool.
+- **A hypothesis name bound to two DIFFERENT lemmas is RESOLVED PER SITE, not
+  refused.** Proof-local scopes legitimately rebind a name to a different
+  instruction — `ProofIput` binds `Hi3a` to `ipi_38` early (an off-by-one in the
+  file's own naming) and to `ipi_3a` 3000 lines later; `ProofKwait` binds `Hie0`
+  to `kwi_e0` and then to `kwi_ee` in the next lemma. The first converter used a
+  global last-pose-wins map and emitted a wrong-but-plausible lemma at the early
+  sites, with `--check` calling both files CLEAN; it fails LOUD (`iApply: cannot
+  apply (instr …)`, since a mismatched fact cannot unify with the leaf's pc), so
+  nothing false can be proved that way, but it cost two agents a compile round.
+  The converter now resolves each site against the **nearest preceding pose**,
+  which is how the proof itself reads. Validated the only way that counts: on
+  pristine `ProofKwait` it reproduces the agent's hand fix **byte for byte**, and
+  on `ProofIput` it reproduces everything but the brace-order fix below. That
+  unlocked `ProofSysLinkTails`, `ProofSysOpenTails`, `ProofSysUnlinkTails`,
+  `ProofAcquiresleep` and `ProofSysPause`, all now CLEAN.
 - **A stray reference need not be a use at all.** `ProofIget`'s lone
   non-conforming reference was the file-header COMMENT quoting a leaf
   application. Read the site before assuming it needs a proof change.
@@ -211,11 +207,11 @@ rather than trusting a table here. As of 2026-08-22, 22 files are converted and
 |---|---|
 | `CLEAN` | the script converts it outright. Prefer files with one big pose block — that is where the win is (§4). |
 | `HAND WORK`, a few names | look at each site: it may be a comment, a leaf with a different hypothesis order, or a pure premise ahead of the instr goal (§3). Usually minutes. |
-| the fourteen ambiguous-name files | the converter refuses them. They need scope-aware resolution — see §3. `ProofVirtioDiskInit` (one name, 127 lemmas) is the extreme case and is also one of the biggest wins available, at 127 poses. |
+| files whose facts are used in some OTHER shape | genuine hand work — `ProofWritei`, `ProofNamex`/`ProofNamexTr`, `ProofPipewrite`, `ProofEitherCopy`, `ProofPushOff`, `ProofReadi`, `ProofKexecC`, `ProofBalloc`, `ProofPrintk`. Convert the conforming sites, hand-convert the rest. |
+| `ProofVirtioDiskInit` | 127 poses, the single biggest block left, and a special case: it already does "pose late, clear early" BY HAND — pose `Hi`, use it, `iClear "Hi"`, 127 times over. Converting it means deleting the now-dead `iClear` line with each pose. Its one genuinely stray `Hi` is a *Coq* hypothesis from `apply … as (i & Hi & ->)`, unrelated to the Iris one. Worth doing; needs an `iClear`-aware pass. |
 
-**The obvious next tool improvement** is resolving each site against the nearest
-preceding pose rather than a global map. That alone unlocks the fourteen, and
-`ProofVirtioDiskInit`, `ProofEitherCopy`, `ProofPushOff` and `ProofWritei` are
-large files with dense pose blocks.
+**The next tool improvement** is teaching the converter to drop an `iClear
+"<hyp>"` along with the pose it kills, which is what `ProofVirtioDiskInit` needs
+and what any other by-hand "pose late, clear early" file will need.
 
 Record each conversion's numbers in §4 as it lands.

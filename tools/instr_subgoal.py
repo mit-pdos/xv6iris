@@ -43,55 +43,65 @@ SITE = re.compile(r'^([ \t]*)(.*with "Hcg Hpc )(\w+)([^"]*")\)\.$', re.M)
 
 
 def scan(src):
-    """-> (hyp -> lemma, conforming sites, {hyp: stray reference count})
+    """-> (site position -> lemma, conforming sites, {hyp: stray count})
 
-    A hypothesis name reused for DIFFERENT lemmas (per-arm reuse: [Hi0] posed
-    from [soi_0b8] in one arm and [soi_10c] in the next) has no single answer,
-    so it is reported as stray rather than resolved to whichever pose came
-    last -- closing a site with the wrong instruction is exactly the mistake
-    this tool must not make.
+    A hypothesis name is resolved per SITE, against the NEAREST PRECEDING pose
+    of that name -- which is how the proof itself reads.  Proof-local scopes
+    legitimately rebind a name to a different instruction (ProofIput binds
+    [Hi3a] to [ipi_38] early and to [ipi_3a] 3000 lines later; ProofKwait binds
+    [Hie0] to [kwi_e0] and then to [kwi_ee] in the next lemma), and a global
+    last-pose-wins map silently closes the early sites with the wrong lemma.
     """
-    seen = {}
-    for l, h in POSE.findall(src):
-        seen.setdefault(h, set()).add(l)
-    ambiguous = set(h for h, ls in seen.items() if len(ls) > 1)
-    posed = dict((h, next(iter(ls))) for h, ls in seen.items()
-                 if h not in ambiguous)
-    sites = [m for m in SITE.finditer(src) if m.group(3) in posed]
+    poses = {}                       # hyp -> [(offset, lemma)], in file order
+    for m in POSE.finditer(src):
+        poses.setdefault(m.group(2), []).append((m.start(), m.group(1)))
+
+    resolved, sites, unposed = {}, [], {}
+    for m in SITE.finditer(src):
+        hyp = m.group(3)
+        if hyp not in poses:
+            continue                 # not an instr hypothesis at all
+        earlier = [l for off, l in poses[hyp] if off < m.start()]
+        if not earlier:              # used before it is ever posed
+            unposed[hyp] = unposed.get(hyp, 0) + 1
+            continue
+        resolved[m.start()] = earlier[-1]
+        sites.append(m)
+
     accounted = {}
     for m in sites:
         accounted[m.group(3)] = accounted.get(m.group(3), 0) + 1
-    stray = {}
-    for h in ambiguous:
-        stray[h] = len(seen[h])          # "posed from N different lemmas"
-    for h in posed:
+    stray = dict(unposed)
+    for h in poses:
         n = len(re.findall(r'(?<![\w])' + re.escape(h) + r'(?![\w])', src))
-        n -= sum(1 for _, hh in POSE.findall(src) if hh == h)  # the pose itself
+        n -= len(poses[h])                        # the poses themselves
         n -= accounted.get(h, 0)
         if n:
-            stray[h] = n
-    return posed, sites, stray
+            stray[h] = stray.get(h, 0) + n
+    return resolved, sites, stray, poses
 
 
 def convert(src):
-    posed, _, stray = scan(src)
+    resolved, _, stray, _ = scan(src)
     if stray:
         raise ValueError('non-conforming references: '
                          + ', '.join('%s x%d' % kv for kv in sorted(stray.items())))
 
-    out, npose = POSE_LINE.subn('', src)
+    nsite = [0]
 
     def repl(m):
-        indent, pre, hyp, post = m.groups()
-        if hyp not in posed:
+        indent, pre, _hyp, post = m.groups()
+        lemma = resolved.get(m.start())
+        if lemma is None:
             return m.group(0)          # not an instr fact -- leave it alone
         nsite[0] += 1
         return (indent + pre + '[]' + post + ').\n'
-                + indent + '{ iApply (' + posed[hyp] + ' with "Htext"). }')
+                + indent + '{ iApply (' + lemma + ' with "Htext"). }')
 
-    nsite = [0]
-
-    out = SITE.sub(repl, out)
+    # Rewrite the SITES FIRST: `resolved` is keyed by offsets into `src`, so
+    # deleting the pose lines beforehand would shift every key.
+    out = SITE.sub(repl, src)
+    out, npose = POSE_LINE.subn('', out)
 
     # The site regex sees the indent of the line the [with "..."] sits on, which
     # for a multi-line iApply is the continuation indent.  Re-indent each brace
@@ -108,8 +118,8 @@ def convert(src):
         fixed.append(line)
     out = '\n'.join(fixed)
 
-    left = scan(out)
-    assert not left[0], 'poses survived: %s' % sorted(left[0])
+    assert not POSE.search(out), 'poses survived'
+
     return out, npose, nsite[0]
 
 
@@ -123,10 +133,11 @@ def main():
     rc = 0
     for f in args.files:
         src = open(f).read()
-        posed, sites, stray = scan(src)
+        resolved, sites, stray, poses = scan(src)
         if args.check:
             print('%-28s posed %3d/%3d  sites %3d  %s'
-                  % (f, len(posed), len(POSE_LINE.findall(src)), len(sites),
+                  % (f, len(poses), sum(len(v) for v in poses.values()),
+                     len(sites),
                      'CLEAN' if not stray else 'HAND WORK: '
                      + ', '.join('%s x%d' % kv for kv in sorted(stray.items()))))
             if stray:
