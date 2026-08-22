@@ -107,7 +107,6 @@ Require Import IrefSlots.
 Require Import UserPtTree.
 Require Import FileInvDefs.
 Require Import SpecKexec.
-Require Import KexecOkQ.
 Require Import SpecMyproc.
 Require Import SpecBeginOp.
 Require Import SpecEndOp.

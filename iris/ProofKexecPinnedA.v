@@ -227,7 +227,6 @@ Require Import BioDefs.
 Require Import FsBlocks LogInv.
 Require Import BitmapInv.
 Require Import DirentEnc.
-Require Import PathElems.
 Require Import InodeInv.
 Require Import IrefSlots.
 Require Import IcacheRef.

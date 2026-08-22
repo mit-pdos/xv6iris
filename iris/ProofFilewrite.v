@@ -340,14 +340,12 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvLang RiscvPtsto RiscvExtras.
 (* [pa_add] -- the buffer in writei's kernel arm is indexed with it *)
 Require Import RiscvModelBytes.
-Require Import FsCrash.
 Require Import DinodeEnc.
 Require Import InodeInv.
 Require Import InodeLock.
 Require Import DirView.
 Require Import DirLinks.
 Require Import LogInv.
-Require Import BioInv.
 Require Import FdSlots FileInvDefs.
 (* [ProcGeom] for [proc_addr] / [p_pid]: [ProcInv] Requires but does not
    Export it, so [proc_priv] is in scope here without them. *)

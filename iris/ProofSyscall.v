@@ -346,7 +346,6 @@ Require Import ProcInv.
 Require Import SchedCtx.
 Require Import BioDefs.
 Require Import SpecFileclose.
-Require Import ProcAvail.
 Require Import SpecAllocpid.
 Require Import WaitInv.
 Require Import TicksInv.

@@ -313,11 +313,9 @@ Qed.
 (* ===================================================================== *)
 
 Require Import WpMmodeLeafBase.
-Require Import RiscvExtras.
 Require Import StackOwn.
 Require Import FdSlots.
 Require Import WpUart.
-Require Import BufOwn.
 Require Import BioInv.
 Require Import LogInv.
 Require Import BitmapInv.

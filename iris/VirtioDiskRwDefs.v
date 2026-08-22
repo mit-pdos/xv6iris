@@ -15,11 +15,8 @@
    module type ([ACQUIRE]/[RELEASE]/[SLEEP]/[FREEDESC]) belongs here -- if you
    need one, you are writing a phase proof, not vocabulary. *)
 
-From Stdlib Require Import ZArith Lia List.
-From stdpp Require Import gmap bitvector.definitions.
-From iris.proofmode Require Import proofmode.
-From iris.program_logic Require Import language weakestpre lifting.
-From iris.base_logic.lib Require Import ghost_var invariants gen_heap ghost_map mono_nat.
+From stdpp Require Import bitvector.definitions.
+From iris.base_logic.lib Require Import mono_nat.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes.
@@ -401,23 +398,11 @@ Definition vdrw_sector_raw (bno : mword 32) : mword 64 :=
 (* ---- from ProofVirtioDiskRwB.v ---- *)
 
 From Stdlib Require Import ZArith Lia List.
-From stdpp Require Import gmap bitvector.definitions.
+From stdpp Require Import gmap.
 From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language weakestpre lifting.
-From iris.base_logic.lib Require Import ghost_var invariants gen_heap ghost_map mono_nat.
-Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
-Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvModelBytes.
-Require Import RiscvLang RiscvPtsto.
-Require Import InstrBytes WpMmodeLeafBase.
-Require Import RegFile.
-Require Import RiscvExtras.
-Require Import StackOwn CalleeSaved.
-Require Import WpSconfMem.
-Require Import VirtioQueue DiskPtsto VirtioProto DiskInv.
-Require Import SpecFreeDesc.
-Require Import SpecVirtioDiskRw.
-Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+From iris.base_logic.lib Require Import ghost_var invariants gen_heap ghost_map.
+Require Import VirtioQueue VirtioProto.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -593,24 +578,8 @@ End VdrwbDefs.
 
 (* ---- from ProofVirtioDiskRwC.v ---- *)
 
-From Stdlib Require Import ZArith Lia List.
-From stdpp Require Import gmap bitvector.definitions.
-From iris.proofmode Require Import proofmode.
-From iris.program_logic Require Import language weakestpre lifting.
-From iris.base_logic.lib Require Import ghost_var invariants gen_heap ghost_map mono_nat.
-Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
-Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvModelBytes.
-Require Import RiscvLang RiscvPtsto.
-Require Import InstrBytes WpMmodeLeafBase.
-Require Import RegFile.
-Require Import RiscvExtras.
-Require Import StackOwn CalleeSaved.
-Require Import WpSconfMem.
 Require Import WpSmodeHalf.
-Require Import VirtioModel DiskPtsto DiskInv.
-Require Import SpecFreeDesc.
-Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import Riscv.rv64d_types.
 Import Defs.
 
 Local Open Scope Z_scope.

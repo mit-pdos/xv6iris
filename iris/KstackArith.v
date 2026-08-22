@@ -163,7 +163,6 @@ Proof.
   split; [apply Z.mul_nonneg_nonneg; lia | exact Hz].
 Qed.
 
-Require Import RiscvExtras.
 
 (* sub_vec of two mword_of_int, no wrap *)
 Lemma subvec_moi (x y : Z) : (0 <= y)%Z -> (y <= x)%Z -> (x < 18446744073709551616)%Z ->
