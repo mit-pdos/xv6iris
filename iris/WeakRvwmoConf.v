@@ -39,7 +39,9 @@
     ** FOUR RECORDED SCOPE DECISIONS
 
     (S-a) TRANSLATION-ORDER EDGES (W-TV, RVWMO rule 13) ARE NOT IN
-      [row_deps].  The walker's reads are [asrc = []] loads and their edge
+      [row_deps].  *** REVERSED at [dedges] (route-b §4d.1 F5): they are now
+      emitted, from [ds_ld]; the paragraph below records the original
+      reasoning. ***  The walker's reads are [asrc = []] loads and their edge
       into the translated store rides the MACHINE's [w_vcap], not the
       syntactic dataflow this fold computes.  Whether the GRAPH-level
       conformance clause needs them as [gd_deps] members is B2e's question
@@ -518,13 +520,20 @@ Definition dsrcs_pos (s : dstate) (xs : list dsrc) : list nat :=
   mjoin (dsrc_pos s <$> xs).
 
 (** THE EDGES A WRITE AT ROW POSITION [k] EMITS: address operands (rule 9),
-    data operands (rule 10) and the control set (rule 11), each source
-    position paired with [k] — minus the self-edges of scope note (S-c). *)
+    data operands (rule 10), the control set (rule 11) and — see below — the
+    current instruction's earlier loads (rule 13), each source position
+    paired with [k], minus the self-edges of scope note (S-c).
+
+    SCOPE DECISION (S-a) IS REVERSED HERE (route-b §4d.1 F5): the W-TV
+    translation-order edges ARE in [row_deps] now, computed from [ds_ld s] —
+    the instruction's own earlier reads, i.e. its translation reads, which
+    precede the translated access.  Value-independent: [ds_ld] holds row
+    POSITIONS, so the arm is as ts-blind and as renaming-stable as the rest. *)
 Definition dedges (s : dstate) (k : nat) (asrc vsrc : list dsrc)
     : list (nat * nat) :=
   (λ j, (j, k)) <$>
     filter (λ j, (j < k)%nat)
-      (dsrcs_pos s asrc ++ dsrcs_pos s vsrc ++ ds_ctl s).
+      (dsrcs_pos s asrc ++ dsrcs_pos s vsrc ++ ds_ctl s ++ ds_ld s).
 
 Definition dstep (s : dstate) (it : eitem) : dstate * list (nat * nat) :=
   match it.1 with
@@ -646,7 +655,8 @@ Proof.
     apply elem_of_list_filter in Hj as [_ Hj]. simpl.
     apply elem_of_app in Hj as [Hj|Hj]; [by eapply dsrcs_pos_within|].
     apply elem_of_app in Hj as [Hj|Hj]; [by eapply dsrcs_pos_within|].
-    by apply Hs. }
+    apply elem_of_app in Hj as [Hj|Hj];
+      [by apply (proj2 (proj2 Hs))|by apply (proj1 (proj2 Hs))]. }
   destruct Hs as (Hp & Hl & Hc).
   destruct it as [l [k|]]; destruct l; simpl in *;
     (split; [|by intros jk Hjk; try (by apply elem_of_nil in Hjk); eauto]).
@@ -1026,8 +1036,8 @@ Qed.
 (* ====================================================================== *)
 (** * 9. SMOKE TESTS
 
-    Three closed checks that the definitions are not vacuous and that the
-    fold computes what the design says. *)
+    Closed checks that the definitions are not vacuous and that the fold
+    computes what the design says. *)
 
 (** The load;regw;store chain of RVWMO rule 10: the store's data operand
     names the register the load wrote, so the load's row position is a dep
@@ -1049,6 +1059,29 @@ Example row_deps_amo_selfedge :
   row_deps [ (LExLoad false 0 [(0%nat, bv_0 8)] [], Some 0%nat);
              (LRegW 5%nat [DLdRes], None);
              (LExStore false 0 [bv_0 8] [] [DReg 5%nat], Some 0%nat) ]
+  = [].
+Proof. vm_compute. reflexivity. Qed.
+
+(** THE W-TV ARM (rule 13) in action: within ONE instruction — no [LInstr]
+    between them — the load's row position feeds the store's, with NO
+    register dataflow at all ([asrc] and [vsrc] both empty).  This is the
+    edge scope decision (S-a) used to omit; the [LInstr] boundary is what
+    keeps it from leaking into the NEXT instruction's stores (contrast
+    [row_deps_chain], where the reset forces the edge through [DReg 5]). *)
+Example row_deps_wtv :
+  row_deps [ (LInstr, None);
+             (WeakPromise.LLoad false false 0 [(0%nat, bv_0 8)] [], Some 0%nat);
+             (WeakPromise.LStore false 8 [bv_0 8] [] [], Some 1%nat) ]
+  = [(0%nat, 1%nat)].
+Proof. vm_compute. reflexivity. Qed.
+
+(** … and the reset really does cut it: with an [LInstr] between, the load
+    is no longer the store's translation read. *)
+Example row_deps_wtv_reset :
+  row_deps [ (LInstr, None);
+             (WeakPromise.LLoad false false 0 [(0%nat, bv_0 8)] [], Some 0%nat);
+             (LInstr, None);
+             (WeakPromise.LStore false 8 [bv_0 8] [] [], Some 1%nat) ]
   = [].
 Proof. vm_compute. reflexivity. Qed.
 

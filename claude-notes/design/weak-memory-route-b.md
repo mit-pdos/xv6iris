@@ -727,6 +727,18 @@ the number of events:
      it, which holds iff `w_{i-1}` is gmo-below `r_i`'s hart's next write
      — otherwise the CS-chained arm applies with `(P)`, since the kill
      only needs `w_{i-1}`'s message and `r_i`'s site).
+   NOTE (2026-08-22, late): in the CS-CHAINED arm the window order
+   between the two sections is ROW DATA whenever the later acquire's
+   `ts` entry names the earlier section's release (atomicity +
+   `hren`), so for "both segments under the same lock" the kill is
+   pure arithmetic with NO export.  The exports enter only to REFUTE
+   the other case — the writer's row has no acquire of that lock
+   before the write (F3″: the byte is protected, so the writer must
+   have held it), or the reader's section is open and the writer's
+   acquire would have to read a release the log does not contain
+   (F3′).  So B2e-3c's classification is: per cross-hart edge, does the
+   writer's row carry the reader's lock?  yes ⇒ arithmetic; no ⇒ F3″
+   at the certifying configuration.
    Composing the inequalities around the cycle yields `w_1 < w_2 < … <
    w_1`.  The xv6-level EXHAUSTIVENESS CLAIM is that every segment falls
    in one of the three arms — the per-site classification, now with

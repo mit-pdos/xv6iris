@@ -64,7 +64,7 @@ lemma, the F4a/F5 repairs, and the segment-composition lemma;
 `topo_linearizes`/`topo_exists`/`normalize_of_acyclic`, Closed; the
 chain's first step is now the direct linearization and `normalize` is
 demoted to analysis; one open item: the `Decision (RacyD GD x y)`
-instance, a bounded row search]; (3) DECIDE the F3″ interface (footprint at `wlock_alloc`,
+instance — DONE: `WeakRvwmoDec.v`, `racyD_dec` + `normalize_of_acyclic'`, Closed]; F5's W-TV line landed in `WeakRvwmoConf.dedges` (`row_deps_wtv` non-vacuity); (3) DECIDE the F3″ interface (footprint at `wlock_alloc`,
 `WProt` store/read rules) BEFORE M4 ports a lock client, then T2-0′
 (F3′ + F3″); (4) [DONE the same day: B1a′ LANDED — `WeakRvwmoHull.v`, Closed];
 (5) B2e-3b certification
