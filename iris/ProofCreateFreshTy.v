@@ -392,15 +392,10 @@ Proof.
   assert (Hcsra : is_cs_idx Rra = false) by (vm_compute; reflexivity).
   assert (Hcsa0 : is_cs_idx Ra0 = false) by (vm_compute; reflexivity).
   assert (Hcsa1 : is_cs_idx Ra1 = false) by (vm_compute; reflexivity).
-  iPoseProof (cri_0a4 with "Htext") as "Hi0a4".
-  iPoseProof (cri_0a6 with "Htext") as "Hi0a6".
-  iPoseProof (cri_0a8 with "Htext") as "Hi0a8".
-  iPoseProof (cri_0ac with "Htext") as "Hi0ac".
-  iPoseProof (cri_0ae with "Htext") as "Hi0ae".
-  iPoseProof (cri_0b0 with "Htext") as "Hi0b0".
   (* ===== +0xa4  c.mv a1,s4 : a1 := type ============================= *)
   iApply (wp_cmv_s_sconf (mword_of_int (CK + 0xa4)) Ra1 Rs4 Ma K b
-            ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi0a4").
+            ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+  { iApply (cri_0a4 with "Htext"). }
   iIntros (CID1 Hq1) "Hcg Hpc". iEval (rgne) in "Hcg".
   pose (A1 := <[Regidx Ra1 := regval_into_reg
                  (add_vec (zero_reg : mword 64) (Ma !!! Regidx Rs4))]> Ma).
@@ -422,7 +417,8 @@ Proof.
   iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0)
             (mword_of_int (CK + 0xa6)) Ra0 Rs1
             (mword_of_int 0 : mword 12) A1 K dev b (dqm := dqp)
-            ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi0a6 Hidev").
+            ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hidev").
+  { iApply (cri_0a6 with "Htext"). }
   iIntros (CID2 Hq2) "Hcg Hpc Hidev".
   iEval (rewrite Hdevadr) in "Hidev".
   pose (A2 := <[Regidx Ra0 := regval_into_reg
@@ -443,7 +439,8 @@ Proof.
   iApply (wp_jal_s_sconf (mword_of_int (CK + 0xa8)) Rra
             (mword_of_int 2090032 : mword 21) A2 K b
             ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
-            with "Hcg Hpc Hi0a8").
+            with "Hcg Hpc []").
+  { iApply (cri_0a8 with "Htext"). }
   iIntros (CID3 Hq3) "Hcg Hpc".
   iEval (rewrite Htgia) in "Hpc".
   pose (A3 := <[Regidx Rra := regval_into_reg
@@ -480,7 +477,8 @@ Proof.
   iEval (rewrite Hpcac) in "Hpc".
   (* ===== +0xac  c.mv s3,a0 : s3 := ip =============================== *)
   iApply (wp_cmv_s_sconf (mword_of_int (CK + 0xac)) Rs3 Ra0 Mi K b
-            ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi0ac").
+            ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+  { iApply (cri_0ac with "Htext"). }
   iIntros (CID5 Hq5) "Hcg Hpc". iEval (rgne) in "Hcg".
   pose (F1 := <[Regidx Rs3 := regval_into_reg
                  (add_vec (zero_reg : mword 64) (Mi !!! Regidx Ra0))]> Mi).
@@ -509,7 +507,8 @@ Proof.
               F1 K b ltac:(vm_compute; reflexivity) ltac:(nz)
               ltac:(rewrite (rget_ne F1 Ra0 ltac:(nz)) HF1a0 Hia0;
                     apply cft_entry_nonzero; unfold NINODE in *; lia)
-              with "Hcg Hpc Hi0ae").
+              with "Hcg Hpc []").
+    { iApply (cri_0ae with "Htext"). }
     iIntros (CID6 Hq6) "Hcg Hpc".
     assert (Hpp0b0 : add_vec_int (mword_of_int (CK + 0xae) : mword 64) 2
                      = mword_of_int (CK + 0xb0)) by pcw.
@@ -521,7 +520,8 @@ Proof.
     iApply (wp_jal_s_sconf (mword_of_int (CK + 0xb0)) Rra
               (mword_of_int 2090392 : mword 21) F1 K b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
-              with "Hcg Hpc Hi0b0").
+              with "Hcg Hpc []").
+    { iApply (cri_0b0 with "Htext"). }
     iIntros (CID7 Hq7) "Hcg Hpc".
     iEval (rewrite Htgil) in "Hpc".
     pose (B1 := <[Regidx Rra := regval_into_reg
@@ -627,7 +627,8 @@ Proof.
               ltac:(rewrite (rget_ne F1 Ra0 ltac:(nz)) HF1a0 Ha0z;
                     vm_compute; reflexivity)
               ltac:(rewrite Htk; vm_compute; reflexivity)
-              with "Hcg Hpc Hi0ae").
+              with "Hcg Hpc []").
+    { iApply (cri_0ae with "Htext"). }
     iApply bi.later_intro.
     iIntros (CID6 Hq6) "Hcg Hpc".
     iEval (rewrite Htk) in "Hpc".

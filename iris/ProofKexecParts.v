@@ -298,12 +298,6 @@ Section ProofKexecParts.
     intros HK Hsp0 Hra0 Hs00 Hs10 Hs20 Hmtsp Hthr.
     iIntros "Hcg #Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11
              Hb12 Hb13 Hrest Hcont".
-    iPoseProof (kxc_072 with "Htext") as "Hi072".
-    iPoseProof (kxc_076 with "Htext") as "Hi076".
-    iPoseProof (kxc_07a with "Htext") as "Hi07a".
-    iPoseProof (kxc_07e with "Htext") as "Hi07e".
-    iPoseProof (kxc_082 with "Htext") as "Hi082".
-    iPoseProof (kxc_086 with "Htext") as "Hi086".
     (* ---- +0x72: ld ra,536(sp) ---- *)
     assert (Hpa1 : add_vec (rget Mt csp_rs1)
                      (sign_extend' 64 (mword_of_int 536 : mword 12))
@@ -315,7 +309,8 @@ Section ProofKexecParts.
               (mword_of_int 536 : mword 12) Mt (K - 68)%nat ra0 b
               (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi072 Hb1").
+              with "Hcg Hpc [] Hb1").
+    { iApply (kxc_072 with "Htext"). }
     iIntros (CID1 Hs1) "Hcg Hpc Hb1". iEval (rewrite Hpa1) in "Hb1".
     set (T1 := <[Regidx Rra := regval_into_reg ra0]> Mt).
     assert (HT1sp : T1 !!! Regidx csp_rs1 = pa_stk sp0 68)
@@ -334,7 +329,8 @@ Section ProofKexecParts.
               (mword_of_int 528 : mword 12) T1 (K - 68)%nat s00 b
               (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi076 Hb2").
+              with "Hcg Hpc [] Hb2").
+    { iApply (kxc_076 with "Htext"). }
     iIntros (CID2 Hs2) "Hcg Hpc Hb2". iEval (rewrite Hpa2) in "Hb2".
     set (T2 := <[Regidx Rs0 := regval_into_reg s00]> T1).
     assert (HT2sp : T2 !!! Regidx csp_rs1 = pa_stk sp0 68)
@@ -353,7 +349,8 @@ Section ProofKexecParts.
               (mword_of_int 520 : mword 12) T2 (K - 68)%nat s10 b
               (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi07a Hb3").
+              with "Hcg Hpc [] Hb3").
+    { iApply (kxc_07a with "Htext"). }
     iIntros (CID3 Hs3) "Hcg Hpc Hb3". iEval (rewrite Hpa3) in "Hb3".
     set (T3 := <[Regidx Rs1 := regval_into_reg s10]> T2).
     assert (HT3sp : T3 !!! Regidx csp_rs1 = pa_stk sp0 68)
@@ -372,7 +369,8 @@ Section ProofKexecParts.
               (mword_of_int 512 : mword 12) T3 (K - 68)%nat s20 b
               (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi07e Hb4").
+              with "Hcg Hpc [] Hb4").
+    { iApply (kxc_07e with "Htext"). }
     iIntros (CID4 Hs4) "Hcg Hpc Hb4". iEval (rewrite Hpa4) in "Hb4".
     set (T4 := <[Regidx Rs2 := regval_into_reg s20]> T3).
     assert (HT4sp : T4 !!! Regidx csp_rs1 = pa_stk sp0 68)
@@ -411,7 +409,8 @@ Section ProofKexecParts.
     iEval (rewrite -Hwv) in "Hframe".
     iApply (wp_addi_sp_pop4_s_sconf (mword_of_int (KX + 0x82))
               (mword_of_int 544 : mword 12) T4 (K - 68)%nat 68 b Hpop
-              with "Hcg Hpc Hi082 Hframe").
+              with "Hcg Hpc [] Hframe").
+    { iApply (kxc_082 with "Htext"). }
     iIntros (CID5 Hs5) "Hcg Hpc".
     assert (Hnk : ((K - 68) + 68)%nat = K) by exact (kxc_frame_back K HK).
     iEval (rewrite Hnk) in "Hcg".
@@ -432,7 +431,8 @@ Section ProofKexecParts.
       rewrite /T2 upd_ne; [| vm_compute; discriminate].
       rewrite /T1; apply upd_eq. }
     iApply (wp_cret_s_sconf (mword_of_int (KX + 0x86)) Rra T5 K b
-              ltac:(vm_compute; discriminate) with "Hcg Hpc Hi086").
+              ltac:(vm_compute; discriminate) with "Hcg Hpc []").
+    { iApply (kxc_086 with "Htext"). }
     iIntros (CID6 Hs6) "Hcg Hpc".
     iEval (rgne) in "Hpc".
     iEval (rewrite HT5ra) in "Hpc".

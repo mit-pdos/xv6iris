@@ -1114,10 +1114,6 @@ Section ProofSysUnlinkEpilogue.
     intros HK30 Kpop Hsp0 HMsp HMthr HMs1 HMs2 HMs3 Hal.
     iIntros "Hcg #Htext Hpc Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD HbN HbP H27 HbE H30
               Hcont".
-    iPoseProof (suli_168 with "Htext") as "Hi168".
-    iPoseProof (suli_16a with "Htext") as "Hi16a".
-    iPoseProof (suli_16c with "Htext") as "Hi16c".
-    iPoseProof (suli_16e with "Htext") as "Hi16e".
     assert (Hc1 : add_vec (M !!! Regidx csp_rs1 : mword 64)
                     (zero_extend' 64 (concat_vec (mword_of_int 29 : mword 6) ('b"000")))
                   = pa_stk sp0 1) by (rewrite HMsp; apply su_frm1).
@@ -1125,7 +1121,8 @@ Section ProofSysUnlinkEpilogue.
     iApply (wp_cldsp_s_sconf (mword_of_int (SU + 0x168))
               (mword_of_int 29 : mword 6) Rra M (K - 30)%nat
               (m !!! Regidx Rra : mword 64) b ltac:(nz) ltac:(rdok)
-              with "Hcg Hpc Hi168 [Hf1]").
+              with "Hcg Hpc [] [Hf1]").
+    { iApply (suli_168 with "Htext"). }
     { iEval (rewrite Hc1). iExact "Hf1". }
     iIntros (CID1 Hq1) "Hcg Hpc Hf1".
     iEval (rewrite Hc1) in "Hf1".
@@ -1155,7 +1152,8 @@ Section ProofSysUnlinkEpilogue.
     iApply (wp_cldsp_s_sconf (mword_of_int (SU + 0x16a))
               (mword_of_int 28 : mword 6) Rs0 M1 (K - 30)%nat
               (m !!! Regidx Rs0 : mword 64) b ltac:(nz) ltac:(rdok)
-              with "Hcg Hpc Hi16a [Hf2]").
+              with "Hcg Hpc [] [Hf2]").
+    { iApply (suli_16a with "Htext"). }
     { iEval (rewrite Hc2). iExact "Hf2". }
     iIntros (CID2 Hq2) "Hcg Hpc Hf2".
     iEval (rewrite Hc2) in "Hf2".
@@ -1198,7 +1196,8 @@ Section ProofSysUnlinkEpilogue.
     iEval (rewrite -Hwv) in "Hstk".
     iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (SU + 0x16c))
               (mword_of_int 15 : mword 6) M2 (K - 30)%nat 30 b Hpop
-              with "Hcg Hpc Hi16c Hstk").
+              with "Hcg Hpc [] Hstk").
+    { iApply (suli_16c with "Htext"). }
     iIntros (CID3 Hq3) "Hcg Hpc".
     set (M3 := <[Regidx csp_rs1 := regval_into_reg
                   (add_vec (M2 !!! Regidx csp_rs1 : mword 64)
@@ -1211,7 +1210,8 @@ Section ProofSysUnlinkEpilogue.
       by (rewrite /M3 upd_ne; [exact HM2ra | nz]).
     (* ===== +0x16e c.ret ===== *)
     iApply (wp_cret_s_sconf (mword_of_int (SU + 0x16e)) Rra M3 K b
-              ltac:(nz) with "Hcg Hpc Hi16e").
+              ltac:(nz) with "Hcg Hpc []").
+    { iApply (suli_16e with "Htext"). }
     iIntros (CID4 Hq4) "Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretf : ret_pc (M3 !!! Regidx Rra : mword 64)
