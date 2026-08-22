@@ -353,11 +353,20 @@ GHOST mirror deliberately is not.
 
 ## Recorded modeling choices
 
-- Disk writes are REQUEST-ATOMIC across a crash (xv6's own assumption;
-  BSIZE = 1024 = 2 virtio sectors). Sector-granularity tearing of
-  in-flight requests would be a one-line knob in the PowerOff arm, at the
-  price of `P_fs` closed under tearing — which xv6's log does NOT satisfy;
-  turning it on would surface a real xv6 assumption, not a proof artifact.
+- Disk writes are SECTOR-ATOMIC, not block-atomic (ruled 2026-08-22;
+  campaign in `projects/sector-atomic-disk.md`). A 512-byte sector lands
+  atomically; an xv6 block (BSIZE = 1024 = 2 sectors) lands one sector per
+  device step in ANY order, and the request completes only after every
+  sector has landed, so a crash can leave any subset of a block's sectors
+  written. The tearing lives in the device's autonomous step, NOT in the
+  PowerOff arm: the durable image still changes only at a DMA landing, so
+  the write permit is simply fired per sector and the crash predicate's
+  shape is unchanged. xv6's log is designed for exactly this disk: its
+  on-disk header is 124 bytes (inside sector 0), so the commit is atomic,
+  and every other log write is content-insensitive to recovery. (An
+  earlier version of this note claimed xv6's log does NOT tolerate
+  tearing; that was wrong, for the 124-byte reason.) Reads stay
+  single-step. Until the campaign lands, the tree is still request-atomic.
 - PowerOn models the loader/firmware: kernel image reloaded, bss zeroed,
   registers per SpecEntry.v's reset state. Warm-boot memory retention is
   deliberately NOT modeled (memory is havocked).
