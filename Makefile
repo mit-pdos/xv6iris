@@ -44,6 +44,7 @@ IRIS  := iris
 DUMPER     := tools/dump_elf.py
 GENCODE    := tools/gen_code.py
 GENSITES   := tools/gen_sites.py
+GENPINS    := tools/gen_pins.py
 XV6_DIR    := xv6-riscv
 XV6_URL    ?= https://github.com/mit-pdos/xv6-riscv
 KERNEL_ELF := $(XV6_DIR)/kernel/kernel
@@ -77,7 +78,7 @@ USER_DUMPS ?= sync:Sync
 .PHONY: all proofs model kernel user dump dump-force kernel-rocq user-rocq \
         xv6-rev-check sail-rev-check gen-code check-decode update-decode \
         gen-shape check-shape live-sites \
-        gen-sites check-sites \
+        gen-sites check-sites gen-pins check-pins \
         clean clean-proofs distclean model-gen
 
 all: proofs
@@ -240,6 +241,25 @@ gen-sites:
 check-sites:
 	$(PYTHON) $(GENSITES) --iris $(IRIS) --kernel-rocq $(KDUMP) --emit-coq --check
 	git diff --exit-code -- tools/sites.json tools/sites.md $(IRIS)/KernelSites.v
+
+# The LOAD-SITE PIN census, R-1(B) slice 1: a sibling of gen-sites one level
+# up -- it classifies every load by what the kernel does with the value
+# before its hart's next store.
+#
+#   make gen-pins      regenerate tools/pins.{json,md} + iris/KernelPins.v
+#   make check-pins    regenerate, then fail if anything moved
+#
+# iris/KernelPinsDef.v is HAND-WRITTEN and is not touched by either target;
+# it is what RE-CHECKS the emitted witnesses, so a check-pins diff that
+# looks clean but a KernelPins.v that no longer compiles are two different
+# failures -- the first says the image moved, the second says a witness is
+# false of it.
+gen-pins:
+	$(PYTHON) $(GENPINS) --iris $(IRIS) --kernel-rocq $(KDUMP)
+
+check-pins:
+	$(PYTHON) $(GENPINS) --iris $(IRIS) --kernel-rocq $(KDUMP) --check
+	git diff --exit-code -- tools/pins.json tools/pins.md $(IRIS)/KernelPins.v
 
 # Re-dump every image from the ELFs currently in xv6-riscv/, even if make
 # thinks the .v are up to date.  Check `git diff kernel-rocq/` afterwards: a
