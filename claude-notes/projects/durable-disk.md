@@ -276,27 +276,34 @@ lemma survive until the SWITCH-ON (after G3 and H2), which equates the
 two and deletes the placeholder — its use sites are the exact rework
 list.
 
-- [ ] **F1.** Define `fs_durable_wf_body` over a block view: the general
-      content sweeps, no log-cleanliness conjunct, closed under the
-      five write shapes. Prove `fsimg_wf -> fs_durable_wf` (the image
-      discharge for E4). The W9 general form (validated against the
-      ledger 2026-08-22): FILE `nlink = tick_count` (a committed orphan
-      has both 0, so no extra arm); DIR `nlink = tick_count + 1` at
-      the root, `= tick_count` elsewhere (self-tickets excluded, as
-      `fs_rec_ticket` already does) — and the ticket supply must be
-      counted over REACHABLE directories only (`tree_of_disk` from
-      root): a committed unlinked-but-unfreed dir still carries a ".."
-      record naming its parent whose `nlink` the unlink already
-      decremented, so an all-live-dirs count breaks at the parent.
-      xv6's own boot orphan sweep (`ireclaim`, fs.c:412) exists because
-      such orphans persist across a crash. NOTE the ghost ledger keeps
-      only `w <= nlink` (L1) — the EQUALITY is a new pure invariant,
-      maintained by G1's abstract view, not read off the ledger.
-      Formalization notes: `tree_of_disk` is the ALL-LIVE store, not a
-      walk — reachability is its own Prop (`∃ p, path_at … ROOTINO p =
-      Some z`), and the predicate is a PROP, not a bool: the base case
-      needs no computable reachability, because under `fsimg_wf` the
-      only directory is root, so reachable-dirs = {ROOTINO} by proof.
+- [x] **F1.** DONE. `FsWf.fs_durable_wf_body` (real body under its own
+      name; `fs_durable_wf`/placeholder untouched, switch-on still gated
+      on G3+H2) = parse + W1 + W3-minus-link-floor + W4/W5 +
+      W6-scoped-to-reachable + W7 + W8 + region-at-`nib` + W9-general.
+      Two REFINEMENTS the pinned sweep list needed to be closed under
+      the write shapes (both recorded at the definition, FsWf.v):
+      (1) W3 sweeps `FsImg.fs_inodes_dwf` (= `fs_inodes_wf` minus the
+      `1 <= nlink` floor, additive family with `fs_inode_dok` and
+      `fs_inodes_wf_dwf`): a committed orphan is LIVE at `nlink = 0`,
+      exactly the state the W9 arm names; (2) the per-dir `fs_dir_ok`
+      bundle binds only REACHABLE dirs (one `∃ rd` shared with W9): an
+      orphan dir's ".." dangles once its emptied parent is unlinked, and
+      H1 routes orphans to `ireclaim` anyway — an orphan owes only W8's
+      dots and `fs_orphans_empty` (empty-but-dots BY INDEX, xv6's
+      `isdirempty`). W9 shape: `fs_rdirs` pins an existential `gset` of
+      reachable live dirs (`fs_reachable` = `∃ p, path_at (tree_of_disk
+      …) ROOTINO p = Some z`); `fs_rtick` counts a `bool_decide`-filtered
+      supply (locality = `fs_all_tickets`'s: one mjoin segment per dir).
+      The agreement suite (FsWf §5–7: the sweeps read block 1 +
+      `[inodestart, size)` only; decoder-level `*_ext` at one-block
+      footprints) is F2's foundation. `FsImg.fs_links_eq` (file-nlink
+      EQUALITY sweep) + `FsImgCheck.fsimg_links_eq` (vm_compute, 22.3 s
+      at `Qed` — W9's own ballpark); the committed-view discharge
+      `FsWfImg.fsimg_durable_wf` concludes `fs_durable_wf_body
+      (fs_restrict P (fs_home_set cov logstart))` from `fsimg_wf +
+      fs_links_eq + fs_region_wf + parse + cov ⊇ [1, size)` — E4
+      consumes it (`FsWfImg.v` is new: `FsCrash` Require-Exports `FsWf`,
+      so the `fs_restrict`-level statement cannot live in `FsWf.v`).
 - [ ] **F2.** The five update lemmas, one per written-block kind:
       bitmap set/clear (`bitmap_bytes`), dinode-at-slot
       (`diblk_bytes` insert, alloc/update/free arms), dirent

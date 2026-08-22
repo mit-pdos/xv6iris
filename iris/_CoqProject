@@ -1052,6 +1052,7 @@ IcacheInv.v
 InodeRef.v
 InodeLock.v
 FsImgBridge.v
+FsWfImg.v
 InodeRegion.v
 EscrowInode.v
 EscrowDeposit.v

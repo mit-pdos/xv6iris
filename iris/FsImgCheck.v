@@ -255,6 +255,18 @@ Lemma fsimg_root_link :
   /\ bv_unsigned (di_nlink (fs_dinode fsimg_P fsimg_sb ROOTINO)) = 1.
 Proof. exact (fsimg_wf_root_link fsimg_P fsimg_sb fsimg_wf_ok). Qed.
 
+(* ---- the durable predicate's sharpening: file nlink EQUALS its count -- *)
+
+(*  [FsImg.fs_links_eq] is stage F1's addition: the durable committed-view
+    invariant ([FsWf.fs_durable_wf_body]) states link EQUALITIES, while W9
+    keeps only [count <= nlink] for a file -- so the image discharge
+    ([FsWfImg.fsimg_durable_wf]) takes this sweep as its one new literal
+    fact.  One more W9-shaped pass: the ticket supply is rebuilt once and
+    each inum pays one [fs_tick_count].  Measured cost is recorded in the
+    worklist (same ballpark as W9's own ~20 s including [Qed]).           *)
+Lemma fsimg_links_eq : fs_links_eq fsimg_P fsimg_sb = true.
+Proof. vm_eq. Qed.
+
 (* ---- W4 reindexed, cited: no inode names one block twice ------------- *)
 
 (* [InodeInv.blkmap_wf]'s injectivity clause at every live inum, out of
