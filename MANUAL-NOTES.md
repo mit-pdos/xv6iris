@@ -27,6 +27,8 @@ Some high-level ideas that might be interesting for some eventual paper:
 + userret: tricky state at second sfence.vma: new page table but old TLB contents (TransPt.v); not needed during kvminithart because Bare has no TLB entries
 - kpt_regime: unified Bare + Sv39 page-table configurations
 - needed axioms about load_reservation and cancel_reservation, which aren't specified in Sail model
+  + fixed at the source: the sail-riscv fork now gives the platform hooks `coq:` extern bindings,
+    so sail stops emitting axioms for them and `model-xv6iris/xv6iris_extras.v` defines them
 - push_off returns intr_count counting token, which is needed to call pop_off to ensure no panic
 + use fable to state specs, opus to prove them
 + kernel ptsto: PA own + VA map fact via kmap_at (code RX, data RW), monotonic for Bare-to-Sv39

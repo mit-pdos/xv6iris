@@ -24,7 +24,7 @@ Require Import ResvAxioms.
 Require Import UserMemAccess.
 Require Import HartMemRun HartMemAsm.
 Require Import UserExecFacts.
-Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import Riscv.rv64d_types Riscv.xv6iris_extras Riscv.rv64d.
 Local Open Scope Z_scope.
 Import Defs.
 

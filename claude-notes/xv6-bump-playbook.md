@@ -941,12 +941,14 @@ Rules that made that work:
    serial build tail — see `optimization.md`). CI runs it after every build
    and prints it in the run's step summary, so a green CI run already has the
    answer; run the target yourself when you are auditing locally.
-   Expect the 5 Sail platform externs
-   (`load_reservation`, `cancel_reservation`, `match_reservation`,
-   `valid_reservation`, `plat_term_write`), `functional_extensionality_dep`,
-   and the deliberately-unproven kernel functions. Anything else is a
-   regression. Note that axioms in `Link` files for cones not yet wired into
-   boot do **not** appear — absence is not proof they are gone.
+   Expect EXACTLY THREE — `functional_extensionality_dep` and the two
+   reservation predicates `xv6iris_extras.resv_matches` / `resv_is_valid`.
+   Anything else is a regression: a `Link*` entry means an unproven kernel
+   function came back into the cone, and a bare Sail platform extern means
+   the fork's `coq:` bindings or `model-xv6iris/xv6iris_extras.v` drifted
+   (see `durable-notes.md` "The adequacy-print baseline"). Note that axioms
+   in `Link` files for cones not yet wired into boot do **not** appear —
+   absence is not proof they are gone.
 3. Ascription-check every `Link` file whose functor arity changed (§4f).
 4. Update the affected `claude-notes/` files, and delete whatever the bump made
    obsolete — a bump's whole point is often that machinery goes away.

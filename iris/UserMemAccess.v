@@ -34,7 +34,7 @@ Require Import UserPtTree.
 Require Import UserMemPt.
 Require Import SmodePte.
 Require Import SRegime.
-Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import Riscv.rv64d_types Riscv.xv6iris_extras Riscv.rv64d.
 Require Import MemAccessGen.
 Require Import ResvAxioms.
 Require Import HartMemRun HartMemAsm PtWalkCert.
@@ -43,7 +43,9 @@ Import Defs.
 
 (* ===================================================================== *)
 (* §0 Reservation platform-effect corollaries of ResvAxioms.v (see the    *)
-(*    file header, and ResvAxioms.v's, for why the axioms are TERM-level). *)
+(*    file header, and ResvAxioms.v's, for why those facts are TERM-level  *)
+(*    -- and for why they are lemmas rather than axioms since the model's  *)
+(*    two effectful reservation hooks got `coq:` bindings).                *)
 (* ===================================================================== *)
 
 Lemma exec_load_reservation :

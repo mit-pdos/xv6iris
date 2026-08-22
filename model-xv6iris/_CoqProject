@@ -5,4 +5,9 @@
 -arg -notation-overridden
 rv64d_types.v
 riscv_extras.v
+# xv6iris_extras.v is HAND-WRITTEN (everything else here is generated) and is
+# passed to sail as a second --coq-lib; it realises the platform hooks that
+# would otherwise be emitted as dangling Axioms.  It requires rv64d_types, so
+# it must compile after it and before rv64d.v.
+xv6iris_extras.v
 rv64d.v

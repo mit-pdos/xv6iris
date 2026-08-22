@@ -196,11 +196,13 @@ jobs:
             echo "transitive axiom footprint of the system theorem, through every functor"
             echo "and every seal."
             echo
-            echo "Expected: the five Sail platform externs (\`load_reservation\`,"
-            echo "\`cancel_reservation\`, \`match_reservation\`, \`valid_reservation\`,"
-            echo "\`plat_term_write\`), \`functional_extensionality_dep\`, and the"
-            echo "deliberately-unproven kernel functions. **Anything else is a"
-            echo "regression.**"
+            echo "Expected: exactly three — \`functional_extensionality_dep\` and"
+            echo "the two LR/SC reservation predicates"
+            echo "(\`xv6iris_extras.resv_matches\`, \`xv6iris_extras.resv_is_valid\`)."
+            echo "**Anything else is a regression** — a \`Link*\` entry means an"
+            echo "unproven kernel function came back into the cone, and a bare Sail"
+            echo "platform extern means the fork's \`coq:\` bindings or"
+            echo "\`model-xv6iris/xv6iris_extras.v\` drifted."
             echo
             if [ "$rc" -ne 0 ]; then
               echo "> :x: The audit did not complete (exit $rc); the output below is partial."

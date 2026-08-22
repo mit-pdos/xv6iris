@@ -85,14 +85,44 @@ build never regenerates them. To regenerate (needs the `sail` compiler with
 directly; `make model-gen` prints instructions if `sail` is missing.
 
 **The model comes from a fork, [`zeldovich/sail-riscv`](https://github.com/zeldovich/sail-riscv),
-pinned by `SAIL_RISCV_REV` in the `Makefile`.** Its delta against
-`riscv/sail-riscv` upstream is the **atomic PTE A/D-bit update**: an A/D update
+pinned by `SAIL_RISCV_REV` in the `Makefile` at the fork's `xv6` branch.** It
+carries three deltas against `riscv/sail-riscv` upstream.
+
+The first is the **atomic PTE A/D-bit update**: an A/D update
 during translation re-reads the PTE with an exclusive read, re-runs the
 tablewalk checks on the freshly read value, and writes it back with a
 conditional write, instead of writing back a value derived from the copy the
 walk read. The privileged spec requires that atomicity, and the difference is
 observable in the memory-interface events the page-table proofs are stated
-over. Like `xv6-riscv/`, the checkout is `.gitignored` and cloned on demand
+over.
+
+The second and third are one change in two halves, and **they only work
+together**. Sail's Rocq backend emits a bare `Axiom` for every `val` it sees
+declared with no Sail body and no `coq:` binding, so the generated model used
+to hand every theorem in this tree six axioms that no file anywhere declared or
+could document.
+
+- **`coq:` extern bindings on six platform hooks** (`load_reservation`,
+  `cancel_reservation`, `match_reservation`, `valid_reservation`,
+  `plat_term_write`, `plat_term_read`), so sail emits nothing for them.
+- **matching `Axiom` declarations in `handwritten_support/riscv_extras.v`**, so
+  the model still compiles for anyone who supplies nothing else. Upstream's
+  assumption count is unchanged — an axiom before, an axiom now — but it has a
+  home, and it mirrors what `RiscvExtras.lean` already does for the Lean
+  backend (`riscv_extras.lem` defines them outright for Lem). Rocq was the only
+  backend with no handwritten home for this group.
+
+**Half one without half two does not merely fail to help, it silently defeats
+the point**: sail keeps emitting its own `Axiom` into the generated model,
+which SHADOWS the imported one, so an override in a later `--coq-lib` is dead
+code and the model's axioms are unchanged.
+
+The override is what this project uses: `model-xv6iris/xv6iris_extras.v` is
+passed as a second `--coq-lib` and, because sail emits the lib requires in
+order, its definitions win. See `claude-notes/durable-notes.md` "The
+adequacy-print baseline".
+
+Like `xv6-riscv/`, the checkout is `.gitignored` and cloned on demand
 (detached, at the pinned revision); `make sail-rev-check` warns when it has
 moved off that revision, because a model regenerated elsewhere is not the model
 the proofs are about.
@@ -105,7 +135,13 @@ Three files decide what comes out, all of them in `model-xv6iris/`:
   substitutions to redo after an upstream bump.
 - `sail-modules.txt` — the Sail module subset to compile (sail-riscv's
   `SAIL_MODULES`, not `--all-modules`).
-- `_CoqProject` — the compile order: `rv64d_types.v → riscv_extras.v → rv64d.v`.
+- `_CoqProject` — the compile order:
+  `rv64d_types.v → riscv_extras.v → xv6iris_extras.v → rv64d.v`.
+
+`xv6iris_extras.v` is the one **hand-written** file in `model-xv6iris/`: a
+regen passes it to sail as a second `--coq-lib` and never overwrites it. Its
+header explains what each hook is realised as and, for the two that stay
+assumed, why.
 
 The regen needs no `cmake`: nothing in the model's `.sail` sources is generated
 by sail-riscv's build, so the source tree plus those files is everything `sail`

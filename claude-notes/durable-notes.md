@@ -2260,10 +2260,10 @@ The number goes up; that is the real one.
   the rule protects the user's machine, so relocation forward suffices —
   no re-verification owed.
 
-## The adequacy-print baseline (GR-36, 2026-08-16; EIGHT and NO assumed Link since 2026-08-22)
+## The adequacy-print baseline (GR-36, 2026-08-16; NO assumed Link, and THREE since the `coq:`-binding change, both 2026-08-22)
 
 `Print Assumptions xv6_power_adequacy_xv6Σ` (SystemAdequacy.v, printed by
-every CI build since 85c21e9f) must show EXACTLY these eight, and merge
+every CI build since 85c21e9f) must show EXACTLY these three, and merge
 rounds diff against this list textually, not by count. The anchor stays
 IMAGE-FREE in `SystemAdequacy.v` (its `fs_boot_image_eras` premise
 undischarged): any constant naming `FsImgDisk.fsimg_dk` audits at baseline
@@ -2272,13 +2272,71 @@ corollaries live in `FsAdequacyImg.v` and are NOT the audit target — see
 `SystemAssumptions.v`'s header.
 
 1. `FunctionalExtensionality.functional_extensionality_dep`
-2. `valid_reservation`    (rv64d extern)
-3. `plat_term_write`      (rv64d extern)
-4. `match_reservation`    (rv64d extern)
-5. `load_reservation`     (rv64d extern)
-6. `cancel_reservation`   (rv64d extern)
-7. `ResvAxioms.load_reservation_term`     (the LR/SC hook, at the term level — `iris/ResvAxioms.v`, 2026-08-18)
-8. `ResvAxioms.cancel_reservation_term`   (same)
+2. `xv6iris_extras.resv_matches`   (the LR/SC reservation predicate — arbitrary but fixed)
+3. `xv6iris_extras.resv_is_valid`  (same, for `valid_reservation`)
+
+MEASURED 2026-08-22 on the GCP builder, full rebuild from the regenerated
+model then `make audit-only`: exactly those three, nothing else. Note the
+trap that produced a WRONG reading first: `audit-only` does not rebuild, so
+running it against a stale `.vo` tree reports the assumptions of whatever
+was last built — here a tree three days old, which still had the four
+`Link*` kernel-function entries and, because the U-tier was not in its cone,
+none of the `ResvAxioms` ones. **Rebuild before auditing, or the list is
+archaeology.**
+
+### It used to be EIGHT, and why the other five went (2026-08-22)
+
+Five of the old eight were axioms **sail generated**, not axioms this tree
+wrote: `pretty_print_coq.ml`'s `find_unimplemented` emits an `Axiom` for every
+`val` with no Sail body and no `coq:` extern binding, and under
+`--coq-undef-axioms` that caught `load_reservation`, `cancel_reservation`,
+`match_reservation`, `valid_reservation` and `plat_term_write`. They were
+undocumentable by construction — no file in this repo declared them.
+
+The fix has three parts. The first two live in the fork (its `xv6` branch, now
+the pinned `SAIL_RISCV_REV`) and **must move together** — the first alone
+silently does nothing useful, the second alone does not compile:
+
+- **`coq:` extern bindings** on all six hooks (`model/sys/sys_reservation.sail`,
+  `model/sys/platform.sail`), so sail emits nothing for them;
+- **matching `Axiom`s in `handwritten_support/riscv_extras.v`**, so the model
+  still compiles for a consumer that supplies nothing else. They are stated
+  monad-polymorphically (`forall {Mon} `{base.MRet Mon}`) because that file is
+  shared by the rv32/rv64 builds and cannot name `M`.
+- **`model-xv6iris/xv6iris_extras.v`** (HAND-WRITTEN, ours, passed as a SECOND
+  `--coq-lib`) then overrides five of the six with real definitions. Sail emits
+  the lib requires in order, so what this file defines wins.
+
+**BINDINGS WITHOUT THE `riscv_extras.v` HALF DEFEAT THE WHOLE THING, QUIETLY.**
+If sail still emits its own `Axiom` into `rv64d.v`, that declaration SHADOWS
+the imported one, the override in the second `--coq-lib` is dead code, and the
+audit is unchanged — the build succeeds and nothing looks wrong. Verified the
+hard way when the fork's branch briefly carried only one half.
+
+Three of the six are now *definitions*, not assumptions: `load_reservation`,
+`cancel_reservation` and `plat_term_write` have nil effect on the state the
+model carries (the reservation set is platform state outside `regstate` /
+`mstate`; the HTIF terminal is not modelled), so `returnm tt` is exact. Only
+the two reservation PREDICATES stay assumed — sail declares them `pure`, so
+each is a fixed function and "arbitrary but fixed" is the honest reading — and
+they are now this project's own named `Parameter`s.
+
+`ResvAxioms.load_reservation_term` / `_cancel_reservation_term` left the list
+in the same change: they are still stated, under the same names and in the
+same shape, so no consumer's proof moved — they are just proved by
+`reflexivity` now.
+
+`plat_term_read` and `get_16_random_bits` are deliberately NOT overridden:
+their results are CONSUMED, so any realisation would fabricate data, and an
+irreducible term makes a hart that reaches one get stuck loudly. They differ in
+where the assumption sits — `plat_term_read` is one of the fork's
+`riscv_extras.v` axioms, `get_16_random_bits` has no binding at all and is
+still generated into `rv64d.v`. Neither is in the cone, so neither is in the
+baseline.
+
+**A regenerated model is byte-identical to the tracked one apart from the
+removed `Axiom` blocks** — verified by regenerating at the pinned rev and
+diffing — so this change costs the proofs nothing beyond the import edits.
 
 **THE BASELINE IS NOT THE WHOLE STORY (found 2026-08-22): `xv6_power_adequacy`
 is VACUOUS as stated.** Its premise `Himg : fs_boot_image_eras sb nib cov`

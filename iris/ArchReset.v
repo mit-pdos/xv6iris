@@ -25,21 +25,25 @@
 (* deliberately NOT in the program; see [board_init]'s comment for the        *)
 (* reason, which is the whole point of the file.                             *)
 (*                                                                          *)
-(* THE ONE PLATFORM HOOK THE INTERPRETERS CANNOT STEP.  [reset_sys] calls    *)
-(* [cancel_reservation], which rv64d declares as an *Axiom* (the LR/SC       *)
-(* reservation is platform state, outside [regstate]).  An opaque element of *)
-(* the monad is not a constructor application, so [run]/[exec] -- both       *)
-(* structural fixpoints on the program -- are STUCK on it: neither an        *)
-(* interpretation of [reset] nor a case analysis of one can exist without a  *)
-(* further axiom about the hook, and the boot cone deliberately has none     *)
-(* (contrast [UserMemAccess.exec_cancel_reservation], which is why the       *)
-(* U-mode tier can step an LR/SC).  So §1 copies the model's [reset_sys]     *)
-(* with the hook as a PARAMETER and [reset_sys_at_split] proves, by          *)
-(* [reflexivity], that the copy at [cancel_reservation tt] IS [reset_sys] -- *)
-(* the copy's fidelity is kernel-checked, and the elision is provably the    *)
-(* only difference.  Same for [reset] and [init_model].  The hook is then    *)
-(* instantiated with a state no-op ([plat_hook]), which is what the model    *)
-(* documents it to be.                                                      *)
+(* THE ONE PLATFORM HOOK THIS FILE REFUSES TO UNFOLD.  [reset_sys] calls     *)
+(* [cancel_reservation] (the LR/SC reservation is platform state, outside    *)
+(* [regstate]).  It USED to be an opaque *Axiom* of the generated model, and *)
+(* since an opaque element of the monad is not a constructor application,    *)
+(* [run]/[exec] -- both structural fixpoints on the program -- were STUCK on *)
+(* it: no interpretation of [reset] could exist without a further axiom, and *)
+(* the boot cone deliberately had none.  It is now realised as [returnm tt]  *)
+(* in [model-xv6iris/xv6iris_extras.v], so that obstruction is gone -- but   *)
+(* the parametrised shape below is KEPT ON PURPOSE.  It is what states, in   *)
+(* the file rather than in a build flag, that the boot cone's account of     *)
+(* [reset] does not depend on WHICH state-preserving term the platform hook  *)
+(* is; the U-mode tier's dependence is separate and explicit                 *)
+(* ([UserMemAccess.exec_cancel_reservation], which is why it can step an     *)
+(* LR/SC).  So §1 copies the model's [reset_sys] with the hook as a         *)
+(* PARAMETER and [reset_sys_at_split] proves, by [reflexivity], that the    *)
+(* copy at [cancel_reservation tt] IS [reset_sys] -- the copy's fidelity is *)
+(* kernel-checked, and the elision is provably the only difference.  Same   *)
+(* for [reset] and [init_model].  The hook is then instantiated with a      *)
+(* state no-op ([plat_hook]), which is what the model documents it to be.   *)
 (*                                                                          *)
 (* IMPORT ORDER TRAP: [SailStdpp.Base] re-exports Prompt_monad's [read_reg]  *)
 (* / [write_reg], so [Import Defs] must come LAST or none of the copy's      *)
@@ -49,7 +53,7 @@
 (* ====================================================================== *)
 From stdpp Require Import gmap finite bitvector.definitions.
 Require Import SailStdpp.Base.
-Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import Riscv.rv64d_types Riscv.xv6iris_extras Riscv.rv64d.
 Import Defs.
 Import ListNotations.
 Open Scope string.
@@ -144,7 +148,12 @@ Proof. reflexivity. Qed.
 (*    parametric in it (the chain only stores it and copies it into a0).     *)
 (* ---------------------------------------------------------------------- *)
 
-(* the reservation hook, as the model documents it: it moves no machine state *)
+(* The reservation hook, as the model documents it: it moves no machine state.
+   Since the `coq:`-binding change this is CONVERTIBLE with [cancel_reservation
+   tt] (xv6iris_extras.v realises the hook as exactly this term), so the three
+   [_split] lemmas above and the instantiation below now meet in the middle --
+   [boot_prog] at [plat_hook] IS the model's [reset].  The parameter is kept
+   anyway; see the header. *)
 Definition plat_hook : M unit := returnm tt.
 
 (* virt's reset vector.  Spelled with the model's own [mword_of_int] because

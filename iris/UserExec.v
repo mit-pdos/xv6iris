@@ -138,7 +138,7 @@ Record ucfg := UCfg {
    The waiting-state step [run_hart_waiting] wakes when the raw
    [mip & mie ≠ 0] ([shouldWakeForInterrupt] -- NOTE: the raw mip register
    only, NOT the sig_* wires) or when the reservation is invalid; the
-   latter scrutinizes the OPAQUE platform axiom [valid_reservation], so
+   latter scrutinizes the OPAQUE platform predicate [valid_reservation], so
    the wait-step arm of the step obligation case-splits on it -- BOTH
    branches step (wake-and-retire vs stay-waiting), and both re-establish
    [user_inv]. *)

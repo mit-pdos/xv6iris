@@ -60,7 +60,9 @@
    analogue of [hval_of_goodb]" move of the port plan.  Its conclusion is a
    DISJUNCTION because the machine chooses: the wake test reads mip, which
    [wp_loop_cycle]'s continuation does not carry across a cycle (mip is in
-   [tk_clock3]), and [valid_reservation] is an opaque platform axiom.
+   [tk_clock3]), and [valid_reservation] is an opaque platform predicate
+   ([xv6iris_extras.resv_is_valid]; see ResvAxioms.v's header for why the
+   reservation's CONTENT stays assumed while its two effectful hooks do not).
 
    The three [exec_run_hart_waiting_*] facts and their [goodmb] twins are
    proved HERE rather than imported from [UserStep.v]: they are facts about
@@ -92,7 +94,7 @@ From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import gen_heap ghost_map.
 From iris.program_logic Require Import language weakestpre.
 Require Import SailStdpp.Operators_mwords.
-Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import Riscv.rv64d_types Riscv.xv6iris_extras Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto RiscvExec HartSwp HartLift HartRegNode
         HartSpan HartSpanChar HartMemRun HartMCycle HartStepAny.
 Local Open Scope Z_scope.
@@ -146,8 +148,9 @@ Definition wait_post (D : gset register) (rs : regstate) (rs3 : regstate)
 (* 2. [run_hart_waiting] AT [exit_wait = false]: THE PURE FACTS.           *)
 (*                                                                        *)
 (* The three outcomes and the three footprint certificates for them.       *)
-(* [valid_reservation] is an opaque platform axiom returning a [bool], so   *)
-(* the reservation branch is taken by DESTRUCTING it -- both values step.   *)
+(* [valid_reservation] is an opaque platform predicate returning a [bool]   *)
+(* ([xv6iris_extras.resv_is_valid]), so the reservation branch is taken by  *)
+(* DESTRUCTING it -- both values step.                                      *)
 (* ====================================================================== *)
 
 Lemma exec_shouldWakeForInterrupt (s : mstate) :

@@ -6,6 +6,7 @@ Require Import SailStdpp.ConcurrencyInterface.
 Require Import SailStdpp.ConcurrencyInterfaceBuiltins.
 Require Import rv64d_types.
 Require Import riscv_extras.
+Require Import xv6iris_extras.
 Import Defs.
 Import ListNotations.
 Open Scope string.
@@ -21790,19 +21791,6 @@ Definition pm_transform_PA '((Virtaddr effective_address) : virtaddr) (pmlen : Z
      ((zero_extend' (64)
          ((subrange_vec_dec (effective_address) ((Z.sub ((Z.sub (xlen) (pmlen))) (1))) (0))))).
 
-Axiom load_reservation :
-  forall
-
-  (_ : mword ((if 64 =? 32 then 34 else 64))) (fv39250_n : Z)
-  (*(0 <? fv39250_n) && (fv39250_n <? 4096)*),
-  M (unit).
-
-Axiom match_reservation : forall  (_ : mword ((if 64 =? 32 then 34 else 64))) , bool.
-
-Axiom cancel_reservation : forall  (_ : unit) , M (unit).
-
-Axiom valid_reservation : forall  (_ : unit) , bool.
-
 Definition effectivePrivilege
 (access : MemoryAccessType mem_payload) (m : mword 64) (priv : Privilege)
 : M (Privilege) :=
@@ -23046,10 +23034,6 @@ Definition tick_clock '(tt : unit) : M (unit) :=
     else returnM (tt)) >>
    ((read_reg mtime)  : M (mword 64)) >>= fun (w__3 : mword 64) =>
    write_reg mtime (add_vec_int (w__3) (1)) >> (clint_dispatch (false))  : M (unit).
-
-Axiom plat_term_write : forall  (_ : mword 8) , M (unit).
-
-Axiom plat_term_read : forall  (_ : unit) , M (mword 8).
 
 Definition undefined_htif_cmd '(tt : unit) : M (mword 64) :=
    (undefined_bitvector (64))  : M (mword 64).

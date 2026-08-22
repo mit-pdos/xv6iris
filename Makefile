@@ -58,7 +58,7 @@ USER_DIR   := $(XV6_DIR)/user
 # value), which is what the page-table proofs are stated against.
 SAIL_RISCV_DIR ?= sail-riscv
 SAIL_RISCV_URL ?= https://github.com/zeldovich/sail-riscv
-SAIL_RISCV_REV ?= c32fbf4111b849061db1812355d6da9df8c2e396
+SAIL_RISCV_REV ?= 23dcf8fd923eb8a1958795393d2975632aa940b2
 
 # THE xv6 revision this development is proved against.  $(XV6_DIR) is
 # .gitignored, so this is the only record of which upstream commit the tracked
@@ -106,7 +106,8 @@ USER_DUMPS ?= sync:Sync echo:Echo sh:Sh init:Init
 
 all: proofs
 
-# ---- 1. Sail-generated Coq model (rv64d_types, riscv_extras, rv64d) ----
+# ---- 1. Sail-generated Coq model (rv64d_types, riscv_extras, rv64d), plus
+#         the hand-written xv6iris_extras (the platform-hook realisations) ----
 $(MODEL)/CoqMakefile: $(MODEL)/_CoqProject
 	cd $(MODEL) && $(RUN) coq_makefile -f _CoqProject -o CoqMakefile
 model: $(MODEL)/CoqMakefile
