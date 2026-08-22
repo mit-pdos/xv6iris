@@ -110,7 +110,7 @@ Require Import SchedCtx.
 Require Import ProcDefs.  (* [proc_priv_bare] *)
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
-Require Import PrintkArgs PrintkFmt SpecPrintk.  (* the recovery printk, via install_trans *)
+Require Import SpecPrintk.  (* the recovery printk, via install_trans *)
 Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.

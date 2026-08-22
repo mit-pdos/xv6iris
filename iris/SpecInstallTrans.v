@@ -113,7 +113,7 @@ Require Import WpNext.
 Require Import WpLock.
 Require Import KernelDataInv.
 Require Import SpecPanic.
-Require Import PrintkArgs PrintkFmt SpecPrintk.  (* the recovering arm's printk *)
+Require Import SpecPrintk.  (* the recovering arm's printk *)
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.

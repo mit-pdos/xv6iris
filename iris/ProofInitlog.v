@@ -70,7 +70,7 @@ Require Import RiscvModelBytes.
 Require Import KernelDataInv.
 Require Import InstrBytes.   (* [pc_is], for the stage-D block lemmas *)
 Require Import KernelText.   (* [kernel_text], same *)
-Require Import PrintkArgs PrintkFmt SpecPrintk.  (* the recovery printk's contract *)
+Require Import SpecPrintk.  (* the recovery printk's contract *)
 Require Import RegFile HartTp WpNext.
 Require Import WpMmodeLeafBase.
 Require Import RiscvExtras.
