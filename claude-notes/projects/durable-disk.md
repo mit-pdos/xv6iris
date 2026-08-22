@@ -80,11 +80,18 @@ crash predicate". The four decisions:
    abstracting away from the disk-like `D`) — not built yet, but the
    target shape. Only the commit permit (and the boot swap) touches
    `P_wf`; logfill/install/clear/recover FRAME it.
-2. **The commit permit NAMES its new `D`** as the install of the batch's
-   logged values: expose `lm_slots` through the committer's mirror half
-   (`log_mirror_ok` already pins physical slot contents), so the commit
-   fupd concludes `D' = ` install of the `Lw` family — the join between
-   the durable ghost view and the FS layer's `γL`.
+2. **The era knows the committed view BY VALUE, through a widened
+   mirror.** `log_mirror`'s payload grows from header+slots to the era's
+   full picture of the durable extent (home blocks included);
+   `log_mirror_ok` pins it to the physical disk on `cov ∪ log_region`.
+   Maintainable because the WAL's own writes are the only writes to the
+   durable extent (installs know the bytes they write), and the custody
+   arm's per-era `ghost_var` + boot swap already solve the mortality
+   problem for exactly this shape. `fr_D` is then a pure function of the
+   mirror picture, the commit fupd concludes `D' = L` (the batch's
+   logged values over the old view), and NO bio-layer fact is needed at
+   the `∅`-mask instant — the "receipt cannot NAME its state" note
+   (FsCrash.v:1508) dies.
 3. **The clear permit PRESERVES `D`** (no re-base): install permits hand
    back per-block "home block caught up" receipts; clear consumes them
    via `fs_recovery_clear_keeps`.
@@ -205,16 +212,21 @@ Footprint (grep `disk_tie\|fs_tie_interp\|riscv_crash_pred\|disk_write_permit`):
       leaves the record (the record keeps the history, last element tied
       to the ghost var). Timelessness of both conjuncts must survive
       (`P_fs_any_timeless`).
-- [ ] **E2. Commit names its state and takes the client fupd.** Widen
-      the committer's mirror half interface so `lm_slots` is visible
-      (`log_mirror_at` today exposes `lm_hdr` only, LogDefs.v:44);
-      `fs_commit_permit` concludes `D' = fs_install` at the NAMED `Lw`
-      family (kills the "receipt cannot NAME its state" note,
-      FsCrash.v:1508) and is DERIVED in the WAL layer from the client's
+- [ ] **E2. The widened mirror (ruling 2.2).** `log_mirror` carries the
+      era's full durable picture (`RiscvPtsto.v:163` — header + slots +
+      homes, or one `Z -> list (bv 8)` view with derived readings);
+      `log_mirror_ok` pins it on `cov ∪ log_region_set ls`; every permit
+      re-establishes it at the post-write image (installs update the
+      home entry — they know their bytes; `mirror_of` generalizes).
+      `log_mirror_at` exposes as much of the value as its holder needs
+      (the header reading stays for the existing call sites).
+- [ ] **E2'. Commit names its state and takes the client fupd.**
+      `fs_commit_permit` concludes `D' =` the batch's logged values over
+      the old view (both named via E2) and is DERIVED from the client's
       D-update fupd (ruling 2.5); `SpecEndOp` gains that fupd as its one
-      crash-facing premise. The other permits take no client input and
-      become internal (their mirror/custody/receipt premises are the
-      log layer's own).
+      crash-facing premise (trivial until G lands, since `P_wf`'s body
+      starts at `⌜True⌝`). The other permits take no client input and
+      become internal.
 - [ ] **E3. Preserving clear.** `fs_install_permit` returns a per-block
       caught-up receipt; `fs_clear_permit` consumes the family and
       keeps `D` via `fs_recovery_clear_keeps` (FsCrash.v:630, today
