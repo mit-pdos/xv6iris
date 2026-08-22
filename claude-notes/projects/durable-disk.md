@@ -43,62 +43,88 @@ learns about the DURABLE bytes comes only through the permits at DMA
 completions (principle 1) or from `P_fs`'s own pure content (opening
 `crashN` in any fupd).
 
-## 1½. STATE AT THE 2026-08-22 CHECKPOINT (second checkpoint: A+B on main-track, D1+D2 done)
+## 1½. STATE AT THE THIRD CHECKPOINT (A+B+D1+D2 landed; ruling 2 issued)
 
-**Stage A is done and committed** (8fc5a036; 883 files rebuilt clean).
-Details of what landed are in the stage-A worklist below (all items hold in
-the tree as described).
+**Stages A and B are DONE and committed** (8fc5a036, 37de0fef;
+tree green on the VM, `make audit-only` at the 8-axiom baseline).
+**D1+D2 are DONE at the log layer** (65ca41d7): general `initlog` +
+`install_trans`, the L-moving recovering arm. **Ruling 2 (below) supersedes
+the L-moving shape** — stage H rebuilds the recovering arms as
+ghost-no-ops — but the landed general specs, the `Bh` home-half plumbing,
+the `printk_gen_contract` premise and the custody strip all survive; only
+the `it_rec_L` movement and the recovering post's L-case are replaced.
 
-**Stage B is DONE and committed** (37de0fef; tree green on the VM, `make
-audit-only` at the 8-axiom baseline). The open point of the first
-checkpoint was closed exactly as sketched: `hdr_wf P cov ls` (decode
-length ≤ LOGBLOCKS ∧ NoDup entries ∧ every entry ∈ cov ∖ log_region_set)
-is the third conjunct of `fs_rec_wf`; the six `_rec` permits re-establish
-it (`fs_commit_permit(_rec)` gained `(nn <= LOGBLOCKS)` / `NoDup Ws` /
-membership premises, discharged in `ProofEndOp` by `eo_hdr_in` from its
-own `Hwok`/`Hnd`; `fs_recover_permit(_rec)` gained a header-preservation
-premise on the generator's write, discharged in `ProofInitlog` by
-`hdr_wf_wr_out` + `home_ne_hdr`); `P_fs_alloc` takes `hdr_wf` of the
-initial image, which `SystemAdequacy` gets from `Himg` via
-`FsImg.fsimg_wf_log` + `hdr_wf_zero`. `P_fs_rec_agree` holds. Keep
-`set_solver` away from `log_region_set` (30-element `list_to_set` — it
-runs >20 min); use the explicit membership lemmas.
+**The old stage C was BLOCKED on an honest wall, now resolved by ruling 2.**
+B4's claim ("`fsimg_wf`-minus-log-clean is permit-invariant because no
+permit writes block 1") was WRONG: W3–W9 and `fs_region_wf` are content
+sweeps over exactly the blocks `fs_commit_permit` moves. Making them a
+`P_fs` conjunct means proving every committed batch preserves FS-level
+consistency — that campaign is now stages F+G below, sized by the
+2026-08-22 tree survey: 9 `log_write` call sites in 8 functions (all
+already stating their written content abstractly), 12 `begin_op..end_op`
+spans with 26 `end_op` exit arms, and ZERO image-level update lemmas in
+`FsImg.v` (the missing join). Old stages C and D are re-cut as stages E–I
+below; `Himg` is deleted in stage I, last.
 
-**Stage D1+D2 are DONE at the log layer** (the stage-D commit): general
-`install_trans` — the recovering arm is live: the logged-view authority
-MOVES per entry (`it_rec_L`, with `_step/_upto/_nil` lemmas), no `bunpin`
-and no dirty-half movement (`bslots (2+0)`), the in-loop printk proved
-against `printk_gen_contract γpr γu γd` (a Prop premise on the spec; the
-□`printk_env` row rides the contract) — and general `initlog` — the
-clean-image premise `hdr_n bs_hdr = 0` is GONE, the header-copy loop is
-live (`il_copy`, ∀CID inside the induction like `it_loop`), the
-recovering install runs with home client halves supplied as a `Bh : nat →
-list (bv 8)` family, custody strips through `fs_recover_permit`, and the
-final `write_head` uses `fs_boot_head_permit`. Callers are re-wired at
-the clean arm: `ProofFsinit` instantiates `Bh := fun _ => []` (via
-`hdr_dec_zero` + `initlog_dirty_all_false`), `ProofEndOp` instantiates
-`recovering := false` with vacuous `HD`/`Hpk` (`ltac:(intros Hab;
-discriminate)`) and a dummy `γpr := 1%positive`.
+## 1¾. Ruling 2 (owner, 2026-08-22): fr_D is the interface; recovery is logically invisible
 
-**D3 is OPEN**: `SpecFsinit`/`FirstTok.first_fsinit_pures` still require
-the clean header, so the system-level boot WP still runs only over the
-clean-log image; lifting it is caller plumbing (thread the read-permit
-fact for the header bytes through forkret's boot arm), not log-layer work.
+Recorded in full in [`../design/crash.md`](../design/crash.md) §"The split
+crash predicate". The four decisions:
 
-**Stage C is BLOCKED on an honest wall — B4's invariance claim is WRONG
-as written.** B4 says the `fsimg_wf`-minus-log-clean content is
-"invariant under every permit because no permit writes block 1". That
-covers only the superblock-parse conjunct. `fs_boot_image_wf`'s other
-conjuncts are CONTENT SWEEPS over the data region (inode-table shape,
-bitmap/dirent consistency, …), and `fs_commit_permit`/`fs_install_permit`
-move exactly those blocks to client-chosen bytes. Making the sweeps
-invariant means every FS-layer writer proves it preserves fs-level
-consistency — an FS-consistency campaign, a separate project of its own
-size. Until that lands, `P_fs` cannot carry B4's pure content, C2 cannot
-mint `fscfg` from `P_fs`, and `Himg` STAYS (C3 undone): the adequacy
-theorem keeps its refutable per-era premise, and the honest restatement
-remains the iProp lend of the crash predicate at PowerOn (notes commit
-a09e4cdc, and fs-log.md's baseline section).
+1. **`P_fs` splits into `P_disk ∗ P_wf` inside the one `crashN` body**,
+   sharing the committed map `D` (= `fr_D`) through one binder
+   (a `ghost_var` handle only when an outside holder must name `D`,
+   e.g. the contents layer's sync receipts). `P_disk` (log/WAL layer):
+   physical fragments, `fs_recovery (blocks dk) D`, `hdr_wf`,
+   mirror/custody, history. `P_wf` (FS layer): `⌜fs_durable_wf D⌝`, and
+   EVENTUALLY the higher-level durable ghosts (directory/file CONTENTS
+   abstracting away from the disk-like `D`) — not built yet, but the
+   target shape. Only the commit permit (and the boot swap) touches
+   `P_wf`; logfill/install/clear/recover FRAME it.
+2. **The era knows the committed view BY VALUE, through a widened
+   mirror.** `log_mirror`'s payload grows from header+slots to the era's
+   full picture of the durable extent (home blocks included);
+   `log_mirror_ok` pins it to the physical disk on `cov ∪ log_region`.
+   Maintainable because the WAL's own writes are the only writes to the
+   durable extent (installs know the bytes they write), and the custody
+   arm's per-era `ghost_var` + boot swap already solve the mortality
+   problem for exactly this shape. `fr_D` is then a pure function of the
+   mirror picture, the commit fupd concludes `D' = L` (the batch's
+   logged values over the old view), and NO bio-layer fact is needed at
+   the `∅`-mask instant — the "receipt cannot NAME its state" note
+   (FsCrash.v:1508) dies.
+3. **The clear permit PRESERVES `D`** (no re-base): install permits hand
+   back per-block "home block caught up" receipts; clear consumes them
+   via `fs_recovery_clear_keeps`.
+4. **The era mint runs at `D`, not at the raw disk**; the logged view
+   `fs_L` is minted at `D`; recovery installs move NO ghost state (a
+   dirty-log boot is the post-commit pre-install steady state: logged =
+   slot content, home block physically stale, dirty-at-boot true).
+   `initlog` is a physical catch-up with an empty exposed ghost effect.
+5. **The FS layer never sees a machine permit.** Commit is the ONLY write
+   kind that moves `D` (logfill/install/clear/recovery are `P_wf`-framing
+   by 1–4), so every `P_disk`-side permit is derived ONCE, in the WAL
+   layer, from its own state (mirror halves, custody, caught-up
+   receipts). `end_op`'s client-facing premise is a single
+   logically-atomic update of the durable view:
+   `∀ D, P_wf D ==∗ P_wf D'` at `D' =` the batch's logged values over
+   the old view — a FUPD, not a pure premise, because the eventual higher-level durable
+   ghosts (directory/file contents) must move in the same instant. It is
+   built at `end_op` time (invariants openable at ⊤ there), consumed at
+   the DMA completion's `∅`-mask opening, so it must be a basic ghost
+   update; `⌜fs_durable_wf D⌝` of the OLD view arrives from the invariant body
+   at fire time. Group commit means the fupd covers the WHOLE group's
+   batch: it is assembled generically from `⌜wf(L)⌝ + ⌜D' = L⌝` (the
+   batch's entries are exactly the blocks written since the last commit;
+   clean blocks have logged = physical = committed), so no exit arm ever
+   states install-arithmetic — each op only maintains "the logged view
+   stays well-formed" (stage G1).
+
+**`fs_durable_wf`** is THE well-formedness invariant of the durable
+committed view: the content sweeps stated generally (`fsimg_wf`'s W9 as
+written is an mkfs artifact — `z = ROOTINO` is false after one successful
+mkdir — and log cleanliness is no part of it). `fs.img` is merely the
+base case: `fsimg_wf -> fs_durable_wf` is the era-0 discharge.
 
 ## 2. Stage A — the machine layer (`RiscvPtsto`, `RiscvExec`, `WpUart`, `PermInv`, `RiscvAdequacy`)
 
@@ -181,55 +207,118 @@ Footprint (grep `disk_tie\|fs_tie_interp\|riscv_crash_pred\|disk_write_permit`):
       `disk_img_bytes γdisk 0 (disk_read fsimg_dk 0 ndisk)` — the only place
       `fsimg_dk` is named (`fsimg_image_wf` `:96` already has the pure half).
 
-## 4. Stage C — no mortal owner holds durable state; `Himg` deleted
+## 4. Stage E — the crash layer under ruling 2 (`FsCrash.v`, no FS-proof dependencies)
 
-Sites that own DURABLE fragments today are exactly the ones that take bytes
-from `P_fs`/the crash layer rather than from the era map. Audit rule: a
-`disk_img_bytes`/`disk_bytes`/`disk_block` at the ERA name
-(`disk_img_name`/`dn_img`) is fine; anything stated at the FIXED name outside
-`P_fs` is a violation.
+**Coordinate with [`sector-atomic-disk.md`](sector-atomic-disk.md)** (ruled
+the same day): once that campaign lands, the write permit fires PER SECTOR
+(any order), so E2's mirror update becomes a per-sector landing and the
+commit's `D`-move rides the header write's sector 0 alone (the on-disk
+header is 124 bytes, inside sector 0 — that is exactly why xv6's commit is
+atomic on such a disk). Whichever campaign lands second restates the other's
+permits at its granularity; neither design changes shape.
 
-- [ ] **C1.** `SpecFsinit`/`SpecInitlog`/`ProofInitlog` read block 1 and the
-      log header through `bread` → the era map; what they need from the
-      durable side is the READ PERMIT's `Q`: "the bytes I got are `P_fs`'s
-      `dk` at this block", established at the completion. Thread a
-      read-permit premise through `SpecBread` (`:~130`, beside the
-      write-permit premise `SpecBwrite.v:130` already takes) so a reader can
-      learn durable facts at the instant; `ProofBread.v` applies it.
-- [ ] **C2.** `fs_cfg_alloc` (`FsCfgBoot.v:1308`) mints `fscfg`/`icfg` from
-      `P_fs`'s pure content (B4), opening `crashN` in the era fupd (mask ⊤),
-      instead of from `fs_boot_image_wf (v_disk g')`. `BootShared.
-      boot_shared_alloc` (`:1235`) loses the `Himg` premise.
-- [ ] **C3.** `SystemAdequacy`: delete `fs_boot_image_eras` (`:146`) and the
-      `Himg` premise of `xv6_boot_era`/`xv6_power_adequacy`/`_xv6Σ`
-      (`:160-170,:308,:414,:488`); `xv6_boot_era`'s `Hcp` becomes the
-      equation on the field. `FsAdequacyImg`: delete `fsimg_at_every_era`
-      (`:157`); `xv6_power_adequacy_fsimg` (`:179`) takes `v_disk g =
-      fsimg_dk` ONLY. `FirstTok.first_fsinit_pures` (`:268-278`) drops
-      `hdr_n … = 0` (it becomes stage D's read-permit fact, not a premise).
-- [ ] **C4.** `FsBoot.v` (22 fragment sites) and `BioInv.v` (5): confirm they
-      are at the ERA map (expected — `bv_gd V` is the era's `dn_img`); if any
-      is at the fixed name, rewrite per the audit rule.
-- [ ] **C5.** `make audit-only`: the baseline loses nothing and gains
-      nothing; `Print Assumptions` of `xv6_power_adequacy_fsimg` is the
-      eight plus the PrimString/PrimInt63 ten (as today).
+- [ ] **E1. The split.** `P_fs := P_disk ∗ P_wf` with `D` a `ghost_var`
+      halved between them (new fixed gname beside `fcn_hist`); `fr_D`
+      leaves the record (the record keeps the history, last element tied
+      to the ghost var). Timelessness of both conjuncts must survive
+      (`P_fs_any_timeless`).
+- [ ] **E2. The widened mirror (ruling 2.2).** `log_mirror` carries the
+      era's full durable picture (`RiscvPtsto.v:163` — header + slots +
+      homes, or one `Z -> list (bv 8)` view with derived readings);
+      `log_mirror_ok` pins it on `cov ∪ log_region_set ls`; every permit
+      re-establishes it at the post-write image (installs update the
+      home entry — they know their bytes; `mirror_of` generalizes).
+      `log_mirror_at` exposes as much of the value as its holder needs
+      (the header reading stays for the existing call sites).
+- [ ] **E2'. Commit names its state and takes the client fupd.**
+      `fs_commit_permit` concludes `D' =` the batch's logged values over
+      the old view (both named via E2) and is DERIVED from the client's
+      D-update fupd (ruling 2.5); `SpecEndOp` gains that fupd as its one
+      crash-facing premise (trivial until G lands, since `P_wf`'s body
+      starts at `⌜True⌝`). The other permits take no client input and
+      become internal.
+- [ ] **E3. Preserving clear.** `fs_install_permit` returns a per-block
+      caught-up receipt; `fs_clear_permit` consumes the family and
+      keeps `D` via `fs_recovery_clear_keeps` (FsCrash.v:630, today
+      unused). Same for the recovery-side install/boot-head permits.
+- [ ] **E4.** `P_fs_alloc`/`FsAdequacyImg`: establish `⌜fs_durable_wf⌝` at the
+      literal image (a `FsImgCheck`-style computation, cheap — the
+      sweeps already run there).
 
-## 5. Stage D — the dirty-log boot (was `fs-log.md` (1)/(3))
+## 5. Stage F — the pure layer: `fs_durable_wf` and the image-level update lemmas
 
-`P_fs` allows `hdr_n > 0` (the commit permit writes it), so after C the boot
-obligation is dischargeable only on the `n = 0` arm; the theorem is TRUE but
-its boot WP is unproved on the dirty-log arm until:
+`FsImg.v` has the full decode vocabulary and ZERO update lemmas (survey
+2026-08-22); the fragment-level laws exist (`BitmapEnc.bm_bytes_*`,
+`InodeRegion.diblk_wf_insert`, `FsTree.dir_written_at`/`dir_zeroed_at`,
+`InodeInv.blkmap_wf_*`). This stage is the join, and it is parallelizable
+and iris-free:
 
-- [x] **D1.** `SpecInitlog.v:164` drops `hdr_n bs_hdr = 0`; `:204`'s
-      `log_mirror_full` becomes `fs_era_custody`; `ProofInitlog`'s header
-      copy loop goes live (`ProofWriteHead.wh_loop` `:1028` is the template).
-- [x] **D2.** `SpecInstallTrans.v:160` loses `recovering = false ∨ n = 0`;
-      `ProofInstallTrans` proves the recovering arm (its printk needs the
-      `SpecPrintkGen` footprint for that one function).
-- [ ] **D3.** `SpecFsinit.v:316-319` and `FirstTok.v:276` stop requiring a
-      clean header; forkret's boot arm threads the read-permit fact instead.
+- [ ] **F1.** Define `fs_durable_wf` over a block view: the general
+      content sweeps (W9 stated against `fs_all_tickets` for arbitrary
+      directory trees, no `z = ROOTINO`; no log-cleanliness conjunct),
+      closed under the five write shapes. Prove
+      `fsimg_wf -> fs_durable_wf` (the image discharge for E4).
+- [ ] **F2.** The five update lemmas, one per written-block kind:
+      bitmap set/clear (`bitmap_bytes`), dinode-at-slot
+      (`diblk_bytes` insert, alloc/update/free arms), dirent
+      write/zero (writei splice on a dir block), file/indirect data
+      (splice + `ind_bytes` insert), fresh-block zero. Each:
+      `fs_durable_wf P -> <side conditions> -> fs_durable_wf (<[b := bytes]> P)`.
+      The side conditions are what stage G threads.
 
-## 6. Gates and rules
+## 6. Stage G — the op sweep: every transaction preserves `fs_durable_wf`
+
+The long pole: the formal content of "xv6 never corrupts its FS".
+Surface (survey 2026-08-22): 9 `log_write` sites (balloc ×2, bfree,
+ialloc, iupdate, iput-free, writei ×2, bmap-indirect), 12 spans / 26
+`end_op` exit arms (sys_link, sys_unlink, sys_open, sys_mkdir,
+sys_mknod, sys_chdir, filewrite, fileclose, kexec ×2, kexit, ireclaim).
+
+- [ ] **G1.** The vehicle (ruling 2.5): a wf row on `log_res`
+      conditioned on the ledger being empty (`out = 0` — mid-batch
+      views are deliberately inconsistent), re-established by each op
+      at its `log_end_step`; plus the bookkeeping row `⌜install of the
+      batch over D = L⌝` (dirty set = batch set; clean blocks logged =
+      committed) from which `ProofEndOp` assembles the commit fupd
+      generically. Design the two rows' exact statements before
+      building; a wrong vehicle here costs the whole sweep.
+- [ ] **G2.** Thread the F2 side conditions from the 9 write sites
+      (their AU suppliers already carry the abstract content) to the
+      per-op obligation; discharge at the 26 arms.
+- [ ] **G3.** `ProofEndOp` discharges E2's premise from G1's row.
+
+## 7. Stage H — boot re-founding: mint at `D`, recovery a ghost no-op
+
+- [ ] **H1.** `fs_cfg_alloc` (and `FsBoot.fs_boot_ghosts`) run at `D`
+      read out of `P_fs` in the era fupd (open `crashN` at ⊤); the
+      raw-disk premises become `fs_durable_wf D` + geometry from `P_fs`.
+      `BootShared.boot_shared_alloc` loses the image premise.
+- [ ] **H2.** Blocks where physical ≠ `D` (the committed log's homes)
+      are minted dirty-at-boot: logged = slot content, bio holds them
+      out of the clean pool; `initlog`/`install_trans` recovering arms
+      restated as ghost-no-ops (no `it_rec_L`; the memmove is
+      content-preserving at the logical level). Supersedes the
+      D1/D2 L-moving arms; keep the `Bh` plumbing with `Bh i := Lw i`.
+- [ ] **H3.** (= old D3) `SpecFsinit.v:318` and `FirstTok.v:275` drop
+      `hdr_n = 0`; forkret's boot arm threads the general form.
+- [ ] **H4.** (= old C1, if still needed after H1/H2) the read-permit
+      premise through `SpecBread` for boot-time reads that must learn
+      durable facts at the completion instant.
+- [ ] **H5.** (= old C4) audit: no `disk_img_bytes` at the FIXED name
+      outside `P_fs` (`FsBoot.v` 22 sites, `BioInv.v` 5 — expected all
+      at the era map).
+
+## 8. Stage I — the theorem (= old C3)
+
+- [ ] **I1.** Delete `fs_boot_image_eras` (SystemAdequacy.v:147) and
+      the `Himg` premises; `xv6_boot_era`'s image premise becomes the
+      `P_fs` read; delete `FsAdequacyImg.fsimg_at_every_era` (:157);
+      `xv6_power_adequacy_fsimg` takes `v_disk g = fsimg_dk` at era 0
+      ONLY.
+- [ ] **I2.** `make audit-only`: baseline unchanged (eight + the
+      PrimString/PrimInt63 ten on the fsimg corollary).
+
+## 9. Gates and rules
 
 - Build on the VM (`QUIET=1 ./gcp-rocq/run-on-gcp make -k -j 36`), rebase
   before whole-tree builds, `make audit-only` after A, C and D.

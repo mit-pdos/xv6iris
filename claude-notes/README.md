@@ -126,13 +126,15 @@ in `durable-notes.md` for what belongs where and what gets deleted.
 Three remain open (audited against the tree 2026-08-22; each file's top
 banner says precisely what is left):
 
-- **[`durable-disk.md`](projects/durable-disk.md)** — THE RULING OF
+- **[`durable-disk.md`](projects/durable-disk.md)** — THE TWO RULINGS OF
   2026-08-22 on the crash layer: the adequacy theorem's per-era disk
-  hypothesis was refutable (the theorem was vacuous); the durable disk
-  becomes one fixed gname owned by `P_fs`, no mortal owner holds durable
-  fragments (logically-atomic access at the DMA instant instead), and the
-  theorem assumes only era 0's `fs.img`. Four stages, A–D; D is initlog's
-  real recovery.
+  hypothesis was refutable (the theorem was vacuous); the durable disk is
+  one fixed gname owned by `P_fs`; ruling 2 splits `P_fs` into
+  `P_disk ∗ P_wf` around the committed-view ghost `D`, makes recovery
+  logically invisible, and derives every machine permit from `end_op`'s
+  one client fupd. Stages A/B/D1/D2 landed; open: E (crash layer),
+  F (pure `fs_durable_wf` + update lemmas), G (the per-op preservation sweep,
+  the long pole), H (boot re-founding), I (delete `Himg`).
 - **[`fs-log.md`](projects/fs-log.md)** — the FS block layer, STAGE 4 (the
   crash instantiation): real `n > 0` recovery in `initlog`/`install_trans`
   (today both carry a clean-image premise), `sys_sync`'s empty
