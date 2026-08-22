@@ -33,10 +33,19 @@ import re
 import sys
 
 # iPoseProof (<lemma> with "Htext") as "<hyp>".
-POSE = re.compile(r'iPoseProof \((\w+) with "Htext"\) as "([^"\s]+)"\.')
+# The pose grammar has to be generous, because every narrowing of it has cost
+# a real bug: a lemma APPLICATION as the argument (ar_i_tf 0%nat Hk), COLUMN
+# ALIGNMENT before [with], and a PERSISTENT intro name (as "#Hj1a") were each
+# silently skipped -- and in the '#' case the pose was deleted as dead while
+# its uses were left behind.  Anything not matched here must be REFUSED, never
+# quietly dropped, which is what the residue check at the end of convert() is
+# for.
+POSE = re.compile(r'iPoseProof \(([^()"]*?)\s+with "Htext"\)\s*as\s*"#?([^"\s]+)"\.')
 # a whole line that is nothing but one or more such poses
-POSE_LINE = re.compile(r'^[ \t]*(?:iPoseProof \(\w+ with "Htext"\) as "[^"\s]+"\. ?)+\n',
-                       re.M)
+POSE_LINE = re.compile(
+    r'^[ \t]*(?:iPoseProof \([^()"]*? with "Htext"\)\s*as\s*"#?[^"\s]+"\. ?)+\n', re.M)
+# any pose at all, however spelled -- the residue oracle
+ANY_POSE = re.compile(r'iPoseProof \([^()"]*with "Htext"\)\s*as')
 # a conforming call site: the instr hypothesis is the third thing handed to a
 # leaf, and the sentence ends on this line
 # A leaf application whose sentence ends on this line.  The instruction
@@ -183,7 +192,7 @@ def convert(src):
     # The site regex sees the indent of the line the [with "..."] sits on, which
     # for a multi-line iApply is the continuation indent.  Re-indent each brace
     # to the indent of the iApply that opened the sentence.
-    brace = re.compile(r'^(\s*)\{ iApply \(\w+ with "Htext"\)\. \}$')
+    brace = re.compile(r'^(\s*)\{ iApply \([^()"]* with "Htext"\)\. \}$')
     lines, fixed = out.split('\n'), []
     for line in lines:
         if brace.match(line):
@@ -195,7 +204,13 @@ def convert(src):
         fixed.append(line)
     out = '\n'.join(fixed)
 
-    assert not POSE.search(out), 'poses survived'
+    left = ANY_POSE.findall(out)
+    if left:
+        raise ValueError('%d pose(s) survived the rewrite -- the file uses a '
+                         'shape the converter cannot delete (a goal selector '
+                         'or bullet before the pose, or a pose sharing its '
+                         'line with another tactic).  Split those lines and '
+                         're-run; nothing has been written.' % len(left))
 
     return out, npose, nsite[0], nclear[0]
 

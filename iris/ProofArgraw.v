@@ -476,11 +476,11 @@ Section ProofArgraw.
       iSpecialize ("Hcont" $! CID0 with "[%]"); [wp_next_chain|].
       iApply ("Hcont" with "Hcg Hpc"). }
     assert (Hk1 : (1 <= k < NARG)%nat) by lia.
-    iPoseProof (ar_i_cj k Hk1 with "Htext") as "Hicj".
     iApply (wp_cj_s_sconf (mword_of_int (KernelSyms.argraw + ar_ld_off k + 2))
               (sign_extend' 21 (concat_vec (mword_of_int (ar_cj_imm k) : mword 11) ('b"0")))
               M av' b ltac:(rewrite (ar_cj_tgt k Hk1); vm_compute; reflexivity)
-              with "Hcg Hpc Hicj").
+              with "Hcg Hpc []").
+    { iApply (ar_i_cj k Hk1 with "Htext"). }
     iIntros (CID1 Hs1). iNext. iIntros "Hcg Hpc".
     iEval (rewrite (ar_cj_tgt k Hk1)) in "Hpc".
     iSpecialize ("Hcont" $! CID1 with "[%]"); [wp_next_chain|].
@@ -598,7 +598,6 @@ Section ProofArgraw.
     { iApply (ari_26 with "Htext"). }
     iIntros (CID3 Hs3) "Hcg Hpc". iEval (rewrite Hrt26) in "Hpc".
     (* the case body: c.ld a5,88(a0) -- p->trapframe *)
-    iPoseProof (ar_i_tf 0%nat Hk with "Htext") as "Hitf".
     assert (HB6a0 : B6 !!! Regidx ar_a0 = p).
     { rewrite /B6 upd_ne; [| vm_compute; discriminate].
       rewrite /B5 upd_ne; [| vm_compute; discriminate]. exact HMa0. }
@@ -609,7 +608,8 @@ Section ProofArgraw.
     iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.argraw + ar_case_off 0%nat)) ar_a5 ar_a0
               (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 5) ('b"000"))) B6 av' (page_base tfp) b
               (dqm := dqt) ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hitf [Htfp]").
+              with "Hcg Hpc [] [Htfp]").
+    { iApply (ar_i_tf 0%nat Hk with "Htext"). }
     { iEval (rewrite Htfa). iExact "Htfp". }
     iIntros (CID4 Hs4) "Hcg Hpc Htfp". iEval (rewrite Htfa) in "Htfp".
     set (C0 := <[Regidx ar_a5 := regval_into_reg (page_base tfp)]> B6).
@@ -619,7 +619,6 @@ Section ProofArgraw.
        tier inside [tf_page]; the load is a VA-tier one through the kernel
        identity map, so it crosses with [tf_word_to_mem] and back. *)
     iDestruct (tf_page_word_mem tfp ws (tf_arg_idx 0%nat) v ltac:(unfold tf_arg_idx; lia) Hws with "Hptc Htf") as "[Hw Hwback]".
-    iPoseProof (ar_i_ld 0%nat Hk with "Htext") as "Hild".
     assert (Harga : add_vec (C0 !!! Regidx ar_a5)
                       (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int (14 + Z.of_nat 0%nat) : mword 5) ('b"000"))))
                     = tf_pa tfp (8 * Z.of_nat (tf_arg_idx 0%nat)))
@@ -627,7 +626,8 @@ Section ProofArgraw.
     iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.argraw + ar_ld_off 0%nat)) ar_a0 ar_a5
               (zero_extend' 12 (concat_vec (mword_of_int (14 + Z.of_nat 0%nat) : mword 5) ('b"000"))) C0 av' v b
               (dqm := DfracOwn 1) ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hild [Hw]").
+              with "Hcg Hpc [] [Hw]").
+    { iApply (ar_i_ld 0%nat Hk with "Htext"). }
     { iEval (rewrite Harga). iExact "Hw". }
     iIntros (CID5 Hs5) "Hcg Hpc Hw". iEval (rewrite Harga) in "Hw".
     iDestruct ("Hwback" with "Hw") as "Htf".
@@ -718,7 +718,6 @@ Section ProofArgraw.
     { iApply (ari_26 with "Htext"). }
     iIntros (CID3 Hs3) "Hcg Hpc". iEval (rewrite Hrt26) in "Hpc".
     (* the case body: c.ld a5,88(a0) -- p->trapframe *)
-    iPoseProof (ar_i_tf 1%nat Hk with "Htext") as "Hitf".
     assert (HB6a0 : B6 !!! Regidx ar_a0 = p).
     { rewrite /B6 upd_ne; [| vm_compute; discriminate].
       rewrite /B5 upd_ne; [| vm_compute; discriminate]. exact HMa0. }
@@ -729,7 +728,8 @@ Section ProofArgraw.
     iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.argraw + ar_case_off 1%nat)) ar_a5 ar_a0
               (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 5) ('b"000"))) B6 av' (page_base tfp) b
               (dqm := dqt) ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hitf [Htfp]").
+              with "Hcg Hpc [] [Htfp]").
+    { iApply (ar_i_tf 1%nat Hk with "Htext"). }
     { iEval (rewrite Htfa). iExact "Htfp". }
     iIntros (CID4 Hs4) "Hcg Hpc Htfp". iEval (rewrite Htfa) in "Htfp".
     set (C0 := <[Regidx ar_a5 := regval_into_reg (page_base tfp)]> B6).
@@ -739,7 +739,6 @@ Section ProofArgraw.
        tier inside [tf_page]; the load is a VA-tier one through the kernel
        identity map, so it crosses with [tf_word_to_mem] and back. *)
     iDestruct (tf_page_word_mem tfp ws (tf_arg_idx 1%nat) v ltac:(unfold tf_arg_idx; lia) Hws with "Hptc Htf") as "[Hw Hwback]".
-    iPoseProof (ar_i_ld 1%nat Hk with "Htext") as "Hild".
     assert (Harga : add_vec (C0 !!! Regidx ar_a5)
                       (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int (14 + Z.of_nat 1%nat) : mword 5) ('b"000"))))
                     = tf_pa tfp (8 * Z.of_nat (tf_arg_idx 1%nat)))
@@ -747,7 +746,8 @@ Section ProofArgraw.
     iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.argraw + ar_ld_off 1%nat)) ar_a0 ar_a5
               (zero_extend' 12 (concat_vec (mword_of_int (14 + Z.of_nat 1%nat) : mword 5) ('b"000"))) C0 av' v b
               (dqm := DfracOwn 1) ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hild [Hw]").
+              with "Hcg Hpc [] [Hw]").
+    { iApply (ar_i_ld 1%nat Hk with "Htext"). }
     { iEval (rewrite Harga). iExact "Hw". }
     iIntros (CID5 Hs5) "Hcg Hpc Hw". iEval (rewrite Harga) in "Hw".
     iDestruct ("Hwback" with "Hw") as "Htf".
@@ -838,7 +838,6 @@ Section ProofArgraw.
     { iApply (ari_26 with "Htext"). }
     iIntros (CID3 Hs3) "Hcg Hpc". iEval (rewrite Hrt26) in "Hpc".
     (* the case body: c.ld a5,88(a0) -- p->trapframe *)
-    iPoseProof (ar_i_tf 2%nat Hk with "Htext") as "Hitf".
     assert (HB6a0 : B6 !!! Regidx ar_a0 = p).
     { rewrite /B6 upd_ne; [| vm_compute; discriminate].
       rewrite /B5 upd_ne; [| vm_compute; discriminate]. exact HMa0. }
@@ -849,7 +848,8 @@ Section ProofArgraw.
     iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.argraw + ar_case_off 2%nat)) ar_a5 ar_a0
               (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 5) ('b"000"))) B6 av' (page_base tfp) b
               (dqm := dqt) ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hitf [Htfp]").
+              with "Hcg Hpc [] [Htfp]").
+    { iApply (ar_i_tf 2%nat Hk with "Htext"). }
     { iEval (rewrite Htfa). iExact "Htfp". }
     iIntros (CID4 Hs4) "Hcg Hpc Htfp". iEval (rewrite Htfa) in "Htfp".
     set (C0 := <[Regidx ar_a5 := regval_into_reg (page_base tfp)]> B6).
@@ -859,7 +859,6 @@ Section ProofArgraw.
        tier inside [tf_page]; the load is a VA-tier one through the kernel
        identity map, so it crosses with [tf_word_to_mem] and back. *)
     iDestruct (tf_page_word_mem tfp ws (tf_arg_idx 2%nat) v ltac:(unfold tf_arg_idx; lia) Hws with "Hptc Htf") as "[Hw Hwback]".
-    iPoseProof (ar_i_ld 2%nat Hk with "Htext") as "Hild".
     assert (Harga : add_vec (C0 !!! Regidx ar_a5)
                       (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int (14 + Z.of_nat 2%nat) : mword 5) ('b"000"))))
                     = tf_pa tfp (8 * Z.of_nat (tf_arg_idx 2%nat)))
@@ -867,7 +866,8 @@ Section ProofArgraw.
     iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.argraw + ar_ld_off 2%nat)) ar_a0 ar_a5
               (zero_extend' 12 (concat_vec (mword_of_int (14 + Z.of_nat 2%nat) : mword 5) ('b"000"))) C0 av' v b
               (dqm := DfracOwn 1) ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hild [Hw]").
+              with "Hcg Hpc [] [Hw]").
+    { iApply (ar_i_ld 2%nat Hk with "Htext"). }
     { iEval (rewrite Harga). iExact "Hw". }
     iIntros (CID5 Hs5) "Hcg Hpc Hw". iEval (rewrite Harga) in "Hw".
     iDestruct ("Hwback" with "Hw") as "Htf".
@@ -958,7 +958,6 @@ Section ProofArgraw.
     { iApply (ari_26 with "Htext"). }
     iIntros (CID3 Hs3) "Hcg Hpc". iEval (rewrite Hrt26) in "Hpc".
     (* the case body: c.ld a5,88(a0) -- p->trapframe *)
-    iPoseProof (ar_i_tf 3%nat Hk with "Htext") as "Hitf".
     assert (HB6a0 : B6 !!! Regidx ar_a0 = p).
     { rewrite /B6 upd_ne; [| vm_compute; discriminate].
       rewrite /B5 upd_ne; [| vm_compute; discriminate]. exact HMa0. }
@@ -969,7 +968,8 @@ Section ProofArgraw.
     iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.argraw + ar_case_off 3%nat)) ar_a5 ar_a0
               (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 5) ('b"000"))) B6 av' (page_base tfp) b
               (dqm := dqt) ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hitf [Htfp]").
+              with "Hcg Hpc [] [Htfp]").
+    { iApply (ar_i_tf 3%nat Hk with "Htext"). }
     { iEval (rewrite Htfa). iExact "Htfp". }
     iIntros (CID4 Hs4) "Hcg Hpc Htfp". iEval (rewrite Htfa) in "Htfp".
     set (C0 := <[Regidx ar_a5 := regval_into_reg (page_base tfp)]> B6).
@@ -979,7 +979,6 @@ Section ProofArgraw.
        tier inside [tf_page]; the load is a VA-tier one through the kernel
        identity map, so it crosses with [tf_word_to_mem] and back. *)
     iDestruct (tf_page_word_mem tfp ws (tf_arg_idx 3%nat) v ltac:(unfold tf_arg_idx; lia) Hws with "Hptc Htf") as "[Hw Hwback]".
-    iPoseProof (ar_i_ld 3%nat Hk with "Htext") as "Hild".
     assert (Harga : add_vec (C0 !!! Regidx ar_a5)
                       (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int (14 + Z.of_nat 3%nat) : mword 5) ('b"000"))))
                     = tf_pa tfp (8 * Z.of_nat (tf_arg_idx 3%nat)))
@@ -987,7 +986,8 @@ Section ProofArgraw.
     iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.argraw + ar_ld_off 3%nat)) ar_a0 ar_a5
               (zero_extend' 12 (concat_vec (mword_of_int (14 + Z.of_nat 3%nat) : mword 5) ('b"000"))) C0 av' v b
               (dqm := DfracOwn 1) ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hild [Hw]").
+              with "Hcg Hpc [] [Hw]").
+    { iApply (ar_i_ld 3%nat Hk with "Htext"). }
     { iEval (rewrite Harga). iExact "Hw". }
     iIntros (CID5 Hs5) "Hcg Hpc Hw". iEval (rewrite Harga) in "Hw".
     iDestruct ("Hwback" with "Hw") as "Htf".
@@ -1078,7 +1078,6 @@ Section ProofArgraw.
     { iApply (ari_26 with "Htext"). }
     iIntros (CID3 Hs3) "Hcg Hpc". iEval (rewrite Hrt26) in "Hpc".
     (* the case body: c.ld a5,88(a0) -- p->trapframe *)
-    iPoseProof (ar_i_tf 4%nat Hk with "Htext") as "Hitf".
     assert (HB6a0 : B6 !!! Regidx ar_a0 = p).
     { rewrite /B6 upd_ne; [| vm_compute; discriminate].
       rewrite /B5 upd_ne; [| vm_compute; discriminate]. exact HMa0. }
@@ -1089,7 +1088,8 @@ Section ProofArgraw.
     iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.argraw + ar_case_off 4%nat)) ar_a5 ar_a0
               (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 5) ('b"000"))) B6 av' (page_base tfp) b
               (dqm := dqt) ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hitf [Htfp]").
+              with "Hcg Hpc [] [Htfp]").
+    { iApply (ar_i_tf 4%nat Hk with "Htext"). }
     { iEval (rewrite Htfa). iExact "Htfp". }
     iIntros (CID4 Hs4) "Hcg Hpc Htfp". iEval (rewrite Htfa) in "Htfp".
     set (C0 := <[Regidx ar_a5 := regval_into_reg (page_base tfp)]> B6).
@@ -1099,7 +1099,6 @@ Section ProofArgraw.
        tier inside [tf_page]; the load is a VA-tier one through the kernel
        identity map, so it crosses with [tf_word_to_mem] and back. *)
     iDestruct (tf_page_word_mem tfp ws (tf_arg_idx 4%nat) v ltac:(unfold tf_arg_idx; lia) Hws with "Hptc Htf") as "[Hw Hwback]".
-    iPoseProof (ar_i_ld 4%nat Hk with "Htext") as "Hild".
     assert (Harga : add_vec (C0 !!! Regidx ar_a5)
                       (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int (14 + Z.of_nat 4%nat) : mword 5) ('b"000"))))
                     = tf_pa tfp (8 * Z.of_nat (tf_arg_idx 4%nat)))
@@ -1107,7 +1106,8 @@ Section ProofArgraw.
     iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.argraw + ar_ld_off 4%nat)) ar_a0 ar_a5
               (zero_extend' 12 (concat_vec (mword_of_int (14 + Z.of_nat 4%nat) : mword 5) ('b"000"))) C0 av' v b
               (dqm := DfracOwn 1) ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hild [Hw]").
+              with "Hcg Hpc [] [Hw]").
+    { iApply (ar_i_ld 4%nat Hk with "Htext"). }
     { iEval (rewrite Harga). iExact "Hw". }
     iIntros (CID5 Hs5) "Hcg Hpc Hw". iEval (rewrite Harga) in "Hw".
     iDestruct ("Hwback" with "Hw") as "Htf".
@@ -1198,7 +1198,6 @@ Section ProofArgraw.
     { iApply (ari_26 with "Htext"). }
     iIntros (CID3 Hs3) "Hcg Hpc". iEval (rewrite Hrt26) in "Hpc".
     (* the case body: c.ld a5,88(a0) -- p->trapframe *)
-    iPoseProof (ar_i_tf 5%nat Hk with "Htext") as "Hitf".
     assert (HB6a0 : B6 !!! Regidx ar_a0 = p).
     { rewrite /B6 upd_ne; [| vm_compute; discriminate].
       rewrite /B5 upd_ne; [| vm_compute; discriminate]. exact HMa0. }
@@ -1209,7 +1208,8 @@ Section ProofArgraw.
     iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.argraw + ar_case_off 5%nat)) ar_a5 ar_a0
               (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 5) ('b"000"))) B6 av' (page_base tfp) b
               (dqm := dqt) ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hitf [Htfp]").
+              with "Hcg Hpc [] [Htfp]").
+    { iApply (ar_i_tf 5%nat Hk with "Htext"). }
     { iEval (rewrite Htfa). iExact "Htfp". }
     iIntros (CID4 Hs4) "Hcg Hpc Htfp". iEval (rewrite Htfa) in "Htfp".
     set (C0 := <[Regidx ar_a5 := regval_into_reg (page_base tfp)]> B6).
@@ -1219,7 +1219,6 @@ Section ProofArgraw.
        tier inside [tf_page]; the load is a VA-tier one through the kernel
        identity map, so it crosses with [tf_word_to_mem] and back. *)
     iDestruct (tf_page_word_mem tfp ws (tf_arg_idx 5%nat) v ltac:(unfold tf_arg_idx; lia) Hws with "Hptc Htf") as "[Hw Hwback]".
-    iPoseProof (ar_i_ld 5%nat Hk with "Htext") as "Hild".
     assert (Harga : add_vec (C0 !!! Regidx ar_a5)
                       (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int (14 + Z.of_nat 5%nat) : mword 5) ('b"000"))))
                     = tf_pa tfp (8 * Z.of_nat (tf_arg_idx 5%nat)))
@@ -1227,7 +1226,8 @@ Section ProofArgraw.
     iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.argraw + ar_ld_off 5%nat)) ar_a0 ar_a5
               (zero_extend' 12 (concat_vec (mword_of_int (14 + Z.of_nat 5%nat) : mword 5) ('b"000"))) C0 av' v b
               (dqm := DfracOwn 1) ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hild [Hw]").
+              with "Hcg Hpc [] [Hw]").
+    { iApply (ar_i_ld 5%nat Hk with "Htext"). }
     { iEval (rewrite Harga). iExact "Hw". }
     iIntros (CID5 Hs5) "Hcg Hpc Hw". iEval (rewrite Harga) in "Hw".
     iDestruct ("Hwback" with "Hw") as "Htf".
