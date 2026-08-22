@@ -31,7 +31,7 @@
     alone — [WeakPromiseBridge.proj_lbl] drops them).  So the witness is
     STRONGER than a fully-instantiated one, not weaker.
 
-    A LEAF: nothing imports this file. *)
+    (Imported by [WeakRvwmoCert] for its smoke block.) *)
 From Stdlib.ssr Require Import ssreflect.
 From stdpp Require Import gmap finite list relations.
 From stdpp Require Import bitvector.definitions.

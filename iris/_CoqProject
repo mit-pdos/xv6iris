@@ -1108,3 +1108,4 @@ WeakRvwmoLinInd.v
 WeakRvwmoConfWit.v
 WeakRvwmoFab.v
 WeakRvwmoFabInd.v
+WeakRvwmoCert.v
