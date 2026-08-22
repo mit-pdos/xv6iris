@@ -236,94 +236,11 @@ Qed.
     entry is the RMW's own write ([cert_rmw_latest], used inside
     [cert_rmw_ok]).  [cpolp_of_rmwfree] remains the RMW-free instance. *)
 
-(** [src_in_log_of_pfx] does not fire at an RMW — it is stated at [LLoad].
-    The same proof at [lb_rd] covers both. *)
-Theorem src_in_log_of_pfx' (G : gexec) (n : nat) (c : cand) (e : geid)
-    (l : lbl) (base : Z) (ts : list nat) (vs : list (bv 8)) :
-  gload_value G →
-  cd_img c = gx_img G →
-  wlog_pfx G n (cd_log_end c) →
-  gx_lbl G e = Some l →
-  lb_rd l = Some (base, ts, vs) →
-  length vs = length ts →
-  (∀ (j : nat) t, ts !! j = Some t → (t ≤ n)%nat) →
-  src_in_log c base ts vs.
-Proof.
-  intros Hlv Himg [Hlen Hpfx] Hl Hrd Hlenv Hle.
-  split; [exact Hlenv|]. intros j t v Hj Hv.
-  have Hrb : greads_byte G e (WeakAxiomatic.acc_addr base j) t v
-    by (exists l, base, ts, vs, j).
-  destruct (Hlv _ _ _ _ Hrb) as [Hval _].
-  have Ht : (t ≤ n)%nat := Hle j t Hj.
-  destruct t as [|t'].
-  - by rewrite log_byte_0 Himg.
-  - destruct Hval as (w & Hw & Hwb & _).
-    rewrite log_byte_S.
-    have Hlt : (t' < n)%nat by lia.
-    rewrite -(Hpfx t' w Hlt Hw).
-    destruct (gmsg G w) as [mm|] eqn:Hm.
-    + rewrite /=. by apply (gmsg_byte G w _ v mm).
-    + exfalso. destruct Hwb as (l0 & base' & vs' & j' & Hl0 & Hwr & _).
-      by rewrite /gmsg Hl0 Hwr in Hm.
-Qed.
-
-(** THE RMW SITE DATUM. *)
-Definition wrmw_site (G : gexec) (n : nat) (x : agent) (p : nat) (lb : lbl)
-    : Prop :=
-  gx_lbl G (x, p) = Some lb ∧
-  (∀ (base : Z) (ts : list nat) (vs : list (bv 8)),
-     lb_rd lb = Some (base, ts, vs) →
-     ∀ (j : nat) t, ts !! j = Some t → (t ≤ n)%nat) ∧
-  gwix G (x, p) = S n.
-
-Theorem wcpolp_at (G : gexec) (n : nat) (x : agent) (cpu : CPU)
-    (d0 : dev_state) (c0 : cand) (ws : wstate) (lb : lbl)
-    (l1 l2 : wlabel) (rds : list wreg) (wrs : list register)
-    (m : M unit) (rs1 rs2 : regstate) (fn : ofence) (ib : oib32)
-    (m' : M unit) (rs1' : regstate) (fn' : ofence) (ib' : oib32) :
-  rvwmo_minus_consistent G →
-  cd_img c0 = gx_img G →
-  wlog_pfx G n (cd_log_end c0) →
-  srvwmo_consistent c0 →
-  cpol_ctx G (wwit G n) x c0 →
-  wrmw_site G n x (gcnt x (cd_tr c0)) lb →
-  dreg_agree (λ nn, nn ∉ []) rs1 rs2 →
-  cblkp cpu d0 ws lb l1 l2 rds wrs m rs1 fn ib m' rs1' fn' ib' →
-  ∃ rs2',
-    cblkp cpu d0 ws lb l1 l2 rds wrs m rs2 fn ib m' rs2' fn' ib' ∧
-    mstep_ok (cand_last_st c0) x lb ∧
-    wcls_at G (wwit G n) x c0 lb ∧
-    dreg_agree (λ nn, nn ∉ []) rs1' rs2'.
-Proof.
-  intros Hcons Himg Hpfx Hc Hctx (Hl & Hbnd & Hix) Hag Hblk.
-  pose proof Hcons as (Hwf & _ & Hlv & _).
-  destruct (cert_block_pair_mirror (λ nn, nn ∉ []) cpu d0 ws lb l1 l2 rds wrs
-              m rs1 fn ib m' rs1' fn' ib' rs2 Hblk
-              (λ nn _, not_elem_of_nil nn) Hag) as (rs2' & Hblk2 & Hag2).
-  have Hrmw : ¬ lb_rmwfree lb
-    := cblkp_rmw cpu d0 ws lb l1 l2 rds wrs m rs1 fn ib m' rs1' fn' ib' Hblk.
-  destruct lb as [aq base ts vs|rl base vs kc|pr pw sr sw
-                 |aq rl base ts rvs wvs kc]; [by destruct (Hrmw I)..|].
-  destruct Hctx as (ev & Hgt & Hub).
-  (* an RMW is never a witness: the witness set names LOADS *)
-  have HnW : ¬ wwit G n (x, gcnt x (cd_tr c0)).
-  { intros (aq0 & b0 & ts0 & vs0 & Hl0 & _). congruence. }
-  destruct (gshape G Hwf _ _ Hl) as (Hne & Hlenw & Hlenr).
-  have Hlenlog : length (cd_log_end c0) = n by (destruct Hpfx as [H _]; exact H).
-  have Hsrc : src_in_log c0 base ts rvs.
-  { apply (src_in_log_of_pfx' G n c0 (x, gcnt x (cd_tr c0)) _ base ts rvs
-            Hlv Himg Hpfx Hl eq_refl Hlenr).
-    intros j t Hj. by apply (Hbnd base ts rvs eq_refl j t). }
-  exists rs2'. split_and!.
-  - exact Hblk2.
-  - apply (cert_rmw_ok G c0 ev (wwit G n) x aq rl base ts rvs wvs kc
-             Hcons Hgt Hc Hl ltac:(by rewrite Hix Hlenlog));
-      [|exact Hsrc].
-    intros j t Hj. rewrite Hlenlog. by apply (Hbnd base ts rvs eq_refl j t).
-  - apply (wcls_of_pfx G (wwit G n) n x c0 _ Hpfx Hl HnW).
-    intros _. exact Hix.
-  - exact Hag2.
-Qed.
+(** [src_in_log_of_pfx'], [wrmw_site] and [wcpolp_at] MOVED to
+    [WeakRvwmoWalk] §4.5b' — generalised in the witness set — so that the
+    chained walk's own site datum [WeakRvwmoWalk.wsite_ok'] can carry the
+    RMW obligation instead of excluding it with [lb_rmwfree].  What stays
+    here is the alignment packaging. *)
 
 (** [cpolp], from the RMW alignment. *)
 Definition wralign (G : gexec) (n : nat) (x : agent) (Q : lbl → Prop)
@@ -346,8 +263,13 @@ Proof.
   have Hrmw : ¬ lb_rmwfree lb
     := cblkp_rmw cpu d0 ws lb l1 l2 rds wrs m rs1 fn ib m' rs1' fn' ib' Hblk.
   destruct (Hal c0 lb Hc Hctx HQ Hrmw) as (Himg & Hpfx & Hsite).
-  exact (wcpolp_at G n x cpu d0 c0 ws lb l1 l2 rds wrs m rs1 rs2 fn ib m'
-           rs1' fn' ib' Hcons Himg Hpfx Hc Hctx Hsite Hag Hblk).
+  have HnW : ¬ wwit G n (x, gcnt x (cd_tr c0)).
+  { intros (aq0 & b0 & ts0 & vs0 & Hl0 & _).
+    destruct Hsite as (Hl & _ & _).
+    rewrite Hl0 in Hl. injection Hl as Hl'. rewrite -Hl' in Hrmw.
+    exact (Hrmw I). }
+  exact (wcpolp_at G (wwit G n) n x cpu d0 c0 ws lb l1 l2 rds wrs m rs1 rs2
+           fn ib m' rs1' fn' ib' Hcons Himg Hpfx Hc Hctx HnW Hsite Hag Hblk).
 Qed.
 
 (* ====================================================================== *)
@@ -1141,25 +1063,25 @@ Proof.
     destruct p as [|[|p]]; [| |exfalso; simpl in Hp; lia].
     + destruct (cyg_lbl _ _ Hl) as [[_ ->]|[[He _]|[[He _]|[He _]]]];
         [|by simplify_eq|by simplify_eq|by simplify_eq].
-      split; [exact I|]. right.
+      split; [by intros Hn; destruct (Hn I)|]. right.
       split_and!; [reflexivity|exact cyg_wit00|exact cyg_wwit_site00].
     + destruct (cyg_lbl _ _ Hl) as [[He _]|[[_ ->]|[[He _]|[He _]]]];
         [by simplify_eq| |by simplify_eq|by simplify_eq].
-      split; [exact I|]. left. split;
+      split; [by intros Hn; destruct (Hn I)|]. left. split;
         [by apply cyW_ne|by apply (cyg_wsrc_le_store 0%nat _ _ Hl)].
   - (* THE SECOND WRITE: hart 1's store, at row position 1 *)
     rewrite cyg_at2 in Hat. simplify_eq.
     destruct p as [|[|p]]; [| |exfalso; simpl in Hp; lia].
     + destruct (cyg_lbl _ _ Hl) as [[He _]|[[He _]|[[_ ->]|[He _]]]];
         [by simplify_eq|by simplify_eq| |by simplify_eq].
-      split; [exact I|]. left. split; [by apply cyW_ne|].
+      split; [by intros Hn; destruct (Hn I)|]. left. split; [by apply cyW_ne|].
       intros aq base ts vs Hl2 j t Hj.
       rewrite Hl2 in Hl. injection Hl as Ha Hb Hc Hd. subst.
       destruct j as [|[|[|[|j]]]]; try (by rewrite /cy_ts1 /= in Hj);
         injection Hj as <-; lia.
     + destruct (cyg_lbl _ _ Hl) as [[He _]|[[He _]|[[He _]|[_ ->]]]];
         [by simplify_eq|by simplify_eq|by simplify_eq|].
-      split; [exact I|]. left. split;
+      split; [by intros Hn; destruct (Hn I)|]. left. split;
         [by apply cyW_ne|by apply (cyg_wsrc_le_store 1%nat _ _ Hl)].
   - exfalso. rewrite /gwrite_at cyg_gwrites /= in Hat. done.
 Qed.

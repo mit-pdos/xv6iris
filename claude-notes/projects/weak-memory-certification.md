@@ -35,8 +35,30 @@ Whole tree green; five rv64d axioms.
 **Since the tenth pass:** `WeakRvwmoPinBridge2` (`checker_taint_sub_prov`
 proved; residual R-3), repairs 1/2/2b (`2a3cc65d`, `2c3b6c2f`, this).
 
-**WHAT REMAINS:** (1) `normalize_ww` + RMW wiring ⇒ `wsupply` discharged
-⇒ capstone at `l2_claim` alone; (2) R-1: PinBridge's R-3 (items are
+**`normalize_ww` LANDED (`WeakRvwmoPreNorm.v`) — with findings.**  The
+descending event is a WRITE, so K1 never arises, but write-only
+minimality leaves THREE residuals: `kill_ww_K2` (stale reader), `_K3`
+(cross-hart same-byte write), and NEW **`kill_ww_K4`** (an interval
+read `z` with `gppo z e` or a dep into `e`).  Each is a two-edge `R`
+path `z → e → w` missing only `w →⁺ z`; machine-checked COUNTEREXAMPLE
+(§7: one hart `z = load a; e = store x; w = store y`, gmo `w, z, e`,
+`gppo z e`) is RVWMO⁻-consistent, `R`-acyclic, WW-inverted and
+K4-blocked — so acyclicity does NOT discharge the kills; the graph IS
+normalizable by ASCENDING `w` past `z` (F1's insight on the write side),
+and every blocker of an ascent hands back the missing `w →` edge.
+RMW wiring DONE (`wrmw_site`/`wcpolp_of_sites`; `wsupply` free of
+`lb_rmwfree`).  Capstone now `xv6_rvwmo_safe_modulo_l2''`: residue
+`l2_claim` + `wsupply_res` (bounds + the witness set) + `gwrow_gmo`;
+`_prenorm` trades `gwrow_gmo` for the three kills + `wsupply_orbit_pull`
+(the consumers — `cut_supply`/`cert_supply`/`cycle_kill` — must be
+stated at the pre-normalized `gd_equiv` member; `Rt` transports).
+
+**WHAT REMAINS:** (1) `normalize_ww` with BOTH moves (descend reads/the
+witness; ASCEND `w` past unread byte-disjoint events): prove the
+residual after both is an `R`-cycle (the dual of B2d's descent
+discipline) so acyclicity discharges it; then run the T2-LIN skeleton
+over the class `gwrow_gmo` (closed under hulls) and retire
+`wsupply_orbit_pull`; (2) R-1: PinBridge's R-3 (items are
 `erw_of`'s groups at the announced word — a `pstep_ev` run lemma),
 the 165 non-certified sites (`WProt` convention + ~5 ownership idioms),
 and the final `l2_claim` assembly from `pin_seg_pin'` + the records;

@@ -1148,6 +1148,113 @@ Definition pex_dag (p q : pexv6) : Prop :=
 Lemma pex_dag_refl p : pex_dag p p.
 Proof. intros cpu m rs fn ib ->. exists rs. split; [done|apply dreg_agree_refl]. Qed.
 
+(* ---------------------------------------------------------------------- *)
+(** ** 4.5b' THE FUSED RMW's POLICY, POINTWISE
+
+    Moved here from [WeakRvwmoWalk2] §3 and GENERALISED in the witness set,
+    so that [wsite_ok'] below no longer has to ask for [lb_rmwfree]: an
+    [LRmw] position is SERVED rather than excluded.
+
+    [WeakRvwmoCert3.cpolp] is [wpol]'s twin for the [HEpair] block, and it
+    is discharged the same way: the untainted mirror
+    ([cert_block_pair_mirror]) plus the RMW admissibility
+    ([WeakRvwmoCert3.cert_rmw_ok]), whose only real input is "the RMW's read
+    sources are in the log" — which for an RMW is not an extra assumption
+    but a consequence of [gatomicity] once the log's next entry is the RMW's
+    own write.  [cpolp_of_rmwfree] survives as the RMW-free instance and is
+    still what the UNCHAINED path (§4.4) uses. *)
+
+(** [src_in_log_of_pfx] does not fire at an RMW — it is stated at [LLoad].
+    The same proof at [lb_rd] covers both. *)
+Theorem src_in_log_of_pfx' (G : gexec) (n : nat) (c : cand) (e : geid)
+    (l : lbl) (base : Z) (ts : list nat) (vs : list (bv 8)) :
+  gload_value G →
+  cd_img c = gx_img G →
+  wlog_pfx G n (cd_log_end c) →
+  gx_lbl G e = Some l →
+  lb_rd l = Some (base, ts, vs) →
+  length vs = length ts →
+  (∀ (j : nat) t, ts !! j = Some t → (t ≤ n)%nat) →
+  src_in_log c base ts vs.
+Proof.
+  intros Hlv Himg [Hlen Hpfx] Hl Hrd Hlenv Hle.
+  split; [exact Hlenv|]. intros j t v Hj Hv.
+  have Hrb : greads_byte G e (WeakAxiomatic.acc_addr base j) t v
+    by (exists l, base, ts, vs, j).
+  destruct (Hlv _ _ _ _ Hrb) as [Hval _].
+  have Ht : (t ≤ n)%nat := Hle j t Hj.
+  destruct t as [|t'].
+  - by rewrite log_byte_0 Himg.
+  - destruct Hval as (w & Hw & Hwb & _).
+    rewrite log_byte_S.
+    have Hlt : (t' < n)%nat by lia.
+    rewrite -(Hpfx t' w Hlt Hw).
+    destruct (gmsg G w) as [mm|] eqn:Hm.
+    + rewrite /=. by apply (gmsg_byte G w _ v mm).
+    + exfalso. destruct Hwb as (l0 & base' & vs' & j' & Hl0 & Hwr & _).
+      by rewrite /gmsg Hl0 Hwr in Hm.
+Qed.
+
+(** THE RMW SITE DATUM. *)
+Definition wrmw_site (G : gexec) (n : nat) (x : agent) (p : nat) (lb : lbl)
+    : Prop :=
+  gx_lbl G (x, p) = Some lb ∧
+  (∀ (base : Z) (ts : list nat) (vs : list (bv 8)),
+     lb_rd lb = Some (base, ts, vs) →
+     ∀ (j : nat) t, ts !! j = Some t → (t ≤ n)%nat) ∧
+  gwix G (x, p) = S n.
+
+(** THE PAIR POLICY AT AN ALIGNED CANDIDATE.  [W] is arbitrary: what the
+    old [wwit]-specific statement derived from "an RMW is not a load" is
+    now the explicit premise [¬ W (x, gcnt x (cd_tr c0))], which the site
+    classification supplies at an RMW position for exactly that reason. *)
+Theorem wcpolp_at (G : gexec) (W : geid -> Prop) (n : nat) (x : agent)
+    (cpu : CPU) (d0 : dev_state) (c0 : cand) (ws : wstate) (lb : lbl)
+    (l1 l2 : wlabel) (rds : list wreg) (wrs : list register)
+    (m : M unit) (rs1 rs2 : regstate) (fn : ofence) (ib : oib32)
+    (m' : M unit) (rs1' : regstate) (fn' : ofence) (ib' : oib32) :
+  rvwmo_minus_consistent G ->
+  cd_img c0 = gx_img G ->
+  wlog_pfx G n (cd_log_end c0) ->
+  srvwmo_consistent c0 ->
+  cpol_ctx G W x c0 ->
+  ~ W (x, gcnt x (cd_tr c0)) ->
+  wrmw_site G n x (gcnt x (cd_tr c0)) lb ->
+  dreg_agree (fun nn => nn ∉ []) rs1 rs2 ->
+  cblkp cpu d0 ws lb l1 l2 rds wrs m rs1 fn ib m' rs1' fn' ib' ->
+  ∃ rs2',
+    cblkp cpu d0 ws lb l1 l2 rds wrs m rs2 fn ib m' rs2' fn' ib' ∧
+    mstep_ok (cand_last_st c0) x lb ∧
+    wcls_at G W x c0 lb ∧
+    dreg_agree (λ nn, nn ∉ []) rs1' rs2'.
+Proof.
+  intros Hcons Himg Hpfx Hc Hctx HnW (Hl & Hbnd & Hix) Hag Hblk.
+  pose proof Hcons as (Hwf & _ & Hlv & _).
+  destruct (cert_block_pair_mirror (λ nn, nn ∉ []) cpu d0 ws lb l1 l2 rds wrs
+              m rs1 fn ib m' rs1' fn' ib' rs2 Hblk
+              (λ nn _, not_elem_of_nil nn) Hag) as (rs2' & Hblk2 & Hag2).
+  have Hrmw : ¬ lb_rmwfree lb
+    := cblkp_rmw cpu d0 ws lb l1 l2 rds wrs m rs1 fn ib m' rs1' fn' ib' Hblk.
+  destruct lb as [aq base ts vs|rl base vs kc|pr pw sr sw
+                 |aq rl base ts rvs wvs kc]; [by destruct (Hrmw I)..|].
+  destruct Hctx as (ev & Hgt & Hub).
+  destruct (gshape G Hwf _ _ Hl) as (Hne & Hlenw & Hlenr).
+  have Hlenlog : length (cd_log_end c0) = n by (destruct Hpfx as [H _]; exact H).
+  have Hsrc : src_in_log c0 base ts rvs.
+  { apply (src_in_log_of_pfx' G n c0 (x, gcnt x (cd_tr c0)) _ base ts rvs
+            Hlv Himg Hpfx Hl eq_refl Hlenr).
+    intros j t Hj. by apply (Hbnd base ts rvs eq_refl j t). }
+  exists rs2'. split_and!.
+  - exact Hblk2.
+  - apply (cert_rmw_ok G c0 ev W x aq rl base ts rvs wvs kc
+             Hcons Hgt Hc Hl ltac:(by rewrite Hix Hlenlog));
+      [|exact Hsrc].
+    intros j t Hj. rewrite Hlenlog. by apply (Hbnd base ts rvs eq_refl j t).
+  - apply (wcls_of_pfx G W n x c0 _ Hpfx Hl HnW).
+    intros _. exact Hix.
+  - exact Hag2.
+Qed.
+
 (** ** 4.5c The frozen witness set: its side condition, and the site datum *)
 
 (** (W-2) FOR EVERY HART AT ONCE.  [wub] is stated at one hart and one
@@ -1178,7 +1285,7 @@ Definition wsite_ok' (G : gexec) (W : geid → Prop) (n : nat) (x : agent)
     (p : nat) (lb : lbl) : Prop :=
   gx_lbl G (x, p) = Some lb ∧
   (lb_is_w lb = true → gwix G (x, p) = S n) ∧
-  lb_rmwfree lb ∧
+  (¬ lb_rmwfree lb → wrmw_site G n x p lb) ∧
   wsite_cls G W n x p.
 
 Definition wQ' (G : gexec) (W : geid → Prop) (n : nat) (x : agent)
@@ -1187,7 +1294,8 @@ Definition wQ' (G : gexec) (W : geid → Prop) (n : nat) (x : agent)
   wsite_ok' G W n x k lb ∧
   (lb_is_w lb = true ↔ k = kz).
 
-Lemma wQ'_rmwfree G W n x k0 kz k lb : wQ' G W n x k0 kz k lb → lb_rmwfree lb.
+Lemma wQ'_rmw_site G W n x k0 kz k lb :
+  wQ' G W n x k0 kz k lb → ¬ lb_rmwfree lb → wrmw_site G n x k lb.
 Proof. by intros (_ & _ & (_ & _ & H & _) & _). Qed.
 
 (** A WRITE POSITION IS NEVER IN [W] — the site datum's own content. *)
@@ -1254,7 +1362,21 @@ Proof.
                Hlv Himg Hpfx Hl (gshape G Hwf _ _ Hl) Hle).
     + apply cert_write_ok. exact (gshape G Hwf _ _ Hl).
     + apply cert_fence_ok.
-    + by destruct Hrmw.
+    + (* THE FUSED RMW, now SERVED rather than refuted (see 4.5b'): a
+         [cblk] may carry an unsplit [WeakPromise.LRmw], which [proj_lbl]
+         sends to an axiomatic [LRmw], so this arm is reachable. *)
+      destruct Hctx as (ev & Hgt & _).
+      destruct (Hrmw ltac:(intros HH; exact HH)) as (Hl2 & Hbnd & Hix2).
+      have Hlenlog : length (cd_log_end c0) = n
+        by (destruct Hpfx as [Hlg _]; exact Hlg).
+      destruct (gshape G Hwf _ _ Hl) as (Hne & Hlenw & Hlenr).
+      have Hsrc : src_in_log c0 base ts rvs.
+      { apply (src_in_log_of_pfx' G n c0 (x, gcnt x (cd_tr c0)) _ base ts rvs
+                Hlv Himg Hpfx Hl eq_refl Hlenr).
+        intros j t Hj. by apply (Hbnd base ts rvs eq_refl j t). }
+      apply (cert_rmw_ok G c0 ev W x aq rl base ts rvs wvs kc
+               Hcons Hgt Hc Hl ltac:(by rewrite Hix2 Hlenlog)); [|exact Hsrc].
+      intros j t Hj. rewrite Hlenlog. by apply (Hbnd base ts rvs eq_refl j t).
   - (* ------------------------ THE WITNESS ROUTE ----------------------- *)
     pose proof Hwit as (aq & base & ts & vs & Hl' & _).
     have Hlb : lb = WeakAxiomatic.LLoad aq base ts vs.
@@ -1319,6 +1441,17 @@ Proof.
 Qed.
 
 (** ** 4.5e The context is preserved, at the frozen set *)
+(** [lbl_reidx] moves only a read's INDICES, so it moves neither the
+    write bit nor the message ([lbl_reidx_notw]'s positive twin). *)
+Lemma lbl_reidx_isw lb lb' : lbl_reidx lb lb' → lb_is_w lb' = lb_is_w lb.
+Proof.
+  destruct lb as [aq base ts vs|rl base vs kc|pr pw sr sw
+                 |aq rl base ts rvs wvs kc];
+    destruct lb' as [aq' base' ts' vs'|rl' base' vs' kc'|pr' pw' sr' sw'
+                    |aq' rl' base' ts' rvs' wvs' kc'];
+    by intros H.
+Qed.
+
 Theorem wctx'_pres (G : gexec) (W : geid → Prop) (n : nat) (x : agent)
     (k0 kz : nat) :
   gwf G →
@@ -1343,35 +1476,33 @@ Proof.
   - exact Hgc2.
   - rewrite cd_log_end_snoc.
     destruct (decide (k = kz)) as [->|Hne].
-    + (* THE EXIT STORE *)
+    + (* THE EXIT WRITE — a store, or (since 4.5b') a FUSED RMW.  The two
+         arms differ only in where the written bytes sit in the label, so
+         the branch is now stated through [lb_wr]. *)
       have Hw : lb_is_w lb = true by apply Hiff.
       destruct Hsite as (Hl & Hgwix & Hrmw & Hcls).
-      destruct lb as [aq0 b0 ts0 vs0|rl base vs kc|pr pw sr sw
-                     |aq0 rl0 b0 ts0 rv0 wv0 kc0]; try by simpl in Hw.
-      have Hlb' : lb' = WeakAxiomatic.LStore rl base vs kc
-        := lbl_reidx_store rl base vs kc lb' Hri.
-      subst lb'.
       have HnW : ¬ W (x, gcnt x (cd_tr c0)).
       { rewrite Hgc.
-        exact (wsite_cls_notW G W n x kz _ Hl eq_refl Hcls). }
-      have Hlbl : gx_lbl G (x, gcnt x (cd_tr c0))
-                = Some (WeakAxiomatic.LStore rl base vs kc).
+        exact (wsite_cls_notW G W n x kz _ Hl Hw Hcls). }
+      have Hlbl : gx_lbl G (x, gcnt x (cd_tr c0)) = Some lb'.
       { destruct Hcl as [[_ H]|[HW _]]; [exact H|by destruct (HnW HW)]. }
+      have Hw' : lb_is_w lb' = true
+        by rewrite (lbl_reidx_isw lb lb' Hri).
+      destruct (lb_is_w_wr lb' Hw') as (base & vs & Hwr).
       have Hwix : gwix G (x, gcnt x (cd_tr c0)) = S n
-        by rewrite (Hix eq_refl) Hlen.
+        by rewrite (Hix Hw') Hlen.
       have Hmem : (x, gcnt x (cd_tr c0)) ∈ gwrites G.
       { eapply gis_w_gwrites;
-          [exact Hwf|by exists (WeakAxiomatic.LStore rl base vs kc)
-          |by rewrite /gis_w Hlbl]. }
+          [exact Hwf|by exists lb'|by rewrite /gis_w Hlbl]. }
       have Hat : gwrite_at G (S n) = Some (x, gcnt x (cd_tr c0))
         by rewrite -Hwix; apply gwrite_at_gwix.
       have Hmsg : gmsg G (x, gcnt x (cd_tr c0))
-                = Some (WMsg base vs (Some x) kc)
-        by rewrite /gmsg Hlbl.
+                = Some (WMsg base vs (Some x) (lb_cls lb'))
+        by rewrite /gmsg Hlbl Hwr.
       have -> : wlogn n kz (S kz) = S n.
       { rewrite /wlogn (bool_decide_eq_false_2 (S kz ≤ kz)%nat); [done|lia]. }
-      have -> : es_msg (EStep x (WeakAxiomatic.LStore rl base vs kc))
-              = [WMsg base vs (Some x) kc] by reflexivity.
+      have -> : es_msg (EStep x lb') = [WMsg base vs (Some x) (lb_cls lb')]
+        by rewrite /es_msg /= Hwr.
       exact (wlog_pfx_snoc G n (cd_log_end c0) _ _ Hpfxn Hat Hmsg).
     + (* A NON-WRITE BLOCK *)
       have Hw : lb_is_w lb = false.
@@ -1390,6 +1521,40 @@ Qed.
     [WeakRvwmoCert4.seg_step_of_segment] now carries: where the acting
     hart's process ends (the emission's own final state), what its
     release-pending bit becomes, and the frame for every other hart. *)
+(** THE PAIR POLICY, AT THE FROZEN SET.  This is what replaces the old
+    [cpolp_of_rmwfree] refutation inside [wlk_seg_of_cert2]: an RMW block is
+    now SERVED by §4.5b'.  The non-witness premise is free — the site
+    classification's witness disjunct names a LOAD. *)
+Lemma wcpolp_of_sites (G : gexec) (W : geid → Prop) (n : nat) (x : agent)
+    (cpu : CPU) (d0 : dev_state) (k0 kz : nat) :
+  rvwmo_minus_consistent G →
+  wubA G W →
+  cpolp x cpu d0 [] (wctx' G W n x kz) (wcls_at G W x) (wQ' G W n x k0 kz).
+Proof.
+  intros Hcons Hub k c0 ws lb l1 l2 rds wrs m rs1 rs2 fn ib m' rs1' fn' ib'
+    Hc Hctx HQ Hrelp Hag Hblk.
+  have Hrmw : ¬ lb_rmwfree lb
+    := cblkp_rmw cpu d0 ws lb l1 l2 rds wrs m rs1 fn ib m' rs1' fn' ib' Hblk.
+  pose proof HQ as (Hk0 & Hkz & Hsite & Hiff).
+  pose proof Hsite as (Hl & _ & Hrs & Hcls).
+  pose proof Hctx as (_ & Hgc & Hpfx).
+  have Hcp : cpol_ctx G W x c0 := wctx'_cpol G W n x kz k c0 Hub Hctx.
+  have Himg : cd_img c0 = gx_img G.
+  { destruct Hcp as (ev & Hgt & _). exact (ctp_img G c0 ev _ Hgt). }
+  have Hpfx' : wlog_pfx G n (cd_log_end c0).
+  { move: Hpfx. by rewrite /wlogn (bool_decide_eq_true_2 (k ≤ kz)%nat Hkz). }
+  have HnW : ¬ W (x, gcnt x (cd_tr c0)).
+  { rewrite Hgc. destruct Hcls as [[H _]|[_ [Hw _]]]; [exact H|exfalso].
+    destruct Hw as (aq0 & b0 & ts0 & vs0 & Hlw & _).
+    rewrite Hlw in Hl. injection Hl as Hl'. rewrite -Hl' in Hrmw.
+    exact (Hrmw I). }
+  destruct (wcpolp_at G W n x cpu d0 c0 ws lb l1 l2 rds wrs m rs1 rs2 fn ib m'
+              rs1' fn' ib' Hcons Himg Hpfx' Hc Hcp HnW
+              ltac:(rewrite Hgc; exact (Hrs Hrmw)) Hag Hblk)
+    as (rs2' & Hblk2 & Hok & Hcl & Hag2).
+  by exists rs2'.
+Qed.
+
 Theorem wlk_seg_of_cert2 (G : gexec) (W : geid → Prop) (n : nat) (x : agent)
     (cpu : CPU) (d0 : dev_state) (k0 kz : nat) (ws0 : wstate)
     (rowseg : list lbl) (es : list eitem) (pfin : pexv6) (m0 : M unit)
@@ -1430,9 +1595,7 @@ Proof.
               (wctx' G W n x kz) (wcls_at G W x)
               (wctx'_pres G W n x k0 kz Hwf Hub)
               (wpol'_of_sites G W n x cpu d0 k0 kz Hcons Hpc Hub)
-              (cpolp_of_rmwfree x cpu d0 [] (wctx' G W n x kz)
-                 (wcls_at G W x) (wQ' G W n x k0 kz)
-                 (λ k lb H, wQ'_rmwfree G W n x k0 kz k lb H))
+              (wcpolp_of_sites G W n x cpu d0 k0 kz Hcons Hub)
               k0 ws0 rowseg es pfin m0 rs10 fn0 ib0 St rs20
               Hem HQ Hok Hctx Hp Hag Hrelp)
     as (St' & tradd & Hstep & Hctx' & Himg & Hpst0 & Hdv0 & Hfin & Hrelpf
@@ -1545,7 +1708,7 @@ Definition wsite_supply (G : gexec) (W : geid → Prop) : Prop :=
     (∀ j lbj, (p ≤ j)%nat → (j < kz)%nat → gx_lbl G (x, j) = Some lbj →
        lb_is_w lbj = false) →
     gx_lbl G (x, p) = Some lb →
-    lb_rmwfree lb ∧ wsite_cls G W n x p.
+    (¬ lb_rmwfree lb → wrmw_site G n x p lb) ∧ wsite_cls G W n x p.
 
 (** THE ORDER FACT THE WALK NEEDS, AND EXACTLY IT: one hart's writes reach
     the log in PROGRAM ORDER.  [grule14] implies it ([gwrow_gmo_of_rule14]),
