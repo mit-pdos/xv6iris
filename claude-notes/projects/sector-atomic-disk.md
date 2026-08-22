@@ -241,6 +241,17 @@ outside its layer; stages 1→2→3 are strictly ordered by dependency.
   `virtio_proto_sector_step`), `WpUart.wp_disk_loop` new arm,
   `SpecVirtioDiskRw`/`ProofVirtioDiskRw`. Gate: `wp_disk_loop` proved with
   `crashN` opened only in the sector arm. ☐
+- **Sequencing against durable-disk stage E (2026-08-22).** Stage 2 is
+  disjoint from E. Stage 3 overlaps E textually in `FsCrash.v` (E1-E3
+  rewrite the mirror and the record; stage 1 already added
+  `log_mirror_ok_sector` and the `hdr_dec_sector0` family there). Plan:
+  land stages 1+2 on `main` at the first green gate, then do stage 3 AFTER
+  E — under ruling 2 every `P_disk`-side permit is derived once in the WAL
+  layer and recovery-side writes are no-ops, so the per-sector restatement
+  happens in ONE place instead of five. The commit's `D`-fupd rides the
+  header write's sector-0 permit; sector 1's permit is content-free; with
+  per-sector keys this holds for either landing order. If E stalls, the
+  reverse order is fine too (E restates at widened-mirror granularity).
 - **Stage 3 — FS permits and call sites (Opus).** §2f. Gate: the whole
   tree green; coverage report unchanged (188 proven); `SystemAdequacy`
   prints the same eight assumptions. ☐
