@@ -1348,3 +1348,17 @@ Section InodeRes.
   Qed.
 
 End InodeRes.
+
+(*  THE 268-ELEMENT BIG-OP MUST NEVER BE UNFOLDED BY INSTANCE SEARCH.
+    [inode_blocks] is a [big_sepL] over [seq 0 MAXFILE], and [iFrame]'s
+    [Frame] search unfolds a TRANSPARENT constant to get at it: every
+    candidate hypothesis is then tried against all 268 elements, which is
+    where the "48-172 s per sentence" hazard recorded above actually comes
+    from.  Sealed, the only [Frame] instance that applies is the syntactic
+    one, and the fourteen bundle rebuilds across the tree that end in a
+    bare [iFrame] over [ic_loaded] / [ipool_alloc] go from ~50 s to free
+    (measured: ProofFilestat 75.0 s -> 22.6 s on this line alone).
+    [rewrite /inode_blocks] and [unfold] are unaffected -- the ten sites
+    that do take the big-op apart still do, and [IcacheEscrow]'s
+    [inode_blocks_timeless] proves through the same [rewrite]. *)
+Global Typeclasses Opaque inode_blocks.

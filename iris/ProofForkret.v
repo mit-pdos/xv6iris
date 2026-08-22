@@ -1170,12 +1170,33 @@ Proof.
   iAssert (fs_sb_cells) as "#Hsbc".
   { rewrite /fs_sb_cells. iFrame "Hni Hist Hsz Hbms". }
   iDestruct (first_persist_pre with "[] Hka Hlctx Hsbc") as "Hpre".
+  (* THE BUNDLE IS BUILT ROW BY ROW, NOT FRAMED (claude-notes/optimization.md,
+     "when every conjunct is definition-valued").  A named [iFrame] over these
+     seventeen rows still searches the GOAL once per name, and the goal's rows
+     are [bio_ctx], [ic_escrows], [is_lock] over [disk_res]/[kmem_res] -- each
+     match attempt a conversion over a big resource.  Measured 62.7 s here;
+     the [iSplitR]/[iExact] chain in the bundle's own conjunct order is a
+     syntactic check per row.  The assert has an EMPTY spatial context (the
+     ["[]"] above), so every row is [iSplitR]. *)
   { rewrite /first_boot_persist.
-    iFrame "Htext Hkdata Hpenv Hbio Hseam Hgen Hdevi Hitb2 Hitbl Hesc Hslks
-            Hireg Hbits Hkmem".
+    iSplitR; [iExact "Htext" |].
+    iSplitR; [iExact "Hkdata" |].
+    iSplitR; [iExact "Hpenv" |].
     iSplitR; [iPureIntro; exact Hpkc |].
-    iSplitL; [| iPureIntro; exact Hgeom].
-    iExists pd, pav, pu. iFrame "Hdgeom Hdlock". }
+    iSplitR; [iExact "Hbio" |].
+    iSplitR; [iExact "Hseam" |].
+    iSplitR; [iExact "Hgen" |].
+    iSplitR; [iExact "Hdevi" |].
+    iSplitR; [iExists pd, pav, pu;
+              iSplitR; [iExact "Hdgeom" | iExact "Hdlock"] |].
+    iSplitR; [iExact "Hitb2" |].
+    iSplitR; [iExact "Hitbl" |].
+    iSplitR; [iExact "Hesc" |].
+    iSplitR; [iExact "Hslks" |].
+    iSplitR; [iExact "Hireg" |].
+    iSplitR; [iExact "Hbits" |].
+    iSplitR; [iExact "Hkmem" |].
+    iPureIntro; exact Hgeom. }
   iMod (fs_ready_establish with "Hpre Hboot") as "#Hfsr".
   (* the token, rebuilt at its steady arm -- and with it the whole process
      block, which every later step (kexec, prepare_return, the residue) takes
@@ -1339,9 +1360,26 @@ Proof.
   iAssert (fs_fabric γs fsc_uart fsc_disk fsc_dlock pd pav pu fsc_bio icfg_log
              fsc_fs fsc_ireg fsc_ic fsc_itlock fsc_cov fsc_logst icfg_ist
              icfg_nib icfg_dev) as "#Hfab".
+  (* ...and the same row-by-row build, for the same measured reason: this
+     named [iFrame] over the fabric's sixteen definition-valued rows was
+     61.0 s. *)
   { rewrite /fs_fabric.
-    iFrame "Hkdata Hpenv2 Hbio Hlctx Hseam Hgen Hitb2 Hitbl Hesc Hslks Hireg
-            Hropen Hpinv Hdevi Hdgeom Hdlock". }
+    iSplitR; [iExact "Hkdata" |].
+    iSplitR; [iExact "Hpenv2" |].
+    iSplitR; [iExact "Hbio" |].
+    iSplitR; [iExact "Hlctx" |].
+    iSplitR; [iExact "Hseam" |].
+    iSplitR; [iExact "Hgen" |].
+    iSplitR; [iExact "Hitb2" |].
+    iSplitR; [iExact "Hitbl" |].
+    iSplitR; [iExact "Hesc" |].
+    iSplitR; [iExact "Hslks" |].
+    iSplitR; [iExact "Hireg" |].
+    iSplitR; [iExact "Hropen" |].
+    iSplitR; [iExact "Hpinv" |].
+    iSplitR; [iExact "Hdevi" |].
+    iSplitR; [iExact "Hdgeom" |].
+    iExact "Hdlock". }
   (* ---- the process block, put back together: the token is the steady
          arm now, so this is [proc_priv] again rather than the deficit ---- *)
   iAssert (proc_priv γf p pid V) with "[Hpbare Hcwd Hofiles]" as "Hpriv".

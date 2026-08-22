@@ -641,9 +641,13 @@ Section KexecPinnedMain.
       iModIntro. iSplitL "Hride"; [iExact "Hride" |].
       iDestruct "Hout" as "[[%Heq _] | #Hc]".
       - iModIntro. iLeft. iPureIntro. cbn. intros j Hj.
-        rewrite (fv_of_file_byte dn data init_bytes j Heq
-                   ltac:(pose proof init_hdr_len; lia)).
-        reflexivity.
+        (* [exact], not [rewrite]: the equation closes the goal outright, and
+           a [rewrite] would first abstract the occurrence and build a motive
+           over the whole [file_byte]/[fv_of] term for conversion to carry --
+           5.5 s against nothing.  claude-notes/optimization.md, "[rewrite]
+           ABSTRACTS, [exact] only UNIFIES". *)
+        exact (fv_of_file_byte dn data init_bytes j Heq
+                 ltac:(pose proof init_hdr_len; lia)).
       - iModIntro. iRight. iExact "Hc". }
     (* ...and the unfolding wand at the same [Q]. *)
     { iApply (kxp_body_wand kxp_entry_ok jp ga gf bmapstart inodestart plen pfun

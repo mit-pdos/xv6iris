@@ -1734,7 +1734,15 @@ Section FsCfgBootEra.
                    = cov ∖ fs_kit_spent (fs_blocks dk) sb icfg_nib
                              (fs_live_set (fs_blocks dk) sb)).
     { apply set_eq. intros b. rewrite /fs_kit_spent.
-      rewrite !elem_of_difference !elem_of_union. tauto. }
+      (* THE COUNTS ARE SPELLED OUT.  A [!] runs one FULL failing pass per
+         lemma, and here that pass is a whole-goal setoid traversal dragging
+         the [elem_of] instance chain over five computed carriers
+         ([log_region_set], [ireg_blk_set], [fs_live_blocks],
+         [fs_bitmap_spent]) -- 6.1 s for a goal with exactly six differences
+         (five on the left, one on the right) and four unions.  See
+         claude-notes/optimization.md, "a [!] in [rewrite] always pays one
+         FULL failing pass". *)
+      rewrite 6!elem_of_difference 4!elem_of_union. tauto. }
     rewrite Hset.
     (* ---- N-5.1 (W5a): root's pin, the post's first conjunct ---- *)
     iSplitL "Hpinr"; [iExact "Hpinr" |].

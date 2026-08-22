@@ -938,8 +938,20 @@ Section UsertrapRes.
     iIntros "H Hkres".
     iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & Henv)".
     iDestruct (ut_trap_tlb_close with "Htrap Hkres") as "Htrap".
-    iExists N, V, av. iFrame "Htfk Htc Htrap Henv".
-    iPureIntro. split; [| split; [| split]]; assumption.
+    (* BUILT ROW BY ROW, NOT FRAMED.  The residue's last row is [ut_env],
+       which is [proc_priv] and so [tf_page]; a named [iFrame] searches the
+       whole GOAL once per name and pays a conversion against that row every
+       time (measured 4-6 s per call, ~55 s across this file).  Each
+       [iSplitR]/[iSplitL] below is a syntactic check.  See
+       claude-notes/optimization.md, "Framing: name the context side". *)
+    iExists N, V, av.
+    iSplitR; [iPureIntro; exact Hupt |].
+    iSplitR; [iPureIntro; exact Hksp |].
+    iSplitR; [iPureIntro; exact Hwf |].
+    iSplitR; [iPureIntro; exact Hav |].
+    iSplitR; [iExact "Htfk" |].
+    iSplitR; [iExact "Htc" |].
+    iSplitL "Htrap"; [iExact "Htrap" | iExact "Henv"].
   Qed.
 
   Lemma ut_res_tlb_open (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
@@ -951,8 +963,15 @@ Section UsertrapRes.
     iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & Henv)".
     iDestruct (ut_trap_tlb_open with "Htrap") as (kroot) "[Hkres Htrap]".
     iExists kroot. iFrame "Hkres".
-    iExists N, V, av. iFrame "Htfk Htc Htrap Henv".
-    iPureIntro. split; [| split; [| split]]; assumption.
+    (* row by row, not framed -- see [ut_res_tlb_close] *)
+    iExists N, V, av.
+    iSplitR; [iPureIntro; exact Hupt |].
+    iSplitR; [iPureIntro; exact Hksp |].
+    iSplitR; [iPureIntro; exact Hwf |].
+    iSplitR; [iPureIntro; exact Hav |].
+    iSplitR; [iExact "Htfk" |].
+    iSplitR; [iExact "Htc" |].
+    iSplitL "Htrap"; [iExact "Htrap" | iExact "Henv"].
   Qed.
 
   (* THE TRAPFRAME BORROW, lifted to [usertrap_res] -- the concrete proof
@@ -981,12 +1000,16 @@ Section UsertrapRes.
     iDestruct ("Hownback" $! (upd_tf V ws') with "Hpv' Hsy") as "Hown'".
     iExists N, (upd_tf V ws'), av.
     iDestruct (ut_tfk_intro ksp (upd_tf V ws') kroot Htfk' with "Hkpt") as "#Htfk'".
-    iFrame "Htfk' Htc Htrap Hcaps Hown'".
-    iPureIntro. split; [| split; [| split]].
-    - rewrite /upd_tf. exact Hupt.
-    - exact Hksp.
-    - exact Hwf.
-    - exact Hav.
+    (* row by row, not framed -- see [ut_res_tlb_close] *)
+    rewrite /ut_env.
+    iSplitR; [iPureIntro; rewrite /upd_tf; exact Hupt |].
+    iSplitR; [iPureIntro; exact Hksp |].
+    iSplitR; [iPureIntro; exact Hwf |].
+    iSplitR; [iPureIntro; exact Hav |].
+    iSplitR; [iExact "Htfk'" |].
+    iSplitR; [iExact "Htc" |].
+    iSplitL "Htrap"; [iExact "Htrap" |].
+    iSplitL "Hcaps"; [iExact "Hcaps" | iExact "Hown'"].
   Qed.
 
   (* =================================================================== *)
@@ -1141,8 +1164,15 @@ Section UsertrapRes.
     iAssert (sstc_enabled) as "#Hsstc"; [iDestruct "Htc" as "[$ _]" |].
     (* same, and here the other conjunct is the residue's whole ∃ body. *)
     iSplitR; [iExact "Hsstc"|].
-    iExists N, V, av. iFrame "Htfk Htc Htrap Henv".
-    iPureIntro. split; [| split; [| split]]; assumption.
+    (* row by row, not framed -- see [ut_res_tlb_close] *)
+    iExists N, V, av.
+    iSplitR; [iPureIntro; exact Hupt |].
+    iSplitR; [iPureIntro; exact Hksp |].
+    iSplitR; [iPureIntro; exact Hwf |].
+    iSplitR; [iPureIntro; exact Hav |].
+    iSplitR; [iExact "Htfk" |].
+    iSplitR; [iExact "Htc" |].
+    iSplitL "Htrap"; [iExact "Htrap" | iExact "Henv"].
   Qed.
 
   Lemma ut_res_pt_close (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
@@ -1153,8 +1183,16 @@ Section UsertrapRes.
     iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & (Hcaps & Hown))".
     subst pt.
     iDestruct (ut_own_pt_close with "Hown Hpt") as "Hown".
-    iExists N, V, av. rewrite /ut_env. iFrame "Htfk Htc Htrap Hcaps Hown".
-    iPureIntro. split; [reflexivity | split; [| split]]; assumption.
+    (* row by row, not framed -- see [ut_res_tlb_close] *)
+    iExists N, V, av. rewrite /ut_env.
+    iSplitR; [iPureIntro; reflexivity |].
+    iSplitR; [iPureIntro; exact Hksp |].
+    iSplitR; [iPureIntro; exact Hwf |].
+    iSplitR; [iPureIntro; exact Hav |].
+    iSplitR; [iExact "Htfk" |].
+    iSplitR; [iExact "Htc" |].
+    iSplitL "Htrap"; [iExact "Htrap" |].
+    iSplitL "Hcaps"; [iExact "Hcaps" | iExact "Hown"].
   Qed.
 
   Lemma ut_res_pt_open (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
@@ -1166,8 +1204,16 @@ Section UsertrapRes.
     subst pt.
     iDestruct (ut_own_pt_open with "Hown") as "(Hown & Hpt)".
     iFrame "Hpt".
-    iExists N, V, av. rewrite /ut_env_nopt. iFrame "Htfk Htc Htrap Hcaps Hown".
-    iPureIntro. split; [reflexivity | split; [| split]]; assumption.
+    (* row by row, not framed -- see [ut_res_tlb_close] *)
+    iExists N, V, av. rewrite /ut_env_nopt.
+    iSplitR; [iPureIntro; reflexivity |].
+    iSplitR; [iPureIntro; exact Hksp |].
+    iSplitR; [iPureIntro; exact Hwf |].
+    iSplitR; [iPureIntro; exact Hav |].
+    iSplitR; [iExact "Htfk" |].
+    iSplitR; [iExact "Htc" |].
+    iSplitL "Htrap"; [iExact "Htrap" |].
+    iSplitL "Hcaps"; [iExact "Hcaps" | iExact "Hown"].
   Qed.
 
   (* RENORMALISING THE DESCRIPTOR.  The bare residue reads [pt] only through
@@ -1187,8 +1233,16 @@ Section UsertrapRes.
                eq_refl eq_refl eq_refl).
     iExists N, (upd_upt V (ud_norm (pv_upt V))), av.
     iDestruct (ut_tfk_upd_upt _ _ (ud_norm (pv_upt V)) with "Htfk") as "#Htfk'".
-    rewrite /ut_env_nopt. iFrame "Htfk' Htc Htrap Hcaps Hown".
-    iPureIntro. split; [reflexivity | split; [| split]]; assumption.
+    (* row by row, not framed -- see [ut_res_tlb_close] *)
+    rewrite /ut_env_nopt.
+    iSplitR; [iPureIntro; reflexivity |].
+    iSplitR; [iPureIntro; exact Hksp |].
+    iSplitR; [iPureIntro; exact Hwf |].
+    iSplitR; [iPureIntro; exact Hav |].
+    iSplitR; [iExact "Htfk'" |].
+    iSplitR; [iExact "Htc" |].
+    iSplitL "Htrap"; [iExact "Htrap" |].
+    iSplitL "Hcaps"; [iExact "Hcaps" | iExact "Hown"].
   Qed.
 
   (* THE TRAPFRAME BORROW at the BARE residue.  This is the form uservec's
@@ -1216,12 +1270,16 @@ Section UsertrapRes.
     iDestruct ("Hownback" $! (upd_tf V ws') with "Hpv' Hsy") as "Hown'".
     iExists N, (upd_tf V ws'), av.
     iDestruct (ut_tfk_intro ksp (upd_tf V ws') kroot Htfk' with "Hkpt") as "#Htfk'".
-    rewrite /ut_env_nopt. iFrame "Htfk' Htc Htrap Hcaps Hown'".
-    iPureIntro. split; [| split; [| split]].
-    - rewrite /upd_tf. exact Hupt.
-    - exact Hksp.
-    - exact Hwf.
-    - exact Hav.
+    (* row by row, not framed -- see [ut_res_tlb_close] *)
+    rewrite /ut_env_nopt.
+    iSplitR; [iPureIntro; rewrite /upd_tf; exact Hupt |].
+    iSplitR; [iPureIntro; exact Hksp |].
+    iSplitR; [iPureIntro; exact Hwf |].
+    iSplitR; [iPureIntro; exact Hav |].
+    iSplitR; [iExact "Htfk'" |].
+    iSplitR; [iExact "Htc" |].
+    iSplitL "Htrap"; [iExact "Htrap" |].
+    iSplitL "Hcaps"; [iExact "Hcaps" | iExact "Hown'"].
   Qed.
 
   (* THE PER-HART CSRs.  [hart_csrs] rides in [cpu_priv], hence in the
@@ -1243,9 +1301,21 @@ Section UsertrapRes.
     iDestruct (cpu_own_csrs_open with "Hcpu") as "[Hcsrs Hback]".
     iFrame "Hcsrs". iIntros "Hcsrs".
     iDestruct ("Hback" with "Hcsrs") as "Hcpu".
+    (* row by row, not framed -- see [ut_res_tlb_close] *)
     iExists N, V, av. rewrite /ut_trap_parked.
-    iFrame "Htfk Htc Hstk Harm Hb1 Hb2 Hgh Hcpu Hclm Henv".
-    iPureIntro. split; [| split; [| split]]; assumption.
+    iSplitR; [iPureIntro; exact Hupt |].
+    iSplitR; [iPureIntro; exact Hksp |].
+    iSplitR; [iPureIntro; exact Hwf |].
+    iSplitR; [iPureIntro; exact Hav |].
+    iSplitR; [iExact "Htfk" |].
+    iSplitR; [iExact "Htc" |].
+    iSplitR "Henv"; [| iExact "Henv"].
+    iSplitL "Hstk"; [iExact "Hstk" |].
+    iSplitL "Harm"; [iExact "Harm" |].
+    iSplitL "Hb1"; [iExact "Hb1" |].
+    iSplitL "Hb2"; [iExact "Hb2" |].
+    iSplitL "Hgh"; [iExact "Hgh" |].
+    iSplitL "Hcpu"; [iExact "Hcpu" | iExact "Hclm"].
   Qed.
 
   (* BOTH AT ONCE, and uservec needs exactly that: its save walk holds the
@@ -1283,12 +1353,21 @@ Section UsertrapRes.
     iExists N, (upd_tf V ws'), av.
     iDestruct (ut_tfk_intro ksp (upd_tf V ws') kroot Htfk' with "Hkpt") as "#Htfk'".
     rewrite /ut_env_nopt /ut_trap_parked.
-    iFrame "Htfk' Htc Hstk Harm Hb1 Hb2 Hgh Hcpu Hclm Hcaps Hown'".
-    iPureIntro. split; [| split; [| split]].
-    - rewrite /upd_tf. exact Hupt.
-    - exact Hksp.
-    - exact Hwf.
-    - exact Hav.
+    (* row by row, not framed -- see [ut_res_tlb_close] *)
+    iSplitR; [iPureIntro; rewrite /upd_tf; exact Hupt |].
+    iSplitR; [iPureIntro; exact Hksp |].
+    iSplitR; [iPureIntro; exact Hwf |].
+    iSplitR; [iPureIntro; exact Hav |].
+    iSplitR; [iExact "Htfk'" |].
+    iSplitR; [iExact "Htc" |].
+    iSplitR "Hcaps Hown'";
+      [| iSplitL "Hcaps"; [iExact "Hcaps" | iExact "Hown'"]].
+    iSplitL "Hstk"; [iExact "Hstk" |].
+    iSplitL "Harm"; [iExact "Harm" |].
+    iSplitL "Hb1"; [iExact "Hb1" |].
+    iSplitL "Hb2"; [iExact "Hb2" |].
+    iSplitL "Hgh"; [iExact "Hgh" |].
+    iSplitL "Hcpu"; [iExact "Hcpu" | iExact "Hclm"].
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -1598,9 +1677,17 @@ Proof.
   iSplitR; [iPureIntro; reflexivity|].
   iSplitR; [iPureIntro; exact Hwf|].
   iSplitR; [iPureIntro; exact Hav|].
-  iFrame "Htfk Htc Htrap".
+  (* row by row, not framed -- see [ut_res_tlb_close] *)
+  iSplitR; [iExact "Htfk" |].
+  iSplitR; [iExact "Htc" |].
+  iSplitL "Htrap"; [iExact "Htrap" |].
   rewrite /ut_env_nopt /ut_own_nopt.
-  iFrame "Hcaps". iFrame "Hbs Hip Hfd Hiref Hpriv Hsys".
+  iSplitR; [iExact "Hcaps" |].
+  iSplitL "Hbs"; [iExact "Hbs" |].
+  iSplitL "Hip"; [iExact "Hip" |].
+  iSplitL "Hfd"; [iExact "Hfd" |].
+  iSplitL "Hiref"; [iExact "Hiref" |].
+  iSplitL "Hpriv"; [iExact "Hpriv" | iExact "Hsys"].
 Qed.
 
 
