@@ -14,13 +14,15 @@
    the C code says it should be:
 
      is_pipe γl γp pi  :=  ⌜page_valid pi⌝ ∗
-                           cinv lockN (pn_cancel γp) (lock_inv γl pi "pipe" (pipe_res γp pi))
+                           inv lockN (lock_inv γl pi "pipe" (pipe_res γp pi)
+                                      ∨ pipe_dead γl γp)
 
    persistent, and [pipe_res] owns every remaining byte of the page -- the
-   lock's own name field included, since kfree memsets all 4096.  The lock is
-   CANCELLABLE (WpLock.v's [lock_openable] over [cinv]) because a pipe's page
-   goes back to kfree: the right to touch [pi->lock] is a resource, and it is
-   exactly a reference to the pipe.
+   lock's own name field included, since kfree memsets all 4096.  The lock's
+   invariant has a DEAD arm because a pipe's page goes back to kfree: once
+   both ends are home the invariant degenerates into [pipe_dead], a husk
+   nobody can open again, and the right to touch [pi->lock] at all is a
+   resource -- a reference to the pipe, or the lock itself (see below).
 
    ---- the reference count ----
 
@@ -30,12 +32,13 @@
    The count of outstanding references IS [readopen + writeopen], so the ghost
    mirrors the ends rather than a single number: per end, a FRACTION ghost
 
-     pipe_ref γp w q   -- q of the [w] end of pi ([w] = the struct file's
+     pipe_ref γp w q  :=  own (pn_end γp w) q
+                       -- q of the [w] end of pi ([w] = the struct file's
                           [writable] flag, i.e. pipeclose's second argument)
 
-   with the invariant holding, per end, either "the flag is nonzero" or "the
-   flag is zero AND the whole fraction has come home".  Three things fall out,
-   and they are the whole reason for the shape:
+   with the invariant holding, per end ([pipe_endstate]), either "the flag is
+   nonzero" or "the flag is zero AND the whole fraction has come home".  Three
+   things fall out, and they are the whole reason for the shape:
 
    * a holder of ANY positive fraction of an end proves that end's flag is
      nonzero -- otherwise the invariant would hold fraction 1 of it as well;
@@ -48,35 +51,42 @@
    A single counter would not do any of this: it could not tell pipeclose(pi,1)
    twice apart from one close of each end.
 
-   ---- the cancel token, and where its halves live ----
+   ---- the dead arm, and who may open the lock ----
 
-   A reference also carries half the lock's cancel token:
+   The licence to open [pi->lock] is deliberately NOT one resource but two:
 
-     pipe_ref γp w q  :=  own (pn_end γp w) q  ∗  cinv_own (pn_cancel γp) (q/2)
+     a REFERENCE  refutes [pipe_dead], so acquire may take the lock;
+     the LOCK     refutes [pipe_dead], so release may put it down.
 
-   so ANY positive share of an end is a licence to OPEN [pi->lock], and the
-   two full ends between them make up the whole token, the licence to DESTROY
-   it.  The halves have to be accounted to exactly 1, and where they sit is
-   forced by what release needs:
+   [pipe_dead γl γp] parks BOTH ends at fraction 1 (so any [pipe_ref] is
+   inconsistent with it) together with the lock's own state fragment
+   [lock_frag γl None] (so any [locked]/[locked_pre] token is too).  The second
+   credential is not redundant: by the time the closer of an end calls
+   release, its reference has already gone home into [pipe_res], which release
+   must be handed INTACT -- so release opens the lock on the strength of the
+   lock token it is already carrying.  WpLock's [lock_openable] quantifies the
+   credential inside the accessor precisely so the two can coexist
+   ([is_pipe_openable] below, via [lock_openable_of_dead]).
 
-     both ends open      end0: 1/2   end1: 1/2   bank: 0
-     one end closed        --        1/2         1/2      (its closer banked it)
-     both ends closed      --        1/2 (!)     1/2
+   A CANCELLABLE invariant ([cinv]) with its token split across the references
+   was the first design and cannot work: [cinv_acc] demands a share of the very
+   token that must be WHOLE to cancel, and the first end to close has
+   surrendered its share before its own release call, which opens the lock
+   four times.  The fraction arithmetic has no solution -- the derivation is in
+   claude-notes/design/pipe.md, "Killing the pipe: why not cinv".
 
-   [pipe_bank] is that third conjunct of [pipe_res]: the invariant holds half
-   the token as soon as EITHER end is closed, and no more.  So the closer of
-   the FIRST end banks its half and walks away with nothing; the closer of the
-   SECOND finds the bank already full, banks nothing, and keeps its own half --
-   which is precisely the positive share it still needs in order to open the
-   lock inside release, one instruction before destroying it.  Its other half
-   is inside [pipe_res], and release's finisher (WpLock's [lock_finisher_destroy])
-   is where the two meet, because [pipe_res] has to be handed in INTACT and
-   is only in hand at that instant.  Banking both halves would leave the last
-   closer unable to open the lock it is about to free; banking neither would
-   lose the first closer's half for good.
+   ---- the receipt ----
 
-   Nobody else can observe the both-closed row: seeing it requires holding the
-   lock, and acquiring requires a reference, and both references are home.
+   [pipe_res] hides its flag words behind existentials, so inside release's
+   finisher the last closer cannot re-read them to show both ends are home.
+   It carries witnesses instead: [pipe_endstate]'s open side holds an
+   exclusive per-end marker ([pipe_openmark], a [DfracOwn 1]), and closing an
+   end DISCARDS it, yielding the persistent [pipe_shut].  So an end can never
+   re-open (which is what makes [pipe_dead] stable), and the closed side keeps
+   a copy of [pipe_shut] that the OTHER closer picks up when it reads that
+   flag as 0.  [pipe_res_dead] is the whole argument in one lemma: two receipts
+   plus the spent [lock_frag γl None] turn [pipe_res] into
+   [pipe_dead ∗ pipe_bytes] -- exactly the wand RELEASE_CANCEL asks for.
 
    ---- the page, and reclaiming it ----
 

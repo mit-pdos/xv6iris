@@ -221,8 +221,8 @@ Section PipeInv.
   Qed.
 
   (* what release hands back, reassembled into what kfree wants.  This is the
-     last link of the chain: cinv destroyed -> two lock words + pipe_res ->
-     pipe_bytes -> pipe_raw -> page_own. *)
+     last link of the chain: [pipe_res_dead] (the dead arm established) ->
+     two lock words + pipe_bytes -> pipe_raw -> page_own. *)
   Lemma pipe_bytes_page_own (pi : mword 64) (v : mword 32) (u : mword 64) :
     pi ↦₄ v -∗ lock_cpu pi ↦₈ u -∗ pipe_bytes pi -∗ page_own pi.
   Proof.
