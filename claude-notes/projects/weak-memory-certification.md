@@ -1,5 +1,36 @@
 # The tier-2 containment worklist (was: the certification route)
 
+## AUDIT (2026-08-24, on the user's question "are miscellaneous unproven
+## premises re-appearing?") — YES; READ BEFORE THE TWELFTH-PASS CHECKPOINT
+
+Reading `xv6_rvwmo_safe_modulo_l2''`'s actual hypotheses:
+- INTENDED, honest: `l2_claim`, the WP package family, `prot_reg`,
+  `gwrow_gmo` (scoped).
+- DERIVABLE PLUMBING LEFT AS HYPOTHESES (drift): in `wsupply_res` the
+  hart bound (`gdexec_qconf`'s hart-count clause gives it), `∃ W` with
+  `W_poloc_closed` (a poloc closure), `wubA` (already proved vacuous —
+  `wub_of_witness`), `wrmw_site` (from `gatomicity`).
+- **FALSE IN GENERAL — must be removed:** (a) `cs_hyps` carries
+  `lock_pattern (gd_g GD) b`, the global pattern F4 showed is false for
+  xv6 (failed swaps, pipe lifetimes) — the kill arms reused `cs_chained`
+  with it; replace with the exported `wlp_at`/`wlp_alt`/`wprot_at`
+  facts `prot_reg` supplies.  (b) `wwit_site` demands `lrd_vs c … = vs`
+  — G's row value at a witness equals the candidate's latest bytes —
+  because `lbl_reidx` frees indices only; the LB acceptance test passed
+  ONLY because `cy_img` was built so the values coincide (CycWit ~395
+  says so).  Fix: `lbl_reidx` must allow value substitution at witness
+  positions (the certified row differs in VALUE there; downstream reads
+  only exit messages), and the witness must use differing values.
+- SCOPE, unrecorded until now: `wsupply_res` requires `boot x` to be a
+  `PHart` for every WRITING agent — excludes the disk agent's DMA
+  writes (the disk is a graph agent with real `LStore`s).
+- TRUSTED/OWED, documented: `own` (59 pin witnesses), R-3, the
+  F-variant's `tr_dev_ordered` guard, the checker's Python-trusted parts.
+LESSON for the discipline: "assumptions Closed + tree green" is not
+enough — every NEW hypothesis needs a non-coincidental satisfiability
+witness, and a witness constructed to make a hypothesis hold is the
+vacuity it was meant to catch.
+
 ## CHECKPOINT (2026-08-24, TWELFTH PASS — end of session) — READ THIS FIRST
 
 **THE RESIDUE, EXACTLY.**  `WeakRvwmoPreNorm2.v` settles where
