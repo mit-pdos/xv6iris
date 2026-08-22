@@ -193,15 +193,14 @@ Section ProofKfork.
   Proof.
     intros HK Hsp0 Hra0 Hs00 Hs10 Hs50 Hmtsp Hthr.
     iIntros "Hcg #Htext Hpc Hframe Hcont".
-    iPoseProof (kfk_10a with "Htext") as "Hi10a".
-    iPoseProof (kfk_10c with "Htext") as "Hi10c".
     (* ---- +0x10a: c.li s1,-1 ---- *)
     iApply (wp_cli_s_sconf (mword_of_int (KF + 0x10a)) Rs1
               (mword_of_int 63 : mword 6) (mword_of_int (-1) : mword 64)
               Mt (K - 8)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(apply bv_eq; vm_compute; reflexivity)
-              with "Hcg Hpc Hi10a").
+              with "Hcg Hpc []").
+    { iApply (kfk_10a with "Htext"). }
     iIntros (CID1 Hs1) "Hcg Hpc".
     set (T1 := <[Regidx Rs1 := regval_into_reg (mword_of_int (-1) : mword 64)]> Mt).
     change (<[Regidx Rs1 := regval_into_reg (mword_of_int (-1) : mword 64)]> Mt)
@@ -219,7 +218,8 @@ Section ProofKfork.
               (sign_extend' 21 (concat_vec (mword_of_int 2040 : mword 11) ('b"0")))
               T1 (K - 8)%nat b
               ltac:(rewrite Htgt; vm_compute; reflexivity)
-              with "Hcg Hpc Hi10c").
+              with "Hcg Hpc []").
+    { iApply (kfk_10c with "Htext"). }
     iIntros (CID2 Hs2). iNext. iIntros "Hcg Hpc".
     iEval (rewrite Htgt) in "Hpc".
     assert (HT1sp : T1 !!! Regidx csp_rs1 = pa_stk sp0 8)
@@ -285,9 +285,6 @@ Section ProofKfork.
   Proof.
     intros HK Hsp0 Hra0 Hs00 Hs10 Hs50 Hmtsp Hmts1 Hthr.
     iIntros "Hcg #Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hcont".
-    iPoseProof (kfk_0f6 with "Htext") as "Hi0f6".
-    iPoseProof (kfk_0f8 with "Htext") as "Hi0f8".
-    iPoseProof (kfk_0fa with "Htext") as "Hi0fa".
     (* ---- +0xf6: c.ldsp s2,32(sp) ---- *)
     assert (Hpa4 : add_vec (Mt !!! Regidx csp_rs1)
                      (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000")))
@@ -296,7 +293,8 @@ Section ProofKfork.
     iApply (wp_cldsp_s_sconf (mword_of_int (KF + 0xf6)) (mword_of_int 4 : mword 6) Rs2
               Mt (K - 8)%nat (m !!! Regidx Rs2) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi0f6 Hb4").
+              with "Hcg Hpc [] Hb4").
+    { iApply (kfk_0f6 with "Htext"). }
     iIntros (CID1 Hc1) "Hcg Hpc Hb4". iEval (rewrite Hpa4) in "Hb4".
     set (U1 := <[Regidx Rs2 := regval_into_reg (m !!! Regidx Rs2)]> Mt).
     assert (HU1sp : U1 !!! Regidx csp_rs1 = pa_stk sp0 8)
@@ -312,7 +310,8 @@ Section ProofKfork.
     iApply (wp_cldsp_s_sconf (mword_of_int (KF + 0xf8)) (mword_of_int 3 : mword 6) Rs3
               U1 (K - 8)%nat (m !!! Regidx Rs3) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi0f8 Hb5").
+              with "Hcg Hpc [] Hb5").
+    { iApply (kfk_0f8 with "Htext"). }
     iIntros (CID2 Hc2) "Hcg Hpc Hb5". iEval (rewrite Hpa5) in "Hb5".
     set (U2 := <[Regidx Rs3 := regval_into_reg (m !!! Regidx Rs3)]> U1).
     assert (HU2sp : U2 !!! Regidx csp_rs1 = pa_stk sp0 8)
@@ -328,7 +327,8 @@ Section ProofKfork.
     iApply (wp_cldsp_s_sconf (mword_of_int (KF + 0xfa)) (mword_of_int 2 : mword 6) Rs4
               U2 (K - 8)%nat (m !!! Regidx Rs4) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi0fa Hb6").
+              with "Hcg Hpc [] Hb6").
+    { iApply (kfk_0fa with "Htext"). }
     iIntros (CID3 Hc3) "Hcg Hpc Hb6". iEval (rewrite Hpa6) in "Hb6".
     set (U3 := <[Regidx Rs4 := regval_into_reg (m !!! Regidx Rs4)]> U2).
     assert (Hpp0fc : add_vec_int (mword_of_int (KF + 0xfa) : mword 64) 2

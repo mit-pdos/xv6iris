@@ -525,7 +525,6 @@ Section KexecPinnedABody.
     iIntros (CIDp Hsp1 M1) "%HM1 Hcg Hpc Hframe".
     destruct HM1 as (HM1sp & HM1s0 & HM1s2 & HM1a0 & HM1a1 & HM1thr).
     (* ---- +0x020: jal ra,myproc ---- *)
-    iPoseProof (kxc_020 with "Htext") as "Hi020".
     assert (Htmp : add_vec (mword_of_int (KXA + 0x20) : mword 64)
                      (sign_extend' 64 (mword_of_int 2085126 : mword 21))
                    = mword_of_int KernelSyms.myproc) by pcw.
@@ -533,7 +532,8 @@ Section KexecPinnedABody.
               (mword_of_int 2085126 : mword 21) M1 (K - 68)%nat eb
               ltac:(nz) ltac:(rdok)
               ltac:(rewrite Htmp; vm_compute; reflexivity)
-              with "Hcg Hpc Hi020").
+              with "Hcg Hpc []").
+    { iApply (kxc_020 with "Htext"). }
     iIntros (CIDj1 Hsj1) "Hcg Hpc". iEval (rewrite Htmp) in "Hpc".
     set (N1 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KXA + 0x20) : mword 64) 4)]> M1).
@@ -557,10 +557,10 @@ Section KexecPinnedABody.
       by (rewrite HN1ra; pcw).
     iEval (rewrite Hpc24) in "Hpc".
     (* ---- +0x024: c.mv s1,a0 -- s1 := p ---- *)
-    iPoseProof (kxc_024 with "Htext") as "Hi024".
     iApply (wp_cmv_s_sconf (mword_of_int (KXA + 0x24)) Rs1 Ra0
               M2 (K - 68)%nat eb ltac:(nz) ltac:(rdok)
-              with "Hcg Hpc Hi024").
+              with "Hcg Hpc []").
+    { iApply (kxc_024 with "Htext"). }
     iIntros (CIDv1 Hsv1) "Hcg Hpc". iEval (rgne) in "Hcg".
     set (N2 := <[Regidx Rs1 := regval_into_reg
                   (add_vec zero_reg (M2 !!! Regidx Ra0))]> M2).
@@ -570,7 +570,6 @@ Section KexecPinnedABody.
                      = mword_of_int (KXA + 0x26)) by pcw.
     iEval (rewrite Hpp026) in "Hpc".
     (* ---- +0x026: jal ra,begin_op ---- *)
-    iPoseProof (kxc_026 with "Htext") as "Hi026".
     assert (Htbo : add_vec (mword_of_int (KXA + 0x26) : mword 64)
                      (sign_extend' 64 (mword_of_int 2094214 : mword 21))
                    = mword_of_int KernelSyms.begin_op) by pcw.
@@ -578,7 +577,8 @@ Section KexecPinnedABody.
               (mword_of_int 2094214 : mword 21) N2 (K - 68)%nat eb
               ltac:(nz) ltac:(rdok)
               ltac:(rewrite Htbo; vm_compute; reflexivity)
-              with "Hcg Hpc Hi026").
+              with "Hcg Hpc []").
+    { iApply (kxc_026 with "Htext"). }
     iIntros (CIDj2 Hsj2) "Hcg Hpc". iEval (rewrite Htbo) in "Hpc".
     set (N3 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KXA + 0x26) : mword 64) 4)]> N2).
@@ -605,7 +605,6 @@ Section KexecPinnedABody.
       by (rewrite HN3ra; pcw).
     iEval (rewrite Hpc2a) in "Hpc".
     (* ---- +0x02a: c.mv a0,s2 -- a0 := path ---- *)
-    iPoseProof (kxc_02a with "Htext") as "Hi02a".
     assert (HM3s2 : M3 !!! Regidx Rs2 = pv).
     { rewrite (callee_saved_lookup Hcsb Rs2 ltac:(vm_compute; reflexivity)).
       rewrite /N3 upd_ne; [| nz]. rewrite /N2 upd_ne; [| nz].
@@ -613,7 +612,8 @@ Section KexecPinnedABody.
       rewrite /N1 upd_ne; [exact HM1s2 | nz]. }
     iApply (wp_cmv_s_sconf (mword_of_int (KXA + 0x2a)) Ra0 Rs2
               M3 (K - 68)%nat eb ltac:(nz) ltac:(rdok)
-              with "Hcg Hpc Hi02a").
+              with "Hcg Hpc []").
+    { iApply (kxc_02a with "Htext"). }
     iIntros (CIDv2 Hsv2) "Hcg Hpc". iEval (rgne) in "Hcg".
     set (N4 := <[Regidx Ra0 := regval_into_reg
                   (add_vec zero_reg (M3 !!! Regidx Rs2))]> M3).
@@ -623,7 +623,6 @@ Section KexecPinnedABody.
                      = mword_of_int (KXA + 0x2c)) by pcw.
     iEval (rewrite Hpp02c) in "Hpc".
     (* ---- +0x02c: jal ra,namei ---- *)
-    iPoseProof (kxc_02c with "Htext") as "Hi02c".
     assert (Htnm : add_vec (mword_of_int (KXA + 0x2c) : mword 64)
                      (sign_extend' 64 (mword_of_int 2093730 : mword 21))
                    = mword_of_int KernelSyms.namei) by pcw.
@@ -631,7 +630,8 @@ Section KexecPinnedABody.
               (mword_of_int 2093730 : mword 21) N4 (K - 68)%nat eb
               ltac:(nz) ltac:(rdok)
               ltac:(rewrite Htnm; vm_compute; reflexivity)
-              with "Hcg Hpc Hi02c").
+              with "Hcg Hpc []").
+    { iApply (kxc_02c with "Htext"). }
     iIntros (CIDj3 Hsj3) "Hcg Hpc". iEval (rewrite Htnm) in "Hpc".
     set (N5 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KXA + 0x2c) : mword 64) 4)]> N4).
@@ -724,7 +724,6 @@ Section KexecPinnedABody.
       rewrite (callee_saved_lookup Hcsm r Hr).
       rewrite /N1 upd_ne; [| regne].
       exact (HM1thr r Hr Nsp Ns0 Ns2). }
-    iPoseProof (kxc_030 with "Htext") as "Hi030".
     destruct ok.
     - (* ============ namei SUCCEEDED: fall through to +0x032 ============ *)
       iDestruct "Harm" as "(%HM4a0 & Hirs & Hverd)".
@@ -749,7 +748,8 @@ Section KexecPinnedABody.
                 (mword_of_int 44 : mword 8) (Cregidx (mword_of_int 2)) Ra0
                 M4 (K - 68)%nat eb
                 ltac:(vm_compute; reflexivity) ltac:(nz) Hcmp
-                with "Hcg Hpc Hi030").
+                with "Hcg Hpc []").
+      { iApply (kxc_030 with "Htext"). }
       iIntros (CIDz Hsz1) "Hcg Hpc".
       assert (Hpp032 : add_vec_int (mword_of_int (KXA + 0x30) : mword 64) 2
                        = mword_of_int (KXA + 0x32)) by pcw.
@@ -815,13 +815,11 @@ Section KexecPinnedABody.
                 M4 (K - 68)%nat eb
                 ltac:(vm_compute; reflexivity) ltac:(nz) Hcmp
                 ltac:(rewrite Htgt88; vm_compute; reflexivity)
-                with "Hcg Hpc Hi030").
+                with "Hcg Hpc []").
+      { iApply (kxc_030 with "Htext"). }
       iIntros (CIDz Hsz1). iNext. iIntros "Hcg Hpc".
       iEval (rewrite Htgt88) in "Hpc".
       (* ---- +0x088: jal ra,end_op ---- *)
-      iPoseProof (kxc_088 with "Htext") as "Hi088".
-      iPoseProof (kxc_08c with "Htext") as "Hi08c".
-      iPoseProof (kxc_08e with "Htext") as "Hi08e".
       assert (Hteo : add_vec (mword_of_int (KXA + 0x88) : mword 64)
                        (sign_extend' 64 (mword_of_int 2094256 : mword 21))
                      = mword_of_int KernelSyms.end_op) by pcw.
@@ -829,7 +827,8 @@ Section KexecPinnedABody.
                 (mword_of_int 2094256 : mword 21) M4 (K - 68)%nat eb
                 ltac:(nz) ltac:(rdok)
                 ltac:(rewrite Hteo; vm_compute; reflexivity)
-                with "Hcg Hpc Hi088").
+                with "Hcg Hpc []").
+      { iApply (kxc_088 with "Htext"). }
       iIntros (CIDj4 Hsj4) "Hcg Hpc". iEval (rewrite Hteo) in "Hpc".
       set (P1 := <[Regidx Rra := regval_into_reg
                     (add_vec_int (mword_of_int (KXA + 0x88) : mword 64) 4)]> M4).
@@ -859,7 +858,8 @@ Section KexecPinnedABody.
                 (mword_of_int 63 : mword 6) (mword_of_int (-1) : mword 64)
                 M5 (K - 68)%nat eb ltac:(nz) ltac:(rdok)
                 ltac:(apply bv_eq; vm_compute; reflexivity)
-                with "Hcg Hpc Hi08c").
+                with "Hcg Hpc []").
+      { iApply (kxc_08c with "Htext"). }
       iIntros (CIDl1 Hsl1) "Hcg Hpc".
       set (P2 := <[Regidx Ra0 := regval_into_reg
                     (mword_of_int (-1) : mword 64)]> M5).
@@ -877,7 +877,8 @@ Section KexecPinnedABody.
                 (sign_extend' 21 (concat_vec (mword_of_int 2034 : mword 11) ('b"0")))
                 P2 (K - 68)%nat eb
                 ltac:(rewrite Htj72; vm_compute; reflexivity)
-                with "Hcg Hpc Hi08e").
+                with "Hcg Hpc []").
+      { iApply (kxc_08e with "Htext"). }
       iIntros (CIDz2 Hsz2). iNext. iIntros "Hcg Hpc".
       iEval (rewrite Htj72) in "Hpc".
       (* ---- close the private block and take the shared exit ---- *)

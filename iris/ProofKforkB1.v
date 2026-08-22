@@ -192,17 +192,11 @@ Section KforkB1Proof.
        existentially quantified), so hand it the projection; both forms are
        persistent at [None], so "Henv" survives for our own postcondition. *)
     iDestruct (KvmSpec.kalloc_env_at_env with "Henv") as "#Henvb".
-    iPoseProof (kfk_07c with "Htext") as "Hi7c".
-    iPoseProof (kfk_07e with "Htext") as "Hi7e".
-    iPoseProof (kfk_082 with "Htext") as "Hi82".
-    iPoseProof (kfk_084 with "Htext") as "Hi84".
-    iPoseProof (kfk_088 with "Htext") as "Hi88".
-    iPoseProof (kfk_08a with "Htext") as "Hi8a".
-    iPoseProof (kfk_08c with "Htext") as "Hi8c".
     (* ---- +0x7c: c.mv a0,s4 ---- *)
     iApply (wp_cmv_s_sconf (mword_of_int (KF + 0x7c)) Ra0 Rs4 Mt (trap_res b + (K - 8))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi7c").
+              with "Hcg Hpc []").
+    { iApply (kfk_07c with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (T0 := <[Regidx Ra0 := regval_into_reg (add_vec zero_reg (rget Mt Rs4))]> Mt).
     change (<[Regidx Ra0 := regval_into_reg (add_vec zero_reg (rget Mt Rs4))]> Mt) with T0.
@@ -220,7 +214,8 @@ Section KforkB1Proof.
               T0 (trap_res b + (K - 8))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(rewrite Htgt7e; vm_compute; reflexivity)
-              with "Hcg Hpc Hi7e").
+              with "Hcg Hpc []").
+    { iApply (kfk_07e with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rewrite Htgt7e) in "Hpc".
     set (T1 := <[Regidx Rra := regval_into_reg (add_vec_int (mword_of_int (KF + 0x7e) : mword 64) 4)]> T0).
@@ -258,7 +253,8 @@ Section KforkB1Proof.
     (* ---- +0x82: c.mv a0,s4 (prepare release's argument) ---- *)
     iApply (wp_cmv_s_sconf (mword_of_int (KF + 0x82)) Ra0 Rs4 mfp (trap_res b + (K - 8))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi82").
+              with "Hcg Hpc []").
+    { iApply (kfk_082 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (T2 := <[Regidx Ra0 := regval_into_reg (add_vec zero_reg (rget mfp Rs4))]> mfp).
     change (<[Regidx Ra0 := regval_into_reg (add_vec zero_reg (rget mfp Rs4))]> mfp) with T2.
@@ -278,7 +274,8 @@ Section KforkB1Proof.
               T2 (trap_res b + (K - 8))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(rewrite Htgt84; vm_compute; reflexivity)
-              with "Hcg Hpc Hi84").
+              with "Hcg Hpc []").
+    { iApply (kfk_084 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rewrite Htgt84) in "Hpc".
     set (T3 := <[Regidx Rra := regval_into_reg (add_vec_int (mword_of_int (KF + 0x84) : mword 64) 4)]> T2).
@@ -335,7 +332,8 @@ Section KforkB1Proof.
               mr (K - 8)%nat (match lvl with O => eb | S _ => false end)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(apply bv_eq; vm_compute; reflexivity)
-              with "Hcg Hpc Hi88").
+              with "Hcg Hpc []").
+    { iApply (kfk_088 with "Htext"). }
     iIntros (CIDs1 Hss1) "Hcg Hpc".
     set (T4 := <[Regidx Rs1 := regval_into_reg (mword_of_int (-1) : mword 64)]> mr).
     change (<[Regidx Rs1 := regval_into_reg (mword_of_int (-1) : mword 64)]> mr) with T4.
@@ -359,7 +357,8 @@ Section KforkB1Proof.
     iApply (wp_cldsp_s_sconf (mword_of_int (KF + 0x8a)) (mword_of_int 2 : mword 6) Rs4
               T4 (K - 8)%nat (m !!! Regidx Rs4) (match lvl with O => eb | S _ => false end)
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi8a Hb6").
+              with "Hcg Hpc [] Hb6").
+    { iApply (kfk_08a with "Htext"). }
     iIntros (CIDs2 Hss2) "Hcg Hpc Hb6". iEval (rewrite Hpa6) in "Hb6".
     set (T5 := <[Regidx Rs4 := regval_into_reg (m !!! Regidx Rs4)]> T4).
     change (<[Regidx Rs4 := regval_into_reg (m !!! Regidx Rs4)]> T4) with T5.
@@ -386,7 +385,8 @@ Section KforkB1Proof.
               (sign_extend' 21 (concat_vec (mword_of_int 56 : mword 11) ('b"0")))
               T5 (K - 8)%nat (match lvl with O => eb | S _ => false end)
               ltac:(rewrite Htgt8c; vm_compute; reflexivity)
-              with "Hcg Hpc Hi8c").
+              with "Hcg Hpc []").
+    { iApply (kfk_08c with "Htext"). }
     iIntros (CIDs3 Hss3). iNext. iIntros "Hcg Hpc".
     iEval (rewrite Htgt8c) in "Hpc".
     (* ---- fall into the shared epilogue ---- *)
