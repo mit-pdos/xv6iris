@@ -45,9 +45,16 @@ axioms), no Admitted.  THE CHAIN IS NOW: T2-LIN ⇒ `RacyD` acyclic ⇒
    has no `stvec` edge (xv6 writes it from constants).
 3. **B2e-3b slice 3** — the gmo-ordered solo-run certification
    (§4d.2(2)) on top of 1–2.
-4. **B2e-3c** — the per-segment classification / the T2-LIN induction
-   skeleton (strong induction on |V| over hulls; the cycle kill with
-   the three arms consuming `_lockalt`, `_prot`, φ).
+4. **B2e-3c** — the per-segment classification.  The T2-LIN INDUCTION
+   SKELETON IS DONE (`WeakRvwmoLinInd.v`: `proper_cut`, `hull_events_lt`,
+   the kill interface `cycle_kill boot d0`, `hull_realizable_of_acyclic`
+   (the IH turned into a realized cand, rows up to the retiming `π`),
+   `t2lin_of_cycle_kill`, `t2lin_supply`; non-vacuity `lbgd_cycle` and
+   `mpgd_acyclic`).  What remains is DISCHARGING `cycle_kill`: the
+   three arms (pinned / CS-chained via `_lockalt` + `_prot` / bad via
+   φ) over the certified configuration of slice 3.  Also done: the
+   `hemit` non-vacuity witness (`WeakRvwmoConfWit.v`, the real
+   `sw &started` of `main`, `hart_conf_nonempty`).
 5. **B3** assembly, **R6**; the width-4/8 lift of `wprot_store`; the
    `lock_pattern` failed-swap arm in `WeakRvwmoLock.v` (now only the
    witness kit's hygiene, since the kill consumes the exports).

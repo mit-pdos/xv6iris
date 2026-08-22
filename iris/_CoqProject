@@ -1104,3 +1104,5 @@ WeakRvwmoTopo.v
 WeakRvwmoDec.v
 WeakRvwmoHull.v
 WeakRvwmoSupply.v
+WeakRvwmoLinInd.v
+WeakRvwmoConfWit.v
