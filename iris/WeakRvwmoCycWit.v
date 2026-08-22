@@ -721,20 +721,9 @@ Qed.
     bytes.  Hart 1's load is TRUE: by the time it runs, hart 0's store IS
     in the log at index 1, which is exactly its graph source. *)
 
-(** The "other agent" twin of [WeakRvwmoCert2.cand_snoc_relp]. *)
-Lemma cand_snoc_relp_ne (c : cand) (i j : agent) (lb : WeakAxiomatic.lbl) :
-  j ≠ i →
-  w_relp (ms_ws (cand_last_st (cand_snoc c (EStep i lb))) j)
-  = w_relp (ms_ws (cand_last_st c) j).
-Proof.
-  intros Hne.
-  have H1 : cand_last_st (cand_snoc c (EStep i lb))
-          = stt (cand_exec (cand_snoc c (EStep i lb))) (S (cd_end c))
-    by rewrite {1}/cand_last_st cd_end_snoc.
-  rewrite H1 (cand_next _ (cd_end c) (EStep i lb) (cand_snoc_tr_end c _))
-          (cand_snoc_last_st c (EStep i lb)).
-  by rewrite (mnext_ws_ne _ _ _ _ Hne).
-Qed.
+(** The "other agent" twin of [WeakRvwmoCert2.cand_snoc_relp] now lives in
+    [WeakRvwmoCert2] ([cand_snoc_relp_ne]), where the segment iteration's own
+    frame lemmas need it. *)
 
 Section walkrun.
   Context (cpu0 cpu1 : CPU) (rs0 rs1 : regstate) (d0 : dev_state).

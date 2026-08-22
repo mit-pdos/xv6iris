@@ -70,6 +70,25 @@
           witness one.  [walk_policy] bundles the per-state supply;
           [walk_supply_of_policy] is the theorem.
 
+      §4.5–§4.6  THE CHAINED WALK.  §4.1–§4.4 build ONE segment at ONE
+          state; chaining them generically needs two changes.  (a) THE
+          WITNESS SET IS FROZEN: [cpol_ctx G (wwit G n) x] cannot be
+          carried across a step, because [wwit G n] shrinks with [n] while
+          [ctrace_prefix] is not monotone in that direction (a substituted
+          position carries the candidate's LATEST-source read, not [G]'s
+          label, so the [¬ W] arm cannot take over when the position leaves
+          [W]).  So the walk carries ONE set [W] throughout, and [wwit G n]
+          survives only inside the per-position SITE DATUM [wsite_cls].
+          (b) THE INVARIANT CARRIES THE PROCESS STATES: [wlk_inv'] records,
+          for every hart, its emission from its current row position
+          ([wemit]), the walk state's process identified with it
+          ([pex_dag]), its release-pending fold, and the ROW-POSITION
+          BOUNDARY ([wpos_lo]/[wpos_hi]).  [wlk_step'_of_supply] then
+          DERIVES the whole per-state datum — which write, whose, where the
+          hart stands, that nothing between is a write, the site data, the
+          emission — from a per-GRAPH datum [wsupply], and
+          [walk_supply_of_sites] is the theorem.
+
       §5  THE CAPSTONE SHAPE, restated: [cycle_kill_of_l2''''],
           [t2lin_of_l2'''] and [xv6_rvwmo_safe_modulo_walk] — the capstone
           with (R-2) replaced by the policy.  The capstone file is NOT
@@ -77,8 +96,7 @@
 
       §6  the audit, §7 the ledger.
 
-    Nothing below is [Admitted] or [Axiom]-ed.  A LEAF: nothing imports
-    this file. *)
+    Nothing below is [Admitted] or [Axiom]-ed. *)
 From Stdlib.ssr Require Import ssreflect.
 From stdpp Require Import gmap finite list relations.
 From stdpp Require Import bitvector.definitions.
@@ -572,12 +590,13 @@ Definition wcls_at (G : gexec) (W : geid → Prop) (x : agent) (c0 : cand)
 (** At a NON-witness position the classification IS [G]'s own label, and
     the write clause is [wlog_pfx] read forward: the log has length [n], so
     "the appended write is [G]'s [(n+1)]-st" says exactly [gwix = S n]. *)
-Theorem wcls_of_pfx (G : gexec) (n : nat) (x : agent) (c0 : cand) (lb' : lbl) :
+Theorem wcls_of_pfx (G : gexec) (W : geid → Prop) (n : nat) (x : agent)
+    (c0 : cand) (lb' : lbl) :
   wlog_pfx G n (cd_log_end c0) →
   gx_lbl G (x, gcnt x (cd_tr c0)) = Some lb' →
-  ¬ wwit G n (x, gcnt x (cd_tr c0)) →
+  ¬ W (x, gcnt x (cd_tr c0)) →
   (lb_is_w lb' = true → gwix G (x, gcnt x (cd_tr c0)) = S n) →
-  wcls_at G (wwit G n) x c0 lb'.
+  wcls_at G W x c0 lb'.
 Proof.
   intros [Hlen _] Hl HnW Hix. split.
   - left. by split.
@@ -773,12 +792,12 @@ Definition wpol (G : gexec) (n : nat) (x : agent) (cpu : CPU)
 
 (** THE CLASSIFICATION AT A WITNESS: [cstep_cls]'s SUBSTITUTED disjunct,
     which the split of [WeakRvwmoCert3.cpol_ctx] made reachable. *)
-Theorem wcls_of_wit (G : gexec) (n : nat) (x : agent) (c0 : cand)
+Theorem wcls_of_wit (G : gexec) (W : geid → Prop) (x : agent) (c0 : cand)
     (base : Z) (ts : list nat) (vs : list (bv 8)) :
   gx_lbl G (x, gcnt x (cd_tr c0))
     = Some (WeakAxiomatic.LLoad false base ts vs) →
-  wwit G n (x, gcnt x (cd_tr c0)) →
-  wcls_at G (wwit G n) x c0 (latest_read_lbl c0 false base (length ts)).
+  W (x, gcnt x (cd_tr c0)) →
+  wcls_at G W x c0 (latest_read_lbl c0 false base (length ts)).
 Proof.
   intros Hl HW. split.
   - right. split; [exact HW|].
@@ -835,7 +854,7 @@ Proof.
     have HnW : ¬ wwit G n (x, gcnt x (cd_tr c0)) := wsrc_le_not_wwit _ _ _ Hle.
     exists lb, l, rds, wrs, rs2'.
     split_and!; [exact Hblk2| |apply lbl_reidx_refl
-                |by apply (wcls_of_pfx G n x c0 lb)|exact Hag2].
+                |by apply (wcls_of_pfx G (wwit G n) n x c0 lb)|exact Hag2].
     destruct lb as [aq base ts vs|rl base vs kc|pr pw sr sw
                    |aq rl base ts rvs wvs kc].
     + apply (cpol_read G (wwit G n) x c0 aq base ts vs Hcons Hpc Hctx HnW Hl).
@@ -864,7 +883,7 @@ Proof.
     + rewrite /latest_read_lbl /=. split_and!;
         [reflexivity|reflexivity|exact Hvals|].
       by rewrite /lrd_ts length_fmap length_seq.
-    + by apply (wcls_of_wit G n x c0 base ts vs).
+    + by apply (wcls_of_wit G (wwit G n) x c0 base ts vs).
     + exact Hag2.
 Qed.
 
@@ -993,7 +1012,7 @@ Proof.
                  (λ k lb H, wQ_rmwfree G n x k0 kz k lb H))
               k0 ws0 rowseg es pfin m0 rs10 fn0 ib0 St rs20
               Hem HQ Hok Hctx Hp Hag Hrelp)
-    as (St' & tradd & Hstep & Hctx' & Himg & Hpst0 & Hdv0).
+    as (St' & tradd & Hstep & Hctx' & Himg & Hpst0 & Hdv0 & _).
   exists St', tradd.
   split_and!; [exact Hstep|exact Hctx'|exact Himg|exact Hpst0|exact Hdv0].
 Qed.
@@ -1041,6 +1060,819 @@ Theorem walk_supply_of_policy (boot : agent → pexv6) (d0 : dev_state)
 Proof.
   intros Hpol. apply walk_supply_of_steps.
   intros GD Hcons Hq. by apply walk_policy_steps, Hpol.
+Qed.
+
+(* ====================================================================== *)
+(** * 4.5 THE CHAINED WALK: A FROZEN WITNESS SET, AND AN INVARIANT THAT
+       CARRIES WHAT THE NEXT STEP NEEDS
+
+    §4.1–§4.4 build ONE segment at ONE state.  Chaining them generically
+    needs two things the interface above does not have.
+
+    THE WITNESS SET MUST BE FROZEN.  [wctx] carries [cpol_ctx G (wwit G n) x]
+    — the certification context AT THE CURRENT WRITE COUNT — and [wwit G n]
+    SHRINKS as [n] grows (a read whose source is [≤ n+1] is no longer a
+    witness at [n+1]).  [ctrace_prefix] is not monotone in that direction:
+    a position substituted at [n] carries the candidate's LATEST-source
+    read, which is NOT [G]'s label, so the [¬ W] arm of [ctp_step] cannot
+    take over when the position leaves [W].  (And it really is the wrong
+    label: the substituted read read the latest bytes AT ITS TIME, before
+    the write that would have made it true was appended.)  So the walk
+    carries ONE witness set [W] for its whole run, and the log-decided
+    [wwit G n] appears only in the SITE DATUM that classifies each newly
+    visited position ([wsite_cls]): "not in [W] and its sources are already
+    in the log" or "in [W], a genuine witness at this count, and carrying
+    the substitution data".  [ctrace_prefix] is then stable under appends
+    for free — the set never moves.
+
+    THE INVARIANT MUST CARRY THE PROCESS STATES.  [wlk_inv] records the
+    candidate, the image, the boot supply and the log prefix; a segment
+    additionally needs, for the hart it runs, that hart's EMISSION from its
+    current row position and the identification of the walk state's process
+    with the emission's own.  [wlk_inv'] carries both, for EVERY hart, and
+    [wlk_seg_of_cert2]'s frame conclusions ([WeakRvwmoCert3.cert_segment']'s
+    own) re-establish them: the acting hart's advance to the emission's next
+    state, every other hart untouched.
+
+    The two remaining bookkeeping clauses are the ROW POSITIONS: hart [x]'s
+    replayed count is exactly the boundary between its writes the log has
+    reached ([wpos_lo]) and those it has not ([wpos_hi]).  Together with
+    [grule14] they are what makes "the next write's hart stands at or before
+    it, with no write in between" a THEOREM rather than a per-state datum. *)
+
+(** Hart [x]'s row, as a list; [gx_lbl] is its lookup. *)
+Definition qrow (G : gexec) (x : agent) : list lbl :=
+  default [] (gx_prog G !! x).
+
+Lemma qrow_lbl (G : gexec) (x : agent) (k : nat) :
+  gx_lbl G (x, k) = qrow G x !! k.
+Proof. rewrite /gx_lbl /qrow /=. by destruct (gx_prog G !! x). Qed.
+
+(** ** 4.5a The row fold, over a segment *)
+
+Lemma row_ws_aux_app (t : nat) (ws : wstate) (r1 r2 : list lbl) :
+  row_ws_aux t ws (r1 ++ r2)
+  = row_ws_aux (t + length r1)%nat (row_ws_aux t ws r1) r2.
+Proof.
+  revert t ws. induction r1 as [|lb r1 IH]; intros t ws.
+  - by rewrite /= Nat.add_0_r.
+  - rewrite /= IH.
+    by replace (S t + length r1)%nat with (t + S (length r1))%nat by lia.
+Qed.
+
+Lemma row_ws_seg (row : list lbl) (k0 L : nat) :
+  (k0 ≤ length row)%nat →
+  row_ws_aux k0 (row_ws row k0) (take L (drop k0 row))
+  = row_ws row (k0 + L)%nat.
+Proof.
+  intros Hk. rewrite /row_ws -(take_take_drop row k0 L) row_ws_aux_app.
+  by rewrite (length_take_le row k0 Hk).
+Qed.
+
+(** ** 4.5b The per-hart emission tail, and the process identification *)
+
+(** "Hart [x]'s emission, from row position [k] on, starts at [p]". *)
+Definition wemit (d0 : dev_state) (G : gexec) (x : agent) (k : nat)
+    (p : pexv6) : Prop :=
+  ∃ (es : list eitem) (pfin : pexv6),
+    hemit (λ _, d0) k (row_ws (qrow G x) k) (drop k (qrow G x)) p es pfin.
+
+(** The walk state's process for a hart IS the emission's, off the taint
+    (which is EMPTY at the walk, so this is agreement on every data
+    register).  Stated as an implication so that a hart which is not a
+    [PHart] at all — the disk — costs nothing. *)
+Definition pex_dag (p q : pexv6) : Prop :=
+  ∀ cpu m rs fn ib, p = PHart cpu m rs fn ib →
+    ∃ rs', q = PHart cpu m rs' fn ib ∧ dreg_agree (λ nn, nn ∉ []) rs rs'.
+
+Lemma pex_dag_refl p : pex_dag p p.
+Proof. intros cpu m rs fn ib ->. exists rs. split; [done|apply dreg_agree_refl]. Qed.
+
+(** ** 4.5c The frozen witness set: its side condition, and the site datum *)
+
+(** (W-2) FOR EVERY HART AT ONCE.  [wub] is stated at one hart and one
+    snoc; the chained walk re-establishes the context for whichever hart
+    runs next, so it asks for the bound at every hart's own next position.
+    [wub] follows ([wubA_wub]). *)
+Definition wubA (G : gexec) (W : geid → Prop) : Prop :=
+  ∀ (c : cand) (ev : nat → geid) (y : agent),
+    ctrace_prefix G c ev W → wit_fence_ub G c ev W (y, gcnt y (cd_tr c)).
+
+Lemma wubA_wub G W x : wubA G W → wub G W x.
+Proof.
+  intros Hub c0 lb' ev' Hct.
+  rewrite -(gcnt_cand_snoc_self c0 x lb'). by apply Hub.
+Qed.
+
+(** THE CLASSIFICATION, AS A SITE DATUM.  Exactly the two routes §4.0c
+    serves, at the FROZEN set: a position outside [W] must have its sources
+    in the log already (the true route), a position inside it must be a
+    genuine witness at this count and carry [wwit_site] (the substituted
+    route). *)
+Definition wsite_cls (G : gexec) (W : geid → Prop) (n : nat) (x : agent)
+    (p : nat) : Prop :=
+  (¬ W (x, p) ∧ wsrc_le G n (x, p)) ∨
+  (W (x, p) ∧ wwit G n (x, p) ∧ wwit_site G n x p).
+
+Definition wsite_ok' (G : gexec) (W : geid → Prop) (n : nat) (x : agent)
+    (p : nat) (lb : lbl) : Prop :=
+  gx_lbl G (x, p) = Some lb ∧
+  (lb_is_w lb = true → gwix G (x, p) = S n) ∧
+  lb_rmwfree lb ∧
+  wsite_cls G W n x p.
+
+Definition wQ' (G : gexec) (W : geid → Prop) (n : nat) (x : agent)
+    (k0 kz : nat) (k : nat) (lb : lbl) : Prop :=
+  (k0 ≤ k)%nat ∧ (k ≤ kz)%nat ∧
+  wsite_ok' G W n x k lb ∧
+  (lb_is_w lb = true ↔ k = kz).
+
+Lemma wQ'_rmwfree G W n x k0 kz k lb : wQ' G W n x k0 kz k lb → lb_rmwfree lb.
+Proof. by intros (_ & _ & (_ & _ & H & _) & _). Qed.
+
+(** A WRITE POSITION IS NEVER IN [W] — the site datum's own content. *)
+Lemma wsite_cls_notW G W n x p lb :
+  gx_lbl G (x, p) = Some lb → lb_is_w lb = true →
+  wsite_cls G W n x p → ¬ W (x, p).
+Proof.
+  intros Hl Hw [[H _]|[_ [HW _]]]; [exact H|].
+  by destruct (wwit_not_w G n (x, p) lb Hl Hw).
+Qed.
+
+(** THE WALK'S CARRIED CONTEXT, at the frozen set. *)
+Definition wctx' (G : gexec) (W : geid → Prop) (n : nat) (x : agent)
+    (kz : nat) (k : nat) (c : cand) : Prop :=
+  (∃ ev, ctrace_prefix G c ev W) ∧
+  gcnt x (cd_tr c) = k ∧
+  wlog_pfx G (wlogn n kz k) (cd_log_end c).
+
+Lemma wctx'_cpol G W n x kz k c :
+  wubA G W → wctx' G W n x kz k c → cpol_ctx G W x c.
+Proof.
+  intros Hub ((ev & Hct) & _ & _). exists ev. split; [exact Hct|by apply Hub].
+Qed.
+
+(** ** 4.5d The policy, at the frozen set *)
+
+Theorem wblk_pol_at' (G : gexec) (W : geid → Prop) (n : nat) (x : agent)
+    (cpu : CPU) (d0 : dev_state) (c0 : cand) (ws : wstate) (lb : lbl)
+    (l : wlabel) (rds : list wreg) (wrs : list register) (m : M unit)
+    (rs1 rs2 : regstate) (fn : ofence) (ib : oib32) (m' : M unit)
+    (rs1' : regstate) (fn' : ofence) (ib' : oib32) :
+  rvwmo_minus_consistent G →
+  W_poloc_closed G W →
+  srvwmo_consistent c0 →
+  cd_img c0 = gx_img G →
+  wlog_pfx G n (cd_log_end c0) →
+  cpol_ctx G W x c0 →
+  wsite_ok' G W n x (gcnt x (cd_tr c0)) lb →
+  dreg_agree (λ nn, nn ∉ []) rs1 rs2 →
+  cblk cpu d0 ws lb l rds wrs m rs1 fn ib m' rs1' fn' ib' →
+  ∃ (lb' : lbl) (l' : wlabel) (rds' : list wreg) (wrs' : list register)
+    (rs2' : regstate),
+    cblk cpu d0 ws lb' l' rds' wrs' m rs2 fn ib m' rs2' fn' ib' ∧
+    mstep_ok (cand_last_st c0) x lb' ∧
+    lbl_reidx lb lb' ∧
+    wcls_at G W x c0 lb' ∧
+    dreg_agree (λ nn, nn ∉ []) rs1' rs2'.
+Proof.
+  intros Hcons Hpc Hc Himg Hpfx Hctx Hsite Hag Hblk.
+  pose proof Hcons as (Hwf & _ & Hlv & _).
+  pose proof Hsite as (Hl & Hix & Hrmw & Hcl).
+  destruct (cert_block_mirror (λ nn, nn ∉ []) cpu d0 ws lb l rds wrs
+              m rs1 fn ib m' rs1' fn' ib' rs2 Hblk
+              (λ nn _, not_elem_of_nil nn) Hag) as (rs2' & Hblk2 & Hag2).
+  destruct Hcl as [[HnW Hle]|[HW [Hwit Hwsite]]].
+  - (* ------------------------- THE TRUE ROUTE ------------------------- *)
+    exists lb, l, rds, wrs, rs2'.
+    split_and!; [exact Hblk2| |apply lbl_reidx_refl
+                |by apply (wcls_of_pfx G W n x c0 lb)|exact Hag2].
+    destruct lb as [aq base ts vs|rl base vs kc|pr pw sr sw
+                   |aq rl base ts rvs wvs kc].
+    + apply (cpol_read G W x c0 aq base ts vs Hcons Hpc Hctx HnW Hl).
+      apply (src_in_log_of_pfx G n c0 (x, gcnt x (cd_tr c0)) aq base ts vs
+               Hlv Himg Hpfx Hl (gshape G Hwf _ _ Hl) Hle).
+    + apply cert_write_ok. exact (gshape G Hwf _ _ Hl).
+    + apply cert_fence_ok.
+    + by destruct Hrmw.
+  - (* ------------------------ THE WITNESS ROUTE ----------------------- *)
+    pose proof Hwit as (aq & base & ts & vs & Hl' & _).
+    have Hlb : lb = WeakAxiomatic.LLoad aq base ts vs.
+    { rewrite Hl' in Hl. by injection Hl as <-. }
+    subst lb.
+    destruct (Hwsite c0 aq base ts vs Himg Hpfx Hl')
+      as (-> & Hbytes & Hvals).
+    have Htsnd : (wit_tvs c0 base (length ts)).*2 = vs
+      by rewrite wit_tvs_snd Hvals.
+    destruct (cblk_load_retime cpu d0 ws false base ts vs l rds wrs
+                m rs2 fn ib m' rs2' fn' ib' (wit_tvs c0 base (length ts))
+                Hblk2 Htsnd) as (l2 & rds2 & wrs2 & Hblk3).
+    rewrite (wit_tvs_lbl c0 false base (length ts)) in Hblk3.
+    exists (latest_read_lbl c0 false base (length ts)), l2, rds2, wrs2, rs2'.
+    split_and!.
+    + exact Hblk3.
+    + by apply cert_read_witness.
+    + rewrite /latest_read_lbl /=. split_and!;
+        [reflexivity|reflexivity|exact Hvals|].
+      by rewrite /lrd_ts length_fmap length_seq.
+    + by apply (wcls_of_wit G W x c0 base ts vs).
+    + exact Hag2.
+Qed.
+
+Definition wpol' (G : gexec) (W : geid → Prop) (n : nat) (x : agent)
+    (cpu : CPU) (d0 : dev_state) (k0 kz : nat) : Prop :=
+  ∀ (k : nat) (c0 : cand) (ws : wstate) (lb : lbl) (l : wlabel)
+    (rds : list wreg) (wrs : list register)
+    (m : M unit) (rs1 rs2 : regstate) (fn : ofence) (ib : oib32)
+    (m' : M unit) (rs1' : regstate) (fn' : ofence) (ib' : oib32),
+    srvwmo_consistent c0 →
+    wctx' G W n x kz k c0 →
+    wQ' G W n x k0 kz k lb →
+    w_relp (ms_ws (cand_last_st c0) x) = w_relp ws →
+    dreg_agree (λ nn, nn ∉ []) rs1 rs2 →
+    cblk cpu d0 ws lb l rds wrs m rs1 fn ib m' rs1' fn' ib' →
+    ∃ lb' l' rds' wrs' rs2',
+      cblk cpu d0 ws lb' l' rds' wrs' m rs2 fn ib m' rs2' fn' ib' ∧
+      mstep_ok (cand_last_st c0) x lb' ∧
+      lbl_reidx lb lb' ∧
+      wcls_at G W x c0 lb' ∧
+      dreg_agree (λ nn, nn ∉ []) rs1' rs2'.
+
+Theorem wpol'_of_sites (G : gexec) (W : geid → Prop) (n : nat) (x : agent)
+    (cpu : CPU) (d0 : dev_state) (k0 kz : nat) :
+  rvwmo_minus_consistent G →
+  W_poloc_closed G W →
+  wubA G W →
+  wpol' G W n x cpu d0 k0 kz.
+Proof.
+  intros Hcons Hpc Hub k c0 ws lb l rds wrs m rs1 rs2 fn ib m' rs1' fn' ib'
+    Hc Hctx (Hk0 & Hkz & Hsite & _) Hrelp Hag Hblk.
+  pose proof Hctx as (_ & Hgc & Hpfx).
+  have Hcp : cpol_ctx G W x c0 := wctx'_cpol G W n x kz k c0 Hub Hctx.
+  have Himg : cd_img c0 = gx_img G.
+  { destruct Hcp as (ev & Hgt & _). exact (ctp_img G c0 ev _ Hgt). }
+  have Hpfx' : wlog_pfx G n (cd_log_end c0).
+  { move: Hpfx. by rewrite /wlogn (bool_decide_eq_true_2 (k ≤ kz)%nat Hkz). }
+  apply (wblk_pol_at' G W n x cpu d0 c0 ws lb l rds wrs m rs1 rs2 fn ib m'
+           rs1' fn' ib' Hcons Hpc Hc Himg Hpfx' Hcp);
+    [by rewrite Hgc|exact Hag|exact Hblk].
+Qed.
+
+(** ** 4.5e The context is preserved, at the frozen set *)
+Theorem wctx'_pres (G : gexec) (W : geid → Prop) (n : nat) (x : agent)
+    (k0 kz : nat) :
+  gwf G →
+  wubA G W →
+  ∀ (k : nat) (c0 : cand) (lb lb' : lbl),
+    wctx' G W n x kz k c0 → srvwmo_consistent c0 → wQ' G W n x k0 kz k lb →
+    lbl_reidx lb lb' → mstep_ok (cand_last_st c0) x lb' →
+    wcls_at G W x c0 lb' →
+    wctx' G W n x kz (S k) (cand_snoc c0 (EStep x lb')).
+Proof.
+  intros Hwf Hub k c0 lb lb' Hctx Hc
+         (Hk0 & Hkz & Hsite & Hiff) Hri Hok (Hcl & Hix).
+  pose proof Hctx as ((ev & Hct) & Hgc & Hpfx).
+  have Hpfxn : wlog_pfx G n (cd_log_end c0).
+  { move: Hpfx. by rewrite /wlogn (bool_decide_eq_true_2 (k ≤ kz)%nat Hkz). }
+  have Hlen : length (cd_log_end c0) = n by destruct Hpfxn as [H _].
+  have Hgc2 : gcnt x (cd_tr (cand_snoc c0 (EStep x lb'))) = S k
+    by rewrite gcnt_cand_snoc_self Hgc.
+  split_and!.
+  - exists (ev_snoc c0 ev (x, gcnt x (cd_tr c0))).
+    by apply (ctrace_prefix_snoc G c0 ev W x lb').
+  - exact Hgc2.
+  - rewrite cd_log_end_snoc.
+    destruct (decide (k = kz)) as [->|Hne].
+    + (* THE EXIT STORE *)
+      have Hw : lb_is_w lb = true by apply Hiff.
+      destruct Hsite as (Hl & Hgwix & Hrmw & Hcls).
+      destruct lb as [aq0 b0 ts0 vs0|rl base vs kc|pr pw sr sw
+                     |aq0 rl0 b0 ts0 rv0 wv0 kc0]; try by simpl in Hw.
+      have Hlb' : lb' = WeakAxiomatic.LStore rl base vs kc
+        := lbl_reidx_store rl base vs kc lb' Hri.
+      subst lb'.
+      have HnW : ¬ W (x, gcnt x (cd_tr c0)).
+      { rewrite Hgc.
+        exact (wsite_cls_notW G W n x kz _ Hl eq_refl Hcls). }
+      have Hlbl : gx_lbl G (x, gcnt x (cd_tr c0))
+                = Some (WeakAxiomatic.LStore rl base vs kc).
+      { destruct Hcl as [[_ H]|[HW _]]; [exact H|by destruct (HnW HW)]. }
+      have Hwix : gwix G (x, gcnt x (cd_tr c0)) = S n
+        by rewrite (Hix eq_refl) Hlen.
+      have Hmem : (x, gcnt x (cd_tr c0)) ∈ gwrites G.
+      { eapply gis_w_gwrites;
+          [exact Hwf|by exists (WeakAxiomatic.LStore rl base vs kc)
+          |by rewrite /gis_w Hlbl]. }
+      have Hat : gwrite_at G (S n) = Some (x, gcnt x (cd_tr c0))
+        by rewrite -Hwix; apply gwrite_at_gwix.
+      have Hmsg : gmsg G (x, gcnt x (cd_tr c0))
+                = Some (WMsg base vs (Some x) kc)
+        by rewrite /gmsg Hlbl.
+      have -> : wlogn n kz (S kz) = S n.
+      { rewrite /wlogn (bool_decide_eq_false_2 (S kz ≤ kz)%nat); [done|lia]. }
+      have -> : es_msg (EStep x (WeakAxiomatic.LStore rl base vs kc))
+              = [WMsg base vs (Some x) kc] by reflexivity.
+      exact (wlog_pfx_snoc G n (cd_log_end c0) _ _ Hpfxn Hat Hmsg).
+    + (* A NON-WRITE BLOCK *)
+      have Hw : lb_is_w lb = false.
+      { destruct (lb_is_w lb) eqn:Hb; [|done].
+        exfalso. apply Hne. by apply Hiff. }
+      have Hw' : lb_is_w lb' = false by eapply lbl_reidx_notw.
+      rewrite (es_msg_notw (EStep x lb') Hw') app_nil_r.
+      have -> : wlogn n kz (S k) = n.
+      { rewrite /wlogn (bool_decide_eq_true_2 (S k ≤ kz)%nat); [done|lia]. }
+      exact Hpfxn.
+Qed.
+
+(** ** 4.5f The segment, with the CHAINING data exposed
+
+    [wlk_seg_of_cert] at the frozen set, keeping every conclusion
+    [WeakRvwmoCert4.seg_step_of_segment] now carries: where the acting
+    hart's process ends (the emission's own final state), what its
+    release-pending bit becomes, and the frame for every other hart. *)
+Theorem wlk_seg_of_cert2 (G : gexec) (W : geid → Prop) (n : nat) (x : agent)
+    (cpu : CPU) (d0 : dev_state) (k0 kz : nat) (ws0 : wstate)
+    (rowseg : list lbl) (es : list eitem) (pfin : pexv6) (m0 : M unit)
+    (rs10 : regstate) (fn0 : ofence) (ib0 : oib32) (St : cyc_state)
+    (rs20 : regstate) :
+  rvwmo_minus_consistent G →
+  W_poloc_closed G W →
+  wubA G W →
+  hemit (λ _, d0) k0 ws0 rowseg (PHart cpu m0 rs10 fn0 ib0) es pfin →
+  (∀ i lb, rowseg !! i = Some lb → wQ' G W n x k0 kz (k0 + i)%nat lb) →
+  cst_ok d0 St →
+  wctx' G W n x kz k0 (cst_c St) →
+  cst_pst St (cd_end (cst_c St)) !! x = Some (PHart cpu m0 rs20 fn0 ib0) →
+  dreg_agree (λ nn, nn ∉ []) rs10 rs20 →
+  w_relp (ms_ws (cand_last_st (cst_c St)) x) = w_relp ws0 →
+  ∃ (St' : cyc_state) (tradd : list estep),
+    seg_step d0 (SegOut x rowseg (cd_end (cst_c St)) tradd) St St' ∧
+    wctx' G W n x kz (k0 + length rowseg)%nat (cst_c St') ∧
+    cd_img (cst_c St') = cd_img (cst_c St) ∧
+    cst_pst St' 0%nat = cst_pst St 0%nat ∧
+    cst_dv St' 0%nat = cst_dv St 0%nat ∧
+    (∃ (m1 : M unit) (rs11 rs21 : regstate) (fn1 : ofence) (ib1 : oib32),
+       pfin = PHart cpu m1 rs11 fn1 ib1 ∧
+       cst_pst St' (cd_end (cst_c St')) !! x
+         = Some (PHart cpu m1 rs21 fn1 ib1) ∧
+       dreg_agree (λ nn, nn ∉ []) rs11 rs21) ∧
+    w_relp (ms_ws (cand_last_st (cst_c St')) x)
+      = w_relp (row_ws_aux k0 ws0 rowseg) ∧
+    (∀ y, y ≠ x →
+       cst_pst St' (cd_end (cst_c St')) !! y
+       = cst_pst St (cd_end (cst_c St)) !! y) ∧
+    (∀ y, y ≠ x → w_relp (ms_ws (cand_last_st (cst_c St')) y)
+                = w_relp (ms_ws (cand_last_st (cst_c St)) y)).
+Proof.
+  intros Hcons Hpc Hub Hem HQ Hok Hctx Hp Hag Hrelp.
+  have Hwf : gwf G by destruct Hcons as (H & _).
+  destruct (seg_step_of_segment x cpu d0 [] (wQ' G W n x k0 kz)
+              (wctx' G W n x kz) (wcls_at G W x)
+              (wctx'_pres G W n x k0 kz Hwf Hub)
+              (wpol'_of_sites G W n x cpu d0 k0 kz Hcons Hpc Hub)
+              (cpolp_of_rmwfree x cpu d0 [] (wctx' G W n x kz)
+                 (wcls_at G W x) (wQ' G W n x k0 kz)
+                 (λ k lb H, wQ'_rmwfree G W n x k0 kz k lb H))
+              k0 ws0 rowseg es pfin m0 rs10 fn0 ib0 St rs20
+              Hem HQ Hok Hctx Hp Hag Hrelp)
+    as (St' & tradd & Hstep & Hctx' & Himg & Hpst0 & Hdv0 & Hfin & Hrelpf
+        & Hfr & Hfrp).
+  exists St', tradd.
+  split_and!; [exact Hstep|exact Hctx'|exact Himg|exact Hpst0|exact Hdv0
+              |exact Hfin|exact Hrelpf|exact Hfr|exact Hfrp].
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(** ** 4.6 THE CHAINED WALK ITSELF
+
+    [wlk_inv'] strengthens [wlk_inv] by the three things §4.5 says a next
+    step needs: the frozen set's [ctrace_prefix], every hart's emission
+    state (with the walk state's process identified with it), and the ROW
+    POSITION BOUNDARY — hart [x]'s replayed count separates its writes the
+    log has reached from those it has not.  Everything else the step needs
+    is then a fact about [G] alone. *)
+
+Definition wpos_lo (G : gexec) (n : nat) (x : agent) (k : nat) : Prop :=
+  ∀ j lb, (j < k)%nat → gx_lbl G (x, j) = Some lb → lb_is_w lb = true →
+    (gwix G (x, j) ≤ n)%nat.
+
+Definition wpos_hi (G : gexec) (n : nat) (x : agent) (k : nat) : Prop :=
+  ∀ j lb, (k ≤ j)%nat → gx_lbl G (x, j) = Some lb → lb_is_w lb = true →
+    (n < gwix G (x, j))%nat.
+
+Definition wlk_inv' (boot : agent → pexv6) (d0 : dev_state) (N : nat)
+    (G : gexec) (W : geid → Prop) (St : cyc_state) (n : nat) : Prop :=
+  wlk_inv boot d0 N G St n ∧
+  (∃ ev, ctrace_prefix G (cst_c St) ev W) ∧
+  (∀ x, (x < N)%nat →
+     ∃ (p q : pexv6),
+       wemit d0 G x (gcnt x (cd_tr (cst_c St))) p ∧
+       cst_pst St (cd_end (cst_c St)) !! x = Some q ∧
+       pex_dag p q ∧
+       w_relp (ms_ws (cand_last_st (cst_c St)) x)
+         = w_relp (row_ws (qrow G x) (gcnt x (cd_tr (cst_c St)))) ∧
+       (∀ cpu m rs fn ib, boot x = PHart cpu m rs fn ib →
+          ∃ m' rs' fn' ib', p = PHart cpu m' rs' fn' ib')) ∧
+  (∀ x, wpos_lo G n x (gcnt x (cd_tr (cst_c St)))) ∧
+  (∀ x, wpos_hi G n x (gcnt x (cd_tr (cst_c St)))).
+
+Lemma wlk_inv'_inv boot d0 N G W St n :
+  wlk_inv' boot d0 N G W St n → wlk_inv boot d0 N G St n.
+Proof. by intros (H & _). Qed.
+
+(** ONE CHAINED STEP: a certified segment whose OUTPUT STATE carries the
+    invariant again.  This is what [wlk_step] could not say — its output
+    state was existential and nothing tied it to the next segment. *)
+Definition wlk_step' (boot : agent → pexv6) (d0 : dev_state) (N : nat)
+    (G : gexec) (W : geid → Prop) (St : cyc_state) (n : nat) : Prop :=
+  ∃ (o : segout) (St' : cyc_state),
+    seg_step d0 o St St' ∧ wlk_inv' boot d0 N G W St' (S n).
+
+Lemma wlk_run' boot d0 N G W
+    (Hsup : ∀ St n, wlk_inv' boot d0 N G W St n →
+              (n < length (gwrites G))%nat → wlk_step' boot d0 N G W St n)
+    (k : nat) :
+  ∀ n St, wlk_inv' boot d0 N G W St n → (n + k)%nat = length (gwrites G) →
+    ∃ l Sf, segs_run d0 l St Sf ∧
+            wlk_inv boot d0 N G Sf (length (gwrites G)).
+Proof.
+  induction k as [|k IH]; intros n St Hinv Hn.
+  - exists [], St. split.
+    + apply segs_done. by destruct Hinv as ((? & _) & _).
+    + replace (length (gwrites G)) with n by lia.
+      exact (wlk_inv'_inv boot d0 N G W St n Hinv).
+  - destruct (Hsup St n Hinv ltac:(lia)) as (o & St' & Hst & Hinv').
+    destruct (IH (S n) St' Hinv' ltac:(lia)) as (l & Sf & Hrun & Hfin).
+    exists (o :: l), Sf. split; [|exact Hfin]. by eapply segs_more.
+Qed.
+
+(** ** 4.6a The START, at the frozen set *)
+Theorem wlk_start_inv' boot d0 N G W :
+  gwf G →
+  (∀ x, (x < N)%nat → wemit d0 G x 0%nat (boot x)) →
+  wlk_inv' boot d0 N G W (wlk_start boot d0 N G) 0%nat.
+Proof.
+  intros Hwf Hem. split_and!.
+  - apply wlk_start_inv.
+  - exists (λ _, (0%nat, 0%nat)). apply ctrace_prefix_empty.
+  - intros x Hx. exists (boot x), (boot x). split_and!.
+    + exact (Hem x Hx).
+    + rewrite /wlk_start /= list_lookup_fmap (lookup_seq_lt 0%nat N x Hx) //.
+    + apply pex_dag_refl.
+    + reflexivity.
+    + intros cpu m rs fn ib ->. by eexists _, _, _, _.
+  - intros x j lb Hj Hl Hw. exfalso. move: Hj.
+    rewrite /wlk_start /gcnt /=. lia.
+  - intros x j lb _ Hl Hw.
+    have Hmem : (x, j) ∈ gwrites G
+      by (eapply gis_w_gwrites; [exact Hwf|by exists lb|by rewrite /gis_w Hl]).
+    destruct (gwix_lookup G (x, j) Hmem) as (i & _ & ->). lia.
+Qed.
+
+(** ** 4.6b THE PER-GRAPH DATUM the chained walk consumes
+
+    Every clause is a statement about [G] (and the booted supply) alone:
+    there is no walk state in it, no emission, and no identification of a
+    process with one — [wlk_inv'] carries all three. *)
+
+(** The site classification, at the position's OWN visit time: [p] is
+    replayed by the segment whose exit is [G]'s [(n+1)]-st write exactly
+    when that write is [p]'s hart's next one. *)
+Definition wsite_supply (G : gexec) (W : geid → Prop) : Prop :=
+  ∀ (n : nat) (x : agent) (kz p : nat) (lb : lbl),
+    gwrite_at G (S n) = Some (x, kz) →
+    (p ≤ kz)%nat →
+    (∀ j lbj, (p ≤ j)%nat → (j < kz)%nat → gx_lbl G (x, j) = Some lbj →
+       lb_is_w lbj = false) →
+    gx_lbl G (x, p) = Some lb →
+    lb_rmwfree lb ∧ wsite_cls G W n x p.
+
+(** THE ORDER FACT THE WALK NEEDS, AND EXACTLY IT: one hart's writes reach
+    the log in PROGRAM ORDER.  [grule14] implies it ([gwrow_gmo_of_rule14]),
+    but the walk does NOT need rule 14 — and must not ask for it, since the
+    graphs this whole development is about are precisely the ones that
+    violate it ([WeakRvwmoCycWit.cyg]'s cycle is built out of rule-14 edges;
+    there the fact below holds vacuously, one write per hart). *)
+Definition gwrow_gmo (G : gexec) : Prop :=
+  ∀ (x : agent) (j k : nat), (j < k)%nat →
+    glbl_is G (x, j) lb_is_w → glbl_is G (x, k) lb_is_w →
+    (gwix G (x, j) < gwix G (x, k))%nat.
+
+Lemma gwrow_gmo_of_rule14 (G : gexec) :
+  gwf G → grule14 G → gwrow_gmo G.
+Proof.
+  intros Hwf H14 x j k Hjk Hj Hk.
+  have Hnd : NoDup (gx_gmo G) by destruct Hwf as (H & _ & _).
+  have Hmj : (x, j) ∈ gwrites G.
+  { destruct Hj as (l & Hl & Hw).
+    eapply gis_w_gwrites; [exact Hwf|by exists l|by rewrite /gis_w Hl]. }
+  have Hmk : (x, k) ∈ gwrites G.
+  { destruct Hk as (l & Hl & Hw).
+    eapply gis_w_gwrites; [exact Hwf|by exists l|by rewrite /gis_w Hl]. }
+  have Hmo : gmo_lt G (x, j) (x, k).
+  { apply H14; [|by apply glbl_is_w_gmem|exact Hk].
+    destruct Hj as (lj & Hlj & _). destruct Hk as (lk & Hlk & _).
+    split_and!; [done|simpl; lia|by exists lj|by exists lk]. }
+  destruct Hmo as (_ & _ & Hpos).
+  by apply (gwix_gpos_lt G (x, j) (x, k) Hnd Hmj Hmk).
+Qed.
+
+Definition wsupply (boot : agent → pexv6) (G : gexec) (W : geid → Prop)
+    (N : nat) : Prop :=
+  gwrow_gmo G ∧
+  (∀ x k, is_Some (gx_lbl G (x, k)) → (x < N)%nat) ∧
+  (∀ x k lb, gx_lbl G (x, k) = Some lb → lb_is_w lb = true →
+     ∃ cpu m rs fn ib, boot x = PHart cpu m rs fn ib) ∧
+  W_poloc_closed G W ∧
+  wubA G W ∧
+  wsite_supply G W.
+
+(** ** 4.6c Two frames, and the row split *)
+
+Lemma gcnt_app_ne (tr tradd : list estep) (x y : agent) :
+  (∀ s, s ∈ tradd → es_ag s = x) → y ≠ x →
+  gcnt y (tr ++ tradd) = gcnt y tr.
+Proof.
+  intros Hag Hne. rewrite /gcnt list_basics.filter_app length_app.
+  have H0 : ∀ l : list estep, (∀ s, s ∈ l → es_ag s = x) →
+              filter (λ s, es_ag s = y) l = [].
+  { induction l as [|s l IH]; [done|]. intros Hl.
+    rewrite filter_cons_False.
+    - apply IH. intros s' Hs'. apply Hl. by right.
+    - intros Heq. apply Hne. rewrite -Heq. apply Hl. by left. }
+  rewrite (H0 tradd Hag) /=. lia.
+Qed.
+
+Lemma seg_split_exit (row : list lbl) (k0 kz : nat) (lb : lbl) :
+  (k0 ≤ kz)%nat → row !! kz = Some lb →
+  take (S kz - k0) (drop k0 row) = take (kz - k0) (drop k0 row) ++ [lb].
+Proof.
+  intros Hle Hkz.
+  have Hs : (S kz - k0)%nat = S (kz - k0)%nat by lia.
+  rewrite Hs. apply take_S_r. rewrite lookup_drop.
+  by replace (k0 + (kz - k0))%nat with kz by lia.
+Qed.
+
+(** A write's index PINS it. *)
+Lemma gwix_pin G e n :
+  NoDup (gx_gmo G) → e ∈ gwrites G → gwix G e = S n →
+  gwrite_at G (S n) = Some e.
+Proof. intros Hnd He <-. by apply gwrite_at_gwix. Qed.
+
+(** ** 4.6d THE STEP, DERIVED
+
+    From the invariant, [grule14] and the per-graph datum: which write the
+    step is at, where its hart stands, that nothing of that hart's row in
+    between is a write, the site data over the stretch, and the emission —
+    all of it, with the OUTPUT state carrying the invariant again. *)
+Theorem wlk_step'_of_supply (boot : agent → pexv6) (d0 : dev_state) (N : nat)
+    (G : gexec) (W : geid → Prop) (St : cyc_state) (n : nat) :
+  rvwmo_minus_consistent G →
+  wsupply boot G W N →
+  wlk_inv' boot d0 N G W St n →
+  (n < length (gwrites G))%nat →
+  wlk_step' boot d0 N G W St n.
+Proof.
+  intros Hcons (H14 & HxN & Hbh & Hpc & Hub & Hsite) Hinv Hn.
+  have Hwf : gwf G by destruct Hcons as (H & _).
+  have Hnd : NoDup (gx_gmo G) by destruct Hwf as (H & _ & _).
+  pose proof Hinv as (Hbase & (ev0 & Hct0) & Hproc & Hlo & Hhi).
+  pose proof Hbase as (Hok & Himg & Hpst0 & Hdv0 & Hpfx).
+  (* ---- 1. WHICH WRITE, AND WHOSE ---- *)
+  destruct (lookup_lt_is_Some_2 (gwrites G) n Hn) as [w Hw].
+  have Hat : gwrite_at G (S n) = Some w := Hw.
+  destruct w as [x kz].
+  destruct (gwrite_at_inv G (S n) (x, kz) Hnd Hat) as (Hmem & Hwix).
+  have Hisw : gis_w G (x, kz) = true
+    by (apply gwrites_elem_of in Hmem as [_ H]; exact H).
+  destruct (gx_lbl G (x, kz)) as [lbz|] eqn:Hlbz;
+    [|by rewrite /gis_w Hlbz in Hisw].
+  have Hlbzw : lb_is_w lbz = true by rewrite /gis_w Hlbz in Hisw.
+  have HxLT : (x < N)%nat by (apply (HxN x kz); by exists lbz).
+  pose k0 := gcnt x (cd_tr (cst_c St)).
+  (* ---- 2. THE HART STANDS AT OR BEFORE ITS NEXT WRITE ---- *)
+  have Hk0 : (k0 ≤ kz)%nat.
+  { destruct (decide (k0 ≤ kz)%nat) as [?|Hgt]; [done|exfalso].
+    have Hle := Hlo x kz lbz ltac:(lia) Hlbz Hlbzw. lia. }
+  (* ---- 3. NOTHING IN BETWEEN IS A WRITE ---- *)
+  have Hnwr : ∀ j lbj, (k0 ≤ j)%nat → (j < kz)%nat →
+                gx_lbl G (x, j) = Some lbj → lb_is_w lbj = false.
+  { intros j lbj Hj1 Hj2 Hlj.
+    destruct (lb_is_w lbj) eqn:Hb; [exfalso|done].
+    have Hmemj : (x, j) ∈ gwrites G
+      by (eapply gis_w_gwrites; [exact Hwf|by exists lbj|by rewrite /gis_w Hlj]).
+    have Hgt := Hhi x j lbj Hj1 Hlj Hb.
+    have Hlt : (gwix G (x, j) < gwix G (x, kz))%nat
+      := H14 x j kz Hj2 (ex_intro _ lbj (conj Hlj Hb))
+           (ex_intro _ lbz (conj Hlbz Hlbzw)).
+    lia. }
+  (* ---- 4. THE ROW STRETCH ---- *)
+  have Hkzr : qrow G x !! kz = Some lbz by rewrite -qrow_lbl.
+  have Hkzlen : (kz < length (qrow G x))%nat
+    by (pose proof (lookup_lt_Some _ _ _ Hkzr); lia).
+  have Hrowseg : take (S kz - k0) (drop k0 (qrow G x))
+               = take (kz - k0) (drop k0 (qrow G x)) ++ [lbz]
+    := seg_split_exit (qrow G x) k0 kz lbz Hk0 Hkzr.
+  have Hlenseg : length (take (S kz - k0) (drop k0 (qrow G x)))
+               = S (kz - k0)%nat.
+  { rewrite length_take length_drop. lia. }
+  have Hkzeq : (k0 + length (take (S kz - k0) (drop k0 (qrow G x))))%nat = S kz
+    by rewrite Hlenseg; lia.
+  (* ---- 5. THE EMISSION AT THE HART'S CURRENT POSITION ---- *)
+  destruct (Hproc x HxLT)
+    as (p & q & (es & pfin & Hem) & Hq & Hdag & Hrelp & Hph).
+  destruct (Hbh x kz lbz Hlbz Hlbzw) as (cpu & mb & rsb & fnb & ibb & Hbx).
+  destruct (Hph cpu mb rsb fnb ibb Hbx) as (m0 & rs10 & fn0 & ib0 & Hp).
+  rewrite Hp in Hem. rewrite Hp in Hdag.
+  destruct (Hdag cpu m0 rs10 fn0 ib0 eq_refl) as (rs20 & Hq2 & Hag).
+  rewrite Hq2 in Hq.
+  have Hdd : drop k0 (qrow G x)
+           = take (S kz - k0) (drop k0 (qrow G x))
+             ++ drop (k0 + length (take (S kz - k0) (drop k0 (qrow G x))))%nat
+                  (qrow G x).
+  { rewrite -{1}(take_drop (S kz - k0) (drop k0 (qrow G x))) drop_drop Hlenseg.
+    replace (k0 + (S kz - k0))%nat with (k0 + S (kz - k0))%nat by lia.
+    reflexivity. }
+  rewrite Hdd in Hem.
+  destruct (hemit_app (λ _, d0) k0 (row_ws (qrow G x) k0)
+              (take (S kz - k0) (drop k0 (qrow G x)))
+              (drop (k0 + length (take (S kz - k0) (drop k0 (qrow G x))))%nat
+                 (qrow G x))
+              (PHart cpu m0 rs10 fn0 ib0) es pfin Hem)
+    as (pm & es1 & es2 & Hem1 & Hem2 & _).
+  have Hws : row_ws_aux k0 (row_ws (qrow G x) k0)
+               (take (S kz - k0) (drop k0 (qrow G x)))
+           = row_ws (qrow G x)
+               (k0 + length (take (S kz - k0) (drop k0 (qrow G x))))%nat.
+  { rewrite Hlenseg.
+    replace (k0 + S (kz - k0))%nat with (k0 + (S kz - k0))%nat by lia.
+    apply row_ws_seg. lia. }
+  (* ---- 6. THE SITE DATA ---- *)
+  have HQ : ∀ i lb, take (S kz - k0) (drop k0 (qrow G x)) !! i = Some lb →
+              wQ' G W n x k0 kz (k0 + i)%nat lb.
+  { intros i lb Hi.
+    have Hilt : (i < S (kz - k0))%nat
+      by (rewrite -Hlenseg; exact (lookup_lt_Some _ _ _ Hi)).
+    have Hik : (k0 + i ≤ kz)%nat by lia.
+    have Hl : gx_lbl G (x, (k0 + i)%nat) = Some lb.
+    { rewrite qrow_lbl. move: Hi. intros Hi0.
+      apply lookup_take_Some in Hi0 as [Hi0 _].
+      by rewrite lookup_drop in Hi0. }
+    have Hiff : lb_is_w lb = true ↔ (k0 + i)%nat = kz.
+    { split.
+      - intros Hb. destruct (decide ((k0 + i)%nat = kz)) as [?|Hne]; [done|].
+        exfalso. rewrite (Hnwr (k0 + i)%nat lb ltac:(lia) ltac:(lia) Hl) in Hb.
+        done.
+      - intros Heq. rewrite Heq in Hl. rewrite Hlbz in Hl.
+        by injection Hl as <-. }
+    destruct (Hsite n x kz (k0 + i)%nat lb Hat Hik
+                (λ j lbj Hj1 Hj2 Hlj, Hnwr j lbj ltac:(lia) Hj2 Hlj) Hl)
+      as (Hrmw & Hcls).
+    split_and!; [lia|lia| |exact Hiff].
+    split_and!; [exact Hl| |exact Hrmw|exact Hcls].
+    intros Hb. rewrite (proj1 Hiff Hb). exact Hwix. }
+  (* ---- 7. THE SEGMENT ---- *)
+  have Hctx : wctx' G W n x kz k0 (cst_c St).
+  { split_and!; [by exists ev0|reflexivity|].
+    rewrite /wlogn (bool_decide_eq_true_2 (k0 ≤ kz)%nat Hk0). exact Hpfx. }
+  destruct (wlk_seg_of_cert2 G W n x cpu d0 k0 kz (row_ws (qrow G x) k0)
+              (take (S kz - k0) (drop k0 (qrow G x))) es1 pm m0 rs10 fn0 ib0
+              St rs20 Hcons Hpc Hub Hem1 HQ Hok Hctx Hq Hag Hrelp)
+    as (St' & tradd & Hstep & Hctx' & Himg' & Hpst0' & Hdv0' &
+        (m1 & rs11 & rs21 & fn1 & ib1 & Hpm & Hpx & Hagx) & Hrelpx &
+        Hfr & Hfrp).
+  pose proof Hctx' as ((ev1 & Hct1) & Hgc1 & Hpfx1).
+  rewrite Hkzeq in Hgc1. rewrite Hkzeq in Hpfx1.
+  have HokSt' : cst_ok d0 St' by destruct Hstep as (_ & H & _).
+  pose proof Hstep as (_ & _ & _ & Htr & Hagt & _).
+  simpl in Htr. simpl in Hagt.
+  exists (SegOut x (take (S kz - k0) (drop k0 (qrow G x)))
+            (cd_end (cst_c St)) tradd), St'.
+  split; [exact Hstep|].
+  have HlogS : wlog_pfx G (S n) (cd_log_end (cst_c St')).
+  { move: Hpfx1.
+    by rewrite /wlogn (bool_decide_eq_false_2 (S kz ≤ kz)%nat ltac:(lia)). }
+  (* ---- 8. THE INVARIANT, AGAIN ---- *)
+  split_and!.
+  - split_and!; [exact HokSt'|by rewrite Himg' Himg|by rewrite Hpst0' Hpst0
+                |by rewrite Hdv0' Hdv0|exact HlogS].
+  - by exists ev1.
+  - intros y Hy. destruct (decide (y = x)) as [->|Hne].
+    + exists pm, (PHart cpu m1 rs21 fn1 ib1). rewrite Hgc1.
+      split_and!.
+      * exists es2, pfin. rewrite Hws in Hem2. rewrite Hkzeq in Hem2.
+        exact Hem2.
+      * exact Hpx.
+      * rewrite Hpm. intros cpu' m' rs' fn' ib' [= <- <- <- <- <-].
+        exists rs21. split; [reflexivity|exact Hagx].
+      * rewrite Hrelpx Hws Hkzeq //.
+      * intros cpu' m' rs' fn' ib' Hb. rewrite Hbx in Hb.
+        injection Hb as Hc H1 H2 H3 H4. subst cpu'.
+        rewrite Hpm. by eexists _, _, _, _.
+    + have Hgcy : gcnt y (cd_tr (cst_c St')) = gcnt y (cd_tr (cst_c St))
+        by rewrite Htr (gcnt_app_ne _ tradd x y Hagt Hne).
+      destruct (Hproc y Hy) as (py & qy & Hemy & Hqy & Hdagy & Hrelpy & Hphy).
+      exists py, qy. rewrite Hgcy. split_and!;
+        [exact Hemy|by rewrite (Hfr y Hne)|exact Hdagy
+        |by rewrite (Hfrp y Hne)|exact Hphy].
+  - (* wpos_lo at [S n] *)
+    intros y j lb Hj Hl Hb. destruct (decide (y = x)) as [->|Hne].
+    + move: Hj. rewrite Hgc1. intros Hj.
+      destruct (decide (j < k0)%nat) as [Hlt|Hge].
+      * have Hle := Hlo x j lb Hlt Hl Hb. lia.
+      * destruct (decide (j = kz)) as [->|Hne2].
+        { rewrite Hlbz in Hl. injection Hl as <-. lia. }
+        exfalso. rewrite (Hnwr j lb ltac:(lia) ltac:(lia) Hl) in Hb. done.
+    + have Hgcy : gcnt y (cd_tr (cst_c St')) = gcnt y (cd_tr (cst_c St))
+        by rewrite Htr (gcnt_app_ne _ tradd x y Hagt Hne).
+      move: Hj. rewrite Hgcy. intros Hj.
+      have Hle := Hlo y j lb Hj Hl Hb. lia.
+  - (* wpos_hi at [S n] *)
+    intros y j lb Hj Hl Hb.
+    have Hmemj : (y, j) ∈ gwrites G
+      by (eapply gis_w_gwrites; [exact Hwf|by exists lb|by rewrite /gis_w Hl]).
+    have Hne3 : gwix G (y, j) ≠ S n.
+    { intros Heq.
+      have Hpin : gwrite_at G (S n) = Some (y, j)
+        := gwix_pin G (y, j) n Hnd Hmemj Heq.
+      rewrite Hat in Hpin. injection Hpin as Hyx Hj2.
+      revert Hj. rewrite -Hyx Hgc1 -Hj2. lia. }
+    destruct (decide (y = x)) as [->|Hne].
+    + move: Hj. rewrite Hgc1. intros Hj.
+      have Hgt := Hhi x j lb ltac:(lia) Hl Hb. lia.
+    + have Hgcy : gcnt y (cd_tr (cst_c St')) = gcnt y (cd_tr (cst_c St))
+        by rewrite Htr (gcnt_app_ne _ tradd x y Hagt Hne).
+      move: Hj. rewrite Hgcy. intros Hj.
+      have Hgt := Hhi y j lb Hj Hl Hb. lia.
+Qed.
+
+
+(** ** 4.6e THE EMISSION AT THE START, from the conformance bundle
+
+    The only thing the walk's start asks beyond [wlk_start_inv]: every
+    hart's whole-row emission from its boot state, which is
+    [WeakRvwmoSupply.gdexec_qconf]'s own [hart_conf] (and, at an index the
+    program list does not reach, the empty emission). *)
+Lemma wemit_of_qconf (boot : agent → pexv6) (d0 : dev_state) (im : image)
+    (nh : nat) (GD : gdexec) (x : agent) :
+  gdexec_qconf boot d0 im nh GD → wemit d0 (gd_g GD) x 0%nat (boot x).
+Proof.
+  intros Hq.
+  destruct (gx_prog (gd_g GD) !! x) as [row|] eqn:Hrow.
+  - destruct (gdexec_qconf_rows boot d0 im nh GD Hq x row Hrow)
+      as (em & Hem & _ & _).
+    exists (em_items em), (em_fin em). rewrite /qrow Hrow /=. exact Hem.
+  - exists [], (boot x). rewrite /qrow Hrow /=. apply HEnil.
+Qed.
+
+(** ** 4.6f THE WALK, AND ITS THEOREM
+
+    [walk_supply] from the per-graph datum alone: no walk state, no
+    emission, no process identification, no alignment — the invariant
+    carries all four and [wlk_step'_of_supply] re-establishes them. *)
+Definition walk_steps' (boot : agent → pexv6) (d0 : dev_state) (N : nat)
+    (G : gexec) (W : geid → Prop) : Prop :=
+  ∀ St n, wlk_inv' boot d0 N G W St n → (n < length (gwrites G))%nat →
+         wlk_step' boot d0 N G W St n.
+
+Theorem walk_supply_of_steps' (boot : agent → pexv6) (d0 : dev_state)
+    (im : image) (nh : nat) (N : nat) :
+  (∀ GD : gdexec,
+     rvwmo_minus_deps_consistent GD → gdexec_qconf boot d0 im nh GD →
+     ∃ W : geid → Prop, walk_steps' boot d0 N (gd_g GD) W) →
+  walk_supply boot d0 im nh N.
+Proof.
+  intros Hsup GD cs c0 pst0 z ss Hcons Hq Hcut Hrd0 Hne Hch.
+  have Hwf : gwf (gd_g GD) by destruct Hcons as ((H & _ & _) & _ & _).
+  destruct (Hsup GD Hcons Hq) as (W & Hsteps).
+  destruct (wlk_run' boot d0 N (gd_g GD) W Hsteps
+              (length (gwrites (gd_g GD))) 0%nat
+              (wlk_start boot d0 N (gd_g GD))
+              (wlk_start_inv' boot d0 N (gd_g GD) W Hwf
+                 (λ x _, wemit_of_qconf boot d0 im nh GD x Hq))
+              ltac:(lia))
+    as (l & Sf & Hrun & Hok & Himg & Hpst & Hdv & Hlog).
+  exists l, (wlk_start boot d0 N (gd_g GD)), Sf.
+  split_and!; [exact Hrun|exact Himg|exact Hpst|exact Hdv|].
+  rewrite -/(cd_end (cst_c Sf)) -/(cd_log_end (cst_c Sf)).
+  by apply log_of_of_pfx.
+Qed.
+
+(** THE THEOREM.  (R-2), at a residue that is a statement about the GRAPH:
+    a frozen witness set, [grule14] (the linearization's own gate —
+    [WeakRvwmoTopo] delivers it), and the per-position site data. *)
+Theorem walk_supply_of_sites (boot : agent → pexv6) (d0 : dev_state)
+    (im : image) (nh : nat) (N : nat) :
+  (∀ GD : gdexec,
+     rvwmo_minus_deps_consistent GD → gdexec_qconf boot d0 im nh GD →
+     ∃ W : geid → Prop, wsupply boot (gd_g GD) W N) →
+  walk_supply boot d0 im nh N.
+Proof.
+  intros Hsup. apply walk_supply_of_steps'. intros GD Hcons Hq.
+  destruct (Hsup GD Hcons Hq) as (W & Hsup').
+  exists W. intros St n Hinv Hn.
+  apply (wlk_step'_of_supply boot d0 N (gd_g GD) W St n);
+    [by destruct Hcons as (H & _ & _)|exact Hsup'|exact Hinv|exact Hn].
 Qed.
 
 (* ====================================================================== *)
@@ -1164,6 +1996,20 @@ Print Assumptions wctx_pres.
 Print Assumptions wlk_seg_of_cert.
 Print Assumptions walk_policy_steps.
 Print Assumptions walk_supply_of_policy.
+Print Assumptions row_ws_seg.
+Print Assumptions wubA_wub.
+Print Assumptions wblk_pol_at'.
+Print Assumptions wpol'_of_sites.
+Print Assumptions wctx'_pres.
+Print Assumptions wlk_seg_of_cert2.
+Print Assumptions wlk_run'.
+Print Assumptions wlk_start_inv'.
+Print Assumptions gwrow_gmo_of_rule14.
+Print Assumptions gcnt_app_ne.
+Print Assumptions wlk_step'_of_supply.
+Print Assumptions wemit_of_qconf.
+Print Assumptions walk_supply_of_steps'.
+Print Assumptions walk_supply_of_sites.
 Print Assumptions cycle_kill_of_l2''''.
 Print Assumptions t2lin_of_l2'''.
 Print Assumptions xv6_rvwmo_safe_modulo_walk.

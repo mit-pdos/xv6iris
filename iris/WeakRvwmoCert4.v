@@ -514,7 +514,22 @@ Theorem seg_step_of_segment (x : agent) (cpu : CPU) (d0 : dev_state)
     (** (O-E), carried through from [cert_segment']'s own conclusion. *)
     cd_img (cst_c S') = cd_img (cst_c S) ∧
     cst_pst S' 0%nat = cst_pst S 0%nat ∧
-    cst_dv S' 0%nat = cst_dv S 0%nat.
+    cst_dv S' 0%nat = cst_dv S 0%nat ∧
+    (** THE CHAINING DATA, also [cert_segment']'s own: where the acting
+        hart's process ENDS (the emission's own final state, up to the
+        taint), what its release-pending bit becomes, and the FRAME for
+        every other hart.  A walk whose invariant speaks of all harts at
+        every state needs precisely these four. *)
+    (∃ (m1 : M unit) (rs11 rs21 : regstate) (fn1 : ofence) (ib1 : oib32),
+       pfin = PHart cpu m1 rs11 fn1 ib1 ∧
+       cst_pst S' (cd_end (cst_c S')) !! x = Some (PHart cpu m1 rs21 fn1 ib1) ∧
+       dreg_agree (λ n, n ∉ T) rs11 rs21) ∧
+    w_relp (ms_ws (cand_last_st (cst_c S')) x)
+      = w_relp (row_ws_aux k0 ws0 rowseg) ∧
+    (∀ y, y ≠ x →
+       cst_pst S' (cd_end (cst_c S')) !! y = cst_pst S (cd_end (cst_c S)) !! y) ∧
+    (∀ y, y ≠ x → w_relp (ms_ws (cand_last_st (cst_c S')) y)
+                = w_relp (ms_ws (cand_last_st (cst_c S)) y)).
 Proof.
   intros Hem HQ HS HCtx Hp Hag Hrelp.
   destruct HS as (Hc & Hpo & Hdv).
@@ -524,10 +539,13 @@ Proof.
               (cst_c S) (cst_pst S) (cst_dv S) rs20
               Hc HCtx Hpo Hp Hdv Hag Hrelp)
     as (c' & pst' & dv' & tradd & m1 & rs11 & rs21 & fn1 & ib1 &
-        Htr & Hagf & Hf2 & Hc' & HCtx' & Hpo' & Hp' & Hdv' & _ & _ & _
-        & Himg & Hpst0 & Hdv0).
+        Htr & Hagf & Hf2 & Hc' & HCtx' & Hpo' & Hp' & Hdv' & Hfin & Hagr
+        & Hrelpf & Himg & Hpst0 & Hdv0 & Hfr & Hfrp).
   exists (CSt c' pst' dv'), tradd.
-  split; [|split_and!; [exact HCtx'|exact Himg|exact Hpst0|exact Hdv0]].
+  split; [|split_and!; [exact HCtx'|exact Himg|exact Hpst0|exact Hdv0
+          |(exists m1, rs11, rs21, fn1, ib1; split_and!;
+              [exact Hfin|exact Hp'|exact Hagr])
+          |exact Hrelpf|exact Hfr|exact Hfrp]].
   split_and!; [split_and!; [exact Hc|exact Hpo|exact Hdv]| |done| | |];
     [split_and!; [exact Hc'|exact Hpo'|exact Hdv']
     |exact Htr|exact Hagf|exact Hf2].

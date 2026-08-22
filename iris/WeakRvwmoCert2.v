@@ -923,6 +923,24 @@ Proof.
   apply mnext_ws_relp.
 Qed.
 
+(** THE "OTHER AGENT" TWIN: a snoc of hart [i]'s step does not move hart
+    [j]'s release-pending bit.  This is the frame every walk-style chaining
+    argument needs — the segment advances one hart, the invariant speaks of
+    all of them. *)
+Lemma cand_snoc_relp_ne (c : cand) (i j : agent) (lb : WeakAxiomatic.lbl) :
+  j ≠ i →
+  w_relp (ms_ws (cand_last_st (cand_snoc c (EStep i lb))) j)
+  = w_relp (ms_ws (cand_last_st c) j).
+Proof.
+  intros Hne.
+  have H1 : cand_last_st (cand_snoc c (EStep i lb))
+          = stt (cand_exec (cand_snoc c (EStep i lb))) (S (cd_end c))
+    by rewrite {1}/cand_last_st cd_end_snoc.
+  rewrite H1 (cand_next _ (cd_end c) (EStep i lb) (cand_snoc_tr_end c _))
+          (cand_snoc_last_st c (EStep i lb)).
+  by rewrite (mnext_ws_ne _ _ _ _ Hne).
+Qed.
+
 Section segment.
   Context (x : agent) (cpu : CPU) (d0 : dev_state) (T : list wreg).
 

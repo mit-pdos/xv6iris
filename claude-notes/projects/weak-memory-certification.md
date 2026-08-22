@@ -1,5 +1,50 @@
 # The tier-2 containment worklist (was: the certification route)
 
+## CHECKPOINT (2026-08-24, ELEVENTH PASS) — READ THIS FIRST
+
+**THE GENERIC WALK PASSES ITS ACCEPTANCE TEST.**  After three repairs
+(row-position-indexed policy; the witness route inside the policy with
+`cpol_ctx` carrying only the `ctrace_prefix` bookkeeping; the invariant
+`wlk_inv'` carrying each hart's emission TAIL, process state up to the
+taint, `w_relp` fold and position boundary, with a FROZEN witness set
+`W` as a parameter — `ctrace_prefix` is not monotone under a shrinking
+`wwit`, so accumulation is wrong and freezing is right), `WeakRvwmoWalk2.
+cyg_walk'` derives the LB cycle's whole walk from `wlk_run'` with nothing
+built by hand.  `walk_supply_of_sites`: `walk_supply` from a GRAPH-ONLY
+residue `wsupply` (`gwrow_gmo`, booted-hart bounds, `W_poloc_closed`,
+`wubA`, `wsite_supply` incl. `lb_rmwfree`).  `xv6_rvwmo_safe_modulo_l2'`
+= the capstone at `l2_claim` + `wsupply` (+ WP package + fresh era).
+`cert_segment'` gained frame conclusions (other harts untouched).
+Whole tree green; five rv64d axioms.
+
+**TWO HONEST RESIDUALS in `wsupply`, and what they are:**
+- **`gwrow_gmo`** — one hart's writes reach the log in PROGRAM order.
+  RVWMO⁻ does not imply it (same-hart byte-disjoint stores are
+  unordered by `gppo`), `grule14` does but `cyg` refutes rule 14.  It is
+  exactly the WRITE-WITNESS case B2d's exchange kit handled ((W,W)
+  byte-disjoint swaps, with K2/K3 residuals — themselves `R`-cycles).
+  DISCHARGE PLAN: a pre-pass `normalize_ww` — every consistent `GD` has
+  a `gd_equiv` graph whose same-hart writes are po-ordered, obtained by
+  `WeakRvwmoXchg.gswapw_ww` on each same-hart inversion; blocked pairs
+  are K2/K3 shapes, which are `R`-cycles already covered by the kill;
+  the kill's certificates transport along `gd_equiv` for read-pinned
+  edges (F2′) — state the walk over the pre-normalized graph.
+- **`lb_rmwfree`** at covered positions — wire `Walk2.wcpolp_at` /
+  `cpolp_of_align` into `wQ'` (priced, mechanical).
+
+**Since the tenth pass:** `WeakRvwmoPinBridge2` (`checker_taint_sub_prov`
+proved; residual R-3), repairs 1/2/2b (`2a3cc65d`, `2c3b6c2f`, this).
+
+**WHAT REMAINS:** (1) `normalize_ww` + RMW wiring ⇒ `wsupply` discharged
+⇒ capstone at `l2_claim` alone; (2) R-1: PinBridge's R-3 (items are
+`erw_of`'s groups at the announced word — a `pstep_ev` run lemma),
+the 165 non-certified sites (`WProt` convention + ~5 ownership idioms),
+and the final `l2_claim` assembly from `pin_seg_pin'` + the records;
+(3) the F-variant's glue mirror, R6, `wprot_store` width lift,
+`WeakRvwmoLock`'s failed-swap arm, the decoder audit.
+
+**Tree:** never `make proofs` from the root here (stale `xv6-riscv`).
+
 ## CHECKPOINT (2026-08-23, TENTH PASS) — READ THIS FIRST
 
 **State of the residue.**  `WeakRvwmoProgress.xv6_rvwmo_safe_modulo_walk'`

@@ -123,13 +123,8 @@ Local Open Scope Z_scope.
     [wstate] index by the row fold, which at index [k0] IS [row_ws row k0]
     by definition. *)
 
-(** Hart [x]'s row, as a list; [gx_lbl] is its lookup. *)
-Definition qrow (G : gexec) (x : agent) : list lbl :=
-  default [] (gx_prog G !! x).
-
-Lemma qrow_lbl (G : gexec) (x : agent) (k : nat) :
-  gx_lbl G (x, k) = qrow G x !! k.
-Proof. rewrite /gx_lbl /qrow /=. by destruct (gx_prog G !! x). Qed.
+(** [qrow] / [qrow_lbl] — hart [x]'s row as a list — now live in
+    [WeakRvwmoWalk] §4.5, where the chained walk's invariant needs them. *)
 
 (** ** 1.1 The whole row's emission *)
 Theorem qconf_hemit (boot : agent → pexv6) (d0 : dev_state) (im : image)
@@ -182,15 +177,7 @@ Proof.
 Qed.
 
 (** ** 1.3 … in the residue's own "[pre ++ [store]]" shape *)
-Lemma seg_split_exit (row : list lbl) (k0 kz : nat) (lb : lbl) :
-  (k0 ≤ kz)%nat → row !! kz = Some lb →
-  take (S kz - k0) (drop k0 row) = take (kz - k0) (drop k0 row) ++ [lb].
-Proof.
-  intros Hle Hkz.
-  have Hs : (S kz - k0)%nat = S (kz - k0)%nat by lia.
-  rewrite Hs. apply take_S_r. rewrite lookup_drop.
-  by replace (k0 + (kz - k0))%nat with kz by lia.
-Qed.
+(** [seg_split_exit] now lives in [WeakRvwmoWalk] §4.6c. *)
 
 Lemma seg_pre_nonwrite (G : gexec) (x : agent) (k0 kz : nat) :
   (∀ j lb, (k0 ≤ j)%nat → (j < kz)%nat → gx_lbl G (x, j) = Some lb →
@@ -333,7 +320,8 @@ Proof.
              Hcons Hgt Hc Hl ltac:(by rewrite Hix Hlenlog));
       [|exact Hsrc].
     intros j t Hj. rewrite Hlenlog. by apply (Hbnd base ts rvs eq_refl j t).
-  - apply (wcls_of_pfx G n x c0 _ Hpfx Hl HnW). intros _. exact Hix.
+  - apply (wcls_of_pfx G (wwit G n) n x c0 _ Hpfx Hl HnW).
+    intros _. exact Hix.
   - exact Hag2.
 Qed.
 
@@ -821,6 +809,66 @@ Proof.
   by apply walk_supply_of_qconf.
 Qed.
 
+(** ** 5.5 THE CAPSTONE AT THE CHAINED WALK — (R-2) AS A STATEMENT ABOUT
+       THE GRAPH
+
+    [xv6_rvwmo_safe_modulo_l2] above still asks, per WALK STATE, for the
+    emission, the alignment and the identification of the state's process
+    with the emission's ([wseg_supply]).  [WeakRvwmoWalk]'s [wlk_inv']
+    CARRIES all three, so what is left is a datum about [G] alone: a frozen
+    witness set [W] together with
+
+      - [gwrow_gmo]: one hart's writes reach the log in program order (the
+        walk replays a row forwards; [grule14] implies it, and the walk
+        deliberately does not ask for rule 14 itself);
+      - the booted harts ([x < N]) and their [PHart]-ness at a writing
+        agent;
+      - [W]'s two side conditions, [W_poloc_closed] and [wubA];
+      - [wsite_supply]: per position, RMW-freedom and the CLASSIFICATION —
+        outside [W] with its sources already in the log, or inside [W], a
+        genuine witness at that position's own visit count, and carrying
+        [wwit_site].
+
+    No walk state appears in it. *)
+Theorem xv6_rvwmo_safe_modulo_l2' (Σ : gFunctors)
+    `{!riscvGpreS Σ, !weakGpreS Σ}
+    (gen : nat) (σ0 : wgstate) (D : CPU → gset register)
+    (Nm : Z → Z → namespace) (P : Z → Z → Prop) :
+  fresh_era gen σ0 →
+  wp_package Σ gen σ0 D →
+  (∀ a base, P a base → wp_package_prot Σ gen σ0 D (Nm a base) a base) →
+  (* (R-1) *)
+  l2_claim (xboot σ0) (wgdev σ0) (img_z (wgimg σ0)) (xN σ0) P
+           (bad_run gen σ0) →
+  (* (R-2), reduced to a per-GRAPH datum *)
+  (∀ GD : gdexec,
+     rvwmo_minus_deps_consistent GD →
+     gdexec_qconf (xboot σ0) (wgdev σ0) (img_z (wgimg σ0)) (xN σ0) GD →
+     ∃ W : geid → Prop, wsupply (xboot σ0) (gd_g GD) W (xN σ0)) →
+  ∀ GD : gdexec,
+    rvwmo_minus_deps_consistent GD →
+    gdexec_qconf (xboot σ0) (wgdev σ0) (img_z (wgimg σ0)) (xN σ0) GD →
+  (∀ x, ¬ tc (RacyD GD) x x) ∧
+  (∃ (c : cand) (pst : nat → list pexv6) P' σ',
+     srvwmo_consistent c ∧
+     cd_img c = img_z (wgimg σ0) ∧
+     pst 0%nat = eps_init σ0 ∧
+     exec_prog_ok' pstep_ev pcls_ev pst (λ _, wgdev σ0) (cand_exec c) ∧
+     rtc epf_run (ep_init gen, σ0) (P', σ') ∧
+     wglog σ' = cd_log c (length (cd_tr c)) ∧
+     pa_st <$> pc_ags (ecfg_of P' σ') = pst (length (cd_tr c))) ∧
+  (∀ ρ, rtc epf_run (ep_init gen, σ0) ρ →
+     ~ violation_hart cls_of pub_of n_disk (ecfg_of ρ.1 ρ.2)) ∧
+  (∀ t2 σ2 e2,
+     rtc (@erased_step weak_ev_lang) (epower_fork gen, σ0) (t2, σ2) →
+     e2 ∈ t2 →
+     reducible (Λ := weak_ev_lang) e2 σ2).
+Proof.
+  intros Hfr Hwp Hwpp Hl2 Hsup.
+  apply (xv6_rvwmo_safe_modulo Σ gen σ0 D Nm P Hfr Hwp Hwpp Hl2).
+  by apply walk_supply_of_sites.
+Qed.
+
 (* ====================================================================== *)
 (** * 6. NON-VACUITY, AND WHAT [cyg] SHOWS THE REPAIR DOES *NOT* REACH
 
@@ -1016,6 +1064,153 @@ Proof.
     by apply Forall_singleton.
 Qed.
 
+
+(** ** 6.3 THE ACCEPTANCE TEST: THE WHOLE WALK AT [cyg], FROM THE GENERIC
+       ENGINE
+
+    §6.2 ran ONE step at a concrete state.  With [WeakRvwmoWalk]'s chained
+    invariant ([wlk_inv']) the walk runs to the end from the per-graph datum
+    alone: [cyg_wsupply] names the FROZEN witness set — hart 0's load, the
+    cycle's backward step, and nothing else — and
+    [WeakRvwmoWalk.wlk_run'] does the rest.  Nothing below builds a
+    candidate, a block, a process supply or a segment by hand; contrast
+    [WeakRvwmoCycWit.cyg_walk], which builds four candidates, five process
+    supplies and two [seg_step]s explicitly. *)
+
+(** THE FROZEN SET: exactly the cycle's backward step. *)
+Definition cyW : geid → Prop := λ e, e = (0%nat, 0%nat).
+
+Lemma cyW_ne (e : geid) : e ≠ (0%nat, 0%nat) → ¬ cyW e.
+Proof. by rewrite /cyW. Qed.
+
+Lemma cyg_hart (e : geid) : is_Some (gx_lbl cyg e) → (e.1 < 2)%nat.
+Proof.
+  intros [l Hl].
+  destruct (cyg_lbl _ _ Hl) as [[He _]|[[He _]|[[He _]|[He _]]]];
+    rewrite He /=; lia.
+Qed.
+
+Lemma cyg_w_at (e : geid) (l : lbl) :
+  gx_lbl cyg e = Some l → lb_is_w l = true → e.2 = 1%nat.
+Proof.
+  intros Hl Hw.
+  destruct (cyg_lbl _ _ Hl) as [[_ Hl2]|[[He _]|[[_ Hl2]|[He _]]]];
+    [by rewrite Hl2 /= in Hw|by rewrite He|by rewrite Hl2 /= in Hw
+    |by rewrite He].
+Qed.
+
+Lemma cyg_W_poloc' : W_poloc_closed cyg cyW.
+Proof.
+  intros e1 e2 a HW Hpo _ _ (l & Hl & Hr).
+  destruct (cyg_lbl e2 l Hl) as [[He _]|[[_ Hl2]|[[He _]|[_ Hl2]]]];
+    [exact He|by rewrite Hl2 /= in Hr| |by rewrite Hl2 /= in Hr].
+  exfalso. destruct Hpo as (Hag & _ & _). rewrite /cyW in HW.
+  rewrite HW He /= in Hag. done.
+Qed.
+
+Lemma cyg_wubA : wubA cyg cyW.
+Proof.
+  intros c ev y _ p s Hs HW Hag Hfh. by destruct (cyg_no_fhook _ _ _ Hfh).
+Qed.
+
+(** ONE WRITE PER HART, so the order fact the walk needs holds vacuously —
+    and that is the point: [cyg] REFUTES [grule14] (its cycle is built out
+    of rule-14 edges), so a walk that asked for rule 14 could not run
+    here. *)
+Lemma cyg_gwrow : gwrow_gmo cyg.
+Proof.
+  intros x j k Hjk (lj & Hlj & Hwj) (lk & Hlk & Hwk). exfalso.
+  have Hj1 : j = 1%nat := cyg_w_at (x, j) lj Hlj Hwj.
+  have Hk1 : k = 1%nat := cyg_w_at (x, k) lk Hlk Hwk.
+  lia.
+Qed.
+
+Lemma cyg_wsrc_le_store (n : nat) (e : geid) (lb : lbl) :
+  gx_lbl cyg e = Some lb → lb_is_w lb = true → wsrc_le cyg n e.
+Proof.
+  intros Hl Hw aq base ts vs Hl2. exfalso.
+  rewrite Hl2 in Hl. injection Hl as <-. by simpl in Hw.
+Qed.
+
+Lemma cyg_wsite_supply : wsite_supply cyg cyW.
+Proof.
+  intros n x kz p lb Hat Hp _ Hl.
+  destruct n as [|[|n]].
+  - (* THE FIRST WRITE: hart 0's store, at row position 1 *)
+    rewrite cyg_at1 in Hat. simplify_eq.
+    destruct p as [|[|p]]; [| |exfalso; simpl in Hp; lia].
+    + destruct (cyg_lbl _ _ Hl) as [[_ ->]|[[He _]|[[He _]|[He _]]]];
+        [|by simplify_eq|by simplify_eq|by simplify_eq].
+      split; [exact I|]. right.
+      split_and!; [reflexivity|exact cyg_wit00|exact cyg_wwit_site00].
+    + destruct (cyg_lbl _ _ Hl) as [[He _]|[[_ ->]|[[He _]|[He _]]]];
+        [by simplify_eq| |by simplify_eq|by simplify_eq].
+      split; [exact I|]. left. split;
+        [by apply cyW_ne|by apply (cyg_wsrc_le_store 0%nat _ _ Hl)].
+  - (* THE SECOND WRITE: hart 1's store, at row position 1 *)
+    rewrite cyg_at2 in Hat. simplify_eq.
+    destruct p as [|[|p]]; [| |exfalso; simpl in Hp; lia].
+    + destruct (cyg_lbl _ _ Hl) as [[He _]|[[He _]|[[_ ->]|[He _]]]];
+        [by simplify_eq|by simplify_eq| |by simplify_eq].
+      split; [exact I|]. left. split; [by apply cyW_ne|].
+      intros aq base ts vs Hl2 j t Hj.
+      rewrite Hl2 in Hl. injection Hl as Ha Hb Hc Hd. subst.
+      destruct j as [|[|[|[|j]]]]; try (by rewrite /cy_ts1 /= in Hj);
+        injection Hj as <-; lia.
+    + destruct (cyg_lbl _ _ Hl) as [[He _]|[[He _]|[[He _]|[_ ->]]]];
+        [by simplify_eq|by simplify_eq|by simplify_eq|].
+      split; [exact I|]. left. split;
+        [by apply cyW_ne|by apply (cyg_wsrc_le_store 1%nat _ _ Hl)].
+  - exfalso. rewrite /gwrite_at cyg_gwrites /= in Hat. done.
+Qed.
+
+Theorem cyg_wsupply (cpu0 cpu1 : CPU) (rs0 rs1 : regstate) :
+  wsupply (cy_boot cpu0 cpu1 rs0 rs1) cyg cyW 2%nat.
+Proof.
+  split_and!.
+  - exact cyg_gwrow.
+  - intros x k Hs. have Hx := cyg_hart (x, k) Hs. simpl in Hx. lia.
+  - intros x k lb Hl _.
+    have Hx := cyg_hart (x, k) (mk_is_Some _ _ Hl). simpl in Hx.
+    destruct x as [|[|x]]; [| |lia]; by eexists _, _, _, _, _.
+  - exact cyg_W_poloc'.
+  - exact cyg_wubA.
+  - exact cyg_wsite_supply.
+Qed.
+
+(** THE ACCEPTANCE TEST: [WeakRvwmoCycWit.cyg_walk]'s conclusion, from the
+    generic engine — the invariant, the start, and the per-graph datum. *)
+Theorem cyg_walk' (cpu0 cpu1 : CPU) (rs0 rs1 : regstate) (d0 : dev_state) :
+  ∃ (l : list segout) (S0 Sf : cyc_state),
+    segs_run d0 l S0 Sf ∧
+    cd_img (cst_c Sf) = gx_img cyg ∧
+    cst_pst Sf 0%nat = cy_boot cpu0 cpu1 rs0 rs1 <$> seq 0 2 ∧
+    cst_dv Sf 0%nat = d0 ∧
+    log_of cyg (cd_log (cst_c Sf) (length (cd_tr (cst_c Sf)))).
+Proof.
+  have Hwf : gwf cyg by destruct cyg_consistent as (H & _).
+  have Hem0 : ∀ x, (x < 2)%nat →
+                wemit d0 cyg x 0%nat (cy_boot cpu0 cpu1 rs0 rs1 x).
+  { intros x _.
+    exact (wemit_of_qconf (cy_boot cpu0 cpu1 rs0 rs1) d0 cy_img 2%nat cygd x
+             (cyg_qconf cpu0 cpu1 rs0 rs1 d0)). }
+  destruct (wlk_run' (cy_boot cpu0 cpu1 rs0 rs1) d0 2%nat cyg cyW
+              (λ St n Hinv Hn,
+                 wlk_step'_of_supply (cy_boot cpu0 cpu1 rs0 rs1) d0 2%nat
+                   cyg cyW St n cyg_consistent (cyg_wsupply cpu0 cpu1 rs0 rs1)
+                   Hinv Hn)
+              2%nat 0%nat
+              (wlk_start (cy_boot cpu0 cpu1 rs0 rs1) d0 2%nat cyg)
+              (wlk_start_inv' (cy_boot cpu0 cpu1 rs0 rs1) d0 2%nat cyg cyW
+                 Hwf Hem0)
+              ltac:(by rewrite cyg_gwrites))
+    as (l & Sf & Hrun & Hok & Himg & Hpst & Hdv & Hpfx).
+  exists l, (wlk_start (cy_boot cpu0 cpu1 rs0 rs1) d0 2%nat cyg), Sf.
+  split_and!; [exact Hrun|exact Himg|exact Hpst|exact Hdv|].
+  rewrite -/(cd_end (cst_c Sf)) -/(cd_log_end (cst_c Sf)).
+  by apply log_of_of_pfx.
+Qed.
+
 (* ====================================================================== *)
 (** * 7. AUDIT *)
 
@@ -1041,6 +1236,13 @@ Print Assumptions cyg_step0_generic.
 Print Assumptions walk_seg_data_of_qconf.
 Print Assumptions walk_supply_of_qconf.
 Print Assumptions xv6_rvwmo_safe_modulo_l2.
+Print Assumptions xv6_rvwmo_safe_modulo_l2'.
+Print Assumptions cyg_W_poloc'.
+Print Assumptions cyg_wubA.
+Print Assumptions cyg_gwrow.
+Print Assumptions cyg_wsite_supply.
+Print Assumptions cyg_wsupply.
+Print Assumptions cyg_walk'.
 
 (* ====================================================================== *)
 (** * 8. THE LEDGER AFTER THIS LEAF
@@ -1085,12 +1287,20 @@ Print Assumptions xv6_rvwmo_safe_modulo_l2.
     functions of [G] and the write count, so they are SITE data like the
     rest; at [WeakRvwmoCycWit.cyg] they compute ([cyg_wwit_site00]).
 
-    WHAT IS STILL OPEN, precisely.  [wlk_inv] records the walk state's
-    candidate, image, boot supply and log prefix — but NOT the hart's
-    process state, NOT its row position, and NOT the carried context (which
-    is indexed by the write count [n] and so must be re-established at
-    every step).  So [wseg_align] and [wctx] stay in [wseg_supply], and the
-    walk cannot be CHAINED generically: [cyg_step0_generic] is one step at
-    a CONCRETE state, and the walk's output state is existential.  Closing
-    that is the next item — [wlk_inv] carrying the emission state — and it
-    is what would turn [cyg_step0_generic] into a whole [cyg_walk']. *)
+    THAT IS NOW CLOSED, in [WeakRvwmoWalk] §4.5–§4.6.  [wlk_inv'] carries
+    the frozen set's [ctrace_prefix], every hart's emission state with the
+    walk state's process identified with it, and the row-position boundary;
+    [wlk_step'_of_supply] derives the whole per-state datum from a
+    per-GRAPH one ([wsupply]).  §5.5's [xv6_rvwmo_safe_modulo_l2'] is the
+    capstone at that residue, and §6.3's [cyg_walk'] is the acceptance
+    test: [WeakRvwmoCycWit.cyg_walk]'s conclusion, both steps, out of the
+    generic engine, with no candidate, block, process supply or segment
+    built by hand.
+
+    WHAT THE RESIDUE STILL NAMES, and why each is honest.  [wsupply] is
+    [gwrow_gmo] (one hart's writes reach the log in program order — NOT
+    [grule14], which [cyg] refutes), the booted-hart bounds, [W]'s two side
+    conditions, and [wsite_supply] (per position: RMW-freedom and the
+    classification).  RMW-freedom is the one clause that is not merely a
+    choice of [W]: an [LRmw] exit needs [wcpolp_at]/[cpolp_of_align] (§3)
+    wired into [wQ'], which is a separate, priced item. *)

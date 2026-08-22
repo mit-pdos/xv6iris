@@ -877,7 +877,14 @@ Section segment'.
             [WeakRvwmoWalk]'s [wlk_inv] needs exactly these three. *)
         cd_img c' = cd_img c ∧
         pst' 0%nat = pst 0%nat ∧
-        dv' 0%nat = dv 0%nat.
+        dv' 0%nat = dv 0%nat ∧
+        (** THE FRAME.  The iteration appends [x]'s steps and nothing else,
+            so every OTHER hart's program state and release-pending bit come
+            through untouched.  A walk that carries an invariant about ALL
+            harts needs exactly this pair. *)
+        (∀ y, y ≠ x → pst' (cd_end c') !! y = pst (cd_end c) !! y) ∧
+        (∀ y, y ≠ x → w_relp (ms_ws (cand_last_st c') y)
+                    = w_relp (ms_ws (cand_last_st c) y)).
   Proof.
     induction 1 as [k ws p
                    |k ws lb row p ls pa da l p' es pfin Har Hre Hst Hem IH
@@ -889,7 +896,8 @@ Section segment'.
       split_and!; [by rewrite app_nil_r| |constructor|exact Hc
                   |(rewrite /= Nat.add_0_r; exact Hctx)
                   |exact Hpo|exact Hp|exact Hdv|reflexivity|exact Hag|exact Hrelp
-                  |reflexivity|reflexivity|reflexivity].
+                  |reflexivity|reflexivity|reflexivity
+                  |(intros y _; reflexivity)|(intros y _; reflexivity)].
       intros s Hs. by apply elem_of_nil in Hs.
     - (* ONE BLOCK, then the rest *)
       have Hlb : Q k lb.
@@ -933,12 +941,12 @@ Section segment'.
                   Hc2 Hctx2 Hpo2 Hp2 Hdv2 Hag2 Hrelp2)
         as (c' & pst' & dv' & tradd & m2 & rs12 & rs22 & fn2 & ib2 &
             Htr & Hag' & Hf2 & Hc' & Hctx' & Hpo' & Hp'' & Hdv' & Hfin & Hagf
-            & Hrelpf & Himg2 & Hpst02 & Hdv02).
+            & Hrelpf & Himg2 & Hpst02 & Hdv02 & Hfr2 & Hfrp2).
       exists c', pst', dv', (EStep x lb' :: tradd), m2, rs12, rs22, fn2, ib2.
       split_and!; [| |constructor; [exact Hri|exact Hf2]|exact Hc'
                    |(rewrite /= Nat.add_succ_r; exact Hctx')
                    |exact Hpo'|exact Hp''|exact Hdv'|exact Hfin|exact Hagf
-                   |exact Hrelpf| | | ].
+                   |exact Hrelpf| | | | | ].
       + rewrite Htr /c2 cand_snoc_tr -app_assoc //.
       + intros s Hs. apply elem_of_cons in Hs as [->|Hs]; [done|by apply Hag'].
       + rewrite Himg2 /c2 cand_snoc_img //.
@@ -946,6 +954,12 @@ Section segment'.
           (pst_snoc_le c pst x (PHart cpu m1 rs21 fn1 ib1) 0%nat
              (Nat.le_0_l _)) //.
       + rewrite Hdv02 /dv2 (dv_snoc_le c dv d0 0%nat (Nat.le_0_l _)) //.
+      + intros y Hy. rewrite (Hfr2 y Hy) Hend /pst2
+          (pst_snoc_gt c pst x (PHart cpu m1 rs21 fn1 ib1) (S (cd_end c))
+             ltac:(lia)).
+        by rewrite list_lookup_insert_ne.
+      + intros y Hy. rewrite (Hfrp2 y Hy) /c2.
+        by rewrite (cand_snoc_relp_ne c x y lb' Hy).
     - (* (O-F) THE FUSED EXCLUSIVE PAIR, CERTIFIED — the same five moves as
          the [HEone] block, with [cblkp]/[cpolp]/[cert_block_snoc_pair] in
          place of [cblk]/[Hpol']/[cert_block_snoc], and with the appended
@@ -999,12 +1013,12 @@ Section segment'.
                   Hc2 Hctx2 Hpo2 Hp2 Hdv2 Hag2 Hrelp2)
         as (c' & pst' & dv' & tradd & m2 & rs12 & rs22 & fn2 & ib2 &
             Htr & Hag' & Hf2 & Hc' & Hctx' & Hpo' & Hp'' & Hdv' & Hfin & Hagf
-            & Hrelpf & Himg2 & Hpst02 & Hdv02).
+            & Hrelpf & Himg2 & Hpst02 & Hdv02 & Hfr2 & Hfrp2).
       exists c', pst', dv', (EStep x lb :: tradd), m2, rs12, rs22, fn2, ib2.
       split_and!; [| |constructor; [apply lbl_reidx_refl|exact Hf2]
                    |exact Hc'|(rewrite /= Nat.add_succ_r; exact Hctx')
                    |exact Hpo'|exact Hp''|exact Hdv'|exact Hfin|exact Hagf
-                   |exact Hrelpf| | | ].
+                   |exact Hrelpf| | | | | ].
       + rewrite Htr /c2 cand_snoc_tr -app_assoc //.
       + intros s Hs. apply elem_of_cons in Hs as [->|Hs]; [done|by apply Hag'].
       + rewrite Himg2 /c2 cand_snoc_img //.
@@ -1012,6 +1026,12 @@ Section segment'.
           (pst_snoc_le c pst x (PHart cpu m1 rs21 fn1 ib1) 0%nat
              (Nat.le_0_l _)) //.
       + rewrite Hdv02 /dv2 (dv_snoc_le c dv d0 0%nat (Nat.le_0_l _)) //.
+      + intros y Hy. rewrite (Hfr2 y Hy) Hend /pst2
+          (pst_snoc_gt c pst x (PHart cpu m1 rs21 fn1 ib1) (S (cd_end c))
+             ltac:(lia)).
+        by rewrite list_lookup_insert_ne.
+      + intros y Hy. rewrite (Hfrp2 y Hy) /c2.
+        by rewrite (cand_snoc_relp_ne c x y lb Hy).
   Qed.
 End segment'.
 
