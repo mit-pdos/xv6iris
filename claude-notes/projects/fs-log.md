@@ -14,6 +14,24 @@
 > `FsBoot.fs_boot_bundle` was superseded by the `_at` boot mint
 > (`completed/fs-cfg-boot.md`); (4) the phase-D2 read-data-indexed-permit
 > decision is untaken, so even after (1) recovery is safety-only.
+>
+> **HOW THIS SQUARES WITH THE CLOSED ADEQUACY THEOREM.**
+> `SystemAdequacy.xv6_power_adequacy` proves the system runs across
+> arbitrarily many crashes — under `Himg : fs_boot_image_eras`, i.e. EVERY
+> era boots on a disk satisfying `fs_boot_image_wf`, which contains
+> `FsImg.fsimg_wf`, which contains `fs_log_clean` (log header `n = 0`;
+> `FsImg.v:907`, `fsimg_wf_log`, consumed via
+> `FirstTok.first_fsinit_pures_of_image`). A crash with a committed,
+> not-yet-installed transaction leaves `n > 0`, so that disk falls OUTSIDE
+> the hypothesis and the theorem says nothing about it. The crash predicate
+> (`riscv_crash_pred = P_fs_any`, with `fs_recovery` stated at the
+> n-transaction install) describes such disks, but nothing connects it to
+> the next era's boot premise — the premise is a separate universal
+> assumption (`SystemAdequacy.v:126-145` says so: "boots twice on the image
+> is a hypothesis, not a theorem"). Items (1) and (3) above are what turn
+> it into a theorem: real recovery in `initlog`/`install_trans`, then
+> discharge `fs_log_clean` from the previous era's `P_fs` instead of
+> assuming it.
 
 Design: [`../design/fs-log.md`](../design/fs-log.md) — read its "stage-4
 architecture" section first; every durable finding of this effort has been
