@@ -131,17 +131,6 @@ Section ProofVirtioDiskRwC.
   Proof.
     intros Hh8 Hs0 Hs6 Hs7.
     iIntros "Hcg #Htext Hpc Hidx Hty Hres Hsec Hcont".
-    iPoseProof (rwi_0c4 with "Htext") as "Hi0b0".
-    iPoseProof (rwi_0c8 with "Htext") as "Hi0b4".
-    iPoseProof (rwi_0cc with "Htext") as "Hi0b8".
-    iPoseProof (rwi_0d0 with "Htext") as "Hi0bc".
-    iPoseProof (rwi_0d4 with "Htext") as "Hi0c0".
-    iPoseProof (rwi_0d8 with "Htext") as "Hi0c4".
-    iPoseProof (rwi_0dc with "Htext") as "Hi0c8".
-    iPoseProof (rwi_0de with "Htext") as "Hi0ca".
-    iPoseProof (rwi_0e2 with "Htext") as "Hi0ce".
-    iPoseProof (rwi_0e4 with "Htext") as "Hi0d0".
-    iPoseProof (rwi_0e8 with "Htext") as "Hi0d4".
     (* ---- +0x0c4  lw a0,-96(s0) ---- *)
     assert (Hidxa : add_vec (M !!! Regidx Rs0)
                       (sign_extend' 64 (mword_of_int 4000 : mword 12))
@@ -151,7 +140,8 @@ Section ProofVirtioDiskRwC.
               (mword_of_int 4000 : mword 12) M av
               (mword_of_int (Z.of_nat h) : SailStdpp.Values.mword 32) false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi0b0 [Hidx]").
+              with "Hcg Hpc [] [Hidx]").
+    { iApply (rwi_0c4 with "Htext"). }
     { rgall. iEval (rewrite Hidxa). iExact "Hidx". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hidx". rgall. iEval (rewrite Hidxa) in "Hidx".
     set (N1 := <[Regidx Ra0 := regval_into_reg
@@ -170,7 +160,8 @@ Section ProofVirtioDiskRwC.
               (mword_of_int (16 * Z.of_nat h) : SailStdpp.Values.mword 64) N1 av false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(rgall; rewrite /N1 upd_eq; exact (vdrwc_slli4 h Hh8))
-              with "Hcg Hpc Hi0b4").
+              with "Hcg Hpc []").
+    { iApply (rwi_0c8 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (N2 := <[Regidx Ra3 := regval_into_reg
                   (mword_of_int (16 * Z.of_nat h) : SailStdpp.Values.mword 64)]> N1).
@@ -183,7 +174,8 @@ Section ProofVirtioDiskRwC.
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x0cc) : mword 64) Ra5
               (mword_of_int 30 : mword 20) N2 av false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi0b8").
+              with "Hcg Hpc []").
+    { iApply (rwi_0cc with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (N3 := <[Regidx Ra5 := regval_into_reg
                   (add_vec (mword_of_int (KernelSyms.virtio_disk_rw + 0x0cc) : mword 64)
@@ -197,7 +189,8 @@ Section ProofVirtioDiskRwC.
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x0d0) : mword 64) Ra5 Ra5
               (mword_of_int 2828 : mword 12) N3 av false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi0bc").
+              with "Hcg Hpc []").
+    { iApply (rwi_0d0 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (N4 := <[Regidx Ra5 := regval_into_reg
                   (add_vec (N3 !!! Regidx Ra5)
@@ -219,7 +212,8 @@ Section ProofVirtioDiskRwC.
               (mword_of_int (16 * Z.of_nat h) : SailStdpp.Values.mword 64) N4 av false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(rgall; rewrite HN4a0; exact (vdrwc_slli4' h Hh8))
-              with "Hcg Hpc Hi0c0").
+              with "Hcg Hpc []").
+    { iApply (rwi_0d4 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (N5 := <[Regidx Ra4 := regval_into_reg
                   (mword_of_int (16 * Z.of_nat h) : SailStdpp.Values.mword 64)]> N4).
@@ -231,7 +225,8 @@ Section ProofVirtioDiskRwC.
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x0d8) : mword 64) Ra4 Ra4
               (mword_of_int 160 : mword 12) N5 av false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi0c4").
+              with "Hcg Hpc []").
+    { iApply (rwi_0d8 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (N6 := <[Regidx Ra4 := regval_into_reg
                   (add_vec (N5 !!! Regidx Ra4)
@@ -250,7 +245,8 @@ Section ProofVirtioDiskRwC.
     iEval (rewrite Hp0c8) in "Hpc".
     iApply (wp_cadd_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x0dc) : mword 64) Ra4 Ra5 N6 av false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi0c8").
+              with "Hcg Hpc []").
+    { iApply (rwi_0dc with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (N7 := <[Regidx Ra4 := regval_into_reg
                   (add_vec (N6 !!! Regidx Ra4) (N6 !!! Regidx Ra5))]> N6).
@@ -276,7 +272,8 @@ Section ProofVirtioDiskRwC.
               (vdrw_ty64 wr) N7 av false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(rgall; rewrite Hz0 HN7s6; reflexivity)
-              with "Hcg Hpc Hi0ca").
+              with "Hcg Hpc []").
+    { iApply (rwi_0de with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (N8 := <[Regidx Ra2 := regval_into_reg (vdrw_ty64 wr)]> N7).
     change (<[Regidx Ra2 := regval_into_reg (vdrw_ty64 wr)]> N7) with N8.
@@ -295,7 +292,8 @@ Section ProofVirtioDiskRwC.
                    = (d_ops h : SailStdpp.Values.mword 64))
       by (rewrite HN8a4; apply vdrwc_ops_addr).
     iApply (wp_csw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_rw + 0x0e2) : mword 64) Ra2 Ra4
-              (mword_of_int 8 : mword 12) N8 av ty0 false with "Hcg Hpc Hi0ce [Hty]").
+              (mword_of_int 8 : mword 12) N8 av ty0 false with "Hcg Hpc [] [Hty]").
+    { iApply (rwi_0e2 with "Htext"). }
     { rgall. iEval (rewrite Haty). iExact "Hty". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hty". rgall.
     iEval (rewrite Haty) in "Hty".
@@ -310,7 +308,8 @@ Section ProofVirtioDiskRwC.
                          : SailStdpp.Values.mword 64))
       by (rewrite HN8a4; apply vdrwc_ops_res_addr).
     iApply (wp_sw_zero_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_rw + 0x0e4) : mword 64) Ra4
-              (mword_of_int 12 : mword 12) N8 av res0 false with "Hcg Hpc Hi0d0 [Hres]").
+              (mword_of_int 12 : mword 12) N8 av res0 false with "Hcg Hpc [] [Hres]").
+    { iApply (rwi_0e4 with "Htext"). }
     { rgall. iEval (rewrite Hares). iExact "Hres". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hres". rgall. iEval (rewrite Hares) in "Hres".
     assert (Hp0d4 : add_vec_int (mword_of_int (KernelSyms.virtio_disk_rw + 0x0e4) : mword 64) 4
@@ -328,7 +327,8 @@ Section ProofVirtioDiskRwC.
                          : SailStdpp.Values.mword 64))
       by (rewrite HN8a4; apply vdrwc_ops_sec_addr).
     iApply (wp_sd_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_rw + 0x0e8) : mword 64) Rs7 Ra4
-              (mword_of_int 16 : mword 12) N8 av sec0 false with "Hcg Hpc Hi0d4 [Hsec]").
+              (mword_of_int 16 : mword 12) N8 av sec0 false with "Hcg Hpc [] [Hsec]").
+    { iApply (rwi_0e8 with "Htext"). }
     { rgall. iEval (rewrite Hasec). iExact "Hsec". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hsec". rgall.
     iEval (rewrite Hasec HN8s7) in "Hsec".
@@ -392,17 +392,6 @@ Section ProofVirtioDiskRwC.
   Proof.
     intros Ha3 Ha5.
     iIntros "Hcg #Htext Hpc #Hdp Hda Hdl Hdf Hcont".
-    iPoseProof (rwi_0ec with "Htext") as "Hi0d8".
-    iPoseProof (rwi_0ee with "Htext") as "Hi0da".
-    iPoseProof (rwi_0f0 with "Htext") as "Hi0dc".
-    iPoseProof (rwi_0f4 with "Htext") as "Hi0e0".
-    iPoseProof (rwi_0f6 with "Htext") as "Hi0e2".
-    iPoseProof (rwi_0f8 with "Htext") as "Hi0e4".
-    iPoseProof (rwi_0fa with "Htext") as "Hi0e6".
-    iPoseProof (rwi_0fe with "Htext") as "Hi0ea".
-    iPoseProof (rwi_100 with "Htext") as "Hi0ec".
-    iPoseProof (rwi_104 with "Htext") as "Hi0f0".
-    iPoseProof (rwi_106 with "Htext") as "Hi0f2".
     assert (Hdpa : add_vec (M !!! Regidx Ra5)
                      (sign_extend' 64 (mword_of_int 0 : mword 12))
                    = (d_desc_ptr : SailStdpp.Values.mword 64)).
@@ -411,7 +400,8 @@ Section ProofVirtioDiskRwC.
     iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_rw + 0x0ec) : mword 64) Ra4 Ra5
               (mword_of_int 0 : mword 12) M av pd false (dqm := DfracDiscarded)
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi0d8 []").
+              with "Hcg Hpc [] []").
+    { iApply (rwi_0ec with "Htext"). }
     { rgall. iEval (rewrite Hdpa). iExact "Hdp". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc _". rgall.
     set (Q1 := <[Regidx Ra4 := regval_into_reg pd]> M).
@@ -426,7 +416,8 @@ Section ProofVirtioDiskRwC.
     (* ---- +0x0ee  c.add a4,a3 ---- *)
     iApply (wp_cadd_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x0ee) : mword 64) Ra4 Ra3 Q1 av false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi0da").
+              with "Hcg Hpc []").
+    { iApply (rwi_0ee with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (Q2 := <[Regidx Ra4 := regval_into_reg
                   (add_vec (Q1 !!! Regidx Ra4) (Q1 !!! Regidx Ra3))]> Q1).
@@ -446,7 +437,8 @@ Section ProofVirtioDiskRwC.
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x0f0) : mword 64) Ra2 Ra3
               (mword_of_int 168 : mword 12) Q2 av false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi0dc").
+              with "Hcg Hpc []").
+    { iApply (rwi_0f0 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (Q3 := <[Regidx Ra2 := regval_into_reg
                   (add_vec (Q2 !!! Regidx Ra3)
@@ -461,7 +453,8 @@ Section ProofVirtioDiskRwC.
     iEval (rewrite Hp0e0) in "Hpc".
     iApply (wp_cadd_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x0f4) : mword 64) Ra2 Ra5 Q3 av false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi0e0").
+              with "Hcg Hpc []").
+    { iApply (rwi_0f4 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (Q4 := <[Regidx Ra2 := regval_into_reg
                   (add_vec (Q3 !!! Regidx Ra2) (Q3 !!! Regidx Ra5))]> Q3).
@@ -480,7 +473,8 @@ Section ProofVirtioDiskRwC.
                    = (d_desc pd h : SailStdpp.Values.mword 64))
       by (rewrite HQ4a4 addv_sext0; reflexivity).
     iApply (wp_csd_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_rw + 0x0f6) : mword 64) Ra2 Ra4
-              (mword_of_int 0 : mword 12) Q4 av va0 false with "Hcg Hpc Hi0e2 [Hda]").
+              (mword_of_int 0 : mword 12) Q4 av va0 false with "Hcg Hpc [] [Hda]").
+    { iApply (rwi_0f6 with "Htext"). }
     { rgall. iEval (rewrite Hada). iExact "Hda". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hda". rgall. iEval (rewrite Hada HQ4a2) in "Hda".
     assert (Hp0e4 : add_vec_int (mword_of_int (KernelSyms.virtio_disk_rw + 0x0f6) : mword 64) 2
@@ -495,7 +489,8 @@ Section ProofVirtioDiskRwC.
     iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_rw + 0x0f8) : mword 64) Ra2 Ra5
               (mword_of_int 0 : mword 12) Q4 av pd false (dqm := DfracDiscarded)
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi0e4 []").
+              with "Hcg Hpc [] []").
+    { iApply (rwi_0f8 with "Htext"). }
     { rgall. iEval (rewrite Hdpa4). iExact "Hdp". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc _". rgall.
     set (Q5 := <[Regidx Ra2 := regval_into_reg pd]> Q4).
@@ -513,7 +508,8 @@ Section ProofVirtioDiskRwC.
               (d_desc pd h : SailStdpp.Values.mword 64) Q5 av false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(rgall; rewrite HQ5a2 HQ5a3; apply vdrwc_desc_addr')
-              with "Hcg Hpc Hi0e6").
+              with "Hcg Hpc []").
+    { iApply (rwi_0fa with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (Q6 := <[Regidx Ra6 := regval_into_reg
                   (d_desc pd h : SailStdpp.Values.mword 64)]> Q5).
@@ -528,7 +524,8 @@ Section ProofVirtioDiskRwC.
     iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x0fe) : mword 64) Ra4
               (mword_of_int 16 : mword 6) (mword_of_int 16 : SailStdpp.Values.mword 64)
               Q6 av false ltac:(vm_compute; discriminate) ltac:(rdok)
-              vdrwc_li16 with "Hcg Hpc Hi0ea").
+              vdrwc_li16 with "Hcg Hpc []").
+    { iApply (rwi_0fe with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (Q7 := <[Regidx Ra4 := regval_into_reg
                   (mword_of_int 16 : SailStdpp.Values.mword 64)]> Q6).
@@ -546,7 +543,8 @@ Section ProofVirtioDiskRwC.
                    = (pa_add pd (16 * h + 8)%nat : SailStdpp.Values.mword 64))
       by (rewrite HQ7a6; apply vdrwc_desc_len).
     iApply (wp_sw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_rw + 0x100) : mword 64) Ra4 Ra6
-              (mword_of_int 8 : mword 12) Q7 av vl0 false with "Hcg Hpc Hi0ec [Hdl]").
+              (mword_of_int 8 : mword 12) Q7 av vl0 false with "Hcg Hpc [] [Hdl]").
+    { iApply (rwi_100 with "Htext"). }
     { rgall. iEval (rewrite Hadl). iExact "Hdl". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hdl". rgall.
     iEval (rewrite Hadl HQ7a4 vdrwc_t32_16) in "Hdl".
@@ -557,7 +555,8 @@ Section ProofVirtioDiskRwC.
     iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x104) : mword 64) Ra1
               (mword_of_int 1 : mword 6) (mword_of_int (Z.of_nat 1) : SailStdpp.Values.mword 64)
               Q7 av false ltac:(vm_compute; discriminate) ltac:(rdok)
-              vdrwb_li1 with "Hcg Hpc Hi0f0").
+              vdrwb_li1 with "Hcg Hpc []").
+    { iApply (rwi_104 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (Q8 := <[Regidx Ra1 := regval_into_reg
                   (mword_of_int (Z.of_nat 1) : SailStdpp.Values.mword 64)]> Q7).
@@ -575,7 +574,8 @@ Section ProofVirtioDiskRwC.
                    = (pa_add pd (16 * h + 12)%nat : SailStdpp.Values.mword 64))
       by (rewrite HQ8a6; apply vdrwc_desc_flags).
     iApply (wp_sh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_rw + 0x106) : mword 64) Ra1 Ra6
-              (mword_of_int 12 : mword 12) Q8 av vf0 false with "Hcg Hpc Hi0f2 [Hdf]").
+              (mword_of_int 12 : mword 12) Q8 av vf0 false with "Hcg Hpc [] [Hdf]").
+    { iApply (rwi_106 with "Htext"). }
     { rgall. iEval (rewrite Hadf). iExact "Hdf". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hdf". rgall.
     iEval (rewrite Hadf HQ8a1 vdrwc_t16_1) in "Hdf".
@@ -654,20 +654,6 @@ Section ProofVirtioDiskRwC.
   Proof.
     intros Hm8 Hs0 Hs3 Hs6 Ha1 Ha2 Ha5 Ha6.
     iIntros "Hcg #Htext Hpc #Hdp Hidx Hdn Hda Hdl Hdf Hcont".
-    iPoseProof (rwi_10a with "Htext") as "Hi0f6".
-    iPoseProof (rwi_10e with "Htext") as "Hi0fa".
-    iPoseProof (rwi_112 with "Htext") as "Hi0fe".
-    iPoseProof (rwi_114 with "Htext") as "Hi100".
-    iPoseProof (rwi_116 with "Htext") as "Hi102".
-    iPoseProof (rwi_11a with "Htext") as "Hi106".
-    iPoseProof (rwi_11e with "Htext") as "Hi10a".
-    iPoseProof (rwi_122 with "Htext") as "Hi10e".
-    iPoseProof (rwi_124 with "Htext") as "Hi110".
-    iPoseProof (rwi_128 with "Htext") as "Hi114".
-    iPoseProof (rwi_12a with "Htext") as "Hi116".
-    iPoseProof (rwi_12e with "Htext") as "Hi11a".
-    iPoseProof (rwi_132 with "Htext") as "Hi11e".
-    iPoseProof (rwi_134 with "Htext") as "Hi120".
     (* ---- +0x10a  lw a4,-92(s0) ---- *)
     assert (Hidxa : add_vec (M !!! Regidx Rs0)
                       (sign_extend' 64 (mword_of_int 4004 : mword 12))
@@ -677,7 +663,8 @@ Section ProofVirtioDiskRwC.
               (mword_of_int 4004 : mword 12) M av
               (mword_of_int (Z.of_nat m2) : SailStdpp.Values.mword 32) false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi0f6 [Hidx]").
+              with "Hcg Hpc [] [Hidx]").
+    { iApply (rwi_10a with "Htext"). }
     { rgall. iEval (rewrite Hidxa). iExact "Hidx". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hidx". rgall. iEval (rewrite Hidxa) in "Hidx".
     set (R1 := <[Regidx Ra4 := regval_into_reg
@@ -697,7 +684,8 @@ Section ProofVirtioDiskRwC.
                    = (pa_add pd (16 * h + 14)%nat : SailStdpp.Values.mword 64))
       by (rewrite HR1a6; apply vdrwc_desc_next).
     iApply (wp_sh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_rw + 0x10e) : mword 64) Ra4 Ra6
-              (mword_of_int 14 : mword 12) R1 av vn0 false with "Hcg Hpc Hi0fa [Hdn]").
+              (mword_of_int 14 : mword 12) R1 av vn0 false with "Hcg Hpc [] [Hdn]").
+    { iApply (rwi_10e with "Htext"). }
     { rgall. iEval (rewrite Hadn). iExact "Hdn". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hdn". rgall.
     iEval (rewrite Hadn) in "Hdn".
@@ -709,7 +697,8 @@ Section ProofVirtioDiskRwC.
     iApply (wp_cslli_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x112) : mword 64)
               (Regidx Ra4) Ra4 (mword_of_int 4 : mword 6) R1 av false
               eq_refl ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi0fe").
+              with "Hcg Hpc []").
+    { iApply (rwi_112 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (R2 := <[Regidx Ra4 := regval_into_reg
                   (shift_bits_left (R1 !!! Regidx Ra4)
@@ -730,7 +719,8 @@ Section ProofVirtioDiskRwC.
     (* ---- +0x114  c.add a2,a4 ---- *)
     iApply (wp_cadd_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x114) : mword 64) Ra2 Ra4 R2 av false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi100").
+              with "Hcg Hpc []").
+    { iApply (rwi_114 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (R3 := <[Regidx Ra2 := regval_into_reg
                   (add_vec (R2 !!! Regidx Ra2) (R2 !!! Regidx Ra4))]> R2).
@@ -748,7 +738,8 @@ Section ProofVirtioDiskRwC.
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x116) : mword 64) Ra6 Rs3
               (mword_of_int 88 : mword 12) R3 av false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi102").
+              with "Hcg Hpc []").
+    { iApply (rwi_116 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (R4 := <[Regidx Ra6 := regval_into_reg
                   (add_vec (R3 !!! Regidx Rs3)
@@ -769,7 +760,8 @@ Section ProofVirtioDiskRwC.
                    = (d_desc pd m2 : SailStdpp.Values.mword 64))
       by (rewrite HR4a2 addv_sext0; reflexivity).
     iApply (wp_sd_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_rw + 0x11a) : mword 64) Ra6 Ra2
-              (mword_of_int 0 : mword 12) R4 av va1 false with "Hcg Hpc Hi106 [Hda]").
+              (mword_of_int 0 : mword 12) R4 av va1 false with "Hcg Hpc [] [Hda]").
+    { iApply (rwi_11a with "Htext"). }
     { rgall. iEval (rewrite Hada). iExact "Hda". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hda". rgall. iEval (rewrite Hada HR4a6) in "Hda".
     assert (Hp10a : add_vec_int (mword_of_int (KernelSyms.virtio_disk_rw + 0x11a) : mword 64) 4
@@ -786,7 +778,8 @@ Section ProofVirtioDiskRwC.
     iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_rw + 0x11e) : mword 64) Ra7 Ra5
               (mword_of_int 0 : mword 12) R4 av pd false (dqm := DfracDiscarded)
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi10a []").
+              with "Hcg Hpc [] []").
+    { iApply (rwi_11e with "Htext"). }
     { rgall. iEval (rewrite Hdpa). iExact "Hdp". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc _". rgall.
     set (R5 := <[Regidx Ra7 := regval_into_reg pd]> R4).
@@ -802,7 +795,8 @@ Section ProofVirtioDiskRwC.
     (* ---- +0x122  c.add a4,a7   a4 := &desc[m2] ---- *)
     iApply (wp_cadd_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x122) : mword 64) Ra4 Ra7 R5 av false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi10e").
+              with "Hcg Hpc []").
+    { iApply (rwi_122 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (R6 := <[Regidx Ra4 := regval_into_reg
                   (add_vec (R5 !!! Regidx Ra4) (R5 !!! Regidx Ra7))]> R5).
@@ -817,7 +811,8 @@ Section ProofVirtioDiskRwC.
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x124) : mword 64) Ra2 Rz
               (mword_of_int 1024 : mword 12) R6 av false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi110").
+              with "Hcg Hpc []").
+    { iApply (rwi_124 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (R7 := <[Regidx Ra2 := regval_into_reg
                   (add_vec (R6 !!! Regidx Rz)
@@ -843,7 +838,8 @@ Section ProofVirtioDiskRwC.
                    = (pa_add pd (16 * m2 + 8)%nat : SailStdpp.Values.mword 64))
       by (rewrite HR7a4; apply vdrwc_desc_len).
     iApply (wp_csw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_rw + 0x128) : mword 64) Ra2 Ra4
-              (mword_of_int 8 : mword 12) R7 av vl1 false with "Hcg Hpc Hi114 [Hdl]").
+              (mword_of_int 8 : mword 12) R7 av vl1 false with "Hcg Hpc [] [Hdl]").
+    { iApply (rwi_128 with "Htext"). }
     { rgall. iEval (rewrite Hadl). iExact "Hdl". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hdl". rgall.
     iEval (rewrite Hadl HR7a2 vdrwc_t32_1024) in "Hdl".
@@ -859,7 +855,8 @@ Section ProofVirtioDiskRwC.
     iApply (wp_sltiu_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x12a) : mword 64) Ra2 Rs6
               (mword_of_int 1 : mword 12) (vdrw_fl0 wr) R7 av false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              ltac:(rgall; rewrite HR7s6; reflexivity) with "Hcg Hpc Hi116").
+              ltac:(rgall; rewrite HR7s6; reflexivity) with "Hcg Hpc []").
+    { iApply (rwi_12a with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (R8 := <[Regidx Ra2 := regval_into_reg (vdrw_fl0 wr)]> R7).
     change (<[Regidx Ra2 := regval_into_reg (vdrw_fl0 wr)]> R7) with R8.
@@ -869,7 +866,8 @@ Section ProofVirtioDiskRwC.
     iApply (wp_slliw_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x12e) : mword 64) Ra2 Ra2
               (mword_of_int 1 : mword 5) (vdrw_fl1 wr) R8 av false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              ltac:(rgall; rewrite /R8 upd_eq; reflexivity) with "Hcg Hpc Hi11a").
+              ltac:(rgall; rewrite /R8 upd_eq; reflexivity) with "Hcg Hpc []").
+    { iApply (rwi_12e with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (R9 := <[Regidx Ra2 := regval_into_reg (vdrw_fl1 wr)]> R8).
     change (<[Regidx Ra2 := regval_into_reg (vdrw_fl1 wr)]> R8) with R9.
@@ -885,7 +883,8 @@ Section ProofVirtioDiskRwC.
     iApply (wp_cor_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x132) : mword 64) Ra2 Ra2 Ra1
               (vdrw_fl2 wr) R9 av false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              ltac:(rgall; rewrite HR9a1 /R9 upd_eq; reflexivity) with "Hcg Hpc Hi11e").
+              ltac:(rgall; rewrite HR9a1 /R9 upd_eq; reflexivity) with "Hcg Hpc []").
+    { iApply (rwi_132 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (RA := <[Regidx Ra2 := regval_into_reg (vdrw_fl2 wr)]> R9).
     change (<[Regidx Ra2 := regval_into_reg (vdrw_fl2 wr)]> R9) with RA.
@@ -902,7 +901,8 @@ Section ProofVirtioDiskRwC.
                    = (pa_add pd (16 * m2 + 12)%nat : SailStdpp.Values.mword 64))
       by (rewrite HRAa4; apply vdrwc_desc_flags).
     iApply (wp_sh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_rw + 0x134) : mword 64) Ra2 Ra4
-              (mword_of_int 12 : mword 12) RA av vf1 false with "Hcg Hpc Hi120 [Hdf]").
+              (mword_of_int 12 : mword 12) RA av vf1 false with "Hcg Hpc [] [Hdf]").
+    { iApply (rwi_134 with "Htext"). }
     { rgall. iEval (rewrite Hadf). iExact "Hdf". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hdf". rgall.
     iEval (rewrite Hadf HRAa2 -/(vdrw_flags wr)) in "Hdf".
@@ -980,18 +980,6 @@ Section ProofVirtioDiskRwC.
   Proof.
     intros Hh8 Ht8 Hs0 Ha0 Ha3 Ha4 Ha5 Ha7.
     iIntros "Hcg #Htext Hpc Hidx Hdn Hst Hda Hcont".
-    iPoseProof (rwi_138 with "Htext") as "Hi124".
-    iPoseProof (rwi_13c with "Htext") as "Hi128".
-    iPoseProof (rwi_140 with "Htext") as "Hi12c".
-    iPoseProof (rwi_144 with "Htext") as "Hi130".
-    iPoseProof (rwi_148 with "Htext") as "Hi134".
-    iPoseProof (rwi_14a with "Htext") as "Hi136".
-    iPoseProof (rwi_14c with "Htext") as "Hi138".
-    iPoseProof (rwi_150 with "Htext") as "Hi13c".
-    iPoseProof (rwi_152 with "Htext") as "Hi13e".
-    iPoseProof (rwi_154 with "Htext") as "Hi140".
-    iPoseProof (rwi_158 with "Htext") as "Hi144".
-    iPoseProof (rwi_15a with "Htext") as "Hi146".
     (* ---- +0x138  lw a2,-88(s0) ---- *)
     assert (Hidxa : add_vec (M !!! Regidx Rs0)
                       (sign_extend' 64 (mword_of_int 4008 : mword 12))
@@ -1001,7 +989,8 @@ Section ProofVirtioDiskRwC.
               (mword_of_int 4008 : mword 12) M av
               (mword_of_int (Z.of_nat t) : SailStdpp.Values.mword 32) false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi124 [Hidx]").
+              with "Hcg Hpc [] [Hidx]").
+    { iApply (rwi_138 with "Htext"). }
     { rgall. iEval (rewrite Hidxa). iExact "Hidx". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hidx". rgall. iEval (rewrite Hidxa) in "Hidx".
     set (S1 := <[Regidx Ra2 := regval_into_reg
@@ -1021,7 +1010,8 @@ Section ProofVirtioDiskRwC.
                    = (pa_add pd (16 * m2 + 14)%nat : SailStdpp.Values.mword 64))
       by (rewrite HS1a4; apply vdrwc_desc_next).
     iApply (wp_sh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_rw + 0x13c) : mword 64) Ra2 Ra4
-              (mword_of_int 14 : mword 12) S1 av vn1 false with "Hcg Hpc Hi128 [Hdn]").
+              (mword_of_int 14 : mword 12) S1 av vn1 false with "Hcg Hpc [] [Hdn]").
+    { iApply (rwi_13c with "Htext"). }
     { rgall. iEval (rewrite Hadn). iExact "Hdn". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hdn". rgall.
     iEval (rewrite Hadn) in "Hdn".
@@ -1038,7 +1028,8 @@ Section ProofVirtioDiskRwC.
               (mword_of_int (16 * Z.of_nat h) : SailStdpp.Values.mword 64) S1 av false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(rgall; rewrite HS1a0; exact (vdrwc_slli4' h Hh8))
-              with "Hcg Hpc Hi12c").
+              with "Hcg Hpc []").
+    { iApply (rwi_140 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (S2 := <[Regidx Ra6 := regval_into_reg
                   (mword_of_int (16 * Z.of_nat h) : SailStdpp.Values.mword 64)]> S1).
@@ -1051,7 +1042,8 @@ Section ProofVirtioDiskRwC.
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x144) : mword 64) Ra6 Ra6
               (mword_of_int 32 : mword 12) S2 av false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi130").
+              with "Hcg Hpc []").
+    { iApply (rwi_144 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (S3 := <[Regidx Ra6 := regval_into_reg
                   (add_vec (S2 !!! Regidx Ra6)
@@ -1067,7 +1059,8 @@ Section ProofVirtioDiskRwC.
     iEval (rewrite Hp134) in "Hpc".
     iApply (wp_cadd_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x148) : mword 64) Ra6 Ra5 S3 av false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi134").
+              with "Hcg Hpc []").
+    { iApply (rwi_148 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (S4 := <[Regidx Ra6 := regval_into_reg
                   (add_vec (S3 !!! Regidx Ra6) (S3 !!! Regidx Ra5))]> S3).
@@ -1084,7 +1077,8 @@ Section ProofVirtioDiskRwC.
     iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x14a) : mword 64) Ra4
               (mword_of_int 63 : mword 6) (mword_of_int (-1) : SailStdpp.Values.mword 64)
               S4 av false ltac:(vm_compute; discriminate) ltac:(rdok)
-              vdrwb_lim1 with "Hcg Hpc Hi136").
+              vdrwb_lim1 with "Hcg Hpc []").
+    { iApply (rwi_14a with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (S5 := <[Regidx Ra4 := regval_into_reg
                   (mword_of_int (-1) : SailStdpp.Values.mword 64)]> S4).
@@ -1104,7 +1098,8 @@ Section ProofVirtioDiskRwC.
                    = (d_info_status h : SailStdpp.Values.mword 64))
       by (rewrite HS5a6; apply vdrwc_status_addr).
     iApply (wp_sb_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_rw + 0x14c) : mword 64) Ra4 Ra6
-              (mword_of_int 16 : mword 12) S5 av sb0 false with "Hcg Hpc Hi138 [Hst]").
+              (mword_of_int 16 : mword 12) S5 av sb0 false with "Hcg Hpc [] [Hst]").
+    { iApply (rwi_14c with "Htext"). }
     { rgall. iEval (rewrite Hast). iExact "Hst". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hst". rgall.
     iEval (rewrite Hast HS5a4 vdrwc_t8_ff) in "Hst".
@@ -1115,7 +1110,8 @@ Section ProofVirtioDiskRwC.
     iApply (wp_cslli_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x150) : mword 64)
               (Regidx Ra2) Ra2 (mword_of_int 4 : mword 6) S5 av false
               eq_refl ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi13c").
+              with "Hcg Hpc []").
+    { iApply (rwi_150 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (S6 := <[Regidx Ra2 := regval_into_reg
                   (shift_bits_left (S5 !!! Regidx Ra2)
@@ -1139,7 +1135,8 @@ Section ProofVirtioDiskRwC.
     iEval (rewrite Hp13e) in "Hpc".
     iApply (wp_cadd_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x152) : mword 64) Ra7 Ra2 S6 av false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi13e").
+              with "Hcg Hpc []").
+    { iApply (rwi_152 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (S7 := <[Regidx Ra7 := regval_into_reg
                   (add_vec (S6 !!! Regidx Ra7) (S6 !!! Regidx Ra2))]> S6).
@@ -1163,7 +1160,8 @@ Section ProofVirtioDiskRwC.
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x154) : mword 64) Ra4 Ra3
               (mword_of_int 48 : mword 12) S7 av false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi140").
+              with "Hcg Hpc []").
+    { iApply (rwi_154 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (S8 := <[Regidx Ra4 := regval_into_reg
                   (add_vec (S7 !!! Regidx Ra3)
@@ -1178,7 +1176,8 @@ Section ProofVirtioDiskRwC.
     iEval (rewrite Hp144) in "Hpc".
     iApply (wp_cadd_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x158) : mword 64) Ra4 Ra5 S8 av false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi144").
+              with "Hcg Hpc []").
+    { iApply (rwi_158 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (S9 := <[Regidx Ra4 := regval_into_reg
                   (add_vec (S8 !!! Regidx Ra4) (S8 !!! Regidx Ra5))]> S8).
@@ -1197,7 +1196,8 @@ Section ProofVirtioDiskRwC.
                    = (d_desc pd t : SailStdpp.Values.mword 64))
       by (rewrite HS9a7 addv_sext0; reflexivity).
     iApply (wp_sd_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_rw + 0x15a) : mword 64) Ra4 Ra7
-              (mword_of_int 0 : mword 12) S9 av va2 false with "Hcg Hpc Hi146 [Hda]").
+              (mword_of_int 0 : mword 12) S9 av va2 false with "Hcg Hpc [] [Hda]").
+    { iApply (rwi_15a with "Htext"). }
     { rgall. iEval (rewrite Hada). iExact "Hda". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hda". rgall. iEval (rewrite Hada HS9a4) in "Hda".
     assert (Hp14a : add_vec_int (mword_of_int (KernelSyms.virtio_disk_rw + 0x15a) : mword 64) 4
@@ -1270,14 +1270,6 @@ Section ProofVirtioDiskRwC.
   Proof.
     intros Hs3 Ha1 Ha2 Ha5 Ha6.
     iIntros "Hcg #Htext Hpc #Hdp Hdl Hdf Hdn Hbd Hib Hcont".
-    iPoseProof (rwi_15e with "Htext") as "Hi14a".
-    iPoseProof (rwi_160 with "Htext") as "Hi14c".
-    iPoseProof (rwi_162 with "Htext") as "Hi14e".
-    iPoseProof (rwi_164 with "Htext") as "Hi150".
-    iPoseProof (rwi_166 with "Htext") as "Hi152".
-    iPoseProof (rwi_16a with "Htext") as "Hi156".
-    iPoseProof (rwi_16e with "Htext") as "Hi15a".
-    iPoseProof (rwi_172 with "Htext") as "Hi15e".
     (* ---- +0x15e / +0x160  a4 := &desc[t] ---- *)
     assert (Hdpa : add_vec (M !!! Regidx Ra5)
                      (sign_extend' 64 (mword_of_int 0 : mword 12))
@@ -1286,7 +1278,8 @@ Section ProofVirtioDiskRwC.
     iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_rw + 0x15e) : mword 64) Ra4 Ra5
               (mword_of_int 0 : mword 12) M av pd false (dqm := DfracDiscarded)
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi14a []").
+              with "Hcg Hpc [] []").
+    { iApply (rwi_15e with "Htext"). }
     { rgall. iEval (rewrite Hdpa). iExact "Hdp". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc _". rgall.
     set (T1 := <[Regidx Ra4 := regval_into_reg pd]> M).
@@ -1300,7 +1293,8 @@ Section ProofVirtioDiskRwC.
     iEval (rewrite Hp14c) in "Hpc".
     iApply (wp_cadd_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x160) : mword 64) Ra4 Ra2 T1 av false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi14c").
+              with "Hcg Hpc []").
+    { iApply (rwi_160 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (T2 := <[Regidx Ra4 := regval_into_reg
                   (add_vec (T1 !!! Regidx Ra4) (T1 !!! Regidx Ra2))]> T1).
@@ -1319,7 +1313,8 @@ Section ProofVirtioDiskRwC.
                    = (pa_add pd (16 * t + 8)%nat : SailStdpp.Values.mword 64))
       by (rewrite HT2a4; apply vdrwc_desc_len).
     iApply (wp_csw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_rw + 0x162) : mword 64) Ra1 Ra4
-              (mword_of_int 8 : mword 12) T2 av vl2 false with "Hcg Hpc Hi14e [Hdl]").
+              (mword_of_int 8 : mword 12) T2 av vl2 false with "Hcg Hpc [] [Hdl]").
+    { iApply (rwi_162 with "Htext"). }
     { rgall. iEval (rewrite Hadl). iExact "Hdl". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hdl". rgall.
     iEval (rewrite Hadl HT2a1 vdrwc_t32_1) in "Hdl".
@@ -1330,7 +1325,8 @@ Section ProofVirtioDiskRwC.
     iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x164) : mword 64) Ra3
               (mword_of_int 2 : mword 6) (mword_of_int 2 : SailStdpp.Values.mword 64)
               T2 av false ltac:(vm_compute; discriminate) ltac:(rdok)
-              vdrwc_li2 with "Hcg Hpc Hi150").
+              vdrwc_li2 with "Hcg Hpc []").
+    { iApply (rwi_164 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (T3 := <[Regidx Ra3 := regval_into_reg
                   (mword_of_int 2 : SailStdpp.Values.mword 64)]> T2).
@@ -1348,7 +1344,8 @@ Section ProofVirtioDiskRwC.
                    = (pa_add pd (16 * t + 12)%nat : SailStdpp.Values.mword 64))
       by (rewrite HT3a4; apply vdrwc_desc_flags).
     iApply (wp_sh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_rw + 0x166) : mword 64) Ra3 Ra4
-              (mword_of_int 12 : mword 12) T3 av vf2 false with "Hcg Hpc Hi152 [Hdf]").
+              (mword_of_int 12 : mword 12) T3 av vf2 false with "Hcg Hpc [] [Hdf]").
+    { iApply (rwi_166 with "Htext"). }
     { rgall. iEval (rewrite Hadf). iExact "Hdf". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hdf". rgall.
     iEval (rewrite Hadf HT3a3 vdrwc_t16_2) in "Hdf".
@@ -1363,7 +1360,8 @@ Section ProofVirtioDiskRwC.
                    = (pa_add pd (16 * t + 14)%nat : SailStdpp.Values.mword 64))
       by (rewrite HT3a4; apply vdrwc_desc_next).
     iApply (wp_sh_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_rw + 0x16a) : mword 64) Rz Ra4
-              (mword_of_int 14 : mword 12) T3 av vn2 false with "Hcg Hpc Hi156 [Hdn]").
+              (mword_of_int 14 : mword 12) T3 av vn2 false with "Hcg Hpc [] [Hdn]").
+    { iApply (rwi_16a with "Htext"). }
     { rgall. iEval (rewrite Hadn). iExact "Hdn". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hdn". rgall.
     iEval (rewrite Hadn Hz0 vdrwc_t16_0) in "Hdn".
@@ -1381,7 +1379,8 @@ Section ProofVirtioDiskRwC.
                    = (b_disk b : SailStdpp.Values.mword 64))
       by (rewrite HT3s3; apply vdrwc_bdisk_addr).
     iApply (wp_sw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_rw + 0x16e) : mword 64) Ra1 Rs3
-              (mword_of_int 4 : mword 12) T3 av dsk0 false with "Hcg Hpc Hi15a [Hbd]").
+              (mword_of_int 4 : mword 12) T3 av dsk0 false with "Hcg Hpc [] [Hbd]").
+    { iApply (rwi_16e with "Htext"). }
     { rgall. iEval (rewrite Habd). iExact "Hbd". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hbd". rgall.
     iEval (rewrite Habd HT3a1 vdrwc_t32_bdisk) in "Hbd".
@@ -1399,7 +1398,8 @@ Section ProofVirtioDiskRwC.
                    = (d_info_b h : SailStdpp.Values.mword 64))
       by (rewrite HT3a6; apply vdrwc_infob_addr).
     iApply (wp_sd_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_rw + 0x172) : mword 64) Rs3 Ra6
-              (mword_of_int 8 : mword 12) T3 av w0 false with "Hcg Hpc Hi15e [Hib]").
+              (mword_of_int 8 : mword 12) T3 av w0 false with "Hcg Hpc [] [Hib]").
+    { iApply (rwi_172 with "Htext"). }
     { rgall. iEval (rewrite Haib). iExact "Hib". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hib". rgall.
     iEval (rewrite Haib HT3s3) in "Hib".

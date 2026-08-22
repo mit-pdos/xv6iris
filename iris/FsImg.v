@@ -2374,6 +2374,182 @@ Proof.
   split; [apply Z.eqb_eq; exact Hnl | apply Z.eqb_eq; exact Hr].
 Qed.
 
+(* ---- W3 MINUS THE LINK FLOOR: THE DURABLE PER-RECORD SANITY ----------
+   [fs_inode_wf]'s [1 <= nlink] clause is a boot-time fact, not a durable
+   one: a COMMITTED ORPHAN -- an inode unlinked while open, whose zeroed
+   [nlink] the transaction wrote home; xv6's boot sweep ([ireclaim],
+   fs.c) exists for exactly these -- keeps a live type, a sane size and
+   sane addrs with [nlink = 0].  The durable invariant
+   [FsWf.fs_durable_wf_body] therefore sweeps THIS form; [fs_inode_wf]
+   stays as-is for the boot readings (at a clean mkfs image the two
+   coincide, [fs_inodes_wf_dwf]).  The body is [fs_inode_wf]'s minus the
+   one clause; at a milestone [fs_inode_wf] can be folded to
+   [(1 <=? nlink) && fs_inode_dwf].                                      *)
+Definition fs_inode_dwf (P : Z -> list (bv 8)) (sb : fs_sb) (dn : dinode)
+  : bool :=
+  let sz := bv_unsigned (di_size dn) in
+  let nb := fs_nblk sz in
+  let ib := bv_unsigned (di_addrs dn !!! 12%nat) in
+  let es := fs_ind_ents P dn in
+  ((bv_unsigned (di_type dn) =? T_DIR_z)
+     || (bv_unsigned (di_type dn) =? T_FILE_z)
+     || (bv_unsigned (di_type dn) =? T_DEVICE_z)) &&
+  (sz <=? Z.of_nat FS_MAXFILE * BSIZE_z) &&
+  List.forallb
+    (fun k => let a := bv_unsigned (di_addrs dn !!! k) in
+              if Z.of_nat k <? nb then fs_addr_ok sb a else a =? 0)
+    (seq 0 FS_NDIRECT) &&
+  (if nb <=? Z.of_nat FS_NDIRECT then ib =? 0 else fs_addr_ok sb ib) &&
+  List.forallb
+    (fun j => let e := es !!! j in
+              if Z.of_nat j <? nb - Z.of_nat FS_NDIRECT
+              then fs_addr_ok sb e else e =? 0)
+    (seq 0 FS_NINDIRECT).
+
+(* [fs_inode_ok] minus [fio_nlink], field for field *)
+Record fs_inode_dok (P : Z -> list (bv 8)) (sb : fs_sb) (dn : dinode)
+  : Prop := {
+  fdi_type : bv_unsigned (di_type dn) = T_DIR_z
+             \/ bv_unsigned (di_type dn) = T_FILE_z
+             \/ bv_unsigned (di_type dn) = T_DEVICE_z;
+  fdi_size : bv_unsigned (di_size dn) <= Z.of_nat FS_MAXFILE * BSIZE_z;
+  fdi_direct : forall k : nat, (k < FS_NDIRECT)%nat ->
+      Z.of_nat k < fs_nblk (bv_unsigned (di_size dn)) ->
+      fs_data_start sb <= bv_unsigned (di_addrs dn !!! k) < sb_size sb;
+  fdi_direct_zero : forall k : nat, (k < FS_NDIRECT)%nat ->
+      fs_nblk (bv_unsigned (di_size dn)) <= Z.of_nat k ->
+      bv_unsigned (di_addrs dn !!! k) = 0;
+  fdi_ind_zero : fs_nblk (bv_unsigned (di_size dn)) <= Z.of_nat FS_NDIRECT ->
+      bv_unsigned (di_addrs dn !!! 12%nat) = 0;
+  fdi_ind : Z.of_nat FS_NDIRECT < fs_nblk (bv_unsigned (di_size dn)) ->
+      fs_data_start sb <= bv_unsigned (di_addrs dn !!! 12%nat) < sb_size sb;
+  fdi_ent : forall j : nat, (j < FS_NINDIRECT)%nat ->
+      Z.of_nat j < fs_nblk (bv_unsigned (di_size dn)) - Z.of_nat FS_NDIRECT ->
+      fs_data_start sb <= fs_ind_ents P dn !!! j < sb_size sb;
+  fdi_ent_zero : forall j : nat, (j < FS_NINDIRECT)%nat ->
+      fs_nblk (bv_unsigned (di_size dn)) - Z.of_nat FS_NDIRECT <= Z.of_nat j ->
+      fs_ind_ents P dn !!! j = 0;
+}.
+
+Lemma fs_inode_dwf_ok (P : Z -> list (bv 8)) (sb : fs_sb) (dn : dinode) :
+  fs_inode_dwf P sb dn = true -> fs_inode_dok P sb dn.
+Proof.
+  unfold fs_inode_dwf. intros H. rewrite !andb_true_iff in H.
+  destruct H as [[[[Hty Hsz] Hdir] Hind] Hent].
+  constructor.
+  - rewrite !orb_true_iff, !Z.eqb_eq in Hty. tauto.
+  - apply Z.leb_le. exact Hsz.
+  - intros k Hk Hlt. apply fs_addr_ok_spec.
+    pose proof (forallb_seq _ FS_NDIRECT k Hdir Hk) as Hk'.
+    cbv beta zeta in Hk'. rewrite (proj2 (Z.ltb_lt _ _) Hlt) in Hk'. exact Hk'.
+  - intros k Hk Hge. apply Z.eqb_eq.
+    pose proof (forallb_seq _ FS_NDIRECT k Hdir Hk) as Hk'.
+    cbv beta zeta in Hk'. rewrite (proj2 (Z.ltb_ge _ _) Hge) in Hk'. exact Hk'.
+  - intros Hle. apply Z.eqb_eq.
+    rewrite (proj2 (Z.leb_le _ _) Hle) in Hind. exact Hind.
+  - intros Hgt. apply fs_addr_ok_spec.
+    rewrite (proj2 (Z.leb_gt _ _) Hgt) in Hind. exact Hind.
+  - intros j Hj Hlt. apply fs_addr_ok_spec.
+    pose proof (forallb_seq _ FS_NINDIRECT j Hent Hj) as Hj'.
+    cbv beta zeta in Hj'. rewrite (proj2 (Z.ltb_lt _ _) Hlt) in Hj'. exact Hj'.
+  - intros j Hj Hge. apply Z.eqb_eq.
+    pose proof (forallb_seq _ FS_NINDIRECT j Hent Hj) as Hj'.
+    cbv beta zeta in Hj'. rewrite (proj2 (Z.ltb_ge _ _) Hge) in Hj'. exact Hj'.
+Qed.
+
+Lemma fs_inode_ok_dok (P : Z -> list (bv 8)) (sb : fs_sb) (dn : dinode) :
+  fs_inode_ok P sb dn -> fs_inode_dok P sb dn.
+Proof.
+  intros Hok. constructor.
+  - exact (fio_type P sb dn Hok).
+  - exact (fio_size P sb dn Hok).
+  - exact (fio_direct P sb dn Hok).
+  - exact (fio_direct_zero P sb dn Hok).
+  - exact (fio_ind_zero P sb dn Hok).
+  - exact (fio_ind P sb dn Hok).
+  - exact (fio_ent P sb dn Hok).
+  - exact (fio_ent_zero P sb dn Hok).
+Qed.
+
+Lemma fs_inode_wf_dwf (P : Z -> list (bv 8)) (sb : fs_sb) (dn : dinode) :
+  fs_inode_wf P sb dn = true -> fs_inode_dwf P sb dn = true.
+Proof.
+  unfold fs_inode_wf, fs_inode_dwf. cbv zeta.
+  rewrite !andb_true_iff. tauto.
+Qed.
+
+Definition fs_inodes_dwf (P : Z -> list (bv 8)) (sb : fs_sb) : bool :=
+  List.forallb
+    (fun i => let dn := fs_dinode P sb (Z.of_nat i) in
+              if bv_unsigned (di_type dn) =? 0 then true
+              else fs_inode_dwf P sb dn)
+    (seq 0 (Z.to_nat (sb_ninodes sb))).
+
+Lemma fs_inodes_dwf_spec (P : Z -> list (bv 8)) (sb : fs_sb) (i : Z) :
+  fs_inodes_dwf P sb = true -> 0 <= i < sb_ninodes sb ->
+  bv_unsigned (di_type (fs_dinode P sb i)) <> 0 ->
+  fs_inode_dok P sb (fs_dinode P sb i).
+Proof.
+  intros H Hi Hnz. apply fs_inode_dwf_ok.
+  pose proof (forallb_seq _ (Z.to_nat (sb_ninodes sb)) (Z.to_nat i) H
+                ltac:(lia)) as Hk.
+  cbv beta zeta in Hk. rewrite Z2Nat.id in Hk by lia.
+  destruct (bv_unsigned (di_type (fs_dinode P sb i)) =? 0) eqn:E;
+    [| exact Hk].
+  exfalso. apply Hnz, Z.eqb_eq, E.
+Qed.
+
+Lemma fs_inodes_wf_dwf (P : Z -> list (bv 8)) (sb : fs_sb) :
+  fs_inodes_wf P sb = true -> fs_inodes_dwf P sb = true.
+Proof.
+  intros H. unfold fs_inodes_dwf.
+  rewrite List.forallb_forall. intros x Hin.
+  apply elem_of_list_In, elem_of_seq in Hin.
+  pose proof (forallb_seq _ _ x H ltac:(lia)) as Hx.
+  cbv beta zeta in Hx. cbv beta zeta.
+  destruct (bv_unsigned (di_type (fs_dinode P sb (Z.of_nat x))) =? 0);
+    [reflexivity |].
+  apply fs_inode_wf_dwf. exact Hx.
+Qed.
+
+(* ---- THE DURABLE-STATE SHARPENING OF (L1) ----------------------------
+   [fs_links_wf] records only [count <= nlink] for a non-directory (its
+   directory arm is mkfs's own [z = ROOTINO] pin), but the durable
+   invariant [FsWf.fs_durable_wf_body] needs the EQUALITY: a live
+   non-directory inode's [nlink] IS its ticket count, which no projection
+   of W9 can supply.  A separate additive sweep rather than a
+   strengthening of [fs_links_wf], because [fsimg_wf]'s conjunct list is
+   frozen (its consumers destruct it) and the equality's only consumer is
+   the durable predicate's image discharge.  Directories need no clause
+   here (W9's mkfs pin already gives their exact counts), and free
+   records carry no durable claim.  Cost shape = W9's: the ticket supply
+   is [let]-bound once, one [fs_tick_count] per inum.                    *)
+Definition fs_links_eq (P : Z -> list (bv 8)) (sb : fs_sb) : bool :=
+  let L := fs_all_tickets P sb in
+  List.forallb
+    (fun i => let z := Z.of_nat i in
+              let dn := fs_dinode P sb z in
+              if (bv_unsigned (di_type dn) =? 0)
+                 || (bv_unsigned (di_type dn) =? T_DIR_z)
+              then true
+              else bv_unsigned (di_nlink dn) =? Z.of_nat (fs_tick_count L z))
+    (seq 0 (Z.to_nat (sb_ninodes sb))).
+
+Lemma fs_links_eq_at (P : Z -> list (bv 8)) (sb : fs_sb) (z : Z) :
+  fs_links_eq P sb = true -> 0 <= z < sb_ninodes sb ->
+  bv_unsigned (di_type (fs_dinode P sb z)) <> 0 ->
+  bv_unsigned (di_type (fs_dinode P sb z)) <> T_DIR_z ->
+  bv_unsigned (di_nlink (fs_dinode P sb z))
+  = Z.of_nat (fs_link_count P sb z).
+Proof.
+  intros H Hz Hty Hnd. unfold fs_links_eq in H. cbv zeta in H.
+  pose proof (forallb_seq _ (Z.to_nat (sb_ninodes sb)) (Z.to_nat z) H
+                ltac:(lia)) as Hk.
+  cbv beta zeta in Hk. rewrite Z2Nat.id in Hk by lia.
+  rewrite (proj2 (Z.eqb_neq _ _) Hty), (proj2 (Z.eqb_neq _ _) Hnd) in Hk.
+  cbn [orb] in Hk. apply Z.eqb_eq. exact Hk.
+Qed.
+
 (* ====================================================================== *)
 (*  12.  THE CHECK                                                         *)
 (* ====================================================================== *)

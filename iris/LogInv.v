@@ -663,18 +663,16 @@ Section LogInv.
   (* ---------------------------------------------------------------- *)
 
   (* THE ERA'S HALF AT A RECORDED HEADER PICTURE.  [h] is the ON-DISK
-     header's [FsCrash.hdr_dec] reading, and it is the ONLY field a WAL fupd
-     ever reads out of the mirror: the log-fill kind needs a CLEAN header,
-     the install kind needs the header to be the (n, W) the commit just
-     wrote (which is what tells it the block it is overwriting is a LOGGED
-     one, so recovery re-installs it anyway).  The slot contents are recorded
-     too ([RiscvPtsto.log_mirror]'s second field) but no fupd has to read
-     them -- [FsCrash.fs_recovery_install] does not depend on the value a
-     home write stores.
-     Kept ONE definition, indexed by [h], because the commit and clear kinds
-     move the picture: [log_mirror_clean] is its [(0, [])] instance and
-     [log_batch] therefore reads exactly as before. *)
-  Definition log_mirror_clean : iProp Σ := log_mirror_at (0%nat, []).
+     header's [hdr_dec] READING of the era's mirror ([LogDefs.lm_hdr]): the
+     log-fill kind needs a CLEAN header, the install kind needs the header
+     to be the (n, W) the commit just wrote (which is what tells it the
+     block it is overwriting is a LOGGED one, so recovery re-installs it
+     anyway).  The mirror's full picture (durable-disk stage E2: one total
+     block view, homes included) is under the existential; assertions here
+     expose only the header reading, so [log_batch] reads exactly as
+     before.  [ls] locates the header inside the picture. *)
+  Definition log_mirror_clean (ls : Z) : iProp Σ :=
+    log_mirror_at ls (0%nat, []).
 
   (* ---------------------------------------------------------------- *)
   (*  The batch bundle (checked out wholesale by the committer)        *)
@@ -728,7 +726,7 @@ Section LogInv.
           inductive. *)
        bslots ((LOGBLOCKS - n) + 2)%nat ∗
        (* THE ERA'S MIRROR HALF, at the between-commits picture *)
-       log_mirror_clean)%I.
+       log_mirror_clean logstart)%I.
 
   (* ---------------------------------------------------------------- *)
   (*  The lock's resource                                              *)

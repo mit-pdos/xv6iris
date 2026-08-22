@@ -145,24 +145,21 @@ Definition lockSetR : cmra := authR (gset_disjUR string).
    exactly it: the pre-split field names are preserved verbatim as
    definitions below the class, so no statement anywhere changes. *)
 
-(* THE FS LOG-REGION MIRROR's VALUE (claude-notes/design/fs-log.md stage 4
-   phase C2b/D1).  Defined HERE, not in the FS layer, because the era record
-   below needs its gname and the fixed class below needs its [ghost_varG]:
-   both sit under every FS file.  It carries no FS CONSTANT (the geometry --
-   which block is the header, how many slots there are -- lives entirely in
-   [FsCrash.log_mirror_ok], above [SystemAdequacy]); it is just the shape of
-   the picture the WAL's writes hand each other:
-
-     - [lm_hdr]  : the ON-DISK header's [hdr_dec] reading, which is what
-       "the log is clean" / "the log holds (n, W)" are statements about;
-     - [lm_slots]: the ON-DISK log slots' contents, which is what
-       "the slots hold the logged values" is a statement about.
-
-   Both are recorded as READINGS rather than as bytes, because that is the
-   lightest thing that serves all three WAL write kinds. *)
+(* THE ERA's MIRROR OF THE DURABLE DISK (claude-notes/design/crash.md,
+   "The split crash predicate", durable-disk stage E2).  Defined HERE, not
+   in the FS layer, because the era record below needs its gname and the
+   fixed class below needs its [ghost_varG]: both sit under every FS file.
+   It carries no FS CONSTANT; it is one total block view -- the era's
+   picture of every durable block's contents, homes included.  The crash
+   layer's custody arm ([FsCrash.fs_custody]) pins it to the physical disk
+   pointwise ([FsCrash.log_mirror_ok]), which is what lets a WAL write's
+   ∅-mask permit know the committed state BY VALUE: the WAL's own writes
+   are the only writes to the durable extent, so every permit re-establishes
+   the picture at the post-write image.  Derived readings (the header's
+   [hdr_dec], the pointwise update a permit hands the era back) live in
+   [LogDefs]. *)
 Record log_mirror := MkLogMirror {
-  lm_hdr   : nat * list Z;
-  lm_slots : nat -> list (bv 8);
+  lm_view : Z -> list (bv 8);
 }.
 
 Record riscvEraGS := RiscvEraGS {

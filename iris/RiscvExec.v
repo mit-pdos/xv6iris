@@ -793,7 +793,7 @@ Require Import SailStdpp.Base.
 (* win over SailStdpp's homonyms for the sections below — matching the original  *)
 (* per-file import order (model imported last).  mstate.mem's type is already    *)
 (* fixed (bv_countable) from the Lang section above, so this does not retype it.  *)
-Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import Riscv.rv64d_types.
 
 (* ===== RiscvModelExecClose ===== *)
 (* ====================================================================== *)

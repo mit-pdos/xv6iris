@@ -1123,7 +1123,7 @@ Section BootAlloc.
       (* the era's LOG-REGION MIRROR variable, whole (phase C2b/D1 stage 3):
          [initlog] splits it, keeping one half in [LogInv.log_batch] and
          handing the other to [FsCrash.P_fs]'s arm at its swap *)
-      ghost_var mirror_name 1 (MkLogMirror (0%nat, []) (fun _ => [])) ∗
+      ghost_var mirror_name 1 (MkLogMirror (fun _ => [])) ∗
       crash_inv ∗ gen_cert.
   Proof. iIntros "H". iExact "H". Qed.
 
@@ -1280,7 +1280,7 @@ Section BootAlloc.
          [LogDefs.log_mirror_full], which [initlog] takes, is this row's
          [∃ M].  Kept at the CONCRETE genesis value rather than weakened to
          [log_mirror_full] here, so nothing is lost on the way to fsinit. *)
-      ghost_var mirror_name 1 (MkLogMirror (0%nat, []) (fun _ => [])) ∗
+      ghost_var mirror_name 1 (MkLogMirror (fun _ => [])) ∗
       (∃ ps : list (mword 64),
          ⌜prun phystop_val s1entry_val ps⌝ ∗
          ⌜(K_kvmmake + 64 + 3 < length ps)%nat⌝ ∗

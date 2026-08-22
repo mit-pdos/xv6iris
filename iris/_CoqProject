@@ -641,6 +641,7 @@ CodeEndOp.v
 CodeLogWrite.v
 CodeSysSync.v
 LogInv.v
+FsWf.v
 FsCrash.v
 FsBoot.v
 SpecWriteHead.v
@@ -1051,6 +1052,7 @@ IcacheInv.v
 InodeRef.v
 InodeLock.v
 FsImgBridge.v
+FsWfImg.v
 InodeRegion.v
 EscrowInode.v
 EscrowDeposit.v

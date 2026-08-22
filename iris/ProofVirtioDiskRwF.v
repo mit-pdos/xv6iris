@@ -560,20 +560,14 @@ Section VdrwfP6.
   Proof.
     intros Hav Hi8 Hfri Hlen Hs2 Hs3 Hbelow.
     iIntros "Hcg Hown #Htext Hpc #Hpinv #Hdp Hd0 Hd8 Hd12 Hd14 Hbun Hrest Hcont".
-    iPoseProof (rwi_1f4 with "Htext") as "Hi1d2".
-    iPoseProof (rwi_1f8 with "Htext") as "Hi1d6".
-    iPoseProof (rwi_1fc with "Htext") as "Hi1da".
-    iPoseProof (rwi_1fe with "Htext") as "Hi1dc".
-    iPoseProof (rwi_202 with "Htext") as "Hi1e0".
-    iPoseProof (rwi_204 with "Htext") as "Hi1e2".
-    iPoseProof (rwi_208 with "Htext") as "Hi1e6".
     (* ---- +0x1f4  slli a4,s2,4 ---- *)
     iApply (wp_slli_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x1f4) : mword 64) Ra4 Rs2
               (mword_of_int 4 : mword 6)
               (mword_of_int (16 * Z.of_nat i) : SailStdpp.Values.mword 64) M av false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(rgall; rewrite Hs2; exact (vdrwc_slli4' i Hi8))
-              with "Hcg Hpc Hi1d2").
+              with "Hcg Hpc []").
+    { iApply (rwi_1f4 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (N1 := <[Regidx Ra4 := regval_into_reg
                   (mword_of_int (16 * Z.of_nat i) : SailStdpp.Values.mword 64)]> M).
@@ -594,7 +588,8 @@ Section VdrwfP6.
     iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_rw + 0x1f8) : mword 64) Ra5 Rs3
               (mword_of_int 0 : mword 12) N1 av pd false (dqm := DfracDiscarded)
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi1d6 []").
+              with "Hcg Hpc [] []").
+    { iApply (rwi_1f8 with "Htext"). }
     { rgall. iEval (rewrite Hdptr). iExact "Hdp". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc _". rgall.
     set (N2 := <[Regidx Ra5 := regval_into_reg pd]> N1).
@@ -609,7 +604,8 @@ Section VdrwfP6.
     (* ---- +0x1fc  c.add a5,a4 : a5 = &desc[i] ---- *)
     iApply (wp_cadd_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x1fc) : mword 64) Ra5 Ra4 N2 av false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi1da").
+              with "Hcg Hpc []").
+    { iApply (rwi_1fc with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (N3 := <[Regidx Ra5 := regval_into_reg
                   (add_vec (N2 !!! Regidx Ra5) (N2 !!! Regidx Ra4))]> N2).
@@ -627,7 +623,8 @@ Section VdrwfP6.
     iApply (wp_lhu_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_rw + 0x1fe) : mword 64) Rs1 Ra5
               (mword_of_int 12 : mword 12) N3 av vf false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi1dc [Hd12]").
+              with "Hcg Hpc [] [Hd12]").
+    { iApply (rwi_1fe with "Htext"). }
     { rgall. iEval (rewrite Hfaddr). iExact "Hd12". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hd12". rgall.
     iEval (rewrite Hfaddr) in "Hd12".
@@ -645,7 +642,8 @@ Section VdrwfP6.
     (* ---- +0x202  c.mv a0,s2 : the argument ---- *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x202) : mword 64) Ra0 Rs2 N4 av false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi1e0").
+              with "Hcg Hpc []").
+    { iApply (rwi_202 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (N5 := <[Regidx Ra0 := regval_into_reg
                   (add_vec zero_reg (N4 !!! Regidx Rs2))]> N4).
@@ -666,7 +664,8 @@ Section VdrwfP6.
     iApply (wp_lhu_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_rw + 0x204) : mword 64) Rs2 Ra5
               (mword_of_int 14 : mword 12) N5 av vn false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi1e2 [Hd14]").
+              with "Hcg Hpc [] [Hd14]").
+    { iApply (rwi_204 with "Htext"). }
     { rgall. iEval (rewrite Hnaddr). iExact "Hd14". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hd14". rgall.
     iEval (rewrite Hnaddr) in "Hd14".
@@ -679,7 +678,8 @@ Section VdrwfP6.
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x208) : mword 64) Rra
               (mword_of_int 2096058 : mword 21) N6 av false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi1e6").
+              ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+    { iApply (rwi_208 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (N7 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.virtio_disk_rw + 0x208) : mword 64) 4)]> N6).
@@ -1026,15 +1026,6 @@ Section VdrwfP6.
     iDestruct (phys_to_byte (d_info_status h) byte_zero Hstatst Hcanst
                  with "Hkm Hstat") as "Hstat".
     (* ================= +0x1d2 .. +0x1f0 ============================== *)
-    iPoseProof (rwi_1d2 with "Htext") as "Hi1b0".
-    iPoseProof (rwi_1d6 with "Htext") as "Hi1b4".
-    iPoseProof (rwi_1da with "Htext") as "Hi1b8".
-    iPoseProof (rwi_1de with "Htext") as "Hi1bc".
-    iPoseProof (rwi_1e2 with "Htext") as "Hi1c0".
-    iPoseProof (rwi_1e6 with "Htext") as "Hi1c4".
-    iPoseProof (rwi_1e8 with "Htext") as "Hi1c6".
-    iPoseProof (rwi_1ec with "Htext") as "Hi1ca".
-    iPoseProof (rwi_1f0 with "Htext") as "Hi1ce".
     iDestruct "Hidx" as "(Hx0 & Hx1 & Hx2 & Hxp)".
     assert (Hidxa : add_vec (M !!! Regidx Rs0)
                       (sign_extend' 64 (mword_of_int 4000 : mword 12))
@@ -1044,7 +1035,8 @@ Section VdrwfP6.
               (mword_of_int 4000 : mword 12) M (trap_res eb + (K - 12))%nat
               (mword_of_int (Z.of_nat h) : SailStdpp.Values.mword 32) false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi1b0 [Hx0]").
+              with "Hcg Hpc [] [Hx0]").
+    { iApply (rwi_1d2 with "Htext"). }
     { rgall. iEval (rewrite Hidxa). iExact "Hx0". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hx0". rgall.
     iEval (rewrite Hidxa) in "Hx0".
@@ -1065,7 +1057,8 @@ Section VdrwfP6.
               (mword_of_int (16 * Z.of_nat h) : SailStdpp.Values.mword 64) E1 (trap_res eb + (K - 12))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(rgall; rewrite HE1s2; exact (vdrwc_slli4' h Hh8))
-              with "Hcg Hpc Hi1b4").
+              with "Hcg Hpc []").
+    { iApply (rwi_1d6 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (E2 := <[Regidx Ra4 := regval_into_reg
                   (mword_of_int (16 * Z.of_nat h) : SailStdpp.Values.mword 64)]> E1).
@@ -1077,7 +1070,8 @@ Section VdrwfP6.
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x1da) : mword 64) Ra4 Ra4
               (mword_of_int 32 : mword 12) E2 (trap_res eb + (K - 12))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi1b8").
+              with "Hcg Hpc []").
+    { iApply (rwi_1da with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (E3 := <[Regidx Ra4 := regval_into_reg
                   (add_vec (E2 !!! Regidx Ra4)
@@ -1096,7 +1090,8 @@ Section VdrwfP6.
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x1de) : mword 64) Ra5
               (mword_of_int 30 : mword 20) E3 (trap_res eb + (K - 12))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi1bc").
+              with "Hcg Hpc []").
+    { iApply (rwi_1de with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (E4 := <[Regidx Ra5 := regval_into_reg
                   (add_vec (mword_of_int (KernelSyms.virtio_disk_rw + 0x1de) : mword 64)
@@ -1110,7 +1105,8 @@ Section VdrwfP6.
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x1e2) : mword 64) Ra5 Ra5
               (mword_of_int 2554 : mword 12) E4 (trap_res eb + (K - 12))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi1c0").
+              with "Hcg Hpc []").
+    { iApply (rwi_1e2 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (E5 := <[Regidx Ra5 := regval_into_reg
                   (add_vec (E4 !!! Regidx Ra5)
@@ -1130,7 +1126,8 @@ Section VdrwfP6.
     iEval (rewrite Hp1c4) in "Hpc".
     iApply (wp_cadd_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x1e6) : mword 64) Ra5 Ra4 E5
               (trap_res eb + (K - 12))%nat false ltac:(vm_compute; discriminate)
-              ltac:(rdok) with "Hcg Hpc Hi1c4").
+              ltac:(rdok) with "Hcg Hpc []").
+    { iApply (rwi_1e6 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (E6 := <[Regidx Ra5 := regval_into_reg
                   (add_vec (E5 !!! Regidx Ra5) (E5 !!! Regidx Ra4))]> E5).
@@ -1146,7 +1143,8 @@ Section VdrwfP6.
     iApply (wp_sd_zero_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_rw + 0x1e8) : mword 64) Ra5
               (mword_of_int 8 : mword 12) E6 (trap_res eb + (K - 12))%nat
               (b : SailStdpp.Values.mword 64) false
-              with "Hcg Hpc Hi1c6 [Hinfob]").
+              with "Hcg Hpc [] [Hinfob]").
+    { iApply (rwi_1e8 with "Htext"). }
     { rgall. iEval (rewrite Hiba). iExact "Hinfob". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hinfob". rgall.
     iEval (rewrite Hiba) in "Hinfob".
@@ -1156,7 +1154,8 @@ Section VdrwfP6.
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x1ec) : mword 64) Rs3
               (mword_of_int 30 : mword 20) E6 (trap_res eb + (K - 12))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi1ca").
+              with "Hcg Hpc []").
+    { iApply (rwi_1ec with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (E7 := <[Regidx Rs3 := regval_into_reg
                   (add_vec (mword_of_int (KernelSyms.virtio_disk_rw + 0x1ec) : mword 64)
@@ -1170,7 +1169,8 @@ Section VdrwfP6.
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x1f0) : mword 64) Rs3 Rs3
               (mword_of_int 2540 : mword 12) E7 (trap_res eb + (K - 12))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi1ce").
+              with "Hcg Hpc []").
+    { iApply (rwi_1f0 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (E8 := <[Regidx Rs3 := regval_into_reg
                   (add_vec (E7 !!! Regidx Rs3)
@@ -1207,8 +1207,6 @@ Section VdrwfP6.
       iSplitL "Hstat"; [iExists byte_zero; iExact "Hstat"|].
       iExists (zero_reg : SailStdpp.Values.mword 64). iExact "Hinfob". }
     (* ================= the three free_chain iterations ================ *)
-    iPoseProof (rwi_20c with "Htext") as "Hi1ea".
-    iPoseProof (rwi_20e with "Htext") as "Hi1ec".
     assert (Hbrk : add_vec (mword_of_int (KernelSyms.virtio_disk_rw + 0x20e) : mword 64)
                      (sign_extend' 64 (sign_extend' 13
                         (concat_vec (mword_of_int 243 : mword 8) ('b"0"))))
@@ -1225,7 +1223,8 @@ Section VdrwfP6.
     iApply (wp_candi_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x20c) : mword 64) Rs1
               (mword_of_int 1 : mword 6) F1 (trap_res eb + (K - 12))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi1ea").
+              with "Hcg Hpc []").
+    { iApply (rwi_20c with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (G1 := <[Regidx Rs1 := regval_into_reg
                   (and_vec (F1 !!! Regidx Rs1)
@@ -1239,7 +1238,8 @@ Section VdrwfP6.
               (mword_of_int 243 : mword 8) (Cregidx (mword_of_int 1)) Rs1 G1 (trap_res eb + (K - 12))%nat false
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
               ltac:(rgall; rewrite /G1 upd_eq HF1s1; exact vdrwf_bit0_1)
-              ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi1ec").
+              ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+    { iApply (rwi_20e with "Htext"). }
     iNext. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     iEval (rewrite Hbrk) in "Hpc".
     assert (HG1s2 : G1 !!! Regidx Rs2
@@ -1270,7 +1270,8 @@ Section VdrwfP6.
     iApply (wp_candi_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x20c) : mword 64) Rs1
               (mword_of_int 1 : mword 6) F2 (trap_res eb + (K - 12))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi1ea").
+              with "Hcg Hpc []").
+    { iApply (rwi_20c with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (G2 := <[Regidx Rs1 := regval_into_reg
                   (and_vec (F2 !!! Regidx Rs1)
@@ -1284,7 +1285,8 @@ Section VdrwfP6.
               (mword_of_int 243 : mword 8) (Cregidx (mword_of_int 1)) Rs1 G2 (trap_res eb + (K - 12))%nat false
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
               ltac:(rgall; rewrite /G2 upd_eq HF2s1; exact (vdrwf_bit0_flags wr))
-              ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi1ec").
+              ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+    { iApply (rwi_20e with "Htext"). }
     iNext. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     iEval (rewrite Hbrk) in "Hpc".
     assert (HG2s2 : G2 !!! Regidx Rs2
@@ -1316,7 +1318,8 @@ Section VdrwfP6.
     iApply (wp_candi_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x20c) : mword 64) Rs1
               (mword_of_int 1 : mword 6) F3 (trap_res eb + (K - 12))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi1ea").
+              with "Hcg Hpc []").
+    { iApply (rwi_20c with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (G3 := <[Regidx Rs1 := regval_into_reg
                   (and_vec (F3 !!! Regidx Rs1)
@@ -1330,7 +1333,8 @@ Section VdrwfP6.
               (mword_of_int 243 : mword 8) (Cregidx (mword_of_int 1)) Rs1 G3 (trap_res eb + (K - 12))%nat false
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
               ltac:(rgall; rewrite /G3 upd_eq HF3s1; exact vdrwf_bit0_2)
-              with "Hcg Hpc Hi1ec").
+              with "Hcg Hpc []").
+    { iApply (rwi_20e with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     assert (Hp1ee : add_vec_int (mword_of_int (KernelSyms.virtio_disk_rw + 0x20e) : mword 64) 2
                     = mword_of_int (KernelSyms.virtio_disk_rw + 0x210)) by pcstep.
@@ -1388,13 +1392,11 @@ Section VdrwfP6.
         rewrite (Hfr'other i Hnh Hnm Hnt). exact (Htrfr p T i Hp Hi). }
       iFrame "Hpub Hlb Hcl Huidx Hflm Hpkm Hfb Hring". }
     (* ================= +0x210 .. +0x218: release ====================== *)
-    iPoseProof (rwi_210 with "Htext") as "Hi1ee".
-    iPoseProof (rwi_214 with "Htext") as "Hi1f2".
-    iPoseProof (rwi_218 with "Htext") as "Hi1f6".
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x210) : mword 64) Ra0
               (mword_of_int 30 : mword 20) G3 (trap_res eb + (K - 12))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi1ee").
+              with "Hcg Hpc []").
+    { iApply (rwi_210 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (H1 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (mword_of_int (KernelSyms.virtio_disk_rw + 0x210) : mword 64)
@@ -1408,7 +1410,8 @@ Section VdrwfP6.
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x214) : mword 64) Ra0 Ra0
               (mword_of_int 2800 : mword 12) H1 (trap_res eb + (K - 12))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi1f2").
+              with "Hcg Hpc []").
+    { iApply (rwi_214 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (H2 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (H1 !!! Regidx Ra0)
@@ -1424,7 +1427,8 @@ Section VdrwfP6.
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x218) : mword 64) Rra
               (mword_of_int 2077050 : mword 21) H2 (trap_res eb + (K - 12))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi1f6").
+              ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+    { iApply (rwi_218 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (H3 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.virtio_disk_rw + 0x218) : mword 64) 4)]> H2).
@@ -1508,22 +1512,11 @@ Section VdrwfP6.
                    = (pa_stk sp0 10 : SailStdpp.Values.mword 64)).
     { unfold pa_stk, add_vec_int. rewrite add_vec_off2.
       apply f_equal. apply bv_eq; vm_compute; reflexivity. }
-    iPoseProof (rwi_21c with "Htext") as "Hj1".
-    iPoseProof (rwi_21e with "Htext") as "Hj2".
-    iPoseProof (rwi_220 with "Htext") as "Hj3".
-    iPoseProof (rwi_222 with "Htext") as "Hj4".
-    iPoseProof (rwi_224 with "Htext") as "Hj5".
-    iPoseProof (rwi_226 with "Htext") as "Hj6".
-    iPoseProof (rwi_228 with "Htext") as "Hj7".
-    iPoseProof (rwi_22a with "Htext") as "Hj8".
-    iPoseProof (rwi_22c with "Htext") as "Hj9".
-    iPoseProof (rwi_22e with "Htext") as "Hj10".
-    iPoseProof (rwi_230 with "Htext") as "Hj11".
-    iPoseProof (rwi_232 with "Htext") as "Hj12".
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x21c) : mword 64)
               (mword_of_int 11 : mword 6) Rra MR (K - 12)%nat (m !!! Regidx Rra) eb
               (dqm := DfracOwn 1) ltac:(vm_compute; discriminate)
-              ltac:(rdok) with "Hcg Hpc Hj1 [Hk1]").
+              ltac:(rdok) with "Hcg Hpc [] [Hk1]").
+    { iApply (rwi_21c with "Htext"). }
     { rgall. iEval (rewrite HMRsp Hb1). iExact "Hk1". }
     iIntros (CIDp1 Hsp1) "Hcg Hpc Hk1". rgall. iEval (rewrite HMRsp Hb1) in "Hk1".
     set (R1 := <[Regidx Rra := regval_into_reg (m !!! Regidx Rra)]> MR).
@@ -1536,7 +1529,8 @@ Section VdrwfP6.
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x21e) : mword 64)
               (mword_of_int 10 : mword 6) Rs0 R1 (K - 12)%nat (m !!! Regidx Rs0) eb
               (dqm := DfracOwn 1) ltac:(vm_compute; discriminate)
-              ltac:(rdok) with "Hcg Hpc Hj2 [Hk2]").
+              ltac:(rdok) with "Hcg Hpc [] [Hk2]").
+    { iApply (rwi_21e with "Htext"). }
     { rgall. iEval (rewrite HR1sp Hb2). iExact "Hk2". }
     iIntros (CIDp2 Hsp2) "Hcg Hpc Hk2". rgall. iEval (rewrite HR1sp Hb2) in "Hk2".
     set (R2 := <[Regidx Rs0 := regval_into_reg (m !!! Regidx Rs0)]> R1).
@@ -1549,7 +1543,8 @@ Section VdrwfP6.
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x220) : mword 64)
               (mword_of_int 9 : mword 6) Rs1 R2 (K - 12)%nat (m !!! Regidx Rs1) eb
               (dqm := DfracOwn 1) ltac:(vm_compute; discriminate)
-              ltac:(rdok) with "Hcg Hpc Hj3 [Hk3]").
+              ltac:(rdok) with "Hcg Hpc [] [Hk3]").
+    { iApply (rwi_220 with "Htext"). }
     { rgall. iEval (rewrite HR2sp Hb3). iExact "Hk3". }
     iIntros (CIDp3 Hsp3) "Hcg Hpc Hk3". rgall. iEval (rewrite HR2sp Hb3) in "Hk3".
     set (R3 := <[Regidx Rs1 := regval_into_reg (m !!! Regidx Rs1)]> R2).
@@ -1562,7 +1557,8 @@ Section VdrwfP6.
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x222) : mword 64)
               (mword_of_int 8 : mword 6) Rs2 R3 (K - 12)%nat (m !!! Regidx Rs2) eb
               (dqm := DfracOwn 1) ltac:(vm_compute; discriminate)
-              ltac:(rdok) with "Hcg Hpc Hj4 [Hk4]").
+              ltac:(rdok) with "Hcg Hpc [] [Hk4]").
+    { iApply (rwi_222 with "Htext"). }
     { rgall. iEval (rewrite HR3sp Hb4). iExact "Hk4". }
     iIntros (CIDp4 Hsp4) "Hcg Hpc Hk4". rgall. iEval (rewrite HR3sp Hb4) in "Hk4".
     set (R4 := <[Regidx Rs2 := regval_into_reg (m !!! Regidx Rs2)]> R3).
@@ -1575,7 +1571,8 @@ Section VdrwfP6.
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x224) : mword 64)
               (mword_of_int 7 : mword 6) Rs3 R4 (K - 12)%nat (m !!! Regidx Rs3) eb
               (dqm := DfracOwn 1) ltac:(vm_compute; discriminate)
-              ltac:(rdok) with "Hcg Hpc Hj5 [Hk5]").
+              ltac:(rdok) with "Hcg Hpc [] [Hk5]").
+    { iApply (rwi_224 with "Htext"). }
     { rgall. iEval (rewrite HR4sp Hb5). iExact "Hk5". }
     iIntros (CIDp5 Hsp5) "Hcg Hpc Hk5". rgall. iEval (rewrite HR4sp Hb5) in "Hk5".
     set (R5 := <[Regidx Rs3 := regval_into_reg (m !!! Regidx Rs3)]> R4).
@@ -1588,7 +1585,8 @@ Section VdrwfP6.
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x226) : mword 64)
               (mword_of_int 6 : mword 6) Rs4 R5 (K - 12)%nat (m !!! Regidx Rs4) eb
               (dqm := DfracOwn 1) ltac:(vm_compute; discriminate)
-              ltac:(rdok) with "Hcg Hpc Hj6 [Hk6]").
+              ltac:(rdok) with "Hcg Hpc [] [Hk6]").
+    { iApply (rwi_226 with "Htext"). }
     { rgall. iEval (rewrite HR5sp Hb6). iExact "Hk6". }
     iIntros (CIDp6 Hsp6) "Hcg Hpc Hk6". rgall. iEval (rewrite HR5sp Hb6) in "Hk6".
     set (R6 := <[Regidx Rs4 := regval_into_reg (m !!! Regidx Rs4)]> R5).
@@ -1601,7 +1599,8 @@ Section VdrwfP6.
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x228) : mword 64)
               (mword_of_int 5 : mword 6) Rs5 R6 (K - 12)%nat (m !!! Regidx Rs5) eb
               (dqm := DfracOwn 1) ltac:(vm_compute; discriminate)
-              ltac:(rdok) with "Hcg Hpc Hj7 [Hk7]").
+              ltac:(rdok) with "Hcg Hpc [] [Hk7]").
+    { iApply (rwi_228 with "Htext"). }
     { rgall. iEval (rewrite HR6sp Hb7). iExact "Hk7". }
     iIntros (CIDp7 Hsp7) "Hcg Hpc Hk7". rgall. iEval (rewrite HR6sp Hb7) in "Hk7".
     set (R7 := <[Regidx Rs5 := regval_into_reg (m !!! Regidx Rs5)]> R6).
@@ -1614,7 +1613,8 @@ Section VdrwfP6.
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x22a) : mword 64)
               (mword_of_int 4 : mword 6) Rs6 R7 (K - 12)%nat (m !!! Regidx Rs6) eb
               (dqm := DfracOwn 1) ltac:(vm_compute; discriminate)
-              ltac:(rdok) with "Hcg Hpc Hj8 [Hk8]").
+              ltac:(rdok) with "Hcg Hpc [] [Hk8]").
+    { iApply (rwi_22a with "Htext"). }
     { rgall. iEval (rewrite HR7sp Hb8). iExact "Hk8". }
     iIntros (CIDp8 Hsp8) "Hcg Hpc Hk8". rgall. iEval (rewrite HR7sp Hb8) in "Hk8".
     set (R8 := <[Regidx Rs6 := regval_into_reg (m !!! Regidx Rs6)]> R7).
@@ -1627,7 +1627,8 @@ Section VdrwfP6.
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x22c) : mword 64)
               (mword_of_int 3 : mword 6) Rs7 R8 (K - 12)%nat (m !!! Regidx Rs7) eb
               (dqm := DfracOwn 1) ltac:(vm_compute; discriminate)
-              ltac:(rdok) with "Hcg Hpc Hj9 [Hk9]").
+              ltac:(rdok) with "Hcg Hpc [] [Hk9]").
+    { iApply (rwi_22c with "Htext"). }
     { rgall. iEval (rewrite HR8sp Hb9). iExact "Hk9". }
     iIntros (CIDp9 Hsp9) "Hcg Hpc Hk9". rgall. iEval (rewrite HR8sp Hb9) in "Hk9".
     set (R9 := <[Regidx Rs7 := regval_into_reg (m !!! Regidx Rs7)]> R8).
@@ -1640,7 +1641,8 @@ Section VdrwfP6.
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x22e) : mword 64)
               (mword_of_int 2 : mword 6) Rs8 R9 (K - 12)%nat (m !!! Regidx Rs8) eb
               (dqm := DfracOwn 1) ltac:(vm_compute; discriminate)
-              ltac:(rdok) with "Hcg Hpc Hj10 [Hk10]").
+              ltac:(rdok) with "Hcg Hpc [] [Hk10]").
+    { iApply (rwi_22e with "Htext"). }
     { rgall. iEval (rewrite HR9sp Hb10). iExact "Hk10". }
     iIntros (CIDp10 Hsp10) "Hcg Hpc Hk10". rgall. iEval (rewrite HR9sp Hb10) in "Hk10".
     set (R10 := <[Regidx Rs8 := regval_into_reg (m !!! Regidx Rs8)]> R9).
@@ -1692,7 +1694,8 @@ Section VdrwfP6.
     iEval (rewrite -Hwv) in "Hframe".
     iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x230) : mword 64)
               (mword_of_int 6 : mword 6) R10 (K - 12)%nat 12 eb Hpop
-              with "Hcg Hpc Hj11 Hframe").
+              with "Hcg Hpc [] Hframe").
+    { iApply (rwi_230 with "Htext"). }
     iIntros (CIDp11 Hsp11) "Hcg Hpc". rgall.
     set (R11 := <[Regidx csp_rs1 := regval_into_reg
                    (add_vec (R10 !!! Regidx csp_rs1)
@@ -1718,7 +1721,8 @@ Section VdrwfP6.
       rewrite /R3 upd_ne; [| reg_neq]. rewrite /R2 upd_ne; [| reg_neq].
       rewrite /R1; apply upd_eq. }
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x232) : mword 64) Rra R11 K eb
-              ltac:(vm_compute; discriminate) with "Hcg Hpc Hj12").
+              ltac:(vm_compute; discriminate) with "Hcg Hpc []").
+    { iApply (rwi_232 with "Htext"). }
     iIntros (CIDp12 Hsp12) "Hcg Hpc". rgall.
     iEval (rewrite HR11ra) in "Hpc".
     (* ================= the spec's continuation ======================== *)

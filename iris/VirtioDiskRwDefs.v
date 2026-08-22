@@ -579,7 +579,6 @@ End VdrwbDefs.
 (* ---- from ProofVirtioDiskRwC.v ---- *)
 
 Require Import WpSmodeHalf.
-Require Import Riscv.rv64d_types.
 Import Defs.
 
 Local Open Scope Z_scope.

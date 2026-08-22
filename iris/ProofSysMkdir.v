@@ -426,10 +426,6 @@ Section ProofSysMkdirEpilogue.
   Proof.
     intros HK18 Kpop Hsp0 HMsp HMthr Hal.
     iIntros "Hcg #Htext Hpc Hf1 Hf2 Hbuf Hcont".
-    iPoseProof (smdi_38 with "Htext") as "Hi38".
-    iPoseProof (smdi_3a with "Htext") as "Hi3a".
-    iPoseProof (smdi_3c with "Htext") as "Hi3c".
-    iPoseProof (smdi_3e with "Htext") as "Hi3e".
     assert (Hc1 : add_vec (M !!! Regidx csp_rs1 : mword 64)
                     (zero_extend' 64 (concat_vec (mword_of_int 17 : mword 6) ('b"000")))
                   = pa_stk sp0 1) by (rewrite HMsp; apply md_frm1).
@@ -437,7 +433,8 @@ Section ProofSysMkdirEpilogue.
     iApply (wp_cldsp_s_sconf (mword_of_int (MD + 0x38))
               (mword_of_int 17 : mword 6) Rra M (K - 18)%nat
               (m !!! Regidx Rra : mword 64) b ltac:(nz) ltac:(rdok)
-              with "Hcg Hpc Hi38 [Hf1]").
+              with "Hcg Hpc [] [Hf1]").
+    { iApply (smdi_38 with "Htext"). }
     { iEval (rewrite Hc1). iExact "Hf1". }
     iIntros (CID1 Hq1) "Hcg Hpc Hf1".
     iEval (rewrite Hc1) in "Hf1".
@@ -461,7 +458,8 @@ Section ProofSysMkdirEpilogue.
     iApply (wp_cldsp_s_sconf (mword_of_int (MD + 0x3a))
               (mword_of_int 16 : mword 6) Rs0 M1 (K - 18)%nat
               (m !!! Regidx Rs0 : mword 64) b ltac:(nz) ltac:(rdok)
-              with "Hcg Hpc Hi3a [Hf2]").
+              with "Hcg Hpc [] [Hf2]").
+    { iApply (smdi_3a with "Htext"). }
     { iEval (rewrite Hc2). iExact "Hf2". }
     iIntros (CID2 Hq2) "Hcg Hpc Hf2".
     iEval (rewrite Hc2) in "Hf2".
@@ -494,7 +492,8 @@ Section ProofSysMkdirEpilogue.
     iEval (rewrite -Hwv) in "Hstk".
     iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (MD + 0x3c))
               (mword_of_int 9 : mword 6) M2 (K - 18)%nat 18 b Hpop
-              with "Hcg Hpc Hi3c Hstk").
+              with "Hcg Hpc [] Hstk").
+    { iApply (smdi_3c with "Htext"). }
     iIntros (CID3 Hq3) "Hcg Hpc".
     set (M3 := <[Regidx csp_rs1 := regval_into_reg
                   (add_vec (M2 !!! Regidx csp_rs1 : mword 64)
@@ -507,7 +506,8 @@ Section ProofSysMkdirEpilogue.
       by (rewrite /M3 upd_ne; [exact HM2ra | nz]).
     (* ===== +0x3e c.ret ===== *)
     iApply (wp_cret_s_sconf (mword_of_int (MD + 0x3e)) Rra M3 K b
-              ltac:(nz) with "Hcg Hpc Hi3e").
+              ltac:(nz) with "Hcg Hpc []").
+    { iApply (smdi_3e with "Htext"). }
     iIntros (CID4 Hq4) "Hcg Hpc".
     iEval (rgne) in "Hpc".
     assert (Hretf : ret_pc (M3 !!! Regidx Rra : mword 64)
@@ -619,14 +619,12 @@ Section ProofSysMkdirM1Tail.
     iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
               Hpid #Hprocs #Hdev #Hgeo #Hdlk Hop Hf1 Hf2 Hbuf Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
-    iPoseProof (smdi_40 with "Htext") as "Hi40".
-    iPoseProof (smdi_44 with "Htext") as "Hi44".
-    iPoseProof (smdi_46 with "Htext") as "Hi46".
     (* ===== +0x40 jal ra,end_op ===== *)
     iApply (wp_jal_s_sconf (CID := CID0) (mword_of_int (MD + 0x40)) Rra
               (mword_of_int 2091590 : mword 21) M (K - 18)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
-              with "Hcg Hpc Hi40").
+              with "Hcg Hpc []").
+    { iApply (smdi_40 with "Htext"). }
     iIntros (CID1 Hq1) "Hcg Hpc".
     set (M1 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (MD + 0x40) : mword 64) 4)]> M).
@@ -667,7 +665,8 @@ Section ProofSysMkdirM1Tail.
     iApply (wp_cli_s_sconf (CID := CID2) (mword_of_int (MD + 0x44)) Ra0
               (mword_of_int 63 : mword 6) (mword_of_int (-1) : mword 64)
               meo (K - 18)%nat b ltac:(nz) ltac:(rdok) ltac:(pcw)
-              with "Hcg Hpc Hi44").
+              with "Hcg Hpc []").
+    { iApply (smdi_44 with "Htext"). }
     iIntros (CID3 Hq3) "Hcg Hpc".
     set (P1 := <[Regidx Ra0 := regval_into_reg (mword_of_int (-1) : mword 64)]> meo).
     assert (HP1a0 : (P1 !!! Regidx Ra0 : mword 64) = (mword_of_int (-1) : mword 64))
@@ -684,7 +683,8 @@ Section ProofSysMkdirM1Tail.
     iApply (wp_cj_s_sconf (CID := CID3) (mword_of_int (MD + 0x46))
               (sign_extend' 21 (concat_vec (mword_of_int 2041 : mword 11) ('b"0")))
               P1 (K - 18)%nat b ltac:(vm_compute; reflexivity)
-              with "Hcg Hpc Hi46").
+              with "Hcg Hpc []").
+    { iApply (smdi_46 with "Htext"). }
     iIntros (CID4 Hq4). iNext. iIntros "Hcg Hpc".
     assert (Htg38 : add_vec (mword_of_int (MD + 0x46) : mword 64)
                       (sign_extend' 64
@@ -781,28 +781,10 @@ Section ProofSysMkdirBody.
     iDestruct (cpu_own_zero_empty with "Hown") as "[%Hlkempty Hown]".
     assert (Hlb : forall r : string, locks_below lks r).
     { intro r. rewrite Hlkempty. apply locks_below_empty. }
-    iPoseProof (smdi_00 with "Htext") as "Hi00".
-    iPoseProof (smdi_02 with "Htext") as "Hi02".
-    iPoseProof (smdi_04 with "Htext") as "Hi04".
-    iPoseProof (smdi_06 with "Htext") as "Hi06".
-    iPoseProof (smdi_08 with "Htext") as "Hi08".
-    iPoseProof (smdi_0c with "Htext") as "Hi0c".
-    iPoseProof (smdi_10 with "Htext") as "Hi10".
-    iPoseProof (smdi_14 with "Htext") as "Hi14".
-    iPoseProof (smdi_16 with "Htext") as "Hi16".
-    iPoseProof (smdi_1a with "Htext") as "Hi1a".
-    iPoseProof (smdi_1e with "Htext") as "Hi1e".
-    iPoseProof (smdi_20 with "Htext") as "Hi20".
-    iPoseProof (smdi_22 with "Htext") as "Hi22".
-    iPoseProof (smdi_24 with "Htext") as "Hi24".
-    iPoseProof (smdi_28 with "Htext") as "Hi28".
-    iPoseProof (smdi_2c with "Htext") as "Hi2c".
-    iPoseProof (smdi_2e with "Htext") as "Hi2e".
-    iPoseProof (smdi_32 with "Htext") as "Hi32".
-    iPoseProof (smdi_36 with "Htext") as "Hi36".
     (* ================= +0x00 c.addi16sp sp,-144 ================= *)
     iApply (wp_caddi16sp_push_s_sconf pcE (mword_of_int 55 : mword 6) m K 18 b
-              ltac:(lia) (md_push sp0) with "Hcg Hpc Hi00").
+              ltac:(lia) (md_push sp0) with "Hcg Hpc []").
+    { iApply (smdi_00 with "Htext"). }
     iIntros (CID1 Hq1) "Hcg Hframe Hpc".
     set (M1 := <[Regidx csp_rs1 := regval_into_reg
                   (add_vec sp0 (sign_extend' 64
@@ -831,7 +813,8 @@ Section ProofSysMkdirBody.
     iEval (rewrite -Hc1) in "Hf1".
     iApply (wp_csdsp_s_sconf (mword_of_int (MD + 0x02))
               (mword_of_int 17 : mword 6) Rra M1 (K - 18)%nat u1 b
-              with "Hcg Hpc Hi02 Hf1").
+              with "Hcg Hpc [] Hf1").
+    { iApply (smdi_02 with "Htext"). }
     iIntros (CID2 Hq2) "Hcg Hpc Hf1".
     iEval (rgne; rewrite Hc1 HM1ra) in "Hf1".
     assert (Hpp04 : add_vec_int (mword_of_int (MD + 0x02) : mword 64) 2
@@ -841,7 +824,8 @@ Section ProofSysMkdirBody.
     iEval (rewrite -Hc2) in "Hf2".
     iApply (wp_csdsp_s_sconf (mword_of_int (MD + 0x04))
               (mword_of_int 16 : mword 6) Rs0 M1 (K - 18)%nat u2 b
-              with "Hcg Hpc Hi04 Hf2").
+              with "Hcg Hpc [] Hf2").
+    { iApply (smdi_04 with "Htext"). }
     iIntros (CID3 Hq3) "Hcg Hpc Hf2".
     iEval (rgne; rewrite Hc2 HM1s0) in "Hf2".
     assert (Hpp06 : add_vec_int (mword_of_int (MD + 0x04) : mword 64) 2
@@ -852,7 +836,8 @@ Section ProofSysMkdirBody.
               (Cregidx (mword_of_int 0)) (mword_of_int 36 : mword 8) Rs0
               M1 (K - 18)%nat b
               ltac:(vm_compute; reflexivity) ltac:(nz) ltac:(rdok)
-              with "Hcg Hpc Hi06").
+              with "Hcg Hpc []").
+    { iApply (smdi_06 with "Htext"). }
     iIntros (CID4 Hq4) "Hcg Hpc".
     set (M2 := <[Regidx Rs0 := regval_into_reg
                   (add_vec (M1 !!! Regidx csp_rs1)
@@ -872,7 +857,8 @@ Section ProofSysMkdirBody.
     iApply (wp_jal_s_sconf (CID := CID4) (mword_of_int (MD + 0x08)) Rra
               (mword_of_int 2091506 : mword 21) M2 (K - 18)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
-              with "Hcg Hpc Hi08").
+              with "Hcg Hpc []").
+    { iApply (smdi_08 with "Htext"). }
     iIntros (CID5 Hq5) "Hcg Hpc".
     set (M3 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (MD + 0x08) : mword 64) 4)]> M2).
@@ -918,7 +904,8 @@ Section ProofSysMkdirBody.
     iApply (wp_li4_s_sconf (CID := CID6) (mword_of_int (MD + 0x0c)) Ra2
               (mword_of_int 128 : mword 12)
               (mword_of_int (Z.of_nat 128) : mword 64) mbo (K - 18)%nat b
-              ltac:(nz) ltac:(rdok) ltac:(pcw) with "Hcg Hpc Hi0c").
+              ltac:(nz) ltac:(rdok) ltac:(pcw) with "Hcg Hpc []").
+    { iApply (smdi_0c with "Htext"). }
     iIntros (CID7 Hq7) "Hcg Hpc".
     set (M4 := <[Regidx Ra2 := regval_into_reg
                   (mword_of_int (Z.of_nat 128) : mword 64)]> mbo).
@@ -938,7 +925,8 @@ Section ProofSysMkdirBody.
     (* ================= +0x10 addi a1,s0,-144 ================= *)
     iApply (wp_addi4_s_sconf (CID := CID7) (mword_of_int (MD + 0x10)) Ra1 Rs0
               (mword_of_int 3952 : mword 12) M4 (K - 18)%nat b
-              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi10").
+              ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (smdi_10 with "Htext"). }
     iIntros (CID8 Hq8) "Hcg Hpc".
     set (M5 := <[Regidx Ra1 := regval_into_reg
                   (add_vec (M4 !!! Regidx Rs0)
@@ -963,7 +951,8 @@ Section ProofSysMkdirBody.
     iApply (wp_cli_s_sconf (CID := CID8) (mword_of_int (MD + 0x14)) Ra0
               (mword_of_int 0 : mword 6)
               (mword_of_int (Z.of_nat 0) : mword 64) M5 (K - 18)%nat b
-              ltac:(nz) ltac:(rdok) ltac:(pcw) with "Hcg Hpc Hi14").
+              ltac:(nz) ltac:(rdok) ltac:(pcw) with "Hcg Hpc []").
+    { iApply (smdi_14 with "Htext"). }
     iIntros (CID9 Hq9) "Hcg Hpc".
     set (M6 := <[Regidx Ra0 := regval_into_reg
                   (mword_of_int (Z.of_nat 0) : mword 64)]> M5).
@@ -989,7 +978,8 @@ Section ProofSysMkdirBody.
     iApply (wp_jal_s_sconf (CID := CID9) (mword_of_int (MD + 0x16)) Rra
               (mword_of_int 2086360 : mword 21) M6 (K - 18)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
-              with "Hcg Hpc Hi16").
+              with "Hcg Hpc []").
+    { iApply (smdi_16 with "Htext"). }
     iIntros (CID10 Hq10) "Hcg Hpc".
     set (M7 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (MD + 0x16) : mword 64) 4)]> M6).
@@ -1046,7 +1036,8 @@ Section ProofSysMkdirBody.
                 (mword_of_int 38 : mword 13) Ra0 mas (K - 18)%nat b
                 ltac:(nz)
                 ltac:(rgne; rewrite Hpr; exact (md_nonneg _ (md_len_range pk Hpk)))
-                with "Hcg Hpc Hi1a").
+                with "Hcg Hpc []").
+      { iApply (smdi_1a with "Htext"). }
       iIntros (CID12 Hq12) "Hcg Hpc".
       assert (Hpp1e : add_vec_int (mword_of_int (MD + 0x1a) : mword 64) 4
                       = mword_of_int (MD + 0x1e)) by pcw.
@@ -1055,7 +1046,8 @@ Section ProofSysMkdirBody.
       iApply (wp_cli_s_sconf (CID := CID12) (mword_of_int (MD + 0x1e)) Ra3
                 (mword_of_int 0 : mword 6)
                 (sign_extend' 64 (mword_of_int 0 : mword 16)) mas (K - 18)%nat b
-                ltac:(nz) ltac:(rdok) ltac:(pcw) with "Hcg Hpc Hi1e").
+                ltac:(nz) ltac:(rdok) ltac:(pcw) with "Hcg Hpc []").
+      { iApply (smdi_1e with "Htext"). }
       iIntros (CID13 Hq13) "Hcg Hpc".
       set (N0 := <[Regidx Ra3 := regval_into_reg
                     (sign_extend' 64 (mword_of_int 0 : mword 16))]> mas).
@@ -1076,7 +1068,8 @@ Section ProofSysMkdirBody.
       iApply (wp_cli_s_sconf (CID := CID13) (mword_of_int (MD + 0x20)) Ra2
                 (mword_of_int 0 : mword 6)
                 (sign_extend' 64 (mword_of_int 0 : mword 16)) N0 (K - 18)%nat b
-                ltac:(nz) ltac:(rdok) ltac:(pcw) with "Hcg Hpc Hi20").
+                ltac:(nz) ltac:(rdok) ltac:(pcw) with "Hcg Hpc []").
+      { iApply (smdi_20 with "Htext"). }
       iIntros (CID14 Hq14) "Hcg Hpc".
       set (N1 := <[Regidx Ra2 := regval_into_reg
                     (sign_extend' 64 (mword_of_int 0 : mword 16))]> N0).
@@ -1100,7 +1093,8 @@ Section ProofSysMkdirBody.
       iApply (wp_cli_s_sconf (CID := CID14) (mword_of_int (MD + 0x22)) Ra1
                 (mword_of_int 1 : mword 6)
                 (sign_extend' 64 SpecDirlookup.T_DIR) N1 (K - 18)%nat b
-                ltac:(nz) ltac:(rdok) ltac:(pcw) with "Hcg Hpc Hi22").
+                ltac:(nz) ltac:(rdok) ltac:(pcw) with "Hcg Hpc []").
+      { iApply (smdi_22 with "Htext"). }
       iIntros (CID15 Hq15) "Hcg Hpc".
       set (N2 := <[Regidx Ra1 := regval_into_reg
                     (sign_extend' 64 SpecDirlookup.T_DIR)]> N1).
@@ -1126,7 +1120,8 @@ Section ProofSysMkdirBody.
       (* ============ +0x24 addi a0,s0,-144 ============ *)
       iApply (wp_addi4_s_sconf (CID := CID15) (mword_of_int (MD + 0x24)) Ra0 Rs0
                 (mword_of_int 3952 : mword 12) N2 (K - 18)%nat b
-                ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi24").
+                ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+      { iApply (smdi_24 with "Htext"). }
       iIntros (CID16 Hq16) "Hcg Hpc".
       set (N3 := <[Regidx Ra0 := regval_into_reg
                     (add_vec (N2 !!! Regidx Rs0)
@@ -1157,7 +1152,8 @@ Section ProofSysMkdirBody.
       iApply (wp_jal_s_sconf (CID := CID16) (mword_of_int (MD + 0x28)) Rra
                 (mword_of_int 2095392 : mword 21) N3 (K - 18)%nat b
                 ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
-                with "Hcg Hpc Hi28").
+                with "Hcg Hpc []").
+      { iApply (smdi_28 with "Htext"). }
       iIntros (CID17 Hq17) "Hcg Hpc".
       set (N4 := <[Regidx Rra := regval_into_reg
                     (add_vec_int (mword_of_int (MD + 0x28) : mword 64) 4)]> N3).
@@ -1233,7 +1229,8 @@ Section ProofSysMkdirBody.
                   ltac:(vm_compute; reflexivity) ltac:(nz)
                   ltac:(rgne; rewrite Hcra0;
                         apply (proj2 (eq_vec_false_iff _ _)); exact Hipnz)
-                  with "Hcg Hpc Hi2c").
+                  with "Hcg Hpc []").
+        { iApply (smdi_2c with "Htext"). }
         iIntros (CID19 Hq19) "Hcg Hpc".
         assert (Hpp2e : add_vec_int (mword_of_int (MD + 0x2c) : mword 64) 2
                         = mword_of_int (MD + 0x2e)) by pcw.
@@ -1242,7 +1239,8 @@ Section ProofSysMkdirBody.
         iApply (wp_jal_s_sconf (CID := CID19) (mword_of_int (MD + 0x2e)) Rra
                   (mword_of_int 2089398 : mword 21) mcr (K - 18)%nat b
                   ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
-                  with "Hcg Hpc Hi2e").
+                  with "Hcg Hpc []").
+        { iApply (smdi_2e with "Htext"). }
         iIntros (CID20 Hq20) "Hcg Hpc".
         set (P0 := <[Regidx Rra := regval_into_reg
                       (add_vec_int (mword_of_int (MD + 0x2e) : mword 64) 4)]> mcr).
@@ -1310,7 +1308,8 @@ Section ProofSysMkdirBody.
         iApply (wp_jal_s_sconf (CID := CID21) (mword_of_int (MD + 0x32)) Rra
                   (mword_of_int 2091604 : mword 21) miu (K - 18)%nat b
                   ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
-                  with "Hcg Hpc Hi32").
+                  with "Hcg Hpc []").
+        { iApply (smdi_32 with "Htext"). }
         iIntros (CID22 Hq22) "Hcg Hpc".
         set (P1 := <[Regidx Rra := regval_into_reg
                       (add_vec_int (mword_of_int (MD + 0x32) : mword 64) 4)]> miu).
@@ -1350,7 +1349,8 @@ Section ProofSysMkdirBody.
         iApply (wp_cli_s_sconf (CID := CID23) (mword_of_int (MD + 0x36)) Ra0
                   (mword_of_int 0 : mword 6) (zero_reg : mword 64)
                   meo (K - 18)%nat b ltac:(nz) ltac:(rdok) ltac:(pcw)
-                  with "Hcg Hpc Hi36").
+                  with "Hcg Hpc []").
+        { iApply (smdi_36 with "Htext"). }
         iIntros (CID24 Hq24) "Hcg Hpc".
         set (P2 := <[Regidx Ra0 := regval_into_reg (zero_reg : mword 64)]> meo).
         assert (HP2a0 : (P2 !!! Regidx Ra0 : mword 64) = (zero_reg : mword 64))
@@ -1395,7 +1395,8 @@ Section ProofSysMkdirBody.
                   mcr (K - 18)%nat b
                   ltac:(vm_compute; reflexivity) ltac:(nz)
                   ltac:(rgne; rewrite Hcrz; vm_compute; reflexivity)
-                  ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi2c").
+                  ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+        { iApply (smdi_2c with "Htext"). }
         iApply bi.later_intro. iIntros (CID19 Hq19) "Hcg Hpc".
         assert (Htg40 : add_vec (mword_of_int (MD + 0x2c) : mword 64)
                           (sign_extend' 64
@@ -1437,7 +1438,8 @@ Section ProofSysMkdirBody.
       iApply (wp_blt_x0_taken_s_sconf (CID := CID11) (mword_of_int (MD + 0x1a))
                 (mword_of_int 38 : mword 13) Ra0 mas (K - 18)%nat b
                 ltac:(nz) ltac:(rgne; rewrite Hpr; exact md_m1_neg)
-                ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi1a").
+                ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+      { iApply (smdi_1a with "Htext"). }
       iApply bi.later_intro. iIntros (CID12 Hq12) "Hcg Hpc".
       assert (Htg40 : add_vec (mword_of_int (MD + 0x1a) : mword 64)
                         (sign_extend' 64 (mword_of_int 38 : mword 13))

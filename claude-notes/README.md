@@ -146,6 +146,12 @@ banner says precisely what is left):
   LANDED (K4 via `ParkCap.v`); what is NEXT is the `instr` ktier sweep
   (~330 statement-identical files) and the uservec/userret trampoline-fetch
   project that consumes `TrampText.tramp_text_mint`.
+- **[`instr-subgoal-sweep.md`](projects/instr-subgoal-sweep.md)** — the
+  performance discipline that replaced posing instruction facts: close the
+  leaf's `instr` premise as a `[]` subgoal from `kernel_text` instead. Measured
+  −46 % wall / −61 % `Qed` / −69 % proof term on the reference conversion. The
+  file is the mechanical recipe, the traps, and the scoreboard for the
+  remaining 214 files.
 - **[`namei-pinned-lookup.md`](projects/namei-pinned-lookup.md)** — a
   ghost-state spec for WHICH inode `namei` returns: N-1 through N-5.2B
   (kexec loads `/init` at its entry) are landed; M2 (`dvrt`, the pin through

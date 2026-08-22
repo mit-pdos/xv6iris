@@ -183,23 +183,13 @@ Section ProofMappages.
       f_equal; try (apply bv_eq; vm_compute; reflexivity). }
     assert (Hsprstk : pa_stk sp0 10 = spr).
     { rewrite /pa_stk /spr /sp0 /add_vec_int. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    iPoseProof (mi_9c with "Htext") as "Hi9c".
-    iPoseProof (mi_9e with "Htext") as "Hi9e".
-    iPoseProof (mi_a0 with "Htext") as "Hia0".
-    iPoseProof (mi_a2 with "Htext") as "Hia2".
-    iPoseProof (mi_a4 with "Htext") as "Hia4".
-    iPoseProof (mi_a6 with "Htext") as "Hia6".
-    iPoseProof (mi_a8 with "Htext") as "Hia8".
-    iPoseProof (mi_aa with "Htext") as "Hiaa".
-    iPoseProof (mi_ac with "Htext") as "Hiac".
-    iPoseProof (mi_ae with "Htext") as "Hiae".
-    iPoseProof (mi_b0 with "Htext") as "Hib0".
     pose proof Hsp as HspE0.
     (* +0x9c c.ldsp x1,72(sp) *)
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.mappages + 0x9c)) (mword_of_int 9 : mword 6) (mword_of_int 1 : mword 5)
               Mf (K - 10)%nat (mm !!! Regidx (mword_of_int 1 : mword 5)) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi9c [Hc72]").
+              with "Hcg Hpc [] [Hc72]").
+    { iApply (mi_9c with "Htext"). }
     { iEval (rewrite HspE0 Hb1). iExact "Hc72". }
     iIntros (CID1 Hs1) "Hcg Hpc Hc72".
     iEval (rewrite HspE0 Hb1) in "Hc72".
@@ -212,7 +202,8 @@ Section ProofMappages.
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.mappages + 0x9e)) (mword_of_int 8 : mword 6) (mword_of_int 8 : mword 5)
               E1 (K - 10)%nat (mm !!! Regidx (mword_of_int 8 : mword 5)) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi9e [Hc64]").
+              with "Hcg Hpc [] [Hc64]").
+    { iApply (mi_9e with "Htext"). }
     { iEval (rewrite HspE1 Hb2). iExact "Hc64". }
     iIntros (CID2 Hs2) "Hcg Hpc Hc64".
     iEval (rewrite HspE1 Hb2) in "Hc64".
@@ -225,7 +216,8 @@ Section ProofMappages.
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.mappages + 0xa0)) (mword_of_int 7 : mword 6) (mword_of_int 9 : mword 5)
               E2 (K - 10)%nat (mm !!! Regidx (mword_of_int 9 : mword 5)) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hia0 [Hc56]").
+              with "Hcg Hpc [] [Hc56]").
+    { iApply (mi_a0 with "Htext"). }
     { iEval (rewrite HspE2 Hb3). iExact "Hc56". }
     iIntros (CID3 Hs3) "Hcg Hpc Hc56".
     iEval (rewrite HspE2 Hb3) in "Hc56".
@@ -238,7 +230,8 @@ Section ProofMappages.
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.mappages + 0xa2)) (mword_of_int 6 : mword 6) (mword_of_int 18 : mword 5)
               E3 (K - 10)%nat (mm !!! Regidx (mword_of_int 18 : mword 5)) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hia2 [Hc48]").
+              with "Hcg Hpc [] [Hc48]").
+    { iApply (mi_a2 with "Htext"). }
     { iEval (rewrite HspE3 Hb4). iExact "Hc48". }
     iIntros (CID4 Hs4) "Hcg Hpc Hc48".
     iEval (rewrite HspE3 Hb4) in "Hc48".
@@ -251,7 +244,8 @@ Section ProofMappages.
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.mappages + 0xa4)) (mword_of_int 5 : mword 6) (mword_of_int 19 : mword 5)
               E4 (K - 10)%nat (mm !!! Regidx (mword_of_int 19 : mword 5)) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hia4 [Hc40]").
+              with "Hcg Hpc [] [Hc40]").
+    { iApply (mi_a4 with "Htext"). }
     { iEval (rewrite HspE4 Hb5). iExact "Hc40". }
     iIntros (CID5 Hs5) "Hcg Hpc Hc40".
     iEval (rewrite HspE4 Hb5) in "Hc40".
@@ -264,7 +258,8 @@ Section ProofMappages.
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.mappages + 0xa6)) (mword_of_int 4 : mword 6) (mword_of_int 20 : mword 5)
               E5 (K - 10)%nat (mm !!! Regidx (mword_of_int 20 : mword 5)) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hia6 [Hc32]").
+              with "Hcg Hpc [] [Hc32]").
+    { iApply (mi_a6 with "Htext"). }
     { iEval (rewrite HspE5 Hb6). iExact "Hc32". }
     iIntros (CID6 Hs6) "Hcg Hpc Hc32".
     iEval (rewrite HspE5 Hb6) in "Hc32".
@@ -277,7 +272,8 @@ Section ProofMappages.
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.mappages + 0xa8)) (mword_of_int 3 : mword 6) (mword_of_int 21 : mword 5)
               E6 (K - 10)%nat (mm !!! Regidx (mword_of_int 21 : mword 5)) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hia8 [Hc24]").
+              with "Hcg Hpc [] [Hc24]").
+    { iApply (mi_a8 with "Htext"). }
     { iEval (rewrite HspE6 Hb7). iExact "Hc24". }
     iIntros (CID7 Hs7) "Hcg Hpc Hc24".
     iEval (rewrite HspE6 Hb7) in "Hc24".
@@ -290,7 +286,8 @@ Section ProofMappages.
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.mappages + 0xaa)) (mword_of_int 2 : mword 6) (mword_of_int 22 : mword 5)
               E7 (K - 10)%nat (mm !!! Regidx (mword_of_int 22 : mword 5)) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hiaa [Hc16]").
+              with "Hcg Hpc [] [Hc16]").
+    { iApply (mi_aa with "Htext"). }
     { iEval (rewrite HspE7 Hb8). iExact "Hc16". }
     iIntros (CID8 Hs8) "Hcg Hpc Hc16".
     iEval (rewrite HspE7 Hb8) in "Hc16".
@@ -303,7 +300,8 @@ Section ProofMappages.
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.mappages + 0xac)) (mword_of_int 1 : mword 6) (mword_of_int 23 : mword 5)
               E8 (K - 10)%nat (mm !!! Regidx (mword_of_int 23 : mword 5)) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hiac [Hc08]").
+              with "Hcg Hpc [] [Hc08]").
+    { iApply (mi_ac with "Htext"). }
     { iEval (rewrite HspE8 Hb9). iExact "Hc08". }
     iIntros (CID9 Hs9) "Hcg Hpc Hc08".
     iEval (rewrite HspE8 Hb9) in "Hc08".
@@ -338,7 +336,8 @@ Section ProofMappages.
     iEval (rewrite -Hwv) in "Hframe".
     iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (KernelSyms.mappages + 0xae)) (mword_of_int 5 : mword 6)
               E9 (K - 10)%nat 10 b Hpop
-              with "Hcg Hpc Hiae Hframe").
+              with "Hcg Hpc [] Hframe").
+    { iApply (mi_ae with "Htext"). }
     iIntros (CID10 Hs10) "Hcg Hpc".
     change (<[Regidx csp_rs1 := regval_into_reg (add_vec (E9 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 5 : mword 6))))]> E9) with E10.
     assert (Hnk : ((K - 10) + 10)%nat = K) by lia.
@@ -352,7 +351,8 @@ Section ProofMappages.
     { rewrite HE10ra. reflexivity. }
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.mappages + 0xb0)) (mword_of_int 1 : mword 5) E10 K b
               ltac:(vm_compute; discriminate)
-              with "Hcg Hpc Hib0").
+              with "Hcg Hpc []").
+    { iApply (mi_b0 with "Htext"). }
     iIntros (CID11 Hs11) "Hcg Hpc".
     iEval (rewrite Hrt) in "Hpc".
     assert (HE10a0 : E10 !!! Regidx (mword_of_int 10 : mword 5) = Mf !!! Regidx (mword_of_int 10 : mword 5)).
@@ -507,30 +507,11 @@ Section ProofMappages.
     rewrite uint_unsigned in Hvab. rewrite uint_unsigned in Hpab.
     assert (Hklt : (k < npages)%nat) by lia.
     assert (Hk27 : (Z.of_nat npages < 134217728)%Z) by lia.
-    iPoseProof (mi_3e with "Htext") as "Hi3e".
-    iPoseProof (mi_40 with "Htext") as "Hi40".
-    iPoseProof (mi_42 with "Htext") as "Hi42".
-    iPoseProof (mi_44 with "Htext") as "Hi44".
-    iPoseProof (mi_48 with "Htext") as "Hi48".
-    iPoseProof (mi_4a with "Htext") as "Hi4a".
-    iPoseProof (mi_4c with "Htext") as "Hi4c".
-    iPoseProof (mi_4e with "Htext") as "Hi4e".
-    iPoseProof (mi_50 with "Htext") as "Hi50".
-    iPoseProof (mi_54 with "Htext") as "Hi54".
-    iPoseProof (mi_56 with "Htext") as "Hi56".
-    iPoseProof (mi_58 with "Htext") as "Hi58".
-    iPoseProof (mi_5c with "Htext") as "Hi5c".
-    iPoseProof (mi_60 with "Htext") as "Hi60".
-    iPoseProof (mi_62 with "Htext") as "Hi62".
-    iPoseProof (mi_66 with "Htext") as "Hi66".
-    iPoseProof (mi_68 with "Htext") as "Hi68".
-    iPoseProof (mi_9a with "Htext") as "Hi9a".
-    iPoseProof (mi_b2 with "Htext") as "Hib2".
-    iPoseProof (mi_b4 with "Htext") as "Hib4".
     (* +0x3e mv a2,s6 *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.mappages + 0x3e)) (mword_of_int 12 : mword 5) (mword_of_int 22 : mword 5)
               Mk (K - 10)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi3e").
+              with "Hcg Hpc []").
+    { iApply (mi_3e with "Htext"). }
     iIntros (CIDa1 Hsa1) "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (W1 := <[Regidx (mword_of_int 12 : mword 5) := regval_into_reg (add_vec zero_reg (Mk !!! Regidx (mword_of_int 22 : mword 5)))]> Mk).
@@ -539,7 +520,8 @@ Section ProofMappages.
     (* +0x40 mv a1,s1 *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.mappages + 0x40)) (mword_of_int 11 : mword 5) (mword_of_int 9 : mword 5)
               W1 (K - 10)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi40").
+              with "Hcg Hpc []").
+    { iApply (mi_40 with "Htext"). }
     iIntros (CIDa2 Hsa2) "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (W2 := <[Regidx (mword_of_int 11 : mword 5) := regval_into_reg (add_vec zero_reg (W1 !!! Regidx (mword_of_int 9 : mword 5)))]> W1).
@@ -548,7 +530,8 @@ Section ProofMappages.
     (* +0x42 mv a0,s4 *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.mappages + 0x42)) (mword_of_int 10 : mword 5) (mword_of_int 20 : mword 5)
               W2 (K - 10)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi42").
+              with "Hcg Hpc []").
+    { iApply (mi_42 with "Htext"). }
     iIntros (CIDa3 Hsa3) "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (W3 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec zero_reg (W2 !!! Regidx (mword_of_int 20 : mword 5)))]> W2).
@@ -557,7 +540,8 @@ Section ProofMappages.
     (* +0x44 jal walk *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.mappages + 0x44)) (mword_of_int 1 : mword 5) (mword_of_int 2096872 : mword 21)
               W3 (K - 10)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
-              with "Hcg Hpc Hi44").
+              with "Hcg Hpc []").
+    { iApply (mi_44 with "Htext"). }
     iIntros (CIDa4 Hsa4) "Hcg Hpc".
     set (W4 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.mappages + 0x44) : mword 64) 4)]> W3).
     assert (Hpcw : add_vec (mword_of_int (KernelSyms.mappages + 0x44) : mword 64) (sign_extend' 64 (mword_of_int 2096872 : mword 21)) = mword_of_int KernelSyms.walk) by (apply bv_eq; vm_compute; reflexivity).
@@ -736,7 +720,8 @@ Section ProofMappages.
                 ltac:(vm_compute; discriminate)
                 ltac:(rgne; rewrite Ha0z; vm_compute; reflexivity)
                 ltac:(vm_compute; reflexivity)
-                with "Hcg Hpc Hi48").
+                with "Hcg Hpc []").
+      { iApply (mi_48 with "Htext"). }
       iApply bi.later_intro. iIntros (CIDn1 Hsn1) "Hcg Hpc".
       assert (Htgt9a : add_vec (mword_of_int (KernelSyms.mappages + 0x48) : mword 64)
                 (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 41 : mword 8) ('b"0"))))
@@ -746,7 +731,8 @@ Section ProofMappages.
       iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.mappages + 0x9a)) (mword_of_int 10 : mword 5) (mword_of_int 63 : mword 6)
                 (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6))))
                 mr (K - 10)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(reflexivity)
-                with "Hcg Hpc Hi9a").
+                with "Hcg Hpc []").
+      { iApply (mi_9a with "Htext"). }
       iIntros (CIDn2 Hsn2) "Hcg Hpc".
       set (F1 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
           (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6))))]> mr).
@@ -796,7 +782,8 @@ Section ProofMappages.
               ltac:(vm_compute; discriminate)
               ltac:(rgne; apply eq_vec_false_iff; intro He; apply Ha0nz;
                     rewrite He; apply bv_eq; vm_compute; reflexivity)
-              with "Hcg Hpc Hi48").
+              with "Hcg Hpc []").
+    { iApply (mi_48 with "Htext"). }
     iIntros (CIDs1 Hss1) "Hcg Hpc".
     assert (Hpp4a : add_vec_int (mword_of_int (KernelSyms.mappages + 0x48) : mword 64) 2 = mword_of_int (KernelSyms.mappages + 0x4a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp4a) in "Hpc".
@@ -812,7 +799,8 @@ Section ProofMappages.
               (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"000")))
               mr (K - 10)%nat w0 b (dqm:=DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi4a [Hcell]").
+              with "Hcg Hpc [] [Hcell]").
+    { iApply (mi_4a with "Htext"). }
     { iEval (rgne). iEval (rewrite Hea0 Ha0v). iExact "Hcell". }
     iIntros (CIDs2 Hss2) "Hcg Hpc Hcell".
     iEval (rgne) in "Hcell".
@@ -823,7 +811,8 @@ Section ProofMappages.
     (* +0x4c c.andi a5,1 *)
     iApply (wp_candi_s_sconf (mword_of_int (KernelSyms.mappages + 0x4c)) (mword_of_int 15 : mword 5) (mword_of_int 1 : mword 6)
               M5 (K - 10)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi4c").
+              with "Hcg Hpc []").
+    { iApply (mi_4c with "Htext"). }
     iIntros (CIDs3 Hss3) "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (M6 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg
@@ -837,7 +826,8 @@ Section ProofMappages.
               ltac:(vm_compute; discriminate)
               ltac:(rgne; rewrite /M6 upd_eq; rewrite /M5 upd_eq;
                     rewrite Hw0z; vm_compute; reflexivity)
-              with "Hcg Hpc Hi4e").
+              with "Hcg Hpc []").
+    { iApply (mi_4e with "Htext"). }
     iIntros (CIDs4 Hss4) "Hcg Hpc".
     assert (Hpp50 : add_vec_int (mword_of_int (KernelSyms.mappages + 0x4e) : mword 64) 2 = mword_of_int (KernelSyms.mappages + 0x50)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp50) in "Hpc".
@@ -856,7 +846,8 @@ Section ProofMappages.
               M6 (K - 10)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(repeat rgne; rewrite HM6s1 HM6s3; apply mappages_pa_of_va)
-              with "Hcg Hpc Hi50").
+              with "Hcg Hpc []").
+    { iApply (mi_50 with "Htext"). }
     iIntros (CIDs5 Hss5) "Hcg Hpc".
     set (M7 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg
         (add_vec pa (mword_of_int (4096 * Z.of_nat k)))]> M6).
@@ -865,7 +856,8 @@ Section ProofMappages.
     (* +0x54 c.srli a5,12 *)
     iApply (wp_csrli_s_sconf (mword_of_int (KernelSyms.mappages + 0x54)) (Cregidx (mword_of_int 7)) (mword_of_int 15 : mword 5) (mword_of_int 12 : mword 6)
               M7 (K - 10)%nat b ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi54").
+              with "Hcg Hpc []").
+    { iApply (mi_54 with "Htext"). }
     iIntros (CIDs6 Hss6) "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (M8 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg
@@ -875,7 +867,8 @@ Section ProofMappages.
     (* +0x56 c.slli a5,10 *)
     iApply (wp_cslli_s_sconf (mword_of_int (KernelSyms.mappages + 0x56)) (Regidx (mword_of_int 15)) (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 6)
               M8 (K - 10)%nat b ltac:(reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi56").
+              with "Hcg Hpc []").
+    { iApply (mi_56 with "Htext"). }
     iIntros (CIDs7 Hss7) "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (M9 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg
@@ -887,7 +880,8 @@ Section ProofMappages.
               (or_vec (M9 !!! Regidx (mword_of_int 15 : mword 5)) (M9 !!! Regidx (mword_of_int 21 : mword 5)))
               M9 (K - 10)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(repeat rgne; reflexivity)
-              with "Hcg Hpc Hi58").
+              with "Hcg Hpc []").
+    { iApply (mi_58 with "Htext"). }
     iIntros (CIDs8 Hss8) "Hcg Hpc".
     set (M10 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg
         (or_vec (M9 !!! Regidx (mword_of_int 15 : mword 5)) (M9 !!! Regidx (mword_of_int 21 : mword 5)))]> M9).
@@ -898,7 +892,8 @@ Section ProofMappages.
               (or_vec (M10 !!! Regidx (mword_of_int 15 : mword 5)) (sign_extend' 64 (mword_of_int 1 : mword 12)))
               M10 (K - 10)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(rgne; reflexivity)
-              with "Hcg Hpc Hi5c").
+              with "Hcg Hpc []").
+    { iApply (mi_5c with "Htext"). }
     iIntros (CIDs9 Hss9) "Hcg Hpc".
     set (M11 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg
         (or_vec (M10 !!! Regidx (mword_of_int 15 : mword 5)) (sign_extend' 64 (mword_of_int 1 : mword 12)))]> M10).
@@ -939,7 +934,8 @@ Section ProofMappages.
     iApply (wp_csd_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.mappages + 0x60)) (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
               (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"000")))
               M11 (K - 10)%nat w0 b
-              with "Hcg Hpc Hi60 [Hcell]").
+              with "Hcg Hpc [] [Hcell]").
+    { iApply (mi_60 with "Htext"). }
     { iEval (rgne). iEval (rewrite Hea0 HM11a0 Ha0v). iExact "Hcell". }
     iIntros (CIDs10 Hss10) "Hcg Hpc Hcell".
     iEval (repeat rgne) in "Hcell".
@@ -982,7 +978,8 @@ Section ProofMappages.
                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                 ltac:(repeat rgne; rewrite HM11s1 HM11s2; rewrite Hlast; apply eq_vec_true_iff; reflexivity)
                 ltac:(vm_compute; reflexivity)
-                with "Hcg Hpc Hi62").
+                with "Hcg Hpc []").
+      { iApply (mi_62 with "Htext"). }
       iApply bi.later_intro. iIntros (CIDl1 Hsl1) "Hcg Hpc".
       assert (Htgtb2 : add_vec (mword_of_int (KernelSyms.mappages + 0x62) : mword 64) (sign_extend' 64 (mword_of_int 80 : mword 13)) = mword_of_int (KernelSyms.mappages + 0xb2)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtb2) in "Hpc".
@@ -990,7 +987,8 @@ Section ProofMappages.
       iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.mappages + 0xb2)) (mword_of_int 10 : mword 5) (mword_of_int 0 : mword 6)
                 (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 0 : mword 6))))
                 M11 (K - 10)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(reflexivity)
-                with "Hcg Hpc Hib2").
+                with "Hcg Hpc []").
+      { iApply (mi_b2 with "Htext"). }
       iIntros (CIDl2 Hsl2) "Hcg Hpc".
       set (F1 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
           (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 0 : mword 6))))]> M11).
@@ -1000,7 +998,8 @@ Section ProofMappages.
       iApply (wp_cj_s_sconf (mword_of_int (KernelSyms.mappages + 0xb4)) (sign_extend' 21 (concat_vec (mword_of_int 2036 : mword 11) ('b"0")))
                 F1 (K - 10)%nat b
                 ltac:(vm_compute; reflexivity)
-                with "Hcg Hpc Hib4").
+                with "Hcg Hpc []").
+      { iApply (mi_b4 with "Htext"). }
       iIntros (CIDl3 Hsl3). iApply bi.later_intro. iIntros "Hcg Hpc".
       assert (Htgt9c : add_vec (mword_of_int (KernelSyms.mappages + 0xb4) : mword 64)
                 (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2036 : mword 11) ('b"0"))))
@@ -1043,14 +1042,16 @@ Section ProofMappages.
               M11 (K - 10)%nat b
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
               ltac:(repeat rgne; rewrite HM11s1 HM11s2; apply eq_vec_false_iff; exact Hne12)
-              with "Hcg Hpc Hi62").
+              with "Hcg Hpc []").
+    { iApply (mi_62 with "Htext"). }
     iIntros (CIDm1 Hsm1) "Hcg Hpc".
     assert (Hpp66 : add_vec_int (mword_of_int (KernelSyms.mappages + 0x62) : mword 64) 4 = mword_of_int (KernelSyms.mappages + 0x66)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp66) in "Hpc".
     (* +0x66 c.add s1,s1,s7 *)
     iApply (wp_cadd_s_sconf (mword_of_int (KernelSyms.mappages + 0x66)) (mword_of_int 9 : mword 5) (mword_of_int 23 : mword 5)
               M11 (K - 10)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi66").
+              with "Hcg Hpc []").
+    { iApply (mi_66 with "Htext"). }
     iIntros (CIDm2 Hsm2) "Hcg Hpc".
     iEval (repeat rgne) in "Hcg".
     set (M12 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg
@@ -1061,7 +1062,8 @@ Section ProofMappages.
     iApply (wp_cj_s_sconf (mword_of_int (KernelSyms.mappages + 0x68)) (sign_extend' 21 (concat_vec (mword_of_int 2027 : mword 11) ('b"0")))
               M12 (K - 10)%nat b
               ltac:(vm_compute; reflexivity)
-              with "Hcg Hpc Hi68").
+              with "Hcg Hpc []").
+    { iApply (mi_68 with "Htext"). }
     iIntros (CIDm3 Hsm3). iApply bi.later_intro. iIntros "Hcg Hpc".
     assert (Htgt3e : add_vec (mword_of_int (KernelSyms.mappages + 0x68) : mword 64)
               (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2027 : mword 11) ('b"0"))))
@@ -1209,36 +1211,12 @@ Section ProofMappages.
     assert (Hb9 : add_vec spr (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) = pa_stk sp0 9).
     { unfold spr, pa_stk, add_vec_int. rewrite !pa_stk_off2.
       f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    iPoseProof (mi_00 with "Htext") as "Hi00".
-    iPoseProof (mi_02 with "Htext") as "Hi02".
-    iPoseProof (mi_04 with "Htext") as "Hi04".
-    iPoseProof (mi_06 with "Htext") as "Hi06".
-    iPoseProof (mi_08 with "Htext") as "Hi08".
-    iPoseProof (mi_0a with "Htext") as "Hi0a".
-    iPoseProof (mi_0c with "Htext") as "Hi0c".
-    iPoseProof (mi_0e with "Htext") as "Hi0e".
-    iPoseProof (mi_10 with "Htext") as "Hi10".
-    iPoseProof (mi_12 with "Htext") as "Hi12".
-    iPoseProof (mi_14 with "Htext") as "Hi14".
-    iPoseProof (mi_16 with "Htext") as "Hi16".
-    iPoseProof (mi_1a with "Htext") as "Hi1a".
-    iPoseProof (mi_1c with "Htext") as "Hi1c".
-    iPoseProof (mi_1e with "Htext") as "Hi1e".
-    iPoseProof (mi_20 with "Htext") as "Hi20".
-    iPoseProof (mi_24 with "Htext") as "Hi24".
-    iPoseProof (mi_26 with "Htext") as "Hi26".
-    iPoseProof (mi_28 with "Htext") as "Hi28".
-    iPoseProof (mi_2c with "Htext") as "Hi2c".
-    iPoseProof (mi_30 with "Htext") as "Hi30".
-    iPoseProof (mi_34 with "Htext") as "Hi34".
-    iPoseProof (mi_36 with "Htext") as "Hi36".
-    iPoseProof (mi_38 with "Htext") as "Hi38".
-    iPoseProof (mi_3c with "Htext") as "Hi3c".
     (* +0x00 c.addi16sp sp,-80 : the 10-slot frame push *)
     assert (Hpush : add_vec (mm !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 59 : mword 6))) = pa_stk (mm !!! Regidx csp_rs1) 10).
     { unfold pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     iApply (wp_caddi16sp_push_s_sconf (mword_of_int KernelSyms.mappages) (mword_of_int 59 : mword 6) mm K 10 b ltac:(lia) Hpush
-              with "Hcg Hpc Hi00").
+              with "Hcg Hpc []").
+    { iApply (mi_00 with "Htext"). }
     iIntros (CID1 Hs1) "Hcg Hframe Hpc".
     change (<[Regidx csp_rs1 := regval_into_reg
         (add_vec (mm !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 59 : mword 6))))]> mm) with W1.
@@ -1255,7 +1233,8 @@ Section ProofMappages.
     iEval (rewrite Hpp02) in "Hpc".
     (* +0x02 c.sdsp x1,72(sp) *)
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.mappages + 0x02)) (mword_of_int 9 : mword 6) (mword_of_int 1 : mword 5)
-              W1 (K - 10)%nat v72 b with "Hcg Hpc Hi02 [Hc72]").
+              W1 (K - 10)%nat v72 b with "Hcg Hpc [] [Hc72]").
+    { iApply (mi_02 with "Htext"). }
     { iEval (rewrite HspW1 Hb1). iExact "Hc72". }
     iIntros (CID2 Hs2) "Hcg Hpc Hc72".
     iEval (rgne) in "Hc72".
@@ -1267,7 +1246,8 @@ Section ProofMappages.
     iEval (rewrite Hpp04) in "Hpc".
     (* +0x04 c.sdsp x8,64(sp) *)
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.mappages + 0x04)) (mword_of_int 8 : mword 6) (mword_of_int 8 : mword 5)
-              W1 (K - 10)%nat v64 b with "Hcg Hpc Hi04 [Hc64]").
+              W1 (K - 10)%nat v64 b with "Hcg Hpc [] [Hc64]").
+    { iApply (mi_04 with "Htext"). }
     { iEval (rewrite HspW1 Hb2). iExact "Hc64". }
     iIntros (CID3 Hs3) "Hcg Hpc Hc64".
     iEval (rgne) in "Hc64".
@@ -1279,7 +1259,8 @@ Section ProofMappages.
     iEval (rewrite Hpp06) in "Hpc".
     (* +0x06 c.sdsp x9,56(sp) *)
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.mappages + 0x06)) (mword_of_int 7 : mword 6) (mword_of_int 9 : mword 5)
-              W1 (K - 10)%nat v56 b with "Hcg Hpc Hi06 [Hc56]").
+              W1 (K - 10)%nat v56 b with "Hcg Hpc [] [Hc56]").
+    { iApply (mi_06 with "Htext"). }
     { iEval (rewrite HspW1 Hb3). iExact "Hc56". }
     iIntros (CID4 Hs4) "Hcg Hpc Hc56".
     iEval (rgne) in "Hc56".
@@ -1291,7 +1272,8 @@ Section ProofMappages.
     iEval (rewrite Hpp08) in "Hpc".
     (* +0x08 c.sdsp x18,48(sp) *)
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.mappages + 0x08)) (mword_of_int 6 : mword 6) (mword_of_int 18 : mword 5)
-              W1 (K - 10)%nat v48 b with "Hcg Hpc Hi08 [Hc48]").
+              W1 (K - 10)%nat v48 b with "Hcg Hpc [] [Hc48]").
+    { iApply (mi_08 with "Htext"). }
     { iEval (rewrite HspW1 Hb4). iExact "Hc48". }
     iIntros (CID5 Hs5) "Hcg Hpc Hc48".
     iEval (rgne) in "Hc48".
@@ -1303,7 +1285,8 @@ Section ProofMappages.
     iEval (rewrite Hpp0a) in "Hpc".
     (* +0x0a c.sdsp x19,40(sp) *)
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.mappages + 0x0a)) (mword_of_int 5 : mword 6) (mword_of_int 19 : mword 5)
-              W1 (K - 10)%nat v40 b with "Hcg Hpc Hi0a [Hc40]").
+              W1 (K - 10)%nat v40 b with "Hcg Hpc [] [Hc40]").
+    { iApply (mi_0a with "Htext"). }
     { iEval (rewrite HspW1 Hb5). iExact "Hc40". }
     iIntros (CID6 Hs6) "Hcg Hpc Hc40".
     iEval (rgne) in "Hc40".
@@ -1315,7 +1298,8 @@ Section ProofMappages.
     iEval (rewrite Hpp0c) in "Hpc".
     (* +0x0c c.sdsp x20,32(sp) *)
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.mappages + 0x0c)) (mword_of_int 4 : mword 6) (mword_of_int 20 : mword 5)
-              W1 (K - 10)%nat v32 b with "Hcg Hpc Hi0c [Hc32]").
+              W1 (K - 10)%nat v32 b with "Hcg Hpc [] [Hc32]").
+    { iApply (mi_0c with "Htext"). }
     { iEval (rewrite HspW1 Hb6). iExact "Hc32". }
     iIntros (CID7 Hs7) "Hcg Hpc Hc32".
     iEval (rgne) in "Hc32".
@@ -1327,7 +1311,8 @@ Section ProofMappages.
     iEval (rewrite Hpp0e) in "Hpc".
     (* +0x0e c.sdsp x21,24(sp) *)
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.mappages + 0x0e)) (mword_of_int 3 : mword 6) (mword_of_int 21 : mword 5)
-              W1 (K - 10)%nat v24 b with "Hcg Hpc Hi0e [Hc24]").
+              W1 (K - 10)%nat v24 b with "Hcg Hpc [] [Hc24]").
+    { iApply (mi_0e with "Htext"). }
     { iEval (rewrite HspW1 Hb7). iExact "Hc24". }
     iIntros (CID8 Hs8) "Hcg Hpc Hc24".
     iEval (rgne) in "Hc24".
@@ -1339,7 +1324,8 @@ Section ProofMappages.
     iEval (rewrite Hpp10) in "Hpc".
     (* +0x10 c.sdsp x22,16(sp) *)
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.mappages + 0x10)) (mword_of_int 2 : mword 6) (mword_of_int 22 : mword 5)
-              W1 (K - 10)%nat v16 b with "Hcg Hpc Hi10 [Hc16]").
+              W1 (K - 10)%nat v16 b with "Hcg Hpc [] [Hc16]").
+    { iApply (mi_10 with "Htext"). }
     { iEval (rewrite HspW1 Hb8). iExact "Hc16". }
     iIntros (CID9 Hs9) "Hcg Hpc Hc16".
     iEval (rgne) in "Hc16".
@@ -1351,7 +1337,8 @@ Section ProofMappages.
     iEval (rewrite Hpp12) in "Hpc".
     (* +0x12 c.sdsp x23,8(sp) *)
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.mappages + 0x12)) (mword_of_int 1 : mword 6) (mword_of_int 23 : mword 5)
-              W1 (K - 10)%nat v8 b with "Hcg Hpc Hi12 [Hc08]").
+              W1 (K - 10)%nat v8 b with "Hcg Hpc [] [Hc08]").
+    { iApply (mi_12 with "Htext"). }
     { iEval (rewrite HspW1 Hb9). iExact "Hc08". }
     iIntros (CID10 Hs10) "Hcg Hpc Hc08".
     iEval (rgne) in "Hc08".
@@ -1365,7 +1352,8 @@ Section ProofMappages.
     iApply (wp_caddi4spn_s_sconf (mword_of_int (KernelSyms.mappages + 0x14)) (Cregidx (mword_of_int 0)) (mword_of_int 20 : mword 8) (mword_of_int 8 : mword 5)
               W1 (K - 10)%nat b
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi14").
+              with "Hcg Hpc []").
+    { iApply (mi_14 with "Htext"). }
     iIntros (CID11 Hs11) "Hcg Hpc".
     set (P2 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg
         (add_vec (W1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm (mword_of_int 20 : mword 8))))]> W1).
@@ -1381,7 +1369,8 @@ Section ProofMappages.
               P2 (K - 10)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(rgne; rewrite HP2a1; apply mappages_align_probe;
                     apply (aligned12_unsigned va Hvaal))
-              with "Hcg Hpc Hi16").
+              with "Hcg Hpc []").
+    { iApply (mi_16 with "Htext"). }
     iIntros (CID12 Hs12) "Hcg Hpc".
     set (P3 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (mword_of_int 0 : mword 64)]> P2).
     assert (Hpp1a : add_vec_int (mword_of_int (KernelSyms.mappages + 0x16) : mword 64) 4 = mword_of_int (KernelSyms.mappages + 0x1a)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1392,14 +1381,16 @@ Section ProofMappages.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; discriminate)
               ltac:(rgne; rewrite /P3 upd_eq; vm_compute; reflexivity)
-              with "Hcg Hpc Hi1a").
+              with "Hcg Hpc []").
+    { iApply (mi_1a with "Htext"). }
     iIntros (CID13 Hs13) "Hcg Hpc".
     assert (Hpp1c : add_vec_int (mword_of_int (KernelSyms.mappages + 0x1a) : mword 64) 2 = mword_of_int (KernelSyms.mappages + 0x1c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp1c) in "Hpc".
     (* +0x1c mv s4,a0 *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.mappages + 0x1c)) (mword_of_int 20 : mword 5) (mword_of_int 10 : mword 5)
               P3 (K - 10)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi1c").
+              with "Hcg Hpc []").
+    { iApply (mi_1c with "Htext"). }
     iIntros (CID14 Hs14) "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (P4 := <[Regidx (mword_of_int 20 : mword 5) := regval_into_reg (add_vec zero_reg (P3 !!! Regidx (mword_of_int 10 : mword 5)))]> P3).
@@ -1408,7 +1399,8 @@ Section ProofMappages.
     (* +0x1e mv s5,a4 *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.mappages + 0x1e)) (mword_of_int 21 : mword 5) (mword_of_int 14 : mword 5)
               P4 (K - 10)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi1e").
+              with "Hcg Hpc []").
+    { iApply (mi_1e with "Htext"). }
     iIntros (CID15 Hs15) "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (P5 := <[Regidx (mword_of_int 21 : mword 5) := regval_into_reg (add_vec zero_reg (P4 !!! Regidx (mword_of_int 14 : mword 5)))]> P4).
@@ -1427,7 +1419,8 @@ Section ProofMappages.
                     rewrite Hszu;
                     replace (Z.of_nat npages * 4096) with (Z.of_nat npages * 4096) by lia;
                     apply Z_mod_mult)
-              with "Hcg Hpc Hi20").
+              with "Hcg Hpc []").
+    { iApply (mi_20 with "Htext"). }
     iIntros (CID16 Hs16) "Hcg Hpc".
     set (P6 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (mword_of_int 0 : mword 64)]> P5).
     assert (Hpp24 : add_vec_int (mword_of_int (KernelSyms.mappages + 0x20) : mword 64) 4 = mword_of_int (KernelSyms.mappages + 0x24)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1438,7 +1431,8 @@ Section ProofMappages.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; discriminate)
               ltac:(rgne; rewrite /P6 upd_eq; vm_compute; reflexivity)
-              with "Hcg Hpc Hi24").
+              with "Hcg Hpc []").
+    { iApply (mi_24 with "Htext"). }
     iIntros (CID17 Hs17) "Hcg Hpc".
     assert (Hpp26 : add_vec_int (mword_of_int (KernelSyms.mappages + 0x24) : mword 64) 2 = mword_of_int (KernelSyms.mappages + 0x26)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp26) in "Hpc".
@@ -1457,14 +1451,16 @@ Section ProofMappages.
                     replace (bv_unsigned (zero_reg : mword 64)) with 0 in He
                       by (vm_compute; reflexivity);
                     lia)
-              with "Hcg Hpc Hi26").
+              with "Hcg Hpc []").
+    { iApply (mi_26 with "Htext"). }
     iIntros (CID18 Hs18) "Hcg Hpc".
     assert (Hpp28 : add_vec_int (mword_of_int (KernelSyms.mappages + 0x26) : mword 64) 2 = mword_of_int (KernelSyms.mappages + 0x28)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp28) in "Hpc".
     (* +0x28/+0x2c addi a2,a2,-2048 twice *)
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.mappages + 0x28)) (mword_of_int 12 : mword 5) (mword_of_int 12 : mword 5) (mword_of_int 2048 : mword 12)
               P6 (K - 10)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi28").
+              with "Hcg Hpc []").
+    { iApply (mi_28 with "Htext"). }
     iIntros (CID19 Hs19) "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (P7 := <[Regidx (mword_of_int 12 : mword 5) := regval_into_reg
@@ -1473,7 +1469,8 @@ Section ProofMappages.
     iEval (rewrite Hpp2c) in "Hpc".
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.mappages + 0x2c)) (mword_of_int 12 : mword 5) (mword_of_int 12 : mword 5) (mword_of_int 2048 : mword 12)
               P7 (K - 10)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi2c").
+              with "Hcg Hpc []").
+    { iApply (mi_2c with "Htext"). }
     iIntros (CID20 Hs20) "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (P8 := <[Regidx (mword_of_int 12 : mword 5) := regval_into_reg
@@ -1497,7 +1494,8 @@ Section ProofMappages.
               P8 (K - 10)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(repeat rgne; rewrite HP8a2 HP8a1;
                     apply (mappages_s2_val va (mword_of_int (Z.of_nat npages * 4096)) npages Hszu Hnp))
-              with "Hcg Hpc Hi30").
+              with "Hcg Hpc []").
+    { iApply (mi_30 with "Htext"). }
     iIntros (CID21 Hs21) "Hcg Hpc".
     set (P9 := <[Regidx (mword_of_int 18 : mword 5) := regval_into_reg
         (add_vec va (mword_of_int (4096 * Z.of_nat (npages - 1))))]> P8).
@@ -1506,7 +1504,8 @@ Section ProofMappages.
     (* +0x34 mv s1,a1 *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.mappages + 0x34)) (mword_of_int 9 : mword 5) (mword_of_int 11 : mword 5)
               P9 (K - 10)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi34").
+              with "Hcg Hpc []").
+    { iApply (mi_34 with "Htext"). }
     iIntros (CID22 Hs22) "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (P10 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg (add_vec zero_reg (P9 !!! Regidx (mword_of_int 11 : mword 5)))]> P9).
@@ -1516,7 +1515,8 @@ Section ProofMappages.
     iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.mappages + 0x36)) (mword_of_int 22 : mword 5) (mword_of_int 1 : mword 6)
               (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))))
               P10 (K - 10)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(reflexivity)
-              with "Hcg Hpc Hi36").
+              with "Hcg Hpc []").
+    { iApply (mi_36 with "Htext"). }
     iIntros (CID23 Hs23) "Hcg Hpc".
     set (P11 := <[Regidx (mword_of_int 22 : mword 5) := regval_into_reg
         (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))))]> P10).
@@ -1535,7 +1535,8 @@ Section ProofMappages.
               (sub_vec pa va)
               P11 (K - 10)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(repeat rgne; rewrite HP11a3 HP11a1; reflexivity)
-              with "Hcg Hpc Hi38").
+              with "Hcg Hpc []").
+    { iApply (mi_38 with "Htext"). }
     iIntros (CID24 Hs24) "Hcg Hpc".
     set (P12 := <[Regidx (mword_of_int 19 : mword 5) := regval_into_reg (sub_vec pa va)]> P11).
     assert (Hpp3c : add_vec_int (mword_of_int (KernelSyms.mappages + 0x38) : mword 64) 4 = mword_of_int (KernelSyms.mappages + 0x3c)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1544,7 +1545,8 @@ Section ProofMappages.
     iApply (wp_clui_s_sconf (mword_of_int (KernelSyms.mappages + 0x3c)) (mword_of_int 23 : mword 5) (sign_extend' 20 (mword_of_int 1 : mword 6))
               (luival (sign_extend' 20 (mword_of_int 1 : mword 6)))
               P12 (K - 10)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(reflexivity)
-              with "Hcg Hpc Hi3c").
+              with "Hcg Hpc []").
+    { iApply (mi_3c with "Htext"). }
     iIntros (CID25 Hs25) "Hcg Hpc".
     set (P13 := <[Regidx (mword_of_int 23 : mword 5) := regval_into_reg
         (luival (sign_extend' 20 (mword_of_int 1 : mword 6)))]> P12).

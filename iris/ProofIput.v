@@ -571,11 +571,6 @@ Section IputTail.
   Proof.
     intros pj spd HK Hsp.
     iIntros "#Htext Hpc Hcg Hr24 Hr16 Hr8 Hg4 Hg5 Hg6 Hcont".
-    iPoseProof (ipi_30 with "Htext") as "Hi32".
-    iPoseProof (ipi_32 with "Htext") as "Hi34".
-    iPoseProof (ipi_34 with "Htext") as "Hi36".
-    iPoseProof (ipi_36 with "Htext") as "Hi38".
-    iPoseProof (ipi_38 with "Htext") as "Hi3a".
     (* the six saved-slot addresses, in the [c.ldsp] leaf's spelling *)
     assert (Hb1 : add_vec spd (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000"))) = pa_stk sp0 1).
     { unfold spd, pa_stk, add_vec_int. rewrite add_vec_off2. apply f_equal. pcw. }
@@ -594,7 +589,8 @@ Section IputTail.
     iEval (rewrite -Hb5) in "Hg5". iEval (rewrite -Hb6) in "Hg6".
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.iput + 0x30))
               (mword_of_int 5 : mword 6) Rra D (K - 6)%nat v1 eb
-              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi32 [Hr24]").
+              ltac:(nz) ltac:(rdok) with "Hcg Hpc [] [Hr24]").
+    { iApply (ipi_30 with "Htext"). }
     { iEval (rewrite Hsp). iExact "Hr24". }
     iIntros (CIDe1 Hse1) "Hcg Hpc Hr24".
     iEval (rewrite Hsp) in "Hr24".
@@ -606,7 +602,8 @@ Section IputTail.
     iEval (rewrite Hpp34) in "Hpc".
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.iput + 0x32))
               (mword_of_int 4 : mword 6) Rs0 P1 (K - 6)%nat v2 eb
-              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi34 [Hr16]").
+              ltac:(nz) ltac:(rdok) with "Hcg Hpc [] [Hr16]").
+    { iApply (ipi_32 with "Htext"). }
     { iEval (rewrite HP1sp). iExact "Hr16". }
     iIntros (CIDe2 Hse2) "Hcg Hpc Hr16".
     iEval (rewrite HP1sp) in "Hr16".
@@ -618,7 +615,8 @@ Section IputTail.
     iEval (rewrite Hpp36) in "Hpc".
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.iput + 0x34))
               (mword_of_int 3 : mword 6) Rs1 P2 (K - 6)%nat v3 eb
-              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi36 [Hr8]").
+              ltac:(nz) ltac:(rdok) with "Hcg Hpc [] [Hr8]").
+    { iApply (ipi_34 with "Htext"). }
     { iEval (rewrite HP2sp). iExact "Hr8". }
     iIntros (CIDe3 Hse3) "Hcg Hpc Hr8".
     iEval (rewrite HP2sp) in "Hr8".
@@ -647,7 +645,8 @@ Section IputTail.
     iEval (rewrite -Hwv) in "Hframe4".
     iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (KernelSyms.iput + 0x36))
               (mword_of_int 3 : mword 6) P3 (K - 6)%nat 6 eb Hpop
-              with "Hcg Hpc Hi38 Hframe4").
+              with "Hcg Hpc [] Hframe4").
+    { iApply (ipi_36 with "Htext"). }
     iIntros (CIDe4 Hse4) "Hcg Hpc".
     assert (Hnk : ((K - 6) + 6)%nat = K) by lia.
     iEval (rewrite Hnk) in "Hcg".
@@ -666,7 +665,8 @@ Section IputTail.
       rewrite /P2 upd_ne; [| nz].
       rewrite /P1 upd_eq. reflexivity. }
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.iput + 0x38)) Rra P4 K eb
-              ltac:(nz) with "Hcg Hpc Hi3a").
+              ltac:(nz) with "Hcg Hpc []").
+    { iApply (ipi_38 with "Htext"). }
     iIntros (CIDe5 Hse5) "Hcg Hpc".
     iEval (rgne) in "Hpc".
     iEval (rewrite HP4ra) in "Hpc".
@@ -777,19 +777,12 @@ Section IputTail.
     destruct Hregs as (HDs1 & HDsp & H18 & H19 & H20 & H21 & H22 & H23 & H24 & H25 & H26 & H27).
     iIntros "#Htext #Hlock Hpc Hcg Hcnt Hpay Hextc Hextm Htok HRres Hislot Hgreg
              Hr24 Hr16 Hr8 Hg4 Hg5 Hg6 Hppid Hbms Hins Hbslots Hop Hcont".
-    iPoseProof (ipi_24 with "Htext") as "Hi26".
-    iPoseProof (ipi_28 with "Htext") as "Hi2a".
-    iPoseProof (ipi_2c with "Htext") as "Hi2e".
-    iPoseProof (ipi_30 with "Htext") as "Hi32".
-    iPoseProof (ipi_32 with "Htext") as "Hi34".
-    iPoseProof (ipi_34 with "Htext") as "Hi36".
-    iPoseProof (ipi_36 with "Htext") as "Hi38".
-    iPoseProof (ipi_38 with "Htext") as "Hi3a".
     (* the frame's slot spellings are [ip_epilogue]'s business now. *)
     (* ===== +0x26 / +0x2a : a0 := &itable ; +0x2e jal release ===== *)
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.iput + 0x24)) Ra0
               (mword_of_int 29 : mword 20) D (trap_res eb + (K - 6))%nat false
-              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi26").
+              ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (ipi_24 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (D3 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (mword_of_int (KernelSyms.iput + 0x24) : mword 64)
@@ -799,7 +792,8 @@ Section IputTail.
     iEval (rewrite Hpp2a) in "Hpc".
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.iput + 0x28)) Ra0 Ra0
               (mword_of_int 1348 : mword 12) D3 (trap_res eb + (K - 6))%nat false
-              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi2a").
+              ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (ipi_28 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (D4 := <[Regidx Ra0 := regval_into_reg
@@ -813,7 +807,8 @@ Section IputTail.
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.iput + 0x2c)) Rra
               (mword_of_int 2087070 : mword 21) D4 (trap_res eb + (K - 6))%nat false
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
-              with "Hcg Hpc Hi2e").
+              with "Hcg Hpc []").
+    { iApply (ipi_2c with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (D5 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.iput + 0x2c) : mword 64) 4)]> D4).
@@ -1004,8 +999,6 @@ Section IputTail.
     iIntros "#Htext #Hlock #Hinv #Hesc #Hireg Hpc Hcg Hcnt Hpay Hextc Hextm Htok
              Hhalf Hiauth Hipool Hslots Hpool Href Hru Hgreg Hr24 Hr16 Hr8 Hg4 Hg5 Hg6
              Hppid Hbms Hins Hbslots Hop Hcont".
-    iPoseProof (ipi_20 with "Htext") as "Hi22".
-    iPoseProof (ipi_22 with "Htext") as "Hi24".
     iDestruct "Href" as "[Hrtok Hrident]".
     iDestruct (iref_lookup with "Hhalf Hrtok") as %(qt & cnt & HMk & Hqt1 & Hone & Hone').
     iDestruct (ip_ref_sub with "Hhalf Hrtok") as %(qt2 & cnt2 & HMk2 & Hsubq).
@@ -1053,7 +1046,8 @@ Section IputTail.
     (* ===== +0x22 c.addiw a5,a5,-1 ===== *)
     iApply (wp_caddiw_s_sconf (mword_of_int (KernelSyms.iput + 0x20)) Ra5
               (mword_of_int 63 : mword 6) M (trap_res eb + (K - 6))%nat false
-              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi22").
+              ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (ipi_20 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (D2 := <[Regidx Ra5 := regval_into_reg
@@ -1141,7 +1135,8 @@ Section IputTail.
                  ifreeze_off (bv_unsigned inum) ∗
                  icnt_half (bv_unsigned inum) 0%nat)%I
                 (⊤ ∖ ↑minstretN ∖ ↑icacheN ∖ ↑iregN) false ltac:(solve_ndisj)
-                with "Hcg Hpc Hi24 [] [Hhalf Hrtok Hlvh Hself Hisl Hru Hoff Hcnt1]").
+                with "Hcg Hpc [] [] [Hhalf Hrtok Hlvh Hself Hisl Hru Hoff Hcnt1]").
+      { iApply (ipi_22 with "Htext"). }
       { rewrite Hpa2. iExact "Hclaim0". }
       { rewrite Hpa2 Hstv.
         replace (Z.pos 1 - 1)%Z with 0%Z by lia.
@@ -1227,7 +1222,8 @@ Section IputTail.
                  isl_slot (<[k := (qrest, npred)]> Mt) k ∗
                  icnt_half (bv_unsigned inum) (Pos.to_nat npred))%I
                 (⊤ ∖ ↑minstretN ∖ ↑icacheN ∖ ↑iregN) false ltac:(solve_ndisj)
-                with "Hcg Hpc Hi24 [] [Hhalf Hrtok Hisl Hru Hcnt1]").
+                with "Hcg Hpc [] [] [Hhalf Hrtok Hisl Hru Hcnt1]").
+      { iApply (ipi_22 with "Htext"). }
       { rewrite Hpa2. iExact "Hclaim0". }
       { rewrite Hpa2 Hstv Hzs.
         (* the count goes down from [Pos.succ npred >= 2], where BOTH phases
@@ -1547,11 +1543,11 @@ Section IputFreePath.
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
     iDestruct (iu_slots_split 1 1 with "Hsl") as "[Hsl Hsl1]".
     (* ===== +0xa8 jal ra,bread ===== *)
-    iPoseProof (ipi_a8 with "Htext") as "Hia8".
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.iput + 0xa8)) Rra
               (mword_of_int 2094910 : mword 21) m K b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
-              with "Hcg Hpc Hia8").
+              with "Hcg Hpc []").
+    { iApply (ipi_a8 with "Htext"). }
     iIntros (CID1 Hq1) "Hcg Hpc".
     set (R0 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.iput + 0xa8) : mword 64) 4)]> m).
@@ -1627,13 +1623,9 @@ Section IputFreePath.
                  Hdswf Hslotlt Hslotal with "Hby") as "[Hslot Hslotback]".
     iDestruct "Hslot" as "(Hd0 & Hd2 & Hd4 & Hd6 & Hd8 & Hda)".
     (* ===== +0xac c.mv s1,a0 : s1 := bp ===== *)
-    iPoseProof (ipi_ac with "Htext") as "Hiac".
-    iPoseProof (ipi_ae with "Htext") as "Hiae".
-    iPoseProof (ipi_b2 with "Htext") as "Hib2".
-    iPoseProof (ipi_b4 with "Htext") as "Hib4".
-    iPoseProof (ipi_b6 with "Htext") as "Hib6".
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.iput + 0xac)) Rs1 Ra0
-              mB K b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hiac").
+              mB K b ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (ipi_ac with "Htext"). }
     iIntros (CID16 Hq16) "Hcg Hpc".
     set (R1 := <[Regidx Rs1 := regval_into_reg (add_vec (zero_reg : mword 64) (rget mB Ra0))]> mB).
     assert (HR1s1 : R1 !!! Regidx Rs1 = bnode kk).
@@ -1649,12 +1641,13 @@ Section IputFreePath.
     iApply (wp_andi_s_sconf (mword_of_int (KernelSyms.iput + 0xae)) Ra5 Rs2
               (mword_of_int 15 : mword 12)
               (mword_of_int (bv_unsigned inum `mod` 16) : mword 64)
-              R1 K b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hiae").
+              R1 K b ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
     { rgne. rewrite HR1s2.
       replace (sign_extend' 64 (mword_of_int 15 : mword 12) : mword 64)
         with (sign_extend' 64 (sign_extend' 12 (mword_of_int 15 : mword 6)) : mword 64)
         by pcw.
       rewrite iu_andi15 iu_sext_mod16. reflexivity. }
+    { iApply (ipi_ae with "Htext"). }
     iIntros (CID17 Hq17) "Hcg Hpc".
     set (R2 := <[Regidx Ra5 := regval_into_reg
                   (mword_of_int (bv_unsigned inum `mod` 16) : mword 64)]> R1).
@@ -1668,7 +1661,8 @@ Section IputFreePath.
     (* ===== +0xb2 c.slli a5,0x6 : a5 := (inum % IPB) * 64 ===== *)
     iApply (wp_cslli_s_sconf (mword_of_int (KernelSyms.iput + 0xb2)) (Regidx Ra5) Ra5
               (mword_of_int 6 : mword 6) R2 K b
-              ltac:(reflexivity) ltac:(nz) ltac:(rdok) with "Hcg Hpc Hib2").
+              ltac:(reflexivity) ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (ipi_b2 with "Htext"). }
     iIntros (CID18 Hq18) "Hcg Hpc".
     set (R3 := <[Regidx Ra5 := regval_into_reg
                   (shift_bits_left (rget R2 Ra5)
@@ -1687,7 +1681,8 @@ Section IputFreePath.
     iEval (rewrite Hppb4) in "Hpc".
     (* ===== +0xb4 c.add a5,a5,a0 : a5 := bp + (inum%IPB)*64 ===== *)
     iApply (wp_cadd_s_sconf (mword_of_int (KernelSyms.iput + 0xb4)) Ra5 Ra0
-              R3 K b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hib4").
+              R3 K b ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (ipi_b4 with "Htext"). }
     iIntros (CID19 Hq19) "Hcg Hpc".
     set (R4 := <[Regidx Ra5 := regval_into_reg
                   (add_vec (rget R3 Ra5) (rget R3 Ra0))]> R3).
@@ -1721,7 +1716,8 @@ Section IputFreePath.
     iEval (rewrite -Hstore) in "Hd0".
     iApply (wp_sh_s_sconf (mword_of_int (KernelSyms.iput + 0xb6)) Rz Ra5
               (mword_of_int 88 : mword 12) R4 K
-              (di_type (ds !!! DinodeEnc.islot inum) : mword 16) b with "Hcg Hpc Hib6 Hd0").
+              (di_type (ds !!! DinodeEnc.islot inum) : mword 16) b with "Hcg Hpc [] Hd0").
+    { iApply (ipi_b6 with "Htext"). }
     iIntros (CID20 Hq20) "Hcg Hpc Hd0".
     (* the store wrote 0 = di_type dn' into the type cell *)
     assert (Hstoreval : trunc16 (rget R4 Rz) = (di_type dn' : mword 16)).
@@ -1746,11 +1742,11 @@ Section IputFreePath.
     { exact (diblk_wf_insert ds (DinodeEnc.islot inum) dn' Hdswf Hdn'wf). }
     iDestruct ("Hheldback" with "Hbuf'") as "Hheld".
     (* ===== +0xba jal ra,log_write ===== *)
-    iPoseProof (ipi_ba with "Htext") as "Hiba".
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.iput + 0xba)) Rra
               (mword_of_int 2524 : mword 21) R4 K b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
-              with "Hcg Hpc Hiba").
+              with "Hcg Hpc []").
+    { iApply (ipi_ba with "Htext"). }
     iIntros (CID21 Hq21) "Hcg Hpc".
     set (R5 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.iput + 0xba) : mword 64) 4)]> R4).
@@ -1821,9 +1817,9 @@ Section IputFreePath.
                     = mword_of_int (KernelSyms.iput + 0xbe)) by (rewrite HR5ra; pcw).
     iEval (rewrite Hpcbe) in "Hpc".
     (* ===== +0xbe c.mv a0,s1 : a0 := bp ===== *)
-    iPoseProof (ipi_be with "Htext") as "Hibe".
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.iput + 0xbe)) Ra0 Rs1
-              mL K b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hibe").
+              mL K b ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (ipi_be with "Htext"). }
     iIntros (CID23 Hq23) "Hcg Hpc".
     set (T0 := <[Regidx Ra0 := regval_into_reg (add_vec (zero_reg : mword 64) (rget mL Rs1))]> mL).
     assert (HT0a0 : T0 !!! Regidx Ra0 = bnode kk).
@@ -1834,11 +1830,11 @@ Section IputFreePath.
                     = mword_of_int (KernelSyms.iput + 0xc0)) by pcw.
     iEval (rewrite Hppc0) in "Hpc".
     (* ===== +0xc0 jal ra,brelse ===== *)
-    iPoseProof (ipi_c0 with "Htext") as "Hic0".
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.iput + 0xc0)) Rra
               (mword_of_int 2095150 : mword 21) T0 K b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
-              with "Hcg Hpc Hic0").
+              with "Hcg Hpc []").
+    { iApply (ipi_c0 with "Htext"). }
     iIntros (CID24 Hq24) "Hcg Hpc".
     set (T1 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.iput + 0xc0) : mword 64) 4)]> T0).
@@ -1874,12 +1870,9 @@ Section IputFreePath.
     iDestruct (iu_slots_join 1 1 with "Hsl Hsl1") as "Hsl".
     iEval (change (1 + 1)%nat with 2%nat) in "Hsl".
     (* ===== +0xc4/c6/c8 c.ldsp s2/s3/s4 : restore ===== *)
-    iPoseProof (ipi_c4 with "Htext") as "Hic4".
-    iPoseProof (ipi_c6 with "Htext") as "Hic6".
-    iPoseProof (ipi_c8 with "Htext") as "Hic8".
-    iPoseProof (ipi_ca with "Htext") as "Hica".
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.iput + 0xc4)) (mword_of_int 2 : mword 6) Rs2
-              mR K vs2 b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hic4 [Hs2f]").
+              mR K vs2 b ltac:(nz) ltac:(rdok) with "Hcg Hpc [] [Hs2f]").
+    { iApply (ipi_c4 with "Htext"). }
     { iEval (rewrite HmRsp). iExact "Hs2f". }
     iIntros (CID26 Hq26) "Hcg Hpc Hs2f".
     iEval (rewrite HmRsp) in "Hs2f".
@@ -1890,7 +1883,8 @@ Section IputFreePath.
                     = mword_of_int (KernelSyms.iput + 0xc6)) by pcw.
     iEval (rewrite Hppc6) in "Hpc".
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.iput + 0xc6)) (mword_of_int 1 : mword 6) Rs3
-              P1 K vs3 b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hic6 [Hs3f]").
+              P1 K vs3 b ltac:(nz) ltac:(rdok) with "Hcg Hpc [] [Hs3f]").
+    { iApply (ipi_c6 with "Htext"). }
     { iEval (rewrite HP1sp). iExact "Hs3f". }
     iIntros (CID27 Hq27) "Hcg Hpc Hs3f".
     iEval (rewrite HP1sp) in "Hs3f".
@@ -1901,7 +1895,8 @@ Section IputFreePath.
                     = mword_of_int (KernelSyms.iput + 0xc8)) by pcw.
     iEval (rewrite Hppc8) in "Hpc".
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.iput + 0xc8)) (mword_of_int 0 : mword 6) Rs4
-              P2 K vs4 b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hic8 [Hs4f]").
+              P2 K vs4 b ltac:(nz) ltac:(rdok) with "Hcg Hpc [] [Hs4f]").
+    { iApply (ipi_c8 with "Htext"). }
     { iEval (rewrite HP2sp). iExact "Hs4f". }
     iIntros (CID28 Hq28) "Hcg Hpc Hs4f".
     iEval (rewrite HP2sp) in "Hs4f".
@@ -1914,7 +1909,8 @@ Section IputFreePath.
     (* ===== +0xca c.j 0x30 : into the iput-return epilogue ===== *)
     iApply (wp_cj_s_sconf (mword_of_int (KernelSyms.iput + 0xca))
               (sign_extend' 21 (concat_vec (mword_of_int 1971 : mword 11) ('b"0")))
-              P3 K b ltac:(vm_compute; reflexivity) with "Hcg Hpc Hica").
+              P3 K b ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+    { iApply (ipi_ca with "Htext"). }
     iIntros (CID29 Hst29). iApply bi.later_intro. iIntros "Hcg Hpc".
     assert (Htgt30 : add_vec (mword_of_int (KernelSyms.iput + 0xca) : mword 64)
                        (sign_extend' 64 (sign_extend' 21
@@ -2357,7 +2353,6 @@ Section IputFreePath.
              #Hprocs #Hdevi #Hdgeom #Hdlock Hbslots Hnlz #Hvlb Hcrd Hop
              Hra Hs0f Hs1f Hs2f Hs3f Hs4f Hcont".
     (* ===== +0x5a jal acquiresleep -- the ref-1 NON-BLOCKING lock ===== *)
-    iPoseProof (ipi_5a with "Htext") as "Hi5a".
     assert (Hslfresh : "sleep lock"%string ∉ ({["itable"%string]} ∪ lks : gset string)).
     { apply not_elem_of_union. split.
       - apply not_elem_of_singleton. discriminate.
@@ -2365,7 +2360,8 @@ Section IputFreePath.
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.iput + 0x5a)) Rra
               (mword_of_int 2986 : mword 21) m (trap_res eb + (K - 6))%nat false
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
-              with "Hcg Hpc Hi5a").
+              with "Hcg Hpc []").
+    { iApply (ipi_5a with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (R0 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.iput + 0x5a) : mword 64) 4)]> m).
@@ -2493,12 +2489,10 @@ Section IputFreePath.
       with "[Hhalf Hiauth Hipool Hslots Hpool]" as "HRres".
     { iExists Mt, ci. iFrame. iPureIntro. split; assumption. }
     (* ===== +0x5e auipc a0 ; +0x62 addi a0,a0,1306 ; +0x66 jal release ===== *)
-    iPoseProof (ipi_5e with "Htext") as "Hi5e".
-    iPoseProof (ipi_62 with "Htext") as "Hi62".
-    iPoseProof (ipi_66 with "Htext") as "Hi66".
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.iput + 0x5e)) Ra0
               (mword_of_int 29 : mword 20) mfa (trap_res eb + (K - 6))%nat false
-              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi5e").
+              ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (ipi_5e with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (H1 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (mword_of_int (KernelSyms.iput + 0x5e) : mword 64)
@@ -2508,7 +2502,8 @@ Section IputFreePath.
     iEval (rewrite Hpp62) in "Hpc".
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.iput + 0x62)) Ra0 Ra0
               (mword_of_int 1290 : mword 12) H1 (trap_res eb + (K - 6))%nat false
-              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi62").
+              ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (ipi_62 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (H2 := <[Regidx Ra0 := regval_into_reg
@@ -2522,7 +2517,8 @@ Section IputFreePath.
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.iput + 0x66)) Rra
               (mword_of_int 2087012 : mword 21) H2 (trap_res eb + (K - 6))%nat false
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
-              with "Hcg Hpc Hi66").
+              with "Hcg Hpc []").
+    { iApply (ipi_66 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (H3 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.iput + 0x66) : mword 64) 4)]> H2).
@@ -2565,11 +2561,10 @@ Section IputFreePath.
       by (rewrite (Hmr1c Rs4 ltac:(vm_compute; reflexivity)); exact Hmfas4).
     assert (Hmr1sp : mr1 !!! Regidx csp_rs1 = sp0)
       by (rewrite (Hmr1c csp_rs1 ltac:(vm_compute; reflexivity)); exact Hmfasp).
-    iPoseProof (ipi_6a with "Htext") as "Hi6a".
-    iPoseProof (ipi_6c with "Htext") as "Hi6c".
     (* ===== +0x6a c.mv a0,s1 (a0:=ip) ; +0x6c jal itrunc ===== *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.iput + 0x6a)) Ra0 Rs1
-              mr1 (K - 6)%nat eb ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi6a").
+              mr1 (K - 6)%nat eb ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (ipi_6a with "Htext"). }
     iIntros (CIDm1 Hsm1) "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (J1 := <[Regidx Ra0 := regval_into_reg (add_vec zero_reg (mr1 !!! Regidx Rs1))]> mr1).
@@ -2584,7 +2579,8 @@ Section IputFreePath.
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.iput + 0x6c)) Rra
               (mword_of_int 2096896 : mword 21) J1 (K - 6)%nat eb
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
-              with "Hcg Hpc Hi6c").
+              with "Hcg Hpc []").
+    { iApply (ipi_6c with "Htext"). }
     iIntros (CIDm2 Hsm2) "Hcg Hpc".
     set (J2 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.iput + 0x6c) : mword 64) 4)]> J1).
@@ -2685,7 +2681,6 @@ Section IputFreePath.
       by (rewrite (Hmfic Rs4 ltac:(vm_compute; reflexivity)); exact Hmr1s4).
     assert (Hmfisp : mfi !!! Regidx csp_rs1 = sp0)
       by (rewrite (Hmfic csp_rs1 ltac:(vm_compute; reflexivity)); exact Hmr1sp).
-    iPoseProof (ipi_70 with "Htext") as "Hi70".
     (* ===================================================================
        +0x70 sw zero,64(s1) : ip->valid = 0.
 
@@ -2728,7 +2723,8 @@ Section IputFreePath.
               (mword_of_int 64 : mword 12) mfi (K - 6)%nat
               (i_valid (ientry k) ↦₄ valid_word false)%I
               (⊤ ∖ ↑minstretN) eb ltac:(solve_ndisj)
-              with "Hcg Hpc Hi70 [] [Hvld]").
+              with "Hcg Hpc [] [] [Hvld]").
+    { iApply (ipi_70 with "Htext"). }
     { rewrite Hpa70. iExact "Hclaim70". }
     { rewrite Hpa70 Hsv70.
       iModIntro. iExists (valid_word true). iFrame "Hvld". iIntros "Hvld".
@@ -2745,11 +2741,10 @@ Section IputFreePath.
     assert (Hpp74 : add_vec_int (mword_of_int (KernelSyms.iput + 0x70) : mword 64) 4
                     = mword_of_int (KernelSyms.iput + 0x74)) by pcw.
     iEval (rewrite Hpp74) in "Hpc".
-    iPoseProof (ipi_74 with "Htext") as "Hi74".
-    iPoseProof (ipi_76 with "Htext") as "Hi76".
     (* ===== +0x74 c.mv a0,s3 ; +0x76 jal releasesleep ===== *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.iput + 0x74)) Ra0 Rs3
-              mfi (K - 6)%nat eb ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi74").
+              mfi (K - 6)%nat eb ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (ipi_74 with "Htext"). }
     iIntros (CIDm5 Hsm5) "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (J5 := <[Regidx Ra0 := regval_into_reg (add_vec zero_reg (mfi !!! Regidx Rs3))]> mfi).
@@ -2764,7 +2759,8 @@ Section IputFreePath.
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.iput + 0x76)) Rra
               (mword_of_int 3042 : mword 21) J5 (K - 6)%nat eb
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
-              with "Hcg Hpc Hi76").
+              with "Hcg Hpc []").
+    { iApply (ipi_76 with "Htext"). }
     iIntros (CIDm6 Hsm6) "Hcg Hpc".
     set (J6 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.iput + 0x76) : mword 64) 4)]> J5).
@@ -2804,13 +2800,11 @@ Section IputFreePath.
                       mrs !!! Regidx c = mfi !!! Regidx c).
     { intros c Hcs. rewrite (callee_saved_lookup Hcsr_cs c Hcs). exact (HJ6c c Hcs). }
     assert (Hitbelow : locks_below lks "itable") by lkbelow.
-    iPoseProof (ipi_7a with "Htext") as "Hi7a".
-    iPoseProof (ipi_7e with "Htext") as "Hi7e".
-    iPoseProof (ipi_82 with "Htext") as "Hi82".
     (* ===== +0x7a auipc a0 ; +0x7e addi a0,a0,1278 ; +0x82 jal acquire ===== *)
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.iput + 0x7a)) Ra0
               (mword_of_int 29 : mword 20) mrs (K - 6)%nat eb
-              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi7a").
+              ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (ipi_7a with "Htext"). }
     iIntros (CIDm7 Hsm7) "Hcg Hpc".
     set (J7 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (mword_of_int (KernelSyms.iput + 0x7a) : mword 64)
@@ -2820,7 +2814,8 @@ Section IputFreePath.
     iEval (rewrite Hpp7e) in "Hpc".
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.iput + 0x7e)) Ra0 Ra0
               (mword_of_int 1262 : mword 12) J7 (K - 6)%nat eb
-              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi7e").
+              ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (ipi_7e with "Htext"). }
     iIntros (CIDm8 Hsm8) "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (J8 := <[Regidx Ra0 := regval_into_reg
@@ -2834,7 +2829,8 @@ Section IputFreePath.
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.iput + 0x82)) Rra
               (mword_of_int 2086848 : mword 21) J8 (K - 6)%nat eb
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
-              with "Hcg Hpc Hi82").
+              with "Hcg Hpc []").
+    { iApply (ipi_82 with "Htext"). }
     iIntros (CIDm9 Hsm9) "Hcg Hpc".
     set (J9 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.iput + 0x82) : mword 64) 4)]> J8).
@@ -2883,9 +2879,6 @@ Section IputFreePath.
     iDestruct (iref_frag_lookup with "Hhalf Hfrg")
       as %(qt2 & cnt2 & HMk2 & Hqt1 & Hone2 & Hone2').
     pose proof (icM_wf_count Mt2 k qt2 cnt2 Hwf2 HMk2) as Hcntb2.
-    iPoseProof (ipi_86 with "Htext") as "Hi86".
-    iPoseProof (ipi_88 with "Htext") as "Hi88".
-    iPoseProof (ipi_8a with "Htext") as "Hi8a".
     assert (Hiw2 : iref_word Mt2 k = (mword_of_int (Z.pos cnt2) : mword 32))
       by (rewrite /iref_word HMk2; reflexivity).
     (* +0x86 lw a5,8(s1) : read ip->ref *)
@@ -2912,7 +2905,8 @@ Section IputFreePath.
               (mword_of_int 8 : mword 12) macq2 (trap_res eb + (K - 6))%nat
               (fun v => (⌜v = iref_word Mt2 k⌝ ∗ itable_half Mt2)%I)
               (⊤ ∖ ↑minstretN ∖ ↑icacheN) false ltac:(nz) ltac:(rdok) ltac:(solve_ndisj)
-              with "Hcg Hpc Hi86 [] [Hhalf]").
+              with "Hcg Hpc [] [] [Hhalf]").
+    { iApply (ipi_86 with "Htext"). }
     { rewrite Hpa86. iExact "Hclaim86". }
     { rewrite Hpa86.
       iMod (iref_load_locked_au (⊤ ∖ ↑minstretN) Mt2 k ltac:(solve_ndisj) Hk
@@ -2935,7 +2929,8 @@ Section IputFreePath.
     (* +0x88 c.addiw a5,a5,-1 *)
     iApply (wp_caddiw_s_sconf (mword_of_int (KernelSyms.iput + 0x88)) Ra5
               (mword_of_int 63 : mword 6) F0 (trap_res eb + (K - 6))%nat false
-              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi88").
+              ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (ipi_88 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (F1 := <[Regidx Ra5 := regval_into_reg
@@ -3060,9 +3055,6 @@ Section IputFreePath.
     assert (Hincid : bv_unsigned inum ∈ ci_inums ci2).
     { apply ci_inums_spec. exists k, (dev, inum). split; [exact Hcik2 | reflexivity]. }
     iDestruct (isl_pool_acc_upd Mt2 k Hk with "Hipool") as "[Hisl Hislback]".
-    iPoseProof (ipi_8c with "Htext") as "Hi8c".
-    iPoseProof (ipi_90 with "Htext") as "Hi90".
-    iPoseProof (ipi_94 with "Htext") as "Hi94".
     iApply (wp_sw_au_s_sconf true (mword_of_int (KernelSyms.iput + 0x8a)) Ra5 Rs1
               (mword_of_int 8 : mword 12) F1 (trap_res eb + (K - 6))%nat
               (itable_half (delete k Mt2) ∗ isl_slot (delete k Mt2) k ∗
@@ -3070,7 +3062,8 @@ Section IputFreePath.
                icnt_half (bv_unsigned inum) 0%nat ∗
                frzm_h (bv_unsigned inum) false)%I
               (⊤ ∖ ↑minstretN ∖ ↑icacheN ∖ ↑iregN) false ltac:(solve_ndisj)
-              with "Hcg Hpc Hi8a [] [Hhalf Hfrg Hrslh Hselp Hsele Hisl Hru Hpre Hicnt Hrcpt Hmirt]").
+              with "Hcg Hpc [] [] [Hhalf Hfrg Hrslh Hselp Hsele Hisl Hru Hpre Hicnt Hrcpt Hmirt]").
+    { iApply (ipi_8a with "Htext"). }
     { rewrite Hpa8a. iExact "Hclaim86". }
     { rewrite Hpa8a Hstv2.
       replace (Z.pos 1 - 1)%Z with 0%Z by lia.
@@ -3195,7 +3188,8 @@ Section IputFreePath.
     (* ===== +0x8c auipc a0 ; +0x90 addi a0,a0,1260 ; +0x94 jal release ===== *)
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.iput + 0x8c)) Ra0
               (mword_of_int 29 : mword 20) F1 (trap_res eb + (K - 6))%nat false
-              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi8c").
+              ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (ipi_8c with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (G1 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (mword_of_int (KernelSyms.iput + 0x8c) : mword 64)
@@ -3205,7 +3199,8 @@ Section IputFreePath.
     iEval (rewrite Hpp90) in "Hpc".
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.iput + 0x90)) Ra0 Ra0
               (mword_of_int 1244 : mword 12) G1 (trap_res eb + (K - 6))%nat false
-              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi90").
+              ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (ipi_90 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (G2 := <[Regidx Ra0 := regval_into_reg
@@ -3219,7 +3214,8 @@ Section IputFreePath.
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.iput + 0x94)) Rra
               (mword_of_int 2086966 : mword 21) G2 (trap_res eb + (K - 6))%nat false
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
-              with "Hcg Hpc Hi94").
+              with "Hcg Hpc []").
+    { iApply (ipi_94 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (G3 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.iput + 0x94) : mword 64) 4)]> G2).
@@ -3275,18 +3271,14 @@ Section IputFreePath.
     destruct (Hcovok _ Hicov) as [Hibpos Hiblt].
     assert (Hib : 0 <= IBLOCK inum inodestart < 2147483648)
       by (change (2 ^ 31)%Z with 2147483648%Z in Hiblt; lia).
-    iPoseProof (ipi_98 with "Htext") as "Hi98".
-    iPoseProof (ipi_9c with "Htext") as "Hi9c".
-    iPoseProof (ipi_a0 with "Htext") as "Hia0".
-    iPoseProof (ipi_a4 with "Htext") as "Hia4".
-    iPoseProof (ipi_a6 with "Htext") as "Hia6".
     (* ===== +0x98 srliw a5,s2,0x4 : a5 := inum / IPB ===== *)
     iApply (wp_srliw_s_sconf (mword_of_int (KernelSyms.iput + 0x98)) Ra5 Rs2
               (mword_of_int 4 : mword 5)
               (mword_of_int (bv_unsigned inum / 16) : mword 64)
               mr2 (K - 6)%nat eb ltac:(nz) ltac:(rdok)
               ltac:(rgne; rewrite Hmr2s2; apply iu_srliw4)
-              with "Hcg Hpc Hi98").
+              with "Hcg Hpc []").
+    { iApply (ipi_98 with "Htext"). }
     iIntros (CIDp1 Hqp1) "Hcg Hpc".
     set (P1 := <[Regidx Ra5 := regval_into_reg
                   (mword_of_int (bv_unsigned inum / 16) : mword 64)]> mr2).
@@ -3302,7 +3294,8 @@ Section IputFreePath.
     (* ===== +0x9c auipc a1,0x1d ===== *)
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.iput + 0x9c)) Ra1
               (mword_of_int 29 : mword 20) P1 (K - 6)%nat eb
-              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi9c").
+              ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (ipi_9c with "Htext"). }
     iIntros (CIDp2 Hqp2) "Hcg Hpc".
     set (P2 := <[Regidx Ra1 := regval_into_reg
                   (add_vec (mword_of_int (KernelSyms.iput + 0x9c) : mword 64)
@@ -3333,7 +3326,8 @@ Section IputFreePath.
               (mword_of_int (KernelSyms.iput + 0xa0)) Ra1 Ra1
               (mword_of_int 1220 : mword 12) P2 (K - 6)%nat
               (mword_of_int inodestart : mword 32) eb
-              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hia0 Hins").
+              ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hins").
+    { iApply (ipi_a0 with "Htext"). }
     iIntros (CIDp3 Hqp3) "Hcg Hpc Hins".
     iEval (rewrite Hsbadr) in "Hins".
     set (P3 := <[Regidx Ra1 := regval_into_reg
@@ -3352,7 +3346,8 @@ Section IputFreePath.
     iEval (rewrite Hppa4) in "Hpc".
     (* ===== +0xa4 c.addw a1,a1,a5 : a1 := IBLOCK(inum, sb) ===== *)
     iApply (wp_addw_s_sconf (mword_of_int (KernelSyms.iput + 0xa4)) Ra1 Ra5
-              P3 (K - 6)%nat eb ltac:(nz) ltac:(rdok) with "Hcg Hpc Hia4").
+              P3 (K - 6)%nat eb ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (ipi_a4 with "Htext"). }
     iIntros (CIDp4 Hqp4) "Hcg Hpc".
     set (P4 := <[Regidx Ra1 := regval_into_reg
                   (sign_extend' 64
@@ -3373,7 +3368,8 @@ Section IputFreePath.
     iEval (rewrite Hppa6) in "Hpc".
     (* ===== +0xa6 c.mv a0,s4 : a0 := dev ===== *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.iput + 0xa6)) Ra0 Rs4
-              P4 (K - 6)%nat eb ltac:(nz) ltac:(rdok) with "Hcg Hpc Hia6").
+              P4 (K - 6)%nat eb ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (ipi_a6 with "Htext"). }
     iIntros (CIDp5 Hqp5) "Hcg Hpc".
     set (P5 := <[Regidx Ra0 := regval_into_reg (add_vec zero_reg (P4 !!! Regidx Rs4))]> P4).
     assert (HP5a0 : P5 !!! Regidx Ra0 = (sign_extend' 64 dev : mword 64)).
@@ -3819,8 +3815,6 @@ Section IputFreePath.
              Hbslots #Hvlb Hcrd Hop Hr1 Hr2 Hr3 Hg4 Hg5 Hg6 Hex".
     pose proof Hregs as Hregs'.
     destruct Hregs' as (HMs1 & HMsp & _).
-    iPoseProof (ipi_3a with "Htext") as "Hi3a".
-    iPoseProof (ipi_3c with "Htext") as "Hi3c".
     (* the slot's own share comes out of the lock's big-op, exactly as the
        stale walk's +0x3c does (ProofIput.v:1503-1520) *)
     assert (Hcikex : exists di : mword 32 * mword 32, ci !! k = Some di).
@@ -3918,7 +3912,8 @@ Section IputFreePath.
                   frzm_h (bv_unsigned inum) false)%I)
               (⊤ ∖ ↑minstretN ∖ ↑icEscN) false
               ltac:(nz) ltac:(rdok) ltac:(solve_ndisj)
-              with "Hcg Hpc Hi3a [] [Hhalf Hrtok Hrident Hrest Hmirf]").
+              with "Hcg Hpc [] [] [Hhalf Hrtok Hrident Hrest Hmirf]").
+    { iApply (ipi_3a with "Htext"). }
     { rewrite Hpa3a. iExact "Hclaim3a". }
     { rewrite Hpa3a.
       iInv "Hesc" as ">Hbody" "Hclose".
@@ -3998,7 +3993,8 @@ Section IputFreePath.
                 F1 (trap_res eb + (K - 6))%nat false
                 ltac:(vm_compute; reflexivity) ltac:(nz)
                 ltac:(rgne; rewrite HF1a4; exact (fe_valid_beqz false))
-                ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi3c").
+                ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+      { iApply (ipi_3c with "Htext"). }
       iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc".
       assert (Hpp20b : add_vec (mword_of_int (KernelSyms.iput + 0x3c) : mword 64)
                          (sign_extend' 64 (sign_extend' 13
@@ -4026,7 +4022,8 @@ Section IputFreePath.
               F1 (trap_res eb + (K - 6))%nat false
               ltac:(vm_compute; reflexivity) ltac:(nz)
               ltac:(rgne; rewrite HF1a4; exact (fe_valid_beqz true))
-              with "Hcg Hpc Hi3c").
+              with "Hcg Hpc []").
+    { iApply (ipi_3c with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     assert (Hpp3e : add_vec_int (mword_of_int (KernelSyms.iput + 0x3c) : mword 64) 2
                     = mword_of_int (KernelSyms.iput + 0x3e)) by pcw.
@@ -4042,9 +4039,6 @@ Section IputFreePath.
     assert (Hb6 : add_vec spd (zero_extend' 64
                     (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) = pa_stk sp0 6).
     { unfold spd, pa_stk, add_vec_int. rewrite add_vec_off2. f_equal; try pcw. }
-    iPoseProof (ipi_3e with "Htext") as "Hi3e".
-    iPoseProof (ipi_40 with "Htext") as "Hi40".
-    iPoseProof (ipi_42 with "Htext") as "Hi42".
     assert (HF1sp : F1 !!! Regidx csp_rs1 = spd)
       by (destruct HF1regs as (_ & B & _); exact B).
     assert (HF1s2 : F1 !!! Regidx Rs2 = m !!! Regidx Rs2)
@@ -4066,7 +4060,8 @@ Section IputFreePath.
     iEval (rewrite -Hb4 -HF1sp) in "Hg4".
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.iput + 0x3e))
               (mword_of_int 2 : mword 6) Rs2 F1 (trap_res eb + (K - 6))%nat vg4 false
-              with "Hcg Hpc Hi3e Hg4").
+              with "Hcg Hpc [] Hg4").
+    { iApply (ipi_3e with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hg4".
     iEval (rgne) in "Hg4".
     iEval (rewrite HF1s2 HF1sp Hb4) in "Hg4".
@@ -4077,7 +4072,8 @@ Section IputFreePath.
     iEval (rewrite -Hb6 -HF1sp) in "Hg6".
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.iput + 0x40))
               (mword_of_int 0 : mword 6) Rs4 F1 (trap_res eb + (K - 6))%nat vg6 false
-              with "Hcg Hpc Hi40 Hg6").
+              with "Hcg Hpc [] Hg6").
+    { iApply (ipi_40 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hg6".
     iEval (rgne) in "Hg6".
     iEval (rewrite HF1s4 HF1sp Hb6) in "Hg6".
@@ -4097,7 +4093,8 @@ Section IputFreePath.
     iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0)
               (mword_of_int (KernelSyms.iput + 0x42)) Rs4 Rs1
               (mword_of_int 0 : mword 12) F1 (trap_res eb + (K - 6))%nat dev false
-              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi42 Hrd").
+              ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hrd").
+    { iApply (ipi_42 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hrd".
     iEval (rewrite Hpa42) in "Hrd".
     set (F2 := <[Regidx Rs4 := regval_into_reg (sign_extend' 64 dev)]> F1).
@@ -4144,7 +4141,6 @@ Section IputFreePath.
        re-enters the window with [ic_open_held] and closes it right back at
        HELD with [ic_close_held].  Nothing moves; the cell is only borrowed.
        =================================================================== *)
-    iPoseProof (ipi_46 with "Htext") as "Hi46".
     assert (Hpa46 : add_vec (rget F2 Rs1) (sign_extend' 64 (mword_of_int 4 : mword 12))
                     = i_inum (ientry k)).
     { rewrite (rget_ne F2 Rs1 ltac:(nz)) HF2s1. reflexivity. }
@@ -4180,7 +4176,8 @@ Section IputFreePath.
                          ic_payload_at γfs γi cov logstart k inum ga dn bm)%I)
               (⊤ ∖ ↑minstretN ∖ ↑icEscN) false
               ltac:(nz) ltac:(rdok) ltac:(solve_ndisj)
-              with "Hcg Hpc Hi46 [] [Hhalf Hrfrg Hrlv Hlvh Hgid Hvb Hpayl]").
+              with "Hcg Hpc [] [] [Hhalf Hrfrg Hrlv Hlvh Hgid Hvb Hpayl]").
+    { iApply (ipi_46 with "Htext"). }
     { rewrite Hpa46. iExact "Hclaim46". }
     { rewrite Hpa46.
       iInv "Hesc" as ">Hbody" "Hclose".
@@ -4224,7 +4221,6 @@ Section IputFreePath.
                     = mword_of_int (KernelSyms.iput + 0x4a)) by pcw.
     iEval (rewrite Hpp4a) in "Hpc".
     (* ===== +0x4a lh a4,74(s1) : nlink, a PLAIN read off the held payload ===== *)
-    iPoseProof (ipi_4a with "Htext") as "Hi4a".
     iEval (rewrite /ic_payload_at) in "Hpayl".
     iDestruct "Hpayl" as "[Hlk #Hshot]".
     iDestruct "Hlk" as (data)
@@ -4242,7 +4238,8 @@ Section IputFreePath.
     iApply (wp_lh_s_sconf (kt := KT1) (ktd := KT0)
               (mword_of_int (KernelSyms.iput + 0x4a)) Ra4 Rs1
               (mword_of_int 74 : mword 12) F3 (trap_res eb + (K - 6))%nat (di_nlink dn) false
-              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi4a Hmnl").
+              ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hmnl").
+    { iApply (ipi_4a with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hmnl".
     iEval (rewrite Hpa4a) in "Hmnl".
     set (F4 := <[Regidx Ra4 := regval_into_reg (sign_extend' 64 (di_nlink dn : mword 16))]> F3).
@@ -4272,7 +4269,6 @@ Section IputFreePath.
     assert (Hpp4e : add_vec_int (mword_of_int (KernelSyms.iput + 0x4a) : mword 64) 4
                     = mword_of_int (KernelSyms.iput + 0x4e)) by pcw.
     iEval (rewrite Hpp4e) in "Hpc".
-    iPoseProof (ipi_4e with "Htext") as "Hi4e".
     (* ===== +0x4e c.bnez a4 : nlink != 0 UNDOES the window (EXIT A) ===== *)
     destruct (neq_vec (sign_extend' 64 (di_nlink dn : mword 16) : mword 64)
                       (zero_reg : mword 64)) eqn:Hnl0.
@@ -4284,7 +4280,8 @@ Section IputFreePath.
                 F4 (trap_res eb + (K - 6))%nat false
                 ltac:(vm_compute; reflexivity) ltac:(nz)
                 ltac:(rgne; rewrite HF4a4; exact Hnl0)
-                ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi4e").
+                ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+      { iApply (ipi_4e with "Htext"). }
       iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc".
       assert (Hppcc : add_vec (mword_of_int (KernelSyms.iput + 0x4e) : mword 64)
                         (sign_extend' 64 (sign_extend' 13
@@ -4334,13 +4331,11 @@ Section IputFreePath.
         iSplitR "Hmirf Hself"; [| iApply (frz_park_intro_off with "Hmirf Hself")].
         rewrite /islot_rest_at Ert /IcacheRef.inode_ident. iFrame. }
       (* ===== +0xcc c.ldsp s2,16(sp) ; +0xce c.ldsp s4,0(sp) ===== *)
-      iPoseProof (ipi_cc with "Htext") as "Hicc".
-      iPoseProof (ipi_ce with "Htext") as "Hice".
-      iPoseProof (ipi_d0 with "Htext") as "Hid0".
       iEval (rewrite -Hb4 -HF4sp) in "Hg4".
       iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.iput + 0xcc))
                 (mword_of_int 2 : mword 6) Rs2 F4 (trap_res eb + (K - 6))%nat
-                (m !!! Regidx Rs2) false ltac:(nz) ltac:(rdok) with "Hcg Hpc Hicc Hg4").
+                (m !!! Regidx Rs2) false ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hg4").
+      { iApply (ipi_cc with "Htext"). }
       iApply wp_next_off_intro. iIntros "Hcg Hpc Hg4".
       iEval (rewrite HF4sp Hb4) in "Hg4".
       set (G1 := <[Regidx Rs2 := regval_into_reg (m !!! Regidx Rs2)]> F4).
@@ -4352,7 +4347,8 @@ Section IputFreePath.
       iEval (rewrite -Hb6 -HG1sp) in "Hg6".
       iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.iput + 0xce))
                 (mword_of_int 0 : mword 6) Rs4 G1 (trap_res eb + (K - 6))%nat
-                (m !!! Regidx Rs4) false ltac:(nz) ltac:(rdok) with "Hcg Hpc Hice Hg6").
+                (m !!! Regidx Rs4) false ltac:(nz) ltac:(rdok) with "Hcg Hpc [] Hg6").
+      { iApply (ipi_ce with "Htext"). }
       iApply wp_next_off_intro. iIntros "Hcg Hpc Hg6".
       iEval (rewrite HG1sp Hb6) in "Hg6".
       set (G2 := <[Regidx Rs4 := regval_into_reg (m !!! Regidx Rs4)]> G1).
@@ -4367,7 +4363,8 @@ Section IputFreePath.
       iApply (wp_cj_s_sconf (mword_of_int (KernelSyms.iput + 0xd0))
                 (sign_extend' 21 (concat_vec (mword_of_int 1960 : mword 11) ('b"0")))
                 G2 (trap_res eb + (K - 6))%nat false
-                ltac:(rewrite Htgtd0; vm_compute; reflexivity) with "Hcg Hpc Hid0").
+                ltac:(rewrite Htgtd0; vm_compute; reflexivity) with "Hcg Hpc []").
+      { iApply (ipi_d0 with "Htext"). }
       iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc".
       iEval (rewrite Htgtd0) in "Hpc".
       assert (HG2regs : iput_regs m G2 spd k).
@@ -4401,7 +4398,8 @@ Section IputFreePath.
               F4 (trap_res eb + (K - 6))%nat false
               ltac:(vm_compute; reflexivity) ltac:(nz)
               ltac:(rgne; rewrite HF4a4; exact Hnl0)
-              with "Hcg Hpc Hi4e").
+              with "Hcg Hpc []").
+    { iApply (ipi_4e with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     assert (Hpp50 : add_vec_int (mword_of_int (KernelSyms.iput + 0x4e) : mword 64) 2
                     = mword_of_int (KernelSyms.iput + 0x50)) by pcw.
@@ -4434,15 +4432,12 @@ Section IputFreePath.
       as "(Hdat & Hpre & Hcnt1 & Hrcpt & Hmirt)".
     iModIntro.
     iEval (rewrite -Hp1nat) in "Hcnt1".
-    iPoseProof (ipi_50 with "Htext") as "Hi50".
-    iPoseProof (ipi_52 with "Htext") as "Hi52".
-    iPoseProof (ipi_56 with "Htext") as "Hi56".
-    iPoseProof (ipi_58 with "Htext") as "Hi58".
     (* ===== +0x50 c.sdsp s3,8(sp) ===== *)
     iEval (rewrite -Hb5 -HF4sp) in "Hg5".
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.iput + 0x50))
               (mword_of_int 1 : mword 6) Rs3 F4 (trap_res eb + (K - 6))%nat vg5 false
-              with "Hcg Hpc Hi50 Hg5").
+              with "Hcg Hpc [] Hg5").
+    { iApply (ipi_50 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hg5".
     iEval (rgne) in "Hg5".
     iEval (rewrite HF4s3 HF4sp Hb5) in "Hg5".
@@ -4452,7 +4447,8 @@ Section IputFreePath.
     (* ===== +0x52 addi a5,s1,16 ; +0x56 c.mv s3,a5 ; +0x58 c.mv a0,a5 ===== *)
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.iput + 0x52)) Ra5 Rs1
               (mword_of_int 16 : mword 12) F4 (trap_res eb + (K - 6))%nat false
-              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi52").
+              ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (ipi_52 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (F5 := <[Regidx Ra5 := regval_into_reg
                   (add_vec (rget F4 Rs1) (sign_extend' 64 (mword_of_int 16 : mword 12)))]> F4).
@@ -4472,7 +4468,8 @@ Section IputFreePath.
     iEval (rewrite Hpp56) in "Hpc".
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.iput + 0x56)) Rs3 Ra5
               F5 (trap_res eb + (K - 6))%nat false ltac:(nz) ltac:(rdok)
-              with "Hcg Hpc Hi56").
+              with "Hcg Hpc []").
+    { iApply (ipi_56 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (F6 := <[Regidx Rs3 := regval_into_reg (add_vec zero_reg (F5 !!! Regidx Ra5))]> F5).
@@ -4493,7 +4490,8 @@ Section IputFreePath.
     iEval (rewrite Hpp58) in "Hpc".
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.iput + 0x58)) Ra0 Ra5
               F6 (trap_res eb + (K - 6))%nat false ltac:(nz) ltac:(rdok)
-              with "Hcg Hpc Hi58").
+              with "Hcg Hpc []").
+    { iApply (ipi_58 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (F7 := <[Regidx Ra0 := regval_into_reg (add_vec zero_reg (F6 !!! Regidx Ra5))]> F6).
@@ -4659,15 +4657,6 @@ Section ProofIput.
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm. cbn in Hbm. subst b.
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64)
                         (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6)))).
-    iPoseProof (ipi_00 with "Htext") as "Hi00".
-    iPoseProof (ipi_02 with "Htext") as "Hi02".
-    iPoseProof (ipi_04 with "Htext") as "Hi04".
-    iPoseProof (ipi_06 with "Htext") as "Hi06".
-    iPoseProof (ipi_08 with "Htext") as "Hi08".
-    iPoseProof (ipi_0a with "Htext") as "Hi0a".
-    iPoseProof (ipi_0c with "Htext") as "Hi0c".
-    iPoseProof (ipi_10 with "Htext") as "Hi10".
-    iPoseProof (ipi_14 with "Htext") as "Hi14".
     (* ===== PROLOGUE (generic [b] = true) ===== *)
     set (R1 := <[Regidx csp_rs1 := regval_into_reg
                   (add_vec (m !!! Regidx csp_rs1)
@@ -4678,7 +4667,8 @@ Section ProofIput.
                     = pa_stk (m !!! Regidx csp_rs1) 6).
     { unfold pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     iApply (wp_caddi16sp_push_s_sconf pcE (mword_of_int 61 : mword 6) m K 6 eb
-              ltac:(lia) Hpush with "Hcg Hpc Hi00").
+              ltac:(lia) Hpush with "Hcg Hpc []").
+    { iApply (ipi_00 with "Htext"). }
     iIntros (CID1 Hs1) "Hcg Hframe Hpc".
     iEval (rewrite Hspm) in "Hframe".
     change (<[Regidx csp_rs1 := regval_into_reg
@@ -4718,19 +4708,22 @@ Section ProofIput.
     assert (Hpp02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (KernelSyms.iput + 0x02)) by pcw.
     iEval (rewrite Hpp02) in "Hpc".
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.iput + 0x02)) (mword_of_int 5 : mword 6) Rra
-              R1 (K - 6)%nat vr24 eb with "Hcg Hpc Hi02 Hr24").
+              R1 (K - 6)%nat vr24 eb with "Hcg Hpc [] Hr24").
+    { iApply (ipi_02 with "Htext"). }
     iIntros (CID2 Hs2) "Hcg Hpc Hr24".
     iEval (rgne) in "Hr24".
     assert (Hpp04 : add_vec_int (mword_of_int (KernelSyms.iput + 0x02) : mword 64) 2 = mword_of_int (KernelSyms.iput + 0x04)) by pcw.
     iEval (rewrite Hpp04) in "Hpc".
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.iput + 0x04)) (mword_of_int 4 : mword 6) Rs0
-              R1 (K - 6)%nat vr16 eb with "Hcg Hpc Hi04 Hr16").
+              R1 (K - 6)%nat vr16 eb with "Hcg Hpc [] Hr16").
+    { iApply (ipi_04 with "Htext"). }
     iIntros (CID3 Hs3) "Hcg Hpc Hr16".
     iEval (rgne) in "Hr16".
     assert (Hpp06 : add_vec_int (mword_of_int (KernelSyms.iput + 0x04) : mword 64) 2 = mword_of_int (KernelSyms.iput + 0x06)) by pcw.
     iEval (rewrite Hpp06) in "Hpc".
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.iput + 0x06)) (mword_of_int 3 : mword 6) Rs1
-              R1 (K - 6)%nat vr8 eb with "Hcg Hpc Hi06 Hr8").
+              R1 (K - 6)%nat vr8 eb with "Hcg Hpc [] Hr8").
+    { iApply (ipi_06 with "Htext"). }
     iIntros (CID4 Hs4) "Hcg Hpc Hr8".
     iEval (rgne) in "Hr8".
     (* the three saved slots now hold the CALLER's ra / s0 / s1, at the
@@ -4751,7 +4744,8 @@ Section ProofIput.
     iApply (wp_caddi4spn_s_sconf (mword_of_int (KernelSyms.iput + 0x08)) (Cregidx (mword_of_int 0))
               (mword_of_int 12 : mword 8) Rs0 R1 (K - 6)%nat eb
               ltac:(vm_compute; reflexivity) ltac:(nz) ltac:(rdok)
-              with "Hcg Hpc Hi08").
+              with "Hcg Hpc []").
+    { iApply (ipi_08 with "Htext"). }
     iIntros (CID5 Hs5) "Hcg Hpc".
     set (R2 := <[Regidx Rs0 := regval_into_reg
                   (add_vec (R1 !!! Regidx csp_rs1)
@@ -4760,7 +4754,8 @@ Section ProofIput.
     iEval (rewrite Hpp0a) in "Hpc".
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.iput + 0x0a)) Rs1 Ra0
               R2 (K - 6)%nat eb ltac:(nz) ltac:(rdok)
-              with "Hcg Hpc Hi0a").
+              with "Hcg Hpc []").
+    { iApply (ipi_0a with "Htext"). }
     iIntros (CID6 Hs6) "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (R3 := <[Regidx Rs1 := regval_into_reg (add_vec zero_reg (R2 !!! Regidx Ra0))]> R2).
@@ -4771,7 +4766,8 @@ Section ProofIput.
     assert (Hpp0c : add_vec_int (mword_of_int (KernelSyms.iput + 0x0a) : mword 64) 2 = mword_of_int (KernelSyms.iput + 0x0c)) by pcw.
     iEval (rewrite Hpp0c) in "Hpc".
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.iput + 0x0c)) Ra0 (mword_of_int 29 : mword 20)
-              R3 (K - 6)%nat eb ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi0c").
+              R3 (K - 6)%nat eb ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (ipi_0c with "Htext"). }
     iIntros (CID7 Hs7) "Hcg Hpc".
     set (R4 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (mword_of_int (KernelSyms.iput + 0x0c) : mword 64)
@@ -4779,7 +4775,8 @@ Section ProofIput.
     assert (Hpp10 : add_vec_int (mword_of_int (KernelSyms.iput + 0x0c) : mword 64) 4 = mword_of_int (KernelSyms.iput + 0x10)) by pcw.
     iEval (rewrite Hpp10) in "Hpc".
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.iput + 0x10)) Ra0 Ra0 (mword_of_int 1372 : mword 12)
-              R4 (K - 6)%nat eb ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi10").
+              R4 (K - 6)%nat eb ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (ipi_10 with "Htext"). }
     iIntros (CID8 Hs8) "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (R5 := <[Regidx Ra0 := regval_into_reg
@@ -4791,7 +4788,8 @@ Section ProofIput.
     (* ===== +0x14 jal ra,acquire ===== *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.iput + 0x14)) Rra (mword_of_int 2086958 : mword 21)
               R5 (K - 6)%nat eb ltac:(nz) ltac:(rdok)
-              ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi14").
+              ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+    { iApply (ipi_14 with "Htext"). }
     iIntros (CID9 Hs9) "Hcg Hpc".
     set (mA := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.iput + 0x14) : mword 64) 4)]> R5).
@@ -4860,9 +4858,6 @@ Section ProofIput.
     iDestruct "Href" as "[Hrtok Hrident]".
     iDestruct (iref_lookup with "Hhalf Hrtok") as %(qt & cnt & HMk & Hqt1 & Hone & Hone').
     pose proof (icM_wf_count Mt k qt cnt Hwf HMk) as Hcntb.
-    iPoseProof (ipi_18 with "Htext") as "Hi18".
-    iPoseProof (ipi_1a with "Htext") as "Hi1a".
-    iPoseProof (ipi_1c with "Htext") as "Hi1c".
     assert (Hiw : iref_word Mt k = (mword_of_int (Z.pos cnt) : mword 32))
       by (rewrite /iref_word HMk; reflexivity).
     (* THE ADDRESS CLAIM, READ OFF THE CELL ITSELF (the standing per-node
@@ -4888,7 +4883,8 @@ Section ProofIput.
               (fun v => (⌜v = iref_word Mt k⌝ ∗ itable_half Mt)%I)
               (⊤ ∖ ↑minstretN ∖ ↑icacheN) false
               ltac:(nz) ltac:(rdok) ltac:(solve_ndisj)
-              with "Hcg Hpc Hi18 [] [Hhalf]").
+              with "Hcg Hpc [] [] [Hhalf]").
+    { iApply (ipi_18 with "Htext"). }
     { rewrite Hpa18. iExact "Hclaim18". }
     { rewrite Hpa18.
       iMod (iref_load_locked_au (⊤ ∖ ↑minstretN) Mt k
@@ -4909,7 +4905,8 @@ Section ProofIput.
     iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.iput + 0x1a)) Ra4
               (mword_of_int 1 : mword 6) (mword_of_int 1 : mword 64)
               E1 (trap_res eb + (K - 6))%nat false ltac:(nz) ltac:(rdok) ltac:(pcw)
-              with "Hcg Hpc Hi1a").
+              with "Hcg Hpc []").
+    { iApply (ipi_1a with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (E2 := <[Regidx Ra4 := regval_into_reg (mword_of_int 1 : mword 64)]> E1).
     assert (HE2a5 : E2 !!! Regidx Ra5 = sign_extend' 64 (mword_of_int (Z.pos cnt) : mword 32))
@@ -4930,12 +4927,12 @@ Section ProofIput.
     { rewrite (rget_ne E2 Ra5 ltac:(nz)) (rget_ne E2 Ra4 ltac:(nz)) HE2a5 HE2a4.
       apply ip_cnt_eq_one. lia. }
     assert (Hsp0eq : sp0 = m !!! Regidx csp_rs1) by reflexivity.
-    iPoseProof (ipi_1c with "Htext") as "Hi1cb".
     destruct (decide (cnt = 1%positive)) as [Hcone|Hcnone]; last first.
     { (* ---- ref != 1: fall through straight into the tail ---- *)
       iApply (wp_beq_fall_s_sconf (mword_of_int (KernelSyms.iput + 0x1c))
                 (mword_of_int 30 : mword 13) Ra4 Ra5 E2 (trap_res eb + (K - 6))%nat false
-                ltac:(nz) ltac:(nz) Hcmp with "Hcg Hpc Hi1cb").
+                ltac:(nz) ltac:(nz) Hcmp with "Hcg Hpc []").
+      { iApply (ipi_1c with "Htext"). }
       iApply wp_next_off_intro. iIntros "Hcg Hpc".
       assert (Hpp20 : add_vec_int (mword_of_int (KernelSyms.iput + 0x1c) : mword 64) 4
                       = mword_of_int (KernelSyms.iput + 0x20)) by pcw.
@@ -4967,7 +4964,8 @@ Section ProofIput.
     iApply (wp_beq_taken_s_sconf (mword_of_int (KernelSyms.iput + 0x1c))
               (mword_of_int 30 : mword 13) Ra4 Ra5 E2 (trap_res eb + (K - 6))%nat false
               ltac:(nz) ltac:(nz) Hcmp ltac:(vm_compute; reflexivity)
-              with "Hcg Hpc Hi1cb").
+              with "Hcg Hpc []").
+    { iApply (ipi_1c with "Htext"). }
     iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc".
     assert (Hpp3a : add_vec (mword_of_int (KernelSyms.iput + 0x1c) : mword 64)
                       (sign_extend' 64 (mword_of_int 30 : mword 13))

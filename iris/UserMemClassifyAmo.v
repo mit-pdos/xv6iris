@@ -1147,7 +1147,7 @@ Qed.
 (* (the shadowing trap of worklist section 15).                            *)
 (* ===================================================================== *)
 Require Import WpDecodeBridge DecodeTotalU.
-Require Import UserExecFacts HartLift HartSpan SmodePte.
+Require Import HartLift HartSpan SmodePte.
 Require Import UserTranslate PtreeType PtTree KptPt PtTreeAdue KptTree PtWalkCert.
 Require Import UserFetchCert UserMemCert UserFaultCert.
 Local Open Scope Z_scope.

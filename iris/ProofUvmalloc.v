@@ -616,13 +616,11 @@ Section ProofUvmalloc.
     { rewrite uint_unsigned uvm_maxsz_val. clear -Havb. lia. }
     assert (Hrooti : Pi.(ud_root) = P.(ud_root)) by exact (proj1 Hext).
     (* ---- +0x36 jal ra,kalloc ---- *)
-    iPoseProof (uai_36 with "Htext") as "Hi36".
-    iPoseProof (uai_3a with "Htext") as "Hi3a".
-    iPoseProof (uai_3c with "Htext") as "Hi3c".
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x36)) Rra
               (mword_of_int 2095146 : mword 21) M (K - 10)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi36").
+              ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+    { iApply (uai_36 with "Htext"). }
     iIntros (CIDu1 Hsu1) "Hcg Hpc".
     iDestruct (cpu_own_transport CID0 CIDu1 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
@@ -689,7 +687,8 @@ Section ProofUvmalloc.
     (* ---- +0x3a c.mv s1,a0 ---- *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x3a)) Rs1 Ra0 mk (K - 10)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi3a").
+              with "Hcg Hpc []").
+    { iApply (uai_3a with "Htext"). }
     iIntros (CIDu3 Hsu3) "Hcg Hpc".
     set (B2 := <[Regidx Rs1 := regval_into_reg (add_vec zero_reg (mk !!! Regidx Ra0))]> mk).
     assert (HB2a0 : B2 !!! Regidx Ra0 = mk !!! Regidx Ra0)
@@ -721,14 +720,6 @@ Section ProofUvmalloc.
     iEval (rewrite Hp3c) in "Hpc".
     iDestruct "Hkpost" as "[(%Hnull & _ & _) | (%Hpv & Hpage & _)]".
     { (* ================= kalloc failed: roll back, return 0 ============ *)
-      iPoseProof (uai_66 with "Htext") as "Hi66".
-      iPoseProof (uai_68 with "Htext") as "Hi68".
-      iPoseProof (uai_6a with "Htext") as "Hi6a".
-      iPoseProof (uai_6c with "Htext") as "Hi6c".
-      iPoseProof (uai_70 with "Htext") as "Hi70".
-      iPoseProof (uai_72 with "Htext") as "Hi72".
-      iPoseProof (uai_74 with "Htext") as "Hi74".
-      iPoseProof (uai_76 with "Htext") as "Hi76".
       assert (Htgt66 : add_vec (mword_of_int (KernelSyms.uvmalloc + 0x3c) : mword 64)
                 (sign_extend' 64
                    (sign_extend' 13 (concat_vec (mword_of_int 21 : mword 8) ('b"0"))))
@@ -739,13 +730,15 @@ Section ProofUvmalloc.
                 (mword_of_int 21 : mword 8) (Cregidx (mword_of_int 2)) Ra0
                 B2 (K - 10)%nat b ltac:(vm_compute; reflexivity)
                 ltac:(vm_compute; discriminate) ltac:(rgne; exact Hzt)
-                ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi3c").
+                ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+      { iApply (uai_3c with "Htext"). }
       iApply bi.later_intro. iIntros (CIDu4 Hsu4) "Hcg Hpc".
       iEval (rewrite Htgt66) in "Hpc".
       (* +0x66 c.mv a2,s7 *)
       iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x66)) Ra2 Rs7 B2 (K - 10)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hi66").
+                with "Hcg Hpc []").
+      { iApply (uai_66 with "Htext"). }
       iIntros (CIDu5 Hsu5) "Hcg Hpc".
       set (N1 := <[Regidx Ra2 := regval_into_reg (add_vec zero_reg (B2 !!! Regidx Rs7))]> B2).
       assert (Hq68 : add_vec_int (mword_of_int (KernelSyms.uvmalloc + 0x66) : mword 64) 2
@@ -754,7 +747,8 @@ Section ProofUvmalloc.
       (* +0x68 c.mv a1,s2 *)
       iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x68)) Ra1 Rs2 N1 (K - 10)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hi68").
+                with "Hcg Hpc []").
+      { iApply (uai_68 with "Htext"). }
       iIntros (CIDu6 Hsu6) "Hcg Hpc".
       set (N2 := <[Regidx Ra1 := regval_into_reg (add_vec zero_reg (N1 !!! Regidx Rs2))]> N1).
       assert (Hq6a : add_vec_int (mword_of_int (KernelSyms.uvmalloc + 0x68) : mword 64) 2
@@ -763,7 +757,8 @@ Section ProofUvmalloc.
       (* +0x6a c.mv a0,s5 *)
       iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x6a)) Ra0 Rs5 N2 (K - 10)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hi6a").
+                with "Hcg Hpc []").
+      { iApply (uai_6a with "Htext"). }
       iIntros (CIDu7 Hsu7) "Hcg Hpc".
       set (N3 := <[Regidx Ra0 := regval_into_reg (add_vec zero_reg (N2 !!! Regidx Rs5))]> N2).
       assert (Hq6c : add_vec_int (mword_of_int (KernelSyms.uvmalloc + 0x6a) : mword 64) 2
@@ -773,7 +768,8 @@ Section ProofUvmalloc.
       iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x6c)) Rra
                 (mword_of_int 2096976 : mword 21) N3 (K - 10)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
-                ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi6c").
+                ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+      { iApply (uai_6c with "Htext"). }
       iIntros (CIDu8 Hsu8) "Hcg Hpc".
       iDestruct (cpu_own_transport CIDu2 CIDu8 0%nat eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
@@ -842,7 +838,8 @@ Section ProofUvmalloc.
       iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x70)) Ra0 (mword_of_int 0 : mword 6)
                 (mword_of_int 0 : mword 64) md (K - 10)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
-                ltac:(apply bv_eq; vm_compute; reflexivity) with "Hcg Hpc Hi70").
+                ltac:(apply bv_eq; vm_compute; reflexivity) with "Hcg Hpc []").
+      { iApply (uai_70 with "Htext"). }
       iIntros (CIDu10 Hsu10) "Hcg Hpc".
       set (N5 := <[Regidx Ra0 := regval_into_reg (mword_of_int 0 : mword 64)]> md).
       assert (HN5sp : N5 !!! Regidx csp_rs1 = spr)
@@ -854,7 +851,8 @@ Section ProofUvmalloc.
       iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x72)) (mword_of_int 7 : mword 6) Rs1
                 N5 (K - 10)%nat (mm !!! Regidx Rs1) b (dqm:=DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hi72 [Hk3]").
+                with "Hcg Hpc [] [Hk3]").
+      { iApply (uai_72 with "Htext"). }
       { iEval (rewrite HN5sp Hb3). iExact "Hk3". }
       iIntros (CIDu11 Hsu11) "Hcg Hpc Hk3". iEval (rewrite HN5sp Hb3) in "Hk3".
       set (N6 := <[Regidx Rs1 := regval_into_reg (mm !!! Regidx Rs1)]> N5).
@@ -867,7 +865,8 @@ Section ProofUvmalloc.
       iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x74)) (mword_of_int 5 : mword 6) Rs3
                 N6 (K - 10)%nat (mm !!! Regidx Rs3) b (dqm:=DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hi74 [Hk5]").
+                with "Hcg Hpc [] [Hk5]").
+      { iApply (uai_74 with "Htext"). }
       { iEval (rewrite HN6sp Hb5). iExact "Hk5". }
       iIntros (CIDu12 Hsu12) "Hcg Hpc Hk5". iEval (rewrite HN6sp Hb5) in "Hk5".
       set (N7 := <[Regidx Rs3 := regval_into_reg (mm !!! Regidx Rs3)]> N6).
@@ -880,7 +879,8 @@ Section ProofUvmalloc.
       iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x76)) (mword_of_int 2 : mword 6) Rs6
                 N7 (K - 10)%nat (mm !!! Regidx Rs6) b (dqm:=DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hi76 [Hk8]").
+                with "Hcg Hpc [] [Hk8]").
+      { iApply (uai_76 with "Htext"). }
       { iEval (rewrite HN7sp Hb8). iExact "Hk8". }
       iIntros (CIDu13 Hsu13) "Hcg Hpc Hk8". iEval (rewrite HN7sp Hb8) in "Hk8".
       set (N8 := <[Regidx Rs6 := regval_into_reg (mm !!! Regidx Rs6)]> N7).
@@ -917,23 +917,14 @@ Section ProofUvmalloc.
     unfold page_in_range, kmem_lo, kmem_hi in Hrrng.
     assert (Hnzr : (zero_reg : mword 64) = nullp) by (apply bv_eq; vm_compute; reflexivity).
     assert (Hilt : (Z.of_nat i < 134217728)%Z) by (clear -Hbnd38 Hpu0; lia).
-    iPoseProof (uai_3e with "Htext") as "Hi3e".
-    iPoseProof (uai_40 with "Htext") as "Hi40".
-    iPoseProof (uai_42 with "Htext") as "Hi42".
-    iPoseProof (uai_46 with "Htext") as "Hi46".
-    iPoseProof (uai_48 with "Htext") as "Hi48".
-    iPoseProof (uai_4a with "Htext") as "Hi4a".
-    iPoseProof (uai_4c with "Htext") as "Hi4c".
-    iPoseProof (uai_4e with "Htext") as "Hi4e".
-    iPoseProof (uai_50 with "Htext") as "Hi50".
-    iPoseProof (uai_54 with "Htext") as "Hi54".
     assert (Hnn : eq_vec (B2 !!! Regidx Ra0) zero_reg = false).
     { rewrite HB2a0. apply eq_vec_false_iff. rewrite Hnzr.
       exact (page_valid_ne_null _ Hpv). }
     iApply (wp_cbeqz_fall_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x3c))
               (mword_of_int 21 : mword 8) (Cregidx (mword_of_int 2)) Ra0
               B2 (K - 10)%nat b ltac:(vm_compute; reflexivity)
-              ltac:(vm_compute; discriminate) ltac:(rgne; exact Hnn) with "Hcg Hpc Hi3c").
+              ltac:(vm_compute; discriminate) ltac:(rgne; exact Hnn) with "Hcg Hpc []").
+    { iApply (uai_3c with "Htext"). }
     iIntros (CIDu14 Hsu14) "Hcg Hpc".
     assert (Hq3e : add_vec_int (mword_of_int (KernelSyms.uvmalloc + 0x3c) : mword 64) 2
                    = mword_of_int (KernelSyms.uvmalloc + 0x3e)) by (apply bv_eq; vm_compute; reflexivity).
@@ -941,7 +932,8 @@ Section ProofUvmalloc.
     (* +0x3e c.mv a2,s3 *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x3e)) Ra2 Rs3 B2 (K - 10)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi3e").
+              with "Hcg Hpc []").
+    { iApply (uai_3e with "Htext"). }
     iIntros (CIDu15 Hsu15) "Hcg Hpc".
     set (B3 := <[Regidx Ra2 := regval_into_reg (add_vec zero_reg (B2 !!! Regidx Rs3))]> B2).
     assert (Hq40 : add_vec_int (mword_of_int (KernelSyms.uvmalloc + 0x3e) : mword 64) 2
@@ -951,7 +943,8 @@ Section ProofUvmalloc.
     iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x40)) Ra1 (mword_of_int 0 : mword 6)
               (mword_of_int 0 : mword 64) B3 (K - 10)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              ltac:(apply bv_eq; vm_compute; reflexivity) with "Hcg Hpc Hi40").
+              ltac:(apply bv_eq; vm_compute; reflexivity) with "Hcg Hpc []").
+    { iApply (uai_40 with "Htext"). }
     iIntros (CIDu16 Hsu16) "Hcg Hpc".
     set (B4 := <[Regidx Ra1 := regval_into_reg (mword_of_int 0 : mword 64)]> B3).
     assert (Hq42 : add_vec_int (mword_of_int (KernelSyms.uvmalloc + 0x40) : mword 64) 2
@@ -961,7 +954,8 @@ Section ProofUvmalloc.
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x42)) Rra
               (mword_of_int 2095544 : mword 21) B4 (K - 10)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi42").
+              ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+    { iApply (uai_42 with "Htext"). }
     iIntros (CIDu17 Hsu17) "Hcg Hpc".
     set (B5 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.uvmalloc + 0x42) : mword 64) 4)]> B4).
@@ -1051,7 +1045,8 @@ Section ProofUvmalloc.
     (* +0x46 c.mv a4,s6 *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x46)) Ra4 Rs6 ms (K - 10)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi46").
+              with "Hcg Hpc []").
+    { iApply (uai_46 with "Htext"). }
     iIntros (CIDu19 Hsu19) "Hcg Hpc".
     set (B6 := <[Regidx Ra4 := regval_into_reg (add_vec zero_reg (ms !!! Regidx Rs6))]> ms).
     assert (Hq48 : add_vec_int (mword_of_int (KernelSyms.uvmalloc + 0x46) : mword 64) 2
@@ -1060,7 +1055,8 @@ Section ProofUvmalloc.
     (* +0x48 c.mv a3,s1 *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x48)) Ra3 Rs1 B6 (K - 10)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi48").
+              with "Hcg Hpc []").
+    { iApply (uai_48 with "Htext"). }
     iIntros (CIDu20 Hsu20) "Hcg Hpc".
     set (B7 := <[Regidx Ra3 := regval_into_reg (add_vec zero_reg (B6 !!! Regidx Rs1))]> B6).
     assert (Hq4a : add_vec_int (mword_of_int (KernelSyms.uvmalloc + 0x48) : mword 64) 2
@@ -1069,7 +1065,8 @@ Section ProofUvmalloc.
     (* +0x4a c.mv a2,s3 *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x4a)) Ra2 Rs3 B7 (K - 10)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi4a").
+              with "Hcg Hpc []").
+    { iApply (uai_4a with "Htext"). }
     iIntros (CIDu21 Hsu21) "Hcg Hpc".
     set (B8 := <[Regidx Ra2 := regval_into_reg (add_vec zero_reg (B7 !!! Regidx Rs3))]> B7).
     assert (Hq4c : add_vec_int (mword_of_int (KernelSyms.uvmalloc + 0x4a) : mword 64) 2
@@ -1078,7 +1075,8 @@ Section ProofUvmalloc.
     (* +0x4c c.mv a1,s2 *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x4c)) Ra1 Rs2 B8 (K - 10)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi4c").
+              with "Hcg Hpc []").
+    { iApply (uai_4c with "Htext"). }
     iIntros (CIDu22 Hsu22) "Hcg Hpc".
     set (B9 := <[Regidx Ra1 := regval_into_reg (add_vec zero_reg (B8 !!! Regidx Rs2))]> B8).
     assert (Hq4e : add_vec_int (mword_of_int (KernelSyms.uvmalloc + 0x4c) : mword 64) 2
@@ -1087,7 +1085,8 @@ Section ProofUvmalloc.
     (* +0x4e c.mv a0,s5 *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x4e)) Ra0 Rs5 B9 (K - 10)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi4e").
+              with "Hcg Hpc []").
+    { iApply (uai_4e with "Htext"). }
     iIntros (CIDu23 Hsu23) "Hcg Hpc".
     set (B10 := <[Regidx Ra0 := regval_into_reg (add_vec zero_reg (B9 !!! Regidx Rs5))]> B9).
     assert (Hq50 : add_vec_int (mword_of_int (KernelSyms.uvmalloc + 0x4e) : mword 64) 2
@@ -1097,7 +1096,8 @@ Section ProofUvmalloc.
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x50)) Rra
               (mword_of_int 2096404 : mword 21) B10 (K - 10)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi50").
+              ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+    { iApply (uai_50 with "Htext"). }
     iIntros (CIDu24 Hsu24) "Hcg Hpc".
     iDestruct (cpu_own_transport CIDu18 CIDu24 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
@@ -1247,8 +1247,6 @@ Section ProofUvmalloc.
     destruct Hmpay as [(Hk1 & Hga0) | (Hklt & Hga0 & _)].
     { (* =========== mappages SUCCEEDED: one more page mapped =========== *)
       subst k. rewrite uvm_run1 in Hrep'.
-      iPoseProof (uai_56 with "Htext") as "Hi56".
-      iPoseProof (uai_58 with "Htext") as "Hi58".
       iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhwc Hcg]".
       iDestruct "Hhwc" as (hwmisa0 hwmseccfg0 hwpmar0 hwelp0)
         "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hkmapb & _)".
@@ -1308,7 +1306,8 @@ Section ProofUvmalloc.
       iApply (wp_cbnez_fall_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x54))
                 (mword_of_int 26 : mword 8) (Cregidx (mword_of_int 2)) Ra0
                 mg (K - 10)%nat b ltac:(vm_compute; reflexivity)
-                ltac:(vm_compute; discriminate) ltac:(rgne; exact Hbnf) with "Hcg Hpc Hi54").
+                ltac:(vm_compute; discriminate) ltac:(rgne; exact Hbnf) with "Hcg Hpc []").
+      { iApply (uai_54 with "Htext"). }
       iIntros (CIDu26 Hsu26) "Hcg Hpc".
       assert (Hq56 : add_vec_int (mword_of_int (KernelSyms.uvmalloc + 0x54) : mword 64) 2
                      = mword_of_int (KernelSyms.uvmalloc + 0x56)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1316,7 +1315,8 @@ Section ProofUvmalloc.
       (* +0x56 c.add s2,s2,s3  --  a += PGSIZE *)
       iApply (wp_cadd_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x56)) Rs2 Rs3 mg (K - 10)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hi56").
+                with "Hcg Hpc []").
+      { iApply (uai_56 with "Htext"). }
       iIntros (CIDu27 Hsu27) "Hcg Hpc".
       set (B12 := <[Regidx Rs2 := regval_into_reg
                      (add_vec (mg !!! Regidx Rs2) (mg !!! Regidx Rs3))]> mg).
@@ -1366,7 +1366,8 @@ Section ProofUvmalloc.
         iApply (wp_bltu_taken_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x58))
                   (mword_of_int 8158 : mword 13) Rs4 Rs2 B12 (K - 10)%nat b
                   ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(rgne; rgne; exact Hbk)
-                  ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi58").
+                  ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+        { iApply (uai_58 with "Htext"). }
         iApply bi.later_intro. iIntros (CIDu28 Hsu28) "Hcg Hpc".
         iEval (rewrite Htgt36) in "Hpc".
         (* re-anchor ["Hexit"] from this iteration's entry [CID0] to the next
@@ -1390,15 +1391,11 @@ Section ProofUvmalloc.
         assert (Hnn2 : ~ (S i < n)%nat).
         { intro Hx. exact (Z.lt_irrefl _ (Z.lt_le_trans _ _ _ (proj2 (Hnchar (S i)) Hx) Hb)). }
         clear -Hsum Hnn2. lia. }
-      iPoseProof (uai_5c with "Htext") as "Hi5c".
-      iPoseProof (uai_5e with "Htext") as "Hi5e".
-      iPoseProof (uai_60 with "Htext") as "Hi60".
-      iPoseProof (uai_62 with "Htext") as "Hi62".
-      iPoseProof (uai_64 with "Htext") as "Hi64".
       iApply (wp_bltu_fall_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x58))
                 (mword_of_int 8158 : mword 13) Rs4 Rs2 B12 (K - 10)%nat b
                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(rgne; rgne; exact Hbk)
-                with "Hcg Hpc Hi58").
+                with "Hcg Hpc []").
+      { iApply (uai_58 with "Htext"). }
       iIntros (CIDu29 Hsu29) "Hcg Hpc".
       assert (Hq5c : add_vec_int (mword_of_int (KernelSyms.uvmalloc + 0x58) : mword 64) 4
                      = mword_of_int (KernelSyms.uvmalloc + 0x5c)) by (apply bv_eq; vm_compute; reflexivity).
@@ -1406,7 +1403,8 @@ Section ProofUvmalloc.
       (* +0x5c c.mv a0,s4 *)
       iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x5c)) Ra0 Rs4 B12 (K - 10)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hi5c").
+                with "Hcg Hpc []").
+      { iApply (uai_5c with "Htext"). }
       iIntros (CIDu30 Hsu30) "Hcg Hpc".
       set (X1 := <[Regidx Ra0 := regval_into_reg (add_vec zero_reg (B12 !!! Regidx Rs4))]> B12).
       assert (HX1sp : X1 !!! Regidx csp_rs1 = spr)
@@ -1418,7 +1416,8 @@ Section ProofUvmalloc.
       iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x5e)) (mword_of_int 7 : mword 6) Rs1
                 X1 (K - 10)%nat (mm !!! Regidx Rs1) b (dqm:=DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hi5e [Hk3]").
+                with "Hcg Hpc [] [Hk3]").
+      { iApply (uai_5e with "Htext"). }
       { iEval (rewrite HX1sp Hb3). iExact "Hk3". }
       iIntros (CIDu31 Hsu31) "Hcg Hpc Hk3". iEval (rewrite HX1sp Hb3) in "Hk3".
       set (X2 := <[Regidx Rs1 := regval_into_reg (mm !!! Regidx Rs1)]> X1).
@@ -1431,7 +1430,8 @@ Section ProofUvmalloc.
       iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x60)) (mword_of_int 5 : mword 6) Rs3
                 X2 (K - 10)%nat (mm !!! Regidx Rs3) b (dqm:=DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hi60 [Hk5]").
+                with "Hcg Hpc [] [Hk5]").
+      { iApply (uai_60 with "Htext"). }
       { iEval (rewrite HX2sp Hb5). iExact "Hk5". }
       iIntros (CIDu32 Hsu32) "Hcg Hpc Hk5". iEval (rewrite HX2sp Hb5) in "Hk5".
       set (X3 := <[Regidx Rs3 := regval_into_reg (mm !!! Regidx Rs3)]> X2).
@@ -1444,7 +1444,8 @@ Section ProofUvmalloc.
       iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x62)) (mword_of_int 2 : mword 6) Rs6
                 X3 (K - 10)%nat (mm !!! Regidx Rs6) b (dqm:=DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hi62 [Hk8]").
+                with "Hcg Hpc [] [Hk8]").
+      { iApply (uai_62 with "Htext"). }
       { iEval (rewrite HX3sp Hb8). iExact "Hk8". }
       iIntros (CIDu33 Hsu33) "Hcg Hpc Hk8". iEval (rewrite HX3sp Hb8) in "Hk8".
       set (X4 := <[Regidx Rs6 := regval_into_reg (mm !!! Regidx Rs6)]> X3).
@@ -1459,7 +1460,8 @@ Section ProofUvmalloc.
       iApply (wp_cj_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x64))
                 (sign_extend' 21 (concat_vec (mword_of_int 10 : mword 11) ('b"0")))
                 X4 (K - 10)%nat b ltac:(vm_compute; reflexivity)
-                with "Hcg Hpc Hi64").
+                with "Hcg Hpc []").
+      { iApply (uai_64 with "Htext"). }
       iIntros (CIDu34 Hsu34). iApply bi.later_intro. iIntros "Hcg Hpc".
       iEval (rewrite Hjt64) in "Hpc".
       iEval (rewrite /ua_exit) in "Hexit".
@@ -1521,17 +1523,6 @@ Section ProofUvmalloc.
     (* =========== mappages FAILED: kfree the page and roll back ======== *)
     assert (Hk0 : k = 0%nat) by (clear -Hklt; lia). subst k.
     cbn [pt_insert_run] in Hrep'.
-    iPoseProof (uai_88 with "Htext") as "Hi88".
-    iPoseProof (uai_8a with "Htext") as "Hi8a".
-    iPoseProof (uai_8e with "Htext") as "Hi8e".
-    iPoseProof (uai_90 with "Htext") as "Hi90".
-    iPoseProof (uai_92 with "Htext") as "Hi92".
-    iPoseProof (uai_94 with "Htext") as "Hi94".
-    iPoseProof (uai_98 with "Htext") as "Hi98".
-    iPoseProof (uai_9a with "Htext") as "Hi9a".
-    iPoseProof (uai_9c with "Htext") as "Hi9c".
-    iPoseProof (uai_9e with "Htext") as "Hi9e".
-    iPoseProof (uai_a0 with "Htext") as "Hia0".
     iDestruct (proc_ptm_rebuild Pi (pu + 4096 * Z.of_nat i)%Z
                  (umem_grow Mv (pu + 4096 * Z.of_nat i)%Z) t' m_ad
                  Hwf Hview Hrep' Hbase'' with "Hptree Hown") as "Hpt".
@@ -1545,13 +1536,15 @@ Section ProofUvmalloc.
               (mword_of_int 26 : mword 8) (Cregidx (mword_of_int 2)) Ra0
               mg (K - 10)%nat b ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; discriminate) ltac:(rgne; exact Hbnt) ltac:(vm_compute; reflexivity)
-              with "Hcg Hpc Hi54").
+              with "Hcg Hpc []").
+    { iApply (uai_54 with "Htext"). }
     iApply bi.later_intro. iIntros (CIDu35 Hsu35) "Hcg Hpc".
     iEval (rewrite Htgt88) in "Hpc".
     (* +0x88 c.mv a0,s1 *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x88)) Ra0 Rs1 mg (K - 10)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi88").
+              with "Hcg Hpc []").
+    { iApply (uai_88 with "Htext"). }
     iIntros (CIDu36 Hsu36) "Hcg Hpc".
     set (F1 := <[Regidx Ra0 := regval_into_reg (add_vec zero_reg (mg !!! Regidx Rs1))]> mg).
     assert (Hq8a : add_vec_int (mword_of_int (KernelSyms.uvmalloc + 0x88) : mword 64) 2
@@ -1561,7 +1554,8 @@ Section ProofUvmalloc.
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x8a)) Rra
               (mword_of_int 2094830 : mword 21) F1 (K - 10)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi8a").
+              ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+    { iApply (uai_8a with "Htext"). }
     iIntros (CIDu37 Hsu37) "Hcg Hpc".
     iDestruct (cpu_own_transport CIDu25 CIDu37 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
@@ -1631,7 +1625,8 @@ Section ProofUvmalloc.
     (* +0x8e c.mv a2,s7 *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x8e)) Ra2 Rs7 mfk (K - 10)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi8e").
+              with "Hcg Hpc []").
+    { iApply (uai_8e with "Htext"). }
     iIntros (CIDu39 Hsu39) "Hcg Hpc".
     set (G1 := <[Regidx Ra2 := regval_into_reg (add_vec zero_reg (mfk !!! Regidx Rs7))]> mfk).
     assert (Hq90 : add_vec_int (mword_of_int (KernelSyms.uvmalloc + 0x8e) : mword 64) 2
@@ -1640,7 +1635,8 @@ Section ProofUvmalloc.
     (* +0x90 c.mv a1,s2 *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x90)) Ra1 Rs2 G1 (K - 10)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi90").
+              with "Hcg Hpc []").
+    { iApply (uai_90 with "Htext"). }
     iIntros (CIDu40 Hsu40) "Hcg Hpc".
     set (G2 := <[Regidx Ra1 := regval_into_reg (add_vec zero_reg (G1 !!! Regidx Rs2))]> G1).
     assert (Hq92 : add_vec_int (mword_of_int (KernelSyms.uvmalloc + 0x90) : mword 64) 2
@@ -1649,7 +1645,8 @@ Section ProofUvmalloc.
     (* +0x92 c.mv a0,s5 *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x92)) Ra0 Rs5 G2 (K - 10)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi92").
+              with "Hcg Hpc []").
+    { iApply (uai_92 with "Htext"). }
     iIntros (CIDu41 Hsu41) "Hcg Hpc".
     set (G3 := <[Regidx Ra0 := regval_into_reg (add_vec zero_reg (G2 !!! Regidx Rs5))]> G2).
     assert (Hq94 : add_vec_int (mword_of_int (KernelSyms.uvmalloc + 0x92) : mword 64) 2
@@ -1659,7 +1656,8 @@ Section ProofUvmalloc.
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x94)) Rra
               (mword_of_int 2096936 : mword 21) G3 (K - 10)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi94").
+              ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+    { iApply (uai_94 with "Htext"). }
     iIntros (CIDu42 Hsu42) "Hcg Hpc".
     iDestruct (cpu_own_transport CIDu38 CIDu42 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
@@ -1727,7 +1725,8 @@ Section ProofUvmalloc.
     iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x98)) Ra0 (mword_of_int 0 : mword 6)
               (mword_of_int 0 : mword 64) md2 (K - 10)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              ltac:(apply bv_eq; vm_compute; reflexivity) with "Hcg Hpc Hi98").
+              ltac:(apply bv_eq; vm_compute; reflexivity) with "Hcg Hpc []").
+    { iApply (uai_98 with "Htext"). }
     iIntros (CIDu44 Hsu44) "Hcg Hpc".
     set (G5 := <[Regidx Ra0 := regval_into_reg (mword_of_int 0 : mword 64)]> md2).
     assert (HG5sp : G5 !!! Regidx csp_rs1 = spr)
@@ -1739,7 +1738,8 @@ Section ProofUvmalloc.
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x9a)) (mword_of_int 7 : mword 6) Rs1
               G5 (K - 10)%nat (mm !!! Regidx Rs1) b (dqm:=DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi9a [Hk3]").
+              with "Hcg Hpc [] [Hk3]").
+    { iApply (uai_9a with "Htext"). }
     { iEval (rewrite HG5sp Hb3). iExact "Hk3". }
     iIntros (CIDu45 Hsu45) "Hcg Hpc Hk3". iEval (rewrite HG5sp Hb3) in "Hk3".
     set (G6 := <[Regidx Rs1 := regval_into_reg (mm !!! Regidx Rs1)]> G5).
@@ -1752,7 +1752,8 @@ Section ProofUvmalloc.
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x9c)) (mword_of_int 5 : mword 6) Rs3
               G6 (K - 10)%nat (mm !!! Regidx Rs3) b (dqm:=DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi9c [Hk5]").
+              with "Hcg Hpc [] [Hk5]").
+    { iApply (uai_9c with "Htext"). }
     { iEval (rewrite HG6sp Hb5). iExact "Hk5". }
     iIntros (CIDu46 Hsu46) "Hcg Hpc Hk5". iEval (rewrite HG6sp Hb5) in "Hk5".
     set (G7 := <[Regidx Rs3 := regval_into_reg (mm !!! Regidx Rs3)]> G6).
@@ -1765,7 +1766,8 @@ Section ProofUvmalloc.
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x9e)) (mword_of_int 2 : mword 6) Rs6
               G7 (K - 10)%nat (mm !!! Regidx Rs6) b (dqm:=DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi9e [Hk8]").
+              with "Hcg Hpc [] [Hk8]").
+    { iApply (uai_9e with "Htext"). }
     { iEval (rewrite HG7sp Hb8). iExact "Hk8". }
     iIntros (CIDu47 Hsu47) "Hcg Hpc Hk8". iEval (rewrite HG7sp Hb8) in "Hk8".
     set (G8 := <[Regidx Rs6 := regval_into_reg (mm !!! Regidx Rs6)]> G7).
@@ -1780,7 +1782,8 @@ Section ProofUvmalloc.
     iApply (wp_cj_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0xa0))
               (sign_extend' 21 (concat_vec (mword_of_int 2028 : mword 11) ('b"0")))
               G8 (K - 10)%nat b ltac:(vm_compute; reflexivity)
-              with "Hcg Hpc Hia0").
+              with "Hcg Hpc []").
+    { iApply (uai_a0 with "Htext"). }
     iIntros (CIDu48 Hsu48). iApply bi.later_intro. iIntros "Hcg Hpc".
     iEval (rewrite Hjta0) in "Hpc".
     iDestruct (ua_restore_mem P Pi (svpn_of (pgroundup oldsz)) i
@@ -1850,11 +1853,8 @@ Section ProofUvmalloc.
     assert (Hpumod : (pu mod 4096 = 0)%Z)
       by (rewrite Hpud; exact (z_pgd_mod (ov + 4095))).
     assert (Hpu0 : (0 <= pu)%Z) by (clear -Hov0 Hpuge; lia).
-    iPoseProof (uai_00 with "Htext") as "Hi00".
     destruct (zopz0zI_u (mm !!! Regidx Ra2) (mm !!! Regidx Ra1)) eqn:Hcmp0.
     { (* ============ newsz < oldsz: return oldsz, NO FRAME ============= *)
-      iPoseProof (uai_a2 with "Htext") as "Hia2".
-      iPoseProof (uai_a4 with "Htext") as "Hia4".
       assert (Hlt0 : (uint newsz < uint oldsz)%Z)
         by (unfold zopz0zI_u in Hcmp0; apply Z.ltb_lt; exact Hcmp0).
       assert (Hlt0' : (nz < ov)%Z).
@@ -1871,12 +1871,14 @@ Section ProofUvmalloc.
         by (apply bv_eq; vm_compute; reflexivity).
       iApply (wp_bltu_taken_s_sconf pcE (mword_of_int 162 : mword 13) Ra1 Ra2 mm K b
                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(rgne; rgne; exact Hcmp0)
-                Hala2 with "Hcg Hpc Hi00").
+                Hala2 with "Hcg Hpc []").
+      { iApply (uai_00 with "Htext"). }
       iApply bi.later_intro. iIntros (CIDu49 Hsu49) "Hcg Hpc".
       iEval (rewrite Htgta2) in "Hpc".
       iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0xa2)) Ra0 Ra1 mm K b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hia2").
+                with "Hcg Hpc []").
+      { iApply (uai_a2 with "Htext"). }
       iIntros (CIDu50 Hsu50) "Hcg Hpc".
       set (Y1 := <[Regidx Ra0 := regval_into_reg (add_vec zero_reg (mm !!! Regidx Ra1))]> mm).
       assert (Hppa4 : add_vec_int (mword_of_int (KernelSyms.uvmalloc + 0xa2) : mword 64) 2
@@ -1884,7 +1886,8 @@ Section ProofUvmalloc.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hppa4) in "Hpc".
       iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0xa4)) Rra Y1 K b
-                ltac:(vm_compute; discriminate) with "Hcg Hpc Hia4").
+                ltac:(vm_compute; discriminate) with "Hcg Hpc []").
+      { iApply (uai_a4 with "Htext"). }
       iIntros (CIDu51 Hsu51) "Hcg Hpc".
       assert (HY1ra : Y1 !!! Regidx Rra = mm !!! Regidx Rra)
         by (rewrite /Y1; rewrite upd_ne; [reflexivity | reg_neq]).
@@ -1912,23 +1915,6 @@ Section ProofUvmalloc.
       by (unfold zopz0zI_u in Hcmp0; apply Z.ltb_ge; exact Hcmp0).
     assert (Hovnz : (ov <= nz)%Z).
     { rewrite Hnz Hov. rewrite <- !uint_unsigned. exact Hoin. }
-    iPoseProof (uai_04 with "Htext") as "Hi04".
-    iPoseProof (uai_06 with "Htext") as "Hi06".
-    iPoseProof (uai_08 with "Htext") as "Hi08".
-    iPoseProof (uai_0a with "Htext") as "Hi0a".
-    iPoseProof (uai_0c with "Htext") as "Hi0c".
-    iPoseProof (uai_0e with "Htext") as "Hi0e".
-    iPoseProof (uai_10 with "Htext") as "Hi10".
-    iPoseProof (uai_12 with "Htext") as "Hi12".
-    iPoseProof (uai_14 with "Htext") as "Hi14".
-    iPoseProof (uai_16 with "Htext") as "Hi16".
-    iPoseProof (uai_18 with "Htext") as "Hi18".
-    iPoseProof (uai_1a with "Htext") as "Hi1a".
-    iPoseProof (uai_1c with "Htext") as "Hi1c".
-    iPoseProof (uai_1e with "Htext") as "Hi1e".
-    iPoseProof (uai_20 with "Htext") as "Hi20".
-    iPoseProof (uai_24 with "Htext") as "Hi24".
-    iPoseProof (uai_26 with "Htext") as "Hi26".
     assert (Hspm : mm !!! Regidx csp_rs1 = sp0) by reflexivity.
     assert (Hpush : add_vec (mm !!! Regidx csp_rs1)
                       (sign_extend' 64 (caddi16sp_imm (mword_of_int 59 : mword 6)))
@@ -1938,12 +1924,14 @@ Section ProofUvmalloc.
       by (apply bv_eq; vm_compute; reflexivity).
     iApply (wp_bltu_fall_s_sconf pcE (mword_of_int 162 : mword 13) Ra1 Ra2 mm K b
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(rgne; rgne; exact Hcmp0)
-              with "Hcg Hpc Hi00").
+              with "Hcg Hpc []").
+    { iApply (uai_00 with "Htext"). }
     iIntros (CIDu52 Hsu52) "Hcg Hpc".
     iEval (rewrite Hp04) in "Hpc".
     iApply (wp_caddi16sp_push_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x04))
               (mword_of_int 59 : mword 6) mm K 10 b HK10 Hpush
-              with "Hcg Hpc Hi04").
+              with "Hcg Hpc []").
+    { iApply (uai_04 with "Htext"). }
     iIntros (CIDu53 Hsu53) "Hcg Hframe Hpc".
     iEval (rewrite Hspm) in "Hframe".
     set (spr := add_vec (mm !!! Regidx csp_rs1 : mword 64)
@@ -2006,7 +1994,8 @@ Section ProofUvmalloc.
     iEval (rewrite Hp06) in "Hpc".
     (* +0x06 c.sdsp ra,72(sp) *)
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x06)) (mword_of_int 9 : mword 6) Rra
-              R1 (K - 10)%nat u72 b with "Hcg Hpc Hi06 [Hk1]").
+              R1 (K - 10)%nat u72 b with "Hcg Hpc [] [Hk1]").
+    { iApply (uai_06 with "Htext"). }
     { iEval (rewrite HspR1 Hb1). iExact "Hk1". }
     iIntros (CIDu54 Hsu54) "Hcg Hpc Hk1". iEval (rewrite HspR1 Hb1) in "Hk1".
     assert (HR1ra : R1 !!! Regidx Rra = mm !!! Regidx Rra)
@@ -2017,7 +2006,8 @@ Section ProofUvmalloc.
     iEval (rewrite Hp08) in "Hpc".
     (* +0x08 c.sdsp s0,64(sp) *)
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x08)) (mword_of_int 8 : mword 6) Rs0
-              R1 (K - 10)%nat u64 b with "Hcg Hpc Hi08 [Hk2]").
+              R1 (K - 10)%nat u64 b with "Hcg Hpc [] [Hk2]").
+    { iApply (uai_08 with "Htext"). }
     { iEval (rewrite HspR1 Hb2). iExact "Hk2". }
     iIntros (CIDu55 Hsu55) "Hcg Hpc Hk2". iEval (rewrite HspR1 Hb2) in "Hk2".
     assert (HR1s0 : R1 !!! Regidx Rs0 = mm !!! Regidx Rs0)
@@ -2028,7 +2018,8 @@ Section ProofUvmalloc.
     iEval (rewrite Hp0a) in "Hpc".
     (* +0x0a c.sdsp s2,48(sp) *)
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x0a)) (mword_of_int 6 : mword 6) Rs2
-              R1 (K - 10)%nat u48 b with "Hcg Hpc Hi0a [Hk4]").
+              R1 (K - 10)%nat u48 b with "Hcg Hpc [] [Hk4]").
+    { iApply (uai_0a with "Htext"). }
     { iEval (rewrite HspR1 Hb4). iExact "Hk4". }
     iIntros (CIDu56 Hsu56) "Hcg Hpc Hk4". iEval (rewrite HspR1 Hb4) in "Hk4".
     assert (HR1s2 : R1 !!! Regidx Rs2 = mm !!! Regidx Rs2)
@@ -2039,7 +2030,8 @@ Section ProofUvmalloc.
     iEval (rewrite Hp0c) in "Hpc".
     (* +0x0c c.sdsp s4,32(sp) *)
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x0c)) (mword_of_int 4 : mword 6) Rs4
-              R1 (K - 10)%nat u32 b with "Hcg Hpc Hi0c [Hk6]").
+              R1 (K - 10)%nat u32 b with "Hcg Hpc [] [Hk6]").
+    { iApply (uai_0c with "Htext"). }
     { iEval (rewrite HspR1 Hb6). iExact "Hk6". }
     iIntros (CIDu57 Hsu57) "Hcg Hpc Hk6". iEval (rewrite HspR1 Hb6) in "Hk6".
     assert (HR1s4 : R1 !!! Regidx Rs4 = mm !!! Regidx Rs4)
@@ -2050,7 +2042,8 @@ Section ProofUvmalloc.
     iEval (rewrite Hp0e) in "Hpc".
     (* +0x0e c.sdsp s5,24(sp) *)
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x0e)) (mword_of_int 3 : mword 6) Rs5
-              R1 (K - 10)%nat u24 b with "Hcg Hpc Hi0e [Hk7]").
+              R1 (K - 10)%nat u24 b with "Hcg Hpc [] [Hk7]").
+    { iApply (uai_0e with "Htext"). }
     { iEval (rewrite HspR1 Hb7). iExact "Hk7". }
     iIntros (CIDu58 Hsu58) "Hcg Hpc Hk7". iEval (rewrite HspR1 Hb7) in "Hk7".
     assert (HR1s5 : R1 !!! Regidx Rs5 = mm !!! Regidx Rs5)
@@ -2061,7 +2054,8 @@ Section ProofUvmalloc.
     iEval (rewrite Hp10) in "Hpc".
     (* +0x10 c.sdsp s7,8(sp) *)
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x10)) (mword_of_int 1 : mword 6) Rs7
-              R1 (K - 10)%nat u8 b with "Hcg Hpc Hi10 [Hk9]").
+              R1 (K - 10)%nat u8 b with "Hcg Hpc [] [Hk9]").
+    { iApply (uai_10 with "Htext"). }
     { iEval (rewrite HspR1 Hb9). iExact "Hk9". }
     iIntros (CIDu59 Hsu59) "Hcg Hpc Hk9". iEval (rewrite HspR1 Hb9) in "Hk9".
     assert (HR1s7 : R1 !!! Regidx Rs7 = mm !!! Regidx Rs7)
@@ -2074,7 +2068,8 @@ Section ProofUvmalloc.
     iApply (wp_caddi4spn_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x12)) (Cregidx (mword_of_int 0))
               (mword_of_int 20 : mword 8) Rs0 R1 (K - 10)%nat b
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
-              ltac:(rdok) with "Hcg Hpc Hi12").
+              ltac:(rdok) with "Hcg Hpc []").
+    { iApply (uai_12 with "Htext"). }
     iIntros (CIDu60 Hsu60) "Hcg Hpc".
     set (R2 := <[Regidx Rs0 := regval_into_reg
                   (add_vec (R1 !!! Regidx csp_rs1)
@@ -2085,7 +2080,8 @@ Section ProofUvmalloc.
     (* +0x14 c.mv s5,a0 *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x14)) Rs5 Ra0 R2 (K - 10)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi14").
+              with "Hcg Hpc []").
+    { iApply (uai_14 with "Htext"). }
     iIntros (CIDu61 Hsu61) "Hcg Hpc".
     set (R3 := <[Regidx Rs5 := regval_into_reg (add_vec zero_reg (R2 !!! Regidx Ra0))]> R2).
     assert (Hp16 : add_vec_int (mword_of_int (KernelSyms.uvmalloc + 0x14) : mword 64) 2
@@ -2094,7 +2090,8 @@ Section ProofUvmalloc.
     (* +0x16 c.mv s4,a2 *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x16)) Rs4 Ra2 R3 (K - 10)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi16").
+              with "Hcg Hpc []").
+    { iApply (uai_16 with "Htext"). }
     iIntros (CIDu62 Hsu62) "Hcg Hpc".
     set (R4 := <[Regidx Rs4 := regval_into_reg (add_vec zero_reg (R3 !!! Regidx Ra2))]> R3).
     assert (Hp18 : add_vec_int (mword_of_int (KernelSyms.uvmalloc + 0x16) : mword 64) 2
@@ -2104,7 +2101,8 @@ Section ProofUvmalloc.
     iApply (wp_clui_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x18)) Ra5
               (sign_extend' 20 (mword_of_int 1 : mword 6)) (mword_of_int 4096 : mword 64)
               R4 (K - 10)%nat b ltac:(vm_compute; discriminate)
-              ltac:(rdok) lui_4096 with "Hcg Hpc Hi18").
+              ltac:(rdok) lui_4096 with "Hcg Hpc []").
+    { iApply (uai_18 with "Htext"). }
     iIntros (CIDu63 Hsu63) "Hcg Hpc".
     set (R5 := <[Regidx Ra5 := regval_into_reg (mword_of_int 4096 : mword 64)]> R4).
     assert (Hp1a : add_vec_int (mword_of_int (KernelSyms.uvmalloc + 0x18) : mword 64) 2
@@ -2113,7 +2111,8 @@ Section ProofUvmalloc.
     (* +0x1a c.addi a5,a5,-1 *)
     iApply (wp_caddi_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x1a)) Ra5 (mword_of_int 63 : mword 6)
               R5 (K - 10)%nat b ltac:(vm_compute; discriminate)
-              ltac:(rdok) with "Hcg Hpc Hi1a").
+              ltac:(rdok) with "Hcg Hpc []").
+    { iApply (uai_1a with "Htext"). }
     iIntros (CIDu64 Hsu64) "Hcg Hpc".
     set (R6 := <[Regidx Ra5 := regval_into_reg
                   (add_vec (R5 !!! Regidx Ra5)
@@ -2124,7 +2123,8 @@ Section ProofUvmalloc.
     (* +0x1c c.add a1,a1,a5 *)
     iApply (wp_cadd_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x1c)) Ra1 Ra5 R6 (K - 10)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi1c").
+              with "Hcg Hpc []").
+    { iApply (uai_1c with "Htext"). }
     iIntros (CIDu65 Hsu65) "Hcg Hpc".
     set (R7 := <[Regidx Ra1 := regval_into_reg
                   (add_vec (R6 !!! Regidx Ra1) (R6 !!! Regidx Ra5))]> R6).
@@ -2135,7 +2135,8 @@ Section ProofUvmalloc.
     iApply (wp_clui_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x1e)) Ra5
               (sign_extend' 20 (mword_of_int 63 : mword 6)) (mword_of_int (-4096) : mword 64)
               R7 (K - 10)%nat b ltac:(vm_compute; discriminate)
-              ltac:(rdok) lui_m4096 with "Hcg Hpc Hi1e").
+              ltac:(rdok) lui_m4096 with "Hcg Hpc []").
+    { iApply (uai_1e with "Htext"). }
     iIntros (CIDu66 Hsu66) "Hcg Hpc".
     set (R8 := <[Regidx Ra5 := regval_into_reg (mword_of_int (-4096) : mword 64)]> R7).
     assert (Hp20 : add_vec_int (mword_of_int (KernelSyms.uvmalloc + 0x1e) : mword 64) 2
@@ -2164,7 +2165,8 @@ Section ProofUvmalloc.
       by (rewrite HR8a1 HR8a5; reflexivity).
     iApply (wp_and_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x20)) Rs2 Ra1 Ra5 (pgroundup oldsz)
               R8 (K - 10)%nat b ltac:(vm_compute; discriminate)
-              ltac:(rdok) ltac:(rgne; rgne; exact HR8and) with "Hcg Hpc Hi20").
+              ltac:(rdok) ltac:(rgne; rgne; exact HR8and) with "Hcg Hpc []").
+    { iApply (uai_20 with "Htext"). }
     iIntros (CIDu67 Hsu67) "Hcg Hpc".
     set (R9 := <[Regidx Rs2 := regval_into_reg (pgroundup oldsz)]> R8).
     assert (Hp24 : add_vec_int (mword_of_int (KernelSyms.uvmalloc + 0x20) : mword 64) 4
@@ -2173,7 +2175,8 @@ Section ProofUvmalloc.
     (* +0x24 c.mv s7,s2 *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x24)) Rs7 Rs2 R9 (K - 10)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi24").
+              with "Hcg Hpc []").
+    { iApply (uai_24 with "Htext"). }
     iIntros (CIDu68 Hsu68) "Hcg Hpc".
     set (R10 := <[Regidx Rs7 := regval_into_reg (add_vec zero_reg (R9 !!! Regidx Rs2))]> R9).
     assert (Hp26 : add_vec_int (mword_of_int (KernelSyms.uvmalloc + 0x24) : mword 64) 2
@@ -2231,14 +2234,6 @@ Section ProofUvmalloc.
     (* ================================================================= *)
     (*  THE EPILOGUE / JOIN at +0x78, taken before the second branch.     *)
     (* ================================================================= *)
-    iPoseProof (uai_78 with "Htext") as "Hi78".
-    iPoseProof (uai_7a with "Htext") as "Hi7a".
-    iPoseProof (uai_7c with "Htext") as "Hi7c".
-    iPoseProof (uai_7e with "Htext") as "Hi7e".
-    iPoseProof (uai_80 with "Htext") as "Hi80".
-    iPoseProof (uai_82 with "Htext") as "Hi82".
-    iPoseProof (uai_84 with "Htext") as "Hi84".
-    iPoseProof (uai_86 with "Htext") as "Hi86".
     iAssert (ua_exit (CID0 := CID) mm P Mv vpn0 n xperm K eb p b lks sp0 spr oldsz newsz)
       with "[Hcont Hk1 Hk2 Hk4 Hk6 Hk7 Hk9 Hk10]" as "Hepi".
     { rewrite /ua_exit.
@@ -2249,7 +2244,8 @@ Section ProofUvmalloc.
       iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x78)) (mword_of_int 9 : mword 6) Rra
                 mj (K - 10)%nat (mm !!! Regidx Rra) b (dqm:=DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hi78 [Hk1]").
+                with "Hcg Hpc [] [Hk1]").
+      { iApply (uai_78 with "Htext"). }
       { iEval (rewrite Hjsp Hb1). iExact "Hk1". }
       iIntros (CIDu69 Hsu69) "Hcg Hpc Hk1". iEval (rewrite Hjsp Hb1) in "Hk1".
       set (E1 := <[Regidx Rra := regval_into_reg (mm !!! Regidx Rra)]> mj).
@@ -2262,7 +2258,8 @@ Section ProofUvmalloc.
       iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x7a)) (mword_of_int 8 : mword 6) Rs0
                 E1 (K - 10)%nat (mm !!! Regidx Rs0) b (dqm:=DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hi7a [Hk2]").
+                with "Hcg Hpc [] [Hk2]").
+      { iApply (uai_7a with "Htext"). }
       { iEval (rewrite HE1sp Hb2). iExact "Hk2". }
       iIntros (CIDu70 Hsu70) "Hcg Hpc Hk2". iEval (rewrite HE1sp Hb2) in "Hk2".
       set (E2 := <[Regidx Rs0 := regval_into_reg (mm !!! Regidx Rs0)]> E1).
@@ -2275,7 +2272,8 @@ Section ProofUvmalloc.
       iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x7c)) (mword_of_int 6 : mword 6) Rs2
                 E2 (K - 10)%nat (mm !!! Regidx Rs2) b (dqm:=DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hi7c [Hk4]").
+                with "Hcg Hpc [] [Hk4]").
+      { iApply (uai_7c with "Htext"). }
       { iEval (rewrite HE2sp Hb4). iExact "Hk4". }
       iIntros (CIDu71 Hsu71) "Hcg Hpc Hk4". iEval (rewrite HE2sp Hb4) in "Hk4".
       set (E3 := <[Regidx Rs2 := regval_into_reg (mm !!! Regidx Rs2)]> E2).
@@ -2288,7 +2286,8 @@ Section ProofUvmalloc.
       iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x7e)) (mword_of_int 4 : mword 6) Rs4
                 E3 (K - 10)%nat (mm !!! Regidx Rs4) b (dqm:=DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hi7e [Hk6]").
+                with "Hcg Hpc [] [Hk6]").
+      { iApply (uai_7e with "Htext"). }
       { iEval (rewrite HE3sp Hb6). iExact "Hk6". }
       iIntros (CIDu72 Hsu72) "Hcg Hpc Hk6". iEval (rewrite HE3sp Hb6) in "Hk6".
       set (E4 := <[Regidx Rs4 := regval_into_reg (mm !!! Regidx Rs4)]> E3).
@@ -2301,7 +2300,8 @@ Section ProofUvmalloc.
       iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x80)) (mword_of_int 3 : mword 6) Rs5
                 E4 (K - 10)%nat (mm !!! Regidx Rs5) b (dqm:=DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hi80 [Hk7]").
+                with "Hcg Hpc [] [Hk7]").
+      { iApply (uai_80 with "Htext"). }
       { iEval (rewrite HE4sp Hb7). iExact "Hk7". }
       iIntros (CIDu73 Hsu73) "Hcg Hpc Hk7". iEval (rewrite HE4sp Hb7) in "Hk7".
       set (E5 := <[Regidx Rs5 := regval_into_reg (mm !!! Regidx Rs5)]> E4).
@@ -2314,7 +2314,8 @@ Section ProofUvmalloc.
       iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x82)) (mword_of_int 1 : mword 6) Rs7
                 E5 (K - 10)%nat (mm !!! Regidx Rs7) b (dqm:=DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hi82 [Hk9]").
+                with "Hcg Hpc [] [Hk9]").
+      { iApply (uai_82 with "Htext"). }
       { iEval (rewrite HE5sp Hb9). iExact "Hk9". }
       iIntros (CIDu74 Hsu74) "Hcg Hpc Hk9". iEval (rewrite HE5sp Hb9) in "Hk9".
       set (E6 := <[Regidx Rs7 := regval_into_reg (mm !!! Regidx Rs7)]> E5).
@@ -2351,7 +2352,8 @@ Section ProofUvmalloc.
       iEval (rewrite -Hwv) in "Hframe10".
       iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x84))
                 (mword_of_int 5 : mword 6) E6 (K - 10)%nat 10 b Hpop
-                with "Hcg Hpc Hi84 Hframe10").
+                with "Hcg Hpc [] Hframe10").
+      { iApply (uai_84 with "Htext"). }
       iIntros (CIDu75 Hsu75) "Hcg Hpc".
       change (<[Regidx csp_rs1 := regval_into_reg
         (add_vec (E6 !!! Regidx csp_rs1)
@@ -2379,7 +2381,8 @@ Section ProofUvmalloc.
         ua_thr_peel.
         apply Hjthr; assumption. }
       iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x86)) Rra E7 K b
-                ltac:(vm_compute; discriminate) with "Hcg Hpc Hi86").
+                ltac:(vm_compute; discriminate) with "Hcg Hpc []").
+      { iApply (uai_86 with "Htext"). }
       iIntros (CIDu76 Hsu76) "Hcg Hpc".
       assert (Hretf : ret_pc (E7 !!! Regidx Rra) = ret_tgt) by (rewrite HE7ra; reflexivity).
       iEval (rewrite Hretf) in "Hpc".
@@ -2435,8 +2438,6 @@ Section ProofUvmalloc.
     (* ================= +0x26 bgeu s2,a2 ================================ *)
     destruct (zopz0zKzJ_u (R10 !!! Regidx Rs2) (R10 !!! Regidx Ra2)) eqn:Hbg.
     { (* ---- PGROUNDUP(oldsz) >= newsz: nothing to do, return newsz ---- *)
-      iPoseProof (uai_a6 with "Htext") as "Hia6".
-      iPoseProof (uai_a8 with "Htext") as "Hia8".
       assert (Hnzle : (nz <= pu)%Z).
       { rewrite HR10s2 HR10a2 in Hbg. unfold zopz0zKzJ_u in Hbg.
         rewrite Z.geb_leb in Hbg. apply Z.leb_le in Hbg.
@@ -2454,13 +2455,15 @@ Section ProofUvmalloc.
       iApply (wp_bgeu_taken_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x26))
                 (mword_of_int 128 : mword 13) Ra2 Rs2 R10 (K - 10)%nat b
                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(rgne; rgne; exact Hbg)
-                Halta6 with "Hcg Hpc Hi26").
+                Halta6 with "Hcg Hpc []").
+      { iApply (uai_26 with "Htext"). }
       iApply bi.later_intro. iIntros (CIDu77 Hsu77) "Hcg Hpc".
       iEval (rewrite Htgta6) in "Hpc".
       (* +0xa6 c.mv a0,a2 *)
       iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0xa6)) Ra0 Ra2 R10 (K - 10)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hia6").
+                with "Hcg Hpc []").
+      { iApply (uai_a6 with "Htext"). }
       iIntros (CIDu78 Hsu78) "Hcg Hpc".
       set (Z1 := <[Regidx Ra0 := regval_into_reg (add_vec zero_reg (R10 !!! Regidx Ra2))]> R10).
       assert (Hpa8 : add_vec_int (mword_of_int (KernelSyms.uvmalloc + 0xa6) : mword 64) 2
@@ -2473,7 +2476,8 @@ Section ProofUvmalloc.
       iApply (wp_cj_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0xa8))
                 (sign_extend' 21 (concat_vec (mword_of_int 2024 : mword 11) ('b"0")))
                 Z1 (K - 10)%nat b ltac:(vm_compute; reflexivity)
-                with "Hcg Hpc Hia8").
+                with "Hcg Hpc []").
+      { iApply (uai_a8 with "Htext"). }
       iIntros (CIDu79 Hsu79). iApply bi.later_intro. iIntros "Hcg Hpc".
       iEval (rewrite Hjta8) in "Hpc".
       iEval (rewrite /ua_exit) in "Hepi".
@@ -2546,22 +2550,19 @@ Section ProofUvmalloc.
         by (clear -Hpultnz; change (Z.of_nat 0) with 0%Z; lia).
       pose proof (proj1 (Hnchar 0%nat) Hz0) as Hx. clear -Hx. lia. }
     assert (Hsum0 : (0 + n = n)%nat) by (clear -Hn1; lia).
-    iPoseProof (uai_2a with "Htext") as "Hi2a".
-    iPoseProof (uai_2c with "Htext") as "Hi2c".
-    iPoseProof (uai_2e with "Htext") as "Hi2e".
-    iPoseProof (uai_30 with "Htext") as "Hi30".
-    iPoseProof (uai_32 with "Htext") as "Hi32".
     iApply (wp_bgeu_fall_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x26))
               (mword_of_int 128 : mword 13) Ra2 Rs2 R10 (K - 10)%nat b
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(rgne; rgne; exact Hbg)
-              with "Hcg Hpc Hi26").
+              with "Hcg Hpc []").
+    { iApply (uai_26 with "Htext"). }
     iIntros (CIDu80 Hsu80) "Hcg Hpc".
     assert (Hp2a : add_vec_int (mword_of_int (KernelSyms.uvmalloc + 0x26) : mword 64) 4
                    = mword_of_int (KernelSyms.uvmalloc + 0x2a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp2a) in "Hpc".
     (* +0x2a c.sdsp s1,56(sp) *)
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x2a)) (mword_of_int 7 : mword 6) Rs1
-              R10 (K - 10)%nat u56 b with "Hcg Hpc Hi2a [Hk3]").
+              R10 (K - 10)%nat u56 b with "Hcg Hpc [] [Hk3]").
+    { iApply (uai_2a with "Htext"). }
     { iEval (rewrite HR10sp Hb3). iExact "Hk3". }
     iIntros (CIDu81 Hsu81) "Hcg Hpc Hk3". iEval (rewrite HR10sp Hb3) in "Hk3".
     assert (HR10s1 : R10 !!! Regidx Rs1 = mm !!! Regidx Rs1)
@@ -2572,7 +2573,8 @@ Section ProofUvmalloc.
     iEval (rewrite Hp2c) in "Hpc".
     (* +0x2c c.sdsp s3,40(sp) *)
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x2c)) (mword_of_int 5 : mword 6) Rs3
-              R10 (K - 10)%nat u40 b with "Hcg Hpc Hi2c [Hk5]").
+              R10 (K - 10)%nat u40 b with "Hcg Hpc [] [Hk5]").
+    { iApply (uai_2c with "Htext"). }
     { iEval (rewrite HR10sp Hb5). iExact "Hk5". }
     iIntros (CIDu82 Hsu82) "Hcg Hpc Hk5". iEval (rewrite HR10sp Hb5) in "Hk5".
     assert (HR10s3 : R10 !!! Regidx Rs3 = mm !!! Regidx Rs3)
@@ -2583,7 +2585,8 @@ Section ProofUvmalloc.
     iEval (rewrite Hp2e) in "Hpc".
     (* +0x2e c.sdsp s6,16(sp) *)
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x2e)) (mword_of_int 2 : mword 6) Rs6
-              R10 (K - 10)%nat u16 b with "Hcg Hpc Hi2e [Hk8]").
+              R10 (K - 10)%nat u16 b with "Hcg Hpc [] [Hk8]").
+    { iApply (uai_2e with "Htext"). }
     { iEval (rewrite HR10sp Hb8). iExact "Hk8". }
     iIntros (CIDu83 Hsu83) "Hcg Hpc Hk8". iEval (rewrite HR10sp Hb8) in "Hk8".
     assert (HR10s6 : R10 !!! Regidx Rs6 = mm !!! Regidx Rs6)
@@ -2596,7 +2599,8 @@ Section ProofUvmalloc.
     iApply (wp_clui_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x30)) Rs3
               (sign_extend' 20 (mword_of_int 1 : mword 6)) (mword_of_int 4096 : mword 64)
               R10 (K - 10)%nat b ltac:(vm_compute; discriminate)
-              ltac:(rdok) lui_4096 with "Hcg Hpc Hi30").
+              ltac:(rdok) lui_4096 with "Hcg Hpc []").
+    { iApply (uai_30 with "Htext"). }
     iIntros (CIDu84 Hsu84) "Hcg Hpc".
     set (R11 := <[Regidx Rs3 := regval_into_reg (mword_of_int 4096 : mword 64)]> R10).
     assert (Hp32 : add_vec_int (mword_of_int (KernelSyms.uvmalloc + 0x30) : mword 64) 2
@@ -2611,7 +2615,8 @@ Section ProofUvmalloc.
     iApply (wp_ori_s_sconf (mword_of_int (KernelSyms.uvmalloc + 0x32)) Rs6 Ra3
               (mword_of_int 18 : mword 12) (mword_of_int (Z.lor xperm 18) : mword 64)
               R11 (K - 10)%nat b ltac:(vm_compute; discriminate)
-              ltac:(rdok) ltac:(rgne; exact HR11ori) with "Hcg Hpc Hi32").
+              ltac:(rdok) ltac:(rgne; exact HR11ori) with "Hcg Hpc []").
+    { iApply (uai_32 with "Htext"). }
     iIntros (CIDu85 Hsu85) "Hcg Hpc".
     set (R12 := <[Regidx Rs6 := regval_into_reg
                    (mword_of_int (Z.lor xperm 18) : mword 64)]> R11).

@@ -217,12 +217,18 @@ header is 124 bytes, inside sector 0 — that is exactly why xv6's commit is
 atomic on such a disk). Whichever campaign lands second restates the other's
 permits at its granularity; neither design changes shape.
 
-- [ ] **E1. The split.** `P_fs := P_disk ∗ P_wf` with `D` a `ghost_var`
-      halved between them (new fixed gname beside `fcn_hist`); `fr_D`
-      leaves the record (the record keeps the history, last element tied
-      to the ghost var). Timelessness of both conjuncts must survive
-      (`P_fs_any_timeless`).
-- [ ] **E2. The widened mirror (ruling 2.2).** `log_mirror` carries the
+- [x] **E1. The split (as landed).** `P_wf`'s content rides `fs_rec_wf`
+      as its fourth conjunct `fs_durable_wf (fr_D r)` — stated about the
+      COMMITTED VIEW only, never about the physical image, which is what
+      makes it invariant under re-indexing and under every
+      view-preserving permit. `FsWf.v` holds the predicate (body = the
+      F1 placeholder `True`; its `fs_durable_wf_placeholder` lemma is
+      the GATE — every use marks a site F1's real body will surface as
+      an error: the re-basing swap/clear/recover arms (stage H), the
+      compat commit (stage G), `P_fs_alloc` (E4)). `P_wf` becomes a
+      separate iProp conjunct of `P_fs` when the contents layer adds
+      durable ghosts.
+- [x] **E2. The widened mirror (ruling 2.2).** `log_mirror` carries the
       era's full durable picture (`RiscvPtsto.v:163` — header + slots +
       homes, or one `Z -> list (bv 8)` view with derived readings);
       `log_mirror_ok` pins it on `cov ∪ log_region_set ls`; every permit
@@ -230,17 +236,27 @@ permits at its granularity; neither design changes shape.
       home entry — they know their bytes; `mirror_of` generalizes).
       `log_mirror_at` exposes as much of the value as its holder needs
       (the header reading stays for the existing call sites).
-- [ ] **E2'. Commit names its state and takes the client fupd.**
-      `fs_commit_permit` concludes `D' =` the batch's logged values over
-      the old view (both named via E2) and is DERIVED from the client's
-      D-update fupd (ruling 2.5); `SpecEndOp` gains that fupd as its one
-      crash-facing premise (trivial until G lands, since `P_wf`'s body
-      starts at `⌜True⌝`). The other permits take no client input and
-      become internal.
-- [ ] **E3. Preserving clear.** `fs_install_permit` returns a per-block
-      caught-up receipt; `fs_clear_permit` consumes the family and
-      keeps `D` via `fs_recovery_clear_keeps` (FsCrash.v:630, today
-      unused). Same for the recovery-side install/boot-head permits.
+- [x] **E2'. The value-chained primitives (as landed).** Four new
+      permits in `FsCrash.v` beside the at-forms:
+      `fs_logfill_permit_v`, `fs_install_permit_v` (Q returns the half
+      at `lm_upd M0 <blk> bs` — the chaining), `fs_commit_permit_named`
+      (pre-image clean per the picture; concludes at the NAMED
+      `D' = fs_install (lm_view M0) ls Ws (restrict …)`; takes the
+      client's preservation premise — pure while `P_wf` is, the fupd
+      when the contents ghosts arrive; receipt AT `D'`), and
+      `fs_clear_permit_keep` (E3). The at-forms stay for the current
+      consumers; **stage G re-points `ProofEndOp` at the primitives**
+      and threads the chained `M` value through `write_log`/commit/
+      installs/clear — `SpecEndOp`'s client-fupd premise enters THEN
+      (one 26-arm sweep, not two).
+- [x] **E3. Preserving clear (as landed).** `fs_clear_permit_keep`:
+      the caught-up premise is pure on the chained mirror value
+      ("home = slot" at every entry, true BY COMPUTATION after the
+      install chain), discharged into `fs_recovery_clear_keeps`; NO
+      history extension, `fs_durable_wf` framed. The re-basing
+      `fs_clear_permit` stays for the current consumer until G adopts
+      the primitives. Recovery-side permits keep re-basing until
+      stage H makes them ghost no-ops.
 - [ ] **E4.** `P_fs_alloc`/`FsAdequacyImg`: establish `⌜fs_durable_wf⌝` at the
       literal image (a `FsImgCheck`-style computation, cheap — the
       sweeps already run there).
@@ -253,18 +269,60 @@ permits at its granularity; neither design changes shape.
 `InodeInv.blkmap_wf_*`). This stage is the join, and it is parallelizable
 and iris-free:
 
-- [ ] **F1.** Define `fs_durable_wf` over a block view: the general
-      content sweeps (W9 stated against `fs_all_tickets` for arbitrary
-      directory trees, no `z = ROOTINO`; no log-cleanliness conjunct),
-      closed under the five write shapes. Prove
-      `fsimg_wf -> fs_durable_wf` (the image discharge for E4).
-- [ ] **F2.** The five update lemmas, one per written-block kind:
-      bitmap set/clear (`bitmap_bytes`), dinode-at-slot
-      (`diblk_bytes` insert, alloc/update/free arms), dirent
-      write/zero (writei splice on a dir block), file/indirect data
-      (splice + `ind_bytes` insert), fresh-block zero. Each:
-      `fs_durable_wf P -> <side conditions> -> fs_durable_wf (<[b := bytes]> P)`.
-      The side conditions are what stage G threads.
+**F runs decoupled from G/H:** the real sweeps land under their own name
+(`fs_durable_wf_body` in `FsWf.v`), with the update lemmas and the image
+discharge stated about IT; `fs_durable_wf := True` and its placeholder
+lemma survive until the SWITCH-ON (after G3 and H2), which equates the
+two and deletes the placeholder — its use sites are the exact rework
+list.
+
+- [x] **F1.** DONE. `FsWf.fs_durable_wf_body` (real body under its own
+      name; `fs_durable_wf`/placeholder untouched, switch-on still gated
+      on G3+H2) = parse + W1 + W3-minus-link-floor + W4/W5 +
+      W6-scoped-to-reachable + W7 + W8 + region-at-`nib` + W9-general.
+      Two REFINEMENTS the pinned sweep list needed to be closed under
+      the write shapes (both recorded at the definition, FsWf.v):
+      (1) W3 sweeps `FsImg.fs_inodes_dwf` (= `fs_inodes_wf` minus the
+      `1 <= nlink` floor, additive family with `fs_inode_dok` and
+      `fs_inodes_wf_dwf`): a committed orphan is LIVE at `nlink = 0`,
+      exactly the state the W9 arm names; (2) the per-dir `fs_dir_ok`
+      bundle binds only REACHABLE dirs (one `∃ rd` shared with W9): an
+      orphan dir's ".." dangles once its emptied parent is unlinked, and
+      H1 routes orphans to `ireclaim` anyway — an orphan owes only W8's
+      dots and `fs_orphans_empty` (empty-but-dots BY INDEX, xv6's
+      `isdirempty`). W9 shape: `fs_rdirs` pins an existential `gset` of
+      reachable live dirs (`fs_reachable` = `∃ p, path_at (tree_of_disk
+      …) ROOTINO p = Some z`); `fs_rtick` counts a `bool_decide`-filtered
+      supply (locality = `fs_all_tickets`'s: one mjoin segment per dir).
+      The agreement suite (FsWf §5–7: the sweeps read block 1 +
+      `[inodestart, size)` only; decoder-level `*_ext` at one-block
+      footprints) is F2's foundation. `FsImg.fs_links_eq` (file-nlink
+      EQUALITY sweep) + `FsImgCheck.fsimg_links_eq` (vm_compute, 22.3 s
+      at `Qed` — W9's own ballpark); the committed-view discharge
+      `FsWfImg.fsimg_durable_wf` concludes `fs_durable_wf_body
+      (fs_restrict P (fs_home_set cov logstart))` from `fsimg_wf +
+      fs_links_eq + fs_region_wf + parse + cov ⊇ [1, size)` — E4
+      consumes it (`FsWfImg.v` is new: `FsCrash` Require-Exports `FsWf`,
+      so the `fs_restrict`-level statement cannot live in `FsWf.v`).
+- [ ] **F2.** The update lemmas — PER SEMANTIC EFFECT, not per block
+      (corrected 2026-08-22): a per-block lemma cannot preserve the
+      invariant (a bitmap bit set before the inode points at the block
+      IS the mid-transaction inconsistency), and under G1 the abstract
+      view moves in per-op net effects anyway. The vocabulary, each a
+      multi-block update on a view `P` preserving `fs_durable_wf_view`
+      under its preconditions:
+      `alloc_file_block (i, fbn, fresh)` (bitmap bit + inode
+      addrs/indirect + zeroed data), `write_file_data (i, off, bs)`
+      (data splice + size), `create_entry (d, name, i, ty)` (dirent +
+      fresh dinode, + parent nlink and dots for dirs),
+      `link_entry (d, name, i)` (dirent + nlink++),
+      `unlink_entry (d, k, i)` (zeroed dirent + nlink--, + parent
+      nlink-- for dirs; target may become an orphan — the arm F1's
+      clauses admit), `trunc (i)` (addrs/size zeroed + bfree bits),
+      `free_inode (i)` (type := 0; needs orphan + empty). The 12 ops
+      are compositions of these; F1's agreement suite localizes each
+      proof to its footprint. Side conditions are what stage G threads
+      from the ops' carried postconditions.
 
 ## 6. Stage G — the op sweep: every transaction preserves `fs_durable_wf`
 
@@ -274,14 +332,66 @@ ialloc, iupdate, iput-free, writei ×2, bmap-indirect), 12 spans / 26
 `end_op` exit arms (sys_link, sys_unlink, sys_open, sys_mkdir,
 sys_mknod, sys_chdir, filewrite, fileclose, kexec ×2, kexit, ireclaim).
 
-- [ ] **G1.** The vehicle (ruling 2.5): a wf row on `log_res`
-      conditioned on the ledger being empty (`out = 0` — mid-batch
-      views are deliberately inconsistent), re-established by each op
-      at its `log_end_step`; plus the bookkeeping row `⌜install of the
-      batch over D = L⌝` (dirty set = batch set; clean blocks logged =
-      committed) from which `ProofEndOp` assembles the commit fupd
-      generically. Design the two rows' exact statements before
-      building; a wrong vehicle here costs the whole sweep.
+- [ ] **G1.** The vehicle (VALIDATED against `log_res` 2026-08-22).
+      Two facts rule out simpler shapes: the ghost ledger keeps only
+      INEQUALITIES (`ireg_link_ok` L1 is `w <= nlink`) and a checked-out
+      inode's content is in no invariant — so `wf(L)` is not derivable
+      from the resource layer at commit; and the last-to-end op cannot
+      know its group's other deltas — so a bare `out = 0 -> wf(L)` row
+      is not locally re-establishable. The shape that IS local, with NO
+      new ghost: two pure rows on `log_res`'s `cmt = false` branch,
+      re-established at each log-lock release:
+      (a) `∃ A, dom A = fs_home_set cov ls ∧ fs_durable_wf_body A ∧
+      ∀ b ∈ home ∖ pending(om), L !! b = A !! b`, where `pending(om)`
+      is the union of the open ops' ledger sets `e.1.2` — every
+      `log_write` adds its block to its op's set in the same critical
+      section, so the row is FREE at all 9 write sites (the domain only
+      shrinks); the whole burden is the 26 `end_op` arms: an ending op
+      must produce `A' := A ⊕ (L on its own blocks)` and prove
+      `fs_durable_wf_body A'` from its own carried postconditions (the
+      per-op preservation lemmas, F2's update lemmas composed). At
+      `out = 0` pending is empty, `L = A` on homes, `wf` falls out.
+      (b) the mirror tie, on the strengthened `log_mirror_clean` row
+      (the mirror half and the batch meet in `log_res`):
+      `∀ b ∈ home ∖ LB, lm_view M b = L b` — maintained freely
+      (log_write moves b into LB; the installs' chained `lm_upd`s
+      restore it; clear resets LB). At commit: `D_old = restrict
+      (lm_view M) home` (clean header), `D' = restrict(L) home` via (b)
+      + `HLw`, `= restrict(A)` via (a), wf — the commit fupd for
+      `fs_commit_permit_named` assembles generically, no exit arm
+      states install-arithmetic.
+- [ ] **G1-impl.** The rows, as Coq (execution-ready once F2 lands;
+      Opus lane). `LogInv.v`: `Definition op_pending (om) : gset Z :=
+      map_fold (fun _ e acc => e.1.2 ∪ acc) ∅ om`; FUSE
+      `log_batch ∗ log_mirror_clean` into one bundle
+      `log_state bn γfs cov ls n LB (pend : gset Z)` binding
+      `∃ W L D M A` with the existing log_batch rows plus:
+      `log_mirror_half M ∗ ⌜lm_hdr M ls = (0,[])⌝`,
+      (a) `⌜dom A = fs_home_set cov ls⌝ ∗ ⌜fs_durable_wf_body A⌝ ∗
+      ⌜∀ b ∈ fs_home_set cov ls, b ∉ pend -> L !! b = A !! b⌝`,
+      (b) `⌜∀ b ∈ fs_home_set cov ls, b ∉ LB -> lm_view M b =
+      <the bytes of L at b>⌝`. `log_res` passes `pend := op_pending om`.
+      Touch points: the four `log_*_step` transitions; `ProofLogWrite`'s
+      repack (free: the written block is in its op's `e.1.2` after
+      `log_record_step`, so `pend` grows — row (a)'s domain shrinks;
+      row (b): b joins LB); `ProofBeginOp`/`ProofEndOp`
+      checkout/deposit (`eo_open_of_batch`/`eo_open_to_batch` now
+      destructure `log_state`; at the commit checkout `out = 0` gives
+      `pend = ∅`, hence `L = A` on homes); `ProofSysSync`; the boot
+      establishment (A₀ := the boot image's home restriction, `wf_body`
+      via `FsWfImg.fsimg_durable_wf` — which needs `fs_links_eq` ADDED
+      to `FsCfgBoot.fs_boot_image_wf` as conjunct (13), discharged at
+      the image by `FsImgCheck.fsimg_links_eq`, threaded through
+      `BootShared`/`SystemAdequacy`/`FsAdequacyImg` premises).
+      STAGING (corrected): a per-arm escape cannot gate on a false
+      lemma (`fs_durable_wf_body` is REAL since F1), so row (a) flips
+      on in ONE commit. Order: (i) G1-impl lands `log_state` with row
+      (b), `op_pending`, and the boot `fs_links_eq` threading — green,
+      real content, no row (a); (ii) G2's 26 per-op preservation
+      lemmas are proven STANDALONE first (pure statements against F2's
+      effect vocabulary — no `log_state` dependency, fully
+      parallelizable across agents); (iii) the flip commit adds row
+      (a) and wires the prepared lemmas into the arms in one sweep.
 - [ ] **G2.** Thread the F2 side conditions from the 9 write sites
       (their AU suppliers already carry the abstract content) to the
       per-op obligation; discharge at the 26 arms.
@@ -289,10 +399,33 @@ sys_mknod, sys_chdir, filewrite, fileclose, kexec ×2, kexit, ireclaim).
 
 ## 7. Stage H — boot re-founding: mint at `D`, recovery a ghost no-op
 
+- [ ] **H0. The adequacy-layer pure-projection hook** (the mechanism
+      that replaces `Himg`). The era fupd cannot identify `P_fs`'s
+      existential `dk` with the real disk — the fixed auth lives in
+      `state_interp`, which the era entailment never holds. But
+      `riscv_power_adequacy`'s OWN proof holds `state_interp` at every
+      PowerOn step, so it can open `crashN` there, run the one
+      auth/frag agreement, and extract a client-chosen PURE projection
+      of the crash predicate at the boot state. Interface:
+      `riscv_power_adequacy` generalizes with a client hook
+      `Hproj : ∀ g', state_interp g' ∗ ▷ Pc ={E}=∗ state_interp g' ∗
+      ▷ Pc ∗ ⌜Pc_pure g'⌝` and `Hboot` gains the premise
+      `⌜Pc_pure g'⌝`. The FS instantiates
+      `Pc_pure g' := fs_durable_wf (the recovery of (v_disk g')) ∧
+      hdr_wf … ∧ geometry` — Himg's SHAPE, now PROVEN from the loop
+      invariant instead of assumed. `fs_recovery_total` makes the
+      recovery-of spelling a pure function of `v_disk g'`, so the era
+      mint computes at a CONCRETE image, exactly as today.
 - [ ] **H1.** `fs_cfg_alloc` (and `FsBoot.fs_boot_ghosts`) run at `D`
       read out of `P_fs` in the era fupd (open `crashN` at ⊤); the
       raw-disk premises become `fs_durable_wf D` + geometry from `P_fs`.
       `BootShared.boot_shared_alloc` loses the image premise.
+      ORPHANS AT THE MINT: the ledger's boot count must be the
+      REACHABLE-ticket count (F1's supply) — counting all-live tickets
+      would violate L1 at any parent of a committed orphan dir (the
+      orphan's ".." ticket has no `nlink` paying for it). Orphan dirs
+      (live, unreachable, empty-but-dots) are excluded from the normal
+      pool stocking and routed to the `ireclaim` path's resources.
 - [ ] **H2.** Blocks where physical ≠ `D` (the committed log's homes)
       are minted dirty-at-boot: logged = slot content, bio holds them
       out of the clean pool; `initlog`/`install_trans` recovering arms
@@ -320,7 +453,7 @@ sys_mknod, sys_chdir, filewrite, fileclose, kexec ×2, kexit, ireclaim).
 
 ## 9. Gates and rules
 
-- Build on the VM (`QUIET=1 ./gcp-rocq/run-on-gcp make -k -j 36`), rebase
+- Build on the VM (`QUIET=1 ./gcp-rocq/run-on-gcp make -k -j 192`), rebase
   before whole-tree builds, `make audit-only` after A, C and D.
 - No contract widening that a single-file check cannot see: stage A changes
   `wp_disk_step`'s and the permits' SHAPE, so expect every virtio proof

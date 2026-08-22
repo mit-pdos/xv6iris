@@ -802,7 +802,6 @@ From iris.base_logic.lib Require Import ghost_var gen_heap invariants ghost_map.
 Require Import RegFile.
 Require Import HartTp WpNext.
 Require Import WpMmodeLeafBase.
-Require Import RiscvExtras.
 Require Import StackOwn.
 Require Import CalleeSaved KernelText.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
@@ -814,27 +813,20 @@ Require Import SchedCtx.
 Require Import WpLock.
 Require Import SpecPanic.
 Require Import FileOff.
-Require Import FileInvDefs.
-(* THE FOUR CLASSES THAT ARE NOT WHERE THEY LOOK.  [diskGhostG],
-   [uartGhostG], [fsLogG] and [iregG] live in [DiskPtsto], [WpUart],
-   [FsBlocks] and [InodeRegion], and NONE of them is re-exported by the
-   [Require Import]s of the preamble above -- so without these four lines
-   the functor's [Context] invents four FRESH variables of those names and
-   the body fails with "Could not find an instance for ?diskGhostG0" and
-   three more, none of which names the missing file.  Same tell as the
-   [lockG]/[lockG0] one in [fw_writei_src]'s comment, one tier up. *)
-Require Import WpUart BioInv FsBlocks LogInv FsCrash.
+(* [diskGhostG], [uartGhostG], [fsLogG] and [iregG] USED TO live unexported in
+   [DiskPtsto], [WpUart], [FsBlocks] and [InodeRegion], and this block
+   re-imported those four so the functor's [Context] would not invent four
+   FRESH variables of the names ("Could not find an instance for ?diskGhostG0",
+   naming no file).  6864d420 moved all four down to [Xv6Cameras], which this
+   file already reaches, so that reason is gone: the re-imports it justified
+   were dead weight and are removed.  What is left on these lines is here for
+   what those modules define themselves. *)
+Require Import WpUart BioInv FsBlocks FsCrash.
 Require Import UartTxInv.
-Require Import InodeInv InodeLock.
 Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import FsTree.
 Require Import IcacheEscrow.
-(* RE-IMPORT, fileread's line for line: [IcacheInv.islot] shadows
-   [DinodeEnc.islot] and [IcacheRef.inode_ref] shadows [FileInv]'s
-   placeholder; neither icache name is meant here except through the two
-   contracts. *)
-Require Import DinodeEnc.
 (* [dev_major] and [NDEV_max] are SpecFileread's -- [SpecFilewrite] states
    [filewrite_dev_env]'s guard with them but does not re-export them, so the
    device arm's four [Local Lemma]s cannot even be TYPED without this line. *)
