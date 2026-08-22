@@ -293,7 +293,7 @@ Definition wp_install_trans_sconf_body
      entry in turn; [R] itself is opaque here, which keeps install_trans as
      crash-agnostic as the rest of the log proofs.
      ([FsCrash.fs_install_permit] is exactly this shape, at
-     [R := LogInv.log_mirror_at (n, map uint W)].  Its [▷] is what the
+     [R := LogInv.log_mirror_at ls (n, map uint W)].  Its [▷] is what the
      bwrite's own [▷ Q] postcondition hands back, and a client whose [R] is
      timeless -- the mirror half is -- strips it inside the fupd.) *)
   □ (∀ (i : nat) (w : SailStdpp.Values.mword 32) (bs' : list (bv 8)),

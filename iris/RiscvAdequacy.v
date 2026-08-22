@@ -580,7 +580,7 @@ Proof.
   (* the era's FS log-region mirror, at the VACUOUS picture: this
      single-generation theorem hands its client no FS custody, and the first
      real one is minted by [initlog]'s swap. *)
-  iMod (ghost_var_alloc (MkLogMirror (0%nat, []) (fun _ => []))) as (γmir) "_".
+  iMod (ghost_var_alloc (MkLogMirror (fun _ => []))) as (γmir) "_".
   iMod (own_alloc_lockset_cpus (enum CPU) (NoDup_enum CPU)) as (γlks) "Hlks".
   (* the reservation mirror, at the (all-[None]) machine map *)
   iMod (ghost_map_alloc (resv_map g.(gresv))) as (γresv) "[Hresvauth Hresvfrags]".
@@ -910,7 +910,7 @@ Section power.
         [LogInv.log_batch] and handing the other to [FsCrash.P_fs]'s
         checked-out arm at its swap.  The value is the VACUOUS picture; the
         first true one is what the swap installs. *)
-     ghost_var (era_mirror_name HE) 1 (MkLogMirror (0%nat, []) (fun _ => [])) ∗
+     ghost_var (era_mirror_name HE) 1 (MkLogMirror (fun _ => [])) ∗
      (* the crash-spanning invariant: FIXED-layer, so every boot gets the
         SAME one -- which is the whole point (the durability property is what
         survives the power cycle).  The boot client threads it to
@@ -1038,7 +1038,7 @@ Section power.
       (* this era's FS log-region mirror, minted fresh like the image map;
          BOTH halves go to the boot client, which pairs one into [P_fs]'s
          checked-out arm at [initlog]'s swap. *)
-      iMod (ghost_var_alloc (MkLogMirror (0%nat, []) (fun _ => [])))
+      iMod (ghost_var_alloc (MkLogMirror (fun _ => [])))
         as (γmir) "Hmir".
       iMod (own_alloc_lockset_cpus (enum CPU) (NoDup_enum CPU)) as (γlks) "Hlks".
       iMod (ghost_map_alloc (resv_map g2.(gresv))) as (γresv) "[Hresvauth Hresvfrags]".

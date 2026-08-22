@@ -702,7 +702,7 @@ Section EndOpDefs.
       (* the era's mirror half travels OUTSIDE [eo_open]: the commit moves the
          on-disk header away from clean and back, so it cannot ride a bundle
          that is held across [write_head] *)
-      log_mirror_clean ∗
+      log_mirror_clean logstart ∗
       eo_open bn γfs cov logstart n W L D (fun _ => []) 0.
   Proof.
     rewrite /log_batch /eo_open.
@@ -728,7 +728,7 @@ Section EndOpDefs.
   Lemma eo_open_to_batch (bn : bio_names) (γfs : fs_names) (cov : gset Z)
       (logstart : Z) (L : gmap Z (list (bv 8))) (D : gmap Z bool)
       (Lw : nat -> list (bv 8)) :
-    log_mirror_clean -∗
+    log_mirror_clean logstart -∗
     eo_open bn γfs cov logstart 0 [] L D Lw 0 -∗
     log_batch bn γfs cov logstart 0 ∅.
   Proof.
@@ -1736,7 +1736,7 @@ Section EndOpBlocks.
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     eo_frame4 m -∗
     eo_frameS m -∗
-    log_mirror_clean -∗
+    log_mirror_clean logstart -∗
     eo_open bn γfs cov logstart n W L D Lw n -∗
     eo_cont (CID0 := CID0)  j pidv dq m K eb eb lks Vpr -∗
     WP (Loop : expr riscv_lang).
@@ -1789,7 +1789,7 @@ Section EndOpBlocks.
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (WH.wp_write_head_sconf γs j γl γu γd γk pd pav pu bn γfs
               cov logstart dev n W L pidv dq A1 (K - 8)%nat eb eb
-              (log_mirror_at (n, map uint W)
+              (log_mirror_at logstart (n, map uint W)
                ∗ ∃ Dc : gmap Z (list (bv 8)), fs_receipt_any Dc)%I lks Vpr
               ltac:(pose proof (eo_Kwh K HK); lia) Hgeom Hj Hgl (conj HnW Hn30)
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlfz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell HW HauthL Hhdr Hu1
@@ -1906,7 +1906,7 @@ Section EndOpBlocks.
               1%positive
               cov logstart dev false n W Lw (fun _ => [])
               (<[log_hdr_bno logstart := bs1]> L) D
-              pidv dq A3 (K - 8)%nat eb eb (log_mirror_at (n, map uint W)) lks Vpr
+              pidv dq A3 (K - 8)%nat eb eb (log_mirror_at logstart (n, map uint W)) lks Vpr
               ltac:(pose proof (eo_Kit K HK); lia) Hgeom Hj Hgl HA3a0
               (conj HnW Hn30) Hnd Hwok (fun _ => HLw')
               ltac:(intros Hab; discriminate)
@@ -2026,7 +2026,7 @@ Section EndOpBlocks.
       by (split; [reflexivity | unfold LOGBLOCKS; lia]).
     iApply (WH.wp_write_head_sconf γs j γl γu γd γk pd pav pu bn γfs
               cov logstart dev 0%nat [] (<[log_hdr_bno logstart := bs1]> L) pidv dq
-              A5 (K - 8)%nat eb eb log_mirror_clean lks Vpr
+              A5 (K - 8)%nat eb eb (log_mirror_clean logstart) lks Vpr
               ltac:(pose proof (eo_Kwh K HK); lia) Hgeom Hj Hgl Hshape0
               with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlfz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell [] HauthL [Hhdr] Hu3
                     [Hmirc]").
@@ -2037,9 +2037,10 @@ Section EndOpBlocks.
        plain home restriction and the mirror goes back to its clean picture --
        which is the form [log_batch] parks in the lock. *)
     { iIntros (bs' Hlen' Hhn' Hdec').
-      iApply (fs_clear_permit cov logstart (n, map uint W) bs'
+      iApply (fs_clear_permit cov logstart bs'
                 ltac:(exact Hlen') ltac:(rewrite Hhn'; reflexivity)
-                with "Hseam Hregc Hswlb Hmirc"). }
+                with "Hseam Hregc Hswlb [Hmirc]").
+      iApply (log_mirror_any_intro with "Hmirc"). }
     iIntros (CIDb3 Hsb3 mf3 bs2) "%Hcs3 Hcg Hcnt Hextc Hextm Hpc Hppid
                                   Hncell _ HauthL Hhdr %Hhdrn2 %Hhdec2 Hu3 >Hmirc".
     assert (Hpc11a : ret_pc (A5 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.end_op + 0x11a)).
@@ -2276,7 +2277,7 @@ Section EndOpBlocks.
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     eo_frame4 m -∗
     eo_frameS m -∗
-    log_mirror_clean -∗
+    log_mirror_clean logstart -∗
     eo_open bn γfs cov logstart n W L D Lw t -∗
     eo_cont (CID0 := CID0)  j pidv dq m K eb eb lks Vpr -∗
     WP (Loop : expr riscv_lang).
@@ -3020,7 +3021,7 @@ Section EndOpBlocks.
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (BW.wp_bwrite_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) k1 pidv dev bnol dq H2 (K - 8)%nat eb
-              bs2 bsd1 eb log_mirror_clean lks Vpr
+              bs2 bsd1 eb (log_mirror_clean logstart) lks Vpr
               ltac:(pose proof (eo_Kbwrite K HK); lia)
               ltac:(rewrite Hubnol; exact (eo_lt_lit _ Hslotrange))
               ltac:(reflexivity) Hj Hgl Hk1 HH2a0

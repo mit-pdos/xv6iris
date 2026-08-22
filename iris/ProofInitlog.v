@@ -2155,7 +2155,7 @@ Section ProofInitlog.
               (it_rec_L (il_W bs_hdr ((hdr_dec bs_hdr).1)) (fun k : nat => ys !!! k) L)
               pidv dq
               D2 (K - 6)%nat eb b
-              (log_mirror_at (0%nat, []) ∗ swap_lb (S gen_id))%I
+              (log_mirror_at logstart (0%nat, []) ∗ swap_lb (S gen_id))%I
               _ Vpr HKwh Hgeomok Hj Hgl Hshape0
               with "Hcg Hcnt Hextc Hclmc Htext Hkdata Hpc Hpenv Hbio Hfroz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell Hnil3 HLauth [Hfsb]
                     Hs1u [Hcust2]").
@@ -2383,7 +2383,7 @@ Section ProofInitlog.
        strips inside this update: the era's mirror half goes into the batch
        and the swap lower bound into [log_ctx]. *)
     iMod "HQ" as "[Hmirc #Hswlb]".
-    iAssert (log_mirror_clean) with "[Hmirc]" as "Hmirc";
+    iAssert (log_mirror_clean logstart) with "[Hmirc]" as "Hmirc";
       [rewrite /log_mirror_clean; iExact "Hmirc"|].
     iAssert (log_batch bn γfs cov logstart 0%nat ∅)
       with "[Hncell Hblk HLauth HDauth Hcovf Hfsb Hslotsfs Hpool Hmirc]" as "Hbatch".

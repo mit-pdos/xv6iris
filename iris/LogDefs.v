@@ -33,6 +33,69 @@ Definition hdr_n (bs : list (bv 8)) : Z := assemble_bytes (take 4 bs).
 Lemma hdr_n_nonneg (bs : list (bv 8)) : 0 <= hdr_n bs.
 Proof. rewrite /hdr_n. apply assemble_bytes_bound. Qed.
 
+(* ---------------------------------------------------------------------- *)
+(* The FULL header decode.                                                 *)
+(*                                                                         *)
+(* [struct logheader] is [int n; int block[LOGBLOCKS];] -- a run of         *)
+(* little-endian 32-bit words.  [hdr_n] above decodes the FIRST one; this   *)
+(* is the whole thing, and [hdr_dec_n] is the bridge that says the two      *)
+(* agree on it.                                                             *)
+(*                                                                         *)
+(* TOTAL and junk-tolerant by construction: a short block simply assembles  *)
+(* fewer bytes ([take]/[drop] never fail), so no well-formedness premise    *)
+(* rides on the decoder and a garbage header decodes to SOMETHING rather    *)
+(* than to nothing.  That matters: recovery must be defined at every        *)
+(* physical disk, including one a crash left mid-write.                     *)
+(* ---------------------------------------------------------------------- *)
+
+Definition le_word (bs : list (bv 8)) (i : nat) : Z :=
+  assemble_bytes (take 4 (drop (4 * i)%nat bs)).
+
+Definition hdr_dec (bs : list (bv 8)) : nat * list Z :=
+  let n := Z.to_nat (le_word bs 0) in
+  (n, (fun i => le_word bs (S i)) <$> seq 0 n).
+
+Lemma le_word_0 (bs : list (bv 8)) : le_word bs 0 = hdr_n bs.
+Proof. rewrite /le_word /hdr_n Nat.mul_0_r drop_0 //. Qed.
+
+(* THE BRIDGING LEMMA: the full decoder's [n] IS [hdr_n]. *)
+Lemma hdr_dec_n (bs : list (bv 8)) : Z.of_nat (hdr_dec bs).1 = hdr_n bs.
+Proof.
+  rewrite /hdr_dec /= le_word_0. apply Z2Nat.id, hdr_n_nonneg.
+Qed.
+
+Lemma hdr_dec_length (bs : list (bv 8)) :
+  length (hdr_dec bs).2 = (hdr_dec bs).1.
+Proof. rewrite /hdr_dec /= length_fmap length_seq //. Qed.
+
+Lemma hdr_dec_zero (bs : list (bv 8)) :
+  hdr_n bs = 0 -> hdr_dec bs = (0%nat, []).
+Proof. intros Hn. rewrite /hdr_dec le_word_0 Hn //. Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* THE MIRROR's READINGS (durable-disk stage E2).  [log_mirror] is the      *)
+(* era's picture of the whole durable disk, one total block view            *)
+(* ([RiscvPtsto.lm_view]); these are the derived readings the log layer     *)
+(* states its assertions at, and the pointwise update a WAL write's permit  *)
+(* hands the era back.                                                      *)
+(* ---------------------------------------------------------------------- *)
+
+(* the era's picture after one block write *)
+Definition lm_upd (M : log_mirror) (b : Z) (bs : list (bv 8)) : log_mirror :=
+  MkLogMirror (fun c => if decide (c = b) then bs else lm_view M c).
+
+(* the on-disk header's reading *)
+Definition lm_hdr (M : log_mirror) (ls : Z) : nat * list Z :=
+  hdr_dec (lm_view M (log_hdr_bno ls)).
+
+Lemma lm_upd_view_eq (M : log_mirror) (b : Z) (bs : list (bv 8)) :
+  lm_view (lm_upd M b bs) b = bs.
+Proof. rewrite /lm_upd /=. by rewrite decide_True. Qed.
+
+Lemma lm_upd_view_ne (M : log_mirror) (b c : Z) (bs : list (bv 8)) :
+  c <> b -> lm_view (lm_upd M b bs) c = lm_view M c.
+Proof. intros Hc. rewrite /lm_upd /=. by rewrite decide_False. Qed.
+
 Section LogMirrorDefs.
   Context `{!riscvGS Σ}.
 
@@ -40,13 +103,19 @@ Section LogMirrorDefs.
   Definition log_mirror_full : iProp Σ :=
     (∃ M : log_mirror, ghost_var mirror_name 1 M)%I.
 
-  (* The era's half, indexed by the on-disk header picture. *)
-  Definition log_mirror_at (h : nat * list Z) : iProp Σ :=
-    (∃ M : log_mirror,
-       ghost_var mirror_name (1/2) M ∗ ⌜lm_hdr M = h⌝)%I.
+  (* The era's half, at a NAMED picture -- what a WAL caller chains its
+     knowledge of the durable disk through. *)
+  Definition log_mirror_half (M : log_mirror) : iProp Σ :=
+    ghost_var mirror_name (1/2) M.
 
-  Global Instance log_mirror_at_timeless h : Timeless (log_mirror_at h).
-  Proof. rewrite /log_mirror_at. apply _. Qed.
+  (* The era's half, indexed by the on-disk header's reading only. *)
+  Definition log_mirror_at (ls : Z) (h : nat * list Z) : iProp Σ :=
+    (∃ M : log_mirror, log_mirror_half M ∗ ⌜lm_hdr M ls = h⌝)%I.
+
+  Global Instance log_mirror_half_timeless M : Timeless (log_mirror_half M).
+  Proof. rewrite /log_mirror_half. apply _. Qed.
+  Global Instance log_mirror_at_timeless ls h : Timeless (log_mirror_at ls h).
+  Proof. rewrite /log_mirror_at /log_mirror_half. apply _. Qed.
 End LogMirrorDefs.
 
 Record log_names := MkLogNames {
