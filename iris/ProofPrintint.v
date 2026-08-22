@@ -543,7 +543,6 @@ Section ProofPrintint.
   Proof.
     induction f as [|f' IH]; intros i CID0 x md Hif Hxf Hbase Ha0 Ha3 Ha4 Ha6;
       iIntros "Hcg #Htext #Hdig Hpc Hbuf Hcont";
-      iPoseProof (pii_40 with "Htext") as "Hi40";
       iApply (wp_printint_dbody (CID0 := CID0) K buf dg i x md b pcur
                 ltac:(lia) ltac:(change (2^31) with 2147483648; lia)
                 Hbase Ha0 Ha3 Ha4 Ha6
@@ -561,7 +560,8 @@ Section ProofPrintint.
                 a1_idx a5_idx mb (K - 8)%nat b
                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                 ltac:(rgne; rgne; unfold zopz0zKzJ_u; rewrite Hb5 (Hbk a1_idx ltac:(reg_neq) ltac:(reg_neq) ltac:(reg_neq) ltac:(reg_neq) ltac:(reg_neq) ltac:(reg_neq)); exact Hcmp)
-                with "Hcg Hpc Hi40").
+                with "Hcg Hpc []").
+                { iApply (pii_40 with "Htext"). }
       iIntros (CIDc Hsc) "Hcg Hpc".
       assert (Hp44 : add_vec_int (mword_of_int (KernelSyms.printint + 0x40) : mword 64) 4 = mword_of_int (KernelSyms.printint + 0x44)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp44) in "Hpc".
@@ -575,7 +575,8 @@ Section ProofPrintint.
                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                 ltac:(rgne; rgne; unfold zopz0zKzJ_u; rewrite Hb5 (Hbk a1_idx ltac:(reg_neq) ltac:(reg_neq) ltac:(reg_neq) ltac:(reg_neq) ltac:(reg_neq) ltac:(reg_neq)); exact Hcmp)
                 ltac:(vm_compute; reflexivity)
-                with "Hcg Hpc Hi40").
+                with "Hcg Hpc []").
+                { iApply (pii_40 with "Htext"). }
       iApply bi.later_intro. iIntros (CIDc Hsc) "Hcg Hpc".
       assert (Htgt : add_vec (mword_of_int (KernelSyms.printint + 0x40) : mword 64) (sign_extend' 64 (mword_of_int 8162 : mword 13)) = mword_of_int (KernelSyms.printint + 0x22)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgt) in "Hpc".
@@ -614,7 +615,8 @@ Section ProofPrintint.
                 a1_idx a5_idx mb (K - 8)%nat b
                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                 ltac:(rgne; rgne; unfold zopz0zKzJ_u; rewrite Hb5 (Hbk a1_idx ltac:(reg_neq) ltac:(reg_neq) ltac:(reg_neq) ltac:(reg_neq) ltac:(reg_neq) ltac:(reg_neq)); exact Hcmp)
-                with "Hcg Hpc Hi40").
+                with "Hcg Hpc []").
+                { iApply (pii_40 with "Htext"). }
       iIntros (CIDc Hsc) "Hcg Hpc".
       assert (Hp44 : add_vec_int (mword_of_int (KernelSyms.printint + 0x40) : mword 64) 4 = mword_of_int (KernelSyms.printint + 0x44)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp44) in "Hpc".
@@ -690,20 +692,17 @@ Section ProofPrintint.
        (rather than framed in a bracket), which is what keeps it that way. *)
     induction j as [|j' IH]; intros CID0 bs mp Hj24 Hs1 Hs2 Hlkbelow;
       iIntros "Hcg Hcnt #Htext Hpc Hbuf #Hdev #Htxl #Hsent Hcont";
-      iPoseProof (pii_74 with "Htext") as "Hi74";
-      iPoseProof (pii_78 with "Htext") as "Hi78";
-      iPoseProof (pii_7c with "Htext") as "Hi7c";
-      iPoseProof (pii_7e with "Htext") as "Hi7e";
       iDestruct (bytes_own_acc (KTR := kt) (DfracOwn 1) buf 24 _ Hj24 with "Hbuf") as "[Hbj Hbcl]";
       iDestruct "Hbj" as (bj) "Hbj";
       assert (Hpa : add_vec (mp !!! Regidx s1_idx) (sign_extend' 64 (mword_of_int 0 : mword 12))
                     = pa_add buf _) by (rewrite Hs1 Hz0; apply kv_addv_zero);
       iEval (rewrite -Hpa) in "Hbj";
       (* +0x74 lbu a0,0(s1) : buf[i] *)
-      iApply (wp_lbu_s_sconf (mword_of_int (KernelSyms.printint + 0x74)) a0_idx s1_idx (mword_of_int 0 : mword 12)
+      (iApply (wp_lbu_s_sconf (mword_of_int (KernelSyms.printint + 0x74)) a0_idx s1_idx (mword_of_int 0 : mword 12)
                 mp (K - 8)%nat (bj : mword 8) b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hi74 Hbj");
+                with "Hcg Hpc [] Hbj");
+       [ iApply (pii_74 with "Htext") | ]);
       iIntros (CIDl1 Hsl1) "Hcg Hpc Hbj";
       iEval (rewrite Hpa) in "Hbj";
       iDestruct ("Hbcl" with "Hbj") as "Hbuf";
@@ -712,10 +711,11 @@ Section ProofPrintint.
         by (apply bv_eq; vm_compute; reflexivity);
       iEval (rewrite Hp78) in "Hpc";
       (* +0x78 jal consputc *)
-      iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.printint + 0x78)) ra_idx (mword_of_int 2096550 : mword 21)
+      (iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.printint + 0x78)) ra_idx (mword_of_int 2096550 : mword 21)
                 P1 (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(vm_compute; reflexivity)
-                with "Hcg Hpc Hi78");
+                with "Hcg Hpc []");
+       [ iApply (pii_78 with "Htext") | ]);
       iIntros (CIDj1 Hsj1) "Hcg Hpc";
       set (P2 := <[Regidx ra_idx := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.printint + 0x78) : mword 64) 4)]> P1);
       assert (Htgtc : add_vec (mword_of_int (KernelSyms.printint + 0x78) : mword 64) (sign_extend' 64 (mword_of_int 2096550 : mword 21)) = mword_of_int KernelSyms.consputc)
@@ -745,9 +745,10 @@ Section ProofPrintint.
             rewrite /P2 upd_ne; [| congruence];
             rewrite /P1 upd_ne; [reflexivity | congruence]);
       (* +0x7c c.addi s1,s1,-1 *)
-      iApply (wp_caddi_s_sconf (mword_of_int (KernelSyms.printint + 0x7c)) s1_idx (mword_of_int 63 : mword 6)
+      (iApply (wp_caddi_s_sconf (mword_of_int (KernelSyms.printint + 0x7c)) s1_idx (mword_of_int 63 : mword 6)
                 mc (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hi7c");
+                with "Hcg Hpc []");
+       [ iApply (pii_7c with "Htext") | ]);
       iIntros (CIDa1 Hsa1) "Hcg Hpc";
       iEval (rgne) in "Hcg";
       set (P3 := <[Regidx s1_idx := regval_into_reg
@@ -768,7 +769,8 @@ Section ProofPrintint.
                 s2_idx s1_idx P3 (K - 8)%nat b
                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                 ltac:(rgne; rgne; rewrite Hcmp; reflexivity)
-                with "Hcg Hpc Hi7e").
+                with "Hcg Hpc []").
+                { iApply (pii_7e with "Htext"). }
       iIntros (CIDbn Hsbn) "Hcg Hpc".
       assert (Hp82 : add_vec_int (mword_of_int (KernelSyms.printint + 0x7e) : mword 64) 4 = mword_of_int (KernelSyms.printint + 0x82))
         by (apply bv_eq; vm_compute; reflexivity).
@@ -783,7 +785,8 @@ Section ProofPrintint.
                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                 ltac:(rgne; rgne; rewrite Hcmp; reflexivity)
                 ltac:(vm_compute; reflexivity)
-                with "Hcg Hpc Hi7e").
+                with "Hcg Hpc []").
+                { iApply (pii_7e with "Htext"). }
       iApply bi.later_intro. iIntros (CIDbn Hsbn) "Hcg Hpc".
       assert (Htgtb : add_vec (mword_of_int (KernelSyms.printint + 0x7e) : mword 64) (sign_extend' 64 (mword_of_int 8182 : mword 13)) = mword_of_int (KernelSyms.printint + 0x74))
         by (apply bv_eq; vm_compute; reflexivity).

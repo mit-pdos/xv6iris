@@ -516,7 +516,6 @@ Section KernelvecCore.
     assert (HVr29 : ρ 29%nat = m !!! Regidx (mword_of_int 29 : mword 5)) by reflexivity.
     assert (HVr30 : ρ 30%nat = m !!! Regidx (mword_of_int 30 : mword 5)) by reflexivity.
     assert (HVr31 : ρ 31%nat = m !!! Regidx (mword_of_int 31 : mword 5)) by reflexivity.
-    iDestruct (kv_store_instrs with "Htext") as "Hbi".
     iApply (wp_vc_block_s (KTR := KT1) root_ppn kv_store_prog
               (VSt (KernelSyms.kernelvec + 0x2) kv_store_regs0 kv_store_heap0 [])
               (VSt (KernelSyms.kernelvec + 0x24) kv_store_regs0 kv_store_heap1 [])
@@ -524,7 +523,8 @@ Section KernelvecCore.
               (dq:=dq)
  kv_store_run HmS
               with "Hsm Htlbinv
-                    Hpc Hfile Hbi [Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17] []").
+                    Hpc Hfile [] [Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17] []").
+    { iApply (kv_store_instrs with "Htext"). }
     { rewrite /vheap_own. cbn [vheap]. rewrite /kv_store_heap0.
       cbn [big_opL fst snd].
       rewrite !sval_den_SX0. cbn [sval_den].
@@ -647,7 +647,6 @@ Section KernelvecCore.
     assert (HVw15 : ρ 47%nat = (w15 : mword 64)) by reflexivity.
     assert (HVw16 : ρ 48%nat = (w16 : mword 64)) by reflexivity.
     assert (HVw17 : ρ 49%nat = (w17 : mword 64)) by reflexivity.
-    iDestruct (kv_load_instrs with "Htext") as "Hbi".
     iApply (wp_vc_block_s (KTR := KT1) root_ppn kv_load_prog
               (VSt (KernelSyms.kernelvec + 0x28) kv_load_regs0 kv_store_heap0 [])
               (VSt (KernelSyms.kernelvec + 0x4a) kv_load_regs1 kv_store_heap0 [])
@@ -655,7 +654,8 @@ Section KernelvecCore.
               (dq:=dq)
  kv_load_run HmL
               with "Hsm Htlbinv
-                    Hpc Hfile Hbi [Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17] []").
+                    Hpc Hfile [] [Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17] []").
+    { iApply (kv_load_instrs with "Htext"). }
     { rewrite /vheap_own. cbn [vheap]. rewrite /kv_store_heap0.
       cbn [big_opL fst snd].
       rewrite !sval_den_SX0. cbn [sval_den].

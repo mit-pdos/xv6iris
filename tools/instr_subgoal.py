@@ -40,6 +40,29 @@ import sys
 # its uses were left behind.  Anything not matched here must be REFUSED, never
 # quietly dropped, which is what the residue check at the end of convert() is
 # for.
+# The persistent [kernel_text] hypothesis is NOT always called "Htext": the
+# console and uart cone calls it "Ht", and hard-coding the name hid 385 poses
+# across six files behind a CLEAN verdict.  The name is discovered per file.
+TEXT_NAMES = ('Htext', 'Ht', 'Hktext', 'Htxt')
+TEXT = 'Htext'
+
+
+def text_name(src):
+    """The name this file gives the persistent kernel_text hypothesis."""
+    best, n = 'Htext', -1
+    for cand in TEXT_NAMES:
+        k = len(re.findall(r'iPoseProof \([^()"]*? with "' + cand + r'"\)\s*as', src))
+        if k > n:
+            best, n = cand, k
+    return best
+
+
+def _pats(t):
+    return (re.compile(r'iPoseProof \(([^()"]*?)\s+with "' + t + r'"\)\s*as\s*"#?([^"\s]+)"\.'),
+            re.compile(r'^[ \t]*(?:iPoseProof \([^()"]*? with "' + t + r'"\)\s*as\s*"#?[^"\s]+"\. ?)+\n', re.M),
+            re.compile(r'iPoseProof \([^()"]*with "' + t + r'"\)\s*as'))
+
+
 POSE = re.compile(r'iPoseProof \(([^()"]*?)\s+with "Htext"\)\s*as\s*"#?([^"\s]+)"\.')
 # a whole line that is nothing but one or more such poses
 POSE_LINE = re.compile(
@@ -66,6 +89,9 @@ CHAINED = re.compile(r'iPoseProof \(\w+ with "Htext"\) as "[^"]+";')
 
 
 def scan(src):
+    global POSE, POSE_LINE, ANY_POSE, TEXT
+    TEXT = text_name(src)
+    POSE, POSE_LINE, ANY_POSE = _pats(TEXT)
     """-> (site position -> lemma, conforming sites, {hyp: stray count})
 
     A hypothesis name is resolved per SITE, against the NEAREST PRECEDING pose
@@ -133,6 +159,7 @@ def scan(src):
 
 
 def convert(src):
+    global TEXT
     resolved, _, stray, poses, _ = scan(src)
     if stray:
         raise ValueError('non-conforming references: '
@@ -150,7 +177,7 @@ def convert(src):
         toks[toks.index(hyp)] = '[]'
         nsite[0] += 1
         return (indent + pre + ' '.join(toks) + post + '\n'
-                + indent + '{ iApply (' + lemma + ' with "Htext"). }')
+                + indent + '{ iApply (' + lemma + ' with "' + TEXT + '"). }')
 
     # Rewrite the SITES FIRST: `resolved` is keyed by offsets into `src`, so
     # deleting the pose lines beforehand would shift every key.
@@ -192,7 +219,7 @@ def convert(src):
     # The site regex sees the indent of the line the [with "..."] sits on, which
     # for a multi-line iApply is the continuation indent.  Re-indent each brace
     # to the indent of the iApply that opened the sentence.
-    brace = re.compile(r'^(\s*)\{ iApply \([^()"]* with "Htext"\)\. \}$')
+    brace = re.compile(r'^(\s*)\{ iApply \([^()"]* with "' + TEXT + r'"\)\. \}$')
     lines, fixed = out.split('\n'), []
     for line in lines:
         if brace.match(line):

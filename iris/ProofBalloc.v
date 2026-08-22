@@ -2581,7 +2581,6 @@ Section BallocScan.
                 #Hdlock Hsl Hop #Hbminv Hlk Hcont";
       iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm; cbn in Hbm;
       pose proof Hbi as Hbi'; rewrite BPB_value in Hbi';
-      iPoseProof (bai_0b6 with "Htext") as "Hib6";
       iPoseProof (printk_env_panic with "Hpenv") as "#Hpanenv";
       assert (Hszsext : (sign_extend' 64 (mword_of_int size : mword 32) : mword 64)
                         = mword_of_int size)
@@ -2595,7 +2594,8 @@ Section BallocScan.
       iApply (wp_bgeu_taken_s_sconf (mword_of_int (KernelSyms.balloc + 0xb6))
                 (mword_of_int 8148 : mword 13) Ra0 Rs1 M (K - 10)%nat b
                 ltac:(nz) ltac:(nz) Hcmp ltac:(vm_compute; reflexivity)
-                with "Hcg Hpc Hib6").
+                with "Hcg Hpc []").
+                { iApply (bai_0b6 with "Htext"). }
       iApply bi.later_intro. iIntros (CID1 Hq1) "Hcg Hpc".
       assert (Hjt : add_vec (mword_of_int (KernelSyms.balloc + 0xb6) : mword 64)
                       (sign_extend' 64 (mword_of_int 8148 : mword 13))
@@ -2622,7 +2622,8 @@ Section BallocScan.
         iApply (wp_bgeu_taken_s_sconf (mword_of_int (KernelSyms.balloc + 0xb6))
                   (mword_of_int 8148 : mword 13) Ra0 Rs1 M (K - 10)%nat b
                   ltac:(nz) ltac:(nz) Hcmp ltac:(vm_compute; reflexivity)
-                  with "Hcg Hpc Hib6").
+                  with "Hcg Hpc []").
+                  { iApply (bai_0b6 with "Htext"). }
         iApply bi.later_intro. iIntros (CID1 Hq1) "Hcg Hpc".
         assert (Hjt : add_vec (mword_of_int (KernelSyms.balloc + 0xb6) : mword 64)
                         (sign_extend' 64 (mword_of_int 8148 : mword 13))
@@ -2666,7 +2667,8 @@ Section BallocScan.
           rewrite (ba_bgeu_moi bi size ltac:(lia) ltac:(lia)). exact Hge. }
         iApply (wp_bgeu_fall_s_sconf (mword_of_int (KernelSyms.balloc + 0xb6))
                   (mword_of_int 8148 : mword 13) Ra0 Rs1 M (K - 10)%nat b
-                  ltac:(nz) ltac:(nz) Hcmp with "Hcg Hpc Hib6").
+                  ltac:(nz) ltac:(nz) Hcmp with "Hcg Hpc []").
+                  { iApply (bai_0b6 with "Htext"). }
         iIntros (CID1 Hq1) "Hcg Hpc".
         assert (Hppba : add_vec_int (mword_of_int (KernelSyms.balloc + 0xb6) : mword 64) 4
                         = mword_of_int (KernelSyms.balloc + 0xba)) by pcw.
