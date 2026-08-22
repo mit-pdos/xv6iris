@@ -133,7 +133,7 @@ banner says precisely what is left):
   `P_disk ∗ P_wf` around the committed-view ghost `D`, makes recovery
   logically invisible, and derives every machine permit from `end_op`'s
   one client fupd. Stages A/B/D1/D2 landed; open: E (crash layer),
-  F (pure `fs_wf⁻` + update lemmas), G (the per-op preservation sweep,
+  F (pure `fs_durable_wf` + update lemmas), G (the per-op preservation sweep,
   the long pole), H (boot re-founding), I (delete `Himg`).
 - **[`fs-log.md`](projects/fs-log.md)** — the FS block layer, STAGE 4 (the
   crash instantiation): real `n > 0` recovery in `initlog`/`install_trans`

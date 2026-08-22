@@ -76,7 +76,7 @@ crash predicate". The four decisions:
    (a `ghost_var` handle only when an outside holder must name `D`,
    e.g. the contents layer's sync receipts). `P_disk` (log/WAL layer):
    physical fragments, `fs_recovery (blocks dk) D`, `hdr_wf`,
-   mirror/custody, history. `P_wf` (FS layer): `⌜fs_wf⁻ D⌝`, and
+   mirror/custody, history. `P_wf` (FS layer): `⌜fs_durable_wf D⌝`, and
    EVENTUALLY the higher-level durable ghosts (directory/file CONTENTS
    abstracting away from the disk-like `D`) — not built yet, but the
    target shape. Only the commit permit (and the boot swap) touches
@@ -112,7 +112,7 @@ crash predicate". The four decisions:
    ghosts (directory/file contents) must move in the same instant. It is
    built at `end_op` time (invariants openable at ⊤ there), consumed at
    the DMA completion's `∅`-mask opening, so it must be a basic ghost
-   update; `⌜fs_wf⁻ D⌝` of the OLD view arrives from the invariant body
+   update; `⌜fs_durable_wf D⌝` of the OLD view arrives from the invariant body
    at fire time. Group commit means the fupd covers the WHOLE group's
    batch: it is assembled generically from `⌜wf(L)⌝ + ⌜D' = L⌝` (the
    batch's entries are exactly the blocks written since the last commit;
@@ -120,9 +120,11 @@ crash predicate". The four decisions:
    states install-arithmetic — each op only maintains "the logged view
    stays well-formed" (stage G1).
 
-**`fs_wf⁻`** is a reachability-closed weakening of `fsimg_wf`-minus-W2:
-W9's directory clause is mkfs-specific (`z = ROOTINO` — false after one
-successful mkdir) and must be generalized before anything carries it.
+**`fs_durable_wf`** is THE well-formedness invariant of the durable
+committed view: the content sweeps stated generally (`fsimg_wf`'s W9 as
+written is an mkfs artifact — `z = ROOTINO` is false after one successful
+mkdir — and log cleanliness is no part of it). `fs.img` is merely the
+base case: `fsimg_wf -> fs_durable_wf` is the era-0 discharge.
 
 ## 2. Stage A — the machine layer (`RiscvPtsto`, `RiscvExec`, `WpUart`, `PermInv`, `RiscvAdequacy`)
 
@@ -231,11 +233,11 @@ Footprint (grep `disk_tie\|fs_tie_interp\|riscv_crash_pred\|disk_write_permit`):
       caught-up receipt; `fs_clear_permit` consumes the family and
       keeps `D` via `fs_recovery_clear_keeps` (FsCrash.v:630, today
       unused). Same for the recovery-side install/boot-head permits.
-- [ ] **E4.** `P_fs_alloc`/`FsAdequacyImg`: establish `⌜fs_wf⁻⌝` at the
+- [ ] **E4.** `P_fs_alloc`/`FsAdequacyImg`: establish `⌜fs_durable_wf⌝` at the
       literal image (a `FsImgCheck`-style computation, cheap — the
       sweeps already run there).
 
-## 5. Stage F — the pure layer: `fs_wf⁻` and the image-level update lemmas
+## 5. Stage F — the pure layer: `fs_durable_wf` and the image-level update lemmas
 
 `FsImg.v` has the full decode vocabulary and ZERO update lemmas (survey
 2026-08-22); the fragment-level laws exist (`BitmapEnc.bm_bytes_*`,
@@ -243,21 +245,20 @@ Footprint (grep `disk_tie\|fs_tie_interp\|riscv_crash_pred\|disk_write_permit`):
 `InodeInv.blkmap_wf_*`). This stage is the join, and it is parallelizable
 and iris-free:
 
-- [ ] **F1.** Define `fs_wf⁻` over a block view: `fsimg_wf` minus W2,
-      with W9 generalized to arbitrary directory trees (drop the
-      `z = ROOTINO` clause; state link counts against `fs_all_tickets`
-      generally) and whatever else the sweep needs to be closed under
-      the five write shapes. Prove `fsimg_wf -> fs_wf⁻` (the image
-      discharge for E4).
+- [ ] **F1.** Define `fs_durable_wf` over a block view: the general
+      content sweeps (W9 stated against `fs_all_tickets` for arbitrary
+      directory trees, no `z = ROOTINO`; no log-cleanliness conjunct),
+      closed under the five write shapes. Prove
+      `fsimg_wf -> fs_durable_wf` (the image discharge for E4).
 - [ ] **F2.** The five update lemmas, one per written-block kind:
       bitmap set/clear (`bitmap_bytes`), dinode-at-slot
       (`diblk_bytes` insert, alloc/update/free arms), dirent
       write/zero (writei splice on a dir block), file/indirect data
       (splice + `ind_bytes` insert), fresh-block zero. Each:
-      `fs_wf⁻ P -> <side conditions> -> fs_wf⁻ (<[b := bytes]> P)`.
+      `fs_durable_wf P -> <side conditions> -> fs_durable_wf (<[b := bytes]> P)`.
       The side conditions are what stage G threads.
 
-## 6. Stage G — the op sweep: every transaction preserves `fs_wf⁻`
+## 6. Stage G — the op sweep: every transaction preserves `fs_durable_wf`
 
 The long pole: the formal content of "xv6 never corrupts its FS".
 Surface (survey 2026-08-22): 9 `log_write` sites (balloc ×2, bfree,
@@ -282,7 +283,7 @@ sys_mknod, sys_chdir, filewrite, fileclose, kexec ×2, kexit, ireclaim).
 
 - [ ] **H1.** `fs_cfg_alloc` (and `FsBoot.fs_boot_ghosts`) run at `D`
       read out of `P_fs` in the era fupd (open `crashN` at ⊤); the
-      raw-disk premises become `fs_wf⁻ D` + geometry from `P_fs`.
+      raw-disk premises become `fs_durable_wf D` + geometry from `P_fs`.
       `BootShared.boot_shared_alloc` loses the image premise.
 - [ ] **H2.** Blocks where physical ≠ `D` (the committed log's homes)
       are minted dirty-at-boot: logged = slot content, bio holds them

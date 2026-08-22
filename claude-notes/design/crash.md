@@ -236,7 +236,7 @@ Refines the ruling above; worklist stages E–I in
    sync receipts). `P_disk` is the log/WAL layer's:
    the physical fragments pinning `dk`, `fs_recovery (fs_blocks dk) D`,
    `hdr_wf`, the mirror/custody arm, the history. `P_wf` is the FS
-   layer's: `⌜fs_wf⁻ D⌝` — and EVENTUALLY the higher-level durable
+   layer's: `⌜fs_durable_wf D⌝` — and EVENTUALLY the higher-level durable
    ghosts: directory and file CONTENTS as their own ghost state, tied to
    `D` by the decode relation, so durability statements speak about
    files and directories, never about a disk-like view (that is also
@@ -246,7 +246,7 @@ Refines the ruling above; worklist stages E–I in
    The era mint (`fs_cfg_alloc`, the `fs_L` logged view, the icache /
    bitmap / link-ledger stocks) runs at `D`, read out of `P_fs` in the
    era fupd — never at the raw boot disk. Its well-formedness premises
-   come from `⌜fs_wf⁻ D⌝`.
+   come from `⌜fs_durable_wf D⌝`.
 3. **Recovery is logically invisible.** A dirty-log boot is the
    post-commit pre-install steady state: logged view = slot content,
    home block physically stale, dirty-at-boot true. `initlog` /
@@ -266,7 +266,7 @@ Refines the ruling above; worklist stages E–I in
    contents-level ghosts must move in the same instant. Built at
    `end_op` time (invariants openable at ⊤), consumed at the
    completion's `∅`-mask opening, hence a basic ghost update; the old
-   view's `⌜fs_wf⁻ D⌝` arrives from the invariant body at fire time.
+   view's `⌜fs_durable_wf D⌝` arrives from the invariant body at fire time.
    **What lets the commit fupd NAME `D'` at mask `∅` is the widened
    mirror**: `log_mirror`'s payload grows from header+slots to the era's
    full picture of the durable extent (home blocks included), pinned to
@@ -279,11 +279,16 @@ Refines the ruling above; worklist stages E–I in
    picture). `fr_D` is then a pure function of the mirror picture — the
    era knows the committed view BY VALUE — and no bio-layer fact is
    ever needed inside a permit.
-5. **`fs_wf⁻`** is the reachability-closed weakening of
-   `fsimg_wf`-minus-`fs_log_clean`: `fsimg_wf`'s W9 is mkfs-specific
-   ("the only directory is root" — false after one successful mkdir),
-   so the carried sweep generalizes it; `fsimg_wf -> fs_wf⁻` is the
-   era-0 discharge. Each commit proves preservation — that obligation
+5. **`fs_durable_wf`** is THE well-formedness invariant of the durable
+   committed view — the property every reachable committed state has and
+   every commit preserves. It states the content sweeps generally
+   (`fsimg_wf`'s W9 as written is an mkfs-image artifact — "the only
+   directory is root", false after one successful mkdir — and log
+   cleanliness is no part of it: a committed-uninstalled log is a fine
+   durable state). There is nothing special about `fs.img` beyond being
+   the base case of the poweroff/poweron loop invariant: adequacy
+   constructs the entire `P_fs` for it at init time, via
+   `fsimg_wf -> fs_durable_wf`. Each commit proves preservation — that obligation
    is per-OP, at `end_op`, under group-commit quiescence (`out = 0`):
    mid-batch logged views are DELIBERATELY inconsistent (bitmap bit set
    before the inode points at the block), so the wf row on `log_res` is
