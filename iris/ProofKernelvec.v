@@ -848,13 +848,13 @@ Section KernelvecCore.
     iIntros "Hsm Htlbinv Hpc Hfile
              #Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17 Hcont".
     (* ---- #1: c.addi16sp sp,-256 @ 0x800053e0 (fetch page-walk, fills slot 5) ---- *)
-    iPoseProof (kv_instr1 with "Htext") as "Hi1".
     assert (Hpc1 : add_vec_int (mword_of_int (KernelSyms.kernelvec) : mword 64) 2 = (mword_of_int (KernelSyms.kernelvec + 0x2) : mword 64))
       by (vm_compute; reflexivity).
     iApply (wp_caddi16sp_gpr_s_pt root_ppn γ (mword_of_int (KernelSyms.kernelvec)) kv_imm1 m
               (1/2)%Qp
 
-              with "Hsm Htlbinv Hpc Hfile Hi1").
+              with "Hsm Htlbinv Hpc Hfile []").
+    { iApply (kv_instr1 with "Htext"). }
     iEval (rewrite Hpc1).
     iIntros "Hsm Htlbinv Hpc Hfile".
     (* the sp-lookup / clobbered-lookup facts over kv_m1 *)
@@ -971,7 +971,6 @@ Section KernelvecCore.
     iEval (rewrite <- Heqw16; rewrite Hmr16) in "Hw16".
     iEval (rewrite <- Heqw17; rewrite Hmr17) in "Hw17".
     (* ---- #19: jal ra, kerneltrap @ 0x80005404 ---- *)
-    iPoseProof (kv_i19 with "Htext") as "Hi19".
     assert (Hrd19 : uint (mword_of_int 1 : mword 5) <> 0) by (vm_compute; discriminate).
     assert (Hal19 : eq_vec (access_vec_dec (add_vec (mword_of_int (KernelSyms.kernelvec + 0x24) : mword 64)
                       (sign_extend' 64 (mword_of_int KernelConsts.kernelvec_jal_imm : mword 21))) 0) ('b"0") = true)
@@ -979,7 +978,8 @@ Section KernelvecCore.
     iApply (wp_jal_gpr_s_zca_pt root_ppn γ (mword_of_int (KernelSyms.kernelvec + 0x24)) (mword_of_int 1) (mword_of_int KernelConsts.kernelvec_jal_imm)
               (kv_m1 m) (1/2)%Qp
  Hrd19 Hal19
-              with "Hsm Htlbinv Hpc Hfile Hi19").
+              with "Hsm Htlbinv Hpc Hfile []").
+    { iApply (kv_i19 with "Htext"). }
     iEval (rewrite kv_jal_tgt kv_ra_val).
     iIntros "Hsm Htlbinv Hpc Hfile".
     iApply ("Hcont" with "Hsm Htlbinv Hpc Hfile Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17").
@@ -1152,13 +1152,13 @@ Section KernelvecCore.
     {{ unfold kv_load_result. kv_skipt. exact Hsp0. }}
     set (mt17 := kv_load_result mt v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 v16 v17) in *.
     (* ---- #37: c.addi16sp sp,+256 @ 0x8000542a ---- *)
-    iPoseProof (kv_i37 with "Htext") as "Hi37".
     assert (Hpc37 : add_vec_int (mword_of_int (KernelSyms.kernelvec + 0x4a) : mword 64) 2 = (mword_of_int (KernelSyms.kernelvec + 0x4c) : mword 64))
       by (vm_compute; reflexivity).
     iApply (wp_caddi16sp_gpr_s_pt root_ppn γ (mword_of_int (KernelSyms.kernelvec + 0x4a)) (mword_of_int 16) mt17
               (1/2)%Qp
 
-              with "Hsm Htlbinv Hpc Hfile Hi37").
+              with "Hsm Htlbinv Hpc Hfile []").
+    { iApply (kv_i37 with "Htext"). }
     iEval (rewrite Hpc37).
     iIntros "Hsm Htlbinv Hpc Hfile".
     iPoseProof (kv_cfg_recombine γ mstatus0 mie_v mdv0 menvcfg0
@@ -1824,7 +1824,6 @@ Section KernelvecHandler.
            the bundle, the travelling tie, BOTH ghost eighths (the arm's, in
            the bundle, and the count's, out of [cpu_hart]), the installed
            handler and the running claim.  Its post IS [ihs_post_of]. ---- *)
-    iPoseProof (kv_i38 with "Htext") as "Hi38".
     iAssert (sconf (CID := CIDn)) with "[Hprivf Hmsf Hhalff Htief Hmief Hmdlf Hmenvf]"
       as "Hscf".
     { rewrite /sconf. iFrame "Hhwf Hinvf Hprivf".
@@ -1843,9 +1842,10 @@ Section KernelvecHandler.
     iDestruct (sie_cap_gpr_join (CID := CIDn) with "Hhsf Hscf Hcapf Hfilef") as "Hcgs".
     iApply (wp_sret_s_sconf (CID := CIDn)
               (mword_of_int (KernelSyms.kernelvec + 0x4c) : mword 64) m av pc0
-              with "Hcgs Hsretf Hcntf Hsepcf [Hscausef] [Hstvalf] Hiresf Hrcptf Hcellsf Hclmf Hpcf Hi38").
+              with "Hcgs Hsretf Hcntf Hsepcf [Hscausef] [Hstvalf] Hiresf Hrcptf Hcellsf Hclmf Hpcf []").
     { iExists sc'. iExact "Hscausef". }
     { iExists tv'. iExact "Hstvalf". }
+    { iApply (kv_i38 with "Htext"). }
     iIntros "Hcg Hpc".
     (* ---- and the post is the engine's own precondition, at THIS hart ---- *)
     iDestruct (wp_next_at true p _ CIDn Hsn with "Hnext") as "Hnext".
