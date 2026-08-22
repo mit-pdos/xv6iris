@@ -110,6 +110,7 @@ Require Import SchedCtx.
 Require Import ProcDefs.  (* [proc_priv_bare] *)
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
+Require Import PrintkArgs PrintkFmt SpecPrintk.  (* the recovery printk, via install_trans *)
 Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
@@ -129,6 +130,35 @@ Notation K_initlog := (74%nat) (only parsing).
    out of [kernel_data] with [kernel_data_string]. *)
 Definition log_name_str : Z := 0x80007518.
 
+(* the boot dirty map is [false] wherever the halves say so -- the pure
+   form of the cov-wide big-op, which is what the recovering install's
+   contract consumes (durable-disk stage D1) *)
+Lemma initlog_dirty_all_false `{!riscvGS Σ, !xv6G Σ} (γfs : fs_names)
+    (D : gmap Z bool) (cov : gset Z) :
+  ghost_map_auth (fs_dirty γfs) 1 D -∗
+  ([∗ set] z ∈ cov, z ↪[fs_dirty γfs]{#(1/2)} false) -∗
+  ⌜forall b : Z, b ∈ cov -> D !! b = Some false⌝ ∗
+  ghost_map_auth (fs_dirty γfs) 1 D ∗
+  ([∗ set] z ∈ cov, z ↪[fs_dirty γfs]{#(1/2)} false).
+Proof.
+  iIntros "Ha Hs".
+  iInduction cov as [|z cov Hz] "IH" using set_ind_L.
+  - iFrame "Ha". iSplitR.
+    + iPureIntro. intros b0 Hb0. exfalso. exact (not_elem_of_empty b0 Hb0).
+    + done.
+  - iEval (rewrite (big_sepS_insert _ cov z Hz)) in "Hs".
+    iDestruct "Hs" as "[Hz1 Hs]".
+    iDestruct (ghost_map_lookup with "Ha Hz1") as %Hlk.
+    iDestruct ("IH" with "Ha Hs") as "(%Hall & Ha & Hs)".
+    iFrame "Ha". iSplitR.
+    { iPureIntro. intros b0 Hb0.
+      apply elem_of_union in Hb0 as [Hb0 | Hb0].
+      - apply elem_of_singleton in Hb0. subst b0. exact Hlk.
+      - exact (Hall b0 Hb0). }
+    rewrite (big_sepS_insert _ cov z Hz).
+    iSplitL "Hz1"; [iExact "Hz1" | iExact "Hs"].
+Qed.
+
 Definition wp_initlog_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     
@@ -137,9 +167,10 @@ Definition wp_initlog_sconf_body
     (pd pav pu : mword 64)
     (bn : bio_names)
     (γ : log_names)     (* THE LOG'S FOUR GNAMES, chosen by the CALLER *)
-    (γfs : fs_names)
+    (γfs : fs_names) (γpr : gname)   (* the "pr" lock: recovery's printk *)
     (cov : gset Z) (logstart : Z) (dev : mword 32) (sb : mword 64)
     (bs_hdr : list (bv 8))
+    (Bh : nat -> list (bv 8))   (* the entries' CRASHED home contents *)
     (L : gmap Z (list (bv 8))) (D : gmap Z bool)
     (* the raw struct log cells initlog is handed *)
     (vlock : mword 32) (vname vcpu : mword 64)
@@ -158,13 +189,29 @@ Definition wp_initlog_sconf_body
   log_geom_ok cov logstart ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
-  (* THE STAGE-2 CLEAN-IMAGE PRECONDITION: the on-disk header says n = 0, so
-     read_head's copy loop and install_trans's recovery pass are both dead.
-     Real recovery is stage 4. *)
-  hdr_n bs_hdr = 0 ->
+  (* THE HEADER'S WELL-FORMEDNESS (durable-disk stage D1; stage 2's
+     clean-image premise [hdr_n bs_hdr = 0] is GONE).  The three conjuncts
+     are [FsCrash.hdr_wf] stated at the block's content: the decoded write
+     set is bounded by the region, duplicate-free, and names covered HOME
+     blocks.  At a clean image the decode is empty and all three are
+     trivial; at a real crash they are what the durable header invariant
+     delivers.  Recovery is SAFE with them: read_head's copy loop runs,
+     install_trans(1) installs every entry (moving the logged view to the
+     slots' contents), and the closing write_head clears the log. *)
+  ((hdr_dec bs_hdr).1 <= LOGBLOCKS)%nat ->
+  NoDup (hdr_dec bs_hdr).2 ->
+  (forall b : Z, b ∈ (hdr_dec bs_hdr).2 ->
+     b ∈ cov /\ b ∉ log_region_set logstart) ->
+  (* the recovering install's printk (dead at a clean header, but the
+     general install contract carries it), as a pure Prop hypothesis *)
+  printk_gen_contract (kt := KT1) γpr γu γd ->
   (* the two arguments (RV64 ABI: the [int dev] arrives sign-extended) *)
   m !!! Regidx (mword_of_int 10 : mword 5) = sign_extend' 64 dev ->
   m !!! Regidx (mword_of_int 11 : mword 5) = sb ->
+  (* nothing is pinned in a fresh era: the boot dirty map is [false] on the
+     whole covered range (the halves below say the same thing per block;
+     the pure form is what the recovering install's contract consumes) *)
+  (forall b : Z, b ∈ cov -> D !! b = Some false) ->
   (* initlog's cone (its own bread/brelse, install_trans's bread/brelse/
      bwrite/bunpin, write_head's bread/bwrite/brelse) never dips below
      "bcache" (4); [initlock] itself carries no order premise. *)
@@ -192,6 +239,13 @@ Definition wp_initlog_sconf_body
      -- the swap that takes custody of the crash record for this era.  The
      boot client gets it from the adequacy instantiation. *)
   fs_crash_seam cov logstart -∗
+  (* the printk credential (persistent; the recovery arm's diagnostic) *)
+  printk_env γpr γu γd -∗
+  (* THE ENTRIES' HOME CLIENT HALVES, at whatever the crash left there.
+     At boot the log layer still holds every covered block's client half;
+     recovery is the one pass that moves them (to the slots' logged
+     contents, under the same existential the slots arrive with). *)
+  ([∗ list] i ↦ b ∈ (hdr_dec bs_hdr).2, fsblock γfs b (Bh i)) -∗
   (* the era certificate: the swap installs custody AT [gen_id], and the
      registry element + started lower bound are exactly what identifies it *)
   gen_cert -∗
@@ -272,6 +326,10 @@ Definition wp_initlog_sconf_body
       pa_add sb 20 ↦₄{dqs} (mword_of_int logstart : mword 32) -∗
       (* only initlog's own working pair: the other 32 are the batch's pool *)
       bslots 2 -∗
+      (* the entries' home halves back, at the INSTALLED (logged) contents
+         -- existential, exactly as the slots' own halves came in *)
+      ([∗ list] i ↦ b ∈ (hdr_dec bs_hdr).2,
+         ∃ bs : list (bv 8), fsblock γfs b bs) -∗
       (* THE LOG LAYER, BUILT -- AT THE CALLER'S OWN [γ].  Everything else
          initlog was handed is now sealed inside the "log" spinlock's
          resource.  No existential: the names came in, so the boot client
@@ -290,17 +348,18 @@ Module Type INITLOG.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γ : log_names)
-      (γfs : fs_names)
+      (γfs : fs_names) (γpr : gname)
       (cov : gset Z) (logstart : Z) (dev : mword 32) (sb : mword 64)
       (bs_hdr : list (bv 8))
+      (Bh : nat -> list (bv 8))
       (L : gmap Z (list (bv 8))) (D : gmap Z bool)
       (vlock : mword 32) (vname vcpu : mword 64)
       (v_start v_dev v_nc v_n : mword 32)
       (pidv : mword 32) (dq dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate),
-      wp_initlog_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs
-                            cov logstart dev sb bs_hdr L D
+      wp_initlog_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γpr
+                            cov logstart dev sb bs_hdr Bh L D
                             vlock vname vcpu v_start v_dev v_nc v_n
                             pidv dq dqs m K eb b lks Vpr.
 End INITLOG.

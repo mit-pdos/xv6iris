@@ -120,7 +120,16 @@ equals the last committed one.
 
 ### Worklist
 
-1. **initlog's REAL spec (n > 0 recovery).** The crash-side interface it needs
+1. **initlog's REAL spec (n > 0 recovery).** — **DONE 2026-08-22** (the
+   durable-disk stage-D commit; see `durable-disk.md` §1½ for what landed:
+   general `SpecInitlog`/`ProofInitlog` with the live copy loop, general
+   `SpecInstallTrans`/`ProofInstallTrans` with the L-moving recovering arm
+   and the sanctioned `printk_gen_contract` premise, callers re-wired).
+   What is NOT covered: D3 — `SpecFsinit`/`FirstTok` still require the
+   clean header, so the SYSTEM-level boot path still runs the `n = 0`
+   corollary; the general spec waits for a caller. The original item, for
+   the record:
+   The crash-side interface it needs
    is DONE (`fs_era_custody` / `fs_recover_permit` / `fs_boot_head_permit`).
    What is left is program-proof work:
    - `SpecInitlog`: drop the clean-image premise `hdr_n bs_hdr = 0`; the

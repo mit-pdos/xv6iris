@@ -68,6 +68,9 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto.
 Require Import RiscvModelBytes.
 Require Import KernelDataInv.
+Require Import InstrBytes.   (* [pc_is], for the stage-D block lemmas *)
+Require Import KernelText.   (* [kernel_text], same *)
+Require Import PrintkArgs PrintkFmt SpecPrintk.  (* the recovery printk's contract *)
 Require Import RegFile HartTp WpNext.
 Require Import WpMmodeLeafBase.
 Require Import RiscvExtras.
@@ -120,6 +123,141 @@ Proof.
   intro H. rewrite /il_hdrw H. apply bv_eq; vm_compute; reflexivity.
 Qed.
 
+(* ---- THE DECODED HEADER, WORD BY WORD (durable-disk stage D1): what the
+   copy loop reads at [92 + 4t (a5)] and what it stores into
+   [log.lh.block[t]].  [il_W] is the whole write set as the 32-bit words
+   the cells end up holding; its [uint] image IS [hdr_dec]'s entry list,
+   which is how the general install contract's premises are discharged. ---- *)
+Definition il_wordw (bs : list (bv 8)) (k : nat) : SailStdpp.Values.mword 32 :=
+  Z_to_bv 32 (le_word bs k).
+
+Definition il_W (bs : list (bv 8)) (nh : nat) : list (SailStdpp.Values.mword 32) :=
+  (fun i => il_wordw bs (S i)) <$> seq 0 nh.
+
+Lemma il_W_length (bs : list (bv 8)) (nh : nat) : length (il_W bs nh) = nh.
+Proof. rewrite /il_W length_fmap length_seq //. Qed.
+
+Lemma le_word_range (bs : list (bv 8)) (k : nat) :
+  0 <= le_word bs k < 2 ^ 32.
+Proof.
+  rewrite /le_word.
+  pose proof (assemble_bytes_bound (take 4 (drop (4 * k) bs))) as [Hlo Hhi].
+  split; [exact Hlo|].
+  eapply Z.lt_le_trans; [exact Hhi|].
+  apply Z.pow_le_mono_r; [lia|]. rewrite length_take. lia.
+Qed.
+
+Lemma il_wordw_uint (bs : list (bv 8)) (k : nat) :
+  uint (il_wordw bs k) = le_word bs k.
+Proof.
+  rewrite /il_wordw bb_uint32 Z_to_bv_unsigned.
+  apply bv_wrap_small.
+  pose proof (le_word_range bs k) as Hr.
+  change (2 ^ 32)%Z with 4294967296%Z in Hr.
+  assert (Hm : bv_modulus 32 = 4294967296%Z) by (vm_compute; reflexivity).
+  rewrite Hm. lia.
+Qed.
+
+Lemma il_W_uint (bs : list (bv 8)) :
+  map uint (il_W bs (hdr_dec bs).1) = (hdr_dec bs).2.
+Proof.
+  change (map uint (il_W bs (hdr_dec bs).1))
+    with (uint <$> (il_W bs (hdr_dec bs).1)).
+  rewrite /il_W -list_fmap_compose.
+  apply list_fmap_ext. intros i k Hk. cbn.
+  apply il_wordw_uint.
+Qed.
+
+(* ---- the copy loop's SOURCE cursor (a5): the buffer pointer plus 4t ---- *)
+Definition il_cur (kk t : nat) : SailStdpp.Values.mword 64 :=
+  pa_add (bnode kk) (4 * t)%nat.
+
+Lemma il_cur_0 (kk : nat) :
+  add_vec (zero_reg : SailStdpp.Values.mword 64) (bnode kk) = il_cur kk 0.
+Proof.
+  rewrite add_vec_zero_l /il_cur Nat.mul_0_r RiscvExtras.pa_add_0 //.
+Qed.
+
+Lemma il_cur_step (kk t : nat) :
+  add_vec (il_cur kk t)
+    (sign_extend' 64 (sign_extend' 12 (mword_of_int 4 : SailStdpp.Values.mword 6)))
+  = il_cur kk (S t).
+Proof.
+  assert (H4 : sign_extend' 64 (sign_extend' 12 (mword_of_int 4 : SailStdpp.Values.mword 6))
+               = (mword_of_int (Z.of_nat 4%nat) : SailStdpp.Values.mword 64))
+    by (apply bv_eq; vm_compute; reflexivity).
+  rewrite /il_cur H4 pa_add_bump. f_equal. lia.
+Qed.
+
+(* the loaded word's address: [92(a5)] is data byte [4 (S t)] *)
+Lemma il_cur_addr (kk t : nat) :
+  add_vec (il_cur kk t) (sign_extend' 64 (mword_of_int 92 : SailStdpp.Values.mword 12))
+  = pa_add (b_data (bnode kk)) (4 * S t)%nat.
+Proof.
+  assert (H92 : sign_extend' 64 (mword_of_int 92 : SailStdpp.Values.mword 12)
+                = (mword_of_int (Z.of_nat 92%nat) : SailStdpp.Values.mword 64))
+    by (apply bv_eq; vm_compute; reflexivity).
+  rewrite /il_cur H92 pa_add_bump /b_data pa_add_assoc.
+  f_equal. lia.
+Qed.
+
+(* two cursors into one buffer agree only at the same index *)
+Lemma il_cur_inj (kk t nh : nat) :
+  (kk < NBUF)%nat -> (t <= LOGBLOCKS)%nat -> (nh <= LOGBLOCKS)%nat ->
+  t <> nh ->
+  eq_vec (il_cur kk t) (il_cur kk nh) = false.
+Proof.
+  intros Hk Ht Hn Hne. rewrite /il_cur pa_add_eqb.
+  - apply Nat.eqb_neq. lia.
+  - unfold LOGBLOCKS in Ht. lia.
+  - unfold LOGBLOCKS in Hn. lia.
+Qed.
+
+Lemma il_cur_eq (kk t : nat) :
+  (t <= LOGBLOCKS)%nat ->
+  eq_vec (il_cur kk t) (il_cur kk t) = true.
+Proof.
+  intros Ht. rewrite /il_cur pa_add_eqb.
+  - apply Nat.eqb_refl.
+  - unfold LOGBLOCKS in Ht. lia.
+  - unfold LOGBLOCKS in Ht. lia.
+Qed.
+
+(* the DESTINATION cursor (a4): [&log.lh.block[t]], stepped by 4 *)
+Lemma il_blk_at (t : nat) :
+  add_vec (lh_block t : SailStdpp.Values.mword 64)
+    (sign_extend' 64 (mword_of_int 0 : SailStdpp.Values.mword 12))
+  = (lh_block t : SailStdpp.Values.mword 64).
+Proof.
+  assert (H0 : sign_extend' 64 (mword_of_int 0 : SailStdpp.Values.mword 12)
+               = (mword_of_int (Z.of_nat 0%nat) : SailStdpp.Values.mword 64))
+    by (apply bv_eq; vm_compute; reflexivity).
+  rewrite /lh_block H0 pa_add_bump. f_equal. lia.
+Qed.
+
+Lemma il_blk_step (t : nat) :
+  add_vec (lh_block t : SailStdpp.Values.mword 64)
+    (sign_extend' 64 (sign_extend' 12 (mword_of_int 4 : SailStdpp.Values.mword 6)))
+  = (lh_block (S t) : SailStdpp.Values.mword 64).
+Proof.
+  assert (H4 : sign_extend' 64 (sign_extend' 12 (mword_of_int 4 : SailStdpp.Values.mword 6))
+               = (mword_of_int (Z.of_nat 4%nat) : SailStdpp.Values.mword 64))
+    by (apply bv_eq; vm_compute; reflexivity).
+  rewrite /lh_block H4 pa_add_bump. f_equal. lia.
+Qed.
+
+(* a4's start: the [auipc/addi] pair at +0x46/+0x4a resolves to
+   [&log.lh.block[0]] *)
+Lemma il_reloc_blk0 :
+  add_vec (add_vec (mword_of_int (KernelSyms.initlog + 0x46) : SailStdpp.Values.mword 64)
+                   (auipc_off (mword_of_int 30 : SailStdpp.Values.mword 20)))
+          (sign_extend' 64 (mword_of_int 1940 : SailStdpp.Values.mword 12))
+  = (lh_block 0 : SailStdpp.Values.mword 64).
+Proof.
+  rewrite /lh_block /log_pa /log_addr /pa_add /add_vec_int.
+  apply bv_eq; vm_compute; reflexivity.
+Qed.
+
 (* ---- the alignment of the buffer's first data word: [bcache]'s geometry,
    then [ByteBuf.bb_align_z] (ProofWriteHead's [wh_align4] at q = 0) ---- *)
 Lemma il_align_arith (kk : Z) :
@@ -132,6 +270,32 @@ Proof.
   replace (2147582488 + 1112 * kk + 88)
     with ((536895644 + 278 * kk) * 4) by lia.
   apply Z_mod_mult.
+Qed.
+
+Lemma il_align4k (k mm : nat) : (k < NBUF)%nat -> (mm <= LOGBLOCKS)%nat ->
+  is_aligned_paddr (Physaddr (pa_add (b_data (bnode k)) (4 * mm)%nat)) 4 = true.
+Proof.
+  intros Hk Hm.
+  unfold b_data. rewrite pa_add_assoc.
+  unfold is_aligned_paddr. apply Z.eqb_eq.
+  rewrite RiscvExtras.uint_unsigned.
+  rewrite ByteCursor.pa_add_unsigned.
+  rewrite (bnode_unsigned k Hk).
+  unfold buf_base, buf_stride, KernelSyms.bcache.
+  assert (Harith : (2147582488 + 1112 * Z.of_nat k + Z.of_nat (88 + 4 * mm))
+                     `mod` 4 = 0
+                   /\ 0 <= 2147582488 + 1112 * Z.of_nat k + Z.of_nat (88 + 4 * mm)
+                   /\ 2147582488 + 1112 * Z.of_nat k + Z.of_nat (88 + 4 * mm)
+                        < 18446744073709551616).
+  { unfold NBUF in Hk. unfold LOGBLOCKS in Hm.
+    split_and!; [| lia | lia].
+    replace (2147582488 + 1112 * Z.of_nat k + Z.of_nat (88 + 4 * mm))
+      with ((536895644 + 278 * Z.of_nat k + Z.of_nat mm) * 4) by lia.
+    apply Z_mod_mult. }
+  destruct Harith as (Hm4 & Hlo & Hhi).
+  replace (0x80018200 + 24 + 1112 * Z.of_nat k + Z.of_nat (88 + 4 * mm))
+    with (2147582488 + 1112 * Z.of_nat k + Z.of_nat (88 + 4 * mm)) by lia.
+  apply bb_align_z; assumption.
 Qed.
 
 Lemma il_align4 (k : nat) : (k < NBUF)%nat ->
@@ -199,6 +363,8 @@ Notation Rs3 := (mword_of_int 19 : mword 5).
 Notation Ra0 := (mword_of_int 10 : mword 5).
 Notation Ra1 := (mword_of_int 11 : mword 5).
 Notation Ra2 := (mword_of_int 12 : mword 5).
+Notation Ra3 := (mword_of_int 13 : mword 5).
+Notation Ra4 := (mword_of_int 14 : mword 5).
 Notation Ra5 := (mword_of_int 15 : mword 5).
 
 Local Ltac regne := reg_ne_side.
@@ -246,6 +412,127 @@ Section InitlogDefs.
     rewrite -Hmk (bb_set_mk (fun j => bs !!! j) 0%nat i). reflexivity.
   Qed.
 
+  (* ---- THE COPY LOOP'S WORD ACCESS (durable-disk stage D1): borrow the
+     aligned 32-bit word at data offset [4 (S k)] -- [lw a3,92(a5)]'s
+     operand -- out of the buffer's byte list, and give it back.  The
+     [il_hdr_acc] recipe at a moving offset. ---- *)
+
+  Lemma il_take4 (bs : list (bv 8)) (o : nat) :
+    (o + 4 <= length bs)%nat ->
+    take 4 (drop o bs)
+    = [bs !!! o; bs !!! (o + 1)%nat; bs !!! (o + 2)%nat; bs !!! (o + 3)%nat].
+  Proof.
+    intros Hle. apply list_eq. intros i.
+    destruct (decide (i < 4)%nat) as [Hi | Hi].
+    - rewrite lookup_take; [| lia]. rewrite lookup_drop.
+      rewrite (list_lookup_lookup_total_lt bs (o + i)%nat); [| lia].
+      destruct i as [|[|[|[|i']]]]; try lia; cbn.
+      + rewrite Nat.add_0_r //.
+      + reflexivity.
+      + reflexivity.
+      + reflexivity.
+    - rewrite lookup_ge_None_2.
+      + symmetry. apply lookup_ge_None_2. cbn [length]. lia.
+      + rewrite length_take. lia.
+  Qed.
+
+  Lemma il_word_mk (bs : list (bv 8)) (k : nat) :
+    (4 * k + 4 <= length bs)%nat ->
+    bb_mk (fun j => bs !!! j) (4 * k)%nat = il_wordw bs k.
+  Proof.
+    intros Hle. rewrite /bb_mk /il_wordw /le_word.
+    f_equal. f_equal.
+    rewrite (il_take4 bs (4 * k)%nat Hle). reflexivity.
+  Qed.
+
+  Lemma il_word_acc (a : Arch.pa) (bs : list (bv 8)) (k : nat) :
+    (4 * k + 4 <= length bs)%nat ->
+    is_aligned_paddr (Physaddr (pa_add a (4 * k)%nat)) 4 = true ->
+    ([∗ list] j ↦ x ∈ bs, pa_add a j ↦ₘ x) -∗
+    pa_add a (4 * k)%nat ↦₄ il_wordw bs k ∗
+    (pa_add a (4 * k)%nat ↦₄ il_wordw bs k -∗
+       ([∗ list] j ↦ x ∈ bs, pa_add a j ↦ₘ x)).
+  Proof.
+    intros Hlen Hal.
+    rewrite (bb_bytes_of_list a bs).
+    iIntros "Hw".
+    iDestruct (bb_word4_acc a (length bs) (4 * k)%nat (length bs - (4 * k) - 4)%nat
+                 (fun j => bs !!! j) ltac:(lia) Hal with "Hw") as "[Hc Hback]".
+    rewrite (il_word_mk bs k Hlen).
+    iSplitL "Hc"; [iExact "Hc"|].
+    iIntros "Hc".
+    iDestruct ("Hback" $! (il_wordw bs k) with "Hc") as "Hw".
+    rewrite /bb_bytes.
+    iApply (big_sepL_mono with "Hw"). intros i jj Hj.
+    apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
+    rewrite -(il_word_mk bs k Hlen) (bb_set_mk (fun j => bs !!! j) (4 * k)%nat i).
+    reflexivity.
+  Qed.
+
+  (* ---- pull a CONTENTS FUNCTION out of a run of existential slots ---- *)
+  Lemma il_sepL_exist {A : Type} (Φ : nat -> A -> list (bv 8) -> iProp Σ)
+      (l : list A) :
+    ([∗ list] i ↦ x ∈ l, ∃ bs : list (bv 8), Φ i x bs) -∗
+    ∃ ys : list (list (bv 8)), ⌜length ys = length l⌝ ∗
+      ([∗ list] i ↦ x ∈ l, Φ i x (ys !!! i)).
+  Proof.
+    iIntros "H".
+    iInduction l as [|x l] "IH" forall (Φ).
+    - iExists []. iSplitR; [done|]. done.
+    - rewrite big_sepL_cons. iDestruct "H" as "[Hx Hl]".
+      iDestruct "Hx" as (bs0) "Hx".
+      iDestruct ("IH" $! (fun i y bs => Φ (S i) y bs) with "Hl") as (ys) "[%Hlen Hl]".
+      iExists (bs0 :: ys). iSplitR.
+      { iPureIntro. cbn [length]. lia. }
+      rewrite big_sepL_cons. iSplitL "Hx"; [iExact "Hx"|].
+      iApply (big_sepL_mono with "Hl"). intros i y Hy. reflexivity.
+  Qed.
+
+  (* an INDEX-ONLY big-op transports across any two lists of one length *)
+  Lemma il_sepL_reindex {A B : Type} (l1 : list A) (l2 : list B)
+      (Φ : nat -> iProp Σ) :
+    length l1 = length l2 ->
+    ([∗ list] i ↦ _ ∈ l1, Φ i) ⊢ ([∗ list] i ↦ _ ∈ l2, Φ i).
+  Proof.
+    revert l2 Φ. induction l1 as [|x l1 IH]; intros l2 Φ Hlen.
+    - destruct l2; [done | cbn in Hlen; lia].
+    - destruct l2 as [|y l2]; [cbn in Hlen; lia|].
+      cbn in Hlen. injection Hlen as Hlen.
+      rewrite !big_sepL_cons.
+      iIntros "[H1 Hrest]". iFrame "H1".
+      iApply (IH l2 (fun i => Φ (S i)) Hlen with "Hrest").
+  Qed.
+
+  (* over [seq 0 n] the element IS the index *)
+  Lemma il_seq_body (n : nat) (Φ : nat -> iProp Σ) :
+    ([∗ list] _ ↦ x ∈ seq 0 n, Φ x) ⊣⊢ ([∗ list] k ↦ _ ∈ seq 0 n, Φ k).
+  Proof.
+    apply big_sepL_proper. intros k x Hk.
+    apply lookup_seq in Hk as [-> _]. done.
+  Qed.
+
+  (* the 30 header cells, re-formed from the decoded run and the junk tail *)
+  Lemma il_cells_join (bs : list (bv 8)) (nh : nat) :
+    (nh <= LOGBLOCKS)%nat ->
+    ([∗ list] i ↦ w ∈ il_W bs nh, lh_block i ↦₄ w) -∗
+    ([∗ list] i ∈ seq nh (LOGBLOCKS - nh), ∃ wj : SailStdpp.Values.mword 32, lh_block i ↦₄ wj) -∗
+    ([∗ list] i ∈ seq 0 LOGBLOCKS, ∃ wj : SailStdpp.Values.mword 32, lh_block i ↦₄ wj).
+  Proof.
+    intros Hnh. iIntros "Hw Hj".
+    assert (Hsp : seq 0 LOGBLOCKS = seq 0 nh ++ seq nh (LOGBLOCKS - nh)).
+    { replace LOGBLOCKS with (nh + (LOGBLOCKS - nh))%nat at 1 by lia.
+      rewrite seq_app. f_equal. }
+    rewrite Hsp big_sepL_app.
+    iSplitL "Hw".
+    - iEval (rewrite (il_seq_body nh (fun x => (∃ wj : SailStdpp.Values.mword 32, lh_block x ↦₄ wj)%I))).
+      iApply (il_sepL_reindex (il_W bs nh) (seq 0 nh)
+                (fun i => (∃ wj : SailStdpp.Values.mword 32, lh_block i ↦₄ wj)%I)
+                ltac:(rewrite il_W_length length_seq; reflexivity)).
+      iApply (big_sepL_mono with "Hw"). intros k y Hy.
+      iIntros "H". iExists y. iExact "H".
+    - iApply (big_sepL_mono with "Hj"). intros k y Hy. done.
+  Qed.
+
   (* an EMPTY indexed big-op is [emp]; naming it keeps the call sites free
      of bracketed spec-pattern goals *)
   Lemma il_bigL_nil {A : Type} (Psi : nat -> A -> iProp Σ) :
@@ -270,6 +557,546 @@ End InitlogDefs.
 
 (* ===================================================================== *)
 
+(* ===================================================================== *)
+(*  The dispatch/copy blocks, in a CID-free section: each lemma binds its  *)
+(*  own hart, exactly like ProofInstallTrans's blocks.                     *)
+(* ===================================================================== *)
+Section InitlogBlocks.
+  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
+
+  (* clones of ProofInstallTrans's small arithmetic helpers (a proof file
+     may not import a sibling proof file) *)
+  Lemma il_sext32 (z : Z) : (0 <= z < 2^31)%Z ->
+    (sign_extend' 64 (mword_of_int z : SailStdpp.Values.mword 32) : SailStdpp.Values.mword 64)
+    = mword_of_int z.
+  Proof.
+    intro Hz. apply bv_eq.
+    rewrite (sext64_moi32_unsigned z Hz) moi64_unsigned.
+    symmetry. apply bvw64_small. lia.
+  Qed.
+
+  Lemma il_sint_moi (z : Z) :
+    (- 2 ^ 63 <= z < 2 ^ 63)%Z ->
+    sint (mword_of_int z : SailStdpp.Values.mword 64) = z.
+  Proof.
+    intro Hz.
+    assert (Hhm : bv_half_modulus 64 = (2 ^ 63)%Z) by reflexivity.
+    change (sint ?x) with (bv_swrap 64 (bv_unsigned x)).
+    rewrite moi64_unsigned bv_swrap_wrap.
+    apply bv_swrap_small. rewrite Hhm. lia.
+  Qed.
+
+  Lemma il_geb_s0 (b : Z) :
+    (0 <= b < 2 ^ 31)%Z ->
+    zopz0zKzJ_s (zero_reg : SailStdpp.Values.mword 64)
+                (mword_of_int b : SailStdpp.Values.mword 64) = Z.geb 0 b.
+  Proof.
+    intro Hb. unfold zopz0zKzJ_s.
+    assert (Hz : sint (zero_reg : SailStdpp.Values.mword 64) = 0)
+      by (vm_compute; reflexivity).
+    rewrite Hz (il_sint_moi b ltac:(lia)). reflexivity.
+  Qed.
+
+  Lemma il_geb_pos (n : nat) : (0 < n)%nat -> Z.geb 0 (Z.of_nat n) = false.
+  Proof. intro H. rewrite Z.geb_leb. apply Z.leb_gt. lia. Qed.
+
+  Lemma il_n_small (n : nat) : (n <= LOGBLOCKS)%nat -> (0 <= Z.of_nat n < 2^31)%Z.
+  Proof. rewrite /LOGBLOCKS. lia. Qed.
+
+  (* the loaded [n] word, at its numeral once the decode bound pins it *)
+  Lemma il_hdrw_moi (bs : list (bv 8)) (nh : nat) :
+    hdr_n bs = Z.of_nat nh -> (nh <= LOGBLOCKS)%nat ->
+    il_hdrw bs = (mword_of_int (Z.of_nat nh) : SailStdpp.Values.mword 32).
+  Proof.
+    intros Hn Hb. rewrite /il_hdrw Hn. apply bv_eq.
+    rewrite Z_to_bv_unsigned.
+    rewrite bv_wrap_small; [reflexivity|].
+    unfold LOGBLOCKS in Hb.
+    assert (Hm : bv_modulus 32 = 4294967296%Z) by (vm_compute; reflexivity).
+    rewrite Hm. lia.
+  Qed.
+
+  (* the [slli a2,a2,2] value: [ofile_slli3]'s recipe at shift 2 *)
+  Lemma il_slli2 (z : Z) : 0 <= z -> z * 4 < 18446744073709551616 ->
+    shift_bits_left (mword_of_int z : SailStdpp.Values.mword 64)
+                    (subrange_vec_dec (mword_of_int 2 : SailStdpp.Values.mword 6)
+                       (Z.sub log2_xlen 1) 0)
+    = (mword_of_int (z * 4) : SailStdpp.Values.mword 64).
+  Proof.
+    intros Hz0 Hz. apply bv_eq.
+    unfold shift_bits_left, shiftl, with_word, get_word,
+           MachineWord.MachineWord.logical_shift_left.
+    rewrite bv_shiftl_unsigned.
+    replace (bv_unsigned (MachineWord.MachineWord.N_to_word (MachineWord.MachineWord.Z_idx 64)
+               (MachineWord.MachineWord.Z_idx (int_of_mword false
+                  (subrange_vec_dec (mword_of_int 2 : SailStdpp.Values.mword 6) (Z.sub log2_xlen 1) 0))))) with 2
+      by (vm_compute; reflexivity).
+    assert (Hzlt : z < 18446744073709551616) by nia.
+    rewrite (moi64_small z ltac:(lia)).
+    rewrite (moi64_small (z * 4) ltac:(lia)).
+    rewrite Z.shiftl_mul_pow2; [| lia].
+    rewrite bv_wrap_small; [| unfold bv_modulus; cbn; lia].
+    lia.
+  Qed.
+
+  (* the decoded write set's [t]-th word *)
+  Lemma il_W_lookup (bs : list (bv 8)) (nh t : nat) :
+    (t < nh)%nat ->
+    il_W bs nh !! t = Some (il_wordw bs (S t)).
+  Proof.
+    intros Ht. rewrite /il_W list_lookup_fmap.
+    rewrite lookup_seq_lt; [| exact Ht]. reflexivity.
+  Qed.
+
+  (* ================================================================== *)
+  (*  +0x52 .. +0x5a : READ_HEAD'S COPY LOOP (durable-disk stage D1),     *)
+  (*  live at a dirty header: word [S t] of the block into                *)
+  (*  [log.lh.block[t]], for t = 0 .. nh-1.  No calls, no ghosts -- four  *)
+  (*  instructions and the back edge.                                     *)
+  (* ================================================================== *)
+  Local Lemma il_copy `{GEN : GenId} (fuel : nat)
+      (kk nh : nat) (bs_hdr : list (bv 8))
+      (pj : SailStdpp.Values.mword 64) (nK : nat) (b : bool) :
+    (kk < NBUF)%nat ->
+    (nh <= LOGBLOCKS)%nat ->
+    length bs_hdr = 1024%nat ->
+    forall (CID0 : CpuId) (t : nat) (M : regfile),
+    (t < nh)%nat ->
+    (nh - t <= fuel)%nat ->
+    M !!! Regidx Ra5 = il_cur kk t ->
+    M !!! Regidx (mword_of_int 14 : SailStdpp.Values.mword 5) = (lh_block t : SailStdpp.Values.mword 64) ->
+    M !!! Regidx Ra2 = il_cur kk nh ->
+    M !!! Regidx Ra0 = (bnode kk : SailStdpp.Values.mword 64) ->
+    sie_cap_gpr KT1 M nK b pj -∗
+    pc_is (mword_of_int (KernelSyms.initlog + 0x52) : SailStdpp.Values.mword 64) -∗
+    kernel_text -∗
+    ([∗ list] jj ↦ x ∈ bs_hdr, pa_add (b_data (bnode kk)) jj ↦ₘ x) -∗
+    ([∗ list] i ↦ w ∈ take t (il_W bs_hdr nh), lh_block i ↦₄ w) -∗
+    ([∗ list] i ∈ seq t (LOGBLOCKS - t), ∃ wj : SailStdpp.Values.mword 32, lh_block i ↦₄ wj) -∗
+    wp_next b pj (fun (CIDo : CpuId) =>
+      ∀ (M' : regfile),
+        ⌜forall c : SailStdpp.Values.mword 5, is_cs_idx c = true ->
+           M' !!! Regidx c = (M !!! Regidx c : SailStdpp.Values.mword 64)⌝ -∗
+        ⌜M' !!! Regidx Ra0 = (bnode kk : SailStdpp.Values.mword 64)⌝ -∗
+        sie_cap_gpr KT1 M' nK b pj -∗
+        pc_is (mword_of_int (KernelSyms.initlog + 0x5e) : SailStdpp.Values.mword 64) -∗
+        ([∗ list] jj ↦ x ∈ bs_hdr, pa_add (b_data (bnode kk)) jj ↦ₘ x) -∗
+        ([∗ list] i ↦ w ∈ il_W bs_hdr nh, lh_block i ↦₄ w) -∗
+        ([∗ list] i ∈ seq nh (LOGBLOCKS - nh), ∃ wj : SailStdpp.Values.mword 32, lh_block i ↦₄ wj) -∗
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hkk Hnh Hlen.
+    induction fuel as [|fuel IH]; intros CID0 t M Ht Hfuel Ha5 Ha4 Ha2 Ha0.
+    { exfalso. lia. }
+    iIntros "Hcg Hpc #Htext Hby Hdone Hjunk Hcont".
+    iPoseProof (ili_52 with "Htext") as "Hi52".
+    iPoseProof (ili_54 with "Htext") as "Hi54".
+    iPoseProof (ili_56 with "Htext") as "Hi56".
+    iPoseProof (ili_58 with "Htext") as "Hi58".
+    iPoseProof (ili_5a with "Htext") as "Hi5a".
+    (* the junk cell at the cursor *)
+    assert (Hjq : seq t (LOGBLOCKS - t) = t :: seq (S t) (LOGBLOCKS - S t)).
+    { replace (LOGBLOCKS - t)%nat with (S (LOGBLOCKS - S t))%nat by lia.
+      reflexivity. }
+    iEval (rewrite Hjq big_sepL_cons) in "Hjunk".
+    iDestruct "Hjunk" as "[Hcell Hjunk]".
+    iDestruct "Hcell" as (wj) "Hcell".
+    (* the word borrowed out of the buffer *)
+    iDestruct (il_word_acc (b_data (bnode kk)) bs_hdr (S t)
+                 ltac:(unfold LOGBLOCKS in Hnh; lia)
+                 (il_align4k kk (S t) Hkk ltac:(lia))
+                 with "Hby") as "[Hword Hback]".
+    (* ===== +0x52 c.lw a3,92(a5) ===== *)
+    assert (Hcaddr : add_vec (rget M Ra5) (sign_extend' 64 (mword_of_int 92 : SailStdpp.Values.mword 12))
+                     = pa_add (b_data (bnode kk)) (4 * S t)%nat).
+    { rgne. rewrite Ha5. exact (il_cur_addr kk t). }
+    iEval (rewrite -Hcaddr) in "Hword".
+    iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.initlog + 0x52)) Ra3 Ra5
+              (mword_of_int 92 : SailStdpp.Values.mword 12) M nK
+              (il_wordw bs_hdr (S t)) b
+              ltac:(vm_compute; discriminate) ltac:(rdok)
+              with "Hcg Hpc Hi52 Hword").
+    iIntros (CIDc1 Hsc1) "Hcg Hpc Hword".
+    iEval (rewrite Hcaddr) in "Hword".
+    iDestruct ("Hback" with "Hword") as "Hby".
+    set (E1 := <[Regidx Ra3 := regval_into_reg
+                  (sign_extend' 64 (il_wordw bs_hdr (S t)))]> M).
+    assert (HE1a3 : E1 !!! Regidx Ra3 = sign_extend' 64 (il_wordw bs_hdr (S t)))
+      by (rewrite /E1; apply upd_eq).
+    assert (HE1a4 : E1 !!! Regidx (mword_of_int 14 : SailStdpp.Values.mword 5)
+                    = (lh_block t : SailStdpp.Values.mword 64))
+      by (rewrite /E1 upd_ne; [exact Ha4 | vm_compute; discriminate]).
+    assert (HE1a5 : E1 !!! Regidx Ra5 = il_cur kk t)
+      by (rewrite /E1 upd_ne; [exact Ha5 | vm_compute; discriminate]).
+    assert (HE1a2 : E1 !!! Regidx Ra2 = il_cur kk nh)
+      by (rewrite /E1 upd_ne; [exact Ha2 | vm_compute; discriminate]).
+    assert (HE1a0 : E1 !!! Regidx Ra0 = (bnode kk : SailStdpp.Values.mword 64))
+      by (rewrite /E1 upd_ne; [exact Ha0 | vm_compute; discriminate]).
+    assert (Hpp54 : add_vec_int (mword_of_int (KernelSyms.initlog + 0x52) : SailStdpp.Values.mword 64) 2
+                    = mword_of_int (KernelSyms.initlog + 0x54))
+      by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp54) in "Hpc".
+    (* ===== +0x54 c.sw a3,0(a4) ===== *)
+    assert (Hsaddr : add_vec (rget E1 (mword_of_int 14 : SailStdpp.Values.mword 5))
+                       (sign_extend' 64 (mword_of_int 0 : SailStdpp.Values.mword 12))
+                     = (lh_block t : SailStdpp.Values.mword 64)).
+    { rgne. rewrite HE1a4. exact (il_blk_at t). }
+    iEval (rewrite -Hsaddr) in "Hcell".
+    iApply (wp_csw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.initlog + 0x54))
+              Ra3 (mword_of_int 14 : SailStdpp.Values.mword 5)
+              (mword_of_int 0 : SailStdpp.Values.mword 12) E1 nK wj b
+              with "Hcg Hpc Hi54 Hcell").
+    iIntros (CIDc2 Hsc2) "Hcg Hpc Hcell".
+    iEval (rewrite Hsaddr) in "Hcell".
+    assert (Hstv : trunc32 (rget E1 Ra3) = il_wordw bs_hdr (S t)).
+    { rgne. rewrite HE1a3. apply trunc32_sext64. }
+    iEval (rewrite Hstv) in "Hcell".
+    assert (Hpp56 : add_vec_int (mword_of_int (KernelSyms.initlog + 0x54) : SailStdpp.Values.mword 64) 2
+                    = mword_of_int (KernelSyms.initlog + 0x56))
+      by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp56) in "Hpc".
+    (* ===== +0x56 c.addi a5,a5,4 ===== *)
+    iApply (wp_caddi_s_sconf (mword_of_int (KernelSyms.initlog + 0x56)) Ra5 (mword_of_int 4 : SailStdpp.Values.mword 6)
+              E1 nK b ltac:(vm_compute; discriminate) ltac:(rdok)
+              with "Hcg Hpc Hi56").
+    iIntros (CIDc3 Hsc3) "Hcg Hpc".
+    iEval (rgne) in "Hcg".
+    assert (Hcurstep : add_vec (E1 !!! Regidx Ra5)
+                         (sign_extend' 64 (sign_extend' 12 (mword_of_int 4 : SailStdpp.Values.mword 6)))
+                       = il_cur kk (S t)).
+    { rewrite HE1a5. exact (il_cur_step kk t). }
+    iEval (rewrite Hcurstep) in "Hcg".
+    set (E2 := <[Regidx Ra5 := regval_into_reg (il_cur kk (S t))]> E1).
+    assert (HE2a5 : E2 !!! Regidx Ra5 = il_cur kk (S t))
+      by (rewrite /E2; apply upd_eq).
+    assert (HE2a4 : E2 !!! Regidx (mword_of_int 14 : SailStdpp.Values.mword 5)
+                    = (lh_block t : SailStdpp.Values.mword 64))
+      by (rewrite /E2 upd_ne; [exact HE1a4 | vm_compute; discriminate]).
+    assert (HE2a2 : E2 !!! Regidx Ra2 = il_cur kk nh)
+      by (rewrite /E2 upd_ne; [exact HE1a2 | vm_compute; discriminate]).
+    assert (HE2a0 : E2 !!! Regidx Ra0 = (bnode kk : SailStdpp.Values.mword 64))
+      by (rewrite /E2 upd_ne; [exact HE1a0 | vm_compute; discriminate]).
+    assert (Hpp58 : add_vec_int (mword_of_int (KernelSyms.initlog + 0x56) : SailStdpp.Values.mword 64) 2
+                    = mword_of_int (KernelSyms.initlog + 0x58))
+      by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp58) in "Hpc".
+    (* ===== +0x58 c.addi a4,a4,4 ===== *)
+    iApply (wp_caddi_s_sconf (mword_of_int (KernelSyms.initlog + 0x58))
+              (mword_of_int 14 : SailStdpp.Values.mword 5) (mword_of_int 4 : SailStdpp.Values.mword 6)
+              E2 nK b ltac:(vm_compute; discriminate) ltac:(rdok)
+              with "Hcg Hpc Hi58").
+    iIntros (CIDc4 Hsc4) "Hcg Hpc".
+    iEval (rgne) in "Hcg".
+    assert (Hblkstep : add_vec (E2 !!! Regidx (mword_of_int 14 : SailStdpp.Values.mword 5))
+                         (sign_extend' 64 (sign_extend' 12 (mword_of_int 4 : SailStdpp.Values.mword 6)))
+                       = (lh_block (S t) : SailStdpp.Values.mword 64)).
+    { rewrite HE2a4. exact (il_blk_step t). }
+    iEval (rewrite Hblkstep) in "Hcg".
+    set (E3 := <[Regidx (mword_of_int 14 : SailStdpp.Values.mword 5)
+                 := regval_into_reg (lh_block (S t) : SailStdpp.Values.mword 64)]> E2).
+    assert (HE3a4 : E3 !!! Regidx (mword_of_int 14 : SailStdpp.Values.mword 5)
+                    = (lh_block (S t) : SailStdpp.Values.mword 64))
+      by (rewrite /E3; apply upd_eq).
+    assert (HE3a5 : E3 !!! Regidx Ra5 = il_cur kk (S t))
+      by (rewrite /E3 upd_ne; [exact HE2a5 | vm_compute; discriminate]).
+    assert (HE3a2 : E3 !!! Regidx Ra2 = il_cur kk nh)
+      by (rewrite /E3 upd_ne; [exact HE2a2 | vm_compute; discriminate]).
+    assert (HE3a0 : E3 !!! Regidx Ra0 = (bnode kk : SailStdpp.Values.mword 64))
+      by (rewrite /E3 upd_ne; [exact HE2a0 | vm_compute; discriminate]).
+    assert (HE3cs : forall c : SailStdpp.Values.mword 5, is_cs_idx c = true ->
+              E3 !!! Regidx c = (M !!! Regidx c : SailStdpp.Values.mword 64)).
+    { intros c Hc.
+      assert (Hne : forall r : SailStdpp.Values.mword 5, is_cs_idx r = false -> Regidx c <> Regidx r).
+      { intros r Hr. apply not_eq_sym. apply is_cs_idx_true_neq; assumption. }
+      rewrite /E3 upd_ne; [| apply Hne; vm_compute; reflexivity].
+      rewrite /E2 upd_ne; [| apply Hne; vm_compute; reflexivity].
+      rewrite /E1 upd_ne; [| apply Hne; vm_compute; reflexivity].
+      reflexivity. }
+    assert (Hpp5a : add_vec_int (mword_of_int (KernelSyms.initlog + 0x58) : SailStdpp.Values.mword 64) 2
+                    = mword_of_int (KernelSyms.initlog + 0x5a))
+      by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp5a) in "Hpc".
+    (* the done run grows by the cell just written *)
+    iAssert ([∗ list] i ↦ w ∈ take (S t) (il_W bs_hdr nh), lh_block i ↦₄ w)%I
+      with "[Hdone Hcell]" as "Hdone".
+    { rewrite (take_S_r (il_W bs_hdr nh) t (il_wordw bs_hdr (S t))
+                 (il_W_lookup bs_hdr nh t Ht)).
+      rewrite big_sepL_app big_sepL_singleton.
+      iSplitL "Hdone"; [iExact "Hdone"|].
+      rewrite length_take il_W_length Nat.min_l; [| lia].
+      rewrite Nat.add_0_r. iExact "Hcell". }
+    (* ===== +0x5a bne a5,a2 : the back edge / the exit ===== *)
+    destruct (decide (S t = nh)) as [Hend | Hmore].
+    - (* ---- the last word: fall through to +0x5e ---- *)
+      assert (Hcmp : neq_vec (rget E3 Ra5) (rget E3 Ra2) = false).
+      { rgne. rgne. rewrite HE3a5 HE3a2 Hend /neq_vec.
+        rewrite (il_cur_eq kk nh Hnh). reflexivity. }
+      iApply (wp_bne_fall_s_sconf (mword_of_int (KernelSyms.initlog + 0x5a))
+                (mword_of_int 8184 : SailStdpp.Values.mword 13) Ra2 Ra5 E3 nK b
+                ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+                Hcmp with "Hcg Hpc Hi5a").
+      iIntros (CIDc5 Hsc5) "Hcg Hpc".
+      assert (Hpp5e : add_vec_int (mword_of_int (KernelSyms.initlog + 0x5a) : SailStdpp.Values.mword 64) 4
+                      = mword_of_int (KernelSyms.initlog + 0x5e))
+        by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Hpp5e) in "Hpc".
+      iSpecialize ("Hcont" $! CIDc5 with "[%]"); [wp_next_chain|].
+      iApply ("Hcont" $! E3 with "[%] [%] Hcg Hpc Hby [Hdone] [Hjunk]").
+      + exact HE3cs.
+      + exact HE3a0.
+      + rewrite Hend (take_ge (il_W bs_hdr nh)); [| rewrite il_W_length; lia].
+        iExact "Hdone".
+      + rewrite Hend. iExact "Hjunk".
+    - (* ---- another word: the branch takes us back to +0x52 ---- *)
+      assert (Hcmp : neq_vec (rget E3 Ra5) (rget E3 Ra2) = true).
+      { rgne. rgne. rewrite HE3a5 HE3a2 /neq_vec.
+        rewrite (il_cur_inj kk (S t) nh Hkk ltac:(lia) Hnh Hmore).
+        reflexivity. }
+      iApply (wp_bne_taken_s_sconf (mword_of_int (KernelSyms.initlog + 0x5a))
+                (mword_of_int 8184 : SailStdpp.Values.mword 13) Ra2 Ra5 E3 nK b
+                ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
+                Hcmp ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi5a").
+      iNext. iIntros (CIDc5 Hsc5) "Hcg Hpc".
+      assert (Htgt52 : add_vec (mword_of_int (KernelSyms.initlog + 0x5a) : SailStdpp.Values.mword 64)
+                         (sign_extend' 64 (mword_of_int 8184 : SailStdpp.Values.mword 13))
+                       = mword_of_int (KernelSyms.initlog + 0x52))
+        by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Htgt52) in "Hpc".
+      iApply (IH CIDc5 (S t) E3 ltac:(lia) ltac:(lia) HE3a5 HE3a4 HE3a2 HE3a0
+                with "Hcg Hpc Htext Hby Hdone Hjunk [Hcont]").
+      rewrite /wp_next. iIntros (CIDo Hso M') "%HcsX %Ha0X HcgX HpcX HbyX HdoneX HjunkX".
+      iSpecialize ("Hcont" $! CIDo with "[%]"); [wp_next_chain|].
+      iApply ("Hcont" $! M' with "[%] [%] HcgX HpcX HbyX HdoneX HjunkX").
+      + intros c Hc. rewrite (HcsX c Hc). exact (HE3cs c Hc).
+      + exact Ha0X.
+  Qed.
+
+  (* ================================================================== *)
+  (*  +0x40 -> +0x5e : THE HEADER DISPATCH (durable-disk stage D1).       *)
+  (*  At a clean header the [blez] skips the copy loop; at a dirty one    *)
+  (*  the loop runs ([il_copy]).  One CPS block, one continuation: the    *)
+  (*  cells arrive holding the decoded write set (empty at nh = 0) and    *)
+  (*  the junk tail.                                                      *)
+  (* ================================================================== *)
+  Local Lemma il_hd `{GEN : GenId} `{CID0 : CpuId}
+      (kk nh : nat) (bs_hdr : list (bv 8))
+      (pj : SailStdpp.Values.mword 64) (nK : nat) (b : bool)
+      (M : regfile) :
+    (kk < NBUF)%nat ->
+    (nh <= LOGBLOCKS)%nat ->
+    nh = (hdr_dec bs_hdr).1 ->
+    length bs_hdr = 1024%nat ->
+    M !!! Regidx Ra2 = sign_extend' 64 (il_hdrw bs_hdr) ->
+    M !!! Regidx Ra0 = (bnode kk : SailStdpp.Values.mword 64) ->
+    sie_cap_gpr KT1 M nK b pj -∗
+    pc_is (mword_of_int (KernelSyms.initlog + 0x40) : SailStdpp.Values.mword 64) -∗
+    kernel_text -∗
+    ([∗ list] jj ↦ x ∈ bs_hdr, pa_add (b_data (bnode kk)) jj ↦ₘ x) -∗
+    ([∗ list] i ∈ seq 0 LOGBLOCKS, ∃ wj : SailStdpp.Values.mword 32, lh_block i ↦₄ wj) -∗
+    wp_next b pj (fun (CIDo : CpuId) =>
+      ∀ (M' : regfile),
+        ⌜forall c : SailStdpp.Values.mword 5, is_cs_idx c = true ->
+           M' !!! Regidx c = (M !!! Regidx c : SailStdpp.Values.mword 64)⌝ -∗
+        ⌜M' !!! Regidx Ra0 = (bnode kk : SailStdpp.Values.mword 64)⌝ -∗
+        sie_cap_gpr KT1 M' nK b pj -∗
+        pc_is (mword_of_int (KernelSyms.initlog + 0x5e) : SailStdpp.Values.mword 64) -∗
+        ([∗ list] jj ↦ x ∈ bs_hdr, pa_add (b_data (bnode kk)) jj ↦ₘ x) -∗
+        ([∗ list] i ↦ w ∈ il_W bs_hdr nh, lh_block i ↦₄ w) -∗
+        ([∗ list] i ∈ seq nh (LOGBLOCKS - nh), ∃ wj : SailStdpp.Values.mword 32, lh_block i ↦₄ wj) -∗
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hkk Hnh Hdec Hlen Ha2 Ha0.
+    assert (Hhn : hdr_n bs_hdr = Z.of_nat nh)
+      by (rewrite Hdec; symmetry; apply hdr_dec_n).
+    assert (Ha2m : M !!! Regidx Ra2
+                   = (mword_of_int (Z.of_nat nh) : SailStdpp.Values.mword 64)).
+    { rewrite Ha2 (il_hdrw_moi bs_hdr nh Hhn Hnh).
+      apply il_sext32. exact (il_n_small nh Hnh). }
+    iIntros "Hcg Hpc #Htext Hby Hjunk Hcont".
+    iPoseProof (ili_40 with "Htext") as "Hi40".
+    destruct (decide (nh = 0%nat)) as [Hn0 | Hnpos].
+    - (* ---- clean header: the branch skips the loop ---- *)
+      assert (Hcmp : zopz0zKzJ_s (zero_reg : SailStdpp.Values.mword 64) (rget M Ra2) = true).
+      { rgne. rewrite Ha2m (il_geb_s0 (Z.of_nat nh) (il_n_small nh Hnh)) Hn0.
+        reflexivity. }
+      iApply (wp_bge_x0_taken_s_sconf (mword_of_int (KernelSyms.initlog + 0x40))
+                (mword_of_int 30 : SailStdpp.Values.mword 13) Ra2 M nK b
+                ltac:(vm_compute; discriminate) Hcmp ltac:(vm_compute; reflexivity)
+                with "Hcg Hpc Hi40").
+      iNext. iIntros (CIDh1 Hsh1) "Hcg Hpc".
+      assert (Htgt5e : add_vec (mword_of_int (KernelSyms.initlog + 0x40) : SailStdpp.Values.mword 64)
+                         (sign_extend' 64 (mword_of_int 30 : SailStdpp.Values.mword 13))
+                       = mword_of_int (KernelSyms.initlog + 0x5e))
+        by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Htgt5e) in "Hpc".
+      iSpecialize ("Hcont" $! CIDh1 with "[%]"); [wp_next_chain|].
+      iApply ("Hcont" $! M with "[%] [%] Hcg Hpc Hby [] [Hjunk]").
+      + intros c Hc. reflexivity.
+      + exact Ha0.
+      + rewrite Hn0 /il_W. iApply il_bigL_nil.
+      + rewrite Hn0. iExact "Hjunk".
+    - (* ---- dirty header: the setup then the live loop ---- *)
+      assert (Hposn : (0 < nh)%nat) by lia.
+      iPoseProof (ili_44 with "Htext") as "Hi44".
+      iPoseProof (ili_46 with "Htext") as "Hi46".
+      iPoseProof (ili_4a with "Htext") as "Hi4a".
+      iPoseProof (ili_4e with "Htext") as "Hi4e".
+      iPoseProof (ili_50 with "Htext") as "Hi50".
+      assert (Hcmp : zopz0zKzJ_s (zero_reg : SailStdpp.Values.mword 64) (rget M Ra2) = false).
+      { rgne. rewrite Ha2m (il_geb_s0 (Z.of_nat nh) (il_n_small nh Hnh)).
+        exact (il_geb_pos nh Hposn). }
+      iApply (wp_bge_x0_fall_s_sconf (mword_of_int (KernelSyms.initlog + 0x40))
+                (mword_of_int 30 : SailStdpp.Values.mword 13) Ra2 M nK b
+                ltac:(vm_compute; discriminate) Hcmp
+                with "Hcg Hpc Hi40").
+      iIntros (CIDh1 Hsh1) "Hcg Hpc".
+      assert (Hpp44 : add_vec_int (mword_of_int (KernelSyms.initlog + 0x40) : SailStdpp.Values.mword 64) 4
+                      = mword_of_int (KernelSyms.initlog + 0x44))
+        by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Hpp44) in "Hpc".
+      (* ===== +0x44 c.mv a5,a0 : the source cursor ===== *)
+      iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.initlog + 0x44)) Ra5 Ra0
+                M nK b ltac:(vm_compute; discriminate) ltac:(rdok)
+                with "Hcg Hpc Hi44").
+      iIntros (CIDh2 Hsh2) "Hcg Hpc".
+      iEval (rgne) in "Hcg".
+      assert (Hcur0 : add_vec (zero_reg : SailStdpp.Values.mword 64) (M !!! Regidx Ra0)
+                      = il_cur kk 0).
+      { rewrite Ha0. exact (il_cur_0 kk). }
+      iEval (rewrite Hcur0) in "Hcg".
+      set (F1 := <[Regidx Ra5 := regval_into_reg (il_cur kk 0)]> M).
+      assert (HF1a5 : F1 !!! Regidx Ra5 = il_cur kk 0)
+        by (rewrite /F1; apply upd_eq).
+      assert (HF1a2 : F1 !!! Regidx Ra2
+                      = (mword_of_int (Z.of_nat nh) : SailStdpp.Values.mword 64))
+        by (rewrite /F1 upd_ne; [exact Ha2m | vm_compute; discriminate]).
+      assert (HF1a0 : F1 !!! Regidx Ra0 = (bnode kk : SailStdpp.Values.mword 64))
+        by (rewrite /F1 upd_ne; [exact Ha0 | vm_compute; discriminate]).
+      assert (Hpp46 : add_vec_int (mword_of_int (KernelSyms.initlog + 0x44) : SailStdpp.Values.mword 64) 2
+                      = mword_of_int (KernelSyms.initlog + 0x46))
+        by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Hpp46) in "Hpc".
+      (* ===== +0x46 / +0x4a : a4 := &log.lh.block[0] ===== *)
+      iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.initlog + 0x46))
+                (mword_of_int 14 : SailStdpp.Values.mword 5) (mword_of_int 30 : SailStdpp.Values.mword 20)
+                F1 nK b ltac:(vm_compute; discriminate) ltac:(rdok)
+                with "Hcg Hpc Hi46").
+      iIntros (CIDh3 Hsh3) "Hcg Hpc".
+      set (F2 := <[Regidx (mword_of_int 14 : SailStdpp.Values.mword 5)
+                   := regval_into_reg
+                        (add_vec (mword_of_int (KernelSyms.initlog + 0x46) : SailStdpp.Values.mword 64)
+                           (auipc_off (mword_of_int 30 : SailStdpp.Values.mword 20)))]> F1).
+      assert (Hpp4a : add_vec_int (mword_of_int (KernelSyms.initlog + 0x46) : SailStdpp.Values.mword 64) 4
+                      = mword_of_int (KernelSyms.initlog + 0x4a))
+        by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Hpp4a) in "Hpc".
+      iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.initlog + 0x4a))
+                (mword_of_int 14 : SailStdpp.Values.mword 5) (mword_of_int 14 : SailStdpp.Values.mword 5)
+                (mword_of_int 1940 : SailStdpp.Values.mword 12) F2 nK b
+                ltac:(vm_compute; discriminate) ltac:(rdok)
+                with "Hcg Hpc Hi4a").
+      iIntros (CIDh4 Hsh4) "Hcg Hpc".
+      iEval (rgne) in "Hcg".
+      set (F3 := <[Regidx (mword_of_int 14 : SailStdpp.Values.mword 5)
+                   := regval_into_reg
+                        (add_vec (F2 !!! Regidx (mword_of_int 14 : SailStdpp.Values.mword 5))
+                           (sign_extend' 64 (mword_of_int 1940 : SailStdpp.Values.mword 12)))]> F2).
+      assert (HF3a4 : F3 !!! Regidx (mword_of_int 14 : SailStdpp.Values.mword 5)
+                      = (lh_block 0 : SailStdpp.Values.mword 64)).
+      { rewrite /F3 upd_eq /F2 upd_eq. exact il_reloc_blk0. }
+      assert (HF3a5 : F3 !!! Regidx Ra5 = il_cur kk 0).
+      { rewrite /F3 upd_ne; [| vm_compute; discriminate].
+        rewrite /F2 upd_ne; [exact HF1a5 | vm_compute; discriminate]. }
+      assert (HF3a2 : F3 !!! Regidx Ra2
+                      = (mword_of_int (Z.of_nat nh) : SailStdpp.Values.mword 64)).
+      { rewrite /F3 upd_ne; [| vm_compute; discriminate].
+        rewrite /F2 upd_ne; [exact HF1a2 | vm_compute; discriminate]. }
+      assert (HF3a0 : F3 !!! Regidx Ra0 = (bnode kk : SailStdpp.Values.mword 64)).
+      { rewrite /F3 upd_ne; [| vm_compute; discriminate].
+        rewrite /F2 upd_ne; [exact HF1a0 | vm_compute; discriminate]. }
+      assert (Hpp4e : add_vec_int (mword_of_int (KernelSyms.initlog + 0x4a) : SailStdpp.Values.mword 64) 4
+                      = mword_of_int (KernelSyms.initlog + 0x4e))
+        by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Hpp4e) in "Hpc".
+      (* ===== +0x4e c.slli a2,a2,2 ===== *)
+      iApply (wp_cslli_s_sconf (mword_of_int (KernelSyms.initlog + 0x4e))
+                (Regidx Ra2) Ra2 (mword_of_int 2 : SailStdpp.Values.mword 6)
+                F3 nK b eq_refl
+                ltac:(vm_compute; discriminate) ltac:(rdok)
+                with "Hcg Hpc Hi4e").
+      iIntros (CIDh5 Hsh5) "Hcg Hpc".
+      set (F4 := <[Regidx Ra2 := regval_into_reg
+                    (shift_bits_left (F3 !!! Regidx Ra2)
+                       (subrange_vec_dec (mword_of_int 2 : SailStdpp.Values.mword 6)
+                          (Z.sub log2_xlen 1) 0))]> F3).
+      assert (HF4a2 : F4 !!! Regidx Ra2
+                      = (mword_of_int (Z.of_nat nh * 4) : SailStdpp.Values.mword 64)).
+      { rewrite /F4 upd_eq HF3a2.
+        apply il_slli2; [lia | unfold LOGBLOCKS in Hnh; lia]. }
+      assert (HF4a0 : F4 !!! Regidx Ra0 = (bnode kk : SailStdpp.Values.mword 64))
+        by (rewrite /F4 upd_ne; [exact HF3a0 | vm_compute; discriminate]).
+      assert (Hpp50 : add_vec_int (mword_of_int (KernelSyms.initlog + 0x4e) : SailStdpp.Values.mword 64) 2
+                      = mword_of_int (KernelSyms.initlog + 0x50))
+        by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Hpp50) in "Hpc".
+      (* ===== +0x50 c.add a2,a2,a0 : the end pointer ===== *)
+      iApply (wp_cadd_s_sconf (mword_of_int (KernelSyms.initlog + 0x50))
+                Ra2 Ra0 F4 nK b
+                ltac:(vm_compute; discriminate) ltac:(rdok)
+                with "Hcg Hpc Hi50").
+      iIntros (CIDh6 Hsh6) "Hcg Hpc".
+      iEval (rgne) in "Hcg". iEval (rgne) in "Hcg".
+      assert (Hendv : add_vec (F4 !!! Regidx Ra2) (F4 !!! Regidx Ra0)
+                      = il_cur kk nh).
+      { rewrite HF4a2 HF4a0.
+        assert (Hz : (Z.of_nat nh * 4)%Z = Z.of_nat (4 * nh)%nat) by lia.
+        rewrite Hz. rewrite pa_add_comm. rewrite /il_cur. f_equal. }
+      iEval (rewrite Hendv) in "Hcg".
+      set (F5 := <[Regidx Ra2 := regval_into_reg (il_cur kk nh)]> F4).
+      assert (HF5a2 : F5 !!! Regidx Ra2 = il_cur kk nh)
+        by (rewrite /F5; apply upd_eq).
+      assert (HF5a5 : F5 !!! Regidx Ra5 = il_cur kk 0).
+      { rewrite /F5 upd_ne; [| vm_compute; discriminate].
+        rewrite /F4 upd_ne; [exact HF3a5 | vm_compute; discriminate]. }
+      assert (HF5a4 : F5 !!! Regidx (mword_of_int 14 : SailStdpp.Values.mword 5)
+                      = (lh_block 0 : SailStdpp.Values.mword 64)).
+      { rewrite /F5 upd_ne; [| vm_compute; discriminate].
+        rewrite /F4 upd_ne; [exact HF3a4 | vm_compute; discriminate]. }
+      assert (HF5a0 : F5 !!! Regidx Ra0 = (bnode kk : SailStdpp.Values.mword 64))
+        by (rewrite /F5 upd_ne; [exact HF4a0 | vm_compute; discriminate]).
+      assert (HF5cs : forall c : SailStdpp.Values.mword 5, is_cs_idx c = true ->
+                F5 !!! Regidx c = (M !!! Regidx c : SailStdpp.Values.mword 64)).
+      { intros c Hc.
+        assert (Hne : forall r : SailStdpp.Values.mword 5, is_cs_idx r = false -> Regidx c <> Regidx r).
+        { intros r Hr. apply not_eq_sym. apply is_cs_idx_true_neq; assumption. }
+        rewrite /F5 upd_ne; [| apply Hne; vm_compute; reflexivity].
+        rewrite /F4 upd_ne; [| apply Hne; vm_compute; reflexivity].
+        rewrite /F3 upd_ne; [| apply Hne; vm_compute; reflexivity].
+        rewrite /F2 upd_ne; [| apply Hne; vm_compute; reflexivity].
+        rewrite /F1 upd_ne; [| apply Hne; vm_compute; reflexivity].
+        reflexivity. }
+      assert (Hpp52 : add_vec_int (mword_of_int (KernelSyms.initlog + 0x50) : SailStdpp.Values.mword 64) 2
+                      = mword_of_int (KernelSyms.initlog + 0x52))
+        by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Hpp52) in "Hpc".
+      (* ===== the live loop ===== *)
+      iAssert ([∗ list] i ↦ w ∈ take 0 (il_W bs_hdr nh), lh_block i ↦₄ w)%I
+        as "Hdone".
+      { rewrite take_0. iApply il_bigL_nil. }
+      iApply (il_copy nh kk nh bs_hdr pj nK b Hkk Hnh Hlen CIDh6 0%nat F5
+                Hposn ltac:(lia) HF5a5 HF5a4 HF5a2 HF5a0
+                with "Hcg Hpc Htext Hby Hdone Hjunk [Hcont]").
+      rewrite /wp_next. iIntros (CIDo Hso M') "%HcsX %Ha0X HcgX HpcX HbyX HdoneX HjunkX".
+      iSpecialize ("Hcont" $! CIDo with "[%]"); [wp_next_chain|].
+      iApply ("Hcont" $! M' with "[%] [%] HcgX HpcX HbyX HdoneX HjunkX").
+      + intros c Hc. rewrite (HcsX c Hc). exact (HF5cs c Hc).
+      + exact Ha0X.
+  Qed.
+
+End InitlogBlocks.
+
 Section ProofInitlog.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
@@ -280,24 +1107,27 @@ Section ProofInitlog.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γ : log_names)
-      (γfs : fs_names)
+      (γfs : fs_names) (γpr : gname)
       (cov : gset Z) (logstart : Z) (dev : mword 32) (sb : mword 64)
       (bs_hdr : list (bv 8))
+      (Bh : nat -> list (bv 8))
       (L : gmap Z (list (bv 8))) (D : gmap Z bool)
       (vlock : mword 32) (vname vcpu : mword 64)
       (v_start v_dev v_nc v_n : mword 32)
       (pidv : mword 32) (dq dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (Vpr : pprivate)
-    : wp_initlog_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs
-                            cov logstart dev sb bs_hdr L D
+    : wp_initlog_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γpr
+                            cov logstart dev sb bs_hdr Bh L D
                             vlock vname vcpu v_start v_dev v_nc v_n
                             pidv dq dqs m K eb b lks Vpr.
   Proof.
     cbv beta delta [wp_initlog_sconf_body].
-    intros pcE pj ret_tgt c_name c_cpu HK Hgeom Hj Hgl Hhdr0 Hma0 Hma1 Hbelow.
+    intros pcE pj ret_tgt c_name c_cpu HK Hgeom Hj Hgl Hbnd Hndup Hin Hpk
+           Hma0 Hma1 HDf Hbelow.
     destruct Hgeom as [Hcovok Hlogsub].
-    iIntros "Hcg Hcnt Hextc Hclmc #Htext #Hkdata Hpc #Hpenv #Hbio #Hseam #Hcert Hmirf
+    iIntros "Hcg Hcnt Hextc Hclmc #Htext #Hkdata Hpc #Hpenv #Hbio #Hseam
+              #Hpenvpk Hhomes #Hcert Hmirf
               Hlfree
               Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hsbf Hlock Hname Hcpu
               Hstc Hdevc Hout Hcmt Hnc Hncell Hblk HLauth HDauth Hcovf Hfsb
@@ -880,21 +1710,19 @@ Section ProofInitlog.
                        (sign_extend' 64 (mword_of_int 88 : mword 12))
                      = b_data (bnode kk)).
     { rgne. rewrite HmBa0 il_s88. apply il_hdr_addr. }
-    iEval (rewrite (il_hdrw_zero bs_hdr Hhdr0)) in "Hword".
     iEval (rewrite -Hhaddr) in "Hword".
     iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.initlog + 0x3a)) Ra2 Ra0
               (mword_of_int 88 : mword 12) mB (K - 6)%nat
-              (mword_of_int 0 : mword 32) b
+              (il_hdrw bs_hdr) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi3a Hword").
     iIntros (CID23 Hs23) "Hcg Hpc Hword".
     iEval (rewrite Hhaddr) in "Hword".
-    iEval (rewrite -(il_hdrw_zero bs_hdr Hhdr0)) in "Hword".
     iDestruct ("Hback" with "Hword") as "Hby".
     set (B1 := <[Regidx Ra2 := regval_into_reg
-                  (sign_extend' 64 (mword_of_int 0 : mword 32))]> mB).
+                  (sign_extend' 64 (il_hdrw bs_hdr))]> mB).
     assert (HB1a2 : B1 !!! Regidx Ra2
-                    = sign_extend' 64 (mword_of_int 0 : mword 32))
+                    = sign_extend' 64 (il_hdrw bs_hdr))
       by (rewrite /B1; apply upd_eq).
     assert (HB1a0 : B1 !!! Regidx Ra0 = bnode kk)
       by (rewrite /B1 upd_ne; [exact HmBa0 | vm_compute; discriminate]).
@@ -907,18 +1735,6 @@ Section ProofInitlog.
               B1 !!! Regidx c = (m !!! Regidx c : mword 64)).
     { intros c Hcs N2 N8 N9 N18 N19.
       rewrite /B1 upd_ne; [| regne]. exact (HmBcs c Hcs N2 N8 N9 N18 N19). }
-    (* rebuild the handle: the buffer was only READ *)
-    iAssert (bio_locked bn (fs_view γfs γd dev cov) kk pidv dev
-               (mword_of_int logstart : mword 32) bs_hdr bsd0 d0)
-      with "[Hslk Hvalid Hbdev Hbno Hbdsk Hby Hdisk Hpay]" as "Hheld".
-    { rewrite /bio_locked /bio_held /buf_own /bpa.
-      iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
-      iSplitL "Hslk"; [iExact "Hslk"|].
-      iSplitL "Hvalid"; [iExact "Hvalid"|]. iSplitL "Hbdev"; [iExact "Hbdev"|].
-      iSplitR "Hdisk Hpay".
-      { iSplitL "Hbno"; [iExact "Hbno"|]. iSplitL "Hbdsk"; [iExact "Hbdsk"|].
-        iSplitR; [iPureIntro; exact Hlen|]. iExact "Hby". }
-      iSplitL "Hdisk"; [iExact "Hdisk"|]. iExact "Hpay". }
     assert (Hpp3c : add_vec_int (mword_of_int (KernelSyms.initlog + 0x3a) : mword 64) 2
                     = mword_of_int (KernelSyms.initlog + 0x3c))
       by (apply bv_eq; vm_compute; reflexivity).
@@ -933,43 +1749,56 @@ Section ProofInitlog.
               with "Hcg Hpc Hi3c Hncell").
     iIntros (CID24 Hs24) "Hcg Hpc Hncell".
     iEval (rewrite Hlhad) in "Hncell".
-    assert (Hsv3 : trunc32 (rget B1 Ra2) = (mword_of_int 0 : mword 32)).
+    assert (Hsv3 : trunc32 (rget B1 Ra2) = il_hdrw bs_hdr).
     { rgne. rewrite HB1a2. apply trunc32_sext64. }
     iEval (rewrite Hsv3) in "Hncell".
     assert (Hpp40 : add_vec_int (mword_of_int (KernelSyms.initlog + 0x3c) : mword 64) 4
                     = mword_of_int (KernelSyms.initlog + 0x40))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp40) in "Hpc".
-    (* ===== +0x40 blez a2 -> +0x5e : TAKEN (n = 0), the copy loop is dead ===== *)
-    assert (Hcmp : zopz0zKzJ_s (zero_reg : mword 64) (rget B1 Ra2) = true).
-    { rgne. rewrite HB1a2. vm_compute. reflexivity. }
-    iApply (wp_bge_x0_taken_s_sconf (mword_of_int (KernelSyms.initlog + 0x40))
-              (mword_of_int 30 : mword 13) Ra2 B1 (K - 6)%nat b
-              ltac:(vm_compute; discriminate) Hcmp ltac:(vm_compute; reflexivity)
-              with "Hcg Hpc Hi40").
-    iNext. iIntros (CID25 Hs25) "Hcg Hpc".
-    assert (Htgt5e : add_vec (mword_of_int (KernelSyms.initlog + 0x40) : mword 64)
-                       (sign_extend' 64 (mword_of_int 30 : mword 13))
-                     = mword_of_int (KernelSyms.initlog + 0x5e))
-      by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Htgt5e) in "Hpc".
+    (* ===== +0x40 -> +0x5e : THE HEADER DISPATCH (stage D1's [il_hd]): the
+       clean header skips the copy loop, the dirty one runs it live ===== *)
+    iApply (il_hd kk ((hdr_dec bs_hdr).1) bs_hdr pj (K - 6)%nat b B1
+              HA Hbnd eq_refl Hlen HB1a2 HB1a0
+              with "Hcg Hpc Htext Hby Hblk").
+    iIntros (CID25 Hs25 B1x) "%HB1xcs %HB1xa0 Hcg Hpc Hby Hcells Hjunk".
+    (* the head's register facts, carried across the dispatch *)
+    assert (HB1xsp : B1x !!! Regidx csp_rs1 = spr).
+    { rewrite (HB1xcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HB1sp. }
+    assert (HB1xcs' : forall c : mword 5, is_cs_idx c = true ->
+              c <> csp_rs1 -> c <> Rs0 -> c <> Rs1 -> c <> Rs2 -> c <> Rs3 ->
+              B1x !!! Regidx c = (m !!! Regidx c : mword 64)).
+    { intros c Hcs N2 N8 N9 N18 N19.
+      rewrite (HB1xcs c Hcs). exact (HB1cs c Hcs N2 N8 N9 N18 N19). }
+    (* rebuild the handle: the buffer was only READ *)
+    iAssert (bio_locked bn (fs_view γfs γd dev cov) kk pidv dev
+               (mword_of_int logstart : mword 32) bs_hdr bsd0 d0)
+      with "[Hslk Hvalid Hbdev Hbno Hbdsk Hby Hdisk Hpay]" as "Hheld".
+    { rewrite /bio_locked /bio_held /buf_own /bpa.
+      iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
+      iSplitL "Hslk"; [iExact "Hslk"|].
+      iSplitL "Hvalid"; [iExact "Hvalid"|]. iSplitL "Hbdev"; [iExact "Hbdev"|].
+      iSplitR "Hdisk Hpay".
+      { iSplitL "Hbno"; [iExact "Hbno"|]. iSplitL "Hbdsk"; [iExact "Hbdsk"|].
+        iSplitR; [iPureIntro; exact Hlen|]. iExact "Hby". }
+      iSplitL "Hdisk"; [iExact "Hdisk"|]. iExact "Hpay". }
     (* ===== +0x5e jal ra,brelse ===== *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.initlog + 0x5e)) Rra
-              (mword_of_int 2093098 : mword 21) B1 (K - 6)%nat b
+              (mword_of_int 2093098 : mword 21) B1x (K - 6)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi5e").
     iIntros (CID26 Hs26) "Hcg Hpc".
     set (B2 := <[Regidx Rra := regval_into_reg
-                  (add_vec_int (mword_of_int (KernelSyms.initlog + 0x5e) : mword 64) 4)]> B1).
+                  (add_vec_int (mword_of_int (KernelSyms.initlog + 0x5e) : mword 64) 4)]> B1x).
     assert (Htgtbl : add_vec (mword_of_int (KernelSyms.initlog + 0x5e) : mword 64)
                        (sign_extend' 64 (mword_of_int 2093098 : mword 21))
                      = mword_of_int KernelSyms.brelse)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtbl) in "Hpc".
     assert (HB2a0 : B2 !!! Regidx Ra0 = bnode kk)
-      by (rewrite /B2 upd_ne; [exact HB1a0 | vm_compute; discriminate]).
+      by (rewrite /B2 upd_ne; [exact HB1xa0 | vm_compute; discriminate]).
     assert (HB2sp : B2 !!! Regidx csp_rs1 = spr)
-      by (rewrite /B2 upd_ne; [exact HB1sp | vm_compute; discriminate]).
+      by (rewrite /B2 upd_ne; [exact HB1xsp | vm_compute; discriminate]).
     assert (HB2ra : B2 !!! Regidx Rra
                     = add_vec_int (mword_of_int (KernelSyms.initlog + 0x5e) : mword 64) 4)
       by (rewrite /B2; apply upd_eq).
@@ -977,7 +1806,7 @@ Section ProofInitlog.
               c <> csp_rs1 -> c <> Rs0 -> c <> Rs1 -> c <> Rs2 -> c <> Rs3 ->
               B2 !!! Regidx c = (m !!! Regidx c : mword 64)).
     { intros c Hcs N2 N8 N9 N18 N19.
-      rewrite /B2 upd_ne; [| regne]. exact (HB1cs c Hcs N2 N8 N9 N18 N19). }
+      rewrite /B2 upd_ne; [| regne]. exact (HB1xcs' c Hcs N2 N8 N9 N18 N19). }
     iDestruct (cpu_own_transport CID22 CID26 0 eb pj b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iDestruct (trap_csrs_ext_transport CID22 CID26 eb pj
@@ -1064,8 +1893,56 @@ Section ProofInitlog.
     iAssert (bslots 2) with "[Hs1u Hs2u]" as "Hs2".
     { rewrite (_ : 2%nat = (1 + 1)%nat); [| lia]. rewrite bslots_op.
       iSplitL "Hs1u"; [iExact "Hs1u" | iExact "Hs2u"]. }
-    iAssert (lh_n_pa ↦₄ (mword_of_int (Z.of_nat 0%nat) : mword 32))%I
-      with "[Hncell]" as "Hncell"; [iExact "Hncell"|].
+    (* the loaded header word, at its decoded numeral *)
+    assert (Hhnd : hdr_n bs_hdr = Z.of_nat ((hdr_dec bs_hdr).1))
+      by (symmetry; apply hdr_dec_n).
+    iEval (rewrite (il_hdrw_moi bs_hdr ((hdr_dec bs_hdr).1) Hhnd Hbnd)) in "Hncell".
+    (* THE SLOT CONTENTS, NAMED: the thirty existential client halves give
+       up a contents function; the first [nh] feed the recovering install *)
+    iDestruct (il_sepL_exist
+                 (fun _ x bs => fsblock γfs (log_slot_bno logstart x) bs)
+                 (seq 0 LOGBLOCKS) with "Hslotsfs") as (ys) "[%Hyslen Hslotsn]".
+    iAssert ([∗ list] k ↦ _ ∈ seq 0 LOGBLOCKS,
+               fsblock γfs (log_slot_bno logstart k) (ys !!! k))%I
+      with "[Hslotsn]" as "Hslotsn".
+    { iApply (big_sepL_mono with "Hslotsn"). intros k x Hk.
+      apply lookup_seq in Hk as [-> _]. done. }
+    assert (Hsp30 : seq 0 LOGBLOCKS
+                    = seq 0 ((hdr_dec bs_hdr).1)
+                      ++ seq ((hdr_dec bs_hdr).1) (LOGBLOCKS - (hdr_dec bs_hdr).1)).
+    { replace LOGBLOCKS with ((hdr_dec bs_hdr).1 + (LOGBLOCKS - (hdr_dec bs_hdr).1))%nat at 1
+        by lia.
+      rewrite seq_app. f_equal. }
+    iEval (rewrite Hsp30 big_sepL_app) in "Hslotsn".
+    iDestruct "Hslotsn" as "[Hslotfst Hslotrest]".
+    iAssert ([∗ list] i ↦ w ∈ il_W bs_hdr ((hdr_dec bs_hdr).1),
+               fsblock γfs (log_slot_bno logstart i) (ys !!! i))%I
+      with "[Hslotfst]" as "Hslotfst".
+    { iApply (il_sepL_reindex (seq 0 ((hdr_dec bs_hdr).1))
+                (il_W bs_hdr ((hdr_dec bs_hdr).1))
+                (fun i => fsblock γfs (log_slot_bno logstart i) (ys !!! i))
+                ltac:(rewrite il_W_length length_seq; reflexivity)
+                with "Hslotfst"). }
+    (* the entries' home halves, re-indexed at the write set *)
+    iEval (rewrite -(il_W_uint bs_hdr)) in "Hhomes".
+    iAssert ([∗ list] i ↦ w ∈ il_W bs_hdr ((hdr_dec bs_hdr).1),
+               fsblock γfs (uint w) (Bh i))%I with "[Hhomes]" as "Hhomes".
+    { iEval (change (map uint ?l) with (uint <$> l)) in "Hhomes".
+      iEval (rewrite big_sepL_fmap) in "Hhomes". iExact "Hhomes". }
+    (* the per-entry rows the recovering install takes *)
+    iAssert ([∗ list] i ↦ w ∈ il_W bs_hdr ((hdr_dec bs_hdr).1),
+               fsblock γfs (log_slot_bno logstart i) (ys !!! i) ∗
+               fsblock γfs (uint w) (Bh i))%I
+      with "[Hslotfst Hhomes]" as "Hents".
+    { rewrite big_sepL_sep. iSplitL "Hslotfst"; [iExact "Hslotfst" | iExact "Hhomes"]. }
+    (* the era's crash custody, out of the whole boot mirror *)
+    iDestruct (fs_era_custody_boot with "Hmirf") as "Hcust".
+    (* the entries are covered home blocks *)
+    assert (Hwok' : forall w : mword 32, w ∈ il_W bs_hdr ((hdr_dec bs_hdr).1) ->
+              uint w ∈ cov /\ ~ (uint w ∈ log_region_set logstart)).
+    { intros w Hw. apply Hin. rewrite -(il_W_uint bs_hdr).
+      change (map uint ?l) with (uint <$> l).
+      apply elem_of_list_fmap_1. exact Hw. }
     iDestruct (cpu_own_transport CID27 CID29 0 eb pj b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     (* THE COMPLEMENT'S SPAN IS WIDER THAN [cpu_own]'S, because brelse does
@@ -1086,44 +1963,56 @@ Section ProofInitlog.
        position whose expected type is still an evar diverges
        (claude-notes/durable-notes.md) *)
     assert (Hgeomok : log_geom_ok cov logstart) by (split; assumption).
-    assert (Hshape0 : (0%nat = length ([] : list (mword 32))
-                       /\ (0 <= LOGBLOCKS)%nat)).
-    { split; [reflexivity | unfold LOGBLOCKS; lia]. }
-    assert (Hnodup0 : NoDup (map uint ([] : list (mword 32)))).
-    { constructor. }
-    assert (Hwcov0 : forall w : mword 32, w ∈ ([] : list (mword 32)) ->
-              uint w ∈ cov /\ ~ (uint w ∈ log_region_set logstart)).
-    { intros w Hw. exfalso. exact (not_elem_of_nil w Hw). }
-    assert (Hrec0 : (true = false \/ 0%nat = 0%nat)) by (right; reflexivity).
-    assert (Hlw0 : forall (i : nat) (w : SailStdpp.Values.mword 32),
-              ([] : list (mword 32)) !! i = Some w ->
-              L !! uint w = Some ((fun _ : nat => ([] : list (bv 8))) i)).
-    { intros i w Hi. rewrite lookup_nil in Hi. discriminate. }
-    iAssert ([∗ list] i ↦ w ∈ ([] : list (mword 32)), lh_block i ↦₄ w)%I
-      as "Hnil1"; [iApply il_bigL_nil|].
-    iAssert ([∗ list] i ↦ w ∈ ([] : list (mword 32)),
-               fsblock γfs (log_slot_bno logstart i) [] ∗
-               (uint w) ↪[fs_dirty γfs]{#(1/2)} true)%I
-      as "Hnil2"; [iApply il_bigL_nil|].
-    iApply (InstallTrans.wp_install_trans_sconf γs j γl γu γd γk pd pav pu bn γfs
-              cov logstart dev true 0%nat ([] : list (mword 32))
-              (fun _ : nat => ([] : list (bv 8))) L D pidv dq
-              C2 (K - 6)%nat eb b True%I
+    assert (Hshapeg : ((hdr_dec bs_hdr).1
+                         = length (il_W bs_hdr ((hdr_dec bs_hdr).1))
+                       /\ ((hdr_dec bs_hdr).1 <= LOGBLOCKS)%nat)).
+    { split; [symmetry; apply il_W_length | exact Hbnd]. }
+    assert (Hnodupg : NoDup (map uint (il_W bs_hdr ((hdr_dec bs_hdr).1)))).
+    { rewrite (il_W_uint bs_hdr). exact Hndup. }
+    assert (HLwg : true = false ->
+              forall (i : nat) (w : SailStdpp.Values.mword 32),
+                il_W bs_hdr ((hdr_dec bs_hdr).1) !! i = Some w ->
+                L !! uint w = Some ((fun k : nat => ys !!! k) i)).
+    { intros Hab. discriminate. }
+    assert (HDg : true = true ->
+              forall w : SailStdpp.Values.mword 32,
+                w ∈ il_W bs_hdr ((hdr_dec bs_hdr).1) ->
+                D !! uint w = Some false).
+    { intros _ w Hw. apply HDf. exact (proj1 (Hwok' w Hw)). }
+    assert (Hpkg : true = true -> printk_gen_contract (kt := KT1) γpr γu γd).
+    { intros _. exact Hpk. }
+    iApply (InstallTrans.wp_install_trans_sconf γs j γl γu γd γk pd pav pu bn γfs γpr
+              cov logstart dev true ((hdr_dec bs_hdr).1)
+              (il_W bs_hdr ((hdr_dec bs_hdr).1))
+              (fun k : nat => ys !!! k) Bh L D pidv dq
+              C2 (K - 6)%nat eb b (fs_era_custody)
               _ Vpr HKit Hgeomok Hj Hgl
-              Hrec0 HC2a0 Hshape0 Hnodup0 Hwcov0 Hlw0
-              Hbelow
-              with "Hcg Hcnt Hextc Hclmc Htext Hkdata Hpc Hpenv Hbio Hfroz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell Hnil1 HLauth HDauth
-                    Hnil2 Hs2 [] []").
+              HC2a0 Hshapeg Hnodupg Hwok' HLwg HDg
+              Hbelow Hpkg
+              with "Hcg Hcnt Hextc Hclmc Htext Hkdata Hpc Hpenv [] Hbio Hfroz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell Hcells HLauth HDauth
+                    Hents Hs2 [] [Hcust]").
     all: try lkbelow.
-    (* THE EMPTY WRITE SET's per-entry permits: this call installs NOTHING
-       (the on-disk header is clean, which is initlog's precondition), so the
-       generator is vacuous -- there is no entry to look up -- and the
-       threaded resource is [True]. *)
-    { iModIntro. iIntros (i w bs') "%Hi _ _". rewrite lookup_nil in Hi.
-      discriminate. }
-    { done. }
+    { iModIntro. iExact "Hpenvpk". }
+    (* THE RECOVERY-SIDE PERMITS, one generator over the era custody
+       ([FsCrash.fs_recover_permit]): every write is to a decoded home
+       block, so it cannot corrupt the durable header ([hdr_wf_wr_out]). *)
+    { iModIntro. iIntros (i w bs') "%Hwi %Hlen' Hcust".
+      iDestruct "Hcert" as "(_ & Hstc2 & Hregc2)".
+      iApply (fs_recover_permit cov logstart (Some ((1024 * uint w)%Z, bs'))
+                ltac:(intros dk Hwdk;
+                      assert (Hidx : (1024 * uint w)%Z
+                                     = (uint w * Z.of_nat BSIZE)%Z)
+                        by (rewrite /BSIZE; lia);
+                      cbn [wr_apply fst snd]; rewrite Hidx;
+                      apply hdr_wf_wr_out;
+                      [ exact Hlen'
+                      | apply FsCrash.home_ne_hdr;
+                        exact (proj2 (Hwok' w (elem_of_list_lookup_2 _ _ _ Hwi)))
+                      | exact Hwdk ])
+                with "Hseam Hregc2 Hstc2 Hcust"). }
+    { iNext. iExact "Hcust". }
     iIntros (CID30 Hs30 mI) "%Hcs3 Hcg Hcnt Hextc Hclmc Hpc Hppid
-                             Hncell _ HLauth HDauth _ Hs2 _".
+                             Hncell Hcells HLauth HDauth Hents Hs2 HRcust".
     assert (Hpc68 : ret_pc (C2 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.initlog + 0x68)).
     { rewrite HC2ra. apply bv_eq; vm_compute; reflexivity. }
@@ -1168,15 +2057,52 @@ Section ProofInitlog.
                        (sign_extend' 64 (mword_of_int 1902 : mword 12)) = lh_n_pa).
     { rgne. rewrite /D1 upd_eq /lh_n_pa /log_pa /log_addr /pa_add /add_vec_int.
       apply bv_eq; vm_compute; reflexivity. }
-    iAssert (lh_n_pa ↦₄ (mword_of_int 0 : mword 32))%I with "[Hncell]" as "Hncell";
-      [iExact "Hncell"|].
     iEval (rewrite -Hlhad2) in "Hncell".
     iApply (wp_sw_zero_s_sconf (mword_of_int (KernelSyms.initlog + 0x6c)) Ra5
               (mword_of_int 1902 : mword 12) D1 (K - 6)%nat
-              (mword_of_int 0 : mword 32) b
+              (mword_of_int (Z.of_nat ((hdr_dec bs_hdr).1)) : mword 32) b
               with "Hcg Hpc Hi6c Hncell").
     iIntros (CID32 Hs32) "Hcg Hpc Hncell".
     iEval (rewrite Hlhad2) in "Hncell".
+    (* the custody's later strips on this step (fs_era_custody is timeless) *)
+    iDestruct "HRcust" as ">Hcust2".
+    (* the cells re-formed for the batch, the homes for the postcondition *)
+    iAssert ([∗ list] i ∈ seq 0 LOGBLOCKS,
+               ∃ wj : mword 32, lh_block i ↦₄ wj)%I
+      with "[Hcells Hjunk]" as "Hblk".
+    { iApply (il_cells_join bs_hdr ((hdr_dec bs_hdr).1) Hbnd
+                with "Hcells Hjunk"). }
+    iEval (rewrite big_sepL_sep) in "Hents".
+    iDestruct "Hents" as "[Hslotfst Hhomes]".
+    (* the slots, back under their existential for the batch *)
+    iAssert ([∗ list] i ∈ seq 0 LOGBLOCKS,
+               ∃ bs0 : list (bv 8), fsblock γfs (log_slot_bno logstart i) bs0)%I
+      with "[Hslotfst Hslotrest]" as "Hslotsfs".
+    { iEval (rewrite Hsp30 big_sepL_app).
+      iSplitL "Hslotfst".
+      - iEval (rewrite (il_seq_body ((hdr_dec bs_hdr).1)
+                 (fun x => (∃ bs0 : list (bv 8),
+                     fsblock γfs (log_slot_bno logstart x) bs0)%I))).
+        iApply (il_sepL_reindex (il_W bs_hdr ((hdr_dec bs_hdr).1))
+                  (seq 0 ((hdr_dec bs_hdr).1))
+                  (fun i => (∃ bs0 : list (bv 8),
+                      fsblock γfs (log_slot_bno logstart i) bs0)%I)
+                  ltac:(rewrite il_W_length length_seq; reflexivity)).
+        iApply (big_sepL_mono with "Hslotfst"). intros k y Hy.
+        iIntros "H". iExists _. iExact "H".
+      - iApply (big_sepL_mono with "Hslotrest"). intros k y Hy.
+        apply lookup_seq in Hy as [-> _].
+        rewrite length_seq.
+        iIntros "H". iExists _. iExact "H". }
+    (* the installed home halves, under the postcondition's existential *)
+    iAssert ([∗ list] i ↦ bb ∈ (hdr_dec bs_hdr).2,
+               ∃ bs0 : list (bv 8), fsblock γfs bb bs0)%I
+      with "[Hhomes]" as "Hhomesout".
+    { iEval (rewrite -(il_W_uint bs_hdr)).
+      iEval (change (map uint ?l) with (uint <$> l)).
+      iEval (rewrite big_sepL_fmap).
+      iApply (big_sepL_mono with "Hhomes"). intros k y Hy.
+      iIntros "H". iExists _. iExact "H". }
     assert (Hpp70 : add_vec_int (mword_of_int (KernelSyms.initlog + 0x6c) : mword 64) 4
                     = mword_of_int (KernelSyms.initlog + 0x70))
       by (apply bv_eq; vm_compute; reflexivity).
@@ -1219,28 +2145,32 @@ Section ProofInitlog.
     iDestruct (wp_next_shift (b := true) (CIDa := CID29) (CIDb := CID33) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKwh : (K_write_head <= K - 6)%nat) by (lia).
+    assert (Hshape0 : (0%nat = length ([] : list (mword 32))
+                       /\ (0 <= LOGBLOCKS)%nat)).
+    { split; [reflexivity | unfold LOGBLOCKS; lia]. }
     iAssert ([∗ list] i ↦ w ∈ ([] : list (mword 32)), lh_block i ↦₄ w)%I
       as "Hnil3"; [iApply il_bigL_nil|].
     iApply (WriteHead.wp_write_head_sconf γs j γl γu γd γk pd pav pu bn γfs
-              cov logstart dev 0%nat ([] : list (mword 32)) L pidv dq
+              cov logstart dev 0%nat ([] : list (mword 32))
+              (it_rec_L (il_W bs_hdr ((hdr_dec bs_hdr).1)) (fun k : nat => ys !!! k) L)
+              pidv dq
               D2 (K - 6)%nat eb b
               (log_mirror_at (0%nat, []) ∗ swap_lb (S gen_id))%I
               _ Vpr HKwh Hgeomok Hj Hgl Hshape0
               with "Hcg Hcnt Hextc Hclmc Htext Hkdata Hpc Hpenv Hbio Hfroz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell Hnil3 HLauth [Hfsb]
-                    Hs1u [Hmirf]").
+                    Hs1u [Hcust2]").
     all: try lkbelow.
     { iExists bs_hdr. iExact "Hfsb". }
-    (* THE SWAP, riding this write (phase C2b/D1 stage 3): the era takes
-       custody of the crash record at the image the write produces.  The
-       WHOLE mirror variable goes into the closure -- the swap sets it to the
-       post-write picture, splits it there, keeps one half in the arm and
-       returns the other (with its clean header, read off the write itself)
-       together with the swap receipt. *)
+    (* THE BOOT'S FINAL HEADER WRITE (durable-disk stage D1): uniform in
+       whether the recovering install already swapped custody in --
+       [FsCrash.fs_boot_head_permit] takes the era custody either way, and
+       both arms land the same [Q]: the era's clean mirror half plus the
+       swap receipt. *)
     { iIntros (bs' Hlen' Hhn' Hdec').
       iDestruct "Hcert" as "(_ & Hstc & Hregc)".
-      iApply (fs_swap_permit cov logstart bs' ltac:(exact Hlen')
+      iApply (fs_boot_head_permit cov logstart bs' ltac:(exact Hlen')
                 ltac:(rewrite Hhn'; reflexivity)
-                with "Hseam Hregc Hstc Hmirf"). }
+                with "Hseam Hregc Hstc Hcust2"). }
     iIntros (CID34 Hs34 mW bs') "%Hcs4 Hcg Hcnt Hextc Hclmc Hpc Hppid
                                  Hncell _ HLauth Hfsb %Hhn %Hhdec Hs1u HQ".
     assert (Hpc74 : ret_pc (D2 !!! Regidx Rra : mword 64)
@@ -1458,12 +2388,16 @@ Section ProofInitlog.
     iAssert (log_batch bn γfs cov logstart 0%nat ∅)
       with "[Hncell Hblk HLauth HDauth Hcovf Hfsb Hslotsfs Hpool Hmirc]" as "Hbatch".
     { rewrite /log_batch.
-      iExists ([] : list (mword 32)), (<[log_hdr_bno logstart := bs']> L), D.
+      iExists ([] : list (mword 32)),
+              (<[log_hdr_bno logstart := bs']>
+                 (it_rec_L (il_W bs_hdr ((hdr_dec bs_hdr).1))
+                    (fun k : nat => ys !!! k) L)), D.
       iSplitR; [iPureIntro; split; [reflexivity | unfold LOGBLOCKS; lia]|].
       (* the fresh batch has logged nothing: LB = list_to_set [] = empty *)
       iSplitR; [iPureIntro; reflexivity|].
       iSplitR; [iPureIntro; constructor|].
-      iSplitR; [iPureIntro; exact Hwcov0|].
+      iSplitR.
+      { iPureIntro. intros w Hw. exfalso. exact (not_elem_of_nil w Hw). }
       iSplitL "Hncell"; [iExact "Hncell"|].
       iSplitR; [iApply il_bigL_nil|].
       iSplitL "Hblk"; [iExact "Hblk"|].
@@ -1531,7 +2465,7 @@ Section ProofInitlog.
     iDestruct (cpu_claim_ext_transport CID34 CID41 eb pj
                  ltac:(rewrite Hbm; wp_next_chain) with "Hclmc") as "Hclmc".
     iSpecialize ("Hcont" $! CID41 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! P6 with "[%] Hcg Hcnt Hextc Hclmc Hpc Hppid Hsbf Hs2 Hctx").
+    iApply ("Hcont" $! P6 with "[%] Hcg Hcnt Hextc Hclmc Hpc Hppid Hsbf Hs2 Hhomesout Hctx").
     { unfold callee_saved. repeat split; assumption. }
   Qed.
 

@@ -26,15 +26,18 @@
    The [recovering] bool is a ghost argument pinning a0 (the [either_copy]
    precedent).
 
-   STAGE 2 STATES TWO INSTANCES, and the premise
-   [recovering = false \/ n = 0] is exactly their union:
-     - recovering = false, any n -- end_op's commit-time install;
-     - recovering = true with n = 0 -- initlog's clean-image call, which
-       takes the +0x08 early return and does NOTHING (which is why the
-       printk arm and the skipped bunpin never run in stage 2 at all).
-   The recovering = true, n > 0 form -- real crash recovery, where the
-   installed blocks are NOT pinned and there is no batch to speak of -- is
-   STAGE 4's, and gets added with the crash invariant.
+   THE CONTRACT COVERS BOTH ARMS (durable-disk stage D2; the stage-2
+   restriction [recovering = false \/ n = 0] is gone):
+     - recovering = false, any n -- end_op's commit-time install: the
+       memmove is content-preserving (the home block already holds the
+       logged content, per the pure premise), L is frozen, the dirty
+       entries flip at each bunpin, and one pin unit per entry comes back;
+     - recovering = true, any n -- initlog's crash recovery: the home
+       block holds its OLD content, so L MOVES entry by entry to the
+       slots' logged contents ([it_rec_L]), nothing is pinned (the bunpin
+       is skipped -- no dirty movement, no extra units), and the printk
+       arm inside the loop body runs (proved against the real printk
+       contract; [panic_env] already carries everything it needs).
 
    WHAT IT TAKES, AND WHY.  install_trans breads both blocks itself, so per
    write-set entry it wants no handle; it wants the log copy's CLIENT half
@@ -110,6 +113,7 @@ Require Import WpNext.
 Require Import WpLock.
 Require Import KernelDataInv.
 Require Import SpecPanic.
+Require Import PrintkArgs PrintkFmt SpecPrintk.  (* the recovering arm's printk *)
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -129,6 +133,48 @@ Import Defs.
 (* install_trans's own frame is 10 slots ([c.addi sp,sp,-80] at +0x0c); its
    deepest callee is bread (40).  memmove/bwrite/bunpin/brelse want less. *)
 Notation K_install_trans := (68%nat) (only parsing).
+
+(* THE RECOVERED LOGICAL VIEW (durable-disk stage D2).  At recovering = 1
+   the memmove is NOT content-preserving -- the home block holds its OLD
+   content and the log slot holds the new one, which is the entire point of
+   the pass -- so the logged-view authority MOVES: entry [i]'s home block
+   goes to the slot's logged content [Lw i].  A [foldl] over the index list
+   so the loop invariant is count-indexed ([it_rec_L_upto_S] below). *)
+Definition it_rec_L_step (W : list (SailStdpp.Values.mword 32))
+    (Lw : nat -> list (bv 8))
+    (acc : gmap Z (list (bv 8))) (i : nat) : gmap Z (list (bv 8)) :=
+  match W !! i with
+  | Some w => <[uint w := Lw i]> acc
+  | None => acc
+  end.
+
+(* the view after the first [t] entries -- the loop invariant's index *)
+Definition it_rec_L_upto (W : list (SailStdpp.Values.mword 32))
+    (Lw : nat -> list (bv 8)) (L : gmap Z (list (bv 8))) (t : nat)
+    : gmap Z (list (bv 8)) :=
+  foldl (it_rec_L_step W Lw) L (seq 0 t).
+
+Definition it_rec_L (W : list (SailStdpp.Values.mword 32))
+    (Lw : nat -> list (bv 8)) (L : gmap Z (list (bv 8)))
+    : gmap Z (list (bv 8)) :=
+  it_rec_L_upto W Lw L (length W).
+
+Lemma it_rec_L_upto_0 W Lw (L : gmap Z (list (bv 8))) :
+  it_rec_L_upto W Lw L 0 = L.
+Proof. reflexivity. Qed.
+
+Lemma it_rec_L_upto_S W Lw (L : gmap Z (list (bv 8))) (t : nat)
+    (w : SailStdpp.Values.mword 32) :
+  W !! t = Some w ->
+  it_rec_L_upto W Lw L (S t) = <[uint w := Lw t]> (it_rec_L_upto W Lw L t).
+Proof.
+  intros Hw. rewrite /it_rec_L_upto seq_S foldl_app /=.
+  rewrite /it_rec_L_step Hw //.
+Qed.
+
+Lemma it_rec_L_nil (Lw : nat -> list (bv 8)) (L : gmap Z (list (bv 8))) :
+  it_rec_L [] Lw L = L.
+Proof. reflexivity. Qed.
 Definition wp_install_trans_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     
@@ -136,10 +182,11 @@ Definition wp_install_trans_sconf_body
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (γfs : fs_names)
+    (γfs : fs_names) (γpr : gname)   (* the "pr" lock: the recovering arm's printk *)
     (cov : gset Z) (logstart : Z) (dev : mword 32)
     (recovering : bool)
     (n : nat) (W : list (mword 32)) (Lw : nat -> list (bv 8))
+    (Bh : nat -> list (bv 8))
     (L : gmap Z (list (bv 8))) (D : gmap Z bool)
     (pidv : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool)
@@ -153,11 +200,6 @@ Definition wp_install_trans_sconf_body
   log_geom_ok cov logstart ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
-  (* THE STAGE-2 RESTRICTION.  end_op installs at recovering = false;
-     initlog calls at recovering = true but with an EMPTY log, where the
-     function returns from its pre-frame test having done nothing.  Real
-     recovery (recovering = true, n > 0) is stage 4's. *)
-  (recovering = false \/ n = 0%nat) ->
   (* a0 is the flag *)
   m !!! Regidx (mword_of_int 10 : mword 5)
     = (mword_of_int (if recovering then 1 else 0) : mword 64) ->
@@ -167,13 +209,26 @@ Definition wp_install_trans_sconf_body
   (forall w, w ∈ W -> uint w ∈ cov /\ ~ (uint w ∈ log_region_set logstart)) ->
   (* THE HOME SIDE'S CONTENT WITNESS, as a fact about the authority below:
      a client [fsblock] for a home block cannot be had on the committer's
-     side (see the header). *)
-  (forall (i : nat) (w : SailStdpp.Values.mword 32),
+     side (see the header).  COMMIT-TIME ONLY: at recovering = 1 the home
+     block holds its OLD content -- the whole point of the pass -- and the
+     caller supplies the home CLIENT halves instead (the [if recovering]
+     row below), because at boot nobody above the log layer holds them
+     yet. *)
+  (recovering = false ->
+   forall (i : nat) (w : SailStdpp.Values.mword 32),
      W !! i = Some w -> L !! uint w = Some (Lw i)) ->
+  (* the recovering arm's home blocks are UNPINNED: a fresh era's dirty map
+     holds [false] at every covered block, and the home payload's polarity
+     is read off the authority install_trans holds whole *)
+  (recovering = true ->
+   forall w : SailStdpp.Values.mword 32, w ∈ W -> D !! uint w = Some false) ->
   (* install_trans directly breads/bwrites/brelses/bunpins, all against
      "bcache" (4); it takes no lock of its own and calls no other function
      with a lower bound, so this is the one premise its whole cone needs. *)
   locks_below lks "bcache" ->
+  (* the recovering arm's printk, as a PURE Prop hypothesis (the
+     [SpecIreclaim] idiom); nothing is owed at recovering = false *)
+  (recovering = true -> printk_gen_contract (kt := KT1) γpr γu γd) ->
   sie_cap_gpr KT1 m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  install_trans has NO
@@ -187,6 +242,10 @@ Definition wp_install_trans_sconf_body
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_env -∗
+  (* ...and the printk credential itself, on the recovering arm only.
+     Boxed, so a proof can park it in the intuitionistic context without
+     case-splitting the flag. *)
+  □ (if recovering then printk_env γpr γu γd else emp) -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   (* NOT [log_ctx]: this helper holds no lock -- see LogInv.log_frozen *)
   log_frozen logstart dev -∗
@@ -201,19 +260,26 @@ Definition wp_install_trans_sconf_body
   (* the in-memory header, READ ONLY (the write set it walks) *)
   lh_n_pa ↦₄ (mword_of_int (Z.of_nat n) : mword 32) -∗
   ([∗ list] i ↦ w ∈ W, lh_block i ↦₄ w) -∗
-  (* the logged view's authority: FROZEN and unchanged -- install writes
-     the disk, not L *)
+  (* the logged view's authority: FROZEN at commit time (install writes the
+     disk, not L); at recovering = 1 it MOVES, entry by entry, to the slots'
+     logged contents ([it_rec_L] -- see its header) *)
   ghost_map_auth (fs_L γfs) 1 L -∗
-  (* the pinned-set authority: exactly W's entries go back to false *)
+  (* the pinned-set authority: exactly W's entries go back to false at
+     commit time; nothing moves at recovery (nothing is pinned in a fresh
+     era, and the bunpin is skipped) *)
   ghost_map_auth (fs_dirty γfs) 1 D -∗
   (* per entry: the LOG COPY's client half at the logged content
-     (write_log's postcondition, frozen by the authority above), plus the
-     log side's dirty half of the home block.  The home block's own content
-     comes from the authority (the pure premise above), not from a client
-     half -- see the header. *)
+     (write_log's postcondition, frozen by the authority above), plus
+       - commit time: the log side's dirty half of the home block (the
+         home content itself comes from the authority, per the pure
+         premise -- a client half cannot be had on the committer's side);
+       - recovery: the home block's CLIENT half, at whatever the crash
+         left there ([Bh i]) -- at boot the log layer still holds every
+         covered block's client half, and the L update is what moves it. *)
   ([∗ list] i ↦ w ∈ W,
      fsblock γfs (log_slot_bno logstart i) (Lw i) ∗
-     (uint w) ↪[fs_dirty γfs]{#(1/2)} true) -∗
+     (if recovering then fsblock γfs (uint w) (Bh i)
+      else (uint w) ↪[fs_dirty γfs]{#(1/2)} true)) -∗
   (* two slot units: it holds lbuf and dbuf at the same time *)
   bslots 2 -∗
   (* THE CRASH PERMITS for the home writes (phase C2b/D1 stage 4).  One per
@@ -254,14 +320,18 @@ Definition wp_install_trans_sconf_body
       (* the in-memory header, unchanged (lh.n := 0 is the CALLER's store) *)
       lh_n_pa ↦₄ (mword_of_int (Z.of_nat n) : mword 32) -∗
       ([∗ list] i ↦ w ∈ W, lh_block i ↦₄ w) -∗
-      ghost_map_auth (fs_L γfs) 1 L -∗
-      ghost_map_auth (fs_dirty γfs) 1 (dirty_clear D (map uint W)) -∗
+      ghost_map_auth (fs_L γfs) 1
+        (if recovering then it_rec_L W Lw L else L) -∗
+      ghost_map_auth (fs_dirty γfs) 1
+        (if recovering then D else dirty_clear D (map uint W)) -∗
       ([∗ list] i ↦ w ∈ W,
          fsblock γfs (log_slot_bno logstart i) (Lw i) ∗
-         (uint w) ↪[fs_dirty γfs]{#(1/2)} false) -∗
-      (* the two units back, PLUS one per entry: each bunpin frees the pin
-         unit log_write's bpin absorbed.  See the header note. *)
-      bslots (2 + length W) -∗
+         (if recovering then fsblock γfs (uint w) (Lw i)
+          else (uint w) ↪[fs_dirty γfs]{#(1/2)} false)) -∗
+      (* the two units back, PLUS -- at commit time -- one per entry: each
+         bunpin frees the pin unit log_write's bpin absorbed.  The bunpin
+         is SKIPPED at recovery, so nothing extra comes back there. *)
+      bslots (2 + (if recovering then 0%nat else length W)) -∗
       (* the threaded resource, back from the last entry's DMA completion *)
       ▷ R -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -275,15 +345,16 @@ Module Type INSTALL_TRANS.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γfs : fs_names)
+      (γfs : fs_names) (γpr : gname)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (recovering : bool)
       (n : nat) (W : list (mword 32)) (Lw : nat -> list (bv 8))
+      (Bh : nat -> list (bv 8))
       (L : gmap Z (list (bv 8))) (D : gmap Z bool)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (R : iProp Σ) (lks : gset string) (Vpr : pprivate),
-      wp_install_trans_sconf_body γs j γl γu γd γk pd pav pu bn γfs
-                                  cov logstart dev recovering n W Lw L D
+      wp_install_trans_sconf_body γs j γl γu γd γk pd pav pu bn γfs γpr
+                                  cov logstart dev recovering n W Lw Bh L D
                                   pidv dq m K eb b R lks Vpr.
 End INSTALL_TRANS.

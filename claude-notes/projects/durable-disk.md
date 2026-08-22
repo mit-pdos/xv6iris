@@ -43,55 +43,62 @@ learns about the DURABLE bytes comes only through the permits at DMA
 completions (principle 1) or from `P_fs`'s own pure content (opening
 `crashN` in any fupd).
 
-## 1½. STATE AT THE 2026-08-22 CHECKPOINT (branch `durable-disk`, NOT on main)
+## 1½. STATE AT THE 2026-08-22 CHECKPOINT (second checkpoint: A+B on main-track, D1+D2 done)
 
-**Stage A is done and compiles** (883 files rebuilt clean above `FsCrash.v`):
-`RiscvPtsto.v` has `riscv_disk_name`/`riscv_disk_size`, `riscv_crash_pred :
-iProp Σ`, `crash_inv := inv crashN riscv_crash_pred`, `disk_fixed_auth` /
-`disk_fixed_interp`; `disk_tie`/`fs_tie_interp` are gone; the permit lends
-`disk_fixed_auth` (A3 as written); `RiscvExec.wp_disk_step`, `PermInv`,
-`WpUart.wp_disk_loop` (the one opener) and both `RiscvAdequacy` theorems
-are adapted (`boot_fixedGS` takes `γdisk ndisk`; `HPc` takes the full
-`disk_img_bytes γdisk 0 (disk_read (v_disk g) 0 ndisk)`; `Pc` has four
-gname arguments). `DiskImg.v` gained `disk_img_auth_sized` + `_alloc` /
-`_read` / `_write` (the owner of the whole [0,N) fragment moves the image
-to ANYTHING — no range side condition on writes, that is the point of the
-domain bound). `SystemAdequacy.v` instantiates `Pc` at the new
-`P_fs_named γd XV6_DISK_BYTES …` with the extent from
-`FirstTok.fs_extent_of_image` (at `PowerBoot.boot_gstate g` — `Himg` is
-still there; stage C deletes it).
+**Stage A is done and committed** (8fc5a036; 883 files rebuilt clean).
+Details of what landed are in the stage-A worklist below (all items hold in
+the tree as described).
 
-**Stage B is mid-rewrite in `FsCrash.v` and DOES NOT COMPILE yet.** What is
-in the file: `P_fs_rec_named` (the old record), `fs_extent`, the new
-`P_fs_named γd N …` (fragments ∗ extent ∗ record), `fs_blocks_agree`,
-`fs_restrict_agree`, `P_fs_rec_agree`, `P_fs_rec`/`P_fs_any` (no `dk`),
-`fs_crash_seam` as a `□` pair on the field, `fs_rec_permit` and
-`fs_permit_of_rec` (the one place the disk bookkeeping happens), and every
-permit split into `fs_X_permit_rec` (record-only; old proof with the seam
-lines removed) + `fs_X_permit` (wrapper = `fs_permit_of_rec`).
+**Stage B is DONE and committed** (37de0fef; tree green on the VM, `make
+audit-only` at the 8-axiom baseline). The open point of the first
+checkpoint was closed exactly as sketched: `hdr_wf P cov ls` (decode
+length ≤ LOGBLOCKS ∧ NoDup entries ∧ every entry ∈ cov ∖ log_region_set)
+is the third conjunct of `fs_rec_wf`; the six `_rec` permits re-establish
+it (`fs_commit_permit(_rec)` gained `(nn <= LOGBLOCKS)` / `NoDup Ws` /
+membership premises, discharged in `ProofEndOp` by `eo_hdr_in` from its
+own `Hwok`/`Hnd`; `fs_recover_permit(_rec)` gained a header-preservation
+premise on the generator's write, discharged in `ProofInitlog` by
+`hdr_wf_wr_out` + `home_ne_hdr`); `P_fs_alloc` takes `hdr_wf` of the
+initial image, which `SystemAdequacy` gets from `Himg` via
+`FsImg.fsimg_wf_log` + `hdr_wf_zero`. `P_fs_rec_agree` holds. Keep
+`set_solver` away from `log_region_set` (30-element `list_to_set` — it
+runs >20 min); use the explicit membership lemmas.
 
-**THE OPEN POINT, found while proving `P_fs_rec_agree`:** `hdr_dec` is
-UNBOUNDED (`n := le_word bs 0`, any 32-bit value), so `fs_recovery` of a
-garbage header reads log slots `log_slot_bno ls j` for `j` up to `n-1`,
-i.e. possibly beyond the log region and beyond the disk's extent — and the
-machine's `dk` beyond `[0, N)` is pinned by no fragment. So "two images
-agreeing on the durable bytes carry the same record" is FALSE unless the
-record carries `length (hdr_dec (P (log_hdr_bno ls))).2 <= LOGBLOCKS` as
-an INVARIANT (`fs_recovery_install` already takes it as a hypothesis,
-`FsCrash.v:536`). That is true of every header the permits ever write
-(swap/clear write `n = 0`; commit writes its own `(n, W)` with `Hdec`;
-logfill/install leave the header alone) EXCEPT `fs_recover_permit` (5a),
-which is stated "at ANY write identity" — it must gain a premise that the
-write does not corrupt the header (e.g. `w` is not a header write, or
-`hdr_len_ok` is preserved), and `SpecInstallTrans`'s uniform generator must
-supply it. Do this next: add the conjunct to `fs_rec_wf`, re-establish it
-in the six `_rec` permits, then `P_fs_rec_agree` goes through with
-`fs_install_ext_P` (slots `< length W ≤ LOGBLOCKS` are in the extent).
+**Stage D1+D2 are DONE at the log layer** (the stage-D commit): general
+`install_trans` — the recovering arm is live: the logged-view authority
+MOVES per entry (`it_rec_L`, with `_step/_upto/_nil` lemmas), no `bunpin`
+and no dirty-half movement (`bslots (2+0)`), the in-loop printk proved
+against `printk_gen_contract γpr γu γd` (a Prop premise on the spec; the
+□`printk_env` row rides the contract) — and general `initlog` — the
+clean-image premise `hdr_n bs_hdr = 0` is GONE, the header-copy loop is
+live (`il_copy`, ∀CID inside the induction like `it_loop`), the
+recovering install runs with home client halves supplied as a `Bh : nat →
+list (bv 8)` family, custody strips through `fs_recover_permit`, and the
+final `write_head` uses `fs_boot_head_permit`. Callers are re-wired at
+the clean arm: `ProofFsinit` instantiates `Bh := fun _ => []` (via
+`hdr_dec_zero` + `initlog_dirty_all_false`), `ProofEndOp` instantiates
+`recovering := false` with vacuous `HD`/`Hpk` (`ltac:(intros Hab;
+discriminate)`) and a dummy `γpr := 1%positive`.
 
-Also pending from the first compile attempt: the two `set_solver` calls
-in `P_fs_rec_agree` were replaced by explicit membership lemmas (`Hhdr`,
-`Hslot`) after a `coqc` on `FsCrash.v` ran >20 min — keep `set_solver`
-away from `log_region_set` (a 30-element `list_to_set`).
+**D3 is OPEN**: `SpecFsinit`/`FirstTok.first_fsinit_pures` still require
+the clean header, so the system-level boot WP still runs only over the
+clean-log image; lifting it is caller plumbing (thread the read-permit
+fact for the header bytes through forkret's boot arm), not log-layer work.
+
+**Stage C is BLOCKED on an honest wall — B4's invariance claim is WRONG
+as written.** B4 says the `fsimg_wf`-minus-log-clean content is
+"invariant under every permit because no permit writes block 1". That
+covers only the superblock-parse conjunct. `fs_boot_image_wf`'s other
+conjuncts are CONTENT SWEEPS over the data region (inode-table shape,
+bitmap/dirent consistency, …), and `fs_commit_permit`/`fs_install_permit`
+move exactly those blocks to client-chosen bytes. Making the sweeps
+invariant means every FS-layer writer proves it preserves fs-level
+consistency — an FS-consistency campaign, a separate project of its own
+size. Until that lands, `P_fs` cannot carry B4's pure content, C2 cannot
+mint `fscfg` from `P_fs`, and `Himg` STAYS (C3 undone): the adequacy
+theorem keeps its refutable per-era premise, and the honest restatement
+remains the iProp lend of the crash predicate at PowerOn (notes commit
+a09e4cdc, and fs-log.md's baseline section).
 
 ## 2. Stage A — the machine layer (`RiscvPtsto`, `RiscvExec`, `WpUart`, `PermInv`, `RiscvAdequacy`)
 
@@ -103,18 +110,18 @@ Footprint (grep `disk_tie\|fs_tie_interp\|riscv_crash_pred\|disk_write_permit`):
 `SpecWriteHead.v`/`ProofWriteHead.v`, `SpecInstallTrans.v`/`ProofInstallTrans.v`,
 `ProofBread.v`, `BootShared.v`, `SpecMain.v`.
 
-- [ ] **A1. `riscvFixedGS`** (`RiscvPtsto.v:405-460`): delete
+- [x] **A1. `riscvFixedGS`** (`RiscvPtsto.v:405-460`): delete
       `riscvF_fstieGS`/`riscv_fstie_name` (the `ghost_var (Z -> bv 8)`), add
       `riscv_disk_name : gname` typed by the existing fixed-layer
       `riscvF_diskGS :: diskImgG Σ` (`:420` — the `ghost_mapG Σ Z (bv 8)`
       instance is ALREADY fixed-layer; only the NAME was per-era). Change
       `riscv_crash_pred : (Z -> bv 8) -> iProp Σ` (`:454`) to `iProp Σ`.
-- [ ] **A2. `state_interp`**: `fs_tie_interp g := disk_tie (v_disk …)`
+- [x] **A2. `state_interp`**: `fs_tie_interp g := disk_tie (v_disk …)`
       (`:1866`) becomes `disk_fixed_interp g := disk_img_auth riscv_disk_name
       (v_disk (dvirtio (gdev g)))`; same slot in `power_interp` (`:1870`).
       Delete `disk_tie`, `disk_tie_agree`, `disk_tie_update` (`:648-662`).
       `crash_inv := inv crashN riscv_crash_pred` (`:668`).
-- [ ] **A3. The permits** (`RiscvPtsto.v:680-700`, `PermInv.v:63,145,189,
+- [x] **A3. The permits** (`RiscvPtsto.v:680-700`, `PermInv.v:63,145,189,
       239,254`): `disk_write_permit gd w Q` becomes
       `∀ dk n, start_auth n -∗ ⌜n = gd+1⌝ -∗ disk_img_auth riscv_disk_name dk
       -∗ ▷ riscv_crash_pred ={∅}=∗ disk_img_auth riscv_disk_name (wr_apply w dk)
@@ -125,14 +132,14 @@ Footprint (grep `disk_tie\|fs_tie_interp\|riscv_crash_pred\|disk_write_permit`):
       the bytes `disk_read dk off n` — that is the phase-D2 READ PERMIT, for
       free. `disk_write_permit_trivial` (`SpecVirtioDiskRw.v:131`) survives
       (return the auth untouched).
-- [ ] **A4. The completion** (`WpUart.v:869-975`, the only opener of
+- [x] **A4. The completion** (`WpUart.v:869-975`, the only opener of
       `crashN`): drop the tie agree/update (`:941,:962`); pass the
       `disk_img_auth riscv_disk_name` conjunct from `wp_disk_step` into the
       permit and take it back. `RiscvExec.wp_disk_step` (`:624-640`): replace
       the `disk_tie` rows by the fixed auth rows (the era auth row stays).
       The three other lifting rules (`RiscvExec.v:359,473,598`) rewrite
       `/fs_tie_interp` → the new name; they frame it.
-- [ ] **A5. Adequacy** (`RiscvAdequacy.v`): `riscv_pre_fstieGS` (`:135`)
+- [x] **A5. Adequacy** (`RiscvAdequacy.v`): `riscv_pre_fstieGS` (`:135`)
       goes; `boot_fixedGS` (`:1142`) takes `γdisk` instead of `γtie`;
       `HPc` (`:452,:1160`) becomes `∀ γdisk γsw γreg γst, disk_img_bytes γdisk 0
       (disk_read (v_disk g) 0 ndisk) -∗ mono_nat_auth_own γsw 1 0 ⊢ |==> Pc
@@ -143,32 +150,34 @@ Footprint (grep `disk_tie\|fs_tie_interp\|riscv_crash_pred\|disk_write_permit`):
       `F = boot_fixedGS …` equation carries `γdisk`; `boot_facts g'` says
       nothing about the disk — AS IT SHOULD. Check `power_boot_res` (`:857`,
       `:909`) still hands the era's own whole fragments (the per-era map).
-- [ ] **A6. Build; `make audit-only` baseline must be unchanged (eight).**
+- [x] **A6. Build; `make audit-only` baseline must be unchanged (eight).**
 
 ## 3. Stage B — `FsCrash.P_fs` (`FsCrash.v:931-1066`)
 
-- [ ] **B1.** `P_fs γs cov ls` (no `dk` argument) `:= ∃ dk, disk_img_bytes
+- [x] **B1.** `P_fs γs cov ls` (no `dk` argument) `:= ∃ dk, disk_img_bytes
       γdisk 0 (disk_read dk 0 ndisk) ∗ ∃ r, fs_hist_auth … ∗ ⌜fs_rec_wf r
       (fs_blocks dk) cov ls⌝ ∗ fs_arm γs ls dk`; `fs_crash_names` gains the
       disk gname (or take `riscv_disk_name` ambiently — `P_fs_named`
       (`:947`) already takes the three fixed names explicitly, so add a
       fourth). `ndisk` is `SystemAdequacy.XV6_DISK_BYTES`; `P_fs` is stated
       below it, so it takes `ndisk` as a parameter.
-- [ ] **B2.** `fs_crash_seam` (`:1505` area) back to an equation on the
+- [x] **B2.** `fs_crash_seam` (`:1505` area) back to an equation on the
       field (`riscv_crash_pred = P_fs_any …`). `P_fs_any_timeless` (`:1061`)
       must still hold (fragments are timeless).
-- [ ] **B3.** The five permits (`fs_logfill_permit`, `fs_commit_permit`,
+- [x] **B3.** The five permits (`fs_logfill_permit`, `fs_commit_permit`,
       `fs_install_permit`, `fs_clear_permit`, `fs_swap_permit`) and the
       recovery-side three (`fs_era_custody`/`fs_recover_permit`/
       `fs_boot_head_permit`, `:1543-1700`) restated at A3's shape: each opens
       with agreement against the lent auth, updates the written block's
       fragments (`DiskImg.disk_img_bytes_update`), re-packs.
-- [ ] **B4.** `P_fs` carries mkfs's geometry as PURE content: add to
+- [~] **B4.** (PARTIAL — only `hdr_wf` landed; the rest of the claim is
+      WRONG, see §1½: the content sweeps are NOT permit-invariant.)
+      Original text: `P_fs` carries mkfs's geometry as PURE content: add to
       `fs_rec_wf` (or beside it) `fs_parse_sb (fs_blocks dk) = Some sb ∧
       fsimg_wf-minus-log-clean` — everything `FsCfgBoot.fs_boot_image_wf`
       (`:1811-1840`) says EXCEPT `fs_log_clean`. It is invariant under every
       permit because no permit writes block 1.
-- [ ] **B5.** `HPc` at the image: `FsAdequacyImg` proves `P_fs` from
+- [x] **B5.** `HPc` at the image: `FsAdequacyImg` proves `P_fs` from
       `disk_img_bytes γdisk 0 (disk_read fsimg_dk 0 ndisk)` — the only place
       `fsimg_dk` is named (`fsimg_image_wf` `:96` already has the pure half).
 
@@ -211,10 +220,10 @@ from `P_fs`/the crash layer rather than from the era map. Audit rule: a
 obligation is dischargeable only on the `n = 0` arm; the theorem is TRUE but
 its boot WP is unproved on the dirty-log arm until:
 
-- [ ] **D1.** `SpecInitlog.v:164` drops `hdr_n bs_hdr = 0`; `:204`'s
+- [x] **D1.** `SpecInitlog.v:164` drops `hdr_n bs_hdr = 0`; `:204`'s
       `log_mirror_full` becomes `fs_era_custody`; `ProofInitlog`'s header
       copy loop goes live (`ProofWriteHead.wh_loop` `:1028` is the template).
-- [ ] **D2.** `SpecInstallTrans.v:160` loses `recovering = false ∨ n = 0`;
+- [x] **D2.** `SpecInstallTrans.v:160` loses `recovering = false ∨ n = 0`;
       `ProofInstallTrans` proves the recovering arm (its printk needs the
       `SpecPrintkGen` footprint for that one function).
 - [ ] **D3.** `SpecFsinit.v:316-319` and `FirstTok.v:276` stop requiring a

@@ -1903,13 +1903,20 @@ Section EndOpBlocks.
     iDestruct (eo_cont_shift (CIDa := CIDa1) (CIDb := CIDa3)  j pidv dq m K eb eb lks Vpr
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (IT.wp_install_trans_sconf γs j γl γu γd γk pd pav pu bn γfs
-              cov logstart dev false n W Lw (<[log_hdr_bno logstart := bs1]> L) D
+              1%positive
+              cov logstart dev false n W Lw (fun _ => [])
+              (<[log_hdr_bno logstart := bs1]> L) D
               pidv dq A3 (K - 8)%nat eb eb (log_mirror_at (n, map uint W)) lks Vpr
-              ltac:(pose proof (eo_Kit K HK); lia) Hgeom Hj Hgl (or_introl eq_refl) HA3a0
-              (conj HnW Hn30) Hnd Hwok HLw'
-              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlfz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell HW HauthL HauthD Hent Hu2
+              ltac:(pose proof (eo_Kit K HK); lia) Hgeom Hj Hgl HA3a0
+              (conj HnW Hn30) Hnd Hwok (fun _ => HLw')
+              ltac:(intros Hab; discriminate)
+              ltac:(lkbelow)
+              ltac:(intros Hab; discriminate)
+              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv [] Hbio Hlfz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell HW HauthL HauthD Hent Hu2
                     [] [Hmirc]").
     all: try lkbelow.
+    (* the recovering arm's printk credential: nothing at recovering = 0 *)
+    { iModIntro. iEmpIntro. }
     (* THE INSTALL fupds, one per entry, out of one generator: each reads the
        committed header picture out of the mirror half and hands it straight
        back, because recovery re-installs a logged block from its slot no

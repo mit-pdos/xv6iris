@@ -90,6 +90,7 @@ Require Import IcacheEscrow.
 Require Import CodeFsinit.
 Require Import SpecBread SpecBrelse SpecMemmove.
 Require Import SpecInitlog SpecIreclaim.
+Require Import FsCrash.   (* [hdr_dec], for the general initlog premises *)
 Require Import SpecPrintk.
 Require Import SpecFsinit.
 From Kernel Require KernelSyms.
@@ -1391,22 +1392,38 @@ Section FsinitMain.
                  ltac:(try rewrite Hebb; wp_next_chain) with "Hclmc") as "Hclmc".
     iDestruct (wp_next_shift (b := true) (CIDa := CID19) (CIDb := CID29) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    iApply (IL.wp_initlog_sconf γs j γl γu γd γk pd pav pu bn icfg_log γfs
-              cov logstart dev sb_base bs_hdr L D
+    (* the boot dirty map is [false] on the covered range: the pure form
+       the general initlog contract consumes (durable-disk stage D1) *)
+    iDestruct (initlog_dirty_all_false γfs D cov with "HauthD Hdirty")
+      as "(%HDall & HauthD & Hdirty)".
+    (* the clean image's header decode is empty, so the three header
+       well-formedness premises and the home-halves row are all trivial *)
+    iAssert ([∗ list] i ↦ b0 ∈ (hdr_dec bs_hdr).2,
+               fsblock γfs b0 ((fun _ : nat => ([] : list (bv 8))) i))%I
+      as "Hnilhomes".
+    { rewrite (hdr_dec_zero bs_hdr Hhdr0). cbn. done. }
+    iApply (IL.wp_initlog_sconf γs j γl γu γd γk pd pav pu bn icfg_log γfs γpr
+              cov logstart dev sb_base bs_hdr (fun _ : nat => ([] : list (bv 8))) L D
               vlock vname vcpu v_start v_dev v_nc v_n
               pidv dq (DfracOwn 1) Q9 (K - 4)%nat eb b lks Vpr
-              ltac:(lia) Hgeom Hj Hgl Hhdr0
-              HQ9a0 HQ9a1
+              ltac:(lia) Hgeom Hj Hgl
+              ltac:(rewrite (hdr_dec_zero bs_hdr Hhdr0); cbn; unfold LOGBLOCKS; lia)
+              ltac:(rewrite (hdr_dec_zero bs_hdr Hhdr0); cbn; constructor)
+              ltac:(rewrite (hdr_dec_zero bs_hdr Hhdr0); cbn;
+                    intros b0 Hb0; destruct (not_elem_of_nil b0 Hb0))
+              Hpk
+              HQ9a0 HQ9a1 HDall
               (* initlog's bound is "bcache"(4); fsinit's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
-              with "Hcg Hcnt Hextc Hclmc Htext Hkdata Hpc Hpanenv Hbio Hseam Hgen Hmirror
+              with "Hcg Hcnt Hextc Hclmc Htext Hkdata Hpc Hpanenv Hbio Hseam
+                    Hpenv Hnilhomes Hgen Hmirror
                     Hlfree
                     Hppid Hprocs Hdevi Hdgeom Hdlock Hls Hlock0 Hlname Hlcpu
                     Hlstart Hldev Hlout Hlcmt Hlnc Hlhn Hlhblk HauthL HauthD
                     Hdirty Hhdr Hlslots Hsl34").
     all: try lkbelow.
-    iIntros (CID30 Hq30 mI) "%Hcsil Hcg Hcnt Hextc Hclmc Hpc Hppid Hls Hsl2 Hlctx".
+    iIntros (CID30 Hq30 mI) "%Hcsil Hcg Hcnt Hextc Hclmc Hpc Hppid Hls Hsl2 _ Hlctx".
     assert (Hpc52 : ret_pc (Q9 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.fsinit + 0x52))
       by (rewrite HQ9ra; pcw).
