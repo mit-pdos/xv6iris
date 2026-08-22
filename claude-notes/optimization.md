@@ -312,6 +312,21 @@ worth 20× on individual files.
   | `ProofMain` `Hpersist` assert | `FirstTok.first_boot_persist`, 16 rows (one a 50-fold `ic_sleeplocks` big-op) | **108.8 s → 32.7 s** |
   | `FsSyscalls.fs_world_all` | the 20-row unpack of `fs_world` | **30.7 s → 6.7 s** |
   | `ForkretParkClose.forkret_park_pkg_intro` | `forkret_park_pkg`, whose 7th row is the residue closer | **31.2 s → 2.6 s** |
+  Three further instances, all the same edit (2026-08-21):
+  | site | the bundle | before → after |
+  |---|---|---|
+  | `ProofForkret`'s `first_persist_pre` premise | `FirstTok.first_boot_persist`, 17 rows | statement **62.7 s → 0** |
+  | `ProofForkret`'s `Hfab` assert | `SpecKexec.fs_fabric`, 16 rows | statement **61.0 s → 0** |
+  | `UsertrapRes`, ELEVEN sites | the residue's ∃ body, whose last row is `ut_env` → `proc_priv` → `tf_page` | file **60.1 s → 7.1 s** |
+
+  `UsertrapRes` is the one to read: no single row is enormous and the frames
+  were only 4–6 s each — it was the COUNT that made the file, and no seal
+  fixes that (sealing `tf_page` locally there was worth 8 s of the 53).
+  The residue's body is right-nested, so a row that is itself a bundle
+  (`ut_trap_parked`'s seven) needs `iSplitR "<the tail>"; [| …]` around it
+  rather than a flat chain; that is the only place the mechanical rewrite
+  needs thought.
+
   A persistent bundle asserted with `iAssert P as "#H"` has an EMPTY spatial
   context in its goal, so every row there is `iSplitR; [iExact "H"|]`; mixed
   bundles take `iSplitL "H"; [iExact "H"|]` for the spatial rows and bare
@@ -358,6 +373,41 @@ worth 20× on individual files.
 
 ## Typeclass search
 
+- **A BIG-OP UNDER A TRANSPARENT NAME IS AN `iFrame` BOMB, AND SEALING IT IS A
+  ONE-LINE FIX FOR EVERY CALL SITE AT ONCE** (measured 2026-08-21). `iFrame`'s
+  `Frame` search unfolds a transparent constant to get at the `big_sepL`
+  underneath, and then tries every candidate hypothesis against every element.
+  `InodeInv.inode_blocks` is `[∗ list] i ∈ seq 0 MAXFILE` with `MAXFILE = 268`,
+  and it is the last-but-two conjunct of `IcacheEscrow.ic_loaded` — so the
+  bundle rebuild every fs proof ends with (`iSplitL "Hdlk"; [iExact "Hdlk" |].
+  iFrame.`) paid ~50 s. **Seventeen statements between 48.9 s and 62.7 s, in
+  twelve files, were all this one shape**; `Global Typeclasses Opaque
+  inode_blocks` removed every one of them and the tree's serial tail with it:
+  | | before | after |
+  |---|---|---|
+  | wall span | 891 s | 467 s |
+  | critical path | 758 s | 467 s |
+  | effectively serial (≤1 in flight) | 378 s | 58 s |
+  | worst non-`Qed` statement | 62.7 s | 6.7 s |
+
+  Per file (CPU): ProofNamex 277→137, ProofCreate 252→161, ProofNamexTr
+  200→101, ProofSysLink 186→86, ProofSysChdir 149→59, ProofIlock 93→47,
+  ProofFilestat 75→23. Diagnose it by the *uniformity*: a dozen sentences all
+  within a second of each other, in unrelated files, is one shared conjunct,
+  not twelve local problems.
+  - **`Global`, not bare `Typeclasses Opaque` — the bare form is
+    compilation-local.** `ProcDefs.v:84` and `ProcInv.v:57` seal
+    `tf_words`/`tf_tail`/`tf_page` twice for exactly that reason, and their
+    comment records it. The consequence nobody had drawn: **every other file
+    in the tree still sees those three transparent**, and a local repeat is
+    worth ~8 s in a file that frames past `proc_priv` (measured on
+    `UsertrapRes`). It is worth a repeat line where the profile says so; it
+    was NOT worth sealing globally once that file's frames were rewritten as
+    chains (below), which is the same "measure before sealing" rule.
+  - `rewrite /X` and `unfold X` are unaffected by the seal, so the sites that
+    genuinely take the big-op apart keep working, and a `Timeless` instance
+    proved `rewrite /X. apply _.` still goes through. Nothing in 1293 files
+    broke on the `inode_blocks` seal.
 - **Give every big-resource abstraction with a `Persistent`/`Timeless` instance a
   `Typeclasses Opaque` right next to it.** Otherwise each `#`-intro re-derives
   the instance by unfolding and descending into the resource: one `iIntros
@@ -904,6 +954,16 @@ in what every rule in this file is fighting.
   set-membership lemma with a COMPUTED carrier, in a goal big enough to
   traverse, should be spelled out at the occurrence count the goal actually has.
   (Same family as the two bullets below: what costs is the tactic that fails.)
+  **`rewrite n!L` is the spelling that keeps the `!` reading without the
+  failing pass** — it performs exactly `n` rewrites and never attempts an
+  `n+1`th. Second instance (`FsCfgBoot.v`'s coverage-remainder `set_eq`,
+  2026-08-21): `rewrite !elem_of_difference !elem_of_union` over a goal with
+  six differences and four unions, whose carriers are five *computed* sets
+  (`log_region_set`, `ireg_blk_set`, `fs_live_blocks`, `fs_bitmap_spent`), was
+  **6.1 s** — two whole-goal traversals for nothing. `rewrite
+  6!elem_of_difference 4!elem_of_union` took the file **15.4 s → 6.4 s**.
+  Counting is mechanical: differences on both sides of the `↔`, unions in the
+  set the right-hand side names.
 - **`rewrite` ABSTRACTS, `exact` only UNIFIES — and a `nat` NUMERAL makes the
   gap enormous.** `rewrite H` must locate the occurrence, abstract it and build
   a motive that conversion then carries; `exact`/`apply` of the same equation
@@ -926,6 +986,13 @@ in what every rule in this file is fighting.
   reads better than a backwards rewrite anyway. This is the PURE-GOAL cousin of
   "Directed entailments, not `⊣⊢` rewrites" above; that section is the same
   trade inside a proofmode goal, where RULE ONE supplies the blow-up instead.
+  **The cheapest instance of it is `rewrite L. reflexivity.` where `L` already
+  closes the goal**: `ProofKexecPinned.v:651`'s `rewrite (fv_of_file_byte …).
+  reflexivity.` builds a motive over the whole `file_byte`/`fv_of` term only to
+  throw it away one line later — `exact (fv_of_file_byte …)` is the same proof
+  term with no motive, and took the statement from **5.5 s** to nothing (file
+  13.4 s → 10.0 s). Grep for a `rewrite <lemma>.` immediately followed by
+  `reflexivity.`
 - **In a `first [ … ]` alternation, put the CHEAP-FAILING branch first.** The
   cost of a tactic that FAILS grows with the proof term, so an alternation
   leading with an expensive-to-fail branch pays that cost at every use — 42 s
