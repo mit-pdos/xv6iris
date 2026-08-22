@@ -91,10 +91,14 @@ audit, push):**
 - branch `worktree-agent-a771acd0806be1fdd`: the FsEff
   build-performance pass (next-steps item 1; statements frozen,
   proof-internal only, before/after measurements required).
-- branch `worktree-agent-aed3d383025baf0eb`: G1-impl (`log_state`
-  fusion + row (b) + `op_pending` + the `fs_links_eq` boot threading;
-  spec = the G1-impl item; row (a) EXCLUDED by staging; premise-debt,
-  if any, must be a named carrier with its discharger recorded).
+
+G1-impl is MERGED (no longer in flight): `log_state` + `op_pending`
+landed; row (b) rides the GATED `log_mirror_tie` (interim `True`;
+`log_mirror_tie_pending` is the gate, dischargers G3 (the deposit,
+via the value-chained primitives) and H2 (the boot pack)); the
+`ProofEndOp` fast-path re-deposit carries the `log_state_pend` debt
+for the G1-flip/G2 arms; `fs_links_eq` is conjunct (13) end to end.
+See the G1-impl entry for the site table.
 
 **Next steps, in order (all specs live in this file):**
 1. **FsEff build-performance pass FIRST** (owner's ruling): the F2

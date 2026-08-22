@@ -17,6 +17,14 @@ environment (`ROCQ_MACHINE_TYPE=c3d-standard-180 ./gcp-rocq/run-on-gcp …`).
 
 ## Daily use
 
+**From a git WORKTREE** (agent lanes): the bare `run-on-gcp make` fails —
+`xv6-riscv/` is gitignored, so a worktree has no clone and the remote `make`
+tries to rebuild the ELF/fs.img. Use the explicit
+`run-on-gcp make -C iris -f CoqMakefile -j180 -k` form (the tracked
+`kernel-rocq/` sources are all the iris build needs); verify any re-dump the
+remote performs is byte-identical (md5) before trusting it.
+
+
 From any project directory:
 
 ```sh
