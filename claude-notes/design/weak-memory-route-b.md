@@ -1336,6 +1336,32 @@ of them are already discharged; the fourth needs slice 3's certification
 statement to exist.  Tree green; both capstones and `gdexec_conf_deps_wf`
 at the five rv64d axioms.
 
+## 4f. Two model facts the witnesses surfaced (2026-08-23)
+
+- **INSTRUCTION FETCHES ARE ROW EVENTS.**  A fetch is a `MemRead` node and
+  `pstep_ev` emits a plain `LLoad` for it (the graph `lbl` has no
+  `lat`/ifetch flag), so every real row interleaves fetch reads with
+  its data accesses (`WeakRvwmoAdm.la_hart_conf`: `[lw &started; fetch
+  main+0x18]`).  For the kill classification this is harmless by
+  construction: a fetch reads the immutable image (write index 0), so
+  it is never the target of a cross-hart `rf` and — with no write to a
+  code byte anywhere — never an `fr` source; it can only be a segment
+  ENTRY via same-hart po, and `cycle_segments` absorbs same-hart runs.
+  Record it in B2e-3c's classification as the `Fetch` case (pinned by
+  having no cross edge at all).
+- **THE `esil → adm_run` BRIDGE** exists (`WeakRvwmoAdm.v`): a
+  reflective checker that steps the silent/boundary/announce nodes and
+  COMPUTES the admin items exactly as the instance emits them (DEC-7
+  sources included); soundness is hypothesis-free (`adm_run_of_iter`).
+  Multi-event rows are now emittable: a 117-node stretch from the spin
+  load's resume to the next fetch, uniformly in the word read, in ~1 s
+  per `vm_cast_no_check`.  The taken `beqz`'s `LCtrl [DReg 15]` (the
+  carrier) is computed inside a real `adm_run`.  A `RacyD`-cycle witness
+  is now mechanical (four blocks, two per hart).
+  Trap: `rewrite` with a lemma whose argument is a computed 117-label
+  list makes the unifier δ-evaluate it (77 s) — lift the shape to a
+  variable-only lemma and `apply`.
+
 ## 5. Honest residual risks — OPEN
 
 - **THE K2-KILL'S PRECISE MECHANISM (flagged 2026-08-21):** K2's
