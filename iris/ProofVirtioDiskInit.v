@@ -402,11 +402,11 @@ Section VdiLeaves.
               with "Hcg Hpc Hinstr Hdinv Hvc []").
     { iIntros (v Hvok) "Hproto Hmine".
       iDestruct (virtio_proto_not_live_cfg γv v c Hl0 with "Hproto Hmine")
-        as %(Hcv & Hsn & Hui).
+        as %(Hcv & Hsn & Hui & Hld).
       iEval (rewrite -Hcv) in "Hmine".
       iMod (virtio_proto_cfg_write γv v (set_vcfg v c') c'
               ltac:(rewrite Hcv; exact Hl0) Hl1 eq_refl
-              ltac:(exact Hsn) ltac:(exact Hui)
+              ltac:(exact Hsn) ltac:(exact Hui) ltac:(exact Hld)
               with "Hproto Hmine") as "[Hproto Hmine]".
       iModIntro. iExists (set_vcfg v c').
       iSplitR.
@@ -459,10 +459,11 @@ Section VdiLeaves.
               with "Hcg Hpc Hinstr Hdinv Hvc []").
     { iIntros (v Hvok) "Hproto Hmine".
       iDestruct (virtio_proto_not_live_cfg γv v c Hl0 with "Hproto Hmine")
-        as %(Hcv & Hsn & Hui).
+        as %(Hcv & Hsn & Hui & Hld).
       iEval (rewrite -Hcv) in "Hmine".
       iMod (virtio_proto_cfg_write γv v (virtio_reset v) virtio_cfg0
               ltac:(rewrite Hcv; exact Hl0) eq_refl eq_refl eq_refl eq_refl
+              ltac:(apply virtio_reset_landed)
               with "Hproto Hmine") as "[Hproto Hmine]".
       iModIntro. iExists (virtio_reset v).
       iSplitR.
@@ -525,11 +526,11 @@ Section VdiLeaves.
     { iFrame "Hvc Hidx Hpage". }
     { iIntros (v Hvok) "Hproto (Hmine & Hidx & Hpage)".
       iDestruct (virtio_proto_not_live_cfg γv v c Hl0 with "Hproto Hmine")
-        as %(Hcv & Hsn & Hui).
+        as %(Hcv & Hsn & Hui & Hld).
       iEval (rewrite -Hcv) in "Hmine".
       iMod (virtio_proto_intro γv v (set_vcfg v (virtio_init_cfg pd pav pu))
               pd pav pu ltac:(rewrite Hcv; exact Hl0) eq_refl eq_refl eq_refl
-              Hpal Hdisj with "Hproto Hmine Hidx Hpage")
+              eq_refl Hpal Hdisj with "Hproto Hmine Hidx Hpage")
         as "(Hproto & Hpub & #Hcfg)".
       iModIntro. iExists (set_vcfg v (virtio_init_cfg pd pav pu)).
       iSplitR.

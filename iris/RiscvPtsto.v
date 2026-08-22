@@ -763,6 +763,67 @@ Proof.
   rewrite wr_apply_none. iFrame "Ha HP Hs".
 Qed.
 
+(* THE PER-SECTOR PERMITS (claude-notes/projects/sector-atomic-disk.md).
+   A 512-byte SECTOR lands atomically and a 1024-byte BLOCK does not, so ONE
+   request has one linearization point PER SECTOR -- and therefore one permit
+   per sector, each indexed at that sector's own slice of the write,
+   [VirtioModel.wr_sector w i].  [Qs i] is the receipt sector [i] yields; the
+   driver hands back the separating conjunction of all of them
+   ([disk_sector_receipts]).  A READ has no sectors at all
+   ([wr_nsectors None = 0]), so this is [emp] for it and every read caller is
+   free ([disk_sector_permits_none]) -- the read's own permit is the request's
+   COMPLETION permit, which the driver keeps stating as
+   [disk_write_permit gd None Q].
+
+   WHY A FUNCTION [Qs] AND NOT A LIST: the sector count is a function of the
+   write, so a list would carry a length side condition at every call site,
+   and every caller here has a uniform per-sector receipt anyway. *)
+Definition disk_sector_permits `{!riscvFixedGS Σ} (gd : nat) (w : disk_wr)
+    (Qs : nat -> iProp Σ) : iProp Σ :=
+  ([∗ list] i ∈ seq 0 (wr_nsectors w),
+     disk_write_permit gd (wr_sector w i) (Qs i))%I.
+
+(* SPELLED WITH THE INDEX, not the element, so that a receipt bundle
+   collected over the slot's KEY VECTOR ([VirtioQueue.vs_perms], a list of the
+   right LENGTH but of a different element type) converts to it by
+   [big_sepL_index_len] alone. *)
+Definition disk_sector_receipts `{!riscvFixedGS Σ} (w : disk_wr)
+    (Qs : nat -> iProp Σ) : iProp Σ :=
+  ([∗ list] i ↦ _ ∈ seq 0 (wr_nsectors w), Qs i)%I.
+
+(* an index-only [big_sepL] depends on the list's LENGTH and nothing else *)
+Lemma big_sepL_index_len `{!riscvFixedGS Σ} {A B : Type}
+    (l1 : list A) (l2 : list B) (Φ : nat -> iProp Σ) :
+  length l1 = length l2 ->
+  ([∗ list] i ↦ _ ∈ l1, Φ i) ⊣⊢ ([∗ list] i ↦ _ ∈ l2, Φ i).
+Proof.
+  revert l2 Φ. induction l1 as [|x l1 IH]; intros l2 Φ Hlen.
+  - destruct l2; [reflexivity | discriminate].
+  - destruct l2 as [|y l2]; [discriminate|].
+    rewrite !big_sepL_cons. cbn [length] in Hlen.
+    rewrite (IH l2 (fun i => Φ (S i)) ltac:(lia)). reflexivity.
+Qed.
+
+Lemma disk_sector_receipts_of_keys `{!riscvFixedGS Σ} {A : Type}
+    (l : list A) (w : disk_wr) (Qs : nat -> iProp Σ) :
+  length l = wr_nsectors w ->
+  ([∗ list] i ↦ _ ∈ l, Qs i) ⊢ disk_sector_receipts w Qs.
+Proof.
+  intro Hlen. rewrite /disk_sector_receipts.
+  rewrite (big_sepL_index_len l (seq 0 (wr_nsectors w)) Qs);
+    [reflexivity | by rewrite length_seq]. 
+Qed.
+
+(* A READ IS STILL FREE: it moves no disk byte, hence has no sectors. *)
+Lemma disk_sector_permits_none `{!riscvFixedGS Σ} (gd : nat)
+    (Qs : nat -> iProp Σ) :
+  ⊢ disk_sector_permits gd None Qs.
+Proof. rewrite /disk_sector_permits. cbn [wr_nsectors seq]. done. Qed.
+
+Lemma disk_sector_receipts_none `{!riscvFixedGS Σ} (Qs : nat -> iProp Σ) :
+  ⊢ disk_sector_receipts None Qs.
+Proof. rewrite /disk_sector_receipts. cbn [wr_nsectors seq]. done. Qed.
+
 (* A REAL WRITE'S PERMIT IS NOT FREE, and that is the honest content of the
    reshape: the completion moves the crash predicate's index, so somebody has
    to say what the predicate does under that move.  There is therefore NO

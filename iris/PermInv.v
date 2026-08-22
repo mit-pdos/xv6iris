@@ -331,4 +331,100 @@ Section perm.
     iApply (perm_collect_body with "Hbody Hrc Htok").
   Qed.
 
+  (* ==================================================================== *)
+  (* 4. THE SECTOR VECTOR (claude-notes/projects/sector-atomic-disk.md)    *)
+  (*                                                                      *)
+  (*    A 512-byte sector lands atomically and a 1024-byte block does not, *)
+  (*    so ONE write request has one linearization point per sector and    *)
+  (*    therefore one permit per sector.  Nothing about the channel        *)
+  (*    changes -- [perm_deposit_kq]/[perm_consume_kq]/[perm_collect_kq]   *)
+  (*    are already per key -- these are just the vector forms the driver  *)
+  (*    calls once per request instead of once per sector.                 *)
+  (* ==================================================================== *)
+
+  Lemma perm_deposit_seq (gd : nat) (γP : gname) (f : nat -> disk_wr)
+      (Qs : nat -> iProp Σ) (n : nat) (E : coPset) :
+    ↑permN ⊆ E ->
+    perm_inv gd γP -∗
+    ([∗ list] i ∈ seq 0 n, disk_write_permit gd (f i) (Qs i)) ={E}=∗
+      ∃ ks : list (nat * gname),
+        ⌜length ks = n⌝ ∗
+        ([∗ list] i ↦ kq ∈ ks, perm_pend γP kq (f i)) ∗
+        ([∗ list] i ↦ kq ∈ ks, perm_receipt kq.2 (Qs i)).
+  Proof.
+    iIntros (HE) "#Hinv Hps".
+    iInduction n as [|n IH] "IH".
+    - iModIntro. iExists []. cbn. by iFrame.
+    - rewrite seq_S Nat.add_0_l big_sepL_app big_sepL_singleton.
+      iDestruct "Hps" as "[Hps Hlast]".
+      iMod ("IH" with "Hps") as (ks) "(%Hlen & Hpend & Hrc)".
+      iMod (perm_deposit_kq gd γP (f n) (Qs n) E HE with "Hinv Hlast")
+        as (kq) "[Hpend0 Hrc0]".
+      iModIntro. iExists (ks ++ [kq]).
+      rewrite !big_sepL_snoc length_app Hlen.
+      iSplitR; [iPureIntro; cbn [length]; lia|].
+      iFrame "Hpend Hrc Hpend0 Hrc0".
+  Qed.
+
+  (* what an enqueuer calls ONCE, on the permits its caller supplied: the
+     keys come back as a list in sector order, which is exactly what the
+     published slot records ([VirtioQueue.vs_perms]). *)
+  Lemma perm_deposit_sectors (gd : nat) (γP : gname) (w : disk_wr)
+      (Qs : nat -> iProp Σ) (E : coPset) :
+    ↑permN ⊆ E ->
+    perm_inv gd γP -∗ disk_sector_permits gd w Qs ={E}=∗
+      ∃ ks : list (nat * gname),
+        ⌜length ks = wr_nsectors w⌝ ∗
+        ([∗ list] i ↦ kq ∈ ks, perm_pend γP kq (wr_sector w i)) ∗
+        ([∗ list] i ↦ kq ∈ ks, perm_receipt kq.2 (Qs i)).
+  Proof.
+    iIntros (HE) "#Hinv Hps". rewrite /disk_sector_permits.
+    iApply (perm_deposit_seq gd γP (wr_sector w) Qs (wr_nsectors w) E HE
+              with "Hinv Hps").
+  Qed.
+
+  (* ...and what the woken enqueuer calls once, on the receipts it recorded *)
+  Lemma perm_collect_list (gd : nat) (γP : gname) (ks : list (nat * gname))
+      (ws : nat -> disk_wr) (Qs : nat -> iProp Σ) :
+    perm_inv_body gd γP -∗
+    ([∗ list] i ↦ kq ∈ ks, perm_receipt kq.2 (Qs i)) -∗
+    ([∗ list] i ↦ kq ∈ ks, perm_done γP kq (ws i)) ==∗
+      perm_inv_body gd γP ∗ ▷ ([∗ list] i ↦ kq ∈ ks, Qs i).
+  Proof.
+    iIntros "Hbody Hrc Hdone".
+    iInduction ks as [|k ks IH] "IH" forall (Qs ws).
+    - iModIntro. iFrame "Hbody". by iNext.
+    - rewrite !big_sepL_cons.
+      iDestruct "Hrc" as "[Hrc0 Hrc]". iDestruct "Hdone" as "[Hd0 Hd]".
+      iMod (perm_collect_kq gd γP k (ws 0%nat) (Qs 0%nat)
+              with "Hbody Hrc0 Hd0") as "[Hbody HQ0]".
+      iMod ("IH" $! (fun i => Qs (S i)) (fun i => ws (S i))
+              with "Hbody Hrc Hd") as "[Hbody HQ]".
+      iModIntro. iFrame "Hbody". iNext. iFrame "HQ0 HQ".
+  Qed.
+
+  (* the same, over the INVARIANT: two laters (the invariant's own and the
+     saved-proposition agreement's), exactly like [perm_collect], one opening
+     per key.  This is what the woken publisher calls on the sector receipts
+     its claim pinned. *)
+  Lemma perm_collect_list_inv (gd : nat) (γP : gname) (ks : list (nat * gname))
+      (ws : nat -> disk_wr) (Qs : nat -> iProp Σ) (E : coPset) :
+    ↑permN ⊆ E ->
+    perm_inv gd γP -∗
+    ([∗ list] i ↦ k ∈ ks, perm_receipt k.2 (Qs i)) -∗
+    ([∗ list] i ↦ k ∈ ks, perm_done γP k (ws i)) ={E}=∗
+      ▷ ▷ ([∗ list] i ↦ k ∈ ks, Qs i).
+  Proof.
+    iIntros (HE) "#Hinv Hrc Hdone".
+    iInduction ks as [|k ks IH] "IH" forall (Qs ws).
+    - iModIntro. by iNext.
+    - rewrite !big_sepL_cons.
+      iDestruct "Hrc" as "[Hrc0 Hrc]". iDestruct "Hdone" as "[Hd0 Hd]".
+      iMod (perm_collect gd γP k.1 k.2 (ws 0%nat) (Qs 0%nat) E HE
+              with "Hinv Hrc0 Hd0") as "HQ0".
+      iMod ("IH" $! (fun i => Qs (S i)) (fun i => ws (S i))
+              with "Hrc Hd") as "HQ".
+      iModIntro. iNext. iNext. iFrame "HQ0 HQ".
+  Qed.
+
 End perm.

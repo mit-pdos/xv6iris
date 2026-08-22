@@ -130,16 +130,16 @@ Section ProofBwrite.
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (bs bsd : list (bv 8)) (b : bool)
-      (Q : iProp Σ) (lks : gset string) (Vpr : pprivate)
+      (Q : iProp Σ) (Qs : nat -> iProp Σ) (lks : gset string) (Vpr : pprivate)
     : wp_bwrite_sconf_body γs j γl γu γd γk pd pav pu bn V k
-                           pidv dev bno dq m K eb bs bsd b Q lks Vpr.
+                           pidv dev bno dq m K eb bs bsd b Q Qs lks Vpr.
   Proof.
     cbv beta delta [wp_bwrite_sconf_body].
     intros pcE pj ret_tgt HK Hbno HgdV Hj Hgl Hk Ha0 Hbelow.
     
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hbio Hppid Hprocs
-              Hdev Hgeom Hdlock Hlocked Hperm Hcont".
+              Hdev Hgeom Hdlock Hlocked Hperm Hperms Hcont".
     (* [b] and [eb] are DERIVABLY EQUAL: bwrite enters and stays at noff 0
        (it has no acquire of its own), so [CpuOwn.cpu_own_eb_agree] gives
        [eb = b] right here.  Do NOT [subst] either -- keep both names, and
@@ -448,12 +448,12 @@ Section ProofBwrite.
     (* ================================================================== *)
     iApply (RW.wp_virtio_disk_rw_sconf γs j γl γu γd γk pd pav pu D3
               (K - 4)%nat eb bno (mword_of_int 0 : mword 32) bs bsd b
-              Q
+              Q Qs
               _ HKrw Hbno Hkdata Hj Hgl
-              with "Hcg Hcnt Hextc Hextm Htext Hpc Hprocs Hdev Hgeom Hdlock [Hbuf] Hdisk Hperm").
+              with "Hcg Hcnt Hextc Hextm Htext Hpc Hprocs Hdev Hgeom Hdlock [Hbuf] Hdisk Hperm Hperms").
     all: try lkbelow.
     { iEval (rewrite HD3a0). iExact "Hbuf". }
-    iIntros (CID14 Hs14 mR) "%Hcs2 Hcg Hcnt Hextc Hextm Hpc Hbuf Hdisk HQ".
+    iIntros (CID14 Hs14 mR) "%Hcs2 Hcg Hcnt Hextc Hextm Hpc Hbuf Hdisk HQ HQs".
     iEval (rewrite (bw_wr_true _ bs bsd HD3a1)) in "Hbuf".
     iEval (rewrite (bw_wr_true _ bs bsd HD3a1)) in "Hdisk".
     iEval (rewrite HD3a0) in "Hbuf".
@@ -641,7 +641,7 @@ Section ProofBwrite.
        tail-calls a parker), so this guard is vacuous, unlike the [eb]-guards
        above. *)
     iSpecialize ("Hcont" $! CID19 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! P4 with "[%] Hcg Hcnt Hextc Hextm Hpc Hppid Hlocked HQ").
+    iApply ("Hcont" $! P4 with "[%] Hcg Hcnt Hextc Hextm Hpc Hppid Hlocked HQ HQs").
     unfold callee_saved. repeat split; assumption.
   Qed.
 

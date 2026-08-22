@@ -871,10 +871,10 @@ Section BreadBlocks.
                    ltac:(wp_next_chain) with "Hextm") as "Hextm".
       iApply (RW.wp_virtio_disk_rw_sconf γs j γl γu γd γk pd pav pu T4
                 (K - 6)%nat eb bno (mword_of_int 0 : mword 32) bs bsl eb
-                True%I lks
+                True%I (fun _ => True%I) lks
                 HKrw Hbno Hkdata Hj Hgl
                 with "Hcg Hcnt Hextc Hextm Htext Hpc Hprocs
-                      Hdev Hgeom Hdlock [Hbuf] Hdb []").
+                      Hdev Hgeom Hdlock [Hbuf] Hdb [] []").
       all: try lkbelow.
       { iEval (rewrite HT4a0). rewrite /bpa. iExact "Hbuf". }
       (* bread's rw call is a READ: no disk byte moves, so the identity
@@ -882,9 +882,13 @@ Section BreadBlocks.
          uniform, which is what keeps the DMA completion from having to know
          the direction. *)
       { iApply disk_write_permit_trivial. }
+      (* ...and a READ HAS NO SECTORS (sector-atomic-disk.md): the per-sector
+         permit bundle is [emp] for it, which is what keeps the whole read
+         stack textually unchanged by the sector-atomic reshape. *)
+      { iApply disk_sector_permits_none. }
       (* rw PARKS: it returns on hart [CIDrw], handing the trap-CSR
          complement back too. *)
-      iIntros (CIDrw Hsrw mR) "%Hcs2 Hcg Hcnt Hextc Hextm Hpc Hbuf Hdb _".
+      iIntros (CIDrw Hsrw mR) "%Hcs2 Hcg Hcnt Hextc Hextm Hpc Hbuf Hdb _ _".
       iPoseProof (bdi_d0 with "Htext") as "Hid0".
       iPoseProof (bdi_d2 with "Htext") as "Hid2".
       iPoseProof (bdi_d4 with "Htext") as "Hid4".

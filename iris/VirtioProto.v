@@ -647,10 +647,10 @@ Proof. reflexivity. Qed.
 Lemma vslot_post_uidx (v : virtio_state) (sl : vslot) :
   v_used_idx (vslot_post v sl) = bv_add (v_used_idx v) (Z_to_bv 16 1).
 Proof. reflexivity. Qed.
+(* THE COMPLETION MOVES NO DISK BYTE (sector-atomic-disk.md stage 2): the
+   request's sectors landed one at a time, before it was enabled. *)
 Lemma vslot_post_disk (v : virtio_state) (sl : vslot) :
-  v_disk (vslot_post v sl)
-  = if vs_is_out sl then disk_write (v_disk v) (vs_sector_off sl) (vs_data sl)
-    else v_disk v.
+  v_disk (vslot_post v sl) = v_disk v.
 Proof. reflexivity. Qed.
 
 Lemma vps_nc (pr : vproto) (sl : vslot) :
@@ -1147,17 +1147,88 @@ Section VirtioProto.
      non-timeless invariant ([PermInv.perm_inv (dn_perm γ)]) and what rides
      HERE is its TIMELESS SKELETON: the ghost-map element [perm_pend], keyed
      by the pure [vs_perm sl] the slot records. *)
-  Definition slot_pend_res (γ : disk_names) (sl : vslot) : iProp Σ :=
+  (* -- THE SLOT'S PERMIT TOKENS (sector-atomic-disk.md stage 2) ---------- *)
+
+  (* WHY TWO SETS OF KEYS, AND WHY THE COMPLETION KEPT ONE.
+     The COMPLETION moves the used ring, the status byte and the interrupt --
+     and NO disk byte at all ([VirtioQueue.vslot_post_disk]), because every
+     sector of an OUT request's data landed at its own earlier step.  So its
+     permit is indexed at [None] and is the trivial identity in BOTH
+     directions.  Keeping it (rather than dropping it for a write) is what
+     keeps [virtio_proto_step]'s interface, and [WpUart.wp_disk_loop]'s
+     completion arm, DIRECTION-AGNOSTIC: the disk thread learns the key from
+     the protocol and cannot case-split on which request completed.  It is
+     also where a READ's client receipt lives -- a read moves no disk byte,
+     hence has no sectors, hence an empty [vs_perms], and the completion key
+     is its only one (the owner's ruling: "IN requests keep one uniform
+     trivial permit key").
+     The SECTOR keys are the real permits of a write: one per 512-byte
+     landing, indexed at [wr_sector (vs_wr sl) i], each spent at its own
+     [VirtioModel.virtio_sector_step].  Sector [i] of the request has already
+     landed exactly when [i ∈ ld], and then its token is the SPENT one. *)
+  Definition slot_sector_pend (γ : disk_names) (ld : gset nat) (sl : vslot)
+      : iProp Σ :=
+    ([∗ list] i ↦ kq ∈ vs_perms sl,
+       if bool_decide (i ∈ ld)
+       then perm_done (dn_perm γ) kq (wr_sector (vs_wr sl) i)
+       else perm_pend (dn_perm γ) kq (wr_sector (vs_wr sl) i))%I.
+
+  Definition slot_sector_done (γ : disk_names) (sl : vslot) : iProp Σ :=
+    ([∗ list] i ↦ kq ∈ vs_perms sl,
+       perm_done (dn_perm γ) kq (wr_sector (vs_wr sl) i))%I.
+
+  (* ALL of a completed request's spent tokens, as one resource: the
+     completion's and every sector landing's.  Downstream (DiskInv's parked
+     claim, the interrupt handler, the woken publisher) never needs to see
+     the split, so it names this. *)
+  Definition slot_perms_done (γ : disk_names) (sl : vslot) : iProp Σ :=
+    (perm_done (dn_perm γ) (vs_perm sl) None ∗ slot_sector_done γ sl)%I.
+
+  Global Instance slot_perms_done_timeless γ sl : Timeless (slot_perms_done γ sl).
+  Proof. rewrite /slot_perms_done /slot_sector_done. apply _. Qed.
+
+  (* nothing landed yet: the split degenerates to the pending form, which is
+     what the publisher hands in *)
+  Lemma slot_sector_pend_empty (γ : disk_names) (sl : vslot) :
+    ([∗ list] i ↦ kq ∈ vs_perms sl,
+       perm_pend (dn_perm γ) kq (wr_sector (vs_wr sl) i))
+    ⊢ slot_sector_pend γ ∅ sl.
+  Proof.
+    rewrite /slot_sector_pend. apply big_sepL_mono. intros i kq _.
+    rewrite (bool_decide_eq_false_2 (i ∈ (∅ : gset nat))
+               (not_elem_of_empty (C := gset nat) i)).
+    done.
+  Qed.
+
+  (* every sector landed: the split degenerates to the spent form *)
+  Lemma slot_sector_pend_full (γ : disk_names) (ld : gset nat) (sl : vslot) :
+    (forall i, (i < length (vs_perms sl))%nat -> i ∈ ld) ->
+    slot_sector_pend γ ld sl -∗ slot_sector_done γ sl.
+  Proof.
+    intro Hall. rewrite /slot_sector_pend /slot_sector_done.
+    iApply big_sepL_mono. intros i kq Hi.
+    rewrite (proj2 (bool_decide_eq_true _)); [done|].
+    apply Hall. by apply lookup_lt_Some in Hi.
+  Qed.
+
+  Definition slot_pend_res (γ : disk_names) (ld : gset nat) (sl : vslot)
+      : iProp Σ :=
     (∃ bs : list (bv 8),
        ⌜length bs = vs_len sl⌝ ∗
        ⌜vs_is_out sl = false -> bs = vs_data sl⌝ ∗
+       (* THE TORN CONTENT (sector-atomic-disk.md).  The block's durable
+          bytes are the OLD ones in the sectors that have not landed and the
+          PAYLOAD's in the ones that have -- which is what makes a crash
+          between two landings leave a half-written block, and what the
+          publisher's fragments have to say while the request is in flight. *)
+       ⌜vs_torn sl ld bs⌝ ∗
+       (* ONE KEY PER SECTOR: the publisher's own well-formedness obligation,
+          and what lets the completion turn "every sector landed" into "every
+          per-sector permit is spent". *)
+       ⌜length (vs_perms sl) = wr_nsectors (vs_wr sl)⌝ ∗
        disk_bytes γ (vs_sector_off sl) bs ∗
-       (* THE PERMIT'S INDEX IS PINNED TO THE REQUEST (phase C2a): the token
-          rides here AT [vs_wr sl], the slot's own write identity, which is
-          what lets the DMA completion discharge the reshaped permit's
-          obligation ([VirtioQueue.vslot_post_wr]) without the permit
-          channel knowing anything about the virtio protocol. *)
-       perm_pend (dn_perm γ) (vs_perm sl) (vs_wr sl))%I.
+       perm_pend (dn_perm γ) (vs_perm sl) None ∗
+       slot_sector_pend γ ld sl)%I.
 
   Definition slot_done_res (γ : disk_names) (c : virtio_cfg)
       (dma : gmap Arch.pa (bv 8)) (p : nat) (sl : vslot) : iProp Σ :=
@@ -1175,10 +1246,12 @@ Section VirtioProto.
        ⌜dma !! vr_status (vs_req sl) = Some byte_zero⌝ ∗
        ⌜vs_is_out sl = false ->
           read_byte_list dma (vr_buf (vs_req sl)) (vs_len sl) = Some bs⌝ ∗
-       (* the SPENT permit's token: the completion moved the cell to [false]
-          and parked the receipt in [PermInv]; this is what the woken
-          publisher presents to collect it. *)
-       perm_done (dn_perm γ) (vs_perm sl) (vs_wr sl))%I.
+       (* the SPENT permits' tokens: the sector landings and the completion
+          each moved their cell to [false] and parked their receipt in
+          [PermInv]; these are what the woken publisher presents to collect
+          them.  The publisher's payoff is therefore the separating
+          conjunction of the per-sector receipts, plus the completion's. *)
+       slot_perms_done γ sl)%I.
 
   (* the completion record mentions only three windows of the lease, so it
      rides through any change to the lease that leaves those bytes alone *)
@@ -1193,7 +1266,8 @@ Section VirtioProto.
     slot_done_res γ c dma p sl -∗ slot_done_res γ c dma' p sl.
   Proof.
     intros Helem Hstat Hbuf. iIntros "H".
-    iDestruct "H" as (bs) "(%Hlen & Hbs & %Hout & %Hre & %Hst & %Hbl & Hperm)".
+    iDestruct "H" as (bs)
+      "(%Hlen & Hbs & %Hout & %Hre & %Hst & %Hbl & Hperm)".
     iExists bs. iFrame "Hbs Hperm". iPureIntro. split_and!.
     - exact Hlen.
     - exact Hout.
@@ -1217,6 +1291,28 @@ Section VirtioProto.
      explicitly.  What stays here is exactly the queue/slot/claim protocol,
      which SHOULD die with the era: in-flight requests vanish at the device
      reset. *)
+  (* WHICH SECTORS OF WHICH SLOT HAVE LANDED.  The device's landed set
+     ([VirtioModel.v_landed]) belongs to the HEAD request -- the one at
+     [v_seen], i.e. protocol position [vp_nc] -- and every other pending slot
+     has landed nothing yet.  This is the function that says so, and it is
+     what carries [v_landed] into the per-slot resource without putting a
+     mutable field into the (immutable, receipt-pinned) [vslot] record. *)
+  Definition pend_landed (pr : vproto) (ld : gset nat) (p : nat) : gset nat :=
+    if bool_decide (p = vp_nc pr) then ld else ∅.
+
+  Lemma pend_landed_other (pr : vproto) (ld : gset nat) (p : nat) :
+    p <> vp_nc pr -> pend_landed pr ld p = ∅.
+  Proof. intro H. rewrite /pend_landed bool_decide_eq_false_2 //. Qed.
+
+  Lemma pend_landed_head (pr : vproto) (ld : gset nat) :
+    pend_landed pr ld (vp_nc pr) = ld.
+  Proof. rewrite /pend_landed bool_decide_eq_true_2 //. Qed.
+
+  (* after a COMPLETION the device's landed set is empty again, so every
+     still-pending slot is back to "nothing landed" *)
+  Lemma pend_landed_empty (pr : vproto) (p : nat) : pend_landed pr ∅ p = ∅.
+  Proof. rewrite /pend_landed. by destruct (bool_decide (p = vp_nc pr)). Qed.
+
   Definition virtio_proto (γ : disk_names) (v : virtio_state) : iProp Σ :=
     (if virtio_live (v_cfg v) then
         ∃ (pr : vproto) (dma : gmap Arch.pa (bv 8)),
@@ -1228,10 +1324,17 @@ Section VirtioProto.
           ⌜v_seen v = wrap16 (vp_nc pr)⌝ ∗
           ⌜v_used_idx v = wrap16 (vp_nc pr)⌝ ∗
           ⌜read_bytes dma (used_idx_pa (v_cfg v)) 2 = Some (wrap16 (vp_nc pr))⌝ ∗
+          (* NOTHING PENDING MEANS NOTHING LANDED.  A sector step needs a
+             pending request ([VirtioModel.virtio_sector_step] is gated on
+             [virtio_pending]) and the completion clears the set
+             ([virtio_complete_landed]), so an idle queue's landed set is
+             empty -- which is what lets the NEXT publish hand its fresh slot
+             in with all its permits still pending. *)
+          ⌜vp_nc pr = vp_np pr -> v_landed v = ∅⌝ ∗
           ghost_map_auth (dn_slot γ) 1 (vp_spins pr) ∗
           mono_nat_auth_own (dn_nc γ) 1 (vp_nc pr) ∗
           ghost_var (dn_np γ) (1/2) (vp_np pr) ∗
-          ([∗ map] p ↦ sl ∈ vp_pend pr, slot_pend_res γ sl) ∗
+          ([∗ map] p ↦ sl ∈ vp_pend pr, slot_pend_res γ (pend_landed pr (v_landed v) p) sl) ∗
           ([∗ map] p ↦ sl ∈ vp_done pr, slot_done_res γ (v_cfg v) dma p sl)
       else
         (* THE CONFIG TRACKER (2026-07-29).  While the queue is not live the
@@ -1256,6 +1359,12 @@ Section VirtioProto.
            driver zeroes the RINGS in memory, but only the invariant can tell
            it that the DEVICE's own counters agree with them. *)
         ⌜v_seen v = zero16⌝ ∗ ⌜v_used_idx v = zero16⌝ ∗
+        (* ...and neither has anything LANDED: a device that is not live
+           takes no sector step either ([virtio_sector_step_not_live]), and
+           the reset that made it not live cleared the set
+           ([virtio_reset_landed]).  Recording it is what lets the LIVE FLIP
+           establish the live arm's "nothing pending means nothing landed". *)
+        ⌜v_landed v = ∅⌝ ∗
         ghost_map_auth (dn_slot γ) 1 (∅ : gmap nat (vslot * gmap Arch.pa (bv 8))) ∗
         mono_nat_auth_own (dn_nc γ) 1 0%nat ∗
         ghost_var (dn_np γ) 1 0%nat)%I.
@@ -1286,7 +1395,7 @@ Section VirtioProto.
      [virtio_proto_step] updates, is the era's. *)
   Lemma disk_ghosts_alloc (gd : nat) (v : virtio_state) :
     virtio_live (v_cfg v) = false ->
-    v_seen v = zero16 -> v_used_idx v = zero16 ->
+    v_seen v = zero16 -> v_used_idx v = zero16 -> v_landed v = ∅ ->
     ⊢ |==> ∃ γ : disk_names,
         (* the image name IS the era's: this is what lets the device thread
            identify the auth [state_interp] hands it with the fragments this
@@ -1302,7 +1411,7 @@ Section VirtioProto.
            holds permits its own era authored (PermInv.v). *)
         perm_inv_body gd (dn_perm γ).
   Proof.
-    intros Hlive Hsn Hui.
+    intros Hlive Hsn Hui Hld.
     iMod (ghost_map_alloc_empty (K:=nat)
             (V:=(vslot * gmap Arch.pa (bv 8))%type)) as (gslot) "Hslot".
     iMod (mono_nat_own_alloc 0) as (gnc) "[Hnc Hlb]".
@@ -1326,6 +1435,7 @@ Section VirtioProto.
     iSplitL "Hcfg1"; [iExact "Hcfg1"|].
     iSplitR; [iPureIntro; exact Hsn|].
     iSplitR; [iPureIntro; exact Hui|].
+    iSplitR; [iPureIntro; exact Hld|].
     iFrame "Hslot Hnc Hnp".
   Qed.
 
@@ -1340,6 +1450,8 @@ Section VirtioProto.
     avail_idx_dom c ## used_page_pas c ->
     v_seen v1 = wrap16 0 ->
     v_used_idx v1 = wrap16 0 ->
+    (* the empty landed set the not-live arm was recording all along *)
+    v_landed v1 = ∅ ->
     disk_cfg γ c -∗
     ghost_map_auth (dn_slot γ) 1 (∅ : gmap nat (vslot * gmap Arch.pa (bv 8))) -∗
     mono_nat_auth_own (dn_nc γ) 1 0%nat -∗
@@ -1348,7 +1460,7 @@ Section VirtioProto.
     phys_list (vc_used c) (replicate 4096 byte_zero) -∗
     virtio_proto γ v1.
   Proof.
-    intros Hcfg Hlive Hqnum Hal Hdisj Hseen Hui.
+    intros Hcfg Hlive Hqnum Hal Hdisj Hseen Hui Hld.
     iIntros "#Hcfgp Hslot Hnc Hnp Hidx Hpage".
     assert (H4k : Z.of_nat 4096 < 18446744073709551616) by (rewrite z4096; lia).
     rewrite phys_word2_map (phys_list_replicate (vc_used c) 4096 byte_zero H4k).
@@ -1370,6 +1482,7 @@ Section VirtioProto.
     iSplitR; [iPureIntro; exact Hseen|].
     iSplitR; [iPureIntro; exact Hui|].
     iSplitR; [iPureIntro; exact (vinit_dma_uidx c Hdisj)|].
+    iSplitR; [iPureIntro; intros _; exact Hld|].
     assert (Hpe : vp_pend vproto0 = (∅ : gmap nat vslot)) by reflexivity.
     assert (Hde : vp_done vproto0 = (∅ : gmap nat vslot)) by reflexivity.
     rewrite Hpe Hde !big_sepM_empty. iSplit; done.
@@ -1400,6 +1513,7 @@ Section VirtioProto.
     virtio_live (v_cfg v0) = false ->
     v_cfg v1 = virtio_init_cfg pd pav pu ->
     v_seen v1 = v_seen v0 -> v_used_idx v1 = v_used_idx v0 ->
+    v_landed v1 = v_landed v0 ->
     virtio_pages_aligned (virtio_init_cfg pd pav pu) ->
     avail_idx_dom (virtio_init_cfg pd pav pu)
       ## used_page_pas (virtio_init_cfg pd pav pu) ->
@@ -1414,10 +1528,10 @@ Section VirtioProto.
     |==> virtio_proto γ v1 ∗ disk_pub γ 0 ∗
          disk_cfg γ (virtio_init_cfg pd pav pu).
   Proof.
-    intros Hlive0 Hc1 Hsn Hui Hal Hdisj. iIntros "Hp Hmine Hidx Hpage".
+    intros Hlive0 Hc1 Hsn Hui Hlde Hal Hdisj. iIntros "Hp Hmine Hidx Hpage".
     rewrite {1}/virtio_proto.
     rewrite Hlive0.
-    iDestruct "Hp" as "(Hcfg & %Hsn0 & %Hui0 & Hslot & Hnc & Hnp)".
+    iDestruct "Hp" as "(Hcfg & %Hsn0 & %Hui0 & %Hld0 & Hslot & Hnc & Hnp)".
     iDestruct (disk_cfg_is_join with "Hcfg Hmine") as "Hcfg".
     iMod (disk_cfg_set γ (v_cfg v0) (virtio_init_cfg pd pav pu) with "Hcfg")
       as "#Hcfg".
@@ -1428,8 +1542,9 @@ Section VirtioProto.
       by (rewrite Hsn Hsn0; exact zero16_wrap16).
     assert (Hu1 : v_used_idx v1 = wrap16 0%nat)
       by (rewrite Hui Hui0; exact zero16_wrap16).
+    assert (Hl1 : v_landed v1 = ∅) by (rewrite Hlde; exact Hld0).
     iApply (virtio_proto_intro_gen γ v1 (virtio_init_cfg pd pav pu)
-              Hc1 (virtio_init_cfg_live pd pav pu) eq_refl Hal Hdisj Hs1 Hu1
+              Hc1 (virtio_init_cfg_live pd pav pu) eq_refl Hal Hdisj Hs1 Hu1 Hl1
               with "Hcfg Hslot Hnc Hnp1 Hidx Hpage").
   Qed.
 
@@ -1445,14 +1560,14 @@ Section VirtioProto.
     virtio_live (v_cfg v) = false ->
     virtio_live c' = false ->
     v_cfg v' = c' ->
-    v_seen v' = zero16 -> v_used_idx v' = zero16 ->
+    v_seen v' = zero16 -> v_used_idx v' = zero16 -> v_landed v' = ∅ ->
     virtio_proto γ v -∗ disk_cfg_is γ (DfracOwn (1/2)) (v_cfg v) ==∗
     virtio_proto γ v' ∗ disk_cfg_is γ (DfracOwn (1/2)) c'.
   Proof.
-    intros Hlive0 Hlive1 Hc1 Hsn Hui. iIntros "Hp Hmine".
+    intros Hlive0 Hlive1 Hc1 Hsn Hui Hld. iIntros "Hp Hmine".
     rewrite {1}/virtio_proto.
     rewrite Hlive0.
-    iDestruct "Hp" as "(Hcfg & _ & _ & Hslot & Hnc & Hnp)".
+    iDestruct "Hp" as "(Hcfg & _ & _ & _ & Hslot & Hnc & Hnp)".
     iDestruct (disk_cfg_is_join with "Hcfg Hmine") as "Hcfg".
     iMod (disk_cfg_is_move γ (v_cfg v) c' with "Hcfg") as "Hcfg".
     iDestruct (disk_cfg_is_split with "Hcfg") as "[Hcfg1 Hcfg2]".
@@ -1462,6 +1577,7 @@ Section VirtioProto.
     iFrame "Hcfg1".
     iSplitR; [iPureIntro; exact Hsn|].
     iSplitR; [iPureIntro; exact Hui|].
+    iSplitR; [iPureIntro; exact Hld|].
     iFrame "Hslot Hnc Hnp".
   Qed.
 
@@ -1497,28 +1613,34 @@ Section VirtioProto.
       (c : virtio_cfg) :
     virtio_live c = false ->
     virtio_proto γ v -∗ disk_cfg_is γ (DfracOwn (1/2)) c -∗
-    ⌜v_cfg v = c /\ v_seen v = zero16 /\ v_used_idx v = zero16⌝.
+    ⌜v_cfg v = c /\ v_seen v = zero16 /\ v_used_idx v = zero16
+     /\ v_landed v = ∅⌝.
   Proof.
     iIntros (Hlive) "Hp Hmine". rewrite /virtio_proto.
     destruct (virtio_live (v_cfg v)) eqn:Hl.
     - iDestruct "Hp" as (pr dma) "(#Hcfg & _)".
       iDestruct (disk_cfg_is_agree with "Hcfg Hmine") as %Hc.
       rewrite Hc Hlive in Hl. discriminate.
-    - iDestruct "Hp" as "(Hcfg & %Hsn & %Hui & _)".
+    - iDestruct "Hp" as "(Hcfg & %Hsn & %Hui & %Hld & _)".
       iDestruct (disk_cfg_is_agree with "Hcfg Hmine") as %Hc.
-      iPureIntro. split_and!; [exact Hc | exact Hsn | exact Hui].
+      iPureIntro. split_and!; [exact Hc | exact Hsn | exact Hui | exact Hld].
   Qed.
 
   (* ==================================================================== *)
   (* stability: MMIO writes that keep cfg / seen / used_idx                *)
   (* ==================================================================== *)
 
+  (* THE LANDED SET IS PART OF THE PROTOCOL NOW (sector-atomic-disk.md): an
+     in-flight write's landed sectors decide which of its permits are still
+     pending, so a store that carried the protocol across on cfg/seen/used
+     alone has to leave [v_landed] alone too.  Both stores the live driver
+     makes do ([VirtioModel.virtio_write_landed] at [vio_cfg_stable]). *)
   Lemma virtio_proto_stable (γ : disk_names) (v v' : virtio_state) :
     v_cfg v' = v_cfg v -> v_seen v' = v_seen v ->
-    v_used_idx v' = v_used_idx v ->
+    v_used_idx v' = v_used_idx v -> v_landed v' = v_landed v ->
     virtio_proto γ v -∗ virtio_proto γ v'.
   Proof.
-    intros Hc Hs Hu. rewrite /virtio_proto Hc Hs Hu. iIntros "$".
+    intros Hc Hs Hu Hl. rewrite /virtio_proto Hc Hs Hu Hl. iIntros "$".
   Qed.
 
   (* ==================================================================== *)
@@ -1588,22 +1710,19 @@ Section VirtioProto.
     { exfalso. rewrite (virtio_req_step_not_live v mv Hlive) in Hstep.
       discriminate. }
     iDestruct "Hp" as (pr dma)
-      "(#Hcfg & Hdma & %Hctl & %Hok & %Hal & %Hseen & %Hui & %Hridx &
+      "(#Hcfg & Hdma & %Hctl & %Hok & %Hal & %Hseen & %Hui & %Hridx & %Hlde &
         Hslot & Hnc & Hnp & Hpend & Hdone)".
     iDestruct (dma_agree with "Hm Hdma") as %Hsub.
     assert (Hctlm : vproto_ctl (v_cfg v) pr ⊆ m)
       by (etransitivity; [exact Hctl | exact Hsub]).
     assert (Hvctl : mem_view (vproto_ctl (v_cfg v) pr) mv)
       by exact (mem_view_subseteq _ m mv Hctlm Hview).
-    pose proof (vproto_step_pend (v_cfg v) pr (dom dma) v mv v' w
-                  Hok eq_refl Hseen Hvctl Hstep) as Hlt.
-    destruct (vproto_step_det (v_cfg v) pr (dom dma) v mv
-                Hok eq_refl Hseen Hvctl Hlt) as (sl & pin & Hsl & Hpin & Hdet).
-    rewrite Hdet in Hstep. injection Hstep as Hv1 Hw1.
+    destruct (vproto_step_det (v_cfg v) pr (dom dma) v mv v' w
+                Hok eq_refl Hseen Hvctl Hstep)
+      as (sl & pin & Hsl & Hpin & Hlt & Hslotok & Hvpin & Hsdone & Hv1 & Hw1).
     subst v' w. rewrite Hui.
     (* the pure protocol facts about the slot the device is completing *)
     pose proof (vproto_pend_slot pr _ _ Hsl) as Hs.
-    pose proof (vpo_slot _ _ _ Hok _ sl pin Hs Hpin) as Hslotok.
     pose proof (vpo_standing _ _ _ Hok _ sl pin Hs Hpin) as Hstand.
     pose proof (vpo_qnum _ _ _ Hok) as Hqnum.
     assert (Hwrpage : slot_wr sl ## used_page_pas (v_cfg v)).
@@ -1619,44 +1738,40 @@ Section VirtioProto.
       - etransitivity; [ apply slot_fp_wr
                        | exact (vpo_fp_D _ _ _ Hok _ sl pin Hs Hpin) ].
       - exact (vpo_used_D _ _ _ Hok). }
-    (* the disk ghost move, uniform over the request direction *)
+    (* THE COMPLETING SLOT.  Its disk fragments do not MOVE here -- every
+       sector of an OUT request landed at its own earlier step -- so all this
+       block does is read off what they already say: the block holds the
+       payload, because [virtio_sectors_done] says every sector landed and
+       [vs_torn] says a landed sector holds the payload. *)
     iDestruct (big_sepM_delete _ (vp_pend pr) (vp_nc pr) sl Hsl with "Hpend")
       as "[Hslres Hpend]".
-    iDestruct "Hslres" as (bs) "(%Hbslen & %Hbspin & Hbs & Hpend0)".
-    iAssert (|==> ∃ (dmap' : gmap Z (bv 8)) (bs' : list (bv 8)),
-               ghost_map_auth (dn_img γ) 1 dmap' ∗
-               disk_bytes γ (vs_sector_off sl) bs' ∗
-               ⌜length bs' = vs_len sl⌝ ∗
-               ⌜disk_view dmap' (v_disk (vslot_post v sl))⌝ ∗
-               ⌜bs' = vs_data sl⌝ ∗
-               ⌜vs_is_out sl = false ->
-                  disk_read (v_disk v) (vs_sector_off sl) (vs_len sl) = bs'⌝)%I
-      with "[Hauth Hbs]" as ">Hdisk".
-    { destruct (vs_is_out sl) eqn:Hout.
-      - assert (Hvl : vs_len sl = 1024%nat)
-          by (unfold vs_len; rewrite (spo_len _ _ _ _ Hslotok); reflexivity).
-        pose proof (spo_out _ _ _ _ Hslotok Hout) as Hro.
-        destruct (read_byte_list_spec pin (vr_buf (vs_req sl)) 1024
-                    (vs_data sl) Hro) as [Hdl _].
-        assert (Hlen2 : length (vs_data sl) = length bs) by (rewrite Hbslen Hvl; exact Hdl).
-        iMod (disk_bytes_update γ dmap (vs_sector_off sl) bs (vs_data sl) Hlen2
-                with "Hauth Hbs") as (dmap') "(Hauth & Hbs & %Hupd)".
-        iModIntro. iExists dmap', (vs_data sl). iFrame "Hauth Hbs".
-        iPureIntro. split_and!.
-        + rewrite Hvl. exact Hdl.
-        + rewrite vslot_post_disk Hout. exact (Hupd (v_disk v) Hdv).
-        + reflexivity.
-        + intro Hc. discriminate.
-      - iDestruct (disk_bytes_read γ dmap (v_disk v) (vs_sector_off sl) bs Hdv
-                     with "Hauth Hbs") as %Hrd.
-        iModIntro. iExists dmap, bs. iFrame "Hauth Hbs".
-        iPureIntro. split_and!.
-        + exact Hbslen.
-        + rewrite vslot_post_disk Hout. exact Hdv.
-        + exact (Hbspin eq_refl).
-        + intros _. rewrite Hbslen in Hrd. exact Hrd. }
-    iDestruct "Hdisk" as (dmap' bs')
-      "(Hauth & Hbs & %Hlen' & %Hdv' & %Hout' & %Hin')".
+    rewrite pend_landed_head.
+    iDestruct "Hslres" as (bs)
+      "(%Hbslen & %Hbspin & %Hbstorn & %Hbsperms & Hbs & Hpend0 & Hsect)".
+    pose proof (vslot_vreq_nsectors (v_cfg v) (vp_nc pr) sl pin mv Hslotok Hvpin)
+      as Hns.
+    assert (Hall : forall i, (i < wr_nsectors (vs_wr sl))%nat -> i ∈ v_landed v).
+    { intros i Hi.
+      apply (proj1 (virtio_sectors_done_spec v (vs_req sl)) Hsdone).
+      rewrite Hns. exact Hi. }
+    assert (Hout' : bs = vs_data sl).
+    { destruct (vs_is_out sl) eqn:Hout; [| exact (Hbspin eq_refl) ].
+      pose proof (vslot_data_len (v_cfg v) (vp_nc pr) sl pin Hslotok Hout) as Hdl.
+      apply (vs_torn_full sl (v_landed v) bs Hbslen Hdl); [| exact Hbstorn ].
+      intros i Hi. apply Hall.
+      rewrite -Hns (vslot_nsectors_out sl Hout). exact Hi. }
+    iDestruct (disk_bytes_read γ dmap (v_disk v) (vs_sector_off sl) bs Hdv
+                 with "Hauth Hbs") as %Hrd.
+    assert (Hin' : vs_is_out sl = false ->
+              disk_read (v_disk v) (vs_sector_off sl) (vs_len sl) = bs)
+      by (intros _; rewrite <- Hbslen; exact Hrd).
+    (* ...and every per-sector permit is therefore spent *)
+    assert (Hallp : forall i, (i < length (vs_perms sl))%nat -> i ∈ v_landed v)
+      by (intros i Hi; apply Hall; rewrite <- Hbsperms; exact Hi).
+    iDestruct (slot_sector_pend_full γ (v_landed v) sl Hallp with "Hsect")
+      as "Hsect".
+    assert (Hdv' : disk_view dmap (v_disk (vslot_post v sl)))
+      by (rewrite vslot_post_disk; exact Hdv).
     (* the byte lease and the counters *)
     iMod (dma_update _ m dma HwDdma with "Hm Hdma") as "[Hm Hdma]".
     assert (Hle : (vp_nc pr <= S (vp_nc pr))%nat) by lia.
@@ -1711,13 +1826,13 @@ Section VirtioProto.
           * apply elem_of_union_r. exact Hc. }
     (* rebuild, AS THE ACCESSOR: the completing slot's pending token goes
        out, and the caller owes the spent one back at the same key. *)
-    iModIntro. iExists (vs_perm sl), (vs_wr sl).
+    iModIntro. iExists (vs_perm sl), None.
     iSplitR; [iPureIntro; apply vslot_post_wr|].
     iFrame "Hpend0". iIntros "Hdone0".
     iFrame "Hm".
     iSplitL "Hauth".
-    { iExists dmap'. iFrame "Hauth". iPureIntro. exact Hdv'. }
-    rewrite /virtio_proto vslot_post_cfg Hlive.
+    { iExists dmap. iFrame "Hauth". iPureIntro. exact Hdv'. }
+    rewrite /virtio_proto vslot_post_cfg vslot_post_landed Hlive.
     iExists (vproto_step_state pr sl),
       (vslot_writes (v_cfg v) (wrap16 (vp_nc pr)) (v_disk v) sl ∪ dma).
     rewrite (vp_spins_step pr sl Hsl) vps_nc vps_np vps_pend vps_done.
@@ -1742,15 +1857,26 @@ Section VirtioProto.
       rewrite (vslot_writes_idx (v_cfg v) (wrap16 (vp_nc pr)) (v_disk v) sl j
                  Hqnum Hj2 Hwrpage).
       rewrite <- wrap16_S. reflexivity. }
-    (* the pending map lost [nc], the done map gained it *)
-    iFrame "Hpend".
+    iSplitR; [iPureIntro; intros _; reflexivity|].
+    (* the pending map lost [nc] -- and the landed set is empty again, so the
+       slots still pending are back to "nothing landed" *)
+    assert (Hpmono : forall k x, delete (vp_nc pr) (vp_pend pr) !! k = Some x ->
+              slot_pend_res γ (pend_landed pr (v_landed v) k) x
+              ⊢ slot_pend_res γ (pend_landed (vproto_step_state pr sl) ∅ k) x).
+    { intros k x Hk. apply bi.wand_entails.
+      apply lookup_delete_Some in Hk as [Hne _].
+      rewrite (pend_landed_other pr (v_landed v) k (fun e => Hne (eq_sym e)))
+              (pend_landed_empty (vproto_step_state pr sl) k). iIntros "$". }
+    iSplitL "Hpend".
+    { iApply (big_sepM_mono _ _ _ Hpmono). iExact "Hpend". }
     assert (Hdnone : vp_done pr !! vp_nc pr = None).
     { apply not_elem_of_dom. intro Hc.
       pose proof (vpo_done_lt _ _ _ Hok _ Hc). lia. }
     rewrite (big_sepM_insert _ (vp_done pr) (vp_nc pr) sl Hdnone).
-    iSplitL "Hbs Hdone0".
-    { iExists bs'. iFrame "Hbs Hdone0". iPureIntro. split_and!.
-      - exact Hlen'.
+    iSplitL "Hbs Hdone0 Hsect".
+    { iExists bs. rewrite /slot_perms_done. iFrame "Hbs Hdone0 Hsect".
+      iPureIntro. split_and!.
+      - exact Hbslen.
       - exact Hout'.
       - apply read_bytes_of_list. intros j Hj.
         assert (Hj2 : (j < 4)%nat) by lia.
@@ -1760,11 +1886,170 @@ Section VirtioProto.
                  Hqnum Hj2 Hwrpage).
       - apply lookup_union_Some_l.
         apply vslot_writes_status. exact (spo_stat _ _ _ _ Hslotok).
-      - intro Hin. apply read_byte_list_intro; [exact Hlen'|].
+      - intro Hin. apply read_byte_list_intro; [exact Hbslen|].
         intros j b Hj. apply lookup_union_Some_l.
         apply (vslot_writes_buf (v_cfg v) (wrap16 (vp_nc pr)) (v_disk v) sl j b Hin).
         rewrite (Hin' Hin). exact Hj. }
     iApply (big_sepM_mono _ _ _ Hmono). iExact "Hdone".
+  Qed.
+
+  (* -- the per-sector accessor over the split token vector -------------- *)
+
+  Lemma slot_sector_pend_acc (γ : disk_names) (ld : gset nat) (sl : vslot)
+      (i : nat) (kq : nat * gname) :
+    vs_perms sl !! i = Some kq -> i ∉ ld ->
+    slot_sector_pend γ ld sl -∗
+      perm_pend (dn_perm γ) kq (wr_sector (vs_wr sl) i) ∗
+      (perm_done (dn_perm γ) kq (wr_sector (vs_wr sl) i) -∗
+         slot_sector_pend γ ({[ i ]} ∪ ld) sl).
+  Proof.
+    intros Hkq Hnl. rewrite /slot_sector_pend.
+    rewrite (big_sepL_delete
+               (fun k kq0 => if bool_decide (k ∈ ld)
+                             then perm_done (dn_perm γ) kq0 (wr_sector (vs_wr sl) k)
+                             else perm_pend (dn_perm γ) kq0 (wr_sector (vs_wr sl) k))%I
+               (vs_perms sl) i kq Hkq).
+    rewrite (big_sepL_delete
+               (fun k kq0 => if bool_decide (k ∈ ({[ i ]} ∪ ld))
+                             then perm_done (dn_perm γ) kq0 (wr_sector (vs_wr sl) k)
+                             else perm_pend (dn_perm γ) kq0 (wr_sector (vs_wr sl) k))%I
+               (vs_perms sl) i kq Hkq).
+    rewrite (bool_decide_eq_false_2 (i ∈ ld) Hnl).
+    rewrite (bool_decide_eq_true_2 (i ∈ ({[ i ]} ∪ ld)) ltac:(set_solver)).
+    assert (Hmono : forall k kq0, vs_perms sl !! k = Some kq0 ->
+              (if decide (k = i) then emp else
+                 if bool_decide (k ∈ ld)
+                 then perm_done (dn_perm γ) kq0 (wr_sector (vs_wr sl) k)
+                 else perm_pend (dn_perm γ) kq0 (wr_sector (vs_wr sl) k))%I
+              ⊢ (if decide (k = i) then emp else
+                   if bool_decide (k ∈ ({[ i ]} ∪ ld))
+                   then perm_done (dn_perm γ) kq0 (wr_sector (vs_wr sl) k)
+                   else perm_pend (dn_perm γ) kq0 (wr_sector (vs_wr sl) k))%I).
+    { intros k kq0 _. apply bi.wand_entails.
+      destruct (decide (k = i)) as [->|Hne]; [by iIntros "$"|].
+      destruct (bool_decide (k ∈ ld)) eqn:Hb.
+      - apply bool_decide_eq_true in Hb.
+        rewrite (bool_decide_eq_true_2 (k ∈ ({[ i ]} ∪ ld)) ltac:(set_solver)).
+        by iIntros "$".
+      - apply bool_decide_eq_false in Hb.
+        rewrite (bool_decide_eq_false_2 (k ∈ ({[ i ]} ∪ ld)) ltac:(set_solver)).
+        by iIntros "$". }
+    iIntros "[$ Hrest]". iIntros "$".
+    iApply (big_sepL_mono _ _ _ Hmono). iExact "Hrest".
+  Qed.
+
+  (* THE SECTOR LANDING -- the step that actually moves the durable image
+     (claude-notes/projects/sector-atomic-disk.md).  512 bytes of the head
+     request's data reach the disk and NOTHING else moves: no memory write, no
+     used-ring entry, no interrupt, and the device does not advance to the
+     next available-ring entry.  So this -- and no longer the completion -- is
+     the linearization point of a disk write, which is why
+     [WpUart.wp_disk_loop] opens [crashN] in THIS arm and no other.
+
+     Same accessor shape as [virtio_proto_step]: the landing sector's PENDING
+     token goes out, its SPENT one is owed back at the same key, and the
+     write identity handed over is the sector's own slice
+     [wr_sector (vs_wr sl) i] -- so the client's view shift is about exactly
+     the 512 bytes that just became durable. *)
+  Lemma virtio_proto_sector_step (γ : disk_names) (v : virtio_state)
+      (m : gmap Arch.pa (bv 8)) (mv : vmem) (i : nat) (v' : virtio_state) :
+    mem_view m mv ->
+    virtio_sector_step v mv i = Some v' ->
+    gen_heap_interp m -∗ disk_img_auth (dn_img γ) (v_disk v) -∗
+    virtio_proto γ v ==∗
+      ∃ (kq : nat * gname) (wr : disk_wr),
+        ⌜v_disk v' = wr_apply wr (v_disk v)⌝ ∗
+        perm_pend (dn_perm γ) kq wr ∗
+        (perm_done (dn_perm γ) kq wr -∗
+           gen_heap_interp m ∗ disk_img_auth (dn_img γ) (v_disk v') ∗
+           virtio_proto γ v').
+  Proof.
+    iIntros (Hview Hstep) "Hm Hauth Hp".
+    iDestruct "Hauth" as (dmap) "[Hauth %Hdv]".
+    rewrite {1}/virtio_proto.
+    destruct (virtio_live (v_cfg v)) eqn:Hlive; last first.
+    { exfalso. rewrite (virtio_sector_step_not_live v mv i Hlive) in Hstep.
+      discriminate. }
+    iDestruct "Hp" as (pr dma)
+      "(#Hcfg & Hdma & %Hctl & %Hok & %Hal & %Hseen & %Hui & %Hridx & %Hlde &
+        Hslot & Hnc & Hnp & Hpend & Hdone)".
+    iDestruct (dma_agree with "Hm Hdma") as %Hsub.
+    assert (Hctlm : vproto_ctl (v_cfg v) pr ⊆ m)
+      by (etransitivity; [exact Hctl | exact Hsub]).
+    assert (Hvctl : mem_view (vproto_ctl (v_cfg v) pr) mv)
+      by exact (mem_view_subseteq _ m mv Hctlm Hview).
+    destruct (vproto_sector_det (v_cfg v) pr (dom dma) v mv i v'
+                Hok eq_refl Hseen Hvctl Hstep)
+      as (sl & pin & Hsl & Hpin & Hlt & Hslotok & Hout & Hilt & Hnl & Hv1).
+    (* the landing slot's pending resource *)
+    iDestruct (big_sepM_delete _ (vp_pend pr) (vp_nc pr) sl Hsl with "Hpend")
+      as "[Hslres Hpend]".
+    rewrite pend_landed_head.
+    iDestruct "Hslres" as (bs)
+      "(%Hbslen & %Hbspin & %Hbstorn & %Hbsperms & Hbs & Hpend0 & Hsect)".
+    (* the sector's own key, and its still-pending token *)
+    assert (Hik : is_Some (vs_perms sl !! i))
+      by (apply lookup_lt_is_Some_2; rewrite Hbsperms; exact Hilt).
+    destruct Hik as [kq Hkq].
+    iDestruct (slot_sector_pend_acc γ (v_landed v) sl i kq Hkq Hnl with "Hsect")
+      as "[Hi Hsback]".
+    (* the disk fragments move by exactly this sector *)
+    pose proof (vslot_data_len (v_cfg v) (vp_nc pr) sl pin Hslotok Hout) as Hdl.
+    iDestruct (disk_bytes_read γ dmap (v_disk v) (vs_sector_off sl) bs Hdv
+                 with "Hauth Hbs") as %Hrd.
+    rewrite Hbslen in Hrd.
+    set (bs' := disk_read (wr_apply (wr_sector (vs_wr sl) i) (v_disk v))
+                          (vs_sector_off sl) (vs_len sl)).
+    assert (Hlen' : length bs' = length bs)
+      by (unfold bs'; rewrite vq_disk_read_length Hbslen; reflexivity).
+    iMod (disk_bytes_update γ dmap (vs_sector_off sl) bs bs' Hlen'
+            with "Hauth Hbs") as (dmap') "(Hauth & Hbs & %Hupd)".
+    assert (Hdisk' : disk_write (v_disk v) (vs_sector_off sl) bs'
+                     = v_disk v').
+    { unfold bs'. rewrite (vs_sector_image sl (v_disk v) i Hdl).
+      rewrite Hv1. reflexivity. }
+    assert (Hdv' : disk_view dmap' (v_disk v'))
+      by (rewrite <- Hdisk'; exact (Hupd (v_disk v) Hdv)).
+    assert (Htorn' : vs_torn sl ({[ i ]} ∪ v_landed v) bs').
+    { unfold bs'. apply (vs_torn_sector sl (v_disk v) (v_landed v) i Hout Hdl).
+      rewrite Hrd. exact Hbstorn. }
+    iModIntro. iExists kq, (wr_sector (vs_wr sl) i).
+    iSplitR; [iPureIntro; rewrite Hv1; reflexivity|].
+    iFrame "Hi". iIntros "Hd".
+    iDestruct ("Hsback" with "Hd") as "Hsect".
+    iFrame "Hm".
+    iSplitL "Hauth".
+    { iExists dmap'. iFrame "Hauth". iPureIntro. exact Hdv'. }
+    rewrite /virtio_proto Hv1.
+    cbn [v_cfg v_isr v_seen v_used_idx v_disk v_landed].
+    rewrite Hlive.
+    iExists pr, dma. iFrame "Hcfg Hdma Hslot Hnc Hnp Hdone".
+    iSplitR; [iPureIntro; exact Hctl|].
+    iSplitR; [iPureIntro; exact Hok|].
+    iSplitR; [iPureIntro; exact Hal|].
+    iSplitR; [iPureIntro; exact Hseen|].
+    iSplitR; [iPureIntro; exact Hui|].
+    iSplitR; [iPureIntro; exact Hridx|].
+    iSplitR; [iPureIntro; intro Hc; exfalso; lia|].
+    (* the pending map: the head slot's landed set grew, the others are
+       still empty *)
+    assert (Hpmono : forall k x, delete (vp_nc pr) (vp_pend pr) !! k = Some x ->
+              slot_pend_res γ (pend_landed pr (v_landed v) k) x
+              ⊢ slot_pend_res γ (pend_landed pr ({[ i ]} ∪ v_landed v) k) x).
+    { intros k x Hk. apply bi.wand_entails.
+      apply lookup_delete_Some in Hk as [Hne _].
+      rewrite (pend_landed_other pr (v_landed v) k (fun e => Hne (eq_sym e)))
+              (pend_landed_other pr ({[ i ]} ∪ v_landed v) k
+                 (fun e => Hne (eq_sym e))). iIntros "$". }
+    iApply (big_sepM_delete _ (vp_pend pr) (vp_nc pr) sl Hsl).
+    rewrite pend_landed_head.
+    iSplitR "Hpend".
+    { iExists bs'. iFrame "Hbs Hpend0 Hsect". iPureIntro. split_and!.
+      - rewrite Hlen'. exact Hbslen.
+      - intro Hc. rewrite Hout in Hc. discriminate.
+      - exact Htorn'.
+      - exact Hbsperms. }
+    iApply (big_sepM_mono _ _ _ Hpmono). iExact "Hpend".
   Qed.
 
   (* ==================================================================== *)
@@ -1782,11 +2067,11 @@ Section VirtioProto.
   Proof.
     iIntros "Hp Hpub". rewrite /virtio_proto /disk_pub.
     destruct (virtio_live (v_cfg v)) eqn:Hlive; last first.
-    { iDestruct "Hp" as "(Hcfg & _ & _ & Hslot & Hnc & Hnp)".
+    { iDestruct "Hp" as "(Hcfg & _ & _ & _ & Hslot & Hnc & Hnp)".
       iDestruct (ghost_var_valid_2 with "Hnp Hpub") as %[Hq _].
       exfalso. exact (Qp.not_add_le_l 1 (1/2)%Qp Hq). }
     iDestruct "Hp" as (pr dma)
-      "(#Hcfg & Hdma & %Hctl & %Hok & %Hal & %Hseen & %Hui & %Hridx &
+      "(#Hcfg & Hdma & %Hctl & %Hok & %Hal & %Hseen & %Hui & %Hridx & %Hlde &
         Hslot & Hnc & Hnp & Hpend & Hdone)".
     iDestruct (ghost_var_agree with "Hnp Hpub") as %Hnpeq.
     pose proof (vproto_ctl_idx (v_cfg v) pr (dom dma) Hok) as Hidx0.
@@ -1824,7 +2109,9 @@ Section VirtioProto.
     slot_wr sl ## dom pin ->
     virtio_proto γ v -∗ disk_pub γ np -∗
     phys_map pin -∗ phys_map wrb -∗
-    slot_pend_res γ sl -∗
+    (* NOTHING HAS LANDED YET: a freshly published request has every one of
+       its per-sector permits still pending. *)
+    slot_pend_res γ ∅ sl -∗
     ⌜virtio_live (v_cfg v) = true⌝ ∗
     disk_cfg γ (v_cfg v) ∗
     phys_word2 (avail_idx_pa (v_cfg v)) (wrap16 np) ∗
@@ -1835,11 +2122,11 @@ Section VirtioProto.
     iIntros "Hp Hpub Hpin Hwrb Hpres".
     rewrite {1}/virtio_proto /disk_pub.
     destruct (virtio_live (v_cfg v)) eqn:Hlive; last first.
-    { iDestruct "Hp" as "(Hcfg & _ & _ & Hslot & Hnc & Hnp)".
+    { iDestruct "Hp" as "(Hcfg & _ & _ & _ & Hslot & Hnc & Hnp)".
       iDestruct (ghost_var_valid_2 with "Hnp Hpub") as %[Hq _].
       exfalso. exact (Qp.not_add_le_l 1 (1/2)%Qp Hq). }
     iDestruct "Hp" as (pr dma)
-      "(#Hcfg & Hdma & %Hctl & %Hok & %Hal & %Hseen & %Hui & %Hridx &
+      "(#Hcfg & Hdma & %Hctl & %Hok & %Hal & %Hseen & %Hui & %Hridx & %Hlde &
         Hslot & Hnc & Hnp & Hpend & Hdone)".
     iDestruct (ghost_var_agree with "Hnp Hpub") as %Hnpeq.
     iDestruct (dma_own_disj with "Hdma Hpin") as %Hpind.
@@ -1987,10 +2274,28 @@ Section VirtioProto.
       - apply (vpo_used_D _ _ _ Hok). exact (used_idx_in_page (v_cfg v) j Hj2).
       - intro Hc. exact (proj1 (elem_of_disjoint _ _) (vpo_idx_used _ _ _ Hok)
                            _ Hc (used_idx_in_page (v_cfg v) j Hj2)). }
+    (* NOTHING PENDING MEANS NOTHING LANDED, one publish later: the queue is
+       no longer idle, so the conjunct is vacuous. *)
+    iSplitR.
+    { iPureIntro. intro Hc. exfalso.
+      pose proof (vpo_ncnp _ _ _ Hok) as Hle. rewrite Hnpeq in Hle. lia. }
     (* the pending map gains [np]; the done records survive *)
     rewrite Hnpeq in Hpendnone.
     rewrite (big_sepM_insert _ (vp_pend pr) np sl Hpendnone).
-    iSplitL "Hpres Hpend"; [ iFrame "Hpres Hpend" |].
+    assert (Hnpland :
+      pend_landed (vproto_publish_state pr sl pin) (v_landed v) np = ∅).
+    { rewrite /pend_landed vpp_nc.
+      destruct (bool_decide (np = vp_nc pr)) eqn:Hb; [|reflexivity].
+      apply bool_decide_eq_true in Hb. apply Hlde. by rewrite Hnpeq Hb. }
+    assert (Hpmono : forall k x, vp_pend pr !! k = Some x ->
+              slot_pend_res γ (pend_landed pr (v_landed v) k) x
+              ⊢ slot_pend_res γ
+                  (pend_landed (vproto_publish_state pr sl pin) (v_landed v) k) x).
+    { intros k x _. apply bi.wand_entails. rewrite /pend_landed vpp_nc.
+      iIntros "$". }
+    iSplitL "Hpres Hpend".
+    { rewrite Hnpland. iFrame "Hpres".
+      iApply (big_sepM_mono _ _ _ Hpmono). iExact "Hpend". }
     assert (Hmono : forall k x, vp_done pr !! k = Some x ->
               slot_done_res γ (v_cfg v) dma k x
               ⊢ slot_done_res γ (v_cfg v)
@@ -2048,11 +2353,11 @@ Section VirtioProto.
   Proof.
     iIntros "Hp Hpub Hlb0". rewrite /virtio_proto /disk_pub /disk_done_lb.
     destruct (virtio_live (v_cfg v)) eqn:Hlive; last first.
-    { iDestruct "Hp" as "(Hcfg & _ & _ & Hslot & Hnc & Hnp)".
+    { iDestruct "Hp" as "(Hcfg & _ & _ & _ & Hslot & Hnc & Hnp)".
       iDestruct (ghost_var_valid_2 with "Hnp Hpub") as %[Hq _].
       exfalso. exact (Qp.not_add_le_l 1 (1/2)%Qp Hq). }
     iDestruct "Hp" as (pr dma)
-      "(#Hcfg & Hdma & %Hctl & %Hok & %Hal & %Hseen & %Hui & %Hridx &
+      "(#Hcfg & Hdma & %Hctl & %Hok & %Hal & %Hseen & %Hui & %Hridx & %Hlde &
         Hslot & Hnc & Hnp & Hpend & Hdone)".
     iDestruct (ghost_var_agree with "Hnp Hpub") as %Hnpeq.
     iDestruct (mono_nat_lb_own_valid with "Hnc Hlb0") as %[_ Hnr].
@@ -2121,11 +2426,11 @@ Section VirtioProto.
     intros Hpc. iIntros "Hp Hpub Hrecpt Hlb".
     rewrite /virtio_proto /disk_pub /disk_receipt /disk_done_lb.
     destruct (virtio_live (v_cfg v)) eqn:Hlive; last first.
-    { iDestruct "Hp" as "(Hcfg & _ & _ & Hslot & Hnc & Hnp)".
+    { iDestruct "Hp" as "(Hcfg & _ & _ & _ & Hslot & Hnc & Hnp)".
       iDestruct (ghost_var_valid_2 with "Hnp Hpub") as %[Hq _].
       exfalso. exact (Qp.not_add_le_l 1 (1/2)%Qp Hq). }
     iDestruct "Hp" as (pr dma)
-      "(#Hcfg & Hdma & %Hctl & %Hok & %Hal & %Hseen & %Hui & %Hridx &
+      "(#Hcfg & Hdma & %Hctl & %Hok & %Hal & %Hseen & %Hui & %Hridx & %Hlde &
         Hslot & Hnc & Hnp & Hpend & Hdone)".
     iDestruct (ghost_map_lookup with "Hslot Hrecpt") as %Hspin.
     destruct (vp_spins_lookup pr p sl pin Hspin) as [Hs Hpin].
@@ -2155,6 +2460,7 @@ Section VirtioProto.
     iExists pr, dma. iFrame "Hcfg Hdma Hslot Hnc Hnp Hpend".
     iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
     iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
+    iSplitR; [done|].
     iApply (big_sepM_delete _ (vp_done pr) p sl Hdone).
     iSplitR "Hdone"; [| iExact "Hdone"].
     iExists bs. iFrame "Hbs Hdone0".
@@ -2179,10 +2485,11 @@ Section VirtioProto.
        virtio_proto γ v ∗ disk_pub γ np ∗ disk_done_lb γ (S p) ∗
        phys_map pin ∗
        phys_pointsto (vr_status (vs_req sl)) (DfracOwn 1) byte_zero ∗
-       (* the SPENT crash permit's token: the completion already ran the
-          client's view shift and parked the receipt in [PermInv]; this is
-          what the woken publisher presents to collect it. *)
-       perm_done (dn_perm γ) (vs_perm sl) (vs_wr sl) ∗
+       (* the SPENT crash permits' tokens: each sector landing and the
+          completion already ran their view shift and parked their receipt in
+          [PermInv]; these are what the woken publisher presents to collect
+          them. *)
+       slot_perms_done γ sl ∗
        (∃ bs : list (bv 8),
           ⌜length bs = vs_len sl⌝ ∗
           ⌜bs = vs_data sl⌝ ∗
@@ -2193,11 +2500,11 @@ Section VirtioProto.
     intros Hpc. iIntros "Hp Hpub Hrecpt Hlb".
     rewrite {1}/virtio_proto /disk_pub /disk_receipt /disk_done_lb.
     destruct (virtio_live (v_cfg v)) eqn:Hlive; last first.
-    { iDestruct "Hp" as "(Hcfg & _ & _ & Hslot & Hnc & Hnp)".
+    { iDestruct "Hp" as "(Hcfg & _ & _ & _ & Hslot & Hnc & Hnp)".
       iDestruct (ghost_var_valid_2 with "Hnp Hpub") as %[Hq _].
       exfalso. exact (Qp.not_add_le_l 1 (1/2)%Qp Hq). }
     iDestruct "Hp" as (pr dma)
-      "(#Hcfg & Hdma & %Hctl & %Hok & %Hal & %Hseen & %Hui & %Hridx &
+      "(#Hcfg & Hdma & %Hctl & %Hok & %Hal & %Hseen & %Hui & %Hridx & %Hlde &
         Hslot & Hnc & Hnp & Hpend & Hdone)".
     iDestruct (ghost_map_lookup with "Hslot Hrecpt") as %Hspin.
     destruct (vp_spins_lookup pr p sl pin Hspin) as [Hs Hpin].
@@ -2359,6 +2666,7 @@ Section VirtioProto.
       apply Hframe. intro Hc'.
       exact (proj1 (elem_of_disjoint _ _) Hstand _ Hc'
                (elem_of_union_r _ _ _ (used_idx_in_page (v_cfg v) j Hj2))). }
+    iSplitR; [iPureIntro; exact Hlde|].
     (* the OTHER done records survive the shrink *)
     assert (Hmono : forall k x, delete p (vp_done pr) !! k = Some x ->
               slot_done_res γ (v_cfg v) dma k x

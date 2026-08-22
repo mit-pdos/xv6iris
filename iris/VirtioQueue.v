@@ -23,10 +23,42 @@
 (*   - [vproto_ok_publish] / [vproto_step_det] / [vproto_ok_reclaim] are   *)
 (*     the three surgeries the Iris layer (VirtioProto.v) performs.        *)
 (*                                                                         *)
+(* SECTOR-ATOMIC DISK (claude-notes/projects/sector-atomic-disk.md,        *)
+(* stage 2).  A 512-byte SECTOR lands atomically and a 1024-byte BLOCK     *)
+(* does not, so an OUT request's data reaches the disk one sector at a     *)
+(* time ([VirtioModel.virtio_sector_step]) and the completion moves NO     *)
+(* disk byte at all ([vslot_post]).  Two consequences live in this file:   *)
+(*                                                                         *)
+(*   - [vslot] carries TWO sets of crash-permit keys: [vs_perms], one per  *)
+(*     sector, indexed at [wr_sector (vs_wr sl) i] and spent at that       *)
+(*     sector's landing; and [vs_perm], ONE key for the completion,        *)
+(*     indexed at [None].                                                  *)
+(*                                                                         *)
+(*     WHY THE COMPLETION KEPT A KEY (the recorded choice, and the least   *)
+(*     churn of the two the plan offered).  The owner's ruling is that IN  *)
+(*     requests keep one uniform trivial permit key -- a READ moves no     *)
+(*     disk byte, hence has no sectors, so the completion key is the only  *)
+(*     place a read's client receipt can live.  Giving the OUT direction   *)
+(*     the same (trivial, [None]-indexed) completion key then keeps        *)
+(*     [VirtioProto.virtio_proto_step] and [WpUart.wp_disk_loop]'s         *)
+(*     completion arm DIRECTION-AGNOSTIC and textually unchanged: the disk *)
+(*     thread learns the key from the protocol and cannot case-split on    *)
+(*     which request completed.  The cost is that [crashN] is opened in    *)
+(*     TWO arms of [wp_disk_loop] rather than one -- but only the SECTOR   *)
+(*     arm moves the durable image, and the completion arm's permit is the *)
+(*     identity ([wr_apply None dk = dk]), so the fixed auth does not move *)
+(*     there.  Dropping the completion key entirely would make a read's    *)
+(*     receipt undeliverable and force the protocol lemma to case-split.   *)
+(*                                                                         *)
+(*   - [vs_torn] is the block's content mid-flight: the payload's bytes in *)
+(*     the sectors that have landed, the old ones elsewhere.  A crash      *)
+(*     between two landings leaves exactly that on the disk.               *)
+(*                                                                         *)
 (* Design rationale: claude-notes/design/virtio-driver.md.                 *)
 (* ====================================================================== *)
 
 From stdpp Require Import gmap.
+From Stdlib Require Import FunctionalExtensionality.
 From stdpp Require Import bitvector.definitions.
 
 Require Import SailStdpp.Operators_mwords.
@@ -552,6 +584,17 @@ Record vslot := VSlot {
      Spelled [positive] because this file is deliberately iris-free;
      [gname := positive], so every consumer reads it as a gname. *)
   vs_perm : nat * positive;
+  (* THE PER-SECTOR CRASH-PERMIT KEYS (sector-atomic-disk.md stage 2).  A
+     512-byte SECTOR lands atomically and a 1024-byte BLOCK does not, so an
+     OUT request's data reaches the durable image one sector at a time
+     ([VirtioModel.virtio_sector_step]) and each landing is its own
+     linearization point -- hence its own permit, indexed at
+     [wr_sector (vs_wr sl) i].  One key per sector, in sector order:
+     [length (vs_perms sl) = wr_nsectors (vs_wr sl)], which is 0 for a READ.
+     [vs_perm] above is what is left for the COMPLETION, and it is now
+     indexed at [None]: the completion writes the used ring and the status
+     byte, and moves no disk byte at all ([vslot_post]). *)
+  vs_perms : list (nat * positive);
 }.
 
 Definition vs_is_out (sl : vslot) : bool :=
@@ -608,14 +651,18 @@ Proof. unfold slot_fp. apply union_subseteq_r. Qed.
 
 (* -- the determined completion -- *)
 
+(* THE COMPLETION DOES NOT MOVE THE IMAGE (sector-atomic-disk.md stage 2).
+   Every byte of an OUT request's data reached the disk BEFORE the completion
+   was enabled ([VirtioModel.virtio_sectors_done] gates
+   [VirtioModel.virtio_req_step]), so all this step does is the used-ring
+   report, the status byte and the interrupt -- and reset the landed set for
+   the next request. *)
 Definition vslot_post (v : virtio_state) (sl : vslot) : virtio_state :=
   VirtioState (v_cfg v)
               (bv_or (v_isr v) (Z_to_bv 32 vio_isr_used_buffer))
               (bv_add (v_seen v) (Z_to_bv 16 1))
               (bv_add (v_used_idx v) (Z_to_bv 16 1))
-              (if vs_is_out sl
-               then disk_write (v_disk v) (vs_sector_off sl) (vs_data sl)
-               else v_disk v).
+              (v_disk v) ∅.
 
 (* THE SLOT'S WRITE IDENTITY (claude-notes/design/fs-log.md stage 4 phase
    C2a): what this request does to the disk image, as the pure
@@ -627,12 +674,18 @@ Definition vslot_post (v : virtio_state) (sl : vslot) : virtio_state :=
 Definition vs_wr (sl : vslot) : disk_wr :=
   if vs_is_out sl then Some (vs_sector_off sl, vs_data sl) else None.
 
+(* ...and hence the identity the completion's (now TRIVIAL) permit needs:
+   the image the machine moves to is [wr_apply None] of the one it moved
+   from.  This is what keeps [VirtioProto.virtio_proto_step]'s interface --
+   and [WpUart.wp_disk_loop]'s completion arm -- uniform over the request's
+   direction while the real, per-sector permits fire elsewhere. *)
 Lemma vslot_post_wr (v : virtio_state) (sl : vslot) :
-  v_disk (vslot_post v sl) = wr_apply (vs_wr sl) (v_disk v).
-Proof.
-  unfold vslot_post, vs_wr, wr_apply. cbn [v_disk].
-  destruct (vs_is_out sl); reflexivity.
-Qed.
+  v_disk (vslot_post v sl) = wr_apply None (v_disk v).
+Proof. reflexivity. Qed.
+
+Lemma vslot_post_landed (v : virtio_state) (sl : vslot) :
+  v_landed (vslot_post v sl) = ∅.
+Proof. reflexivity. Qed.
 
 Definition vslot_writes (c : virtio_cfg) (ui : bv 16) (dk : Z -> bv 8)
     (sl : vslot) : gmap Arch.pa (bv 8) :=
@@ -696,8 +749,9 @@ Proof.
 Qed.
 
 (* THE determinism fact: at a pinned slot the device's completion is a
-   function of the slot alone (the only view-dependence [virtio_complete] has
-   left is the OUT payload, and [spo_out] fixes that). *)
+   function of the slot alone.  Since the completion no longer transfers the
+   OUT payload (its sectors landed earlier, one step each), the last piece of
+   view-dependence it had is gone and only the pinned request matters. *)
 Lemma vslot_complete (c : virtio_cfg) (p : nat) (sl : vslot)
     (pin : gmap Arch.pa (bv 8)) (mv : vmem) (v : virtio_state) :
   slot_pin_ok c p sl pin -> mem_view pin mv -> v_cfg v = c ->
@@ -706,24 +760,16 @@ Lemma vslot_complete (c : virtio_cfg) (p : nat) (sl : vslot)
 Proof.
   intros Hslot Hview Hcfg.
   pose proof (spo_type _ _ _ _ Hslot) as Htype.
-  pose proof (spo_len _ _ _ _ Hslot) as Hlen.
   unfold virtio_complete, vslot_post, vslot_writes, vs_is_out, vs_sector_off, vs_len.
   cbv zeta. rewrite Hcfg.
-  destruct Htype as [Hin|Hout].
-  - rewrite Hin. unfold virtio_blk_t_in, virtio_blk_t_out.
-    cbn [Z.eqb orb Pos.eqb]. reflexivity.
-  - assert (Hout' : vs_is_out sl = true)
-      by (unfold vs_is_out; rewrite Hout; unfold virtio_blk_t_out; reflexivity).
-    pose proof (spo_out _ _ _ _ Hslot Hout') as Hro.
-    pose proof (view_bytes_read pin mv (vr_buf (vs_req sl)) 1024 (vs_data sl)
-                  Hview Hro) as Hvb.
-    rewrite Hout. unfold virtio_blk_t_in, virtio_blk_t_out.
-    cbn [Z.eqb orb Pos.eqb]. rewrite Hlen.
-    assert (H1024 : Z.to_nat 1024 = 1024%nat) by (vm_compute; reflexivity).
-    rewrite H1024, Hvb. reflexivity.
+  destruct Htype as [Hin|Hout]; rewrite ?Hin, ?Hout;
+    unfold virtio_blk_t_in, virtio_blk_t_out;
+    cbn [Z.eqb orb Pos.eqb]; reflexivity.
 Qed.
 
-(* ...and hence the step at a pinned slot, when it fires, is that function *)
+(* ...and hence the step at a pinned slot, when it fires, is that function.
+   [virtio_req_step]'s new gate ([VirtioModel.virtio_sectors_done]) is simply
+   discharged by the fact that the step DID fire. *)
 Lemma vslot_req_step (c : virtio_cfg) (p : nat) (sl : vslot)
     (pin : gmap Arch.pa (bv 8)) (mv : vmem) (v v' : virtio_state)
     (w : gmap Arch.pa (bv 8)) :
@@ -736,8 +782,226 @@ Proof.
   unfold virtio_req_step in Hstep.
   destruct (negb (virtio_pending v mv)); [discriminate|].
   rewrite Hcfg, Hseen, (spo_req _ _ _ _ Hslot mv Hview) in Hstep.
+  destruct (negb (virtio_sectors_done v (vs_req sl))); [discriminate|].
   rewrite (vslot_complete c p sl pin mv v Hslot Hview Hcfg) in Hstep.
   injection Hstep as Hv Hw. split; [ symmetry; exact Hv | symmetry; exact Hw ].
+Qed.
+
+(* THE GATE, READ BACK: a completion that fired proves every sector of the
+   request had already landed.  This is what lets [VirtioProto] conclude that
+   the block's durable content IS the payload at the instant the publisher is
+   woken -- the completion itself moves no byte. *)
+Lemma vslot_req_step_done (c : virtio_cfg) (p : nat) (sl : vslot)
+    (pin : gmap Arch.pa (bv 8)) (mv : vmem) (v v' : virtio_state)
+    (w : gmap Arch.pa (bv 8)) :
+  slot_pin_ok c p sl pin -> mem_view pin mv ->
+  v_cfg v = c -> v_seen v = wrap16 p ->
+  virtio_req_step v mv = Some (v', w) ->
+  virtio_sectors_done v (vs_req sl) = true.
+Proof.
+  intros Hslot Hview Hcfg Hseen Hstep.
+  unfold virtio_req_step in Hstep.
+  destruct (negb (virtio_pending v mv)); [discriminate|].
+  rewrite Hcfg, Hseen, (spo_req _ _ _ _ Hslot mv Hview) in Hstep.
+  destruct (virtio_sectors_done v (vs_req sl)) eqn:Hd; [reflexivity|].
+  cbn [negb] in Hstep. discriminate.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* 1b. SECTOR LANDINGS at a pinned slot.                                  *)
+(*                                                                        *)
+(*    A 512-byte sector lands atomically and a 1024-byte block does not    *)
+(*    (claude-notes/projects/sector-atomic-disk.md).  Between the publish  *)
+(*    and the completion the block therefore holds a TORN mixture of its   *)
+(*    old content and the payload -- old bytes in the sectors that have    *)
+(*    not landed, payload bytes in the ones that have -- and that is what  *)
+(*    [VirtioProto.slot_pend_res] has to state about the disk fragments it *)
+(*    is holding on the publisher's behalf.  [vs_torn] is that mixture as  *)
+(*    a predicate on the CURRENT content, parameterized by the landed set. *)
+(* ---------------------------------------------------------------------- *)
+
+(* [VirtioModel.vreq_wr] reads the payload off the bus; the pin fixes it, so
+   at a pinned slot the device's write identity IS the slot's own [vs_wr].
+   This is what ties the per-sector permit indices [wr_sector (vs_wr sl) i]
+   to the image move a sector step actually makes. *)
+Lemma vslot_vreq_wr (c : virtio_cfg) (p : nat) (sl : vslot)
+    (pin : gmap Arch.pa (bv 8)) (mv : vmem) :
+  slot_pin_ok c p sl pin -> mem_view pin mv ->
+  vreq_wr mv (vs_req sl) = vs_wr sl.
+Proof.
+  intros Hslot Hview.
+  pose proof (spo_type _ _ _ _ Hslot) as Htype.
+  pose proof (spo_len _ _ _ _ Hslot) as Hlen.
+  unfold vreq_wr, vs_wr, vs_is_out, vs_sector_off.
+  destruct Htype as [Hin|Hout].
+  - rewrite Hin. unfold virtio_blk_t_in, virtio_blk_t_out.
+    cbn [Z.eqb Pos.eqb]. reflexivity.
+  - assert (Hout' : vs_is_out sl = true)
+      by (unfold vs_is_out; rewrite Hout; unfold virtio_blk_t_out; reflexivity).
+    pose proof (spo_out _ _ _ _ Hslot Hout') as Hro.
+    pose proof (view_bytes_read pin mv (vr_buf (vs_req sl)) 1024 (vs_data sl)
+                  Hview Hro) as Hvb.
+    rewrite Hout. unfold virtio_blk_t_out. cbn [Z.eqb Pos.eqb].
+    rewrite Hlen.
+    assert (H1024 : Z.to_nat 1024 = 1024%nat) by (vm_compute; reflexivity).
+    rewrite H1024, Hvb. reflexivity.
+Qed.
+
+(* ...and the sector COUNT the model gates the completion on is the slot's *)
+Lemma vslot_vreq_nsectors (c : virtio_cfg) (p : nat) (sl : vslot)
+    (pin : gmap Arch.pa (bv 8)) (mv : vmem) :
+  slot_pin_ok c p sl pin -> mem_view pin mv ->
+  vreq_nsectors (vs_req sl) = wr_nsectors (vs_wr sl).
+Proof.
+  intros Hslot Hview.
+  rewrite <- (vslot_vreq_wr c p sl pin mv Hslot Hview).
+  symmetry. apply vreq_nsectors_wr.
+Qed.
+
+(* the payload's length, from the pin: a request always names 1024 bytes *)
+Lemma vq_read_byte_list_len (mm : gmap Arch.pa (bv 8)) (pa : Arch.pa) (n : nat)
+    (bs : list (bv 8)) :
+  read_byte_list mm pa n = Some bs -> length bs = n.
+Proof.
+  unfold read_byte_list. intro Hm. apply mapM_Some_1 in Hm.
+  pose proof (Forall2_length Hm) as Hlen. rewrite length_seq in Hlen. lia.
+Qed.
+
+Lemma vslot_data_len (c : virtio_cfg) (p : nat) (sl : vslot)
+    (pin : gmap Arch.pa (bv 8)) :
+  slot_pin_ok c p sl pin -> vs_is_out sl = true ->
+  length (vs_data sl) = vs_len sl.
+Proof.
+  intros Hslot Hout.
+  pose proof (spo_len _ _ _ _ Hslot) as Hlen.
+  pose proof (vq_read_byte_list_len pin (vr_buf (vs_req sl)) 1024 (vs_data sl)
+                (spo_out _ _ _ _ Hslot Hout)) as Hdl.
+  unfold vs_len. rewrite Hlen, Hdl. vm_compute. reflexivity.
+Qed.
+
+(* the sector count, in the slot's own vocabulary *)
+Lemma vslot_nsectors_out (sl : vslot) :
+  vs_is_out sl = true -> vreq_nsectors (vs_req sl) = sector_count (vs_len sl).
+Proof.
+  unfold vs_is_out, vreq_nsectors, vs_len. intro H. by rewrite H.
+Qed.
+
+Lemma vslot_wr_out (sl : vslot) :
+  vs_is_out sl = true -> vs_wr sl = Some (vs_sector_off sl, vs_data sl).
+Proof. intro H. unfold vs_wr. by rewrite H. Qed.
+
+(* -- reading an image back as a byte list -- *)
+
+Lemma vq_disk_read_length (dk : Z -> bv 8) (o : Z) (n : nat) :
+  length (disk_read dk o n) = n.
+Proof. unfold disk_read. by rewrite length_fmap, length_seq. Qed.
+
+Lemma vq_disk_read_lookup (dk : Z -> bv 8) (o : Z) (n j : nat) :
+  (j < n)%nat -> disk_read dk o n !! j = Some (dk (o + Z.of_nat j)).
+Proof.
+  intro Hj. unfold disk_read. rewrite list_lookup_fmap.
+  rewrite (lookup_seq_lt 0 n j Hj). reflexivity.
+Qed.
+
+(* THE RE-READ IDENTITY: rewriting a window with what an image ALREADY holds
+   there reproduces that image, provided the two agree outside the window.
+   This is what turns a per-sector image move into a [disk_bytes] update of
+   the block the publisher owns. *)
+Lemma disk_write_read_range (dk dk' : Z -> bv 8) (o : Z) (n : nat) :
+  (forall a : Z, a < o \/ o + Z.of_nat n <= a -> dk' a = dk a) ->
+  disk_write dk o (disk_read dk' o n) = dk'.
+Proof.
+  intro Hout. apply functional_extensionality. intro a.
+  destruct (decide (o <= a < o + Z.of_nat n)) as [Hin|Hno].
+  - apply disk_write_in; [lia|].
+    rewrite (vq_disk_read_lookup dk' o n (Z.to_nat (a - o)) ltac:(lia)).
+    f_equal. f_equal. lia.
+  - rewrite disk_write_out by (rewrite vq_disk_read_length; lia).
+    symmetry. apply Hout. lia.
+Qed.
+
+(* ONE SECTOR OF THE SLOT'S WRITE stays inside the block, so re-reading the
+   block after a landing is exactly the landing. *)
+Lemma vs_sector_image (sl : vslot) (dk : Z -> bv 8) (i : nat) :
+  length (vs_data sl) = vs_len sl ->
+  disk_write dk (vs_sector_off sl)
+    (disk_read (wr_apply (wr_sector (vs_wr sl) i) dk)
+               (vs_sector_off sl) (vs_len sl))
+  = wr_apply (wr_sector (vs_wr sl) i) dk.
+Proof.
+  intro Hdlen. apply disk_write_read_range. intros a Ha.
+  destruct (vs_is_out sl) eqn:Hout.
+  - rewrite (vslot_wr_out sl Hout). apply wr_sector_outside. rewrite Hdlen. lia.
+  - assert (Hnone : vs_wr sl = None) by (unfold vs_wr; by rewrite Hout).
+    rewrite Hnone, wr_sector_none, wr_apply_none. reflexivity.
+Qed.
+
+(* -- the torn content -- *)
+
+Definition vs_torn (sl : vslot) (ld : gset nat) (bs : list (bv 8)) : Prop :=
+  forall j : nat, (j < vs_len sl)%nat ->
+    Nat.div j virtio_sector_bytes ∈ ld -> bs !! j = vs_data sl !! j.
+
+(* nothing landed yet: no constraint at all *)
+Lemma vs_torn_empty (sl : vslot) (bs : list (bv 8)) : vs_torn sl ∅ bs.
+Proof. intros j _ Hj. exfalso. by apply elem_of_empty in Hj. Qed.
+
+(* a READ never lands a sector, and its content is pinned outright *)
+Lemma vs_torn_data (sl : vslot) (ld : gset nat) : vs_torn sl ld (vs_data sl).
+Proof. intros j _ _. reflexivity. Qed.
+
+(* THE PAYOFF: once every sector has landed, the block holds the payload --
+   which is what the woken publisher is owed. *)
+Lemma vs_torn_full (sl : vslot) (ld : gset nat) (bs : list (bv 8)) :
+  length bs = vs_len sl -> length (vs_data sl) = vs_len sl ->
+  (forall i, (i < sector_count (vs_len sl))%nat -> i ∈ ld) ->
+  vs_torn sl ld bs -> bs = vs_data sl.
+Proof.
+  intros Hlen Hdlen Hall Htorn. apply list_eq. intro j.
+  destruct (decide (j < vs_len sl)%nat) as [Hj|Hj].
+  - apply Htorn; [exact Hj|]. apply Hall, sector_count_lt. exact Hj.
+  - assert (Hb : bs !! j = None) by (apply lookup_ge_None_2; lia).
+    assert (Hd : vs_data sl !! j = None) by (apply lookup_ge_None_2; lia).
+    by rewrite Hb, Hd.
+Qed.
+
+(* THE STEP: landing sector [i] adds it to the landed set and moves the
+   block's content by exactly that sector. *)
+Lemma vs_torn_sector (sl : vslot) (dk : Z -> bv 8) (ld : gset nat) (i : nat) :
+  vs_is_out sl = true -> length (vs_data sl) = vs_len sl ->
+  vs_torn sl ld (disk_read dk (vs_sector_off sl) (vs_len sl)) ->
+  vs_torn sl ({[ i ]} ∪ ld)
+    (disk_read (wr_apply (wr_sector (vs_wr sl) i) dk)
+               (vs_sector_off sl) (vs_len sl)).
+Proof.
+  intros Hout Hdlen Htorn j Hj Hmem.
+  rewrite (vq_disk_read_lookup _ _ _ j Hj).
+  rewrite (vslot_wr_out sl Hout).
+  pose proof (sector_of_bounds j) as Hb.
+  destruct (decide (Nat.div j virtio_sector_bytes = i)) as [Heq|Hne].
+  - (* this sector just landed: the byte is the payload's *)
+    rewrite <- Heq.
+    rewrite (wr_sector_hit (vs_sector_off sl) (vs_data sl)
+               (Nat.div j virtio_sector_bytes) _ dk);
+      [| unfold virtio_sector_size, virtio_sector_bytes in *; lia
+       | unfold virtio_sector_size, virtio_sector_bytes in *; lia ].
+    assert (Hsx : is_Some (vs_data sl !! j))
+      by (apply lookup_lt_is_Some_2; lia).
+    destruct Hsx as [x Hx]. rewrite Hx. f_equal.
+    apply (disk_write_in dk (vs_sector_off sl) (vs_data sl)
+             (vs_sector_off sl + Z.of_nat j) x); [lia|].
+    replace (Z.to_nat (vs_sector_off sl + Z.of_nat j - vs_sector_off sl))
+      with j by lia. exact Hx.
+  - (* some OTHER sector: the byte is unchanged, and it had already landed *)
+    rewrite wr_sector_miss;
+      [| destruct (Nat.lt_total (Nat.div j virtio_sector_bytes) i)
+           as [Hlt|[He|Hgt]];
+         [ left | exfalso; exact (Hne He) | right ];
+         unfold virtio_sector_size, virtio_sector_bytes in *; lia ].
+    rewrite <- (vq_disk_read_lookup dk (vs_sector_off sl) (vs_len sl) j Hj).
+    apply Htorn; [exact Hj|].
+    apply elem_of_union in Hmem as [Hmem|Hmem]; [|exact Hmem].
+    exfalso. apply Hne. by apply elem_of_singleton in Hmem.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -1083,9 +1347,9 @@ Proof.
       * unfold virtio_chain_ok. unfold req_at in Hreq.
         destruct (chain_at c mv (wrap16 p)) as [[[[h d0] d1] d2]|];
           [reflexivity | discriminate].
-      * intros isr ui dk v' w Hstep.
+      * intros isr ui dk ld v' w Hstep.
         destruct (vslot_req_step c p sl pin mv
-                    (VirtioState c isr (wrap16 p) ui dk) v' w
+                    (VirtioState c isr (wrap16 p) ui dk ld) v' w
                     Hslot Hvpin eq_refl eq_refl Hstep) as [_ Hw].
         cbn [v_used_idx v_disk] in Hw. subst w.
         pose proof (vslot_writes_dom_sub c p sl pin ui dk
@@ -1110,22 +1374,37 @@ Qed.
 (* 4. The determined step.                                                *)
 (* ---------------------------------------------------------------------- *)
 
-(* If the device is at position [nc] with something pending, the step it
-   takes is COMPUTED by the slot: post-state [vslot_post], write set
-   [vslot_writes].  (The only view-dependence [virtio_complete] has left is
-   the OUT payload, and the pin fixes it.) *)
-Lemma vproto_step_det (c : virtio_cfg) (pr : vproto) (D : gset Arch.pa)
+(* A DEVICE WITH WORK TO DO IS A DRIVER THAT PUBLISHED SOMETHING: the
+   published index the view reports is pinned to [wrap16 np], and the wrap of
+   the window (width <= 8) is injective.  Both determined-step lemmas below
+   run through this. *)
+Lemma vproto_pending_lt (c : virtio_cfg) (pr : vproto) (D : gset Arch.pa)
     (v : virtio_state) (mv : vmem) :
   vproto_ok c pr D ->
   v_cfg v = c -> v_seen v = wrap16 (vp_nc pr) ->
   mem_view (vproto_ctl c pr) mv ->
-  (vp_nc pr < vp_np pr)%nat ->
+  virtio_pending v mv = true ->
+  (vp_nc pr < vp_np pr)%nat.
+Proof.
+  intros Hok Hcfg Hseen Hview Hp.
+  destruct (decide (vp_nc pr < vp_np pr)%nat) as [Hlt|Hge]; [exact Hlt|].
+  exfalso.
+  pose proof (vpo_ncnp _ _ _ Hok) as Hle.
+  assert (Heq : vp_nc pr = vp_np pr) by lia.
+  unfold virtio_pending in Hp. rewrite Hcfg in Hp.
+  rewrite (avail_idx_pinned c (vproto_ctl c pr) mv (wrap16 (vp_np pr))
+             Hview (vproto_ctl_idx c pr D Hok)), Hseen, Heq, Z.eqb_refl in Hp.
+  rewrite andb_false_r in Hp. discriminate.
+Qed.
+
+(* the pending slot at the consumed position, with its pin *)
+Lemma vproto_head_slot (c : virtio_cfg) (pr : vproto) (D : gset Arch.pa) :
+  vproto_ok c pr D -> (vp_nc pr < vp_np pr)%nat ->
   exists sl pin,
     vp_pend pr !! vp_nc pr = Some sl /\ vp_pin pr !! vp_nc pr = Some pin /\
-    virtio_req_step v mv
-      = Some (vslot_post v sl, vslot_writes c (v_used_idx v) (v_disk v) sl).
+    slot_pin_ok c (vp_nc pr) sl pin.
 Proof.
-  intros Hok Hcfg Hseen Hview Hlt.
+  intros Hok Hlt.
   assert (Hin : vp_nc pr ∈ dom (vp_pend pr)).
   { rewrite (vpo_pend_dom _ _ _ Hok). apply elem_of_set_seq. lia. }
   apply elem_of_dom in Hin as [sl Hsl].
@@ -1134,28 +1413,54 @@ Proof.
     exists sl. exact Hsl. }
   apply elem_of_dom in Hpd as [pin Hpin].
   exists sl, pin. split; [exact Hsl|]. split; [exact Hpin|].
-  pose proof (vproto_pend_slot pr _ _ Hsl) as Hs.
-  pose proof (vpo_slot _ _ _ Hok _ sl pin Hs Hpin) as Hslot.
+  exact (vpo_slot _ _ _ Hok _ sl pin (vproto_pend_slot pr _ _ Hsl) Hpin).
+Qed.
+
+(* If the device COMPLETES at position [nc], the step it took is COMPUTED by
+   the slot: post-state [vslot_post], write set [vslot_writes], and every
+   sector of the request had already landed.
+
+   RESTATED (sector-atomic-disk.md stage 2) from "here is the step the device
+   WILL take" to "here is what the step it TOOK was".  The constructive form
+   is no longer provable from the protocol alone -- the completion is gated on
+   [virtio_sectors_done], which is a fact about the DEVICE's landed set, not
+   about the queue -- and no caller ever wanted it: [VirtioProto] always has
+   the step in hand and only needs to identify it. *)
+Lemma vproto_step_det (c : virtio_cfg) (pr : vproto) (D : gset Arch.pa)
+    (v : virtio_state) (mv : vmem) (v' : virtio_state)
+    (w : gmap Arch.pa (bv 8)) :
+  vproto_ok c pr D ->
+  v_cfg v = c -> v_seen v = wrap16 (vp_nc pr) ->
+  mem_view (vproto_ctl c pr) mv ->
+  virtio_req_step v mv = Some (v', w) ->
+  exists sl pin,
+    vp_pend pr !! vp_nc pr = Some sl /\ vp_pin pr !! vp_nc pr = Some pin /\
+    (vp_nc pr < vp_np pr)%nat /\
+    slot_pin_ok c (vp_nc pr) sl pin /\
+    mem_view pin mv /\
+    virtio_sectors_done v (vs_req sl) = true /\
+    v' = vslot_post v sl /\ w = vslot_writes c (v_used_idx v) (v_disk v) sl.
+Proof.
+  intros Hok Hcfg Hseen Hview Hstep.
+  assert (Hp : virtio_pending v mv = true).
+  { unfold virtio_req_step in Hstep.
+    destruct (virtio_pending v mv) eqn:Hp; [reflexivity|]. by cbn in Hstep. }
+  pose proof (vproto_pending_lt c pr D v mv Hok Hcfg Hseen Hview Hp) as Hlt.
+  destruct (vproto_head_slot c pr D Hok Hlt) as (sl & pin & Hsl & Hpin & Hslot).
   assert (Hvpin : mem_view pin mv).
   { apply (mem_view_subseteq pin (vproto_ctl c pr) mv);
       [ exact (vproto_pin_ctl c pr D _ pin Hok Hpin) | exact Hview ]. }
-  assert (Hpend : virtio_pending v mv = true).
-  { unfold virtio_pending. rewrite Hcfg, (vpo_live _ _ _ Hok). cbn [andb].
-    apply negb_true_iff, Z.eqb_neq.
-    rewrite (avail_idx_pinned c (vproto_ctl c pr) mv (wrap16 (vp_np pr))
-               Hview (vproto_ctl_idx c pr D Hok)), Hseen.
-    pose proof (vproto_window c pr D Hok) as Hw.
-    assert (Hne : wrap16 (vp_nc pr) <> wrap16 (vp_np pr))
-      by (apply wrap16_inj_window; lia).
-    intro Heq. apply Hne, bv_eq. symmetry. exact Heq. }
-  unfold virtio_req_step. rewrite Hpend. cbn [negb].
-  rewrite Hcfg, Hseen, (spo_req _ _ _ _ Hslot mv Hvpin).
-  rewrite (vslot_complete c (vp_nc pr) sl pin mv v Hslot Hvpin Hcfg). reflexivity.
+  exists sl, pin. split_and!; [exact Hsl|exact Hpin|exact Hlt|exact Hslot|exact Hvpin| |
+                              |].
+  - exact (vslot_req_step_done c (vp_nc pr) sl pin mv v v' w
+             Hslot Hvpin Hcfg Hseen Hstep).
+  - exact (proj1 (vslot_req_step c (vp_nc pr) sl pin mv v v' w
+                    Hslot Hvpin Hcfg Hseen Hstep)).
+  - exact (proj2 (vslot_req_step c (vp_nc pr) sl pin mv v v' w
+                    Hslot Hvpin Hcfg Hseen Hstep)).
 Qed.
 
-(* Conversely, a step that FIRED means something was pending: the published
-   index the view reports is pinned to [wrap16 np], and the wrap of the
-   window (width <= 8) is injective. *)
+(* Conversely, a step that FIRED means something was pending. *)
 Lemma vproto_step_pend (c : virtio_cfg) (pr : vproto) (D : gset Arch.pa)
     (v : virtio_state) (mv : vmem) (v' : virtio_state)
     (w : gmap Arch.pa (bv 8)) :
@@ -1166,17 +1471,55 @@ Lemma vproto_step_pend (c : virtio_cfg) (pr : vproto) (D : gset Arch.pa)
   (vp_nc pr < vp_np pr)%nat.
 Proof.
   intros Hok Hcfg Hseen Hview Hstep.
-  destruct (decide (vp_nc pr < vp_np pr)%nat) as [Hlt|Hge]; [exact Hlt|].
-  exfalso.
-  pose proof (vpo_ncnp _ _ _ Hok) as Hle.
-  assert (Heq : vp_nc pr = vp_np pr) by lia.
-  assert (Hnp : virtio_pending v mv = false).
-  { unfold virtio_pending. rewrite Hcfg.
-    rewrite (avail_idx_pinned c (vproto_ctl c pr) mv (wrap16 (vp_np pr))
-               Hview (vproto_ctl_idx c pr D Hok)), Hseen, Heq, Z.eqb_refl.
-    apply andb_false_r. }
-  unfold virtio_req_step in Hstep. rewrite Hnp in Hstep. cbn [negb] in Hstep.
-  discriminate.
+  destruct (vproto_step_det c pr D v mv v' w Hok Hcfg Hseen Hview Hstep)
+    as (sl & pin & _ & _ & Hlt & _). exact Hlt.
+Qed.
+
+(* THE SECTOR LANDING, at the consumed position (sector-atomic-disk.md stage
+   2): which slot's payload moved, which sector of it, and what the durable
+   image did.  The request is necessarily a WRITE -- a read has no sectors --
+   and the sector had not landed before, which is what makes the permit the
+   slot is holding for it still PENDING. *)
+Lemma vproto_sector_det (c : virtio_cfg) (pr : vproto) (D : gset Arch.pa)
+    (v : virtio_state) (mv : vmem) (i : nat) (v' : virtio_state) :
+  vproto_ok c pr D ->
+  v_cfg v = c -> v_seen v = wrap16 (vp_nc pr) ->
+  mem_view (vproto_ctl c pr) mv ->
+  virtio_sector_step v mv i = Some v' ->
+  exists sl pin,
+    vp_pend pr !! vp_nc pr = Some sl /\ vp_pin pr !! vp_nc pr = Some pin /\
+    (vp_nc pr < vp_np pr)%nat /\
+    slot_pin_ok c (vp_nc pr) sl pin /\
+    vs_is_out sl = true /\
+    (i < wr_nsectors (vs_wr sl))%nat /\ i ∉ v_landed v /\
+    v' = VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_used_idx v)
+           (wr_apply (wr_sector (vs_wr sl) i) (v_disk v))
+           ({[ i ]} ∪ v_landed v).
+Proof.
+  intros Hok Hcfg Hseen Hview Hstep.
+  destruct (virtio_sector_step_shape v mv i v' Hstep) as (r & Hr & Hv').
+  destruct (virtio_sector_step_enabled v mv i v' r Hr Hstep)
+    as (Hp & Hlti & Hnl).
+  pose proof (vproto_pending_lt c pr D v mv Hok Hcfg Hseen Hview Hp) as Hlt.
+  destruct (vproto_head_slot c pr D Hok Hlt) as (sl & pin & Hsl & Hpin & Hslot).
+  assert (Hvpin : mem_view pin mv).
+  { apply (mem_view_subseteq pin (vproto_ctl c pr) mv);
+      [ exact (vproto_pin_ctl c pr D _ pin Hok Hpin) | exact Hview ]. }
+  (* the request the device is working on IS the pinned slot's *)
+  assert (Hreq : r = vs_req sl).
+  { pose proof (spo_req _ _ _ _ Hslot mv Hvpin) as Hsq.
+    rewrite Hcfg, Hseen in Hr. rewrite Hr in Hsq. by injection Hsq as <-. }
+  subst r.
+  pose proof (vslot_vreq_wr c (vp_nc pr) sl pin mv Hslot Hvpin) as Hwr.
+  assert (Hout : vs_is_out sl = true).
+  { unfold vs_is_out.
+    rewrite (virtio_sector_step_out v mv i v' (vs_req sl) Hr Hstep).
+    unfold virtio_blk_t_out. reflexivity. }
+  exists sl, pin. split_and!;
+    [exact Hsl|exact Hpin|exact Hlt|exact Hslot|exact Hout| | exact Hnl |].
+  - rewrite <- (vslot_vreq_nsectors c (vp_nc pr) sl pin mv Hslot Hvpin).
+    exact Hlti.
+  - rewrite Hv', Hwr. reflexivity.
 Qed.
 
 (* the keyed obligation survives its own step: [nc] moves from pend to done *)

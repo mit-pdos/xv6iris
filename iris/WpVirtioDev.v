@@ -91,7 +91,8 @@ Lemma virtio_ack_write_ok (v : virtio_state) (w : bv 32) :
     virtio_write v vio_off_interrupt_ack w = Some v'
     /\ virtio_isr_ok v'
     /\ v_cfg v' = v_cfg v /\ v_seen v' = v_seen v
-    /\ v_used_idx v' = v_used_idx v /\ v_disk v' = v_disk v.
+    /\ v_used_idx v' = v_used_idx v /\ v_disk v' = v_disk v
+    /\ v_landed v' = v_landed v.
 Proof.
   intro Hok. eexists. split; [ reflexivity |].
   split_and!; [| reflexivity .. ].
@@ -107,7 +108,8 @@ Lemma virtio_notify_write_ok (v : virtio_state) (w : bv 32) :
     virtio_write v vio_off_queue_notify w = Some v'
     /\ virtio_isr_ok v'
     /\ v_cfg v' = v_cfg v /\ v_seen v' = v_seen v
-    /\ v_used_idx v' = v_used_idx v /\ v_disk v' = v_disk v.
+    /\ v_used_idx v' = v_used_idx v /\ v_disk v' = v_disk v
+    /\ v_landed v' = v_landed v.
 Proof.
   intros Hw Hok. exists v.
   assert (Hz : (bv_unsigned w =? 0) = true) by (apply Z.eqb_eq; exact Hw).
@@ -852,7 +854,12 @@ Lemma wp_sw_virtio_dev_s_sconf (γu : uart_names) (γd : disk_names) (pc : mword
        virtio_write v (uint a8 - virtio_base)%Z storeword = Some v'
        /\ virtio_isr_ok v'
        /\ v_cfg v' = v_cfg v /\ v_seen v' = v_seen v
-       /\ v_used_idx v' = v_used_idx v /\ v_disk v' = v_disk v) ->
+       /\ v_used_idx v' = v_used_idx v /\ v_disk v' = v_disk v
+       (* AND THE LANDED SET (sector-atomic-disk.md stage 2): an in-flight
+          write's landed sectors decide which of its crash permits are still
+          pending, so a protocol-neutral store has to leave them alone.  Both
+          stores the live driver makes do. *)
+       /\ v_landed v' = v_landed v) ->
   sie_cap_gpr kt m n false p -∗
   pc_is pc -∗ instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗
   dev_inv γu γd -∗
@@ -878,8 +885,9 @@ Proof.
             with "Hcg Hpc Hinstr Hvinv [] [] [-]").
   { done. }
   { iIntros (v Hvok) "Hproto _".
-    destruct (Hwrite v Hvok) as (v' & Hvw & Hvok' & Hcfg' & Hseen' & Hused' & Hdisk').
-    iDestruct (virtio_proto_stable γd v v' Hcfg' Hseen' Hused'
+    destruct (Hwrite v Hvok)
+      as (v' & Hvw & Hvok' & Hcfg' & Hseen' & Hused' & Hdisk' & Hland').
+    iDestruct (virtio_proto_stable γd v v' Hcfg' Hseen' Hused' Hland'
                  with "Hproto") as "Hproto".
     iModIntro. iExists v'.
     iSplitR; [iPureIntro; exact Hvw|].

@@ -740,6 +740,11 @@ Corollary riscv_device_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ} `{GEN : GenId} (g
        satisfies this too ([virtio_reset] zeroes both). *)
     (Hvseen : v_seen g.(gdev).(dvirtio) = zero16)
     (Hvuidx : v_used_idx g.(gdev).(dvirtio) = zero16)
+    (* ...and nothing of an in-flight write has LANDED
+       (claude-notes/projects/sector-atomic-disk.md): the not-live arm of
+       [virtio_proto] records the landed set at ∅, which is what the live
+       flip needs.  A reset device satisfies this ([virtio_reset_landed]). *)
+    (Hvlanded : v_landed g.(gdev).(dvirtio) = ∅)
     (* [dev_inv] also maintains [virtio_isr_ok] (the disk's analogue of the
        PLIC plan): the interrupt-status register holds only defined bits.  A
        reset device does. *)
@@ -775,7 +780,8 @@ Proof.
      the caller's half of the config tracker is discarded likewise, and so are
      the two vdisk_lock tokens ([dn_claim] at ∅ and [disk_done_lb _ 0]) that a
      boot chain would thread through virtio_disk_init into main's [newlock]. *)
-  iMod (disk_ghosts_alloc gen_id g.(gdev).(dvirtio) Hvlive Hvseen Hvuidx)
+  iMod (disk_ghosts_alloc gen_id g.(gdev).(dvirtio) Hvlive Hvseen Hvuidx
+          Hvlanded)
     as (γv) "(%Himg & Hproto & _ & _ & _ & Hpbody)".
   iMod (dev_inv_alloc _ γ γv
           with "[Huf Hpf Hvf Hacc Hout Htx Hdl Hproto] Hpbody") as "#Hinv".

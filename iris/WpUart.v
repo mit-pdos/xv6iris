@@ -900,14 +900,21 @@ Section DevLoops.
     iApply fupd_mask_intro; [set_solver|]. iIntros "Hmask".
     iNext. iIntros (d' m' Hstep).
     iMod "Hmask" as "_".
-    destruct Hstep as [mv vnew w Hview Hdisk | mv w Hview Hstall
-                      | p' Hirq Hlatch |].
+    destruct Hstep as [mv vnew w Hview Hdisk | mv i vnew Hview Hsect
+                      | mv w Hview Hstall | p' Hirq Hlatch |].
     - (* the disk completes a queued request.  This is the only step that
          touches the byte memory, and the ONLY thing that justifies it is the
          DMA lease inside the invariant: [virtio_proto_step] consumes the
          lease's ownership of the written bytes and hands the same lease back,
          because the write set provably lands inside it and misses the queue's
-         control region (VirtioModel.virtio_dma_ok). *)
+         control region (VirtioModel.virtio_dma_ok).
+
+         IT NO LONGER MOVES THE DURABLE IMAGE (sector-atomic-disk.md stage 2):
+         every sector of an OUT request landed at its own earlier step, so the
+         [wr] this arm gets back is [None] and the permit it spends is the
+         request's trivial COMPLETION permit.  The arm's SHAPE is unchanged --
+         that is the point of keeping a uniform completion key: the disk
+         thread still cannot tell a read from a write here. *)
       iInv "Hvinv" as ">Hbody" "Hclose".
       iDestruct "Hbody" as (vs) "(Hv & Hlease & %Hvok)".
       iDestruct (dev_interp_agree_virtio with "Hdev Hv") as %Hv.
@@ -961,6 +968,55 @@ Section DevLoops.
       iMod ("Hclose" with "[Hv' Hlease']") as "_".
       { iNext. iExists vnew. iFrame.
         iPureIntro. exact (virtio_req_step_isr_ok vs mv vnew w Hvok Hdisk). }
+      iMod ("Hpclose" with "[Hpbody]") as "_"; [iNext; iExact "Hpbody"|].
+      iModIntro. iFrame "Hgr Hmem' Hdev'".
+      iDestruct "Hdur'" as (dmap') "[Hdauth' %Hdv']".
+      iEval (rewrite Himg) in "Hdauth'".
+      iSplitL "Hdauth'".
+      { iExists dmap'. iFrame "Hdauth'". iPureIntro. exact Hdv'. }
+      iFrame "Htie Hsa".
+      iApply "IH".
+    - (* ONE SECTOR OF AN IN-FLIGHT WRITE LANDS -- THE COMMIT INSTANT
+         (claude-notes/projects/sector-atomic-disk.md).  A 512-byte sector is
+         atomic and a 1024-byte block is not, so this is the ONLY step in the
+         whole machine at which the durable image MOVES: the client's
+         per-sector view shift runs here, on the crash predicate, at the
+         instant those 512 bytes become durable.  A power cycle between two of
+         these leaves a half-written block, which is exactly what real
+         hardware does and what the FS layer must survive.
+
+         The completion arm above still opens [crashN] too, but its permit is
+         indexed at [None] and is therefore the IDENTITY on the crash
+         predicate and on the fixed auth ([wr_apply None dk = dk]) -- it is
+         the request's uniform trivial completion key, which is where a READ's
+         client receipt lives and what keeps that arm direction-agnostic (the
+         recorded choice, VirtioQueue.v's header).
+
+         The byte memory is UNTOUCHED (the step's [m' = m]) and so are the
+         used ring, the ISR and the consumed index -- the request is still in
+         flight until its completion, one arm up. *)
+      iInv "Hvinv" as ">Hbody" "Hclose".
+      iDestruct "Hbody" as (vs) "(Hv & Hlease & %Hvok)".
+      iDestruct (dev_interp_agree_virtio with "Hdev Hv") as %Hv.
+      rewrite Hv in Hsect.
+      iMod (dev_interp_update_virtio _ vs vnew with "Hdev Hv") as "[Hdev' Hv']".
+      iEval (rewrite -Himg Hv) in "Hdur".
+      iMod (virtio_proto_sector_step γd vs m mv i vnew Hview Hsect
+              with "Hmem Hdur Hlease") as (kq wr) "(%Hwr & Hpend & Hback)".
+      assert (Hpost : wr_apply wr (v_disk (dvirtio d)) = v_disk vnew)
+        by (rewrite Hv Hwr; reflexivity).
+      iInv "Hcinv" as "HP" "Hcclose".
+      iMod (fupd_mask_subseteq ∅) as "Hmclose"; [set_solver|].
+      iMod (perm_consume_kq gen_id (dn_perm γd) kq wr (v_disk (dvirtio d)) n
+              with "Hpbody Hpend Hsa [//] Htie HP")
+        as "(Hpbody & Hdone & Hsa & Htie & HP)".
+      iMod "Hmclose" as "_".
+      iEval (rewrite Hpost) in "Htie".
+      iMod ("Hcclose" with "HP") as "_".
+      iDestruct ("Hback" with "Hdone") as "(Hmem' & Hdur' & Hlease')".
+      iMod ("Hclose" with "[Hv' Hlease']") as "_".
+      { iNext. iExists vnew. iFrame.
+        iPureIntro. exact (virtio_sector_step_isr_ok vs mv i vnew Hvok Hsect). }
       iMod ("Hpclose" with "[Hpbody]") as "_"; [iNext; iExact "Hpbody"|].
       iModIntro. iFrame "Hgr Hmem' Hdev'".
       iDestruct "Hdur'" as (dmap') "[Hdauth' %Hdv']".
