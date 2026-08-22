@@ -75,7 +75,6 @@ Require Import MstatusFacts.
 Require Import SailStdpp.Base SailStdpp.TypeCasts.
 Require Import RiscvLang RiscvPtsto RiscvFetchExec RiscvExtras WpGpr.
 Require Import WpMmodeShiftiop WpMmodeJal.
-Require Import WpMmodeLeafBase.
 Require Import WpMmodeUtype.
 Require Import WpMmodeAddiw.
 Require Import WpMmodeItype.

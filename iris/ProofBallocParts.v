@@ -18,12 +18,11 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExec.
-Require Import RiscvExtras.
 Require Import PrintintArith.
 Require Import WpSconfMem.
 Require Import BufOwn.
 Require Import DinodeSlot.
-Require Import FsCrash.
+Require Import BioDefs.
 Require Import BitmapEnc BitmapInv.
 Require Import InstrBytes.
 Require Import RiscvExtras.

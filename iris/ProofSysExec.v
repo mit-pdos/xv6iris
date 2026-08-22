@@ -63,7 +63,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes.
-Require Import RiscvLang RiscvPtsto RiscvExtras.
+Require Import RiscvLang RiscvPtsto.
 Require Import RegFile.
 Require Import HartTp.
 Require Import WpNext.
@@ -79,14 +79,11 @@ Require Import KernelDataInv.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import WpSmodeIntr.
 Require Import IntrDefs.
-Require Import LockRank.
 Require Import CpuOwn.
 Require Import LockRank.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
-Require Import IrefSlots.
-Require Import ProcAvail.
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
 Require Import BioDefs.
@@ -94,7 +91,6 @@ Require Import FsBlocks LogInv.
 Require Import BitmapInv.
 Require Import ByteBuf.
 Require Import InodeInv.
-Require Import IcacheRef.
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.

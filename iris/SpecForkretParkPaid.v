@@ -109,8 +109,7 @@ Require Import RiscvLang RiscvPtsto.
 Require Import KernelText WireInv.
 Require Import KptExecMap.
 Require Import StackOwn.
-Require Import IntrDefs.
-Require Import UserPtTree UserExec.
+Require Import UserPtTree.
 Require Import ProcGeom.
 Require Import ProcDefs.
 Require Import ProcPtOwn.
@@ -122,9 +121,7 @@ Require Import ProcAvail.
 Require Import ProcInv.
 Require Import SchedCtx.
 Require Import UsertrapRes UtResFits.
-Require Import FsReady.
 Require Import FirstTok.
-Require Import SpecUsertrap.
 Require Import SpecForkret.
 Require Import SpecForkretPark.
 Require Import ParkCap.   (* [park_token] *)

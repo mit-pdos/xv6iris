@@ -31,9 +31,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
 Require Import RiscvExtras.   (* [svpn_of_unsigned_lo] / [moi64_unsigned] -- the va keying *)
 Require Import UserBits.      (* [bv_subrange11] -- the page-offset arithmetic *)
-Require Import SmodePte.
 Require Import PtAdBits.
-Require Import Pt4kWalk.
 Require Import CommonWalk.
 Require Import PtTree.
 Require Import PtTreeAdue.

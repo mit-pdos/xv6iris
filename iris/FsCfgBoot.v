@@ -44,7 +44,6 @@ Require Import RiscvPtsto RiscvModelBytes.
 Require Import WpUart.         (* [uart_names]  *)
 Require Import VirtioModel.    (* [disk_read]    *)
 Require Import DiskPtsto.      (* [disk_names]  *)
-Require Import BioDefs.        (* [bio_names]   *)
 Require Import FsBlocks.
 Require Import DinodeEnc.
 Require Import DirView.

@@ -73,7 +73,7 @@ From iris.program_logic Require Import language weakestpre lifting.
 From iris.base_logic.lib Require Import ghost_var invariants gen_heap.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExtras.
+Require Import RiscvLang RiscvPtsto.
 Require Import RegFile.
 Require Import RiscvExtras.
 Require Import IntrDefs.
@@ -88,10 +88,8 @@ Require Import ProcAvail.
 Require Import ProcInv.
 Require Import SchedCtx.
 Require Import UsertrapRes.  (* [ut_park_intro_body] -- the park's producer entry *)
-Require Import SpecPrepareReturn.
 Require Import SpecKexec.   (* [K_kexec] -- forkret's deepest callee, on the boot arm *)
 Require Import SpecForkret.
-Require Import FsReady.
 Require Import FirstTok.
 Require Import UserPtTree ProcPtOwn.
 Require Import SpecForkretPark SpecForkretParkPaid ParkCap.

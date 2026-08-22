@@ -64,7 +64,6 @@ Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import FsCfg.
 Require Import KallocInv.
-Require Import KvmSpec.
 Require Import SpecPrintk.
 Require Import FileInvDefs.
 Require Import ProcAvail.

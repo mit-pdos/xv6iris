@@ -16,7 +16,6 @@ Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values SailSt
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvPtsto RiscvLang.
 Require Import RegFile WpMmodeLeafBase.
-Require Import RiscvExtras.
 Require Import HartTp WpNext IntrDefs.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfCsr.
 Require Import RiscvExtras.

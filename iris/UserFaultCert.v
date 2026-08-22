@@ -43,10 +43,9 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
 Require Import WpDecodeBridge HartMemRun HartMemAsm PtBytes.
-Require Import SmodePte.
-Require Import CommonWalk PtAdBits Pt4kWalk PtreeType PtTree PtTreeAdue PtBuild.
+Require Import CommonWalk PtAdBits PtreeType PtTree PtTreeAdue PtBuild.
 Require Import UserTranslate UptTree UserPtTree UserBits UserMem UserFetch.
 Require Import UserBytes PtWalkCert UserFetchPt.
 Require Import Pt4kWalk.

@@ -52,7 +52,6 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
 Require Import RiscvModelBytes.
-Require Import RiscvExtras.
 Require Import InstrBytes.
 Require Import KernelText.
 Require Import RegFile HartTp WpNext.
@@ -64,7 +63,6 @@ Require Import VcGen.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import DiskPtsto DiskInv.
-Require Import BufOwn.
 Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import WpSmodeHalf.

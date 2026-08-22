@@ -42,7 +42,7 @@
        stepper, where fences move views and are events; the weak port pulls
        [Barrier] back out of the silent class, which is a change inside
        this file's successor, not in the language. *)
-From stdpp Require Import gmap bitvector.definitions.
+From stdpp Require Import gmap.
 From stdpp Require Import bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import gen_heap ghost_map.

@@ -83,7 +83,6 @@ From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvExtras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvFetchExec.
 Require Import RegFile WpNext.
@@ -91,12 +90,12 @@ Require Import MinstretInv InstrBytes.
 Require Import WpGpr.
 Require Import KernelText.
 Require Import RiscvExtras.
-Require Import TrampPt UptTree KptShare UserretDefs.
+Require Import TrampPt UptTree UserretDefs.
 Require Import UserPtTree UserExec.
-Require Import IntrDefs.
 Require Import MstatusBits.
 Require Import ProcGeom.
-Require Import ProcInv ProcPtOwn.   (* [proc_pt] / [ud_pas] / [ud_norm] -- the address-space split *)
+Require Import ProcPtOwn.   (* [proc_pt] / [ud_pas] / [ud_norm] -- the address-space split *)
+Require Import Xv6Cameras.
 (* [usertrap_res]'s own signature (SpecUsertrap.v/USERTRAP_RES) is stated
    over these fourteen classes; unqualified [lockG]/[fdslotG]/... below
    only resolve to the CONCRETE classes (rather than each getting silently
@@ -108,7 +107,7 @@ Require Import FdSlots.
 Require Import FileInvDefs.
 Require Import IrefSlots.
 Require Import SpecUsertrap.
-Require Import UsertrapRes UtResFits.  (* [USERTRAP_RES_PARK] -- the residue plus its producer *)
+Require Import UtResFits.  (* [USERTRAP_RES_PARK] -- the residue plus its producer *)
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)

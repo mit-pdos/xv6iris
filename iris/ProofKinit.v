@@ -25,13 +25,12 @@ Require Import WpNext.
 Require Import CpuOwn.
 Require Import WpMmodeLeafBase.
 Require Import RiscvExtras.
-Require Import RiscvExtras.
 Require Import StackOwn CalleeSaved.
 Require Import KernelDataInv.
 Require Import WpLock.
 Require Import WpLockAt.   (* [newlock_at]: the lock's gname is the caller's *)
 Require Import KallocInv.
-Require Import IntrDefs WpSmodeIntr.
+Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import SpecInitlock SpecFreerange.

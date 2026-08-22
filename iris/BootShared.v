@@ -58,12 +58,10 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
    consumes is [power_boot_res]'s own ([power_boot_res_unpack]'s [Hdimg]),
    which this lemma used to hand back untouched and its one caller dropped
    on the floor. *)
-Require Import LogDefs.        (* [log_mirror_full]: kit-2's row (B) *)
-Require Import FsCrash.        (* [fs_blocks] *)
-Require Import InodeInv.       (* [ROOTDEV] *)
+Require Import Xv6Cameras.        (* [log_mirror_full]: kit-2's row (B) *)
+Require Import BioDefs.        (* [fs_blocks] *)
 Require Import FsBoot.         (* [fs_cov_in] *)
 Require Import FsImg.          (* the image sweeps' vocabulary *)
-Require Import FsCfg.          (* [fscfg], and its projections in the ties *)
 Require Import FsCfgBoot.      (* [fs_cfg_alloc] and the two boot kits *)
 Local Open Scope Z_scope.
 

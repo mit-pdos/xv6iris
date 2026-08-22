@@ -58,7 +58,6 @@ Require Import ByteCursor.
 Require Import ByteBuf.
 Require Import WpSmodeHalf.
 Require Import DiskPtsto.
-Require Import BufOwn.
 Require Import BufOwn BcacheInv BioInv.
 Require Import FsBlocks.
 Require Import BlockWords.

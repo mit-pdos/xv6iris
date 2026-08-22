@@ -23,7 +23,6 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
 Require Import RegFile InstrBytes.
-Require Import RiscvExtras.
 Require Import CalleeSaved KernelText.
 Require Import ProcGeom PlicHart IntrDefs HartTp.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

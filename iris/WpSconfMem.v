@@ -40,7 +40,7 @@ From iris.program_logic Require Import language lifting.
 From iris.base_logic.lib Require Import ghost_var invariants gen_heap.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
+Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
 Require Import WpLoad.
 Require Import MinstretInv.
 Require Import UserBits.
@@ -53,7 +53,7 @@ Require Import WpSmodePtEngine.
 Require Import KptGoodb.
 Require Import WpIntrInv.
 Require Import MemAccessGen.
-Require Import IntrDefs WpSmodeIntr.
+Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import KptGhost.   (* kptN: the accessor-mask premise below *)
 Require Import SRegime.

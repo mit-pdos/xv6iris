@@ -85,19 +85,14 @@ Require Import RiscvExtras.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
-Require Import WpLock.
-Require Import KernelDataInv.
-Require Import SpecPanic.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import CpuOwn.
-Require Import SchedCtx.
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
-Require Import BioInv.
+Require Import BioDefs.
 Require Import FsBlocks LogInv.
-Require Import FsCrash.
 Require Import BitmapInv.
 Require Import ByteBuf.
 Require Import PathElems.        (* [SLASH], [bview], [path_elems]           *)
@@ -114,14 +109,12 @@ Require Import DirViewG.         (* [fv_of], [fv_half]                        *)
 Require Import DirViewLend.      (* [fv_pin], [fv_ride], [fv_cancelled]       *)
 Require Import DirViewPin.       (* [dv_pin_ent], [dv_cancelled]              *)
 Require Import FsTree.           (* [file_bytes]                              *)
-Require Import UserPtTree.
 Require Import KvmSpec.
 Require Import ProcInv.
 Require Import FileInvDefs.
 Require Import ElfEnc.           (* [eh_entry]                                *)
 Require Import SpecReadi.        (* [rd_delivered] -- the readi window bridge *)
 Require Import SpecDirlink.
-Require Import SpecNamex.        (* [ROOTDEV]                                 *)
 Require Import SpecKexec.        (* the landed contract this parallels        *)
 Require Import KexecOkQ.         (* [kexec_ok_q] / [kxq_entry] / [kxq_hdr_ok] *)
 Require Import FsImg.            (* [fs_dinode], [fs_data_of], the reductions *)

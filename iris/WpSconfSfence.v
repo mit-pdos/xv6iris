@@ -40,7 +40,6 @@ Require Import HartSwp HartLift HartSpan HartSpanChar HartRegNode HartMemRun
         HartMemAsm.
 Require Import UserretDefs.
 Require Import WpNext.
-Require Import SmodePte.
 Require Import IntrDefs WpIntrInv WpSmodeIntr.
 (* the KPT arm's residue, for the second leaf below: [tlb_res_pt_open] /
    [_intro] (KptShare), [tlb_ok_pt_empty] (PtTree), [tlb_hash_range]

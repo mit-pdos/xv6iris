@@ -52,10 +52,10 @@ Require Import ConsoleInv.    (* [console_ready] *)
 Require Import SchedCtx.      (* [procs_inv] *)
 Require Import WpUart.        (* [dev_inv] *)
 Require Import SpecConsoleintr.  (* [console_caps] *)
-Require Import DiskPtsto DiskInv.  (* [disk_geom] / [disk_res] / [d_lock] *)
+Require Import DiskInv.  (* [disk_geom] / [disk_res] / [d_lock] *)
+Require Import Xv6Cameras.
 Require Import WireInv.       (* [wire_inv] *)
-Require Import TrampPt KptExecMap. (* [kmap_at tramp_vpn tramp_ppn KP_rx] *)
-Require Import KernelText.
+Require Import KptExecMap. (* [kmap_at tramp_vpn tramp_ppn KP_rx] *)
 Require Import FsCfg.         (* the ambient device names *)
 Require Import FileInvDefs.   (* [fileG] -- which carries [fscfg] *)
 From Kernel Require KernelSyms.

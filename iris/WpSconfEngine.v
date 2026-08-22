@@ -49,7 +49,6 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
 Require Import RegFile HartTp WpNext WpGpr InstrBytes WpMmodeLeafBase.
-Require Import RiscvExtras.
 Require Import HartSwp HartMFrame.
 Require Import HartLift HartSpan HartSpanChar HartMCycle WpMmodeJump.
 Require Import HartGoodb WpDecodeBridge WpDecode RiscvExtras.

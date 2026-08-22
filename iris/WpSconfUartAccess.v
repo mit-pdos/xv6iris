@@ -26,7 +26,6 @@ Require Import InstrBytes.
 Require Import RegFile HartTp WpNext.
 Require Import DevModel DiskPtsto WpUart.
 Require Import IntrDefs.
-Require Import IntrDefs.
 Require Import SpecUart.
 Require Import WpSmodeUart.
 From Kernel Require KernelSyms.

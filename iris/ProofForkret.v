@@ -43,7 +43,6 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import RiscvModelBytes.   (* [pa_add] -- how kexec indexes its byte runs *)
-Require Import RiscvModelBytes.   (* [pa_add] -- how kexec indexes its byte runs *)
 Require Import PageGeom.
 Require Import InstrBytes WireInv.   (* [wire_inv] -- named by [fkr_tail]'s statement *)
 Require Import KernelText.           (* [kernel_text] *)
@@ -62,14 +61,14 @@ Require Import IntrDefs.
 Require Import KptShare UserretDefs.
 Require Import TrampPt.  (* [tf_pa] -- the trapframe word addresses *)
 Require Import KptTree.  (* [pt_node_claim_from_static] -- phys trapframe words as memory *)
-Require Import UserPtTree UserExec.  (* [trap_mstatus_ok] *)
+Require Import UserPtTree.  (* [trap_mstatus_ok] *)
 Require Import ProcGeom.
 Require Import ProcPtOwn.
 Require Import FdSlots FileInvDefs.
 Require Import ProcInv.
 Require Import FirstTok.  (* [first_tok] -- the resource the [if (first)] branch reads *)
 Require Import SchedCtx.  (* [procs_inv] / [proc_lock_res] *)
-Require Import FsCfg KvmSpec KallocInv.  (* [fsc_kpages] / [kalloc_avail], the token's allocator row *)
+Require Import FsCfg KallocInv.  (* [fsc_kpages] / [kalloc_avail], the token's allocator row *)
 Require Import WpUart LogInv.
 Require Import IrefSlots ProcAvail.
 Require Import CodeForkret.

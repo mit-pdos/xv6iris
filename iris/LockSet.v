@@ -62,7 +62,6 @@ Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvPtsto RiscvLang.
 Require Export LockRank.
-Require Import ProcGeom.   (* cpus_ptr and its injectivity/nonzero facts *)
 Local Open Scope Z_scope.
 
 Section LockSet.

@@ -69,7 +69,6 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base.
 Require Import RiscvLang RegFile RiscvPtsto RiscvExtras WpGpr.
 Require Import InstrBytes.
-Require Import WpInstr.   (* wp_instr / mm_cycle, split out of InstrBytes *)
 From iris.base_logic.lib Require Import invariants.
 Local Open Scope Z_scope.
 

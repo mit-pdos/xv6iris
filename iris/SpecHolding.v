@@ -44,7 +44,6 @@ Require Import InstrBytes.
 Require Import RiscvExtras.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
-Require Import IntrDefs.
 Require Import WpLock.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)

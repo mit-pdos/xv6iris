@@ -45,17 +45,14 @@ From iris.base_logic.lib Require Import invariants.
 From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvExtras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvFetchExec.
 Require Import RegFile WpNext.
 Require Import MinstretInv WireInv.
 Require Import KernelText MstatusBits.
 Require Import RiscvExtras.
-Require Import KptShare.
 Require Import KptExecMap.
 Require Import UserPtTree UserExec UserKernelBridge.
-Require Import IntrDefs.
 Require Import ProcGeom ProcInv.
 Require Import FdSlots FileInvDefs.
 Require Import IrefSlots.
@@ -64,12 +61,11 @@ Require Import SpecUserret SpecUser SpecUservec SpecUserretClosed.
 Require Import UserretUser.
 Require Import TfPage36.
 From Kernel Require KernelSyms.
-Require Import TimerCap.   (* [sstc_enabled]: the residue's mcounteren pin *)
 Require Import UserFrame.  (* [u_regs_pc_is]: the pc_is bundle in u_regs *)
 Local Open Scope Z_scope.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import ParkCap.   (* [park_token] *)
-Require Import UsertrapRes UtResFits.  (* [ut_park_intro_body] -- the park's producer entry *)
+Require Import UsertrapRes.  (* [ut_park_intro_body] -- the park's producer entry *)
 Import Defs.
 
 (* ===================================================================== *)

@@ -81,7 +81,7 @@ Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import RegFile.
 Require Import WpMmodeLeafBase.
 Require Import UserPtTree UserExec.
-Require Import UmodeMem UmodeCap UmodeAbi UmodeArith UmodeSyscall UmodeIo.
+Require Import UmodeMem UmodeCap UmodeArith UmodeSyscall UmodeIo.
 Require Import WpUmodeLeaf WpUmodeBranch WpUmodeStore WpUmodeLoad.
 Require Import UmodeFrame.
 Require Import UCodeSh USpecSh UProofShLib.

@@ -87,7 +87,6 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto.
-Require Import RiscvExtras.
 Require Import RegFile.
 Require Import HartTp.
 Require Import WpNext.
@@ -105,12 +104,10 @@ Require Import WpLock.
 Require Import FdSlots.
 Require Export SwtchCtx.
 Require Import WpUart.
-Require Import IcacheRef.
 Require Import IcacheEscrow.
 Require Import W32Arith.
 Require Import PageGeom.
 Require Import ProcGeom.
-Require Import ProcInv.
 Require Import DiskPtsto.
 Require Import BioDefs.
 Require Import FsBlocks LogInv.
@@ -118,7 +115,6 @@ Require Import BitmapInv.
 Require Import InodeInv.
 Require Import IrefSlots.
 Require Import IcacheRef.
-Require Import FileInvDefs.
 Require Import DinodeEnc.
 Require Import ProcInv.
 Require Import PtreeType.

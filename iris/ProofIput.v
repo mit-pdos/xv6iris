@@ -85,8 +85,6 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
-Require Import WpLock SleepLock.
-Require Import RiscvExtras.
 Require Import RegFile.
 Require Import InstrBytes.
 Require Import HartTp WpNext.
@@ -106,12 +104,8 @@ Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import ProcGeom.
 Require Import IcacheRef.
-Require Import IrefSlots.
-Require Import IcacheRef.
-Require Import IrefSlots.
 Require Import WpUart.
 Require Import DiskPtsto.
-Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import BitmapInv.
 Require Import InodeInv.

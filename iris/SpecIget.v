@@ -197,10 +197,8 @@ Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
-Require Import DinodeEnc. (* [IBLOCK]: the mint premise's block tie, item 7a-wire *)
 Require Import IgetLic.
 From Kernel Require KernelSyms.
-Require Import LogInv.  (* [logG]: the region's zero-receipt, fs-log.md G.17 *)
 Local Open Scope Z_scope.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 

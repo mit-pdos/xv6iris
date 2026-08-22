@@ -64,7 +64,7 @@ Require Import AlignBits.
 Require Import RiscvModelBytes.
 Require Import WpMmodeLeafBase.
 Require Import UserPtTree UserExec.
-Require Import UmodeMem UmodeCap UmodeAbi UmodeArith UmodeSyscall UmodeIo.
+Require Import UmodeMem UmodeCap UmodeArith UmodeSyscall UmodeIo.
 Require Import WpUmodeLeaf WpUmodeBranch WpUmodeStore WpUmodeLoad.
 Require Import UCodeSh USpecSh UProofShLib UProofShMem.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)

@@ -35,12 +35,10 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto.
-Require Import RiscvExtras.
 Require Import RegFile HartTp WpNext.
 Require Import WpMmodeLeafBase.
 Require Import RiscvExtras.
 Require Import KernelRvcDecode.
-Require Import VcGen.
 Require Import StackOwn StackBytes.
 Require Import CalleeSaved.
 Require Import WpLock.
@@ -49,27 +47,17 @@ Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import ByteBuf.
-Require Import DirentEnc.
-Require Import PathElems.
 Require Import FdSlots.
 Require Import ProcGeom.
-Require Import IcacheRef.
-Require Import IrefSlots.
 Require Import WpUart.
 Require Import DiskPtsto.
 Require Import BioDefs.
 Require Import FsBlocks LogInv.
-Require Import IcacheRef.
-Require Import IrefSlots.
-Require Import IcacheRef.
 Require Import IcacheEscrow.
-Require Import FsTree.
 Require Import FileInvDefs.
 Require Import IcacheRef.
 Require Import IrefSlots.
 Require Import CodeNamei.
-Require Import SpecNamex.
-Require Import SpecNamei.
 Require Import SpecNameiTr.
 Require Import SpecNamexTr.
 Require Import ProofNamei.   (* READ-ONLY REUSE: its top-level pure lemmas *)

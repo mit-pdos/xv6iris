@@ -59,8 +59,6 @@ Require Import DirentEnc.
 Require Import PathElems.
 Require Import InodeInv.
 Require Import InodeRegion.
-Require Import IrefSlots.
-Require Import IcacheRef.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import KvmSpec.

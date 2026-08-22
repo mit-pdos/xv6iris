@@ -44,7 +44,7 @@ Require Import SailStdpp.Base.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto MinstretInv.
 Require Import RegFile HartTp InstrBytes WpGpr.
-Require Import KMap KptPt.
+Require Import KMap.
 Require Import StackOwn.
 Require Import KernelText KernelDataInv.
 Require Import MbootVocab.

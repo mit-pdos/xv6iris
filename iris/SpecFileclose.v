@@ -123,11 +123,9 @@ Require Import DiskPtsto DiskInv.
 Require Import BioDefs.
 Require Import FsBlocks LogInv.
 Require Import BitmapInv.
-Require Import IcacheRef.
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheEscrow.
-Require Import SleepLock.
 Require Import SpecEndOp.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.

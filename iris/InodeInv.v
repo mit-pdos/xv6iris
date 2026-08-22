@@ -56,7 +56,7 @@ Require Import InstrBytes.
 Require Import ByteBuf.
 Require Import FsBlocks.
 Require Import LogInv.
-Require Import FsCrash.   (* [BSIZE]: the block size [bm_covers] divides by *)
+Require Import BioDefs.   (* [BSIZE]: the block size [bm_covers] divides by *)
 Require Import BlockWords.
 Require Import DinodeEnc.
 Require Export IcacheRef.   (* the in-core scalar fields + the reference *)

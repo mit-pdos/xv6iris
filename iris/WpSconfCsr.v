@@ -77,7 +77,7 @@ Require Import HartTp WpNext.
 Require Import HartSCsr HartSwp HartMFrame HartLift HartSpan HartSpanChar
         HartMCycle HartRegNode HartGoodb
         WpDecodeBridge WpMmodeJump WpMmodeCsrSwp.
-Require Import IntrDefs WpIntrInv WpSmodeIntr.
+Require Import WpIntrInv WpSmodeIntr.
 Require Import IntrDefs.
 (* [sr_ktier_wit]: the capability's tier witness, which this file's sstatus
    read has to carry ACROSS its σ-callback -- see the give-back below. *)

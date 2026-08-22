@@ -86,7 +86,6 @@ Require Import ProcGeom CpuOwn.
 Require Import KallocInv.
 (* the proc table's two regimes -- the counted premise that refutes the
    empty-table arm, and the marker the found slot is minted with *)
-Require Import ProcAvail.
 Require Import ProcPtOwn.
 Require Import SwtchCtx.
 Require Import FdSlots.
@@ -100,7 +99,6 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
-Require Import FsCfg.   (* [fsc_kpages] -- see [KvmSpec.kalloc_env_at] *)
 Local Open Scope Z_scope.
 
 

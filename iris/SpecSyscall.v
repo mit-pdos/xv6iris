@@ -121,7 +121,7 @@ Require Import UserPtTree.
 Require Import ProcInv.
 Require Import SchedCtx.
 Require Import IrefSlots.
-Require Import BioInv.        (* [bio_names], for [bslots] *)
+Require Import BioDefs.        (* [bio_names], for [bslots] *)
 Require Import SpecFileclose. (* [fclose_names] -- see the header *)
 (* The classes the widened binder list now generalizes over
    ([kallocG]/[bioG]/[diskGhostG]/[uartGhostG]/[fsLogG]/[logG]/[fsCrashG]/

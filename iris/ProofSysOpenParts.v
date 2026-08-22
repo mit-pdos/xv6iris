@@ -44,7 +44,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes.
-Require Import RiscvLang RiscvPtsto RiscvExtras.
+Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
 Require Import RegFile WpNext.
 Require Import WpMmodeLeafBase.
@@ -63,7 +63,7 @@ Require Import DinodeEnc.
 Require Import DirView.
 Require Import DirLinks.              (* [dir_links_not_dir] *)
 Require Import FsBlocks.              (* [fs_names] *)
-Require Import FsCrash.               (* [BSIZE] *)
+Require Import BioDefs.               (* [BSIZE] *)
 Require Import InodeInv.
 Require Import InodeLock.
 Require Import InodeRegion.

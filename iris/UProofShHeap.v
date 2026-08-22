@@ -88,7 +88,7 @@ Require Import AlignBits.
 Require Import RiscvModelBytes.
 Require Import WpMmodeLeafBase.
 Require Import UserPtTree UserExec.
-Require Import UmodeMem UmodeCap UmodeAbi UmodeArith UmodeIo.
+Require Import UmodeMem UmodeCap UmodeArith UmodeIo.
 Require Import WpUmodeLeaf WpUmodeBranch WpUmodeStore WpUmodeLoad.
 Require Import UmodeFrame.
 Require Import UCodeSh USpecSh.

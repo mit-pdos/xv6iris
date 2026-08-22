@@ -30,7 +30,7 @@ From iris.algebra Require Import excl.
 From iris.base_logic.lib Require Import invariants ghost_var.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Operators_mwords SailStdpp.Values SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvPtsto RiscvLang RiscvExtras.
+Require Import RiscvPtsto RiscvLang.
 Require Import RegFile.
 Require Import RiscvExtras.
 Require Import InstrBytes KernelText.

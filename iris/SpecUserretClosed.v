@@ -50,18 +50,17 @@ Require Import RiscvLang RiscvPtsto RiscvFetchExec.
 Require Import RegFile.
 Require Import MinstretInv InstrBytes WireInv.
 Require Import WpGpr.
-Require Import KernelText MstatusBits.
+Require Import KernelText.
 Require Import PtTree.
 Require Import TrampPt UptTree KptShare UserretDefs.
 Require Import UserPtTree UserExec.
 Require Import IntrDefs.
 Require Import ProcGeom ProcPtOwn.
-Require Import IrefSlots.
 Require Import FdSlots FileInvDefs.
 Require Import IrefSlots.
 Require Import ProcAvail.
 Require Import SpecUsertrap.
-Require Import UsertrapRes UtResFits.  (* [USERTRAP_RES_PARK] -- the residue plus its producer *)
+Require Import UtResFits.  (* [USERTRAP_RES_PARK] -- the residue plus its producer *)
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Local Open Scope Z_scope.

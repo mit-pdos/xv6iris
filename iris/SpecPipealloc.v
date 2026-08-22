@@ -72,7 +72,6 @@ Require Import WpNext.
 Require Import SpecPanic.
 Require Import IntrDefs.
 Require Import CpuOwn.
-Require Import IrefSlots.
 From Kernel Require KernelSyms.
 Require Import IrefSlots.
 Require Import ProcAvail.

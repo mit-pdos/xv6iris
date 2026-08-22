@@ -58,7 +58,6 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto.
-Require Import RiscvExtras.
 Require Import RegFile.
 Require Import HartTp.
 Require Import WpNext.
@@ -87,7 +86,6 @@ Require Import IcacheEscrow.
 Require Import ByteBuf.
 Require Import ElfEnc.
 Require Import ProcGeom.
-Require Import ProcInv.
 Require Import DiskPtsto.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
@@ -99,7 +97,6 @@ Require Import IcacheInv.
 Require Import KallocInv.
 Require Import KvmSpec.
 Require Import ProcInv.
-Require Import FileInvDefs.
 (* Names the nightly dead-import sweep stopped delivering transitively. *)
 Require Import DinodeEnc.
 Require Import InodeLock.

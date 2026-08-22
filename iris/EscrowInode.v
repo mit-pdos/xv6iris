@@ -12,7 +12,6 @@ From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import invariants ghost_map mono_nat own.
 Require Import RiscvPtsto.
 Require Import IcacheRef.
-Require Import DirViewG.   (* [dv_hold] -- the pending arm's untied contents hold *)
 Require Import DirViewLend. (* N-4 PHASE B: the arm rides [dv_ride], not [dv_hold] *)
 Require Import EscrowDefs.
 Require Import InodeRegion.

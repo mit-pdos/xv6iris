@@ -44,7 +44,6 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvExtras.
 Require Import SmodePte.
 Require Import PtAdBits.
-Require Import Pt4kWalk.
 Require Import CommonWalk.
 Require Import PtTree.
 Require Import PtTreeAdue.

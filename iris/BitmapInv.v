@@ -78,7 +78,7 @@ Require Import RiscvModelBytes.
 Require Import RiscvPtsto.
 Require Import FsBlocks.
 Require Import LogInv.
-Require Import FsCrash.     (* [BSIZE] *)
+Require Import BioDefs.     (* [BSIZE] *)
 Require Import BitmapEnc.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types.

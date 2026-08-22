@@ -62,9 +62,8 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExec.
 Require Import RegFile HartTp WpNext WpGpr InstrBytes WpMmodeLeafBase WpMmodeShiftiop ExecCommon StackOwn.
 Require Import RiscvExtras.
-Require Import RiscvExtras.
 Require Import HartSwp WpMmodeSwpBase.
-Require Import IntrDefs WpSconfEngine.
+Require Import WpSconfEngine.
 Require Import IntrDefs.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)

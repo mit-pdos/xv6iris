@@ -82,8 +82,6 @@ From iris.base_logic.lib Require Import gen_heap ghost_map.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExtras.
-Require Import ByteCursor.   (* the add/sub/mword_of_int unsigned laws *)
-Require Import Pt4kWalk.
 Require Import CommonWalk.
 Require Import PtTree.
 Require Import KptPt.

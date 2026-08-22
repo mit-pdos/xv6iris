@@ -49,7 +49,6 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto.
-Require Import RiscvExtras.
 Require Import RegFile.
 Require Import WpNext.
 Require Import WpMmodeLeafBase.
@@ -73,7 +72,6 @@ Require Import W32Arith.
 Require Import ElfEnc.
 Require Import PageGeom.
 Require Import ProcGeom.
-Require Import ProcInv.
 Require Import DiskPtsto.
 Require Import BioDefs.
 Require Import FsBlocks LogInv.
@@ -84,7 +82,6 @@ Require Import IcacheRef.
 Require Import IcacheInv.
 Require Import KallocInv.
 Require Import KvmSpec.
-Require Import FileInvDefs.
 Require Import DinodeEnc.
 Require Import DirView.
 Require Import DirLinks.

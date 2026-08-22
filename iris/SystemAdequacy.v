@@ -59,8 +59,7 @@ Require Import FsCrash.
 (* [ROOTDEV], for the two config ties the boot arm now carries *)
 Require Import IrefSlots.
 Require Import LogDefs.   (* [log_mirror_full] -- row (B) of the fsinit bundle *)
-Require Import FsCfg.       (* [fscfg] -- the concrete instance below *)
-Require Import BioDefs FsBlocks IcacheEscrow DiskPtsto.  (* its record constructors *)
+Require Import Xv6Cameras.  (* its record constructors *)
 Require Import FsImg.  (* [fs_sb]: the era-wide image hypothesis's shape.  No
    computation and no literal image comes with it -- [FsImgCheck.v] is what
    instantiates the sweeps, and it is NOT on this file's cone. *)

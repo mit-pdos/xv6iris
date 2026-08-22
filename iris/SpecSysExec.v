@@ -104,7 +104,7 @@ From iris.base_logic.lib Require Import ghost_var invariants gen_heap ghost_map.
 From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExtras.
+Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
 Require Import RegFile.
 Require Import RiscvExtras.
@@ -115,15 +115,12 @@ Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import CpuOwn.
-Require Import ProcAvail.
-Require Import ProcInv.
 Require Import WpUart.
 Require Import DiskPtsto.
 Require Import BioDefs.
 Require Import FsBlocks LogInv.
 Require Import BitmapInv.
 Require Import InodeInv.
-Require Import IcacheRef.
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
@@ -133,9 +130,7 @@ Require Import FileInvDefs.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import ProcInv.
-Require Import SpecIput.       (* [iput_units] *)
 Require Import SpecDirlink.    (* [ic_sleeplocks], [ireg_blocks_ok] *)
-Require Import SpecNamex.      (* [ROOTDEV] *)
 (* [SpecKexec] for [kexec_ok] and [fs_fabric].  This contract is a CALLER of
    kexec -- its whole job is to build kexec's precondition -- so requiring
    kexec's Spec is not the cross-function reach the tree's rule warns about;

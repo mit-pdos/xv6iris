@@ -27,7 +27,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec.
 Require Import InstrBytes WpGpr RegFile HartTp WpNext.
-Require Import IntrDefs WpSconfEngine.
+Require Import WpSconfEngine.
 Require Import IntrDefs.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.

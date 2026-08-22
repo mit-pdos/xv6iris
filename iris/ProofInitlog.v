@@ -67,7 +67,6 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
 Require Import RiscvModelBytes.
-Require Import RiscvExtras.
 Require Import KernelDataInv.
 Require Import RegFile HartTp WpNext.
 Require Import WpMmodeLeafBase.
@@ -78,7 +77,6 @@ Require Import KernelRvcDecode.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import DiskPtsto.
-Require Import BufOwn.
 Require Import WpLock.
 Require Import WpLockAt.   (* [newlock_at]: seal a lock at a GIVEN gname *)
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.

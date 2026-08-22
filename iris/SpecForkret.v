@@ -189,7 +189,7 @@ Require Import RegFile.
 Require Import InstrBytes WireInv.
 Require Import KernelText.
 Require Import KptExecMap.
-Require Import UserPtTree UserExec.
+Require Import UserPtTree.
 Require Import IntrDefs.
 Require Import WpLock.
 Require Import CpuOwn.
@@ -198,11 +198,8 @@ Require Import FdSlots FileInvDefs.
 Require Import ProcInv ProcPtOwn.
 Require Import SchedCtx.   (* [procs_inv] / [proc_lock_res] -- p->lock is the table's slot [j] *)
 Require Import IrefSlots ProcAvail.
-Require Import SpecPrepareReturn.
 Require Import SpecKexec.
-Require Import SpecUsertrap.
 Require Import UsertrapRes UtResFits.
-Require Import FsReady.    (* [fs_ready] -- [first_done]'s second half *)
 Require Import FirstTok.   (* [first_done] -- the one thing the closer takes, see the header *)
 From Kernel Require KernelSyms.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)

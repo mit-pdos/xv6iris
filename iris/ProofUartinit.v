@@ -60,11 +60,10 @@ Require Import RiscvLang RiscvPtsto.
 Require Import RegFile.
 Require Import WpMmodeLeafBase.
 Require Import RiscvExtras.
-Require Import RiscvExtras.
 Require Import StackOwn CalleeSaved.
 Require Import KernelDataInv.
 Require Import DevModel WpUart.
-Require Import IntrDefs WpSmodeIntr.
+Require Import WpSmodeIntr.
 Require Import IntrDefs HartTp WpNext.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import WpLock.

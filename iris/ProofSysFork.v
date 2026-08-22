@@ -35,7 +35,7 @@ Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import IntrDefs HartTp WpNext.
 Require Import WpLock.
 Require Import CpuOwn.
-Require Import FdSlots ProcInv.
+Require Import FdSlots.
 Require Import FileInvDefs.
 Require Import ProcInv.
 Require Import FsBlocks.

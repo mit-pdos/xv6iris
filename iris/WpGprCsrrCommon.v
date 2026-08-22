@@ -6,7 +6,6 @@ Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvExtras ExecCommon.
-Require Import WpInstr.   (* wp_instr / mm_cycle, split out of InstrBytes *)
 From iris.bi.lib Require Import fractional.
 Local Open Scope Z_scope.
 

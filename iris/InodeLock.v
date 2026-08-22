@@ -46,7 +46,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvPtsto.
 Require Import RiscvExtras.
-Require Import FsCrash.   (* [BSIZE]: [inode_ok]'s size cap, §13.5 *)
+Require Import BioDefs.   (* [BSIZE]: [inode_ok]'s size cap, §13.5 *)
 Require Import DinodeEnc.
 Require Import InodeInv.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

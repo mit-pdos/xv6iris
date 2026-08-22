@@ -827,7 +827,7 @@ Require Import FileInvDefs.
    [lockG]/[lockG0] one in [fw_writei_src]'s comment, one tier up. *)
 Require Import WpUart BioInv FsBlocks LogInv FsCrash.
 Require Import UartTxInv.
-Require Import DinodeEnc InodeInv InodeLock.
+Require Import InodeInv InodeLock.
 Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import FsTree.

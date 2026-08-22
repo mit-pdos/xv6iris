@@ -90,7 +90,6 @@ Require Import IcacheEscrow.   (* Require Export's DirViewG *)
 Require Import FsTree.         (* [fname], [dir_view]'s home *)
 Require Import KvmSpec.
 Require Import FileInvDefs.
-Require Import SpecIput.
 Require Import SpecDirlink.
 Require Import SpecNamex.
 Require Import SpecNamei.      (* K_namei, and the landed body this shadows *)

@@ -64,7 +64,7 @@ Require Import KallocInv KvmSpec.
 Require Import IcacheEscrow IrefSlots.
 Require Import WaitInv.
 Require Import WpUart.
-Require Import DiskPtsto DiskInv.
+Require Import DiskPtsto.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
@@ -76,7 +76,7 @@ Require Import SpecUsertrap.  (* [usertrap_ret_ms] / [usertrap_entry_ms]; the fi
 Require Import FsCfg.    (* [fsc_printk] etc -- the ambient names the ties point at *)
 Require Import FirstTok.     (* [first_done] -- what the park's closer is handed *)
 Require Import SyscParkEnv.  (* [sysc_park_extra] / [park_world] -- the park's syscall-side rows *)
-Require Import ConsoleInv WireInv TrampPt KptExecMap.   (* [park_world_open]'s rows *)
+Require Import WireInv KptExecMap.   (* [park_world_open]'s rows *)
 Require Import FsReady.
 Require Import SpecConsoleintr.  (* [console_caps] -- devintr's console row *)
 Require Import TicksInv.         (* [is_tickslock] -- the tick keeper's real arm *)

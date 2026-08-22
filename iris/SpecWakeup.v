@@ -13,7 +13,6 @@ Require Import RiscvPtsto RiscvLang.
 Require Import RegFile.
 Require Import RiscvExtras.
 Require Import FdSlots.
-Require Import ProcGeom.
 Require Import InstrBytes KernelText.
 Require Import LockRank.
 Require Import WpMmodeLeafBase.

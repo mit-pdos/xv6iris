@@ -32,7 +32,7 @@ Require Import RiscvLang RiscvPtsto.
 Require Import RegFile.
 Require Import KernelDataInv.
 Require Import PrintkFmt.
-Require Import SpecPrintk.    (* [pk_arg_desc] / [pk_desc_kind] *)
+Require Import PrintkArgs.    (* [pk_arg_desc] / [pk_desc_kind] *)
 From Kernel Require KernelSyms.
 From Kernel Require KernelData.
 Local Open Scope Z_scope.

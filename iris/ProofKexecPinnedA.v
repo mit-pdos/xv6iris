@@ -201,18 +201,16 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto.
-Require Import RiscvExtras.
 Require Import RegFile.
 Require Import HartTp.
 Require Import WpNext.
 Require Import WpMmodeLeafBase.
 Require Import RiscvExtras.
 Require Import StackOwn.
-Require Import StackBytes.
 Require Import CalleeSaved.
 Require Import InstrBytes.
 Require Import KernelText.
-Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
+Require Import WpSconfAlu WpSconfCtl WpSconfBtype.
 Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import CpuOwn.
@@ -221,12 +219,9 @@ Require Import WpLock.
 Require Import FdSlots.
 Require Export SwtchCtx.
 Require Import WpUart.
-Require Import InodeRegion.
 Require Import IcacheEscrow.
 Require Import ByteBuf.
-Require Import ElfEnc.
 Require Import ProcGeom.
-Require Import ProcInv.
 Require Import DiskPtsto.
 Require Import BioDefs.
 Require Import FsBlocks LogInv.
@@ -238,8 +233,6 @@ Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
 Require Import KvmSpec.
-Require Import ProcInv.
-Require Import FileInvDefs.
 (* Names the nightly dead-import sweep stopped delivering transitively. *)
 Require Import DinodeEnc.
 Require Import InodeLock.
@@ -259,7 +252,6 @@ Require Import SpecNamei.
 (* [SpecNamex] for [walk_need]/[walk_spend]: the SET form's ledger clause is
    namex's, and phase A prices its namei call through it. *)
 Require Import SpecNamex.
-Require Import ProofKexecParts.
 Require Import ProofKexecTail.
 Require Import CodeKexec.
 From Kernel Require KernelSyms.

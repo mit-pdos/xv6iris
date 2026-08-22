@@ -83,13 +83,11 @@ Require Import WpNext.
 Require Import WpLock.
 Require Import KernelDataInv.
 Require Import SpecPanic.
-Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import CpuOwn.
 Require Import FdSlots.
 Require Import IcacheRef.
-Require Import IrefSlots.
 Require Import SchedCtx.
 Require Import ProcDefs.  (* [proc_priv_bare] *)
 Require Import WpUart.

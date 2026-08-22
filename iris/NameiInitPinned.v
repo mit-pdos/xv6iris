@@ -77,7 +77,6 @@ Require Import DirView.       (* [T_DIR_z], [dir_first]                     *)
 Require Import FsTree.
 Require Import KvmSpec.
 Require Import FileInvDefs.
-Require Import SpecIput.
 Require Import SpecDirlink.
 Require Import SpecNamex.
 Require Import SpecNamei.

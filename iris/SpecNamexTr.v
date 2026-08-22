@@ -76,13 +76,10 @@ Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
 Require Import IcacheEscrow.   (* Require Export's DirViewG *)
-Require Import FsTree.         (* [fname], [dir_view]'s home *)
 Require Import KvmSpec.
 Require Import FileInvDefs.
-Require Import SpecIput.
 Require Import SpecDirlink.
 Require Import SpecNamex.      (* K_namex, walk_need / walk_spend, ROOT* *)
-Require Import SpecNamei.
 Require Import SpecNameiTr.    (* THE RULED VOCABULARY: nx_hop, nx_hops_from,
                                   inode_held_at -- imported, never restated *)
 From Kernel Require KernelSyms.

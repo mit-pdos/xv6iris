@@ -32,7 +32,7 @@ Require Import InstrBytes RegFile HartTp WpNext.
 Require Import RiscvExtras.
 Require Import WpMmodeLeafBase.
 Require Import HartSwp.
-Require Import IntrDefs WpSconfEngine.
+Require Import WpSconfEngine.
 Require Import IntrDefs.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Import Defs.

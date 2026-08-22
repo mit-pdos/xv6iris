@@ -95,7 +95,6 @@ Require Import RiscvExtras.
 Require Import CalleeSaved KernelText KernelDataInv.
 Require Import IntrDefs.
 Require Import WpNext.
-Require Import LockRank.
 Require Import CpuOwn.
 Require Import LockRank.
 Require Import SpecPanic.

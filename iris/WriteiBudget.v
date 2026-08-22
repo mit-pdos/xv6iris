@@ -93,8 +93,7 @@ From iris.base_logic.lib Require Import ghost_map.
    implicit arguments now mention -- see the note on [Section LogAmort]'s
    context below.  Nothing in this file uses a machine or a disk. *)
 Require Import RiscvPtsto.    (* riscvGS -- carries the ambient mono_natG *)
-Require Import DiskPtsto.     (* diskGhostG *)
-Require Import FsCrash.       (* BSIZE *)
+Require Import BioDefs.       (* BSIZE *)
 Require Import InodeInv.      (* NDIRECT, NINDIRECT, MAXFILE *)
 Require Import LogInv.        (* MAXOPBLOCKS, log_op, log_opS *)
 Require Import BitmapInv.     (* BPB, bitmap_geom_ok, BBLOCK *)

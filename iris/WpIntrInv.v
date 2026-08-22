@@ -100,7 +100,7 @@ Require Import HartSwp HartLift HartSpan HartSpanChar HartRegNode
         HartMCycle HartStepAny HartRunGen HartSFrame HartSTrans HartMFrame
         HartGoodb WpDecodeBridge WpDecode DecodeTotalU CommonWalk ExecCommon
         WpGprMret.
-Require Import WpSFrames KptShare KptPt SRegime StackOwn.
+Require Import WpSFrames KptShare SRegime StackOwn.
 Require Import KptPt.
 Require Import RiscvExtras.
 Require Import SmodePte.

@@ -14,7 +14,6 @@ Require Import InstrBytes.
 Require Import RiscvExtras.
 Require Import CalleeSaved.
 Require Import KernelText.
-Require Import IntrDefs.
 Require Import IntrDefs WpNext.
 Require Import WpLock.
 Require Import RegFile.

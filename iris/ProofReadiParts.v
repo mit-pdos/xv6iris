@@ -45,7 +45,6 @@ Require Export W32Arith.
 Require Import ByteCursor.
 Require Import ByteBuf.
 Require Import DiskPtsto.
-Require Import BufOwn.
 Require Import BufOwn BcacheInv BioInv.
 Require Import FsBlocks.
 Require Import InodeInv.

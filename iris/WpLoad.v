@@ -5,7 +5,6 @@ From stdpp Require Import bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language.
 Require Import SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.Operators_mwords.
-Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import SailStdpp.Base.
 Require Import Riscv.rv64d_types Riscv.rv64d.

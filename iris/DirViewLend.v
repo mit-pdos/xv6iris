@@ -123,7 +123,6 @@ From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import own ghost_map.
 Require Import SailStdpp.Values.
 Require Import DinodeEnc.   (* [dinode], [di_size]                          *)
-Require Import DirView.     (* [dir_nrec]                                   *)
 Require Import FsTree.      (* [fname], [dir_view]                          *)
 Require Import IcacheRef.   (* [icfg], [icfg_dview], [icfg_reg], [dviewUR]  *)
 Require Import DirViewG.    (* [dv_half], [dv_hold], [dv_set], [dv_agree]   *)

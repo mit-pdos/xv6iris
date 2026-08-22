@@ -47,7 +47,7 @@ From iris.base_logic.lib Require Import gen_heap invariants ghost_var.
 From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
-Require Import RiscvPtsto RiscvLang RiscvExtras.
+Require Import RiscvPtsto RiscvLang.
 Require Import RegFile WpMmodeLeafBase.
 Require Import RiscvExtras.
 Require Import IntrDefs.
@@ -59,7 +59,6 @@ Require Import CalleeSaved StackOwn.
 Require Import ProcGeom.
 Require Import KallocInv.
 Require Import PtBuild KptExecMap TrampPt.
-Require Import PtreeType.
 (* the epilogue block STATES [pc_is] / [ptree_own] / [kalloc_env] (through
    [ppt_post]) rather than only receiving them, so these come in directly. *)
 Require Import InstrBytes.

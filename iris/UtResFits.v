@@ -20,7 +20,7 @@ Require Import RiscvLang RiscvPtsto.
 (* the residue's classes, IMPORTED so they resolve to the concrete ones and
    do not get auto-generalized (the one-[Require]-isn't-enough trap) *)
 Require Import FdSlots FileInvDefs IrefSlots ProcAvail Xv6Cameras ProcDefs.
-Require Import ProcInv ProcPtOwn UserPtTree ProcGeom TimerCap CpuOwn SchedCtx.
+Require Import ProcPtOwn UserPtTree ProcGeom TimerCap.
 Require Import IntrDefs KptShare.
 Require Import UsertrapRes.
 Require Import ParkCap.

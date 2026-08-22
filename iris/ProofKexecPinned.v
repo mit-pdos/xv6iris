@@ -79,7 +79,6 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto.
-Require Import RiscvExtras.
 Require Import RegFile.
 Require Import WpNext.
 Require Import WpMmodeLeafBase.
@@ -103,11 +102,8 @@ Require Import FsBlocks.
 Require Import LogDefs.
 Require Import BitmapInv.
 Require Import InodeInv.
-Require Import IrefSlots.
 Require Import KvmSpec.
-Require Import FileInvDefs.
 Require Import IrefSlots.
-Require Import ProcAvail.
 Require Import UserPtTree.
 Require Import FileInvDefs.
 Require Import SpecKexec.
@@ -130,7 +126,6 @@ Require Import SpecCopyout.
 Require Import SpecSafestrcpy.
 Require Import ProofKexecTail.
 Require Import ProofKexecSeam.
-Require Import ProofKexecA.
 Require Import ProofKexecB.
 Require Import SpecPanic.
 Require Import ProofKexecB2.
@@ -152,14 +147,8 @@ Notation KX := KernelSyms.kexec (only parsing).
 Require Import ProofKexecPinnedA.
 Require Import SpecKexecPinned.
 Require Import KexecOkQ.
-Require Import DirViewG.
 Require Import DirViewLend.
-Require Import DirViewPin.
-Require Import NameiInitPinned.
-Require Import InodeRegion.
-Require Import FsTree.
-Require Import PathElems.
-Require Import FsImgCheck.
+Require Import IcacheRef.
 
 
 (* ===================================================================== *)

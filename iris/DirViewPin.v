@@ -59,12 +59,10 @@ Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
 Require Import IcacheEscrow.   (* Require Export's DirViewG *)
-Require Import DirViewG.
 Require Import DirViewLend.    (* the M1 kit: dv_pin, dv_pin_redeem, ...   *)
 Require Import FsTree.
 Require Import KvmSpec.
 Require Import FileInvDefs.
-Require Import SpecIput.
 Require Import SpecDirlink.
 Require Import SpecNamex.
 Require Import SpecNamei.

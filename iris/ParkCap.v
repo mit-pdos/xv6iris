@@ -44,15 +44,14 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvLang RiscvPtsto.
 Require Import KernelText WireInv.
-Require Import KptExecMap TrampPt.
-Require Import IntrDefs StackOwn.
+Require Import KptExecMap.
+Require Import StackOwn.
 Require Import ProcGeom ProcDefs ProcInv ProcAvail.
 Require Import SchedCtx SwtchCtx.
 Require Import FdSlots IrefSlots FileInvDefs.
 Require Import FirstTok TimerCap.
 Require Import UserPtTree ProcPtOwn.   (* [uptd] / [ud_data] / [ud_pas] / [proc_pt_wf] *)
 Require Import UsertrapRes.
-Require Import SyscParkEnv.
 From Kernel Require KernelSyms.
 Require Import Xv6G.
 Local Open Scope Z_scope.

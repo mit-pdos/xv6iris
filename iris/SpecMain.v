@@ -147,7 +147,7 @@ Require Import SpecIinit SpecVirtioDiskInit.
 Require Import SpecFreerange SpecPrintk.
 Require Import ProcGeom FdSlots CpuOwn SchedCtx.
 Require Import KallocInv KvmSpec BcacheInv SleepLock.
-Require Import VirtioModel DiskPtsto WpUart.
+Require Import DiskPtsto WpUart.
 Require Import VirtioModel.
 (* [DiskInv] for the vdisk_lock's vocabulary: [d_used_idx] and
    [disk_slot_raw] are cells of the static [struct disk] that main hands

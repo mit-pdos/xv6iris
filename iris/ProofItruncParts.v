@@ -315,7 +315,6 @@ Qed.
 Require Import WpMmodeLeafBase.
 Require Import RiscvExtras.
 Require Import StackOwn.
-Require Import BufOwn.
 Require Import FdSlots.
 Require Import WpUart.
 Require Import BufOwn.

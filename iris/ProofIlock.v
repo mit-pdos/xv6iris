@@ -87,7 +87,6 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
 Require Import RiscvModelBytes.
-Require Import RiscvExtras.
 Require Import InstrBytes.
 Require Import KernelText.
 Require Import RegFile HartTp WpNext.
@@ -100,7 +99,6 @@ Require Import IntrDefs.
 Require Import MinstretInv.
 Require Import CpuOwn.
 Require Import DiskPtsto DiskInv.
-Require Import BufOwn.
 Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import WpAu4.
@@ -111,12 +109,10 @@ Require Import ProcGeom.
 Require Import SchedCtx.
 Require Import ProcDefs.  (* [proc_priv_bare] *)
 Require Import SleepLock.
-Require Import WpUart.
 Require Import BufOwn BcacheInv BioInv.
 Require Import FsBlocks LogInv.
 Require Import BioFs.  (* [bio_held_fs_L] *)
 Require Import BlockWords.
-Require Import DinodeEnc.
 Require Import InodeInv.
 Require Import DirView.
 Require Import DirLinks.

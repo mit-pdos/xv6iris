@@ -2,7 +2,7 @@
    Holds the shared kernel-window instruction tactics and re-exports the M-mode
    leaf base. Primitives are Require Import (local, non-propagating) to avoid
    changing notation resolution in downstream files. *)
-Require Import SailStdpp.Operators_mwords Riscv.rv64d_types Riscv.rv64d SailStdpp.Base.
+Require Import SailStdpp.Operators_mwords Riscv.rv64d_types SailStdpp.Base.
 Require Import RiscvLang RiscvPtsto.
 From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language.
