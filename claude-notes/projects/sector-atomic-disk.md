@@ -13,6 +13,15 @@ Reading order: [`../design/crash.md`](../design/crash.md) "The durable disk"
 and "Recorded modeling choices"; [`../design/device.md`](../design/device.md);
 [`../design/virtio-driver.md`](../design/virtio-driver.md); then this file.
 
+**Coordinate with [`durable-disk.md`](durable-disk.md) stage E** (ruled the
+same day, crash.md §"The split crash predicate"): that campaign widens
+`log_mirror` to the era's full durable picture and derives every machine
+permit from `end_op`'s one commit fupd. Under sector atomicity the mirror
+update becomes a per-sector landing and the commit's `D`-move rides the
+header write's sector 0 alone — which is this campaign's §0 fact.
+Whichever campaign lands second restates the other's permits at its
+granularity; neither design changes shape.
+
 ## 0. The one fact the whole campaign rests on
 
 `struct logheader { int n; int block[LOGBLOCKS]; }` (`kernel/log.c:35`),

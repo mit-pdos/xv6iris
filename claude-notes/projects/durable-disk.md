@@ -209,6 +209,14 @@ Footprint (grep `disk_tie\|fs_tie_interp\|riscv_crash_pred\|disk_write_permit`):
 
 ## 4. Stage E — the crash layer under ruling 2 (`FsCrash.v`, no FS-proof dependencies)
 
+**Coordinate with [`sector-atomic-disk.md`](sector-atomic-disk.md)** (ruled
+the same day): once that campaign lands, the write permit fires PER SECTOR
+(any order), so E2's mirror update becomes a per-sector landing and the
+commit's `D`-move rides the header write's sector 0 alone (the on-disk
+header is 124 bytes, inside sector 0 — that is exactly why xv6's commit is
+atomic on such a disk). Whichever campaign lands second restates the other's
+permits at its granularity; neither design changes shape.
+
 - [ ] **E1. The split.** `P_fs := P_disk ∗ P_wf` with `D` a `ghost_var`
       halved between them (new fixed gname beside `fcn_hist`); `fr_D`
       leaves the record (the record keeps the history, last element tied
