@@ -635,7 +635,12 @@ class Candidate:
     # (`Require Import A B A.`): dropping "the token named A" would drop both.
     # None means "every occurrence of this token on the line", the old behaviour.
     occurrence: int | None = None
-    dup_of: int = 0                    # 'dupe': line of the occurrence kept
+    # 'dupe': the OTHER occurrence -- the one this candidate keeps.  Recorded in
+    # full (not just its line) so the edit can be resolved the other way round;
+    # see `mirror_candidate`.
+    dup_of: int = 0
+    dup_token: str = ""
+    dup_occurrence: int | None = None
 
 
 @dataclass
@@ -735,8 +740,97 @@ def duplicate_candidates(text: str, stmts: list[ImportStmt], local_prefix: str,
                 continue                       # real code in between: not a no-op
             out.append(Candidate(stmt=stmt, token=token, full_path=full_path,
                                  kind="dupe", occurrence=idx,
-                                 dup_of=keeper[0].lineno))
+                                 dup_of=keeper[0].lineno,
+                                 dup_token=keeper[2],
+                                 dup_occurrence=keeper[1]))
     return out
+
+
+def is_documented(stmt: ImportStmt, text: str,
+                  stmts: list[ImportStmt]) -> bool:
+    """Does a human comment attach to this import statement?
+
+    True when the line carries a trailing comment, or when the comment block
+    directly above it -- reached over any contiguous `Require` lines, with NO
+    blank line anywhere on the way -- is entirely comment.  The walk over
+    neighbouring `Require`s is what catches a comment heading a group of import
+    lines rather than a single one (`UserMemClassifyAmo.v`, where the note is
+    three imports above the one at issue).
+
+    A blank line breaks the attachment: a comment across one is a banner for
+    what follows, not an annotation on this statement.  That is exactly what
+    separates `RiscvExec.v`'s "win over SailStdpp's homonyms ...", which sits
+    directly on top of its re-import, from `VirtioDiskRwDefs.v`'s "---- from
+    ProofVirtioDiskRwB.v ----", which sits a blank line above a whole pasted
+    header block.
+    """
+    if stmt.trailer.strip():
+        return True
+    lines = text.splitlines()
+    blanked = blank_coq_comments(text).splitlines()
+    req = {s.lineno for s in stmts}
+    j = stmt.lineno - 2                      # 0-based index of the line above
+    while j >= 0 and (j + 1) in req:         # skip the rest of the import group
+        j -= 1
+    if j < 0:
+        return False
+    return lines[j].strip() != "" and blanked[j].strip() == ""
+
+
+def mirror_candidate(c: Candidate, stmts: list[ImportStmt],
+                     text: str) -> "Candidate | None":
+    """The same duplicate resolved the OTHER way: drop the occurrence `c` keeps.
+
+    WHY BOTH DIRECTIONS EXIST.  Dropping the EARLIER occurrence is the safe
+    edit -- the import state after the survivor is identical, so shadowing is
+    untouched -- and it is the only one offered for a duplicate inside one
+    contiguous run of `Require`s, where it is a provable no-op.  But once REAL
+    CODE sits between the two, that direction is also the one most likely to
+    FAIL: anything in between that uses a name from the module needs the
+    earlier import.  The build then rejects the candidate and both copies
+    survive, even when the honest reading is that the LATER one is the
+    redundant half.
+
+    So this is the fallback, tried only after the safe direction is rejected.
+    It is genuinely weaker: dropping the later occurrence lets any module
+    imported between the two keep its shadow over the module's names for the
+    rest of the file, where the re-import used to win it back.  A single-file
+    compile catches a name that DISAPPEARS, not one that resolves elsewhere and
+    still typechecks -- so what stands behind this direction is the whole-tree
+    rebuild (a changed meaning almost always breaks a downstream user), and its
+    diff is worth reading rather than trusting.
+
+    Refused when the two occurrences differ in strength, which here can only
+    mean the kept one is a `Require Export` and this one is not: dropping an
+    Export changes what DOWNSTREAM files see, and no single-file compile here
+    can see that.
+
+    ALSO REFUSED WHEN A COMMENT ATTACHES TO THE OCCURRENCE IT WOULD DROP.  This
+    direction's whole risk is that it silently undoes a DELIBERATE re-import,
+    and in this tree a deliberate one is documented on the line above it --
+    "win over SailStdpp's homonyms for the sections below" (`RiscvExec.v`),
+    "RE-IMPORT, fileread's line for line: [IcacheInv.islot] shadows ..."
+    (`ProofFilewrite.v`), "at the top would put the certificate layer's names
+    in scope for it (the shadowing trap ...)" (`UserMemClassifyAmo.v`).  Each of
+    those compiles perfectly well without the line, and the whole tree still
+    builds, so NOTHING ELSE HERE CATCHES THEM: the comment is the only evidence
+    that survives.  Treat it as the author saying "leave this alone".
+    """
+    if c.kind != "dupe" or not c.dup_of or c.dup_occurrence is None:
+        return None
+    keeper = next((s for s in stmts if s.lineno == c.dup_of), None)
+    if keeper is None or c.dup_occurrence >= len(keeper.modules):
+        return None
+    if keeper.modules[c.dup_occurrence] != c.dup_token:
+        return None
+    if _STRENGTH[keeper.kind] != _STRENGTH[c.stmt.kind]:
+        return None
+    if is_documented(keeper, text, stmts):
+        return None
+    return Candidate(stmt=keeper, token=c.dup_token, full_path=c.full_path,
+                     kind="dupe", occurrence=c.dup_occurrence,
+                     dup_of=c.stmt.lineno, dup_token=c.token,
+                     dup_occurrence=c.occurrence)
 
 
 def analyze_file(dir_path: str, vfile: str, local_prefix: str,
@@ -1043,6 +1137,27 @@ def _narrow_candidates(res: FileResult, compiles) -> None:
             res.removable = keep
 
 
+def _retry_dupes_mirrored(res: FileResult, stmts: list[ImportStmt],
+                          text: str, compiles) -> None:
+    """Re-offer each REJECTED duplicate resolved the other way round.
+
+    The shortlist always proposes dropping the earlier occurrence (see
+    `mirror_candidate` for why that is the safe direction).  When the build
+    rejects it -- overwhelmingly because code between the two copies uses the
+    module -- the pair is not thereby proved necessary: the LATER copy may be
+    the redundant one.  Each rejected candidate is retried in that direction,
+    on top of everything already confirmed, so a mirror that only works in
+    isolation is never accepted.
+    """
+    for c in [c for c in res.needed if c.kind == "dupe"]:
+        mirror = mirror_candidate(c, stmts, text)
+        if mirror is None:
+            continue
+        if compiles(res.removable + [mirror]):
+            res.needed.remove(c)
+            res.removable.append(mirror)
+
+
 def verify_file(dir_path: str, res: FileResult, flags: list[str],
                 local_prefix: str) -> None:
     """Build-confirm which of `res`'s candidate edits actually still compile.
@@ -1060,11 +1175,15 @@ def verify_file(dir_path: str, res: FileResult, flags: list[str],
     with open(path) as f:
         original = f.read()
 
+    stmts = parse_imports(original)
+
     if not USE_MAKE:
-        _narrow_candidates(
-            res, lambda cands: build_text(
-                dir_path, res.vfile, apply_edits(original, cands, local_prefix),
-                flags)[0])
+        def compiles(cands):
+            return build_text(dir_path, res.vfile,
+                              apply_edits(original, cands, local_prefix),
+                              flags)[0]
+        _narrow_candidates(res, compiles)
+        _retry_dupes_mirrored(res, stmts, original, compiles)
         res.verified = True
         return
 
@@ -1077,6 +1196,7 @@ def verify_file(dir_path: str, res: FileResult, flags: list[str],
             write(cands)
             return build(dir_path, res.vfile, flags)[0]
         _narrow_candidates(res, compiles)
+        _retry_dupes_mirrored(res, stmts, original, compiles)
         res.verified = True
     finally:
         with open(path, "w") as f:                # restore the original bytes
@@ -1091,7 +1211,8 @@ def _cand_dict(c: Candidate) -> dict:
     return {"token": c.token, "full_path": c.full_path,
             "lineno": c.stmt.lineno, "raw": c.stmt.raw,
             "kind": c.kind, "via": list(c.via),
-            "occurrence": c.occurrence, "dup_of": c.dup_of}
+            "occurrence": c.occurrence, "dup_of": c.dup_of,
+            "dup_token": c.dup_token, "dup_occurrence": c.dup_occurrence}
 
 
 def describe(c: Candidate) -> str:
@@ -1102,8 +1223,12 @@ def describe(c: Candidate) -> str:
         where += "\n  - provides no referenced name itself; import instead: " + \
                  ", ".join(f"`{m}`" for m in c.via)
     elif c.kind == "dupe":
-        where += (f"\n  - duplicate: the same module is required again at line "
-                  f"{c.dup_of}, with only other `Require`s in between")
+        # `dup_of` can be either side: the shortlist drops the earlier
+        # occurrence, the mirrored retry the later one.  Say which.
+        rel = "again at line" if c.dup_of > c.stmt.lineno else \
+              "already at line"
+        where += (f"\n  - duplicate: the same module is required {rel} "
+                  f"{c.dup_of}, which this drop keeps")
     return where
 
 
@@ -1144,6 +1269,8 @@ class _DictCand:
         self.via = d.get("via", [])
         self.occurrence = d.get("occurrence")
         self.dup_of = d.get("dup_of", 0)
+        self.dup_token = d.get("dup_token", "")
+        self.dup_occurrence = d.get("dup_occurrence")
         self.stmt = type("S", (), {"lineno": d["lineno"], "raw": d["raw"]})()
 
 
