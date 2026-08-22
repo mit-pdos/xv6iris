@@ -3,7 +3,7 @@
 STATUS: RULED (owner, 2026-08-22): **ANY-ORDER sector tearing**, reads
 atomic, IN requests keep one uniform (trivial) permit key. Stage 0 done;
 stage 1 DONE (branch `sector-atomic`, commit aa3c59a6; main stays green);
-stage 2 in flight on the Opus lane. Owner's
+stage 2 DONE (ddf6f937 on the branch); stage 3 waits for durable-disk stage E. Owner's
 ask: model the disk so that a SECTOR (512 B, `VirtioModel.virtio_sector_size`)
 lands atomically and an xv6 BLOCK (`BSIZE` = 1024 = 2 sectors) does not, and
 then PROVE that xv6's commit is nevertheless atomic because the on-disk log
@@ -236,11 +236,27 @@ outside its layer; stages 1→2→3 are strictly ordered by dependency.
   `log_mirror_ok_sector`. 810/1295 files recompile; the red set is exactly
   `VirtioQueue.v:612` (arity + `vslot_post_wr` now false) → `VirtioProto.v:654`
   → 438 files behind it. ☑
-- **Stage 2 — device layer (Opus).** `VirtioQueue.v`, `VirtioProto.v`
-  (the big one: `slot_pend_res`/`virtio_proto` with the landed set,
-  `virtio_proto_sector_step`), `WpUart.wp_disk_loop` new arm,
-  `SpecVirtioDiskRw`/`ProofVirtioDiskRw`. Gate: `wp_disk_loop` proved with
-  `crashN` opened only in the sector arm. ☐
+- **Stage 2 — device layer (Opus).** DONE 2026-08-22 (ddf6f937, 19 files,
+  zero admits, `Print Assumptions wp_disk_loop` unchanged). DESIGN DEVIATION,
+  recorded in `VirtioQueue.v`'s header: the completion keeps a permit key
+  (`vs_perm`) re-indexed at `None` in BOTH directions, beside the per-sector
+  keys `vs_perms`. So `crashN` is opened in TWO arms of `wp_disk_loop` — the
+  sector arm (the only one where the fixed auth moves) and the completion
+  arm (identity permit, auth untouched). Forced by the IN ruling: a read
+  has no sectors, so its receipt `Q` can only be delivered at completion,
+  and any client permit needs `▷ riscv_crash_pred`; giving OUT the same key
+  keeps the completion direction-agnostic. New vocabulary: `vs_torn`
+  (the mid-flight block content, `VirtioQueue.v:941`), `slot_pend_res γ ld
+  sl` indexed by the landed set, `virtio_proto_sector_step`
+  (`VirtioProto.v:1953`), `disk_sector_permits`/`disk_sector_receipts`
+  (`RiscvPtsto.v:781-823`), `PermInv.perm_deposit_sectors`/`perm_collect_list`.
+  `vproto_step_det` is restated with the step as a premise. Red set after
+  stage 2: exactly `ProofWriteHead.v:673`, `ProofInstallTrans.v:2297`,
+  `ProofEndOp.v:3023` (the WAL bwrite call sites now owe
+  `disk_sector_permits`), with 26 files skipped behind them (BootShared,
+  FsAdequacyImg, SystemAdequacy, the 22 Link files). `BootShared.v:1436`'s
+  `virtio_reset_landed` fix is written but unverified (it sits behind
+  ProofEndOp). ☑
 - **Sequencing against durable-disk stage E (2026-08-22).** Stage 2 is
   disjoint from E. Stage 3 overlaps E textually in `FsCrash.v` (E1-E3
   rewrite the mirror and the record; stage 1 already added
