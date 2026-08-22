@@ -2,7 +2,8 @@
 
 STATUS: RULED (owner, 2026-08-22): **ANY-ORDER sector tearing**, reads
 atomic, IN requests keep one uniform (trivial) permit key. Stage 0 done;
-stage 1 in flight on the Opus lane. Owner's
+stage 1 DONE (branch `sector-atomic`, commit aa3c59a6; main stays green);
+stage 2 in flight on the Opus lane. Owner's
 ask: model the disk so that a SECTOR (512 B, `VirtioModel.virtio_sector_size`)
 lands atomically and an xv6 BLOCK (`BSIZE` = 1024 = 2 sectors) does not, and
 then PROVE that xv6's commit is nevertheless atomic because the on-disk log
@@ -215,11 +216,17 @@ outside its layer; stages 1→2→3 are strictly ordered by dependency.
 - **Stage 0 — design (Fable, this file).** DONE 2026-08-22: any-order
   ruled by the owner; IN keeps a uniform trivial key (§2c, least churn in
   `slot_done_res`); `crash.md` paragraph fixed. ☑
-- **Stage 1 — pure (Opus).** `VirtioModel.v` §2a, `RiscvLang.v` §2b,
-  `FsCrash.v` §0 lemmas (`hdr_dec_sector0`, `hdr_wf`/`fs_recovery`/
-  `log_mirror_ok` sector-1 invariance, `log_mirror_ok_sector`). Gate: the
-  three files and their direct dependents compile; `virtio_not_stalled_step`
-  restated and proved. ☐
+- **Stage 1 — pure (Opus).** DONE 2026-08-22 (aa3c59a6, zero admits).
+  `VirtioModel.v`: `v_landed`, `virtio_sector_step` (:1254) + field lemmas,
+  completion gated on `virtio_sectors_done` and no longer writing the disk,
+  `wr_sector`/`wr_nsectors`/`wr_fold_all` (order-free reassembly),
+  `virtio_not_stalled_step` = sector-step ∨ completion. `RiscvLang.v`:
+  `DiskStepSector` (:427). `FsCrash.v`: `hdr_dec_sector0` (:320; NOTE it
+  needs the `hdr_wf` bound — unbounded `hdr_dec` is junk-tolerant and a
+  garbage `n` reads past 512), `fs_recovery_hdr_sector0`,
+  `log_mirror_ok_sector`. 810/1295 files recompile; the red set is exactly
+  `VirtioQueue.v:612` (arity + `vslot_post_wr` now false) → `VirtioProto.v:654`
+  → 438 files behind it. ☑
 - **Stage 2 — device layer (Opus).** `VirtioQueue.v`, `VirtioProto.v`
   (the big one: `slot_pend_res`/`virtio_proto` with the landed set,
   `virtio_proto_sector_step`), `WpUart.wp_disk_loop` new arm,
