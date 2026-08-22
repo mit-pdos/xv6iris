@@ -10,7 +10,24 @@ Only files listed in _CoqProject are considered (scratch/Zz*/Scratch* globs
 are ignored), so a lemma referenced only by a throwaway Print-Assumptions
 file is still counted as dead.
 
-Caveats (why a "dead" hit may be a false positive):
+Two false-positive classes that a sealed-functor tree produces in bulk are
+FILTERED OUT rather than left for the reader (both were found the hard way, by
+nearly deleting them):
+
+  * MODULE-SIGNATURE OBLIGATIONS. [Module UservecProof (...) : USERVEC.] must
+    define every field USERVEC declares, and those definitions are usually
+    re-exports ([Definition usertrap_res := UT.usertrap_res.]) that nothing
+    names -- consumers go through the functor and .glob records no reference
+    across that boundary. They are unreferenced BY CONSTRUCTION and deleting
+    one does not compile. Anything declared inside a [Module Type], and any
+    definition inside a module sealed [: SIG] / [<: SIG] whose name is a field
+    of SIG (following [Include]), is suppressed and counted separately.
+  * MODULE ALIASES. [Module LP := UserretClosed R US UV.] then
+    [LP.stvec_handler_loop] records the reference under the REFERRING module's
+    secpath, so the exact (module, secpath, name) triple misses. For a def
+    inside a module the secpath is therefore relaxed to same-file-same-name.
+
+Caveats (why a "dead" hit may still be a false positive):
   * Instances / Notations / Canonical structures are used by inference, not by
     name -- reported separately under [implicit] and almost never truly dead.
   * Lemmas used ONLY via a hint database (auto/eauto with, autorewrite) or a
@@ -147,6 +164,110 @@ def off_to_line(starts, off):
     return bisect.bisect_right(starts, off)
 
 DEF_RE = re.compile(r"^([a-z]+)\s+(\d+):(\d+)\s+(\S+)\s+(\S+)\s*$")
+
+# ---------------------------------------------------------------------------
+# MODULE-SIGNATURE FIELDS ARE NOT DEAD, and this is the biggest false-positive
+# class in a tree built out of sealed functors (design/spec-modules.md).
+#
+#   Module Type USERVEC.  Parameter usertrap_res : ...  End USERVEC.
+#   Module UservecProof (UT : ...) : USERVEC.
+#     Definition usertrap_res := UT.usertrap_res.   <-- MANDATORY, not dead
+#
+# Nothing references that re-export by name -- consumers go through the
+# functor, and .glob records no reference across that boundary -- so it looks
+# unreferenced while being required for the module to match its seal.  Deleting
+# it does not compile.  Two shapes are suppressed here:
+#
+#   * anything declared INSIDE a [Module Type] (it IS the signature), and
+#   * a definition inside a module sealed [: SIG] / [<: SIG] whose name is a
+#     field of SIG (following [Include] transitively).
+#
+# The .glob def line's secpath carries the enclosing module, which is what
+# makes this checkable without parsing Coq: [def 3514:3525 UservecProof
+# usertrap_res].
+# ---------------------------------------------------------------------------
+_MODTYPE_RE = re.compile(r"^[ \t]*Module\s+Type\s+([A-Za-z_][\w']*)\s*\.", re.M)
+_ENDMOD_RE = re.compile(r"^[ \t]*End\s+([A-Za-z_][\w']*)\s*\.", re.M)
+_FIELD_RE = re.compile(
+    r"^[ \t]*(?:Local\s+|Global\s+|Program\s+)*"
+    r"(?:Parameter|Axiom|Definition|Lemma|Theorem|Corollary|Fixpoint|Notation|"
+    r"Record|Inductive|Instance|Conjecture)\s+([A-Za-z_][\w']*)", re.M)
+_INCLUDE_RE = re.compile(r"^[ \t]*Include\s+([A-Za-z_][\w'.]*)\s*\.", re.M)
+
+
+def _module_headers(text):
+    """[(module name, sealing signature or None, body start offset)] for every
+    [Module M ... .] header.  The seal is a ':' or '<:' at paren depth 0, so a
+    functor argument list [(R : USERRET)] is not mistaken for one."""
+    out = []
+    for m in re.finditer(r"^[ \t]*Module\s+(?!Type\b)([A-Za-z_][\w']*)", text, re.M):
+        i, depth, seal, n = m.end(), 0, None, len(text)
+        while i < n:
+            c = text[i]
+            if c == '(':
+                depth += 1
+            elif c == ')':
+                depth -= 1
+            elif depth == 0 and c == ':':
+                j = i + 1
+                if text[i-1] == '<':
+                    pass
+                # NOT [\w'.]* -- that swallows the sentence-ending period, so
+                # [: USERVEC.] would capture "USERVEC." and split to ''.
+                k = re.match(r"[ \t]*([A-Za-z_][\w']*(?:\.[A-Za-z_][\w']*)*)",
+                             text[j:])
+                if k:
+                    seal = k.group(1).split('.')[-1]
+            elif c == '.' and depth == 0 and (i + 1 >= n or text[i+1] in ' \t\r\n'):
+                break
+            i += 1
+        out.append((m.group(1), seal, i + 1))
+    return out
+
+
+def signature_fields(dirpath, modset):
+    """-> (set of Module Type names, {sealed module -> set of its signature's
+    field names})."""
+    sigs, seals, includes = {}, {}, {}
+    for mod in sorted(modset):
+        try:
+            text = strip_coq_comments(open(os.path.join(dirpath, mod + ".v"),
+                                           encoding="utf-8").read())
+        except OSError:
+            continue
+        # Module Type bodies
+        for m in _MODTYPE_RE.finditer(text):
+            name, start = m.group(1), m.end()
+            e = _ENDMOD_RE.search(text, start)
+            while e and e.group(1) != name:
+                e = _ENDMOD_RE.search(text, e.end())
+            body = text[start:e.start()] if e else text[start:]
+            sigs.setdefault(name, set()).update(_FIELD_RE.findall(body))
+            includes.setdefault(name, set()).update(
+                x.split('.')[-1] for x in _INCLUDE_RE.findall(body))
+        for name, seal, _ in _module_headers(text):
+            if seal:
+                seals[name] = seal
+    # resolve Include transitively
+    for _ in range(8):
+        for sig, incs in includes.items():
+            for inc in incs:
+                sigs.setdefault(sig, set()).update(sigs.get(inc, ()))
+    return set(sigs), {m: sigs.get(s, set()) for m, s in seals.items()}, sigs
+
+
+def is_signature_field(secpath, name, modtypes, sealed):
+    """True when this definition is a module-signature obligation."""
+    if secpath == "<>":
+        return False
+    for comp in secpath.split('.'):
+        if comp in modtypes:
+            return True                      # declared inside a Module Type
+        if name in sealed.get(comp, ()):
+            return True                      # required by the module's seal
+    return False
+
+
 REF_RE = re.compile(r"^R(\d+):(\d+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s*$")
 
 def main():
@@ -205,9 +326,27 @@ def main():
         if args.all:
             want |= IMPLICIT
 
-    # a def is dead if (module, secpath, name) is referenced nowhere
-    dead0 = [row for row in defs
-             if row[3] in want and (row[0], row[1], row[2]) not in refs]
+    # A def is dead if (module, secpath, name) is referenced nowhere.
+    #
+    # MODULE ALIASES need the secpath relaxed.  [Module LP := UserretClosed R US
+    # UV.] then [LP.stvec_handler_loop] records the reference under the
+    # REFERRING module's secpath, not the defining one:
+    #
+    #   prf  4522:4539            UserretClosed       stvec_handler_loop
+    #   R13109:13129 xv6iris.ProofUserretClosed  UserretClosedProof  stvec_handler_loop
+    #
+    # so the exact triple misses and the lemma looks dead while being used ten
+    # lines away.  For a def that lives inside a module (secpath /= "<>") we
+    # therefore also accept a reference to the same NAME from the same FILE.
+    # That can under-report -- two same-named defs in two modules of one file,
+    # only one of them used -- which is the safe direction for a tool whose
+    # false positives cost a broken build.
+    modname_refs = {(r[0], r[2]) for r in refs}
+    def referenced(row):
+        if (row[0], row[1], row[2]) in refs:
+            return True
+        return row[1] != "<>" and (row[0], row[2]) in modname_refs
+    dead0 = [row for row in defs if row[3] in want and not referenced(row)]
 
     lineidx = {}
     def loc(gbase, off):
@@ -243,6 +382,12 @@ def main():
     kept = [r for r in dead0 if keep_marked(r[4], r[5])]
     dead = [r for r in dead0 if not keep_marked(r[4], r[5])]
 
+    # Drop module-signature obligations before anything is reported: they are
+    # unreferenced by construction and deleting one does not compile.
+    modtypes, sealed, _sigs = signature_fields(d, module_set(d, only_mods))
+    sigfields = [r for r in dead if is_signature_field(r[1], r[2], modtypes, sealed)]
+    dead = [r for r in dead if not is_signature_field(r[1], r[2], modtypes, sealed)]
+
     if not args.triage:
         by_file = {}
         for module, sec, name, kind, gbase, off in dead:
@@ -276,6 +421,12 @@ def main():
     nfiles = len({r[4] for r in dead})
     print(f"\n== {total} unreferenced {kinds_desc} across {nfiles} files "
           f"(of {len(globs)} globs scanned) ==")
+    if sigfields:
+        nf = len({r[4] for r in sigfields})
+        print(f"   ({len(sigfields)} module-signature obligation(s) across {nf} file(s) "
+              "suppressed: declared in a Module Type, or required by a module's "
+              "[: SIG] seal.  These are unreferenced BY CONSTRUCTION -- consumers "
+              "reach them through the functor -- and deleting one does not compile.)")
     if kept:
         print(f"   ({len(kept)} unreferenced def(s) suppressed by KEEP-UNREFERENCED marker: "
               + ", ".join(sorted(r[2] for r in kept)) + ")")
