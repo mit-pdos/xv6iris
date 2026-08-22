@@ -383,17 +383,15 @@ sys_mknod, sys_chdir, filewrite, fileclose, kexec ×2, kexit, ireclaim).
       to `FsCfgBoot.fs_boot_image_wf` as conjunct (13), discharged at
       the image by `FsImgCheck.fsimg_links_eq`, threaded through
       `BootShared`/`SystemAdequacy`/`FsAdequacyImg` premises).
-      INTERIM DISCHARGE at the 26 arms: until G2's real per-op
-      preservation lands, each `end_op` arm may re-establish row (a)
-      only if its op wrote nothing (A := A) — arms whose ops DO write
-      need the real proof, so G1-impl and G2 land TOGETHER per-arm:
-      start with the read-only ops (kexec, kexit, sys_chdir,
-      fileclose-no-write arms) and the no-op paths, and hold a
-      PLACEHOLDER row-(a) escape (`A` re-chosen := L's home
-      restriction, wf via a `fs_durable_wf_body`-placeholder-style
-      gate lemma `log_state_TODO_rebase`) for the writing arms so the
-      tree stays green while G2 proceeds arm by arm; the gate lemma's
-      deletion is G2's completion check.
+      STAGING (corrected): a per-arm escape cannot gate on a false
+      lemma (`fs_durable_wf_body` is REAL since F1), so row (a) flips
+      on in ONE commit. Order: (i) G1-impl lands `log_state` with row
+      (b), `op_pending`, and the boot `fs_links_eq` threading — green,
+      real content, no row (a); (ii) G2's 26 per-op preservation
+      lemmas are proven STANDALONE first (pure statements against F2's
+      effect vocabulary — no `log_state` dependency, fully
+      parallelizable across agents); (iii) the flip commit adds row
+      (a) and wires the prepared lemmas into the arms in one sweep.
 - [ ] **G2.** Thread the F2 side conditions from the 9 write sites
       (their AU suppliers already carry the abstract content) to the
       per-op obligation; discharge at the 26 arms.
