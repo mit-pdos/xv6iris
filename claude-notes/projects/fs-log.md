@@ -38,16 +38,26 @@
 > `boot_facts g'`, and `boot_facts` leaves the disk free; a zero-disk `g'`
 > satisfies it and fails `fs_parse_sb … = Some sb` (magic 0), so
 > `fs_boot_image_eras` is False and `xv6_power_adequacy` (and both
-> `FsAdequacyImg` corollaries) prove their conclusion from False. The honest
-> shape: (i) `riscv_power_adequacy` takes a client pure predicate `Pure` with
-> `Pc dk ⊢ ⌜Pure dk⌝` and lets `Hboot` assume `Pure (v_disk g')` — the
-> generic proof has the crash invariant's body at `dk` and `state_interp`'s
-> `disk_tie` half at the real disk at every PowerOn (era 0 from `HPc`);
-> (ii) `P_fs ⊢ ⌜image-shaped modulo a pending log⌝`, which is NOT
-> `fs_boot_image_wf` (it allows `n > 0`) — so (ii) is blocked on items (1)
-> and (3) above; (iii) until then, the only non-vacuous statement is a
-> premise over the REACHABLE boot states ("every crash in the trace has a
-> clean log"), restrictive but satisfiable. Owner's call which to do first.
+> `FsAdequacyImg` corollaries) prove their conclusion from False.
+>
+> THE HONEST SHAPE IS AN iProp LEND, NOT A PURE HOOK — the crash predicate
+> is an iProp so that durable ghost state crosses eras as OWNERSHIP. Today
+> `Hboot` (`RiscvAdequacy.v:1164`) gives an era `crash_inv` but nothing
+> tying the body's `dk` to `v_disk g'` (the two `disk_tie` halves are in
+> the body and in `state_interp`; only a DMA completion holds both), which
+> is the gap (d2b) papered over with `Himg`. So: (i) strengthen `Hboot` to
+> `power_boot_res g' -∗ ▷ Pc (v_disk g') ={⊤∖↑crashN}=∗ ▷ Pc (v_disk g') ∗
+> WPs` — the generic proof opens `crashN` at the PowerOn step (it owns
+> `state_interp`'s tie half there), agrees `dk = v_disk g'`, lends the body,
+> closes after; era 0 from `HPc`. (ii) `boot_shared_alloc`/`fs_cfg_alloc`
+> consume the lend: take history snapshots, read `fs_rec_wf` and the
+> superblock parse as consequences of `P_fs`'s own ghosts (add the parse to
+> `fs_rec_wf` if it is not there), mint `fscfg`/`icfg`, give `P_fs` back;
+> `Himg` disappears from the theorem. (iii) `P_fs` allows `hdr_n > 0`, so
+> the lend is consumable only once `fsinit`/`initlog` are proved at a dirty
+> log — items (1)/(3) above; until then the only closed form carries an
+> explicit premise over the REACHABLE traces ("every crash has a clean
+> log"). Owner's call whether (i)+(ii) go first or (iii).
 
 Design: [`../design/fs-log.md`](../design/fs-log.md) — read its "stage-4
 architecture" section first; every durable finding of this effort has been
