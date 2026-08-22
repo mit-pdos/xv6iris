@@ -1106,6 +1106,7 @@ WeakRvwmoHull.v
 WeakRvwmoSupply.v
 WeakRvwmoLinInd.v
 WeakRvwmoConfWit.v
+WeakRvwmoConfWit2.v
 WeakRvwmoFab.v
 WeakRvwmoFabInd.v
 WeakRvwmoCert.v

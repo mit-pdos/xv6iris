@@ -126,7 +126,12 @@ change that produced it.
   `x ∈ remove_dups (remove_dups l)`) — use `apply (proj1 lem) in H`.  An
   intro pattern `(j & <- & …)` on `x = f y` rewrites the WRONG way (use
   `->`); ssreflect's `.1` on an `iff` is pair-`fst`, not `proj1` — write
-  `proj1 (proj1 lem H)`.  Related paper cuts:
+  `proj1 (proj1 lem H)`.  `[->|->]` in an intro pattern lexes `|->` as one
+  token (write `[-> | ->]`; bites `destruct … as` too); and
+  `WeakInterp.acc_addr : Arch.pa → nat → Z` shadows
+  `WeakAxiomatic.acc_addr : Z → nat → Z` when both are imported — the error
+  surfaces at an IMAGE definition ("pa_z … has type Z while expected
+  Arch.pa"), not where the graph is built.  Related paper cuts:
   `StronglySorted`-family lemmas hand back un-beta-reduced `R x y`, so `lia`
   fails with "Cannot find witness" until `cbn in H`; in the same import
   context `if decide P then _ else _` does NOT elaborate (the scrutinee is

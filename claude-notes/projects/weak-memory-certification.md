@@ -49,8 +49,18 @@ progress), the WP package.
    hull (`hull_run`) processing exits in gmo order, with `cstep_cls` at
    each step, and end with the whole graph's writes in the log (the
    remaining non-cycle writes appended by the same solo machinery) —
-   the last piece of §4d.2(2).  Needs a 2-hart emitted witness to stay
-   honest.
+   the last piece of §4d.2(2).
+   WITNESS STATUS (`WeakRvwmoConfWit2.v`): the SECOND emitted block
+   exists — hart 1's real `lw started` (built from the image at
+   `main+0x16`, plain, same byte the store writes) — giving the first
+   two-row `gdexec_qconf` (`mpw`/`mpw'`, MP both ways) and the first
+   two-hart `exec_prog_ok'` supply (`mp_supply`).  A genuine `RacyD`
+   CYCLE witness needs two-event rows, whose only missing mechanism is
+   the `esil → adm_run` BRIDGE (the ~200 silent nodes between a load's
+   resume and the next store, certified at the WP tier in
+   `WeakEvStarted` §4 but never as `adm_run` at the `pstep_ev` tier) —
+   leaf-sized, not a design problem; the same-hart carrier is the
+   `beqz` control dep `dstep` already records.
 2. **L2′ proper — prove `l2_claim` for xv6's image**: per site class
    (S6 §3's inventory: aq/fenced/branched/data-fed/CS-covered/bad),
    from the emission (site records, `row_deps`) and the certified
