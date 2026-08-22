@@ -72,8 +72,9 @@ Recorded in full in [`../design/crash.md`](../design/crash.md) §"The split
 crash predicate". The four decisions:
 
 1. **`P_fs` splits into `P_disk ∗ P_wf` inside the one `crashN` body**,
-   sharing the committed map `D` (= `fr_D`) through a `ghost_var` at a
-   fixed gname, one half in each conjunct. `P_disk` (log/WAL layer):
+   sharing the committed map `D` (= `fr_D`) through one binder
+   (a `ghost_var` handle only when an outside holder must name `D`,
+   e.g. the contents layer's sync receipts). `P_disk` (log/WAL layer):
    physical fragments, `fs_recovery (blocks dk) D`, `hdr_wf`,
    mirror/custody, history. `P_wf` (FS layer): `⌜fs_wf⁻ D⌝`, and
    EVENTUALLY the higher-level durable ghosts (directory/file CONTENTS
@@ -106,9 +107,8 @@ crash predicate". The four decisions:
    layer, from its own state (mirror halves, custody, caught-up
    receipts). `end_op`'s client-facing premise is a single
    logically-atomic update of the durable view:
-   `∀ D, ghost_var γD ½ D ∗ ⌜fs_wf⁻ D⌝ ==∗ ghost_var γD ½ D' ∗
-   ⌜fs_wf⁻ D'⌝` at `D' =` install of the batch's logged values — a
-   FUPD, not a pure premise, because the eventual higher-level durable
+   `∀ D, P_wf D ==∗ P_wf D'` at `D' =` the batch's logged values over
+   the old view — a FUPD, not a pure premise, because the eventual higher-level durable
    ghosts (directory/file contents) must move in the same instant. It is
    built at `end_op` time (invariants openable at ⊤ there), consumed at
    the DMA completion's `∅`-mask opening, so it must be a basic ghost

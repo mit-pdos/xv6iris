@@ -228,10 +228,12 @@ stays open — honestly open, not vacuously closed.
 Refines the ruling above; worklist stages E–I in
 `projects/durable-disk.md`. Five decisions:
 
-1. **`P_fs = P_disk ∗ P_wf`, sharing the committed map `D` through a
-   `ghost_var` at a fixed gname, one half in each conjunct** (both inside
-   the ONE `crashN` body — the machine layer still opens exactly one
-   invariant at a DMA completion). `P_disk` is the log/WAL layer's:
+1. **`P_fs = P_disk ∗ P_wf`, sharing the committed map `D` through one
+   binder in the `crashN` body** (`∃ dk D, frags dk ∗ P_disk dk D ∗
+   P_wf D` — the machine layer still opens exactly one invariant at a
+   DMA completion; a `ghost_var` handle for `D` is introduced only when
+   an OUTSIDE holder needs to name it, e.g. the contents layer's
+   sync receipts). `P_disk` is the log/WAL layer's:
    the physical fragments pinning `dk`, `fs_recovery (fs_blocks dk) D`,
    `hdr_wf`, the mirror/custody arm, the history. `P_wf` is the FS
    layer's: `⌜fs_wf⁻ D⌝` — and EVENTUALLY the higher-level durable
@@ -259,14 +261,24 @@ Refines the ruling above; worklist stages E–I in
    So every `P_disk`-side permit is derived once, in the WAL layer, from
    its own state, and `end_op`'s one crash-facing premise is a
    logically-atomic update of the durable view:
-   `∀ D, ghost_var γD ½ D ∗ ⌜fs_wf⁻ D⌝ ==∗ ghost_var γD ½ D' ∗
-   ⌜fs_wf⁻ D'⌝` at `D' =` install of the batch's logged values (the
-   commit permit can NAME `D'` because the committer's mirror half
-   exposes `lm_slots`). A FUPD, not a pure premise: the eventual
+   `∀ D, P_wf D ==∗ P_wf D'` at `D' =` the batch's logged values over
+   the old view. A FUPD, not a pure premise: the eventual
    contents-level ghosts must move in the same instant. Built at
    `end_op` time (invariants openable at ⊤), consumed at the
    completion's `∅`-mask opening, hence a basic ghost update; the old
    view's `⌜fs_wf⁻ D⌝` arrives from the invariant body at fire time.
+   **What lets the commit fupd NAME `D'` at mask `∅` is the widened
+   mirror**: `log_mirror`'s payload grows from header+slots to the era's
+   full picture of the durable extent (home blocks included), pinned to
+   the physical disk on `cov ∪ log_region` by `log_mirror_ok`.
+   Maintainable because the WAL's own writes are the only writes to the
+   durable extent (installs know the bytes they write), and the custody
+   arm's per-era `ghost_var` + boot swap already solve the mortality
+   problem for exactly this shape (a stranded old-era half is abandoned
+   with its era; the new era swaps in its own var at the real disk's
+   picture). `fr_D` is then a pure function of the mirror picture — the
+   era knows the committed view BY VALUE — and no bio-layer fact is
+   ever needed inside a permit.
 5. **`fs_wf⁻`** is the reachability-closed weakening of
    `fsimg_wf`-minus-`fs_log_clean`: `fsimg_wf`'s W9 is mkfs-specific
    ("the only directory is root" — false after one successful mkdir),
