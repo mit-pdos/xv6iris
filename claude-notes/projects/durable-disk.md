@@ -486,8 +486,10 @@ sys_mknod, sys_chdir, filewrite, fileclose, kexec ×2, kexit, ireclaim).
         ∀ b, b ∈ fs_home_set cov ls -> b ∉ LB -> L !! b = Some (lm_view M b)`
         — the real body, under its own name, exactly the F1 idiom.
         What `log_state` carries is `log_mirror_tie`, whose interim body is
-        `True`; `log_mirror_tie_pending` is THE GATE and its three call
-        sites are the switch-on's rework list. **Why gated:** BOTH
+        `True`; `log_mirror_tie_pending` is THE GATE and its FOUR call
+        sites are the switch-on's rework list — two free (`ProofLogWrite`'s
+        absorb and append arms) and two walls
+        (`ProofEndOp.eo_open_to_batch`, `ProofInitlog`). **Why gated:** BOTH
         establishment sites are walls, so the unconditional row cannot be
         landed without an axiom (which the audit baseline forbids) —
         (1) end_op's deposit (`ProofEndOp.eo_open_to_batch`): the commit
