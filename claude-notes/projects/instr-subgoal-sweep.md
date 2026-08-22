@@ -113,6 +113,45 @@ conversions to this. A clean way to get a pristine arm without touching the
 shared tree is a throwaway remote directory of symlinks with the pristine `.v`
 copied in under a scratch name.
 
+## 2b. How to know you are actually done
+
+**`--check` is NOT an oracle.** Over four waves its `CLEAN` verdict was wrong in
+six distinct ways, each found by an agent after `--check` had passed the file:
+
+| what slips through | example | effect |
+|---|---|---|
+| the text hypothesis is not called `Htext` | the console/uart cone calls it `Ht` | **385 poses in 6 files** invisible; every wave skipped them |
+| a lemma APPLICATION as the argument | `iPoseProof (ar_i_tf 0%nat Hk with "Ht…")` | 13 poses in `ProofArgraw`, reported as converted |
+| column alignment before `with` | `iPoseProof (ti_instr9␣␣with "Htext")` | pose survives, file compiles green |
+| a `#`-persistent intro name | `as "#Hj1a"` | poses DELETED as dead, uses left behind |
+| a goal selector or bullet before the pose | `2:{ iPoseProof …`, `all: iPoseProof …`, `* iPoseProof …` | converter aborts *after* CLEAN |
+| a selection list split across lines | `with "[Hepi Hi80 …⏎ … Hib2]"` | the name on the closing line is not counted |
+
+The first four have been fixed in the tool and the last two now fail loud. But
+the lesson is the shape of the thing: **every one was a place where the
+grammar was narrower than the codebase**, so do not trust the next narrowing
+either. The real oracle is name-independent and grammar-independent:
+
+```sh
+grep -n 'with "Ht") as\|with "Htext") as' iris/<F>.v
+```
+
+Anything it prints that is a per-instruction fact is still posed. (A
+`kernel_text_intro` hypothesis or a composite continuation is fine.) Run it on
+every file you convert, and run it tree-wide before declaring a sweep finished
+— that grep is what found the console/uart cone after 220 files had been
+"completed".
+
+Alongside it, check the `Qed` COUNT is unchanged:
+
+```sh
+grep -c 'Qed\.' iris/<F>.v      # NOT '^ *Qed\.' -- that misses one-line
+                                #  [Proof. … Qed.] and cried wolf for 5 agents
+```
+
+against the `-time` log's `grep -cF '[Qed'`. This held on all 220 conversions
+and is the cheapest evidence that nothing was dropped.
+
 ## 3. The traps
 
 - **The `[]` subgoal usually comes first, but that is a property of the LEAF,
@@ -176,11 +215,49 @@ copied in under a scratch name.
   shape to watch for in any future grammar change: four agents hit it, and its
   worst form left the pose orphaned while rewriting the site CORRECTLY, so the
   file **compiled green carrying a dead fact in `Δ`** (worth ~9 % of
-  `ProofFreerange`). A green compile is not proof that a conversion is
-  complete — `tools/instr_subgoal.py --check` reporting `posed 0` is.
+  `ProofFreerange`). NEITHER a green compile NOR `--check` proves a
+  conversion complete — see "How to know you are actually done" below.
+- **A leaf or file-local helper taking N instruction facts at once.** Common:
+  `pw_restore5` (5), `fw_rest6` (6), `rd_exit` (6), `fc_restore4` (5),
+  `ec_epi` (8), `sp_close2` (5), `ilw_code` (13). The converter refuses more
+  than one instr token per site rather than guess. Convert by hand to N `[]`s
+  and N braces in premise order — the pure premises at these sites arrive as
+  `ltac:`/term arguments, so the N instr goals come out first and in order.
+  **Do NOT change the composite lemma's statement.** These lemmas are genuinely
+  pc-GENERIC (`pw_restore5` is applied at four different addresses, `ec_epi`
+  across two different functions), so the fact cannot be derived from
+  `kernel_text` inside them: `instr_intro_rvc`'s side conditions are all
+  `vm_compute` over the CONCRETE address. The ruling is that the composites
+  keep their `instr … -∗` premises and the facts are discharged as subgoals at
+  the call sites.
+- **A BUNDLE lemma** (`kv_store_instrs`, `pk_restore_at_2fe`) hands over a whole
+  block's instructions as one hypothesis. The discipline needs no change: one
+  `[]`, one brace.
+- **The fact is massaged before use** — `iEval (rewrite Hc7) in "Hi14"`. Move the
+  rewrite into the brace AND FLIP ITS DIRECTION:
+  `{ iEval (rewrite -Hc7). iApply (kvi_14 with "Htext"). }`. This has been
+  necessary at EVERY such site: the rewrite existed to turn the Code lemma's
+  compressed register spelling into the full one for the leaf, and in the
+  subgoal style the goal already carries the full spelling, so the brace must
+  rewrite back. The `iEval` and the `iApply` are not always adjacent —
+  `ProofForkret` has a 30-line `assert` between them.
+- **Brace VALIDITY under a goal selector.** Under `all:` or `1,3:` a `{ … }`
+  focuses one goal of several and shifts the numbering later explicit selectors
+  depend on. Use `; [ iApply (… with "Htext") | | ]`, preserving the goal count.
+- **A site inside a `;`-chain.** A `[]` adds a goal and breaks the chain — and
+  in an induction body the chain is running over several goals, so a selector
+  cannot be written either. Parenthesise the element so it stays single-goal:
+  `(iApply (… with "… []"); [ iApply (pii_74 with "Htext") | ]);`.
+  `ProofPrintint` is the worked example, and its own header comment explains
+  why every step of that chain must stay single-goal.
+- **A helper lemma's own statement hypotheses can collide** with a posed name
+  elsewhere in the file (`ProofSysPipe`'s `Hi10`). Alpha-rename the intro; leave
+  the statement alone.
 - **A stray reference need not be a use at all.** `ProofIget`'s lone
   non-conforming reference was the file-header COMMENT quoting a leaf
-  application. Read the site before assuming it needs a proof change.
+  application. Read the site before assuming it needs a proof change — and
+  UPDATE the comment to the subgoal style, so it stops teaching the old pattern
+  to the next reader. That is the whole point of finishing the sweep.
 
 ## 4. What the sweep measured
 
@@ -258,18 +335,30 @@ take what you get.
 - The `Require` prelude is ~1.0 s in every file and unchanged, so none of the
   residual is fixed overhead.
 
-## 5. What is left
+## 5. State
 
-`tools/instr_subgoal.py --check iris/*.v` is the live scoreboard and
-`--rank iris/*.v` is the queue. As of 2026-08-22, **111 files are converted**
-and ~110 still pose, but most of the remaining ones score low — the top of the
-`--rank` list is where the value is:
+**The sweep is complete.** Every `Proof*.v` / `Wp*.v` in the tree closes its
+instruction facts as subgoals; `grep -n 'with "Ht") as\|with "Htext") as'` over
+`iris/` returns no per-instruction pose. Verified by a from-scratch rebuild
+(every `.vo` deleted, `make -C iris -j180 -k`): 1297/1297, zero errors.
 
-| tier | what to do |
-|---|---|
-| score ≥ 8 on `--rank` (~30 files) | worth converting; `ProofKalloc` (37/1), `ProofFileclose` (60/2), `ProofEitherCopy` (68/3), `ProofPrepareReturn` (42/2), `ProofVmfault` (55/3), `ProofReadi` (92/6) lead it. |
-| score < 8 | `ProofKfree`, `ProofKinit`, `ProofVirtioDiskRw` and friends: either already clear-early (peak 1) or spread over many small lemmas. Convert for consistency if you like, expect ~5 %. |
-| `HAND WORK` on `--check` | the facts are used in a shape the site grammar does not cover. `ProofEitherCopy`, `ProofPipewrite`, `ProofNamex`-family leftovers. Convert the conforming sites, hand-convert the rest. |
-| `;`-chained poses | `--check` now flags them (`ProofPrintint` 5, `ProofBalloc` 1). Their sites end in `;` rather than `).`, so the grammar cannot see them; hand work, and small. |
+Two things deliberately left as they are, both recorded above:
 
-Record each conversion's numbers in §4 as it lands.
+- **The pc-generic composite leaves** keep their `instr … -∗` premises
+  (§3). Their call sites discharge the facts as subgoals; the statements cannot
+  derive them internally, and specialising them per address would duplicate
+  proof bodies.
+- **The user tier does not participate and should not be converted.**
+  `UProof*.v` gets its instruction facts from `uinstr` (`UmodeMem.v`), a
+  `Record … : Prop` over a PURE process image `M : gmap Z (bv 8)` — not an
+  iProp over a persistent resource. So the facts are passed positionally as
+  Coq terms at each leaf application (1016 of them) and never enter `Δ` at all:
+  `iPoseProof` appears **zero** times in every `UProof*.v`. Measured, the lever
+  does not exist there — `UProofShParse.v`, 8992 lines, compiles in 46 s with
+  65 `Qed`s totalling 4.3 s and no single `Qed` over ~1 s, against
+  `ProofCreate.v`'s 41 s of `Qed` and a 13.5 s single one. A reader comparing
+  the two tiers should not conclude the user side was missed; the modelling
+  choice is what differs.
+
+Keep new proofs in the discipline from the start — that is much cheaper than a
+retrofit, and §2b is how to tell you actually did.

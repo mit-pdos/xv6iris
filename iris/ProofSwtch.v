@@ -173,7 +173,6 @@ Section ProofSwtch.
               [32;33;34;35;36;37;38;39;40;41;42;43;44;45]%nat = new_vs).
     { unfold rho; cbn.
       apply (list14_nth new_vs (mword_of_int 0) Hlen_new). }
-    iDestruct (swtch_code with "Ht") as "Hcode".
     iEval (rewrite -Hden) in "Hfile".
     (* ---- run the 28-instruction straight-line block (regime-blind engine) ---- *)
     iApply (wp_vc_block_s_den_r strans_regime swtch_prog
@@ -183,7 +182,8 @@ Section ProofSwtch.
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               (SRegime.sr_ktier_wit_KT0 strans_regime) swtch_run
               with "Hhw Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Htr
-                    Hpc Hfile Hcode [Holdcells Hnewcells] []").
+                    Hpc Hfile [] [Holdcells Hnewcells] []").
+    { iApply (swtch_code with "Ht"). }
     { rewrite /vheap_own /swtch_heap0 big_sepL_app.
       rewrite (seg_cells_ctx rho 10 oldc 0 _ Hrho10).
       rewrite (seg_cells_ctx rho 11 newc 0 _ Hrho11).
@@ -263,7 +263,6 @@ Section ProofSwtch.
     assert (Hcsp_t : vregs_den rho swtch_regs1 !!! Regidx csp_rs1
                      = nth 1 new_vs (mword_of_int 0)).
     { rewrite <- Hcallee_new. exact (eq_sym (callee_img_nth1 _ (mword_of_int 0))). }
-    iDestruct (swi_68 with "Ht") as "Hret".
     iApply (wp_cret_s_zca_r_later strans_regime
               (mword_of_int (KernelSyms.swtch + 0x68) : mword 64)
               (mword_of_int 1 : mword 5) (vregs_den rho swtch_regs1)
@@ -271,8 +270,9 @@ Section ProofSwtch.
               HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               ltac:(intro Hc0; vm_compute in Hc0; discriminate) Hlpe
               with "Hhw Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Htr
-                    Hpc Hfile Hret
+                    Hpc Hfile []
                     [Hnewwand Hvoldc Hnewpart HP Hhalf Hspp Hq0 Hcpuown Hstk_t]").
+    { iApply (swi_68 with "Ht"). }
     (* ---- the ▷ continuation: iNext strips it AND the record's ▷'d pieces ---- *)
     iNext.
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htr Hpc Hfile".
