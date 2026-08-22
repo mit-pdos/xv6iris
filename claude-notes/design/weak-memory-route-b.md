@@ -1157,6 +1157,31 @@ PROBE (the build's step 0): widen `oib32`, make the `RegRead` arm
 record `r` and the boundaries reset, and check `pcls_ev_erasable` and
 `esil_node_agree`/`erun_silent_sound` still go through; ~64 `wgib`
 sites are the mechanical blast radius.
+SLICES 2b/3, STATED (2026-08-22, post-DEC-7).  THE CERTIFICATION
+INVARIANT, per hart `x`: a certified program state `p_x` (in the
+certified run) and the G-emission state `q_x` (`hemit_states` at the
+same row position), a TAINT set `T_x ⊆ wreg`, with `dreg_agree
+(complement T_x) p_x q_x`, and `T_x` = the dynamic-provenance closure
+of the substituted reads so far.  Because DEC-7 makes `row_deps` the
+SAME dataflow the taint follows (the `LRegW` sources ARE the
+instruction's carrier read set), "`z`'s instruction reads no tainted
+carrier" ⟺ "no `row_deps` path from a substituted read to `z`" —
+and every read with a path to `z` is `gd_deps`-below `z`, hence not a
+witness.  So the per-instruction lemma (2b) is: iterate
+`pnode_step_dagree` through one instruction's nodes from `p_x`/`q_x`
+agreeing off `T_x`, with equal memory-read answers at its memory
+nodes (PTE reads included), to conclude equal emitted labels and
+equal destination writes; a memory read whose answers DIFFER (a
+witness) instead adds its destination to `T_x` (`pnode_step_channel`
+/`erun_ib_rds` give the read set; the destination is the decoder's).
+Slice 3 then runs the gmo-ordered induction over `K`'s writes
+maintaining the invariant, with the fabric at `d0` (B1b-1's
+quiescence) and the log = `P`'s messages ++ the certified ones.  The
+"substituted read" is any read whose G-source is not yet in the log
+— its value is the log's current message (the machine's latest,
+always admissible); its hart's later same-byte reads are witnesses
+too (poloc), and its taint reaches exactly the registers the dynamic
+flow says.
 Order of work for B2e-3b, revised: (1) the satp-provenance edge in the
 emission (`dstep` + the instance's CSR write annotation); (2) the
 soundness lemma, stated once over `pstep_ev` ("agreement on named
