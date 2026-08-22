@@ -367,6 +367,23 @@ sys_mknod, sys_chdir, filewrite, fileclose, kexec ×2, kexit, ireclaim).
 
 ## 7. Stage H — boot re-founding: mint at `D`, recovery a ghost no-op
 
+- [ ] **H0. The adequacy-layer pure-projection hook** (the mechanism
+      that replaces `Himg`). The era fupd cannot identify `P_fs`'s
+      existential `dk` with the real disk — the fixed auth lives in
+      `state_interp`, which the era entailment never holds. But
+      `riscv_power_adequacy`'s OWN proof holds `state_interp` at every
+      PowerOn step, so it can open `crashN` there, run the one
+      auth/frag agreement, and extract a client-chosen PURE projection
+      of the crash predicate at the boot state. Interface:
+      `riscv_power_adequacy` generalizes with a client hook
+      `Hproj : ∀ g', state_interp g' ∗ ▷ Pc ={E}=∗ state_interp g' ∗
+      ▷ Pc ∗ ⌜Pc_pure g'⌝` and `Hboot` gains the premise
+      `⌜Pc_pure g'⌝`. The FS instantiates
+      `Pc_pure g' := fs_durable_wf (the recovery of (v_disk g')) ∧
+      hdr_wf … ∧ geometry` — Himg's SHAPE, now PROVEN from the loop
+      invariant instead of assumed. `fs_recovery_total` makes the
+      recovery-of spelling a pure function of `v_disk g'`, so the era
+      mint computes at a CONCRETE image, exactly as today.
 - [ ] **H1.** `fs_cfg_alloc` (and `FsBoot.fs_boot_ghosts`) run at `D`
       read out of `P_fs` in the era fupd (open `crashN` at ⊤); the
       raw-disk premises become `fs_durable_wf D` + geometry from `P_fs`.
