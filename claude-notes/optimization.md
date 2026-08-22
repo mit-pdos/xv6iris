@@ -111,6 +111,34 @@ once at the return. A 20-wand continuation over three 4096-element big-ops was
 the continuation is already a named `Definition`** — naming is the fix; the seal
 is only for a spec body that spells it inline.
 
+**THE SAME RULE APPLIES TO A PREMISE-SIDE CLOSER, and there it is easier to
+miss** — a closer arrives as a hypothesis rather than as a goal, so it never
+shows up as a hot sentence; it just sits in `Δ` making every step of the walk
+dearer. `ProofForkret`'s residue closer (`∀ h pt' V', ⌜..⌝ -∗ ⌜..⌝ -∗ ⌜..⌝ -∗
+ut_tfk -∗ first_done -∗ W -∗ timer_cap -∗ forkret_yield -∗ URes h pt' ksp`) was
+spelled out in THREE statements — `wp_forkret_gen_body` and both of the proof's
+two block lemmas — and measured **13 % of the Iris context** of every step of a
+1300-step walk. One `Definition SpecForkret.forkret_closer` naming it, used in
+all three, took the file **27.1 s → 20.7 s (−24 %)** with a byte-identical
+assumption set. Keep it TRANSPARENT for the reason the previous subsection
+gives: the tail applies it with `iDestruct ("Hyield" $! …)`.
+
+**How to find the entry worth sealing: dump `Δ` and rank it by printed size.**
+`Unset Printing Notations. Set Printing Depth 200. Show.` on a line in the
+middle of the walk, on a scratch copy, prints `environments.Envs` in full;
+splitting it on the quoted hypothesis names gives a size per entry. On
+`ProofForkret` at the `kexec` call that was 55 entries / 15 kB, and the closer
+was the biggest single row by 30 %. This beats guessing — the entries that LOOK
+big (`big_opS`/`big_opL` rows over the fs kit) were 300–900 bytes each.
+
+**A closer that is a premise of a MODULE-TYPE contract has to be defined
+outside the spec file's `Section`.** The closer quantifies over the hart `h`
+and applies its rows at `(CID := h)`, and inside a `Section` whose `Context`
+fixes `CID` those rows do not take a `CID` argument yet — the error is
+*"Wrong argument name CID"* at the first such row. Give the `Definition` its
+own `` `{!riscvGS Σ, …} `{GEN : GenId} `` binders at top level, exactly as the
+contract body beside it already does.
+
 ### Do not pose instruction facts AT ALL — close them as subgoals
 
 **This supersedes "pose late" for `instr` facts, and it is a bigger win than
@@ -178,6 +206,26 @@ way; retrofitting only works on **straight-line** stretches (in a Löb/induction
 body a textually single use runs every iteration, so an `iClear` after it kills
 the back edge, and if the uses are spread over two arms, moving the pose into the
 first starves the second).
+
+**`iPoseProof (fkr_XX with "Htext") as "HiXX"` lands the fact in the
+INTUITIONISTIC context, so the `iApply` that reads it does NOT consume it** —
+`instr` is persistent, and the proofmode files a persistent hypothesis under
+`□`. That is why the pose block costs what it costs, and why the retrofit needs
+an explicit `iClear "HiXX"` after the last use, not just a later pose.
+
+**And it is why a pose that is never used is invisible.** Nothing fails: a
+persistent leftover does not trip the "spatial hypotheses remain" check at
+`Qed`, so a copy-pasted block of 30 poses can carry 16 that the proof never
+reads. `ProofForkret.wp_forkret` had exactly that (`fkr_64` … `fkr_8e`, which
+its callee `fkr_tail` poses for itself). Retrofit measured on that file
+(77 poses over three block lemmas): 16 dead poses dropped, 56 moved to the
+sentence of their first use, 57 `iClear`s added — **28.9 s → 27.1 s**.
+Grep for it with "a pose whose name never appears again in the same
+`Proof.`…`Qed.`"; the name is reused across the file's lemmas, so the search
+has to be scoped to one proof block or every pose looks live. **That retrofit
+is superseded by the subsection above** — converting the same 61 surviving
+poses to `[]` subgoals is the bigger win, and it makes the dead ones vanish by
+construction; the numbers here stand only as the cost of the poses themselves.
 
 ### Hypothesis names are 10–20 % of a whole-function proof term
 
@@ -708,6 +756,13 @@ alone: read the `.v.timing` cost of a candidate site, never its shape.
   with X` is the fully-redundant form — the `change` alone produces the same
   goal, so the pair is `pose` + `change` (measured in ProofPipewrite: 66 such
   `set`s cost 4.4 s where the sibling's 83 `pose`s cost 0.29 s, ~20× per call).
+  **Where the file already uses `set`, deleting the trailing `change` is the
+  free half of that fix and needs no other edit**: the `change` is then a
+  whole-goal conversion that folds nothing, because `set` has already folded
+  every occurrence. 45 of them in `ProofForkret` cost **1.44 s** of a 30.3 s
+  file (30.3 s → 28.9 s to delete, proof script otherwise untouched). Grep is
+  `set (X := T).` immediately followed by `change T with X.` with `T` equal up
+  to whitespace.
 - **`Local Strategy opaque [rget tp_pin rf_upd]` in a whole-function proof whose
   leaves state their premises over `rget`.** Every such `iApply` otherwise makes
   the unifier walk `rget → tp_pin → rf_upd` down the whole update chain, and the
@@ -988,6 +1043,55 @@ in what every rule in this file is fighting.
   dead-import sweep shortlists candidates from whatever `.glob` files it finds
   in `iris/`, and `SystemAssumptions.v`'s single `Require` is the one thing it
   must not lose; with no `.glob` the file is reported UNANALYSED and left alone.
+
+### The 95 s figure is stale: the audit is now 379 s (re-measured 2026-08-22)
+
+Same command, same VM, `iris/` at 344 MB of `.vo` — up only 14 % from the
+302 MB the 95 s was measured at, so **the cone widened, the tree did not**.
+Budget the audit at ~6½ minutes and treat the number as a tripwire: it is the
+proxy metric this section says it is, and it just moved 4×.
+
+Measured beside it, on the same tree (isolated `coqc`, one `Print Assumptions`
+per process):
+
+| constant | wall | peak RSS |
+|---|---|---|
+| `SystemAdequacy.xv6_power_adequacy_xv6Σ` (the audit) | 379 s | 5.8 GB |
+| **`Forkret.wp_forkret`** | **336 s** | 5.5 GB |
+| `UserretClosedD.wp_userret_closed` | **334 s** | 5.2 GB |
+| `Kexec.wp_kexec_sconf` | 149 s | 4.0 GB |
+| `Fsinit.wp_fsinit_sconf` | 85 s | 2.6 GB |
+
+**So "auditing forkret takes forever" is not about forkret.** `ProofForkret`'s
+own proof terms are ~2 s of the 336; the other 334 is the closed trap loop it
+concludes in, and every contract that ends in `UserretClosedD` pays exactly
+that. Cutting `ProofForkret.v`'s compile time by a third (2026-08-22) moved its
+audit by nothing — 336 s → 343 s, i.e. run-to-run noise, with a byte-identical
+axiom list. Do not go looking for the cost in the file you are auditing;
+audit its deepest callee first and see whether the difference is worth anything.
+
+**Where the time actually goes** (`perf record` over the 336 s run, flat self
+time; the tree's opam switch carries OCaml symbols, so this is readable):
+
+| cluster | share |
+|---|---|
+| `Cooking.*` — the SECTION DISCHARGE (`substrec`, `share`, and the `Int.Map` memo behind it, plus the `Constr.map_with_binders` / `CArray.map` it drives) | **~40 %** |
+| `Mod_subst.map_kn` + the `Names` hashing/compare it drives — the FUNCTOR substitution | ~12 % |
+| `Assumptions.traverse` / `traverse_inductive` / `fold_with_full_binders` — the walk the command is nominally doing | ~8 % |
+| OCaml GC (`caml_oldify_one`, `do_some_marking`) | ~4 % |
+
+The command spends five times as long re-COOKING terms out of their sections as
+it does walking them, which is the mechanism behind the 2.7× section-packaging
+figure above. The lever, if anyone wants it, is per-lemma `` `{!riscvGS Σ, …} ``
+binders instead of `Section` + `Context` in the hot cone — `ProofForkret.v`
+already writes its lemmas that way, which is part of why it contributes so
+little. That is a ~778-file change, so it is a campaign, not a fix.
+
+- **GC tuning does nothing — do not redo it.** `OCAMLRUNPARAM=s=8M,o=200`,
+  `s=64M,o=400` and `s=256M,o=1000` against a 336 s / 5.5 GB baseline came back
+  350 s, 350 s and 342 s (all three run concurrently, so slightly inflated).
+  `s=256M,o=1000` doubles peak RSS to 11 GB and buys ~2 %. Consistent with the
+  perf profile: GC is 4 % of the run.
 
 
 ## Smaller traps

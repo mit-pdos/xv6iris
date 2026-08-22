@@ -228,6 +228,45 @@ Section SpecForkret.
 
 End SpecForkret.
 
+(* THE RESIDUE CLOSER, SEALED IN A NAME.  Spelled inline it is ~13 % of
+   the Iris context of every step of ProofForkret's three walks -- and a
+   proofmode step's term mentions the whole context twice, so an inline
+   20-line wand is paid ~1300 times over.  It is one [Definition] and
+   stays TRANSPARENT: [fkr_tail] applies it with [iDestruct ("Hyield" $!
+   ...)], which unifies through a transparent constant and fails through
+   an opaque one (claude-notes/optimization.md, "Fold block continuations
+   into named definitions"). *)
+Definition forkret_closer
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+    (URes : CpuId -> uptd -> mword 64 -> iProp Σ)
+    (W : iProp Σ) (γf : gname) (p ksp : mword 64) (pid : mword 32)
+    (av : nat) : iProp Σ :=
+  (∀ (h : CpuId) (pt' : uptd) (V' : pprivate),
+     ⌜pv_upt V' = pt'⌝ -∗
+     ⌜ud_data pt' = ud_pas pt'⌝ -∗
+     ⌜proc_pt_wf pt'⌝ -∗
+     (* THE TRAPFRAME'S KERNEL WORDS, at the resuming hart: prepare_return
+        wrote them there and [V'] is the descriptor it handed back, so this
+        is forkret's to pay -- see [UsertrapRes.ut_tfk]. *)
+     UsertrapRes.ut_tfk (CID := h) ksp V' -∗
+     (* THE FILE SYSTEM AND THE SEALED [first] CELL, HANDED TO THE CLOSER
+        RATHER THAN HELD BY IT.  [FirstTok.first_done] is exactly
+        [first_addr ↦₄□ 0 ∗ fs_ready] -- see the header's last section for
+        why the closer's builder cannot own either half. *)
+     FirstTok.first_done -∗
+     W -∗
+     (* THE RESUMING HART'S TIMER CAPABILITY.  It is a conjunct of
+        [IntrDefs.sie_cap] now (see the note there), so the residue cannot
+        assemble the kernel bundle at the trap without one -- and it must be
+        THIS hart's, which is why it is supplied PER APPLICATION rather than
+        owned by the closer: a record parked before that hart ever booted
+        could not hold it.  forkret has one, out of the very capability it
+        is about to hand back. *)
+     TimerCap.timer_cap (CID := h) -∗
+     forkret_yield (CID := h) γf p ksp pid av V' -∗
+     URes h pt' ksp)%I.
+
+
 (* THE CONTRACT.  One statement, no [first] premise and no [first] reading:
    the branch is decided by [FirstTok.first_tok] inside [proc_priv].  See
    the header for the three premises the boot arm costs and for why the
@@ -286,31 +325,9 @@ Definition wp_forkret_gen_body
   is_kstack p ks -∗
   proc_priv γf p pid V -∗
   W -∗
-  (* ---- the residue closer -- see the header ---- *)
-  (∀ (h : CpuId) (pt' : uptd) (V' : pprivate),
-     ⌜pv_upt V' = pt'⌝ -∗
-     ⌜ud_data pt' = ud_pas pt'⌝ -∗
-     ⌜proc_pt_wf pt'⌝ -∗
-     (* THE TRAPFRAME'S KERNEL WORDS, at the resuming hart: prepare_return
-        wrote them there and [V'] is the descriptor it handed back, so this
-        is forkret's to pay -- see [UsertrapRes.ut_tfk]. *)
-     UsertrapRes.ut_tfk (CID := h) ksp V' -∗
-     (* THE FILE SYSTEM AND THE SEALED [first] CELL, HANDED TO THE CLOSER
-        RATHER THAN HELD BY IT.  [FirstTok.first_done] is exactly
-        [first_addr ↦₄□ 0 ∗ fs_ready] -- see the header's last section for
-        why the closer's builder cannot own either half. *)
-     FirstTok.first_done -∗
-     W -∗
-     (* THE RESUMING HART'S TIMER CAPABILITY.  It is a conjunct of
-        [IntrDefs.sie_cap] now (see the note there), so the residue cannot
-        assemble the kernel bundle at the trap without one -- and it must be
-        THIS hart's, which is why it is supplied PER APPLICATION rather than
-        owned by the closer: a record parked before that hart ever booted
-        could not hold it.  forkret has one, out of the very capability it
-        is about to hand back. *)
-     TimerCap.timer_cap (CID := h) -∗
-     forkret_yield (CID := h) γf p ksp pid av V' -∗
-     URes h pt' ksp) -∗
+  (* ---- the residue closer -- see the header, and [forkret_closer] above
+     for why it is a name rather than the wand spelled out ---- *)
+  forkret_closer URes W γf p ksp pid av -∗
   WP (Loop : expr riscv_lang).
 
 (* The residue is the module-type parameter it is everywhere else: forkret's

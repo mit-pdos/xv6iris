@@ -97,8 +97,10 @@ the tree as it stands and touches no dump rule:
 run-on-gcp --no-sync bash -c 'cd /mnt/rocq/trees/<tree> && make -s SWITCH=/shared/xv6rocq audit-only'
 ```
 
-Budget ~95 s for it — that is the command, not the build (claude-notes/optimization.md
-§"`Print Assumptions` is a whole-tree walk").
+Budget ~6½ minutes for it (379 s, re-measured 2026-08-22; the 95 s this note
+used to give is stale — the cone widened, not the tree). That is the command,
+not the build — see claude-notes/optimization.md §"`Print Assumptions` is a
+whole-tree walk", which also has the perf breakdown and the GC negative result.
 
 **`user-rocq` is a THIRD compiled directory, and forgetting it does not look
 like a missing step** — `iris/_CoqProject` maps `-R ../user-rocq User`, so the
