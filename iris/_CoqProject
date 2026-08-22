@@ -1124,3 +1124,4 @@ WeakRvwmoGlue2.v
 WeakRvwmoCapstone.v
 WeakRvwmoWalk.v
 WeakRvwmoCycWit.v
+WeakRvwmoProgress.v
