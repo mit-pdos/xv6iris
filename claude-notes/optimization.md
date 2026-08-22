@@ -111,15 +111,73 @@ once at the return. A 20-wand continuation over three 4096-element big-ops was
 the continuation is already a named `Definition`** — naming is the fix; the seal
 is only for a spec body that spells it inline.
 
+### Do not pose instruction facts AT ALL — close them as subgoals
+
+**This supersedes "pose late" for `instr` facts, and it is a bigger win than
+anything else of its size in this file.** A leaf lemma's `instr pc rvc ast`
+premise does not have to arrive as a hypothesis. Leave it as a `[]` in the
+specialisation pattern and close the subgoal on the spot from the persistent
+`kernel_text`:
+
+```coq
+    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.pipealloc + 0x02))
+              (mword_of_int 5 : mword 6) Rra R1 (K - 6)%nat u40 b
+              with "Hcg Hpc [] Hr40").
+    { iApply (pai_02 with "Htext"). }
+```
+
+No `pai_*` fact ever enters Δ, so the whole file's per-step cost drops by the
+size of the block that used to sit there. Purely mechanical: delete the
+`iPoseProof (pai_<off> with "Htext") as "Hi<off>"` lines and rewrite each
+`with "Hcg Hpc Hi<off> …"` into `with "Hcg Hpc [] …"` plus the brace.
+
+**Measured on `ProofPipealloc.v`** — one 2000-line whole-function proof, 58
+posed facts, 72 use sites; two module-renamed copies of the same file compiled
+in the same tree, isolated `coqc -time -async-proofs off`, min of three
+interleaved runs:
+
+| | posed | subgoal | |
+|---|---|---|---|
+| wall | 47.6 s | 25.6 s | **−46 %** |
+| tactic time (Σ sentences − `Qed`) | 39.0 s | 21.7 s | −44 % |
+| `Qed` | 7.68 s | 3.02 s | **−61 %** |
+| proof-term tree (`Debug "hconstr"`) | 26.6 M | 8.31 M | **−69 %** |
+| DAG bindings | 96 677 | 84 141 | −13 % |
+| `.vo` | 1.40 MB | 1.15 MB | −18 % |
+| peak RSS | 2.55 GB | 1.81 GB | −29 % |
+
+Three things to read out of that table. The saving is **flat** — no sentence
+got dramatically faster, the whole 1690-sentence tail did, which is RULE ONE's
+`tree ≈ 2 × steps × |Δ|` seen from the `|Δ|` side. The **tree collapses 3.2×
+while the DAG barely moves** (−13 %): the derivations of the 72 facts are still
+in the term, sharing their subterms, but they are no longer re-embedded in every
+following step's environment. And the 72 extra subgoals cost essentially
+nothing — each is one `iApply` against a persistent hypothesis.
+
+Two mechanics worth knowing:
+
+- The `[]` subgoal comes **first**, before the continuation. Use a focused
+  `{ … }` rather than `; [ … | ]`: a call site that already has a `[Hr40]`
+  pattern later in the string produces three goals, not two, and the brace does
+  not care.
+- `[]` splits the *spatial* context only, so `#Htext` (and every other
+  persistent hypothesis) is still there to close the goal with.
+
+The limit is the same as "pose late"'s: an `instr` used inside a Löb/induction
+body is re-derived on every iteration. That is one extra `iApply` per iteration
+against a persistent fact, and it is still the right trade — but do not expect
+the retrofit to be free there.
+
 ### Pose late, clear early
 
-A persistent hypothesis is not free — it is re-embedded in the term of every
-step that follows it. Pose an `instr` fact on the line above the `iApply` that
-eats it, not in a block of 40 at the top. Write new proofs this way; retrofitting
-only works on **straight-line** stretches (in a Löb/induction body a textually
-single use runs every iteration, so an `iClear` after it kills the back edge, and
-if the uses are spread over two arms, moving the pose into the first starves the
-second).
+For everything that is NOT an `instr` fact (and for an `instr` fact you have a
+reason not to convert), a persistent hypothesis is still not free — it is
+re-embedded in the term of every step that follows it. Pose it on the line above
+the `iApply` that eats it, not in a block of 40 at the top. Write new proofs this
+way; retrofitting only works on **straight-line** stretches (in a Löb/induction
+body a textually single use runs every iteration, so an `iClear` after it kills
+the back edge, and if the uses are spread over two arms, moving the pose into the
+first starves the second).
 
 ### Hypothesis names are 10–20 % of a whole-function proof term
 
