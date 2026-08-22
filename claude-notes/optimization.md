@@ -159,37 +159,45 @@ size of the block that used to sit there. Purely mechanical: delete the
 `iPoseProof (pai_<off> with "Htext") as "Hi<off>"` lines and rewrite each
 `with "Hcg Hpc Hi<off> …"` into `with "Hcg Hpc [] …"` plus the brace.
 
-**Measured on `ProofPipealloc.v`** — one 2000-line whole-function proof, 58
-posed facts, 72 use sites; two module-renamed copies of the same file compiled
-in the same tree, isolated `coqc -time -async-proofs off`, min of three
-interleaved runs:
+**Measured across 63 converted files** (2026-08-22), each an isolated
+`coqc -time -async-proofs off` pair, pristine vs converted:
 
-| | posed | subgoal | |
-|---|---|---|---|
-| wall | 47.6 s | 25.6 s | **−46 %** |
-| tactic time (Σ sentences − `Qed`) | 39.0 s | 21.7 s | −44 % |
-| `Qed` | 7.68 s | 3.02 s | **−61 %** |
-| proof-term tree (`Debug "hconstr"`) | 26.6 M | 8.31 M | **−69 %** |
-| DAG bindings | 96 677 | 84 141 | −13 % |
-| `.vo` | 1.40 MB | 1.15 MB | −18 % |
-| peak RSS | 2.55 GB | 1.81 GB | −29 % |
+| | range | median |
+|---|---|---|
+| wall | −9 % … −49 % | ≈ −24 % |
+| `Qed` | −16 % … −62 % | ≈ −33 % |
+| `.vo` | −24 % … **+0.2 %** | ≈ −6 % |
 
-Three things to read out of that table. The saving is **flat** — no sentence
-got dramatically faster, the whole 1690-sentence tail did, which is RULE ONE's
-`tree ≈ 2 × steps × |Δ|` seen from the `|Δ|` side. The **tree collapses 3.2×
-while the DAG barely moves** (−13 %): the derivations of the 72 facts are still
-in the term, sharing their subterms, but they are no longer re-embedded in every
-following step's environment. And the 72 extra subgoals cost essentially
-nothing — each is one `iApply` against a persistent hypothesis.
+Aggregate: **1893 s → 1400 s of serial compile work, −26 %.** On the reference
+file (`ProofPipealloc.v`, one whole-function proof, 58 posed facts) the proof
+term itself went 26.6 M → 8.3 M nodes (−69 %) while the shared DAG moved only
+−13 % — the derivations are still in the term, sharing subterms, but they are no
+longer re-embedded in every following step's environment. That is RULE ONE seen
+from the `|Δ|` side, and it is why the saving is FLAT: no sentence gets
+dramatically faster, the whole 1690-sentence tail does.
 
-Two mechanics worth knowing:
+**What predicts the size of the win is the LARGEST LIVE POSE BLOCK A LEAF SITS
+UNDER** — not the file's site count. `ProofUartinit` (27 sites, all one block)
+got −35 %; `ProofSysExec` (92 sites, blocks ≤19 over ~30 proofs) got −14 %;
+`ProofCreate` (150 sites over 111 lemmas) got −18 %. It sorts candidates
+reliably but sizes the win only to ±10 points.
 
-- The `[]` subgoal comes **first**, before the continuation. Use a focused
-  `{ … }` rather than `; [ … | ]`: a call site that already has a `[Hr40]`
-  pattern later in the string produces three goals, not two, and the brace does
-  not care.
-- `[]` splits the *spatial* context only, so `#Htext` (and every other
-  persistent hypothesis) is still there to close the goal with.
+Three things measurement refuted, all of which looked true after the first file:
+
+- **`Qed` does not always improve more than wall** — it failed on
+  `ProofUvmcreate`, `ProofWakeupParts` (whose first `Qed` got slower outright)
+  and `ProofSysOpen`. Holds for blocks of ~20+.
+- **`.vo` is not a proxy for the effect and can grow** (+0.2 % on four files),
+  and on one batch it anti-correlated with the wall win.
+- **Peak RSS is not a reliable benefit** (−37 % to +0.2 %).
+
+A `Löb`/`iInduction` body is **not** a special case: measured in-loop vs
+out-of-loop discounts agree (−56/−45, −43/−42, −26/−30 on three loop files), so
+re-deriving the fact each iteration is swamped by the `|Δ|` discount.
+
+`tools/instr_subgoal.py` does the edit; see
+`claude-notes/projects/instr-subgoal-sweep.md` for the recipe, the traps and
+what is left.
 
 The limit is the same as "pose late"'s: an `instr` used inside a Löb/induction
 body is re-derived on every iteration. That is one extra `iApply` per iteration

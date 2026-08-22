@@ -1,8 +1,8 @@
 # The instr-subgoal sweep
 
-**Status (2026-08-22).** The discipline is settled and measured; `ProofPipealloc.v`
-is the landed reference conversion (`baabee94`). What is left is the sweep: 214
-more files still pose their instruction facts. The rule itself lives in
+**Status (2026-08-22).** The discipline is settled and measured over 63 files;
+`ProofPipealloc.v` is the reference conversion (`baabee94`). What is left is
+the tail: 157 files still pose their instruction facts. The rule itself lives in
 [`../optimization.md`](../optimization.md) under "Do not pose instruction facts
 AT ALL"; this file is the RECIPE and the SCOREBOARD.
 
@@ -25,9 +25,10 @@ the persistent `kernel_text`.
 Why it pays: RULE ONE says `tree ≈ 2 × (#proofmode steps) × |Δ|`. A block of 60
 posed facts is 60 extra entries in `Δ` re-embedded in the term of every step that
 follows, and a whole-function proof has ~1700 of them. Deleting the block is a
-`|Δ|` reduction, so it discounts the ENTIRE proof, flatly. Measured on
-`ProofPipealloc.v`: wall −46 %, `Qed` −61 %, proof-term tree −69 %, `.vo` −18 %,
-peak RSS −29 %. The table is in `optimization.md`.
+`|Δ|` reduction, so it discounts the ENTIRE proof, flatly. Measured across 63
+converted files: wall −9 % to −49 %, median ≈ −24 %, aggregate −26 % of serial
+compile work; on the reference file the proof term itself went −69 % (26.6 M →
+8.3 M nodes). §4 has the full dataset and the three claims it refutes.
 
 ## 2. The mechanical recipe
 
@@ -145,63 +146,95 @@ awk '{for(i=1;i<=NF;i++) if($i=="secs") s+=$(i-1)} END{print s}' F.time.log
 
 ## 4. What the sweep measured
 
-Twenty-two files converted 2026-08-22, each measured with one pristine and one
-converted single-file `coqc -time -async-proofs off` run, back to back on the
-VM.
+63 files converted 2026-08-22, each with one pristine and one converted
+single-file `coqc -time -async-proofs off` run, back to back on the VM. Every
+one compiled green, and every one has the SAME NUMBER of `Qed` sentences before
+and after — the cheap invariant that says no proof obligation was dropped. Run
+it on every conversion:
 
-| file | sites | wall | `Qed` | `.vo` |
-|---|---|---|---|---|
-| `ProofScheduler` | 57 | 30.1 → 15.4 s (**−49 %**) | 4.76 → 1.81 (−62 %) | −17.5 % |
-| `ProofPipealloc` (reference) | 72 | 47.6 → 25.6 s (−46 %) | 7.68 → 3.02 (−61 %) | −18 % |
-| `ProofIget` | 64 | 53.3 → 31.0 s (−42 %) | 9.67 → 4.54 (−53 %) | −10.9 % |
-| `ProofProcinit` | 63 | 24.0 → 16.8 s (−30 %) | 3.48 → 2.05 (−41 %) | −9.4 % |
-| `ProofKwait` | 99 | 32.0 → 22.8 s (−29 %) | 5.84 → 3.83 (−35 %) | −6.2 % |
-| `ProofInstallTrans` | 76 | 47.6 → 35.0 s (−26 %) | 8.97 → 5.78 (−36 %) | −8.4 % |
-| `ProofIlock` | 59 | 36.6 → 28.1 s (−23 %) | 6.34 → 4.31 (−32 %) | −6.5 % |
-| `ProofUvmalloc` | 79 | 37.6 → 29.3 s (−22 %) | 6.44 → 4.49 (−30 %) | −6.8 % |
-| `ProofSched` | 54 | 30.1 → 24.1 s (−20 %) | 3.25 → 1.81 (−45 %) | −7.5 % |
-| `ProofIupdate` | 44 | 27.7 → 22.0 s (−20 %) | 5.01 → 3.80 (−24 %) | −5.4 % |
-| `ProofBmap` | 75 | 42.1 → 33.9 s (−19 %) | 11.70 → 5.53 (−53 %) | −3.8 % |
-| `ProofBread` | 79 | 24.5 → 19.9 s (−19 %) | 4.52 → 3.51 (−22 %) | −3.4 % |
-| `ProofCopyout` | 94 | 53.6 → 43.7 s (−18 %) | 8.66 → 6.58 (−24 %) | −5.6 % |
-| `ProofCopyinstr` | 90 | 37.4 → 30.6 s (−18 %) | 6.14 → 4.51 (−27 %) | −2.8 % |
-| `ProofWalk` | 61 | 25.2 → 20.8 s (−18 %) | 4.91 → 3.91 (−20 %) | −0.6 % |
-| `ProofEndOp` | 94 | 46.7 → 38.8 s (−17 %) | 8.86 → 6.63 (−25 %) | −3.7 % |
-| `ProofCopyin` | 72 | 40.8 → 34.8 s (−15 %) | 7.17 → 5.81 (−19 %) | −1.9 % |
-| `ProofIput` | 77 | 75.0 → 64.1 s (−15 %) | 16.43 → 13.33 (−19 %) | −2.7 % |
-| `ProofUvmcopy` | 71 | 83.8 → 72.6 s (−13 %) | 12.56 → 10.11 (−20 %) | −9.5 % |
-| `ProofVirtioDiskRwF` | 37 | 46.3 → 42.2 s (−9 %) | 5.92 → 4.90 (−17 %) | −2.9 % |
+```sh
+grep -c "\[Qed" /mnt/rocq/F.before.log /mnt/rocq/F.after.log     # must be equal
+```
 
-**The predictor is the LARGEST LIVE POSE BLOCK A LEAF SITS UNDER**, not the
-file's site count, not its length, and not whether the leaf is in a loop. The
-reference file is one whole-function proof carrying all 58 facts through all
-~1700 steps, so it sits at the top; `ProofUvmcopy` has more sites (71) and a
-worse result (−13 %) because its poses split 7+34+31 across three proofs;
-`ProofKwait` has the most sites of all (99) and lands at −29 % because its 90
-poses are nine scoped clusters of 4–24. Sort candidates by biggest block, not
-by `--check`'s site count.
+Wall discount by file, best first: `ProofScheduler` −49 %, `ProofPipealloc`
+−46 %, `ProofSysSbrk` −43 %, `ProofDirlookup` −43 %, `ProofIget` −42 %,
+`ProofNamexRoot` −42 %, `ProofUartinit` −35 %, `ProofVirtioDiskRwC` −35 %,
+`ProofArgfd` −34 %, `ProofWalkNoalloc` −34 %, `ProofProcPagetable` −33 %,
+`ProofSysChdir` −32 %, `ProofKexecB2` −32 %, `ProofKexecB3` −31 %,
+`ProofFilestat` −31 %, `ProofSysDup` −30 %, `ProofProcinit` −30 %,
+`ProofKexecB` −30 %, `ProofFetchstr` −29 %, `ProofConsoleinit` −29 %,
+`ProofSysRead` −29 %, `ProofMappages` −29 %, `ProofStati` −29 %,
+`ProofKwait` −29 %, `ProofProcdumpParts` −28 %, `ProofSysOpen` −28 %,
+`ProofSysWrite` −27 %, `ProofInstallTrans` −26 %, `ProofKforkB6` −26 %,
+`ProofSysClose` −25 %, `ProofWakeupParts` −25 %, `ProofIlock` −23 %,
+`ProofSysFstat` −23 %, `ProofSysMknod` −23 %, `ProofUvmalloc` −22 %,
+`ProofIinit` −22 %, `ProofReparent` −22 %, `ProofInitsleeplock` −21 %,
+`ProofSched` −20 %, `ProofIupdate` −20 %, `ProofIalloc` −20 %,
+`ProofSysMkdir` −20 %, `ProofUvmcreate` −20 %, `ProofInitlog` −20 %,
+`ProofBmap` −19 %, `ProofBread` −19 %, `ProofArgstr` −19 %,
+`ProofCopyout` −18 %, `ProofCopyinstr` −18 %, `ProofWalk` −18 %,
+`ProofCreate` −18 %, `ProofFetchaddr` −18 %, `ProofEndOp` −17 %,
+`ProofUserinit` −17 %, `ProofFsinit` −17 %, `ProofKexecA` −16 %,
+`ProofCopyin` −15 %, `ProofIput` −15 %, `ProofSysExec` −14 %,
+`ProofUvmcopy` −13 %, `ProofIreclaim` −12 %, `ProofUvmunmap` −10 %,
+`ProofVirtioDiskRwF` −9 %.
 
-Secondary readings, all consistent across the twenty:
+Median ≈ −24 %. Aggregate over the 63: **1893 s → 1400 s of serial compile
+work, −26 %.**
 
-- **`Qed` always improves more than wall** (−17 % to −62 %). `Qed` walks the
-  proof term and the term is what collapses; wall carries elaboration work this
-  discipline does not touch. On several files the post-conversion `Qed` is a
-  small minority of wall (1.8 s of 24 s on `ProofSched`), so ~20 % is near the
-  ceiling for that file shape and further gains need a different lever.
-- **`.vo` shrinks far less than the reference's −18 %** — typically −2 % to
-  −10 %, and `ProofWalk` barely moved. The `.vo` stores the shared DAG, which
-  RULE ONE predicts barely changes; the reference's −18 % is the outlier.
-- **Peak RSS is NOT a reliable benefit.** −30 % on `ProofScheduler` but −5 %,
-  −6 % and +0.2 % on batch 5's three. Memory on the `vm_compute`-heavy files is
-  dominated by something other than `Δ`. Do not advertise it.
+### The predictor
+
+**The LARGEST LIVE POSE BLOCK A LEAF SITS UNDER** — not the file's site count,
+not its length, and not whether the leaf is in a loop. Every batch tested this
+prospectively and it sorted the candidates correctly every time:
+
+| | sites | largest block | wall |
+|---|---|---|---|
+| `ProofUartinit` | 27 | 27, one proof | −35 % |
+| `ProofSysExec` | 92 | ≤19 over ~30 proofs | −14 % |
+| `ProofIreclaim` | 74 | ≤21 over 9 proofs | −12 % |
+| `ProofCreate` | 150 | spread over 111 lemmas | −18 % |
+
+**But it only sorts; it does not size.** `ProofInitlog` has a 15-pose block and
+hit −20 %, while `ProofUvmunmap` has 18 and hit −10 %. Expect ±10 points of
+slop. Sort candidates by biggest block, then take what you get.
+
+### Secondary readings, and what is NOT true
+
+- **`Qed` usually improves more than wall, but this is a tendency, not a law** —
+  it failed on three files. `ProofUvmcreate` (−20 % wall, −16 % `Qed`) and
+  `ProofWakeupParts` (−25 %, −18 %) are small-block files, and
+  `ProofWakeupParts`' first `Qed` got SLOWER outright (0.456 → 0.523 s): at
+  9–17 poses the per-site re-derivation is no longer swamped by the `|Δ|`
+  discount inside the term. `ProofSysOpen` rules out "small-file artifact" —
+  `Qed` −26.8 % against wall −27.6 %, with `Qed` at 17.2 s of 86.5 s. The rule
+  holds for blocks of roughly 20+.
+- **The win is NOT mostly `Qed`.** On several files wall fell 30 %+ while `Qed`
+  was already a small fraction of it (`ProofWalkNoalloc`: 2.1 s of 13.6 s after).
+  Shrinking `Δ` speeds up the proofmode steps themselves, not just the kernel's
+  walk of the finished term.
+- **`.vo` is not a usable proxy, and can GROW.** Range across the 63 is −24 %
+  (`ProofNamexRoot`) to **+0.2 %** (`ProofWalkNoalloc`, `ProofMappages`,
+  `ProofStati`, `ProofArgfd`). It tracks the block predictor loosely — big-block
+  files shrink most — but batch 3 saw it ANTI-correlate (`ProofProcPagetable`
+  took the biggest wall and `Qed` win of its batch and the smallest `.vo` win,
+  −0.2 %). Small-block files store new `iApply` subterms while their shared DAG
+  barely changes, hence the sign flip.
+- **Peak RSS is not a reliable benefit.** −37 % on `ProofNamexRoot`, +0.2 % on
+  `ProofUvmcopy`, −0.6 % on `ProofIalloc`. Do not advertise it.
+- **Dead poses exist and the converter removes them.** `ProofUvmcreate` had 23
+  pose lines against 18 sites — five instruction facts posed into `Δ` and never
+  used, carried through every later step for nothing. `--check` calls that CLEAN
+  (no non-conforming *references*, because there are no references), so read
+  `posed N/N sites M` with `M < N` as dead poses, not as missed sites.
 - The `Require` prelude is ~1.0 s in every file and unchanged, so none of the
   residual is fixed overhead.
 
 ## 5. What is left
 
 `tools/instr_subgoal.py --check iris/Proof*.v` is the live scoreboard; run it
-rather than trusting a table here. As of 2026-08-22, 22 files are converted and
-~193 still pose. Three tiers:
+rather than trusting a table here. As of 2026-08-22, **63 files are converted
+and 157 still pose.** Three tiers:
 
 | tier | what to do |
 |---|---|
