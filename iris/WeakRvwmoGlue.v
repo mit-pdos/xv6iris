@@ -371,9 +371,10 @@ Record run_data (boot : agent → pexv6) (d0 : dev_state) (N : nat)
 (** THE ROUTE, assembled: the induction hypothesis at a good cut realizes
     the causal past, with the row equation carrying the ONE renaming. *)
 Theorem hull_run (boot : agent → pexv6) (d0 : dev_state)
+    (im : image) (nh : nat)
     (GD : gdexec) (cs : list nat) (N : nat) :
   rvwmo_minus_deps_consistent GD →
-  gdexec_qconf boot d0 GD →
+  gdexec_qconf boot d0 im nh GD →
   cut_ok (gd_g GD) cs →
   (∀ x, ¬ tc (RacyD (gd_hull GD cs)) x x) →
   (length (gx_prog (gd_g GD)) ≤ N)%nat →
@@ -385,7 +386,7 @@ Theorem hull_run (boot : agent → pexv6) (d0 : dev_state)
                     (default [] (gx_prog (gd_g GD) !! i))).
 Proof.
   intros Hcons Hq Hcut Hacy HN.
-  destruct (hull_realizable_rows_G boot d0 GD cs N Hcons Hq
+  destruct (hull_realizable_rows_G boot d0 im nh GD cs N Hcons Hq
               (cut_ok_proper _ _ Hcut) Hacy HN)
     as (c & pst & rho & Hc & Himg & Hpst & Hprog & Hrow).
   exists c, pst, rho. split; [|exact Hrow].
@@ -601,8 +602,9 @@ Definition l2_claim_at (GD : gdexec) (P : Z → Z → Prop) (Bad : Prop) : Prop 
       seg_pin GD s ∨ cs_hyps GD P log prev s ∨ Bad.
 
 Definition l2_claim (boot : agent → pexv6) (d0 : dev_state)
+    (im : image) (nh : nat)
     (P : Z → Z → Prop) (Bad : Prop) : Prop :=
-  ∀ GD, gdexec_qconf boot d0 GD → l2_claim_at GD P Bad.
+  ∀ GD, gdexec_qconf boot d0 im nh GD → l2_claim_at GD P Bad.
 
 (** A classified raw chain IS a [WeakRvwmoKillArms.chain]. *)
 Lemma raw_chain_chain GD P log (Bad : Prop) (ss : list seg) :
@@ -640,17 +642,19 @@ Qed.
     log is [G]'s whole write list ([log_of]).  This is
     [WeakRvwmoCert4.cert_cycle] plus the [Ctx] instantiation ((O-C)) and
     the gmo-order narrowing ((O-A)). *)
-Definition cut_supply (boot : agent → pexv6) (d0 : dev_state) : Prop :=
+Definition cut_supply (boot : agent → pexv6) (d0 : dev_state)
+    (im : image) (nh : nat) : Prop :=
   ∀ (GD : gdexec) (z : geid) (ss : list seg),
-    rvwmo_minus_deps_consistent GD → gdexec_qconf boot d0 GD →
+    rvwmo_minus_deps_consistent GD → gdexec_qconf boot d0 im nh GD →
     ss ≠ [] → raw_chain GD z z ss →
     ∃ cs, cut_ok (gd_g GD) cs.
 
-Definition cert_supply (boot : agent → pexv6) (d0 : dev_state) (N : nat)
+Definition cert_supply (boot : agent → pexv6) (d0 : dev_state)
+    (im : image) (nh : nat) (N : nat)
     : Prop :=
   ∀ (GD : gdexec) (cs : list nat) (c0 : cand) (pst0 : nat → list pexv6)
     (z : geid) (ss : list seg),
-    rvwmo_minus_deps_consistent GD → gdexec_qconf boot d0 GD →
+    rvwmo_minus_deps_consistent GD → gdexec_qconf boot d0 im nh GD →
     cut_ok (gd_g GD) cs →
     run_data boot d0 N (gd_g GD) c0 pst0 (λ _, d0) →
     ss ≠ [] → raw_chain GD z z ss →
@@ -667,11 +671,12 @@ Definition cert_supply (boot : agent → pexv6) (d0 : dev_state) (N : nat)
     already fixes the programs and the device state; the image is the one
     piece of the machine's initial configuration it omits), after which
     [boot_tie]'s third conjunct is free at every producer. *)
-Definition boot_tie (boot : agent → pexv6) (d0 : dev_state) (N : nat)
+Definition boot_tie (boot : agent → pexv6) (d0 : dev_state)
+    (im : image) (nh : nat) (N : nat)
     (σ0 : wgstate) : Prop :=
   boot <$> seq 0 N = eps_init σ0 ∧
   d0 = wgdev σ0 ∧
-  (∀ GD, gdexec_qconf boot d0 GD →
+  (∀ GD, gdexec_qconf boot d0 im nh GD →
      gx_img (gd_g GD) = img_z (wgimg σ0) ∧
      (length (gx_prog (gd_g GD)) ≤ N)%nat).
 
@@ -679,18 +684,19 @@ Definition boot_tie (boot : agent → pexv6) (d0 : dev_state) (N : nat)
 Theorem cycle_kill_of_l2 (Σ : gFunctors) `{!riscvGpreS Σ, !weakGpreS Σ}
     (gen : nat) (σ0 : wgstate) (D : CPU → gset register)
     (Nm : Z → Z → namespace) (P : Z → Z → Prop)
-    (boot : agent → pexv6) (d0 : dev_state) (N : nat) :
+    (boot : agent → pexv6) (d0 : dev_state) (im : image) (nh : nat)
+    (N : nat) :
   fresh_era gen σ0 →
-  boot_tie boot d0 N σ0 →
+  boot_tie boot d0 im nh N σ0 →
   (* (b) THE WP PACKAGE, in the two flavours the exports need *)
   wp_package Σ gen σ0 D →
   (∀ a base, P a base → wp_package_prot Σ gen σ0 D (Nm a base) a base) →
   (* the two certification supplies (§6.3) *)
-  cut_supply boot d0 →
-  cert_supply boot d0 N →
+  cut_supply boot d0 im nh →
+  cert_supply boot d0 im nh N →
   (* THE L2′ CLAIM *)
-  l2_claim boot d0 P (bad_run gen σ0) →
-  cycle_kill boot d0.
+  l2_claim boot d0 im nh P (bad_run gen σ0) →
+  cycle_kill boot d0 im nh.
 Proof.
   intros Hfr (Hb1 & Hb2 & Hb3) Hwp Hwpp Hcut Hcert Hl2.
   intros GD Hcons Hq HIH x Hcyc.
@@ -700,7 +706,7 @@ Proof.
   (* (2) the cut, and the realized causal past *)
   destruct (Hcut GD z ss Hcons Hq Hne Hch) as (cs & Hcut_ok).
   destruct (Hb3 GD Hq) as (Himg & HN).
-  destruct (hull_run boot d0 GD cs N Hcons Hq Hcut_ok
+  destruct (hull_run boot d0 im nh GD cs N Hcons Hq Hcut_ok
               (HIH cs (cut_ok_proper _ _ Hcut_ok)) HN) as (c0 & pst0 & rho & Hrd0 & _).
   (* (3) the certified configuration *)
   destruct (Hcert GD cs c0 pst0 z ss Hcons Hq Hcut_ok Hrd0 Hne Hch)
@@ -724,22 +730,23 @@ Qed.
 Theorem t2lin_of_l2 (Σ : gFunctors) `{!riscvGpreS Σ, !weakGpreS Σ}
     (gen : nat) (σ0 : wgstate) (D : CPU → gset register)
     (Nm : Z → Z → namespace) (P : Z → Z → Prop)
-    (boot : agent → pexv6) (d0 : dev_state) (N : nat) :
+    (boot : agent → pexv6) (d0 : dev_state) (im : image) (nh : nat)
+    (N : nat) :
   fresh_era gen σ0 →
-  boot_tie boot d0 N σ0 →
+  boot_tie boot d0 im nh N σ0 →
   wp_package Σ gen σ0 D →
   (∀ a base, P a base → wp_package_prot Σ gen σ0 D (Nm a base) a base) →
-  cut_supply boot d0 →
-  cert_supply boot d0 N →
-  l2_claim boot d0 P (bad_run gen σ0) →
+  cut_supply boot d0 im nh →
+  cert_supply boot d0 im nh N →
+  l2_claim boot d0 im nh P (bad_run gen σ0) →
   ∀ GD : gdexec,
     rvwmo_minus_deps_consistent GD →
-    gdexec_qconf boot d0 GD →
+    gdexec_qconf boot d0 im nh GD →
     ∀ x, ¬ tc (RacyD GD) x x.
 Proof.
   intros Hfr Hbt Hwp Hwpp Hcut Hcert Hl2.
   apply t2lin_of_cycle_kill.
-  by eapply (cycle_kill_of_l2 Σ gen σ0 D Nm P boot d0 N).
+  by eapply (cycle_kill_of_l2 Σ gen σ0 D Nm P boot d0 im nh N).
 Qed.
 
 (* ====================================================================== *)

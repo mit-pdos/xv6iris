@@ -185,10 +185,11 @@ Proof. apply hull_events_lt, erg_proper_cut. Qed.
     (via [hull_realizable_of_acyclic] below) and to read the exports at that
     run's configurations, which is exactly §4d.2(2)'s certification. *)
 
-Definition cycle_kill (boot : agent → pexv6) (d0 : dev_state) : Prop :=
+Definition cycle_kill (boot : agent → pexv6) (d0 : dev_state)
+    (im : image) (nh : nat) : Prop :=
   ∀ GD : gdexec,
     rvwmo_minus_deps_consistent GD →
-    gdexec_qconf boot d0 GD →
+    gdexec_qconf boot d0 im nh GD →
     (∀ cs, proper_cut (gd_g GD) cs →
            ∀ x, ¬ tc (RacyD (gd_hull GD cs)) x x) →
     ∀ x, tc (RacyD GD) x x → False.
@@ -207,9 +208,9 @@ Definition cycle_kill (boot : agent → pexv6) (d0 : dev_state) : Prop :=
     survives — [topo_supply] drops it, and the kill needs to know that the
     run's events ARE the hull's events. *)
 Theorem hull_realizable_of_acyclic (boot : agent → pexv6) (d0 : dev_state)
-    (GD : gdexec) (cs : list nat) (N : nat) :
+    (im : image) (nh : nat) (GD : gdexec) (cs : list nat) (N : nat) :
   rvwmo_minus_deps_consistent GD →
-  gdexec_qconf boot d0 GD →
+  gdexec_qconf boot d0 im nh GD →
   proper_cut (gd_g GD) cs →
   (∀ x, ¬ tc (RacyD (gd_hull GD cs)) x x) →
   (length (gx_prog (gd_g GD)) ≤ N)%nat →
@@ -226,12 +227,12 @@ Proof.
   have Hok : hull_ok (gd_g GD) cs := proper_cut_ok _ _ Hpc.
   have Hch : rvwmo_minus_deps_consistent (gd_hull GD cs)
     by apply hull_deps_consistent.
-  have Hqh : gdexec_qconf boot d0 (gd_hull GD cs)
+  have Hqh : gdexec_qconf boot d0 im nh (gd_hull GD cs)
     by apply gdexec_qconf_hull.
   destruct (normalize_of_acyclic (gd_hull GD cs) Hch
               (λ x y, racyD_dec (gd_hull GD cs) x y) Hacy)
     as (GD' & pi & Hcons' & H14 & Hrr & Hdeps & _).
-  have Hq' : gdexec_qconf boot d0 GD'
+  have Hq' : gdexec_qconf boot d0 im nh GD'
     by (eapply gdexec_qconf_ren; [exact Hrr|exact Hdeps|exact Hqh]).
   destruct Hcons' as (Hc' & _ & _).
   destruct (rule14_linearization (gd_g GD') Hc' H14)
@@ -254,7 +255,7 @@ Proof.
     change (gx_prog (gd_g (gd_hull GD cs)))
       with (gx_prog (gx_hull (gd_g GD) cs)).
     pose proof (gxh_nharts (gd_g GD) cs). lia.
-  - intros i _. exact (qconf_rows boot d0 GD' i Hq').
+  - intros i _. exact (qconf_rows boot d0 im nh GD' i Hq').
   - exists c, pst, pi. split_and!; [done| |done|done|].
     + rewrite Himg (rows_rel_img pi (gd_g (gd_hull GD cs)) (gd_g GD') Hrr).
       apply gxh_img.
@@ -264,12 +265,12 @@ Qed.
 (* ====================================================================== *)
 (** * 3. THE THEOREM: T2-LIN, by strong induction on the event count *)
 
-Lemma t2lin_aux (boot : agent → pexv6) (d0 : dev_state) :
-  cycle_kill boot d0 →
+Lemma t2lin_aux (boot : agent → pexv6) (d0 : dev_state) (im : image) (nh : nat) :
+  cycle_kill boot d0 im nh →
   ∀ (n : nat) (GD : gdexec),
     (length (gevs' (gd_g GD)) ≤ n)%nat →
     rvwmo_minus_deps_consistent GD →
-    gdexec_qconf boot d0 GD →
+    gdexec_qconf boot d0 im nh GD →
     ∀ x, ¬ tc (RacyD GD) x x.
 Proof.
   intros Hk n. induction n as [|n IH]; intros GD Hlen Hcons Hq x Hcyc.
@@ -284,22 +285,25 @@ Proof.
     + by apply gdexec_qconf_hull.
 Qed.
 
-Theorem t2lin_of_cycle_kill (boot : agent → pexv6) (d0 : dev_state) :
-  cycle_kill boot d0 →
+Theorem t2lin_of_cycle_kill (boot : agent → pexv6) (d0 : dev_state)
+    (im : image) (nh : nat) :
+  cycle_kill boot d0 im nh →
   ∀ GD : gdexec,
     rvwmo_minus_deps_consistent GD →
-    gdexec_qconf boot d0 GD →
+    gdexec_qconf boot d0 im nh GD →
     ∀ x, ¬ tc (RacyD GD) x x.
-Proof. intros Hk GD. by eapply (t2lin_aux boot d0 Hk (length (gevs' (gd_g GD)))). Qed.
+Proof.
+  intros Hk GD. by eapply (t2lin_aux boot d0 im nh Hk (length (gevs' (gd_g GD)))).
+Qed.
 
 (** THE COROLLARY: the whole graph is realized.  [topo_supply] at the full
     graph, with T2-LIN supplying its acyclicity premise and [racyD_dec] its
     decidability premise. *)
 Theorem t2lin_supply (boot : agent → pexv6) (d0 : dev_state)
-    (GD : gdexec) (N : nat) :
-  cycle_kill boot d0 →
+    (im : image) (nh : nat) (GD : gdexec) (N : nat) :
+  cycle_kill boot d0 im nh →
   rvwmo_minus_deps_consistent GD →
-  gdexec_qconf boot d0 GD →
+  gdexec_qconf boot d0 im nh GD →
   (length (gx_prog (gd_g GD)) ≤ N)%nat →
   ∃ (c : cand) (pst : nat → list pexv6),
     srvwmo_consistent c ∧
@@ -308,7 +312,8 @@ Theorem t2lin_supply (boot : agent → pexv6) (d0 : dev_state)
     exec_prog_ok' pstep_ev pcls_ev pst (λ _, d0) (cand_exec c).
 Proof.
   intros Hk Hcons Hq HN.
-  eapply topo_supply; [exact Hcons|exact (λ x y, racyD_dec GD x y)| |exact Hq|exact HN].
+  eapply topo_supply;
+    [exact Hcons|exact (λ x y, racyD_dec GD x y)| |exact Hq|exact HN].
   by eapply t2lin_of_cycle_kill.
 Qed.
 

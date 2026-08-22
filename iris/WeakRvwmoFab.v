@@ -604,11 +604,12 @@ Qed.
     B1b-1 records from the other side.  §5's decidability and acyclicity are
     unconditional and hold for every [gf_dev].) *)
 
-Lemma gfexec_conf_of_qconf boot d0 GD :
-  gdexec_qconf boot d0 GD →
+Lemma gfexec_conf_of_qconf boot d0 im nh GD :
+  gdexec_qconf boot d0 im nh GD →
   gfexec_conf boot d0 (λ _, d0) (GFExec GD []).
 Proof.
-  intros Hq. split_and!; [done|apply NoDup_nil_2| |].
+  intros Hq0. pose proof (gdexec_qconf_rows _ _ _ _ _ Hq0) as Hq.
+  split_and!; [done|apply NoDup_nil_2| |].
   - intros n i k Hn. by rewrite lookup_nil in Hn.
   - intros i row Hrow. simpl in Hrow.
     destruct (Hq i row Hrow) as (em & Hem & Hdf & Hdep).

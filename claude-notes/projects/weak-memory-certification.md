@@ -30,11 +30,27 @@ exports F3′/F3″ in WeakGhost/WeakStore/WeakLock/WeakEvAdequacy; DEC-4..7
 in WeakDeps/WeakEvLang/WeakEvInst/WeakLang + WeakEvProv (the soundness
 spine).
 
+**(G-2)/(G-3)/(G-4) — DONE (`WeakRvwmoGlue2.v`, same day):** `gdexec_qconf`
+gained the image/hart-count clause (`boot_tie` gone); `cut_supply` is
+discharged by the ZERO cut — the glue's `cut_ok` never relates the cut
+to the cycle, so the intended write-closed causal past buys nothing at
+that interface (and is NOT provably proper in general: rf-closure can
+climb above another hart's entry, recorded in §2.4); `cert_supply`
+reduces to **`walk_supply`** — the certification WALK itself (Cert4's
+`segs_run` over the cycle, ending with a FULL-graph `log_of`), with
+(P-1) `Hpres` discharged (`ctrace_prefix_snoc`, `cpol_Hpres`) and the
+exits' gmo order FORCED (`walk_exits_gmo_forced`), not assumed.  The
+final premise list of `t2lin_of_l2''`: fresh era + boot equations,
+`l2_claim`, `walk_supply` (inside it: `wit_fence_ub` per witness and
+progress), the WP package.
+
 **WHAT REMAINS:**
-1. Discharge (G-2)/(G-3)/(G-4): add the image clause to `gdexec_qconf`;
-   build `cut_supply` (the write-closed causal past of an SCC) and
-   `cert_supply` (compose `cert_cycle` with the `cpol_ctx` instance and
-   Cert3's `Hpres`).  Mechanical, all leaf-level.
+1. **`walk_supply`** — run `segs_run` around the cycle from the realized
+   hull (`hull_run`) processing exits in gmo order, with `cstep_cls` at
+   each step, and end with the whole graph's writes in the log (the
+   remaining non-cycle writes appended by the same solo machinery) —
+   the last piece of §4d.2(2).  Needs a 2-hart emitted witness to stay
+   honest.
 2. **L2′ proper — prove `l2_claim` for xv6's image**: per site class
    (S6 §3's inventory: aq/fenced/branched/data-fed/CS-covered/bad),
    from the emission (site records, `row_deps`) and the certified

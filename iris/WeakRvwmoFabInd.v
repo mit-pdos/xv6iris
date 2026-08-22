@@ -635,14 +635,15 @@ Qed.
     at an empty fabric order [RacyF] IS [RacyD], [gf_hull] IS [gd_hull] and
     [proper_cut_F] IS [proper_cut] — so the fabric kill obligation SUBSUMES
     the quiescent one. *)
-Theorem cycle_kill_of_F (boot : agent → pexv6) (d0 : dev_state) :
-  cycle_kill_F boot d0 (λ _, d0) → cycle_kill boot d0.
+Theorem cycle_kill_of_F (boot : agent → pexv6) (d0 : dev_state)
+    (im : image) (nh : nat) :
+  cycle_kill_F boot d0 (λ _, d0) → cycle_kill boot d0 im nh.
 Proof.
   intros HkF GD Hcons Hq Hhull x Hcyc.
   have Hc : gfexec_consistent (GFExec GD []).
   { split; [exact Hcons|]. intros a b (n & Ha & _).
     by rewrite lookup_nil in Ha. }
-  eapply (HkF (GFExec GD []) Hc (gfexec_conf_of_qconf boot d0 GD Hq)).
+  eapply (HkF (GFExec GD []) Hc (gfexec_conf_of_qconf boot d0 im nh GD Hq)).
   - intros cs [Hpc _] y Hcy. apply (Hhull cs Hpc y).
     eapply tc_mono; [|exact Hcy].
     intros a b [Hab|(n & Ha & _)]; [exact Hab|by rewrite lookup_nil in Ha].

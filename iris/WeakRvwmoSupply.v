@@ -284,20 +284,50 @@ Qed.
 
 Definition em_devfree (em : hemission) : Prop := LDev ∉ em_labels em.
 
+(** *** THE BOOT TIE (G-4, 2026-08-24).
+
+    The bundle used to fix the PROGRAMS and the DEVICE STATE and to say
+    nothing about the machine's initial IMAGE or its hart count — so a
+    consumer that lives at ONE booted state ([WeakRvwmoGlue]'s exports)
+    had to carry the tie as a separate premise ([WeakRvwmoGlue.boot_tie]'s
+    third conjunct).  The tie belongs HERE: it is part of "this graph is a
+    conformant execution OF THIS BOOTED MACHINE", and it is free at every
+    producer (the hull and the row-renaming both preserve the image and do
+    not grow the hart count).  [im] is the booted image, [nh] the length of
+    the booted program-state list. *)
 Definition gdexec_qconf (boot : agent → pexv6) (d0 : dev_state)
-    (GD : gdexec) : Prop :=
+    (im : image) (nh : nat) (GD : gdexec) : Prop :=
+  gx_img (gd_g GD) = im ∧
+  (length (gx_prog (gd_g GD)) ≤ nh)%nat ∧
+  (∀ i row, gx_prog (gd_g GD) !! i = Some row →
+    ∃ em, hart_conf i row (boot i) (λ _, d0) em ∧
+          em_devfree em ∧
+          (∀ jk, jk ∈ row_deps (em_items em) →
+                 ((i, jk.1), (i, jk.2)) ∈ gd_deps GD)).
+
+Lemma gdexec_qconf_img boot d0 im nh GD :
+  gdexec_qconf boot d0 im nh GD → gx_img (gd_g GD) = im.
+Proof. by intros (? & _ & _). Qed.
+
+Lemma gdexec_qconf_nharts boot d0 im nh GD :
+  gdexec_qconf boot d0 im nh GD → (length (gx_prog (gd_g GD)) ≤ nh)%nat.
+Proof. by intros (_ & ? & _). Qed.
+
+Lemma gdexec_qconf_rows boot d0 im nh GD :
+  gdexec_qconf boot d0 im nh GD →
   ∀ i row, gx_prog (gd_g GD) !! i = Some row →
     ∃ em, hart_conf i row (boot i) (λ _, d0) em ∧
           em_devfree em ∧
           (∀ jk, jk ∈ row_deps (em_items em) →
                  ((i, jk.1), (i, jk.2)) ∈ gd_deps GD).
+Proof. by intros (_ & _ & ?). Qed.
 
 (** The bundle IS a [gdexec_conf] bundle — the milestone is a
     SPECIALIZATION, not a different interface. *)
-Lemma gdexec_qconf_conf boot d0 GD :
-  gdexec_qconf boot d0 GD → gdexec_conf boot (λ _ _, d0) GD.
+Lemma gdexec_qconf_conf boot d0 im nh GD :
+  gdexec_qconf boot d0 im nh GD → gdexec_conf boot (λ _ _, d0) GD.
 Proof.
-  intros H i row Hrow. destruct (H i row Hrow) as (em & Hem & _ & Hdep).
+  intros (_ & _ & H) i row Hrow. destruct (H i row Hrow) as (em & Hem & _ & Hdep).
   by exists em.
 Qed.
 
@@ -352,10 +382,19 @@ Proof. intros [t ->] Hjk. by apply row_deps_aux_app. Qed.
     dep set because a [row_deps] edge of an emission of [take c p] names row
     positions BELOW [c] on both ends ([hart_conf_row_deps_wf]), which is
     [gcut]'s clause. *)
-Theorem gdexec_qconf_hull boot d0 GD cs :
-  gdexec_qconf boot d0 GD → gdexec_qconf boot d0 (gd_hull GD cs).
+Theorem gdexec_qconf_hull boot d0 im nh GD cs :
+  gdexec_qconf boot d0 im nh GD → gdexec_qconf boot d0 im nh (gd_hull GD cs).
 Proof.
-  intros Hq i row' Hrow'.
+  intros Hq0. pose proof (gdexec_qconf_rows _ _ _ _ _ Hq0) as Hq.
+  split_and!.
+  { rewrite /gd_hull /=. exact (gdexec_qconf_img _ _ _ _ _ Hq0). }
+  { rewrite /gd_hull /=.
+    change (gx_prog (gx_hull (gd_g GD) cs))
+      with ((λ row : list lbl, lbl_ren (hren (gd_g GD) cs) <$> row)
+              <$> zip_with take cs (gx_prog (gd_g GD))).
+    rewrite length_fmap length_zip_with.
+    pose proof (gdexec_qconf_nharts _ _ _ _ _ Hq0). lia. }
+  intros i row' Hrow'.
   rewrite /gd_hull /= gxh_prog_lookup in Hrow'.
   destruct (cs !! i) as [c|] eqn:Hc; [|done]. simpl in Hrow'.
   destruct (gx_prog (gd_g GD) !! i) as [p|] eqn:Hp; [|done]. simpl in Hrow'.
@@ -383,12 +422,19 @@ Proof.
 Qed.
 
 (** ** 3.4 THE ORBIT TRANSPORT, mirroring [gdexec_conf_ren] *)
-Lemma gdexec_qconf_ren π boot d0 GD GD' :
+Lemma gdexec_qconf_ren π boot d0 im nh GD GD' :
   rows_rel π (gd_g GD) (gd_g GD') →
   gd_deps GD' = gd_deps GD →
-  gdexec_qconf boot d0 GD → gdexec_qconf boot d0 GD'.
+  gdexec_qconf boot d0 im nh GD → gdexec_qconf boot d0 im nh GD'.
 Proof.
-  intros Hrr Hdeps Hq i row' Hrow'.
+  intros Hrr Hdeps Hq0.
+  pose proof (gdexec_qconf_rows _ _ _ _ _ Hq0) as Hq.
+  split_and!.
+  { rewrite (rows_rel_img π (gd_g GD) (gd_g GD') Hrr).
+    exact (gdexec_qconf_img _ _ _ _ _ Hq0). }
+  { rewrite (rows_rel_nharts π (gd_g GD) (gd_g GD') Hrr).
+    exact (gdexec_qconf_nharts _ _ _ _ _ Hq0). }
+  intros i row' Hrow'.
   destruct Hrr as (_ & Hprog & _).
   rewrite Hprog list_lookup_fmap in Hrow'.
   apply fmap_Some in Hrow' as (row & Hrow & ->).
@@ -669,12 +715,12 @@ Qed.
     route: a violation-free hull) and [WeakRvwmoTopo.normalize_of_acyclic] +
     [WeakRvwmoLin.rule14_linearization] (the acyclicity route). *)
 
-Lemma qconf_rows boot d0 GD i :
-  gdexec_qconf boot d0 GD →
+Lemma qconf_rows boot d0 im nh GD i :
+  gdexec_qconf boot d0 im nh GD →
   ∃ em, hart_conf i (default [] (gx_prog (gd_g GD) !! i)) (boot i)
                   (λ _, d0) em.
 Proof.
-  intros Hq. destruct (gx_prog (gd_g GD) !! i) as [row|] eqn:E; simpl.
+  intros Hq0. pose proof (gdexec_qconf_rows _ _ _ _ _ Hq0) as Hq. destruct (gx_prog (gd_g GD) !! i) as [row|] eqn:E; simpl.
   - destruct (Hq i row E) as (em & Hem & _ & _). by exists em.
   - exists (HEm [] (boot i)). apply HEnil.
 Qed.
@@ -698,7 +744,7 @@ Theorem hull_supply (boot : agent → pexv6) (d0 : dev_state)
   rvwmo_minus_deps_consistent GD →
   hull_ok (gd_g GD) cs →
   (∀ e w, gcut cs e = true → gcut cs w = true → ¬ gviol (gd_g GD) e w) →
-  gdexec_qconf boot d0 GD →
+  ∀ im nh, gdexec_qconf boot d0 im nh GD →
   (length (gx_prog (gd_g GD)) ≤ N)%nat →
   ∃ (c : cand) (pst : nat → list pexv6),
     srvwmo_consistent c ∧
@@ -708,7 +754,7 @@ Theorem hull_supply (boot : agent → pexv6) (d0 : dev_state)
     cd_log c (length (cd_tr c))
       = omap (gmsg (gd_g GD)) (filter (gcut cs) (gwrites (gd_g GD))).
 Proof.
-  intros Hcons Hok Hvf Hq HN.
+  intros Hcons Hok Hvf im nh Hq HN.
   destruct (hull_linearizes GD cs Hcons Hok Hvf)
     as (c & Hsr & Himg & Hrow & Hlog).
   destruct (supply_of_qconf c boot d0
@@ -718,7 +764,8 @@ Proof.
   - intros i Hi. apply prog_row_nil.
     pose proof (gxh_nharts (gd_g GD) cs). lia.
   - intros i _.
-    exact (qconf_rows boot d0 (gd_hull GD cs) i (gdexec_qconf_hull _ _ _ cs Hq)).
+    exact (qconf_rows boot d0 im nh (gd_hull GD cs) i
+             (gdexec_qconf_hull _ _ _ _ _ cs Hq)).
   - by exists c, pst.
 Qed.
 
@@ -732,7 +779,7 @@ Theorem topo_supply (boot : agent → pexv6) (d0 : dev_state)
   rvwmo_minus_deps_consistent GD →
   (∀ x y, Decision (RacyD GD x y)) →
   (∀ x, ¬ tc (RacyD GD) x x) →
-  gdexec_qconf boot d0 GD →
+  ∀ im nh, gdexec_qconf boot d0 im nh GD →
   (length (gx_prog (gd_g GD)) ≤ N)%nat →
   ∃ (c : cand) (pst : nat → list pexv6),
     srvwmo_consistent c ∧
@@ -740,10 +787,10 @@ Theorem topo_supply (boot : agent → pexv6) (d0 : dev_state)
     pst 0%nat = boot <$> seq 0 N ∧
     exec_prog_ok' pstep_ev pcls_ev pst (λ _, d0) (cand_exec c).
 Proof.
-  intros Hcons Hdec Hacy Hq HN.
+  intros Hcons Hdec Hacy im nh Hq HN.
   destruct (normalize_of_acyclic GD Hcons Hdec Hacy)
     as (GD' & pi & Hcons' & H14 & Hrr & Hdeps & _).
-  have Hq' : gdexec_qconf boot d0 GD'
+  have Hq' : gdexec_qconf boot d0 im nh GD'
     by (eapply gdexec_qconf_ren; [exact Hrr|exact Hdeps|exact Hq]).
   destruct Hcons' as (Hc' & _ & _).
   destruct (rule14_linearization (gd_g GD') Hc' H14)
@@ -754,7 +801,7 @@ Proof.
   - exact Hrow.
   - intros i Hi. apply prog_row_nil.
     rewrite (rows_rel_nharts pi (gd_g GD) (gd_g GD') Hrr). lia.
-  - intros i _. exact (qconf_rows boot d0 GD' i Hq').
+  - intros i _. exact (qconf_rows boot d0 im nh GD' i Hq').
   - exists c, pst. split_and!; [done| |done|done].
     rewrite Himg. by apply (rows_rel_img pi).
 Qed.

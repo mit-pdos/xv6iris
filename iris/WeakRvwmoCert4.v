@@ -156,9 +156,9 @@ Qed.
     composite [pi ∘ hren G cs] — [pi] from the normalization,
     [hren] from the hull itself. *)
 Theorem hull_realizable_rows_G (boot : agent → pexv6) (d0 : dev_state)
-    (GD : gdexec) (cs : list nat) (N : nat) :
+    (im : image) (nh : nat) (GD : gdexec) (cs : list nat) (N : nat) :
   rvwmo_minus_deps_consistent GD →
-  gdexec_qconf boot d0 GD →
+  gdexec_qconf boot d0 im nh GD →
   proper_cut (gd_g GD) cs →
   (∀ x, ¬ tc (RacyD (gd_hull GD cs)) x x) →
   (length (gx_prog (gd_g GD)) ≤ N)%nat →
@@ -173,7 +173,7 @@ Theorem hull_realizable_rows_G (boot : agent → pexv6) (d0 : dev_state)
                     (default [] (gx_prog (gd_g GD) !! i))).
 Proof.
   intros Hcons Hq Hpc Hacy HN.
-  destruct (hull_realizable_of_acyclic boot d0 GD cs N Hcons Hq Hpc Hacy HN)
+  destruct (hull_realizable_of_acyclic boot d0 im nh GD cs N Hcons Hq Hpc Hacy HN)
     as (c & pst & pi & Hc & Himg & Hpst & Hpo & Hrow).
   exists c, pst, (λ t, pi (hren (gd_g GD) cs t)). split_and!;
     [exact Hc|exact Himg|exact Hpst|exact Hpo|].
