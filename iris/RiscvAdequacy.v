@@ -925,13 +925,32 @@ Section power.
      gen_born gen ∗ gen_started gen ∗ era_registered gen HE)%I.
 
   Lemma wp_power_loop (D : CPU -> gset register) (nproc ndisk : nat)
+      (* THE CLIENT'S PURE PROJECTION OF THE CRASH PREDICATE (stage H0,
+         claude-notes/projects/durable-disk.md).  A crash predicate that is a
+         real durability invariant says something about the REAL disk, but no
+         era can see that: the tie is the auth/fragment agreement against the
+         fixed conjunct of [state_interp], and no era fupd ever holds the
+         auth.  THIS proof does, at every PowerOn -- so the client names a
+         pure consequence [Ppure] of its predicate at the machine's own
+         image, proves it here once ([Hproj], which must hand BOTH the auth
+         and the predicate straight back: nothing is spent), and gets it as a
+         premise of its boot entailment.  It is what lets a boot learn
+         something true about the disk it is booting on WITHOUT assuming it
+         (stage I deletes the assumed form). *)
+      (Ppure : (Z -> bv 8) -> Prop)
+      (Hproj : forall dk : Z -> bv 8,
+         ⊢ disk_fixed_auth dk -∗ ▷ riscv_crash_pred -∗
+           ◇ (disk_fixed_auth dk ∗ ▷ riscv_crash_pred ∗ ⌜Ppure dk⌝))
       (* the boot client is handed the WHOLE fact set a reset machine has
          ([RiscvLang.boot_facts]: RAM total and holding the loaded image, the
          per-hart reset registers, the reset devices, power on) -- everything
          [boot_shape] says except the two bookkeeping equalities that relate
-         the new machine to the dead one. *)
+         the new machine to the dead one -- AND the projection above, read at
+         this era's own disk ([virtio_reset] preserves [v_disk], so the fact
+         extracted at the dying machine IS the fact at the reset one). *)
       (Hboot : forall (HE : riscvEraGS) (gen : nat) (g' : gstate),
          boot_facts g' ->
+         Ppure (v_disk (g'.(gdev).(dvirtio))) ->
          ⊢ power_boot_res HE gen D nproc ndisk g' ={⊤}=∗
             ([∗ list] c ∈ enum CPU,
                WP (LoopE gen c : expr riscv_lang) @ ⊤) ∗
@@ -985,6 +1004,22 @@ Section power.
       iSplitL; [|done]. iApply "IH".
     - (* PowerOn: THE SURGERY -- a fresh era over the reset state, then
          the client's boot entailment discharges the fork obligations *)
+      (* THE PURE PROJECTION, EXTRACTED HERE AND NOWHERE ELSE (stage H0).
+         This is the one point in the system that holds BOTH sides of the
+         durable disk's tie: [Htie] is the fixed auth at the machine's own
+         [v_disk], and [crash_inv] is the client's predicate over the
+         fragments of that same map.  So open [crashN] at ⊤ -- BEFORE the
+         step's mask shrink, since ∅ can open nothing -- run the client's
+         projection (which spends neither side), close again, and carry the
+         pure fact to the boot entailment below.  The crash predicate's
+         [▷] is NOT stripped here: it is arbitrary, hence not timeless, so
+         [Hproj] takes and returns it under the later and does its own
+         stripping under the [◇]. *)
+      iEval (rewrite /disk_fixed_interp) in "Htie".
+      iInv "Hcinv" as "HP" "Hclose".
+      iDestruct (Hproj (v_disk (g.(gdev).(dvirtio))) with "Htie HP")
+        as ">(Htie & HP & %Hpure)".
+      iMod ("Hclose" with "HP") as "_".
       iApply fupd_mask_intro; [set_solver|]. iIntros "Hback".
       iSplitR.
       { iPureIntro.
@@ -1005,6 +1040,14 @@ Section power.
       iIntros "_".
       destruct Hbs as (Hgen2 & Hvirt2 & Hbf).
       pose proof (proj1 Hbf) as Hpow2.
+      (* THE DISK IS WHAT A POWER CYCLE PRESERVES ([VirtioModel.virtio_reset]
+         keeps [v_disk]), so the projection extracted at the dying machine IS
+         the projection at the reset one -- which is what makes the fact
+         deliverable to the boot entailment at all.  The same equation moves
+         the fixed auth below. *)
+      assert (Hdk2 : v_disk (dvirtio (gdev g)) = v_disk (dvirtio (gdev g2)))
+        by (rewrite Hvirt2; reflexivity).
+      rewrite Hdk2 in Hpure.
       (* fresh era: registers, memory, devices, and the per-era kernel
          ghosts, all at brand-new names *)
       iMod (reg_alloc_cpus g2.(gregs) D (enum CPU) (NoDup_enum CPU))
@@ -1063,7 +1106,7 @@ Section power.
       iDestruct (mono_nat_lb_own_get with "Hgauth") as "#Hbornlb".
       (* run the client's boot entailment over the fresh era *)
       iMod "Hback" as "_".
-      iMod (Hboot HE g.(ggen) g2 Hbf with
+      iMod (Hboot HE g.(ggen) g2 Hbf Hpure with
               "[Helems Hbytes Hkauth Hkfrags Hkpt Hs Hsie Hspp Hspie Hlks Hpark Hpst HuF HpF HvF
                 Hdfrags Hmir Hresvfrags]")
         as "(Hwps & Hwpu & Hwpd & Hwpp)".
@@ -1089,10 +1132,10 @@ Section power.
         rewrite Hgen2 Hpow2.
         (* the FS tie is FRAMED across the boot too: [boot_shape] resets the
            device but KEEPS [v_disk] ([VirtioModel.virtio_reset]), so the
-           machine-side half is still at the right image. *)
-        assert (Hdk2 : v_disk (dvirtio (gdev g)) = v_disk (dvirtio (gdev g2)))
-          by (rewrite Hvirt2; reflexivity).
-        iEval (rewrite /disk_fixed_interp Hdk2) in "Htie".
+           machine-side half is still at the right image ([Hdk2], posed at
+           the step above where the projection needed it -- [Htie] is already
+           unfolded to the bare auth there). *)
+        iEval (rewrite Hdk2) in "Htie".
         rewrite /disk_fixed_interp.
         iFrame "Hgauth Hsauth Htie".
         iExists (<[g.(ggen) := HE]> R). iFrame "HRauth".
@@ -1168,6 +1211,24 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
        disk_img_bytes γdisk 0 (disk_read (v_disk (g.(gdev).(dvirtio))) 0 ndisk) ∗
        mono_nat_auth_own γsw 1 0%nat ⊢
          |==> Pc γdisk γsw γreg γst)
+    (* THE PURE PROJECTION HOOK (stage H0, claude-notes/projects/
+       durable-disk.md).  [Ppure] is a client-chosen pure consequence of [Pc]
+       AT THE MACHINE'S OWN DISK IMAGE, and [Hproj] is its proof -- stated,
+       exactly like [HPc], at the gnames this proof allocates, so the client
+       can write it against its own [Pc γdisk γsw γreg γst].
+       NON-DESTRUCTIVE by construction: the durable auth is LENT (that is the
+       whole content -- agreeing the predicate's own fragments against it is
+       what identifies its image with the real disk) and both it and the
+       predicate are handed back.  [wp_power_loop] runs this once per
+       PowerOn, against [state_interp]'s own fixed conjunct, and delivers the
+       result to [Hboot] below: a boot LEARNS this about the disk it boots
+       on, rather than assuming it. *)
+    (Ppure : (Z -> bv 8) -> Prop)
+    (Hproj : forall (γdisk γsw γreg γst : gname) (dk : Z -> bv 8),
+       ⊢ disk_img_auth_sized γdisk ndisk dk -∗
+         ▷ Pc γdisk γsw γreg γst -∗
+         ◇ (disk_img_auth_sized γdisk ndisk dk ∗
+            ▷ Pc γdisk γsw γreg γst ∗ ⌜Ppure dk⌝))
     (Hgen0 : g.(ggen) = 0%nat) (Hpow : g.(gpow) = false)
     (* the client boots ANY era over ANY machine of the reset shape; what it
        is told about that machine is [RiscvLang.boot_facts] (RAM total and
@@ -1176,6 +1237,9 @@ Theorem riscv_power_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ}
     (Hboot : forall (F : riscvFixedGS Σ) (HE : riscvEraGS) (gen : nat)
                     (g' : gstate),
        boot_facts g' ->
+       (* ...AND THE PROJECTION, at this era's own disk (stage H0): what the
+          crash predicate says about the machine this boot runs on. *)
+       Ppure (v_disk (g'.(gdev).(dvirtio))) ->
        (* THE FIXED LAYER'S SHAPE (fs-cfg-boot.md stage (f), row 7 of
           [FirstTok.first_boot_persist]).  [Hboot] is quantified over an
           ARBITRARY [riscvFixedGS], so without this the client learns
@@ -1263,8 +1327,9 @@ Proof.
     assert (Hshape : exists (Hi : invGS Σ) (γg γs γr γd γsw : gname),
               F = boot_fixedGS Hi γg γs γr γd ndisk γsw (Pc γd γsw γr γs))
       by (exists Hinv, γgen, γstart, γreg, γfdisk, γswap; reflexivity).
-    iApply (@wp_power_loop Σ F _ D nproc ndisk
-              (fun HE gen g' Hbf => Hboot F HE gen g' Hbf Hshape)
+    iApply (@wp_power_loop Σ F _ D nproc ndisk Ppure
+              (Hproj γfdisk γswap γreg γstart)
+              (fun HE gen g' Hbf Hp => Hboot F HE gen g' Hbf Hp Hshape)
               with "Hcinv"). }
   iIntros (es' t2') "%Heq %Hlen %Hns Hsi Hes Hts".
   iApply fupd_mask_intro; [set_solver|]. iIntros "_".

@@ -1701,6 +1701,82 @@ Section fs_crash.
   Qed.
 
   (* -------------------------------------------------------------------- *)
+  (* 3a'. THE PURE PROJECTION (stage H0, claude-notes/projects/             *)
+  (*      durable-disk.md): what a holder of the DURABLE AUTH -- and only    *)
+  (*      adequacy's own proof ever holds it, inside [state_interp] -- can   *)
+  (*      read off the crash predicate WITHOUT consuming it.                 *)
+  (*                                                                         *)
+  (*      The era boot entailment cannot do this itself: it never holds the   *)
+  (*      fixed auth, so it can never identify [P_fs_named]'s existential     *)
+  (*      image with the machine's real [v_disk].  [wp_power_loop]'s PowerOn  *)
+  (*      arm DOES hold it, so it runs the one agreement here and hands the   *)
+  (*      resulting PURE fact to the client -- which is the mechanism that    *)
+  (*      replaces the assumed per-era image hypothesis (stage I).           *)
+  (* -------------------------------------------------------------------- *)
+
+  (* the predicate is timeless, exactly as [P_fs_any] is (that one IS this
+     one, at the fixed layer's names): every conjunct is a [ghost_map] /
+     [mono_nat] / [own] over a discrete cmra *)
+  Global Instance P_fs_named_timeless γd N γsw γreg γst cov ls :
+    Timeless (P_fs_named γd N γsw γreg γst cov ls).
+  Proof.
+    rewrite /P_fs_named /P_fs_rec_named /P_fs /fs_arm /fs_custody /fs_hist_auth.
+    apply _.
+  Qed.
+
+  (* the record's own [fs_rec_wf] conjuncts, read off at its committed view
+     [fr_D].  PURE, hence non-destructive: the record is handed back. *)
+  Lemma P_fs_rec_named_wf (γsw γreg γst : gname) (cov : gset Z) (ls : Z)
+      (dk : Z -> bv 8) :
+    P_fs_rec_named γsw γreg γst cov ls dk -∗
+      ⌜exists D : gmap Z (list (bv 8)),
+         fs_recovery (fs_blocks dk) D cov ls /\ fs_durable_wf D /\
+         hdr_wf (fs_blocks dk) cov ls⌝.
+  Proof.
+    rewrite /P_fs_rec_named /P_fs.
+    iIntros "H". iDestruct "H" as (γs) "[_ H]".
+    iDestruct "H" as (r) "(_ & %Hwf & _)".
+    iPureIntro. destruct Hwf as (Hrec & _ & Hhdr & Hdwf).
+    exists (fr_D r). split_and!; assumption.
+  Qed.
+
+  (* THE PROJECTION ITSELF.  Non-destructive in every resource: the auth is
+     borrowed only to run [disk_img_sized_read] -- which re-indexes the record
+     at the machine's own [dk], exactly as [fs_permit_of_rec] does -- and both
+     it and the predicate are handed straight back.  The [▷] strips under the
+     [◇] because the predicate is timeless. *)
+  Lemma P_fs_project (γd : gname) (N : nat) (γsw γreg γst : gname)
+      (cov : gset Z) (ls : Z) (dk : Z -> bv 8) :
+    disk_img_auth_sized γd N dk -∗
+    ▷ P_fs_named γd N γsw γreg γst cov ls -∗
+    ◇ (disk_img_auth_sized γd N dk ∗
+       ▷ P_fs_named γd N γsw γreg γst cov ls ∗
+       ⌜fs_extent cov ls N /\
+        exists D : gmap Z (list (bv 8)),
+          fs_recovery (fs_blocks dk) D cov ls /\ fs_durable_wf D /\
+          hdr_wf (fs_blocks dk) cov ls⌝).
+  Proof.
+    iIntros "Ha HP". iMod "HP".
+    rewrite /P_fs_named. iDestruct "HP" as (dk0) "(Hfr & %Hext & HPr)".
+    (* the fragments read the machine's image: the record's [dk0] agrees
+       with [dk] on the whole durable disk *)
+    iDestruct (disk_img_sized_read with "Ha Hfr") as %Hrd.
+    rewrite disk_read_length in Hrd.
+    (* re-index the record at [dk], read the pure fact off it there, and
+       re-index back -- the agreement runs in both directions, and nothing
+       else moves *)
+    iDestruct (P_fs_rec_agree γsw γreg γst cov ls N dk0 dk
+                 (eq_sym Hrd) Hext with "HPr") as "HPr".
+    iDestruct (P_fs_rec_named_wf with "HPr") as %Hwf.
+    iDestruct (P_fs_rec_agree γsw γreg γst cov ls N dk dk0
+                 Hrd Hext with "HPr") as "HPr".
+    iModIntro. iSplitL "Ha"; [iExact "Ha"|].
+    iSplitL "Hfr HPr".
+    { iNext. iExists dk0. iFrame "Hfr HPr". iPureIntro. exact Hext. }
+    iPureIntro. split; [exact Hext | exact Hwf].
+  Qed.
+
+  (* -------------------------------------------------------------------- *)
   (* 3b. ALLOCATION -- mkfs's obligation, discharged                        *)
   (* -------------------------------------------------------------------- *)
 

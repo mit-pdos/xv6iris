@@ -151,6 +151,23 @@ Definition fs_boot_image_eras (sb : fs_sb) (nib : nat) (cov : gset Z)
     fs_boot_image_wf (v_disk (g'.(gdev).(dvirtio))) XV6_DISK_BYTES
       sb nib cov.
 
+(* THE PURE PROJECTION OF THE CRASH PREDICATE (stage H0, claude-notes/
+   projects/durable-disk.md): what [FsCrash.P_fs_named] says about the
+   PHYSICAL disk it is stated over -- the durable extent's geometry, and that
+   the image recovers to a committed view that is FS-well-formed.
+
+   This is [fs_boot_image_wf]'s SHAPE, and the point of the stage: the era
+   hypothesis [fs_boot_image_eras] above ASSUMES a fact of this kind at every
+   era, while this one is EXTRACTED from the crash predicate by
+   [FsCrash.P_fs_project], which [RiscvAdequacy.riscv_power_adequacy] runs
+   against its own [state_interp] at each PowerOn.  Stage I is what deletes
+   the assumed form; H0 only builds the channel, so both are live here. *)
+Definition fs_boot_pure (cov : gset Z) (ls : Z) (dk : Z -> bv 8) : Prop :=
+  fs_extent cov ls XV6_DISK_BYTES /\
+  exists D : gmap Z (list (bv 8)),
+    fs_recovery (fs_blocks dk) D cov ls /\ fs_durable_wf D /\
+    hdr_wf (fs_blocks dk) cov ls.
+
 Section SystemBoot.
   Context `{!riscvGS Σ, !xv6G Σ}.
   Context `{!fileGpreS Σ, !fdslotGpreS Σ, !irefslotGpreS Σ, !pavGpreS Σ, !bioslotGpreS Σ}.
@@ -170,6 +187,13 @@ Section SystemBoot.
     boot_facts g ->
     fs_boot_image_wf (v_disk (g.(gdev).(dvirtio))) XV6_DISK_BYTES
       sb nib cov ->
+    (* THE PROJECTION THE POWER THEOREM PROVES AT THIS ERA (stage H0): the
+       crash predicate's own reading of the disk this boot runs on, extracted
+       from [P_fs] rather than assumed.  NOT USED YET -- it is the premise
+       stage H1 mints the FS configuration from and stage I replaces [Himg]
+       with; H0 only builds the channel and proves it carries the fact. *)
+    fs_boot_pure cov (FsImg.sb_logstart sb)
+      (v_disk (g.(gdev).(dvirtio))) ->
     (* THE CRASH SLOT'S VALUE, as a PURE equation (fs-cfg-boot.md stage
        (f), row 7 of [FirstTok.first_boot_persist]).  The boot cone needs
        [FsCrash.fs_crash_seam], and no fupd inside an era can mint it:
@@ -190,7 +214,7 @@ Section SystemBoot.
       WP (DiskLoopE gen_id : expr riscv_lang) @ ⊤ ∗
       WP (PlicLoopE gen_id : expr riscv_lang) @ ⊤.
   Proof.
-    intros Hbf Himg Hcp. iIntros "Hres".
+    intros Hbf Himg Hpure Hcp. iIntros "Hres".
     (* THE SEAM, ASSEMBLED FROM THE SLOT EQUATION and put in the
        intuitionistic context: it rides [FirstTok.first_boot_persist] from
        here to forkret's first arm.  Both directions are the identity once
@@ -366,12 +390,21 @@ Proof.
                  iSplitR; [iPureIntro; exact Hext |];
                  rewrite /P_fs_rec_named; iExists γs;
                  iSplitR; [iPureIntro; exact Hseq | iExact "HP"])
+           (* THE PURE PROJECTION (stage H0): the crash predicate's own
+              reading of the physical disk, at every era.  [P_fs_project] IS
+              the obligation -- the durable auth is lent for the one
+              agreement that identifies [P_fs]'s image with the machine's,
+              and nothing is spent. *)
+           (fs_boot_pure cov (FsImg.sb_logstart sb))
+           ltac:(intros γd γsw γreg γst dk;
+                 exact (P_fs_project γd XV6_DISK_BYTES γsw γreg γst cov
+                          (FsImg.sb_logstart sb) dk))
            Hgen0 Hpow).
   (* the per-era boot entailment, at the era instance the power thread just
      minted.  [riscv_fixedGS (RiscvGS Σ F HE)] iota-reduces to [F] and
      [riscv_eraGS] to [HE], so §2's statement at the composed instance IS
      this obligation (crash.md's M0 gotcha, in the direction that works). *)
-  intros F HE gen g' Hbf Hshape.
+  intros F HE gen g' Hbf Hpure Hshape.
   (* THE RECORD'S SHAPE, destructed: every projection below reduces, which
      is what makes the crash slot's value -- and hence the seam -- visible
      to the boot cone at all.  [RiscvAdequacy.boot_fixedGS]'s header is the
@@ -379,7 +412,7 @@ Proof.
      do (the ghost CLASS instances have to agree too). *)
   destruct Hshape as (Hi & Gg & Gs & Gr & Gt & Gsw & ->).
   refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ _ _ _ _ _ gen g' sb nib cov Hbf
-            (Himg g' Hbf) _).
+            (Himg g' Hbf) Hpure _).
   reflexivity.
 Qed.
 
@@ -478,8 +511,17 @@ Proof.
                  iSplitR; [iPureIntro; exact Hext |];
                  rewrite /P_fs_rec_named; iExists γs;
                  iSplitR; [iPureIntro; exact Hseq | iExact "HP"])
+           (* THE PURE PROJECTION (stage H0): the crash predicate's own
+              reading of the physical disk, at every era.  [P_fs_project] IS
+              the obligation -- the durable auth is lent for the one
+              agreement that identifies [P_fs]'s image with the machine's,
+              and nothing is spent. *)
+           (fs_boot_pure cov (FsImg.sb_logstart sb))
+           ltac:(intros γd γsw γreg γst dk;
+                 exact (P_fs_project γd XV6_DISK_BYTES γsw γreg γst cov
+                          (FsImg.sb_logstart sb) dk))
            Hgen0 Hpow).
-  intros F HE gen g' Hbf Hshape.
+  intros F HE gen g' Hbf Hpure Hshape.
   (* THE RECORD'S SHAPE, destructed: every projection below reduces, which
      is what makes the crash slot's value -- and hence the seam -- visible
      to the boot cone at all.  [RiscvAdequacy.boot_fixedGS]'s header is the
@@ -487,7 +529,7 @@ Proof.
      do (the ghost CLASS instances have to agree too). *)
   destruct Hshape as (Hi & Gg & Gs & Gr & Gt & Gsw & ->).
   refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ _ _ _ _ _ gen g' sb nib cov Hbf
-            (Himg g' Hbf) _).
+            (Himg g' Hbf) Hpure _).
   reflexivity.
 Qed.
 

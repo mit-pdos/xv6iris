@@ -435,23 +435,37 @@ sys_mknod, sys_chdir, filewrite, fileclose, kexec ×2, kexit, ireclaim).
 
 ## 7. Stage H — boot re-founding: mint at `D`, recovery a ghost no-op
 
-- [ ] **H0. The adequacy-layer pure-projection hook** (the mechanism
-      that replaces `Himg`). The era fupd cannot identify `P_fs`'s
-      existential `dk` with the real disk — the fixed auth lives in
-      `state_interp`, which the era entailment never holds. But
-      `riscv_power_adequacy`'s OWN proof holds `state_interp` at every
-      PowerOn step, so it can open `crashN` there, run the one
-      auth/frag agreement, and extract a client-chosen PURE projection
-      of the crash predicate at the boot state. Interface:
-      `riscv_power_adequacy` generalizes with a client hook
-      `Hproj : ∀ g', state_interp g' ∗ ▷ Pc ={E}=∗ state_interp g' ∗
-      ▷ Pc ∗ ⌜Pc_pure g'⌝` and `Hboot` gains the premise
-      `⌜Pc_pure g'⌝`. The FS instantiates
-      `Pc_pure g' := fs_durable_wf (the recovery of (v_disk g')) ∧
-      hdr_wf … ∧ geometry` — Himg's SHAPE, now PROVEN from the loop
-      invariant instead of assumed. `fs_recovery_total` makes the
-      recovery-of spelling a pure function of `v_disk g'`, so the era
-      mint computes at a CONCRETE image, exactly as today.
+- [x] **H0. The adequacy-layer pure-projection hook** — LANDED, and the
+      channel `Himg` will be deleted through (stage I). The era fupd
+      cannot identify `P_fs`'s existential `dk` with the real disk (the
+      fixed auth lives in `state_interp`, which no era entailment ever
+      holds); `wp_power_loop`'s PowerOn arm does hold it, so THAT is
+      where the agreement runs. As landed:
+      `wp_power_loop`/`riscv_power_adequacy` take
+      `Ppure : (Z -> bv 8) -> Prop` and
+      `Hproj : ∀ dk, ⊢ disk_fixed_auth dk -∗ ▷ riscv_crash_pred -∗
+      ◇ (disk_fixed_auth dk ∗ ▷ riscv_crash_pred ∗ ⌜Ppure dk⌝)`
+      (a `◇`, not a fupd: the arm runs it inside the step's own
+      `|={⊤,∅}=>`; at `riscv_power_adequacy` it is quantified over the
+      four gnames exactly as `HPc` is, at
+      `disk_img_auth_sized γdisk ndisk`). The PowerOn arm opens `crashN`
+      at ⊤ BEFORE the mask shrink, runs `Hproj` against `state_interp`'s
+      own `Htie` conjunct, closes, and `Hboot` gains
+      `Ppure (v_disk (dvirtio (gdev g')))` — sound because
+      `virtio_reset` keeps `v_disk` (`Hdk2`, hoisted to where the arm
+      destructures `boot_shape`), so the fact extracted at the dying
+      machine IS the fact at the reset one.
+      FS SIDE: `FsCrash.P_fs_project` (with `P_fs_rec_named_wf` and
+      `P_fs_named_timeless`) — lend the auth to `disk_img_sized_read`,
+      re-index the record with `P_fs_rec_agree` to the machine's `dk`,
+      read the pure fact (persistent ⇒ non-destructive), re-index back;
+      the `▷` strips under the `◇`. The payload is
+      `SystemAdequacy.fs_boot_pure cov ls dk` :=
+      `fs_extent cov ls XV6_DISK_BYTES ∧ ∃ D, fs_recovery (fs_blocks dk)
+      D cov ls ∧ fs_durable_wf D ∧ hdr_wf (fs_blocks dk) cov ls` —
+      Himg's SHAPE, PROVEN from the loop invariant instead of assumed.
+      `xv6_boot_era` takes it as a premise and DOES NOT USE IT YET
+      (H1 is what mints from it; `Himg` stays until I1).
 - [ ] **H1.** `fs_cfg_alloc` (and `FsBoot.fs_boot_ghosts`) run at `D`
       read out of `P_fs` in the era fupd (open `crashN` at ⊤); the
       raw-disk premises become `fs_durable_wf D` + geometry from `P_fs`.
