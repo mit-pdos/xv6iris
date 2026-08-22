@@ -676,14 +676,15 @@ Qed.
     back [G]'s own label, and §4.5's [cert_block_pair] is what discharges it
     at a real site. *)
 Definition cpolp (x : agent) (cpu : CPU) (d0 : dev_state) (T : list wreg)
-    (Ctx : cand → Prop) (Cls : cand → lbl → Prop) (Q : lbl → Prop) : Prop :=
-  ∀ (c0 : cand) (ws : wstate) (lb : lbl) (l1 l2 : wlabel)
+    (Ctx : nat → cand → Prop) (Cls : cand → lbl → Prop)
+    (Q : nat → lbl → Prop) : Prop :=
+  ∀ (k : nat) (c0 : cand) (ws : wstate) (lb : lbl) (l1 l2 : wlabel)
     (rds : list wreg) (wrs : list register)
     (m : M unit) (rs1 rs2 : regstate) (fn : ofence) (ib : oib32)
     (m' : M unit) (rs1' : regstate) (fn' : ofence) (ib' : oib32),
     srvwmo_consistent c0 →
-    Ctx c0 →
-    Q lb →
+    Ctx k c0 →
+    Q k lb →
     w_relp (ms_ws (cand_last_st c0) x) = w_relp ws →
     dreg_agree (λ n, n ∉ T) rs1 rs2 →
     cblkp cpu d0 ws lb l1 l2 rds wrs m rs1 fn ib m' rs1' fn' ib' →
@@ -710,13 +711,14 @@ Qed.
 (** … so an RMW-FREE [Q] gives the pair policy vacuously: this is the OLD
     [HQrmw] refutation, packaged as a policy. *)
 Lemma cpolp_of_rmwfree (x : agent) (cpu : CPU) (d0 : dev_state)
-    (T : list wreg) (Ctx : cand → Prop) (Cls : cand → lbl → Prop)
-    (Q : lbl → Prop) :
-  (∀ lb, Q lb → lb_rmwfree lb) → cpolp x cpu d0 T Ctx Cls Q.
+    (T : list wreg) (Ctx : nat → cand → Prop) (Cls : cand → lbl → Prop)
+    (Q : nat → lbl → Prop) :
+  (∀ k lb, Q k lb → lb_rmwfree lb) → cpolp x cpu d0 T Ctx Cls Q.
 Proof.
-  intros HQrmw c0 ws lb l1 l2 rds wrs m rs1 rs2 fn ib m' rs1' fn' ib'
+  intros HQrmw k c0 ws lb l1 l2 rds wrs m rs1 rs2 fn ib m' rs1' fn' ib'
     _ _ HQ _ _ Hblk.
-  exfalso. exact (cblkp_rmw _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Hblk (HQrmw lb HQ)).
+  exfalso.
+  exact (cblkp_rmw _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Hblk (HQrmw k lb HQ)).
 Qed.
 
 (** [WeakRvwmoCert2.pol_store], carrying the (trivial) classification the
@@ -765,13 +767,28 @@ Qed.
         [WeakRvwmoCert2.cert_segment] (§6.3). *)
 Section segment'.
   Context (x : agent) (cpu : CPU) (d0 : dev_state) (T : list wreg).
-  Context (Q : lbl -> Prop).
+
+  (** THE ROW-POSITION-INDEXED SEGMENT PREDICATE.  [Q k lb] is "the block at
+      ROW POSITION [k] carries label [lb]".  Indexing it (and [Ctx] below) by
+      the position is the REPAIR of the over-quantification recorded in
+      [WeakRvwmoWalk2] §4: the policy used to be asked at EVERY candidate the
+      carried context admits while its conclusion spoke of that candidate's
+      OWN row position, and the empty candidate — a context of every
+      witness-free graph — then pinned the segment's exit write to row
+      position 0. *)
+  Context (Q : nat -> lbl -> Prop).
 
   (** THE CARRIED CONTEXT, abstract.  The INTENDED instance is
       [Ctx := cpol_ctx G W x] (§3.3), at which [Hpol']'s read clause is
       [cpol_read] and owes NO [floor_ok]; [Ctx := λ _, True] recovers
-      [WeakRvwmoCert2.cert_segment] verbatim (§6). *)
-  Context (Ctx : cand → Prop).
+      [WeakRvwmoCert2.cert_segment] verbatim (§6).
+
+      The context is INDEXED BY ROW POSITION too: the intended instance
+      ([WeakRvwmoWalk.wctx]) pins the candidate's replayed count for [x] to
+      that position, which is what makes the policy's conclusion — about
+      [G]'s label at [gcnt x (cd_tr c0)] — a statement about the block's own
+      site. *)
+  Context (Ctx : nat → cand → Prop).
 
   (** (W-3) THE STEP CLASSIFICATION, as a parameter.  The appended label's
       classification — [WeakRvwmoGlue2.cstep_cls] at the intended instance —
@@ -781,19 +798,20 @@ Section segment'.
       [Cls := λ _ _, True] nothing changes. *)
   Context (Cls : cand → lbl → Prop).
 
-  Context (Hpres : ∀ (c0 : cand) (lb lb' : lbl),
-      Ctx c0 → srvwmo_consistent c0 → Q lb → lbl_reidx lb lb' →
+  Context (Hpres : ∀ (k : nat) (c0 : cand) (lb lb' : lbl),
+      Ctx k c0 → srvwmo_consistent c0 → Q k lb → lbl_reidx lb lb' →
       mstep_ok (cand_last_st c0) x lb' →
       Cls c0 lb' →
-      Ctx (cand_snoc c0 (EStep x lb'))).
+      Ctx (S k) (cand_snoc c0 (EStep x lb'))).
 
-  Context (Hpol' : ∀ (c0 : cand) (ws : wstate) (lb : lbl) (l : wlabel)
+  Context (Hpol' : ∀ (k : nat) (c0 : cand) (ws : wstate) (lb : lbl)
+      (l : wlabel)
       (rds : list wreg) (wrs : list register)
       (m : M unit) (rs1 rs2 : regstate) (fn : ofence) (ib : oib32)
       (m' : M unit) (rs1' : regstate) (fn' : ofence) (ib' : oib32),
       srvwmo_consistent c0 →
-      Ctx c0 →
-      Q lb →
+      Ctx k c0 →
+      Q k lb →
       w_relp (ms_ws (cand_last_st c0) x) = w_relp ws →
       dreg_agree (λ n, n ∉ T) rs1 rs2 →
       cblk cpu d0 ws lb l rds wrs m rs1 fn ib m' rs1' fn' ib' →
@@ -811,12 +829,12 @@ Section segment'.
 
   Theorem cert_segment' k0 ws0 rowseg p es pfin :
     hemit (λ _, d0) k0 ws0 rowseg p es pfin →
-    Forall Q rowseg →
+    (∀ i lb, rowseg !! i = Some lb → Q (k0 + i)%nat lb) →
     ∀ m0 rs10 fn0 ib0, p = PHart cpu m0 rs10 fn0 ib0 →
     ∀ (c : cand) (pst : nat → list pexv6) (dv : nat → dev_state)
       (rs20 : regstate),
       srvwmo_consistent c →
-      Ctx c →
+      Ctx k0 c →
       exec_prog_ok' pstep_ev pcls_ev pst dv (cand_exec c) →
       pst (cd_end c) !! x = Some (PHart cpu m0 rs20 fn0 ib0) →
       dv (cd_end c) = d0 →
@@ -829,7 +847,7 @@ Section segment'.
         (∀ s, s ∈ tradd → es_ag s = x) ∧
         Forall2 lbl_reidx rowseg ((λ s, es_lb s) <$> tradd) ∧
         srvwmo_consistent c' ∧
-        Ctx c' ∧
+        Ctx (k0 + length rowseg)%nat c' ∧
         exec_prog_ok' pstep_ev pcls_ev pst' dv' (cand_exec c') ∧
         pst' (cd_end c') !! x = Some (PHart cpu m1 rs21 fn1 ib1) ∧
         dv' (cd_end c') = d0 ∧
@@ -853,12 +871,17 @@ Section segment'.
       intros Hrf m0 rs10 fn0 ib0 -> c pst dv rs20 Hc Hctx Hpo Hp Hdv Hag Hrelp.
     - (* EMPTY SEGMENT *)
       exists c, pst, dv, [], m0, rs10, rs20, fn0, ib0.
-      split_and!; [by rewrite app_nil_r| |constructor|exact Hc|exact Hctx
+      split_and!; [by rewrite app_nil_r| |constructor|exact Hc
+                  |(rewrite /= Nat.add_0_r; exact Hctx)
                   |exact Hpo|exact Hp|exact Hdv|reflexivity|exact Hag|exact Hrelp
                   |reflexivity|reflexivity|reflexivity].
       intros s Hs. by apply elem_of_nil in Hs.
     - (* ONE BLOCK, then the rest *)
-      apply Forall_cons_1 in Hrf as [Hlb Hrf].
+      have Hlb : Q k lb.
+      { have H0 := Hrf 0%nat lb eq_refl. by rewrite Nat.add_0_r in H0. }
+      have Hrf' : ∀ i lb0, row !! i = Some lb0 → Q (S k + i)%nat lb0.
+      { intros i lb0 Hi. have H0 := Hrf (S i) lb0 Hi.
+        by replace (S k + i)%nat with (k + S i)%nat by lia. }
       destruct (adm_run_phart true _ _ d0 ls da Har cpu m0 rs10 fn0 ib0 eq_refl)
         as (ma & rsa & fna & iba & Hpa).
       rewrite Hpa in Hst Hre.
@@ -869,7 +892,7 @@ Section segment'.
       destruct (cblk_intro cpu d0 ws lb l ls (PHart cpu ma rsa fna iba) da
                   m0 rs10 fn0 ib0 m1 rs11 fn1 ib1 Har Hre Hst)
         as (rds & wrs & Hblk).
-      destruct (Hpol' c ws lb l rds wrs m0 rs10 rs20 fn0 ib0 m1 rs11 fn1 ib1
+      destruct (Hpol' k c ws lb l rds wrs m0 rs10 rs20 fn0 ib0 m1 rs11 fn1 ib1
                   Hc Hctx Hlb Hrelp Hag Hblk)
         as (lb' & l' & rds' & wrs' & rs21 & Hblk2 & Hok & Hri & Hcl & Hag2).
       destruct (cert_block_snoc c x pst dv cpu d0 lb' l' rds' wrs'
@@ -880,7 +903,7 @@ Section segment'.
       set (c2 := cand_snoc c (EStep x lb')).
       set (pst2 := pst_snoc c pst x (PHart cpu m1 rs21 fn1 ib1)).
       set (dv2 := dv_snoc c dv d0).
-      have Hctx2 : Ctx c2 := Hpres c lb lb' Hctx Hc Hlb Hri Hok Hcl.
+      have Hctx2 : Ctx (S k) c2 := Hpres k c lb lb' Hctx Hc Hlb Hri Hok Hcl.
       have Hend : cd_end c2 = S (cd_end c) by apply cd_end_snoc.
       have Hp2 : pst2 (cd_end c2) !! x = Some (PHart cpu m1 rs21 fn1 ib1).
       { rewrite Hend /pst2 (pst_snoc_gt c pst x _ (S (cd_end c)) ltac:(lia)).
@@ -891,13 +914,14 @@ Section segment'.
                   = w_relp (lbl_post k ws lb).
       { rewrite /c2 cand_snoc_relp Hrelp (lbl_reidx_relp _ lb lb' Hri).
         by rewrite lbl_post_relp. }
-      destruct (IH Hrf m1 rs11 fn1 ib1 Hp' c2 pst2 dv2 rs21
+      destruct (IH Hrf' m1 rs11 fn1 ib1 Hp' c2 pst2 dv2 rs21
                   Hc2 Hctx2 Hpo2 Hp2 Hdv2 Hag2 Hrelp2)
         as (c' & pst' & dv' & tradd & m2 & rs12 & rs22 & fn2 & ib2 &
             Htr & Hag' & Hf2 & Hc' & Hctx' & Hpo' & Hp'' & Hdv' & Hfin & Hagf
             & Hrelpf & Himg2 & Hpst02 & Hdv02).
       exists c', pst', dv', (EStep x lb' :: tradd), m2, rs12, rs22, fn2, ib2.
-      split_and!; [| |constructor; [exact Hri|exact Hf2]|exact Hc'|exact Hctx'
+      split_and!; [| |constructor; [exact Hri|exact Hf2]|exact Hc'
+                   |(rewrite /= Nat.add_succ_r; exact Hctx')
                    |exact Hpo'|exact Hp''|exact Hdv'|exact Hfin|exact Hagf
                    |exact Hrelpf| | | ].
       + rewrite Htr /c2 cand_snoc_tr -app_assoc //.
@@ -912,7 +936,11 @@ Section segment'.
          place of [cblk]/[Hpol']/[cert_block_snoc], and with the appended
          label [G]'s OWN ([lbl_reidx_refl]): an RMW is never re-indexed
          because it is never a witness ([witness_not_aq]). *)
-      apply Forall_cons_1 in Hrf as [Hlb Hrf].
+      have Hlb : Q k lb.
+      { have H0 := Hrf 0%nat lb eq_refl. by rewrite Nat.add_0_r in H0. }
+      have Hrf' : ∀ i lb0, row !! i = Some lb0 → Q (S k + i)%nat lb0.
+      { intros i lb0 Hi. have H0 := Hrf (S i) lb0 Hi.
+        by replace (S k + i)%nat with (k + S i)%nat by lia. }
       destruct (adm_run_phart true _ _ d0 ls1 da Har1 cpu m0 rs10 fn0 ib0 eq_refl)
         as (ma & rsa & fna & iba & Hpa).
       rewrite Hpa in Har1 Hst1 Hre.
@@ -930,7 +958,7 @@ Section segment'.
                   ls2 (PHart cpu mc rsc fnc ibc) dm2
                   m0 rs10 fn0 ib0 m1 rs11 fn1 ib1 Har1 Hre Hst1 Har2 Hst2)
         as (rds & wrs & Hblk).
-      destruct (Hpolp c ws lb l1 l2 rds wrs m0 rs10 rs20 fn0 ib0
+      destruct (Hpolp k c ws lb l1 l2 rds wrs m0 rs10 rs20 fn0 ib0
                   m1 rs11 fn1 ib1 Hc Hctx Hlb Hrelp Hag Hblk)
         as (rs21 & Hblk2 & Hok & Hcl & Hag2).
       destruct (cert_block_snoc_pair c x pst dv cpu d0 lb l1 l2 rds wrs
@@ -941,8 +969,8 @@ Section segment'.
       set (c2 := cand_snoc c (EStep x lb)).
       set (pst2 := pst_snoc c pst x (PHart cpu m1 rs21 fn1 ib1)).
       set (dv2 := dv_snoc c dv d0).
-      have Hctx2 : Ctx c2
-        := Hpres c lb lb Hctx Hc Hlb (lbl_reidx_refl lb) Hok Hcl.
+      have Hctx2 : Ctx (S k) c2
+        := Hpres k c lb lb Hctx Hc Hlb (lbl_reidx_refl lb) Hok Hcl.
       have Hend : cd_end c2 = S (cd_end c) by apply cd_end_snoc.
       have Hp2 : pst2 (cd_end c2) !! x = Some (PHart cpu m1 rs21 fn1 ib1).
       { rewrite Hend /pst2 (pst_snoc_gt c pst x _ (S (cd_end c)) ltac:(lia)).
@@ -952,14 +980,14 @@ Section segment'.
       have Hrelp2 : w_relp (ms_ws (cand_last_st c2) x)
                   = w_relp (lbl_post k ws lb).
       { rewrite /c2 cand_snoc_relp Hrelp. by rewrite lbl_post_relp. }
-      destruct (IH Hrf m1 rs11 fn1 ib1 Hp' c2 pst2 dv2 rs21
+      destruct (IH Hrf' m1 rs11 fn1 ib1 Hp' c2 pst2 dv2 rs21
                   Hc2 Hctx2 Hpo2 Hp2 Hdv2 Hag2 Hrelp2)
         as (c' & pst' & dv' & tradd & m2 & rs12 & rs22 & fn2 & ib2 &
             Htr & Hag' & Hf2 & Hc' & Hctx' & Hpo' & Hp'' & Hdv' & Hfin & Hagf
             & Hrelpf & Himg2 & Hpst02 & Hdv02).
       exists c', pst', dv', (EStep x lb :: tradd), m2, rs12, rs22, fn2, ib2.
       split_and!; [| |constructor; [apply lbl_reidx_refl|exact Hf2]
-                   |exact Hc'|exact Hctx'
+                   |exact Hc'|(rewrite /= Nat.add_succ_r; exact Hctx')
                    |exact Hpo'|exact Hp''|exact Hdv'|exact Hfin|exact Hagf
                    |exact Hrelpf| | | ].
       + rewrite Htr /c2 cand_snoc_tr -app_assoc //.
@@ -1347,17 +1375,21 @@ Section nonvacuity3.
       = Some (EStep 0%nat (WeakAxiomatic.LStore false (pa_z ev_flag)
                              (wbytes 4 WeakLock.lock_one) WCplain)).
   Proof.
-    destruct (cert_segment' 0%nat cpu d0 [] lb_store_ne
-                (λ _ : cand, True) (λ _ _, True)
-                (λ c0 lb lb' _ _ _ _ _ _, I)
-                (λ c0 ws lb l rds wrs m rs1 rs2 fn ib0 m' rs1' fn' ib'
+    destruct (cert_segment' 0%nat cpu d0 [] (λ _ : nat, lb_store_ne)
+                (λ (_ : nat) (_ : cand), True) (λ _ _, True)
+                (λ k c0 lb lb' _ _ _ _ _ _, I)
+                (λ k c0 ws lb l rds wrs m rs1 rs2 fn ib0 m' rs1' fn' ib'
                    Hc _ Hlb H1 H2 H3,
                    pol_store' 0%nat cpu d0 c0 ws lb l rds wrs m rs1 rs2 fn ib0
                      m' rs1' fn' ib' Hc Hlb H1 H2 H3)
-                (cpolp_of_rmwfree 0%nat cpu d0 [] (λ _ : cand, True)
-                   (λ _ _, True) lb_store_ne lb_store_ne_rmwfree)
+                (cpolp_of_rmwfree 0%nat cpu d0 []
+                   (λ (_ : nat) (_ : cand), True) (λ _ _, True)
+                   (λ _ : nat, lb_store_ne)
+                   (λ _ lb Hlb, lb_store_ne_rmwfree lb Hlb))
                 0%nat ws_init ev_row (ev_p0 cpu rs ib) _ _
-                (nv_hemit cpu rs ib d0) nv_row_class
+                (nv_hemit cpu rs ib d0)
+                (λ i lb Hi, Forall_lookup_1 lb_store_ne ev_row i lb
+                              nv_row_class Hi)
                 ev_x2.2 rs None ib eq_refl
                 (sm_c img0) (sm_pst cpu rs ib) (sm_dv d0) rs
                 (sm_consistent img0) I (sm_prog0 img0 cpu rs ib d0)

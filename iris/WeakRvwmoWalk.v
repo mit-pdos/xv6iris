@@ -606,7 +606,23 @@ Proof.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
-(** ** 4.0b THE TWO REMAINING OBLIGATIONS *)
+(** ** 4.0b THE OBLIGATIONS, AND THE POSITION-INDEXED POLICY
+
+    THE REPAIR ([WeakRvwmoWalk2] §4, the TENTH-PASS checkpoint item 3).  The
+    policy used to be asked at EVERY candidate the certification context
+    admits, while everything it must deliver — [mstep_ok] and the
+    classification [wcls_at] — is about [G]'s label at THAT CANDIDATE'S OWN
+    row position.  The two are irreconcilable: the EMPTY candidate is a
+    context of every witness-free graph and its position is 0, so a policy
+    carrying the segment's exit store pinned that store to row position 0
+    ([WeakRvwmoWalk2.wpol_pins_store] / [wpol_exit_at_zero]).
+
+    The cure is to INDEX BY ROW POSITION.  [wctx] is the walk's carried
+    context — [cpol_ctx] together with the ALIGNMENT [gcnt x (cd_tr c) = k]
+    and the log's own prefix state at that position — and [wQ] is the
+    per-position segment predicate.  [wpol] is then the policy at an ALIGNED
+    candidate, and (this is the second half of the repair) it is no longer
+    an obligation at all: §4.0c discharges it outright from the graph. *)
 
 Definition wub (G : gexec) (W : geid → Prop) (x : agent) : Prop :=
   ∀ (c0 : cand) (lb' : lbl) (ev' : nat → geid),
@@ -614,7 +630,17 @@ Definition wub (G : gexec) (W : geid → Prop) (x : agent) : Prop :=
     wit_fence_ub G (cand_snoc c0 (EStep x lb')) ev' W
       (x, S (gcnt x (cd_tr c0))).
 
-Definition wpol (G : gexec) (W : geid → Prop) (x : agent) (cpu : CPU)
+(** (W-4) RESTRICTED TO THE SEGMENT.  [wnw] above asks the witness set to
+    miss the successor of EVERY candidate's position; the walk only ever
+    needs the positions its own segment covers, and a hart with witnesses
+    elsewhere in its row is then not excluded. *)
+Definition wnw_seg (G : gexec) (n : nat) (x : agent) (k0 kz : nat) : Prop :=
+  ∀ k, (k0 ≤ k)%nat → (k ≤ kz)%nat → ¬ wwit G n (x, S k).
+
+(** THE OLD, OVER-QUANTIFIED POLICY.  Kept ONLY as the subject of
+    [WeakRvwmoWalk2] §4's machine-checked refutation; nothing builds a
+    segment out of it any more. *)
+Definition wpol_flat (G : gexec) (W : geid → Prop) (x : agent) (cpu : CPU)
     (d0 : dev_state) (T : list wreg) (Q : lbl → Prop) : Prop :=
   ∀ (c0 : cand) (ws : wstate) (lb : lbl) (l : wlabel)
     (rds : list wreg) (wrs : list register)
@@ -633,57 +659,248 @@ Definition wpol (G : gexec) (W : geid → Prop) (x : agent) (cpu : CPU)
       wcls_at G W x c0 lb' ∧
       dreg_agree (λ nn, nn ∉ T) rs1' rs2'.
 
+(** THE SITE DATUM: [G]'s label at row position [p], the log-decided
+    classification at it, and RMW-freedom. *)
+Definition wsite_ok (G : gexec) (n : nat) (x : agent) (p : nat) (lb : lbl)
+    : Prop :=
+  gx_lbl G (x, p) = Some lb ∧
+  wsrc_le G n (x, p) ∧
+  (lb_is_w lb = true → gwix G (x, p) = S n) ∧
+  lb_rmwfree lb.
+
+(** The log length a candidate at row position [k] of the segment carries:
+    the segment is "non-writes, then ONE store at [kz]", so the log is the
+    gmo prefix of length [n] up to and including [kz], and of length [S n]
+    after it. *)
+Definition wlogn (n kz k : nat) : nat :=
+  if bool_decide (k ≤ kz)%nat then n else S n.
+
+(** THE WALK'S CARRIED CONTEXT, INDEXED BY ROW POSITION. *)
+Definition wctx (G : gexec) (n : nat) (x : agent) (kz : nat)
+    (k : nat) (c : cand) : Prop :=
+  cpol_ctx G (wwit G n) x c ∧
+  gcnt x (cd_tr c) = k ∧
+  wlog_pfx G (wlogn n kz k) (cd_log_end c).
+
+(** THE SEGMENT PREDICATE, INDEXED BY ROW POSITION: positions [k0 .. kz] of
+    hart [x]'s row, non-writes before [kz] and the exit store at it. *)
+Definition wQ (G : gexec) (n : nat) (x : agent) (k0 kz : nat)
+    (k : nat) (lb : lbl) : Prop :=
+  (k0 ≤ k)%nat ∧ (k ≤ kz)%nat ∧
+  wsite_ok G n x k lb ∧
+  (lb_is_w lb = true ↔ k = kz).
+
+Lemma wQ_rmwfree G n x k0 kz k lb : wQ G n x k0 kz k lb → lb_rmwfree lb.
+Proof. by intros (_ & _ & (_ & _ & _ & H) & _). Qed.
+
+(** ** 4.0c THE POLICY AT AN ALIGNED CANDIDATE, AND ITS DISCHARGE *)
+
+Definition wpol (G : gexec) (n : nat) (x : agent) (cpu : CPU)
+    (d0 : dev_state) (T : list wreg) (k0 kz : nat) : Prop :=
+  ∀ (k : nat) (c0 : cand) (ws : wstate) (lb : lbl) (l : wlabel)
+    (rds : list wreg) (wrs : list register)
+    (m : M unit) (rs1 rs2 : regstate) (fn : ofence) (ib : oib32)
+    (m' : M unit) (rs1' : regstate) (fn' : ofence) (ib' : oib32),
+    srvwmo_consistent c0 →
+    wctx G n x kz k c0 →
+    wQ G n x k0 kz k lb →
+    w_relp (ms_ws (cand_last_st c0) x) = w_relp ws →
+    dreg_agree (λ nn, nn ∉ T) rs1 rs2 →
+    cblk cpu d0 ws lb l rds wrs m rs1 fn ib m' rs1' fn' ib' →
+    ∃ lb' l' rds' wrs' rs2',
+      cblk cpu d0 ws lb' l' rds' wrs' m rs2 fn ib m' rs2' fn' ib' ∧
+      mstep_ok (cand_last_st c0) x lb' ∧
+      lbl_reidx lb lb' ∧
+      wcls_at G (wwit G n) x c0 lb' ∧
+      dreg_agree (λ nn, nn ∉ T) rs1' rs2'.
+
+(** THE THREE [mstep_ok] ROUTES, at an aligned candidate. *)
+Theorem wsite_mstep_ok (G : gexec) (n : nat) (x : agent) (c0 : cand)
+    (lb : lbl) :
+  rvwmo_minus_consistent G →
+  W_poloc_closed G (wwit G n) →
+  cd_img c0 = gx_img G →
+  wlog_pfx G n (cd_log_end c0) →
+  cpol_ctx G (wwit G n) x c0 →
+  wsite_ok G n x (gcnt x (cd_tr c0)) lb →
+  mstep_ok (cand_last_st c0) x lb.
+Proof.
+  intros Hcons Hpc Himg Hpfx Hctx (Hl & Hle & _ & Hrmw).
+  pose proof Hcons as (Hwf & _ & Hlv & _).
+  destruct lb as [aq base ts vs|rl base vs kc|pr pw sr sw|aq rl base ts rvs wvs kc].
+  - apply (cpol_read G (wwit G n) x c0 aq base ts vs Hcons Hpc Hctx Hl).
+    apply (src_in_log_of_pfx G n c0 (x, gcnt x (cd_tr c0)) aq base ts vs
+             Hlv Himg Hpfx Hl (gshape G Hwf _ _ Hl) Hle).
+  - apply cert_write_ok. exact (gshape G Hwf _ _ Hl).
+  - apply cert_fence_ok.
+  - by destruct Hrmw.
+Qed.
+
+(** THE POLICY'S BLOCK, at an aligned candidate: the untainted mirror
+    ([cert_block_mirror] at the EMPTY taint set) plus the admissibility and
+    the classification, with [G]'s own label handed back
+    ([lbl_reidx_refl]). *)
+Theorem wblk_pol_at (G : gexec) (n : nat) (x : agent) (cpu : CPU)
+    (d0 : dev_state) (c0 : cand) (ws : wstate) (lb : lbl) (l : wlabel)
+    (rds : list wreg) (wrs : list register) (m : M unit) (rs1 rs2 : regstate)
+    (fn : ofence) (ib : oib32) (m' : M unit) (rs1' : regstate)
+    (fn' : ofence) (ib' : oib32) :
+  rvwmo_minus_consistent G →
+  W_poloc_closed G (wwit G n) →
+  cd_img c0 = gx_img G →
+  wlog_pfx G n (cd_log_end c0) →
+  cpol_ctx G (wwit G n) x c0 →
+  wsite_ok G n x (gcnt x (cd_tr c0)) lb →
+  dreg_agree (λ nn, nn ∉ []) rs1 rs2 →
+  cblk cpu d0 ws lb l rds wrs m rs1 fn ib m' rs1' fn' ib' →
+  ∃ (lb' : lbl) (l' : wlabel) (rds' : list wreg) (wrs' : list register)
+    (rs2' : regstate),
+    cblk cpu d0 ws lb' l' rds' wrs' m rs2 fn ib m' rs2' fn' ib' ∧
+    mstep_ok (cand_last_st c0) x lb' ∧
+    lbl_reidx lb lb' ∧
+    wcls_at G (wwit G n) x c0 lb' ∧
+    dreg_agree (λ nn, nn ∉ []) rs1' rs2'.
+Proof.
+  intros Hcons Hpc Himg Hpfx Hctx Hsite Hag Hblk.
+  destruct (cert_block_mirror (λ nn, nn ∉ []) cpu d0 ws lb l rds wrs
+              m rs1 fn ib m' rs1' fn' ib' rs2 Hblk
+              (λ nn _, not_elem_of_nil nn) Hag) as (rs2' & Hblk2 & Hag2).
+  exists lb, l, rds, wrs, rs2'.
+  destruct Hctx as (ev & Hgt & Hub & HnW).
+  destruct Hsite as (Hl & Hle & Hix & Hrmw).
+  split_and!.
+  - exact Hblk2.
+  - apply (wsite_mstep_ok G n x c0 lb Hcons Hpc Himg Hpfx);
+      [by exists ev|by split_and!].
+  - apply lbl_reidx_refl.
+  - by apply (wcls_of_pfx G n x c0 lb).
+  - exact Hag2.
+Qed.
+
+(** (W-1), DISCHARGED.  The alignment is what makes it derivable: the site
+    data are read off [G] at the position the block sits at, and the
+    candidate's own position IS that position. *)
+Theorem wpol_of_sites (G : gexec) (n : nat) (x : agent) (cpu : CPU)
+    (d0 : dev_state) (k0 kz : nat) :
+  rvwmo_minus_consistent G →
+  W_poloc_closed G (wwit G n) →
+  wpol G n x cpu d0 [] k0 kz.
+Proof.
+  intros Hcons Hpc k c0 ws lb l rds wrs m rs1 rs2 fn ib m' rs1' fn' ib'
+    Hc (Hctx & Hgc & Hpfx) (Hk0 & Hkz & Hsite & _) Hrelp Hag Hblk.
+  have Himg : cd_img c0 = gx_img G.
+  { destruct Hctx as (ev & Hgt & _ & _). exact (ctp_img G c0 ev _ Hgt). }
+  have Hpfx' : wlog_pfx G n (cd_log_end c0).
+  { move: Hpfx. by rewrite /wlogn (bool_decide_eq_true_2 (k ≤ kz)%nat Hkz). }
+  apply (wblk_pol_at G n x cpu d0 c0 ws lb l rds wrs m rs1 rs2 fn ib m'
+           rs1' fn' ib' Hcons Hpc Himg Hpfx' Hctx);
+    [by rewrite Hgc|exact Hag|exact Hblk].
+Qed.
+
+(** ** 4.0d THE CONTEXT IS PRESERVED — (P-1) at the indexed instance *)
+Theorem wctx_pres (G : gexec) (n : nat) (x : agent) (k0 kz : nat) :
+  gwf G →
+  wub G (wwit G n) x →
+  wnw_seg G n x k0 kz →
+  ∀ (k : nat) (c0 : cand) (lb lb' : lbl),
+    wctx G n x kz k c0 → srvwmo_consistent c0 → wQ G n x k0 kz k lb →
+    lbl_reidx lb lb' → mstep_ok (cand_last_st c0) x lb' →
+    wcls_at G (wwit G n) x c0 lb' →
+    wctx G n x kz (S k) (cand_snoc c0 (EStep x lb')).
+Proof.
+  intros Hwf Hub Hnw k c0 lb lb' (Hctx & Hgc & Hpfx) Hc
+         (Hk0 & Hkz & Hsite & Hiff) Hri Hok (Hcl & Hix).
+  have Hpfxn : wlog_pfx G n (cd_log_end c0).
+  { move: Hpfx. by rewrite /wlogn (bool_decide_eq_true_2 (k ≤ kz)%nat Hkz). }
+  have Hlen : length (cd_log_end c0) = n by destruct Hpfxn as [H _].
+  have Hgc2 : gcnt x (cd_tr (cand_snoc c0 (EStep x lb'))) = S k
+    by rewrite gcnt_cand_snoc_self Hgc.
+  split_and!.
+  - eapply cpol_ctx_snoc;
+      [exact Hwf|exact Hctx|exact Hcl|exact Hix
+      |intros ev' Hev'; exact (Hub c0 lb' ev' Hev')
+      |rewrite Hgc; by apply Hnw].
+  - exact Hgc2.
+  - rewrite cd_log_end_snoc.
+    destruct (decide (k = kz)) as [->|Hne].
+    + (* THE EXIT STORE: the log grows by G's (n+1)-st write's message *)
+      have Hw : lb_is_w lb = true by apply Hiff.
+      destruct Hsite as (Hl & Hle & Hgwix & Hrmw).
+      destruct lb as [aq0 b0 ts0 vs0|rl base vs kc|pr pw sr sw
+                     |aq0 rl0 b0 ts0 rv0 wv0 kc0]; try by simpl in Hw.
+      have Hlb' : lb' = WeakAxiomatic.LStore rl base vs kc
+        := lbl_reidx_store rl base vs kc lb' Hri.
+      subst lb'.
+      have HnW : ¬ wwit G n (x, gcnt x (cd_tr c0))
+        by rewrite Hgc; apply wsrc_le_not_wwit.
+      have Hlbl : gx_lbl G (x, gcnt x (cd_tr c0))
+                = Some (WeakAxiomatic.LStore rl base vs kc).
+      { destruct Hcl as [[_ H]|[HW _]]; [exact H|by destruct (HnW HW)]. }
+      have Hwix : gwix G (x, gcnt x (cd_tr c0)) = S n
+        by rewrite (Hix eq_refl) Hlen.
+      have Hmem : (x, gcnt x (cd_tr c0)) ∈ gwrites G.
+      { eapply gis_w_gwrites; [exact Hwf|by exists (WeakAxiomatic.LStore rl base vs kc)
+                              |by rewrite /gis_w Hlbl]. }
+      have Hat : gwrite_at G (S n) = Some (x, gcnt x (cd_tr c0))
+        by rewrite -Hwix; apply gwrite_at_gwix.
+      have Hmsg : gmsg G (x, gcnt x (cd_tr c0))
+                = Some (WMsg base vs (Some x) kc)
+        by rewrite /gmsg Hlbl.
+      have -> : wlogn n kz (S kz) = S n.
+      { rewrite /wlogn (bool_decide_eq_false_2 (S kz ≤ kz)%nat); [done|lia]. }
+      have -> : es_msg (EStep x (WeakAxiomatic.LStore rl base vs kc))
+              = [WMsg base vs (Some x) kc] by reflexivity.
+      exact (wlog_pfx_snoc G n (cd_log_end c0) _ _ Hpfxn Hat Hmsg).
+    + (* A NON-WRITE BLOCK: the log does not move *)
+      have Hw : lb_is_w lb = false.
+      { destruct (lb_is_w lb) eqn:Hb; [|done].
+        exfalso. apply Hne. by apply Hiff. }
+      have Hw' : lb_is_w lb' = false by eapply lbl_reidx_notw.
+      rewrite (es_msg_notw (EStep x lb') Hw') app_nil_r.
+      have -> : wlogn n kz (S k) = n.
+      { rewrite /wlogn (bool_decide_eq_true_2 (S k ≤ kz)%nat); [done|lia]. }
+      exact Hpfxn.
+Qed.
+
 (** ** 4.1 THE SEGMENT, from the emission and the REDUCED ledger
 
-    (P-1) is DISCHARGED here — [WeakRvwmoGlue2.cpol_ctx_snoc] is exactly the
-    [Hpres] [cert_segment'] asks for at [Ctx := cpol_ctx G W x], once the
-    classification travels with the step ([Cls := wcls_at G W x], §4.0a) —
-    so the inputs left are the emission block, the invariant at the current
-    state, the graph-side datum [wrow_in_log] (which discharges (W-4)), and
-    the TWO obligations (W-1) [wpol] and (W-2) [wub].  The RMW block's own
-    policy ([WeakRvwmoCert3.cpolp], (O-F)) rides alongside [wpol]; at an
-    RMW-free row it is [WeakRvwmoCert3.cpolp_of_rmwfree]. *)
+    (P-1) is [wctx_pres]; (W-1) is [wpol_of_sites]; (O-F) is
+    [WeakRvwmoCert3.cpolp_of_rmwfree] (the site datum is RMW-free).  What is
+    left at this interface is (W-2) [wub] and the restricted (W-4)
+    [wnw_seg]. *)
 Theorem wlk_seg_of_cert (G : gexec) (n : nat) (x : agent) (cpu : CPU)
-    (d0 : dev_state) (T : list wreg) (Q : lbl → Prop)
-    (k0 : nat) (ws0 : wstate) (rowseg : list lbl) (es : list eitem)
-    (pfin : pexv6) (m0 : M unit) (rs10 : regstate) (fn0 : ofence)
-    (ib0 : oib32) (St : cyc_state) (rs20 : regstate) :
-  gwf G →
-  (* (W-4), DISCHARGED: the walk's witness set is log-decided *)
-  wrow_in_log G x n →
+    (d0 : dev_state) (k0 kz : nat) (ws0 : wstate) (rowseg : list lbl)
+    (es : list eitem) (pfin : pexv6) (m0 : M unit) (rs10 : regstate)
+    (fn0 : ofence) (ib0 : oib32) (St : cyc_state) (rs20 : regstate) :
+  rvwmo_minus_consistent G →
+  W_poloc_closed G (wwit G n) →
   (* (W-2) *)
   wub G (wwit G n) x →
-  (* (W-1), carrying (W-3)'s classification and (P-4) progress *)
-  wpol G (wwit G n) x cpu d0 T Q →
-  (* (O-F): the fused RMW block's policy *)
-  cpolp x cpu d0 T (cpol_ctx G (wwit G n) x) (wcls_at G (wwit G n) x) Q →
+  (* (W-4), restricted to the segment *)
+  wnw_seg G n x k0 kz →
   hemit (λ _, d0) k0 ws0 rowseg (PHart cpu m0 rs10 fn0 ib0) es pfin →
-  Forall Q rowseg →
+  (∀ i lb, rowseg !! i = Some lb → wQ G n x k0 kz (k0 + i)%nat lb) →
   cst_ok d0 St →
-  cpol_ctx G (wwit G n) x (cst_c St) →
+  wctx G n x kz k0 (cst_c St) →
   cst_pst St (cd_end (cst_c St)) !! x = Some (PHart cpu m0 rs20 fn0 ib0) →
-  dreg_agree (λ nn, nn ∉ T) rs10 rs20 →
+  dreg_agree (λ nn, nn ∉ []) rs10 rs20 →
   w_relp (ms_ws (cand_last_st (cst_c St)) x) = w_relp ws0 →
   ∃ (St' : cyc_state) (tradd : list estep),
     seg_step d0 (SegOut x rowseg (cd_end (cst_c St)) tradd) St St' ∧
-    cpol_ctx G (wwit G n) x (cst_c St') ∧
-    (* (O-E), DELIVERED — [cert_segment'] states all three *)
+    wctx G n x kz (k0 + length rowseg)%nat (cst_c St') ∧
     cd_img (cst_c St') = cd_img (cst_c St) ∧
     cst_pst St' 0%nat = cst_pst St 0%nat ∧
     cst_dv St' 0%nat = cst_dv St 0%nat.
 Proof.
-  intros Hwf Hrow Hub Hpol Hpolp Hem HQ Hok Hctx Hp Hag Hrelp.
-  have Hpres : ∀ (c0 : cand) (lb lb' : lbl),
-      cpol_ctx G (wwit G n) x c0 → srvwmo_consistent c0 → Q lb →
-      lbl_reidx lb lb' → mstep_ok (cand_last_st c0) x lb' →
-      wcls_at G (wwit G n) x c0 lb' →
-      cpol_ctx G (wwit G n) x (cand_snoc c0 (EStep x lb')).
-  { intros c0 lb lb' Hctx0 Hc0 HQ0 Hri Hok0 [Hcl Hix].
-    eapply cpol_ctx_snoc;
-      [exact Hwf|exact Hctx0|exact Hcl|exact Hix|exact (Hub c0 lb')
-      |exact (wnw_of_pfx G x n Hrow c0)]. }
-  destruct (seg_step_of_segment x cpu d0 T Q (cpol_ctx G (wwit G n) x)
-              (wcls_at G (wwit G n) x) Hpres Hpol Hpolp
+  intros Hcons Hpc Hub Hnw Hem HQ Hok Hctx Hp Hag Hrelp.
+  have Hwf : gwf G by destruct Hcons as (H & _).
+  destruct (seg_step_of_segment x cpu d0 [] (wQ G n x k0 kz)
+              (wctx G n x kz) (wcls_at G (wwit G n) x)
+              (wctx_pres G n x k0 kz Hwf Hub Hnw)
+              (wpol_of_sites G n x cpu d0 k0 kz Hcons Hpc)
+              (cpolp_of_rmwfree x cpu d0 [] (wctx G n x kz)
+                 (wcls_at G (wwit G n) x) (wQ G n x k0 kz)
+                 (λ k lb H, wQ_rmwfree G n x k0 kz k lb H))
               k0 ws0 rowseg es pfin m0 rs10 fn0 ib0 St rs20
               Hem HQ Hok Hctx Hp Hag Hrelp)
     as (St' & tradd & Hstep & Hctx' & Himg & Hpst0 & Hdv0).
@@ -849,6 +1066,8 @@ Print Assumptions wlk_step_of_seg.
 Print Assumptions wnw_of_pfx.
 Print Assumptions wcls_of_pfx.
 Print Assumptions src_in_log_of_pfx.
+Print Assumptions wpol_of_sites.
+Print Assumptions wctx_pres.
 Print Assumptions wlk_seg_of_cert.
 Print Assumptions walk_policy_steps.
 Print Assumptions walk_supply_of_policy.

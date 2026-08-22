@@ -476,17 +476,17 @@ Qed.
     what [WeakRvwmoCert3.cert_segment'] delivers, with the carried context
     [Ctx] (intended: [cpol_ctx G W x], §3.1) coming along. *)
 Theorem seg_step_of_segment (x : agent) (cpu : CPU) (d0 : dev_state)
-    (T : list wreg) (Q : lbl → Prop)
-    (Ctx : cand → Prop) (Cls : cand → lbl → Prop)
-    (Hpres : ∀ (c0 : cand) (lb lb' : lbl),
-        Ctx c0 → srvwmo_consistent c0 → Q lb → lbl_reidx lb lb' →
+    (T : list wreg) (Q : nat → lbl → Prop)
+    (Ctx : nat → cand → Prop) (Cls : cand → lbl → Prop)
+    (Hpres : ∀ (k : nat) (c0 : cand) (lb lb' : lbl),
+        Ctx k c0 → srvwmo_consistent c0 → Q k lb → lbl_reidx lb lb' →
         mstep_ok (cand_last_st c0) x lb' → Cls c0 lb' →
-        Ctx (cand_snoc c0 (EStep x lb')))
-    (Hpol' : ∀ (c0 : cand) (ws : wstate) (lb : lbl) (l : wlabel)
+        Ctx (S k) (cand_snoc c0 (EStep x lb')))
+    (Hpol' : ∀ (k : nat) (c0 : cand) (ws : wstate) (lb : lbl) (l : wlabel)
         (rds : list wreg) (wrs : list register)
         (m : M unit) (rs1 rs2 : regstate) (fn : ofence) (ib : oib32)
         (m' : M unit) (rs1' : regstate) (fn' : ofence) (ib' : oib32),
-        srvwmo_consistent c0 → Ctx c0 → Q lb →
+        srvwmo_consistent c0 → Ctx k c0 → Q k lb →
         w_relp (ms_ws (cand_last_st c0) x) = w_relp ws →
         dreg_agree (λ n, n ∉ T) rs1 rs2 →
         cblk cpu d0 ws lb l rds wrs m rs1 fn ib m' rs1' fn' ib' →
@@ -503,15 +503,15 @@ Theorem seg_step_of_segment (x : agent) (cpu : CPU) (d0 : dev_state)
     (pfin : pexv6) (m0 : M unit) (rs10 : regstate) (fn0 : ofence)
     (ib0 : oib32) (S : cyc_state) (rs20 : regstate) :
   hemit (λ _, d0) k0 ws0 rowseg (PHart cpu m0 rs10 fn0 ib0) es pfin →
-  Forall Q rowseg →
+  (∀ i lb, rowseg !! i = Some lb → Q (k0 + i)%nat lb) →
   cst_ok d0 S →
-  Ctx (cst_c S) →
+  Ctx k0 (cst_c S) →
   cst_pst S (cd_end (cst_c S)) !! x = Some (PHart cpu m0 rs20 fn0 ib0) →
   dreg_agree (λ n, n ∉ T) rs10 rs20 →
   w_relp (ms_ws (cand_last_st (cst_c S)) x) = w_relp ws0 →
   ∃ (S' : cyc_state) (tradd : list estep),
     seg_step d0 (SegOut x rowseg (cd_end (cst_c S)) tradd) S S' ∧
-    Ctx (cst_c S') ∧
+    Ctx (k0 + length rowseg)%nat (cst_c S') ∧
     (** (O-E), carried through from [cert_segment']'s own conclusion. *)
     cd_img (cst_c S') = cd_img (cst_c S) ∧
     cst_pst S' 0%nat = cst_pst S 0%nat ∧
@@ -733,18 +733,22 @@ Section nonvacuity4.
       = Some (EStep 0%nat (WeakAxiomatic.LStore false (pa_z ev_flag)
                              (wbytes 4 WeakLock.lock_one) WCplain)).
   Proof.
-    destruct (seg_step_of_segment 0%nat cpu d0 [] lb_store_ne
-                (λ _ : cand, True) (λ _ _, True)
-                (λ c0 lb lb' _ _ _ _ _ _, I)
-                (λ c0 ws lb l rds wrs m rs1 rs2 fn ib0 m' rs1' fn' ib'
+    destruct (seg_step_of_segment 0%nat cpu d0 [] (λ _ : nat, lb_store_ne)
+                (λ (_ : nat) (_ : cand), True) (λ _ _, True)
+                (λ k c0 lb lb' _ _ _ _ _ _, I)
+                (λ k c0 ws lb l rds wrs m rs1 rs2 fn ib0 m' rs1' fn' ib'
                    Hc _ Hlb H1 H2 H3,
                    pol_store' 0%nat cpu d0 c0 ws lb l rds wrs m rs1 rs2 fn ib0
                      m' rs1' fn' ib' Hc Hlb H1 H2 H3)
-                (cpolp_of_rmwfree 0%nat cpu d0 [] (λ _ : cand, True)
-                   (λ _ _, True) lb_store_ne lb_store_ne_rmwfree)
+                (cpolp_of_rmwfree 0%nat cpu d0 []
+                   (λ (_ : nat) (_ : cand), True) (λ _ _, True)
+                   (λ _ : nat, lb_store_ne)
+                   (λ _ lb Hlb, lb_store_ne_rmwfree lb Hlb))
                 0%nat ws_init ev_row _ _
                 ev_x2.2 rs None ib nv4_S0 rs
-                (nv_hemit cpu rs ib d0) nv_row_class
+                (nv_hemit cpu rs ib d0)
+                (λ i lb Hi, Forall_lookup_1 lb_store_ne ev_row i lb
+                              nv_row_class Hi)
                 nv4_S0_ok I eq_refl (dreg_agree_refl _ _)
                 ltac:(by rewrite (sm_ws img0)))
       as (Sf & tradd & Hstep & _).

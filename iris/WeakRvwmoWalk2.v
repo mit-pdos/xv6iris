@@ -25,7 +25,7 @@
         ([cert_block_pair] + [cert_rmw_ok]); [cpolp_of_rmwfree] is the
         RMW-free instance.
 
-    §4  THE OBSTRUCTION (item 4).  [WeakRvwmoWalk.wpol] quantifies over
+    §4  THE OBSTRUCTION (item 4).  [WeakRvwmoWalk.wpol_flat] quantifies over
         EVERY candidate the certification context admits, while the
         classification it must deliver is about G's label AT THAT
         CANDIDATE'S OWN POSITION.  The two cannot be reconciled: §4.1
@@ -107,6 +107,7 @@ Require Import WeakSrvwmoCapstone.
 Require Import WeakRvwmoCapstone.
 Require Import WeakRvwmoWalk.
 Require Import WeakRvwmoProgress.
+Require Import WeakRvwmoCycWit.
 
 Local Open Scope Z_scope.
 
@@ -228,123 +229,14 @@ Proof.
 Qed.
 
 (* ====================================================================== *)
-(** * 2. THE READ/REGISTER POLICY, POINTWISE
+(** * 2. THE READ/REGISTER POLICY — MOVED
 
-    [WeakRvwmoWalk.wpol] is asked at a CANDIDATE and a LABEL; everything it
-    must deliver about the label — [mstep_ok] and the classification
-    [wcls_at] — is about [G]'s label AT THE CANDIDATE'S OWN POSITION
-    [gcnt x (cd_tr c0)].  This section proves the policy at exactly the
-    pairs where the two agree ([wsite_ok] below), which is every pair the
-    certification iteration actually visits.  §4 is about the pairs it does
-    not.
-
-    The register half is free at an EMPTY taint set: [rds_ok (λ n, n ∉ [])]
-    holds of every read list, so [cert_block_mirror] re-runs the block from
-    the certified register file step for step and the emitted label does
-    not move at all — [lbl_reidx] is [lbl_reidx_refl] and no re-timing is
-    needed, because a log-decided non-witness read's sources ARE the
-    candidate's. *)
-
-(** THE SITE DATUM: [G]'s label at row position [p], the pointwise form of
-    the log-decided classification ("this read's sources are in the log",
-    "this write is the log's next entry"), and RMW-freedom (the fused pair
-    is §3's business). *)
-Definition wsite_ok (G : gexec) (n : nat) (x : agent) (p : nat) (lb : lbl)
-    : Prop :=
-  gx_lbl G (x, p) = Some lb ∧
-  wsrc_le G n (x, p) ∧
-  (lb_is_w lb = true → gwix G (x, p) = S n) ∧
-  lb_rmwfree lb.
-
-(** ** 2.1 The three [mstep_ok] routes, at an aligned candidate *)
-Theorem wsite_mstep_ok (G : gexec) (n : nat) (x : agent) (c0 : cand)
-    (lb : lbl) :
-  rvwmo_minus_consistent G →
-  W_poloc_closed G (wwit G n) →
-  cd_img c0 = gx_img G →
-  wlog_pfx G n (cd_log_end c0) →
-  cpol_ctx G (wwit G n) x c0 →
-  wsite_ok G n x (gcnt x (cd_tr c0)) lb →
-  mstep_ok (cand_last_st c0) x lb.
-Proof.
-  intros Hcons Hpc Himg Hpfx Hctx (Hl & Hle & _ & Hrmw).
-  pose proof Hcons as (Hwf & _ & Hlv & _).
-  destruct lb as [aq base ts vs|rl base vs kc|pr pw sr sw|aq rl base ts rvs wvs kc].
-  - (* THE IN-LOG READ: [cpol_read], with NO floor obligation *)
-    apply (cpol_read G (wwit G n) x c0 aq base ts vs Hcons Hpc Hctx Hl).
-    apply (src_in_log_of_pfx G n c0 (x, gcnt x (cd_tr c0)) aq base ts vs
-             Hlv Himg Hpfx Hl (gshape G Hwf _ _ Hl) Hle).
-  - (* THE STORE *)
-    apply cert_write_ok. exact (gshape G Hwf _ _ Hl).
-  - (* THE FENCE *)
-    apply cert_fence_ok.
-  - (* THE FUSED RMW is §3's *)
-    by destruct Hrmw.
-Qed.
-
-(** ** 2.2 The policy, at an aligned candidate *)
-Theorem wblk_pol_at (G : gexec) (n : nat) (x : agent) (cpu : CPU)
-    (d0 : dev_state) (c0 : cand) (ws : wstate) (lb : lbl) (l : wlabel)
-    (rds : list wreg) (wrs : list register) (m : M unit) (rs1 rs2 : regstate)
-    (fn : ofence) (ib : oib32) (m' : M unit) (rs1' : regstate)
-    (fn' : ofence) (ib' : oib32) :
-  rvwmo_minus_consistent G →
-  W_poloc_closed G (wwit G n) →
-  cd_img c0 = gx_img G →
-  wlog_pfx G n (cd_log_end c0) →
-  cpol_ctx G (wwit G n) x c0 →
-  wsite_ok G n x (gcnt x (cd_tr c0)) lb →
-  dreg_agree (λ nn, nn ∉ []) rs1 rs2 →
-  cblk cpu d0 ws lb l rds wrs m rs1 fn ib m' rs1' fn' ib' →
-  ∃ (lb' : lbl) (l' : wlabel) (rds' : list wreg) (wrs' : list register)
-    (rs2' : regstate),
-    cblk cpu d0 ws lb' l' rds' wrs' m rs2 fn ib m' rs2' fn' ib' ∧
-    mstep_ok (cand_last_st c0) x lb' ∧
-    lbl_reidx lb lb' ∧
-    wcls_at G (wwit G n) x c0 lb' ∧
-    dreg_agree (λ nn, nn ∉ []) rs1' rs2'.
-Proof.
-  intros Hcons Hpc Himg Hpfx Hctx Hsite Hag Hblk.
-  destruct (cert_block_mirror (λ nn, nn ∉ []) cpu d0 ws lb l rds wrs
-              m rs1 fn ib m' rs1' fn' ib' rs2 Hblk
-              (λ nn _, not_elem_of_nil nn) Hag) as (rs2' & Hblk2 & Hag2).
-  exists lb, l, rds, wrs, rs2'.
-  destruct Hctx as (ev & Hgt & Hub & HnW).
-  destruct Hsite as (Hl & Hle & Hix & Hrmw).
-  split_and!.
-  - exact Hblk2.
-  - apply (wsite_mstep_ok G n x c0 lb Hcons Hpc Himg Hpfx);
-      [by exists ev|by split_and!].
-  - apply lbl_reidx_refl.
-  - by apply (wcls_of_pfx G n x c0 lb).
-  - exact Hag2.
-Qed.
-
-(** ** 2.3 [wpol], from the ALIGNMENT
-
-    The alignment is what [WeakRvwmoWalk.wpol] does not say and cannot say:
-    that the candidate it is asked at and the label it is asked about name
-    the SAME row position.  §4 shows the gap is not a formality. *)
-Definition walign (G : gexec) (n : nat) (x : agent) (Q : lbl → Prop)
-    : Prop :=
-  ∀ (c0 : cand) (lb : lbl),
-    srvwmo_consistent c0 → cpol_ctx G (wwit G n) x c0 → Q lb →
-    cd_img c0 = gx_img G ∧ wlog_pfx G n (cd_log_end c0) ∧
-    wsite_ok G n x (gcnt x (cd_tr c0)) lb.
-
-Theorem wpol_of_align (G : gexec) (n : nat) (x : agent) (cpu : CPU)
-    (d0 : dev_state) (Q : lbl → Prop) :
-  rvwmo_minus_consistent G →
-  W_poloc_closed G (wwit G n) →
-  walign G n x Q →
-  wpol G (wwit G n) x cpu d0 [] Q.
-Proof.
-  intros Hcons Hpc Hal c0 ws lb l rds wrs m rs1 rs2 fn ib m' rs1' fn' ib'
-    Hc Hctx HQ _ Hag Hblk.
-  destruct (Hal c0 lb Hc Hctx HQ) as (Himg & Hpfx & Hsite).
-  exact (wblk_pol_at G n x cpu d0 c0 ws lb l rds wrs m rs1 rs2 fn ib m'
-           rs1' fn' ib' Hcons Hpc Himg Hpfx Hctx Hsite Hag Hblk).
-Qed.
+    What was §2 here ([wsite_ok], [wsite_mstep_ok], [wblk_pol_at]) is now
+    [WeakRvwmoWalk] §4.0c, where it DISCHARGES the repaired policy
+    ([WeakRvwmoWalk.wpol_of_sites]) rather than only meeting it half way:
+    once the policy is indexed by row position, the alignment §2 had to
+    assume ([walign]) is part of the carried context [WeakRvwmoWalk.wctx],
+    and the site data are read off [G] at the block's own position. *)
 
 (* ====================================================================== *)
 (** * 3. THE FUSED RMW's POLICY, POINTWISE
@@ -455,9 +347,10 @@ Theorem cpolp_of_align (G : gexec) (n : nat) (x : agent) (cpu : CPU)
     (d0 : dev_state) (Q : lbl → Prop) :
   rvwmo_minus_consistent G →
   wralign G n x Q →
-  cpolp x cpu d0 [] (cpol_ctx G (wwit G n) x) (wcls_at G (wwit G n) x) Q.
+  cpolp x cpu d0 [] (λ _ : nat, cpol_ctx G (wwit G n) x)
+    (wcls_at G (wwit G n) x) (λ _ : nat, Q).
 Proof.
-  intros Hcons Hal c0 ws lb l1 l2 rds wrs m rs1 rs2 fn ib m' rs1' fn' ib'
+  intros Hcons Hal k c0 ws lb l1 l2 rds wrs m rs1 rs2 fn ib m' rs1' fn' ib'
     Hc Hctx HQ _ Hag Hblk.
   have Hrmw : ¬ lb_rmwfree lb
     := cblkp_rmw cpu d0 ws lb l1 l2 rds wrs m rs1 fn ib m' rs1' fn' ib' Hblk.
@@ -552,7 +445,7 @@ Theorem wpol_pins_store (G : gexec) (n : nat) (x : agent) (cpu : CPU)
     (l : wlabel) (rds : list wreg) (wrs : list register) (m : M unit)
     (rs1 rs2 : regstate) (fn : ofence) (ib : oib32) (m' : M unit)
     (rs1' : regstate) (fn' : ofence) (ib' : oib32) :
-  wpol G (wwit G n) x cpu d0 T Q →
+  wpol_flat G (wwit G n) x cpu d0 T Q →
   srvwmo_consistent c0 →
   cpol_ctx G (wwit G n) x c0 →
   Q (WeakAxiomatic.LStore rl base vs kc) →
@@ -591,7 +484,7 @@ Corollary wpol_exit_at_zero (G : gexec) (n : nat) (x : agent) (cpu : CPU)
     (l : wlabel) (rds : list wreg) (wrs : list register) (m : M unit)
     (rs1 rs2 : regstate) (fn : ofence) (ib : oib32) (m' : M unit)
     (rs1' : regstate) (fn' : ofence) (ib' : oib32) :
-  wpol G (wwit G n) x cpu d0 T Q →
+  wpol_flat G (wwit G n) x cpu d0 T Q →
   ¬ wwit G n (x, 0%nat) →
   Q (WeakAxiomatic.LStore rl base vs kc) →
   w_relp (ms_ws (cand_last_st (Cand (gx_img G) [])) x) = w_relp ws →
@@ -615,7 +508,7 @@ Qed.
     reflexivity there — [dreg_agree_refl]), so §4.1 applies verbatim. *)
 Theorem walk_seg_data_pins (boot : agent → pexv6) (d0 : dev_state) (N : nat)
     (G : gexec) :
-  walk_seg_data boot d0 N G →
+  walk_seg_data_flat boot d0 N G →
   ∀ (St : cyc_state) (n : nat),
     wlk_inv boot d0 N G St n → (n < length (gwrites G))%nat →
   ∃ (x : agent) (rl : bool) (base : Z) (vs : list (bv 8)) (kc : wm_class)
@@ -667,7 +560,7 @@ Qed.
     [walk_seg_data]. *)
 Corollary walk_seg_data_exit_at_zero (boot : agent → pexv6)
     (d0 : dev_state) (N : nat) (G : gexec) :
-  walk_seg_data boot d0 N G →
+  walk_seg_data_flat boot d0 N G →
   ∀ (St : cyc_state) (n : nat),
     wlk_inv boot d0 N G St n → (n < length (gwrites G))%nat →
   ∃ (x : agent) (rl : bool) (base : Z) (vs : list (bv 8)) (kc : wm_class)
@@ -689,51 +582,20 @@ Proof.
            (cpol_ctx_empty G (wwit G n) x HnW) Hrelp0).
 Qed.
 
-(** ** 4.4 THE REPAIR, stated: the POSITION-INDEXED policy
+(** ** 4.4 THE REPAIR, LANDED — where it now lives
 
-    The disease is one and the same in all three places the residue
-    over-quantifies — [wpol]/[WeakRvwmoCert3.cert_segment']'s [Hpol'] over
-    ALL context candidates, [WeakRvwmoWalk.wrow_in_log]/[wnw] over ALL row
-    positions, and [walk_seg_data] over ALL [wlk_inv] states — and the cure
-    is the same: index the policy by the ROW POSITION the iteration has
-    reached, and let the invariant pin the candidate's own position to it.
-    [wpol_ix] is that shape, and §2 discharges it outright. *)
-Definition wpol_ix (G : gexec) (n : nat) (x : agent) (cpu : CPU)
-    (d0 : dev_state) (row : list lbl) (k0 : nat) : Prop :=
-  ∀ (i : nat) (lb : lbl) (c0 : cand) (ws : wstate) (l : wlabel)
-    (rds : list wreg) (wrs : list register) (m : M unit)
-    (rs1 rs2 : regstate) (fn : ofence) (ib : oib32) (m' : M unit)
-    (rs1' : regstate) (fn' : ofence) (ib' : oib32),
-    row !! i = Some lb →
-    gcnt x (cd_tr c0) = (k0 + i)%nat →
-    cd_img c0 = gx_img G →
-    wlog_pfx G n (cd_log_end c0) →
-    srvwmo_consistent c0 →
-    cpol_ctx G (wwit G n) x c0 →
-    dreg_agree (λ nn, nn ∉ []) rs1 rs2 →
-    cblk cpu d0 ws lb l rds wrs m rs1 fn ib m' rs1' fn' ib' →
-    ∃ (lb' : lbl) (l' : wlabel) (rds' : list wreg) (wrs' : list register)
-      (rs2' : regstate),
-      cblk cpu d0 ws lb' l' rds' wrs' m rs2 fn ib m' rs2' fn' ib' ∧
-      mstep_ok (cand_last_st c0) x lb' ∧
-      lbl_reidx lb lb' ∧
-      wcls_at G (wwit G n) x c0 lb' ∧
-      dreg_agree (λ nn, nn ∉ []) rs1' rs2'.
-
-Theorem wpol_ix_of_sites (G : gexec) (n : nat) (x : agent) (cpu : CPU)
-    (d0 : dev_state) (row : list lbl) (k0 : nat) :
-  rvwmo_minus_consistent G →
-  W_poloc_closed G (wwit G n) →
-  (∀ (i : nat) (lb : lbl), row !! i = Some lb →
-     wsite_ok G n x (k0 + i)%nat lb) →
-  wpol_ix G n x cpu d0 row k0.
-Proof.
-  intros Hcons Hpc Hsite i lb c0 ws l rds wrs m rs1 rs2 fn ib m' rs1' fn' ib'
-    Hi Hpos Himg Hpfx Hc Hctx Hag Hblk.
-  apply (wblk_pol_at G n x cpu d0 c0 ws lb l rds wrs m rs1 rs2 fn ib m'
-           rs1' fn' ib' Hcons Hpc Himg Hpfx Hctx);
-    [rewrite Hpos; by apply Hsite|exact Hag|exact Hblk].
-Qed.
+    The disease was one and the same in all three places the residue
+    over-quantified — [wpol_flat]/[WeakRvwmoCert3.cert_segment']'s [Hpol']
+    over ALL context candidates, [WeakRvwmoWalk.wrow_in_log]/[wnw] over ALL
+    row positions, and [walk_seg_data_flat] over ALL [wlk_inv] states — and
+    the cure is the same: index the policy by the ROW POSITION the iteration
+    has reached, and let the carried context pin the candidate's own
+    position to it.  That shape is now [WeakRvwmoWalk.wpol] (with its
+    context [wctx] and its per-position segment predicate [wQ]), and §2's
+    argument DISCHARGES it outright: [WeakRvwmoWalk.wpol_of_sites].
+    [WeakRvwmoCert3.cert_segment'], [WeakRvwmoCert4.seg_step_of_segment] and
+    [WeakRvwmoWalk.wlk_seg_of_cert] all take the indexed form; §5 below
+    supplies the repaired residue's EMISSION from the conformance bundle. *)
 
 (** … and the site hypothesis is READ OFF the graph at the walk's own
     segment: the emission's row IS [G]'s row ([qrow_lbl]), so row position
@@ -747,14 +609,315 @@ Proof.
 Qed.
 
 (* ====================================================================== *)
-(** * 5. AUDIT *)
+(** * 5. THE REPAIRED RESIDUE, AND WHAT THE CONFORMANCE BUNDLE SUPPLIES
+
+    [WeakRvwmoProgress.walk_seg_data'] is the repaired residue: at every
+    walk state, an EMISSION of hart [x]'s stretch through [G]'s [(n+1)]-st
+    write, the SITE DATA [WeakRvwmoWalk.wQ] for that stretch, and the walk
+    state's own ALIGNMENT [WeakRvwmoWalk.wctx].  §1 delivers the emission
+    from [gdexec_qconf] alone.  What it does NOT deliver, and what is named
+    here rather than hidden, is [wseg_supply]: which write the step is at,
+    the graph-side site facts over the covered positions, the witness set's
+    two side conditions, and the identification of the walk state's process
+    with the emission's own ([wseg_align]). *)
+
+(** ** 5.1 The emission of the stretch, with its PREFIX FIXED
+
+    [qconf_seg_data] hands the prefix back existentially; the site data have
+    to index into it, so this variant keeps it as the [take]/[drop] it is. *)
+Theorem qconf_seg_take (boot : agent → pexv6) (d0 : dev_state) (im : image)
+    (nh : nat) (GD : gdexec) (x : agent) (k0 kz : nat) (lb : lbl) :
+  gdexec_qconf boot d0 im nh GD →
+  (k0 ≤ kz)%nat →
+  gx_lbl (gd_g GD) (x, kz) = Some lb →
+  ∃ (p1 p2 : pexv6) (es : list eitem),
+    hemit (λ _, d0) k0 (row_ws (qrow (gd_g GD) x) k0)
+      (take (kz - k0) (drop k0 (qrow (gd_g GD) x)) ++ [lb]) p1 es p2.
+Proof.
+  intros Hq Hle Hkz.
+  have Hkzr : qrow (gd_g GD) x !! kz = Some lb by rewrite -qrow_lbl.
+  have Hk : (k0 ≤ length (qrow (gd_g GD) x))%nat.
+  { pose proof (lookup_lt_Some _ _ _ Hkzr). lia. }
+  destruct (qconf_hemit_seg boot d0 im nh GD x k0 (S kz - k0) Hq Hk)
+    as (p1 & p2 & es & Hem).
+  rewrite (seg_split_exit (qrow (gd_g GD) x) k0 kz lb Hle Hkzr) in Hem.
+  by exists p1, p2, es.
+Qed.
+
+(** ** 5.2 The per-state datum the bundle does NOT supply *)
+
+(** The walk state's process for [x] IS the emission's own starting
+    process, and its release-pending bit is the row fold's. *)
+Definition wseg_align (d0 : dev_state) (G : gexec) (St : cyc_state)
+    (x : agent) (k0 : nat) (stretch : list lbl) : Prop :=
+  ∀ (p1 : pexv6) (es : list eitem) (p2 : pexv6),
+    hemit (λ _, d0) k0 (row_ws (qrow G x) k0) stretch p1 es p2 →
+    ∃ (cpu : CPU) (m0 : M unit) (rs10 rs20 : regstate) (fn0 : ofence)
+      (ib0 : oib32),
+      p1 = PHart cpu m0 rs10 fn0 ib0 ∧
+      cst_pst St (cd_end (cst_c St)) !! x = Some (PHart cpu m0 rs20 fn0 ib0) ∧
+      dreg_agree (λ nn, nn ∉ []) rs10 rs20 ∧
+      w_relp (ms_ws (cand_last_st (cst_c St)) x)
+        = w_relp (row_ws (qrow G x) k0).
+
+Definition wseg_supply (boot : agent → pexv6) (d0 : dev_state) (N : nat)
+    (GD : gdexec) : Prop :=
+  ∀ St n, wlk_inv boot d0 N (gd_g GD) St n →
+    (n < length (gwrites (gd_g GD)))%nat →
+  ∃ (x : agent) (k0 kz : nat),
+    (* WHICH WRITE: [G]'s [(n+1)]-st, and where the hart stands now *)
+    gwrite_at (gd_g GD) (S n) = Some (x, kz) ∧
+    (k0 ≤ kz)%nat ∧
+    gcnt x (cd_tr (cst_c St)) = k0 ∧
+    (* THE SITE FACTS over the covered positions *)
+    (∀ k, (k0 ≤ k)%nat → (k ≤ kz)%nat → wsrc_le (gd_g GD) n (x, k)) ∧
+    (∀ k lb, (k0 ≤ k)%nat → (k < kz)%nat →
+       gx_lbl (gd_g GD) (x, k) = Some lb → lb_is_w lb = false) ∧
+    (∀ k lb, (k0 ≤ k)%nat → (k ≤ kz)%nat →
+       gx_lbl (gd_g GD) (x, k) = Some lb → lb_rmwfree lb) ∧
+    (* THE WITNESS SET's side conditions *)
+    cpol_ctx (gd_g GD) (wwit (gd_g GD) n) x (cst_c St) ∧
+    W_poloc_closed (gd_g GD) (wwit (gd_g GD) n) ∧
+    wub (gd_g GD) (wwit (gd_g GD) n) x ∧
+    wnw_seg (gd_g GD) n x k0 kz ∧
+    (* THE STATE IDENTIFICATION *)
+    wseg_align d0 (gd_g GD) St x k0
+      (take (kz - k0) (drop k0 (qrow (gd_g GD) x)) ++
+       [default (WeakAxiomatic.LFence false false false false)
+          (gx_lbl (gd_g GD) (x, kz))]).
+
+(** ** 5.3 … and then the residue IS supplied *)
+Theorem walk_seg_data_of_qconf (boot : agent → pexv6) (d0 : dev_state)
+    (im : image) (nh N : nat) (GD : gdexec) :
+  rvwmo_minus_deps_consistent GD →
+  gdexec_qconf boot d0 im nh GD →
+  wseg_supply boot d0 N GD →
+  walk_seg_data' boot d0 N (gd_g GD).
+Proof.
+  intros Hcons Hq Hsup St n Hinv Hn.
+  set G := gd_g GD.
+  have Hwf : gwf G by destruct Hcons as ((H & _ & _) & _ & _).
+  have Hnd : NoDup (gx_gmo G) by destruct Hwf as (H & _ & _).
+  destruct (Hsup St n Hinv Hn)
+    as (x & k0 & kz & Hat & Hle & Hgc & Hsrc & Hnwr & Hrmw & Hctx & Hpc &
+        Hub & Hnw & Hal).
+  destruct (gwrite_at_inv G (S n) (x, kz) Hnd Hat) as (Hmem & Hwix).
+  (* the exit write's label *)
+  have Hisw : gis_w G (x, kz) = true by apply gwrites_elem_of in Hmem as [_ H].
+  destruct (gx_lbl G (x, kz)) as [lb|] eqn:Hlb; [|by rewrite /gis_w Hlb in Hisw].
+  have Hlbw : lb_is_w lb = true by rewrite /gis_w Hlb in Hisw.
+  have Hlbr : lb_rmwfree lb := Hrmw kz lb Hle (Nat.le_refl _) Hlb.
+  destruct lb as [aq0 b0 ts0 vs0|rl base vs kc|pr pw sr sw
+                 |aq0 rl0 b0 ts0 rv0 wv0 kc0]; try by simpl in Hlbw.
+  set pre := take (kz - k0) (drop k0 (qrow G x)).
+  destruct (qconf_seg_take boot d0 im nh GD x k0 kz
+              (WeakAxiomatic.LStore rl base vs kc) Hq Hle Hlb)
+    as (p1 & p2 & es & Hem).
+  have Hemp : hemit (λ _, d0) k0 (row_ws (qrow G x) k0)
+                (pre ++ [WeakAxiomatic.LStore rl base vs kc]) p1 es p2
+    := Hem.
+  destruct (Hal p1 es p2 ltac:(rewrite Hlb /=; exact Hemp))
+    as (cpu & m0 & rs10 & rs20 & fn0 & ib0 & -> & Hp & Hag & Hrelp).
+  (* the prefix's length pins [kz] *)
+  have Hkzr : qrow G x !! kz = Some (WeakAxiomatic.LStore rl base vs kc)
+    by rewrite -qrow_lbl.
+  have Hlenpre : length pre = (kz - k0)%nat.
+  { rewrite /pre length_take length_drop.
+    pose proof (lookup_lt_Some _ _ _ Hkzr). lia. }
+  have Hkz : (k0 + length pre)%nat = kz by lia.
+  exists x, cpu, k0, (row_ws (qrow G x) k0), pre, rl, base, vs, kc, es, p2,
+         m0, rs10, rs20, fn0, ib0, (x, kz).
+  split_and!.
+  - exact Hat.
+  - by rewrite /gmsg Hlb.
+  - apply Forall_lookup_2. intros i lb0 Hi.
+    apply lookup_take_Some in Hi as [Hi Hlt].
+    rewrite lookup_drop in Hi.
+    apply (Hnwr (k0 + i)%nat lb0 ltac:(lia) ltac:(lia)).
+    by rewrite qrow_lbl.
+  - exact Hemp.
+  - intros i lb0 Hi.
+    destruct (decide (i < length pre)%nat) as [Hlt|Hlt].
+    + rewrite lookup_app_l // in Hi.
+      have Hl0 : gx_lbl G (x, (k0 + i)%nat) = Some lb0
+        by apply (qrow_seg_lookup G x k0 (kz - k0)%nat i).
+      have Hnw0 : lb_is_w lb0 = false
+        := Hnwr (k0 + i)%nat lb0 ltac:(lia) ltac:(lia) Hl0.
+      split_and!; [lia|lia| |].
+      * split_and!; [exact Hl0|by apply Hsrc; lia
+                    |by rewrite Hnw0|by apply (Hrmw (k0+i)%nat); [lia|lia|]].
+      * split; [by rewrite Hnw0|lia].
+    + rewrite lookup_app_r in Hi; [|lia].
+      have Hi0 : (i - length pre)%nat = 0%nat.
+      { pose proof (lookup_lt_Some _ _ _ Hi) as Hb. simpl in Hb. lia. }
+      have Hik : (k0 + i)%nat = kz by lia.
+      rewrite Hi0 /= in Hi. injection Hi as <-.
+      rewrite Hik. split_and!; [lia|lia| |].
+      * split_and!; [exact Hlb|by apply Hsrc; lia|by intros _|exact I].
+      * split; [done|by intros _].
+  - split_and!; [exact Hctx|exact Hgc|].
+    rewrite /wlogn (bool_decide_eq_true_2 (k0 ≤ k0 + length pre)%nat); [|lia].
+    by destruct Hinv as (_ & _ & _ & _ & H).
+  - exact Hp.
+  - exact Hag.
+  - exact Hrelp.
+  - exact Hpc.
+  - exact Hub.
+  - by rewrite Hkz.
+Qed.
+
+(** ** 5.4 THE WALK, AND THE CAPSTONE AT (R-1) PLUS [wseg_supply] *)
+Theorem walk_supply_of_qconf (boot : agent → pexv6) (d0 : dev_state)
+    (im : image) (nh N : nat) :
+  (∀ GD : gdexec,
+     rvwmo_minus_deps_consistent GD → gdexec_qconf boot d0 im nh GD →
+     wseg_supply boot d0 N GD) →
+  walk_supply boot d0 im nh N.
+Proof.
+  intros Hsup. apply walk_supply_of_wp'. intros GD Hcons Hq.
+  by apply (walk_seg_data_of_qconf boot d0 im nh N GD Hcons Hq), Hsup.
+Qed.
+
+Theorem xv6_rvwmo_safe_modulo_l2 (Σ : gFunctors)
+    `{!riscvGpreS Σ, !weakGpreS Σ}
+    (gen : nat) (σ0 : wgstate) (D : CPU → gset register)
+    (Nm : Z → Z → namespace) (P : Z → Z → Prop) :
+  fresh_era gen σ0 →
+  wp_package Σ gen σ0 D →
+  (∀ a base, P a base → wp_package_prot Σ gen σ0 D (Nm a base) a base) →
+  (* (R-1) *)
+  l2_claim (xboot σ0) (wgdev σ0) (img_z (wgimg σ0)) (xN σ0) P
+           (bad_run gen σ0) →
+  (* (R-2), reduced to the per-state SITE/STATE datum *)
+  (∀ GD : gdexec,
+     rvwmo_minus_deps_consistent GD →
+     gdexec_qconf (xboot σ0) (wgdev σ0) (img_z (wgimg σ0)) (xN σ0) GD →
+     wseg_supply (xboot σ0) (wgdev σ0) (xN σ0) GD) →
+  ∀ GD : gdexec,
+    rvwmo_minus_deps_consistent GD →
+    gdexec_qconf (xboot σ0) (wgdev σ0) (img_z (wgimg σ0)) (xN σ0) GD →
+  (∀ x, ¬ tc (RacyD GD) x x) ∧
+  (∃ (c : cand) (pst : nat → list pexv6) P' σ',
+     srvwmo_consistent c ∧
+     cd_img c = img_z (wgimg σ0) ∧
+     pst 0%nat = eps_init σ0 ∧
+     exec_prog_ok' pstep_ev pcls_ev pst (λ _, wgdev σ0) (cand_exec c) ∧
+     rtc epf_run (ep_init gen, σ0) (P', σ') ∧
+     wglog σ' = cd_log c (length (cd_tr c)) ∧
+     pa_st <$> pc_ags (ecfg_of P' σ') = pst (length (cd_tr c))) ∧
+  (∀ ρ, rtc epf_run (ep_init gen, σ0) ρ →
+     ~ violation_hart cls_of pub_of n_disk (ecfg_of ρ.1 ρ.2)) ∧
+  (∀ t2 σ2 e2,
+     rtc (@erased_step weak_ev_lang) (epower_fork gen, σ0) (t2, σ2) →
+     e2 ∈ t2 →
+     reducible (Λ := weak_ev_lang) e2 σ2).
+Proof.
+  intros Hfr Hwp Hwpp Hl2 Hsup.
+  apply (xv6_rvwmo_safe_modulo Σ gen σ0 D Nm P Hfr Hwp Hwpp Hl2).
+  by apply walk_supply_of_qconf.
+Qed.
+
+(* ====================================================================== *)
+(** * 6. NON-VACUITY, AND WHAT [cyg] SHOWS THE REPAIR DOES *NOT* REACH
+
+    [WeakRvwmoCycWit.cyg] is the tree's two-hart LB graph with a real
+    [RacyD] cycle, consistent and [gdexec_qconf]-conformant, on which
+    [WeakRvwmoWalk]'s ENGINE runs end to end ([cyg_walk], built by hand out
+    of [wlk_step_of_seg]).  This section runs the REPAIRED residue at it.
+
+    §6.1 THE POSITIVE HALF.  The repaired site predicate [WeakRvwmoWalk.wQ]
+    — the thing the old, over-quantified policy could not state — HOLDS at
+    [cyg]'s second segment, with the exit store at ROW POSITION 1.  That is
+    exactly the configuration [WeakRvwmoWalk2.wpol_exit_at_zero] refuted
+    under the old shape, so the repair is not vacuous where it was.
+
+    §6.2 THE NEGATIVE HALF, AND IT IS A FINDING.  The residue is still
+    UNSATISFIABLE at [cyg]'s FIRST segment, and NOT because of the
+    positional indexing: hart 0's load draws on hart 1's store, which the
+    log has not reached at [n = 0], so that read is a WITNESS
+    ([cyg_wit00]) — and [WeakRvwmoCert3.cpol_ctx], the context the whole
+    certification route carries, asserts [¬ W] AT THE CANDIDATE'S OWN
+    POSITION.  So no candidate standing at a witness carries the context,
+    the substituted branch of [WeakRvwmoGlue2.cstep_cls] is UNREACHABLE
+    through [cert_segment'], and [walk_seg_data'] is false at [cyg]'s first
+    walk state ([cyg_walk_seg_data_false]).  This obstruction PRE-DATES the
+    repair — the old [walk_seg_data_flat] is false at [cyg] for the same
+    reason, on top of being refutable — and it is the next thing to fix:
+    [cpol_ctx]'s [¬ W (x, gcnt x (cd_tr c))] clause has to move OUT of the
+    carried context and INTO the policy's non-witness case, so that a
+    witness position is served by the latest-read route instead. *)
+
+(** ** 6.1 The repaired site data, at [cyg]'s second segment *)
+Lemma cyg_wQ_seg1 (i : nat) (lb : lbl) :
+  cy_row cy_B cy_A cy_ts1 !! i = Some lb →
+  wQ cyg 1%nat 1%nat 0%nat 1%nat (0 + i)%nat lb.
+Proof.
+  destruct i as [|[|i]]; [| |by rewrite /cy_row /=]; intros [= <-].
+  - (* the TRUE read: its source is write 1, which the log holds *)
+    split_and!; [lia|lia| |split; [done|done]].
+    split_and!.
+    + reflexivity.
+    + intros aq base ts vs [= <- <- <- <-] j t Hj.
+      destruct j as [|[|[|[|j]]]]; try (by rewrite /cy_ts1 /= in Hj);
+        injection Hj as <-; lia.
+    + by intros H.
+    + exact I.
+  - (* THE EXIT STORE, AT ROW POSITION 1 — not 0 *)
+    split_and!; [lia|lia| |split; [done|done]].
+    split_and!.
+    + reflexivity.
+    + by intros aq base ts vs H.
+    + intros _. exact cyg_wix2.
+    + exact I.
+Qed.
+
+(** … and the segment-restricted (W-4) at it. *)
+Lemma cyg_wnw_seg1 : wnw_seg cyg 1%nat 1%nat 0%nat 1%nat.
+Proof.
+  intros k _ Hk (aq & base & ts & vs & Hl & _).
+  destruct (cyg_lbl _ _ Hl) as [[He Hl2]|[[He Hl2]|[[He Hl2]|[He Hl2]]]];
+    by simplify_eq.
+Qed.
+
+(** ** 6.2 The obstruction, machine-checked *)
+
+(** Hart 0's load IS a witness at log length 0. *)
+Lemma cyg_wit00 : wwit cyg 0%nat (0%nat, 0%nat).
+Proof.
+  exists false, zA, cy_ts2, cy_bytes. split; [reflexivity|].
+  exists 0%nat, 2%nat. split; [reflexivity|lia].
+Qed.
+
+(** … so the EMPTY candidate — the walk's start — does not carry the
+    certification context for hart 0. *)
+Lemma cyg_no_ctx0 : ¬ cpol_ctx cyg (wwit cyg 0%nat) 0%nat cw_c0.
+Proof. intros (ev & _ & _ & HnW). exact (HnW cyg_wit00). Qed.
+
+(** THE FINDING: the repaired residue is FALSE at [cyg]'s first walk
+    state. *)
+Theorem cyg_walk_seg_data_false (cpu0 cpu1 : CPU) (rs0 rs1 : regstate)
+    (d0 : dev_state) :
+  ¬ walk_seg_data' (cy_boot cpu0 cpu1 rs0 rs1) d0 2%nat cyg.
+Proof.
+  intros Hdata.
+  have Hn : (0 < length (gwrites cyg))%nat by rewrite cyg_gwrites /=; lia.
+  destruct (Hdata (cw_S0 cpu0 cpu1 rs0 rs1 d0) 0%nat
+              (cw_inv0 cpu0 cpu1 rs0 rs1 d0) Hn)
+    as (x & cpu & k0 & ws0 & pre & rl & base & vs & kc & es & pfin &
+        m0 & rs10 & rs20 & fn0 & ib0 & w &
+        Hw & Hm & Hpre & Hem & HQ & (Hctx & Hgc & Hpf) & Hp & Hag & Hrelp &
+        Hpc & Hub & Hnw).
+  rewrite cyg_at1 in Hw. injection Hw as <-.
+  rewrite cw_gmsg1 in Hm. simplify_eq.
+  apply cyg_no_ctx0. exact Hctx.
+Qed.
+
+(* ====================================================================== *)
+(** * 7. AUDIT *)
 
 Print Assumptions qconf_hemit.
 Print Assumptions qconf_hemit_seg.
 Print Assumptions qconf_seg_data.
-Print Assumptions wsite_mstep_ok.
-Print Assumptions wblk_pol_at.
-Print Assumptions wpol_of_align.
 Print Assumptions src_in_log_of_pfx'.
 Print Assumptions wcpolp_at.
 Print Assumptions cpolp_of_align.
@@ -764,49 +927,53 @@ Print Assumptions wpol_pins_store.
 Print Assumptions wpol_exit_at_zero.
 Print Assumptions walk_seg_data_pins.
 Print Assumptions walk_seg_data_exit_at_zero.
-Print Assumptions wpol_ix_of_sites.
+Print Assumptions qconf_seg_take.
+Print Assumptions cyg_wQ_seg1.
+Print Assumptions cyg_wnw_seg1.
+Print Assumptions cyg_walk_seg_data_false.
+Print Assumptions walk_seg_data_of_qconf.
+Print Assumptions walk_supply_of_qconf.
+Print Assumptions xv6_rvwmo_safe_modulo_l2.
 
 (* ====================================================================== *)
-(** * 6. THE LEDGER AFTER THIS LEAF
+(** * 8. THE LEDGER AFTER THIS LEAF
 
-    DELIVERED, and reusable unchanged by a repaired interface:
+    DELIVERED here:
 
       - §1 the EMISSION per walk state, from [gdexec_qconf] alone
-        ([qconf_seg_data]: the row's [hart_conf] derivation, split at [k0]
-        and after the exit write by [hemit_app], in the residue's own
-        [pre ++ [store]] shape).  No progress argument is needed for it:
-        the bundle already asserts the whole row is emitted, and
-        [WeakRvwmoProgress] §1–§3 are what would be needed only to BUILD
-        such a bundle, not to split one.
-      - §2 the READ/REGISTER POLICY at an aligned candidate
-        ([wblk_pol_at]): [cert_read_in_log'] through [cpol_read] (floor
-        free, from [cpol_ctx]) at every read whose sources the log has
-        reached, [cert_write_ok] at the exit store, [cert_fence_ok] at a
-        fence, [wcls_of_pfx] for the classification, and
-        [cert_block_mirror] for the register half at an EMPTY taint set.
-      - §3 the RMW policy in the same shape ([wcpolp_at], [cpolp_of_align]),
-        with [src_in_log_of_pfx'] generalising the log-decided source fact
-        from [LLoad] to [lb_rd] so it fires at an [LRmw] too.
+        ([qconf_seg_data] / [qconf_seg_take]: the row's [hart_conf]
+        derivation, split at [k0] and after the exit write by [hemit_app],
+        in the residue's own [pre ++ [store]] shape, with the prefix kept as
+        the [take]/[drop] the site data index into).
+      - §3 the RMW policy pointwise ([wcpolp_at], [cpolp_of_align]), with
+        [src_in_log_of_pfx'] generalising the log-decided source fact from
+        [LLoad] to [lb_rd] so it fires at an [LRmw] too.
+      - §4.1–§4.3 THE REFUTATION OF THE OLD SHAPE, kept machine-checked
+        against [WeakRvwmoWalk.wpol_flat] /
+        [WeakRvwmoProgress.walk_seg_data_flat]: a policy quantified over
+        every context candidate pins the segment's exit store to ROW
+        POSITION 0.
+      - §5 the REPAIRED residue supplied from the bundle
+        ([walk_seg_data_of_qconf]) under one named per-state datum
+        [wseg_supply], and the capstone [xv6_rvwmo_safe_modulo_l2] at
+        (R-1) [l2_claim] plus that datum.
 
-    NOT DELIVERED, and why — the finding.  [walk_seg_data] cannot be
-    supplied, for a reason that is not about the kernel or the graph: it
-    asks for [wpol], which quantifies over EVERY candidate the
-    certification context admits while its classification output speaks
-    about that candidate's OWN row position.  §4.1–§4.3 machine-check the
-    consequence: a [walk_seg_data] at a walk state forces the segment's
-    exit store to be [G]'s label at every context candidate, hence — at the
-    empty candidate, a context of every graph where hart [x] has no witness
-    at position 0, which [wrow_in_log'] itself guarantees — at ROW POSITION
-    0.  Any site whose write is not its hart's first event refutes it.  The
-    same over-quantification is in [wrow_in_log] (all row positions rather
-    than the segment's) and in [walk_seg_data]'s [∀ St] over [wlk_inv],
-    which records the log prefix but not that the state is a CERTIFIED
-    prefix of [G] at all — so [cpol_ctx G (wwit G n) x (cst_c St)], a
-    conjunct of the residue, is not a consequence of its own hypothesis.
+    WHAT §2 BECAME.  The read/register policy at an ALIGNED candidate moved
+    into [WeakRvwmoWalk] §4.0c, where — the policy now being indexed by row
+    position and the alignment being part of the carried context [wctx] —
+    it DISCHARGES the policy outright ([WeakRvwmoWalk.wpol_of_sites]).  So
+    (W-1) is closed, and what [walk_seg_data'] still asks per state is the
+    EMISSION and the SITE DATA.
 
-    THE REPAIR, in one line: index the per-block policy by the row position
-    ([wpol_ix], §4.4 — discharged here from §2), and strengthen the walk's
-    invariant to pin each hart's replayed count to its row position.  That
-    is a change to [WeakRvwmoCert3.cert_segment']'s [Hpol'] parameter, to
-    [WeakRvwmoCert4.seg_step_of_segment], and to [WeakRvwmoWalk.wlk_inv] —
-    not to anything below them, and none of §1–§3 above moves. *)
+    THE NEXT OBSTRUCTION, machine-checked in §6.  [WeakRvwmoCert3.cpol_ctx]
+    asserts [¬ W] AT THE CANDIDATE'S OWN POSITION, so no candidate standing
+    at a witness carries the certification context and the substituted
+    branch of [WeakRvwmoGlue2.cstep_cls] is unreachable through
+    [cert_segment'].  At [WeakRvwmoCycWit.cyg] — the LB graph the whole
+    route exists to kill — hart 0's load IS such a witness at [n = 0]
+    ([cyg_wit00]), so [walk_seg_data'] is FALSE there
+    ([cyg_walk_seg_data_false]); the same was already true of the old
+    [walk_seg_data_flat].  The repair to make next is to move that clause
+    out of [cpol_ctx] and into the policy's non-witness case, so a witness
+    position is served by the latest-read route
+    ([WeakRvwmoCert.latest_read_lbl], which [cyg_walk] uses by hand). *)

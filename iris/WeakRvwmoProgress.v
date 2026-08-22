@@ -428,69 +428,66 @@ Proof.
 Qed.
 
 (* ====================================================================== *)
-(** * 5. THE RESTATEMENTS
+(** * 5. THE RESTATEMENTS, AT THE REPAIRED INTERFACE *)
 
-    ** 5.1 The segment, with (W-2) gone.
+(** ** 5.1 The segment, with (W-2) gone.
 
-    [WeakRvwmoWalk.wlk_seg_of_cert] verbatim, minus the [wub] premise and
-    with the graph-side datum at its widened form.  What is left of the
-    ledger at this interface is (W-1) [wpol] and (O-F) [cpolp]. *)
+    [WeakRvwmoWalk.wlk_seg_of_cert] verbatim, minus the [wub] and [wnw_seg]
+    premises: the widened graph-side datum [wrow_in_log'] discharges BOTH
+    (that hart has no witness at any position at all).  A hart that DOES
+    carry a witness elsewhere in its row is served by the segment-restricted
+    form directly ([wlk_seg_of_cert] with [wnw_seg] and an honest [wub]). *)
 Theorem wlk_seg_of_cert' (G : gexec) (n : nat) (x : agent) (cpu : CPU)
-    (d0 : dev_state) (T : list wreg) (Q : lbl → Prop)
-    (k0 : nat) (ws0 : wstate) (rowseg : list lbl) (es : list eitem)
-    (pfin : pexv6) (m0 : M unit) (rs10 : regstate) (fn0 : ofence)
-    (ib0 : oib32) (St : cyc_state) (rs20 : regstate) :
-  gwf G →
+    (d0 : dev_state) (k0 kz : nat) (ws0 : wstate) (rowseg : list lbl)
+    (es : list eitem) (pfin : pexv6) (m0 : M unit) (rs10 : regstate)
+    (fn0 : ofence) (ib0 : oib32) (St : cyc_state) (rs20 : regstate) :
+  rvwmo_minus_consistent G →
+  W_poloc_closed G (wwit G n) →
   wrow_in_log' G x n →
-  wpol G (wwit G n) x cpu d0 T Q →
-  cpolp x cpu d0 T (cpol_ctx G (wwit G n) x) (wcls_at G (wwit G n) x) Q →
   hemit (λ _, d0) k0 ws0 rowseg (PHart cpu m0 rs10 fn0 ib0) es pfin →
-  Forall Q rowseg →
+  (∀ i lb, rowseg !! i = Some lb → wQ G n x k0 kz (k0 + i)%nat lb) →
   cst_ok d0 St →
-  cpol_ctx G (wwit G n) x (cst_c St) →
+  wctx G n x kz k0 (cst_c St) →
   cst_pst St (cd_end (cst_c St)) !! x = Some (PHart cpu m0 rs20 fn0 ib0) →
-  dreg_agree (λ nn, nn ∉ T) rs10 rs20 →
+  dreg_agree (λ nn, nn ∉ []) rs10 rs20 →
   w_relp (ms_ws (cand_last_st (cst_c St)) x) = w_relp ws0 →
   ∃ (St' : cyc_state) (tradd : list estep),
     seg_step d0 (SegOut x rowseg (cd_end (cst_c St)) tradd) St St' ∧
-    cpol_ctx G (wwit G n) x (cst_c St') ∧
+    wctx G n x kz (k0 + length rowseg)%nat (cst_c St') ∧
     cd_img (cst_c St') = cd_img (cst_c St) ∧
     cst_pst St' 0%nat = cst_pst St 0%nat ∧
     cst_dv St' 0%nat = cst_dv St 0%nat.
 Proof.
-  intros Hwf Hrow Hpol Hpolp Hem HQ Hok Hctx Hp Hag Hrelp.
-  eapply (wlk_seg_of_cert G n x cpu d0 T Q k0 ws0 rowseg es pfin m0 rs10
+  intros Hcons Hpc Hrow Hem HQ Hok Hctx Hp Hag Hrelp.
+  eapply (wlk_seg_of_cert G n x cpu d0 k0 kz ws0 rowseg es pfin m0 rs10
             fn0 ib0 St rs20);
-    [exact Hwf|by apply wrow_in_log'_weaken|by apply wub_of_row
-    |exact Hpol|exact Hpolp|exact Hem|exact HQ|exact Hok|exact Hctx
-    |exact Hp|exact Hag|exact Hrelp].
+    [exact Hcons|exact Hpc|by apply wub_of_row
+    |intros k _ _; by apply wrow_no_wit
+    |exact Hem|exact HQ|exact Hok|exact Hctx|exact Hp|exact Hag|exact Hrelp].
 Qed.
 
-(** ** 5.2 THE PER-STATE RESIDUE
+(** ** 5.2 THE PER-STATE RESIDUE, REPAIRED
 
-    [WeakRvwmoWalk.walk_policy] asked for a certified segment per write.
-    [walk_seg_data] is what §5.1 needs to BUILD one, and it no longer
-    mentions (W-2).  Its semantic content is exactly three items:
+    [WeakRvwmoWalk.walk_policy] asks for a certified segment per write.
+    [walk_seg_data'] is what §5.1 needs to BUILD one, at the REPAIRED,
+    row-position-indexed interface.  Its semantic content is now exactly
+    TWO items, since (W-1) [wpol] is discharged outright at an aligned
+    candidate ([WeakRvwmoWalk.wpol_of_sites]):
 
       - the EMISSION [hemit …] of hart [x]'s stretch through [G]'s
-        [(n+1)]-st write.  This is where PROGRESS lives — [hemit] is built
-        out of [pstep_ev] steps ([HEone]'s [adm_run] + realizing step), and
-        §1–§2 are what say those steps exist at every certified
-        configuration ([cert_progress]), with §3 the bridge that puts each
-        read at the message the walk chose;
-      - (W-1) [wpol], the READ/REGISTER POLICY;
-      - (O-F) [cpolp], the fused RMW block's policy.
-
-    Everything else in the list is graph bookkeeping or the walk's own
-    invariant. *)
-Definition walk_seg_data (boot : agent → pexv6) (d0 : dev_state) (N : nat)
+        [(n+1)]-st write (where PROGRESS lives, §1–§3);
+      - the SITE DATA [wQ] — [G]'s label at each position of the stretch,
+        its sources already in the log, and the exit write being the log's
+        next entry — together with the walk state's own alignment [wctx]
+        and the two witness-set side conditions [wub] / [wnw_seg], which
+        are stated only over the positions the segment covers. *)
+Definition walk_seg_data' (boot : agent → pexv6) (d0 : dev_state) (N : nat)
     (G : gexec) : Prop :=
   ∀ St n, wlk_inv boot d0 N G St n → (n < length (gwrites G))%nat →
-  ∃ (x : agent) (cpu : CPU) (T : list wreg) (Q : lbl → Prop)
-    (k0 : nat) (ws0 : wstate) (pre : list lbl) (rl : bool) (base : Z)
-    (vs : list (bv 8)) (kc : wm_class) (es : list eitem) (pfin : pexv6)
-    (m0 : M unit) (rs10 rs20 : regstate) (fn0 : ofence) (ib0 : oib32)
-    (w : geid),
+  ∃ (x : agent) (cpu : CPU) (k0 : nat) (ws0 : wstate) (pre : list lbl)
+    (rl : bool) (base : Z) (vs : list (bv 8)) (kc : wm_class)
+    (es : list eitem) (pfin : pexv6) (m0 : M unit) (rs10 rs20 : regstate)
+    (fn0 : ofence) (ib0 : oib32) (w : geid),
     (* the graph side: the segment's exit IS [G]'s [(n+1)]-st write *)
     gwrite_at G (S n) = Some w ∧
     gmsg G w = Some (WMsg base vs (Some x) kc) ∧
@@ -498,56 +495,54 @@ Definition walk_seg_data (boot : agent → pexv6) (d0 : dev_state) (N : nat)
     (* THE EMISSION — the progress-carrying input *)
     hemit (λ _, d0) k0 ws0 (pre ++ [WeakAxiomatic.LStore rl base vs kc])
       (PHart cpu m0 rs10 fn0 ib0) es pfin ∧
-    Forall Q (pre ++ [WeakAxiomatic.LStore rl base vs kc]) ∧
-    (* the walk's state, at the hart being run *)
-    cpol_ctx G (wwit G n) x (cst_c St) ∧
+    (* THE SITE DATA, INDEXED BY ROW POSITION *)
+    (∀ i lb, (pre ++ [WeakAxiomatic.LStore rl base vs kc]) !! i = Some lb →
+       wQ G n x k0 (k0 + length pre)%nat (k0 + i)%nat lb) ∧
+    (* the walk's state, ALIGNED to the segment's first position *)
+    wctx G n x (k0 + length pre)%nat k0 (cst_c St) ∧
     cst_pst St (cd_end (cst_c St)) !! x = Some (PHart cpu m0 rs20 fn0 ib0) ∧
-    dreg_agree (λ nn, nn ∉ T) rs10 rs20 ∧
+    dreg_agree (λ nn, nn ∉ []) rs10 rs20 ∧
     w_relp (ms_ws (cand_last_st (cst_c St)) x) = w_relp ws0 ∧
-    (* the graph-side datum, and the TWO policies *)
-    wrow_in_log' G x n ∧
-    wpol G (wwit G n) x cpu d0 T Q ∧
-    cpolp x cpu d0 T (cpol_ctx G (wwit G n) x) (wcls_at G (wwit G n) x) Q.
+    (* the witness set's side conditions, over the segment only *)
+    W_poloc_closed G (wwit G n) ∧
+    wub G (wwit G n) x ∧
+    wnw_seg G n x k0 (k0 + length pre)%nat.
 
-Theorem walk_policy_of_seg_data (boot : agent → pexv6) (d0 : dev_state)
+Theorem walk_policy_of_seg_data' (boot : agent → pexv6) (d0 : dev_state)
     (N : nat) (G : gexec) :
-  gwf G → walk_seg_data boot d0 N G → walk_policy boot d0 N G.
+  rvwmo_minus_consistent G → walk_seg_data' boot d0 N G →
+  walk_policy boot d0 N G.
 Proof.
-  intros Hwf Hdata St n Hinv Hn.
+  intros Hcons Hdata St n Hinv Hn.
   destruct (Hdata St n Hinv Hn)
-    as (x & cpu & T & Q & k0 & ws0 & pre & rl & base & vs & kc & es & pfin &
+    as (x & cpu & k0 & ws0 & pre & rl & base & vs & kc & es & pfin &
         m0 & rs10 & rs20 & fn0 & ib0 & w &
-        Hw & Hm & Hpre & Hem & HQ & Hctx & Hp & Hag & Hrelp & Hrow & Hpol &
-        Hpolp).
+        Hw & Hm & Hpre & Hem & HQ & Hctx & Hp & Hag & Hrelp & Hpc & Hub &
+        Hnw).
   have Hok : cst_ok d0 St by destruct Hinv as (? & _).
-  destruct (wlk_seg_of_cert' G n x cpu d0 T Q k0 ws0
+  destruct (wlk_seg_of_cert G n x cpu d0 k0 (k0 + length pre)%nat ws0
               (pre ++ [WeakAxiomatic.LStore rl base vs kc]) es pfin m0 rs10
-              fn0 ib0 St rs20 Hwf Hrow Hpol Hpolp Hem HQ Hok Hctx Hp Hag Hrelp)
+              fn0 ib0 St rs20 Hcons Hpc Hub Hnw Hem HQ Hok Hctx Hp Hag Hrelp)
     as (St' & tradd & Hstep & _ & Himg & Hpst & Hdv).
   exists x, rl, base, vs, kc, pre, tradd, St', w.
   split_and!; [exact Hw|exact Hm|exact Hpre|exact Hstep|exact Himg|exact Hpst
               |exact Hdv].
 Qed.
 
-(** ** 5.3 THE WALK'S THEOREM, at the residue *)
-Theorem walk_supply_of_wp (boot : agent → pexv6) (d0 : dev_state)
+(** ** 5.3 THE WALK'S THEOREM, at the repaired residue *)
+Theorem walk_supply_of_wp' (boot : agent → pexv6) (d0 : dev_state)
     (im : image) (nh : nat) (N : nat) :
   (∀ GD : gdexec,
      rvwmo_minus_deps_consistent GD → gdexec_qconf boot d0 im nh GD →
-     walk_seg_data boot d0 N (gd_g GD)) →
+     walk_seg_data' boot d0 N (gd_g GD)) →
   walk_supply boot d0 im nh N.
 Proof.
   intros Hdata. apply walk_supply_of_policy. intros GD Hcons Hq.
-  apply walk_policy_of_seg_data; [|by apply Hdata].
-  by destruct Hcons as ((Hwf & _ & _ & _) & _ & _).
+  apply walk_policy_of_seg_data'; [|by apply Hdata].
+  by destruct Hcons as (Hc & _ & _).
 Qed.
 
-(** ** 5.4 THE CAPSTONE, with (R-2) at the residue
-
-    [WeakRvwmoWalk.xv6_rvwmo_safe_modulo_walk] with the per-state policy
-    replaced by [walk_seg_data]: (W-2) is gone, and what remains besides
-    (R-1) [l2_claim] is the per-state EMISSION (progress, §1–§3), (W-1)
-    [wpol] and (O-F) [cpolp]. *)
+(** ** 5.4 THE CAPSTONE, with (R-2) at the repaired residue *)
 Theorem xv6_rvwmo_safe_modulo_walk' (Σ : gFunctors)
     `{!riscvGpreS Σ, !weakGpreS Σ}
     (gen : nat) (σ0 : wgstate) (D : CPU → gset register)
@@ -558,11 +553,11 @@ Theorem xv6_rvwmo_safe_modulo_walk' (Σ : gFunctors)
   (* (R-1) *)
   l2_claim (xboot σ0) (wgdev σ0) (img_z (wgimg σ0)) (xN σ0) P
            (bad_run gen σ0) →
-  (* (R-2), at the residue: no [wub] anywhere *)
+  (* (R-2), at the repaired, position-indexed residue *)
   (∀ GD : gdexec,
      rvwmo_minus_deps_consistent GD →
      gdexec_qconf (xboot σ0) (wgdev σ0) (img_z (wgimg σ0)) (xN σ0) GD →
-     walk_seg_data (xboot σ0) (wgdev σ0) (xN σ0) (gd_g GD)) →
+     walk_seg_data' (xboot σ0) (wgdev σ0) (xN σ0) (gd_g GD)) →
   ∀ GD : gdexec,
     rvwmo_minus_deps_consistent GD →
     gdexec_qconf (xboot σ0) (wgdev σ0) (img_z (wgimg σ0)) (xN σ0) GD →
@@ -584,8 +579,33 @@ Theorem xv6_rvwmo_safe_modulo_walk' (Σ : gFunctors)
 Proof.
   intros Hfr Hwp Hwpp Hl2 Hdata.
   apply (xv6_rvwmo_safe_modulo Σ gen σ0 D Nm P Hfr Hwp Hwpp Hl2).
-  by apply walk_supply_of_wp.
+  by apply walk_supply_of_wp'.
 Qed.
+
+(** ** 5.5 THE OLD, OVER-QUANTIFIED RESIDUE, kept only as the subject of
+    [WeakRvwmoWalk2] §4's machine-checked refutation. *)
+Definition walk_seg_data_flat (boot : agent → pexv6) (d0 : dev_state)
+    (N : nat) (G : gexec) : Prop :=
+  ∀ St n, wlk_inv boot d0 N G St n → (n < length (gwrites G))%nat →
+  ∃ (x : agent) (cpu : CPU) (T : list wreg) (Q : lbl → Prop)
+    (k0 : nat) (ws0 : wstate) (pre : list lbl) (rl : bool) (base : Z)
+    (vs : list (bv 8)) (kc : wm_class) (es : list eitem) (pfin : pexv6)
+    (m0 : M unit) (rs10 rs20 : regstate) (fn0 : ofence) (ib0 : oib32)
+    (w : geid),
+    gwrite_at G (S n) = Some w ∧
+    gmsg G w = Some (WMsg base vs (Some x) kc) ∧
+    Forall (λ lb, lb_is_w lb = false) pre ∧
+    hemit (λ _, d0) k0 ws0 (pre ++ [WeakAxiomatic.LStore rl base vs kc])
+      (PHart cpu m0 rs10 fn0 ib0) es pfin ∧
+    Forall Q (pre ++ [WeakAxiomatic.LStore rl base vs kc]) ∧
+    cpol_ctx G (wwit G n) x (cst_c St) ∧
+    cst_pst St (cd_end (cst_c St)) !! x = Some (PHart cpu m0 rs20 fn0 ib0) ∧
+    dreg_agree (λ nn, nn ∉ T) rs10 rs20 ∧
+    w_relp (ms_ws (cand_last_st (cst_c St)) x) = w_relp ws0 ∧
+    wrow_in_log' G x n ∧
+    wpol_flat G (wwit G n) x cpu d0 T Q ∧
+    cpolp x cpu d0 T (λ _ : nat, cpol_ctx G (wwit G n) x)
+      (wcls_at G (wwit G n) x) (λ _ : nat, Q).
 
 (* ====================================================================== *)
 (** * 6. AUDIT *)
@@ -600,8 +620,8 @@ Print Assumptions wub_of_witness.
 Print Assumptions wub_of_row.
 Print Assumptions cpol_ctx_of_ctrace.
 Print Assumptions wlk_seg_of_cert'.
-Print Assumptions walk_policy_of_seg_data.
-Print Assumptions walk_supply_of_wp.
+Print Assumptions walk_policy_of_seg_data'.
+Print Assumptions walk_supply_of_wp'.
 Print Assumptions xv6_rvwmo_safe_modulo_walk'.
 
 (* ====================================================================== *)
