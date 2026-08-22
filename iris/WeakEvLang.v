@@ -347,11 +347,17 @@ Proof. by destruct k. Qed.
     into a no-op that still builds. *)
 
 (* [lw a5,0(a5)] = 0x0007a783: the write of x15 IS the destination, and it
-   inherits the LOAD RESULT (PARM's [res]) — this is the ppo 9/10/11 chain's
-   first link. *)
+   inherits the LOAD RESULT (PARM's [res]) AND the load's ADDRESS SOURCES
+   (F5' / DEC-4 — rules 9 and 10 composed) — this is the ppo 9/10/11 chain's
+   first link.  Here rs1 = rd = x15; [ld a4,0(a5)] below separates them. *)
 Example erw_of_lw_rd :
   erw_of (deps_of_bits (dbits 0x0007a783)) (R_bitvector_64 x15)
-  = ERWreg 15 [DLdRes].
+  = ERWreg 15 [DLdRes; DReg 15%nat].
+Proof. vm_compute. reflexivity. Qed.
+
+Example erw_of_ld_rd :
+  erw_of (deps_of_bits (dbits 0x0007b703)) (R_bitvector_64 x14)
+  = ERWreg 14 [DLdRes; DReg 15%nat].
 Proof. vm_compute. reflexivity. Qed.
 
 (* ... and a write of any OTHER GPR in the same instruction is silent *)

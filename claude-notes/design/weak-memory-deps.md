@@ -664,7 +664,15 @@ instruction.  So `LCtrl` at that node is PARM's `step_if` position exactly,
 and for a non-branch instruction `deps_ctrl` is `[]`, making the arm a no-op.
 **The D2 label vocabulary was already right; nothing in Layer 1 moved.**
 
-**DEVIATION D-8 (as briefed): a plain load carries NO address sources.**  A
+**DEVIATION D-8 (as briefed): a plain load carries NO address sources
+ON ITS LABEL — but since F5′ (2026-08-22) its RESULT REGISTER names them.**
+`WeakDeps.deps_addr` is the one definition of "the address sources of a
+memory role"; `deps_asrc` (the ppo-9 operand list on the label) masks the
+load arm off, exactly as below, and `deps_rd`'s `ORload` arm uses it raw, so
+the emission is `LRegW rd (DLdRes :: deps_addr role)` (decoder deviation
+DEC-4).  Rules 9 and 10 composed are RVWMO-honest, the machine's
+`read_ok_d` vaddr floor stays untripped, and the only effect downstream is a
+HIGHER dependency view / one more `row_deps` edge.  The rest of D-8:  A
 load's data read and the page walker's PTE read are indistinguishable at the
 node (both `AK_explicit` plain, `va = None`; the model emits no
 `TranslationStart`/`TranslationEnd`), so attaching `rs1` to a read would

@@ -678,6 +678,18 @@ check `srcs_view` users).  Without it, B2e-3b's "true label" claim is
 false and must be restricted to writes with no load-address chain
 from a witness — unworkable to classify.  DECISION: build the
 provenance extension as a B2e-3b prerequisite.
+**LANDED 2026-08-22 (F5′).**  `WeakDeps.deps_addr` is now the single
+place a base register is read as an address source; `deps_asrc` masks
+its load arm (D-8 UNCHANGED — the `LLoad` label still carries `[]`, the
+`read_ok_d` vaddr floor is still untripped) and `deps_rd`'s `ORload` arm
+uses it raw, so a load's result write is `LRegW rd (DLdRes :: address
+srcs)`.  `dstep` needed NOTHING (its `LRegW` arm already composes
+provenance); the smoke tests are `WeakRvwmoConf.row_deps_addr_chain` and
+its `_before` twin.  No tier-1 proof moved: every consumer of `LRegW`'s
+`srcs` speaks through `DLdRes ∈ srcs` and `srcs_view` monotonicity, so
+the extra source only RAISES a dependency view.  An AMO needs no patch
+(its address sources are on the `LRmw` label already, so a chain through
+its `rd` is pinned by two dep edges and gmo transitivity).
 
 **F6 — the per-site fact the lock kill cannot do without, named.**  Every
 CS-to-CS step of a cycle needs `(P)`: "the message a CS read of byte `a`

@@ -49,7 +49,17 @@
       PC-derived or immediate.  [jal]/[jalr]'s link value likewise (D-4), so
       [ORjal]/[ORjalr] contribute a destination with an EMPTY source list —
       the write still RESETS [rd]'s view (PARM's [step_assign] overwrites),
-      which is the point of emitting it at all. *)
+      which is the point of emitting it at all.
+
+    (DEC-4 / F5', 2026-08-22) A LOAD's [rd] takes [DLdRes :: deps_addr role]
+      — the load result AND the address sources — where D-8 keeps the same
+      sources OFF the [LLoad] label.  RVWMO rule 9 orders a load after its
+      address registers and rules 9/10 order a later store after the load's
+      result; the composite is RVWMO-honest, and recording it on the result
+      REGISTER is the only place D-8 leaves open.  It is what makes a
+      two-deep pointer chase ([ld r1,[x]; ld r2,[r1]; sd r2,[q]]) put the
+      FIRST load in the store's dependency set.
+ *)
 From Stdlib.ssr Require Import ssreflect.
 From stdpp Require Import gmap finite list.
 From stdpp Require Import bitvector.definitions.
@@ -121,15 +131,25 @@ Definition deps_ctrl (r : op_roles) : list dsrc :=
   | _ => []
   end.
 
-(** ppo 9 — the ADDRESS sources of a memory access.  See deviation D-8: the
-    LOAD arm does not use this (a load's data read and the page walker's PTE
-    read are indistinguishable at the node), only stores and the fused RMW
-    do. *)
+(** THE ADDRESS SOURCES of a memory access — the ONE place a base register
+    is read as such, for EVERY memory role (load, store, AMO alike).  Two
+    consumers sit on top of it and they want different halves of D-8:
+    [deps_asrc] (the ppo-9 operand list that goes on the memory LABEL) masks
+    the load arm off, [deps_rd] (F5', below) uses it raw. *)
+Definition deps_addr (r : op_roles) : list dsrc :=
+  match r with
+  | ORload _ rs1 | ORstore rs1 _ | ORamo _ rs1 _ => dsrc_of_num rs1
+  | _ => []
+  end.
+
+(** ppo 9 — the ADDRESS sources that go on the memory access's own label.
+    See deviation D-8: the LOAD arm is masked to [[]] (a load's data read and
+    the page walker's PTE read are indistinguishable at the node), only
+    stores and the fused RMW carry it. *)
 Definition deps_asrc (r : op_roles) : list dsrc :=
   match r with
-  | ORstore rs1 _ => dsrc_of_num rs1
-  | ORamo _ rs1 _ => dsrc_of_num rs1
-  | _ => []
+  | ORload _ _ => []                        (* D-8 — see [deps_addr] *)
+  | _ => deps_addr r
   end.
 
 (** ppo 10 — the DATA sources of a store. *)
@@ -145,7 +165,25 @@ Definition deps_vsrc (r : op_roles) : list dsrc :=
     destination", in which case every [RegWrite] of it stays [LSilent]. *)
 Definition deps_rd (r : op_roles) : option (wreg * list dsrc) :=
   match r with
-  | ORload rd _ | ORamo rd _ _ =>
+  | ORload rd rs1 =>
+      (* F5' — TRANSITIVE PROVENANCE THROUGH LOAD ADDRESSES.  RVWMO rule 9
+         orders a load after the registers its ADDRESS was computed from, and
+         rules 9/10 order a later store after the load's RESULT; composing
+         them, the store depends on the address registers too.  D-8 keeps
+         those sources OFF the [LLoad] label (the PTE read is
+         indistinguishable there), so the composition has to be recorded on
+         the RESULT REGISTER instead: [rd]'s provenance is the load event
+         PLUS the load's address sources — the very list [deps_addr] hands a
+         store.  Composing rules 9 and 10 is RVWMO-honest, so this only
+         raises a dependency view / adds a dep edge, never removes one. *)
+      match wreg_of_num rd with
+      | Some w => Some (w, DLdRes :: deps_addr (ORload rd rs1))
+      | None => None
+      end
+  | ORamo rd _ _ =>
+      (* An AMO needs no such patch: its address sources are already on the
+         [LRmw] LABEL ([deps_asrc]), so a chain through an AMO's [rd] is
+         pinned by two dep edges and gmo's transitivity. *)
       match wreg_of_num rd with Some w => Some (w, [DLdRes]) | None => None end
   | ORjal rd | ORjalr rd _ =>
       (* D-4/DEC-3: the link value is PC-derived, so no source — but the
@@ -304,6 +342,26 @@ Proof. vm_compute. reflexivity. Qed.
 
 (* ld a5,0(a5)   = 0x0007b783 *)
 Example deps_ld : deps_of_bits (dbits 0x0007b783) = ORload 15 15.
+Proof. vm_compute. reflexivity. Qed.
+
+(* F5': the load's RESULT REGISTER carries the load AND its address source.
+   [lw a5,0(a5)] is the degenerate case rs1 = rd; [ld a4,0(a5)] = 0x0007b703
+   separates them. *)
+Example deps_lw_rd :
+  deps_rd (deps_of_bits (dbits 0x0007a783)) = Some (15%nat, [DLdRes; DReg 15%nat]).
+Proof. vm_compute. reflexivity. Qed.
+Example deps_ld_a4_a5_rd :
+  deps_rd (deps_of_bits (dbits 0x0007b703)) = Some (14%nat, [DLdRes; DReg 15%nat]).
+Proof. vm_compute. reflexivity. Qed.
+
+(* ... and D-8 is UNCHANGED: nothing lands on the load's own label. *)
+Example deps_lw_asrc : deps_asrc (deps_of_bits (dbits 0x0007a783)) = [].
+Proof. vm_compute. reflexivity. Qed.
+
+(* [ld a5,0(x0)] = 0x00003783 — an x0 base contributes no source, so the
+   result register is back to the pre-F5' shape. *)
+Example deps_ld_x0_rd :
+  deps_rd (deps_of_bits (dbits 0x00003783)) = Some (15%nat, [DLdRes]).
 Proof. vm_compute. reflexivity. Qed.
 
 (* sw a4,0(a5)   = 0x00e7a023 : rs1 = x15 (base), rs2 = x14 (data) *)
@@ -485,6 +543,11 @@ Proof. vm_compute. reflexivity. Qed.
 
 (* c.ld a4,0(a5) = 0x6398 *)
 Example deps_cld : deps_of_bits (dbits 0x6398) = ORload 14 15.
+Proof. vm_compute. reflexivity. Qed.
+Example deps_cld_rd :
+  deps_rd (deps_of_bits (dbits 0x6398)) = Some (14%nat, [DLdRes; DReg 15%nat]).
+Proof. vm_compute. reflexivity. Qed.
+Example deps_cld_asrc : deps_asrc (deps_of_bits (dbits 0x6398)) = [].
 Proof. vm_compute. reflexivity. Qed.
 
 (* c.sw a4,0(a5) = 0xc398 — the [started] publisher's store *)

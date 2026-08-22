@@ -48,6 +48,28 @@
       (the walker kills there consume [w_vcap] at the realized prefix, not
       graph edges).
 
+
+    (S-a') F5' — TRANSITIVE PROVENANCE THROUGH LOAD ADDRESSES (2026-08-22).
+      D-8 (a plain load's LABEL carries no [asrc], because the node cannot
+      tell a data read from the walker's PTE read) is UNCHANGED and stays
+      unchanged: [read_ok_d]'s vaddr floor is still untripped.  What changed
+      is the instance's REGISTER-PROVENANCE annotation: a load's result write
+      is now [LRegW rd (DLdRes :: the load's address sources)]
+      ([WeakDeps.deps_rd]'s [ORload] arm, via the same [deps_addr] a store's
+      [asrc] comes from).  [dstep] needed NOTHING: the [LRegW] arm already
+      composes provenance, so [dprov rd] now names the address chain's reads
+      as well and every later store inherits them through [dedges].  RVWMO
+      rules 9 (into the load) and 10 (out of it) composed — so the dep set
+      only GROWS, and it grows within RVWMO.  See [row_deps_addr_chain] and
+      its [_before] twin in §9.  Why it is needed: §4d.2(2) certifies a
+      cycle-SCC write [z] by a solo run and claims [z]'s label is [G]'s
+      because every source of [z] is in [gd_deps] hence gmo-below [z] — with
+      no address sources on loads, [r1 ->addr r2 ->data z] left [r1]
+      unpinned, so a substituted witness value could change [r2]'s ADDRESS
+      and hence [z]'s data.  (An AMO needs no patch: its address sources are
+      on the [LRmw] label already, so such a chain is pinned by two dep edges
+      and gmo's transitivity.)
+
     (S-b) AN EMISSION ITEM CARRIES ITS ROW POSITION EXPLICITLY.  [row_deps]
       folds over [list eitem] — labels TAGGED with the row position they
       realize ([None] for an administrative label) — not over a bare
@@ -1051,6 +1073,47 @@ Example row_deps_chain :
              (LInstr, None);
              (WeakPromise.LStore false 8 [bv_0 8] [DReg 5%nat] [], Some 1%nat) ]
   = [(0%nat, 1%nat)].
+Proof. vm_compute. reflexivity. Qed.
+
+(** F5' (route-b §4d.1) — TRANSITIVE PROVENANCE THROUGH LOAD ADDRESSES.
+    The pointer chase [ld r1 <- [x]; ld r2 <- [r1]; st [q] := r2]: the second
+    load's ADDRESS comes from the first load's result, so the store depends
+    on the FIRST load too (RVWMO rules 9 and 10 composed).  D-8 keeps the
+    address sources off the [LLoad] LABEL, so what carries the composition is
+    the instance's register write, [LRegW r2 (DLdRes :: DReg r1)]
+    ([WeakDeps.deps_rd]'s [ORload] arm) — and the fold then yields BOTH
+    (1,2) and (0,2).  The edge (0,2) is the new one.  ([r9] is the first
+    load's own base register, written by nobody in this row, so its
+    provenance is empty and it contributes nothing — the emission is
+    nonetheless the shape the instance now produces.) *)
+Example row_deps_addr_chain :
+  row_deps [ (LInstr, None);
+             (WeakPromise.LLoad false false 0 [(0%nat, bv_0 8)] [], Some 0%nat);
+             (LRegW 1%nat [DLdRes; DReg 9%nat], None);
+             (LInstr, None);
+             (WeakPromise.LLoad false false 8 [(1%nat, bv_0 8)] [], Some 1%nat);
+             (LRegW 2%nat [DLdRes; DReg 1%nat], None);
+             (LInstr, None);
+             (WeakPromise.LStore false 16 [bv_0 8] [] [DReg 2%nat], Some 2%nat) ]
+  = [(1%nat, 2%nat); (0%nat, 2%nat)].
+Proof. vm_compute. reflexivity. Qed.
+
+(** THE "BEFORE", kept as a live check: with the PRE-F5' emission — the
+    second load's result write naming only [DLdRes] — the first load is NOT
+    in the store's dependency set, and nothing else in the row changes.  That
+    absence is exactly the hole §4d.1 F5' names (a witness read above the
+    certified write could redirect the second load's address, hence the
+    store's data, with no dep edge to forbid it). *)
+Example row_deps_addr_chain_before :
+  row_deps [ (LInstr, None);
+             (WeakPromise.LLoad false false 0 [(0%nat, bv_0 8)] [], Some 0%nat);
+             (LRegW 1%nat [DLdRes], None);
+             (LInstr, None);
+             (WeakPromise.LLoad false false 8 [(1%nat, bv_0 8)] [], Some 1%nat);
+             (LRegW 2%nat [DLdRes], None);
+             (LInstr, None);
+             (WeakPromise.LStore false 16 [bv_0 8] [] [DReg 2%nat], Some 2%nat) ]
+  = [(1%nat, 2%nat)].
 Proof. vm_compute. reflexivity. Qed.
 
 (** Scope note (S-c) in action: the exclusive pair's INTERNAL read→write

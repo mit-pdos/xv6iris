@@ -68,7 +68,7 @@ instance — DONE: `WeakRvwmoDec.v`, `racyD_dec` + `normalize_of_acyclic'`, Clos
 DECIDE the F3″ interface (footprint at `wlock_alloc`, `WProt`
 store/read rules, `lock_auth` into the state interp; spec in route-b
 §4d.3′) BEFORE M4 ports a lock client, then build it; (4) [DONE the same day: B1a′ LANDED — `WeakRvwmoHull.v`, Closed];
-(4b) F5′ — transitive provenance through load addresses at the instance (`LRegW rd (DLdRes :: address srcs)`) — a B2e-3b PREREQUISITE (route-b F5′); (4c) B1b's device-order extension (`Rdev` as a sixth R arm; route-b §4d.4 B1b note); (5) B2e-3b certification
+(4b) [F5′ DONE the same day: `WeakDeps.deps_addr`/`deps_rd` (DEC-4), `row_deps_addr_chain` smoke test, tree green, capstone assumptions unchanged]; (4c) B1b's device-order extension (`Rdev` as a sixth R arm; route-b §4d.4 B1b note); (5) B2e-3b certification
 machinery; (6) B2e-3c the per-segment classification (the L2′
 content); then B1b, B3, R6.
 
