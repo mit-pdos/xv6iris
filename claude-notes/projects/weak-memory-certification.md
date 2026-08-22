@@ -1,5 +1,43 @@
 # The tier-2 containment worklist (was: the certification route)
 
+## CHECKPOINT (2026-08-23, SIXTH PASS) — READ THIS FIRST
+
+**Landed since the fifth pass:** slice 3c the CYCLE CERTIFICATION
+(`WeakRvwmoCert4.v`: `cert_cycle`; the forced finding that a
+`ctrace_prefix` appends writes in gmo order — `ctp_wix_gmo_mono` — so
+certification runs in a gmo-respecting order, and the cut must be
+write-closed, `wcut_closed`/`hren_id`) — `d4584de7`; **B2e-3c's
+ARITHMETIC** (`WeakRvwmoKillArms.v`: `cycle_kill_arms` over
+`Pinned`/`CSchained`/`Bad` certificates, needing NO `grule14`;
+`cs_chained` in BOTH window orders from F3′/F3″'s log predicates via
+the dictionary `log_of` (log position p ⇔ write index S p); `lkw` — a
+4-byte-lock witness discharging every hypothesis, since `lkg`'s 1-byte
+lock cannot satisfy the word fold; LB's two-segment cycle fires iff
+both `Pinned` certificates exist) — this commit.  Whole tree green.
+
+**WHAT REMAINS (assembly-facing):**
+1. **Glue `cert_cycle` to `cycle_kill_arms`** — the B2e-3c DISCHARGE of
+   `cycle_kill`: per segment, produce its certificate from the certified
+   configuration: `Pinned` from rule 4/5/`gd_deps` (graph arithmetic);
+   `CSchained` from the exports at the certified run's final state
+   (`weak_ev_adequacy_lockalt`/`_prot` applied through T1's run — the
+   adequacy-level step that turns `cert_cycle`'s cand into a machine run
+   whose log is the cand's; `prot_read` records at `cert_cycle_pos`) plus
+   the row facts; `Bad` from φ (`weak_ev_pf_violation_free` at the read
+   step).  THE PER-SITE CLASSIFICATION (every segment gets one) is the
+   L2′ claim; state it as the hypothesis of the glue and attack it
+   site-class by site-class.  Honest side conditions found by the arms:
+   `n0 < gwix ACQ` (registration precedes the reader's acquire), the
+   protected write does not touch the lock word, `lock_word_byte`.
+2. Small: export `tfull` from `WeakRvwmoLin2` (O-D); `WeakRvwmoCert3`'s
+   P-1 `Hpres`; a second emitted block for a 2-hart witness.
+3. **B3** assembly (`t2lin_of_cycle_kill` + `t2lin_supply` + T1 +
+   adequacy) at the device-quiet milestone; then the full bundle via
+   `fconf_trace_realize`; **R6**; `wprot_store` width lift;
+   `WeakRvwmoLock`'s failed-swap arm.
+
+**Tree:** never `make proofs` from the root here (stale `xv6-riscv`).
+
 ## CHECKPOINT (2026-08-23, FIFTH PASS) — READ THIS FIRST
 
 **Landed since the fourth pass:** the certification WIRING
