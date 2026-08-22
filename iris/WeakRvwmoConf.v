@@ -70,6 +70,26 @@
       on the [LRmw] label already, so such a chain is pinned by two dep edges
       and gmo's transitivity.)
 
+    (S-a'') THE SATP-PROVENANCE EDGE (route-b §4e, 2026-08-22).  D-4 ("a CSR
+      is not an RVWMO register, so SYSTEM instructions get no role") is
+      RELAXED FOR [satp] AND ONLY [satp] ([WeakDeps]' DEC-5): the decoder
+      names the pseudo-register [wsatp] as the destination of a [satp] write
+      and as the source of a [csrr rd,satp], and [dedges] adds
+      [dprov s wsatp] — the hart's TRANSLATION CONTEXT — to every store's and
+      RMW's dependency sources.  Motivation: a witness value can otherwise
+      flow [ld -> csrw satp -> sfence.vma -> st] into the store's TRANSLATION
+      with neither a [row_deps] edge nor an RVWMO ppo edge to pin it, so the
+      declared model would let the store be gmo-early relative to the load
+      that produced its page table — which hardware cannot do.  The edge is
+      justified by the privileged spec's [sfence.vma] discipline rather than
+      by RVWMO ppo, hence recorded here as a deviation; its polarity is
+      STRONGER (it adds edges).  Value-independent like every other arm
+      ([dprov] holds row POSITIONS), and self-unlinking: a later [satp] write
+      OVERWRITES the entry through the ordinary [LRegW] arm.  Loads take no
+      such edge — a load cannot be a [gdeps_wf] target, and the edge INTO the
+      store is what pins a witness below it.  See [row_deps_satp_chain], its
+      [_before] twin, and [row_deps_satp_read] in §9.
+
     (S-b) AN EMISSION ITEM CARRIES ITS ROW POSITION EXPLICITLY.  [row_deps]
       folds over [list eitem] — labels TAGGED with the row position they
       realize ([None] for an administrative label) — not over a bare
@@ -550,12 +570,26 @@ Definition dsrcs_pos (s : dstate) (xs : list dsrc) : list nat :=
     translation-order edges ARE in [row_deps] now, computed from [ds_ld s] —
     the instruction's own earlier reads, i.e. its translation reads, which
     precede the translated access.  Value-independent: [ds_ld] holds row
-    POSITIONS, so the arm is as ts-blind and as renaming-stable as the rest. *)
+    POSITIONS, so the arm is as ts-blind and as renaming-stable as the rest.
+
+    AND THE SATP-PROVENANCE EDGE (route-b §4e; [WeakDeps]' DEC-5): the LAST
+    summand is [dprov s wsatp], the provenance of the hart's TRANSLATION
+    CONTEXT.  Every access of the hart is translated through the page table
+    [satp] names, so a value that reached [satp] reached this store's
+    address; RVWMO has no syntactic dependency for a CSR, but the privileged
+    spec's [sfence.vma] discipline is exactly what makes hardware order the
+    store after the load that produced the [satp] value.  It is maintained
+    by the ordinary [LRegW] arm below — the decoder names [wsatp] as the
+    destination of a [satp] write, so a LATER [satp] write OVERWRITES the
+    entry and no stale claim survives — and it is as value-independent as
+    every other arm.  Only WRITES take it: a load cannot be a dep target in
+    [gdeps_wf], and the edge INTO the store is what pins a witness below it. *)
 Definition dedges (s : dstate) (k : nat) (asrc vsrc : list dsrc)
     : list (nat * nat) :=
   (λ j, (j, k)) <$>
     filter (λ j, (j < k)%nat)
-      (dsrcs_pos s asrc ++ dsrcs_pos s vsrc ++ ds_ctl s ++ ds_ld s).
+      (dsrcs_pos s asrc ++ dsrcs_pos s vsrc ++ ds_ctl s ++ ds_ld s
+       ++ dprov s wsatp).
 
 Definition dstep (s : dstate) (it : eitem) : dstate * list (nat * nat) :=
   match it.1 with
@@ -677,8 +711,11 @@ Proof.
     apply elem_of_list_filter in Hj as [_ Hj]. simpl.
     apply elem_of_app in Hj as [Hj|Hj]; [by eapply dsrcs_pos_within|].
     apply elem_of_app in Hj as [Hj|Hj]; [by eapply dsrcs_pos_within|].
+    apply elem_of_app in Hj as [Hj|Hj]; [by apply (proj2 (proj2 Hs))|].
+    (* [ds_ld], then the satp-provenance arm (§4e) — a [dprov] entry, so the
+       register clause of [ds_within] is what discharges it. *)
     apply elem_of_app in Hj as [Hj|Hj];
-      [by apply (proj2 (proj2 Hs))|by apply (proj1 (proj2 Hs))]. }
+      [by apply (proj1 (proj2 Hs))|by eapply (proj1 Hs)]. }
   destruct Hs as (Hp & Hl & Hc).
   destruct it as [l [k|]]; destruct l; simpl in *;
     (split; [|by intros jk Hjk; try (by apply elem_of_nil in Hjk); eauto]).
@@ -1146,6 +1183,61 @@ Example row_deps_wtv_reset :
              (LInstr, None);
              (WeakPromise.LStore false 8 [bv_0 8] [] [], Some 1%nat) ]
   = [].
+Proof. vm_compute. reflexivity. Qed.
+
+(** THE SATP-PROVENANCE EDGE (route-b §4e / [WeakDeps]' DEC-5) in action.
+    [ld a0 <- [x]; csrw satp,a0; sd [q] := v]: the store names NO register
+    operand at all — its address and data are constants — and there is no
+    register dataflow into it, yet the load is in its dependency set, because
+    the value the load produced became the hart's TRANSLATION CONTEXT and the
+    store's address goes through it.  ([csrw satp,a0] emits the register
+    write [LRegW wsatp [DReg 10]] — the decoder's [ORalu SATP [a0]] arm.) *)
+Example row_deps_satp_chain :
+  row_deps [ (LInstr, None);
+             (WeakPromise.LLoad false false 0 [(0%nat, bv_0 8)] [], Some 0%nat);
+             (LRegW 10%nat [DLdRes], None);
+             (LInstr, None);
+             (LRegW wsatp [DReg 10%nat], None);
+             (LInstr, None);
+             (WeakPromise.LStore false 8 [bv_0 8] [] [], Some 1%nat) ]
+  = [(0%nat, 1%nat)].
+Proof. vm_compute. reflexivity. Qed.
+
+(** THE TWIN WITHOUT THE [csrw] — the same row with the [satp] write dropped
+    has NO edge.  That absence is precisely the hole §4e names: nothing else
+    in the emission connects the load to the store. *)
+Example row_deps_satp_chain_before :
+  row_deps [ (LInstr, None);
+             (WeakPromise.LLoad false false 0 [(0%nat, bv_0 8)] [], Some 0%nat);
+             (LRegW 10%nat [DLdRes], None);
+             (LInstr, None);
+             (LInstr, None);
+             (WeakPromise.LStore false 8 [bv_0 8] [] [], Some 1%nat) ]
+  = [].
+Proof. vm_compute. reflexivity. Qed.
+
+(** [csrr rd,satp] TRANSFERS the translation context's provenance back into a
+    GPR — and a LATER [csrw satp] OVERWRITES it, so the satp arm never makes
+    a stale claim.  Here [a4] keeps load 0 (the context [csrr] read), the
+    context itself has moved on to load 1, and the store at position 2
+    inherits BOTH: (0,2) through its address register, (1,2) through the
+    current [satp]. *)
+Example row_deps_satp_read :
+  row_deps [ (LInstr, None);
+             (WeakPromise.LLoad false false 0 [(0%nat, bv_0 8)] [], Some 0%nat);
+             (LRegW 10%nat [DLdRes], None);
+             (LInstr, None);
+             (LRegW wsatp [DReg 10%nat], None);
+             (LInstr, None);
+             (LRegW 14%nat [DReg wsatp], None);
+             (LInstr, None);
+             (WeakPromise.LLoad false false 8 [(1%nat, bv_0 8)] [], Some 1%nat);
+             (LRegW 11%nat [DLdRes], None);
+             (LInstr, None);
+             (LRegW wsatp [DReg 11%nat], None);
+             (LInstr, None);
+             (WeakPromise.LStore false 16 [bv_0 8] [DReg 14%nat] [], Some 2%nat) ]
+  = [(0%nat, 2%nat); (1%nat, 2%nat)].
 Proof. vm_compute. reflexivity. Qed.
 
 (** The empty row is emittable. *)

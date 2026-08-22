@@ -59,6 +59,40 @@
       REGISTER is the only place D-8 leaves open.  It is what makes a
       two-deep pointer chase ([ld r1,[x]; ld r2,[r1]; sd r2,[q]]) put the
       FIRST load in the store's dependency set.
+
+    (DEC-5 / THE SATP-PROVENANCE EDGE, 2026-08-22; route-b design §4e)
+      D-4 SAYS SYSTEM INSTRUCTIONS HAVE NO ROLE — AND [satp] IS THE ONE
+      EXCEPTION.  Every memory access of a hart is translated through the
+      page table [satp] names, so a value that reaches [satp] reaches the
+      ADDRESS of every later access; RVWMO has no syntactic dependency for
+      that (a CSR is not an integer register), but the privileged spec's
+      [sfence.vma] discipline is exactly what makes hardware order a store
+      after the load that produced its [satp] value.  Without an edge for it
+      a witness value could flow [ld -> csrw satp -> sfence.vma -> st] into
+      the store's TRANSLATION with nothing in the declared model to stop the
+      store being gmo-early — which real hardware cannot do.
+
+      So the [satp] CSR forms get a role, and only they: [satp] is modelled
+      as the PSEUDO-REGISTER [SATP] (= [32], one past [x31] — [wreg] is
+      [nat] and [w_regv]/[ds_prov] are [gmap]s with a default, so a number
+      outside [0..31] costs nothing anywhere and no bound is tripped).
+        [csrrw  SATP, rs1] ([csrw satp,rs1])  ~>  [ORalu SATP [rs1]]
+        [csrrs/csrrc rd, satp, x0] ([csrr])   ~>  [ORalu rd [SATP]]
+        [csrrs/csrrc SATP, rs1]               ~>  [ORalu SATP [rs1; SATP]]
+        [csrrwi SATP, uimm]                   ~>  [ORalu SATP []]
+      i.e. every form that WRITES [satp] rewrites its provenance (so a later
+      write UNLINKS the earlier one — no stale claim), and the pure-read
+      form transfers it into [rd].  EVERY OTHER CSR AND EVERY OTHER SYSTEM
+      INSTRUCTION STAYS AT [ORnone]: D-4 is untouched for them.
+
+      The consumer is [WeakRvwmoConf.dedges], which adds [dprov s SATP] to
+      every store's/RMW's dependency sources.  Polarity: this ADDS edges
+      (STRONGER — removes behaviors), justified by the [sfence.vma]
+      discipline above rather than by RVWMO ppo, and recorded as such.
+
+      xv6's image contains exactly two forms — [csrw satp,rs1]
+      (0x18079073 / 0x18031073 / 0x18051073, in [kvminithart] and
+      [trampoline.S]) and [csrr rd,satp] (0x18002773, in [kernelvec]).
  *)
 From Stdlib.ssr Require Import ssreflect.
 From stdpp Require Import gmap finite list.
@@ -113,6 +147,19 @@ Definition dsrc_of_num (n : rnum) : list dsrc :=
 
 Definition dsrcs_of_nums (l : list rnum) : list dsrc :=
   mjoin (dsrc_of_num <$> l).
+
+(** THE [satp] PSEUDO-REGISTER (DEC-5).  [32] is one past [x31]; [wreg] is
+    [nat] and every consumer of it ([WeakMem.w_regv], [WeakRvwmoConf.ds_prov])
+    is a [gmap] read through a default, so the number is simply a fresh key —
+    there is no 32-entry structure anywhere to overflow. *)
+Definition SATP : rnum := 32.
+Definition wsatp : wreg := 32%nat.
+
+Lemma wreg_of_num_satp : wreg_of_num SATP = Some wsatp.
+Proof. reflexivity. Qed.
+
+Lemma dsrc_of_num_satp : dsrc_of_num SATP = [DReg wsatp].
+Proof. reflexivity. Qed.
 
 (* ====================================================================== *)
 (** ** 3. The four projections the language uses
@@ -200,6 +247,40 @@ Definition deps_rd (r : op_roles) : option (wreg * list dsrc) :=
 (* ====================================================================== *)
 (** ** 4. The decoder *)
 
+(** *** 4a0. THE ONE SYSTEM FORM THAT HAS A ROLE: the [satp] CSR (DEC-5).
+
+    [funct3] (bits [14:12]) selects the Zicsr form: [001] csrrw, [010] csrrs,
+    [011] csrrc, [101] csrrwi, [110] csrrsi, [111] csrrci; [000] is
+    [ecall]/[ebreak]/[sret]/[wfi]/[sfence.vma], which are not CSR accesses at
+    all.  A [csrrs]/[csrrc] with a ZERO source field performs NO write (that
+    is [csrr]); with a nonzero one it writes [satp] from the old [satp] and
+    the source.  The immediate forms take their operand from the [rs1] FIELD,
+    so they have no register source.
+
+    A [csrrw rd, satp, rs1] with [rd <> x0] writes BOTH [satp] and [rd]; the
+    role vocabulary has one destination, and [satp] is the one that carries
+    the ordering claim, so [rd]'s provenance is left alone.  That is the same
+    (pre-existing, D-4) under-modelling every unrecognised destination-writing
+    instruction already gets, and xv6's image has no such form. *)
+Definition csr_satp : Z := 0x180.
+
+Definition deps_of_csr_satp (w : mword 32) : op_roles :=
+  let rd  := ibits w 11 7 in
+  let rs1 := ibits w 19 15 in
+  match ibits w 14 12 with
+  | 1 => ORalu SATP [rs1]                    (* csrrw  — xv6's [csrw satp,rs1] *)
+  | 5 => ORalu SATP []                       (* csrrwi — an immediate, no source *)
+  | 2 | 3 =>                                 (* csrrs / csrrc                   *)
+      if bool_decide (rs1 = 0)
+      then ORalu rd [SATP]                   (*   [csrr rd,satp] — a pure read  *)
+      else ORalu SATP [rs1; SATP]            (*   a read-modify-write of satp   *)
+  | 6 | 7 =>                                 (* csrrsi / csrrci                 *)
+      if bool_decide (rs1 = 0)
+      then ORalu rd [SATP]
+      else ORalu SATP [SATP]
+  | _ => ORnone                              (* funct3 = 000/100: not Zicsr     *)
+  end.
+
 (** *** 4a. The base (32-bit) formats. *)
 Definition deps_of_base (w : mword 32) : op_roles :=
   let rd  := ibits w 11 7 in
@@ -221,7 +302,11 @@ Definition deps_of_base (w : mword 32) : op_roles :=
       if bool_decide (ibits w 31 27 = 2)
       then ORload rd rs1                     (*   lr.w / lr.d             *)
       else ORamo rd rs1 rs2                  (*   sc.*, amo*.*            *)
-  | _ => ORnone       (* MISC-MEM (fence), SYSTEM (Zicsr, D-4), F/D, ...  *)
+  | 115 =>                                   (* SYSTEM                    *)
+      (* D-4 holds for EVERY CSR but [satp] — see DEC-5. *)
+      if bool_decide (ibits w 31 20 = csr_satp)
+      then deps_of_csr_satp w else ORnone
+  | _ => ORnone       (* MISC-MEM (fence), F/D, anything unrecognised     *)
   end.
 
 (** *** 4b. The C extension.
@@ -432,6 +517,52 @@ Proof. vm_compute. reflexivity. Qed.
 
 (* csrr a5,sstatus = csrrs a5,sstatus,x0 = 0x100027f3 : no role (D-4) *)
 Example deps_csrr : deps_of_bits (dbits 0x100027f3) = ORnone.
+Proof. vm_compute. reflexivity. Qed.
+
+(* --- DEC-5: THE [satp] FORMS, and only they ---------------------------- *)
+
+(* [csrw satp,a5] = csrrw x0,satp,a5 = 0x18079073 — [kvminithart]'s write,
+   and [trampoline.S]'s.  The destination is the PSEUDO-REGISTER [SATP]. *)
+Example deps_csrw_satp_a5 : deps_of_bits (dbits 0x18079073) = ORalu SATP [15].
+Proof. vm_compute. reflexivity. Qed.
+Example deps_csrw_satp_a5_rd :
+  deps_rd (deps_of_bits (dbits 0x18079073)) = Some (wsatp, [DReg 15%nat]).
+Proof. vm_compute. reflexivity. Qed.
+
+(* [csrw satp,t1] = 0x18031073 and [csrw satp,a0] = 0x18051073 — the other
+   two sites in the image (trampoline). *)
+Example deps_csrw_satp_t1_rd :
+  deps_rd (deps_of_bits (dbits 0x18031073)) = Some (wsatp, [DReg 6%nat]).
+Proof. vm_compute. reflexivity. Qed.
+Example deps_csrw_satp_a0_rd :
+  deps_rd (deps_of_bits (dbits 0x18051073)) = Some (wsatp, [DReg 10%nat]).
+Proof. vm_compute. reflexivity. Qed.
+
+(* [csrr a4,satp] = csrrs a4,satp,x0 = 0x18002773 — the image's read site;
+   it TRANSFERS the translation context's provenance into [a4]. *)
+Example deps_csrr_satp : deps_of_bits (dbits 0x18002773) = ORalu 14 [SATP].
+Proof. vm_compute. reflexivity. Qed.
+Example deps_csrr_satp_rd :
+  deps_rd (deps_of_bits (dbits 0x18002773)) = Some (14%nat, [DReg wsatp]).
+Proof. vm_compute. reflexivity. Qed.
+
+(* A satp form carries NO memory operands — it is an [ORalu]. *)
+Example deps_csrw_satp_asrc : deps_asrc (deps_of_bits (dbits 0x18079073)) = [].
+Proof. vm_compute. reflexivity. Qed.
+Example deps_csrw_satp_vsrc : deps_vsrc (deps_of_bits (dbits 0x18079073)) = [].
+Proof. vm_compute. reflexivity. Qed.
+Example deps_csrw_satp_ctrl : deps_ctrl (deps_of_bits (dbits 0x18079073)) = [].
+Proof. vm_compute. reflexivity. Qed.
+
+(* D-4 IS UNTOUCHED FOR EVERY OTHER CSR: [csrw sstatus,a5] = 0x10079073. *)
+Example deps_csrw_sstatus : deps_of_bits (dbits 0x10079073) = ORnone.
+Proof. vm_compute. reflexivity. Qed.
+
+(* ... and for the non-Zicsr SYSTEM forms: [sfence.vma] = 0x12000073 (whose
+   [31:20] field is 0x120, not a CSR number at all) and [ecall] = 0x73. *)
+Example deps_sfence_vma : deps_of_bits (dbits 0x12000073) = ORnone.
+Proof. vm_compute. reflexivity. Qed.
+Example deps_ecall : deps_of_bits (dbits 0x00000073) = ORnone.
 Proof. vm_compute. reflexivity. Qed.
 
 (* amoswap.w.aq a5,a4,(a3) = 0x0ce6a7af : rd = x15, rs1 = x13, rs2 = x14 *)

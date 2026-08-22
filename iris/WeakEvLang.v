@@ -271,12 +271,23 @@ Definition ereg_gpr_num (r : register) : option wreg :=
   | _ => None
   end.
 
+(** ... AND THE ONE NON-GPR DESTINATION THE DEPENDENCY TRACK KNOWS: [satp],
+    as [WeakDeps]' pseudo-register [wsatp] (DEC-5 / route-b §4e).  A hart's
+    translation context is not an RVWMO register, but the privileged spec's
+    [sfence.vma] discipline orders a memory access after the load that
+    produced its [satp] value, and that is the edge [WeakRvwmoConf.dedges]
+    draws.  Nothing else changes: only the decoder's [satp] forms name
+    [wsatp] as their destination, so this arm fires ONLY at those, and every
+    other CSR write is still [ERWnone] (D-4). *)
+Definition ereg_num (r : register) : option wreg :=
+  if register_beq r (R_bitvector_64 satp) then Some wsatp else ereg_gpr_num r.
+
 Definition erw_of (role : op_roles) (r : register) : erw_kind :=
   if register_beq r (R_bitvector_64 nextPC) then ERWctrl (deps_ctrl role)
   else
     match deps_rd role with
     | Some (rd, srcs) =>
-        match ereg_gpr_num r with
+        match ereg_num r with
         | Some n => if decide (n = rd) then ERWreg rd srcs else ERWnone
         | None => ERWnone
         end
@@ -368,6 +379,36 @@ Proof. vm_compute. reflexivity. Qed.
 (* a CSR write is silent, whatever the instruction (deviation D-4) *)
 Example erw_of_csr :
   erw_of (deps_of_bits (dbits 0x0007a783)) (R_bitvector_64 mstatus) = ERWnone.
+Proof. vm_compute. reflexivity. Qed.
+
+(* DEC-5 — THE SATP-PROVENANCE EDGE's emission half.  [csrw satp,a5]
+   = 0x18079073: the model's [RegWrite satp] node IS the destination, and it
+   inherits [a5]'s provenance. *)
+Example erw_of_csrw_satp :
+  erw_of (deps_of_bits (dbits 0x18079073)) (R_bitvector_64 satp)
+  = ERWreg wsatp [DReg 15%nat].
+Proof. vm_compute. reflexivity. Qed.
+
+(* [csrr a4,satp] = 0x18002773: the transfer back out, into [a4]. *)
+Example erw_of_csrr_satp :
+  erw_of (deps_of_bits (dbits 0x18002773)) (R_bitvector_64 x14)
+  = ERWreg 14 [DReg wsatp].
+Proof. vm_compute. reflexivity. Qed.
+
+(* ... and the [satp] node of an instruction that is NOT a satp write stays
+   silent, as does a satp write's own GPR node. *)
+Example erw_of_satp_other_instr :
+  erw_of (deps_of_bits (dbits 0x0007a783)) (R_bitvector_64 satp) = ERWnone.
+Proof. vm_compute. reflexivity. Qed.
+Example erw_of_csrw_satp_gpr :
+  erw_of (deps_of_bits (dbits 0x18079073)) (R_bitvector_64 x15) = ERWnone.
+Proof. vm_compute. reflexivity. Qed.
+
+(* D-4 for every other CSR: [csrw sstatus,a5] = 0x10079073 has no role at
+   all, so the node it writes ([sstatus] is a view of [mstatus] in the
+   model) is silent too. *)
+Example erw_of_csrw_sstatus :
+  erw_of (deps_of_bits (dbits 0x10079073)) (R_bitvector_64 mstatus) = ERWnone.
 Proof. vm_compute. reflexivity. Qed.
 
 (* [beq a5,zero,.] = 0x00078063: [nextPC] carries the CONTROL view — PARM's

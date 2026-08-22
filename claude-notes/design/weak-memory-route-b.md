@@ -1063,6 +1063,35 @@ tracked.  xv6 writes `satp` at exactly two sites (`kvminithart`,
 `usertrapret`/`trampoline`), from `kernel_pagetable` (static) and
 `p->pagetable`.
 
+REFINEMENTS (same day, while the satp slice was being built):
+- `satp` is one of several.  `sepc`/`mepc` decide the `sret`/`mret`
+  TARGET (a control dependency the decoder drops with SYSTEM, so a
+  witness value could choose the user program's resumption PC);
+  `sscratch` carries the trapframe pointer through `csrrw`;
+  `stvec`/`mtvec` the trap entry.  The honest, uniform rule: EVERY CSR
+  that xv6 writes from a GPR gets a pseudo-register with provenance
+  (`csrw/csrrw/csrrs/csrrc` = an ALU role writing it from `rs1`,
+  `csrr` = an ALU role reading it), `sret`/`mret` = a `jalr`-like role
+  on `sepc`/`mepc` (so their sources join `ds_ctl`), and `satp`'s
+  provenance joins every store's sources (the translation context).
+  Then the soundness lemma's "non-memory state" is exactly GPRs + the
+  named CSRs, all provenance-tracked, and no per-site "this CSR is
+  written from constants" side argument is needed.
+- STATE THE SOUNDNESS LEMMA PER INSTRUCTION, not per row position: two
+  emissions that agree on the named sources of instruction `n` (GPRs/
+  CSRs it reads, and the VALUES of its own memory reads — the walker's
+  PTE reads included, which is why W-TV's `ds_ld` is in the provenance)
+  emit the same memory-event sequence for instruction `n`.  Event
+  positions need not align across emissions (a walk's A/D exclusive
+  pair appears or not depending on PTE contents), so the certified
+  write is identified by INSTRUCTION index, and the kill reads its
+  message, never its row position.
+- A solo run is a genuine pf run of the verified program (the other
+  harts idle), so it cannot fault where the verified kernel cannot:
+  "the substituted value does not derail the run before `z`" is the
+  EWPs' content, not a new obligation — PROVIDED the control path to
+  `z` agrees, which is the ctrl-provenance clause (branches, `jalr`,
+  and now `sret`/`mret`).
 Order of work for B2e-3b, revised: (1) the satp-provenance edge in the
 emission (`dstep` + the instance's CSR write annotation); (2) the
 soundness lemma, stated once over `pstep_ev` ("agreement on named
@@ -1070,6 +1099,20 @@ sources ⇒ agreement on the emitted label and on the named
 destinations"), proved by the instruction inventory; (3) only then the
 solo-run certification of §4d.2(2).  Do (1) and (2) as their own
 slices; each is delegate-sized once the statement is fixed.
+
+**LANDED (1), 2026-08-22:** `satp` is the pseudo-register `SATP = 32`
+(`WeakDeps.SATP`/`wsatp`; `wreg` is `nat` and every consumer is a
+`gmap` with a default, so no bound is tripped) — decoder DEC-5 gives
+`csrrw/csrrs/csrrc(+i)` on csr `0x180` a role (`csrw satp,rs1`
+↦ `ORalu SATP [rs1]`, `csrr rd,satp` ↦ `ORalu rd [SATP]`; every other
+CSR and SYSTEM form stays `ORnone`, D-4 intact), `WeakEvLang.ereg_num`
+routes the model's `RegWrite satp` node to it, and
+`WeakRvwmoConf.dedges` adds `dprov s wsatp` to every store's/RMW's
+sources (scope note S-a''; `dstep_within` took one extra `elem_of_app`
+case, nothing else moved).  Witnesses: `row_deps_satp_chain` +
+`_before` twin + `row_deps_satp_read` (transfer AND the overwrite that
+unlinks a stale context).  Tree green; both capstones at the five
+rv64d axioms.
 
 ## 5. Honest residual risks — OPEN
 
