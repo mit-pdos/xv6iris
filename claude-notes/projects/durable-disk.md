@@ -254,10 +254,21 @@ permits at its granularity; neither design changes shape.
 and iris-free:
 
 - [ ] **F1.** Define `fs_durable_wf` over a block view: the general
-      content sweeps (W9 stated against `fs_all_tickets` for arbitrary
-      directory trees, no `z = ROOTINO`; no log-cleanliness conjunct),
-      closed under the five write shapes. Prove
-      `fsimg_wf -> fs_durable_wf` (the image discharge for E4).
+      content sweeps, no log-cleanliness conjunct, closed under the
+      five write shapes. Prove `fsimg_wf -> fs_durable_wf` (the image
+      discharge for E4). The W9 general form (validated against the
+      ledger 2026-08-22): FILE `nlink = tick_count` (a committed orphan
+      has both 0, so no extra arm); DIR `nlink = tick_count + 1` at
+      the root, `= tick_count` elsewhere (self-tickets excluded, as
+      `fs_rec_ticket` already does) — and the ticket supply must be
+      counted over REACHABLE directories only (`tree_of_disk` from
+      root): a committed unlinked-but-unfreed dir still carries a ".."
+      record naming its parent whose `nlink` the unlink already
+      decremented, so an all-live-dirs count breaks at the parent.
+      xv6's own boot orphan sweep (`ireclaim`, fs.c:412) exists because
+      such orphans persist across a crash. NOTE the ghost ledger keeps
+      only `w <= nlink` (L1) — the EQUALITY is a new pure invariant,
+      maintained by G1's abstract view, not read off the ledger.
 - [ ] **F2.** The five update lemmas, one per written-block kind:
       bitmap set/clear (`bitmap_bytes`), dinode-at-slot
       (`diblk_bytes` insert, alloc/update/free arms), dirent
@@ -274,14 +285,26 @@ ialloc, iupdate, iput-free, writei ×2, bmap-indirect), 12 spans / 26
 `end_op` exit arms (sys_link, sys_unlink, sys_open, sys_mkdir,
 sys_mknod, sys_chdir, filewrite, fileclose, kexec ×2, kexit, ireclaim).
 
-- [ ] **G1.** The vehicle (ruling 2.5): a wf row on `log_res`
-      conditioned on the ledger being empty (`out = 0` — mid-batch
-      views are deliberately inconsistent), re-established by each op
-      at its `log_end_step`; plus the bookkeeping row `⌜install of the
-      batch over D = L⌝` (dirty set = batch set; clean blocks logged =
-      committed) from which `ProofEndOp` assembles the commit fupd
-      generically. Design the two rows' exact statements before
-      building; a wrong vehicle here costs the whole sweep.
+- [ ] **G1.** The vehicle (sketched 2026-08-22; VALIDATE before
+      building — a wrong vehicle costs the whole sweep). Two facts rule
+      out simpler shapes: the ghost ledger keeps only INEQUALITIES
+      (`ireg_link_ok` L1 is `w <= nlink`), and a checked-out inode's
+      content is in no invariant — so `wf(L)` is NOT derivable from the
+      resource layer at the commit instant; and the last-to-end op of a
+      group cannot know the other ops' deltas — so a bare
+      `out = 0 -> wf(L)` row is not re-establishable locally. The shape
+      that is local: an ABSTRACT-VIEW row on `log_res`,
+      `∃ A, ⌜wf(A)⌝ ∗ ⌜∀ b ∉ pending(om), L b = A b⌝`, where each op
+      updates `A` in SEMANTIC CHUNKS (e.g. "allocate block b to inode
+      i" is ONE `A`-update, fired at a `log_write` AU under the
+      object's lock, where the preconditions are in hand), `wf(A)`
+      preserved per chunk, and each op's pending blocks are finalized
+      (`L = A` there) by its `log_end_step`, tied to its op token. At
+      `out = 0` the pending set is empty, so `L = A` and `wf(L)` falls
+      out; mid-op inconsistency lives only in the residue, never in
+      `A`. Plus the bookkeeping row `⌜install of the batch over D = L⌝`
+      (dirty set = batch set; clean blocks logged = committed) from
+      which `ProofEndOp` assembles the commit fupd generically.
 - [ ] **G2.** Thread the F2 side conditions from the 9 write sites
       (their AU suppliers already carry the abstract content) to the
       per-op obligation; discharge at the 26 arms.
@@ -320,7 +343,7 @@ sys_mknod, sys_chdir, filewrite, fileclose, kexec ×2, kexit, ireclaim).
 
 ## 9. Gates and rules
 
-- Build on the VM (`QUIET=1 ./gcp-rocq/run-on-gcp make -k -j 36`), rebase
+- Build on the VM (`QUIET=1 ./gcp-rocq/run-on-gcp make -k -j 192`), rebase
   before whole-tree builds, `make audit-only` after A, C and D.
 - No contract widening that a single-file check cannot see: stage A changes
   `wp_disk_step`'s and the permits' SHAPE, so expect every virtio proof
