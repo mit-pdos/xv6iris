@@ -2258,6 +2258,22 @@ corollaries live in `FsAdequacyImg.v` and are NOT the audit target — see
 7. `ResvAxioms.load_reservation_term`     (the LR/SC hook, at the term level — `iris/ResvAxioms.v`, 2026-08-18)
 8. `ResvAxioms.cancel_reservation_term`   (same)
 
+**THE BASELINE IS NOT THE WHOLE STORY (found 2026-08-22): `xv6_power_adequacy`
+is VACUOUS as stated.** Its premise `Himg : fs_boot_image_eras sb nib cov`
+is `∀ g', boot_facts g' → fs_boot_image_wf (v_disk g') …`, and
+`boot_facts` (`RiscvLang.v:1087`) leaves the disk bytes free (`∃ v0,
+dvirtio = virtio_reset v0`). `boot_facts` is satisfiable
+(`PowerBoot.boot_shape_boot_gstate`), so a `g'` with a zeroed disk
+satisfies it and fails conjunct (10) of `fs_boot_image_wf`
+(`fs_parse_sb` gives magic 0) — the premise is FALSE for every `sb nib
+cov`, and so is `FsAdequacyImg.fsimg_at_every_era`. `Print Assumptions`
+cannot see this; it is the §"GAP PREMISE" trap above, at the top-level
+theorem, since stage (d2b) (2026-08-20) replaced the era-0 equation with
+the ∀. The fix is in `projects/fs-log.md`'s banner: a client pure hook on
+`riscv_power_adequacy` discharged from the crash invariant at each PowerOn,
+then `P_fs ⊢ image-shaped-modulo-log` — which needs initlog's real
+recovery.
+
 **There is no assumed Link any more.** The last one,
 `LinkForkretPark.ForkretPark.forkret_park` (the runnable park — "where does a
 new process's half of the kernel environment come from", kfork's and

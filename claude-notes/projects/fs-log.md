@@ -32,6 +32,22 @@
 > it into a theorem: real recovery in `initlog`/`install_trans`, then
 > discharge `fs_log_clean` from the previous era's `P_fs` instead of
 > assuming it.
+>
+> **AND THE CURRENT HYPOTHESIS IS REFUTABLE, NOT MERELY UNPROVED** (found
+> 2026-08-22, the user's question). `Himg` is quantified over ALL `g'` with
+> `boot_facts g'`, and `boot_facts` leaves the disk free; a zero-disk `g'`
+> satisfies it and fails `fs_parse_sb … = Some sb` (magic 0), so
+> `fs_boot_image_eras` is False and `xv6_power_adequacy` (and both
+> `FsAdequacyImg` corollaries) prove their conclusion from False. The honest
+> shape: (i) `riscv_power_adequacy` takes a client pure predicate `Pure` with
+> `Pc dk ⊢ ⌜Pure dk⌝` and lets `Hboot` assume `Pure (v_disk g')` — the
+> generic proof has the crash invariant's body at `dk` and `state_interp`'s
+> `disk_tie` half at the real disk at every PowerOn (era 0 from `HPc`);
+> (ii) `P_fs ⊢ ⌜image-shaped modulo a pending log⌝`, which is NOT
+> `fs_boot_image_wf` (it allows `n > 0`) — so (ii) is blocked on items (1)
+> and (3) above; (iii) until then, the only non-vacuous statement is a
+> premise over the REACHABLE boot states ("every crash in the trace has a
+> clean log"), restrictive but satisfiable. Owner's call which to do first.
 
 Design: [`../design/fs-log.md`](../design/fs-log.md) — read its "stage-4
 architecture" section first; every durable finding of this effort has been
