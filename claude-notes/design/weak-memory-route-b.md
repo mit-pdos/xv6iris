@@ -1,4 +1,4 @@
-# Route B — the exchange-normalization plan of record (IN PROGRESS)
+# Route B — the plan of record (THE CAPSTONE MODULO L2′ IS LANDED, 2026-08-23: `WeakRvwmoCapstone.xv6_rvwmo_safe_modulo`; see the certification worklist's eighth-pass checkpoint)
 
 Status: ADOPTED by the user 2026-08-21 (over route A, on the D-iii probe
 evidence — see the certification worklist's D-iii entry for the probe

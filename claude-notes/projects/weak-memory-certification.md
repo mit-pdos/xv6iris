@@ -1,5 +1,46 @@
 # The tier-2 containment worklist (was: the certification route)
 
+## CHECKPOINT (2026-08-23, EIGHTH PASS — THE MILESTONE) — READ THIS FIRST
+
+**`WeakRvwmoCapstone.xv6_rvwmo_safe_modulo` IS THE TIER-2 CAPSTONE MODULO
+TWO NAMED HYPOTHESES.**  For every RVWMO⁻(+deps)-consistent graph that
+is `gdexec_qconf`-conformant to the booted image (device-quiet scope):
+T2-LIN (`RacyD` acyclic), a realized cand with an `exec_prog_ok'`
+supply and its erased pf run (log identified), φ's
+`violation_hart`-freedom, and progress — `xv6_srvwmo_safe`'s
+conclusion verbatim — under (R-1) `l2_claim` (the per-site
+classification) and (R-2) `walk_supply` (the certification walk).
+`Print Assumptions` = exactly tier 1's five rv64d reservation axioms;
+the two residues are hypotheses, not axioms.  The full-bundle variant
+`xv6_rvwmo_safe_modulo_F` (moving fabric, via `fconf_trace_realize`)
+takes the revised dev-order acyclicity as a hypothesis; its glue
+mirror is enumerated (F-a/F-b).  Whole tree green.
+
+**Since the seventh pass:** Glue2 (`walk_supply` as the residue; the
+zero-cut finding) — `5cead230`; the two-hart emission witness
+(`WeakRvwmoConfWit2.v`) — `5ad2c28d`; the `esil → adm_run` bridge
+(`WeakRvwmoAdm.v`; fetches are row events) — `23c08c0e`; the capstone
+— this commit.
+
+**WHAT REMAINS — the project's content from here:**
+1. **R-2 `walk_supply`**: the certification walk around a cycle from the
+   realized hull (Cert4's `segs_run` + Glue2's `cpol_Hpres`, exits in
+   gmo order, ending with the whole graph's writes in the log), with
+   `wit_fence_ub` and progress inside.  Leaf-sized, now that multi-event
+   rows emit (`WeakRvwmoAdm`).  Build the `RacyD`-cycle witness (four
+   blocks, two per hart — mechanical now) FIRST so the walk is checked
+   non-vacuously.
+2. **R-1 `l2_claim` — L2′ proper**: per site class (aq / fenced /
+   branched / data-fed / CS-covered / bad / FETCH — §4f), from the
+   emission (`row_deps`, site records) and the certified configuration.
+   The kernel claim; the largest remaining item.
+3. The F-variant's glue mirror; **R6** (the deletion contract, the
+   `lb_rfoldfree → lb_ldepfree` items, `WeakCertify` archival,
+   `WeakAxiomatic.acq_po`'s narrowing); `wprot_store` width lift;
+   `WeakRvwmoLock`'s failed-swap arm.
+
+**Tree:** never `make proofs` from the root here (stale `xv6-riscv`).
+
 ## CHECKPOINT (2026-08-23, SEVENTH PASS — the session's closing state)
 ## READ THIS FIRST
 
