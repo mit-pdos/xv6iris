@@ -274,6 +274,8 @@ Section touch.
       (q : dfrac) :
     wlog_wf (wm_log σ) → acc_wf hf 4 →
     wQ_amo_aq tid hf lock_one σ σ' →
+    (* T2-0′ (F3′): the swap's author IS the resuming hart. *)
+    tid = Some (fin_to_nat B) →
     (∀ j : nat, (j < 4)%nat →
        wflat (wm_img σ) (wm_log σ) !! pa_add hf j = Some (nth_byte lock_zero j)) →
     (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
@@ -286,8 +288,8 @@ Section touch.
     ctx_own_at cur_ctx B (wm_ws σ') ∗
     (x ↦wpo vx) ∗ (z ↦wp{q} vz).
   Proof.
-    intros Hwf Hacc HQ Hzero. iIntros "Hi Hinv Hall Hx Hz".
-    iMod (wctx_resume_core cur_ctx γ hf B tid σ σ' Hwf Hacc HQ Hzero
+    intros Hwf Hacc HQ Htid Hzero. iIntros "Hi Hinv Hall Hx Hz".
+    iMod (wctx_resume_core cur_ctx γ hf B tid σ σ' Hwf Hacc HQ Htid Hzero
             with "Hi Hinv Hall") as "($ & $ & $ & $)".
     by iFrame "Hx Hz".
   Qed.
@@ -307,6 +309,7 @@ Section touch.
     ws_bounded (wm_ws σ) (length (wm_log σ)) →
     wlog_wf (wm_log σ2) → acc_wf hf 4 →
     wQ_amo_aq tid hf lock_one σ2 σ2' →
+    tid = Some (fin_to_nat B) →
     (∀ j : nat, (j < 4)%nat →
        wflat (wm_img σ2) (wm_log σ2) !! pa_add hf j
          = Some (nth_byte lock_zero j)) →
@@ -324,13 +327,13 @@ Section touch.
        wlock_inv γ hf (wctx_baton cur_ctx) ∗ locked γ B ∗
        ctx_own_at cur_ctx B (wm_ws σ2')).
   Proof.
-    intros HQ Hlog Hbnd Hwf Hacc HQa Hzero.
+    intros HQ Hlog Hbnd Hwf Hacc HQa Htid Hzero.
     iIntros "Hlog Hi Hinv Htok Hrun".
     iMod (wctx_park_core cur_ctx γ hf A σ σ' HQ Hlog Hbnd
             with "Hlog Hi Hinv Htok Hrun") as "($ & $ & $ & Hall)".
     iModIntro. iIntros "Hi2 Hinv2".
-    by iApply (wctx_resume_core cur_ctx γ hf B tid σ2 σ2' Hwf Hacc HQa Hzero
-                 with "Hi2 Hinv2 Hall").
+    by iApply (wctx_resume_core cur_ctx γ hf B tid σ2 σ2' Hwf Hacc HQa Htid
+                 Hzero with "Hi2 Hinv2 Hall").
   Qed.
 
 End touch.
@@ -393,6 +396,7 @@ Section legs.
       (v : bv 8) (c : CPU) (tid : option nat) (σ σ' : wmstate) :
     wlog_wf (wm_log σ) → acc_wf lk 4 →
     wQ_amo_aq tid lk lock_one σ σ' →
+    tid = Some (fin_to_nat c) →
     (∀ j : nat, (j < 4)%nat →
        wflat (wm_img σ) (wm_log σ) !! pa_add lk j = Some (nth_byte lock_zero j)) →
     (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
@@ -403,9 +407,10 @@ Section legs.
     wctx_held γ ξL cur_ctx c ∗ ctx_own_at cur_ctx c (wm_ws σ') ∗
     (x ↦wpo v).
   Proof.
-    intros Hwf Hacc HQ Hzero. iIntros "Hi Hinv Hrun".
+    intros Hwf Hacc HQ Htid Hzero. iIntros "Hi Hinv Hrun".
     iMod (wctx_acquire_core γ ξL cur_ctx lk <{ x ↦wp v }> c tid σ σ'
-            Hwf Hacc HQ Hzero with "Hi Hinv Hrun") as "($ & $ & $ & $ & HR)".
+            Hwf Hacc HQ Htid Hzero with "Hi Hinv Hrun")
+      as "($ & $ & $ & $ & HR)".
     iModIntro. by iApply wptsto_of_cl.
   Qed.
 
@@ -419,6 +424,7 @@ Section legs.
       (ak : akinfo) (t' : nat) (b : bv 8) :
     wlog_wf (wm_log σ) → acc_wf lk 4 →
     wQ_amo_aq tid lk lock_one σ σ' →
+    tid = Some (fin_to_nat c) →
     (∀ j : nat, (j < 4)%nat →
        wflat (wm_img σ) (wm_log σ) !! pa_add lk j = Some (nth_byte lock_zero j)) →
     ak_coh ak = false →
@@ -433,9 +439,9 @@ Section legs.
     wctx_held γ ξL cur_ctx c ∗ ctx_own_at cur_ctx c (wm_ws σn) ∗
     ⌜b = v⌝ ∗ (x ↦wpo v).
   Proof.
-    intros Hwf Hacc HQ Hzero Hcoh Himg Hlog Hle Hok.
+    intros Hwf Hacc HQ Htid Hzero Hcoh Himg Hlog Hle Hok.
     iIntros "Hi Hinv Hrun".
-    iMod (wcs_acquire_leg γ ξL lk x v c tid σ σ' Hwf Hacc HQ Hzero
+    iMod (wcs_acquire_leg γ ξL lk x v c tid σ σ' Hwf Hacc HQ Htid Hzero
             with "Hi Hinv Hrun") as "(Hi & $ & $ & Hrun & Hx)".
     iDestruct (ctx_own_at_mono cur_ctx c _ _ Hle with "Hrun") as "Hrun".
     rewrite -Himg -Hlog.
@@ -587,7 +593,8 @@ Section wp_park.
     iSpecialize ("Hk2" with "Hall").
     (* the release itself, and the φ payment — [wwp_release_store]'s verbatim *)
     iMod (wrelease_core γ hf (wctx_baton ξ) cpu_id (Some (fin_to_nat cpu_id))
-            σ σ' HQ Hrelp Hbnd with "Hlat Hbody Htok [Hau]") as "[Hlat Hbody]".
+            σ σ' HQ eq_refl Hrelp Hbnd with "Hlat Hbody Htok [Hau]")
+      as "[Hlat Hbody]".
     { rewrite /wctx_baton wledger_pay_at. iExists V. by iFrame "Hau". }
     iAssert (⌜nv_hart (wm_log σ') cpu_id (wm_ws σ')⌝)%I as %Hnv'.
     { iDestruct "Hbody" as (st' t' v'') "[Hw' Hlk']".

@@ -288,7 +288,9 @@ Section pingpong.
     (* the lock word's own bundle moves to the fresh top — it stays CLEAN,
        because a [WCrel] message is not an owned store *)
     iMod (wlat4L_store_gen (Some (fin_to_nat i)) WCrel σ σ' lk t w lock_zero
-            (wlock_shaped_rel _ WCrel _ ltac:(discriminate)) Himg Hlog
+            (Some (fin_to_nat i)) None
+            (wlock_shaped_rel _ WCrel _ ltac:(discriminate))
+            (alt_step_rel_msg i WCrel lk) Himg Hlog
             with "Hi Hw") as "[Hi Hw]".
     (* THE FLIP.  The authority is now at the POST-log, whose last message is
        this hart's release — which is [wlat_flip]'s entire premise. *)
@@ -479,6 +481,9 @@ Section receive.
       (c : CPU) (tid : option nat) (σ σ' : wmstate) :
     wlog_wf (wm_log σ) -> acc_wf lk 4 ->
     wQ_amo_aq tid lk lock_one σ σ' ->
+    (* T2-0′ (F3′): the swap's author IS the acquiring hart — what
+       [WeakLock.wacquire_core]'s alternation step needs. *)
+    tid = Some (fin_to_nat c) ->
     (∀ j : nat, (j < 4)%nat ->
        wflat (wm_img σ) (wm_log σ) !! pa_add lk j = Some (nth_byte lock_zero j)) ->
     (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
@@ -486,9 +491,9 @@ Section receive.
     wlat_interp (wm_img σ') (wm_log σ') ∗ wlock_inv γ lk (x ↦w v) ∗
     locked γ c ∗ vwp_hold (x ↦w v) (wm_ws σ').
   Proof.
-    intros Hwf Hacc HQ Hzero. iIntros "Hi Hinv".
-    iDestruct (wacquire_core γ lk (x ↦w v) c tid σ σ' Hwf Hacc HQ with "Hi Hinv")
-      as (v0) "[%Hflat Hupd]".
+    intros Hwf Hacc HQ Htid Hzero. iIntros "Hi Hinv".
+    iDestruct (wacquire_core γ lk (x ↦w v) c tid σ σ' Hwf Hacc HQ Htid
+                 with "Hi Hinv") as (v0) "[%Hflat Hupd]".
     assert (Hv : lock_zero = v0)
       by exact (wflat_word_agree σ lk lock_zero v0 Hzero Hflat).
     iMod "Hupd" as "(Hi & Hbody & Harm)".
@@ -500,6 +505,7 @@ Section receive.
       (v : bv 8) (c : CPU) (tid : option nat) (σ σ' : wmstate) :
     wlog_wf (wm_log σ) -> acc_wf lk 4 ->
     wQ_amo_aq tid lk lock_one σ σ' ->
+    tid = Some (fin_to_nat c) ->
     (∀ j : nat, (j < 4)%nat ->
        wflat (wm_img σ) (wm_log σ) !! pa_add lk j = Some (nth_byte lock_zero j)) ->
     (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
@@ -507,8 +513,8 @@ Section receive.
     wlat_interp (wm_img σ') (wm_log σ') ∗ wlock_inv γ lk (x ↦w v) ∗
     locked γ c ∗ vwp_hold (x ↦wo v) (wm_ws σ').
   Proof.
-    intros Hwf Hacc HQ Hzero. iIntros "Hi Hinv".
-    iMod (pp_acquire_payload γ lk x v c tid σ σ' Hwf Hacc HQ Hzero
+    intros Hwf Hacc HQ Htid Hzero. iIntros "Hi Hinv".
+    iMod (pp_acquire_payload γ lk x v c tid σ σ' Hwf Hacc HQ Htid Hzero
             with "Hi Hinv") as "($ & $ & $ & HR)".
     iModIntro. by iApply (pp_receive x v (wm_ws σ')).
   Qed.
@@ -741,6 +747,7 @@ Section payoff.
     (* --- the acquire: the swap read 0, so the payload is thawed here --- *)
     wlog_wf (wm_log σ) -> acc_wf lk 4 ->
     wQ_amo_aq tid lk lock_one σ σ' ->
+    tid = Some (fin_to_nat c) ->
     (∀ j : nat, (j < 4)%nat ->
        wflat (wm_img σ) (wm_log σ) !! pa_add lk j = Some (nth_byte lock_zero j)) ->
     (* --- and then a PLAIN load of [x] at a state with the same memory --- *)
@@ -753,8 +760,8 @@ Section payoff.
     wlat_interp (wm_img σn) (wm_log σn) ∗ wlock_inv γ lk (x ↦w v) ∗
     locked γ c ∗ ⌜b = v⌝ ∗ vwp_hold (x ↦wo v) (wm_ws σn).
   Proof.
-    intros Hwf Hacc HQ Hzero Hcoh Himg Hlog Hle Hok. iIntros "Hi Hinv".
-    iMod (pp_acquire_payload γ lk x v c tid σ σ' Hwf Hacc HQ Hzero
+    intros Hwf Hacc HQ Htid Hzero Hcoh Himg Hlog Hle Hok. iIntros "Hi Hinv".
+    iMod (pp_acquire_payload γ lk x v c tid σ σ' Hwf Hacc HQ Htid Hzero
             with "Hi Hinv") as "(Hi & Hbody & Htok & HR)".
     (* carry the payload to the load's own state, then collapse the load *)
     iDestruct (vwp_hold_mono (x ↦w v) (wm_ws σ') (wm_ws σn) Hle with "HR")
@@ -780,6 +787,7 @@ Section payoff.
       (ak : akinfo) (t' : nat) (b : bv 8) :
     wlog_wf (wm_log σ) -> acc_wf lk 4 ->
     wQ_amo_aq tid lk lock_one σ σ' ->
+    tid = Some (fin_to_nat cA) ->
     (∀ j : nat, (j < 4)%nat ->
        wflat (wm_img σ) (wm_log σ) !! pa_add lk j = Some (nth_byte lock_zero j)) ->
     ak_coh ak = false ->
@@ -794,10 +802,10 @@ Section payoff.
     vwp_hold (x ↦wo v) (wm_ws σn) ∗
     vwp_hold (wpt_dirty cur_ctx cA y w) (wm_ws σn).
   Proof.
-    intros Hwf Hacc HQ Hzero Hcoh Himg Hlog Hle Hok.
+    intros Hwf Hacc HQ Htid Hzero Hcoh Himg Hlog Hle Hok.
     iIntros "Hi Hinv Hy".
     iMod (pp_handoff_load γ lk x v cA tid σ σ' σn ak t' b
-            Hwf Hacc HQ Hzero Hcoh Himg Hlog Hle Hok with "Hi Hinv")
+            Hwf Hacc HQ Htid Hzero Hcoh Himg Hlog Hle Hok with "Hi Hinv")
       as "($ & $ & $ & $ & $)".
     iModIntro.
     iApply (wpt_dirty_mono cur_ctx cA y w (wm_ws σ) (wm_ws σn)); [|iFrame].

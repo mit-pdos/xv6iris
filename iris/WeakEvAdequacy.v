@@ -375,6 +375,153 @@ Proof.
   iPureIntro. exact Hlp.
 Qed.
 
+(* ====================================================================== *)
+(** ** 2b′. THE ALTERNATION EXPORT (T2-0′ / F3′; design
+    [claude-notes/design/weak-memory-route-b.md] §4d.3′)
+
+    [weak_ev_adequacy_lockproto]'s SIBLING, at the same premises and through
+    the same registration seam.  Where [_lockproto] exports the SHAPE
+    protocol ([wlp_at]: every post-registration message on the word is a
+    whole-word acquire- or release-shaped message), this one adds the
+    PAIRING protocol ([wlp_alt]: those messages fold, by [WeakGhost.alt_step],
+    to a holder — a release requires the fold to be held by its own author,
+    a successful acquire installs one, a failed swap changes nothing).  That
+    is what route B's [cs_kill] consumes: "only the holder releases", from
+    which [WeakGhost.wlp_alt_two_acq] separates two acquires by the first
+    one's release and [WeakGhost.wlp_alt_open] keeps the current holder's
+    critical section open.
+
+    The holder is EXISTENTIAL here for the same reason the registration point
+    is: no client names it, and the kill quantifies over it. *)
+
+Theorem weak_ev_adequacy_lockalt Σ `{!riscvGpreS Σ, !weakGpreS Σ}
+    (gen : nat) (σ : wgstate) (D : CPU -> gset register)
+    (N : namespace) (a base : Z)
+    (Hgen : gen = 0%nat)
+    (Hpow : wgpow σ = true) (Hgen0 : wggen σ = 0%nat)
+    (Hlog : wglog σ = [])
+    (Hws : forall c : CPU, wgws σ c = ws_init) :
+  (forall (HR : riscvGS Σ) (HW : weakGS Σ),
+     ⊢ ([∗ set] c ∈ (fin_to_set CPU : gset CPU),
+          [∗ set] r ∈ D c,
+            reg_pointsto_at c r (DfracOwn 1)
+              (register_lookup r (wgregs σ c))) ∗
+       ([∗ map] a0 ↦ b ∈ wgimg σ, wlat_pointsto (pa_z a0) (DfracOwn 1) 0%nat b) ∗
+       ([∗ set] c ∈ (fin_to_set CPU : gset CPU), hart_view c) ∗
+       wlog_lb [] ∗
+       uart_frag (wgdev σ).(duart) ∗ plic_frag (wgdev σ).(dplic) ∗
+       virtio_frag (wgdev σ).(dvirtio)
+       ={⊤}=∗ wlock_regd N a base ∗
+              ([∗ list] e ∈ epower_fork gen, EWP e @ ⊤)) ->
+  forall t2 σ2,
+    rtc (@erased_step weak_ev_lang) (epower_fork gen, σ) (t2, σ2) ->
+    exists (n0 : nat) (h : option nat),
+      wlp_at (wglog σ2) a base n0 /\ wlp_alt (wglog σ2) a n0 h.
+Proof.
+  intros Hwp t2 σ2 Hrtc.
+  apply erased_steps_nsteps in Hrtc as (n & κs & Hsteps).
+  eapply (wp_strong_adequacy Σ weak_ev_lang NotStuck (epower_fork gen) σ n κs
+            t2 σ2 _ (fun _ => 0%nat)); last exact Hsteps.
+  intros Hinv.
+  (* ---- allocate the ghost state ([weak_ev_adequacy_phi]'s bundle) ---- *)
+  iMod (reg_alloc_cpus (wgregs σ) D (enum CPU) (NoDup_enum CPU)) as (f) "Hcpus".
+  iMod (ghost_var_alloc (wgdev σ).(duart)) as (γu) "Hu".
+  iMod (ghost_var_alloc (wgdev σ).(dplic)) as (γp) "Hp".
+  iMod (ghost_var_alloc (wgdev σ).(dvirtio)) as (γv) "Hv".
+  iEval (rewrite -Qp.half_half) in "Hu".
+  iDestruct (ghost_var_split with "Hu") as "[HuA HuF]".
+  iEval (rewrite -Qp.half_half) in "Hp".
+  iDestruct (ghost_var_split with "Hp") as "[HpA HpF]".
+  iEval (rewrite -Qp.half_half) in "Hv".
+  iDestruct (ghost_var_split with "Hv") as "[HvA HvF]".
+  iMod (own_alloc (●ML ([] : list (leibnizO wmsg))
+                   ⋅ ◯ML ([] : list (leibnizO wmsg)))) as (γlog) "[Hlga #Hlgf]".
+  { apply mono_list_both_valid_L. reflexivity. }
+  iMod (ghost_map_alloc (wlat_init (wgimg σ))) as (γlat) "[Hlatauth Hlatel]".
+  iMod (ghost_map_alloc (wcds_init (wgimg σ))) as (γcds) "[Hcdsauth Hcdsel]".
+  iMod (ghost_var_alloc_halves_cpus ws_init (enum CPU) (NoDup_enum CPU))
+    as (γws) "Hwss".
+  set (E0 := RiscvEraGS f 1%positive 1%positive γu γp γv 1%positive 1%positive
+               (fun _ => 1%positive) (fun _ => 1%positive)
+               (fun _ => 1%positive) (fun _ => 1%positive)
+               (fun _ => 1%positive) (fun _ => 1%positive)
+               1%positive 1%positive).
+  set (HR := RiscvGS Σ
+               (RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ _ _ _ _ 1%positive 1%positive _
+                  1%positive _ _ 1%positive (fun _ => True%I) 1%positive)
+               E0).
+  set (HW := WeakGS Σ _ γlog γlat γcds γws).
+  iDestruct (big_sepL_sep with "Hcpus") as "[Hauths Helems]".
+  iDestruct (big_sepL_sep with "Hwss") as "[HwsA HwsF]".
+  iPoseProof (Hwp HR HW) as "Hwand".
+  iMod ("Hwand" with "[Helems Hlatel Hcdsel HwsF HuF HpF HvF]")
+    as "[#Hreg Hwps]".
+  { iSplitL "Helems".
+    { iApply (@RiscvAdequacy.big_sepL_enum_to_set (iPropI Σ)). iExact "Helems". }
+    iSplitL "Hlatel Hcdsel".
+    { rewrite /wlat_pointsto /wlat_elem /wclean /wcds_el big_sepM_sep.
+      iSplitL "Hlatel".
+      - iApply (big_sepM_wlat_init
+                  (fun z tv => ghost_map_elem γlat z (DfracOwn 1) tv)).
+        iExact "Hlatel".
+      - iApply (big_sepM_wcds_init
+                  (fun z s => ghost_map_elem γcds z (DfracOwn 1) s)).
+        iExact "Hcdsel". }
+    iSplitL "HwsF".
+    { iApply (@RiscvAdequacy.big_sepL_enum_to_set (iPropI Σ)).
+      iApply (big_sepL_mono with "HwsF").
+      intros k c Hk. iIntros "H".
+      iApply (hart_view_intro c ws_init). iExact "H". }
+    iSplitR; [iExact "Hlgf"|].
+    iSplitL "HuF"; [iExact "HuF"|].
+    iSplitL "HpF"; [iExact "HpF"|iExact "HvF"]. }
+  iModIntro.
+  iExists
+    (fun (σ' : wgstate) (_ : nat) (_ : list eobs) (_ : nat) =>
+       (@weak_state_interp Σ HR HW σ')%I),
+    (replicate (length (epower_fork gen)) (fun _ : eval => True%I)),
+    (fun _ : eval => True%I),
+    (@state_interp_mono HasLc weak_ev_lang Σ (@weak_ev_irisGS Σ HR HW)).
+  cbv zeta beta.
+  iSplitL "Hauths Hlga Hlatauth Hcdsauth HwsA HuA HpA HvA".
+  { rewrite /weak_state_interp.
+    iSplitR; [iPureIntro; by split|].
+    iSplitR.
+    { iPureIntro. intros c. rewrite (Hws c) Hlog. apply ws_bounded_init. }
+    iSplitR.
+    { iPureIntro. rewrite Hlog. apply no_violation_nil. }
+    iSplitR.
+    { iPureIntro. rewrite Hlog. apply Forall_nil_2. }
+    iSplitL "Hauths".
+    { rewrite /gregs_interp.
+      iApply (@RiscvAdequacy.big_sepL_enum_to_set (iPropI Σ)).
+      iExact "Hauths". }
+    iSplitL "HuA HpA HvA".
+    { iSplitL "HuA"; [iExact "HuA"|].
+      iSplitL "HpA"; [iExact "HpA"|iExact "HvA"]. }
+    iSplitL "Hlga".
+    { rewrite /wlog_auth Hlog. iExact "Hlga". }
+    iSplitL "Hlatauth Hcdsauth".
+    { rewrite /wlat_interp.
+      iExists (wlat_init (wgimg σ)), (wcds_init (wgimg σ)).
+      iFrame "Hlatauth Hcdsauth".
+      iSplitR; [iPureIntro; rewrite Hlog; apply wlat_init_agree|].
+      iPureIntro. rewrite Hlog. apply wcds_init_agree. }
+    rewrite /wws_interp.
+    iApply (big_sepS_mono (fun c => wws_auth c ws_init)).
+    { intros c _. rewrite /wws_auth (Hws c). done. }
+    iApply (@RiscvAdequacy.big_sepL_enum_to_set (iPropI Σ)). iExact "HwsA". }
+  iSplitL "Hwps".
+  { rewrite big_sepL2_replicate_r; [|done]. iExact "Hwps". }
+  iIntros (es' t2') "%Heq %Hlen %Hns Hsi Hes Hts".
+  (* THE EXPORT: at ⊤, open the lock's invariant through the seam, read the
+     protocol off the C/D/S auth, close.  ([WeakGhost.wlock_regd_export].) *)
+  iMod (wlock_regd_export_alt N ⊤ σ2 a base ltac:(set_solver) with "Hsi Hreg")
+    as %Hlp.
+  iApply fupd_mask_intro; [set_solver|]. iIntros "_".
+  iPureIntro. exact Hlp.
+Qed.
+
 (** THE SAFETY FORM, projected — the event-language twin of
     [WeakAdequacy.weak_system_adequacy].  EVERY thread of EVERY reachable
     configuration can take a step: the WP package is a total correctness

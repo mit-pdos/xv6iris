@@ -126,6 +126,19 @@ Notation wlogR := (mono_listR (leibnizO wmsg)).
                      [n0] is the length of the log at registration and the
                      protocol quantifies over positions [n0 ≤ p] only.
 
+                     THE HOLDER [h] (T2-0′ / F3′, route-b §4d.3′).  The
+                     third index is the lock's CURRENT HOLDER as the pure
+                     FOLD [wlp_alt] computes it from the post-registration
+                     messages: [None] free, [Some t] held by agent [t].  The
+                     fold is what turns the SHAPE protocol ([wlp_at]) into the
+                     PAIRING protocol the kill needs — "only the holder
+                     releases" — and it is enforced by the three write rules
+                     ([wcds_ok_store_lock_acq]/[_fail]/[_rel]), each of which
+                     ties the message's AUTHOR to the state.  The tie to the
+                     lock's ghost ([WeakLock.wlock_inv]: [h = tid_of st]) is
+                     what makes those rules discharge locally at the two
+                     leaves.
+
                      WHY THE CLEAN CONJUNCT.  Everything that holds the lock
                      word's bundle must still pay φ's per-byte obligation
                      ([nv_ok]), and the suffix protocol alone says nothing
@@ -137,7 +150,7 @@ Inductive wcds :=
   | WClean
   | WDirty (c : CPU)
   | WSync
-  | WLock (base : Z) (n0 : nat).
+  | WLock (base : Z) (n0 : nat) (h : option nat).
 
 Global Instance wcds_eq_dec : EqDecision wcds.
 Proof. solve_decision. Defined.
@@ -583,32 +596,494 @@ Definition wlp_at (log : list wmsg) (a base : Z) (n0 : nat) : Prop :=
   forall p m, log !! p = Some m -> (n0 <= p)%nat -> is_Some (msg_byte m a) ->
     wm_pa m = base /\ wlock_shaped m.
 
+(* ---------------------------------------------------------------------- *)
+(** *** THE ALTERNATION FOLD (tier-2 T2-0' / F3', route-b sect 4d.3')
+
+    [wlp_at] pins the SHAPES of the messages on a registered lock word; what
+    the kill needs on top is the PAIRING — "only the holder releases".  That
+    is a fact about the SEQUENCE of those messages, and it is a pure FOLD:
+    replay the post-registration messages of the word, carrying the current
+    holder [h : option nat] ([None] = free, [Some t] = held by agent [t]).
+
+      - a ZERO-DATA message (the release) requires the fold to be held by its
+        own author and leaves it free;
+      - an EXCLUSIVE NONZERO message is an [amoswap] write half: from FREE it
+        is a SUCCESSFUL ACQUIRE and installs its author as the holder; from
+        HELD it is a FAILED SWAP and changes nothing (the log records no read
+        value, so the fold cannot tell a failed swap from anything else — and
+        need not);
+      - anything else does not occur on a [wlock_shaped] word and fails the
+        fold outright.
+
+    The zero-data test comes FIRST because [wlock_shaped] deliberately admits
+    an exclusive write of the zero word (an [amoswap] swapping in 0), which
+    is a release. *)
+
+(** Does [m] write byte [a]?  As a boolean, so that it may be matched on
+    inside the fold. *)
+Definition mwrites (a : Z) (m : wmsg) : bool :=
+  match msg_byte m a with Some _ => true | None => false end.
+
+Lemma mwrites_true a m : mwrites a m = true <-> is_Some (msg_byte m a).
+Proof.
+  rewrite /mwrites. destruct (msg_byte m a) as [b|].
+  - split; [intros _; by eexists|done].
+  - split; [done|intros [b Hb]; done].
+Qed.
+
+Lemma mwrites_false a m : mwrites a m = false <-> msg_byte m a = None.
+Proof.
+  rewrite /mwrites. destruct (msg_byte m a) as [b|]; [|done].
+  split; [done|intros [=]].
+Qed.
+
+Definition alt_step (h : option nat) (m : wmsg) : option (option nat) :=
+  if bool_decide (wm_data m = wlock_zero4)
+  then match h with
+       | Some t => if bool_decide (wm_tid m = Some t) then Some None else None
+       | None => None
+       end
+  else if bool_decide (wm_ak m = WCexcl)
+       then match h with
+            | None => match wm_tid m with
+                      | Some t => Some (Some t)
+                      | None => None
+                      end
+            | Some _ => Some h
+            end
+       else None.
+
+(** THE THREE STEPS, as the leaves use them. *)
+Lemma alt_step_rel m t :
+  wm_data m = wlock_zero4 -> wm_tid m = Some t ->
+  alt_step (Some t) m = Some None.
+Proof.
+  intros Hd Ht. rewrite /alt_step (bool_decide_eq_true_2 _ Hd).
+  by rewrite (bool_decide_eq_true_2 _ Ht).
+Qed.
+
+Lemma alt_step_acq m t :
+  wm_data m <> wlock_zero4 -> wm_ak m = WCexcl -> wm_tid m = Some t ->
+  alt_step None m = Some (Some t).
+Proof.
+  intros Hd Hk Ht. rewrite /alt_step (bool_decide_eq_false_2 _ Hd).
+  by rewrite (bool_decide_eq_true_2 _ Hk) Ht.
+Qed.
+
+Lemma alt_step_fail m t :
+  wm_data m <> wlock_zero4 -> wm_ak m = WCexcl ->
+  alt_step (Some t) m = Some (Some t).
+Proof.
+  intros Hd Hk. rewrite /alt_step (bool_decide_eq_false_2 _ Hd).
+  by rewrite (bool_decide_eq_true_2 _ Hk).
+Qed.
+
+(** ... and their INVERSIONS, which is what the kill lemmas read. *)
+Lemma alt_step_zero h m h' :
+  wm_data m = wlock_zero4 -> alt_step h m = Some h' ->
+  h' = None /\ h <> None /\ wm_tid m = h.
+Proof.
+  intros Hd. rewrite /alt_step (bool_decide_eq_true_2 _ Hd).
+  destruct h as [t|]; [|discriminate].
+  case_bool_decide as Ht; [|discriminate]. intros [= <-].
+  split_and!; [done|done|exact Ht].
+Qed.
+
+Lemma alt_step_nonzero h m h' :
+  wm_data m <> wlock_zero4 -> alt_step h m = Some h' ->
+  wm_ak m = WCexcl /\ h' <> None /\
+  (h = None -> h' = wm_tid m) /\ (h <> None -> h' = h).
+Proof.
+  intros Hd. rewrite /alt_step (bool_decide_eq_false_2 _ Hd).
+  case_bool_decide as Hk; [|discriminate].
+  destruct h as [t|].
+  - intros [= <-]. split_and!; [done|done|intros [=]|done].
+  - destruct (wm_tid m) as [t|] eqn:Ht; [|discriminate].
+    intros [= <-]. split_and!;
+      [done|done|done|intros Hne; exfalso; by apply Hne].
+Qed.
+
+Fixpoint alt_fold (a : Z) (h : option nat) (ms : list wmsg)
+    : option (option nat) :=
+  match ms with
+  | [] => Some h
+  | m :: ms' =>
+      if mwrites a m
+      then match alt_step h m with
+           | Some h' => alt_fold a h' ms'
+           | None => None
+           end
+      else alt_fold a h ms'
+  end.
+
+Lemma alt_fold_app a h ms1 ms2 :
+  alt_fold a h (ms1 ++ ms2)
+  = match alt_fold a h ms1 with
+    | Some h' => alt_fold a h' ms2
+    | None => None
+    end.
+Proof.
+  revert h. induction ms1 as [|m ms1 IH]; intros h; [done|]. simpl.
+  destruct (mwrites a m); [|by apply IH].
+  destruct (alt_step h m) as [h'|]; [by apply IH|done].
+Qed.
+
+Lemma alt_fold_quiet a h ms :
+  (forall m, m ∈ ms -> msg_byte m a = None) -> alt_fold a h ms = Some h.
+Proof.
+  induction ms as [|m ms IH]; [done|]. intros Hno. simpl.
+  rewrite (proj2 (mwrites_false a m) (Hno m (elem_of_list_here _ _))).
+  apply IH. intros m' Hm'. by apply Hno, elem_of_list_further.
+Qed.
+
+(** THE FOLD AT A POSITION: replay the messages of the log in the window
+    [[n0, p)] that write [a].  [wlp_holder_at log a n0 p = Some h] says the
+    word is held by [h] just BEFORE position [p]; [None] says the sequence is
+    not a legal alternation at all. *)
+Definition wlp_holder_at (log : list wmsg) (a : Z) (n0 p : nat)
+    : option (option nat) :=
+  alt_fold a None (drop n0 (take p log)).
+
+(** THE EXPORTED FACT: the whole post-registration suffix folds, and ends at
+    holder [h].  ([n0] is at or below the log's length — registration happens
+    at the current top and the log only grows — which is what makes the fold
+    extend one message at a time.) *)
+Definition wlp_alt (log : list wmsg) (a : Z) (n0 : nat) (h : option nat)
+    : Prop :=
+  (n0 <= length log)%nat /\ wlp_holder_at log a n0 (length log) = Some h.
+
+Lemma wlp_holder_small log a n0 p :
+  (p <= n0)%nat -> wlp_holder_at log a n0 p = Some None.
+Proof.
+  intros Hp. rewrite /wlp_holder_at drop_ge; [done|].
+  rewrite length_take. lia.
+Qed.
+
+Lemma wlp_holder_big log a n0 p :
+  (length log <= p)%nat ->
+  wlp_holder_at log a n0 p = wlp_holder_at log a n0 (length log).
+Proof. intros Hp. rewrite /wlp_holder_at !take_ge //. Qed.
+
+Lemma wlp_holder_step log a n0 p m :
+  (n0 <= p)%nat -> log !! p = Some m ->
+  wlp_holder_at log a n0 (S p)
+  = match wlp_holder_at log a n0 p with
+    | None => None
+    | Some h => if mwrites a m then alt_step h m else Some h
+    end.
+Proof.
+  intros Hn0 Hp. pose proof (lookup_lt_Some _ _ _ Hp) as Hlt.
+  rewrite /wlp_holder_at (take_S_r _ _ m Hp).
+  rewrite drop_app_le; [|rewrite length_take; lia].
+  rewrite alt_fold_app.
+  destruct (alt_fold a None (drop n0 (take p log))) as [h|]; [|done].
+  simpl. destruct (mwrites a m); [|done]. by destruct (alt_step h m).
+Qed.
+
+Lemma wlp_holder_none_mono log a n0 p q :
+  (p <= q)%nat -> wlp_holder_at log a n0 p = None ->
+  wlp_holder_at log a n0 q = None.
+Proof.
+  induction q as [|q IH]; intros Hpq Hp.
+  - assert (p = 0%nat) as -> by lia. exact Hp.
+  - destruct (decide (p = S q)) as [->|Hne]; [exact Hp|].
+    assert (Hq : wlp_holder_at log a n0 q = None) by (apply IH; [lia|done]).
+    destruct (decide (q < n0)%nat) as [Hlt|Hge].
+    { rewrite (wlp_holder_small log a n0 q ltac:(lia)) in Hq. discriminate. }
+    destruct (log !! q) as [m|] eqn:Hm.
+    + rewrite (wlp_holder_step log a n0 q m ltac:(lia) Hm) Hq //.
+    + apply lookup_ge_None in Hm.
+      rewrite (wlp_holder_big log a n0 (S q) ltac:(lia))
+              -(wlp_holder_big log a n0 q ltac:(lia)) //.
+Qed.
+
+Lemma wlp_holder_is_Some log a n0 p q h :
+  (p <= q)%nat -> wlp_holder_at log a n0 q = Some h ->
+  exists h', wlp_holder_at log a n0 p = Some h'.
+Proof.
+  intros Hpq Hq. destruct (wlp_holder_at log a n0 p) as [h'|] eqn:Hp;
+    [by exists h'|].
+  rewrite (wlp_holder_none_mono log a n0 p q Hpq Hp) in Hq. discriminate.
+Qed.
+
+(** The fold does not move across a stretch that does not write [a]. *)
+Lemma wlp_holder_quiet log a n0 p q :
+  (p <= q)%nat ->
+  (forall r mr, (p <= r < q)%nat -> log !! r = Some mr -> msg_byte mr a = None) ->
+  wlp_holder_at log a n0 q = wlp_holder_at log a n0 p.
+Proof.
+  induction q as [|q IH]; intros Hpq Hq.
+  - assert (p = 0%nat) as -> by lia. done.
+  - destruct (decide (p = S q)) as [->|Hne]; [done|].
+    rewrite -(IH ltac:(lia) ltac:(intros r mr Hr; apply Hq; lia)).
+    destruct (decide (q < n0)%nat) as [Hlt|Hge].
+    { rewrite (wlp_holder_small log a n0 (S q) ltac:(lia))
+              (wlp_holder_small log a n0 q ltac:(lia)) //. }
+    destruct (log !! q) as [m|] eqn:Hm.
+    + rewrite (wlp_holder_step log a n0 q m ltac:(lia) Hm).
+      rewrite (proj2 (mwrites_false a m) (Hq q m ltac:(lia) Hm)).
+      by destruct (wlp_holder_at log a n0 q).
+    + apply lookup_ge_None in Hm.
+      rewrite (wlp_holder_big log a n0 (S q) ltac:(lia))
+              -(wlp_holder_big log a n0 q ltac:(lia)) //.
+Qed.
+
+(** ... and it does not move across a stretch of FAILED SWAPS: while the word
+    is held and nobody writes zero to it, the holder stays. *)
+Lemma wlp_holder_hold log a n0 p q hv h2 :
+  (p <= q)%nat ->
+  wlp_holder_at log a n0 p = Some (Some hv) ->
+  wlp_holder_at log a n0 q = Some h2 ->
+  (forall r mr, (p <= r < q)%nat -> log !! r = Some mr ->
+     is_Some (msg_byte mr a) -> wm_data mr <> wlock_zero4) ->
+  h2 = Some hv.
+Proof.
+  revert h2. induction q as [|q IH]; intros h2 Hpq Hp Hq Hnz.
+  - assert (p = 0%nat) as -> by lia. rewrite Hp in Hq. by simplify_eq.
+  - destruct (decide (p = S q)) as [->|Hne].
+    { rewrite Hp in Hq. by simplify_eq. }
+    assert (Hpq' : (p <= q)%nat) by lia.
+    destruct (wlp_holder_is_Some log a n0 q (S q) h2 ltac:(lia) Hq)
+      as [h1 Hq1].
+    assert (Hh1 : h1 = Some hv)
+      by (apply (IH h1 Hpq' Hp Hq1); intros r mr Hr; apply Hnz; lia).
+    subst h1.
+    (* the window is above the registration point: [p] is, and [p <= q] *)
+    assert (Hn0 : (n0 <= q)%nat).
+    { destruct (decide (n0 <= q)%nat) as [?|Hgt]; [done|exfalso].
+      rewrite (wlp_holder_small log a n0 p ltac:(lia)) in Hp. by simplify_eq. }
+    destruct (log !! q) as [m|] eqn:Hm.
+    + rewrite (wlp_holder_step log a n0 q m Hn0 Hm) Hq1 in Hq.
+      destruct (mwrites a m) eqn:Hw; [|by simplify_eq].
+      destruct (alt_step_nonzero (Some hv) m h2 
+                  (Hnz q m ltac:(lia) Hm (proj1 (mwrites_true a m) Hw)) Hq)
+        as (_ & _ & _ & Hkeep).
+      by apply Hkeep.
+    + apply lookup_ge_None in Hm.
+      rewrite (wlp_holder_big log a n0 (S q) ltac:(lia))
+              -(wlp_holder_big log a n0 q ltac:(lia)) Hq1 in Hq.
+      by simplify_eq.
+Qed.
+
+(** A bounded search for the FIRST position of a window at which a decidable
+    property of the message holds. *)
+Lemma msg_search (f : wmsg -> bool) (log : list wmsg) (s0 e : nat) :
+  (forall r mr, (s0 <= r < e)%nat -> log !! r = Some mr -> f mr = false)
+  \/ (exists r mr, (s0 <= r < e)%nat /\ log !! r = Some mr /\ f mr = true /\
+        forall r' mr', (s0 <= r' < r)%nat -> log !! r' = Some mr' ->
+          f mr' = false).
+Proof.
+  induction e as [|e IH].
+  - left. intros r mr Hr. exfalso. lia.
+  - destruct IH as [Hno|(r & mr & Hr & Hlk & Hf & Hfirst)].
+    + destruct (log !! e) as [m|] eqn:Hm.
+      * destruct (f m) eqn:Hf.
+        -- destruct (decide (s0 <= e)%nat) as [Hle|Hgt].
+           ++ right. exists e, m. split_and!; [lia|lia|done|done|].
+              intros r' mr' Hr'. apply Hno. lia.
+           ++ left. intros r mr Hr. exfalso. lia.
+        -- left. intros r mr Hr Hlk.
+           destruct (decide (r = e)) as [->|Hne];
+             [rewrite Hm in Hlk; by simplify_eq|apply (Hno r mr); [lia|done]].
+      * left. intros r mr Hr Hlk.
+        destruct (decide (r = e)) as [->|Hne];
+          [rewrite Hm in Hlk; by simplify_eq|apply (Hno r mr); [lia|done]].
+    + right. exists r, mr. split_and!; [lia|lia|done|done|done].
+Qed.
+
+(** THE FRAMING FACT for the fold: messages that do not write [a] do not
+    move it. *)
+Lemma wlp_alt_app log ms a n0 h :
+  (forall m, m ∈ ms -> msg_byte m a = None) ->
+  wlp_alt log a n0 h -> wlp_alt (log ++ ms) a n0 h.
+Proof.
+  intros Hno [Hlen Hf]. split; [rewrite length_app; lia|].
+  rewrite /wlp_holder_at take_ge; [|lia].
+  rewrite drop_app_le; [|lia]. rewrite alt_fold_app.
+  rewrite /wlp_holder_at take_ge in Hf; [|lia]. rewrite Hf.
+  by apply alt_fold_quiet.
+Qed.
+
+(** ... and THE STEP: one message on the word moves it by [alt_step]. *)
+Lemma wlp_alt_store log mnew a n0 h h' :
+  wlp_alt log a n0 h -> is_Some (msg_byte mnew a) ->
+  alt_step h mnew = Some h' -> wlp_alt (log ++ [mnew]) a n0 h'.
+Proof.
+  intros [Hlen Hf] Hw Hst. split; [rewrite length_app /=; lia|].
+  rewrite /wlp_holder_at take_ge; [|rewrite length_app /=; lia].
+  rewrite drop_app_le; [|lia]. rewrite alt_fold_app.
+  rewrite /wlp_holder_at take_ge in Hf; [|lia]. rewrite Hf /=.
+  by rewrite (proj2 (mwrites_true a mnew) Hw) Hst.
+Qed.
+
+(** The registration point's own value: at [n0 = length log] the window is
+    empty, so the word is FREE. *)
+Lemma wlp_alt_register log a : wlp_alt log a (length log) None.
+Proof. split; [lia|by apply wlp_holder_small]. Qed.
+
+(* ---------------------------------------------------------------------- *)
+(** *** WHAT THE FOLD SAYS ABOUT THE WORD'S VALUE, AND THE TWO KILL LEMMAS
+
+    These three are the reason the export exists (route-b sect 4d.3'): the
+    graph-side [cs_kill] consumes them at the certifying configuration. *)
+
+(** LOCALITY FACT (i): the fold's state is the word's CURRENT VALUE, read the
+    way [WeakStore.wlat4L_flat_gen] reads it — off the LATEST message writing
+    the byte.  The word is free exactly when that message wrote zero.  (There
+    is no third case: the fold's own success rules out a zero-data message on
+    a free word, and a nonzero one always leaves the word held.) *)
+Lemma wlp_alt_value log a n0 h p m :
+  wlp_alt log a n0 h -> (n0 <= p)%nat ->
+  log !! p = Some m -> is_Some (msg_byte m a) ->
+  (forall q mq, (p < q)%nat -> log !! q = Some mq -> msg_byte mq a = None) ->
+  (h = None <-> wm_data m = wlock_zero4).
+Proof.
+  intros [Hlen Hf] Hn0 Hp Hw Hlast.
+  pose proof (lookup_lt_Some _ _ _ Hp) as Hlt.
+  assert (Hsp : wlp_holder_at log a n0 (S p) = Some h).
+  { rewrite -Hf. symmetry.
+    apply (wlp_holder_quiet log a n0 (S p) (length log)); [lia|].
+    intros r mr Hr. apply Hlast. lia. }
+  destruct (wlp_holder_is_Some log a n0 p (S p) h ltac:(lia) Hsp) as [hp Hhp].
+  rewrite (wlp_holder_step log a n0 p m Hn0 Hp) Hhp
+          (proj2 (mwrites_true a m) Hw) in Hsp.
+  split.
+  - intros ->. destruct (decide (wm_data m = wlock_zero4)) as [?|Hne]; [done|].
+    destruct (alt_step_nonzero hp m None Hne Hsp) as (_ & Hnn & _). done.
+  - intros Hd. by destruct (alt_step_zero hp m h Hd Hsp) as (-> & _ & _).
+Qed.
+
+(** KILL LEMMA 1 — TWO ACQUIRES ARE SEPARATED BY THE FIRST ONE'S RELEASE.
+    [p] is a successful acquire (the fold is FREE just before it, and the
+    message is not a release) by agent [i]; the word is FREE again just
+    before [q].  Then [i] released in between — which is exactly the
+    "critical sections do not overlap" premise [cs_kill] carries.  (The
+    two harts need not be distinct: the statement holds for [i = j] too, so
+    the distinctness hypothesis of the design note is not taken.) *)
+Lemma wlp_alt_two_acq log a n0 p q mp i :
+  (n0 <= p)%nat -> (p < q)%nat ->
+  log !! p = Some mp -> is_Some (msg_byte mp a) ->
+  wm_data mp <> wlock_zero4 -> wm_tid mp = Some i ->
+  wlp_holder_at log a n0 p = Some None ->
+  wlp_holder_at log a n0 q = Some None ->
+  exists r mr, (p < r < q)%nat /\ log !! r = Some mr /\
+               is_Some (msg_byte mr a) /\ wm_data mr = wlock_zero4 /\
+               wm_tid mr = Some i.
+Proof.
+  intros Hn0 Hpq Hp Hw Hnz Hti Hfp Hfq.
+  (* the acquire installs [i] *)
+  destruct (wlp_holder_is_Some log a n0 (S p) q None ltac:(lia) Hfq)
+    as [h1 Hsp].
+  assert (Hst : alt_step None mp = Some h1).
+  { rewrite -Hsp (wlp_holder_step log a n0 p mp Hn0 Hp) Hfp
+            (proj2 (mwrites_true a mp) Hw) //. }
+  destruct (alt_step_nonzero None mp h1 Hnz Hst) as (_ & _ & Hfree & _).
+  rewrite (Hfree eq_refl) Hti in Hsp.
+  (* the first release after it *)
+  destruct (msg_search
+              (fun m => mwrites a m && bool_decide (wm_data m = wlock_zero4))
+              log (S p) q) as [Hnone|(r & mr & Hr & Hlk & Hf & Hfirst)].
+  - exfalso.
+    assert (Hcontra : (None : option nat) = Some i).
+    { apply (wlp_holder_hold log a n0 (S p) q i None ltac:(lia) Hsp Hfq).
+      intros s ms Hs Hls Hws Hzs.
+      specialize (Hnone s ms Hs Hls).
+      rewrite (proj2 (mwrites_true a ms) Hws) (bool_decide_eq_true_2 _ Hzs)
+        in Hnone. done. }
+    done.
+  - apply andb_prop in Hf as [Hf1 Hf2].
+    apply mwrites_true in Hf1. apply bool_decide_eq_true in Hf2.
+    exists r, mr. split_and!; [lia|lia|done|done|done|].
+    (* the holder is still [i] at [r] *)
+    destruct (wlp_holder_is_Some log a n0 r q None ltac:(lia) Hfq) as [hr Hhr].
+    assert (Hhr' : hr = Some i).
+    { apply (wlp_holder_hold log a n0 (S p) r i hr ltac:(lia) Hsp Hhr).
+      intros s ms Hs Hls Hws Hzs.
+      specialize (Hfirst s ms ltac:(lia) Hls).
+      rewrite (proj2 (mwrites_true a ms) Hws) (bool_decide_eq_true_2 _ Hzs)
+        in Hfirst. done. }
+    subst hr.
+    destruct (wlp_holder_is_Some log a n0 (S r) q None ltac:(lia) Hfq)
+      as [h2 Hsr].
+    rewrite (wlp_holder_step log a n0 r mr ltac:(lia) Hlk) Hhr
+            (proj2 (mwrites_true a mr) Hf1) in Hsr.
+    by destruct (alt_step_zero (Some i) mr h2 Hf2 Hsr) as (_ & _ & <-).
+Qed.
+
+(** KILL LEMMA 2 — THE CURRENT HOLDER'S CRITICAL SECTION IS STILL OPEN.
+    If the word ends HELD, then its holder's LAST acquire — the position [p]
+    at which the fold was free and after which no later message finds it free
+    again — has no release after it at all.  ([cs_kill] uses this at the
+    certifying configuration for the hart that is inside the section.) *)
+Lemma wlp_alt_open log a n0 i p mp :
+  wlp_alt log a n0 (Some i) ->
+  (n0 <= p)%nat -> log !! p = Some mp -> is_Some (msg_byte mp a) ->
+  wlp_holder_at log a n0 p = Some None ->
+  (forall r mr, (p < r)%nat -> log !! r = Some mr -> is_Some (msg_byte mr a) ->
+     wlp_holder_at log a n0 r <> Some None) ->
+  forall r mr, (p < r)%nat -> log !! r = Some mr -> is_Some (msg_byte mr a) ->
+     wm_data mr <> wlock_zero4.
+Proof.
+  intros [Hlen Hf] Hn0 Hp Hw Hfp Hlast r mr Hr Hlk Hwr Hzero.
+  pose proof (lookup_lt_Some _ _ _ Hlk) as Hrlt.
+  (* the release frees the word at [S r] *)
+  destruct (wlp_holder_is_Some log a n0 r (length log) (Some i)
+              ltac:(lia) Hf) as [hr Hhr].
+  destruct (wlp_holder_is_Some log a n0 (S r) (length log) (Some i)
+              ltac:(lia) Hf) as [h2 Hsr].
+  assert (Hst : alt_step hr mr = Some h2).
+  { rewrite -Hsr (wlp_holder_step log a n0 r mr ltac:(lia) Hlk) Hhr
+            (proj2 (mwrites_true a mr) Hwr) //. }
+  destruct (alt_step_zero hr mr h2 Hzero Hst) as (-> & _ & _).
+  (* ... and the word can only be held again by a LATER successful acquire,
+     which the "last acquire" hypothesis forbids *)
+  destruct (msg_search (mwrites a) log (S r) (length log))
+    as [Hnone|(s & ms & Hs & Hls & Hfs & Hfirst)].
+  - rewrite (wlp_holder_quiet log a n0 (S r) (length log) ltac:(lia)
+               ltac:(intros s2 ms2 Hs2 Hls2;
+                     exact (proj1 (mwrites_false a ms2)
+                              (Hnone s2 ms2 Hs2 Hls2))))
+      in Hf.
+    rewrite Hsr in Hf. by simplify_eq.
+  - apply (Hlast s ms ltac:(lia) Hls (proj1 (mwrites_true a ms) Hfs)).
+    rewrite (wlp_holder_quiet log a n0 (S r) s ltac:(lia)
+               ltac:(intros s' ms' Hs' Hls';
+                     exact (proj1 (mwrites_false a ms')
+                              (Hfirst s' ms' Hs' Hls')))).
+    exact Hsr.
+Qed.
+
 (** ... and the state's own obligation: the protocol ON TOP OF clean (see the
-    [WLock] note at the head of the file). *)
-Definition wcds_lock (log : list wmsg) (a base : Z) (n0 : nat) : Prop :=
-  wcds_clean log a /\ wlp_at log a base n0.
+    [WLock] note at the head of the file), the alternation included. *)
+Definition wcds_lock (log : list wmsg) (a base : Z) (n0 : nat)
+    (h : option nat) : Prop :=
+  wcds_clean log a /\ wlp_at log a base n0 /\ wlp_alt log a n0 h.
 
 Definition wcds_ok (log : list wmsg) (a : Z) (s : wcds) : Prop :=
   match s with
   | WClean => wcds_clean log a
   | WDirty c => wcds_dirty log a c
   | WSync => wcds_sync log a
-  | WLock base n0 => wcds_lock log a base n0
+  | WLock base n0 h => wcds_lock log a base n0 h
   end.
 
 (** The state a NON-PROTOCOL store may be taken at.  A [WLock] byte is
     exactly the one that may not (its write rule is [wcds_ok_store_lock]),
     and this boolean is what every generic store site now threads. *)
 Definition is_wlock (s : wcds) : bool :=
-  match s with WLock _ _ => true | _ => false end.
+  match s with WLock _ _ _ => true | _ => false end.
 
-Lemma wcds_lock_clean log a base n0 :
-  wcds_ok log a (WLock base n0) -> wcds_clean log a.
+Lemma wcds_lock_clean log a base n0 h :
+  wcds_ok log a (WLock base n0 h) -> wcds_clean log a.
 Proof. by intros [? _]. Qed.
 
-Lemma wcds_lock_wlp log a base n0 :
-  wcds_ok log a (WLock base n0) -> wlp_at log a base n0.
-Proof. by intros [_ ?]. Qed.
+Lemma wcds_lock_wlp log a base n0 h :
+  wcds_ok log a (WLock base n0 h) -> wlp_at log a base n0.
+Proof. by intros [_ [? _]]. Qed.
+
+Lemma wcds_lock_alt log a base n0 h :
+  wcds_ok log a (WLock base n0 h) -> wlp_alt log a n0 h.
+Proof. by intros [_ [_ ?]]. Qed.
 
 Lemma wcds_clean_dirty log a c : wcds_clean log a -> wcds_dirty log a c.
 Proof. intros H p m Hp. destruct (H p m Hp); auto. Qed.
@@ -629,12 +1104,13 @@ Proof.
   assert (Hcln : wcds_clean log a -> wcds_clean (log ++ ms) a).
   { intros Hcl p m Hp. destruct (Hcl p m (Hback p m Hp)) as [?|?];
       [by left|right; by apply wpublished_app]. }
-  destruct s as [ | c | | base n0 ]; simpl.
+  destruct s as [ | c | | base n0 h ]; simpl.
   - exact Hcln.
   - intros Hdi p m Hp. destruct (Hdi p m (Hback p m Hp)) as [?|[?|?]];
       [by left|right; left; by apply wpublished_app|by right; right].
   - intros Hsy p m Hp. exact (Hsy p m (Hback p m Hp)).
-  - intros [Hcl [Hrng Hlp]]. split; [by apply Hcln|]. split; [exact Hrng|].
+  - intros [Hcl [[Hrng Hlp] Halt]]. split; [by apply Hcln|].
+    split; [|by apply wlp_alt_app]. split; [exact Hrng|].
     intros p m Hp Hn0 Hs.
     apply lookup_app_Some in Hp as [Hp|[_ Hp]]; [by apply (Hlp p m)|].
     exfalso. apply elem_of_list_lookup_2, Hno in Hp.
@@ -723,7 +1199,7 @@ Proof.
     apply lookup_app_Some in Hp as [Hp|[_ Hp]]; [by split_and!|].
     exfalso. destruct (p - length log)%nat as [|n]; simpl in Hp;
       [|by rewrite lookup_nil in Hp]. simplify_eq; by apply Hk. }
-  destruct s as [ | c | | base n0 ]; simpl in Hok |- *.
+  destruct s as [ | c | | base n0 h ]; simpl in Hok |- *.
   - intros p m Hp. destruct (Hok p m (Hback p m Hp)) as [?|?];
       [by left|right; by apply wpublished_app].
   - intros p m Hp. destruct (Hok p m (Hback p m Hp)) as [?|[?|?]];
@@ -742,17 +1218,33 @@ Lemma wcds_ok_store_sync log mnew a :
   wcds_sync log a -> wcds_sync (log ++ [mnew]) a.
 Proof. intros Hk. exact (wcds_ok_store_nonplain log mnew a WSync Hk eq_refl). Qed.
 
+(** A whole-word message writes EVERY byte of the word — which is why the
+    protocol store below always moves the fold. *)
+Lemma wlock_shaped_writes m a base :
+  wm_pa m = base -> wlock_shaped m -> (base <= a < base + 4)%Z ->
+  is_Some (msg_byte m a).
+Proof.
+  intros Hpa [Hlen _] Hrng. rewrite /msg_byte Hpa bool_decide_eq_true_2;
+    [|lia].
+  apply lookup_lt_is_Some_2. rewrite Hlen. lia.
+Qed.
+
 (** THE PROTOCOL STORE — the [WLock] write rule, covering BOTH the acquire's
     exclusive write and the release's zero store in one lemma: a message of
-    the whole word, acquire- or release-shaped, keeps the state. *)
-Lemma wcds_ok_store_lock log mnew a base n0 :
-  wm_pa mnew = base -> wlock_shaped mnew ->
-  wcds_ok log a (WLock base n0) ->
-  wcds_ok (log ++ [mnew]) a (WLock base n0).
+    the whole word, acquire- or release-shaped, keeps the state, MOVING the
+    holder by [alt_step].  The three named instances below are the shapes the
+    two leaves discharge. *)
+Lemma wcds_ok_store_lock log mnew a base n0 h h' :
+  wm_pa mnew = base -> wlock_shaped mnew -> alt_step h mnew = Some h' ->
+  wcds_ok log a (WLock base n0 h) ->
+  wcds_ok (log ++ [mnew]) a (WLock base n0 h').
 Proof.
-  intros Hpa Hsh [Hcl [Hrng Hlp]].
+  intros Hpa Hsh Hst [Hcl [[Hrng Hlp] Halt]].
   assert (Hk : wm_ak mnew <> WCplain) by (destruct Hsh as (_ & ? & _); done).
-  split; [by apply wcds_ok_store_clean|]. split; [exact Hrng|].
+  split; [by apply wcds_ok_store_clean|].
+  split; [|apply (wlp_alt_store log mnew a n0 h h' Halt
+                    (wlock_shaped_writes mnew a base Hpa Hsh Hrng) Hst)].
+  split; [exact Hrng|].
   intros p m Hp Hn0 Hs.
   apply lookup_app_Some in Hp as [Hp|[Hge Hp]]; [by apply (Hlp p m)|].
   destruct (p - length log)%nat as [|n]; simpl in Hp;
@@ -760,16 +1252,56 @@ Proof.
   simplify_eq. by split.
 Qed.
 
-(** THE REGISTRATION, purely.  At [n0] at or above the log's length the
-    suffix obligation is VACUOUS, so a clean byte inside the word's range
-    becomes a lock byte with nothing said about its history — which is what
-    makes registration legal AFTER [initlock]'s plain store. *)
-Lemma wcds_ok_register log a base n0 :
-  (base <= a < base + 4)%Z -> (length log <= n0)%nat ->
-  wcds_clean log a ->
-  wcds_ok log a (WLock base n0).
+(** THE SUCCESSFUL ACQUIRE: an exclusive nonzero write on a FREE word
+    installs its author. *)
+Lemma wcds_ok_store_lock_acq log mnew a base n0 t :
+  wm_pa mnew = base -> wlock_shaped mnew ->
+  wm_data mnew <> wlock_zero4 -> wm_ak mnew = WCexcl -> wm_tid mnew = Some t ->
+  wcds_ok log a (WLock base n0 None) ->
+  wcds_ok (log ++ [mnew]) a (WLock base n0 (Some t)).
 Proof.
-  intros Hrng Hlen Hcl. split; [exact Hcl|]. split; [exact Hrng|].
+  intros Hpa Hsh Hd Hk Ht.
+  apply (wcds_ok_store_lock log mnew a base n0 None (Some t) Hpa Hsh).
+  by apply alt_step_acq.
+Qed.
+
+(** THE FAILED SWAP: the same message on a HELD word leaves the holder
+    alone (the log records no read value; the fold does not need one). *)
+Lemma wcds_ok_store_lock_fail log mnew a base n0 t :
+  wm_pa mnew = base -> wlock_shaped mnew ->
+  wm_data mnew <> wlock_zero4 -> wm_ak mnew = WCexcl ->
+  wcds_ok log a (WLock base n0 (Some t)) ->
+  wcds_ok (log ++ [mnew]) a (WLock base n0 (Some t)).
+Proof.
+  intros Hpa Hsh Hd Hk.
+  apply (wcds_ok_store_lock log mnew a base n0 (Some t) (Some t) Hpa Hsh).
+  by apply alt_step_fail.
+Qed.
+
+(** THE RELEASE: a zero write frees the word — and ONLY THE HOLDER MAY DO
+    IT.  This is the arm the whole export exists for. *)
+Lemma wcds_ok_store_lock_rel log mnew a base n0 t :
+  wm_pa mnew = base -> wlock_shaped mnew ->
+  wm_data mnew = wlock_zero4 -> wm_tid mnew = Some t ->
+  wcds_ok log a (WLock base n0 (Some t)) ->
+  wcds_ok (log ++ [mnew]) a (WLock base n0 None).
+Proof.
+  intros Hpa Hsh Hd Ht.
+  apply (wcds_ok_store_lock log mnew a base n0 (Some t) None Hpa Hsh).
+  by apply alt_step_rel.
+Qed.
+
+(** THE REGISTRATION, purely.  At the log's own length the suffix obligation
+    is VACUOUS — nothing is said about the byte's history, which is what makes
+    registration legal AFTER [initlock]'s plain store — and the fold starts
+    FREE, which is the word's value there. *)
+Lemma wcds_ok_register log a base :
+  (base <= a < base + 4)%Z ->
+  wcds_clean log a ->
+  wcds_ok log a (WLock base (length log) None).
+Proof.
+  intros Hrng Hcl. split; [exact Hcl|].
+  split; [|apply wlp_alt_register]. split; [exact Hrng|].
   intros p m Hp Hn0 _. exfalso. apply lookup_lt_Some in Hp. lia.
 Qed.
 
@@ -873,19 +1405,25 @@ Qed.
 (** ... and its PROTOCOL twin: the whole map survives an acquire-/release-
     shaped store to a registered lock word, the window's bytes being exactly
     the ones the storing site holds [WLock] fragments for. *)
-Lemma wcds_agree_store_lock log mnew mc (zs : list Z) (base : Z) (n0 : nat) :
-  wm_pa mnew = base -> wlock_shaped mnew ->
+Lemma wcds_agree_store_lock log mnew mc mc' (zs : list Z) (base : Z)
+    (n0 : nat) (h h' : option nat) :
+  wm_pa mnew = base -> wlock_shaped mnew -> alt_step h mnew = Some h' ->
   (forall z, msg_byte mnew z <> None -> z ∈ zs) ->
-  (forall z, z ∈ zs -> mc !! z = Some (WLock base n0)) ->
-  wcds_agree log mc -> wcds_agree (log ++ [mnew]) mc.
+  (forall z, z ∈ zs -> mc !! z = Some (WLock base n0 h)) ->
+  (forall z, z ∈ zs -> mc' !! z = Some (WLock base n0 h')) ->
+  (forall z, z ∉ zs -> mc' !! z = mc !! z) ->
+  wcds_agree log mc -> wcds_agree (log ++ [mnew]) mc'.
 Proof.
-  intros Hpa Hsh Hcov Hin Hag a s Ha.
-  destruct (decide (msg_byte mnew a = None)) as [Hnone|Hsome].
-  - apply wcds_ok_app; [|by apply Hag].
-    intros m0 Hm0. by apply elem_of_list_singleton in Hm0 as ->.
-  - assert (s = WLock base n0) as ->.
-    { rewrite (Hin a (Hcov a Hsome)) in Ha. by simplify_eq. }
-    apply wcds_ok_store_lock; [done|done|by apply Hag].
+  intros Hpa Hsh Hst Hcov Hin Hin' Hout Hag a s Ha.
+  destruct (decide (a ∈ zs)) as [Hz|Hz].
+  - rewrite (Hin' a Hz) in Ha. injection Ha as <-.
+    apply (wcds_ok_store_lock log mnew a base n0 h h' Hpa Hsh Hst).
+    by apply Hag, Hin.
+  - rewrite (Hout a Hz) in Ha.
+    apply wcds_ok_app; [|by apply Hag].
+    intros m0 Hm0. apply elem_of_list_singleton in Hm0 as ->.
+    destruct (msg_byte mnew a) as [b|] eqn:Hb; [|done].
+    exfalso. apply Hz, Hcov. by rewrite Hb.
 Qed.
 
 (** The initial state map: every byte of the era-initial image is CLEAN (the
@@ -1116,8 +1654,8 @@ Proof. intros Hsy p m c Hp Ht Hk Hnp Hs _. by destruct (Hsy p m (conj Hp (conj H
     conjunct: a registered lock byte pays φ's obligation exactly as a clean
     one does, so the acquire/release leaves keep paying it off the very
     bundle they hand back. *)
-Lemma nv_byte_lock log c' a n base n0 :
-  wcds_lock log a base n0 -> nv_byte log c' a n.
+Lemma nv_byte_lock log c' a n base n0 h :
+  wcds_lock log a base n0 h -> nv_byte log c' a n.
 Proof. intros [Hcl _]. by apply nv_byte_clean. Qed.
 
 (** The uniform reading: any state a hart may legitimately PRESENT for a
@@ -1193,10 +1731,10 @@ Proof. intros H c n. by apply nv_byte_sync. Qed.
 Lemma nv_free_unwritten log a : latest_ts log a = 0%nat -> nv_free log a.
 Proof. intros H c n. by apply nv_byte_unwritten. Qed.
 
-Lemma nv_ok_lock log c a base n0 : wcds_lock log a base n0 -> nv_ok log c a.
+Lemma nv_ok_lock log c a base n0 h : wcds_lock log a base n0 h -> nv_ok log c a.
 Proof. intros [H _] n. by apply nv_byte_clean. Qed.
 
-Lemma nv_free_lock log a base n0 : wcds_lock log a base n0 -> nv_free log a.
+Lemma nv_free_lock log a base n0 h : wcds_lock log a base n0 h -> nv_free log a.
 Proof. intros [H _] c n. by apply nv_byte_clean. Qed.
 
 Lemma nv_byte_of_free log c a n : nv_free log a -> nv_byte log c a n.
@@ -1711,18 +2249,20 @@ Section resources.
       therefore no separate "registration witness" resource: the fragment
       inside the lock invariant IS the witness, and the export
       ([wlp_at_of_lock]) reads the pure protocol off it against the auth. *)
-  Definition wlock_st (a : Z) (base : Z) (n0 : nat) : iProp Σ :=
-    wcds_el a (DfracOwn 1) (WLock base n0).
+  Definition wlock_st (a : Z) (base : Z) (n0 : nat) (h : option nat)
+      : iProp Σ :=
+    wcds_el a (DfracOwn 1) (WLock base n0 h).
 
   Global Instance wcds_el_timeless a dq s : Timeless (wcds_el a dq s).
   Proof. rewrite /wcds_el. apply _. Qed.
 
-  Global Instance wlock_st_timeless a base n0 : Timeless (wlock_st a base n0).
+  Global Instance wlock_st_timeless a base n0 h :
+    Timeless (wlock_st a base n0 h).
   Proof. rewrite /wlock_st. apply _. Qed.
 
-  Lemma wlock_st_lookup a base n0 mc :
-    ghost_map_auth weak_cds_name 1 mc -∗ wlock_st a base n0 -∗
-    ⌜mc !! a = Some (WLock base n0)⌝.
+  Lemma wlock_st_lookup a base n0 h mc :
+    ghost_map_auth weak_cds_name 1 mc -∗ wlock_st a base n0 h -∗
+    ⌜mc !! a = Some (WLock base n0 h)⌝.
   Proof.
     iIntros "Ha Hel". rewrite /wlock_st /wcds_el.
     by iDestruct (ghost_map_lookup with "Ha Hel") as %Hlk.
@@ -1731,7 +2271,8 @@ Section resources.
   (** A lock byte is not a clean/owned/sync one: the fragments are
       incompatible, which is what makes the C/D/S store rules and the
       protocol rule mutually exclusive. *)
-  Lemma wlock_st_clean_excl a base n0 dq : wlock_st a base n0 -∗ wclean a dq -∗ False.
+  Lemma wlock_st_clean_excl a base n0 h dq :
+    wlock_st a base n0 h -∗ wclean a dq -∗ False.
   Proof.
     rewrite /wlock_st /wclean /wcds_el. iIntros "H1 H2".
     iDestruct (ghost_map_elem_agree with "H1 H2") as %Hq. by inversion Hq.
@@ -1901,22 +2442,30 @@ Section resources.
       registration witness (it lives inside [WeakLock.wlock_inv], the only
       writer of the word), and the interp tie [wcds_agree] covers the new arm
       automatically. *)
-  Lemma wlp_at_of_lock img log a base n0 :
-    wlat_interp img log -∗ wlock_st a base n0 -∗ ⌜wlp_at log a base n0⌝.
+  Lemma wlp_at_of_lock img log a base n0 h :
+    wlat_interp img log -∗ wlock_st a base n0 h -∗ ⌜wlp_at log a base n0⌝.
   Proof.
     iIntros "Hi He". iDestruct (wcds_lookup with "Hi He") as %Hok.
-    iPureIntro. exact (wcds_lock_wlp log a base n0 Hok).
+    iPureIntro. exact (wcds_lock_wlp log a base n0 h Hok).
   Qed.
 
-  Lemma nv_free_of_lock img log a base n0 :
-    wlat_interp img log -∗ wlock_st a base n0 -∗ ⌜nv_free log a⌝.
+  (** ... and its T2-0′ twin: the ALTERNATION, off the same fragment. *)
+  Lemma wlp_alt_of_lock img log a base n0 h :
+    wlat_interp img log -∗ wlock_st a base n0 h -∗ ⌜wlp_alt log a n0 h⌝.
   Proof.
     iIntros "Hi He". iDestruct (wcds_lookup with "Hi He") as %Hok.
-    iPureIntro. by apply (nv_free_lock log a base n0).
+    iPureIntro. exact (wcds_lock_alt log a base n0 h Hok).
   Qed.
 
-  Lemma nv_ok_of_lock img log c a base n0 :
-    wlat_interp img log -∗ wlock_st a base n0 -∗ ⌜nv_ok log c a⌝.
+  Lemma nv_free_of_lock img log a base n0 h :
+    wlat_interp img log -∗ wlock_st a base n0 h -∗ ⌜nv_free log a⌝.
+  Proof.
+    iIntros "Hi He". iDestruct (wcds_lookup with "Hi He") as %Hok.
+    iPureIntro. by apply (nv_free_lock log a base n0 h).
+  Qed.
+
+  Lemma nv_ok_of_lock img log c a base n0 h :
+    wlat_interp img log -∗ wlock_st a base n0 h -∗ ⌜nv_ok log c a⌝.
   Proof.
     iIntros "Hi He". iDestruct (nv_free_of_lock with "Hi He") as %H.
     iPureIntro. by apply nv_ok_of_free.
@@ -1930,18 +2479,19 @@ Section resources.
   Lemma wlock_register img log a base :
     (base <= a < base + 4)%Z ->
     wlat_interp img log -∗ wclean a (DfracOwn 1) ==∗
-    wlat_interp img log ∗ wlock_st a base (length log).
+    wlat_interp img log ∗ wlock_st a base (length log) None.
   Proof.
     intros Hrng. iIntros "Hi Hel".
     iDestruct "Hi" as (m mc) "(Hauth & %Hag & Hc & %Hagc)".
     rewrite /wclean /wcds_el.
     iDestruct (ghost_map_lookup with "Hc Hel") as %Hlk.
-    iMod (ghost_map_update (WLock base (length log)) with "Hc Hel")
+    iMod (ghost_map_update (WLock base (length log) None) with "Hc Hel")
       as "[Hc Hel]".
-    iModIntro. iFrame "Hel". iExists m, (<[a := WLock base (length log)]> mc).
+    iModIntro. iFrame "Hel".
+    iExists m, (<[a := WLock base (length log) None]> mc).
     iFrame "Hauth Hc". iSplitR; [iPureIntro; exact Hag|].
     iPureIntro. apply wcds_agree_insert; [exact Hagc|].
-    apply wcds_ok_register; [exact Hrng|lia|exact (Hagc a WClean Hlk)].
+    apply wcds_ok_register; [exact Hrng|exact (Hagc a WClean Hlk)].
   Qed.
 
 
@@ -2393,8 +2943,8 @@ Section resources.
   Definition wlock_regd (N : namespace) (a base : Z) : iProp Σ :=
     (∃ I : iProp Σ,
        inv N I ∗
-       □ (I -∗ ∃ n0 : nat,
-            wlock_st a base n0 ∗ (wlock_st a base n0 -∗ I)))%I.
+       □ (I -∗ ∃ (n0 : nat) (h : option nat),
+            wlock_st a base n0 h ∗ (wlock_st a base n0 h -∗ I)))%I.
 
   Global Instance wlock_regd_persistent N a base :
     Persistent (wlock_regd N a base).
@@ -2405,8 +2955,9 @@ Section resources.
   Proof. iIntros "(_ & _ & _ & _ & _ & _ & _ & $ & _)". Qed.
 
   (** THE PER-STATE EXPORT, off a fragment in hand. *)
-  Lemma weak_state_interp_lockproto (g : wgstate) (a base : Z) (n0 : nat) :
-    weak_state_interp g -∗ wlock_st a base n0 -∗
+  Lemma weak_state_interp_lockproto (g : wgstate) (a base : Z) (n0 : nat)
+      (h : option nat) :
+    weak_state_interp g -∗ wlock_st a base n0 h -∗
     ⌜wlp_at (wglog g) a base n0⌝.
   Proof.
     iIntros "Hi He". iDestruct (weak_state_interp_lat with "Hi") as "Hlat".
@@ -2416,6 +2967,31 @@ Section resources.
   (** ... and THROUGH THE SEAM, in one fancy update at a mask containing the
       lock's namespace — which is the form the adequacy wrapper consumes
       (the continuation of [wp_strong_adequacy] runs at ⊤). *)
+  Lemma wlock_regd_export_alt (N : namespace) (E : coPset) (g : wgstate)
+      (a base : Z) :
+    ↑N ⊆ E ->
+    weak_state_interp g -∗ wlock_regd N a base ={E}=∗
+    ⌜exists (n0 : nat) (h : option nat),
+       wlp_at (wglog g) a base n0 /\ wlp_alt (wglog g) a n0 h⌝.
+  Proof.
+    intros HN. iIntros "Hsi #Hreg".
+    iDestruct (weak_state_interp_lat with "Hsi") as "Hlat".
+    iDestruct "Hreg" as (I) "[#Hinv #Hacc]".
+    iInv "Hinv" as "HI" "Hclose".
+    iAssert (▷ (∃ (n0 : nat) (h : option nat),
+                  wlock_st a base n0 h ∗ (wlock_st a base n0 h -∗ I)))%I
+      with "[HI]" as "HQ".
+    { iNext. by iApply "Hacc". }
+    rewrite bi.later_exist. iDestruct "HQ" as (n0) "HQ".
+    rewrite bi.later_exist. iDestruct "HQ" as (h) "HQ".
+    rewrite bi.later_sep. iDestruct "HQ" as "[>Hst Hback]".
+    iDestruct (wlp_at_of_lock with "Hlat Hst") as %Hlp.
+    iDestruct (wlp_alt_of_lock with "Hlat Hst") as %Halt.
+    iMod ("Hclose" with "[Hst Hback]") as "_".
+    { iNext. by iApply "Hback". }
+    iModIntro. iPureIntro. by exists n0, h.
+  Qed.
+
   Lemma wlock_regd_export (N : namespace) (E : coPset) (g : wgstate)
       (a base : Z) :
     ↑N ⊆ E ->
@@ -2423,17 +2999,8 @@ Section resources.
     ⌜exists n0 : nat, wlp_at (wglog g) a base n0⌝.
   Proof.
     intros HN. iIntros "Hsi #Hreg".
-    iDestruct (weak_state_interp_lat with "Hsi") as "Hlat".
-    iDestruct "Hreg" as (I) "[#Hinv #Hacc]".
-    iInv "Hinv" as "HI" "Hclose".
-    iAssert (▷ (∃ n0 : nat, wlock_st a base n0 ∗ (wlock_st a base n0 -∗ I)))%I
-      with "[HI]" as "HQ".
-    { iNext. by iApply "Hacc". }
-    rewrite bi.later_exist. iDestruct "HQ" as (n0) "HQ".
-    rewrite bi.later_sep. iDestruct "HQ" as "[>Hst Hback]".
-    iDestruct (wlp_at_of_lock with "Hlat Hst") as %Hlp.
-    iMod ("Hclose" with "[Hst Hback]") as "_".
-    { iNext. by iApply "Hback". }
+    iMod (wlock_regd_export_alt N E g a base HN with "Hsi Hreg")
+      as %(n0 & h & Hlp & _).
     iModIntro. iPureIntro. by exists n0.
   Qed.
 

@@ -64,10 +64,11 @@ lemma, the F4a/F5 repairs, and the segment-composition lemma;
 `topo_linearizes`/`topo_exists`/`normalize_of_acyclic`, Closed; the
 chain's first step is now the direct linearization and `normalize` is
 demoted to analysis; one open item: the `Decision (RacyD GD x y)`
-instance — DONE: `WeakRvwmoDec.v`, `racyD_dec` + `normalize_of_acyclic'`, Closed]; F5's W-TV line landed in `WeakRvwmoConf.dedges` (`row_deps_wtv` non-vacuity); (3) DECIDE the F3″ interface (footprint at `wlock_alloc`,
-`WProt` store/read rules) BEFORE M4 ports a lock client, then T2-0′
-(F3′ + F3″); (4) [DONE the same day: B1a′ LANDED — `WeakRvwmoHull.v`, Closed];
-(5) B2e-3b certification
+instance — DONE: `WeakRvwmoDec.v`, `racyD_dec` + `normalize_of_acyclic'`, Closed]; F5's W-TV line landed in `WeakRvwmoConf.dedges` (`row_deps_wtv` non-vacuity); (3) [F3′ DONE the same day — `weak_ev_adequacy_lockalt`, tree green]
+DECIDE the F3″ interface (footprint at `wlock_alloc`, `WProt`
+store/read rules, `lock_auth` into the state interp; spec in route-b
+§4d.3′) BEFORE M4 ports a lock client, then build it; (4) [DONE the same day: B1a′ LANDED — `WeakRvwmoHull.v`, Closed];
+(4b) F5′ — transitive provenance through load addresses at the instance (`LRegW rd (DLdRes :: address srcs)`) — a B2e-3b PREREQUISITE (route-b F5′); (4c) B1b's device-order extension (`Rdev` as a sixth R arm; route-b §4d.4 B1b note); (5) B2e-3b certification
 machinery; (6) B2e-3c the per-segment classification (the L2′
 content); then B1b, B3, R6.
 

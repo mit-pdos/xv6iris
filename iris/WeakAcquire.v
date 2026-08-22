@@ -248,7 +248,7 @@ Section wp_lock.
     (* open the lock: ⊤ -> ⊤ ∖ ↑wlockN, held across the step *)
     iInv wlockN as (st t v) "(>Hw & Hlk)" "Hclose".
     (* the swap's return value, off the elements alone *)
-    iDestruct (wlat4L_flat_gen σ lk t v Hwf Hacclk with "Hlat Hw")
+    iDestruct (wlat4L_flat_gen σ lk t v _ Hwf Hacclk with "Hlat Hw")
       as %[Hflat _].
     iMod ("Hk" $! σ v with "[%] Hlat Hrest")
       as "(%Hpc & %Htext & %HP & %Hnvpc & Hlat & Hcont)"; [exact Hflat|].
@@ -260,7 +260,8 @@ Section wp_lock.
     destruct HQfr as [HQ HQeff].
     (* past the step: reassemble the invariant body and fire the core *)
     iDestruct (wacquire_core γ lk R cpu_id (Some (fin_to_nat cpu_id)) σ σ'
-                 Hwf Hacclk HQ with "Hlat [Hw Hlk]") as (v') "[%Hflat' Hupd]".
+                 Hwf Hacclk HQ eq_refl with "Hlat [Hw Hlk]")
+      as (v') "[%Hflat' Hupd]".
     { iExists st, t, v. iFrame "Hw". iExact "Hlk". }
     assert (Hvv : v = v') by exact (wflat_word_agree σ lk v v' Hflat Hflat').
     subst v'.
@@ -427,7 +428,7 @@ Section wp_lock.
     iNext. iIntros (tick σ') "%Hpost %HQfr".
     destruct HQfr as [HQ HQeff].
     iMod (wrelease_core γ lk R cpu_id (Some (fin_to_nat cpu_id)) σ σ' HQ
-            Hrelp Hbnd with "Hlat Hbody Htok HR") as "[Hlat Hbody]".
+            eq_refl Hrelp Hbnd with "Hlat Hbody Htok HR") as "[Hlat Hbody]".
     (* the same payment as the acquire: the release's own message is a
        [WCrel] store of THIS hart, so the fetch fact transports across the
        append, and [wrelease_core] hands the lock bundle back CLEAN. *)

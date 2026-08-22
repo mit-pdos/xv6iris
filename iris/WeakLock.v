@@ -119,6 +119,40 @@ Proof.
   split_and!; [reflexivity|exact Hk|right; apply lock_zero_data4].
 Qed.
 
+(** T2-0′ (F3′): the ALTERNATION side of the same two messages.  The acquire
+    swaps in ONE, which is not the zero word — that, plus the [WCexcl] class
+    and the message's author, is the whole content of the acquire step of
+    [WeakGhost.alt_step]; the release's is [lock_zero_data4] above. *)
+Lemma nth_byte_lock_one_0_ne : nth_byte lock_one 0 <> Z_to_bv 8 0.
+Proof. intros H. apply (f_equal bv_unsigned) in H. by vm_compute in H. Qed.
+
+Lemma lock_one_data4_ne tid k (a : Arch.pa) :
+  wm_data (wwrite_msg tid k a 4 lock_one) <> wlock_zero4.
+Proof.
+  rewrite wwrite_msg_data4 wlock_zero4_eq.
+  intros H. apply nth_byte_lock_one_0_ne. by injection H.
+Qed.
+
+(** The acquire's step: a successful swap on a FREE word installs its
+    author. *)
+Lemma alt_step_acq_msg (i : CPU) (a : Arch.pa) :
+  alt_step None (wwrite_msg (Some (fin_to_nat i)) WCexcl a 4 lock_one)
+  = Some (Some (fin_to_nat i)).
+Proof.
+  apply alt_step_acq; [apply lock_one_data4_ne|reflexivity|reflexivity].
+Qed.
+
+(** ... the FAILED swap's: the same message on a HELD word changes nothing. *)
+Lemma alt_step_fail_msg (tid : option nat) (a : Arch.pa) (t : nat) :
+  alt_step (Some t) (wwrite_msg tid WCexcl a 4 lock_one) = Some (Some t).
+Proof. apply alt_step_fail; [apply lock_one_data4_ne|reflexivity]. Qed.
+
+(** ... and the release's: the HOLDER's zero store frees it. *)
+Lemma alt_step_rel_msg (i : CPU) k (a : Arch.pa) :
+  alt_step (Some (fin_to_nat i))
+    (wwrite_msg (Some (fin_to_nat i)) k a 4 lock_zero) = Some None.
+Proof. apply alt_step_rel; [apply lock_zero_data4|reflexivity]. Qed.
+
 (* ====================================================================== *)
 (** ** 1. The instruction effects the two cores consume
 
@@ -154,9 +188,20 @@ Section weak_lock.
       WkYieldFrame, WkCtxSurface, WeakCtxLock, WeakBranch, WeakLeafAmo4Leaf)
       would buy nothing — no client names the registration point, and the
       export recovers it existentially. *)
+  (** T2-0′ (F3′): THE TIE.  The lock's ghost state names the holder; so does
+      the alternation fold.  [wlock_inv] IDENTIFIES the two, which is what
+      makes the fold's step rules discharge locally at the two leaves: the
+      acquire's success arm has [st = None] hence [h = None] (the acquire
+      rule), its contended arm has [st ≠ None] hence [h ≠ None] (the failed
+      swap), and the release holds [locked γ i] hence [h = Some i] (the
+      release rule, whose author side condition is the core's new
+      [tid = Some (fin_to_nat i)] hypothesis). *)
+  Definition tid_of (st : lock_state) : option nat :=
+    match st with Some (i, _) => Some (fin_to_nat i) | None => None end.
+
   Definition wlock_inv (γ : gname) (lk : Arch.pa) (R : vProp Σ) : iProp Σ :=
     (∃ (st : lock_state) (t : nat) (v : bv 32),
-       wlat4L lk t v ∗ lock_auth γ st ∗
+       wlat4L lk t v (tid_of st) ∗ lock_auth γ st ∗
        (⌜st = None⌝ ∗ ⌜v = lock_zero⌝ ∗ lock_frag γ None ∗ monPred_at R (view_scl t)
         ∨ ⌜st ≠ None⌝ ∗ ⌜v ≠ lock_zero⌝))%I.
 
@@ -204,7 +249,7 @@ Section weak_lock.
                       ⋅ ◯E (None : leibnizO lock_state)) : lockUR)) as (γ) "[Ha Hf]".
     { apply excl_auth_valid. }
     iMod (inv_alloc wlockN _ (wlock_inv γ lk R) with "[Hw Ha Hf HR]") as "#Hinv".
-    { iNext. iExists None, t, lock_zero. iFrame "Hw Ha".
+    { iNext. iExists None, t, lock_zero. rewrite /tid_of. iFrame "Hw Ha".
       iLeft. iSplitR; [done|]. iSplitR; [done|]. iFrame "Hf HR". }
     iModIntro. iFrame "Hi". iExists γ. iExact "Hinv".
   Qed.
@@ -224,7 +269,7 @@ Section weak_lock.
     iExists (wlock_inv γ lk R). iFrame "Hinv". iModIntro.
     iIntros "Hbody". iDestruct "Hbody" as (st t v) "(Hw & Ha & Harm)".
     iDestruct "Hw" as (n0) "[Hel (L0 & L1 & L2 & L3)]".
-    iExists n0.
+    iExists n0, (tid_of st).
     destruct j as [|[|[|[|j]]]]; [| | | |lia].
     - iFrame "L0". iIntros "L0". iExists st, t, v. iFrame "Ha Harm".
       iExists n0. rewrite /wlock_win. iFrame.
@@ -302,6 +347,10 @@ Section weak_lock.
   Lemma wacquire_core (γ : gname) (lk : Arch.pa) R (i : CPU) (tid : option nat)
       (σ σ' : wmstate) :
     wlog_wf (wm_log σ) → acc_wf lk 4 → wQ_amo_aq tid lk lock_one σ σ' →
+    (* T2-0′ (F3′): THE AUTHOR TIE.  The message the step appends is THIS
+       hart's — true at every xv6 site ([holding()]) — and it is the only way
+       the alternation fold's author bookkeeping is sound. *)
+    tid = Some (fin_to_nat i) →
     (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
     wlock_inv γ lk R -∗
     ∃ v : bv 32,
@@ -311,22 +360,21 @@ Section weak_lock.
             ((⌜v = lock_zero⌝ ∗ vwp_hold R (wm_ws σ') ∗ locked γ i)
              ∨ ⌜v ≠ lock_zero⌝)).
   Proof.
-    intros Hwf Hacc Heff.
+    intros Hwf Hacc Heff Htid.
     destruct Heff as ((Himg & (kc & Hlog & _) & Hle & Hflr) & Hgain & Hexcl).
     iIntros "Hi Hinv".
     iDestruct "Hinv" as (st t v) "(Hw & Ha & Harm)".
-    iDestruct (wlat4L_flat_gen σ lk t v Hwf Hacc with "Hi Hw")
+    iDestruct (wlat4L_flat_gen σ lk t v (tid_of st) Hwf Hacc with "Hi Hw")
       as %[Hflat Hts].
     iExists v. iSplitR; [by iPureIntro|].
-    (* the machine's own write: the elements move to the fresh top, value 1.
-       T2-0: it goes through the PROTOCOL store — the message is [WCexcl]
-       (pinned by [wQ_amo_aq]), which is the acquire arm of
-       [WeakGhost.wlock_shaped]. *)
-    iMod (wlat4L_store_gen tid WCexcl σ σ' lk t v lock_one
-            (wlock_shaped_acq tid lk lock_one) Himg Hexcl with "Hi Hw")
-      as "[Hi Hw]".
     iDestruct "Harm" as "[(-> & -> & Hfrag & HR)|(%Hst & %Hv)]".
-    - (* the lock was FREE: take it, and thaw the payload *)
+    - (* the lock was FREE: the swap is a SUCCESSFUL ACQUIRE, so the fold
+         moves from [None] to this hart — take the lock and thaw the payload *)
+      iMod (wlat4L_store_gen tid WCexcl σ σ' lk t lock_zero lock_one None
+              (Some (fin_to_nat i))
+              (wlock_shaped_acq tid lk lock_one)
+              ltac:(rewrite Htid; apply alt_step_acq_msg) Himg Hexcl
+              with "Hi Hw") as "[Hi Hw]".
       iMod (lock_take γ i with "Ha Hfrag") as "[Ha Hpre]".
       iMod (lock_setcpu γ (Some (i, false)) i with "Ha Hpre") as "(_ & Ha & Htok)".
       iModIntro. iFrame "Hi". iSplitR "HR Htok".
@@ -339,10 +387,16 @@ Section weak_lock.
         rewrite /vwp_hold. iApply (monPred_mono R (view_scl t) (ws_view (wm_ws σ'))).
         { rewrite -(Hts 0%nat ltac:(lia)). apply Hgain. lia. }
         iExact "HR".
-    - (* the lock was HELD: the swap returns a nonzero word; nothing moves but
-         the timestamp *)
+    - (* the lock was HELD: the swap is a FAILED one; the fold keeps the
+         holder, and nothing moves but the timestamp *)
+      destruct st as [[j b]|]; [|by destruct Hst].
+      iMod (wlat4L_store_gen tid WCexcl σ σ' lk t v lock_one
+              (Some (fin_to_nat j)) (Some (fin_to_nat j))
+              (wlock_shaped_acq tid lk lock_one)
+              (alt_step_fail_msg tid lk (fin_to_nat j)) Himg Hexcl
+              with "Hi Hw") as "[Hi Hw]".
       iModIntro. iFrame "Hi". iSplitR "".
-      + iExists st, (S (length (wm_log σ))), lock_one.
+      + iExists (Some (j, b)), (S (length (wm_log σ))), lock_one.
         iFrame "Hw Ha". iRight. iSplitR; [done|].
         iPureIntro. apply lock_one_ne_zero.
       + iRight. by iPureIntro.
@@ -363,6 +417,10 @@ Section weak_lock.
   Lemma wrelease_core (γ : gname) (lk : Arch.pa) R (i : CPU) (tid : option nat)
       (σ σ' : wmstate) :
     wQ_store tid lk lock_zero σ σ' →
+    (* T2-0′ (F3′): THE AUTHOR TIE — the releasing message is the holder's
+       own (see [wacquire_core]).  It is what the fold's release step needs:
+       only the holder may free the word. *)
+    tid = Some (fin_to_nat i) →
     (* φ-upgrade §1: the RELEASE-PENDING flag is what makes this store's
        message release-class ([WeakInstr.wm_class_of_relp]), hence what lets
        the lock word's invariant-held bundle be retargeted CLEAN.  It is set
@@ -376,11 +434,12 @@ Section weak_lock.
     vwp_hold R (wm_ws σ) ==∗
     wlat_interp (wm_img σ') (wm_log σ') ∗ wlock_inv γ lk R.
   Proof.
-    intros (Himg & (kc & Hlog & Hnp) & Hle & Hflr) Hrelp Hbnd.
+    intros (Himg & (kc & Hlog & Hnp) & Hle & Hflr) Htid Hrelp Hbnd.
     specialize (Hnp Hrelp).
     iIntros "Hi Hinv Htok HR".
     iDestruct "Hinv" as (st t v) "(Hw & Ha & _)".
-    (* the holder's token says the lock is held by [i] *)
+    (* the holder's token says the lock is held by [i] — hence, by the tie,
+       so does the alternation fold *)
     iDestruct (locked_state with "Ha Htok") as %->.
     (* THE DEPOSIT: everything the releaser holds is below the store's own
        timestamp, so it may be frozen there and handed to the invariant *)
@@ -390,13 +449,16 @@ Section weak_lock.
        the ZERO word and is at least release-class (the [w_relp] flag the
        preceding [fence rw,w] set is what rules out [WCplain]). *)
     iMod (wlat4L_store_gen tid kc σ σ' lk t v lock_zero
-            (wlock_shaped_rel tid kc lk Hnp) Himg Hlog
+            (Some (fin_to_nat i)) None
+            (wlock_shaped_rel tid kc lk Hnp)
+            ltac:(rewrite Htid; apply alt_step_rel_msg) Himg Hlog
             with "Hi Hw") as "[Hi Hw]".
     iMod (lock_clrcpu γ (Some (i, true)) i with "Ha Htok") as "(_ & Ha & Hpre)".
     iMod (lock_give γ (Some (i, false)) i with "Ha Hpre") as "(_ & Ha & Hfrag)".
     iModIntro. iFrame "Hi".
     iExists None, (S (length (wm_log σ))), lock_zero.
-    iFrame "Hw Ha". iLeft. iSplitR; [done|]. iSplitR; [done|]. iFrame "Hfrag HR".
+    iFrame "Hw Ha". iLeft. iSplitR; [done|].
+    iSplitR; [done|]. iFrame "Hfrag HR".
   Qed.
 
 End weak_lock.

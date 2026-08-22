@@ -642,7 +642,8 @@ Real RVWMO forbids it (rule 9).  But every pointer read in xv6 that
 feeds a later load is acquire- or fence-covered or same-hart, and rule 5
 / rule 4 pin the dependent load after the covering event, which kills
 the cycle by the ordinary window/fence arithmetic.  So rule-9-load is
-NOT required; it is recorded as an option (it would make the capstone's
+NOT required BY THE KILLS (but see F5′: it IS required by the
+certification step); it was first recorded as an option (it would make the capstone's
 hypothesis strictly closer to RVWMO at the cost of an opcode-carrying
 admin label — `LInstr` carries none and announce nodes are silent).
 What IS required: the W-TV edges (every read of a store instruction →
@@ -650,6 +651,33 @@ the store) must be in `gd_deps` — `dstep` already accumulates `ds_ld`
 per instruction and `dedges` does not consume it; the fix is one line
 in `dedges`, and it is what keeps walker reads and the walker's A/D
 pair from ever being witnesses (they are dep-pinned below the store).
+
+**F5′ — CORRECTION (2026-08-22, late): rule 9's load half IS needed,
+by the certification step, not by the kills.**  §4d.2(2) certifies a
+`K`-write `z` by a solo run in which a witness read `r₁` (source above
+`z`) reads the log instead, and claims `z`'s label is unaffected
+because every source of `z` is in `gd_deps`, hence below `z`.  That
+claim has a hole exactly the size of D-8: `r₁ →addr r₂ →data z` with
+`r₂` a LOAD.  `(r₂, z) ∈ gd_deps` pins `r₂ < z`, but nothing pins
+`r₁ < r₂` (no address sources on loads), so `r₁` can be a witness whose
+substituted value changes `r₂`'s ADDRESS, hence `r₂`'s value, hence
+`z`'s data — the certified message is then NOT `G`'s.  (Control through
+a witness is excluded: a branch before `z` is a ctrl edge into `z`, so
+its read is below `z`; same-byte later reads of a substituted read
+are themselves witnesses by poloc; fences and aq reads are rule-4/5
+pinned below `z`.  The load-address chain is the only leak.)  THE
+CHEAPEST HONEST FIX is TRANSITIVE PROVENANCE THROUGH LOAD ADDRESSES
+in the emission: the load's result register write names its address
+sources too — `LRegW rd (DLdRes :: address srcs)` at the instance
+(`WeakEvInst`) — and `row_deps`' `dprov` composition then yields
+`(r₁, z)` with no opcode data and no PTE/data distinction (rules 9+10
+composed are RVWMO-honest, so the assumption side stays ⊆ RVWMO).
+Instance-band cost: the `LRegW` emission for loads and whatever
+consumes its `srcs` (the D2/D3 view machinery sees one more source —
+check `srcs_view` users).  Without it, B2e-3b's "true label" claim is
+false and must be restricted to writes with no load-address chain
+from a witness — unworkable to classify.  DECISION: build the
+provenance extension as a B2e-3b prerequisite.
 
 **F6 — the per-site fact the lock kill cannot do without, named.**  Every
 CS-to-CS step of a cycle needs `(P)`: "the message a CS read of byte `a`
@@ -891,7 +919,18 @@ hypotheses of `cs_kill`, machine-grounded.
   (`erg_hull_beats_restr`).  Factored as cut-then-rename so B1a's label
   layer is reused by conversion; the rename layer is `WeakRvwmoNorm`'s
   plus `WeakRvwmoAcyc`'s transports.  All Closed.
-- **T2-0′ — the two exports (F3′, F3″)** — scope F3″ first.
+- **T2-0′ — F3′ LANDED (2026-08-22):** `WLock base n0 h` with the fold
+  `alt_step`/`wlp_holder_at`/`wlp_alt` in `WeakGhost.v`, the rules
+  `wcds_ok_store_lock_{acq,fail,rel}`, the tie `h = tid_of st` in
+  `wlock_inv`, the author hypothesis `tid = Some (fin_to_nat i)` on
+  both cores (threaded through WeakAcquire/WeakCtxLock/WkOwnPingPong/
+  WkYieldFrame/WkCtxSurface), the export
+  `weak_ev_adequacy_lockalt` (assumptions identical to `_lockproto`'s),
+  and the two kill lemmas `wlp_alt_two_acq` (no `i ≠ j` needed) and
+  `wlp_alt_open` (needs "p is i's LAST acquire" — load-bearing).  Note
+  `wlp_alt` carries no `base` and requires `n0 ≤ length log`;
+  `wlp_alt_value` is stated at the latest writer.  **F3″** remains:
+  scope it against §4d.3′.
 - **B2e-3b — THE CERTIFICATION MACHINERY (the E1 build, the route's
   largest item):** the gmo-ordered solo certification of an SCC's
   first-generation writes from `σ_P`, with the substituted-read
@@ -904,6 +943,28 @@ hypotheses of `cs_kill`, machine-grounded.
   kernel-level exhaustiveness claim; its failure mode is a site whose
   xv6 code is genuinely weak-memory-unsafe, and it is repaired by the
   Iris invariant (a fence or a lock), never by a premise.
+- **B1b — THE DEVICE ORDER IS THE OPEN DESIGN POINT (noted 2026-08-22).**
+  `exec_prog_ok'` is TRACE-indexed with ONE global device sequence
+  `dv : nat → dev_state` (`dv (S k)` is the post-fabric of the k-th
+  step), while `gdexec_conf`'s `dvp : agent → nat → dev_state` is
+  per-hart, row-indexed.  A global `dv` exists for a linearized cand
+  only if the per-hart device sequences CHAIN along the trace — i.e.
+  the device-touching events (and the admin `LDev` items riding in
+  their `adm_star` runs) are totally ordered in a way the
+  linearization preserves.  `R` does not contain that order today, so
+  a topological order of `R` may interleave two harts' MMIO runs
+  differently from `G`'s gmo and no `dv` threads.  Resolution to
+  build: make the FABRIC ORDER graph data — `Rdev := gmo restricted to
+  the fabric-touching events` (honest: MMIO is serialized by the
+  interconnect and the M5 fence discipline pins it into gmo), add it
+  to `R` (still ⊆ gmo, so `R_acyclic`/`topo_linearizes`/hulls extend
+  verbatim — it is a sixth arm), and state `gdexec_conf`'s device
+  parameter along that chain (`dvp` = the global fabric trace composed
+  with "the fabric position of hart i's n-th event", with non-fabric
+  steps leaving the device unchanged).  Do NOT try to derive the
+  device order from the lock structure (that would need the exports
+  at the very realization B1b is building).  Read `WeakAxRealize.v`
+  §adm_star/`LDev` and `WeakRvwmoConf.v` (S-d) before designing.
 - **B1b, B3, R6** as before (B1b now supplies `exec_prog_ok'` for a hull's
   linearization).
 

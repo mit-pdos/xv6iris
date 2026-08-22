@@ -150,6 +150,9 @@ Section clock.
       (σ σ' : wmstate) :
     wlog_wf (wm_log σ) → acc_wf lk 4 →
     wQ_amo_aq tid lk lock_one σ σ' →
+    (* T2-0′ (F3′): the message's author IS this hart — threaded down to
+       [WeakLock]'s cores, where the alternation fold reads it. *)
+    tid = Some (fin_to_nat i) →
     (∀ j : nat, (j < 4)%nat →
        wflat (wm_img σ) (wm_log σ) !! pa_add lk j = Some (nth_byte lock_zero j)) →
     (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
@@ -158,12 +161,12 @@ Section clock.
     wlat_interp (wm_img σ') (wm_log σ') ∗ wclock_body γ lk R ξL ∗
     wctx_held γ ξL ξ i ∗ ctx_own_at ξ i (wm_ws σ') ∗ R ξ.
   Proof.
-    intros Hwf Hacc HQ Hzero. iIntros "Hi Hinv Hrun".
+    intros Hwf Hacc HQ Htid Hzero. iIntros "Hi Hinv Hrun".
     assert (Hle : ws_le (wm_ws σ) (wm_ws σ'))
       by exact (proj1 (proj2 (proj2 (proj1 HQ)))).
     iDestruct (ctx_own_at_mono ξ i _ _ Hle with "Hrun") as "[Hlb Hmg]".
     iDestruct (wacquire_core γ lk (wledger_pay ξL (R ξL)) i tid σ σ'
-                 Hwf Hacc HQ with "Hi Hinv") as (v0) "[%Hflat Hupd]".
+                 Hwf Hacc HQ Htid with "Hi Hinv") as (v0) "[%Hflat Hupd]".
     assert (Hv : lock_zero = v0)
       by exact (wflat_word_agree σ lk lock_zero v0 Hzero Hflat).
     iMod "Hupd" as "(Hi & Hbody & Harm)".
@@ -201,6 +204,9 @@ Section clock.
       (R : CtxId → iProp Σ) `{!CtxMorph R} (i : CPU) (tid : option nat)
       (σ σ' : wmstate) :
     wQ_store tid lk lock_zero σ σ' →
+    (* T2-0′ (F3′): the message's author IS this hart — threaded down to
+       [WeakLock]'s cores, where the alternation fold reads it. *)
+    tid = Some (fin_to_nat i) →
     w_relp (wm_ws σ) = true →
     ws_bounded (wm_ws σ) (length (wm_log σ)) →
     (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
@@ -209,7 +215,7 @@ Section clock.
     wlat_interp (wm_img σ') (wm_log σ') ∗ wclock_body γ lk R ξL ∗
     ctx_own_at ξ i (wm_ws σ).
   Proof.
-    intros HQ Hrelp Hbnd.
+    intros HQ Htid Hrelp Hbnd.
     iIntros "Hi Hinv [Htok [%VL [HaL #Hd]]] [Hlb Hmg] HR".
     (* the depositor's ledger at its hart's view, and the lock's below it *)
     iMod (ctx_lb_sync ξ (wm_ws σ) with "Hlb") as "Ha".
@@ -221,8 +227,8 @@ Section clock.
     iMod (ctx_morph ξ ξL (ws_view (wm_ws σ)) with "Hdom HR") as "[Hdom HR]".
     iDestruct (ctx_dom_auth with "Hdom") as "Ha".
     (* the deposit is now an ordinary [wrelease_core] at the wrapped payload *)
-    iMod (wrelease_core γ lk (wledger_pay ξL (R ξL)) i tid σ σ' HQ Hrelp Hbnd
-            with "Hi Hinv Htok [HaL HR]") as "[$ $]".
+    iMod (wrelease_core γ lk (wledger_pay ξL (R ξL)) i tid σ σ' HQ Htid Hrelp
+            Hbnd with "Hi Hinv Htok [HaL HR]") as "[$ $]".
     { rewrite wledger_pay_at. iExists (ws_view (wm_ws σ)). by iFrame "HaL HR". }
     iModIntro. iFrame "Hmg". by iApply (ctx_lb_of_auth with "Ha").
   Qed.
@@ -267,7 +273,9 @@ Section clock.
     iFrame "Hlg".
     (* the lock word's own bundle moves to the fresh top, and stays CLEAN *)
     iMod (wlat4L_store_gen (Some (fin_to_nat i)) WCrel σ σ' lk t w lock_zero
-            (wlock_shaped_rel _ WCrel _ ltac:(discriminate)) Himg Hlog
+            (Some (fin_to_nat i)) None
+            (wlock_shaped_rel _ WCrel _ ltac:(discriminate))
+            (alt_step_rel_msg i WCrel lk) Himg Hlog
             with "Hi Hw") as "[Hi Hw]".
     (* THE FLIP, at the post-log whose last message is this hart's release *)
     rewrite Hlog.
@@ -342,7 +350,9 @@ Section clock.
     iDestruct (locked_state with "Ha Htok") as %->.
     (* the flag word's bundle moves to the fresh top and stays CLEAN *)
     iMod (wlat4L_store_gen (Some (fin_to_nat i)) WCrel σ σ' hf t w lock_zero
-            (wlock_shaped_rel _ WCrel _ ltac:(discriminate)) Himg Hlog
+            (Some (fin_to_nat i)) None
+            (wlock_shaped_rel _ WCrel _ ltac:(discriminate))
+            (alt_step_rel_msg i WCrel hf) Himg Hlog
             with "Hi Hw") as "[Hi Hw]".
     (* THE MINT: the handoff store is this hart's, release-class, at the log's
        fresh top, so it publishes every earlier position at once *)
@@ -381,6 +391,9 @@ Section clock.
       (tid : option nat) (σ σ' : wmstate) :
     wlog_wf (wm_log σ) → acc_wf hf 4 →
     wQ_amo_aq tid hf lock_one σ σ' →
+    (* T2-0′ (F3′): the message's author IS this hart — threaded down to
+       [WeakLock]'s cores, where the alternation fold reads it. *)
+    tid = Some (fin_to_nat c') →
     (∀ j : nat, (j < 4)%nat →
        wflat (wm_img σ) (wm_log σ) !! pa_add hf j = Some (nth_byte lock_zero j)) →
     (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
@@ -388,8 +401,8 @@ Section clock.
     wlat_interp (wm_img σ') (wm_log σ') ∗ wlock_inv γ hf (wctx_baton ξ) ∗
     locked γ c' ∗ ctx_own_at ξ c' (wm_ws σ').
   Proof.
-    intros Hwf Hacc HQ Hzero. iIntros "Hi Hinv Hall".
-    iDestruct (wacquire_core γ hf (wctx_baton ξ) c' tid σ σ' Hwf Hacc HQ
+    intros Hwf Hacc HQ Htid Hzero. iIntros "Hi Hinv Hall".
+    iDestruct (wacquire_core γ hf (wctx_baton ξ) c' tid σ σ' Hwf Hacc HQ Htid
                  with "Hi Hinv") as (v0) "[%Hflat Hupd]".
     assert (Hv : lock_zero = v0)
       by exact (wflat_word_agree σ hf lock_zero v0 Hzero Hflat).
@@ -429,6 +442,7 @@ Section clock.
       (tid : option nat) (σ σ' : wmstate) :
     wlog_wf (wm_log σ) → acc_wf hf 4 →
     wQ_amo_aq tid hf lock_one σ σ' →
+    tid = Some (fin_to_nat c') →
     (∀ j : nat, (j < 4)%nat →
        wflat (wm_img σ) (wm_log σ) !! pa_add hf j = Some (nth_byte lock_zero j)) →
     hart_ws c' (wm_ws σ') -∗
@@ -437,8 +451,8 @@ Section clock.
     wlat_interp (wm_img σ') (wm_log σ') ∗ wlock_inv γ hf (wctx_baton ξ) ∗
     locked γ c' ∗ ctx_own ξ c'.
   Proof.
-    intros Hwf Hacc HQ Hzero. iIntros "Hws Hi Hinv Hall".
-    iMod (wctx_resume_core ξ γ hf c' tid σ σ' Hwf Hacc HQ Hzero
+    intros Hwf Hacc HQ Htid Hzero. iIntros "Hws Hi Hinv Hall".
+    iMod (wctx_resume_core ξ γ hf c' tid σ σ' Hwf Hacc HQ Htid Hzero
             with "Hi Hinv Hall") as "($ & $ & $ & Hrun)".
     iModIntro. by iApply (ctx_own_close with "Hws Hrun").
   Qed.

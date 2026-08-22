@@ -232,7 +232,9 @@ Section yield.
     (* the flag word's bundle moves to the fresh top and stays CLEAN — a
        [WCrel] message is not an owned store *)
     iMod (wlat4L_store_gen (Some (fin_to_nat i)) WCrel σ σ' hf t w lock_zero
-            (wlock_shaped_rel _ WCrel _ ltac:(discriminate)) Himg Hlog
+            (Some (fin_to_nat i)) None
+            (wlock_shaped_rel _ WCrel _ ltac:(discriminate))
+            (alt_step_rel_msg i WCrel hf) Himg Hlog
             with "Hi Hw") as "[Hi Hw]".
     (* THE MINT.  The step's own message is this hart's, release-class, and at
        the log's fresh top — so it covers every earlier position at once. *)
@@ -292,6 +294,8 @@ Section yield.
       (i : CPU) (tid : option nat) (σ σ' : wmstate) :
     wlog_wf (wm_log σ) → acc_wf hf 4 →
     wQ_amo_aq tid hf lock_one σ σ' →
+    (* T2-0′ (F3′): the swap's author IS the resuming hart. *)
+    tid = Some (fin_to_nat i) →
     (* the spin loop's successful attempt: the flag word read 0 *)
     (∀ j : nat, (j < 4)%nat →
        wflat (wm_img σ) (wm_log σ) !! pa_add hf j = Some (nth_byte lock_zero j)) →
@@ -301,8 +305,8 @@ Section yield.
     wlat_interp (wm_img σ') (wm_log σ') ∗ wlock_inv γ hf (wbaton V) ∗
     locked γ i ∗ ctx_migr ξ i ∗ ⌜V ⊑ ws_view (wm_ws σ')⌝.
   Proof.
-    intros Hwf Hacc HQ Hzero. iIntros "Hi Hall Hinv".
-    iDestruct (wacquire_core γ hf (wbaton V) i tid σ σ' Hwf Hacc HQ
+    intros Hwf Hacc HQ Htid Hzero. iIntros "Hi Hall Hinv".
+    iDestruct (wacquire_core γ hf (wbaton V) i tid σ σ' Hwf Hacc HQ Htid
                  with "Hi Hinv") as (v0) "[%Hflat Hupd]".
     assert (Hv : lock_zero = v0)
       by exact (wflat_word_agree σ hf lock_zero v0 Hzero Hflat).
@@ -537,6 +541,7 @@ Section example.
     (* --- the resume --- *)
     wlog_wf (wm_log σ) → acc_wf hf 4 →
     wQ_amo_aq tid hf lock_one σ σ' →
+    tid = Some (fin_to_nat B) →
     (∀ j : nat, (j < 4)%nat →
        wflat (wm_img σ) (wm_log σ) !! pa_add hf j = Some (nth_byte lock_zero j)) →
     (* --- and then T's own three accesses, at a state with the same memory --- *)
@@ -571,11 +576,11 @@ Section example.
     vwp_hold (z ↦w{q} vz)
       (store_post (wm_ws σn) rl x (S (length (wm_log σn)))).
   Proof.
-    intros Hwf Hacc HQ Hzero Himg Hlg Hle Hcohx Hokx Hcohz Hokz
+    intros Hwf Hacc HQ Htidb Hzero Himg Hlg Hle Hcohx Hokx Hcohz Hokz
            Hmb Hother Htid Hk.
     iIntros "Hlog Hall Hi Hinv Hx Hz".
     (* --- the resume: the index and the invariant arrive, and nothing else --- *)
-    iMod (wyield_resume_core cur_ctx γ hf V B tid σ σ' Hwf Hacc HQ Hzero
+    iMod (wyield_resume_core cur_ctx γ hf V B tid σ σ' Hwf Hacc HQ Htidb Hzero
             with "Hi Hall Hinv") as "(Hi & Hbody & Htok & Hmg & %HV)".
     (* carry everything to the state T's own accesses run at *)
     assert (HVn : V ⊑ ws_view (wm_ws σn))
@@ -754,7 +759,8 @@ Section wp_yield.
     iSpecialize ("Hk2" with "Hall").
     (* the release itself, and the φ payment — [wwp_release_store]'s verbatim *)
     iMod (wrelease_core γ hf (wbaton V) cpu_id (Some (fin_to_nat cpu_id)) σ σ'
-            HQ Hrelp Hbnd with "Hlat Hbody Htok []") as "[Hlat Hbody]".
+            HQ eq_refl Hrelp Hbnd with "Hlat Hbody Htok []")
+      as "[Hlat Hbody]".
     { by iApply (wbaton_intro V (wm_ws σ) HV). }
     iAssert (⌜nv_hart (wm_log σ') cpu_id (wm_ws σ')⌝)%I as %Hnv'.
     { iDestruct "Hbody" as (st' t' v'') "[Hw' Hlk']".
