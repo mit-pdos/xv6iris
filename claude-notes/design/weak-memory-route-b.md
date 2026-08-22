@@ -1362,6 +1362,52 @@ at the five rv64d axioms.
   list makes the unifier δ-evaluate it (77 s) — lift the shape to a
   variable-only lemma and `apply`.
 
+## 4g. L2′ REDUCED (2026-08-23): what `l2_claim` actually asks of xv6
+
+`l2_claim` (Glue) is, per cycle segment `(x, entry, exit)` at the
+certified configuration: `seg_pin ∨ cs_hyps ∨ Bad`.  Unfold the three:
+- `seg_pin` is DECIDED ON THE ROW — `gacq_po` (the entry is an aq
+  read), `gfence_covers` (a fence between entry and exit), `gd_deps`
+  (`row_deps ⊇` address/data/ctrl/W-TV/CSR provenance into the exit,
+  DEC-4..7).  Fetch entries have no cross edge at all (§4f).
+- `Bad` is φ's: the entry observed an owned-unpublished message —
+  refuted at the certified configuration by
+  `weak_ev_pf_violation_free` (Glue's `no_bad_run`).
+- `cs_hyps` needs, besides row facts, that the entry is a `prot_read`
+  (F3″'s record: the read went through the PROTECTED load rule) of a
+  byte whose writer held the lock (`wprot_at`).
+So the ONLY kernel content is: **every cross-hart read that the row does
+not pin before the hart's next write is a `prot_read`.**  Two pieces:
+(A) A PORT CONVENTION, enforced when M4 ports a lock client: every
+    access to a lock's payload goes through `wplock_alloc`'s footprint
+    and the `WProt` load/store rules (`wprot_read_record`,
+    `wprot_store_core`).  Then "the read is a `prot_read`" holds BY
+    CONSTRUCTION for CS data reads.  (The convention is checkable: a
+    CS read done with the plain rule is a proof that compiles but
+    leaves no record — the claim then fails at that site, which is the
+    signal to fix the port, never to add a premise.)
+(B) A STATIC SITE CHECK over the image: every load site that the port
+    does NOT access through `WProt` is, on every path to the hart's next
+    store, pinned — branched on (`LCtrl` from its `rd`: the spin loops,
+    `holding`, `killed`, `started`, `panicked`), fenced (`__sync_
+    synchronize` after a flag read; the device ring's M5 discipline),
+    aq, or feeding the store (data/address/W-TV/CSR provenance) — or
+    reads a byte no other hart writes (per-cpu data, the hart's own
+    stack).  Value-independent (a CFG property of the binary; the pin
+    is syntactic dataflow the emission records anyway).  Build it as a
+    checker over the `Code*.v`/`KernelDecode*.v` layer with a Rocq
+    proof that every emitted row satisfies it — the same genre as
+    `tools/gen_code.py`'s decode lemmas — and feed it to `l2_claim` as
+    `seg_pin` at the graph level.
+(B) is the remaining "kernel claim" and it is FINITE and MECHANICAL; (A)
+costs nothing now and everything later if ignored.  `l2_claim` itself
+then follows by a case split per entry: recorded ⇒ `cs_hyps` (the
+exports at the certified log supply the holder facts; the two honest
+side conditions `n0 < gwix ACQ` and "the protected write does not
+touch the lock word" hold at every xv6 site and are discharged from
+the records); not recorded ⇒ (B) gives `seg_pin`, or the message is
+same-hart/unpublished ⇒ `Bad`/no cross edge.
+
 ## 5. Honest residual risks — OPEN
 
 - **THE K2-KILL'S PRECISE MECHANISM (flagged 2026-08-21):** K2's
