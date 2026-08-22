@@ -1837,8 +1837,9 @@ The failure mode of each is a green-looking ANSWER, not an error.
   grep the file afterwards.
 - **A green build BEFORE a rebase says nothing about the tree AFTER it, and the
   commit most likely to break you cannot conflict textually.** The nightly
-  dead-import sweep (`.github/workflows/dead-imports.yml`) removes and RE-POINTS
-  imports across ~100 files at a time. It changes no statement and no proof, so
+  dead-import sweep (`.github/workflows/dead-imports.yml`) removes, RE-POINTS
+  and DE-DUPLICATES imports across a hundred files at a time — and the de-dup
+  pass, added 2026-08-22, reaches ~380 files in its first run. It changes no statement and no proof, so
   the rebase is always clean — but it changes which names arrive TRANSITIVELY,
   and its likeliest victim is a brand-new file, whose own import list nobody has
   ever pruned and which therefore names half its vocabulary through chains that
@@ -1846,6 +1847,27 @@ The failure mode of each is a green-looking ANSWER, not an error.
   verification build is still running, however small the incoming delta looks.
   The fix is always the same: add the requires explicitly; the next sweep prunes
   whatever is genuinely unused.
+- **A LINE-ORIENTED REGEX THAT STOPS AT THE SYNTAX SILENTLY EXCLUDES EVERY
+  COMMENTED LINE — AND REPORTS THE SHORTFALL AS "NOTHING TO DO".**
+  `iris/detect_unused_imports.py`'s statement pattern ended at the `Require`'s
+  period (`\s*\.\s*$`), so `Require Import X.  (* why *)` — this tree's house
+  style for explaining an import — matched NOTHING. That is 1072 of the tree's
+  25833 `Require` lines, across 628 files, invisible to every nightly sweep
+  since the tool landed: never removed, never re-pointed, never de-duplicated,
+  and (worse, because it is silent) counted as *code* by the contiguity test, so
+  a duplicate straddling one looked separated by a definition. Teaching the
+  pattern about a trailing comment found 52 dead imports and 27 re-points in
+  files the sweep had "already cleaned" (2026-08-22). **The tell was never in
+  the output** — the report said what it found, and what it could not see was
+  not in it. When a source-scanning tool's yield drops off, check what its
+  pattern REJECTS against a `grep -c` of the raw construct before believing the
+  tree is clean. The same regex must also carry the comment through an edit: a
+  partially-rewritten line keeps its own, a re-pointed one hands it to the line
+  that replaces it (the comment says what the import is FOR, and a re-point aims
+  at the module actually providing exactly that), and a deleted line takes it
+  along. Only a comment CLOSED on the same line may be matched — one that opens
+  there and closes further down must stay invisible, or a deletion strands its
+  tail.
 - **A SENTINEL WAIT LOOP READS A LOG THAT IS ALREADY THERE.** The recommended
   "have the build write its own sentinel and wait on `grep EXIT` of the log"
   becomes an instant false green when a *previous session* left that log on the
