@@ -1090,6 +1090,7 @@ WeakEvDisk.v
 WeakEvStarted.v
 WeakEvInst.v
 WeakEvCapstone.v
+WeakEvProv.v
 WeakRvwmoConf.v
 WeakRvwmoRestr.v
 WeakRvwmoKill.v

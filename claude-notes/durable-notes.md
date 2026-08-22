@@ -126,7 +126,12 @@ change that produced it.
   (e.g. `¬ (p1 = n ∧ p2 = S n)`) on its own, so a following
   `exfalso; apply Hne` fails with "No such goal".  Two more from the same
   genre: `apply` does not pick a direction for an `iff` — use
-  `proj1`/`proj2` explicitly (and a `naive_solver` over a four-disjunct
+  `proj1`/`proj2` explicitly — and `apply lem in H` for an `iff` `lem`
+  silently picks the BACKWARD direction, so `apply elem_of_remove_dups in H`
+  turns `x ∈ remove_dups l` into `x ∈ remove_dups (remove_dups l)` rather
+  than `x ∈ l`, and the failure surfaces one tactic later as an
+  `exact`/`assumption` type mismatch; write `apply (proj1 (lem args)) in H`
+  (and a `naive_solver` over a four-disjunct
   iff-equivalence can simply not terminate; write per-disjunct lemmas);
   and ssreflect's `rewrite lem; [|lia]` puts the side condition FIRST
   (e.g. `lookup_app_r`'s `length l1 ≤ i` lands in goal 1, not 2), so the

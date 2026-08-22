@@ -31,11 +31,18 @@ axioms), no Admitted.  THE CHAIN IS NOW: T2-LIN ⇒ `RacyD` acyclic ⇒
    **B1b-2** the fabric order as bundle data (route-b §4d.4 B1b entry),
    and a one-instruction `hemit` non-vacuity witness (B0b-1's open
    question, inherited).
-2. **B2e-3b slice 2 — DEPENDENCY SOUNDNESS** (route-b §4e, read its
-   "two shapes" block): decide dynamic provenance (ii) vs decoded-role
-   coverage (i) — probe the instance's `RegRead` capture first; then
-   the per-instruction soundness lemma.  Residual already recorded:
-   trap ENTRY has no `stvec` edge (xv6 writes it from constants).
+2. **B2e-3b slice 2a DONE — DYNAMIC PROVENANCE (DEC-7)**: the
+   per-instruction channel `ibch` carries the carrier-register read
+   set; `erw_of` sources are dynamic (decoder still picks destinations
+   and the control GATE — ungating it would be a strengthening beyond
+   hardware); `WeakEvProv.v` has the soundness spine: `dreg_agree`,
+   `pnode_step_dagree`, `erun_silent_dagree`, `erun_ib_rds` (the
+   channel accumulates exactly the stretch's carrier reads),
+   `pstep_ev_dagree`.  REMAINING slice 2b: the per-INSTRUCTION
+   statement with memory answers (obligations P-a..P-d enumerated in
+   `WeakEvProv.v`'s header; P-c is a certification hypothesis, P-d the
+   iteration that needs slice 3's statement).  Residual: trap ENTRY
+   has no `stvec` edge (xv6 writes it from constants).
 3. **B2e-3b slice 3** — the gmo-ordered solo-run certification
    (§4d.2(2)) on top of 1–2.
 4. **B2e-3c** — the per-segment classification / the T2-LIN induction

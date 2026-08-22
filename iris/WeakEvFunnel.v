@@ -476,7 +476,7 @@ Section frame.
     iAssert (|==> ∃ ws' : wstate, ⌜ws_depmove (wgws σ c) ws'⌝ ∗
                     weak_state_interp σ' ∗ hart_ws c ws')%I
       with "[Hri Hlog Hlat Hwsa Hws Hcl]" as ">(%ws' & %Hdm' & Hσ & Hws)".
-    { destruct Hσ' as [(k0 & ->)|[(Hr & (v & ->))|(Hr & ->)]].
+    { destruct Hσ' as [(k0 & ->)|[(Hr & (v & ->))|[(Hr & (v & ->))|(Hr & ->)]]].
       - iMod (hart_ws_update c (wgws σ c) (wgws σ c) (erw_ws (wgws σ c) k0)
                 with "Hwsa Hws") as "[Hwsa Hws]".
         iDestruct ("Hcl" $! rs2 (erw_ws (wgws σ c) k0) (wglog σ)
@@ -533,6 +533,34 @@ Section frame.
           destruct (decide (c0 = c)) as [->|Hne];
             [by rewrite greg_insert_eq|by rewrite greg_insert_ne].
         + reflexivity.
+        + iExact "Hσ0".
+      - (* DEC-7 (slice 2a): the [RegRead] node — the per-instruction READ
+           SET grew and nothing else did.  [weak_state_interp] does not read
+           [wgib], so the shape reduces to the identity one by conversion
+           ([weak_state_interp_ib]). *)
+        rewrite weak_state_interp_ib.
+        iMod (hart_ws_update c (wgws σ c) (wgws σ c) (wgws σ c)
+                with "Hwsa Hws") as "[Hwsa Hws]".
+        iDestruct ("Hcl" $! rs2 (wgws σ c) (wglog σ)
+                     with "[%] [%] [%] [%] [%] Hri Hlog Hlat Hwsa") as "Hσ0".
+        { lia. }
+        { exact (Hbnd c). }
+        { exact (no_violation_hart _ _ c Hnv). }
+        { exists []. rewrite app_nil_r. split; [reflexivity|].
+          intros mm Hmm. by apply elem_of_nil in Hmm. }
+        { exact Hwf. }
+        iModIntro. iExists (wgws σ c). iFrame "Hws".
+        iSplitR; [iPureIntro; reflexivity|].
+        destruct σ as [gr img lg f dv gn pw ib0]. simpl in Hr.
+        iApply (weak_state_interp_ptwise
+                  (ewg_regwslog (WGState gr img lg f dv gn pw ib0) c rs2 (f c) lg)
+                  gr f ib0 with "[Hσ0]").
+        + intros c0. rewrite /ewg_regwslog /= Hr.
+          destruct (decide (c0 = c)) as [->|Hne];
+            [by rewrite greg_insert_eq|by rewrite greg_insert_ne].
+        + intros c0. rewrite /ewg_regwslog /=.
+          destruct (decide (c0 = c)) as [->|Hne];
+            [by rewrite gws_insert_eq|by rewrite gws_insert_ne].
         + iExact "Hσ0".
       - iMod (hart_ws_update c (wgws σ c) (wgws σ c) (wgws σ c)
                 with "Hwsa Hws") as "[Hwsa Hws]".

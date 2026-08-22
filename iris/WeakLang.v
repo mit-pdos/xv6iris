@@ -54,6 +54,50 @@ Local Open Scope Z_scope.
     Decision 2: timestamp 0 is the image, timestamp [i+1] is [wglog !! i]),
     and with one [wstate] per hart.  The generation/power fields are
     untouched — the crash layer is orthogonal to the memory model. *)
+(** *** D3 / B2e-3b slice 2a: THE PER-INSTRUCTION CHANNEL
+
+    The hart's announced instruction bits AND the DYNAMIC REGISTER
+    PROVENANCE of the instruction in flight — the list of dependency-carrying
+    registers ([wreg]s: GPRs [1..31] and [WeakDeps]' CSR pseudo-registers
+    [32..52]) that the Sail run has READ since the instruction started.
+
+    WHY THE READ SET RIDES HERE (route-b design §4e, DECIDED (ii) "dynamic
+    provenance").  RVWMO's syntactic dependencies are DECODED, and the
+    decoder cannot see what the Sail semantics actually consults — a memory
+    op reads [satp]/[mstatus] for translation and permissions, [sret] reads
+    [sepc], and no encoding field names them.  Provenance SOUNDNESS ("two
+    runs that agree on the named sources emit the same label") therefore has
+    to name the registers the run really read, which is exactly this list.
+    It is reset at the two instruction boundaries ([Interface.Ret tt] and
+    [Interface.InstrAnnounce]) and appended to at every [RegRead] of a
+    carrier register; non-carriers (PC, [cur_privilege], [misa], …) are
+    ignored — see [WeakEvLang.ereg_num].
+
+    [WeakGhost.weak_state_interp] does not mention the field, so widening it
+    is invisible to every WP rule. *)
+Record ibch := IbCh {
+  ib_bits : option (SailStdpp.Values.mword 32);
+  ib_rds  : list wreg;
+}.
+
+(** The two BOUNDARY values and the ACCUMULATOR.  [ib_read] takes the
+    already-classified register number ([None] = "not a dependency
+    carrier"), so this file needs nothing from [WeakDeps]. *)
+Definition ib_none : ibch := IbCh None [].
+Definition ib_ann (w : SailStdpp.Values.mword 32) : ibch := IbCh (Some w) [].
+Definition ib_read (i : ibch) (o : option wreg) : ibch :=
+  match o with
+  | Some r => IbCh (ib_bits i) (ib_rds i ++ [r])
+  | None => i
+  end.
+
+Lemma ib_read_bits i o : ib_bits (ib_read i o) = ib_bits i.
+Proof. by destruct o. Qed.
+Lemma ib_read_rds_some i r : ib_rds (ib_read i (Some r)) = ib_rds i ++ [r].
+Proof. reflexivity. Qed.
+Lemma ib_read_rds_none i : ib_rds (ib_read i None) = ib_rds i.
+Proof. reflexivity. Qed.
+
 Record wgstate := WGState {
   wgregs : CPU -> regstate;
   wgimg  : gmap Arch.pa (bv 8);
@@ -70,8 +114,11 @@ Record wgstate := WGState {
       in the expression (every WP statement mentions the expression, and the
       D3 acceptance test is that no WP statement moves).
       [WeakGhost.weak_state_interp] does not mention it: no ghost, no
-      leaf-visible resource, no obligation. *)
-  wgib   : CPU -> option (SailStdpp.Values.mword 32);
+      leaf-visible resource, no obligation.
+
+      SLICE 2a: it is the whole [ibch] channel — the bits AND the dynamic
+      read set. *)
+  wgib   : CPU -> ibch;
 }.
 
 (** pointwise update of a single hart's weak state — the [wstate] twin of
@@ -94,19 +141,17 @@ Proof.
 Qed.
 
 (** ... and the same for the D3 instruction-bits field. *)
-Global Instance gib_insert :
-    Insert CPU (option (SailStdpp.Values.mword 32))
-      (CPU -> option (SailStdpp.Values.mword 32)) :=
+Global Instance gib_insert : Insert CPU ibch (CPU -> ibch) :=
   fun cpu v gi c => if decide (c = cpu) then v else gi c.
 
-Lemma gib_insert_eq (gi : CPU -> option (SailStdpp.Values.mword 32)) (c : CPU) v :
+Lemma gib_insert_eq (gi : CPU -> ibch) (c : CPU) v :
   (<[c := v]> gi) c = v.
 Proof.
   rewrite /insert /gib_insert.
   destruct (decide (c = c)) as [_|Hne]; [reflexivity|congruence].
 Qed.
 
-Lemma gib_insert_ne (gi : CPU -> option (SailStdpp.Values.mword 32))
+Lemma gib_insert_ne (gi : CPU -> ibch)
     (c c' : CPU) v :
   c' ≠ c -> (<[c := v]> gi) c' = gi c'.
 Proof.

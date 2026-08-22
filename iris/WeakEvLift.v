@@ -760,6 +760,10 @@ Definition esil_sigma (σ : wgstate) (c : CPU) (rs' : regstate) (σ' : wgstate)
   (exists k : erw_kind, σ' = ewg_rw σ c rs' k)
   \/ (rs' = wgregs σ c /\
       exists v : oib32, σ' = ewg_ibws σ c v (instr_post (wgws σ c)))
+  (* DEC-7 (slice 2a): the [RegRead] node's shape — the per-instruction READ
+     SET grows, and NOTHING else moves.  [weak_state_interp] does not read
+     [wgib], so this shape is as invisible as the announce's bits half. *)
+  \/ (rs' = wgregs σ c /\ exists v : oib32, σ' = ewg_ib σ c v)
   \/ (rs' = wgregs σ c /\ σ' = σ).
 
 (** THE SEMANTIC BRIDGE: a silent node IS an arm of [ecycle_step], and its
@@ -777,7 +781,9 @@ Proof.
     injection Hnode as <- <-;
     solve [ eexists; (split; [by split|]);
               right; left; (split; [reflexivity|by eexists])
-          | eexists; (split; [by split|]); right; right; by split
+          | eexists; (split; [by split|]);
+              right; right; left; (split; [reflexivity|by eexists])
+          | eexists; (split; [by split|]); right; right; right; by split
           | eexists; (split; [by split|]); left; by eexists ].
 Qed.
 
@@ -794,7 +800,8 @@ Proof.
     injection Hnode as <- <-; destruct Hcy as (-> & ->);
     (split; [reflexivity|]);
     solve [ right; left; (split; [reflexivity|by eexists])
-          | right; right; by split | left; by eexists ].
+          | right; right; left; (split; [reflexivity|by eexists])
+          | right; right; right; by split | left; by eexists ].
 Qed.
 
 (** THE VIEW MOVE OF A SILENT NODE.  The three shapes are [erw_ws] of a
@@ -804,22 +811,30 @@ Qed.
 Lemma esil_sigma_depmove σ c rs' σ' :
   esil_sigma σ c rs' σ' -> ws_depmove (wgws σ c) (wgws σ' c).
 Proof.
-  intros [(k & ->)|[(-> & (v & ->))|(-> & ->)]].
+  intros [(k & ->)|[(-> & (v & ->))|[(-> & (v & ->))|(-> & ->)]]].
   - rewrite ewg_rw_ws. apply erw_ws_depmove.
   - rewrite /ewg_ibws /= gws_insert_eq. apply instr_post_depmove.
+  - reflexivity.
   - reflexivity.
 Qed.
 
 Lemma esil_sigma_log σ c rs' σ' : esil_sigma σ c rs' σ' -> wglog σ' = wglog σ.
-Proof. intros [(k & ->)|[(_ & (v & ->))|(_ & ->)]]; by [rewrite ewg_rw_log| |]. Qed.
+Proof.
+  intros [(k & ->)|[(_ & (v & ->))|[(_ & (v & ->))|(_ & ->)]]];
+    by [rewrite ewg_rw_log| | |].
+Qed.
 
 Lemma esil_sigma_img σ c rs' σ' : esil_sigma σ c rs' σ' -> wgimg σ' = wgimg σ.
-Proof. intros [(k & ->)|[(_ & (v & ->))|(_ & ->)]]; by [rewrite ewg_rw_img| |]. Qed.
+Proof.
+  intros [(k & ->)|[(_ & (v & ->))|[(_ & (v & ->))|(_ & ->)]]];
+    by [rewrite ewg_rw_img| | |].
+Qed.
 
 Lemma esil_sigma_regs σ c rs' σ' : esil_sigma σ c rs' σ' -> wgregs σ' c = rs'.
 Proof.
-  intros [(k & ->)|[(-> & (v & ->))|(-> & ->)]];
-    [by rewrite ewg_rw_regs greg_insert_eq|reflexivity|reflexivity].
+  intros [(k & ->)|[(-> & (v & ->))|[(-> & (v & ->))|(-> & ->)]]];
+    [by rewrite ewg_rw_regs greg_insert_eq|reflexivity|reflexivity
+    |reflexivity].
 Qed.
 
 (* ====================================================================== *)
@@ -1156,7 +1171,7 @@ Section batch.
     iAssert (|==> ∃ ws' : wstate, ⌜ws_depmove (wgws σ c) ws'⌝ ∗
                     weak_state_interp σ' ∗ hart_ws c ws')%I
       with "[Hri Hlog Hlat Hwsa Hws Hcl]" as ">(%ws' & %Hdm' & Hσ & Hws)".
-    { destruct Hσ' as [(k & ->)|[(Hr & (v & ->))|(Hr & ->)]].
+    { destruct Hσ' as [(k & ->)|[(Hr & (v & ->))|[(Hr & (v & ->))|(Hr & ->)]]].
       - iMod (hart_ws_update c (wgws σ c) (wgws σ c) (erw_ws (wgws σ c) k)
                 with "Hwsa Hws") as "[Hwsa Hws]".
         iDestruct ("Hcl" $! rs2 (erw_ws (wgws σ c) k) (wglog σ)
@@ -1213,6 +1228,34 @@ Section batch.
           destruct (decide (c0 = c)) as [->|Hne];
             [by rewrite greg_insert_eq|by rewrite greg_insert_ne].
         + reflexivity.
+        + iExact "Hσ0".
+      - (* DEC-7 (slice 2a): the [RegRead] node — the per-instruction READ
+           SET grew and nothing else did.  [weak_state_interp] does not read
+           [wgib], so the shape reduces to the identity one by conversion
+           ([weak_state_interp_ib]). *)
+        rewrite weak_state_interp_ib.
+        iMod (hart_ws_update c (wgws σ c) (wgws σ c) (wgws σ c)
+                with "Hwsa Hws") as "[Hwsa Hws]".
+        iDestruct ("Hcl" $! rs2 (wgws σ c) (wglog σ)
+                     with "[%] [%] [%] [%] [%] Hri Hlog Hlat Hwsa") as "Hσ0".
+        { lia. }
+        { exact (Hbnd c). }
+        { exact (no_violation_hart _ _ c Hnv). }
+        { exists []. rewrite app_nil_r. split; [reflexivity|].
+          intros mm Hmm. by apply elem_of_nil in Hmm. }
+        { exact Hwf. }
+        iModIntro. iExists (wgws σ c). iFrame "Hws".
+        iSplitR; [iPureIntro; reflexivity|].
+        destruct σ as [gr img lg f dv gn pw ib0]. simpl in Hr.
+        iApply (weak_state_interp_ptwise
+                  (ewg_regwslog (WGState gr img lg f dv gn pw ib0) c rs2 (f c) lg)
+                  gr f ib0 with "[Hσ0]").
+        + intros c0. rewrite /ewg_regwslog /= Hr.
+          destruct (decide (c0 = c)) as [->|Hne];
+            [by rewrite greg_insert_eq|by rewrite greg_insert_ne].
+        + intros c0. rewrite /ewg_regwslog /=.
+          destruct (decide (c0 = c)) as [->|Hne];
+            [by rewrite gws_insert_eq|by rewrite gws_insert_ne].
         + iExact "Hσ0".
       - iMod (hart_ws_update c (wgws σ c) (wgws σ c) (wgws σ c)
                 with "Hwsa Hws") as "[Hwsa Hws]".

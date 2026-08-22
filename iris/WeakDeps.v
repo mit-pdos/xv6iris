@@ -170,6 +170,41 @@
       on [sstatus] ([csrsi]/[csrci] x5 with [rd = x0], and the one
       [csrrci a5,sstatus,2]); [sret] x2, [mret] x1, [wfi] x1,
       [sfence.vma] x6, and no [ecall]/[ebreak] in the kernel image.
+
+    (DEC-7 / THE SOURCE LISTS ARE NOT USED BY THE EMISSION ANY MORE,
+     2026-08-22; route-b design §4e, slice 2a "DYNAMIC PROVENANCE")
+      **SOURCES ARE DYNAMIC; THE DECODER'S SOURCE LISTS REMAIN AS THE
+      SYNTACTIC REFERENCE AND AS [vm_compute] CROSS-CHECKS.**
+
+      Provenance SOUNDNESS — "two runs of the same instruction from
+      regstates that agree on the sources the emission NAMES emit the same
+      label" — needs the named sources to COVER the registers the Sail
+      semantics actually reads, and no decoder can see those: a translated
+      access reads [satp] and [mstatus], [sret] reads [sepc], and no
+      encoding field names them.  So [WeakEvLang.erw_of] now builds a
+      register write's source list from the PER-INSTRUCTION READ SET the
+      machine accumulates ([WeakLang.ibch]'s [ib_rds], appended to at every
+      [RegRead] of a carrier register, reset at the two instruction
+      boundaries), and coverage holds by construction
+      ([WeakEvProv.erun_ib_rds] / [WeakEvProv.erun_silent_dagree]).
+
+      WHAT THIS FILE IS STILL THE ORACLE FOR — everything except the source
+      lists: WHICH register is the destination ([deps_rd]/[deps_rd2], the
+      DEC-4 join that decides which [RegWrite] node emits [LRegW] at all),
+      whether the result carries the load result ([DLdRes], a role question),
+      whether a [nextPC] write is a CONTROL node at all ([deps_ctrl] being
+      non-empty — without that gate EVERY instruction would become a
+      control-dependency point, far beyond RVWMO and beyond hardware), and
+      the memory labels' own operand lists ([deps_asrc]/[deps_vsrc], which
+      slice 2a does not touch).
+
+      HONESTY AND POLARITY.  The dynamic set is a SUPERSET of the decoded
+      one on the image's forms (the [erw_of_*] witnesses in [WeakEvLang]
+      re-record exactly that: fed the decoded registers, [erw_of] returns
+      the decoded answer), so no RVWMO syntactic dependency is lost.  The
+      extra sources are CSR-mediated, and an edge from a CSR exists only
+      when that CSR's own provenance is non-empty — a chain real hardware
+      also orders.  Adding sources is the STRONGER direction, as in DEC-5/6.
  *)
 From Stdlib.ssr Require Import ssreflect.
 From stdpp Require Import gmap finite list.

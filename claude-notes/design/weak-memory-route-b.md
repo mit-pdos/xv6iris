@@ -1203,6 +1203,47 @@ value reaches them.  Witnesses: `row_deps_sret_chain` + `_before` twin
 24 GPR-write sites' CSRs, the pure reads, the immediate forms and the
 two returns.  Tree green; both capstones at the five rv64d axioms.
 
+**LANDED — SLICE 2a, DYNAMIC REGISTER PROVENANCE, 2026-08-22 (DEC-7):**
+the per-instruction channel is now a record, `WeakLang.ibch = { ib_bits :
+option (mword 32); ib_rds : list wreg }` (`oib32` is a notation for it), with
+`ib_none` / `ib_ann w` at the two boundaries and `ib_read i (ereg_num r)` at
+every `RegRead`; `WeakEvLang.ib_rd` is the instance-side spelling.  The
+language's `RegRead` arm is no longer σ-silent — it writes `ewg_ib σ c
+(ib_rd (wgib σ c) r)` — which cost `WeakEvLift.esil_sigma` a FOURTH shape
+(`∃ v, σ' = ewg_ib σ c v`, invisible to `weak_state_interp` by conversion,
+so `weak_state_interp_ib` closes it), one extra bullet in
+`ewp_ev_sil_node`/its `WeakEvFunnel` twin, one extra `esil_case`-exempt arm
+in `ecycle_step_factor` (new lemma `elab_apply_ib`), and a
+`rewrite weak_state_interp_ib` in `WeakEvWire`'s two `RegRead` WP rules.
+`erw_of` takes the read set as a second argument and builds the SOURCE list
+as `erw_srcs dec rds = (if has_ldres dec then [DLdRes] else []) ++
+(DReg <$> remove_dups rds)`; the decoder keeps the DESTINATION (DEC-4's
+join), the `DLdRes` flag, and — crucially — the CONTROL GATE: `deps_ctrl
+role = []` still means "not a control node", because handing every
+instruction's read set to `ERWctrl` would make each instruction a
+control-dependency point, far beyond RVWMO and beyond hardware.  All 29
+`erw_of_*` witnesses are re-recorded with the decoded registers as the read
+set and return the DECODED answers unchanged; five new ones record the
+strict superset (`ld` whose run read `satp`/`sstatus`), the dedup, the
+control gate and the branch.  `WeakRvwmoConf`'s `row_deps_*` rows are
+hand-written label lists and did NOT move.  THE SOUNDNESS LEMMAS are the
+new file `iris/WeakEvProv.v`: `dreg_agree S rs1 rs2` ("agree on every
+non-carrier register and on every carrier named in `S`"),
+`pnode_step_regread_agree` (the per-step sentence),
+`pnode_step_dagree`/`pstep_hart_dagree`/`pstep_ev_dagree` (the whole node
+dispatch, PLIC wire included), `esil_node_dagree` +
+`erun_silent_dagree` (the silent-run induction on
+`WeakEvLift.erun_silent`'s spine, at the WEAKER hypothesis — agreement on
+what the stretch READ, not on the owned frame `D`), and the coverage bridge
+`pnode_step_channel` / `ibn_step_rds` / `erun_ib_rds` ("away from an
+instruction boundary the channel accumulates exactly the stretch's carrier
+reads") with the corollary `erun_silent_dagree_channel`.  ALL `Qed`; the
+per-INSTRUCTION statement (memory answers included) is NOT stated — its
+four obligations (P-a..P-d) are enumerated in the file's header, and three
+of them are already discharged; the fourth needs slice 3's certification
+statement to exist.  Tree green; both capstones and `gdexec_conf_deps_wf`
+at the five rv64d axioms.
+
 ## 5. Honest residual risks — OPEN
 
 - **THE K2-KILL'S PRECISE MECHANISM (flagged 2026-08-21):** K2's

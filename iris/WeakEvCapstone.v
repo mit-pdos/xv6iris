@@ -555,7 +555,7 @@ Proof.
        CLEARS the announced bits *)
     rewrite /pstep_node /ehart_m /ehart_fn /pnode_step /= in Hps.
     destruct Hps as (tick & -> & -> & -> & -> & -> & ->).
-    rewrite (elab_apply_instr σ c k None).
+    rewrite (elab_apply_instr σ c k ib_none).
     by apply (EPFBoundary c P σ tick).
 Qed.
 
@@ -697,15 +697,15 @@ Proof.
     exists LInstr.
     have Hstep := wp_pf_step_intro pstep_ev pcls_ev (fin_to_nat c) LInstr
                     (ecfg_of P σ) (ehart_ag P σ c)
-                    (PHart c (riscv_step tick) (wgregs σ c) None None)
+                    (PHart c (riscv_step tick) (wgregs σ c) None ib_none)
                     (wgdev σ) (eags_hart P σ c).
     rewrite -(elab_apply_instr σ c
-                (pcls_ev (pa_st (ehart_ag P σ c)) LInstr (wgws σ c)) None)
+                (pcls_ev (pa_st (ehart_ag P σ c)) LInstr (wgws σ c)) ib_none)
             ecfg_of_hart_upd.
     rewrite /pf_cfg pf_log_hart pf_ws_hart in Hstep.
     apply Hstep; [|exact I].
     rewrite /pstep_ev /= /ehart_ag /= Hh /=.
-    split; [reflexivity|]. exists None, (Some None). split_and!;
+    split; [reflexivity|]. exists None, (Some ib_none). split_and!;
       [reflexivity|reflexivity|].
     left. rewrite /pstep_node /pnode_step /=. by exists tick.
   - (* one cycle event *)

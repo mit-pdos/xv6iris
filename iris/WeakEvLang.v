@@ -184,7 +184,7 @@ Definition ewg_log (σ : wgstate) (lg : list wmsg) : wgstate :=
     unambiguous, because an RVC halfword has [bits[1:0] <> 0b11]
     ([WeakDeps.ib_compressed] is exactly that test), so the decoder can tell
     the two apart from the 32-bit value alone. *)
-Notation oib32 := (option (SailStdpp.Values.mword 32)) (only parsing).
+Notation oib32 := WeakLang.ibch (only parsing).
 
 Definition ib_of_bvn (o : bvn) : SailStdpp.Values.mword 32 :=
   Z_to_bv 32 (bvn_unsigned o).
@@ -194,8 +194,7 @@ Definition ib_of_bvn (o : bvn) : SailStdpp.Values.mword 32 :=
     [wgib], so this shape is INVISIBLE to the state interpretation — which is
     what [WeakEvLift.weak_state_interp_ib] records and what lets the announce
     node stay silent for the reflective cursor (D3 acceptance test). *)
-Definition ewg_ib (σ : wgstate) (c : CPU)
-    (v : option (SailStdpp.Values.mword 32)) : wgstate :=
+Definition ewg_ib (σ : wgstate) (c : CPU) (v : oib32) : wgstate :=
   WGState (wgregs σ) (wgimg σ) (wglog σ) (wgws σ) (wgdev σ) (wggen σ)
           (wgpow σ) (<[c := v]> (wgib σ)).
 
@@ -322,13 +321,124 @@ Definition ereg_csr_num (r : register) : option wreg :=
 Definition ereg_num (r : register) : option wreg :=
   match ereg_csr_num r with Some n => Some n | None => ereg_gpr_num r end.
 
+(** *** DEC-7 (B2e-3b slice 2a): THE SOURCES ARE DYNAMIC
+
+    [WeakDeps.deps_of_bits] decodes RVWMO's SYNTACTIC operand roles from the
+    instruction word, and that is still the oracle for the DESTINATIONS (which
+    node is [rd], DEC-4's join) and for the node CLASSIFICATION (is this a
+    control node? does the result carry [DLdRes]?).  It is NO LONGER the
+    oracle for the SOURCE lists.
+
+    WHY.  Provenance soundness — "two runs of the same instruction from
+    regstates that agree on the named sources emit the same label" — needs
+    the named sources to COVER the registers the Sail semantics actually
+    reads, and the decoder cannot see those: a memory access consults [satp]
+    and [mstatus] for translation and permissions, [sret] consults [sepc],
+    and no encoding field names them.  So the sources are taken from the
+    per-instruction READ SET the machine accumulates ([WeakLang.ibch]'s
+    [ib_rds], appended to at every [RegRead] of a carrier register and reset
+    at the two instruction boundaries), and coverage holds BY CONSTRUCTION.
+
+    HONESTY.  The dynamic set is a SUPERSET of the decoded one on the image's
+    forms (the tests below), so every RVWMO syntactic dependency is still
+    drawn; the extra ones are CSR-mediated chains, and an edge from a CSR
+    exists only when that CSR's own provenance is non-empty — a chain real
+    hardware also orders (CSR writes serialize; the [sfence.vma] discipline).
+    The decoder's source lists stay in [WeakDeps] as the syntactic reference
+    and as the [vm_compute] cross-checks of this section.
+
+    TWO THINGS THE DECODER STILL DECIDES.
+      - [DLdRes]: whether the instruction's result carries the LOAD RESULT
+        (PARM's [res]) is a role question (DEC-2/DEC-4), not a register one,
+        so it is read off the decoded list and prepended unchanged.
+      - The CONTROL GATE: [nextPC] is written by EVERY instruction, so
+        handing every instruction's read set to [ERWctrl] would make each of
+        them a control-dependency point — far beyond RVWMO and beyond
+        hardware.  The decoder says which instructions are control nodes
+        (its [deps_ctrl] is non-empty exactly at a conditional branch and an
+        indirect jump, [sret]/[mret] included since DEC-6), and only there is
+        the read set used. *)
+
+(** Does the decoded source list carry the load result? *)
+Fixpoint has_ldres (l : list dsrc) : bool :=
+  match l with
+  | [] => false
+  | DLdRes :: _ => true
+  | _ :: t => has_ldres t
+  end.
+
+Lemma has_ldres_intro l : DLdRes ∈ l -> has_ldres l = true.
+Proof.
+  induction l as [|a l IH]; [by intros ?%elem_of_nil|].
+  intros [Heq|Hin]%elem_of_cons.
+  - subst a. reflexivity.
+  - destruct a; [by apply IH|reflexivity].
+Qed.
+
+(** THE DYNAMIC SOURCE LIST: the decoded list's [DLdRes] flag, then one
+    [DReg] per DISTINCT register the instruction has read so far. *)
+Definition erw_srcs (dec : list dsrc) (rds : list wreg) : list dsrc :=
+  (if has_ldres dec then [DLdRes] else []) ++ (DReg <$> remove_dups rds).
+
+Lemma erw_srcs_ldres dec rds : DLdRes ∈ dec -> DLdRes ∈ erw_srcs dec rds.
+Proof.
+  intros Hin. rewrite /erw_srcs (has_ldres_intro _ Hin).
+  apply elem_of_app. left. apply elem_of_list_singleton. reflexivity.
+Qed.
+
+Lemma erw_srcs_reg dec rds (r : wreg) :
+  r ∈ rds -> DReg r ∈ erw_srcs dec rds.
+Proof.
+  intros Hin. rewrite /erw_srcs. apply elem_of_app. right.
+  apply elem_of_list_fmap. exists r. split; [reflexivity|].
+  by apply (proj2 (elem_of_remove_dups rds r)).
+Qed.
+
+(** THE COVERAGE TEST, once and for all: every DECODED source is a DYNAMIC
+    source as soon as the run has read the register it names.  This is the
+    general form of the [vm_compute] witnesses below. *)
+Lemma erw_srcs_covers dec rds (s : dsrc) :
+  s ∈ dec -> (forall r : wreg, s = DReg r -> r ∈ rds) ->
+  s ∈ erw_srcs dec rds.
+Proof.
+  intros Hin Hr. destruct s as [r|].
+  - apply erw_srcs_reg, Hr. reflexivity.
+  - by apply erw_srcs_ldres.
+Qed.
+
+(** ... and the read set only ever grows, so neither does the source list
+    shrink. *)
+Lemma erw_srcs_mono dec rds rds' (s : dsrc) :
+  rds ⊆ rds' -> s ∈ erw_srcs dec rds -> s ∈ erw_srcs dec rds'.
+Proof.
+  intros Hsub [Hs|Hs]%elem_of_app.
+  - apply elem_of_app. by left.
+  - apply elem_of_list_fmap in Hs as (r & Hseq & Hr).
+    apply (proj1 (elem_of_remove_dups rds r)) in Hr. subst s.
+    apply erw_srcs_reg. unfold subseteq, list_subseteq in Hsub.
+    exact (Hsub r Hr).
+Qed.
+
+(** THE ACCUMULATOR at a [RegRead] node: the register is appended when it is
+    a dependency CARRIER — a GPR [x1..x31] or one of [WeakDeps]' CSR
+    pseudo-registers.  Everything else the Sail model reads (PC, [nextPC],
+    [cur_privilege], [misa], the counters, …) is NOT a carrier: no value
+    flows through it that RVWMO or the privileged spec would order on, and
+    the soundness lemma quantifies over regstates that AGREE on all of them
+    ([WeakEvProv.dreg_agree]'s non-carrier clause). *)
+Definition ib_rd (i : oib32) (r : register) : oib32 := ib_read i (ereg_num r).
+
+Lemma ib_rd_bits i r : ib_bits (ib_rd i r) = ib_bits i.
+Proof. apply ib_read_bits. Qed.
+
 (** One node, one candidate destination: does this [RegWrite]'s register
     match the one the decoded role names, and with which sources? *)
-Definition erw_dest (r : register) (d : option (wreg * list dsrc)) : erw_kind :=
+Definition erw_dest (rds : list wreg) (r : register)
+    (d : option (wreg * list dsrc)) : erw_kind :=
   match d with
   | Some (rd, srcs) =>
       match ereg_num r with
-      | Some n => if decide (n = rd) then ERWreg rd srcs else ERWnone
+      | Some n => if decide (n = rd) then ERWreg rd (erw_srcs srcs rds) else ERWnone
       | None => ERWnone
       end
   | None => ERWnone
@@ -339,11 +449,16 @@ Definition erw_dest (r : register) (d : option (wreg * list dsrc)) : erw_kind :=
     ([deps_rd2]).  They are distinct registers, so trying the second only
     where the first did not match is exactly right, and for every
     non-[ORcsr] role [deps_rd2] is [None] and nothing changes. *)
-Definition erw_of (role : op_roles) (r : register) : erw_kind :=
-  if register_beq r (R_bitvector_64 nextPC) then ERWctrl (deps_ctrl role)
+Definition erw_of (role : op_roles) (rds : list wreg) (r : register)
+    : erw_kind :=
+  if register_beq r (R_bitvector_64 nextPC)
+  then ERWctrl (match deps_ctrl role with
+                | [] => []              (* DEC-7: not a control node *)
+                | dec => erw_srcs dec rds
+                end)
   else
-    match erw_dest r (deps_rd role) with
-    | ERWnone => erw_dest r (deps_rd2 role)
+    match erw_dest rds r (deps_rd role) with
+    | ERWnone => erw_dest rds r (deps_rd2 role)
     | k => k
     end.
 
@@ -415,70 +530,70 @@ Proof. by destruct k. Qed.
    (F5' / DEC-4 — rules 9 and 10 composed) — this is the ppo 9/10/11 chain's
    first link.  Here rs1 = rd = x15; [ld a4,0(a5)] below separates them. *)
 Example erw_of_lw_rd :
-  erw_of (deps_of_bits (dbits 0x0007a783)) (R_bitvector_64 x15)
+  erw_of (deps_of_bits (dbits 0x0007a783)) [15%nat] (R_bitvector_64 x15)
   = ERWreg 15 [DLdRes; DReg 15%nat].
 Proof. vm_compute. reflexivity. Qed.
 
 Example erw_of_ld_rd :
-  erw_of (deps_of_bits (dbits 0x0007b703)) (R_bitvector_64 x14)
+  erw_of (deps_of_bits (dbits 0x0007b703)) [15%nat] (R_bitvector_64 x14)
   = ERWreg 14 [DLdRes; DReg 15%nat].
 Proof. vm_compute. reflexivity. Qed.
 
 (* ... and a write of any OTHER GPR in the same instruction is silent *)
 Example erw_of_lw_other :
-  erw_of (deps_of_bits (dbits 0x0007a783)) (R_bitvector_64 x14) = ERWnone.
+  erw_of (deps_of_bits (dbits 0x0007a783)) [15%nat] (R_bitvector_64 x14) = ERWnone.
 Proof. vm_compute. reflexivity. Qed.
 
 (* a CSR write is silent, whatever the instruction (deviation D-4) *)
 Example erw_of_csr :
-  erw_of (deps_of_bits (dbits 0x0007a783)) (R_bitvector_64 mstatus) = ERWnone.
+  erw_of (deps_of_bits (dbits 0x0007a783)) [15%nat] (R_bitvector_64 mstatus) = ERWnone.
 Proof. vm_compute. reflexivity. Qed.
 
 (* DEC-5 — THE SATP-PROVENANCE EDGE's emission half.  [csrw satp,a5]
    = 0x18079073: the model's [RegWrite satp] node IS the destination, and it
    inherits [a5]'s provenance. *)
 Example erw_of_csrw_satp :
-  erw_of (deps_of_bits (dbits 0x18079073)) (R_bitvector_64 satp)
+  erw_of (deps_of_bits (dbits 0x18079073)) [15%nat] (R_bitvector_64 satp)
   = ERWreg wsatp [DReg 15%nat].
 Proof. vm_compute. reflexivity. Qed.
 
 (* [csrr a4,satp] = 0x18002773: the transfer back out, into [a4]. *)
 Example erw_of_csrr_satp :
-  erw_of (deps_of_bits (dbits 0x18002773)) (R_bitvector_64 x14)
+  erw_of (deps_of_bits (dbits 0x18002773)) [wsatp] (R_bitvector_64 x14)
   = ERWreg 14 [DReg wsatp].
 Proof. vm_compute. reflexivity. Qed.
 
 (* ... and the [satp] node of an instruction that is NOT a satp write stays
    silent, as does a satp write's own GPR node. *)
 Example erw_of_satp_other_instr :
-  erw_of (deps_of_bits (dbits 0x0007a783)) (R_bitvector_64 satp) = ERWnone.
+  erw_of (deps_of_bits (dbits 0x0007a783)) [15%nat] (R_bitvector_64 satp) = ERWnone.
 Proof. vm_compute. reflexivity. Qed.
 Example erw_of_csrw_satp_gpr :
-  erw_of (deps_of_bits (dbits 0x18079073)) (R_bitvector_64 x15) = ERWnone.
+  erw_of (deps_of_bits (dbits 0x18079073)) [15%nat] (R_bitvector_64 x15) = ERWnone.
 Proof. vm_compute. reflexivity. Qed.
 
 (* DEC-6 — THE REST OF THE TABLE.  [csrw sstatus,a5] = 0x10079073 writes the
    model's [mstatus] node ([sstatus] is a VIEW of it), and the decoder named
    the same shared pseudo-register, so the two meet. *)
 Example erw_of_csrw_sstatus :
-  erw_of (deps_of_bits (dbits 0x10079073)) (R_bitvector_64 mstatus)
+  erw_of (deps_of_bits (dbits 0x10079073)) [15%nat] (R_bitvector_64 mstatus)
   = ERWreg (wcsr MSTATUS) [DReg 15%nat].
 Proof. vm_compute. reflexivity. Qed.
 
 (* [csrw sepc,a5] = 0x14179073 and [csrw mepc,a5] = 0x34179073 — the two
    resumption-PC CSRs, whose provenance [sret]/[mret] turn into control. *)
 Example erw_of_csrw_sepc :
-  erw_of (deps_of_bits (dbits 0x14179073)) (R_bitvector_64 sepc)
+  erw_of (deps_of_bits (dbits 0x14179073)) [15%nat] (R_bitvector_64 sepc)
   = ERWreg (wcsr SEPC) [DReg 15%nat].
 Proof. vm_compute. reflexivity. Qed.
 Example erw_of_csrw_mepc :
-  erw_of (deps_of_bits (dbits 0x34179073)) (R_bitvector_64 mepc)
+  erw_of (deps_of_bits (dbits 0x34179073)) [15%nat] (R_bitvector_64 mepc)
   = ERWreg (wcsr MEPC) [DReg 15%nat].
 Proof. vm_compute. reflexivity. Qed.
 
 (* [csrw sscratch,a0] = 0x14051073 — [uservec]'s first instruction. *)
 Example erw_of_csrw_sscratch :
-  erw_of (deps_of_bits (dbits 0x14051073)) (R_bitvector_64 sscratch)
+  erw_of (deps_of_bits (dbits 0x14051073)) [10%nat] (R_bitvector_64 sscratch)
   = ERWreg (wcsr SSCRATCH) [DReg 10%nat].
 Proof. vm_compute. reflexivity. Qed.
 
@@ -487,25 +602,25 @@ Proof. vm_compute. reflexivity. Qed.
    [csrw pmpcfg0,a5] = 0x3a079073, whose model nodes are the whole-vector
    writes [pmpaddr_n] / [pmpcfg_n]. *)
 Example erw_of_csrw_stvec :
-  erw_of (deps_of_bits (dbits 0x10579073)) (R_bitvector_64 stvec)
+  erw_of (deps_of_bits (dbits 0x10579073)) [15%nat] (R_bitvector_64 stvec)
   = ERWreg (wcsr STVEC) [DReg 15%nat].
 Proof. vm_compute. reflexivity. Qed.
 Example erw_of_csrw_stimecmp :
-  erw_of (deps_of_bits (dbits 0x14d79073)) (R_bitvector_64 stimecmp)
+  erw_of (deps_of_bits (dbits 0x14d79073)) [15%nat] (R_bitvector_64 stimecmp)
   = ERWreg (wcsr STIMECMP) [DReg 15%nat].
 Proof. vm_compute. reflexivity. Qed.
 Example erw_of_csrw_pmpaddr0 :
-  erw_of (deps_of_bits (dbits 0x3b079073)) (R_vector_64_bitvector_64 pmpaddr_n)
+  erw_of (deps_of_bits (dbits 0x3b079073)) [15%nat] (R_vector_64_bitvector_64 pmpaddr_n)
   = ERWreg (wcsr PMPADDR0) [DReg 15%nat].
 Proof. vm_compute. reflexivity. Qed.
 Example erw_of_csrw_pmpcfg0 :
-  erw_of (deps_of_bits (dbits 0x3a079073)) (R_vector_64_bitvector_8 pmpcfg_n)
+  erw_of (deps_of_bits (dbits 0x3a079073)) [15%nat] (R_vector_64_bitvector_8 pmpcfg_n)
   = ERWreg (wcsr PMPCFG0) [DReg 15%nat].
 Proof. vm_compute. reflexivity. Qed.
 
 (* [csrw mcounteren,a5] = 0x30679073 — a 32-bit model register. *)
 Example erw_of_csrw_mcounteren :
-  erw_of (deps_of_bits (dbits 0x30679073)) (R_bitvector_32 mcounteren)
+  erw_of (deps_of_bits (dbits 0x30679073)) [15%nat] (R_bitvector_32 mcounteren)
   = ERWreg (wcsr MCOUNTEREN) [DReg 15%nat].
 Proof. vm_compute. reflexivity. Qed.
 
@@ -513,66 +628,124 @@ Proof. vm_compute. reflexivity. Qed.
    = 0x14102773; the [sepc] node of that instruction stays silent (it writes
    no CSR). *)
 Example erw_of_csrr_sepc :
-  erw_of (deps_of_bits (dbits 0x14102773)) (R_bitvector_64 x14)
+  erw_of (deps_of_bits (dbits 0x14102773)) [wcsr SEPC] (R_bitvector_64 x14)
   = ERWreg 14 [DReg (wcsr SEPC)].
 Proof. vm_compute. reflexivity. Qed.
 Example erw_of_csrr_sepc_csrnode :
-  erw_of (deps_of_bits (dbits 0x14102773)) (R_bitvector_64 sepc) = ERWnone.
+  erw_of (deps_of_bits (dbits 0x14102773)) [wcsr SEPC] (R_bitvector_64 sepc) = ERWnone.
 Proof. vm_compute. reflexivity. Qed.
 
 (* THE TWO-DESTINATION FORM (DEC-6): [csrrci a5,sstatus,2] = 0x100177f3.
    BOTH nodes fire — the CSR from [deps_rd], [a5] from [deps_rd2]. *)
 Example erw_of_csrrci_sstatus_csr :
-  erw_of (deps_of_bits (dbits 0x100177f3)) (R_bitvector_64 mstatus)
+  erw_of (deps_of_bits (dbits 0x100177f3)) [wcsr MSTATUS] (R_bitvector_64 mstatus)
   = ERWreg (wcsr MSTATUS) [DReg (wcsr MSTATUS)].
 Proof. vm_compute. reflexivity. Qed.
 Example erw_of_csrrci_sstatus_gpr :
-  erw_of (deps_of_bits (dbits 0x100177f3)) (R_bitvector_64 x15)
+  erw_of (deps_of_bits (dbits 0x100177f3)) [wcsr MSTATUS] (R_bitvector_64 x15)
   = ERWreg 15 [DReg (wcsr MSTATUS)].
 Proof. vm_compute. reflexivity. Qed.
 (* ... and an unrelated node of the same instruction is still silent. *)
 Example erw_of_csrrci_sstatus_other :
-  erw_of (deps_of_bits (dbits 0x100177f3)) (R_bitvector_64 x14) = ERWnone.
+  erw_of (deps_of_bits (dbits 0x100177f3)) [wcsr MSTATUS] (R_bitvector_64 x14) = ERWnone.
 Proof. vm_compute. reflexivity. Qed.
 
 (* [sret] = 0x10200073 / [mret] = 0x30200073: the CONTROL node carries the
    resumption-PC CSR's provenance (this is what reaches [ds_ctl]), and the
    instruction writes no destination at all. *)
 Example erw_of_sret_nextpc :
-  erw_of (deps_of_bits (dbits 0x10200073)) (R_bitvector_64 nextPC)
+  erw_of (deps_of_bits (dbits 0x10200073)) [wcsr SEPC] (R_bitvector_64 nextPC)
   = ERWctrl [DReg (wcsr SEPC)].
 Proof. vm_compute. reflexivity. Qed.
 Example erw_of_mret_nextpc :
-  erw_of (deps_of_bits (dbits 0x30200073)) (R_bitvector_64 nextPC)
+  erw_of (deps_of_bits (dbits 0x30200073)) [wcsr MEPC] (R_bitvector_64 nextPC)
   = ERWctrl [DReg (wcsr MEPC)].
 Proof. vm_compute. reflexivity. Qed.
 Example erw_of_sret_sepc :
-  erw_of (deps_of_bits (dbits 0x10200073)) (R_bitvector_64 sepc) = ERWnone.
+  erw_of (deps_of_bits (dbits 0x10200073)) [wcsr SEPC] (R_bitvector_64 sepc) = ERWnone.
 Proof. vm_compute. reflexivity. Qed.
 
 (* D-4 SURVIVES OUTSIDE THE TABLE: [csrw fcsr,a5] = 0x00379073 has no role,
    so its [fcsr] node is silent. *)
 Example erw_of_csrw_fcsr :
-  erw_of (deps_of_bits (dbits 0x00379073)) (R_bitvector_32 fcsr) = ERWnone.
+  erw_of (deps_of_bits (dbits 0x00379073)) [15%nat] (R_bitvector_32 fcsr) = ERWnone.
 Proof. vm_compute. reflexivity. Qed.
 
 (* [beq a5,zero,.] = 0x00078063: [nextPC] carries the CONTROL view — PARM's
    [step_if], on the taken and the not-taken arm alike (deviation D-9) *)
 Example erw_of_beq_nextpc :
-  erw_of (deps_of_bits (dbits 0x00078063)) (R_bitvector_64 nextPC)
+  erw_of (deps_of_bits (dbits 0x00078063)) [15%nat] (R_bitvector_64 nextPC)
   = ERWctrl [DReg 15%nat].
 Proof. vm_compute. reflexivity. Qed.
 
 (* an ALU instruction's [nextPC] write carries NO control source *)
 Example erw_of_addi_nextpc :
-  erw_of (deps_of_bits (dbits 0x00178793)) (R_bitvector_64 nextPC)
+  erw_of (deps_of_bits (dbits 0x00178793)) [15%nat] (R_bitvector_64 nextPC)
   = ERWctrl [].
 Proof. vm_compute. reflexivity. Qed.
 
 (* [addi a5,a5,1]: the destination inherits its ALU source *)
 Example erw_of_addi_rd :
-  erw_of (deps_of_bits (dbits 0x00178793)) (R_bitvector_64 x15)
+  erw_of (deps_of_bits (dbits 0x00178793)) [15%nat] (R_bitvector_64 x15)
   = ERWreg 15 [DReg 15%nat].
+Proof. vm_compute. reflexivity. Qed.
+
+(** *** DEC-7's OWN WITNESSES: where the dynamic set is STRICTLY LARGER, and
+    where the read set does NOT reach.
+
+    Every [Example] above supplies the read set the DECODED role names and
+    gets the decoded answer back, which is the "dynamic = decoded on the
+    syntactic operands" half.  These three are the other half. *)
+
+(* THE HONEST STRICT SUPERSET.  The same [ld a4,0(a5)] whose run consulted
+   the translation context ([satp]) and the permission bits ([sstatus], i.e.
+   the model's [mstatus]) — as EVERY translated access does.  The decoded
+   answer was [[DLdRes; DReg 15]]; the dynamic one keeps it and adds the two
+   pseudo-registers, so a value that reached [satp] now reaches this
+   register's provenance. *)
+Example erw_of_ld_rd_dynamic :
+  erw_of (deps_of_bits (dbits 0x0007b703)) [15%nat; wsatp; wcsr MSTATUS]
+    (R_bitvector_64 x14)
+  = ERWreg 14 [DLdRes; DReg 15%nat; DReg wsatp; DReg (wcsr MSTATUS)].
+Proof. vm_compute. reflexivity. Qed.
+
+(* ... and it really is a superset of the decoded answer, mechanically. *)
+Example erw_of_ld_rd_superset :
+  forall s : dsrc,
+    s ∈ [DLdRes; DReg 15%nat] ->
+    match erw_of (deps_of_bits (dbits 0x0007b703))
+            [15%nat; wsatp; wcsr MSTATUS] (R_bitvector_64 x14) with
+    | ERWreg _ srcs => s ∈ srcs
+    | _ => False
+    end.
+Proof.
+  intros s Hs. rewrite erw_of_ld_rd_dynamic.
+  apply elem_of_cons in Hs as [->|Hs]; [by apply elem_of_cons; left|].
+  apply elem_of_cons in Hs as [->|Hs%elem_of_nil]; [|done].
+  apply elem_of_cons; right. by apply elem_of_cons; left.
+Qed.
+
+(* A REPEATED READ COSTS NOTHING: the set is deduplicated. *)
+Example erw_of_addi_rd_dedup :
+  erw_of (deps_of_bits (dbits 0x00178793)) [15%nat; 15%nat; 15%nat]
+    (R_bitvector_64 x15)
+  = ERWreg 15 [DReg 15%nat].
+Proof. vm_compute. reflexivity. Qed.
+
+(* THE CONTROL GATE (DEC-7).  An [addi] reads [a5] and writes [nextPC] like
+   every instruction, and its [nextPC] node is STILL source-free: the
+   decoder says it is not a control node. *)
+Example erw_of_addi_nextpc_gated :
+  erw_of (deps_of_bits (dbits 0x00178793)) [15%nat; wsatp; wcsr MSTATUS]
+    (R_bitvector_64 nextPC)
+  = ERWctrl [].
+Proof. vm_compute. reflexivity. Qed.
+
+(* ... whereas a [beq]'s IS, and picks up whatever the branch consulted. *)
+Example erw_of_beq_nextpc_dynamic :
+  erw_of (deps_of_bits (dbits 0x00078063)) [15%nat; wcsr MSTATUS]
+    (R_bitvector_64 nextPC)
+  = ERWctrl [DReg 15%nat; DReg (wcsr MSTATUS)].
 Proof. vm_compute. reflexivity. Qed.
 
 (** THE OPERAND LISTS a memory node carries, from the announced bits.
@@ -586,7 +759,11 @@ Proof. vm_compute. reflexivity. Qed.
     are unambiguous (the walker's A/D update is itself the fused arm), so
     they carry theirs. *)
 Definition edeps (σ : wgstate) (c : CPU) : op_roles :=
-  deps_of_ib (wgib σ c).
+  deps_of_ib (ib_bits (wgib σ c)).
+
+(** DEC-7: ... and the DYNAMIC half of the same channel — the registers this
+    hart's current instruction has read so far. *)
+Definition erds (σ : wgstate) (c : CPU) : list wreg := ib_rds (wgib σ c).
 
 (* ====================================================================== *)
 (** ** 3. The barrier table
@@ -681,18 +858,24 @@ Section hart.
              RVWMO does not have (it forbids LB).  The announce KEEPS its
              own [LInstr] — see [WeakEvInst.pnode_step]'s boundary arm for
              why both resets stay. *)
-          σ' = ewg_ibws σ c None (instr_post ws0)
+          σ' = ewg_ibws σ c ib_none (instr_post ws0)
     | Interface.Next oc k =>
         (match oc in Interface.outcome _ T return (T -> M unit) -> Prop with
+         (* DEC-7: THE READ SET ACCUMULATES HERE.  The node is still silent
+            for the log, the views and the register file — the σ-write is
+            [wgib] alone, which [WeakEvLift.weak_state_interp_ib] makes
+            invisible to the interpretation by conversion. *)
          | Interface.RegRead r _ => fun k =>
-             e' = ECycle gen c (k (register_lookup r rs0)) None /\ σ' = σ
+             e' = ECycle gen c (k (register_lookup r rs0)) None /\
+             σ' = ewg_ib σ c (ib_rd (wgib σ c) r)
          (* D3-2: a register write MAY carry a dependency — PARM's
             [step_assign] for the instruction's architectural [rd], and
             PARM's [step_if] (the control view) at [nextPC]; every other
             register write is silent (D-4). *)
          | Interface.RegWrite r _ v => fun k =>
              e' = ECycle gen c (k tt) None /\
-             σ' = ewg_rw σ c (register_set r v rs0) (erw_of (edeps σ c) r)
+             σ' = ewg_rw σ c (register_set r v rs0)
+                    (erw_of (edeps σ c) (erds σ c) r)
          | Interface.MemRead n req => fun k =>
              if dev_addr (Interface.ReadReq.pa req)
              then (* MMIO: the SHARED fabric answers, partially (D1) *)
@@ -839,7 +1022,7 @@ Section hart.
              e' = ECycle gen c (k tt) None /\
              (* D3-2: the announce is ALSO the instruction start, so it
                 RESETS the load-result bank ([LInstr] / PARM's [res]). *)
-             σ' = ewg_ibws σ c (Some (ib_of_bvn ob)) (instr_post ws0)
+             σ' = ewg_ibws σ c (ib_ann (ib_of_bvn ob)) (instr_post ws0)
          (* [BranchAnnounce] STAYS SILENT: it fires only on the TAKEN arm of a
             redirect, whereas RVWMO ppo 11 (and PARM's [step_if]) order after
             a branch whether or not it is taken.  The control view is raised
@@ -1092,7 +1275,7 @@ Lemma eprim_step_loop_inv gen cpu σ κ e' σ' efs :
   eprim_step (ELoop gen cpu) σ κ e' σ' efs ->
   κ = [] /\ efs = [] /\
   ((ethread_live σ gen /\
-    σ' = ewg_ibws σ cpu None (instr_post (wgws σ cpu)) /\
+    σ' = ewg_ibws σ cpu ib_none (instr_post (wgws σ cpu)) /\
     exists tick : bool, e' = ECycle gen cpu (riscv_step tick) None)
    \/ (~ ethread_live σ gen /\ e' = ELoop gen cpu /\ σ' = σ)).
 Proof.
@@ -1363,7 +1546,7 @@ Qed.
 Lemma eprim_step_loop_live gen cpu σ (tick : bool) :
   ethread_live σ gen ->
   eprim_step (ELoop gen cpu) σ [] (ECycle gen cpu (riscv_step tick) None)
-    (ewg_ibws σ cpu None (instr_post (wgws σ cpu))) [].
+    (ewg_ibws σ cpu ib_none (instr_post (wgws σ cpu))) [].
 Proof.
   intros Hl. left. exists gen, cpu, (Interface.Ret tt), None.
   split_and!; try reflexivity. left. split; [exact Hl|].

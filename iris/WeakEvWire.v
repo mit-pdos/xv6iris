@@ -260,6 +260,9 @@ Section read.
       split; reflexivity. }
     iNext. iIntros (e' σ') "%Hcy".
     rewrite /ecycle_step /emonad_step /= in Hcy. destruct Hcy as (-> & ->).
+    (* DEC-7: the node accumulates the read set, which the interpretation
+       does not read ([weak_state_interp_ib]). *)
+    rewrite weak_state_interp_ib.
     iMod "Hmask" as "_". iModIntro. iFrame "Hσ". iApply "H".
   Qed.
 
@@ -297,7 +300,8 @@ Section read.
     iDestruct ("H" $! v with "HP") as "[HP H]".
     iMod ("Hclose" with "[Hr HP]") as "_".
     { iNext. iExists v. iFrame. }
-    iModIntro. rewrite Hlk. iSplitL "Hri Hcl"; [|iExact "H"].
+    iModIntro. rewrite Hlk weak_state_interp_ib.
+    iSplitL "Hri Hcl"; [|iExact "H"].
     iApply weak_state_interp_reg_id. by iApply "Hcl".
   Qed.
 

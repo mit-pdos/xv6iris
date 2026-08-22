@@ -371,7 +371,7 @@ Inductive epf_step :
        bank. *)
     epf_step (fin_to_nat c) LInstr (P, σ)
       (ep_hset P c (Some (riscv_step tick, None)),
-       ewg_ibws σ c None (instr_post (wgws σ c)))
+       ewg_ibws σ c ib_none (instr_post (wgws σ c)))
 | EPFCycle (c : CPU) (l : wlabel) (P : epool) (σ : wgstate)
            (m : M unit) (fn : option (bool * bool * bool * bool))
            (h' : ehst) (σ' : wgstate) :
@@ -596,8 +596,8 @@ Proof.
   - (* D3-2: THE REGISTER WRITE.  Its label is its classification's
        ([LSilent] / [LRegW] / [LCtrl]) and its σ-effect is that label's,
        by construction — one [destruct] over the three kinds. *)
-    intros (_ & ->). eexists (erw_label (erw_of (edeps σ c) reg)).
-    destruct (erw_of (edeps σ c) reg); simpl;
+    intros (_ & ->). eexists (erw_label (erw_of (edeps σ c) (erds σ c) reg)).
+    destruct (erw_of (edeps σ c) (erds σ c) reg); simpl;
       (split; [reflexivity|]);
       solve [reflexivity|apply gws_insert_eq].
   - (* MemRead *)

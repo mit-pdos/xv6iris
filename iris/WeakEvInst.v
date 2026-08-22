@@ -277,18 +277,22 @@ Definition pnode_step (m : M unit) (rs : regstate) (ib : oib32) (d : dev_state)
         l = LInstr /\ m' = riscv_step tick /\ ors = None /\ fn' = None /\
         d' = d /\
         (* D3: THE BOUNDARY CLEARS THE ANNOUNCED BITS — a hart between
-           instructions has no roles. *)
-        oib = Some None
+           instructions has no roles.  DEC-7: it clears the READ SET too. *)
+        oib = Some ib_none
   | Interface.Next oc k =>
       (match oc in Interface.outcome _ T return (T -> M unit) -> Prop with
+       (* DEC-7 (route-b §4e, slice 2a): THE READ SET ACCUMULATES HERE.  The
+          node stays [LSilent] — nothing about the log, the views or the
+          register file moves — but the per-instruction channel gains the
+          register, when it is a dependency carrier. *)
        | Interface.RegRead r _ => fun k =>
            l = LSilent /\ m' = k (register_lookup r rs) /\ ors = None /\
-           fn' = None /\ d' = d /\ oib = None
+           fn' = None /\ d' = d /\ oib = Some (ib_rd ib r)
        (* D3-2: PARM's [step_assign] at the instruction's architectural
           destination, PARM's [step_if] at [nextPC], [LSilent] elsewhere —
           all three are [WeakEvLang.erw_label] of the classification. *)
        | Interface.RegWrite r _ v => fun k =>
-           l = erw_label (erw_of (deps_of_ib ib) r) /\
+           l = erw_label (erw_of (deps_of_ib (ib_bits ib)) (ib_rds ib) r) /\
            m' = k tt /\ ors = Some (register_set r v rs) /\
            fn' = None /\ d' = d /\ oib = None
        | Interface.MemRead n req => fun k =>
@@ -321,7 +325,7 @@ Definition pnode_step (m : M unit) (rs : regstate) (ib : oib32) (d : dev_state)
                     tvs.*2 !! j = Some (nth_byte w j)) /\
                  l = LExLoad (ak_sync (classify (Interface.ReadReq.access_kind req)))
                        (pa_z (Interface.ReadReq.pa req)) tvs
-                       (deps_asrc (deps_of_ib ib)) /\
+                       (deps_asrc (deps_of_ib (ib_bits ib))) /\
                  m' = k (inl (w, None)) /\ ors = None /\ fn' = None /\ d' = d /\
                  oib = None))
        | Interface.MemWrite n req => fun k =>
@@ -337,7 +341,8 @@ Definition pnode_step (m : M unit) (rs : regstate) (ib : oib32) (d : dev_state)
                l = LStore (ak_sync (classify (Interface.WriteReq.access_kind req)))
                      (pa_z (Interface.WriteReq.pa req))
                      (wbytes n (Interface.WriteReq.value req))
-                     (deps_asrc (deps_of_ib ib)) (deps_vsrc (deps_of_ib ib)) /\
+                     (deps_asrc (deps_of_ib (ib_bits ib)))
+                     (deps_vsrc (deps_of_ib (ib_bits ib))) /\
                m' = k (inl None) /\ ors = None /\ fn' = None /\ d' = d /\
                oib = None)
               \/
@@ -347,7 +352,8 @@ Definition pnode_step (m : M unit) (rs : regstate) (ib : oib32) (d : dev_state)
                 (l = LExStore (ak_sync (classify (Interface.WriteReq.access_kind req)))
                        (pa_z (Interface.WriteReq.pa req))
                        (wbytes n (Interface.WriteReq.value req))
-                       (deps_asrc (deps_of_ib ib)) (deps_vsrc (deps_of_ib ib)) /\
+                       (deps_asrc (deps_of_ib (ib_bits ib)))
+                     (deps_vsrc (deps_of_ib (ib_bits ib))) /\
                  m' = k (inl None) /\ ors = None /\ fn' = None /\ d' = d /\
                  oib = None)
                 \/
@@ -367,7 +373,7 @@ Definition pnode_step (m : M unit) (rs : regstate) (ib : oib32) (d : dev_state)
            (* D3-2: the instruction START — [LInstr] resets the load-result
               bank (PARM's [res]) and the node records the bits. *)
            l = LInstr /\ m' = k tt /\ ors = None /\ fn' = None /\ d' = d /\
-           oib = Some (Some (ib_of_bvn ob))
+           oib = Some (ib_ann (ib_of_bvn ob))
        | Interface.BranchAnnounce _ _ => fun k =>
            l = LSilent /\ m' = k tt /\ ors = None /\ fn' = None /\ d' = d /\
            oib = None
@@ -777,6 +783,14 @@ Lemma elab_apply_instr σ c k v :
   = ewg_ibws σ c v (instr_post (wgws σ c)).
 Proof. reflexivity. Qed.
 
+(** DEC-7: ... and the READ-SET ACCUMULATION, which is the bits field ALONE
+    ([WeakEvLang.ewg_ib]).  A [RegRead] is silent for the log, the views and
+    the register file, so this is the one shape that separates it from the
+    other silent nodes. *)
+Lemma elab_apply_ib σ c k v :
+  elab_apply σ c LSilent k None (Some v) (wgdev σ) = ewg_ib σ c v.
+Proof. reflexivity. Qed.
+
 (** The barrier arm: the label of (D2) reproduces [efence_apply] exactly. *)
 Lemma elab_apply_barrier σ c k b :
   elab_apply σ c (ebar_label b) k None None (wgdev σ)
@@ -872,12 +886,22 @@ Proof.
               & (tick & -> & -> & -> & -> & -> & ->) & _ & Hs); subst.
       exists tick. split; [reflexivity|by rewrite elab_apply_instr]. }
   destruct oc; simpl; try esil_case; try estuck_case.
+  - (* RegRead — DEC-7: silent for everything except the read set, which is
+       why it does not fall to [esil_case] (its σ-shape is [ewg_ib], not the
+       identity). *)
+    split.
+    + intros (-> & ->). do 6 eexists. efac4;
+        [reflexivity|split_and!; reflexivity|exact I
+        |by rewrite elab_apply_ib].
+    + intros (l & m' & ors & fn' & d' & oib & He
+              & (-> & -> & -> & -> & -> & ->) & _ & Hs); subst.
+      split; [reflexivity|by rewrite elab_apply_ib].
   - (* RegWrite — D3-2: the label is the classification's, and [elab_ok] of
        all three kinds is [True] *)
     split.
     + intros (-> & ->). do 6 eexists. efac4;
         [reflexivity|split_and!; reflexivity
-        |by destruct (erw_of _ _)
+        |by destruct (erw_of _ _ _)
         |by rewrite elab_apply_rw].
     + intros (l & m' & ors & fn' & d' & oib & He & Hp & _ & Hs).
       destruct Hp as (-> & -> & -> & -> & -> & ->). subst.
@@ -1017,7 +1041,7 @@ Proof.
     split_and!; [by intros m fn ib; split_and!|exact I|].
     by rewrite elab_apply_ldev_reg.
   - intros (c & l & ors & d' & Hp & _ & Hs).
-    destruct (Hp (Interface.Ret tt) None None) as (-> & _ & _ & -> & _ & ->).
+    destruct (Hp (Interface.Ret tt) None ib_none) as (-> & _ & _ & -> & _ & ->).
     exists c. by rewrite Hs elab_apply_ldev_reg.
 Qed.
 
@@ -1204,7 +1228,8 @@ Proof.
   rewrite /pnode_step. destruct m as [y|T oc k].
   { by intros (? & ? & _). }
   destruct oc; simpl; try (by intros (? & _));
-    try (intros (Hl & _); by destruct (erw_of (deps_of_ib ib) reg));
+    try (intros (Hl & _);
+         by destruct (erw_of (deps_of_ib (ib_bits ib)) (ib_rds ib) reg));
     try (by intros []).
   - (* MemRead *) destruct (dev_addr _).
     + by intros (w & _ & ? & _).
@@ -1314,7 +1339,8 @@ Proof.
   rewrite /pnode_step. destruct m as [y|T oc k].
   { by intros (? & ? & _). }
   destruct oc; simpl; try (by intros (? & _));
-    try (intros (Hl & _); by destruct (erw_of (deps_of_ib ib) reg));
+    try (intros (Hl & _);
+         by destruct (erw_of (deps_of_ib (ib_bits ib)) (ib_rds ib) reg));
     try (by intros []).
   - (* MemRead *) destruct (dev_addr _).
     + by intros (w & _ & ? & _).
@@ -1343,7 +1369,8 @@ Proof.
   rewrite /pnode_step. destruct m as [y|T oc k].
   { by intros (? & ? & _). }
   destruct oc; simpl; try (by intros (? & _));
-    try (intros (Hl & _); by destruct (erw_of (deps_of_ib ib) reg));
+    try (intros (Hl & _);
+         by destruct (erw_of (deps_of_ib (ib_bits ib)) (ib_rds ib) reg));
     try (by intros []).
   - (* MemRead *) destruct (dev_addr _).
     + by intros (w & _ & ? & _).
@@ -1531,7 +1558,8 @@ Proof.
   rewrite /pnode_step. destruct m as [y|T oc k].
   { by intros (? & -> & _). }
   destruct oc; simpl; try (by intros (-> & _));
-    try (intros (-> & _); by destruct (erw_of (deps_of_ib ib) reg));
+    try (intros (-> & _);
+         by destruct (erw_of (deps_of_ib (ib_bits ib)) (ib_rds ib) reg));
     try done.
   - (* MemRead *)
     destruct (dev_addr _); [by intros (? & _ & -> & _)|].
@@ -1621,7 +1649,7 @@ Qed.
     read — and it constrains [tvs] only through [length tvs] and [tvs.*2],
     so retiming it is free.  Unlike the plain load's clause this one is
     proved at an ARBITRARY [asrc] (the exclusive read's operand list is
-    REAL: it is [deps_asrc (deps_of_ib ib)], D3-2), exactly as the fused
+    REAL: it is [deps_asrc (deps_of_ib (ib_bits ib))], D3-2), exactly as the fused
     [LRmw] clause was generalised. *)
 
 Lemma pnode_step_ts_exload m rs ib d aq base tvs tvs' asrc m' ors fn' d' oib :
@@ -1632,7 +1660,8 @@ Proof.
   rewrite /pnode_step. destruct m as [y|T oc k].
   { by intros (? & ? & _). }
   destruct oc; simpl; try (by intros (? & _));
-    try (intros (Hl & _); by destruct (erw_of (deps_of_ib ib) reg));
+    try (intros (Hl & _);
+         by destruct (erw_of (deps_of_ib (ib_bits ib)) (ib_rds ib) reg));
     try (by intros []).
   - (* MemRead *) destruct (dev_addr _).
     + by intros (w & _ & ? & _).
@@ -1703,7 +1732,8 @@ Proof.
   rewrite /pnode_step /pnode_wclass. destruct m as [y|T oc k].
   { by intros (? & ? & _). }
   destruct oc; simpl; try (by intros (? & _));
-    try (intros (Hl & _); by destruct (erw_of (deps_of_ib ib) reg));
+    try (intros (Hl & _);
+         by destruct (erw_of (deps_of_ib (ib_bits ib)) (ib_rds ib) reg));
     try (by intros []).
   - (* MemRead *) destruct (dev_addr _).
     + by intros (w & _ & ? & _).
