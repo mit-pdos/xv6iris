@@ -112,6 +112,11 @@ Require Import SpecAllocproc.
 Require Import SpecNameiRootBoot.
 Require Import SpecRelease.
 Require Import SpecForkretPark.
+Require Import SpecForkretParkPaid.   (* [FORKRET_PARK_PAID], [forkret_park_pkg_of_park] *)
+Require Import UsertrapRes.           (* [ut_names], [park_env], [park_own] *)
+Require Import SyscParkEnv.           (* [sysc_park_extra] *)
+Require Import FsReady.               (* [fs_geom_ok] *)
+Require Import DiskInv TicksInv.      (* [disk_geom], [is_tickslock] *)
 Require Import SpecUserinit.
 Require Import Xv6G.   (* the ghost-state bundle; see its header *)
 Require Import CodeUserinit.
@@ -210,7 +215,7 @@ End PstateRunnableHelper.
 (* ===================================================================== *)
 
 Module UserinitProof (AP : ALLOCPROC) (NR : NAMEI_ROOT_BOOT)
-                     (RL : RELEASE) (FP : FORKRET_PARK) : USERINIT.
+                     (RL : RELEASE) (FP : FORKRET_PARK_PAID) : USERINIT.
 
 Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
 Local Ltac nz := vm_compute; discriminate.
@@ -425,7 +430,9 @@ Section ProofUserinit.
       "(%Hfacts & Hheld & Hhart & Hpriv & #Hmk & Hfd & Hirs & Hbsl & Hks & Hkfree
         & Hctx & Hcg & Hcpu & Hpay & Hkenv & Hpav)".
     destruct Hfacts as (Hrv & Hj & Hgl & _ & _ & Hcwd0 & Hrest & Hnc).
-    iClear "Hkfree".
+    (* [Hkfree] is KEPT: the paid park is anchored on the child's free
+       kernel stack ([ProcDefs.kstack_free_at] spells it at [ks] below). *)
+    iDestruct "Hks" as "#Hks".
     (* ===== +0x0e c.mv s1,a0 ===== *)
     iApply (wp_cmv_s_sconf (mword_of_int (UI + 0x0e)) Rs1 Ra0 mr1
               (trap_res b + (K - 4))%nat false ltac:(nz) ltac:(rdok)
@@ -681,8 +688,62 @@ Section ProofUserinit.
     iApply fupd_wp.
     iMod (procs_avail_seal ⊤ np with "Hpav") as "#Hpav".
     iModIntro.
-    iMod (FP.forkret_park γs γf (proc_addr j) ks rest pid (upd_cwd V ipv) Hrest
-            with "Hks Hctx Hpriv Hfd Hirs") as "Hpctx".
+    (* ================================================================= *)
+    (* THE PAID PARK.  The record [N] names the first process's trap-loop  *)
+    (* environment: every file-system field is the AMBIENT one (which is   *)
+    (* what [fclose_ties] says), the table / wait / ticks / disk names are *)
+    (* the contract's, the slot and stack are allocproc's, the initproc    *)
+    (* share is the persisted cell four stores up.  [park_env N] is the    *)
+    (* eleven persistent rows the environment needs BEYOND the file system *)
+    (* (forkret establishes that and hands it to the closer);              *)
+    (* [park_own N] is the three bio units and the initproc share; the     *)
+    (* package is the channel [FP.usertrap_res_bare_park] turned into the  *)
+    (* closer, beside the persistent world and the child's stack.          *)
+    (* ================================================================= *)
+    iAssert (∃ iv1 : mword 64,
+               (mword_of_int KernelSyms.initproc : mword 64) ↦₈□ iv1)%I
+      as (iv1) "#Hip1".
+    { iExists _. iExact "Hinitproc". }
+    iDestruct (procs_inv_len with "Hpinv") as %Hnproc.
+    iAssert (⌜fs_geom_ok⌝)%I as %Hgeomok.
+    { iPoseProof "Hpersist" as "Hp".
+      iEval (rewrite /first_boot_persist) in "Hp".
+      iDestruct "Hp" as "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
+                         _ & _ & _ & _ & %Hg)".
+      iPureIntro. exact Hg. }
+    pose (N := MkUtNames γft γf γw γs j γl fsc_uart fsc_disk fsc_dlock pd pav pu
+                 γtl fsc_printk fsc_bio icfg_log fsc_fs fsc_cov fsc_logst icfg_dev
+                 iv1 DfracDiscarded fsc_kalloc fsc_kpages fsc_ireg fsc_ic fsc_itlock
+                 fsc_bmapstart icfg_ist icfg_nib fsc_size ks pid).
+    assert (Hwf : ut_wf N).
+    { split_and!; [exact Hj | exact Hgl | exact Hnproc | exact (fgo_loggeom Hgeomok)]. }
+    assert (Hkav : (K_usertrap <= KSTACK_AV)%nat) by (vm_compute; lia).
+    iAssert (park_env N) as "#Henv".
+    { iAssert (disk_geom fsc_disk pd pav pu ∗ is_tickslock γtl)%I as "[#Hgeom #Htl]".
+      { iDestruct "Hdcaps" as "(_ & _ & $ & _ & $ & _)". }
+      rewrite /park_env /ut_park_caps /sysc_park_extra.
+      iSplitL.
+      { iSplitR; [iPureIntro; constructor; reflexivity|].
+        iSplitR; [iPureIntro; reflexivity|].
+        iSplitR; [iExact "Hpinv"|].
+        iSplitR; [iExact "Hks"|].
+        iSplitR; [iExact "Hdcaps"|].
+        iSplitR; [iExact "Hwaitlk"|].
+        iSplitR; [iExact "Hftable"|].
+        iExact "Hgeom". }
+      iSplitR; [iExists γp; iExact "Hlpid"|].
+      iSplitR; [iExact "Hpav"|].
+      iSplitR; [iExact "Htl"|].
+      iExact "Hcready". }
+    iAssert (park_own N) with "[Hbsl]" as "Hown".
+    { rewrite /park_own. iFrame "Hbsl". iExact "Hip1". }
+    iDestruct (kstack_free_at with "Hks Hkfree") as "Hstack".
+    iDestruct (forkret_park_pkg_of_park (fun h : CpuId => FP.usertrap_res_bare (CID := h))
+                 N KSTACK_AV (FP.usertrap_res_bare_park N KSTACK_AV) Hwf Hkav
+                 with "Htext Hwire Htramp Hmk Hstack Henv Hown") as "Hpkg".
+    iMod (FP.forkret_park_paid γs γf (proc_addr j) ks rest pid (upd_cwd V ipv) KSTACK_AV
+            Hrest (ex_intro _ j (conj eq_refl Hj)) Hkav
+            with "Hpkg Hks Hctx Hpriv Hfd Hirs") as "Hpctx".
     iMod (pstate_whole_update (proc_addr j) USED RUNNABLE with "Hpwhole")
       as "Hpwhole".
     iEval (rewrite uin_pwhole_runnable) in "Hpwhole".

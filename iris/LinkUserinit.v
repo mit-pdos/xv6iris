@@ -23,7 +23,7 @@
 Require Import LinkAllocproc.
 Require Import LinkNameiRootBoot.
 Require Import LinkRelease.
-Require Import LinkForkretPark.
+Require Import LinkForkretParkPaid.
 Require Import ProofUserinit.
 
-Module Userinit := UserinitProof Allocproc NameiRootBoot Release ForkretPark.
+Module Userinit := UserinitProof Allocproc NameiRootBoot Release ForkretParkPaid.

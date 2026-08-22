@@ -193,6 +193,47 @@ Definition forkret_park_pkg
       iref_slots IREFSPARE -∗
       URes h pt' (add_vec ks (mword_of_int 4096))))%I.
 
+(* THE PACKAGE, OUT OF THE PARK'S CHANNEL.  [UsertrapRes.ut_park_intro_body]
+   is the one producer-side entry the residue's module types carry, and a
+   parker holds it as [usertrap_res_bare_park]; this turns it into the
+   package above.  Everything else the package wants is a persistent row
+   the parker holds anyway, plus the child's free stack and slot marker out
+   of allocproc's post.  [forkret_yield] is the pair the channel takes apart
+   ([ut_trap_parked] and [proc_priv_nopt]); the two page-table facts are the
+   loop's and are dropped. *)
+Lemma forkret_park_pkg_of_park
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId}
+    (URB : CpuId -> uptd -> mword 64 -> iProp Σ) (N : ut_names) (av : nat) :
+  ut_park_intro_body URB N av ->
+  ut_wf N ->
+  (K_usertrap <= av)%nat ->
+  kernel_text -∗
+  wire_inv -∗
+  kmap_at tramp_vpn tramp_ppn KP_rx -∗
+  pslot_used_at (un_pj N) -∗
+  stack_own (KTR := KT1) (add_vec (un_ks N) (mword_of_int 4096)) av -∗
+  park_env N -∗
+  park_own N -∗
+  forkret_park_pkg URB (un_s N) (un_f N) (un_pj N) (un_ks N) (un_pid N) av.
+Proof.
+  iIntros (Hpark Hwf Hav) "#Htext #Hwire #Hkmap Hslot Hstack #Henv Hown".
+  iAssert (procs_inv (un_s N)) as "#Hprocs".
+  { iDestruct "Henv" as "[Hcaps _]". iDestruct "Hcaps" as "(_ & _ & $ & _)". }
+  iPoseProof (Hpark Hwf Hav) as "Hchan".
+  iDestruct ("Hchan" with "Henv Hown") as "Hclose".
+  rewrite /forkret_park_pkg.
+  iSplitR; [iExact "Htext"|].
+  iSplitR; [iExact "Hwire"|].
+  iSplitR; [iExact "Hkmap"|].
+  iSplitR; [iExact "Hprocs"|].
+  iSplitL "Hslot"; [iExact "Hslot"|].
+  iSplitL "Hstack"; [iExact "Hstack"|].
+  iIntros (h pt' V') "%Hupt %Hnorm %Hptwf #Htfk #Hdone #Htc (Htrap & Hpriv) Hfd Hiref".
+  clear Hnorm Hptwf.
+  iApply ("Hclose" $! h pt' V' with "[%] Htfk Hdone Htc Htrap Hpriv Hfd Hiref").
+  exact Hupt.
+Qed.
+
 Definition forkret_park_paid_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (URes : CpuId -> uptd -> mword 64 -> iProp Σ)
