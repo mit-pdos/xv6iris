@@ -186,11 +186,13 @@ Section perm.
       (w : disk_wr) (dk : Z -> bv 8) (n : nat) :
     perm_inv_body gd γP -∗ perm_tok γP k true γq w -∗
     start_auth n -∗ ⌜n = (gd + 1)%nat⌝ -∗
-    ▷ riscv_crash_pred dk ={∅}=∗
+    disk_fixed_auth dk -∗
+    ▷ riscv_crash_pred ={∅}=∗
       perm_inv_body gd γP ∗ perm_tok γP k false γq w ∗ start_auth n ∗
-      ▷ riscv_crash_pred (wr_apply w dk).
+      disk_fixed_auth (wr_apply w dk) ∗
+      ▷ riscv_crash_pred.
   Proof.
-    iIntros "Hbody Htok Hsa %Hn HP". rewrite {1}/perm_inv_body.
+    iIntros "Hbody Htok Hsa %Hn Ha HP". rewrite {1}/perm_inv_body.
     iDestruct "Hbody" as (m) "[Hauth Hents]".
     rewrite /perm_tok.
     iDestruct (ghost_map_lookup with "Hauth Htok") as %Hk.
@@ -202,9 +204,9 @@ Section perm.
        moving the machine FROM.  The index move is the whole content of the
        reshaped permit: [w] is this request's write identity, pinned to the
        slot by [VirtioProto.slot_pend_res]. *)
-    iMod ("Hpm" $! dk n with "Hsa [//]  HP") as "(HP & Hsa & HQ)".
+    iMod ("Hpm" $! dk n with "Hsa [//] Ha HP") as "(Ha & HP & Hsa & HQ)".
     iMod (ghost_map_update (false, γq, w) with "Hauth Htok") as "[Hauth Htok]".
-    iModIntro. iFrame "Htok Hsa HP". rewrite /perm_inv_body.
+    iModIntro. iFrame "Htok Hsa Ha HP". rewrite /perm_inv_body.
     iExists (<[k := (false, γq, w)]> m). iFrame "Hauth".
     rewrite (big_sepM_insert_delete (fun k x => perm_slot gd x.1.1 x.1.2 x.2)
                m k (false, γq, w)).
@@ -236,14 +238,16 @@ Section perm.
       (w : disk_wr) (dk : Z -> bv 8) (n : nat) :
     perm_inv_body gd γP -∗ perm_pend γP kq w -∗
     start_auth n -∗ ⌜n = (gd + 1)%nat⌝ -∗
-    ▷ riscv_crash_pred dk ={∅}=∗
+    disk_fixed_auth dk -∗
+    ▷ riscv_crash_pred ={∅}=∗
       perm_inv_body gd γP ∗ perm_done γP kq w ∗ start_auth n ∗
-      ▷ riscv_crash_pred (wr_apply w dk).
+      disk_fixed_auth (wr_apply w dk) ∗
+      ▷ riscv_crash_pred.
   Proof.
-    iIntros "Hbody Hpend Hsa %Hn HP". rewrite /perm_pend /perm_done.
-    iMod (perm_consume with "Hbody Hpend Hsa [//] HP")
-      as "(Hbody & Htok & Hsa & HP)".
-    iModIntro. iFrame "Hbody Htok Hsa HP".
+    iIntros "Hbody Hpend Hsa %Hn Ha HP". rewrite /perm_pend /perm_done.
+    iMod (perm_consume with "Hbody Hpend Hsa [//] Ha HP")
+      as "(Hbody & Htok & Hsa & Ha & HP)".
+    iModIntro. iFrame "Hbody Htok Hsa Ha HP".
   Qed.
 
   (* the pair form of the deposit: what an enqueuer calls, returning exactly

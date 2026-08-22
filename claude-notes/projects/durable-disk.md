@@ -43,6 +43,56 @@ learns about the DURABLE bytes comes only through the permits at DMA
 completions (principle 1) or from `P_fs`'s own pure content (opening
 `crashN` in any fupd).
 
+## 1½. STATE AT THE 2026-08-22 CHECKPOINT (branch `durable-disk`, NOT on main)
+
+**Stage A is done and compiles** (883 files rebuilt clean above `FsCrash.v`):
+`RiscvPtsto.v` has `riscv_disk_name`/`riscv_disk_size`, `riscv_crash_pred :
+iProp Σ`, `crash_inv := inv crashN riscv_crash_pred`, `disk_fixed_auth` /
+`disk_fixed_interp`; `disk_tie`/`fs_tie_interp` are gone; the permit lends
+`disk_fixed_auth` (A3 as written); `RiscvExec.wp_disk_step`, `PermInv`,
+`WpUart.wp_disk_loop` (the one opener) and both `RiscvAdequacy` theorems
+are adapted (`boot_fixedGS` takes `γdisk ndisk`; `HPc` takes the full
+`disk_img_bytes γdisk 0 (disk_read (v_disk g) 0 ndisk)`; `Pc` has four
+gname arguments). `DiskImg.v` gained `disk_img_auth_sized` + `_alloc` /
+`_read` / `_write` (the owner of the whole [0,N) fragment moves the image
+to ANYTHING — no range side condition on writes, that is the point of the
+domain bound). `SystemAdequacy.v` instantiates `Pc` at the new
+`P_fs_named γd XV6_DISK_BYTES …` with the extent from
+`FirstTok.fs_extent_of_image` (at `PowerBoot.boot_gstate g` — `Himg` is
+still there; stage C deletes it).
+
+**Stage B is mid-rewrite in `FsCrash.v` and DOES NOT COMPILE yet.** What is
+in the file: `P_fs_rec_named` (the old record), `fs_extent`, the new
+`P_fs_named γd N …` (fragments ∗ extent ∗ record), `fs_blocks_agree`,
+`fs_restrict_agree`, `P_fs_rec_agree`, `P_fs_rec`/`P_fs_any` (no `dk`),
+`fs_crash_seam` as a `□` pair on the field, `fs_rec_permit` and
+`fs_permit_of_rec` (the one place the disk bookkeeping happens), and every
+permit split into `fs_X_permit_rec` (record-only; old proof with the seam
+lines removed) + `fs_X_permit` (wrapper = `fs_permit_of_rec`).
+
+**THE OPEN POINT, found while proving `P_fs_rec_agree`:** `hdr_dec` is
+UNBOUNDED (`n := le_word bs 0`, any 32-bit value), so `fs_recovery` of a
+garbage header reads log slots `log_slot_bno ls j` for `j` up to `n-1`,
+i.e. possibly beyond the log region and beyond the disk's extent — and the
+machine's `dk` beyond `[0, N)` is pinned by no fragment. So "two images
+agreeing on the durable bytes carry the same record" is FALSE unless the
+record carries `length (hdr_dec (P (log_hdr_bno ls))).2 <= LOGBLOCKS` as
+an INVARIANT (`fs_recovery_install` already takes it as a hypothesis,
+`FsCrash.v:536`). That is true of every header the permits ever write
+(swap/clear write `n = 0`; commit writes its own `(n, W)` with `Hdec`;
+logfill/install leave the header alone) EXCEPT `fs_recover_permit` (5a),
+which is stated "at ANY write identity" — it must gain a premise that the
+write does not corrupt the header (e.g. `w` is not a header write, or
+`hdr_len_ok` is preserved), and `SpecInstallTrans`'s uniform generator must
+supply it. Do this next: add the conjunct to `fs_rec_wf`, re-establish it
+in the six `_rec` permits, then `P_fs_rec_agree` goes through with
+`fs_install_ext_P` (slots `< length W ≤ LOGBLOCKS` are in the extent).
+
+Also pending from the first compile attempt: the two `set_solver` calls
+in `P_fs_rec_agree` were replaced by explicit membership lemmas (`Hhdr`,
+`Hslot`) after a `coqc` on `FsCrash.v` ran >20 min — keep `set_solver`
+away from `log_region_set` (a 30-element `list_to_set`).
+
 ## 2. Stage A — the machine layer (`RiscvPtsto`, `RiscvExec`, `WpUart`, `PermInv`, `RiscvAdequacy`)
 
 Footprint (grep `disk_tie\|fs_tie_interp\|riscv_crash_pred\|disk_write_permit`):

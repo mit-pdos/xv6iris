@@ -527,6 +527,39 @@ Section FirstTok.
      both are true of the mkfs image (208 <= 65536; 2048000 = 1024*2000) and
      both are threaded exactly the way [0 < nib] is -- as conjuncts of
      [fs_boot_image_wf], discharged in [FsAdequacyImg]. *)
+  (* THE DURABLE DISK'S EXTENT, off the image: every covered block and
+     every log-region block lies inside the [ndisk] bytes.  What the crash
+     predicate's fragments are stated over ([FsCrash.P_fs_named]). *)
+  Lemma fs_extent_of_image (dk : Z -> bv 8) (ndisk : nat)
+      (sb : FsImg.fs_sb) (nib : nat) (cov : gset Z) :
+    FsImg.fsimg_wf (FsCrash.fs_blocks dk) sb = true ->
+    Z.of_nat nib = FsImg.sb_ninodes sb / 16 + 1 ->
+    FsBoot.fs_cov_in cov ndisk ->
+    (forall b : Z, 1 <= b < FsImg.fs_data_start sb -> b ∈ cov) ->
+    FsCrash.fs_extent cov (FsImg.sb_logstart sb) ndisk.
+  Proof.
+    intros Hwf Hnibeq Hcovin Hcovmeta.
+    pose proof (FsImg.fsimg_wf_sb _ _ Hwf) as Hsb.
+    pose proof (FsImg.sbo_logstart sb Hsb) as Hls.
+    pose proof (FsImg.sbo_nlog sb Hsb) as Hnl.
+    pose proof (FsImg.sbo_inodestart sb Hsb) as Hist.
+    pose proof (FsImg.sbo_bmapstart sb Hsb) as Hbms.
+    pose proof (FsImg.sbo_ninodes sb Hsb) as Hni.
+    unfold FsImg.ROOTINO in Hni.
+    assert (Hdiv : 0 <= FsImg.sb_ninodes sb / 16) by (apply Z.div_pos; lia).
+    assert (Hds : FsImg.fs_data_start sb = FsImg.sb_bmapstart sb + 1)
+      by reflexivity.
+    assert (Hbm : FsImg.sb_bmapstart sb = 33 + Z.of_nat nib) by lia.
+    rewrite Hds Hbm in Hcovmeta.
+    assert (Hincov : forall b, b ∈ cov -> 0 <= b /\ (b + 1) * Z.of_nat BSIZE <= Z.of_nat ndisk).
+    { intros b Hb. destruct (Hcovin b Hb) as [Hb0 Hbn]. unfold BSIZE. lia. }
+    intros b Hb. rewrite elem_of_union in Hb. destruct Hb as [Hb | Hb].
+    - exact (Hincov b Hb).
+    - apply Hincov.
+      pose proof (log_region_bound (FsImg.sb_logstart sb) b Hb) as Hbb.
+      unfold LOGBLOCKS in Hbb. apply Hcovmeta. lia.
+  Qed.
+
   Lemma fs_geom_ok_of_image (dk : Z -> bv 8) (ndisk : nat)
       (sb : FsImg.fs_sb) (nib : nat) (cov : gset Z) :
     FsImg.fsimg_wf (FsCrash.fs_blocks dk) sb = true ->

@@ -356,8 +356,8 @@ Section WPExec.
     iMod ("Hk" $! m2 σ2 r2 with "[//]") as "[(Hri' & Hmem' & Hdev') HWP]".
     iDestruct ("Hclose" with "Hri'") as "Hgr'".
     iIntros "_ !>".
-    iEval (rewrite /fs_tie_interp Hvd2) in "Htie".
-    rewrite /state_interp /power_interp /fs_tie_interp
+    iEval (rewrite /disk_fixed_interp Hvd2) in "Htie".
+    rewrite /state_interp /power_interp /disk_fixed_interp
       /era_interp /disk_dur_interp /disk_img_auth /=.
     iFrame "Hgauth Hsauth Htie HWP".
     iExists R. iFrame "HRauth".
@@ -470,8 +470,8 @@ Section WPExec.
       as "[Hresv Hfrag]".
     iDestruct ("HWP" with "Hfrag") as "HWP".
     iIntros "_ !>".
-    iEval (rewrite /fs_tie_interp Hvd2) in "Htie".
-    rewrite /state_interp /power_interp /fs_tie_interp
+    iEval (rewrite /disk_fixed_interp Hvd2) in "Htie".
+    rewrite /state_interp /power_interp /disk_fixed_interp
       /era_interp /disk_dur_interp /disk_img_auth /=.
     iFrame "Hgauth Hsauth Htie HWP".
     iExists R. iFrame "HRauth".
@@ -595,8 +595,8 @@ Section WPDev.
     assert (Hvd2 : v_disk (dvirtio (gdev g)) = v_disk (dvirtio d'))
       by (symmetry; exact Hvd).
     iIntros "_ !>".
-    iEval (rewrite /fs_tie_interp Hvd2) in "Htie".
-    rewrite /state_interp /power_interp /fs_tie_interp
+    iEval (rewrite /disk_fixed_interp Hvd2) in "Htie".
+    rewrite /state_interp /power_interp /disk_fixed_interp
       /era_interp /disk_dur_interp /disk_img_auth /=.
     iFrame "Hgauth Hsauth Htie HWP".
     iExists R. iFrame "HRauth".
@@ -632,11 +632,11 @@ Section WPDev.
     (∀ gr m d n, ⌜n = (gen_id + 1)%nat⌝ -∗
        gregs_interp gr ∗ gen_heap_interp m ∗ dev_interp d ∗
        disk_img_auth disk_img_name (v_disk (dvirtio d)) ∗
-       disk_tie (v_disk (dvirtio d)) ∗ start_auth n ={⊤,∅}=∗
+       disk_fixed_auth (v_disk (dvirtio d)) ∗ start_auth n ={⊤,∅}=∗
        ▷ (∀ d' m', ⌜disk_step d m d' m'⌝ ={∅,⊤}=∗
             gregs_interp gr ∗ gen_heap_interp m' ∗ dev_interp d' ∗
             disk_img_auth disk_img_name (v_disk (dvirtio d')) ∗
-            disk_tie (v_disk (dvirtio d')) ∗ start_auth n ∗
+            disk_fixed_auth (v_disk (dvirtio d')) ∗ start_auth n ∗
             WP (DiskLoop : expr riscv_lang))) -∗
     WP (DiskLoop : expr riscv_lang).
   Proof.
@@ -673,6 +673,7 @@ Section WPDev.
     { rewrite Heq in HRE. congruence. }
     iDestruct "Hera" as "(Hgr & Hmem & Hdev & Hdur & Hresv & %Hrok)".
     iDestruct "Hdur" as (dmap) "[Hdauth %Hdview]".
+    iEval (rewrite /disk_fixed_interp) in "Htie".
     iMod ("H" $! g.(gregs) g.(gmem) g.(gdev) (start_count g)
             with "[] [$Hgr $Hmem $Hdev Hdauth Htie Hsauth]") as "Hk".
     { iPureIntro. rewrite /start_count Hpw Heq. lia. }
@@ -691,7 +692,7 @@ Section WPDev.
       last by (exfalso; apply Hnl; split; congruence).
     iMod ("Hk" $! d' m' with "[//]")
       as "(Hgr' & Hmem' & Hdev' & Hdur' & Htie' & Hsauth' & HWP)".
-    iIntros "_ !>". rewrite /state_interp /power_interp /fs_tie_interp
+    iIntros "_ !>". rewrite /state_interp /power_interp /disk_fixed_interp
       /era_interp /disk_dur_interp /disk_img_auth /=.
     iFrame "Hgauth Hsauth' Htie' HWP".
     iDestruct "Hdur'" as (dmap') "[Hdauth' %Hdview']".
@@ -764,7 +765,7 @@ Section WPDev.
       as (-> & -> & -> & [ (Hlive & gr' & Hdstep & ->) | (Hnl & ->) ]);
       last by (exfalso; apply Hnl; split; congruence).
     iMod ("Hk" $! gr' with "[//]") as "(Hgr' & Hmem' & Hdev' & HWP)".
-    iIntros "_ !>". rewrite /state_interp /power_interp /fs_tie_interp
+    iIntros "_ !>". rewrite /state_interp /power_interp /disk_fixed_interp
       /era_interp /disk_dur_interp /disk_img_auth /=.
     iFrame "Hgauth Hsauth Htie HWP".
     (* a PLIC step moves only registers: the image conjunct and the FS tie

@@ -664,7 +664,7 @@ Section fs_crash.
   (* bare constraints, deliberately not [fsCrashG] fields -- see
      [fs_crash_names] above *)
   Context `{!ghost_mapG Σ nat riscvEraGS, !mono_natG Σ,
-            !ghost_varG Σ log_mirror}.
+            !ghost_varG Σ log_mirror, !diskImgG Σ}.
 
   (* -------------------------------------------------------------------- *)
   (* 2a. the committed-history mono-list                                   *)
@@ -944,11 +944,104 @@ Section fs_crash.
      exactly what [fs_arm_acc] reads).  Stated HERE, in the section that must
      stay [riscvFixedGS]-free, because this IS the value the fixed record's
      [riscv_crash_pred] field is built from. *)
-  Definition P_fs_named (γsw γreg γst : gname) (cov : gset Z) (ls : Z)
+  Definition P_fs_rec_named (γsw γreg γst : gname) (cov : gset Z) (ls : Z)
       (dk : Z -> bv 8) : iProp Σ :=
     (∃ γs : fs_crash_names,
        ⌜fcn_swap γs = γsw /\ fcn_reg γs = γreg /\ fcn_start γs = γst⌝ ∗
        P_fs γs cov ls dk)%I.
+
+  (* THE EXTENT: every block the record reads -- the covered blocks and the
+     log region -- lies inside the durable disk's [N] bytes.  A pure fact
+     about the geometry, invariant under every write. *)
+  Definition fs_extent (cov : gset Z) (ls : Z) (N : nat) : Prop :=
+    forall b : Z, b ∈ cov ∪ log_region_set ls ->
+      0 <= b /\ (b + 1) * Z.of_nat BSIZE <= Z.of_nat N.
+
+  (* THE CRASH PREDICATE, AS THE OWNER OF THE DURABLE DISK
+     (claude-notes/design/crash.md, "The durable disk: ONE fixed gname").
+     The record above is about an image [dk]; THIS is what pins [dk] to the
+     real disk: the fragments of the fixed-layer map over all of [0, N),
+     which only the machine's auth can disagree with.  No thread that can
+     die ever owns one of them; a DMA completion lends the auth for the
+     instant, and [fs_permit_of_rec] below is how the record's own view
+     shift runs under that loan. *)
+  Definition P_fs_named (γd : gname) (N : nat) (γsw γreg γst : gname)
+      (cov : gset Z) (ls : Z) : iProp Σ :=
+    (∃ dk : Z -> bv 8,
+       disk_img_bytes γd 0 (disk_read dk 0 N) ∗
+       ⌜fs_extent cov ls N⌝ ∗
+       P_fs_rec_named γsw γreg γst cov ls dk)%I.
+
+  (* the record reads the image only on the extent: two images that agree
+     on the durable bytes carry the same record *)
+  Lemma fs_blocks_agree (dk dk' : Z -> bv 8) (N : nat) (b : Z) :
+    disk_read dk 0 N = disk_read dk' 0 N ->
+    0 <= b -> (b + 1) * Z.of_nat BSIZE <= Z.of_nat N ->
+    fs_blocks dk b = fs_blocks dk' b.
+  Proof.
+    intros Heq Hb0 HbN. rewrite /fs_blocks.
+    apply list_eq. intro j. rewrite /disk_read !list_lookup_fmap.
+    destruct (decide (j < BSIZE)%nat) as [Hj | Hj].
+    - rewrite (lookup_seq_lt _ _ _ Hj). cbn. f_equal.
+      apply (disk_read_agree dk dk' N Heq). unfold BSIZE in *. lia.
+    - assert (Hge : (BSIZE <= j)%nat) by lia.
+      rewrite (lookup_seq_ge 0%nat BSIZE j Hge). reflexivity.
+  Qed.
+
+  Lemma fs_restrict_agree (dk dk' : Z -> bv 8) (N : nat) (s : gset Z)
+      (cov : gset Z) (ls : Z) :
+    disk_read dk 0 N = disk_read dk' 0 N ->
+    fs_extent cov ls N ->
+    s ⊆ cov ∪ log_region_set ls ->
+    fs_restrict (fs_blocks dk) s = fs_restrict (fs_blocks dk') s.
+  Proof.
+    intros Heq Hext Hs. apply fs_restrict_ext. intros b Hb.
+    destruct (Hext b (Hs b Hb)) as [Hb0 HbN].
+    exact (fs_blocks_agree dk dk' N b Heq Hb0 HbN).
+  Qed.
+
+  Lemma P_fs_rec_agree (γsw γreg γst : gname) (cov : gset Z) (ls : Z)
+      (N : nat) (dk dk' : Z -> bv 8) :
+    disk_read dk 0 N = disk_read dk' 0 N ->
+    fs_extent cov ls N ->
+    P_fs_rec_named γsw γreg γst cov ls dk -∗ P_fs_rec_named γsw γreg γst cov ls dk'.
+  Proof.
+    intros Heq Hext.
+    assert (Hblk : forall b, b ∈ cov ∪ log_region_set ls ->
+                     fs_blocks dk b = fs_blocks dk' b).
+    { intros b Hb. destruct (Hext b Hb) as [Hb0 HbN].
+      exact (fs_blocks_agree dk dk' N b Heq Hb0 HbN). }
+    assert (Hlog : forall b, b ∈ log_region_set ls -> fs_blocks dk b = fs_blocks dk' b).
+    { intros b Hb. apply Hblk. apply elem_of_union. by right. }
+    assert (Hhdr : log_hdr_bno ls ∈ log_region_set ls).
+    { rewrite /log_region_set. apply elem_of_union. right.
+      apply elem_of_singleton. reflexivity. }
+    assert (Hslot : forall i, (i < LOGBLOCKS)%nat -> log_slot_bno ls i ∈ log_region_set ls).
+    { intros i Hi. rewrite /log_region_set. apply elem_of_union. left.
+      apply elem_of_list_to_set. apply elem_of_list_fmap. exists i.
+      split; [reflexivity |]. apply elem_of_seq. lia. }
+    rewrite /P_fs_rec_named. iIntros "H". iDestruct "H" as (γs) "[%Hseq H]".
+    iExists γs. iSplitR; [iPureIntro; exact Hseq|].
+    rewrite /P_fs. iDestruct "H" as (r) "(Hh & %Hwf & Harm)".
+    iExists r. iFrame "Hh". iSplitR.
+    { iPureIntro. rewrite /fs_rec_wf in Hwf *. destruct Hwf as [Hrec Hlast].
+      split; [| exact Hlast].
+      rewrite /fs_recovery in Hrec *.
+      rewrite -(fs_restrict_agree dk dk' N (fs_home_set cov ls) cov ls Heq Hext);
+        [| rewrite /fs_home_set; intros x Hx; apply elem_of_union; left;
+           exact (proj1 (elem_of_difference _ _ _) Hx).1 ].
+      rewrite -(Hlog (log_hdr_bno ls) Hhdr).
+      rewrite Hrec. apply fs_install_ext_P.
+      intros i Hi. apply Hlog. apply Hslot. exact (hdr_dec_len_bound _ _ Hi). }
+    rewrite /fs_arm. iDestruct "Harm" as (c) "[Hsw Harm]". iExists c. iFrame "Hsw".
+    iDestruct "Harm" as "[$ | Harm]". iRight.
+    iDestruct "Harm" as (g'') "[%Hc Hc]". iExists g''. iSplitR; [done|].
+    rewrite /fs_custody. iDestruct "Hc" as (E M) "(Hr & Hs & Hm & %Hok)".
+    iExists E, M. iFrame "Hr Hs Hm". iPureIntro.
+    rewrite /log_mirror_ok in Hok *. destruct Hok as [Hh Hsl]. split.
+    - rewrite Hh. f_equal. symmetry. exact (Hlog _ Hhdr).
+    - intros i Hi. rewrite (Hsl i Hi). symmetry. exact (Hlog _ (Hslot i Hi)).
+  Qed.
 
   (* -------------------------------------------------------------------- *)
   (* 3a. what [P_fs] SAYS                                                   *)
@@ -1055,12 +1148,26 @@ Section fs_crash_seam.
      equations are what make the record's arm identifiable from outside --
      they are all a WAL fupd needs, since [fs_arm_acc] reads only
      [fcn_swap] / [fcn_reg] / [fcn_start]. *)
-  Definition P_fs_any (cov : gset Z) (ls : Z) (dk : Z -> bv 8) : iProp Σ :=
-    P_fs_named riscv_swap_name riscv_registry_name riscv_start_name cov ls dk.
+  (* the record at an image, at the fixed layer's names *)
+  Definition P_fs_rec (cov : gset Z) (ls : Z) (dk : Z -> bv 8) : iProp Σ :=
+    P_fs_rec_named riscv_swap_name riscv_registry_name riscv_start_name cov ls dk.
 
-  Global Instance P_fs_any_timeless cov ls dk : Timeless (P_fs_any cov ls dk).
+  Global Instance P_fs_rec_timeless cov ls dk : Timeless (P_fs_rec cov ls dk).
   Proof.
-    rewrite /P_fs_any /P_fs_named /P_fs /fs_arm /fs_custody /fs_hist_auth.
+    rewrite /P_fs_rec /P_fs_rec_named /P_fs /fs_arm /fs_custody /fs_hist_auth.
+    apply _.
+  Qed.
+
+  (* the crash predicate itself: the record AND the durable disk's fragments
+     at the fixed layer's name and size *)
+  Definition P_fs_any (cov : gset Z) (ls : Z) : iProp Σ :=
+    P_fs_named riscv_disk_name riscv_disk_size
+      riscv_swap_name riscv_registry_name riscv_start_name cov ls.
+
+  Global Instance P_fs_any_timeless cov ls : Timeless (P_fs_any cov ls).
+  Proof.
+    rewrite /P_fs_any /P_fs_named /P_fs_rec_named /P_fs /fs_arm /fs_custody
+      /fs_hist_auth.
     apply _.
   Qed.
 
@@ -1068,9 +1175,49 @@ Section fs_crash_seam.
      Adequacy discharges it by conversion when it instantiates [Pc]; every
      WAL fupd consumes it to get at the record. *)
   Definition fs_crash_seam (cov : gset Z) (ls : Z) : iProp Σ :=
-    (□ ∀ dk : Z -> bv 8,
-       (riscv_crash_pred dk -∗ P_fs_any cov ls dk) ∗
-       (P_fs_any cov ls dk -∗ riscv_crash_pred dk))%I.
+    (□ ((riscv_crash_pred -∗ P_fs_any cov ls) ∗
+        (P_fs_any cov ls -∗ riscv_crash_pred)))%I.
+
+  (* A PERMIT STATED ON THE RECORD ALONE: what each WAL fupd actually proves.
+     [fs_permit_of_rec] turns it into the machine's [disk_write_permit] by
+     doing the disk bookkeeping once -- agree the fragments against the lent
+     auth (so the record's [dk] IS the machine's image), run the record's
+     view shift, move the fragments and the auth to the post-write image. *)
+  Definition fs_rec_permit (cov : gset Z) (ls : Z) (gd : nat) (w : disk_wr)
+      (Q : iProp Σ) : iProp Σ :=
+    (∀ (dk : Z -> bv 8) (n : nat),
+       start_auth n -∗ ⌜n = (gd + 1)%nat⌝ -∗
+       ▷ P_fs_rec cov ls dk ={∅}=∗
+         ▷ P_fs_rec cov ls (wr_apply w dk) ∗ start_auth n ∗ Q)%I.
+
+  Lemma fs_permit_of_rec (cov : gset Z) (ls : Z) (gd : nat) (w : disk_wr)
+      (Q : iProp Σ) :
+    fs_crash_seam cov ls -∗
+    fs_rec_permit cov ls gd w Q -∗
+    disk_write_permit gd w Q.
+  Proof.
+    iIntros "#Hseam Hrec". rewrite /disk_write_permit.
+    iIntros (dk n) "Hsa %Hn Ha HP".
+    iDestruct "Hseam" as "[Hfwd Hbwd]".
+    iAssert (▷ P_fs_any cov ls)%I with "[HP]" as "HP"; [iNext; by iApply "Hfwd"|].
+    iMod "HP". rewrite /P_fs_any /P_fs_named.
+    iDestruct "HP" as (dk0) "(Hfr & %Hext & HPr)".
+    (* the fragments read the machine's image: the record's [dk0] agrees
+       with [dk] on the whole durable disk *)
+    rewrite /disk_fixed_auth.
+    iDestruct (disk_img_sized_read with "Ha Hfr") as %Hrd.
+    rewrite disk_read_length in Hrd.
+    iDestruct (P_fs_rec_agree _ _ _ cov ls riscv_disk_size dk0 dk
+                 (eq_sym Hrd) Hext with "HPr") as "HPr".
+    iMod ("Hrec" $! dk n with "Hsa [//] [HPr]") as "(HPr & Hsa & HQ)";
+      [iNext; iExact "HPr"|].
+    (* the fragments and the auth, to the post-write image *)
+    iEval (rewrite -Hrd) in "Hfr".
+    iMod (disk_img_sized_write _ _ dk (wr_apply w dk) with "Ha Hfr") as "[Ha Hfr]".
+    iModIntro. iFrame "Ha Hsa HQ".
+    iNext. iApply "Hbwd". rewrite /P_fs_any /P_fs_named.
+    iExists (wr_apply w dk). iFrame "Hfr HPr". iPureIntro. exact Hext.
+  Qed.
 
   Global Instance fs_crash_seam_persistent cov ls :
     Persistent (fs_crash_seam cov ls).
@@ -1098,19 +1245,18 @@ Section fs_crash_seam.
   (* ([fs_blocks_write_eq] then [hdr_dec_zero]), which is why no fact about  *)
   (* the pre-image is needed anywhere.                                       *)
   (* ==================================================================== *)
-  Lemma fs_swap_permit `{GEN : GenId} (cov : gset Z) (ls : Z)
+  Lemma fs_swap_permit_rec `{GEN : GenId} (cov : gset Z) (ls : Z)
       (bs : list (bv 8)) :
     length bs = BSIZE ->
     hdr_n bs = 0 ->
-    fs_crash_seam cov ls -∗
     era_registered gen_id riscv_eraGS -∗
     gen_started gen_id -∗
     (∃ M0 : log_mirror, ghost_var mirror_name 1 M0) -∗
-    disk_write_permit gen_id (Some ((1024 * log_hdr_bno ls)%Z, bs))
+    fs_rec_permit cov ls gen_id (Some ((1024 * log_hdr_bno ls)%Z, bs))
       (log_mirror_at (0%nat, []) ∗ swap_lb (S gen_id)).
   Proof.
-    intros Hlen Hn0. iIntros "#Hseam #Hreg #Hst Hmir".
-    rewrite /disk_write_permit. iIntros (dk n) "Hsa %Hn1 HP".
+    intros Hlen Hn0. iIntros "#Hreg #Hst Hmir".
+    rewrite /fs_rec_permit. iIntros (dk n) "Hsa %Hn1 HP".
     (* the index, in the block view's spelling *)
     assert (Hidx : (1024 * log_hdr_bno ls)%Z
                    = (log_hdr_bno ls * Z.of_nat BSIZE)%Z)
@@ -1123,10 +1269,7 @@ Section fs_crash_seam.
     assert (Hmiss : forall c, c <> log_hdr_bno ls -> fs_blocks dk' c = fs_blocks dk c)
       by (intros c Hc; apply fs_blocks_write_ne; [exact Hlen | exact Hc]).
     (* through the seam, and the record is timeless *)
-    iDestruct ("Hseam" $! dk) as "[Hfwd _]".
-    iAssert (▷ P_fs_any cov ls dk)%I with "[HP]" as "HP";
-      [iNext; by iApply "Hfwd"|].
-    iMod "HP". rewrite /P_fs_any /P_fs_named.
+    iMod "HP". rewrite /P_fs_rec /P_fs_rec_named.
     iDestruct "HP" as (γs) "[%Hseq HPfs]".
     destruct Hseq as (Hsw & Hrg & Hstn).
     rewrite {1}/P_fs. iDestruct "HPfs" as (r) "(Hhist & %Hwf & Harm)".
@@ -1150,9 +1293,8 @@ Section fs_crash_seam.
             (mirror_of (fs_blocks dk') ls) Hn1 (mirror_of_ok _ _)
             with "Hreg2 Hst2 Hsa Hm2 Harm") as "(Harm & Hsa & #Hswlb)".
     iModIntro.
-    iDestruct ("Hseam" $! dk') as "[_ Hbwd]".
     iSplitL "Hhist Harm".
-    { iNext. iApply "Hbwd". rewrite /P_fs_any /P_fs_named. iExists γs.
+    { iNext. rewrite /P_fs_rec /P_fs_rec_named. iExists γs.
       iSplitR; [iPureIntro; done|].
       rewrite /P_fs. iExists (MkFsRec D' (fr_hist r ++ [D'])).
       iFrame "Hhist". iSplitR; [| iExact "Harm"].
@@ -1166,6 +1308,22 @@ Section fs_crash_seam.
       iFrame "Hm1". iPureIntro.
       rewrite /mirror_of /= Hhit. exact (hdr_dec_zero bs Hn0). }
     rewrite /swap_lb -Hsw. iExact "Hswlb".
+  Qed.
+
+  Lemma fs_swap_permit `{GEN : GenId} (cov : gset Z) (ls : Z)
+      (bs : list (bv 8)) :
+    length bs = BSIZE ->
+    hdr_n bs = 0 ->
+    fs_crash_seam cov ls -∗
+    era_registered gen_id riscv_eraGS -∗
+    gen_started gen_id -∗
+    (∃ M0 : log_mirror, ghost_var mirror_name 1 M0) -∗
+    disk_write_permit gen_id (Some ((1024 * log_hdr_bno ls)%Z, bs))
+      (log_mirror_at (0%nat, []) ∗ swap_lb (S gen_id)).
+  Proof.
+    intros P0 P1. iIntros "#Hseam H0 H1 H2".
+    iApply (fs_permit_of_rec with "Hseam").
+    iApply (fs_swap_permit_rec with "H0 H1 H2"); try assumption.
   Qed.
 
   (* ==================================================================== *)
@@ -1204,19 +1362,18 @@ Section fs_crash_seam.
   Proof. rewrite /fs_receipt_any. apply _. Qed.
 
   (* ---- (1) LOG FILL: write_log copying a logged block into slot [i]. ---- *)
-  Lemma fs_logfill_permit `{GEN : GenId} (cov : gset Z) (ls : Z) (i : nat)
+  Lemma fs_logfill_permit_rec `{GEN : GenId} (cov : gset Z) (ls : Z) (i : nat)
       (bs : list (bv 8)) :
     length bs = BSIZE ->
     (i < LOGBLOCKS)%nat ->
-    fs_crash_seam cov ls -∗
     era_registered gen_id riscv_eraGS -∗
     swap_lb (S gen_id) -∗
     log_mirror_at (0%nat, []) -∗
-    disk_write_permit gen_id (Some ((1024 * log_slot_bno ls i)%Z, bs))
+    fs_rec_permit cov ls gen_id (Some ((1024 * log_slot_bno ls i)%Z, bs))
       (log_mirror_at (0%nat, [])).
   Proof.
-    intros Hlen Hi. iIntros "#Hseam #Hreg #Hswlb Hmir".
-    rewrite /disk_write_permit. iIntros (dk n) "Hsa %Hn1 HP".
+    intros Hlen Hi. iIntros "#Hreg #Hswlb Hmir".
+    rewrite /fs_rec_permit. iIntros (dk n) "Hsa %Hn1 HP".
     assert (Hidx : (1024 * log_slot_bno ls i)%Z
                    = (log_slot_bno ls i * Z.of_nat BSIZE)%Z)
       by (rewrite /BSIZE; lia).
@@ -1226,10 +1383,7 @@ Section fs_crash_seam.
                       fs_blocks dk' c = fs_blocks dk c)
       by (intros c Hc; apply fs_blocks_write_ne; [exact Hlen | exact Hc]).
     (* through the seam; the record is timeless, so the [▷] strips *)
-    iDestruct ("Hseam" $! dk) as "[Hfwd _]".
-    iAssert (▷ P_fs_any cov ls dk)%I with "[HP]" as "HP";
-      [iNext; by iApply "Hfwd"|].
-    iMod "HP". rewrite /P_fs_any /P_fs_named.
+    iMod "HP". rewrite /P_fs_rec /P_fs_rec_named.
     iDestruct "HP" as (γs) "[%Hseq HPfs]".
     destruct Hseq as (Hsw & Hrg & Hstn).
     rewrite {1}/P_fs. iDestruct "HPfs" as (r) "(Hhist & %Hwf & Harm)".
@@ -1250,9 +1404,8 @@ Section fs_crash_seam.
     iMod ("Hclose" $! dk' (mirror_of (fs_blocks dk') ls)
             with "[%]") as "[Harm Hmir]"; [exact (mirror_of_ok _ _)|].
     iModIntro.
-    iDestruct ("Hseam" $! dk') as "[_ Hbwd]".
     iSplitL "Hhist Harm".
-    { iNext. iApply "Hbwd". rewrite /P_fs_any /P_fs_named. iExists γs.
+    { iNext. rewrite /P_fs_rec /P_fs_rec_named. iExists γs.
       iSplitR; [iPureIntro; done|].
       rewrite /P_fs. iExists r. iFrame "Hhist". iSplitR; [| iExact "Harm"].
       iPureIntro. destruct Hwf as [Hrec Hlast]. split; [| exact Hlast].
@@ -1263,6 +1416,22 @@ Section fs_crash_seam.
     rewrite /mirror_of /= Hhdr' -(proj1 Hok) HM0 //.
   Qed.
 
+  Lemma fs_logfill_permit `{GEN : GenId} (cov : gset Z) (ls : Z) (i : nat)
+      (bs : list (bv 8)) :
+    length bs = BSIZE ->
+    (i < LOGBLOCKS)%nat ->
+    fs_crash_seam cov ls -∗
+    era_registered gen_id riscv_eraGS -∗
+    swap_lb (S gen_id) -∗
+    log_mirror_at (0%nat, []) -∗
+    disk_write_permit gen_id (Some ((1024 * log_slot_bno ls i)%Z, bs))
+      (log_mirror_at (0%nat, [])).
+  Proof.
+    intros P0 P1. iIntros "#Hseam H0 H1 H2".
+    iApply (fs_permit_of_rec with "Hseam").
+    iApply (fs_logfill_permit_rec with "H0 H1 H2"); try assumption.
+  Qed.
+
   (* ---- (2) COMMIT: write_head storing a header that decodes to (n, W). ---- *)
   (* THE commit point.  [Q] carries the mirror half forward at the NEW header
      picture -- which is what the install fupds then read -- plus a durability
@@ -1271,19 +1440,18 @@ Section fs_crash_seam.
      the physical disk is not something the era holds any picture of (the
      mirror is the LOG REGION's).  Naming it is phase D's sys_sync work, which
      needs a CURRENT-state witness rather than a mono-list lower bound. *)
-  Lemma fs_commit_permit `{GEN : GenId} (cov : gset Z) (ls : Z)
+  Lemma fs_commit_permit_rec `{GEN : GenId} (cov : gset Z) (ls : Z)
       (h : nat * list Z) (nn : nat) (Ws : list Z) (bs : list (bv 8)) :
     length bs = BSIZE ->
     hdr_dec bs = (nn, Ws) ->
-    fs_crash_seam cov ls -∗
     era_registered gen_id riscv_eraGS -∗
     swap_lb (S gen_id) -∗
     log_mirror_at h -∗
-    disk_write_permit gen_id (Some ((1024 * log_hdr_bno ls)%Z, bs))
+    fs_rec_permit cov ls gen_id (Some ((1024 * log_hdr_bno ls)%Z, bs))
       (log_mirror_at (nn, Ws) ∗ (∃ D : gmap Z (list (bv 8)), fs_receipt_any D)).
   Proof.
-    intros Hlen Hdec. iIntros "#Hseam #Hreg #Hswlb Hmir".
-    rewrite /disk_write_permit. iIntros (dk n) "Hsa %Hn1 HP".
+    intros Hlen Hdec. iIntros "#Hreg #Hswlb Hmir".
+    rewrite /fs_rec_permit. iIntros (dk n) "Hsa %Hn1 HP".
     assert (Hidx : (1024 * log_hdr_bno ls)%Z
                    = (log_hdr_bno ls * Z.of_nat BSIZE)%Z)
       by (rewrite /BSIZE; lia).
@@ -1294,10 +1462,7 @@ Section fs_crash_seam.
     assert (Hmiss : forall c, c <> log_hdr_bno ls ->
                       fs_blocks dk' c = fs_blocks dk c)
       by (intros c Hc; apply fs_blocks_write_ne; [exact Hlen | exact Hc]).
-    iDestruct ("Hseam" $! dk) as "[Hfwd _]".
-    iAssert (▷ P_fs_any cov ls dk)%I with "[HP]" as "HP";
-      [iNext; by iApply "Hfwd"|].
-    iMod "HP". rewrite /P_fs_any /P_fs_named.
+    iMod "HP". rewrite /P_fs_rec /P_fs_rec_named.
     iDestruct "HP" as (γs) "[%Hseq HPfs]".
     destruct Hseq as (Hsw & Hrg & Hstn).
     rewrite {1}/P_fs. iDestruct "HPfs" as (r) "(Hhist & %Hwf & Harm)".
@@ -1319,9 +1484,8 @@ Section fs_crash_seam.
     iMod ("Hclose" $! dk' (mirror_of (fs_blocks dk') ls)
             with "[%]") as "[Harm Hmir]"; [exact (mirror_of_ok _ _)|].
     iModIntro.
-    iDestruct ("Hseam" $! dk') as "[_ Hbwd]".
     iSplitL "Hhist Harm".
-    { iNext. iApply "Hbwd". rewrite /P_fs_any /P_fs_named. iExists γs.
+    { iNext. rewrite /P_fs_rec /P_fs_rec_named. iExists γs.
       iSplitR; [iPureIntro; done|].
       rewrite /P_fs. iExists (MkFsRec D' (fr_hist r ++ [D'])).
       iFrame "Hhist". iSplitR; [| iExact "Harm"].
@@ -1338,19 +1502,34 @@ Section fs_crash_seam.
     rewrite /fs_receipt. iExists (fr_hist r). iExact "Hlb".
   Qed.
 
+  Lemma fs_commit_permit `{GEN : GenId} (cov : gset Z) (ls : Z)
+      (h : nat * list Z) (nn : nat) (Ws : list Z) (bs : list (bv 8)) :
+    length bs = BSIZE ->
+    hdr_dec bs = (nn, Ws) ->
+    fs_crash_seam cov ls -∗
+    era_registered gen_id riscv_eraGS -∗
+    swap_lb (S gen_id) -∗
+    log_mirror_at h -∗
+    disk_write_permit gen_id (Some ((1024 * log_hdr_bno ls)%Z, bs))
+      (log_mirror_at (nn, Ws) ∗ (∃ D : gmap Z (list (bv 8)), fs_receipt_any D)).
+  Proof.
+    intros P0 P1. iIntros "#Hseam H0 H1 H2".
+    iApply (fs_permit_of_rec with "Hseam").
+    iApply (fs_commit_permit_rec with "H0 H1 H2"); try assumption.
+  Qed.
+
   (* ---- (3) INSTALL: install_trans writing home block [b] = W[i]. ---- *)
   (* Recovery does not move, and the CONTENT written is irrelevant: the
      decoded header still names [b] at index [i], so recovery overwrites it
      from slot [i] either way.  That is the WAL's whole point, and it is why
      this permit needs no picture of the home side of the disk. *)
-  Lemma fs_install_permit `{GEN : GenId} (cov : gset Z) (ls : Z)
+  Lemma fs_install_permit_rec `{GEN : GenId} (cov : gset Z) (ls : Z)
       (nn : nat) (Ws : list Z) (i : nat) (b : Z) (bs : list (bv 8)) :
     length bs = BSIZE ->
     NoDup Ws ->
     (length Ws <= LOGBLOCKS)%nat ->
     Ws !! i = Some b ->
     b ∉ log_region_set ls ->
-    fs_crash_seam cov ls -∗
     era_registered gen_id riscv_eraGS -∗
     swap_lb (S gen_id) -∗
     (* THE ONE [▷] AMONG THE FOUR, and it is the install site's shape that
@@ -1361,10 +1540,10 @@ Section fs_crash_seam.
        timeless -- which is exactly the argument that made the permit a fupd
        in the first place. *)
     ▷ log_mirror_at (nn, Ws) -∗
-    disk_write_permit gen_id (Some ((1024 * b)%Z, bs)) (log_mirror_at (nn, Ws)).
+    fs_rec_permit cov ls gen_id (Some ((1024 * b)%Z, bs)) (log_mirror_at (nn, Ws)).
   Proof.
-    intros Hlen Hnd Hwlen Hi Hb. iIntros "#Hseam #Hreg #Hswlb Hmir".
-    rewrite /disk_write_permit. iIntros (dk n) "Hsa %Hn1 HP".
+    intros Hlen Hnd Hwlen Hi Hb. iIntros "#Hreg #Hswlb Hmir".
+    rewrite /fs_rec_permit. iIntros (dk n) "Hsa %Hn1 HP".
     assert (Hidx : (1024 * b)%Z = (b * Z.of_nat BSIZE)%Z)
       by (rewrite /BSIZE; lia).
     cbn [wr_apply fst snd]. rewrite Hidx.
@@ -1372,10 +1551,7 @@ Section fs_crash_seam.
     assert (Hhit : fs_blocks dk' b = bs) by (apply fs_blocks_write_eq, Hlen).
     assert (Hmiss : forall c, c <> b -> fs_blocks dk' c = fs_blocks dk c)
       by (intros c Hc; apply fs_blocks_write_ne; [exact Hlen | exact Hc]).
-    iDestruct ("Hseam" $! dk) as "[Hfwd _]".
-    iAssert (▷ P_fs_any cov ls dk)%I with "[HP]" as "HP";
-      [iNext; by iApply "Hfwd"|].
-    iMod "HP". rewrite /P_fs_any /P_fs_named.
+    iMod "HP". rewrite /P_fs_rec /P_fs_rec_named.
     iDestruct "HP" as (γs) "[%Hseq HPfs]".
     destruct Hseq as (Hsw & Hrg & Hstn).
     rewrite {1}/P_fs. iDestruct "HPfs" as (r) "(Hhist & %Hwf & Harm)".
@@ -1398,9 +1574,8 @@ Section fs_crash_seam.
                    Hb Hmiss Hok)).
     iMod ("Hclose" $! dk' M0 with "[%]") as "[Harm Hmir]"; [exact Hok'|].
     iModIntro.
-    iDestruct ("Hseam" $! dk') as "[_ Hbwd]".
     iSplitL "Hhist Harm".
-    { iNext. iApply "Hbwd". rewrite /P_fs_any /P_fs_named. iExists γs.
+    { iNext. rewrite /P_fs_rec /P_fs_rec_named. iExists γs.
       iSplitR; [iPureIntro; done|].
       rewrite /P_fs. iExists r. iFrame "Hhist". iSplitR; [| iExact "Harm"].
       iPureIntro. destruct Hwf as [Hrec Hlast]. split; [| exact Hlast].
@@ -1408,6 +1583,31 @@ Section fs_crash_seam.
                i b); rewrite ?Hhdr /=; assumption. }
     iSplitL "Hsa"; [rewrite /start_auth -Hstn; iExact "Hsa"|].
     iExists M0. iFrame "Hmir". iPureIntro. exact HM0.
+  Qed.
+
+  Lemma fs_install_permit `{GEN : GenId} (cov : gset Z) (ls : Z)
+      (nn : nat) (Ws : list Z) (i : nat) (b : Z) (bs : list (bv 8)) :
+    length bs = BSIZE ->
+    NoDup Ws ->
+    (length Ws <= LOGBLOCKS)%nat ->
+    Ws !! i = Some b ->
+    b ∉ log_region_set ls ->
+    fs_crash_seam cov ls -∗
+    era_registered gen_id riscv_eraGS -∗
+    swap_lb (S gen_id) -∗
+    (* THE ONE [▷] AMONG THE FOUR, and it is the install site's shape that
+       forces it: install_trans threads its resource through the loop as the
+       [▷ R] its own [bwrite]s hand back (SpecInstallTrans's generator), and
+       there is no step between the return and the next entry's permit.  The
+       later strips inside the [={∅}=∗] below because the mirror half is
+       timeless -- which is exactly the argument that made the permit a fupd
+       in the first place. *)
+    ▷ log_mirror_at (nn, Ws) -∗
+    disk_write_permit gen_id (Some ((1024 * b)%Z, bs)) (log_mirror_at (nn, Ws)).
+  Proof.
+    intros P0 P1 P2 P3 P4. iIntros "#Hseam H0 H1 H2".
+    iApply (fs_permit_of_rec with "Hseam").
+    iApply (fs_install_permit_rec with "H0 H1 H2"); try assumption.
   Qed.
 
   (* ---- (4) CLEAR: write_head storing an n = 0 header at the end of a
@@ -1424,19 +1624,18 @@ Section fs_crash_seam.
      case -- the record's [fr_D] is what the disk NOW recovers to -- and a
      receipt handed out before the clear stays valid, since the history only
      ever grows. *)
-  Lemma fs_clear_permit `{GEN : GenId} (cov : gset Z) (ls : Z)
+  Lemma fs_clear_permit_rec `{GEN : GenId} (cov : gset Z) (ls : Z)
       (h : nat * list Z) (bs : list (bv 8)) :
     length bs = BSIZE ->
     hdr_n bs = 0 ->
-    fs_crash_seam cov ls -∗
     era_registered gen_id riscv_eraGS -∗
     swap_lb (S gen_id) -∗
     log_mirror_at h -∗
-    disk_write_permit gen_id (Some ((1024 * log_hdr_bno ls)%Z, bs))
+    fs_rec_permit cov ls gen_id (Some ((1024 * log_hdr_bno ls)%Z, bs))
       (log_mirror_at (0%nat, [])).
   Proof.
-    intros Hlen Hn0. iIntros "#Hseam #Hreg #Hswlb Hmir".
-    rewrite /disk_write_permit. iIntros (dk n) "Hsa %Hn1 HP".
+    intros Hlen Hn0. iIntros "#Hreg #Hswlb Hmir".
+    rewrite /fs_rec_permit. iIntros (dk n) "Hsa %Hn1 HP".
     assert (Hidx : (1024 * log_hdr_bno ls)%Z
                    = (log_hdr_bno ls * Z.of_nat BSIZE)%Z)
       by (rewrite /BSIZE; lia).
@@ -1447,10 +1646,7 @@ Section fs_crash_seam.
     assert (Hmiss : forall c, c <> log_hdr_bno ls ->
                       fs_blocks dk' c = fs_blocks dk c)
       by (intros c Hc; apply fs_blocks_write_ne; [exact Hlen | exact Hc]).
-    iDestruct ("Hseam" $! dk) as "[Hfwd _]".
-    iAssert (▷ P_fs_any cov ls dk)%I with "[HP]" as "HP";
-      [iNext; by iApply "Hfwd"|].
-    iMod "HP". rewrite /P_fs_any /P_fs_named.
+    iMod "HP". rewrite /P_fs_rec /P_fs_rec_named.
     iDestruct "HP" as (γs) "[%Hseq HPfs]".
     destruct Hseq as (Hsw & Hrg & Hstn).
     rewrite {1}/P_fs. iDestruct "HPfs" as (r) "(Hhist & %Hwf & Harm)".
@@ -1469,9 +1665,8 @@ Section fs_crash_seam.
     iMod ("Hclose" $! dk' (mirror_of (fs_blocks dk') ls)
             with "[%]") as "[Harm Hmir]"; [exact (mirror_of_ok _ _)|].
     iModIntro.
-    iDestruct ("Hseam" $! dk') as "[_ Hbwd]".
     iSplitL "Hhist Harm".
-    { iNext. iApply "Hbwd". rewrite /P_fs_any /P_fs_named. iExists γs.
+    { iNext. rewrite /P_fs_rec /P_fs_rec_named. iExists γs.
       iSplitR; [iPureIntro; done|].
       rewrite /P_fs. iExists (MkFsRec D' (fr_hist r ++ [D'])).
       iFrame "Hhist". iSplitR; [| iExact "Harm"].
@@ -1482,6 +1677,22 @@ Section fs_crash_seam.
     iSplitL "Hsa"; [rewrite /start_auth -Hstn; iExact "Hsa"|].
     iExists (mirror_of (fs_blocks dk') ls). iFrame "Hmir". iPureIntro.
     rewrite /mirror_of /= Hhit. exact (hdr_dec_zero bs Hn0).
+  Qed.
+
+  Lemma fs_clear_permit `{GEN : GenId} (cov : gset Z) (ls : Z)
+      (h : nat * list Z) (bs : list (bv 8)) :
+    length bs = BSIZE ->
+    hdr_n bs = 0 ->
+    fs_crash_seam cov ls -∗
+    era_registered gen_id riscv_eraGS -∗
+    swap_lb (S gen_id) -∗
+    log_mirror_at h -∗
+    disk_write_permit gen_id (Some ((1024 * log_hdr_bno ls)%Z, bs))
+      (log_mirror_at (0%nat, [])).
+  Proof.
+    intros P0 P1. iIntros "#Hseam H0 H1 H2".
+    iApply (fs_permit_of_rec with "Hseam").
+    iApply (fs_clear_permit_rec with "H0 H1 H2"); try assumption.
   Qed.
 
   (* ==================================================================== *)
@@ -1555,21 +1766,17 @@ Section fs_crash_seam.
   Proof. iIntros "H". rewrite /fs_era_custody. by iLeft. Qed.
 
   (* ---- (5a) THE RE-BASING WRITE, at ANY write identity. ---- *)
-  Lemma fs_recover_permit `{GEN : GenId} (cov : gset Z) (ls : Z) (w : disk_wr) :
-    fs_crash_seam cov ls -∗
+  Lemma fs_recover_permit_rec `{GEN : GenId} (cov : gset Z) (ls : Z) (w : disk_wr) :
     era_registered gen_id riscv_eraGS -∗
     gen_started gen_id -∗
     ▷ fs_era_custody -∗
-    disk_write_permit gen_id w fs_era_custody.
+    fs_rec_permit cov ls gen_id w fs_era_custody.
   Proof.
-    iIntros "#Hseam #Hreg #Hst Hcust".
-    rewrite /disk_write_permit. iIntros (dk n) "Hsa %Hn1 HP".
+    iIntros "#Hreg #Hst Hcust".
+    rewrite /fs_rec_permit. iIntros (dk n) "Hsa %Hn1 HP".
     set (dk' := wr_apply w dk).
     (* through the seam; the record is timeless, so the [▷] strips *)
-    iDestruct ("Hseam" $! dk) as "[Hfwd _]".
-    iAssert (▷ P_fs_any cov ls dk)%I with "[HP]" as "HP";
-      [iNext; by iApply "Hfwd"|].
-    iMod "HP". rewrite /P_fs_any /P_fs_named.
+    iMod "HP". rewrite /P_fs_rec /P_fs_rec_named.
     iDestruct "HP" as (γs) "[%Hseq HPfs]".
     destruct Hseq as (Hsw & Hrg & Hstn).
     rewrite {1}/P_fs. iDestruct "HPfs" as (r) "(Hhist & _ & Harm)".
@@ -1621,9 +1828,8 @@ Section fs_crash_seam.
         iExists (lm_hdr (mirror_of (fs_blocks dk') ls)).
         iExists (mirror_of (fs_blocks dk') ls). iFrame "Hmir". done. }
     iModIntro.
-    iDestruct ("Hseam" $! dk') as "[_ Hbwd]".
     iSplitL "Hhist Harm".
-    { iNext. iApply "Hbwd". rewrite /P_fs_any /P_fs_named. iExists γs.
+    { iNext. rewrite /P_fs_rec /P_fs_rec_named. iExists γs.
       iSplitR; [iPureIntro; done|].
       rewrite /P_fs. iExists (MkFsRec D' (fr_hist r ++ [D'])).
       iFrame "Hhist". iSplitR; [| iExact "Harm"].
@@ -1632,6 +1838,18 @@ Section fs_crash_seam.
       - rewrite last_snoc. reflexivity. }
     iSplitL "Hsa"; [rewrite /start_auth -Hstn; iExact "Hsa"|].
     rewrite /fs_era_custody. iRight. iFrame "Hmir Hswlb".
+  Qed.
+
+  Lemma fs_recover_permit `{GEN : GenId} (cov : gset Z) (ls : Z) (w : disk_wr) :
+    fs_crash_seam cov ls -∗
+    era_registered gen_id riscv_eraGS -∗
+    gen_started gen_id -∗
+    ▷ fs_era_custody -∗
+    disk_write_permit gen_id w fs_era_custody.
+  Proof.
+    iIntros "#Hseam H0 H1 H2".
+    iApply (fs_permit_of_rec with "Hseam").
+    iApply (fs_recover_permit_rec with "H0 H1 H2").
   Qed.
 
   (* ---- (5b) THE BOOT'S FINAL HEADER WRITE, uniform in whether the era
@@ -1661,10 +1879,10 @@ Section fs_crash_seam.
     rewrite /log_mirror_any. iDestruct "Hany" as (h) "Hmir".
     iPoseProof (fs_clear_permit cov ls h bs Hlen Hn0
                   with "Hseam Hreg Hswlb Hmir") as "Hp".
-    rewrite /disk_write_permit. iIntros (dk n) "Hsa %Hn1 HP".
-    iMod ("Hp" $! dk n with "Hsa [%] HP") as "(HP & Hsa & Hmir)";
+    rewrite /disk_write_permit. iIntros (dk n) "Hsa %Hn1 Ha HP".
+    iMod ("Hp" $! dk n with "Hsa [%] Ha HP") as "(Ha & HP & Hsa & Hmir)";
       [exact Hn1|].
-    iModIntro. iFrame "HP Hsa Hmir Hswlb".
+    iModIntro. iFrame "Ha HP Hsa Hmir Hswlb".
   Qed.
 
 End fs_crash_seam.

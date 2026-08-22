@@ -270,6 +270,52 @@ Section DiskImgPtsto.
       rewrite disk_read_cons disk_img_bytes_cons. iFrame "Hb Hbs".
   Qed.
 
+  (* the mint, reporting where the new keys went: in [o, o + n) or already
+     in the old map *)
+  Lemma disk_img_bytes_mint_dom (γi : gname) (dmap : gmap Z (bv 8))
+      (dk : Z -> bv 8) (o : Z) (n : nat) :
+    disk_view dmap dk ->
+    (forall j : nat, (j < n)%nat -> dmap !! (o + Z.of_nat j) = None) ->
+    (forall (x : Z) (b : bv 8), dmap !! x = Some b -> True) ->
+    ghost_map_auth γi 1 dmap ==∗
+    ∃ dmap' : gmap Z (bv 8),
+      ghost_map_auth γi 1 dmap' ∗
+      disk_img_bytes γi o (disk_read dk o n) ∗
+      ⌜disk_view dmap' dk⌝ ∗
+      ⌜forall (x : Z) (b : bv 8), dmap' !! x = Some b ->
+         dmap !! x = Some b \/ (o <= x < o + Z.of_nat n)⌝.
+  Proof.
+    revert o dmap. induction n as [|n IH]; intros o dmap Hview Hfresh _.
+    - iIntros "Hauth". iModIntro. iExists dmap. iFrame "Hauth".
+      iSplitR; [| iPureIntro; split; [exact Hview | intros x b Hx; by left]].
+      assert (Hnil : disk_read dk o 0%nat = []) by reflexivity.
+      rewrite Hnil /disk_img_bytes big_sepL_nil. done.
+    - iIntros "Hauth".
+      iMod (ghost_map_insert o (dk o) with "Hauth") as "[Hauth Hb]".
+      { pose proof (Hfresh 0%nat ltac:(lia)) as Hf.
+        assert (Ho : o + Z.of_nat 0%nat = o) by lia. rewrite Ho in Hf. exact Hf. }
+      assert (Hview' : disk_view (<[o := dk o]> dmap) dk).
+      { intros x b Hx. destruct (decide (x = o)) as [->|Hne].
+        - rewrite lookup_insert in Hx. by injection Hx as <-.
+        - rewrite lookup_insert_ne in Hx; [| exact (fun e => Hne (eq_sym e)) ].
+          exact (Hview x b Hx). }
+      assert (Hfresh' : forall j : nat, (j < n)%nat ->
+                <[o := dk o]> dmap !! (o + 1 + Z.of_nat j) = None).
+      { intros j Hj. rewrite lookup_insert_ne; [| lia ].
+        pose proof (Hfresh (S j) ltac:(lia)) as Hf.
+        assert (Hs : o + Z.of_nat (S j) = o + 1 + Z.of_nat j) by lia.
+        rewrite Hs in Hf. exact Hf. }
+      iMod (IH (o + 1) (<[o := dk o]> dmap) Hview' Hfresh' ltac:(done) with "Hauth")
+        as (dmap') "(Hauth & Hbs & %Hv & %Hd)".
+      iModIntro. iExists dmap'. iFrame "Hauth".
+      iSplitL; [| iPureIntro; split; [exact Hv |]].
+      { rewrite disk_read_cons disk_img_bytes_cons. iFrame "Hb Hbs". }
+      intros x b Hx. destruct (Hd x b Hx) as [Hold | Hrng]; [| right; lia].
+      destruct (decide (x = o)) as [-> | Hne]; [right; lia |].
+      rewrite lookup_insert_ne in Hold; [| exact (fun e => Hne (eq_sym e))].
+      by left.
+  Qed.
+
   (* -- THE BOOT MINT ---------------------------------------------------- *)
 
   (* A fresh era's image: a brand-new ghost map, allocated AT the disk's
@@ -290,6 +336,107 @@ Section DiskImgPtsto.
     { intros j _. apply lookup_empty. }
     iModIntro. iExists γi. iFrame "Hbs".
     iExists dmap'. iFrame "Hauth". iPureIntro. exact Hv.
+  Qed.
+
+
+  (* ==================================================================== *)
+  (* THE SIZED AUTH -- the DURABLE disk's shape (claude-notes/design/       *)
+  (* crash.md, "The durable disk: ONE fixed gname").                       *)
+  (*                                                                      *)
+  (* The fixed-layer auth carries a DOMAIN BOUND beside the view: every     *)
+  (* minted offset is in [0, N).  With it, whoever owns the whole [0, N)    *)
+  (* fragment controls the image outright ([disk_img_sized_write]): the     *)
+  (* auth can be moved to ANY image, because no key outside the fragment    *)
+  (* exists to disagree.  That is what lets a client's crash predicate --   *)
+  (* the one owner of the durable fragments -- re-establish itself under    *)
+  (* an arbitrary DMA write with the auth lent for the instant, and why no  *)
+  (* permit needs a "write within range" side condition.                    *)
+  (* ==================================================================== *)
+  Definition disk_img_auth_sized (γi : gname) (N : nat) (dk : Z -> bv 8)
+      : iProp Σ :=
+    (∃ dmap : gmap Z (bv 8),
+       ghost_map_auth γi 1 dmap ∗ ⌜disk_view dmap dk⌝ ∗
+       ⌜forall (o : Z) (b : bv 8), dmap !! o = Some b -> 0 <= o < Z.of_nat N⌝)%I.
+
+  Global Instance disk_img_auth_sized_timeless γi N dk :
+    Timeless (disk_img_auth_sized γi N dk).
+  Proof. apply _. Qed.
+
+  Lemma disk_read_length (dk : Z -> bv 8) (o : Z) (n : nat) :
+    length (disk_read dk o n) = n.
+  Proof. rewrite /disk_read length_fmap length_seq. reflexivity. Qed.
+
+  Lemma disk_read_lookup (dk : Z -> bv 8) (o : Z) (n j : nat) :
+    (j < n)%nat -> disk_read dk o n !! j = Some (dk (o + Z.of_nat j)).
+  Proof.
+    intro Hj. rewrite /disk_read list_lookup_fmap lookup_seq_lt; [| exact Hj].
+    reflexivity.
+  Qed.
+
+  (* two images that read the same bytes on [0, N) agree pointwise there *)
+  Lemma disk_read_agree (dk dk' : Z -> bv 8) (N : nat) :
+    disk_read dk 0 N = disk_read dk' 0 N ->
+    forall x : Z, 0 <= x < Z.of_nat N -> dk x = dk' x.
+  Proof.
+    intros Heq x Hx.
+    assert (Hj : (Z.to_nat x < N)%nat) by lia.
+    pose proof (disk_read_lookup dk 0 N (Z.to_nat x) Hj) as H1.
+    pose proof (disk_read_lookup dk' 0 N (Z.to_nat x) Hj) as H2.
+    rewrite Heq in H1. rewrite H1 in H2. injection H2 as H2.
+    rewrite Z2Nat.id in H2; [| lia]. rewrite Z.add_0_l in H2. exact H2.
+  Qed.
+
+  Lemma disk_img_sized_alloc (dk : Z -> bv 8) (N : nat) :
+    ⊢ |==> ∃ γi : gname,
+        disk_img_auth_sized γi N dk ∗ disk_img_bytes γi 0 (disk_read dk 0 N).
+  Proof.
+    iMod (ghost_map_alloc_empty (K := Z) (V := bv 8)) as (γi) "Hauth".
+    iMod (disk_img_bytes_mint_dom γi ∅ dk 0 N with "Hauth")
+      as (dmap') "(Hauth & Hbs & %Hv & %Hdom)".
+    { intros o b Ho. rewrite lookup_empty in Ho. discriminate. }
+    { intros j _. apply lookup_empty. }
+    { intros o b Ho. rewrite lookup_empty in Ho. discriminate. }
+    iModIntro. iExists γi. iFrame "Hbs".
+    iExists dmap'. iFrame "Hauth". iPureIntro. split; [exact Hv |].
+    intros o b Ho. pose proof (Hdom o b Ho) as [H | H]; [| lia].
+    rewrite lookup_empty in H. discriminate.
+  Qed.
+
+  (* the fragments read the image *)
+  Lemma disk_img_sized_read (γi : gname) (N : nat) (dk : Z -> bv 8)
+      (o : Z) (bs : list (bv 8)) :
+    disk_img_auth_sized γi N dk -∗ disk_img_bytes γi o bs -∗
+    ⌜disk_read dk o (length bs) = bs⌝.
+  Proof.
+    iIntros "Ha Hbs". iDestruct "Ha" as (dmap) "(Hauth & %Hv & _)".
+    iApply (disk_img_bytes_read with "Hauth Hbs"). exact Hv.
+  Qed.
+
+  (* THE OWNER OF THE WHOLE FRAGMENT MOVES THE IMAGE, to anything at all *)
+  Lemma disk_img_sized_write (γi : gname) (N : nat) (dk dk' : Z -> bv 8) :
+    disk_img_auth_sized γi N dk -∗ disk_img_bytes γi 0 (disk_read dk 0 N) ==∗
+    disk_img_auth_sized γi N dk' ∗ disk_img_bytes γi 0 (disk_read dk' 0 N).
+  Proof.
+    iIntros "Ha Hbs". iDestruct "Ha" as (dmap) "(Hauth & %Hv & %Hdom)".
+    iMod (disk_img_bytes_update_gen γi dmap 0 (disk_read dk 0 N) (disk_read dk' 0 N)
+            with "Hauth Hbs") as (dmap') "(Hauth & Hbs & %Hin & %Hout)".
+    { rewrite !disk_read_length. reflexivity. }
+    iModIntro. iFrame "Hbs". iExists dmap'. iFrame "Hauth".
+    (* the domain did not move: an updated key was a key *)
+    assert (Hdom' : forall (o : Z) (b : bv 8), dmap' !! o = Some b ->
+                      0 <= o < Z.of_nat N).
+    { intros o b Ho.
+      destruct (decide (0 <= o < Z.of_nat N)) as [Hin' | Hnot]; [exact Hin' |].
+      exfalso. rewrite (Hout o) in Ho.
+      - exact (Hnot (Hdom o b Ho)).
+      - intros j Hj Heq. rewrite disk_read_length in Hj. lia. }
+    iPureIntro. split; [| exact Hdom'].
+    intros o b Ho. pose proof (Hdom' o b Ho) as Ho'.
+    assert (Hj : (Z.to_nat o < N)%nat) by lia.
+    pose proof (Hin (Z.to_nat o) (dk' o)) as Hi.
+    rewrite disk_read_lookup in Hi; [| exact Hj].
+    assert (Hoz : 0 + Z.of_nat (Z.to_nat o) = o) by lia. rewrite Hoz in Hi.
+    specialize (Hi eq_refl). rewrite Hi in Ho. injection Ho as <-. reflexivity.
   Qed.
 
 End DiskImgPtsto.

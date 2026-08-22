@@ -45,6 +45,8 @@ Require Import BootChain BootShared.
 Require Import FsCfgBoot.   (* [fs_boot_image_wf], moved down at stage (f) *)
 Require Import RiscvAdequacy.
 Require Import FsCrash.
+Require Import PowerBoot.   (* [boot_gstate]: one boot state, for the era-0 extent *)
+Require Import FirstTok.    (* [fs_extent_of_image] *)
 (* THE LITERAL mkfs IMAGE, for the generic FS theorem's [Hrec] vocabulary.
    (The corollaries AT the image live in [FsAdequacyImg.v] since stage
    (d2b); this import stays because §3b's statement is spelled in
@@ -179,8 +181,7 @@ Section SystemBoot.
        has to come from -- that is [riscv_power_adequacy]'s [Hcp], and this
        premise is [Hcp] read at the FS's own [Pc].  The seam is assembled
        from it below and rides [first_tok] to forkret's first arm. *)
-    (forall dk : Z -> bv 8,
-       riscv_crash_pred dk = P_fs_any cov (FsImg.sb_logstart sb) dk) ->
+    riscv_crash_pred = P_fs_any cov (FsImg.sb_logstart sb) ->
     power_boot_res riscv_eraGS gen_id boot_D NPROC XV6_DISK_BYTES g
     ={⊤}=∗
       ([∗ list] c ∈ enum CPU,
@@ -196,8 +197,8 @@ Section SystemBoot.
        [Hcp] has rewritten the field away, which is exactly what "the FS's
        predicate IS the crash predicate" means. *)
     iAssert (fs_crash_seam cov (FsImg.sb_logstart sb)) as "#Hseam".
-    { rewrite /fs_crash_seam. iIntros "!>" (dk).
-      rewrite (Hcp dk). iSplitL; iIntros "H"; iExact "H". }
+    { rewrite /fs_crash_seam. iModIntro.
+      rewrite Hcp. iSplitL; iIntros "H"; iExact "H". }
     iMod (boot_shared_alloc g XV6_DISK_BYTES sb nib cov Hbf Himg with "Hres")
       as (Hfd Hir Hpav Hbs HF γd γv)
       "(%Hdimg & #Htext & #Hdata & #Hstarted & #Hdev & #Hwinv &
@@ -329,14 +330,30 @@ Proof.
      DURABILITY claim, by pinning [D0] to mkfs's own recovery. *)
   destruct (fs_recovery_total (fs_blocks (v_disk (g.(gdev).(dvirtio))))
               cov (FsImg.sb_logstart sb)) as [D0 Hrec].
+  (* the durable disk's extent, read off the image at the first boot state
+     ([PowerBoot.boot_gstate g] is one; [fs_extent] says nothing about the
+     bytes) *)
+  assert (Hext : fs_extent cov (FsImg.sb_logstart sb) XV6_DISK_BYTES).
+  { pose proof (Himg (PowerBoot.boot_gstate g)
+                  (proj2 (proj2 (PowerBoot.boot_shape_boot_gstate g)))) as Hw.
+    destruct Hw as (Hwf & _ & _ & _ & _ & Hnibeq & Hcovin & Hcovmeta & _).
+    exact (FirstTok.fs_extent_of_image _ _ _ _ _ Hwf Hnibeq Hcovin Hcovmeta). }
+  (* THE CRASH PREDICATE AT ERA 0: the record from mkfs's recovery fact,
+     and the DURABLE DISK's fragments -- the whole [0, XV6_DISK_BYTES) of the
+     initial image, handed over once by the power theorem and owned by the
+     predicate from here on (design/crash.md, "The durable disk").  This is
+     the only place the initial image is ever named. *)
   apply (riscv_power_adequacy Σ boot_D NPROC XV6_DISK_BYTES g
-           (fun (γsw γreg γst : gname) (dk : Z -> bv 8) =>
-              P_fs_named γsw γreg γst cov (FsImg.sb_logstart sb) dk)
-           ltac:(intros γsw γreg γst; iIntros "Hsw";
+           (fun (γd γsw γreg γst : gname) =>
+              P_fs_named γd XV6_DISK_BYTES γsw γreg γst cov (FsImg.sb_logstart sb))
+           ltac:(intros γd γsw γreg γst; iIntros "[Hfr Hsw]";
                  iMod (P_fs_alloc γsw γreg γst _ D0 cov
                          (FsImg.sb_logstart sb) Hrec
                          with "Hsw") as (γs) "(%Hseq & HP & _)";
-                 iModIntro; rewrite /P_fs_named; iExists γs;
+                 iModIntro; rewrite /P_fs_named;
+                 iExists (v_disk (g.(gdev).(dvirtio))); iFrame "Hfr";
+                 iSplitR; [iPureIntro; exact Hext |];
+                 rewrite /P_fs_rec_named; iExists γs;
                  iSplitR; [iPureIntro; exact Hseq | iExact "HP"])
            Hgen0 Hpow).
   (* the per-era boot entailment, at the era instance the power thread just
@@ -352,7 +369,7 @@ Proof.
   destruct Hshape as (Hi & Gg & Gs & Gr & Gt & Gsw & ->).
   refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ _ _ _ _ _ gen g' sb nib cov Hbf
             (Himg g' Hbf) _).
-  intros dk. reflexivity.
+  reflexivity.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -416,14 +433,30 @@ Theorem xv6_fs_adequacy Σ
     e2 ∈ t2 ->
     reducible (Λ := riscv_lang) e2 g2.
 Proof.
+  (* the durable disk's extent, read off the image at the first boot state
+     ([PowerBoot.boot_gstate g] is one; [fs_extent] says nothing about the
+     bytes) *)
+  assert (Hext : fs_extent cov (FsImg.sb_logstart sb) XV6_DISK_BYTES).
+  { pose proof (Himg (PowerBoot.boot_gstate g)
+                  (proj2 (proj2 (PowerBoot.boot_shape_boot_gstate g)))) as Hw.
+    destruct Hw as (Hwf & _ & _ & _ & _ & Hnibeq & Hcovin & Hcovmeta & _).
+    exact (FirstTok.fs_extent_of_image _ _ _ _ _ Hwf Hnibeq Hcovin Hcovmeta). }
+  (* THE CRASH PREDICATE AT ERA 0: the record from mkfs's recovery fact,
+     and the DURABLE DISK's fragments -- the whole [0, XV6_DISK_BYTES) of the
+     initial image, handed over once by the power theorem and owned by the
+     predicate from here on (design/crash.md, "The durable disk").  This is
+     the only place the initial image is ever named. *)
   apply (riscv_power_adequacy Σ boot_D NPROC XV6_DISK_BYTES g
-           (fun (γsw γreg γst : gname) (dk : Z -> bv 8) =>
-              P_fs_named γsw γreg γst cov (FsImg.sb_logstart sb) dk)
-           ltac:(intros γsw γreg γst; iIntros "Hsw";
+           (fun (γd γsw γreg γst : gname) =>
+              P_fs_named γd XV6_DISK_BYTES γsw γreg γst cov (FsImg.sb_logstart sb))
+           ltac:(intros γd γsw γreg γst; iIntros "[Hfr Hsw]";
                  iMod (P_fs_alloc γsw γreg γst _ D0 cov
                          (FsImg.sb_logstart sb) Hrec
                          with "Hsw") as (γs) "(%Hseq & HP & _)";
-                 iModIntro; rewrite /P_fs_named; iExists γs;
+                 iModIntro; rewrite /P_fs_named;
+                 iExists (v_disk (g.(gdev).(dvirtio))); iFrame "Hfr";
+                 iSplitR; [iPureIntro; exact Hext |];
+                 rewrite /P_fs_rec_named; iExists γs;
                  iSplitR; [iPureIntro; exact Hseq | iExact "HP"])
            Hgen0 Hpow).
   intros F HE gen g' Hbf Hshape.
@@ -435,7 +468,7 @@ Proof.
   destruct Hshape as (Hi & Gg & Gs & Gr & Gt & Gsw & ->).
   refine (@xv6_boot_era Σ (RiscvGS Σ _ HE) _ _ _ _ _ _ gen g' sb nib cov Hbf
             (Himg g' Hbf) _).
-  intros dk. reflexivity.
+  reflexivity.
 Qed.
 
 (* ---------------------------------------------------------------------- *)

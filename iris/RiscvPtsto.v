@@ -418,40 +418,39 @@ Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
      same instance, and RiscvPtsto sits BELOW DiskPtsto, so neither file can
      take the class from the other. *)
   riscvF_diskGS :: diskImgG Σ;
-  (* THE FS TIE (claude-notes/design/fs-log.md stage 4 phase C2a): a
-     [ghost_var] over the WHOLE disk image function, split 1/2 - 1/2 between
-     [state_interp]'s fixed conjunct ([fs_tie_interp] below, always at the
-     machine's own [v_disk]) and [crash_inv]'s body.  FIXED-layer, because it
-     is what must survive a power cycle -- the disk does, so its mirror must
-     too, unlike the per-era image map above.
+  (* THE DURABLE DISK'S NAME (claude-notes/design/crash.md, "The durable
+     disk: ONE fixed gname", ruled 2026-08-22).  A FIXED-layer [ghost_map Z
+     (bv 8)] name, typed by [riscvF_diskGS] above (the class was always
+     fixed-layer; only the name used to be per-era).  [state_interp] holds
+     its AUTH at the machine's own [v_disk] ([disk_fixed_interp] below) --
+     a fixed conjunct, because the disk is the one thing a power cycle
+     preserves, so both power arms simply frame it.  The crash predicate
+     owns the FRAGMENTS, all of them, forever: no thread that can die ever
+     holds a fragment of the durable disk (they die with the era and take
+     what they own with them).  Auth/frag agreement is therefore THE TIE
+     between the crash predicate and the real disk -- which retires the
+     [ghost_var] tie halves this field replaces ([disk_tie] / [fs_tie_interp])
+     and the [dk]-indexing of the crash predicate they required.
 
-     THE VALUE IS THE RAW BYTE FUNCTION, not a block map.  Every FS constant
-     (BSIZE, the fs range) lives above [SystemAdequacy], and the block view is
-     a pure re-indexing the FS layer applies on top ([FsCrash.fs_blocks]); the
-     completion's own obligation is then exactly [VirtioModel.disk_write],
-     with no sector-alignment side condition anywhere in the device stack.
-
-     The [ghost_varG Σ (Z -> bv 8)] instance is unique in a [riscvGS]
-     context (no other ghost in the tree carries that type), so there is no
-     resolution ambiguity. *)
-  riscvF_fstieGS :: ghost_varG Σ (Z -> bv 8);
-  riscv_fstie_name : gname;
+     The per-era image map ([riscvEraGS.era_disk_name]) STAYS: it is the
+     driver's in-memory picture, owned by mortals, re-minted per era; the
+     crash predicate does not depend on it. *)
+  riscv_disk_name : gname;
+  (* ...and its SIZE: every minted offset of the durable map is below it
+     ([DiskImg.disk_img_auth_sized]), which is what lets the one owner of
+     the whole [0, size) fragment -- the crash predicate -- move the image
+     under any write at all.  A machine constant of this boot (adequacy's
+     [ndisk]), fixed-layer like the name. *)
+  riscv_disk_size : nat;
   (* THE CRASH PREDICATE (claude-notes/design/crash.md): the client's
-     durability invariant over the disk image, sealed into [crash_inv] below.
-
-     INDEXED BY THE DISK IMAGE (phase C2a).  It used to be a bare [iProp Σ],
-     and that shape cannot carry the tie: a field of type [iProp Σ] is OPAQUE
-     to every opener, so a [ghost_var] half parked INSIDE the client's
-     predicate is unreachable to the DMA completion -- which is the only
-     mover of the tie -- and at a trivial [Pc] it does not exist at all.
-     Indexing the field instead puts the tie half BESIDE the client's
-     predicate in [crash_inv]'s body, where the completion can move it
-     mechanically, while the index is exactly what a real [P_fs] needs to
-     talk about the real disk.
-
-     Still an ARBITRARY predicate, and still nothing between here and the
-     device thread names it. *)
-  riscv_crash_pred : (Z -> bv 8) -> iProp Σ;
+     durability invariant over the durable disk, sealed into [crash_inv]
+     below.  A bare [iProp Σ] again (it was [dk]-indexed while the tie was a
+     [ghost_var] half beside it): the client's predicate owns the durable
+     fragments, and a DMA completion re-establishes it by running the
+     client's own view shift with the AUTH lent for the instant
+     ([disk_write_permit]).  Still an ARBITRARY predicate, and still nothing
+     between here and the device thread names it. *)
+  riscv_crash_pred : iProp Σ;
   (* THE SWAP COUNTER (phase C2b/D1): a mono-nat whose FULL auth lives inside
      [P_fs]'s checked-out arm and whose value is the generation currently in
      custody of the FS record.  FIXED-layer, and the auth never strands
@@ -640,33 +639,24 @@ Definition gen_cert `{!riscvGS Σ} `{GEN : GenId} : iProp Σ :=
 
 Definition crashN : namespace := nroot .@ "crash".
 
-(* ONE HALF of the FS tie, at a given disk image.  [state_interp] holds the
-   other half at the machine's own [v_disk] ([fs_tie_interp] below), so the
-   two together say that the crash predicate is about THIS disk.  Both halves
-   are in hand exactly at the DMA completion: [wp_disk_step] hands over
-   [state_interp]'s, and opening [crashN] yields the body's. *)
-Definition disk_tie `{!riscvFixedGS Σ} (dk : Z -> bv 8) : iProp Σ :=
-  ghost_var riscv_fstie_name (1/2) dk.
-
-Global Instance disk_tie_timeless `{!riscvFixedGS Σ} dk : Timeless (disk_tie dk).
-Proof. rewrite /disk_tie. apply _. Qed.
-
-(* the two halves always agree, and only a holder of BOTH can move them --
-   which is exactly the DMA completion, and nobody else in the machine. *)
-Lemma disk_tie_agree `{!riscvFixedGS Σ} (dk dk' : Z -> bv 8) :
-  disk_tie dk -∗ disk_tie dk' -∗ ⌜dk = dk'⌝.
-Proof. rewrite /disk_tie. iApply ghost_var_agree. Qed.
-
-Lemma disk_tie_update `{!riscvFixedGS Σ} (dk dk' dk'' : Z -> bv 8) :
-  disk_tie dk -∗ disk_tie dk' ==∗ disk_tie dk'' ∗ disk_tie dk''.
-Proof. rewrite /disk_tie. iApply ghost_var_update_halves. Qed.
-
-(* THE CRASH INVARIANT.  The tie half is a SIBLING of the client's predicate,
-   not a conjunct of it: the completion must move it mechanically and cannot
-   look inside an opaque [iProp] field.  The existential is what makes the
-   body allocatable at ANY client predicate, including the trivial one. *)
+(* THE CRASH INVARIANT.  The client's predicate, and nothing beside it: the
+   tie to the real disk is the auth/fragment agreement against
+   [state_interp]'s [disk_fixed_interp], available to the one opener (the
+   DMA completion, [WpUart.wp_disk_loop]) because it holds [state_interp]
+   there.  Allocated once, in adequacy, over the fixed layer's
+   [riscv_crash_pred]; it spans power cycles for free, since neither power
+   arm touches [v_disk] and neither opens it. *)
 Definition crash_inv `{!riscvFixedGS Σ} : iProp Σ :=
-  inv crashN (∃ dk : Z -> bv 8, disk_tie dk ∗ riscv_crash_pred dk).
+  inv crashN riscv_crash_pred.
+
+(* the durable disk's auth, at an image: what [state_interp] holds and what
+   a DMA completion lends a permit for the instant *)
+Definition disk_fixed_auth `{!riscvFixedGS Σ} (dk : Z -> bv 8) : iProp Σ :=
+  disk_img_auth_sized riscv_disk_name riscv_disk_size dk.
+
+Global Instance disk_fixed_auth_timeless `{!riscvFixedGS Σ} dk :
+  Timeless (disk_fixed_auth dk).
+Proof. rewrite /disk_fixed_auth. apply _. Qed.
 
 Global Instance crash_inv_persistent `{!riscvFixedGS Σ} : Persistent crash_inv.
 Proof. rewrite /crash_inv. apply _. Qed.
@@ -692,8 +682,19 @@ Definition disk_write_permit `{!riscvFixedGS Σ} (gd : nat) (w : disk_wr)
     (Q : iProp Σ) : iProp Σ :=
   (∀ (dk : Z -> bv 8) (n : nat),
      start_auth n -∗ ⌜n = (gd + 1)%nat⌝ -∗
-     ▷ riscv_crash_pred dk ={∅}=∗
-       ▷ riscv_crash_pred (wr_apply w dk) ∗ start_auth n ∗ Q)%I.
+     (* THE DURABLE AUTH IS LENT FOR THE INSTANT (design/crash.md, "The
+        durable disk"): the client's predicate owns the fragments, so the
+        view shift agrees them against the auth (learning [dk], the image
+        the machine is moving FROM), moves them with the write, and hands
+        the auth back at the image the machine moved TO.  A READ is the
+        same shape at [w = None] ([wr_apply None dk = dk]): the auth is
+        lent, nothing moves, and [Q] may be stated at the bytes of [dk] --
+        which is how a reader learns something DURABLE about what it read,
+        at the only instant anybody can. *)
+     disk_fixed_auth dk -∗
+     ▷ riscv_crash_pred ={∅}=∗
+       disk_fixed_auth (wr_apply w dk) ∗
+       ▷ riscv_crash_pred ∗ start_auth n ∗ Q)%I.
 
 (* WHY A MASK-[∅] FUPD AND NOT A BASIC UPDATE.  A client whose crash
    predicate is TIMELESS -- [FsCrash.P_fs_any] is, every conjunct of it is a
@@ -758,8 +759,8 @@ Definition disk_write_permit `{!riscvFixedGS Σ} (gd : nat) (w : disk_wr)
 Lemma disk_write_permit_trivial `{!riscvFixedGS Σ} (gd : nat) :
   ⊢ disk_write_permit gd None True.
 Proof.
-  rewrite /disk_write_permit. iIntros (dk n) "Hs _ HP". iModIntro.
-  rewrite wr_apply_none. iFrame "HP Hs".
+  rewrite /disk_write_permit. iIntros (dk n) "Hs _ Ha HP". iModIntro.
+  rewrite wr_apply_none. iFrame "Ha HP Hs".
 Qed.
 
 (* A REAL WRITE'S PERMIT IS NOT FREE, and that is the honest content of the
@@ -1855,19 +1856,20 @@ Definition era_interp `{!riscvFixedGS Σ} (E : riscvEraGS) (g : gstate) : iProp 
       re-establishes it and no rule has to carry it. *)
    resv_auth_at E g.(gresv) ∗ ⌜resv_ok g⌝)%I.
 
-(* THE FS TIE's MACHINE SIDE: [state_interp]'s half, always at the machine's
-   own disk image.  A FIXED conjunct, NOT part of [era_interp]: the disk (and
-   hence its mirror) is the one thing a power cycle preserves, so the tie must
-   survive PowerOff -- both power arms simply FRAME it ([boot_shape] preserves
-   [v_disk]).  Of the whole machine only the DMA completion moves [v_disk], so
-   only [RiscvExec.wp_disk_step] hands this conjunct to its callback; the hart,
+(* THE DURABLE DISK's MACHINE SIDE: the fixed gname's AUTH, always at the
+   machine's own disk image.  A FIXED conjunct, NOT part of [era_interp]: the
+   disk is the one thing a power cycle preserves, so its authority must
+   survive PowerOff -- both power arms simply FRAME it ([boot_shape]
+   preserves [v_disk]).  Of the whole machine only the DMA completion moves
+   [v_disk], so only [RiscvExec.wp_disk_step] hands this conjunct to its
+   callback (it lends it to the client's permit for the instant); the hart,
    UART and PLIC rules frame it through their own [v_disk]-preservation
    lemmas. *)
-Definition fs_tie_interp `{!riscvFixedGS Σ} (g : gstate) : iProp Σ :=
-  disk_tie (v_disk (dvirtio (gdev g))).
+Definition disk_fixed_interp `{!riscvFixedGS Σ} (g : gstate) : iProp Σ :=
+  disk_fixed_auth (v_disk (dvirtio (gdev g))).
 
 Definition power_interp `{!riscvFixedGS Σ} (g : gstate) : iProp Σ :=
-  (gen_auth g.(ggen) ∗ start_auth (start_count g) ∗ fs_tie_interp g ∗
+  (gen_auth g.(ggen) ∗ start_auth (start_count g) ∗ disk_fixed_interp g ∗
    (∃ R : gmap nat riscvEraGS,
       ghost_map_auth riscv_registry_name 1 R ∗
       ⌜dom R = set_seq 0 (start_count g)⌝ ∗

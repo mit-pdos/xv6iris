@@ -932,12 +932,13 @@ Section DevLoops.
          stripped: it is arbitrary, hence not timeless, and the permit's type
          takes it under the later.  This is the only opening of [crashN] in
          the tree. *)
-      iInv "Hcinv" as "HPbody" "Hcclose".
-      (* The body's TIE HALF is timeless (a [ghost_var]), so it strips out
-         from under the invariant's later while the client's predicate stays
-         under it -- which is exactly what the permit's type wants. *)
-      iDestruct "HPbody" as (dk) "[>Htie2 HP]".
-      iDestruct (disk_tie_agree with "Htie Htie2") as %<-.
+      iInv "Hcinv" as "HP" "Hcclose".
+      (* THE TIE IS THE AUTH: [wp_disk_step] handed over the durable disk's
+         fixed auth at the machine's own image ([Htie]), and the permit
+         below is the client's view shift WITH THAT AUTH LENT -- it agrees
+         its own fragments against it, moves them, and returns it at the
+         image the device just produced (design/crash.md, "The durable
+         disk").  No [ghost_var] halves to agree or move any more. *)
       (* THE CLIENT'S VIEW SHIFT, at the image the machine is moving FROM;
          it lands the crash predicate at [wr_apply wr] of it. *)
       (* THE LIVE-ERA ARITHMETIC GOES IN WITH THE VIEW SHIFT (phase C2b/D1):
@@ -951,18 +952,11 @@ Section DevLoops.
          three invariants open, so shrink the mask around it and restore. *)
       iMod (fupd_mask_subseteq ∅) as "Hmclose"; [set_solver|].
       iMod (perm_consume_kq gen_id (dn_perm γd) kq wr (v_disk (dvirtio d)) n
-              with "Hpbody Hpend Hsa [//] HP")
-        as "(Hpbody & Hdone & Hsa & HP)".
+              with "Hpbody Hpend Hsa [//] Htie HP")
+        as "(Hpbody & Hdone & Hsa & Htie & HP)".
       iMod "Hmclose" as "_".
-      (* THE MECHANICAL TIE UPDATE: both halves, together, to the image the
-         device just produced.  It is the completion's own job -- the client
-         cannot do it (it holds neither half) and nobody else in the machine
-         ever holds both. *)
-      iMod (disk_tie_update _ _ (v_disk vnew) with "Htie Htie2")
-        as "[Htie Htie2]".
-      iEval (rewrite Hpost) in "HP".
-      iMod ("Hcclose" with "[Htie2 HP]") as "_".
-      { iNext. iExists (v_disk vnew). iFrame "Htie2 HP". }
+      iEval (rewrite Hpost) in "Htie".
+      iMod ("Hcclose" with "HP") as "_".
       iDestruct ("Hback" with "Hdone") as "(Hmem' & Hdur' & Hlease')".
       iMod ("Hclose" with "[Hv' Hlease']") as "_".
       { iNext. iExists vnew. iFrame.
