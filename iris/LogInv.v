@@ -14,12 +14,12 @@
    op's budget and the others' are indistinguishable to an auth-nat), so
    the ledger keeps the per-op structure -- which is also exactly the C
    code's own reservation argument.
-   Conditionally inside (cmt = false): [log_batch] -- the lh cells with
+   Conditionally inside (cmt = false): [log_state] -- the lh cells with
    their write-set reading W, BOTH FsBlocks auths (the freeze-by-auth
    that makes log_write and the committer the ONLY writers of the logged
    view), the log-side dirty halves recording exactly W's membership over
    the whole covered range, and the log-region + header client halves.
-   end_op's last-out path flips cmt := 1 and takes [log_batch] out
+   end_op's last-out path flips cmt := 1 and takes [log_state] out
    linearly, mirroring the code running commit with no locks held;
    begin_op sleeps on cmt, so out stays 0 across a commit, and
    ⌜cmt = true -> out = 0⌝ rides as a pure conjunct (what kills end_op's
@@ -106,7 +106,7 @@ Definition cov_ok (cov : gset Z) : Prop :=
   forall z : Z, z ∈ cov -> 0 < z < 2 ^ 31.
 
 (* The log's own storage is part of the covered range: the log layer is
-   the CLIENT of the header block and the LOGBLOCKS slots (log_batch holds
+   the CLIENT of the header block and the LOGBLOCKS slots (log_state holds
    their [fsblock] halves), and write_head / write_log / install_trans
    [bread] them, which needs them covered. *)
 Definition log_geom_ok (cov : gset Z) (logstart : Z) : Prop :=
@@ -260,6 +260,103 @@ Proof.
   rewrite (op_sum_delete om i (u, Sb, e0) Hi).
   rewrite (op_sum_delete (<[i := (u, Sb', e0)]> om) i (u, Sb', e0) Hj).
   rewrite delete_insert_delete. reflexivity.
+Qed.
+
+(* ------------------------------------------------------------------ *)
+(*  THE OPEN OPS' PENDING SET (durable-disk stage G1)                   *)
+(*                                                                     *)
+(*  The union of every LIVE operation's already-logged set -- the       *)
+(*  blocks some open transaction has written into the batch and has not *)
+(*  yet ended.  It is what the abstract-view row (a) of [log_state]     *)
+(*  excludes from its agreement: between [begin_op] and [end_op] the    *)
+(*  logged view [L] and the committed view [A] may differ at exactly    *)
+(*  these blocks and nowhere else.                                     *)
+(*                                                                     *)
+(*  Stated as a [map_fold] rather than a union over [map_to_list] so    *)
+(*  every law below is one [map_fold_weak_ind], and so that it is       *)
+(*  spelled the way [op_sum] above is.  Everything is derived from the  *)
+(*  MEMBERSHIP characterisation [op_pending_elem_of]; nothing unfolds   *)
+(*  the fold at a use site, and no law reaches for [set_solver] on a    *)
+(*  whole map (durable-notes.md's set_solver rules).                    *)
+(* ------------------------------------------------------------------ *)
+Definition op_pending (om : gmap nat op_entry) : gset Z :=
+  map_fold (fun _ e acc => e.1.2 ∪ acc) ∅ om.
+
+Lemma op_pending_empty : op_pending ∅ = ∅.
+Proof. reflexivity. Qed.
+
+(* THE CHARACTERISATION.  Every other law is a corollary. *)
+Lemma op_pending_elem_of (om : gmap nat op_entry) (b : Z) :
+  b ∈ op_pending om <-> exists i e, om !! i = Some e /\ b ∈ e.1.2.
+Proof.
+  rewrite /op_pending.
+  apply (map_fold_weak_ind
+           (fun (r : gset Z) (m : gmap nat op_entry) =>
+              b ∈ r <-> exists i e, m !! i = Some e /\ b ∈ e.1.2)).
+  - split.
+    + intros Hb. exfalso. exact (not_elem_of_empty b Hb).
+    + intros (i & e & Hi & _). rewrite lookup_empty in Hi. discriminate.
+  - intros i e m r Hi IH. split.
+    + intros Hb. apply elem_of_union in Hb as [Hb | Hb].
+      * exists i, e. rewrite lookup_insert. done.
+      * apply IH in Hb as (j & e' & Hj & Hb).
+        exists j, e'. rewrite lookup_insert_ne; [done|].
+        intros ->. rewrite Hi in Hj. discriminate.
+    + intros (j & e' & Hj & Hb).
+      destruct (decide (j = i)) as [->|Hne].
+      * rewrite lookup_insert in Hj. injection Hj as <-.
+        apply elem_of_union_l. exact Hb.
+      * rewrite lookup_insert_ne in Hj; [| exact (not_eq_sym Hne)].
+        apply elem_of_union_r. apply IH. exists j, e'. done.
+Qed.
+
+(* a live entry's set is pending *)
+Lemma op_pending_lookup (om : gmap nat op_entry) (i : nat) (e : op_entry) :
+  om !! i = Some e -> e.1.2 ⊆ op_pending om.
+Proof.
+  intros Hi b Hb. apply op_pending_elem_of. exists i, e. done.
+Qed.
+
+(* THE MONOTONICITY LAW THE THREE GROWING TRANSITIONS USE.  [begin_op]'s
+   mint (premise vacuous -- [om !! i = None]) and both of [log_write]'s
+   ledger steps (the entry's set only grows) are instances; ONE lemma
+   rather than an insert/update pair, because the two differ only in how
+   the premise is discharged. *)
+Lemma op_pending_insert_mono (om : gmap nat op_entry) (i : nat)
+    (e' : op_entry) :
+  (forall e, om !! i = Some e -> e.1.2 ⊆ e'.1.2) ->
+  op_pending om ⊆ op_pending (<[i := e']> om).
+Proof.
+  intros Hgrow b Hb. apply op_pending_elem_of.
+  apply op_pending_elem_of in Hb as (j & e & Hj & Hb).
+  destruct (decide (j = i)) as [->|Hne].
+  - exists i, e'. rewrite lookup_insert. split; [reflexivity|].
+    exact (Hgrow e Hj b Hb).
+  - exists j, e. rewrite lookup_insert_ne; [done | exact (not_eq_sym Hne)].
+Qed.
+
+(* THE SHRINKING LAW: [end_op]'s retire.  Stated as the exact split rather
+   than as a bare inclusion, because that is the shape stage G's per-op
+   preservation obligation is discharged against -- the retiring entry's
+   own set is the only thing that leaves the pending union. *)
+Lemma op_pending_delete (om : gmap nat op_entry) (i : nat) (e : op_entry) :
+  om !! i = Some e ->
+  op_pending om ⊆ e.1.2 ∪ op_pending (delete i om).
+Proof.
+  intros Hi b Hb.
+  apply op_pending_elem_of in Hb as (j & e' & Hj & Hb).
+  destruct (decide (j = i)) as [->|Hne].
+  - rewrite Hi in Hj. injection Hj as <-. apply elem_of_union_l. exact Hb.
+  - apply elem_of_union_r. apply op_pending_elem_of.
+    exists j, e'. rewrite lookup_delete_ne; [done | exact (not_eq_sym Hne)].
+Qed.
+
+Lemma op_pending_delete_subseteq (om : gmap nat op_entry) (i : nat) :
+  op_pending (delete i om) ⊆ op_pending om.
+Proof.
+  intros b Hb. apply op_pending_elem_of.
+  apply op_pending_elem_of in Hb as (j & e & Hj & Hb).
+  rewrite lookup_delete_Some in Hj. exists j, e. tauto.
 Qed.
 
 Section LogInv.
@@ -652,7 +749,7 @@ Section LogInv.
   (*  header is clean", "the slots hold the logged values").             *)
   (*                                                                     *)
   (*  Which half lives where, and why the value is existential: the era's *)
-  (*  half rides [log_batch], so it is exactly as available as the batch  *)
+  (*  half rides [log_state], so it is exactly as available as the batch  *)
   (*  is -- in the lock between commits, checked out by the committer     *)
   (*  during one.  The BETWEEN-COMMITS form carries the pure conjunct     *)
   (*  [lm_hdr M = (0, [])]: with the batch in the lock the on-disk header *)
@@ -669,10 +766,74 @@ Section LogInv.
      block it is overwriting is a LOGGED one, so recovery re-installs it
      anyway).  The mirror's full picture (durable-disk stage E2: one total
      block view, homes included) is under the existential; assertions here
-     expose only the header reading, so [log_batch] reads exactly as
+     expose only the header reading, so [log_state] reads exactly as
      before.  [ls] locates the header inside the picture. *)
   Definition log_mirror_clean (ls : Z) : iProp Σ :=
     log_mirror_at ls (0%nat, []).
+
+  (* ---------------------------------------------------------------- *)
+  (*  ROW (b): THE MIRROR TIE (durable-disk stage G1)                  *)
+  (*                                                                    *)
+  (*  OUTSIDE THE BATCH, THE ERA'S PICTURE OF THE DURABLE DISK IS THE     *)
+  (*  LOGGED VIEW.  A home block that is not in [LB] has not been         *)
+  (*  written since the last commit, so its home block on the physical    *)
+  (*  disk -- which is what [lm_view M] records -- still holds the        *)
+  (*  logged bytes.  It is what turns the commit's [D' = restrict L]      *)
+  (*  into an equation about the PHYSICAL pre-image, i.e. what lets       *)
+  (*  [FsCrash.fs_commit_permit_named]'s conclusion be assembled          *)
+  (*  generically instead of at each of end_op's 26 exit arms             *)
+  (*  (durable-disk.md stage G1 row (b)).                                *)
+  (*                                                                     *)
+  (*  IT IS GATED, AND THE GATE IS VISIBLE DEBT -- read this before        *)
+  (*  using it.  The real content is [log_mirror_tie_body], under its      *)
+  (*  own name; [log_mirror_tie] -- what [log_state] actually carries --   *)
+  (*  is [True] until the two ESTABLISHMENT sites can produce the body:   *)
+  (*                                                                     *)
+  (*   - end_op's DEPOSIT ([ProofEndOp.eo_open_to_batch]).  The commit     *)
+  (*     runs [write_head] / [install_trans] / [write_head] through the    *)
+  (*     AT-FORM permits ([FsCrash.fs_logfill_permit] and friends), whose  *)
+  (*     [Q] is [log_mirror_at ls h] -- the mirror VALUE is existential,   *)
+  (*     so the deposit cannot say what [lm_view M'] is at any block.      *)
+  (*     DISCHARGER: stage G3, which re-points [ProofEndOp] at E2''s       *)
+  (*     value-chained primitives ([fs_logfill_permit_v],                  *)
+  (*     [fs_install_permit_v] -- whose [Q] returns the half at            *)
+  (*     [lm_upd M0 blk bs] -- [fs_commit_permit_named] and                *)
+  (*     [fs_clear_permit_keep]) and threads the chained [M] through the   *)
+  (*     copy loop, the installs and the clear.  With the chain in hand    *)
+  (*     the deposit is arithmetic: an install writes [L]'s bytes to the   *)
+  (*     home block of every [b ∈ LB], and touches nothing else, so the    *)
+  (*     post-commit picture agrees with [L] on the WHOLE home set.        *)
+  (*                                                                     *)
+  (*   - boot ([ProofInitlog]).  The era's half arrives from               *)
+  (*     [FsCrash.fs_swap_permit_rec]'s [Q], which is again                *)
+  (*     [log_mirror_at ls (0, [])]: the value the swap sets               *)
+  (*     ([mirror_of (fs_blocks dk')]) is under the permit's own           *)
+  (*     universally quantified [dk] and cannot be named by the caller.    *)
+  (*     DISCHARGER: stage H2's re-founded boot (the era mint runs at [D]  *)
+  (*     read out of [P_fs], so the mirror's value and [L]'s are the same  *)
+  (*     reading of one image), or a value-chained [fs_swap_permit_v]      *)
+  (*     stated at [mirror_of (fs_blocks dk')].                            *)
+  (*                                                                     *)
+  (*  The SWITCH-ON is one line -- [log_mirror_tie := log_mirror_tie_body] *)
+  (*  -- and [log_mirror_tie_pending]'s call sites are then exactly the    *)
+  (*  places that owe a proof.  Until then every MAINTENANCE site          *)
+  (*  (log_write's two arms, begin_op) is free, which is what row (b) is   *)
+  (*  designed to be: [log_write] moves [L] only at a block it puts into   *)
+  (*  [LB] in the same critical section, so the row's domain only shrinks. *)
+  (* ---------------------------------------------------------------- *)
+  Definition log_mirror_tie_body (M : log_mirror) (L : gmap Z (list (bv 8)))
+      (cov : gset Z) (ls : Z) (LB : gset Z) : Prop :=
+    forall b : Z, b ∈ fs_home_set cov ls -> b ∉ LB ->
+      L !! b = Some (lm_view M b).
+
+  Definition log_mirror_tie (M : log_mirror) (L : gmap Z (list (bv 8)))
+      (cov : gset Z) (ls : Z) (LB : gset Z) : Prop := True.
+
+  (* THE GATE.  Every use marks a site the switch-on turns into an error. *)
+  Lemma log_mirror_tie_pending (M : log_mirror) (L : gmap Z (list (bv 8)))
+      (cov : gset Z) (ls : Z) (LB : gset Z) :
+    log_mirror_tie M L cov ls LB.
+  Proof. exact I. Qed.
 
   (* ---------------------------------------------------------------- *)
   (*  The batch bundle (checked out wholesale by the committer)        *)
@@ -681,11 +842,22 @@ Section LogInv.
   (* Parameters: bn -- the bio layer's names (for the SLOT POOL); γfs --
      the FsBlocks ghosts; cov -- the covered range the bio layer runs at;
      logstart -- the sb's log start block.  [n] is a parameter (not an
-     existential) because the ledger's sum tie in [log_res] mentions it. *)
-  Definition log_batch (bn : bio_names) (γfs : fs_names) (cov : gset Z)
-      (logstart : Z) (n : nat) (LB : gset Z) : iProp Σ :=
+     existential) because the ledger's sum tie in [log_res] mentions it.
+     [pend] is the OPEN OPS' pending set ([op_pending om] at the one call
+     site, [log_res]); it is what stage G's abstract-view row (a) excludes
+     from its agreement, and until row (a) lands the bundle does not read
+     it -- see [log_state_pend_mono] / [log_state_pend] below, which are
+     the two lemmas the flip commit will re-prove.
+
+     THE MIRROR RIDES HERE (durable-disk stage G1's fusion).  [M] was an
+     existential inside [log_mirror_clean]; it is a binder of this bundle
+     so that row (b) -- which relates the era's picture of the durable
+     disk to the logged view -- can be stated at all.  The header reading
+     is unchanged, so nothing above this file grew a binder. *)
+  Definition log_state (bn : bio_names) (γfs : fs_names) (cov : gset Z)
+      (logstart : Z) (n : nat) (LB : gset Z) (pend : gset Z) : iProp Σ :=
     (∃ (W : list (SailStdpp.Values.mword 32))
-       (L : gmap Z (list (bv 8))) (D : gmap Z bool),
+       (L : gmap Z (list (bv 8))) (D : gmap Z bool) (M : log_mirror),
        ⌜n = length W /\ (n <= LOGBLOCKS)%nat⌝ ∗
        (* LB IS EXPOSED, not existential, so that [log_res] -- which is
           where the ledger authority lives -- can state that every op's
@@ -725,8 +897,36 @@ Section LogInv.
           of end_op dropping them: pool + n = LOGBLOCKS + 2 is
           inductive. *)
        bslots ((LOGBLOCKS - n) + 2)%nat ∗
-       (* THE ERA'S MIRROR HALF, at the between-commits picture *)
-       log_mirror_clean logstart)%I.
+       (* THE ERA'S MIRROR HALF, at the between-commits picture -- the
+          header reading is [log_mirror_clean]'s, spelled out because [M]
+          is this bundle's own binder now. *)
+       log_mirror_half M ∗ ⌜lm_hdr M logstart = (0%nat, [])⌝ ∗
+       (* ROW (b), gated -- see [log_mirror_tie] above *)
+       ⌜log_mirror_tie M L cov logstart LB⌝)%I.
+
+  (* THE PENDING SET MOVES, in the two shapes the transitions need.
+
+     GROWTH ([begin_op]'s mint, [log_write]'s two ledger steps) is free
+     forever: row (a) only ever weakens as more blocks go pending.  This
+     lemma keeps its statement across stage G's flip. *)
+  Lemma log_state_pend_mono (bn : bio_names) (γfs : fs_names) (cov : gset Z)
+      (logstart : Z) (n : nat) (LB pend pend' : gset Z) :
+    pend ⊆ pend' ->
+    log_state bn γfs cov logstart n LB pend -∗
+    log_state bn γfs cov logstart n LB pend'.
+  Proof. intros _. rewrite /log_state. iIntros "H". iExact "H". Qed.
+
+  (* SHRINKAGE ([end_op]'s retire, where the ending op's blocks leave the
+     pending union) is FREE ONLY WHILE ROW (a) IS ABSENT.  Stage G's flip
+     replaces this lemma by the per-op preservation obligation: the
+     retiring op must move the abstract view [A] to [A ⊕ L] on its own
+     blocks and re-prove [fs_durable_wf_body] of the result (durable-disk
+     stage G2, the 26 exit arms).  Its call sites are that sweep's list. *)
+  Lemma log_state_pend (bn : bio_names) (γfs : fs_names) (cov : gset Z)
+      (logstart : Z) (n : nat) (LB pend pend' : gset Z) :
+    log_state bn γfs cov logstart n LB pend -∗
+    log_state bn γfs cov logstart n LB pend'.
+  Proof. rewrite /log_state. iIntros "H". iExact "H". Qed.
 
   (* ---------------------------------------------------------------- *)
   (*  The lock's resource                                              *)
@@ -784,7 +984,7 @@ Section LogInv.
              unconstrained, which is exactly the self-invalidation -- they
              can never be used, because using one needs [e = E]. *)
           ⌜forall b : Z, (E, b) ∈ X -> b ∈ LB⌝ ∗
-          log_batch bn γfs cov logstart n LB))%I.
+          log_state bn γfs cov logstart n LB (op_pending om)))%I.
 
   (* the persistent bundle every log function shares: the sealed lock and
      the two cells initlog wrote once and froze *)
@@ -813,7 +1013,7 @@ Section LogInv.
      is the whole of the log context they need.  Giving them [log_ctx]
      instead would make initlog unprovable: initlog CALLS both of them
      before the "log" spinlock can be sealed (sealing it means depositing
-     [log_batch] -- including the very lh cells those two callees want in
+     [log_state] -- including the very lh cells those two callees want in
      hand), so [is_lock] does not yet exist at either call site. *)
   Definition log_frozen (logstart : Z)
       (dev : SailStdpp.Values.mword 32) : iProp Σ :=

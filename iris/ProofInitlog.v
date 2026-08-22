@@ -2382,13 +2382,14 @@ Section ProofInitlog.
     iMod "HQ" as "[Hmirc #Hswlb]".
     iAssert (log_mirror_clean logstart) with "[Hmirc]" as "Hmirc";
       [rewrite /log_mirror_clean; iExact "Hmirc"|].
-    iAssert (log_batch bn γfs cov logstart 0%nat ∅)
+    iAssert (log_state bn γfs cov logstart 0%nat ∅ ∅)
       with "[Hncell Hblk HLauth HDauth Hcovf Hfsb Hslotsfs Hpool Hmirc]" as "Hbatch".
-    { rewrite /log_batch.
+    { rewrite /log_state /log_mirror_clean /log_mirror_at.
+      iDestruct "Hmirc" as (M0) "[Hmirh %Hmhdr]".
       iExists ([] : list (mword 32)),
               (<[log_hdr_bno logstart := bs']>
                  (it_rec_L (il_W bs_hdr ((hdr_dec bs_hdr).1))
-                    (fun k : nat => ys !!! k) L)), D.
+                    (fun k : nat => ys !!! k) L)), D, M0.
       iSplitR; [iPureIntro; split; [reflexivity | unfold LOGBLOCKS; lia]|].
       (* the fresh batch has logged nothing: LB = list_to_set [] = empty *)
       iSplitR; [iPureIntro; reflexivity|].
@@ -2405,7 +2406,16 @@ Section ProofInitlog.
       iSplitL "Hfsb"; [iExists bs'; iExact "Hfsb"|].
       iSplitL "Hslotsfs"; [iExact "Hslotsfs"|].
       iSplitL "Hpool"; [iExact "Hpool"|].
-      iExact "Hmirc". }
+      iSplitL "Hmirh"; [iExact "Hmirh"|].
+      iSplitR; [iPureIntro; exact Hmhdr|].
+      (* ROW (b) AT BOOT, gated -- the second of durable-disk G1-impl's two
+         walls.  The era's mirror half arrives from
+         [FsCrash.fs_swap_permit_rec]'s [Q], whose value
+         ([mirror_of (fs_blocks dk')]) lives under the permit's own
+         universally quantified [dk], so nothing here can name it.  Stage
+         H2's re-founded boot (or a value-chained swap) discharges it; the
+         argument is at [LogInv.log_mirror_tie]. *)
+      iPureIntro. apply log_mirror_tie_pending. }
     iAssert (log_res γ bn γfs cov logstart)
       with "[Hout Hcmt Hnc Hops Hepa Hxa Hbatch]" as "Hres".
     { rewrite /log_res.
@@ -2437,7 +2447,7 @@ Section ProofInitlog.
       iSplitR; [iPureIntro; intros i e Hi; rewrite lookup_empty in Hi; discriminate|].
       iSplitR; [iPureIntro; intros b' Hi;
                 exfalso; exact (not_elem_of_empty _ Hi)|].
-      iExact "Hbatch". }
+      rewrite op_pending_empty. iExact "Hbatch". }
     (* THE SEAL, AT THE GIVEN NAME.  [newlock_at] is [newlock] over a gname
        the caller already owns the free ghost state of -- the era fupd's
        [lock_ghost_alloc] minted it as [ln_lk γ], so this is a FILL, not a

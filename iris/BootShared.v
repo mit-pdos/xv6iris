@@ -1121,7 +1121,7 @@ Section BootAlloc.
       disk_img_bytes disk_img_name 0
         (disk_read (v_disk (g.(gdev).(dvirtio))) 0 ndisk) ∗
       (* the era's LOG-REGION MIRROR variable, whole (phase C2b/D1 stage 3):
-         [initlog] splits it, keeping one half in [LogInv.log_batch] and
+         [initlog] splits it, keeping one half in [LogInv.log_state] and
          handing the other to [FsCrash.P_fs]'s arm at its swap *)
       ghost_var mirror_name 1 (MkLogMirror (fun _ => [])) ∗
       crash_inv ∗ gen_cert.
@@ -1306,7 +1306,7 @@ Section BootAlloc.
   Proof.
     intros Hbf Himg.
     destruct Himg as (Hwf & Hrw & Hnin & Hnib32 & Hnib0 & Hnibeq &
-                      Hcovin & Hcovmeta & Hcovdata & Hparse & Hush & Hnd).
+                      Hcovin & Hcovmeta & Hcovdata & Hparse & Hush & Hnd & Hleq).
     pose proof (boot_ram_of_facts g Hbf) as Hram.
     pose proof (boot_mem_of_facts g Hbf) as Hmem.
     pose proof Hbf as Hbf'.

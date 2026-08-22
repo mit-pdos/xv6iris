@@ -50,7 +50,7 @@
    THE GUARD'S ARITHMETIC is computed by the image in W-form
    (addiw/slliw/addw/slliw/addw, all 32-bit and sign-extended).  Every value
    involved is tiny -- [out <= 3] is a log_res conjunct and [n <= LOGBLOCKS]
-   a log_batch one -- so the register values stay 64-bit literals
+   a log_state one -- so the register values stay 64-bit literals
    ([mword_of_int z] with 0 <= z < 2^31) all the way through.  The three
    steps whose operand is the small [out] are discharged by a four-way case
    split ([bo_slli2] / [bo_addw1] / [bo_slli1]); only the final
@@ -367,23 +367,25 @@ Section BoProps.
 
   (* the log lock's batch, opened just for its [lh.n] cell *)
   Lemma bo_batch_lhn (bn : bio_names) (γfs : fs_names) (cov : gset Z)
-      (logstart : Z) (n : nat) (LB : gset Z) :
-    log_batch bn γfs cov logstart n LB -∗
+      (logstart : Z) (n : nat) (LB pend : gset Z) :
+    log_state bn γfs cov logstart n LB pend -∗
     ⌜(n <= LOGBLOCKS)%nat⌝ ∗
     lh_n_pa ↦₄ (mword_of_int (Z.of_nat n) : mword 32) ∗
     (lh_n_pa ↦₄ (mword_of_int (Z.of_nat n) : mword 32) -∗
-       log_batch bn γfs cov logstart n LB).
+       log_state bn γfs cov logstart n LB pend).
   Proof.
-    iIntros "H". rewrite /log_batch.
-    iDestruct "H" as (W L D) "(%Hlen & %HLB & %Hnd & %Hcv & Hn & Hblk & Hjunk & HL & HD & Hdirty & Hhdr & Hsl & Hpool & Hmirc)".
+    iIntros "H". rewrite /log_state.
+    iDestruct "H" as (W L D M) "(%Hlen & %HLB & %Hnd & %Hcv & Hn & Hblk & Hjunk & HL & HD & Hdirty & Hhdr & Hsl & Hpool & Hmirh & %Hmhdr & %Hmtie)".
     iSplitR; [iPureIntro; exact (proj2 Hlen)|].
     iFrame "Hn". iIntros "Hn".
-    iExists W, L, D.
+    iExists W, L, D, M.
     iSplitR; [iPureIntro; exact Hlen|].
     iSplitR; [iPureIntro; exact HLB|].
     iSplitR; [iPureIntro; exact Hnd|].
     iSplitR; [iPureIntro; exact Hcv|].
-    iFrame "Hn Hblk Hjunk HL HD Hdirty Hhdr Hsl Hpool Hmirc".
+    iFrame "Hn Hblk Hjunk HL HD Hdirty Hhdr Hsl Hpool Hmirh".
+    iSplitR; [iPureIntro; exact Hmhdr|].
+    iPureIntro; exact Hmtie.
   Qed.
 
   (* The exit continuation, control at +0x58 (the store has already
@@ -1392,7 +1394,7 @@ Section BoBodies.
                        ⌜(n + op_sum om <= LOGBLOCKS)%nat⌝ ∗
                        ⌜forall i e, om !! i = Some e -> e.1.2 ⊆ LB⌝ ∗
                        ⌜forall b : Z, (E, b) ∈ X -> b ∈ LB⌝ ∗
-                       log_batch bn γfs cov logstart n LB))%I
+                       log_state bn γfs cov logstart n LB (op_pending om)))%I
         with "[Hout Hcmt Hnc Hauth Hepa Hxa Hrest]" as "Hres".
       { iExists out, true, nc, om, Ep, Xr. iFrame "Hout Hcmt Hnc Hauth".
         iSplitR; [iPureIntro; exact Hsz|].
@@ -1737,6 +1739,15 @@ Section BoBodies.
               apply empty_subseteq.
             - rewrite lookup_insert_ne in Hk; [| exact (not_eq_sym Hne)]. exact (Hsub k e Hk). }
           iSplitR; [iPureIntro; exact Hreg|].
+          (* THE PENDING SET GROWS (durable-disk stage G1): the fresh op
+             contributes its own (empty) already-logged set, so [pend] only
+             gets bigger and every row of [log_state] that excludes it only
+             weakens.  Free at this site, forever. *)
+          assert (Hpm : op_pending om
+                        ⊆ op_pending (<[i := (MAXOPBLOCKS, ∅, Ep)]> om)).
+          { apply op_pending_insert_mono. intros e He.
+            rewrite Hi in He. discriminate. }
+          iApply (log_state_pend_mono _ _ _ _ _ _ _ _ Hpm).
           iApply ("Hbclose" with "Hlhn"). }
         rewrite /bo_exit.
         iSpecialize ("Hexit" $! CID with "[%]"); [wp_next_chain|].

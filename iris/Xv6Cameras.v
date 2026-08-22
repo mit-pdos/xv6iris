@@ -147,7 +147,7 @@ Proof. solve_inG. Qed.
 
 (* The reference-count authority and the finite slot supply used to bound
    every buffer reference count.  These functors and names are shared with
-   the log layer because [log_batch] stores the unused slot fragments. *)
+   the log layer because [log_state] stores the unused slot fragments. *)
 Definition bioUR : ucmra := authUR (gmapUR nat (prodR fracR positiveR)).
 Definition bioslotUR : ucmra := authUR natUR.
 

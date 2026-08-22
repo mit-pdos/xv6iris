@@ -31,7 +31,7 @@
    So it takes [log_ctx] plus the running-process bundle and nothing else --
    the one log.c function whose contract is free of the block layer.  The
    [bio_names] binder is there only because [log_ctx] names the slot pool
-   parked in [log_batch]; no bio RESOURCE crosses this interface.
+   parked in [log_state]; no bio RESOURCE crosses this interface.
 
    It DOES sleep (both arms of the retry loop), so it threads the full
    running-process bundle exactly as SpecBread.v does and enters/returns at

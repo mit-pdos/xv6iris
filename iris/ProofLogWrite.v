@@ -22,7 +22,7 @@
 
    The two premises are what makes the [∧] provable with no case split on
    the payload polarity [d]: the handle's dirty half agrees with
-   [log_batch]'s cov big-op entry, which reads
+   [log_state]'s cov big-op entry, which reads
    [bool_decide (uint bno ∈ map uint W)], so ⌜∈⌝ forces d = true (the
    earlier bpin's reference is already parked in the payload) and ⌜∉⌝
    forces d = false (so the false->true flip is available).  Whichever
@@ -2009,9 +2009,9 @@ Section ProofLogWrite.
     destruct cmt.
     { exfalso. specialize (Hcmt0 eq_refl). lia. }
     iDestruct "Hbatch" as (nl LB) "(%Hsum & %Hsub & %Hreg & Hbatch)".
-    rewrite /log_batch.
-    iDestruct "Hbatch" as (W L D)
-      "(%Hlen & %HLB & %Hnodup & %Hwok & Hncell & HW & Hjunk & HLauth & HDauth & Hcov & Hhdr & Hlogr & Hpool & Hmirc)".
+    rewrite /log_state.
+    iDestruct "Hbatch" as (W L D M)
+      "(%Hlen & %HLB & %Hnodup & %Hwok & Hncell & HW & Hjunk & HLauth & HDauth & Hcov & Hhdr & Hlogr & Hpool & Hmirh & %Hmhdr & %Hmtie)".
     destruct Hlen as [HlenW HnlB].
     (* ---- THE LEDGER STEP, both arms into ONE post-state.
 
@@ -2059,7 +2059,14 @@ Section ProofLogWrite.
                ⌜forall j e, om' !! j = Some e -> e.2 = Ep⌝ ∗
                ⌜(nl + op_sum om' <= LOGBLOCKS)%nat⌝ ∗
                ⌜cr = false -> (S nl + op_sum om' <= LOGBLOCKS)%nat⌝ ∗
-               ⌜(1 <= op_sum om)%nat⌝)%I
+               ⌜(1 <= op_sum om)%nat⌝ ∗
+               (* THE PENDING SET GROWS (durable-disk stage G1).  Both arms
+                  record the written block in THIS op's already-logged set,
+                  so [op_pending] only gets bigger -- which is exactly why
+                  [log_state]'s rows are free at a [log_write]: the block
+                  leaves the row's domain in the same critical section that
+                  moves [L] at it. *)
+               ⌜op_pending om ⊆ op_pending om'⌝)%I
       with "[Hoauth Hop]" as ">Hled".
     { destruct cr.
       - (* CREDITED: no unit burns and lh.n does not move, but the block
@@ -2112,8 +2119,12 @@ Section ProofLogWrite.
         iSplitR; [iPureIntro; rewrite Habs; exact Hsum|].
         iSplitR; [iPureIntro; discriminate|].
         (* the unit in hand bounds the sum below, hence lh.n above *)
-        iPureIntro. pose proof (op_sum_delete om i0 (S u, Sb, Ep) Hi0) as He.
-        cbn in He. lia.
+        iSplitR.
+        { iPureIntro. pose proof (op_sum_delete om i0 (S u, Sb, Ep) Hi0) as He.
+          cbn in He. lia. }
+        iPureIntro. unfold om'. apply op_pending_insert_mono.
+        intros e He. rewrite Hi0 in He. injection He as <-. cbn.
+        apply union_subseteq_l.
       - (* UNCREDITED: spend one, and record the block *)
         iMod (log_spend_step γ om u Sb Ep (uint bno) with "Hoauth Hop")
           as (i0) "(%Hi0 & Hoauth & Hop)".
@@ -2160,10 +2171,13 @@ Section ProofLogWrite.
         iSplitR; [iPureIntro; rewrite Hspend; unfold LOGBLOCKS in *; lia|].
         iSplitR;
           [iPureIntro; intros _; rewrite Hspend; unfold LOGBLOCKS in *; lia|].
-        iPureIntro. exact Hsum1. }
+        iSplitR; [iPureIntro; exact Hsum1|].
+        iPureIntro. unfold om'. apply op_pending_insert_mono.
+        intros e He. rewrite Hi0 in He. injection He as <-. cbn.
+        apply union_subseteq_l. }
     iDestruct "Hled" as (om')
       "(Hoauth & Hop & %HszL & %HbndL & %HsubA & %HsubB & %HliveL & %HsumA & %HsumBcr
-        & %Hsum1)".
+        & %Hsum1 & %Hpend)".
     (* ---- THE MINT (fs-log.md §G.2).  One registry row, [(Ep, bno)], at
        the epoch this op was born in -- which by [HliveL] is the epoch the
        batch is running under.  It is minted HERE, before the arm split,
@@ -2405,7 +2419,7 @@ Section ProofLogWrite.
     iAssert (lw_closeA γ bn γfs γd cov logstart dev k pidv bno bs bsd Φfsb Bud nl W
              ∧ lw_closeB γ bn γfs γd cov logstart dev k pidv bno bs bsd Φfsb Bud nl W)%I
       with "[Houtc Hcmtc Hncc Hoauth Hepa Hxa HLauth HDauth Hcovrest Hcovb Hhdr Hlogr Hpool
-             Hmirc Hjtail HpL HpD Hextra Hslk Hvalid Hdevh Hbdisk Hbytes Hdisk
+             Hmirh Hjtail HpL HpD Hextra Hslk Hvalid Hdevh Hbdisk Hbytes Hdisk
              HPhifsb Hop]"
       as "Hcl".
     { iSplit.
@@ -2449,7 +2463,8 @@ Section ProofLogWrite.
             apply elem_of_union in Hin as [Hin|Hin].
             - exact (Hreg b' Hin).
             - apply elem_of_singleton in Hin. injection Hin as ->. exact HbnoLB. }
-          rewrite /log_batch. iExists W, (<[uint bno := bs]> L), D.
+          iApply (log_state_pend_mono _ _ _ _ _ _ _ _ Hpend).
+          rewrite /log_state. iExists W, (<[uint bno := bs]> L), D, M.
           iSplitR; [iPureIntro; split; [exact HlenW | exact HnlB]|].
           iSplitR; [iPureIntro; exact HLB|].
           iSplitR; [iPureIntro; exact Hnodup|].
@@ -2461,7 +2476,13 @@ Section ProofLogWrite.
           iSplitL "Hcovb Hcovrest".
           { rewrite (big_sepS_delete _ cov (uint bno) Hcovbno).
             iSplitL "Hcovb"; [iExact "Hcovb" | iExact "Hcovrest"]. }
-          iFrame "Hhdr Hlogr Hpool Hmirc".
+          iFrame "Hhdr Hlogr Hpool Hmirh".
+          iSplitR; [iPureIntro; exact Hmhdr|].
+          (* ROW (b), the ABSORB arm.  Free once the tie's body is switched
+             on (durable-disk G3): [LB] does not move and the scan found
+             [bno] in it ([HbnoLB]), so the only key [L] moves at is already
+             outside the row's domain. *)
+          iPureIntro. apply log_mirror_tie_pending.
         + rewrite /lw_res. iFrame "Hop HPhifsb Hslot".
           rewrite /bio_locked /bio_held.
           iSplitR; [iPureIntro; exact Hk2|].
@@ -2536,8 +2557,9 @@ Section ProofLogWrite.
             - apply elem_of_union_l. exact (Hreg b' Hin).
             - apply elem_of_singleton in Hin. injection Hin as ->.
               apply elem_of_union_r, elem_of_singleton. reflexivity. }
-          rewrite /log_batch. iExists (W ++ [bno]), (<[uint bno := bs]> L),
-                                     (<[uint bno := true]> D).
+          iApply (log_state_pend_mono _ _ _ _ _ _ _ _ Hpend).
+          rewrite /log_state. iExists (W ++ [bno]), (<[uint bno := bs]> L),
+                                     (<[uint bno := true]> D), M.
           iSplitR.
           { iPureIntro. split.
             - rewrite length_app HlenW /=. lia.
@@ -2564,7 +2586,12 @@ Section ProofLogWrite.
             { apply elem_of_difference in Hx as [_ Hx].
               intro Hc. apply Hx. rewrite Hc. apply elem_of_singleton. reflexivity. }
             rewrite (lw_bd_snoc W bno x Hxne). done. }
-          iFrame "Hhdr Hlogr Hpool Hmirc".
+          iFrame "Hhdr Hlogr Hpool Hmirh".
+          iSplitR; [iPureIntro; exact Hmhdr|].
+          (* ROW (b), the APPEND arm.  Free once the tie's body is switched
+             on (durable-disk G3): [LB] grows by exactly [uint bno], the one
+             key [L] moves at, so the row's domain shrinks by it. *)
+          iPureIntro. apply log_mirror_tie_pending.
         + rewrite /lw_res. iFrame "Hop HPhifsb Hslot".
           rewrite /bio_locked /bio_held.
           iSplitR; [iPureIntro; exact Hk2|].

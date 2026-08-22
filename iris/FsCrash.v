@@ -326,7 +326,7 @@ Qed.
 (* by the region, duplicate-free, and names covered HOME blocks only.      *)
 (* Every header the steady-state permits write satisfies it (swap/clear    *)
 (* write n = 0; commit writes its own decoded [(n, W)] under the batch's   *)
-(* recorded facts, [LogInv.log_batch]'s three pure rows; logfill and       *)
+(* recorded facts, [LogInv.log_state]'s three pure rows; logfill and       *)
 (* install leave the header alone), and the recovery-side permit takes     *)
 (* the write's share of it as a premise ([hdr_wf_wr_out] is the form a     *)
 (* recovery home write discharges it in).                                  *)
@@ -410,9 +410,8 @@ Qed.
 (* cannot drift apart on where the log lives.                              *)
 (* ---------------------------------------------------------------------- *)
 
-(* the HOME blocks: the covered range minus the log's own storage *)
-Definition fs_home_set (cov : gset Z) (logstart : Z) : gset Z :=
-  cov ∖ log_region_set logstart.
+(* the HOME blocks ([LogDefs.fs_home_set], re-exported: the covered range
+   minus the log's own storage) *)
 
 (* a total block view, restricted to a finite set of block numbers *)
 Definition fs_restrict (P : Z -> list (bv 8)) (s : gset Z)
@@ -2124,7 +2123,7 @@ Section fs_crash_seam.
       (h : nat * list Z) (nn : nat) (Ws : list Z) (bs : list (bv 8)) :
     length bs = BSIZE ->
     hdr_dec bs = (nn, Ws) ->
-    (* the batch's recorded facts ([LogInv.log_batch]'s three pure rows),
+    (* the batch's recorded facts ([LogInv.log_state]'s three pure rows),
        here because the header this permit writes must satisfy [hdr_wf] *)
     (nn <= LOGBLOCKS)%nat ->
     NoDup Ws ->

@@ -429,7 +429,7 @@ Section FsBoot.
 
   (* the log region's halves, taken apart into the header and the thirty
      slots.  The header keeps its NAMED content; the slots go existential
-     (which is all [log_batch] records for them). *)
+     (which is all [log_state] records for them). *)
   Lemma fs_log_region_split (γfs : fs_names) (dk : Z -> bv 8) (logstart : Z) :
     ([∗ set] b ∈ log_region_set logstart, fsblock γfs b (fs_blocks dk b))
       ⊢ fsblock γfs (log_hdr_bno logstart)

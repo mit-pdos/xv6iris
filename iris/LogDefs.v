@@ -27,6 +27,15 @@ Definition log_region_set (logstart : Z) : gset Z :=
   list_to_set ((fun i => log_slot_bno logstart i) <$> seq 0 LOGBLOCKS)
   ∪ {[ log_hdr_bno logstart ]}.
 
+(* THE HOME BLOCKS: the covered range minus the log's own storage.  Stated
+   here, in the geometry's own file, rather than beside the recovery
+   relation that first needed it ([FsCrash]) -- the log INVARIANT names it
+   too (durable-disk stage G1's rows are about the home blocks), and
+   [FsCrash] cannot be on [LogInv]'s cone.  [FsCrash] re-exports this
+   file, so every existing reading of it is unchanged. *)
+Definition fs_home_set (cov : gset Z) (logstart : Z) : gset Z :=
+  cov ∖ log_region_set logstart.
+
 (* The first little-endian 32-bit word of an on-disk log header. *)
 Definition hdr_n (bs : list (bv 8)) : Z := assemble_bytes (take 4 bs).
 

@@ -15,7 +15,7 @@
    THE COMMITTER-ONLY HELPER.  write_head is [static]; its only callers are
    end_op (via the inlined commit) and initlog (via the inlined
    recover_from_log), and BOTH of them are holding the checked-out
-   [log_batch] when they call it -- the "log" spinlock is NOT held (the C
+   [log_state] when they call it -- the "log" spinlock is NOT held (the C
    code runs commit with no locks, which is the whole point of the
    committing flag).  So this contract does NOT take [log_res]; it takes,
    EXPLICITLY, exactly the pieces of the batch write_head touches:

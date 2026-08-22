@@ -129,7 +129,10 @@ Proof.
   (* (11) the ushort bound: 16 * 13 = 208 <= 65536 *)
   split; [vm_compute; discriminate |].
   (* (12) the image is 2000 blocks: 2048000 = 1024 * 2000 *)
-  rewrite xv6_disk_bytes_z. cbv [fsimg_sb sb_size]. lia.
+  split; [rewrite xv6_disk_bytes_z; cbv [fsimg_sb sb_size]; lia |].
+  (* (13) the file-nlink EQUALITY sweep -- CITED, like (1)/(2)/(10):
+     [FsImgCheck.fsimg_links_eq], and [fsimg_P] IS [fs_blocks fsimg_dk]. *)
+  exact fsimg_links_eq.
 Qed.
 
 (* ---------------------------------------------------------------------- *)

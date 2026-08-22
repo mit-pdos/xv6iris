@@ -45,7 +45,7 @@
    THIRTY-FIVE BUFFER SLOTS, AND THE ONE HELD BACK.  The contract enters with
    [bslots ((LOGBLOCKS + 2) + 2 + 1)] = 35.  ONE is split off for the
    bread at +0x10 and returned by the brelse at +0x2c; the other 34 go to
-   initlog, which seals 32 into [log_batch]'s pool and returns 2; the held
+   initlog, which seals 32 into [log_state]'s pool and returns 2; the held
    one rejoins them to make the 3 ireclaim wants.  See SpecFsinit.v's header
    and the N5d ledger's finding 1.                                        *)
 From Stdlib Require Import Eqdep_dec ZArith Bool Lia List String Ascii.

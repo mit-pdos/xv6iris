@@ -93,7 +93,7 @@
    ---- ONE SLOT MORE THAN initlog GIVES BACK (a real composition fact) --
 
    [SpecInitlog] takes [bslots ((LOGBLOCKS + 2) + 2)] = 34 and returns
-   only TWO: the other 32 are sealed into [log_batch]'s pool inside the log
+   only TWO: the other 32 are sealed into [log_state]'s pool inside the log
    spinlock, forever.  But [SpecIreclaim] needs THREE (iput's indirect arm,
    [iput_units]).  So fsinit cannot simply pass initlog's leftovers on, and
    it enters with [((LOGBLOCKS + 2) + 2 + 1)] = 35: one is held back across
@@ -397,7 +397,7 @@ Definition wp_fsinit_sconf_body
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-  (* THIRTY-FIVE slot units.  initlog seals 32 of them into [log_batch]'s
+  (* THIRTY-FIVE slot units.  initlog seals 32 of them into [log_state]'s
      pool and returns two; ireclaim needs three; so ONE is held back across
      the [jal initlog] at +0x4e.  See the header. *)
   bslots ((LOGBLOCKS + 2) + 2 + 1)%nat -∗

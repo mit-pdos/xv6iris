@@ -170,7 +170,7 @@ Section FsBlocks.
      range): the two auths, and PER BLOCK all four client-side pieces --
      the fsblock client half, the machinery-clean payload (which pairs
      with the boot-side [disk_block]s to form [bio_init]'s pool bundles),
-     the LOG-SIDE dirty half (which stocks [log_batch]'s all-false
+     the LOG-SIDE dirty half (which stocks [log_state]'s all-false
      big-op), and the exclusive [blk_own] token (which the allocator layer
      above will hand out and take back).  All four, explicitly: an affine
      iFrame dropping one of them compiles and strands initlog -- or, for

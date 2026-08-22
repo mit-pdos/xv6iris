@@ -46,7 +46,7 @@
    drops the sum by exactly the returned budget, so the sum tie survives at
    the decremented outstanding.
 
-   The commit arm flips committing := 1 and TAKES [log_batch] out linearly --
+   The commit arm flips committing := 1 and TAKES [log_state] out linearly --
    the checkout -- so the whole commit body runs with NO lock held and the
    batch in hand, exactly as the C code does.  The copy loop's per-iteration
    ghost step moves the LOG SLOT's logged content to the home block's bytes
@@ -57,10 +57,10 @@
    block on the committer's side, which is exactly the premise
    install_trans now takes).  That per-iteration fact is what discharges
    install_trans's ⌜forall i w, W !! i = Some w -> L !! uint w = Some (Lw i)⌝:
-   later iterations move L only at LOG-REGION keys, and log_batch's own
+   later iterations move L only at LOG-REGION keys, and log_state's own
    conjunct says no entry of W is in the log region.
 
-   SLOT ACCOUNTING, EXACT.  The pool parked in [log_batch] is
+   SLOT ACCOUNTING, EXACT.  The pool parked in [log_state] is
    [bslots ((LOGBLOCKS - n) + 2)].  The copy loop peels 2 per iteration
    and its two brelses give them back; write_head peels 1 and returns 1;
    install_trans takes 2 and returns [2 + length W]; the second write_head
@@ -671,7 +671,7 @@ Section EndOpDefs.
     iSplitL "H7"; [iExists _; iExact "H7"|]. iExact "H8".
   Qed.
 
-  (* the OPENED batch: log_batch taken apart, with the log-region client
+  (* the OPENED batch: log_state taken apart, with the log-region client
      halves SPLIT at the copy loop's cursor [t] (the prefix is at the
      contents the loop has already written, the suffix is still opaque). *)
   Definition eo_open (bn : bio_names) (γfs : fs_names) (cov : gset Z)
@@ -693,8 +693,8 @@ Section EndOpDefs.
      bslots ((LOGBLOCKS - n) + 2)%nat)%I.
 
   Lemma eo_open_of_batch (bn : bio_names) (γfs : fs_names) (cov : gset Z)
-      (logstart : Z) (n : nat) (LB : gset Z) :
-    log_batch bn γfs cov logstart n LB -∗
+      (logstart : Z) (n : nat) (LB pend : gset Z) :
+    log_state bn γfs cov logstart n LB pend -∗
     ∃ (W : list (mword 32)) (L : gmap Z (list (bv 8))) (D : gmap Z bool),
       ⌜n = length W /\ (n <= LOGBLOCKS)%nat⌝ ∗
       ⌜NoDup (map uint W)⌝ ∗
@@ -705,14 +705,20 @@ Section EndOpDefs.
       log_mirror_clean logstart ∗
       eo_open bn γfs cov logstart n W L D (fun _ => []) 0.
   Proof.
-    rewrite /log_batch /eo_open.
-    iIntros "H". iDestruct "H" as (W L D)
-      "(%Hlen & %HLB & %Hnd & %Hwok & Hncell & HW & Hjunk & HauthL & HauthD & Hcov & Hhdr & Hlogr & Hpool & Hmirc)".
+    rewrite /log_state /eo_open.
+    iIntros "H". iDestruct "H" as (W L D M)
+      "(%Hlen & %HLB & %Hnd & %Hwok & Hncell & HW & Hjunk & HauthL & HauthD & Hcov & Hhdr & Hlogr & Hpool & Hmirh & %Hmhdr & %Hmtie)".
     iExists W, L, D.
     iSplitR; [iPureIntro; exact Hlen|].
     iSplitR; [iPureIntro; exact Hnd|].
     iSplitR; [iPureIntro; exact Hwok|].
-    iSplitL "Hmirc"; [iExact "Hmirc"|].
+    (* THE MIRROR VALUE IS DROPPED HERE, and that is durable-disk G3's whole
+       remaining job: the committer chases the era's half through the
+       AT-FORM permits, so what leaves the checkout is [log_mirror_clean],
+       not [log_mirror_half M].  Row (b) therefore cannot be re-established
+       at the deposit ([eo_open_to_batch]) -- see [LogInv.log_mirror_tie]. *)
+    iSplitL "Hmirh"; [rewrite /log_mirror_clean /log_mirror_at;
+                      iExists M; iFrame "Hmirh"; iPureIntro; exact Hmhdr|].
     iSplitL "Hncell"; [iExact "Hncell"|].
     iSplitL "HW"; [iExact "HW"|].
     iSplitL "Hjunk"; [iExact "Hjunk"|].
@@ -725,16 +731,27 @@ Section EndOpDefs.
     iSplitL "Hlogr"; [iExact "Hlogr"|]. iExact "Hpool".
   Qed.
 
+  (* THE DEPOSIT.  [pend] is universally quantified because the bundle does
+     not read it yet (durable-disk G1-impl: row (a) is stage G's flip); the
+     one caller re-deposits at [op_pending om] with [om = ∅].
+
+     ROW (b) IS DISCHARGED BY THE GATE HERE, and this is the site the wall
+     is at: the mirror half arrives as [log_mirror_clean] -- the value the
+     install chain left is under the at-form permits' existential -- so
+     nothing here can say what [lm_view M'] holds at a home block.  G3's
+     value-chained primitives are what turn this into arithmetic; the full
+     argument is at [LogInv.log_mirror_tie]. *)
   Lemma eo_open_to_batch (bn : bio_names) (γfs : fs_names) (cov : gset Z)
       (logstart : Z) (L : gmap Z (list (bv 8))) (D : gmap Z bool)
-      (Lw : nat -> list (bv 8)) :
+      (Lw : nat -> list (bv 8)) (pend : gset Z) :
     log_mirror_clean logstart -∗
     eo_open bn γfs cov logstart 0 [] L D Lw 0 -∗
-    log_batch bn γfs cov logstart 0 ∅.
+    log_state bn γfs cov logstart 0 ∅ pend.
   Proof.
-    rewrite /log_batch /eo_open.
+    rewrite /log_state /eo_open /log_mirror_clean /log_mirror_at.
     iIntros "Hmirc (Hncell & HW & Hjunk & HauthL & HauthD & Hcov & Hhdr & _ & Hlogr & Hpool)".
-    iExists [], L, D.
+    iDestruct "Hmirc" as (M) "[Hmirh %Hmhdr]".
+    iExists [], L, D, M.
     iSplitR; [iPureIntro; split; [reflexivity | unfold LOGBLOCKS; lia]|].
     (* the emptied batch has logged nothing *)
     iSplitR; [iPureIntro; reflexivity|].
@@ -749,7 +766,10 @@ Section EndOpDefs.
     iSplitL "Hhdr"; [iExact "Hhdr"|].
     replace (LOGBLOCKS - 0)%nat with LOGBLOCKS in * by (unfold LOGBLOCKS; lia).
     iSplitL "Hlogr"; [iExact "Hlogr"|].
-    iSplitL "Hpool"; [iExact "Hpool"|]. iExact "Hmirc".
+    iSplitL "Hpool"; [iExact "Hpool"|].
+    iSplitL "Hmirh"; [iExact "Hmirh"|].
+    iSplitR; [iPureIntro; exact Hmhdr|].
+    iPureIntro. apply log_mirror_tie_pending.
   Qed.
 
   (* ---- the payload's pieces, extracted / re-assembled without a case
@@ -1177,7 +1197,7 @@ Section EndOpBlocks.
     proc_priv_bare (proc_addr j) pidv Vpr -∗
     eo_frame4 m -∗
     eo_frameJ m -∗
-    log_batch bn γfs cov logstart 0 ∅ -∗
+    log_state bn γfs cov logstart 0 ∅ ∅ -∗
     eo_cont (CID0 := CID0)  j pidv dq m K eb eb lks Vpr -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1329,9 +1349,9 @@ Section EndOpBlocks.
        AUTHORITY, and log_res's cmt = false arm holds one too. *)
     destruct cmt.
     2: { iDestruct "Hrest" as (n0 LB0) "(_ & _ & _ & Hb2)".
-         rewrite /log_batch.
-         iDestruct "Hbatch" as (W1 L1 D1) "(_ & _ & _ & _ & _ & _ & _ & Ha1 & _)".
-         iDestruct "Hb2" as (W2 L2 D2) "(_ & _ & _ & _ & _ & _ & _ & Ha2 & _)".
+         rewrite /log_state.
+         iDestruct "Hbatch" as (W1 L1 D1 M1) "(_ & _ & _ & _ & _ & _ & _ & Ha1 & _)".
+         iDestruct "Hb2" as (W2 L2 D2 M2) "(_ & _ & _ & _ & _ & _ & _ & Ha2 & _)".
          iDestruct (ghost_map_auth_valid_2 with "Ha1 Ha2") as %[Hbad _].
          exfalso. by apply (Qp.not_add_le_l 1 1). }
     (* ===== +0x50 sw zero,32(s1) : committing := 0 ===== *)
@@ -1585,7 +1605,13 @@ Section EndOpBlocks.
       iSplitR.
       { iPureIntro. intros b' Hin. exfalso.
         pose proof (Hcap (S Ep) b' Hin). lia. }
-      iExact "Hbatch". }
+      (* THE PENDING SET AT THE RE-DEPOSIT (durable-disk stage G1): the
+         ledger is EMPTY here ([Hommt] -- that is what makes the epoch bump
+         above sound), so nothing is pending and the batch's [∅] is already
+         the right value.  No debt at this site. *)
+      assert (Hpe : op_pending om = ∅)
+        by (rewrite Hommt; exact op_pending_empty).
+      rewrite Hpe. iExact "Hbatch". }
     iApply (Rel.wp_release_sconf KT1 (ln_lk γ) log_addr "log"%string
               (log_res γ bn γfs cov logstart) G2 0%nat eb (proc_addr j)
               (K - 8)%nat
@@ -2035,7 +2061,7 @@ Section EndOpBlocks.
     { iExists bs1. iExact "Hhdr". }
     (* THE CLEAR's fupd: the on-disk log is emptied, so recovery becomes the
        plain home restriction and the mirror goes back to its clean picture --
-       which is the form [log_batch] parks in the lock. *)
+       which is the form [log_state] parks in the lock. *)
     { iIntros (bs' Hlen' Hhn' Hdec').
       iApply (fs_clear_seq_permit cov logstart bs'
                 ltac:(exact Hlen') ltac:(rewrite Hhn'; reflexivity)
@@ -2167,11 +2193,11 @@ Section EndOpBlocks.
       iSplitL "Hpool"; [iExact "Hpool"|].
       rewrite (bslots_op 1 (1 + length W)).
       iSplitL "Hu3"; [iExact "Hu3"|iExact "Hu2"]. }
-    iAssert (log_batch bn γfs cov logstart 0 ∅)
+    iAssert (log_state bn γfs cov logstart 0 ∅ ∅)
       with "[Hncell HauthL HauthD Hcov Hhdr Hjunk Hlogr Hpool Hmirc]" as "Hbatch".
     { iApply (eo_open_to_batch bn γfs cov logstart
                 (<[log_hdr_bno logstart := bs2]> (<[log_hdr_bno logstart := bs1]> L))
-                (dirty_clear D (map uint W)) Lw with "Hmirc").
+                (dirty_clear D (map uint W)) Lw ∅ with "Hmirc").
       rewrite /eo_open.
       iSplitL "Hncell"; [iExact "Hncell"|].
       iSplitR; [by iApply big_sepL_nil|].
@@ -4700,7 +4726,16 @@ Section ProofEndOp.
         iSplitR; [iPureIntro; exact Hcap|].
         iExists nl, LB. iSplitR; [iPureIntro; exact Hsumd|].
         iSplitR; [iPureIntro; exact Hsubd|].
-        iSplitR; [iPureIntro; exact Hreg|]. iExact "Hbatch". }
+        iSplitR; [iPureIntro; exact Hreg|].
+        (* THE PENDING SET SHRINKS (durable-disk stage G1), and this is THE
+           site stage G2's 26 per-op preservation arms land at: the retiring
+           op's already-logged set leaves the union ([op_pending_delete]), so
+           row (a) must be re-established at the blocks that just stopped
+           being pending -- i.e. the ending transaction must move the
+           abstract view and re-prove [fs_durable_wf_body] of the result.
+           Free while row (a) is absent; [log_state_pend]'s header says so. *)
+        iApply (log_state_pend _ _ _ _ _ _ (op_pending om)).
+        iExact "Hbatch". }
       assert (HT4regsE : eo_regsE m T4).
       { rewrite /eo_regsE. split.
         - rewrite HT4sp. exact (proj1 HqregsE).

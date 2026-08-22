@@ -22,7 +22,7 @@
    THE COMMITTER-ONLY HELPER, WITH ITS FLAG AS A GHOST ARGUMENT.
    install_trans is [static]; end_op's commit calls it with recovering = 0
    and initlog's recover_from_log with recovering = 1, and both callers are
-   holding the checked-out [log_batch] -- the "log" spinlock is NOT held.
+   holding the checked-out [log_state] -- the "log" spinlock is NOT held.
    The [recovering] bool is a ghost argument pinning a0 (the [either_copy]
    precedent).
 
@@ -55,13 +55,13 @@
    HOLDS, NOT THROUGH A CLIENT HALF -- a home block's [fsblock] is
    UNOBTAINABLE here.  The home blocks' client halves belong to the FS layer
    above by construction (log_write hands each one back to its caller, and
-   [log_batch] retains only the log REGION's), so end_op -- the only caller
+   [log_state] retains only the log REGION's), so end_op -- the only caller
    with a non-empty write set -- could never discharge such a premise.  What
    the committer does hold is [ghost_map_auth (fs_L γfs) 1 L], and one
    [ghost_map_lookup] against the payload the bread returns pins the home
    block's bytes to [L !! uint w], which the pure premise identifies with
    [Lw i].  The log slot's client half stays a resource: it rides in
-   [log_batch], so the caller has it for free.
+   [log_state], so the caller has it for free.
 
    Both sides therefore land at content [Lw i], which is the write_log
    invariant made a precondition: after write_log ran, log slot i holds
@@ -85,7 +85,7 @@
    [bslots 2]; it returns [bslots (2 + length W)].  The surplus is
    real: each entry's [bunpin] frees the pin unit that log_write's [bpin]
    absorbed, and this is where it re-enters circulation.  Its home is the
-   POOL parked in [log_batch] ([bslots ((LOGBLOCKS - n) + 2)]) -- the
+   POOL parked in [log_state] ([bslots ((LOGBLOCKS - n) + 2)]) -- the
    caller (end_op, or initlog with an empty log) deposits the surplus there
    when it re-forms the batch at n = 0, and the arithmetic is exact because
    length W = n.  Nothing of that shows here: this contract is stated in

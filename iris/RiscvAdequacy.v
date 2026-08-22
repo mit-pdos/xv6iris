@@ -913,7 +913,7 @@ Section power.
         Minted here beside the image map and for the same reason: a fixed one
         could never be re-paired after a crash.  BOTH halves go to the boot
         client -- the FS layer's [initlog] splits them, keeping one in
-        [LogInv.log_batch] and handing the other to [FsCrash.P_fs]'s
+        [LogInv.log_state] and handing the other to [FsCrash.P_fs]'s
         checked-out arm at its swap.  The value is the VACUOUS picture; the
         first true one is what the swap installs. *)
      ghost_var (era_mirror_name HE) 1 (MkLogMirror (fun _ => [])) ∗

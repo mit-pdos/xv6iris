@@ -43,7 +43,7 @@
    NEITHER PATH COSTS THE CALLER A SLOT UNIT: [bslot] goes in and comes
    back out, unconditionally.  On the absorb path it is simply never spent;
    on the append path [bpin] absorbs it and the n++ releases one unit of the
-   POOL parked in [log_batch] ([bslots ((LOGBLOCKS - n) + 2)]) to replace
+   POOL parked in [log_state] ([bslots ((LOGBLOCKS - n) + 2)]) to replace
    it -- pool + n is invariant, and install_trans's bunpins refill it.  A
    conditional refund would poison every caller proof, which is exactly the
    argument the design doc's decision record makes about the budget unit.
@@ -111,7 +111,7 @@ Definition wp_log_write_gen_body
   m !!! Regidx (mword_of_int 10 : mword 5) = bnode k ->
   (* the block is a covered HOME block: never the log's own storage.  (The
      covered fact is also carried by the handle below; it is restated here
-     because log_batch's own conjunct is what the append path must
+     because log_state's own conjunct is what the append path must
      re-establish.) *)
   uint bno ∈ cov ->
   ~ (uint bno ∈ log_region_set logstart) ->
@@ -439,7 +439,7 @@ Definition wp_log_write_sconf_body
   m !!! Regidx (mword_of_int 10 : mword 5) = bnode k ->
   (* the block is a covered HOME block: never the log's own storage.  (The
      covered fact is also carried by the handle below; it is restated here
-     because log_batch's own conjunct is what the append path must
+     because log_state's own conjunct is what the append path must
      re-establish.) *)
   uint bno ∈ cov ->
   ~ (uint bno ∈ log_region_set logstart) ->

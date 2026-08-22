@@ -73,7 +73,7 @@
        arbitrary content.  The log is its own client for exactly those
        blocks.
      - the SLOT POOL to stock, plus a working pair: [bslots 34].  Thirty
-       two of them ([(LOGBLOCKS - 0) + 2]) go into [log_batch]'s pool and
+       two of them ([(LOGBLOCKS - 0) + 2]) go into [log_state]'s pool and
        stay sealed inside the lock; the pair comes back.  (initlog itself
        only ever holds one buffer, but the [install_trans] contract asks for
        two even on the dead path.)
@@ -251,7 +251,7 @@ Definition wp_initlog_sconf_body
   gen_cert -∗
   (* THE ERA'S LOG-REGION MIRROR VARIABLE (phase C2b/D1 stage 2), whole: no
      custody of the crash record has been taken yet, so both halves are the
-     era's, and [initlog] is what splits them -- one into [log_batch] (the
+     era's, and [initlog] is what splits them -- one into [log_state] (the
      era's continuing half), one into [P_fs]'s checked-out arm when the swap
      lands (stage 3).  It comes from the era boot bundle, minted at PowerOn
      beside the disk image map. *)
@@ -297,7 +297,7 @@ Definition wp_initlog_sconf_body
   fsblock γfs (log_hdr_bno logstart) bs_hdr -∗
   ([∗ list] i ∈ seq 0 LOGBLOCKS,
      ∃ bs : list (bv 8), fsblock γfs (log_slot_bno logstart i) bs) -∗
-  (* THE SLOT POOL, STOCKED.  initlog is where [log_batch]'s pool comes
+  (* THE SLOT POOL, STOCKED.  initlog is where [log_state]'s pool comes
      from: at n = 0 the batch wants [bslots ((LOGBLOCKS - 0) + 2)] =
      32 units, and initlog needs a working pair of its own on top (its
      bread/brelse, and install_trans's contract asks for two even on the

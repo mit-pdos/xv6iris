@@ -466,42 +466,85 @@ sys_mknod, sys_chdir, filewrite, fileclose, kexec ×2, kexit, ireclaim).
       + `HLw`, `= restrict(A)` via (a), wf — the commit fupd for
       `fs_commit_permit_named` assembles generically, no exit arm
       states install-arithmetic.
-- [ ] **G1-impl.** The rows, as Coq (execution-ready once F2 lands;
-      Opus lane). `LogInv.v`: `Definition op_pending (om) : gset Z :=
-      map_fold (fun _ e acc => e.1.2 ∪ acc) ∅ om`; FUSE
-      `log_batch ∗ log_mirror_clean` into one bundle
-      `log_state bn γfs cov ls n LB (pend : gset Z)` binding
-      `∃ W L D M A` with the existing log_batch rows plus:
-      `log_mirror_half M ∗ ⌜lm_hdr M ls = (0,[])⌝`,
-      (a) `⌜dom A = fs_home_set cov ls⌝ ∗ ⌜fs_durable_wf_body A⌝ ∗
-      ⌜∀ b ∈ fs_home_set cov ls, b ∉ pend -> L !! b = A !! b⌝`,
-      (b) `⌜∀ b ∈ fs_home_set cov ls, b ∉ LB -> lm_view M b =
-      <the bytes of L at b>⌝`. `log_res` passes `pend := op_pending om`.
-      Touch points: the four `log_*_step` transitions; `ProofLogWrite`'s
-      repack (free: the written block is in its op's `e.1.2` after
-      `log_record_step`, so `pend` grows — row (a)'s domain shrinks;
-      row (b): b joins LB); `ProofBeginOp`/`ProofEndOp`
-      checkout/deposit (`eo_open_of_batch`/`eo_open_to_batch` now
-      destructure `log_state`; at the commit checkout `out = 0` gives
-      `pend = ∅`, hence `L = A` on homes); `ProofSysSync`; the boot
-      establishment (A₀ := the boot image's home restriction, `wf_body`
-      via `FsWfImg.fsimg_durable_wf` — which needs `fs_links_eq` ADDED
-      to `FsCfgBoot.fs_boot_image_wf` as conjunct (13), discharged at
-      the image by `FsImgCheck.fsimg_links_eq`, threaded through
-      `BootShared`/`SystemAdequacy`/`FsAdequacyImg` premises).
-      STAGING (corrected): a per-arm escape cannot gate on a false
-      lemma (`fs_durable_wf_body` is REAL since F1), so row (a) flips
-      on in ONE commit. Order: (i) G1-impl lands `log_state` with row
-      (b), `op_pending`, and the boot `fs_links_eq` threading — green,
-      real content, no row (a); (ii) G2's 26 per-op preservation
-      lemmas are proven STANDALONE first (pure statements against F2's
-      effect vocabulary — no `log_state` dependency, fully
-      parallelizable across agents); (iii) the flip commit adds row
-      (a) and wires the prepared lemmas into the arms in one sweep.
+- [x] **G1-impl.** DONE (staging step (i)); row (b) LANDED BUT GATED —
+      read the delta below before building on it.
+      - `LogInv.op_pending om := map_fold (fun _ e acc => e.1.2 ∪ acc) ∅ om`,
+        with one characterisation (`op_pending_elem_of`, by
+        `map_fold_weak_ind`) and four corollaries: `op_pending_empty`,
+        `op_pending_lookup`, `op_pending_insert_mono` (ONE lemma for
+        begin_op's mint and both of log_write's ledger steps — they differ
+        only in how the premise `∀ e, om !! i = Some e -> e.1.2 ⊆ e'.1.2`
+        is discharged) and `op_pending_delete` / `_delete_subseteq`.
+      - `log_batch ∗ log_mirror_clean` FUSED into
+        `log_state bn γfs cov ls n LB (pend : gset Z)`, binding
+        `∃ W L D M` — the batch's old rows verbatim, then
+        `log_mirror_half M ∗ ⌜lm_hdr M ls = (0%nat,[])⌝ ∗
+        ⌜log_mirror_tie M L cov ls LB⌝`. `log_res` passes
+        `pend := op_pending om`. The name `log_batch` is gone (renamed
+        tree-wide, comments included).
+      - ROW (b) is `LogInv.log_mirror_tie_body M L cov ls LB :=
+        ∀ b, b ∈ fs_home_set cov ls -> b ∉ LB -> L !! b = Some (lm_view M b)`
+        — the real body, under its own name, exactly the F1 idiom.
+        What `log_state` carries is `log_mirror_tie`, whose interim body is
+        `True`; `log_mirror_tie_pending` is THE GATE and its three call
+        sites are the switch-on's rework list. **Why gated:** BOTH
+        establishment sites are walls, so the unconditional row cannot be
+        landed without an axiom (which the audit baseline forbids) —
+        (1) end_op's deposit (`ProofEndOp.eo_open_to_batch`): the commit
+        runs through the AT-FORM permits, whose `Q` is `log_mirror_at ls h`,
+        so the post-install mirror VALUE is existential → **G3** discharges
+        it, by re-pointing `ProofEndOp` at E2''s value-chained primitives
+        and threading the chained `M`; (2) boot (`ProofInitlog`): the era's
+        half comes from `fs_swap_permit_rec`'s `Q`, whose value
+        `mirror_of (fs_blocks dk')` lives under the permit's own ∀-bound
+        `dk` → **H2**'s re-founded boot (or a value-chained
+        `fs_swap_permit_v`) discharges it. The MAINTENANCE sites
+        (log_write's two arms) are free and say so at the point of use.
+        `fs_home_set` moved from `FsCrash.v` to `LogDefs.v` (it is pure
+        LogDefs geometry and `LogInv` cannot see `FsCrash`); `FsCrash`
+        re-exports `LogDefs`, so no reading of it changed.
+      - `pend` is CARRIED BUT NOT READ until row (a) lands. The two moves
+        are named lemmas, and which one a site uses says whether it
+        survives the flip: `log_state_pend_mono` (`pend ⊆ pend'`, free
+        forever — begin_op's mint, log_write's two arms) and
+        `log_state_pend` (unconditional; THE DEBT — its one call site,
+        end_op's fast-path re-deposit at `delete i0 om`, is where G2's 26
+        per-op preservation arms land). end_op's commit re-deposit needs
+        neither: `om = ∅` there, so `op_pending_empty` closes it.
+      - `FsCfgBoot.fs_boot_image_wf` conjunct (13)
+        `FsImg.fs_links_eq (fs_blocks dk) sb = true`, discharged at the
+        literal image by `FsImgCheck.fsimg_links_eq` (cited, no new
+        computation on the adequacy cone); the two destructurings that had
+        to grow a name are `BootShared.boot_shared_alloc` and
+        `ProofMain`'s `wp_main_boot_sconf_body`. Nothing consumes it yet —
+        it is row (a)'s `A₀` premise, prepared.
+- [ ] **G2.** Thread the F2 side conditions from the 9 write sites
+      (their AU suppliers already carry the abstract content) to the
+      per-op obligation; discharge at the 26 arms. Prove the per-op
+      preservation lemmas STANDALONE first (pure statements against F2's
+      effect vocabulary — no `log_state` dependency, fully parallelizable
+      across agents).
+- [ ] **G1-flip.** Row (a) — `∃ A` beside `log_state`'s four binders,
+      `⌜dom A = fs_home_set cov ls⌝ ∗ ⌜fs_durable_wf_body A⌝ ∗
+      ⌜∀ b ∈ fs_home_set cov ls, b ∉ pend -> L !! b = A !! b⌝` — flips on
+      in ONE commit once G2's lemmas exist (a per-arm escape cannot gate
+      on a false lemma: `fs_durable_wf_body` has been REAL since F1).
+      The rework list is `log_state_pend`'s call sites plus the boot
+      establishment (`A₀` := the image's home restriction, `wf_body` via
+      `FsWfImg.fsimg_durable_wf` off conjunct (13)).
 - [ ] **G2.** Thread the F2 side conditions from the 9 write sites
       (their AU suppliers already carry the abstract content) to the
       per-op obligation; discharge at the 26 arms.
-- [ ] **G3.** `ProofEndOp` discharges E2's premise from G1's row.
+- [ ] **G3.** `ProofEndOp` discharges E2's premise from G1's row. It is
+      also what switches ROW (b) ON at the deposit: re-point the commit
+      path at `fs_logfill_permit_v` / `fs_install_permit_v` /
+      `fs_commit_permit_named` / `fs_clear_permit_keep`, thread the chained
+      `M` through `write_log` / the installs / the clear, and give
+      `eo_open_of_batch` / `eo_open_to_batch` the NAMED half instead of
+      `log_mirror_clean`. With the chain in hand the deposit is arithmetic
+      (an install writes `L`'s bytes at every `b ∈ LB` and touches nothing
+      else, so the post-commit picture agrees with `L` on the whole home
+      set), and `LogInv.log_mirror_tie` loses its gate.
 
 ## 7. Stage H — boot re-founding: mint at `D`, recovery a ghost no-op
 
@@ -552,6 +595,10 @@ sys_mknod, sys_chdir, filewrite, fileclose, kexec ×2, kexit, ireclaim).
       restated as ghost-no-ops (no `it_rec_L`; the memmove is
       content-preserving at the logical level). Supersedes the
       D1/D2 L-moving arms; keep the `Bh` plumbing with `Bh i := Lw i`.
+      It is also the BOOT half of `LogInv.log_mirror_tie`'s gate (G1-impl):
+      with the mint running at `D` read out of `P_fs`, the era's mirror
+      value and `L` are two readings of one image, so `ProofInitlog`'s
+      pack can prove row (b) instead of calling `log_mirror_tie_pending`.
 - [ ] **H3.** (= old D3) `SpecFsinit.v:318` and `FirstTok.v:275` drop
       `hdr_n = 0`; forkret's boot arm threads the general form.
 - [ ] **H4.** (= old C1, if still needed after H1/H2) the read-permit

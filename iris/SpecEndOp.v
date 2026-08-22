@@ -33,7 +33,7 @@
    Whether this particular end_op is the last one out, and therefore
    whether it runs the commit, is INTERNAL: the spec deliberately does not
    expose which, because no caller can predict it and no caller needs to.
-   The commit path checks [log_batch] out of the lock resource under
+   The commit path checks [log_state] out of the lock resource under
    [committing = 1] and deposits it back before returning, so the batch
    never appears in the interface either.
 
@@ -48,7 +48,7 @@
    SLOT ACCOUNTING, AND WHY IT CLOSES.  The interior install_trans hands
    back [bslots (2 + length W)] having taken 2 -- one surplus unit per
    installed block, the units log_write's bpin absorbed.  They are not
-   dropped: end_op deposits them into [log_batch]'s POOL when it re-forms
+   dropped: end_op deposits them into [log_state]'s POOL when it re-forms
    the batch at n = 0.  The arithmetic is exact -- length W = n, and the
    pool goes from [(LOGBLOCKS - n) + 2] to [(LOGBLOCKS - 0) + 2].  Nothing
    about it crosses this interface; end_op's post stays empty. *)
