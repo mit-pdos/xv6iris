@@ -64,12 +64,11 @@
           [Ctx := cpol_ctx G W x], with (P-1) discharged through
           [WeakRvwmoGlue2.cpol_Hpres] and the TWO HONEST PREMISES quantified
           where they are honestly stated: (P-3) [wit_fence_ub] at the next
-          position and (P-4) progress, the latter inside the read policy
-          [Hpol'] (that is where [WeakRvwmoCert3.boundary_reconverge_run]
-          is applied — after a substituted read the two runs are at
-          different nodes and only the EWPs say either reaches a boundary).
-          [walk_policy] bundles the per-state supply; [walk_supply_of_policy]
-          is the theorem.
+          position, and the read policy [Hpol'] itself — which §4.0c
+          DISCHARGES ([wpol_of_sites]), on both routes: [G]'s own label at
+          a non-witness position, the candidate's latest-source read at a
+          witness one.  [walk_policy] bundles the per-state supply;
+          [walk_supply_of_policy] is the theorem.
 
       §5  THE CAPSTONE SHAPE, restated: [cycle_kill_of_l2''''],
           [t2lin_of_l2'''] and [xv6_rvwmo_safe_modulo_walk] — the capstone
@@ -520,6 +519,31 @@ Proof.
   rewrite Hl' in Hl. injection Hl as <-. by simpl in Hw.
 Qed.
 
+(** THE CLASSIFICATION IS LOG-DECIDED.  At a position whose label is known,
+    "witness" and "sources already in the log" are the two arms of a
+    DECIDABLE alternative — the read's source list is finite and [n] is a
+    number.  This is what lets the policy dispatch on the two routes
+    without a [Decision] instance for [wwit] itself. *)
+Lemma wsrc_or_wwit (G : gexec) (n : nat) (e : geid) (lb : lbl) :
+  gx_lbl G e = Some lb → wsrc_le G n e ∨ wwit G n e.
+Proof.
+  intros Hl.
+  destruct lb as [aq base ts vs|rl base vs kc|pr pw sr sw
+                 |aq rl base ts rvs wvs kc];
+    [|left; intros aq0 base0 ts0 vs0 Hl0; congruence
+     |left; intros aq0 base0 ts0 vs0 Hl0; congruence
+     |left; intros aq0 base0 ts0 vs0 Hl0; congruence].
+  destruct (decide (Exists (λ t, (n < t)%nat) ts)) as [Hex|Hex].
+  - right. apply Exists_exists in Hex as (t & Hin & Hlt).
+    apply elem_of_list_lookup in Hin as (j & Hj).
+    exists aq, base, ts, vs. split; [exact Hl|]. by exists j, t.
+  - left. intros aq0 base0 ts0 vs0 Hl0 j t Hj.
+    rewrite Hl in Hl0. injection Hl0 as Ha Hb Hc Hd. subst.
+    destruct (decide (t ≤ n)%nat) as [Hle|Hgt]; [exact Hle|].
+    exfalso. apply Hex, Exists_exists. exists t.
+    split; [by eapply elem_of_list_lookup_2|lia].
+Qed.
+
 (** THE GRAPH-SIDE DATUM the walk carries for the hart it is running: every
     read of hart [x] draws on a write the log has already reached.  It is
     decidable from [G] and [n], and it is what makes the segment need no
@@ -659,14 +683,47 @@ Definition wpol_flat (G : gexec) (W : geid → Prop) (x : agent) (cpu : CPU)
       wcls_at G W x c0 lb' ∧
       dreg_agree (λ nn, nn ∉ T) rs1' rs2'.
 
-(** THE SITE DATUM: [G]'s label at row position [p], the log-decided
-    classification at it, and RMW-freedom. *)
+(** THE WITNESS SITE DATUM.  A position the log-decided witness set names
+    is served by the SUBSTITUTED route — [WeakRvwmoCert2.cert_read_witness]
+    at [WeakRvwmoCert.latest_read_lbl] — and three things must line up for
+    the certified label to be [WeakRvwmoCert2.lbl_reidx]-related to [G]'s:
+
+      - [aq = false].  [WeakRvwmoCert3.ctrace_prefix]'s witness arm (hence
+        [WeakRvwmoGlue2.cstep_cls]'s substituted disjunct) writes the
+        witness's own label as a PLAIN load; [WeakRvwmoCert3.witness_not_aq]
+        is why that costs nothing where the witness set is a cycle's
+        backward step.
+      - [latest_bytes_ok] — [cert_read_witness]'s ONLY demand: the
+        footprint's bytes exist at the candidate's latest source.
+      - THE VALUES AGREE.  [lbl_reidx] frees the read INDICES and nothing
+        else, so the candidate's latest bytes must be [G]'s own read
+        values.  (This is the one place the route is not free: the walk
+        substitutes a TIMESTAMP, never a value.)
+
+    All three are functions of [G] and the write count alone — the
+    candidate is pinned by [cd_img c = gx_img G] and [wlog_pfx G n] — so
+    this is a SITE datum, indexed by the row position like the rest of
+    [wsite_ok]. *)
+Definition wwit_site (G : gexec) (n : nat) (x : agent) (p : nat) : Prop :=
+  ∀ (c : cand) (aq : bool) (base : Z) (ts : list nat) (vs : list (bv 8)),
+    cd_img c = gx_img G →
+    wlog_pfx G n (cd_log_end c) →
+    gx_lbl G (x, p) = Some (WeakAxiomatic.LLoad aq base ts vs) →
+    aq = false ∧
+    latest_bytes_ok c base (length ts) ∧
+    lrd_vs c base (length ts) = vs.
+
+(** THE SITE DATUM: [G]'s label at row position [p], the log index a write
+    there must carry, RMW-freedom, and — only where the position IS a
+    witness — the substituted route's data.  What it NO LONGER asks (the
+    tenth pass's OBSTRUCTION 2) is [wsrc_le]: a witness position is now
+    servable, by the latest-read route. *)
 Definition wsite_ok (G : gexec) (n : nat) (x : agent) (p : nat) (lb : lbl)
     : Prop :=
   gx_lbl G (x, p) = Some lb ∧
-  wsrc_le G n (x, p) ∧
   (lb_is_w lb = true → gwix G (x, p) = S n) ∧
-  lb_rmwfree lb.
+  lb_rmwfree lb ∧
+  (wwit G n (x, p) → wwit_site G n x p).
 
 (** The log length a candidate at row position [k] of the segment carries:
     the segment is "non-writes, then ONE store at [kz]", so the log is the
@@ -691,7 +748,7 @@ Definition wQ (G : gexec) (n : nat) (x : agent) (k0 kz : nat)
   (lb_is_w lb = true ↔ k = kz).
 
 Lemma wQ_rmwfree G n x k0 kz k lb : wQ G n x k0 kz k lb → lb_rmwfree lb.
-Proof. by intros (_ & _ & (_ & _ & _ & H) & _). Qed.
+Proof. by intros (_ & _ & (_ & _ & H & _) & _). Qed.
 
 (** ** 4.0c THE POLICY AT AN ALIGNED CANDIDATE, AND ITS DISCHARGE *)
 
@@ -714,32 +771,37 @@ Definition wpol (G : gexec) (n : nat) (x : agent) (cpu : CPU)
       wcls_at G (wwit G n) x c0 lb' ∧
       dreg_agree (λ nn, nn ∉ T) rs1' rs2'.
 
-(** THE THREE [mstep_ok] ROUTES, at an aligned candidate. *)
-Theorem wsite_mstep_ok (G : gexec) (n : nat) (x : agent) (c0 : cand)
-    (lb : lbl) :
-  rvwmo_minus_consistent G →
-  W_poloc_closed G (wwit G n) →
-  cd_img c0 = gx_img G →
-  wlog_pfx G n (cd_log_end c0) →
-  cpol_ctx G (wwit G n) x c0 →
-  wsite_ok G n x (gcnt x (cd_tr c0)) lb →
-  mstep_ok (cand_last_st c0) x lb.
+(** THE CLASSIFICATION AT A WITNESS: [cstep_cls]'s SUBSTITUTED disjunct,
+    which the split of [WeakRvwmoCert3.cpol_ctx] made reachable. *)
+Theorem wcls_of_wit (G : gexec) (n : nat) (x : agent) (c0 : cand)
+    (base : Z) (ts : list nat) (vs : list (bv 8)) :
+  gx_lbl G (x, gcnt x (cd_tr c0))
+    = Some (WeakAxiomatic.LLoad false base ts vs) →
+  wwit G n (x, gcnt x (cd_tr c0)) →
+  wcls_at G (wwit G n) x c0 (latest_read_lbl c0 false base (length ts)).
 Proof.
-  intros Hcons Hpc Himg Hpfx Hctx (Hl & Hle & _ & Hrmw).
-  pose proof Hcons as (Hwf & _ & Hlv & _).
-  destruct lb as [aq base ts vs|rl base vs kc|pr pw sr sw|aq rl base ts rvs wvs kc].
-  - apply (cpol_read G (wwit G n) x c0 aq base ts vs Hcons Hpc Hctx Hl).
-    apply (src_in_log_of_pfx G n c0 (x, gcnt x (cd_tr c0)) aq base ts vs
-             Hlv Himg Hpfx Hl (gshape G Hwf _ _ Hl) Hle).
-  - apply cert_write_ok. exact (gshape G Hwf _ _ Hl).
-  - apply cert_fence_ok.
-  - by destruct Hrmw.
+  intros Hl HW. split.
+  - right. split; [exact HW|].
+    exists base, (length ts), ts, vs.
+    split_and!; [exact Hl|reflexivity|reflexivity].
+  - intros Hw. by rewrite latest_read_not_w in Hw.
 Qed.
 
-(** THE POLICY'S BLOCK, at an aligned candidate: the untainted mirror
-    ([cert_block_mirror] at the EMPTY taint set) plus the admissibility and
-    the classification, with [G]'s own label handed back
-    ([lbl_reidx_refl]). *)
+(** THE TWO READ ROUTES, AS ONE BLOCK POLICY.  The mirror
+    ([WeakRvwmoCert2.cert_block_mirror] at the EMPTY taint set) moves the
+    block across the register change without touching its label; then the
+    LOG-DECIDED classification ([wsrc_or_wwit]) picks the route:
+
+      - NOT a witness: [G]'s own label comes back verbatim
+        ([lbl_reidx_refl]), admissible by [WeakRvwmoCert3.cpol_read] (whose
+        [¬ W] premise is exactly what the split moved here) at
+        [src_in_log_of_pfx], [cert_write_ok] or [cert_fence_ok];
+      - A WITNESS: the candidate's LATEST-source read comes back
+        ([WeakRvwmoCert.latest_read_lbl]), admissible by
+        [WeakRvwmoCert2.cert_read_witness] with NO floor obligation, and
+        the block is RE-TIMESTAMPED to it
+        ([WeakRvwmoCert2.cblk_load_retime] — the values are the site
+        datum's, so the successor monad node does not move). *)
 Theorem wblk_pol_at (G : gexec) (n : nat) (x : agent) (cpu : CPU)
     (d0 : dev_state) (c0 : cand) (ws : wstate) (lb : lbl) (l : wlabel)
     (rds : list wreg) (wrs : list register) (m : M unit) (rs1 rs2 : regstate)
@@ -747,6 +809,7 @@ Theorem wblk_pol_at (G : gexec) (n : nat) (x : agent) (cpu : CPU)
     (fn' : ofence) (ib' : oib32) :
   rvwmo_minus_consistent G →
   W_poloc_closed G (wwit G n) →
+  srvwmo_consistent c0 →
   cd_img c0 = gx_img G →
   wlog_pfx G n (cd_log_end c0) →
   cpol_ctx G (wwit G n) x c0 →
@@ -761,20 +824,48 @@ Theorem wblk_pol_at (G : gexec) (n : nat) (x : agent) (cpu : CPU)
     wcls_at G (wwit G n) x c0 lb' ∧
     dreg_agree (λ nn, nn ∉ []) rs1' rs2'.
 Proof.
-  intros Hcons Hpc Himg Hpfx Hctx Hsite Hag Hblk.
+  intros Hcons Hpc Hc Himg Hpfx Hctx Hsite Hag Hblk.
+  pose proof Hcons as (Hwf & _ & Hlv & _).
+  pose proof Hsite as (Hl & Hix & Hrmw & Hwit).
   destruct (cert_block_mirror (λ nn, nn ∉ []) cpu d0 ws lb l rds wrs
               m rs1 fn ib m' rs1' fn' ib' rs2 Hblk
               (λ nn _, not_elem_of_nil nn) Hag) as (rs2' & Hblk2 & Hag2).
-  exists lb, l, rds, wrs, rs2'.
-  destruct Hctx as (ev & Hgt & Hub & HnW).
-  destruct Hsite as (Hl & Hle & Hix & Hrmw).
-  split_and!.
-  - exact Hblk2.
-  - apply (wsite_mstep_ok G n x c0 lb Hcons Hpc Himg Hpfx);
-      [by exists ev|by split_and!].
-  - apply lbl_reidx_refl.
-  - by apply (wcls_of_pfx G n x c0 lb).
-  - exact Hag2.
+  destruct (wsrc_or_wwit G n (x, gcnt x (cd_tr c0)) lb Hl) as [Hle|HW].
+  - (* ------------------------- THE TRUE ROUTE ------------------------- *)
+    have HnW : ¬ wwit G n (x, gcnt x (cd_tr c0)) := wsrc_le_not_wwit _ _ _ Hle.
+    exists lb, l, rds, wrs, rs2'.
+    split_and!; [exact Hblk2| |apply lbl_reidx_refl
+                |by apply (wcls_of_pfx G n x c0 lb)|exact Hag2].
+    destruct lb as [aq base ts vs|rl base vs kc|pr pw sr sw
+                   |aq rl base ts rvs wvs kc].
+    + apply (cpol_read G (wwit G n) x c0 aq base ts vs Hcons Hpc Hctx HnW Hl).
+      apply (src_in_log_of_pfx G n c0 (x, gcnt x (cd_tr c0)) aq base ts vs
+               Hlv Himg Hpfx Hl (gshape G Hwf _ _ Hl) Hle).
+    + apply cert_write_ok. exact (gshape G Hwf _ _ Hl).
+    + apply cert_fence_ok.
+    + by destruct Hrmw.
+  - (* ------------------------ THE WITNESS ROUTE ----------------------- *)
+    pose proof HW as (aq & base & ts & vs & Hl' & _).
+    have Hlb : lb = WeakAxiomatic.LLoad aq base ts vs.
+    { rewrite Hl' in Hl. by injection Hl as <-. }
+    subst lb.
+    destruct (Hwit HW c0 aq base ts vs Himg Hpfx Hl')
+      as (-> & Hbytes & Hvals).
+    have Htsnd : (wit_tvs c0 base (length ts)).*2 = vs
+      by rewrite wit_tvs_snd Hvals.
+    destruct (cblk_load_retime cpu d0 ws false base ts vs l rds wrs
+                m rs2 fn ib m' rs2' fn' ib' (wit_tvs c0 base (length ts))
+                Hblk2 Htsnd) as (l2 & rds2 & wrs2 & Hblk3).
+    rewrite (wit_tvs_lbl c0 false base (length ts)) in Hblk3.
+    exists (latest_read_lbl c0 false base (length ts)), l2, rds2, wrs2, rs2'.
+    split_and!.
+    + exact Hblk3.
+    + by apply cert_read_witness.
+    + rewrite /latest_read_lbl /=. split_and!;
+        [reflexivity|reflexivity|exact Hvals|].
+      by rewrite /lrd_ts length_fmap length_seq.
+    + by apply (wcls_of_wit G n x c0 base ts vs).
+    + exact Hag2.
 Qed.
 
 (** (W-1), DISCHARGED.  The alignment is what makes it derivable: the site
@@ -789,11 +880,11 @@ Proof.
   intros Hcons Hpc k c0 ws lb l rds wrs m rs1 rs2 fn ib m' rs1' fn' ib'
     Hc (Hctx & Hgc & Hpfx) (Hk0 & Hkz & Hsite & _) Hrelp Hag Hblk.
   have Himg : cd_img c0 = gx_img G.
-  { destruct Hctx as (ev & Hgt & _ & _). exact (ctp_img G c0 ev _ Hgt). }
+  { destruct Hctx as (ev & Hgt & _). exact (ctp_img G c0 ev _ Hgt). }
   have Hpfx' : wlog_pfx G n (cd_log_end c0).
   { move: Hpfx. by rewrite /wlogn (bool_decide_eq_true_2 (k ≤ kz)%nat Hkz). }
   apply (wblk_pol_at G n x cpu d0 c0 ws lb l rds wrs m rs1 rs2 fn ib m'
-           rs1' fn' ib' Hcons Hpc Himg Hpfx' Hctx);
+           rs1' fn' ib' Hcons Hpc Hc Himg Hpfx' Hctx);
     [by rewrite Hgc|exact Hag|exact Hblk].
 Qed.
 
@@ -801,14 +892,13 @@ Qed.
 Theorem wctx_pres (G : gexec) (n : nat) (x : agent) (k0 kz : nat) :
   gwf G →
   wub G (wwit G n) x →
-  wnw_seg G n x k0 kz →
   ∀ (k : nat) (c0 : cand) (lb lb' : lbl),
     wctx G n x kz k c0 → srvwmo_consistent c0 → wQ G n x k0 kz k lb →
     lbl_reidx lb lb' → mstep_ok (cand_last_st c0) x lb' →
     wcls_at G (wwit G n) x c0 lb' →
     wctx G n x kz (S k) (cand_snoc c0 (EStep x lb')).
 Proof.
-  intros Hwf Hub Hnw k c0 lb lb' (Hctx & Hgc & Hpfx) Hc
+  intros Hwf Hub k c0 lb lb' (Hctx & Hgc & Hpfx) Hc
          (Hk0 & Hkz & Hsite & Hiff) Hri Hok (Hcl & Hix).
   have Hpfxn : wlog_pfx G n (cd_log_end c0).
   { move: Hpfx. by rewrite /wlogn (bool_decide_eq_true_2 (k ≤ kz)%nat Hkz). }
@@ -818,21 +908,22 @@ Proof.
   split_and!.
   - eapply cpol_ctx_snoc;
       [exact Hwf|exact Hctx|exact Hcl|exact Hix
-      |intros ev' Hev'; exact (Hub c0 lb' ev' Hev')
-      |rewrite Hgc; by apply Hnw].
+      |intros ev' Hev'; exact (Hub c0 lb' ev' Hev')].
   - exact Hgc2.
   - rewrite cd_log_end_snoc.
     destruct (decide (k = kz)) as [->|Hne].
     + (* THE EXIT STORE: the log grows by G's (n+1)-st write's message *)
       have Hw : lb_is_w lb = true by apply Hiff.
-      destruct Hsite as (Hl & Hle & Hgwix & Hrmw).
+      destruct Hsite as (Hl & Hgwix & Hrmw & Hwit).
       destruct lb as [aq0 b0 ts0 vs0|rl base vs kc|pr pw sr sw
                      |aq0 rl0 b0 ts0 rv0 wv0 kc0]; try by simpl in Hw.
       have Hlb' : lb' = WeakAxiomatic.LStore rl base vs kc
         := lbl_reidx_store rl base vs kc lb' Hri.
       subst lb'.
-      have HnW : ¬ wwit G n (x, gcnt x (cd_tr c0))
-        by rewrite Hgc; apply wsrc_le_not_wwit.
+      have HnW : ¬ wwit G n (x, gcnt x (cd_tr c0)).
+      { rewrite Hgc.
+        exact (wwit_not_w G n (x, kz) (WeakAxiomatic.LStore rl base vs kc)
+                 Hl eq_refl). }
       have Hlbl : gx_lbl G (x, gcnt x (cd_tr c0))
                 = Some (WeakAxiomatic.LStore rl base vs kc).
       { destruct Hcl as [[_ H]|[HW _]]; [exact H|by destruct (HnW HW)]. }
@@ -866,8 +957,9 @@ Qed.
 
     (P-1) is [wctx_pres]; (W-1) is [wpol_of_sites]; (O-F) is
     [WeakRvwmoCert3.cpolp_of_rmwfree] (the site datum is RMW-free).  What is
-    left at this interface is (W-2) [wub] and the restricted (W-4)
-    [wnw_seg]. *)
+    left at this interface is (W-2) [wub] alone: the restricted (W-4)
+    [wnw_seg] is GONE with the split — the carried context no longer
+    asserts that the next position is not a witness. *)
 Theorem wlk_seg_of_cert (G : gexec) (n : nat) (x : agent) (cpu : CPU)
     (d0 : dev_state) (k0 kz : nat) (ws0 : wstate) (rowseg : list lbl)
     (es : list eitem) (pfin : pexv6) (m0 : M unit) (rs10 : regstate)
@@ -876,8 +968,6 @@ Theorem wlk_seg_of_cert (G : gexec) (n : nat) (x : agent) (cpu : CPU)
   W_poloc_closed G (wwit G n) →
   (* (W-2) *)
   wub G (wwit G n) x →
-  (* (W-4), restricted to the segment *)
-  wnw_seg G n x k0 kz →
   hemit (λ _, d0) k0 ws0 rowseg (PHart cpu m0 rs10 fn0 ib0) es pfin →
   (∀ i lb, rowseg !! i = Some lb → wQ G n x k0 kz (k0 + i)%nat lb) →
   cst_ok d0 St →
@@ -892,11 +982,11 @@ Theorem wlk_seg_of_cert (G : gexec) (n : nat) (x : agent) (cpu : CPU)
     cst_pst St' 0%nat = cst_pst St 0%nat ∧
     cst_dv St' 0%nat = cst_dv St 0%nat.
 Proof.
-  intros Hcons Hpc Hub Hnw Hem HQ Hok Hctx Hp Hag Hrelp.
+  intros Hcons Hpc Hub Hem HQ Hok Hctx Hp Hag Hrelp.
   have Hwf : gwf G by destruct Hcons as (H & _).
   destruct (seg_step_of_segment x cpu d0 [] (wQ G n x k0 kz)
               (wctx G n x kz) (wcls_at G (wwit G n) x)
-              (wctx_pres G n x k0 kz Hwf Hub Hnw)
+              (wctx_pres G n x k0 kz Hwf Hub)
               (wpol_of_sites G n x cpu d0 k0 kz Hcons Hpc)
               (cpolp_of_rmwfree x cpu d0 [] (wctx G n x kz)
                  (wcls_at G (wwit G n) x) (wQ G n x k0 kz)
@@ -1064,7 +1154,10 @@ Print Assumptions hemit_app.
 Print Assumptions seg_step_msgs.
 Print Assumptions wlk_step_of_seg.
 Print Assumptions wnw_of_pfx.
+Print Assumptions wsrc_or_wwit.
 Print Assumptions wcls_of_pfx.
+Print Assumptions wcls_of_wit.
+Print Assumptions wblk_pol_at.
 Print Assumptions src_in_log_of_pfx.
 Print Assumptions wpol_of_sites.
 Print Assumptions wctx_pres.
@@ -1084,29 +1177,32 @@ Print Assumptions xv6_rvwmo_safe_modulo_walk.
     BUILDS one such step out of [WeakRvwmoCert3.cert_segment'] — still asks
     is exactly two obligations plus one graph-side datum:
 
-    (W-1) THE READ/REGISTER POLICY [wpol] — the certification's real
-          content, where (P-4) PROGRESS lives and where (W-3)'s
-          CLASSIFICATION now lives too.  At an UNSUBSTITUTED read the two
-          runs are in lockstep and the clause is
-          [WeakEvProv.instr_dagree_ev] (equal labels, register files still
-          agreeing off the taint set) plus [WeakRvwmoCert3.cpol_read] (the
-          admissibility, with [floor_ok] discharged).  At a SUBSTITUTED one
-          the runs diverge at the read's continuation
-          ([WeakEvProv.taint_closure_load]) and re-converge only at the
-          next instruction boundary
-          ([WeakRvwmoCert3.boundary_reconverge_run]) — and that either run
-          REACHES a boundary is the EWPs' content, not a graph-side lemma.
-          [WeakEvProv]'s (P-a)–(P-c) are discharged; (P-d), the iteration
-          to the boundary, is exactly this.
+    (W-1) THE READ/REGISTER POLICY [wpol] — DISCHARGED (§4.0c,
+          [wpol_of_sites]).  The alignment makes it derivable, and since
+          the tenth pass's split of [WeakRvwmoCert3.cpol_ctx] it covers
+          BOTH read routes: [cpol_read] at a non-witness position (its
+          [¬ W] premise is what the split moved out of the context), and
+          [WeakRvwmoCert2.cert_read_witness] at a witness one, with the
+          block re-timestamped by [WeakRvwmoCert2.cblk_load_retime].  The
+          substituted route does NOT diverge the runs — the values are the
+          site datum's ([wwit_site]) and only the TIMESTAMPS move — so
+          [WeakRvwmoCert3.boundary_reconverge_run] is not among the walk's
+          obligations.  What the route costs instead is [wwit_site]: a
+          witness's graph label must be plain, its footprint must exist at
+          the candidate's latest source, and its VALUES must be the
+          candidate's latest bytes.
 
     (W-2) [wub] — (P-3) [wit_fence_ub], per witness.  Guarded and vacuous
           at a witness with no publishing fence between it and the read
           whose floor it would raise ([WeakRvwmoCert3] §2.1).
 
-    THE DATUM: [wrow_in_log G x n] — "hart [x]'s reads all draw on writes
-    the log has reached".  Decidable from [G] and the write count, with no
-    semantic content; it is what makes the segment substitution-free, and
-    it discharges the old (W-4).
+    THE OLD (W-4) IS GONE.  [wnw_seg] was needed only because the carried
+    context asserted that the next position is not a witness; the split
+    deleted that clause, so [wctx_pres] no longer asks for it, and a hart
+    with witnesses in its row is now a first-class case rather than an
+    excluded one ([WeakRvwmoWalk2] §6.2 runs it at the tree's LB graph).
+    [wrow_in_log] survives as the datum of the SUBSTITUTION-FREE
+    specialisation ([WeakRvwmoProgress.wlk_seg_of_cert']).
 
     ------------------------------------------------------------------------
     WHAT MOVED, AND WHY (this session):

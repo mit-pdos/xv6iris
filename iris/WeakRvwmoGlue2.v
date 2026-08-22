@@ -455,11 +455,12 @@ Qed.
 
 (** ** 3.1a [cpol_ctx] is preserved — (O-C)'s context, carried
 
-    The two clauses of [cpol_ctx] beyond [ctrace_prefix] are about the NEXT
-    position, and neither is bookkeeping: [wit_fence_ub] is (P-3) and the
-    non-witness-ness of the next position is a property of the witness SET
-    (its shape is fixed where the cycle fixes it, §4e).  Both enter as
-    hypotheses, stated at the position they are about. *)
+    The one clause of [cpol_ctx] beyond [ctrace_prefix] is about the NEXT
+    position and is not bookkeeping: [wit_fence_ub] is (P-3).  It enters as
+    a hypothesis, stated at the position it is about.  The non-witness-ness
+    of the next position is NO LONGER part of the context (the tenth pass's
+    OBSTRUCTION 2: it made the context unsatisfiable at a witness) — it is
+    a premise of [WeakRvwmoCert3.cpol_read] instead. *)
 Theorem cpol_ctx_snoc G W (x : agent) (c : cand) (l : lbl) :
   gwf G →
   cpol_ctx G W x c →
@@ -469,16 +470,15 @@ Theorem cpol_ctx_snoc G W (x : agent) (c : cand) (l : lbl) :
   (∀ ev', ctrace_prefix G (cand_snoc c (EStep x l)) ev' W →
      wit_fence_ub G (cand_snoc c (EStep x l)) ev' W
        (x, S (gcnt x (cd_tr c)))) →
-  ¬ W (x, S (gcnt x (cd_tr c))) →
   cpol_ctx G W x (cand_snoc c (EStep x l)).
 Proof.
-  intros Hwf (ev & Hgt & _ & _) Hcls Hix Hub HnW.
+  intros Hwf (ev & Hgt & _) Hcls Hix Hub.
   have Hgt' : ctrace_prefix G (cand_snoc c (EStep x l))
                 (ev_snoc c ev (x, gcnt x (cd_tr c))) W
     := ctrace_prefix_snoc G c ev W x l Hwf Hgt Hcls Hix.
   exists (ev_snoc c ev (x, gcnt x (cd_tr c))).
   rewrite gcnt_cand_snoc_self. split_and!;
-    [exact Hgt'|exact (Hub _ Hgt')|exact HnW].
+    [exact Hgt'|exact (Hub _ Hgt')].
 Qed.
 
 (** ** 3.1b (P-1), in [cert_segment']'s own [Hpres] shape *)
@@ -498,17 +498,15 @@ Theorem cpol_Hpres G W (x : agent) (Q : lbl → Prop) :
      ctrace_prefix G (cand_snoc c0 (EStep x lb')) ev' W →
      wit_fence_ub G (cand_snoc c0 (EStep x lb')) ev' W
        (x, S (gcnt x (cd_tr c0)))) →
-  (* the witness set does not name the next position *)
-  (∀ (c0 : cand), ¬ W (x, S (gcnt x (cd_tr c0)))) →
   ∀ (c0 : cand) (lb lb' : lbl),
     cpol_ctx G W x c0 → srvwmo_consistent c0 → Q lb → lbl_reidx lb lb' →
     mstep_ok (cand_last_st c0) x lb' →
     cpol_ctx G W x (cand_snoc c0 (EStep x lb')).
 Proof.
-  intros Hwf Hcls Hub HnW c0 lb lb' Hctx Hc HQ Hri Hok.
+  intros Hwf Hcls Hub c0 lb lb' Hctx Hc HQ Hri Hok.
   destruct (Hcls c0 lb lb' Hctx Hc HQ Hri Hok) as (Hcl & Hix).
   eapply cpol_ctx_snoc;
-    [exact Hwf|exact Hctx|exact Hcl|exact Hix|exact (Hub c0 lb')|apply HnW].
+    [exact Hwf|exact Hctx|exact Hcl|exact Hix|exact (Hub c0 lb')].
 Qed.
 
 (** ** 3.2 A certified configuration IS a [run_data] *)

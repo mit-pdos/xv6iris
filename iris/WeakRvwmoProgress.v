@@ -424,7 +424,7 @@ Lemma cpol_ctx_of_ctrace (G : gexec) (x : agent) (n : nat) (c : cand)
   cpol_ctx G (wwit G n) x c.
 Proof.
   intros Hrow Hpc. exists ev. split_and!;
-    [exact Hpc|by apply wit_fence_ub_vacuous|by apply wrow_no_wit].
+    [exact Hpc|by apply wit_fence_ub_vacuous].
 Qed.
 
 (* ====================================================================== *)
@@ -432,11 +432,13 @@ Qed.
 
 (** ** 5.1 The segment, with (W-2) gone.
 
-    [WeakRvwmoWalk.wlk_seg_of_cert] verbatim, minus the [wub] and [wnw_seg]
-    premises: the widened graph-side datum [wrow_in_log'] discharges BOTH
-    (that hart has no witness at any position at all).  A hart that DOES
-    carry a witness elsewhere in its row is served by the segment-restricted
-    form directly ([wlk_seg_of_cert] with [wnw_seg] and an honest [wub]). *)
+    [WeakRvwmoWalk.wlk_seg_of_cert] verbatim, minus the [wub] premise: the
+    widened graph-side datum [wrow_in_log'] discharges it (that hart has no
+    witness at any position at all).  A hart that DOES carry a witness is
+    served by [wlk_seg_of_cert] directly, with an honest [wub] — and, since
+    the tenth pass's split, that is no longer a dead branch: the policy
+    serves a witness position by the latest-read route
+    ([WeakRvwmoWalk.wblk_pol_at]). *)
 Theorem wlk_seg_of_cert' (G : gexec) (n : nat) (x : agent) (cpu : CPU)
     (d0 : dev_state) (k0 kz : nat) (ws0 : wstate) (rowseg : list lbl)
     (es : list eitem) (pfin : pexv6) (m0 : M unit) (rs10 : regstate)
@@ -462,7 +464,6 @@ Proof.
   eapply (wlk_seg_of_cert G n x cpu d0 k0 kz ws0 rowseg es pfin m0 rs10
             fn0 ib0 St rs20);
     [exact Hcons|exact Hpc|by apply wub_of_row
-    |intros k _ _; by apply wrow_no_wit
     |exact Hem|exact HQ|exact Hok|exact Hctx|exact Hp|exact Hag|exact Hrelp].
 Qed.
 
@@ -479,8 +480,9 @@ Qed.
       - the SITE DATA [wQ] — [G]'s label at each position of the stretch,
         its sources already in the log, and the exit write being the log's
         next entry — together with the walk state's own alignment [wctx]
-        and the two witness-set side conditions [wub] / [wnw_seg], which
-        are stated only over the positions the segment covers. *)
+        and the witness-set side condition [wub].  ([wnw_seg] is GONE with
+        the tenth pass's split: the carried context no longer asserts that
+        the next position is not a witness.) *)
 Definition walk_seg_data' (boot : agent → pexv6) (d0 : dev_state) (N : nat)
     (G : gexec) : Prop :=
   ∀ St n, wlk_inv boot d0 N G St n → (n < length (gwrites G))%nat →
@@ -503,10 +505,9 @@ Definition walk_seg_data' (boot : agent → pexv6) (d0 : dev_state) (N : nat)
     cst_pst St (cd_end (cst_c St)) !! x = Some (PHart cpu m0 rs20 fn0 ib0) ∧
     dreg_agree (λ nn, nn ∉ []) rs10 rs20 ∧
     w_relp (ms_ws (cand_last_st (cst_c St)) x) = w_relp ws0 ∧
-    (* the witness set's side conditions, over the segment only *)
+    (* the witness set's side conditions *)
     W_poloc_closed G (wwit G n) ∧
-    wub G (wwit G n) x ∧
-    wnw_seg G n x k0 (k0 + length pre)%nat.
+    wub G (wwit G n) x.
 
 Theorem walk_policy_of_seg_data' (boot : agent → pexv6) (d0 : dev_state)
     (N : nat) (G : gexec) :
@@ -517,12 +518,11 @@ Proof.
   destruct (Hdata St n Hinv Hn)
     as (x & cpu & k0 & ws0 & pre & rl & base & vs & kc & es & pfin &
         m0 & rs10 & rs20 & fn0 & ib0 & w &
-        Hw & Hm & Hpre & Hem & HQ & Hctx & Hp & Hag & Hrelp & Hpc & Hub &
-        Hnw).
+        Hw & Hm & Hpre & Hem & HQ & Hctx & Hp & Hag & Hrelp & Hpc & Hub).
   have Hok : cst_ok d0 St by destruct Hinv as (? & _).
   destruct (wlk_seg_of_cert G n x cpu d0 k0 (k0 + length pre)%nat ws0
               (pre ++ [WeakAxiomatic.LStore rl base vs kc]) es pfin m0 rs10
-              fn0 ib0 St rs20 Hcons Hpc Hub Hnw Hem HQ Hok Hctx Hp Hag Hrelp)
+              fn0 ib0 St rs20 Hcons Hpc Hub Hem HQ Hok Hctx Hp Hag Hrelp)
     as (St' & tradd & Hstep & _ & Himg & Hpst & Hdv).
   exists x, rl, base, vs, kc, pre, tradd, St', w.
   split_and!; [exact Hw|exact Hm|exact Hpre|exact Hstep|exact Himg|exact Hpst

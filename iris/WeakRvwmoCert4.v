@@ -316,13 +316,12 @@ Corollary cpol_ctx_of_hull G cs (W : geid → Prop) (x : agent) (c : cand) :
   gwf G → hull_ok G cs → wcut_closed G cs →
   (∃ ev, ctrace_prefix (gx_hull G cs) c ev W ∧
          (∀ p s, cd_tr c !! p = Some s → gcut cs (ev p) = true) ∧
-         wit_fence_ub G c ev W (x, gcnt x (cd_tr c)) ∧
-         ¬ W (x, gcnt x (cd_tr c))) →
+         wit_fence_ub G c ev W (x, gcnt x (cd_tr c))) →
   cpol_ctx G W x c.
 Proof.
-  intros Hwf Hok Hwc (ev & Hgt & Hcut & Hub & HnW).
+  intros Hwf Hok Hwc (ev & Hgt & Hcut & Hub).
   exists ev. split_and!;
-    [by apply (ctrace_prefix_of_hull G cs)|exact Hub|exact HnW].
+    [by apply (ctrace_prefix_of_hull G cs)|exact Hub].
 Qed.
 
 (** ** 3.2 THE OBSTRUCTION, as an identity rather than a counterexample

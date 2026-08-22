@@ -34,7 +34,8 @@ up with the pc walk), with a real-bytes instance agreeing by
    (boot-published globals, the running proc's trapframe/pagetable,
    `swtch`'s incoming context) — each needs a small per-idiom argument
    (same-hart or lock-transfer), stated as `seg_pin`/`cs_hyps`.
-3. **R-2's `walk_seg_data` — VACUITY CAUGHT (`WeakRvwmoWalk2.v`)**: the
+3. **R-2's `walk_seg_data` — VACUITY CAUGHT, REPAIR 1 + REPAIR 2(a) LANDED
+   (`WeakRvwmoWalk2.v`)**: the
    residue's `wpol` (and `cert_segment'`'s `Hpol'`, `seg_step_of_segment`'s)
    quantifies over EVERY `cpol_ctx` candidate while its classification
    speaks of that candidate's own position; the empty candidate is a
@@ -58,14 +59,48 @@ up with the pc walk), with a real-bytes instance agreeing by
    (the step's write/position, `W_poloc_closed`, `wub`, `wnw_seg`, and
    `wseg_align`: the walk state's `pexv6` IS the emission's — `wlk_inv`
    never ties the state's process supply to the row's emission).
-   OBSTRUCTION 2 (machine-checked, `cyg_walk_seg_data_false`):
-   `cpol_ctx` asserts `¬ W` at the candidate's OWN position, so a
-   witness position cannot carry the context — the substituted route is
-   unreachable through `cert_segment'`.  FIX NEXT: move that clause into
-   the policy's non-witness case (serve witness positions by the
-   latest-read route `cyg_walk` uses by hand) and make `wlk_inv` carry
-   the emission state so `wseg_align` is derived.  Until then the honest
-   capstone form is `xv6_rvwmo_safe_modulo` (R-2 as `walk_supply`).
+   OBSTRUCTION 2 — **REPAIR 2 (a) DONE, THE SPLIT**: `cpol_ctx` used to
+   assert `¬ W` at the candidate's OWN position, so a witness position
+   could not carry the context and the substituted route was unreachable
+   through `cert_segment'`.  `cpol_ctx` now keeps only the `ctrace_prefix`
+   bookkeeping + `wit_fence_ub`; the `¬ W` fact is a PREMISE of the
+   TRUE-read case (`cpol_read`), and a witness position is served by the
+   latest-read route (`cert_read_witness`, with the block re-timestamped by
+   the new shape-free `Cert2.cblk_load_retime` — it covers BOTH wlabels
+   `proj_lbl` sends to an axiomatic `LLoad`, plain `LLoad` and `LExLoad`).
+   The policy `wpol_of_sites` now dispatches on `wsrc_or_wwit` (the
+   classification is log-DECIDED given the label) and discharges both
+   routes.  WHAT THE SUBSTITUTED ROUTE COSTS, and it is a real new site
+   datum: `Walk.wwit_site` — at a witness the graph read must be plain
+   (`aq = false`, what `ctp_step`'s witness arm writes), its footprint must
+   exist at the candidate's latest source (`latest_bytes_ok`), and its
+   VALUES must be the candidate's latest bytes (`lrd_vs c base n = vs`),
+   because `lbl_reidx` frees the read INDICES and nothing else.  All three
+   are functions of `G` and the write count (the candidate is pinned by
+   `cd_img = gx_img G` + `wlog_pfx G n`), so they are site data.  FALLOUT:
+   `wnw_seg` is GONE from `wctx_pres`/`wlk_seg_of_cert`/`walk_seg_data'`
+   (it existed only to feed the deleted clause); `wsite_ok` lost `wsrc_le`.
+   THE ACCEPTANCE TEST, at `cyg` (`Walk2` §6.2): `cyg_ctx0` (the exact
+   negation of the old `cyg_no_ctx0`), `cyg_wwit_site00`, `cyg_wQ_seg0`
+   (the site data at a WITNESS position — unstatable before), and
+   **`cyg_step0_generic : wlk_step cyg d0 cw_S0 0`** built by the GENERIC
+   engine (`wlk_seg_of_cert` + `wlk_step_of_seg`) from `cy_hart_conf`'s own
+   emission, no hand-built block.  All at the five rv64d axioms.
+   **REPAIR 2 (b) NOT DONE — and this is what blocks a whole `cyg_walk'`:**
+   `wlk_inv` still records only the candidate/image/boot/log-prefix, NOT
+   the hart's process state, NOT its row position, and NOT the carried
+   context (which is indexed by the write count `n`, so it must be
+   re-established at every step).  Hence `wseg_align` + `wctx` stay in
+   `wseg_supply`, and the walk cannot be CHAINED generically: the segment
+   theorem's output state is existential, so a second generic step cannot
+   be applied to it.  NEXT: `wlk_inv` carries `hemit_states`' state per
+   hart (modulo `dreg_agree` off the taint, with the `w_relp` fold) plus
+   the hart's row position and a `ctrace_prefix` for the CURRENT `n`
+   (`wwit_poloc_closed`: a same-byte later read after a witness has a
+   source ≥ the witness's, so it is a witness too).  Then `wseg_align` is
+   derived, the residue drops to the step's write/position, and
+   `cyg_step0_generic` becomes `cyg_walk'`.  Until then the honest
+   capstone form is `xv6_rvwmo_safe_modulo_l2` (R-2 as `wseg_supply`).
 4. The F-variant's glue mirror; **R6**; `wprot_store` width lift;
    `WeakRvwmoLock`'s failed-swap arm; the `c.j`-style decoder audit
    (bitmask vs Sail, `KernelSitesDef` §6.6).

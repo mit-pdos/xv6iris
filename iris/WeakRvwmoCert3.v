@@ -512,22 +512,37 @@ Qed.
 
     What a candidate must carry for §3.2 to fire at it.  [cert_segment]
     changes the candidate at every block, so the context has to be an
-    INVARIANT of the iteration — that is [cert_segment'] below. *)
+    INVARIANT of the iteration — that is [cert_segment'] below.
+
+    THE SPLIT (TENTH-PASS checkpoint item 3, OBSTRUCTION 2).  The context
+    carries ONLY what is an invariant of the iteration and is true at EVERY
+    position the walk visits: the [ctrace_prefix] bookkeeping (the image
+    among its clauses) and the fence-guarded log bound at the next
+    position.  It does NOT carry [¬ W (x, gcnt x (cd_tr c))] — that clause
+    made the context UNSATISFIABLE at a witness position, so the
+    substituted branch of [WeakRvwmoGlue2.cstep_cls] was unreachable
+    through [cert_segment'] (machine-checked at the tree's own LB graph:
+    the old [WeakRvwmoWalk2.cyg_no_ctx0]).  The non-witness fact is now a
+    PREMISE of the read policy's TRUE-read case ([cpol_read] below); a
+    witness position is served by the latest-read route instead
+    ([WeakRvwmoCert2.cert_read_witness], whose only demand is
+    [latest_bytes_ok]). *)
 Definition cpol_ctx (G : gexec) (W : geid → Prop) (x : agent) (c : cand) : Prop :=
   ∃ ev, ctrace_prefix G c ev W ∧
-        wit_fence_ub G c ev W (x, gcnt x (cd_tr c)) ∧
-        ¬ W (x, gcnt x (cd_tr c)).
+        wit_fence_ub G c ev W (x, gcnt x (cd_tr c)).
 
-(** The payoff, packaged: at a candidate carrying the context, an in-log
-    read of [G]'s own label is admissible with NO floor obligation. *)
+(** The payoff, packaged: at a candidate carrying the context whose own
+    position is NOT a witness, an in-log read of [G]'s own label is
+    admissible with NO floor obligation. *)
 Corollary cpol_read (G : gexec) (W : geid → Prop) (x : agent) (c : cand)
     (aq : bool) (base : Z) (ts : list nat) (vs : list (bv 8)) :
   rvwmo_minus_consistent G → W_poloc_closed G W → cpol_ctx G W x c →
+  ¬ W (x, gcnt x (cd_tr c)) →
   gx_lbl G (x, gcnt x (cd_tr c)) = Some (WeakAxiomatic.LLoad aq base ts vs) →
   src_in_log c base ts vs →
   mstep_ok (cand_last_st c) x (WeakAxiomatic.LLoad aq base ts vs).
 Proof.
-  intros Hcons Hpc (ev & Hgt & Hwub & HnW) Hl Hsrc.
+  intros Hcons Hpc (ev & Hgt & Hwub) HnW Hl Hsrc.
   by apply (cert_read_in_log' G c ev W x aq base ts vs).
 Qed.
 
@@ -1325,10 +1340,10 @@ Lemma wit_fence_ub_empty G W r :
 Proof. by intros [|p] s Hs. Qed.
 
 Lemma cpol_ctx_empty G W (x : agent) :
-  ¬ W (x, 0%nat) → cpol_ctx G W x (Cand (gx_img G) []).
+  cpol_ctx G W x (Cand (gx_img G) []).
 Proof.
-  intros HnW. exists (λ _, (0%nat, 0%nat)). split_and!;
-    [apply ctrace_prefix_empty|apply wit_fence_ub_empty|exact HnW].
+  exists (λ _, (0%nat, 0%nat)). split_and!;
+    [apply ctrace_prefix_empty|apply wit_fence_ub_empty].
 Qed.
 
 (** ** 6.2 THE FLOOR, at a real graph read

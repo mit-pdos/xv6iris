@@ -659,6 +659,76 @@ Proof.
               |reflexivity|reflexivity].
 Qed.
 
+(** ** 4.3a THE WLABEL SHAPE OF A LOAD BLOCK, AND THE SHAPE-FREE RETIME
+
+    [WeakPromiseBridge.proj_lbl] sends exactly TWO wlabel constructors to an
+    axiomatic [LLoad]: the plain [LLoad] — whose [lat] is [false] by
+    [WeakPromiseFact.lat_free] and whose operand list is empty by
+    [WeakAxRealize.lb_rfoldfree] — and the exclusive read [LExLoad].  Both
+    are re-timestampable at the SAME successor node
+    ([WeakEvInst.pstep_ev_ts_load] / [pstep_ev_ts_exload]), so a load block
+    can be retimed without the caller knowing which one realizes it.  That
+    is what a policy serving a WITNESS position needs: it is handed a
+    [cblk] at an arbitrary wlabel. *)
+Lemma hlbl_realizes_load_shape p ws aq base ts vs l :
+  hlbl_realizes p ws (WeakAxiomatic.LLoad aq base ts vs) l →
+  ∃ tvs : list (nat * bv 8),
+    tvs.*1 = ts ∧ tvs.*2 = vs ∧
+    (l = LLoad aq false base tvs [] ∨ ∃ asrc, l = LExLoad aq base tvs asrc).
+Proof.
+  intros (Hbx & Hlat & Hrf & Hpr).
+  destruct l; simpl in Hpr; try discriminate.
+  - (* the plain load *)
+    injection Hpr as <- <- <- <-. simpl in Hlat, Hrf. subst.
+    eexists. split_and!; [reflexivity|reflexivity|by left].
+  - (* the exclusive read *)
+    injection Hpr as <- <- <- <-.
+    eexists. split_and!; [reflexivity|reflexivity|right; by eexists].
+Qed.
+
+Lemma cblk_load_retime cpu d0 ws aq base ts vs l rds wrs
+    m rs fn ib m' rs' fn' ib' (tvs2 : list (nat * bv 8)) :
+  cblk cpu d0 ws (WeakAxiomatic.LLoad aq base ts vs) l rds wrs
+    m rs fn ib m' rs' fn' ib' →
+  tvs2.*2 = vs →
+  ∃ l2 rds2 wrs2,
+    cblk cpu d0 ws (WeakAxiomatic.LLoad aq base tvs2.*1 tvs2.*2) l2 rds2 wrs2
+      m rs fn ib m' rs' fn' ib'.
+Proof.
+  intros (ls & ma & rsa & fna & iba & da & rdsA & wrsA & annA & rdsB & wrsB
+          & annB & Hadm & HA & Hre & HB & -> & ->) Hts.
+  have Hst : pstep_ev (PHart cpu ma rsa fna iba) da l
+               (PHart cpu m' rs' fn' ib') d0.
+  { apply pevrun_single_inv. by eapply phrun_pevrun. }
+  destruct (hlbl_realizes_load_shape (PHart cpu ma rsa fna iba) ws
+              aq base ts vs l Hre) as (tvs & Hf & Hs & [Hl|(asrc & Hl)]);
+    subst l.
+  - have Hts' : tvs2.*2 = tvs.*2 by rewrite Hts Hs.
+    have Hst2 : pstep_ev (PHart cpu ma rsa fna iba) da
+                  (LLoad aq false base tvs2 []) (PHart cpu m' rs' fn' ib') d0
+      := pstep_ev_ts_load _ _ _ _ _ _ _ _ Hst Hts'.
+    destruct (pevrun_phrun [_] _ da _ d0
+                (pevrun_more _ [] _ da _ d0 _ d0 Hst2 (pevrun_nil _ _))
+                cpu ma rsa fna iba m' rs' fn' ib' eq_refl eq_refl)
+      as (rdsB2 & wrsB2 & annB2 & HB2).
+    exists (LLoad aq false base tvs2 []), (rdsA ++ rdsB2), (wrsA ++ wrsB2).
+    exists ls, ma, rsa, fna, iba, da, rdsA, wrsA, annA, rdsB2, wrsB2, annB2.
+    split_and!; [exact Hadm|exact HA|apply hlbl_realizes_load|exact HB2
+                |reflexivity|reflexivity].
+  - have Hts' : tvs2.*2 = tvs.*2 by rewrite Hts Hs.
+    have Hst2 : pstep_ev (PHart cpu ma rsa fna iba) da
+                  (LExLoad aq base tvs2 asrc) (PHart cpu m' rs' fn' ib') d0
+      := pstep_ev_ts_exload _ _ _ _ _ _ _ _ _ Hst Hts'.
+    destruct (pevrun_phrun [_] _ da _ d0
+                (pevrun_more _ [] _ da _ d0 _ d0 Hst2 (pevrun_nil _ _))
+                cpu ma rsa fna iba m' rs' fn' ib' eq_refl eq_refl)
+      as (rdsB2 & wrsB2 & annB2 & HB2).
+    exists (LExLoad aq base tvs2 asrc), (rdsA ++ rdsB2), (wrsA ++ wrsB2).
+    exists ls, ma, rsa, fna, iba, da, rdsA, wrsA, annA, rdsB2, wrsB2, annB2.
+    split_and!; [exact Hadm|exact HA| |exact HB2|reflexivity|reflexivity].
+    by rewrite /hlbl_realizes.
+Qed.
+
 (** THE IN-LOG READ ([src_in_log]) — the block, transported and retimed. *)
 Theorem cert_block_read (P : wreg → Prop) cpu d0 ws lb rds wrs
     m rs1 fn ib m' rs1' fn' ib' rs2 aq base (tvs tvs2 : list (nat * bv 8)) :
