@@ -31,61 +31,43 @@ peak RSS −29 %. The table is in `optimization.md`.
 
 ## 2. The mechanical recipe
 
-**Step 0 — check the file conforms.** Two greps:
+`tools/instr_subgoal.py` does the whole edit. It reads the hypothesis-name ->
+lemma-name map OFF THE POSE LINES, so no per-file prefix (`pai_`, `fci_`,
+`sdi_`, …) has to be guessed, and it refuses to touch a file where some
+reference to a posed name is not a conforming call site. Verified to reproduce
+the hand-landed `ProofPipealloc.v` conversion byte for byte.
+
+**Step 1 — check.** `--check` changes nothing and exits 1 if the file needs hand
+work:
 
 ```sh
-cd iris
-grep -c 'iPoseProof ([a-z0-9_]* with "Htext") as' F.v          # the pose block
-grep -n 'H<tag>[0-9a-f]' F.v | grep -v iPoseProof \
-  | grep -v 'with "Hcg Hpc H[a-z0-9]*[^"]*")\.$'                # NON-conforming uses
+tools/instr_subgoal.py --check iris/Proof*.v
 ```
 
-The second must print nothing. If it prints, the file has uses in other shapes
-(a bare `iApply ("Hi02")`, an `iSpecialize`, a use inside an `iAssert`
-continuation, a leaf whose hypothesis order is not `Hcg Hpc <instr> …`) — convert
-the conforming sites with the script and the rest by hand, or skip the file and
-record why. Files where the reference count exceeds the conforming-site count are
-listed in §4 as the "needs hand work" tier.
-
-**Step 1 — run the transformation.** It is two regexes. `<tag>` is the file's
-instruction-lemma prefix (`pai_` for pipealloc, `fci_` for fileclose, `sdi_` for
-sys_dup, …); read it off the pose lines.
-
-```python
-import re
-src = open('F.v').read()
-# a. delete the pose lines (one OR MORE poses may share a line)
-b, npose = re.subn(
-    r'^[ \t]*(?:iPoseProof \(TAG[0-9a-f]+ with "Htext"\) as "H[0-9a-f]+"\. ?)+\n',
-    '', src, flags=re.M)
-# b. rewrite each call site, closing the premise in a focused brace
-def repl(m):
-    indent, pre, off, post = m.groups()
-    return (indent + pre + '[]' + post + ').\n'
-            + indent + '{ iApply (TAG' + off + ' with "Htext"). }')
-b, nuse = re.subn(r'^([ \t]*)(.*with "Hcg Hpc )H([0-9a-f]+)([^"]*")\)\.$',
-                  repl, b, flags=re.M)
-open('F.v','w').write(b)
+```
+iris/ProofBmap.v             posed  66  sites  75  CLEAN
+iris/ProofIget.v             posed  58  sites  64  HAND WORK: Hi3c x1
 ```
 
-**Step 2 — fix the brace indentation.** The regex captures the indent of the line
-the `with "…"` sits on, which for a multi-line `iApply` is the continuation
-indent. Re-indent each inserted brace to its `iApply`'s own indent:
+`CLEAN` means every reference to a posed fact is a `with "Hcg Hpc <hyp> …")`
+sentence ending on its own line. `HAND WORK` names the hypotheses used in some
+other shape (a bare `iApply ("Hi3c")`, an `iSpecialize`, a use inside an
+`iAssert`ed continuation, a leaf whose hypothesis order is not
+`Hcg Hpc <instr> …`). Convert those sites by hand first, then re-run `--check`.
 
-```python
-lines = open('F.v').read().split('\n'); out = []
-for l in lines:
-    m = re.match(r'^(\s*)\{ iApply \(TAG[0-9a-f]+ with "Htext"\)\. \}$', l)
-    if m:
-        j = len(out) - 1
-        while j >= 0 and not re.match(r'^\s*iApply \(', out[j]): j -= 1
-        l = re.match(r'^(\s*)', out[j]).group(1) + l.strip()
-    out.append(l)
-open('F.v','w').write('\n'.join(out))
+**Step 2 — convert.**
+
+```sh
+tools/instr_subgoal.py iris/ProofBmap.v
 ```
 
-**Step 3 — check nothing is left behind.** `grep -c 'iPoseProof (TAG' F.v` and
-`grep -c 'Hcg Hpc H[0-9a-f]' F.v` must both be `0`.
+It deletes the pose lines (including lines carrying two or three poses), rewrites
+each call site to `[]` plus a focused `{ iApply (<lemma> with "Htext"). }`, and
+re-indents each brace to its `iApply`'s own indent.
+
+**Step 3 — read the diff.** The conversion must not change the statement. Only
+pose lines and specialisation patterns move; if `git diff` shows anything else,
+stop.
 
 **Step 4 — compile it, ALONE, on the VM.** Never `make` (see §3).
 
@@ -97,14 +79,16 @@ open('F.v','w').write('\n'.join(out))
   coqc -time -async-proofs off -R . xv6iris -R ../model-xv6iris Riscv \
     -R ../kernel-rocq Kernel -R ../user-rocq User -w -notation-overridden F.v \
     > /mnt/rocq/F.time.log 2> /mnt/rocq/F.wall.log; echo exit=$?;
-  grep WALL /mnt/rocq/F.wall.log; grep "\[Qed" /mnt/rocq/F.time.log'
+  grep WALL /mnt/rocq/F.wall.log; grep "\[Qed" /mnt/rocq/F.time.log; ls -l F.vo'
 ```
 
-Measure the SAME way before converting, so the pair is comparable; back-to-back
-runs on the 192-vCPU box are stable to ±1 % even under someone else's build.
-Useful readings, all from that one command: `WALL`, the `[Qed.]` line, `maxrss`,
-and `ls -l F.vo`. Sum the sentence times with
-`awk '{for(i=1;i<=NF;i++) if($i=="secs") s+=$(i-1)} END{print s}' F.time.log`.
+Run that command ONCE BEFORE converting and once after, so the pair is
+comparable; back-to-back runs on the 192-vCPU box are stable to ~1 % even under
+someone else's build. Sum the sentence times with
+
+```sh
+awk '{for(i=1;i<=NF;i++) if($i=="secs") s+=$(i-1)} END{print s}' F.time.log
+```
 
 ## 3. The traps
 
@@ -143,8 +127,7 @@ script converts the file outright.
 | clean but LOOP | `ProofNamex`, `ProofPiperead`, `ProofDirlink`, `ProofKexecC`, `ProofDirlookup`, `ProofIget`, `ProofAllocproc`, `ProofIalloc`, `ProofInitlog`, `ProofScheduler`, `ProofIreclaim`, `ProofKwait`, … |
 | needs hand work (`refs > conf`) | `ProofWritei` (108/198), `ProofVirtioDiskInit` (127/255), `ProofPipewrite`, `ProofReadi`, `ProofSysPipe`, `ProofPrintk`, `ProofFileread`, `ProofEitherCopy`, … |
 
-Regenerate the table with the scanner in §0 of this file's history, or just rerun
-the two greps per file.
+Regenerate the table with `tools/instr_subgoal.py --check iris/Proof*.v`.
 
 Record each conversion here as it lands: file, `conf` sites, before/after wall,
 before/after `Qed`.
