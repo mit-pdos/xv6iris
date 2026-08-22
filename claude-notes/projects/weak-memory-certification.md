@@ -34,10 +34,25 @@ up with the pc walk), with a real-bytes instance agreeing by
    (boot-published globals, the running proc's trapframe/pagetable,
    `swtch`'s incoming context) — each needs a small per-idiom argument
    (same-hart or lock-transfer), stated as `seg_pin`/`cs_hyps`.
-3. R-2's `walk_seg_data`: supply the emission per state from
-   `gdexec_qconf` (it IS the row's `hart_conf`, split at the write by
-   `hemit_app`) and the read policy from the log-decided classification
-   — mostly plumbing now.
+3. **R-2's `walk_seg_data` — VACUITY CAUGHT (`WeakRvwmoWalk2.v`)**: the
+   residue's `wpol` (and `cert_segment'`'s `Hpol'`, `seg_step_of_segment`'s)
+   quantifies over EVERY `cpol_ctx` candidate while its classification
+   speaks of that candidate's own position; the empty candidate is a
+   context, so a store is pinned to its hart's row position 0
+   (`wpol_pins_store`, `walk_seg_data_exit_at_zero`) — any real site
+   refutes `walk_seg_data`, and `xv6_rvwmo_safe_modulo_walk'` is
+   VACUOUS as stated.  Also over-quantified: `wrow_in_log`/`wnw` over all
+   row positions (false for `cyg`'s hart 0), and `wlk_inv` does not
+   record that the state is a certified prefix though `walk_seg_data`
+   assumes `cpol_ctx` of it.  THE REPAIR (half-done): index the
+   per-block policy by row position — `wpol_ix` proved outright from
+   the conformance bundle (`wpol_ix_of_sites`, with §1–§3: the emission
+   per state from `gdexec_qconf` via `hemit_app`, the read/RMW policies
+   at an aligned candidate) — and thread it through `cert_segment'`'s
+   `Hpol'`, `seg_step_of_segment`, and `wlk_inv` (pin each hart's
+   replayed count to its row position).  DO THIS NEXT; until then the
+   capstone's honest form is `xv6_rvwmo_safe_modulo` (R-2 as
+   `walk_supply`), not `_walk'`.
 4. The F-variant's glue mirror; **R6**; `wprot_store` width lift;
    `WeakRvwmoLock`'s failed-swap arm; the `c.j`-style decoder audit
    (bitmask vs Sail, `KernelSitesDef` §6.6).
