@@ -264,12 +264,6 @@ Definition wp_forkret_gen_body
   (K_usertrap <= av)%nat ->
   (* calling convention: swtch restored sp to the kernel stack TOP *)
   m !!! Regidx (mword_of_int 2 : mword 5) = ksp ->
-  (* ---- SpecUservec's two gaps, passed through -- see the header on why
-         the kernel root is quantified here ---- *)
-  (forall ms_v : mword 64, trap_mstatus_ok ms_v ->
-     sconf_ms_facts ms_v /\ _get_Mstatus_SPIE ms_v = ('b"1" : mword 1)) ->
-  (forall (h : CpuId) (kr : mword 44) (ksp' : mword 64) (ws : list (mword 64)),
-     length ws = TFWORDS -> tf_kernel_words_ok (CID := h) kr ksp' ws) ->
   kernel_text -∗
   wire_inv -∗
   kmap_at tramp_vpn tramp_ppn KP_rx -∗
@@ -293,6 +287,10 @@ Definition wp_forkret_gen_body
      ⌜pv_upt V' = pt'⌝ -∗
      ⌜ud_data pt' = ud_pas pt'⌝ -∗
      ⌜proc_pt_wf pt'⌝ -∗
+     (* THE TRAPFRAME'S KERNEL WORDS, at the resuming hart: prepare_return
+        wrote them there and [V'] is the descriptor it handed back, so this
+        is forkret's to pay -- see [UsertrapRes.ut_tfk]. *)
+     UsertrapRes.ut_tfk (CID := h) ksp V' -∗
      (* THE FILE SYSTEM AND THE SEALED [first] CELL, HANDED TO THE CLOSER
         RATHER THAN HELD BY IT.  [FirstTok.first_done] is exactly
         [first_addr ↦₄□ 0 ∗ fs_ready] -- see the header's last section for

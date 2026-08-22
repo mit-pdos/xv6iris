@@ -58,25 +58,25 @@
    folded in too; the [Rut] it will need is
    [fun p => ∃ ksp, usertrap_res_bare p ksp].
 
-   THE MSTATUS GAP.  [user_trap_frame]'s own pure content is only
-   [trap_mstatus_ok ms_v] (UserExec.v); [usertrap_entry_ms] additionally
-   needs [sconf_ms_facts ms_v] (IntrDefs.v: XS/FS/VS/SD/MPP pins) and
-   [SPIE = 1]. Neither is derivable from what a trap frame already carries
-   -- [SPIE = 1] in particular is a genuine cross-round historical fact
-   ("userret's sret set it, so it survived to this trap") that needs ghost
-   tracking through the full user-mode loop, out of scope here. So this
-   spec takes the gap as a BARE, EXPLICIT, undischarged premise instead of
-   silently assuming it -- a real proof obligation for whoever eventually
-   closes the loop, not a hole.
+   THE TWO GAPS THIS CONTRACT USED TO TAKE AS PREMISES, AND NO LONGER DOES
+   (2026-08-21).  [user_trap_frame]'s pure content used to be only
+   [trap_mstatus_ok ms_v], and nothing tied the trapframe's four kernel
+   words to a root / [KernelSyms.usertrap] / [cid_word]; so this spec took
+   "trap_mstatus_ok -> sconf_ms_facts /\ SPIE = 1" and "every 36-word list
+   is tf_kernel_words_ok" as bare premises.  BOTH WERE UNSATISFIABLE (see
+   claude-notes/projects/forkret-park.md §4), which made everything above
+   uservec vacuous.  Now:
 
-   THE TRAPFRAME KERNEL-WORDS GAP is the SAME shape.  Nothing ties the
-   trapframe's four kernel words (inside [usertrap_res], opaque to this
-   spec) to [kroot]/[KernelSyms.usertrap]/[cid_word] -- that connection IS
-   established, but only at [prepare_return]'s own exit
-   (SpecPrepareReturn.v), one round before uservec next opens
-   [usertrap_res]; threading it forward is the same full-loop ghost
-   tracking the SPIE=1 gap needs.  See [ProcGeom.tf_kernel_words_ok] and
-   [usertrap_res_tf_open]'s own premise. *)
+   * [UserExec.trap_mstatus_ok] carries FS/VS/XS/SD/MPP and SPIE = 1 --
+     the user tier never writes mstatus, so it preserves from userret's sret
+     what [user_mstatus_ok] now records -- and
+     [SpecUsertrap.usertrap_entry_ms_of_trap] derives the rest;
+   * the residue carries [UsertrapRes.ut_tfk]: the four kernel words are
+     [ProcGeom.tf_kernel_words_ok] at an existential root whose [kpt_inv]
+     rides beside the fact.  prepare_return establishes it at the hart the
+     process resumes on (usertrap's exit and forkret's tail seal it), and
+     the openers hand it back -- which is also where the proof gets the
+     kernel root it switches to, so this contract names no [kroot]. *)
 From Stdlib Require Import ZArith.
 From stdpp Require Import bitvector.definitions gmap.
 From iris.proofmode Require Import proofmode.
@@ -229,7 +229,7 @@ Definition wp_uservec_pt_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : Gen
        after that call -- the residue included -- is a resource AT WHATEVER
        HART RESUMED.  Same shape, same reason, as [wp_usertrap_body]'s [R]. *)
     (URes : CpuId -> uptd -> mword 64 -> iProp Σ)
-    (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) (kroot : mword 44)
+    (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
     (j : nat) (vksp : mword 64) :=
   (* stvec points at the trampoline base *)
   uc_stvec C = mword_of_int TRAMPOLINE ->
@@ -269,23 +269,13 @@ Definition wp_uservec_pt_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : Gen
      above this is loop-closed: [uservec_post] hands it back for [pt'],
      read straight out of the residue's own [proc_pt]. *)
   proc_pt_wf pt ->
-  (* THE MSTATUS GAP, stated as a bare, undischarged premise -- see the
-     header. *)
-  (forall ms_v : mword 64, trap_mstatus_ok ms_v ->
-     sconf_ms_facts ms_v /\ _get_Mstatus_SPIE ms_v = ('b"1" : mword 1)) ->
-  (* THE TRAPFRAME KERNEL-WORDS GAP, the same shape -- see
-     [ProcGeom.tf_kernel_words_ok]'s own header.  [vksat]/[vktr]/[vkhart]
-     are no longer named parameters here: the four kernel words live
-     entirely inside [usertrap_res] now (this spec's own header), so their
-     values are discovered by OPENING it, not chosen by the caller -- this
-     premise is what the proof's tail uses to justify the switch/jalr once
-     it does.  HART-GENERIC: usertrap may PARK and resume on a different
-     hart (SpecUsertrap.v's [wp_next] crossing), and the proof opens
-     [usertrap_res] a second time there, at whichever hart that turns out
-     to be -- so this premise must hold at ALL of them, not just the one
-     uservec itself started on. *)
-  (forall (CID' : CpuId) (ws : list (mword 64)),
-     length ws = TFWORDS -> tf_kernel_words_ok (CID := CID') kroot vksp ws) ->
+  (* THE TRAPFRAME'S KERNEL WORDS -- [vksat]/[vktr]/[vkhart] and the kernel
+     root they name -- are NOT parameters: they live inside [usertrap_res]
+     together with the fact that ties them to a root and to [vksp]
+     ([UsertrapRes.ut_tfk]), and the proof discovers both by OPENING the
+     residue.  The kernel root is therefore existential here too, with its
+     [kpt_inv] coming out of the same open -- which is why this contract
+     names no [kroot] and takes no [kpt_inv]. *)
   kernel_text -∗
   hw_config -∗
   minstret_inv -∗
@@ -300,7 +290,6 @@ Definition wp_uservec_pt_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN : Gen
      below, and the proof borrows it from there ([usertrap_res_tf_csrs_open])
      -- a separate premise would be BOTH unsatisfiable (the residue owns the
      cell, so a caller cannot hold a second one) and unmintable. *)
-  kpt_inv kroot -∗
   (* usertrap's own kernel-internal bundle, for THIS trap round -- the ONE
      owner of the trapframe (SpecUsertrap.v's header), opened once at the
      top of the proof for the 44-instruction walk's own [tf_pa] cells and
@@ -335,7 +324,7 @@ Module Type USERVEC.
   Parameter wp_uservec_pt :
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
-      (kroot : mword 44) (j : nat) (vksp : mword 64),
+      (j : nat) (vksp : mword 64),
       (* THE BARE RESIDUE, not [usertrap_res] and not even the parked form.
          [usertrap_res] and this spec's own [user_trap_frame] premise claim
          THE SAME FOUR RESOURCES -- satp/tlb, the user page-table tree, the
@@ -350,5 +339,5 @@ Module Type USERVEC.
          the same two moves in reverse.  See
          claude-notes/projects/uservec.md. *)
       wp_uservec_pt_body (fun h : CpuId => usertrap_res_bare (CID := h))
-        C pt Rut kroot j vksp.
+        C pt Rut j vksp.
 End USERVEC.

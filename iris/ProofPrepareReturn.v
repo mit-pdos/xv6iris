@@ -520,7 +520,7 @@ Section ProofPrepareReturn.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hkptr Hpc Hi32").
     iApply wp_next_off_intro.
-    iIntros (ksat root) "%Hmode %Hasid %Hppn Hcg Hkptr Hpc".
+    iIntros (ksat root) "%Hmode %Hasid %Hppn #Hkinv Hcg Hkptr Hpc".
     set (U2 := <[Regidx a4_idx := regval_into_reg ksat]> U1).
     change (<[Regidx a4_idx := regval_into_reg ksat]> U1) with U2.
     (* +0x32 is a BASE instruction, not compressed: pc advances by 4. *)
@@ -1049,7 +1049,7 @@ Section ProofPrepareReturn.
                               (add_vec ks (mword_of_int 4096)) cid_word)
                  with "Htfc Htfp") as "Hpv".
     iSpecialize ("Hcont" $! CID7 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! U19 ksat root vb with "[%] [%] [%] [%] Hcg Hcpu Hclm Hsepc
+    iApply ("Hcont" $! U19 ksat root vb with "[%] [%] [%] [%] Hkinv Hcg Hcpu Hclm Hsepc
               Hscause Hstval Hsret Hstvec Hq4 Hkptr Hpv Hpc").
     - exact Hcs.
     - exact Hmode.

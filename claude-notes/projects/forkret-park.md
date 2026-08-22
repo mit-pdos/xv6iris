@@ -2,11 +2,12 @@
 
 ## CHECKPOINT — 2026-08-21
 
-**`main` is GREEN, clean and pushed, at `a2381924`.** Every resource E3 was
-missing now has a producer. What is left is NOT plumbing: see
-[§4](#4-the-blocker) — closing the Link as things stand would replace a
-visible `Axiom` with a vacuous hypothesis, and that is the decision to take
-before any more code is written.
+**`main` is GREEN at `a2381924` plus the §4 fix (2026-08-22, uncommitted
+at the time of writing).** Every resource E3 was missing now has a producer,
+AND the two false premises that made the trap-loop theorems vacuous are gone
+([§4](#4-the-blocker)). What is left is the §3 E3 call-site work and the
+switch to `FORKRET_PARK_PAID`, which now retires the Axiom without adding a
+hypothesis anywhere.
 
 ### What landed
 
@@ -538,9 +539,31 @@ everything else and each is one file plus threading), then
 `devintr_caps_any`, then userinit, then kfork, then the Link.
 **STATUS: the first three are DONE** (`dd2af18e`, `d94ee33f`, `8d825c62`).
 
-## 4. THE BLOCKER {#4-the-blocker}
+## 4. THE BLOCKER — FIXED (2026-08-22) {#4-the-blocker}
 
-### SpecUservec's two premises are FALSE, not merely undischarged
+> **DONE.** Both false premises are gone from the tree, which is green.
+> What follows is the record of what was wrong and how it was fixed; the
+> "right statements" section below is now the as-built description.
+> Deviations from the design as first written, so they are not re-derived:
+>
+> * `SpecUserretClosed` takes `usertrap_ret_ms mstatus0` as ONE premise
+>   (it used to spell nine of its conjuncts); `usertrap_ret_ms` itself gained
+>   XS/SD/MPP/SPIE so that one predicate pays the bridge.
+> * `wp_csrr_satp_kpt_s_sconf` (`WpSconfCsr.v`) and prepare_return's post
+>   hand back `kpt_inv root` beside the satp facts — `KptShare.tlb_res_pt_kpt_inv`
+>   reads it off the slot. `SpecPrepareReturn.prepare_return_tf_kernel_words_ok`
+>   is the pure proof that the four inserts ARE the fact.
+> * `proc_priv_tf_open` / `proc_priv_nopt_tf_open` now say `⌜ws = pv_tf V⌝`
+>   (they always returned exactly that).
+> * `ProcGeom.tf_kernel_words_ok_tail` is what uservec's closers and the
+>   loop's first entry pay with: the fact looks only at indices 0..4.
+> * forkret's tail keeps the moved record hidden (`∃ V'`) and carries
+>   `ut_tfk` beside it, built from prepare_return's facts at `CIDf`.
+> * `SpecUservec.wp_uservec_pt` lost `kroot` and `kpt_inv kroot`; the loop
+>   lemma `stvec_handler_loop` lost both too. `SpecUserretClosed` keeps
+>   `kroot` for the entry `tlb_res_pt kroot` (and a now-redundant `kpt_inv`).
+
+### The two premises ARE false — confirmed against the definitions
 
 `SpecForkretParkPaid.forkret_park_paid_body` carries, and
 `ProofForkretPark.forkret_park_paid` threads unchanged:
@@ -552,73 +575,141 @@ everything else and each is one file plus threading), then
    tf_kernel_words_ok (CID := h) kr ksp' ws) ->
 ```
 
-`SpecUservec.v`'s header introduces both as *"a bare, EXPLICIT, undischarged
-premise ... a real proof obligation for whoever eventually closes the loop,
-not a hole"*. That description is too kind. **As stated they are
-unsatisfiable**, so they are not obligations anyone can discharge — only
-inherit.
+* `tf_kernel_words_ok kr ksp' ws` (`ProcGeom.v:205`) demands `ws !! 1 = Some
+  ksp'`; `ws := replicate 36 (ksp'+1)` refutes it. Already false at
+  `SpecUservec.v:288` where only `ws` is quantified.
+* `trap_mstatus_ok` (`UserExec.v:212`) pins SXL/MPRV/MXR/SPP/SIE/TVM/TSR and
+  says nothing about SPIE, XS/FS/VS/SD/MPP; `sconf_ms_facts`
+  (`IntrDefs.v:194`) needs the latter five and the conclusion needs SPIE.
 
-* **The kernel-words one.** `ProcGeom.TFWORDS = 36` and `tf_ksp_idx = 1`, and
-  `tf_kernel_words_ok kr ksp' ws` demands `ws !! 1 = Some ksp'`. Take
-  `ws := replicate 36 (ksp' + 1)`: length 36, and index 1 is not `ksp'`.
-  Refuted. This is already false at `SpecUservec.v:288`, where `kroot`/`vksp`
-  are the lemma's own fixed parameters and only `ws` is quantified; the park's
-  version quantifies `kr` and `ksp'` too, so it is false twice over.
-* **The mstatus one.** `UserExec.trap_mstatus_ok` pins SXL / MPRV / MXR / SPP
-  / SIE / TVM / TSR and says NOTHING about SPIE, nor about the XS/FS/VS/SD/MPP
-  bits `sconf_ms_facts` wants. An mstatus with those seven conjuncts and
-  SPIE = 0 refutes it.
+### Who relies on them
 
-Traced: both are threaded and never produced, through `ProofUservec` (121,
-1509) → `ProofUsertrap` (1177, 1205) → `ProofUserretClosed` (106, 141–142,
-246, 254, 273) → `ProofForkret` (197, 239, 717, 807, 852, 1617, 2016) →
-`ProofForkretPark` (173, 261). `grep` for them in `SystemAdequacy.v`,
+Every theorem from uservec up is stated under them and is therefore
+VACUOUS as a statement (the proofs are fine; the hypotheses are not):
+`SpecUservec.wp_uservec_pt`, `SpecUserretClosed` /
+`ProofUserretClosed.stvec_handler_loop` (the whole-trap-loop Löb theorem),
+`SpecForkret` / `ProofForkret` (both arms), `SpecForkretParkPaid` /
+`ProofForkretPark`. Usage is exactly ONE site each: `ProofUservec.v:1509`
+instantiates the mstatus one at the single `ms_v` the `user_trap_frame`
+delivered, and `ProofUservec.v:152/1598` + `ProofUserretClosed.v:272` feed
+the words one into `usertrap_res_tf_open` / `_tf_csrs_open`
+(`UsertrapRes.v:920,1151,1207`), whose implementation reads the raw words
+off `proc_priv_tf_open` and manufactures the fact from the ∀.
+
+NOBODY ABOVE THE LOOP assumes them: `grep` in `SystemAdequacy.v`,
 `BootChain.v`, `SpecMain.v`, `ProofMain.v`, `SpecUserinit.v`, `SpecKfork.v`
-returns NOTHING.
+is empty. `LinkForkretPark.v`'s `Axiom` (the unpaid `forkret_park_body`,
+which carries neither) is what keeps them out of main's cone. So the ranking
+stands: switching to `FORKRET_PARK_PAID` as-is would move a false
+hypothesis onto the top-level theorem, invisible to `Print Assumptions` and
+`proof_coverage.py`. Do not do that.
 
-### Why that makes the Link a decision and not a chore
+### What is TRUE, and where each fact is already established
 
-**`LinkForkretPark.v`'s `Axiom` is currently what keeps `main`'s theorem out
-of this.** `SpecForkretPark.forkret_park_body` — the ASSUMED form — carries
-neither premise, so main's cone is genuinely free of them today; the vacuity
-is confined to the trap-loop specs, which nothing above the loop applies.
+Both facts are real properties of the kernel's code; they are lost only
+because neither is CARRIED across the user-mode round.
 
-Swap in `FORKRET_PARK_PAID` and userinit must supply both, so they propagate
-userinit → main → boot chain → `SystemAdequacy`. That trades a VISIBLE
-`Axiom` — seen by `Print Assumptions` *and* by `tools/proof_coverage.py`'s
-textual scan, which is exactly why `LinkForkretPark.v` uses the `Axiom`
-keyword rather than a `Declare Module` — for a false hypothesis on the
-top-level theorem, which neither tool reports. That is strictly worse than
-the state we are in.
+* **Kernel words.** `SpecPrepareReturn`'s post hands back `proc_priv … (upd_tf
+  V (prepare_return_tf (pv_tf V) ksat ksp cid_word))` with the three
+  `satp_rooted ksat root` facts, i.e. `tf_kernel_words_ok (CID := CIDp) root
+  ksp (pv_tf Vr)` outright (given `length (pv_tf V) = 36`, which
+  `tf_page_length` gives). usertrap builds its exit residue from exactly that
+  `Vr` (`ProofUsertrapTail.v:723`), and forkret hands the closer its `V'`
+  from the same post (`ProofForkret.v:287,704`). uservec's two closers
+  rebuild the page with the kernel words UNTOUCHED (`tf_page_close36` with
+  the same `u0..u4` / `Hk0..Hk32` cells, `ProofUservec.v:1530,1661`), so the
+  fact is preserved through the save walk for free. The `cid_word` conjunct
+  is hart-indexed and that is CORRECT: the residue is hart-indexed
+  (`Rut_at h`), prepare_return rewrites the word at the resuming hart, and
+  the trap is taken on the hart user mode ran on.
+* **mstatus.** prepare_return pays `sret_bits 0 1` (SPP = 0, SPIE = 1);
+  usertrap's exit already derives `SPIE ms' = 1` (`Hspie2`,
+  `ProofUsertrapTail.v:531`) and `sconf_ms_facts ms'` is in
+  `usertrap_post`. `sret_ms5` keeps XS/FS/VS/SD/MPP and sets `SIE := SPIE`
+  (`MstatusBits.sret_ms5_*`, all present). User mode cannot write mstatus,
+  and the U tier already treats `user_mstatus_ok` as an opaque property of an
+  UNCHANGED value — every re-establishment is `rewrite (… u_fix_mst); exact
+  Hmsok` (`UserActiveClass.v:1474,1659`, `WpUmodeStep.v:3010`,
+  `UserTotalU.v:2224,2508`) and every `trap_mstatus_ok` producer is
+  `utrap_ms_ok` (`UserActiveClass.v:787`, `WpUmodeStep.v:1505,3145`). The trap
+  transform `utrap_ms` copies SIE into SPIE and touches nothing else.
 
-### What closing it properly needs
+### The right statements
 
-Reshape both premises into something satisfiable, which is the "full-loop
-ghost tracking" `SpecUservec.v`'s header already names as future work. The
-shape the headers point at is the same for both: **carry the fact IN THE
-RESIDUE instead of quantifying over it.**
+**mstatus — a predicate-level change, no new resources.**
 
-* The kernel-words tie IS established — at `prepare_return`'s own exit
-  (`SpecPrepareReturn.v`), one round before uservec next opens
-  `usertrap_res`. So `ut_trap` grows `⌜tf_kernel_words_ok kroot ksp ws⌝` for
-  the `ws` it actually holds, prepare_return pays it, uservec reads it, and
-  the ∀-premise disappears.
-* SPIE = 1 is the cross-round historical fact "userret's `sret` set it, so it
-  survived to this trap"; it rides the residue the same way.
-* **At the PARK the initial instance is not inherited but ESTABLISHED**: a
-  never-run process's trapframe kernel words are what allocproc/kfork
-  actually wrote, so userinit and kfork can prove their own instance rather
-  than assume it. That is the one part of this that is new work rather than
-  re-plumbing, and it is bounded.
+1. `UserExec.user_mstatus_ok` gains four conjuncts: `XS = Off`, `SD = 0`,
+   `eq_vec MPP 'b"10" = false` (the `mstatus_kernel_facts` spelling;
+   `have_nom_val` is exactly `MPP <> 10` and lives above UserExec),
+   `eq_vec SIE 'b"1" = true`. Appended at the END so the existing `(_ & _ &
+   … & _)` destructurings (`UserTotalU.v:1722,1765`, `utrap_ms_ok`) keep
+   working — the last binder absorbs the tail.
+2. `UserExec.trap_mstatus_ok` gains six: FS, VS, XS, SD (sconf spellings),
+   MPP as above, `SPIE = 'b"1"`. Then `trap_mstatus_ok ms -> sconf_ms_facts
+   ms /\ SPIE ms = 1` is a LEMMA (state it in `SpecUsertrap.v`, which sees
+   both), and the ∀-premise is deleted from `SpecUservec`,
+   `SpecUserretClosed`, `SpecForkret`, `SpecForkretParkPaid` and replaced at
+   `ProofUservec.v:1509` by the lemma.
+3. `UserTrap.utrap_ms_ok` needs six more bit lemmas in the `utrap_ms_SIE`
+   style (FS/VS/XS/SD/MPP unchanged; SPIE = old SIE).
+4. `UserKernelBridge.user_mstatus_ok_sret_ms5` / `userret_to_user_inv` and
+   `UserretUser.wp_userret_user` gain four premises on the PRE-sret
+   `mstatus0`: XS, SD, MPP, `SPIE = 1` (`sret_ms5_SIE` turns the last into
+   `SIE = 1` in user mode).
+5. `SpecUsertrap.usertrap_ret_ms` gains `SPIE = 1`; `ut_exit_ms_ok` already
+   has `Hspie2` in hand. The loop pays (4) from `usertrap_ret_ms` +
+   `sconf_ms_facts ms'`; forkret from its own `sret_bits_agree` against
+   `sconf`'s tie, which it performs already.
 
-Only after that does the call-site work in §3 E3 actually retire the Axiom.
+**Kernel words — carry the fact in the residue, at an EXISTENTIAL root.**
 
-### If you want progress without touching this
+1. `UsertrapRes.ut_res_bare` / `ut_res_parked` / `ut_res` (the shared `∃ N V
+   av` shell, `UsertrapRes.v:1048`) gain `∃ kroot, kpt_inv kroot ∗
+   ⌜tf_kernel_words_ok kroot ksp (pv_tf V)⌝`. `kpt_inv` is persistent and is
+   what uservec's exit switch needs at that root; `tlb_res_pt r` already
+   bundles `kpt_inv r`, so usertrap's tail and forkret have it wherever they
+   have the satp facts (prepare_return's post should hand `kpt_inv root`
+   back beside the three `satp_rooted` conjuncts — it reads the root off
+   `tlb_res_pt`, which owns it).
+2. The openers lose the ∀-premise and the `kroot` argument:
+   `usertrap_res_tf_open pt ksp : usertrap_res_bare pt ksp -∗ ∃ kroot ws,
+   kpt_inv kroot ∗ ⌜tf_kernel_words_ok kroot ksp ws⌝ ∗ tf_page … ws ∗ (∀ ws',
+   ⌜tf_kernel_words_ok kroot ksp ws'⌝ -∗ tf_page … ws' -∗ usertrap_res_bare
+   pt ksp)`; same for `_tf_csrs_open`. At uservec's two closers the
+   obligation is `exact Hokws` after `tf_page_open36`'s `->`, since the
+   first five words are the same variables.
+3. `wp_uservec_pt` drops `kroot` and `kpt_inv kroot` (the exit switch uses
+   the residue's root). `SpecUserretClosed` keeps `kroot` for the entry
+   `tlb_res_pt kroot`; its `kpt_inv kroot` premise is redundant with that
+   and can go.
+4. `ut_ret2` (`ProofUsertrapTail.v`) proves the conjunct for `Vr` from
+   `Hmode/Hasid/Hppn` + `tf_page_length`; it is `prepare_return_tf`'s four
+   `list_lookup_insert`s.
+5. `ut_park_intro_body` / `ForkretParkClose.forkret_park_closer_intro` /
+   `SpecForkret`'s closer gain, per application beside `pt'`/`V'`, a `kroot`
+   binder plus `kpt_inv kroot -∗ ⌜tf_kernel_words_ok (CID := h) kroot
+   (ks+4096) (pv_tf V')⌝ -∗`. forkret pays it at `fkr_tail` from
+   prepare_return's post (`ProofForkret.v:287`: `ksat kroot0 HksatM HksatA
+   Hksatp`), exactly as usertrap's tail does.
 
-Items 1–3 of §3 E3's call-site list (the six premises on `SpecUserinit`, the
-four on `mn_grp_fs`, and the `wire_inv` route to main) are useful regardless,
-land independently, and do not touch `LinkForkretPark.v`. Do those and stop
-at the switch to `FORKRET_PARK_PAID`.
+**THE PARK ITSELF PROVES NOTHING ABOUT THE TRAPFRAME.** The earlier
+revision of this section said userinit/kfork would have to "establish the
+initial instance" — wrong. A never-run process reaches userret only
+through forkret → usertrapret → prepare_return, which rewrites all four
+words at the resuming hart BEFORE the closer is applied to `V'`. So the
+park's `ut_res_bare_park` stays as it is, and this closes with no new
+obligation on userinit or kfork.
+
+### Order of work
+
+1. mstatus (user tier + bridge + `usertrap_ret_ms`) — purely pure, builds
+   bottom-up from `UserExec.v`; the premise deletion at the four Specs.
+2. words (residue + openers + `ut_ret2` + uservec closers + forkret's
+   closer payment); the premise deletion at the same four Specs.
+3. `ProofForkretPark` loses both hypotheses; THEN the §3 E3 call-site work
+   (userinit's six premises, `mn_grp_fs`'s four, `wire_inv` to main, build
+   `N`) and the switch to `FORKRET_PARK_PAID`, which at that point retires
+   the Axiom without adding a hypothesis anywhere.
 
 ## 5. How to build
 

@@ -191,10 +191,6 @@ Lemma fkr_tail
   av = (6 + (trap_res eb + av2))%nat ->
   mt !!! Regidx csp_rs1 = pa_stk ksp 6 ->
   mt !!! Regidx Rs1 = p ->
-  (forall ms_v : mword 64, trap_mstatus_ok ms_v ->
-     sconf_ms_facts ms_v /\ _get_Mstatus_SPIE ms_v = ('b"1" : mword 1)) ->
-  (forall (h : CpuId) (kr : mword 44) (ksp' : mword 64) (ws : list (mword 64)),
-     length ws = TFWORDS -> tf_kernel_words_ok (CID := h) kr ksp' ws) ->
   kernel_text -∗
   wire_inv -∗
   kmap_at tramp_vpn tramp_ppn KP_rx -∗
@@ -223,6 +219,7 @@ Lemma fkr_tail
      ⌜pv_upt V' = pt'⌝ -∗
      ⌜ud_data pt' = ud_pas pt'⌝ -∗
      ⌜proc_pt_wf pt'⌝ -∗
+     UsertrapRes.ut_tfk (CID := h) ksp V' -∗
      FirstTok.first_done -∗
      (* THE RESUMING HART'S TIMER CAPABILITY.  It is a conjunct of
         [IntrDefs.sie_cap] now (see the note there), so the residue cannot
@@ -236,7 +233,7 @@ Lemma fkr_tail
      usertrap_res_bare (CID := h) pt' ksp) -∗
   WP (Loop : expr riscv_lang).
 Proof.
-  intros p ksp Hjlt Hpr Havsum Hmtsp Hmts1 Hgap Hkw.
+  intros p ksp Hjlt Hpr Havsum Hmtsp Hmts1.
   iIntros "#Htext #Hwire #Hclaimmap Hpc Hcg Hcpu Hext Hcx #Hks Hf16 Hpv #Hdone Hyield".
   iPoseProof (fkr_64 with "Htext") as "Hi64".
   iPoseProof (fkr_68 with "Htext") as "Hi68".
@@ -282,10 +279,11 @@ Proof.
   iDestruct (cpu_claim_ext_transport CID CID7 eb p
                ltac:(wp_next_chain) with "Hcx") as "Hcx".
   iDestruct (ut_epc_exists with "Hpv") as %[epc Hepc].
+  iDestruct (ut_tf_length with "Hpv") as %Htflen0.
   iApply (PR.wp_prepare_return_sconf γf ks pid V T5 av2 p epc eb ∅
             Hpr Hepc with "Hcg Hcpu Hext Htext Hpc Hks Hpv").
   iIntros (CIDf Hkf mf ksat kroot0 vb)
-    "%Hcsf %HksatM %Hksata %Hksatp Hcg Hcpu Hcpay Hsepc Hscause Hstval
+    "%Hcsf %HksatM %Hksata %Hksatp #Hkinv0 Hcg Hcpu Hcpay Hsepc Hscause Hstval
      Hsret Hstvec Hq4 Hkptr Hpv Hpc".
   assert (Hpc68 : ret_pc (T5 !!! Regidx Rra) = mword_of_int (FR + 0x68))
     by (rewrite HT5ra; pcw).
@@ -311,9 +309,20 @@ Proof.
      names the RESUMING hart -- so writing the term out would pin it to the
      section's hart.  All the walk needs of it is [pv_upt], which [upd_tf]
      does not touch. *)
-  iAssert (∃ V' : pprivate, ⌜pv_upt V' = pv_upt V⌝ ∗ proc_priv γf p pid V')%I
-    with "[Hpv]" as (V') "[%HuptV' Hpv]".
-  { iExists _. iFrame "Hpv". iPureIntro. reflexivity. }
+  (* ... except for the one thing the residue STATES about it: the four
+     kernel words are [tf_kernel_words_ok] at the root the satp read gave,
+     at this hart ([UsertrapRes.ut_tfk]).  Built here, where the facts are,
+     and carried beside the hidden record. *)
+  iAssert (∃ V' : pprivate, ⌜pv_upt V' = pv_upt V⌝ ∗
+             UsertrapRes.ut_tfk (CID := CIDf) ksp V' ∗ proc_priv γf p pid V')%I
+    with "[Hpv]" as (V') "(%HuptV' & #Htfk & Hpv)".
+  { iExists (upd_tf V (prepare_return_tf (pv_tf V) ksat ksp (cid_word (CID := CIDf)))).
+    iFrame "Hpv". iSplitR; [iPureIntro; reflexivity |].
+    iApply (ut_tfk_intro (CID := CIDf) ksp
+              (upd_tf V (prepare_return_tf (pv_tf V) ksat ksp (cid_word (CID := CIDf))))
+              kroot0
+              (prepare_return_tf_kernel_words_ok (CID := CIDf) (pv_tf V) ksat
+                 ksp kroot0 Htflen0 HksatM Hksata Hksatp) with "Hkinv0"). }
   iDestruct (proc_priv_copy with "Hpv") as "(Hsz & Hpgt & Hppt & Hpvback)".
   assert (Hc0 : creg2reg_idx (Cregidx (mword_of_int 0)) = Regidx Rs0)
     by (vm_compute; reflexivity).
@@ -701,11 +710,11 @@ Proof.
     with "[Hparked Hpnopt]" as "Hyld".
   { rewrite /forkret_yield.
     iSplitL "Hparked"; [iExact "Hparked" | iExact "Hpnopt"]. }
+  iDestruct (ut_tfk_upd_upt (CID := CIDf) ksp V' pt with "Htfk") as "#Htfk'".
   iDestruct ("Hyield" $! CIDf pt (upd_upt V' pt)
-               with "[%] [%] [%] Hdone Htc Hyld")
+               with "[%] [%] [%] Htfk' Hdone Htc Hyld")
     as "Hures"; [reflexivity | exact Hnorm | exact Hptwf |].
   (* ---- the config record for this round ---- *)
-  destruct Hretms as (HSIE & HMPRV & HSXL & HTVM & HMXR & HTSR & HFS & HVS & Hsup).
   assert (HSEa0 : tp_pin SE !!! Regidx (mword_of_int 10)
                   = kvi_satp_word (ud_root pt)).
   { rewrite /tp_pin upd_ne; [| reg_neq]. rewrite /SE upd_ne; [| reg_neq].
@@ -714,8 +723,8 @@ Proof.
             (loop_ucfg mdv0 Hmask) pt kroot j ksp (tp_pin SE)
             (kvi_satp_word (ud_root pt)) msg (mepc_val epc) scv stv
             (loop_ok_loop_ucfg mdv0 Hmask pt Hnorm Hptwf)
-            Hjlt Hgap (fun h ksp' ws Hl => Hkw h kroot ksp' ws Hl)
-            HSIE HMPRV HSXL HTVM HMXR HTSR HFS HVS Hsup Hmapwf HSEa0
+            Hjlt
+            Hretms Hmapwf HSEa0
             (conj (kvi_satp_mode _) (conj (kvi_satp_asid _) (kvi_satp_ppn _)))
             Hcov Haccwf
             with "Htext Hhw Hmin Hwire Hclaimmap Hkptinv Hhs Hprivc Hms Hmie
@@ -801,10 +810,6 @@ Lemma fkr_boot
      slots, at -48(s0) and -40(s0) *)
   mr !!! Regidx Rs0 = ksp ->
   mr !!! Regidx Rs1 = p ->
-  (forall ms_v : mword 64, trap_mstatus_ok ms_v ->
-     sconf_ms_facts ms_v /\ _get_Mstatus_SPIE ms_v = ('b"1" : mword 1)) ->
-  (forall (h : CpuId) (kr : mword 44) (ksp' : mword 64) (ws : list (mword 64)),
-     length ws = TFWORDS -> tf_kernel_words_ok (CID := h) kr ksp' ws) ->
   kernel_text -∗
   wire_inv -∗
   kmap_at tramp_vpn tramp_ppn KP_rx -∗
@@ -836,6 +841,7 @@ Lemma fkr_boot
      ⌜pv_upt V' = pt'⌝ -∗
      ⌜ud_data pt' = ud_pas pt'⌝ -∗
      ⌜proc_pt_wf pt'⌝ -∗
+     UsertrapRes.ut_tfk (CID := h) ksp V' -∗
      FirstTok.first_done -∗
      (* THE RESUMING HART'S TIMER CAPABILITY.  It is a conjunct of
         [IntrDefs.sie_cap] now (see the note there), so the residue cannot
@@ -849,7 +855,7 @@ Lemma fkr_boot
      usertrap_res_bare (CID := h) pt' ksp) -∗
   WP (Loop : expr riscv_lang).
 Proof.
-  intros p ksp Hjlt Hgl Hkx Havsum Hmrsp Hmrs0 Hmrs1 Hgap Hkw.
+  intros p ksp Hjlt Hgl Hkx Havsum Hmrsp Hmrs0 Hmrs1.
   pose proof Hkx as Hkx'.
   (* fsinit's 88 sits under kexec's 184, which is what this arm is budgeted
      at; both are [Notation]s for literals, so [lia] sees them directly. *)
@@ -1614,7 +1620,7 @@ Proof.
     (* ...and the two arms MEET at +0x64, which is [fkr_tail]. *)
     iApply (fkr_tail j γf pid
               (upd_tf V' (<[tf_arg_idx 0 := rget E1 Ra0]> (pv_tf V')))
-              ks E4 av av2 eb Hjlt ltac:(kxarith) Havsum HE4sp HE4s1 Hgap Hkw
+              ks E4 av av2 eb Hjlt ltac:(kxarith) Havsum HE4sp HE4s1
               with "Htext Hwire Hclaimmap Hpc Hcg Hcpu Hextc Hclmc Hks Hf16
                     Hpriv Hdone Hyield").
 Qed.
@@ -1628,7 +1634,7 @@ Theorem wp_forkret
       j γs γl γf pid V ks m av av2 eb.
 Proof.
   cbv beta delta [wp_forkret_gen_body].
-  intros pcE p ksp Hjlt Hgl Hav2 Hkx Hut Hsp Hgap Hkw.
+  intros pcE p ksp Hjlt Hgl Hav2 Hkx Hut Hsp.
   (* the tail's own budget: prepare_return's 12 is under kexec's 184 *)
   assert (Hpr : (K_prepare_return <= av2)%nat) by lia.
   (* the budget in numbers [lia] can see *)
@@ -1890,7 +1896,7 @@ Proof.
     iDestruct (cpu_claim_ext_transport CID CIDr eb p
                  ltac:(wp_next_chain) with "Hcx") as "Hcx".
     iApply (fkr_boot (CID := CIDr) j γs γl γf pid V ks mr av av2 eb
-              Hjlt Hgl Hkx Havsum Hmrsp Hmrs0 Hmrs1 Hgap Hkw
+              Hjlt Hgl Hkx Havsum Hmrsp Hmrs0 Hmrs1
             with "Htext Hwire Hclaimmap Hpc Hpinv Hcg Hcpu Hext Hcx Hks
                   Hf16 Hpnc Hcwd Hf1 Hbp Hka Hfsi Hyield"). }
   (* ---------------- THE STEADY ARM: [first] is 0, the boot arm is dead -- *)
@@ -2013,7 +2019,7 @@ Proof.
   (* the steady arm's [first_done] IS [first_tok]'s persistent steady
      disjunct, read at +0x24; it goes straight to the tail. *)
   iApply (fkr_tail (CID := CID6) j γf pid V ks T4 av av2 eb
-            Hjlt Hpr Havsum HT4sp HT4s1 Hgap Hkw
+            Hjlt Hpr Havsum HT4sp HT4s1
           with "Htext Hwire Hclaimmap Hpc Hcg Hcpu Hext Hcx Hks Hf16 Hpv
                 Hdone2 Hyield").
 Qed.

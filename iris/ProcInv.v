@@ -1093,12 +1093,12 @@ Section ProcInv.
   Lemma proc_priv_nopt_tf_open (γf : gname) (pa : mword 64) (pid : mword 32)
       (V : pprivate) :
     proc_priv_nopt γf pa pid V -∗
-    ∃ ws : list (mword 64), tf_page (ud_tfp (pv_upt V)) ws ∗
+    ∃ ws : list (mword 64), ⌜ws = pv_tf V⌝ ∗ tf_page (ud_tfp (pv_upt V)) ws ∗
       (∀ ws' : list (mword 64), tf_page (ud_tfp (pv_upt V)) ws' -∗
          proc_priv_nopt γf pa pid (upd_tf V ws')).
   Proof.
     iIntros "(%Hszb & %Hbel & Hpid & Hf & Hc & Htfp & Hcwd & Ho & Hft)".
-    iExists (pv_tf V). iFrame "Htfp".
+    iExists (pv_tf V). iSplitR; [done|]. iFrame "Htfp".
     iIntros (ws') "Htfp".
     (* every field [upd_tf] does not touch is equal by a single iota step;
        name them so the goal reduces by [rewrite] rather than by a blind

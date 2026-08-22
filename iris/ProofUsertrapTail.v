@@ -209,6 +209,9 @@ Section UtRet2.
     stvec ↦ᵣ uservec_tvec -∗
     ghost_var sie_gname (1/4) vb -∗
     kpt_on cpu_id -∗
+    (* the four kernel words prepare_return just wrote, as the residue
+       states them -- see [UsertrapRes.ut_tfk] *)
+    ut_tfk ksp V -∗
     ut_env Rsys N V -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
@@ -224,7 +227,7 @@ Section UtRet2.
     
     destruct Hwf as (Hj & Hjl & Hlen & Hlg).
     iIntros "#Htext Hpc Hcg Hcpu Hclm Hsepc Hscause Hstval Hsret Hstvec Hq4
-             Hkptr [#Hcaps Hown] Hframe Hcont".
+             Hkptr #Htfk [#Hcaps Hown] Hframe Hcont".
     (* the boundary hands the trap resource back at the literal [∅] that
        [ut_res] pins -- depth 0 forces the held set empty, so this is a
        re-spelling, not an obligation. *)
@@ -608,6 +611,7 @@ Section UtRet2.
       iSplitR; [iPureIntro; exact Hksp|].
       iSplitR; [iPureIntro; exact (conj Hj (conj Hjl (conj Hlen Hlg)))|].
       iSplitR; [iPureIntro; exact Hav|].
+      iSplitR; [iExact "Htfk"|].
       iSplitR; [iExact "Htc"|].
       (* the mstatus and privilege CELLS, and now [mie]/[mideleg]/[menvcfg]
          too, are NOT in [ut_trap]: they go to the boundary raw (above). *)
@@ -672,6 +676,7 @@ Section UtRet.
     iDestruct "Hhold" as "(Hcpu & Hcsrs & Hclm & [#Hcaps Hown])".
     iDestruct (ut_own_priv with "Hown") as "(Hpv & Hsy & Hownback)".
     iDestruct (ut_epc_exists with "Hpv") as %Hepcx.
+    iDestruct (ut_tf_length with "Hpv") as %Htflen.
     destruct Hepcx as [uepc Hepc].
     iAssert (is_kstack (un_pj N) (un_ks N)) with "[]" as "#Hkst".
     { iDestruct "Hcaps" as "(_ & _ & #H & _)". iExact "H". }
@@ -705,7 +710,7 @@ Section UtRet.
               M1 nx (un_pj N) uepc b lks ltac:(lia) Hepc
               with "Hcg Hcpu Hcsrs Htext Hpc Hkst Hpv [-]").
     iIntros (CIDp Hkp mf ksat kroot vb)
-      "%Hcspr %Hmode %Hasid %Hppn Hcg Hcpu Hclmpay Hsepc Hscause Hstval
+      "%Hcspr %Hmode %Hasid %Hppn #Hkinv Hcg Hcpu Hclmpay Hsepc Hscause Hstval
        Hsret Hstvec Hq4 Hkptr Hpv Hpc".
     assert (Hpc0b2 : ret_pc (M1 !!! Regidx Rra) = mword_of_int (UT + 0xb2))
       by (rewrite HM1ra; pcw).
@@ -725,6 +730,14 @@ Section UtRet.
     change (upd_tf V (prepare_return_tf (pv_tf V) ksat
               (add_vec (un_ks N) (mword_of_int 4096)) (cid_word (CID := CIDp)))) with Vr.
     assert (HVrupt : pv_upt Vr = pv_upt V) by (rewrite /Vr; destruct V; reflexivity).
+    (* THE KERNEL WORDS, sealed: [Vr]'s trapframe is [prepare_return_tf] of
+       the old one, whose four inserts are exactly [tf_kernel_words_ok] at
+       the root the satp read returned, at THIS hart. *)
+    iDestruct (ut_tfk_intro (CID := CIDp) (add_vec (un_ks N) (mword_of_int 4096)) Vr kroot
+                 (prepare_return_tf_kernel_words_ok (CID := CIDp) (pv_tf V) ksat
+                    (add_vec (un_ks N) (mword_of_int 4096)) kroot Htflen Hmode Hasid Hppn)
+                 with "Hkinv") as "#Htfk".
+    iEval (rewrite Hksp) in "Htfk".
     iDestruct ("Hownback" $! Vr with "Hpv Hsy") as "Hown".
     iApply (ut_ret2 (CID := CIDp) Rsys N Vr pt ksp m0 mf av nx b uepc vb
               mie_v menvcfg0 lks
@@ -737,7 +750,7 @@ Section UtRet.
                              (ut_cs_of_callee_saved _ _ Hcspr)))
               Hmiev Hmenvv
               with "Htext Hpc Hcg Hcpu Hclm Hsepc Hscause Hstval Hsret Hstvec
-                    Hq4 Hkptr [Hown] Hframe Hcont").
+                    Hq4 Hkptr Htfk [Hown] Hframe Hcont").
     rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"].
   Qed.
 

@@ -178,6 +178,7 @@ Definition forkret_park_pkg
       ⌜pv_upt V' = pt'⌝ -∗
       ⌜ud_data pt' = ud_pas pt'⌝ -∗
       ⌜proc_pt_wf pt'⌝ -∗
+      UsertrapRes.ut_tfk (CID := h) (add_vec ks (mword_of_int 4096)) V' -∗
       FirstTok.first_done -∗
  (* THE RESUMING HART'S TIMER CAPABILITY.  It is a conjunct of
     [IntrDefs.sie_cap] now (see the note there), so the residue cannot
@@ -215,11 +216,6 @@ Definition forkret_park_paid_body
        [KSTACK_AV = 342] too, which is not a coincidence: a caller that
      hands over a whole free kernel stack satisfies this exactly. *)
   (K_usertrap <= av)%nat ->
-  (* ---- SpecUservec's two gaps, passed through one more tier ---- *)
-  (forall ms_v : mword 64, trap_mstatus_ok ms_v ->
-     sconf_ms_facts ms_v /\ _get_Mstatus_SPIE ms_v = ('b"1" : mword 1)) ->
-  (forall (h : CpuId) (kr : mword 44) (ksp' : mword 64) (ws : list (mword 64)),
-     length ws = TFWORDS -> tf_kernel_words_ok (CID := h) kr ksp' ws) ->
   ⊢ forkret_park_pkg URes γs γf pa ks pid av -∗
     is_kstack pa ks -∗
     ctx_cells (p_context pa) (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest) -∗

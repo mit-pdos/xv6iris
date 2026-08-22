@@ -102,14 +102,14 @@ Section UservecAllPt.
 
 
   Lemma wp_uservec_pt (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
-      (kroot : mword 44) (j : nat) (vksp : mword 64) :
+      (j : nat) (vksp : mword 64) :
     (* [UT.]-qualified, not the section alias: inside a section that FIXES
        [CID], the alias has no [CID] implicit left to instantiate (section
        variables are discharged only at [End]).  The module-type parameter
        still does, and the two are convertible, so the [: USERVEC] check
        accepts it. *)
     wp_uservec_pt_body (fun h : CpuId => UT.usertrap_res_bare (CID := h))
-      C pt Rut kroot j vksp.
+      C pt Rut j vksp.
   Proof.
     cbv beta zeta delta [wp_uservec_pt_body].
     (* [tf_pa] deliberately NOT unfolded here: its 35 trapframe cells ride in
@@ -118,8 +118,8 @@ Section UservecAllPt.
        address (~260 nodes vs ~12) is 14 % of the proof TERM.  The leaves
        unify through the definition. See claude-notes/optimization.md. *)
     unfold uservec_gpr.
-    intros Hstvec Hdqc Hmie Hjlt Hnorm Hptwf Hgap Hkwgap.
-    iIntros "#Hkt #Hhw #Hinv #Hclaim Hframe #Hkfr Hures Hcont".
+    intros Hstvec Hdqc Hmie Hjlt Hnorm Hptwf.
+    iIntros "#Hkt #Hhw #Hinv #Hclaim Hframe Hures Hcont".
     (* ============ open the trapped machine ============ *)
     iDestruct (user_trap_frame_open C pt Rut with "Hframe") as (ms_v sc_v stval_v sepc_v g)
       "(%Hok & Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc & Hpc & Hfile &
@@ -149,8 +149,11 @@ Section UservecAllPt.
     (* the trapframe page AND [sscratch] come out of the residue together:
        the save walk and the sscratch swap overlap, and the residue is
        sealed, so one opener hands out both. *)
-    iDestruct (usertrap_res_tf_csrs_open pt vksp kroot (Hkwgap CID) with "Hures") as (ws0)
-      "(%Hok0 & Htf0 & Hcsrs0 & Hclose0)".
+    (* ... and with them the KERNEL ROOT the residue's kernel_satp names,
+       with its [kpt_inv]: this is the [kroot] the exit switch installs. *)
+    iDestruct (usertrap_res_tf_csrs_open pt vksp with "Hures") as (kroot ws0)
+      "(#Hkfr & %Hok0 & Htf0 & Hcsrs0 & Hclose0)".
+    pose proof Hok0 as Hok0k.
     iDestruct "Hcsrs0" as "(Hssc0 & Hmdlc & Hmsec & Hssec)".
     iDestruct "Hssc0" as (sscr0) "Hsscr".
     iDestruct (tf_page_length with "Htf0") as %Hlen0.
@@ -1506,8 +1509,7 @@ Section UservecAllPt.
     assert (Hpcu : ret_pc (mword_of_int KernelSyms.usertrap : mword 64) = mword_of_int KernelSyms.usertrap)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcu) in "Hpc".
-    destruct (Hgap ms_v Hok) as (Hsconf & Hspie).
-    assert (Hums : usertrap_entry_ms ms_v) by (split; [exact Hok | split; [exact Hsconf | exact Hspie]]).
+    pose proof (usertrap_entry_ms_of_trap ms_v Hok) as Hums.
     assert (Hspv : M7 !!! Regidx (mword_of_int 2) = (vksp : mword 64)).
     { unfold M7. rewrite upd_ne; [| intro He; injection He as He2; vm_compute in He2; congruence].
       unfold M6. rewrite upd_ne; [| intro He; injection He as He2; vm_compute in He2; congruence].
@@ -1536,7 +1538,8 @@ Section UservecAllPt.
     (* hand the page and the CSRs back before the residue goes to usertrap *)
     iAssert hart_csrs with "[Hsscr Hmdlc Hmsec Hssec]" as "Hcsrs0'".
     { iFrame "Hmdlc Hmsec Hssec". iExists _. iExact "Hsscr". }
-    iDestruct ("Hclose0" with "Htf0' Hcsrs0'") as "Hures'".
+    iDestruct ("Hclose0" with "[%] Htf0' Hcsrs0'") as "Hures'".
+    { refine (tf_kernel_words_ok_tail _ _ _ _ _ _ _ _ _ Hok0k). }
     (* ---- THE ADDRESS SPACE CHANGES VIEW, then the two borrows close ----
        The exit switch just did the one thing that converts the views: it
        wrote the KERNEL root into satp, which turned the user table from the
@@ -1595,8 +1598,8 @@ Section UservecAllPt.
       as "[Hpt' Hures2]".
     iEval (rewrite proc_pt_split) in "Hpt'".
     iDestruct "Hpt'" as "[(%Hptwf' & Hufr') Hdata']".
-    iDestruct (UT.usertrap_res_tf_open (CID:=CID2) pt' vksp kroot (Hkwgap CID2) with "Hures2") as (ws1)
-      "(%Hok1 & Htf1 & Hclose1)".
+    iDestruct (UT.usertrap_res_tf_open (CID:=CID2) pt' vksp with "Hures2") as (kroot1 ws1)
+      "(#Hinv1 & %Hok1 & Htf1 & Hclose1)".
     iDestruct (tf_page_length with "Htf1") as %Hlen1.
     iDestruct (tf_page_open36 (ud_tfp pt') ws1 Hlen1 with "Htf1") as
       (u0 u1 u2 u3 u4
@@ -1609,7 +1612,7 @@ Section UservecAllPt.
         Hutf264 & Hutf272 & Hutf280 & Htail1)".
     destruct Hsatprooted as (HuMode & Huasid & Huppn).
     pose proof Hretms as Hretms_keep.
-    destruct Hretms as (HSIE2 & HMPRV2 & HSXL2 & HTVM2 & HMXR2 & HTSR2 & HFS2 & HVS2 & Hsretnp2).
+    destruct Hretms as (HSIE2 & HMPRV2 & HSXL2 & HTVM2 & HMXR2 & HTSR2 & HFS2 & HVS2 & Hsretnp2 & _).
     iEval (rewrite Hmie) in "Hmie3".
     assert (Hra9c : (<[Regidx (mword_of_int 1) := regval_into_reg (uva 0x9c)]> M7)
                       !!! Regidx (mword_of_int 1) = uva 0x9c) by (rewrite upd_eq; reflexivity).
@@ -1666,7 +1669,8 @@ Section UservecAllPt.
                        Hutf120' Hutf128' Hutf136' Hutf144' Hutf152' Hutf160' Hutf168' Hutf176' Hutf184'
                        Hutf192' Hutf200' Hutf208' Hutf216' Hutf224' Hutf232' Hutf240' Hutf248' Hutf256'
                        Hutf264' Hutf272' Hutf280' Htail1") as "Htf1'".
-    iDestruct ("Hclose1" with "Htf1'") as "Hures3".
+    iDestruct ("Hclose1" with "[%] Htf1'") as "Hures3".
+    { refine (tf_kernel_words_ok_tail _ _ _ _ _ _ _ _ _ Hok1). }
     (* ---- THE ADDRESS SPACE CHANGES VIEW BACK -------------------------
        userret's entry switch installed the user root, so [Hutlb3] is the
        tree live again; the pages ([Hdata'], still page-indexed since the

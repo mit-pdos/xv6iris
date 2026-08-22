@@ -172,6 +172,11 @@ Section KptShare.
      CONSTRUCTION: the wand takes the cell at the SAME value, so no caller can
      use this to switch page tables -- that is [wp_csrw_satp_*]'s business and
      it goes through the slot's own arms. *)
+  (* the shared invariant, read off the slot (persistent, so it is a copy) *)
+  Lemma tlb_res_pt_kpt_inv (root_ppn : mword 44) :
+    tlb_res_pt root_ppn -∗ kpt_inv root_ppn.
+  Proof. iIntros "H". iDestruct "H" as (s t) "(_ & _ & _ & _ & _ & _ & _ & #$)". Qed.
+
   Lemma tlb_res_pt_satp_acc (root_ppn : mword 44) :
     tlb_res_pt root_ppn -∗
     ∃ satp0 : mword 64,

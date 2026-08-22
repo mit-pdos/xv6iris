@@ -139,7 +139,16 @@ Definition usertrap_ret_ms (ms : mword 64) : Prop :=
   eq_vec (_get_Mstatus_TSR ms) ('b"1") = false /\
   eq_vec (_get_Mstatus_FS ms) ('b"00") = true /\
   eq_vec (_get_Mstatus_VS ms) ('b"00") = true /\
-  sret_newpriv ms = User.
+  sret_newpriv ms = User /\
+  (* the four pins [UserExec.user_mstatus_ok] carries through user mode and
+     the bridge therefore asks of the pre-sret value: XS/SD/MPP out of
+     [sconf_ms_facts], and SPIE = 1 -- prepare_return's [sret_bits 0 1],
+     agreed against [sconf]'s tie at the exit.  Appended, so the existing
+     destructurings' last binder absorbs them. *)
+  _get_Mstatus_XS ms = extStatus_map_forwards Off /\
+  _get_Mstatus_SD ms = ('b"0" : mword 1) /\
+  eq_vec (_get_Mstatus_MPP ms) ('b"10") = false /\
+  _get_Mstatus_SPIE ms = ('b"1" : mword 1).
 
 (* the satp-value facts both trampoline switches need, shared spec
    vocabulary: [v] is a Sv39, asid-0 satp value rooted at [root]. *)
@@ -167,6 +176,26 @@ Definition usertrap_entry_ms (ms : mword 64) : Prop :=
   trap_mstatus_ok ms /\
   sconf_ms_facts ms /\
   _get_Mstatus_SPIE ms = ('b"1" : mword 1).
+
+(* ... AND [trap_mstatus_ok] NOW IMPLIES THE OTHER TWO.  [UserExec.v]'s
+   trap predicate carries FS/VS/XS/SD/MPP and SPIE = 1 since 2026-08-21 --
+   the user tier preserves them (mstatus is never written in user mode) from
+   what userret's sret left.  Before that, uservec's contract had to take
+   this implication as a ∀-premise, which was unsatisfiable
+   (claude-notes/projects/forkret-park.md §4). *)
+Lemma usertrap_entry_ms_of_trap (ms : mword 64) :
+  trap_mstatus_ok ms -> usertrap_entry_ms ms.
+Proof.
+  intro H. pose proof H as H'.
+  destruct H' as (HSXL & HMPRV & HMXR & HSPP & HSIE & HTVM & HTSR &
+                  HFS & HVS & HXS & HSD & HMPP & HSPIE).
+  split; [exact H |]. split; [| exact HSPIE].
+  unfold sconf_ms_facts. split_and!; try assumption.
+  unfold WpGprCsrwCommon.have_nom_val.
+  destruct (eq_vec (_get_Mstatus_MPP ms) ('b"00")); [reflexivity |].
+  destruct (eq_vec (_get_Mstatus_MPP ms) ('b"01")); [reflexivity |].
+  rewrite HMPP. reflexivity.
+Qed.
 
 (* The statement, parameterized over the abstract kernel-internal resource
    [R : uptd -> mword 64 -> iProp Σ]: [R pt ksp] is everything usertrap needs
@@ -483,22 +512,25 @@ Module Type USERTRAP_RES.
      remainder -- simultaneous borrows of a sealed bundle come out of ONE
      opener.  Concrete: [UsertrapRes.ut_res_bare_tf_csrs_open]. *)
   Parameter usertrap_res_tf_csrs_open :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) (kroot : mword 44),
-      (forall ws : list (mword 64), length ws = TFWORDS -> tf_kernel_words_ok kroot ksp ws) ->
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64),
       usertrap_res_bare pt ksp -∗
-      ∃ ws : list (mword 64), ⌜tf_kernel_words_ok kroot ksp ws⌝ ∗
+      ∃ (kroot : mword 44) (ws : list (mword 64)),
+        kpt_inv kroot ∗ ⌜tf_kernel_words_ok kroot ksp ws⌝ ∗
         tf_page (ud_tfp pt) ws ∗ hart_csrs ∗
         (∀ ws' : list (mword 64),
-           tf_page (ud_tfp pt) ws' -∗ hart_csrs -∗ usertrap_res_bare pt ksp).
+           ⌜tf_kernel_words_ok kroot ksp ws'⌝ -∗ tf_page (ud_tfp pt) ws' -∗ hart_csrs -∗
+           usertrap_res_bare pt ksp).
 
   Parameter usertrap_res_tf_open :
-    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) (kroot : mword 44),
+    forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64),
       (* THE CROSS-ROUND HISTORICAL FACT, bare and undischarged -- see
          [ProcGeom.tf_kernel_words_ok]'s own header. *)
-      (forall ws : list (mword 64), length ws = TFWORDS -> tf_kernel_words_ok kroot ksp ws) ->
       usertrap_res_bare pt ksp -∗
-      ∃ ws : list (mword 64), ⌜tf_kernel_words_ok kroot ksp ws⌝ ∗ tf_page (ud_tfp pt) ws ∗
-        (∀ ws' : list (mword 64), tf_page (ud_tfp pt) ws' -∗ usertrap_res_bare pt ksp).
+      ∃ (kroot : mword 44) (ws : list (mword 64)),
+        kpt_inv kroot ∗ ⌜tf_kernel_words_ok kroot ksp ws⌝ ∗ tf_page (ud_tfp pt) ws ∗
+        (∀ ws' : list (mword 64),
+           ⌜tf_kernel_words_ok kroot ksp ws'⌝ -∗ tf_page (ud_tfp pt) ws' -∗
+           usertrap_res_bare pt ksp).
 End USERTRAP_RES.
 
 Module Type USERTRAP.

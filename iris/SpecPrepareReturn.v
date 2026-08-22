@@ -108,6 +108,7 @@ Require Import RiscvExtras.
 Require Import KernelText.
 Require Import TrampPt.
 Require Import IntrDefs.
+Require Import KptShare.   (* [kpt_inv]: the post names the kernel root's invariant *)
 Require Import CpuOwn.
 Require Import ProcGeom.
 Require Import FdSlots.
@@ -147,6 +148,37 @@ Definition prepare_return_tf (ws : list (mword 64))
       (<[tf_ksp_idx := ksp]>
         (<[tf_ksatp_idx := ksat]> ws))).
 
+(* ... and what those four writes ESTABLISH: [ProcGeom.tf_kernel_words_ok]
+   at the root the satp value decodes to, at the hart whose id was written.
+   The one fact the residue ([UsertrapRes.ut_tfk]) is sealed with, so it is
+   proved once here, beside the function that writes the words. *)
+Lemma prepare_return_tf_kernel_words_ok `{CID : CpuId}
+    (ws : list (mword 64)) (ksat ksp : mword 64) (root : mword 44) :
+  length ws = TFWORDS ->
+  _get_Satp64_Mode (Mk_Satp64 ksat) = ('b"1000" : mword 4) ->
+  zero_extend' 16 (satp_to_asid (autocast (T := mword) ksat : mword 64))
+    = (mword_of_int 0 : mword 16) ->
+  autocast (T := mword) (satp_to_ppn (autocast (T := mword) ksat : mword 64)) = root ->
+  tf_kernel_words_ok root ksp (prepare_return_tf ws ksat ksp cid_word).
+Proof.
+  intros Hlen Hmode Hasid Hppn.
+  unfold prepare_return_tf, tf_kernel_words_ok.
+  unfold tf_ksatp_idx, tf_ksp_idx, tf_ktrap_idx, tf_khartid_idx.
+  unfold TFWORDS in Hlen.
+  split; [| split; [| split]].
+  - exists ksat. split; [| exact (conj Hmode (conj Hasid Hppn))].
+    rewrite list_lookup_insert_ne; [| lia].
+    rewrite list_lookup_insert_ne; [| lia].
+    rewrite list_lookup_insert_ne; [| lia].
+    apply list_lookup_insert. lia.
+  - rewrite list_lookup_insert_ne; [| lia].
+    rewrite list_lookup_insert_ne; [| lia].
+    apply list_lookup_insert. rewrite length_insert. lia.
+  - rewrite list_lookup_insert_ne; [| lia].
+    apply list_lookup_insert. rewrite !length_insert. lia.
+  - apply list_lookup_insert. rewrite !length_insert. lia.
+Qed.
+
 Definition wp_prepare_return_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (γf : gname) (ks : mword 64) (pid : mword 32) (V : pprivate)
@@ -180,6 +212,12 @@ Definition wp_prepare_return_sconf_body
           = (mword_of_int 0 : mword 16) ⌝ -∗
       ⌜ autocast (T := mword) (satp_to_ppn (autocast (T := mword) ksat : mword 64))
           = root ⌝ -∗
+      (* ... and the shared kernel-table invariant at that root, read off the
+         translation slot with the value.  Persistent.  It is what lets the
+         caller SEAL the four words it just wrote into the residue as
+         [UsertrapRes.ut_tfk]: the residue states where kernel_satp points
+         at an existential root, and this is the witness. *)
+      kpt_inv root -∗
       (* INTERRUPTS ARE OFF, and the reserve the enabled arm was holding is
          now usable stack -- the standard csrci index move.  At [b = false]
          there was no arm and no reserve, and [trap_res false + av = av]. *)

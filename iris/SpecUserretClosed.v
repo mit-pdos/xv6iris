@@ -132,21 +132,12 @@ Definition wp_userret_closed_body `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ} `{GEN :
   (* ---- the loop's own shape, re-established every round ---- *)
   loop_ok C pt ->
   (j < NPROC)%nat ->
-  (* ---- SpecUservec's two gaps, passed through verbatim ---- *)
-  (forall ms_v : mword 64, trap_mstatus_ok ms_v ->
-     sconf_ms_facts ms_v /\ _get_Mstatus_SPIE ms_v = ('b"1" : mword 1)) ->
-  (forall (h : CpuId) (ksp' : mword 64) (ws : list (mword 64)),
-     length ws = TFWORDS -> tf_kernel_words_ok (CID := h) kroot ksp' ws) ->
-  (* ---- userret's own premises ---- *)
-  eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
-  eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
-  _get_Mstatus_SXL mstatus0 = 'b"10" ->
-  eq_vec (_get_Mstatus_TVM mstatus0) ('b"1") = false ->
-  eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
-  eq_vec (_get_Mstatus_TSR mstatus0) ('b"1") = false ->
-  eq_vec (_get_Mstatus_FS mstatus0) ('b"00") = true ->
-  eq_vec (_get_Mstatus_VS mstatus0) ('b"00") = true ->
-  sret_newpriv mstatus0 = User ->
+  (* ---- the pre-sret mstatus: userret's own premises (the sret decodes to
+         User and does not trap) plus the pins the user-mode invariant
+         carries across the sret -- which is exactly what usertrap's exit
+         guarantees, and what both callers (the loop and forkret) hold.
+         Stated as the ONE predicate rather than its thirteen conjuncts. *)
+  usertrap_ret_ms mstatus0 ->
   upt_map_wf (ud_um pt) ->
   m !!! Regidx (mword_of_int 10) = usatp ->
   satp_rooted usatp (ud_root pt) ->

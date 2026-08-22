@@ -3138,6 +3138,10 @@ Section WpSconfCsr.
           = (mword_of_int 0 : mword 16) ⌝ -∗
       ⌜ autocast (T := mword) (satp_to_ppn (autocast (T := mword) sp0 : mword 64))
           = root ⌝ -∗
+      (* the shared kernel-table invariant AT THAT ROOT, read off the slot's
+         [tlb_res_pt] -- what a caller that parks the value needs to say
+         where it points ([UsertrapRes.ut_tfk]). *)
+      kpt_inv root -∗
       sie_cap_gpr kt (<[Regidx rd := regval_into_reg sp0]> m) n false p -∗
       kpt_on cpu_id -∗
       pc_is (add_vec_int pc 4) -∗
@@ -3153,14 +3157,14 @@ Section WpSconfCsr.
               (CSRReg (csr_satp, zreg, Regidx rd, CSRRS))
               (fun (_ : CpuId) npc ms' m' n' =>
                  ⌜npc = add_vec_int pc 4⌝ ∗ ⌜n' = n⌝ ∗
-                 ⌜∃ (sp0 : mword 64) (root : mword 44),
-                    m' = <[Regidx rd := regval_into_reg sp0]> m /\
+                 ∃ (sp0 : mword 64) (root : mword 44),
+                   ⌜m' = <[Regidx rd := regval_into_reg sp0]> m /\
                     _get_Satp64_Mode (Mk_Satp64 sp0) = ('b"1000" : mword 4) /\
                     zero_extend' 16 (satp_to_asid (autocast (T := mword) sp0 : mword 64))
                       = (mword_of_int 0 : mword 16) /\
                     autocast (T := mword)
                       (satp_to_ppn (autocast (T := mword) sp0 : mword 64))
-                      = root⌝)%I
+                      = root⌝ ∗ kpt_inv root)%I
               with "Hcg Hpc Hinstr [Hcont]").
     iNext. iApply wp_next_off_intro. rewrite /sconf_step_obl.
     iSplitR "Hcont".
@@ -3173,6 +3177,7 @@ Section WpSconfCsr.
          -- which is what keeps the frame the ordinary four-cell one. *)
       iDestruct "Hcap" as "(Hstk & Htr & Harm & #Htc & #Hwit)".
       iDestruct (strans_inv_acc_kpt with "Hkptr Htr") as (root) "(Htlb & Htrback)".
+      iDestruct (tlb_res_pt_kpt_inv with "Htlb") as "#Hkinv".
       iDestruct (tlb_res_pt_satp_acc with "Htlb")
         as (v) "(Hcell & %Hmode & %Hasid & %Hppn & Htlbback)".
       iDestruct (sconf_to_cells with "Hsc") as (ms0 mdv0)
@@ -3239,7 +3244,8 @@ Section WpSconfCsr.
         { iEval (rewrite (tp_pin_upd m rd (regval_into_reg v) Hrdtp)) in "Hf".
           iExact "Hf". }
         iSplitR; [done|]. iSplitR; [done|].
-        iPureIntro. exists v, root. split_and!;
+        iExists v, root. iFrame "Hkinv".
+        iPureIntro. split_and!;
           [ reflexivity | exact Hmode | exact Hasid | exact Hppn ].
       + (* the satp read: the borrowed cell, at a one-cell node rule *)
         iIntros "Hrw Hro". rewrite read_CSR_satp_red.
@@ -3248,11 +3254,12 @@ Section WpSconfCsr.
                        with "Hcert Hcell") ].
         iIntros (x) "[-> Hcell]". iFrame "Hrw Hro Hcell". done.
     - (* ---- the continuation ---- *)
-      iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & %Hex)".
+      iIntros (npc ms' m' n') "Hcg' Hpc' (-> & -> & Hex)".
       iDestruct (sie_cap_gpr_at_close with "Hcg'") as "Hcg'".
-      destruct Hex as (sp0 & root & -> & Hmode & Hasid & Hppn).
+      iDestruct "Hex" as (sp0 root) "(%Hex & #Hkinv)".
+      destruct Hex as (-> & Hmode & Hasid & Hppn).
       iSpecialize ("Hcont" $! cpu_id with "[%]"); [done|].
-      iApply ("Hcont" $! sp0 root with "[%] [%] [%] Hcg' Hkptr Hpc'").
+      iApply ("Hcont" $! sp0 root with "[%] [%] [%] Hkinv Hcg' Hkptr Hpc'").
       { exact Hmode. }
       { exact Hasid. }
       { exact Hppn. }

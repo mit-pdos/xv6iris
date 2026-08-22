@@ -91,6 +91,10 @@ Section UserretUser.
     (* ---- the extra mstatus pins the user-mode invariant carries ---- *)
     eq_vec (_get_Mstatus_FS mstatus0) ('b"00") = true ->
     eq_vec (_get_Mstatus_VS mstatus0) ('b"00") = true ->
+    _get_Mstatus_XS mstatus0 = extStatus_map_forwards Off ->
+    _get_Mstatus_SD mstatus0 = ('b"0" : mword 1) ->
+    eq_vec (_get_Mstatus_MPP mstatus0) ('b"10") = false ->
+    _get_Mstatus_SPIE mstatus0 = ('b"1" : mword 1) ->
     (* ---- the config record's data fields, pinned to the cells ---- *)
     uc_dqc C = DfracOwn 1 ->
     (* ---- the user data pages' pure facts ---- *)
@@ -205,7 +209,7 @@ Section UserretUser.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HSIE HMPRV HSXL HTVM HMXR Hmm Hwf HTSR Hsup Ha0 HuMode Huasid Huppn
-      HFS HVS Hdqc Hinj Hacc.
+      HFS HVS HXS HSD HMPP HSPIE Hdqc Hinj Hacc.
     iIntros "#Hkt #Hhw #Hmi #Hwi Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenv Hsepc
              #Hclaim Hktlb Hufr Hpc Hfile
              Htf40 Htf48 Htf56 Htf64 Htf72 Htf80 Htf88 Htf96 Htf104 Htf120
@@ -248,7 +252,7 @@ Section UserretUser.
                  (userret_gpr m vra vsp vgp vtp vt0 vt1 vt2 vs0 vs1 va1 va2
                     va3 va4 va5 va6 va7 vs2 vs3 vs4 vs5 vs6 vs7 vs8 vs9 vs10
                     vs11 vt3 vt4 vt5 vt6 va0f)
-                 HSXL HMXR HFS HVS HTVM HTSR Hdqc
+                 HSXL HMXR HFS HVS HTVM HTSR HXS HSD HMPP HSPIE Hdqc
                  eq_refl eq_refl eq_refl eq_refl
                  eq_refl eq_refl eq_refl
                  eq_refl eq_refl eq_refl eq_refl

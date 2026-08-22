@@ -170,7 +170,7 @@ Theorem forkret_park_paid
       γs γf pa ks rest pid V av.
 Proof.
   cbv beta delta [forkret_park_paid_body].
-  intros Hrest [j [Hpa Hj]] Hut Hgap Hkw.
+  intros Hrest [j [Hpa Hj]] Hut.
   subst pa.
   iIntros "Hpkg #Hks Hctx Hpriv Hfd Hirsp".
   iEval (rewrite /forkret_park_pkg) in "Hpkg".
@@ -195,6 +195,7 @@ Proof.
              ⌜pv_upt V' = pt'⌝ -∗
              ⌜ud_data pt' = ud_pas pt'⌝ -∗
              ⌜proc_pt_wf pt'⌝ -∗
+             UsertrapRes.ut_tfk (CID := h) (add_vec ks (mword_of_int 4096)) V' -∗
              first_done -∗
              TimerCap.timer_cap (CID := h) -∗
              forkret_yield (CID := h) γf (proc_addr j)
@@ -202,8 +203,8 @@ Proof.
              FR.usertrap_res_bare (CID := h) pt'
                (add_vec ks (mword_of_int 4096)))%I
     with "[Hclose Hfd Hirsp]" as "Hclose".
-  { iIntros (h pt' V') "%HV %Hnorm %Hptwf Hdone #Htc Hy".
-    iApply ("Hclose" with "[%] [%] [%] Hdone Htc Hy Hfd Hirsp");
+  { iIntros (h pt' V') "%HV %Hnorm %Hptwf #Htfk Hdone #Htc Hy".
+    iApply ("Hclose" with "[%] [%] [%] Htfk Hdone Htc Hy Hfd Hirsp");
       [exact HV | exact Hnorm | exact Hptwf]. }
   iIntros (h m eb') "%Hadm %Himg Hcg Hcpu Hpc Hcells Hpay".
   iDestruct "Hpay" as (A' cret backr) "[Hrec Hpay]".
@@ -258,7 +259,7 @@ Proof.
   (* ================================================================== *)
   iApply (FR.wp_forkret (CID := h) j γs γl γf pid V ks m av
             (av - 6 - trap_res eb')%nat eb'
-            Hj Hgl Hbud Hkx Hut Hsp Hgap Hkw
+            Hj Hgl Hbud Hkx Hut Hsp
           with "Htext Hwire Hkmap Hpc Hpinv Hcg Hcpu Htc Hclm
                 Hlocked HR Hks Hpriv Hclose").
 Qed.

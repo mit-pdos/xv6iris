@@ -166,7 +166,38 @@ Definition user_mstatus_ok (ms : mword 64) : Prop :=
   eq_vec (_get_Mstatus_FS ms) ('b"00") = true /\
   eq_vec (_get_Mstatus_VS ms) ('b"00") = true /\
   eq_vec (_get_Mstatus_TVM ms) ('b"1") = false /\
-  eq_vec (_get_Mstatus_TSR ms) ('b"1") = false.
+  eq_vec (_get_Mstatus_TSR ms) ('b"1") = false /\
+  (* THE FOUR KERNEL-TIER CONJUNCTS, appended (so every existing
+     [(_ & _ & ...)] destructuring still matches: the last binder absorbs
+     them).  User mode cannot write mstatus, so these are facts about what
+     userret's [sret] LEFT, carried unchanged to the next trap: the XS / SD
+     / MPP pins [IntrDefs.sconf_ms_facts] wants back in the kernel, and
+     SIE = 1 -- [sret] copies SPIE into SIE and prepare_return set SPIE --
+     which the trap copies back into SPIE ([utrap_ms]), the historical
+     "SPIE = 1" fact [SpecUsertrap.usertrap_entry_ms] pins.  Without these
+     the kernel-side trap loop had to ASSUME them of every trap frame, and
+     that assumption was unsatisfiable (claude-notes/projects/forkret-park.md
+     §4). *)
+  _get_Mstatus_XS ms = extStatus_map_forwards Off /\
+  _get_Mstatus_SD ms = ('b"0" : mword 1) /\
+  eq_vec (_get_Mstatus_MPP ms) ('b"10") = false /\
+  eq_vec (_get_Mstatus_SIE ms) ('b"1") = true.
+
+(* the spelling bridges between the user tier's [eq_vec … = true] pins and
+   the kernel tier's equations ([IntrDefs.sconf_ms_facts] spells FS/VS as
+   [= extStatus_map_forwards Off], SIE as a literal). *)
+Lemma fs_off_of_eq (ms : mword 64) :
+  eq_vec (_get_Mstatus_FS ms) ('b"00") = true ->
+  _get_Mstatus_FS ms = extStatus_map_forwards Off.
+Proof. intro H. apply eq_vec_true_iff in H. rewrite H. vm_compute. reflexivity. Qed.
+Lemma vs_off_of_eq (ms : mword 64) :
+  eq_vec (_get_Mstatus_VS ms) ('b"00") = true ->
+  _get_Mstatus_VS ms = extStatus_map_forwards Off.
+Proof. intro H. apply eq_vec_true_iff in H. rewrite H. vm_compute. reflexivity. Qed.
+Lemma sie_one_of_eq (ms : mword 64) :
+  eq_vec (_get_Mstatus_SIE ms) ('b"1") = true ->
+  _get_Mstatus_SIE ms = ('b"1" : mword 1).
+Proof. intro H. apply eq_vec_true_iff in H. exact H. Qed.
 
 (* after the trap: same pins, plus what the trap transform wrote --
    SPP = User (we trapped FROM user) and SIE = 0 (interrupts masked,
@@ -216,7 +247,18 @@ Definition trap_mstatus_ok (ms : mword 64) : Prop :=
   eq_vec (_get_Mstatus_SPP ms) ('b"1") = false /\
   eq_vec (_get_Mstatus_SIE ms) ('b"1") = false /\
   eq_vec (_get_Mstatus_TVM ms) ('b"1") = false /\
-  eq_vec (_get_Mstatus_TSR ms) ('b"1") = false.
+  eq_vec (_get_Mstatus_TSR ms) ('b"1") = false /\
+  (* appended, as in [user_mstatus_ok]: what the trap transform carries over
+     from the user-mode value (FS/VS/XS/SD/MPP untouched) and what it WRITES
+     from it (SPIE := SIE = 1).  Together with the seven above this is
+     [IntrDefs.sconf_ms_facts] plus SPIE = 1, which is what the kernel-side
+     trap loop needs of a delivered frame ([SpecUsertrap.usertrap_entry_ms]). *)
+  _get_Mstatus_FS ms = extStatus_map_forwards Off /\
+  _get_Mstatus_VS ms = extStatus_map_forwards Off /\
+  _get_Mstatus_XS ms = extStatus_map_forwards Off /\
+  _get_Mstatus_SD ms = ('b"0" : mword 1) /\
+  eq_vec (_get_Mstatus_MPP ms) ('b"10") = false /\
+  _get_Mstatus_SPIE ms = ('b"1" : mword 1).
 
 (* The post-fetch config facts an execute totality assumes at the fetched
    state [σf].  Relocated here from the pruned UserExecProducer.v and EXTENDED:

@@ -1173,12 +1173,14 @@ Lemma usertrap_res_bare_norm
 Proof. exact (ut_res_bare_norm SY.syscall_env pt ksp). Qed.
 
 Lemma usertrap_res_tf_open
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) (kroot : mword 44) :
-  (forall ws : list (mword 64), length ws = TFWORDS -> tf_kernel_words_ok kroot ksp ws) ->
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
   usertrap_res_bare pt ksp -∗
-  ∃ ws : list (mword 64), ⌜tf_kernel_words_ok kroot ksp ws⌝ ∗ tf_page (ud_tfp pt) ws ∗
-    (∀ ws' : list (mword 64), tf_page (ud_tfp pt) ws' -∗ usertrap_res_bare pt ksp).
-Proof. exact (ut_res_bare_tf_open SY.syscall_env pt ksp kroot). Qed.
+  ∃ (kroot : mword 44) (ws : list (mword 64)),
+    kpt_inv kroot ∗ ⌜tf_kernel_words_ok kroot ksp ws⌝ ∗ tf_page (ud_tfp pt) ws ∗
+    (∀ ws' : list (mword 64),
+       ⌜tf_kernel_words_ok kroot ksp ws'⌝ -∗ tf_page (ud_tfp pt) ws' -∗
+       usertrap_res_bare pt ksp).
+Proof. exact (ut_res_bare_tf_open SY.syscall_env pt ksp). Qed.
 
 (* THE PARK'S PRODUCER, re-exported off the fit check.  See [Module Fits]
    above: it is proved under the same [SY], so this is a rename. *)
@@ -1201,14 +1203,15 @@ Lemma usertrap_res_sstc
 Proof. exact (ut_res_bare_sstc SY.syscall_env pt ksp). Qed.
 
 Lemma usertrap_res_tf_csrs_open
-    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) (kroot : mword 44) :
-  (forall ws : list (mword 64), length ws = TFWORDS -> tf_kernel_words_ok kroot ksp ws) ->
-      usertrap_res_bare pt ksp -∗
-      ∃ ws : list (mword 64), ⌜tf_kernel_words_ok kroot ksp ws⌝ ∗
-        tf_page (ud_tfp pt) ws ∗ hart_csrs ∗
-        (∀ ws' : list (mword 64),
-           tf_page (ud_tfp pt) ws' -∗ hart_csrs -∗ usertrap_res_bare pt ksp).
-Proof. exact (ut_res_bare_tf_csrs_open SY.syscall_env pt ksp kroot). Qed.
+    `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
+  usertrap_res_bare pt ksp -∗
+  ∃ (kroot : mword 44) (ws : list (mword 64)),
+    kpt_inv kroot ∗ ⌜tf_kernel_words_ok kroot ksp ws⌝ ∗
+    tf_page (ud_tfp pt) ws ∗ hart_csrs ∗
+    (∀ ws' : list (mword 64),
+       ⌜tf_kernel_words_ok kroot ksp ws'⌝ -∗ tf_page (ud_tfp pt) ws' -∗ hart_csrs -∗
+       usertrap_res_bare pt ksp).
+Proof. exact (ut_res_bare_tf_csrs_open SY.syscall_env pt ksp). Qed.
 
 Section UtSeal.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}.
@@ -1237,7 +1240,7 @@ Section UtSeal.
     (* SCOPED: a bare [rewrite] would unfold [ut_res] inside the crossing's
        [usertrap_post] too, and the blocks state it folded. *)
     iEval (rewrite /usertrap_res /ut_res) in "HR".
-    iDestruct "HR" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htc & Htrap & Henv)".
+    iDestruct "HR" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & #Htfk & #Htc & Htrap & Henv)".
     assert (Hpjnz : pj <> (zero_reg : mword 64))
       by exact (proc_addr_nonzero j Hj).
     iDestruct (wp_next_true_swap pj (un_pj N) _ Hpjnz with "Hcont") as "Hcont".

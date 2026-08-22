@@ -248,6 +248,33 @@ Lemma utrap_ms_TSR (elp_v : mword 1) (ms : mword 64) :
   _get_Mstatus_TSR (utrap_ms elp_v ms) = _get_Mstatus_TSR ms.
 Proof. unfold utrap_ms, _get_Mstatus_TSR; cbn zeta; mw_prep; tb1. Qed.
 
+(* the kernel-tier conjuncts [trap_mstatus_ok] carries over from the user
+   value: FS/VS/XS/SD/MPP are untouched by the trap transform, and SPIE is
+   WRITTEN from the old SIE (bit 5 := bit 1, then bit 1 := 0). *)
+Lemma utrap_ms_FS (elp_v : mword 1) (ms : mword 64) :
+  _get_Mstatus_FS (utrap_ms elp_v ms) = _get_Mstatus_FS ms.
+Proof. unfold utrap_ms, _get_Mstatus_FS; cbn zeta; mw_prep; tb2. Qed.
+
+Lemma utrap_ms_VS (elp_v : mword 1) (ms : mword 64) :
+  _get_Mstatus_VS (utrap_ms elp_v ms) = _get_Mstatus_VS ms.
+Proof. unfold utrap_ms, _get_Mstatus_VS; cbn zeta; mw_prep; tb2. Qed.
+
+Lemma utrap_ms_XS (elp_v : mword 1) (ms : mword 64) :
+  _get_Mstatus_XS (utrap_ms elp_v ms) = _get_Mstatus_XS ms.
+Proof. unfold utrap_ms, _get_Mstatus_XS; cbn zeta; mw_prep; tb2. Qed.
+
+Lemma utrap_ms_SD (elp_v : mword 1) (ms : mword 64) :
+  _get_Mstatus_SD (utrap_ms elp_v ms) = _get_Mstatus_SD ms.
+Proof. unfold utrap_ms, _get_Mstatus_SD; cbn zeta; mw_prep; tb1. Qed.
+
+Lemma utrap_ms_MPP (elp_v : mword 1) (ms : mword 64) :
+  _get_Mstatus_MPP (utrap_ms elp_v ms) = _get_Mstatus_MPP ms.
+Proof. unfold utrap_ms, _get_Mstatus_MPP; cbn zeta; mw_prep; tb2. Qed.
+
+Lemma utrap_ms_SPIE (elp_v : mword 1) (ms : mword 64) :
+  _get_Mstatus_SPIE (utrap_ms elp_v ms) = _get_Mstatus_SIE ms.
+Proof. unfold utrap_ms, _get_Mstatus_SPIE, _get_Mstatus_SIE; cbn zeta; mw_prep; tb1. Qed.
+
 (* ===================================================================== *)
 (* §2 Exception delegation at User: with the cause's medeleg bit set (and  *)
 (* S present), a synchronous exception from U delegates to Supervisor.     *)
@@ -1480,14 +1507,20 @@ Definition utrap_state (s_x : mstate) (c : TrapCause) (info : option (mword 64))
 Lemma utrap_ms_ok (elp0 : mword 1) (ms_v : mword 64) :
   user_mstatus_ok ms_v -> trap_mstatus_ok (utrap_ms elp0 ms_v).
 Proof.
-  intros (HSXL & HMPRV & HMXR & HFS & HVS & HTVM & HTSR).
+  intros (HSXL & HMPRV & HMXR & HFS & HVS & HTVM & HTSR & HXS & HSD & HMPP & HSIE).
   split; [ rewrite utrap_ms_SXL; exact HSXL | ].
   split; [ rewrite utrap_ms_MPRV; exact HMPRV | ].
   split; [ rewrite utrap_ms_MXR; exact HMXR | ].
   split; [ rewrite utrap_ms_SPP; reflexivity | ].
   split; [ rewrite utrap_ms_SIE; reflexivity | ].
   split; [ rewrite utrap_ms_TVM; exact HTVM | ].
-  rewrite utrap_ms_TSR; exact HTSR.
+  split; [ rewrite utrap_ms_TSR; exact HTSR | ].
+  split; [ rewrite utrap_ms_FS; exact (fs_off_of_eq _ HFS) | ].
+  split; [ rewrite utrap_ms_VS; exact (vs_off_of_eq _ HVS) | ].
+  split; [ rewrite utrap_ms_XS; exact HXS | ].
+  split; [ rewrite utrap_ms_SD; exact HSD | ].
+  split; [ rewrite utrap_ms_MPP; exact HMPP | ].
+  rewrite utrap_ms_SPIE. exact (sie_one_of_eq _ HSIE).
 Qed.
 
 Section UTrapGhost.

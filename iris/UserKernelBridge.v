@@ -65,11 +65,19 @@ Section UserKernelBridge.
     eq_vec (_get_Mstatus_VS ms0) ('b"00") = true ->
     eq_vec (_get_Mstatus_TVM ms0) ('b"1") = false ->
     eq_vec (_get_Mstatus_TSR ms0) ('b"1") = false ->
+    (* the kernel-tier pins [user_mstatus_ok] now carries: XS/SD/MPP ride
+       through the sret untouched, and SIE = 1 in user mode is SPIE = 1
+       before it ([sret_ms5_SIE]) -- which is what prepare_return wrote
+       and what the trap will copy back ([UserTrap.utrap_ms_SPIE]). *)
+    _get_Mstatus_XS ms0 = extStatus_map_forwards Off ->
+    _get_Mstatus_SD ms0 = ('b"0" : mword 1) ->
+    eq_vec (_get_Mstatus_MPP ms0) ('b"10") = false ->
+    _get_Mstatus_SPIE ms0 = ('b"1" : mword 1) ->
     user_mstatus_ok (sret_ms5 ms0).
   Proof.
-    intros HSXL HMXR HFS HVS HTVM HTSR.
+    intros HSXL HMXR HFS HVS HTVM HTSR HXS HSD HMPP HSPIE.
     unfold user_mstatus_ok.
-    split; [| split; [| split; [| split; [| split; [| split]]]]].
+    split_and!.
     - rewrite sret_ms5_SXL. exact HSXL.
     - rewrite sret_ms5_MPRV. vm_compute. reflexivity.
     - rewrite sret_ms5_MXR. exact HMXR.
@@ -77,6 +85,10 @@ Section UserKernelBridge.
     - rewrite sret_ms5_VS. exact HVS.
     - rewrite sret_ms5_TVM. exact HTVM.
     - rewrite sret_ms5_TSR. exact HTSR.
+    - rewrite sret_ms5_XS. exact HXS.
+    - rewrite sret_ms5_SD. exact HSD.
+    - rewrite sret_ms5_MPP. exact HMPP.
+    - rewrite sret_ms5_SIE HSPIE. vm_compute. reflexivity.
   Qed.
 
   (* -------------------------------------------------------------------- *)
@@ -105,6 +117,11 @@ Section UserKernelBridge.
     eq_vec (_get_Mstatus_VS mstatus0) ('b"00") = true ->
     eq_vec (_get_Mstatus_TVM mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_TSR mstatus0) ('b"1") = false ->
+    (* the kernel-tier pins -- see [user_mstatus_ok_sret_ms5] *)
+    _get_Mstatus_XS mstatus0 = extStatus_map_forwards Off ->
+    _get_Mstatus_SD mstatus0 = ('b"0" : mword 1) ->
+    eq_vec (_get_Mstatus_MPP mstatus0) ('b"10") = false ->
+    _get_Mstatus_SPIE mstatus0 = ('b"1" : mword 1) ->
     (* config-record data fields pinned to the cell values *)
     uc_dqc C = DfracOwn 1 ->
     uc_stvec C = stv ->
@@ -162,7 +179,7 @@ Section UserKernelBridge.
     Rut pt -∗
     user_inv C pt Rut.
   Proof.
-    intros HSXL HMXR HFS HVS HTVM HTSR Hdqc Hstvec Hmie Hmdl Hmedl
+    intros HSXL HMXR HFS HVS HTVM HTSR HXS HSD HMPP HSPIE Hdqc Hstvec Hmie Hmdl Hmedl
       Hroot Htfp Hum Hmenv Hsenv Hmse Hsse Hinj Hacc.
     subst menvcfg0 senvcfg0 mstateen0v sstateen0v.
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenv Hsepc Hutlb Hpc Hgpr
@@ -173,7 +190,7 @@ Section UserKernelBridge.
     (* user_hart_ok *)
     iSplitR; [iPureIntro; exact I |].
     (* user_mstatus_ok *)
-    iSplitR; [iPureIntro; exact (user_mstatus_ok_sret_ms5 mstatus0 HSXL HMXR HFS HVS HTVM HTSR) |].
+    iSplitR; [iPureIntro; exact (user_mstatus_ok_sret_ms5 mstatus0 HSXL HMXR HFS HVS HTVM HTSR HXS HSD HMPP HSPIE) |].
     (* lock-step va' = va *)
     iSplitR; [iPureIntro; intros u _; reflexivity |].
     iSplitL "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hgpr".

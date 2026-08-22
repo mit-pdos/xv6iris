@@ -186,22 +186,18 @@ Definition tf_khartid_idx : nat := 4%nat.
    range: sp is a saved register, not a syscall argument. *)
 Definition tf_sp_idx      : nat := 6%nat.
 
-(* THE CROSS-ROUND HISTORICAL FACT about the trapframe's four KERNEL words,
-   at the SAME hart-relative vocabulary [prepare_return_tf]'s own exit
-   already establishes ([SpecPrepareReturn.wp_prepare_return_sconf_body]'s
-   postcondition: the satp-decode facts over [ksat], plus [ktrap] pinned to
-   the constant [KernelSyms.usertrap] by [prepare_return_tf]'s own
-   definition) -- but NOT YET threaded across the full user-mode round trip
-   back into [usertrap_res]'s next open, the same gap
-   [SpecUsertrap.usertrap_entry_ms]'s SPIE=1 conjunct already documents for
-   mstatus.  [SpecUsertrap.usertrap_res_tf_open] takes it as a bare,
-   undischarged premise over the SAME [kroot]/[cid_word] vocabulary
-   [wp_uservec_pt_body] already has explicit parameters for, and the SAME
-   [ksp] its own [usertrap_res pt ksp] is keyed on (the fourth conjunct:
-   [usertrap_res]'s [ksp] is the process's kernel stack top by
-   construction, but nothing ties it to what the trapframe's OWN
-   [kernel_sp] slot holds -- uservec's [ld sp,8(a0)] needs that, since
-   [wp_usertrap_body]'s own entry premise is [m !!! sp = ksp]). *)
+(* THE FACT ABOUT THE TRAPFRAME'S FOUR KERNEL WORDS that the trap loop
+   needs at every trap: kernel_satp is a Sv39 / asid-0 satp rooted at
+   [kroot], kernel_sp is the process's kernel stack top [ksp] (which is what
+   uservec's [ld sp,8(a0)] loads, and what [usertrap_res pt ksp] is keyed
+   on), kernel_trap is [KernelSyms.usertrap], kernel_hartid is THIS hart's
+   id.  [prepare_return_tf] writes exactly these ([SpecPrepareReturn.v], and
+   [prepare_return_tf_kernel_words_ok] there is the proof), at the hart the
+   process resumes on -- the last writer before the next trap, which is
+   taken on the same hart.  The residue carries it across the user-mode
+   round as [UsertrapRes.ut_tfk] (at an existential root, with that root's
+   [kpt_inv]); it used to be an undischarged -- and unsatisfiable --
+   ∀-premise on the openers (claude-notes/projects/forkret-park.md §4). *)
 Definition tf_kernel_words_ok `{CID : CpuId} (kroot : mword 44) (ksp : mword 64)
     (ws : list (mword 64)) : Prop :=
   (exists ksat : mword 64, ws !! tf_ksatp_idx = Some ksat /\
@@ -211,6 +207,17 @@ Definition tf_kernel_words_ok `{CID : CpuId} (kroot : mword 44) (ksp : mword 64)
   ws !! tf_ksp_idx = Some ksp /\
   ws !! tf_ktrap_idx = Some (mword_of_int KernelSyms.usertrap : mword 64) /\
   ws !! tf_khartid_idx = Some cid_word.
+(* the fact looks at indices 0..4 only, so a save walk that rewrites the
+   other 31 words keeps it -- this is what uservec's two closers pay with *)
+Lemma tf_kernel_words_ok_tail `{CID : CpuId} (kroot : mword 44)
+    (ksp a b c d e : mword 64) (l l' : list (mword 64)) :
+  tf_kernel_words_ok kroot ksp (a :: b :: c :: d :: e :: l) ->
+  tf_kernel_words_ok kroot ksp (a :: b :: c :: d :: e :: l').
+Proof.
+  unfold tf_kernel_words_ok, tf_ksatp_idx, tf_ksp_idx, tf_ktrap_idx, tf_khartid_idx.
+  intro H. cbn in H. cbn. exact H.
+Qed.
+
 (* argraw serves a0..a5 *)
 Definition NARG : nat := 6%nat.
 
