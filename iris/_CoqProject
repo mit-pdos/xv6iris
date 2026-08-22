@@ -1099,3 +1099,5 @@ WeakRvwmoAcyc.v
 WeakRvwmoProbeK1.v
 WeakRvwmoProbeRestr.v
 WeakRvwmoProbeSwap.v
+WeakRvwmoTopo.v
+WeakRvwmoHull.v

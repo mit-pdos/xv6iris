@@ -60,11 +60,14 @@ route-B leaves (`WeakRvwmo*.vo`) compile and are what the probes use.
 **NEXT SESSION, in order:** (1) B2e-3a — T2-LIN's arithmetic core
 (§4d.4): `R_acyclic` lands with P5; then the violation-on-every-cycle
 lemma, the F4a/F5 repairs, and the segment-composition lemma;
-(2) probe F2(ii) (a topological order of `R` is consistent) and, if it
-holds, build B2d′(a) — the direct linearization — and demote
-`normalize`; (3) DECIDE the F3″ interface (footprint at `wlock_alloc`,
+(2) [DONE later the same day: B2d′(a) LANDED — `WeakRvwmoTopo.v`,
+`topo_linearizes`/`topo_exists`/`normalize_of_acyclic`, Closed; the
+chain's first step is now the direct linearization and `normalize` is
+demoted to analysis; one open item: the `Decision (RacyD GD x y)`
+instance, a bounded row search]; (3) DECIDE the F3″ interface (footprint at `wlock_alloc`,
 `WProt` store/read rules) BEFORE M4 ports a lock client, then T2-0′
-(F3′ + F3″); (4) B1a′ causal hulls; (5) B2e-3b certification
+(F3′ + F3″); (4) [DONE the same day: B1a′ LANDED — `WeakRvwmoHull.v`, Closed];
+(5) B2e-3b certification
 machinery; (6) B2e-3c the per-segment classification (the L2′
 content); then B1b, B3, R6.
 

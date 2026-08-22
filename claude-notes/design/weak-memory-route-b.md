@@ -18,7 +18,9 @@ undischarged — the same standard as everything landed.
 
 ```
 G : gexec, rvwmo_minus_deps_consistent, xv6 image
-  │  (the exchange normalization — THIS ROUTE'S NEW CONTENT, §3)
+  │  (T2-LIN: no violation on an R-cycle — §4d; then the DIRECT
+  │   LINEARIZATION `WeakRvwmoTopo.topo_linearizes`, which superseded
+  │   §3's exchange normalization on 2026-08-22)
   ▼
 G' : same observables, grule14
   │  (T2-1c, LANDED: rule14_linearization — Closed, no axioms)
@@ -764,6 +766,76 @@ the number of events:
   lemma + a footprint expression at each `initlock` spec.  Decide the
   interface before the sweep reaches the first lock client.
 
+#### 4d.3′ The exports, concretely (orchestrator spec, 2026-08-22; build
+#### as T2-0′ against `WeakGhost.v`/`WeakLock.v`/`WeakEvAdequacy.v`)
+
+Read first: `WeakGhost.v`'s `wcds` states (the `WLock base n0` note and
+`wcds_ok_store_lock`), `WeakLock.v`'s `wlock_inv`/`wacquire_core`/
+`wrelease_core`, `WpLock.v`'s `lock_state := option (CPU * bool)`.
+
+**F3′ — ALTERNATION.**  A pure fold over the post-registration
+messages of the word overlapping byte `a`:
+`alt_step (h : option nat) (m : wmsg) : option (option nat)` —
+zero data (release-shaped): `h = Some (wm_tid m)` required, result
+`None`; exclusive nonzero: if `h = None` then `Some (wm_tid m)`
+(a successful acquire) else `h` unchanged (a failed swap; the
+message's read value is not in the log, so the fold cannot tell a
+failed swap from anything else — and need not).  `wlp_alt log a base n0
+h := fold over positions ≥ n0 = Some h`.  The `WLock` state gains the
+holder: `WLock base n0 (h : option nat)`, `wcds_lock := clean ∧ wlp_at
+∧ wlp_alt … h`.  Two facts make the leaf rules LOCAL: (i) `wlp_alt …
+h` ⇒ (the word's current value is zero ⟺ `h = None`) — so the acquire
+leaf, which already case-splits on `v = lock_zero`, knows the fold's
+state; (ii) `wlock_inv` gains the tie `h = tid_of st` (`Some (fin_to_nat
+i)` for `st = Some (i, _)`), so the release leaf, holding `locked γ i`,
+knows `h = Some i`.  Both leaves must TIE THE MESSAGE'S AUTHOR TO THE
+TOKEN: add `tid = Some (fin_to_nat i)` to `wacquire_core` and
+`wrelease_core` (true at every xv6 site — `holding()` — and the only
+way the fold's author bookkeeping is sound).  The export
+(`weak_ev_adequacy_lockalt`, a sibling of `_lockproto`): `∃ n0 h,
+wlp_alt (wglog σ2) a base n0 h` for a registered byte.  What the kill
+consumes: with two acquires `A_i <co A_j` by harts `i ≠ j` in the
+suffix, a release by `i` sits co-between (else `A_j`'s prefix fold has
+holder `Some i` and `A_j` is a failed swap — but a SUCCESSFUL acquire
+is one whose READ ENTRY is zero, a ROW fact; relate the two through
+(i): the value is zero at `A_j`'s read ⟺ the fold is `None` there).
+The graph-side `cs_kill` keeps its arithmetic; its `lock_pattern`/
+`lock_paired` hypotheses are replaced by `wlp_alt` at the certifying
+configuration plus the row's read entries.
+
+**F3″ — PROTECTED BYTES.**  A fifth state `WProt (γ : gname) (base : Z)
+(r0 : nat)`: the byte is in the payload of the lock registered at
+`base` with ghost `γ`, protected from log position `r0`.
+`wcds_ok log a (WProt γ base r0) := clean ∧ ∀ p ≥ r0, m at p writes a ∧
+wm_ak m = WCplain ⇒ wm_tid m = holder_at log base p` where `holder_at`
+is F3′'s fold evaluated at `p` (a pure function of the log — no new
+ghost).  ENFORCEMENT needs the holder to be provable at a store site
+from what the site has, which is `locked γ c`: so `lock_auth` MOVES
+from `wlock_inv` into `weak_state_interp` (a `gmap gname lock_state`
+auth; `wlock_alloc` allocates the entry; `wlock_inv` keeps `lock_frag`
+for the free arm as today), with the state-interp invariant "for every
+registered `(γ, base)`: `tid_of (auth γ) = holder_at log base (length
+log)`".  Then `wp_store_prot` takes `locked γ c` and returns it; the
+update agrees the fragment with the auth and the invariant supplies
+`holder_at = Some c`.  A WProt byte REFUSES the plain store rule
+(`is_wprot` threaded like `is_wlock`).  `wp_load_prot` is the ordinary
+load plus a RECORD: a persistent fact `prot_read γ base a p` ("at log
+position `p`, hart `c` read a `WProt γ base` byte `a`") appended to a
+monotone ghost list in the state interp — its only purpose is to let
+the kill know `a` was protected at `e*`'s read.  Registration:
+`wlock_alloc lk R F` with `F : gset Z` (the footprint); the client's `R`
+must contain full-fraction points-to's for `F` (flipped `WClean →
+WProt` at registration, like `wcds_ok_register`); deregistration
+(pipe free) flips back with full fractions in hand.  EXPORTS:
+(a) `wprot_at (wglog σ2) a γ base r0` for a byte in `WProt`;
+(b) every recorded `prot_read γ base a p` has the byte in `WProt γ
+base` at `p` with `r0 ≤ p`.  What the kill consumes (`(P)`): `e*`'s
+site is a `prot_read` of `a` under `L`'s `γ` ⇒ `w0`'s message (plain,
+to `a`, at `p0 ≥ r0`) was written by `holder_at log base p0` = `j` ⇒
+`j` holds `L` at `p0` ⇒ (fold) `ACQ_j` is the last `base`-acquire
+before `p0` and no release by `j` lies between — the CS-coverage
+hypotheses of `cs_kill`, machine-grounded.
+
 ### 4d.4 Staging (replaces the B2e-3 / B1b / B3 items of §4)
 
 - **B2e-3a — T2-LIN's ARITHMETIC CORE (delegate-ready, pure graph
@@ -776,26 +848,37 @@ the number of events:
   `cs_kill` style), the cycle is inconsistent.  Also the two kit repairs
   of F4 (failed-swap arm; `cs_kill`'s hypotheses restated per
   configuration) and the W-TV line in `dedges` (F5).
-- **B2d′ — THE KILL-FREE NORMALIZATION, two options; RECOMMENDED: the
-  direct linearization.**  (a) DIRECT: by F2(ii), ANY topological order
-  of `R` is a rows-equivalent consistent rule-14 gmo (rows renamed by
-  the write-index permutation, exactly `normalize`'s `rows_rel`/`wperm`
-  conclusion).  This is a finite-graph topological sort over `gevs'`
-  plus the consistency check of F2(ii) — smaller than the exchange
-  kit and with NO kill interface at all; `normalize`'s statement is
-  then a corollary of T2-LIN.  (b) KIT: extend `normalize` with the
-  source-descent move (F1) so the only residual is "an `R`-cycle
-  through `w`".  Build (a); keep B2d/B2a–c as the landed analysis that
-  found the three entry shapes (their non-vacuity witnesses remain the
-  kill interface's sanity checks).  Probe (a)'s consistency claim
-  first (F2(ii) is an argument, not yet a theorem): the load-value
-  co-max half under a topological order is the one clause to check.
-  With F2′: `R` is taken with `G`'s own `co`; when `R_{co}` has a cycle
-  through an unread same-byte pair, flip that pair (a legal (W,W)
-  move) and retry — only read-pinned cycles reach the kill.
-- **B1a′ — CAUSAL HULLS:** generalize `gx_restrict`/`restr_ok` from
-  prefixes to arbitrary po-/rf-closed sets with the write-index renaming
-  (F3); `restrict_linearizes` restated for hulls.
+- **B2d′ — LANDED (2026-08-22) as THE DIRECT LINEARIZATION,
+  `iris/WeakRvwmoTopo.v`:** `topo_linearizes` — for ANY linear extension
+  `L` of `RacyD` (a permutation of the gmo list respecting every `R`
+  edge), `retime G L` (gmo := `L`, rows renamed by the write-rank map
+  `tren`) is deps-consistent, rule-14, `rows_rel`/`wperm`-related to
+  `G`; `topo_exists` — a finite topological sort from acyclicity (the
+  minimal-element descent needs `Decision (RacyD GD x y)`, an instance
+  still to be PROVED: every existential in `greads_byte`/`gwrites_byte`/
+  `gfence_between` is a bounded row search); `normalize_of_acyclic` —
+  exactly `WeakRvwmoNorm.normalize`'s conclusion from acyclicity.  So
+  the exchange normalization is RETIRED as the chain's first step: the
+  chain is now `T2-LIN ⇒ RacyD acyclic ⇒ topo ⇒ T2-1c ⇒ T1`.  B2a–d
+  stay as the landed analysis (their kit and witnesses are what found
+  the three entry shapes).  Three statement corrections recorded in the
+  file's header: the co-max half has the RMW's own write as a case
+  (discharged by `gvisible`'s irreflexivity, since `fr ∖ id`); atomicity
+  needs same-byte monotonicity of the rank map in BOTH directions; the
+  rank map's identity branch off the write range is what makes `wperm`'s
+  injectivity fall out of its own `gwrite_at` clause.
+- **B1a′ — LANDED (2026-08-22), `iris/WeakRvwmoHull.v`:** `gx_hull G cs`
+  = cut each row at `cs` (po-closure by construction), gmo := the
+  FILTERED gmo (a subsequence, no prefix cut), labels renamed by `hren`
+  (write rank inside the hull; identity off it); `hull_ok` = lengths +
+  RF-CLOSURE.  `hull_consistent`, `hull_rule14` (given violation-freeness
+  inside the cut), `gd_hull`/`hull_deps_consistent`, `hull_linearizes`
+  (rows = renamed prefixes, log = the hull's messages), `hull_rows_rel`
+  (the seam B1b uses: `hart_conf_prefix` then `hart_conf_ren`), full-cut
+  identity, and the `erg` instantiation where `restr_ok` fails
+  (`erg_hull_beats_restr`).  Factored as cut-then-rename so B1a's label
+  layer is reused by conversion; the rename layer is `WeakRvwmoNorm`'s
+  plus `WeakRvwmoAcyc`'s transports.  All Closed.
 - **T2-0′ — the two exports (F3′, F3″)** — scope F3″ first.
 - **B2e-3b — THE CERTIFICATION MACHINERY (the E1 build, the route's
   largest item):** the gmo-ordered solo certification of an SCC's
