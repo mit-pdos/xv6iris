@@ -443,3 +443,33 @@ and `LinkIinit.v` were both in that shape and were repaired.
 Before writing a straight-line body, check whether `F` is an instance of a shape
 that is already proved — a body that is just `initlock(&L, "name")` is a member
 of the thin-wrapper family above and needs no proof of its own.
+
+## When the functor shape cannot tie the knot: a recursive function is a resource
+
+The `SpecF`/sealed-functor/`LinkF` shape keeps a function's proof off its
+callees' proofs, but it cannot express a function whose proof needs ITSELF
+one call deeper: the `Link` chain would be cyclic, and no functor
+application closes a cycle. The one such function in xv6 is the park of a
+fresh process (`forkret_park`): proving it runs forkret, hence the trap
+loop, hence syscall, hence kfork, hence the park again. It was an `Axiom`
+for exactly that reason.
+
+The resolution is to tie the knot in the LOGIC: state the function's
+contract as a persistent proposition that callers HOLD (`iris/ParkCap.v`'s
+`park_token γs`, carried in the syscall environment and handed to every
+child), define it as a guarded fixpoint (every recursive occurrence under
+`▷`, so `solve_contractive` goes through), and prove it ONCE at the top
+from the ordinary functor proof, which is stated with the recursive
+occurrences under `▷` too. Callers in the cycle (kfork) take the resource
+as a premise and name no module; only the top-level link (main's cone)
+refers to the proof. Two placement rules made it work and will again:
+
+* the `▷` goes where the proof already strips a later — here the context's
+  own `▷ proc_ctx` — so nothing needs `▷ |==> P ⊢ |==> ▷ P` (false);
+* the resource must be STATABLE below the first contract that carries it
+  (`SpecSyscall`), which meant splitting `UsertrapRes.v` so its park
+  vocabulary sits below the syscall spec and its `SYSCALL` fit check
+  (`UtResFits.v`) above.
+
+`claude-notes/completed/forkret-park.md` §6 is the worked case.
+

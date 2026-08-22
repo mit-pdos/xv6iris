@@ -151,7 +151,6 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   each increment cost, where the landed tree diverged from the report's
   sketches, and the standing constraints.
 - **[`fs-cfg-boot.md`](projects/fs-cfg-boot.md)** — giving `IcacheRef.icfg` and
-- [`projects/forkret-park.md`](projects/forkret-park.md) — retiring the last assumed Link: what `forkret_park_pkg` still costs, after `ForkretParkClose.v` cut it to two resources.
   `FsCfg.fscfg` VALUES: the era-fupd allocation, the `_at` constructor
   discipline that replaces every existential name, the stocked inode pool, the
   two boot kits and how each reaches its consumer, and the adequacy
@@ -260,6 +259,12 @@ in xv6 and the installed rank table. The one thing it left behind —
 everything downstream of `iput` vacuous — is GONE; how, and why no ranking
 could ever have licensed that edge, is in
 [`completed/iput-acquiresleep.md`](completed/iput-acquiresleep.md).
+
+`forkret-park.md` arrived on 2026-08-22: the LAST assumed Link, retired. Read
+it for two things that are not obvious from the tree: why the trap loop's
+two "gap" premises were unsatisfiable and how they became residue-carried
+facts (§4), and why the park had to become a guarded-fixpoint RESOURCE
+(`iris/ParkCap.v`) rather than a functor argument (§6 — a module cycle).
 
 Seven arrived on 2026-08-20, when their work finished: `kexec.md` (the largest
 function in the tree, and the home of **the copyout story** — the most

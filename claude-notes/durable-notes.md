@@ -130,7 +130,7 @@ file, and delete the line when the file goes.
   - **If a CALLER genuinely needs the fact AT `nat`**, do not restate it over `nat` — that regresses straight back to the overflow, and it hides: `reflexivity`/`vm_compute` on the small unfolded factors (`268 * 1024`) succeed FINE in isolation and only overflow inside the real file's Iris/stdpp-heavy import context, so a standalone test says it is safe. `lia`/`nia` cannot bridge it either — past Rocq's abstraction threshold (~5000) a `nat` literal elaborates to an opaque `Nat.of_num_uint`, which `lia` cannot relate to a *computed* product (`(268 * 1024 <= 274432)%nat` fails with "Cannot find witness" though both sides are closed numerals). **Derive the `nat` fact from the `Z` one via `Z.to_nat`**: state `… = Z.to_nat <literal>`, prove `rewrite <- <the Z lemma>, Nat2Z.id; reflexivity`. Both rewrites are symbolic, so it is O(1) regardless of context, and `lia` resolves `Z.to_nat` of a literal symbolically downstream — a transparent drop-in.
 - **Compile-time budget: a single file taking over ~5 minutes is a RED FLAG, not a cost to absorb** — something in a proof is degenerate (a `rewrite ?lemma_a ?lemma_b …` chain over an opaque tower, an unbounded `repeat rewrite` peeling into `s_rs`/`mm_rs`, `set_solver` over `gset (mword n)`, `cbn`/`vm_compute` on data-bearing terms, `iFrame` over a huge context). Bisect with `Time` per lemma and fix the offender; do not ship the slow proof and do not raise timeouts around it.
 - **Fork/parallel discipline:** `make clean-proofs` nukes the shared `.vo` tree and breaks concurrent siblings — a fork must `coqc` only its OWN file, one compile at a time. NEVER `pkill` coqc/rocqworker AT ALL in a shared checkout — not `-f`, not `-x`: `pkill -x coqc`/`pkill -x rocqworker` kills every SIBLING agent's compile too (one agent doing this at the start of each iteration killed ~15 of another's builds and cost a session). Kill only your OWN compile, by the PID you started (`$!` of your background command, or the PID from `run_in_background`). The same self-match trap breaks WAIT loops: `until ! pgrep -f "CoqMakefile -j16"; do …` never terminates (the waiter's own command line contains the pattern) and then makes `pgrep -f CoqMakefile` report a phantom in-progress build to everyone else. Don't poll processes at all — have the build write its own sentinel (`…; echo "EXIT=$?" >> log`) and wait on `grep EXIT` of the log. **And never `git stash` in a shared working tree** — the stash captures every concurrent agent's uncommitted edits along with yours, and the pop conflicts with (or silently wipes) work you never saw. For an "untouched baseline" compile, `git show HEAD:iris/<f>.v > /tmp/copy.v` and compile the copy; leave the live tree alone. **The same rule kills `git commit -a` and `git add -A`**: a sweep-everything commit lands every OTHER agent's in-flight files under YOUR message, and the loser finds their increment already committed, unattributed, with its own record gone missing — one increment's five files were absorbed into a sibling's commit exactly that way. Commit by explicit path (`git commit <paths> -m …`), and before you do, `git status --porcelain` and account for every line that is not yours. **`git commit --amend` and any `git reset` (even `--mixed`/`--soft`) are in the same family**: an amend folds YOUR delta into a SIBLING's last commit (their message, your file), and a `reset` to an older commit drops the siblings' commits off the branch (one lane's commit was wiped that way; the file survived only because it was still on disk). Never amend or reset in a shared tree; if you committed the wrong paths, add a NEW commit that fixes it. Likewise NEVER leave anything staged in the index (`git rm --cached`, `git add` without an immediate commit): a sibling's `git commit <its paths>` will absorb your staged entry into ITS commit. Delete with plain `rm` and let `git commit <path>` record it. Corollary for the reader of a shared tree: `git status` is not a private view, so a file you did not touch appearing modified means a sibling is live — re-check the MIRROR's md5s before trusting any build you started.
-- **A "GAP" PREMISE CAN BE UNSATISFIABLE, AND THREADING ONE UPWARD TURNS A VISIBLE AXIOM INTO INVISIBLE VACUITY.** Several specs in this tree park a known-missing fact as a bare `∀`-premise rather than an `Axiom`, with a header calling it "a real proof obligation for whoever closes the loop, not a hole". CHECK THAT CLAIM BEFORE PROPAGATING ONE. `SpecUservec`'s two are the worked example and both are FALSE as stated: `∀ ws, length ws = TFWORDS → tf_kernel_words_ok kr ksp ws` is refuted by `replicate 36 (ksp + 1)` (`TFWORDS = 36`, `tf_ksp_idx = 1`), and `∀ ms, trap_mstatus_ok ms → … ∧ SPIE = 1` is refuted by any `ms` with those seven bits set and SPIE = 0 (`trap_mstatus_ok` does not mention SPIE). Such a premise cannot be discharged, only inherited — so a caller who supplies it is proving from `False`, and every theorem above becomes vacuous WITHOUT `Print Assumptions` or `tools/proof_coverage.py` reporting anything. The test is thirty seconds: instantiate the quantified data with something the premise cannot constrain and see whether the conjunction survives. The honest fix is to move the fact INTO the resource that carries it (the producer already establishes it one round earlier) rather than quantify over it. Corollary: **an assumed `Link` is sometimes what is KEEPING a top-level theorem honest** — retiring it is only progress if the premises it hides are satisfiable. `claude-notes/projects/forkret-park.md` §4 is the full case.
+- **A "GAP" PREMISE CAN BE UNSATISFIABLE, AND THREADING ONE UPWARD TURNS A VISIBLE AXIOM INTO INVISIBLE VACUITY.** Several specs in this tree park a known-missing fact as a bare `∀`-premise rather than an `Axiom`, with a header calling it "a real proof obligation for whoever closes the loop, not a hole". CHECK THAT CLAIM BEFORE PROPAGATING ONE. `SpecUservec`'s two are the worked example and both are FALSE as stated: `∀ ws, length ws = TFWORDS → tf_kernel_words_ok kr ksp ws` is refuted by `replicate 36 (ksp + 1)` (`TFWORDS = 36`, `tf_ksp_idx = 1`), and `∀ ms, trap_mstatus_ok ms → … ∧ SPIE = 1` is refuted by any `ms` with those seven bits set and SPIE = 0 (`trap_mstatus_ok` does not mention SPIE). Such a premise cannot be discharged, only inherited — so a caller who supplies it is proving from `False`, and every theorem above becomes vacuous WITHOUT `Print Assumptions` or `tools/proof_coverage.py` reporting anything. The test is thirty seconds: instantiate the quantified data with something the premise cannot constrain and see whether the conjunction survives. The honest fix is to move the fact INTO the resource that carries it (the producer already establishes it one round earlier) rather than quantify over it. Corollary: **an assumed `Link` is sometimes what is KEEPING a top-level theorem honest** — retiring it is only progress if the premises it hides are satisfiable. `claude-notes/completed/forkret-park.md` §4 is the full case.
 - **A SINGLE-FILE `coqc` LOOP SILENTLY ACCEPTS A STALE BASE, AND IN A TREE THAT BUILDS ON THE VM THE LOCAL BASE IS ROUTINELY A WHOLE COMMIT BEHIND.** `coqc <one file>.v` loads sibling `.vo` without ever comparing them to their `.v`, so a checkout whose `.vo` were pulled back (or last built) before a mid-tree commit compiles new work happily against the OLD interfaces — for hours, with `git status` clean and every proof green. The tell is one `ls`: `ls -la iris/*.v iris/*.vo` and look for a `.v` NEWER than its own `.vo` (here `UserExec.v` was, by a commit that changed `user_cfg`'s conjuncts and two step engines' invariant masks). The damage is a file written to the old interface that no local check can fail. **Before starting a session of single-file work, run one `make -f CoqMakefile -j<N> -k` (or the VM equivalent) to establish that the base is current**, and validate anything that reaches into an engine's internals — a new leaf file, anything mirroring `WpUmodeStore.v` — with a real build, not a `coqc`. The GCP tree keeps its own `.vo` and rebuilds from synced sources, so `run-on-gcp make` is the cheap authoritative answer.
 - **`make` SAYING "Nothing to be done" WITH ZERO COMPILE LINES IS NOT A GREEN CONE — ON A SHARED BUILD BOX IT IS USUALLY A MTIME ARTEFACT.** A whole-tree sync (`rsync -a`, a `tar` restore, a bulk `touch` of `*.vo` to force "staleness 0") leaves every `.vo` newer than every `.v` — check with `ls --time-style=full-iso`: **identical timestamps to the NANOSECOND across unrelated files is the tell**, and no compile ever produces that. `make` then skips the cone you meant to validate and reports success, which is indistinguishable at a glance from a real green. Force the cone instead of trusting it: take the reverse transitive closure of the file you edited out of `iris/.CoqMakefile.d` (the `X.vo: … Y.vo …` lines are already the dependency graph), `rm` those `.vo/.vos/.vok/.glob`, then `make -f CoqMakefile -jN -k`. The closure is small for a leaf-ish file (`DirLinks.v` → 142) and it is the only way to know the consumers actually recompiled. Do NOT reach for `-B`: that rebuilds the whole tree.
 - **A PARTIALLY-BUILT LANE HOLDS TWO GENERATIONS OF `.vo`, AND "STALENESS 0" FOR ONE TARGET PROVES NOTHING ABOUT A NEW ONE.** A lane built by `make <one>.vo` is green and `make -n` emits 0 compile lines — for that chain. The first file you add that Requires something OUTSIDE it dies with **"Compiled library X makes inconsistent assumptions over library Y"**, which reads like a corrupt checkout and is not one: X was compiled against an older Y, and `make` will never notice because every stale `.vo` is still newer than its own `.v`. **The mtime test that finds them is not "older than the file that was rebuilt"** — that flags every base file the rebuilt one sits on top of (27 false positives out of a 208-file chain) — **it is "older than a `.vo` it DEPENDS on", iterated to a fixpoint** over `iris/.CoqMakefile.d`. `rm` the few that names and re-make. And after adding a `_CoqProject` row, regenerate with `coq_makefile -f _CoqProject -o CoqMakefile` **chained into the same command as the `eval $(opam env …)`** — a regeneration under the wrong switch stamps the wrong Rocq version into `CoqMakefile` and every later build inherits it.
@@ -2238,10 +2238,10 @@ The number goes up; that is the real one.
   the rule protects the user's machine, so relocation forward suffices —
   no re-verification owed.
 
-## The adequacy-print baseline (GR-36, 2026-08-16; SEVEN since fs-cfg-boot stage (e), 2026-08-20)
+## The adequacy-print baseline (GR-36, 2026-08-16; EIGHT and NO assumed Link since 2026-08-22)
 
 `Print Assumptions xv6_power_adequacy_xv6Σ` (SystemAdequacy.v, printed by
-every CI build since 85c21e9f) must show EXACTLY these seven, and merge
+every CI build since 85c21e9f) must show EXACTLY these eight, and merge
 rounds diff against this list textually, not by count. The anchor stays
 IMAGE-FREE in `SystemAdequacy.v` (its `fs_boot_image_eras` premise
 undischarged): any constant naming `FsImgDisk.fsimg_dk` audits at baseline
@@ -2249,26 +2249,32 @@ undischarged): any constant naming `FsImgDisk.fsimg_dk` audits at baseline
 corollaries live in `FsAdequacyImg.v` and are NOT the audit target — see
 `SystemAssumptions.v`'s header.
 
-1. `LinkForkretPark.ForkretPark.forkret_park`            (assumed-Link)
-2. `FunctionalExtensionality.functional_extensionality_dep`
-3. `valid_reservation`    (rv64d extern)
-4. `plat_term_write`      (rv64d extern)
-5. `match_reservation`    (rv64d extern)
-6. `load_reservation`     (rv64d extern)
-7. `cancel_reservation`   (rv64d extern)
+1. `FunctionalExtensionality.functional_extensionality_dep`
+2. `valid_reservation`    (rv64d extern)
+3. `plat_term_write`      (rv64d extern)
+4. `match_reservation`    (rv64d extern)
+5. `load_reservation`     (rv64d extern)
+6. `cancel_reservation`   (rv64d extern)
+7. `ResvAxioms.load_reservation_term`     (the LR/SC hook, at the term level — `iris/ResvAxioms.v`, 2026-08-18)
+8. `ResvAxioms.cancel_reservation_term`   (same)
 
-The ONE assumed-Link left is the runnable park — the "where does a new
-process's half of the kernel environment come from" question, kfork's and
-userinit's alike; the humans' forkret effort owns it. The entry that fell
-on 2026-08-20 was `LinkNameiRootBoot.NameiRootBoot.wp_namei_root_boot`,
-retired by fs-cfg-boot stage (e) exactly as its header predicted — a
-functor application over `LinkNameiRoot.NameiRoot` once `icache_boot_at`
-ran in main's walk and the four icache rows existed at the `namei("/")`
-call; the two config ties are `eq_refl` at the minted `icfg`. The count
-history: seven → eight on 2026-08-19 (userinit's whole-body axiom traded
-for its two real dependencies — the count went UP while the assumed
-surface went DOWN by a whole function; prefer that trade, and do not read
-the count alone) → seven on 2026-08-20.
+**There is no assumed Link any more.** The last one,
+`LinkForkretPark.ForkretPark.forkret_park` (the runnable park — "where does a
+new process's half of the kernel environment come from", kfork's and
+userinit's alike), fell on 2026-08-22: the park is a RESOURCE now
+(`iris/ParkCap.v`'s `park_token`, a guarded fixpoint a process holds inside
+its syscall environment and hands its children), `LinkForkretPark.v` is
+deleted, and `LinkForkretParkPaid.v` is the proved park instantiated at the
+real forkret. `claude-notes/completed/forkret-park.md` has the record, and
+[`design/spec-modules.md`](design/spec-modules.md) the lesson (a module
+cycle is tied in the logic, not in the functors). The entry before it,
+`LinkNameiRootBoot.NameiRootBoot.wp_namei_root_boot`, fell on 2026-08-20
+(fs-cfg-boot stage (e)). The count history: seven → eight on 2026-08-19
+(userinit's whole-body axiom traded for its two real dependencies — the
+count went UP while the assumed surface went DOWN by a whole function;
+prefer that trade, and do not read the count alone) → seven on 2026-08-20
+→ eight on 2026-08-22 (the assumed Link gone; the two `ResvAxioms` term
+axioms, added 2026-08-18, were never entered in this list and are now).
 
 `LinkPanicStub.PanicAssumed.panic_wp_holds` was an earlier assumed Link and
 is gone: `panic()` is proven and every arm links against `SpecPanic`, so the

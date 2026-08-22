@@ -1,6 +1,13 @@
-# forkret_park: the plan to retire the last assumed Link
+# forkret_park: the plan to retire the last assumed Link — DONE 2026-08-22
 
-## CHECKPOINT — 2026-08-21
+**FINISHED.** `LinkForkretPark.v` is deleted; `Print Assumptions` on the
+system theorem shows no assumed Link (durable-notes.md, "The adequacy-print
+baseline"). The record of how is §6 at the end; §§0–5 are the worklist as it
+stood and are kept for their reasoning. The lesson that generalises —
+a module cycle is tied in the logic as a guarded fixpoint, not in the
+functors — is lifted into `design/spec-modules.md`.
+
+## CHECKPOINT — 2026-08-21 (superseded by §6)
 
 **`main` is GREEN at `a2381924` plus the §4 fix (2026-08-22, uncommitted
 at the time of writing).** Every resource E3 was missing now has a producer,
@@ -722,7 +729,72 @@ Single file (list dependencies ahead of it if they changed):
 `opam exec --switch=…` is required — `coqc` is not on the VM's PATH. Local
 `coqc` fails on stale `.vo`. **Rebase before any whole-tree rebuild.**
 
-## 6. Two process lessons from the session that produced this
+## 6. HOW IT CLOSED (2026-08-22): the park is a RESOURCE
+
+### The call-site work was not the end: a module cycle
+
+§3 E3's call-site plumbing landed as written (userinit's six rows,
+`mn_grp_fs`'s, `wire_inv` to main; commits `4df96595`, `7851b14b`), and
+userinit's park on `FORKRET_PARK_PAID` went green. kfork's did not, and
+could not: kfork as a functor over the park's proof needs
+`LinkForkretParkPaid → LinkForkret → LinkUserretClosed → LinkUsertrap →
+LinkSyscall → LinkSysFork → LinkKfork` — a cycle. The park's proof RUNS
+forkret, which runs the trap loop, which dispatches to sys_fork, which is
+kfork. No functor application ties that knot; it is exactly why the Axiom
+existed, and the notes' "then switch the caller" step was wrong about
+kfork.
+
+### The fix: `iris/ParkCap.v`
+
+The park is a persistent proposition `park_token γs` that a process HOLDS
+(last conjunct of `ProofSyscall.syscall_env`, appended; `syscall_env_token`
+reads it) and hands to its children, and it is a GUARDED FIXPOINT:
+
+    park_token γs = ∃ URB, park_cap URB (park_token γs) γs ∗ park_chan URB (park_token γs) γs
+
+* `park_cap URB W γs` is `forkret_park_paid_body` as a `□` wand, with the
+  package AND `W` under `▷` — the park's proof uses neither before the
+  context's own later (`ProofForkretPark`'s `iNext`), and that is what makes
+  the functional contractive.
+* `park_chan URB W γs` is the residue's producer entry
+  (`UsertrapRes.ut_park_intro_body`, which gained a `W` slot beside
+  `first_done`) under a `▷`, for the records of this table.
+* `W := park_token γs` is what forkret hands the closer at the resume, so
+  the CHILD's syscall environment carries a token too. forkret's contract
+  (`SpecForkret`, `fkr_tail`/`fkr_boot`/`wp_forkret`) takes an abstract `W`
+  and passes it through.
+
+kfork (`ProofKforkB5`) and userinit park with `park_token_park`: build
+`N`, `park_env N`, `park_own N`, the child's rows, and apply the token —
+no functor argument. The token is PROVED once, at the top:
+`ProofForkretPark.park_token_intro` (a `FORKRET_PARK_PAID` entry) from
+`forkret_park_paid` plus `usertrap_res_bare_park`, and only main's cone
+(`LinkUserinit` via `LinkForkretParkPaid`) refers to it. `KforkProof` lost
+its `FRP` argument; `LinkKfork` imports no park at all.
+
+### What had to move to make the token statable
+
+`park_token` must sit below `SpecSyscall` (so `syscall_env_park` can take
+it) and above the residue's park vocabulary. So `UsertrapRes.v` was split:
+the `SYSCALL` fit check and the two `USERTRAP_*_PARK` module types are
+`UtResFits.v` now, and `UsertrapRes` no longer imports `SpecSyscall`
+(`K_usertrap` spells `4 + K_sys_exec` out). `SyscParkEnv.park_world γs` —
+the device complement, console, the two global locks, the slot ledger,
+`wire_inv`, the trampoline claim, an `initproc ↦₈□` share — is the
+persistent world a child's park needs, also carried in `syscall_env` and in
+`ut_park_caps`. `ForkretParkClose.v` (the package builder at the concrete
+residue) was deleted as superseded.
+
+### Why `▷` is in the right places, in one paragraph
+
+A parker (kfork) has the token outright from its own environment, applies
+the cap with `▷ package` and `▷ token` (`later_intro`), and gets
+`|==> ▷ proc_ctx`. The park's proof strips its `iNext` first, then has the
+package and the token un-guarded, runs forkret with `W := token`, and
+forkret hands it to the closer, which puts it in the child's `syscall_env`
+un-guarded. Nothing ever needs `▷ |==> P ⊢ |==> ▷ P`, which does not hold.
+
+## 7. Two process lessons from the session that produced this
 
 * **Never regex proof scripts on an unanchored pattern.** A `bslot <ident>` →
   `bslot` rule silently ate a `rewrite /bslot H3` tactic argument and two
