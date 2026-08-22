@@ -1240,10 +1240,10 @@ Section store.
       becomes the lock word's bundle, registered at the CURRENT log length —
       where the protocol's suffix obligation is vacuous, so the word's
       pre-registration history ([initlock]'s plain store) is irrelevant. *)
-  Lemma wlat4L_mint (img : _) (log : list wmsg) (a : Arch.pa) (t : nat)
+  Lemma wlat4_lock_mint (img : _) (log : list wmsg) (a : Arch.pa) (t : nat)
       (w : bv 32) :
     wlat_interp img log -∗ wlat4 a (DfracOwn 1) t w ==∗
-    wlat_interp img log ∗ wlat4L a t w None.
+    wlat_interp img log ∗ wlat4_lock a (length log) t w None.
   Proof.
     rewrite /wlat4 /wlat_pointsto.
     iIntros "Hi ([E0 C0] & [E1 C1] & [E2 C2] & [E3 C3])".
@@ -1255,8 +1255,19 @@ Section store.
             ltac:(rewrite /acc_addr; lia) with "Hi C2") as "[Hi L2]".
     iMod (wlock_register img log (acc_addr a 3) (pa_z a)
             ltac:(rewrite /acc_addr; lia) with "Hi C3") as "[Hi L3]".
-    iModIntro. iFrame "Hi". iExists (length log).
+    iModIntro. iFrame "Hi".
     rewrite /wlat4_lock /wlat4_el /wlock_win. iFrame.
+  Qed.
+
+  (** ... and the [n0]-HIDING form the ordinary lock invariant holds. *)
+  Lemma wlat4L_mint (img : _) (log : list wmsg) (a : Arch.pa) (t : nat)
+      (w : bv 32) :
+    wlat_interp img log -∗ wlat4 a (DfracOwn 1) t w ==∗
+    wlat_interp img log ∗ wlat4L a t w None.
+  Proof.
+    iIntros "Hi Hw".
+    iMod (wlat4_lock_mint img log a t w with "Hi Hw") as "[$ Hw]".
+    iModIntro. by iExists (length log).
   Qed.
 
   (** THE PROTOCOL STORE.  [wlat4_sync_store_prim]'s twin: the state map is
@@ -1345,6 +1356,40 @@ Section store.
     intros Hsh Hst Himg Hlog. iIntros "Hi Hw". rewrite Himg Hlog.
     by iMod (wlat4L_store_prim tid k σ a v t w h h' Hsh Hst with "Hi Hw")
       as "[$ $]".
+  Qed.
+
+  (** THE [n0]-EXPOSED TWINS (T2-0′ / F3″).  A PROTECTED lock — one whose
+      payload's [WProt] bytes must name the same registration point as the
+      word — keeps [n0] visible in its invariant, so its acquire/release
+      cores need the store and the flat reading at a FIXED [n0].  Both are
+      the hiding versions with the existential not taken. *)
+  Lemma wlat4_lock_store_gen (tid : option nat) k (σ σ' : wmstate)
+      (a : Arch.pa) (n0 t : nat) (w v : bv 32) (h h' : option nat) :
+    wlock_shaped (wwrite_msg tid k a 4 v) ->
+    alt_step h (wwrite_msg tid k a 4 v) = Some h' ->
+    wm_img σ' = wm_img σ ->
+    wm_log σ' = (wm_log σ ++ [wwrite_msg tid k a 4 v])%list ->
+    wlat_interp (wm_img σ) (wm_log σ) -∗
+    wlat4_lock a n0 t w h ==∗
+    wlat_interp (wm_img σ') (wm_log σ') ∗
+    wlat4_lock a n0 (S (length (wm_log σ))) v h'.
+  Proof.
+    intros Hsh Hst Himg Hlog. iIntros "Hi Hw". rewrite Himg Hlog.
+    by iMod (wlat4_lock_store_prim tid k σ a v n0 t w h h' Hsh Hst with "Hi Hw")
+      as "[$ $]".
+  Qed.
+
+  Lemma wlat4_lock_flat_gen (σ : wmstate) (a : Arch.pa) (n0 t : nat)
+      (w : bv 32) (h : option nat) :
+    wlog_wf (wm_log σ) -> acc_wf a 4 ->
+    (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
+    wlat4_lock a n0 t w h -∗
+    ⌜(forall j : nat, (j < 4)%nat ->
+        wflat (wm_img σ) (wm_log σ) !! pa_add a j = Some (nth_byte w j)) /\
+     (forall j : nat, (j < 4)%nat -> latest_ts (wm_log σ) (acc_addr a j) = t)⌝.
+  Proof.
+    intros Hwf Hacc. iIntros "Hi [He _]".
+    by iApply (wlat4_el_flat_gen σ a (DfracOwn 1) t w Hwf Hacc with "Hi He").
   Qed.
 
   (** The FLAT reading, [WeakLock.wlat4_flat_gen]'s twin over the lock

@@ -941,8 +941,42 @@ hypotheses of `cs_kill`, machine-grounded.
   and the two kill lemmas `wlp_alt_two_acq` (no `i ≠ j` needed) and
   `wlp_alt_open` (needs "p is i's LAST acquire" — load-bearing).  Note
   `wlp_alt` carries no `base` and requires `n0 ≤ length log`;
-  `wlp_alt_value` is stated at the latest writer.  **F3″** remains:
-  scope it against §4d.3′.
+  `wlp_alt_value` is stated at the latest writer.
+- **T2-0′ — F3″ LANDED (2026-08-22):** the PROTECTED-BYTE FOOTPRINT.
+  A fifth C/D/S state `WProt γ base n0 r0 d` in `WeakGhost.v` with
+  `wprot_at log a base n0 r0` = "every `WCplain` message at `p ≥ r0`
+  writing `a` is authored by `wlp_holder_at log base n0 p`", the rules
+  `wcds_ok_register_prot` / `wcds_ok_store_prot` / `wcds_prot_flip` /
+  `wcds_ok_deregister_prot`, φ's fifth arm `nv_byte_prot`, the kill
+  lemmas `wlp_holder_acq_exists` + `wprot_writer_cs` (the plain writer's
+  acquire is identified and no release of the word lies between it and
+  the write — `(P)` of §4d.1 F6 in machine-checked form), the read-record
+  ghost (`prot_recs`/`prot_read`, class `wprotG`), the seams
+  `wprot_regd` / `wprot_rd_regd` and the exports
+  `weak_ev_adequacy_prot` / `_protread`.  THREE SHAPE DECISIONS the
+  mechanization forced, all recorded in the file's state comment:
+  (i) the state carries the DIRTY AUTHOR `d : option CPU` — a protected
+  byte is not unconditionally clean, since the holder's own plain stores
+  are owned-unpublished until it releases, so φ's conjunct is
+  `wcds_ob_ok d` and the store rule takes `d = None ∨ d = Some c`
+  exactly as `wcds_ok_store_own` does; (ii) the state carries the lock
+  word's registration point `n0` AS WELL AS the byte's `r0`, and the
+  footprint's `WProt` fragments therefore live INSIDE the lock's own
+  invariant (`WeakLock.wplock_body γ γr lk R n0 F`, with `n0` a
+  parameter where `wlock_inv` hides it) — `wprot_at` is a statement
+  about the fold at `n0`, nothing relates two independently-quantified
+  registration points, so the tie must be a resource fact and only an
+  invariant makes a resource fact persistent; (iii) the protected
+  RELEASE core pins the message's class at `WCrel` (where
+  `wrelease_core` makes do with `≠ WCplain`), because the footprint's
+  D→C flip is about PUBLICATION — true at every xv6 site (a plain `sw`
+  under the `fence rw,w`'s `w_relp`).  ENFORCEMENT needed no threading:
+  the generic plain store rule's `s = WClean ∨ s = WDirty c` premise
+  refuses `WProt` outright, and the NON-plain rule is *true* at `WProt`
+  (the clause speaks of plain messages only), so `is_wprot` exists as
+  the boolean but is threaded nowhere.  OPEN: the Iris-level protected
+  store rule is SINGLE-BYTE (`wprot_store` / `WeakLock.wprot_store_core`);
+  the width-4/8 lift is the mechanical `wcds_agree_nonplain4/8` repeat.
 - **B2e-3b — THE CERTIFICATION MACHINERY (the E1 build, the route's
   largest item):** the gmo-ordered solo certification of an SCC's
   first-generation writes from `σ_P`, with the substituted-read
@@ -990,6 +1024,52 @@ certification machinery, R2 as the |V| induction over hulls, R3 only as
 normalization's interface (B2d′ makes them the single cycle
 obligation); and the global `lock_pattern`/`lock_paired` hypotheses of
 B2e-2 as anything but the arithmetic core's per-configuration inputs.
+
+## 4e. B2e-3b's crux, identified (2026-08-22, late): DEPENDENCY SOUNDNESS
+
+The certification step (§4d.2(2)) claims a solo run emits the `K`-write
+`z` with `G`'s label when every read feeding `z` reads its true source.
+That is a VALUE-DETERMINISM property of the emission — "the label at
+row position `k` is a function of the values of the reads in
+`row_deps⁻¹(k)` (transitively) and of the hart's non-memory state" —
+which tier 1 never needed: it used the dependency annotations for
+ORDERING (views) only, and nothing in the tree states that the Sail
+instruction semantics reads exactly the registers the decoded roles
+name.  B2e-3b must prove it, per instruction class, as
+"two emissions from the same program state that agree on the named
+sources agree on the label" (the `LRegW rd srcs` annotation's
+soundness; `WeakDeps` is the decoder, `WeakEvInst`/`WeakEvLang` the
+instrumented step).  Mechanical but wide (every instruction form in
+the image: `tools/gen_code.py`'s whitelist is the inventory).
+
+THE HARD PART IS NOT REGISTERS BUT CSRs AND TRANSLATION.  `WeakDeps`
+gives SYSTEM instructions no role (D-4 — RVWMO's syntactic
+dependencies are on integer/FP registers, and a CSR is neither), so a
+witness value can flow `ld → csrw satp → (sfence.vma) → store` into
+the STORE'S TRANSLATION with no `row_deps` edge — and no RVWMO ppo
+edge either: CSR-mediated ordering is the privileged spec's
+`sfence.vma` discipline, outside RVWMO.  In the declared model the
+store may therefore be gmo-early relative to the load that produced
+its page table, which real hardware cannot do.  RESOLUTION TO BUILD
+(a boundary clause, the W-TV sentence's sibling): the emission records
+a `csrw satp`'s source provenance and gives every later memory event
+of the hart a dependency edge from it (the translation depends on
+`satp`; `sfence.vma` is what makes hardware honor it) — computable in
+`dstep` by a per-hart "translation-context provenance" register,
+value-independent, still ⊆ what hardware enforces.  With that edge
+the soundness statement's "non-memory state" is only the PC path (a
+ctrl-dep matter, already in deps) and the CSRs whose sources are
+tracked.  xv6 writes `satp` at exactly two sites (`kvminithart`,
+`usertrapret`/`trampoline`), from `kernel_pagetable` (static) and
+`p->pagetable`.
+
+Order of work for B2e-3b, revised: (1) the satp-provenance edge in the
+emission (`dstep` + the instance's CSR write annotation); (2) the
+soundness lemma, stated once over `pstep_ev` ("agreement on named
+sources ⇒ agreement on the emitted label and on the named
+destinations"), proved by the instruction inventory; (3) only then the
+solo-run certification of §4d.2(2).  Do (1) and (2) as their own
+slices; each is delegate-sized once the statement is fixed.
 
 ## 5. Honest residual risks — OPEN
 

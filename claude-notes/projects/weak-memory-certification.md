@@ -65,10 +65,14 @@ lemma, the F4a/F5 repairs, and the segment-composition lemma;
 chain's first step is now the direct linearization and `normalize` is
 demoted to analysis; one open item: the `Decision (RacyD GD x y)`
 instance — DONE: `WeakRvwmoDec.v`, `racyD_dec` + `normalize_of_acyclic'`, Closed]; F5's W-TV line landed in `WeakRvwmoConf.dedges` (`row_deps_wtv` non-vacuity); (3) [F3′ DONE the same day — `weak_ev_adequacy_lockalt`, tree green]
-DECIDE the F3″ interface (footprint at `wlock_alloc`, `WProt`
-store/read rules, `lock_auth` into the state interp; spec in route-b
-§4d.3′) BEFORE M4 ports a lock client, then build it; (4) [DONE the same day: B1a′ LANDED — `WeakRvwmoHull.v`, Closed];
-(4b) [F5′ DONE the same day: `WeakDeps.deps_addr`/`deps_rd` (DEC-4), `row_deps_addr_chain` smoke test, tree green, capstone assumptions unchanged]; (4c) B1b's device-order extension (`Rdev` as a sixth R arm; route-b §4d.4 B1b note); (5) B2e-3b certification
+[F3″ DONE the same day — `WProt` + `wprot_at` + the four rules +
+`wprot_writer_cs` in `WeakGhost.v`, the protected lock
+`WeakLock.wplock_body` (footprint fragments INSIDE the lock invariant,
+`n0` a parameter), `weak_ev_adequacy_prot`/`_protread`, tree green; the
+interface is settled for M4's first lock client — see route-b §4d.4's
+F3″ entry for the three shapes the mechanization forced and for the
+one open item, the width-4/8 lift of the single-byte protected store]; (4) [DONE the same day: B1a′ LANDED — `WeakRvwmoHull.v`, Closed];
+(4b) [F5′ DONE the same day: `WeakDeps.deps_addr`/`deps_rd` (DEC-4), `row_deps_addr_chain` smoke test, tree green, capstone assumptions unchanged]; (4c) B1b's device-order extension (`Rdev` as a sixth R arm; route-b §4d.4 B1b note); (5) B2e-3b — READ route-b §4e FIRST: its crux is DEPENDENCY SOUNDNESS (value determinism of the emission modulo provenance), with the satp/translation chain (CSRs have no dep role, D-4) as the hard part; build the satp-provenance edge, then the soundness lemma, then the solo-run certification certification
 machinery; (6) B2e-3c the per-segment classification (the L2′
 content); then B1b, B3, R6.
 

@@ -461,6 +461,439 @@ Section weak_lock.
     iSplitR; [done|]. iFrame "Hfrag HR".
   Qed.
 
+(* ====================================================================== *)
+(** ** 6. THE PROTECTED LOCK — the payload's FOOTPRINT (T2-0′ / F3″,
+    route-b §4d.3′)
+
+    [wlock_inv] protects a payload [R] by an Iris invariant; NOTHING in it
+    says what the payload's BYTES are, and that is exactly what route B's
+    cycle kill needs to know (`(P)` of §4d.1 F6: the message a critical
+    section read was written inside its writer's critical section of the SAME
+    lock).  [wplock_body] is [wlock_inv] with the payload's FOOTPRINT
+    declared: a list [F] of byte addresses whose C/D/S state is
+    [WeakGhost.WProt], registered at the same point [n0] as the word itself.
+
+    WHY THE FRAGMENTS LIVE IN THE INVARIANT, AND WHY [n0] IS A PARAMETER.
+    [wprot_at]'s content is a statement about the fold [wlp_holder_at log
+    base n0 ·]: it is only as good as the registration point it is stated at,
+    and nothing relates two independently-quantified ones.  So the
+    footprint's [n0] and the word's must be THE SAME NUMBER — a resource
+    fact, which can only be made persistent by living in one invariant.
+    Hence [n0] is a parameter here where [wlock_inv] hides it, and the
+    footprint's [WProt] fragments sit next to the word's [WLock] ones.
+    (Everything else about the lock is unchanged: [wplock_body_inv] forgets
+    the footprint and is an ordinary [wlock_inv].) *)
+
+  Context `{!wprotG Σ}.
+
+  Lemma acc_addr_0 (a : Arch.pa) : acc_addr a 0 = pa_z a.
+  Proof. rewrite /acc_addr. lia. Qed.
+
+  (** The dirty author a footprint byte may carry, tied to the lock's state:
+      only the CURRENT holder may have an outstanding owned store on the
+      payload.  φ's D-state, with the lock protocol saying whose it is; the
+      release's flip ([wprot_win_flip]) is what re-establishes it. *)
+  Definition prot_dok (d : option CPU) (st : lock_state) : Prop :=
+    match d with
+    | None => True
+    | Some c => exists b : bool, st = Some (c, b)
+    end.
+
+  Definition wprot_win (γ : gname) (base : Z) (n0 : nat) (F : list Z)
+      (st : lock_state) : iProp Σ :=
+    ([∗ list] a ∈ F, ∃ d : option CPU,
+       wprot_st a γ base n0 n0 d ∗ ⌜prot_dok d st⌝)%I.
+
+  Global Instance wprot_win_timeless γ base n0 F st :
+    Timeless (wprot_win γ base n0 F st).
+  Proof. rewrite /wprot_win. apply _. Qed.
+
+  (** A state change that only ever WIDENS what [prot_dok] allows — the
+      acquire's [None → Some (i, b)] — leaves the window alone. *)
+  Lemma wprot_win_free γ base n0 F st :
+    wprot_win γ base n0 F None -∗ wprot_win γ base n0 F st.
+  Proof.
+    rewrite /wprot_win. iIntros "H".
+    iApply (big_sepL_mono with "H"). intros k a Hk.
+    iIntros "H". iDestruct "H" as (d) "[Hpr %Hd]".
+    destruct d as [c|]; [by destruct Hd as (b & [=])|].
+    iExists None. iFrame "Hpr".
+  Qed.
+
+  Definition wplock_body (γ γr : gname) (lk : Arch.pa) (R : vProp Σ)
+      (n0 : nat) (F : list Z) : iProp Σ :=
+    (∃ (st : lock_state) (t : nat) (v : bv 32) (L : list (Z * nat)),
+       wlat4_lock lk n0 t v (tid_of st) ∗ lock_auth γ st ∗
+       wprot_win γ (pa_z lk) n0 F st ∗
+       prot_recs γr L ∗ ⌜prot_recs_ok n0 L⌝ ∗
+       (⌜st = None⌝ ∗ ⌜v = lock_zero⌝ ∗ lock_frag γ None ∗
+          monPred_at R (view_scl t)
+        ∨ ⌜st ≠ None⌝ ∗ ⌜v ≠ lock_zero⌝))%I.
+
+  (** It IS a lock invariant — the footprint and the records are extra. *)
+  Lemma wplock_body_inv γ γr lk R n0 F :
+    wplock_body γ γr lk R n0 F ⊢ wlock_inv γ lk R.
+  Proof.
+    iIntros "H". iDestruct "H" as (st t v L) "(Hw & Ha & _ & _ & _ & Harm)".
+    iExists st, t, v. iSplitL "Hw"; [by iExists n0|]. iFrame "Ha Harm".
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (** *** 6a. REGISTRATION *)
+
+  (** The whole footprint at once: full-fraction CLEAN fragments in, [WProt]
+      fragments out, all at the current log length — where the protection
+      clause is vacuous, so nothing about the payload's history is required
+      (which is what makes registration legal after the allocator's zeroing
+      and after [initlock]). *)
+  Lemma wprot_register_list (img : _) (log : list wmsg) (F : list Z)
+      (γ : gname) (base : Z) :
+    wlat_interp img log -∗ ([∗ list] a ∈ F, wclean a (DfracOwn 1)) ==∗
+    wlat_interp img log ∗ wprot_win γ base (length log) F None.
+  Proof.
+    induction F as [|a F IH]; iIntros "Hi HF".
+    - iModIntro. rewrite /wprot_win /=. by iFrame.
+    - rewrite /wprot_win /=. iDestruct "HF" as "[Ha HF]".
+      iMod (wprot_register img log a γ base (length log) (Nat.le_refl _)
+              with "Hi Ha") as "[Hi Hpr]".
+      iMod (IH with "Hi HF") as "[Hi Htl]".
+      iModIntro. iFrame "Hi Htl". iExists None. iFrame "Hpr".
+  Qed.
+
+  (** DEREGISTRATION, purely at the ghost level: with the lock free every
+      byte's dirty author is [None], so the whole footprint comes back as
+      ordinary clean fragments.  (The Iris-level side conditions — the full
+      fractions, and that the lock is free — are the caller's; this is the
+      ghost half, and it is what a [pipefree]-shaped client spends.) *)
+  Lemma wprot_deregister_list (img : _) (log : list wmsg) (F : list Z)
+      (γ : gname) (base : Z) (n0 : nat) :
+    wlat_interp img log -∗ wprot_win γ base n0 F None ==∗
+    wlat_interp img log ∗ ([∗ list] a ∈ F, wclean a (DfracOwn 1)).
+  Proof.
+    induction F as [|a F IH]; iIntros "Hi HF".
+    - iModIntro. by iFrame.
+    - rewrite /wprot_win /=. iDestruct "HF" as "[Ha HF]".
+      iDestruct "Ha" as (d) "[Hpr %Hd]".
+      destruct d as [c|]; [by destruct Hd as (b & [=])|].
+      iMod (wprot_deregister img log a γ base n0 n0 with "Hi Hpr")
+        as "[Hi Hcl]".
+      iMod (IH with "Hi HF") as "[Hi Htl]".
+      iModIntro. by iFrame.
+  Qed.
+
+  (** THE ALLOCATION.  [wlock_alloc]'s protected twin: the lock word AND the
+      declared footprint are registered in the same instant, so they share
+      the registration point — which is the whole reason the invariant names
+      it. *)
+  Lemma wplock_alloc (lk : Arch.pa) (R : vProp Σ) (F : list Z) (t : nat)
+      img log E :
+    wlat_interp img log -∗
+    wlat4 lk (DfracOwn 1) t lock_zero -∗
+    ([∗ list] a ∈ F, wclean a (DfracOwn 1)) -∗
+    monPred_at R (view_scl t) ={E}=∗
+    wlat_interp img log ∗
+    ∃ γ γr : gname, inv wlockN (wplock_body γ γr lk R (length log) F).
+  Proof.
+    iIntros "Hi Hw HF HR".
+    iMod (own_alloc ((●E (None : leibnizO lock_state)
+                      ⋅ ◯E (None : leibnizO lock_state)) : lockUR))
+      as (γ) "[Ha Hf]".
+    { apply excl_auth_valid. }
+    iMod prot_recs_alloc as (γr) "Hrecs".
+    iMod (wlat4_lock_mint img log lk t lock_zero with "Hi Hw") as "[Hi Hw]".
+    iMod (wprot_register_list img log F γ (pa_z lk) with "Hi HF")
+      as "[Hi Hwin]".
+    iMod (inv_alloc wlockN _ (wplock_body γ γr lk R (length log) F)
+            with "[Hw Ha Hf HR Hwin Hrecs]") as "#Hinv".
+    { iNext. iExists None, t, lock_zero, []. rewrite /tid_of.
+      iFrame "Hw Ha Hwin Hrecs". iSplitR.
+      { iPureIntro. intros ap Hap. by apply elem_of_nil in Hap. }
+      iLeft. iSplitR; [done|]. iSplitR; [done|]. iFrame "Hf HR". }
+    iModIntro. iFrame "Hi". iExists γ, γr. iExact "Hinv".
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (** *** 6b. THE ADEQUACY SEAMS
+
+      [WeakLock.wlock_inv_regd]'s twins.  Both hand out the byte's [WProt]
+      fragment TOGETHER WITH the lock word's byte-0 [WLock] fragment at the
+      same [n0], which is what makes the exported protection clause and the
+      exported alternation speak of one and the same fold. *)
+  Lemma wplock_inv_regd (γ γr : gname) (lk : Arch.pa) R (n0 : nat)
+      (F : list Z) (a : Z) :
+    a ∈ F ->
+    inv wlockN (wplock_body γ γr lk R n0 F) -∗ wprot_regd wlockN a (pa_z lk).
+  Proof.
+    intros Hin. apply elem_of_list_lookup in Hin as [k Hk].
+    iIntros "#Hinv". rewrite /wprot_regd.
+    iExists (wplock_body γ γr lk R n0 F). iFrame "Hinv". iModIntro.
+    iIntros "Hbody".
+    iDestruct "Hbody" as (st t v L) "(Hw & Ha & Hwin & Hrec & %Hok & Harm)".
+    iDestruct "Hw" as "[Hel (L0 & L1 & L2 & L3)]".
+    iDestruct (big_sepL_lookup_acc _ _ k a Hk with "Hwin") as "[Hb Hwin]".
+    iDestruct "Hb" as (d) "[Hpr %Hd]".
+    replace (acc_addr lk 0) with (pa_z lk) by (rewrite /acc_addr; lia).
+    iExists γ, n0, n0, d, (tid_of st). iFrame "Hpr L0".
+    iIntros "Hpr L0". iExists st, t, v, L. iFrame "Ha Hrec Harm".
+    iSplitL "Hel L0 L1 L2 L3".
+    { rewrite /wlat4_lock /wlock_win.
+      replace (acc_addr lk 0) with (pa_z lk) by (rewrite /acc_addr; lia).
+      iFrame "Hel L0 L1 L2 L3". }
+    iSplitL; [|by iPureIntro].
+    iApply "Hwin". iExists d. iFrame "Hpr". by iPureIntro.
+  Qed.
+
+  Lemma wplock_inv_rd_regd (γ γr : gname) (lk : Arch.pa) R (n0 : nat)
+      (F : list Z) (a : Z) :
+    a ∈ F ->
+    inv wlockN (wplock_body γ γr lk R n0 F) -∗
+    wprot_rd_regd wlockN γr a (pa_z lk).
+  Proof.
+    intros Hin. apply elem_of_list_lookup in Hin as [k Hk].
+    iIntros "#Hinv". rewrite /wprot_rd_regd.
+    iExists (wplock_body γ γr lk R n0 F). iFrame "Hinv". iModIntro.
+    iIntros "Hbody".
+    iDestruct "Hbody" as (st t v L) "(Hw & Ha & Hwin & Hrec & %Hok & Harm)".
+    iDestruct "Hw" as "[Hel (L0 & L1 & L2 & L3)]".
+    iDestruct (big_sepL_lookup_acc _ _ k a Hk with "Hwin") as "[Hb Hwin]".
+    iDestruct "Hb" as (d) "[Hpr %Hd]".
+    replace (acc_addr lk 0) with (pa_z lk) by (rewrite /acc_addr; lia).
+    iExists γ, n0, n0, d, (tid_of st), L. iFrame "Hpr L0 Hrec".
+    iSplitR; [by iPureIntro|].
+    iIntros "Hpr L0 Hrec". iExists st, t, v, L. iFrame "Ha Hrec Harm".
+    iSplitL "Hel L0 L1 L2 L3".
+    { rewrite /wlat4_lock /wlock_win.
+      replace (acc_addr lk 0) with (pa_z lk) by (rewrite /acc_addr; lia).
+      iFrame "Hel L0 L1 L2 L3". }
+    iSplitL; [|by iPureIntro].
+    iApply "Hwin". iExists d. iFrame "Hpr". by iPureIntro.
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (** *** 6c. THE PROTECTED STORE AND THE READ RECORD *)
+
+  (** The holder fact, off the invariant and the token: the lock word's fold
+      names THIS hart at the log's top.  This is the premise the pure
+      protected-store rule ([WeakGhost.wcds_ok_store_prot]) takes, and the
+      only thing a protected store site needs the lock for. *)
+  Lemma wplock_holder (γ γr : gname) (lk : Arch.pa) R (n0 : nat) (F : list Z)
+      (i : CPU) (img : _) (log : list wmsg) :
+    wlat_interp img log -∗ wplock_body γ γr lk R n0 F -∗ locked γ i -∗
+    ⌜wlp_holder_at log (pa_z lk) n0 (length log)
+       = Some (Some (fin_to_nat i))⌝.
+  Proof.
+    iIntros "Hi Hbody Htok".
+    iDestruct "Hbody" as (st t v L) "(Hw & Ha & _ & _ & _ & _)".
+    iDestruct (locked_state with "Ha Htok") as %->.
+    iDestruct "Hw" as "[_ (L0 & _ & _ & _)]".
+    iDestruct (wlp_alt_of_lock with "Hi L0") as %[_ Hf].
+    iPureIntro. rewrite -Hf /acc_addr. f_equal. lia.
+  Qed.
+
+  (** THE PROTECTED STORE, at the altitude the two lock cores are stated at:
+      the message the step appended is an OWNED store of this hart to a
+      footprint byte, and it is legal because the token says this hart holds
+      the lock.  The byte's value element is retargeted and its state becomes
+      "dirty by [i]"; the lock's own bundle is untouched. *)
+  Lemma wprot_store_core (γ γr : gname) (lk : Arch.pa) R (n0 : nat)
+      (F : list Z) (i : CPU) (a : Z) (m : wmsg) (σ σ' : wmstate)
+      (t : nat) (w b : bv 8) :
+    a ∈ F ->
+    msg_byte m a = Some b -> (forall a', a' <> a -> msg_byte m a' = None) ->
+    wm_ak m = WCplain -> wm_tid m = Some (fin_to_nat i) ->
+    wm_img σ' = wm_img σ -> wm_log σ' = (wm_log σ ++ [m])%list ->
+    (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
+    wplock_body γ γr lk R n0 F -∗ locked γ i -∗
+    wlat_elem a (DfracOwn 1) t w ==∗
+    wlat_interp (wm_img σ') (wm_log σ') ∗ wplock_body γ γr lk R n0 F ∗
+    locked γ i ∗ wlat_elem a (DfracOwn 1) (S (length (wm_log σ))) b.
+  Proof.
+    intros Hin Hma Hother Hk Htid Himg Hlog.
+    apply elem_of_list_lookup in Hin as [j Hj].
+    iIntros "Hi Hbody Htok Hel".
+    iDestruct (wplock_holder γ γr lk R n0 F i (wm_img σ) (wm_log σ)
+                 with "Hi Hbody Htok") as %Hhold.
+    iDestruct "Hbody" as (st t0 v L) "(Hw & Ha & Hwin & Hrec & %Hok & Harm)".
+    iDestruct (locked_state with "Ha Htok") as %->.
+    iDestruct (big_sepL_lookup_acc _ _ j a Hj with "Hwin") as "[Hb Hwin]".
+    iDestruct "Hb" as (d) "[Hpr %Hd]".
+    assert (Hdd : d = None \/ d = Some i).
+    { destruct d as [c|]; [|by left]. right.
+      destruct Hd as (bb & [= <- _]). done. }
+    iMod (wprot_store (wm_img σ) (wm_log σ) m a γ (pa_z lk) n0 n0 d i t w b
+            Hk Htid Hdd Hhold Hma Hother with "Hi Hel Hpr")
+      as "(Hi & Hel & Hpr)".
+    iModIntro. rewrite Himg Hlog. iFrame "Hi Hel Htok".
+    iExists (Some (i, true)), t0, v, L. iFrame "Ha Hw Hrec Harm".
+    iSplitL "Hwin Hpr"; [|by iPureIntro].
+    iApply "Hwin". iExists (Some i). iFrame "Hpr". iPureIntro. by exists true.
+  Qed.
+
+  (** THE READ RECORD.  The protected LOAD rule is the ordinary load PLUS
+      this: a persistent receipt that byte [a] of this lock's payload was
+      read at log position [p].  Its only content is the position bound the
+      export re-states ([r0 ≤ p], with [r0 = n0] here), which is what tells
+      the kill that the read it is chasing happened inside the protected
+      window. *)
+  Lemma wprot_read_record (γ γr : gname) (lk : Arch.pa) R (n0 : nat)
+      (F : list Z) (a : Z) (p : nat) :
+    (n0 <= p)%nat ->
+    wplock_body γ γr lk R n0 F ==∗
+    wplock_body γ γr lk R n0 F ∗ prot_read γr a p.
+  Proof.
+    intros Hp. iIntros "Hbody".
+    iDestruct "Hbody" as (st t v L) "(Hw & Ha & Hwin & Hrec & %Hok & Harm)".
+    iMod (prot_recs_append γr L a p with "Hrec") as "[Hrec #Hrd]".
+    iModIntro. iFrame "Hrd".
+    iExists st, t, v, (L ++ [(a, p)])%list. iFrame "Hw Ha Hwin Hrec Harm".
+    iPureIntro. intros ap Hap. apply elem_of_app in Hap as [Hap|Hap].
+    - exact (Hok ap Hap).
+    - apply elem_of_list_singleton in Hap as ->. exact Hp.
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (** *** 6d. THE TWO CORES, AT A FIXED REGISTRATION POINT
+
+      [wacquire_core] / [wrelease_core] verbatim, over [wplock_body] instead
+      of [wlock_inv] — the [n0] the footprint names has to survive the two
+      protocol steps, and [wlock_inv] hides it.  The only NEW content is what
+      happens to the footprint window:
+
+        - the ACQUIRE takes the lock from FREE, where every payload byte's
+          dirty author is [None] (the previous holder published its backlog
+          when it released), so the window survives by [wprot_win_free];
+        - the RELEASE hands it back, and its [WCrel] message publishes the
+          holder's whole owned backlog — so every payload byte flips D→C
+          ([wprot_win_flip]).  That is why this core needs the release
+          message's class PINNED at [WCrel] where [wrelease_core] makes do
+          with [≠ WCplain]: the weaker fact keeps the lock WORD clean but
+          does not publish anything, and the footprint's φ obligation is
+          about publication.  Every xv6 release site has it (the store is a
+          plain [sw] — [ak_latest] false — under the [fence rw,w]'s
+          [w_relp], so [WeakInterp.wm_class_of] computes [WCrel]). *)
+
+  Lemma wprot_win_flip (img : _) (log : list wmsg) (mrel : wmsg)
+      (γ : gname) (base : Z) (n0 : nat) (F : list Z) (i : CPU) (bb : bool) :
+    wm_tid mrel = Some (fin_to_nat i) -> wm_ak mrel = WCrel ->
+    wlat_interp img (log ++ [mrel]) -∗
+    wprot_win γ base n0 F (Some (i, bb)) ==∗
+    wlat_interp img (log ++ [mrel]) ∗ wprot_win γ base n0 F None.
+  Proof.
+    intros Htid Hk. induction F as [|a F IH]; iIntros "Hi HF".
+    - iModIntro. by iFrame.
+    - rewrite /wprot_win /=. iDestruct "HF" as "[Ha HF]".
+      iDestruct "Ha" as (d) "[Hpr %Hd]".
+      iMod (IH with "Hi HF") as "[Hi Htl]".
+      iAssert (|==> wlat_interp img (log ++ [mrel]) ∗
+                    wprot_st a γ base n0 n0 None)%I with "[Hi Hpr]" as ">[Hi Hpr]".
+      { destruct d as [c|]; last first.
+        { iModIntro. iFrame "Hi Hpr". }
+        destruct Hd as (b0 & [= <- _]).
+        iMod (wprot_flip img log mrel i a γ base n0 n0 Htid Hk with "Hi Hpr")
+          as "[Hi Hpr]". iModIntro. iFrame "Hi Hpr". }
+      iModIntro. iFrame "Hi Htl". iExists None. iFrame "Hpr".
+  Qed.
+
+  Lemma wpacquire_core (γ γr : gname) (lk : Arch.pa) R (n0 : nat)
+      (F : list Z) (i : CPU) (tid : option nat) (σ σ' : wmstate) :
+    wlog_wf (wm_log σ) -> acc_wf lk 4 -> wQ_amo_aq tid lk lock_one σ σ' ->
+    tid = Some (fin_to_nat i) ->
+    (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
+    wplock_body γ γr lk R n0 F -∗
+    ∃ v : bv 32,
+      ⌜forall j : nat, (j < 4)%nat ->
+         wflat (wm_img σ) (wm_log σ) !! pa_add lk j = Some (nth_byte v j)⌝ ∗
+      (|==> wlat_interp (wm_img σ') (wm_log σ') ∗
+            wplock_body γ γr lk R n0 F ∗
+            ((⌜v = lock_zero⌝ ∗ vwp_hold R (wm_ws σ') ∗ locked γ i)
+             ∨ ⌜v ≠ lock_zero⌝)).
+  Proof.
+    intros Hwf Hacc Heff Htid.
+    destruct Heff as ((Himg & (kc & Hlog & _) & Hle & Hflr) & Hgain & Hexcl).
+    iIntros "Hi Hbody".
+    iDestruct "Hbody" as (st t v L) "(Hw & Ha & Hwin & Hrec & %Hok & Harm)".
+    iDestruct (wlat4_lock_flat_gen σ lk n0 t v (tid_of st) Hwf Hacc
+                 with "Hi Hw") as %[Hflat Hts].
+    iExists v. iSplitR; [by iPureIntro|].
+    iDestruct "Harm" as "[(-> & -> & Hfrag & HR)|(%Hst & %Hv)]".
+    - (* FREE: a successful acquire, and the window widens for free *)
+      iMod (wlat4_lock_store_gen tid WCexcl σ σ' lk n0 t lock_zero lock_one
+              None (Some (fin_to_nat i))
+              (wlock_shaped_acq tid lk lock_one)
+              ltac:(rewrite Htid; apply alt_step_acq_msg) Himg Hexcl
+              with "Hi Hw") as "[Hi Hw]".
+      iMod (lock_take γ i with "Ha Hfrag") as "[Ha Hpre]".
+      iMod (lock_setcpu γ (Some (i, false)) i with "Ha Hpre") as "(_ & Ha & Htok)".
+      iDestruct (wprot_win_free γ (pa_z lk) n0 F (Some (i, true))
+                   with "Hwin") as "Hwin".
+      iModIntro. iFrame "Hi". iSplitR "HR Htok".
+      + iExists (Some (i, true)), (S (length (wm_log σ))), lock_one, L.
+        iFrame "Hw Ha Hwin Hrec". iSplitR; [by iPureIntro|].
+        iRight. iSplitR; [done|]. iPureIntro. apply lock_one_ne_zero.
+      + iLeft. iSplitR; [done|]. iFrame "Htok".
+        rewrite /vwp_hold.
+        iApply (monPred_mono R (view_scl t) (ws_view (wm_ws σ'))).
+        { rewrite -(Hts 0%nat ltac:(lia)). apply Hgain. lia. }
+        iExact "HR".
+    - (* HELD: a failed swap; nothing about the footprint moves *)
+      destruct st as [[j b]|]; [|by destruct Hst].
+      iMod (wlat4_lock_store_gen tid WCexcl σ σ' lk n0 t v lock_one
+              (Some (fin_to_nat j)) (Some (fin_to_nat j))
+              (wlock_shaped_acq tid lk lock_one)
+              (alt_step_fail_msg tid lk (fin_to_nat j)) Himg Hexcl
+              with "Hi Hw") as "[Hi Hw]".
+      iModIntro. iFrame "Hi". iSplitR "".
+      + iExists (Some (j, b)), (S (length (wm_log σ))), lock_one, L.
+        iFrame "Hw Ha Hwin Hrec". iSplitR; [by iPureIntro|].
+        iRight. iSplitR; [done|]. iPureIntro. apply lock_one_ne_zero.
+      + iRight. by iPureIntro.
+  Qed.
+
+  Lemma wprelease_core (γ γr : gname) (lk : Arch.pa) R (n0 : nat)
+      (F : list Z) (i : CPU) (tid : option nat) (σ σ' : wmstate) :
+    wQ_store tid lk lock_zero σ σ' ->
+    tid = Some (fin_to_nat i) ->
+    (* the release's message is RELEASE-CLASS, not merely non-plain: it is
+       what publishes the footprint's owned backlog.  Pinned exactly as
+       [wQ_amo_aq_w] pins [WCexcl] for the acquire's write half; every xv6
+       release site has it (a plain [sw] — [ak_latest] false — under the
+       [fence rw,w]'s [w_relp], so [WeakInterp.wm_class_of] computes
+       [WCrel]). *)
+    wm_log σ' = (wm_log σ ++ [wwrite_msg tid WCrel lk 4 lock_zero])%list ->
+    ws_bounded (wm_ws σ) (length (wm_log σ)) ->
+    (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
+    wplock_body γ γr lk R n0 F -∗
+    locked γ i -∗
+    vwp_hold R (wm_ws σ) ==∗
+    wlat_interp (wm_img σ') (wm_log σ') ∗ wplock_body γ γr lk R n0 F.
+  Proof.
+    intros (Himg & _ & Hle & Hflr) Htid Hrel Hbnd.
+    iIntros "Hi Hbody Htok HR".
+    iDestruct "Hbody" as (st t v L) "(Hw & Ha & Hwin & Hrec & %Hok & _)".
+    iDestruct (locked_state with "Ha Htok") as %->.
+    iAssert (monPred_at R (view_scl (S (length (wm_log σ)))))%I
+      with "[HR]" as "HR".
+    { by iApply (wwp_release_deposit R σ Hbnd with "HR"). }
+    iMod (wlat4_lock_store_gen tid WCrel σ σ' lk n0 t v lock_zero
+            (Some (fin_to_nat i)) None
+            (wlock_shaped_rel tid WCrel lk ltac:(discriminate))
+            ltac:(rewrite Htid; apply alt_step_rel_msg) Himg Hrel
+            with "Hi Hw") as "[Hi Hw]".
+    iMod (lock_clrcpu γ (Some (i, true)) i with "Ha Htok") as "(_ & Ha & Hpre)".
+    iMod (lock_give γ (Some (i, false)) i with "Ha Hpre") as "(_ & Ha & Hfrag)".
+    (* THE FOOTPRINT FLIP: the release message is the log's last and is
+       [WCrel], so every payload byte's owned backlog is published *)
+    rewrite Himg Hrel.
+    iMod (wprot_win_flip (wm_img σ) (wm_log σ)
+            (wwrite_msg tid WCrel lk 4 lock_zero) γ (pa_z lk) n0 F i true
+            ltac:(by rewrite Htid) ltac:(reflexivity) with "Hi Hwin")
+      as "[Hi Hwin]".
+    iModIntro. iFrame "Hi".
+    iExists None, (S (length (wm_log σ))), lock_zero, L.
+    iFrame "Hw Ha Hwin Hrec". iSplitR; [by iPureIntro|].
+    iLeft. iSplitR; [done|]. iSplitR; [done|]. iFrame "Hfrag HR".
+  Qed.
+
 End weak_lock.
 
 (* ======================================================================

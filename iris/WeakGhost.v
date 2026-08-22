@@ -86,6 +86,25 @@ Local Open Scope Z_scope.
     spelled out — the same shape [FsCrash.fs_hist_auth] uses. *)
 Notation wlogR := (mono_listR (leibnizO wmsg)).
 
+(** THE READ-RECORD ALGEBRA (T2-0′ / F3″).  A protected LOAD leaves a
+    persistent RECORD "byte [a] was read, as a byte of this lock's payload,
+    at log position [p]" — a monotone list of [(a, p)] pairs, one ghost per
+    registered lock.  It is what lets the kill know that the read whose value
+    it is chasing happened INSIDE the protected window ([r0 ≤ p]); nothing
+    else about a load is exported.
+
+    It is a SEPARATE class rather than a field of [weakGpreS]: the record
+    ghost is allocated per lock, by the lock library, and no rule of the
+    memory model mentions it — so making it a [weakGS] field would put it in
+    the ~50-site state-interpretation reassembly for nothing.  It composes
+    exactly as [lockG] does. *)
+Notation wprecR := (mono_listR (leibnizO (Z * nat))).
+
+Class wprotG (Σ : gFunctors) := WprotG { wprot_recG :: inG Σ wprecR }.
+Definition wprotΣ : gFunctors := #[ GFunctor wprecR ].
+Global Instance subG_wprotG Σ : subG wprotΣ Σ -> wprotG Σ.
+Proof. solve_inG. Qed.
+
 (** THE C/D/S STATE of a byte (the φ-upgrade's three-state protocol; see
     [claude-notes/design/weak-memory-phi-upgrade.md] §1).  It rides in a
     SECOND ghost map, keyed by the same [Z] addresses as the latest-write map
@@ -145,12 +164,57 @@ Notation wlogR := (mono_listR (leibnizO wmsg)).
                      about the pre-registration history — where [initlock]'s
                      plain store sits.  Registration therefore CONSUMES a
                      clean state and carries it along; every protocol store is
-                     non-plain, so clean is preserved for free. *)
+                     non-plain, so clean is preserved for free.
+
+      - [WProt γ base n0 r0 d] — THE FIFTH STATE (tier-2 T2-0′ / F3″, see
+                     [claude-notes/design/weak-memory-route-b.md] §4d.3′):
+                     the byte is in the PAYLOAD (footprint) of the lock word
+                     at [base], whose ghost is [γ] and whose registration
+                     point is [n0], and it is PROTECTED from log position
+                     [r0] on ([n0 ≤ r0]; the lock library registers both at
+                     once, so [r0 = n0] there).  The obligation
+                     ([wcds_prot]) is φ's, PLUS the protection clause
+                     [wprot_at]: every [WCplain] message at or after [r0]
+                     that writes the byte is authored by the lock's HOLDER at
+                     that position — the holder being F3′'s fold
+                     [wlp_holder_at] evaluated on the lock word's own byte
+                     [base] at [n0].  This is `(P)` of route-b §4d.1 F6, and
+                     it is what the CS-chained arm of the cycle kill
+                     consumes.
+
+                     THE φ HALF AND WHY [d] IS THERE.  A protected byte is
+                     NOT unconditionally clean: the holder's own plain
+                     stores inside its critical section are owned and
+                     UNPUBLISHED until it releases, which is exactly the C→D
+                     move of the three-state protocol.  So the state carries
+                     the dirty author [d : option CPU] and its φ conjunct is
+                     [wcds_ob_ok] — [WClean]'s obligation at [None],
+                     [WDirty c]'s at [Some c].  The protected store rule
+                     ([wcds_ok_store_prot]) takes [d = None ∨ d = Some c]
+                     exactly as the owned store rule takes [WClean ∨ WDirty
+                     c], and the D→C flip at the release is
+                     [wcds_prot_flip], the twin of [wcds_dirty_flip].  ([γ]
+                     is IDENTIFICATION ONLY — no clause of [wcds_prot]
+                     mentions it; it is what lets a client's [locked γ c] and
+                     the byte's state name the same lock.)
+
+                     ENFORCEMENT.  The generic PLAIN store rule
+                     ([wcds_ok_store_own]) demands [s = WClean ∨ s = WDirty
+                     c], so it refuses a [WProt] byte outright — the same
+                     disequality every generic store site already reads off
+                     the [wclean]/[wown_st]/[sync_byte] fragment it holds,
+                     no new premise threaded anywhere.  ([is_wprot] is the
+                     boolean form, for a site that wants to say it.)  The
+                     NON-plain rule ([wcds_ok_store_nonplain]) is TRUE at
+                     [WProt] and stays available: [wprot_at] speaks of plain
+                     messages only, and no site can reach the byte without
+                     the exclusive fragment anyway. *)
 Inductive wcds :=
   | WClean
   | WDirty (c : CPU)
   | WSync
-  | WLock (base : Z) (n0 : nat) (h : option nat).
+  | WLock (base : Z) (n0 : nat) (h : option nat)
+  | WProt (γ : gname) (base : Z) (n0 r0 : nat) (d : option CPU).
 
 Global Instance wcds_eq_dec : EqDecision wcds.
 Proof. solve_decision. Defined.
@@ -1059,19 +1123,91 @@ Definition wcds_lock (log : list wmsg) (a base : Z) (n0 : nat)
     (h : option nat) : Prop :=
   wcds_clean log a /\ wlp_at log a base n0 /\ wlp_alt log a n0 h.
 
+(* ---------------------------------------------------------------------- *)
+(** *** THE PROTECTED-BYTE FOOTPRINT (tier-2 T2-0′ / F3″, route-b §4d.3′)
+
+    The lock word's own protocol ([wlp_at] / [wlp_alt]) says who holds the
+    lock at every position.  THE FOOTPRINT says what that buys: a byte
+    declared to be in the lock's payload may be plain-written only by the
+    hart the fold names as the holder.  That is the one fact the CS-chained
+    arm of route B's cycle kill cannot read off the emission — "the message
+    this critical-section read observed was written INSIDE its writer's
+    critical section of the SAME lock" — and it is a pure predicate of the
+    log, so the state interpretation exports it at every reachable
+    configuration.
+
+    [n0] is the LOCK WORD's registration point (the fold's origin, F3′), [r0]
+    the BYTE's: the protection clause is quantified over [r0 ≤ p], leaving
+    the byte's pre-registration history — [initlock]'s plain store, the
+    allocator's zeroing — entirely unconstrained, exactly as [wlp_at]'s
+    suffix does for the word. *)
+
+(** The fold does not see an append below its cut point. *)
+Lemma wlp_holder_app log ms a n0 p :
+  (p <= length log)%nat ->
+  wlp_holder_at (log ++ ms) a n0 p = wlp_holder_at log a n0 p.
+Proof. intros Hp. rewrite /wlp_holder_at take_app_le //. Qed.
+
+(** The φ obligation, indexed by the DIRTY AUTHOR: [None] is [WClean]'s,
+    [Some c] is [WDirty c]'s.  (The state-level twin of [wcds_ob], which the
+    context-indexed owned surface already uses; kept pure and separate so
+    that [wcds_ok] does not have to call itself.) *)
+Definition wcds_ob (b : option CPU) : wcds :=
+  match b with None => WClean | Some c => WDirty c end.
+
+Definition wcds_ob_ok (log : list wmsg) (a : Z) (d : option CPU) : Prop :=
+  match d with
+  | None => wcds_clean log a
+  | Some c => wcds_dirty log a c
+  end.
+
+(** THE PROTECTION CLAUSE, per byte: every owned store at or after [r0] that
+    reaches the byte is the lock's holder's.  [wm_tid m] is an [option agent]
+    and the fold's value is an [option (option nat)], so the equation reads
+    "the fold is DEFINED at [p] and names exactly this message's author". *)
+Definition wprot_at (log : list wmsg) (a base : Z) (n0 r0 : nat) : Prop :=
+  (n0 <= r0)%nat /\
+  forall p m, log !! p = Some m -> (r0 <= p)%nat -> is_Some (msg_byte m a) ->
+    wm_ak m = WCplain -> wlp_holder_at log base n0 p = Some (wm_tid m).
+
+(** ... and the state's own obligation: φ's, at the dirty author the state
+    carries, PLUS the protection clause. *)
+Definition wcds_prot (log : list wmsg) (a base : Z) (n0 r0 : nat)
+    (d : option CPU) : Prop :=
+  wcds_ob_ok log a d /\ wprot_at log a base n0 r0.
+
 Definition wcds_ok (log : list wmsg) (a : Z) (s : wcds) : Prop :=
   match s with
   | WClean => wcds_clean log a
   | WDirty c => wcds_dirty log a c
   | WSync => wcds_sync log a
   | WLock base n0 h => wcds_lock log a base n0 h
+  | WProt _ base n0 r0 d => wcds_prot log a base n0 r0 d
   end.
+
+Lemma wcds_ok_ob log a d : wcds_ok log a (wcds_ob d) <-> wcds_ob_ok log a d.
+Proof. by destruct d. Qed.
 
 (** The state a NON-PROTOCOL store may be taken at.  A [WLock] byte is
     exactly the one that may not (its write rule is [wcds_ok_store_lock]),
     and this boolean is what every generic store site now threads. *)
 Definition is_wlock (s : wcds) : bool :=
   match s with WLock _ _ _ => true | _ => false end.
+
+(** ... and the FIFTH state's boolean, for a site that wants to name it.  It
+    is NOT threaded through the non-plain store rule (which is true at
+    [WProt]); the PLAIN rule refuses the state by its [WClean ∨ WDirty c]
+    premise, which is where the enforcement lives. *)
+Definition is_wprot (s : wcds) : bool :=
+  match s with WProt _ _ _ _ _ => true | _ => false end.
+
+Lemma wcds_prot_ob log a γ base n0 r0 d :
+  wcds_ok log a (WProt γ base n0 r0 d) -> wcds_ob_ok log a d.
+Proof. by intros [? _]. Qed.
+
+Lemma wcds_prot_wprot log a γ base n0 r0 d :
+  wcds_ok log a (WProt γ base n0 r0 d) -> wprot_at log a base n0 r0.
+Proof. by intros [_ ?]. Qed.
 
 Lemma wcds_lock_clean log a base n0 h :
   wcds_ok log a (WLock base n0 h) -> wcds_clean log a.
@@ -1104,10 +1240,12 @@ Proof.
   assert (Hcln : wcds_clean log a -> wcds_clean (log ++ ms) a).
   { intros Hcl p m Hp. destruct (Hcl p m (Hback p m Hp)) as [?|?];
       [by left|right; by apply wpublished_app]. }
-  destruct s as [ | c | | base n0 h ]; simpl.
+  assert (Hdrt : forall c, wcds_dirty log a c -> wcds_dirty (log ++ ms) a c).
+  { intros c Hdi p m Hp. destruct (Hdi p m (Hback p m Hp)) as [?|[?|?]];
+      [by left|right; left; by apply wpublished_app|by right; right]. }
+  destruct s as [ | c | | base n0 h | γ base n0 r0 d ]; simpl.
   - exact Hcln.
-  - intros Hdi p m Hp. destruct (Hdi p m (Hback p m Hp)) as [?|[?|?]];
-      [by left|right; left; by apply wpublished_app|by right; right].
+  - exact (Hdrt c).
   - intros Hsy p m Hp. exact (Hsy p m (Hback p m Hp)).
   - intros [Hcl [[Hrng Hlp] Halt]]. split; [by apply Hcln|].
     split; [|by apply wlp_alt_app]. split; [exact Hrng|].
@@ -1115,6 +1253,19 @@ Proof.
     apply lookup_app_Some in Hp as [Hp|[_ Hp]]; [by apply (Hlp p m)|].
     exfalso. apply elem_of_list_lookup_2, Hno in Hp.
     rewrite Hp in Hs. by destruct Hs.
+  - (* the FIFTH arm: φ's half frames as its own state does, and the
+       protection clause is about messages of the OLD log only — the append
+       writes none of the byte, and the fold below a cut point does not see
+       an append ([wlp_holder_app]). *)
+    intros [Hob [Hle Hpr]]. split.
+    { destruct d as [c|]; simpl in Hob |- *; [by apply Hdrt|by apply Hcln]. }
+    split; [exact Hle|]. intros p m Hp Hr0 Hs Hk.
+    apply lookup_app_Some in Hp as [Hp|[_ Hp]]; last first.
+    { exfalso. apply elem_of_list_lookup_2, Hno in Hp.
+      rewrite Hp in Hs. by destruct Hs. }
+    rewrite (wlp_holder_app log ms base n0 p
+               ltac:(pose proof (lookup_lt_Some _ _ _ Hp); lia)).
+    exact (Hpr p m Hp Hr0 Hs Hk).
 Qed.
 
 (** ... and the STORE step at the byte the message writes.  The state moves
@@ -1199,13 +1350,29 @@ Proof.
     apply lookup_app_Some in Hp as [Hp|[_ Hp]]; [by split_and!|].
     exfalso. destruct (p - length log)%nat as [|n]; simpl in Hp;
       [|by rewrite lookup_nil in Hp]. simplify_eq; by apply Hk. }
-  destruct s as [ | c | | base n0 h ]; simpl in Hok |- *.
-  - intros p m Hp. destruct (Hok p m (Hback p m Hp)) as [?|?];
-      [by left|right; by apply wpublished_app].
-  - intros p m Hp. destruct (Hok p m (Hback p m Hp)) as [?|[?|?]];
-      [by left|right; left; by apply wpublished_app|by right; right].
+  assert (Hcln : wcds_clean log a -> wcds_clean (log ++ [mnew]) a).
+  { intros Hc p m Hp. destruct (Hc p m (Hback p m Hp)) as [?|?];
+      [by left|right; by apply wpublished_app]. }
+  assert (Hdrt : forall c, wcds_dirty log a c -> wcds_dirty (log ++ [mnew]) a c).
+  { intros c Hd p m Hp. destruct (Hd p m (Hback p m Hp)) as [?|[?|?]];
+      [by left|right; left; by apply wpublished_app|by right; right]. }
+  destruct s as [ | c | | base n0 h | γ base n0 r0 d ]; simpl in Hok |- *.
+  - exact (Hcln Hok).
+  - exact (Hdrt c Hok).
   - intros p m Hp. exact (Hok p m (Hback p m Hp)).
   - simpl in Hnl. discriminate.
+  - (* TRUE at [WProt]: [wprot_at] constrains PLAIN messages only, and the
+       appended one is not plain, so the new position's obligation is
+       vacuous. *)
+    destruct Hok as [Hob [Hle Hpr]]. split.
+    { destruct d as [c|]; simpl in Hob |- *; [by apply Hdrt|by apply Hcln]. }
+    split; [exact Hle|]. intros p m Hp Hr0 Hs Hkm.
+    apply lookup_app_Some in Hp as [Hp|[Hge Hp]]; last first.
+    { exfalso. destruct (p - length log)%nat as [|n]; simpl in Hp;
+        [|by rewrite lookup_nil in Hp]. by (simplify_eq; apply Hk). }
+    rewrite (wlp_holder_app log [mnew] base n0 p
+               ltac:(pose proof (lookup_lt_Some _ _ _ Hp); lia)).
+    exact (Hpr p m Hp Hr0 Hs Hkm).
 Qed.
 
 Lemma wcds_ok_store_clean log mnew a :
@@ -1305,6 +1472,172 @@ Proof.
   intros p m Hp Hn0 _. exfalso. apply lookup_lt_Some in Hp. lia.
 Qed.
 
+(* ---------------------------------------------------------------------- *)
+(** *** THE PROTECTED-BYTE RULES (T2-0′ / F3″)
+
+    Four rules, in the same shapes the [WLock] arm has: REGISTER (a clean
+    byte joins the footprint), STORE (the holder's owned store), FLIP (the
+    release publishes the holder's backlog, D→C) and DEREGISTER (the byte
+    leaves the footprint with its φ obligation intact). *)
+
+(** THE REGISTRATION.  At the log's own length the protection clause is
+    VACUOUS — nothing about the byte's history is required, which is what
+    makes registration legal after [initlock] and after the allocator's
+    zeroing — and the byte starts with no outstanding owned store, i.e. at
+    the state its clean fragment already certifies. *)
+Lemma wcds_ok_register_prot log a base n0 :
+  (n0 <= length log)%nat ->
+  wcds_clean log a ->
+  wcds_prot log a base n0 (length log) None.
+Proof.
+  intros Hn0 Hcl. split; [exact Hcl|]. split; [exact Hn0|].
+  intros p m Hp Hr0 _ _. exfalso. apply lookup_lt_Some in Hp. lia.
+Qed.
+
+(** THE PROTECTED STORE — the rule the whole export exists to enforce: an
+    owned ([WCplain]) message may reach a footprint byte only if its author
+    is the lock's HOLDER at the log's top, which is where the appended
+    message sits.  The [d = None ∨ d = Some c] premise is φ's, verbatim from
+    [wcds_ok_store_own]: a second hart's outstanding owned store would be
+    lost by the retarget, and the protocol forbids one anyway (it would have
+    been made by a previous holder, who published it at its release —
+    [wcds_prot_flip]). *)
+Lemma wcds_ok_store_prot log mnew a base n0 r0 d (c : CPU) :
+  wm_ak mnew = WCplain -> wm_tid mnew = Some (fin_to_nat c) ->
+  (d = None \/ d = Some c) ->
+  wlp_holder_at log base n0 (length log) = Some (Some (fin_to_nat c)) ->
+  wcds_prot log a base n0 r0 d ->
+  wcds_prot (log ++ [mnew]) a base n0 r0 (Some c).
+Proof.
+  intros Hk Htid Hd Hhold [Hob [Hle Hpr]]. split.
+  - (* φ: the owned-store step of the three-state protocol, at [d]'s state *)
+    assert (Hs : wcds_ok log a (wcds_ob d) /\
+                 (wcds_ob d = WClean \/ wcds_ob d = WDirty c)).
+    { destruct Hd as [-> | ->]; simpl; (split; [exact Hob|]);
+        [by left|by right]. }
+    destruct Hs as [Hok Hor].
+    pose proof (wcds_ok_store_own log mnew a c _ Htid Hor Hok) as Hstep.
+    by rewrite /wcds_own_step Hk in Hstep.
+  - split; [exact Hle|]. intros p m Hp Hr0 Hsm Hkm.
+    apply lookup_app_Some in Hp as [Hp|[Hge Hp]].
+    + rewrite (wlp_holder_app log [mnew] base n0 p
+                 ltac:(pose proof (lookup_lt_Some _ _ _ Hp); lia)).
+      exact (Hpr p m Hp Hr0 Hsm Hkm).
+    + destruct (p - length log)%nat as [|n] eqn:Hn; simpl in Hp;
+        [|by rewrite lookup_nil in Hp].
+      assert (p = length log) as -> by lia. injection Hp as <-.
+      rewrite (wlp_holder_app log [mnew] base n0 (length log) ltac:(lia)).
+      by rewrite Hhold Htid.
+Qed.
+
+(** THE DEREGISTRATION: the byte leaves the footprint carrying exactly the
+    φ obligation its dirty author names — [WClean]'s when the lock is free
+    (which is when a client may hand the payload back), [WDirty c]'s
+    otherwise.  Purely a projection; the fractions and the lock's freedom are
+    the Iris-level side conditions. *)
+Lemma wcds_ok_deregister_prot log a base n0 r0 d :
+  wcds_prot log a base n0 r0 d -> wcds_ok log a (wcds_ob d).
+Proof. intros [Hob _]. by destruct d. Qed.
+
+(* ---------------------------------------------------------------------- *)
+(** *** THE KILL LEMMA (route-b §4d.3′, "what the kill consumes")
+
+    The footprint's export, read backwards.  A plain message writing a
+    protected byte at [p ≥ r0] is the holder's; unfolding the fold that says
+    so gives the holder's SUCCESSFUL ACQUIRE — the last position at which the
+    word was free — together with the fact that NO release of the word (no
+    zero write at all) lies between it and [p].  That pair is precisely the
+    CS-coverage hypothesis [WeakRvwmoLock.cs_kill] carries, now
+    machine-grounded rather than assumed. *)
+
+(** The fold's own inversion: a held word was acquired, and has not been
+    released since. *)
+Lemma wlp_holder_acq_exists log a n0 p j :
+  wlp_holder_at log a n0 p = Some (Some j) ->
+  exists q mq, (n0 <= q < p)%nat /\ log !! q = Some mq /\
+    is_Some (msg_byte mq a) /\ wm_data mq <> wlock_zero4 /\
+    wm_tid mq = Some j /\ wlp_holder_at log a n0 q = Some None /\
+    (forall r mr, (q < r < p)%nat -> log !! r = Some mr ->
+       is_Some (msg_byte mr a) -> wm_data mr <> wlock_zero4).
+Proof.
+  induction p as [|p IH]; intros Hp.
+  { rewrite (wlp_holder_small log a n0 0 ltac:(lia)) in Hp. discriminate. }
+  destruct (decide (S p <= n0)%nat) as [Hle|Hgt].
+  { rewrite (wlp_holder_small log a n0 (S p) Hle) in Hp. discriminate. }
+  destruct (log !! p) as [m|] eqn:Hm; last first.
+  { (* past the end of the log: the fold has not moved *)
+    apply lookup_ge_None in Hm.
+    rewrite (wlp_holder_big log a n0 (S p) ltac:(lia))
+            -(wlp_holder_big log a n0 p ltac:(lia)) in Hp.
+    destruct (IH Hp) as (q & mq & [Hq1 Hq2] & Hlk & Hw & Hnz & Ht & Hfree & Hno).
+    exists q, mq. split_and!;
+      [lia|lia|exact Hlk|exact Hw|exact Hnz|exact Ht|exact Hfree|].
+    intros r mr Hr Hlr Hwr. destruct (decide (r < p)%nat) as [Hlt|Hge];
+      [exact (Hno r mr ltac:(lia) Hlr Hwr)|].
+    exfalso. apply lookup_lt_Some in Hlr. lia. }
+  destruct (decide (n0 <= p)%nat) as [Hn0p|Hn0p]; [|lia].
+  rewrite (wlp_holder_step log a n0 p m Hn0p Hm) in Hp.
+  destruct (wlp_holder_at log a n0 p) as [h|] eqn:Hh; [|discriminate].
+  destruct (mwrites a m) eqn:Hwm; last first.
+  { (* the message does not touch the word *)
+    destruct (IH Hp) as (q & mq & [Hq1 Hq2] & Hlk & Hw & Hnz & Ht & Hfree & Hno).
+    exists q, mq. split_and!;
+      [lia|lia|exact Hlk|exact Hw|exact Hnz|exact Ht|exact Hfree|].
+    intros r mr Hr Hlr Hwr. destruct (decide (r < p)%nat) as [Hlt|Hge];
+      [exact (Hno r mr ltac:(lia) Hlr Hwr)|].
+    assert (r = p) as -> by lia. rewrite Hm in Hlr. injection Hlr as <-.
+    exfalso. rewrite (proj1 (mwrites_false a m) ltac:(done)) in Hwr.
+    by destruct Hwr. }
+  apply mwrites_true in Hwm.
+  destruct (decide (wm_data m = wlock_zero4)) as [Hz|Hnz].
+  { exfalso. by destruct (alt_step_zero h m (Some j) Hz Hp) as (? & _ & _). }
+  destruct (alt_step_nonzero h m (Some j) Hnz Hp)
+    as (_ & _ & Hfromfree & Hfromheld).
+  destruct h as [t|].
+  - (* a FAILED swap: the holder was already [j], so the acquire is earlier *)
+    assert (Some t = Some j) as [= <-] by (symmetry; apply Hfromheld; done).
+    destruct (IH eq_refl)
+      as (q & mq & [Hq1 Hq2] & Hlk & Hw & Hnzq & Ht & Hfree & Hno).
+    exists q, mq. split_and!;
+      [lia|lia|exact Hlk|exact Hw|exact Hnzq|exact Ht|exact Hfree|].
+    intros r mr Hr Hlr Hwr. destruct (decide (r < p)%nat) as [Hlt|Hge];
+      [exact (Hno r mr ltac:(lia) Hlr Hwr)|].
+    assert (r = p) as -> by lia. rewrite Hm in Hlr. by injection Hlr as <-.
+  - (* a SUCCESSFUL acquire: [p] is the position we were looking for *)
+    exists p, m. split_and!;
+      [lia|lia|exact Hm|exact Hwm|exact Hnz| |exact Hh|].
+    + by rewrite -(Hfromfree eq_refl).
+    + intros r mr Hr. lia.
+Qed.
+
+(** THE EXPORTED CONSUMPTION.  [(P)] of route-b §4d.1 F6: the plain writer of
+    a protected byte holds the lock, its acquire is identified, and its
+    critical section is still open at the write. *)
+Lemma wprot_writer_holds log a base n0 r0 p m j :
+  wprot_at log a base n0 r0 ->
+  log !! p = Some m -> (r0 <= p)%nat -> is_Some (msg_byte m a) ->
+  wm_ak m = WCplain -> wm_tid m = Some j ->
+  wlp_holder_at log base n0 p = Some (Some j).
+Proof.
+  intros [_ Hpr] Hp Hr0 Hs Hk Ht.
+  rewrite (Hpr p m Hp Hr0 Hs Hk) Ht //.
+Qed.
+
+Lemma wprot_writer_cs log a base n0 r0 p m j :
+  wprot_at log a base n0 r0 ->
+  log !! p = Some m -> (r0 <= p)%nat -> is_Some (msg_byte m a) ->
+  wm_ak m = WCplain -> wm_tid m = Some j ->
+  exists q mq, (n0 <= q < p)%nat /\ log !! q = Some mq /\
+    is_Some (msg_byte mq base) /\ wm_data mq <> wlock_zero4 /\
+    wm_tid mq = Some j /\ wlp_holder_at log base n0 q = Some None /\
+    (forall r mr, (q < r < p)%nat -> log !! r = Some mr ->
+       is_Some (msg_byte mr base) -> wm_data mr <> wlock_zero4).
+Proof.
+  intros Hpr Hp Hr0 Hs Hk Ht.
+  apply wlp_holder_acq_exists.
+  exact (wprot_writer_holds log a base n0 r0 p m j Hpr Hp Hr0 Hs Hk Ht).
+Qed.
+
 (** THE FLIP, purely.  A byte that is dirty by [c] is CLEAN as soon as [c]'s
     release store is the log's LAST message: that message publishes every
     earlier position, hence every one of [c]'s outstanding own stores.  This
@@ -1320,6 +1653,20 @@ Proof.
   destruct (Hdi p m Hp) as [?|[?|Hc]]; [by left|by right|].
   right. rewrite Hc. exists q, mq. split_and!; try done.
   destruct Hp as (Hlk & _). apply lookup_lt_Some in Hlk. lia.
+Qed.
+
+(** THE D→C FLIP, [wcds_dirty_flip]'s twin: once the holder's release
+    message is the log's LAST, its whole owned backlog is published, so every
+    byte of the footprint returns to the "no outstanding store" state.  This
+    is what a release site applies to the whole footprint before it gives the
+    lock back — the protected twin of the deposit flip. *)
+Lemma wcds_prot_flip log a base n0 r0 (c : CPU) q mq :
+  log !! q = Some mq -> wm_tid mq = Some (fin_to_nat c) -> wm_ak mq = WCrel ->
+  (length log <= S q)%nat ->
+  wcds_prot log a base n0 r0 (Some c) -> wcds_prot log a base n0 r0 None.
+Proof.
+  intros Hq Htid Hk Hlen [Hob Hpr]. split; [|exact Hpr].
+  exact (wcds_dirty_flip log a c q mq Hq Htid Hk Hlen Hob).
 Qed.
 
 (** THE LAZY UPGRADE, purely (φ-upgrade §1.5).  The flip above needs the
@@ -1658,6 +2005,19 @@ Lemma nv_byte_lock log c' a n base n0 h :
   wcds_lock log a base n0 h -> nv_byte log c' a n.
 Proof. intros [Hcl _]. by apply nv_byte_clean. Qed.
 
+(** φ'S FIFTH ARM: a protected byte pays the violation-freedom obligation
+    exactly as the C/D state its dirty author names does — which is what lets
+    a protected store leaf discharge [nv_ok] off the very fragment it hands
+    back. *)
+Lemma nv_byte_prot log (c : CPU) a n base n0 r0 d :
+  wcds_prot log a base n0 r0 d -> (d = None \/ d = Some c) ->
+  nv_byte log c a n.
+Proof.
+  intros [Hob _] Hd. destruct Hd as [-> | ->]; simpl in Hob.
+  - by apply nv_byte_clean.
+  - by apply nv_byte_dirty.
+Qed.
+
 (** The uniform reading: any state a hart may legitimately PRESENT for a
     byte — clean at any fraction, dirty by itself, or sync — discharges the
     obligation at that byte.  [WeakGhost.wown_st] is exactly the first two,
@@ -1736,6 +2096,10 @@ Proof. intros [H _] n. by apply nv_byte_clean. Qed.
 
 Lemma nv_free_lock log a base n0 h : wcds_lock log a base n0 h -> nv_free log a.
 Proof. intros [H _] c n. by apply nv_byte_clean. Qed.
+
+Lemma nv_free_prot log a base n0 r0 :
+  wcds_prot log a base n0 r0 None -> nv_free log a.
+Proof. intros [Hob _] c n. by apply nv_byte_clean. Qed.
 
 Lemma nv_byte_of_free log c a n : nv_free log a -> nv_byte log c a n.
 Proof. intros H. apply H. Qed.
@@ -2278,6 +2642,42 @@ Section resources.
     iDestruct (ghost_map_elem_agree with "H1 H2") as %Hq. by inversion Hq.
   Qed.
 
+  (** THE PROTECTED-BYTE FRAGMENT (T2-0′ / F3″).  Exclusive, like
+      [wlock_st]: it is the byte's registration witness AND the carrier of
+      the dirty author [d], and only its holder — the lock's payload owner —
+      may write the byte.  It is incompatible with [wclean] / [wown_st] /
+      [sync_byte] by the ghost map, which is where the plain store rule's
+      refusal is paid for. *)
+  Definition wprot_st (a : Z) (γ : gname) (base : Z) (n0 r0 : nat)
+      (d : option CPU) : iProp Σ :=
+    wcds_el a (DfracOwn 1) (WProt γ base n0 r0 d).
+
+  Global Instance wprot_st_timeless a γ base n0 r0 d :
+    Timeless (wprot_st a γ base n0 r0 d).
+  Proof. rewrite /wprot_st. apply _. Qed.
+
+  Lemma wprot_st_lookup a γ base n0 r0 d mc :
+    ghost_map_auth weak_cds_name 1 mc -∗ wprot_st a γ base n0 r0 d -∗
+    ⌜mc !! a = Some (WProt γ base n0 r0 d)⌝.
+  Proof.
+    iIntros "Ha Hel". rewrite /wprot_st /wcds_el.
+    by iDestruct (ghost_map_lookup with "Ha Hel") as %Hlk.
+  Qed.
+
+  Lemma wprot_st_clean_excl a γ base n0 r0 d dq :
+    wprot_st a γ base n0 r0 d -∗ wclean a dq -∗ False.
+  Proof.
+    rewrite /wprot_st /wclean /wcds_el. iIntros "H1 H2".
+    iDestruct (ghost_map_elem_agree with "H1 H2") as %Hq. by inversion Hq.
+  Qed.
+
+  Lemma wprot_st_lock_excl a γ base n0 r0 d base' n0' h :
+    wprot_st a γ base n0 r0 d -∗ wlock_st a base' n0' h -∗ False.
+  Proof.
+    rewrite /wprot_st /wlock_st /wcds_el. iIntros "H1 H2".
+    iDestruct (ghost_map_elem_agree with "H1 H2") as %Hq. by inversion Hq.
+  Qed.
+
   (** THE OWNED STATE: clean, or dirty by THIS hart.  The [∃] is what makes
       the surface absorb both, so that a store's postcondition needs no case
       split at any call site. *)
@@ -2292,6 +2692,15 @@ Section resources.
 
   Lemma wdirty_own_st c a : wdirty c a -∗ wown_st c a.
   Proof. iIntros "H". iExists (WDirty c). iFrame "H". by iRight. Qed.
+
+  Lemma wprot_st_own_excl (c : CPU) a γ base n0 r0 d :
+    wprot_st a γ base n0 r0 d -∗ wown_st c a -∗ False.
+  Proof.
+    iIntros "H1 H2". iDestruct "H2" as (s) "[Hel %Hs]".
+    rewrite /wprot_st /wcds_el.
+    iDestruct (ghost_map_elem_agree with "H1 Hel") as %Hq.
+    destruct Hs as [-> | ->]; by inversion Hq.
+  Qed.
 
   (** A full-fraction state element and a sync witness cannot coexist. *)
   Lemma wcds_el_sync_excl a s : wcds_el a (DfracOwn 1) s -∗ sync_byte a -∗ False.
@@ -2494,6 +2903,149 @@ Section resources.
     apply wcds_ok_register; [exact Hrng|exact (Hagc a WClean Hlk)].
   Qed.
 
+  (** *** THE PROTECTED-BYTE OPERATIONS (T2-0′ / F3″)
+
+      Registration, the owned store, the release flip and deregistration —
+      the ghost halves of the four pure rules.  Each is one ghost-map update
+      against the C/D/S auth, exactly like the [WLock] ones. *)
+
+  (** REGISTRATION: a clean byte joins the footprint of the lock registered
+      at [base] with ghost [γ] and registration point [n0], protected from
+      the CURRENT log length on — where the protection clause is vacuous, so
+      nothing about the byte's history is required. *)
+  Lemma wprot_register img log a γ base (n0 : nat) :
+    (n0 <= length log)%nat ->
+    wlat_interp img log -∗ wclean a (DfracOwn 1) ==∗
+    wlat_interp img log ∗ wprot_st a γ base n0 (length log) None.
+  Proof.
+    intros Hn0. iIntros "Hi Hel".
+    iDestruct "Hi" as (m mc) "(Hauth & %Hag & Hc & %Hagc)".
+    rewrite /wclean /wcds_el.
+    iDestruct (ghost_map_lookup with "Hc Hel") as %Hlk.
+    iMod (ghost_map_update (WProt γ base n0 (length log) None) with "Hc Hel")
+      as "[Hc Hel]".
+    iModIntro. iFrame "Hel".
+    iExists m, (<[a := WProt γ base n0 (length log) None]> mc).
+    iFrame "Hauth Hc". iSplitR; [iPureIntro; exact Hag|].
+    iPureIntro. apply wcds_agree_insert; [exact Hagc|].
+    apply wcds_ok_register_prot; [exact Hn0|exact (Hagc a WClean Hlk)].
+  Qed.
+
+  (** DEREGISTRATION: the byte leaves the footprint carrying the C/D state
+      its dirty author names.  Stated at [d = None] — the shape a client has
+      when the lock is free, which is the only moment the payload may be
+      dismantled — so what comes back is an ordinary clean fragment. *)
+  Lemma wprot_deregister img log a γ base n0 r0 :
+    wlat_interp img log -∗ wprot_st a γ base n0 r0 None ==∗
+    wlat_interp img log ∗ wclean a (DfracOwn 1).
+  Proof.
+    iIntros "Hi Hel".
+    iDestruct "Hi" as (m mc) "(Hauth & %Hag & Hc & %Hagc)".
+    rewrite /wprot_st /wclean /wcds_el.
+    iDestruct (ghost_map_lookup with "Hc Hel") as %Hlk.
+    iMod (ghost_map_update WClean with "Hc Hel") as "[Hc Hel]".
+    iModIntro. iFrame "Hel". iExists m, (<[a := WClean]> mc).
+    iFrame "Hauth Hc". iSplitR; [iPureIntro; exact Hag|].
+    iPureIntro. apply wcds_agree_insert; [exact Hagc|].
+    exact (wcds_ok_deregister_prot log a base n0 r0 None
+             (Hagc a _ Hlk)).
+  Qed.
+
+  (** THE D→C FLIP at a release site, [wlat_flip]'s twin: the releasing
+      hart's [WCrel] message is the log's LAST, so its whole owned backlog is
+      published and every footprint byte returns to [d = None]. *)
+  Lemma wprot_flip img log (mrel : wmsg) (c : CPU) a γ base n0 r0 :
+    wm_tid mrel = Some (fin_to_nat c) -> wm_ak mrel = WCrel ->
+    wlat_interp img (log ++ [mrel]) -∗ wprot_st a γ base n0 r0 (Some c) ==∗
+    wlat_interp img (log ++ [mrel]) ∗ wprot_st a γ base n0 r0 None.
+  Proof.
+    intros Htid Hk. iIntros "Hi Hel".
+    iDestruct "Hi" as (m mc) "(Hauth & %Hag & Hc & %Hagc)".
+    rewrite /wprot_st /wcds_el.
+    iDestruct (ghost_map_lookup with "Hc Hel") as %Hlk.
+    iMod (ghost_map_update (WProt γ base n0 r0 None) with "Hc Hel")
+      as "[Hc Hel]".
+    iModIntro. iFrame "Hel".
+    iExists m, (<[a := WProt γ base n0 r0 None]> mc).
+    iFrame "Hauth Hc". iSplitR; [iPureIntro; exact Hag|].
+    iPureIntro. apply wcds_agree_insert; [exact Hagc|].
+    apply (wcds_prot_flip _ _ _ _ _ c (length log) mrel).
+    - rewrite lookup_app_r; [|lia]. by rewrite Nat.sub_diag.
+    - exact Htid.
+    - exact Hk.
+    - rewrite length_app /=. lia.
+    - exact (Hagc a _ Hlk).
+  Qed.
+
+  (** THE PROTECTED STORE, at the ghost altitude: the byte's VALUE element is
+      retargeted at the message the step appended and its state moves to
+      "dirty by the storing hart".  The holder premise is the whole content
+      of the rule — the message's author must be the hart the lock word's
+      fold names at the log's top — and the client discharges it from the
+      lock invariant plus its [locked] token. *)
+  Lemma wprot_store img log (mnew : wmsg) a γ base n0 r0 d (c : CPU)
+      (t : nat) (w b : bv 8) :
+    wm_ak mnew = WCplain -> wm_tid mnew = Some (fin_to_nat c) ->
+    (d = None \/ d = Some c) ->
+    wlp_holder_at log base n0 (length log) = Some (Some (fin_to_nat c)) ->
+    msg_byte mnew a = Some b ->
+    (forall a', a' <> a -> msg_byte mnew a' = None) ->
+    wlat_interp img log -∗ wlat_elem a (DfracOwn 1) t w -∗
+    wprot_st a γ base n0 r0 d ==∗
+    wlat_interp img (log ++ [mnew]) ∗
+    wlat_elem a (DfracOwn 1) (S (length log)) b ∗
+    wprot_st a γ base n0 r0 (Some c).
+  Proof.
+    intros Hk Htid Hd Hhold Hma Hother. iIntros "Hi He Hs".
+    iDestruct "Hi" as (mm mc) "(Hauth & %Hag & Hc & %Hagc)".
+    rewrite /wlat_elem /wprot_st /wcds_el.
+    iDestruct (ghost_map_lookup with "Hc Hs") as %Hlk.
+    iMod (ghost_map_update (S (length log), b) with "Hauth He")
+      as "[Hauth He]".
+    iMod (ghost_map_update (WProt γ base n0 r0 (Some c)) with "Hc Hs")
+      as "[Hc Hs]".
+    iModIntro. iFrame "He Hs".
+    iExists (<[a := (S (length log), b)]> mm),
+            (<[a := WProt γ base n0 r0 (Some c)]> mc).
+    iFrame "Hauth Hc". iSplitR.
+    { iPureIntro. by apply wlat_agree_store. }
+    iPureIntro. intros a' s' Ha'.
+    destruct (decide (a' = a)) as [->|Hne].
+    - rewrite lookup_insert in Ha'. injection Ha' as <-.
+      exact (wcds_ok_store_prot log mnew a base n0 r0 d c Hk Htid Hd Hhold
+               (Hagc a _ Hlk)).
+    - rewrite lookup_insert_ne // in Ha'.
+      apply wcds_ok_app; [|by apply Hagc].
+      intros m0 Hm0. apply elem_of_list_singleton in Hm0 as ->.
+      by apply Hother.
+  Qed.
+
+  (** THE READINGS off the fragment: the protection clause itself (the
+      export), and φ's obligation (what a protected leaf pays with). *)
+  Lemma wprot_at_of_prot img log a γ base n0 r0 d :
+    wlat_interp img log -∗ wprot_st a γ base n0 r0 d -∗
+    ⌜wprot_at log a base n0 r0⌝.
+  Proof.
+    iIntros "Hi He". iDestruct (wcds_lookup with "Hi He") as %Hok.
+    iPureIntro. exact (wcds_prot_wprot log a γ base n0 r0 d Hok).
+  Qed.
+
+  Lemma nv_byte_of_prot img log (c : CPU) a γ base n0 r0 d n :
+    (d = None \/ d = Some c) ->
+    wlat_interp img log -∗ wprot_st a γ base n0 r0 d -∗ ⌜nv_byte log c a n⌝.
+  Proof.
+    intros Hd. iIntros "Hi He".
+    iDestruct (wcds_lookup with "Hi He") as %Hok.
+    iPureIntro. exact (nv_byte_prot log c a n base n0 r0 d Hok Hd).
+  Qed.
+
+  Lemma nv_free_of_prot img log a γ base n0 r0 :
+    wlat_interp img log -∗ wprot_st a γ base n0 r0 None -∗ ⌜nv_free log a⌝.
+  Proof.
+    iIntros "Hi He". iDestruct (wcds_lookup with "Hi He") as %Hok.
+    iPureIntro. exact (nv_free_prot log a base n0 r0 Hok).
+  Qed.
+
 
   (** The accessor M2's store leaf uses: take the authority out, update the
       elements of the bytes the store wrote, put it back at the new log. *)
@@ -2656,9 +3208,6 @@ Section resources.
       publication coverage the invariant supplies, exactly as Stage 1.5's
       caller-applied [wpt_own_upgrade] did, and otherwise doing nothing at
       all.  Every owned rule is stated over [wown_ctx] and opens with this. *)
-
-  Definition wcds_ob (b : option CPU) : wcds :=
-    match b with None => WClean | Some c => WDirty c end.
 
   Definition ctx_bc (ξ : CtxId) (b : option CPU) (a : Z) (t : nat) : iProp Σ :=
     match b with
@@ -3002,6 +3551,203 @@ Section resources.
     iMod (wlock_regd_export_alt N E g a base HN with "Hsi Hreg")
       as %(n0 & h & Hlp & _).
     iModIntro. iPureIntro. by exists n0.
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (** *** 3d′. F3″'s EXPORT AND ITS SEAM — THE PROTECTED-BYTE FOOTPRINT
+
+      [wlock_regd]'s twin, one level up: the byte of interest is a PAYLOAD
+      byte, and what travels to the adequacy seam is an invariant whose body
+      holds BOTH its [WProt] fragment AND the lock word's own [WLock]
+      fragment — the two AT THE SAME REGISTRATION POINT [n0].
+
+      WHY BOTH FRAGMENTS, AND WHY ONE INVARIANT.  [wprot_at]'s content is a
+      statement about the fold [wlp_holder_at log base n0 ·], so it is only
+      as good as the [n0] it is stated at: the kill has to read the
+      footprint's protection and the word's alternation ON THE SAME FOLD.
+      Nothing relates two independently-quantified registration points, so
+      the tie must be a RESOURCE fact, and the only place a resource fact can
+      be persistent is inside an invariant.  [WeakLock.wplock_body] is that
+      invariant — the lock's own, with the footprint's fragments moved in —
+      and [WeakLock.wplock_inv_regd] is what produces this seam from it. *)
+
+  Definition wprot_regd (N : namespace) (a base : Z) : iProp Σ :=
+    (∃ I : iProp Σ,
+       inv N I ∗
+       □ (I -∗ ∃ (γ : gname) (n0 r0 : nat) (d : option CPU) (h : option nat),
+            wprot_st a γ base n0 r0 d ∗ wlock_st base base n0 h ∗
+            (wprot_st a γ base n0 r0 d -∗ wlock_st base base n0 h -∗ I)))%I.
+
+  Global Instance wprot_regd_persistent N a base :
+    Persistent (wprot_regd N a base).
+  Proof. rewrite /wprot_regd. apply _. Qed.
+
+  (** THE PER-STATE EXPORT, off the fragments in hand. *)
+  Lemma weak_state_interp_prot (g : wgstate) (a base : Z) (γ : gname)
+      (n0 r0 : nat) (d : option CPU) :
+    weak_state_interp g -∗ wprot_st a γ base n0 r0 d -∗
+    ⌜wprot_at (wglog g) a base n0 r0⌝.
+  Proof.
+    iIntros "Hi He". iDestruct (weak_state_interp_lat with "Hi") as "Hlat".
+    by iApply (wprot_at_of_prot with "Hlat He").
+  Qed.
+
+  (** ... and THROUGH THE SEAM, in one fancy update at a mask containing the
+      lock's namespace — the form the adequacy wrapper consumes.  All three
+      conclusions share the registration point [n0]: the byte is protected
+      from [r0] on, and the word it is protected by carries the shape and the
+      alternation protocols from [n0] on. *)
+  Lemma wprot_regd_export (N : namespace) (E : coPset) (g : wgstate)
+      (a base : Z) :
+    ↑N ⊆ E ->
+    weak_state_interp g -∗ wprot_regd N a base ={E}=∗
+    ⌜exists (γ : gname) (n0 r0 : nat) (h : option nat),
+       wprot_at (wglog g) a base n0 r0 /\
+       wlp_at (wglog g) base base n0 /\ wlp_alt (wglog g) base n0 h⌝.
+  Proof.
+    intros HN. iIntros "Hsi #Hreg".
+    iDestruct (weak_state_interp_lat with "Hsi") as "Hlat".
+    iDestruct "Hreg" as (I) "[#Hinv #Hacc]".
+    iInv "Hinv" as "HI" "Hclose".
+    iAssert (▷ (∃ (γ : gname) (n0 r0 : nat) (d : option CPU) (h : option nat),
+                  wprot_st a γ base n0 r0 d ∗ wlock_st base base n0 h ∗
+                  (wprot_st a γ base n0 r0 d -∗
+                     wlock_st base base n0 h -∗ I)))%I
+      with "[HI]" as "HQ".
+    { iNext. by iApply "Hacc". }
+    rewrite bi.later_exist. iDestruct "HQ" as (γ) "HQ".
+    rewrite bi.later_exist. iDestruct "HQ" as (n0) "HQ".
+    rewrite bi.later_exist. iDestruct "HQ" as (r0) "HQ".
+    rewrite bi.later_exist. iDestruct "HQ" as (d) "HQ".
+    rewrite bi.later_exist. iDestruct "HQ" as (h) "HQ".
+    rewrite !bi.later_sep. iDestruct "HQ" as "(>Hpr & >Hlk & Hback)".
+    iDestruct (wprot_at_of_prot with "Hlat Hpr") as %Hpa.
+    iDestruct (wlp_at_of_lock with "Hlat Hlk") as %Hlp.
+    iDestruct (wlp_alt_of_lock with "Hlat Hlk") as %Halt.
+    iMod ("Hclose" with "[Hpr Hlk Hback]") as "_".
+    { iNext. iApply ("Hback" with "Hpr Hlk"). }
+    iModIntro. iPureIntro. by exists γ, n0, r0, h.
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (** *** 3d″. THE READ RECORDS
+
+      The protected LOAD rule is the ordinary load plus a persistent record.
+      The ghost is one monotone list of [(byte, log position)] pairs per
+      registered lock; the mint's side condition — the position is at or
+      after the footprint's registration point — is the invariant the auth
+      carries, so a recorded read cannot be fabricated below [r0].  [(a, p)]
+      is all the kill needs: with the footprint export at the same [r0] it
+      says the byte WAS protected when the read happened. *)
+
+  Context `{!wprotG Σ}.
+
+  Definition prot_recs (γr : gname) (L : list (Z * nat)) : iProp Σ :=
+    own γr (●ML (L : list (leibnizO (Z * nat)))).
+
+  Definition prot_read (γr : gname) (a : Z) (p : nat) : iProp Σ :=
+    (∃ L : list (Z * nat),
+       own γr (◯ML (L : list (leibnizO (Z * nat)))) ∗ ⌜(a, p) ∈ L⌝)%I.
+
+  Global Instance prot_read_persistent γr a p : Persistent (prot_read γr a p).
+  Proof. rewrite /prot_read. apply _. Qed.
+
+  Global Instance prot_recs_timeless γr L : Timeless (prot_recs γr L).
+  Proof. rewrite /prot_recs. apply _. Qed.
+
+  (** The list's own well-formedness, carried next to the auth: every record
+      sits at or after the footprint's registration point. *)
+  Definition prot_recs_ok (r0 : nat) (L : list (Z * nat)) : Prop :=
+    forall ap, ap ∈ L -> (r0 <= ap.2)%nat.
+
+  Lemma prot_recs_alloc : ⊢ |==> ∃ γr, prot_recs γr [].
+  Proof.
+    iMod (own_alloc (●ML ([] : list (leibnizO (Z * nat))))) as (γr) "H".
+    { by apply mono_list_auth_valid. }
+    iModIntro. by iExists γr.
+  Qed.
+
+  (** THE MINT, at a load site: append the record and keep a persistent copy
+      of it. *)
+  Lemma prot_recs_append γr L a p :
+    prot_recs γr L ==∗ prot_recs γr (L ++ [(a, p)]) ∗ prot_read γr a p.
+  Proof.
+    iIntros "Ha".
+    iAssert (|==> prot_recs γr (L ++ [(a, p)]))%I with "[Ha]" as ">Ha".
+    { rewrite /prot_recs. iApply (own_update with "Ha").
+      apply mono_list_update. by apply prefix_app_r. }
+    iAssert (prot_recs γr (L ++ [(a, p)]) ∗
+             own γr (◯ML ((L ++ [(a, p)]) : list (leibnizO (Z * nat)))))%I
+      with "[Ha]" as "[$ #Hlb]".
+    { rewrite /prot_recs -own_op -mono_list_auth_lb_op. iExact "Ha". }
+    iModIntro. iExists ((L ++ [(a, p)])%list). iFrame "Hlb". iPureIntro.
+    apply elem_of_app. right. by apply elem_of_list_singleton.
+  Qed.
+
+  Lemma prot_read_agree γr L a p :
+    prot_recs γr L -∗ prot_read γr a p -∗ ⌜(a, p) ∈ L⌝.
+  Proof.
+    rewrite /prot_recs /prot_read. iIntros "Ha (%L' & Hf & %Hin)".
+    iDestruct (own_valid_2 with "Ha Hf") as %Hv.
+    apply mono_list_both_valid_L in Hv.
+    iPureIntro. by eapply elem_of_prefix.
+  Qed.
+
+  (** THE SEAM, [wprot_regd] plus the record authority: one invariant holds
+      the byte's [WProt] fragment, the lock word's [WLock] fragment and the
+      record list, so the export can state the position bound at THE SAME
+      [r0] the protection is stated at. *)
+  Definition wprot_rd_regd (N : namespace) (γr : gname) (a base : Z)
+      : iProp Σ :=
+    (∃ I : iProp Σ,
+       inv N I ∗
+       □ (I -∗ ∃ (γ : gname) (n0 r0 : nat) (d : option CPU) (h : option nat)
+                  (L : list (Z * nat)),
+            wprot_st a γ base n0 r0 d ∗ wlock_st base base n0 h ∗
+            prot_recs γr L ∗ ⌜prot_recs_ok r0 L⌝ ∗
+            (wprot_st a γ base n0 r0 d -∗ wlock_st base base n0 h -∗
+               prot_recs γr L -∗ I)))%I.
+
+  Global Instance wprot_rd_regd_persistent N γr a base :
+    Persistent (wprot_rd_regd N γr a base).
+  Proof. rewrite /wprot_rd_regd. apply _. Qed.
+
+  Lemma wprot_rd_regd_export (N : namespace) (E : coPset) (g : wgstate)
+      (γr : gname) (a base : Z) (p : nat) :
+    ↑N ⊆ E ->
+    weak_state_interp g -∗ wprot_rd_regd N γr a base -∗ prot_read γr a p ={E}=∗
+    ⌜exists (γ : gname) (n0 r0 : nat) (h : option nat),
+       (r0 <= p)%nat /\ wprot_at (wglog g) a base n0 r0 /\
+       wlp_at (wglog g) base base n0 /\ wlp_alt (wglog g) base n0 h⌝.
+  Proof.
+    intros HN. iIntros "Hsi #Hreg #Hrd".
+    iDestruct (weak_state_interp_lat with "Hsi") as "Hlat".
+    iDestruct "Hreg" as (I) "[#Hinv #Hacc]".
+    iInv "Hinv" as "HI" "Hclose".
+    iAssert (▷ (∃ (γ : gname) (n0 r0 : nat) (d : option CPU) (h : option nat)
+                  (L : list (Z * nat)),
+                  wprot_st a γ base n0 r0 d ∗ wlock_st base base n0 h ∗
+                  prot_recs γr L ∗ ⌜prot_recs_ok r0 L⌝ ∗
+                  (wprot_st a γ base n0 r0 d -∗ wlock_st base base n0 h -∗
+                     prot_recs γr L -∗ I)))%I
+      with "[HI]" as "HQ".
+    { iNext. by iApply "Hacc". }
+    rewrite bi.later_exist. iDestruct "HQ" as (γ) "HQ".
+    rewrite bi.later_exist. iDestruct "HQ" as (n0) "HQ".
+    rewrite bi.later_exist. iDestruct "HQ" as (r0) "HQ".
+    rewrite bi.later_exist. iDestruct "HQ" as (d) "HQ".
+    rewrite bi.later_exist. iDestruct "HQ" as (h) "HQ".
+    rewrite bi.later_exist. iDestruct "HQ" as (L) "HQ".
+    rewrite !bi.later_sep.
+    iDestruct "HQ" as "(>Hpr & >Hlk & >Hrecs & >%Hok & Hback)".
+    iDestruct (wprot_at_of_prot with "Hlat Hpr") as %Hpa.
+    iDestruct (wlp_at_of_lock with "Hlat Hlk") as %Hlp.
+    iDestruct (wlp_alt_of_lock with "Hlat Hlk") as %Halt.
+    iDestruct (prot_read_agree with "Hrecs Hrd") as %Hin.
+    iMod ("Hclose" with "[Hpr Hlk Hrecs Hback]") as "_".
+    { iNext. iApply ("Hback" with "Hpr Hlk Hrecs"). }
+    iModIntro. iPureIntro. exists γ, n0, r0, h.
+    split_and!; [exact (Hok (a, p) Hin)|exact Hpa|exact Hlp|exact Halt].
   Qed.
 
 End resources.
