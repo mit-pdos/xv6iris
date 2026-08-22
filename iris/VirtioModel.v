@@ -58,6 +58,7 @@ From stdpp Require Import bitvector.definitions.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types.
 Require Import RiscvModelBytes.
+From Stdlib Require Import FunctionalExtensionality.
 
 Local Open Scope Z_scope.
 
@@ -169,11 +170,18 @@ Record virtio_state := VirtioState {
   v_seen     : bv 16;        (* available-ring index consumed so far *)
   v_used_idx : bv 16;        (* used-ring index produced so far *)
   v_disk     : Z -> bv 8;    (* the disk image, byte-addressed *)
+  (* A DISK WRITE IS ATOMIC AT THE SECTOR, NOT AT THE REQUEST
+     (claude-notes/projects/sector-atomic-disk.md).  The data of the HEAD
+     pending request -- the one at [v_seen] -- lands one 512-byte sector per
+     autonomous step, and this is the set of sector indices that have landed
+     so far.  It is reset to [∅] by [virtio_reset] and by every completion,
+     so it only ever describes the request currently in flight. *)
+  v_landed   : gset nat;
 }.
 
 (* replace the dynamic part, keeping the configuration *)
 Definition set_vcfg (v : virtio_state) (c : virtio_cfg) : virtio_state :=
-  VirtioState c (v_isr v) (v_seen v) (v_used_idx v) (v_disk v).
+  VirtioState c (v_isr v) (v_seen v) (v_used_idx v) (v_disk v) (v_landed v).
 
 (* THE DISK IMAGE'S GHOST VIEW (claude-notes/design/crash.md).  The image is
    a TOTAL function, while its ghost mirror is a partial map -- a fragment
@@ -269,7 +277,7 @@ Definition virtio_cfg0 : virtio_cfg :=
   VirtioCfg zero32 zero32 zero32 zero32 false zero64 zero64 zero64.
 
 Definition virtio_reset (v : virtio_state) : virtio_state :=
-  VirtioState virtio_cfg0 zero32 zero16 zero16 (v_disk v).
+  VirtioState virtio_cfg0 zero32 zero16 zero16 (v_disk v) ∅.
 
 (* WHAT A RESET DEVICE SATISFIES.  These are the four facts a boot client owes
    [VirtioProto.disk_ghosts_alloc] and [WpUart.dev_inv_alloc] about the device
@@ -287,6 +295,11 @@ Proof. reflexivity. Qed.
 
 Lemma virtio_reset_used_idx (v : virtio_state) :
   v_used_idx (virtio_reset v) = zero16.
+Proof. reflexivity. Qed.
+
+(* a power cycle drops any half-landed request: whatever sectors reached the
+   disk stay there ([v_disk] survives), but nothing is owed any more *)
+Lemma virtio_reset_landed (v : virtio_state) : v_landed (virtio_reset v) = ∅.
 Proof. reflexivity. Qed.
 
 Definition virtio_write (v : virtio_state) (off : Z) (w : bv 32)
@@ -328,7 +341,7 @@ Definition virtio_write (v : virtio_state) (off : Z) (w : bv 32)
   else if off =? vio_off_interrupt_ack then
     Some (VirtioState c (Z_to_bv 32 (Z.land (bv_unsigned (v_isr v))
                                             (Z.lnot (bv_unsigned w))))
-                      (v_seen v) (v_used_idx v) (v_disk v))
+                      (v_seen v) (v_used_idx v) (v_disk v) (v_landed v))
   else if off =? vio_off_queue_desc_low then
     if negb (bv_unsigned (vc_qsel c) =? 0) then None else
     Some (set_vcfg v (VirtioCfg (vc_status c) (vc_dfeat c) (vc_qsel c) (vc_qnum c)
@@ -498,7 +511,8 @@ Qed.
 (* Record eta, so a fact stated over the split state applies to a state that
    arrived whole (as the device thread's does). *)
 Lemma virtio_state_eta (v : virtio_state) :
-  v = VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_used_idx v) (v_disk v).
+  v = VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_used_idx v) (v_disk v)
+        (v_landed v).
 Proof. by destruct v. Qed.
 
 (* No MMIO write touches the disk image -- not even the reset command. *)
@@ -512,6 +526,22 @@ Proof.
           [ repeat (destruct (negb _); [discriminate|]);
             intro H; injection H as <-; reflexivity |]).
   discriminate.
+Qed.
+
+(* ... and the two writes the driver makes while the queue is LIVE leave the
+   landed set alone too, so a sector transfer in flight survives them.  (The
+   RESET command does NOT: it drops the whole request, landed set included.) *)
+Lemma virtio_write_landed (v : virtio_state) (off : Z) (w : bv 32)
+    (v' : virtio_state) :
+  vio_cfg_stable off = true ->
+  virtio_write v off w = Some v' -> v_landed v' = v_landed v.
+Proof.
+  unfold vio_cfg_stable. intro H.
+  apply orb_prop in H as [H|H]; apply Z.eqb_eq in H; subst off;
+    unfold virtio_write; cbv zeta.
+  - destruct (negb (bv_unsigned w =? 0)); [discriminate|].
+    intro He; injection He as <-; reflexivity.
+  - intro He; injection He as <-; reflexivity.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -607,6 +637,270 @@ Definition wr_apply (w : disk_wr) (dk : Z -> bv 8) : Z -> bv 8 :=
 
 Lemma wr_apply_none (dk : Z -> bv 8) : wr_apply None dk = dk.
 Proof. reflexivity. Qed.
+
+(* -- SECTOR GRANULARITY (claude-notes/projects/sector-atomic-disk.md) --
+
+   A disk write is atomic at the SECTOR (512 bytes) and NOT at the 1024-byte
+   BLOCK xv6 works in, so a crash can leave one sector of a block written and
+   the other not.  The device therefore lands a request's data one sector per
+   autonomous step (section 6), and the block-sized [disk_wr] a client
+   deposits its permit at is CUT into per-sector writes here.
+
+   [wr_sector w i] is sector [i] of [w]: the 512 bytes of [w]'s payload at
+   payload offset [512*i], addressed at [w]'s own offset plus the same
+   displacement.  [wr_sector None i = None] keeps a READ's permit free
+   exactly as [wr_apply None] does.  The two facts the device layer runs on
+   are [wr_sector_comm] (distinct sectors of one write commute, so the device
+   may land them in ANY order) and [wr_fold_all] (landing every sector -- in
+   any order, with repetitions allowed -- IS the whole write). *)
+
+Definition virtio_sector_bytes : nat := 512%nat.
+
+Lemma virtio_sector_size_bytes :
+  virtio_sector_size = Z.of_nat virtio_sector_bytes.
+Proof. reflexivity. Qed.
+
+(* how many sectors an [n]-byte transfer occupies: ceil (n / 512).  A partial
+   last sector is a sector of its own; nothing in xv6 sends one (BSIZE = 2
+   sectors), but the model must not silently drop its bytes. *)
+Definition sector_count (n : nat) : nat :=
+  Nat.div (n + (virtio_sector_bytes - 1))%nat virtio_sector_bytes.
+
+Lemma sector_count_cover (n : nat) :
+  (n <= virtio_sector_bytes * sector_count n)%nat.
+Proof.
+  unfold sector_count.
+  pose proof (Nat.div_mod (n + (virtio_sector_bytes - 1))%nat virtio_sector_bytes
+                ltac:(unfold virtio_sector_bytes; lia)) as Hdm.
+  pose proof (Nat.mod_upper_bound (n + (virtio_sector_bytes - 1))%nat
+                virtio_sector_bytes
+                ltac:(unfold virtio_sector_bytes; lia)) as Hlt.
+  unfold virtio_sector_bytes in Hdm, Hlt |- *. lia.
+Qed.
+
+(* the sector an offset falls in, as bounds *)
+Lemma sector_of_bounds (d : nat) :
+  (virtio_sector_bytes * Nat.div d virtio_sector_bytes <= d
+   < virtio_sector_bytes * Nat.div d virtio_sector_bytes
+     + virtio_sector_bytes)%nat.
+Proof.
+  pose proof (Nat.div_mod d virtio_sector_bytes
+                ltac:(unfold virtio_sector_bytes; lia)) as Hdm.
+  pose proof (Nat.mod_upper_bound d virtio_sector_bytes
+                ltac:(unfold virtio_sector_bytes; lia)) as Hlt.
+  unfold virtio_sector_bytes in Hdm, Hlt |- *. lia.
+Qed.
+
+(* every byte offset of an [n]-byte transfer lies in one of its sectors *)
+Lemma sector_count_lt (n i : nat) :
+  (i < n)%nat -> (Nat.div i virtio_sector_bytes < sector_count n)%nat.
+Proof.
+  intro Hi. pose proof (sector_count_cover n) as Hcov.
+  pose proof (sector_of_bounds i) as Hb.
+  unfold virtio_sector_bytes in Hcov, Hb |- *. lia.
+Qed.
+
+Definition wr_nsectors (w : disk_wr) : nat :=
+  match w with
+  | None => 0%nat
+  | Some ob => sector_count (length ob.2)
+  end.
+
+Definition wr_sector (w : disk_wr) (i : nat) : disk_wr :=
+  match w with
+  | None => None
+  | Some ob =>
+      Some (ob.1 + virtio_sector_size * Z.of_nat i,
+            take virtio_sector_bytes (drop (virtio_sector_bytes * i)%nat ob.2))
+  end.
+
+(* A READ has no sectors and no permit: the read side of the driver is
+   unaffected by any of this. *)
+Lemma wr_sector_none (i : nat) : wr_sector None i = None.
+Proof. reflexivity. Qed.
+
+Lemma wr_nsectors_none : wr_nsectors None = 0%nat.
+Proof. reflexivity. Qed.
+
+(* -- pointwise facts about [disk_write], which is where all of this is
+      actually proved (the function equalities below are these plus funext) -- *)
+
+(* the byte a write lands, at an address inside its range *)
+Lemma disk_write_in (dk : Z -> bv 8) (off : Z) (bs : list (bv 8)) (a : Z)
+    (b : bv 8) :
+  off <= a -> bs !! Z.to_nat (a - off) = Some b -> disk_write dk off bs a = b.
+Proof.
+  intros Hle Hb. unfold disk_write.
+  rewrite (proj2 (Z.leb_le off a) Hle), Hb. reflexivity.
+Qed.
+
+(* a write is determined, at each address, by the underlying image ONLY
+   where it does not itself land a byte *)
+Lemma disk_write_agree (dk dk' : Z -> bv 8) (off : Z) (bs : list (bv 8))
+    (a : Z) :
+  (a < off \/ off + Z.of_nat (length bs) <= a -> dk a = dk' a) ->
+  disk_write dk off bs a = disk_write dk' off bs a.
+Proof.
+  intro H. unfold disk_write. destruct (off <=? a) eqn:E.
+  - destruct (bs !! Z.to_nat (a - off)) eqn:Hb; [reflexivity|].
+    apply H. right. apply lookup_ge_None in Hb.
+    apply Z.leb_le in E. lia.
+  - apply H. left. apply Z.leb_gt in E. lia.
+Qed.
+
+Lemma disk_write_nil (dk : Z -> bv 8) (off : Z) : disk_write dk off [] = dk.
+Proof.
+  apply functional_extensionality. intro a.
+  apply disk_write_out. cbn [length]. lia.
+Qed.
+
+(* THE COMMUTATION.  Two writes to DISJOINT ranges commute -- which is what
+   lets the device land a request's sectors in ANY order. *)
+Lemma disk_write_comm (dk : Z -> bv 8) (o1 : Z) (bs1 : list (bv 8))
+    (o2 : Z) (bs2 : list (bv 8)) :
+  o1 + Z.of_nat (length bs1) <= o2 \/ o2 + Z.of_nat (length bs2) <= o1 ->
+  disk_write (disk_write dk o1 bs1) o2 bs2
+  = disk_write (disk_write dk o2 bs2) o1 bs1.
+Proof.
+  intro Hdisj. apply functional_extensionality. intro a.
+  destruct (decide (o1 <= a < o1 + Z.of_nat (length bs1))) as [Hin|Hout].
+  - (* inside range 1, hence outside range 2 *)
+    rewrite (disk_write_out (disk_write dk o1 bs1) o2 bs2 a) by lia.
+    apply disk_write_agree. intro Hc. exfalso. lia.
+  - (* outside range 1 *)
+    rewrite (disk_write_out (disk_write dk o2 bs2) o1 bs1 a) by lia.
+    apply disk_write_agree. intros _. apply disk_write_out. lia.
+Qed.
+
+(* -- the geometry of one sector of a write -- *)
+
+Lemma sector_chunk_len (bs : list (bv 8)) (i : nat) :
+  (length (take virtio_sector_bytes (drop (virtio_sector_bytes * i)%nat bs))
+     <= virtio_sector_bytes)%nat
+  /\ ((virtio_sector_bytes * i
+       + length (take virtio_sector_bytes
+                   (drop (virtio_sector_bytes * i)%nat bs)) <= length bs)%nat
+      \/ length (take virtio_sector_bytes
+                   (drop (virtio_sector_bytes * i)%nat bs)) = 0%nat).
+Proof.
+  rewrite !length_take, !length_drop. unfold virtio_sector_bytes. lia.
+Qed.
+
+(* an address in NO sector of [i] reads straight through *)
+Lemma wr_sector_miss (off : Z) (bs : list (bv 8)) (i : nat) (a : Z)
+    (dk : Z -> bv 8) :
+  a < off + virtio_sector_size * Z.of_nat i
+  \/ off + virtio_sector_size * (Z.of_nat i + 1) <= a ->
+  wr_apply (wr_sector (Some (off, bs)) i) dk a = dk a.
+Proof.
+  intro H. cbn [wr_sector wr_apply fst snd]. apply disk_write_out.
+  pose proof (sector_chunk_len bs i) as [Hle _].
+  unfold virtio_sector_size, virtio_sector_bytes in *. lia.
+Qed.
+
+(* ...and so does an address outside the WHOLE write *)
+Lemma wr_sector_outside (off : Z) (bs : list (bv 8)) (i : nat) (a : Z)
+    (dk : Z -> bv 8) :
+  a < off \/ off + Z.of_nat (length bs) <= a ->
+  wr_apply (wr_sector (Some (off, bs)) i) dk a = dk a.
+Proof.
+  intro H. cbn [wr_sector wr_apply fst snd]. apply disk_write_out.
+  pose proof (sector_chunk_len bs i) as [Hle Hcov].
+  unfold virtio_sector_size, virtio_sector_bytes in *. lia.
+Qed.
+
+(* the byte sector [i] lands is the byte the WHOLE write lands there *)
+Lemma wr_sector_hit (off : Z) (bs : list (bv 8)) (i : nat) (a : Z)
+    (dk : Z -> bv 8) :
+  off + virtio_sector_size * Z.of_nat i <= a ->
+  a < off + virtio_sector_size * (Z.of_nat i + 1) ->
+  wr_apply (wr_sector (Some (off, bs)) i) dk a = disk_write dk off bs a.
+Proof.
+  intros H1 H2. cbn [wr_sector wr_apply fst snd].
+  unfold virtio_sector_size, virtio_sector_bytes in *.
+  assert (Hj : (Z.to_nat (a - (off + 512 * Z.of_nat i)) < 512)%nat) by lia.
+  assert (Hidx : Z.to_nat (a - off)
+                 = (512 * i + Z.to_nat (a - (off + 512 * Z.of_nat i)))%nat)
+    by lia.
+  unfold disk_write.
+  rewrite (proj2 (Z.leb_le (off + 512 * Z.of_nat i) a)) by lia.
+  rewrite (proj2 (Z.leb_le off a)) by lia.
+  rewrite Hidx, lookup_take by lia. rewrite lookup_drop. reflexivity.
+Qed.
+
+(* Distinct sectors of ONE write commute -- the model's licence to land them
+   in any order. *)
+Lemma wr_sector_comm (w : disk_wr) (i j : nat) (dk : Z -> bv 8) :
+  i <> j ->
+  wr_apply (wr_sector w i) (wr_apply (wr_sector w j) dk)
+  = wr_apply (wr_sector w j) (wr_apply (wr_sector w i) dk).
+Proof.
+  intro Hne. destruct w as [[off bs]|]; [|reflexivity].
+  cbn [wr_sector wr_apply fst snd]. apply disk_write_comm.
+  pose proof (sector_chunk_len bs i) as [Hi _].
+  pose proof (sector_chunk_len bs j) as [Hj _].
+  unfold virtio_sector_size, virtio_sector_bytes in *.
+  (* [apply] matched [o1] with sector [j] and [o2] with sector [i] *)
+  destruct (Nat.lt_total i j) as [Hlt|[He|Hgt]]; [right|congruence|left]; lia.
+Qed.
+
+(* THE REASSEMBLY FACT.  Landing every sector of [w] -- in ANY order, with
+   repetitions allowed -- is exactly [w].  This is what lets a request slot
+   keep the BLOCK write as its recorded [disk_wr] while the crash permits are
+   handed out one sector at a time. *)
+Definition wr_fold (w : disk_wr) (l : list nat) (dk : Z -> bv 8) : Z -> bv 8 :=
+  foldr (fun i d => wr_apply (wr_sector w i) d) dk l.
+
+Lemma wr_fold_nil (w : disk_wr) (dk : Z -> bv 8) : wr_fold w [] dk = dk.
+Proof. reflexivity. Qed.
+
+Lemma wr_fold_cons (w : disk_wr) (i : nat) (l : list nat) (dk : Z -> bv 8) :
+  wr_fold w (i :: l) dk = wr_apply (wr_sector w i) (wr_fold w l dk).
+Proof. reflexivity. Qed.
+
+Lemma wr_fold_all (w : disk_wr) (l : list nat) (dk : Z -> bv 8) :
+  (forall i, (i < wr_nsectors w)%nat -> i ∈ l) ->
+  wr_fold w l dk = wr_apply w dk.
+Proof.
+  destruct w as [[off bs]|]; last first.
+  { intros _. induction l as [|i l IH]; [reflexivity|].
+    rewrite wr_fold_cons, IH. reflexivity. }
+  intro Hall. apply functional_extensionality. intro a.
+  cbn [wr_apply fst snd].
+  destruct (decide (off <= a < off + Z.of_nat (length bs))) as [Hin|Hout];
+    last first.
+  { (* outside the whole write: every sector misses, and so does [w] *)
+    rewrite (disk_write_out dk off bs a) by lia.
+    clear Hall. induction l as [|i l IH]; [reflexivity|].
+    rewrite wr_fold_cons, wr_sector_outside; [exact IH | lia]. }
+  (* inside: exactly the sector holding [a] decides the byte, and it is the
+     byte the whole write lands there *)
+  assert (Hoff : off <= a) by lia.
+  assert (Hsx : is_Some (bs !! Z.to_nat (a - off)))
+    by (apply lookup_lt_is_Some_2; lia).
+  destruct Hsx as [x Hx].
+  rewrite (disk_write_in dk off bs a x Hoff Hx).
+  remember (Nat.div (Z.to_nat (a - off)) virtio_sector_bytes) as k eqn:Hkdef.
+  assert (Hk : (k < wr_nsectors (Some (off, bs)))%nat).
+  { cbn [wr_nsectors snd]. rewrite Hkdef. apply sector_count_lt. lia. }
+  specialize (Hall k Hk).
+  pose proof (sector_of_bounds (Z.to_nat (a - off))) as Hdk.
+  rewrite <- Hkdef in Hdk.
+  assert (Hlo : off + virtio_sector_size * Z.of_nat k <= a).
+  { unfold virtio_sector_size, virtio_sector_bytes in *. lia. }
+  assert (Hhi : a < off + virtio_sector_size * (Z.of_nat k + 1)).
+  { unfold virtio_sector_size, virtio_sector_bytes in *. lia. }
+  clear Hk Hin Hdk Hkdef.
+  induction l as [|i l IH]; [by apply elem_of_nil in Hall|].
+  rewrite wr_fold_cons.
+  destruct (decide (i = k)) as [->|Hne].
+  - rewrite (wr_sector_hit off bs k a _ Hlo Hhi).
+    exact (disk_write_in _ off bs a x Hoff Hx).
+  - rewrite wr_sector_miss.
+    + apply IH. apply elem_of_cons in Hall as [->|Hall]; [congruence|exact Hall].
+    + unfold virtio_sector_size in *.
+      destruct (Nat.lt_total i k) as [Hlt|[He|Hgt]]; [right|congruence|left]; lia.
+Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* 4. The memory VIEW: what the device sees when it masters the bus.       *)
@@ -804,6 +1098,49 @@ Definition byte_zero : bv 8 := Z_to_bv 8 0.
 (* Completing ONE parsed request.  TOTAL: there is no request the device
    refuses to answer.  An unrecognised type is reported back with status
    UNSUPP and no data transfer, exactly as a real block device does. *)
+(* THE DISK WRITE ONE REQUEST MAKES, as pure data (section 3's [disk_wr]).
+   A READ -- and an unrecognised type -- moves no disk byte, so it is [None]
+   and its permit is free.  This is the write the sector steps below CUT into
+   [wr_nsectors] pieces. *)
+Definition vreq_wr (mv : vmem) (r : vio_req) : disk_wr :=
+  if bv_unsigned (vr_type r) =? virtio_blk_t_out then
+    Some (bv_unsigned (vr_sector r) * virtio_sector_size,
+          view_bytes mv (vr_buf r) (Z.to_nat (bv_unsigned (vr_len r))))
+  else None.
+
+(* ...and how many sectors that is.  VIEW-INDEPENDENT: the device's schedule
+   may not depend on what it reads out of the buffer. *)
+Definition vreq_nsectors (r : vio_req) : nat :=
+  if bv_unsigned (vr_type r) =? virtio_blk_t_out then
+    sector_count (Z.to_nat (bv_unsigned (vr_len r)))
+  else 0%nat.
+
+Lemma vreq_nsectors_wr (mv : vmem) (r : vio_req) :
+  wr_nsectors (vreq_wr mv r) = vreq_nsectors r.
+Proof.
+  unfold vreq_wr, vreq_nsectors, wr_nsectors.
+  destruct (bv_unsigned (vr_type r) =? virtio_blk_t_out); [|reflexivity].
+  cbn [snd]. by rewrite view_bytes_length.
+Qed.
+
+Lemma vreq_wr_in (mv : vmem) (r : vio_req) :
+  bv_unsigned (vr_type r) <> virtio_blk_t_out -> vreq_wr mv r = None.
+Proof. intro H. unfold vreq_wr. by rewrite (proj2 (Z.eqb_neq _ _) H). Qed.
+
+Lemma vreq_nsectors_in (r : vio_req) :
+  bv_unsigned (vr_type r) <> virtio_blk_t_out -> vreq_nsectors r = 0%nat.
+Proof. intro H. unfold vreq_nsectors. by rewrite (proj2 (Z.eqb_neq _ _) H). Qed.
+
+(* Completing ONE parsed request.  The DATA of a disk write has already
+   landed, sector by sector, before this step is enabled (see
+   [virtio_sectors_done] and [virtio_req_step] below), so the completion no
+   longer touches the disk image at all: it writes the status byte, the
+   used-ring element and the used index, and clears the landed set for the
+   next request.  A disk READ still transfers in one step -- a torn read has
+   no crash meaning (claude-notes/projects/sector-atomic-disk.md).  TOTAL:
+   there is no request the device refuses to answer; an unrecognised type is
+   reported back with status UNSUPP and no data transfer, exactly as a real
+   block device does. *)
 Definition virtio_complete (v : virtio_state) (mv : vmem) (r : vio_req)
   : virtio_state * gmap Arch.pa (bv 8) :=
   let n := Z.to_nat (bv_unsigned (vr_len r)) in
@@ -813,19 +1150,38 @@ Definition virtio_complete (v : virtio_state) (mv : vmem) (r : vio_req)
             then virtio_blk_s_ok else virtio_blk_s_unsupp in
   let ws := <[ vr_status r := Z_to_bv 8 st ]>
               (virtio_used_writes (v_cfg v) (v_used_idx v) r) in
-  let vd := fun dk => VirtioState (v_cfg v)
-                        (bv_or (v_isr v) (Z_to_bv 32 vio_isr_used_buffer))
-                        (bv_add (v_seen v) (Z_to_bv 16 1))
-                        (bv_add (v_used_idx v) (Z_to_bv 16 1)) dk in
+  let vd := VirtioState (v_cfg v)
+              (bv_or (v_isr v) (Z_to_bv 32 vio_isr_used_buffer))
+              (bv_add (v_seen v) (Z_to_bv 16 1))
+              (bv_add (v_used_idx v) (Z_to_bv 16 1)) (v_disk v) ∅ in
   if bv_unsigned (vr_type r) =? virtio_blk_t_in then
     (* read the disk: the device WRITES the driver's buffer *)
-    (vd (v_disk v), write_byte_list ws (vr_buf r) (disk_read (v_disk v) doff n))
-  else if bv_unsigned (vr_type r) =? virtio_blk_t_out then
-    (* write the disk: the device READS the driver's buffer *)
-    (vd (disk_write (v_disk v) doff (view_bytes mv (vr_buf r) n)), ws)
+    (vd, write_byte_list ws (vr_buf r) (disk_read (v_disk v) doff n))
   else
-    (* unsupported: the status byte and the used-ring report, nothing else *)
-    (vd (v_disk v), ws).
+    (* write the disk, or an unsupported type: the status byte and the
+       used-ring report, nothing else *)
+    (vd, ws).
+
+(* The completion is now VIEW-INDEPENDENT -- a strengthening of the model:
+   whatever the device reads off the bus, it has already committed. *)
+Lemma virtio_complete_view (v : virtio_state) (mv mv' : vmem) (r : vio_req) :
+  virtio_complete v mv r = virtio_complete v mv' r.
+Proof. reflexivity. Qed.
+
+(* ...and it does not move the disk image. *)
+Lemma virtio_complete_disk (v : virtio_state) (mv : vmem) (r : vio_req) :
+  v_disk (virtio_complete v mv r).1 = v_disk v.
+Proof.
+  unfold virtio_complete. cbv zeta.
+  destruct (bv_unsigned (vr_type r) =? virtio_blk_t_in); reflexivity.
+Qed.
+
+Lemma virtio_complete_landed (v : virtio_state) (mv : vmem) (r : vio_req) :
+  v_landed (virtio_complete v mv r).1 = ∅.
+Proof.
+  unfold virtio_complete. cbv zeta.
+  destruct (bv_unsigned (vr_type r) =? virtio_blk_t_in); reflexivity.
+Qed.
 
 (* the device has work to do: the queue is live and the driver has published
    an entry the device has not taken yet *)
@@ -833,13 +1189,201 @@ Definition virtio_pending (v : virtio_state) (mv : vmem) : bool :=
   virtio_live (v_cfg v)
   && negb (bv_unsigned (avail_idx_at (v_cfg v) mv) =? bv_unsigned (v_seen v)).
 
+(* THE COMPLETION GATE: every sector of the request's data has landed.
+   Vacuous for a READ and for an unrecognised type ([vreq_nsectors] is 0
+   there), so only a disk WRITE has to wait. *)
+Definition virtio_sectors_done (v : virtio_state) (r : vio_req) : bool :=
+  bool_decide ((list_to_set (seq 0 (vreq_nsectors r)) : gset nat)
+                 ⊆ v_landed v).
+
+Lemma virtio_sectors_done_spec (v : virtio_state) (r : vio_req) :
+  virtio_sectors_done v r = true
+  <-> forall i, (i < vreq_nsectors r)%nat -> i ∈ v_landed v.
+Proof.
+  unfold virtio_sectors_done. rewrite bool_decide_eq_true. split.
+  - intros Hsub i Hi. apply Hsub, elem_of_list_to_set, elem_of_seq. lia.
+  - intros H x Hx. apply elem_of_list_to_set, elem_of_seq in Hx. apply H. lia.
+Qed.
+
+Lemma virtio_sectors_done_intro (v : virtio_state) (r : vio_req) :
+  (forall i, (i < vreq_nsectors r)%nat -> i ∈ v_landed v) ->
+  virtio_sectors_done v r = true.
+Proof. apply virtio_sectors_done_spec. Qed.
+
+(* ...and when it is NOT done, an outstanding sector is exhibited -- this is
+   what keeps the device from stalling (see [virtio_not_stalled_step]). *)
+Lemma virtio_sectors_undone (v : virtio_state) (r : vio_req) :
+  virtio_sectors_done v r = false ->
+  exists i, (i < vreq_nsectors r)%nat /\ i ∉ v_landed v.
+Proof.
+  intro H. unfold virtio_sectors_done in H.
+  apply bool_decide_eq_false in H.
+  destruct (set_choose_or_empty
+              ((list_to_set (seq 0 (vreq_nsectors r)) : gset nat)
+                 ∖ v_landed v)) as [[x Hx]|Hemp].
+  - apply elem_of_difference in Hx as [Hx1 Hx2].
+    apply elem_of_list_to_set, elem_of_seq in Hx1.
+    exists x. split; [lia | exact Hx2].
+  - exfalso. apply H. set_solver.
+Qed.
+
 Definition virtio_req_step (v : virtio_state) (mv : vmem)
   : option (virtio_state * gmap Arch.pa (bv 8)) :=
   if negb (virtio_pending v mv) then None
   else match req_at (v_cfg v) mv (v_seen v) with
        | None => None
-       | Some r => Some (virtio_complete v mv r)
+       | Some r =>
+           if negb (virtio_sectors_done v r) then None
+           else Some (virtio_complete v mv r)
        end.
+
+(* ---------------------------------------------------------------------- *)
+(* 6a. THE SECTOR STEP: one 512-byte piece of the head request's data.     *)
+(*                                                                        *)
+(*    Enabled while the device has work to do, the published chain is well *)
+(*    formed, the request is a disk WRITE, and sector [i] of its data has  *)
+(*    not landed yet.  The sector indices may be taken in ANY ORDER -- the *)
+(*    honest hardware statement is "some subset landed", and               *)
+(*    [wr_sector_comm] / [wr_fold_all] say the order does not matter to    *)
+(*    the final image.  Nothing else moves: no memory write ([w] would be  *)
+(*    [∅], so the step returns a device state only), no used-ring entry,   *)
+(*    no interrupt.  A crash between two sector steps therefore leaves     *)
+(*    exactly the landed sectors on the disk, which is the whole point.    *)
+(* ---------------------------------------------------------------------- *)
+
+Definition virtio_sector_step (v : virtio_state) (mv : vmem) (i : nat)
+  : option virtio_state :=
+  if negb (virtio_pending v mv) then None
+  else match req_at (v_cfg v) mv (v_seen v) with
+       | None => None
+       | Some r =>
+           if negb (bool_decide (i < vreq_nsectors r)%nat) then None
+           else if bool_decide (i ∈ v_landed v) then None
+           else Some (VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_used_idx v)
+                        (wr_apply (wr_sector (vreq_wr mv r) i) (v_disk v))
+                        ({[ i ]} ∪ v_landed v))
+       end.
+
+(* -- what a sector step does and does not touch -- *)
+
+(* THE inversion the field lemmas below all run on: a sector step names the
+   head request and rebuilds the state with only two fields moved. *)
+Lemma virtio_sector_step_shape (v : virtio_state) (mv : vmem) (i : nat)
+    (v' : virtio_state) :
+  virtio_sector_step v mv i = Some v' ->
+  exists r, req_at (v_cfg v) mv (v_seen v) = Some r
+    /\ v' = VirtioState (v_cfg v) (v_isr v) (v_seen v) (v_used_idx v)
+              (wr_apply (wr_sector (vreq_wr mv r) i) (v_disk v))
+              ({[ i ]} ∪ v_landed v).
+Proof.
+  unfold virtio_sector_step. intro Hs.
+  destruct (negb (virtio_pending v mv)); [discriminate|].
+  destruct (req_at (v_cfg v) mv (v_seen v)) as [r|]; [|discriminate].
+  destruct (negb (bool_decide (i < vreq_nsectors r)%nat)); [discriminate|].
+  destruct (bool_decide (i ∈ v_landed v)); [discriminate|].
+  injection Hs as <-. by exists r.
+Qed.
+
+Lemma virtio_sector_step_cfg (v : virtio_state) (mv : vmem) (i : nat)
+    (v' : virtio_state) :
+  virtio_sector_step v mv i = Some v' -> v_cfg v' = v_cfg v.
+Proof.
+  intro Hs. destruct (virtio_sector_step_shape _ _ _ _ Hs) as (r & _ & ->).
+  reflexivity.
+Qed.
+
+(* the device does NOT advance to the next available-ring entry: the request
+   is still in flight until its completion *)
+Lemma virtio_sector_step_seen (v : virtio_state) (mv : vmem) (i : nat)
+    (v' : virtio_state) :
+  virtio_sector_step v mv i = Some v' -> v_seen v' = v_seen v.
+Proof.
+  intro Hs. destruct (virtio_sector_step_shape _ _ _ _ Hs) as (r & _ & ->).
+  reflexivity.
+Qed.
+
+Lemma virtio_sector_step_used (v : virtio_state) (mv : vmem) (i : nat)
+    (v' : virtio_state) :
+  virtio_sector_step v mv i = Some v' -> v_used_idx v' = v_used_idx v.
+Proof.
+  intro Hs. destruct (virtio_sector_step_shape _ _ _ _ Hs) as (r & _ & ->).
+  reflexivity.
+Qed.
+
+(* NO interrupt: the driver is woken by the completion, not by a sector *)
+Lemma virtio_sector_step_isr (v : virtio_state) (mv : vmem) (i : nat)
+    (v' : virtio_state) :
+  virtio_sector_step v mv i = Some v' -> v_isr v' = v_isr v.
+Proof.
+  intro Hs. destruct (virtio_sector_step_shape _ _ _ _ Hs) as (r & _ & ->).
+  reflexivity.
+Qed.
+
+Lemma virtio_sector_step_irq (v : virtio_state) (mv : vmem) (i : nat)
+    (v' : virtio_state) :
+  virtio_sector_step v mv i = Some v' -> virtio_irq v' = virtio_irq v.
+Proof.
+  intro Hs. unfold virtio_irq.
+  by rewrite (virtio_sector_step_isr _ _ _ _ Hs).
+Qed.
+
+Lemma virtio_sector_step_landed (v : virtio_state) (mv : vmem) (i : nat)
+    (v' : virtio_state) :
+  virtio_sector_step v mv i = Some v' -> v_landed v' = {[ i ]} ∪ v_landed v.
+Proof.
+  intro Hs. destruct (virtio_sector_step_shape _ _ _ _ Hs) as (r & _ & ->).
+  reflexivity.
+Qed.
+
+(* THE IMAGE MOVE: exactly sector [i] of the request's own [disk_wr]. *)
+Lemma virtio_sector_step_disk (v : virtio_state) (mv : vmem) (i : nat)
+    (v' : virtio_state) (r : vio_req) :
+  req_at (v_cfg v) mv (v_seen v) = Some r ->
+  virtio_sector_step v mv i = Some v' ->
+  v_disk v' = wr_apply (wr_sector (vreq_wr mv r) i) (v_disk v).
+Proof.
+  intros Hr Hs.
+  destruct (virtio_sector_step_shape _ _ _ _ Hs) as (r' & Hr' & ->).
+  rewrite Hr in Hr'. injection Hr' as <-. reflexivity.
+Qed.
+
+(* the enabling conditions, read back *)
+Lemma virtio_sector_step_enabled (v : virtio_state) (mv : vmem) (i : nat)
+    (v' : virtio_state) (r : vio_req) :
+  req_at (v_cfg v) mv (v_seen v) = Some r ->
+  virtio_sector_step v mv i = Some v' ->
+  virtio_pending v mv = true /\ (i < vreq_nsectors r)%nat
+  /\ i ∉ v_landed v.
+Proof.
+  intros Hr Hs. unfold virtio_sector_step in Hs.
+  destruct (virtio_pending v mv) eqn:Hp; [|by cbn in Hs].
+  rewrite Hr in Hs. cbn [negb] in Hs.
+  destruct (bool_decide (i < vreq_nsectors r)%nat) eqn:Hlt; [|by cbn in Hs].
+  cbn [negb] in Hs.
+  destruct (bool_decide (i ∈ v_landed v)) eqn:Hmem; [discriminate|].
+  apply bool_decide_eq_true in Hlt. apply bool_decide_eq_false in Hmem.
+  by split_and!.
+Qed.
+
+(* ...in particular the request is a disk WRITE: a READ has no sectors *)
+Lemma virtio_sector_step_out (v : virtio_state) (mv : vmem) (i : nat)
+    (v' : virtio_state) (r : vio_req) :
+  req_at (v_cfg v) mv (v_seen v) = Some r ->
+  virtio_sector_step v mv i = Some v' ->
+  bv_unsigned (vr_type r) = virtio_blk_t_out.
+Proof.
+  intros Hr Hs.
+  destruct (virtio_sector_step_enabled _ _ _ _ _ Hr Hs) as (_ & Hlt & _).
+  destruct (decide (bv_unsigned (vr_type r) = virtio_blk_t_out)) as [He|Hne];
+    [exact He|].
+  exfalso. rewrite (vreq_nsectors_in r Hne) in Hlt. lia.
+Qed.
+
+Lemma virtio_sector_step_not_live (v : virtio_state) (mv : vmem) (i : nat) :
+  virtio_live (v_cfg v) = false -> virtio_sector_step v mv i = None.
+Proof.
+  intro H. unfold virtio_sector_step, virtio_pending. by rewrite H.
+Qed.
 
 (* THE hole this model must not have.  [virtio_stalled] is "the device owes
    an answer and this model does not have one": it has work to do, and the
@@ -861,15 +1405,39 @@ Proof.
   split; reflexivity.
 Qed.
 
+(* ...and neither does it have a SECTOR step: a malformed chain names no
+   request at all. *)
+Lemma virtio_stalled_sector_step (v : virtio_state) (mv : vmem) :
+  virtio_stalled v mv = true -> forall i, virtio_sector_step v mv i = None.
+Proof.
+  intros H i. unfold virtio_stalled in H. apply andb_prop in H as [Hp Hc].
+  unfold virtio_sector_step. rewrite Hp. cbn [negb].
+  unfold virtio_chain_ok in Hc. unfold req_at.
+  destruct (chain_at (v_cfg v) mv (v_seen v)) as [[[[h d0] d1] d2]|];
+    [by cbn in Hc | reflexivity].
+Qed.
+
+(* THE DEVICE ALWAYS HAS SOMETHING TO DO.  With the data of a disk write now
+   landing one sector at a time, "pending and well formed" no longer means
+   the completion is enabled -- it means EITHER an outstanding sector has a
+   step OR every sector has landed and the completion does.  This is the
+   liveness half of the model that [wp_disk_loop]'s not-stuck obligation
+   discharges (claude-notes/projects/sector-atomic-disk.md §2d). *)
 Lemma virtio_not_stalled_step (v : virtio_state) (mv : vmem) :
   virtio_pending v mv = true -> virtio_stalled v mv = false ->
-  exists v' w, virtio_req_step v mv = Some (v', w).
+  (exists i v', virtio_sector_step v mv i = Some v')
+  \/ (exists v' w, virtio_req_step v mv = Some (v', w)).
 Proof.
   intros Hp Hs. unfold virtio_stalled in Hs. rewrite Hp in Hs. cbn [andb] in Hs.
   apply negb_false_iff in Hs.
   destruct (req_at_chain _ _ _ Hs) as [r Hr].
-  unfold virtio_req_step. rewrite Hp. cbn [negb]. rewrite Hr.
-  destruct (virtio_complete v mv r) as [v' w]. exists v', w. reflexivity.
+  destruct (virtio_sectors_done v r) eqn:Hdone.
+  - right. unfold virtio_req_step. rewrite Hp. cbn [negb]. rewrite Hr, Hdone.
+    cbn [negb]. destruct (virtio_complete v mv r) as [v' w]. by exists v', w.
+  - left. destruct (virtio_sectors_undone v r Hdone) as (i & Hi & Hni).
+    exists i. unfold virtio_sector_step. rewrite Hp. cbn [negb]. rewrite Hr.
+    rewrite (proj2 (bool_decide_eq_true _) Hi). cbn [negb].
+    rewrite (proj2 (bool_decide_eq_false _) Hni). by eexists.
 Qed.
 
 (* -- what a step does and does not touch -- *)
@@ -883,10 +1451,9 @@ Proof.
   unfold virtio_req_step.
   destruct (negb (virtio_pending v mv)); [discriminate|].
   destruct (req_at (v_cfg v) mv (v_seen v)) as [r|]; [|discriminate].
+  destruct (negb (virtio_sectors_done v r)); [discriminate|].
   unfold virtio_complete. cbv zeta.
   destruct (bv_unsigned (vr_type r) =? virtio_blk_t_in);
-    [ intro H; injection H as H1 H2; by subst v' | ].
-  destruct (bv_unsigned (vr_type r) =? virtio_blk_t_out);
     intro H; injection H as H1 H2; by subst v'.
 Qed.
 
@@ -899,10 +1466,9 @@ Proof.
   unfold virtio_req_step.
   destruct (negb (virtio_pending v mv)); [discriminate|].
   destruct (req_at (v_cfg v) mv (v_seen v)) as [r|]; [|discriminate].
+  destruct (negb (virtio_sectors_done v r)); [discriminate|].
   unfold virtio_complete. cbv zeta.
   destruct (bv_unsigned (vr_type r) =? virtio_blk_t_in);
-    [ intro H; injection H as H1 H2; by subst v' | ].
-  destruct (bv_unsigned (vr_type r) =? virtio_blk_t_out);
     intro H; injection H as H1 H2; by subst v'.
 Qed.
 
@@ -916,11 +1482,41 @@ Proof.
   unfold virtio_req_step.
   destruct (negb (virtio_pending v mv)); [discriminate|].
   destruct (req_at (v_cfg v) mv (v_seen v)) as [r|]; [|discriminate].
+  destruct (negb (virtio_sectors_done v r)); [discriminate|].
   unfold virtio_complete. cbv zeta.
   destruct (bv_unsigned (vr_type r) =? virtio_blk_t_in);
-    [ intro H; injection H as H1 H2; by subst v' | ].
-  destruct (bv_unsigned (vr_type r) =? virtio_blk_t_out);
     intro H; injection H as H1 H2; by subst v'.
+Qed.
+
+(* THE COMPLETION NO LONGER MOVES THE IMAGE: the data landed sector by
+   sector, before this step was enabled (section 6a). *)
+Lemma virtio_req_step_disk (v : virtio_state) (mv : vmem)
+    (v' : virtio_state) (w : gmap Arch.pa (bv 8)) :
+  virtio_req_step v mv = Some (v', w) -> v_disk v' = v_disk v.
+Proof.
+  unfold virtio_req_step.
+  destruct (negb (virtio_pending v mv)); [discriminate|].
+  destruct (req_at (v_cfg v) mv (v_seen v)) as [r|]; [|discriminate].
+  destruct (negb (virtio_sectors_done v r)); [discriminate|].
+  intro H. injection H as H1.
+  assert (Hv : v' = (virtio_complete v mv r).1)
+    by (rewrite H1; reflexivity).
+  rewrite Hv. apply (virtio_complete_disk v mv r).
+Qed.
+
+(* ...and it clears the landed set for the next request *)
+Lemma virtio_req_step_landed (v : virtio_state) (mv : vmem)
+    (v' : virtio_state) (w : gmap Arch.pa (bv 8)) :
+  virtio_req_step v mv = Some (v', w) -> v_landed v' = ∅.
+Proof.
+  unfold virtio_req_step.
+  destruct (negb (virtio_pending v mv)); [discriminate|].
+  destruct (req_at (v_cfg v) mv (v_seen v)) as [r|]; [|discriminate].
+  destruct (negb (virtio_sectors_done v r)); [discriminate|].
+  intro H. injection H as H1.
+  assert (Hv : v' = (virtio_complete v mv r).1)
+    by (rewrite H1; reflexivity).
+  rewrite Hv. apply (virtio_complete_landed v mv r).
 Qed.
 
 Lemma bv_or_bit0_irq (x : bv 32) :
@@ -990,9 +1586,9 @@ Definition virtio_slot_ok (c : virtio_cfg) (ctl : gmap Arch.pa (bv 8))
     (D : gset Arch.pa) (i : bv 16) : Prop :=
   forall mv : vmem, mem_view ctl mv ->
     virtio_chain_ok c mv i = true
-    /\ forall (isr : bv 32) (ui : bv 16) (dk : Z -> bv 8)
+    /\ forall (isr : bv 32) (ui : bv 16) (dk : Z -> bv 8) (ld : gset nat)
               (v' : virtio_state) (w : gmap Arch.pa (bv 8)),
-         virtio_req_step (VirtioState c isr i ui dk) mv = Some (v', w) ->
+         virtio_req_step (VirtioState c isr i ui dk ld) mv = Some (v', w) ->
          dom w ⊆ D /\ dom w ## dom ctl.
 
 Definition virtio_queue_ok (c : virtio_cfg) (ctl : gmap Arch.pa (bv 8))
@@ -1075,15 +1671,32 @@ Proof.
   (* re-index the step at the split state, so the slot obligation applies *)
   assert (Hsplit : virtio_req_step
                      (VirtioState (v_cfg v) (v_isr v) (v_seen v)
-                                  (v_used_idx v) (v_disk v)) mv = Some (v', w)).
+                                  (v_used_idx v) (v_disk v) (v_landed v)) mv
+                   = Some (v', w)).
   { rewrite <- virtio_state_eta. exact Hstep. }
-  destruct (proj2 (Hslot mv Hv) (v_isr v) (v_used_idx v) (v_disk v) v' w Hsplit)
+  destruct (proj2 (Hslot mv Hv) (v_isr v) (v_used_idx v) (v_disk v)
+              (v_landed v) v' w Hsplit)
     as [Hdw Hdisj].
   split; [exact Hdw|]. split; [exact Hdisj|].
   rewrite (virtio_req_step_cfg _ _ _ _ Hstep),
           (virtio_req_step_seen _ _ _ _ Hstep).
   intros _. split; [exact Hai|]. split; [|exact HS].
   destruct Hnext as [Hnext|Hnext]; [left|right]; exact Hnext.
+Qed.
+
+(* PAYOFF 3: a SECTOR step writes no memory at all and moves neither the
+   configuration nor the consumed index, so the obligation is preserved for
+   free -- the same reason [virtio_cfg] is a separate record. *)
+Lemma virtio_queue_ok_sector_step (v : virtio_state) (ctl : gmap Arch.pa (bv 8))
+    (D : gset Arch.pa) (S : gset (bv 16)) (ai : bv 16) (mv : vmem)
+    (i : nat) (v' : virtio_state) :
+  virtio_queue_ok (v_cfg v) ctl D S ai (v_seen v) ->
+  virtio_sector_step v mv i = Some v' ->
+  virtio_queue_ok (v_cfg v') ctl D S ai (v_seen v').
+Proof.
+  intros Hok Hstep.
+  by rewrite (virtio_sector_step_cfg _ _ _ _ Hstep),
+             (virtio_sector_step_seen _ _ _ _ Hstep).
 Qed.
 
 (* [ctl] stays inside the memory the step produced -- the fact that makes the
@@ -1104,7 +1717,7 @@ Qed.
 (* ---------------------------------------------------------------------- *)
 
 Definition virtio0_state : virtio_state :=
-  VirtioState virtio_cfg0 zero32 zero16 zero16 (fun _ => byte_zero).
+  VirtioState virtio_cfg0 zero32 zero16 zero16 (fun _ => byte_zero) ∅.
 
 Lemma virtio0_not_live : virtio_live (v_cfg virtio0_state) = false.
 Proof. reflexivity. Qed.
@@ -1189,7 +1802,7 @@ Definition virtio_init_post (v : virtio_state) (dl dh al ah ul uh : bv 32)
                          (set_hi (set_lo zero64 dl) dh)
                          (set_hi (set_lo zero64 al) ah)
                          (set_hi (set_lo zero64 ul) uh))
-              zero32 zero16 zero16 (v_disk v).
+              zero32 zero16 zero16 (v_disk v) ∅.
 
 (* The same configuration with the queue addresses named DIRECTLY.  The driver
    programs each as two 32-bit halves, and [set_lo_hi_id] reassembles them, so a
@@ -1201,7 +1814,7 @@ Definition virtio_init_cfg (pd pav pu : Arch.pa) : virtio_cfg :=
 
 Lemma virtio_init_post_cfg (v : virtio_state) (pd pav pu : Arch.pa) :
   virtio_init_post v (lo32 pd) (hi32 pd) (lo32 pav) (hi32 pav) (lo32 pu) (hi32 pu)
-  = VirtioState (virtio_init_cfg pd pav pu) zero32 zero16 zero16 (v_disk v).
+  = VirtioState (virtio_init_cfg pd pav pu) zero32 zero16 zero16 (v_disk v) ∅.
 Proof.
   unfold virtio_init_post, virtio_init_cfg. by rewrite !set_lo_hi_id.
 Qed.
@@ -1281,6 +1894,15 @@ Proof.
   rewrite Z.lor_spec, (land3_bit_high _ i Hok Hi).
   rewrite (Z.bits_above_log2 1 i); [ reflexivity | lia | ].
   change (Z.log2 1) with 0. lia.
+Qed.
+
+(* a sector step does not touch the interrupt-status register at all *)
+Lemma virtio_sector_step_isr_ok (v : virtio_state) (mv : vmem) (i : nat)
+    (v' : virtio_state) :
+  virtio_isr_ok v -> virtio_sector_step v mv i = Some v' -> virtio_isr_ok v'.
+Proof.
+  intros Hok Hs. unfold virtio_isr_ok.
+  by rewrite (virtio_sector_step_isr _ _ _ _ Hs).
 Qed.
 
 (* And so the acknowledgement [virtio_disk_intr] writes really does drop the

@@ -117,6 +117,122 @@ Proof.
   destruct (Z.lt_total c b) as [Hlt|[->|Hgt]]; [| congruence |]; [left|right]; lia.
 Qed.
 
+(* -- SUB-BLOCK (SECTOR) WRITES (claude-notes/projects/sector-atomic-disk.md).
+      A 512-byte sector write lands inside ONE block and splices its content;
+      the two facts below are what every torn-write argument reduces to. -- *)
+
+Lemma fs_blocks_lookup (dk : Z -> bv 8) (b : Z) (k : nat) :
+  (k < BSIZE)%nat ->
+  fs_blocks dk b !! k = Some (dk (b * Z.of_nat BSIZE + Z.of_nat k)).
+Proof.
+  intro Hk. rewrite /fs_blocks /disk_read list_lookup_fmap.
+  rewrite (lookup_seq_lt 0 BSIZE k Hk). reflexivity.
+Qed.
+
+(* a write of [bs] at byte offset [o] INSIDE block [b] leaves every other
+   block alone *)
+Lemma fs_blocks_sub_ne (dk : Z -> bv 8) (b c : Z) (o : nat) (bs : list (bv 8)) :
+  (o + length bs <= BSIZE)%nat -> c <> b ->
+  fs_blocks (disk_write dk (b * Z.of_nat BSIZE + Z.of_nat o) bs) c
+  = fs_blocks dk c.
+Proof.
+  intros Hfit Hne. rewrite /fs_blocks /disk_read.
+  apply list_fmap_ext. intros j x Hx.
+  apply lookup_seq in Hx as [-> Hjlt].
+  apply disk_write_out.
+  rewrite /BSIZE in Hjlt. rewrite /BSIZE in Hfit. rewrite /BSIZE.
+  destruct (Z.lt_total c b) as [Hlt|[->|Hgt]]; [| congruence |]; [left|right]; lia.
+Qed.
+
+(* ...and splices the block it does write *)
+Lemma fs_blocks_splice (dk : Z -> bv 8) (b : Z) (o : nat) (bs : list (bv 8)) :
+  (o + length bs <= BSIZE)%nat ->
+  fs_blocks (disk_write dk (b * Z.of_nat BSIZE + Z.of_nat o) bs) b
+  = take o (fs_blocks dk b) ++ bs ++ drop (o + length bs) (fs_blocks dk b).
+Proof.
+  intro Hfit. pose proof (fs_blocks_length dk b) as HL.
+  assert (Hto : (o <= length (fs_blocks dk b))%nat) by lia.
+  assert (Hlt : length (take o (fs_blocks dk b)) = o)
+    by exact (length_take_le _ _ Hto).
+  apply list_eq. intro k.
+  destruct (decide (k < BSIZE)%nat) as [Hk|Hk]; last first.
+  { assert (H1 : (length (fs_blocks
+                    (disk_write dk (b * Z.of_nat BSIZE + Z.of_nat o) bs) b)
+                  <= k)%nat) by (rewrite fs_blocks_length; lia).
+    assert (H2 : (length (take o (fs_blocks dk b)
+                    ++ bs ++ drop (o + length bs) (fs_blocks dk b)) <= k)%nat).
+    { rewrite !length_app Hlt length_drop HL. lia. }
+    rewrite (lookup_ge_None_2 _ _ H1) (lookup_ge_None_2 _ _ H2). reflexivity. }
+  rewrite (fs_blocks_lookup _ b k Hk).
+  destruct (decide (k < o)%nat) as [Hbef|Hge].
+  - (* before the write *)
+    assert (Hk1 : (k < length (take o (fs_blocks dk b)))%nat) by lia.
+    rewrite (lookup_app_l _ _ _ Hk1) (lookup_take _ _ _ Hbef)
+            (fs_blocks_lookup _ b k Hk).
+    f_equal. apply disk_write_out. lia.
+  - assert (Hk1 : (length (take o (fs_blocks dk b)) <= k)%nat) by lia.
+    rewrite (lookup_app_r _ _ _ Hk1) Hlt.
+    destruct (decide (k < o + length bs)%nat) as [Hin|Hout].
+    + (* inside the write *)
+      assert (Hk2 : (k - o < length bs)%nat) by lia.
+      destruct (lookup_lt_is_Some_2 bs (k - o) Hk2) as [x Hx].
+      rewrite (lookup_app_l _ _ _ Hk2) Hx. f_equal.
+      assert (Hoff : b * Z.of_nat BSIZE + Z.of_nat o
+                     <= b * Z.of_nat BSIZE + Z.of_nat k) by lia.
+      assert (Hidx : Z.to_nat (b * Z.of_nat BSIZE + Z.of_nat k
+                               - (b * Z.of_nat BSIZE + Z.of_nat o))
+                     = (k - o)%nat) by lia.
+      apply (disk_write_in _ _ _ _ x Hoff). rewrite Hidx. exact Hx.
+    + (* after the write *)
+      assert (Hk2 : (length bs <= k - o)%nat) by lia.
+      assert (Hkk : (o + length bs + (k - o - length bs))%nat = k) by lia.
+      rewrite (lookup_app_r _ _ _ Hk2) lookup_drop Hkk
+              (fs_blocks_lookup _ b k Hk).
+      f_equal. apply disk_write_out. lia.
+Qed.
+
+(* the two sectors of an xv6 block *)
+Lemma bsize_two_sectors : BSIZE = (2 * virtio_sector_bytes)%nat.
+Proof. reflexivity. Qed.
+
+(* SECTOR 0 of a block: the first 512 bytes become [bs]... *)
+Lemma fs_blocks_sector0 (dk : Z -> bv 8) (b : Z) (bs : list (bv 8)) :
+  length bs = virtio_sector_bytes ->
+  take virtio_sector_bytes
+    (fs_blocks (disk_write dk (b * Z.of_nat BSIZE) bs) b) = bs.
+Proof.
+  intro Hlen.
+  assert (Hfit : (0 + length bs <= BSIZE)%nat)
+    by (rewrite Hlen bsize_two_sectors; lia).
+  pose proof (fs_blocks_splice dk b 0 bs Hfit) as Hsp.
+  rewrite Nat2Z.inj_0 Z.add_0_r in Hsp.
+  rewrite Hsp take_0. cbn [app].
+  exact (take_app_length' bs _ virtio_sector_bytes (eq_sym Hlen)).
+Qed.
+
+(* ...and SECTOR 1 of a block leaves the first 512 bytes ALONE.  This is the
+   torn-header case: recovery reads sector 0 only ([hdr_dec_sector0]), so a
+   write that lands only sector 1 is invisible to it. *)
+Lemma fs_blocks_sector1 (dk : Z -> bv 8) (b : Z) (bs : list (bv 8)) :
+  length bs = virtio_sector_bytes ->
+  take virtio_sector_bytes
+    (fs_blocks (disk_write dk (b * Z.of_nat BSIZE + virtio_sector_size) bs) b)
+  = take virtio_sector_bytes (fs_blocks dk b).
+Proof.
+  intro Hlen.
+  assert (Hfit : (virtio_sector_bytes + length bs <= BSIZE)%nat)
+    by (rewrite Hlen bsize_two_sectors; lia).
+  pose proof (fs_blocks_splice dk b virtio_sector_bytes bs Hfit) as Hsp.
+  rewrite -virtio_sector_size_bytes in Hsp.
+  rewrite Hsp.
+  assert (Hto : (virtio_sector_bytes <= length (fs_blocks dk b))%nat)
+    by (rewrite fs_blocks_length bsize_two_sectors; lia).
+  assert (Hle : (virtio_sector_bytes
+                 <= length (take virtio_sector_bytes (fs_blocks dk b)))%nat)
+    by (rewrite (length_take_le _ _ Hto); lia).
+  rewrite (take_app_le _ _ _ Hle) take_take Nat.min_id. reflexivity.
+Qed.
+
 (* ---------------------------------------------------------------------- *)
 (* 1b. The FULL header decode.                                             *)
 (*                                                                         *)
@@ -157,6 +273,82 @@ Lemma hdr_dec_zero (bs : list (bv 8)) :
 Proof. intros Hn. rewrite /hdr_dec le_word_0 Hn //. Qed.
 
 (* ---------------------------------------------------------------------- *)
+(* 1b''. THE HEADER FITS IN ONE SECTOR                                     *)
+(*    (claude-notes/projects/sector-atomic-disk.md §0).                     *)
+(*                                                                          *)
+(* [struct logheader] is [int n; int block[LOGBLOCKS];] = 4 + 4*30 = 124     *)
+(* bytes, and a well-formed header ([hdr_wf]) has [n <= LOGBLOCKS], so the   *)
+(* decoder reads bytes [0, 124) ONLY -- entirely inside SECTOR 0 of the      *)
+(* header block.  That is the one fact the whole sector-tearing campaign     *)
+(* rests on: a torn header write is harmless in either order, because        *)
+(* sector 0 landing IS the commit and sector 1 landing changes nothing       *)
+(* recovery reads.                                                          *)
+(* ---------------------------------------------------------------------- *)
+
+(* one decoded word only reads bytes [4*i, 4*i+4) *)
+Lemma le_word_take (bs : list (bv 8)) (i k : nat) :
+  (4 * i + 4 <= k)%nat -> le_word (take k bs) i = le_word bs i.
+Proof.
+  intro Hk. rewrite /le_word !take_drop_commute take_take.
+  rewrite (Nat.min_l (4 * i + 4) k) //.
+Qed.
+
+(* the DECODED COUNT reads the first word only, so it survives any truncation
+   that keeps four bytes *)
+Lemma hdr_dec_fst_take (bs : list (bv 8)) (k : nat) :
+  (4 <= k)%nat -> (hdr_dec (take k bs)).1 = (hdr_dec bs).1.
+Proof.
+  intro Hk. rewrite /hdr_dec /=.
+  assert (H0 : le_word (take k bs) 0 = le_word bs 0)
+    by (apply le_word_take; lia).
+  by rewrite H0.
+Qed.
+
+(* THE DECODER READS A PREFIX.  [4 * S n] bytes is all of it. *)
+Lemma hdr_dec_take (bs : list (bv 8)) (k : nat) :
+  (4 * S (hdr_dec bs).1 <= k)%nat -> hdr_dec (take k bs) = hdr_dec bs.
+Proof.
+  intro Hk. rewrite /hdr_dec /=.
+  assert (H0 : le_word (take k bs) 0 = le_word bs 0)
+    by (apply le_word_take; lia).
+  rewrite H0. f_equal. apply list_fmap_ext. intros j x Hx.
+  apply lookup_seq in Hx as [-> Hjlt].
+  apply le_word_take. rewrite /hdr_dec /= in Hk. lia.
+Qed.
+
+(* ...and under [hdr_wf]'s bound that prefix is inside SECTOR 0 *)
+Lemma hdr_dec_sector0 (bs : list (bv 8)) :
+  ((hdr_dec bs).1 <= LOGBLOCKS)%nat ->
+  hdr_dec (take virtio_sector_bytes bs) = hdr_dec bs.
+Proof.
+  intro Hn. apply hdr_dec_take. rewrite /LOGBLOCKS in Hn.
+  rewrite /virtio_sector_bytes. lia.
+Qed.
+
+(* the tight form: 4 + 4*LOGBLOCKS = 124 bytes *)
+Lemma hdr_dec_hdr_bytes (bs : list (bv 8)) :
+  ((hdr_dec bs).1 <= LOGBLOCKS)%nat ->
+  hdr_dec (take (4 * S LOGBLOCKS)%nat bs) = hdr_dec bs.
+Proof. intro Hn. apply hdr_dec_take. lia. Qed.
+
+(* THE FORM EVERY COROLLARY BELOW USES: two block contents that agree on
+   sector 0 decode to the same header.  Bytes [512, 1024) are dead to the
+   decoder. *)
+Lemma hdr_dec_sector0_eq (bs bs' : list (bv 8)) :
+  ((hdr_dec bs).1 <= LOGBLOCKS)%nat ->
+  take virtio_sector_bytes bs' = take virtio_sector_bytes bs ->
+  hdr_dec bs' = hdr_dec bs.
+Proof.
+  intros Hn Heq.
+  assert (Hn' : ((hdr_dec bs').1 <= LOGBLOCKS)%nat).
+  { rewrite -(hdr_dec_fst_take bs' virtio_sector_bytes);
+      [|rewrite /virtio_sector_bytes; lia].
+    rewrite Heq (hdr_dec_fst_take bs virtio_sector_bytes);
+      [exact Hn | rewrite /virtio_sector_bytes; lia]. }
+  rewrite -(hdr_dec_sector0 bs' Hn') Heq. by apply hdr_dec_sector0.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
 (* 1b'. THE HEADER WELL-FORMEDNESS INVARIANT (durable-disk stage B).       *)
 (*                                                                         *)
 (* [hdr_dec] is junk-tolerant and UNBOUNDED: a garbage header names any    *)
@@ -195,6 +387,23 @@ Lemma hdr_wf_ext (P P' : Z -> list (bv 8)) (cov : gset Z) (logstart : Z) :
   P' (log_hdr_bno logstart) = P (log_hdr_bno logstart) ->
   hdr_wf P cov logstart -> hdr_wf P' cov logstart.
 Proof. rewrite /hdr_wf. by intros ->. Qed.
+
+(* ...in fact it reads it only through [hdr_dec] ... *)
+Lemma hdr_wf_hdr_dec (P P' : Z -> list (bv 8)) (cov : gset Z) (logstart : Z) :
+  hdr_dec (P' (log_hdr_bno logstart)) = hdr_dec (P (log_hdr_bno logstart)) ->
+  hdr_wf P cov logstart -> hdr_wf P' cov logstart.
+Proof. rewrite /hdr_wf. by intros ->. Qed.
+
+(* ...and so only through SECTOR 0 of it: a torn header write that lands only
+   sector 1 changes nothing this invariant sees. *)
+Lemma hdr_wf_sector0 (P P' : Z -> list (bv 8)) (cov : gset Z) (logstart : Z) :
+  take virtio_sector_bytes (P' (log_hdr_bno logstart))
+  = take virtio_sector_bytes (P (log_hdr_bno logstart)) ->
+  hdr_wf P cov logstart -> hdr_wf P' cov logstart.
+Proof.
+  intros Heq Hwf. eapply hdr_wf_hdr_dec; [|exact Hwf].
+  apply hdr_dec_sector0_eq; [exact (proj1 Hwf) | exact Heq].
+Qed.
 
 (* ...so a whole-block write ANYWHERE ELSE preserves it.  This is the form
    a recovery home write discharges [fs_recover_permit]'s premise in: the
@@ -655,6 +864,92 @@ Proof.
   - rewrite Hhdr Hmiss //. by apply not_eq_sym, home_ne_hdr.
   - intros i Hi. rewrite (Hslots i Hi) Hmiss //.
     by apply not_eq_sym, (home_ne_slot ls b i Hb).
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* 1c'''. TORN WRITES (claude-notes/projects/sector-atomic-disk.md).       *)
+(*                                                                          *)
+(* A 512-byte sector lands atomically; a 1024-byte BLOCK does not.  Two      *)
+(* consequences the WAL's crash argument needs, and nothing else:            *)
+(*                                                                          *)
+(*  - a header write that lands only SECTOR 1 is invisible to recovery       *)
+(*    ([hdr_dec_sector0]), so [hdr_wf], [fs_recovery] and [log_mirror_ok]    *)
+(*    all survive it unchanged;                                             *)
+(*  - a torn write of a LOG SLOT moves the mirror's picture of that slot to  *)
+(*    whatever the disk now holds -- the mirror is content-agnostic, which   *)
+(*    is exactly why it can carry a half-written slot.                      *)
+(* ---------------------------------------------------------------------- *)
+
+Lemma log_slot_bno_inj (ls : Z) (i j : nat) :
+  i <> j -> log_slot_bno ls i <> log_slot_bno ls j.
+Proof. rewrite /log_slot_bno. lia. Qed.
+
+(* RECOVERY reads the header block only through [hdr_dec]... *)
+Lemma fs_recovery_hdr_dec (P P' : Z -> list (bv 8))
+    (D : gmap Z (list (bv 8))) (cov : gset Z) (ls : Z) :
+  hdr_dec (P' (log_hdr_bno ls)) = hdr_dec (P (log_hdr_bno ls)) ->
+  (forall c, c <> log_hdr_bno ls -> P' c = P c) ->
+  fs_recovery P D cov ls -> fs_recovery P' D cov ls.
+Proof.
+  intros Hhdr Hmiss Hrec. rewrite /fs_recovery Hhdr.
+  assert (HPs : forall j, (j < length (hdr_dec (P (log_hdr_bno ls))).2)%nat ->
+                  P' (log_slot_bno ls j) = P (log_slot_bno ls j))
+    by (intros j _; apply Hmiss, log_slot_ne_hdr).
+  rewrite (fs_install_ext_P P P' ls _ _ HPs).
+  rewrite (fs_restrict_upd_out P P' (fs_home_set cov ls) (log_hdr_bno ls)
+             (log_region_not_home cov ls _ (log_hdr_in_region ls)) Hmiss).
+  exact Hrec.
+Qed.
+
+(* ...and so only through SECTOR 0 of it *)
+Lemma fs_recovery_hdr_sector0 (P P' : Z -> list (bv 8))
+    (D : gmap Z (list (bv 8))) (cov : gset Z) (ls : Z) :
+  ((hdr_dec (P (log_hdr_bno ls))).1 <= LOGBLOCKS)%nat ->
+  take virtio_sector_bytes (P' (log_hdr_bno ls))
+  = take virtio_sector_bytes (P (log_hdr_bno ls)) ->
+  (forall c, c <> log_hdr_bno ls -> P' c = P c) ->
+  fs_recovery P D cov ls -> fs_recovery P' D cov ls.
+Proof.
+  intros Hn Heq Hmiss Hrec.
+  eapply fs_recovery_hdr_dec; [| exact Hmiss | exact Hrec].
+  by apply hdr_dec_sector0_eq.
+Qed.
+
+(* THE MIRROR under a torn header write: sector 1 changes nothing it holds. *)
+Lemma log_mirror_ok_hdr_sector0 (M : log_mirror) (P P' : Z -> list (bv 8))
+    (ls : Z) :
+  ((hdr_dec (P (log_hdr_bno ls))).1 <= LOGBLOCKS)%nat ->
+  take virtio_sector_bytes (P' (log_hdr_bno ls))
+  = take virtio_sector_bytes (P (log_hdr_bno ls)) ->
+  (forall c, c <> log_hdr_bno ls -> P' c = P c) ->
+  log_mirror_ok M P ls -> log_mirror_ok M P' ls.
+Proof.
+  intros Hn Heq Hmiss [Hhdr Hslots]. split.
+  - rewrite Hhdr. symmetry. by apply hdr_dec_sector0_eq.
+  - intros i Hi. rewrite (Hslots i Hi) Hmiss //. apply log_slot_ne_hdr.
+Qed.
+
+(* THE SECTOR ANALOGUE OF [log_mirror_ok_out]: a write that lands anywhere
+   inside log SLOT [j] -- a whole block, one sector, or a torn half of one --
+   moves the mirror's picture of that slot to whatever the disk now holds and
+   leaves every other row alone.  Content-agnostic on purpose: the mirror is
+   what carries a half-written slot across the rest of the commit. *)
+Lemma log_mirror_ok_sector (M : log_mirror) (P P' : Z -> list (bv 8))
+    (ls : Z) (j : nat) :
+  (j < LOGBLOCKS)%nat ->
+  (forall c, c <> log_slot_bno ls j -> P' c = P c) ->
+  log_mirror_ok M P ls ->
+  log_mirror_ok (MkLogMirror (lm_hdr M)
+                   (fun k => if decide (k = j)
+                             then P' (log_slot_bno ls j) else lm_slots M k))
+                P' ls.
+Proof.
+  intros Hj Hmiss [Hhdr Hslots]. split.
+  - cbn [lm_hdr]. rewrite Hhdr Hmiss //.
+    by apply not_eq_sym, log_slot_ne_hdr.
+  - cbn [lm_slots]. intros i Hi. destruct (decide (i = j)) as [->|Hne].
+    + reflexivity.
+    + rewrite (Hslots i Hi) Hmiss //. by apply log_slot_bno_inj.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
