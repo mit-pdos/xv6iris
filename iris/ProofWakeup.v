@@ -263,15 +263,14 @@ Section ProofWakeup.
         with "[Hqx]" as "Htail".
       { iIntros (CIDt Hst Mt) "%Hmt Hcg Hown Hpc Hframe".
         destruct Hmt as (Ht1 & Htsp & Ht18 & Ht19 & Ht20 & Ht21 & Ht22 & Ht23 & Ht24 & Ht25 & Ht26 & Ht27 & Htdom).
-        iPoseProof (wki_30 with "Htext") as "Hi30".
-        iPoseProof (wki_34 with "Htext") as "Hi34".
         (* 0x30 addi s1,s1,360 : s1 := &proc[k+1] *)
         assert (Hrgt9 : rget (CID := CIDt) Mt (mword_of_int 9 : mword 5)
                         = Mt !!! Regidx (mword_of_int 9 : mword 5)) by (rgne; reflexivity).
         iApply (wp_addi4_s_sconf (CID := CIDt) (mword_of_int (KernelSyms.wakeup + 0x30))
                   (mword_of_int 9 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 360 : mword 12)
                   Mt av b ltac:(vm_compute; discriminate) ltac:(rdok)
-                  with "Hcg Hpc Hi30").
+                  with "Hcg Hpc []").
+        { iApply (wki_30 with "Htext"). }
         iIntros (CIDt1 Hst1) "Hcg Hpc".
         iEval (rewrite Hrgt9) in "Hcg".
         set (Mt30 := <[Regidx (mword_of_int 9 : mword 5) := regval_into_reg
@@ -298,7 +297,8 @@ Section ProofWakeup.
                     (mword_of_int 32 : mword 13) (mword_of_int 19 : mword 5) (mword_of_int 9 : mword 5)
                     Mt30 av b ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                     Hcmpr ltac:(vm_compute; reflexivity)
-                    with "Hcg Hpc Hi34").
+                    with "Hcg Hpc []").
+          { iApply (wki_34 with "Htext"). }
           iNext. iIntros (CIDt2 Hst2) "Hcg Hpc".
           assert (Htgt54 : add_vec (mword_of_int (KernelSyms.wakeup + 0x34) : mword 64)
                              (sign_extend' 64 (mword_of_int 32 : mword 13)) = mword_of_int (KernelSyms.wakeup + 0x54))
@@ -324,7 +324,8 @@ Section ProofWakeup.
           iApply (wp_beq_fall_s_sconf (CID := CIDt1) (mword_of_int (KernelSyms.wakeup + 0x34))
                     (mword_of_int 32 : mword 13) (mword_of_int 19 : mword 5) (mword_of_int 9 : mword 5)
                     Mt30 av b ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
-                    Hcmpr with "Hcg Hpc Hi34").
+                    Hcmpr with "Hcg Hpc []").
+          { iApply (wki_34 with "Htext"). }
           iIntros (CIDt2 Hst2) "Hcg Hpc".
           assert (HkS : (S k < NPROC)%nat).
           { destruct (Nat.lt_ge_cases (S k) NPROC) as [Hlt | Hge]; [exact Hlt|].
@@ -362,13 +363,13 @@ Section ProofWakeup.
       destruct (lookup_lt_is_Some_2 γs k ltac:(rewrite Hlen; exact Hk)) as [γk Hγk].
       iDestruct (procs_inv_lookup γs k γk Hγk with "Hpinv") as "#Hlockk".
       (* ---- 0x38 c.mv a0,s1 : a0 := &proc[k] ---- *)
-      iPoseProof (wki_38 with "Htext") as "Hi38".
       assert (Hrgk9 : rget (CID := CIDk) M (mword_of_int 9 : mword 5)
                       = M !!! Regidx (mword_of_int 9 : mword 5)) by (rgne; reflexivity).
       iApply (wp_cmv_s_sconf (CID := CIDk) (mword_of_int (KernelSyms.wakeup + 0x38))
                 (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
                 M av b ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hi38").
+                with "Hcg Hpc []").
+      { iApply (wki_38 with "Htext"). }
       iIntros (CIDd Hsd) "Hcg Hpc".
       iEval (rewrite Hrgk9) in "Hcg".
       set (M38 := <[Regidx (mword_of_int 10 : mword 5) :=
@@ -377,12 +378,12 @@ Section ProofWakeup.
                       = mword_of_int (KernelSyms.wakeup + 0x3a)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp3a) in "Hpc".
       (* ---- 0x3a jal ra,acquire ---- *)
-      iPoseProof (wki_3a with "Htext") as "Hi3a".
       iApply (wp_jal_s_sconf (CID := CIDd) (mword_of_int (KernelSyms.wakeup + 0x3a))
                 (mword_of_int 1 : mword 5) (mword_of_int 2092080 : mword 21) M38 av b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(vm_compute; reflexivity)
-                with "Hcg Hpc Hi3a").
+                with "Hcg Hpc []").
+      { iApply (wki_3a with "Htext"). }
       iIntros (CIDe Hse) "Hcg Hpc".
       set (M3a := <[Regidx (mword_of_int 1 : mword 5) :=
                     regval_into_reg (add_vec_int (mword_of_int (KernelSyms.wakeup + 0x3a) : mword 64) 4)]> M38).
@@ -463,15 +464,14 @@ Section ProofWakeup.
         as "Hrel".
       { iIntros (Mr) "%Hmr Hcg Hpc Htok HR".
         destruct Hmr as (Hr9 & Hr2 & Hr18 & Hr19 & Hr20 & Hr21 & Hr22 & Hr23 & Hr24 & Hr25 & Hr26 & Hr27 & Hrdom).
-        iPoseProof (wki_2a with "Htext") as "Hi2a".
-        iPoseProof (wki_2c with "Htext") as "Hi2c".
         (* 0x2a c.mv a0,s1 : a0 := &proc[k] *)
         assert (Hrgr9 : rget (CID := CIDf) Mr (mword_of_int 9 : mword 5)
                         = Mr !!! Regidx (mword_of_int 9 : mword 5)) by (rgne; reflexivity).
         iApply (wp_cmv_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.wakeup + 0x2a))
                   (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
                   Mr (trap_res b + av)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
-                  with "Hcg Hpc Hi2a").
+                  with "Hcg Hpc []").
+        { iApply (wki_2a with "Htext"). }
         iApply wp_next_off_intro.
         iIntros "Hcg Hpc".
         iEval (rewrite Hrgr9) in "Hcg".
@@ -485,7 +485,8 @@ Section ProofWakeup.
                   (mword_of_int 1 : mword 5) (mword_of_int 2092230 : mword 21) Mr2a (trap_res b + av)%nat false
                   ltac:(vm_compute; discriminate) ltac:(rdok)
                   ltac:(vm_compute; reflexivity)
-                  with "Hcg Hpc Hi2c").
+                  with "Hcg Hpc []").
+        { iApply (wki_2c with "Htext"). }
         iApply wp_next_off_intro.
         iIntros "Hcg Hpc".
         set (Mr2c := <[Regidx (mword_of_int 1 : mword 5) :=
@@ -582,7 +583,6 @@ Section ProofWakeup.
         exact Hdommr. }
       (* ===== 0x3e..0x52: chan test, chan clear, state test + wake, then Hrel ===== *)
       (* ---- 0x3e c.ld a5,32(s1) : a5 := p->chan ---- *)
-      iPoseProof (wki_3e with "Htext") as "Hi3e".
       assert (Hea3e : add_vec (rget (CID := CIDf) Macq (mword_of_int 9 : mword 5))
                         (sign_extend' 64 (mword_of_int 32 : mword 12)) = p_chan (proc_addr k)).
       { rewrite (rget_ne Macq (mword_of_int 9 : mword 5) ltac:(intro Hq; injection Hq as Hq2; vm_compute in Hq2; congruence)).
@@ -593,7 +593,8 @@ Section ProofWakeup.
       iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (CID := CIDf) (mword_of_int (KernelSyms.wakeup + 0x3e))
                 (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 32 : mword 12)
                 Macq (trap_res b + av)%nat ch false ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hi3e [Hpch]").
+                with "Hcg Hpc [] [Hpch]").
+      { iApply (wki_3e with "Htext"). }
       { iEval (rewrite Hea3e). iExact "Hpch". }
       iApply wp_next_off_intro.
       iIntros "Hcg Hpc Hpch".
@@ -631,7 +632,6 @@ Section ProofWakeup.
       assert (HdomM3e : forall r : regidx, r ∈ dom (rf_to_gmap M3e)).
       { intro r. rewrite /M3e rf_to_gmap_upd dom_insert_L. apply elem_of_union_r. apply Hdomacq. }
       (* ---- 0x40 bne a5,s2 : if p->chan != chan -> release ---- *)
-      iPoseProof (wki_40 with "Htext") as "Hi40".
       assert (Hrg40_15 : rget (CID := CIDf) M3e (mword_of_int 15 : mword 5)
                          = M3e !!! Regidx (mword_of_int 15 : mword 5)) by (rgne; reflexivity).
       assert (Hrg40_18 : rget (CID := CIDf) M3e (mword_of_int 18 : mword 5)
@@ -646,7 +646,8 @@ Section ProofWakeup.
                   (mword_of_int 8170 : mword 13) (mword_of_int 18 : mword 5) (mword_of_int 15 : mword 5)
                   M3e (trap_res b + av)%nat false ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                   Hcmp40r ltac:(vm_compute; reflexivity)
-                  with "Hcg Hpc Hi40").
+                  with "Hcg Hpc []").
+        { iApply (wki_40 with "Htext"). }
         iNext. iApply wp_next_off_intro. iIntros "Hcg Hpc".
         assert (H40tgt : add_vec (mword_of_int (KernelSyms.wakeup + 0x40) : mword 64)
                           (sign_extend' 64 (mword_of_int 8170 : mword 13))
@@ -665,7 +666,8 @@ Section ProofWakeup.
         iApply (wp_bne_fall_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.wakeup + 0x40))
                   (mword_of_int 8170 : mword 13) (mword_of_int 18 : mword 5) (mword_of_int 15 : mword 5)
                   M3e (trap_res b + av)%nat false ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
-                  Hcmp40r with "Hcg Hpc Hi40").
+                  Hcmp40r with "Hcg Hpc []").
+        { iApply (wki_40 with "Htext"). }
         iApply wp_next_off_intro. iIntros "Hcg Hpc".
         assert (Hpc44 : add_vec_int (mword_of_int (KernelSyms.wakeup + 0x40) : mword 64) 4
                         = mword_of_int (KernelSyms.wakeup + 0x44)) by (apply bv_eq; vm_compute; reflexivity).
@@ -673,7 +675,6 @@ Section ProofWakeup.
         (* ---- 0x44 sd zero,32(s1) : p->chan := 0.  THE WAKEUP FLAG CLEAR.
            [p_chan] is unconditional in [proc_lock_res] -- no guard is opened
            and the state is irrelevant, which is what makes this arm free. ---- *)
-        iPoseProof (wki_44 with "Htext") as "Hi44".
         assert (Hea44 : add_vec (rget (CID := CIDf) M3e (mword_of_int 9 : mword 5))
                           (sign_extend' 64 (mword_of_int 32 : mword 12)) = p_chan (proc_addr k)).
         { rewrite (rget_ne M3e (mword_of_int 9 : mword 5) ltac:(intro Hq; injection Hq as Hq2; vm_compute in Hq2; congruence)).
@@ -684,7 +685,8 @@ Section ProofWakeup.
         iApply (wp_sd_zero_s_sconf (kt := KT1) (ktd := KT0) (CID := CIDf) (mword_of_int (KernelSyms.wakeup + 0x44))
                   (mword_of_int 9 : mword 5) (mword_of_int 32 : mword 12)
                   M3e (trap_res b + av)%nat ch false
-                  with "Hcg Hpc Hi44 [Hpch]").
+                  with "Hcg Hpc [] [Hpch]").
+        { iApply (wki_44 with "Htext"). }
         { iEval (rewrite Hea44). iExact "Hpch". }
         iApply wp_next_off_intro.
         iIntros "Hcg Hpc Hpch".
@@ -693,7 +695,6 @@ Section ProofWakeup.
                         = mword_of_int (KernelSyms.wakeup + 0x48)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hpc48) in "Hpc".
         (* ---- 0x48 c.lw a5,24(s1) : a5 := sext(p->state) ---- *)
-        iPoseProof (wki_48 with "Htext") as "Hi48".
         assert (Hea48 : add_vec (rget (CID := CIDf) M3e (mword_of_int 9 : mword 5))
                           (sign_extend' 64 (mword_of_int 24 : mword 12)) = p_state (proc_addr k)).
         { rewrite (rget_ne M3e (mword_of_int 9 : mword 5) ltac:(intro Hq; injection Hq as Hq2; vm_compute in Hq2; congruence)).
@@ -704,7 +705,8 @@ Section ProofWakeup.
         iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (CID := CIDf) (mword_of_int (KernelSyms.wakeup + 0x48))
                   (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 24 : mword 12)
                   M3e (trap_res b + av)%nat st false ltac:(vm_compute; discriminate) ltac:(rdok)
-                  with "Hcg Hpc Hi48 [Hpst]").
+                  with "Hcg Hpc [] [Hpst]").
+        { iApply (wki_48 with "Htext"). }
         { iEval (rewrite Hea48). iExact "Hpst". }
         iApply wp_next_off_intro.
         iIntros "Hcg Hpc Hpst".
@@ -742,7 +744,6 @@ Section ProofWakeup.
         assert (HdomM48 : forall r : regidx, r ∈ dom (rf_to_gmap M48)).
         { intro r. rewrite /M48 rf_to_gmap_upd dom_insert_L. apply elem_of_union_r. apply HdomM3e. }
         (* ---- 0x4a bne a5,s4 : if state != SLEEPING -> release ---- *)
-        iPoseProof (wki_4a with "Htext") as "Hi4a".
         assert (Hrg4a_15 : rget (CID := CIDf) M48 (mword_of_int 15 : mword 5)
                            = M48 !!! Regidx (mword_of_int 15 : mword 5)) by (rgne; reflexivity).
         assert (Hrg4a_20 : rget (CID := CIDf) M48 (mword_of_int 20 : mword 5)
@@ -757,7 +758,8 @@ Section ProofWakeup.
                     (mword_of_int 8160 : mword 13) (mword_of_int 20 : mword 5) (mword_of_int 15 : mword 5)
                     M48 (trap_res b + av)%nat false ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                     Hcmp4ar ltac:(vm_compute; reflexivity)
-                    with "Hcg Hpc Hi4a").
+                    with "Hcg Hpc []").
+          { iApply (wki_4a with "Htext"). }
           iNext. iApply wp_next_off_intro. iIntros "Hcg Hpc".
           assert (H4atgt : add_vec (mword_of_int (KernelSyms.wakeup + 0x4a) : mword 64)
                             (sign_extend' 64 (mword_of_int 8160 : mword 13))
@@ -776,7 +778,8 @@ Section ProofWakeup.
           iApply (wp_bne_fall_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.wakeup + 0x4a))
                     (mword_of_int 8160 : mword 13) (mword_of_int 20 : mword 5) (mword_of_int 15 : mword 5)
                     M48 (trap_res b + av)%nat false ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
-                    Hcmp4ar with "Hcg Hpc Hi4a").
+                    Hcmp4ar with "Hcg Hpc []").
+          { iApply (wki_4a with "Htext"). }
           iApply wp_next_off_intro. iIntros "Hcg Hpc".
           assert (Heq2 : sign_extend' 64 st = (mword_of_int 2 : mword 64)).
           { rewrite HM48a5 HM48_20 in Hcmp4a. unfold neq_vec in Hcmp4a.
@@ -786,7 +789,6 @@ Section ProofWakeup.
                           = mword_of_int (KernelSyms.wakeup + 0x4e)) by (apply bv_eq; vm_compute; reflexivity).
           iEval (rewrite Hpc4e) in "Hpc".
           (* ---- 0x4e sw s5,24(s1) : p->state := RUNNABLE ---- *)
-          iPoseProof (wki_4e with "Htext") as "Hi4e".
           assert (Hea4e : add_vec (rget (CID := CIDf) M48 (mword_of_int 9 : mword 5))
                             (sign_extend' 64 (mword_of_int 24 : mword 12)) = p_state (proc_addr k)).
           { rewrite (rget_ne M48 (mword_of_int 9 : mword 5) ltac:(intro Hq; injection Hq as Hq2; vm_compute in Hq2; congruence)).
@@ -796,7 +798,8 @@ Section ProofWakeup.
             reflexivity. }
           iApply (wp_sw_s_sconf (kt := KT1) (ktd := KT0) (CID := CIDf) (mword_of_int (KernelSyms.wakeup + 0x4e))
                     (mword_of_int 21 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 24 : mword 12)
-                    M48 (trap_res b + av)%nat st false with "Hcg Hpc Hi4e [Hpst]").
+                    M48 (trap_res b + av)%nat st false with "Hcg Hpc [] [Hpst]").
+          { iApply (wki_4e with "Htext"). }
           { iEval (rewrite Hea4e). iExact "Hpst". }
           iApply wp_next_off_intro.
           iIntros "Hcg Hpc Hpst".
@@ -818,14 +821,14 @@ Section ProofWakeup.
                   with "Hpst Hpg Hpch Hpub Hctx") as "HR".
           iModIntro.
           (* ---- 0x52 c.j release ---- *)
-          iPoseProof (wki_52 with "Htext") as "Hi52".
           assert (H52tgt : add_vec (mword_of_int (KernelSyms.wakeup + 0x52) : mword 64)
                             (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2028 : mword 11) ('b"0"))))
                           = mword_of_int (KernelSyms.wakeup + 0x2a)) by (apply bv_eq; vm_compute; reflexivity).
           iApply (wp_cj_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.wakeup + 0x52))
                     (sign_extend' 21 (concat_vec (mword_of_int 2028 : mword 11) ('b"0")))
                     M48 (trap_res b + av)%nat false ltac:(rewrite H52tgt; vm_compute; reflexivity)
-                    with "Hcg Hpc Hi52").
+                    with "Hcg Hpc []").
+          { iApply (wki_52 with "Htext"). }
           iApply wp_next_off_intro.
           iNext. iIntros "Hcg Hpc".
           iEval (rewrite H52tgt) in "Hpc".

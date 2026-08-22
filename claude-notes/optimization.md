@@ -159,41 +159,45 @@ size of the block that used to sit there. Purely mechanical: delete the
 `iPoseProof (pai_<off> with "Htext") as "Hi<off>"` lines and rewrite each
 `with "Hcg Hpc Hi<off> …"` into `with "Hcg Hpc [] …"` plus the brace.
 
-**Measured across 63 converted files** (2026-08-22), each an isolated
-`coqc -time -async-proofs off` pair, pristine vs converted:
+**The whole tree now follows this discipline** — 226 proof files converted
+2026-08-22, verified by a from-scratch rebuild (every `.vo` deleted): 1297/1297,
+zero errors. Measured over the ~110 files where before/after pairs were taken:
 
 | | range | median |
 |---|---|---|
-| wall | −9 % … −49 % | ≈ −24 % |
-| `Qed` | −16 % … −62 % | ≈ −33 % |
-| `.vo` | −24 % … **+0.2 %** | ≈ −6 % |
+| wall | −4 % … −49 % | ≈ −18 % |
+| `Qed` | −6 % … −62 % | ≈ −27 % |
+| `.vo` | −24 % … **+0.2 %** | ≈ −5 % |
 
-Aggregate: **1893 s → 1400 s of serial compile work, −26 %.** On the reference
-file (`ProofPipealloc.v`, one whole-function proof, 58 posed facts) the proof
-term itself went 26.6 M → 8.3 M nodes (−69 %) while the shared DAG moved only
-−13 % — the derivations are still in the term, sharing subterms, but they are no
-longer re-embedded in every following step's environment. That is RULE ONE seen
-from the `|Δ|` side, and it is why the saving is FLAT: no sentence gets
-dramatically faster, the whole 1690-sentence tail does.
+On the reference file (`ProofPipealloc.v`, one whole-function proof, 58 posed
+facts) the proof term went 26.6 M → 8.3 M nodes (−69 %) while the shared DAG
+moved only −13 % — the derivations are still there, sharing subterms, but no
+longer re-embedded in every following step's environment. That is RULE ONE from
+the `|Δ|` side, and it is why the saving is FLAT: no sentence gets dramatically
+faster, the whole tail does.
 
-**What predicts the size of the win is the LARGEST LIVE POSE BLOCK A LEAF SITS
-UNDER** — not the file's site count. `ProofUartinit` (27 sites, all one block)
-got −35 %; `ProofSysExec` (92 sites, blocks ≤19 over ~30 proofs) got −14 %;
-`ProofCreate` (150 sites over 111 lemmas) got −18 %. It sorts candidates
-reliably but sizes the win only to ±10 points.
+**What predicts the size of the win** is `min(peak live block net of iClears,
+poses per Qed)` — `tools/instr_subgoal.py --rank` computes it. Not the file's
+site count: `ProofUartinit` (27 sites, one block) got −35 % while `ProofSysExec`
+(92 sites over ~30 proofs) got −14 %, and `ProofVirtioDiskInit` (127 poses, but
+posed-and-cleared one at a time) got −7.5 %. It sorts candidates; it sizes the
+win only to ±10 points, and `ProofSysLink` has the tree's largest block at
+−14 % because most of its time is not proofmode work at all.
 
-Three things measurement refuted, all of which looked true after the first file:
+Four things measurement refuted, all of which looked true after the first file:
+`Qed` does NOT always improve more than wall (fails below ~20-pose blocks);
+`.vo` is not a proxy and can grow; peak RSS is not a reliable benefit (−37 % to
++0.2 %); and a `Löb`/`iInduction` body is NOT a special case (in-loop and
+out-of-loop discounts agree — measured −56/−45, −43/−42, −26/−30).
 
-- **`Qed` does not always improve more than wall** — it failed on
-  `ProofUvmcreate`, `ProofWakeupParts` (whose first `Qed` got slower outright)
-  and `ProofSysOpen`. Holds for blocks of ~20+.
-- **`.vo` is not a proxy for the effect and can grow** (+0.2 % on four files),
-  and on one batch it anti-correlated with the wall win.
-- **Peak RSS is not a reliable benefit** (−37 % to +0.2 %).
+**Do not measure this on a loaded box.** The error is BIASED, not just noisy:
+eight files measured concurrently reported seven apparent REGRESSIONS that were
+all 5–20 % wins when re-measured serially. One `coqc` at a time, arms
+interleaved, 2–3 reps.
 
-A `Löb`/`iInduction` body is **not** a special case: measured in-loop vs
-out-of-loop discounts agree (−56/−45, −43/−42, −26/−30 on three loop files), so
-re-deriving the fact each iteration is swamped by the `|Δ|` discount.
+**The user tier (`UProof*.v`) is out of scope and should stay that way**: its
+`uinstr` is a `Prop` over a pure process image, passed positionally as a Coq
+term at each leaf (1016 sites, zero `iPoseProof`), so it never enters `Δ`.
 
 `tools/instr_subgoal.py` does the edit; see
 `claude-notes/projects/instr-subgoal-sweep.md` for the recipe, the traps and

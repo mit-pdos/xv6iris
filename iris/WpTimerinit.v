@@ -296,8 +296,6 @@ Section WpTimerinitThm.
     { unfold ti_ea_s0, ti_sp1, pa_stk, add_vec_int. rewrite pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
     iEval (rewrite -Hpra) in "Hstkra".
     iEval (rewrite -Hps0) in "Hstks0".
-    (* the 21 [instr] facts, off the persistent text image *)
-    iPoseProof (ti_instr9  with "Htext") as "Hi9".
     (* register-nonzero side conditions *)
     assert (Hnz_sp : uint csp_rs1 <> 0) by (vm_compute; discriminate).
     assert (Hnz_ra : uint ti_ra <> 0) by (vm_compute; discriminate).
@@ -340,7 +338,8 @@ Section WpTimerinitThm.
     (* ---- 9. c.addi sp, -16 ---- *)
     iApply (wp_addi_gpr ti_pc9 true csp_rs1 csp_rs1 (sign_extend' 12 i9) m pmpcfg1 q
               Hpmp ltac:(boot_static) Hnz_sp
-              with "Hmm Hpmpc Hpc Hfile Hi9").
+              with "Hmm Hpmpc Hpc Hfile []").
+    { iApply (ti_instr9 with "Htext"). }
     iEval (change (if true then 2%Z else 4%Z) with 2%Z). iEval (rewrite P0). iIntros "Hmm Hpmpc Hpc Hfile".
     iEval (rewrite sext6_12_64 Hsp) in "Hfile".
     iEval (change (<[Regidx csp_rs1 := regval_into_reg (add_vec sp0 (sign_extend' 64 i9))]> m)
@@ -360,11 +359,10 @@ Section WpTimerinitThm.
               (add_vec (ti_m1 m sp0 !!! Regidx csp_rs1)
                  (sign_extend' 64 (zero_extend' 12 (concat_vec u10 ('b"000"))))) 8)
       by (rewrite Hea_ra1; exact Htor_ra).
-    iPoseProof (ti_instr10 with "Htext") as "Hi10".
     iApply (wp_csdsp_gpr_tor ti_pc10 u10 ti_ra (ti_m1 m sp0) vold_ra pmpcfg1 pmpaddrs q
               Hpmp ltac:(boot_static) Htor10
-              with "Hmm Hpmpc Hpaddr Hpc Hfile Hi10 [Hstkra]").
-              iClear "Hi10".
+              with "Hmm Hpmpc Hpaddr Hpc Hfile [] [Hstkra]").
+    { iApply (ti_instr10 with "Htext"). }
     { rewrite Hea_ra1. iExact "Hstkra". }
     iEval (rewrite P1 Hea_ra1 Lra1). iIntros "Hmm Hpmpc Hpaddr Hpc Hfile Hstkra".
 
@@ -376,31 +374,28 @@ Section WpTimerinitThm.
               (add_vec (ti_m1 m sp0 !!! Regidx csp_rs1)
                  (sign_extend' 64 (zero_extend' 12 (concat_vec u11 ('b"000"))))) 8)
       by (rewrite Hea_s01; exact Htor_s0).
-    iPoseProof (ti_instr11 with "Htext") as "Hi11".
     iApply (wp_csdsp_gpr_tor ti_pc11 u11 ti_s0 (ti_m1 m sp0) vold_s0 pmpcfg1 pmpaddrs q
               Hpmp ltac:(boot_static) Htor11
-              with "Hmm Hpmpc Hpaddr Hpc Hfile Hi11 [Hstks0]").
-              iClear "Hi11".
+              with "Hmm Hpmpc Hpaddr Hpc Hfile [] [Hstks0]").
+    { iApply (ti_instr11 with "Htext"). }
     { rewrite Hea_s01. iExact "Hstks0". }
     iEval (rewrite P2 Hea_s01 Ls01). iIntros "Hmm Hpmpc Hpaddr Hpc Hfile Hstks0".
-iPoseProof (ti_instr12 with "Htext") as "Hi12".
 
     (* ---- 12. c.addi4spn s0, sp, 16 ---- *)
     iApply (wp_addi_gpr ti_pc12 true csp_rs1 ti_s0 (caddi4spn_imm nz12) (ti_m1 m sp0) pmpcfg1 q
               Hpmp ltac:(boot_static) Hnz_s0
-              with "Hmm Hpmpc Hpc Hfile Hi12").
-              iClear "Hi12".
+              with "Hmm Hpmpc Hpc Hfile []").
+    { iApply (ti_instr12 with "Htext"). }
     iEval (change (if true then 2%Z else 4%Z) with 2%Z). iEval (rewrite P3 Lsp1). iIntros "Hmm Hpmpc Hpc Hfile".
     iEval (change (<[Regidx ti_s0 := regval_into_reg
                       (add_vec (ti_sp1 sp0) (sign_extend' 64 (caddi4spn_imm nz12)))]> (ti_m1 m sp0))
              with (ti_m12 m sp0)) in "Hfile".
-iPoseProof (ti_instr13 with "Htext") as "Hi13".
 
     (* ---- 13. csrr a5, menvcfg ---- *)
     iApply (wp_csrr_menvcfg_gpr ti_pc13 ti_a5 menv0 (ti_m12 m sp0) pmpcfg1 q
               Hpmp ltac:(boot_static) Hnz_a5
-              with "Hmm Hpmpc Hpc Hfile Hmenv Hi13").
-              iClear "Hi13".
+              with "Hmm Hpmpc Hpc Hfile Hmenv []").
+    { iApply (ti_instr13 with "Htext"). }
     iEval (rewrite P4). iIntros "Hmm Hpmpc Hpc Hfile Hmenv".
     iEval (change (<[Regidx ti_a5 := regval_into_reg menv0]> (ti_m12 m sp0))
              with (ti_m13 m sp0 menv0)) in "Hfile".
@@ -408,11 +403,10 @@ iPoseProof (ti_instr13 with "Htext") as "Hi13".
     (* ---- 14. c.li a4, -1 ---- *)
     iDestruct (gpr_file_x0 (ti_m13 m sp0 menv0) cli_rs1 ltac:(vm_compute; reflexivity)
                  with "Hfile") as "[%Hx0_14 Hfile]".
-    iPoseProof (ti_instr14 with "Htext") as "Hi14".
     iApply (wp_addi_gpr ti_pc14 true cli_rs1 ti_a4 (sign_extend' 12 i14) (ti_m13 m sp0 menv0) pmpcfg1 q
               Hpmp ltac:(boot_static) Hnz_a4
-              with "Hmm Hpmpc Hpc Hfile Hi14").
-              iClear "Hi14".
+              with "Hmm Hpmpc Hpc Hfile []").
+    { iApply (ti_instr14 with "Htext"). }
     iEval (change (if true then 2%Z else 4%Z) with 2%Z). iEval (rewrite P5 Hx0_14 add_vec_zero_l sext6_12_64). iIntros "Hmm Hpmpc Hpc Hfile".
     iEval (change (<[Regidx ti_a4 := regval_into_reg (cli_wval i14)]> (ti_m13 m sp0 menv0))
              with (ti_m14 m sp0 menv0)) in "Hfile".
@@ -420,11 +414,10 @@ iPoseProof (ti_instr13 with "Htext") as "Hi13".
     (* ---- 15. c.slli a4, 63 ---- *)
     assert (L15a4 : ti_m14 m sp0 menv0 !!! Regidx ti_a4 = cli_wval i14)
       by (ti_unfold; ti_look).
-    iPoseProof (ti_instr15 with "Htext") as "Hi15".
     iApply (wp_slli_gpr ti_pc15 true ti_a4 ti_a4 sh15 (ti_m14 m sp0 menv0) pmpcfg1 q
               Hpmp ltac:(boot_static) Hnz_a4
-              with "Hmm Hpmpc Hpc Hfile Hi15").
-              iClear "Hi15".
+              with "Hmm Hpmpc Hpc Hfile []").
+    { iApply (ti_instr15 with "Htext"). }
     iEval (change (if true then 2%Z else 4%Z) with 2%Z). iEval (rewrite P6 L15a4 Hb63). iIntros "Hmm Hpmpc Hpc Hfile".
     iEval (change (<[Regidx ti_a4 := regval_into_reg ti_bit63]> (ti_m14 m sp0 menv0))
              with (ti_m15 m sp0 menv0)) in "Hfile".
@@ -434,11 +427,10 @@ iPoseProof (ti_instr13 with "Htext") as "Hi13".
       by (ti_unfold; ti_look).
     assert (L16a4 : ti_m15 m sp0 menv0 !!! Regidx ti_a4 = ti_bit63)
       by (ti_unfold; ti_look).
-    iPoseProof (ti_instr16 with "Htext") as "Hi16".
     iApply (wp_or_gpr ti_pc16 true ti_a4 ti_a5 ti_a5 (ti_m15 m sp0 menv0) pmpcfg1 q
               Hpmp ltac:(boot_static) Hnz_a5
-              with "Hmm Hpmpc Hpc Hfile Hi16").
-              iClear "Hi16".
+              with "Hmm Hpmpc Hpc Hfile []").
+    { iApply (ti_instr16 with "Htext"). }
     iEval (change (if true then 2%Z else 4%Z) with 2%Z). iEval (rewrite P7 L16a5 L16a4). iIntros "Hmm Hpmpc Hpc Hfile".
     iEval (change (<[Regidx ti_a5 := regval_into_reg (or_vec menv0 ti_bit63)]> (ti_m15 m sp0 menv0))
              with (ti_m16 m sp0 menv0)) in "Hfile".
@@ -446,19 +438,17 @@ iPoseProof (ti_instr13 with "Htext") as "Hi13".
     (* ---- 17. csrw menvcfg, a5 ---- *)
     assert (L17a5 : ti_m16 m sp0 menv0 !!! Regidx ti_a5 = ti_menv1 menv0)
       by (ti_unfold; ti_look).
-    iPoseProof (ti_instr17 with "Htext") as "Hi17".
     iApply (wp_csrw_menvcfg_gpr ti_pc17 ti_a5 (ti_m16 m sp0 menv0) menv0 pmpcfg1 q
               Hpmp ltac:(boot_static) Hnz_a5
-              with "Hmm Hpmpc Hpc Hfile Hmenv Hi17").
-              iClear "Hi17".
+              with "Hmm Hpmpc Hpc Hfile Hmenv []").
+    { iApply (ti_instr17 with "Htext"). }
     iEval (rewrite P8 L17a5). iIntros "Hmm Hpmpc Hpc Hfile Hmenv".
-iPoseProof (ti_instr18 with "Htext") as "Hi18".
 
     (* ---- 18. csrr a5, mcounteren ---- *)
     iApply (wp_csrr_mcounteren_gpr ti_pc18 ti_a5 mcen0 (ti_m16 m sp0 menv0) pmpcfg1 q
               Hpmp ltac:(boot_static) Hnz_a5
-              with "Hmm Hpmpc Hpc Hfile Hmcen Hi18").
-              iClear "Hi18".
+              with "Hmm Hpmpc Hpc Hfile Hmcen []").
+    { iApply (ti_instr18 with "Htext"). }
     iEval (rewrite P9). iIntros "Hmm Hpmpc Hpc Hfile Hmcen".
     iEval (change (<[Regidx ti_a5 := regval_into_reg (zero_extend' 64 mcen0)]> (ti_m16 m sp0 menv0))
              with (ti_m18 m sp0 menv0 mcen0)) in "Hfile".
@@ -466,11 +456,10 @@ iPoseProof (ti_instr18 with "Htext") as "Hi18".
     (* ---- 19. ori a5, a5, 2 ---- *)
     assert (L19a5 : ti_m18 m sp0 menv0 mcen0 !!! Regidx ti_a5 = zero_extend' 64 mcen0)
       by (ti_unfold; ti_look).
-    iPoseProof (ti_instr19 with "Htext") as "Hi19".
     iApply (wp_ori_gpr ti_pc19 ti_a5 ti_a5 i19 (ti_m18 m sp0 menv0 mcen0) pmpcfg1 q
               Hpmp ltac:(boot_static) Hnz_a5
-              with "Hmm Hpmpc Hpc Hfile Hi19").
-              iClear "Hi19".
+              with "Hmm Hpmpc Hpc Hfile []").
+    { iApply (ti_instr19 with "Htext"). }
     iEval (rewrite P10 L19a5). iIntros "Hmm Hpmpc Hpc Hfile".
     iEval (change (<[Regidx ti_a5 := regval_into_reg
                       (or_vec (zero_extend' 64 mcen0) (sign_extend' 64 i19))]>
@@ -480,29 +469,26 @@ iPoseProof (ti_instr18 with "Htext") as "Hi18".
     (* ---- 20. csrw mcounteren, a5 ---- *)
     assert (L20a5 : ti_m19 m sp0 menv0 mcen0 !!! Regidx ti_a5 = ti_mcen1 mcen0)
       by (ti_unfold; ti_look).
-    iPoseProof (ti_instr20 with "Htext") as "Hi20".
     iApply (wp_csrw_mcounteren_gpr ti_pc20 ti_a5 (ti_m19 m sp0 menv0 mcen0) mcen0 pmpcfg1 q
               Hpmp ltac:(boot_static) Hnz_a5
-              with "Hmm Hpmpc Hpc Hfile Hmcen Hi20").
-              iClear "Hi20".
+              with "Hmm Hpmpc Hpc Hfile Hmcen []").
+    { iApply (ti_instr20 with "Htext"). }
     iEval (rewrite P11 L20a5). iIntros "Hmm Hpmpc Hpc Hfile Hmcen".
-iPoseProof (ti_instr21 with "Htext") as "Hi21".
 
     (* ---- 21. csrr a5, time ---- *)
     iApply (wp_csrr_time_gpr ti_pc21 ti_a5 (ti_m19 m sp0 menv0 mcen0) pmpcfg1 q
               Hpmp ltac:(boot_static) Hnz_a5
-              with "Hmm Hpmpc Hpc Hfile Hi21").
-              iClear "Hi21".
+              with "Hmm Hpmpc Hpc Hfile []").
+    { iApply (ti_instr21 with "Htext"). }
     iEval (rewrite P12). iIntros (tv) "Hmm Hpmpc Hpc Hfile".
     iEval (change (<[Regidx ti_a5 := regval_into_reg tv]> (ti_m19 m sp0 menv0 mcen0))
              with (ti_m21 m sp0 menv0 mcen0 tv)) in "Hfile".
-iPoseProof (ti_instr22 with "Htext") as "Hi22".
 
     (* ---- 22. lui a4, 0xf4 ---- *)
     iApply (wp_lui_gpr ti_pc22 false ti_a4 i22 (ti_m21 m sp0 menv0 mcen0 tv) pmpcfg1 q
               Hpmp ltac:(boot_static) Hnz_a4
-              with "Hmm Hpmpc Hpc Hfile Hi22").
-              iClear "Hi22".
+              with "Hmm Hpmpc Hpc Hfile []").
+    { iApply (ti_instr22 with "Htext"). }
     iEval (change (if false then 2%Z else 4%Z) with 4%Z). iEval (rewrite P13). iIntros "Hmm Hpmpc Hpc Hfile".
     iEval (change (<[Regidx ti_a4 := regval_into_reg (luival i22)]>
                      (ti_m21 m sp0 menv0 mcen0 tv))
@@ -511,11 +497,10 @@ iPoseProof (ti_instr22 with "Htext") as "Hi22".
     (* ---- 23. addi a4, a4, 576 ---- *)
     assert (L23a4 : ti_m22 m sp0 menv0 mcen0 tv !!! Regidx ti_a4 = luival i22)
       by (ti_unfold; ti_look).
-    iPoseProof (ti_instr23 with "Htext") as "Hi23".
     iApply (wp_addi_gpr ti_pc23 false ti_a4 ti_a4 i23 (ti_m22 m sp0 menv0 mcen0 tv) pmpcfg1 q
               Hpmp ltac:(boot_static) Hnz_a4
-              with "Hmm Hpmpc Hpc Hfile Hi23").
-              iClear "Hi23".
+              with "Hmm Hpmpc Hpc Hfile []").
+    { iApply (ti_instr23 with "Htext"). }
     iEval (change (if false then 2%Z else 4%Z) with 4%Z). iEval (rewrite P14 L23a4 Hival). iIntros "Hmm Hpmpc Hpc Hfile".
     iEval (change (<[Regidx ti_a4 := regval_into_reg ti_interval]>
                      (ti_m22 m sp0 menv0 mcen0 tv))
@@ -526,11 +511,10 @@ iPoseProof (ti_instr22 with "Htext") as "Hi22".
       by (ti_unfold; ti_look).
     assert (L24a4 : ti_m23 m sp0 menv0 mcen0 tv !!! Regidx ti_a4 = ti_interval)
       by (ti_unfold; ti_look).
-    iPoseProof (ti_instr24 with "Htext") as "Hi24".
     iApply (wp_add_gpr ti_pc24 true ti_a4 ti_a5 ti_a5 (ti_m23 m sp0 menv0 mcen0 tv) pmpcfg1 q
               Hpmp ltac:(boot_static) Hnz_a5
-              with "Hmm Hpmpc Hpc Hfile Hi24").
-              iClear "Hi24".
+              with "Hmm Hpmpc Hpc Hfile []").
+    { iApply (ti_instr24 with "Htext"). }
     iEval (change (if true then 2%Z else 4%Z) with 2%Z). iEval (rewrite P15 L24a5 L24a4). iIntros "Hmm Hpmpc Hpc Hfile".
     iEval (change (<[Regidx ti_a5 := regval_into_reg (add_vec tv ti_interval)]>
                      (ti_m23 m sp0 menv0 mcen0 tv))
@@ -539,11 +523,10 @@ iPoseProof (ti_instr22 with "Htext") as "Hi22".
     (* ---- 25. csrw stimecmp, a5 ---- *)
     assert (L25a5 : ti_m24 m sp0 menv0 mcen0 tv !!! Regidx ti_a5 = ti_deadline tv)
       by (ti_unfold; ti_look).
-    iPoseProof (ti_instr25 with "Htext") as "Hi25".
     iApply (wp_csrw_stimecmp_gpr ti_pc25 ti_a5 (ti_m24 m sp0 menv0 mcen0 tv) stimecmp0 pmpcfg1 q
               Hpmp ltac:(boot_static) Hnz_a5
-              with "Hmm Hpmpc Hpc Hfile Hstc Hi25").
-              iClear "Hi25".
+              with "Hmm Hpmpc Hpc Hfile Hstc []").
+    { iApply (ti_instr25 with "Htext"). }
     iEval (rewrite P16 L25a5). iIntros "Hmm Hpmpc Hpc Hfile Hstc".
 
     (* ---- 26. c.ldsp ra, 8(sp) ---- *)
@@ -556,11 +539,10 @@ iPoseProof (ti_instr22 with "Htext") as "Hi22".
               (add_vec (ti_m24 m sp0 menv0 mcen0 tv !!! Regidx csp_rs1)
                  (sign_extend' 64 (zero_extend' 12 (concat_vec u10 ('b"000"))))) 8)
       by (rewrite Hea_ra26; exact Htor_ra).
-    iPoseProof (ti_instr26 with "Htext") as "Hi26".
     iApply (wp_cldsp_gpr_tor ti_pc26 u10 ti_ra (ti_m24 m sp0 menv0 mcen0 tv) ra0
               pmpcfg1 pmpaddrs q Hpmp ltac:(boot_static) Htor26 Hnz_ra
-              with "Hmm Hpmpc Hpaddr Hpc Hfile Hi26 [Hstkra]").
-              iClear "Hi26".
+              with "Hmm Hpmpc Hpaddr Hpc Hfile [] [Hstkra]").
+    { iApply (ti_instr26 with "Htext"). }
     { rewrite Hea_ra26. iExact "Hstkra". }
     iEval (rewrite P17 Hea_ra26). iIntros "Hmm Hpmpc Hpaddr Hpc Hfile Hstkra".
     iEval (change (<[Regidx ti_ra := regval_into_reg ra0]> (ti_m24 m sp0 menv0 mcen0 tv))
@@ -576,11 +558,10 @@ iPoseProof (ti_instr22 with "Htext") as "Hi22".
               (add_vec (ti_m26 m sp0 menv0 mcen0 tv ra0 !!! Regidx csp_rs1)
                  (sign_extend' 64 (zero_extend' 12 (concat_vec u11 ('b"000"))))) 8)
       by (rewrite Hea_s027; exact Htor_s0).
-    iPoseProof (ti_instr27 with "Htext") as "Hi27".
     iApply (wp_cldsp_gpr_tor ti_pc27 u11 ti_s0 (ti_m26 m sp0 menv0 mcen0 tv ra0) s00
               pmpcfg1 pmpaddrs q Hpmp ltac:(boot_static) Htor27 Hnz_s0
-              with "Hmm Hpmpc Hpaddr Hpc Hfile Hi27 [Hstks0]").
-              iClear "Hi27".
+              with "Hmm Hpmpc Hpaddr Hpc Hfile [] [Hstks0]").
+    { iApply (ti_instr27 with "Htext"). }
     { rewrite Hea_s027. iExact "Hstks0". }
     iEval (rewrite P18 Hea_s027). iIntros "Hmm Hpmpc Hpaddr Hpc Hfile Hstks0".
     iEval (change (<[Regidx ti_s0 := regval_into_reg s00]> (ti_m26 m sp0 menv0 mcen0 tv ra0))
@@ -589,12 +570,11 @@ iPoseProof (ti_instr22 with "Htext") as "Hi22".
     (* ---- 28. c.addi sp, 16 ---- *)
     assert (L28sp : ti_m27 m sp0 menv0 mcen0 tv ra0 s00 !!! Regidx csp_rs1 = ti_sp1 sp0)
       by (ti_unfold; ti_look).
-    iPoseProof (ti_instr28 with "Htext") as "Hi28".
     iApply (wp_addi_gpr ti_pc28 true csp_rs1 csp_rs1 (sign_extend' 12 i28)
               (ti_m27 m sp0 menv0 mcen0 tv ra0 s00) pmpcfg1 q
               Hpmp ltac:(boot_static) Hnz_sp
-              with "Hmm Hpmpc Hpc Hfile Hi28").
-              iClear "Hi28".
+              with "Hmm Hpmpc Hpc Hfile []").
+    { iApply (ti_instr28 with "Htext"). }
     iEval (change (if true then 2%Z else 4%Z) with 2%Z). iEval (rewrite sext6_12_64 P19 L28sp Hspres). iIntros "Hmm Hpmpc Hpc Hfile".
     iEval (change (<[Regidx csp_rs1 := regval_into_reg sp0]>
                      (ti_m27 m sp0 menv0 mcen0 tv ra0 s00))
@@ -603,11 +583,10 @@ iPoseProof (ti_instr22 with "Htext") as "Hi22".
     (* ---- 29. c.ret ---- *)
     assert (L29ra : ti_mout m sp0 menv0 mcen0 tv ra0 s00 !!! Regidx ti_ra = ra0)
       by (ti_unfold; ti_look).
-    iPoseProof (ti_instr29 with "Htext") as "Hi29".
     iApply (wp_cret_gpr_zca ti_pc29 ti_ra (ti_mout m sp0 menv0 mcen0 tv ra0 s00) pmpcfg1 q
               Hpmp ltac:(boot_static) Hnz_ra
-              with "Hmm Hpmpc Hpc Hfile Hi29").
-              iClear "Hi29".
+              with "Hmm Hpmpc Hpc Hfile []").
+    { iApply (ti_instr29 with "Htext"). }
     iEval (rewrite L29ra). iIntros "Hmm Hpmpc Hpc Hfile".
 
     (* re-bundle timerinit's two frame slots back into [stack_own_phys sp0 n]

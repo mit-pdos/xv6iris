@@ -254,14 +254,6 @@ Section ProofMain.
     intros Hcid HK.
     pose proof (mn_bounds K HK) as (Hc2 & Hn50 & Hnsched).
     iIntros "Hcg #Htext Hpc Hcont".
-    iPoseProof (mni_00 with "Htext") as "Hi00".
-    iPoseProof (mni_02 with "Htext") as "Hi02".
-    iPoseProof (mni_04 with "Htext") as "Hi04".
-    iPoseProof (mni_06 with "Htext") as "Hi06".
-    iPoseProof (mni_08 with "Htext") as "Hi08".
-    iPoseProof (mni_0c with "Htext") as "Hi0c".
-    iPoseProof (mni_10 with "Htext") as "Hi10".
-    iPoseProof (mni_14 with "Htext") as "Hi14".
     (* frame-cell address facts (2-slot frame: ra @ slot 1, s0 @ slot 2) *)
     assert (Hpush : add_vec (m !!! Regidx csp_rs1)
               (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))
@@ -281,7 +273,8 @@ Section ProofMain.
       f_equal; try (apply bv_eq; vm_compute; reflexivity). }
     (* +0x00 addi sp,sp,-16 *)
     iApply (wp_caddi_sp_push_s_sconf (mword_of_int KernelSyms.main) (mword_of_int 48 : mword 6)
-              m K 2 false Hc2 Hpush with "Hcg Hpc Hi00").
+              m K 2 false Hc2 Hpush with "Hcg Hpc []").
+    { iApply (mni_00 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hframe Hpc".
     pose (W1 := <[Regidx csp_rs1 := regval_into_reg
@@ -299,7 +292,8 @@ Section ProofMain.
     (* +0x02 sd ra,8(sp) *)
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.main + 0x02)) (mword_of_int 1 : mword 6)
               (mword_of_int 1 : mword 5) W1 (K - 2)%nat v1 false
-              with "Hcg Hpc Hi02 [Hc1]").
+              with "Hcg Hpc [] [Hc1]").
+    { iApply (mni_02 with "Htext"). }
     { iEval (rewrite HspW1 Hb1). iExact "Hc1". }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc Hc1".
@@ -309,7 +303,8 @@ Section ProofMain.
     (* +0x04 sd s0,0(sp) *)
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.main + 0x04)) (mword_of_int 0 : mword 6)
               (mword_of_int 8 : mword 5) W1 (K - 2)%nat v2 false
-              with "Hcg Hpc Hi04 [Hc2]").
+              with "Hcg Hpc [] [Hc2]").
+    { iApply (mni_04 with "Htext"). }
     { iEval (rewrite HspW1 Hb2). iExact "Hc2". }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc Hc2".
@@ -321,7 +316,8 @@ Section ProofMain.
               (Cregidx (mword_of_int 0)) (mword_of_int 4 : mword 8) (mword_of_int 8 : mword 5)
               W1 (K - 2)%nat false ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi06").
+              with "Hcg Hpc []").
+    { iApply (mni_06 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     pose (W2 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg
@@ -334,7 +330,8 @@ Section ProofMain.
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x08)) (mword_of_int 1 : mword 5)
               (mword_of_int 2670 : mword 21) W2 (K - 2)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi08").
+              ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+    { iApply (mni_08 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     pose (W3 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
@@ -359,7 +356,8 @@ Section ProofMain.
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.main + 0x0c)) (mword_of_int 14 : mword 5)
               (mword_of_int 9 : mword 20) m4 (K - 2)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi0c").
+              with "Hcg Hpc []").
+    { iApply (mni_0c with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     pose (W5 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg
@@ -372,7 +370,8 @@ Section ProofMain.
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.main + 0x10)) (mword_of_int 14 : mword 5)
               (mword_of_int 14 : mword 5) (mword_of_int 1128 : mword 12) W5 (K - 2)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi10").
+              with "Hcg Hpc []").
+    { iApply (mni_10 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     pose (W6 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg
@@ -389,7 +388,8 @@ Section ProofMain.
               (mword_of_int 23 : mword 8) (Cregidx (mword_of_int 2))
               (mword_of_int 10 : mword 5) W6 (K - 2)%nat false
               creg_c2 ltac:(vm_compute; discriminate) HW6a0
-              ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi14").
+              ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+    { iApply (mni_14 with "Htext"). }
     iApply wp_next_off_intro.
     iApply bi.later_intro. iIntros "Hcg Hpc".
     assert (Htgtb : add_vec (mword_of_int (KernelSyms.main + 0x14) : mword 64)
@@ -457,17 +457,6 @@ Section ProofMain.
     iIntros "Hcg #Htext #Hkdata #Hdev Hpc Hfree Hcpu Hlcons Hltx Hlpr".
     iIntros "Hkprintk Hdevsw Hrest Hring Htx Hsent Hlb Hdlab Hcont".
     iPoseProof (dev_inv_uart with "Hdev") as "#Huinv".
-    iPoseProof (mni_42 with "Htext") as "Hi42".
-    iPoseProof (mni_46 with "Htext") as "Hi46".
-    iPoseProof (mni_4a with "Htext") as "Hi4a".
-    iPoseProof (mni_4e with "Htext") as "Hi4e".
-    iPoseProof (mni_52 with "Htext") as "Hi52".
-    iPoseProof (mni_56 with "Htext") as "Hi56".
-    iPoseProof (mni_5a with "Htext") as "Hi5a".
-    iPoseProof (mni_5e with "Htext") as "Hi5e".
-    iPoseProof (mni_62 with "Htext") as "Hi62".
-    iPoseProof (mni_66 with "Htext") as "Hi66".
-    iPoseProof (mni_6a with "Htext") as "Hi6a".
     iPoseProof (kernel_data_string mn_nl_addr mn_nl
                   (mword_of_int mn_nl_addr) eq_refl
                   ltac:(unfold text_end, mn_nl_addr; lia)
@@ -489,7 +478,8 @@ Section ProofMain.
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x42)) (mword_of_int 1 : mword 5)
               (mword_of_int 2094518 : mword 21) m n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi42").
+              ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+    { iApply (mni_42 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     pose (C0 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
@@ -519,7 +509,8 @@ Section ProofMain.
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x46)) (mword_of_int 1 : mword 5)
               (mword_of_int 2095576 : mword 21) mc n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi46").
+              ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+    { iApply (mni_46 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     pose (C1 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
@@ -599,7 +590,8 @@ Section ProofMain.
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.main + 0x4a)) (mword_of_int 10 : mword 5)
               (mword_of_int 6 : mword 20) mp n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi4a").
+              with "Hcg Hpc []").
+    { iApply (mni_4a with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     pose (A1 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
@@ -611,7 +603,8 @@ Section ProofMain.
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.main + 0x4e)) (mword_of_int 10 : mword 5)
               (mword_of_int 10 : mword 5) (mword_of_int 510 : mword 12) A1 n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi4e").
+              with "Hcg Hpc []").
+    { iApply (mni_4e with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     pose (A2 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
@@ -628,7 +621,8 @@ Section ProofMain.
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x52)) (mword_of_int 1 : mword 5)
               (mword_of_int 2094720 : mword 21) A2 n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi52").
+              ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+    { iApply (mni_52 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     pose (A3 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
@@ -658,7 +652,8 @@ Section ProofMain.
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.main + 0x56)) (mword_of_int 10 : mword 5)
               (mword_of_int 6 : mword 20) mk1 n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi56").
+              with "Hcg Hpc []").
+    { iApply (mni_56 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     pose (B1 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
@@ -670,7 +665,8 @@ Section ProofMain.
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.main + 0x5a)) (mword_of_int 10 : mword 5)
               (mword_of_int 10 : mword 5) (mword_of_int 506 : mword 12) B1 n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi5a").
+              with "Hcg Hpc []").
+    { iApply (mni_5a with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     pose (B2 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
@@ -686,7 +682,8 @@ Section ProofMain.
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x5e)) (mword_of_int 1 : mword 5)
               (mword_of_int 2094708 : mword 21) B2 n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi5e").
+              ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+    { iApply (mni_5e with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     pose (B3 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
@@ -716,7 +713,8 @@ Section ProofMain.
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.main + 0x62)) (mword_of_int 10 : mword 5)
               (mword_of_int 6 : mword 20) mk2 n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi62").
+              with "Hcg Hpc []").
+    { iApply (mni_62 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     pose (D1 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
@@ -728,7 +726,8 @@ Section ProofMain.
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.main + 0x66)) (mword_of_int 10 : mword 5)
               (mword_of_int 10 : mword 5) (mword_of_int 486 : mword 12) D1 n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi66").
+              with "Hcg Hpc []").
+    { iApply (mni_66 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     pose (D2 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
@@ -744,7 +743,8 @@ Section ProofMain.
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x6a)) (mword_of_int 1 : mword 5)
               (mword_of_int 2094696 : mword 21) D2 n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi6a").
+              ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+    { iApply (mni_6a with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     pose (D3 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
@@ -887,17 +887,14 @@ Section ProofMain.
     subst phystop s1entry.
     iIntros "Hcg #Htext #Hkdata Hpc Hfree Hcpu Hlkmem Hkkalloc Hkmem24 Hpages Hkpt".
     iIntros "Hsbit Htlb Hunset Hkauth Hlpid Hlwait Hwres Hnpid Hprocs Hppub Hfds Hirs Hbss Hparks Hpst Hcont".
-    iPoseProof (mni_6e with "Htext") as "Hi6e".
-    iPoseProof (mni_72 with "Htext") as "Hi72".
-    iPoseProof (mni_76 with "Htext") as "Hi76".
-    iPoseProof (mni_7a with "Htext") as "Hi7a".
     iDestruct "Hlkmem" as (vkl vkn vkc) "(Hkw & Hkn & Hkc)".
     iDestruct "Hkpt" as (kpt0) "Hkpt".
     (* ---- +0x6e jal kinit ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x6e)) (mword_of_int 1 : mword 5)
               (mword_of_int 2096142 : mword 21) m n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi6e").
+              ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+    { iApply (mni_6e with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     pose (V1 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
@@ -934,7 +931,8 @@ Section ProofMain.
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x72)) (mword_of_int 1 : mword 5)
               (mword_of_int 718 : mword 21) mki n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi72").
+              ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+    { iApply (mni_72 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     pose (V2 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
@@ -981,7 +979,8 @@ Section ProofMain.
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x76)) (mword_of_int 1 : mword 5)
               (mword_of_int 62 : mword 21) mkv n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi76").
+              ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+    { iApply (mni_76 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     pose (V3 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
@@ -1014,7 +1013,8 @@ Section ProofMain.
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x7a)) (mword_of_int 1 : mword 5)
               (mword_of_int 2374 : mword 21) mkh n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi7a").
+              ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+    { iApply (mni_7a with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     pose (V4 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
@@ -1117,16 +1117,13 @@ Section ProofMain.
     assert (Hcidz : cid_word_of cpu_id = (zero_reg : mword 64)) by exact Hcid.
     iIntros "Hcg #Htext #Hkdata #Hdev Hpc Hltick Hticks Hstvec Hq Hcont".
     iPoseProof (dev_inv_plic with "Hdev") as "#Hpinv".
-    iPoseProof (mni_7e with "Htext") as "Hi7e".
-    iPoseProof (mni_82 with "Htext") as "Hi82".
-    iPoseProof (mni_86 with "Htext") as "Hi86".
-    iPoseProof (mni_8a with "Htext") as "Hi8a".
     iDestruct "Hltick" as (vtl vtn vtc) "(Htw & Htn & Htc)".
     (* ---- +0x7e jal trapinit ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x7e)) (mword_of_int 1 : mword 5)
               (mword_of_int 5480 : mword 21) m n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi7e").
+              ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+    { iApply (mni_7e with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     pose (T1 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
@@ -1160,7 +1157,8 @@ Section ProofMain.
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x82)) (mword_of_int 1 : mword 5)
               (mword_of_int 5512 : mword 21) mt n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi82").
+              ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+    { iApply (mni_82 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     pose (T2 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
@@ -1185,7 +1183,8 @@ Section ProofMain.
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x86)) (mword_of_int 1 : mword 5)
               (mword_of_int 18216 : mword 21) mth n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi86").
+              ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+    { iApply (mni_86 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     pose (T3 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
@@ -1208,7 +1207,8 @@ Section ProofMain.
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x8a)) (mword_of_int 1 : mword 5)
               (mword_of_int 18238 : mword 21) mpl n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi8a").
+              ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+    { iApply (mni_8a with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     pose (T4 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
@@ -1417,11 +1417,6 @@ Section ProofMain.
              Hldisk".
     iIntros "Hdiskptr Hdiskfree Hdusedidx Hdslots Hclaim #Hdone Hcfg Hinitproc Hcont".
     iPoseProof (dev_inv_disk with "Hdev") as "#Hdinv".
-    iPoseProof (mni_8e with "Htext") as "Hi8e".
-    iPoseProof (mni_92 with "Htext") as "Hi92".
-    iPoseProof (mni_96 with "Htext") as "Hi96".
-    iPoseProof (mni_9a with "Htext") as "Hi9a".
-    iPoseProof (mni_9e with "Htext") as "Hi9e".
     iDestruct "Hlbc" as (vbl vbn vbc) "(Hbw & Hbn & Hbc)".
     iDestruct "Hlit" as (vil vin vic) "(Hiw & Hin & Hic)".
     iDestruct "Hlft" as (vfl vfn vfc) "(Hfw & Hfn & Hfc)".
@@ -1448,7 +1443,8 @@ Section ProofMain.
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x8e)) (mword_of_int 1 : mword 5)
               (mword_of_int 7194 : mword 21) m n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi8e").
+              ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+    { iApply (mni_8e with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     pose (F1 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
@@ -1492,7 +1488,8 @@ Section ProofMain.
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x92)) (mword_of_int 1 : mword 5)
               (mword_of_int 8556 : mword 21) mbi n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi92").
+              ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+    { iApply (mni_92 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     pose (F2 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
@@ -1556,7 +1553,8 @@ Section ProofMain.
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x96)) (mword_of_int 1 : mword 5)
               (mword_of_int 12684 : mword 21) mii n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi96").
+              ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+    { iApply (mni_96 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     pose (F3 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
@@ -1599,7 +1597,8 @@ Section ProofMain.
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x9a)) (mword_of_int 1 : mword 5)
               (mword_of_int 18462 : mword 21) mfi n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi9a").
+              ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+    { iApply (mni_9a with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     pose (F4 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
@@ -1677,7 +1676,8 @@ Section ProofMain.
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x9e)) (mword_of_int 1 : mword 5)
               (mword_of_int 3294 : mword 21) mvd n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi9e").
+              ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+    { iApply (mni_9e with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     pose (F5 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
@@ -1867,13 +1867,6 @@ Section ProofMain.
     intros Hn Hp0.
     iIntros "Hcg #Htext Hpc Hfree Hcpu Htcsr #Hsinv #Hwand".
     iIntros "#Hpenv #Hpinv #Hccaps #Hdlock #Hgeom #Hkinv #Hkptp #Htramp #Hkstx".
-    iPoseProof (mni_a2 with "Htext") as "Hia2".
-    iPoseProof (mni_a6 with "Htext") as "Hia6".
-    iPoseProof (mni_aa with "Htext") as "Hiaa".
-    iPoseProof (mni_ac with "Htext") as "Hiac".
-    iPoseProof (mni_b0 with "Htext") as "Hib0".
-    iPoseProof (mni_b2 with "Htext") as "Hib2".
-    iPoseProof (mni_3e with "Htext") as "Hi3e".
     (* the deposit itself: everything main built, through the □-wand *)
     iAssert P as "#HP".
     { iApply ("Hwand" $! γpr γs γk pd pav pu root pas
@@ -1886,7 +1879,8 @@ Section ProofMain.
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.main + 0xa2)) (mword_of_int 15 : mword 5)
               (mword_of_int 9 : mword 20) m n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hia2").
+              with "Hcg Hpc []").
+    { iApply (mni_a2 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     pose (S1 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg
@@ -1899,7 +1893,8 @@ Section ProofMain.
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.main + 0xa6)) (mword_of_int 15 : mword 5)
               (mword_of_int 15 : mword 5) (mword_of_int 978 : mword 12) S1 n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hia6").
+              with "Hcg Hpc []").
+    { iApply (mni_a6 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     pose (S2 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg
@@ -1912,7 +1907,8 @@ Section ProofMain.
     iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.main + 0xaa)) (mword_of_int 14 : mword 5)
               (mword_of_int 1 : mword 6) (mword_of_int 1 : mword 64) S2 n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              ltac:(apply bv_eq; vm_compute; reflexivity) with "Hcg Hpc Hiaa").
+              ltac:(apply bv_eq; vm_compute; reflexivity) with "Hcg Hpc []").
+    { iApply (mni_aa with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     pose (S3 := <[Regidx (mword_of_int 14 : mword 5) :=
@@ -1924,7 +1920,8 @@ Section ProofMain.
     iApply (wp_fence_gen_s_sconf (mword_of_int (KernelSyms.main + 0xac))
               (mword_of_int 0 : mword 4) (mword_of_int 3 : mword 4)
               (mword_of_int 1 : mword 4) (Regidx (mword_of_int 0))
-              (Regidx (mword_of_int 0)) S3 n false with "Hcg Hpc Hiac").
+              (Regidx (mword_of_int 0)) S3 n false with "Hcg Hpc []").
+    { iApply (mni_ac with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     assert (Hpb0 : add_vec_int (mword_of_int (KernelSyms.main + 0xac) : mword 64) 4
@@ -1961,7 +1958,8 @@ Section ProofMain.
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity)
               ltac:(vm_compute; reflexivity) exec_write_ram_plain_4
               (store_ext_4 (rget S3 (mword_of_int 14 : mword 5)))
-              ltac:(solve_ndisj) with "Hcg Hpc Hib0 [] [HP]").
+              ltac:(solve_ndisj) with "Hcg Hpc [] [] [HP]").
+    { iApply (mni_b0 with "Htext"). }
     { rewrite Hsa. iExact "Hstcl". }
     { rewrite Hsa Hsvst.
       iApply (started_inv_store_au (⊤ ∖ ↑minstretN) P ltac:(solve_ndisj)
@@ -1975,7 +1973,8 @@ Section ProofMain.
     (* ---- +0xb2 j 0x3e : back to the join the secondary arm also reaches ---- *)
     iApply (wp_cj_s_sconf (mword_of_int (KernelSyms.main + 0xb2))
               (sign_extend' 21 (concat_vec (mword_of_int 1990 : mword 11) ('b"0")))
-              S3 n false ltac:(vm_compute; reflexivity) with "Hcg Hpc Hib2").
+              S3 n false ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+    { iApply (mni_b2 with "Htext"). }
     iApply wp_next_off_intro.
     iApply bi.later_intro. iIntros "Hcg Hpc".
     assert (Htgtj : add_vec (mword_of_int (KernelSyms.main + 0xb2) : mword 64)
@@ -1988,7 +1987,8 @@ Section ProofMain.
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x3e)) (mword_of_int 1 : mword 5)
               (mword_of_int 3818 : mword 21) S3 n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi3e").
+              ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+    { iApply (mni_3e with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     pose (SS := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg

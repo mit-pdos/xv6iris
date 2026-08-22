@@ -85,12 +85,12 @@ Section ProofProcdumpMain.
     (* ================================================================== *)
     (* +0x1e  jal ra,printk -- THE CALL THIS FILE OWNS                    *)
     (* ================================================================== *)
-    iPoseProof (pdi_1e with "Htext") as "Hi1e".
     iApply (wp_jal_s_sconf (CID := CID1)
               (mword_of_int (KernelSyms.procdump + 0x1e) : mword 64) Rra
               (mword_of_int 2089436 : mword 21) M (K - 10)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
-              with "Hcg Hpc Hi1e").
+              with "Hcg Hpc []").
+    { iApply (pdi_1e with "Htext"). }
     iIntros (CID2 Hs2) "Hcg Hpc".
     set (M1 := <[Regidx Rra := regval_into_reg
                   (add_vec_int

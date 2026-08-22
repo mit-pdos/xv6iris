@@ -130,16 +130,6 @@ Section ProofCpuid.
     set (m6 := <[Regidx s0_idx := regval_into_reg s00]> m5).
     set (m7 := <[Regidx csp_rs1 := regval_into_reg (add_vec (m6 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_dealloc)))]> m6).
     iIntros "Hcg #Htext Hpc Hcont".
-    iPoseProof (ci_00 with "Htext") as "Hi00".
-    iPoseProof (ci_02 with "Htext") as "Hi02".
-    iPoseProof (ci_04 with "Htext") as "Hi04".
-    iPoseProof (ci_06 with "Htext") as "Hi06".
-    iPoseProof (ci_08 with "Htext") as "Hi08".
-    iPoseProof (ci_0a with "Htext") as "Hi0a".
-    iPoseProof (ci_0c with "Htext") as "Hi0c".
-    iPoseProof (ci_0e with "Htext") as "Hi0e".
-    iPoseProof (ci_10 with "Htext") as "Hi10".
-    iPoseProof (ci_12 with "Htext") as "Hi12".
     (* the sp geometry: sp' = pa_stk sp0 2; frame slot addresses *)
     assert (Hcsp1 : m1 !!! Regidx csp_rs1 = sp') by (apply upd_eq).
     assert (Hpush : sp' = pa_stk (m0 !!! Regidx csp_rs1) 2).
@@ -147,7 +137,8 @@ Section ProofCpuid.
       apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     (* ---- 0x00: c.addi sp,-16 -- the frame push ---- *)
     iApply (wp_caddi_sp_push_s_sconf pcE imm_entry m0 n 2 false Hn Hpush
-              with "Hcg Hpc Hi00").
+              with "Hcg Hpc []").
+    { iApply (ci_00 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hframe Hpc".
     assert (Hpp02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (KernelSyms.cpuid + 0x02)) by (apply bv_eq; vm_compute; reflexivity).
@@ -164,14 +155,16 @@ Section ProofCpuid.
     iEval (rewrite -Hpa2) in "Hbs0".
     (* ---- 0x02: c.sdsp ra,8(sp) ---- *)
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.cpuid + 0x02)) (mword_of_int 1 : mword 6) ra_idx m1 (n - 2)%nat vr24 false
-              with "Hcg Hpc Hi02 Hbra").
+              with "Hcg Hpc [] Hbra").
+    { iApply (ci_02 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc Hbra".
     assert (Hpp04 : add_vec_int (mword_of_int (KernelSyms.cpuid + 0x02) : mword 64) 2 = mword_of_int (KernelSyms.cpuid + 0x04)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp04) in "Hpc".
     (* ---- 0x04: c.sdsp s0,0(sp) ---- *)
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.cpuid + 0x04)) (mword_of_int 0 : mword 6) s0_idx m1 (n - 2)%nat vs16 false
-              with "Hcg Hpc Hi04 Hbs0").
+              with "Hcg Hpc [] Hbs0").
+    { iApply (ci_04 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc Hbs0".
     assert (Hpp06 : add_vec_int (mword_of_int (KernelSyms.cpuid + 0x04) : mword 64) 2 = mword_of_int (KernelSyms.cpuid + 0x06)) by (apply bv_eq; vm_compute; reflexivity).
@@ -179,7 +172,8 @@ Section ProofCpuid.
     (* ---- 0x06: c.addi4spn s0,sp,4 ---- *)
     iApply (wp_caddi4spn_s_sconf (mword_of_int (KernelSyms.cpuid + 0x06)) (Cregidx (mword_of_int 0)) nzimm_s0 s0_idx m1 (n - 2)%nat false
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi06").
+              with "Hcg Hpc []").
+    { iApply (ci_06 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     assert (Hpp08 : add_vec_int (mword_of_int (KernelSyms.cpuid + 0x06) : mword 64) 2 = mword_of_int (KernelSyms.cpuid + 0x08)) by (apply bv_eq; vm_compute; reflexivity).
@@ -189,7 +183,8 @@ Section ProofCpuid.
        tp_idx], which is this hart's id; nothing special is needed for it. ---- *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.cpuid + 0x08)) a0_idx tp_idx m2 (n - 2)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi08").
+              with "Hcg Hpc []").
+    { iApply (ci_08 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     assert (Hpp0a : add_vec_int (mword_of_int (KernelSyms.cpuid + 0x08) : mword 64) 2 = mword_of_int (KernelSyms.cpuid + 0x0a)) by (apply bv_eq; vm_compute; reflexivity).
@@ -198,7 +193,8 @@ Section ProofCpuid.
     (* ---- 0x0a: c.addiw a0,0 (sext.w a0) ---- *)
     iApply (wp_caddiw_s_sconf (mword_of_int (KernelSyms.cpuid + 0x0a)) a0_idx (mword_of_int 0 : mword 6) m3 (n - 2)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi0a").
+              with "Hcg Hpc []").
+    { iApply (ci_0a with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     assert (Hpp0c : add_vec_int (mword_of_int (KernelSyms.cpuid + 0x0a) : mword 64) 2 = mword_of_int (KernelSyms.cpuid + 0x0c)) by (apply bv_eq; vm_compute; reflexivity).
@@ -223,7 +219,8 @@ Section ProofCpuid.
     iEval (rewrite Hpa2 -Hpa2' Hs00v) in "Hbs0".
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.cpuid + 0x0c)) (mword_of_int 1 : mword 6) ra_idx m4 (n - 2)%nat ra0 false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi0c Hbra").
+              with "Hcg Hpc [] Hbra").
+    { iApply (ci_0c with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc Hbra".
     assert (Hpp0e : add_vec_int (mword_of_int (KernelSyms.cpuid + 0x0c) : mword 64) 2 = mword_of_int (KernelSyms.cpuid + 0x0e)) by (apply bv_eq; vm_compute; reflexivity).
@@ -235,7 +232,8 @@ Section ProofCpuid.
     iEval (rewrite -Hm5sp) in "Hbs0".
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.cpuid + 0x0e)) (mword_of_int 0 : mword 6) s0_idx m5 (n - 2)%nat s00 false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi0e Hbs0").
+              with "Hcg Hpc [] Hbs0").
+    { iApply (ci_0e with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc Hbs0".
     assert (Hpp10 : add_vec_int (mword_of_int (KernelSyms.cpuid + 0x0e) : mword 64) 2 = mword_of_int (KernelSyms.cpuid + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
@@ -256,7 +254,8 @@ Section ProofCpuid.
     iEval (rewrite -Hwv) in "Hframe".
     iApply (wp_caddi_sp_pop_s_sconf (mword_of_int (KernelSyms.cpuid + 0x10)) imm_dealloc m6
               (n - 2)%nat 2 false Hpop
-              with "Hcg Hpc Hi10 Hframe").
+              with "Hcg Hpc [] Hframe").
+    { iApply (ci_10 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     assert (Hnk : ((n - 2) + 2)%nat = n) by lia.
@@ -270,7 +269,8 @@ Section ProofCpuid.
       unfold m5. rewrite upd_eq. reflexivity. }
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.cpuid + 0x12)) ra_idx m7 n false
               ltac:(vm_compute; discriminate)
-              with "Hcg Hpc Hi12").
+              with "Hcg Hpc []").
+    { iApply (ci_12 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     assert (Hra_final : ret_pc (rget m7 ra_idx) = ret_tgt)

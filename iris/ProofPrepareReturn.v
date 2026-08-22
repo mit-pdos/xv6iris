@@ -151,48 +151,6 @@ Section ProofPrepareReturn.
     set (ra0 := m !!! Regidx ra_idx).
     set (s00 := m !!! Regidx s0_idx).
     iIntros "Hcg Hcpu Hext #Htext Hpc #Hks Hpv Hcont".
-    iPoseProof (prr_00 with "Htext") as "Hi00".
-    iPoseProof (prr_02 with "Htext") as "Hi02".
-    iPoseProof (prr_04 with "Htext") as "Hi04".
-    iPoseProof (prr_06 with "Htext") as "Hi06".
-    iPoseProof (prr_08 with "Htext") as "Hi08".
-    iPoseProof (prr_0c with "Htext") as "Hi0c".
-    iPoseProof (prr_10 with "Htext") as "Hi10".
-    iPoseProof (prr_14 with "Htext") as "Hi14".
-    iPoseProof (prr_16 with "Htext") as "Hi16".
-    iPoseProof (prr_18 with "Htext") as "Hi18".
-    iPoseProof (prr_1c with "Htext") as "Hi1c".
-    iPoseProof (prr_20 with "Htext") as "Hi20".
-    iPoseProof (prr_24 with "Htext") as "Hi24".
-    iPoseProof (prr_28 with "Htext") as "Hi28".
-    iPoseProof (prr_2a with "Htext") as "Hi2a".
-    iPoseProof (prr_2c with "Htext") as "Hi2c".
-    iPoseProof (prr_30 with "Htext") as "Hi30".
-    iPoseProof (prr_32 with "Htext") as "Hi32".
-    iPoseProof (prr_36 with "Htext") as "Hi36".
-    iPoseProof (prr_38 with "Htext") as "Hi38".
-    iPoseProof (prr_3a with "Htext") as "Hi3a".
-    iPoseProof (prr_3c with "Htext") as "Hi3c".
-    iPoseProof (prr_3e with "Htext") as "Hi3e".
-    iPoseProof (prr_40 with "Htext") as "Hi40".
-    iPoseProof (prr_42 with "Htext") as "Hi42".
-    iPoseProof (prr_44 with "Htext") as "Hi44".
-    iPoseProof (prr_48 with "Htext") as "Hi48".
-    iPoseProof (prr_4c with "Htext") as "Hi4c".
-    iPoseProof (prr_4e with "Htext") as "Hi4e".
-    iPoseProof (prr_50 with "Htext") as "Hi50".
-    iPoseProof (prr_52 with "Htext") as "Hi52".
-    iPoseProof (prr_54 with "Htext") as "Hi54".
-    iPoseProof (prr_58 with "Htext") as "Hi58".
-    iPoseProof (prr_5c with "Htext") as "Hi5c".
-    iPoseProof (prr_60 with "Htext") as "Hi60".
-    iPoseProof (prr_64 with "Htext") as "Hi64".
-    iPoseProof (prr_66 with "Htext") as "Hi66".
-    iPoseProof (prr_68 with "Htext") as "Hi68".
-    iPoseProof (prr_6c with "Htext") as "Hi6c".
-    iPoseProof (prr_6e with "Htext") as "Hi6e".
-    iPoseProof (prr_70 with "Htext") as "Hi70".
-    iPoseProof (prr_72 with "Htext") as "Hi72".
     (* =============================================================== *)
     (*  +0x00 .. +0x06: the 16-byte frame, at [b = true].               *)
     (* =============================================================== *)
@@ -202,7 +160,8 @@ Section ProofPrepareReturn.
                     = pa_stk sp0 2)
       by (apply (stk_push sp0 _ 2); pcw).
     iApply (wp_caddi_sp_push_s_sconf pcE (mword_of_int 48 : mword 6) m av 2 b
-              ltac:(lia) Hpush with "Hcg Hpc Hi00").
+              ltac:(lia) Hpush with "Hcg Hpc []").
+    { iApply (prr_00 with "Htext"). }
     iIntros (CID1 Hk1) "Hcg Hframe Hpc".
     change (<[Regidx csp_rs1 := regval_into_reg
                (add_vec (m !!! Regidx csp_rs1)
@@ -226,14 +185,16 @@ Section ProofPrepareReturn.
     iEval (rewrite -Hpa2) in "Hbs0".
     (* ---- +0x02: c.sdsp ra,8(sp) ---- *)
     iApply (wp_csdsp_s_sconf (mword_of_int (PRR + 0x02)) (mword_of_int 1 : mword 6)
-              ra_idx M1 (av - 2)%nat vra b with "Hcg Hpc Hi02 Hbra").
+              ra_idx M1 (av - 2)%nat vra b with "Hcg Hpc [] Hbra").
+    { iApply (prr_02 with "Htext"). }
     iIntros (CID2 Hk2) "Hcg Hpc Hbra".
     assert (Hpp04 : add_vec_int (mword_of_int (PRR + 0x02) : mword 64) 2
                     = mword_of_int (PRR + 0x04)) by pcw.
     iEval (rewrite Hpp04) in "Hpc".
     (* ---- +0x04: c.sdsp s0,0(sp) ---- *)
     iApply (wp_csdsp_s_sconf (mword_of_int (PRR + 0x04)) (mword_of_int 0 : mword 6)
-              s0_idx M1 (av - 2)%nat vs0 b with "Hcg Hpc Hi04 Hbs0").
+              s0_idx M1 (av - 2)%nat vs0 b with "Hcg Hpc [] Hbs0").
+    { iApply (prr_04 with "Htext"). }
     iIntros (CID3 Hk3) "Hcg Hpc Hbs0".
     assert (Hpp06 : add_vec_int (mword_of_int (PRR + 0x04) : mword 64) 2
                     = mword_of_int (PRR + 0x06)) by pcw.
@@ -242,7 +203,8 @@ Section ProofPrepareReturn.
     iApply (wp_caddi4spn_s_sconf (mword_of_int (PRR + 0x06)) (Cregidx (mword_of_int 0))
               (mword_of_int 4 : mword 8) s0_idx M1 (av - 2)%nat b
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi06").
+              with "Hcg Hpc []").
+    { iApply (prr_06 with "Htext"). }
     iIntros (CID4 Hk4) "Hcg Hpc".
     set (M2 := <[Regidx s0_idx := regval_into_reg
                    (add_vec (M1 !!! Regidx csp_rs1)
@@ -261,7 +223,8 @@ Section ProofPrepareReturn.
     iApply (wp_jal_s_sconf (mword_of_int (PRR + 0x08)) ra_idx
               (mword_of_int 2094204 : mword 21) M2 (av - 2)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
-              with "Hcg Hpc Hi08").
+              with "Hcg Hpc []").
+    { iApply (prr_08 with "Htext"). }
     iIntros (CID5 Hk5) "Hcg Hpc".
     set (M3 := <[Regidx ra_idx := regval_into_reg
                    (add_vec_int (mword_of_int (PRR + 0x08) : mword 64) 4)]> M2).
@@ -297,7 +260,8 @@ Section ProofPrepareReturn.
     iDestruct (trap_csrs_ext_transport CID CID6 b p
                  ltac:(wp_next_chain) with "Hext") as "Hext".
     iApply (wp_intr_off_lvl0_s_sconf (mword_of_int (PRR + 0x0c)) b p A
-              (av - 2)%nat with "Hcg Hcpu Hext Hpc Hi0c").
+              (av - 2)%nat with "Hcg Hcpu Hext Hpc []").
+    { iApply (prr_0c with "Htext"). }
     (* THE BINDER INDEX IS THE ENTRY ONE.  The leaf's continuation is
        [wp_next b p] at the instruction's OWN index, and at [b = true] an
        interrupt can be taken ON this very instruction, so the hart may have
@@ -330,7 +294,8 @@ Section ProofPrepareReturn.
               (mword_of_int 16384 : mword 20) (mword_of_int 0x4000000 : mword 64)
               A (trap_res b + (av - 2))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) prr_lui_a4
-              with "Hcg Hpc Hi10").
+              with "Hcg Hpc []").
+    { iApply (prr_10 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (T1 := <[Regidx a4_idx := regval_into_reg (mword_of_int 0x4000000 : mword 64)]> A).
     change (<[Regidx a4_idx := regval_into_reg (mword_of_int 0x4000000 : mword 64)]> A) with T1.
@@ -342,7 +307,8 @@ Section ProofPrepareReturn.
     (* ---- +0x14: c.addi a4,a4,-1 ---- *)
     iApply (wp_caddi_s_sconf (mword_of_int (PRR + 0x14)) a4_idx (mword_of_int 63 : mword 6)
               T1 (trap_res b + (av - 2))%nat false
-              ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc Hi14").
+              ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (prr_14 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rewrite HT1a4 prr_addi_a4) in "Hcg".
     set (T2 := <[Regidx a4_idx := regval_into_reg (mword_of_int 0x3FFFFFF : mword 64)]> T1).
@@ -356,7 +322,8 @@ Section ProofPrepareReturn.
     iApply (wp_cslli_s_sconf (mword_of_int (PRR + 0x16)) (Regidx a4_idx) a4_idx
               (mword_of_int 12 : mword 6) T2 (trap_res b + (av - 2))%nat false
               eq_refl ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi16").
+              with "Hcg Hpc []").
+    { iApply (prr_16 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rewrite HT2a4 prr_slli_a4) in "Hcg".
     set (T3 := <[Regidx a4_idx := regval_into_reg uservec_tvec]> T2).
@@ -367,7 +334,8 @@ Section ProofPrepareReturn.
     (* ---- +0x18: auipc a5,0x4 ---- *)
     iApply (wp_auipc_s_sconf (mword_of_int (PRR + 0x18)) a5_idx (mword_of_int 4 : mword 20)
               T3 (trap_res b + (av - 2))%nat false
-              ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc Hi18").
+              ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (prr_18 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (T4 := <[Regidx a5_idx := regval_into_reg
                    (add_vec (mword_of_int (PRR + 0x18) : mword 64)
@@ -381,7 +349,8 @@ Section ProofPrepareReturn.
     (* ---- +0x1c: addi a5,a5,-1128 ---- *)
     iApply (wp_addi4_s_sconf (mword_of_int (PRR + 0x1c)) a5_idx a5_idx
               (mword_of_int 2962 : mword 12) T4 (trap_res b + (av - 2))%nat false
-              ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc Hi1c").
+              ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (prr_1c with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rgne; rewrite /T4 upd_eq prr_uservec_addr) in "Hcg".
     set (T5 := <[Regidx a5_idx := regval_into_reg
@@ -394,7 +363,8 @@ Section ProofPrepareReturn.
     (* ---- +0x20: auipc a3,0x4 ---- *)
     iApply (wp_auipc_s_sconf (mword_of_int (PRR + 0x20)) a3_idx (mword_of_int 4 : mword 20)
               T5 (trap_res b + (av - 2))%nat false
-              ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc Hi20").
+              ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (prr_20 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (T6 := <[Regidx a3_idx := regval_into_reg
                    (add_vec (mword_of_int (PRR + 0x20) : mword 64)
@@ -408,7 +378,8 @@ Section ProofPrepareReturn.
     (* ---- +0x24: addi a3,a3,-1136 ---- *)
     iApply (wp_addi4_s_sconf (mword_of_int (PRR + 0x24)) a3_idx a3_idx
               (mword_of_int 2954 : mword 12) T6 (trap_res b + (av - 2))%nat false
-              ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc Hi24").
+              ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (prr_24 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rgne; rewrite /T6 upd_eq prr_trampoline_addr) in "Hcg".
     set (T7 := <[Regidx a3_idx := regval_into_reg
@@ -432,7 +403,8 @@ Section ProofPrepareReturn.
               (mword_of_int 0 : mword 64) T7 (trap_res b + (av - 2))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(rewrite HT7a5 HT7a3; exact prr_uservec_off_zero)
-              with "Hcg Hpc Hi28").
+              with "Hcg Hpc []").
+    { iApply (prr_28 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (T8 := <[Regidx a5_idx := regval_into_reg (mword_of_int 0 : mword 64)]> T7).
     change (<[Regidx a5_idx := regval_into_reg (mword_of_int 0 : mword 64)]> T7) with T8.
@@ -446,7 +418,8 @@ Section ProofPrepareReturn.
     (* ---- +0x2a: c.add a5,a5,a4 ---- *)
     iApply (wp_cadd_s_sconf (mword_of_int (PRR + 0x2a)) a5_idx a4_idx
               T8 (trap_res b + (av - 2))%nat false
-              ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc Hi2a").
+              ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (prr_2a with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rewrite HT8a5 HT8a4 prr_tvec_val) in "Hcg".
     set (T9 := <[Regidx a5_idx := regval_into_reg uservec_tvec]> T8).
@@ -460,7 +433,8 @@ Section ProofPrepareReturn.
     iApply (wp_csrw_stvec_s_sconf (mword_of_int (PRR + 0x2c)) a5_idx
               T9 (trap_res b + (av - 2))%nat tv0 uservec_tvec
               ltac:(vm_compute; discriminate) HT9a5 prr_tvec_mode
-              with "Hcg Hstvec Hpc Hi2c").
+              with "Hcg Hstvec Hpc []").
+    { iApply (prr_2c with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hstvec Hpc".
     assert (Hpp30 : add_vec_int (mword_of_int (PRR + 0x2c) : mword 64) 4
                     = mword_of_int (PRR + 0x30)) by pcw.
@@ -501,7 +475,8 @@ Section ProofPrepareReturn.
               (mword_of_int 88 : mword 12) T9 (trap_res b + (av - 2))%nat
               (page_base tfp) false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi30 Htfc").
+              with "Hcg Hpc [] Htfc").
+    { iApply (prr_30 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Htfc".
     iEval (rewrite HT9a0 (prr_p_trapframe p)) in "Htfc".
     set (U1 := <[Regidx a5_idx := regval_into_reg (page_base tfp)]> T9).
@@ -518,7 +493,8 @@ Section ProofPrepareReturn.
     iApply (wp_csrr_satp_kpt_s_sconf (mword_of_int (PRR + 0x32)) a4_idx
               U1 (trap_res b + (av - 2))%nat
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hkptr Hpc Hi32").
+              with "Hcg Hkptr Hpc []").
+    { iApply (prr_32 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros (ksat root) "%Hmode %Hasid %Hppn #Hkinv Hcg Hkptr Hpc".
     set (U2 := <[Regidx a4_idx := regval_into_reg ksat]> U1).
@@ -541,7 +517,8 @@ Section ProofPrepareReturn.
     iEval (rewrite -(prr_tf_addr_00 tfp) -HU2a5) in "Hcell".
     iApply (wp_csd_s_sconf (mword_of_int (PRR + 0x36)) a4_idx a5_idx
               (mword_of_int 0 : mword 12) U2 (trap_res b + (av - 2))%nat w0 false
-              with "Hcg Hpc Hi36 Hcell").
+              with "Hcg Hpc [] Hcell").
+    { iApply (prr_36 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hcell".
     iEval (rewrite HU2a4 HU2a5 (prr_tf_addr_00 tfp)) in "Hcell".
     iDestruct ("Hback" $! ksat with "Hcell") as "Htfp".
@@ -554,7 +531,8 @@ Section ProofPrepareReturn.
               (mword_of_int 88 : mword 12) U2 (trap_res b + (av - 2))%nat
               (page_base tfp) false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi38 Htfc").
+              with "Hcg Hpc [] Htfc").
+    { iApply (prr_38 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Htfc".
     iEval (rewrite HU2a0 (prr_p_trapframe p)) in "Htfc".
     set (U3 := <[Regidx a4_idx := regval_into_reg (page_base tfp)]> U2).
@@ -573,7 +551,8 @@ Section ProofPrepareReturn.
               (mword_of_int 64 : mword 12) U3 (trap_res b + (av - 2))%nat
               ks false (dqm := DfracDiscarded)
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi3a Hksb").
+              with "Hcg Hpc [] Hksb").
+    { iApply (prr_3a with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc _".
     set (U4 := <[Regidx a5_idx := regval_into_reg ks]> U3).
     change (<[Regidx a5_idx := regval_into_reg ks]> U3) with U4.
@@ -585,7 +564,8 @@ Section ProofPrepareReturn.
               (sign_extend' 20 (mword_of_int 1 : mword 6)) (mword_of_int 4096 : mword 64)
               U4 (trap_res b + (av - 2))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) prr_lui_pgsize
-              with "Hcg Hpc Hi3c").
+              with "Hcg Hpc []").
+    { iApply (prr_3c with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (U5 := <[Regidx a3_idx := regval_into_reg (mword_of_int 4096 : mword 64)]> U4).
     change (<[Regidx a3_idx := regval_into_reg (mword_of_int 4096 : mword 64)]> U4) with U5.
@@ -599,7 +579,8 @@ Section ProofPrepareReturn.
     (* ---- +0x3e: c.add a5,a5,a3 -- kernel_sp = p->kstack + PGSIZE ---- *)
     iApply (wp_cadd_s_sconf (mword_of_int (PRR + 0x3e)) a5_idx a3_idx
               U5 (trap_res b + (av - 2))%nat false
-              ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc Hi3e").
+              ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (prr_3e with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rewrite HU5a5 HU5a3) in "Hcg".
     set (U6 := <[Regidx a5_idx := regval_into_reg
@@ -625,7 +606,8 @@ Section ProofPrepareReturn.
     iEval (rewrite -(prr_tf_addr_08 tfp) -HU6a4) in "Hcell".
     iApply (wp_csd_s_sconf (mword_of_int (PRR + 0x40)) a5_idx a4_idx
               (mword_of_int 8 : mword 12) U6 (trap_res b + (av - 2))%nat w1 false
-              with "Hcg Hpc Hi40 Hcell").
+              with "Hcg Hpc [] Hcell").
+    { iApply (prr_40 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hcell".
     iEval (rewrite HU6a5 HU6a4 (prr_tf_addr_08 tfp)) in "Hcell".
     iDestruct ("Hback" $! (add_vec ks (mword_of_int 4096)) with "Hcell") as "Htfp".
@@ -641,7 +623,8 @@ Section ProofPrepareReturn.
               (mword_of_int 88 : mword 12) U6 (trap_res b + (av - 2))%nat
               (page_base tfp) false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi42 Htfc").
+              with "Hcg Hpc [] Htfc").
+    { iApply (prr_42 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Htfc".
     iEval (rewrite HU6a0 (prr_p_trapframe p)) in "Htfc".
     set (U7 := <[Regidx a5_idx := regval_into_reg (page_base tfp)]> U6).
@@ -652,7 +635,8 @@ Section ProofPrepareReturn.
     (* ---- +0x44: auipc a4,0x0 ---- *)
     iApply (wp_auipc_s_sconf (mword_of_int (PRR + 0x44)) a4_idx (mword_of_int 0 : mword 20)
               U7 (trap_res b + (av - 2))%nat false
-              ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc Hi44").
+              ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (prr_44 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (U8 := <[Regidx a4_idx := regval_into_reg
                    (add_vec (mword_of_int (PRR + 0x44) : mword 64)
@@ -666,7 +650,8 @@ Section ProofPrepareReturn.
     (* ---- +0x48: addi a4,a4,252 -- and 0x44 + 252 = 0x140 = usertrap ---- *)
     iApply (wp_addi4_s_sconf (mword_of_int (PRR + 0x48)) a4_idx a4_idx
               (mword_of_int 252 : mword 12) U8 (trap_res b + (av - 2))%nat false
-              ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc Hi48").
+              ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (prr_48 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rgne; rewrite /U8 upd_eq prr_usertrap_addr) in "Hcg".
     set (U9 := <[Regidx a4_idx := regval_into_reg
@@ -695,7 +680,8 @@ Section ProofPrepareReturn.
     iEval (rewrite -(prr_tf_addr_16 tfp) -HU9a5) in "Hcell".
     iApply (wp_csd_s_sconf (mword_of_int (PRR + 0x4c)) a4_idx a5_idx
               (mword_of_int 16 : mword 12) U9 (trap_res b + (av - 2))%nat w2 false
-              with "Hcg Hpc Hi4c Hcell").
+              with "Hcg Hpc [] Hcell").
+    { iApply (prr_4c with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hcell".
     iEval (rewrite HU9a4 HU9a5 (prr_tf_addr_16 tfp)) in "Hcell".
     iDestruct ("Hback" $! (mword_of_int KernelSyms.usertrap : mword 64) with "Hcell")
@@ -712,7 +698,8 @@ Section ProofPrepareReturn.
               (mword_of_int 88 : mword 12) U9 (trap_res b + (av - 2))%nat
               (page_base tfp) false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi4e Htfc").
+              with "Hcg Hpc [] Htfc").
+    { iApply (prr_4e with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Htfc".
     iEval (rewrite HU9a0 (prr_p_trapframe p)) in "Htfc".
     set (U10 := <[Regidx a5_idx := regval_into_reg (page_base tfp)]> U9).
@@ -725,7 +712,8 @@ Section ProofPrepareReturn.
        proved anywhere before the +0x0c flip. ---- *)
     iApply (wp_cmv_s_sconf (mword_of_int (PRR + 0x50)) a4_idx tp_idx
               U10 (trap_res b + (av - 2))%nat false
-              ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc Hi50").
+              ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (prr_50 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rewrite /tp_idx rget_tp add_vec_zero_l) in "Hcg".
     set (U11 := <[Regidx a4_idx := regval_into_reg cid_word]> U10).
@@ -754,7 +742,8 @@ Section ProofPrepareReturn.
     iEval (rewrite -(prr_tf_addr_32 tfp) -HU11a5) in "Hcell".
     iApply (wp_csd_s_sconf (mword_of_int (PRR + 0x52)) a4_idx a5_idx
               (mword_of_int 32 : mword 12) U11 (trap_res b + (av - 2))%nat w4 false
-              with "Hcg Hpc Hi52 Hcell").
+              with "Hcg Hpc [] Hcell").
+    { iApply (prr_52 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hcell".
     iEval (rewrite HU11a4 HU11a5 (prr_tf_addr_32 tfp)) in "Hcell".
     iDestruct ("Hback" $! cid_word with "Hcell") as "Htfp".
@@ -772,7 +761,8 @@ Section ProofPrepareReturn.
     iApply (wp_csrr_sstatus_s_sconf (mword_of_int (PRR + 0x54)) a5_idx
               U11 (trap_res b + (av - 2))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi54").
+              with "Hcg Hpc []").
+    { iApply (prr_54 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros (ms1) "%Hms1f Hhs Hsc Htr Hpc Hfile Harm".
     set (U12 := <[Regidx a5_idx := regval_into_reg (sstatus_read ms1)]> U11).
@@ -797,7 +787,8 @@ Section ProofPrepareReturn.
               U12 (trap_res b + (av - 2))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(rewrite HU12a5; exact (prr_andi_step (sstatus_read ms1)))
-              with "Hcg Hpc Hi58").
+              with "Hcg Hpc []").
+    { iApply (prr_58 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (U13 := <[Regidx a5_idx := regval_into_reg
                    (bv_and (sstatus_read ms1) prr_and_mask)]> U12).
@@ -814,7 +805,8 @@ Section ProofPrepareReturn.
               U13 (trap_res b + (av - 2))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(rewrite HU13a5; exact (prr_ori_step (sstatus_read ms1)))
-              with "Hcg Hpc Hi5c").
+              with "Hcg Hpc []").
+    { iApply (prr_5c with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (U14 := <[Regidx a5_idx := regval_into_reg
                    (prr_sst (sstatus_read ms1))]> U13).
@@ -844,7 +836,8 @@ Section ProofPrepareReturn.
               U14 (trap_res b + (av - 2))%nat (prr_sst (sstatus_read ms1)) vspp vspie
               ltac:(vm_compute; discriminate) HU14a5
               HW_sie HW_mxr HW_fs HW_vs HW_xs
-              with "Hcg Hsret Hpc Hi60").
+              with "Hcg Hsret Hpc []").
+    { iApply (prr_60 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros (msf) "%Hf_sie %Hf_spp %Hf_spie Hcgat Hsret Hpc".
     iDestruct (sie_cap_gpr_at_close with "Hcgat") as "Hcg".
@@ -869,7 +862,8 @@ Section ProofPrepareReturn.
               (mword_of_int 88 : mword 12) U14 (trap_res b + (av - 2))%nat
               (page_base tfp) false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi64 Htfc").
+              with "Hcg Hpc [] Htfc").
+    { iApply (prr_64 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Htfc".
     iEval (rewrite HU14a0 (prr_p_trapframe p)) in "Htfc".
     set (U15 := <[Regidx a5_idx := regval_into_reg (page_base tfp)]> U14).
@@ -898,7 +892,8 @@ Section ProofPrepareReturn.
               (mword_of_int 24 : mword 12) U15 (trap_res b + (av - 2))%nat
               epc false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi66 Hcell").
+              with "Hcg Hpc [] Hcell").
+    { iApply (prr_66 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hcell".
     iEval (rewrite HU15a5 (prr_tf_addr_24 tfp)) in "Hcell".
     iDestruct ("Hback" with "Hcell") as "Htfp".
@@ -913,7 +908,8 @@ Section ProofPrepareReturn.
     iApply (wp_csrw_sepc_s_sconf (mword_of_int (PRR + 0x68)) a5_idx
               U16 (trap_res b + (av - 2))%nat sepc0 epc
               ltac:(vm_compute; discriminate) HU16a5
-              with "Hcg Hsepc Hpc Hi68").
+              with "Hcg Hsepc Hpc []").
+    { iApply (prr_68 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hsepc Hpc".
     assert (Hpp6c : add_vec_int (mword_of_int (PRR + 0x68) : mword 64) 4
                     = mword_of_int (PRR + 0x6c)) by pcw.
@@ -944,7 +940,8 @@ Section ProofPrepareReturn.
     iApply (wp_cldsp_s_sconf (mword_of_int (PRR + 0x6c)) (mword_of_int 1 : mword 6)
               ra_idx U16 (trap_res b + (av - 2))%nat ra0 false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi6c Hbra").
+              with "Hcg Hpc [] Hbra").
+    { iApply (prr_6c with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hbra".
     set (U17 := <[Regidx ra_idx := regval_into_reg ra0]> U16).
     change (<[Regidx ra_idx := regval_into_reg ra0]> U16) with U17.
@@ -966,7 +963,8 @@ Section ProofPrepareReturn.
     iApply (wp_cldsp_s_sconf (mword_of_int (PRR + 0x6e)) (mword_of_int 0 : mword 6)
               s0_idx U17 (trap_res b + (av - 2))%nat s00 false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi6e Hbs0").
+              with "Hcg Hpc [] Hbs0").
+    { iApply (prr_6e with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hbs0".
     set (U18 := <[Regidx s0_idx := regval_into_reg s00]> U17).
     change (<[Regidx s0_idx := regval_into_reg s00]> U17) with U18.
@@ -996,7 +994,8 @@ Section ProofPrepareReturn.
     iEval (rewrite -Hwv) in "Hframe".
     iApply (wp_caddi_sp_pop_s_sconf (mword_of_int (PRR + 0x70)) (mword_of_int 16 : mword 6)
               U18 (trap_res b + (av - 2))%nat 2 false Hpop
-              with "Hcg Hpc Hi70 Hframe").
+              with "Hcg Hpc [] Hframe").
+    { iApply (prr_70 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rewrite Hwv) in "Hcg".
     set (U19 := <[Regidx csp_rs1 := regval_into_reg sp0]> U18).
@@ -1012,7 +1011,8 @@ Section ProofPrepareReturn.
       rewrite /U17 upd_eq. reflexivity. }
     iApply (wp_cret_s_sconf (mword_of_int (PRR + 0x72)) ra_idx
               U19 (trap_res b + av)%nat false
-              ltac:(vm_compute; discriminate) with "Hcg Hpc Hi72").
+              ltac:(vm_compute; discriminate) with "Hcg Hpc []").
+    { iApply (prr_72 with "Htext"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rewrite HU19ra) in "Hpc".
     (* =============================================================== *)

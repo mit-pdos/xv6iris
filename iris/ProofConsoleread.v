@@ -270,15 +270,6 @@ Section CrBodies.
   Proof.
     intros pj Hm0sp HMsp HMa0 HMcs Hr Hav Heb Hcr.
     iIntros "#Ht Hcg Hcnt Hpc Hpriv (K1 & K2 & K3 & K4 & K5 & K6 & K8 & K9) Hrest Hcont".
-    iPoseProof (cnri_0ce with "Ht") as "Hice".
-    iPoseProof (cnri_0d0 with "Ht") as "Hid0".
-    iPoseProof (cnri_0d2 with "Ht") as "Hid2".
-    iPoseProof (cnri_0d4 with "Ht") as "Hid4".
-    iPoseProof (cnri_0d6 with "Ht") as "Hid6".
-    iPoseProof (cnri_0d8 with "Ht") as "Hid8".
-    iPoseProof (cnri_0da with "Ht") as "Hida".
-    iPoseProof (cnri_0dc with "Ht") as "Hidc".
-    iPoseProof (cnri_0de with "Ht") as "Hi0de". iPoseProof (cnri_0e0 with "Ht") as "Hi0e0".
     assert (Hb1 : add_vec (pa_stk sp0 12%nat)
                     (zero_extend' 64 (concat_vec (mword_of_int 11 : mword 6) ('b"000")))
                   = pa_stk sp0 1) by (apply cr_slot_bridge; pcw).
@@ -306,7 +297,8 @@ Section CrBodies.
     (* +0xce  c.ldsp rra,88(sp) *)
     iApply (wp_cldsp_s_sconf (mword_of_int (CR + 0xce)) (mword_of_int 11 : mword 6) Rra
               M (av - 12)%nat (m0 !!! Regidx Rra) true ltac:(nz) ltac:(rdok)
-              with "Hcg Hpc Hice [K1]").
+              with "Hcg Hpc [] [K1]").
+    { iApply (cnri_0ce with "Ht"). }
     { iEval (rewrite HMsp Hb1). iExact "K1". }
     iIntros (CIDe0 Hse0) "Hcg Hpc K1". iEval (rewrite HMsp Hb1) in "K1".
     set (E1 := <[Regidx Rra := regval_into_reg (m0 !!! Regidx Rra)]> M).
@@ -319,7 +311,8 @@ Section CrBodies.
     (* +0xd0  c.ldsp rs0,80(sp) *)
     iApply (wp_cldsp_s_sconf (mword_of_int (CR + 0xd0)) (mword_of_int 10 : mword 6) Rs0
               E1 (av - 12)%nat (m0 !!! Regidx Rs0) true ltac:(nz) ltac:(rdok)
-              with "Hcg Hpc Hid0 [K2]").
+              with "Hcg Hpc [] [K2]").
+    { iApply (cnri_0d0 with "Ht"). }
     { iEval (rewrite HE1sp Hb2). iExact "K2". }
     iIntros (CIDe1 Hse1) "Hcg Hpc K2". iEval (rewrite HE1sp Hb2) in "K2".
     set (E2 := <[Regidx Rs0 := regval_into_reg (m0 !!! Regidx Rs0)]> E1).
@@ -332,7 +325,8 @@ Section CrBodies.
     (* +0xd2  c.ldsp rs1,72(sp) *)
     iApply (wp_cldsp_s_sconf (mword_of_int (CR + 0xd2)) (mword_of_int 9 : mword 6) Rs1
               E2 (av - 12)%nat (m0 !!! Regidx Rs1) true ltac:(nz) ltac:(rdok)
-              with "Hcg Hpc Hid2 [K3]").
+              with "Hcg Hpc [] [K3]").
+    { iApply (cnri_0d2 with "Ht"). }
     { iEval (rewrite HE2sp Hb3). iExact "K3". }
     iIntros (CIDe2 Hse2) "Hcg Hpc K3". iEval (rewrite HE2sp Hb3) in "K3".
     set (E3 := <[Regidx Rs1 := regval_into_reg (m0 !!! Regidx Rs1)]> E2).
@@ -345,7 +339,8 @@ Section CrBodies.
     (* +0xd4  c.ldsp rs2,64(sp) *)
     iApply (wp_cldsp_s_sconf (mword_of_int (CR + 0xd4)) (mword_of_int 8 : mword 6) Rs2
               E3 (av - 12)%nat (m0 !!! Regidx Rs2) true ltac:(nz) ltac:(rdok)
-              with "Hcg Hpc Hid4 [K4]").
+              with "Hcg Hpc [] [K4]").
+    { iApply (cnri_0d4 with "Ht"). }
     { iEval (rewrite HE3sp Hb4). iExact "K4". }
     iIntros (CIDe3 Hse3) "Hcg Hpc K4". iEval (rewrite HE3sp Hb4) in "K4".
     set (E4 := <[Regidx Rs2 := regval_into_reg (m0 !!! Regidx Rs2)]> E3).
@@ -358,7 +353,8 @@ Section CrBodies.
     (* +0xd6  c.ldsp rs3,56(sp) *)
     iApply (wp_cldsp_s_sconf (mword_of_int (CR + 0xd6)) (mword_of_int 7 : mword 6) Rs3
               E4 (av - 12)%nat (m0 !!! Regidx Rs3) true ltac:(nz) ltac:(rdok)
-              with "Hcg Hpc Hid6 [K5]").
+              with "Hcg Hpc [] [K5]").
+    { iApply (cnri_0d6 with "Ht"). }
     { iEval (rewrite HE4sp Hb5). iExact "K5". }
     iIntros (CIDe4 Hse4) "Hcg Hpc K5". iEval (rewrite HE4sp Hb5) in "K5".
     set (E5 := <[Regidx Rs3 := regval_into_reg (m0 !!! Regidx Rs3)]> E4).
@@ -371,7 +367,8 @@ Section CrBodies.
     (* +0xd8  c.ldsp rs4,48(sp) *)
     iApply (wp_cldsp_s_sconf (mword_of_int (CR + 0xd8)) (mword_of_int 6 : mword 6) Rs4
               E5 (av - 12)%nat (m0 !!! Regidx Rs4) true ltac:(nz) ltac:(rdok)
-              with "Hcg Hpc Hid8 [K6]").
+              with "Hcg Hpc [] [K6]").
+    { iApply (cnri_0d8 with "Ht"). }
     { iEval (rewrite HE5sp Hb6). iExact "K6". }
     iIntros (CIDe5 Hse5) "Hcg Hpc K6". iEval (rewrite HE5sp Hb6) in "K6".
     set (E6 := <[Regidx Rs4 := regval_into_reg (m0 !!! Regidx Rs4)]> E5).
@@ -384,7 +381,8 @@ Section CrBodies.
     (* +0xda  c.ldsp rs6,32(sp) *)
     iApply (wp_cldsp_s_sconf (mword_of_int (CR + 0xda)) (mword_of_int 4 : mword 6) Rs6
               E6 (av - 12)%nat (m0 !!! Regidx Rs6) true ltac:(nz) ltac:(rdok)
-              with "Hcg Hpc Hida [K8]").
+              with "Hcg Hpc [] [K8]").
+    { iApply (cnri_0da with "Ht"). }
     { iEval (rewrite HE6sp Hb8). iExact "K8". }
     iIntros (CIDe6 Hse6) "Hcg Hpc K8". iEval (rewrite HE6sp Hb8) in "K8".
     set (E7 := <[Regidx Rs6 := regval_into_reg (m0 !!! Regidx Rs6)]> E6).
@@ -397,7 +395,8 @@ Section CrBodies.
     (* +0xdc  c.ldsp rs7,24(sp) *)
     iApply (wp_cldsp_s_sconf (mword_of_int (CR + 0xdc)) (mword_of_int 3 : mword 6) Rs7
               E7 (av - 12)%nat (m0 !!! Regidx Rs7) true ltac:(nz) ltac:(rdok)
-              with "Hcg Hpc Hidc [K9]").
+              with "Hcg Hpc [] [K9]").
+    { iApply (cnri_0dc with "Ht"). }
     { iEval (rewrite HE7sp Hb9). iExact "K9". }
     iIntros (CIDe7 Hse7) "Hcg Hpc K9". iEval (rewrite HE7sp Hb9) in "K9".
     set (E8 := <[Regidx Rs7 := regval_into_reg (m0 !!! Regidx Rs7)]> E7).
@@ -423,7 +422,8 @@ Section CrBodies.
     { rewrite /cr_saved. iFrame "K1 K2 K3 K4 K5 K6 K8 K9". }
     iEval (rewrite -Hspv) in "Hframe".
     iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (CR + 0xde)) (mword_of_int 6 : mword 6)
-              E8 (av - 12)%nat 12%nat true Hpop with "Hcg Hpc Hi0de Hframe").
+              E8 (av - 12)%nat 12%nat true Hpop with "Hcg Hpc [] Hframe").
+    { iApply (cnri_0de with "Ht"). }
     iIntros (CIDp Hsp') "Hcg Hpc".
     assert (Havx : (av - 12 + 12)%nat = av) by (lia).
     iEval (rewrite Havx) in "Hcg".
@@ -444,7 +444,8 @@ Section CrBodies.
       rewrite /E3 upd_ne; [| reg_neq]. rewrite /E2 upd_ne; [| reg_neq].
       rewrite /E1 upd_eq. reflexivity. }
     iApply (wp_cret_s_sconf (mword_of_int (CR + 0xe0)) Rra E9 av true
-              ltac:(nz) with "Hcg Hpc Hi0e0").
+              ltac:(nz) with "Hcg Hpc []").
+    { iApply (cnri_0e0 with "Ht"). }
     iIntros (CIDr Hsr) "Hcg Hpc". iEval (rgne) in "Hpc".
     iEval (rewrite HE9ra) in "Hpc".
     assert (HE9a0 : E9 !!! Regidx Ra0 = (mword_of_int r : mword 64)).
@@ -707,15 +708,11 @@ Section ProofConsoleread.
     rewrite /cr_retx_prop.
     iIntros (CIDx Hsx M P' nc)
       "%Hsp %Hs3 %Hs7 %Hcs %Hrng %Hext Hcg Hpc Hcnt Hpay Hlocked Hres Hpriv Hrest".
-    iPoseProof (cnri_0fc with "Ht") as "Hi0fc".
-    iPoseProof (cnri_100 with "Ht") as "Hi100".
-    iPoseProof (cnri_104 with "Ht") as "Hi104".
-    iPoseProof (cnri_108 with "Ht") as "Hi108".
-    iPoseProof (cnri_10c with "Ht") as "Hi10c".
     (* ---- +0xfc auipc a0,0x12 ; +0x100 addi a0,a0,60 : a0 := &cons ---- *)
     iApply (wp_auipc_s_sconf (mword_of_int (CR + 0xfc)) Ra0 (mword_of_int 18 : mword 20)
               M (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(rdok)
-              with "Hcg Hpc Hi0fc").
+              with "Hcg Hpc []").
+    { iApply (cnri_0fc with "Ht"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (X1 := <[Regidx Ra0 := regval_into_reg
         (add_vec (mword_of_int (CR + 0xfc) : mword 64)
@@ -725,7 +722,8 @@ Section ProofConsoleread.
     iEval (rewrite Hp100) in "Hpc".
     iApply (wp_addi4_s_sconf (mword_of_int (CR + 0x100)) Ra0 Ra0 (mword_of_int 76 : mword 12)
               X1 (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(rdok)
-              with "Hcg Hpc Hi100").
+              with "Hcg Hpc []").
+    { iApply (cnri_100 with "Ht"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (X2 := <[Regidx Ra0 := regval_into_reg
         (add_vec (X1 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 76 : mword 12)))]> X1).
@@ -737,7 +735,8 @@ Section ProofConsoleread.
     (* ---- +0x104 jal ra,release ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (CR + 0x104)) Rra (mword_of_int 2502 : mword 21)
               X2 (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(rdok)
-              ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi104").
+              ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+    { iApply (cnri_104 with "Ht"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (X3 := <[Regidx Rra := regval_into_reg
         (add_vec_int (mword_of_int (CR + 0x104) : mword 64) 4)]> X2).
@@ -789,7 +788,8 @@ Section ProofConsoleread.
                     = (mword_of_int (n - nc) : mword 64))
       by (apply w32_subw_moi; exact Hdiff).
     iApply (wp_subw_s_sconf (mword_of_int (CR + 0x108)) Ra0 Rs7 Rs3
-              mr (av - 12)%nat true ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi108").
+              mr (av - 12)%nat true ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (cnri_108 with "Ht"). }
     iIntros (CIDs Hss) "Hcg Hpc". rgall.
     iEval (rewrite Hmrs3 Hmrs7 Hsubw) in "Hcg".
     set (X4 := <[Regidx Ra0 := regval_into_reg (mword_of_int (n - nc) : mword 64)]> mr).
@@ -799,7 +799,8 @@ Section ProofConsoleread.
     (* ---- +0x10c c.j -> the epilogue at +0xce ---- *)
     iApply (wp_cj_s_sconf (mword_of_int (CR + 0x10c))
               (sign_extend' 21 (concat_vec (mword_of_int 2017 : mword 11) ('b"0")))
-              X4 (av - 12)%nat true ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi10c").
+              X4 (av - 12)%nat true ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+    { iApply (cnri_10c with "Ht"). }
     iIntros (CIDj Hsj). iApply bi.later_intro. iIntros "Hcg Hpc". rgall.
     assert (Hjce : add_vec (mword_of_int (CR + 0x10c) : mword 64)
                      (sign_extend' 64 (sign_extend' 21
@@ -963,10 +964,10 @@ Section ProofConsoleread.
     destruct Hnb as (Hncpos & Hrng & Hfl).
     assert (Hmax : Z.max 0 n = n) by lia.
     (* ---- +0x76 auipc a4,0x12 ; +0x7a addi a4,a4,194 : a4 := &cons ---- *)
-    iPoseProof (cnri_076 with "Ht") as "Hi76".
     iApply (wp_auipc_s_sconf (mword_of_int (CR + 0x76)) Ra4 (mword_of_int 18 : mword 20)
               M (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(rdok)
-              with "Hcg Hpc Hi76").
+              with "Hcg Hpc []").
+    { iApply (cnri_076 with "Ht"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (H1 := <[Regidx Ra4 := regval_into_reg
         (add_vec (mword_of_int (CR + 0x76) : mword 64)
@@ -974,10 +975,10 @@ Section ProofConsoleread.
     assert (Hp7a : add_vec_int (mword_of_int (CR + 0x76) : mword 64) 4
                    = mword_of_int (CR + 0x7a)) by pcw.
     iEval (rewrite Hp7a) in "Hpc".
-    iPoseProof (cnri_07a with "Ht") as "Hi7a".
     iApply (wp_addi4_s_sconf (mword_of_int (CR + 0x7a)) Ra4 Ra4 (mword_of_int 210 : mword 12)
               H1 (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(rdok)
-              with "Hcg Hpc Hi7a").
+              with "Hcg Hpc []").
+    { iApply (cnri_07a with "Ht"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (H2 := <[Regidx Ra4 := regval_into_reg
         (add_vec (H1 !!! Regidx Ra4) (sign_extend' 64 (mword_of_int 210 : mword 12)))]> H1).
@@ -989,10 +990,10 @@ Section ProofConsoleread.
                    = mword_of_int (CR + 0x7e)) by pcw.
     iEval (rewrite Hp7e) in "Hpc".
     (* ---- +0x7e addiw a3,a5,1 ---- *)
-    iPoseProof (cnri_07e with "Ht") as "Hi7e".
     iApply (wp_addiw_s_sconf (mword_of_int (CR + 0x7e)) Ra3 Ra5 (mword_of_int 1 : mword 12)
               H2 (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(rdok)
-              with "Hcg Hpc Hi7e").
+              with "Hcg Hpc []").
+    { iApply (cnri_07e with "Ht"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     iEval (rewrite HH2a5) in "Hcg".
     set (H3 := <[Regidx Ra3 := regval_into_reg (sign_extend' 64 (subrange_vec_dec
@@ -1009,9 +1010,9 @@ Section ProofConsoleread.
     assert (Hra : add_vec (H3 !!! Regidx Ra4)
                     (sign_extend' 64 (mword_of_int 152 : mword 12)) = a_cons_r)
       by (rewrite HH3a4; reflexivity).
-    iPoseProof (cnri_082 with "Ht") as "Hi82".
     iApply (wp_sw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (CR + 0x82)) Ra3 Ra4 (mword_of_int 152 : mword 12)
-              H3 (trap_res true + (av - 12))%nat rr false with "Hcg Hpc Hi82 [Hrc]").
+              H3 (trap_res true + (av - 12))%nat rr false with "Hcg Hpc [] [Hrc]").
+    { iApply (cnri_082 with "Ht"). }
     { rgall. iEval (rewrite Hra). iExact "Hrc". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hrc". rgall.
     iEval (rewrite Hra HH3a3 cr_sw_r) in "Hrc".
@@ -1031,10 +1032,10 @@ Section ProofConsoleread.
     assert (Hwv : and_vec (H3 !!! Regidx Ra5) (sign_extend' 64 (mword_of_int 127 : mword 12))
                   = (mword_of_int (Z.of_nat idx) : mword 64)).
     { rewrite /H3 upd_ne; [| reg_neq]. rewrite HH2a5. exact Hidxw. }
-    iPoseProof (cnri_086 with "Ht") as "Hi86".
     iApply (wp_andi_s_sconf (mword_of_int (CR + 0x86)) Ra3 Ra5 (mword_of_int 127 : mword 12)
               (mword_of_int (Z.of_nat idx) : mword 64) H3 (trap_res true + (av - 12))%nat false
-              ltac:(nz) ltac:(rdok) Hwv with "Hcg Hpc Hi86").
+              ltac:(nz) ltac:(rdok) Hwv with "Hcg Hpc []").
+    { iApply (cnri_086 with "Ht"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (H4 := <[Regidx Ra3 := regval_into_reg (mword_of_int (Z.of_nat idx) : mword 64)]> H3).
     assert (Hp8a : add_vec_int (mword_of_int (CR + 0x86) : mword 64) 4
@@ -1045,9 +1046,9 @@ Section ProofConsoleread.
       by (rewrite /H4 upd_ne; [exact HH3a4 | reg_neq]).
     assert (HH4a3 : H4 !!! Regidx Ra3 = (mword_of_int (Z.of_nat idx) : mword 64))
       by (rewrite /H4; apply upd_eq).
-    iPoseProof (cnri_08a with "Ht") as "Hi8a".
     iApply (wp_cadd_s_sconf (mword_of_int (CR + 0x8a)) Ra4 Ra3 H4
-              (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi8a").
+              (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (cnri_08a with "Ht"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     iEval (rewrite HH4a4 HH4a3) in "Hcg".
     set (H5 := <[Regidx Ra4 := regval_into_reg
@@ -1060,10 +1061,10 @@ Section ProofConsoleread.
     iDestruct (cons_data_acc bs idx db Hlk with "Hdat") as "[Hbyte Hdback]".
     assert (HH5a4 : H5 !!! Regidx Ra4 = add_vec a_cons (mword_of_int (Z.of_nat idx) : mword 64))
       by (rewrite /H5; apply upd_eq).
-    iPoseProof (cnri_08c with "Ht") as "Hi8c".
     iApply (wp_lbu_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (CR + 0x8c)) Ra4 Ra4 (mword_of_int 24 : mword 12)
               H5 (trap_res true + (av - 12))%nat (db : mword 8) false ltac:(nz) ltac:(rdok)
-              with "Hcg Hpc Hi8c [Hbyte]").
+              with "Hcg Hpc [] [Hbyte]").
+    { iApply (cnri_08c with "Ht"). }
     { rgall. iEval (rewrite HH5a4 (cr_byaddr idx Hidxlt)). iExact "Hbyte". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hbyte". rgall.
     iEval (rewrite HH5a4 (cr_byaddr idx Hidxlt)) in "Hbyte".
@@ -1082,10 +1083,10 @@ Section ProofConsoleread.
                  (sign_extend' 64 (mword_of_int 0 : mword 12))) 31 0)
         = (mword_of_int cbv : mword 64)).
     { rewrite w32_zext8_moi. apply w32_sextw_moi. rewrite /cbv. lia. }
-    iPoseProof (cnri_090 with "Ht") as "Hi90".
     iApply (wp_addiw_s_sconf (mword_of_int (CR + 0x90)) Rs5 Ra4 (mword_of_int 0 : mword 12)
               H6 (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(rdok)
-              with "Hcg Hpc Hi90").
+              with "Hcg Hpc []").
+    { iApply (cnri_090 with "Ht"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     iEval (rewrite HH6a4 Hsextc) in "Hcg".
     set (H7 := <[Regidx Rs5 := regval_into_reg (mword_of_int cbv : mword 64)]> H6).
@@ -1093,11 +1094,11 @@ Section ProofConsoleread.
                    = mword_of_int (CR + 0x94)) by pcw.
     iEval (rewrite Hp94) in "Hpc".
     (* ---- +0x94 c.li a3,4 ---- *)
-    iPoseProof (cnri_094 with "Ht") as "Hi94".
     iApply (wp_cli_s_sconf (mword_of_int (CR + 0x94)) Ra3 (mword_of_int 4 : mword 6)
               (mword_of_int 4 : mword 64) H7 (trap_res true + (av - 12))%nat false
               ltac:(nz) ltac:(rdok) ltac:(apply bv_eq; vm_compute; reflexivity)
-              with "Hcg Hpc Hi94").
+              with "Hcg Hpc []").
+    { iApply (cnri_094 with "Ht"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (H8 := <[Regidx Ra3 := regval_into_reg (mword_of_int 4 : mword 64)]> H7).
     assert (Hp96 : add_vec_int (mword_of_int (CR + 0x94) : mword 64) 2
@@ -1131,36 +1132,36 @@ Section ProofConsoleread.
       rewrite /H6 upd_ne; [| reg_neq]. rewrite /H5 upd_ne; [| reg_neq].
       rewrite /H4 upd_ne; [| reg_neq]. rewrite /H3 upd_ne; [| reg_neq].
       exact HH2a5. }
-    iPoseProof (cnri_096 with "Ht") as "Hi96".
     destruct (Z.eqb cbv 4) eqn:HD.
     { (* ============ c == C('D'): the end-of-file break at +0xe2 ======== *)
       iApply (wp_beq_taken_s_sconf (mword_of_int (CR + 0x96)) (mword_of_int 76 : mword 13)
                 Ra3 Rs5 H8 (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(nz)
                 ltac:(rgall; rewrite HH8s5 HH8a3 (w32_eq_moi cbv 4 ltac:(lia) ltac:(lia)); exact HD)
-                ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi96").
+                ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+      { iApply (cnri_096 with "Ht"). }
       iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
       assert (Hje2 : add_vec (mword_of_int (CR + 0x96) : mword 64)
                        (sign_extend' 64 (mword_of_int 76 : mword 13))
                      = mword_of_int (CR + 0xe2)) by pcw.
       iEval (rewrite Hje2) in "Hpc".
       (* ---- +0xe2 bgeu s3,s7 : was anything copied yet? ---- *)
-      iPoseProof (cnri_0e2 with "Ht") as "Hie2".
       destruct (Z.geb nc n) eqn:HG.
       { (* nc >= n: nothing copied, so no push-back.  -> +0xf6 ---- *)
         iApply (wp_bgeu_taken_s_sconf (mword_of_int (CR + 0xe2)) (mword_of_int 20 : mword 13)
                   Rs7 Rs3 H8 (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(nz)
                   ltac:(rgall; rewrite HH8s3 HH8s7 (w32_bgeu_moi nc n ltac:(lia) ltac:(lia)); exact HG)
-                  ltac:(vm_compute; reflexivity) with "Hcg Hpc Hie2").
+                  ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+        { iApply (cnri_0e2 with "Ht"). }
         iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
         assert (Hjf6 : add_vec (mword_of_int (CR + 0xe2) : mword 64)
                          (sign_extend' 64 (mword_of_int 20 : mword 13))
                        = mword_of_int (CR + 0xf6)) by pcw.
         iEval (rewrite Hjf6) in "Hpc".
         (* ---- +0xf6 c.ldsp s5,40(sp) ; +0xf8 c.j -> +0xfc ---- *)
-        iPoseProof (cnri_0f6 with "Ht") as "Hif6".
         iApply (wp_cldsp_s_sconf (mword_of_int (CR + 0xf6)) (mword_of_int 5 : mword 6) Rs5
                   H8 (trap_res true + (av - 12))%nat (m0 !!! Regidx Rs5) false
-                  ltac:(nz) ltac:(rdok) with "Hcg Hpc Hif6 [Hsl7]").
+                  ltac:(nz) ltac:(rdok) with "Hcg Hpc [] [Hsl7]").
+        { iApply (cnri_0f6 with "Ht"). }
         { iEval (rewrite HH8sp cr_b7). iExact "Hsl7". }
         iApply wp_next_off_intro. iIntros "Hcg Hpc Hsl7". rgall.
         iEval (rewrite HH8sp cr_b7) in "Hsl7".
@@ -1168,11 +1169,11 @@ Section ProofConsoleread.
         assert (Hpf8 : add_vec_int (mword_of_int (CR + 0xf6) : mword 64) 2
                        = mword_of_int (CR + 0xf8)) by pcw.
         iEval (rewrite Hpf8) in "Hpc".
-        iPoseProof (cnri_0f8 with "Ht") as "Hif8".
         iApply (wp_cj_s_sconf (mword_of_int (CR + 0xf8))
                   (sign_extend' 21 (concat_vec (mword_of_int 2 : mword 11) ('b"0")))
                   H9 (trap_res true + (av - 12))%nat false
-                  ltac:(vm_compute; reflexivity) with "Hcg Hpc Hif8").
+                  ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+        { iApply (cnri_0f8 with "Ht"). }
         iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc". rgall.
         assert (Hjfc : add_vec (mword_of_int (CR + 0xf8) : mword 64)
                          (sign_extend' 64 (sign_extend' 21
@@ -1205,16 +1206,17 @@ Section ProofConsoleread.
       iApply (wp_bgeu_fall_s_sconf (mword_of_int (CR + 0xe2)) (mword_of_int 20 : mword 13)
                 Rs7 Rs3 H8 (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(nz)
                 ltac:(rgall; rewrite HH8s3 HH8s7 (w32_bgeu_moi nc n ltac:(lia) ltac:(lia)); exact HG)
-                with "Hcg Hpc Hie2").
+                with "Hcg Hpc []").
+      { iApply (cnri_0e2 with "Ht"). }
       iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
       assert (Hpe6 : add_vec_int (mword_of_int (CR + 0xe2) : mword 64) 4
                      = mword_of_int (CR + 0xe6)) by pcw.
       iEval (rewrite Hpe6) in "Hpc".
       (* +0xe6 auipc a4,0x12 ; +0xea sw a5,234(a4) : cons.r := the OLD r *)
-      iPoseProof (cnri_0e6 with "Ht") as "Hie6".
       iApply (wp_auipc_s_sconf (mword_of_int (CR + 0xe6)) Ra4 (mword_of_int 18 : mword 20)
                 H8 (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(rdok)
-                with "Hcg Hpc Hie6").
+                with "Hcg Hpc []").
+      { iApply (cnri_0e6 with "Ht"). }
       iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
       set (E1 := <[Regidx Ra4 := regval_into_reg
           (add_vec (mword_of_int (CR + 0xe6) : mword 64)
@@ -1227,10 +1229,10 @@ Section ProofConsoleread.
       { rewrite /E1 upd_eq /a_cons_r /coff_of /a_cons. apply bv_eq; vm_compute; reflexivity. }
       assert (HE1a5 : E1 !!! Regidx Ra5 = sign_extend' 64 rr)
         by (rewrite /E1 upd_ne; [exact HH8a5 | reg_neq]).
-      iPoseProof (cnri_0ea with "Ht") as "Hiea".
       iApply (wp_sw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (CR + 0xea)) Ra5 Ra4 (mword_of_int 250 : mword 12)
                 E1 (trap_res true + (av - 12))%nat (add_vec rr (mword_of_int 1 : mword 32)) false
-                with "Hcg Hpc Hiea [Hrc]").
+                with "Hcg Hpc [] [Hrc]").
+      { iApply (cnri_0ea with "Ht"). }
       { rgall. iEval (rewrite HE1ra). iExact "Hrc". }
       iApply wp_next_off_intro. iIntros "Hcg Hpc Hrc". rgall.
       iEval (rewrite HE1ra HE1a5 trunc32_sext) in "Hrc".
@@ -1240,10 +1242,10 @@ Section ProofConsoleread.
       assert (HE1sp : E1 !!! Regidx csp_rs1 = pa_stk sp0 12%nat)
         by (rewrite /E1 upd_ne; [exact HH8sp | reg_neq]).
       (* ---- +0xee c.ldsp s5,40(sp) ; +0xf0 c.j -> +0xfc ---- *)
-      iPoseProof (cnri_0ee with "Ht") as "Hiee".
       iApply (wp_cldsp_s_sconf (mword_of_int (CR + 0xee)) (mword_of_int 5 : mword 6) Rs5
                 E1 (trap_res true + (av - 12))%nat (m0 !!! Regidx Rs5) false
-                ltac:(nz) ltac:(rdok) with "Hcg Hpc Hiee [Hsl7]").
+                ltac:(nz) ltac:(rdok) with "Hcg Hpc [] [Hsl7]").
+      { iApply (cnri_0ee with "Ht"). }
       { iEval (rewrite HE1sp cr_b7). iExact "Hsl7". }
       iApply wp_next_off_intro. iIntros "Hcg Hpc Hsl7". rgall.
       iEval (rewrite HE1sp cr_b7) in "Hsl7".
@@ -1251,11 +1253,11 @@ Section ProofConsoleread.
       assert (Hpf0 : add_vec_int (mword_of_int (CR + 0xee) : mword 64) 2
                      = mword_of_int (CR + 0xf0)) by pcw.
       iEval (rewrite Hpf0) in "Hpc".
-      iPoseProof (cnri_0f0 with "Ht") as "Hif0".
       iApply (wp_cj_s_sconf (mword_of_int (CR + 0xf0))
                 (sign_extend' 21 (concat_vec (mword_of_int 6 : mword 11) ('b"0")))
                 E2 (trap_res true + (av - 12))%nat false
-                ltac:(vm_compute; reflexivity) with "Hcg Hpc Hif0").
+                ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+      { iApply (cnri_0f0 with "Ht"). }
       iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc". rgall.
       assert (Hjfc2 : add_vec (mword_of_int (CR + 0xf0) : mword 64)
                         (sign_extend' 64 (sign_extend' 21
@@ -1289,7 +1291,8 @@ Section ProofConsoleread.
     iApply (wp_beq_fall_s_sconf (mword_of_int (CR + 0x96)) (mword_of_int 76 : mword 13)
               Ra3 Rs5 H8 (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(nz)
               ltac:(rgall; rewrite HH8s5 HH8a3 (w32_eq_moi cbv 4 ltac:(lia) ltac:(lia)); exact HD)
-              with "Hcg Hpc Hi96").
+              with "Hcg Hpc []").
+    { iApply (cnri_096 with "Ht"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     assert (Hp9a : add_vec_int (mword_of_int (CR + 0x96) : mword 64) 4
                    = mword_of_int (CR + 0x9a)) by pcw.
@@ -1306,9 +1309,9 @@ Section ProofConsoleread.
     assert (HH8a4 : H8 !!! Regidx Ra4 = zero_extend' 64 (db : mword 8)).
     { rewrite /H8 upd_ne; [| reg_neq]. rewrite /H7 upd_ne; [| reg_neq]. exact HH6a4. }
     (* ---- +0x9a sb a4,-81(s0) : cbuf := c ---- *)
-    iPoseProof (cnri_09a with "Ht") as "Hi9a".
     iApply (wp_sb_s_sconf (mword_of_int (CR + 0x9a)) Ra4 Rs0 (mword_of_int 4015 : mword 12)
-              H8 (trap_res true + (av - 12))%nat chb0 false with "Hcg Hpc Hi9a [Hch]").
+              H8 (trap_res true + (av - 12))%nat chb0 false with "Hcg Hpc [] [Hch]").
+    { iApply (cnri_09a with "Ht"). }
     { rgall. iEval (rewrite HH8s0). iExact "Hch". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hch". rgall.
     iEval (rewrite HH8s0) in "Hch".
@@ -1316,11 +1319,11 @@ Section ProofConsoleread.
                    = mword_of_int (CR + 0x9e)) by pcw.
     iEval (rewrite Hp9e) in "Hpc".
     (* ---- +0x9e c.li a3,1 ---- *)
-    iPoseProof (cnri_09e with "Ht") as "Hi9e".
     iApply (wp_cli_s_sconf (mword_of_int (CR + 0x9e)) Ra3 (mword_of_int 1 : mword 6)
               (mword_of_int 1 : mword 64) H8 (trap_res true + (av - 12))%nat false
               ltac:(nz) ltac:(rdok) ltac:(apply bv_eq; vm_compute; reflexivity)
-              with "Hcg Hpc Hi9e").
+              with "Hcg Hpc []").
+    { iApply (cnri_09e with "Ht"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (G1 := <[Regidx Ra3 := regval_into_reg (mword_of_int 1 : mword 64)]> H8).
     assert (Hpa0 : add_vec_int (mword_of_int (CR + 0x9e) : mword 64) 2
@@ -1329,10 +1332,10 @@ Section ProofConsoleread.
     (* ---- +0xa0 addi a2,s0,-81 : a2 := &cbuf ---- *)
     assert (HG1s0 : G1 !!! Regidx Rs0 = sp0)
       by (rewrite /G1 upd_ne; [exact HH8s0 | reg_neq]).
-    iPoseProof (cnri_0a0 with "Ht") as "Hia0".
     iApply (wp_addi4_s_sconf (mword_of_int (CR + 0xa0)) Ra2 Rs0 (mword_of_int 4015 : mword 12)
               G1 (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(rdok)
-              with "Hcg Hpc Hia0").
+              with "Hcg Hpc []").
+    { iApply (cnri_0a0 with "Ht"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     iEval (rewrite HG1s0) in "Hcg".
     set (G2 := <[Regidx Ra2 := regval_into_reg
@@ -1344,9 +1347,9 @@ Section ProofConsoleread.
     assert (HG2s4 : G2 !!! Regidx Rs4 = cur).
     { rewrite /G2 upd_ne; [| reg_neq]. rewrite /G1 upd_ne; [| reg_neq].
       rewrite (HthrH Rs4 ltac:(vm_compute; reflexivity) ltac:(reg_neq)). exact Hs4. }
-    iPoseProof (cnri_0a4 with "Ht") as "Hia4".
     iApply (wp_cmv_s_sconf (mword_of_int (CR + 0xa4)) Ra1 Rs4 G2
-              (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(rdok) with "Hcg Hpc Hia4").
+              (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (cnri_0a4 with "Ht"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     iEval (rewrite HG2s4 w32_zero_add) in "Hcg".
     set (G3 := <[Regidx Ra1 := regval_into_reg cur]> G2).
@@ -1357,9 +1360,9 @@ Section ProofConsoleread.
     { rewrite /G3 upd_ne; [| reg_neq]. rewrite /G2 upd_ne; [| reg_neq].
       rewrite /G1 upd_ne; [| reg_neq].
       rewrite (HthrH Rs6 ltac:(vm_compute; reflexivity) ltac:(reg_neq)). exact Hs6. }
-    iPoseProof (cnri_0a6 with "Ht") as "Hia6".
     iApply (wp_cmv_s_sconf (mword_of_int (CR + 0xa6)) Ra0 Rs6 G3
-              (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(rdok) with "Hcg Hpc Hia6").
+              (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (cnri_0a6 with "Ht"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     iEval (rewrite HG3s6 w32_zero_add) in "Hcg".
     set (G4 := <[Regidx Ra0 := regval_into_reg (mword_of_int 1 : mword 64)]> G3).
@@ -1367,10 +1370,10 @@ Section ProofConsoleread.
                    = mword_of_int (CR + 0xa8)) by pcw.
     iEval (rewrite Hpa8) in "Hpc".
     (* ---- +0xa8 jal either_copyout ---- *)
-    iPoseProof (cnri_0a8 with "Ht") as "Hia8".
     iApply (wp_jal_s_sconf (mword_of_int (CR + 0xa8)) Rra (mword_of_int 8272 : mword 21)
               G4 (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(rdok)
-              ltac:(vm_compute; reflexivity) with "Hcg Hpc Hia8").
+              ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+    { iApply (cnri_0a8 with "Ht"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (G5 := <[Regidx Rra := regval_into_reg
         (add_vec_int (mword_of_int (CR + 0xa8) : mword 64) 4)]> G4).
@@ -1435,11 +1438,11 @@ Section ProofConsoleread.
           rewrite /G3 upd_ne; [| reg_neq]; rewrite /G2 upd_ne; [| reg_neq];
           rewrite /G1 upd_ne; [| reg_neq]; exact HH8s5).
     (* ---- +0xac c.li a5,-1 ; +0xae beq a0,a5 ---- *)
-    iPoseProof (cnri_0ac with "Ht") as "Hiac".
     iApply (wp_cli_s_sconf (mword_of_int (CR + 0xac)) Ra5 (mword_of_int 63 : mword 6)
               (mword_of_int (-1) : mword 64) mrc (trap_res true + (av - 12))%nat false
               ltac:(nz) ltac:(rdok) ltac:(apply bv_eq; vm_compute; reflexivity)
-              with "Hcg Hpc Hiac").
+              with "Hcg Hpc []").
+    { iApply (cnri_0ac with "Ht"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (G6 := <[Regidx Ra5 := regval_into_reg (mword_of_int (-1) : mword 64)]> mrc).
     assert (Hpae : add_vec_int (mword_of_int (CR + 0xac) : mword 64) 2
@@ -1460,13 +1463,13 @@ Section ProofConsoleread.
     { iDestruct ("Hchback" $! (trunc8 (H8 !!! Regidx Ra4)) with "[Hbuf]") as "Hby11".
       { iEval (rewrite (cr_cbufa sp0)) in "Hbuf". iExact "Hbuf". }
       iApply (bytes_own_slot (KTR := KT1) (pa_stk sp0 11%nat) Hal11 with "Hby11"). }
-    iPoseProof (cnri_0ae with "Ht") as "Hiae".
     destruct Hret as [Hr0 | Hrm1].
     { (* ---- either_copyout SUCCEEDED: bump the cursor and the count ---- *)
       iApply (wp_beq_fall_s_sconf (mword_of_int (CR + 0xae)) (mword_of_int 76 : mword 13)
                 Ra5 Ra0 G6 (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(nz)
                 ltac:(rgall; rewrite HG6a5 HG6a0 Hr0; vm_compute; reflexivity)
-                with "Hcg Hpc Hiae").
+                with "Hcg Hpc []").
+      { iApply (cnri_0ae with "Ht"). }
       iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
       assert (Hpb2 : add_vec_int (mword_of_int (CR + 0xae) : mword 64) 4
                      = mword_of_int (CR + 0xb2)) by pcw.
@@ -1475,10 +1478,10 @@ Section ProofConsoleread.
       assert (HG6s4 : G6 !!! Regidx Rs4 = cur).
       { rewrite /G6 upd_ne; [| reg_neq].
         rewrite (HthrG Rs4 ltac:(vm_compute; reflexivity) ltac:(reg_neq)). exact Hs4. }
-      iPoseProof (cnri_0b2 with "Ht") as "Hib2".
       iApply (wp_caddi_s_sconf (mword_of_int (CR + 0xb2)) Rs4 (mword_of_int 1 : mword 6)
                 G6 (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(rdok)
-                with "Hcg Hpc Hib2").
+                with "Hcg Hpc []").
+      { iApply (cnri_0b2 with "Ht"). }
       iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
       iEval (rewrite HG6s4) in "Hcg".
       set (G7 := <[Regidx Rs4 := regval_into_reg
@@ -1496,10 +1499,10 @@ Section ProofConsoleread.
                = (mword_of_int (nc - 1) : mword 64)).
       { replace (nc - 1)%Z with (nc + (-1))%Z by lia.
         apply (w32_caddiw_moi nc (-1) (mword_of_int 63 : mword 6)); [pcw | lia]. }
-      iPoseProof (cnri_0b4 with "Ht") as "Hib4".
       iApply (wp_caddiw_s_sconf (mword_of_int (CR + 0xb4)) Rs3 (mword_of_int 63 : mword 6)
                 G7 (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(rdok)
-                with "Hcg Hpc Hib4").
+                with "Hcg Hpc []").
+      { iApply (cnri_0b4 with "Ht"). }
       iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
       iEval (rewrite HG7s3 Hdec) in "Hcg".
       set (G8 := <[Regidx Rs3 := regval_into_reg (mword_of_int (nc - 1) : mword 64)]> G7).
@@ -1507,11 +1510,11 @@ Section ProofConsoleread.
                      = mword_of_int (CR + 0xb6)) by pcw.
       iEval (rewrite Hpb6) in "Hpc".
       (* +0xb6 c.li a5,10 ; +0xb8 beq s5,a5 *)
-      iPoseProof (cnri_0b6 with "Ht") as "Hib6".
       iApply (wp_cli_s_sconf (mword_of_int (CR + 0xb6)) Ra5 (mword_of_int 10 : mword 6)
                 (mword_of_int 10 : mword 64) G8 (trap_res true + (av - 12))%nat false
                 ltac:(nz) ltac:(rdok) ltac:(apply bv_eq; vm_compute; reflexivity)
-                with "Hcg Hpc Hib6").
+                with "Hcg Hpc []").
+      { iApply (cnri_0b6 with "Ht"). }
       iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
       set (G9 := <[Regidx Ra5 := regval_into_reg (mword_of_int 10 : mword 64)]> G8).
       assert (Hpb8 : add_vec_int (mword_of_int (CR + 0xb6) : mword 64) 2
@@ -1544,23 +1547,23 @@ Section ProofConsoleread.
       iAssert (cons_res) with "[Hrc Hwc Hec Hdat]" as "Hres".
       { iExists (add_vec rr (mword_of_int 1 : mword 32)), ww, ee, bs.
         iFrame "Hrc Hwc Hec Hdat". iPureIntro. exact Hlen. }
-      iPoseProof (cnri_0b8 with "Ht") as "Hib8".
       destruct (Z.eqb cbv 10) eqn:HNL.
       { (* ---- c == '\n': break out at +0x10e ---- *)
         iApply (wp_beq_taken_s_sconf (mword_of_int (CR + 0xb8)) (mword_of_int 86 : mword 13)
                   Ra5 Rs5 G9 (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(nz)
                   ltac:(rgall; rewrite HG9s5 HG9a5 (w32_eq_moi cbv 10 ltac:(lia) ltac:(lia)); exact HNL)
-                  ltac:(vm_compute; reflexivity) with "Hcg Hpc Hib8").
+                  ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+        { iApply (cnri_0b8 with "Ht"). }
         iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
         assert (Hj10e : add_vec (mword_of_int (CR + 0xb8) : mword 64)
                           (sign_extend' 64 (mword_of_int 86 : mword 13))
                         = mword_of_int (CR + 0x10e)) by pcw.
         iEval (rewrite Hj10e) in "Hpc".
         (* +0x10e c.ldsp s5,40(sp) ; +0x110 c.j -> +0xfc *)
-        iPoseProof (cnri_10e with "Ht") as "Hi10e".
         iApply (wp_cldsp_s_sconf (mword_of_int (CR + 0x10e)) (mword_of_int 5 : mword 6) Rs5
                   G9 (trap_res true + (av - 12))%nat (m0 !!! Regidx Rs5) false
-                  ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi10e [Hsl7]").
+                  ltac:(nz) ltac:(rdok) with "Hcg Hpc [] [Hsl7]").
+        { iApply (cnri_10e with "Ht"). }
         { iEval (rewrite HG9sp cr_b7). iExact "Hsl7". }
         iApply wp_next_off_intro. iIntros "Hcg Hpc Hsl7". rgall.
         iEval (rewrite HG9sp cr_b7) in "Hsl7".
@@ -1568,11 +1571,11 @@ Section ProofConsoleread.
         assert (Hp110 : add_vec_int (mword_of_int (CR + 0x10e) : mword 64) 2
                         = mword_of_int (CR + 0x110)) by pcw.
         iEval (rewrite Hp110) in "Hpc".
-        iPoseProof (cnri_110 with "Ht") as "Hi110".
         iApply (wp_cj_s_sconf (mword_of_int (CR + 0x110))
                   (sign_extend' 21 (concat_vec (mword_of_int 2038 : mword 11) ('b"0")))
                   G10 (trap_res true + (av - 12))%nat false
-                  ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi110").
+                  ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+        { iApply (cnri_110 with "Ht"). }
         iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc". rgall.
         assert (Hjfc3 : add_vec (mword_of_int (CR + 0x110) : mword 64)
                           (sign_extend' 64 (sign_extend' 21
@@ -1607,15 +1610,16 @@ Section ProofConsoleread.
       iApply (wp_beq_fall_s_sconf (mword_of_int (CR + 0xb8)) (mword_of_int 86 : mword 13)
                 Ra5 Rs5 G9 (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(nz)
                 ltac:(rgall; rewrite HG9s5 HG9a5 (w32_eq_moi cbv 10 ltac:(lia) ltac:(lia)); exact HNL)
-                with "Hcg Hpc Hib8").
+                with "Hcg Hpc []").
+      { iApply (cnri_0b8 with "Ht"). }
       iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
       assert (Hpbc : add_vec_int (mword_of_int (CR + 0xb8) : mword 64) 4
                      = mword_of_int (CR + 0xbc)) by pcw.
       iEval (rewrite Hpbc) in "Hpc".
-      iPoseProof (cnri_0bc with "Ht") as "Hibc".
       iApply (wp_cldsp_s_sconf (mword_of_int (CR + 0xbc)) (mword_of_int 5 : mword 6) Rs5
                 G9 (trap_res true + (av - 12))%nat (m0 !!! Regidx Rs5) false
-                ltac:(nz) ltac:(rdok) with "Hcg Hpc Hibc [Hsl7]").
+                ltac:(nz) ltac:(rdok) with "Hcg Hpc [] [Hsl7]").
+      { iApply (cnri_0bc with "Ht"). }
       { iEval (rewrite HG9sp cr_b7). iExact "Hsl7". }
       iApply wp_next_off_intro. iIntros "Hcg Hpc Hsl7". rgall.
       iEval (rewrite HG9sp cr_b7) in "Hsl7".
@@ -1623,11 +1627,11 @@ Section ProofConsoleread.
       assert (Hpbe : add_vec_int (mword_of_int (CR + 0xbc) : mword 64) 2
                      = mword_of_int (CR + 0xbe)) by pcw.
       iEval (rewrite Hpbe) in "Hpc".
-      iPoseProof (cnri_0be with "Ht") as "Hibe".
       iApply (wp_cj_s_sconf (mword_of_int (CR + 0xbe))
                 (sign_extend' 21 (concat_vec (mword_of_int 1981 : mword 11) ('b"0")))
                 G10 (trap_res true + (av - 12))%nat false
-                ltac:(vm_compute; reflexivity) with "Hcg Hpc Hibe").
+                ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+      { iApply (cnri_0be with "Ht"). }
       iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc". rgall.
       assert (Hj38 : add_vec (mword_of_int (CR + 0xbe) : mword 64)
                        (sign_extend' 64 (sign_extend' 21
@@ -1677,16 +1681,17 @@ Section ProofConsoleread.
     iApply (wp_beq_taken_s_sconf (mword_of_int (CR + 0xae)) (mword_of_int 76 : mword 13)
               Ra5 Ra0 G6 (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(nz)
               ltac:(rgall; rewrite HG6a5 HG6a0 Hrm1; apply eq_vec_true_iff; reflexivity)
-              ltac:(vm_compute; reflexivity) with "Hcg Hpc Hiae").
+              ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+    { iApply (cnri_0ae with "Ht"). }
     iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     assert (Hjfa : add_vec (mword_of_int (CR + 0xae) : mword 64)
                      (sign_extend' 64 (mword_of_int 76 : mword 13))
                    = mword_of_int (CR + 0xfa)) by pcw.
     iEval (rewrite Hjfa) in "Hpc".
-    iPoseProof (cnri_0fa with "Ht") as "Hifa".
     iApply (wp_cldsp_s_sconf (mword_of_int (CR + 0xfa)) (mword_of_int 5 : mword 6) Rs5
               G6 (trap_res true + (av - 12))%nat (m0 !!! Regidx Rs5) false
-              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hifa [Hsl7]").
+              ltac:(nz) ltac:(rdok) with "Hcg Hpc [] [Hsl7]").
+    { iApply (cnri_0fa with "Ht"). }
     { iEval (rewrite HG6sp cr_b7). iExact "Hsl7". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hsl7". rgall.
     iEval (rewrite HG6sp cr_b7) in "Hsl7".
@@ -1775,10 +1780,10 @@ Section ProofConsoleread.
     destruct Hregs' as (Hsp & Hs0 & Hs1 & Hs2 & Hs3 & Hs4 & Hs6 & Hs7 & Hcs8 & Hcs9 & Hcs10 & Hcs11).
     destruct Hnb as (Hncpos & Hrng & Hfl).
     (* ---- +0x48 jal ra,myproc ---- *)
-    iPoseProof (cnri_048 with "Ht") as "Hi48".
     iApply (wp_jal_s_sconf (mword_of_int (CR + 0x48)) Rra (mword_of_int 5914 : mword 21)
               M (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(rdok)
-              ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi48").
+              ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+    { iApply (cnri_048 with "Ht"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (W1 := <[Regidx Rra := regval_into_reg
         (add_vec_int (mword_of_int (CR + 0x48) : mword 64) 4)]> M).
@@ -1804,10 +1809,10 @@ Section ProofConsoleread.
                    = (mword_of_int (CR + 0x4c) : mword 64)) by pcw.
     iEval (rewrite Hp4c) in "Hpc".
     (* ---- +0x4c jal ra,killed ---- *)
-    iPoseProof (cnri_04c with "Ht") as "Hi4c".
     iApply (wp_jal_s_sconf (mword_of_int (CR + 0x4c)) Rra (mword_of_int 8056 : mword 21)
               mmp (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(rdok)
-              ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi4c").
+              ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+    { iApply (cnri_04c with "Ht"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (W2 := <[Regidx Rra := regval_into_reg
         (add_vec_int (mword_of_int (CR + 0x4c) : mword 64) 4)]> mmp).
@@ -1844,14 +1849,14 @@ Section ProofConsoleread.
     assert (Hmks2 : mkl !!! Regidx Rs2 = a_cons_r)
       by (rewrite (callee_saved_lookup HcsMk Rs2 ltac:(vm_compute; reflexivity)); exact Hs2).
     (* ---- +0x50 c.bnez a0 : killed? ---- *)
-    iPoseProof (cnri_050 with "Ht") as "Hi50".
     destruct (neq_vec (sign_extend' 64 kl : mword 64) (zero_reg : mword 64)) eqn:Hkz.
     { (* ======= KILLED: release and return -1 at +0xc0 ======= *)
       iApply (wp_cbnez_taken_s_sconf (mword_of_int (CR + 0x50)) (mword_of_int 56 : mword 8)
                 (Cregidx (mword_of_int 2)) Ra0 mkl (trap_res true + (av - 12))%nat false
                 ltac:(vm_compute; reflexivity) ltac:(nz)
                 ltac:(rgall; rewrite Hkla0; exact Hkz) ltac:(vm_compute; reflexivity)
-                with "Hcg Hpc Hi50").
+                with "Hcg Hpc []").
+      { iApply (cnri_050 with "Ht"). }
       iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
       assert (Hjc0 : add_vec (mword_of_int (CR + 0x50) : mword 64)
                        (sign_extend' 64 (sign_extend' 13
@@ -1859,10 +1864,10 @@ Section ProofConsoleread.
                      = mword_of_int (CR + 0xc0)) by pcw.
       iEval (rewrite Hjc0) in "Hpc".
       (* +0xc0 auipc a0,0x12 ; +0xc4 addi a0,a0,120 : a0 := &cons *)
-      iPoseProof (cnri_0c0 with "Ht") as "Hic0".
       iApply (wp_auipc_s_sconf (mword_of_int (CR + 0xc0)) Ra0 (mword_of_int 18 : mword 20)
                 mkl (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(rdok)
-                with "Hcg Hpc Hic0").
+                with "Hcg Hpc []").
+      { iApply (cnri_0c0 with "Ht"). }
       iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
       set (K1 := <[Regidx Ra0 := regval_into_reg
           (add_vec (mword_of_int (CR + 0xc0) : mword 64)
@@ -1870,10 +1875,10 @@ Section ProofConsoleread.
       assert (Hpc4 : add_vec_int (mword_of_int (CR + 0xc0) : mword 64) 4
                      = mword_of_int (CR + 0xc4)) by pcw.
       iEval (rewrite Hpc4) in "Hpc".
-      iPoseProof (cnri_0c4 with "Ht") as "Hic4".
       iApply (wp_addi4_s_sconf (mword_of_int (CR + 0xc4)) Ra0 Ra0 (mword_of_int 136 : mword 12)
                 K1 (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(rdok)
-                with "Hcg Hpc Hic4").
+                with "Hcg Hpc []").
+      { iApply (cnri_0c4 with "Ht"). }
       iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
       set (K2 := <[Regidx Ra0 := regval_into_reg
           (add_vec (K1 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 136 : mword 12)))]> K1).
@@ -1883,10 +1888,10 @@ Section ProofConsoleread.
                      = mword_of_int (CR + 0xc8)) by pcw.
       iEval (rewrite Hpc8) in "Hpc".
       (* +0xc8 jal ra,release *)
-      iPoseProof (cnri_0c8 with "Ht") as "Hic8".
       iApply (wp_jal_s_sconf (mword_of_int (CR + 0xc8)) Rra (mword_of_int 2562 : mword 21)
                 K2 (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(rdok)
-                ltac:(vm_compute; reflexivity) with "Hcg Hpc Hic8").
+                ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+      { iApply (cnri_0c8 with "Ht"). }
       iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
       set (K3 := <[Regidx Rra := regval_into_reg
           (add_vec_int (mword_of_int (CR + 0xc8) : mword 64) 4)]> K2).
@@ -1926,11 +1931,11 @@ Section ProofConsoleread.
       { apply (callee_saved_trans M mkl mrl HcsMk).
         apply (callee_saved_trans mkl K3 mrl HcsK3 Hcsrl). }
       (* +0xcc c.li a0,-1, then FALL into the epilogue at +0xce *)
-      iPoseProof (cnri_0cc with "Ht") as "Hicc".
       iApply (wp_cli_s_sconf (mword_of_int (CR + 0xcc)) Ra0 (mword_of_int 63 : mword 6)
                 (mword_of_int (-1) : mword 64) mrl (av - 12)%nat true
                 ltac:(nz) ltac:(rdok) ltac:(apply bv_eq; vm_compute; reflexivity)
-                with "Hcg Hpc Hicc").
+                with "Hcg Hpc []").
+      { iApply (cnri_0cc with "Ht"). }
       iIntros (CIDz Hsz) "Hcg Hpc". rgall.
       set (K4 := <[Regidx Ra0 := regval_into_reg (mword_of_int (-1) : mword 64)]> mrl).
       assert (Hpce : add_vec_int (mword_of_int (CR + 0xcc) : mword 64) 2
@@ -1955,25 +1960,26 @@ Section ProofConsoleread.
     iApply (wp_cbnez_fall_s_sconf (mword_of_int (CR + 0x50)) (mword_of_int 56 : mword 8)
               (Cregidx (mword_of_int 2)) Ra0 mkl (trap_res true + (av - 12))%nat false
               ltac:(vm_compute; reflexivity) ltac:(nz)
-              ltac:(rgall; rewrite Hkla0; exact Hkz) with "Hcg Hpc Hi50").
+              ltac:(rgall; rewrite Hkla0; exact Hkz) with "Hcg Hpc []").
+    { iApply (cnri_050 with "Ht"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     assert (Hp52 : add_vec_int (mword_of_int (CR + 0x50) : mword 64) 2
                    = mword_of_int (CR + 0x52)) by pcw.
     iEval (rewrite Hp52) in "Hpc".
     (* ---- +0x52 c.mv a0,s2 ; +0x54 jal sleep_prepare ---- *)
-    iPoseProof (cnri_052 with "Ht") as "Hi52".
     iApply (wp_cmv_s_sconf (mword_of_int (CR + 0x52)) Ra0 Rs2 mkl
-              (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi52").
+              (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (cnri_052 with "Ht"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     iEval (rewrite Hmks2 w32_zero_add) in "Hcg".
     set (S1 := <[Regidx Ra0 := regval_into_reg a_cons_r]> mkl).
     assert (Hp54 : add_vec_int (mword_of_int (CR + 0x52) : mword 64) 2
                    = mword_of_int (CR + 0x54)) by pcw.
     iEval (rewrite Hp54) in "Hpc".
-    iPoseProof (cnri_054 with "Ht") as "Hi54".
     iApply (wp_jal_s_sconf (mword_of_int (CR + 0x54)) Rra (mword_of_int 7448 : mword 21)
               S1 (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(rdok)
-              ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi54").
+              ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+    { iApply (cnri_054 with "Ht"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (S2 := <[Regidx Rra := regval_into_reg
         (add_vec_int (mword_of_int (CR + 0x54) : mword 64) 4)]> S1).
@@ -2008,19 +2014,19 @@ Section ProofConsoleread.
     assert (Hmsps1 : msp !!! Regidx Rs1 = a_cons)
       by (rewrite (callee_saved_lookup HcsMsp Rs1 ltac:(vm_compute; reflexivity)); exact Hs1).
     (* ---- +0x58 c.mv a0,s1 ; +0x5a jal release ---- *)
-    iPoseProof (cnri_058 with "Ht") as "Hi58".
     iApply (wp_cmv_s_sconf (mword_of_int (CR + 0x58)) Ra0 Rs1 msp
-              (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi58").
+              (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (cnri_058 with "Ht"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     iEval (rewrite Hmsps1 w32_zero_add) in "Hcg".
     set (S3 := <[Regidx Ra0 := regval_into_reg a_cons]> msp).
     assert (Hp5a : add_vec_int (mword_of_int (CR + 0x58) : mword 64) 2
                    = mword_of_int (CR + 0x5a)) by pcw.
     iEval (rewrite Hp5a) in "Hpc".
-    iPoseProof (cnri_05a with "Ht") as "Hi5a".
     iApply (wp_jal_s_sconf (mword_of_int (CR + 0x5a)) Rra (mword_of_int 2672 : mword 21)
               S3 (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(rdok)
-              ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi5a").
+              ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+    { iApply (cnri_05a with "Ht"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (S4 := <[Regidx Rra := regval_into_reg
         (add_vec_int (mword_of_int (CR + 0x5a) : mword 64) 4)]> S3).
@@ -2058,10 +2064,10 @@ Section ProofConsoleread.
     { apply (callee_saved_trans M msp mrl0 HcsMsp).
       apply (callee_saved_trans msp S4 mrl0 HcsS4 Hcsrl0). }
     (* ---- +0x5e jal sleep : the park.  Interrupts are back ON here. ---- *)
-    iPoseProof (cnri_05e with "Ht") as "Hi5e".
     iApply (wp_jal_s_sconf (mword_of_int (CR + 0x5e)) Rra (mword_of_int 7498 : mword 21)
               mrl0 (av - 12)%nat true ltac:(nz) ltac:(rdok)
-              ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi5e").
+              ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+    { iApply (cnri_05e with "Ht"). }
     iIntros (CIDs0 Hss0) "Hcg Hpc". rgall.
     set (S5 := <[Regidx Rra := regval_into_reg
         (add_vec_int (mword_of_int (CR + 0x5e) : mword 64) 4)]> mrl0).
@@ -2095,19 +2101,19 @@ Section ProofConsoleread.
     assert (Hmsls1 : msl !!! Regidx Rs1 = a_cons)
       by (rewrite (callee_saved_lookup HcsMsl Rs1 ltac:(vm_compute; reflexivity)); exact Hs1).
     (* ---- +0x62 c.mv a0,s1 ; +0x64 jal acquire ---- *)
-    iPoseProof (cnri_062 with "Ht") as "Hi62".
     iApply (wp_cmv_s_sconf (mword_of_int (CR + 0x62)) Ra0 Rs1 msl (av - 12)%nat true
-              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi62").
+              ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (cnri_062 with "Ht"). }
     iIntros (CIDq0 Hsq0) "Hcg Hpc". rgall.
     iEval (rewrite Hmsls1 w32_zero_add) in "Hcg".
     set (S6 := <[Regidx Ra0 := regval_into_reg a_cons]> msl).
     assert (Hp64 : add_vec_int (mword_of_int (CR + 0x62) : mword 64) 2
                    = mword_of_int (CR + 0x64)) by pcw.
     iEval (rewrite Hp64) in "Hpc".
-    iPoseProof (cnri_064 with "Ht") as "Hi64".
     iApply (wp_jal_s_sconf (mword_of_int (CR + 0x64)) Rra (mword_of_int 2526 : mword 21)
               S6 (av - 12)%nat true ltac:(nz) ltac:(rdok)
-              ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi64").
+              ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+    { iApply (cnri_064 with "Ht"). }
     iIntros (CIDq1 Hsq1) "Hcg Hpc". rgall.
     set (S7 := <[Regidx Rra := regval_into_reg
         (add_vec_int (mword_of_int (CR + 0x64) : mword 64) 4)]> S6).
@@ -2147,10 +2153,10 @@ Section ProofConsoleread.
     assert (Hra2 : add_vec (maq !!! Regidx Rs1)
                      (sign_extend' 64 (mword_of_int 152 : mword 12)) = a_cons_r)
       by (rewrite Hmaqs1; reflexivity).
-    iPoseProof (cnri_068 with "Ht") as "Hi68".
     iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (CR + 0x68)) Ra5 Rs1 (mword_of_int 152 : mword 12)
               maq (trap_res true + (av - 12))%nat rr2 false ltac:(nz) ltac:(rdok)
-              with "Hcg Hpc Hi68 [Hrc]").
+              with "Hcg Hpc [] [Hrc]").
+    { iApply (cnri_068 with "Ht"). }
     { rgall. iEval (rewrite Hra2). iExact "Hrc". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hrc". rgall. iEval (rewrite Hra2) in "Hrc".
     set (S8 := <[Regidx Ra5 := regval_into_reg (sign_extend' 64 rr2)]> maq).
@@ -2162,10 +2168,10 @@ Section ProofConsoleread.
     assert (Hwa2 : add_vec (S8 !!! Regidx Rs1)
                      (sign_extend' 64 (mword_of_int 156 : mword 12)) = a_cons_w)
       by (rewrite HS8s1; reflexivity).
-    iPoseProof (cnri_06c with "Ht") as "Hi6c".
     iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (CR + 0x6c)) Ra4 Rs1 (mword_of_int 156 : mword 12)
               S8 (trap_res true + (av - 12))%nat ww2 false ltac:(nz) ltac:(rdok)
-              with "Hcg Hpc Hi6c [Hwc]").
+              with "Hcg Hpc [] [Hwc]").
+    { iApply (cnri_06c with "Ht"). }
     { rgall. iEval (rewrite Hwa2). iExact "Hwc". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hwc". rgall. iEval (rewrite Hwa2) in "Hwc".
     set (S9 := <[Regidx Ra4 := regval_into_reg (sign_extend' 64 ww2)]> S8).
@@ -2196,13 +2202,13 @@ Section ProofConsoleread.
               | rewrite (callee_saved_lookup HcsMS9 Rs11 ltac:(vm_compute; reflexivity)); exact Hcs11 ]. }
     assert (HS9s5 : S9 !!! Regidx Rs5 = m0 !!! Regidx Rs5)
       by (rewrite (callee_saved_lookup HcsMS9 Rs5 ltac:(vm_compute; reflexivity)); exact Hs5).
-    iPoseProof (cnri_070 with "Ht") as "Hi70".
     destruct (eq_vec (sign_extend' 64 ww2 : mword 64) (sign_extend' 64 rr2)) eqn:Hstill.
     { (* still empty: THE BACK EDGE to +0x48 *)
       iApply (wp_beq_taken_s_sconf (mword_of_int (CR + 0x70)) (mword_of_int 8152 : mword 13)
                 Ra5 Ra4 S9 (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(nz)
                 ltac:(rgall; rewrite HS9a4 HS9a5; exact Hstill)
-                ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi70").
+                ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+      { iApply (cnri_070 with "Ht"). }
       (* the Loeb back edge: the [▷] has to come off "IH", not just the goal *)
       iNext. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
       assert (Hbk48 : add_vec (mword_of_int (CR + 0x70) : mword 64)
@@ -2220,7 +2226,8 @@ Section ProofConsoleread.
     (* data arrived: fall to +0x74, spill s5 and enter the copy block *)
     iApply (wp_beq_fall_s_sconf (mword_of_int (CR + 0x70)) (mword_of_int 8152 : mword 13)
               Ra5 Ra4 S9 (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(nz)
-              ltac:(rgall; rewrite HS9a4 HS9a5; exact Hstill) with "Hcg Hpc Hi70").
+              ltac:(rgall; rewrite HS9a4 HS9a5; exact Hstill) with "Hcg Hpc []").
+    { iApply (cnri_070 with "Ht"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     assert (Hp74 : add_vec_int (mword_of_int (CR + 0x70) : mword 64) 4
                    = mword_of_int (CR + 0x74)) by pcw.
@@ -2229,9 +2236,9 @@ Section ProofConsoleread.
       by (destruct HregS9 as (Q & _); exact Q).
     iDestruct "Hrest" as "(Hq7 & Hq10 & Hq11 & Hq12)".
     iDestruct "Hq7" as (y7) "Hsl7".
-    iPoseProof (cnri_074 with "Ht") as "Hi74".
     iApply (wp_csdsp_s_sconf (mword_of_int (CR + 0x74)) (mword_of_int 5 : mword 6) Rs5
-              S9 (trap_res true + (av - 12))%nat y7 false with "Hcg Hpc Hi74 [Hsl7]").
+              S9 (trap_res true + (av - 12))%nat y7 false with "Hcg Hpc [] [Hsl7]").
+    { iApply (cnri_074 with "Ht"). }
     { iEval (rewrite HS9sp cr_b7). iExact "Hsl7". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hsl7". rgall.
     iEval (rewrite HS9sp cr_b7) in "Hsl7". iEval (rewrite HS9s5) in "Hsl7".
@@ -2293,13 +2300,13 @@ Section ProofConsoleread.
     (* ---- +0x38 blez s3 : while (n > 0) ---- *)
     assert (Hblez : zopz0zKzJ_s (zero_reg : mword 64) (M !!! Regidx Rs3) = Z.geb 0 nc).
     { rewrite Hs3. apply w32_bge0_moi. lia. }
-    iPoseProof (cnri_038 with "Ht") as "Hi38".
     destruct (Z.geb 0 nc) eqn:HZ.
     { (* n <= 0: the loop is over, release and return [target - n] *)
       iApply (wp_bge_x0_taken_s_sconf (mword_of_int (CR + 0x38)) (mword_of_int 196 : mword 13)
                 Rs3 M (trap_res true + (av - 12))%nat false ltac:(nz)
                 ltac:(rgall; exact Hblez) ltac:(vm_compute; reflexivity)
-                with "Hcg Hpc Hi38").
+                with "Hcg Hpc []").
+      { iApply (cnri_038 with "Ht"). }
       iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
       assert (Hjfc : add_vec (mword_of_int (CR + 0x38) : mword 64)
                        (sign_extend' 64 (mword_of_int 196 : mword 13))
@@ -2320,7 +2327,8 @@ Section ProofConsoleread.
     { rewrite Z.geb_leb in HZ. apply Z.leb_gt in HZ. lia. }
     iApply (wp_bge_x0_fall_s_sconf (mword_of_int (CR + 0x38)) (mword_of_int 196 : mword 13)
               Rs3 M (trap_res true + (av - 12))%nat false ltac:(nz)
-              ltac:(rgall; exact Hblez) with "Hcg Hpc Hi38").
+              ltac:(rgall; exact Hblez) with "Hcg Hpc []").
+    { iApply (cnri_038 with "Ht"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     assert (Hp3c : add_vec_int (mword_of_int (CR + 0x38) : mword 64) 4
                    = mword_of_int (CR + 0x3c)) by pcw.
@@ -2330,10 +2338,10 @@ Section ProofConsoleread.
     assert (Hra : add_vec (M !!! Regidx Rs1)
                     (sign_extend' 64 (mword_of_int 152 : mword 12)) = a_cons_r)
       by (rewrite Hs1; reflexivity).
-    iPoseProof (cnri_03c with "Ht") as "Hi3c".
     iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (CR + 0x3c)) Ra5 Rs1 (mword_of_int 152 : mword 12)
               M (trap_res true + (av - 12))%nat rr false ltac:(nz) ltac:(rdok)
-              with "Hcg Hpc Hi3c [Hrc]").
+              with "Hcg Hpc [] [Hrc]").
+    { iApply (cnri_03c with "Ht"). }
     { rgall. iEval (rewrite Hra). iExact "Hrc". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hrc". rgall. iEval (rewrite Hra) in "Hrc".
     set (D1 := <[Regidx Ra5 := regval_into_reg (sign_extend' 64 rr)]> M).
@@ -2345,10 +2353,10 @@ Section ProofConsoleread.
     assert (Hwa : add_vec (D1 !!! Regidx Rs1)
                     (sign_extend' 64 (mword_of_int 156 : mword 12)) = a_cons_w)
       by (rewrite HD1s1; reflexivity).
-    iPoseProof (cnri_040 with "Ht") as "Hi40".
     iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (CR + 0x40)) Ra4 Rs1 (mword_of_int 156 : mword 12)
               D1 (trap_res true + (av - 12))%nat ww false ltac:(nz) ltac:(rdok)
-              with "Hcg Hpc Hi40 [Hwc]").
+              with "Hcg Hpc [] [Hwc]").
+    { iApply (cnri_040 with "Ht"). }
     { rgall. iEval (rewrite Hwa). iExact "Hwc". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hwc". rgall. iEval (rewrite Hwa) in "Hwc".
     set (D2 := <[Regidx Ra4 := regval_into_reg (sign_extend' 64 ww)]> D1).
@@ -2383,13 +2391,13 @@ Section ProofConsoleread.
     assert (HD2sp : D2 !!! Regidx csp_rs1 = pa_stk sp0 12%nat)
       by (destruct HregD2 as (Q & _); exact Q).
     (* ---- +0x44 bne a4,a5 : is the ring non-empty? ---- *)
-    iPoseProof (cnri_044 with "Ht") as "Hi44".
     destruct (neq_vec (sign_extend' 64 ww : mword 64) (sign_extend' 64 rr)) eqn:Hne.
     { (* a byte is already there: +0xf2 spills s5 and jumps to the copy block *)
       iApply (wp_bne_taken_s_sconf (mword_of_int (CR + 0x44)) (mword_of_int 174 : mword 13)
                 Ra5 Ra4 D2 (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(nz)
                 ltac:(rgall; rewrite HD2a4 HD2a5; exact Hne)
-                ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi44").
+                ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+      { iApply (cnri_044 with "Ht"). }
       iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
       assert (Hjf2 : add_vec (mword_of_int (CR + 0x44) : mword 64)
                        (sign_extend' 64 (mword_of_int 174 : mword 13))
@@ -2397,20 +2405,20 @@ Section ProofConsoleread.
       iEval (rewrite Hjf2) in "Hpc".
       iDestruct "Hrest" as "(Hq7 & Hq10 & Hq11 & Hq12)".
       iDestruct "Hq7" as (y7) "Hsl7".
-      iPoseProof (cnri_0f2 with "Ht") as "Hif2".
       iApply (wp_csdsp_s_sconf (mword_of_int (CR + 0xf2)) (mword_of_int 5 : mword 6) Rs5
-                D2 (trap_res true + (av - 12))%nat y7 false with "Hcg Hpc Hif2 [Hsl7]").
+                D2 (trap_res true + (av - 12))%nat y7 false with "Hcg Hpc [] [Hsl7]").
+      { iApply (cnri_0f2 with "Ht"). }
       { iEval (rewrite HD2sp cr_b7). iExact "Hsl7". }
       iApply wp_next_off_intro. iIntros "Hcg Hpc Hsl7". rgall.
       iEval (rewrite HD2sp cr_b7) in "Hsl7". iEval (rewrite HD2s5) in "Hsl7".
       assert (Hpf4 : add_vec_int (mword_of_int (CR + 0xf2) : mword 64) 2
                      = mword_of_int (CR + 0xf4)) by pcw.
       iEval (rewrite Hpf4) in "Hpc".
-      iPoseProof (cnri_0f4 with "Ht") as "Hif4".
       iApply (wp_cj_s_sconf (mword_of_int (CR + 0xf4))
                 (sign_extend' 21 (concat_vec (mword_of_int 1985 : mword 11) ('b"0")))
                 D2 (trap_res true + (av - 12))%nat false
-                ltac:(vm_compute; reflexivity) with "Hcg Hpc Hif4").
+                ltac:(vm_compute; reflexivity) with "Hcg Hpc []").
+      { iApply (cnri_0f4 with "Ht"). }
       iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc". rgall.
       assert (Hj76 : add_vec (mword_of_int (CR + 0xf4) : mword 64)
                        (sign_extend' 64 (sign_extend' 21
@@ -2429,7 +2437,8 @@ Section ProofConsoleread.
     (* the ring is empty: fall into the park at +0x48 *)
     iApply (wp_bne_fall_s_sconf (mword_of_int (CR + 0x44)) (mword_of_int 174 : mword 13)
               Ra5 Ra4 D2 (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(nz)
-              ltac:(rgall; rewrite HD2a4 HD2a5; exact Hne) with "Hcg Hpc Hi44").
+              ltac:(rgall; rewrite HD2a4 HD2a5; exact Hne) with "Hcg Hpc []").
+    { iApply (cnri_044 with "Ht"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     assert (Hp48 : add_vec_int (mword_of_int (CR + 0x44) : mword 64) 4
                    = mword_of_int (CR + 0x48)) by pcw.
@@ -2472,9 +2481,9 @@ Section ProofConsoleread.
                       (sign_extend' 64 (caddi16sp_imm (mword_of_int 58 : mword 6)))
                     = pa_stk (m !!! Regidx csp_rs1) 12%nat).
     { unfold pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
-    iPoseProof (cnri_000 with "Ht") as "Hi00".
     iApply (wp_caddi16sp_push_s_sconf pcE (mword_of_int 58 : mword 6) m av 12%nat true
-              ltac:(lia) Hpush with "Hcg Hpc Hi00").
+              ltac:(lia) Hpush with "Hcg Hpc []").
+    { iApply (cnri_000 with "Ht"). }
     iIntros (CIDp1 Hsp1) "Hcg Hframe Hpc". rgall.
     iEval (rewrite Hspm) in "Hframe".
     set (P0 := <[Regidx csp_rs1 := regval_into_reg
@@ -2516,9 +2525,9 @@ Section ProofConsoleread.
     iDestruct "Q5" as (u5) "Hf5". iDestruct "Q6" as (u6) "Hf6".
     iDestruct "Q8" as (u8) "Hf8". iDestruct "Q9" as (u9) "Hf9".
     (* ---- +0x02 .. +0x10: save ra, s0, s1, s2, s3, s4, s6, s7 ---- *)
-    iPoseProof (cnri_002 with "Ht") as "Hi02".
     iApply (wp_csdsp_s_sconf (mword_of_int (CR + 0x02)) (mword_of_int 11 : mword 6) Rra
-              P0 (av - 12)%nat u1 true with "Hcg Hpc Hi02 [Hf1]").
+              P0 (av - 12)%nat u1 true with "Hcg Hpc [] [Hf1]").
+    { iApply (cnri_002 with "Ht"). }
     { iEval (rewrite HP0sp Hb1). iExact "Hf1". }
     iIntros (CIDp2 Hsp2) "Hcg Hpc Hf1". rgall. iEval (rewrite HP0sp Hb1) in "Hf1".
     assert (HP0ra : P0 !!! Regidx Rra = m !!! Regidx Rra)
@@ -2527,9 +2536,9 @@ Section ProofConsoleread.
     assert (Hpc04 : add_vec_int (mword_of_int (CR + 0x02) : mword 64) 2
                     = mword_of_int (CR + 0x04)) by pcw.
     iEval (rewrite Hpc04) in "Hpc".
-    iPoseProof (cnri_004 with "Ht") as "Hi04".
     iApply (wp_csdsp_s_sconf (mword_of_int (CR + 0x04)) (mword_of_int 10 : mword 6) Rs0
-              P0 (av - 12)%nat u2 true with "Hcg Hpc Hi04 [Hf2]").
+              P0 (av - 12)%nat u2 true with "Hcg Hpc [] [Hf2]").
+    { iApply (cnri_004 with "Ht"). }
     { iEval (rewrite HP0sp Hb2). iExact "Hf2". }
     iIntros (CIDp3 Hsp3) "Hcg Hpc Hf2". rgall. iEval (rewrite HP0sp Hb2) in "Hf2".
     assert (HP0s0 : P0 !!! Regidx Rs0 = m !!! Regidx Rs0)
@@ -2538,9 +2547,9 @@ Section ProofConsoleread.
     assert (Hpc06 : add_vec_int (mword_of_int (CR + 0x04) : mword 64) 2
                     = mword_of_int (CR + 0x06)) by pcw.
     iEval (rewrite Hpc06) in "Hpc".
-    iPoseProof (cnri_006 with "Ht") as "Hi06".
     iApply (wp_csdsp_s_sconf (mword_of_int (CR + 0x06)) (mword_of_int 9 : mword 6) Rs1
-              P0 (av - 12)%nat u3 true with "Hcg Hpc Hi06 [Hf3]").
+              P0 (av - 12)%nat u3 true with "Hcg Hpc [] [Hf3]").
+    { iApply (cnri_006 with "Ht"). }
     { iEval (rewrite HP0sp Hb3). iExact "Hf3". }
     iIntros (CIDp4 Hsp4) "Hcg Hpc Hf3". rgall. iEval (rewrite HP0sp Hb3) in "Hf3".
     assert (HP0s1 : P0 !!! Regidx Rs1 = m !!! Regidx Rs1)
@@ -2549,9 +2558,9 @@ Section ProofConsoleread.
     assert (Hpc08 : add_vec_int (mword_of_int (CR + 0x06) : mword 64) 2
                     = mword_of_int (CR + 0x08)) by pcw.
     iEval (rewrite Hpc08) in "Hpc".
-    iPoseProof (cnri_008 with "Ht") as "Hi08".
     iApply (wp_csdsp_s_sconf (mword_of_int (CR + 0x08)) (mword_of_int 8 : mword 6) Rs2
-              P0 (av - 12)%nat u4 true with "Hcg Hpc Hi08 [Hf4]").
+              P0 (av - 12)%nat u4 true with "Hcg Hpc [] [Hf4]").
+    { iApply (cnri_008 with "Ht"). }
     { iEval (rewrite HP0sp Hb4). iExact "Hf4". }
     iIntros (CIDp5 Hsp5) "Hcg Hpc Hf4". rgall. iEval (rewrite HP0sp Hb4) in "Hf4".
     assert (HP0s2 : P0 !!! Regidx Rs2 = m !!! Regidx Rs2)
@@ -2560,9 +2569,9 @@ Section ProofConsoleread.
     assert (Hpc0a : add_vec_int (mword_of_int (CR + 0x08) : mword 64) 2
                     = mword_of_int (CR + 0x0a)) by pcw.
     iEval (rewrite Hpc0a) in "Hpc".
-    iPoseProof (cnri_00a with "Ht") as "Hi0a".
     iApply (wp_csdsp_s_sconf (mword_of_int (CR + 0x0a)) (mword_of_int 7 : mword 6) Rs3
-              P0 (av - 12)%nat u5 true with "Hcg Hpc Hi0a [Hf5]").
+              P0 (av - 12)%nat u5 true with "Hcg Hpc [] [Hf5]").
+    { iApply (cnri_00a with "Ht"). }
     { iEval (rewrite HP0sp Hb5). iExact "Hf5". }
     iIntros (CIDp6 Hsp6) "Hcg Hpc Hf5". rgall. iEval (rewrite HP0sp Hb5) in "Hf5".
     assert (HP0s3 : P0 !!! Regidx Rs3 = m !!! Regidx Rs3)
@@ -2571,9 +2580,9 @@ Section ProofConsoleread.
     assert (Hpc0c : add_vec_int (mword_of_int (CR + 0x0a) : mword 64) 2
                     = mword_of_int (CR + 0x0c)) by pcw.
     iEval (rewrite Hpc0c) in "Hpc".
-    iPoseProof (cnri_00c with "Ht") as "Hi0c".
     iApply (wp_csdsp_s_sconf (mword_of_int (CR + 0x0c)) (mword_of_int 6 : mword 6) Rs4
-              P0 (av - 12)%nat u6 true with "Hcg Hpc Hi0c [Hf6]").
+              P0 (av - 12)%nat u6 true with "Hcg Hpc [] [Hf6]").
+    { iApply (cnri_00c with "Ht"). }
     { iEval (rewrite HP0sp Hb6). iExact "Hf6". }
     iIntros (CIDp7 Hsp7) "Hcg Hpc Hf6". rgall. iEval (rewrite HP0sp Hb6) in "Hf6".
     assert (HP0s4 : P0 !!! Regidx Rs4 = m !!! Regidx Rs4)
@@ -2582,9 +2591,9 @@ Section ProofConsoleread.
     assert (Hpc0e : add_vec_int (mword_of_int (CR + 0x0c) : mword 64) 2
                     = mword_of_int (CR + 0x0e)) by pcw.
     iEval (rewrite Hpc0e) in "Hpc".
-    iPoseProof (cnri_00e with "Ht") as "Hi0e".
     iApply (wp_csdsp_s_sconf (mword_of_int (CR + 0x0e)) (mword_of_int 4 : mword 6) Rs6
-              P0 (av - 12)%nat u8 true with "Hcg Hpc Hi0e [Hf8]").
+              P0 (av - 12)%nat u8 true with "Hcg Hpc [] [Hf8]").
+    { iApply (cnri_00e with "Ht"). }
     { iEval (rewrite HP0sp Hb8). iExact "Hf8". }
     iIntros (CIDp8 Hsp8) "Hcg Hpc Hf8". rgall. iEval (rewrite HP0sp Hb8) in "Hf8".
     assert (HP0s6 : P0 !!! Regidx Rs6 = m !!! Regidx Rs6)
@@ -2593,9 +2602,9 @@ Section ProofConsoleread.
     assert (Hpc10 : add_vec_int (mword_of_int (CR + 0x0e) : mword 64) 2
                     = mword_of_int (CR + 0x10)) by pcw.
     iEval (rewrite Hpc10) in "Hpc".
-    iPoseProof (cnri_010 with "Ht") as "Hi10".
     iApply (wp_csdsp_s_sconf (mword_of_int (CR + 0x10)) (mword_of_int 3 : mword 6) Rs7
-              P0 (av - 12)%nat u9 true with "Hcg Hpc Hi10 [Hf9]").
+              P0 (av - 12)%nat u9 true with "Hcg Hpc [] [Hf9]").
+    { iApply (cnri_010 with "Ht"). }
     { iEval (rewrite HP0sp Hb9). iExact "Hf9". }
     iIntros (CIDp9 Hsp9) "Hcg Hpc Hf9". rgall. iEval (rewrite HP0sp Hb9) in "Hf9".
     assert (HP0s7 : P0 !!! Regidx Rs7 = m !!! Regidx Rs7)
@@ -2623,10 +2632,10 @@ Section ProofConsoleread.
                      (sign_extend' 64 (caddi4spn_imm (mword_of_int 24 : mword 8)))
                    = (mword_of_int 0 : mword 64)); [| pcw].
       apply bv_add_0_r. vm_compute. reflexivity. }
-    iPoseProof (cnri_012 with "Ht") as "Hi12".
     iApply (wp_caddi4spn_s_sconf (mword_of_int (CR + 0x12)) (Cregidx (mword_of_int 0))
               (mword_of_int 24 : mword 8) Rs0 P0 (av - 12)%nat true
-              ltac:(vm_compute; reflexivity) ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi12").
+              ltac:(vm_compute; reflexivity) ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (cnri_012 with "Ht"). }
     iIntros (CIDp10 Hsp10) "Hcg Hpc". rgall.
     iEval (rewrite HP0sp Hs0v) in "Hcg".
     set (P1 := <[Regidx Rs0 := regval_into_reg sp0]> P0).
@@ -2636,9 +2645,9 @@ Section ProofConsoleread.
     (* ---- +0x14/+0x16/+0x18/+0x1a: s6 := a0, s4 := a1, s3 := a2, s7 := a2 ---- *)
     assert (HP1a0 : P1 !!! Regidx Ra0 = (mword_of_int 1 : mword 64)).
     { rewrite /P1 upd_ne; [| reg_neq]. rewrite /P0 upd_ne; [| reg_neq]. exact Ha0v. }
-    iPoseProof (cnri_014 with "Ht") as "Hi14".
     iApply (wp_cmv_s_sconf (mword_of_int (CR + 0x14)) Rs6 Ra0 P1 (av - 12)%nat true
-              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi14").
+              ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (cnri_014 with "Ht"). }
     iIntros (CIDp11 Hsp11) "Hcg Hpc". rgall.
     iEval (rewrite HP1a0 w32_zero_add) in "Hcg".
     set (P2 := <[Regidx Rs6 := regval_into_reg (mword_of_int 1 : mword 64)]> P1).
@@ -2648,9 +2657,9 @@ Section ProofConsoleread.
     assert (HP2a1 : P2 !!! Regidx Ra1 = m !!! Regidx Ra1).
     { rewrite /P2 upd_ne; [| reg_neq]. rewrite /P1 upd_ne; [| reg_neq].
       rewrite /P0 upd_ne; [reflexivity | reg_neq]. }
-    iPoseProof (cnri_016 with "Ht") as "Hi16".
     iApply (wp_cmv_s_sconf (mword_of_int (CR + 0x16)) Rs4 Ra1 P2 (av - 12)%nat true
-              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi16").
+              ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (cnri_016 with "Ht"). }
     iIntros (CIDp12 Hsp12) "Hcg Hpc". rgall.
     iEval (rewrite HP2a1 w32_zero_add) in "Hcg".
     set (P3 := <[Regidx Rs4 := regval_into_reg (m !!! Regidx Ra1)]> P2).
@@ -2660,9 +2669,9 @@ Section ProofConsoleread.
     assert (HP3a2 : P3 !!! Regidx Ra2 = (mword_of_int n : mword 64)).
     { rewrite /P3 upd_ne; [| reg_neq]. rewrite /P2 upd_ne; [| reg_neq].
       rewrite /P1 upd_ne; [| reg_neq]. rewrite /P0 upd_ne; [| reg_neq]. exact Ha2v. }
-    iPoseProof (cnri_018 with "Ht") as "Hi18".
     iApply (wp_cmv_s_sconf (mword_of_int (CR + 0x18)) Rs3 Ra2 P3 (av - 12)%nat true
-              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi18").
+              ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (cnri_018 with "Ht"). }
     iIntros (CIDp13 Hsp13) "Hcg Hpc". rgall.
     iEval (rewrite HP3a2 w32_zero_add) in "Hcg".
     set (P4 := <[Regidx Rs3 := regval_into_reg (mword_of_int n : mword 64)]> P3).
@@ -2671,9 +2680,9 @@ Section ProofConsoleread.
     iEval (rewrite Hpc1a) in "Hpc".
     assert (HP4a2 : P4 !!! Regidx Ra2 = (mword_of_int n : mword 64))
       by (rewrite /P4 upd_ne; [exact HP3a2 | reg_neq]).
-    iPoseProof (cnri_01a with "Ht") as "Hi1a".
     iApply (wp_cmv_s_sconf (mword_of_int (CR + 0x1a)) Rs7 Ra2 P4 (av - 12)%nat true
-              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi1a").
+              ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (cnri_01a with "Ht"). }
     iIntros (CIDp14 Hsp14) "Hcg Hpc". rgall.
     iEval (rewrite HP4a2 w32_zero_add) in "Hcg".
     set (P5 := <[Regidx Rs7 := regval_into_reg (mword_of_int n : mword 64)]> P4).
@@ -2707,9 +2716,9 @@ Section ProofConsoleread.
       rewrite /P3 upd_ne; [| congruence]. rewrite /P2 upd_ne; [| congruence].
       rewrite /P1 upd_ne; [| congruence]. rewrite /P0 upd_ne; [| congruence]. reflexivity. }
     (* ---- +0x1c auipc a0,0x12 ; +0x20 addi a0,a0,284 : a0 := &cons ---- *)
-    iPoseProof (cnri_01c with "Ht") as "Hi1c".
     iApply (wp_auipc_s_sconf (mword_of_int (CR + 0x1c)) Ra0 (mword_of_int 18 : mword 20)
-              P5 (av - 12)%nat true ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi1c").
+              P5 (av - 12)%nat true ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (cnri_01c with "Ht"). }
     iIntros (CIDp15 Hsp15) "Hcg Hpc". rgall.
     set (P6 := <[Regidx Ra0 := regval_into_reg
         (add_vec (mword_of_int (CR + 0x1c) : mword 64)
@@ -2717,9 +2726,9 @@ Section ProofConsoleread.
     assert (Hpc20 : add_vec_int (mword_of_int (CR + 0x1c) : mword 64) 4
                     = mword_of_int (CR + 0x20)) by pcw.
     iEval (rewrite Hpc20) in "Hpc".
-    iPoseProof (cnri_020 with "Ht") as "Hi20".
     iApply (wp_addi4_s_sconf (mword_of_int (CR + 0x20)) Ra0 Ra0 (mword_of_int 300 : mword 12)
-              P6 (av - 12)%nat true ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi20").
+              P6 (av - 12)%nat true ltac:(nz) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (cnri_020 with "Ht"). }
     iIntros (CIDp16 Hsp16) "Hcg Hpc". rgall.
     set (P7 := <[Regidx Ra0 := regval_into_reg
         (add_vec (P6 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 300 : mword 12)))]> P6).
@@ -2729,10 +2738,10 @@ Section ProofConsoleread.
                     = mword_of_int (CR + 0x24)) by pcw.
     iEval (rewrite Hpc24) in "Hpc".
     (* ---- +0x24 jal ra,acquire ---- *)
-    iPoseProof (cnri_024 with "Ht") as "Hi24".
     iApply (wp_jal_s_sconf (mword_of_int (CR + 0x24)) Rra (mword_of_int 2590 : mword 21)
               P7 (av - 12)%nat true ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
-              with "Hcg Hpc Hi24").
+              with "Hcg Hpc []").
+    { iApply (cnri_024 with "Ht"). }
     iIntros (CIDp17 Hsp17) "Hcg Hpc". rgall.
     set (P8 := <[Regidx Rra := regval_into_reg
         (add_vec_int (mword_of_int (CR + 0x24) : mword 64) 4)]> P7).
@@ -2765,10 +2774,10 @@ Section ProofConsoleread.
                     = (mword_of_int (CR + 0x28) : mword 64)) by pcw.
     iEval (rewrite Hpc28) in "Hpc".
     (* ---- +0x28/+0x2c: s1 := &cons ; +0x30/+0x34: s2 := &cons.r ---- *)
-    iPoseProof (cnri_028 with "Ht") as "Hi28".
     iApply (wp_auipc_s_sconf (mword_of_int (CR + 0x28)) Rs1 (mword_of_int 18 : mword 20)
               maq (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(rdok)
-              with "Hcg Hpc Hi28").
+              with "Hcg Hpc []").
+    { iApply (cnri_028 with "Ht"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (A1 := <[Regidx Rs1 := regval_into_reg
         (add_vec (mword_of_int (CR + 0x28) : mword 64)
@@ -2776,10 +2785,10 @@ Section ProofConsoleread.
     assert (Hpc2c : add_vec_int (mword_of_int (CR + 0x28) : mword 64) 4
                     = mword_of_int (CR + 0x2c)) by pcw.
     iEval (rewrite Hpc2c) in "Hpc".
-    iPoseProof (cnri_02c with "Ht") as "Hi2c".
     iApply (wp_addi4_s_sconf (mword_of_int (CR + 0x2c)) Rs1 Rs1 (mword_of_int 288 : mword 12)
               A1 (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(rdok)
-              with "Hcg Hpc Hi2c").
+              with "Hcg Hpc []").
+    { iApply (cnri_02c with "Ht"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (A2 := <[Regidx Rs1 := regval_into_reg
         (add_vec (A1 !!! Regidx Rs1) (sign_extend' 64 (mword_of_int 288 : mword 12)))]> A1).
@@ -2788,10 +2797,10 @@ Section ProofConsoleread.
     assert (Hpc30 : add_vec_int (mword_of_int (CR + 0x2c) : mword 64) 4
                     = mword_of_int (CR + 0x30)) by pcw.
     iEval (rewrite Hpc30) in "Hpc".
-    iPoseProof (cnri_030 with "Ht") as "Hi30".
     iApply (wp_auipc_s_sconf (mword_of_int (CR + 0x30)) Rs2 (mword_of_int 18 : mword 20)
               A2 (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(rdok)
-              with "Hcg Hpc Hi30").
+              with "Hcg Hpc []").
+    { iApply (cnri_030 with "Ht"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (A3 := <[Regidx Rs2 := regval_into_reg
         (add_vec (mword_of_int (CR + 0x30) : mword 64)
@@ -2799,10 +2808,10 @@ Section ProofConsoleread.
     assert (Hpc34 : add_vec_int (mword_of_int (CR + 0x30) : mword 64) 4
                     = mword_of_int (CR + 0x34)) by pcw.
     iEval (rewrite Hpc34) in "Hpc".
-    iPoseProof (cnri_034 with "Ht") as "Hi34".
     iApply (wp_addi4_s_sconf (mword_of_int (CR + 0x34)) Rs2 Rs2 (mword_of_int 432 : mword 12)
               A3 (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(rdok)
-              with "Hcg Hpc Hi34").
+              with "Hcg Hpc []").
+    { iApply (cnri_034 with "Ht"). }
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (A4 := <[Regidx Rs2 := regval_into_reg
         (add_vec (A3 !!! Regidx Rs2) (sign_extend' 64 (mword_of_int 432 : mword 12)))]> A3).

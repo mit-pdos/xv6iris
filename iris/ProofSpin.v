@@ -143,7 +143,6 @@ Qed.
     iRevert "Hmm Hpmpc Hpc Hfile".
     iLöb as "IH".
     iIntros "Hmm Hpmpc Hpc Hfile".
-    iPoseProof (spin_instr with "Htext") as "Hinstr".
     (* keep half the bundle: [jump_to] reads misa (persistent) and the leaf
        needs cur_privilege for [swp_execute_JAL_zreg]'s footprint *)
     iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".
@@ -159,8 +158,9 @@ Qed.
               (mmode_config (DfracOwn (q/2)) ∗
                pmpcfg_n ↦ᵣ{DfracOwn (q/2)} pmpcfg0)%I
               Hpmp Hspin_static
-              with "Hmm_wp Hpmpc_wp Hpc Hfile Hinstr
+              with "Hmm_wp Hpmpc_wp Hpc Hfile []
                     [Hhs_k Hpriv_k Hmst_k Hpmpc_k] [IH]").
+    { iApply (spin_instr with "Htext"). }
     - iIntros "Hf HPC HnPC".
       change zreg with (Regidx cli_rs1).
       iApply (swp_mono with "[Hhs_k Hmst_k Hpmpc_k] [Hf HPC HnPC Hpriv_k]");

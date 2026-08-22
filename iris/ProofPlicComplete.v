@@ -123,22 +123,6 @@ Section ProofPlicComplete.
     set (R1 := <[Regidx csp_rs1 := regval_into_reg sp']> m0).
     set (R2 := <[Regidx s0_idx := regval_into_reg (add_vec (R1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm_s0)))]> R1).
     iIntros "Hcg #Htext Hpc #Hdinv Hcont".
-    iPoseProof (pci_00 with "Htext") as "Hi00".
-    iPoseProof (pci_02 with "Htext") as "Hi02".
-    iPoseProof (pci_04 with "Htext") as "Hi04".
-    iPoseProof (pci_06 with "Htext") as "Hi06".
-    iPoseProof (pci_08 with "Htext") as "Hi08".
-    iPoseProof (pci_0a with "Htext") as "Hi0a".
-    iPoseProof (pci_0c with "Htext") as "Hi0c".
-    iPoseProof (pci_10 with "Htext") as "Hi10".
-    iPoseProof (pci_14 with "Htext") as "Hi14".
-    iPoseProof (pci_18 with "Htext") as "Hi18".
-    iPoseProof (pci_1a with "Htext") as "Hi1a".
-    iPoseProof (pci_1c with "Htext") as "Hi1c".
-    iPoseProof (pci_1e with "Htext") as "Hi1e".
-    iPoseProof (pci_20 with "Htext") as "Hi20".
-    iPoseProof (pci_22 with "Htext") as "Hi22".
-    iPoseProof (pci_24 with "Htext") as "Hi24".
     assert (Hn4 : (4 <= n)%nat) by lia.
     assert (Hcsp1 : R1 !!! Regidx csp_rs1 = sp') by (apply upd_eq).
     assert (Hpush : add_vec (m0 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_entry))
@@ -146,7 +130,8 @@ Section ProofPlicComplete.
     { unfold pa_stk, add_vec_int, imm_entry. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     (* ---- 0x00: c.addi sp,-32 -- the frame push (k := 4) ---- *)
     iApply (wp_caddi_sp_push_s_sconf pcE imm_entry m0 n 4 false Hn4 Hpush
-              with "Hcg Hpc Hi00").
+              with "Hcg Hpc []").
+    { iApply (pci_00 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hframe Hpc".
     assert (Hpp02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (KernelSyms.plic_complete + 0x02)) by (apply bv_eq; vm_compute; reflexivity).
@@ -173,21 +158,24 @@ Section ProofPlicComplete.
     iEval (rewrite -Hb3) in "Hr8".
     (* ---- 0x02: c.sdsp ra,24(sp) ---- *)
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.plic_complete + 0x02)) (mword_of_int 3 : mword 6) ra_idx R1 (n - 4)%nat vr24 false
-              with "Hcg Hpc Hi02 Hr24").
+              with "Hcg Hpc [] Hr24").
+    { iApply (pci_02 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc Hr24".
     assert (Hpp04 : add_vec_int (mword_of_int (KernelSyms.plic_complete + 0x02) : mword 64) 2 = mword_of_int (KernelSyms.plic_complete + 0x04)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp04) in "Hpc".
     (* ---- 0x04: c.sdsp s0,16(sp) ---- *)
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.plic_complete + 0x04)) (mword_of_int 2 : mword 6) s0_idx R1 (n - 4)%nat vr16 false
-              with "Hcg Hpc Hi04 Hr16").
+              with "Hcg Hpc [] Hr16").
+    { iApply (pci_04 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc Hr16".
     assert (Hpp06 : add_vec_int (mword_of_int (KernelSyms.plic_complete + 0x04) : mword 64) 2 = mword_of_int (KernelSyms.plic_complete + 0x06)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp06) in "Hpc".
     (* ---- 0x06: c.sdsp s1,8(sp) ---- *)
     iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.plic_complete + 0x06)) (mword_of_int 1 : mword 6) s1_idx R1 (n - 4)%nat vr8 false
-              with "Hcg Hpc Hi06 Hr8").
+              with "Hcg Hpc [] Hr8").
+    { iApply (pci_06 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc Hr8".
     assert (Hpp08 : add_vec_int (mword_of_int (KernelSyms.plic_complete + 0x06) : mword 64) 2 = mword_of_int (KernelSyms.plic_complete + 0x08)) by (apply bv_eq; vm_compute; reflexivity).
@@ -195,7 +183,8 @@ Section ProofPlicComplete.
     (* ---- 0x08: c.addi4spn s0,sp,32 ---- *)
     iApply (wp_caddi4spn_s_sconf (mword_of_int (KernelSyms.plic_complete + 0x08)) (Cregidx (mword_of_int 0)) nzimm_s0 s0_idx R1 (n - 4)%nat false
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi08").
+              with "Hcg Hpc []").
+    { iApply (pci_08 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     assert (Hpp0a : add_vec_int (mword_of_int (KernelSyms.plic_complete + 0x08) : mword 64) 2 = mword_of_int (KernelSyms.plic_complete + 0x0a)) by (apply bv_eq; vm_compute; reflexivity).
@@ -204,7 +193,8 @@ Section ProofPlicComplete.
     (* ---- 0x0a: c.mv s1,a0 ---- *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.plic_complete + 0x0a)) s1_idx a0_idx R2 (n - 4)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi0a").
+              with "Hcg Hpc []").
+    { iApply (pci_0a with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     assert (Hpp0c : add_vec_int (mword_of_int (KernelSyms.plic_complete + 0x0a) : mword 64) 2 = mword_of_int (KernelSyms.plic_complete + 0x0c)) by (apply bv_eq; vm_compute; reflexivity).
@@ -222,7 +212,8 @@ Section ProofPlicComplete.
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(lia)
-              with "Hcg Htext Hpc Hi0c").
+              with "Hcg Htext Hpc []").
+    { iApply (pci_0c with "Htext"). }
     iIntros (mo) "Hcg Hpc %Hmo".
     destruct Hmo as [Hmo_cs Hmo_a0].
     iEval (rewrite upd_eq) in "Hpc".
@@ -248,7 +239,8 @@ Section ProofPlicComplete.
               (mword_of_int 13 : mword 5) (ph_shl cid_word 13) mo (n - 4)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(rgne; rewrite Hmoa0; reflexivity)
-              with "Hcg Hpc Hi10").
+              with "Hcg Hpc []").
+    { iApply (pci_10 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     assert (Hpp14 : add_vec_int (mword_of_int (KernelSyms.plic_complete + 0x10) : mword 64) 4 = mword_of_int (KernelSyms.plic_complete + 0x14)) by (apply bv_eq; vm_compute; reflexivity).
@@ -259,7 +251,8 @@ Section ProofPlicComplete.
               (mword_of_int 0xc201 : mword 20) (mword_of_int 0x0c201000 : mword 64) N2 (n - 4)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(apply bv_eq; vm_compute; reflexivity)
-              with "Hcg Hpc Hi14").
+              with "Hcg Hpc []").
+    { iApply (pci_14 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     assert (Hpp18 : add_vec_int (mword_of_int (KernelSyms.plic_complete + 0x14) : mword 64) 4 = mword_of_int (KernelSyms.plic_complete + 0x18)) by (apply bv_eq; vm_compute; reflexivity).
@@ -268,7 +261,8 @@ Section ProofPlicComplete.
     (* ---- 0x18: c.add a5,a5,a4 ---- *)
     iApply (wp_cadd_s_sconf (mword_of_int (KernelSyms.plic_complete + 0x18)) a5_idx a4_idx N3 (n - 4)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi18").
+              with "Hcg Hpc []").
+    { iApply (pci_18 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     assert (Hpp1a : add_vec_int (mword_of_int (KernelSyms.plic_complete + 0x18) : mword 64) 2 = mword_of_int (KernelSyms.plic_complete + 0x1a)) by (apply bv_eq; vm_compute; reflexivity).
@@ -291,7 +285,8 @@ Section ProofPlicComplete.
               ltac:(rewrite HN4a5; intros pq Hpq; eexists; split;
                     [ exact (ph_sclaim_write _ pq _ Hhart)
                     | apply plic_ok_complete; exact Hpq ])
-              with "Hcg Hpc Hi1a Hdinv").
+              with "Hcg Hpc [] Hdinv").
+    { iApply (pci_1a with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     assert (Hpp1c : add_vec_int (mword_of_int (KernelSyms.plic_complete + 0x1a) : mword 64) 2 = mword_of_int (KernelSyms.plic_complete + 0x1c)) by (apply bv_eq; vm_compute; reflexivity).
@@ -317,7 +312,8 @@ Section ProofPlicComplete.
     (* ---- 0x1c: c.ldsp ra,24(sp) ---- *)
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.plic_complete + 0x1c)) (mword_of_int 3 : mword 6) ra_idx N4 (n - 4)%nat ra0 false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi1c Hr24").
+              with "Hcg Hpc [] Hr24").
+    { iApply (pci_1c with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc Hr24".
     assert (Hpp1e : add_vec_int (mword_of_int (KernelSyms.plic_complete + 0x1c) : mword 64) 2 = mword_of_int (KernelSyms.plic_complete + 0x1e)) by (apply bv_eq; vm_compute; reflexivity).
@@ -329,7 +325,8 @@ Section ProofPlicComplete.
     (* ---- 0x1e: c.ldsp s0,16(sp) ---- *)
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.plic_complete + 0x1e)) (mword_of_int 2 : mword 6) s0_idx N5 (n - 4)%nat s00 false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi1e Hr16").
+              with "Hcg Hpc [] Hr16").
+    { iApply (pci_1e with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc Hr16".
     assert (Hpp20 : add_vec_int (mword_of_int (KernelSyms.plic_complete + 0x1e) : mword 64) 2 = mword_of_int (KernelSyms.plic_complete + 0x20)) by (apply bv_eq; vm_compute; reflexivity).
@@ -341,7 +338,8 @@ Section ProofPlicComplete.
     (* ---- 0x20: c.ldsp s1,8(sp) ---- *)
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.plic_complete + 0x20)) (mword_of_int 1 : mword 6) s1_idx N6 (n - 4)%nat s10 false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi20 Hr8").
+              with "Hcg Hpc [] Hr8").
+    { iApply (pci_20 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc Hr8".
     assert (Hpp22 : add_vec_int (mword_of_int (KernelSyms.plic_complete + 0x20) : mword 64) 2 = mword_of_int (KernelSyms.plic_complete + 0x22)) by (apply bv_eq; vm_compute; reflexivity).
@@ -365,7 +363,8 @@ Section ProofPlicComplete.
     iEval (rewrite -Hwv) in "Hframe4".
     iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (KernelSyms.plic_complete + 0x22)) (mword_of_int 2 : mword 6) N7
               (n - 4)%nat 4 false Hpop
-              with "Hcg Hpc Hi22 Hframe4").
+              with "Hcg Hpc [] Hframe4").
+    { iApply (pci_22 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     assert (Hnk : ((n - 4) + 4)%nat = n) by lia.
@@ -379,7 +378,8 @@ Section ProofPlicComplete.
       unfold N5. rewrite upd_eq. reflexivity. }
     iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.plic_complete + 0x24)) ra_idx N8 n false
               ltac:(vm_compute; discriminate)
-              with "Hcg Hpc Hi24").
+              with "Hcg Hpc []").
+    { iApply (pci_24 with "Htext"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     assert (Hra_final : ret_pc (rget N8 ra_idx) = ret_tgt)
