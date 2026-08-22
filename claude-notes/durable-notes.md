@@ -81,7 +81,7 @@ file, and delete the line when the file goes.
 - Working dir: `/shared/xv6rocq/iris`.
 - Single file: `coqc -R . xv6iris -R ../model-xv6iris Riscv -R ../kernel-rocq Kernel -w -notation-overridden <file>.v`
 - Full build: `make -f CoqMakefile -j16` (CoqMakefile auto-regenerates from `_CoqProject`; coqdep decides order).
-- ALWAYS grep the build log for `Error` — `make …; echo $?` masks make's exit via the echo.
+- ALWAYS grep the build log for `Error` — `make …; echo $?` masks make's exit via the echo. Grep for PLAIN `Error`: the `File "…":`/`Error:` pair spans two lines, so anchored patterns like `^File.*Error` miss real failures.
 - **PICK `-j` BY RAM, NOT BY CORES.** A `Code*.v` worker peaks near **2 GB** and the `Code*` band runs many at once, so `-j` above `RAM_GB / 2` gets workers OOM-killed — which make reports as **`Error 137`** with no Coq error at all, on whichever targets happened to be in flight. Re-derive the bound on the machine you are on; the `-j16`/`-j32` figures elsewhere in these notes are from a large one.
 - Never `git add -A` from a parent dir (sweeps sibling untracked trees `coq-sail-stdpp*/`, `lean/`, `rocq/`, `sail-riscv/`); use `git add -A .` from `iris/`.
 - The build's shape (critical-path bound, where the CPU goes, what does and does not move it) is in [`optimization.md`](optimization.md) §"Build shape".

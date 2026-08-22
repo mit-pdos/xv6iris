@@ -43,28 +43,95 @@ learns about the DURABLE bytes comes only through the permits at DMA
 completions (principle 1) or from `P_fs`'s own pure content (opening
 `crashN` in any fupd).
 
-## 1½. STATE AT THE THIRD CHECKPOINT (A+B+D1+D2 landed; ruling 2 issued)
+## 1½. STATE AT THE FOURTH CHECKPOINT (handoff point)
 
-**Stages A and B are DONE and committed** (8fc5a036, 37de0fef;
-tree green on the VM, `make audit-only` at the 8-axiom baseline).
-**D1+D2 are DONE at the log layer** (65ca41d7): general `initlog` +
-`install_trans`, the L-moving recovering arm. **Ruling 2 (below) supersedes
-the L-moving shape** — stage H rebuilds the recovering arms as
-ghost-no-ops — but the landed general specs, the `Bh` home-half plumbing,
-the `printk_gen_contract` premise and the custody strip all survive; only
-the `it_rec_L` movement and the recovering post's L-case are replaced.
+Everything below is on `main` and VM-green with `make audit-only` at the
+8-entry baseline after every commit. Landed, in order:
 
-**The old stage C was BLOCKED on an honest wall, now resolved by ruling 2.**
-B4's claim ("`fsimg_wf`-minus-log-clean is permit-invariant because no
-permit writes block 1") was WRONG: W3–W9 and `fs_region_wf` are content
-sweeps over exactly the blocks `fs_commit_permit` moves. Making them a
-`P_fs` conjunct means proving every committed batch preserves FS-level
-consistency — that campaign is now stages F+G below, sized by the
-2026-08-22 tree survey: 9 `log_write` call sites in 8 functions (all
-already stating their written content abstractly), 12 `begin_op..end_op`
-spans with 26 `end_op` exit arms, and ZERO image-level update lemmas in
-`FsImg.v` (the missing join). Old stages C and D are re-cut as stages E–I
-below; `Himg` is deleted in stage I, last.
+- **Stages A, B, D1, D2** (see the stage sections): the fixed-gname
+  durable disk, `hdr_wf`, general `initlog`/`install_trans` at the log
+  layer (the L-moving recovering arms — superseded in design by ruling
+  2.4, rebuilt at stage H2).
+- **Stage E complete** (E1/E2/E2'/E3): the widened mirror (`lm_view`,
+  one total block view pinned pointwise on the durable extent — NOT
+  total on all of Z: `P_fs_rec_agree` forces the scoping), the
+  `P_wf` conjunct riding `fs_rec_wf` (`FsWf.fs_durable_wf`, placeholder
+  body, gate lemma `fs_durable_wf_placeholder` — every use site is the
+  switch-on rework list), and the value-chained permit primitives
+  (`fs_logfill_permit_v`, `fs_install_permit_v`,
+  `fs_commit_permit_named` — concludes at the NAMED committed view,
+  takes the client preservation premise, receipt AT it —
+  `fs_clear_permit_keep` — preserves `fr_D` off the chained caught-up
+  fact). The at-form permits remain the consumers' interface until G3.
+- **Stage F1**: `fs_durable_wf_body` is real (FsWf.v), with the
+  reachable-dir ticket W9, the orphans-empty clause, `fs_inodes_dwf`
+  (link floor removed — orphans), W6 scoped to reachable dirs, the
+  agreement suite, `fs_links_eq` + its image check (22.3 s), and the
+  mkfs discharge `FsWfImg.fsimg_durable_wf`.
+- **Stage F2, 8/8 pending merge**: seven semantic-effect update lemmas
+  landed (`FsEffBase.v` + one file per effect — the one-file-per-effect
+  split is an OWNER RULING, keep it), preconditions as discovered (see
+  the F2 entry: mkdir fuses the dots block; unlink-dir needs
+  `nlink i = 1` and `..` pinned to the parent; free_inode fuses
+  trunc+bfree+type:=0; alloc splits direct/indirect-entry arms). The
+  EIGHTH effect (fused indirect-block allocation at `fbn = 12`) is IN
+  FLIGHT on an agent worktree branch (see "In flight" below).
+- **Stage H0**: the adequacy pure-projection hook
+  (`Ppure`/`Hproj` on `wp_power_loop` + `riscv_power_adequacy`,
+  `FsCrash.P_fs_project`, `SystemAdequacy.fs_boot_pure`) — the channel
+  that stage I uses to delete `Himg`. `xv6_boot_era` receives the
+  proven per-era fact and does not use it yet. NOTE: the projected
+  payload names `fs_durable_wf` (the placeholder), so it strengthens BY
+  NAME at the switch-on with no re-plumbing.
+
+**In flight at handoff (Opus worktree agents; when one finishes,
+review its report against the spec in this file, cherry-pick its
+worktree-branch commits onto main linearly, run one combined VM build +
+audit, push):**
+- branch `worktree-agent-aed3d383025baf0eb`: G1-impl (`log_state`
+  fusion + row (b) + `op_pending` + the `fs_links_eq` boot threading;
+  spec = the G1-impl item; row (a) EXCLUDED by staging; premise-debt,
+  if any, must be a named carrier with its discharger recorded).
+
+**Next steps, in order (all specs live in this file):**
+1. **FsEff build-performance pass FIRST** (owner's ruling): the F2
+   files are slow to build and every later stage iterates on them.
+   Proof-internal optimization only (statements identical), per
+   optimization.md's rules; measure before/after per file. Only THEN:
+2. **Effect 8** (`eff_alloc_ind_block`, spec = the F2 entry's deferral
+   note) on the optimized base.
+3. Merge the G1-impl branch (above) when it reports.
+4. **G2**: the per-op preservation lemmas, STANDALONE (pure statements
+   composing the F2 effects per op; no log_state dependency; fully
+   parallelizable — one Opus agent per op batch). The 12 ops and their
+   26 exit arms are enumerated in the 2026-08-22 survey (§Stage G);
+   each op = a composition of effects (e.g. sys_mkdir =
+   eff_create_dir_entry; filewrite = eff_alloc_file_block* +
+   eff_write_file_data* (+ eff_alloc_ind_block at the boundary);
+   sys_unlink = eff_unlink_entry (+ trunc/free on the nlink=0 path)).
+5. **The row-(a) flip + G3** (one coordinated sweep): add row (a) to
+   `log_state`, wire the G2 lemmas into the 26 arms, re-point
+   `ProofEndOp` at the value-chained primitives (threading the chained
+   `M` through write_log/commit/installs/clear — this discharges any
+   G1-impl premise-debt), `SpecEndOp` gains the client fupd.
+6. **H1–H3**: the boot re-founding (mint at `D` off `fs_boot_pure`,
+   dirty-at-boot blocks, ghost-no-op recovery arms replacing D1/D2's
+   L-moving ones, orphan routing to ireclaim, D3's clean-header
+   deletion). H0's channel is already there.
+7. **The switch-on**: `fs_durable_wf := fs_durable_wf_body`, delete
+   `fs_durable_wf_placeholder`; its use sites (grep) are exactly the
+   rework list; E4's image discharge closes via `FsWfImg`.
+8. **Stage I**: delete `Himg`/`fs_boot_image_eras`/
+   `fsimg_at_every_era`; adequacy assumes only era 0's `fs.img`;
+   audit unchanged.
+
+**Working rules that proved out (keep):** design on the orchestrator,
+focused execution on Opus agents with pinned specs; agent worktrees for
+parallel lanes (run-on-gcp mirrors $PWD, so each worktree gets its own
+VM mirror — no build collisions); linearize agent merge commits
+(reset + cherry-pick) before pushing; verify the MERGED tree on the VM
+before every push to main; grep build logs for plain `Error` (the
+`File …`/`Error:` pair spans two lines — anchored patterns miss it).
 
 ## 1¾. Ruling 2 (owner, 2026-08-22): fr_D is the interface; recovery is logically invisible
 
