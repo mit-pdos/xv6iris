@@ -304,13 +304,25 @@ list.
       fs_links_eq + fs_region_wf + parse + cov ⊇ [1, size)` — E4
       consumes it (`FsWfImg.v` is new: `FsCrash` Require-Exports `FsWf`,
       so the `fs_restrict`-level statement cannot live in `FsWf.v`).
-- [ ] **F2.** The five update lemmas, one per written-block kind:
-      bitmap set/clear (`bitmap_bytes`), dinode-at-slot
-      (`diblk_bytes` insert, alloc/update/free arms), dirent
-      write/zero (writei splice on a dir block), file/indirect data
-      (splice + `ind_bytes` insert), fresh-block zero. Each:
-      `fs_durable_wf P -> <side conditions> -> fs_durable_wf (<[b := bytes]> P)`.
-      The side conditions are what stage G threads.
+- [ ] **F2.** The update lemmas — PER SEMANTIC EFFECT, not per block
+      (corrected 2026-08-22): a per-block lemma cannot preserve the
+      invariant (a bitmap bit set before the inode points at the block
+      IS the mid-transaction inconsistency), and under G1 the abstract
+      view moves in per-op net effects anyway. The vocabulary, each a
+      multi-block update on a view `P` preserving `fs_durable_wf_view`
+      under its preconditions:
+      `alloc_file_block (i, fbn, fresh)` (bitmap bit + inode
+      addrs/indirect + zeroed data), `write_file_data (i, off, bs)`
+      (data splice + size), `create_entry (d, name, i, ty)` (dirent +
+      fresh dinode, + parent nlink and dots for dirs),
+      `link_entry (d, name, i)` (dirent + nlink++),
+      `unlink_entry (d, k, i)` (zeroed dirent + nlink--, + parent
+      nlink-- for dirs; target may become an orphan — the arm F1's
+      clauses admit), `trunc (i)` (addrs/size zeroed + bfree bits),
+      `free_inode (i)` (type := 0; needs orphan + empty). The 12 ops
+      are compositions of these; F1's agreement suite localizes each
+      proof to its footprint. Side conditions are what stage G threads
+      from the ops' carried postconditions.
 
 ## 6. Stage G — the op sweep: every transaction preserves `fs_durable_wf`
 
