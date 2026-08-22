@@ -496,16 +496,11 @@ Section ProofFilereadParts.
   Proof.
     intros HK Hsp0 Hra0 Hs00 Hs20 Hmtsp Hmts2 Hthr.
     iIntros "Hcg #Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hcont".
-    iPoseProof (fri_5e with "Htext") as "Hi5e".
-    iPoseProof (fri_60 with "Htext") as "Hi60".
-    iPoseProof (fri_62 with "Htext") as "Hi62".
-    iPoseProof (fri_64 with "Htext") as "Hi64".
-    iPoseProof (fri_66 with "Htext") as "Hi66".
-    iPoseProof (fri_68 with "Htext") as "Hi68".
     (* ---- +0x58: c.mv a0,s2 ---- *)
     iApply (wp_cmv_s_sconf (mword_of_int (FR + 0x5e)) Ra0 Rs2 Mt (K - 6)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi5e").
+              with "Hcg Hpc []").
+    { iApply (fri_5e with "Htext"). }
     iIntros (CID1 Hs1) "Hcg Hpc". iEval (rgne) in "Hcg".
     set (T0 := <[Regidx Ra0 := regval_into_reg (add_vec zero_reg (Mt !!! Regidx Rs2))]> Mt).
     assert (HT0a0 : T0 !!! Regidx Ra0 = rv).
@@ -524,7 +519,8 @@ Section ProofFilereadParts.
     iApply (wp_cldsp_s_sconf (mword_of_int (FR + 0x60)) (mword_of_int 5 : mword 6) Rra
               T0 (K - 6)%nat ra0 b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi60 Hb1").
+              with "Hcg Hpc [] Hb1").
+    { iApply (fri_60 with "Htext"). }
     iIntros (CID2 Hs2) "Hcg Hpc Hb1". iEval (rewrite Hpa1) in "Hb1".
     set (T1 := <[Regidx Rra := regval_into_reg ra0]> T0).
     assert (HT1sp : T1 !!! Regidx csp_rs1 = pa_stk sp0 6)
@@ -540,7 +536,8 @@ Section ProofFilereadParts.
     iApply (wp_cldsp_s_sconf (mword_of_int (FR + 0x62)) (mword_of_int 4 : mword 6) Rs0
               T1 (K - 6)%nat s00 b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi62 Hb2").
+              with "Hcg Hpc [] Hb2").
+    { iApply (fri_62 with "Htext"). }
     iIntros (CID3 Hs3) "Hcg Hpc Hb2". iEval (rewrite Hpa2) in "Hb2".
     set (T2 := <[Regidx Rs0 := regval_into_reg s00]> T1).
     assert (HT2sp : T2 !!! Regidx csp_rs1 = pa_stk sp0 6)
@@ -556,7 +553,8 @@ Section ProofFilereadParts.
     iApply (wp_cldsp_s_sconf (mword_of_int (FR + 0x64)) (mword_of_int 2 : mword 6) Rs2
               T2 (K - 6)%nat s20 b
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi64 Hb4").
+              with "Hcg Hpc [] Hb4").
+    { iApply (fri_64 with "Htext"). }
     iIntros (CID4 Hs4) "Hcg Hpc Hb4". iEval (rewrite Hpa4) in "Hb4".
     set (T3 := <[Regidx Rs2 := regval_into_reg s20]> T2).
     assert (HT3sp : T3 !!! Regidx csp_rs1 = pa_stk sp0 6)
@@ -583,7 +581,8 @@ Section ProofFilereadParts.
       done. }
     iEval (rewrite -Hwv) in "Hframe".
     iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (FR + 0x66)) (mword_of_int 3 : mword 6)
-              T3 (K - 6)%nat 6 b Hpop with "Hcg Hpc Hi66 Hframe").
+              T3 (K - 6)%nat 6 b Hpop with "Hcg Hpc [] Hframe").
+    { iApply (fri_66 with "Htext"). }
     iIntros (CID5 Hs5) "Hcg Hpc".
     assert (Hnk : ((K - 6) + 6)%nat = K) by exact (fr_frame_back K HK).
     iEval (rewrite Hnk) in "Hcg".
@@ -603,7 +602,8 @@ Section ProofFilereadParts.
       rewrite /T2 upd_ne; [| vm_compute; discriminate].
       rewrite /T1; apply upd_eq. }
     iApply (wp_cret_s_sconf (mword_of_int (FR + 0x68)) Rra T4 K b
-              ltac:(vm_compute; discriminate) with "Hcg Hpc Hi68").
+              ltac:(vm_compute; discriminate) with "Hcg Hpc []").
+    { iApply (fri_68 with "Htext"). }
     iIntros (CID6 Hs6) "Hcg Hpc".
     iEval (rgne) in "Hpc".
     iEval (rewrite HT4ra) in "Hpc".
