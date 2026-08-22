@@ -270,7 +270,11 @@ outside its layer; stages 1→2→3 are strictly ordered by dependency.
   reverse order is fine too (E restates at widened-mirror granularity).
 - **Stage 3 — FS permits and call sites (Opus).** §2f. Gate: the whole
   tree green; coverage report unchanged (188 proven); `SystemAdequacy`
-  prints the same eight assumptions. ☐
+  prints the same eight assumptions. **BLOCKED on a ruling — §6.** Landed
+  so far: `FsCrash.v`'s two stage-1 mirror lemmas restated for the widened
+  mirror (`log_mirror_ok_upd_pt`, `log_mirror_ok_upd_sector`,
+  `lm_hdr_sector0`, `lm_hdr_upd_sector1`), so the whole tree compiles again
+  except the three WAL call sites. ☐
 - **Stage 4 — notes (Fable).** `crash.md` recorded choice flipped to
   "sector-atomic, any order, reads atomic"; `virtio-driver.md` slot shape;
   `fs-log.md` item 6; `durable-disk.md` cross-reference (stage C of that
@@ -291,3 +295,171 @@ outside its layer; stages 1→2→3 are strictly ordered by dependency.
 - `disk_write_permit_trivial` (`RiscvPtsto.v:759`) must stay the read
   permit's one-liner; if IN keeps a key, `wr_sector None i = None` keeps
   it free.
+
+## 6. STAGE 3'S BLOCKER: one exclusive mirror half cannot serve two
+   per-sector permits, and the fix is a THREE-CELL mirror
+
+**The finding (2026-08-22, measured on the branch).** Stage 3 as written in
+§2f — "each permit gets a sector-indexed sibling" — is NOT implementable on
+top of durable-disk stage E2's mirror. The obstruction is not a proof
+difficulty; it is a resource-algebra impossibility, and it changes the shape
+of E2's ghost. §4's sequencing note ("neither design changes shape") is
+therefore wrong, and this section is the correction.
+
+### 6a. Why it cannot work as planned
+
+A crash permit is a STATELESS view shift: `RiscvPtsto.disk_write_permit`
+(`:678`) takes only `start_auth n`, `⌜n = gd+1⌝`, the lent disk auth and
+`▷ riscv_crash_pred dk`. It receives NOTHING from the client at firing time
+and it runs at mask `∅`, so it can open no invariant. Everything a permit
+needs must therefore be CURRIED INTO IT at creation.
+
+Every WAL permit's fupd must re-establish `FsCrash.fs_arm` at the POST-write
+image, whose `fs_custody` carries `⌜log_mirror_ok M (fs_blocks dk) cov ls⌝` —
+POINTWISE equality on `cov ∪ log_region_set ls`. Every WAL write lands in
+that extent, so **every sector landing moves the mirror**, and moving it is a
+`ghost_var` update needing BOTH halves: the era's (inside custody, available
+in the fupd) and the client's (`log_mirror_half`, curried).
+
+There is exactly ONE client half and there are TWO sector permits, fired in
+an order the device picks. Three closed doors:
+
+- *Fractions cannot work.* If custody holds `c` and permit `i` holds `p_i`,
+  each permit must reach 1 alone, so `c + p_0 = c + p_1 = 1`; but
+  `p_0 + p_1 ≤ 1 - c`, giving `2(1-c) ≤ 1-c`, i.e. `c ≥ 1`. Contradiction.
+- *Chaining cannot work.* The receipt `Qs 0` goes to the CLIENT, not to the
+  other permit; `disk_write_permit` has no input slot, and `Qs i` is fixed at
+  creation while "which sectors have already landed" is not.
+- *Parking the half between the landings cannot work.* The only state both
+  permits can reach at mask `∅` is the crash predicate itself, and putting a
+  per-request torn write into `P_fs` is the mortal-state import that §1
+  rejected the PowerOff knob for.
+
+So the client's mirror ownership MUST be splittable into one independently
+updatable piece per sector. That is a change to E2's ghost, not to the WAL.
+
+### 6b. The fix: the mirror pins exactly what recovery reads
+
+`log_mirror` becomes THREE cells, owned separately:
+
+| cell | contents | who writes it |
+|---|---|---|
+| `lm_hsec` | **sector 0 of the header block** — all of the header anything ever reads (§0) | a header write's sector-0 permit |
+| `lm_sec0` | sector 0 of every OTHER durable block | a slot/home write's sector-0 permit |
+| `lm_sec1` | sector 1 of every OTHER durable block | a slot/home write's sector-1 permit |
+
+`lm_view M b := lm_sec0 M b ++ lm_sec1 M b` (used at non-header blocks only —
+`fs_install`/`fs_restrict`/the caught-up premise never read the header block);
+`lm_hdr M ls := hdr_dec (lm_hsec M)`; and
+
+```
+log_mirror_ok M P cov ls :=
+  lm_hsec M = take 512 (P (log_hdr_bno ls))
+  /\ (forall b, b ∈ cov ∪ log_region_set ls -> b <> log_hdr_bno ls ->
+        lm_view M b = P b)
+```
+
+**The header block's SECOND sector is deliberately outside the picture** —
+nothing reads it (`hdr_dec_sector0`), and that is exactly what makes a header
+write's sector-1 permit resource-free. This is "the commit is atomic" stated
+at the ghost level rather than only at the pure level.
+
+Ownership per write kind then has no conflict — each permit owns what it
+WRITES and shares a read fraction of what it READS:
+
+| permit | owns exclusively | reads (dfrac 1/2) |
+|---|---|---|
+| logfill / install, sector 0 | `lm_sec0` | `lm_hsec` |
+| logfill / install, sector 1 | `lm_sec1` | `lm_hsec` |
+| commit / clear / boot head, sector 0 | `lm_hsec` (+ `lm_sec0`,`lm_sec1` for the `_named`/`_keep` primitives) | — |
+| commit / clear / boot head, sector 1 | — (nothing) | — |
+
+and `Qs 0 ∗ Qs 1` recombines to `log_mirror_half (lm_upd M0 blk bs)` in either
+landing order, which is the receipts lemma §2f asked for.
+
+Mechanics: the three cells want independent updates at one gname, so the era's
+mirror ghost becomes `ghost_map nat (Z -> list (bv 8))` at `era_mirror_name`
+(keys 0/1/2, dfrac elements give the read sharing for free) in place of
+`ghost_var log_mirror`. Custody holds the auth, the client holds the elements;
+`log_mirror_half`/`_at`/`_full` keep their current statements, so the WAL call
+sites' vocabulary does not move.
+
+### 6c. The second obstruction, and its (cheap) fix: the boot swap
+
+`fs_swap_permit` / `fs_recover_permit` install THIS era's custody by retiring
+the previous era's, and that needs the WHOLE mirror variable — so, again, only
+one of the two sector permits could carry it, and the other is stuck when it
+lands first (after a crash the arm is at `c = S g_old`, not at the free
+`c = 0`).
+
+Fix, and it is small: **a dead custody's picture claim retires itself.**
+Replace `fs_custody`'s `⌜log_mirror_ok M (fs_blocks dk) cov ls⌝` by
+
+```
+(mono_nat_lb_own (fcn_start γs) (S (S g'')) ∨ ⌜log_mirror_ok M (fs_blocks dk) cov ls⌝)
+```
+
+— "either a strictly later generation has started, or my picture is right".
+A fresh era mints the left disjunct from the started auth it is handed
+(`n = gen_id + 1 ≥ g'' + 2`) and can then move the arm across ANY image for
+free, so both sector permits of a boot write are resource-free until the swap.
+The LIVE era cannot take that disjunct (`S (S gen_id) ≤ gen_id + 1` is false),
+so `fs_arm_acc` still extracts the real `log_mirror_ok` — nothing weakens for
+the steady state. As a bonus this removes "swap on first use" from
+`fs_recover_permit`.
+
+### 6d. Cost, and what it touches
+
+`RiscvPtsto.v` (the record + the class), `RiscvAdequacy.v` (class, Σ, the era
+mint), `BootShared.v` (two mints), `LogDefs.v` (the mirror props + per-cell
+own/split/combine), `FsCrash.v` (`log_mirror_ok`, `mirror_of`, `fs_custody`,
+`fs_arm_swap`/`_acc`, the eight existing permits, ~12 new sector permits and
+the `fs_sector_permits_of_rec` packaging), then `SpecWriteHead`/
+`SpecInstallTrans`'s generator premises and the WAL proofs. It is a stage-E
+sized job in `FsCrash.v`, not a call-site sweep — **hence the ruling ask
+before it is built**, since it re-shapes durable-disk stage E2/E3's landed
+ghost.
+
+### 6e. RULING (design lane, 2026-08-22): the SEQUENTIAL permit, not the 3-cell mirror
+
+§6b is correct but re-shapes durable-disk E2/E3's just-landed ghost. The
+wall is narrower than that: it is that stage 2 made the two sector permits
+INDEPENDENT resources. Make the request's permit ONE object — a conjunction
+over the sectors still to land, where firing sector `i` RETURNS the residual
+permit for the rest, and the leaf (nothing left) is the completion's identity
+permit delivering `Q`:
+
+```
+Fixpoint sperm gd w (todo : list nat) (Q : iProp) : iProp :=
+  match todo with
+  | []   => disk_write_permit gd None Q
+  | _    => [∧ list] i ∈ todo,
+              disk_write_permit gd (wr_sector w i) (sperm gd w (remove i todo) Q)
+  end.
+disk_seq_permit gd w Q := sperm gd w (seq 0 (wr_nsectors w)) Q     (* reads: the leaf *)
+```
+
+- ANY ORDER is the `∧`: the device picks the branch. The client's mirror
+  half (and anything else a later sector needs — what the commit's sector
+  0 learned, for sector 1) travels DOWN THE CHAIN inside the residual.
+  E2's `log_mirror`/custody/swap are untouched; §6b/§6c are not needed.
+- The permit channel holds ONE entry per request (the key stage 2 already
+  keeps at `None`, `vs_perm`); `vs_perms` is retired. `PermInv` gains a
+  consume-and-REDEPOSIT step (`perm_step_kq`: consume at index
+  `wr_sector w i`, deposit the residual at the same key, new index); the
+  completion arm consumes the leaf exactly as today. `slot_pend_res`'s
+  index is the remaining set (it already carries `ld`).
+- Clients get the OLD shape back: `SpecBwrite`/`SpecVirtioDiskRw` take
+  `disk_seq_permit gen_id w Q` and return `Q` — `Qs` disappears, and the
+  three red call sites change one argument. Stage 2's completion-key
+  "deviation" becomes the uniform design.
+- The FS layer builds `disk_seq_permit` for a 2-sector block from record
+  level shifts in BOTH orders (sector 0 then 1, and 1 then 0), each
+  threading the mirror half through `lm_upd` at the spliced content
+  (`fs_blocks_splice`); the §3 table is the content, unchanged. The
+  commit's sector-0 shift moves `D`; its sector-1 shift (either order) is
+  content-free by `lm_hdr_upd_sector1`.
+- Cost: stage-2-sized rework in our own layer (PermInv, VirtioQueue,
+  VirtioProto, WpUart's two arms, SpecVirtioDiskRw/ProofVirtioDiskRw*,
+  SpecBwrite/ProofBwrite, RiscvPtsto's `disk_sector_permits` → `disk_seq_permit`),
+  then the stage 3 FS work as budgeted.

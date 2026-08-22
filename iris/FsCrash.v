@@ -914,41 +914,70 @@ Proof.
   by apply hdr_dec_sector0_eq.
 Qed.
 
-(* THE MIRROR under a torn header write: sector 1 changes nothing it holds. *)
-Lemma log_mirror_ok_hdr_sector0 (M : log_mirror) (P P' : Z -> list (bv 8))
-    (ls : Z) :
-  ((hdr_dec (P (log_hdr_bno ls))).1 <= LOGBLOCKS)%nat ->
-  take virtio_sector_bytes (P' (log_hdr_bno ls))
-  = take virtio_sector_bytes (P (log_hdr_bno ls)) ->
-  (forall c, c <> log_hdr_bno ls -> P' c = P c) ->
-  log_mirror_ok M P ls -> log_mirror_ok M P' ls.
+(* -- THE MIRROR UNDER A TORN WRITE (sector-atomic-disk.md stage 3) --------
+   The widened mirror ([LogDefs.lm_view], durable-disk stage E2) pins the
+   durable extent BLOCK BY BLOCK, so a write that lands anywhere inside block
+   [blk] -- a whole block, one 512-byte sector, or a torn half of one -- moves
+   exactly that block's row to whatever the disk now holds and leaves every
+   other row alone.  Content-agnostic on purpose: this is what carries a
+   half-written block across the rest of a commit. *)
+Lemma log_mirror_ok_upd_pt (M : log_mirror) (P P' : Z -> list (bv 8))
+    (cov : gset Z) (ls blk : Z) :
+  (forall c, c <> blk -> P' c = P c) ->
+  log_mirror_ok M P cov ls ->
+  log_mirror_ok (lm_upd M blk (P' blk)) P' cov ls.
 Proof.
-  intros Hn Heq Hmiss [Hhdr Hslots]. split.
-  - rewrite Hhdr. symmetry. by apply hdr_dec_sector0_eq.
-  - intros i Hi. rewrite (Hslots i Hi) Hmiss //. apply log_slot_ne_hdr.
+  intros Hmiss Hok b Hb. destruct (decide (b = blk)) as [-> | Hne].
+  - by rewrite lm_upd_view_eq.
+  - rewrite (lm_upd_view_ne _ _ _ _ Hne) (Hmiss b Hne). exact (Hok b Hb).
 Qed.
 
-(* THE SECTOR ANALOGUE OF [log_mirror_ok_out]: a write that lands anywhere
-   inside log SLOT [j] -- a whole block, one sector, or a torn half of one --
-   moves the mirror's picture of that slot to whatever the disk now holds and
-   leaves every other row alone.  Content-agnostic on purpose: the mirror is
-   what carries a half-written slot across the rest of the commit. *)
-Lemma log_mirror_ok_sector (M : log_mirror) (P P' : Z -> list (bv 8))
-    (ls : Z) (j : nat) :
-  (j < LOGBLOCKS)%nat ->
-  (forall c, c <> log_slot_bno ls j -> P' c = P c) ->
-  log_mirror_ok M P ls ->
-  log_mirror_ok (MkLogMirror (lm_hdr M)
-                   (fun k => if decide (k = j)
-                             then P' (log_slot_bno ls j) else lm_slots M k))
-                P' ls.
+(* ...and the form a SECTOR write arrives in: [bs] at byte offset [o] INSIDE
+   block [blk].  [fs_blocks_sub_ne] is the "every other block" half; the
+   written block's new row is left as the disk's own reading of it, because a
+   torn row has no shorter name ([fs_blocks_splice] spells it out when a
+   caller needs the bytes). *)
+Lemma log_mirror_ok_upd_sector (M : log_mirror) (dk : Z -> bv 8)
+    (cov : gset Z) (ls blk : Z) (o : nat) (bs : list (bv 8)) :
+  (o + length bs <= BSIZE)%nat ->
+  log_mirror_ok M (fs_blocks dk) cov ls ->
+  log_mirror_ok
+    (lm_upd M blk
+       (fs_blocks (disk_write dk (blk * Z.of_nat BSIZE + Z.of_nat o) bs) blk))
+    (fs_blocks (disk_write dk (blk * Z.of_nat BSIZE + Z.of_nat o) bs)) cov ls.
 Proof.
-  intros Hj Hmiss [Hhdr Hslots]. split.
-  - cbn [lm_hdr]. rewrite Hhdr Hmiss //.
-    by apply not_eq_sym, log_slot_ne_hdr.
-  - cbn [lm_slots]. intros i Hi. destruct (decide (i = j)) as [->|Hne].
-    + reflexivity.
-    + rewrite (Hslots i Hi) Hmiss //. by apply log_slot_bno_inj.
+  intros Hfit Hok.
+  apply (log_mirror_ok_upd_pt _ (fs_blocks dk)); [| exact Hok].
+  intros c Hc. exact (fs_blocks_sub_ne dk blk c o bs Hfit Hc).
+Qed.
+
+(* THE HEADER's READING IS A SECTOR-0 READING (sector-atomic-disk.md §0): the
+   decoder reads bytes [0, 124) only, so two pictures of the header block that
+   agree on sector 0 carry the same [lm_hdr]. *)
+Lemma lm_hdr_sector0 (M M' : log_mirror) (ls : Z) :
+  ((lm_hdr M ls).1 <= LOGBLOCKS)%nat ->
+  take virtio_sector_bytes (lm_view M' (log_hdr_bno ls))
+  = take virtio_sector_bytes (lm_view M (log_hdr_bno ls)) ->
+  lm_hdr M' ls = lm_hdr M ls.
+Proof. rewrite /lm_hdr. intros Hn Heq. by apply hdr_dec_sector0_eq. Qed.
+
+(* THE COMMIT IS ATOMIC, at the mirror: a write that lands only in SECTOR 1 of
+   the header block moves the picture of that block but NOT its reading, in
+   either landing order. *)
+Lemma lm_hdr_upd_sector1 (M : log_mirror) (dk : Z -> bv 8)
+    (cov : gset Z) (ls : Z) (bs : list (bv 8)) :
+  ((lm_hdr M ls).1 <= LOGBLOCKS)%nat ->
+  length bs = virtio_sector_bytes ->
+  log_mirror_ok M (fs_blocks dk) cov ls ->
+  lm_hdr (lm_upd M (log_hdr_bno ls)
+            (fs_blocks (disk_write dk
+               (log_hdr_bno ls * Z.of_nat BSIZE + virtio_sector_size) bs)
+               (log_hdr_bno ls))) ls
+  = lm_hdr M ls.
+Proof.
+  intros Hn Hlen Hok. apply (lm_hdr_sector0 M _ ls Hn).
+  rewrite lm_upd_view_eq (fs_blocks_sector1 dk (log_hdr_bno ls) bs Hlen).
+  by rewrite (Hok (log_hdr_bno ls) (log_hdr_in_ext cov ls)).
 Qed.
 
 (* ---------------------------------------------------------------------- *)
