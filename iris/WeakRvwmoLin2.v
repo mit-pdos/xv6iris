@@ -593,7 +593,7 @@ Section Trace.
     (k ≤ length L)%nat → length (cd_tr (cand_of G (take k L))) = k.
   Proof. intros Hk. rewrite cand_of_tr length_fmap length_take. lia. Qed.
 
-  Local Lemma tprefix k :
+  Lemma tprefix k :
     srvwmo_consistent (cand_of G (take k L)) ∧
     gtrace_prefix G (cand_of G (take k L)) tev.
   Proof.
@@ -726,7 +726,7 @@ Section Trace.
     rewrite (omap_gmsg_filter G L) tw_list //.
   Qed.
 
-  Local Lemma tfull :
+  Lemma tfull :
     srvwmo_consistent (cand_of G L) ∧
     gtrace_prefix G (cand_of G L) tev.
   Proof.
