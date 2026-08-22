@@ -317,25 +317,48 @@ list.
       fs_links_eq + fs_region_wf + parse + cov ⊇ [1, size)` — E4
       consumes it (`FsWfImg.v` is new: `FsCrash` Require-Exports `FsWf`,
       so the `fs_restrict`-level statement cannot live in `FsWf.v`).
-- [ ] **F2.** The update lemmas — PER SEMANTIC EFFECT, not per block
-      (corrected 2026-08-22): a per-block lemma cannot preserve the
-      invariant (a bitmap bit set before the inode points at the block
-      IS the mid-transaction inconsistency), and under G1 the abstract
-      view moves in per-op net effects anyway. The vocabulary, each a
-      multi-block update on a view `P` preserving `fs_durable_wf_view`
-      under its preconditions:
-      `alloc_file_block (i, fbn, fresh)` (bitmap bit + inode
-      addrs/indirect + zeroed data), `write_file_data (i, off, bs)`
-      (data splice + size), `create_entry (d, name, i, ty)` (dirent +
-      fresh dinode, + parent nlink and dots for dirs),
-      `link_entry (d, name, i)` (dirent + nlink++),
-      `unlink_entry (d, k, i)` (zeroed dirent + nlink--, + parent
-      nlink-- for dirs; target may become an orphan — the arm F1's
-      clauses admit), `trunc (i)` (addrs/size zeroed + bfree bits),
-      `free_inode (i)` (type := 0; needs orphan + empty). The 12 ops
-      are compositions of these; F1's agreement suite localizes each
-      proof to its footprint. Side conditions are what stage G threads
-      from the ops' carried postconditions.
+- [~] **F2.** LANDED except one arm: per-effect files `iris/FsEffBase.v`
+      + `FsEff{WriteData,Trunc,FreeInode,LinkEntry,UnlinkEntry,
+      CreateEntry,AllocBlock}.v`. The base file holds the single-block
+      `fs_upd` combinator, the dinode-block RE-ENCODE effect
+      (`eff_dinode` writes `diblk_bytes (<[islot i := dn']> (fs_iblk …))`
+      so an op postcondition at `diblk_bytes (<[…]> ds)` matches after
+      one `fs_dinode_of_diblk`), the per-inode locality suite, the
+      ticket segment arithmetic (`tick_omap_*`/`tick_mjoin_*`), the
+      `rch` reachability toolkit (edge insert/delete/no-in-edge), and a
+      common-ground section (`Set Default Proof Using "All"`) that each
+      effect file rebinds with a uniform local-notation block. Every
+      effect is a composition of `fs_upd`s from the EXISTING encoders
+      (`bm_bytes` over `fs_bmap_set` of the old block, `dirent_bytes
+      (de_of_name …)` under `fs_splice` = `wi_splice`'s pure body); each
+      `eff_*_wf` is proved in-section and each `eff_*_wfv` wrapper is
+      the G2-facing `fs_durable_wf_view P -> preconds ->
+      fs_durable_wf_view (eff_… P sb …)` form (`sb` pinned by
+      `fs_parse_sb`; the fresh-block premise is the CLEARED BITMAP BIT —
+      balloc's own postcondition — since `u` is existential in the
+      view). STATEMENT DELTAS vs the briefed seven, each forced and
+      recorded at its lemma: (1) create splits into `eff_create_entry
+      (d k name i ty maj min)` (mknod's device pair is part of the
+      written record) and `eff_create_dir_entry (d k name i fb)` — a
+      typed dir without its dots block has NO wf intermediate, so
+      mkdir's arm carries the fresh block, its bit and `dirblk_bytes
+      ([de "." i; de ".." d] ++ zeros)` in one effect; (2) unlink is one
+      definition with file/dir-arm LEMMAS; the dir arm takes
+      `nlink i = 1` (only then is the deleted dirent provably i's ONLY
+      in-edge — the invariant alone admits a dir with two parents) and
+      `".." of i names d` (the invariant does not pin ".." to the
+      parent, and stranding the ".."-target must strand only i);
+      (3) `eff_trunc` takes type ≠ T_DIR (a truncated typed dir breaks
+      W8); the dir reclaim is `eff_free_inode`, trunc+type:=0+bfree
+      FUSED, with `nlink = 0` DERIVED from unreachability;
+      (4) the dirent effects compute the size move as
+      `Z.max sz (16(k+1))` under a reuse-or-append precondition;
+      (5) `eff_alloc_file_block (i fbn fresh sz')` covers the direct
+      and indirect-ENTRY arms with `fbn ≠ 12`; (6) dirent-writing
+      effects take `i < 65536` (the record stores a bv 16; nothing
+      bounds ninodes). LEFT: the fused indirect-block allocation
+      (`fbn = 12`, TWO fresh blocks in one effect — an eighth effect;
+      until it lands G2 cannot cross a file's 12-block boundary).
 
 ## 6. Stage G — the op sweep: every transaction preserves `fs_durable_wf`
 

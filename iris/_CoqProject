@@ -636,6 +636,14 @@ CodeLogWrite.v
 CodeSysSync.v
 LogInv.v
 FsWf.v
+FsEffBase.v
+FsEffWriteData.v
+FsEffTrunc.v
+FsEffFreeInode.v
+FsEffLinkEntry.v
+FsEffUnlinkEntry.v
+FsEffCreateEntry.v
+FsEffAllocBlock.v
 FsCrash.v
 FsBoot.v
 SpecWriteHead.v
