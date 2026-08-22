@@ -217,12 +217,18 @@ header is 124 bytes, inside sector 0 — that is exactly why xv6's commit is
 atomic on such a disk). Whichever campaign lands second restates the other's
 permits at its granularity; neither design changes shape.
 
-- [ ] **E1. The split.** `P_fs := P_disk ∗ P_wf` with `D` a `ghost_var`
-      halved between them (new fixed gname beside `fcn_hist`); `fr_D`
-      leaves the record (the record keeps the history, last element tied
-      to the ghost var). Timelessness of both conjuncts must survive
-      (`P_fs_any_timeless`).
-- [ ] **E2. The widened mirror (ruling 2.2).** `log_mirror` carries the
+- [x] **E1. The split (as landed).** `P_wf`'s content rides `fs_rec_wf`
+      as its fourth conjunct `fs_durable_wf (fr_D r)` — stated about the
+      COMMITTED VIEW only, never about the physical image, which is what
+      makes it invariant under re-indexing and under every
+      view-preserving permit. `FsWf.v` holds the predicate (body = the
+      F1 placeholder `True`; its `fs_durable_wf_placeholder` lemma is
+      the GATE — every use marks a site F1's real body will surface as
+      an error: the re-basing swap/clear/recover arms (stage H), the
+      compat commit (stage G), `P_fs_alloc` (E4)). `P_wf` becomes a
+      separate iProp conjunct of `P_fs` when the contents layer adds
+      durable ghosts.
+- [x] **E2. The widened mirror (ruling 2.2).** `log_mirror` carries the
       era's full durable picture (`RiscvPtsto.v:163` — header + slots +
       homes, or one `Z -> list (bv 8)` view with derived readings);
       `log_mirror_ok` pins it on `cov ∪ log_region_set ls`; every permit
@@ -230,17 +236,27 @@ permits at its granularity; neither design changes shape.
       home entry — they know their bytes; `mirror_of` generalizes).
       `log_mirror_at` exposes as much of the value as its holder needs
       (the header reading stays for the existing call sites).
-- [ ] **E2'. Commit names its state and takes the client fupd.**
-      `fs_commit_permit` concludes `D' =` the batch's logged values over
-      the old view (both named via E2) and is DERIVED from the client's
-      D-update fupd (ruling 2.5); `SpecEndOp` gains that fupd as its one
-      crash-facing premise (trivial until G lands, since `P_wf`'s body
-      starts at `⌜True⌝`). The other permits take no client input and
-      become internal.
-- [ ] **E3. Preserving clear.** `fs_install_permit` returns a per-block
-      caught-up receipt; `fs_clear_permit` consumes the family and
-      keeps `D` via `fs_recovery_clear_keeps` (FsCrash.v:630, today
-      unused). Same for the recovery-side install/boot-head permits.
+- [x] **E2'. The value-chained primitives (as landed).** Four new
+      permits in `FsCrash.v` beside the at-forms:
+      `fs_logfill_permit_v`, `fs_install_permit_v` (Q returns the half
+      at `lm_upd M0 <blk> bs` — the chaining), `fs_commit_permit_named`
+      (pre-image clean per the picture; concludes at the NAMED
+      `D' = fs_install (lm_view M0) ls Ws (restrict …)`; takes the
+      client's preservation premise — pure while `P_wf` is, the fupd
+      when the contents ghosts arrive; receipt AT `D'`), and
+      `fs_clear_permit_keep` (E3). The at-forms stay for the current
+      consumers; **stage G re-points `ProofEndOp` at the primitives**
+      and threads the chained `M` value through `write_log`/commit/
+      installs/clear — `SpecEndOp`'s client-fupd premise enters THEN
+      (one 26-arm sweep, not two).
+- [x] **E3. Preserving clear (as landed).** `fs_clear_permit_keep`:
+      the caught-up premise is pure on the chained mirror value
+      ("home = slot" at every entry, true BY COMPUTATION after the
+      install chain), discharged into `fs_recovery_clear_keeps`; NO
+      history extension, `fs_durable_wf` framed. The re-basing
+      `fs_clear_permit` stays for the current consumer until G adopts
+      the primitives. Recovery-side permits keep re-basing until
+      stage H makes them ghost no-ops.
 - [ ] **E4.** `P_fs_alloc`/`FsAdequacyImg`: establish `⌜fs_durable_wf⌝` at the
       literal image (a `FsImgCheck`-style computation, cheap — the
       sweeps already run there).
@@ -253,7 +269,14 @@ permits at its granularity; neither design changes shape.
 `InodeInv.blkmap_wf_*`). This stage is the join, and it is parallelizable
 and iris-free:
 
-- [ ] **F1.** Define `fs_durable_wf` over a block view: the general
+**F runs decoupled from G/H:** the real sweeps land under their own name
+(`fs_durable_wf_body` in `FsWf.v`), with the update lemmas and the image
+discharge stated about IT; `fs_durable_wf := True` and its placeholder
+lemma survive until the SWITCH-ON (after G3 and H2), which equates the
+two and deletes the placeholder — its use sites are the exact rework
+list.
+
+- [ ] **F1.** Define `fs_durable_wf_body` over a block view: the general
       content sweeps, no log-cleanliness conjunct, closed under the
       five write shapes. Prove `fsimg_wf -> fs_durable_wf` (the image
       discharge for E4). The W9 general form (validated against the
