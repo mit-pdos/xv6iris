@@ -1408,6 +1408,47 @@ touch the lock word" hold at every xv6 site and are discharged from
 the records); not recorded ⇒ (B) gives `seg_pin`, or the message is
 same-hart/unpublished ⇒ `Bad`/no cross edge.
 
+### 4g.1 The static site check, scoped (read-only census, 2026-08-23)
+
+The image has **1611 loads** (388 base + 1223 compressed), 1 AMO (the
+`amoswap.w.aq` in `acquire`), 0 LR/SC, 9 fences.  991 are `sp`-relative
+(spills); 620 are not; zero use `tp` directly (per-cpu addressing is
+the 5-instruction `mv tp; slli 7; auipc cpus; add` idiom).  A linear
+pilot over the 620: 244 ctrl-pinned, 138 dep-into-next-store, 2
+fence, 190 hit a `jal` before any store (needs callee summaries), 32
+ran off a 40-instruction window, and **10 genuinely unpinned before a
+store — all lock-payload or caller-owned** (`fileclose` under
+`ftable.lock`, `kexec`, `kfork`'s trapframe copy, `printk`'s format
+byte): exactly the `WProt` bucket, no bug.  Every racy flag read is
+pinned on its row (`started`/`first` by `fence r,rw` + `beqz`;
+`panicked`/`panicking`, the UART LSR poll, virtio `used->idx` by
+branch and full fence; `ticks`, `p->killed`, `p->state`, `cons.*`
+under their locks; `holding`'s `lk->cpu` pinned in the CALLER — an
+interprocedural summary).  String helpers are dep-pinned on the row
+(`lbu … → sb …`), so no ownership reasoning.  Hardware-walk PTE reads
+are pinned transitively through the data load's address provenance
+(DEC-4), never separately.  THE OWNERSHIP RESIDUE is ~5 idioms, not
+~600 sites: `swtch`'s incoming-context reloads, the trapframe loads off
+`a0` in `forkret`/`usertrap`/`userret`, user-pagetable walks in
+`kexec`/`uvmcopy`/`copyin`/`copyout`/`walk`, and the boot-published
+globals (`kernel_pagetable`, `initproc`, `sb`, the `bcache` bases —
+"written only before `started = 1`").
+
+THE CHECKER'S SHAPE (adopt): two layers mirroring `tools/gen_sites.py`
+/ `iris/KernelSitesDef.v`, Python UNTRUSTED.  (1) `tools/gen_pins.py`:
+intra-function CFG from the same fuelled walk, forward taint over
+`WeakDeps.deps_of_bits`' roles, callee-summary table for the ~30 leaf
+helpers (first store; returns-a-branched-value), emitting per non-`sp`
+load a WITNESS `Stack | PerCpu | Ctrl pc' | Fence pc' | Dep pc' | Prot
+lock | Residue` into `tools/pins.json` + a `pins.md` audit.  (2)
+`iris/KernelPinsDef.v`: `pinnedb fuel pc witness : bool` re-checking
+the witness by `vm_compute` (successor in the same function, role
+membership via `deps_of_bits`), a `forallb` over `text_pcs`, ONE
+reflection lemma `image_pinnedb = true` in `image_disciplineb`'s trust
+shape; per-site lemmas only for the residue.  Then the bridge to
+`l2_claim`: a pinned witness at the site of a row's read yields
+`seg_pin` at the graph level (the row's items carry the same roles).
+
 ## 5. Honest residual risks — OPEN
 
 - **THE K2-KILL'S PRECISE MECHANISM (flagged 2026-08-21):** K2's

@@ -30,10 +30,14 @@ zero-cut finding) — `5cead230`; the two-hart emission witness
    rows emit (`WeakRvwmoAdm`).  Build the `RacyD`-cycle witness (four
    blocks, two per hart — mechanical now) FIRST so the walk is checked
    non-vacuously.
-2. **R-1 `l2_claim` — L2′ proper**: per site class (aq / fenced /
-   branched / data-fed / CS-covered / bad / FETCH — §4f), from the
-   emission (`row_deps`, site records) and the certified configuration.
-   The kernel claim; the largest remaining item.
+2. **R-1 `l2_claim` — L2′ proper**, REDUCED (route-b §4g/§4g.1): (A) the
+   port convention (payload accesses through the `WProt` rules) and
+   (B) the static site check — `tools/gen_pins.py` (untrusted witness
+   generator over the existing `gen_sites.py` walk) + `KernelPinsDef.v`
+   (a `vm_compute` re-checker with one reflection lemma), residue ≈
+   10–40 `WProt` sites + ~5 ownership idioms; then the bridge
+   "pinned witness at the site ⇒ `seg_pin`".  Census: 1611 loads, 620
+   non-`sp`, 10 unpinned-before-store (all lock-payload).
 3. The F-variant's glue mirror; **R6** (the deletion contract, the
    `lb_rfoldfree → lb_ldepfree` items, `WeakCertify` archival,
    `WeakAxiomatic.acq_po`'s narrowing); `wprot_store` width lift;
