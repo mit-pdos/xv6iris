@@ -92,9 +92,15 @@ awk '{for(i=1;i<=NF;i++) if($i=="secs") s+=$(i-1)} END{print s}' F.time.log
 
 ## 3. The traps
 
-- **The `[]` subgoal comes FIRST**, before the continuation. Use a focused
-  `{ … }`, NOT `; [ … | ]`: a call site that already carries a `[Hr40]` pattern
-  later in the string produces three goals, not two, and the brace does not care.
+- **The `[]` subgoal usually comes first, but that is a property of the LEAF,
+  not of the tactic.** Goals come out in pattern order, so a site that already
+  carries an earlier `[]` with its own brace takes the new brace SECOND
+  (`ProofScheduler`, three sites). Worse, a leaf carrying an unresolved PURE
+  premise generates it AHEAD of the instr goal — `wp_andi_s_sconf` does, and the
+  inserted brace then hits the pure goal and dies with *"iStartProof: not a BI
+  assertion"* (`ProofIput`, one site). Both are one-line fixes: swap the braces.
+  Always use a focused `{ … }`, never `; [ … | ]` — a site with a `[Hr40]`
+  pattern later in the string produces three goals, not two.
 - **`[]` splits only the SPATIAL context**, so `#Htext` — and every other
   persistent hypothesis — is still there to close the subgoal with. That is the
   whole reason this works.
@@ -107,27 +113,109 @@ awk '{for(i=1;i<=NF;i++) if($i=="secs") s+=$(i-1)} END{print s}' F.time.log
 - **The conversion must not change the statement.** Only pose lines and
   specialisation patterns move. If the diff touches anything else, the regex
   over-matched.
-- **A `Löb`/`iInduction` body re-derives the fact every iteration.** Still
-  correct, and still expected to win (one `iApply` against a persistent
-  hypothesis per iteration against a smaller `Δ` for the whole body), but it is
-  the one shape where the retrofit is not free. Measure before believing.
-- **Multi-pose lines.** Some files put two `iPoseProof`s on one line; the `(?:…)+`
-  in the delete regex is there for exactly that. Verify with the step-3 grep.
+- **A `Löb`/`iInduction` body is NOT a special case — measured, and the caveat
+  this line used to carry was wrong.** Splitting the `-time` log by the loop
+  body's byte range on three loop files: `ProofScheduler` −56 % in-loop vs −45 %
+  out, `ProofIget` −43 % vs −42 %, `ProofKwait` −26 % vs −30 %. The in-loop and
+  out-of-loop discounts agree everywhere, and the most loop-dominated file
+  discounts MORE inside the body. Re-deriving against `kernel_text` once per
+  iteration is swamped by the `|Δ|` discount. Convert loop files with the same
+  expectations as loop-free ones.
+- **Multi-pose lines.** Some files put two `iPoseProof`s on one line; the
+  converter handles them. `--check`'s `posed a/b` prints distinct hypothesis
+  NAMES over pose LINES, and the two differ whenever a file reposts a name.
+- **A hypothesis name bound to two DIFFERENT lemmas is refused, and this is the
+  trap that actually bit.** Proof-local scopes legitimately reuse a name for a
+  different instruction — `ProofIput` binds `Hi3a` to `ipi_38` early (an
+  off-by-one in the file's own naming) and to `ipi_3a` at line 3822;
+  `ProofKwait` binds `Hie0` to both `kwi_e0` and `kwi_ee`. The first version of
+  the converter resolved these globally, last-pose-wins, and emitted a
+  wrong-but-plausible lemma at the early sites; `--check` called both files
+  CLEAN. It fails LOUD (`iApply: cannot apply (instr …)`, because a mismatched
+  fact cannot unify with the leaf's pc), so nothing false can be proved this
+  way — but two agents lost a compile round to it. `--check` now reports such a
+  name as HAND WORK and the converter refuses the file. **Fourteen files carry
+  the shape**, worst first: `ProofVirtioDiskInit` (one name, `Hi`, bound to 127
+  lemmas), `ProofEitherCopy` (34 names), `ProofPushOff` (16), `ProofSysLinkTails`
+  (8), `ProofSysOpenTails` (7 names, one of them 7 lemmas deep),
+  `ProofSysUnlinkTails` (5), `ProofPipewrite` (5), `ProofNamex` and
+  `ProofNamexTr` (4 each), `ProofAcquiresleep` (3), `ProofWritei` (3),
+  `ProofSysPause` (2), plus `ProofIput` and `ProofKwait`, now converted by hand.
+  Converting those means resolving each site against the NEAREST PRECEDING pose
+  — scope-aware resolution is the obvious next improvement to the tool.
+- **A stray reference need not be a use at all.** `ProofIget`'s lone
+  non-conforming reference was the file-header COMMENT quoting a leaf
+  application. Read the site before assuming it needs a proof change.
 
-## 4. Scoreboard
+## 4. What the sweep measured
 
-215 files pose instruction facts. Read `conf` as the number of conforming call
-sites and `refs` as the total references to posed names; `conf == refs` means the
-script converts the file outright.
+Twenty-two files converted 2026-08-22, each measured with one pristine and one
+converted single-file `coqc -time -async-proofs off` run, back to back on the
+VM.
 
-| state | files |
+| file | sites | wall | `Qed` | `.vo` |
+|---|---|---|---|---|
+| `ProofScheduler` | 57 | 30.1 → 15.4 s (**−49 %**) | 4.76 → 1.81 (−62 %) | −17.5 % |
+| `ProofPipealloc` (reference) | 72 | 47.6 → 25.6 s (−46 %) | 7.68 → 3.02 (−61 %) | −18 % |
+| `ProofIget` | 64 | 53.3 → 31.0 s (−42 %) | 9.67 → 4.54 (−53 %) | −10.9 % |
+| `ProofProcinit` | 63 | 24.0 → 16.8 s (−30 %) | 3.48 → 2.05 (−41 %) | −9.4 % |
+| `ProofKwait` | 99 | 32.0 → 22.8 s (−29 %) | 5.84 → 3.83 (−35 %) | −6.2 % |
+| `ProofInstallTrans` | 76 | 47.6 → 35.0 s (−26 %) | 8.97 → 5.78 (−36 %) | −8.4 % |
+| `ProofIlock` | 59 | 36.6 → 28.1 s (−23 %) | 6.34 → 4.31 (−32 %) | −6.5 % |
+| `ProofUvmalloc` | 79 | 37.6 → 29.3 s (−22 %) | 6.44 → 4.49 (−30 %) | −6.8 % |
+| `ProofSched` | 54 | 30.1 → 24.1 s (−20 %) | 3.25 → 1.81 (−45 %) | −7.5 % |
+| `ProofIupdate` | 44 | 27.7 → 22.0 s (−20 %) | 5.01 → 3.80 (−24 %) | −5.4 % |
+| `ProofBmap` | 75 | 42.1 → 33.9 s (−19 %) | 11.70 → 5.53 (−53 %) | −3.8 % |
+| `ProofBread` | 79 | 24.5 → 19.9 s (−19 %) | 4.52 → 3.51 (−22 %) | −3.4 % |
+| `ProofCopyout` | 94 | 53.6 → 43.7 s (−18 %) | 8.66 → 6.58 (−24 %) | −5.6 % |
+| `ProofCopyinstr` | 90 | 37.4 → 30.6 s (−18 %) | 6.14 → 4.51 (−27 %) | −2.8 % |
+| `ProofWalk` | 61 | 25.2 → 20.8 s (−18 %) | 4.91 → 3.91 (−20 %) | −0.6 % |
+| `ProofEndOp` | 94 | 46.7 → 38.8 s (−17 %) | 8.86 → 6.63 (−25 %) | −3.7 % |
+| `ProofCopyin` | 72 | 40.8 → 34.8 s (−15 %) | 7.17 → 5.81 (−19 %) | −1.9 % |
+| `ProofIput` | 77 | 75.0 → 64.1 s (−15 %) | 16.43 → 13.33 (−19 %) | −2.7 % |
+| `ProofUvmcopy` | 71 | 83.8 → 72.6 s (−13 %) | 12.56 → 10.11 (−20 %) | −9.5 % |
+| `ProofVirtioDiskRwF` | 37 | 46.3 → 42.2 s (−9 %) | 5.92 → 4.90 (−17 %) | −2.9 % |
+
+**The predictor is the LARGEST LIVE POSE BLOCK A LEAF SITS UNDER**, not the
+file's site count, not its length, and not whether the leaf is in a loop. The
+reference file is one whole-function proof carrying all 58 facts through all
+~1700 steps, so it sits at the top; `ProofUvmcopy` has more sites (71) and a
+worse result (−13 %) because its poses split 7+34+31 across three proofs;
+`ProofKwait` has the most sites of all (99) and lands at −29 % because its 90
+poses are nine scoped clusters of 4–24. Sort candidates by biggest block, not
+by `--check`'s site count.
+
+Secondary readings, all consistent across the twenty:
+
+- **`Qed` always improves more than wall** (−17 % to −62 %). `Qed` walks the
+  proof term and the term is what collapses; wall carries elaboration work this
+  discipline does not touch. On several files the post-conversion `Qed` is a
+  small minority of wall (1.8 s of 24 s on `ProofSched`), so ~20 % is near the
+  ceiling for that file shape and further gains need a different lever.
+- **`.vo` shrinks far less than the reference's −18 %** — typically −2 % to
+  −10 %, and `ProofWalk` barely moved. The `.vo` stores the shared DAG, which
+  RULE ONE predicts barely changes; the reference's −18 % is the outlier.
+- **Peak RSS is NOT a reliable benefit.** −30 % on `ProofScheduler` but −5 %,
+  −6 % and +0.2 % on batch 5's three. Memory on the `vm_compute`-heavy files is
+  dominated by something other than `Δ`. Do not advertise it.
+- The `Require` prelude is ~1.0 s in every file and unchanged, so none of the
+  residual is fixed overhead.
+
+## 5. What is left
+
+`tools/instr_subgoal.py --check iris/Proof*.v` is the live scoreboard; run it
+rather than trusting a table here. As of 2026-08-22, 22 files are converted and
+~193 still pose. Three tiers:
+
+| tier | what to do |
 |---|---|
-| landed | `ProofPipealloc` (`baabee94`) |
-| clean (`conf == refs`, no loop) | the bulk — `ProofCreate`, `ProofKexecB3`, `ProofEndOp`, `ProofInstallTrans`, `ProofIput`, `ProofBmap`, `ProofSysChdir`, `ProofCopyinstr`, `ProofIlock`, `ProofCopyout`, `ProofSched`, `ProofIupdate`, `ProofUvmcopy`, `ProofUvmalloc`, `ProofCopyin`, `ProofProcinit`, `ProofBread`, `ProofWalk`, `ProofVirtioDiskRwF`, … |
-| clean but LOOP | `ProofNamex`, `ProofPiperead`, `ProofDirlink`, `ProofKexecC`, `ProofDirlookup`, `ProofIget`, `ProofAllocproc`, `ProofIalloc`, `ProofInitlog`, `ProofScheduler`, `ProofIreclaim`, `ProofKwait`, … |
-| needs hand work (`refs > conf`) | `ProofWritei` (108/198), `ProofVirtioDiskInit` (127/255), `ProofPipewrite`, `ProofReadi`, `ProofSysPipe`, `ProofPrintk`, `ProofFileread`, `ProofEitherCopy`, … |
+| `CLEAN` | the script converts it outright. Prefer files with one big pose block — that is where the win is (§4). |
+| `HAND WORK`, a few names | look at each site: it may be a comment, a leaf with a different hypothesis order, or a pure premise ahead of the instr goal (§3). Usually minutes. |
+| the fourteen ambiguous-name files | the converter refuses them. They need scope-aware resolution — see §3. `ProofVirtioDiskInit` (one name, 127 lemmas) is the extreme case and is also one of the biggest wins available, at 127 poses. |
 
-Regenerate the table with `tools/instr_subgoal.py --check iris/Proof*.v`.
+**The obvious next tool improvement** is resolving each site against the nearest
+preceding pose rather than a global map. That alone unlocks the fourteen, and
+`ProofVirtioDiskInit`, `ProofEitherCopy`, `ProofPushOff` and `ProofWritei` are
+large files with dense pose blocks.
 
-Record each conversion here as it lands: file, `conf` sites, before/after wall,
-before/after `Qed`.
+Record each conversion's numbers in §4 as it lands.

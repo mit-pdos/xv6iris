@@ -43,13 +43,27 @@ SITE = re.compile(r'^([ \t]*)(.*with "Hcg Hpc )(\w+)([^"]*")\)\.$', re.M)
 
 
 def scan(src):
-    """-> (hyp -> lemma, conforming sites, {hyp: stray reference count})"""
-    posed = dict((h, l) for l, h in POSE.findall(src))
+    """-> (hyp -> lemma, conforming sites, {hyp: stray reference count})
+
+    A hypothesis name reused for DIFFERENT lemmas (per-arm reuse: [Hi0] posed
+    from [soi_0b8] in one arm and [soi_10c] in the next) has no single answer,
+    so it is reported as stray rather than resolved to whichever pose came
+    last -- closing a site with the wrong instruction is exactly the mistake
+    this tool must not make.
+    """
+    seen = {}
+    for l, h in POSE.findall(src):
+        seen.setdefault(h, set()).add(l)
+    ambiguous = set(h for h, ls in seen.items() if len(ls) > 1)
+    posed = dict((h, next(iter(ls))) for h, ls in seen.items()
+                 if h not in ambiguous)
     sites = [m for m in SITE.finditer(src) if m.group(3) in posed]
     accounted = {}
     for m in sites:
         accounted[m.group(3)] = accounted.get(m.group(3), 0) + 1
     stray = {}
+    for h in ambiguous:
+        stray[h] = len(seen[h])          # "posed from N different lemmas"
     for h in posed:
         n = len(re.findall(r'(?<![\w])' + re.escape(h) + r'(?![\w])', src))
         n -= sum(1 for _, hh in POSE.findall(src) if hh == h)  # the pose itself
@@ -70,11 +84,14 @@ def convert(src):
     def repl(m):
         indent, pre, hyp, post = m.groups()
         if hyp not in posed:
-            return m.group(0)
+            return m.group(0)          # not an instr fact -- leave it alone
+        nsite[0] += 1
         return (indent + pre + '[]' + post + ').\n'
                 + indent + '{ iApply (' + posed[hyp] + ' with "Htext"). }')
 
-    out, nsite = SITE.subn(repl, out)
+    nsite = [0]
+
+    out = SITE.sub(repl, out)
 
     # The site regex sees the indent of the line the [with "..."] sits on, which
     # for a multi-line iApply is the continuation indent.  Re-indent each brace
@@ -93,7 +110,7 @@ def convert(src):
 
     left = scan(out)
     assert not left[0], 'poses survived: %s' % sorted(left[0])
-    return out, npose, nsite
+    return out, npose, nsite[0]
 
 
 def main():
@@ -108,8 +125,8 @@ def main():
         src = open(f).read()
         posed, sites, stray = scan(src)
         if args.check:
-            print('%-28s posed %3d  sites %3d  %s'
-                  % (f, len(posed), len(sites),
+            print('%-28s posed %3d/%3d  sites %3d  %s'
+                  % (f, len(posed), len(POSE_LINE.findall(src)), len(sites),
                      'CLEAN' if not stray else 'HAND WORK: '
                      + ', '.join('%s x%d' % kv for kv in sorted(stray.items()))))
             if stray:
