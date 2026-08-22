@@ -753,10 +753,9 @@ Section VdrwfP6.
       (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool)
       (sp0 b : Arch.pa) (m : regfile) (wr sector : SailStdpp.Values.mword 64)
       (bno : SailStdpp.Values.mword 32) (bs_buf bs_disk : list (bv 8))
-      (Q : iProp Σ) (Qs : nat -> iProp Σ)
-      (kq : nat * positive) (ks : list (nat * positive)) (lks : gset string) :
+      (Q : iProp Σ)
+      (kq : nat * positive) (lks : gset string) :
     (K_virtio_disk_rw <= K)%nat -> length γs = NPROC ->
-    length ks = wr_nsectors (vdrwd_wr wr (1024 * uint bno)%Z bs_buf) ->
     length bs_buf = 1024%nat -> length bs_disk = 1024%nat ->
     (bv_unsigned sector * 512)%Z = (1024 * uint bno)%Z ->
     (forall k, (k < 1024)%nat -> addr_is_kdata (pa_add (b_data b) k)) ->
@@ -773,10 +772,6 @@ Section VdrwfP6.
        parked payoff carries is at exactly this [kq]. *)
     perm_inv gen_id (dn_perm γd) -∗
     perm_receipt kq.2 Q -∗
-    (* ...and one per 512-byte SECTOR (sector-atomic-disk.md): the claim pins
-       [vs_perms] of our own slot, so the spent tokens the parked payoff
-       carries are at exactly these keys. *)
-    ([∗ list] i ↦ k ∈ ks, perm_receipt k.2 (Qs i)) -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     vdrw_saved (KTR := KT1) sp0 m -∗
@@ -797,18 +792,15 @@ Section VdrwfP6.
         buf_own b bno (mword_of_int 0 : SailStdpp.Values.mword 32)
                 (vdrwd_sldata wr bs_buf bs_disk) -∗
         disk_block γd (uint bno) (vdrwd_sldata wr bs_buf bs_disk) -∗
-        (* THE RECEIPTS: what the client's own view shifts produced -- one
-           per 512-byte sector, at the landing that made those bytes durable,
-           and one at the completion. *)
+        (* THE RECEIPT: what the client's own sequential view shift produced,
+           delivered at the leaf -- the request's completion. *)
         ▷ Q -∗
-        ▷ disk_sector_receipts
-            (vdrwd_wr wr (1024 * uint bno)%Z bs_buf) Qs -∗
         WP (Loop : expr riscv_lang)) -∗
     P5.vdrw_p5_exit CID γk γs j γd pd pav pu K eb sp0 b wr sector bs_buf
-                    bs_disk m kq ks lks.
+                    bs_disk m kq lks.
   Proof.
-    intros HK Hglen Hkslen Hlenbuf Hlendisk Hsec Hbufkd Hsp0m Hbelow.
-    iIntros "#Htext #Hpinv #Hqinv #Hrcpt #Hrcpts #Hgeom #Hlk Hsaved Hbno Hcont".
+    intros HK Hglen Hlenbuf Hlendisk Hsec Hbufkd Hsp0m Hbelow.
+    iIntros "#Htext #Hpinv #Hqinv #Hrcpt #Hgeom #Hlk Hsaved Hbno Hcont".
     rewrite /P5.vdrw_p5_exit.
     iIntros (CIDx Hsx M q np nr fl pk tr fr h m2 t pin)
             "%Hrh %Hok %Hpq %Hpinr %Hal Hcg Hown Htc Hclm Hpc Htok
@@ -850,7 +842,7 @@ Section VdrwfP6.
     assert (Hnflq : q ∉ dom fl)
       by (rewrite Hdfl; exact (vdrwf_below_seq q nr np Hqnr)).
     assert (Hflq : fl !! q = None) by (apply not_elem_of_dom; exact Hnflq).
-    assert (Huq : (fl ∪ pk) !! q = Some (DClaim b (vdrwd_slot kq ks b h wr sector (vdrwd_sldata wr bs_buf bs_disk)) (h, m2, t) pin))
+    assert (Huq : (fl ∪ pk) !! q = Some (DClaim b (vdrwd_slot kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk)) (h, m2, t) pin))
       by (rewrite (lookup_union_r fl pk q Hflq); exact Hpq).
     assert (Htrq : tr !! q = Some (h, m2, t)) by exact (Hcoh q _ Huq).
     destruct (vdrwf_tri_mem h m2 t) as (Hinh & Hinm & Hint).
@@ -878,30 +870,20 @@ Section VdrwfP6.
        to execute before it reaches its continuation, which is why the
        postcondition below is a single [▷ Q]. *)
     iApply fupd_wp.
-    iEval (rewrite /slot_perms_done /slot_sector_done) in "Hperm".
-    iDestruct "Hperm" as "[Hperm Hpsect]".
+    iEval (rewrite /slot_perms_done) in "Hperm".
     iMod (perm_collect gen_id (dn_perm γd) kq.1 kq.2 _ Q ⊤ ltac:(solve_ndisj)
             with "Hqinv Hrcpt Hperm") as "HQ".
-    (* ...and the per-sector receipts, one invariant opening each *)
-    iMod (perm_collect_list_inv gen_id (dn_perm γd) ks
-            (fun i => wr_sector (vs_wr (dc_slot
-                        (DClaim b (vdrwd_slot kq ks b h wr sector
-                                     (vdrwd_sldata wr bs_buf bs_disk))
-                                (h, m2, t) pin))) i)
-            Qs ⊤ ltac:(solve_ndisj)
-            with "Hqinv Hrcpts [Hpsect]") as "HQs".
-    { cbn [dc_slot vs_perms vdrwd_slot rw_slot]. iExact "Hpsect". }
     iModIntro.
-    assert (Hdcb : dc_buf (DClaim b (vdrwd_slot kq ks b h wr sector (vdrwd_sldata wr bs_buf bs_disk)) (h, m2, t) pin) = b) by reflexivity.
-    assert (Hdcs : dc_slot (DClaim b (vdrwd_slot kq ks b h wr sector (vdrwd_sldata wr bs_buf bs_disk)) (h, m2, t) pin) = (vdrwd_slot kq ks b h wr sector (vdrwd_sldata wr bs_buf bs_disk))) by reflexivity.
-    assert (Hvsts : vr_status (vs_req (dc_slot (DClaim b (vdrwd_slot kq ks b h wr sector (vdrwd_sldata wr bs_buf bs_disk)) (h, m2, t) pin))) = d_info_status h)
+    assert (Hdcb : dc_buf (DClaim b (vdrwd_slot kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk)) (h, m2, t) pin) = b) by reflexivity.
+    assert (Hdcs : dc_slot (DClaim b (vdrwd_slot kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk)) (h, m2, t) pin) = (vdrwd_slot kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk))) by reflexivity.
+    assert (Hvsts : vr_status (vs_req (dc_slot (DClaim b (vdrwd_slot kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk)) (h, m2, t) pin))) = d_info_status h)
       by reflexivity.
-    assert (Hvsout : vs_is_out (dc_slot (DClaim b (vdrwd_slot kq ks b h wr sector (vdrwd_sldata wr bs_buf bs_disk)) (h, m2, t) pin)) = vdrwd_out wr) by reflexivity.
-    assert (Hvsbuf : vr_buf (vs_req (dc_slot (DClaim b (vdrwd_slot kq ks b h wr sector (vdrwd_sldata wr bs_buf bs_disk)) (h, m2, t) pin))) = b_data b) by reflexivity.
-    assert (Hslen : vs_len (dc_slot (DClaim b (vdrwd_slot kq ks b h wr sector (vdrwd_sldata wr bs_buf bs_disk)) (h, m2, t) pin)) = 1024%nat) by exact vdrwd_len1024.
-    assert (Hsloff : vs_sector_off (dc_slot (DClaim b (vdrwd_slot kq ks b h wr sector (vdrwd_sldata wr bs_buf bs_disk)) (h, m2, t) pin)) = (1024 * uint bno)%Z).
+    assert (Hvsout : vs_is_out (dc_slot (DClaim b (vdrwd_slot kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk)) (h, m2, t) pin)) = vdrwd_out wr) by reflexivity.
+    assert (Hvsbuf : vr_buf (vs_req (dc_slot (DClaim b (vdrwd_slot kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk)) (h, m2, t) pin))) = b_data b) by reflexivity.
+    assert (Hslen : vs_len (dc_slot (DClaim b (vdrwd_slot kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk)) (h, m2, t) pin)) = 1024%nat) by exact vdrwd_len1024.
+    assert (Hsloff : vs_sector_off (dc_slot (DClaim b (vdrwd_slot kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk)) (h, m2, t) pin)) = (1024 * uint bno)%Z).
     { transitivity (bv_unsigned sector * 512)%Z; [| exact Hsec].
-      exact (vdrwd_slot_off kq ks b h wr sector (vdrwd_sldata wr bs_buf bs_disk)
+      exact (vdrwd_slot_off kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk)
                (bv_unsigned sector) eq_refl). }
     assert (Hbs : bs = vdrwd_sldata wr bs_buf bs_disk)
       by (rewrite Hbsdata; reflexivity).
@@ -917,7 +899,7 @@ Section VdrwfP6.
     { intro Ho. unfold vdrwd_out in Ho. unfold vdrwd_bufwin. rewrite Ho. reflexivity. }
     iEval (rewrite Hdcb) in "Hbdisk".
     iEval (rewrite Hdcs) in "Hinfob".
-    iEval (rewrite (vdrwd_slot_head kq ks b h wr sector
+    iEval (rewrite (vdrwd_slot_head kq b h wr sector
                       (vdrwd_sldata wr bs_buf bs_disk) Hh8)) in "Hinfob".
     iEval (rewrite Hdcb) in "Hinfob".
     iEval (rewrite Hvsts) in "Hstat".
@@ -925,7 +907,7 @@ Section VdrwfP6.
     iEval (rewrite Hvsout) in "Hbufp".
     iEval (rewrite Hvsbuf) in "Hbufp".
     (* ---- the residual pin, split into its fifteen (+1) windows ---- *)
-    assert (Hpinreq : dc_pinr pav q (DClaim b (vdrwd_slot kq ks b h wr sector (vdrwd_sldata wr bs_buf bs_disk)) (h, m2, t) pin)
+    assert (Hpinreq : dc_pinr pav q (DClaim b (vdrwd_slot kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk)) (h, m2, t) pin)
                       = foldr union ∅ (vdrwd_pinr_regions pd b h m2 t wr sector
                                          (vdrwd_bufwin b wr bs_buf))).
     { rewrite /dc_pinr /dc_ring_map. cbn [dc_pin dc_slot].
@@ -1835,8 +1817,7 @@ Section VdrwfP6.
                  with "Hextm") as "Hextm".
     iSpecialize ("Hcont" $! CIDp12 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! R11 with
-              "[%] Hcg Hown Hextc Hextm Hpc [Hbno Hbdisk Hbufm] [Hdbytes] [HQ]
-               [HQs]").
+              "[%] Hcg Hown Hextc Hextm Hpc [Hbno Hbdisk Hbufm] [Hdbytes] [HQ]").
     - exact Hcs.
     - rewrite /buf_own. iFrame "Hbno Hbdisk Hbufm".
       iPureIntro. exact Hlensl.
@@ -1845,9 +1826,6 @@ Section VdrwfP6.
     - (* the receipt.  Whatever laters survived the instruction stream since
          [perm_collect] ran, [▷ Q] is weaker, so this closes either way. *)
       iExact "HQ".
-    - (* ...and the per-sector receipts, re-indexed off the key vector's
-         LENGTH (they are index-only, so nothing else about it matters) *)
-      iNext. iApply (disk_sector_receipts_of_keys ks _ Qs Hkslen). iExact "HQs".
   Qed.
 End VdrwfP6.
 
@@ -1871,14 +1849,14 @@ Section ProofVirtioDiskRwF.
       (pd pav pu : SailStdpp.Values.mword 64)
       (m : regfile) (K : nat) (eb : bool)
       (bno dsk0 : SailStdpp.Values.mword 32) (bs_buf bs_disk : list (bv 8))
-      (b : bool) (Q : iProp Σ) (Qs : nat -> iProp Σ) (lks : gset string)
+      (b : bool) (Q : iProp Σ) (lks : gset string)
     : wp_virtio_disk_rw_sconf_body γs j γl γu γd γk pd pav pu
-                                   m K eb bno dsk0 bs_buf bs_disk b Q Qs lks.
+                                   m K eb bno dsk0 bs_buf bs_disk b Q lks.
   Proof.
     cbv beta zeta delta [wp_virtio_disk_rw_sconf_body].
     intros HK Hbnolt Hbufkd Hj Hjl Hbelow.
     iIntros "Hcg Hown Hextc Hextm #Htext Hpc #Hpinv
-             #Hdinv #Hgeom #Hlk Hbuf Hdisk Hperm Hperms Hcont".
+             #Hdinv #Hgeom #Hlk Hbuf Hdisk Hperm Hcont".
     (* LEVEL 0 TIES THE TWO INDICES: [cpu_own_eb_agree] gives [eb = b]
        outright, so the function runs at ONE index throughout and there is
        nothing left to pin.  This used to derive [b = true] from an
@@ -1907,18 +1885,11 @@ Section ProofVirtioDiskRwF.
        then Some ((1024 * uint bno)%Z, bs_buf) else None)
       = vdrwd_wr (m !!! Regidx Ra1) (1024 * uint bno)%Z bs_buf).
     { unfold vdrwd_wr. rewrite (vdrwf_out_iff (m !!! Regidx Ra1)). reflexivity. }
-    iEval (rewrite Hpermidx) in "Hperms".
+    iEval (rewrite Hpermidx) in "Hperm".
     iApply fupd_wp.
-    iMod (perm_deposit_kq gen_id (dn_perm γd) None Q ⊤ ltac:(solve_ndisj)
-            with "Hqinv Hperm") as (kq) "[Hpend #Hrcpt]".
-    (* ...and ONE PER SECTOR: the channel chooses the key vector [ks], which
-       travels INSIDE the published slot ([vs_perms]) so each sector landing
-       can find its own view shift and this proof can find its receipts after
-       the wake (sector-atomic-disk.md). *)
-    iMod (perm_deposit_sectors gen_id (dn_perm γd)
-            (vdrwd_wr (m !!! Regidx Ra1) (1024 * uint bno)%Z bs_buf) Qs ⊤
-            ltac:(solve_ndisj) with "Hqinv Hperms")
-      as (ks) "(%Hkslen & Hsect & #Hrcpts)".
+    iMod (perm_deposit_kq gen_id (dn_perm γd)
+            (vdrwd_wr (m !!! Regidx Ra1) (1024 * uint bno)%Z bs_buf) Q ⊤
+            ltac:(solve_ndisj) with "Hqinv Hperm") as (kq) "[Hpend #Hrcpt]".
     iModIntro.
     assert (Hsecval : (bv_unsigned (vdrw_sector_raw bno) * 512)%Z
                       = (1024 * uint bno)%Z).
@@ -1978,31 +1949,29 @@ Section ProofVirtioDiskRwF.
        than closing it. *)
     iApply (P4.wp_vdrw_p4_seam (CID := CIDa) γk γs j γu γd pd pav pu K eb
               (m !!! Regidx csp_rs1) (m !!! Regidx Ra0) (m !!! Regidx Ra1)
-              bno bs_buf bs_disk m kq ks ({["virtio_disk"]} ∪ lks)
+              bno bs_buf bs_disk m kq ({["virtio_disk"]} ∪ lks)
               Hbnolt Hlenbuf Hbufkd
-              with "Htext Hdinv Hgeom Hbufm Hdisk Hpend [%] Hsect").
-    { exact Hkslen. }
+              with "Htext Hdinv Hgeom Hbufm Hdisk Hpend").
     (* ---- P5: the device kick and the completion wait ---- *)
     iApply (P5.wp_vdrw_p5_seam (CID := CIDa) γk γs j γl γu γd pd pav pu K eb
               (m !!! Regidx csp_rs1) (m !!! Regidx Ra0) (m !!! Regidx Ra1)
-              (vdrw_sector_raw bno) bs_buf bs_disk m kq ks lks HK Hj Hjl
+              (vdrw_sector_raw bno) bs_buf bs_disk m kq lks HK Hj Hjl
               (vdrwf_bnz _ (Hbufkd 0%nat ltac:(lia))) ltac:(lkbelow)
               with "Htext Hpinv Hdinv Hlk").
     (* ---- P6: the payoff, free_chain, release, epilogue ---- *)
     iApply (wp_vdrw_p6_seam (CID := CIDa) γk γs j γd pd pav pu K eb
               (m !!! Regidx csp_rs1) (m !!! Regidx Ra0) m (m !!! Regidx Ra1)
-              (vdrw_sector_raw bno) bno bs_buf bs_disk Q Qs kq ks lks
-              HK Hglen Hkslen Hlenbuf Hlendisk Hsecval Hbufkd eq_refl
+              (vdrw_sector_raw bno) bno bs_buf bs_disk Q kq lks
+              HK Hglen Hlenbuf Hlendisk Hsecval Hbufkd eq_refl
               ltac:(lkbelow)
-              with "Htext Hpinv Hqinv Hrcpt Hrcpts Hgeom Hlk Hsaved Hbno").
-    iIntros (CIDf Hsf mf) "%Hcsf Hcg Hown Hextc Hextm Hpc Hbufo Hdisko HQ HQs".
+              with "Htext Hpinv Hqinv Hrcpt Hgeom Hlk Hsaved Hbno").
+    iIntros (CIDf Hsf mf) "%Hcsf Hcg Hown Hextc Hextm Hpc Hbufo Hdisko HQ".
     iEval (rewrite Hsld) in "Hbufo".
     iEval (rewrite Hsld) in "Hdisko".
     iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! mf with
-              "[%] Hcg Hown Hextc Hextm Hpc Hbufo Hdisko HQ [HQs]").
+              "[%] Hcg Hown Hextc Hextm Hpc Hbufo Hdisko HQ").
     { exact Hcsf. }
-    iEval (rewrite Hpermidx). iExact "HQs".
   Qed.
 
 End ProofVirtioDiskRwF.

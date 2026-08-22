@@ -268,13 +268,36 @@ outside its layer; stages 1→2→3 are strictly ordered by dependency.
   header write's sector-0 permit; sector 1's permit is content-free; with
   per-sector keys this holds for either landing order. If E stalls, the
   reverse order is fine too (E restates at widened-mirror granularity).
-- **Stage 3 — FS permits and call sites (Opus).** §2f. Gate: the whole
-  tree green; coverage report unchanged (188 proven); `SystemAdequacy`
-  prints the same eight assumptions. **BLOCKED on a ruling — §6.** Landed
-  so far: `FsCrash.v`'s two stage-1 mirror lemmas restated for the widened
-  mirror (`log_mirror_ok_upd_pt`, `log_mirror_ok_upd_sector`,
-  `lm_hdr_sector0`, `lm_hdr_upd_sector1`), so the whole tree compiles again
-  except the three WAL call sites. ☐
+- **Stage 3 — the sequential permit and the FS layer (Opus).** DONE, per the
+  §6e ruling (§6b/§6c were NOT built; E2's mirror is untouched).  Whole tree
+  green, coverage 188 proven, `Print Assumptions` at the eight-axiom
+  baseline.  What landed:
+  - `RiscvPtsto.v`: `sperm`/`disk_seq_permit` and their two unfolding facts
+    (`sperm_nil`, `sperm_cons`), `sperm_one`, `disk_seq_permit_none` (a read
+    IS the leaf), `disk_write_permit_mono`/`_intro`, and
+    `disk_seq_permit_two` — the two landing orders as a `∧`, which is the
+    only form the FS layer ever builds.  `disk_sector_permits`/`_receipts`
+    are gone.
+  - `PermInv.v`: the cell holds the SEQUENTIAL permit at the sectors still to
+    land, and `perm_step` consumes one branch and RE-DEPOSITS the residual at
+    the same key; `perm_consume` is the leaf.  `perm_deposit_seq`/`_sectors`
+    and `perm_collect_list*` are gone.  The ghost value gained the remaining
+    set (`Xv6Cameras.permG`).
+  - `VirtioQueue.v`: `vs_perms` retired, `vs_todo sl ld` added (the entry's
+    index, derived from the landed set).  `VirtioProto.v`: `slot_pend_res` is
+    indexed by it; `virtio_proto_sector_step` hands out the branch and takes
+    the residual back; the completion is at `∅`.  `WpUart`'s sector arm calls
+    `perm_step_kq`, its completion arm is unchanged.
+  - Clients are back to the pre-stage-2 shape: `SpecVirtioDiskRw`/`SpecBwrite`
+    take `disk_seq_permit gen_id w Q` and return `▷ Q`; `Qs` is gone, and the
+    three red call sites changed one argument.
+  - `FsCrash.v`: six sequential builders (`fs_logfill_seq_permit`,
+    `fs_install_seq_permit`, `fs_commit_seq_permit`, `fs_clear_seq_permit`,
+    `fs_boot_head_seq_permit`, `fs_recover_seq_permit`) over four reusable
+    record-level landings.  The block-level `disk_write_permit` wrappers were
+    DELETED (no client can consume that shape any more); every `_rec` form,
+    including E2'/E3's value-chained ones, is kept — stage G composes them
+    exactly as (6a)–(6i) do. ☑
 - **Stage 4 — notes (Fable).** `crash.md` recorded choice flipped to
   "sector-atomic, any order, reads atomic"; `virtio-driver.md` slot shape;
   `fs-log.md` item 6; `durable-disk.md` cross-reference (stage C of that
@@ -463,3 +486,29 @@ disk_seq_permit gd w Q := sperm gd w (seq 0 (wr_nsectors w)) Q     (* reads: the
   VirtioProto, WpUart's two arms, SpecVirtioDiskRw/ProofVirtioDiskRw*,
   SpecBwrite/ProofBwrite, RiscvPtsto's `disk_sector_permits` → `disk_seq_permit`),
   then the stage 3 FS work as budgeted.
+
+### 6f. What the FS layer actually proves (stage 3, as built)
+
+Four record-level landings do all the work, and the six builders are chains
+of them:
+
+| landing | lemma | content |
+|---|---|---|
+| any sector of a NON-header block | `FsCrash.fs_at_sector_rec` | the picture moves at that block alone, so the header READING the caller carries is untouched — which is why the receipt is the caller's own `log_mirror_at` and **the chain never has to name the intermediate picture** |
+| the header's SECTOR 1 | `fs_hdr_sector1_rec` (and `_any_rec`) | "the commit is atomic": the row moves, the reading does not (`hdr_dec_sector0_eq`, with the bound out of the record's own `hdr_wf`) |
+| the header's SECTOR 0 | `fs_commit_sector0_rec` / `fs_clear_sector0_rec` / `fs_swap_sector0_rec` / `fs_boot_head_sector0_rec` | the decoded header switches HERE and nowhere else — `hdr_dec_blk_sector0` says the landing alone determines it |
+| any sector, recovery side | `fs_recover_permit_rec` at `wr_sector w i` | re-bases and threads the era custody; both orders are the same proof |
+
+Three things fell out that the plan did not anticipate:
+
+- **The receipt never names the mirror value.** Chaining through
+  `log_mirror_at ls h` (existential in `M`) rather than a named `lm_upd …`
+  removes the whole "do both orders end at the same picture" obligation —
+  and with it the `lm_upd_idem`/funext argument and the length side
+  conditions on `lm_view M blk` that a named receipt would have needed.
+- **The boot head's sector 1 may land with NO custody yet**, so that branch
+  is the recovery-side re-basing permit, not `fs_hdr_sector1_rec`.  The swap
+  always rides sector 0, which is where the header's reading changes.
+- **`fs_rec_permit_mono` is what makes a chain a chain**: the receipt of one
+  landing is built into the permit for the next inside the fupd, where the
+  torn content is known.

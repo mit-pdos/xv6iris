@@ -928,8 +928,9 @@ Section DevLoops.
          out the completing request's PENDING token and owes the SPENT one *)
       iMod (virtio_proto_step γd vs m mv vnew w Hview Hdisk
               with "Hmem Hdur Hlease") as (kq wr) "(%Hwr & Hpend & Hback)".
-      (* the post-write image, in the form the tie's two halves must move to *)
-      assert (Hpost : wr_apply wr (v_disk (dvirtio d)) = v_disk vnew)
+      (* the post-completion image, in the form the tie must move to: the
+         IDENTITY, because every sector landed at its own earlier step *)
+      assert (Hpost : wr_apply None (v_disk (dvirtio d)) = v_disk vnew)
         by (rewrite Hv Hwr; reflexivity).
       (* THE COMMIT INSTANT -- the linearization point of every disk write in
          the system.  The durable image has just changed, so the crash
@@ -985,12 +986,11 @@ Section DevLoops.
          these leaves a half-written block, which is exactly what real
          hardware does and what the FS layer must survive.
 
-         The completion arm above still opens [crashN] too, but its permit is
-         indexed at [None] and is therefore the IDENTITY on the crash
-         predicate and on the fixed auth ([wr_apply None dk = dk]) -- it is
-         the request's uniform trivial completion key, which is where a READ's
-         client receipt lives and what keeps that arm direction-agnostic (the
-         recorded choice, VirtioQueue.v's header).
+         The completion arm above still opens [crashN] too, but it spends the
+         sequential permit's LEAF, which is indexed at [None] and is
+         therefore the IDENTITY on the fixed auth ([wr_apply None dk = dk]) --
+         that leaf is where a READ's client receipt lives and what keeps that
+         arm direction-agnostic (sector-atomic-disk.md §6e).
 
          The byte memory is UNTOUCHED (the step's [m' = m]) and so are the
          used ring, the ISR and the consumed index -- the request is still in
@@ -1002,12 +1002,19 @@ Section DevLoops.
       iMod (dev_interp_update_virtio _ vs vnew with "Hdev Hv") as "[Hdev' Hv']".
       iEval (rewrite -Himg Hv) in "Hdur".
       iMod (virtio_proto_sector_step γd vs m mv i vnew Hview Hsect
-              with "Hmem Hdur Hlease") as (kq wr) "(%Hwr & Hpend & Hback)".
-      assert (Hpost : wr_apply wr (v_disk (dvirtio d)) = v_disk vnew)
+              with "Hmem Hdur Hlease")
+        as (kq wr todo) "(%Hitd & %Hwr & Hpend & Hback)".
+      assert (Hpost : wr_apply (wr_sector wr i) (v_disk (dvirtio d))
+                      = v_disk vnew)
         by (rewrite Hv Hwr; reflexivity).
       iInv "Hcinv" as "HP" "Hcclose".
       iMod (fupd_mask_subseteq ∅) as "Hmclose"; [set_solver|].
-      iMod (perm_consume_kq gen_id (dn_perm γd) kq wr (v_disk (dvirtio d)) n
+      (* CONSUME AND RE-DEPOSIT (sector-atomic-disk.md §6e): the branch the
+         device took is spent and the RESIDUAL obligation for the remaining
+         sectors goes straight back into the same cell.  The request's cell
+         only reaches the done state at its completion, one arm up. *)
+      iMod (perm_step_kq gen_id (dn_perm γd) kq wr todo i
+              (v_disk (dvirtio d)) n Hitd
               with "Hpbody Hpend Hsa [//] Htie HP")
         as "(Hpbody & Hdone & Hsa & Htie & HP)".
       iMod "Hmclose" as "_".

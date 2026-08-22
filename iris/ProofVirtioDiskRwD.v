@@ -858,11 +858,11 @@ End VdrwdLeaves.
 (* [kq] is the crash-permit key ([VirtioQueue.vs_perm]); it comes FIRST so
    that every downstream statement about the published slot threads it as a
    leading parameter, exactly like a section variable would. *)
-Definition vdrwd_slot (kq : nat * positive) (ks : list (nat * positive))
+Definition vdrwd_slot (kq : nat * positive)
     (b : Arch.pa) (h : nat)
     (wr sector : SailStdpp.Values.mword 64)
     (bs : list (bv 8)) : vslot :=
-  rw_slot h (vdrw_ty wr) sector (b_data b) (d_info_status h) bs kq ks.
+  rw_slot h (vdrw_ty wr) sector (b_data b) (d_info_status h) bs kq.
 
 (* whether the request is a WRITE, as the pin sees it *)
 Definition vdrwd_out (wr : SailStdpp.Values.mword 64) : bool :=
@@ -937,7 +937,7 @@ Proof. vm_compute. reflexivity. Qed.
 
 (* THE pure half: a pin that CONTAINS the sixteen windows (and, for a write
    request, the payload) parses to exactly the request the driver meant. *)
-Lemma vdrwd_mk_pin (kq : nat * positive) (ks : list (nat * positive))
+Lemma vdrwd_mk_pin (kq : nat * positive)
     (pd pav pu : SailStdpp.Values.mword 64) (b : Arch.pa)
     (np h m2 t : nat) (wr sector : SailStdpp.Values.mword 64)
     (bs : list (bv 8)) (pin mbuf : _) :
@@ -947,13 +947,13 @@ Lemma vdrwd_mk_pin (kq : nat * positive) (ks : list (nat * positive))
   (bv_unsigned (vdrw_ty wr) = virtio_blk_t_out ->
      range_map (b_data b) 1024 (fun j => bs !!! j) ⊆ pin) ->
   d_info_status h ∉ pa_range (b_data b) 1024 ->
-  slot_pin_ok (virtio_init_cfg pd pav pu) np (vdrwd_slot kq ks b h wr sector bs) pin.
+  slot_pin_ok (virtio_init_cfg pd pav pu) np (vdrwd_slot kq b h wr sector bs) pin.
 Proof.
   intros Hh Hm Ht Hlen Hsub Hbuf Hstat.
   destruct (vdrwc_ty_flags wr) as [Htyv Hflags].
   unfold vdrwd_slot.
   apply (mk_pin_slot_ok (virtio_init_cfg pd pav pu) np pd pin h m2 t
-           (d_ops h) (b_data b) (d_info_status h) (vdrw_ty wr) sector bs kq ks).
+           (d_ops h) (b_data b) (d_info_status h) (vdrw_ty wr) sector bs kq).
   - reflexivity.
   - reflexivity.
   - exact Hh.
@@ -1084,7 +1084,7 @@ Section VdrwdPinBuild.
      caller's buffer become the pin and the writable footprint the publish
      accessor consumes -- plus, for a WRITE, the payload moves from the
      writable side into the pin. *)
-  Lemma vdrwd_pin_res (kq : nat * positive) (ks : list (nat * positive))
+  Lemma vdrwd_pin_res (kq : nat * positive)
       (pd pav pu : SailStdpp.Values.mword 64) (b : Arch.pa)
       (np h m2 t : nat) (wr sector : SailStdpp.Values.mword 64)
       (bs bsl : list (bv 8)) :
@@ -1099,9 +1099,9 @@ Section VdrwdPinBuild.
     vdrw_chain pd b h m2 t wr sector -∗
     ([∗ list] j ↦ x ∈ bs, pa_add (b_data b) j ↦ₘ x) -∗
     ∃ pin wrb,
-      ⌜slot_pin_ok (virtio_init_cfg pd pav pu) np (vdrwd_slot kq ks b h wr sector bsl) pin⌝ ∗
-      ⌜dom wrb = slot_wr (vdrwd_slot kq ks b h wr sector bsl)⌝ ∗
-      ⌜slot_wr (vdrwd_slot kq ks b h wr sector bsl) ## dom pin⌝ ∗
+      ⌜slot_pin_ok (virtio_init_cfg pd pav pu) np (vdrwd_slot kq b h wr sector bsl) pin⌝ ∗
+      ⌜dom wrb = slot_wr (vdrwd_slot kq b h wr sector bsl)⌝ ∗
+      ⌜slot_wr (vdrwd_slot kq b h wr sector bsl) ## dom pin⌝ ∗
       (* THE STRUCTURE OF THE PIN, for P6: the residue after the interrupt
          handler splits the avail-ring entry back off is exactly the fifteen
          formatted windows (plus a write's payload), pairwise disjoint. *)
@@ -1225,7 +1225,7 @@ Section VdrwdPinBuild.
       iFrame "Hpin Hst Hib Hbd Hrm Hrt".
       destruct Hpmok as [Hdring Hpmok'].
       iPureIntro. split_and!.
-      + apply (vdrwd_mk_pin kq ks pd pav pu b np h m2 t wr sector bsl _
+      + apply (vdrwd_mk_pin kq pd pav pu b np h m2 t wr sector bsl _
                  (range_map (b_data b) 1024 (fun j => bs !!! j))
                  Hh Hm Ht Hlensl).
         * exact Hsub.
@@ -1265,7 +1265,7 @@ Section VdrwdPinBuild.
       iFrame "Hpin Hwrb Hib Hbd Hrm Hrt".
       destruct Hpmok as [Hdring Hpmok'].
       iPureIntro. split_and!.
-      + apply (vdrwd_mk_pin kq ks pd pav pu b np h m2 t wr sector bsl _ ∅
+      + apply (vdrwd_mk_pin kq pd pav pu b np h m2 t wr sector bsl _ ∅
                  Hh Hm Ht Hlensl).
         * exact Hsub.
         * intro Hc. exfalso. rewrite Hc Z.eqb_refl in Hout. discriminate.
@@ -1421,10 +1421,10 @@ Lemma vdrwd_dom_tr_ins {A : Type} (np : nat) (fl pk : gmap nat A)
 Proof. intro H. rewrite !dom_insert_L H. set_solver. Qed.
 
 (* the slot the publisher records really does describe the caller's buffer *)
-Lemma vdrwd_slot_link (kq : nat * positive) (ks : list (nat * positive)) (b : Arch.pa) (h : nat)
+Lemma vdrwd_slot_link (kq : nat * positive) (b : Arch.pa) (h : nat)
     (wr sector : SailStdpp.Values.mword 64)
     (bs : list (bv 8)) :
-  (h < 8)%nat -> slot_buf_link (vdrwd_slot kq ks b h wr sector bs) b.
+  (h < 8)%nat -> slot_buf_link (vdrwd_slot kq b h wr sector bs) b.
 Proof.
   intro Hh. unfold slot_buf_link, vdrwd_slot.
   exists h. cbn [rw_slot vs_req vr_head vr_status vr_buf].
@@ -1436,20 +1436,20 @@ Proof.
   - unfold vs_len. cbn [rw_slot vs_req vr_len]. exact vdrwd_len1024.
 Qed.
 
-Lemma vdrwd_slot_head (kq : nat * positive) (ks : list (nat * positive)) (b : Arch.pa) (h : nat)
+Lemma vdrwd_slot_head (kq : nat * positive) (b : Arch.pa) (h : nat)
     (wr sector : SailStdpp.Values.mword 64)
     (bs : list (bv 8)) :
-  (h < 8)%nat -> sl_head (vdrwd_slot kq ks b h wr sector bs) = h.
+  (h < 8)%nat -> sl_head (vdrwd_slot kq b h wr sector bs) = h.
 Proof.
   intro Hh. unfold sl_head, vdrwd_slot. cbn [rw_slot vs_req vr_head].
   rewrite (bv16_small h Hh). lia.
 Qed.
 
-Lemma vdrwd_slot_off (kq : nat * positive) (ks : list (nat * positive)) (b : Arch.pa) (h : nat)
+Lemma vdrwd_slot_off (kq : nat * positive) (b : Arch.pa) (h : nat)
     (wr sector : SailStdpp.Values.mword 64)
     (bs : list (bv 8)) (o : Z) :
   bv_unsigned sector = o ->
-  vs_sector_off (vdrwd_slot kq ks b h wr sector bs) = (o * 512)%Z.
+  vs_sector_off (vdrwd_slot kq b h wr sector bs) = (o * 512)%Z.
 Proof.
   intro Ho. unfold vs_sector_off, vdrwd_slot, virtio_sector_size.
   cbn [rw_slot vs_req vr_sector]. rewrite Ho. reflexivity.
@@ -1463,25 +1463,25 @@ Definition vdrwd_wr (wr : SailStdpp.Values.mword 64) (sec_off : Z)
     (bs_buf : list (bv 8)) : disk_wr :=
   if vdrwd_out wr then Some (sec_off, bs_buf) else None.
 
-Lemma vdrwd_slot_is_out (kq : nat * positive) (ks : list (nat * positive)) (b : Arch.pa) (h : nat)
+Lemma vdrwd_slot_is_out (kq : nat * positive) (b : Arch.pa) (h : nat)
     (wr sector : SailStdpp.Values.mword 64) (bs : list (bv 8)) :
-  vs_is_out (vdrwd_slot kq ks b h wr sector bs) = vdrwd_out wr.
+  vs_is_out (vdrwd_slot kq b h wr sector bs) = vdrwd_out wr.
 Proof.
   unfold vs_is_out, vdrwd_out, vdrwd_slot. cbn [rw_slot vs_req vr_type].
   reflexivity.
 Qed.
 
-Lemma vdrwd_slot_wr (kq : nat * positive) (ks : list (nat * positive)) (b : Arch.pa) (h : nat)
+Lemma vdrwd_slot_wr (kq : nat * positive) (b : Arch.pa) (h : nat)
     (wr sector : SailStdpp.Values.mword 64)
     (bs_buf bs_disk : list (bv 8)) (sec_off : Z) :
   (bv_unsigned sector * 512)%Z = sec_off ->
-  vs_wr (vdrwd_slot kq ks b h wr sector (vdrwd_sldata wr bs_buf bs_disk))
+  vs_wr (vdrwd_slot kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk))
   = vdrwd_wr wr sec_off bs_buf.
 Proof.
   intro Hoff. unfold vs_wr, vdrwd_wr.
   rewrite vdrwd_slot_is_out.
   destruct (vdrwd_out wr) eqn:Ho; [|reflexivity].
-  rewrite (vdrwd_slot_off kq ks b h wr sector _ (bv_unsigned sector) eq_refl) Hoff.
+  rewrite (vdrwd_slot_off kq b h wr sector _ (bv_unsigned sector) eq_refl) Hoff.
   unfold vs_data, vdrwd_slot. cbn [rw_slot].
   unfold vdrwd_sldata. rewrite Ho. reflexivity.
 Qed.
@@ -1511,7 +1511,7 @@ Section VdrwdP4.
 
   Local Ltac pcstep := apply bv_eq; vm_compute; reflexivity.
 
-  Lemma wp_vdrw_p4 (kq : nat * positive) (ks : list (nat * positive))
+  Lemma wp_vdrw_p4 (kq : nat * positive)
       (γu : uart_names) (γd : disk_names) (pme : Arch.pa)
       (M : regfile) (av : nat)
       (pd pav pu : SailStdpp.Values.mword 64) (b : Arch.pa)
@@ -1534,18 +1534,14 @@ Section VdrwdP4.
     vdrw_chain pd b h m2 t wr sector -∗
     ([∗ list] j ↦ x ∈ bs_buf, pa_add (b_data b) j ↦ₘ x) -∗
     disk_bytes γd sec_off bs_disk -∗
-    (* THE CRASH PERMITS' tokens, deposited before the chain was formatted and
-       spent into the published slot here (PermInv.v).  They are the TIMELESS
-       skeletons of the client's view shifts: the shifts themselves are in
-       [perm_inv], keyed by [kq] and by [ks].
-       [kq] is the request's COMPLETION key, indexed at [None] -- the
-       completion moves no disk byte (sector-atomic-disk.md); [ks] is one key
-       per 512-byte SECTOR of the data, each indexed at its own slice, and
-       each spent at the sector landing that makes those bytes durable. *)
-    perm_pend (dn_perm γd) kq None -∗
-    ⌜length ks = wr_nsectors (vdrwd_wr wr sec_off bs_buf)⌝ -∗
-    ([∗ list] i ↦ k ∈ ks,
-       perm_pend (dn_perm γd) k (wr_sector (vdrwd_wr wr sec_off bs_buf) i)) -∗
+    (* THE CRASH PERMIT's token, deposited before the chain was formatted and
+       spent into the published slot here (PermInv.v).  It is the TIMELESS
+       skeleton of the client's SEQUENTIAL view shift: the shift itself is in
+       [perm_inv] at the single key [kq], indexed at the sectors still to
+       land -- all of them, since nothing has landed yet
+       (sector-atomic-disk.md §6e). *)
+    perm_pend (dn_perm γd) kq (vdrwd_wr wr sec_off bs_buf)
+      (set_seq 0 (wr_nsectors (vdrwd_wr wr sec_off bs_buf))) -∗
     ( ∀ (M1 : regfile) pin,
         ⌜(forall r : mword 5, is_cs_idx r = true -> M1 !!! Regidx r = M !!! Regidx r)
          /\ M1 !!! Regidx Ra1 = M !!! Regidx Ra1⌝ -∗
@@ -1558,11 +1554,11 @@ Section VdrwdP4.
         sie_cap_gpr KT1 M1 av false pme -∗
         pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x19a) : mword 64) -∗
         vdrw_body γd pd pav (S np) nr
-                  (<[ np := DClaim b (vdrwd_slot kq ks b h wr sector
+                  (<[ np := DClaim b (vdrwd_slot kq b h wr sector
                                         (vdrwd_sldata wr bs_buf bs_disk))
                                    (h, m2, t) pin ]> fl) pk
                   (<[ np := (h, m2, t) ]> tr) fr -∗
-        disk_claim γd np (DClaim b (vdrwd_slot kq ks b h wr sector
+        disk_claim γd np (DClaim b (vdrwd_slot kq b h wr sector
                                       (vdrwd_sldata wr bs_buf bs_disk))
                                  (h, m2, t) pin) -∗
         vdrw_slot_rest m2 -∗ vdrw_slot_rest t -∗
@@ -1571,8 +1567,7 @@ Section VdrwdP4.
   Proof.
     intros Htok Hdisj0 Hfrh Hfrm Hfrt Hlenbuf Hlendisk Hbufkd Hoff Ha0 Ha5.
     destruct Htok as (Hhm & Hht & Hmt & Hh8 & Hm8 & Ht8). cbn in Hh8, Hm8, Ht8.
-    iIntros "Hcg #Htext Hpc #Hdinv #Hgeom Hbody Hchain Hbuf Hdisk Hpend %Hkslen
-             Hsect Hcont".
+    iIntros "Hcg #Htext Hpc #Hdinv #Hgeom Hbody Hchain Hbuf Hdisk Hpend Hcont".
     iDestruct (sie_cap_gpr_kmap_claims with "Hcg") as "[#Hkm Hcg]".
     iDestruct (disk_geom_static with "Hgeom") as %(Hspd & Hspav & _).
     iPoseProof "Hgeom" as "Hgeom2".
@@ -1821,7 +1816,7 @@ Section VdrwdP4.
     { unfold vdrwd_sldata. destruct (vdrwd_out wr); assumption. }
     assert (Hbsl : vdrwd_out wr = true -> vdrwd_sldata wr bs_buf bs_disk = bs_buf).
     { unfold vdrwd_sldata. intro Ho. rewrite Ho. reflexivity. }
-    iDestruct (vdrwd_pin_res kq ks pd pav pu b np h m2 t wr sector bs_buf
+    iDestruct (vdrwd_pin_res kq pd pav pu b np h m2 t wr sector bs_buf
                  (vdrwd_sldata wr bs_buf bs_disk)
                  Hh8 Hm8 Ht8 Hlenbuf Hlensl Hbsl Hspd Hspav Hsbuf
                  with "Hkm Hcell Hchain Hbuf") as
@@ -1834,9 +1829,9 @@ Section VdrwdP4.
     iApply (wp_vdrwd_sh_publish γu γd pme pd pav pu
               (mword_of_int (KernelSyms.virtio_disk_rw + 0x192) : mword 64) Ra5 Ra4
               (mword_of_int 2 : mword 12) N8 av np
-              (vdrwd_slot kq ks b h wr sector (vdrwd_sldata wr bs_buf bs_disk)) pin wrb
+              (vdrwd_slot kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk)) pin wrb
               Hidxa3 HN8sv Hpinok Hwrbdom Hwrpin
-              with "Hcg Hpc Hi17e Hdinv Hgeom Hpub Hpin Hwrb [Hdisk Hpend Hsect]").
+              with "Hcg Hpc Hi17e Hdinv Hgeom Hpub Hpin Hwrb [Hdisk Hpend]").
     { iExists bs_disk. iSplitR.
       - iPureIntro. unfold vs_len, vdrwd_slot. cbn [rw_slot vs_req vr_len].
         rewrite vdrwd_len1024. exact Hlendisk.
@@ -1845,24 +1840,17 @@ Section VdrwdP4.
           cbn [rw_slot vs_req vr_type]. intro Ho. rewrite Ho. reflexivity.
         + (* NOTHING HAS LANDED YET *)
           iSplitR; [iPureIntro; apply vs_torn_empty|].
-          (* ONE KEY PER SECTOR, at the count the deposit returned *)
-          iSplitR.
-          { iPureIntro. cbn [vs_perms vdrwd_slot rw_slot].
-            rewrite (vdrwd_slot_wr kq ks b h wr sector bs_buf bs_disk sec_off Hoff).
-            exact Hkslen. }
           iSplitL "Hdisk".
-          * rewrite (vdrwd_slot_off kq ks b h wr sector
+          * rewrite (vdrwd_slot_off kq b h wr sector
                        (vdrwd_sldata wr bs_buf bs_disk)
                        (bv_unsigned sector) eq_refl) Hoff.
             iExact "Hdisk".
-          * (* [vs_perm (vdrwd_slot kq ks …) = kq] and [vs_perms … = ks] by
-               conversion; the permits' INDICES have to be rewritten to the
-               slot's own [vs_wr]. *)
-            iSplitL "Hpend"; [iExact "Hpend"|].
-            iApply slot_sector_pend_empty.
-            cbn [vs_perms vdrwd_slot rw_slot].
-            rewrite (vdrwd_slot_wr kq ks b h wr sector bs_buf bs_disk sec_off Hoff).
-            iExact "Hsect". }
+          * (* [vs_perm (vdrwd_slot kq …) = kq] by conversion; the entry's
+               INDEX has to be rewritten to the slot's own [vs_wr], and its
+               remaining set is every sector -- nothing has landed. *)
+            rewrite /vs_todo difference_empty_L.
+            rewrite (vdrwd_slot_wr kq b h wr sector bs_buf bs_disk sec_off Hoff).
+            iExact "Hpend". }
     iIntros "Hcg Hpc Hpub Hrcpt".
     assert (Hp182 : add_vec_int (mword_of_int (KernelSyms.virtio_disk_rw + 0x192) : mword 64) 4
                     = mword_of_int (KernelSyms.virtio_disk_rw + 0x196)) by pcstep.
@@ -1877,7 +1865,7 @@ Section VdrwdP4.
                     = mword_of_int (KernelSyms.virtio_disk_rw + 0x19a)) by pcstep.
     iEval (rewrite Hp186) in "Hpc".
     (* ---- the claim, and the rebuilt lock resource ---- *)
-    set (V := DClaim b (vdrwd_slot kq ks b h wr sector (vdrwd_sldata wr bs_buf bs_disk))
+    set (V := DClaim b (vdrwd_slot kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk))
                      (h, m2, t) pin).
     iMod (ghost_map_insert np V
             (vdrwd_fresh_pos np nr fl pk Hle Hdfl Hpkb)
@@ -1888,9 +1876,9 @@ Section VdrwdP4.
     { iSplitR "Hflm"; [| iExact "Hflm"]. rewrite /flight_res /V.
       cbn [dc_buf dc_slot dc_tri dc_pin].
       iSplitR; [iPureIntro;
-        exact (vdrwd_slot_link kq ks b h wr sector (vdrwd_sldata wr bs_buf bs_disk) Hh8)|].
+        exact (vdrwd_slot_link kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk) Hh8)|].
       iFrame "Hrcpt Hbd".
-      rewrite (vdrwd_slot_head kq ks b h wr sector (vdrwd_sldata wr bs_buf bs_disk) Hh8).
+      rewrite (vdrwd_slot_head kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk) Hh8).
       iExact "Hib". }
     iApply ("Hcont" $! N8 pin with "[%] [%] Hcg Hpc [-Hfrag Hrm Hrt] [Hfrag] Hrm Hrt").
     { split.

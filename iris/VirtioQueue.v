@@ -29,26 +29,15 @@
 (* time ([VirtioModel.virtio_sector_step]) and the completion moves NO     *)
 (* disk byte at all ([vslot_post]).  Two consequences live in this file:   *)
 (*                                                                         *)
-(*   - [vslot] carries TWO sets of crash-permit keys: [vs_perms], one per  *)
-(*     sector, indexed at [wr_sector (vs_wr sl) i] and spent at that       *)
-(*     sector's landing; and [vs_perm], ONE key for the completion,        *)
-(*     indexed at [None].                                                  *)
-(*                                                                         *)
-(*     WHY THE COMPLETION KEPT A KEY (the recorded choice, and the least   *)
-(*     churn of the two the plan offered).  The owner's ruling is that IN  *)
-(*     requests keep one uniform trivial permit key -- a READ moves no     *)
-(*     disk byte, hence has no sectors, so the completion key is the only  *)
-(*     place a read's client receipt can live.  Giving the OUT direction   *)
-(*     the same (trivial, [None]-indexed) completion key then keeps        *)
-(*     [VirtioProto.virtio_proto_step] and [WpUart.wp_disk_loop]'s         *)
-(*     completion arm DIRECTION-AGNOSTIC and textually unchanged: the disk *)
-(*     thread learns the key from the protocol and cannot case-split on    *)
-(*     which request completed.  The cost is that [crashN] is opened in    *)
-(*     TWO arms of [wp_disk_loop] rather than one -- but only the SECTOR   *)
-(*     arm moves the durable image, and the completion arm's permit is the *)
-(*     identity ([wr_apply None dk = dk]), so the fixed auth does not move *)
-(*     there.  Dropping the completion key entirely would make a read's    *)
-(*     receipt undeliverable and force the protocol lemma to case-split.   *)
+(*   - [vslot] carries ONE crash-permit key, [vs_perm] (the ruling of      *)
+(*     sector-atomic-disk.md §6e).  The request's obligation is a SINGLE   *)
+(*     sequential permit ([RiscvPtsto.disk_seq_permit]) that unfolds one   *)
+(*     sector at a time; the channel entry stays at that one key and is    *)
+(*     RE-INDEXED at each landing, from the sectors still to land          *)
+(*     ([vs_todo] below) down to the empty set, whose leaf is the          *)
+(*     completion's identity permit delivering the client's receipt.  A    *)
+(*     READ has no sectors, so its entry is at the leaf from the start --  *)
+(*     which is what keeps the completion arm DIRECTION-AGNOSTIC.          *)
 (*                                                                         *)
 (*   - [vs_torn] is the block's content mid-flight: the payload's bytes in *)
 (*     the sectors that have landed, the old ones elsewhere.  A crash      *)
@@ -582,19 +571,11 @@ Record vslot := VSlot {
      across a sleep must be IDENTIFIED in the record the invariant keys on,
      or the woken publisher gets it back opaque.
      Spelled [positive] because this file is deliberately iris-free;
-     [gname := positive], so every consumer reads it as a gname. *)
+     [gname := positive], so every consumer reads it as a gname.
+     ONE key per request (sector-atomic-disk.md §6e): the cell it names
+     holds the whole SEQUENTIAL permit and is re-indexed at every sector
+     landing, so nothing about the slot has to grow with the sector count. *)
   vs_perm : nat * positive;
-  (* THE PER-SECTOR CRASH-PERMIT KEYS (sector-atomic-disk.md stage 2).  A
-     512-byte SECTOR lands atomically and a 1024-byte BLOCK does not, so an
-     OUT request's data reaches the durable image one sector at a time
-     ([VirtioModel.virtio_sector_step]) and each landing is its own
-     linearization point -- hence its own permit, indexed at
-     [wr_sector (vs_wr sl) i].  One key per sector, in sector order:
-     [length (vs_perms sl) = wr_nsectors (vs_wr sl)], which is 0 for a READ.
-     [vs_perm] above is what is left for the COMPLETION, and it is now
-     indexed at [None]: the completion writes the used ring and the status
-     byte, and moves no disk byte at all ([vslot_post]). *)
-  vs_perms : list (nat * positive);
 }.
 
 Definition vs_is_out (sl : vslot) : bool :=
@@ -889,6 +870,54 @@ Qed.
 Lemma vslot_wr_out (sl : vslot) :
   vs_is_out sl = true -> vs_wr sl = Some (vs_sector_off sl, vs_data sl).
 Proof. intro H. unfold vs_wr. by rewrite H. Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* THE SECTORS STILL TO LAND (sector-atomic-disk.md §6e).                 *)
+(*                                                                        *)
+(* The request's single channel entry is INDEXED by this set: at publish   *)
+(* it is every sector of the write, each landing removes one, and the      *)
+(* completion finds it empty -- which is exactly when the sequential       *)
+(* permit has unfolded down to its leaf.  A READ has no sectors, so it is  *)
+(* empty from the start.  Derived from the slot and the landed set the     *)
+(* protocol already tracks ([VirtioModel.v_landed]), so nothing is         *)
+(* recorded twice.                                                        *)
+(* ---------------------------------------------------------------------- *)
+Definition vs_todo (sl : vslot) (ld : gset nat) : gset nat :=
+  set_seq 0 (wr_nsectors (vs_wr sl)) ∖ ld.
+
+Lemma vs_todo_in (sl : vslot) (ld : gset nat) (i : nat) :
+  (i < wr_nsectors (vs_wr sl))%nat -> i ∉ ld -> i ∈ vs_todo sl ld.
+Proof.
+  intros Hi Hnl. unfold vs_todo. apply elem_of_difference.
+  split; [| exact Hnl]. apply elem_of_set_seq. lia.
+Qed.
+
+(* one landing removes exactly its own sector *)
+Lemma vs_todo_step (sl : vslot) (ld : gset nat) (i : nat) :
+  vs_todo sl ({[ i ]} ∪ ld) = vs_todo sl ld ∖ {[ i ]}.
+Proof.
+  unfold vs_todo. apply set_eq. intro x.
+  rewrite !elem_of_difference, elem_of_union, elem_of_singleton. tauto.
+Qed.
+
+(* every sector landed: nothing left, so the entry is at the leaf *)
+Lemma vs_todo_done (sl : vslot) (ld : gset nat) :
+  (forall i, (i < wr_nsectors (vs_wr sl))%nat -> i ∈ ld) ->
+  vs_todo sl ld = ∅.
+Proof.
+  intro Hall. unfold vs_todo. apply set_eq. intro x.
+  rewrite elem_of_difference, elem_of_empty, elem_of_set_seq.
+  split; [| tauto]. intros [Hx Hnx]. apply Hnx, Hall. lia.
+Qed.
+
+(* a READ owes nothing per-sector *)
+Lemma vs_todo_read (sl : vslot) (ld : gset nat) :
+  vs_is_out sl = false -> vs_todo sl ld = ∅.
+Proof.
+  intro Hin. apply vs_todo_done. intros i Hi.
+  exfalso. unfold vs_wr in Hi. rewrite Hin in Hi.
+  unfold wr_nsectors in Hi. lia.
+Qed.
 
 (* -- reading an image back as a byte list -- *)
 

@@ -1147,69 +1147,39 @@ Section VirtioProto.
      non-timeless invariant ([PermInv.perm_inv (dn_perm γ)]) and what rides
      HERE is its TIMELESS SKELETON: the ghost-map element [perm_pend], keyed
      by the pure [vs_perm sl] the slot records. *)
-  (* -- THE SLOT'S PERMIT TOKENS (sector-atomic-disk.md stage 2) ---------- *)
+  (* -- THE SLOT'S PERMIT TOKEN (sector-atomic-disk.md §6e) -------------- *)
 
-  (* WHY TWO SETS OF KEYS, AND WHY THE COMPLETION KEPT ONE.
-     The COMPLETION moves the used ring, the status byte and the interrupt --
-     and NO disk byte at all ([VirtioQueue.vslot_post_disk]), because every
-     sector of an OUT request's data landed at its own earlier step.  So its
-     permit is indexed at [None] and is the trivial identity in BOTH
-     directions.  Keeping it (rather than dropping it for a write) is what
-     keeps [virtio_proto_step]'s interface, and [WpUart.wp_disk_loop]'s
-     completion arm, DIRECTION-AGNOSTIC: the disk thread learns the key from
-     the protocol and cannot case-split on which request completed.  It is
-     also where a READ's client receipt lives -- a read moves no disk byte,
-     hence has no sectors, hence an empty [vs_perms], and the completion key
-     is its only one (the owner's ruling: "IN requests keep one uniform
-     trivial permit key").
-     The SECTOR keys are the real permits of a write: one per 512-byte
-     landing, indexed at [wr_sector (vs_wr sl) i], each spent at its own
-     [VirtioModel.virtio_sector_step].  Sector [i] of the request has already
-     landed exactly when [i ∈ ld], and then its token is the SPENT one. *)
-  Definition slot_sector_pend (γ : disk_names) (ld : gset nat) (sl : vslot)
-      : iProp Σ :=
-    ([∗ list] i ↦ kq ∈ vs_perms sl,
-       if bool_decide (i ∈ ld)
-       then perm_done (dn_perm γ) kq (wr_sector (vs_wr sl) i)
-       else perm_pend (dn_perm γ) kq (wr_sector (vs_wr sl) i))%I.
+  (* ONE KEY PER REQUEST, RE-INDEXED AS THE SECTORS LAND.  A 512-byte SECTOR
+     lands atomically and a 1024-byte BLOCK does not, so an OUT request's
+     data reaches the durable image one sector at a time
+     ([VirtioModel.virtio_sector_step]) and each landing is its own
+     linearization point.  The request's obligation is therefore a SINGLE
+     SEQUENTIAL permit ([RiscvPtsto.disk_seq_permit]) that unfolds a branch
+     at a time: the channel cell at [vs_perm sl] carries it, each landing
+     spends one branch and re-deposits the residual at the SAME key, and the
+     cell's index -- the sectors still to land -- is [vs_todo sl ld], a pure
+     function of the landed set the protocol already tracks.
 
-  Definition slot_sector_done (γ : disk_names) (sl : vslot) : iProp Σ :=
-    ([∗ list] i ↦ kq ∈ vs_perms sl,
-       perm_done (dn_perm γ) kq (wr_sector (vs_wr sl) i))%I.
+     WHY ONE OBJECT AND NOT ONE PERMIT PER SECTOR.  A crash permit is a
+     stateless view shift with no input slot and no invariant it may open at
+     mask [∅], so an exclusive resource a LATER sector needs (the WAL's
+     mirror half; what an earlier sector learned) could be curried into only
+     one of several independent permits and would be unreachable from the
+     others.  In the sequential form it travels inside the residual, and the
+     device's free choice of landing order is the permit's own conjunction.
 
-  (* ALL of a completed request's spent tokens, as one resource: the
-     completion's and every sector landing's.  Downstream (DiskInv's parked
-     claim, the interrupt handler, the woken publisher) never needs to see
-     the split, so it names this. *)
+     THE COMPLETION IS THE LEAF.  It moves the used ring, the status byte and
+     the interrupt -- and NO disk byte at all
+     ([VirtioQueue.vslot_post_disk]) -- so the last thing the cell holds is
+     the identity permit at [None], which is where the client's receipt is
+     delivered in BOTH directions.  A READ has no sectors, so its cell is at
+     the leaf from the start; that is what keeps [virtio_proto_step] and
+     [WpUart.wp_disk_loop]'s completion arm DIRECTION-AGNOSTIC. *)
   Definition slot_perms_done (γ : disk_names) (sl : vslot) : iProp Σ :=
-    (perm_done (dn_perm γ) (vs_perm sl) None ∗ slot_sector_done γ sl)%I.
+    perm_done (dn_perm γ) (vs_perm sl) (vs_wr sl).
 
   Global Instance slot_perms_done_timeless γ sl : Timeless (slot_perms_done γ sl).
-  Proof. rewrite /slot_perms_done /slot_sector_done. apply _. Qed.
-
-  (* nothing landed yet: the split degenerates to the pending form, which is
-     what the publisher hands in *)
-  Lemma slot_sector_pend_empty (γ : disk_names) (sl : vslot) :
-    ([∗ list] i ↦ kq ∈ vs_perms sl,
-       perm_pend (dn_perm γ) kq (wr_sector (vs_wr sl) i))
-    ⊢ slot_sector_pend γ ∅ sl.
-  Proof.
-    rewrite /slot_sector_pend. apply big_sepL_mono. intros i kq _.
-    rewrite (bool_decide_eq_false_2 (i ∈ (∅ : gset nat))
-               (not_elem_of_empty (C := gset nat) i)).
-    done.
-  Qed.
-
-  (* every sector landed: the split degenerates to the spent form *)
-  Lemma slot_sector_pend_full (γ : disk_names) (ld : gset nat) (sl : vslot) :
-    (forall i, (i < length (vs_perms sl))%nat -> i ∈ ld) ->
-    slot_sector_pend γ ld sl -∗ slot_sector_done γ sl.
-  Proof.
-    intro Hall. rewrite /slot_sector_pend /slot_sector_done.
-    iApply big_sepL_mono. intros i kq Hi.
-    rewrite (proj2 (bool_decide_eq_true _)); [done|].
-    apply Hall. by apply lookup_lt_Some in Hi.
-  Qed.
+  Proof. rewrite /slot_perms_done. apply _. Qed.
 
   Definition slot_pend_res (γ : disk_names) (ld : gset nat) (sl : vslot)
       : iProp Σ :=
@@ -1222,13 +1192,9 @@ Section VirtioProto.
           between two landings leave a half-written block, and what the
           publisher's fragments have to say while the request is in flight. *)
        ⌜vs_torn sl ld bs⌝ ∗
-       (* ONE KEY PER SECTOR: the publisher's own well-formedness obligation,
-          and what lets the completion turn "every sector landed" into "every
-          per-sector permit is spent". *)
-       ⌜length (vs_perms sl) = wr_nsectors (vs_wr sl)⌝ ∗
        disk_bytes γ (vs_sector_off sl) bs ∗
-       perm_pend (dn_perm γ) (vs_perm sl) None ∗
-       slot_sector_pend γ ld sl)%I.
+       (* THE REQUEST'S ONE CHANNEL ENTRY, at the sectors STILL TO LAND. *)
+       perm_pend (dn_perm γ) (vs_perm sl) (vs_wr sl) (vs_todo sl ld))%I.
 
   Definition slot_done_res (γ : disk_names) (c : virtio_cfg)
       (dma : gmap Arch.pa (bv 8)) (p : nat) (sl : vslot) : iProp Σ :=
@@ -1694,11 +1660,12 @@ Section VirtioProto.
     gen_heap_interp m -∗ disk_img_auth (dn_img γ) (v_disk v) -∗
     virtio_proto γ v ==∗
       ∃ (kq : nat * gname) (wr : disk_wr),
-        (* THE WRITE IDENTITY the completion needs to spend the permit: what
-           this request did to the disk image, as pure data.  [None] for a
-           read, so a read's completion moves no index at all. *)
-        ⌜v_disk v' = wr_apply wr (v_disk v)⌝ ∗
-        perm_pend (dn_perm γ) kq wr ∗
+        (* THE COMPLETION MOVES NO DISK BYTE (sector-atomic-disk.md): every
+           sector of an OUT request's data landed at its own earlier step, so
+           the index here is [None] in BOTH directions and the cell is at the
+           sequential permit's LEAF -- nothing left to land. *)
+        ⌜v_disk v' = wr_apply None (v_disk v)⌝ ∗
+        perm_pend (dn_perm γ) kq wr ∅ ∗
         (perm_done (dn_perm γ) kq wr -∗
            gen_heap_interp (w ∪ m) ∗ disk_img_auth (dn_img γ) (v_disk v') ∗
            virtio_proto γ v').
@@ -1747,7 +1714,7 @@ Section VirtioProto.
       as "[Hslres Hpend]".
     rewrite pend_landed_head.
     iDestruct "Hslres" as (bs)
-      "(%Hbslen & %Hbspin & %Hbstorn & %Hbsperms & Hbs & Hpend0 & Hsect)".
+      "(%Hbslen & %Hbspin & %Hbstorn & Hbs & Hpend0)".
     pose proof (vslot_vreq_nsectors (v_cfg v) (vp_nc pr) sl pin mv Hslotok Hvpin)
       as Hns.
     assert (Hall : forall i, (i < wr_nsectors (vs_wr sl))%nat -> i ∈ v_landed v).
@@ -1765,11 +1732,11 @@ Section VirtioProto.
     assert (Hin' : vs_is_out sl = false ->
               disk_read (v_disk v) (vs_sector_off sl) (vs_len sl) = bs)
       by (intros _; rewrite <- Hbslen; exact Hrd).
-    (* ...and every per-sector permit is therefore spent *)
-    assert (Hallp : forall i, (i < length (vs_perms sl))%nat -> i ∈ v_landed v)
-      by (intros i Hi; apply Hall; rewrite <- Hbsperms; exact Hi).
-    iDestruct (slot_sector_pend_full γ (v_landed v) sl Hallp with "Hsect")
-      as "Hsect".
+    (* ...so the request's channel entry has nothing left to land: its cell
+       is at the LEAF, the completion's own identity permit. *)
+    assert (Htodo : vs_todo sl (v_landed v) = ∅)
+      by exact (vs_todo_done sl (v_landed v) Hall).
+    rewrite Htodo.
     assert (Hdv' : disk_view dmap (v_disk (vslot_post v sl)))
       by (rewrite vslot_post_disk; exact Hdv).
     (* the byte lease and the counters *)
@@ -1826,7 +1793,7 @@ Section VirtioProto.
           * apply elem_of_union_r. exact Hc. }
     (* rebuild, AS THE ACCESSOR: the completing slot's pending token goes
        out, and the caller owes the spent one back at the same key. *)
-    iModIntro. iExists (vs_perm sl), None.
+    iModIntro. iExists (vs_perm sl), (vs_wr sl).
     iSplitR; [iPureIntro; apply vslot_post_wr|].
     iFrame "Hpend0". iIntros "Hdone0".
     iFrame "Hm".
@@ -1873,8 +1840,8 @@ Section VirtioProto.
     { apply not_elem_of_dom. intro Hc.
       pose proof (vpo_done_lt _ _ _ Hok _ Hc). lia. }
     rewrite (big_sepM_insert _ (vp_done pr) (vp_nc pr) sl Hdnone).
-    iSplitL "Hbs Hdone0 Hsect".
-    { iExists bs. rewrite /slot_perms_done. iFrame "Hbs Hdone0 Hsect".
+    iSplitL "Hbs Hdone0".
+    { iExists bs. rewrite /slot_perms_done. iFrame "Hbs Hdone0".
       iPureIntro. split_and!.
       - exact Hbslen.
       - exact Hout'.
@@ -1891,51 +1858,6 @@ Section VirtioProto.
         apply (vslot_writes_buf (v_cfg v) (wrap16 (vp_nc pr)) (v_disk v) sl j b Hin).
         rewrite (Hin' Hin). exact Hj. }
     iApply (big_sepM_mono _ _ _ Hmono). iExact "Hdone".
-  Qed.
-
-  (* -- the per-sector accessor over the split token vector -------------- *)
-
-  Lemma slot_sector_pend_acc (γ : disk_names) (ld : gset nat) (sl : vslot)
-      (i : nat) (kq : nat * gname) :
-    vs_perms sl !! i = Some kq -> i ∉ ld ->
-    slot_sector_pend γ ld sl -∗
-      perm_pend (dn_perm γ) kq (wr_sector (vs_wr sl) i) ∗
-      (perm_done (dn_perm γ) kq (wr_sector (vs_wr sl) i) -∗
-         slot_sector_pend γ ({[ i ]} ∪ ld) sl).
-  Proof.
-    intros Hkq Hnl. rewrite /slot_sector_pend.
-    rewrite (big_sepL_delete
-               (fun k kq0 => if bool_decide (k ∈ ld)
-                             then perm_done (dn_perm γ) kq0 (wr_sector (vs_wr sl) k)
-                             else perm_pend (dn_perm γ) kq0 (wr_sector (vs_wr sl) k))%I
-               (vs_perms sl) i kq Hkq).
-    rewrite (big_sepL_delete
-               (fun k kq0 => if bool_decide (k ∈ ({[ i ]} ∪ ld))
-                             then perm_done (dn_perm γ) kq0 (wr_sector (vs_wr sl) k)
-                             else perm_pend (dn_perm γ) kq0 (wr_sector (vs_wr sl) k))%I
-               (vs_perms sl) i kq Hkq).
-    rewrite (bool_decide_eq_false_2 (i ∈ ld) Hnl).
-    rewrite (bool_decide_eq_true_2 (i ∈ ({[ i ]} ∪ ld)) ltac:(set_solver)).
-    assert (Hmono : forall k kq0, vs_perms sl !! k = Some kq0 ->
-              (if decide (k = i) then emp else
-                 if bool_decide (k ∈ ld)
-                 then perm_done (dn_perm γ) kq0 (wr_sector (vs_wr sl) k)
-                 else perm_pend (dn_perm γ) kq0 (wr_sector (vs_wr sl) k))%I
-              ⊢ (if decide (k = i) then emp else
-                   if bool_decide (k ∈ ({[ i ]} ∪ ld))
-                   then perm_done (dn_perm γ) kq0 (wr_sector (vs_wr sl) k)
-                   else perm_pend (dn_perm γ) kq0 (wr_sector (vs_wr sl) k))%I).
-    { intros k kq0 _. apply bi.wand_entails.
-      destruct (decide (k = i)) as [->|Hne]; [by iIntros "$"|].
-      destruct (bool_decide (k ∈ ld)) eqn:Hb.
-      - apply bool_decide_eq_true in Hb.
-        rewrite (bool_decide_eq_true_2 (k ∈ ({[ i ]} ∪ ld)) ltac:(set_solver)).
-        by iIntros "$".
-      - apply bool_decide_eq_false in Hb.
-        rewrite (bool_decide_eq_false_2 (k ∈ ({[ i ]} ∪ ld)) ltac:(set_solver)).
-        by iIntros "$". }
-    iIntros "[$ Hrest]". iIntros "$".
-    iApply (big_sepL_mono _ _ _ Hmono). iExact "Hrest".
   Qed.
 
   (* THE SECTOR LANDING -- the step that actually moves the durable image
@@ -1957,10 +1879,11 @@ Section VirtioProto.
     virtio_sector_step v mv i = Some v' ->
     gen_heap_interp m -∗ disk_img_auth (dn_img γ) (v_disk v) -∗
     virtio_proto γ v ==∗
-      ∃ (kq : nat * gname) (wr : disk_wr),
-        ⌜v_disk v' = wr_apply wr (v_disk v)⌝ ∗
-        perm_pend (dn_perm γ) kq wr ∗
-        (perm_done (dn_perm γ) kq wr -∗
+      ∃ (kq : nat * gname) (wr : disk_wr) (todo : gset nat),
+        ⌜i ∈ todo⌝ ∗
+        ⌜v_disk v' = wr_apply (wr_sector wr i) (v_disk v)⌝ ∗
+        perm_pend (dn_perm γ) kq wr todo ∗
+        (perm_pend (dn_perm γ) kq wr (todo ∖ {[ i ]}) -∗
            gen_heap_interp m ∗ disk_img_auth (dn_img γ) (v_disk v') ∗
            virtio_proto γ v').
   Proof.
@@ -1986,13 +1909,11 @@ Section VirtioProto.
       as "[Hslres Hpend]".
     rewrite pend_landed_head.
     iDestruct "Hslres" as (bs)
-      "(%Hbslen & %Hbspin & %Hbstorn & %Hbsperms & Hbs & Hpend0 & Hsect)".
-    (* the sector's own key, and its still-pending token *)
-    assert (Hik : is_Some (vs_perms sl !! i))
-      by (apply lookup_lt_is_Some_2; rewrite Hbsperms; exact Hilt).
-    destruct Hik as [kq Hkq].
-    iDestruct (slot_sector_pend_acc γ (v_landed v) sl i kq Hkq Hnl with "Hsect")
-      as "[Hi Hsback]".
+      "(%Hbslen & %Hbspin & %Hbstorn & Hbs & Hpend0)".
+    (* the sector is one of the ones still to land, so the request's cell is
+       at a branch of the sequential permit and [i] is the branch taken *)
+    assert (Hitd : i ∈ vs_todo sl (v_landed v))
+      by exact (vs_todo_in sl (v_landed v) i Hilt Hnl).
     (* the disk fragments move by exactly this sector *)
     pose proof (vslot_data_len (v_cfg v) (vp_nc pr) sl pin Hslotok Hout) as Hdl.
     iDestruct (disk_bytes_read γ dmap (v_disk v) (vs_sector_off sl) bs Hdv
@@ -2013,10 +1934,11 @@ Section VirtioProto.
     assert (Htorn' : vs_torn sl ({[ i ]} ∪ v_landed v) bs').
     { unfold bs'. apply (vs_torn_sector sl (v_disk v) (v_landed v) i Hout Hdl).
       rewrite Hrd. exact Hbstorn. }
-    iModIntro. iExists kq, (wr_sector (vs_wr sl) i).
+    iModIntro. iExists (vs_perm sl), (vs_wr sl), (vs_todo sl (v_landed v)).
+    iSplitR; [iPureIntro; exact Hitd|].
     iSplitR; [iPureIntro; rewrite Hv1; reflexivity|].
-    iFrame "Hi". iIntros "Hd".
-    iDestruct ("Hsback" with "Hd") as "Hsect".
+    iFrame "Hpend0". iIntros "Hpend0".
+    rewrite -(vs_todo_step sl (v_landed v) i).
     iFrame "Hm".
     iSplitL "Hauth".
     { iExists dmap'. iFrame "Hauth". iPureIntro. exact Hdv'. }
@@ -2044,11 +1966,10 @@ Section VirtioProto.
     iApply (big_sepM_delete _ (vp_pend pr) (vp_nc pr) sl Hsl).
     rewrite pend_landed_head.
     iSplitR "Hpend".
-    { iExists bs'. iFrame "Hbs Hpend0 Hsect". iPureIntro. split_and!.
+    { iExists bs'. iFrame "Hbs Hpend0". iPureIntro. split_and!.
       - rewrite Hlen'. exact Hbslen.
       - intro Hc. rewrite Hout in Hc. discriminate.
-      - exact Htorn'.
-      - exact Hbsperms. }
+      - exact Htorn'. }
     iApply (big_sepM_mono _ _ _ Hpmono). iExact "Hpend".
   Qed.
 

@@ -1770,7 +1770,7 @@ Section InstallTransBlocks.
     (* the per-entry crash permits, and the resource they thread *)
     □ (∀ (i : nat) (w : mword 32) (bs' : list (bv 8)),
          ⌜W !! i = Some w⌝ -∗ ⌜length bs' = 1024%nat⌝ -∗ ▷ R -∗
-         disk_write_permit gen_id (Some ((1024 * uint w)%Z, bs')) R) -∗
+         disk_seq_permit gen_id (Some ((1024 * uint w)%Z, bs')) R) -∗
     ▷ R -∗
     it_cont (CID0 := CID0)  j bn γfs logstart recovering n W Lw L D pidv dq m K eb eb R lks Vpr -∗
     WP (Loop : expr riscv_lang).

@@ -292,13 +292,16 @@ Definition wp_install_trans_sconf_body
      over the one threaded resource [R], persistent and instantiated at each
      entry in turn; [R] itself is opaque here, which keeps install_trans as
      crash-agnostic as the rest of the log proofs.
-     ([FsCrash.fs_install_permit] is exactly this shape, at
+     Each generated permit is the SEQUENTIAL one (sector-atomic-disk.md
+     §6e): a home block lands one 512-byte sector at a time, and the chain
+     threads [R] from one landing to the next.
+     ([FsCrash.fs_install_seq_permit] is exactly this shape, at
      [R := LogInv.log_mirror_at ls (n, map uint W)].  Its [▷] is what the
      bwrite's own [▷ Q] postcondition hands back, and a client whose [R] is
      timeless -- the mirror half is -- strips it inside the fupd.) *)
   □ (∀ (i : nat) (w : SailStdpp.Values.mword 32) (bs' : list (bv 8)),
        ⌜W !! i = Some w⌝ -∗ ⌜length bs' = 1024%nat⌝ -∗ ▷ R -∗
-       disk_write_permit gen_id (Some ((1024 * uint w)%Z, bs')) R) -∗
+       disk_seq_permit gen_id (Some ((1024 * uint w)%Z, bs')) R) -∗
   ▷ R -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP
      (its bread / ilock / bwrite does), and a park moves the hart with

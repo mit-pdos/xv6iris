@@ -1995,19 +1995,15 @@ Section ProofInitlog.
     all: try lkbelow.
     { iModIntro. iExact "Hpenvpk". }
     (* THE RECOVERY-SIDE PERMITS, one generator over the era custody
-       ([FsCrash.fs_recover_permit]): every write is to a decoded home
+       ([FsCrash.fs_recover_seq_permit]): every write is to a decoded home
        block, so it cannot corrupt the durable header ([hdr_wf_wr_out]). *)
     { iModIntro. iIntros (i w bs') "%Hwi %Hlen' Hcust".
       iDestruct "Hcert" as "(_ & Hstc2 & Hregc2)".
-      iApply (fs_recover_permit cov logstart (Some ((1024 * uint w)%Z, bs'))
-                ltac:(intros dk Hwdk;
-                      assert (Hidx : (1024 * uint w)%Z
-                                     = (uint w * Z.of_nat BSIZE)%Z)
-                        by (rewrite /BSIZE; lia);
-                      cbn [wr_apply fst snd]; rewrite Hidx;
-                      apply hdr_wf_wr_out;
-                      [ exact Hlen'
-                      | apply FsCrash.home_ne_hdr;
+      iApply (fs_recover_seq_permit cov logstart (uint w) bs'
+                ltac:(exact Hlen')
+                ltac:(intros dk o sbs Hfit Hwdk;
+                      apply (hdr_wf_sub_out cov logstart (uint w) o sbs dk Hfit);
+                      [ apply FsCrash.home_ne_hdr;
                         exact (proj2 (Hwok' w (elem_of_list_lookup_2 _ _ _ Hwi)))
                       | exact Hwdk ])
                 with "Hseam Hregc2 Hstc2 Hcust"). }
@@ -2164,12 +2160,12 @@ Section ProofInitlog.
     { iExists bs_hdr. iExact "Hfsb". }
     (* THE BOOT'S FINAL HEADER WRITE (durable-disk stage D1): uniform in
        whether the recovering install already swapped custody in --
-       [FsCrash.fs_boot_head_permit] takes the era custody either way, and
+       [FsCrash.fs_boot_head_seq_permit] takes the era custody either way, and
        both arms land the same [Q]: the era's clean mirror half plus the
        swap receipt. *)
     { iIntros (bs' Hlen' Hhn' Hdec').
       iDestruct "Hcert" as "(_ & Hstc & Hregc)".
-      iApply (fs_boot_head_permit cov logstart bs' ltac:(exact Hlen')
+      iApply (fs_boot_head_seq_permit cov logstart bs' ltac:(exact Hlen')
                 ltac:(rewrite Hhn'; reflexivity)
                 with "Hseam Hregc Hstc Hcust2"). }
     iIntros (CID34 Hs34 mW bs') "%Hcs4 Hcg Hcnt Hextc Hclmc Hpc Hppid

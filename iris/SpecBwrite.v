@@ -69,7 +69,7 @@ Definition wp_bwrite_sconf_body
     (pidv dev bno : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool)
     (bs bsd : list (bv 8)) (b : bool)
-    (Q : iProp Σ) (Qs : nat -> iProp Σ) (lks : gset string) (Vpr : pprivate) :=
+    (Q : iProp Σ) (lks : gset string) (Vpr : pprivate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.bwrite in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -125,19 +125,21 @@ Definition wp_bwrite_sconf_body
      [1024 * bno ..].  A WRITE's permit is NOT free the way a READ's is, and
      that is the honest content of the indexed crash predicate: every one of
      the three log.c call sites supplies a REAL durability fupd
-     ([FsCrash.fs_logfill_permit] and its siblings), and there is no
+     ([FsCrash.fs_logfill_seq_permit] and its siblings), and there is no
      [Pc]-generic way to write a disk block.
 
      A 512-BYTE SECTOR IS ATOMIC AND A 1024-BYTE BLOCK IS NOT
-     (claude-notes/projects/sector-atomic-disk.md), so the durability
-     obligation is now PER SECTOR: one view shift per 512-byte landing, each
-     indexed at that sector's own slice [wr_sector w i], and the caller gets
-     one receipt per sector back.  The extra [disk_write_permit gen_id None Q]
-     is the request's COMPLETION permit -- the instant the device REPORTS the
-     write done, at which no disk byte moves; a caller with nothing to say
-     there discharges it with [disk_write_permit_trivial]. *)
-  disk_write_permit gen_id None Q -∗
-  disk_sector_permits gen_id (Some (1024 * uint bno, bs)%Z) Qs -∗
+     (claude-notes/projects/sector-atomic-disk.md §6e), so the durability
+     obligation unfolds ONE SECTOR AT A TIME: [disk_seq_permit] is a
+     conjunction over the sectors still to land, each branch a view shift at
+     that sector's own slice [wr_sector w i] whose receipt is the RESIDUAL
+     obligation for the rest, and whose leaf -- the completion, which moves
+     no disk byte -- delivers [Q].  The device picks the landing order, so
+     the caller proves every branch from the SAME resources; whatever a later
+     sector needs (the WAL's mirror half, what an earlier sector learned)
+     travels down the chain rather than having to be curried into two
+     independent permits, which is impossible for an exclusive resource. *)
+  disk_seq_permit gen_id (Some (1024 * uint bno, bs)%Z) Q -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  bwrite's whole body is a
      tail call into virtio_disk_rw, which PARKS -- so a [swtch] can move the
      hart with interrupts off, which has nothing to do with the entry SIE
@@ -157,7 +159,6 @@ Definition wp_bwrite_sconf_body
          permit invariant is not timeless, and the saved-proposition
          agreement costs the other later, which rw's epilogue pays off). *)
       ▷ Q -∗
-      ▷ disk_sector_receipts (Some (1024 * uint bno, bs)%Z) Qs -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -172,7 +173,7 @@ Module Type BWRITE.
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (bs bsd : list (bv 8)) (b : bool)
-      (Q : iProp Σ) (Qs : nat -> iProp Σ) (lks : gset string) (Vpr : pprivate),
+      (Q : iProp Σ) (lks : gset string) (Vpr : pprivate),
       wp_bwrite_sconf_body γs j γl γu γd γk pd pav pu bn V k
-                           pidv dev bno dq m K eb bs bsd b Q Qs lks Vpr.
+                           pidv dev bno dq m K eb bs bsd b Q lks Vpr.
 End BWRITE.

@@ -872,24 +872,22 @@ Section BreadBlocks.
                    ltac:(wp_next_chain) with "Hextm") as "Hextm".
       iApply (RW.wp_virtio_disk_rw_sconf γs j γl γu γd γk pd pav pu T4
                 (K - 6)%nat eb bno (mword_of_int 0 : mword 32) bs bsl eb
-                True%I (fun _ => True%I) lks
+                True%I lks
                 HKrw Hbno Hkdata Hj Hgl
                 with "Hcg Hcnt Hextc Hextm Htext Hpc Hprocs
-                      Hdev Hgeom Hdlock [Hbuf] Hdb [] []").
+                      Hdev Hgeom Hdlock [Hbuf] Hdb []").
       all: try lkbelow.
       { iEval (rewrite HT4a0). rewrite /bpa. iExact "Hbuf". }
-      (* bread's rw call is a READ: no disk byte moves, so the identity
-         permit at the trivial receipt is the honest one.  Permits are
-         uniform, which is what keeps the DMA completion from having to know
-         the direction. *)
-      { iApply disk_write_permit_trivial. }
-      (* ...and a READ HAS NO SECTORS (sector-atomic-disk.md): the per-sector
-         permit bundle is [emp] for it, which is what keeps the whole read
-         stack textually unchanged by the sector-atomic reshape. *)
-      { iApply disk_sector_permits_none. }
+      (* bread's rw call is a READ: no disk byte moves, so it has no sectors
+         and its SEQUENTIAL permit IS the identity one at the leaf
+         ([disk_seq_permit_none], sector-atomic-disk.md §6e) -- which is what
+         keeps the whole read stack textually unchanged by the sector-atomic
+         reshape, and what keeps the DMA completion from having to know the
+         direction. *)
+      { rewrite disk_seq_permit_none. iApply disk_write_permit_trivial. }
       (* rw PARKS: it returns on hart [CIDrw], handing the trap-CSR
          complement back too. *)
-      iIntros (CIDrw Hsrw mR) "%Hcs2 Hcg Hcnt Hextc Hextm Hpc Hbuf Hdb _ _".
+      iIntros (CIDrw Hsrw mR) "%Hcs2 Hcg Hcnt Hextc Hextm Hpc Hbuf Hdb _".
       iEval (rewrite (bd_wr_false _ bs bsl HT4a1)) in "Hbuf".
       iEval (rewrite (bd_wr_false _ bs bsl HT4a1)) in "Hdb".
       iEval (rewrite -Hgd) in "Hdb".

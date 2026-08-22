@@ -41,7 +41,7 @@
    following little-endian words.  The first is what initlog's clean-image
    path needs (it re-reads the header it just wrote, and its precondition is
    that n = 0 there); the second is what identifies the durable state this
-   write commits to ([FsCrash.fs_commit_permit] decodes the header it is
+   write commits to ([FsCrash.fs_commit_seq_permit] decodes the header it is
    handed), so when n > 0 this bwrite is THE COMMIT POINT (D := L over W).
 
    write_head sleeps (bread, bwrite, brelse), so it threads the full
@@ -143,14 +143,17 @@ Definition wp_write_head_sconf_body
      caller does not know the header IMAGE this function will assemble -- it
      is built from [n] and [W] by the copy loop -- so the permit is supplied
      as a FAMILY over the bytes, given the one fact the assembly establishes
-     about them.  At [n = 0] (initlog's clear, and the clear that ends a
+     about them.  It is the SEQUENTIAL permit (sector-atomic-disk.md §6e):
+     the header block lands one 512-byte sector at a time and the caller owes
+     one chained view shift per landing -- which is exactly where "the commit
+     is atomic" is proved, since [hdr_dec] reads bytes [0, 124) only.  At [n = 0] (initlog's clear, and the clear that ends a
      commit) [hdr_n bs' = 0] plus [FsCrash.hdr_dec_zero] pins the whole
      decoding, which is all a clear's fupd needs
-     ([FsCrash.fs_clear_permit]); the COMMIT arm ([FsCrash.fs_commit_permit])
+     ([FsCrash.fs_clear_seq_permit]); the COMMIT arm ([_commit_seq_permit])
      consumes the third hypothesis instead. *)
   (∀ bs' : list (bv 8), ⌜length bs' = 1024%nat⌝ -∗ ⌜hdr_n bs' = Z.of_nat n⌝ -∗
      ⌜hdr_dec bs' = (n, map uint W)⌝ -∗
-     disk_write_permit gen_id (Some ((1024 * log_hdr_bno logstart)%Z, bs')) Q) -∗
+     disk_seq_permit gen_id (Some ((1024 * log_hdr_bno logstart)%Z, bs')) Q) -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP
      (its bread / ilock / bwrite does), and a park moves the hart with
      interrupts off, so the crossing has nothing to do with SIE -- the

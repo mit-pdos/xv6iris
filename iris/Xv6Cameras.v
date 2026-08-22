@@ -194,11 +194,11 @@ Proof. solve_inG. Qed.
    nothing here has to know anything about the virtio protocol. *)
 Class permG (Σ : gFunctors) := PermG {
   permG_saved :: savedPropG Σ;
-  permG_map :: ghost_mapG Σ nat (bool * gname * disk_wr);
+  permG_map :: ghost_mapG Σ nat (bool * gname * (disk_wr * gset nat));
 }.
 
 Definition permΣ : gFunctors :=
-  #[ savedPropΣ ; ghost_mapΣ nat (bool * gname * disk_wr) ].
+  #[ savedPropΣ ; ghost_mapΣ nat (bool * gname * (disk_wr * gset nat)) ].
 
 Global Instance subG_permΣ Σ : subG permΣ Σ -> permG Σ.
 Proof. solve_inG. Qed.

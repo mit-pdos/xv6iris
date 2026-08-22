@@ -62,7 +62,7 @@ Definition wp_virtio_disk_rw_sconf_body
     (pd pav pu : mword 64)
     (m : regfile) (K : nat) (eb : bool)
     (bno dsk0 : mword 32) (bs_buf bs_disk : list (bv 8)) (b : bool)
-    (Q : iProp Σ) (Qs : nat -> iProp Σ) (lks : gset string) :=
+    (Q : iProp Σ) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.virtio_disk_rw in
   let pj := proc_addr j in
   (* a0 = the [struct buf *b] argument, a1 = write.  Renamed to [bp] (was
@@ -136,22 +136,21 @@ Definition wp_virtio_disk_rw_sconf_body
      published slot ([VirtioQueue.vs_wr]).  A caller with no durability
      obligation instantiates the pair trivially and its statement is
      unchanged in meaning. *)
-  (* THE COMPLETION PERMIT.  Indexed at [None] in BOTH directions
-     (claude-notes/projects/sector-atomic-disk.md): the completion writes the
-     used ring, the status byte and the interrupt, and no disk byte at all --
-     the data landed earlier, one 512-byte sector at a time.  A READ's client
-     permit is exactly this one (a read moves no disk byte, so it has no
-     sectors), which is what keeps the read stack unchanged; a WRITE's caller
-     discharges it with [disk_write_permit_trivial] unless it wants a receipt
-     at the instant the request is reported done. *)
-  disk_write_permit gen_id None Q -∗
-  (* THE PER-SECTOR PERMITS -- the real ones.  A 512-byte SECTOR is atomic
-     and a 1024-byte BLOCK is not, so this request has one linearization
-     point per sector and the caller owes one view shift per sector, each
-     indexed at that sector's own slice [wr_sector w i].  [emp] for a read
-     ([disk_sector_permits_none]). *)
-  disk_sector_permits gen_id
-    (if wr then Some (1024 * uint bno, bs_buf)%Z else None) Qs -∗
+  (* ONE SEQUENTIAL PERMIT (claude-notes/projects/sector-atomic-disk.md §6e).
+     A 512-byte SECTOR is atomic and a 1024-byte BLOCK is not, so this request
+     has one linearization point per sector -- but the caller owes ONE object,
+     not a bag of independent view shifts: a conjunction over the sectors
+     still to land, each branch's receipt being the residual obligation for
+     the rest, and the leaf (the completion, which moves no disk byte) the
+     identity permit delivering [Q].  The device picks the order, so the [∧]
+     is what the caller proves from the SAME resources; whatever a later
+     sector needs travels down the chain.  A READ has no sectors, so
+     [disk_seq_permit gen_id None Q] IS [disk_write_permit gen_id None Q]
+     ([disk_seq_permit_none]) and every read caller is textually unchanged --
+     [disk_write_permit_trivial] still proves it for an ARBITRARY crash
+     predicate. *)
+  disk_seq_permit gen_id
+    (if wr then Some (1024 * uint bno, bs_buf)%Z else None) Q -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b] (porting guide: "a PARKING
      function's [wp_next] index is [true] UNCONDITIONALLY").  virtio_disk_rw
      sleeps -- twice -- so a [swtch] can move the hart with interrupts OFF,
@@ -174,15 +173,11 @@ Definition wp_virtio_disk_rw_sconf_body
       buf_own bp bno (mword_of_int 0 : mword 32)
               (if wr then bs_buf else bs_disk) -∗
       disk_block γd (uint bno) (if wr then bs_buf else bs_disk) -∗
-      (* THE RECEIPTS, under ONE later: collecting them costs the permit
+      (* THE RECEIPT, under ONE later: collecting it costs the permit
          invariant's own later (it is not timeless -- it holds arbitrary
          client view shifts) plus the saved-proposition agreement's, and the
-         epilogue's instruction stream pays one of the two off.  There are
-         [1 + wr_nsectors] of them: the completion's, and one per sector
-         landing. *)
+         epilogue's instruction stream pays one of the two off. *)
       ▷ Q -∗
-      ▷ disk_sector_receipts
-          (if wr then Some (1024 * uint bno, bs_buf)%Z else None) Qs -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -195,7 +190,7 @@ Module Type VIRTIODISKRW.
       (pd pav pu : mword 64)
       (m : regfile) (K : nat) (eb : bool)
       (bno dsk0 : mword 32) (bs_buf bs_disk : list (bv 8)) (b : bool)
-      (Q : iProp Σ) (Qs : nat -> iProp Σ) (lks : gset string),
+      (Q : iProp Σ) (lks : gset string),
       wp_virtio_disk_rw_sconf_body γs j γl γu γd γk pd pav pu
-                                   m K eb bno dsk0 bs_buf bs_disk b Q Qs lks.
+                                   m K eb bno dsk0 bs_buf bs_disk b Q lks.
 End VIRTIODISKRW.

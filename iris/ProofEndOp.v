@@ -407,7 +407,7 @@ Lemma eo_lookup_elem (W : list (mword 32)) (t : nat) (w : mword 32) :
   W !! t = Some w -> w ∈ W.
 Proof. intro H. eapply elem_of_list_lookup_2. exact H. Qed.
 (* the batch's home-blocks row, restated at the DECODED header's spelling --
-   what [fs_commit_permit]'s [hdr_wf] premise wants *)
+   what [fs_commit_seq_permit]'s [hdr_wf] premise wants *)
 Lemma eo_hdr_in (W : list (mword 32)) (cov : gset Z) (logstart : Z) :
   (forall w, w ∈ W -> uint w ∈ cov /\ ~ (uint w ∈ log_region_set logstart)) ->
   forall b : Z, b ∈ map uint W -> b ∈ cov /\ b ∉ log_region_set logstart.
@@ -1801,7 +1801,7 @@ Section EndOpBlocks.
        and the mirror half comes back at the header picture the write just
        laid down, which is what the install fupds below then read. *)
     { iIntros (bs' Hlen' Hhn' Hdec').
-      iApply (fs_commit_permit cov logstart (0%nat, []) n (map uint W) bs'
+      iApply (fs_commit_seq_permit cov logstart (0%nat, []) n (map uint W) bs'
                 ltac:(exact Hlen') ltac:(exact Hdec')
                 ltac:(exact Hn30) ltac:(by apply NoDup_ListNoDup)
                 ltac:(exact (eo_hdr_in W cov logstart Hwok))
@@ -1922,7 +1922,7 @@ Section EndOpBlocks.
        back, because recovery re-installs a logged block from its slot no
        matter what the home write put there. *)
     { iModIntro. iIntros (i w bs') "%Hwi %Hlen'".
-      iApply (fs_install_permit cov logstart n (map uint W) i (uint w) bs'
+      iApply (fs_install_seq_permit cov logstart n (map uint W) i (uint w) bs'
                 ltac:(exact Hlen')
                 ltac:(by apply NoDup_ListNoDup)
                 ltac:(rewrite length_map; lia)
@@ -2037,7 +2037,7 @@ Section EndOpBlocks.
        plain home restriction and the mirror goes back to its clean picture --
        which is the form [log_batch] parks in the lock. *)
     { iIntros (bs' Hlen' Hhn' Hdec').
-      iApply (fs_clear_permit cov logstart bs'
+      iApply (fs_clear_seq_permit cov logstart bs'
                 ltac:(exact Hlen') ltac:(rewrite Hhn'; reflexivity)
                 with "Hseam Hregc Hswlb [Hmirc]").
       iApply (log_mirror_any_intro with "Hmirc"). }
@@ -3033,7 +3033,7 @@ Section EndOpBlocks.
        lock -- recovery does not look at the slots at all, so this write is
        invisible to the durable state. *)
     { rewrite Hubnol.
-      iApply (fs_logfill_permit cov logstart t bs2 Hlen2
+      iApply (fs_logfill_seq_permit cov logstart t bs2 Hlen2
                 ltac:(exact (eo_t_lt_lb t n Ht Hn30))
                 with "Hseam Hregc Hswlb Hmirc"). }
     iIntros (CIDb3 Hsb3 mf4) "%Hcs4 Hcg Hcnt Hextc Hextm Hpc Hppid Hhold >Hmirc".

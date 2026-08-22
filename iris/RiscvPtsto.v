@@ -760,74 +760,192 @@ Proof.
   rewrite wr_apply_none. iFrame "Ha HP Hs".
 Qed.
 
-(* THE PER-SECTOR PERMITS (claude-notes/projects/sector-atomic-disk.md).
+(* ...and the general form: at [None] the permit IS its own receipt, which is
+   what closes every sequential chain -- the leaf hands [Q] over with nothing
+   to say about the image. *)
+Lemma disk_write_permit_intro `{!riscvFixedGS Σ} (gd : nat) (Q : iProp Σ) :
+  Q -∗ disk_write_permit gd None Q.
+Proof.
+  iIntros "HQ". rewrite /disk_write_permit. iIntros (dk n) "Hs _ Ha HP".
+  iModIntro. rewrite wr_apply_none. iFrame "Ha HP Hs HQ".
+Qed.
+
+(* THE SEQUENTIAL PERMIT (claude-notes/projects/sector-atomic-disk.md §6e).
    A 512-byte SECTOR lands atomically and a 1024-byte BLOCK does not, so ONE
-   request has one linearization point PER SECTOR -- and therefore one permit
-   per sector, each indexed at that sector's own slice of the write,
-   [VirtioModel.wr_sector w i].  [Qs i] is the receipt sector [i] yields; the
-   driver hands back the separating conjunction of all of them
-   ([disk_sector_receipts]).  A READ has no sectors at all
-   ([wr_nsectors None = 0]), so this is [emp] for it and every read caller is
-   free ([disk_sector_permits_none]) -- the read's own permit is the request's
-   COMPLETION permit, which the driver keeps stating as
-   [disk_write_permit gd None Q].
+   request has one linearization point PER SECTOR.  The request's obligation
+   is therefore not a bag of independent permits -- it is ONE object that
+   unfolds a step at a time: a conjunction over the sectors STILL TO LAND,
+   each branch a permit whose receipt is the RESIDUAL obligation for the
+   rest, and whose leaf (nothing left) is the completion's identity permit
+   delivering the client's [Q].
 
-   WHY A FUNCTION [Qs] AND NOT A LIST: the sector count is a function of the
-   write, so a list would carry a length side condition at every call site,
-   and every caller here has a uniform per-sector receipt anyway. *)
-Definition disk_sector_permits `{!riscvFixedGS Σ} (gd : nat) (w : disk_wr)
-    (Qs : nat -> iProp Σ) : iProp Σ :=
-  ([∗ list] i ∈ seq 0 (wr_nsectors w),
-     disk_write_permit gd (wr_sector w i) (Qs i))%I.
+   WHY A CONJUNCTION AND NOT A SEPARATING ONE.  The device picks the landing
+   order, so the client must be ready for every branch -- but exactly ONE is
+   ever taken, so all of them may be proved from the SAME resources.  That is
+   [∧], and it is the whole reason this shape exists: an earlier design
+   handed out one INDEPENDENT permit per sector, and then the client's
+   mirror half (an exclusive [ghost_var] fragment) could be curried into only
+   one of them, with no way for the other to obtain it -- a permit is a
+   stateless view shift with no input slot and no invariant it may open at
+   mask [∅].  Here whatever a later sector needs travels DOWN THE CHAIN
+   inside the residual.
 
-(* SPELLED WITH THE INDEX, not the element, so that a receipt bundle
-   collected over the slot's KEY VECTOR ([VirtioQueue.vs_perms], a list of the
-   right LENGTH but of a different element type) converts to it by
-   [big_sepL_index_len] alone. *)
-Definition disk_sector_receipts `{!riscvFixedGS Σ} (w : disk_wr)
-    (Qs : nat -> iProp Σ) : iProp Σ :=
-  ([∗ list] i ↦ _ ∈ seq 0 (wr_nsectors w), Qs i)%I.
+   Spelled with an explicit fuel so the recursion is structural; the fuel is
+   always [size todo], which is what [sperm] fixes and what makes
+   [sperm_nil]/[sperm_cons] the only two facts anybody needs. *)
+Fixpoint sperm_aux `{!riscvFixedGS Σ} (gd : nat) (w : disk_wr) (n : nat)
+    (todo : gset nat) (Q : iProp Σ) : iProp Σ :=
+  match n with
+  | O => disk_write_permit gd None Q
+  | S n' =>
+      (∀ i : nat, ⌜i ∈ todo⌝ -∗
+         disk_write_permit gd (wr_sector w i)
+           (sperm_aux gd w n' (todo ∖ {[ i ]}) Q))%I
+  end.
 
-(* an index-only [big_sepL] depends on the list's LENGTH and nothing else *)
-Lemma big_sepL_index_len `{!riscvFixedGS Σ} {A B : Type}
-    (l1 : list A) (l2 : list B) (Φ : nat -> iProp Σ) :
-  length l1 = length l2 ->
-  ([∗ list] i ↦ _ ∈ l1, Φ i) ⊣⊢ ([∗ list] i ↦ _ ∈ l2, Φ i).
+Definition sperm `{!riscvFixedGS Σ} (gd : nat) (w : disk_wr)
+    (todo : gset nat) (Q : iProp Σ) : iProp Σ :=
+  sperm_aux gd w (size todo) todo Q.
+
+(* THE REQUEST'S WHOLE OBLIGATION, and what every client hands the driver.
+   A READ has no sectors ([wr_nsectors None = 0]), so this IS the identity
+   permit for it -- the read side of the stack is textually unchanged. *)
+Definition disk_seq_permit `{!riscvFixedGS Σ} (gd : nat) (w : disk_wr)
+    (Q : iProp Σ) : iProp Σ :=
+  sperm gd w (set_seq 0 (wr_nsectors w)) Q.
+
+(* removing one element of a finite set drops its size by exactly one *)
+Lemma size_diff_one (X : gset nat) (i : nat) :
+  i ∈ X -> S (size (X ∖ {[ i ]})) = size X.
 Proof.
-  revert l2 Φ. induction l1 as [|x l1 IH]; intros l2 Φ Hlen.
-  - destruct l2; [reflexivity | discriminate].
-  - destruct l2 as [|y l2]; [discriminate|].
-    rewrite !big_sepL_cons. cbn [length] in Hlen.
-    rewrite (IH l2 (fun i => Φ (S i)) ltac:(lia)). reflexivity.
+  intro Hi.
+  assert (Hsub : ({[ i ]} : gset nat) ⊆ X).
+  { intros x Hx. apply elem_of_singleton in Hx as ->. exact Hi. }
+  pose proof (subseteq_size _ _ Hsub) as Hle.
+  rewrite (size_difference _ _ Hsub) size_singleton.
+  rewrite size_singleton in Hle. lia.
 Qed.
 
-Lemma disk_sector_receipts_of_keys `{!riscvFixedGS Σ} {A : Type}
-    (l : list A) (w : disk_wr) (Qs : nat -> iProp Σ) :
-  length l = wr_nsectors w ->
-  ([∗ list] i ↦ _ ∈ l, Qs i) ⊢ disk_sector_receipts w Qs.
+(* THE LEAF: nothing left to land, so the obligation is the completion's own
+   identity permit. *)
+Lemma sperm_nil `{!riscvFixedGS Σ} (gd : nat) (w : disk_wr) (Q : iProp Σ) :
+  sperm gd w ∅ Q = disk_write_permit gd None Q.
+Proof. rewrite /sperm size_empty //. Qed.
+
+(* THE STEP: with sectors outstanding the obligation is the conjunction over
+   them, each branch owing the residual. *)
+Lemma sperm_cons `{!riscvFixedGS Σ} (gd : nat) (w : disk_wr)
+    (todo : gset nat) (Q : iProp Σ) :
+  todo ≠ ∅ ->
+  sperm gd w todo Q ⊣⊢
+    (∀ i : nat, ⌜i ∈ todo⌝ -∗
+       disk_write_permit gd (wr_sector w i) (sperm gd w (todo ∖ {[ i ]}) Q)).
 Proof.
-  intro Hlen. rewrite /disk_sector_receipts.
-  rewrite (big_sepL_index_len l (seq 0 (wr_nsectors w)) Qs);
-    [reflexivity | by rewrite length_seq]. 
+  intro Hne. rewrite {1}/sperm.
+  destruct (set_choose_L todo Hne) as [x Hx].
+  pose proof (size_diff_one todo x Hx) as Hsx.
+  destruct (size todo) as [|k] eqn:Hs; [exfalso; lia|].
+  cbn [sperm_aux]. iSplit.
+  - iIntros "H" (i) "%Hi". rewrite /sperm.
+    rewrite (_ : size (todo ∖ {[ i ]}) = k);
+      [| pose proof (size_diff_one todo i Hi); lia].
+    by iApply "H".
+  - iIntros "H" (i) "%Hi".
+    rewrite (_ : k = size (todo ∖ {[ i ]}));
+      [| pose proof (size_diff_one todo i Hi); lia].
+    by iApply "H".
 Qed.
 
-(* A READ IS STILL FREE: it moves no disk byte, hence has no sectors. *)
-Lemma disk_sector_permits_none `{!riscvFixedGS Σ} (gd : nat)
-    (Qs : nat -> iProp Σ) :
-  ⊢ disk_sector_permits gd None Qs.
-Proof. rewrite /disk_sector_permits. cbn [wr_nsectors seq]. done. Qed.
+Lemma singleton_ne_empty (i : nat) : ({[ i ]} : gset nat) ≠ ∅.
+Proof.
+  intro Hc. apply (elem_of_empty (C := gset nat) i).
+  rewrite -Hc. by apply elem_of_singleton.
+Qed.
 
-Lemma disk_sector_receipts_none `{!riscvFixedGS Σ} (Qs : nat -> iProp Σ) :
-  ⊢ disk_sector_receipts None Qs.
-Proof. rewrite /disk_sector_receipts. cbn [wr_nsectors seq]. done. Qed.
+(* ONE sector outstanding: the branch and then the leaf. *)
+Lemma sperm_one `{!riscvFixedGS Σ} (gd : nat) (w : disk_wr) (i : nat)
+    (Q : iProp Σ) :
+  sperm gd w {[ i ]} Q ⊣⊢
+    disk_write_permit gd (wr_sector w i) (disk_write_permit gd None Q).
+Proof.
+  rewrite (sperm_cons gd w {[ i ]} Q (singleton_ne_empty i)).
+  assert (Hd : ({[ i ]} : gset nat) ∖ {[ i ]} = ∅).
+  { apply set_eq. intro x. rewrite elem_of_difference elem_of_empty. tauto. }
+  iSplit.
+  - iIntros "H". iSpecialize ("H" $! i with "[%]").
+    { by apply elem_of_singleton. }
+    rewrite Hd sperm_nil. iExact "H".
+  - iIntros "H" (j) "%Hj". apply elem_of_singleton in Hj as ->.
+    rewrite Hd sperm_nil. iExact "H".
+Qed.
+
+(* the permit is MONOTONE in its receipt -- what lets a chain written in the
+   plain nested form be read as the residual [sperm] *)
+Lemma disk_write_permit_mono `{!riscvFixedGS Σ} (gd : nat) (w : disk_wr)
+    (Q Q' : iProp Σ) :
+  (Q -∗ Q') -∗ disk_write_permit gd w Q -∗ disk_write_permit gd w Q'.
+Proof.
+  iIntros "HQ Hp". rewrite /disk_write_permit.
+  iIntros (dk n) "Hs %Hn Ha HP".
+  iMod ("Hp" $! dk n with "Hs [//] Ha HP") as "(Ha & HP & Hs & HQ0)".
+  iModIntro. iFrame "Ha HP Hs". by iApply "HQ".
+Qed.
+
+Lemma sperm_one_intro `{!riscvFixedGS Σ} (gd : nat) (w : disk_wr) (i : nat)
+    (Q : iProp Σ) :
+  disk_write_permit gd (wr_sector w i) (disk_write_permit gd None Q)
+  ⊢ sperm gd w {[ i ]} Q.
+Proof. rewrite (sperm_one gd w i Q). done. Qed.
+
+(* A READ IS STILL FREE at the sequence level: no sector, so the sequential
+   permit IS the completion's identity permit. *)
+Lemma disk_seq_permit_none `{!riscvFixedGS Σ} (gd : nat) (Q : iProp Σ) :
+  disk_seq_permit gd None Q = disk_write_permit gd None Q.
+Proof. rewrite /disk_seq_permit /=. apply sperm_nil. Qed.
+
+(* THE TWO-SECTOR FORM -- an xv6 BLOCK ([BSIZE] = 2 * 512).  This is what the
+   FS layer builds: the two landing orders, proved from the SAME resources
+   (that is the [∧]), each order a chain of two record-level view shifts
+   ending in the completion's. *)
+Lemma disk_seq_permit_two `{!riscvFixedGS Σ} (gd : nat) (w : disk_wr)
+    (Q : iProp Σ) :
+  wr_nsectors w = 2%nat ->
+  (disk_write_permit gd (wr_sector w 0)
+     (disk_write_permit gd (wr_sector w 1) (disk_write_permit gd None Q))
+   ∧ disk_write_permit gd (wr_sector w 1)
+     (disk_write_permit gd (wr_sector w 0) (disk_write_permit gd None Q)))
+  ⊢ disk_seq_permit gd w Q.
+Proof.
+  intro Hn. rewrite /disk_seq_permit Hn.
+  assert (Hne : set_seq (C := gset nat) 0 2 ≠ ∅).
+  { intro Hc. apply (elem_of_empty (C := gset nat) 0%nat).
+    rewrite -Hc. apply elem_of_set_seq. lia. }
+  assert (Hd0 : set_seq (C := gset nat) 0 2 ∖ {[ 0%nat ]} = {[ 1%nat ]}).
+  { apply set_eq. intro x.
+    rewrite elem_of_difference elem_of_set_seq !elem_of_singleton. lia. }
+  assert (Hd1 : set_seq (C := gset nat) 0 2 ∖ {[ 1%nat ]} = {[ 0%nat ]}).
+  { apply set_eq. intro x.
+    rewrite elem_of_difference elem_of_set_seq !elem_of_singleton. lia. }
+  rewrite (sperm_cons gd w (set_seq 0 2) Q Hne).
+  iIntros "H" (i) "%Hi".
+  assert (Hi01 : i = 0%nat \/ i = 1%nat)
+    by (apply elem_of_set_seq in Hi; lia).
+  destruct Hi01 as [-> | ->].
+  - rewrite Hd0. iDestruct "H" as "[H _]".
+    iApply (disk_write_permit_mono with "[] H").
+    iIntros "Hr". iApply (sperm_one_intro gd w 1%nat Q). iExact "Hr".
+  - rewrite Hd1. iDestruct "H" as "[_ H]".
+    iApply (disk_write_permit_mono with "[] H").
+    iIntros "Hr". iApply (sperm_one_intro gd w 0%nat Q). iExact "Hr".
+Qed.
 
 (* A REAL WRITE'S PERMIT IS NOT FREE, and that is the honest content of the
    reshape: the completion moves the crash predicate's index, so somebody has
    to say what the predicate does under that move.  There is therefore NO
    [Pc]-generic write permit, and no bridge lemma either: the four WAL write
    kinds each prove their own fupd against the FS's own crash predicate
-   ([FsCrash.fs_logfill_permit] / [_commit_permit] / [_install_permit] /
-   [_clear_permit], phase C2b/D1 stage 4).  The earlier placeholder premise
+   ([FsCrash.fs_logfill_seq_permit] / [_commit_seq_permit] /
+   [_install_seq_permit] / [_clear_seq_permit], phase C2b/D1 stage 4).  The earlier placeholder premise
    [crash_pred_indifferent], which said the system promises nothing about
    durability, was DELETED when those landed rather than discharged: it is
    FALSE at the real [P_fs], so keeping it would have made every WAL

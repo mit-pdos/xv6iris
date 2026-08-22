@@ -572,7 +572,7 @@ Section WriteHeadBlocks.
     ([∗ list] i ↦ w ∈ W, lh_block i ↦₄ w) -∗
     (∀ bs' : list (bv 8), ⌜length bs' = 1024%nat⌝ -∗ ⌜hdr_n bs' = Z.of_nat n⌝ -∗
        ⌜hdr_dec bs' = (n, map uint W)⌝ -∗
-       disk_write_permit gen_id (Some ((1024 * log_hdr_bno logstart)%Z, bs')) Q) -∗
+       disk_seq_permit gen_id (Some ((1024 * log_hdr_bno logstart)%Z, bs')) Q) -∗
     wh_cont (CID0 := CID0)  γfs bn logstart n W L pidv dq j m K eb b lks Vpr Q -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1083,7 +1083,7 @@ Section WriteHeadBlocks.
     ([∗ list] i0 ↦ w ∈ W, lh_block i0 ↦₄ w) -∗
     (∀ bs' : list (bv 8), ⌜length bs' = 1024%nat⌝ -∗ ⌜hdr_n bs' = Z.of_nat n⌝ -∗
        ⌜hdr_dec bs' = (n, map uint W)⌝ -∗
-       disk_write_permit gen_id (Some ((1024 * log_hdr_bno logstart)%Z, bs')) Q) -∗
+       disk_seq_permit gen_id (Some ((1024 * log_hdr_bno logstart)%Z, bs')) Q) -∗
     wh_cont (CID0 := CID0)  γfs bn logstart n W L pidv dq j m K eb b lks Vpr Q -∗
     WP (Loop : expr riscv_lang).
   Proof.

@@ -137,7 +137,7 @@ Definition wp_end_op_sconf_body
      the machine layer's crash predicate with THIS file system's [P_fs].  It
      is what lets the commit path's four writes -- the log fills, the commit
      header, the installs and the clear -- carry REAL durability fupds
-     ([FsCrash.fs_logfill_permit] and its three siblings).  The era
+     ([FsCrash.fs_logfill_seq_permit] and its three siblings).  The era
      certificate beside it is what identifies the crash record's checked-out
      arm as THIS era's; the swap receipt the same squeeze needs rides
      [log_ctx] already. *)

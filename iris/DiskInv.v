@@ -354,13 +354,14 @@ Section DiskInv.
        disk_bytes γ (vs_sector_off (dc_slot v)) bs ∗
        (* THE SPENT CRASH PERMIT's token (PermInv.v).  It is named at the
           CLAIM's own slot, so a woken publisher -- whose claim fragment pins
-          [dc_slot v], hence [vs_perm (dc_slot v)] and [vs_perms (dc_slot v)]
-          -- gets them back at exactly the keys IT deposited, and can
-          therefore match the invariant's receipts against its own saved
-          propositions.  An existential key here would come back opaque and no
-          receipt could ever be collected (the [vs_data] rule, one layer up).
-          There are [1 + wr_nsectors] of them now: the request's completion
-          and one per 512-byte sector landing (sector-atomic-disk.md). *)
+          [dc_slot v], hence [vs_perm (dc_slot v)] -- gets it back at exactly
+          the key IT deposited, and can therefore match the invariant's
+          receipt against its own saved proposition.  An existential key here
+          would come back opaque and no receipt could ever be collected (the
+          [vs_data] rule, one layer up).  ONE token, not one per sector: the
+          request's whole obligation is a single SEQUENTIAL permit whose cell
+          was re-indexed at each landing and spent at the completion
+          (sector-atomic-disk.md §6e). *)
        slot_perms_done γ (dc_slot v) ∗
        (if vs_is_out (dc_slot v) then emp
         else phys_list (vr_buf (vs_req (dc_slot v))) bs))%I.
@@ -967,16 +968,16 @@ Qed.
    request.  Pure data; it is what lets the woken publisher recognize its own
    receipt, since its claim pins the slot. *)
 Definition rw_slot (hd : nat) (ty : bv 32) (sec : bv 64) (buf sts : Arch.pa)
-    (bs : list (bv 8)) (kq : nat * positive) (ks : list (nat * positive))
+    (bs : list (bv 8)) (kq : nat * positive)
   : vslot :=
   VSlot (VioReq (Z_to_bv 16 (Z.of_nat hd)) ty sec buf (Z_to_bv 32 1024) sts)
-        bs kq ks.
+        bs kq.
 
 (* THE PUBLISHED SLOT'S WRITE IDENTITY (phase C2a), by conversion: what the
    crash permit deposited with this request has to be indexed by. *)
 Lemma rw_slot_wr (hd : nat) (ty : bv 32) (sec : bv 64) (buf sts : Arch.pa)
-    (bs : list (bv 8)) (kq : nat * positive) (ks : list (nat * positive)) :
-  vs_wr (rw_slot hd ty sec buf sts bs kq ks)
+    (bs : list (bv 8)) (kq : nat * positive) :
+  vs_wr (rw_slot hd ty sec buf sts bs kq)
   = (if bv_unsigned ty =? virtio_blk_t_out
      then Some (bv_unsigned sec * 512, bs) else None).
 Proof. reflexivity. Qed.
@@ -991,7 +992,7 @@ Qed.
 Lemma mk_pin_slot_ok
     (c : virtio_cfg) (p : nat) (pd : Arch.pa) (pin : gmap Arch.pa (bv 8))
     (hd md td : nat) (hops buf sts : Arch.pa) (ty : bv 32) (sec : bv 64)
-    (bs : list (bv 8)) (kq : nat * positive) (ks : list (nat * positive)) :
+    (bs : list (bv 8)) (kq : nat * positive) :
   vc_qnum c = Z_to_bv 32 8 ->
   vc_desc c = pd ->
   (hd < 8)%nat -> (md < 8)%nat -> (td < 8)%nat ->
@@ -1017,7 +1018,7 @@ Lemma mk_pin_slot_ok
   (* the status byte is in [struct disk], the buffer in a [struct buf]: the
      device's status write never lands inside the data it is filling in *)
   sts ∉ pa_range buf 1024 ->
-  slot_pin_ok c p (rw_slot hd ty sec buf sts bs kq ks) pin.
+  slot_pin_ok c p (rw_slot hd ty sec buf sts bs kq) pin.
 Proof.
   intros Hq Hc Hh Hm Ht Hring Hdh Hdm Hdt Hty Hsec Htyv Hout Hstat.
   (* the two flag computations *)

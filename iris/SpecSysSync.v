@@ -24,7 +24,7 @@
    making once the thing waited for can be NAMED -- which for this function
    means a durability receipt indexed by the commit that produced it.  That
    receipt does not exist yet: [ProofEndOp] holds the commit's
-   [FsCrash.fs_receipt_any] (it is what [fs_commit_permit] hands back) and
+   [FsCrash.fs_receipt_any] (what [fs_commit_seq_permit] hands back) and
    drops it, and nothing in [LogInv] records which commit a client's writes
    landed in.  The design note (claude-notes/design/fs-log.md, item 5) has
    the two additions that would let this postcondition say something --
