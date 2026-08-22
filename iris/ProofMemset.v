@@ -127,9 +127,6 @@ Section ProofMemset.
     induction rem as [|rem' IH]; intros CID off m Hoff Hrem Hcur Hm4 Hm1;
       [ exfalso; lia | ].
     iIntros "Hcg #Htext Hpc Hbuf Hcont".
-    iPoseProof (Hext0 with "Htext") as "Hi0".
-    iPoseProof (Hext4 with "Htext") as "Hi4".
-    iPoseProof (Hext6 with "Htext") as "Hi6".
     (* off < N, and the current byte is offset off *)
     assert (HoffN : (off < N)%nat) by lia.
     (* peel the head byte of the pending buffer *)
@@ -148,14 +145,16 @@ Section ProofMemset.
     { intro H. rewrite (rget_ne (CID := H) m ra1 Hra1tp). exact Hm1. }
     (* --- 0xce0: sb a1, 0(a5) : fill byte [off] --- *)
     iApply (wp_sb_s_sconf (kt := kt) (ktd := ktb) pc0 ra1 ra5 (mword_of_int 0) m n (olds off) b
-              with "Hcg Hpc Hi0 [Hb0]").
+              with "Hcg Hpc [] [Hb0]").
+    { iApply (Hext0 with "Htext"). }
     { rewrite Hcur'. rewrite -ms_pa_sb_pa. iExact "Hb0". }
     iIntros (CID1 Hs1) "Hcg Hpc Hb0".
     (* --- 0xce4: c.addi a5, a5, 1 : a5 := a5 + 1 --- *)
     iApply (wp_caddi_s_sconf pc4 ra5 (mword_of_int 1) m n b
               Hra5 (conj Hra5sp Hra5tp)
-              with "Hcg [Hpc] Hi4").
+              with "Hcg [Hpc] []").
     { unfold pc4. iExact "Hpc". }
+    { iApply (Hext4 with "Htext"). }
     iIntros (CID2 Hs2) "Hcg Hpc".
     (* normalise the written value to [ms_addr p (S off)] IN the bundle, so
        the map the rest of the proof carries is hart-free. *)
@@ -185,8 +184,9 @@ Section ProofMemset.
         rewrite HSN Nat.eqb_refl. reflexivity. }
       iApply (wp_bne_fall_s_sconf pc6 imm_bne ra4 ra5 m' n b
                 Hra5 Hra4 (Hbcmp _)
-                with "Hcg [Hpc] Hi6").
+                with "Hcg [Hpc] []").
       { unfold pc6. iExact "Hpc". }
+      { iApply (Hext6 with "Htext"). }
       iIntros (CID3 Hs3) "Hcg Hpc".
       (* the cursor's final value IS [ms_addr p N] on the last iteration *)
       assert (Hm'N : m' = <[Regidx ra5 := regval_into_reg (ms_addr p N)]> m)
@@ -207,8 +207,9 @@ Section ProofMemset.
       iApply (wp_bne_taken_s_sconf pc6 imm_bne ra4 ra5 m' n b
                 Hra5 Hra4 (Hbcmp _)
                 ltac:(rewrite Hback; exact Hal0)
-                with "Hcg [Hpc] Hi6").
+                with "Hcg [Hpc] []").
       { unfold pc6. iExact "Hpc". }
+      { iApply (Hext6 with "Htext"). }
       iNext.
       iIntros (CID3 Hs3) "Hcg Hpc".
       rewrite Hback.

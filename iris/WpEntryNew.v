@@ -225,15 +225,8 @@ Section WpEntryNew.
     iIntros (Hpmp)
       "Hmm Hpmpc Hpc Hfile Hmh Hbytes #Htext Hcont".
     pose proof (pmp_all_off_allows_all _ Hpmp) as HpmpU.
-    (* derive the eight [instr] facts off the (persistent) text image *)
-    iPoseProof (entry_instr_auipc with "Htext") as "Hi0".
-    iPoseProof (entry_instr_ld    with "Htext") as "Hi1".
-    iPoseProof (entry_instr_clui  with "Htext") as "Hi2".
-    iPoseProof (entry_instr_csrr  with "Htext") as "Hi3".
-    iPoseProof (entry_instr_caddi with "Htext") as "Hi4".
-    iPoseProof (entry_instr_mul   with "Htext") as "Hi5".
-    iPoseProof (entry_instr_cadd  with "Htext") as "Hi6".
-    iPoseProof (entry_instr_jal   with "Htext") as "Hi7".
+    (* the eight [instr] facts are closed as subgoals off the (persistent)
+       text image at each leaf, never posed into the context *)
     (* register-nonzero side conditions (all targets are sp/a0/a1/ra <> x0) *)
     assert (Hrd0 : uint i_auipc <> 0) by (vm_compute; discriminate).
     assert (Hrd1 : uint i_ld <> 0) by (vm_compute; discriminate).
@@ -246,7 +239,8 @@ Section WpEntryNew.
 
     (* ---- 1. AUIPC @ pc_e0: sp := entry_sp1 ---- *)
     iApply (wp_auipc_gpr pc_e0 i_auipc imm_auipc m pmpcfg0 1%Qp HpmpU ltac:(boot_static) Hrd0
-              with "Hmm Hpmpc Hpc Hfile Hi0").
+              with "Hmm Hpmpc Hpc Hfile []").
+    { iApply (entry_instr_auipc with "Htext"). }
     iEval (rewrite pc_e0_e1).
     iIntros "Hmm Hpmpc Hpc Hfile".
     (* fold the AUIPC continuation map into [m_auipc m] *)
@@ -262,7 +256,8 @@ Section WpEntryNew.
       rewrite reg_ld_auipc.
       rewrite upd_eq. reflexivity. }
     iApply (wp_ld_gpr pc_e1 false i_ld i_ld imm_ld (m_auipc m) v_stack0 pmpcfg0 1%Qp
-              (dq := dq) Hpmp ltac:(boot_static) Hrd1 with "Hmm Hpmpc Hpc Hfile Hi1 [Hbytes]").
+              (dq := dq) Hpmp ltac:(boot_static) Hrd1 with "Hmm Hpmpc Hpc Hfile [] [Hbytes]").
+    { iApply (entry_instr_ld with "Htext"). }
     { rewrite Hea. iExact "Hbytes". }
     iEval (rewrite pc_e1_e2).
     iIntros "Hmm Hpmpc Hpc Hfile Hbytes".
@@ -273,7 +268,8 @@ Section WpEntryNew.
     (* ---- 3. C.LUI @ pc_e2: a0 := 0x1000 ---- *)
     iApply (wp_lui_gpr pc_e2 true (regidx_bits rd_clui) (sign_extend' 20 imm_clui)
               (m_ld m v_stack0) pmpcfg0 1%Qp HpmpU ltac:(boot_static) Hrd2
-              with "Hmm Hpmpc Hpc Hfile Hi2").
+              with "Hmm Hpmpc Hpc Hfile []").
+    { iApply (entry_instr_clui with "Htext"). }
     iEval (change (if true then 2%Z else 4%Z) with 2%Z).
     iEval (rewrite pc_e2_e3).
     iIntros "Hmm Hpmpc Hpc Hfile".
@@ -284,7 +280,8 @@ Section WpEntryNew.
     (* ---- 4. CSRRS @ pc_e3 (2-aligned): a1 := mhartid ---- *)
     iApply (wp_csrr_mhartid_gpr pc_e3 i_rd_csrr mhartid_in
               (m_clui m v_stack0) pmpcfg0 1%Qp HpmpU ltac:(boot_static) Hrd3
-              with "Hmm Hpmpc Hpc Hfile Hmh Hi3").
+              with "Hmm Hpmpc Hpc Hfile Hmh []").
+    { iApply (entry_instr_csrr with "Htext"). }
     iEval (rewrite pc_e3_e4).
     iIntros "Hmm Hpmpc Hpc Hfile Hmh".
     iEval (change (<[Regidx i_rd_csrr := regval_into_reg mhartid_in]> (m_clui m v_stack0))
@@ -294,7 +291,8 @@ Section WpEntryNew.
     iApply (wp_addi_gpr pc_e4 true (regidx_bits rsd_caddi) (regidx_bits rsd_caddi)
               (sign_extend' 12 imm_caddi)
               (m_csrr m v_stack0 mhartid_in) pmpcfg0 1%Qp HpmpU ltac:(boot_static) Hrd4
-              with "Hmm Hpmpc Hpc Hfile Hi4").
+              with "Hmm Hpmpc Hpc Hfile []").
+    { iApply (entry_instr_caddi with "Htext"). }
     iEval (change (if true then 2%Z else 4%Z) with 2%Z).
     iEval (rewrite pc_e4_e5).
     iIntros "Hmm Hpmpc Hpc Hfile".
@@ -308,7 +306,8 @@ Section WpEntryNew.
     (* ---- 6. MUL @ pc_e5: a0 := a0 * a1 ---- *)
     iApply (wp_mul_gpr pc_e5 i_mul_rs2 i_mul_rs1 i_mul_rd
               (m_caddi m v_stack0 mhartid_in) pmpcfg0 HpmpU ltac:(boot_static) Hrd5
-              with "Hmm Hpmpc Hpc Hfile Hi5").
+              with "Hmm Hpmpc Hpc Hfile []").
+    { iApply (entry_instr_mul with "Htext"). }
     iEval (rewrite pc_e5_e6).
     iIntros "Hmm Hpmpc Hpc Hfile".
     iEval (change (<[Regidx i_mul_rd :=
@@ -324,7 +323,8 @@ Section WpEntryNew.
     iApply (wp_add_gpr pc_e6 true (regidx_bits rs2_cadd) (regidx_bits rsd_cadd)
               (regidx_bits rsd_cadd)
               (m_mul m v_stack0 mhartid_in) pmpcfg0 1%Qp HpmpU ltac:(boot_static) Hrd6
-              with "Hmm Hpmpc Hpc Hfile Hi6").
+              with "Hmm Hpmpc Hpc Hfile []").
+    { iApply (entry_instr_cadd with "Htext"). }
     iEval (change (if true then 2%Z else 4%Z) with 2%Z).
     iEval (rewrite pc_e6_e7).
     iIntros "Hmm Hpmpc Hpc Hfile".
@@ -338,7 +338,8 @@ Section WpEntryNew.
     (* ---- 8. JAL @ pc_e7 (2-aligned): ra := pc+4; PC := start ---- *)
     iApply (wp_jal_gpr pc_e7 i_jal imm_jal
               (m_cadd m v_stack0 mhartid_in) pmpcfg0 1%Qp HpmpU ltac:(boot_static) Hrd7 jal_aligned
-              with "Hmm Hpmpc Hpc Hfile Hi7").
+              with "Hmm Hpmpc Hpc Hfile []").
+    { iApply (entry_instr_jal with "Htext"). }
     iEval (rewrite pc_e7_start).
     iIntros "Hmm Hpmpc Hpc Hfile".
     iEval (change (<[Regidx i_jal := regval_into_reg (add_vec_int pc_e7 4)]>

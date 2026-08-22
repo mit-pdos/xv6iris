@@ -71,18 +71,13 @@ Section WpMemsetArray.
     { unfold sp', imm_entry, pa_stk, add_vec_int. apply f_equal.
       apply bv_eq; vm_compute; reflexivity. }
     iIntros "Hcg #Htext Hpc Hbuf Hcont".
-    iPoseProof (minstr_000 with "Htext") as "Hi0".
-    iPoseProof (minstr_002 with "Htext") as "Hi2".
-    iPoseProof (minstr_004 with "Htext") as "Hi4".
-    iPoseProof (minstr_006 with "Htext") as "Hi6".
-    iPoseProof (minstr_008 with "Htext") as "Hi8".
-    iPoseProof (minstr_01e with "Htext") as "HiL0".
-    iPoseProof (minstr_020 with "Htext") as "HiL2".
-    iPoseProof (minstr_022 with "Htext") as "HiL4".
-    iPoseProof (minstr_024 with "Htext") as "HiL6".
     (* --- HEAD: 0x00..0x06 --- *)
     iApply (Memset.wp_memset_head_sconf kt m0 n imm_entry nzimm_s0 b pcur Hn Hsp'
-              with "Hcg Hpc Hi0 Hi2 Hi4 Hi6 [-]").
+              with "Hcg Hpc [] [] [] [] [-]").
+    { iApply (minstr_000 with "Htext"). }
+    { iApply (minstr_002 with "Htext"). }
+    { iApply (minstr_004 with "Htext"). }
+    { iApply (minstr_006 with "Htext"). }
     iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hcg Hpc Hbra Hbs0".
     (* --- SKIP: the count is zero, so 0x08 branches to the epilogue --- *)
     assert (Hz : eq_vec (m2 !!! Regidx a2_idx) zero_reg = true).
@@ -95,14 +90,19 @@ Section WpMemsetArray.
                  = (mword_of_int (KernelSyms.memset + 0x1e) : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iApply (Memset.wp_memset_skip_sconf kt m2 (n - 2)%nat imm8_beqz b pcur Hz Htgt
-              with "Hcg Hpc Hi8 [-]").
+              with "Hcg Hpc [] [-]").
+    { iApply (minstr_008 with "Htext"). }
     iEval (rewrite /wp_next). iIntros (CID2 Hs2) "Hcg Hpc".
     (* --- SUFFIX: 0x1e..0x24 --- *)
     assert (Hsuf_sp : m2 !!! Regidx csp_rs1 = sp').
     { unfold m2. rewrite upd_ne; [| vm_compute; discriminate].
       unfold m1. apply upd_eq. }
     iApply (Memset.wp_memset_suffix_sconf kt m2 (n - 2)%nat ra0 s00 b pcur
-              with "Hcg HiL0 HiL2 HiL4 HiL6 Hpc [Hbra] [Hbs0] [-]").
+              with "Hcg [] [] [] [] Hpc [Hbra] [Hbs0] [-]").
+    { iApply (minstr_01e with "Htext"). }
+    { iApply (minstr_020 with "Htext"). }
+    { iApply (minstr_022 with "Htext"). }
+    { iApply (minstr_024 with "Htext"). }
     { iEval (rewrite Hsuf_sp). iExact "Hbra". }
     { iEval (rewrite Hsuf_sp). iExact "Hbs0". }
     iEval (rewrite /wp_next). iIntros (CID3 Hs3 mfin) "Hcg Hpc %Hmeq".
@@ -163,19 +163,6 @@ Section WpMemsetArray.
     { iApply (big_sepL_impl with "Hbuf0"). iIntros "!>" (k j _) "H".
       rewrite ms_pa_ms_addr. iExact "H". }
     (* --- prefix/loop/suffix instr resources --- *)
-    iPoseProof (minstr_000 with "Htext") as "Hi0".
-    iPoseProof (minstr_002 with "Htext") as "Hi2".
-    iPoseProof (minstr_004 with "Htext") as "Hi4".
-    iPoseProof (minstr_006 with "Htext") as "Hi6".
-    iPoseProof (minstr_008 with "Htext") as "Hi8".
-    iPoseProof (minstr_00a with "Htext") as "Hi10".
-    iPoseProof (minstr_00c with "Htext") as "Hi12".
-    iPoseProof (minstr_00e with "Htext") as "Hi14".
-    iPoseProof (minstr_010 with "Htext") as "Hi16".
-    iPoseProof (minstr_01e with "Htext") as "HiL0".
-    iPoseProof (minstr_020 with "Htext") as "HiL2".
-    iPoseProof (minstr_022 with "Htext") as "HiL4".
-    iPoseProof (minstr_024 with "Htext") as "HiL6".
     (* the value-coupling premises for the setup and the loop *)
     assert (Hn0 : eq_vec (m2 !!! Regidx a2_idx) zero_reg = false).
     { unfold m2, m1.
@@ -205,12 +192,21 @@ Section WpMemsetArray.
       apply bv_eq; vm_compute; reflexivity. }
     (* --- HEAD: 0x00..0x06 --- *)
     iApply (Memset.wp_memset_head_sconf kt m0 n imm_entry nzimm_s0 b pcur Hn Hsp'
-              with "Hcg Hpc Hi0 Hi2 Hi4 Hi6 [-]").
+              with "Hcg Hpc [] [] [] [] [-]").
+    { iApply (minstr_000 with "Htext"). }
+    { iApply (minstr_002 with "Htext"). }
+    { iApply (minstr_004 with "Htext"). }
+    { iApply (minstr_006 with "Htext"). }
     iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hcg Hpc Hbra Hbs0".
     (* --- SETUP: 0x08..0x10 (the count is nonzero: c.beqz falls through) --- *)
     iApply (Memset.wp_memset_setup_sconf kt m2 (n - 2)%nat shamt_l shamt_r imm8_beqz
               wval_add b pcur Hn0 Hvalue_add
-              with "Hcg Hpc Hi8 Hi10 Hi12 Hi14 Hi16 [-]").
+              with "Hcg Hpc [] [] [] [] [] [-]").
+    { iApply (minstr_008 with "Htext"). }
+    { iApply (minstr_00a with "Htext"). }
+    { iApply (minstr_00c with "Htext"). }
+    { iApply (minstr_00e with "Htext"). }
+    { iApply (minstr_010 with "Htext"). }
     iEval (rewrite /wp_next). iIntros (CID2 Hs2) "Hcg Hpc".
     change (<[Regidx a4_idx := regval_into_reg wval_add]> m5) with m6.
     (* pc at pcE+20 = memset+0x14 = loop top *)
@@ -262,7 +258,11 @@ Section WpMemsetArray.
       repeat (rewrite upd_ne; [| vm_compute; discriminate]).
       unfold ra0; reflexivity. }
     iApply (Memset.wp_memset_suffix_sconf kt m7 (n - 2)%nat ra0 s00 b pcur
-              with "Hcg HiL0 HiL2 HiL4 HiL6 Hpc [Hbra] [Hbs0] [-]").
+              with "Hcg [] [] [] [] Hpc [Hbra] [Hbs0] [-]").
+    { iApply (minstr_01e with "Htext"). }
+    { iApply (minstr_020 with "Htext"). }
+    { iApply (minstr_022 with "Htext"). }
+    { iApply (minstr_024 with "Htext"). }
     { iEval (rewrite Hsuf_sp). iExact "Hbra". }
     { iEval (rewrite Hsuf_sp). iExact "Hbs0". }
     iEval (rewrite /wp_next). iIntros (CID4 Hs4 mfin) "Hcg Hpc %Hmeq".
