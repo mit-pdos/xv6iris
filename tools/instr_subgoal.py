@@ -33,18 +33,23 @@ import re
 import sys
 
 # iPoseProof (<lemma> with "Htext") as "<hyp>".
-POSE = re.compile(r'iPoseProof \((\w+) with "Htext"\) as "(\w+)"\.')
+POSE = re.compile(r'iPoseProof \((\w+) with "Htext"\) as "([^"\s]+)"\.')
 # a whole line that is nothing but one or more such poses
-POSE_LINE = re.compile(r'^[ \t]*(?:iPoseProof \(\w+ with "Htext"\) as "\w+"\. ?)+\n',
+POSE_LINE = re.compile(r'^[ \t]*(?:iPoseProof \(\w+ with "Htext"\) as "[^"\s]+"\. ?)+\n',
                        re.M)
 # a conforming call site: the instr hypothesis is the third thing handed to a
 # leaf, and the sentence ends on this line
-SITE = re.compile(r'^([ \t]*)(.*with "Hcg Hpc )(\w+)([^"]*")\)\.$', re.M)
+SITE = re.compile(r'^([ \t]*)(.*with "Hcg Hpc )([^"\s]+?)(?=[ "])([^"]*")\)\.$', re.M)
 # [iClear "Ha Hb Hc".] -- the names may span a line break (ProofSysLink)
 CLEAR = re.compile(r'([ \t]*)iClear "([^"]*)"\s*\.')
 # every double-quoted string; an Iris hypothesis name only ever appears inside
 # one, which is how a Coq hypothesis of the SAME name is told apart (see scan)
 QUOTED = re.compile(r'"([^"]*)"', re.S)
+# a pose inside a [tac ; iPoseProof ... ;] preamble: the converter cannot touch
+# it (its use site ends in [;], not [).]), and POSE_LINE cannot delete it, so
+# "posed 0" would otherwise read as "fully converted" on a file still carrying
+# a whole chained block
+CHAINED = re.compile(r'iPoseProof \(\w+ with "Htext"\) as "[^"]+";')
 
 
 def scan(src):
@@ -182,23 +187,82 @@ def convert(src):
     return out, npose, nsite[0], nclear[0]
 
 
+QED = re.compile(r'^\s*(?:Qed|Defined)\.', re.M)
+
+
+def rank(files):
+    """Rank candidates by expected payoff, best first.
+
+    Measured over 111 conversions, the thing that predicts the win is how much
+    of a PROOF sits under a live block -- not the file's pose count, not its
+    length, and not the largest contiguous run of pose lines.  Two corrections
+    the sweep had to make the hard way are built in here:
+
+      * poses killed by a later [iClear] were never live alongside the next
+        pose, so a "pose late, clear early" file has a live block of ~1 however
+        many poses it has (ProofVirtioDiskInit: 127 poses, -7.5%);
+      * the unit of Delta is the PROOF, not the file, so poses-per-Qed sorts a
+        set that peak-block leaves uncorrelated (ProofVirtioDiskRwD: 12 poses
+        over 84 lemmas, -4.8%).
+
+    Both columns are printed; sort key is poses-per-Qed, with peak live block
+    breaking ties.  Neither sizes the win to better than about +/-10 points --
+    ProofSysLink has the largest block in the tree and returned -14% because
+    most of its time is not proofmode work at all.
+    """
+    rows = []
+    for f in files:
+        src = open(f).read()
+        poses = POSE.findall(src)
+        if not poses:
+            continue
+        live, peak = 0, 0
+        for m in re.finditer(r'iPoseProof \(\w+ with "Htext"\) as "([^"\s]+)"\.'
+                             r'|iClear "([^"]*)"', src):
+            if m.group(1) is not None:
+                live += 1
+                peak = max(peak, live)
+            else:
+                live = max(0, live - len(m.group(2).split()))
+        qeds = max(1, len(QED.findall(src)))
+        ppq = len(poses) / qeds
+        # the score has to be small when EITHER correction bites: a clear-early
+        # file has a tiny peak however many poses it has, and a file of many
+        # small lemmas has a tiny poses-per-Qed however big one block is
+        rows.append((min(peak, ppq), peak, ppq, len(poses), qeds, f))
+    rows.sort(reverse=True)
+    print('%-30s %6s %6s %6s %9s %6s'
+          % ('file', 'poses', 'Qeds', 'peak', 'pose/Qed', 'score'))
+    for score, peak, ppq, n, q, f in rows:
+        print('%-30s %6d %6d %6d %9.1f %6.1f' % (f, n, q, peak, ppq, score))
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('files', nargs='+')
     ap.add_argument('--check', action='store_true',
                     help='report conformance and change nothing')
+    ap.add_argument('--rank', action='store_true',
+                    help='rank unconverted files by expected payoff, best first')
     args = ap.parse_args()
+
+    if args.rank:
+        return rank(args.files)
 
     rc = 0
     for f in args.files:
         src = open(f).read()
         resolved, sites, stray, poses, _ = scan(src)
+        chained = len(CHAINED.findall(src))
         if args.check:
+            state = ('CLEAN' if not stray else 'HAND WORK: '
+                     + ', '.join('%s x%d' % kv for kv in sorted(stray.items())))
+            if chained:
+                state += '  [+%d ;-CHAINED pose(s) the tool cannot touch]' % chained
             print('%-28s posed %3d/%3d  sites %3d  %s'
                   % (f, len(poses), sum(len(v) for v in poses.values()),
-                     len(sites),
-                     'CLEAN' if not stray else 'HAND WORK: '
-                     + ', '.join('%s x%d' % kv for kv in sorted(stray.items()))))
+                     len(sites), state))
             if stray:
                 rc = 1
             continue
