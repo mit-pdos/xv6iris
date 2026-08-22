@@ -1,5 +1,49 @@
 # The tier-2 containment worklist (was: the certification route)
 
+## CHECKPOINT (2026-08-22, SECOND PASS — end of the build session)
+## READ THIS FIRST; the design-session checkpoint right below stays as the
+## design record (its "next session" list is superseded by this one)
+
+**LANDED TODAY, after the design session, in commit order:** B2d′(a)
+the DIRECT LINEARIZATION (`WeakRvwmoTopo.v`: `topo_linearizes`,
+`topo_exists`, `normalize_of_acyclic`) + B1a′ CAUSAL HULLS
+(`WeakRvwmoHull.v`) — `af07389e`; the `Decision (RacyD)` instance
+(`WeakRvwmoDec.v`) + the W-TV line in `dedges` — `53b21cfb`; T2-0′/F3′
+the lock ALTERNATION export (`weak_ev_adequacy_lockalt`,
+`wlp_alt_two_acq`/`wlp_alt_open`) — `5c2b4c3e`; F5′ load-address
+provenance (`deps_addr`, DEC-4) — `2b8633fe`; T2-0′/F3″ the
+PROTECTED-BYTE export (`WProt`, `weak_ev_adequacy_prot`,
+`wprot_writer_cs` = `(P)`) — `57e468bb`; the satp-provenance edge
+(DEC-5) — `104cb3d2`; CSR provenance uniformly (DEC-6: 21
+pseudo-registers, `ORcsr` two-destination role, `sret`/`mret` as
+`jalr`-like on `sepc`/`mepc`) — this commit.  Every landing: tree
+green by `make -f CoqMakefile -k` (re-run by the orchestrator),
+`xv6_srvwmo_safe`'s assumptions unchanged (five rv64d reservation
+axioms), no Admitted.  THE CHAIN IS NOW: T2-LIN ⇒ `RacyD` acyclic ⇒
+`topo_linearizes` ⇒ T2-1c ⇒ T1; `normalize` is demoted to analysis.
+
+**WHAT REMAINS (in order):**
+1. **B1b** — the supply derivation for a hull's linearized cand, WITH
+   the device-order arm (`Rdev` as a sixth `R` arm; route-b §4d.4 B1b
+   note) and the conformance transport for hulls (`gdexec_conf_hull`:
+   `hart_conf_prefix` + `hart_conf_ren` over `hull_rows_rel`).
+2. **B2e-3b slice 2 — DEPENDENCY SOUNDNESS** (route-b §4e, read its
+   "two shapes" block): decide dynamic provenance (ii) vs decoded-role
+   coverage (i) — probe the instance's `RegRead` capture first; then
+   the per-instruction soundness lemma.  Residual already recorded:
+   trap ENTRY has no `stvec` edge (xv6 writes it from constants).
+3. **B2e-3b slice 3** — the gmo-ordered solo-run certification
+   (§4d.2(2)) on top of 1–2.
+4. **B2e-3c** — the per-segment classification / the T2-LIN induction
+   skeleton (strong induction on |V| over hulls; the cycle kill with
+   the three arms consuming `_lockalt`, `_prot`, φ).
+5. **B3** assembly, **R6**; the width-4/8 lift of `wprot_store`; the
+   `lock_pattern` failed-swap arm in `WeakRvwmoLock.v` (now only the
+   witness kit's hygiene, since the kill consumes the exports).
+
+**Tree:** `xv6-riscv/` is still off `XV6_REV` — never `make proofs` from
+the root here; `make -f CoqMakefile` inside `iris/` only.
+
 ## CHECKPOINT (2026-08-22, end of the B2e-3 DESIGN session) — READ THIS
 ## FIRST WHEN RESUMING; the 2026-08-21b checkpoint below is SUPERSEDED
 ## (kept for its landing record and design pointers)

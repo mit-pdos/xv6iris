@@ -93,6 +93,83 @@
       xv6's image contains exactly two forms — [csrw satp,rs1]
       (0x18079073 / 0x18031073 / 0x18051073, in [kvminithart] and
       [trampoline.S]) and [csrr rd,satp] (0x18002773, in [kernelvec]).
+
+      GENERALISED BY DEC-6 BELOW: [satp] is now one row of a CSR table, and
+      [deps_of_csr_satp] has become [deps_of_csr].  [SATP] is still [32].
+
+    (DEC-6 / CSR PROVENANCE FOR EVERY CSR xv6 WRITES FROM A GPR, 2026-08-22;
+     route-b design §4e's REFINEMENTS block)
+      DEC-5's argument is not special to [satp].  Any CSR a witness value can
+      reach decides something the hart later does: [sepc]/[mepc] decide the
+      [sret]/[mret] TARGET (so a witness value could choose the resumption
+      PC), [sscratch]/[mscratch] carry the trapframe pointer, [sstatus]/[sie]
+      the interrupt state, [stvec]/[mtvec] the trap entry.  D-4 dropped all of
+      them, so §4e's uniform rule replaces the per-CSR exception: EVERY CSR
+      the image touches gets a PSEUDO-REGISTER [32 + k] and the same role
+      rules, and only the CSRs OUTSIDE the table stay at [ORnone] (D-4 —
+      which is where the un-modelled remainder of the CSR space now lives).
+
+      THE TABLE ([csr_reg], §4a0) — 21 pseudo-registers, [32 .. 52]:
+        [satp] 0x180 -> 32     [sepc] 0x141 -> 33     [mepc] 0x341 -> 34
+        [sscratch] 0x140 -> 35 [mscratch] 0x340 -> 36 [stvec] 0x105 -> 37
+        [mtvec] 0x305 -> 38    [mstatus] 0x300 AND [sstatus] 0x100 -> 39
+        [mie] 0x304 AND [sie] 0x104 -> 40   [mip] 0x344 AND [sip] 0x144 -> 41
+        [medeleg] 0x302 -> 42  [mideleg] 0x303 -> 43  [pmpaddr0] 0x3b0 -> 44
+        [pmpcfg0] 0x3a0 -> 45  [mcounteren] 0x306 -> 46 [menvcfg] 0x30a -> 47
+        [mhartid] 0xf14 -> 48  [time] 0xc01 -> 49     [scause] 0x142 -> 50
+        [stval] 0x143 -> 51    [stimecmp] 0x14d -> 52
+      THE S-/M-ALIASES SHARE A PSEUDO-REGISTER ON PURPOSE: [sstatus] is a
+      restricted VIEW of the one physical [mstatus] (likewise [sie]/[mie],
+      [sip]/[mip]), and the Sail model has no separate register for it — a
+      [csrw sstatus,a5] emits [RegWrite mstatus].  One key for both is
+      therefore the only choice that makes the machine side land, and it is
+      an OVER-approximation on the read side (a [csrr rd,sstatus] inherits
+      the whole register's provenance), i.e. the safe polarity.
+
+      TWO DESTINATIONS, HONESTLY ([ORcsr], and DEC-5's under-modelling
+      RETRACTED).  A [csrrw/csrrs/csrrc(+i)] with [rd <> x0] writes BOTH the
+      CSR and [rd] (with the OLD CSR value).  The image HAS one:
+      [csrrci a5,sstatus,2] (0x100177f3, in [intr_get]).  Rather than grow a
+      second destination into every role, the CSR forms get their own
+      constructor [ORcsr p srcs rd] — "writes [p] from [srcs], and writes
+      [rd] from [p]" — and a SECOND projection [deps_rd2] beside [deps_rd];
+      [WeakEvLang.erw_of] consults [deps_rd] first and [deps_rd2] only when
+      the node's register did not match, so every pre-existing role (for
+      which [deps_rd2] is [None]) behaves exactly as before.  [rd = x0]
+      collapses [ORcsr] to the plain single-destination write, which is
+      xv6's [csrw] and 23 of the image's 24 write sites.
+
+      CONTROL THROUGH [sepc]/[mepc].  [sret] (funct3 = 0, funct12 = 0x102)
+      and [mret] (0x302) take the JALR-LIKE role [ORjalr 0 SEPC] /
+      [ORjalr 0 MEPC]: [deps_ctrl] of an [ORjalr] is its base register, so
+      the resumption PC's provenance flows into [ds_ctl] through the ordinary
+      [LCtrl] node ([WeakEvLang]'s [nextPC] arm, deviation D-9) and taints
+      every po-later store.  Link register [x0] means [deps_rd] is [None] —
+      neither instruction writes a GPR.  Reusing [ORjalr] is exactly the
+      point: no new path through [deps_ctrl] is created.
+
+      RESIDUAL (recorded, not fixed): TRAP ENTRY takes no [stvec]/[mtvec]
+      edge.  The emission's control hook is [erw_of]'s [nextPC] arm, whose
+      sources come from the DECODED ROLE OF THE CURRENT INSTRUCTION; a trap's
+      redirect is the same [RegWrite nextPC] node, and nothing at that node
+      distinguishes it from the instruction's own, so there is no place to
+      attach [stvec]'s provenance without a new emission hook.  xv6 writes
+      [stvec]/[mtvec] from CONSTANTS (the [kernelvec]/[uservec] addresses) at
+      boot and in [usertrapret], so no witness value can reach them; the
+      residual is recorded here and in route-b §4e, and it stays inside D-4.
+
+      Polarity, as in DEC-5: every clause ADDS sources (STRONGER — removes
+      behaviors); the justification is the privileged spec's discipline, not
+      RVWMO ppo, and [WeakRvwmoConf]'s [dedges] is UNCHANGED (only [satp]
+      feeds translation, so only [dprov s wsatp] is a store's extra source —
+      the new CSRs reach a store through [ds_ctl] and through GPR dataflow).
+
+      THE IMAGE'S SYSTEM INVENTORY (71 words, all 32-bit): 24 GPR writes
+      ([csrrw], funct3 = 1, [rd = x0] at all 24 sites) to 15 distinct CSRs;
+      31 pure reads ([csrrs] with [rs1 = x0]) of 12 CSRs; 6 immediate forms
+      on [sstatus] ([csrsi]/[csrci] x5 with [rd = x0], and the one
+      [csrrci a5,sstatus,2]); [sret] x2, [mret] x1, [wfi] x1,
+      [sfence.vma] x6, and no [ecall]/[ebreak] in the kernel image.
  *)
 From Stdlib.ssr Require Import ssreflect.
 From stdpp Require Import gmap finite list.
@@ -132,7 +209,14 @@ Inductive op_roles :=
 | ORbranch (rs1 rs2 : rnum)
 | ORjalr   (rd rs1 : rnum)
 | ORjal    (rd : rnum)
-| ORalu    (rd : rnum) (srcs : list rnum).
+| ORalu    (rd : rnum) (srcs : list rnum)
+| ORcsr    (p : rnum) (srcs : list rnum) (rd : rnum).
+  (* DEC-6: a Zicsr access.  [p] is the CSR's PSEUDO-REGISTER, written from
+     [srcs]; [rd] is the GPR destination that receives the OLD [p] ([rd = 0]
+     — xv6's [csrw] — means there is none).  TWO destinations, which is why
+     it needs a constructor of its own: [deps_rd] hands out the first,
+     [deps_rd2] the second.  A PURE read ([csrr rd,csr]) writes no CSR and
+     stays an ordinary [ORalu rd [p]]. *)
 
 Global Instance op_roles_eq_dec : EqDecision op_roles.
 Proof. solve_decision. Defined.
@@ -159,6 +243,41 @@ Lemma wreg_of_num_satp : wreg_of_num SATP = Some wsatp.
 Proof. reflexivity. Qed.
 
 Lemma dsrc_of_num_satp : dsrc_of_num SATP = [DReg wsatp].
+Proof. reflexivity. Qed.
+
+(** ... AND THE REST OF THE CSR FILE (DEC-6).  [32 .. 52], one per CSR the
+    image touches, with the S-/M-aliases sharing a key because they are the
+    same physical register ([sstatus] is a view of [mstatus]).  Every one is
+    [>= 32], so [wreg_of_num] never drops one and none can collide with a
+    GPR. *)
+Definition SEPC       : rnum := 33.
+Definition MEPC       : rnum := 34.
+Definition SSCRATCH   : rnum := 35.
+Definition MSCRATCH   : rnum := 36.
+Definition STVEC      : rnum := 37.
+Definition MTVEC      : rnum := 38.
+Definition MSTATUS    : rnum := 39.   (* [sstatus] too — one physical CSR *)
+Definition MIE        : rnum := 40.   (* [sie] too *)
+Definition MIP        : rnum := 41.   (* [sip] too *)
+Definition MEDELEG    : rnum := 42.
+Definition MIDELEG    : rnum := 43.
+Definition PMPADDR0   : rnum := 44.
+Definition PMPCFG0    : rnum := 45.
+Definition MCOUNTEREN : rnum := 46.
+Definition MENVCFG    : rnum := 47.
+Definition MHARTID    : rnum := 48.
+Definition TIME       : rnum := 49.
+Definition SCAUSE     : rnum := 50.
+Definition STVAL      : rnum := 51.
+Definition STIMECMP   : rnum := 52.
+
+(** The [wreg] a pseudo-register number denotes.  [wreg] is [nat] and every
+    consumer ([WeakMem.w_regv], [WeakRvwmoConf.ds_prov]) is a [gmap] read
+    through a default, so these are simply fresh keys — there is no 32-entry
+    structure anywhere to overflow (DEC-5's note, unchanged). *)
+Definition wcsr (n : rnum) : wreg := Z.to_nat n.
+
+Lemma wcsr_satp : wcsr SATP = wsatp.
 Proof. reflexivity. Qed.
 
 (* ====================================================================== *)
@@ -241,45 +360,124 @@ Definition deps_rd (r : op_roles) : option (wreg * list dsrc) :=
       | Some w => Some (w, dsrcs_of_nums srcs)
       | None => None
       end
+  | ORcsr p srcs _ =>
+      (* DEC-6: the CSR destination.  [p >= 32], so [wreg_of_num] always
+         succeeds; the GPR destination is [deps_rd2]'s. *)
+      match wreg_of_num p with
+      | Some w => Some (w, dsrcs_of_nums srcs)
+      | None => None
+      end
   | ORnone | ORstore _ _ | ORbranch _ _ => None
+  end.
+
+(** THE SECOND DESTINATION (DEC-6).  Only a Zicsr access has one: a
+    [csrrw/csrrs/csrrc(+i)] with [rd <> x0] also writes [rd], with the CSR's
+    OLD value — so [rd] inherits the CSR pseudo-register's provenance.
+    [None] for every other role, which is why [WeakEvLang.erw_of]'s extra
+    lookup changes nothing outside the CSR forms. *)
+Definition deps_rd2 (r : op_roles) : option (wreg * list dsrc) :=
+  match r with
+  | ORcsr p _ rd =>
+      match wreg_of_num rd with
+      | Some w => Some (w, dsrc_of_num p)
+      | None => None
+      end
+  | _ => None
   end.
 
 (* ====================================================================== *)
 (** ** 4. The decoder *)
 
-(** *** 4a0. THE ONE SYSTEM FORM THAT HAS A ROLE: the [satp] CSR (DEC-5).
+(** *** 4a0. THE SYSTEM FORMS THAT HAVE A ROLE: the CSR table (DEC-6).
 
     [funct3] (bits [14:12]) selects the Zicsr form: [001] csrrw, [010] csrrs,
     [011] csrrc, [101] csrrwi, [110] csrrsi, [111] csrrci; [000] is
-    [ecall]/[ebreak]/[sret]/[wfi]/[sfence.vma], which are not CSR accesses at
-    all.  A [csrrs]/[csrrc] with a ZERO source field performs NO write (that
-    is [csrr]); with a nonzero one it writes [satp] from the old [satp] and
-    the source.  The immediate forms take their operand from the [rs1] FIELD,
-    so they have no register source.
+    [ecall]/[ebreak]/[sret]/[mret]/[wfi]/[sfence.vma], which are not CSR
+    accesses at all — [sret]/[mret] are handled separately below, the rest
+    stay [ORnone].  A [csrrs]/[csrrc] with a ZERO source field performs NO
+    write (that is [csrr]); with a nonzero one it writes the CSR from the old
+    CSR and the source.  The immediate forms take their operand from the
+    [rs1] FIELD, so they have no register source — but a nonzero [uimm] still
+    makes them WRITE, hence the same split. *)
 
-    A [csrrw rd, satp, rs1] with [rd <> x0] writes BOTH [satp] and [rd]; the
-    role vocabulary has one destination, and [satp] is the one that carries
-    the ordering claim, so [rd]'s provenance is left alone.  That is the same
-    (pre-existing, D-4) under-modelling every unrecognised destination-writing
-    instruction already gets, and xv6's image has no such form. *)
+(** THE TABLE: the CSR number xv6 touches -> its pseudo-register.  Anything
+    NOT here is D-4 (no role at all) — that is where the un-modelled
+    remainder of the 4096-entry CSR space lives.  [sstatus]/[mstatus],
+    [sie]/[mie] and [sip]/[mip] deliberately share a row: they are one
+    physical register, and the Sail model has only the M-mode one. *)
+Definition csr_reg (c : Z) : option rnum :=
+  match c with
+  | 0x180 => Some SATP
+  | 0x141 => Some SEPC
+  | 0x341 => Some MEPC
+  | 0x140 => Some SSCRATCH
+  | 0x340 => Some MSCRATCH
+  | 0x105 => Some STVEC
+  | 0x305 => Some MTVEC
+  | 0x100 | 0x300 => Some MSTATUS
+  | 0x104 | 0x304 => Some MIE
+  | 0x144 | 0x344 => Some MIP
+  | 0x302 => Some MEDELEG
+  | 0x303 => Some MIDELEG
+  | 0x3b0 => Some PMPADDR0
+  | 0x3a0 => Some PMPCFG0
+  | 0x306 => Some MCOUNTEREN
+  | 0x30a => Some MENVCFG
+  | 0xf14 => Some MHARTID
+  | 0xc01 => Some TIME
+  | 0x142 => Some SCAUSE
+  | 0x143 => Some STVAL
+  | 0x14d => Some STIMECMP
+  | _ => None
+  end.
+
+(** Kept from DEC-5 (the one CSR [WeakRvwmoConf.dedges] consumes). *)
 Definition csr_satp : Z := 0x180.
 
-Definition deps_of_csr_satp (w : mword 32) : op_roles :=
+Lemma csr_reg_satp : csr_reg csr_satp = Some SATP.
+Proof. reflexivity. Qed.
+
+(** The funct12 fields of the two returns. *)
+Definition f12_sret : Z := 0x102.
+Definition f12_mret : Z := 0x302.
+
+(** A Zicsr access on a TABLE CSR [p].  [ORcsr p srcs rd] carries both
+    destinations; [rd = 0] (xv6's [csrw]) collapses it to the CSR alone. *)
+Definition deps_of_csr (p : rnum) (w : mword 32) : op_roles :=
   let rd  := ibits w 11 7 in
   let rs1 := ibits w 19 15 in
   match ibits w 14 12 with
-  | 1 => ORalu SATP [rs1]                    (* csrrw  — xv6's [csrw satp,rs1] *)
-  | 5 => ORalu SATP []                       (* csrrwi — an immediate, no source *)
-  | 2 | 3 =>                                 (* csrrs / csrrc                   *)
+  | 1 => ORcsr p [rs1] rd                    (* csrrw  — xv6's [csrw csr,rs1] *)
+  | 5 => ORcsr p [] rd                       (* csrrwi — an immediate source   *)
+  | 2 | 3 =>                                 (* csrrs / csrrc                  *)
       if bool_decide (rs1 = 0)
-      then ORalu rd [SATP]                   (*   [csrr rd,satp] — a pure read  *)
-      else ORalu SATP [rs1; SATP]            (*   a read-modify-write of satp   *)
-  | 6 | 7 =>                                 (* csrrsi / csrrci                 *)
+      then ORalu rd [p]                      (*   [csrr rd,csr] — a pure read  *)
+      else ORcsr p [rs1; p] rd               (*   a read-modify-write          *)
+  | 6 | 7 =>                                 (* csrrsi / csrrci                *)
       if bool_decide (rs1 = 0)
-      then ORalu rd [SATP]
-      else ORalu SATP [SATP]
-  | _ => ORnone                              (* funct3 = 000/100: not Zicsr     *)
+      then ORalu rd [p]
+      else ORcsr p [p] rd
+  | _ => ORnone                              (* funct3 = 000/100: not Zicsr    *)
   end.
+
+(** THE WHOLE SYSTEM OPCODE.  Three cases: the two returns (a JALR-LIKE role
+    on the resumption-PC CSR, so [deps_ctrl] picks it up — DEC-6), a Zicsr
+    access on a table CSR, and D-4 for everything else. *)
+Definition deps_of_system (w : mword 32) : op_roles :=
+  let c := ibits w 31 20 in
+  if bool_decide (ibits w 14 12 = 0)
+  then
+    (* Not a CSR access.  [sret]/[mret] resume at [sepc]/[mepc]: the role is
+       [ORjalr 0 <that CSR>], whose [deps_ctrl] is the base register — the
+       existing control path, no new machinery.  Link register [x0]: neither
+       writes a GPR.  [ecall]/[ebreak]/[wfi]/[sfence.vma] keep D-4. *)
+    (if bool_decide (c = f12_sret) then ORjalr 0 SEPC
+     else if bool_decide (c = f12_mret) then ORjalr 0 MEPC
+     else ORnone)
+  else match csr_reg c with
+       | Some p => deps_of_csr p w
+       | None => ORnone                      (* D-4: a CSR outside the table *)
+       end.
 
 (** *** 4a. The base (32-bit) formats. *)
 Definition deps_of_base (w : mword 32) : op_roles :=
@@ -302,10 +500,7 @@ Definition deps_of_base (w : mword 32) : op_roles :=
       if bool_decide (ibits w 31 27 = 2)
       then ORload rd rs1                     (*   lr.w / lr.d             *)
       else ORamo rd rs1 rs2                  (*   sc.*, amo*.*            *)
-  | 115 =>                                   (* SYSTEM                    *)
-      (* D-4 holds for EVERY CSR but [satp] — see DEC-5. *)
-      if bool_decide (ibits w 31 20 = csr_satp)
-      then deps_of_csr_satp w else ORnone
+  | 115 => deps_of_system w                  (* SYSTEM (Zicsr, sret/mret) *)
   | _ => ORnone       (* MISC-MEM (fence), F/D, anything unrecognised     *)
   end.
 
@@ -515,18 +710,21 @@ Proof. vm_compute. reflexivity. Qed.
 Example deps_fence : deps_of_bits (dbits 0x0ff0000f) = ORnone.
 Proof. vm_compute. reflexivity. Qed.
 
-(* csrr a5,sstatus = csrrs a5,sstatus,x0 = 0x100027f3 : no role (D-4) *)
-Example deps_csrr : deps_of_bits (dbits 0x100027f3) = ORnone.
-Proof. vm_compute. reflexivity. Qed.
+(* --- DEC-6: THE CSR TABLE, the two returns, and what still has no role
+       ------------------------------------------------------------------
+   Every word below is out of the image (the 71-instruction SYSTEM
+   inventory of the header). *)
 
-(* --- DEC-5: THE [satp] FORMS, and only they ---------------------------- *)
-
-(* [csrw satp,a5] = csrrw x0,satp,a5 = 0x18079073 — [kvminithart]'s write,
-   and [trampoline.S]'s.  The destination is the PSEUDO-REGISTER [SATP]. *)
-Example deps_csrw_satp_a5 : deps_of_bits (dbits 0x18079073) = ORalu SATP [15].
+(* [csrw satp,a5] = csrrw x0,satp,a5 = 0x18079073 — [kvminithart]'s write
+   and [trampoline.S]'s.  [rd = x0], so the [ORcsr] has no second
+   destination and [deps_rd] is the CSR's. *)
+Example deps_csrw_satp_a5 : deps_of_bits (dbits 0x18079073) = ORcsr SATP [15] 0.
 Proof. vm_compute. reflexivity. Qed.
 Example deps_csrw_satp_a5_rd :
   deps_rd (deps_of_bits (dbits 0x18079073)) = Some (wsatp, [DReg 15%nat]).
+Proof. vm_compute. reflexivity. Qed.
+Example deps_csrw_satp_a5_rd2 :
+  deps_rd2 (deps_of_bits (dbits 0x18079073)) = None.
 Proof. vm_compute. reflexivity. Qed.
 
 (* [csrw satp,t1] = 0x18031073 and [csrw satp,a0] = 0x18051073 — the other
@@ -539,14 +737,15 @@ Example deps_csrw_satp_a0_rd :
 Proof. vm_compute. reflexivity. Qed.
 
 (* [csrr a4,satp] = csrrs a4,satp,x0 = 0x18002773 — the image's read site;
-   it TRANSFERS the translation context's provenance into [a4]. *)
+   it TRANSFERS the translation context's provenance into [a4].  A pure read
+   writes no CSR, so it stays an ordinary [ORalu]. *)
 Example deps_csrr_satp : deps_of_bits (dbits 0x18002773) = ORalu 14 [SATP].
 Proof. vm_compute. reflexivity. Qed.
 Example deps_csrr_satp_rd :
   deps_rd (deps_of_bits (dbits 0x18002773)) = Some (14%nat, [DReg wsatp]).
 Proof. vm_compute. reflexivity. Qed.
 
-(* A satp form carries NO memory operands — it is an [ORalu]. *)
+(* A CSR form carries NO memory operands and NO control sources. *)
 Example deps_csrw_satp_asrc : deps_asrc (deps_of_bits (dbits 0x18079073)) = [].
 Proof. vm_compute. reflexivity. Qed.
 Example deps_csrw_satp_vsrc : deps_vsrc (deps_of_bits (dbits 0x18079073)) = [].
@@ -554,15 +753,161 @@ Proof. vm_compute. reflexivity. Qed.
 Example deps_csrw_satp_ctrl : deps_ctrl (deps_of_bits (dbits 0x18079073)) = [].
 Proof. vm_compute. reflexivity. Qed.
 
-(* D-4 IS UNTOUCHED FOR EVERY OTHER CSR: [csrw sstatus,a5] = 0x10079073. *)
-Example deps_csrw_sstatus : deps_of_bits (dbits 0x10079073) = ORnone.
+(* THE OTHER GPR-WRITTEN CSRs OF THE IMAGE — the same shape, one row of the
+   table each.  [csrw sepc,a5] = 0x14179073 ([usertrapret]),
+   [csrw sepc,s2] = 0x14191073 ([usertrap]'s restore),
+   [csrw mepc,a5] = 0x34179073 ([start]),
+   [csrw stvec,a5] = 0x10579073, [csrw sstatus,a5] = 0x10079073,
+   [csrw sie,a5] = 0x10479073, [csrw mstatus,a5] = 0x30079073,
+   [csrw medeleg,a5] = 0x30279073, [csrw mideleg,a5] = 0x30379073,
+   [csrw pmpaddr0,a5] = 0x3b079073, [csrw pmpcfg0,a5] = 0x3a079073,
+   [csrw mcounteren,a5] = 0x30679073, [csrw menvcfg,a5] = 0x30a79073,
+   [csrw stimecmp,a5] = 0x14d79073. *)
+Example deps_csrw_sepc_a5 :
+  deps_rd (deps_of_bits (dbits 0x14179073)) = Some (wcsr SEPC, [DReg 15%nat]).
+Proof. vm_compute. reflexivity. Qed.
+Example deps_csrw_sepc_s2 :
+  deps_rd (deps_of_bits (dbits 0x14191073)) = Some (wcsr SEPC, [DReg 18%nat]).
+Proof. vm_compute. reflexivity. Qed.
+Example deps_csrw_mepc_a5 :
+  deps_rd (deps_of_bits (dbits 0x34179073)) = Some (wcsr MEPC, [DReg 15%nat]).
+Proof. vm_compute. reflexivity. Qed.
+Example deps_csrw_stvec_a5 :
+  deps_rd (deps_of_bits (dbits 0x10579073)) = Some (wcsr STVEC, [DReg 15%nat]).
+Proof. vm_compute. reflexivity. Qed.
+Example deps_csrw_sstatus_a5 :
+  deps_rd (deps_of_bits (dbits 0x10079073)) = Some (wcsr MSTATUS, [DReg 15%nat]).
+Proof. vm_compute. reflexivity. Qed.
+Example deps_csrw_sie_a5 :
+  deps_rd (deps_of_bits (dbits 0x10479073)) = Some (wcsr MIE, [DReg 15%nat]).
+Proof. vm_compute. reflexivity. Qed.
+Example deps_csrw_mstatus_a5 :
+  deps_rd (deps_of_bits (dbits 0x30079073)) = Some (wcsr MSTATUS, [DReg 15%nat]).
+Proof. vm_compute. reflexivity. Qed.
+Example deps_csrw_medeleg_a5 :
+  deps_rd (deps_of_bits (dbits 0x30279073)) = Some (wcsr MEDELEG, [DReg 15%nat]).
+Proof. vm_compute. reflexivity. Qed.
+Example deps_csrw_mideleg_a5 :
+  deps_rd (deps_of_bits (dbits 0x30379073)) = Some (wcsr MIDELEG, [DReg 15%nat]).
+Proof. vm_compute. reflexivity. Qed.
+Example deps_csrw_pmpaddr0_a5 :
+  deps_rd (deps_of_bits (dbits 0x3b079073)) = Some (wcsr PMPADDR0, [DReg 15%nat]).
+Proof. vm_compute. reflexivity. Qed.
+Example deps_csrw_pmpcfg0_a5 :
+  deps_rd (deps_of_bits (dbits 0x3a079073)) = Some (wcsr PMPCFG0, [DReg 15%nat]).
+Proof. vm_compute. reflexivity. Qed.
+Example deps_csrw_mcounteren_a5 :
+  deps_rd (deps_of_bits (dbits 0x30679073)) = Some (wcsr MCOUNTEREN, [DReg 15%nat]).
+Proof. vm_compute. reflexivity. Qed.
+Example deps_csrw_menvcfg_a5 :
+  deps_rd (deps_of_bits (dbits 0x30a79073)) = Some (wcsr MENVCFG, [DReg 15%nat]).
+Proof. vm_compute. reflexivity. Qed.
+Example deps_csrw_stimecmp_a5 :
+  deps_rd (deps_of_bits (dbits 0x14d79073)) = Some (wcsr STIMECMP, [DReg 15%nat]).
+Proof. vm_compute. reflexivity. Qed.
+(* [csrw sscratch,a0] = 0x14051073 — [uservec]'s very first instruction. *)
+Example deps_csrw_sscratch_a0 :
+  deps_rd (deps_of_bits (dbits 0x14051073)) = Some (wcsr SSCRATCH, [DReg 10%nat]).
 Proof. vm_compute. reflexivity. Qed.
 
-(* ... and for the non-Zicsr SYSTEM forms: [sfence.vma] = 0x12000073 (whose
-   [31:20] field is 0x120, not a CSR number at all) and [ecall] = 0x73. *)
+(* THE PURE READS of the image — [csrr a5,sstatus] = 0x100027f3 (which
+   DEC-5 still left at [ORnone]), [csrr a4,scause] = 0x14202773,
+   [csrr a4,sepc] = 0x14102773, [csrr a1,stval] = 0x143025f3,
+   [csrr t0,sscratch] = 0x140022f3, [csrr a1,mhartid] = 0xf14025f3,
+   [rdtime a5] = 0xc01027f3. *)
+Example deps_csrr_sstatus :
+  deps_of_bits (dbits 0x100027f3) = ORalu 15 [MSTATUS].
+Proof. vm_compute. reflexivity. Qed.
+Example deps_csrr_scause_rd :
+  deps_rd (deps_of_bits (dbits 0x14202773)) = Some (14%nat, [DReg (wcsr SCAUSE)]).
+Proof. vm_compute. reflexivity. Qed.
+Example deps_csrr_sepc_rd :
+  deps_rd (deps_of_bits (dbits 0x14102773)) = Some (14%nat, [DReg (wcsr SEPC)]).
+Proof. vm_compute. reflexivity. Qed.
+Example deps_csrr_stval_rd :
+  deps_rd (deps_of_bits (dbits 0x143025f3)) = Some (11%nat, [DReg (wcsr STVAL)]).
+Proof. vm_compute. reflexivity. Qed.
+Example deps_csrr_sscratch_rd :
+  deps_rd (deps_of_bits (dbits 0x140022f3)) = Some (5%nat, [DReg (wcsr SSCRATCH)]).
+Proof. vm_compute. reflexivity. Qed.
+Example deps_csrr_mhartid_rd :
+  deps_rd (deps_of_bits (dbits 0xf14025f3)) = Some (11%nat, [DReg (wcsr MHARTID)]).
+Proof. vm_compute. reflexivity. Qed.
+Example deps_rdtime_rd :
+  deps_rd (deps_of_bits (dbits 0xc01027f3)) = Some (15%nat, [DReg (wcsr TIME)]).
+Proof. vm_compute. reflexivity. Qed.
+
+(* THE IMMEDIATE FORMS.  [csrsi sstatus,2] = 0x10016073 and
+   [csrci sstatus,2] = 0x10017073 write the CSR from ITSELF (the operand is
+   an immediate) and have no GPR destination. *)
+Example deps_csrsi_sstatus :
+  deps_of_bits (dbits 0x10016073) = ORcsr MSTATUS [MSTATUS] 0.
+Proof. vm_compute. reflexivity. Qed.
+Example deps_csrci_sstatus_rd :
+  deps_rd (deps_of_bits (dbits 0x10017073))
+  = Some (wcsr MSTATUS, [DReg (wcsr MSTATUS)]).
+Proof. vm_compute. reflexivity. Qed.
+
+(* THE ONE TWO-DESTINATION FORM IN THE IMAGE: [csrrci a5,sstatus,2]
+   = 0x100177f3 ([intr_get]).  BOTH destinations get provenance — the CSR
+   from itself ([deps_rd]) and [a5] from the CSR's old value
+   ([deps_rd2]). *)
+Example deps_csrrci_sstatus_a5 :
+  deps_of_bits (dbits 0x100177f3) = ORcsr MSTATUS [MSTATUS] 15.
+Proof. vm_compute. reflexivity. Qed.
+Example deps_csrrci_sstatus_a5_rd :
+  deps_rd (deps_of_bits (dbits 0x100177f3))
+  = Some (wcsr MSTATUS, [DReg (wcsr MSTATUS)]).
+Proof. vm_compute. reflexivity. Qed.
+Example deps_csrrci_sstatus_a5_rd2 :
+  deps_rd2 (deps_of_bits (dbits 0x100177f3))
+  = Some (15%nat, [DReg (wcsr MSTATUS)]).
+Proof. vm_compute. reflexivity. Qed.
+
+(* A hypothetical [csrrw a0,sscratch,a0] = 0x14051573 — the swap
+   [trampoline.S] used to carry.  Not in this image (uservec reads
+   [sscratch] with a plain [csrr] instead), but the decoder handles it: the
+   CSR takes [a0]'s provenance, [a0] takes the CSR's. *)
+Example deps_csrrw_sscratch_a0 :
+  deps_of_bits (dbits 0x14051573) = ORcsr SSCRATCH [10] 10.
+Proof. vm_compute. reflexivity. Qed.
+Example deps_csrrw_sscratch_a0_rd :
+  deps_rd (deps_of_bits (dbits 0x14051573))
+  = Some (wcsr SSCRATCH, [DReg 10%nat]).
+Proof. vm_compute. reflexivity. Qed.
+Example deps_csrrw_sscratch_a0_rd2 :
+  deps_rd2 (deps_of_bits (dbits 0x14051573))
+  = Some (10%nat, [DReg (wcsr SSCRATCH)]).
+Proof. vm_compute. reflexivity. Qed.
+
+(* THE TWO RETURNS.  [sret] = 0x10200073, [mret] = 0x30200073: a JALR-LIKE
+   role whose CONTROL source is the resumption-PC CSR, and no destination. *)
+Example deps_sret : deps_of_bits (dbits 0x10200073) = ORjalr 0 SEPC.
+Proof. vm_compute. reflexivity. Qed.
+Example deps_sret_ctrl :
+  deps_ctrl (deps_of_bits (dbits 0x10200073)) = [DReg (wcsr SEPC)].
+Proof. vm_compute. reflexivity. Qed.
+Example deps_sret_rd : deps_rd (deps_of_bits (dbits 0x10200073)) = None.
+Proof. vm_compute. reflexivity. Qed.
+Example deps_mret : deps_of_bits (dbits 0x30200073) = ORjalr 0 MEPC.
+Proof. vm_compute. reflexivity. Qed.
+Example deps_mret_ctrl :
+  deps_ctrl (deps_of_bits (dbits 0x30200073)) = [DReg (wcsr MEPC)].
+Proof. vm_compute. reflexivity. Qed.
+
+(* WHAT STILL HAS NO ROLE (D-4).  A CSR outside the table — [fcsr]
+   ([csrw fcsr,a5] = 0x00379073) — and the non-Zicsr SYSTEM forms
+   [sfence.vma] = 0x12000073, [wfi] = 0x10500073, [ecall] = 0x73,
+   [ebreak] = 0x00100073. *)
+Example deps_csrw_fcsr : deps_of_bits (dbits 0x00379073) = ORnone.
+Proof. vm_compute. reflexivity. Qed.
 Example deps_sfence_vma : deps_of_bits (dbits 0x12000073) = ORnone.
 Proof. vm_compute. reflexivity. Qed.
+Example deps_wfi : deps_of_bits (dbits 0x10500073) = ORnone.
+Proof. vm_compute. reflexivity. Qed.
 Example deps_ecall : deps_of_bits (dbits 0x00000073) = ORnone.
+Proof. vm_compute. reflexivity. Qed.
+Example deps_ebreak : deps_of_bits (dbits 0x00100073) = ORnone.
 Proof. vm_compute. reflexivity. Qed.
 
 (* amoswap.w.aq a5,a4,(a3) = 0x0ce6a7af : rd = x15, rs1 = x13, rs2 = x14 *)

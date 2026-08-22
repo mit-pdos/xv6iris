@@ -90,6 +90,23 @@
       store is what pins a witness below it.  See [row_deps_satp_chain], its
       [_before] twin, and [row_deps_satp_read] in §9.
 
+    (S-a''') CSR PROVENANCE BEYOND [satp] ([WeakDeps]' DEC-6, route-b §4e).
+      Every CSR xv6 writes from a GPR now has a pseudo-register and a role,
+      and [sret]/[mret] carry a JALR-LIKE role on [sepc]/[mepc].  THIS FILE
+      IS UNCHANGED BY THAT: [dedges]' extra summand is still exactly
+      [dprov s wsatp], because [satp] is the only CSR that feeds TRANSLATION
+      and so the only one that reaches an access the ordinary dataflow
+      cannot see.  The other CSRs reach a store through paths [row_deps]
+      already has — GPR dataflow (a [csrr rd,csr] is an [ORalu], its result
+      an ordinary register source) and, for the resumption PC, [ds_ctl]:
+      [deps_ctrl] of [ORjalr 0 SEPC] is [[DReg wsepc]], the emission's
+      [nextPC] node turns it into [LCtrl], and the [LCtrl] arm of [dstep]
+      appends it to [ds_ctl], which taints every po-later store.  See
+      [row_deps_sret_chain] and its [_before] twin in §9.
+      RESIDUAL: trap ENTRY takes no [stvec]/[mtvec] edge — there is no
+      emission hook at a trap's [nextPC] redirect that could distinguish it
+      from the instruction's own (xv6 writes both from constants).
+
     (S-b) AN EMISSION ITEM CARRIES ITS ROW POSITION EXPLICITLY.  [row_deps]
       folds over [list eitem] — labels TAGGED with the row position they
       realize ([None] for an administrative label) — not over a bare
@@ -1238,6 +1255,61 @@ Example row_deps_satp_read :
              (LInstr, None);
              (WeakPromise.LStore false 16 [bv_0 8] [DReg 14%nat] [], Some 2%nat) ]
   = [(0%nat, 2%nat); (1%nat, 2%nat)].
+Proof. vm_compute. reflexivity. Qed.
+
+(** CONTROL THROUGH [sepc] ([WeakDeps]' DEC-6 / route-b §4e).
+    [ld a0 <- [x]; csrw sepc,a0; sret; sd [q] := v]: the store names no
+    register operand, there is no register dataflow into it and no [satp]
+    write anywhere — yet the load is in its dependency set, because the value
+    the load produced became the hart's RESUMPTION PC and [sret] jumped to
+    it.  The chain is [LRegW wsepc [DReg 10]] (the decoder's
+    [ORcsr SEPC [a0] 0]) then [LCtrl [DReg wsepc]] (the [nextPC] node of
+    [sret]'s [ORjalr 0 SEPC] role), which [dstep] appends to [ds_ctl]. *)
+Example row_deps_sret_chain :
+  row_deps [ (LInstr, None);
+             (WeakPromise.LLoad false false 0 [(0%nat, bv_0 8)] [], Some 0%nat);
+             (LRegW 10%nat [DLdRes], None);
+             (LInstr, None);
+             (LRegW (wcsr SEPC) [DReg 10%nat], None);
+             (LInstr, None);
+             (LCtrl [DReg (wcsr SEPC)], None);
+             (LInstr, None);
+             (WeakPromise.LStore false 8 [bv_0 8] [] [], Some 1%nat) ]
+  = [(0%nat, 1%nat)].
+Proof. vm_compute. reflexivity. Qed.
+
+(** THE TWIN WITHOUT THE [csrw sepc] — [sret]'s control node then names a
+    pseudo-register with no provenance, and the store has NO dependency.
+    That absence is what the DEC-6 clause closes. *)
+Example row_deps_sret_chain_before :
+  row_deps [ (LInstr, None);
+             (WeakPromise.LLoad false false 0 [(0%nat, bv_0 8)] [], Some 0%nat);
+             (LRegW 10%nat [DLdRes], None);
+             (LInstr, None);
+             (LInstr, None);
+             (LCtrl [DReg (wcsr SEPC)], None);
+             (LInstr, None);
+             (WeakPromise.LStore false 8 [bv_0 8] [] [], Some 1%nat) ]
+  = [].
+Proof. vm_compute. reflexivity. Qed.
+
+(** THE TWO-DESTINATION FORM ([csrrci a5,sstatus,2], DEC-6) in a row: the
+    GPR destination inherits the CSR's provenance, so a value that reached
+    [sstatus] reaches a later store's address through [a5].  Here load 0
+    fed [sstatus] (via [csrw sstatus,a5]), the [csrrci] read it back into
+    [a5], and the store at position 1 addresses off [a5]. *)
+Example row_deps_csr_readback :
+  row_deps [ (LInstr, None);
+             (WeakPromise.LLoad false false 0 [(0%nat, bv_0 8)] [], Some 0%nat);
+             (LRegW 15%nat [DLdRes], None);
+             (LInstr, None);
+             (LRegW (wcsr MSTATUS) [DReg 15%nat], None);
+             (LInstr, None);
+             (LRegW (wcsr MSTATUS) [DReg (wcsr MSTATUS)], None);
+             (LRegW 15%nat [DReg (wcsr MSTATUS)], None);
+             (LInstr, None);
+             (WeakPromise.LStore false 8 [bv_0 8] [DReg 15%nat] [], Some 1%nat) ]
+  = [(0%nat, 1%nat)].
 Proof. vm_compute. reflexivity. Qed.
 
 (** The empty row is emittable. *)

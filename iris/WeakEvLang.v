@@ -271,27 +271,80 @@ Definition ereg_gpr_num (r : register) : option wreg :=
   | _ => None
   end.
 
-(** ... AND THE ONE NON-GPR DESTINATION THE DEPENDENCY TRACK KNOWS: [satp],
-    as [WeakDeps]' pseudo-register [wsatp] (DEC-5 / route-b §4e).  A hart's
-    translation context is not an RVWMO register, but the privileged spec's
-    [sfence.vma] discipline orders a memory access after the load that
-    produced its [satp] value, and that is the edge [WeakRvwmoConf.dedges]
-    draws.  Nothing else changes: only the decoder's [satp] forms name
-    [wsatp] as their destination, so this arm fires ONLY at those, and every
-    other CSR write is still [ERWnone] (D-4). *)
-Definition ereg_num (r : register) : option wreg :=
-  if register_beq r (R_bitvector_64 satp) then Some wsatp else ereg_gpr_num r.
+(** ... AND THE NON-GPR DESTINATIONS THE DEPENDENCY TRACK KNOWS: the CSRs of
+    [WeakDeps]' table, as its pseudo-registers [32 .. 52] (DEC-6, generalising
+    DEC-5's [satp] / route-b §4e).  A CSR is not an RVWMO register, but a
+    value that reaches one decides something the hart later does — the
+    translation context ([satp], via the [sfence.vma] discipline), the
+    [sret]/[mret] resumption PC ([sepc]/[mepc]), the trapframe pointer
+    ([sscratch]) — so each gets provenance and [WeakRvwmoConf] draws the
+    edges.  This is the SAIL-SIDE half of the table: the model has no
+    [sstatus]/[sie]/[sip] register (they are views of [mstatus]/[mie]/[mip],
+    and a [csrw sstatus,a5] emits [RegWrite mstatus]), which is exactly why
+    [WeakDeps.csr_reg] gives each S/M pair ONE pseudo-register; [pmpaddr0]
+    and [pmpcfg0] are elements of the model's [pmpaddr_n]/[pmpcfg_n] vector
+    registers, whose whole-vector write is the node that fires.
 
+    The arm fires only where the decoder ALSO named that pseudo-register as
+    a destination ([erw_of] compares the two), so every CSR write of an
+    instruction that has no CSR role is still [ERWnone] (D-4). *)
+Definition ereg_csr_num (r : register) : option wreg :=
+  match r with
+  | R_bitvector_64 rb =>
+      match rb with
+      | satp     => Some (wcsr SATP)
+      | sepc     => Some (wcsr SEPC)
+      | mepc     => Some (wcsr MEPC)
+      | sscratch => Some (wcsr SSCRATCH)
+      | mscratch => Some (wcsr MSCRATCH)
+      | stvec    => Some (wcsr STVEC)
+      | mtvec    => Some (wcsr MTVEC)
+      | mstatus  => Some (wcsr MSTATUS)   (* [sstatus] is a view of it *)
+      | mie      => Some (wcsr MIE)       (* [sie]     is a view of it *)
+      | mip      => Some (wcsr MIP)       (* [sip]     is a view of it *)
+      | medeleg  => Some (wcsr MEDELEG)
+      | mideleg  => Some (wcsr MIDELEG)
+      | menvcfg  => Some (wcsr MENVCFG)
+      | mhartid  => Some (wcsr MHARTID)
+      | mtime    => Some (wcsr TIME)      (* the [time] CSR's backing store *)
+      | scause   => Some (wcsr SCAUSE)
+      | stval    => Some (wcsr STVAL)
+      | stimecmp => Some (wcsr STIMECMP)
+      | _ => None
+      end
+  | R_bitvector_32 rb =>
+      match rb with mcounteren => Some (wcsr MCOUNTEREN) | _ => None end
+  | R_vector_64_bitvector_64 _ => Some (wcsr PMPADDR0)  (* [pmpaddr_n] *)
+  | R_vector_64_bitvector_8  _ => Some (wcsr PMPCFG0)   (* [pmpcfg_n]  *)
+  | _ => None
+  end.
+
+Definition ereg_num (r : register) : option wreg :=
+  match ereg_csr_num r with Some n => Some n | None => ereg_gpr_num r end.
+
+(** One node, one candidate destination: does this [RegWrite]'s register
+    match the one the decoded role names, and with which sources? *)
+Definition erw_dest (r : register) (d : option (wreg * list dsrc)) : erw_kind :=
+  match d with
+  | Some (rd, srcs) =>
+      match ereg_num r with
+      | Some n => if decide (n = rd) then ERWreg rd srcs else ERWnone
+      | None => ERWnone
+      end
+  | None => ERWnone
+  end.
+
+(** DEC-6: A ZICSR ACCESS HAS TWO DESTINATIONS — the CSR ([deps_rd]) and,
+    when [rd <> x0], the GPR that receives the CSR's OLD value
+    ([deps_rd2]).  They are distinct registers, so trying the second only
+    where the first did not match is exactly right, and for every
+    non-[ORcsr] role [deps_rd2] is [None] and nothing changes. *)
 Definition erw_of (role : op_roles) (r : register) : erw_kind :=
   if register_beq r (R_bitvector_64 nextPC) then ERWctrl (deps_ctrl role)
   else
-    match deps_rd role with
-    | Some (rd, srcs) =>
-        match ereg_num r with
-        | Some n => if decide (n = rd) then ERWreg rd srcs else ERWnone
-        | None => ERWnone
-        end
-    | None => ERWnone
+    match erw_dest r (deps_rd role) with
+    | ERWnone => erw_dest r (deps_rd2 role)
+    | k => k
     end.
 
 (** The label and the view effect of a classified register write — one
@@ -404,11 +457,103 @@ Example erw_of_csrw_satp_gpr :
   erw_of (deps_of_bits (dbits 0x18079073)) (R_bitvector_64 x15) = ERWnone.
 Proof. vm_compute. reflexivity. Qed.
 
-(* D-4 for every other CSR: [csrw sstatus,a5] = 0x10079073 has no role at
-   all, so the node it writes ([sstatus] is a view of [mstatus] in the
-   model) is silent too. *)
+(* DEC-6 — THE REST OF THE TABLE.  [csrw sstatus,a5] = 0x10079073 writes the
+   model's [mstatus] node ([sstatus] is a VIEW of it), and the decoder named
+   the same shared pseudo-register, so the two meet. *)
 Example erw_of_csrw_sstatus :
-  erw_of (deps_of_bits (dbits 0x10079073)) (R_bitvector_64 mstatus) = ERWnone.
+  erw_of (deps_of_bits (dbits 0x10079073)) (R_bitvector_64 mstatus)
+  = ERWreg (wcsr MSTATUS) [DReg 15%nat].
+Proof. vm_compute. reflexivity. Qed.
+
+(* [csrw sepc,a5] = 0x14179073 and [csrw mepc,a5] = 0x34179073 — the two
+   resumption-PC CSRs, whose provenance [sret]/[mret] turn into control. *)
+Example erw_of_csrw_sepc :
+  erw_of (deps_of_bits (dbits 0x14179073)) (R_bitvector_64 sepc)
+  = ERWreg (wcsr SEPC) [DReg 15%nat].
+Proof. vm_compute. reflexivity. Qed.
+Example erw_of_csrw_mepc :
+  erw_of (deps_of_bits (dbits 0x34179073)) (R_bitvector_64 mepc)
+  = ERWreg (wcsr MEPC) [DReg 15%nat].
+Proof. vm_compute. reflexivity. Qed.
+
+(* [csrw sscratch,a0] = 0x14051073 — [uservec]'s first instruction. *)
+Example erw_of_csrw_sscratch :
+  erw_of (deps_of_bits (dbits 0x14051073)) (R_bitvector_64 sscratch)
+  = ERWreg (wcsr SSCRATCH) [DReg 10%nat].
+Proof. vm_compute. reflexivity. Qed.
+
+(* [csrw stvec,a5] = 0x10579073, [csrw stimecmp,a5] = 0x14d79073, and the
+   two VECTOR-REGISTER CSRs [csrw pmpaddr0,a5] = 0x3b079073 /
+   [csrw pmpcfg0,a5] = 0x3a079073, whose model nodes are the whole-vector
+   writes [pmpaddr_n] / [pmpcfg_n]. *)
+Example erw_of_csrw_stvec :
+  erw_of (deps_of_bits (dbits 0x10579073)) (R_bitvector_64 stvec)
+  = ERWreg (wcsr STVEC) [DReg 15%nat].
+Proof. vm_compute. reflexivity. Qed.
+Example erw_of_csrw_stimecmp :
+  erw_of (deps_of_bits (dbits 0x14d79073)) (R_bitvector_64 stimecmp)
+  = ERWreg (wcsr STIMECMP) [DReg 15%nat].
+Proof. vm_compute. reflexivity. Qed.
+Example erw_of_csrw_pmpaddr0 :
+  erw_of (deps_of_bits (dbits 0x3b079073)) (R_vector_64_bitvector_64 pmpaddr_n)
+  = ERWreg (wcsr PMPADDR0) [DReg 15%nat].
+Proof. vm_compute. reflexivity. Qed.
+Example erw_of_csrw_pmpcfg0 :
+  erw_of (deps_of_bits (dbits 0x3a079073)) (R_vector_64_bitvector_8 pmpcfg_n)
+  = ERWreg (wcsr PMPCFG0) [DReg 15%nat].
+Proof. vm_compute. reflexivity. Qed.
+
+(* [csrw mcounteren,a5] = 0x30679073 — a 32-bit model register. *)
+Example erw_of_csrw_mcounteren :
+  erw_of (deps_of_bits (dbits 0x30679073)) (R_bitvector_32 mcounteren)
+  = ERWreg (wcsr MCOUNTEREN) [DReg 15%nat].
+Proof. vm_compute. reflexivity. Qed.
+
+(* A PURE READ transfers the CSR's provenance into the GPR: [csrr a4,sepc]
+   = 0x14102773; the [sepc] node of that instruction stays silent (it writes
+   no CSR). *)
+Example erw_of_csrr_sepc :
+  erw_of (deps_of_bits (dbits 0x14102773)) (R_bitvector_64 x14)
+  = ERWreg 14 [DReg (wcsr SEPC)].
+Proof. vm_compute. reflexivity. Qed.
+Example erw_of_csrr_sepc_csrnode :
+  erw_of (deps_of_bits (dbits 0x14102773)) (R_bitvector_64 sepc) = ERWnone.
+Proof. vm_compute. reflexivity. Qed.
+
+(* THE TWO-DESTINATION FORM (DEC-6): [csrrci a5,sstatus,2] = 0x100177f3.
+   BOTH nodes fire — the CSR from [deps_rd], [a5] from [deps_rd2]. *)
+Example erw_of_csrrci_sstatus_csr :
+  erw_of (deps_of_bits (dbits 0x100177f3)) (R_bitvector_64 mstatus)
+  = ERWreg (wcsr MSTATUS) [DReg (wcsr MSTATUS)].
+Proof. vm_compute. reflexivity. Qed.
+Example erw_of_csrrci_sstatus_gpr :
+  erw_of (deps_of_bits (dbits 0x100177f3)) (R_bitvector_64 x15)
+  = ERWreg 15 [DReg (wcsr MSTATUS)].
+Proof. vm_compute. reflexivity. Qed.
+(* ... and an unrelated node of the same instruction is still silent. *)
+Example erw_of_csrrci_sstatus_other :
+  erw_of (deps_of_bits (dbits 0x100177f3)) (R_bitvector_64 x14) = ERWnone.
+Proof. vm_compute. reflexivity. Qed.
+
+(* [sret] = 0x10200073 / [mret] = 0x30200073: the CONTROL node carries the
+   resumption-PC CSR's provenance (this is what reaches [ds_ctl]), and the
+   instruction writes no destination at all. *)
+Example erw_of_sret_nextpc :
+  erw_of (deps_of_bits (dbits 0x10200073)) (R_bitvector_64 nextPC)
+  = ERWctrl [DReg (wcsr SEPC)].
+Proof. vm_compute. reflexivity. Qed.
+Example erw_of_mret_nextpc :
+  erw_of (deps_of_bits (dbits 0x30200073)) (R_bitvector_64 nextPC)
+  = ERWctrl [DReg (wcsr MEPC)].
+Proof. vm_compute. reflexivity. Qed.
+Example erw_of_sret_sepc :
+  erw_of (deps_of_bits (dbits 0x10200073)) (R_bitvector_64 sepc) = ERWnone.
+Proof. vm_compute. reflexivity. Qed.
+
+(* D-4 SURVIVES OUTSIDE THE TABLE: [csrw fcsr,a5] = 0x00379073 has no role,
+   so its [fcsr] node is silent. *)
+Example erw_of_csrw_fcsr :
+  erw_of (deps_of_bits (dbits 0x00379073)) (R_bitvector_32 fcsr) = ERWnone.
 Proof. vm_compute. reflexivity. Qed.
 
 (* [beq a5,zero,.] = 0x00078063: [nextPC] carries the CONTROL view — PARM's

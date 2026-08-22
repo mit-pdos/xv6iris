@@ -1092,6 +1092,36 @@ REFINEMENTS (same day, while the satp slice was being built):
   EWPs' content, not a new obligation — PROVIDED the control path to
   `z` agrees, which is the ctrl-provenance clause (branches, `jalr`,
   and now `sret`/`mret`).
+THE SOUNDNESS LEMMA'S TWO SHAPES (decide before slice 2).  The program
+state is `PHart cpu m rs fn ib` — `m` the Sail continuation, `rs` the
+FULL `regstate` (GPRs and CSRs alike) — and the Sail interaction monad
+answers every register read through a `RegRead` node and every memory
+read through the label.  So the GENERIC fact is free: two runs of the
+same continuation from regstates that agree on every register the run
+actually `RegRead`s, given equal memory-read answers, are identical.
+What provenance soundness then needs is only "the registers the
+instruction actually reads are covered by the sources the emission
+names", and there are two ways to get it:
+  (i) DECODED ROLES (today): prove per instruction class that
+  `deps_of_bits`' sources ∪ the constant CSRs cover the `RegRead` set —
+  an inventory-sized proof over the Sail code of every form the image
+  contains (≈60 forms; the `tools/gen_code.py` whitelist is the list),
+  with the CSR read sets per class (memory ops read `satp`/`sstatus`
+  bits, `sret` reads `sepc`/`sstatus`, …).
+  (ii) DYNAMIC PROVENANCE: compute `LRegW rd srcs` from the registers
+  the instruction ACTUALLY read since its `LInstr` (captured from the
+  monad's `RegRead` nodes by the instance), not from the decoder — then
+  coverage holds by construction and the soundness lemma is the
+  generic one.  Honesty: dynamic sources ⊇ RVWMO's syntactic ones and
+  include CSRs the instruction consulted (`sstatus` for a permission
+  check); an edge from such a CSR exists only when the CSR's own
+  provenance is non-empty, i.e. it was written from a value with read
+  provenance — a chain real hardware also orders (CSR writes
+  serialize).  Cost: the instance's `LRegW` emission and whatever the
+  machine's view machinery does with extra sources (views only rise).
+  (ii) is cleaner and sound-by-construction; (i) keeps the machine
+  untouched.  Lean (ii) unless the instance's `RegRead` capture is
+  awkward; probe that first.
 Order of work for B2e-3b, revised: (1) the satp-provenance edge in the
 emission (`dstep` + the instance's CSR write annotation); (2) the
 soundness lemma, stated once over `pstep_ev` ("agreement on named
@@ -1113,6 +1143,30 @@ case, nothing else moved).  Witnesses: `row_deps_satp_chain` +
 `_before` twin + `row_deps_satp_read` (transfer AND the overwrite that
 unlinks a stale context).  Tree green; both capstones at the five
 rv64d axioms.
+
+**LANDED (1) EXTENDED TO EVERY CSR, 2026-08-22 (DEC-6):**
+`WeakDeps.csr_reg` is now a TABLE — the 21 CSRs xv6 touches ↦ the
+pseudo-registers `32..52`, `satp` still `32`, with `sstatus`/`mstatus`,
+`sie`/`mie` and `sip`/`mip` SHARING a key (they are one physical
+register, and the Sail model has only the M-mode one) — `deps_of_csr`
+gives every Zicsr form a role, the new constructor `ORcsr p srcs rd`
+plus the second projection `deps_rd2` give a `csrrw/csrrs/csrrc(+i)`
+with `rd ≠ x0` BOTH destinations honestly (the image has one:
+`csrrci a5,sstatus,2`), and `sret`/`mret` take the jalr-like role
+`ORjalr 0 SEPC`/`MEPC` so the resumption PC's provenance reaches
+`ds_ctl` through the existing `LCtrl` path.  `WeakEvLang.ereg_csr_num`
+is the Sail-side half (including the `pmpaddr_n`/`pmpcfg_n` vector
+registers and 32-bit `mcounteren`); `erw_of` tries `deps_rd` then
+`deps_rd2`.  `WeakRvwmoConf.dedges` is UNCHANGED — `satp` is still the
+only CSR that feeds translation (scope note S-a''').  RESIDUAL: trap
+ENTRY takes no `stvec`/`mtvec` edge — the only control hook is
+`erw_of`'s `nextPC` arm, driven by the CURRENT instruction's decoded
+role, and nothing there distinguishes a trap redirect from the
+instruction's own; xv6 writes both CSRs from constants, so no witness
+value reaches them.  Witnesses: `row_deps_sret_chain` + `_before` twin
++ `row_deps_csr_readback`, and per-form decoder/`erw_of` tests for all
+24 GPR-write sites' CSRs, the pure reads, the immediate forms and the
+two returns.  Tree green; both capstones at the five rv64d axioms.
 
 ## 5. Honest residual risks — OPEN
 
