@@ -196,7 +196,7 @@ obligation, §20.17.5's residue closure, and F1.5d's gate (fs-fragments.md
 R9).  In the model the discarded record's `ilink ip` is STRANDED by
 `dir_links_size_zero`, which is precisely §20.6's "makes those unfreeable
 — a blocker on a reachable step".  Recorded with the amendment it forces
-in projects/fs-fragments-campaign.md, "F1.5b's FIRST-CONSUMER VERDICT".
+in completed/fs-fragments-campaign.md, "F1.5b's FIRST-CONSUMER VERDICT".
 
 ## FIXED UPSTREAM (`31f115a`) — a NEGATIVE count to `read()` delivered the
 ## rest of the file, overflowing the caller's buffer

@@ -97,7 +97,7 @@ the Löb invariant, full stop.
   `fileclose`'s last close puts one back — but `fslot`'s `Some (q,n)` arm
   cannot see the file's TYPE, and only an inode-typed file has spent its
   unit. That is the "wants per-`ofile` ghost state" item in
-  `projects/fs-icache.md`, "Deferred / owed", and it is what has to land
+  `completed/fs-icache.md`, "Deferred / owed", and it is what has to land
   first. Do NOT try to fund it from `ofile_slot` instead: units-per-
   descriptor and units-per-file disagree the moment `filedup` runs.
 

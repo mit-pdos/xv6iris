@@ -223,6 +223,31 @@ Both are one-file edits; do them when the file is open for another reason.
   assumed-callee interfaces; both are proven and linked, and
   `LinkPrintkGen.v` is gone. Cut when `SpecMain.v` is open. (From
   `completed/main-boot.md`.)
+- **From the seven projects closed on 2026-08-22** (`cwd-ref`, `fs-icache`,
+  `fs-inode`, `iclaim-ledger`, `fs-fragments-campaign`,
+  `proc-struct-resources`, `proc-pagetable-ownership`), all refactor or
+  comment, none a proof gap:
+  - `SpecFileclose.v:346-350` still says iput's `iref_slot` give-back
+    "leaks one unit"; the same file's `:588-621` borrows it in and returns
+    it. Cut the sentence (Spec file: 35-file cone, do it in stride).
+  - stale comments naming retired shapes: `BootShared.v:427-431` ("FD_INODE
+    arm is still a placeholder"), `BootShared.v:1384` and `ProcAvail.v:87-88`
+    (`InodeRef.iref_name_alloc`, which does not exist), `SpecIdup.v:19-21`
+    (`FileInv.inode_ref` "is `emp`"), `ProofForkretPark.v:40` and
+    `SpecForkretPark.v:11` (`LinkForkretPark.v` "assumed" — it is deleted).
+  - `NINODE` is defined twice (`IcacheRef.v:122`, `SpecIinit.v:46`); keep one.
+  - `bf_xor_vec64_unsigned` / `bf_zext8_unsigned` (`ProofBfree.v:214,222`)
+    and `bal_zext8_unsigned` (`ProofBallocParts.v:251`) belong in
+    `RiscvExtras.v`; `ProofBfree.v:477 bf_buf_byte` wants a content-generic
+    single-byte accessor in `ByteBuf.v`/`BufOwn.v`.
+  - fold `IregLinkNz.v` / `IregDirBit.v` into `InodeRegion.v` at a milestone.
+  - `ProcPtOwn.v` §1–§3 (`pte_ppn` … `proc_pt_own`) could move into
+    `UserPtTree.v`; the `uptd` field `ud_data`, `ud_norm`, and every
+    `⌜ud_data pt = ud_pas pt⌝` premise (`SpecUservec`, `SpecUserretClosed`,
+    `SpecForkret`, `ParkCap`) are DEAD — `user_pt_inv` no longer reads the
+    field — and can be deleted in one mechanical sweep (~45 + 10 sites).
+  - three `pa_add`-doesn't-wrap copies remain beside `RiscvExtras.uint_pa_add`
+    (`UserBits.v:59`, `Pt4kWalk.v:318`, `PageFields.v:46`).
 
 ## Specific-vs-generic leaf lemmas
 

@@ -123,7 +123,7 @@ no contract can yet say "the process runs the file's text"; closing that
 needs a contents-indexed refinement of `proc_pt`. The file side of that
 refinement now exists: `elf_image : elf_bytes → gmap Z (bv 8)` is keyed by
 user va, the same shape as the `user_pt_inv P M` abstract state
-(`projects/proc-pagetable-ownership.md`). The exec spec's payload will be:
+(`completed/proc-pagetable-ownership.md`). The exec spec's payload will be:
 for a file whose FS contents `f` satisfy `elf_wf f` (plus the xv6-loadable
 bounds above), the user image below `elf_mem_end` refines `elf_image f`,
 with the stack/argv pages layered above it by kexec's own stack model

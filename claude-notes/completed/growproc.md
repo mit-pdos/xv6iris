@@ -255,7 +255,7 @@ What it cost, and what is worth reusing:
 - **`sys_read` / `sys_write` / `sys_fstat`** are the other `argfd` callers
   and are the natural next syscalls; they want the `pf`-optional
   generalization of `SpecArgfd` noted in
-  [`../projects/proc-struct-resources.md`](../projects/proc-struct-resources.md).
+  [`../completed/proc-struct-resources.md`](../completed/proc-struct-resources.md).
 - **`allocproc` — the one producer of `proc_priv` — establishes both
   conjuncts for free.** `proc_priv_intro` gained the coherence premise, and
   allocproc discharges it with `um_below_empty`: the table it has just built
@@ -264,7 +264,7 @@ What it cost, and what is worth reusing:
   `freeproc` zeroes `p->sz` at UNUSED and a ZOMBIE's size is the live
   process's. `userinit` / `exec` / `fork` are the remaining producers-to-be.
 - The `p->sz` coherence item in
-  [`../projects/proc-pagetable-ownership.md`](../projects/proc-pagetable-ownership.md)
+  [`../completed/proc-pagetable-ownership.md`](../completed/proc-pagetable-ownership.md)
   (step 7) is now closed: it IS part of the process invariant, though still
   not part of *table* validity, which remains the right split — a `uptd`
   knows nothing about a size.

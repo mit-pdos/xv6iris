@@ -1,5 +1,20 @@
 # Project: the process page table — OWNERSHIP (`struct proc`'s `pagetable`)
 
+> **FINISHED as a proof effort (audited 2026-08-22).** Every function this
+> project targets is proven, the ownership tiers and bridges are landed, and
+> the address-space view (`umem_own` / `user_pt_inv P M` / `proc_ptm`) is
+> consumed by `ProofUservec.v:1561,1688`, `ProofUserretClosed.v:129` and the
+> uvm* contracts (`SpecUvmcopy`/`SpecUvmalloc`/`SpecUvmunmap`/`SpecUvmdealloc`
+> are `proc_ptm`-indexed). Worklist steps 1–3 are FILE-ORGANIZATION REFACTORS
+> (`PageOwn.v` extraction — its motivation no longer applies; moving
+> `ProcPtOwn.v` §1–§3; deleting the dead `ud_data` field / `ud_norm` / the
+> `ud_data pt = ud_pas pt` premises, whose target shape is superseded by the
+> M-indexed `user_pt_inv`), recorded in `design/code-organization.md`. Two
+> optional strengthenings — pinning `M` across user-mode arms (`u_mem_step`
+> has no `M M'`) and a `proc_ptm`-indexed `SpecKexec` — are not holes.
+> Open question "all of `um` or only `PTE_U`" is settled: all of `um`.
+
+
 One predicate for "a valid process page table", and the reconciliation that
 keeps it the *only* such definition. `iris/ProcPtOwn.v` holds the design; this
 file is the worklist for folding the pre-existing descriptions into it.

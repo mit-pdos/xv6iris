@@ -72,7 +72,7 @@ refinement builds on.  (copyin/copyout used to be contents-existential too,
 so no observable contract COULD say more.  They no longer are —
 `SpecCopyin.wp_copyin_sconf_mem` / `SpecCopyout.wp_copyout_sconf_mem` run at
 `proc_ptm P (uint szv) M` and name what they read and wrote; see
-claude-notes/projects/proc-pagetable-ownership.md.  The pipe still speaks the
+claude-notes/completed/proc-pagetable-ownership.md.  The pipe still speaks the
 existential-`M` corollaries, so this is now a choice, not a limit.)
 
 ## The reference count: two ends, not one number

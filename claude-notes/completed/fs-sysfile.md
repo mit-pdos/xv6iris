@@ -8576,7 +8576,7 @@ post keeps the share at `gsh` across the window, and `ity_shot_agree` fires
 at the re-`ilock` at +0xe8.  The pure fact is HOISTED once beside the shot
 (`Hncd`) — at four applications nested this deep an `ltac:` in argument
 position is the recorded budget trap.  Full record:
-[`fs-fragments-campaign.md`](../projects/fs-fragments-campaign.md), "PASS 2".
+[`fs-fragments-campaign.md`](../completed/fs-fragments-campaign.md), "PASS 2".
 
 The arm graph, the frame map and the two ledgers are in `SpecSysLink.v`'s
 own header.  Four facts worth knowing outside those files:
@@ -9329,7 +9329,7 @@ fragment fact both halves spend is a PROVEN lemma.  `proof_coverage.py
 ### seal is STILL STOPPED, and `su_w5_dir` keeps both premises**
 
 `DirView`/`FsTree`'s `dir_uniq` is LANDED (the full record is
-[`fs-fragments-campaign.md`](../projects/fs-fragments-campaign.md)'s S2-0 section):
+[`fs-fragments-campaign.md`](../completed/fs-fragments-campaign.md)'s S2-0 section):
 the name-uniqueness invariant now rides in `IcacheEscrow.ipool_alloc` and
 `ic_loaded` beside `dir_ok`/`dir_dots_ix`/`dir_orphan_clean`, and
 `FsLookup.ic_loaded_fdir` turns a locked directory's payload into an
@@ -9807,7 +9807,7 @@ The design above asked for "a DESIGN ruling on how an empty directory's
 count becomes readable".  The ruling is the count-fact carrier, staged V1 /
 V2 / V3; **V1 — the carrier, with no producer and no consumer — is landed**
 and its full record is
-[`fs-fragments-campaign.md`](../projects/fs-fragments-campaign.md)'s V1 section.  What
+[`fs-fragments-campaign.md`](../completed/fs-fragments-campaign.md)'s V1 section.  What
 S7-unlink needs to know:
 
 * `IcacheRef.linkElemUR`'s `w` is now `(wl, wd)`, and **(L1) is the SUM**
@@ -9843,7 +9843,7 @@ clause that turns it into an upper bound; V3 is this walk's consumption.
 ### payload now bounds a directory's count from ABOVE, and the T_DIR arm's
 ### one unsupplied premise is derivable**
 
-The full record is [`fs-fragments-campaign.md`](../projects/fs-fragments-campaign.md)'s
+The full record is [`fs-fragments-campaign.md`](../completed/fs-fragments-campaign.md)'s
 V2 section.  What S7-unlink needs to know, in the order the walk meets it:
 
 * **`DirLinks.dir_links` carries `∃ F : nat -> bool, ⌜DirView.dlc_bound F
@@ -9922,7 +9922,7 @@ passes, and between them they partition the directory case:
   `DirLinks.dir_links_unlink`'s home-live premise — without any guard
   sys_unlink does not have.
 
-See [`fs-fragments-campaign.md`](../projects/fs-fragments-campaign.md), PASS 1 + PASS 2.
+See [`fs-fragments-campaign.md`](../completed/fs-fragments-campaign.md), PASS 1 + PASS 2.
 
 **The contract was deliberately not written until both were landed**:
 fixing a postcondition around an arm nobody can reach is what the D₀ stops
@@ -10594,7 +10594,7 @@ builds an EMPTY reverse map and reports every cone as zero.  Mine did, twice.)
 **WHAT THE KERNEL GAINED.**  `if (dp->nlink == 0) { iunlockput(dp); goto
 bad; }` immediately after `ilock(dp)` — create's re-check at
 `sysfile.c:262`, given to sys_link.  It is the fix the user ruled on in
-[`fs-fragments-campaign.md`](../projects/fs-fragments-campaign.md): the STRONG
+[`fs-fragments-campaign.md`](../completed/fs-fragments-campaign.md): the STRONG
 isdirempty invariant ("an orphaned directory's live records are exactly `.`
 and `..`") was refuted by sys_link's unguarded `dirlink`, and it is true of
 this binary.  Five instructions, fourteen bytes.

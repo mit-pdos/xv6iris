@@ -146,5 +146,5 @@ fetchstr gets the block WHOLE and does its own `proc_priv_copy` inside.
 Nothing in this cone. The obvious consumers are the syscalls that call
 `argstr` — `sys_open`, `sys_exec`, `sys_chdir`, `sys_mknod`, `sys_link`,
 `sys_unlink` — none of which is specified yet; see
-[`proc-struct-resources.md`](../projects/proc-struct-resources.md) for the syscall
+[`proc-struct-resources.md`](../completed/proc-struct-resources.md) for the syscall
 worklist.

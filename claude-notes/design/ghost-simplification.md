@@ -4,7 +4,7 @@ STATUS: ASSESSMENT ONLY (2026-08-19, coordinator review; nothing executed).
 Verified against `main` @ `874cb5e7` (= the pushed FINAL-GATE tree).  Every
 verdict below rests on a consumer enumeration run against the sources; the
 two machine-checked verdicts cite the campaign's own probes (recorded in
-[`../projects/iclaim-ledger.md`](../projects/iclaim-ledger.md) §5⁗″/§5⁗⁗).
+[`../completed/iclaim-ledger.md`](../completed/iclaim-ledger.md) §5⁗″/§5⁗⁗).
 Ranking metric, per the user's refinement: **contract-surface reduction
 first** — a candidate that deletes Spec clauses at moderate internal cost
 outranks one that only merges invariants.

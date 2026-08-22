@@ -561,7 +561,7 @@ Three, and they nest:
 
 The phdr loop's continuation is a genuine "return from inside a loop" shape —
 `kwait` is the model to read first (see
-[`proc-struct-resources.md`](../projects/proc-struct-resources.md)).
+[`proc-struct-resources.md`](../completed/proc-struct-resources.md)).
 
 **WHEN A LOOP'S OBVIOUS MEASURE IS NOT AVAILABLE AT ITS HEAD, LOOK FOR ONE
 THE MACHINE WORD ITSELF BOUNDS.** The loadseg loop reads `[ph.off + i,

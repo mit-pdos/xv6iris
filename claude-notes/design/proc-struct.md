@@ -899,7 +899,7 @@ taken by `allocproc` and `kill` on procs the holder is *not* running.
 
 ## What moves where, and when
 
-- **`allocproc`** (PROVEN — `projects/proc-struct-resources.md` S6) finds
+- **`allocproc`** (PROVEN — `completed/proc-struct-resources.md` S6) finds
   `UNUSED`, so `inv_dormant` opens and hands it `proc_dormant` — the field
   cells, `own_ctx`, and the second pid half. It writes `pid` (both halves in
   hand — `ProcInv.p_pid_join` / `p_pid_split`), flips to `USED` (both guards
@@ -1055,7 +1055,7 @@ The three moving parts, all already in `ProcInv.v`:
 The instruction-level lessons (a 4-byte local in the upper half of a frame
 slot, deriving "this stack address is not null", indexing `p_ofile` at a
 symbolic fd, and factoring a branch join) are in
-[`../projects/proc-struct-resources.md`](../projects/proc-struct-resources.md).
+[`../completed/proc-struct-resources.md`](../completed/proc-struct-resources.md).
 
 ## `wait_lock`, and where the lock ordering shows up
 

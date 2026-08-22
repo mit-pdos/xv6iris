@@ -1,5 +1,22 @@
 # Project: filling `cwd_ref` — the inode-reference hole
 
+> **FINISHED (audited 2026-08-22).** Every hole this file enumerates is closed:
+> `ProcInv.cwd_ref := inode_held` (a real count-carrying reference),
+> `SpecKfork` carries no inode parameters or `pv_cwd` side condition and its
+> post has no `∃ q'`, `kfk_cwd_ref_any` is deleted, `SpecIput` consumes a
+> whole `inode_refp` and returns an `iref_slot`, `ProofKexit`/`ProofFileclose`
+> spend real references into a proven `iput`, and boot routes the `NFILE`
+> units. The section "THE FILE TABLE'S HALF — DESIGNED, NOT BUILT" (the
+> `off_body` parked arm, `fpark_tok`, `off_take_last`, the `natR` count-0
+> algebra) was SUPERSEDED, not built: the shape that landed is a cancellable
+> invariant, `FileInvDefs.inode_pay` / `inode_pay_cancel`, with a real share
+> beside it. The acceptance test over-reached: kfork deliberately keeps
+> `is_itable2`/`itable_inv`/`ireg_inv` as the lock and region handles `idup`
+> needs. Residue is comment cleanup (stale `BootShared.v:427-431`,
+> `ProcAvail.v:87-88`, `SpecIdup.v:19-21`; duplicate `NINODE` in
+> `SpecIinit.v`), recorded in `design/code-organization.md`.
+
+
 > **MERGE NOTE 2 (2026-08-10, second reconciliation).** The "Step 1 is
 > DONE" update below (origin's 5fa5f8c3, the share-shaped payload arm)
 > and d69678b3 (idup over shares) were REVIEWED AND NOT TAKEN into the

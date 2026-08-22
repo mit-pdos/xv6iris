@@ -185,7 +185,7 @@ proc_pt_data_irrel P Q : ud_root/ud_tfp/ud_um agree -> proc_pt P ⊣⊢ proc_pt 
 ```
 
 `proc_pt` never reads `ud_data`. (The field is still slated for retirement —
-[`proc-pagetable-ownership.md`](../projects/proc-pagetable-ownership.md) step 3; this
+[`proc-pagetable-ownership.md`](../completed/proc-pagetable-ownership.md) step 3; this
 lemma is the cheap stand-in, not a reason to keep it.)
 
 ## The specs

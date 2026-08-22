@@ -1,5 +1,18 @@
 # fs-icache — worklist: the inode region, the escrow, and iget/iput
 
+> **FINISHED (audited 2026-08-22).** Cycles C1–C7 are all in the tree:
+> `iget`/`iput` proven and linked, `icache_boot_at` runs at main+0x92 on the
+> real image via `FsCfgBoot.fs_cfg_alloc` (`ireg_alloc` + `ipool_alloc_of_image`),
+> `adequacy_icfg` and the `LinkNameiRootBoot` axiom are gone, `inode_ok` has
+> producers, `wp_lw_au_*` lives in `WpAu4.v`. The "Deferred / owed" leak is
+> NOT a leak: `SpecFileclose.v:588-621` borrows one `iref_slot` in and returns
+> iput's give-back in the post on every arm (`ProofFileclose.v:1654-1659`),
+> so the ledger is an equality — only the comment at `SpecFileclose.v:346-350`
+> still says otherwise. The `fsblock`-carries-its-length fold was superseded
+> by `inode_sized` in `inode_ok` (design §6(ii)'s alternative). The header's
+> "iget is unproven" and the whole "OWED after C7" block are stale.
+
+
 Design: [`design/fs-icache.md`](../design/fs-icache.md) — read §10 (the
 per-entry escrow + pool), §11 (the inode region / `dinode_at`), and §12
 (why §11.4's checkout died, and the fupd-shaped `SpecLogWrite` premise

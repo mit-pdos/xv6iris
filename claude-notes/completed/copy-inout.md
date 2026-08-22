@@ -468,7 +468,7 @@ share).
   also a conjunct of `ProcInv.proc_priv`, so a caller at that altitude derives
   it (`proc_priv_sz_bound`) instead of taking it — fetchaddr forced that move
   earlier than this note anticipated, because a `proc_priv`-only caller could
-  not have discharged such a premise.  See projects/proc-struct-resources.md
+  not have discharged such a premise.  See completed/proc-struct-resources.md
   (S4b) and design/proc-struct.md.
 - `copyinstr` (0x800014c8) is the third member of this family and reuses
   `walkaddr` + `ByteBuf` unchanged.  Not attempted here.

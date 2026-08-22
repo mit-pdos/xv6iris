@@ -20,7 +20,7 @@ footprint). Since kexit diverges, sys_exit's proof has no epilogue to prove:
 applying `Kexit.wp_kexit_sconf` after the `jal kexit` discharges the whole
 function, and the dead `li a0,0`/pop/`ret` tail gcc emits (not knowing kexit
 is `noreturn`) is decoded by nobody's proof. Detail in
-[`proc-struct-resources.md`](../projects/proc-struct-resources.md)'s S6.
+[`proc-struct-resources.md`](../completed/proc-struct-resources.md)'s S6.
 
 The callee it waited on, `fileclose`, is proven
 ([`../completed/fileclose.md`](../completed/fileclose.md)). Landing it moved
@@ -57,7 +57,7 @@ What compiles today:
   bridges for the base-encoded stores kexit is the first to use.
 
 **kwait is a different matter, and its worklist is elsewhere:**
-[`proc-struct-resources.md`](../projects/proc-struct-resources.md) item **S10**.  Six of
+[`proc-struct-resources.md`](../completed/proc-struct-resources.md) item **S10**.  Six of
 `ProofKwait.v`'s seven blocks are green; `kw_round` (the outer `iLöb`), the
 prologue and `wp_kwait_sconf` are not, so there is no `LinkKwait.v` either —
 and that one is blocked on nothing external, all seven of kwait's callees
@@ -149,7 +149,7 @@ all of it caller-side: kexit's contract gained the inode cache's persistent
 set and the bitmap (`SpecFileclose.fileclose_ic_env` / `fileclose_bm`,
 shared verbatim with the descriptor loop), nine ghost/geometry fields on
 `fclose_names`, and one honest pure premise — `pv_cwd V <> 0`, because
-xv6's `iput(p->cwd)` has no null test. See projects/fs-icache.md, C6b.
+xv6's `iput(p->cwd)` has no null test. See completed/fs-icache.md, C6b.
 
 ## The proof, as it landed
 

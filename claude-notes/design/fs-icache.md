@@ -166,7 +166,7 @@ class carries the gname as a field, so the predicate's arity is unchanged
 (the alternative — an explicit `γ` parameter — ripples into `FileInv`,
 `ProcInv`, `SpecIput`, `SpecFileclose`, `kexit`).
 
-What landed (see projects/fs-icache.md's C6b entry for the whole story):
+What landed (see completed/fs-icache.md's C6b entry for the whole story):
 
 * the reference layer moved BELOW the file table, into a new
   `IcacheRef.v` — `IrefSlots.v` imports `FileInv.v`, so `FileInv.v`
@@ -5344,7 +5344,7 @@ follows for both `T_FILE` (a directory fails the +0x5c test) and `T_DIR`
 **(iii) — REFUTED at `sys_link` ON THE BINARY THIS WAS WRITTEN AGAINST.
 `XV6_REV` is now `f60ff58` and `ilock(dp)` there IS guarded**, by create's
 `dp->nlink == 0` re-check (the ruling in
-[`../projects/fs-fragments-campaign.md`](../projects/fs-fragments-campaign.md);
+[`../completed/fs-fragments-campaign.md`](../completed/fs-fragments-campaign.md);
 the walk is `sys_link`'s ARM E2).  So (iii) has the shelter (i) and (ii)
 have, and the argument below is kept as the reason the kernel had to move
 rather than as a live refutation.  `sys_link`'s `dirlink(dp, name, ...)`

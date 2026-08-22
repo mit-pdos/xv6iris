@@ -123,54 +123,25 @@ in `durable-notes.md` for what belongs where and what gets deleted.
 
 ## `projects/` — ongoing worklists & plans (one per effort)
 
-- **[`fs-fragments-campaign.md`](projects/fs-fragments-campaign.md)** — the
-  fragment campaign's ledger (design in
-  [`design/fs-fragments.md`](design/fs-fragments.md)): the staged slate, what
-  each increment cost, where the landed tree diverged from the report's
-  sketches, and the standing constraints.
-- **[`fs-icache.md`](projects/fs-icache.md)** — the inode-cache implementation
-  effort (design in [`design/fs-icache.md`](design/fs-icache.md)): the staged
-  cycle plan, the branch-per-cycle strategy; the boot wiring landed with
-  `completed/fs-cfg-boot.md`, and what is left is its "Deferred / owed"
-  list (the `fsblock` length fold, a stale header, fileclose dropping
-  iput's `iref_slot` give-back).
-- **[`fs-inode.md`](projects/fs-inode.md)** — the inode layer above the block
-  layer (landed through `writei`/`readi`); what is LEFT in it is the owed
-  decode-word dedup sweep — the bitmap-invariant question it used to keep
-  is settled in [`design/fs-bitmap.md`](design/fs-bitmap.md).
-- **[`fs-log.md`](projects/fs-log.md)** — the FS block layer, STAGE 4 (the crash
-  instantiation) only. Left: initlog's real recovery spec, sys_sync, the boot
-  composition, and the phase-D2 finding that caps what recovery can CLAIM.
-- **[`proc-struct-resources.md`](projects/proc-struct-resources.md)** — the
-  `struct proc` resource split: what has landed and what is next (the remaining
-  syscalls, and `cwd_ref`). **Read `kwait` before writing any loop that can
-  RETURN from inside itself.**
-- **[`cwd-ref.md`](projects/cwd-ref.md)** — filling the `ProcInv.cwd_ref` hole:
-  the target shape (no null arm), the measured layering fix, why the itable
-  gname must be canonical, and the ordering behind kfork.
+Three remain open (audited against the tree 2026-08-22; each file's top
+banner says precisely what is left):
+
+- **[`fs-log.md`](projects/fs-log.md)** — the FS block layer, STAGE 4 (the
+  crash instantiation): real `n > 0` recovery in `initlog`/`install_trans`
+  (today both carry a clean-image premise), `sys_sync`'s empty
+  postcondition, and the phase-D2 read-data-indexed-permit decision. The
+  boot composition's wiring is done; it inherits the clean-image premise.
 - **[`sp-migration.md`](projects/sp-migration.md)** — owning memory at a
-  NON-IDENTITY kernel va (the gate on the process kernel stack): the four
-  dead ends, and THE SETTLED DESIGN — a ktier-indexed `↦ₘ[kt]` datum, a
-  persistent per-hart `kpt_on` witness carried by a ktier-indexed `sie_cap`,
-  tier-preserving `KtierLe`-inferred leaf rules, ambient `CurKtier` notation,
-  and lock payloads at explicit tiers.
-- **[`proc-pagetable-ownership.md`](projects/proc-pagetable-ownership.md)** —
-  the process page table's OWNERSHIP side (`proc_pt`): the footprint derived
-  from `um`, the physical-tier decision, the `page_own ⇄ umem_own` bridges,
-  and **the address-space view** — `user_pt_inv P M` now EXPOSES the abstract
-  state of a user-mode process (`M`, its memory keyed by user virtual
-  address), why that forces no aliasing, and what is left to thread it into
-  the kernel-side proofs. The CONSTRUCTION side is
-  [`completed/proc-pagetable.md`](completed/proc-pagetable.md).
+  NON-IDENTITY kernel va: the settled design (ktier-indexed `↦ₘ[kt]`,
+  `kpt_on` witness, `KtierLe` inference) and the KSTACK campaign are
+  LANDED (K4 via `ParkCap.v`); what is NEXT is the `instr` ktier sweep
+  (~330 statement-identical files) and the uservec/userret trampoline-fetch
+  project that consumes `TrampText.tramp_text_mint`.
 - **[`namei-pinned-lookup.md`](projects/namei-pinned-lookup.md)** — a
-  ghost-state spec for WHICH inode `namei` returns: ruled and staged
-  (per-directory fragments, absolute paths first, N-1 carries the whole
-  fragment); §9 is the staging charter, §10 the long-run tree-level
-  direction. Design, not yet built.
-- **[`iclaim-ledger.md`](projects/iclaim-ledger.md)** — the iclaim ledger
-  increment's own worklist (design in [`design/fs-icache.md`](design/fs-icache.md)):
-  the escrow's await arm, the freeze mirror, and the as-built record of what
-  each increment deviated on.
+  ghost-state spec for WHICH inode `namei` returns: N-1 through N-5.2B
+  (kexec loads `/init` at its entry) are landed; M2 (`dvrt`, the pin through
+  the trap seam) and stage C (threading `proc_ptm` through kexec) are gated
+  on the owner's call. §10 is the long-run tree-level direction.
 
 ## `completed/` — finished projects, archived for reference
 
@@ -224,6 +195,20 @@ verified and back in the build since the tier's revival (`e8459afe`).
 `iget-licence.md`'s three non-blocking leftovers are in
 [`design/code-organization.md`](design/code-organization.md) under
 "Cleanups inherited from finished projects", beside `main-boot.md`'s.
+
+Seven more followed the same day after a tree audit of every remaining
+project (each carries a top banner saying what was verified and which of
+its own claims were stale): `cwd-ref.md` (the reference is `inode_held`;
+the file-table half landed as `inode_pay`, not as designed),
+`fs-icache.md` (read §10–§12 of the design; the "iref_slot leak" it owes
+is not a leak), `fs-inode.md`, `iclaim-ledger.md` (its STATUS header says
+"nothing built" — §5⁗″/§6‴ are the truth), `fs-fragments-campaign.md`
+(the ledger of the fragment slate; F3 was stopped by ruling),
+`proc-struct-resources.md` (**read `kwait` before writing any loop that
+can RETURN from inside itself**), and `proc-pagetable-ownership.md` (only
+file-organization refactors left). Their refactor/comment leftovers are
+in `design/code-organization.md`'s "Cleanups inherited from finished
+projects".
 
 Seven arrived on 2026-08-20, when their work finished: `kexec.md` (the largest
 function in the tree, and the home of **the copyout story** — the most

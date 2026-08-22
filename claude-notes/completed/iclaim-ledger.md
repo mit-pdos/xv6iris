@@ -1,5 +1,14 @@
 # The iclaim/ifreeze ledger — B1/B2 resolution + create_fresh_ty retirement (F1.5c/F1.5d)
 
+> **FINISHED (audited 2026-08-22).** The STATUS header below ("DESIGN —
+> nothing built") is stale; §5⁗″ and §6‴ record the landing and the tree
+> matches them: `ilkc` (`InodeRegion.v:448`), `frz`/`ireg_regime`/`ireg_fsh`,
+> `ireg_freeze_au`/`ireg_free_au`, the `rg` binder on `SpecIput`. The B1/B2
+> admits' file `IputFreeLockedDev.v` is deleted (the walk folded into
+> `ProofIput`), `create_fresh_ty` is a `Qed` lemma (`ProofCreateFreshTy.v:364`),
+> and the tree has no `Admitted` and no `Axiom` outside `ResvAxioms.v`.
+
+
 STATUS: **DESIGN** (2026-08-17, Fable design session).  Nothing built.  This
 is the design of record for TWO converged effort: (PART 1) the two design
 debts blocking `IputFreeLockedDev.v` (lane commit `60cc0136b1`, admits at

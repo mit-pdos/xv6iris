@@ -1,5 +1,17 @@
 # The fragment campaign — worklist
 
+> **FINISHED (audited 2026-08-22).** Every slate row is landed or superseded:
+> F1a/F1b/F1.5b/F2/V1–V5′/S2-0 are in the tree; F1.5c/F1.5d landed under
+> `iclaim-ledger.md`'s §5⁗″/§6‴ design (`ilkc`, `ireg_claim_no_out`, the `rg`
+> binder) rather than as written; `IregBox.v` was garbage-collected; the
+> "`create_fresh_ty` stands" wall is gone (it is a lemma); IgetLic's row-14
+> premise growth was re-supplied by namei's N-2/N-3 on the `dv_of` tie. The
+> one stopped item, F3's tree-delta half, was STOPPED BY RULING and its
+> carrier question answered by `dview` (`projects/namei-pinned-lookup.md`).
+> Cosmetic: fold `IregLinkNz.v`/`IregDirBit.v` into `InodeRegion.v` at a
+> milestone (`design/code-organization.md`).
+
+
 The design of record is [`../design/fs-fragments.md`](../design/fs-fragments.md);
 rulings **R1–R12** there bind this campaign and are not restated here. This
 file is the LEDGER: what has landed, what each increment actually cost, what

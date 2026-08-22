@@ -2319,10 +2319,13 @@ subset of what its own (untouched) consumer
   tier-generic under its original names; and `TrampText.tramp_text_mint`
   turns the persistent trampoline claim plus the identity kernel-text
   byte into `va ↦ₓ[KT1]□ b` at the TRAMPOLINE va.
-- K4 (retire `FORKRET_PARK`) is BLOCKED on a resource that is not this
-  campaign's: `UsertrapRes.ut_own_nopt` claims `fileclose_bm` — the FS
-  block bitmap — PER PROCESS, and there is exactly one. See "K4
-  findings".
+- K4 (retire `FORKRET_PARK`) is DONE (2026-08-22), by a different mechanism
+  than this campaign planned: the park is a guarded-fixpoint RESOURCE
+  (`iris/ParkCap.v`, `completed/forkret-park.md` §6) and `LinkForkretPark.v`
+  is deleted. The blocker named in "K4 findings" (`fileclose_bm` per
+  process) dissolved earlier when the bitmap became the persistent
+  `BitmapInv.bitmap_inv`. The worklist's K5 checkbox above is stale too:
+  K5 LANDED (next bullet).
 - NEXT, and it is the mint's first consumer: **the uservec/userret fetch
   project.** It needs (i) `instr` indexed — a statement-identical but
   284-file sweep, do it as its own increment (see "K5 findings"), and

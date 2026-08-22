@@ -1,5 +1,20 @@
 # Project: the FS block layer — stage 4, the crash instantiation
 
+> **Audited 2026-08-22 — STILL OPEN, and it is proof work, not cleanup.**
+> What remains: (1) real `n > 0` recovery — `SpecInitlog.v:164` still takes
+> `hdr_n bs_hdr = 0` and `:204` consumes `log_mirror_full`, `ProofInitlog`'s
+> copy loop is dead, `SpecInstallTrans.v:160` still restricts to
+> `recovering = false \/ n = 0`; (2) `sys_sync`'s postcondition
+> (`SpecSysSync.v:20` "THE CONTRACT IS EMPTY") — needs the partial-slot index
+> on `LogInv.log_mirror_at` and a commit counter for the receipt
+> `ProofEndOp.v:1783` drops; (3) the boot composition's WIRING is done
+> (forkret's boot arm → `fsinit` → `initlog` → `FsReady.fs_ready_establish`,
+> `completed/forkret-boot-arm.md`) but inherits the clean-image premise
+> (`SpecFsinit.v:316-319`, `FirstTok.v:276`) until (1) lands;
+> `FsBoot.fs_boot_bundle` was superseded by the `_at` boot mint
+> (`completed/fs-cfg-boot.md`); (4) the phase-D2 read-data-indexed-permit
+> decision is untaken, so even after (1) recovery is safety-only.
+
 Design: [`../design/fs-log.md`](../design/fs-log.md) — read its "stage-4
 architecture" section first; every durable finding of this effort has been
 lifted there. This file is the WORKLIST for what is left.

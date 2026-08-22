@@ -1,5 +1,19 @@
 # Project: `struct proc` resources
 
+> **FINISHED (audited 2026-08-22).** Every "Left"/unchecked item is done in
+> the tree: main threads `procs_avail (Some NPROC)` to userinit; S4's
+> sys_read/sys_write/sys_fstat are proven and linked (the blocker was
+> mis-described — the null out-parameter is `pfd`, handled by `SpecArgfd`'s
+> `ofd_out`); sys_close/argfd/fileclose are linked (`LinkFileclose.v`: all six
+> callees real); the FD_INODE payload and a real `LinkIput` exist;
+> `cwd_ref := inode_held`; the `ForkretPark` axiom is retired by
+> `iris/ParkCap.v`'s `park_token` (`completed/forkret-park.md`), and the
+> `fileclose_bm` obstacle dissolved into `BitmapInv.bitmap_inv`; B6's
+> `Hcont4a` hands the child's `kstack_free`/`bslots` over. **Read `kwait`
+> before writing any loop that can RETURN from inside itself** — that lesson
+> is still this file's.
+
+
 Design: [`design/proc-struct.md`](../design/proc-struct.md) — read it first; it
 has the field-by-field sharing analysis, the two-boolean invariant shape, and
 the evidence for every offset. This file is only the worklist.

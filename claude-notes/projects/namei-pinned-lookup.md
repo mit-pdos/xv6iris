@@ -1,5 +1,14 @@
 # namei, pinned: a ghost-state spec for WHICH inode the walk returns
 
+> **Audited 2026-08-22.** Stages N-1 through N-5.2B are LANDED and linked
+> (`DirViewG.v`, `SpecNamexTr`/`ProofNameiTr`/`LinkNameiTr`, `DirViewLend.v`,
+> `DirViewPin.wp_namei_pinned`, `NameiInitPinned.v`, `LinkKexecPinned.v` —
+> commit `3286cd35`). What remains is exactly §13.5's two gated items: M2
+> (`dvrt`, the unconditional pin through the usertrap/forkret seam — nothing
+> in the tree, trigger-gated on the owner's D1/D2 word) and stage C (threading
+> `proc_ptm`/M through the kexec cone, `szv'` pinning, the phdr fold — held at
+> the §14 design proposal). The STATUS line below predates the landings.
+
 STATUS: RULED AND STAGED (user, 2026-08-21): **per-directory fragments
 (Q-a), absolute paths first (Q-c), N-1 staged** — see §9 for the staging
 charter (which also REVISES §2: N-1 carries the whole fragment, no

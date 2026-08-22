@@ -1,5 +1,14 @@
 # Project: the inode layer — bmap, then iupdate, then writei/readi
 
+> **FINISHED (audited 2026-08-22).** Stages 3–4, the bitmap invariant, the
+> `SpecWritei` `proc_priv`/`p_pid` repair (`SpecWritei.v:677-686`), the
+> `srliw`/`sllw` leaf merge-back into `WpSconfAlu.v`, the decode-word dedup
+> sweep (every `kd_*` is in `KernelDecode*.v`) and even the "still deferred"
+> inode table (`iget`/`iput`/`ialloc`, `completed/iget-licence.md`) are in the
+> tree; `LinkBalloc` is a functor application, not an Axiom. Two lemma moves
+> remain and are recorded in `design/code-organization.md`.
+
+
 Design: [`../design/fs-inode.md`](../design/fs-inode.md) — read it first.
 This file is the worklist.
 

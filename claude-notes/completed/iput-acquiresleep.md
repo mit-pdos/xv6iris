@@ -136,7 +136,7 @@ also the reason the sleeplock's share had to be a fraction rather than a whole
 token: many `struct file`s share one inode reference and any of them may race
 for `ip->lock`. Three things to settle when it is written: the sleeplock's `γ`
 must be canonical rather than existential per slot (the same requirement
-[`cwd-ref.md`](../projects/cwd-ref.md) records for the itable gname), `ilock`/`iunlock`
+[`cwd-ref.md`](../completed/cwd-ref.md) records for the itable gname), `ilock`/`iunlock`
 move to the `_gen` contracts so the deposit is threaded, and the itable
 invariant has to relate its `slh_auth` total to the `ref` word it already
 tracks. No new premise on
