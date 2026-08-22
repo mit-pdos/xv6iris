@@ -50,9 +50,22 @@ up with the pc walk), with a real-bytes instance agreeing by
    per state from `gdexec_qconf` via `hemit_app`, the read/RMW policies
    at an aligned candidate) — and thread it through `cert_segment'`'s
    `Hpol'`, `seg_step_of_segment`, and `wlk_inv` (pin each hart's
-   replayed count to its row position).  DO THIS NEXT; until then the
-   capstone's honest form is `xv6_rvwmo_safe_modulo` (R-2 as
-   `walk_supply`), not `_walk'`.
+   replayed count to its row position).
+   REPAIR 1 DONE (`2a3cc65d`): the policy is row-position-indexed
+   (`wQ`/`wctx`, the alignment inside `Ctx`), **(W-1) `wpol`
+   DISCHARGED** (`wpol_of_sites`); `xv6_rvwmo_safe_modulo_l2` = the
+   capstone with residue `l2_claim` + ONE per-state datum `wseg_supply`
+   (the step's write/position, `W_poloc_closed`, `wub`, `wnw_seg`, and
+   `wseg_align`: the walk state's `pexv6` IS the emission's — `wlk_inv`
+   never ties the state's process supply to the row's emission).
+   OBSTRUCTION 2 (machine-checked, `cyg_walk_seg_data_false`):
+   `cpol_ctx` asserts `¬ W` at the candidate's OWN position, so a
+   witness position cannot carry the context — the substituted route is
+   unreachable through `cert_segment'`.  FIX NEXT: move that clause into
+   the policy's non-witness case (serve witness positions by the
+   latest-read route `cyg_walk` uses by hand) and make `wlk_inv` carry
+   the emission state so `wseg_align` is derived.  Until then the honest
+   capstone form is `xv6_rvwmo_safe_modulo` (R-2 as `walk_supply`).
 4. The F-variant's glue mirror; **R6**; `wprot_store` width lift;
    `WeakRvwmoLock`'s failed-swap arm; the `c.j`-style decoder audit
    (bitmask vs Sail, `KernelSitesDef` §6.6).
