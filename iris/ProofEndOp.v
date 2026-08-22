@@ -406,6 +406,17 @@ Qed.
 Lemma eo_lookup_elem (W : list (mword 32)) (t : nat) (w : mword 32) :
   W !! t = Some w -> w ∈ W.
 Proof. intro H. eapply elem_of_list_lookup_2. exact H. Qed.
+(* the batch's home-blocks row, restated at the DECODED header's spelling --
+   what [fs_commit_permit]'s [hdr_wf] premise wants *)
+Lemma eo_hdr_in (W : list (mword 32)) (cov : gset Z) (logstart : Z) :
+  (forall w, w ∈ W -> uint w ∈ cov /\ ~ (uint w ∈ log_region_set logstart)) ->
+  forall b : Z, b ∈ map uint W -> b ∈ cov /\ b ∉ log_region_set logstart.
+Proof.
+  intros Hwok b Hb.
+  change (map uint W) with (uint <$> W) in Hb.
+  apply elem_of_list_fmap in Hb.
+  destruct Hb as (w & -> & Hw). exact (Hwok w Hw).
+Qed.
 Lemma eo_t_lt_lb (t n : nat) : (t < n)%nat -> (n <= LOGBLOCKS)%nat -> (t < LOGBLOCKS)%nat.
 Proof. lia. Qed.
 Lemma eo_St_small (t n : nat) :
@@ -1792,6 +1803,8 @@ Section EndOpBlocks.
     { iIntros (bs' Hlen' Hhn' Hdec').
       iApply (fs_commit_permit cov logstart (0%nat, []) n (map uint W) bs'
                 ltac:(exact Hlen') ltac:(exact Hdec')
+                ltac:(exact Hn30) ltac:(by apply NoDup_ListNoDup)
+                ltac:(exact (eo_hdr_in W cov logstart Hwok))
                 with "Hseam Hregc Hswlb Hmirc"). }
     iIntros (CIDb1 Hsb1 mf1 bs1) "%Hcs1 Hcg Hcnt Hextc Hextm Hpc Hppid
                                   Hncell HW HauthL Hhdr %Hhdrn1 %Hhdec1 Hu1 HQ1".

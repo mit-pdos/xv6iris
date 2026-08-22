@@ -157,6 +157,61 @@ Lemma hdr_dec_zero (bs : list (bv 8)) :
 Proof. intros Hn. rewrite /hdr_dec le_word_0 Hn //. Qed.
 
 (* ---------------------------------------------------------------------- *)
+(* 1b'. THE HEADER WELL-FORMEDNESS INVARIANT (durable-disk stage B).       *)
+(*                                                                         *)
+(* [hdr_dec] is junk-tolerant and UNBOUNDED: a garbage header names any    *)
+(* 32-bit [n], and recovery of such a header would read log slots beyond   *)
+(* the region -- beyond the durable extent, where no fragment pins the     *)
+(* bytes -- so "two images agreeing on the durable bytes carry the same    *)
+(* record" ([P_fs_rec_agree]) would be FALSE.  The cure is an invariant    *)
+(* riding [fs_rec_wf]: the ON-DISK header's decoded write set is bounded   *)
+(* by the region, duplicate-free, and names covered HOME blocks only.      *)
+(* Every header the steady-state permits write satisfies it (swap/clear    *)
+(* write n = 0; commit writes its own decoded [(n, W)] under the batch's   *)
+(* recorded facts, [LogInv.log_batch]'s three pure rows; logfill and       *)
+(* install leave the header alone), and the recovery-side permit takes     *)
+(* the write's share of it as a premise ([hdr_wf_wr_out] is the form a     *)
+(* recovery home write discharges it in).                                  *)
+(* ---------------------------------------------------------------------- *)
+
+Definition hdr_wf (P : Z -> list (bv 8)) (cov : gset Z) (logstart : Z)
+    : Prop :=
+  ((hdr_dec (P (log_hdr_bno logstart))).1 <= LOGBLOCKS)%nat
+  /\ NoDup (hdr_dec (P (log_hdr_bno logstart))).2
+  /\ (forall b : Z, b ∈ (hdr_dec (P (log_hdr_bno logstart))).2 ->
+        b ∈ cov /\ b ∉ log_region_set logstart).
+
+(* a clean header is well formed -- mkfs's disk, and every swap/clear *)
+Lemma hdr_wf_zero (P : Z -> list (bv 8)) (cov : gset Z) (logstart : Z) :
+  hdr_n (P (log_hdr_bno logstart)) = 0 -> hdr_wf P cov logstart.
+Proof.
+  intros Hn. rewrite /hdr_wf (hdr_dec_zero _ Hn) /=.
+  split_and!; [lia | constructor |].
+  intros b Hb. by apply elem_of_nil in Hb.
+Qed.
+
+(* the invariant reads the header block only *)
+Lemma hdr_wf_ext (P P' : Z -> list (bv 8)) (cov : gset Z) (logstart : Z) :
+  P' (log_hdr_bno logstart) = P (log_hdr_bno logstart) ->
+  hdr_wf P cov logstart -> hdr_wf P' cov logstart.
+Proof. rewrite /hdr_wf. by intros ->. Qed.
+
+(* ...so a whole-block write ANYWHERE ELSE preserves it.  This is the form
+   a recovery home write discharges [fs_recover_permit]'s premise in: the
+   block it writes came out of the header it read, and the invariant it
+   learned there says that block is not the header. *)
+Lemma hdr_wf_wr_out (cov : gset Z) (logstart b : Z) (bs : list (bv 8))
+    (dk : Z -> bv 8) :
+  length bs = BSIZE ->
+  b <> log_hdr_bno logstart ->
+  hdr_wf (fs_blocks dk) cov logstart ->
+  hdr_wf (fs_blocks (disk_write dk (b * Z.of_nat BSIZE)%Z bs)) cov logstart.
+Proof.
+  intros Hlen Hb. apply hdr_wf_ext.
+  apply fs_blocks_write_ne; [exact Hlen | by apply not_eq_sym].
+Qed.
+
+(* ---------------------------------------------------------------------- *)
 (* 1c. The recovery relation.                                              *)
 (*                                                                         *)
 (* Stated in LogDefs' own geometry vocabulary ([log_hdr_bno],              *)
@@ -621,11 +676,15 @@ Record fs_rec := MkFsRec {
 Definition fs_rec_wf (r : fs_rec) (P : Z -> list (bv 8))
     (cov : gset Z) (logstart : Z) : Prop :=
   fs_recovery P (fr_D r) cov logstart /\
-  last (fr_hist r) = Some (fr_D r).
+  last (fr_hist r) = Some (fr_D r) /\
+  (* the on-disk header's invariant (1b' above): without it the record
+     would read the image beyond the durable extent, and [P_fs_rec_agree]
+     -- the machine-image agreement every permit runs on -- would be false *)
+  hdr_wf P cov logstart.
 
 Lemma fs_rec_wf_hist_ne r P cov logstart :
   fs_rec_wf r P cov logstart -> fr_hist r <> [].
-Proof. intros [_ Hlast] Hnil. rewrite Hnil in Hlast. discriminate. Qed.
+Proof. intros (_ & Hlast & _) Hnil. rewrite Hnil in Hlast. discriminate. Qed.
 
 (* ====================================================================== *)
 (* 2. THE GHOSTS.                                                         *)
@@ -1024,23 +1083,31 @@ Section fs_crash.
     iExists γs. iSplitR; [iPureIntro; exact Hseq|].
     rewrite /P_fs. iDestruct "H" as (r) "(Hh & %Hwf & Harm)".
     iExists r. iFrame "Hh". iSplitR.
-    { iPureIntro. rewrite /fs_rec_wf in Hwf *. destruct Hwf as [Hrec Hlast].
-      split; [| exact Hlast].
-      rewrite /fs_recovery in Hrec *.
-      rewrite -(fs_restrict_agree dk dk' N (fs_home_set cov ls) cov ls Heq Hext);
-        [| rewrite /fs_home_set; intros x Hx; apply elem_of_union; left;
-           exact (proj1 (elem_of_difference _ _ _) Hx).1 ].
-      rewrite -(Hlog (log_hdr_bno ls) Hhdr).
-      rewrite Hrec. apply fs_install_ext_P.
-      intros i Hi. apply Hlog. apply Hslot. exact (hdr_dec_len_bound _ _ Hi). }
+    { iPureIntro. rewrite /fs_rec_wf in Hwf *.
+      destruct Hwf as (Hrec & Hlast & Hhwf).
+      pose proof Hhwf as (Hlen & _ & _).
+      assert (Hhdreq : fs_blocks dk' (log_hdr_bno ls)
+                       = fs_blocks dk (log_hdr_bno ls))
+        by (symmetry; exact (Hlog _ Hhdr)).
+      split_and!.
+      - rewrite /fs_recovery in Hrec *.
+        rewrite -(fs_restrict_agree dk dk' N (fs_home_set cov ls) cov ls Heq Hext);
+          [| rewrite /fs_home_set; intros x Hx; apply elem_of_union; left;
+             exact (proj1 (proj1 (elem_of_difference _ _ _) Hx)) ].
+        rewrite Hhdreq.
+        rewrite Hrec. apply fs_install_ext_P.
+        intros i Hi. rewrite hdr_dec_length in Hi.
+        apply Hlog, Hslot. lia.
+      - exact Hlast.
+      - exact (hdr_wf_ext _ _ _ _ Hhdreq Hhwf). }
     rewrite /fs_arm. iDestruct "Harm" as (c) "[Hsw Harm]". iExists c. iFrame "Hsw".
     iDestruct "Harm" as "[$ | Harm]". iRight.
     iDestruct "Harm" as (g'') "[%Hc Hc]". iExists g''. iSplitR; [done|].
     rewrite /fs_custody. iDestruct "Hc" as (E M) "(Hr & Hs & Hm & %Hok)".
     iExists E, M. iFrame "Hr Hs Hm". iPureIntro.
     rewrite /log_mirror_ok in Hok *. destruct Hok as [Hh Hsl]. split.
-    - rewrite Hh. f_equal. symmetry. exact (Hlog _ Hhdr).
-    - intros i Hi. rewrite (Hsl i Hi). symmetry. exact (Hlog _ (Hslot i Hi)).
+    - rewrite Hh. f_equal. exact (Hlog _ Hhdr).
+    - intros i Hi. rewrite (Hsl i Hi). exact (Hlog _ (Hslot i Hi)).
   Qed.
 
   (* -------------------------------------------------------------------- *)
@@ -1060,7 +1127,7 @@ Section fs_crash.
     rewrite /P_fs.
     iIntros "Hp". iDestruct "Hp" as (r) "(_ & %Hwf & _)".
     iPureIntro. exists (fr_D r), (fr_hist r).
-    destruct Hwf as [Hrec Hlast].
+    destruct Hwf as (Hrec & Hlast & _).
     split_and!; [exact Hrec | | exact Hlast].
     intros Hnil. rewrite Hnil in Hlast. discriminate.
   Qed.
@@ -1094,11 +1161,12 @@ Section fs_crash.
   Lemma P_fs_alloc (γsw γreg γst : gname) (dk0 : Z -> bv 8)
       (D0 : gmap Z (list (bv 8))) (cov : gset Z) (logstart : Z) :
     fs_recovery (fs_blocks dk0) D0 cov logstart ->
+    hdr_wf (fs_blocks dk0) cov logstart ->
     mono_nat_auth_own γsw 1 0%nat ⊢ |==> ∃ γs : fs_crash_names,
       ⌜fcn_swap γs = γsw /\ fcn_reg γs = γreg /\ fcn_start γs = γst⌝ ∗
       P_fs γs cov logstart dk0 ∗ fs_receipt γs D0.
   Proof.
-    intros Hrec. iIntros "Hsw".
+    intros Hrec Hhwf. iIntros "Hsw".
     iMod (fs_hist_alloc [D0]) as (γh) "[Hauth #Hlb]".
     iModIntro. iExists (MkFsCrashNames γh γsw γreg γst).
     iSplitR; [iPureIntro; done|].
@@ -1106,7 +1174,8 @@ Section fs_crash.
     - rewrite /P_fs. iExists (MkFsRec D0 [D0]).
       iFrame "Hauth".
       iSplitR.
-      { iPureIntro. rewrite /fs_rec_wf /=. split; [exact Hrec | reflexivity]. }
+      { iPureIntro. rewrite /fs_rec_wf /=.
+        split_and!; [exact Hrec | reflexivity | exact Hhwf]. }
       iApply fs_arm_at_rest. iExact "Hsw".
     - rewrite /fs_receipt /=. iExists []. iExact "Hlb".
   Qed.
@@ -1124,7 +1193,8 @@ Section fs_crash.
                        (fs_home_set cov logstart)).
   Proof.
     intros Hn. iApply P_fs_alloc.
-    by apply (fs_recovery_clean (fs_blocks dk0) _ cov logstart Hn).
+    - by apply (fs_recovery_clean (fs_blocks dk0) _ cov logstart Hn).
+    - by apply hdr_wf_zero.
   Qed.
 
 End fs_crash.
@@ -1298,10 +1368,11 @@ Section fs_crash_seam.
       iSplitR; [iPureIntro; done|].
       rewrite /P_fs. iExists (MkFsRec D' (fr_hist r ++ [D'])).
       iFrame "Hhist". iSplitR; [| iExact "Harm"].
-      iPureIntro. rewrite /fs_rec_wf /=. split.
+      iPureIntro. rewrite /fs_rec_wf /=. split_and!.
       - exact (fs_recovery_clear (fs_blocks dk) (fs_blocks dk') cov ls bs
                  Hhit Hn0 Hmiss).
-      - rewrite last_snoc. reflexivity. }
+      - rewrite last_snoc. reflexivity.
+      - apply hdr_wf_zero. rewrite Hhit. exact Hn0. }
     iSplitL "Hsa"; [rewrite /start_auth -Hstn; iExact "Hsa"|].
     iSplitL "Hm1".
     { rewrite /log_mirror_at. iExists (mirror_of (fs_blocks dk') ls).
@@ -1408,9 +1479,11 @@ Section fs_crash_seam.
     { iNext. rewrite /P_fs_rec /P_fs_rec_named. iExists γs.
       iSplitR; [iPureIntro; done|].
       rewrite /P_fs. iExists r. iFrame "Hhist". iSplitR; [| iExact "Harm"].
-      iPureIntro. destruct Hwf as [Hrec Hlast]. split; [| exact Hlast].
-      exact (fs_recovery_logfill (fs_blocks dk) (fs_blocks dk') (fr_D r) cov ls i
-               Hi Hmiss Hn0 Hrec). }
+      iPureIntro. destruct Hwf as (Hrec & Hlast & Hhwf). split_and!.
+      - exact (fs_recovery_logfill (fs_blocks dk) (fs_blocks dk') (fr_D r) cov ls i
+               Hi Hmiss Hn0 Hrec).
+      - exact Hlast.
+      - exact (hdr_wf_ext _ _ _ _ Hhdr' Hhwf). }
     iSplitL "Hsa"; [rewrite /start_auth -Hstn; iExact "Hsa"|].
     iExists (mirror_of (fs_blocks dk') ls). iFrame "Hmir". iPureIntro.
     rewrite /mirror_of /= Hhdr' -(proj1 Hok) HM0 //.
@@ -1444,13 +1517,18 @@ Section fs_crash_seam.
       (h : nat * list Z) (nn : nat) (Ws : list Z) (bs : list (bv 8)) :
     length bs = BSIZE ->
     hdr_dec bs = (nn, Ws) ->
+    (* the batch's recorded facts ([LogInv.log_batch]'s three pure rows),
+       here because the header this permit writes must satisfy [hdr_wf] *)
+    (nn <= LOGBLOCKS)%nat ->
+    NoDup Ws ->
+    (forall b : Z, b ∈ Ws -> b ∈ cov /\ b ∉ log_region_set ls) ->
     era_registered gen_id riscv_eraGS -∗
     swap_lb (S gen_id) -∗
     log_mirror_at h -∗
     fs_rec_permit cov ls gen_id (Some ((1024 * log_hdr_bno ls)%Z, bs))
       (log_mirror_at (nn, Ws) ∗ (∃ D : gmap Z (list (bv 8)), fs_receipt_any D)).
   Proof.
-    intros Hlen Hdec. iIntros "#Hreg #Hswlb Hmir".
+    intros Hlen Hdec Hnn Hnd Hin. iIntros "#Hreg #Hswlb Hmir".
     rewrite /fs_rec_permit. iIntros (dk n) "Hsa %Hn1 HP".
     assert (Hidx : (1024 * log_hdr_bno ls)%Z
                    = (log_hdr_bno ls * Z.of_nat BSIZE)%Z)
@@ -1489,10 +1567,12 @@ Section fs_crash_seam.
       iSplitR; [iPureIntro; done|].
       rewrite /P_fs. iExists (MkFsRec D' (fr_hist r ++ [D'])).
       iFrame "Hhist". iSplitR; [| iExact "Harm"].
-      iPureIntro. rewrite /fs_rec_wf /=. split.
+      iPureIntro. rewrite /fs_rec_wf /=. split_and!.
       - exact (fs_recovery_commit (fs_blocks dk) (fs_blocks dk') cov ls bs
                  Hhit Hmiss).
-      - rewrite last_snoc. reflexivity. }
+      - rewrite last_snoc. reflexivity.
+      - rewrite /hdr_wf Hhit Hdec /=.
+        split_and!; [exact Hnn | exact Hnd | exact Hin]. }
     iSplitL "Hsa"; [rewrite /start_auth -Hstn; iExact "Hsa"|].
     iSplitL "Hmir".
     { iExists (mirror_of (fs_blocks dk') ls). iFrame "Hmir". iPureIntro.
@@ -1506,6 +1586,9 @@ Section fs_crash_seam.
       (h : nat * list Z) (nn : nat) (Ws : list Z) (bs : list (bv 8)) :
     length bs = BSIZE ->
     hdr_dec bs = (nn, Ws) ->
+    (nn <= LOGBLOCKS)%nat ->
+    NoDup Ws ->
+    (forall b : Z, b ∈ Ws -> b ∈ cov /\ b ∉ log_region_set ls) ->
     fs_crash_seam cov ls -∗
     era_registered gen_id riscv_eraGS -∗
     swap_lb (S gen_id) -∗
@@ -1513,7 +1596,7 @@ Section fs_crash_seam.
     disk_write_permit gen_id (Some ((1024 * log_hdr_bno ls)%Z, bs))
       (log_mirror_at (nn, Ws) ∗ (∃ D : gmap Z (list (bv 8)), fs_receipt_any D)).
   Proof.
-    intros P0 P1. iIntros "#Hseam H0 H1 H2".
+    intros P0 P1 P2 P3 P4. iIntros "#Hseam H0 H1 H2".
     iApply (fs_permit_of_rec with "Hseam").
     iApply (fs_commit_permit_rec with "H0 H1 H2"); try assumption.
   Qed.
@@ -1578,9 +1661,12 @@ Section fs_crash_seam.
     { iNext. rewrite /P_fs_rec /P_fs_rec_named. iExists γs.
       iSplitR; [iPureIntro; done|].
       rewrite /P_fs. iExists r. iFrame "Hhist". iSplitR; [| iExact "Harm"].
-      iPureIntro. destruct Hwf as [Hrec Hlast]. split; [| exact Hlast].
-      apply (fs_recovery_install (fs_blocks dk) (fs_blocks dk') (fr_D r) cov ls
-               i b); rewrite ?Hhdr /=; assumption. }
+      iPureIntro. destruct Hwf as (Hrec & Hlast & Hhwf). split_and!.
+      - apply (fs_recovery_install (fs_blocks dk) (fs_blocks dk') (fr_D r) cov ls
+               i b); rewrite ?Hhdr /=; assumption.
+      - exact Hlast.
+      - refine (hdr_wf_ext _ _ _ _ _ Hhwf).
+        apply Hmiss, not_eq_sym. by apply home_ne_hdr. }
     iSplitL "Hsa"; [rewrite /start_auth -Hstn; iExact "Hsa"|].
     iExists M0. iFrame "Hmir". iPureIntro. exact HM0.
   Qed.
@@ -1607,7 +1693,8 @@ Section fs_crash_seam.
   Proof.
     intros P0 P1 P2 P3 P4. iIntros "#Hseam H0 H1 H2".
     iApply (fs_permit_of_rec with "Hseam").
-    iApply (fs_install_permit_rec with "H0 H1 H2"); try assumption.
+    iApply (fs_install_permit_rec cov ls nn Ws i b bs with "H0 H1 H2");
+      try assumption.
   Qed.
 
   (* ---- (4) CLEAR: write_head storing an n = 0 header at the end of a
@@ -1670,10 +1757,11 @@ Section fs_crash_seam.
       iSplitR; [iPureIntro; done|].
       rewrite /P_fs. iExists (MkFsRec D' (fr_hist r ++ [D'])).
       iFrame "Hhist". iSplitR; [| iExact "Harm"].
-      iPureIntro. rewrite /fs_rec_wf /=. split.
+      iPureIntro. rewrite /fs_rec_wf /=. split_and!.
       - exact (fs_recovery_clear (fs_blocks dk) (fs_blocks dk') cov ls bs
                  Hhit Hn0 Hmiss).
-      - rewrite last_snoc. reflexivity. }
+      - rewrite last_snoc. reflexivity.
+      - apply hdr_wf_zero. rewrite Hhit. exact Hn0. }
     iSplitL "Hsa"; [rewrite /start_auth -Hstn; iExact "Hsa"|].
     iExists (mirror_of (fs_blocks dk') ls). iFrame "Hmir". iPureIntro.
     rewrite /mirror_of /= Hhit. exact (hdr_dec_zero bs Hn0).
@@ -1765,21 +1853,31 @@ Section fs_crash_seam.
     log_mirror_full -∗ fs_era_custody.
   Proof. iIntros "H". rewrite /fs_era_custody. by iLeft. Qed.
 
-  (* ---- (5a) THE RE-BASING WRITE, at ANY write identity. ---- *)
+  (* ---- (5a) THE RE-BASING WRITE, at any write identity that DOES NOT
+     CORRUPT THE HEADER's invariant.  The premise is the one fact stage B's
+     [hdr_wf] forces on this family: a re-based record is well formed only
+     if the post-write header still is, and a recovery write cannot claim
+     that for free -- its block came out of the header it read, and the
+     invariant it learned there ([hdr_wf]'s home-blocks conjunct, delivered
+     by the read permit) is exactly what discharges [hdr_wf_wr_out]. ---- *)
   Lemma fs_recover_permit_rec `{GEN : GenId} (cov : gset Z) (ls : Z) (w : disk_wr) :
+    (forall dk : Z -> bv 8,
+       hdr_wf (fs_blocks dk) cov ls ->
+       hdr_wf (fs_blocks (wr_apply w dk)) cov ls) ->
     era_registered gen_id riscv_eraGS -∗
     gen_started gen_id -∗
     ▷ fs_era_custody -∗
     fs_rec_permit cov ls gen_id w fs_era_custody.
   Proof.
-    iIntros "#Hreg #Hst Hcust".
+    intros Hsafe. iIntros "#Hreg #Hst Hcust".
     rewrite /fs_rec_permit. iIntros (dk n) "Hsa %Hn1 HP".
     set (dk' := wr_apply w dk).
     (* through the seam; the record is timeless, so the [▷] strips *)
     iMod "HP". rewrite /P_fs_rec /P_fs_rec_named.
     iDestruct "HP" as (γs) "[%Hseq HPfs]".
     destruct Hseq as (Hsw & Hrg & Hstn).
-    rewrite {1}/P_fs. iDestruct "HPfs" as (r) "(Hhist & _ & Harm)".
+    rewrite {1}/P_fs. iDestruct "HPfs" as (r) "(Hhist & %Hwf & Harm)".
+    pose proof Hwf as (_ & _ & Hhwf).
     iAssert (fs_era_reg γs gen_id riscv_eraGS) as "#Hreg2".
     { rewrite /fs_era_reg Hrg. iExact "Hreg". }
     iAssert (mono_nat_auth_own (fcn_start γs) 1 n) with "[Hsa]" as "Hsa".
@@ -1833,23 +1931,27 @@ Section fs_crash_seam.
       iSplitR; [iPureIntro; done|].
       rewrite /P_fs. iExists (MkFsRec D' (fr_hist r ++ [D'])).
       iFrame "Hhist". iSplitR; [| iExact "Harm"].
-      iPureIntro. rewrite /fs_rec_wf /=. split.
+      iPureIntro. rewrite /fs_rec_wf /=. split_and!.
       - rewrite /fs_recovery. reflexivity.
-      - rewrite last_snoc. reflexivity. }
+      - rewrite last_snoc. reflexivity.
+      - exact (Hsafe dk Hhwf). }
     iSplitL "Hsa"; [rewrite /start_auth -Hstn; iExact "Hsa"|].
     rewrite /fs_era_custody. iRight. iFrame "Hmir Hswlb".
   Qed.
 
   Lemma fs_recover_permit `{GEN : GenId} (cov : gset Z) (ls : Z) (w : disk_wr) :
+    (forall dk : Z -> bv 8,
+       hdr_wf (fs_blocks dk) cov ls ->
+       hdr_wf (fs_blocks (wr_apply w dk)) cov ls) ->
     fs_crash_seam cov ls -∗
     era_registered gen_id riscv_eraGS -∗
     gen_started gen_id -∗
     ▷ fs_era_custody -∗
     disk_write_permit gen_id w fs_era_custody.
   Proof.
-    iIntros "#Hseam H0 H1 H2".
+    intros Hsafe. iIntros "#Hseam H0 H1 H2".
     iApply (fs_permit_of_rec with "Hseam").
-    iApply (fs_recover_permit_rec with "H0 H1 H2").
+    iApply (fs_recover_permit_rec cov ls w Hsafe with "H0 H1 H2").
   Qed.
 
   (* ---- (5b) THE BOOT'S FINAL HEADER WRITE, uniform in whether the era

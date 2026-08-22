@@ -338,6 +338,17 @@ Proof.
                   (proj2 (proj2 (PowerBoot.boot_shape_boot_gstate g)))) as Hw.
     destruct Hw as (Hwf & _ & _ & _ & _ & Hnibeq & Hcovin & Hcovmeta & _).
     exact (FirstTok.fs_extent_of_image _ _ _ _ _ Hwf Hnibeq Hcovin Hcovmeta). }
+  (* ...and the header invariant [P_fs_alloc] now carries (stage B's
+     [hdr_wf]): the image's log is clean, so [hdr_wf_zero] closes it.  The
+     boot state's disk IS [g]'s ([virtio_reset] keeps [v_disk]), so the
+     image sweep applies by conversion. *)
+  assert (Hhwf : hdr_wf (fs_blocks (v_disk (g.(gdev).(dvirtio)))) cov
+                   (FsImg.sb_logstart sb)).
+  { pose proof (Himg (PowerBoot.boot_gstate g)
+                  (proj2 (proj2 (PowerBoot.boot_shape_boot_gstate g)))) as Hw.
+    destruct Hw as (Hwf & _).
+    apply hdr_wf_zero. rewrite /log_hdr_bno /hdr_n.
+    exact (FsImg.fsimg_wf_log _ _ Hwf). }
   (* THE CRASH PREDICATE AT ERA 0: the record from mkfs's recovery fact,
      and the DURABLE DISK's fragments -- the whole [0, XV6_DISK_BYTES) of the
      initial image, handed over once by the power theorem and owned by the
@@ -348,7 +359,7 @@ Proof.
               P_fs_named γd XV6_DISK_BYTES γsw γreg γst cov (FsImg.sb_logstart sb))
            ltac:(intros γd γsw γreg γst; iIntros "[Hfr Hsw]";
                  iMod (P_fs_alloc γsw γreg γst _ D0 cov
-                         (FsImg.sb_logstart sb) Hrec
+                         (FsImg.sb_logstart sb) Hrec Hhwf
                          with "Hsw") as (γs) "(%Hseq & HP & _)";
                  iModIntro; rewrite /P_fs_named;
                  iExists (v_disk (g.(gdev).(dvirtio))); iFrame "Hfr";
@@ -441,6 +452,15 @@ Proof.
                   (proj2 (proj2 (PowerBoot.boot_shape_boot_gstate g)))) as Hw.
     destruct Hw as (Hwf & _ & _ & _ & _ & Hnibeq & Hcovin & Hcovmeta & _).
     exact (FirstTok.fs_extent_of_image _ _ _ _ _ Hwf Hnibeq Hcovin Hcovmeta). }
+  (* ...and stage B's header invariant, from the image's clean log exactly
+     as [xv6_power_adequacy] derives it *)
+  assert (Hhwf : hdr_wf (fs_blocks (v_disk (g.(gdev).(dvirtio)))) cov
+                   (FsImg.sb_logstart sb)).
+  { pose proof (Himg (PowerBoot.boot_gstate g)
+                  (proj2 (proj2 (PowerBoot.boot_shape_boot_gstate g)))) as Hw.
+    destruct Hw as (Hwf & _).
+    apply hdr_wf_zero. rewrite /log_hdr_bno /hdr_n.
+    exact (FsImg.fsimg_wf_log _ _ Hwf). }
   (* THE CRASH PREDICATE AT ERA 0: the record from mkfs's recovery fact,
      and the DURABLE DISK's fragments -- the whole [0, XV6_DISK_BYTES) of the
      initial image, handed over once by the power theorem and owned by the
@@ -451,7 +471,7 @@ Proof.
               P_fs_named γd XV6_DISK_BYTES γsw γreg γst cov (FsImg.sb_logstart sb))
            ltac:(intros γd γsw γreg γst; iIntros "[Hfr Hsw]";
                  iMod (P_fs_alloc γsw γreg γst _ D0 cov
-                         (FsImg.sb_logstart sb) Hrec
+                         (FsImg.sb_logstart sb) Hrec Hhwf
                          with "Hsw") as (γs) "(%Hseq & HP & _)";
                  iModIntro; rewrite /P_fs_named;
                  iExists (v_disk (g.(gdev).(dvirtio))); iFrame "Hfr";
