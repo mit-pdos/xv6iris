@@ -60,6 +60,15 @@
        flavor to the heap.
      - no control flow: branches/jumps end a block (compose blocks with the
        existing jal/jalr/beq WPs). *)
+
+(* THE SCONF-BASED VCgen IS GONE.  [WpSmodeVc]/[WpSconfVc.v] -- a second
+   block executor over [sconf]+[sie_cap] with sp-move support -- was built
+   but never adopted: nothing in the tree ever required it, and the
+   whole-function proofs went through this executor and the per-leaf
+   [wp_*_s_sconf] lemmas instead.  It was deleted rather than carried,
+   on the judgment that a restart would rebuild it from scratch anyway.
+   It is recoverable in full at commit cd75545c (iris/WpSconfVc.v,
+   1222 lines), together with its own header explaining [vsstate]. *)
 From Stdlib Require Import ZArith Lia List FunctionalExtensionality.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.

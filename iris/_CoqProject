@@ -43,7 +43,6 @@ HartLift2.v
 HartMRun.v
 HartGoodb.v
 HartMFrame.v
-HartMLeaf.v
 HartMDispatch.v
 HartPilot.v
 RegFile.v
@@ -121,11 +120,9 @@ UserPtTree.v
 HartSTrans.v
 HartSKpt.v
 UserFetchPt.v
-MemAmo4.v
 UserMemPt.v
 UserMemAccess.v
 UserMemMis.v
-PtFetchGen.v
 TrampStepPt.v
 UptWalkPt.v
 Pt2Walk.v
@@ -201,7 +198,6 @@ HartSMem.v
 SmodeCorePt.v
 WpSmodePtFetch.v
 WpSmodeGpr.v
-WpSmodeMemGen.v
 WpMemsetS.v
 WpSmodeSret.v
 CodeTimerinit.v
@@ -230,7 +226,6 @@ UserTrap.v
 UserTranslate.v
 UserMem.v
 UserFetch.v
-UserCompute.v
 UserStepFull.v
 # --- BEGIN verified Umode WP tier (sync/echo/sh/init) ---
 # Descoped from the hart-node-port build on 2026-08-19 and REVIVED on
@@ -395,7 +390,6 @@ LinkKvminithart.v
 SpecWakeupParts.v
 ProofWakeupParts.v
 LinkWakeupParts.v
-WpSconfVc.v
 WpSieFlipBits.v
 WpSconfCsr.v
 WpSconfSret.v
