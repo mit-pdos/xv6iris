@@ -356,13 +356,11 @@ Section KforkB3Proof.
         with "[Hqx]" as "Htail".
       { iIntros (CIDta Hsta Mt) "%Hregst Hcg Hown Hpc Hpv Hpv2".
         destruct Hregst as (Ht0 & Ht0' & Ht1 & Ht2 & Ht3 & Ht4 & Ht5 & Htthr).
-        iPoseProof (kfk_08e with "Htext") as "Hi08e".
-        iPoseProof (kfk_090 with "Htext") as "Hi090".
-        iPoseProof (kfk_092 with "Htext") as "Hi092".
         (* ---- +0x8e: c.addi s1,s1,8 ---- *)
         iApply (wp_caddi_s_sconf (mword_of_int (KF + 0x8e)) Rs1 (mword_of_int 8 : mword 6)
                   Mt (rsv + (K - 8))%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
-                  with "Hcg Hpc Hi08e").
+                  with "Hcg Hpc []").
+        { iApply (kfk_08e with "Htext"). }
         iIntros (CID1 Hst1) "Hcg Hpc".
         set (T1 := <[Regidx Rs1 := regval_into_reg
                       (add_vec (Mt !!! Regidx Rs1)
@@ -394,7 +392,8 @@ Section KforkB3Proof.
         (* ---- +0x90: c.addi s2,s2,8 ---- *)
         iApply (wp_caddi_s_sconf (mword_of_int (KF + 0x90)) Rs2 (mword_of_int 8 : mword 6)
                   T1 (rsv + (K - 8))%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
-                  with "Hcg Hpc Hi090").
+                  with "Hcg Hpc []").
+        { iApply (kfk_090 with "Htext"). }
         iIntros (CID2 Hst2) "Hcg Hpc".
         set (T2 := <[Regidx Rs2 := regval_into_reg
                       (add_vec (T1 !!! Regidx Rs2)
@@ -432,7 +431,8 @@ Section KforkB3Proof.
                     Rs3 Rs1 T2 (rsv + (K - 8))%nat b
                     ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                     ltac:(rgne; rgne; exact Hcmp) ltac:(vm_compute; reflexivity)
-                    with "Hcg Hpc Hi092").
+                    with "Hcg Hpc []").
+          { iApply (kfk_092 with "Htext"). }
           iNext. iIntros (CID3 Hst3) "Hcg Hpc".
           assert (Htgta4 : add_vec (mword_of_int (KF + 0x92) : mword 64)
                              (sign_extend' 64 (mword_of_int 18 : mword 13))
@@ -456,7 +456,8 @@ Section KforkB3Proof.
                     Rs3 Rs1 T2 (rsv + (K - 8))%nat b
                     ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                     ltac:(rgne; rgne; exact Hcmp)
-                    with "Hcg Hpc Hi092").
+                    with "Hcg Hpc []").
+          { iApply (kfk_092 with "Htext"). }
           iIntros (CID3 Hst3) "Hcg Hpc".
           assert (Hpp96 : add_vec_int (mword_of_int (KF + 0x92) : mword 64) 4
                          = mword_of_int (KF + 0x96)) by (apply bv_eq; vm_compute; reflexivity).
@@ -473,8 +474,6 @@ Section KforkB3Proof.
       (* ================================================================= *)
       (*  THE BODY, +0x96 .. +0xa2, at index [i].                          *)
       (* ================================================================= *)
-      iPoseProof (kfk_096 with "Htext") as "Hi096".
-      iPoseProof (kfk_098 with "Htext") as "Hi098".
       iDestruct (proc_priv_ofile_len with "Hpv") as "%HlenVp".
       destruct (lookup_lt_is_Some_2 (pv_ofile Vp) i ltac:(rewrite HlenVp; lia)) as [v Hv].
       iDestruct (proc_priv_ofile γf pme pid_p Vp i v Hv with "Hpv") as "[[Hcell Hpay] Hback]".
@@ -483,7 +482,8 @@ Section KforkB3Proof.
                      = p_ofile pme i) by (rewrite Hs1; apply addv_sext0).
       iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KF + 0x96)) Ra0 Rs1 (mword_of_int 0 : mword 12)
                 M (rsv + (K - 8))%nat v b ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hi096 [Hcell]").
+                with "Hcg Hpc [] [Hcell]").
+      { iApply (kfk_096 with "Htext"). }
       { iEval (rewrite Haddr). iExact "Hcell". }
       iIntros (CIDl Hstl) "Hcg Hpc Hcell". iEval (rewrite Haddr) in "Hcell".
       set (L1 := <[Regidx Ra0 := regval_into_reg v]> M).
@@ -518,7 +518,8 @@ Section KforkB3Proof.
                   (Cregidx (mword_of_int 2)) Ra0 L1 (rsv + (K - 8))%nat b
                   ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
                   Hz ltac:(vm_compute; reflexivity)
-                  with "Hcg Hpc Hi098").
+                  with "Hcg Hpc []").
+        { iApply (kfk_098 with "Htext"). }
         iNext. iIntros (CIDm Hstm) "Hcg Hpc".
         assert (Htgt8e : add_vec (mword_of_int (KF + 0x98) : mword 64)
                            (sign_extend' 64 (sign_extend' 13
@@ -551,14 +552,12 @@ Section KforkB3Proof.
         iApply (wp_cbeqz_fall_s_sconf (mword_of_int (KF + 0x98)) (mword_of_int 251 : mword 8)
                   (Cregidx (mword_of_int 2)) Ra0 L1 (rsv + (K - 8))%nat b
                   ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
-                  Hz with "Hcg Hpc Hi098").
+                  Hz with "Hcg Hpc []").
+        { iApply (kfk_098 with "Htext"). }
         iIntros (CIDm Hstm) "Hcg Hpc".
         assert (Hpp9a : add_vec_int (mword_of_int (KF + 0x98) : mword 64) 2
                        = mword_of_int (KF + 0x9a)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hpp9a) in "Hpc".
-        iPoseProof (kfk_09a with "Htext") as "Hi09a".
-        iPoseProof (kfk_09e with "Htext") as "Hi09e".
-        iPoseProof (kfk_0a2 with "Htext") as "Hi0a2".
         (* the child's slot [i] is null: open it, it owns exactly the one
            [FdSlots.fd_slot] unit filedup's precondition wants. *)
         assert (Hvc : pv_ofile (kfk_childV V0 (pv_ofile Vp) i) !! i = Some (zero_reg : mword 64)).
@@ -572,7 +571,8 @@ Section KforkB3Proof.
         iApply (wp_jal_s_sconf (mword_of_int (KF + 0x9a)) Rra (mword_of_int 9200 : mword 21)
                   L1 (rsv + (K - 8))%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
                   ltac:(vm_compute; reflexivity)
-                  with "Hcg Hpc Hi09a").
+                  with "Hcg Hpc []").
+        { iApply (kfk_09a with "Htext"). }
         iIntros (CIDn Hstn) "Hcg Hpc".
         set (L2 := <[Regidx Rra := regval_into_reg
                       (add_vec_int (mword_of_int (KF + 0x9a) : mword 64) 4)]> L1).
@@ -637,7 +637,8 @@ Section KforkB3Proof.
                         = p_ofile npa i) by (rewrite Hmrs2; apply addv_sext0).
         iApply (wp_sd_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KF + 0x9e)) Ra0 Rs2 (mword_of_int 0 : mword 12)
                   mr (rsv + (K - 8))%nat (zero_reg : mword 64) b
-                  with "Hcg Hpc Hi09e [Hcell2]").
+                  with "Hcg Hpc [] [Hcell2]").
+        { iApply (kfk_09e with "Htext"). }
         { iEval (rgne; rewrite Haddr2). iExact "Hcell2". }
         iIntros (CIDp Hstp) "Hcg Hpc Hcell2".
         iEval (rgne; rgne; rewrite Haddr2 Hmra0) in "Hcell2".
@@ -659,7 +660,8 @@ Section KforkB3Proof.
         iApply (wp_cj_s_sconf (mword_of_int (KF + 0xa2))
                   (sign_extend' 21 (concat_vec (mword_of_int 2038 : mword 11) ('b"0")))
                   mr (rsv + (K - 8))%nat b ltac:(vm_compute; reflexivity)
-                  with "Hcg Hpc Hi0a2").
+                  with "Hcg Hpc []").
+        { iApply (kfk_0a2 with "Htext"). }
         iIntros (CIDq Hstq). iNext. iIntros "Hcg Hpc".
         assert (Htgt8e' : add_vec (mword_of_int (KF + 0xa2) : mword 64)
                            (sign_extend' 64 (sign_extend' 21
