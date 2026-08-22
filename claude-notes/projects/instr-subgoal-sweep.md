@@ -83,13 +83,35 @@ stop.
   grep WALL /mnt/rocq/F.wall.log; grep "\[Qed" /mnt/rocq/F.time.log; ls -l F.vo'
 ```
 
-Run that command ONCE BEFORE converting and once after, so the pair is
-comparable; back-to-back runs on the 192-vCPU box are stable to ~1 % even under
-someone else's build. Sum the sentence times with
+**Step 5 — the `Qed`-count check.** `grep -c "\[Qed" F.before.log F.after.log`
+must give the SAME number. An inequality means the conversion dropped a proof
+obligation: stop. This has held on all 111 conversions and is the cheapest
+correctness evidence available.
 
-```sh
-awk '{for(i=1;i<=NF;i++) if($i=="secs") s+=$(i-1)} END{print s}' F.time.log
-```
+### How to measure, and how NOT to
+
+**MEASURE SERIALLY, INTERLEAVED, TWO OR THREE REPS.** One pristine run followed
+by one converted run, minutes apart on a loaded box, is worthless — and the
+error is BIASED, not just noisy, so it does not average out:
+
+- Eight files measured concurrently reported +25 %, +18 %, +12 %, +9 %, +9 %,
+  +8 %, +1.5 % — **seven apparent regressions that were all 5–20 % wins** when
+  re-measured one at a time.
+- `ProofSysLinkTails`: 30.33 s converted vs 25.63 s pristine in parallel (+18 %),
+  25.84 → 22.80 s (−11.8 %) serial. Same binary, same inputs, 32 % spread,
+  identical `maxrss`. The other seven files in that batch were all
+  *understated* by 4–10 points.
+- `ProofLogWrite`: a single converted run at 30.70 s against a 26.97 s baseline
+  looked like a 14 % regression; interleaved it is −20 %.
+- `ProofPlicinit`: 6.55 / 6.43 / 6.11 s on three runs of the *same pristine*
+  source. On a sub-10 s file a single pair is not trustworthy to ±5 points.
+
+So: one `coqc` at a time, with none of your own running beside it; alternate the
+arms (`b,a,b,a`); take the median or min of 2–3; and **re-measure anything that
+looks like a regression before believing it**. Two agents nearly discarded good
+conversions to this. A clean way to get a pristine arm without touching the
+shared tree is a throwaway remote directory of symlinks with the pristine `.v`
+copied in under a scratch name.
 
 ## 3. The traps
 
@@ -108,9 +130,18 @@ awk '{for(i=1;i<=NF;i++) if($i=="secs") s+=$(i-1)} END{print s}' F.time.log
 - **Never run `make` for this.** Two `make`s in the same remote tree race and die
   with *"Cannot find a physical path bound to logical path"*, which reads like a
   broken switch (see `remote-build-gcp.md`), and a plain `make` on the VM can
-  re-dump `kernel-rocq/`. Compile the single file with `coqc`. Several agents
-  compiling DIFFERENT `Proof*.v` files concurrently in the same tree is safe —
-  they are leaves, so nobody reads the `.vo` another is writing.
+  re-dump `kernel-rocq/`. Compile the single file with `coqc`.
+- **`Proof*.v` FILES ARE NOT ALL LEAVES — an earlier version of this note said
+  they were, and it cost two agents a broken run each.** `ProofNamexTr` requires
+  `ProofNamex`; `ProofKexecD` requires `ProofKexecTail` and `ProofKexecSeam`;
+  `ProofSysLink` requires `ProofSysLinkTails`. So a sibling that `rm`s its
+  baseline `.vo` gives you *"Cannot find a physical path bound to logical path
+  ProofNamex"* — the very error this note blames on racing `make`s — and a
+  sibling that reconverts a dependency leaves an intermediate stale, giving
+  *"makes inconsistent assumptions over library …"*. Before fanning out, check
+  the dependency graph and put a file and its dependants in the SAME batch;
+  recover with one `coqc` of the stale intermediate, and **discard any baseline
+  measured against the older dependency set** rather than comparing across it.
 - **The conversion must not change the statement.** Only pose lines and
   specialisation patterns move. If the diff touches anything else, the regex
   over-matched.
@@ -140,64 +171,61 @@ awk '{for(i=1;i<=NF;i++) if($i=="secs") s+=$(i-1)} END{print s}' F.time.log
   on `ProofIput` it reproduces everything but the brace-order fix below. That
   unlocked `ProofSysLinkTails`, `ProofSysOpenTails`, `ProofSysUnlinkTails`,
   `ProofAcquiresleep` and `ProofSysPause`, all now CLEAN.
+- **A hypothesis name ending in an apostrophe** used to be mishandled and is
+  now supported; the tool is prime-aware. Historical note, because it is the
+  shape to watch for in any future grammar change: four agents hit it, and its
+  worst form left the pose orphaned while rewriting the site CORRECTLY, so the
+  file **compiled green carrying a dead fact in `Δ`** (worth ~9 % of
+  `ProofFreerange`). A green compile is not proof that a conversion is
+  complete — `tools/instr_subgoal.py --check` reporting `posed 0` is.
 - **A stray reference need not be a use at all.** `ProofIget`'s lone
   non-conforming reference was the file-header COMMENT quoting a leaf
   application. Read the site before assuming it needs a proof change.
 
 ## 4. What the sweep measured
 
-63 files converted 2026-08-22, each with one pristine and one converted
-single-file `coqc -time -async-proofs off` run, back to back on the VM. Every
-one compiled green, and every one has the SAME NUMBER of `Qed` sentences before
-and after — the cheap invariant that says no proof obligation was dropped. Run
-it on every conversion:
+**111 files converted 2026-08-22.** Every one compiled green, and every one has
+the same number of `Qed` sentences before and after. Wall discount ranges
+−4 % to −49 %, median ≈ −16 %; `Qed` −6 % to −62 %. On the reference file the
+proof term itself went 26.6 M → 8.3 M nodes (−69 %) while the shared DAG moved
+only −13 % — the derivations are still there, sharing subterms, but no longer
+re-embedded in every following step's environment.
 
-```sh
-grep -c "\[Qed" /mnt/rocq/F.before.log /mnt/rocq/F.after.log     # must be equal
-```
-
-Wall discount by file, best first: `ProofScheduler` −49 %, `ProofPipealloc`
-−46 %, `ProofSysSbrk` −43 %, `ProofDirlookup` −43 %, `ProofIget` −42 %,
-`ProofNamexRoot` −42 %, `ProofUartinit` −35 %, `ProofVirtioDiskRwC` −35 %,
-`ProofArgfd` −34 %, `ProofWalkNoalloc` −34 %, `ProofProcPagetable` −33 %,
-`ProofSysChdir` −32 %, `ProofKexecB2` −32 %, `ProofKexecB3` −31 %,
-`ProofFilestat` −31 %, `ProofSysDup` −30 %, `ProofProcinit` −30 %,
-`ProofKexecB` −30 %, `ProofFetchstr` −29 %, `ProofConsoleinit` −29 %,
-`ProofSysRead` −29 %, `ProofMappages` −29 %, `ProofStati` −29 %,
-`ProofKwait` −29 %, `ProofProcdumpParts` −28 %, `ProofSysOpen` −28 %,
-`ProofSysWrite` −27 %, `ProofInstallTrans` −26 %, `ProofKforkB6` −26 %,
-`ProofSysClose` −25 %, `ProofWakeupParts` −25 %, `ProofIlock` −23 %,
-`ProofSysFstat` −23 %, `ProofSysMknod` −23 %, `ProofUvmalloc` −22 %,
-`ProofIinit` −22 %, `ProofReparent` −22 %, `ProofInitsleeplock` −21 %,
-`ProofSched` −20 %, `ProofIupdate` −20 %, `ProofIalloc` −20 %,
-`ProofSysMkdir` −20 %, `ProofUvmcreate` −20 %, `ProofInitlog` −20 %,
-`ProofBmap` −19 %, `ProofBread` −19 %, `ProofArgstr` −19 %,
-`ProofCopyout` −18 %, `ProofCopyinstr` −18 %, `ProofWalk` −18 %,
-`ProofCreate` −18 %, `ProofFetchaddr` −18 %, `ProofEndOp` −17 %,
-`ProofUserinit` −17 %, `ProofFsinit` −17 %, `ProofKexecA` −16 %,
-`ProofCopyin` −15 %, `ProofIput` −15 %, `ProofSysExec` −14 %,
-`ProofUvmcopy` −13 %, `ProofIreclaim` −12 %, `ProofUvmunmap` −10 %,
-`ProofVirtioDiskRwF` −9 %.
-
-Median ≈ −24 %. Aggregate over the 63: **1893 s → 1400 s of serial compile
-work, −26 %.**
+The largest wins were `ProofScheduler` −49 %, `ProofPipealloc` −46 %,
+`ProofSysSbrk` −43 %, `ProofDirlookup` −43 %, `ProofIget` −42 %,
+`ProofNamexRoot` −42 %; the smallest `ProofCpuid` −4 %,
+`ProofVirtioDiskRwD` −5 %, `ProofNameiparent` −7 %,
+`ProofVirtioDiskInit` −7.5 %, `ProofMain` −7 %.
 
 ### The predictor
 
-**The LARGEST LIVE POSE BLOCK A LEAF SITS UNDER** — not the file's site count,
-not its length, and not whether the leaf is in a loop. Every batch tested this
-prospectively and it sorted the candidates correctly every time:
+Run `tools/instr_subgoal.py --rank iris/*.v`. It scores each candidate
+`min(peak live block, poses per Qed)`, and both halves of that minimum were
+learned by getting it wrong:
 
-| | sites | largest block | wall |
-|---|---|---|---|
-| `ProofUartinit` | 27 | 27, one proof | −35 % |
-| `ProofSysExec` | 92 | ≤19 over ~30 proofs | −14 % |
-| `ProofIreclaim` | 74 | ≤21 over 9 proofs | −12 % |
-| `ProofCreate` | 150 | spread over 111 lemmas | −18 % |
+- **Peak live block, net of `iClear`s.** A "pose late, clear early" file never
+  has more than a fact or two in `Δ`, however many poses it contains.
+  `ProofVirtioDiskInit` has 127 poses and returned **−7.5 %**; `ProofWritei`
+  (90 of 100 poses cleared) −12 %; `ProofNamexTr` −13 %; `ProofNamex` — one
+  4817-line proof carrying 97 % of the file's time with all 124 poses in one
+  head block, which by naive block-counting should have led the entire sweep —
+  **−10.6 %**, because 45 of them are bulk-cleared. Counting poses, or counting
+  contiguous pose LINES, gets all four of these wrong.
+- **Poses per `Qed`.** `Δ` belongs to a PROOF, not a file. Across one batch
+  where peak block (9–16) was uncorrelated with the result, poses-per-`Qed`
+  sorted it almost monotonically: 11.0 → −19.9 %, 6.5 → −19.1 %, 5.0 → −17.7 %,
+  4.8 → −12.1 %, 2.0 → −8.9 %, 0.14 → −4.8 %. `ProofVirtioDiskRwD` is the floor
+  made obvious: 12 poses over **84** tiny lemmas, so `Δ` never holds more than
+  one fact.
 
-**But it only sorts; it does not size.** `ProofInitlog` has a 15-pose block and
-hit −20 %, while `ProofUvmunmap` has 18 and hit −10 %. Expect ±10 points of
-slop. Sort candidates by biggest block, then take what you get.
+**It sorts; it does not size.** The residual spread is wide and real:
+`ProofBrelse` (block 10) got −27.5 % while `ProofNameiTr` (block 11) got
+−11.9 %. And the score can be beaten outright by what a file spends its time
+on — `ProofSysLink` has the largest live block in the tree (49, mean depth
+32.5) and returned −14.2 %, because most of its 85 s is filesystem-invariant
+reasoning and 52 `Qed`s rather than proofmode stepping. **The score predicts the
+DISCOUNTABLE PORTION of a file, not the file.** Use it to order the queue, then
+take what you get.
 
 ### Secondary readings, and what is NOT true
 
@@ -232,19 +260,16 @@ slop. Sort candidates by biggest block, then take what you get.
 
 ## 5. What is left
 
-`tools/instr_subgoal.py --check iris/Proof*.v` is the live scoreboard; run it
-rather than trusting a table here. As of 2026-08-22, **63 files are converted
-and 157 still pose.** Three tiers:
+`tools/instr_subgoal.py --check iris/*.v` is the live scoreboard and
+`--rank iris/*.v` is the queue. As of 2026-08-22, **111 files are converted**
+and ~110 still pose, but most of the remaining ones score low — the top of the
+`--rank` list is where the value is:
 
 | tier | what to do |
 |---|---|
-| `CLEAN` | the script converts it outright. Prefer files with one big pose block — that is where the win is (§4). |
-| `HAND WORK`, a few names | look at each site: it may be a comment, a leaf with a different hypothesis order, or a pure premise ahead of the instr goal (§3). Usually minutes. |
-| files whose facts are used in some OTHER shape | genuine hand work — `ProofWritei`, `ProofNamex`/`ProofNamexTr`, `ProofPipewrite`, `ProofEitherCopy`, `ProofPushOff`, `ProofReadi`, `ProofKexecC`, `ProofBalloc`, `ProofPrintk`. Convert the conforming sites, hand-convert the rest. |
-| `ProofVirtioDiskInit` | 127 poses, the single biggest block left, and a special case: it already does "pose late, clear early" BY HAND — pose `Hi`, use it, `iClear "Hi"`, 127 times over. Converting it means deleting the now-dead `iClear` line with each pose. Its one genuinely stray `Hi` is a *Coq* hypothesis from `apply … as (i & Hi & ->)`, unrelated to the Iris one. Worth doing; needs an `iClear`-aware pass. |
-
-**The next tool improvement** is teaching the converter to drop an `iClear
-"<hyp>"` along with the pose it kills, which is what `ProofVirtioDiskInit` needs
-and what any other by-hand "pose late, clear early" file will need.
+| score ≥ 8 on `--rank` (~30 files) | worth converting; `ProofKalloc` (37/1), `ProofFileclose` (60/2), `ProofEitherCopy` (68/3), `ProofPrepareReturn` (42/2), `ProofVmfault` (55/3), `ProofReadi` (92/6) lead it. |
+| score < 8 | `ProofKfree`, `ProofKinit`, `ProofVirtioDiskRw` and friends: either already clear-early (peak 1) or spread over many small lemmas. Convert for consistency if you like, expect ~5 %. |
+| `HAND WORK` on `--check` | the facts are used in a shape the site grammar does not cover. `ProofEitherCopy`, `ProofPipewrite`, `ProofNamex`-family leftovers. Convert the conforming sites, hand-convert the rest. |
+| `;`-chained poses | `--check` now flags them (`ProofPrintint` 5, `ProofBalloc` 1). Their sites end in `;` rather than `).`, so the grammar cannot see them; hand work, and small. |
 
 Record each conversion's numbers in §4 as it lands.
