@@ -313,26 +313,34 @@ ialloc, iupdate, iput-free, writei ×2, bmap-indirect), 12 spans / 26
 `end_op` exit arms (sys_link, sys_unlink, sys_open, sys_mkdir,
 sys_mknod, sys_chdir, filewrite, fileclose, kexec ×2, kexit, ireclaim).
 
-- [ ] **G1.** The vehicle (sketched 2026-08-22; VALIDATE before
-      building — a wrong vehicle costs the whole sweep). Two facts rule
-      out simpler shapes: the ghost ledger keeps only INEQUALITIES
-      (`ireg_link_ok` L1 is `w <= nlink`), and a checked-out inode's
-      content is in no invariant — so `wf(L)` is NOT derivable from the
-      resource layer at the commit instant; and the last-to-end op of a
-      group cannot know the other ops' deltas — so a bare
-      `out = 0 -> wf(L)` row is not re-establishable locally. The shape
-      that is local: an ABSTRACT-VIEW row on `log_res`,
-      `∃ A, ⌜wf(A)⌝ ∗ ⌜∀ b ∉ pending(om), L b = A b⌝`, where each op
-      updates `A` in SEMANTIC CHUNKS (e.g. "allocate block b to inode
-      i" is ONE `A`-update, fired at a `log_write` AU under the
-      object's lock, where the preconditions are in hand), `wf(A)`
-      preserved per chunk, and each op's pending blocks are finalized
-      (`L = A` there) by its `log_end_step`, tied to its op token. At
-      `out = 0` the pending set is empty, so `L = A` and `wf(L)` falls
-      out; mid-op inconsistency lives only in the residue, never in
-      `A`. Plus the bookkeeping row `⌜install of the batch over D = L⌝`
-      (dirty set = batch set; clean blocks logged = committed) from
-      which `ProofEndOp` assembles the commit fupd generically.
+- [ ] **G1.** The vehicle (VALIDATED against `log_res` 2026-08-22).
+      Two facts rule out simpler shapes: the ghost ledger keeps only
+      INEQUALITIES (`ireg_link_ok` L1 is `w <= nlink`) and a checked-out
+      inode's content is in no invariant — so `wf(L)` is not derivable
+      from the resource layer at commit; and the last-to-end op cannot
+      know its group's other deltas — so a bare `out = 0 -> wf(L)` row
+      is not locally re-establishable. The shape that IS local, with NO
+      new ghost: two pure rows on `log_res`'s `cmt = false` branch,
+      re-established at each log-lock release:
+      (a) `∃ A, dom A = fs_home_set cov ls ∧ fs_durable_wf_body A ∧
+      ∀ b ∈ home ∖ pending(om), L !! b = A !! b`, where `pending(om)`
+      is the union of the open ops' ledger sets `e.1.2` — every
+      `log_write` adds its block to its op's set in the same critical
+      section, so the row is FREE at all 9 write sites (the domain only
+      shrinks); the whole burden is the 26 `end_op` arms: an ending op
+      must produce `A' := A ⊕ (L on its own blocks)` and prove
+      `fs_durable_wf_body A'` from its own carried postconditions (the
+      per-op preservation lemmas, F2's update lemmas composed). At
+      `out = 0` pending is empty, `L = A` on homes, `wf` falls out.
+      (b) the mirror tie, on the strengthened `log_mirror_clean` row
+      (the mirror half and the batch meet in `log_res`):
+      `∀ b ∈ home ∖ LB, lm_view M b = L b` — maintained freely
+      (log_write moves b into LB; the installs' chained `lm_upd`s
+      restore it; clear resets LB). At commit: `D_old = restrict
+      (lm_view M) home` (clean header), `D' = restrict(L) home` via (b)
+      + `HLw`, `= restrict(A)` via (a), wf — the commit fupd for
+      `fs_commit_permit_named` assembles generically, no exit arm
+      states install-arithmetic.
 - [ ] **G2.** Thread the F2 side conditions from the 9 write sites
       (their AU suppliers already carry the abstract content) to the
       per-op obligation; discharge at the 26 arms.
