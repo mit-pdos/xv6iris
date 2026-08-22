@@ -1,5 +1,40 @@
 # The tier-2 containment worklist (was: the certification route)
 
+## CHECKPOINT (2026-08-23, NINTH PASS) — READ THIS FIRST
+
+**R-2 IS AN ENGINE NOW.**  `WeakRvwmoWalk.walk_supply_of_policy`: the
+certification walk iterates the graph's writes in gmo order from the
+EMPTY candidate (Glue2's zero cut, used), one `cert_segment'` per
+write, and yields `walk_supply`; what it still asks per step is the
+honest ledger (W-1) `wpol` — the read/register policy carrying
+progress, (W-2) `wub` = `wit_fence_ub`, (W-3) `wcls` (decidable from
+the log), (W-4) `wnw`; plus (O-E) three bookkeeping equations
+`cert_segment'` establishes but does not state, and (O-F) RMW segments
+(`HEpair`) out of scope.  `xv6_rvwmo_safe_modulo_walk` is the
+capstone with (R-2) replaced by the policy.  **THE LB CYCLE WITNESS
+`WeakRvwmoCycWit.cyg`** (real `sw`/`lw` requests with the address
+changed, a three-node hand-built monad with the `InstrAnnounce`
+boundary) is consistent, conformant, carries `tc (RacyD) (0,0) (0,0)`,
+and **runs the walk end to end** (`cyg_walk`: hart 0's load
+substituted at the empty log, hart 1's true).  FINDING: without the
+`InstrAnnounce` boundary the load and store are one instruction and
+`ds_ld` emits the rule-13 edge, making LB INCONSISTENT — the announce
+is what resets `ds_ld`.  Whole tree green; all at the five axioms.
+
+**WHAT REMAINS:**
+1. Close the walk's ledger: (O-E) strengthen `cert_segment'`'s
+   conclusion (two lines in Cert3); (W-3)/(W-4) from the gmo-order
+   policy; (O-F) the RMW segment (`cert_block_pair` exists);
+   (W-1)/(W-2) are the genuine hypotheses (progress = the EWPs; the
+   fence hook).
+2. **R-1, L2′ proper** — (A) the `WProt` port convention; (B)
+   `gen_pins.py` + `KernelPinsDef.v` (§4g.1), then the bridge to
+   `seg_pin`.
+3. The F-variant's glue mirror; **R6**; `wprot_store` width lift;
+   `WeakRvwmoLock`'s failed-swap arm.
+
+**Tree:** never `make proofs` from the root here (stale `xv6-riscv`).
+
 ## CHECKPOINT (2026-08-23, EIGHTH PASS — THE MILESTONE) — READ THIS FIRST
 
 **`WeakRvwmoCapstone.xv6_rvwmo_safe_modulo` IS THE TIER-2 CAPSTONE MODULO
