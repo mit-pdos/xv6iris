@@ -1,5 +1,73 @@
 # The tier-2 containment worklist (was: the certification route)
 
+## CHECKPOINT (2026-08-22, end of the B2e-3 DESIGN session) — READ THIS
+## FIRST WHEN RESUMING; the 2026-08-21b checkpoint below is SUPERSEDED
+## (kept for its landing record and design pointers)
+
+**What this session did.**  Ran the B2e-3 design session S6-style against
+route-b §4d's three candidates and found the problem mis-posed; the
+result is a NEW §4d in `../design/weak-memory-route-b.md` (read §4d.1
+findings F1–F6, §4d.2 the design, §4d.3 the two exports, §4d.4 the
+staging, §7 the probes).  Nothing landed in the chain; the deliverables
+are the design and the machine-checked probe witnesses listed below.
+THE HEADLINES: (1) `kill_K1` is stronger than the theorem needs — the
+normalization has a SOURCE-DESCENT move, and the only genuine residual
+is a cycle of `R := po|→W ∪ rf ∪ co ∪ fr ∪ ppo⁻ ∪ deps` through the
+violation (F1/F2 — with F2′'s correction: `co`/`fr` count only where a
+read pins them); (2) the kernel claim is therefore ONE sentence,
+T2-LIN: no violation lies on an `R`-cycle — and a topological order of
+`R` is itself the rule-14 gmo, which likely RETIRES the exchange kit as
+the chain's first step (B2d′(a), §4d.4); (3) the old wild-value crux
+dissolves into: strong induction on |V| over CAUSAL HULLS (every
+informative hull of a non-saturated cycle is a proper sub-graph, so the
+IH kills it for free), plus — for the saturated case only —
+CERTIFICATION of the cycle's SCC by gmo-ordered solo runs (route A's
+E1, made precise: §4d.2(2)); (4) two exports are needed, both T2-0's
+mechanism — ALTERNATION (holder-pairing of the lock word, F3′) and the
+PROTECTED-BYTE FOOTPRINT with access records (F3″) — and F3″ costs
+almost nothing NOW because the weak-logic kernel port (M4) has no lock
+client yet: shape the interface before the sweep reaches one;
+(5) three defects in landed/assumed pieces: `restr_ok` cannot express
+B1b's prefix (other harts' early reads — F3), `lock_pattern` is false
+for any contended lock (failed `amoswap` iterations — F4a) and for any
+pipe lock over its lifetime (F4b), and `dedges` drops the W-TV edges
+(`ds_ld` accumulated, never consumed — F5).  Rule-9-load is NOT needed
+(F5, with the reason).
+
+**Probe witnesses (iris/, each a leaf; add to `_CoqProject` when
+committing):** ALL FOUR LANDED, every theorem
+`Qed`, `Print Assumptions` Closed.  `WeakRvwmoAcyc.v` (P5: `R_acyclic`,
+`gcaus_acyclic`, `caus_cycle_gviol`, the `Rt`/`gcaus` orbit transports —
+and the NEGATIVE result that `co`/`fr` do not transport, which produced
+F2′: the obligation is disjunctive over the per-byte write order, and
+unread same-byte pairs must be swappable), `WeakRvwmoProbeK1.v` (P4:
+`¬ kill_K1` at a graph with `mpg_normalizes`), `WeakRvwmoProbeRestr.v`
+(P2: `∀ cs, ¬ restr_ok erg 1`, unconditional), `WeakRvwmoProbeSwap.v`
+(P1: contended-lock graph consistent, `¬ lock_pattern`, `lock_paired`
+intact).  Read route-b §4d.1 F2′ before touching the normalization or
+the kill tree.
+
+**TREE STATE WARNING.**  This checkout's `xv6-riscv/` clone is at
+`4398009`, not the pinned `XV6_REV`; a bare `make proofs` RE-DUMPS
+`kernel-rocq/` from its stale ELF (it did, this session; restored with
+`git checkout -- kernel-rocq/*.v && touch kernel-rocq/*.v`).  The
+`kernel-rocq/*.vo` and every `.vo` rebuilt in that run are against the
+clobbered image: run `make kernel-rocq` then `make -C iris -f
+CoqMakefile -j16 -k` before trusting a full build, and fix the clone
+per durable-notes ("AFTER A git pull, RUN make xv6-rev-check").  The
+route-B leaves (`WeakRvwmo*.vo`) compile and are what the probes use.
+
+**NEXT SESSION, in order:** (1) B2e-3a — T2-LIN's arithmetic core
+(§4d.4): `R_acyclic` lands with P5; then the violation-on-every-cycle
+lemma, the F4a/F5 repairs, and the segment-composition lemma;
+(2) probe F2(ii) (a topological order of `R` is consistent) and, if it
+holds, build B2d′(a) — the direct linearization — and demote
+`normalize`; (3) DECIDE the F3″ interface (footprint at `wlock_alloc`,
+`WProt` store/read rules) BEFORE M4 ports a lock client, then T2-0′
+(F3′ + F3″); (4) B1a′ causal hulls; (5) B2e-3b certification
+machinery; (6) B2e-3c the per-segment classification (the L2′
+content); then B1b, B3, R6.
+
 ## CHECKPOINT (2026-08-21b, end of the route-B-opening + T1-D session)
 ## — READ THIS FIRST WHEN RESUMING; both earlier checkpoints below are
 ## SUPERSEDED and kept only for their design pointers

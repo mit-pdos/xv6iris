@@ -1095,3 +1095,7 @@ WeakRvwmoRestr.v
 WeakRvwmoKill.v
 WeakRvwmoLock.v
 WeakRvwmoLockWit.v
+WeakRvwmoAcyc.v
+WeakRvwmoProbeK1.v
+WeakRvwmoProbeRestr.v
+WeakRvwmoProbeSwap.v

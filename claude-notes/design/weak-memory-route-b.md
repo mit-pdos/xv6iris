@@ -508,59 +508,320 @@ Three stages, each smaller than the last is hard:
   class — orbit-invariant graph data) against the prefix's protocol
   state, not on a replayed read step.
 
-## 4d. B2e-3 — the problem statement (2026-08-21; THE ROUTE'S LAST
-## HARD DESIGN PROBLEM, identified precisely; design session owed)
+## 4d. B2e-3 — the design (2026-08-22 session; supersedes the 2026-08-21
+## problem statement, which is folded in below as the starting point)
 
-THE ARCHITECTURE (settled): (A) `xv6_row_ok` — a row-syntactic site
-bundle parameterized by the byte classification (the `wcds` map's
-concept: lock bytes, CS-protected-by-which-lock, classified racy
-bytes), carrying `lock_pattern`/`lock_paired` at row level + the
-CS-coverage shapes + the racy classification; (B) the kill discharges
-from consistency + conformance + `xv6_row_ok` (+ the realized-prefix
-φ export): the CS cases via `cs_kill` (the owned-byte K1 residual
-REDUCES to `cs_kill` with `b` = the protecting lock — same lemma),
-the branched/data-fed cases via the dep arithmetic (rule-11 edges
-from spin-loop branches taint every later store, so class-(b) reads
-are `gd_deps`-killed); (C) the discharge of `xv6_row_ok` itself for
-conformant rows.
+THE STARTING POINT (2026-08-21): the architecture `xv6_row_ok` / kill
+discharges / row_ok discharge was "settled", and the CRUX was the
+WILD-VALUE OBSTRUCTION — emittability does not ground values (`pstep_ev`
+accepts any read value), realization reaches only the violation-free
+prefix below `w`, and the kills need site facts at `w0`/`z` ABOVE it.
+Three candidates were recorded (extended realization; groundedness as an
+induction invariant; a static checker).  This session ran the miniature
+against all three and found that the question was mis-posed in four
+places before it could be answered.  The findings first, then the design
+they force.
 
-THE CRUX (the wild-value obstruction): (C) is NOT derivable from
-emittability alone.  `pstep_ev` accepts ANY read value (the
-continuation is applied to the row's value), so a conformant row with
-FICTIONAL values can drive computed store addresses anywhere — a
-wild-pointer store into a lock byte, plain-classed, is
-emittable-consistent.  Value-groundedness comes only from
-REALIZATION (a realized run's `read_ok` pins values to the log), and
-realization reaches exactly the violation-free prefix below `w` —
-while the kill configurations need site facts at `w0`/`z` ABOVE it
-(hart j's row-prefix through `w0` is not known realizable: its reads
-may source inside the unrealized interval).  This is route A's E1
-("the extended exhibit") in route-B clothing, and it is the
-one place the route still owes a genuinely new mechanism.
+### 4d.1 Findings that reshape the problem (each machine-checkable; see §7)
 
-CANDIDATE RESOLUTIONS (to weigh in the design session, none chosen):
-  (R1) EXTENDED REALIZATION, E1-style: strengthen the kill
-  configurations (further minimality — e.g. also minimalize `w0`)
-  until hart j's row-prefix through `w0` has all its read sources
-  below `w`, then realize prefix + j's extension as one run and
-  apply the machine exports (`wlp_at`, φ) to it directly.  The open
-  question is whether the needed extension property is derivable
-  from the configuration's minimality or needs its own induction.
-  (R2) VALUE-GROUNDEDNESS AS AN INVARIANT OF `normalize`'s induction:
-  process violations bottom-up carrying "the region below the
-  frontier is realized"; derive groundedness of frontier-adjacent
-  values incrementally.  Heavier restructuring of B2d's landed
-  theorem (or a wrapper induction above it).
-  (R3) `xv6_row_ok` AS A CAPSTONE CONFORMANCE CLAUSE discharged by a
-  static checker — blocked as pure statics by the wild-pointer issue
-  unless the checker itself consumes groundedness, which circles back
-  to (R1)/(R2).  Viable only for the fragments that ARE
-  value-independent (e.g. "code stores to lock words only via the
-  acquire/release instructions" IF lock addresses are only ever
-  taken from the image's static lock-table... they are not — xv6 has
-  dynamically-allocated locks).  Likely a COMPONENT, not the answer.
-The next session should run this like S6: the miniature end-to-end
-against each candidate, probes where claims are checkable.
+**F1 — `kill_K1` as landed is STRONGER THAN THE THEOREM NEEDS, and the
+excess is exactly the undischargeable part.**  K1 fires whenever the
+witness `e` is blocked at its cross-hart source `w0 ∈ (w, e)`.  But the
+normalization has a second move the B2d design never used: DESCEND THE
+SOURCE.  `w0`'s readers never block its downward moves, so `w0` can be
+descended to just above `w` and (W,W)-swapped below it (byte-disjoint —
+a shared byte would give `e` a same-byte po-earlier write and poloc
+orders it), after which `e` descends freely.  `w0`'s descent is blocked
+only by `w0`'s OWN po-earlier events in the interval (rule 1–5 pins) —
+which descend first, recursively — i.e. by `w0`'s causal past inside
+`(w, e)`.  The recursion fails exactly when that past reaches `w`'s hart
+above `e`, i.e. when **`w (po ∪ rf)⁺ w0`: a causal cycle through the
+violation**.  The MP-reader-without-fence shape (h: `e` reads `w0`; `w`
+an independent early store; nothing reads `w` in the interval) satisfies
+K1's premises verbatim and HAS a rows-equivalent rule-14 graph
+(`w0 < e < w`), so no kernel fact could ever discharge K1 there — the
+kill would be asking us to refute a possible execution.  Every "(d)/(e)
+exhaustiveness" worry of the old §4d about dead racy reads and
+unclassifiable CS reads lived in this excess.
+
+**F2 — the genuine obligation is ONE sentence: the relation
+`R := po|→W ∪ rf ∪ co ∪ fr ∪ ppo⁻ ∪ deps` IS ACYCLIC** (`po|→W` = po
+edges INTO a write, i.e. rule 14's edges; `co` = same-byte write order;
+`fr` = read-before-a-co-later-write).  Two facts: (i) in a rule-14
+consistent graph every edge of `R` is a `gmo` edge (rule 14, load-value,
+co = write order, the ppo/deps axioms), so `R` is acyclic, and
+rows-equivalence preserves every edge class — hence a rows-equivalent
+rule-14 graph exists ONLY IF `G`'s `R` is acyclic; (ii) conversely a
+topological order of `R` IS a consistent rule-14 gmo (load-value: `rf`
+puts the source before the read and `fr` puts every co-later write after
+it, so the co-max before the read is its source; atomicity: co-adjacency
+is preserved), so `R`-acyclic graphs normalize — with F1's extended
+move set this is what the exchange kit computes.  Since `G` is itself
+consistent, `rf ∪ co ∪ fr ∪ ppo⁻ ∪ deps ⊆ gmo(G)` is acyclic already:
+**every `R`-cycle passes through a VIOLATING WRITE** via one of its
+`po|→W` edges, so route B's kernel claim is **(T2-LIN): in every
+RVWMO⁻(+deps)-consistent, conformant execution of the xv6 image, no
+violation `(e, w)` lies on an `R`-cycle** — i.e. no `R`-path from `w`
+back to `e`.  The pure `po ∪ rf` cycles (load buffering / thin air)
+are the special case B2d's K1 enters from; the `co` and `fr` entries
+are exactly B2d's K3 (cross-hart same-byte write in the interval) and
+K2 (stale reader) — the kit had found the three entry kinds
+correctly, it only lacked the cycle that makes them GENUINE.  (A
+first draft of this finding said `po ∪ rf`; the K3 shape — `w` read
+by x, x's later store to `a`, j's `w0` to `a` co-after it, `e` reads
+`w0` — has no `po ∪ rf` cycle and no rule-14 graph, which is what
+corrected it.)
+
+**F2′ — THE CORRECTION P5 FORCED (third iteration, now
+machine-grounded).**  `WeakRvwmoAcyc.v` proves `R ⊆ gmo` (hence `R`
+acyclic) for rule-14 consistent graphs and transports `po|→W`, `rf`,
+`ppo` along `rows_rel`/`wperm` — but NOT `co`/`fr`: `wperm`'s π is only
+injective (B2d's (W,W) exchange is a non-monotone transposition), and
+that is correct, because the co-order of two same-byte writes that NO
+read distinguishes is unconstrained by consistency, so two
+rows-equivalent consistent graphs can disagree on it.  So the "only if"
+of F2(i) holds for `Rt := po|→W ∪ rf ∪ ppo(∪ deps)` unconditionally and
+for `co`/`fr` only where a read pins them.  THE HONEST OBLIGATION is
+therefore DISJUNCTIVE: `G` normalizes iff there is a per-byte write
+order `co'` compatible with the rows (each read's source stays its
+co-max: every other same-byte write is co'-before the source OR
+gmo-after the read; RMW read/write co'-adjacent) such that
+`R_{co'} := po|→W ∪ rf ∪ co' ∪ fr(co') ∪ ppo⁻ ∪ deps` is acyclic; `G`'s
+own `co` is one candidate, and a cycle of `R_{co}` through a same-byte
+pair that no read distinguishes is NOT a genuine kill — the
+normalization must flip such pairs (B2d excluded all same-byte (W,W)
+swaps; the precise rule is: adjacent same-byte writes swap when the
+lower one has no reader above the pair).  The per-segment KILL
+(§4d.2(3)) is unaffected — it refutes a cycle in the CHAIN'S CURRENT
+graph by arithmetic on that graph's own co, with `co`/`fr` entries
+only where a read pins them (K2's stale reader, K3's write race with
+a reader in the interval).  Three definitional corrections from the
+same file, to reuse: `po|→W` needs `gmem` of the source (fences are in
+po but not in gmo); `fr` is defined on the read's own `ts` entry per
+byte (a co edge at another byte of a multi-byte write carries no
+load-value information); `fr` excludes the identity (a fused RMW reads
+and writes the same byte — herd's `fr = rf⁻¹;co ∖ id`).
+
+**F3 — the realizable region is NOT the gmo prefix, and B1a's `restr_ok`
+cannot express what B1b needs.**  `restr_ok` demands per-hart cut = gmo
+prefix.  Other harts' EARLY READS break it: hart `k` with `r1 po< r2`,
+`r2` below `w`, `r1` above, is consistent (load–load reordering) and is
+not a violation, so nothing in minimality excludes it; no cut vector
+satisfies `restr_ok` at `n = pos w`.  §4b's closure claim holds for the
+WITNESS's hart only.  The right object is the CAUSAL HULL: a set closed
+under po-predecessors and rf-sources (every such set is a consistent
+restriction — load-value's ∃-half by rf-closure, its co-max half only
+weakens, atomicity and ppo restrict, deps restrict to in-hull pairs —
+with a write-index RENAMING since the hull's writes need not be a prefix
+of `gwrites`; `lbl_ren`/`hart_conf_ren` already carry renamings).  The
+doubly-closed prefix below `w` is one such hull; the design below needs
+arbitrary ones.
+
+**F4 — the graph-side lock kit's GLOBAL pattern hypothesis is false for
+xv6's rows, twice over.**  (a) A FAILED `amoswap.w.aq` (the spin reading
+1 and writing 1) is a `b`-write that is neither an acquire-reading-zero
+nor a zero write, so `lock_pattern` fails on every contended lock.
+(b) Pipes are kalloc'd: the byte that is `pi->lock.locked` is later
+memset to 1 (kfree) and 5 (kalloc) and zeroed by a fresh `initlock` —
+plain writes outside any protocol — so no lifetime-blind per-byte
+pattern holds over a whole execution.  The machine-side export is
+already lifetime-aware (`wlp_at` is post-registration); the kit's
+`cs_kill` arithmetic survives, its HYPOTHESES must be supplied per
+configuration by exports, not assumed globally.  `lock_pattern` needs
+the failed-swap arm regardless (a nonzero RMW reading nonzero — inside
+someone's window, harmless to the order).
+
+**F5 — thin-air THROUGH ADDRESSES is admitted by the declared model but
+is not a problem for xv6's sites.**  Rule 9's load half is dropped (D-8),
+so a load may sit gmo-before the load that computed its address, and a
+self-justifying wild ADDRESS (r → addr r' → data z; z read by j; j's
+write read by r) is consistent with `gd_deps` = the store fragment.
+Real RVWMO forbids it (rule 9).  But every pointer read in xv6 that
+feeds a later load is acquire- or fence-covered or same-hart, and rule 5
+/ rule 4 pin the dependent load after the covering event, which kills
+the cycle by the ordinary window/fence arithmetic.  So rule-9-load is
+NOT required; it is recorded as an option (it would make the capstone's
+hypothesis strictly closer to RVWMO at the cost of an opcode-carrying
+admin label — `LInstr` carries none and announce nodes are silent).
+What IS required: the W-TV edges (every read of a store instruction →
+the store) must be in `gd_deps` — `dstep` already accumulates `ds_ld`
+per instruction and `dedges` does not consume it; the fix is one line
+in `dedges`, and it is what keeps walker reads and the walker's A/D
+pair from ever being witnesses (they are dep-pinned below the store).
+
+**F6 — the per-site fact the lock kill cannot do without, named.**  Every
+CS-to-CS step of a cycle needs `(P)`: "the message a CS read of byte `a`
+under lock `L` observes was written INSIDE the writer's CS of the SAME
+`L`".  It is not a row-syntactic fact (the byte's protecting lock is a
+value), it is not exported today (the lock payload `R` is opaque to the
+state interpretation), and the old §4d's `xv6_row_ok` would have had to
+carry it as a premise.  It IS cheaply exportable through the φ
+mechanism (§4d.3, F3″).
+
+### 4d.2 THE DESIGN — strong induction on |V| over causal hulls, with the
+### SCC of a cycle certified by solo runs (route A's E1, done right)
+
+The theorem to build is T2-LIN (F2).  Proof shape, by strong induction on
+the number of events:
+
+1. Suppose `G` has a causal cycle; let `K` be the cycle's SCC of
+   `(po ∪ rf)⁺` and `P := past(K) ∖ K` (everything causally before `K`,
+   not in it).  `P` is a causal hull (F3), a proper sub-graph, consistent
+   and conformant (rows are prefixes, `hart_conf_prefix`/`_ren`).  By IH
+   it is cycle-free, hence (the extended normalization, §4d.4) it has a
+   rows-equivalent rule-14 graph, hence (T2-1c + T1, LANDED) a
+   promise-free run `R_P` with final configuration `σ_P` at which EVERY
+   export holds and every event of `P` is a real machine step.
+   NOTE the non-saturated case needs nothing else: if the cycle's hull
+   `past(K)` is itself proper, IH on it says it is cycle-free — it is not
+   — contradiction.  So the only case with content is the SATURATED one,
+   `V = past(K)`: the cycle is causally last.  (This is why the old
+   candidates all looked circular: every informative hull of a saturated
+   cycle is the whole graph.)
+
+2. Events of `K` are not realizable as rows (that is what a causal cycle
+   means for a promise-free machine).  They are CERTIFIED instead, in gmo
+   order, exactly as a promising machine certifies a promise: for a
+   `K`-write `z` of hart `x`, run `x` SOLO from its state in the current
+   run up to `z`; every read of `x` whose G-source is already in the log
+   reads it (true value); a read whose source is above the current
+   position reads the log instead (a SUBSTITUTED read — it is exactly a
+   violation witness, and `z`'s label does not depend on it: every
+   address/data/control source of `z` is in `gd_deps`, hence gmo-below
+   `z`).  So `z`'s message is TRUE and appears at a pf-reachable
+   configuration; the exports apply to it.  The cost is that a hart whose
+   witness was substituted is POISONED from there on: its later labels
+   may differ from the row.  Two facts keep the kill from needing
+   poisoned labels: (a) a substituted read keeps its TRUE ADDRESS and
+   site (address sources precede it; only the value changes), so the
+   site record of the witness read itself is grounded; (b) a release's
+   base is the acquire's base by the hart's own forwarding (the lock
+   pointer is reloaded from the hart's own stack), so the CS structure
+   after a substitution is grounded too.  Everything the cycle kill
+   reads — entry reads' sites, exit writes' messages, acquires,
+   releases — is either in `P`, a first-generation `K`-write, or a site
+   fact of a witness.
+
+3. THE KILL is graph arithmetic around the `R`-cycle with the exports
+   supplying the per-configuration facts.  The cycle alternates
+   cross-hart edges (`rf`, `co`, `fr`) with same-hart runs (`po|→W`,
+   `ppo⁻`, `deps`); each same-hart run from its entry event to its exit
+   write is one of S6 §3's classes, now stated as gmo-inequalities
+   (below for an `rf` entry at a read `r_i`; a `co`/`fr` entry is the
+   same arithmetic routed through the shared byte — B2d's K3/K2):
+   - PINNED: `r_i < w_i` by rule 5 (`r_i` aq), rule 4 (a fence between),
+     or `gdeps_gmo` (addr/data/ctrl into `w_i` — spin loops and
+     `holding()` are here, as are W-TV pins);
+   - CS-CHAINED: `r_i` is a CS read of `L` (site record) and `w_{i-1}`,
+     which it observes, was written in ITS writer's CS of `L` (`(P)`,
+     F3″) — then `w_{i-1} < r_i` (rf), `r_i < REL_i` (rule 4, release
+     fence), and the ALTERNATION export (F3′) at the certifying
+     configuration orders the windows: `REL_{i-1} <co ACQ_i`, while
+     `ACQ_i < w_i` (rule 5); so `w_{i-1} < w_i` through the window;
+   - BAD: `w_{i-1}`'s message is owned-unpublished when `r_i`'s site
+     reads it — `weak_ev_pf_violation_free` refutes the certifying
+     configuration directly (this needs `r_i`'s read step in a pf run:
+     it is one iff `w_{i-1}` is certified before `r_i`'s hart runs past
+     it, which holds iff `w_{i-1}` is gmo-below `r_i`'s hart's next write
+     — otherwise the CS-chained arm applies with `(P)`, since the kill
+     only needs `w_{i-1}`'s message and `r_i`'s site).
+   Composing the inequalities around the cycle yields `w_1 < w_2 < … <
+   w_1`.  The xv6-level EXHAUSTIVENESS CLAIM is that every segment falls
+   in one of the three arms — the per-site classification, now with
+   every wild-value concern removed: the classes are read off the
+   emission (site records, deps) and the certified configurations.
+
+4. With T2-LIN in hand, the exchange normalization runs with NO kills
+   (§4d.4), T2-1c linearizes, T1 realizes, tier-1 adequacy finishes (B3).
+
+### 4d.3 The exports the design consumes (two new, both T2-0's mechanism)
+
+- **F3′ — ALTERNATION (pairing) of the lock word.**  `wlp_at` gives
+  shapes only; `cs_kill` needs "only the holder releases".  The lock's
+  ghost already knows the holder (`lock_auth γ (Some i)`; the token is
+  hart-indexed).  Move the holder into the `WLock` byte state (or carry
+  it alongside) so the state interpretation can export the LOG predicate:
+  after registration the byte's messages alternate
+  `acquire(i) · release(i) · acquire(j) · release(j) · …` with matching
+  authors, failed swaps (nonzero over nonzero) interleaved freely.  Two
+  leaf touches (`WeakAcquire`/`WeakRelease`), one export lemma.
+- **F3″ — PROTECTED-BYTE FOOTPRINT + ACCESS RECORDS.**  At `wlock_alloc`
+  the client declares the payload's bytes; they flip to a `WProt γ`
+  flavor.  The plain store rule refuses `WProt` bytes; the `WProt` store
+  rule takes the holder token and returns it; the `WProt` read rule
+  records the access.  Exported: every post-registration message to a
+  `WProt γ` byte is by the holder of `γ` at that position, and every
+  recorded read of a `WProt γ` byte is by a holder.  This is `(P)` (F6)
+  at every pf-reachable configuration, lifetime-aware for free
+  (deregistration precedes kfree).  COST (scoped 2026-08-22): NEAR ZERO
+  RETROFIT.  The tier-1 capstone takes the kernel EWPs as a HYPOTHESIS
+  (the "WP package" of `xv6_srvwmo_safe`), and the weak-logic port of
+  the kernel (M4, `projects/weak-memory-porting.md`) has landed only a
+  handful of leaves — `WeakLock.v` has no kernel client yet.  So the
+  `WProt` store/read rules and the footprint parameter of `wlock_alloc`
+  are shaped NOW as the weak logic's lock interface, and the sweep uses
+  them from the start; the only cost is the two rules + the export
+  lemma + a footprint expression at each `initlock` spec.  Decide the
+  interface before the sweep reaches the first lock client.
+
+### 4d.4 Staging (replaces the B2e-3 / B1b / B3 items of §4)
+
+- **B2e-3a — T2-LIN's ARITHMETIC CORE (delegate-ready, pure graph
+  theory):** (i) `lin_acyclic`: a rule-14 consistent graph has acyclic
+  `R` (every `R` edge is a gmo edge), and the edge classes transport
+  along `rows_rel`/`wperm`; (ii) every `R`-cycle of a consistent graph
+  contains a `po|→W` edge that is a violation; (iii) the
+  SEGMENT-COMPOSITION lemma: given per-segment
+  inequality certificates of the three arms (as explicit hypotheses in
+  `cs_kill` style), the cycle is inconsistent.  Also the two kit repairs
+  of F4 (failed-swap arm; `cs_kill`'s hypotheses restated per
+  configuration) and the W-TV line in `dedges` (F5).
+- **B2d′ — THE KILL-FREE NORMALIZATION, two options; RECOMMENDED: the
+  direct linearization.**  (a) DIRECT: by F2(ii), ANY topological order
+  of `R` is a rows-equivalent consistent rule-14 gmo (rows renamed by
+  the write-index permutation, exactly `normalize`'s `rows_rel`/`wperm`
+  conclusion).  This is a finite-graph topological sort over `gevs'`
+  plus the consistency check of F2(ii) — smaller than the exchange
+  kit and with NO kill interface at all; `normalize`'s statement is
+  then a corollary of T2-LIN.  (b) KIT: extend `normalize` with the
+  source-descent move (F1) so the only residual is "an `R`-cycle
+  through `w`".  Build (a); keep B2d/B2a–c as the landed analysis that
+  found the three entry shapes (their non-vacuity witnesses remain the
+  kill interface's sanity checks).  Probe (a)'s consistency claim
+  first (F2(ii) is an argument, not yet a theorem): the load-value
+  co-max half under a topological order is the one clause to check.
+  With F2′: `R` is taken with `G`'s own `co`; when `R_{co}` has a cycle
+  through an unread same-byte pair, flip that pair (a legal (W,W)
+  move) and retry — only read-pinned cycles reach the kill.
+- **B1a′ — CAUSAL HULLS:** generalize `gx_restrict`/`restr_ok` from
+  prefixes to arbitrary po-/rf-closed sets with the write-index renaming
+  (F3); `restrict_linearizes` restated for hulls.
+- **T2-0′ — the two exports (F3′, F3″)** — scope F3″ first.
+- **B2e-3b — THE CERTIFICATION MACHINERY (the E1 build, the route's
+  largest item):** the gmo-ordered solo certification of an SCC's
+  first-generation writes from `σ_P`, with the substituted-read
+  bookkeeping and the two groundedness facts of §4d.2(2).  Reuses T1-D's
+  `exec_prog_ok'` supply and `hart_conf`'s emission; new is the
+  interleaving and the "true label" argument via `row_deps`.
+- **B2e-3c — THE PER-SITE CLASSIFICATION (L2′ proper):** every
+  hart-segment of a conformant row is PINNED, CS-CHAINED, or BAD, as
+  facts about the emission + the certified configuration.  This is the
+  kernel-level exhaustiveness claim; its failure mode is a site whose
+  xv6 code is genuinely weak-memory-unsafe, and it is repaired by the
+  Iris invariant (a fence or a lock), never by a premise.
+- **B1b, B3, R6** as before (B1b now supplies `exec_prog_ok'` for a hull's
+  linearization).
+
+### 4d.5 What this retires
+
+`xv6_row_ok` as a capstone conformance clause (its value-dependent half
+is F3″'s export; its syntactic half is read off the emission inside
+B2e-3c); the three 2026-08-21 candidates as stated (R1 survives as the
+certification machinery, R2 as the |V| induction over hulls, R3 only as
+"the classes are read off the emission"); `kill_K1/K2/K3` as the
+normalization's interface (B2d′ makes them the single cycle
+obligation); and the global `lock_pattern`/`lock_paired` hypotheses of
+B2e-2 as anything but the arithmetic core's per-configuration inputs.
 
 ## 5. Honest residual risks — OPEN
 
@@ -612,3 +873,30 @@ FLAGGED, NOT FIXED: `WeakAxiomatic.acq_po` has the identical
 unconstrained-successor shape on the cand side — harmless today
 (`ax_ord`/`ax_rel_ord` consume it only at reads), narrow it the next
 time that file is touched (R6-adjacent debt).
+
+## 7. Probes of the 2026-08-22 design session (machine-checked witnesses)
+
+Each finding of §4d.1 with a checkable claim got a witness file; the
+outcomes are recorded here as they land (an honest "did not go as
+described" is the more valuable outcome):
+
+- **P5 / F2** — `WeakRvwmoAcyc.v` (LANDED, Closed): `R_acyclic`/
+  `RD_acyclic` (rule-14 consistent ⇒ `R ⊆ gmo`, acyclic), `gcaus_acyclic`
+  (po ∪ rf), `caus_cycle_gviol` (every causal cycle of a consistent
+  graph carries a violation), transport of `Rt` and `gcaus` along
+  `rows_rel`/`wperm` (`Rt_acyclic_orbit`, `gcaus_acyclic_orbit`); `co`/
+  `fr` transport only under a monotone π (`gco_rows_rel_mono`) — the
+  negative result that produced F2′.
+- **P4 / F1** — `WeakRvwmoProbeK1.v` (LANDED, Closed): `mpgd_kill_K1_false`
+  and `mpg_normalizes : ∃ GD', gd_equiv mpgd GD' ∧ grule14 (gd_g GD')` —
+  `kill_K1` demands refuting a graph that provably normalizes.
+- **P2 / F3** — `WeakRvwmoProbeRestr.v` (LANDED, Closed): `erg_no_restr :
+  ∀ cs, ¬ restr_ok erg 1` with `erg_w_min_viol` — unconditional: the tie
+  itself is unsatisfiable, not a bad choice of cut.
+- **P1 / F4(a)** — `WeakRvwmoProbeSwap.v` (LANDED, Closed):
+  `swg_consistent`, `swg_no_pattern`, and `swg_paired` (pairing survives;
+  only the pattern breaks).  Also noted there: `acq_src_rel` ("a nonzero
+  read index names a release") is false once failed swaps exist.
+- **F5, F6** are code-reading findings (`dedges` ignores `ds_ld`; no
+  operand data in labels or admin items; `R` opaque to the state
+  interpretation) — no witness needed.
