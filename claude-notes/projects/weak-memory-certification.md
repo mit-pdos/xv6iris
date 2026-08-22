@@ -1,5 +1,49 @@
 # The tier-2 containment worklist (was: the certification route)
 
+## CHECKPOINT (2026-08-23, TENTH PASS) — READ THIS FIRST
+
+**State of the residue.**  `WeakRvwmoProgress.xv6_rvwmo_safe_modulo_walk'`
+is the capstone with residue (R-1) `l2_claim` and (R-2) `walk_seg_data`
+= per walk state: the hart's EMISSION (progress-backed from tier 1's
+`reducible` conjunct: `epf_progress_hart`, `cert_progress`,
+`step_at_chosen_answer`), the read/register policy `wpol` (no progress
+content — a finding), and the RMW policy `cpolp`.  The fence hook is
+GONE (a witness never has a fence over its own backward step;
+vacuous at the walk).  **R-1(B)**: `tools/gen_pins.py` +
+`KernelPinsDef.v`/`KernelPins.v` certify **1446 of 1611 load sites**
+with BOTH branch arms and call descent (depth 2) re-checked in Rocq by
+one 0.5 s reflection lemma (census: 991 Stack / 3 PerCpu / 280 Ctrl /
+2 Fence / 170 Dep / 65 Call / 100 Residue; a latent `c.j` hole in
+slice 1 caught; 59 witnesses assume the callee's own `sp`-spills are
+its own — `own`); `WeakRvwmoPinBridge.v` turns a `PDep`/`PCtrl`/
+`PFence` witness into `seg_pin` (`pin_seg_pin`) under ONE precisely
+stated hypothesis, `checker_taint_sub_prov` (the checker's taint walk
+is a sub-approximation of the emission's `dprov` — both run the same
+decoder; what is missing is the induction lining an emission's items
+up with the pc walk), with a real-bytes instance agreeing by
+`vm_compute` (`la_ctrl_checker_agrees`).  Whole tree green.
+
+**WHAT REMAINS:**
+1. `checker_taint_sub_prov` — the induction over `pstep_ev` runs /
+   `adm_lbls` relating `KernelPinsDef.taint_step` to `dstep` along the
+   announce-boundary structure (DEC-7's `erw_srcs_covers` lifted along
+   a run).  Then `l2_claim` at pinned sites is DISCHARGED.
+2. The 165 non-certified sites: 65 `Call` (indirect/deep), 100
+   `Residue` — the ten lock-payload sites + `userret`/`swtch`/trampoline
+   idioms ⇒ the `WProt` convention (A) and the ~5 ownership idioms
+   (boot-published globals, the running proc's trapframe/pagetable,
+   `swtch`'s incoming context) — each needs a small per-idiom argument
+   (same-hart or lock-transfer), stated as `seg_pin`/`cs_hyps`.
+3. R-2's `walk_seg_data`: supply the emission per state from
+   `gdexec_qconf` (it IS the row's `hart_conf`, split at the write by
+   `hemit_app`) and the read policy from the log-decided classification
+   — mostly plumbing now.
+4. The F-variant's glue mirror; **R6**; `wprot_store` width lift;
+   `WeakRvwmoLock`'s failed-swap arm; the `c.j`-style decoder audit
+   (bitmask vs Sail, `KernelSitesDef` §6.6).
+
+**Tree:** never `make proofs` from the root here (stale `xv6-riscv`).
+
 ## CHECKPOINT (2026-08-23, NINTH PASS) — READ THIS FIRST
 
 **R-2 IS AN ENGINE NOW.**  `WeakRvwmoWalk.walk_supply_of_policy`: the
@@ -31,21 +75,38 @@ walk's remaining hypotheses: **(W-1) `wpol`** (the read/register
 policy, carrying progress and the classification) and **(W-2) `wub`**
 (`wit_fence_ub`), plus the graph datum `wrow_in_log`.
 
-**R-1(B) SLICE 1 LANDED:** `tools/gen_pins.py` + `KernelPinsDef.v` +
-`KernelPins.v` — 1611 loads certified by one 0.3 s reflection lemma
-(`image_pinnedb`, `pins_cover`): 991 Stack / 3 PerCpu / 247 Ctrl /
-2 Fence / 138 Dep / 162 Call / 68 Residue; the store-unpinned residue
-is exactly the ten lock-payload sites; `userret`/`swtch` the ownership
-idioms.  Python-trusted: full-path coverage (reported), callee
-summaries (next).
+**R-1(B) SLICES 1 AND 2 LANDED:** `tools/gen_pins.py` +
+`KernelPinsDef.v` + `KernelPins.v` + `WeakRvwmoPinBridge.v`.  Slice 2
+moved the three Python-trusted parts into Rocq: control flow is DECODED
+(`kflow_of` — slice 1 read it off the roles and `c.j` has none, a latent
+hole, no landed witness affected), the walk DESCENDS INTO CALLEES (a
+return stack of depth 2, so a witness pc may sit inside a callee and the
+callee-summary table is audit-only), and BOTH BRANCH ARMS are searched
+(`pdfs`, a fuel-bounded DFS with a visited set) — the `all_paths` column
+is now a `vm_compute` fact.  ONE new assumption, carried IN the witness
+as `own : bool`: skipping stores based on `sp` (the dual of `PStack`).
+Census 1611 loads: **1446 certifying** (991 Stack / 3 PerCpu / 280 Ctrl /
+2 Fence / 170 Dep), only **59** of them needing `own = true`; residue 65
+`PCall` + 100 `PResidue`.  Of slice 1's 162 `PCall` sites, 64 became
+pins, 33 moved to the residue; exactly one site was DOWNGRADED by the
+all-paths check and is kept as a negative `Example`.  Timings:
+`KernelPinsDef.v` 28 s, `KernelPins.v` 2.6 s (`image_pinnedb` Qed 0.54 s
+— no sharding), `WeakRvwmoPinBridge.v` 11 s / 1.4 GB.  THE BRIDGE proves
+the emission-side arithmetic outright (`row_deps_item`, `dedges_reg`,
+`ds_run_ctl_sub` — a control item taints every po-later store) and
+derives `pin_seg_pin` in Glue's vocabulary under ONE stated hypothesis,
+`checker_taint_sub_prov` (the checker's taint ⊆ the emission's
+provenance — both sides run the same decoder; what is missing is the
+induction lining an item list up with a pc walk).  §7 exhibits the
+agreement on `WeakRvwmoAdm`'s computed stretch.  See route-b §4g.1.
 
 **WHAT REMAINS:**
-1. R-1(B) slice 2: callee summaries for the ~30 leaf helpers (162
-   `Call` sites), path coverage re-checked in Rocq (both branch arms),
-   then THE BRIDGE: a `PCtrl/PFence/PDep` witness at a row read's site
-   ⇒ `seg_pin` at the graph level (the emission's items carry the same
-   roles — relate `KernelPinsDef.taint_step` to `WeakRvwmoConf.dstep`).
-   The 68 + 10 residue ⇒ the `WProt` convention (A) as M4 ports them.
+1. R-1(B) slice 3: DISCHARGE `checker_taint_sub_prov` (the announce-
+   boundary induction over `pstep_ev` runs, with DEC-7's `erw_srcs_covers`
+   pointwise fact lifted along a run), and supply the site oracle from
+   `WeakRvwmoAdm`-tier machinery.  The 100 + 65 residue ⇒ the `WProt`
+   convention (A) as M4 ports them; a deeper inlining depth or a jump-table
+   decoder would move some of the 65 `PCall`.
 1b. (W-1)/(W-2) are the EWPs' content (progress; the fence hook) —
    state them once against the WP package and discharge from the
    adequacy theorem (a sibling export), not per site.
