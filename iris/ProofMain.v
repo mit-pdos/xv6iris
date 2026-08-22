@@ -63,6 +63,8 @@ Require Import RiscvExtras.
 Require Import StackOwn.
 Require Import KernelText KernelDataInv.
 Require Import IntrDefs.
+Require Import WireInv.   (* [wire_inv] *)
+Require Import UsertrapRes.   (* [devintr_caps_any] *)
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSmodeIntr.
 Require Import WpLock.
 Require Import KallocInv KvmSpec PageGeom.
@@ -1238,6 +1240,7 @@ Section ProofMain.
   (* =================================================================== *)
   Local Lemma mn_grp_fs 
       (γp : gname) (γs : list gname) (γv : disk_names) (γd : uart_names)
+      (γw γtl : gname)
       (m : regfile) (n : nat) (p0 : mword 64)
       (ps : list (mword 64)) (c0 : virtio_cfg) (free0 : nat -> bv 8)
       (* kit 2's era data.  It used to be carried as two OPAQUE parameters
@@ -1277,6 +1280,19 @@ Section ProofMain.
     printk_gen_contract (kt := KT1) fsc_printk fsc_uart fsc_disk ->
     sie_cap_gpr KT1 m n false p0 -∗
     kernel_text -∗ kernel_data -∗ dev_inv γd γv -∗
+    (* ---- THE PARK ROWS, forwarded to userinit at +0x9e (forkret-park.md
+       §3 E3): the wire invariant and the trampoline claim (persistent
+       world the parked closure captures), the console capability and
+       readiness, the ticks lock and the wait lock.  This group reads none
+       of them; together with the disk lock, the geometry and the file
+       table it builds below they are the first process's trap-loop
+       environment minus the file system. ---- *)
+    wire_inv -∗
+    kmap_at tramp_vpn tramp_ppn KP_rx -∗
+    console_caps γd -∗
+    ConsoleInv.console_ready -∗
+    is_tickslock γtl -∗
+    is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
     (* ---- ...AND ITS FOUR FORWARDED PERSISTENT ROWS.  [printk_env] is
        [mn_grp_printk]'s product and the kmem [is_lock] is [mn_grp_kvm]'s;
        [gen_cert] and [FsCrash.fs_crash_seam] come down the boot chain from
@@ -1393,7 +1409,8 @@ Section ProofMain.
   Proof.
     intros Hn Hlen Hlive Hdevq Hnibq Hcov0 Hnibeq Hpures
            Huartq Hdiskq Hgeomok Hpkc.
-    iIntros "Hcg #Htext #Hkdata #Hdev #Hpenv #Hkmem #Hcert #Hseam Hfirst
+    iIntros "Hcg #Htext #Hkdata #Hdev #Hwire #Htramp #Hccaps #Hcready #Htl #Hwaitlk
+             #Hpenv #Hkmem #Hcert #Hseam Hfirst
              #Hpanic Hpc Hfree Hcpu #Hpinv Hpavail #Hlpidlk Hkenv".
     iIntros "Hlbc Hbufl Hbufn Hbhead Hbpay Hlit Hinl Hkit1 Hkit2
              Hsbb Hlogr Hmir Hirslot Hirauth Hient Hlft Hfents Hirfile Hfdauth
@@ -1571,8 +1588,9 @@ Section ProofMain.
     iMod (newlock ⊤ (mword_of_int KernelSyms.ftable : mword 64) "ftable"%string
             (ftable_res γf) with "Hftnm Hftw Hftc Hfres") as (γft) "#Hftable".
     iModIntro.
-    iAssert (∃ γft' γf' : gname, is_ftable γft' γf')%I as "Hftfresh".
-    { iExists γft, γf. rewrite /is_ftable /ftable_addr. iExact "Hftable". }
+    (* [is_ftable γft γf] is [Hftable] at [ftable_addr]'s spelling *)
+    iAssert (is_ftable γft γf) as "#Hftable'".
+    { rewrite /is_ftable /ftable_addr. iExact "Hftable". }
     assert (Hretfi : ret_pc (F3 !!! Regidx (mword_of_int 1 : mword 5) : mword 64)
                      = (mword_of_int (KernelSyms.main + 0x9a) : mword 64)).
     { rewrite /F3 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
@@ -1738,6 +1756,12 @@ Section ProofMain.
                is_lock fsc_dlock d_lock "virtio_disk"%string
                        (disk_res fsc_disk pd' pav' pu'))%I as "#Hdpair".
     { rewrite Hdiskq. iExists pd, pav, pu. iFrame "Hgeom Hdlock". }
+    (* THE DEVICE COMPLEMENT the park wants, at the ambient names: every
+       member is in hand here and none is assumed. *)
+    iAssert (devintr_caps_any fsc_uart fsc_disk fsc_dlock γtl γs pd pav pu)
+      as "#Hdcaps".
+    { rewrite /devintr_caps_any Huartq Hdiskq.
+      iFrame "Hdev Hccaps Hgeom Hdlock Htl Hpinv". }
     iAssert first_boot_persist as "#Hpersist".
     { rewrite /first_boot_persist /ic_sleeplocks.
       (* SEVENTEEN ROWS, ONE [iSplitR] EACH, NOT ONE [iFrame] -- and the
@@ -1773,13 +1797,13 @@ Section ProofMain.
        They are not spent there either; the staging site is the
        [forkret_park] call, and [ProofUserinit]'s loud D1 block is the
        handoff.  What main no longer does is DROP them. *)
-    iApply (Userinit.wp_userinit_sconf γp γs F5 n false p0
+    iApply (Userinit.wp_userinit_sconf γp γs γft γf γw γtl pd pav pu F5 n false p0
               (avail_sub (avail_sub (Some (length ps)) K_kvmmake) 3)
               0%nat iv0 false ∅
               ltac:(lia) Hnb8 Hdevq Hnibq
               with "Hcg Hcpu Htext Hkdata Hpc Hpanic Hitl Hitinv Hesc Hireg
                     Hfirst Hpersist Hfsinit
-                    Hpinv Hlpidlk Hkenv
+                    Hpinv Hlpidlk Hdcaps Hwaitlk Hftable' Hcready Hwire Htramp Hkenv
                     Hpavail Hinitproc").
     all: try lkbelow.
     iApply wp_next_off_intro.
@@ -1790,7 +1814,8 @@ Section ProofMain.
     { rewrite /F5 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hretui) in "Hpc".
     iApply ("Hcont" $! fsc_dlock pd pav pu mui
-              with "Hcg Hpc Hfree Hcpu Hdlock Hgeom Hftfresh").
+              with "Hcg Hpc Hfree Hcpu Hdlock Hgeom []").
+    iExists γft, γf. iExact "Hftable'".
   Qed.
 
   (* =================================================================== *)
@@ -2005,7 +2030,7 @@ Section ProofMain.
     iIntros "Hcg Hfree Hcpu Hq #Htext #Hkdata Hpc #Hsinv #Hwand Hlocks Hglobals".
     iIntros "Hfirst Hnpid".
     iIntros "Hparks Hpst Hpavail Hfs Hmir Hirslot Hirauth #Hcert #Hseam".
-    iIntros "#Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim #Hdone #Htimc Hhart Hunset Hkauth Hpages".
+    iIntros "#Hdev #Hwire Htx Hsent Hlb Hdlab Hcfg Hclaim #Hdone #Htimc Hhart Hunset Hkauth Hpages".
     iDestruct "Hlocks" as "(Hlcons & Hltx & Hlpr & Hlkmem & Hlpid & Hlwait &
                             Hltick & Hlbc & Hlit & Hlft & Hldisk)".
     (* THE [tx_busy] CELL IS GONE from the bundle: ae96fd0 deleted the flag, so
@@ -2114,10 +2139,11 @@ Section ProofMain.
     iIntros (m4 γtl) "Hcg Hpc #Htl Hstvec Hq".
     (* --- 0x8e .. 0x9e : binit / iinit / fileinit / virtio_disk_init /
            userinit, and the disk lock --- *)
-    iApply (mn_grp_fs γp γs γv γd m4 (K - 2)%nat p0 ps c0 free0 dk sb nib
+    iApply (mn_grp_fs γp γs γv γd γw γtl m4 (K - 2)%nat p0 ps c0 free0 dk sb nib
               Hn50 Hlen Hlive Hdevq Hnibpos Hcovpos Hnibq Hpures
               Huartq Hdiskq Hgeomok Hpkc
-              with "Hcg Htext Hkdata Hdev Hpenvc Hkmem Hcert Hseamc Hfirst
+              with "Hcg Htext Hkdata Hdev Hwire Htramp Hccaps Hcready Htl Hwaitlock
+                    Hpenvc Hkmem Hcert Hseamc Hfirst
                     [Hpenv] Hpc Hfree Hcpu Hpinv Hpavail
                     Hpidlock Hkenv Hlbc Hbufl
                     Hbufn Hbhead Hbpay Hlit Hinl Hkit1 Hkit2

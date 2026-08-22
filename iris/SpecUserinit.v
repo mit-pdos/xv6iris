@@ -79,6 +79,13 @@ Require Import RegFile InstrBytes.
 Require Import RiscvExtras.
 Require Import CalleeSaved KernelText KernelDataInv.
 Require Import IntrDefs.
+Require Import WireInv.   (* [wire_inv] *)
+Require Import UsertrapRes.   (* [devintr_caps_any] -- the park's device complement *)
+Require Import WaitInv.       (* [wait_res] *)
+Require Import SpecProcinit.  (* [wait_lock_addr] *)
+Require Import FileInv.       (* [is_ftable] *)
+Require Import ConsoleInv.    (* [console_ready] *)
+Require Import TrampPt KptExecMap.   (* [kmap_at tramp_vpn tramp_ppn KP_rx] *)
 Require Import WpNext.
 Require Import WpLock.
 Require Import CpuOwn.
@@ -128,6 +135,12 @@ Definition wp_userinit_sconf_body
     `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (γp : gname) (γs : list gname)
+    (* THE PARK'S NAMES: the open-file table's two gnames, the wait lock's,
+       the ticks lock's, and the disk geometry's three words.  userinit
+       reads none of them; they index the six persistent rows below, which
+       the first process's trap-loop environment is assembled from at the
+       park (SpecForkretParkPaid.v, UsertrapRes.park_env). *)
+    (γft γf γw γtl : gname) (pd pav pu : mword 64)
     (m : regfile) (K : nat) (eb : bool) (pj : mword 64)
     (on : option nat) (np : nat) (v0 : mword 64)
     (b : bool) (lks : gset string) :=
@@ -191,6 +204,18 @@ Definition wp_userinit_sconf_body
      back the slot userinit found.  Persistent, so threading it is free. *)
   procs_inv γs -∗
   is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
+  (* ---- THE SIX PARK ROWS (claude-notes/projects/forkret-park.md §3 E3).
+     All persistent, none read here: they are what the first process's
+     trap loop needs of the kernel BEYOND the file system (which forkret's
+     boot arm establishes later and hands to the park's closer).  The
+     device complement is stated at the ambient uart / disk / disk-lock
+     names, which is what [fclose_ties] pins the record to. ---- *)
+  devintr_caps_any fsc_uart fsc_disk fsc_dlock γtl γs pd pav pu -∗
+  is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
+  is_ftable γft γf -∗
+  ConsoleInv.console_ready -∗
+  wire_inv -∗
+  kmap_at tramp_vpn tramp_ppn KP_rx -∗
   (* ---- the two counted regimes ----
      AT THE AMBIENT [fsc_kalloc], not at a threaded [γa], and that is what
      makes the deposit possible.  The token's allocator row is
@@ -248,8 +273,9 @@ Module Type USERINIT.
     forall `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γp : gname) (γs : list gname)
+      (γft γf γw γtl : gname) (pd pav pu : mword 64)
       (m : regfile) (K : nat) (eb : bool) (pj : mword 64)
       (on : option nat) (np : nat) (v0 : mword 64)
       (b : bool) (lks : gset string),
-      wp_userinit_sconf_body γp γs m K eb pj on np v0 b lks.
+      wp_userinit_sconf_body γp γs γft γf γw γtl pd pav pu m K eb pj on np v0 b lks.
 End USERINIT.

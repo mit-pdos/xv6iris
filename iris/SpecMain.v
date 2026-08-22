@@ -123,6 +123,7 @@ Require Import RegFile InstrBytes.
 Require Import KptPt.
 Require Import KernelText KernelDataInv.
 Require Import IntrDefs.
+Require Import WireInv.   (* [wire_inv] *)
 Require Import HartTp.
 (* the shared kernel page table: [kpt_unset] is a boot token, [kpt_inv] and
    the 65 claims are what the deposit wand carries to the secondaries *)
@@ -610,6 +611,11 @@ Section SpecMain.
     (* the device fabric, which exists from time 0 (allocated in adequacy), and
        the boot hart's tokens over it *)
     dev_inv γd γv -∗
+    (* the PLIC wire invariant, allocated beside [dev_inv] at adequacy and,
+       like it, persistent from time 0.  main does not read it: it is one of
+       the rows the first process's park captures
+       ([SpecForkretParkPaid.forkret_park_pkg]), handed to userinit. *)
+    wire_inv -∗
     uart_tx_own γd l0 -∗ uart_sent γd l0 -∗ uart_out_lb γd l0 -∗
     uart_dlab_is γd (DfracOwn (1/2)) b0 -∗
     disk_cfg_is γv (DfracOwn (1/2)) c0 -∗

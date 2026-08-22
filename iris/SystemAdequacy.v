@@ -265,7 +265,7 @@ Section SystemBoot.
                   Himg
                   with "Htext Hdata Hh0 Hstarted Hlk Hgl Hmfirst Hmnext Hpark Hpst Hpavail
                         Hfs Hmir Hirslot Hirauth Hcert Hseam
-                        Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim Hdone Hkpt Hkmap
+                        Hdev Hwinv Htx Hsent Hlb Hdlab Hcfg Hclaim Hdone Hkpt Hkmap
                         Hpages"). }
       (* THE SEVEN SECONDARIES: every element of the tail is an [FS]. *)
       iApply (big_sepL_impl with "Hhrest").

@@ -91,6 +91,7 @@ Require Import LockRank.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import WpSmodeIntr.
 Require Import IntrDefs.
+Require Import WireInv.   (* [wire_inv] *)
 Require Import CpuOwn.
 Require Import LockRank.
 Require Import KallocInv.
@@ -227,24 +228,21 @@ Section ProofUserinit.
 
   Local Ltac regne := reg_ne_side.
 
-  (* THE FTABLE'S GNAME IS PICKED HERE, and [γp] is as good as any: it
-     appears in allocproc's post ([ProcInv.proc_priv_nocwd γf]) and in
-     [FORKRET_PARK]'s premise, both universally quantified over it, and in
-     nothing this contract states -- the block userinit hands over has every
-     descriptor null.  See [SpecUserinit]'s last paragraph.  (It used to be
-     the allocator's [γa]; that parameter is gone -- the contract states the
-     allocator at the ambient [fsc_kalloc] so that the seal below can build
-     the boot token's own row.) *)
+  (* THE FTABLE'S GNAME IS NOT PICKED HERE ANY MORE: it is the [γf] of the
+     [is_ftable γft γf] the contract takes, because the block this park
+     hands over ends up inside the first process's trap-loop environment
+     ([UsertrapRes.ut_own_nopt] names the table's gname), and that
+     environment's file-table row must be the one main built. *)
   Lemma wp_userinit_sconf
       (γp : gname) (γs : list gname)
+      (γft γf γw γtl : gname) (pd pav pu : mword 64)
       (m : regfile) (K : nat) (eb : bool) (pj : mword 64)
       (on : option nat) (np : nat) (v0 : mword 64)
       (b : bool) (lks : gset string)
-    : wp_userinit_sconf_body γp γs m K eb pj on np v0 b lks.
+    : wp_userinit_sconf_body γp γs γft γf γw γtl pd pav pu m K eb pj on np v0 b lks.
   Proof.
     cbv beta delta [wp_userinit_sconf_body].
     intros pcE ret_tgt HK Hnb Hdev Hnib Hbelow.
-    pose (γf := γp).
     destruct (uin_kb K HK) as (Kap & Knm & Krl & K4 & Kpop).
     (* the four inode-cache rows are PERSISTENT and are relayed unchanged to
        namei's root corner at +0x20 (fs-cfg-boot.md stage (e)); nothing else
@@ -252,6 +250,7 @@ Section ProofUserinit.
     iIntros "Hcg Hcpu #Htext #Hkd Hpc #Hpenv #Hitl #Hitinv #Hesc #Hireg
              Hfirst #Hpersist Hfsinit
              #Hpinv #Hlpid
+             #Hdcaps #Hwaitlk #Hftable #Hcready #Hwire #Htramp
              Hkenv Hpav Hinitproc Hcont".
     (* the boot arm: at nesting level 0 the exit arm IS the entry base *)
     iDestruct (cpu_own_eb_agree with "Hcg Hcpu") as %Heb. cbn in Heb. subst eb.
