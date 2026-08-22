@@ -47,28 +47,30 @@ Local Open Scope Z_scope.
 
 
 (* ------------------------------------------------------------------ *)
-(*  The one thing filedup will rest on -- NOT stated as an axiom         *)
+(*  Why [f->ref++] is safe -- a conserved supply, NOT an axiom           *)
 (* ------------------------------------------------------------------ *)
 
-(* xv6's filedup increments [f->ref] with no overflow check.  The ftable
+(* xv6's filedup increments [f->ref] with no overflow check, and the ftable
    invariant needs every count to stay a faithful [int] (< 2^31) -- that is
    what makes [ref == 0] mean "free" and what the sign-extended branch tests
-   read -- but NO unconditional increment can preserve a finite bound, so
-   filedup cannot re-establish it.  That is a real (if astronomically
-   unreachable) bug in the C, not an artifact of the model, and it is being
-   fixed upstream by bounding the count in the code.
-
-   Do NOT paper over it with an axiom.  The missing step is
+   read.  No unconditional increment can preserve a finite bound on its own,
+   and the missing step
 
      forall n, Z.pos n < 2^31 -> Z.pos (Pos.succ n) < 2^31
 
-   which is FALSE at n = 2^31 - 1, so asserting it would make every proof in
-   any file that transitively requires this one vacuous.  The contract below
-   is therefore stated without it, and filedup is deliberately left unproven
-   until the check lands -- at which point the branch it adds becomes a live
-   arm of this spec (see "when the check lands" in
-   claude-notes/design/file-table.md), so a proof written against today's
-   instruction sequence would have to be thrown away regardless. *)
+   is FALSE at n = 2^31 - 1: asserting it as an axiom would make every proof
+   in any file that transitively requires this one vacuous.  Do NOT.
+
+   The bound is a WHOLE-KERNEL fact instead: every holder of a file reference
+   is some process's descriptor, and there are at most NPROC * (NOFILE + FDSPARE)
+   = FDSLOTS of those.  That fact is carried as a resource (FdSlots.v): the
+   ftable holds one [fd_slot] per outstanding reference, the supply is fixed
+   at FDSLOTS, and the contract below takes the caller's [fd_slot] -- the
+   descriptor the duplicate will live in.  Adding it to the ones the table
+   already holds gives [Pos.to_nat n + 1 <= FDSLOTS] by auth validity alone
+   ([fd_slots_no_overflow]), with no arithmetic and no local update, and
+   FDSLOTS < 2^31 does the rest.  ProofFiledup.v is the proof; upstream's C
+   is unchanged (no bound check was added, none is needed). *)
 
 (* ------------------------------------------------------------------ *)
 
