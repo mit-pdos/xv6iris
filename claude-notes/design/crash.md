@@ -223,6 +223,63 @@ the critical path to a true theorem, not optional. Until they land, the
 boot obligation cannot be discharged on the dirty-log arm and the theorem
 stays open — honestly open, not vacuously closed.
 
+### The split crash predicate (ruled 2026-08-22): `fr_D` is the interface; recovery is logically invisible
+
+Refines the ruling above; worklist stages E–I in
+`projects/durable-disk.md`. Five decisions:
+
+1. **`P_fs = P_disk ∗ P_wf`, sharing the committed map `D` through a
+   `ghost_var` at a fixed gname, one half in each conjunct** (both inside
+   the ONE `crashN` body — the machine layer still opens exactly one
+   invariant at a DMA completion). `P_disk` is the log/WAL layer's:
+   the physical fragments pinning `dk`, `fs_recovery (fs_blocks dk) D`,
+   `hdr_wf`, the mirror/custody arm, the history. `P_wf` is the FS
+   layer's: `⌜fs_wf⁻ D⌝` — and EVENTUALLY the higher-level durable
+   ghosts: directory and file CONTENTS as their own ghost state, tied to
+   `D` by the decode relation, so durability statements speak about
+   files and directories, never about a disk-like view (that is also
+   where sys_sync's pending postcondition wants to land). Both conjuncts
+   stay timeless.
+2. **The logical disk is `D`; everything era-visible is stated over `D`.**
+   The era mint (`fs_cfg_alloc`, the `fs_L` logged view, the icache /
+   bitmap / link-ledger stocks) runs at `D`, read out of `P_fs` in the
+   era fupd — never at the raw boot disk. Its well-formedness premises
+   come from `⌜fs_wf⁻ D⌝`.
+3. **Recovery is logically invisible.** A dirty-log boot is the
+   post-commit pre-install steady state: logged view = slot content,
+   home block physically stale, dirty-at-boot true. `initlog` /
+   `install_trans` move NO exposed ghost state (no `γL` movement; the
+   recovering memmove is content-preserving at the logical level, since
+   `D` at a home block IS the slot's content by construction).
+4. **The FS layer never sees a machine permit.** Commit is the only
+   write kind that moves `D` — logfill and install change physical
+   bytes recovery ignores or reproduces, clear preserves `D` via
+   per-block caught-up receipts the install permits return
+   (`fs_recovery_clear_keeps`), recovery-side writes are no-ops by (3).
+   So every `P_disk`-side permit is derived once, in the WAL layer, from
+   its own state, and `end_op`'s one crash-facing premise is a
+   logically-atomic update of the durable view:
+   `∀ D, ghost_var γD ½ D ∗ ⌜fs_wf⁻ D⌝ ==∗ ghost_var γD ½ D' ∗
+   ⌜fs_wf⁻ D'⌝` at `D' =` install of the batch's logged values (the
+   commit permit can NAME `D'` because the committer's mirror half
+   exposes `lm_slots`). A FUPD, not a pure premise: the eventual
+   contents-level ghosts must move in the same instant. Built at
+   `end_op` time (invariants openable at ⊤), consumed at the
+   completion's `∅`-mask opening, hence a basic ghost update; the old
+   view's `⌜fs_wf⁻ D⌝` arrives from the invariant body at fire time.
+5. **`fs_wf⁻`** is the reachability-closed weakening of
+   `fsimg_wf`-minus-`fs_log_clean`: `fsimg_wf`'s W9 is mkfs-specific
+   ("the only directory is root" — false after one successful mkdir),
+   so the carried sweep generalizes it; `fsimg_wf -> fs_wf⁻` is the
+   era-0 discharge. Each commit proves preservation — that obligation
+   is per-OP, at `end_op`, under group-commit quiescence (`out = 0`):
+   mid-batch logged views are DELIBERATELY inconsistent (bitmap bit set
+   before the inode points at the block), so the wf row on `log_res` is
+   conditioned on the op ledger being empty and re-established by each
+   op as it ends. The commit fupd is then assembled generically from
+   `⌜wf(L)⌝ + ⌜install of the batch over D = L⌝` — no `end_op` exit arm
+   states install-arithmetic.
+
 ### The previous shape (superseded 2026-08-22): per-era, re-minted at every boot
 
 Kept for the reasoning it records — the stranded-fragment problem is real and
