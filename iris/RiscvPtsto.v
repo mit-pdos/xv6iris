@@ -770,7 +770,7 @@ Proof.
   iModIntro. rewrite wr_apply_none. iFrame "Ha HP Hs HQ".
 Qed.
 
-(* THE SEQUENTIAL PERMIT (claude-notes/projects/sector-atomic-disk.md §6e).
+(* THE SEQUENTIAL PERMIT (claude-notes/completed/sector-atomic-disk.md §6e).
    A 512-byte SECTOR lands atomically and a 1024-byte BLOCK does not, so ONE
    request has one linearization point PER SECTOR.  The request's obligation
    is therefore not a bag of independent permits -- it is ONE object that

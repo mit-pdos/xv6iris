@@ -978,7 +978,7 @@ Section DevLoops.
       iFrame "Htie Hsa".
       iApply "IH".
     - (* ONE SECTOR OF AN IN-FLIGHT WRITE LANDS -- THE COMMIT INSTANT
-         (claude-notes/projects/sector-atomic-disk.md).  A 512-byte sector is
+         (claude-notes/completed/sector-atomic-disk.md).  A 512-byte sector is
          atomic and a 1024-byte block is not, so this is the ONLY step in the
          whole machine at which the durable image MOVES: the client's
          per-sector view shift runs here, on the crash predicate, at the

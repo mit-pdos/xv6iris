@@ -136,7 +136,7 @@ Definition wp_virtio_disk_rw_sconf_body
      published slot ([VirtioQueue.vs_wr]).  A caller with no durability
      obligation instantiates the pair trivially and its statement is
      unchanged in meaning. *)
-  (* ONE SEQUENTIAL PERMIT (claude-notes/projects/sector-atomic-disk.md §6e).
+  (* ONE SEQUENTIAL PERMIT (claude-notes/completed/sector-atomic-disk.md §6e).
      A 512-byte SECTOR is atomic and a 1024-byte BLOCK is not, so this request
      has one linearization point per sector -- but the caller owes ONE object,
      not a bag of independent view shifts: a conjunction over the sectors

@@ -171,7 +171,7 @@ Record virtio_state := VirtioState {
   v_used_idx : bv 16;        (* used-ring index produced so far *)
   v_disk     : Z -> bv 8;    (* the disk image, byte-addressed *)
   (* A DISK WRITE IS ATOMIC AT THE SECTOR, NOT AT THE REQUEST
-     (claude-notes/projects/sector-atomic-disk.md).  The data of the HEAD
+     (claude-notes/completed/sector-atomic-disk.md).  The data of the HEAD
      pending request -- the one at [v_seen] -- lands one 512-byte sector per
      autonomous step, and this is the set of sector indices that have landed
      so far.  It is reset to [∅] by [virtio_reset] and by every completion,
@@ -638,7 +638,7 @@ Definition wr_apply (w : disk_wr) (dk : Z -> bv 8) : Z -> bv 8 :=
 Lemma wr_apply_none (dk : Z -> bv 8) : wr_apply None dk = dk.
 Proof. reflexivity. Qed.
 
-(* -- SECTOR GRANULARITY (claude-notes/projects/sector-atomic-disk.md) --
+(* -- SECTOR GRANULARITY (claude-notes/completed/sector-atomic-disk.md) --
 
    A disk write is atomic at the SECTOR (512 bytes) and NOT at the 1024-byte
    BLOCK xv6 works in, so a crash can leave one sector of a block written and
@@ -1137,7 +1137,7 @@ Proof. intro H. unfold vreq_nsectors. by rewrite (proj2 (Z.eqb_neq _ _) H). Qed.
    longer touches the disk image at all: it writes the status byte, the
    used-ring element and the used index, and clears the landed set for the
    next request.  A disk READ still transfers in one step -- a torn read has
-   no crash meaning (claude-notes/projects/sector-atomic-disk.md).  TOTAL:
+   no crash meaning (claude-notes/completed/sector-atomic-disk.md).  TOTAL:
    there is no request the device refuses to answer; an unrecognised type is
    reported back with status UNSUPP and no data transfer, exactly as a real
    block device does. *)
@@ -1422,7 +1422,7 @@ Qed.
    the completion is enabled -- it means EITHER an outstanding sector has a
    step OR every sector has landed and the completion does.  This is the
    liveness half of the model that [wp_disk_loop]'s not-stuck obligation
-   discharges (claude-notes/projects/sector-atomic-disk.md §2d). *)
+   discharges (claude-notes/completed/sector-atomic-disk.md §2d). *)
 Lemma virtio_not_stalled_step (v : virtio_state) (mv : vmem) :
   virtio_pending v mv = true -> virtio_stalled v mv = false ->
   (exists i v', virtio_sector_step v mv i = Some v')

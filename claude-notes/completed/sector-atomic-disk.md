@@ -1,14 +1,9 @@
 # sector-atomic-disk — a 512-byte sector write is atomic, a 1024-byte block write is NOT
 
-STATUS: RULED (owner, 2026-08-22): **ANY-ORDER sector tearing**, reads
-atomic, IN requests keep one uniform (trivial) permit key. Stage 0 done;
-stage 1 DONE (branch `sector-atomic`, commit aa3c59a6; main stays green);
-stage 2 DONE (ddf6f937 on the branch); stage 3 waits for durable-disk stage E. Owner's
-ask: model the disk so that a SECTOR (512 B, `VirtioModel.virtio_sector_size`)
-lands atomically and an xv6 BLOCK (`BSIZE` = 1024 = 2 sectors) does not, and
-then PROVE that xv6's commit is nevertheless atomic because the on-disk log
-header is smaller than one sector. Lanes: design stages run on Fable, proof
-stages on Opus (standing preference).
+STATUS: COMPLETE (2026-08-22, `b227bb54` on main): ANY-ORDER sector tearing,
+reads atomic, ONE sequential permit per request (§6e). Tree green at the
+eight-axiom baseline, 188/190 proven. Kept as the record; §6 is the design
+finding worth reading (why independent per-sector permits cannot work).
 
 Reading order: [`../design/crash.md`](../design/crash.md) "The durable disk"
 and "Recorded modeling choices"; [`../design/device.md`](../design/device.md);
@@ -298,7 +293,7 @@ outside its layer; stages 1→2→3 are strictly ordered by dependency.
     DELETED (no client can consume that shape any more); every `_rec` form,
     including E2'/E3's value-chained ones, is kept — stage G composes them
     exactly as (6a)–(6i) do. ☑
-- **Stage 4 — notes (Fable).** `crash.md` recorded choice flipped to
+- **Stage 4 — notes (Fable).** DONE 2026-08-22. `crash.md` recorded choice flipped to
   "sector-atomic, any order, reads atomic"; `virtio-driver.md` slot shape;
   `fs-log.md` item 6; `durable-disk.md` cross-reference (stage C of that
   project is unaffected: the B4 wall is about data-region content sweeps,

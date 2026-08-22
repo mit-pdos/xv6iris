@@ -741,7 +741,7 @@ Corollary riscv_device_adequacy Σ `{!xv6G Σ, !riscvGpreS Σ} `{GEN : GenId} (g
     (Hvseen : v_seen g.(gdev).(dvirtio) = zero16)
     (Hvuidx : v_used_idx g.(gdev).(dvirtio) = zero16)
     (* ...and nothing of an in-flight write has LANDED
-       (claude-notes/projects/sector-atomic-disk.md): the not-live arm of
+       (claude-notes/completed/sector-atomic-disk.md): the not-live arm of
        [virtio_proto] records the landed set at ∅, which is what the live
        flip needs.  A reset device satisfies this ([virtio_reset_landed]). *)
     (Hvlanded : v_landed g.(gdev).(dvirtio) = ∅)

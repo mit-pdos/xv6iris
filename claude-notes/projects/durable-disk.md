@@ -209,13 +209,26 @@ Footprint (grep `disk_tie\|fs_tie_interp\|riscv_crash_pred\|disk_write_permit`):
 
 ## 4. Stage E — the crash layer under ruling 2 (`FsCrash.v`, no FS-proof dependencies)
 
-**Coordinate with [`sector-atomic-disk.md`](sector-atomic-disk.md)** (ruled
+**Coordinate with [`sector-atomic-disk.md`](../completed/sector-atomic-disk.md)** (ruled
 the same day): once that campaign lands, the write permit fires PER SECTOR
 (any order), so E2's mirror update becomes a per-sector landing and the
 commit's `D`-move rides the header write's sector 0 alone (the on-disk
 header is 124 bytes, inside sector 0 — that is exactly why xv6's commit is
 atomic on such a disk). Whichever campaign lands second restates the other's
 permits at its granularity; neither design changes shape.
+
+**LANDED FIRST (sector-atomic, 2026-08-22, `b227bb54`; record in
+`../completed/sector-atomic-disk.md`).** The machine permit is now
+`disk_seq_permit` (`RiscvPtsto.sperm`: a `∧` over the sectors still to land,
+each branch returning the residual). In `FsCrash.v` the block-level
+`disk_write_permit` wrappers (`fs_{swap,logfill,commit,install,clear,
+boot_head}_permit`, E2''s `fs_{logfill,install}_permit_v`,
+`fs_commit_permit_named`, `fs_clear_permit_keep`) are DELETED — no client can
+consume a block-indexed permit any more — and EVERY `_rec` form is kept; the
+six sequential builders `fs_*_seq_permit` chain them via
+`fs_rec_permit_mono`. Stage G composes `_rec` forms into sequential builders
+the same way. E2's mirror did NOT change shape: the receipt chains through
+`log_mirror_at`, so no intermediate picture is ever named.
 
 - [x] **E1. The split (as landed).** `P_wf`'s content rides `fs_rec_wf`
       as its fourth conjunct `fs_durable_wf (fr_D r)` — stated about the

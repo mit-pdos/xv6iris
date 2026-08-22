@@ -1861,7 +1861,7 @@ Section VirtioProto.
   Qed.
 
   (* THE SECTOR LANDING -- the step that actually moves the durable image
-     (claude-notes/projects/sector-atomic-disk.md).  512 bytes of the head
+     (claude-notes/completed/sector-atomic-disk.md).  512 bytes of the head
      request's data reach the disk and NOTHING else moves: no memory write, no
      used-ring entry, no interrupt, and the device does not advance to the
      next available-ring entry.  So this -- and no longer the completion -- is

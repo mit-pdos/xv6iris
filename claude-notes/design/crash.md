@@ -428,7 +428,7 @@ GHOST mirror deliberately is not.
 ## Recorded modeling choices
 
 - Disk writes are SECTOR-ATOMIC, not block-atomic (ruled 2026-08-22;
-  campaign in `projects/sector-atomic-disk.md`). A 512-byte sector lands
+  campaign in `completed/sector-atomic-disk.md`). A 512-byte sector lands
   atomically; an xv6 block (BSIZE = 1024 = 2 sectors) lands one sector per
   device step in ANY order, and the request completes only after every
   sector has landed, so a crash can leave any subset of a block's sectors
@@ -440,7 +440,8 @@ GHOST mirror deliberately is not.
   and every other log write is content-insensitive to recovery. (An
   earlier version of this note claimed xv6's log does NOT tolerate
   tearing; that was wrong, for the 124-byte reason.) Reads stay
-  single-step. Until the campaign lands, the tree is still request-atomic.
+  single-step. LANDED 2026-08-22 (`b227bb54`; record in
+  `completed/sector-atomic-disk.md`).
 - PowerOn models the loader/firmware: kernel image reloaded, bss zeroed,
   registers per SpecEntry.v's reset state. Warm-boot memory retention is
   deliberately NOT modeled (memory is havocked).

@@ -415,7 +415,7 @@ Inductive disk_step (d : dev_state) (m : gmap Arch.pa (bv 8))
       virtio_req_step d.(dvirtio) mv = Some (v', w) ->
       disk_step d m (set_dvirtio d v') (w ∪ m)
   (* A DISK WRITE IS ATOMIC AT THE SECTOR, NOT AT THE REQUEST
-     (claude-notes/projects/sector-atomic-disk.md).  The data of an
+     (claude-notes/completed/sector-atomic-disk.md).  The data of an
      outstanding write request lands 512 bytes at a time, in ANY order, each
      landing its own step -- so a power cycle between two of them leaves a
      half-written BLOCK on the disk, which is exactly what real hardware

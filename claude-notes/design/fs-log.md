@@ -607,8 +607,9 @@ resolution must make the stranded pieces RE-CREATABLE, i.e.:
      `Pcontent` lives (item 6).
 6. **FS-level consistency stays parametric** (the record carries raw
    maps; `Pcontent D` and the per-op composable wands remain the future
-   fs.c layer's business), and the torn-write knob stays off
-   (request-atomic writes, crash.md's recorded modeling choice).
+   fs.c layer's business). Disk writes are SECTOR-atomic, not block-atomic
+   (`completed/sector-atomic-disk.md`, landed 2026-08-22): every WAL
+   landing is per sector and the commit rides the header's sector 0.
 
 Cost inventory (all contained): the era image ghost + boot mint seam
 (DiskPtsto/VirtioProto/boot bundle); the γdur auth-only sweep (rw's

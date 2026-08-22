@@ -153,6 +153,25 @@ device model's disk stays total), and
          OUT: pending → cur = the OLD contents (existential at deposit);
               done    → cur = vs_data sl (the ghost update happened at the step) *)
 
+**Sector tearing (campaign `completed/sector-atomic-disk.md`, landed
+2026-08-22).** An OUT request's 1024 bytes land one 512-byte sector per
+device step (`VirtioModel.virtio_sector_step`, ANY order; `v_landed` on
+`virtio_state` is the landed set), and `virtio_complete` fires only once all
+sectors are down and no longer writes the disk. The slot gained `vs_wr` (the
+request's write identity, `disk_wr`), `vs_perm` (its ONE permit-channel key)
+and `vs_todo` (the sectors still to land); the pending arm's `cur` for OUT is
+`vs_torn sl ld` — the old bytes with the landed sectors spliced in — and the
+permit the channel holds is the SEQUENTIAL permit `RiscvPtsto.sperm`: a `∧`
+over the sectors still to land, each branch a `disk_write_permit` at
+`wr_sector (vs_wr sl) i` returning the residual, the leaf the completion's
+identity permit (`None`) delivering the client's `Q`. `wp_disk_loop`'s sector
+arm runs one branch through `PermInv.perm_step_kq` (consume, re-deposit the
+residual at the same key) and is where the durable image moves; the
+completion arm consumes the leaf (image untouched). Clients see only
+`disk_seq_permit gen_id w Q` (`SpecBwrite`/`SpecVirtioDiskRw`); a read's is
+the leaf. The two-ended `∧` (`disk_seq_permit_two`) is the only form the FS
+layer builds.
+
 When the queue is not live, `virtio_proto` degenerates to the empty lease +
 empty auths (what adequacy allocates; `virtio_proto_init`).
 

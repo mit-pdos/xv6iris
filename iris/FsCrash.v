@@ -118,7 +118,7 @@ Proof.
   destruct (Z.lt_total c b) as [Hlt|[->|Hgt]]; [| congruence |]; [left|right]; lia.
 Qed.
 
-(* -- SUB-BLOCK (SECTOR) WRITES (claude-notes/projects/sector-atomic-disk.md).
+(* -- SUB-BLOCK (SECTOR) WRITES (claude-notes/completed/sector-atomic-disk.md).
       A 512-byte sector write lands inside ONE block and splices its content;
       the two facts below are what every torn-write argument reduces to. -- *)
 
@@ -240,7 +240,7 @@ Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* 1b''. THE HEADER FITS IN ONE SECTOR                                     *)
-(*    (claude-notes/projects/sector-atomic-disk.md §0).                     *)
+(*    (claude-notes/completed/sector-atomic-disk.md §0).                     *)
 (*                                                                          *)
 (* [struct logheader] is [int n; int block[LOGBLOCKS];] = 4 + 4*30 = 124     *)
 (* bytes, and a well-formed header ([hdr_wf]) has [n <= LOGBLOCKS], so the   *)
@@ -882,7 +882,7 @@ Proof.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
-(* 1c'''. TORN WRITES (claude-notes/projects/sector-atomic-disk.md).       *)
+(* 1c'''. TORN WRITES (claude-notes/completed/sector-atomic-disk.md).       *)
 (*                                                                          *)
 (* A 512-byte sector lands atomically; a 1024-byte BLOCK does not.  Two      *)
 (* consequences the WAL's crash argument needs, and nothing else:            *)
@@ -999,7 +999,7 @@ Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* 1c'''. THE TWO SECTORS OF AN XV6 BLOCK WRITE                            *)
-(*        (claude-notes/projects/sector-atomic-disk.md §6e).                *)
+(*        (claude-notes/completed/sector-atomic-disk.md §6e).                *)
 (*                                                                          *)
 (* A [BSIZE]-byte block write is exactly two 512-byte landings, and the WAL  *)
 (* owes one view shift per landing, chained ([RiscvPtsto.disk_seq_permit]).  *)

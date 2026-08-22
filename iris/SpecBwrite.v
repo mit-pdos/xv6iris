@@ -129,7 +129,7 @@ Definition wp_bwrite_sconf_body
      [Pc]-generic way to write a disk block.
 
      A 512-BYTE SECTOR IS ATOMIC AND A 1024-BYTE BLOCK IS NOT
-     (claude-notes/projects/sector-atomic-disk.md §6e), so the durability
+     (claude-notes/completed/sector-atomic-disk.md §6e), so the durability
      obligation unfolds ONE SECTOR AT A TIME: [disk_seq_permit] is a
      conjunction over the sectors still to land, each branch a view shift at
      that sector's own slice [wr_sector w i] whose receipt is the RESIDUAL

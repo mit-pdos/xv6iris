@@ -168,6 +168,13 @@ no remaining work and no cleanup — move its file here rather than deleting it,
 and lift any broadly-applicable lesson up into the design or durable notes
 first.
 
+- **[`sector-atomic-disk.md`](completed/sector-atomic-disk.md)** — disk
+  writes are SECTOR-atomic (512 B); a block (1024 B) lands one sector per
+  device step in ANY order; the commit is atomic because the 124-byte log
+  header sits in sector 0. The machine permit became ONE sequential permit
+  per request (`RiscvPtsto.sperm`); §6 records why independent per-sector
+  permits cannot work (one mirror half, two permits, device-chosen order).
+
 `panic.md` is the one to open before proving any arm that ends in a `jal
 panic` — `forkret`'s `if (first)` is the only such arm left. It carries the arm
 recipe, its six traps, and the rule for deriving a `.rodata` message address
