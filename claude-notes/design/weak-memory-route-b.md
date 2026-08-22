@@ -1024,6 +1024,33 @@ hypotheses of `cs_kill`, machine-grounded.
   deps, and DEV-CHAIN holds for every linear extension.  The
   single-active-agent relaxation (`ρ i k = k`, `dv := dvp i`) is what
   §4d.2(2)'s solo runs need and comes for free.
+- **B1b-2 RESIDUE LANDED (`WeakRvwmoFabInd.v`: O1–O5, `gfexec_conf_hull`,
+  the `cycle_kill_F` skeleton, `cycle_kill_of_F`) WITH A FINDING THAT
+  REVISES THE DEV-ORDER AXIOM.**  T2-1c's trace is built from rank
+  blocks (`grank e` = the gwix of `e`'s next po-write), so cross-hart
+  order agrees with gmo ONLY on writes (`glin_gmo_writes`); on the LB
+  witness the cross-hart read pair is reversed
+  (`lin_cross_hart_gmo_reversed`), and `lbf` (the LB bundle with
+  `gf_dev = [(1,1); (0,0)]`) satisfies `gfexec_consistent` yet no
+  `tr_dev_ordered` trace comes out of `lin_cand` — `fconf_supply`'s
+  last hypothesis is therefore handed back as a guard in
+  `hull_realizable_of_acyclic_F`.  THE DEEPER POINT: `gdev_adj ⊆ gmo`
+  is NOT the honest axiom.  A dev block's fabric time is its hart's
+  PROGRAM-ORDER time (MMIO is issued in order; the `LDev` rides the
+  admin run of the next tagged event), not that event's gmo position —
+  a dev block hung on an EARLY read can be fabric-late.  There is a
+  rule-14 consistent graph with `dev ⊆ gmo` (hart a: `r' (reads z')`,
+  `y_a`, `r_a` early; hart b: `r_b`, `z'`; `r_a <dev r_b`) that NO
+  trace realizes: `y_a →po r_a →dev r_b →po z' →rf r' →po y_a`.  The
+  honest axiom is **`po ∪ rf ∪ gmo|W ∪ dev` ACYCLIC** (exactly "the
+  fabric order is realizable by the machine's own ordering"), and the
+  build item is **T2-1c′ — the trace-flexible linearization**: any
+  trace that is a linear extension of `po ∪ rf ∪ gmo|W (∪ dev)` with
+  every read at its `G`-source is `srvwmo_consistent` (reads may sit
+  anywhere between their source and their hart's next write; the cand's
+  load-value is coherence-based, which is why SB-both-0 linearizes at
+  all).  Generalizes `WeakRvwmoLin`'s proof; sizeable.  PARKED behind
+  slice 3 / B2e-3c: the device-quiet milestone (B1b-1) does not need it.
 - **B1b, B3, R6** as before (B1b now supplies `exec_prog_ok'` for a hull's
   linearization).
 
