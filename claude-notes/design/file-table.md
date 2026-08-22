@@ -550,7 +550,7 @@ Two consequences for `fileread`'s contract:
   below keeps the premises it already had, `fileread_ret` stays `pipe_rw_ret`,
   and readi's overflow arm stays dead by premise.  The defect entry is in
   `kernel-defects.md`; the bump's ledger is in
-  `projects/syscall-dispatch.md`, "THE BUMP TO `31f115a`".
+  `completed/syscall-dispatch.md`, "THE BUMP TO `31f115a`".
 
 * **the delivered bytes are not describable, and this too is inherited.**
   `readi`'s postcondition describes the destination bytes only on its KERNEL

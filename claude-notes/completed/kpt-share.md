@@ -3,7 +3,7 @@
 GOAL (ACHIEVED): make `kvminithart` callable on EVERY hart, so
 `wp_main_secondary_sconf` becomes statable — and it is now statable AND
 PROVEN (`SpecMainSecondary.v` / `ProofMainSecondary.v` /
-`LinkMainSecondary.v`; see [`main-boot.md`](../projects/main-boot.md)).
+`LinkMainSecondary.v`; see [`main-boot.md`](../completed/main-boot.md)).
 This was the first half of main-boot's G5; the second half (hart-generic
 `p_sched`/`procs_inv`) was an independent sweep with its own file.
 
@@ -124,7 +124,7 @@ only for user-mode-under-shared-table.
 3. The kvminithart respec/reproof + main's publication assembly + the
    secondary arm itself — all landed; the secondary arm's record (deposit
    shape, spin-loop recipe, fence later-strip) lives in
-   [`main-boot.md`](../projects/main-boot.md).
+   [`main-boot.md`](../completed/main-boot.md).
 
 Remaining (tracked in main-boot's worklist, not here): the whole-system
 adequacy with `cs = all harts` — hart 0 via ENTRY ∘ boot-bridge ∘

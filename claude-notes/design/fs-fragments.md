@@ -188,7 +188,7 @@ R14 (2026-08-16, C′ UN-PARKED — the licence increment executes).  The
      lands") is VOID: K-F2 is rejected, so the clause as written parks
      C′ forever, which was not its intent.  C′-lite — the delivery
      half, licence (d) FORECLOSED per §7.9 step 3 — executes now.
-     The worklist is `claude-notes/projects/iget-licence.md`.
+     The worklist is `claude-notes/completed/iget-licence.md`.
      (ii) The one design delta the foreclosure forces: `ProofIalloc`'s
      own `iget` presents a new TRANSITIONAL constructor `SpanL`, with
      `iname … SpanL := ⌜True⌝`, documented in `IgetLic.v` as the

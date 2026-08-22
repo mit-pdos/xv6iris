@@ -2532,7 +2532,7 @@ throughout and were not touched.
 
 Design of record: `design/fs-fragments.md` §7.1 (R13(i)) as amended by
 **R14** (C′ un-parked, licence (d) foreclosed, the `SpanL` transitional
-constructor); supplier table §7.5.6.  Worklist: `projects/iget-licence.md`.
+constructor); supplier table §7.5.6.  Worklist: `completed/iget-licence.md`.
 
 ### What landed
 

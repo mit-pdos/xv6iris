@@ -2064,7 +2064,7 @@ re-exports) carry the approved `wordw_claim` premise; 11 call sites updated.
 ### HOW TO RESUME (for a fresh session/agent)
 1. `git log` on `hart-node-port`; read this section, "LEAF-STATEMENT CHANGES:
    THE RULE", "THE S-MODE WRAPPER SHAPES", "MACHINERY INVENTORY", "Traps…",
-   and claude-notes/projects/user-tier-port.md §8-§14.
+   and claude-notes/completed/user-tier-port.md §8-§14.
 2. Get the user's rulings on the three "AWAITING USER RULING" items, then
    apply them (small, mechanical).
 3. Finish the two open lanes (below): P4b + UserActiveClass §5; the

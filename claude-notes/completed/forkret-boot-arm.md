@@ -17,7 +17,7 @@ arms of the `-1` test are proved, and both meet `fkr_tail` / `panic`.
 
 This file is kept as the record of what the arm cost. The remaining open
 work on forkret is `forkret_park` — who may HAND forkret its precondition
-— which is a separate note (`claude-notes/projects/forkret-park.md`) and
+— which is a separate note (`claude-notes/completed/forkret-park.md`) and
 never gated this.
 
 ## The branch itself cost the contract nothing
@@ -280,6 +280,6 @@ frames across the call is hart-free stack cells, so it pays one
   own `wp_next true` crossing; that is only sound under the `Hb` shortcut, so
   the bundle now threads `cpu_own` and the pair in and hands them back.
 
-`forkret_park` (`claude-notes/projects/forkret-park.md`) is a SEPARATE
+`forkret_park` (`claude-notes/completed/forkret-park.md`) is a SEPARATE
 blocker and does not gate this: it is about who can hand forkret its
 precondition, not about what forkret proves.

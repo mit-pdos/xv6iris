@@ -470,7 +470,7 @@ DROPPED INDEX PREMISE STOPS HIDING:
 base (`SpecKexec`, `SpecKexecB2/B3`, `ProofKexecTail`, `ProofKexecSeam`),
 each lane checking its own file with a single-file `coqc` against pulled
 `.vo`. `ProofKexecA/B/B2/B3/D` are mutually independent; only `C` waits on
-`B3`. See claude-notes/projects/forkret-boot-arm.md.
+`B3`. See claude-notes/completed/forkret-boot-arm.md.
 
 **What is still pinned above the cone, and why that is not this project.**
 ~25 contracts outside the kexit dependency chain still carry `eb = true ->`:

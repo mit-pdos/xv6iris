@@ -285,7 +285,7 @@ the scaffolding here (this file's own rule):
 What it cost: the relayout of everything after `filewrite` (three text groups,
 and -16 on all of data/bss), and a genuine reshape of `fileread` and
 `filewrite`.  The ledger is in
-[`projects/syscall-dispatch.md`](projects/syscall-dispatch.md), "THE BUMP TO
+[`completed/syscall-dispatch.md`](completed/syscall-dispatch.md), "THE BUMP TO
 `31f115a`".
 
 **Two smaller inconsistencies in the same family are NOT fixed**, and are

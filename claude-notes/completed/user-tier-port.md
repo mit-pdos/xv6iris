@@ -3,7 +3,7 @@
 Branch `hart-node-port`.  Everything below is either **[V]** verified by reading
 the tree (file:line given) or **[A]** assumed / to be checked by the agent that
 does the work.  Design of record: `claude-notes/design/main-cycle-port.md`;
-worklist: `claude-notes/projects/main-cycle-port.md`, "THE USER TIER".
+worklist: `claude-notes/completed/main-cycle-port.md`, "THE USER TIER".
 
 ---
 
@@ -147,7 +147,7 @@ already — no change.
 
 ### 1.3 **[V] THE "FOOTPRINT CANNOT RUN SYMBOLIC OPERANDS" TRAP DOES NOT APPLY HERE.**
 
-`projects/main-cycle-port.md`'s trap list says a footprint walker "CANNOT run an
+`completed/main-cycle-port.md`'s trap list says a footprint walker "CANNOT run an
 instruction with SYMBOLIC operands" because `hfrun` answers a read by
 `bool_decide (r ∈ D)`, which does not compute at a symbolic index.  That killed
 the M-mode "convert `gpr_file` into `hreg_frame`" plan.  **It does not bind the
@@ -539,7 +539,7 @@ and `hval_of_goodb` demands `exec m dst = Some (x, dst)` — the SAME state
 (`HartGoodb.v:219` **[V]**).  So the trap tower (which writes mstatus ×3, elp,
 scause ×2, stval, sepc, cur_privilege, nextPC — `UserTrap.v:104-120`) **cannot**
 go through `goodb`, and the worklist's sketch ("an `hval_of_goodb` engine over
-`exec_handle_interrupt_S`", `projects/main-cycle-port.md`, "What `WpIntrInv`
+`exec_handle_interrupt_S`", `completed/main-cycle-port.md`, "What `WpIntrInv`
 actually needs") is WRONG as written.
 
 `goodmb` is the fix and it is already built: it takes writes
@@ -587,7 +587,7 @@ wp_user_exec                       (UserExec, UNCHANGED)
 * **register WRITES, no memory → `goodmb` assembled along the exec proof's own
   chain**, `mm := ∅` (`goodmb_bind`, `_bind0`, `_bindR`, `_bind0R`,
   `_try_catch`, `_liftR`, `_cer`, `_mono`, `HartMemRun.v:854-1005`).  The three
-  habits from `projects/main-cycle-port.md` ("THE PAGE-TABLE PROOFS ARE
+  habits from `completed/main-cycle-port.md` ("THE PAGE-TABLE PROOFS ARE
   BRIDGED") apply verbatim: `set` the left operand OUT of the goal; make its
   value existential; mind the monad level (`bindR`/`execR` inside a
   `catch_early_return`).
@@ -688,7 +688,7 @@ things they settled apply to every remaining row:
    `goodmb_bind_nest_empty`; deeper than one nest (four consecutive register
    writes, `track_trap`'s callback chain) build the prefixes' facts
    inside-out and peel the top once.  This is habit 1 of
-   `projects/main-cycle-port.md` and it costs a day to re-learn.
+   `completed/main-cycle-port.md` and it costs a day to re-learn.
 3. **AN EARLY-RETURN REGION THAT THROWS CANNOT USE `goodmb_cer` AT ALL.**
    `goodmb` refuses an `ExtraOutcome` node, so a body that early-returns has
    no certificate; the wrapper must stay ON while the chain is peeled
@@ -864,7 +864,7 @@ of re-shaped tier glue, and ~4 500 lines that do not move at all.**
    (`hval_of_goodb`'s missing twin).  The worklist currently tells the next agent
    to use `hval_of_goodb` for the S-mode trap tower; that is impossible
    (`goodb` refuses writes) and the correction belongs in
-   `projects/main-cycle-port.md`, "What `WpIntrInv` actually needs".
+   `completed/main-cycle-port.md`, "What `WpIntrInv` actually needs".
 2. The durable "a footprint CANNOT run symbolic operands" trap must be qualified:
    it is about *computing* `hfrun`, not about `goodmb`, which is assembled and
    discharges `bool_decide (r ∈ D)` by proof.  The user tier puts all 31 GPRs in

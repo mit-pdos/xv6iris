@@ -304,4 +304,4 @@ proof (consumes p_sched's first disjunct / supplies the second, see
 [`scheduler.md`](scheduler.md)), sleep(), threading cur_proc through wakeup,
 and the boot-side establishment of procs_inv, the initial per-CPU ▷ sched_vc
 and the "tp := mhartid = CpuId" convention (see
-[`../projects/main-boot.md`](../projects/main-boot.md)).
+[`../completed/main-boot.md`](../completed/main-boot.md)).

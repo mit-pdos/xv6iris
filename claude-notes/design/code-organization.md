@@ -209,6 +209,20 @@ Both are one-file edits; do them when the file is open for another reason.
   this tree's own rule — so delete the sentence next time `SpecReadi.v` is
   open. (From `completed/fs-sysfile.md`, stage S3p, which deliberately did
   not fix it in-flight.)
+- **`IgetLic.v` folds back at a milestone** into `InodeRegion.v` /
+  `DirLinks.v` (in particular `dir_links_borrow` belongs beside
+  `dir_links_dotdot_out`), for the reason `IregLinkNz.v` does; and
+  **`SpanL` / `GreyL` delete** on the schedule fs-fragments.md R14 sets —
+  `SpanL` when F1.5c mints an `iclaim` or `create_fresh_ty` retires, `GreyL`
+  with G1's token deletion at the same fold-back. Row 14's shape question
+  (F2's three extra client premises; the fix is folding the edges into
+  `fdir`, a change to F1b's landed fragment) is recorded in `FsLookup.v`'s
+  header. (From `completed/iget-licence.md`.)
+- **The three `main-boot` dangling comments**: `SpecMain.v`'s G2/G3
+  paragraphs still describe `LinkPrintkGen.v` / `LinkUserinit.v` as
+  assumed-callee interfaces; both are proven and linked, and
+  `LinkPrintkGen.v` is gone. Cut when `SpecMain.v` is open. (From
+  `completed/main-boot.md`.)
 
 ## Specific-vs-generic leaf lemmas
 

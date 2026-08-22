@@ -568,7 +568,7 @@ would hand a client a `cn` with nothing to use it on. Do not split it.
   it is a functor application over `LinkNameiRoot.NameiRoot`, which already
   proves that corner AT those rows. So this item is the last thing between
   the tree and an axiom-free boot cone modulo `forkret_park`. See
-  `projects/main-boot.md` §G3, and note its warning that the cache's
+  `completed/main-boot.md` §G3, and note its warning that the cache's
   CONFIGURATION (`icfg_dev = ROOTDEV`, `0 < icfg_nib`) cannot be pinned by
   threading a premise either — that is (c) again, and `vm_compute` does not
   fail on it, it grinds.

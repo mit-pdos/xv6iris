@@ -104,7 +104,7 @@ The protocol layer, in place and green:
 the `disk_res γv pd pav pu` that `virtio_disk_rw` and `virtio_disk_intr`
 consume, and `ProofMain.v` applies it right before the disk-lock `newlock`, so
 what leaves `main` is `is_lock γk d_lock "virtio_disk" (disk_res …)` ∗
-`disk_geom` — see [`main-boot.md`](../projects/main-boot.md).
+`disk_geom` — see [`main-boot.md`](../completed/main-boot.md).
 
 **What this effort deliberately does not say: what a block device IS to the
 file system.** `disk_read_write` (VirtioModel.v) is the only fact about disk
@@ -295,7 +295,7 @@ touching it:
   will have to change: no device fragment may sit raw in a CPU's precondition
   while the system runs, so the invariant-form re-proof (with a config-tracking
   ghost half keeping the reset deterministic) is G1 of
-  [`main-boot.md`](../projects/main-boot.md).
+  [`main-boot.md`](../completed/main-boot.md).
 - **Every one of the six panic paths is refuted, so the spec needs no
   `panic_wp`.** The four identification reads are constants of the model
   (`virtio_ident_reads`), `QUEUE_NUM_MAX` is 8 (`virtio_queue_num_max_read`,

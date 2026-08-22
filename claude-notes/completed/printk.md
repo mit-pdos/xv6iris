@@ -804,7 +804,7 @@ retiring the `Axiom` is now a re-statement sweep, not a proof:
   `LinkProcdump`, `LinkSyscall`, `LinkUartwrite`, `LinkUsertrap` and their
   proofs), which gain `is_txlock` and the `uart_sent_sub` threading;
 - **the wiring is main's**, and it is written up there rather than here:
-  [`projects/main-boot.md`](../projects/main-boot.md) §G2 — main must then
+  [`completed/main-boot.md`](../completed/main-boot.md) §G2 — main must then
   mint the `tx_lock` `newlock` in `mn_grp_printk` (paid with the `lk_fresh`
   + `uart_tx_own`/`uart_sent` it drops today) and put `is_txlock` in the
   deposit payload so the secondaries get it.

@@ -124,7 +124,7 @@ The five load-bearing lemmas: `free_pool_take` (allocate),
 one per file system, so threading it through contracts serialized every
 allocator and freer — and, because `fileclose`'s environment rode in the
 trap residue (`UsertrapRes.ut_own`), it would have serialized user mode
-across all harts (projects/forkret-park.md's design question). It lives in
+across all harts (completed/forkret-park.md's design question). It lives in
 an Iris invariant at an EXISTENTIAL set:
 
 ```

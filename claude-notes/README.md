@@ -123,43 +123,17 @@ in `durable-notes.md` for what belongs where and what gets deleted.
 
 ## `projects/` — ongoing worklists & plans (one per effort)
 
-- **[`syscall-dispatch.md`](projects/syscall-dispatch.md)** — folding the 22
-  table entries into `syscall()` and retiring `LinkSyscall.v`'s `Axiom`
-  (the tree's only remaining `Admitted` lives here too). Sixteen entries
-  are wired; the six that are not are blocked on three debts the file
-  states — the inode-reference ledger not closing, `sys_pipe`'s pid
-  fraction, and read/write's premises about the count word the USER wrote.
-  Read it for **why `syscall_env` is now `FsReady.fs_ready` plus
-  twenty-eight equations**, and for the fraction-arithmetic defect it
-  turned up in `SpecSysClose.v`.  Its LAST section is the plan for making
-  read/write TOTAL in the user-supplied count — read it before touching
-  either entry.
-- **[`main-cycle-port.md`](projects/main-cycle-port.md)** — the expression-resident
-  monad port (design in [`design/main-cycle-port.md`](design/main-cycle-port.md)).
-- **[`user-tier-port.md`](projects/user-tier-port.md)** — the user tier's port onto
-  per-node semantics (sub-plan of the above: `swp_hmrun_of_exec` + `goodmb` twins).
-  **Done on branch `hart-node-port`**: `ProofUser.wp_user_exec_closed` is proven
-  per-node, so the temporary user-exec axiom is discharged and
-  `iris/UserExecAxiom.v` is gone. Read it for the §14.4 fetch-geometry package
-  (width-generic read certificates, the six va geometries, the split-fetch
-  shells) and the `goodmb` discipline. The one scope decision it still records
-  is §P8: the specific-binary Umode tier (`sync`/`echo`/`sh`/`init`) is
-  descoped from the build.
 - **[`fs-fragments-campaign.md`](projects/fs-fragments-campaign.md)** — the
   fragment campaign's ledger (design in
   [`design/fs-fragments.md`](design/fs-fragments.md)): the staged slate, what
   each increment cost, where the landed tree diverged from the report's
   sketches, and the standing constraints.
-- **[`fs-cfg-boot.md`](projects/fs-cfg-boot.md)** — giving `IcacheRef.icfg` and
-  `FsCfg.fscfg` VALUES: the era-fupd allocation, the `_at` constructor
-  discipline that replaces every existential name, the stocked inode pool, the
-  two boot kits and how each reaches its consumer, and the adequacy
-  restatement that deletes `adequacy_icfg`. Subsumes `fs-icache.md`'s C7 (b),
-  (c), (iii) and (iv), and is the gate `main-boot.md` §G3 names. **Read R5
-  before assuming `valid = 0` means the ghost state says nothing.**
 - **[`fs-icache.md`](projects/fs-icache.md)** — the inode-cache implementation
   effort (design in [`design/fs-icache.md`](design/fs-icache.md)): the staged
-  cycle plan, the branch-per-cycle strategy, the owed boot wiring.
+  cycle plan, the branch-per-cycle strategy; the boot wiring landed with
+  `completed/fs-cfg-boot.md`, and what is left is its "Deferred / owed"
+  list (the `fsblock` length fold, a stale header, fileclose dropping
+  iput's `iref_slot` give-back).
 - **[`fs-inode.md`](projects/fs-inode.md)** — the inode layer above the block
   layer (landed through `writei`/`readi`); what is LEFT in it is the owed
   decode-word dedup sweep — the bitmap-invariant question it used to keep
@@ -188,48 +162,16 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   address), why that forces no aliasing, and what is left to thread it into
   the kernel-side proofs. The CONSTRUCTION side is
   [`completed/proc-pagetable.md`](completed/proc-pagetable.md).
-- **[`main-boot.md`](projects/main-boot.md)** — `main()`, both arms proven: the
-  `started` one-shot escrow, the deposit as a □-wand, the hart-generic init
-  chain. **§G3 is now `userinit`'s own record** — proven AND linked, with the
-  axiom moved down to `namei`'s root corner
-  (`SpecNameiRootBoot`/`LinkNameiRootBoot`), the row-by-row table of what
-  main can and cannot pay, and the ruling that the cache's configuration
-  must NOT be pinned by threading a premise. Remaining: that boot wiring,
-  and (§G2) retiring `LinkPrintkGen.v`'s `Axiom`.
-- **[`user-verified.md`](projects/user-verified.md)** — VERIFIED user-mode
-  execution (the Umode tier): the `uv_cap` capability, the concrete-image memory
-  layer, the interrupt-absorbing step engine, and the sync program's proofs.
-  (DESCOPED from the hart-node-port build — see the ruling in
-  [`user-tier-port.md`](projects/user-tier-port.md).)
-- **[`user-echo.md`](projects/user-echo.md)** — the Umode tier's SECOND
-  program, `echo`: the first with loops, memory reads, an argv area and a
-  syscall with a real precondition. Read it for the pieces that grew to carry
-  it — the stack as a splittable BUDGET, `uM_only` as the image
-  postcondition of a call, the `mword_of_int` calculus, and the one generic
-  branch leaf that replaces an op cross-product. (DESCOPED from the
-  hart-node-port build — see the ruling in
-  [`user-tier-port.md`](projects/user-tier-port.md).)
-- **[`user-sh.md`](projects/user-sh.md)** — the Umode tier's THIRD program,
-  `sh` on one fixed input: the design of record for scoping a program by its
-  input, the `xv6_io_protocol` at I/O depth, and the code-catalog generator.
-  (DESCOPED from the hart-node-port build — see the ruling in
-  [`user-tier-port.md`](projects/user-tier-port.md).)
-- **[`user-init.md`](projects/user-init.md)** — the Umode tier's FOURTH
-  program, `init`: the first that NEVER TERMINATES (two nested `iLöb` loops
-  and the `▷`-exposing branch leaves that close them), the first whose
-  theorem assumes nothing about what the kernel returns (every branch of
-  every syscall test is proved), and the first verified xv6 `printf`.
-  (DESCOPED from the hart-node-port build — see the ruling in
-  [`user-tier-port.md`](projects/user-tier-port.md).)
-
+- **[`namei-pinned-lookup.md`](projects/namei-pinned-lookup.md)** — a
+  ghost-state spec for WHICH inode `namei` returns: ruled and staged
+  (per-directory fragments, absolute paths first, N-1 carries the whole
+  fragment); §9 is the staging charter, §10 the long-run tree-level
+  direction. Design, not yet built.
 - **[`iclaim-ledger.md`](projects/iclaim-ledger.md)** — the iclaim ledger
   increment's own worklist (design in [`design/fs-icache.md`](design/fs-icache.md)):
   the escrow's await arm, the freeze mirror, and the as-built record of what
   each increment deviated on.
-- **[`iget-licence.md`](projects/iget-licence.md)** — the iget licence
-  increment (C′-lite), LANDED at `35bc973b`, with the three non-blocking
-  things it left: row 14's shape question, `IgetLic.v`'s fold-back into
-  `InodeRegion`/`DirLinks`, and the `SpanL`/`GreyL` deletes.
+
 ## `completed/` — finished projects, archived for reference
 
 Kept for their durable design notes, gotchas and reusable recipes; `ls` them.
@@ -260,18 +202,35 @@ everything downstream of `iput` vacuous — is GONE; how, and why no ranking
 could ever have licensed that edge, is in
 [`completed/iput-acquiresleep.md`](completed/iput-acquiresleep.md).
 
-`forkret-park.md` arrived on 2026-08-22: the LAST assumed Link, retired. Read
-it for two things that are not obvious from the tree: why the trap loop's
-two "gap" premises were unsatisfiable and how they became residue-carried
-facts (§4), and why the park had to become a guarded-fixpoint RESOURCE
-(`iris/ParkCap.v`) rather than a functor argument (§6 — a module cycle).
+Twelve arrived on 2026-08-22. `forkret-park.md` is the LAST assumed Link,
+retired — read it for why the trap loop's two "gap" premises were
+unsatisfiable and became residue-carried facts (§4), and why the park had
+to become a guarded-fixpoint RESOURCE (`iris/ParkCap.v`) rather than a
+functor argument (§6, a module cycle). With it, eleven projects whose work
+had finished: `forkret-boot-arm.md` (forkret's `if (first)` arm),
+`syscall-dispatch.md` (all 22 entries wired, the dispatcher's `Axiom` and
+the tree's last `Admitted` gone — read it for why `syscall_env` is
+`fs_ready` plus the ties, and the read/write count story), `main-boot.md`
+(`main()` proven, both callee axioms retired), `fs-cfg-boot.md` (the
+era-fupd allocation of `icfg`/`fscfg`, the `_at` constructor discipline,
+the boot kits — **read R5 before assuming `valid = 0` means the ghost
+state says nothing**), `main-cycle-port.md` and `user-tier-port.md` (the
+per-node port, complete and merged; `user-tier-port.md` §14.4 is the
+fetch-geometry package), and the Umode tier's four programs —
+`user-verified.md` (`sync`, the tier's vocabulary), `user-echo.md` (the
+stack as a budget, `uM_only`), `user-sh.md` (scoping a program by its
+input, the I/O protocol), `user-init.md` (the non-terminating loop) — all
+verified and back in the build since the tier's revival (`e8459afe`).
+`iget-licence.md`'s three non-blocking leftovers are in
+[`design/code-organization.md`](design/code-organization.md) under
+"Cleanups inherited from finished projects", beside `main-boot.md`'s.
 
 Seven arrived on 2026-08-20, when their work finished: `kexec.md` (the largest
 function in the tree, and the home of **the copyout story** — the most
 transferable thing that project produced), `fs-sysfile.md` (the syscall-layer
 campaign that took `sysfile.c` to 16/16 and retired the tree's last stub
 `Axiom`; its successor, the DISPATCHER, is
-[`projects/syscall-dispatch.md`](projects/syscall-dispatch.md)), `uservec.md` (uservec proven and the whole-trap-loop Löb theorem
+[`completed/syscall-dispatch.md`](completed/syscall-dispatch.md)), `uservec.md` (uservec proven and the whole-trap-loop Löb theorem
 built on top of it), `console.md` and `uart-driver.md` (console.c 5/5, uart.c
 4/4, both cones axiom-clean), `kvminithart-tlb-lane.md` (the TLB lane's root,
 closed), and `iput-acquiresleep.md`. The two cleanups those files were still
